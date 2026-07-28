@@ -345,11 +345,36 @@ window.KCaptions = (function () {
   };
 
   function applyPreset(key) {
-    var p = PRESETS[key];
+    var p = (key === "user") ? K.settings().userPreset : PRESETS[key];
     if (!p) return;
     el("cap-maxlen").value = p.maxlen;
     el("cap-case").value = p.kase;
     el("cap-punct").checked = p.punct;
+  }
+
+  // "Şablonum" seçeneğini menüde göster/oluştur
+  function ensureUserPresetOption() {
+    if (!K.settings().userPreset) return;
+    var sel = el("cap-preset");
+    if (sel.querySelector('option[value="user"]')) return;
+    var o = document.createElement("option");
+    o.value = "user";
+    o.textContent = "★ Şablonum";
+    sel.appendChild(o);
+  }
+
+  function saveUserPreset() {
+    var s = K.settings();
+    s.userPreset = {
+      maxlen: el("cap-maxlen").value,
+      kase: el("cap-case").value,
+      punct: el("cap-punct").checked
+    };
+    K.saveSettings();
+    ensureUserPresetOption();
+    el("cap-preset").value = "user";
+    savePrefs();
+    KApp.toast("Şablonun kaydedildi — menüde ★ Şablonum", "good");
   }
 
   function savePrefs() {
@@ -794,6 +819,50 @@ window.KCaptions = (function () {
     KApp.toast(n ? n + " satırda değiştirildi" : "Eşleşme yok", n ? "good" : undefined);
   }
 
+  /* ---------------- SRT içe aktarma ---------------- */
+
+  function parseSrt(text) {
+    var out = [];
+    var blocks = String(text).replace(/^﻿/, "").replace(/\r\n/g, "\n").split(/\n\s*\n/);
+    blocks.forEach(function (b) {
+      var lines = b.split("\n").filter(function (l) { return l.trim(); });
+      var ti = -1;
+      for (var i = 0; i < lines.length; i++) {
+        if (lines[i].indexOf("-->") !== -1) { ti = i; break; }
+      }
+      if (ti === -1) return;
+      var m = lines[ti].split("-->");
+      var start = tcParse(m[0]);
+      var end = tcParse(m[1]);
+      var txt = lines.slice(ti + 1).join(" ").trim();
+      if (txt) out.push({ start: start, end: end, text: txt });
+    });
+    return out;
+  }
+
+  function importSrt() {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".srt,.vtt";
+    input.onchange = function () {
+      if (!input.files.length) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var segs = parseSrt(reader.result);
+        if (!segs.length) { KApp.toast("Dosyada altyazı bulunamadı.", "bad"); return; }
+        segments = segs;
+        preTranslate = null;
+        el("cap-revert").hidden = true;
+        el("cap-result").hidden = false;
+        el("cap-result-info").textContent = segs.length + " satır · içe aktarıldı";
+        render();
+        KApp.toast(segs.length + " satır içe aktarıldı — düzenle, çevir, uygula", "good");
+      };
+      reader.readAsText(input.files[0], "utf-8");
+    };
+    input.click();
+  }
+
   /* ---------------- SRT + uygulama ---------------- */
 
   function buildSrt() {
@@ -834,15 +903,30 @@ window.KCaptions = (function () {
     }
   }
 
+  function saveToDesktop(name, content) {
+    var dir = K.path.join(K.os.homedir(), "Desktop");
+    if (!K.fs.existsSync(dir)) dir = K.os.homedir();
+    var p = K.path.join(dir, name);
+    K.fs.writeFileSync(p, content, "utf8");
+    return p;
+  }
+
   function saveSrt() {
     try {
       var srt = buildSrt();
       if (!srt) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
-      var dir = K.path.join(K.os.homedir(), "Desktop");
-      if (!K.fs.existsSync(dir)) dir = K.os.homedir();
-      var p = K.path.join(dir, "suflo-altyazi.srt");
-      K.fs.writeFileSync(p, "﻿" + srt, "utf8");
-      KApp.toast("Kaydedildi: " + p, "good");
+      KApp.toast("Kaydedildi: " + saveToDesktop("suflo-altyazi.srt", "﻿" + srt), "good");
+    } catch (e) {
+      KApp.toast(e.message, "bad");
+    }
+  }
+
+  // düz transkript: video açıklaması / blog için, zaman damgasız
+  function saveTxt() {
+    try {
+      var lines = segments.map(function (s) { return styleText(s.text); }).filter(Boolean);
+      if (!lines.length) { KApp.toast("Yazılacak metin yok.", "bad"); return; }
+      KApp.toast("Kaydedildi: " + saveToDesktop("suflo-transkript.txt", "﻿" + lines.join("\n")), "good");
     } catch (e) {
       KApp.toast(e.message, "bad");
     }
@@ -854,9 +938,13 @@ window.KCaptions = (function () {
     el("cap-go").addEventListener("click", go);
     el("cap-apply").addEventListener("click", apply);
     el("cap-save-srt").addEventListener("click", saveSrt);
+    el("cap-save-txt").addEventListener("click", saveTxt);
+    el("cap-import-srt").addEventListener("click", function (e) { e.preventDefault(); importSrt(); });
+    el("cap-preset-save").addEventListener("click", saveUserPreset);
     el("cap-translate-go").addEventListener("click", translateAll);
     el("cap-revert").addEventListener("click", revertTranslate);
     el("cap-fr-go").addEventListener("click", findReplace);
+    ensureUserPresetOption();
 
     Array.prototype.forEach.call(el("cap-scope").querySelectorAll("button"), function (b) {
       b.addEventListener("click", function () {

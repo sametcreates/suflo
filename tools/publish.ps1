@@ -39,12 +39,12 @@ if ($LASTEXITCODE -ne 0) {
     git config user.email "sametkaygisiz27@gmail.com"
 }
 
-# OWNER yer tutucularini gercek kullaniciyla degistir
-foreach ($f in @("docs\index.html", "marketing\lansman-kiti.md")) {
+# OWNER yer tutucularini gercek kullaniciyla degistir (bridge.js guncelleme kontrolu dahil)
+foreach ($f in @("docs\index.html", "marketing\lansman-kiti.md", "js\bridge.js")) {
     $p = Join-Path $root $f
     if (Test-Path $p) {
         $c = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
-        $c = $c.Replace("github.com/OWNER/suflo", "github.com/$owner/suflo")
+        $c = $c.Replace("OWNER/suflo", "$owner/suflo")
         [System.IO.File]::WriteAllText($p, $c, (New-Object System.Text.UTF8Encoding($false)))
     }
 }

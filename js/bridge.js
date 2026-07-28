@@ -198,9 +198,39 @@ window.K = (function () {
     });
   }
 
+  /* ---------------- HTTP GET (güncelleme kontrolü) ---------------- */
+
+  function httpGet(urlStr, headers) {
+    return new Promise(function (resolve) {
+      if (!nodeOK) { resolve({ status: 0, body: "Node erişimi yok" }); return; }
+      var proto, u;
+      try {
+        u = new URL(urlStr);
+        proto = require(u.protocol === "http:" ? "http" : "https");
+      } catch (e) { resolve({ status: 0, body: String(e) }); return; }
+      var hdrs = { "User-Agent": "Suflo-Panel" };
+      for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
+      var req = proto.get({
+        hostname: u.hostname,
+        port: u.port || (u.protocol === "http:" ? 80 : 443),
+        path: u.pathname + (u.search || ""),
+        headers: hdrs
+      }, function (res) {
+        var data = "";
+        res.on("data", function (d) { data += d.toString(); });
+        res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
+        res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
+      });
+      req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
+      req.setTimeout(20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+    });
+  }
+
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.4.1";
+  var VERSION = "1.5.0";
+  // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
+  var REPO = "OWNER/suflo";
   var logBuf = [];
 
   function log(msg) {
@@ -478,9 +508,11 @@ window.K = (function () {
     run: run,
     httpUpload: httpUpload,
     httpJson: httpJson,
+    httpGet: httpGet,
     log: log,
     logText: logText,
     VERSION: VERSION,
+    REPO: REPO,
     whisperLocal: whisperLocal,
     whisperDir: whisperDir,
     download: download,

@@ -309,10 +309,35 @@ window.KApp = (function () {
 
   /* ---------------- Başlat ---------------- */
 
+  /* ---------------- Güncelleme kontrolü ---------------- */
+
+  async function checkUpdate() {
+    // yayindan once REPO yer tutucudur; kontrol devre disi kalir
+    if (!K.nodeOK || K.REPO.indexOf("OWNER") === 0) return;
+    try {
+      var r = await K.httpGet("https://api.github.com/repos/" + K.REPO + "/releases/latest");
+      if (r.status !== 200) return;
+      var tag = String(JSON.parse(r.body).tag_name || "").replace(/^v/, "");
+      if (!tag) return;
+      var cur = K.VERSION.split(".").map(Number);
+      var yeni = tag.split(".").map(Number);
+      var newer = false;
+      for (var i = 0; i < 3; i++) {
+        if ((yeni[i] || 0) > (cur[i] || 0)) { newer = true; break; }
+        if ((yeni[i] || 0) < (cur[i] || 0)) break;
+      }
+      if (newer) {
+        K.log("guncelleme mevcut: v" + tag);
+        toast("Yeni sürüm hazır: v" + tag + " — github.com/" + K.REPO + "/releases", "good");
+      }
+    } catch (e) {}
+  }
+
   function init() {
     initTabs();
     initSettings();
     applySoloMode();
+    setTimeout(checkUpdate, 4000);
     KSfx.init();
     KCaptions.init();
     KCut.init();
