@@ -155,9 +155,28 @@ window.KCaptions = (function () {
     }
     var parsed = JSON.parse(K.fs.readFileSync(jsonPath, "utf8").toString());
     try { K.fs.unlinkSync(jsonPath); } catch (e2) {}
-    return (parsed.transcription || []).map(function (t) {
-      return { start: t.offsets.from / 1000, end: t.offsets.to / 1000, text: String(t.text || "").trim() };
+    var segs = (parsed.transcription || []).map(function (t) {
+      var s = t.offsets ? t.offsets.from / 1000 : NaN;
+      var e = t.offsets ? t.offsets.to / 1000 : NaN;
+      // offsets bozuksa timestamps dizgesinden coz ("00:00:01,380")
+      if ((!isFinite(s) || (s === 0 && e === 0)) && t.timestamps && t.timestamps.from) {
+        s = tcParse(t.timestamps.from);
+        e = tcParse(t.timestamps.to);
+      }
+      return { start: s || 0, end: e || 0, text: String(t.text || "").trim() };
     });
+    if (wordLevel) {
+      K.log("yerel kelime modu: " + segs.length + " parça, ilk3=" +
+        segs.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
+    }
+    return segs;
+  }
+
+  // "00:00:01,380" -> saniye
+  function tcParse(t) {
+    var m = String(t).match(/(\d+):(\d+):(\d+)[,.](\d+)/);
+    if (!m) return 0;
+    return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 1000;
   }
 
   function apiError(status, body) {
@@ -201,9 +220,15 @@ window.KCaptions = (function () {
     }
     // karaoke: kelime dizisi varsa onu kullan (word alanı "word", segment alanı "text")
     if (wordLevel && json.words && json.words.length) {
-      return json.words.map(function (w) {
-        return { start: Number(w.start), end: Number(w.end), text: String(w.word || "").trim() };
+      var ws = json.words.map(function (w) {
+        return { start: Number(w.start) || 0, end: Number(w.end) || 0, text: String(w.word || "").trim() };
       });
+      K.log("bulut kelime modu: " + ws.length + " kelime, ilk3=" +
+        ws.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
+      return ws;
+    }
+    if (wordLevel) {
+      K.log("bulut kelime zamanı DÖNMEDİ (words alanı yok) — segment fallback");
     }
     var raw = json.segments || [];
     if (raw.length === 0 && json.text) {
@@ -545,6 +570,19 @@ window.KCaptions = (function () {
         mapped = mapped.filter(function (s) {
           return s.text.replace(/[.,!?;:…]/g, "").trim();
         });
+        // bozulmuş kelime zamanı korumasi: 8+ kelime var ama hepsi ayni ana yigilmis
+        if (mapped.length >= 8) {
+          var tMin = mapped[0].start, tMax = mapped[0].start;
+          mapped.forEach(function (s) {
+            if (s.start < tMin) tMin = s.start;
+            if (s.start > tMax) tMax = s.start;
+          });
+          if (tMax - tMin < 1) {
+            K.log("karaoke HATA: " + mapped.length + " kelimenin tümü " + tMin.toFixed(2) + " sn civarında");
+            throw new Error("Motor kelime zamanlarını veremedi (tüm kelimeler aynı anda). " +
+              "Ayarlar > Destek'ten günlüğü kopyalayıp bildir; şimdilik satır modunu kullan.");
+          }
+        }
         segments = lenVal === "kc" ? karaokeCumulative(mapped, 4) : karaokeWords(mapped);
       } else {
         mapped = cleanSegments(mapped);

@@ -200,7 +200,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.4.0";
+  var VERSION = "1.4.1";
   var logBuf = [];
 
   function log(msg) {
