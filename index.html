@@ -23,7 +23,7 @@
       <span class="brand-name">Suflo</span>
     </div>
     <div class="top-right">
-      <span class="brand-ver">v1.2</span>
+      <span class="brand-ver">v1.3</span>
       <span id="host-dot" class="host-dot" title="Premiere bağlantısı"></span>
     </div>
   </header>
@@ -166,9 +166,31 @@
       <div id="cap-result" hidden>
         <div class="result-head">
           <span id="cap-result-info" class="dim"></span>
+          <button id="cap-revert" class="link-btn" hidden>çeviriyi geri al</button>
           <button id="cap-save-srt" class="link-btn">SRT indir</button>
         </div>
         <div id="cap-segments" class="segments"></div>
+
+        <div class="row">
+          <select id="cap-translate" class="grow" title="Altyazıyı başka dile çevir (Pro önizleme — lansman süresince ücretsiz)">
+            <option value="" selected>Çeviri — hedef dil seç</option>
+            <option value="en">English'e çevir</option>
+            <option value="tr">Türkçe'ye çevir</option>
+            <option value="az">Azərbaycancaya çevir</option>
+            <option value="ru">Rusçaya çevir</option>
+          </select>
+          <button id="cap-translate-go" class="btn">Çevir</button>
+        </div>
+
+        <details class="adv">
+          <summary>Bul & değiştir</summary>
+          <div class="row">
+            <input id="cap-find" type="text" placeholder="bul">
+            <input id="cap-replace" type="text" placeholder="yerine koy">
+            <button id="cap-fr-go" class="btn">Uygula</button>
+          </div>
+        </details>
+
         <button id="cap-apply" class="btn primary big">Sequence'a uygula</button>
       </div>
     </div>
@@ -310,7 +332,7 @@
 
     <div class="set-group">
       <div class="set-title">Hakkında</div>
-      <p class="dim">Suflo v1.2 — Premiere Pro için ücretsiz, açık kaynak kurgu paneli.<br>SFX · Altyazı · Kesim · Motion — abonelik yok, kredi yok.<br>MIT · sametcreates</p>
+      <p class="dim">Suflo v1.3 — Premiere Pro için ücretsiz, açık kaynak kurgu paneli.<br>SFX · Altyazı · Kesim · Motion — abonelik yok, kredi yok.<br>MIT · sametcreates</p>
     </div>
   </section>
 

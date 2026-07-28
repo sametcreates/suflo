@@ -153,6 +153,20 @@ function KS_getContext() {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- Playhead ---------- */
+
+function KS_setPlayerPosition(encoded) {
+  try {
+    var p = KS_arg(encoded); // { sec }
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var t = new Time();
+    t.seconds = Number(p.sec) || 0;
+    seq.setPlayerPosition(t.ticks);
+    return KS_ok({});
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- SFX ---------- */
 
 function KS_insertSfx(encoded) {

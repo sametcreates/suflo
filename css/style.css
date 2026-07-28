@@ -505,6 +505,14 @@ details.adv > *:not(summary) { margin-top: 7px; }
 .seg input[type="text"]:hover { background: var(--bg3); }
 .seg input[type="text"]:focus { background: var(--bg3); border-color: var(--accent); }
 .seg-time { flex: 0 0 auto; color: var(--faint); font-size: 10.5px; }
+button.seg-time.jump {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: color .12s;
+}
+button.seg-time.jump:hover { color: var(--accent); }
 .seg-x {
   background: none; border: none;
   color: var(--faint);

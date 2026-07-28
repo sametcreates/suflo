@@ -186,6 +186,42 @@ window.K = (function () {
     });
   }
 
+  /* ---------------- HTTP JSON (Node üzerinden, CORS'suz) ---------------- */
+
+  function httpJson(urlStr, headers, bodyObj) {
+    return new Promise(function (resolve) {
+      if (!nodeOK) { resolve({ status: 0, body: "Node erişimi yok" }); return; }
+      var proto, u, Buf;
+      try {
+        u = new URL(urlStr);
+        proto = require(u.protocol === "http:" ? "http" : "https");
+        Buf = require("buffer").Buffer;
+      } catch (e) { resolve({ status: 0, body: String(e) }); return; }
+      var body = Buf.from(JSON.stringify(bodyObj), "utf8");
+      var hdrs = { "Content-Type": "application/json", "Content-Length": body.length };
+      for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
+      var req;
+      try {
+        req = proto.request({
+          hostname: u.hostname,
+          port: u.port || (u.protocol === "http:" ? 80 : 443),
+          path: u.pathname + (u.search || ""),
+          method: "POST",
+          headers: hdrs
+        }, function (res) {
+          var data = "";
+          res.on("data", function (d) { data += d.toString(); });
+          res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
+          res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
+        });
+      } catch (e3) { resolve({ status: 0, body: String(e3) }); return; }
+      req.on("error", function (e4) { resolve({ status: 0, body: String(e4) }); });
+      req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+      req.write(body);
+      req.end();
+    });
+  }
+
   /* ---------------- Yerel Whisper (whisper.cpp) ---------------- */
 
   function whisperDir() {
@@ -405,6 +441,7 @@ window.K = (function () {
     call: call,
     run: run,
     httpUpload: httpUpload,
+    httpJson: httpJson,
     whisperLocal: whisperLocal,
     whisperDir: whisperDir,
     download: download,

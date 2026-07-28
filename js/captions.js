@@ -542,20 +542,162 @@ window.KCaptions = (function () {
     segments.forEach(function (s, i) {
       var row = document.createElement("div");
       row.className = "seg";
-      var t = document.createElement("span");
-      t.className = "seg-time mono";
+
+      var t = document.createElement("button");
+      t.className = "seg-time mono jump";
       t.textContent = tc(s.start, false).slice(3, 8);
+      t.title = "Playhead'i buraya götür";
+      t.onclick = function () { K.call("KS_setPlayerPosition", { sec: s.start }); };
+
       var inp = document.createElement("input");
       inp.type = "text";
       inp.value = s.text;
       inp.oninput = function () { segments[i].text = inp.value; };
+
+      var mrg = document.createElement("button");
+      mrg.className = "seg-x";
+      mrg.textContent = "⨝";
+      mrg.title = "Sonraki satırla birleştir";
+      if (i === segments.length - 1) mrg.style.visibility = "hidden";
+      mrg.onclick = function () {
+        var nx = segments[i + 1];
+        if (!nx) return;
+        segments[i].text = (segments[i].text + " " + nx.text).replace(/\s+/g, " ").trim();
+        segments[i].end = nx.end;
+        segments.splice(i + 1, 1);
+        render();
+      };
+
       var del = document.createElement("button");
       del.className = "seg-x";
       del.textContent = "×";
+      del.title = "Satırı sil";
       del.onclick = function () { segments.splice(i, 1); render(); };
-      row.appendChild(t); row.appendChild(inp); row.appendChild(del);
+
+      row.appendChild(t); row.appendChild(inp); row.appendChild(mrg); row.appendChild(del);
       box.appendChild(row);
     });
+  }
+
+  /* ---------------- Çeviri (LLM) ---------------- */
+
+  var preTranslate = null; // çeviri öncesi metinler (geri almak için)
+
+  var LANG_NAMES = { en: "English", tr: "Turkish", az: "Azerbaijani", ru: "Russian" };
+
+  function chatConfig() {
+    var s = K.settings();
+    if (s.provider === "openai" && s.apiKey) {
+      return { url: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini", key: s.apiKey };
+    }
+    if (s.provider === "custom" && s.endpoint && s.apiKey) {
+      return {
+        url: s.endpoint.replace(/\/audio\/transcriptions.*$/, "/chat/completions"),
+        model: "llama-3.3-70b-versatile", key: s.apiKey
+      };
+    }
+    // local dahil: anahtar varsa Groq'un ücretsiz LLM'i
+    if (s.apiKey) {
+      return { url: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile", key: s.apiKey };
+    }
+    return null;
+  }
+
+  async function chatCall(cfg, bodyObj) {
+    if (K.nodeOK) {
+      var r = await K.httpJson(cfg.url, { "Authorization": "Bearer " + cfg.key }, bodyObj);
+      if (r.status === 0) throw new Error("Bağlantı hatası: " + String(r.body).slice(0, 140));
+      if (r.status < 200 || r.status >= 300) throw apiError(r.status, r.body);
+      return JSON.parse(r.body);
+    }
+    var res = await fetch(cfg.url, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + cfg.key, "Content-Type": "application/json" },
+      body: JSON.stringify(bodyObj)
+    });
+    if (!res.ok) throw apiError(res.status, await res.text());
+    return await res.json();
+  }
+
+  async function translateAll() {
+    if (segments.length === 0) return;
+    var target = el("cap-translate").value;
+    if (!target) { KApp.toast("Önce hedef dili seç.", "warn"); return; }
+    var cfg = chatConfig();
+    if (!cfg) {
+      KApp.toast("Çeviri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      return;
+    }
+    var btn = el("cap-translate-go");
+    btn.disabled = true;
+    try {
+      var texts = segments.map(function (s) { return s.text; });
+      var out = [];
+      var BATCH = 60;
+      for (var i = 0; i < texts.length; i += BATCH) {
+        status("Çevriliyor… " + Math.min(i + BATCH, texts.length) + "/" + texts.length);
+        var chunk = texts.slice(i, i + BATCH);
+        var json = await chatCall(cfg, {
+          model: cfg.model,
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: "You translate subtitle lines for video. Reply ONLY with a JSON object {\"lines\": [...]} containing exactly " +
+                chunk.length + " translated lines in the same order. Keep translations short and natural for subtitles. Do not merge or split lines."
+            },
+            {
+              role: "user",
+              content: "Translate to " + (LANG_NAMES[target] || target) + ":\n" + JSON.stringify(chunk)
+            }
+          ]
+        });
+        var content = json.choices && json.choices[0] && json.choices[0].message.content;
+        var parsed = JSON.parse(content);
+        var lines = parsed.lines || parsed.Lines;
+        if (!lines || lines.length !== chunk.length) {
+          throw new Error("Çeviri satır sayısı tutmadı (" + (lines ? lines.length : 0) + "/" + chunk.length + ") — tekrar dene.");
+        }
+        out = out.concat(lines);
+      }
+      preTranslate = texts;
+      segments.forEach(function (s, i2) { s.text = String(out[i2] || "").trim() || s.text; });
+      status("");
+      el("cap-revert").hidden = false;
+      render();
+      KApp.toast(texts.length + " satır çevrildi", "good");
+    } catch (e) {
+      status("✕ " + e.message, "bad");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function revertTranslate() {
+    if (!preTranslate) return;
+    segments.forEach(function (s, i) { if (preTranslate[i] !== undefined) s.text = preTranslate[i]; });
+    preTranslate = null;
+    el("cap-revert").hidden = true;
+    render();
+    KApp.toast("Orijinal metne dönüldü");
+  }
+
+  /* ---------------- Bul & değiştir ---------------- */
+
+  function findReplace() {
+    var find = el("cap-find").value;
+    if (!find) return;
+    var rep = el("cap-replace").value;
+    var n = 0;
+    segments.forEach(function (s) {
+      if (s.text.indexOf(find) !== -1) {
+        s.text = s.text.split(find).join(rep);
+        n++;
+      }
+    });
+    render();
+    KApp.toast(n ? n + " satırda değiştirildi" : "Eşleşme yok", n ? "good" : undefined);
   }
 
   /* ---------------- SRT + uygulama ---------------- */
@@ -618,6 +760,9 @@ window.KCaptions = (function () {
     el("cap-go").addEventListener("click", go);
     el("cap-apply").addEventListener("click", apply);
     el("cap-save-srt").addEventListener("click", saveSrt);
+    el("cap-translate-go").addEventListener("click", translateAll);
+    el("cap-revert").addEventListener("click", revertTranslate);
+    el("cap-fr-go").addEventListener("click", findReplace);
 
     Array.prototype.forEach.call(el("cap-scope").querySelectorAll("button"), function (b) {
       b.addEventListener("click", function () {
