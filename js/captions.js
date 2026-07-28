@@ -449,32 +449,32 @@ window.KCaptions = (function () {
     lastTrackCount = list.length;
     box.innerHTML = "";
 
+    var TICK = '<svg viewBox="0 0 16 16"><path d="M3.5 8.5 L6.5 11.5 L12.5 4.5" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var DASH = '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5.6 8 h4.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+    function chip(label, on, title, onClick, faded) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "track-chip" + (on ? " on" : "") + (faded ? " empty" : "");
+      b.title = title || "";
+      b.innerHTML = (on ? TICK : DASH) + "<span></span>";
+      b.querySelector("span").textContent = label;
+      b.onclick = onClick;
+      return b;
+    }
+
     var allOn = list.every(function (t, i) { return trackSel[i] !== false; });
-    var allLbl = document.createElement("label");
-    allLbl.className = "check-label";
-    var allCb = document.createElement("input");
-    allCb.type = "checkbox";
-    allCb.checked = allOn;
-    allCb.onchange = function () {
-      list.forEach(function (t, i) { trackSel[i] = allCb.checked; });
+    box.appendChild(chip("Tümü", allOn, "Tüm katmanlar", function () {
+      list.forEach(function (t, i) { trackSel[i] = !allOn; });
       renderTracks(ctx, true);
-    };
-    allLbl.appendChild(allCb);
-    allLbl.appendChild(document.createTextNode(" Tümü"));
-    box.appendChild(allLbl);
+    }));
 
     list.forEach(function (t, i) {
-      var lbl = document.createElement("label");
-      lbl.className = "check-label";
-      lbl.title = t.clips ? t.name + " — klip var" : t.name + " — boş katman";
-      var cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = trackSel[i] !== false;
-      cb.onchange = function () { trackSel[i] = cb.checked; renderTracks(ctx, true); };
-      lbl.appendChild(cb);
-      lbl.appendChild(document.createTextNode(" " + t.name));
-      if (!t.clips) lbl.style.opacity = ".5";
-      box.appendChild(lbl);
+      var on = trackSel[i] !== false;
+      box.appendChild(chip(t.name, on,
+        t.clips ? t.name + " — klip var" : t.name + " — boş katman",
+        function () { trackSel[i] = !on; renderTracks(ctx, true); },
+        !t.clips));
     });
   }
 

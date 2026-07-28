@@ -30,26 +30,34 @@ window.KApp = (function () {
 
   function onContext(fn) { ctxListeners.push(fn); }
 
+  var CLAP_IC = '<svg class="ctx-ic" viewBox="0 0 16 16"><path d="M1.8 6.2 h12.4 v6.4 a1.4 1.4 0 0 1 -1.4 1.4 h-9.6 a1.4 1.4 0 0 1 -1.4-1.4 z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2.2 6.2 L3.4 3.3 L14.2 4.6 L13.4 6.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M6.4 3.7 L5.4 6.2 M9.9 4.1 L8.9 6.2" stroke="currentColor" stroke-width="1.1"/></svg>';
+
   function renderContext() {
     var elx = el("ctx-text");
     var dot = el("host-dot");
+    var strip = el("context-strip");
     if (!ctx.connected) {
       dot.className = "host-dot off";
-      elx.innerHTML = K.nodeOK
-        ? '<span class="dim">Premiere\'e bağlanılamadı</span>'
-        : '<span class="dim">önizleme modu — Premiere dışında</span>';
+      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="dim">' +
+        (K.nodeOK ? "Premiere'e bağlanılamadı" : "önizleme modu — Premiere dışında") + "</span>";
       return;
     }
     dot.className = "host-dot ok";
     if (!ctx.hasSeq) {
-      elx.innerHTML = '<span class="dim">aktif sequence yok — bir sequence aç</span>';
+      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="dim">Sequence yok</span>' +
+        '<span class="pill">bir sequence aç</span>';
     } else if (ctx.sel) {
-      var extra = (ctx.selCount > 1) ? ' +' + (ctx.selCount - 1) + ' klip' : ' · ' + ctx.sel.dur.toFixed(1) + ' sn seçili';
-      elx.innerHTML = '<span class="ok-mark">●</span><span class="sel-name"></span><span class="dim"></span>';
-      elx.querySelector(".sel-name").textContent = ctx.sel.name;
-      elx.querySelector(".dim").textContent = extra;
+      var pill = (ctx.selCount > 1)
+        ? ctx.selCount + " klip seçili"
+        : ctx.sel.dur.toFixed(1) + " sn";
+      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name"></span>' +
+        '<span class="pill live"></span>';
+      strip.querySelector(".sel-name").textContent = ctx.sel.name;
+      strip.querySelector(".pill").textContent = pill;
     } else {
-      elx.innerHTML = '<span class="dim">' + esc(ctx.sequence) + ' · klip seçilmedi</span>';
+      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name"></span>' +
+        '<span class="pill">Klip seçilmedi</span>';
+      strip.querySelector(".sel-name").textContent = ctx.sequence;
     }
   }
 

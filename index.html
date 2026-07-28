@@ -98,76 +98,90 @@
       <div class="seg-ctl full" id="cap-scope">
         <button class="on" data-s="clip">Seçili klip</button>
         <button data-s="inout">In → Out</button>
-        <button data-s="entire">Sequence</button>
+        <button data-s="entire">Sekans</button>
       </div>
 
       <div class="card">
-        <div class="card-title">Ayarlar</div>
-        <div class="row">
-          <label>Şablon</label>
-          <select id="cap-preset" class="grow">
-            <option value="" selected>Özel</option>
-            <option value="yt">YouTube Klasik</option>
-            <option value="reels">Reels / TikTok</option>
-            <option value="karaoke">Karaoke Pop</option>
-            <option value="doc">Belgesel</option>
-          </select>
-          <button id="cap-preset-save" class="btn icon-btn" title="Mevcut ayarları şablonum olarak kaydet">
-            <svg viewBox="0 0 16 16"><path d="M8 2.5 l1.7 3.5 3.8.5 -2.8 2.7 .7 3.8 -3.4-1.8 -3.4 1.8 .7-3.8 -2.8-2.7 3.8-.5 z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>
-          </button>
+        <div class="card-title">Altyazı ayarları</div>
+
+        <div class="field">
+          <label for="cap-preset">Şablon</label>
+          <div class="field-row">
+            <select id="cap-preset" class="grow">
+              <option value="" selected>Özel</option>
+              <option value="yt">YouTube Klasik</option>
+              <option value="reels">Reels / TikTok</option>
+              <option value="karaoke">Karaoke Pop</option>
+              <option value="doc">Belgesel</option>
+            </select>
+            <button id="cap-preset-save" class="star-btn" title="Mevcut ayarları şablonum olarak kaydet">
+              <svg viewBox="0 0 16 16"><path d="M8 2.4 l1.75 3.55 3.9.55 -2.82 2.75 .67 3.9 -3.5-1.84 -3.5 1.84 .67-3.9 -2.82-2.75 3.9-.55 z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
         </div>
-        <div class="row">
-          <label>Dil</label>
-          <select id="cap-lang" class="grow">
-            <option value="tr" selected>Türkçe</option>
-            <option value="az">Azərbaycanca</option>
-            <option value="en">English</option>
-            <option value="ru">Русский</option>
-            <option value="">Otomatik algıla</option>
-          </select>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="cap-lang">Dil</label>
+            <select id="cap-lang">
+              <option value="tr" selected>Türkçe</option>
+              <option value="az">Azərbaycanca</option>
+              <option value="en">English</option>
+              <option value="ru">Русский</option>
+              <option value="">Otomatik</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cap-maxlen">Satır uzunluğu</label>
+            <select id="cap-maxlen">
+              <optgroup label="Satır">
+                <option value="w2">2 kelime</option>
+                <option value="w3">3 kelime</option>
+                <option value="w4">4 kelime</option>
+                <option value="w5">5 kelime</option>
+                <option value="c32">32 karakter</option>
+                <option value="c42" selected>42 karakter</option>
+                <option value="c60">60 karakter</option>
+              </optgroup>
+              <optgroup label="Karaoke (kelime zamanlı)">
+                <option value="k1">Kelime kelime</option>
+                <option value="kc">Birikimli</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
-        <div class="row">
-          <label>Satır</label>
-          <select id="cap-maxlen" class="grow">
-            <optgroup label="Satır">
-              <option value="w2">2 kelime</option>
-              <option value="w3">3 kelime</option>
-              <option value="w4">4 kelime</option>
-              <option value="w5">5 kelime</option>
-              <option value="c32">32 karakter</option>
-              <option value="c42" selected>42 karakter</option>
-              <option value="c60">60 karakter</option>
-            </optgroup>
-            <optgroup label="Karaoke (kelime zamanlı)">
-              <option value="k1">Kelime kelime</option>
-              <option value="kc">Birikimli (satır dolar)</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="row">
-          <label>Harf</label>
-          <select id="cap-case" class="grow">
-            <option value="normal" selected>Normal yazım</option>
-            <option value="upper">BÜYÜK HARF</option>
-            <option value="lower">küçük harf</option>
-          </select>
-          <label class="check-label" title="Noktalama işaretlerini koru">
-            <input id="cap-punct" type="checkbox" checked> noktalama
-          </label>
+
+        <div class="field">
+          <label for="cap-case">Yazım biçimi</label>
+          <div class="field-row">
+            <select id="cap-case" class="grow">
+              <option value="normal" selected>Normal yazım</option>
+              <option value="upper">BÜYÜK HARF</option>
+              <option value="lower">küçük harf</option>
+            </select>
+            <label class="switch" title="Noktalama işaretlerini koru">
+              <input id="cap-punct" type="checkbox" checked>
+              <i></i>
+              <span>Noktalama</span>
+            </label>
+          </div>
         </div>
       </div>
 
       <div class="card" id="cap-tracks-card" hidden>
-        <div class="card-title">Hangi ses katmanları yazıya dökülsün?</div>
+        <div class="card-title">Ses katmanları</div>
         <div id="cap-tracks" class="tracks"></div>
       </div>
 
       <button id="cap-go" class="btn primary big cta" disabled>
         <span class="btn-label">Altyazı oluştur<em id="cap-go-scope">Seçili klip</em></span>
       </button>
+      <button id="cap-import-srt" class="btn outline big">
+        <svg viewBox="0 0 16 16" class="btn-ic"><path d="M9 1.8 H4.4 a1.6 1.6 0 0 0 -1.6 1.6 v9.2 a1.6 1.6 0 0 0 1.6 1.6 h7.2 a1.6 1.6 0 0 0 1.6-1.6 V6 z M9 1.8 V6 h4.2" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+        SRT içe aktar
+      </button>
       <div id="cap-progress" class="progress-line" hidden><i></i></div>
       <div id="cap-status" class="inline-status"></div>
-      <p class="hint" style="text-align:center">…ya da hazır bir <a href="#" id="cap-import-srt">SRT dosyası aç</a> — düzenle, çevir, uygula</p>
 
       <div id="cap-result" hidden>
         <div class="result-head">
@@ -198,7 +212,7 @@
           </div>
         </details>
 
-        <button id="cap-apply" class="btn primary big">Sequence'a uygula</button>
+        <button id="cap-apply" class="btn primary big">Sekansa uygula</button>
       </div>
     </div>
   </section>

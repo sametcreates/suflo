@@ -80,19 +80,16 @@ svg { display: block; }
   flex: 0 0 auto;
 }
 
-.brand { display: flex; align-items: center; gap: 8px; }
+.brand { display: flex; align-items: center; gap: 9px; }
 .brand-mark {
-  width: 21px; height: 21px;
-  filter: drop-shadow(0 2px 6px rgba(120, 108, 255, .45));
+  width: 26px; height: 26px;
+  filter: drop-shadow(0 3px 8px rgba(120, 108, 255, .5));
 }
 .brand-name {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: .2px;
-  background: var(--grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  letter-spacing: .1px;
+  color: var(--text);
 }
 
 .top-right { display: flex; align-items: center; gap: 9px; }
@@ -165,18 +162,40 @@ svg { display: block; }
 /* ---------- Bağlam şeridi ---------- */
 
 .context-strip {
-  padding: 7px 13px;
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 13px;
+  font-size: 12px;
   color: var(--dim);
   background: linear-gradient(180deg, rgba(255,255,255,.018), transparent);
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   flex: 0 0 auto;
 }
-.context-strip .sel-name { color: var(--text); font-weight: 500; }
-.context-strip .ok-mark { color: var(--good); margin-right: 5px; font-size: 9px; }
+.context-strip .ctx-ic { flex: 0 0 auto; width: 16px; height: 16px; color: var(--faint); }
+.context-strip .sel-name {
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* durum rozeti — "klip seçilmedi" / "34.2 sn" */
+.context-strip .pill {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--bg3);
+  color: var(--dim);
+  border: 1px solid var(--line);
+}
+.context-strip .pill.live {
+  background: var(--accent-soft);
+  border-color: rgba(139, 124, 246, .35);
+  color: var(--accent-lite);
+}
 
 /* ---------- Panolar ---------- */
 
@@ -347,26 +366,27 @@ a.link-btn { display: inline-block; }
   gap: 2px;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, .35);
 }
-.seg-ctl.full { display: flex; width: 100%; margin-bottom: 11px; }
+.seg-ctl.full { display: flex; width: 100%; margin-bottom: 12px; }
 .seg-ctl.full button { flex: 1; }
 .seg-ctl button {
   position: relative;
   background: none;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--dim);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
-  padding: 6px 10px;
+  padding: 9px 10px;
   cursor: pointer;
   transition: color .18s var(--ease), background .18s var(--ease), box-shadow .18s var(--ease);
 }
 .seg-ctl button:hover:not(.on) { color: var(--text); background: rgba(255, 255, 255, .03); }
 .seg-ctl button.on {
-  background: linear-gradient(180deg, rgba(139,124,246,.22), rgba(91,140,255,.14));
+  background: var(--grad);
   color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(139, 124, 246, .45), 0 2px 10px -3px rgba(120, 108, 255, .5);
+  font-weight: 600;
+  box-shadow: 0 3px 14px -4px rgba(120, 108, 255, .75), inset 0 1px 0 rgba(255, 255, 255, .2);
 }
 .seg-ctl button em {
   display: block;
@@ -493,14 +513,152 @@ body:not(.solo) .solo-gear { display: none; }
 .card .row:last-child { margin-bottom: 10px; }
 .card .row label:first-child { flex: 0 0 46px; }
 
-/* ---------- Ses katmanı kutuları ---------- */
+/* ---------- Alan (etiket üstte) ---------- */
+
+.field { margin-bottom: 11px; }
+.field > label {
+  display: block;
+  font-size: 11px;
+  color: var(--dim);
+  margin-bottom: 5px;
+  letter-spacing: .2px;
+}
+.field select, .field input[type="text"], .field input[type="password"] {
+  width: 100%;
+  padding: 9px 11px;
+  font-size: 12.5px;
+  border-radius: 9px;
+}
+.field select { padding-right: 28px; }
+
+.field-row { display: flex; align-items: center; gap: 9px; }
+.field-row .grow { flex: 1; }
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.field-grid .field { margin-bottom: 11px; }
+
+/* yıldız (şablon kaydet) */
+.star-btn {
+  flex: 0 0 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--dim);
+  cursor: pointer;
+  box-shadow: var(--edge);
+  transition: color .16s var(--ease), border-color .16s var(--ease), background .16s var(--ease);
+}
+.star-btn svg { width: 16px; height: 16px; }
+.star-btn:hover {
+  color: var(--accent-lite);
+  border-color: rgba(139, 124, 246, .5);
+  background: var(--raise);
+}
+
+/* ---------- Toggle anahtarı ---------- */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--dim);
+  transition: color .15s var(--ease);
+}
+.switch:hover { color: var(--text); }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch i {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px; height: 20px;
+  border-radius: 20px;
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .4);
+  transition: background .2s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.switch i::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #8f93ab;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  transition: transform .22s var(--ease), background .2s var(--ease);
+}
+.switch input:checked + i {
+  background: var(--grad);
+  border-color: transparent;
+  box-shadow: 0 2px 10px -3px rgba(120, 108, 255, .7);
+}
+.switch input:checked + i::after { transform: translateX(14px); background: #fff; }
+.switch input:focus-visible + i { box-shadow: var(--glow-sm); }
+
+/* ---------- Ses katmanı chip'leri ---------- */
 
 .tracks {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px 14px;
-  padding-bottom: 10px;
+  gap: 8px;
+  padding-bottom: 11px;
 }
+.track-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px 7px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--bg3);
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--edge);
+  transition: all .16s var(--ease);
+}
+.track-chip svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.track-chip:hover { color: var(--text); border-color: var(--line2); background: var(--raise); }
+.track-chip.on {
+  background: var(--grad);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 3px 12px -4px rgba(120, 108, 255, .7), inset 0 1px 0 rgba(255,255,255,.2);
+}
+.track-chip.empty { opacity: .5; }
+
+/* ---------- Outline düğme ---------- */
+
+.btn.outline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid rgba(139, 124, 246, .35);
+  color: var(--accent-lite);
+  font-weight: 500;
+  box-shadow: none;
+}
+.btn.outline:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: rgba(139, 124, 246, .6);
+  color: #fff;
+}
+.btn-ic { width: 15px; height: 15px; }
 
 /* ---------- Büyük CTA ---------- */
 
