@@ -6,11 +6,11 @@ Kopyala-yapıştır hazır metinler. `github.com/sametkaygisiz27-stack/suflo` li
 
 ## Tek cümlelik tanıtım (elevator pitch)
 
-> **Suflo — videonun suflörü.** Premiere Pro'da altyazıyı bilgisayarında üreten, ücretsiz ve açık kaynak yapay zekâ eklentisi. Abonelik yok, kredi yok, sınır yok.
+> **Suflo — videonun suflörü.** Premiere'de altyazıyı bilgisayarında üreten, ücretsiz ve açık kaynak yapay zekâ eklentisi. Abonelik yok, kredi yok, sınır yok.
 
 Uzun hali (3 cümle):
 
-> Suflo, Adobe Premiere Pro için ücretsiz bir yapay zekâ altyazı eklentisi. Yerel motorla Whisper kendi bilgisayarında çalışır: sesin hiçbir sunucuya gitmez, kullanım sınırın olmaz, kimseye abonelik ödemezsin (istersen kendi ücretsiz Groq anahtarınla isteğe bağlı hızlı bulut modu da var). Seçili klip, In→Out ya da tüm sequence'tan transkript çıkarır; panelde düzenlersin, tek tıkla caption izine uygularsın.
+> Suflo, Adobe Premiere için ücretsiz bir yapay zekâ altyazı eklentisi. Yerel motorla Whisper kendi bilgisayarında çalışır: sesin hiçbir sunucuya gitmez, kullanım sınırın olmaz, kimseye abonelik ödemezsin (istersen kendi ücretsiz Groq anahtarınla isteğe bağlı hızlı bulut modu da var). Seçili klip, In→Out ya da tüm sequence'tan transkript çıkarır; panelde düzenlersin, tek tıkla caption izine uygularsın.
 
 ---
 
@@ -67,7 +67,7 @@ Format: ekran kaydı + senin sesin. Müzik alçak, tempo yüksek.
 
 ## X / Twitter (EN, global tanıtım)
 
-> Built a free, open-source AI subtitle panel for Premiere Pro: **Suflo**.
+> Built a free, open-source AI subtitle panel for Premiere: **Suflo**.
 > With the local Whisper engine your audio never leaves your machine — no credits, no subscription, no limits. Optional cloud mode with your own free Groq key. Edit lines before applying. TR/AZ/EN/RU.
 > github.com/sametkaygisiz27-stack/suflo
 
@@ -78,7 +78,7 @@ Format: ekran kaydı + senin sesin. Müzik alçak, tempo yüksek.
 premiere pro altyazı eklentisi · premiere otomatik altyazı · ücretsiz altyazı programı · whisper premiere · premiere pro subtitle plugin free · auto caption premiere · azerbaycanca altyazı · premiere altyazı yapma
 
 GitHub repo açıklaması önerisi:
-> Free, open-source AI subtitles for Adobe Premiere Pro. Runs Whisper locally (optional cloud) — no subscription, no credits, no limits. TR/AZ/EN/RU.
+> Free, open-source AI subtitles for Adobe Premiere. Runs Whisper locally (optional cloud) — no subscription, no credits, no limits. TR/AZ/EN/RU.
 
 ---
 

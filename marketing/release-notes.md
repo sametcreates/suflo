@@ -1,6 +1,6 @@
 ## Suflo 1.1.0 — ilk halka açık sürüm 🎬
 
-Premiere Pro için ücretsiz, açık kaynak yapay zekâ altyazı eklentisi.
+Premiere için ücretsiz, açık kaynak yapay zekâ altyazı eklentisi.
 
 ### Öne çıkanlar
 - **Yerel Whisper motoru** — ses bilgisayarından çıkmaz, internet gerekmez, sınır yok (panel içinden tek tıkla kurulum, ~570 MB)
@@ -19,8 +19,8 @@ Premiere Pro için ücretsiz, açık kaynak yapay zekâ altyazı eklentisi.
 2. `Suflo-1.1.0.zxp` dosyasına çift tıkla
 3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
 
-Gereksinim: Windows, Premiere Pro 2022+. ffmpeg ve yerel motor panel içinden kurulur.
+Gereksinim: Windows, Premiere 2022+. ffmpeg ve yerel motor panel içinden kurulur.
 
 ---
 
-*Free, open-source AI subtitles for Adobe Premiere Pro. Runs Whisper locally (optional cloud) — no subscription, no credits, no limits.*
+*Free, open-source AI subtitles for Adobe Premiere. Runs Whisper locally (optional cloud) — no subscription, no credits, no limits.*

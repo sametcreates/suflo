@@ -1,6 +1,6 @@
 # Suflo
 
-**Premiere Pro için ücretsiz, açık kaynak kurgu paneli.**
+**Premiere için ücretsiz, açık kaynak kurgu paneli.**
 SFX kütüphanesi · yapay zekâ altyazı · otomatik ilk kesim · keyframe easing — abonelik yok, kredi yok, hesap yok.
 
 > Kredi ve abonelik satan altyazı panellerine ücretsiz, bakımlı, açık kaynak bir alternatif.
@@ -27,7 +27,7 @@ Noktalama kaldır/koru · Normal / BÜYÜK HARF / küçük harf (Türkçe İ-ı 
 
 1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir (ücretsiz).
 2. Son sürüm `Suflo-x.y.z.zxp` dosyasını indirip çift tıkla.
-3. Premiere Pro'yu yeniden başlat → `Window > Extensions > Suflo`.
+3. Premiere'i yeniden başlat → `Window > Extensions > Suflo`.
 
 Geliştirici kurulumu (kaynaktan):
 
@@ -37,7 +37,7 @@ powershell -ExecutionPolicy Bypass -File tools/install.ps1
 
 ### Gereksinimler
 
-- Premiere Pro 2022+ (CEP 11/12), Windows. macOS desteği yol haritasında.
+- Premiere 2022+ (CEP 11/12), Windows. macOS desteği yol haritasında.
 - **ffmpeg** — Kesim ve Altyazı için. Panel Ayarlar sekmesinden tek tıkla kurulur (winget).
 
 ## Kullanım notları
