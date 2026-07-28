@@ -133,13 +133,21 @@ window.K = (function () {
       }
       var boundary = "----kesit" + Date.now().toString(36);
       var parts = [];
-      for (var k in fields) {
-        if (!fields.hasOwnProperty(k)) continue;
+      function addField(name, val) {
         parts.push(Buf.from(
           "--" + boundary + "\r\n" +
-          'Content-Disposition: form-data; name="' + k + '"\r\n\r\n' +
-          fields[k] + "\r\n"
+          'Content-Disposition: form-data; name="' + name + '"\r\n\r\n' +
+          val + "\r\n"
         ));
+      }
+      for (var k in fields) {
+        if (!fields.hasOwnProperty(k)) continue;
+        // dizi degerler ayni adla coklu part olur (timestamp_granularities[] gibi)
+        if (fields[k] instanceof Array) {
+          for (var ai = 0; ai < fields[k].length; ai++) addField(k, fields[k][ai]);
+        } else {
+          addField(k, fields[k]);
+        }
       }
       parts.push(Buf.from(
         "--" + boundary + "\r\n" +

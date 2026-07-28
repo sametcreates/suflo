@@ -23,7 +23,7 @@
       <span class="brand-name">Suflo</span>
     </div>
     <div class="top-right">
-      <span class="brand-ver">v1.1</span>
+      <span class="brand-ver">v1.2</span>
       <span id="host-dot" class="host-dot" title="Premiere bağlantısı"></span>
     </div>
   </header>
@@ -102,6 +102,16 @@
       <div class="card">
         <div class="card-title">Ayarlar</div>
         <div class="row">
+          <label>Şablon</label>
+          <select id="cap-preset" class="grow">
+            <option value="" selected>Özel</option>
+            <option value="yt">YouTube Klasik</option>
+            <option value="reels">Reels / TikTok</option>
+            <option value="karaoke">Karaoke Pop</option>
+            <option value="doc">Belgesel</option>
+          </select>
+        </div>
+        <div class="row">
           <label>Dil</label>
           <select id="cap-lang" class="grow">
             <option value="tr" selected>Türkçe</option>
@@ -114,13 +124,19 @@
         <div class="row">
           <label>Satır</label>
           <select id="cap-maxlen" class="grow">
-            <option value="w2">2 kelime</option>
-            <option value="w3">3 kelime</option>
-            <option value="w4">4 kelime</option>
-            <option value="w5">5 kelime</option>
-            <option value="c32">32 karakter</option>
-            <option value="c42" selected>42 karakter</option>
-            <option value="c60">60 karakter</option>
+            <optgroup label="Satır">
+              <option value="w2">2 kelime</option>
+              <option value="w3">3 kelime</option>
+              <option value="w4">4 kelime</option>
+              <option value="w5">5 kelime</option>
+              <option value="c32">32 karakter</option>
+              <option value="c42" selected>42 karakter</option>
+              <option value="c60">60 karakter</option>
+            </optgroup>
+            <optgroup label="Karaoke (kelime zamanlı)">
+              <option value="k1">Kelime kelime</option>
+              <option value="kc">Birikimli (satır dolar)</option>
+            </optgroup>
           </select>
         </div>
         <div class="row">
@@ -294,7 +310,7 @@
 
     <div class="set-group">
       <div class="set-title">Hakkında</div>
-      <p class="dim">Suflo v1.1 — Premiere Pro için ücretsiz, açık kaynak kurgu paneli.<br>SFX · Altyazı · Kesim · Motion — abonelik yok, kredi yok.<br>MIT · sametcreates</p>
+      <p class="dim">Suflo v1.2 — Premiere Pro için ücretsiz, açık kaynak kurgu paneli.<br>SFX · Altyazı · Kesim · Motion — abonelik yok, kredi yok.<br>MIT · sametcreates</p>
     </div>
   </section>
 

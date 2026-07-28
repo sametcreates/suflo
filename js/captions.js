@@ -117,21 +117,24 @@ window.KCaptions = (function () {
 
   /* ---------------- Motorlar ---------------- */
 
-  async function transcribeLocal(audioPath) {
+  async function transcribeLocal(audioPath, wordLevel) {
     var lw = K.whisperLocal();
     if (!lw) throw new Error("Yerel motor kurulu değil — Ayarlar'dan kur.");
     var outBase = audioPath.replace(/\.wav$/i, "") + "_w";
     var lang = el("cap-lang").value || "auto";
     var threads = 4;
     try { threads = Math.max(2, Math.min(8, K.os.cpus().length - 2)); } catch (e) {}
-    var r = await K.run(lw.exe, [
+    var args = [
       "-m", lw.model,
       "-f", audioPath,
       "-l", lang,
       "-oj", "-of", outBase,
       "-t", String(threads),
       "-pp"
-    ], {
+    ];
+    // karaoke: her kelime kendi zaman damgasıyla ayrı segment olur
+    if (wordLevel) args = args.concat(["-ml", "1", "-sow"]);
+    var r = await K.run(lw.exe, args, {
       timeout: 7200000,
       onStderr: function (s) {
         var m = s.match(/progress\s*=\s*(\d+)%/);
@@ -156,10 +159,11 @@ window.KCaptions = (function () {
     return new Error("API " + status + ": " + String(body).slice(0, 160));
   }
 
-  async function transcribeCloud(audioPath, durHint) {
+  async function transcribeCloud(audioPath, durHint, wordLevel) {
     var cfg = providerConfig();
     if (!cfg.url) throw new Error("Endpoint tanımsız — Ayarlar'a bak.");
     var fields = { model: cfg.model, response_format: "verbose_json" };
+    if (wordLevel) fields["timestamp_granularities[]"] = ["word", "segment"];
     var lang = el("cap-lang").value;
     if (lang) fields.language = lang;
     var buf = K.fs.readFileSync(audioPath);
@@ -175,7 +179,11 @@ window.KCaptions = (function () {
     } else {
       var form = new FormData();
       form.append("file", new Blob([new Uint8Array(buf)], { type: "audio/mpeg" }), "audio.mp3");
-      for (var k in fields) form.append(k, fields[k]);
+      for (var k in fields) {
+        if (fields[k] instanceof Array) {
+          for (var fi = 0; fi < fields[k].length; fi++) form.append(k, fields[k][fi]);
+        } else form.append(k, fields[k]);
+      }
       var res = await fetch(cfg.url, {
         method: "POST",
         headers: { "Authorization": "Bearer " + cfg.key },
@@ -183,6 +191,12 @@ window.KCaptions = (function () {
       });
       if (!res.ok) throw apiError(res.status, await res.text());
       json = await res.json();
+    }
+    // karaoke: kelime dizisi varsa onu kullan (word alanı "word", segment alanı "text")
+    if (wordLevel && json.words && json.words.length) {
+      return json.words.map(function (w) {
+        return { start: Number(w.start), end: Number(w.end), text: String(w.word || "").trim() };
+      });
     }
     var raw = json.segments || [];
     if (raw.length === 0 && json.text) {
@@ -212,6 +226,38 @@ window.KCaptions = (function () {
       } else { repeat = 0; }
       lastText = norm;
       out.push(segs[i]);
+    }
+    return out;
+  }
+
+  /* ---------------- Karaoke ---------------- */
+
+  // kelime cue'ları: her kelime kendi zamanında, bir sonrakiyle çakışmadan
+  function karaokeWords(words) {
+    var out = [];
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      var end = Math.max(w.end, w.start + 0.12);
+      if (words[i + 1] && end > words[i + 1].start) end = words[i + 1].start;
+      if (end <= w.start) end = w.start + 0.05;
+      out.push({ start: w.start, end: end, text: w.text });
+    }
+    return out;
+  }
+
+  // birikimli karaoke: satır kelime kelime dolar (n kelimede ya da uzun boşlukta sıfırlanır)
+  function karaokeCumulative(words, n) {
+    var out = [];
+    var line = [];
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      var prev = words[i - 1];
+      if (line.length >= n || (prev && w.start - prev.end > 1.2)) line = [];
+      line.push(w.text);
+      var end = Math.max(w.end, w.start + 0.12);
+      if (words[i + 1] && end > words[i + 1].start) end = words[i + 1].start;
+      if (end <= w.start) end = w.start + 0.05;
+      out.push({ start: w.start, end: end, text: line.join(" ") });
     }
     return out;
   }
@@ -255,6 +301,49 @@ window.KCaptions = (function () {
       });
     });
     return out;
+  }
+
+  /* ---------------- Şablonlar + tercih kalıcılığı ---------------- */
+
+  var PRESETS = {
+    yt:      { maxlen: "c42", kase: "normal", punct: true },
+    reels:   { maxlen: "w3",  kase: "upper",  punct: false },
+    karaoke: { maxlen: "k1",  kase: "upper",  punct: false },
+    doc:     { maxlen: "c60", kase: "normal", punct: true }
+  };
+
+  function applyPreset(key) {
+    var p = PRESETS[key];
+    if (!p) return;
+    el("cap-maxlen").value = p.maxlen;
+    el("cap-case").value = p.kase;
+    el("cap-punct").checked = p.punct;
+  }
+
+  function savePrefs() {
+    try {
+      var s = K.settings();
+      s.capPrefs = {
+        lang: el("cap-lang").value,
+        maxlen: el("cap-maxlen").value,
+        kase: el("cap-case").value,
+        punct: el("cap-punct").checked,
+        preset: el("cap-preset").value
+      };
+      K.saveSettings();
+    } catch (e) {}
+  }
+
+  function loadPrefs() {
+    var p = K.settings().capPrefs;
+    if (!p) return;
+    try {
+      if (p.lang !== undefined) el("cap-lang").value = p.lang;
+      if (p.maxlen) el("cap-maxlen").value = p.maxlen;
+      if (p.kase) el("cap-case").value = p.kase;
+      if (p.punct !== undefined) el("cap-punct").checked = p.punct;
+      if (p.preset !== undefined) el("cap-preset").value = p.preset;
+    } catch (e) {}
   }
 
   /* ---------------- Stil ---------------- */
@@ -379,8 +468,13 @@ window.KCaptions = (function () {
         tempFiles.push(audioSrc);
       }
 
+      var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime, "k1"/"kc" karaoke
+      var karaoke = /^k/.test(lenVal);
+
       status(useLocal ? "Transkribe ediliyor… (yerel)" : "Transkribe ediliyor…");
-      var raw = useLocal ? await transcribeLocal(audioSrc) : await transcribeCloud(audioSrc, durHint);
+      var raw = useLocal
+        ? await transcribeLocal(audioSrc, karaoke)
+        : await transcribeCloud(audioSrc, durHint, karaoke);
 
       var mapped = raw.map(function (s) {
         return {
@@ -390,13 +484,21 @@ window.KCaptions = (function () {
         };
       }).filter(function (s) { return s.text; });
 
-      mapped = cleanSegments(mapped);
-      var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime
-      if (/^w\d+$/.test(lenVal)) {
-        segments = splitWords(mapped, parseInt(lenVal.slice(1), 10) || 3);
+      if (karaoke) {
+        // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer
+        mapped = mapped.filter(function (s) {
+          return s.text.replace(/[.,!?;:…]/g, "").trim();
+        });
+        segments = lenVal === "kc" ? karaokeCumulative(mapped, 4) : karaokeWords(mapped);
       } else {
-        segments = splitLong(mapped, parseInt(lenVal.slice(1), 10) || 42, 4.5);
+        mapped = cleanSegments(mapped);
+        if (/^w\d+$/.test(lenVal)) {
+          segments = splitWords(mapped, parseInt(lenVal.slice(1), 10) || 3);
+        } else {
+          segments = splitLong(mapped, parseInt(lenVal.slice(1), 10) || 42, 4.5);
+        }
       }
+      savePrefs();
       if (segments.length === 0) throw new Error("Konuşma bulunamadı.");
 
       status("");
@@ -460,12 +562,16 @@ window.KCaptions = (function () {
 
   function buildSrt() {
     var out = [], n = 0;
-    segments.forEach(function (s) {
+    segments.forEach(function (s, i) {
       var txt = styleText(s.text);
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
       n++;
+      // minimum 0.3 sn gorunum — ama bir sonraki cue ile CAKISMA (karaoke'de kritik)
+      var end = Math.max(s.end, s.start + 0.3);
+      var next = segments[i + 1];
+      if (next && end > next.start) end = Math.max(next.start, s.start + 0.05);
       out.push(String(n));
-      out.push(tc(s.start, true) + " --> " + tc(Math.max(s.end, s.start + 0.3), true));
+      out.push(tc(s.start, true) + " --> " + tc(end, true));
       out.push(txt);
       out.push("");
     });
@@ -545,6 +651,19 @@ window.KCaptions = (function () {
       refreshSetup();
       KApp.toast("Anahtar kaydedildi", "good");
     });
+
+    // şablon seçimi kontrolleri günceller; elle değişiklik şablonu "Özel"e düşürür
+    el("cap-preset").addEventListener("change", function () {
+      applyPreset(this.value);
+      savePrefs();
+    });
+    ["cap-maxlen", "cap-case", "cap-punct", "cap-lang"].forEach(function (id) {
+      el(id).addEventListener("change", function () {
+        if (id !== "cap-lang") el("cap-preset").value = "";
+        savePrefs();
+      });
+    });
+    loadPrefs();
 
     KApp.onContext(function (ctx) {
       refreshButton();
