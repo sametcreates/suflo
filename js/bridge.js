@@ -29,11 +29,19 @@ window.K = (function () {
         : fn + '("' + encodeURIComponent(JSON.stringify(arg)) + '")';
       cs.evalScript(script, function (res) {
         if (res === "EvalScript error.") {
+          log("jsx HATA " + fn + ": EvalScript error");
           resolve({ ok: false, error: "ExtendScript hatası (" + fn + ")" });
           return;
         }
-        try { resolve(JSON.parse(res)); }
-        catch (e) { resolve({ ok: false, error: "Yanıt okunamadı: " + String(res).slice(0, 200) }); }
+        try {
+          var parsed = JSON.parse(res);
+          if (parsed && parsed.ok === false) log("jsx " + fn + ": " + parsed.error);
+          resolve(parsed);
+        }
+        catch (e) {
+          log("jsx " + fn + ": yanit okunamadi");
+          resolve({ ok: false, error: "Yanıt okunamadı: " + String(res).slice(0, 200) });
+        }
       });
     });
   }
@@ -98,6 +106,10 @@ window.K = (function () {
         if (done) return;
         done = true;
         clearTimeout(timer);
+        if (code !== 0) {
+          log("run HATA [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kod=" + code + " " +
+            String(err).split("\n").slice(-2).join(" ").slice(0, 200));
+        }
         resolve({ code: code, stdout: out, stderr: err });
       }
       child.stdout.on("data", function (d) { out += d.toString(); });
@@ -184,6 +196,30 @@ window.K = (function () {
       req.write(body);
       req.end();
     });
+  }
+
+  /* ---------------- Tanılama günlüğü ---------------- */
+
+  var VERSION = "1.4.0";
+  var logBuf = [];
+
+  function log(msg) {
+    var t = new Date();
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    logBuf.push(p(t.getHours()) + ":" + p(t.getMinutes()) + ":" + p(t.getSeconds()) + "  " + msg);
+    if (logBuf.length > 300) logBuf.shift();
+  }
+
+  function logText() {
+    var head = [
+      "Suflo v" + VERSION,
+      "node: " + (nodeOK ? "ok" : "yok"),
+      "ffmpeg: " + (_ffmpeg || "bulunmadı"),
+      "yerel motor: " + (whisperLocal() ? "kurulu" : "yok"),
+      "motor secimi: " + (loadSettings().provider || "?"),
+      "---"
+    ];
+    return head.join("\n") + "\n" + logBuf.join("\n");
   }
 
   /* ---------------- HTTP JSON (Node üzerinden, CORS'suz) ---------------- */
@@ -442,6 +478,9 @@ window.K = (function () {
     run: run,
     httpUpload: httpUpload,
     httpJson: httpJson,
+    log: log,
+    logText: logText,
+    VERSION: VERSION,
     whisperLocal: whisperLocal,
     whisperDir: whisperDir,
     download: download,

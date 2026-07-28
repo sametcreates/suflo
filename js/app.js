@@ -44,9 +44,10 @@ window.KApp = (function () {
     if (!ctx.hasSeq) {
       elx.innerHTML = '<span class="dim">aktif sequence yok — bir sequence aç</span>';
     } else if (ctx.sel) {
-      elx.innerHTML = '<span class="ok-mark">●</span><span class="sel-name"></span> <span class="dim">· ' +
-        ctx.sel.dur.toFixed(1) + ' sn seçili</span>';
+      var extra = (ctx.selCount > 1) ? ' +' + (ctx.selCount - 1) + ' klip' : ' · ' + ctx.sel.dur.toFixed(1) + ' sn seçili';
+      elx.innerHTML = '<span class="ok-mark">●</span><span class="sel-name"></span><span class="dim"></span>';
       elx.querySelector(".sel-name").textContent = ctx.sel.name;
+      elx.querySelector(".dim").textContent = extra;
     } else {
       elx.innerHTML = '<span class="dim">' + esc(ctx.sequence) + ' · klip seçilmedi</span>';
     }
@@ -63,14 +64,14 @@ window.KApp = (function () {
     polling = true;
     try {
       var r = await K.call("KS_getContext");
-      var prev = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, q: ctx.sequence, c: ctx.connected });
+      var prev = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, c: ctx.connected });
       if (r.ok) {
         ctx = r;
         ctx.connected = true;
       } else {
         ctx = { connected: false, hasSeq: false, sel: null, sequence: "" };
       }
-      var now = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, q: ctx.sequence, c: ctx.connected });
+      var now = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, c: ctx.connected });
       renderContext();
       if (prev !== now) ctxListeners.forEach(function (fn) { fn(ctx); });
     } finally {
@@ -257,6 +258,19 @@ window.KApp = (function () {
 
     el("set-ffmpeg-recheck").addEventListener("click", checkFfmpeg);
     el("set-ffmpeg-install").addEventListener("click", installFfmpeg);
+
+    el("set-copy-log").addEventListener("click", function () {
+      var txt = K.logText();
+      var ta = document.createElement("textarea");
+      ta.value = txt;
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      ta.remove();
+      if (ok) toast("Günlük panoya kopyalandı (" + txt.split("\n").length + " satır)", "good");
+      else toast("Kopyalanamadı", "bad");
+    });
 
     refreshFolderList();
   }

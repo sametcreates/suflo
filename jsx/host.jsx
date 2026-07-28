@@ -116,6 +116,23 @@ function KS_getContext() {
       sel: null
     };
     if (seq) {
+      // secili klip sayisi (bagli video+ses cifti tek sayilir)
+      try {
+        var selArr = seq.getSelection();
+        var cnt = {}, nUniq = 0;
+        if (selArr) {
+          for (var si = 0; si < selArr.length; si++) {
+            try {
+              if (!selArr[si].projectItem) continue;
+              var kk = String(selArr[si].projectItem.getMediaPath()).toLowerCase() +
+                "@" + selArr[si].start.seconds.toFixed(3);
+              if (!cnt[kk]) { cnt[kk] = 1; nUniq++; }
+            } catch (eS) {}
+          }
+        }
+        out.selCount = nUniq;
+      } catch (eN) { out.selCount = 0; }
+
       var cl = KS_firstSelectedClip();
       if (cl) {
         out.sel = {
@@ -150,6 +167,46 @@ function KS_getContext() {
       } catch (eT) {}
     }
     return KS_ok(out);
+  } catch (e) { return KS_err(e); }
+}
+
+/* ---------- Seçili klipler (toplu işlem) ---------- */
+
+function KS_getSelectedClips() {
+  try {
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var sel = seq.getSelection();
+    var out = [];
+    if (sel) {
+      for (var i = 0; i < sel.length; i++) {
+        var cl = sel[i];
+        try {
+          if (!cl.projectItem) continue;
+          var mp = String(cl.projectItem.getMediaPath());
+          if (!mp) continue;
+          out.push({
+            name: String(cl.name),
+            mediaPath: mp,
+            clipStart: cl.start.seconds,
+            clipEnd: cl.end.seconds,
+            inPoint: cl.inPoint.seconds,
+            outPoint: cl.outPoint.seconds,
+            dur: cl.outPoint.seconds - cl.inPoint.seconds
+          });
+        } catch (eC) {}
+      }
+    }
+    // bagli video+ses cifti secimde iki ayri trackItem olarak gelir — tekillestir
+    var seen = {}, ded = [];
+    for (var j = 0; j < out.length; j++) {
+      var key = out[j].mediaPath.toLowerCase() + "@" + out[j].clipStart.toFixed(3);
+      if (seen[key]) continue;
+      seen[key] = 1;
+      ded.push(out[j]);
+    }
+    ded.sort(function (a, b) { return a.clipStart - b.clipStart; });
+    return KS_ok({ clips: ded });
   } catch (e) { return KS_err(e); }
 }
 

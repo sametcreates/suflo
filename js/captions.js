@@ -31,6 +31,7 @@ window.KCaptions = (function () {
     var e = el("cap-status");
     e.className = "inline-status" + (cls ? " " + cls : "");
     e.textContent = msg || "";
+    if (cls === "bad" && msg) K.log("[altyazı] " + msg);
   }
 
   /* ---------------- Kurulum durumu ---------------- */
@@ -51,6 +52,12 @@ window.KCaptions = (function () {
     var needSel = scope === "clip";
     var ready = engineReady() && (needSel ? !!ctx.sel : !!ctx.hasSeq);
     el("cap-go").disabled = busy || !ready;
+    // coklu secimde CTA etiketi klip sayisini gostersin
+    if (scope === "clip") {
+      el("cap-go-scope").textContent = (ctx.selCount > 1)
+        ? "Seçili klipler (" + ctx.selCount + ")"
+        : "Seçili klip";
+    }
     // is surerken ilerleme yazisini talimatlarla ezme
     if (busy || !ctx.connected) return;
     if (!engineReady()) {
@@ -436,17 +443,29 @@ window.KCaptions = (function () {
       var audioSrc, seqOffset, durHint;
 
       var speedFactor = 1;
+      var batchClips = null; // coklu klip: [clip, ...] — tek klipte null kalir
       if (scope === "clip") {
-        seqOffset = clip.clipStart;
-        durHint = clip.dur;
-        // hiz degistirilmis klipte kaynak suresi != timeline suresi; damgalari olcekle
-        var tlDur = clip.clipEnd - clip.clipStart;
-        if (clip.dur > 0 && tlDur > 0) speedFactor = tlDur / clip.dur;
-        status("Ses çıkarılıyor…");
-        audioSrc = await convertAudio(clip.mediaPath, {
-          wav: useLocal, ss: clip.inPoint, t: clip.dur, durHint: durHint
-        });
-        tempFiles.push(audioSrc);
+        var sc = await K.call("KS_getSelectedClips");
+        if (sc.ok && sc.clips && sc.clips.length > 1) {
+          batchClips = sc.clips;
+        } else if (sc.ok && sc.clips && sc.clips.length === 1) {
+          clip = sc.clips[0];
+        }
+        if (batchClips) {
+          // coklu klip: her klip ayri islenir, asagida birlestirilir
+          audioSrc = null;
+        } else {
+          seqOffset = clip.clipStart;
+          durHint = clip.dur;
+          // hiz degistirilmis klipte kaynak suresi != timeline suresi; damgalari olcekle
+          var tlDur = clip.clipEnd - clip.clipStart;
+          if (clip.dur > 0 && tlDur > 0) speedFactor = tlDur / clip.dur;
+          status("Ses çıkarılıyor…");
+          audioSrc = await convertAudio(clip.mediaPath, {
+            wav: useLocal, ss: clip.inPoint, t: clip.dur, durHint: durHint
+          });
+          tempFiles.push(audioSrc);
+        }
       } else {
         // katman seçimi: hepsi seçiliyse host'a filtre gönderme
         var trackArg = null;
@@ -470,19 +489,56 @@ window.KCaptions = (function () {
 
       var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime, "k1"/"kc" karaoke
       var karaoke = /^k/.test(lenVal);
+      var mapped = [];
 
-      status(useLocal ? "Transkribe ediliyor… (yerel)" : "Transkribe ediliyor…");
-      var raw = useLocal
-        ? await transcribeLocal(audioSrc, karaoke)
-        : await transcribeCloud(audioSrc, durHint, karaoke);
+      if (batchClips) {
+        // toplu islem: klipler sirayla; biri patlarsa digerleri devam eder
+        var failed = [];
+        for (var bi = 0; bi < batchClips.length; bi++) {
+          var bc = batchClips[bi];
+          var tag = "Klip " + (bi + 1) + "/" + batchClips.length + " (" + bc.name + "): ";
+          try {
+            status(tag + "ses çıkarılıyor…");
+            var ba = await convertAudio(bc.mediaPath, {
+              wav: useLocal, ss: bc.inPoint, t: bc.dur, durHint: bc.dur
+            });
+            tempFiles.push(ba);
+            status(tag + "transkribe ediliyor…");
+            var bRaw = useLocal
+              ? await transcribeLocal(ba, karaoke)
+              : await transcribeCloud(ba, bc.dur, karaoke);
+            var bTl = bc.clipEnd - bc.clipStart;
+            var bf = (bc.dur > 0 && bTl > 0) ? bTl / bc.dur : 1;
+            bRaw.forEach(function (s) {
+              if (!s.text) return;
+              mapped.push({
+                start: bc.clipStart + s.start * bf,
+                end: bc.clipStart + s.end * bf,
+                text: s.text
+              });
+            });
+          } catch (eB) {
+            failed.push(bc.name);
+            K.log("toplu islem atladi [" + bc.name + "]: " + eB.message);
+          }
+        }
+        if (mapped.length === 0) throw new Error("Hiçbir klipten konuşma alınamadı.");
+        if (failed.length) KApp.toast(failed.length + " klip atlandı: " + failed.join(", ").slice(0, 100), "bad");
+        mapped.sort(function (a, b) { return a.start - b.start; });
+      } else {
+        status(useLocal ? "Transkribe ediliyor… (yerel)" : "Transkribe ediliyor…");
+        var raw = useLocal
+          ? await transcribeLocal(audioSrc, karaoke)
+          : await transcribeCloud(audioSrc, durHint, karaoke);
 
-      var mapped = raw.map(function (s) {
-        return {
-          start: seqOffset + s.start * speedFactor,
-          end: seqOffset + s.end * speedFactor,
-          text: s.text
-        };
-      }).filter(function (s) { return s.text; });
+        mapped = raw.map(function (s) {
+          return {
+            start: seqOffset + s.start * speedFactor,
+            end: seqOffset + s.end * speedFactor,
+            text: s.text
+          };
+        }).filter(function (s) { return s.text; });
+      }
 
       if (karaoke) {
         // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer
