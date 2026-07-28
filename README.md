@@ -3,7 +3,7 @@
 **Premiere Pro için ücretsiz, açık kaynak kurgu paneli.**
 SFX kütüphanesi · yapay zekâ altyazı · otomatik ilk kesim · keyframe easing — abonelik yok, kredi yok, hesap yok.
 
-> Eski adıyla *Kesit*. Kapix ve Subs gibi ücretli panellere ücretsiz, bakımlı bir alternatif.
+> Kredi ve abonelik satan altyazı panellerine ücretsiz, bakımlı, açık kaynak bir alternatif.
 
 ## Özellikler
 

@@ -90,7 +90,8 @@
   .feat p { color: var(--dim); font-size: 14.5px; }
 
   /* compare */
-  .cmp { width: 100%; border-collapse: collapse; font-size: 14.5px; overflow-x: auto; display: block; }
+  .cmp-scroll { overflow-x: auto; }
+  .cmp { width: 100%; border-collapse: collapse; font-size: 14.5px; }
   .cmp th, .cmp td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .cmp th { color: var(--faint); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .6px; }
   .cmp td:first-child { color: var(--dim); }
@@ -160,7 +161,7 @@
     <p class="lead">Suflo tiyatrodaki suflör gibi çalışır: sözü ekrana o fısıldar, karar hep sende kalır.</p>
     <div class="grid">
       <div class="feat"><div class="ic">🔒</div><h3>Tamamen senin bilgisayarında</h3><p>Whisper yapay zekâsı yerelde çalışır. Ses dosyan hiçbir sunucuya gitmez, internet bile gerekmez.</p></div>
-      <div class="feat"><div class="ic">✂️</div><h3>Üç kapsam</h3><p>Seçili klip, In → Out aralığı ya da tüm sequence — Subs'ta olan da var, olmayan da.</p></div>
+      <div class="feat"><div class="ic">✂️</div><h3>Üç kapsam</h3><p>Seçili klip, In → Out aralığı ya da tüm sequence — nasıl çalışıyorsan öyle.</p></div>
       <div class="feat"><div class="ic">✏️</div><h3>Uygulamadan önce düzenle</h3><p>Transkript panelde düzenlenebilir listeyle gelir: satırı düzelt, sil, sonra tek tıkla caption izine uygula.</p></div>
       <div class="feat"><div class="ic">🌍</div><h3>TR · AZ · EN · RU</h3><p>Türkçe İ-ı ve Azerice kurallarına uygun BÜYÜK/küçük harf, noktalama kontrolü, kelime bazlı satırlar.</p></div>
       <div class="feat"><div class="ic">🎚️</div><h3>Ses katmanı seçimi</h3><p>Hangi kanallar yazıya dökülsün? A1'den A99'a kadar seç; müzik kanalını dışarıda bırak.</p></div>
@@ -171,15 +172,17 @@
   <section id="karsilastirma">
     <h2>Neden Suflo?</h2>
     <p class="lead">Aynı işi yapan araçların çoğu abonelik ya da kredi satar. Suflo satmaz.</p>
+    <div class="cmp-scroll">
     <table class="cmp">
       <tr><th></th><th class="suflo">Suflo</th><th>Kredi/abonelikli paneller</th></tr>
       <tr><td>Fiyat</td><td class="suflo">Ücretsiz · açık kaynak</td><td>Kredi paketi / abonelik</td></tr>
       <tr><td>Kullanım sınırı</td><td class="yes">Sınırsız</td><td class="no">Dakika başına kredi</td></tr>
       <tr><td>İnternetsiz çalışma</td><td class="yes">Var (yerel motor)</td><td class="no">Yok</td></tr>
-      <tr><td>Ses verisi nereye gider?</td><td class="yes">Hiçbir yere</td><td class="no">Sağlayıcının sunucusuna</td></tr>
+      <tr><td>Ses verisi nereye gider?</td><td class="yes">Hiçbir yere (yerel motor)</td><td class="no">Sağlayıcının sunucusuna</td></tr>
       <tr><td>Uygulamadan önce düzenleme</td><td class="yes">Var</td><td class="no">Çoğunda yok</td></tr>
       <tr><td>Kaynak kodu</td><td class="yes">Açık (MIT)</td><td class="no">Kapalı</td></tr>
     </table>
+    </div>
   </section>
 
   <section id="sss">
@@ -190,7 +193,7 @@
     </details>
     <details>
       <summary>Nasıl kurulur?</summary>
-      <p>Ücretsiz ZXP/UXP Installer'ı indir, Suflo'nun .zxp dosyasına çift tıkla, Premiere'i yeniden başlat. Panel içinden yerel motoru tek düğmeyle kurarsın (~570 MB, bir kez).</p>
+      <p>Ücretsiz ZXP/UXP Installer'ı indir, Suflo'nun .zxp dosyasına çift tıkla, Premiere'i yeniden başlat. Panel içinden yerel motoru tek düğmeyle kurarsın (~570 MB, bir kez). Altyazı için gereken ffmpeg'i de Ayarlar sekmesinden tek tıkla kurarsın (winget ile, bir kez).</p>
     </details>
     <details>
       <summary>Hangi diller destekleniyor?</summary>

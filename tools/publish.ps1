@@ -1,13 +1,25 @@
 # Suflo — tek komutla GitHub yayını
 # Gereksinim: gh CLI kurulu ve "gh auth login" yapılmış olmalı.
 # Kullanım:  powershell -ExecutionPolicy Bypass -File tools\publish.ps1
+#
+# Not: PS 5.1'de EAP=Stop altında native komut stderr'i script'i öldürür;
+# bu yüzden "beklenen hata" üretebilecek yoklamalar cmd /c üzerinden yapılır.
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
+# gh PATH'te olmayabilir (kurulumdan sonra terminal yenilenmediyse)
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    $env:PATH += ";C:\Program Files\GitHub CLI"
+}
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    Write-Host "gh CLI bulunamadi. Kur: winget install GitHub.cli" -ForegroundColor Red
+    exit 1
+}
+
 # 0) gh girisi var mi?
-gh auth status 2>$null | Out-Null
+$null = cmd /c "gh auth status >nul 2>&1"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "GitHub girisi yok. Once su komutu calistir:" -ForegroundColor Red
     Write-Host "  gh auth login" -ForegroundColor Yellow
@@ -21,7 +33,8 @@ if (-not (Test-Path (Join-Path $root ".git"))) {
     git init | Out-Null
     git branch -M main
 }
-if (-not (git config user.email)) {
+$null = cmd /c "git config user.email >nul 2>&1"
+if ($LASTEXITCODE -ne 0) {
     git config user.name "sametcreates"
     git config user.email "sametkaygisiz27@gmail.com"
 }
@@ -37,15 +50,16 @@ foreach ($f in @("docs\index.html", "marketing\lansman-kiti.md")) {
 }
 
 git add -A
-git commit -m "Suflo v1.1.0" 2>$null | Out-Null
+$null = cmd /c "git commit -m ""Suflo yayin"" >nul 2>&1"
 
 # 2) repo olustur (varsa gec) + push
-gh repo view "$owner/suflo" 2>$null | Out-Null
+$null = cmd /c "gh repo view $owner/suflo >nul 2>&1"
 if ($LASTEXITCODE -ne 0) {
     gh repo create suflo --public --source . --remote origin --push `
-        --description "Free, open-source AI subtitles for Adobe Premiere Pro. Local Whisper - no subscription, no credits, no limits. TR/AZ/EN/RU."
+        --description "Free, open-source AI subtitles for Adobe Premiere Pro. Runs Whisper locally (optional cloud) - no subscription, no credits, no limits. TR/AZ/EN/RU."
 } else {
-    if (-not (git remote | Select-String "^origin$")) {
+    $null = cmd /c "git remote get-url origin >nul 2>&1"
+    if ($LASTEXITCODE -ne 0) {
         git remote add origin "https://github.com/$owner/suflo.git"
     }
     git push -u origin main
@@ -58,16 +72,17 @@ $zxp = Join-Path $root "dist\Suflo-$version.zxp"
 if (-not (Test-Path $zxp)) {
     Write-Host "Paket yok, uretiliyor..." -ForegroundColor DarkGray
     powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "package.ps1")
+    if (-not (Test-Path $zxp)) { Write-Host "Paket uretilemedi." -ForegroundColor Red; exit 1 }
 }
-gh release view "v$version" 2>$null | Out-Null
+$null = cmd /c "gh release view v$version >nul 2>&1"
 if ($LASTEXITCODE -ne 0) {
     gh release create "v$version" $zxp --title "Suflo $version" --notes-file (Join-Path $root "marketing\release-notes.md")
 } else {
     Write-Host "Release v$version zaten var." -ForegroundColor DarkGray
 }
 
-# 4) GitHub Pages (docs/) — zaten acik ise hata verme
-gh api -X POST "repos/$owner/suflo/pages" -f "source[branch]=main" -f "source[path]=/docs" 2>$null | Out-Null
+# 4) GitHub Pages (docs/) — zaten acik ise sessizce gec
+$null = cmd /c "gh api -X POST repos/$owner/suflo/pages -f source[branch]=main -f source[path]=/docs >nul 2>&1"
 
 Write-Host ""
 Write-Host "YAYINDA:" -ForegroundColor Green

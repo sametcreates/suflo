@@ -23,4 +23,4 @@ Gereksinim: Windows, Premiere Pro 2022+. ffmpeg ve yerel motor panel içinden ku
 
 ---
 
-*Free, open-source AI subtitles for Adobe Premiere Pro. Local Whisper — no subscription, no credits, no limits.*
+*Free, open-source AI subtitles for Adobe Premiere Pro. Runs Whisper locally (optional cloud) — no subscription, no credits, no limits.*

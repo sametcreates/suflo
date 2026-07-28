@@ -54,7 +54,7 @@ window.K = (function () {
 
   function loadSettings() {
     if (_settings) return _settings;
-    _settings = { folders: [], provider: "groq", endpoint: "", apiKey: "", ffmpeg: "", favs: [], recent: [] };
+    _settings = { folders: [], provider: "local", endpoint: "", apiKey: "", ffmpeg: "", favs: [], recent: [] };
     try {
       var p = settingsPath();
       if (p && fs.existsSync(p)) {
