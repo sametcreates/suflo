@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.zxp
+*.p12
+tools/ZXPSignCmd.exe
+settings.json
+.DS_Store
+Thumbs.db

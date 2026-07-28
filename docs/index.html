@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suflo — Premiere Pro için ücretsiz yapay zekâ altyazı eklentisi</title>
+<meta name="description" content="Suflo, Adobe Premiere Pro için ücretsiz ve açık kaynak yapay zekâ altyazı eklentisi. Bilgisayarında çalışır: abonelik yok, kredi yok, sınır yok. Türkçe, Azerice, İngilizce, Rusça.">
+<meta property="og:title" content="Suflo — videonun suflörü">
+<meta property="og:description" content="Premiere Pro için ücretsiz yapay zekâ altyazı. Abonelik yok, kredi yok, sınır yok.">
+<style>
+  :root {
+    --bg: #0e0f15; --bg2: #14151d; --bg3: #1b1d29;
+    --line: #262a3a; --text: #eceaf6; --dim: #9b9db4; --faint: #62657c;
+    --accent: #8b7cf6; --accent2: #5b8cff;
+    --grad: linear-gradient(135deg, #8b7cf6, #5b8cff);
+    --glow: 0 8px 40px rgba(120, 108, 255, .35);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.65 "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 22px; }
+  a { color: var(--accent); text-decoration: none; }
+
+  /* nav */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; }
+  .logo svg { width: 30px; height: 30px; }
+  .logo span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  nav .links { display: flex; gap: 22px; font-size: 14.5px; }
+  nav .links a { color: var(--dim); }
+  nav .links a:hover { color: var(--text); }
+
+  /* hero */
+  .hero { text-align: center; padding: 72px 0 60px; position: relative; }
+  .hero::before {
+    content: ""; position: absolute; inset: -80px 0 0;
+    background: radial-gradient(600px 320px at 50% 0%, rgba(139,124,246,.16), transparent 70%);
+    pointer-events: none;
+  }
+  .hero h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.12; letter-spacing: -.5px; }
+  .hero h1 em { font-style: normal; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p.sub { color: var(--dim); font-size: clamp(16px, 2.5vw, 19px); max-width: 620px; margin: 18px auto 0; }
+  .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 34px; }
+  .btn {
+    display: inline-block; padding: 13px 28px; border-radius: 10px;
+    font-weight: 600; font-size: 16px; transition: transform .15s, filter .15s;
+  }
+  .btn.primary { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+  .btn.primary:hover { transform: translateY(-2px); filter: brightness(1.1); }
+  .btn.ghost { border: 1px solid var(--line); color: var(--text); }
+  .btn.ghost:hover { border-color: var(--accent); }
+  .hero .note { color: var(--faint); font-size: 13.5px; margin-top: 14px; }
+
+  /* panel mock */
+  .mock {
+    margin: 56px auto 0; max-width: 420px; text-align: left;
+    background: var(--bg2); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(139,124,246,.08);
+    overflow: hidden; font-size: 13px;
+  }
+  .mock .mhead { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .mock .mhead b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .mock .mdot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: #7fe0a7; }
+  .mock .mbody { padding: 14px; display: grid; gap: 10px; }
+  .mock .mseg { display: flex; background: var(--bg3); border-radius: 7px; padding: 3px; }
+  .mock .mseg i { flex: 1; text-align: center; font-style: normal; padding: 6px; border-radius: 5px; color: var(--faint); }
+  .mock .mseg i.on { background: rgba(139,124,246,.16); color: #cfc9ff; }
+  .mock .mrow { display: flex; justify-content: space-between; background: var(--bg3); border-radius: 7px; padding: 9px 12px; color: var(--dim); }
+  .mock .mcta { background: var(--grad); border-radius: 8px; text-align: center; padding: 11px; color: #fff; font-weight: 600; }
+  .mock .mline { display: flex; gap: 8px; align-items: center; color: var(--dim); }
+  .mock .mline b { color: var(--text); font-weight: 500; }
+  .mock .mtime { color: var(--faint); font-size: 11px; min-width: 40px; }
+
+  /* sections */
+  section { padding: 64px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: clamp(24px, 4vw, 34px); letter-spacing: -.3px; margin-bottom: 8px; }
+  .lead { color: var(--dim); max-width: 640px; margin-bottom: 36px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+  .feat {
+    background: linear-gradient(180deg, rgba(139,124,246,.06), transparent 60%), var(--bg2);
+    border: 1px solid var(--line); border-radius: 12px; padding: 22px;
+  }
+  .feat .ic { font-size: 22px; margin-bottom: 10px; }
+  .feat h3 { font-size: 16.5px; margin-bottom: 6px; }
+  .feat p { color: var(--dim); font-size: 14.5px; }
+
+  /* compare */
+  .cmp { width: 100%; border-collapse: collapse; font-size: 14.5px; overflow-x: auto; display: block; }
+  .cmp th, .cmp td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .cmp th { color: var(--faint); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .6px; }
+  .cmp td:first-child { color: var(--dim); }
+  .cmp .yes { color: #7fe0a7; }
+  .cmp .no { color: #ff8f8f; }
+  .cmp .suflo { color: #cfc9ff; font-weight: 600; }
+
+  /* faq */
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; margin-bottom: 10px; background: var(--bg2); }
+  details summary { cursor: pointer; font-weight: 600; font-size: 15.5px; }
+  details p { color: var(--dim); margin-top: 10px; font-size: 14.5px; }
+
+  footer { padding: 44px 0 60px; border-top: 1px solid var(--line); color: var(--faint); font-size: 14px; text-align: center; }
+  footer a { color: var(--dim); }
+
+  @media (max-width: 560px) {
+    nav .links { display: none; }
+    section { padding: 46px 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <div class="logo">
+      <svg viewBox="0 0 20 20"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5b8cff"/></linearGradient></defs><rect x="1" y="1" width="18" height="18" rx="5" fill="url(#g)"/><path d="M4.6 10.6 v1.6 M6.8 9 v4.8 M9 7.6 v7.6" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/><path d="M11.6 9.4 h3.8 M11.6 12.4 h2.4" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>Suflo</span>
+    </div>
+    <div class="links">
+      <a href="#ozellikler">Özellikler</a>
+      <a href="#karsilastirma">Karşılaştırma</a>
+      <a href="#sss">SSS</a>
+      <a href="https://github.com/OWNER/suflo">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <h1>Videonun <em>suflörü.</em></h1>
+    <p class="sub">Premiere Pro için ücretsiz, açık kaynak yapay zekâ altyazı eklentisi.
+    Bilgisayarında çalışır — abonelik yok, kredi yok, sınır yok.</p>
+    <div class="cta-row">
+      <a class="btn primary" href="https://github.com/OWNER/suflo/releases/latest">Ücretsiz indir</a>
+      <a class="btn ghost" href="https://github.com/OWNER/suflo">Kaynak kodu</a>
+    </div>
+    <p class="note">Windows · Premiere Pro 2022+ · MIT lisansı</p>
+
+    <div class="mock" aria-hidden="true">
+      <div class="mhead">
+        <svg width="18" height="18" viewBox="0 0 20 20"><rect x="1" y="1" width="18" height="18" rx="5" fill="url(#g)"/><path d="M4.6 10.6 v1.6 M6.8 9 v4.8 M9 7.6 v7.6" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/><path d="M11.6 9.4 h3.8 M11.6 12.4 h2.4" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <b>Suflo</b><span class="mdot"></span>
+      </div>
+      <div class="mbody">
+        <div class="mseg"><i>Seçili klip</i><i class="on">In → Out</i><i>Sequence</i></div>
+        <div class="mrow"><span>Dil</span><span>Türkçe</span></div>
+        <div class="mrow"><span>Satır</span><span>3 kelime</span></div>
+        <div class="mcta">Altyazı oluştur · In → Out</div>
+        <div class="mline"><span class="mtime">00:04</span><b>Merhaba arkadaşlar, bugün</b></div>
+        <div class="mline"><span class="mtime">00:06</span><b>çok özel bir konu var</b></div>
+        <div class="mline"><span class="mtime">00:08</span><b>kurguya ışık hızı geliyor</b></div>
+      </div>
+    </div>
+  </header>
+
+  <section id="ozellikler">
+    <h2>Altyazı, olması gerektiği gibi.</h2>
+    <p class="lead">Suflo tiyatrodaki suflör gibi çalışır: sözü ekrana o fısıldar, karar hep sende kalır.</p>
+    <div class="grid">
+      <div class="feat"><div class="ic">🔒</div><h3>Tamamen senin bilgisayarında</h3><p>Whisper yapay zekâsı yerelde çalışır. Ses dosyan hiçbir sunucuya gitmez, internet bile gerekmez.</p></div>
+      <div class="feat"><div class="ic">✂️</div><h3>Üç kapsam</h3><p>Seçili klip, In → Out aralığı ya da tüm sequence — Subs'ta olan da var, olmayan da.</p></div>
+      <div class="feat"><div class="ic">✏️</div><h3>Uygulamadan önce düzenle</h3><p>Transkript panelde düzenlenebilir listeyle gelir: satırı düzelt, sil, sonra tek tıkla caption izine uygula.</p></div>
+      <div class="feat"><div class="ic">🌍</div><h3>TR · AZ · EN · RU</h3><p>Türkçe İ-ı ve Azerice kurallarına uygun BÜYÜK/küçük harf, noktalama kontrolü, kelime bazlı satırlar.</p></div>
+      <div class="feat"><div class="ic">🎚️</div><h3>Ses katmanı seçimi</h3><p>Hangi kanallar yazıya dökülsün? A1'den A99'a kadar seç; müzik kanalını dışarıda bırak.</p></div>
+      <div class="feat"><div class="ic">🧹</div><h3>Halüsinasyon filtresi</h3><p>"Altyazı M.K." ve takılan tekrarlar otomatik süzülür — Whisper'ın klasik saçmalıkları timeline'ına ulaşmaz.</p></div>
+    </div>
+  </section>
+
+  <section id="karsilastirma">
+    <h2>Neden Suflo?</h2>
+    <p class="lead">Aynı işi yapan araçların çoğu abonelik ya da kredi satar. Suflo satmaz.</p>
+    <table class="cmp">
+      <tr><th></th><th class="suflo">Suflo</th><th>Kredi/abonelikli paneller</th></tr>
+      <tr><td>Fiyat</td><td class="suflo">Ücretsiz · açık kaynak</td><td>Kredi paketi / abonelik</td></tr>
+      <tr><td>Kullanım sınırı</td><td class="yes">Sınırsız</td><td class="no">Dakika başına kredi</td></tr>
+      <tr><td>İnternetsiz çalışma</td><td class="yes">Var (yerel motor)</td><td class="no">Yok</td></tr>
+      <tr><td>Ses verisi nereye gider?</td><td class="yes">Hiçbir yere</td><td class="no">Sağlayıcının sunucusuna</td></tr>
+      <tr><td>Uygulamadan önce düzenleme</td><td class="yes">Var</td><td class="no">Çoğunda yok</td></tr>
+      <tr><td>Kaynak kodu</td><td class="yes">Açık (MIT)</td><td class="no">Kapalı</td></tr>
+    </table>
+  </section>
+
+  <section id="sss">
+    <h2>Sık sorulanlar</h2>
+    <details open>
+      <summary>Gerçekten tamamen ücretsiz mi?</summary>
+      <p>Evet. Panel MIT lisanslı açık kaynak; yerel yapay zekâ motoru kendi bilgisayarında çalışır, kimseye ödeme yapmazsın, kullanım sınırı yoktur. İstersen hız için ücretsiz bir Groq bulut anahtarı da bağlayabilirsin.</p>
+    </details>
+    <details>
+      <summary>Nasıl kurulur?</summary>
+      <p>Ücretsiz ZXP/UXP Installer'ı indir, Suflo'nun .zxp dosyasına çift tıkla, Premiere'i yeniden başlat. Panel içinden yerel motoru tek düğmeyle kurarsın (~570 MB, bir kez).</p>
+    </details>
+    <details>
+      <summary>Hangi diller destekleniyor?</summary>
+      <p>Türkçe, Azerice, İngilizce ve Rusça'yı arayüzden seçebilirsin; "Otomatik algıla" ile Whisper'ın desteklediği diğer dilleri de kullanabilirsin.</p>
+    </details>
+    <details>
+      <summary>Bilgisayarım yavaşsa?</summary>
+      <p>Yerel motor ses süresinin 1,5-2 katı sürede çalışır. Acelen varsa ücretsiz Groq anahtarıyla bulut moduna geçersin: dakikalar değil, saniyeler.</p>
+    </details>
+    <details>
+      <summary>Mac desteği var mı?</summary>
+      <p>Şu an Windows. macOS yol haritasında ilk sırada.</p>
+    </details>
+  </section>
+
+  <footer>
+    <p>Suflo — <a href="https://github.com/OWNER/suflo">açık kaynak</a>, MIT lisansı.
+    <a href="https://instagram.com/sametcreates">sametcreates</a> tarafından yapılır.</p>
+  </footer>
+
+</div>
+</body>
+</html>
