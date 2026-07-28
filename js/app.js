@@ -88,6 +88,12 @@ window.KApp = (function () {
     var tabs = document.querySelectorAll(".tab");
     Array.prototype.forEach.call(tabs, function (t) {
       t.addEventListener("click", function () {
+        // solo modda dişli aç/kapa gibi çalışır (geri dönüş için sekme çubuğu yok)
+        if (t.dataset.tab === "settings" && document.body.classList.contains("solo") &&
+            el("tab-settings").classList.contains("active")) {
+          document.querySelector('.tab[data-tab="captions"]').click();
+          return;
+        }
         Array.prototype.forEach.call(tabs, function (x) { x.classList.remove("active"); });
         Array.prototype.forEach.call(document.querySelectorAll(".tabpane"), function (p) {
           p.classList.remove("active");
