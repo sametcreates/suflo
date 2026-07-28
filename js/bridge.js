@@ -230,7 +230,7 @@ window.K = (function () {
 
   var VERSION = "1.5.0";
   // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
-  var REPO = "OWNER/suflo";
+  var REPO = "sametkaygisiz27-stack/suflo";
   var logBuf = [];
 
   function log(msg) {
