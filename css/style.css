@@ -611,6 +611,8 @@ body:not(.solo) .solo-gear { display: none; }
 .tracks {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;   /* alt satırda tek kalan chip uzamasın */
+  align-content: flex-start;
   gap: 8px;
   padding-bottom: 11px;
 }
