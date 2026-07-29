@@ -1,6 +1,6 @@
 # Suflo Lansman Kiti
 
-Kopyala-yapıştır hazır metinler. `github.com/sametkaygisiz27-stack/suflo` linklerini yayın sonrası gerçek adresle değiştir (publish.ps1 otomatik yapar).
+Kopyala-yapıştır hazır metinler. `github.com/sametcreates/suflo` linklerini yayın sonrası gerçek adresle değiştir (publish.ps1 otomatik yapar).
 
 ---
 
@@ -33,10 +33,10 @@ Format: ekran kaydı + senin sesin. Müzik alçak, tempo yüksek.
 ## Azeri YouTube yorumuna cevap
 
 **Türkçe:**
-> Bu yorumu görünce yaptık 🙂 Premiere için tamamen ücretsiz, açık kaynak bir altyazı eklentisi çıkardık: Suflo. Azərbaycanca dahil TR/EN/RU destekliyor, bilgisayarında çalışıyor (internet gerekmez), kredi-abonelik yok. GitHub'dan indirebilirsiniz: github.com/sametkaygisiz27-stack/suflo
+> Bu yorumu görünce yaptık 🙂 Premiere için tamamen ücretsiz, açık kaynak bir altyazı eklentisi çıkardık: Suflo. Azərbaycanca dahil TR/EN/RU destekliyor, bilgisayarında çalışıyor (internet gerekmez), kredi-abonelik yok. GitHub'dan indirebilirsiniz: github.com/sametcreates/suflo
 
 **Azərbaycanca:**
-> Bu şərhi görəndən sonra hazırladıq 🙂 Premiere üçün tamamilə pulsuz, açıq mənbəli altyazı plagini: Suflo. Azərbaycan dili daxil olmaqla TR/EN/RU dəstəkləyir, kompüterinizdə işləyir (internet lazım deyil), kredit-abunə yoxdur: github.com/sametkaygisiz27-stack/suflo
+> Bu şərhi görəndən sonra hazırladıq 🙂 Premiere üçün tamamilə pulsuz, açıq mənbəli altyazı plagini: Suflo. Azərbaycan dili daxil olmaqla TR/EN/RU dəstəkləyir, kompüterinizdə işləyir (internet lazım deyil), kredit-abunə yoxdur: github.com/sametcreates/suflo
 
 ---
 
@@ -51,7 +51,7 @@ Format: ekran kaydı + senin sesin. Müzik alçak, tempo yüksek.
 > • TR/AZ/EN/RU + kelime bazlı satırlar + BÜYÜK harf/noktalama kontrolü
 > • Ses katmanı seçimi (müzik kanalını dışarıda bırak)
 >
-> Ücretsiz + MIT: github.com/sametkaygisiz27-stack/suflo
+> Ücretsiz + MIT: github.com/sametcreates/suflo
 > Geri bildirim gelirse hızlı güncelliyorum, her şey konuşulur 🙏
 
 ---
@@ -69,7 +69,7 @@ Format: ekran kaydı + senin sesin. Müzik alçak, tempo yüksek.
 
 > Built a free, open-source AI subtitle panel for Premiere: **Suflo**.
 > With the local Whisper engine your audio never leaves your machine — no credits, no subscription, no limits. Optional cloud mode with your own free Groq key. Edit lines before applying. TR/AZ/EN/RU.
-> github.com/sametkaygisiz27-stack/suflo
+> github.com/sametcreates/suflo
 
 ---
 

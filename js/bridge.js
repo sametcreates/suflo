@@ -294,7 +294,7 @@ window.K = (function () {
 
   var VERSION = "1.6.0";
   // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
-  var REPO = "sametkaygisiz27-stack/suflo";
+  var REPO = "sametcreates/suflo";
   var logBuf = [];
 
   function log(msg) {
