@@ -1,0 +1,101 @@
+/* Suflo Instagram slayt tabanı — 1080x1350 */
+* { margin: 0; box-sizing: border-box; }
+html, body { width: 1080px; height: 1350px; overflow: hidden; }
+body {
+  background: #0e0f15;
+  color: #edecf5;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 90px 80px 150px;
+}
+body::before {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(700px 500px at 50% 0%, rgba(139,124,246,.20), transparent 70%),
+    radial-gradient(500px 400px at 100% 100%, rgba(91,140,255,.10), transparent 70%);
+  pointer-events: none;
+}
+.grad-text {
+  background: linear-gradient(135deg, #8b7cf6, #5b8cff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.logo { width: 170px; height: 170px; filter: drop-shadow(0 20px 60px rgba(120,108,255,.5)); }
+.logo-sm { width: 76px; height: 76px; filter: drop-shadow(0 8px 24px rgba(120,108,255,.5)); }
+
+h1 { font-size: 76px; font-weight: 700; letter-spacing: -1px; line-height: 1.12; }
+h2 { font-size: 62px; font-weight: 700; letter-spacing: -.5px; line-height: 1.16; }
+.sub { font-size: 36px; color: #9a9cb4; line-height: 1.5; }
+.kicker {
+  font-size: 28px; letter-spacing: 3px;
+  color: #626578; font-weight: 700; margin-bottom: 26px;
+}
+
+/* alt bar: mini logo + site + kaydır */
+.footer {
+  position: absolute;
+  bottom: 60px; left: 80px; right: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 28px;
+  color: #626578;
+}
+.footer .brand { display: flex; align-items: center; gap: 14px; }
+.footer .brand svg { width: 40px; height: 40px; }
+.footer .brand b { color: #9a9cb4; font-weight: 600; font-size: 28px; }
+.footer .swipe { color: #cfc9ff; font-size: 30px; display: flex; align-items: center; gap: 12px; }
+
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,.03), transparent 40%), #161822;
+  border: 2px solid #262a3a;
+  border-radius: 28px;
+  box-shadow: 0 40px 100px -30px rgba(0,0,0,.8);
+}
+
+/* adım listesi */
+.step { display:flex; align-items:center; gap:30px; text-align:left; padding:32px 40px; width:820px; }
+.step + .step { border-top: 2px solid #262a3a; }
+.step .num {
+  flex:0 0 66px; height:66px; border-radius:20px;
+  background: linear-gradient(135deg,#8b7cf6,#5b8cff);
+  display:flex; align-items:center; justify-content:center;
+  font-size:34px; font-weight:700; color:#fff;
+  box-shadow: 0 10px 26px -8px rgba(120,108,255,.8);
+}
+.step b { font-size:36px; display:block; margin-bottom:6px; }
+.step span { font-size:27px; color:#9a9cb4; line-height:1.4; }
+
+/* özellik chip'leri */
+.chips { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; max-width:860px; }
+.chip {
+  padding: 18px 32px;
+  border-radius: 20px;
+  border: 2px solid rgba(139,124,246,.35);
+  background: rgba(139,124,246,.10);
+  color: #cfc9ff;
+  font-size: 31px;
+  font-weight: 600;
+}
+.chip.solid {
+  background: linear-gradient(135deg,#8b7cf6,#5b8cff);
+  border-color: transparent; color:#fff;
+  box-shadow: 0 12px 32px -10px rgba(120,108,255,.8);
+}
+
+/* karşılaştırma */
+.cmp { width: 880px; border-collapse: collapse; font-size: 30px; }
+.cmp td { padding: 26px 24px; border-bottom: 2px solid #262a3a; text-align: left; }
+.cmp tr:last-child td { border-bottom: none; }
+.cmp td:first-child { color: #9a9cb4; }
+.cmp td.s { text-align:center; width:210px; color:#cfc9ff; font-weight:700; }
+.cmp td.o { text-align:center; width:230px; color:#8a8ea6; }
+.cmp th { padding: 20px 24px; font-size: 27px; color:#626578; text-transform:uppercase; letter-spacing:1.5px; }
+.cmp th.s { color:#cfc9ff; }

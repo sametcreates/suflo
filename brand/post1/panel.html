@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../../css/style.css">
+<style>
+  /* slayt içine gömmek için sabit panel boyutu */
+  html, body { width: 430px; height: 780px; overflow: hidden; }
+  body { border-radius: 18px; }
+</style>
+</head>
+<body class="solo">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="1 1 18 18">
+        <defs><linearGradient id="bm-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5b8cff"/></linearGradient></defs>
+        <rect x="1" y="1" width="18" height="18" rx="5" fill="url(#bm-g)"/>
+        <path d="M13.9 7.2 C13.5 5.5 11.9 4.7 10 4.7 C8 4.7 6.3 5.5 6.3 7.1 C6.3 10.7 13.7 9.1 13.7 12.9 C13.7 14.5 12 15.3 10 15.3 C8.1 15.3 6.5 14.5 6.1 12.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-name">Suflo</span>
+    </div>
+    <div class="top-right">
+      <span class="brand-ver">v1.5</span>
+      <span class="host-dot ok"></span>
+      <button class="tab tab-gear solo-gear">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="context-strip">
+    <svg class="ctx-ic" viewBox="0 0 16 16"><path d="M1.8 6.2 h12.4 v6.4 a1.4 1.4 0 0 1 -1.4 1.4 h-9.6 a1.4 1.4 0 0 1 -1.4-1.4 z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2.2 6.2 L3.4 3.3 L14.2 4.6 L13.4 6.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M6.4 3.7 L5.4 6.2 M9.9 4.1 L8.9 6.2" stroke="currentColor" stroke-width="1.1"/></svg>
+    <span class="sel-name">roportaj_01.mp4</span>
+    <span class="pill live">34.2 sn</span>
+  </div>
+
+  <section class="tabpane active">
+    <div class="seg-ctl full">
+      <button>Seçili klip</button>
+      <button class="on">In → Out</button>
+      <button>Sekans</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Altyazı ayarları</div>
+      <div class="field">
+        <label>Şablon</label>
+        <div class="field-row">
+          <select class="grow"><option>★ Şablonum</option></select>
+          <button class="star-btn"><svg viewBox="0 0 16 16"><path d="M8 2.4 l1.75 3.55 3.9.55 -2.82 2.75 .67 3.9 -3.5-1.84 -3.5 1.84 .67-3.9 -2.82-2.75 3.9-.55 z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+      <div class="field-grid">
+        <div class="field"><label>Dil</label><select><option>Türkçe</option></select></div>
+        <div class="field"><label>Satır uzunluğu</label><select><option>3 kelime</option></select></div>
+      </div>
+      <div class="field">
+        <label>Yazım biçimi</label>
+        <div class="field-row">
+          <select class="grow"><option>Normal yazım</option></select>
+          <label class="switch"><input type="checkbox" checked><i></i><span>Noktalama</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Ses katmanları</div>
+      <div class="tracks">
+        <button class="track-chip on"><svg viewBox="0 0 16 16"><path d="M3.5 8.5 L6.5 11.5 L12.5 4.5" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Tümü</span></button>
+        <button class="track-chip on"><svg viewBox="0 0 16 16"><path d="M3.5 8.5 L6.5 11.5 L12.5 4.5" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>A1</span></button>
+        <button class="track-chip on"><svg viewBox="0 0 16 16"><path d="M3.5 8.5 L6.5 11.5 L12.5 4.5" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>A2</span></button>
+        <button class="track-chip empty"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5.6 8 h4.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>A3</span></button>
+      </div>
+    </div>
+
+    <button class="btn primary big cta">
+      <span class="btn-label">Altyazı oluştur<em>In → Out</em></span>
+    </button>
+
+    <div class="result-head" style="margin-top:14px">
+      <span class="dim">18 satır · düzenleyip uygula</span>
+      <button class="link-btn">TXT</button>
+      <button class="link-btn">SRT indir</button>
+    </div>
+    <div class="segments" style="max-height:none">
+      <div class="seg"><button class="seg-time mono jump">00:04</button><input type="text" value="Merhaba arkadaşlar, bugün"><button class="seg-x">⨝</button><button class="seg-x">×</button></div>
+      <div class="seg"><button class="seg-time mono jump">00:06</button><input type="text" value="çok özel bir konu var"><button class="seg-x">⨝</button><button class="seg-x">×</button></div>
+      <div class="seg"><button class="seg-time mono jump">00:09</button><input type="text" value="kurguya ışık hızı geliyor"><button class="seg-x">⨝</button><button class="seg-x">×</button></div>
+    </div>
+  </section>
+
+</body>
+</html>

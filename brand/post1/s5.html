@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><link rel="stylesheet" href="slide.css"><style>  .road { width: 880px; display:flex; flex-direction:column; gap:20px; }
+   .road-row {
+     display:flex; align-items:center; gap:28px;
+     background: linear-gradient(180deg, rgba(255,255,255,.03), transparent 40%), #161822;
+     border:2px solid #262a3a; border-radius:24px; padding:28px 34px;
+   }
+   .road-row.now {
+     border-color:#8b7cf6;
+     box-shadow: 0 20px 50px -20px rgba(120,108,255,.6);
+   }
+   .rn {
+     flex:0 0 84px; height:84px; border-radius:22px;
+     background:#1c1f2b; color:#4c5169;
+     display:flex; align-items:center; justify-content:center;
+     font-size:36px; font-weight:700;
+   }
+   .road-row.now .rn {
+     background: linear-gradient(135deg,#8b7cf6,#5b8cff); color:#fff;
+     box-shadow: 0 12px 30px -10px rgba(120,108,255,.9);
+   }
+   .rt { flex:1; text-align:left; }
+   .rt b { display:block; font-size:40px; margin-bottom:10px; }
+   .badge {
+     display:inline-block; padding:8px 20px; border-radius:30px;
+     font-size:22px; font-weight:700; letter-spacing:1px;
+   }
+   .badge.live { background:#6fdca0; color:#0b2318; }
+   .badge.soon { background:#eac877; color:#2a2210; }
+   .rc { font-size:52px; color:#3d4257; }
+   .road-note {
+     margin-top:8px; padding:30px;
+     background: linear-gradient(135deg, rgba(139,124,246,.14), rgba(91,140,255,.07));
+     border:2px solid rgba(139,124,246,.28); border-radius:22px;
+     font-size:31px; font-weight:600; color:#cfc9ff;
+   }</style></head>
+<body>
+  <div class="kicker">YOL HARİTASI</div>
+  <h2 style="margin-bottom:48px">Bu sadece<br><span class="grad-text">başlangıç.</span></h2>
+  <div class="road">
+    <div class="road-row now">
+      <div class="rn">01</div>
+      <div class="rt"><b>AI Altyazı</b><span class="badge live">ŞİMDİ</span></div>
+      <div class="rc">›</div>
+    </div>
+    <div class="road-row">
+      <div class="rn">02</div>
+      <div class="rt"><b>Beat Marker</b><span class="badge soon">YAKINDA</span></div>
+      <div class="rc">›</div>
+    </div>
+    <div class="road-row">
+      <div class="rn">03</div>
+      <div class="rt"><b>Emoji Picker</b><span class="badge soon">YAKINDA</span></div>
+      <div class="rc">›</div>
+    </div>
+    <div class="road-note">Suflo büyüdükçe kurgu akışın hızlanacak.</div>
+  </div>
+  <div class="footer">
+    <div class="brand">
+      <svg viewBox="1 1 18 18"><defs><linearGradient id="fg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5b8cff"/></linearGradient></defs><rect x="1" y="1" width="18" height="18" rx="5" fill="url(#fg)"/><path d="M13.9 7.2 C13.5 5.5 11.9 4.7 10 4.7 C8 4.7 6.3 5.5 6.3 7.1 C6.3 10.7 13.7 9.1 13.7 12.9 C13.7 14.5 12 15.3 10 15.3 C8.1 15.3 6.5 14.5 6.1 12.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <b>suflo.app</b>
+    </div>
+    <div class="swipe">indir <span style="font-size:38px">→</span></div>
+  </div>
+</body></html>
