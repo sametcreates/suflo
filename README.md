@@ -16,12 +16,25 @@ SFX kütüphanesi · yapay zekâ altyazı · otomatik ilk kesim · keyframe easi
 
 ### Altyazı motorları
 
-- **Yerel (önerilen):** whisper.cpp + Whisper large-v3-turbo bilgisayarında çalışır. İnternet, hesap, anahtar gerekmez. Panel tek düğmeyle kurar (~570 MB, bir kez).
+- **Yerel (önerilen):** whisper.cpp bilgisayarında çalışır. İnternet, hesap, anahtar gerekmez. Panel tek düğmeyle kurar.
+  - **Model seçimi:** Tiny (32 MB) · Base · Small · **Turbo (varsayılan)** · Large v3 (1 GB, Türkçe'de en iyi)
+  - **NVIDIA GPU desteği:** ekran kartı otomatik algılanır, cuBLAS sürümü kurulur — ölçümde 7 kat hız
+  - **Sessizlik atlama (VAD):** konuşma olmayan bölümler işlenmez — %61 hız + daha az uydurma altyazı
 - **Groq bulut:** ücretsiz API anahtarıyla saniyeler içinde sonuç (günde 8 saat ses kotası). OpenAI ve özel endpoint (self-hosted Whisper dahil) de desteklenir.
 
-### Altyazı stilleri
+**Hız (83 sn ses):** CPU 8,5 sn · NVIDIA GPU **1,2 sn**
 
-Noktalama kaldır/koru · Normal / BÜYÜK HARF / küçük harf (Türkçe İ-ı ve Azerice kurallarına uygun) · satır uzunluğu 32/42/60 · Whisper halüsinasyon filtresi ("Altyazı M.K." vb. otomatik süzülür).
+### Altyazı editörü
+
+Satır bölme (Enter) · birleştirme · elle zaman düzenleme (çift tık) · toplu kaydırma (±0,5 sn) · satır ekleme/silme · **geri al/yinele (Ctrl+Z / Ctrl+Y)** · zamana tıklayıp playhead'e gitme.
+
+### Stiller ve düzeltme
+
+Noktalama kaldır/koru · Normal / BÜYÜK HARF / küçük harf (Türkçe İ-ı ve Azerice kurallarına uygun) · satır uzunluğu kelime (2-5) veya karakter (32/42/60) · karaoke (kelime kelime / birikimli) · Whisper halüsinasyon filtresi · **terim sözlüğü** (`yanlış => doğru` kuralları her transkriptte otomatik uygulanır).
+
+### İş kaybına karşı
+
+Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır. Uygulanan SRT proje klasörüne yazılır (Premiere dosyayı kopyalamaz, yola referans verir). Model indirmesi kesilirse kaldığı yerden devam eder, ayna sunucu dener, kota/sunucu hatasında inen kısım korunur, yarım dosya kurulu sayılmaz. Vekil sunucu (proxy) Ayarlar'dan girilir; https için CONNECT tüneli kurulur.
 
 ## Kurulum
 
@@ -37,7 +50,7 @@ powershell -ExecutionPolicy Bypass -File tools/install.ps1
 
 ### Gereksinimler
 
-- Premiere 2022+ (CEP 11/12), Windows. macOS desteği yol haritasında.
+- Premiere 14.4 (2020) ve üstü, Windows. Önerilen: Premiere 2022+. macOS desteği yol haritasında.
 - **ffmpeg** — Kesim ve Altyazı için. Panel Ayarlar sekmesinden tek tıkla kurulur (winget).
 
 ## Kullanım notları
@@ -62,13 +75,14 @@ powershell -ExecutionPolicy Bypass -File tools/install.ps1
 
 ```
 css/style.css     tasarım sistemi
-js/bridge.js      CEP köprüsü: Node, ffmpeg, whisper.cpp, indirici
-js/captions.js    altyazı modülü
+js/bridge.js      CEP köprüsü: Node, ffmpeg, indirici (resume+ayna), taslak, günlük
+js/engine.js      yerel motor: model kataloğu, GPU tespiti, kurulum, whisper argümanları
+js/captions.js    altyazı modülü + editör (bölme, zaman, undo, sözlük)
 js/magiccut.js    kesim modülü
 js/motion.js      easing modülü
 js/sfx.js         ses kütüphanesi
 jsx/host.jsx      Premiere ExtendScript tarafı
-tools/            kur/kaldır/paketle/dev-server
+tools/            kur/kaldır/paketle/yayınla/dev-server
 ```
 
 Önizleme: `node tools/devserver.js` → http://localhost:5177 (Premiere dışında sahte veriyle açılır).

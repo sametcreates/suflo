@@ -22,7 +22,7 @@
       <span class="brand-name">Suflo</span>
     </div>
     <div class="top-right">
-      <span class="brand-ver">v1.5</span>
+      <span class="brand-ver">v1.6</span>
       <span id="host-dot" class="host-dot" title="Premiere bağlantısı"></span>
       <button class="tab tab-gear solo-gear" data-tab="settings" title="Ayarlar">
         <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -85,8 +85,8 @@
   <!-- ================= ALTYAZI ================= -->
   <section id="tab-captions" class="tabpane active">
     <div id="cap-setup" class="setup-note" hidden>
-      <p><strong>Altyazı için bir motor gerek.</strong> En kolayı: yerel motoru kur — hesap, anahtar, internet gerektirmez.</p>
-      <button id="cap-local-install" class="btn primary" style="width:100%">Yerel motoru indir & kur (~570 MB)</button>
+      <p><strong>Altyazı için bir motor gerek.</strong> En kolayı: yerel motoru kur — hesap, anahtar, internet gerektirmez. NVIDIA ekran kartın varsa otomatik kullanılır.</p>
+      <button id="cap-local-install" class="btn primary" style="width:100%">Yerel motoru indir & kur</button>
       <p class="hint" style="margin:8px 0 6px">ya da hızlı bulut için ücretsiz <a href="#" id="cap-groq-link">Groq anahtarı</a> gir:</p>
       <div class="row">
         <input id="cap-key-input" type="password" placeholder="gsk_… anahtarını yapıştır">
@@ -176,6 +176,7 @@
       <button id="cap-go" class="btn primary big cta" disabled>
         <span class="btn-label">Altyazı oluştur<em id="cap-go-scope">Seçili klip</em></span>
       </button>
+      <button id="cap-restore" class="btn outline big" hidden></button>
       <button id="cap-import-srt" class="btn outline big">
         <svg viewBox="0 0 16 16" class="btn-ic"><path d="M9 1.8 H4.4 a1.6 1.6 0 0 0 -1.6 1.6 v9.2 a1.6 1.6 0 0 0 1.6 1.6 h7.2 a1.6 1.6 0 0 0 1.6-1.6 V6 z M9 1.8 V6 h4.2" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
         SRT içe aktar
@@ -186,11 +187,20 @@
       <div id="cap-result" hidden>
         <div class="result-head">
           <span id="cap-result-info" class="dim"></span>
+          <button id="cap-undo" class="link-btn" title="Geri al (Ctrl+Z)" disabled>↶</button>
+          <button id="cap-redo" class="link-btn" title="Yinele (Ctrl+Y)" disabled>↷</button>
           <button id="cap-revert" class="link-btn" hidden>çeviriyi geri al</button>
           <button id="cap-save-txt" class="link-btn">TXT</button>
           <button id="cap-save-srt" class="link-btn">SRT indir</button>
         </div>
         <div id="cap-segments" class="segments"></div>
+
+        <div class="row shift-row">
+          <span class="dim" style="font-size:11px">Tümünü kaydır</span>
+          <button id="cap-shift-back" class="btn tiny" title="Altyazıları geri al">−0,5 sn</button>
+          <button id="cap-shift-fwd" class="btn tiny" title="Altyazıları ileri al">+0,5 sn</button>
+          <button id="cap-add-line" class="btn tiny" style="margin-left:auto" title="Sona boş satır ekle">+ satır</button>
+        </div>
 
         <div class="row">
           <select id="cap-translate" class="grow" title="Altyazıyı başka dile çevir (Pro önizleme — lansman süresince ücretsiz)">
@@ -209,6 +219,12 @@
             <input id="cap-find" type="text" placeholder="bul">
             <input id="cap-replace" type="text" placeholder="yerine koy">
             <button id="cap-fr-go" class="btn">Uygula</button>
+          </div>
+          <div class="row">
+            <label class="check-label" title="Büyük/küçük harf ayrımı yapmaz, tam kelime eşler (Türkçe İ-ı duyarlı)">
+              <input id="cap-fr-ci" type="checkbox" checked> harf duyarsız · tam kelime
+            </label>
+            <button id="cap-fr-glossary" class="link-btn" style="margin-left:auto" title="Bu düzeltmeyi kalıcı sözlüğe ekle">sözlüğe ekle →</button>
           </div>
         </details>
 
@@ -311,6 +327,18 @@
         <span id="set-local-status" class="inline-status" style="margin:0;flex:1">kontrol ediliyor…</span>
         <button id="set-local-install" class="btn" hidden>İndir & kur</button>
       </div>
+      <div class="row">
+        <label>Model</label>
+        <select id="set-model" class="grow" title="Büyük model = daha doğru ama yavaş"></select>
+      </div>
+      <div class="row" id="set-gpu-row" hidden>
+        <label>Hızlandırma</label>
+        <label class="switch" style="flex:1" title="NVIDIA ekran kartıyla 5-15 kat hızlı">
+          <input id="set-gpu" type="checkbox" checked>
+          <i></i>
+          <span>GPU: <b id="set-gpu-name" style="color:var(--accent-lite);font-weight:600"></b></span>
+        </label>
+      </div>
       <div class="row" id="set-custom-row" hidden>
         <label>Endpoint</label>
         <input id="set-endpoint" type="text" placeholder="https://…/v1/audio/transcriptions">
@@ -344,6 +372,29 @@
     </div>
 
     <div class="set-group">
+      <div class="set-title">Terim sözlüğü</div>
+      <p class="hint" style="margin-bottom:8px">Whisper'ın sürekli yanlış yazdığı isimleri kalıcı düzelt. Her satır: <b>yanlış =&gt; doğru</b></p>
+      <textarea id="set-glossary" class="glossary" rows="4" placeholder="suflo => Suflo&#10;sametkreyts => sametcreates&#10;rils => Reels"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="set-glossary-save" class="btn">Sözlüğü kaydet</button>
+        <span id="set-glossary-info" class="dim" style="font-size:11px"></span>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <div class="set-title">Vekil sunucu (proxy)</div>
+      <p class="hint" style="margin-bottom:8px">Kurumsal ağdaysan model indirmeleri buradan geçer. Boş bırakırsan sistem ayarı (HTTPS_PROXY) kullanılır.</p>
+      <div class="field">
+        <label class="field-label" for="set-proxy">Adres</label>
+        <input id="set-proxy" type="text" placeholder="http://kullanici:sifre@proxy.sirket.com:8080">
+      </div>
+      <div class="field" style="margin-top:8px">
+        <label class="field-label" for="set-noproxy">Muaf adresler</label>
+        <input id="set-noproxy" type="text" placeholder="sirket.local, 10.0.0.5">
+      </div>
+    </div>
+
+    <div class="set-group">
       <div class="set-title">Modüller</div>
       <label class="check-label">
         <input id="set-modules" type="checkbox"> Beta modülleri göster (SFX · Kesim · Motion)
@@ -359,7 +410,7 @@
 
     <div class="set-group">
       <div class="set-title">Hakkında</div>
-      <p class="dim">Suflo v1.5 — Premiere için ücretsiz, açık kaynak kurgu paneli.<br>SFX · Altyazı · Kesim · Motion — abonelik yok, kredi yok.<br>MIT · sametcreates</p>
+      <p class="dim">Suflo v1.6 — Premiere için ücretsiz, açık kaynak kurgu paneli.<br>SFX · Altyazı · Kesim · Motion — abonelik yok, kredi yok.<br>MIT · sametcreates</p>
     </div>
   </section>
 
@@ -367,6 +418,7 @@
 
   <script src="js/CSInterface.js"></script>
   <script src="js/bridge.js"></script>
+  <script src="js/engine.js"></script>
   <script src="js/sfx.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/magiccut.js"></script>

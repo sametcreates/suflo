@@ -149,23 +149,45 @@ window.KApp = (function () {
 
   /* ---------------- Yerel Whisper kurulumu ---------------- */
 
-  var WCPP_ZIP = "https://github.com/ggerganov/whisper.cpp/releases/download/v1.9.1/whisper-blas-bin-x64.zip";
-  var WCPP_MODEL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin";
   var installingLocal = false;
 
   function refreshLocalStatus() {
     var box = el("set-local-status");
     var btn = el("set-local-install");
-    var lw = K.whisperLocal();
-    if (lw) {
+    var m = KEngine.activeModel();
+    var gpu = KEngine.gpuInfo();
+    var hw = KEngine.installedBuild() === "cuda"
+      ? "GPU" + (gpu && gpu.name ? " (" + gpu.name.replace(/NVIDIA\s*/i, "") + ")" : "")
+      : "CPU";
+    if (m) {
       box.className = "inline-status good";
-      box.textContent = "✓ kurulu — " + lw.model.replace(/^.*[\\\/]/, "").replace(/^ggml-|\.bin$/g, "");
-      btn.hidden = true;
+      box.textContent = "✓ " + m.label.split(" —")[0] + " · " + hw + (KEngine.vadPath() ? " · VAD" : "");
+      btn.textContent = "Değiştir";
+      btn.hidden = false;
     } else {
       box.className = "inline-status";
       box.textContent = installingLocal ? box.textContent : "kurulu değil";
+      btn.textContent = "İndir & kur";
       btn.hidden = installingLocal;
     }
+    refreshModelPicker();
+  }
+
+  // Ayarlar'daki model listesi: kurulu olanlar işaretli, seçim kalıcı
+  function refreshModelPicker() {
+    var sel = el("set-model");
+    if (!sel) return;
+    var inst = KEngine.installedModels().map(function (m) { return m.id; });
+    var active = KEngine.activeModel();
+    sel.innerHTML = "";
+    KEngine.MODELS.forEach(function (m) {
+      var o = document.createElement("option");
+      o.value = m.id;
+      var kurulu = inst.indexOf(m.id) !== -1;
+      o.textContent = (kurulu ? "✓ " : "") + m.label + " — " + KEngine.fmtMB(m.sizeMB);
+      sel.appendChild(o);
+    });
+    sel.value = active ? active.id : (K.settings().model || "turbo");
   }
 
   async function installLocalWhisper(progressEl) {
@@ -180,33 +202,17 @@ window.KApp = (function () {
       if (progressEl) progressEl.textContent = msg;
     }
     try {
-      var dir = K.whisperDir();
-      K.fs.mkdirSync(K.path.join(dir, "models"), { recursive: true });
+      say("Donanım kontrol ediliyor…");
+      var gpu = await KEngine.detectGpu(true);
+      var useGpu = gpu.kind === "cuda" && el("set-gpu") ? el("set-gpu").checked : (gpu.kind === "cuda");
+      var modelId = (el("set-model") && el("set-model").value) || K.settings().model || "turbo";
 
-      say("Motor iniyor… (20 MB)");
-      var zipPath = K.path.join(dir, "wcpp.zip");
-      var r1 = await K.download(WCPP_ZIP, zipPath, function (f) {
-        say("Motor iniyor… %" + Math.round(f * 100));
-      });
-      if (!r1.ok) throw new Error("Motor indirilemedi: " + r1.error);
-      say("Motor açılıyor…");
-      var un = await K.unzip(zipPath, dir);
-      try { K.fs.unlinkSync(zipPath); } catch (e) {}
-      if (!un) throw new Error("Zip açılamadı.");
+      var res = await KEngine.install({ modelId: modelId, useGpu: useGpu, onStatus: say });
 
-      say("Model iniyor… (~570 MB, birkaç dk)");
-      var mPath = K.path.join(dir, "models", "ggml-large-v3-turbo-q5_0.bin");
-      var r2 = await K.download(WCPP_MODEL, mPath, function (f) {
-        say("Model iniyor… %" + Math.round(f * 100));
-      });
-      if (!r2.ok) throw new Error("Model indirilemedi: " + r2.error);
-
-      if (!K.whisperLocal()) throw new Error("Kurulum doğrulanamadı.");
-      var st = K.settings();
-      st.provider = "local";
-      K.saveSettings();
       el("set-provider").value = "local";
-      toast("Yerel motor hazır — altyazı artık tamamen offline", "good");
+      toast("Hazır: " + res.model.label.split(" —")[0] +
+        (res.build === "cuda" ? " · GPU hızlandırmalı" : " · CPU") +
+        (res.vad ? " · sessizlik atlama açık" : ""), "good");
     } catch (e) {
       toast(e.message, "bad");
     } finally {
@@ -249,6 +255,36 @@ window.KApp = (function () {
     });
 
     el("set-local-install").addEventListener("click", function () { installLocalWhisper(); });
+    if (el("set-model")) {
+      el("set-model").addEventListener("change", function () {
+        var st2 = K.settings();
+        var inst = KEngine.installedModels().map(function (m) { return m.id; });
+        st2.model = this.value;
+        K.saveSettings();
+        if (inst.indexOf(this.value) === -1) {
+          el("set-local-status").className = "inline-status warn";
+          el("set-local-status").textContent = "bu model kurulu değil — indirmek için düğmeye bas";
+          el("set-local-install").textContent = "İndir & kur";
+          el("set-local-install").hidden = false;
+        } else {
+          refreshLocalStatus();
+          KCaptions.refreshSetup();
+        }
+      });
+    }
+    // GPU tespiti arka planda: kutuyu ancak NVIDIA varsa göster
+    KEngine.detectGpu().then(function (g) {
+      var row = el("set-gpu-row");
+      if (!row) return;
+      if (g.kind === "cuda") {
+        row.hidden = false;
+        el("set-gpu-name").textContent = g.name.replace(/NVIDIA\s*/i, "");
+        if (el("set-gpu")) el("set-gpu").checked = K.settings().engineBuild !== "cpu";
+      } else {
+        row.hidden = true;
+      }
+      refreshLocalStatus();
+    });
     refreshLocalStatus();
 
     el("set-save").addEventListener("click", function () {
@@ -272,6 +308,35 @@ window.KApp = (function () {
 
     el("set-ffmpeg-recheck").addEventListener("click", checkFfmpeg);
     el("set-ffmpeg-install").addEventListener("click", installFfmpeg);
+
+    // terim sözlüğü
+    if (el("set-glossary")) {
+      el("set-glossary").value = KCaptions.glossaryText();
+      el("set-glossary-save").addEventListener("click", function () {
+        var st = K.settings();
+        st.glossary = KCaptions.parseGlossary(el("set-glossary").value);
+        K.saveSettings();
+        el("set-glossary-info").textContent = st.glossary.length + " kural kayıtlı";
+        toast(st.glossary.length + " sözlük kuralı kaydedildi", "good");
+      });
+      var gl = K.settings().glossary || [];
+      if (gl.length) el("set-glossary-info").textContent = gl.length + " kural kayıtlı";
+    }
+
+    // vekil sunucu — kurumsal ağda indirmeler buradan geçer
+    if (el("set-proxy")) {
+      el("set-proxy").value = s.proxyUrl || "";
+      el("set-noproxy").value = s.noProxy || "";
+      ["set-proxy", "set-noproxy"].forEach(function (id) {
+        el(id).addEventListener("change", function () {
+          var st = K.settings();
+          st.proxyUrl = el("set-proxy").value.trim();
+          st.noProxy = el("set-noproxy").value.trim();
+          K.saveSettings();
+          toast(st.proxyUrl ? "Vekil sunucu kaydedildi" : "Vekil sunucu kapatıldı");
+        });
+      });
+    }
 
     el("set-copy-log").addEventListener("click", function () {
       var txt = K.logText();
@@ -347,18 +412,39 @@ window.KApp = (function () {
     } catch (e) {}
   }
 
+  /*
+   * Her adımı izole çalıştır: tek bir modül yüklenemezse (ör. eski CEF'te ayrıştırılamayan
+   * bir dosya) panelin tamamı boş açılmasın. Hata sessiz kalmasın diye günlüğe düşer.
+   */
+  function guvenli(ad, fn) {
+    try { fn(); } catch (e) {
+      K.log("init " + ad + " hata: " + (e && e.message ? e.message : e));
+      toast(ad + " bölümü yüklenemedi — Ayarlar > Destek'ten günlüğü gönder.", "bad");
+    }
+  }
+
   function init() {
-    initTabs();
-    initSettings();
-    applySoloMode();
-    setTimeout(checkUpdate, 4000);
-    KSfx.init();
-    KCaptions.init();
-    KCut.init();
-    KMotion.init();
-    pollContext();
-    checkFfmpeg();
+    // Global hata yakalayıcı: aksi halde bir arıza tamamen sessiz kalıyor
+    window.addEventListener("error", function (ev) {
+      try { K.log("js hata: " + (ev.message || "") + " @ " + (ev.filename || "") + ":" + (ev.lineno || 0)); } catch (e) {}
+    });
+
+    // Bağlam yoklaması ve ffmpeg denetimi ÖNCE: modüllerden bağımsız çalışsın
+    guvenli("bağlam", pollContext);
+    guvenli("ffmpeg", checkFfmpeg);
     setInterval(pollContext, 2500);
+
+    guvenli("sekmeler", initTabs);
+    guvenli("ayarlar", initSettings);
+    guvenli("mod", applySoloMode);
+    guvenli("SFX", function () { KSfx.init(); });
+    guvenli("Altyazı", function () { KCaptions.init(); });
+    guvenli("Kesim", function () { KCut.init(); });
+    guvenli("Motion", function () { KMotion.init(); });
+
+    setTimeout(checkUpdate, 4000);
+    // eski geçici ses dosyalarını süpür (disk sessizce dolmasın)
+    setTimeout(function () { try { K.sweepTemp(); } catch (e) {} }, 6000);
   }
 
   document.addEventListener("DOMContentLoaded", init);

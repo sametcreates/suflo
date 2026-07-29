@@ -224,6 +224,23 @@ function KS_setPlayerPosition(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/*
+ * Kaydedilmiş projenin klasörü. Altyazı SRT'si buraya yazılır: Premiere içe aktarılan
+ * dosyayı kopyalamaz, yola referans verir — proje yanında duran dosya asla süpürülmez.
+ * Proje kaydedilmemişse path boştur; panel kendi kalıcı klasörüne düşer.
+ */
+function KS_projectDir() {
+  try {
+    var p = app.project ? String(app.project.path || "") : "";
+    if (!p) return KS_ok({ dir: "" });
+    var f = new File(p);
+    var d = f.parent;
+    if (!d || !d.exists) return KS_ok({ dir: "" });
+    // Folder.fsName URI kodlamasi icermez (Folder.name icerir — orada decodeURIComponent sart)
+    return KS_ok({ dir: String(d.fsName) });
+  } catch (e) { return KS_ok({ dir: "" }); }
+}
+
 /* ---------- SFX ---------- */
 
 function KS_insertSfx(encoded) {

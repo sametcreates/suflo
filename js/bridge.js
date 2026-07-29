@@ -198,6 +198,70 @@ window.K = (function () {
     });
   }
 
+  /* ---------------- Taslak kalıcılığı ---------------- */
+
+  function draftPath() {
+    if (!nodeOK) return null;
+    var p = settingsPath();
+    if (!p) return null;
+    return path.join(path.dirname(p), "draft.json");
+  }
+
+  // Transkripti diske yaz — panel kapanırsa iş kaybolmasın.
+  // Geçici dosyaya yazıp üzerine taşı: yazma ortasında çökme eski taslağı bozmasın.
+  function saveDraft(obj) {
+    try {
+      var p = draftPath();
+      if (!p) return false;
+      var tmp = p + ".tmp";
+      fs.writeFileSync(tmp, JSON.stringify(obj), "utf8");
+      fs.renameSync(tmp, p);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function loadDraft() {
+    try {
+      var p = draftPath();
+      if (!p || !fs.existsSync(p)) return null;
+      var age = Date.now() - fs.statSync(p).mtimeMs;
+      if (age > 86400000) { clearDraft(); return null; } // 24 saatten eskisini at
+      var d = JSON.parse(fs.readFileSync(p, "utf8"));
+      if (!d || !d.segments || !d.segments.length) return null;
+      return d;
+    } catch (e) { return null; }
+  }
+
+  function clearDraft() {
+    try {
+      var p = draftPath();
+      if (p && fs.existsSync(p)) fs.unlinkSync(p);
+    } catch (e) {}
+  }
+
+  // Temp klasöründe biriken eski ses/JSON artıklarını süpür
+  function sweepTemp() {
+    if (!nodeOK) return 0;
+    var n = 0;
+    [tmpDir(), path.join(os.tmpdir(), "Suflo"), path.join(os.tmpdir(), "kesit")].forEach(function (dir) {
+      try {
+        if (!fs.existsSync(dir)) return;
+        fs.readdirSync(dir).forEach(function (f) {
+          // .srt ASLA silinmez: Premiere içe aktarılan altyazıyı kopyalamaz, diskteki yola
+          // referans verir — silinirse kullanıcının projesindeki caption izi kırılır.
+          if (/\.srt$/i.test(f)) return;
+          if (!/^(cap_|seq_|warmup|montaj_|suflo_)/i.test(f)) return;
+          var fp = path.join(dir, f);
+          try {
+            if (Date.now() - fs.statSync(fp).mtimeMs > 86400000) { fs.unlinkSync(fp); n++; }
+          } catch (e2) {}
+        });
+      } catch (e) {}
+    });
+    if (n) log("temp temizligi: " + n + " dosya silindi");
+    return n;
+  }
+
   /* ---------------- HTTP GET (güncelleme kontrolü) ---------------- */
 
   function httpGet(urlStr, headers) {
@@ -228,7 +292,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.5.0";
+  var VERSION = "1.6.0";
   // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
   var REPO = "sametkaygisiz27-stack/suflo";
   var logBuf = [];
@@ -294,8 +358,13 @@ window.K = (function () {
     return path.join(os.homedir(), "AppData", "Roaming", "Kesit", "whisper");
   }
 
-  // Kurulu yerel motoru bul: { exe, model } veya null
-  function whisperLocal() {
+  /*
+   * Kurulu yerel motoru bul: { exe, model, dir } veya null.
+   * opts.skipModel: yalnız çalıştırılabilir aranır (kurulum sırasında gerekir).
+   * Model seçimi KEngine'e bırakılır; burada yalnız yedek tarama yapılır.
+   */
+  function whisperLocal(opts) {
+    opts = opts || {};
     if (!nodeOK) return null;
     try {
       var dir = whisperDir();
@@ -316,14 +385,25 @@ window.K = (function () {
         }
       }
       if (!exe) return null;
-      var mdir = path.join(dir, "models");
-      if (!fs.existsSync(mdir)) return null;
-      var files = fs.readdirSync(mdir);
+      if (opts.skipModel) return { exe: exe, model: null, dir: dir };
+
+      // model: once KEngine'in sectigi, yoksa klasordeki en buyuk ggml
       var model = null;
-      for (var mi = 0; mi < files.length; mi++) {
-        if (/^ggml-.*\.bin$/i.test(files[mi]) && fs.statSync(path.join(mdir, files[mi])).size > 50000000) {
-          model = path.join(mdir, files[mi]);
-          break;
+      try {
+        if (window.KEngine) model = window.KEngine.activeModelPath();
+      } catch (eE) {}
+      if (!model || !fs.existsSync(model)) {
+        var mdir = path.join(dir, "models");
+        if (!fs.existsSync(mdir)) return null;
+        var files = fs.readdirSync(mdir);
+        var best = 0;
+        for (var mi = 0; mi < files.length; mi++) {
+          if (!/^ggml-.*\.bin$/i.test(files[mi])) continue;
+          if (/silero/i.test(files[mi])) continue; // VAD modeli transkripsiyon modeli degil
+          var p = path.join(mdir, files[mi]);
+          var sz = 0;
+          try { sz = fs.statSync(p).size; } catch (eS2) {}
+          if (sz > 20000000 && sz > best) { best = sz; model = p; }
         }
       }
       if (!model) return null;
@@ -331,9 +411,85 @@ window.K = (function () {
     } catch (e) { return null; }
   }
 
-  // Yonlendirme takip eden dosya indirici (panelden kurulum icin)
-  function download(urlStr, destPath, onProgress, redirects) {
+  /* ---------------- Vekil sunucu (proxy) ---------------- */
+
+  function proxyFor(u) {
+    var s = loadSettings();
+    var raw = String(s.proxyUrl || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || "").trim();
+    if (!raw) return null;
+    var host = String(u.hostname).toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return null;
+    var noP = String(s.noProxy || process.env.NO_PROXY || "").split(",");
+    for (var i = 0; i < noP.length; i++) {
+      var pat = noP[i].trim().toLowerCase().replace(/^\./, "");
+      if (!pat) continue;
+      if (pat === "*" || host === pat || host.slice(-(pat.length + 1)) === "." + pat) {
+        log("proxy atlandi (NO_PROXY): " + host);
+        return null;
+      }
+    }
+    // Semasiz girdiyi normalize et: new URL("proxy.local:8080") hata vermez ama hostname
+    // bos kalir ve istek sessizce 127.0.0.1:8080'e gider.
+    if (!/^[a-z][a-z0-9+.\-]*:\/\//i.test(raw)) raw = "http://" + raw;
+    try {
+      var pu = new URL(raw);
+      if (!pu.hostname) throw new Error("adreste host yok");
+      return pu;
+    } catch (e) {
+      log("proxy adresi anlasilmadi, dogrudan baglaniliyor: " + raw + " (" + e.message + ")");
+      return null;
+    }
+  }
+
+  function proxyAuth(pu) {
+    if (!pu.username) return null;
+    var Buf = require("buffer").Buffer;
+    return "Basic " + Buf.from(decodeURIComponent(pu.username) + ":" +
+      decodeURIComponent(pu.password || "")).toString("base64");
+  }
+
+  /*
+   * https hedef icin CONNECT tuneli. Duz absolute-URI GET yalnizca http:// icin gecerlidir;
+   * katalogdaki tum adresler https oldugu icin tunel olmadan Squid/kurumsal proxy'ler
+   * 400/403/501 doner ve HTTPS_PROXY tanimli makinelerde kurulum sessizce bozulur.
+   */
+  function connectTunnel(pu, u, cb) {
+    var hdrs = {};
+    var au = proxyAuth(pu);
+    if (au) hdrs["Proxy-Authorization"] = au;
+    var settled = false;
+    function done(e, s) { if (!settled) { settled = true; cb(e, s); } }
+    var cr = require("http").request({
+      host: pu.hostname,
+      port: Number(pu.port) || 8080,
+      method: "CONNECT",
+      path: u.hostname + ":" + (u.port || 443),
+      headers: hdrs
+    });
+    cr.on("connect", function (res, socket) {
+      if (res.statusCode !== 200) {           // 407 vb. yuzeye ciksin
+        try { socket.destroy(); } catch (e1) {}
+        done(new Error("Proxy CONNECT reddetti: HTTP " + res.statusCode));
+        return;
+      }
+      done(null, socket);
+    });
+    cr.on("error", function (e) { done(e); });
+    cr.setTimeout(30000, function () { cr.destroy(); done(new Error("Proxy CONNECT zaman asimi")); });
+    cr.end();
+  }
+
+  /*
+   * Yonlendirme takip eden, kaldigi yerden devam eden dosya indirici.
+   * .part dosyasina yazar, tamamlaninca atomik olarak nihai ada tasir.
+   * resumeFrom: ic kullanim (byte offset).
+   * meta: { key, expectedMB } — key mantiksal kimliktir; yarim dosya yalnizca ayni
+   *   kimlige devam eder, boylece aynalar arasi devam korunur ama farkli dosyalar
+   *   (ornegin CPU/GPU derlemeleri) birbirine eklenmez.
+   */
+  function download(urlStr, destPath, onProgress, redirects, resumeFrom, meta) {
     redirects = redirects || 0;
+    meta = meta || {};
     return new Promise(function (resolve) {
       if (!nodeOK) { resolve({ ok: false, error: "Node erişimi yok" }); return; }
       if (redirects > 6) { resolve({ ok: false, error: "Çok fazla yönlendirme" }); return; }
@@ -342,37 +498,128 @@ window.K = (function () {
         u = new URL(urlStr);
         proto = require(u.protocol === "http:" ? "http" : "https");
       } catch (e) { resolve({ ok: false, error: String(e) }); return; }
-      var req = proto.get({
+
+      var partPath0 = destPath + ".part";
+      var sidePath = destPath + ".part.json";
+      var side = null;
+      try {
+        if (fs.existsSync(sidePath)) side = JSON.parse(fs.readFileSync(sidePath, "utf8"));
+      } catch (eS) {}
+
+      function partSize() {
+        try { return fs.existsSync(partPath0) ? fs.statSync(partPath0).size : 0; } catch (e) { return 0; }
+      }
+      function dropPart() {
+        try { fs.unlinkSync(partPath0); } catch (e) {}
+        try { fs.unlinkSync(sidePath); } catch (e) {}
+      }
+      function writeSide(total) {
+        if (!meta.key) return;
+        try {
+          fs.writeFileSync(sidePath, JSON.stringify({ key: meta.key, total: total || 0 }), "utf8");
+        } catch (e) {}
+      }
+
+      // ilk cagrida yarim dosya varsa kaldigi yerden devam etmeyi dene
+      if (resumeFrom === undefined) {
+        resumeFrom = 0;
+        try {
+          if (fs.existsSync(partPath0)) {
+            var half = fs.statSync(partPath0).size;
+            if (meta.key && side && side.key && side.key !== meta.key) {
+              // .part baska bir indirmeye ait (ornegin yarida kalmis GPU derlemesi).
+              // Uzerine eklemek bozuk arsiv uretir.
+              dropPart();
+              log("yarim dosya baska indirmeye ait (" + side.key + "), bastan indiriliyor");
+            } else if (half > 65536) {
+              resumeFrom = half;
+              log("indirme devam ediyor: " + half + " bayttan");
+            }
+          }
+        } catch (eR0) {}
+      }
+
+      var hdrs = { "User-Agent": "Suflo-Panel" };
+      if (resumeFrom > 0) hdrs.Range = "bytes=" + resumeFrom + "-";
+      var reqOpts = {
         hostname: u.hostname,
         port: u.port || (u.protocol === "http:" ? 80 : 443),
         path: u.pathname + (u.search || ""),
-        headers: { "User-Agent": "Kesit-Panel" }
-      }, function (res) {
+        headers: hdrs
+      };
+
+      function onRes(res) {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
           var next = res.headers.location.indexOf("http") === 0
             ? res.headers.location
             : u.protocol + "//" + u.hostname + res.headers.location;
-          download(next, destPath, onProgress, redirects + 1).then(resolve);
+          download(next, destPath, onProgress, redirects + 1, resumeFrom, meta).then(resolve);
           return;
         }
-        if (res.statusCode !== 200) {
+        // 206 = kaldigi yerden devam kabul edildi, 200 = bastan gonderiyor
+        var resuming = (res.statusCode === 206 && resumeFrom > 0);
+        if (resuming) {
+          // Devam dogrulamasi: sunucunun bildirdigi aralik bekledigimizle uyusmali.
+          // Uyusmuyorsa yarim dosya baska bir surume/aynaya ait — birlestirme bozuk cikar.
+          var cr = /bytes\s+(\d+)-\d*\/(\d+)/i.exec(String(res.headers["content-range"] || ""));
+          var basla = cr ? Number(cr[1]) : -1;
+          var toplam = cr ? Number(cr[2]) : 0;
+          var uyumsuz = (cr && basla !== resumeFrom) ||
+            (toplam && toplam <= resumeFrom) ||
+            (toplam && side && side.total && side.total !== toplam);
+          if (uyumsuz) {
+            res.resume();
+            dropPart();
+            log("yarim dosya bu surumle uyusmuyor (content-range: " +
+              (res.headers["content-range"] || "yok") + "), bastan indiriliyor");
+            download(urlStr, destPath, onProgress, redirects, 0, meta).then(resolve);
+            return;
+          }
+        }
+        if (res.statusCode !== 200 && !resuming) {
           res.resume();
-          resolve({ ok: false, error: "HTTP " + res.statusCode });
+          // SADECE Range'e ozel bir ret ise yarim dosyayi at. 403/429/5xx Range ile
+          // ilgisizdir: .part KORUNUR, sonraki deneme kaldigi yerden devam eder.
+          var rangeRed = (res.statusCode === 416 || res.statusCode === 400 || res.statusCode === 501);
+          if (resumeFrom > 0 && rangeRed) {
+            dropPart();
+            log("sunucu Range istegini reddetti (HTTP " + res.statusCode + "), bastan indiriliyor");
+            download(urlStr, destPath, onProgress, redirects, 0, meta).then(resolve);
+            return;
+          }
+          var kalan = partSize();
+          if (kalan > 0) {
+            log("gecici sunucu hatasi (HTTP " + res.statusCode + "), yarim dosya korunuyor: " +
+              kalan + " bayt");
+          }
+          resolve({ ok: false, error: "HTTP " + res.statusCode, kept: kalan });
           return;
         }
-        var total = Number(res.headers["content-length"] || 0);
-        var got = 0;
+        var partial = Number(res.headers["content-length"] || 0);
+        var base = resuming ? resumeFrom : 0;
+        var total = partial ? base + partial : 0;
+        if (!resuming) writeSide(total);
+        // Katalog boyutuyla kaba denetim (checksum yok): sapma varsa uyar, engelleme.
+        if (total && meta.expectedMB) {
+          var sapma = Math.abs(total - meta.expectedMB * 1048576) / (meta.expectedMB * 1048576);
+          if (sapma > 0.15) {
+            log("uyari: beklenen boyuttan sapma - " + meta.key + " " +
+              Math.round(total / 1048576) + " MB (katalog: " + meta.expectedMB + " MB)");
+          }
+        }
+        var got = base;
         // once .part'a yaz; ancak butunlugu dogrulaninca nihai ada tasi —
         // yarim indirme asla "kurulu model" sanilmasin
-        var partPath = destPath + ".part";
+        var partPath = partPath0;
         var out;
-        try { out = fs.createWriteStream(partPath); }
+        try { out = fs.createWriteStream(partPath, resuming ? { flags: "a" } : undefined); }
         catch (eO) { resolve({ ok: false, error: String(eO) }); return; }
-        function fail(msg) {
+        function fail(msg, keepPart) {
           try { out.destroy(); } catch (e1) {}
-          try { fs.unlinkSync(partPath); } catch (e2) {}
-          resolve({ ok: false, error: msg });
+          // ag hatasinda .part'i KORU — sonraki denemede kaldigi yerden devam eder
+          if (!keepPart) dropPart();
+          resolve({ ok: false, error: msg, kept: keepPart ? partSize() : 0 });
         }
         res.on("data", function (d) {
           got += d.length;
@@ -381,19 +628,56 @@ window.K = (function () {
         res.pipe(out);
         out.on("finish", function () {
           out.close(function () {
-            if (total > 0 && got !== total) { fail("Eksik indirme: " + got + "/" + total); return; }
+            if (total > 0 && got !== total) { fail("Eksik indirme: " + got + "/" + total, true); return; }
             try {
               if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
               fs.renameSync(partPath, destPath);
+              try { fs.unlinkSync(sidePath); } catch (e3) {}
               resolve({ ok: true, bytes: got });
             } catch (eR2) { fail(String(eR2)); }
           });
         });
-        res.on("error", function (eR) { fail(String(eR)); });
-        out.on("error", function (eW) { fail(String(eW)); });
-      });
-      req.on("error", function (eq) { resolve({ ok: false, error: String(eq) }); });
-      req.setTimeout(1800000, function () { req.destroy(); resolve({ ok: false, error: "indirme zaman aşımı" }); });
+        res.on("error", function (eR) { fail(String(eR), true); });
+        out.on("error", function (eW) { fail(String(eW), true); });
+      }
+
+      function fire(extra) {
+        if (extra) for (var k in extra) reqOpts[k] = extra[k];
+        var req = proto.get(reqOpts, onRes);
+        // ag hatasinda .part korunur ki sonraki deneme kaldigi yerden devam etsin
+        req.on("error", function (eq) {
+          resolve({ ok: false, error: String(eq), kept: partSize() });
+        });
+        req.setTimeout(1800000, function () {
+          req.destroy();
+          resolve({ ok: false, error: "indirme zaman aşımı", kept: partSize() });
+        });
+      }
+
+      var pu = proxyFor(u);
+      if (pu && u.protocol === "http:") {
+        // http hedefte absolute-URI forward-proxy istegi GECERLIDIR
+        var h2 = Object.assign({ Host: u.hostname }, hdrs);
+        var au2 = proxyAuth(pu);
+        if (au2) h2["Proxy-Authorization"] = au2;
+        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, headers: h2 };
+        proto = require("http");
+        log("proxy (http hedef): " + pu.hostname + ":" + (pu.port || 8080));
+        fire();
+      } else if (pu) {
+        log("proxy CONNECT tuneli: " + pu.hostname + ":" + (pu.port || 8080) + " -> " + u.hostname);
+        connectTunnel(pu, u, function (err, socket) {
+          if (err) {
+            log("proxy tuneli kurulamadi: " + err.message);
+            resolve({ ok: false, error: err.message, kept: partSize() });
+            return;
+          }
+          // hazir socket uzerinden TLS: SNI ve Host icin host/servername sart
+          fire({ socket: socket, agent: false, host: u.hostname, servername: u.hostname });
+        });
+      } else {
+        fire();
+      }
     });
   }
 
@@ -405,11 +689,14 @@ window.K = (function () {
       var r = await run(tarExe, ["-xf", zipPath, "-C", destDir], { timeout: 180000 });
       if (r.code === 0) return true;
     }
-    // PowerShell fallback — tek tirnaklari ikileyerek kacir (O'Neil gibi kullanici adlari)
+    // PowerShell fallback — tek tirnaklari ikileyerek kacir (O'Neil gibi kullanici adlari).
+    // -ErrorAction Stop + try/catch sart: Expand-Archive bozuk arsivde sonlandirmayan hata
+    // uretip yine exit 0 donuyor, yani cikis koduna guvenmek bozuk kurulumu "basarili" sayar.
     function q(s) { return String(s).replace(/'/g, "''"); }
     var r2 = await run("powershell", [
       "-NoProfile", "-Command",
-      "Expand-Archive -LiteralPath '" + q(zipPath) + "' -DestinationPath '" + q(destDir) + "' -Force"
+      "try { Expand-Archive -LiteralPath '" + q(zipPath) + "' -DestinationPath '" + q(destDir) +
+      "' -Force -ErrorAction Stop } catch { exit 1 }"
     ], { timeout: 180000 });
     return r2.code === 0;
   }
@@ -500,6 +787,20 @@ window.K = (function () {
     return d;
   }
 
+  /*
+   * Kalıcı SRT klasörü. Premiere içe aktardığı altyazıyı kopyalamaz, diskteki yola
+   * referans verir; bu yüzden altyazı ASLA temp'e (ne bizim süpürgemizin ne Windows
+   * Depolama Alanı Sensörü'nün eline geçen yere) yazılmamalı.
+   */
+  function srtDir() {
+    if (!nodeOK) return "";
+    var p = settingsPath();
+    if (!p) return tmpDir();                        // son çare
+    var d = path.join(path.dirname(p), "srt");
+    try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); } catch (e) {}
+    return d;
+  }
+
   return {
     cs: cs,
     nodeOK: nodeOK,
@@ -513,6 +814,10 @@ window.K = (function () {
     logText: logText,
     VERSION: VERSION,
     REPO: REPO,
+    saveDraft: saveDraft,
+    loadDraft: loadDraft,
+    clearDraft: clearDraft,
+    sweepTemp: sweepTemp,
     whisperLocal: whisperLocal,
     whisperDir: whisperDir,
     download: download,
@@ -522,6 +827,7 @@ window.K = (function () {
     saveSettings: saveSettings,
     walkAudio: walkAudio,
     isAudio: isAudio,
-    tmpDir: tmpDir
+    tmpDir: tmpDir,
+    srtDir: srtDir
   };
 })();

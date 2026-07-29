@@ -915,6 +915,51 @@ button.seg-time.jump:hover { color: var(--accent-lite); background: rgba(139, 12
 .seg-dur { margin-left: auto; color: var(--warn); font-size: 10.5px; }
 .cut-seg.off { opacity: .38; }
 
+/* zaman damgası düzenleme kutusu (çift tıkta açılır) */
+.seg-time-edit {
+  flex: 0 0 auto;
+  width: 92px;
+  padding: 3px 6px !important;
+  font-size: 10.5px !important;
+  border-radius: 5px;
+  border-color: var(--accent) !important;
+  box-shadow: var(--glow-sm) !important;
+  background: var(--bg3) !important;
+}
+
+/* mini düğmeler (toplu kaydırma / satır ekleme) */
+.btn.tiny {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+.shift-row { gap: 6px; margin-bottom: 10px; align-items: center; }
+.shift-row .dim { flex: 0 0 auto; margin-right: 2px; }
+
+/* terim sözlüğü alanı */
+.glossary {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  color: var(--text);
+  padding: 9px 11px;
+  font: inherit;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+  resize: vertical;
+  user-select: text;
+  box-shadow: var(--edge);
+  transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+.glossary:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--glow-sm), var(--edge);
+}
+.glossary::placeholder { color: var(--faint); }
+
 /* ---------- Kesim görsel barı ---------- */
 
 .cut-bar {

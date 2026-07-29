@@ -15,15 +15,91 @@ window.KCaptions = (function () {
 
   function el(id) { return document.getElementById(id); }
 
+  /* ---------------- Geri alma yığını + taslak kaydı ---------------- */
+
+  var undoStack = [];
+  var redoStack = [];
+  var UNDO_MAX = 25;
+  var draftTimer = null;
+
+  function snapshot(etiket) {
+    undoStack.push({ segs: JSON.stringify(segments), etiket: etiket || "" });
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+    redoStack.length = 0;
+    refreshUndoUI();
+  }
+
+  function undo() {
+    if (!undoStack.length) return;
+    redoStack.push({ segs: JSON.stringify(segments), etiket: "" });
+    var st = undoStack.pop();
+    segments = JSON.parse(st.segs);
+    render();
+    refreshUndoUI();
+    saveDraftSoon();          // diskteki taslak ekrandakiyle aynı kalsın
+    KApp.toast(st.etiket ? "Geri alındı: " + st.etiket : "Geri alındı");
+  }
+
+  function redo() {
+    if (!redoStack.length) return;
+    undoStack.push({ segs: JSON.stringify(segments), etiket: "" });
+    segments = JSON.parse(redoStack.pop().segs);
+    render();
+    refreshUndoUI();
+    saveDraftSoon();
+  }
+
+  function refreshUndoUI() {
+    var u = el("cap-undo"), r = el("cap-redo");
+    if (u) u.disabled = !undoStack.length;
+    if (r) r.disabled = !redoStack.length;
+  }
+
+  // Taslağı diske yaz — panel kapanırsa iş kaybolmaz
+  function writeDraft() {
+    if (!segments.length) return;
+    var ctx = KApp.ctx();
+    K.saveDraft({
+      segments: segments,
+      sequence: ctx.sequence || "",
+      scope: scope,
+      ts: Date.now()
+    });
+  }
+  function cancelDraft() { if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; } }
+  // uzun iş bitti (transkript, içe alma, çeviri): beklemeden yaz
+  function saveDraftNow() { cancelDraft(); writeDraft(); }
+  // tuş vuruşu: debounce
+  function saveDraftSoon() {
+    cancelDraft();
+    draftTimer = setTimeout(function () { draftTimer = null; writeDraft(); }, 1200);
+  }
+
+  // Kurtarma teklifi artık geçersiz: ekranda taze iş var ya da taslak silindi
+  function hideRestore() { var b = el("cap-restore"); if (b) b.hidden = true; }
+
+  function restoreDraft(d) {
+    // Ekranda iş varsa üzerine yazmadan önce anlık görüntü al — Ctrl+Z geri getirsin
+    if (segments.length) snapshot("taslak kurtarma");
+    else { undoStack.length = 0; redoStack.length = 0; }
+    segments = JSON.parse(JSON.stringify(d.segments));   // taslak nesnesini takma adla mutasyona uğratma
+    clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil
+    el("cap-result").hidden = false;
+    render();                                            // önce render, sonra etiket (render eziyor)
+    el("cap-result-info").textContent = segments.length + " satır · kurtarıldı";
+    refreshUndoUI();
+  }
+
   // panelle birlikte gelen WAV export presetleri (once 16 kHz, olmazsa 48 kHz)
   function bundledEpr() {
     try {
-      var root = K.cs.getSystemPath(SystemPath.EXTENSION);
+      // SystemPath global DEĞİL — CSInterface üzerinden erişilir
+      var root = K.cs.getSystemPath(CSInterface.SystemPath.EXTENSION);
       if (root) {
         root = root.replace(/\//g, "\\");
         return [root + "\\jsx\\presets\\wav16k.epr", root + "\\jsx\\presets\\wav48k.epr"];
       }
-    } catch (e) {}
+    } catch (e) { K.log("[altyazı] gömülü preset yolu alınamadı: " + e); }
     return [];
   }
 
@@ -38,7 +114,7 @@ window.KCaptions = (function () {
 
   function engineReady() {
     var s = K.settings();
-    if (s.provider === "local") return !!K.whisperLocal();
+    if (s.provider === "local") return !!KEngine.activeModel() && !!K.whisperLocal();
     return !!s.apiKey;
   }
 
@@ -131,16 +207,21 @@ window.KCaptions = (function () {
     var lang = el("cap-lang").value || "auto";
     var threads = 4;
     try { threads = Math.max(2, Math.min(8, K.os.cpus().length - 2)); } catch (e) {}
-    var args = [
-      "-m", lw.model,
-      "-f", audioPath,
-      "-l", lang,
-      "-oj", "-of", outBase,
-      "-t", String(threads),
-      "-pp"
-    ];
-    // karaoke: her kelime kendi zaman damgasıyla ayrı segment olur
-    if (wordLevel) args = args.concat(["-ml", "1", "-sow"]);
+
+    // motor katmanı: VAD (sessizlik atlama) + beam search + karaoke bayrakları
+    var built = KEngine.buildArgs({
+      model: lw.model,
+      audio: audioPath,
+      lang: lang,
+      outBase: outBase,
+      threads: threads,
+      wordLevel: wordLevel
+    });
+    var args = built.args;
+    K.log("yerel motor: " + (KEngine.installedBuild() === "cuda" ? "GPU" : "CPU") +
+      ", VAD " + (built.vad ? "acik" : "kapali") +
+      ", model " + String(lw.model).replace(/^.*[\\\/]/, ""));
+
     var r = await K.run(lw.exe, args, {
       timeout: 7200000,
       onStderr: function (s) {
@@ -172,11 +253,20 @@ window.KCaptions = (function () {
     return segs;
   }
 
-  // "00:00:01,380" -> saniye
+  // "00:00:01,380" veya "01:23.500" -> saniye
   function tcParse(t) {
-    var m = String(t).match(/(\d+):(\d+):(\d+)[,.](\d+)/);
-    if (!m) return 0;
-    return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 1000;
+    var s = String(t).trim();
+    var m = s.match(/(\d+):(\d+):(\d+)[,.](\d+)/);
+    if (m) return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 1000;
+    // saat alanı olmayan biçim (mm:ss.mmm) — elle düzenlemede yaygın
+    var m2 = s.match(/^(\d+):(\d+)[,.](\d+)$/);
+    if (m2) return (+m2[1]) * 60 + (+m2[2]) + (+m2[3]) / 1000;
+    return 0;
+  }
+
+  // Satırları zamana göre sırala (elle düzenleme ve kaydırma sonrası şart)
+  function sortSegments() {
+    segments.sort(function (a, b) { return a.start - b.start; });
   }
 
   function apiError(status, body) {
@@ -314,6 +404,28 @@ window.KCaptions = (function () {
     return out;
   }
 
+  /*
+   * Whisper (özellikle VAD açıkken) bir cue'nun sonunu sonraki konuşma başlayana
+   * kadar uzatabiliyor: 3 saniyelik cümle 17 saniye ekranda kalıyor.
+   * Metnin okunması için gereken makul süreyi aşan sonları kırp.
+   */
+  function trimOverlongCues(segs) {
+    var GAP = 0.12;
+    return segs.map(function (s, i) {
+      var chars = s.text.length;
+      // ~13 karakter/sn okuma hızı + 0.7 sn tampon, en az 1.2 sn
+      var makul = Math.max(1.2, chars / 13 + 0.7);
+      var dur = s.end - s.start;
+      if (dur > makul * 1.8) {
+        var yeni = s.start + makul;
+        var next = segs[i + 1];
+        if (next && yeni > next.start - GAP) yeni = Math.max(s.start + 0.5, next.start - GAP);
+        return { start: s.start, end: yeni, text: s.text };
+      }
+      return s;
+    });
+  }
+
   function splitLong(segs, maxChars, maxDur) {
     var out = [];
     segs.forEach(function (s) {
@@ -333,6 +445,79 @@ window.KCaptions = (function () {
       });
     });
     return out;
+  }
+
+  /* ---------------- Terim sözlüğü ---------------- */
+
+  /*
+   * Whisper Türkçe'de marka/kişi adlarını ve jargonu tutarlı biçimde yanlış yazar.
+   * Sözlük transkripsiyon SONRASI çalışır — dil algılamayı ve çıktıyı bozmaz,
+   * deterministiktir, kullanıcı sonucu görüp kuralı düzeltebilir.
+   * Biçim: her satır "yanlış => doğru"
+   */
+  function parseGlossary(text) {
+    var out = [];
+    String(text || "").split(/\r?\n/).forEach(function (line) {
+      var m = line.split("=>");
+      if (m.length !== 2) return;
+      var from = m[0].trim(), to = m[1].trim();
+      if (from) out.push({ from: from, to: to });
+    });
+    return out;
+  }
+
+  function glossaryText() {
+    var g = K.settings().glossary || [];
+    return g.map(function (r) { return r.from + " => " + r.to; }).join("\n");
+  }
+
+  /*
+   * Harf/rakam sınırı testi. Unicode özellik kaçışları (\p{L}) Chromium 64+ ister; REGEX
+   * LİTERALİ olarak yazılırsa eski CEF'te ayrıştırma anında SyntaxError verir ve tüm modül
+   * düşer (panel bomboş açılır). new RegExp ile kurulunca hata yakalanabilir hale gelir.
+   */
+  var HARF = (function () {
+    try { return new RegExp("[\\p{L}\\p{N}]", "u"); }
+    catch (eU) {
+      // eski CEF yedegi: carpma (00D7) ve bolme (00F7) isaretleri dislanir
+      return new RegExp("[0-9A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u024F" +
+        "\\u0370-\\u1FFF\\u2C00-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD]");
+    }
+  })();
+
+  // Türkçe-duyarlı kelime bazlı değiştirme (İ/ı eşleşmesi doğru çalışır)
+  function trReplace(text, from, to) {
+    var loc = styleLocale() || "tr";
+    var lowText = text.toLocaleLowerCase(loc);
+    var lowFrom = from.toLocaleLowerCase(loc);
+    if (lowText.indexOf(lowFrom) === -1) return text;
+    var out = "";
+    var i = 0;
+    var harf = HARF;
+    while (i < text.length) {
+      if (lowText.startsWith(lowFrom, i)) {
+        var oncesi = i === 0 ? "" : text[i - 1];
+        var sonrasi = text[i + from.length] || "";
+        var sinirOK = (!oncesi || !harf.test(oncesi)) && (!sonrasi || !harf.test(sonrasi));
+        if (sinirOK) { out += to; i += from.length; continue; }
+      }
+      out += text[i];
+      i++;
+    }
+    return out;
+  }
+
+  function applyGlossary(segs) {
+    var rules = K.settings().glossary || [];
+    if (!rules.length) return segs;
+    var n = 0;
+    segs.forEach(function (s) {
+      var before = s.text;
+      rules.forEach(function (r) { s.text = trReplace(s.text, r.from, r.to); });
+      if (s.text !== before) n++;
+    });
+    if (n) K.log("sozluk: " + n + " satirda duzeltme yapildi");
+    return segs;
   }
 
   /* ---------------- Şablonlar + tercih kalıcılığı ---------------- */
@@ -611,19 +796,28 @@ window.KCaptions = (function () {
         segments = lenVal === "kc" ? karaokeCumulative(mapped, 4) : karaokeWords(mapped);
       } else {
         mapped = cleanSegments(mapped);
+        mapped = trimOverlongCues(mapped);
         if (/^w\d+$/.test(lenVal)) {
           segments = splitWords(mapped, parseInt(lenVal.slice(1), 10) || 3);
         } else {
           segments = splitLong(mapped, parseInt(lenVal.slice(1), 10) || 42, 4.5);
         }
       }
+      applyGlossary(segments);
+      undoStack.length = 0;
+      redoStack.length = 0;
+      refreshUndoUI();
       savePrefs();
       if (segments.length === 0) throw new Error("Konuşma bulunamadı.");
 
       status("");
+      hideRestore();          // ekranda taze iş var: eski taslak teklifi artık geçersiz
+      clearRevert();          // yeni doküman — eski çevirinin orijinalleri buraya ait değil
       el("cap-result").hidden = false;
       el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula";
       render();
+      // Uzun bir transkripsiyon bitti: kullanıcı hiçbir şeye dokunmasa da taslak diskte olsun
+      saveDraftNow();
       KApp.toast(segments.length + " altyazı satırı hazır", "good");
     } catch (e) {
       status("✕ " + e.message, "bad");
@@ -662,16 +856,42 @@ window.KCaptions = (function () {
       var row = document.createElement("div");
       row.className = "seg";
 
+      /* zaman: tek tık → playhead, çift tık → elle düzenle */
       var t = document.createElement("button");
       t.className = "seg-time mono jump";
       t.textContent = tc(s.start, false).slice(3, 8);
-      t.title = "Playhead'i buraya götür";
+      t.title = "Tık: playhead'i götür · Çift tık: zamanı düzenle";
       t.onclick = function () { K.call("KS_setPlayerPosition", { sec: s.start }); };
+      t.ondblclick = function () { editTime(i, t); };
 
       var inp = document.createElement("input");
       inp.type = "text";
       inp.value = s.text;
-      inp.oninput = function () { segments[i].text = inp.value; };
+      inp.dataset.i = String(i);
+      inp.onfocus = function () { inp.dataset.before = inp.value; };
+      inp.oninput = function () { segments[i].text = inp.value; saveDraftSoon(); };
+      inp.onblur = function () {
+        // metin gerçekten değiştiyse geri alınabilir olsun
+        if (inp.dataset.before !== undefined && inp.dataset.before !== inp.value) {
+          var eski = JSON.parse(JSON.stringify(segments));
+          eski[i].text = inp.dataset.before;
+          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme" });
+          if (undoStack.length > UNDO_MAX) undoStack.shift();
+          redoStack.length = 0;
+          refreshUndoUI();
+          inp.dataset.before = inp.value;
+        }
+      };
+      // Enter: imleç konumundan böl
+      inp.onkeydown = function (e) {
+        if (e.key === "Enter") { e.preventDefault(); splitAt(i, inp.selectionStart); }
+      };
+
+      var spl = document.createElement("button");
+      spl.className = "seg-x";
+      spl.textContent = "⤸";
+      spl.title = "İmleçten böl (Enter)";
+      spl.onclick = function () { splitAt(i, inp.selectionStart || Math.floor(inp.value.length / 2)); };
 
       var mrg = document.createElement("button");
       mrg.className = "seg-x";
@@ -681,26 +901,158 @@ window.KCaptions = (function () {
       mrg.onclick = function () {
         var nx = segments[i + 1];
         if (!nx) return;
+        snapshot("birleştirme");
+        // çeviri öncesi metinleri de birleştir, yoksa "çeviriyi geri al" bu satırı atlar
+        if (typeof segments[i].orig === "string" || typeof nx.orig === "string") {
+          segments[i].orig = ((segments[i].orig || segments[i].text) + " " +
+            (nx.orig || nx.text)).replace(/\s+/g, " ").trim();
+        }
         segments[i].text = (segments[i].text + " " + nx.text).replace(/\s+/g, " ").trim();
         segments[i].end = nx.end;
         segments.splice(i + 1, 1);
-        render();
+        render(); saveDraftSoon();
       };
 
       var del = document.createElement("button");
       del.className = "seg-x";
       del.textContent = "×";
       del.title = "Satırı sil";
-      del.onclick = function () { segments.splice(i, 1); render(); };
+      del.onclick = function () {
+        snapshot("satır silme");
+        segments.splice(i, 1);
+        render(); saveDraftSoon();
+      };
 
-      row.appendChild(t); row.appendChild(inp); row.appendChild(mrg); row.appendChild(del);
+      row.appendChild(t); row.appendChild(inp);
+      row.appendChild(spl); row.appendChild(mrg); row.appendChild(del);
       box.appendChild(row);
     });
+    el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula";
+  }
+
+  // Boşluksuz yazı sistemleri (Japonca/Çince/Korece): kelime sınırı yok, her yerden bölünür
+  var BOSLUKSUZ = new RegExp("[\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uAC00-\\uD7AF]");
+
+  /* satırı imleç konumundan böl — süreyi karakter oranına göre paylaştır */
+  function splitAt(i, pos) {
+    var s = segments[i];
+    if (!s) return;
+    var text = s.text;
+    if (pos === null || pos === undefined) pos = Math.floor(text.length / 2);
+    // kelime ortasında bölmeyi engelle: en yakın boşluğa kaydır
+    if (pos > 0 && pos < text.length && text[pos] !== " ") {
+      var sag = text.indexOf(" ", pos);
+      var sol = text.lastIndexOf(" ", pos);
+      if (sag === -1 && sol === -1) {
+        // Metinde hiç boşluk yok. Boşluksuz yazı sistemlerinde (CJK) her karakter sınırı
+        // geçerlidir; Latin/Kiril tek kelimesini ortadan kesmek ise her zaman hatadır
+        // (karaoke ve "kelime kelime" modlarında her satır tek kelimedir).
+        if (!BOSLUKSUZ.test(text)) {
+          KApp.toast("Tek kelimelik satır bölünemez — metni düzenle ya da ⨝ ile birleştir.", "warn");
+          return;
+        }
+      } else {
+        pos = (sag !== -1 && (sol === -1 || sag - pos <= pos - sol)) ? sag : sol;
+      }
+    }
+    var a = text.slice(0, pos).trim();
+    var b = text.slice(pos).trim();
+    if (!a || !b) { KApp.toast("Bölmek için imleci metnin ortasına koy.", "warn"); return; }
+    snapshot("bölme");
+    var dur = s.end - s.start;
+    var oran = a.length / Math.max(1, a.length + b.length);
+    var kesme = s.start + Math.max(0.3, dur * oran);
+    if (kesme >= s.end - 0.15) kesme = s.start + dur / 2;
+    segments.splice(i, 1,
+      { start: s.start, end: kesme, text: a },
+      { start: kesme, end: s.end, text: b });
+    render(); saveDraftSoon();
+    KApp.toast("Satır bölündü", "good");
+  }
+
+  /* zaman damgasını elle düzenle (çift tık) */
+  function editTime(i, btn) {
+    var s = segments[i];
+    if (!s) return;
+    var inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "seg-time-edit mono";
+    inp.value = tc(s.start, false).slice(0, 12); // hh:mm:ss.mmm
+    btn.replaceWith(inp);
+    inp.focus();
+    inp.select();
+    function bitir(kaydet) {
+      if (kaydet) {
+        // biçimi ÖNCE doğrula — tcParse tanımadığı girdide 0 döner, o sessizce 00:00 yapar
+        var v = inp.value.trim();
+        var gecerli = /^\d{1,2}:\d{1,2}(:\d{1,2})?[.,]\d{1,3}$/.test(v) ||
+                      /^\d{1,2}:\d{1,2}(:\d{1,2})?$/.test(v);
+        var yeni = gecerli ? tcParse(v.indexOf(".") === -1 && v.indexOf(",") === -1 ? v + ".000" : v) : NaN;
+        if (gecerli && isFinite(yeni) && yeni >= 0) {
+          var dur = s.end - s.start;
+          snapshot("zaman düzenleme");
+          segments[i].start = yeni;
+          segments[i].end = yeni + Math.max(0.3, dur);
+          sortSegments();          // sıra bozulmasın: SRT komşu kontrolü sıralı liste ister
+          saveDraftSoon();
+        } else {
+          KApp.toast("Zaman biçimi: dd:ss.mmm (örn. 01:23.500)", "warn");
+        }
+      }
+      render();
+    }
+    inp.onblur = function () { bitir(true); };
+    inp.onkeydown = function (e) {
+      if (e.key === "Enter") { e.preventDefault(); bitir(true); }
+      if (e.key === "Escape") { e.preventDefault(); bitir(false); }
+    };
+  }
+
+  /* tüm satırları topluca kaydır (in/out kayması düzeltmesi) */
+  function shiftAll(sec) {
+    if (!segments.length || !sec) return;
+    // TOPLU sınır: start ve end'i ayrı ayrı kırpmak cue sürelerini bozar ve kaydırmayı
+    // tersine çevrilemez yapar. Tek bir miktar uygulanır, süreler aynen korunur.
+    var minStart = segments[0].start;
+    segments.forEach(function (s) { if (s.start < minStart) minStart = s.start; });
+    var uyg = Math.max(sec, -minStart);
+    if (Math.abs(uyg) < 0.001) {
+      KApp.toast("Altyazılar sequence başında — daha geriye kaydırılamaz.", "warn");
+      return;                        // snapshot YOK: boş tıklama undo geçmişini yemesin
+    }
+    snapshot("toplu kaydırma");
+    segments.forEach(function (s) { s.start += uyg; s.end += uyg; });
+    var msg = (uyg > 0 ? "+" : "") + uyg.toFixed(2) + " sn kaydırıldı";
+    if (Math.abs(uyg - sec) > 0.001) msg += " (sequence başına dayandı)";
+    render(); saveDraftSoon();
+    KApp.toast(msg, Math.abs(uyg - sec) < 0.001 ? "good" : "warn");
+  }
+
+  /* araya yeni boş satır ekle */
+  function insertAfter(i) {
+    var s = segments[i];
+    var nx = segments[i + 1];
+    var start = s ? s.end + 0.05 : 0;
+    var end = nx ? Math.min(nx.start - 0.05, start + 1.5) : start + 1.5;
+    if (end <= start) end = start + 0.5;
+    snapshot("satır ekleme");
+    segments.splice(i + 1, 0, { start: start, end: end, text: "", orig: "" });
+    render(); saveDraftSoon();
   }
 
   /* ---------------- Çeviri (LLM) ---------------- */
 
-  var preTranslate = null; // çeviri öncesi metinler (geri almak için)
+  /*
+   * Çeviri geri alma. Orijinal metin index dizisinde DEĞİL, segmentin kendisinde (s.orig)
+   * taşınır: bölme/birleştirme/silme/sıralama index eşlemesini bozduğu için index tabanlı
+   * saklama, geri alındığında metinleri yanlış satırlara yazıyordu.
+   */
+  var preTranslate = null; // yalnızca "çeviri yapıldı" bayrağı
+  function clearRevert() {
+    preTranslate = null;
+    var b = el("cap-revert");
+    if (b) b.hidden = true;
+  }
 
   var LANG_NAMES = { en: "English", tr: "Turkish", az: "Azerbaijani", ru: "Russian" };
 
@@ -780,11 +1132,14 @@ window.KCaptions = (function () {
         }
         out = out.concat(lines);
       }
-      preTranslate = texts;
-      segments.forEach(function (s, i2) { s.text = String(out[i2] || "").trim() || s.text; });
+      segments.forEach(function (s, i2) {
+        if (typeof s.orig !== "string") s.orig = texts[i2];   // zincir çeviride ilk orijinali koru
+        s.text = String(out[i2] || "").trim() || s.text;
+      });
+      preTranslate = true;
       status("");
       el("cap-revert").hidden = false;
-      render();
+      render(); saveDraftNow();
       KApp.toast(texts.length + " satır çevrildi", "good");
     } catch (e) {
       status("✕ " + e.message, "bad");
@@ -795,11 +1150,17 @@ window.KCaptions = (function () {
 
   function revertTranslate() {
     if (!preTranslate) return;
-    segments.forEach(function (s, i) { if (preTranslate[i] !== undefined) s.text = preTranslate[i]; });
-    preTranslate = null;
-    el("cap-revert").hidden = true;
-    render();
-    KApp.toast("Orijinal metne dönüldü");
+    var atlanan = 0;
+    snapshot("çeviriyi geri al");
+    segments.forEach(function (s) {
+      if (typeof s.orig === "string") { s.text = s.orig; delete s.orig; }
+      else atlanan++;                    // orijinali olmayan (sonradan eklenen) satıra dokunma
+    });
+    clearRevert();
+    render(); saveDraftNow();
+    KApp.toast(atlanan
+      ? "Orijinale dönüldü · " + atlanan + " satır yapısal düzenlendiği için çeviride kaldı"
+      : "Orijinal metne dönüldü", atlanan ? "warn" : undefined);
   }
 
   /* ---------------- Bul & değiştir ---------------- */
@@ -808,15 +1169,41 @@ window.KCaptions = (function () {
     var find = el("cap-find").value;
     if (!find) return;
     var rep = el("cap-replace").value;
+    var ci = el("cap-fr-ci") && el("cap-fr-ci").checked;   // büyük/küçük harf duyarsız
     var n = 0;
+    var yedek = JSON.stringify(segments);
     segments.forEach(function (s) {
-      if (s.text.indexOf(find) !== -1) {
+      var before = s.text;
+      if (ci) {
+        s.text = trReplace(s.text, find, rep);        // Türkçe-duyarlı, kelime sınırlı
+      } else if (s.text.indexOf(find) !== -1) {
         s.text = s.text.split(find).join(rep);
-        n++;
       }
+      if (s.text !== before) n++;
     });
-    render();
+    if (n) {
+      undoStack.push({ segs: yedek, etiket: "bul & değiştir" });
+      if (undoStack.length > UNDO_MAX) undoStack.shift();
+      redoStack.length = 0;
+      refreshUndoUI();     // yığını elle güncelledik: ↶/↷ düğmelerini de güncelle
+      render(); saveDraftSoon();
+    }
     KApp.toast(n ? n + " satırda değiştirildi" : "Eşleşme yok", n ? "good" : undefined);
+  }
+
+  // Bu düzeltmeyi kalıcı sözlüğe ekle — bir daha elle uğraşma
+  function addToGlossary() {
+    var from = el("cap-find").value.trim();
+    var to = el("cap-replace").value.trim();
+    if (!from) { KApp.toast("Önce 'bul' alanını doldur.", "warn"); return; }
+    var s = K.settings();
+    s.glossary = s.glossary || [];
+    var mevcut = s.glossary.filter(function (r) { return r.from !== from; });
+    mevcut.push({ from: from, to: to });
+    s.glossary = mevcut;
+    K.saveSettings();
+    if (el("set-glossary")) el("set-glossary").value = glossaryText();
+    KApp.toast("Sözlüğe eklendi: " + from + " → " + to, "good");
   }
 
   /* ---------------- SRT içe aktarma ---------------- */
@@ -851,11 +1238,12 @@ window.KCaptions = (function () {
         var segs = parseSrt(reader.result);
         if (!segs.length) { KApp.toast("Dosyada altyazı bulunamadı.", "bad"); return; }
         segments = segs;
-        preTranslate = null;
-        el("cap-revert").hidden = true;
+        clearRevert();
+        hideRestore();
         el("cap-result").hidden = false;
         el("cap-result-info").textContent = segs.length + " satır · içe aktarıldı";
         render();
+        saveDraftNow();
         KApp.toast(segs.length + " satır içe aktarıldı — düzenle, çevir, uygula", "good");
       };
       reader.readAsText(input.files[0], "utf-8");
@@ -888,13 +1276,32 @@ window.KCaptions = (function () {
     try {
       var srt = buildSrt();
       if (!srt) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
-      var p = K.path.join(K.tmpDir(), "suflo_" + Date.now() + ".srt");
+      // Premiere içe aktardığı SRT'yi KOPYALAMAZ, diskteki yola referans verir. Bu yüzden
+      // temp'e yazmak yasak (biz ya da Windows süpürünce projedeki altyazı kırılır):
+      // proje klasörü varsa oraya, yoksa kalıcı srt klasörüne yaz.
+      var dir = K.srtDir();
+      try {
+        var pr = await K.call("KS_projectDir", {});
+        if (pr.ok && pr.dir && K.fs.existsSync(pr.dir)) {
+          K.fs.accessSync(pr.dir, K.fs.constants.W_OK);   // yazılamıyorsa srtDir'de kal
+          dir = pr.dir;
+        }
+      } catch (eD) {}
+      var p = K.path.join(dir, "suflo_" + Date.now() + ".srt");
       K.fs.writeFileSync(p, "﻿" + srt, "utf8");
       var r = await K.call("KS_importSrtAsCaptions", { srtPath: p });
       if (r.ok) {
-        KApp.toast(r.captionTrack
-          ? "Altyazı izi oluşturuldu"
-          : "SRT projeye alındı — proje panelinden timeline'a sürükle", "good");
+        if (r.captionTrack) {
+          // Yalnızca iş gerçekten sekansa yerleştiyse taslağı sil.
+          // cancelDraft şart: 1,2 sn içinde bir tuş vuruşu olduysa zamanlayıcı taslağı diriltir.
+          cancelDraft();
+          K.clearDraft();
+          hideRestore();
+          KApp.toast("Altyazı izi oluşturuldu", "good");
+        } else {
+          // caption izi oluşmadı: düzenlenebilir tek kopya olan taslağı SİLME
+          KApp.toast("SRT projeye alındı — proje panelinden timeline'a sürükle: " + p, "good");
+        }
       } else {
         KApp.toast(r.error, "bad");
       }
@@ -944,7 +1351,42 @@ window.KCaptions = (function () {
     el("cap-translate-go").addEventListener("click", translateAll);
     el("cap-revert").addEventListener("click", revertTranslate);
     el("cap-fr-go").addEventListener("click", findReplace);
+    el("cap-fr-glossary").addEventListener("click", addToGlossary);
+    el("cap-undo").addEventListener("click", undo);
+    el("cap-redo").addEventListener("click", redo);
+    el("cap-shift-back").addEventListener("click", function () { shiftAll(-0.5); });
+    el("cap-shift-fwd").addEventListener("click", function () { shiftAll(0.5); });
+    el("cap-add-line").addEventListener("click", function () { insertAfter(segments.length - 1); });
+
+    // Ctrl+Z / Ctrl+Y — metin alanında yazarken tarayıcının kendi geri alması çalışsın
+    document.addEventListener("keydown", function (e) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      var t = e.target;
+      var yaziyor = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+      var k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey && !yaziyor) { e.preventDefault(); undo(); }
+      else if ((k === "y" || (k === "z" && e.shiftKey)) && !yaziyor) { e.preventDefault(); redo(); }
+    });
+
     ensureUserPresetOption();
+
+    // Yarım kalmış transkript varsa kurtarmayı öner
+    try {
+      var d = K.loadDraft();
+      if (d) {
+        setTimeout(function () {
+          KApp.toast("Yarım kalmış transkript var (" + d.segments.length +
+            " satır). Kurtarmak için Altyazı sekmesindeki düğmeye bas.", "good");
+          var b = el("cap-restore");
+          if (b) {
+            b.hidden = false;
+            b.textContent = "Kurtar: " + d.segments.length + " satır" +
+              (d.sequence ? " · " + d.sequence : "");
+            b.onclick = function () { restoreDraft(d); b.hidden = true; };
+          }
+        }, 1500);
+      }
+    } catch (eD) {}
 
     Array.prototype.forEach.call(el("cap-scope").querySelectorAll("button"), function (b) {
       b.addEventListener("click", function () {
@@ -999,5 +1441,10 @@ window.KCaptions = (function () {
     refreshSetup();
   }
 
-  return { init: init, refreshSetup: refreshSetup };
+  return {
+    init: init,
+    refreshSetup: refreshSetup,
+    glossaryText: glossaryText,
+    parseGlossary: parseGlossary
+  };
 })();
