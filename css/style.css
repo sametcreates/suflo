@@ -474,6 +474,31 @@ details.adv > *:not(summary) { margin-top: 8px; }
 
 /* ---------- Solo mod ---------- */
 
+/* Ayarlardan çıkış çubuğu — solo modda sekme çubuğu gizli olduğu için tek görünür yol */
+.set-back-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.set-back-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  margin-left: auto;
+  letter-spacing: .2px;
+}
+.btn.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px 7px 9px;
+  font-size: 12px;
+}
+.btn.back-btn svg { width: 13px; height: 13px; flex: 0 0 auto; }
+
 /* solo modda sekme çubuğu tamamen kalkar — dişli üst bara taşınır */
 body.solo .tabs { display: none; }
 body:not(.solo) .solo-gear { display: none; }

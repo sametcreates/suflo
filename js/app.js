@@ -106,8 +106,22 @@ window.KApp = (function () {
   var tabListeners = {};
   function onTab(name, fn) { tabListeners[name] = fn; }
 
+  // Ayarlardan çıkış: Altyazı sekmesine dön (solo modda sekme çubuğu gizli olduğu için şart)
+  function ayarlardanCik() {
+    var b = document.querySelector('.tab[data-tab="captions"]');
+    if (b) b.click();
+  }
+
   function initTabs() {
     var tabs = document.querySelectorAll(".tab");
+    if (el("set-back")) el("set-back").addEventListener("click", ayarlardanCik);
+    // Esc: ayarlar açıkken ve bir alana yazmıyorken çıkar
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      var t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+      if (el("tab-settings").classList.contains("active")) { e.preventDefault(); ayarlardanCik(); }
+    });
     Array.prototype.forEach.call(tabs, function (t) {
       t.addEventListener("click", function () {
         // solo modda dişli aç/kapa gibi çalışır (geri dönüş için sekme çubuğu yok)

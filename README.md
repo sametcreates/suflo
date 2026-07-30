@@ -49,33 +49,54 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 
 ## Kurulum
 
-1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir (ücretsiz).
-2. Son sürüm `Suflo-x.y.z.zxp` dosyasını indirip çift tıkla.
-3. Premiere'i yeniden başlat → `Window > Extensions > Suflo`.
+**Windows ve macOS**, Premiere 14.4 (2020) ve üstü. Bir kere kurulur, sonra hep hazır.
 
-Geliştirici kurulumu (kaynaktan):
+### 🪟 Windows
+
+1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir ve kur (ücretsiz).
+2. [Son sürüm `.zxp` dosyasını indir](https://github.com/sametcreates/suflo/releases/latest), çift tıkla.
+3. Premiere'i kapat, tekrar aç → `Window > Extensions > Suflo`.
+4. Panelde **"Yerel motoru indir & kur"** düğmesine bas. Gerisini panel yapar.
+
+NVIDIA ekran kartın varsa hızlandırma otomatik açılır.
+
+### 🍎 Mac
+
+Mac'te iki yardımcı program gerekiyor. Panel bunları senin için kurar, ama önce **Homebrew** denen kurulum yardımcısına ihtiyacı var. Kopyala, yapıştır, bitti.
+
+1. **Terminal'i aç.** (`⌘ + boşluk` → "Terminal" yaz → Enter)
+2. **Homebrew'u kur** — şu satırı Terminal'e yapıştır, Enter'a bas. Mac şifreni isteyecek; yazarken ekranda görünmez, normali bu.
+
+   ```bash
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+
+   Bittiğinde "Installation successful!" yazar. Terminal sana `eval "$(/opt/homebrew/bin/brew shellenv)"` gibi ek satırlar kopyalamanı söylerse onları da yapıştır.
+3. **Ses aracını kur:**
+
+   ```bash
+   brew install ffmpeg
+   ```
+4. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir ve kur (ücretsiz).
+5. [Son sürüm `.zxp` dosyasını indir](https://github.com/sametcreates/suflo/releases/latest), çift tıkla.
+6. Premiere'i kapat, tekrar aç → `Window > Extensions > Suflo`.
+7. Panelde **"Yerel motoru kur (Homebrew)"** düğmesine bas.
+
+**Neden Homebrew?** whisper.cpp macOS için hazır ikili yayınlamıyor (resmi sürüm dosyaları yalnız Windows ve Ubuntu); Mac'te bu araçları kurmanın standart yolu Homebrew. Panel `brew install whisper-cpp` çalıştırır, modelleri kendisi indirir.
+
+**Apple Silicon'da (M1 ve sonrası) GPU hızlandırma (Metal) kendiliğinden açıktır** — ayrı bir sürüm indirmek gerekmez.
+
+**Homebrew istemiyorum:** ffmpeg'i [evermeet.cx](https://evermeet.cx/ffmpeg/)'ten tek dosya olarak indir, panelde `Ayarlar > ffmpeg > Elle yol` alanına yerini yaz, ücretsiz Groq anahtarıyla bulut modunu kullan. (Bu durumda ses Groq'a gider ve internet gerekir.)
+
+### Geliştirici kurulumu (kaynaktan)
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tools/install.ps1
 ```
 
-### Gereksinimler
+### ffmpeg neden gerekli?
 
-- Premiere 14.4 (2020) ve üstü. Önerilen: Premiere 2022+.
-- **Windows** ve **macOS**.
-- **ffmpeg** — Kesim ve Altyazı için. Panel Ayarlar sekmesinden tek tıkla kurulur (Windows'ta winget, macOS'ta Homebrew).
-
-#### macOS notu
-
-whisper.cpp macOS için hazır ikili yayınlamıyor (resmi sürüm dosyaları yalnız Windows ve Ubuntu). Bu yüzden Mac'te yerel motoru **Homebrew** kurar:
-
-```bash
-brew install whisper-cpp
-```
-
-Panel bunu senin için çalıştırır — "Yerel motoru kur (Homebrew)" düğmesi. Homebrew yoksa panel bunu söyler; [brew.sh](https://brew.sh) adresindeki tek satırlık komutu çalıştırıp paneli yeniden açman gerekir. Modeller yine panel içinden iner.
-
-**Apple Silicon'da GPU hızlandırma (Metal) kendiliğinden açıktır** — ayrı bir sürüm indirmek gerekmez. Homebrew kurmak istemiyorsan ücretsiz Groq anahtarıyla bulut motorunu kullanabilirsin.
+Hem yerel hem bulut motoru sesi ffmpeg ile çıkarıp 16 kHz'e çeviriyor — yani ffmpeg her iki durumda da şart. Panel Ayarlar sekmesinden tek tıkla kurar (Windows'ta winget, macOS'ta Homebrew).
 
 ## Kullanım notları
 

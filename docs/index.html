@@ -105,6 +105,21 @@
   details summary { cursor: pointer; font-weight: 600; font-size: 15.5px; }
   details p { color: var(--dim); margin-top: 10px; font-size: 14.5px; }
 
+  /* Kurulum adımları — herkesin takip edebileceği netlikte */
+  .kur { border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; margin-bottom: 16px; background: var(--bg2); }
+  .kur h3 { font-size: 18px; margin-bottom: 14px; }
+  .kur-giris { color: var(--dim); font-size: 14.5px; margin-bottom: 14px; }
+  .kur ol { margin: 0 0 4px 20px; }
+  .kur li { color: var(--text); font-size: 14.5px; line-height: 1.65; margin-bottom: 12px; }
+  .kur pre {
+    background: #0c0d13; border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; margin: 10px 0 6px; overflow-x: auto;
+  }
+  .kur pre code { color: #b8c4ff; font-size: 12.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+  .kur code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: #b8c4ff; }
+  .kur-not { display: block; color: var(--faint); font-size: 13px; margin-top: 8px; line-height: 1.6; }
+  .kur-yardim { color: var(--dim); font-size: 14px; margin-top: 6px; }
+
   footer { padding: 44px 0 60px; border-top: 1px solid var(--line); color: var(--faint); font-size: 14px; text-align: center; }
   footer a { color: var(--dim); }
 
@@ -125,6 +140,7 @@
     <div class="links">
       <a href="#ozellikler">Özellikler</a>
       <a href="#karsilastirma">Karşılaştırma</a>
+      <a href="#kurulum">Kurulum</a>
       <a href="#sss">SSS</a>
       <a href="https://github.com/sametcreates/suflo">GitHub</a>
     </div>
@@ -138,7 +154,7 @@
       <a class="btn primary" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir</a>
       <a class="btn ghost" href="https://github.com/sametcreates/suflo">Kaynak kodu</a>
     </div>
-    <p class="note">Windows · Premiere 2020 (14.4) ve üstü · MIT lisansı</p>
+    <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı</p>
 
     <div class="mock" aria-hidden="true">
       <div class="mhead">
@@ -194,7 +210,7 @@
     </details>
     <details>
       <summary>Nasıl kurulur?</summary>
-      <p>Ücretsiz ZXP/UXP Installer'ı indir, Suflo'nun .zxp dosyasına çift tıkla, Premiere'i yeniden başlat. Panel içinden yerel motoru tek düğmeyle kurarsın (~570 MB, bir kez). Altyazı için gereken ffmpeg'i de Ayarlar sekmesinden tek tıkla kurarsın (winget ile, bir kez).</p>
+      <p>Ücretsiz ZXP/UXP Installer'ı indir, Suflo'nun .zxp dosyasına çift tıkla, Premiere'i yeniden başlat. Panel içinden yerel motoru tek düğmeyle kurarsın (~570 MB, bir kez). Ayrıntılı adımlar için <a href="#kurulum">kurulum bölümüne</a> bak.</p>
     </details>
     <details>
       <summary>Hangi diller destekleniyor?</summary>
@@ -206,8 +222,58 @@
     </details>
     <details>
       <summary>Mac desteği var mı?</summary>
-      <p>Şu an Windows. macOS yol haritasında ilk sırada.</p>
+      <p><b>Var.</b> Windows ve macOS'ta çalışır. Mac'te iki komut çalıştırman gerekiyor — <a href="#kurulum">kurulum bölümünde</a> adım adım anlattık. M1/M2/M3/M4 Mac'lerde Apple'ın grafik işlemcisi (Metal) otomatik kullanılır, yani hızlıdır.</p>
     </details>
+  </section>
+
+  <section id="kurulum">
+    <h2>Kurulum</h2>
+    <p class="lead">Bir kere yapıyorsun, sonra hep hazır. Bilgisayarını hangi işletim sistemi kullanıyorsa o adımları izle.</p>
+
+    <div class="kur">
+      <h3>🪟 Windows</h3>
+      <ol>
+        <li><a href="https://aescripts.com/learn/zxp-installer/">ZXP/UXP Installer</a>'ı indir ve kur (ücretsiz, bir kere).</li>
+        <li><a href="https://github.com/sametcreates/suflo/releases/latest">Suflo'nun .zxp dosyasını indir</a>, çift tıkla.</li>
+        <li>Premiere'i kapat, tekrar aç. <b>Window → Extensions → Suflo</b>.</li>
+        <li>Panelde <b>"Yerel motoru indir &amp; kur"</b> düğmesine bas. Gerisini panel yapar.</li>
+      </ol>
+      <p class="kur-not">Ekran kartın NVIDIA ise hızlandırma otomatik açılır.</p>
+    </div>
+
+    <div class="kur">
+      <h3>🍎 Mac</h3>
+      <p class="kur-giris">Mac'te iki yardımcı program gerekiyor. Panel bunları senin için kurar, ama önce <b>Homebrew</b> denen kurulum yardımcısına ihtiyacı var. Korkma — kopyala, yapıştır, bitti.</p>
+      <ol>
+        <li>
+          <b>Terminal'i aç.</b> (Spotlight'ı aç: <code>⌘ + boşluk</code> → "Terminal" yaz → Enter.)
+        </li>
+        <li>
+          <b>Homebrew'u kur.</b> Aşağıdaki satırı kopyalayıp Terminal'e yapıştır, Enter'a bas.
+          Mac şifreni isteyecek — yazarken ekranda görünmez, normal olan bu.
+          <pre><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></pre>
+          <span class="kur-not">Bir süre sürebilir. Bittiğinde ekranda "Installation successful!" yazar.
+          Terminal sana birkaç satır daha kopyalamanı söylerse (<code>eval "$(/opt/homebrew/bin/brew shellenv)"</code> gibi), onları da yapıştır.</span>
+        </li>
+        <li>
+          <b>Ses aracını kur.</b> Aynı Terminal'e bunu yapıştır:
+          <pre><code>brew install ffmpeg</code></pre>
+        </li>
+        <li><a href="https://aescripts.com/learn/zxp-installer/">ZXP/UXP Installer</a>'ı indir ve kur (ücretsiz).</li>
+        <li><a href="https://github.com/sametcreates/suflo/releases/latest">Suflo'nun .zxp dosyasını indir</a>, çift tıkla.</li>
+        <li>Premiere'i kapat, tekrar aç. <b>Window → Extensions → Suflo</b>.</li>
+        <li>Panelde <b>"Yerel motoru kur (Homebrew)"</b> düğmesine bas. Panel gerisini yapar.</li>
+      </ol>
+      <p class="kur-not"><b>Neden Homebrew?</b> Yapay zekâ motorunu yapanlar Mac için hazır dosya yayınlamıyor;
+      Mac'te bu programları kurmanın standart yolu Homebrew. Apple Silicon (M1 ve sonrası) Mac'lerde
+      motor Apple'ın grafik işlemcisini (Metal) kendiliğinden kullanır.</p>
+      <p class="kur-not">Homebrew kurmak istemiyorsan: ffmpeg'i <a href="https://evermeet.cx/ffmpeg/">evermeet.cx</a>'ten
+      tek dosya olarak indir, Ayarlar → ffmpeg → "Elle yol" alanına yerini yaz ve ücretsiz Groq anahtarıyla
+      bulut modunu kullan. (Bu durumda ses Groq'a gider ve internet gerekir.)</p>
+    </div>
+
+    <p class="kur-yardim">Takıldığın yer olursa panelde <b>Ayarlar → Destek → "Günlüğü kopyala"</b> deyip
+    <a href="https://github.com/sametcreates/suflo/issues">GitHub'da bir konu aç</a> — bakarız.</p>
   </section>
 
   <footer>
