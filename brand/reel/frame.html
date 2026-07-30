@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Suflo — reel karesi</title>
+<style>
+  /* 9:16 reel karesi. Panel GERCEK index.html'den iframe ile geliyor —
+     elle kopya cikarilmiyor ki arayuz surumden surume sapmasin. */
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(900px 700px at 50% 18%, rgba(139,124,246,.20), transparent 65%),
+      radial-gradient(700px 600px at 50% 92%, rgba(91,140,255,.14), transparent 65%),
+      #0b0c12;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cerceve {
+    width: 940px; height: 1660px;
+    border-radius: 30px;
+    overflow: hidden;
+    box-shadow: 0 60px 160px rgba(0,0,0,.75), 0 0 0 1px rgba(139,124,246,.28),
+                0 0 120px rgba(120,108,255,.18);
+    background: #0e0f15;
+  }
+  /* Paneli 430x780 tasarim boyutunda kurup buyuterek keskin tut */
+  iframe {
+    width: 470px; height: 830px; border: 0;
+    transform: scale(2); transform-origin: top left;
+  }
+  .kutu { width: 940px; height: 1660px; overflow: hidden; }
+</style>
+</head>
+<body>
+  <div class="cerceve"><div class="kutu"><iframe id="p" src="/index.html"></iframe></div></div>
+
+<script>
+// Panel yuklendikten sonra GERCEK durumu enjekte et (ayni origin, dogrudan erisim)
+var f = document.getElementById("p");
+f.onload = function () {
+  var w = f.contentWindow, d = f.contentDocument;
+
+  // solo mod (kullanicinin gordugu hal)
+  d.body.classList.add("solo");
+
+  // Motor KURULU gorunsun: kurulum karti kalksin, CTA parlasin
+  var s = w.K.settings();
+  s.provider = "groq";
+  s.apiKey = "x";
+  s.showModules = false;
+
+  // Premiere baglantisini taklit et: gercek sekans adi ve secili klip
+  w.K.call = function (fn) {
+    if (fn === "KS_getContext") {
+      return Promise.resolve({
+        ok: true, connected: true, hasSeq: true, sequence: "IMG_5929.mov", selCount: 1,
+        sel: { name: "IMG_5929.mov", dur: 2.2, mediaPath: "C:/x.mov" },
+        audioTracks: [{ name: "A1", clips: 2 }, { name: "A2", clips: 1 }, { name: "A3", clips: 0 }]
+      });
+    }
+    return Promise.resolve({ ok: false });
+  };
+
+  // Altyazi listesini gercek ice aktarma akisiyla doldur (elle DOM kurmuyoruz)
+  setTimeout(function () {
+    var srt = [
+      "1", "00:00:00,300 --> 00:00:01,100", "Merhaba arkadaşlar", "",
+      "2", "00:00:01,150 --> 00:00:02,000", "bugün çok özel", "",
+      "3", "00:00:02,050 --> 00:00:02,900", "bir konu var", "",
+      "4", "00:00:02,950 --> 00:00:03,800", "kurguya ışık hızı", "",
+      "5", "00:00:03,850 --> 00:00:04,700", "geliyor dostlar", ""
+    ].join("\n");
+    var orij = d.createElement.bind(d), yak = null;
+    d.createElement = function (t) { var e = orij(t); if (t === "input") { yak = e; e.click = function () {}; } return e; };
+    d.getElementById("cap-import-srt").click();
+    d.createElement = orij;
+    var dt = new w.DataTransfer();
+    dt.items.add(new w.File([srt], "t.srt", { type: "text/plain" }));
+    Object.defineProperty(yak, "files", { value: dt.files });
+    yak.onchange();
+    setTimeout(function () {
+      w.KCaptions.refreshSetup();                    // kurulum karti gizlensin
+      var r = d.getElementById("cap-result");
+      // ilgi ceken kisim kadraja gelsin: CTA + altyazi listesi
+      if (r) w.scrollTo(0, Math.max(0, r.offsetTop - 250));
+      document.title = "HAZIR";
+    }, 500);
+  }, 1200);
+};
+</script>
+</body>
+</html>
