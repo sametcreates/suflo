@@ -338,7 +338,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.7.6";
+  var VERSION = "1.7.7";
   // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
   var REPO = "sametcreates/suflo";
   var logBuf = [];

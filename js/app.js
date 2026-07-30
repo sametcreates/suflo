@@ -459,26 +459,96 @@ window.KApp = (function () {
 
   /* ---------------- Güncelleme kontrolü ---------------- */
 
+  /*
+   * Guncelleme. ZXP IMZALI oldugu icin panel kendi dosyalarini degistiremez —
+   * degistirirse imza bozulur ve Premiere eklentiyi hic yuklemez. Yani "sessizce
+   * guncelle" mumkun degil; yapabilecegimiz en iyi sey kullaniciyi tek tiklamayla
+   * indirilmis .zxp dosyasinin onune getirmek.
+   */
+  var guncelleme = null;   // { surum, url, ad, not }
+
+  function surumDahaYeni(yeni, mevcut) {
+    var a = String(yeni).split(".").map(Number);
+    var b = String(mevcut).split(".").map(Number);
+    for (var i = 0; i < 3; i++) {
+      if ((a[i] || 0) > (b[i] || 0)) return true;
+      if ((a[i] || 0) < (b[i] || 0)) return false;
+    }
+    return false;
+  }
+
   async function checkUpdate() {
     // yayindan once REPO yer tutucudur; kontrol devre disi kalir
     if (!K.nodeOK || K.REPO.indexOf("OWNER") === 0) return;
     try {
       var r = await K.httpGet("https://api.github.com/repos/" + K.REPO + "/releases/latest");
       if (r.status !== 200) return;
-      var tag = String(JSON.parse(r.body).tag_name || "").replace(/^v/, "");
-      if (!tag) return;
-      var cur = K.VERSION.split(".").map(Number);
-      var yeni = tag.split(".").map(Number);
-      var newer = false;
-      for (var i = 0; i < 3; i++) {
-        if ((yeni[i] || 0) > (cur[i] || 0)) { newer = true; break; }
-        if ((yeni[i] || 0) < (cur[i] || 0)) break;
-      }
-      if (newer) {
-        K.log("guncelleme mevcut: v" + tag);
-        toast("Yeni sürüm hazır: v" + tag + " — github.com/" + K.REPO + "/releases", "good");
-      }
+      var j = JSON.parse(r.body);
+      var tag = String(j.tag_name || "").replace(/^v/, "");
+      if (!tag || !surumDahaYeni(tag, K.VERSION)) return;
+
+      // kullanici bu surumu "gosterme" dediyse rahatsiz etme
+      if (K.settings().skipVersion === tag) { K.log("guncelleme v" + tag + " kullanici tarafindan gizlendi"); return; }
+
+      var zxp = (j.assets || []).filter(function (a) { return /\.zxp$/i.test(a.name); })[0];
+      // Surum notunun ilk anlamli satiri: neden guncellesin, bir cumleyle
+      var ilkSatir = String(j.body || "").split("\n").map(function (s) {
+        return s.replace(/^[#*\->\s]+/, "").trim();
+      }).filter(function (s) { return s.length > 12; })[0] || "";
+
+      guncelleme = {
+        surum: tag,
+        url: zxp ? zxp.browser_download_url : ("https://github.com/" + K.REPO + "/releases/latest"),
+        ad: zxp ? zxp.name : "Suflo-" + tag + ".zxp",
+        not: ilkSatir.slice(0, 90)
+      };
+      K.log("guncelleme mevcut: v" + tag);
+
+      el("update-baslik").textContent = "Yeni sürüm: v" + tag;
+      el("update-not").textContent = guncelleme.not || "İndir, çift tıkla, Premiere'i yeniden başlat.";
+      el("update-indir").disabled = !zxp;
+      el("update-bar").hidden = false;
     } catch (e) {}
+  }
+
+  // Indirilen dosyayi kullanicinin onune getir: once dosyayi acmayi dene
+  // (ZXP Installer kuruluysa devrali), olmazsa klasoru ac.
+  async function dosyayiGoster(yol) {
+    var klasor = K.path.dirname(yol);
+    if (K.MAC) {
+      var r = await K.run("/usr/bin/open", [yol], { timeout: 20000 });
+      if (r.code !== 0) await K.run("/usr/bin/open", ["-R", yol], { timeout: 20000 });
+    } else {
+      var w = await K.run("cmd", ["/c", "start", "", yol], { timeout: 20000 });
+      if (w.code !== 0) await K.run("explorer", ["/select,", yol], { timeout: 20000 });
+    }
+    return klasor;
+  }
+
+  async function guncellemeyiIndir() {
+    if (!guncelleme) return;
+    var b = el("update-indir");
+    b.disabled = true;
+    var eski = b.textContent;
+    b.textContent = "İniyor…";
+    try {
+      var indirilenler = K.path.join(K.os.homedir(), "Downloads");
+      if (!K.fs.existsSync(indirilenler)) indirilenler = K.os.homedir();
+      var hedef = K.path.join(indirilenler, guncelleme.ad);
+      var d = await K.download(guncelleme.url, hedef, function (f) {
+        b.textContent = "%" + Math.round(f * 100);
+      }, 0, undefined, { key: "zxp:" + guncelleme.surum });
+      if (!d.ok) throw new Error(d.error || "indirilemedi");
+      await dosyayiGoster(hedef);
+      el("update-not").textContent = "İndirildi. Dosyaya çift tıkla, sonra Premiere'i yeniden başlat.";
+      b.textContent = "İndirildi ✓";
+      toast("v" + guncelleme.surum + " indirildi: " + hedef, "good");
+    } catch (e) {
+      b.textContent = eski;
+      b.disabled = false;
+      toast("İndirilemedi: " + e.message + " — github.com/" + K.REPO + "/releases", "bad");
+      K.cs.openURLInDefaultBrowser("https://github.com/" + K.REPO + "/releases/latest");
+    }
   }
 
   /*
@@ -511,6 +581,18 @@ window.KApp = (function () {
     guvenli("Kesim", function () { KCut.init(); });
     guvenli("Motion", function () { KMotion.init(); });
 
+    if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);
+    if (el("update-kapat")) {
+      el("update-kapat").addEventListener("click", function () {
+        el("update-bar").hidden = true;
+        if (guncelleme) {                      // bu sürüm için bir daha gösterme
+          var s = K.settings();
+          s.skipVersion = guncelleme.surum;
+          K.saveSettings();
+        }
+      });
+    }
+
     setTimeout(checkUpdate, 4000);
     // eski geçici ses dosyalarını süpür (disk sessizce dolmasın)
     setTimeout(function () { try { K.sweepTemp(); } catch (e) {} }, 6000);
@@ -524,6 +606,7 @@ window.KApp = (function () {
     onTab: onTab,
     ctx: function () { return ctx; },
     refreshFolders: refreshFolderList,
-    installLocalWhisper: installLocalWhisper
+    installLocalWhisper: installLocalWhisper,
+    checkUpdate: checkUpdate
   };
 })();

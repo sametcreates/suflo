@@ -474,6 +474,27 @@ details.adv > *:not(summary) { margin-top: 8px; }
 
 /* ---------- Solo mod ---------- */
 
+/* Güncelleme şeridi — kaybolan toast yerine kalıcı, eylemli bir şerit */
+.update-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 9px 10px 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(139, 124, 246, .38);
+  background: linear-gradient(180deg, rgba(139, 124, 246, .14), rgba(139, 124, 246, .06));
+}
+.update-metin { flex: 1; min-width: 0; line-height: 1.35; }
+.update-metin b { display: block; font-size: 12px; color: var(--text); font-weight: 600; }
+.update-metin .dim {
+  display: block; font-size: 11px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.update-bar .btn.tiny { flex: 0 0 auto; }
+.update-bar .link-btn { flex: 0 0 auto; color: var(--faint); font-size: 13px; line-height: 1; }
+.update-bar .link-btn:hover { color: var(--text); }
+
 /* Ayarlardan çıkış çubuğu — solo modda sekme çubuğu gizli olduğu için tek görünür yol */
 .set-back-bar {
   display: flex;
