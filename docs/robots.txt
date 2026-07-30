@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://suflo.app/sitemap.xml
