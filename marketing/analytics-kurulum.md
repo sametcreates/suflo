@@ -1,4 +1,15 @@
-# Ziyaretçi sayacı — 5 dakikalık kurulum
+# Ziyaretçi sayacı — KURULDU ✅
+
+**Durum:** 30 Temmuz 2026'da kuruldu ve çalışıyor.
+**Panel:** [dash.cloudflare.com](https://dash.cloudflare.com) → Analytics → Web analytics → suflo.app
+**Hesap:** Sametkaygisiz27@gmail.com
+**Bağımsız mod:** DNS/nameserver değiştirilmedi, domain Hostinger'da kaldı.
+
+Aşağıdaki adımlar kayıt olarak duruyor (ikinci bir site eklemek gerekirse aynı yol).
+
+---
+
+
 
 **Neden:** Şu an suflo.app'i kaç kişinin ziyaret ettiğini bilmiyoruz. GitHub bize sadece
 kaç kişinin **indirdiğini** söylüyor. İkisi olmadan lansmanın işe yarayıp yaramadığını
