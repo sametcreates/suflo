@@ -28,6 +28,17 @@ SFX kütüphanesi · yapay zekâ altyazı · otomatik ilk kesim · keyframe easi
 
 Satır bölme (Enter) · birleştirme · elle zaman düzenleme (çift tık) · toplu kaydırma (±0,5 sn) · satır ekleme/silme · **geri al/yinele (Ctrl+Z / Ctrl+Y)** · zamana tıklayıp playhead'e gitme.
 
+### Dışa aktarma
+
+| Biçim | Ne için |
+|---|---|
+| **SRT** | Premiere caption izi, her yerde çalışır |
+| **WebVTT** | YouTube, web oynatıcılar, sosyal platformlar |
+| **ASS** | Stilli altyazı — kelime kelime modunda **karaoke (`\k`) etiketleriyle**; ffmpeg ile videoya gömülür, Aegisub/DaVinci/VLC okur |
+| **TXT** | Zaman damgasız transkript (video açıklaması, blog) |
+
+İçe aktarma: SRT ve WebVTT. Etiketler (`<v>`, `<i>`, `{\an8}`) ve HTML varlıkları temizlenir; cue ayarları olan zaman satırları ve saat alanı olmayan kısa biçim doğru okunur.
+
 ### Stiller ve düzeltme
 
 Noktalama kaldır/koru · Normal / BÜYÜK HARF / küçük harf (Türkçe İ-ı ve Azerice kurallarına uygun) · satır uzunluğu kelime (2-5) veya karakter (32/42/60) · karaoke (kelime kelime / birikimli) · Whisper halüsinasyon filtresi · **terim sözlüğü** (`yanlış => doğru` kuralları her transkriptte otomatik uygulanır).

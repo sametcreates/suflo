@@ -22,27 +22,50 @@ window.K = (function () {
 
   /* ---------------- ExtendScript ---------------- */
 
-  function call(fn, arg) {
+  /*
+   * ExtendScript cagrisi. Premiere mesgul/modal haldeyken evalScript geri cagrisini HIC
+   * cagirmayabiliyor; o zaman bu promise sonsuza dek askida kalir ve onu bekleyen dongu
+   * (ornegin baglam yoklamasi) kalici olarak kilitlenir — panel secili klibi gormemeye baslar.
+   * Bu yuzden her cagri en gec timeout sonunda MUTLAKA sonuclanir.
+   */
+  function call(fn, arg, timeout) {
     return new Promise(function (resolve) {
+      var bitti = false;
+      function son(v) {
+        if (bitti) return;          // evalScript bazen gecikip sonra da cevap verebiliyor
+        bitti = true;
+        clearTimeout(saat);
+        resolve(v);
+      }
+      var saat = setTimeout(function () {
+        log("jsx ZAMAN ASIMI " + fn + " (" + (timeout || 60000) + " ms)");
+        son({ ok: false, error: "Premiere yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
+      }, timeout || 60000);
+
       var script = arg === undefined
         ? fn + "()"
         : fn + '("' + encodeURIComponent(JSON.stringify(arg)) + '")';
-      cs.evalScript(script, function (res) {
-        if (res === "EvalScript error.") {
-          log("jsx HATA " + fn + ": EvalScript error");
-          resolve({ ok: false, error: "ExtendScript hatası (" + fn + ")" });
-          return;
-        }
-        try {
-          var parsed = JSON.parse(res);
-          if (parsed && parsed.ok === false) log("jsx " + fn + ": " + parsed.error);
-          resolve(parsed);
-        }
-        catch (e) {
-          log("jsx " + fn + ": yanit okunamadi");
-          resolve({ ok: false, error: "Yanıt okunamadı: " + String(res).slice(0, 200) });
-        }
-      });
+      try {
+        cs.evalScript(script, function (res) {
+          if (res === "EvalScript error.") {
+            log("jsx HATA " + fn + ": EvalScript error");
+            son({ ok: false, error: "ExtendScript hatası (" + fn + ")" });
+            return;
+          }
+          try {
+            var parsed = JSON.parse(res);
+            if (parsed && parsed.ok === false) log("jsx " + fn + ": " + parsed.error);
+            son(parsed);
+          }
+          catch (e) {
+            log("jsx " + fn + ": yanit okunamadi");
+            son({ ok: false, error: "Yanıt okunamadı: " + String(res).slice(0, 200) });
+          }
+        });
+      } catch (eE) {
+        log("jsx " + fn + ": evalScript cagrilamadi - " + eE.message);
+        son({ ok: false, error: "ExtendScript çağrılamadı (" + fn + ")" });
+      }
     });
   }
 
@@ -292,7 +315,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.6.0";
+  var VERSION = "1.7.0";
   // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
   var REPO = "sametcreates/suflo";
   var logBuf = [];

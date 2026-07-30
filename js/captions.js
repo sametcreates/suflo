@@ -253,15 +253,46 @@ window.KCaptions = (function () {
     return segs;
   }
 
-  // "00:00:01,380" veya "01:23.500" -> saniye
+  /*
+   * "00:00:01,380" · "00:00:04.000 align:start" · "01:23.500" -> saniye.
+   * Sona kadar eşleşme aranmaz: WebVTT zaman satırının ardına cue ayarları
+   * (align/position/line/size) eklenebiliyor, bunlar zamanı bozmamalı.
+   */
   function tcParse(t) {
     var s = String(t).trim();
     var m = s.match(/(\d+):(\d+):(\d+)[,.](\d+)/);
     if (m) return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 1000;
-    // saat alanı olmayan biçim (mm:ss.mmm) — elle düzenlemede yaygın
-    var m2 = s.match(/^(\d+):(\d+)[,.](\d+)$/);
+    // saat alanı olmayan biçim (mm:ss.mmm) — VTT kısa biçimi ve elle düzenlemede yaygın
+    var m2 = s.match(/^(\d+):(\d+)[,.](\d+)/);
     if (m2) return (+m2[1]) * 60 + (+m2[2]) + (+m2[3]) / 1000;
+    // milisaniyesiz biçimler
+    var m3 = s.match(/^(\d+):(\d+):(\d+)/);
+    if (m3) return (+m3[1]) * 3600 + (+m3[2]) * 60 + (+m3[3]);
+    var m4 = s.match(/^(\d+):(\d+)/);
+    if (m4) return (+m4[1]) * 60 + (+m4[2]);
     return 0;
+  }
+
+  var VARLIKLAR = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+
+  /*
+   * İçe aktarılan altyazıdaki biçimlendirmeyi temizle. Sıra önemli: ÖNCE etiketler
+   * silinir, SONRA varlıklar çözülür — tersi olursa yazarın bilerek kaçırdığı
+   * "&lt;b&gt;" metni etikete dönüşüp silinir.
+   */
+  function temizleEtiket(t) {
+    var s = String(t || "");
+    s = s.replace(/\{\\[^}]*\}/g, "");        // ASS/SSA override blokları: {\an8}, {\pos(..)}
+    s = s.replace(/<[^>]+>/g, "");            // VTT/SRT etiketleri: <v Ad>, <i>, <c.sinif>, <b>
+    s = s.replace(/&#x([0-9a-fA-F]+);/g, function (_, h) {
+      return String.fromCharCode(parseInt(h, 16));
+    });
+    s = s.replace(/&#(\d+);/g, function (_, d) { return String.fromCharCode(+d); });
+    s = s.replace(/&([a-zA-Z]+);/g, function (tam, ad) {
+      var v = VARLIKLAR[ad.toLowerCase()];
+      return v === undefined ? tam : v;
+    });
+    return s.replace(/\s+/g, " ").trim();
   }
 
   // Satırları zamana göre sırala (elle düzenleme ve kaydırma sonrası şart)
@@ -712,7 +743,9 @@ window.KCaptions = (function () {
           if (enabled.length < at.length) trackArg = enabled;
         }
         status(scope === "inout" ? "In → Out sesi dışa aktarılıyor…" : "Sequence sesi dışa aktarılıyor…");
-        var ex = await K.call("KS_exportAudio", { scope: scope, epr: bundledEpr(), tracks: trackArg });
+        // Uzun sekanslarda dışa aktarım dakikalar sürebilir: varsayılan zaman aşımını uzat
+        var ex = await K.call("KS_exportAudio",
+          { scope: scope, epr: bundledEpr(), tracks: trackArg }, 3600000);
         if (!ex.ok) throw new Error(ex.error);
         tempFiles.push(ex.wav);
         seqOffset = ex.offset;
@@ -811,8 +844,9 @@ window.KCaptions = (function () {
       if (segments.length === 0) throw new Error("Konuşma bulunamadı.");
 
       status("");
-      hideRestore();          // ekranda taze iş var: eski taslak teklifi artık geçersiz
-      clearRevert();          // yeni doküman — eski çevirinin orijinalleri buraya ait değil
+      hideRestore();             // ekranda taze iş var: eski taslak teklifi artık geçersiz
+      clearRevert();             // yeni doküman — eski çevirinin orijinalleri buraya ait değil
+      uygulaEtiketiniSifirla();  // yeni transkript: uygula düğmesi normal haline dönsün
       el("cap-result").hidden = false;
       el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula";
       render();
@@ -1221,7 +1255,7 @@ window.KCaptions = (function () {
       var m = lines[ti].split("-->");
       var start = tcParse(m[0]);
       var end = tcParse(m[1]);
-      var txt = lines.slice(ti + 1).join(" ").trim();
+      var txt = temizleEtiket(lines.slice(ti + 1).join(" "));
       if (txt) out.push({ start: start, end: end, text: txt });
     });
     return out;
@@ -1253,26 +1287,162 @@ window.KCaptions = (function () {
 
   /* ---------------- SRT + uygulama ---------------- */
 
-  function buildSrt() {
-    var out = [], n = 0;
+  /*
+   * Stil uygulanmış, çakışması giderilmiş cue listesi.
+   * TÜM dışa aktarma biçimleri bunu kullanır — biçimler arası davranış ayrışmasın.
+   */
+  function cueler() {
+    var out = [];
     segments.forEach(function (s, i) {
       var txt = styleText(s.text);
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
-      n++;
       // minimum 0.3 sn gorunum — ama bir sonraki cue ile CAKISMA (karaoke'de kritik)
       var end = Math.max(s.end, s.start + 0.3);
       var next = segments[i + 1];
       if (next && end > next.start) end = Math.max(next.start, s.start + 0.05);
-      out.push(String(n));
-      out.push(tc(s.start, true) + " --> " + tc(end, true));
-      out.push(txt);
+      out.push({ start: s.start, end: end, text: txt });
+    });
+    return out;
+  }
+
+  function buildSrt() {
+    var out = [];
+    cueler().forEach(function (c, i) {
+      out.push(String(i + 1));
+      out.push(tc(c.start, true) + " --> " + tc(c.end, true));
+      out.push(c.text);
       out.push("");
     });
     return out.join("\r\n");
   }
 
+  // WebVTT — YouTube, web oynatıcılar ve sosyal platformların istediği biçim
+  function buildVtt() {
+    var out = ["WEBVTT", ""];
+    cueler().forEach(function (c, i) {
+      out.push(String(i + 1));
+      out.push(tc(c.start, false) + " --> " + tc(c.end, false));
+      out.push(c.text);
+      out.push("");
+    });
+    return out.join("\n");
+  }
+
+  /* ---------------- ASS / SSA (stilli altyazı) ---------------- */
+
+  // ASS zamanı: H:MM:SS.cc (santisaniye, tek haneli saat)
+  function assTc(sec) {
+    if (sec < 0) sec = 0;
+    var cs = Math.round(sec * 100);
+    var h = Math.floor(cs / 360000);
+    var m = Math.floor((cs % 360000) / 6000);
+    var s = Math.floor((cs % 6000) / 100);
+    var c = cs % 100;
+    function p(n) { return n < 10 ? "0" + n : String(n); }
+    return h + ":" + p(m) + ":" + p(s) + "." + p(c);
+  }
+
+  // Süslü parantez ASS'te override bloğu açar; metindeki gerçek parantez kaçırılmalı
+  function assMetin(t) {
+    return String(t || "").replace(/\{/g, "\\{").replace(/\}/g, "\\}")
+      .replace(/\r?\n/g, "\\N");
+  }
+
+  /*
+   * Kelime modundaki cue'ları satırlara toplayıp karaoke (\k) etiketi üretir.
+   * \k değeri SANTİSANİYE cinsindendir ve o kelimenin vurgulanma süresidir.
+   */
+  function assKaraokeSatirlari(cs) {
+    var satirlar = [], grup = [];
+    function bosalt() {
+      if (grup.length) { satirlar.push(grup); grup = []; }
+    }
+    for (var i = 0; i < cs.length; i++) {
+      grup.push(cs[i]);
+      var son = cs[i], sonraki = cs[i + 1];
+      var bosluk = sonraki ? sonraki.start - son.end : 99;
+      // satırı kapat: 5 kelime doldu, araya sessizlik girdi ya da noktalama bitti
+      if (grup.length >= 5 || bosluk > 0.7 || /[.!?…]$/.test(son.text)) bosalt();
+    }
+    bosalt();
+    return satirlar;
+  }
+
+  function buildAss(opts) {
+    opts = opts || {};
+    var font = opts.font || "Arial";
+    var boyut = opts.boyut || 72;
+    var karaoke = !!opts.karaoke;
+    var cs = cueler();
+
+    var bas = [
+      "[Script Info]",
+      "; Suflo ile üretildi — https://suflo.app",
+      "ScriptType: v4.00+",
+      "WrapStyle: 2",
+      "ScaledBorderAndShadow: yes",
+      "PlayResX: 1920",
+      "PlayResY: 1080",
+      "",
+      "[V4+ Styles]",
+      "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour," +
+        " Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline," +
+        " Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+      // Renkler ASS'te &HAABBGGRR: beyaz dolgu, siyah kontur, vurgu (karaoke) moru
+      "Style: Suflo," + font + "," + boyut + ",&H00FFFFFF,&H00F67C8B,&H00000000,&H80000000," +
+        "-1,0,0,0,100,100,0,0,1,4,2,2,80,80,90,1",
+      "",
+      "[Events]",
+      "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
+    ];
+
+    if (karaoke) {
+      assKaraokeSatirlari(cs).forEach(function (grup) {
+        var bas0 = grup[0].start, son0 = grup[grup.length - 1].end;
+        var parcalar = grup.map(function (c) {
+          var sure = Math.max(1, Math.round((c.end - c.start) * 100)); // santisaniye
+          return "{\\k" + sure + "}" + assMetin(c.text);
+        });
+        bas.push("Dialogue: 0," + assTc(bas0) + "," + assTc(son0) +
+          ",Suflo,,0,0,0,," + parcalar.join(" "));
+      });
+    } else {
+      cs.forEach(function (c) {
+        bas.push("Dialogue: 0," + assTc(c.start) + "," + assTc(c.end) +
+          ",Suflo,,0,0,0,," + assMetin(c.text));
+      });
+    }
+    return bas.join("\n") + "\n";
+  }
+
+  /*
+   * Premiere'in createCaptionTrack'i HER çağrıda YENİ bir altyazı izi açar; var olanı
+   * değiştirmenin betik yolu yok. Düzelt-uygula-düzelt döngüsünde kullanıcı farkında
+   * olmadan üst üste izler biriktiriyor ve altyazılar çakışık görünüyor.
+   * Çözüm: aynı sekansa ikinci kez uygulamadan önce açıkça onay iste.
+   */
+  var uygulananSekans = {};   // sekans adı -> son uygulama zamanı (oturum içi)
+  var onayBekleyen = null;
+  var UYGULA_ETIKET = "Sekansa uygula";
+
+  function uygulaEtiketiniSifirla() {
+    onayBekleyen = null;
+    var b = el("cap-apply");
+    if (b) { b.textContent = UYGULA_ETIKET; b.classList.remove("warn"); }
+  }
+
   async function apply() {
     if (segments.length === 0) return;
+    var sekans = (KApp.ctx().sequence || "") || "?";
+    if (uygulananSekans[sekans] && onayBekleyen !== sekans) {
+      onayBekleyen = sekans;
+      var btn = el("cap-apply");
+      btn.textContent = "Yine de yeni altyazı izi ekle";
+      btn.classList.add("warn");
+      KApp.toast("Bu sekansa zaten altyazı uyguladın. Premiere var olan izi güncelleyemiyor, " +
+        "YENİ bir altyazı izi ekler — eskisini silmezsen ikisi üst üste görünür.", "warn");
+      return;
+    }
     try {
       var srt = buildSrt();
       if (!srt) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
@@ -1291,6 +1461,8 @@ window.KCaptions = (function () {
       K.fs.writeFileSync(p, "﻿" + srt, "utf8");
       var r = await K.call("KS_importSrtAsCaptions", { srtPath: p });
       if (r.ok) {
+        uygulananSekans[sekans] = Date.now();
+        uygulaEtiketiniSifirla();
         if (r.captionTrack) {
           // Yalnızca iş gerçekten sekansa yerleştiyse taslağı sil.
           // cancelDraft şart: 1,2 sn içinde bir tuş vuruşu olduysa zamanlayıcı taslağı diriltir.
@@ -1318,22 +1490,35 @@ window.KCaptions = (function () {
     return p;
   }
 
-  function saveSrt() {
+  /*
+   * Seçili biçimde dosyaya yaz. ASS'te BOM YAZILMAZ: libass/ffmpeg BOM'lu [Script Info]
+   * başlığını tanımıyor. SRT/VTT/TXT'te BOM Türkçe karakterler için kalsın.
+   */
+  function saveAs() {
     try {
-      var srt = buildSrt();
-      if (!srt) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
-      KApp.toast("Kaydedildi: " + saveToDesktop("suflo-altyazi.srt", "﻿" + srt), "good");
-    } catch (e) {
-      KApp.toast(e.message, "bad");
-    }
-  }
-
-  // düz transkript: video açıklaması / blog için, zaman damgasız
-  function saveTxt() {
-    try {
-      var lines = segments.map(function (s) { return styleText(s.text); }).filter(Boolean);
-      if (!lines.length) { KApp.toast("Yazılacak metin yok.", "bad"); return; }
-      KApp.toast("Kaydedildi: " + saveToDesktop("suflo-transkript.txt", "﻿" + lines.join("\n")), "good");
+      var fmt = (el("cap-export-fmt") && el("cap-export-fmt").value) || "srt";
+      var kelimeModu = /^(k1|kc|w\d+)$/.test(el("cap-maxlen").value);
+      var icerik, ad, bom = "﻿";
+      if (fmt === "txt") {
+        var lines = segments.map(function (s) { return styleText(s.text); }).filter(Boolean);
+        if (!lines.length) { KApp.toast("Yazılacak metin yok.", "bad"); return; }
+        icerik = lines.join("\r\n");
+        ad = "suflo-transkript.txt";
+      } else if (fmt === "vtt") {
+        icerik = buildVtt();
+        ad = "suflo-altyazi.vtt";
+      } else if (fmt === "ass") {
+        icerik = buildAss({ karaoke: kelimeModu });
+        ad = "suflo-altyazi.ass";
+        bom = "";
+      } else {
+        icerik = buildSrt();
+        ad = "suflo-altyazi.srt";
+      }
+      if (!icerik) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
+      var yol = saveToDesktop(ad, bom + icerik);
+      var not = (fmt === "ass" && kelimeModu) ? " · karaoke etiketleriyle" : "";
+      KApp.toast("Kaydedildi: " + yol + not, "good");
     } catch (e) {
       KApp.toast(e.message, "bad");
     }
@@ -1344,8 +1529,7 @@ window.KCaptions = (function () {
   function init() {
     el("cap-go").addEventListener("click", go);
     el("cap-apply").addEventListener("click", apply);
-    el("cap-save-srt").addEventListener("click", saveSrt);
-    el("cap-save-txt").addEventListener("click", saveTxt);
+    el("cap-save").addEventListener("click", saveAs);
     el("cap-import-srt").addEventListener("click", function (e) { e.preventDefault(); importSrt(); });
     el("cap-preset-save").addEventListener("click", saveUserPreset);
     el("cap-translate-go").addEventListener("click", translateAll);
@@ -1434,7 +1618,10 @@ window.KCaptions = (function () {
     });
     loadPrefs();
 
+    var sonSekans = null;
     KApp.onContext(function (ctx) {
+      // başka sekansa geçildiyse bekleyen "yine de ekle" onayı düşsün
+      if (ctx.sequence !== sonSekans) { sonSekans = ctx.sequence; uygulaEtiketiniSifirla(); }
       refreshButton();
       renderTracks(ctx);
     });

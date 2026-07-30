@@ -318,6 +318,15 @@ input[type="range"]::-webkit-slider-thumb:hover {
   letter-spacing: .2px;
 }
 
+/* geri alınamayan bir işlem onay bekliyor (ör. ikinci altyazı izi eklemek) */
+.btn.primary.warn {
+  background: linear-gradient(135deg, #d98324, #c2610f);
+  box-shadow: 0 8px 28px -8px rgba(217, 131, 36, .55), inset 0 1px 0 rgba(255, 255, 255, .18);
+}
+.btn.primary.warn:hover:not(:disabled) {
+  box-shadow: 0 8px 30px -6px rgba(217, 131, 36, .7), inset 0 1px 0 rgba(255, 255, 255, .22);
+}
+
 .btn.busy { position: relative; display: inline-flex; align-items: center; justify-content: center; }
 .btn.busy .btn-label { visibility: hidden; }
 .btn.busy::after {
@@ -852,6 +861,22 @@ body:not(.solo) .solo-gear { display: none; }
   font-size: 11px;
 }
 .result-head .dim { margin-right: auto; }
+
+/* sonuç başlığındaki biçim seçici — link-btn'lerle aynı ağırlıkta kalmalı */
+.mini-select {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 3px 20px 3px 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--dim);
+  background-color: var(--bg2);
+  background-position: right 5px center;
+  background-size: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.mini-select:hover { color: var(--text); border-color: var(--line-lite, var(--line)); }
 
 .segments {
   max-height: 240px;

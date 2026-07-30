@@ -197,11 +197,12 @@ window.KCut = (function () {
     el("cut-apply").disabled = true;
     status("Uygulanıyor…");
     var mode = target === "clone" ? "ripple" : el("cut-mode").value;
+    // Yuzlerce kesim uygulamak uzun surebilir: zaman asimini genis tut
     var r = await K.call("KS_applyCuts", {
       ranges: act,
       removeMode: mode,
       cloneFirst: target === "clone"
-    });
+    }, 900000);
     el("cut-apply").disabled = false;
     if (r.ok) {
       status("");

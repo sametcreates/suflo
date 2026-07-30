@@ -1,60 +1,48 @@
-## Suflo 1.6.0 — hız, GPU ve gerçek altyazı editörü 🚀
+## Suflo 1.7.0 — WebVTT + ASS dışa aktarma, karaoke etiketleri, dayanıklılık 🎬
 
-Bu sürüm iki şeyi değiştiriyor: **çok daha hızlı** ve artık sadece altyazı üreten değil, **altyazıyı düzenlediğin** bir araç.
+Bu sürüm altyazıyı Premiere'in dışına da taşıyor: YouTube'a yükleyeceğin VTT'yi ve ffmpeg ile videoya gömebileceğin stilli ASS'i doğrudan panelden alıyorsun.
 
-### Hız: 22 kata kadar
+### Yeni: dört biçimde dışa aktarma
 
-| | 83 saniyelik ses |
+Sonuç listesinin üstündeki biçim seçicisinden seç, **indir**:
+
+| Biçim | Ne için |
 |---|---|
-| v1.5 (CPU) | 26,7 sn |
-| v1.6 CPU + sessizlik atlama | 8,5 sn |
-| **v1.6 NVIDIA GPU + sessizlik atlama** | **1,2 sn** |
+| **SRT** | Premiere caption izi — her yerde çalışır |
+| **WebVTT** | YouTube, web oynatıcılar, sosyal platformlar |
+| **ASS** | Stilli altyazı; ffmpeg ile videoya gömülür, Aegisub/DaVinci/VLC okur |
+| **TXT** | Zaman damgasız transkript (video açıklaması, blog) |
 
-- **Sessizlik atlama (VAD):** Konuşma olmayan bölümler artık motora hiç gönderilmiyor. Hem hızlandırıyor hem de sessizlikte doğan uydurma altyazıları (“abone olmayı unutmayın” vb.) kaynağında kesiyor. Ölçümlerde zaman damgalarını da düzeltti.
-- **NVIDIA GPU desteği:** Ekran kartın varsa Suflo onu kendisi bulur ve GPU sürümünü kurar. Kurulum sonunda GPU’yu bir kez ısıtır, böylece ilk gerçek işin de hızlı olur.
-- **Model seçimi:** Tiny (32 MB) → Large v3 (1 GB) arası beş model. Zayıf dizüstüde Tiny, Türkçe’de en iyi sonuç için Large. Varsayılan: Turbo.
+**Karaoke etiketleri:** satır uzunluğunu "kelime" modlarından birine (2-5 kelime ya da kelime kelime) alıp ASS indirirsen, kelimeler `\k` zamanlama etiketleriyle satırlara toplanır — gerçek karaoke vurgusu. Videoya gömmek için:
 
-### Altyazı editörü
+```bash
+ffmpeg -i video.mp4 -vf "subtitles=suflo-altyazi.ass" cikti.mp4
+```
 
-- **Satır bölme** — imleci koy, Enter’a bas (ya da ⤸). Süre karakter oranına göre paylaşılır, kelime ortasından bölmez.
-- **Zaman düzenleme** — zaman damgasına çift tıkla, elle yaz. Geçersiz biçim reddedilir, liste otomatik sıralanır.
-- **Geri al / yinele** — Ctrl+Z, Ctrl+Y. Bölme, birleştirme, silme, çeviri, bul & değiştir; hepsi geri alınabilir.
-- **Toplu kaydırma** — tüm altyazılar 0,5 saniye ileri/geri. In–out kayması olan sekanslarda hayat kurtarır.
-- **Satır ekleme** — araya boş satır.
+### İçe aktarma gerçekten VTT okuyor
 
-### Terim sözlüğü (Türkçe/Azerice için)
+YouTube'dan indirdiğin altyazıyı panele atınca artık:
+- `<v Konuşmacı>`, `<i>`, `<b>`, `{\an8}` gibi etiketler temizleniyor (eskiden altyazının içine ham olarak giriyordu),
+- `&amp;`, `&#305;` gibi HTML varlıkları çözülüyor,
+- zaman satırındaki cue ayarları (`align:start position:0%`) zamanı bozmuyor,
+- saat alanı olmayan kısa biçim (`00:01.000 --> 00:03.500`) doğru okunuyor — eskiden hepsi 00:00 oluyordu.
 
-Whisper marka ve kişi adlarını sürekli yanlış yazar. Ayarlar’a `yanlış => doğru` biçiminde kural yaz, her transkriptte otomatik düzeltilsin. Büyük/küçük harf eşleşmesi Türkçe İ-ı kurallarına uygun çalışır. Bul & değiştir’de bulduğun düzeltmeyi tek tıkla sözlüğe ekleyebilirsin.
+### Aynı sekansa ikinci kez uygulama
 
-### İş kaybına karşı koruma
+Premiere'in betik arayüzü var olan altyazı izini güncelleyemiyor, her seferinde **yeni** bir iz açıyor. Düzelt-uygula-düzelt döngüsünde farkında olmadan üst üste izler birikiyordu. Artık aynı sekansa ikinci kez uygularken panel önce uyarıyor ve onay istiyor; ne olacağını açıkça söylüyor.
 
-- **Taslak kurtarma:** Transkript diske yazılır. Panel kapanır, Premiere çökerse iş kaybolmaz — açılışta kurtarma teklif edilir. Transkript biter bitmez yazılır: hiçbir şeye dokunmadan panel kapanırsa da kurtarılır.
-- **Altyazı dosyası projenin yanında:** Uygulanan SRT artık geçici klasöre değil, proje klasörüne (yoksa kalıcı Suflo klasörüne) yazılır. Premiere içe aktardığı dosyayı kopyalamıyor, yola referans veriyor — geçici klasörde duran altyazı bir gün sonra kırılırdı.
-- **Kesintiye dayanıklı indirme:** Model indirmesi düşerse kaldığı yerden devam eder, ayna sunucu dener; yarım dosya asla “kurulu” sayılmaz. HuggingFace kota (429) ya da geçici sunucu hatası verdiğinde inen kısım **korunur** — 1 GB'lık model baştan inmez. Sunucunun gönderdiği aralık doğrulanır, farklı bir dosyadan kalan yarım indirme birleştirilmez.
-- **Vekil sunucu (proxy):** Artık Ayarlar'dan girilebiliyor ve https adresler için gerçek CONNECT tüneli kuruluyor — kurumsal ağlarda kurulum sessizce bozulmuyor. `NO_PROXY` ve yerel adres muafiyeti destekli.
-- **Otomatik temizlik:** Bir günden eski geçici ses dosyaları silinir; altyazı dosyalarına asla dokunulmaz.
+### Panel artık kilitlenmiyor
 
-### Düzeltmeler
-
-- **GPU doğrulaması gerçek oldu.** Motorun GPU'yu gerçekten kullandığı çıktıdan kanıtlanıyor; sürücü eski ya da CUDA yüklenemiyorsa otomatik CPU sürümüne dönülüyor (ve CUDA DLL'leri silinip ~600 MB yer açılıyor). Eskiden bozuk GPU kurulumu “hazır” görünüyordu.
-- **Toplu kaydırma** artık cue sürelerini bozmuyor. Sequence başında olan altyazılarda tek tek kırpma yapmak yerine kaydırma topluca sınırlanıyor, üst üste tıklamak satırları 0'a yığmıyor ve Ctrl+Z tek adımda geri alıyor.
-- **Çeviriyi geri al** yapısal düzenlemeden sonra metinleri kaydırmıyor. Orijinal metin satırın kendisinde taşınıyor; satır silme, bölme, birleştirme, yeniden sıralama sonrası doğru satıra dönüyor.
-- **Tek kelimelik satır** artık kelime ortasından bölünmüyor (karaoke modunda her satır tek kelime olduğu için kritikti). Japonca/Çince/Korece gibi boşluksuz yazılarda bölme çalışmaya devam ediyor.
-- **Bul & değiştir** sonrası geri alma düğmesi aktifleşiyor; eşleşme bulunmazsa geçmişe hayalet kayıt düşmüyor.
-- **Kurtarma teklifi** taze işin üzerinde açık kalmıyor; yanlışlıkla tıklanırsa yapılan iş Ctrl+Z ile geri geliyor.
-- **Gömülü WAV presetleri** artık gerçekten kullanılıyor (sequence/In–Out ses aktarımı daha güvenilir).
-- **Bir modül yüklenemezse** panelin tamamı boş açılmıyor; hata günlüğe düşüyor ve diğer bölümler çalışmaya devam ediyor.
-
-> Kurulum gereksinimi: Premiere 14.4 (2020) ve üstü. Daha eski sürümlerde panel ayağa kalkamıyordu; artık ZXP kurulumu baştan uyarı veriyor.
+Premiere meşgul ya da modal bir pencere açıkken ExtendScript geri çağrısı hiç gelmeyebiliyor. Bu durumda bağlam yoklaması sonsuza dek askıda kalıyor ve **panel seçili klibi bir daha hiç görmüyordu** — paneli kapatıp açmadan düzelmiyordu. Artık her çağrı en geç zaman aşımında sonuçlanıyor, ayrıca yoklama için bekçi var: Premiere cevap vermeye başlayınca panel kendini toparlıyor.
 
 ### Kurulum
 
 1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir (ücretsiz)
-2. `Suflo-1.6.0.zxp` dosyasına çift tıkla
+2. `Suflo-1.7.0.zxp` dosyasına çift tıkla
 3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
 
-Gereksinim: Windows, Adobe Premiere. ffmpeg ve yerel motor panel içinden kurulur.
+Gereksinim: Windows, Premiere 14.4 (2020) ve üstü. ffmpeg ve yerel motor panel içinden kurulur.
 
 ---
 
-*Free, open-source AI subtitles for Adobe Premiere. Runs Whisper locally with optional NVIDIA GPU acceleration — no subscription, no credits, no limits.*
+*Free, open-source AI subtitles for Adobe Premiere. Runs Whisper locally with optional NVIDIA GPU acceleration — no subscription, no credits, no limits. Now exports SRT, WebVTT and styled ASS with karaoke timing tags.*

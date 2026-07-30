@@ -67,11 +67,25 @@ window.KApp = (function () {
     return d.innerHTML;
   }
 
+  /*
+   * Bağlam yoklaması. `polling` kilidi eşzamanlı çağrıyı engeller, ama takılı kalırsa panel
+   * seçili klibi bir daha hiç görmez — bu yüzden bekçi var: makul süreyi aşan yoklama
+   * terk edilmiş sayılır ve kilit açılır. K.call zaten kendi zaman aşımıyla sonuçlanıyor;
+   * bu ikinci savunma katmanı.
+   */
+  var pollBasladi = 0;
+  var POLL_BEKCI = 30000;
+
   async function pollContext() {
-    if (polling) return;
+    if (polling) {
+      if (Date.now() - pollBasladi < POLL_BEKCI) return;
+      K.log("baglam yoklamasi takildi (" + Math.round((Date.now() - pollBasladi) / 1000) + " sn), kilit aciliyor");
+      polling = false;
+    }
     polling = true;
+    pollBasladi = Date.now();
     try {
-      var r = await K.call("KS_getContext");
+      var r = await K.call("KS_getContext", undefined, 20000);
       var prev = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, c: ctx.connected });
       if (r.ok) {
         ctx = r;
