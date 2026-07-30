@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Aranan ifade basta: kimse "Suflo" aramiyor, "premiere türkçe altyazı" ariyor -->
-<title>Premiere Türkçe Altyazı — Ücretsiz Eklenti | Suflo</title>
+<title>Premiere Türkçe Altyazı - Ücretsiz Eklenti | Suflo</title>
 <meta name="description" content="Adobe Premiere Pro'ya otomatik Türkçe altyazı ekleyen ücretsiz eklenti. Bilgisayarında çalışır, kurulumdan sonra internet gerekmez. Abonelik ve kredi yok.">
 <link rel="canonical" href="https://suflo.app/">
-<!-- Arama motoru sahiplik dogrulamalari — SILME, dogrulamalar duser -->
+<!-- Arama motoru sahiplik dogrulamalari: SILME, dogrulamalar duser -->
 <meta name="google-site-verification" content="eJVJ-uwBTV8J9m-nev31huudWZvu2YDRdBSqlveBNBU" />
 <meta name="msvalidate.01" content="4936EC1B936A7C168D5F15A6AFAA8A0C" />
 <meta name="robots" content="index, follow, max-image-preview:large">
@@ -18,15 +18,15 @@
 <meta property="og:site_name" content="Suflo">
 <meta property="og:locale" content="tr_TR">
 <meta property="og:url" content="https://suflo.app/">
-<meta property="og:title" content="Premiere'e Türkçe altyazı — ücretsiz">
+<meta property="og:title" content="Premiere'e Türkçe altyazı, ücretsiz">
 <meta property="og:description" content="Adobe'un yapamadığını yapan ücretsiz eklenti. Bilgisayarında çalışır, abonelik ve kredi yok.">
 <meta property="og:image" content="https://suflo.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Suflo — Premiere için ücretsiz Türkçe altyazı eklentisi">
+<meta property="og:image:alt" content="Suflo: Premiere için ücretsiz Türkçe altyazı eklentisi">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Premiere'e Türkçe altyazı — ücretsiz">
+<meta name="twitter:title" content="Premiere'e Türkçe altyazı, ücretsiz">
 <meta name="twitter:description" content="Adobe'un yapamadığını yapan ücretsiz eklenti. Abonelik yok, kredi yok, sınır yok.">
 <meta name="twitter:image" content="https://suflo.app/og.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b7cf6'/%3E%3Cstop offset='1' stop-color='%235b8cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='1' y='1' width='18' height='18' rx='5' fill='url(%23f)'/%3E%3Cpath d='M13.9 7.2 C13.5 5.5 11.9 4.7 10 4.7 C8 4.7 6.3 5.5 6.3 7.1 C6.3 10.7 13.7 9.1 13.7 12.9 C13.7 14.5 12 15.3 10 15.3 C8.1 15.3 6.5 14.5 6.1 12.8' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -103,7 +103,13 @@
   * { box-sizing: border-box; margin: 0; }
   html { scroll-behavior: smooth; }
   body {
-    background: var(--bg); color: var(--text);
+    /* Hero isimasi BODY'de: tam genislik yayilir, konteyner kenarinda kesilmez,
+       mutlak konumlu katman olmadigi icin yatay tasma riski sifir. */
+    background:
+      radial-gradient(760px 420px at 50% 40px, rgba(139, 124, 246, .16), transparent 68%),
+      radial-gradient(600px 360px at 72% 260px, rgba(91, 140, 255, .09), transparent 70%),
+      var(--bg);
+    color: var(--text);
     font: 16px/1.66 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
@@ -137,16 +143,8 @@
   }
 
   /* ---------- Hero ---------- */
-  .hero { position: relative; padding: 78px 0 64px; text-align: center; }
-  /* Isima yatayda kutunun DISINA tasmamali: negatif yatay inset sayfayi genisletiyordu */
-  .hero::before {
-    content: ""; position: absolute; inset: -120px 0 0;
-    background:
-      radial-gradient(720px 400px at 50% 0%, rgba(139, 124, 246, .17), transparent 68%),
-      radial-gradient(560px 340px at 78% 22%, rgba(91, 140, 255, .10), transparent 70%);
-    pointer-events: none;
-  }
-  .hero > * { position: relative; }
+  /* Isima body arka planinda (yukarida): burada ek katman yok, kesik kenar sorunu bitti */
+  .hero { padding: 78px 0 64px; text-align: center; }
   .rozet {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 12.5px; font-weight: 600; letter-spacing: .3px;
@@ -208,7 +206,7 @@
   .lead { color: var(--dim); max-width: 660px; margin-bottom: 40px; font-size: 16.5px; }
   .lead a { text-decoration: underline; text-underline-offset: 3px; }
 
-  /* Kayarak belirme. Gizleme yalnizca JS calisirken uygulanir (html.js) —
+  /* Kayarak belirme. Gizleme yalnizca JS calisirken uygulanir (html.js);
      JS yuklenmezse ya da coker ise sayfa ASLA bos kalmamali. */
   html.js .reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s ease, transform .6s ease; }
   html.js .reveal.in { opacity: 1; transform: none; }
@@ -331,7 +329,7 @@
   .cmp { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 560px; }
   .cmp th, .cmp td { padding: 14px 18px; text-align: left; border-bottom: 1px solid var(--line); }
   .cmp tr:last-child td, .cmp tr:last-child th { border-bottom: 0; }
-  /* sutun basliklari (thead) — satir basliklari (tbody th) duz metin gorunumunde kalir */
+  /* sutun basliklari (thead), satir basliklari (tbody th) duz metin gorunumunde kalir */
   .cmp thead th { color: var(--faint); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
   .cmp thead th.suflo { color: var(--accent-lite); }
   .cmp tbody th { color: var(--dim); font-weight: 400; font-size: 14.5px; }
@@ -439,7 +437,7 @@
     <div class="rozet"><i aria-hidden="true"></i>Ücretsiz · Açık kaynak · Sınırsız</div>
     <h1>Premiere'e <em>Türkçe altyazı.</em></h1>
     <p class="sub">Adobe'un yerleşik aracı Türkçe konuşmayı yazıya dökemiyor.
-    Suflo döküyor — bilgisayarında çalışan yapay zekâyla.
+    Suflo döküyor: bilgisayarında çalışan yapay zekâyla.
     Abonelik yok, kredi yok, sınır yok.</p>
     <div class="cta-row">
       <a class="btn primary" id="indir-cta" href="https://github.com/sametcreates/suflo/releases/latest">
@@ -479,7 +477,7 @@
     <div class="kanit reveal">
       <div class="k"><b>18</b><span>Premiere'in resmî olarak desteklediği dil sayısı</span></div>
       <div class="k"><b>0</b><span>Listede Türkçe ve Azerice</span></div>
-      <div class="k"><b>99</b><span>Suflo'nun desteklediği dil — Türkçe ve Azerice dahil</span></div>
+      <div class="k"><b>99</b><span>Suflo'nun desteklediği dil (Türkçe ve Azerice dahil)</span></div>
     </div>
     <p class="kaynaklar reveal">Kaynaklar:
       <a href="https://helpx.adobe.com/premiere/desktop/add-text-images/insert-captions/languages-supported-by-speech-to-text.html" rel="nofollow">Adobe'un resmî dil listesi</a> ·
@@ -491,7 +489,7 @@
   <section id="nasil">
     <p class="kicker reveal">Nasıl çalışır?</p>
     <h2 class="reveal">Üç adım. Gerisi Suflo'da.</h2>
-    <p class="lead reveal">Panel Premiere'in içinde yaşar — dışarıda program yok, dosya taşıma yok.</p>
+    <p class="lead reveal">Panel Premiere'in içinde yaşar. Dışarıda program yok, dosya taşıma yok.</p>
     <div class="adimlar">
       <div class="adim reveal"><span class="no">1</span>
         <h3>Kur</h3>
@@ -541,7 +539,7 @@
       <div>
         <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Satır satır düzenleme</b><span>Bölme (Enter), birleştirme, silme, araya satır ekleme.</span></div></div>
         <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Zaman kontrolü</b><span>Çift tıkla elle düzenle, tümünü ±0,5 sn kaydır, zamana tıklayıp playhead'e git.</span></div></div>
-        <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Geri al / yinele</b><span>Ctrl+Z ve Ctrl+Y, 25 adıma kadar. Taslak diske yazılır — çökmede iş kaybolmaz.</span></div></div>
+        <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Geri al / yinele</b><span>Ctrl+Z ve Ctrl+Y, 25 adıma kadar. Taslak diske yazılır; çökmede iş kaybolmaz.</span></div></div>
         <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Terim sözlüğü</b><span>Whisper'ın sürekli yanlış yazdığı isimleri bir kez öğret, her transkriptte otomatik düzelsin.</span></div></div>
         <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Türkçeye duyarlı bul &amp; değiştir</b><span>İ/ı ayrımını doğru yapan, tam kelime eşleşmeli arama.</span></div></div>
       </div>
@@ -574,7 +572,7 @@
       <div class="feat reveal">
         <div class="ic"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 13.5 12.5 5a1.9 1.9 0 0 1 2.7 2.7L6.7 16.2 3.5 16.8z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg></div>
         <h3>Uygulamadan önce düzelt</h3>
-        <p>Düzenlenebilir liste: satırı böl, birleştir, zamanı elle yaz — sonra tek tıkla caption izine gönder.</p>
+        <p>Düzenlenebilir liste: satırı böl, birleştir, zamanı elle yaz, sonra tek tıkla caption izine gönder.</p>
       </div>
       <div class="feat reveal">
         <div class="ic"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M3.5 10h13M10 3.2c-3.6 3.8-3.6 9.8 0 13.6M10 3.2c3.6 3.8 3.6 9.8 0 13.6" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></div>
@@ -653,11 +651,11 @@
     <div class="kur reveal">
       <h3>🍎 Mac</h3>
       <p class="kur-giris">Mac'te iki yardımcı program gerekiyor. Panel bunları senin için kurar,
-      ama önce <b>Homebrew</b> denen kurulum yardımcısına ihtiyacı var. Korkma — kopyala, yapıştır, bitti.</p>
+      ama önce <b>Homebrew</b> denen kurulum yardımcısına ihtiyacı var. Korkma: kopyala, yapıştır, bitti.</p>
       <ol>
         <li><b>Terminal'i aç.</b> (Spotlight: <code class="satirici">⌘ + boşluk</code> → "Terminal" yaz → Enter.)</li>
         <li><b>Homebrew'u kur.</b> Aşağıdaki satırı Terminal'e yapıştır, Enter'a bas.
-          Mac şifreni isteyecek — yazarken ekranda görünmez, normal olan bu.
+          Mac şifreni isteyecek; yazarken ekranda görünmez, normal olan bu.
           <div class="kod"><pre><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></pre><button class="kopyala" type="button">Kopyala</button></div>
           <span class="kur-not">Bir süre sürebilir. Bittiğinde "Installation successful!" yazar.
           Terminal sana birkaç satır daha kopyalamanı söylerse (<code class="satirici">eval "$(/opt/homebrew/bin/brew shellenv)"</code> gibi), onları da yapıştır.</span>
@@ -679,7 +677,7 @@
     </div>
 
     <p class="kur-yardim reveal">Takıldığın yer olursa panelde <b>Ayarlar → Destek → "Günlüğü kopyala"</b> deyip
-    <a href="https://github.com/sametcreates/suflo/issues">GitHub'da bir konu aç</a> — bakarız.</p>
+    <a href="https://github.com/sametcreates/suflo/issues">GitHub'da bir konu aç</a>, bakarız.</p>
   </section>
 
   <!-- ================= SSS ================= -->
@@ -710,7 +708,7 @@
     </details>
     <details class="reveal">
       <summary>Verilerim nereye gidiyor?</summary>
-      <p>Yerel motorda sesin hiçbir yere gitmez — bilgisayarından çıkmaz. Bulut motorunu seçersen ses yalnızca
+      <p>Yerel motorda sesin hiçbir yere gitmez, bilgisayarından çıkmaz. Bulut motorunu seçersen ses yalnızca
       senin seçtiğin sağlayıcıya (Groq/OpenAI) gider. Tek istisna çeviri özelliği: o buluttan çalışır ve
       yalnızca altyazı <b>metnini</b> gönderir, sesi değil.</p>
     </details>
@@ -722,7 +720,7 @@
     <details class="reveal">
       <summary>Bilgisayarım yavaşsa?</summary>
       <p>Beş model seçeneği var: en küçüğü 32 MB, zayıf bilgisayarlarda da çalışır. Acelen varsa ücretsiz
-      Groq anahtarıyla bulut moduna geçersin — dakikalar değil, saniyeler.</p>
+      Groq anahtarıyla bulut moduna geçersin: dakikalar değil, saniyeler.</p>
     </details>
   </section>
 
@@ -744,7 +742,7 @@
       <a href="https://github.com/sametcreates/suflo/releases">Sürüm notları</a>
       <a href="https://instagram.com/suflo.app">Instagram</a>
     </div>
-    <p>Suflo — açık kaynak, MIT lisansı. <a href="https://instagram.com/sametcreates">sametcreates</a> tarafından yapılır.</p>
+    <p>Suflo · açık kaynak · MIT lisansı. <a href="https://instagram.com/sametcreates">sametcreates</a> tarafından yapılır.</p>
     <p class="gizlilik">Bu sitede çerez kullanılmaz ve kişisel veri toplanmaz; yalnızca kaç kişinin
     siteyi ziyaret ettiğini sayan, kimliksiz bir istatistik aracı çalışır.
     Suflo eklentisi ise sesini hiçbir sunucuya göndermez.</p>
@@ -762,7 +760,7 @@
   if (azHareket || !("IntersectionObserver" in window)) {
     reveals.forEach(function (e) { e.classList.add("in"); });
   } else {
-    // gizleme ancak gozlemci kurulduktan sonra devreye girer — JS coker ise sayfa acik kalir
+    // gizleme ancak gozlemci kurulduktan sonra devreye girer; JS coker ise sayfa acik kalir
     document.documentElement.classList.add("js");
     var io = new IntersectionObserver(function (girisler) {
       girisler.forEach(function (g) {
@@ -784,7 +782,7 @@
     if (azHareket) {
       satirlar.forEach(function (b) { b.textContent = b.getAttribute("data-yazi"); });
     } else {
-      // WCAG 2.2.2: kendiliginden baslayan hareket 5 sn'yi asip suresiz surmemeli —
+      // WCAG 2.2.2: kendiliginden baslayan hareket 5 sn'yi asip suresiz surmemeli:
       // dongu 3 turla sinirli, son turda metin tam haliyle sabit kalir.
       var tur = 0, MAKS_TUR = 3;
       var yazici = function () {
@@ -867,11 +865,11 @@
 </script>
 
 <!--
-  ZİYARETÇİ SAYACI — Cloudflare Web Analytics
+  ZİYARETÇİ SAYACI: Cloudflare Web Analytics
   Çerezsiz, kişisel veri toplamaz, kimliksiz. Yalnızca kaç ziyaretçi geldiğini,
   hangi ülkeden ve hangi siteden geldiklerini sayar. Token gizli değildir:
   herkese açık sayfada durur, tek işlevi ölçümü bu siteye bağlamaktır.
-  Yalnızca suflo.app'te yüklenir — yerel önizleme istatistikleri şişirmesin.
+  Yalnızca suflo.app'te yüklenir; yerel önizleme istatistikleri şişirmesin.
 -->
 <script>
 (function () {
