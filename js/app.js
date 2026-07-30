@@ -322,8 +322,24 @@ window.KApp = (function () {
       KSfx.addFolder(function () { refreshFolderList(); });
     });
 
-    el("set-ffmpeg-recheck").addEventListener("click", checkFfmpeg);
+    el("set-ffmpeg-recheck").addEventListener("click", function () { checkFfmpeg(true); });
     el("set-ffmpeg-install").addEventListener("click", installFfmpeg);
+    // macOS'ta winget yok — dugme ne yapiyorsa onu yazsin
+    if (K.MAC) el("set-ffmpeg-install").textContent = "Homebrew ile kur";
+
+    // Elle ffmpeg yolu: paket yoneticisi kurmak istemeyenler icin (tek dosya indirip gosterir)
+    if (el("set-ffmpeg-path")) {
+      el("set-ffmpeg-path").value = s.ffmpeg || "";
+      el("set-ffmpeg-path").addEventListener("change", async function () {
+        var st = K.settings();
+        st.ffmpeg = this.value.trim();
+        K.saveSettings();
+        var ff = await K.findFfmpeg(true);      // onbellegi tazele, gercekten calisiyor mu bak
+        if (ff) toast("ffmpeg bulundu: " + ff, "good");
+        else if (st.ffmpeg) toast("Bu yolda çalışan bir ffmpeg bulunamadı.", "bad");
+        checkFfmpeg(true);
+      });
+    }
 
     // terim sözlüğü
     if (el("set-glossary")) {
@@ -380,7 +396,10 @@ window.KApp = (function () {
       box.textContent = "✓ " + ff;
     } else {
       box.className = "inline-status bad";
-      box.textContent = "✕ bulunamadı — Kesim ve Altyazı çalışmaz";
+      // ffmpeg olmadan HEM yerel HEM bulut altyazi calismaz: sebebi ve cikis yolunu soyle
+      box.textContent = K.MAC
+        ? "✕ bulunamadı — altyazı çalışmaz. Homebrew ile kur ya da aşağıya yolu yaz."
+        : "✕ bulunamadı — altyazı çalışmaz. winget ile kur ya da aşağıya yolu yaz.";
     }
     return ff;
   }
