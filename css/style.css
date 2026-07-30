@@ -503,17 +503,47 @@ details.adv > *:not(summary) { margin-top: 8px; }
 body.solo .tabs { display: none; }
 body:not(.solo) .solo-gear { display: none; }
 
+/*
+ * Ayarlar girişi. Yalnız ikon olduğunda kullanıcılar bulamıyordu: üst barda 26 px'lik
+ * çerçevesiz bir ikon, sürüm rozeti ve bağlantı noktasıyla yan yana durunca düğme
+ * olduğu bile anlaşılmıyor. Etiket + çerçeve ile açıkça düğme yapıldı.
+ */
 .solo-gear {
-  flex: 0 0 26px;
-  width: 26px; height: 26px;
-  padding: 0;
+  flex: 0 0 auto;
+  width: auto;
+  height: 26px;
+  display: inline-flex;
+  /* .tab dikey hizalıdır (sekmede ikon üstte, yazı altta) — burada yan yana olmalı */
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px 0 7px;
+  border: 1px solid var(--line);
   border-radius: 7px;
   color: var(--dim);
+  background: var(--bg2);
 }
 .solo-gear::after { display: none; }
-.solo-gear:hover { color: var(--accent-lite); background: rgba(255, 255, 255, .05); }
-.solo-gear.active { color: var(--accent-lite); background: var(--accent-soft); }
-.solo-gear svg { width: 15px; height: 15px; }
+.solo-gear .gear-label {
+  display: inline;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .1px;
+  line-height: 1;
+}
+.solo-gear:hover {
+  color: var(--accent-lite);
+  border-color: var(--accent);
+  background: rgba(139, 124, 246, .1);
+}
+.solo-gear.active { color: var(--accent-lite); background: var(--accent-soft); border-color: var(--accent); }
+.solo-gear svg { width: 14px; height: 14px; flex: 0 0 auto; }
+
+/* Dişliyle yarışmasın: sürüm rozeti dar panelde gizlenir (sürüm zaten Ayarlar'da yazıyor) */
+@media (max-width: 340px) {
+  .brand-ver { display: none; }
+}
 
 /* ---------- Kartlar ---------- */
 
