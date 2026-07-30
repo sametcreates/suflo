@@ -709,7 +709,8 @@ window.KCaptions = (function () {
     function chip(label, on, title, onClick, faded) {
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "track-chip" + (on ? " on" : "") + (faded ? " empty" : "");
+      // "empty" DEĞİL: o genel bir sınıf (boş liste yazısı, padding:20px) ve çipi şişiriyordu
+      b.className = "track-chip" + (on ? " on" : "") + (faded ? " bos" : "");
       b.title = title || "";
       b.innerHTML = (on ? TICK : DASH) + "<span></span>";
       b.querySelector("span").textContent = label;

@@ -704,7 +704,9 @@ body:not(.solo) .solo-gear { display: none; }
   color: #fff;
   box-shadow: 0 3px 12px -4px rgba(120, 108, 255, .7), inset 0 1px 0 rgba(255,255,255,.2);
 }
-.track-chip.empty { opacity: .5; }
+/* Boş katman (klip yok): soluk göster ama BOYUTU DEĞİŞTİRME.
+   Sınıf adı bilerek "empty" değil — o genel bir sınıf (padding:20px) ve çipi şişiriyordu. */
+.track-chip.bos { opacity: .55; }
 
 /* ---------- Outline düğme ---------- */
 
