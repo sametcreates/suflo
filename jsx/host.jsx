@@ -481,7 +481,10 @@ function KS_applyEase(encoded) {
 
 // Premiere kurulumundaki sistem WAV export presetini (.epr) bul
 function KS_findWavEpr() {
-  var roots = ["C:/Program Files/Adobe", "C:/Program Files (x86)/Adobe"];
+  // macOS'ta Adobe uygulamalari /Applications altinda; C:/ taramasi orada hicbir sey bulmaz
+  var roots = ($.os.indexOf("Windows") !== -1)
+    ? ["C:/Program Files/Adobe", "C:/Program Files (x86)/Adobe"]
+    : ["/Applications", "/Applications/Adobe"];
   var best = null, fallback = null;
   for (var r = 0; r < roots.length; r++) {
     var root = new Folder(roots[r]);
@@ -491,8 +494,16 @@ function KS_findWavEpr() {
       return f instanceof Folder && /premiere pro/i.test(String(f.displayName || decodeURIComponent(f.name)));
     });
     for (var a = 0; a < apps.length; a++) {
+      // macOS'ta presetler .app paketinin icinde: .../X.app/Contents/... altina in
+      var taban = apps[a].fsName;
+      if ($.os.indexOf("Windows") === -1) {
+        var bundles = apps[a].getFiles(function (f) {
+          return f instanceof Folder && /\.app$/i.test(String(decodeURIComponent(f.name)));
+        });
+        if (bundles.length) taban = bundles[0].fsName + "/Contents";
+      }
       // 1) Settings/EncoderPresets (Wave48mono16.epr vb.)
-      var encP = new Folder(apps[a].fsName + "/Settings/EncoderPresets");
+      var encP = new Folder(taban + "/Settings/EncoderPresets");
       if (encP.exists) {
         var encs = encP.getFiles("*.epr");
         for (var ei = 0; ei < encs.length; ei++) {
@@ -608,12 +619,19 @@ function KS_importSrtAsCaptions(encoded) {
     if (!item) return KS_err("SRT projeye aktarilamadi.");
 
     // createCaptionTrack basarisizligi exception DEGIL false donusuyle bildirir
+    /*
+     * createCaptionTrack basarisizligi exception DEGIL donus degeriyle bildiriyor, ama
+     * hangi degerle bildirdigi belgesiz. Panel bu sinyale bakip taslagi SILDIGI icin
+     * yanlis "basarili" bir saatlik isi yok edebilir: yalnizca KESIN pozitif kabul edilir
+     * (undefined/null "bilmiyorum" demektir, basari degil).
+     */
     function tryCap(fmt) {
       try {
         var r = (fmt === undefined)
           ? seq.createCaptionTrack(item, 0)
           : seq.createCaptionTrack(item, 0, fmt);
-        return (r !== false);
+        if (r === false || r === undefined || r === null) return false;
+        return true;
       } catch (eC) { return false; }
     }
     var created = tryCap(); // varsayilan format zaten Subtitle

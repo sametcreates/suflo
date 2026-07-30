@@ -112,7 +112,7 @@ Hem yerel hem bulut motoru sesi ffmpeg ile çıkarıp 16 kHz'e çeviriyor — ya
 
 **Gerçekten ücretsiz mi?** Evet. Panel MIT lisanslı açık kaynak; yerel altyazı motoru bilgisayarında çalışır, kimseye ödeme yapmazsın. Groq'u seçersen kendi ücretsiz anahtarını kullanırsın — kart bilgisi istemez.
 
-**Verilerim nereye gidiyor?** Yerel motorda hiçbir yere — ses bilgisayarından çıkmaz. Bulut motorunda ses yalnızca seçtiğin sağlayıcıya (Groq/OpenAI) gider.
+**Verilerim nereye gidiyor?** Yerel motorda **sesin hiçbir yere gitmez** — bilgisayarından çıkmaz. Bulut motorunu seçersen ses yalnızca senin seçtiğin sağlayıcıya (Groq/OpenAI) gider. Tek istisna: **çeviri özelliği** buluttan çalışır, yani onu kullanırsan altyazı **metni** sağlayıcıya gönderilir (ses değil). Çeviri yapmazsan yerel motorda hiçbir şey dışarı çıkmaz.
 
 **Orijinal sequence'ım bozulur mu?** Kesim varsayılan olarak kopya sekansta çalışır; Altyazı yalnızca caption izi ekler; Magic benzeri hiçbir işlem kaynağı silmez.
 

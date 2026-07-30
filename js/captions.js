@@ -96,8 +96,12 @@ window.KCaptions = (function () {
       // SystemPath global DEĞİL — CSInterface üzerinden erişilir
       var root = K.cs.getSystemPath(CSInterface.SystemPath.EXTENSION);
       if (root) {
-        root = root.replace(/\//g, "\\");
-        return [root + "\\jsx\\presets\\wav16k.epr", root + "\\jsx\\presets\\wav48k.epr"];
+        // Windows'ta Adobe exporter karisik ayraci reddediyor (Error code 10) — hepsi ters bolu
+        // olmali. macOS'ta ters bolu YOLU BOZAR: orada egik cizgi kalmali.
+        var ay = K.MAC ? "/" : "\\";
+        if (!K.MAC) root = root.replace(/\//g, "\\");
+        return [root + ay + "jsx" + ay + "presets" + ay + "wav16k.epr",
+                root + ay + "jsx" + ay + "presets" + ay + "wav48k.epr"];
       }
     } catch (e) { K.log("[altyazı] gömülü preset yolu alınamadı: " + e); }
     return [];
@@ -663,12 +667,26 @@ window.KCaptions = (function () {
   }
 
   // WAV başlığındaki byteRate'ten süreyi hesapla (preset formatından bağımsız)
+  /*
+   * WAV suresi = (dosya boyutu - 44 baytlik baslik) / saniyedeki bayt.
+   * Yalnizca BASLIGI oku: tum dosyayi belege almak 1 saatlik sekansta 115 MB (16 kHz mono),
+   * 48 kHz stereo yedekte ~690 MB demek ve paneli kilitliyordu.
+   */
   function wavDuration(p) {
+    var fd = null;
     try {
-      var b = K.fs.readFileSync(p);
+      var boyut = K.fs.statSync(p).size;
+      if (boyut <= 44) return 0;
+      var b = require("buffer").Buffer.alloc(44);
+      fd = K.fs.openSync(p, "r");
+      K.fs.readSync(fd, b, 0, 44, 0);
       var br = b[28] | (b[29] << 8) | (b[30] << 16) | (b[31] << 24);
-      if (br > 0) return Math.max(0, (b.length - 44) / br);
-    } catch (e) {}
+      if (br > 0) return Math.max(0, (boyut - 44) / br);
+    } catch (e) {
+      K.log("[altyazı] wav süresi okunamadı: " + e.message);
+    } finally {
+      if (fd !== null) { try { K.fs.closeSync(fd); } catch (e2) {} }
+    }
     return 0;
   }
 

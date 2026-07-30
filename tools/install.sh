@@ -8,7 +8,7 @@ DEST="$HOME/Library/Application Support/Adobe/CEP/extensions/com.sametcreates.ke
 echo "Kesit kuruluyor..."
 
 # 1) Imzasiz eklentilere izin
-for v in 9 10 11 12; do
+for v in 9 10 11 12 13 14; do
   defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1 2>/dev/null || true
 done
 echo "  PlayerDebugMode acildi (CSXS 9-12)"

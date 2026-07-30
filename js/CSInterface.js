@@ -20,10 +20,18 @@
     window.__adobe_cep__.evalScript(script, callback || function () {});
   };
 
+  /*
+   * CEP yolu file:// URI olarak dondurur ve KIRPMA PLATFORMA GORE DEGISIR:
+   *   Windows: "file:///C:/Users/..."  -> "file:///" kirpilir -> "C:/Users/..."
+   *   macOS:   "file:///Users/..."     -> "file://"  kirpilir -> "/Users/..."
+   * Ikisini arka arkaya calistirmak mac'te bastaki egik cizgiyi yiyor ve mutlak yol
+   * GORELI yola donuyordu; ayarlar, taslak ve SRT klasoru yanlis yere yaziliyordu.
+   */
   CSInterface.prototype.getSystemPath = function (pathType) {
     if (!hasCEP) return "";
     var path = decodeURI(window.__adobe_cep__.getSystemPath(pathType));
-    return path.replace("file:///", "").replace("file://", "");
+    var mac = /Mac|Darwin/i.test(navigator.platform + " " + navigator.userAgent);
+    return mac ? path.replace("file://", "") : path.replace("file:///", "");
   };
 
   CSInterface.prototype.openURLInDefaultBrowser = function (url) {

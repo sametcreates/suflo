@@ -338,7 +338,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.7.4";
+  var VERSION = "1.7.5";
   // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -515,7 +515,8 @@ window.K = (function () {
       if (!pu.hostname) throw new Error("adreste host yok");
       return pu;
     } catch (e) {
-      log("proxy adresi anlasilmadi, dogrudan baglaniliyor: " + raw + " (" + e.message + ")");
+      // Ham adresi YAZMA: kullanici:sifre iceriyor olabilir ve gunluk destege gonderiliyor
+      log("proxy adresi anlasilmadi, dogrudan baglaniliyor (" + e.message + ")");
       return null;
     }
   }
