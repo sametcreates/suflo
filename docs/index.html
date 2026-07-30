@@ -289,15 +289,12 @@
 
 <!--
   ZİYARETÇİ SAYACI — Cloudflare Web Analytics
-  Çerezsiz, kişisel veri toplamaz, ücretsiz.
-
-  AÇMAK İÇİN: aşağıdaki satırın başındaki yorum işaretlerini kaldır ve
-  BEACON_TOKEN yerine Cloudflare'den aldığın token'ı yaz.
-  Adımlar: marketing/analytics-kurulum.md
-
-  <script defer src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "BEACON_TOKEN"}'></script>
+  Çerezsiz, kişisel veri toplamaz, kimliksiz. Yalnızca kaç ziyaretçi geldiğini,
+  hangi ülkeden ve hangi siteden geldiklerini sayar. Token gizli değildir:
+  herkese açık sayfada durur, tek işlevi ölçümü bu siteye bağlamaktır.
 -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon='{"token": "0e9cbe24552b412d8b1b6e4d34abe34f"}'></script>
 
 </body>
 </html>
