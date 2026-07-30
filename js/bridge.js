@@ -20,6 +20,20 @@ window.K = (function () {
     }
   } catch (e) { nodeOK = false; }
 
+  /* ---------------- Platform ---------------- */
+
+  // Windows ve macOS'ta yol, arşiv açma ve araç konumları farklı; tek yerden sorulur.
+  var MAC = false, WIN = true;
+  try {
+    if (nodeOK) { MAC = process.platform === "darwin"; WIN = process.platform === "win32"; }
+    else { MAC = /Mac|Darwin/i.test(navigator.platform + " " + navigator.userAgent); WIN = !MAC; }
+  } catch (eP) {}
+
+  // Apple Silicon'da whisper.cpp Metal ile derlenir: GPU hızlandırma kendiliğinden açık
+  function macMetal() {
+    try { return MAC && nodeOK && os.arch() === "arm64"; } catch (e) { return false; }
+  }
+
   /* ---------------- ExtendScript ---------------- */
 
   /*
@@ -112,7 +126,16 @@ window.K = (function () {
       if (!nodeOK) { resolve({ code: -1, stdout: "", stderr: "Node erişimi yok" }); return; }
       var child;
       try {
-        child = cp.spawn(cmd, args, { windowsHide: true });
+        var spawnOpts = { windowsHide: true };
+        if (MAC) {
+          // CEP surecinin PATH'i cogu zaman /usr/bin ile sinirli; Homebrew'i goremiyor
+          var env = {};
+          for (var ek in process.env) if (process.env.hasOwnProperty(ek)) env[ek] = process.env[ek];
+          env.PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" +
+            (process.env.PATH ? ":" + process.env.PATH : "");
+          spawnOpts.env = env;
+        }
+        child = cp.spawn(cmd, args, spawnOpts);
       } catch (e) {
         resolve({ code: -1, stdout: "", stderr: String(e) });
         return;
@@ -315,7 +338,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.7.0";
+  var VERSION = "1.7.1";
   // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -377,8 +400,32 @@ window.K = (function () {
 
   /* ---------------- Yerel Whisper (whisper.cpp) ---------------- */
 
+  /*
+   * Motor ve model klasörü. Windows yolu GERİYE DÖNÜK korunur (kurulu kullanıcılar
+   * modellerini yeniden indirmesin); macOS'ta platformun doğru yeri kullanılır.
+   */
   function whisperDir() {
+    if (!nodeOK) return "";        // tarayici onizlemesi: Node yok
+    if (MAC) return path.join(os.homedir(), "Library", "Application Support", "Suflo", "whisper");
     return path.join(os.homedir(), "AppData", "Roaming", "Kesit", "whisper");
+  }
+
+  // macOS'ta motor Homebrew ile kurulur; CEP'in PATH'i eksik olabildiği için tam yol aranır
+  function macWhisperYollari() {
+    return [
+      "/opt/homebrew/bin/whisper-cli",   // Apple Silicon
+      "/usr/local/bin/whisper-cli",      // Intel
+      "/opt/local/bin/whisper-cli"       // MacPorts
+    ];
+  }
+
+  function brewYolu() {
+    if (!nodeOK) return null;
+    var adaylar = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"];
+    for (var i = 0; i < adaylar.length; i++) {
+      try { if (fs.existsSync(adaylar[i])) return adaylar[i]; } catch (e) {}
+    }
+    return null;
   }
 
   /*
@@ -392,8 +439,17 @@ window.K = (function () {
     try {
       var dir = whisperDir();
       var exe = null;
-      var names = ["whisper-cli.exe", "main.exe", "whisper.exe"];
-      for (var i = 0; i < names.length; i++) {
+      var names = MAC
+        ? ["whisper-cli", "main", "whisper"]
+        : ["whisper-cli.exe", "main.exe", "whisper.exe"];
+      // macOS: motor Homebrew'dan gelir, kendi klasörümüzde durmaz
+      if (MAC) {
+        var my = macWhisperYollari();
+        for (var mi2 = 0; mi2 < my.length; mi2++) {
+          try { if (fs.existsSync(my[mi2])) { exe = my[mi2]; break; } } catch (eM) {}
+        }
+      }
+      for (var i = 0; !exe && i < names.length; i++) {
         var c = path.join(dir, names[i]);
         if (fs.existsSync(c)) { exe = c; break; }
       }
@@ -706,6 +762,15 @@ window.K = (function () {
 
   async function unzip(zipPath, destDir) {
     try { fs.mkdirSync(destDir, { recursive: true }); } catch (eM) {}
+    if (MAC) {
+      // macOS: unzip ve bsdtar sistemde hazir gelir
+      var u = await run("/usr/bin/unzip", ["-o", "-q", zipPath, "-d", destDir], { timeout: 180000 });
+      if (u.code === 0) return true;
+      var t = await run("/usr/bin/tar", ["-xf", zipPath, "-C", destDir], { timeout: 180000 });
+      if (t.code === 0) return true;
+      log("mac arsiv acilamadi: " + String(u.stderr || t.stderr).slice(0, 200));
+      return false;
+    }
     // Windows'un yerlesik bsdtar'i: argv ile gectigimiz icin tirnak sorunu yok
     var tarExe = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe");
     if (fs.existsSync(tarExe)) {
@@ -733,6 +798,14 @@ window.K = (function () {
     var s = loadSettings();
     if (s.ffmpeg) list.push(s.ffmpeg);
     list.push("ffmpeg");
+    if (nodeOK && MAC) {
+      // CEP'in spawn ortaminda PATH genelde /usr/bin ile sinirli: tam yol sart
+      list.push("/opt/homebrew/bin/ffmpeg");   // Apple Silicon Homebrew
+      list.push("/usr/local/bin/ffmpeg");      // Intel Homebrew
+      list.push("/opt/local/bin/ffmpeg");      // MacPorts
+      list.push("/usr/bin/ffmpeg");
+      return list;
+    }
     if (nodeOK) {
       var home = os.homedir();
       list.push(path.join(home, "AppData", "Local", "Microsoft", "WinGet", "Links", "ffmpeg.exe"));
@@ -851,6 +924,10 @@ window.K = (function () {
     walkAudio: walkAudio,
     isAudio: isAudio,
     tmpDir: tmpDir,
-    srtDir: srtDir
+    srtDir: srtDir,
+    MAC: MAC,
+    WIN: WIN,
+    macMetal: macMetal,
+    brewYolu: brewYolu
   };
 })();

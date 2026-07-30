@@ -61,8 +61,21 @@ powershell -ExecutionPolicy Bypass -File tools/install.ps1
 
 ### Gereksinimler
 
-- Premiere 14.4 (2020) ve üstü, Windows. Önerilen: Premiere 2022+. macOS desteği yol haritasında.
-- **ffmpeg** — Kesim ve Altyazı için. Panel Ayarlar sekmesinden tek tıkla kurulur (winget).
+- Premiere 14.4 (2020) ve üstü. Önerilen: Premiere 2022+.
+- **Windows** ve **macOS**.
+- **ffmpeg** — Kesim ve Altyazı için. Panel Ayarlar sekmesinden tek tıkla kurulur (Windows'ta winget, macOS'ta Homebrew).
+
+#### macOS notu
+
+whisper.cpp macOS için hazır ikili yayınlamıyor (resmi sürüm dosyaları yalnız Windows ve Ubuntu). Bu yüzden Mac'te yerel motoru **Homebrew** kurar:
+
+```bash
+brew install whisper-cpp
+```
+
+Panel bunu senin için çalıştırır — "Yerel motoru kur (Homebrew)" düğmesi. Homebrew yoksa panel bunu söyler; [brew.sh](https://brew.sh) adresindeki tek satırlık komutu çalıştırıp paneli yeniden açman gerekir. Modeller yine panel içinden iner.
+
+**Apple Silicon'da GPU hızlandırma (Metal) kendiliğinden açıktır** — ayrı bir sürüm indirmek gerekmez. Homebrew kurmak istemiyorsan ücretsiz Groq anahtarıyla bulut motorunu kullanabilirsin.
 
 ## Kullanım notları
 

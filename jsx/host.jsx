@@ -559,11 +559,12 @@ function KS_exportAudio(encoded) {
       }
     }
 
-    // Adobe exporter karisik ayracli yollari reddeder (Error code 10) —
-    // yol bastan sona ters bolu olmali ve klasor onceden var olmali
-    var tdir = new Folder(Folder.temp.fsName + "\\Suflo");
+    // Adobe exporter karisik ayracli yollari reddeder (Windows'ta Error code 10) —
+    // yol bastan sona platformun ayraci olmali ve klasor onceden var olmali
+    var AY = ($.os.indexOf("Windows") !== -1) ? "\\" : "/";
+    var tdir = new Folder(Folder.temp.fsName + AY + "Suflo");
     if (!tdir.exists) tdir.create();
-    var out = tdir.fsName + "\\seq_" + (new Date().getTime()) + ".wav";
+    var out = tdir.fsName + AY + "seq_" + (new Date().getTime()) + ".wav";
     var wa = (p.scope === "inout") ? 1 : 0; // 1 = in-out, 0 = tum sequence
 
     var res = "", done = false;

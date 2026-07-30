@@ -170,9 +170,10 @@ window.KApp = (function () {
     var btn = el("set-local-install");
     var m = KEngine.activeModel();
     var gpu = KEngine.gpuInfo();
-    var hw = KEngine.installedBuild() === "cuda"
+    var derleme = KEngine.installedBuild();
+    var hw = derleme === "cuda"
       ? "GPU" + (gpu && gpu.name ? " (" + gpu.name.replace(/NVIDIA\s*/i, "") + ")" : "")
-      : "CPU";
+      : (derleme === "metal" ? "Metal (Apple GPU)" : "CPU");
     if (m) {
       box.className = "inline-status good";
       box.textContent = "✓ " + m.label.split(" —")[0] + " · " + hw + (KEngine.vadPath() ? " · VAD" : "");
@@ -224,8 +225,9 @@ window.KApp = (function () {
       var res = await KEngine.install({ modelId: modelId, useGpu: useGpu, onStatus: say });
 
       el("set-provider").value = "local";
-      toast("Hazır: " + res.model.label.split(" —")[0] +
-        (res.build === "cuda" ? " · GPU hızlandırmalı" : " · CPU") +
+      var donanim = res.build === "cuda" ? " · GPU hızlandırmalı"
+        : (res.build === "metal" ? " · Metal hızlandırmalı" : " · CPU");
+      toast("Hazır: " + res.model.label.split(" —")[0] + donanim +
         (res.vad ? " · sessizlik atlama açık" : ""), "good");
     } catch (e) {
       toast(e.message, "bad");
@@ -386,17 +388,37 @@ window.KApp = (function () {
   async function installFfmpeg() {
     var box = el("set-ffmpeg-status");
     box.className = "inline-status";
-    box.textContent = "winget ile kuruluyor… (birkaç dakika sürebilir)";
-    var r = await K.run("winget", [
-      "install", "--id", "Gyan.FFmpeg", "-e",
-      "--accept-source-agreements", "--accept-package-agreements"
-    ], { timeout: 480000 });
-    if (r.code === 0) {
+    var r;
+    if (K.MAC) {
+      var brew = K.brewYolu();
+      if (!brew) {
+        box.className = "inline-status bad";
+        box.textContent = "✕ Homebrew yok — brew.sh'tan kur, sonra buraya dön";
+        toast("macOS'ta ffmpeg Homebrew ile kurulur. brew.sh adresindeki tek satırlık " +
+          "komutu Terminal'de çalıştırıp paneli yeniden aç.", "bad");
+        return;
+      }
+      box.textContent = "brew install ffmpeg… (birkaç dakika sürebilir)";
+      r = await K.run(brew, ["install", "ffmpeg"], { timeout: 1800000 });
+    } else {
+      box.textContent = "winget ile kuruluyor… (birkaç dakika sürebilir)";
+      r = await K.run("winget", [
+        "install", "--id", "Gyan.FFmpeg", "-e",
+        "--accept-source-agreements", "--accept-package-agreements"
+      ], { timeout: 480000 });
+    }
+    // Kurulum aracı 0 dönmese de ffmpeg ortaya çıkmış olabilir: sonuca değil GERÇEĞE bak
+    var ff = await K.findFfmpeg(true);
+    if (ff) {
       toast("ffmpeg kuruldu", "good");
       await checkFfmpeg();
     } else {
       box.className = "inline-status bad";
-      box.textContent = "✕ winget başarısız — ffmpeg.org'dan elle kur, Premiere'i yeniden başlat";
+      box.textContent = K.MAC
+        ? "✕ brew ffmpeg kuramadı — Terminal'de 'brew install ffmpeg' dene"
+        : "✕ winget başarısız — ffmpeg.org'dan elle kur, Premiere'i yeniden başlat";
+      K.log("ffmpeg kurulumu basarisiz: kod=" + r.code + " " +
+        String(r.stderr || r.stdout).split("\n").slice(-2).join(" ").slice(0, 200));
     }
   }
 

@@ -145,6 +145,16 @@ window.KEngine = (function () {
     if (_gpu && !force) return _gpu;
     _gpu = { kind: "cpu", name: "" };
     if (!K.nodeOK) return _gpu;
+    if (K.MAC) {
+      // Apple Silicon'da whisper.cpp Metal ile derli: ayri surucu/derleme secimi yok
+      if (K.macMetal()) {
+        _gpu = { kind: "metal", name: "Apple Silicon (Metal)" };
+        K.log("GPU: Apple Silicon - Metal kullanilacak");
+      } else {
+        K.log("GPU: Intel Mac, CPU modu");
+      }
+      return _gpu;
+    }
     try {
       var r = await K.run("nvidia-smi", ["--query-gpu=name", "--format=csv,noheader"], { timeout: 15000 });
       if (r.code === 0 && r.stdout && r.stdout.trim()) {
@@ -260,7 +270,36 @@ window.KEngine = (function () {
     /* 1) motor derlemesi — zaten varsa atla */
     var haveExe = !!K.whisperLocal({ skipModel: true });
     var wantBuild = opts.useGpu ? "cuda" : "cpu";
-    if (!haveExe || installedBuild() !== wantBuild) {
+
+    if (K.MAC) {
+      /*
+       * macOS için whisper.cpp RESMİ İKİLİ YAYINLAMIYOR: v1.9.1 varlıkları yalnızca
+       * Windows (x64/Win32) ve Ubuntu. Homebrew formülü (whisper-cpp) aynı sürümü ve
+       * çağırdığımız aynı `whisper-cli`yi veriyor, Apple Silicon için hazır bottle'ı var.
+       * Bu yüzden macOS'ta arşiv indirmiyoruz — motoru brew kuruyor.
+       */
+      if (!haveExe) {
+        var brew = K.brewYolu();
+        if (!brew) {
+          throw new Error("macOS'ta yerel motor Homebrew ile kurulur, ama Homebrew bulunamadı. " +
+            "Terminal'e şunu yapıştırıp paneli yeniden aç: " +
+            '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ' +
+            "— ya da Homebrew kurmadan, Ayarlar'dan ücretsiz Groq anahtarıyla bulut motorunu kullan.");
+        }
+        say("Motor kuruluyor: brew install whisper-cpp (birkaç dakika sürebilir)…");
+        var bi = await K.run(brew, ["install", "whisper-cpp"], { timeout: 1800000 });
+        if (!K.whisperLocal({ skipModel: true })) {
+          throw new Error("Homebrew motoru kuramadı (kod=" + bi.code + "): " +
+            String(bi.stderr || bi.stdout).split("\n").slice(-3).join(" ").slice(0, 220));
+        }
+        K.log("mac motoru kuruldu: brew whisper-cpp");
+      }
+      var prM = await probeBuild(false);
+      if (!prM.ok) throw new Error("Motor çalıştırılamadı: " + prM.why);
+      var sM = K.settings();
+      sM.engineBuild = K.macMetal() ? "metal" : "cpu";
+      K.saveSettings();
+    } else if (!haveExe || installedBuild() !== wantBuild) {
       var build = BUILDS[wantBuild];
       say("Motor iniyor… (" + fmtMB(build.sizeMB) + ")");
       // Derleme başına ayrı ad: yarım kalan cuBLAS .part'ı CPU zip'ine eklenmesin
@@ -354,6 +393,10 @@ window.KEngine = (function () {
       } else if (!w.ok) {
         K.log("GPU isinma yapilamadi (" + w.reason + ") - dogrulama atlandi, derleme degistirilmedi");
       }
+    } else if (K.MAC && K.macMetal()) {
+      // Metal shader'ları da ilk çalıştırmada derleniyor: bedeli şimdi öde
+      say("Motor hazırlanıyor…");
+      try { await warmUp(); } catch (eW2) { K.log("isinma atlandi: " + eW2.message); }
     }
 
     cleanEngineParts(dir);

@@ -1,48 +1,51 @@
-## Suflo 1.7.0 — WebVTT + ASS dışa aktarma, karaoke etiketleri, dayanıklılık 🎬
+## Suflo 1.7.1 — macOS desteği 🍎
 
-Bu sürüm altyazıyı Premiere'in dışına da taşıyor: YouTube'a yükleyeceğin VTT'yi ve ffmpeg ile videoya gömebileceğin stilli ASS'i doğrudan panelden alıyorsun.
+Mac'te "Motor arşivi açılamadı" hatası alıyorsan bu sürüm onu çözüyor. Sorun şuydu: panel Mac'te de **Windows** motor arşivini indiriyor, sonra onu Windows'a özel komutlarla açmaya çalışıyordu. İkisi de Mac'te çalışmaz.
 
-### Yeni: dört biçimde dışa aktarma
+### Mac'te yerel motor artık kuruluyor
 
-Sonuç listesinin üstündeki biçim seçicisinden seç, **indir**:
+whisper.cpp macOS için hazır ikili yayınlamıyor (resmi sürüm dosyaları yalnızca Windows ve Ubuntu). Bu yüzden Mac'te motoru **Homebrew** kuruyor — panel bunu senin için yapıyor:
 
-| Biçim | Ne için |
-|---|---|
-| **SRT** | Premiere caption izi — her yerde çalışır |
-| **WebVTT** | YouTube, web oynatıcılar, sosyal platformlar |
-| **ASS** | Stilli altyazı; ffmpeg ile videoya gömülür, Aegisub/DaVinci/VLC okur |
-| **TXT** | Zaman damgasız transkript (video açıklaması, blog) |
+```bash
+brew install whisper-cpp
+```
 
-**Karaoke etiketleri:** satır uzunluğunu "kelime" modlarından birine (2-5 kelime ya da kelime kelime) alıp ASS indirirsen, kelimeler `\k` zamanlama etiketleriyle satırlara toplanır — gerçek karaoke vurgusu. Videoya gömmek için:
+Kurulum kartındaki düğme artık **"Yerel motoru kur (Homebrew)"** diyor. Homebrew yoksa panel bunu açıkça söylüyor ve ne yapman gerektiğini yazıyor (ya da Homebrew kurmadan ücretsiz Groq anahtarıyla buluttan başlayabilirsin).
+
+**Apple Silicon'da GPU hızlandırma (Metal) kendiliğinden açık** — ayrı sürüm indirmek gerekmiyor, panel "Metal (Apple GPU)" yazıyor.
+
+### Mac'te düzelen diğer şeyler
+
+- **Model klasörü** doğru yerde: `~/Library/Application Support/Suflo/whisper` (eskiden Mac'in içine `AppData/Roaming` diye Windows klasörü açıyordu).
+- **ffmpeg** artık bulunuyor: Homebrew (`/opt/homebrew`, `/usr/local`) ve MacPorts yolları taranıyor. Ayarlar'daki kur düğmesi Mac'te `brew install ffmpeg` çalıştırıyor.
+- **Arşiv açma** `unzip`/`tar` ile yapılıyor (Windows'un `tar.exe`/PowerShell'i yerine).
+- **Sekans sesi dışa aktarma** yolları Mac ayracıyla kuruluyor.
+- CEP'in kısıtlı `PATH`'i yüzünden Homebrew araçları görünmüyordu; alt süreçlere doğru `PATH` veriliyor.
+
+### Kurulum
+
+1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir (ücretsiz)
+2. `Suflo-1.7.1.zxp` dosyasına çift tıkla
+3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
+
+Gereksinim: Premiere 14.4 (2020) ve üstü · Windows veya macOS.
+
+---
+
+### 1.7.0'da gelenler (hatırlatma)
+
+**Dört biçimde dışa aktarma:** SRT · WebVTT · **ASS** (stilli; kelime modunda karaoke `\k` etiketleriyle) · TXT.
 
 ```bash
 ffmpeg -i video.mp4 -vf "subtitles=suflo-altyazi.ass" cikti.mp4
 ```
 
-### İçe aktarma gerçekten VTT okuyor
+**İçe aktarma gerçekten VTT okuyor:** `<v>`, `<i>`, `{\an8}` etiketleri ve HTML varlıkları temizleniyor; cue ayarlı zaman satırları ve saat alanı olmayan kısa biçim doğru okunuyor.
 
-YouTube'dan indirdiğin altyazıyı panele atınca artık:
-- `<v Konuşmacı>`, `<i>`, `<b>`, `{\an8}` gibi etiketler temizleniyor (eskiden altyazının içine ham olarak giriyordu),
-- `&amp;`, `&#305;` gibi HTML varlıkları çözülüyor,
-- zaman satırındaki cue ayarları (`align:start position:0%`) zamanı bozmuyor,
-- saat alanı olmayan kısa biçim (`00:01.000 --> 00:03.500`) doğru okunuyor — eskiden hepsi 00:00 oluyordu.
+**Aynı sekansa ikinci uygulamada onay:** Premiere var olan altyazı izini güncelleyemiyor, her seferinde yeni iz açıyor — panel artık uyarıyor.
 
-### Aynı sekansa ikinci kez uygulama
-
-Premiere'in betik arayüzü var olan altyazı izini güncelleyemiyor, her seferinde **yeni** bir iz açıyor. Düzelt-uygula-düzelt döngüsünde farkında olmadan üst üste izler birikiyordu. Artık aynı sekansa ikinci kez uygularken panel önce uyarıyor ve onay istiyor; ne olacağını açıkça söylüyor.
-
-### Panel artık kilitlenmiyor
-
-Premiere meşgul ya da modal bir pencere açıkken ExtendScript geri çağrısı hiç gelmeyebiliyor. Bu durumda bağlam yoklaması sonsuza dek askıda kalıyor ve **panel seçili klibi bir daha hiç görmüyordu** — paneli kapatıp açmadan düzelmiyordu. Artık her çağrı en geç zaman aşımında sonuçlanıyor, ayrıca yoklama için bekçi var: Premiere cevap vermeye başlayınca panel kendini toparlıyor.
-
-### Kurulum
-
-1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir (ücretsiz)
-2. `Suflo-1.7.0.zxp` dosyasına çift tıkla
-3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
-
-Gereksinim: Windows, Premiere 14.4 (2020) ve üstü. ffmpeg ve yerel motor panel içinden kurulur.
+**Panel kilitlenmiyor:** Premiere meşgul/modalken ExtendScript geri çağrısı hiç gelmeyebiliyor; bu durumda panel seçili klibi bir daha görmüyordu. Her çağrı artık zaman aşımıyla sonuçlanıyor.
 
 ---
 
-*Free, open-source AI subtitles for Adobe Premiere. Runs Whisper locally with optional NVIDIA GPU acceleration — no subscription, no credits, no limits. Now exports SRT, WebVTT and styled ASS with karaoke timing tags.*
+*Free, open-source AI subtitles for Adobe Premiere — Windows and macOS. Runs Whisper locally (NVIDIA cuBLAS or Apple Metal) with no subscription, no credits, no limits. Exports SRT, WebVTT and styled ASS with karaoke timing tags.*

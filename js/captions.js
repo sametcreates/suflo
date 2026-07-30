@@ -120,6 +120,26 @@ window.KCaptions = (function () {
 
   function refreshSetup() {
     el("cap-setup").hidden = engineReady();
+    // macOS'ta motor Homebrew'dan gelir (whisper.cpp resmi mac ikilisi yayınlamıyor):
+    // kullanıcı "indir & kur" deyip anlamsız bir hata almasın, ne olacağını baştan bilsin
+    if (K.MAC) {
+      var t = el("cap-setup-text");
+      var b = el("cap-local-install");
+      var brewVar = !!K.brewYolu();
+      if (t) {
+        t.innerHTML = brewVar
+          ? "<strong>Altyazı için bir motor gerek.</strong> Mac'te motoru Homebrew kurar " +
+            "(<code>brew install whisper-cpp</code>) — hesap, anahtar, internet aboneliği yok. " +
+            "Apple Silicon'da Metal ile hızlanır."
+          : "<strong>Altyazı için bir motor gerek.</strong> Mac'te yerel motor <b>Homebrew</b> " +
+            "ile kurulur, ama Homebrew bulunamadı. brew.sh'taki tek satırlık komutu Terminal'de " +
+            "çalıştırıp paneli yeniden aç — ya da aşağıdan ücretsiz Groq anahtarıyla buluttan başla.";
+      }
+      if (b) {
+        b.textContent = brewVar ? "Yerel motoru kur (Homebrew)" : "Homebrew gerekli";
+        b.disabled = !brewVar;
+      }
+    }
     refreshButton();
   }
 
