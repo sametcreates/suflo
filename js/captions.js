@@ -605,11 +605,32 @@ window.KCaptions = (function () {
 
   /* ---------------- Şablonlar + tercih kalıcılığı ---------------- */
 
+  /*
+   * Şablon = metin kuralları + görünüm. Görünüm de dahil olmalı: kullanıcı
+   * "Reels" seçince Reels gibi görünmesini bekliyor, yalnız satır uzunluğunun
+   * değişmesini değil.
+   */
   var PRESETS = {
-    yt:      { maxlen: "c42", kase: "normal", punct: true },
-    reels:   { maxlen: "w3",  kase: "upper",  punct: false },
-    karaoke: { maxlen: "k1",  kase: "upper",  punct: false },
-    doc:     { maxlen: "c60", kase: "normal", punct: true }
+    yt: {
+      maxlen: "c42", kase: "normal", punct: true,
+      stil: { font: "Arial", boyut: 64, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#ffe14d", kontur: 4, konum: 2, kutu: false }
+    },
+    reels: {
+      maxlen: "w3", kase: "upper", punct: false,
+      stil: { font: "Impact", boyut: 110, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#ffe14d", kontur: 7, konum: 5, kutu: false }
+    },
+    karaoke: {
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { font: "Impact", boyut: 100, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#8b7cf6", kontur: 7, konum: 5, kutu: false }
+    },
+    doc: {
+      maxlen: "c60", kase: "normal", punct: true,
+      stil: { font: "Georgia", boyut: 54, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#8b7cf6", kontur: 0, konum: 2, kutu: true }
+    }
   };
 
   function applyPreset(key) {
@@ -618,6 +639,10 @@ window.KCaptions = (function () {
     el("cap-maxlen").value = p.maxlen;
     el("cap-case").value = p.kase;
     el("cap-punct").checked = p.punct;
+    stiliYaz(p.stil);
+    vurguKutusuDurumu();
+    onizlemeDurdur();
+    onizlemeCiz();
   }
 
   // "Şablonum" seçeneğini menüde göster/oluştur
@@ -636,7 +661,8 @@ window.KCaptions = (function () {
     s.userPreset = {
       maxlen: el("cap-maxlen").value,
       kase: el("cap-case").value,
-      punct: el("cap-punct").checked
+      punct: el("cap-punct").checked,
+      stil: stil()
     };
     K.saveSettings();
     ensureUserPresetOption();
@@ -645,15 +671,52 @@ window.KCaptions = (function () {
     KApp.toast("Şablonun kaydedildi — menüde ★ Şablonum", "good");
   }
 
+  /* ---------------- Görünüm (stil) ---------------- */
+
+  /*
+   * Altyazının görünümü tek bir yerden okunur; hem ASS dosyasına hem panel
+   * önizlemesine AYNI değerler gider, böylece önizleme yalan söylemez.
+   */
+  function stil() {
+    function d(id, varsayilan) {
+      var e = el(id);
+      return e ? e.value : varsayilan;
+    }
+    return {
+      font: d("cap-font", "Arial"),
+      boyut: parseInt(d("cap-boyut", "72"), 10) || 72,
+      renk: d("cap-renk", "#ffffff"),
+      konturRenk: d("cap-renk-kontur", "#000000"),
+      vurguRenk: d("cap-renk-vurgu", "#8b7cf6"),
+      kontur: parseInt(d("cap-kontur", "4"), 10),
+      konum: parseInt(d("cap-konum", "2"), 10),          // ASS Alignment: 2 alt, 5 orta, 8 üst
+      kutu: !!(el("cap-kutu") && el("cap-kutu").checked)
+    };
+  }
+
+  /*
+   * ASS rengi &HAABBGGRR biçimindedir: alfa önce, sonra mavi-yeşil-kırmızı
+   * (HTML'in tam TERSİ sırada). Alfa da terstir: 00 opak, FF tamamen saydam.
+   */
+  function assRenk(hex, saydamlik) {
+    var h = String(hex || "#ffffff").replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var r = h.slice(0, 2), g = h.slice(2, 4), b = h.slice(4, 6);
+    var a = ("0" + Number(saydamlik || 0).toString(16)).slice(-2);
+    return ("&H" + a + b + g + r).toUpperCase();
+  }
+
   function savePrefs() {
     try {
       var s = K.settings();
+      var st = stil();
       s.capPrefs = {
         lang: el("cap-lang").value,
         maxlen: el("cap-maxlen").value,
         kase: el("cap-case").value,
         punct: el("cap-punct").checked,
-        preset: el("cap-preset").value
+        preset: el("cap-preset").value,
+        stil: st
       };
       K.saveSettings();
     } catch (e) {}
@@ -668,7 +731,23 @@ window.KCaptions = (function () {
       if (p.kase) el("cap-case").value = p.kase;
       if (p.punct !== undefined) el("cap-punct").checked = p.punct;
       if (p.preset !== undefined) el("cap-preset").value = p.preset;
+      stiliYaz(p.stil);
     } catch (e) {}
+  }
+
+  // Kayıtlı görünüm ayarlarını kontrollere geri koy
+  function stiliYaz(st) {
+    if (!st) return;
+    var esle = {
+      "cap-font": st.font, "cap-boyut": st.boyut, "cap-renk": st.renk,
+      "cap-renk-kontur": st.konturRenk, "cap-renk-vurgu": st.vurguRenk,
+      "cap-kontur": st.kontur, "cap-konum": st.konum
+    };
+    Object.keys(esle).forEach(function (id) {
+      var e = el(id);
+      if (e && esle[id] !== undefined && esle[id] !== null) e.value = String(esle[id]);
+    });
+    if (el("cap-kutu") && st.kutu !== undefined) el("cap-kutu").checked = !!st.kutu;
   }
 
   /* ---------------- Stil ---------------- */
@@ -972,6 +1051,8 @@ window.KCaptions = (function () {
   }
 
   function render() {
+    // Gerçek satırlar geldiğinde/değiştiğinde önizleme de onlardan beslensin
+    onizlemeCiz();
     var box = el("cap-segments");
     box.innerHTML = "";
     segments.forEach(function (s, i) {
@@ -1497,12 +1578,159 @@ window.KCaptions = (function () {
     return satirlar;
   }
 
+  /* ---------------- Canlı önizleme ---------------- */
+
+  /*
+   * Altyazının videoda nasıl duracağını panelde gösterir. ASS ile AYNI stil
+   * nesnesini okur — burada güzel görünüp dışa aktarımda başka türlü çıkması
+   * kullanıcının güvenini bitirecek tek şey olurdu.
+   *
+   * Ölçek: sahne genişliği / 1920. ASS 1920x1080 sahneye göre yazıldığı için
+   * aynı oranı kullanınca panel görüntüsü gerçek çıktıyla aynı olur.
+   */
+  var onizlemeSaat = null;
+
+  // Vurgu rengi yalnızca karaoke modunda iş görür; diğer modlarda soluklaştır
+  function vurguKutusuDurumu() {
+    var kutu = el("cap-renk-vurgu-kutu");
+    if (!kutu || !el("cap-maxlen")) return;
+    kutu.classList.toggle("pasif", !/^k/.test(el("cap-maxlen").value));
+  }
+
+  function onizlemeDurdur() {
+    if (onizlemeSaat) { clearTimeout(onizlemeSaat); onizlemeSaat = null; }
+    var b = el("cap-onizleme-oynat");
+    if (b) b.textContent = "▶ Oynat";
+  }
+
+  function onizlemeCiz(vurguIndex) {
+    var sahne = el("cap-sahne");
+    var kutu = el("cap-onizleme-metin");
+    if (!sahne || !kutu) return;
+
+    var st = stil();
+    var karaoke = /^k/.test(el("cap-maxlen").value);
+    var olcek = sahne.clientWidth / 1920;
+
+    // Yerleşim: ASS Alignment 2/5/8 -> alt/orta/üst
+    kutu.className = "onizleme-alt " + (st.konum === 8 ? "ust" : st.konum === 5 ? "orta" : "alt");
+    kutu.style.fontFamily = st.font + ", sans-serif";
+    kutu.style.fontSize = Math.max(7, st.boyut * olcek) + "px";
+    kutu.style.fontWeight = "700";
+    kutu.style.color = st.renk;
+
+    // Kontur: ASS'in outline'ı her yöne eşit; tarayıcıda dört yönlü gölgeyle taklit
+    if (st.kontur > 0) {
+      var k = Math.max(1, st.kontur * olcek);
+      kutu.style.textShadow = [
+        k + "px 0 0 " + st.konturRenk, "-" + k + "px 0 0 " + st.konturRenk,
+        "0 " + k + "px 0 " + st.konturRenk, "0 -" + k + "px 0 " + st.konturRenk,
+        k + "px " + k + "px 0 " + st.konturRenk, "-" + k + "px -" + k + "px 0 " + st.konturRenk,
+        k + "px -" + k + "px 0 " + st.konturRenk, "-" + k + "px " + k + "px 0 " + st.konturRenk
+      ].join(",");
+    } else {
+      kutu.style.textShadow = st.kutu ? "none" : "0 " + (2 * olcek) + "px " + (3 * olcek) + "px rgba(0,0,0,.6)";
+    }
+
+    // Örnek metin: gerçek transkript varsa ondan, yoksa temsili bir cümle
+    var ornek = onizlemeMetni();
+    if (!ornek.kelimeler.length) {
+      kutu.innerHTML = "";
+      if (!sahne.querySelector(".onizleme-bos")) {
+        var bos = document.createElement("div");
+        bos.className = "onizleme-bos";
+        bos.textContent = "Altyazı oluşturunca burada nasıl görüneceğini görürsün.";
+        sahne.appendChild(bos);
+      }
+      return;
+    }
+    var bosEski = sahne.querySelector(".onizleme-bos");
+    if (bosEski) bosEski.remove();
+
+    kutu.innerHTML = "";
+    ornek.kelimeler.forEach(function (kelime, i) {
+      var s = document.createElement("span");
+      s.textContent = kelime + (i < ornek.kelimeler.length - 1 ? " " : "");
+      if (st.kutu) {
+        s.className = "kutu";
+        s.style.background = "rgba(0,0,0,.75)";
+      }
+      // karaoke: o an okunan kelime vurgu rengiyle
+      if (karaoke && vurguIndex !== undefined && i === vurguIndex) s.style.color = st.vurguRenk;
+      else if (karaoke && vurguIndex !== undefined && i < vurguIndex) s.style.color = st.vurguRenk;
+      kutu.appendChild(s);
+    });
+  }
+
+  /*
+   * Önizlemede gösterilecek kelimeler. Gerçek transkript varsa ORTASINDAN bir
+   * satır alınır (baştaki satır çoğu videoda "merhaba" gibi kısa ve temsil etmez).
+   */
+  function onizlemeMetni() {
+    if (!segments.length) {
+      return { kelimeler: ["Örnek", "altyazı", "böyle", "görünecek"], sureler: null };
+    }
+    var karaoke = /^k/.test(el("cap-maxlen").value);
+    if (karaoke) {
+      var cs = cueler();
+      if (!cs.length) return { kelimeler: [], sureler: null };
+      var gruplar = assKaraokeSatirlari(cs);
+      var g = gruplar[Math.floor(gruplar.length / 2)] || gruplar[0] || [];
+      return {
+        kelimeler: g.map(function (c) { return styleText(c.text); }).filter(Boolean),
+        sureler: g.map(function (c) { return Math.max(0.12, c.end - c.start); })
+      };
+    }
+    var orta = segments[Math.floor(segments.length / 2)] || segments[0];
+    var metin = styleText(orta.text || "");
+    return { kelimeler: metin ? metin.split(/\s+/) : [], sureler: null };
+  }
+
+  function onizlemeOynat() {
+    var b = el("cap-onizleme-oynat");
+    if (onizlemeSaat) { onizlemeDurdur(); onizlemeCiz(); return; }
+
+    var veri = onizlemeMetni();
+    if (!veri.kelimeler.length) return;
+    if (b) b.textContent = "■ Durdur";
+
+    var i = 0;
+    function adim() {
+      onizlemeCiz(i);
+      var sure = veri.sureler ? veri.sureler[i] * 1000 : 380;
+      i++;
+      if (i >= veri.kelimeler.length) {
+        onizlemeSaat = setTimeout(function () {
+          onizlemeDurdur();
+          onizlemeCiz();
+        }, Math.min(1200, sure));
+        return;
+      }
+      onizlemeSaat = setTimeout(adim, Math.min(1500, sure));
+    }
+    adim();
+  }
+
   function buildAss(opts) {
     opts = opts || {};
-    var font = opts.font || "Arial";
-    var boyut = opts.boyut || 72;
+    var st = opts.stil || stil();
+    var font = opts.font || st.font || "Arial";
+    var boyut = opts.boyut || st.boyut || 72;
     var karaoke = !!opts.karaoke;
     var cs = cueler();
+
+    /*
+     * ASS stil satırı. Karaoke'de SecondaryColour "henüz okunmamış" kelimenin,
+     * PrimaryColour ise okunan kelimenin rengidir — yani \k etiketi soldurmayı
+     * Secondary'den Primary'ye yapar. Bu yüzden vurgu rengi Primary'ye yazılır.
+     */
+    var birincil = karaoke ? assRenk(st.vurguRenk) : assRenk(st.renk);
+    var ikincil = karaoke ? assRenk(st.renk) : assRenk(st.renk);
+    // BorderStyle 3 = yazının arkasına dolu kutu, 1 = yalnız kontur+gölge
+    var kenarBicim = st.kutu ? 3 : 1;
+    var arkaRenk = assRenk("#000000", st.kutu ? 0x40 : 0x80);
+    var golge = st.kutu ? 0 : 2;
+    var altBosluk = st.konum === 2 ? 90 : 40;
 
     var bas = [
       "[Script Info]",
@@ -1517,9 +1745,10 @@ window.KCaptions = (function () {
       "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour," +
         " Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline," +
         " Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-      // Renkler ASS'te &HAABBGGRR: beyaz dolgu, siyah kontur, vurgu (karaoke) moru
-      "Style: Suflo," + font + "," + boyut + ",&H00FFFFFF,&H00F67C8B,&H00000000,&H80000000," +
-        "-1,0,0,0,100,100,0,0,1,4,2,2,80,80,90,1",
+      "Style: Suflo," + font + "," + boyut + "," + birincil + "," + ikincil + "," +
+        assRenk(st.konturRenk) + "," + arkaRenk + "," +
+        "-1,0,0,0,100,100,0,0," + kenarBicim + "," + st.kontur + "," + golge + "," +
+        st.konum + ",80,80," + altBosluk + ",1",
       "",
       "[Events]",
       "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -1703,6 +1932,36 @@ window.KCaptions = (function () {
     el("cap-shift-fwd").addEventListener("click", function () { shiftAll(0.5); });
     el("cap-add-line").addEventListener("click", function () { insertAfter(segments.length - 1); });
     initYildizBar();
+
+    /* Görünüm kontrolleri: her değişiklikte önizleme anında yenilenir ve kaydedilir */
+    ["cap-font", "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu",
+     "cap-kontur", "cap-konum", "cap-kutu"].forEach(function (id) {
+      var e = el(id);
+      if (!e) return;
+      // renk seçicide "input" anlık, diğerlerinde "change" yeterli
+      var olay = e.type === "color" ? "input" : "change";
+      e.addEventListener(olay, function () {
+        onizlemeDurdur();
+        onizlemeCiz();
+        savePrefs();
+        // stil elle değiştiyse artık hazır şablonda değiliz
+        if (el("cap-preset")) el("cap-preset").value = "";
+      });
+    });
+    if (el("cap-onizleme-oynat")) el("cap-onizleme-oynat").addEventListener("click", onizlemeOynat);
+
+    // Satır uzunluğu karaoke'ye geçince vurgu rengi anlam kazanır: önizleme onu da yansıtsın
+    if (el("cap-maxlen")) {
+      el("cap-maxlen").addEventListener("change", function () {
+        onizlemeDurdur();
+        vurguKutusuDurumu();
+        onizlemeCiz();
+      });
+    }
+    vurguKutusuDurumu();
+    onizlemeCiz();
+    // panel genişleyince ölçek değişir; önizleme yeniden çizilmeli
+    window.addEventListener("resize", function () { onizlemeCiz(); });
 
     // Ctrl+Z / Ctrl+Y — metin alanında yazarken tarayıcının kendi geri alması çalışsın
     document.addEventListener("keydown", function (e) {

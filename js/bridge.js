@@ -127,6 +127,14 @@ window.K = (function () {
       var child;
       try {
         var spawnOpts = { windowsHide: true };
+        /*
+         * cwd: ffmpeg'in altyazı filtrelerinde (ass=/subtitles=) MUTLAK yol
+         * kullanılamıyor. Filtre sözdiziminde ":" parametre ayracı olduğu için
+         * "C:/..." ikinci parametre sanılıyor ve "Invalid argument" veriyor;
+         * ters bölü ile kaçırmak da çözmüyor. Tek güvenilir yol, ffmpeg'i
+         * dosyanın klasöründe çalıştırıp filtreye yalnız dosya adını vermek.
+         */
+        if (opts.cwd) spawnOpts.cwd = opts.cwd;
         if (MAC) {
           // CEP surecinin PATH'i cogu zaman /usr/bin ile sinirli; Homebrew'i goremiyor
           var env = {};

@@ -137,6 +137,89 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-title">Görünüm</div>
+
+        <!-- Canlı önizleme: altyazının videoda nasıl duracağı, stil değişince anında -->
+        <div class="onizleme" id="cap-onizleme">
+          <div class="onizleme-sahne" id="cap-sahne">
+            <div class="onizleme-alt" id="cap-onizleme-metin"></div>
+          </div>
+          <button type="button" id="cap-onizleme-oynat" class="onizleme-oynat" title="Önizlemeyi oynat">▶ Oynat</button>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="cap-font">Yazı tipi</label>
+            <select id="cap-font">
+              <option value="Arial" selected>Arial</option>
+              <option value="Impact">Impact</option>
+              <option value="Verdana">Verdana</option>
+              <option value="Tahoma">Tahoma</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Trebuchet MS">Trebuchet MS</option>
+              <option value="Courier New">Courier New</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cap-boyut">Punto</label>
+            <select id="cap-boyut">
+              <option value="48">Küçük (48)</option>
+              <option value="64">Orta (64)</option>
+              <option value="72" selected>Büyük (72)</option>
+              <option value="90">Çok büyük (90)</option>
+              <option value="110">Dev (110)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="cap-konum">Konum</label>
+            <select id="cap-konum">
+              <option value="2" selected>Alt</option>
+              <option value="5">Orta</option>
+              <option value="8">Üst</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cap-kontur">Kontur</label>
+            <select id="cap-kontur">
+              <option value="0">Yok</option>
+              <option value="2">İnce</option>
+              <option value="4" selected>Kalın</option>
+              <option value="7">Çok kalın</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Renkler</label>
+          <div class="renk-satir">
+            <label class="renk-kutu" title="Yazı rengi">
+              <input type="color" id="cap-renk" value="#ffffff">
+              <span>Yazı</span>
+            </label>
+            <label class="renk-kutu" title="Kontur (çevre çizgisi) rengi">
+              <input type="color" id="cap-renk-kontur" value="#000000">
+              <span>Kontur</span>
+            </label>
+            <label class="renk-kutu" id="cap-renk-vurgu-kutu" title="Karaoke modunda okunan kelimenin rengi">
+              <input type="color" id="cap-renk-vurgu" value="#8b7cf6">
+              <span>Vurgu</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="switch" title="Yazının arkasına yarı saydam kutu koy">
+            <input id="cap-kutu" type="checkbox">
+            <i></i>
+            <span>Arka plan kutusu</span>
+          </label>
+        </div>
+      </div>
+
       <div class="card" id="cap-tracks-card" hidden>
         <div class="card-title">Ses katmanları</div>
         <div id="cap-tracks" class="tracks"></div>

@@ -635,6 +635,111 @@ details.adv > *:not(summary) { margin-top: 8px; }
 }
 .field-grid .field { margin-bottom: 11px; }
 
+/* ---------- Canlı önizleme ---------- */
+
+/*
+ * Altyazının videoda nasıl duracağını panelde gösterir. Sahne 16:9 tutulur ve
+ * font boyutu sahne genişliğine göre ölçeklenir (--olcek), böylece buradaki
+ * görüntü ASS çıktısındaki 1920x1080 yerleşimiyle aynı oranda olur.
+ */
+.onizleme { margin-bottom: 11px; }
+
+.onizleme-sahne {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  /* satranç tahtası: altyazının arkasının saydam olduğunu gösterir */
+  background-color: #20222e;
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,.028) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255,255,255,.028) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255,255,255,.028) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.028) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.onizleme-alt {
+  position: absolute;
+  left: 4%; right: 4%;
+  text-align: center;
+  line-height: 1.25;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  /* ASS Alignment karşılıkları JS'ten sınıfla verilir */
+}
+.onizleme-alt.alt   { bottom: 8%; }
+.onizleme-alt.orta  { top: 50%; transform: translateY(-50%); }
+.onizleme-alt.ust   { top: 8%; }
+
+.onizleme-alt b { font-weight: inherit; }          /* vurgulanan kelime */
+.onizleme-alt .kutu {
+  padding: .12em .4em;
+  border-radius: .12em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.onizleme-bos {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  font-size: 11px;
+  text-align: center;
+  padding: 0 18px;
+  line-height: 1.5;
+}
+
+.onizleme-oynat {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  padding: 6px;
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  border-radius: var(--r-s);
+  color: var(--dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .16s var(--ease), color .16s var(--ease);
+}
+.onizleme-oynat:hover { background: var(--raise); color: var(--text); }
+.onizleme-oynat:disabled { opacity: .45; cursor: default; }
+
+/* ---------- Renk seçiciler ---------- */
+
+.renk-satir { display: flex; gap: 8px; }
+.renk-kutu {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.renk-kutu span { font-size: 10.5px; color: var(--dim); }
+.renk-kutu input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line2);
+  border-radius: var(--r-s);
+  background: none;
+  cursor: pointer;
+  box-shadow: var(--edge);
+}
+.renk-kutu input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.renk-kutu input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+.renk-kutu.pasif { opacity: .4; pointer-events: none; }
+
 /* yıldız (şablon kaydet) */
 .star-btn {
   flex: 0 0 38px;
