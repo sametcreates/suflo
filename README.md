@@ -127,11 +127,35 @@ js/magiccut.js    kesim modülü
 js/motion.js      easing modülü
 js/sfx.js         ses kütüphanesi
 jsx/host.jsx      Premiere ExtendScript tarafı
-tools/            kur/kaldır/paketle/yayınla/dev-server
+tests/            testler (panelin gerçek kaynağını çalıştırır)
+tools/            kur/kaldır/paketle/yayınla/dev-server/test
 ```
 
 Önizleme: `node tools/devserver.js` → http://localhost:5177 (Premiere dışında sahte veriyle açılır).
 Paket: `tools/package.ps1` (ZXPSignCmd gerekir) → `dist/Suflo-x.y.z.zxp`.
+
+### Testler
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test.ps1
+```
+
+Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanmış mantık üzerinde
+çalışmazlar. Bu yüzden bir test kırıldığında gerçekten ürün kırılmış demektir.
+
+| Dosya | Ne ölçer |
+|---|---|
+| `test-download.js` | Yarım kalan indirmenin devamı, hangi HTTP hatasında dosya korunur/silinir |
+| `test-parse.js` | SRT/VTT ayrıştırma, etiket ve HTML varlık temizliği, BOM/CRLF |
+| `test-export.js` | SRT/VTT/ASS/TXT çıktıları (ffmpeg ile gerçekten ayrıştırılarak) |
+| `test-burn.js` | ASS'in libass ile videoya gerçekten çizildiği (kare farkı) |
+| `test-hata.js` | Hata rehberi: doğru tavsiye veriyor mu, masum hataya yanlış tavsiye veriyor mu |
+| `test-mac.js` | macOS yolları: Homebrew, Metal, model klasörü, Windows'a özgü kodun çalışmaması |
+| `test-v175.js` | Sürüm regresyonları |
+| `seo-kontrol.js` | `docs/` site çıktısı: meta etiketler, JSON-LD, sitemap |
+| `cakisma.js` | CSS sınıf adı çakışmaları (aynı ada iki tanım) |
+
+`test-export.js` ve `test-burn.js` `ffmpeg` ister; yoksa atlanır.
 
 ## Yol haritası
 

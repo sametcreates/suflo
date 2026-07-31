@@ -39,16 +39,6 @@ if ($LASTEXITCODE -ne 0) {
     git config user.email "sametkaygisiz27@gmail.com"
 }
 
-# OWNER yer tutucularini gercek kullaniciyla degistir (bridge.js guncelleme kontrolu dahil)
-foreach ($f in @("docs\index.html", "marketing\lansman-kiti.md", "js\bridge.js")) {
-    $p = Join-Path $root $f
-    if (Test-Path $p) {
-        $c = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
-        $c = $c.Replace("OWNER/suflo", "$owner/suflo")
-        [System.IO.File]::WriteAllText($p, $c, (New-Object System.Text.UTF8Encoding($false)))
-    }
-}
-
 git add -A
 $null = cmd /c "git commit -m ""Suflo yayin"" >nul 2>&1"
 
@@ -76,7 +66,20 @@ if (-not (Test-Path $zxp)) {
 }
 $null = cmd /c "gh release view v$version >nul 2>&1"
 if ($LASTEXITCODE -ne 0) {
-    gh release create "v$version" $zxp --title "Suflo $version" --notes-file (Join-Path $root "marketing\release-notes.md")
+    # Surum notu GERCEKTEN bu surume mi ait? Dosya guncellenmeyi unutulursa
+    # yayina bir onceki surumun notlari gider ve kullanici yanlis sey okur.
+    $notlar = Join-Path $root "marketing\release-notes.md"
+    if (-not (Test-Path $notlar)) {
+        Write-Host "release-notes.md yok — yayin durduruldu." -ForegroundColor Red; exit 1
+    }
+    $ilkSatir = (Get-Content $notlar -TotalCount 1)
+    if ($ilkSatir -notmatch [regex]::Escape($version)) {
+        Write-Host "DUR: release-notes.md '$version' surumunden bahsetmiyor." -ForegroundColor Red
+        Write-Host "     Ilk satir: $ilkSatir" -ForegroundColor DarkGray
+        Write-Host "     Notlari guncelle, sonra tekrar calistir." -ForegroundColor DarkGray
+        exit 1
+    }
+    gh release create "v$version" $zxp --title "Suflo $version" --notes-file $notlar
 } else {
     Write-Host "Release v$version zaten var." -ForegroundColor DarkGray
 }

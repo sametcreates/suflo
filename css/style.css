@@ -291,6 +291,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
               transform .12s var(--ease), opacity .16s var(--ease), box-shadow .16s var(--ease);
 }
 .btn:hover:not(:disabled) { background: var(--raise); border-color: #4a5070; }
+.row-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .38; cursor: default; }
 .btn.ghost { background: transparent; border-color: var(--line); }
@@ -439,6 +440,7 @@ a.link-btn { display: inline-block; }
   min-height: 15px;
   margin-bottom: 9px;
   word-break: break-word;
+  white-space: pre-line; /* hata rehberi "Çözüm:" satırı ayrı satırda dursun */
   line-height: 1.45;
 }
 .inline-status.good { color: var(--good); }
@@ -494,6 +496,23 @@ details.adv > *:not(summary) { margin-top: 8px; }
 .update-bar .btn.tiny { flex: 0 0 auto; }
 .update-bar .link-btn { flex: 0 0 auto; color: var(--faint); font-size: 13px; line-height: 1; }
 .update-bar .link-btn:hover { color: var(--text); }
+
+/* Yıldız şeridi — üçüncü başarılı uygulamadan sonra bir kez, kapatılabilir */
+.star-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line2);
+  background: var(--bg3);
+  font-size: 11px;
+  color: var(--dim);
+  line-height: 1.4;
+}
+.star-bar span { flex: 1; min-width: 0; }
+.star-bar .link-btn { flex: 0 0 auto; }
 
 /* Ayarlardan çıkış çubuğu — solo modda sekme çubuğu gizli olduğu için tek görünür yol */
 .set-back-bar {
@@ -1190,6 +1209,7 @@ canvas#mo-canvas {
   box-shadow: 0 10px 30px -8px rgba(0, 0, 0, .8);
   animation: toast-in .28s var(--ease);
   word-break: break-word;
+  white-space: pre-line; /* hata rehberi "Çözüm:" satırı için */
 }
 .toast.good { border-left-color: var(--good); }
 .toast.bad { border-left-color: var(--bad); }

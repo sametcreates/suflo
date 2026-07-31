@@ -1,0 +1,58 @@
+name: 🐛 Hata bildirimi
+description: Bir şey çalışmıyor mu? Buradan bildir, bakalım.
+title: "[Hata] "
+labels: ["hata"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Teşekkürler! İki dakikanı alacak. Ne kadar detay verirsen o kadar hızlı çözeriz.
+
+  - type: textarea
+    id: ne-oldu
+    attributes:
+      label: Ne oldu?
+      description: Ne yapmaya çalışıyordun, ne bekliyordun, ne gördün?
+      placeholder: "Sekans kapsamında Altyazı oluştur'a bastım, %40'ta 'Motor çıktı üretmedi' hatası verdi."
+    validations:
+      required: true
+
+  - type: textarea
+    id: gunluk
+    attributes:
+      label: Panel günlüğü
+      description: "Panelde Ayarlar → Destek → Günlüğü kopyala deyip buraya yapıştır. Hatanın nedeni çoğu zaman burada gizli."
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: sistem
+    attributes:
+      label: İşletim sistemi
+      options:
+        - Windows
+        - "macOS (Apple Silicon: M1/M2/M3/M4)"
+        - macOS (Intel)
+    validations:
+      required: true
+
+  - type: input
+    id: premiere
+    attributes:
+      label: Premiere sürümü
+      placeholder: "2025 (v25.x)"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: motor
+    attributes:
+      label: Hangi motoru kullanıyordun?
+      options:
+        - Yerel motor
+        - Groq bulut
+        - OpenAI / özel endpoint
+        - Bilmiyorum
+    validations:
+      required: false

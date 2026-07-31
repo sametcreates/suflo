@@ -338,8 +338,8 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.7.7";
-  // yayin sirasinda publish.ps1 gercek kullanici adiyla degistirir
+  var VERSION = "1.7.8";
+  // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
 
@@ -360,6 +360,82 @@ window.K = (function () {
       "---"
     ];
     return head.join("\n") + "\n" + logBuf.join("\n");
+  }
+
+  /* ---------------- Hata rehberi ---------------- */
+
+  /*
+   * Ham hata mesajını "şimdi ne yapayım" cümlesiyle zenginleştir.
+   * Eşleşme yoksa mesaj AYNEN döner: "Konuşma bulunamadı" gibi normal durumlara
+   * çözüm önerisi yapıştırmak güveni azaltır. Sıra önemli: özgül kalıplar önce.
+   */
+  var HATA_REHBERI = [
+    { // eksik Windows bileşeni (0xC0000135: DLL bulunamadı) veya VC++ runtime
+      re: /3221225781|-1073741515|0xC0000135|VCRUNTIME|MSVCP\d+\.dll/i,
+      tip: "Bir Windows bileşeni eksik görünüyor. Şu adresten Visual C++ paketini kur, " +
+        "Premiere'i yeniden başlat: aka.ms/vs/17/release/vc_redist.x64.exe"
+    },
+    { // eski işlemci (0xC000001D: illegal instruction, AVX yok)
+      re: /-1073741795|0xC000001D|illegal instruction/i,
+      tip: "İşlemcin bu motor sürümünü desteklemiyor olabilir. Ayarlar'dan ücretsiz " +
+        "Groq bulut motorunu dene: aynı kalite, kurulum gerektirmez."
+    },
+    { // antivirüs / izin: motor exe'si karantinada ya da klasör kilitli
+      re: /EPERM|EACCES|EBUSY|access is denied|erişim engellendi|erişim reddedildi|operation not permitted/i,
+      tip: MAC
+        ? "macOS izin vermemiş olabilir. Sistem Ayarları > Gizlilik ve Güvenlik'e bak; " +
+          "sorun sürerse Ayarlar > Destek > Sorun bildir."
+        : "Antivirüs motoru engellemiş olabilir. Windows Güvenlik > Virüs koruması > " +
+          "Dışlamalar'a şu klasörü ekle: %APPDATA%\\Kesit — sonra motoru Ayarlar'dan yeniden kur."
+    },
+    { // disk dolu
+      re: /ENOSPC|no space left|not enough space|yeterli alan/i,
+      tip: "Diskte yer kalmamış. 2 GB kadar yer aç, tekrar dene; indirme kaldığı yerden devam eder."
+    },
+    { // ağ: DNS, kopma, güvenlik duvarı, sertifika, indirme/istek zaman aşımı
+      re: /ENOTFOUND|EAI_AGAIN|getaddrinfo|ETIMEDOUT|ECONNRESET|ECONNREFUSED|socket hang up|SELF_SIGNED|CERT_|indirme zaman aşımı|timed? ?out/i,
+      tip: "İnternet bağlantısında sorun görünüyor. Bağlantıyı kontrol edip tekrar dene; " +
+        "indirme kaldığı yerden devam eder. Şirket veya okul ağındaysan Ayarlar'dan vekil sunucu tanımla."
+    },
+    /*
+     * Cıplak "401"/"429" ARAMA: bu sayılar masum mesajlarda da geçiyor
+     * ("Ses çok uzun (429 MB)", "401 altyazı satırı hazır") ve kullanıcıyı
+     * olmayan bir sorunu kovalamaya yollar. Yalnızca gerçek API kalıpları.
+     */
+    { // API anahtarı geçersiz
+      re: /invalid[_ ]api[_ ]key|API anahtarı geçersiz|\bAPI\s+401\b|geçersiz anahtar/i,
+      tip: "API anahtarı geçersiz veya süresi dolmuş. Ayarlar'dan yeni bir Groq anahtarı " +
+        "oluştur (ücretsiz, 1 dakika sürer)."
+    },
+    { // API limiti — captions.js apiError() Türkçe "kotası doldu" üretiyor, ham kalıplar da olabilir
+      re: /rate[_ ]limit|\bAPI\s+429\b|quota exceeded|kota(sı)? doldu/i,
+      tip: "Bulut motorunun dakikalık sınırına takıldın. 1-2 dakika bekleyip tekrar dene, " +
+        "ya da sınırsız kullanım için Ayarlar'dan yerel motoru kur."
+    },
+    /*
+     * Premiere meşgul: modal pencere, render, kilitli host.
+     * Yalnızca evalScript köprüsünün ürettiği mesaja bakılır. Çıplak "zaman aşımı"
+     * ARANMAZ: aynı ifadeyi HTTP isteği, indirme ve alt süreç zaman aşımları da
+     * üretiyor, onlarda kullanıcıyı Premiere'e yollamak yanlış yönlendirme olur.
+     */
+    {
+      re: /Premiere yanıt vermedi/i,
+      tip: "Premiere meşgul olabilir. Premiere'e geç, açık iletişim kutusu veya süren " +
+        "render varsa kapat, sonra tekrar dene."
+    },
+    { // motor bozuk / çalışmıyor
+      re: /çıktı üretmedi|Motor çalıştırılamadı|motor dosyasi bulunamadi/i,
+      tip: "Motor bozulmuş olabilir. Ayarlar'dan yerel motoru yeniden kur. Sorun sürerse " +
+        "antivirüs dışlaması ekle ve Ayarlar > Destek > Sorun bildir de günlüğe bakalım."
+    }
+  ];
+
+  function hataYardimi(e) {
+    var m = String(e && e.message ? e.message : (e || ""));
+    for (var i = 0; i < HATA_REHBERI.length; i++) {
+      if (HATA_REHBERI[i].re.test(m)) return m + "\nÇözüm: " + HATA_REHBERI[i].tip;
+    }
+    return m;
   }
 
   /* ---------------- HTTP JSON (Node üzerinden, CORS'suz) ---------------- */
@@ -909,6 +985,7 @@ window.K = (function () {
     httpGet: httpGet,
     log: log,
     logText: logText,
+    hataYardimi: hataYardimi,
     VERSION: VERSION,
     REPO: REPO,
     saveDraft: saveDraft,

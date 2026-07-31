@@ -1,0 +1,32 @@
+name: 💡 Özellik isteği
+description: Suflo'da olmasını istediğin bir şey mi var? Anlat.
+title: "[İstek] "
+labels: ["istek"]
+body:
+  - type: textarea
+    id: ihtiyac
+    attributes:
+      label: Neye ihtiyacın var?
+      description: Hangi işini kolaylaştırır? Şu an bu işi nasıl yapıyorsun?
+      placeholder: "Altyazıları CapCut şablonu gibi kelime kelime renklendirmek istiyorum. Şu an tek tek elle yapıyorum."
+    validations:
+      required: true
+
+  - type: textarea
+    id: detay
+    attributes:
+      label: Nasıl çalışsın? (isteğe bağlı)
+      description: Aklında bir görünüm veya akış varsa yaz, ekran görüntüsü ekle.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: onem
+    attributes:
+      label: Senin için ne kadar önemli?
+      options:
+        - Olmazsa olmaz, bu yüzden başka araç kullanıyorum
+        - Çok işime yarar
+        - Olsa güzel olur
+    validations:
+      required: true

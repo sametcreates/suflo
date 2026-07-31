@@ -255,7 +255,8 @@ window.KCaptions = (function () {
     });
     var jsonPath = outBase + ".json";
     if (!K.fs.existsSync(jsonPath)) {
-      throw new Error("Yerel motor çıktı üretmedi: " +
+      // çıkış kodu mesajda kalsın: hata rehberi eksik DLL / eski CPU kalıplarını kodla tanır
+      throw new Error("Yerel motor çıktı üretmedi (kod=" + r.code + "): " +
         (r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 180));
     }
     var parsed = JSON.parse(K.fs.readFileSync(jsonPath, "utf8").toString());
@@ -804,9 +805,10 @@ window.KCaptions = (function () {
         for (var bi = 0; bi < batchClips.length; bi++) {
           var bc = batchClips[bi];
           var tag = "Klip " + (bi + 1) + "/" + batchClips.length + " (" + bc.name + "): ";
+          var ba = null;
           try {
             status(tag + "ses çıkarılıyor…");
-            var ba = await convertAudio(bc.mediaPath, {
+            ba = await convertAudio(bc.mediaPath, {
               wav: useLocal, ss: bc.inPoint, t: bc.dur, durHint: bc.dur
             });
             tempFiles.push(ba);
@@ -827,6 +829,10 @@ window.KCaptions = (function () {
           } catch (eB) {
             failed.push(bc.name);
             K.log("toplu islem atladi [" + bc.name + "]: " + eB.message);
+          } finally {
+            // klip biter bitmez WAV'ini sil: 20 kliplik toplu iste disk sismesin
+            // (yol tempFiles'ta da durur; sondaki toplu silme yokluga aldirmaz)
+            if (ba) { try { K.fs.unlinkSync(ba); } catch (eT) {} }
           }
         }
         if (mapped.length === 0) throw new Error("Hiçbir klipten konuşma alınamadı.");
@@ -893,7 +899,7 @@ window.KCaptions = (function () {
       saveDraftNow();
       KApp.toast(segments.length + " altyazı satırı hazır", "good");
     } catch (e) {
-      status("✕ " + e.message, "bad");
+      status("✕ " + K.hataYardimi(e), "bad");
     } finally {
       tempFiles.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
       busy = false;
@@ -1215,7 +1221,7 @@ window.KCaptions = (function () {
       render(); saveDraftNow();
       KApp.toast(texts.length + " satır çevrildi", "good");
     } catch (e) {
-      status("✕ " + e.message, "bad");
+      status("✕ " + K.hataYardimi(e), "bad");
     } finally {
       btn.disabled = false;
     }
@@ -1306,20 +1312,61 @@ window.KCaptions = (function () {
     input.accept = ".srt,.vtt";
     input.onchange = function () {
       if (!input.files.length) return;
-      var reader = new FileReader();
-      reader.onload = function () {
-        var segs = parseSrt(reader.result);
+      var dosya = input.files[0];
+
+      function yerlestir(metin, kodlama) {
+        var segs = parseSrt(metin);
         if (!segs.length) { KApp.toast("Dosyada altyazı bulunamadı.", "bad"); return; }
+        /*
+         * Ekranda iş varsa üzerine yazmadan önce anlık görüntü al: kullanıcı yanlış
+         * dosya seçtiyse Ctrl+Z ile geri dönebilsin. Ekran boşsa yığını temizle, yoksa
+         * geri alma eski bir dokümanın satırlarını geri getirir.
+         */
+        if (segments.length) snapshot("SRT içe aktarma");
+        else { undoStack.length = 0; redoStack.length = 0; }
         segments = segs;
+        uygulaEtiketiniSifirla();  // yeni doküman: "yine de uygula" onayı geçersiz
+        refreshUndoUI();
         clearRevert();
         hideRestore();
         el("cap-result").hidden = false;
         el("cap-result-info").textContent = segs.length + " satır · içe aktarıldı";
         render();
         saveDraftNow();
-        KApp.toast(segs.length + " satır içe aktarıldı — düzenle, çevir, uygula", "good");
+        KApp.toast(segs.length + " satır içe aktarıldı" +
+          (kodlama ? " (" + kodlama + " olarak okundu)" : "") +
+          " — düzenle, çevir, uygula", "good");
+      }
+
+      /*
+       * Türkiye'de dolaşan SRT'lerin çoğu windows-1254 (Türkçe ANSI); UTF-8 sanıp
+       * okursak bütün ş/ğ/ı/İ harfleri bozulur.
+       *
+       * Kodlamayı HAM BAYTTAN karar veriyoruz: TextDecoder'ı fatal kipte çalıştırınca
+       * geçersiz UTF-8'de istisna atar, geçerlide atmaz. "Çıktıda bozuk karakter var mı"
+       * diye bakmak işe YARAMAZ: windows-1254 tek baytlık bir kodlamadır, her bayt
+       * dizisini sessizce kabul eder, yani o kontrol hiçbir zaman "hayır" demez.
+       */
+      var reader = new FileReader();
+      reader.onload = function () {
+        var buf = reader.result;
+        var metin, kodlama = "";
+        try {
+          metin = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+        } catch (eU) {
+          try {
+            metin = new TextDecoder("windows-1254").decode(buf);
+            kodlama = "Türkçe ANSI";
+            K.log("[altyazı] gecerli UTF-8 degil, windows-1254 olarak okundu: " + dosya.name);
+          } catch (eW) {
+            KApp.toast("Dosyanın kodlaması çözülemedi.", "bad");
+            return;
+          }
+        }
+        yerlestir(metin, kodlama);
       };
-      reader.readAsText(input.files[0], "utf-8");
+      reader.onerror = function () { KApp.toast("Dosya okunamadı.", "bad"); };
+      reader.readAsArrayBuffer(dosya);
     };
     input.click();
   }
@@ -1509,6 +1556,7 @@ window.KCaptions = (function () {
           K.clearDraft();
           hideRestore();
           KApp.toast("Altyazı izi oluşturuldu", "good");
+          yildizIste();
         } else {
           // caption izi oluşmadı: düzenlenebilir tek kopya olan taslağı SİLME
           KApp.toast("SRT projeye alındı — proje panelinden timeline'a sürükle: " + p, "good");
@@ -1519,6 +1567,37 @@ window.KCaptions = (function () {
     } catch (e) {
       KApp.toast(e.message, "bad");
     }
+  }
+
+  /*
+   * Ucuncu basarili uygulamadan sonra BIR KEZ yildiz iste.
+   * Kurallar bilincli: (1) mutlu anda sorulur, isin ortasinda degil, (2) omurde tek sefer,
+   * (3) kapatilabilir ve isi engellemez. Erken veya tekrarlayan istek uruna zarar verir.
+   */
+  function yildizIste() {
+    var s = K.settings();
+    if (s.yildizSoruldu) return;
+    s.basariliUygulama = (s.basariliUygulama || 0) + 1;
+    K.saveSettings();
+    if (s.basariliUygulama < 3) return;
+
+    s.yildizSoruldu = true;
+    K.saveSettings();
+
+    // toast yerine kalici, kapatilabilir bir serit: kullanici hazir oldugunda tiklar
+    var bar = el("star-bar");
+    if (!bar) return;
+    bar.hidden = false;
+  }
+
+  function initYildizBar() {
+    var bar = el("star-bar");
+    if (!bar) return;
+    el("star-go").addEventListener("click", function () {
+      K.cs.openURLInDefaultBrowser("https://github.com/" + K.REPO);
+      bar.hidden = true;
+    });
+    el("star-close").addEventListener("click", function () { bar.hidden = true; });
   }
 
   function saveToDesktop(name, content) {
@@ -1580,6 +1659,7 @@ window.KCaptions = (function () {
     el("cap-shift-back").addEventListener("click", function () { shiftAll(-0.5); });
     el("cap-shift-fwd").addEventListener("click", function () { shiftAll(0.5); });
     el("cap-add-line").addEventListener("click", function () { insertAfter(segments.length - 1); });
+    initYildizBar();
 
     // Ctrl+Z / Ctrl+Y — metin alanında yazarken tarayıcının kendi geri alması çalışsın
     document.addEventListener("keydown", function (e) {

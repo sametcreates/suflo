@@ -14,7 +14,7 @@ window.KApp = (function () {
 
   /* ---------------- Toast ---------------- */
 
-  function toast(msg, kind) {
+  function toast(msg, kind, sure) {
     var box = el("toasts");
     var t = document.createElement("div");
     t.className = "toast" + (kind ? " " + kind : "");
@@ -23,7 +23,7 @@ window.KApp = (function () {
     setTimeout(function () {
       t.classList.add("out");
       setTimeout(function () { t.remove(); }, 300);
-    }, kind === "bad" ? 5200 : 3200);
+    }, sure || (kind === "bad" ? 5200 : 3200));
   }
 
   /* ---------------- Bağlam ---------------- */
@@ -224,6 +224,10 @@ window.KApp = (function () {
     if (!K.nodeOK) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return; }
     installingLocal = true;
     var box = el("set-local-status");
+    var kurulumHatasi = null;
+    // ilerleme metnini yazdığımız öğenin kendi etiketi: iş bitince geri konur,
+    // yoksa kurulum kartındaki düğme "Motor iniyor… %62" yazısında donup kalıyor
+    var progressEski = progressEl ? progressEl.textContent : null;
     el("set-local-install").hidden = true;
     function say(msg) {
       box.className = "inline-status";
@@ -244,11 +248,19 @@ window.KApp = (function () {
       toast("Hazır: " + res.model.label.split(" —")[0] + donanim +
         (res.vad ? " · sessizlik atlama açık" : ""), "good");
     } catch (e) {
-      toast(e.message, "bad");
+      // kurulum hatası en kritik an: çözüm önerisiyle ve uzun süre göster
+      kurulumHatasi = K.hataYardimi(e);
+      toast(kurulumHatasi, "bad", 12000);
     } finally {
       installingLocal = false;
+      if (progressEl && progressEski !== null) progressEl.textContent = progressEski;
       refreshLocalStatus();
       KCaptions.refreshSetup();
+      // refreshLocalStatus kutuyu ezdiği için hata ondan SONRA basılır
+      if (kurulumHatasi) {
+        box.className = "inline-status bad";
+        box.textContent = "✕ " + kurulumHatasi;
+      }
     }
   }
 
@@ -384,7 +396,7 @@ window.KApp = (function () {
       });
     }
 
-    el("set-copy-log").addEventListener("click", function () {
+    function gunlukKopyala() {
       var txt = K.logText();
       var ta = document.createElement("textarea");
       ta.value = txt;
@@ -393,8 +405,35 @@ window.KApp = (function () {
       var ok = false;
       try { ok = document.execCommand("copy"); } catch (e) {}
       ta.remove();
-      if (ok) toast("Günlük panoya kopyalandı (" + txt.split("\n").length + " satır)", "good");
+      return ok ? txt.split("\n").length : 0;
+    }
+
+    el("set-copy-log").addEventListener("click", function () {
+      var n = gunlukKopyala();
+      if (n) toast("Günlük panoya kopyalandı (" + n + " satır)", "good");
       else toast("Kopyalanamadı", "bad");
+    });
+
+    // Tek tikla sorun bildirimi: gunluk panoya, tarayicida onceden doldurulmus
+    // issue formu. Gunluk URL'ye konmaz (uzunluk + kisisel yol iceriyor olabilir).
+    el("set-report").addEventListener("click", function () {
+      var sistem = "Windows";
+      if (K.MAC) {
+        var arm = false;
+        try { arm = require("os").arch() === "arm64"; } catch (e) {}
+        sistem = arm ? "macOS (Apple Silicon: M1/M2/M3/M4)" : "macOS (Intel)";
+      }
+      var ppro = "";
+      try { ppro = JSON.parse(window.__adobe_cep__.getHostEnvironment()).appVersion || ""; } catch (e) {}
+      var u = "https://github.com/" + K.REPO + "/issues/new?template=hata-bildirimi.yml" +
+        "&title=" + encodeURIComponent("[Hata] v" + K.VERSION + ": ") +
+        "&sistem=" + encodeURIComponent(sistem);
+      if (ppro) u += "&premiere=" + encodeURIComponent(ppro);
+      var n = gunlukKopyala();
+      K.cs.openURLInDefaultBrowser(u);
+      toast(n
+        ? "Günlük kopyalandı. Açılan sayfada \"Panel günlüğü\" alanına yapıştır (Ctrl+V)."
+        : "Bildirim sayfası açıldı. Günlüğü \"Günlüğü kopyala\" ile ekleyebilirsin.", "good", 9000);
     });
 
     refreshFolderList();
@@ -478,8 +517,7 @@ window.KApp = (function () {
   }
 
   async function checkUpdate() {
-    // yayindan once REPO yer tutucudur; kontrol devre disi kalir
-    if (!K.nodeOK || K.REPO.indexOf("OWNER") === 0) return;
+    if (!K.nodeOK) return;
     try {
       var r = await K.httpGet("https://api.github.com/repos/" + K.REPO + "/releases/latest");
       if (r.status !== 200) return;
@@ -566,6 +604,13 @@ window.KApp = (function () {
     // Global hata yakalayıcı: aksi halde bir arıza tamamen sessiz kalıyor
     window.addEventListener("error", function (ev) {
       try { K.log("js hata: " + (ev.message || "") + " @ " + (ev.filename || "") + ":" + (ev.lineno || 0)); } catch (e) {}
+    });
+
+    // Sürüm etiketleri tek kaynaktan (bridge.js VERSION) beslenir: elle yazılan
+    // "v1.7" her yayında geride kalıyor, kullanıcı hangi sürümde olduğunu bilemiyordu
+    ["brand-ver", "hakkinda-ver"].forEach(function (id) {
+      var e = el(id);
+      if (e) e.textContent = "v" + K.VERSION;
     });
 
     // Bağlam yoklaması ve ffmpeg denetimi ÖNCE: modüllerden bağımsız çalışsın

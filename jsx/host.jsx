@@ -57,6 +57,17 @@ var KS_TPS = 254016000000; // Premiere ticks / saniye
 
 function KS_seq() { return app.project.activeSequence; }
 
+/*
+ * NOT — undo gruplama: Premiere ExtendScript'te YOK.
+ * After Effects'teki app.beginUndoGroup/endUndoGroup ikilisinin Premiere karsiligi
+ * bulunmuyor; Adobe'dan Bruce Bullis forumda dogrudan "No" diyor ve gruplama hala
+ * acik bir ozellik talebi (DVAPR-4235114). Adobe bu yetenegi yalnizca UXP'ye verdi
+ * (project.executeTransaction). Dolayisiyla cok adimli islemlerimiz (kesim, ease)
+ * kullanicida birden fazla Ctrl+Z olarak geri alinir; bunu gizlemeye calisan sahte
+ * bir sarmalayici yazmak yerine gercegi burada belgeliyoruz.
+ * Kaynak: https://community.adobe.com/questions-729/undo-groups-in-premiere-1422157
+ */
+
 function KS_findBin(name) {
   var root = app.project.rootItem;
   for (var i = 0; i < root.children.numItems; i++) {
@@ -572,22 +583,26 @@ function KS_exportAudio(encoded) {
 
     // Adobe exporter karisik ayracli yollari reddeder (Windows'ta Error code 10) —
     // yol bastan sona platformun ayraci olmali ve klasor onceden var olmali
-    var AY = ($.os.indexOf("Windows") !== -1) ? "\\" : "/";
-    var tdir = new Folder(Folder.temp.fsName + AY + "Suflo");
-    if (!tdir.exists) tdir.create();
-    var out = tdir.fsName + AY + "seq_" + (new Date().getTime()) + ".wav";
-    var wa = (p.scope === "inout") ? 1 : 0; // 1 = in-out, 0 = tum sequence
+    var res = "", done = false, out, AY;
+    try {
+      AY = ($.os.indexOf("Windows") !== -1) ? "\\" : "/";
+      var tdir = new Folder(Folder.temp.fsName + AY + "Suflo");
+      if (!tdir.exists) tdir.create();
+      out = tdir.fsName + AY + "seq_" + (new Date().getTime()) + ".wav";
+      var wa = (p.scope === "inout") ? 1 : 0; // 1 = in-out, 0 = tum sequence
 
-    var res = "", done = false;
-    for (var ei2 = 0; ei2 < eprList.length && !done; ei2++) {
-      try {
-        res = seq.exportAsMediaDirect(out, eprList[ei2], wa);
-      } catch (eX) {
-        res = String(eX);
+      for (var ei2 = 0; ei2 < eprList.length && !done; ei2++) {
+        try {
+          res = seq.exportAsMediaDirect(out, eprList[ei2], wa);
+        } catch (eX) {
+          res = String(eX);
+        }
+        done = (new File(out)).exists;
       }
-      done = (new File(out)).exists;
+    } finally {
+      // ne olursa olsun katmanlar eski haline donmeli: kullanicinin miksini bozamayiz
+      restoreMute();
     }
-    restoreMute();
 
     if (!done) {
       return KS_err("Ses disari alinamadi" + (res ? ": " + res : ".") + " 'Secili klip' kapsamini dene.");
@@ -607,6 +622,7 @@ function KS_importSrtAsCaptions(encoded) {
     var p = KS_arg(encoded); // { srtPath }
     var seq = KS_seq();
     if (!seq) return KS_err("Aktif sequence yok.");
+
     var bin = KS_findBin("Kesit Altyazi");
     app.project.importFiles([p.srtPath], true, bin, false);
     var item = KS_findItemByPath(app.project.rootItem, p.srtPath);
