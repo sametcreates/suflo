@@ -31,27 +31,6 @@
     </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab" data-tab="sfx">
-      <svg viewBox="0 0 16 16"><path d="M2 8h1.5v0M2 6.5v3M5 4.5v7M8 2.5v11M11 5v6M14 7v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
-      <span>SFX</span>
-    </button>
-    <button class="tab active" data-tab="captions">
-      <svg viewBox="0 0 16 16"><rect x="1.5" y="3" width="13" height="10" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M7 8.2c0-1 -.7-1.7-1.6-1.7S3.8 7.2 3.8 8.2s.7 1.7 1.6 1.7c.6 0 1.1-.3 1.4-.7M12.2 8.2c0-1-.7-1.7-1.6-1.7s-1.6.7-1.6 1.7.7 1.7 1.6 1.7c.6 0 1.1-.3 1.4-.7" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
-      <span>Altyazı</span>
-    </button>
-    <button class="tab" data-tab="cut">
-      <svg viewBox="0 0 16 16"><circle cx="4" cy="4" r="2" stroke="currentColor" stroke-width="1.4" fill="none"/><circle cx="4" cy="12" r="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5.7 5.2 L14 13.5 M5.7 10.8 L14 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      <span>Kesim</span>
-    </button>
-    <button class="tab" data-tab="motion">
-      <svg viewBox="0 0 16 16"><path d="M2 13 C6 13 7 3 14 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="2" cy="13" r="1.6" fill="currentColor"/><circle cx="14" cy="3" r="1.6" fill="currentColor"/></svg>
-      <span>Motion</span>
-    </button>
-    <button class="tab tab-gear" data-tab="settings" title="Ayarlar">
-      <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-    </button>
-  </nav>
 
   <div id="context-strip" class="context-strip">
     <span id="ctx-text" class="dim">bağlanıyor…</span>
@@ -67,31 +46,6 @@
     <button id="update-kapat" class="link-btn" title="Bu sürüm için gösterme">✕</button>
   </div>
 
-  <!-- ================= SFX ================= -->
-  <section id="tab-sfx" class="tabpane">
-    <div class="sfx-head">
-      <div class="search-wrap">
-        <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M10.5 10.5 L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <input id="sfx-search" type="text" placeholder="Ses ara…  (↓↑ gez · Enter ekle)">
-      </div>
-      <button id="sfx-add-folder" class="btn icon-btn" title="Ses klasörü bağla">
-        <svg viewBox="0 0 16 16"><path d="M1.5 4.5 a1.5 1.5 0 0 1 1.5-1.5 h3 l1.5 2 h5.5 a1.5 1.5 0 0 1 1.5 1.5 v5 a1.5 1.5 0 0 1 -1.5 1.5 h-10 a1.5 1.5 0 0 1 -1.5 -1.5 z" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M8 7v4M6 9h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      </button>
-    </div>
-    <div class="filter-row">
-      <div class="seg-ctl" id="sfx-filter">
-        <button class="on" data-f="all">Tümü</button>
-        <button data-f="fav">★</button>
-        <button data-f="recent">Son</button>
-      </div>
-      <span id="sfx-count" class="dim"></span>
-    </div>
-    <div id="sfx-list" class="list"></div>
-    <div id="sfx-empty" class="empty-state" hidden>
-      <p>Ses arşivini bağla,<br>panelden ara ve timeline'a bırak.</p>
-      <button id="sfx-add-folder-big" class="btn primary">Klasör bağla</button>
-    </div>
-  </section>
 
   <!-- ================= ALTYAZI ================= -->
   <section id="tab-captions" class="tabpane active">
@@ -262,81 +216,7 @@
     </div>
   </section>
 
-  <!-- ================= KESIM ================= -->
-  <section id="tab-cut" class="tabpane">
-    <div class="action-bar">
-      <button id="cut-analyze" class="btn primary big" disabled>
-        <span class="btn-label">Duraksamaları bul</span>
-      </button>
-    </div>
-    <div id="cut-progress" class="progress-line" hidden><i></i></div>
-    <div id="cut-status" class="inline-status"></div>
 
-    <details class="adv">
-      <summary>Hassasiyet</summary>
-      <div class="row">
-        <label>Eşik</label>
-        <input id="cut-noise" type="range" min="-60" max="-20" value="-38">
-        <span id="cut-noise-val" class="mono">-38 dB</span>
-      </div>
-      <div class="row">
-        <label>Min. sessizlik</label>
-        <input id="cut-minsil" type="range" min="0.3" max="2.5" step="0.1" value="0.8">
-        <span id="cut-minsil-val" class="mono">0.8 sn</span>
-      </div>
-      <div class="row">
-        <label>Tampon</label>
-        <input id="cut-pad" type="range" min="0" max="0.5" step="0.05" value="0.15">
-        <span id="cut-pad-val" class="mono">0.15 sn</span>
-      </div>
-    </details>
-
-    <div id="cut-result" hidden>
-      <div class="result-head">
-        <span id="cut-summary" class="dim"></span>
-      </div>
-      <div id="cut-bar" class="cut-bar" title="Turuncu: kesilecek — tıklayıp kapatabilirsin"></div>
-      <details class="adv">
-        <summary>Kesim listesi</summary>
-        <div id="cut-ranges" class="segments"></div>
-      </details>
-      <div class="seg-ctl full" id="cut-target">
-        <button class="on" data-m="clone">Kopya sekansta<em>önerilen</em></button>
-        <button data-m="here">Bu sekansta</button>
-      </div>
-      <div class="row" id="cut-here-row" hidden>
-        <label>Yöntem</label>
-        <select id="cut-mode">
-          <option value="select" selected>Sadece kes + seç</option>
-          <option value="gap">Sil, boşluk bırak</option>
-          <option value="ripple">Ripple sil</option>
-        </select>
-      </div>
-      <button id="cut-apply" class="btn primary big">Kesimleri uygula</button>
-    </div>
-  </section>
-
-  <!-- ================= MOTION ================= -->
-  <section id="tab-motion" class="tabpane">
-    <div class="row">
-      <select id="mo-prop" class="grow"></select>
-      <button id="mo-refresh" class="btn icon-btn" title="Özellikleri yenile">
-        <svg viewBox="0 0 16 16"><path d="M13.5 8 a5.5 5.5 0 1 1 -1.6 -3.9 M12 1.5 v2.8 h-2.8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-      </button>
-    </div>
-    <canvas id="mo-canvas" width="352" height="180"></canvas>
-    <div class="preset-pills" id="mo-presets">
-      <button data-p="0.65,0,0.35,1" class="on">Smooth</button>
-      <button data-p="0,0,0.35,1">Out</button>
-      <button data-p="0.55,0,1,1">In</button>
-      <button data-p="0.16,1,0.3,1">Expo</button>
-      <button data-p="0.34,1.45,0.64,1">Back</button>
-      <button data-p="0.5,-0.4,0.4,1">Anticipate</button>
-    </div>
-    <p class="hint">Eğri, her iki keyframe arasındaki hareketin zamanlamasıdır. Noktaları sürükleyerek özelleştir.</p>
-    <button id="mo-apply" class="btn primary big" disabled>Ease uygula</button>
-    <div id="mo-status" class="inline-status"></div>
-  </section>
 
   <!-- ================= AYARLAR ================= -->
   <section id="tab-settings" class="tabpane">
@@ -393,12 +273,6 @@
     </div>
 
     <div class="set-group">
-      <div class="set-title">SFX Klasörleri</div>
-      <div id="set-folders" class="folder-list"></div>
-      <button id="set-add-folder" class="btn">＋ Klasör bağla</button>
-    </div>
-
-    <div class="set-group">
       <div class="set-title">ffmpeg</div>
       <div class="row">
         <span id="set-ffmpeg-status" class="inline-status">kontrol ediliyor…</span>
@@ -436,26 +310,10 @@
       </div>
     </div>
 
-    <div class="set-group">
-      <div class="set-title">Modüller</div>
-      <label class="check-label">
-        <input id="set-modules" type="checkbox"> Beta modülleri göster (SFX · Kesim · Motion)
-      </label>
-      <p class="hint" style="margin-top:6px">Suflo v1 altyazıya odaklanır; diğer araçlar beta olarak gelişmeye devam ediyor.</p>
-    </div>
-
-    <div class="set-group">
-      <div class="set-title">Destek</div>
-      <p class="hint" style="margin-bottom:8px">Bir sorun mu var? "Sorun bildir" günlüğü kopyalar ve bildirim sayfasını açar; tek yapman gereken yapıştırmak.</p>
-      <div class="row-btns">
-        <button id="set-report" class="btn primary">Sorun bildir</button>
-        <button id="set-copy-log" class="btn">Günlüğü kopyala</button>
-      </div>
-    </div>
 
     <div class="set-group">
       <div class="set-title">Hakkında</div>
-      <p class="dim">Suflo <span id="hakkinda-ver">v1.7</span> — Premiere için ücretsiz, açık kaynak kurgu paneli.<br>SFX · Altyazı · Kesim · Motion — abonelik yok, kredi yok.<br>MIT · sametcreates</p>
+      <p class="dim">Suflo <span id="hakkinda-ver">v1.7</span> — Premiere için ücretsiz altyazı paneli.<br>Türkçe ve Azerice dahil 99 dil · abonelik yok, kredi yok, hesap yok.<br>MIT · sametcreates</p>
     </div>
   </section>
 
@@ -464,10 +322,7 @@
   <script src="js/CSInterface.js"></script>
   <script src="js/bridge.js"></script>
   <script src="js/engine.js"></script>
-  <script src="js/sfx.js"></script>
   <script src="js/captions.js"></script>
-  <script src="js/magiccut.js"></script>
-  <script src="js/motion.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

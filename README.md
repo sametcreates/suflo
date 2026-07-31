@@ -1,18 +1,24 @@
 # Suflo
 
-**Premiere için ücretsiz, açık kaynak kurgu paneli.**
-SFX kütüphanesi · yapay zekâ altyazı · otomatik ilk kesim · keyframe easing — abonelik yok, kredi yok, hesap yok.
+**Premiere için ücretsiz, açık kaynak altyazı paneli.**
+Türkçe ve Azerice dahil 99 dil — abonelik yok, kredi yok, hesap yok.
 
-> Kredi ve abonelik satan altyazı panellerine ücretsiz, bakımlı, açık kaynak bir alternatif.
+> Premiere'in yerleşik altyazısı Türkçe konuşmayı yazıya dökemiyor. Suflo döküyor, üstelik bilgisayarında çalışan yapay zekâyla.
 
 ## Özellikler
 
-| Modül | Ne yapar | Maliyet |
-|---|---|---|
-| **SFX** | Kendi ses klasörlerini bağla; ara, dinle (↓↑ + Enter), favorile, playhead'e bırak | Ücretsiz, sınırsız |
-| **Altyazı** | Seçili klip, In–Out aralığı ya da tüm sequence'tan transkript; düzenle, stille, caption izi olarak uygula. TR · AZ · EN · RU · oto | Yerel motorla ücretsiz, sınırsız |
-| **Kesim** | Duraksamaları bulur, kesimleri görsel barda gösterir, kopya sekansta güvenle uygular | Ücretsiz, sınırsız |
-| **Motion** | Sürüklenebilir bezier eğrisiyle keyframe easing; her keyframe aralığına uygular | Ücretsiz, sınırsız |
+Suflo tek bir iş yapar: **altyazı.** Seçili klipten, In–Out aralığından ya da tüm sequence'tan
+transkript çıkarır; panelin içinde düzenlersin; caption izi olarak uygular ya da SRT/VTT/ASS/TXT
+olarak dışa aktarır.
+
+| Ne | Nasıl |
+|---|---|
+| **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
+| **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
+| **Karaoke** | Kelime kelime ve birikimli mod; kelime zamanlarıyla |
+| **Çeviri** | TR · AZ · EN · RU arası, satır satır |
+| **Terim sözlüğü** | Marka ve özel isimlerin doğru yazımını her transkriptte uygular |
+| **Dışa aktarma** | SRT · WebVTT · ASS (stilli, karaoke etiketli) · TXT |
 
 ### Altyazı motorları
 
@@ -104,19 +110,13 @@ Paket yöneticisine (winget) bilerek güvenilmiyor: her Windows'ta bulunmuyor, k
 
 **Altyazı.** Kapsamı seç (klip / In–Out / sequence), dili seç, "Altyazı oluştur". Liste gelince satırları düzenle, stilini seç, "Sequence'a uygula" — Premiere caption izi oluşturur; olmazsa SRT projeye alınır, timeline'a sürüklersin. "SRT indir" ile dosya olarak da alabilirsin. Yerel motor ses süresinin ~1,5-2 katı sürede çalışır; acelen varsa Groq'a geç.
 
-**Kesim.** Eşik (dB) sesin ne kadar altını "sessizlik" saydığını belirler; gürültülü çekimde -30, temiz kayıtta -45 dene. Tampon, kesimin konuşmanın nefesini yemesini engeller. Varsayılan uygulama hedefi **kopya sekans**tır: orijinal sequence'a hiç dokunulmaz.
-
-**Motion.** Effect Controls'ta bir özelliğe en az iki keyframe koy. Panel özellikleri kendisi listeler; eğriyi preset'ten seç ya da tutamaçları sürükleyerek çiz.
-
-**SFX.** Arama kutusundan çıkmadan ↓↑ ile gez (otomatik önizler), Enter ile ekle. ★ ile favorile.
-
 ## Sık sorulanlar
 
 **Gerçekten ücretsiz mi?** Evet. Panel MIT lisanslı açık kaynak; yerel altyazı motoru bilgisayarında çalışır, kimseye ödeme yapmazsın. Groq'u seçersen kendi ücretsiz anahtarını kullanırsın — kart bilgisi istemez.
 
 **Verilerim nereye gidiyor?** Yerel motorda **sesin hiçbir yere gitmez** — bilgisayarından çıkmaz. Bulut motorunu seçersen ses yalnızca senin seçtiğin sağlayıcıya (Groq/OpenAI) gider. Tek istisna: **çeviri özelliği** buluttan çalışır, yani onu kullanırsan altyazı **metni** sağlayıcıya gönderilir (ses değil). Çeviri yapmazsan yerel motorda hiçbir şey dışarı çıkmaz.
 
-**Orijinal sequence'ım bozulur mu?** Kesim varsayılan olarak kopya sekansta çalışır; Altyazı yalnızca caption izi ekler; Magic benzeri hiçbir işlem kaynağı silmez.
+**Orijinal sequence'ım bozulur mu?** Hayır. Suflo yalnızca yeni bir caption izi ekler; mevcut kliplerine, kesimlerine ve ses katmanlarına dokunmaz.
 
 ## Geliştirme
 
@@ -125,9 +125,6 @@ css/style.css     tasarım sistemi
 js/bridge.js      CEP köprüsü: Node, ffmpeg, indirici (resume+ayna), taslak, günlük
 js/engine.js      yerel motor: model kataloğu, GPU tespiti, kurulum, whisper argümanları
 js/captions.js    altyazı modülü + editör (bölme, zaman, undo, sözlük)
-js/magiccut.js    kesim modülü
-js/motion.js      easing modülü
-js/sfx.js         ses kütüphanesi
 jsx/host.jsx      Premiere ExtendScript tarafı
 tests/            testler (panelin gerçek kaynağını çalıştırır)
 tools/            kur/kaldır/paketle/yayınla/dev-server/test
@@ -161,10 +158,13 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 
 ## Yol haritası
 
-- Kelime kelime (karaoke) altyazı stilleri
-- macOS desteği
+Suflo yalnızca altyazı yapar ve öyle kalacak. Sıradakiler:
+
+- Panelde canlı stil önizlemesi (altyazının videoda nasıl görüneceği)
+- Altyazı rengi, yazı tipi, kontur ve ekran konumu seçimi
+- Kelime kelime vurgulu altyazıyı doğrudan timeline'a koyma
+- Konuşmacı ayrımı (podcast ve röportaj kurgusu için)
 - Azerice arayüz çevirisi
-- Sequence tabanlı kesim (klip bağımsız)
 
 ## Lisans
 

@@ -101,20 +101,32 @@ window.KApp = (function () {
     }
   }
 
-  /* ---------------- Sekmeler ---------------- */
+  /* ---------------- Görünüm: Altyazı ↔ Ayarlar ---------------- */
 
+  /*
+   * Suflo yalnizca altyazi yapar. Panelde iki gorunum var: Altyazi ve Ayarlar;
+   * disli ikisi arasinda gidip gelir. (Sekme cubugu kaldirildi — SFX/Kesim/Motion
+   * modulleri urunden cikarildi, tek modul icin sekme gostermek gurultu.)
+   */
   var tabListeners = {};
   function onTab(name, fn) { tabListeners[name] = fn; }
 
-  // Ayarlardan çıkış: Altyazı sekmesine dön (solo modda sekme çubuğu gizli olduğu için şart)
-  function ayarlardanCik() {
-    var b = document.querySelector('.tab[data-tab="captions"]');
-    if (b) b.click();
+  function goster(ad) {
+    Array.prototype.forEach.call(document.querySelectorAll(".tabpane"), function (p) {
+      p.classList.remove("active");
+    });
+    var hedef = el("tab-" + ad);
+    if (hedef) hedef.classList.add("active");
+    var d = document.querySelector(".solo-gear");
+    if (d) d.classList.toggle("active", ad === "settings");
+    if (tabListeners[ad]) tabListeners[ad]();
   }
 
+  function ayarlardanCik() { goster("captions"); }
+
   function initTabs() {
-    var tabs = document.querySelectorAll(".tab");
     if (el("set-back")) el("set-back").addEventListener("click", ayarlardanCik);
+
     // Esc: ayarlar açıkken ve bir alana yazmıyorken çıkar
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") return;
@@ -122,58 +134,18 @@ window.KApp = (function () {
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
       if (el("tab-settings").classList.contains("active")) { e.preventDefault(); ayarlardanCik(); }
     });
-    Array.prototype.forEach.call(tabs, function (t) {
-      t.addEventListener("click", function () {
-        // solo modda dişli aç/kapa gibi çalışır (geri dönüş için sekme çubuğu yok)
-        if (t.dataset.tab === "settings" && document.body.classList.contains("solo") &&
-            el("tab-settings").classList.contains("active")) {
-          document.querySelector('.tab[data-tab="captions"]').click();
-          return;
-        }
-        Array.prototype.forEach.call(tabs, function (x) { x.classList.remove("active"); });
-        Array.prototype.forEach.call(document.querySelectorAll(".tabpane"), function (p) {
-          p.classList.remove("active");
-        });
-        t.classList.add("active");
-        el("tab-" + t.dataset.tab).classList.add("active");
-        if (tabListeners[t.dataset.tab]) tabListeners[t.dataset.tab]();
+
+    // Dişli: ayarlar kapalıysa açar, açıksa altyazıya döner
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tab="settings"]'), function (b) {
+      b.addEventListener("click", function () {
+        goster(el("tab-settings").classList.contains("active") ? "captions" : "settings");
       });
     });
   }
 
   /* ---------------- Ayarlar ---------------- */
 
-  function refreshFolderList() {
-    var box = el("set-folders");
-    var s = K.settings();
-    box.innerHTML = "";
-    if (s.folders.length === 0) {
-      box.innerHTML = '<div class="empty">Bağlı klasör yok.</div>';
-      return;
-    }
-    s.folders.forEach(function (f, i) {
-      var row = document.createElement("div");
-      row.className = "folder-item";
-      var p = document.createElement("span");
-      p.className = "path";
-      p.textContent = f;
-      p.title = f;
-      var x = document.createElement("button");
-      x.className = "seg-x";
-      x.textContent = "×";
-      x.title = "Kaldır";
-      x.onclick = function () {
-        s.folders.splice(i, 1);
-        K.saveSettings();
-        refreshFolderList();
-        KSfx.refresh();
-        toast("Klasör kaldırıldı");
-      };
-      row.appendChild(p);
-      row.appendChild(x);
-      box.appendChild(row);
-    });
-  }
+
 
   /* ---------------- Yerel Whisper kurulumu ---------------- */
 
@@ -264,29 +236,9 @@ window.KApp = (function () {
     }
   }
 
-  /* ---------------- Solo mod (altyazı-öncelikli ürün) ---------------- */
-
-  function applySoloMode() {
-    var solo = !K.settings().showModules;
-    document.body.classList.toggle("solo", solo);
-    // gizlenen bir sekmede kaldıysak altyazıya dön
-    if (solo) {
-      var active = document.querySelector(".tab.active");
-      if (active && ["sfx", "cut", "motion"].indexOf(active.dataset.tab) !== -1) {
-        document.querySelector('.tab[data-tab="captions"]').click();
-      }
-    }
-  }
 
   function initSettings() {
     var s = K.settings();
-    el("set-modules").checked = !!s.showModules;
-    el("set-modules").addEventListener("change", function () {
-      var st = K.settings();
-      st.showModules = this.checked;
-      K.saveSettings();
-      applySoloMode();
-    });
     el("set-provider").value = s.provider || "groq";
     el("set-apikey").value = s.apiKey || "";
     el("set-endpoint").value = s.endpoint || "";
@@ -344,9 +296,6 @@ window.KApp = (function () {
       K.cs.openURLInDefaultBrowser("https://console.groq.com/keys");
     });
 
-    el("set-add-folder").addEventListener("click", function () {
-      KSfx.addFolder(function () { refreshFolderList(); });
-    });
 
     el("set-ffmpeg-recheck").addEventListener("click", function () { checkFfmpeg(true); });
     el("set-ffmpeg-install").addEventListener("click", installFfmpeg);
@@ -437,7 +386,6 @@ window.KApp = (function () {
         : "Bildirim sayfası açıldı. Günlüğü \"Günlüğü kopyala\" ile ekleyebilirsin.", "good", 9000);
     });
 
-    refreshFolderList();
   }
 
   async function checkFfmpeg() {
@@ -636,11 +584,7 @@ window.KApp = (function () {
 
     guvenli("sekmeler", initTabs);
     guvenli("ayarlar", initSettings);
-    guvenli("mod", applySoloMode);
-    guvenli("SFX", function () { KSfx.init(); });
     guvenli("Altyazı", function () { KCaptions.init(); });
-    guvenli("Kesim", function () { KCut.init(); });
-    guvenli("Motion", function () { KMotion.init(); });
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);
     if (el("update-kapat")) {
@@ -666,7 +610,6 @@ window.KApp = (function () {
     onContext: onContext,
     onTab: onTab,
     ctx: function () { return ctx; },
-    refreshFolders: refreshFolderList,
     installLocalWhisper: installLocalWhisper,
     checkUpdate: checkUpdate
   };

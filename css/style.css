@@ -115,15 +115,7 @@ svg { display: block; }
 }
 .host-dot.off { background: var(--bad); box-shadow: 0 0 0 3px rgba(255, 139, 139, .1); }
 
-/* ---------- Sekmeler ---------- */
-
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: 0 9px;
-  border-bottom: 1px solid var(--line);
-  flex: 0 0 auto;
-}
+/* ---------- Ayarlar düğmesi (eski sekme stilleri tabanı) ---------- */
 
 .tab {
   position: relative;
@@ -539,9 +531,7 @@ details.adv > *:not(summary) { margin-top: 8px; }
 }
 .btn.back-btn svg { width: 13px; height: 13px; flex: 0 0 auto; }
 
-/* solo modda sekme çubuğu tamamen kalkar — dişli üst bara taşınır */
-body.solo .tabs { display: none; }
-body:not(.solo) .solo-gear { display: none; }
+/* Sekme çubuğu yok: Suflo tek iş yapar (altyazı), giriş dişli düğmesinden */
 
 /*
  * Ayarlar girişi. Yalnız ikon olduğunda kullanıcılar bulamıyordu: üst barda 26 px'lik
