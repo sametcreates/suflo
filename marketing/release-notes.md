@@ -1,49 +1,55 @@
-## Suflo 1.7.8 — takıldığında ne yapacağını söyleyen sürüm
+## Suflo 1.7.9 — ffmpeg artık kendi kuruluyor
 
-Bu sürümde yeni bir özellik yok; kurulumda veya kullanımda takılan kişinin **tek başına çıkabilmesi** üzerine çalıştım.
+En çok bildirilen sorun buydu: **"ffmpeg bulunamadı"**. Hem Windows'ta hem Mac'te. Bu sürüm onu kökünden çözüyor.
 
-### Hatalar artık çözümü de söylüyor
+### Ne değişti
 
-Eskiden "Yerel motor çıktı üretmedi (kod=3221225781)" gibi bir şey görüyordun ve yapabileceğin bir şey yoktu. Artık aynı hata şunu ekliyor:
+Panel artık ffmpeg'i **kendisi indirip kuruyor**. Senin bir şey yapmana gerek yok:
 
-> Çözüm: Bir Windows bileşeni eksik görünüyor. Şu adresten Visual C++ paketini kur, Premiere'i yeniden başlat: aka.ms/vs/17/release/vc_redist.x64.exe
+- Yerel motoru kurarken ffmpeg yoksa, motordan önce o kuruluyor.
+- Bulut motoruyla çalışıyorsan da ilk altyazıda otomatik kuruluyor (ffmpeg her iki motorda da gerekli).
+- Sistemde zaten ffmpeg varsa hiç dokunulmuyor.
 
-Tanınan durumlar: eksik Visual C++, AVX desteklemeyen eski işlemci, antivirüs engeli, dolu disk, kopuk internet, geçersiz API anahtarı, bulut kotası ve meşgul Premiere. Tanınmayan bir hata olduğu gibi kalıyor; "Konuşma bulunamadı" gibi normal durumlara gereksiz tavsiye eklenmiyor.
+Dosya panelin kendi klasörüne iniyor (`%APPDATA%\Kesit\ffmpeg`, Mac'te `~/Library/Application Support/Suflo/ffmpeg`). Sistem PATH'i değiştirilmiyor, yönetici izni istenmiyor.
 
-### Ayarlar → Destek → "Sorun bildir"
+### Neden eskisi çalışmıyordu
 
-Tek tıkla tanılama günlüğünü panoya kopyalar ve önceden doldurulmuş bildirim formunu açar. İşletim sistemin ve Premiere sürümün otomatik doluyor; senin yapacağın tek şey günlüğü yapıştırmak. Günlük hiçbir yere kendiliğinden gönderilmiyor, kontrol tamamen sende.
+Eskiden Windows'ta `winget` çağırıyorduk. Üç ayrı yerde kırılıyordu: winget her Windows'ta yok, kurumsal makinelerde kapalı olabiliyor, ve kurulum başarılı olsa bile PATH'i **çalışan** Premiere sürecine yansıtmıyor — yani "kurdum ama panel görmüyor" durumu.
 
-### Türkçe ANSI altyazılar düzgün açılıyor
+Ayrıca panelin ffmpeg arama listesinde bir tuzak vardı: Windows'ta bazı program kısayolları (App Execution Alias) diskte "yok" görünür, `fs.existsSync` onlar için çalışan bir programda bile `false` döner. Artık o yollar diskte yoklanmıyor, doğrudan çalıştırılarak sınanıyor.
 
-Elde dolaşan eski SRT'lerin çoğu windows-1254 kodlamasında. Bunları içe aktarınca bütün ş/ğ/ı/İ harfleri bozuluyordu. Artık dosyanın kodlaması ham baytlardan anlaşılıyor ve doğru çözülüyor. İçe aktarma ayrıca geri alınabilir hale geldi: yanlış dosya seçersen Ctrl+Z ile dönebilirsin.
+### Mac kullanıcıları için önemli
+
+Apple Silicon'da (M1/M2/M3/M4) artık doğru mimarideki ffmpeg iniyor. Önceki plandaki kaynak yalnızca Intel ikilisi yayınlıyordu ve Apple Silicon'da "Bad CPU type" hatası verirdi. İndirilen dosyanın Gatekeeper karantinası da otomatik temizleniyor, yoksa macOS çalıştırmayı engelliyor.
+
+Homebrew'un varsa önce o kullanılıyor — sistemin kendi paketleriyle uyumlu kalırsın.
+
+### Bekleme sırası düzeltildi
+
+- **Sekans altyazısında** ffmpeg kontrolü artık en başta yapılıyor. Eskiden önce dakikalarca ses dışa aktarılıyor, sonra "ffmpeg yok" deniyordu.
+- **Mac'te Homebrew yoksa** panel bunu ilk saniyede söylüyor; eskiden önce dosya indirip sonra vazgeçiyordu.
+- Arama sırasında var olmayan yollar için artık boşuna program başlatılmıyor; kurulum kontrolü belirgin şekilde hızlandı.
 
 ### Sessiz düzeltmeler
 
-- **Ses katmanların artık her durumda eski haline dönüyor.** Sekans sesi dışa aktarılırken seçmediğin katmanlar geçici olarak susturuluyordu; dışa aktarma yarıda hata verirse bu susturma üzerinde kalabiliyordu. Artık ne olursa olsun geri alınıyor.
-- **Toplu işlemde disk şişmesi giderildi:** her klibin geçici ses dosyası işi biter bitmez siliniyor (20 kliplik bir işte gigabaytlar fark ediyor).
-- **Kurulum hatasında** kurulum düğmesi "Motor iniyor… %62" yazısında donup kalmıyor.
-- **Sürüm numarası** panelin üstünde ve Hakkında bölümünde artık gerçek sürümü gösteriyor.
-
-### Geliştiriciler için
-
-- `tests/` klasörü ve `tools\test.ps1` eklendi. Testler panelin gerçek kaynağını dosyadan okuyup çalıştırıyor, kopya mantık sınamıyor.
-- GitHub'da hata bildirimi ve özellik isteği için form şablonları eklendi.
-- ExtendScript'te undo gruplama denemesi kaldırıldı: Premiere bu API'yi sunmuyor (Adobe'nun kendi yanıtı ve açık özellik talebi DVAPR-4235114). Kodda sahte bir sarmalayıcı tutmak yerine durum belgelendi.
+- Ayarlar'daki düğme ile otomatik kurulum aynı anda çalışıp aynı dosyaya yazamıyor.
+- `spawn ... ENOENT` gibi ham hatalar artık ne yapılacağını söylüyor.
+- Adobe klasörlerinde ffmpeg aranmıyor: Premiere yalnızca kütüphane DLL'leri dağıtıyor, çağrılabilir bir ffmpeg koymuyor (2026 sürümleriyle dolu bir kurulumda arama sıfır sonuç verdi).
+- Chocolatey ve Scoop kurulumları da aranıyor.
 
 ### Kurulum
 
 1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir (ücretsiz)
-2. `Suflo-1.7.8.zxp` dosyasına çift tıkla
+2. `Suflo-1.7.9.zxp` dosyasına çift tıkla
 3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
 
 Gereksinim: Premiere 14.4 (2020) ve üstü · Windows veya macOS.
 
 ---
 
-### 1.7.1'de gelenler (hatırlatma): macOS desteği
+### 1.7.8'de gelenler (hatırlatma)
 
-Mac'te yerel motor Homebrew ile kuruluyor (`brew install whisper-cpp`); panel bunu senin için yapıyor. Apple Silicon'da Metal hızlandırma kendiliğinden açık. Model klasörü `~/Library/Application Support/Suflo/whisper`.
+Hatalar artık çözümü de söylüyor (eksik Visual C++, eski işlemci, antivirüs, dolu disk, kopuk internet, geçersiz anahtar, kota). Ayarlar → Destek → **"Sorun bildir"** günlüğü kopyalayıp önceden doldurulmuş bildirim formunu açıyor. Türkçe ANSI (windows-1254) SRT dosyaları düzgün açılıyor ve içe aktarma geri alınabiliyor.
 
 ### 1.7.0'da gelenler (hatırlatma)
 

@@ -124,6 +124,19 @@ window.KCaptions = (function () {
 
   function refreshSetup() {
     el("cap-setup").hidden = engineReady();
+
+    /*
+     * ffmpeg olmadan bulut motoru da calismaz. Kullanici Groq anahtarini yapistirip
+     * "hazirim" saniyordu, sonra ilk denemede duvara carpiyordu. Anahtar alanina
+     * dokunmadan once eksigi soyluyoruz; kurulum artik otomatik ama beklenmedik
+     * bir indirme kullaniciyi sasirtmasin.
+     */
+    var ipucu = el("cap-ffmpeg-ipucu");
+    if (ipucu) {
+      K.findFfmpeg().then(function (ff) {
+        ipucu.hidden = !!ff;
+      }).catch(function () {});
+    }
     // macOS'ta motor Homebrew'dan gelir (whisper.cpp resmi mac ikilisi yayınlamıyor):
     // kullanıcı "indir & kur" deyip anlamsız bir hata almasın, ne olacağını baştan bilsin
     if (K.MAC) {
@@ -194,7 +207,21 @@ window.KCaptions = (function () {
   // Kaynak dosyadan (klip) ya da hazır WAV'dan (sequence exportu) motorun istediği formata çevir
   async function convertAudio(srcPath, opts) {
     var ff = await K.findFfmpeg();
-    if (!ff) throw new Error("ffmpeg bulunamadı — Ayarlar sekmesinden kur.");
+    if (!ff) {
+      /*
+       * Kullaniciyi Ayarlar'a yollayip yalniz birakmak yerine burada kuruyoruz:
+       * "ffmpeg bulunamadi - Ayarlar'dan kur" mesaji, cogu kisinin vazgectigi yerdi.
+       */
+      status("ffmpeg kuruluyor… (bir kerelik, ses dönüştürme için gerekli)");
+      try {
+        await KEngine.installFfmpeg(function (m) { status(m); });
+        ff = await K.findFfmpeg(true);
+      } catch (eF) {
+        throw new Error("ffmpeg kurulamadı: " + (eF && eF.message ? eF.message : eF) +
+          " — Ayarlar > ffmpeg bölümünden elle bir yol gösterebilirsin.");
+      }
+      if (!ff) throw new Error("ffmpeg kurulamadı — Ayarlar > ffmpeg bölümünden elle yol göster.");
+    }
     var wav = opts.wav;
     var out = K.path.join(K.tmpDir(), "cap_" + Date.now() + (wav ? ".wav" : ".mp3"));
     var args = ["-y"];
@@ -745,6 +772,22 @@ window.KCaptions = (function () {
     setBusy(true);
     var tempFiles = [];
     try {
+      /*
+       * ffmpeg'i EN BASTA hazirla. Sekans kapsaminda ses disa aktarimi dakikalar
+       * suruyor; kontrolu sonraya birakmak, kullanicinin bes dakika bekleyip
+       * "ffmpeg bulunamadi" duymasi demekti. Kurulum gerekiyorsa simdi olsun.
+       */
+      if (!(await K.findFfmpeg())) {
+        status("ffmpeg kuruluyor… (bir kerelik, ses dönüştürme için gerekli)");
+        try {
+          await KEngine.installFfmpeg(function (m) { status(m); });
+          await K.findFfmpeg(true);
+        } catch (eFF) {
+          throw new Error("ffmpeg kurulamadı: " + (eFF && eFF.message ? eFF.message : eFF) +
+            " — Ayarlar > ffmpeg bölümünden elle bir yol gösterebilirsin.");
+        }
+      }
+
       var useLocal = K.settings().provider === "local";
       var audioSrc, seqOffset, durHint;
 

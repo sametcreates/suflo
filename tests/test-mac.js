@@ -99,7 +99,23 @@ function macOrtam(opts) {
           }
         };
       }
-      if (m === "http" || m === "https") return { get: function () { return { on: function () {}, setTimeout: function () {} }; }, request: function () { return { on: function () {}, setTimeout: function () {}, end: function () {} }; } };
+      /*
+       * Ag sahtesi SESSIZCE ASILMAZ: hemen hata verir. Once hicbir sey yapmayan
+       * bir stub vardi ve gercek kodda bir indirme eklendiginde test cikti
+       * uretmeden donuyordu — kirilma "gecti" gibi gorunuyordu.
+       */
+      if (m === "http" || m === "https") {
+        var sahteIstek = function () {
+          var h = {};
+          var nesne = {
+            on: function (e, f) { if (e === "error") setTimeout(function () { f(new Error("testte ag yok")); }, 1); return nesne; },
+            setTimeout: function () { return nesne; },
+            destroy: function () {}, end: function () {}, write: function () {}
+          };
+          return nesne;
+        };
+        return { get: sahteIstek, request: sahteIstek };
+      }
       if (m === "buffer") return { Buffer: Buffer };
       throw new Error("bilinmeyen modul: " + m);
     }
@@ -138,9 +154,15 @@ chk("motor yoksa null doner", macOrtam({}).K.whisperLocal({ skipModel: true }) =
 /* ================= 4) ffmpeg adaylari mac yollari ================= */
 var ff = null;
 (function () {
-  // ffmpegCandidates dogrudan disa acilmiyor; findFfmpeg uzerinden hangi yollarin
-  // denendigini komut kaydindan gorelim
-  var e = macOrtam({ komutCikti: function (cmd) { return { code: 1, out: "", err: "" }; } });
+  /*
+   * ffmpegCandidates disa acilmiyor; hangi yollarin denendigini komut kaydindan
+   * goruyoruz. Diskte VAR OLAN yollar verilir: findFfmpeg olmayan mutlak yollari
+   * bilerek atliyor (on iki aday icin bosuna surec baslatmasin diye).
+   */
+  var e = macOrtam({
+    dosyalar: ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"],
+    komutCikti: function (cmd) { return { code: 1, out: "", err: "" }; }
+  });
   return e.K.findFfmpeg(true).then(function () {
     var denenen = e.komutlar.map(function (k) { return k.cmd; });
     chk("ffmpeg /opt/homebrew denendi", denenen.indexOf("/opt/homebrew/bin/ffmpeg") !== -1, denenen.join(", "));
@@ -149,6 +171,16 @@ var ff = null;
       denenen.filter(function (d) { return /WinGet|ffmpeg\.exe/i.test(d); }).length === 0);
     chk("spawn PATH'i Homebrew iceriyor",
       e.komutlar.length > 0 && /\/opt\/homebrew\/bin/.test(e.komutlar[0].env || ""), (e.komutlar[0] || {}).env);
+  });
+})();
+
+/* Olmayan mutlak yollar icin surec baslatilmamali (kurulumu yavaslatiyordu) */
+(function () {
+  var e = macOrtam({ komutCikti: function () { return { code: 1, out: "", err: "" }; } });
+  return e.K.findFfmpeg(true).then(function () {
+    var mutlakDenemeler = e.komutlar.filter(function (k) { return /^\//.test(String(k.cmd)); });
+    chk("diskte olmayan mutlak yollar denenmiyor", mutlakDenemeler.length === 0,
+      mutlakDenemeler.map(function (k) { return k.cmd; }).join(", ") || "hicbiri");
   });
 })();
 
@@ -180,12 +212,16 @@ isler.push((function () {
 /* ================= 7) install(): brew varsa whisper-cpp kurulur, zip INMEZ ================= */
 isler.push((function () {
   var e = macOrtam({
-    dosyalar: ["/opt/homebrew/bin/brew"],
+    // ffmpeg zaten kurulu: install() artik ffmpeg'i de kuruyor, burada olculen o degil
+    dosyalar: ["/opt/homebrew/bin/brew", "/opt/homebrew/bin/ffmpeg"],
     komutCikti: function (cmd, args) {
       // brew install cagrildiktan sonra motor "kurulmus" olsun
       if (cmd === "/opt/homebrew/bin/brew" && args[0] === "install") {
         e.fs._kume["/opt/homebrew/bin/whisper-cli"] = true;
         return { code: 0, out: "installed", err: "" };
+      }
+      if (/ffmpeg$/.test(String(cmd)) && args && args[0] === "-version") {
+        return { code: 0, out: "ffmpeg version 7.1", err: "" };
       }
       return { code: 0, out: "", err: "" };
     }

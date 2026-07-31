@@ -155,6 +155,15 @@ ok("motor cikti uretmedi -> yeniden kur mesaji",
   iceriyor("Yerel motor çıktı üretmedi (kod=1): ggml assert", "yeniden kur"),
   coz("Yerel motor çıktı üretmedi (kod=1): ggml assert"));
 
+
+ok("ham spawn ENOENT -> ffmpeg kur yonlendirmesi",
+  iceriyor("Error: spawn ffmpeg ENOENT", "indir ve kur"),
+  coz("Error: spawn ffmpeg ENOENT"));
+
+ok("masum ENOENT metni olmayan mesaj etkilenmiyor",
+  !oneriVar("Dosya bulunamadı: proje.prproj"),
+  coz("Dosya bulunamadı: proje.prproj"));
+
 /* ---------- 3) Bicim: orijinal mesaj korunuyor mu ---------- */
 
 var uzun = "ENOSPC: no space left on device, write";
@@ -191,7 +200,8 @@ var ornekler = [
   "invalid_api_key",
   "rate_limit exceeded",
   "Premiere yanıt vermedi (KS_getContext)",
-  "Motor çalıştırılamadı: kod=1"
+  "Motor çalıştırılamadı: kod=1",
+  "Error: spawn ffmpeg ENOENT"
 ];
 var kapsanan = {};
 ornekler.forEach(function (m) {

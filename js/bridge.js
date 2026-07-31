@@ -338,7 +338,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "1.7.8";
+  var VERSION = "1.7.9";
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -387,6 +387,11 @@ window.K = (function () {
           "sorun sürerse Ayarlar > Destek > Sorun bildir."
         : "Antivirüs motoru engellemiş olabilir. Windows Güvenlik > Virüs koruması > " +
           "Dışlamalar'a şu klasörü ekle: %APPDATA%\\Kesit — sonra motoru Ayarlar'dan yeniden kur."
+    },
+    { // aranan program yok: ham "spawn ... ENOENT" kullaniciya hicbir sey anlatmiyor
+      re: /ENOENT.*spawn|spawn.*ENOENT|is not recognized|bulunamayan komut/i,
+      tip: "Gereken yardımcı program bulunamadı. Ayarlar > ffmpeg bölümünden " +
+        "\"ffmpeg'i indir ve kur\" düğmesine bas; panel gerekli dosyayı kendisi kurar."
     },
     { // disk dolu
       re: /ENOSPC|no space left|not enough space|yeterli alan/i,
@@ -484,6 +489,23 @@ window.K = (function () {
     if (!nodeOK) return "";        // tarayici onizlemesi: Node yok
     if (MAC) return path.join(os.homedir(), "Library", "Application Support", "Suflo", "whisper");
     return path.join(os.homedir(), "AppData", "Roaming", "Kesit", "whisper");
+  }
+
+  /*
+   * Panelin kendi kurdugu ffmpeg'in yeri (whisper klasorunun kardesi).
+   * Kullanicilarin cogu "ffmpeg bulunamadi" duvarina carpiyordu: winget her makinede
+   * yok, olsa da kurulum PATH'i CALISAN Premiere surecine yansimiyor. Bu yuzden
+   * ffmpeg'i motor gibi kendimiz indirip buraya koyuyoruz.
+   */
+  function ffmpegDir() {
+    if (!nodeOK) return "";
+    return path.join(path.dirname(whisperDir()), "ffmpeg");
+  }
+
+  function ffmpegKurulu() {
+    if (!nodeOK) return null;
+    var p = path.join(ffmpegDir(), MAC ? "ffmpeg" : "ffmpeg.exe");
+    try { return fs.existsSync(p) ? p : null; } catch (e) { return null; }
   }
 
   // macOS'ta motor Homebrew ile kurulur; CEP'in PATH'i eksik olabildiği için tam yol aranır
@@ -874,6 +896,9 @@ window.K = (function () {
     var list = [];
     var s = loadSettings();
     if (s.ffmpeg) list.push(s.ffmpeg);
+    // Panelin kendi kurdugu kopya EN ONCE denenir: onu biz koyduk, kesin calisir
+    var bizim = ffmpegKurulu();
+    if (bizim) list.push(bizim);
     list.push("ffmpeg");
     if (nodeOK && MAC) {
       // CEP'in spawn ortaminda PATH genelde /usr/bin ile sinirli: tam yol sart
@@ -885,6 +910,8 @@ window.K = (function () {
     }
     if (nodeOK) {
       var home = os.homedir();
+      // Windows'ta spawn PATHEXT'i uygulamaz: uzantisiz "ffmpeg" bulunmayabilir
+      list.push("ffmpeg.exe");
       list.push(path.join(home, "AppData", "Local", "Microsoft", "WinGet", "Links", "ffmpeg.exe"));
       // winget bazen Links symlink'ini olusturmaz; paket klasorunu dogrudan tara
       try {
@@ -901,8 +928,14 @@ window.K = (function () {
       } catch (eW) {}
       list.push("C:\\ffmpeg\\bin\\ffmpeg.exe");
       list.push("C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe");
-      // Adobe kendi ffmpeg'ini de getirir
-      list.push("C:\\Program Files\\Adobe\\Adobe Media Encoder 2026\\ffmpeg.exe");
+      // diger paket yoneticileri: kullanici zaten kurmus olabilir
+      list.push("C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe");
+      list.push(path.join(home, "scoop", "shims", "ffmpeg.exe"));
+      /*
+       * Adobe'da CLI ARANMAZ: Premiere/Media Encoder yalnizca libavcodec.dll gibi
+       * KUTUPHANELERI dagitiyor, cagirabilecegimiz bir ffmpeg.exe koymuyor
+       * (2026 surumleriyle dolu bir kurulumda ozyinelemeli arama sifir sonuc verdi).
+       */
     }
     return list;
   }
@@ -911,9 +944,26 @@ window.K = (function () {
     if (_ffmpeg && !force) return _ffmpeg;
     var cands = ffmpegCandidates();
     for (var i = 0; i < cands.length; i++) {
-      var r = await run(cands[i], ["-version"]);
+      /*
+       * Mutlak yollar once diskte yoklanir: olmayan bir dosya icin surec baslatmak
+       * bosuna. Cikplak "ffmpeg"/"ffmpeg.exe" isimleri PATH'ten cozulecegi icin
+       * bu kontrolden muaf. Zaman asimi kisa: -version aninda doner, takilirsa
+       * on iki adayin her biri varsayilan bes dakikayi yiyip paneli kilitlerdi.
+       */
+      var aday = cands[i];
+      /*
+       * DIKKAT: fs.existsSync Windows'ta "App Execution Alias" dosyalari icin
+       * YALAN SOYLER — calisan bir programda bile false doner, statSync ise
+       * EACCES firlatir (WindowsApps ve WinGet\Links altindaki 0 baytlik
+       * reparse point'ler boyledir). O yollari asla diskte yoklamiyoruz;
+       * yoklarsak calisan bir ffmpeg'i "yok" sayip atlariz.
+       */
+      if (nodeOK && /[\\\/]/.test(aday) && !/WindowsApps|WinGet/i.test(aday)) {
+        try { if (!fs.existsSync(aday)) continue; } catch (eX) {}
+      }
+      var r = await run(aday, ["-version"], { timeout: 15000 });
       if (r.code === 0 && /ffmpeg version/i.test(r.stdout + r.stderr)) {
-        _ffmpeg = cands[i];
+        _ffmpeg = aday;
         return _ffmpeg;
       }
     }
@@ -994,6 +1044,8 @@ window.K = (function () {
     sweepTemp: sweepTemp,
     whisperLocal: whisperLocal,
     whisperDir: whisperDir,
+    ffmpegDir: ffmpegDir,
+    ffmpegKurulu: ffmpegKurulu,
     download: download,
     unzip: unzip,
     findFfmpeg: findFfmpeg,

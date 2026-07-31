@@ -267,6 +267,38 @@ window.KEngine = (function () {
 
     var model = modelById(opts.modelId) || modelById("turbo");
 
+    /*
+     * 0) ON KOSULLAR — tek bir bayt indirmeden once. Karsilanamayacak bir kurulum
+     * icin once yuz megabayt indirtip sonra "olmadi" demek en sinir bozucu davranis.
+     * macOS'ta motor Homebrew'dan geliyor; brew yoksa daha ise baslamadan soyle.
+     */
+    var haveExe0 = !!K.whisperLocal({ skipModel: true });
+    if (K.MAC && !haveExe0 && !K.brewYolu()) {
+      throw new Error("macOS'ta yerel motor Homebrew ile kurulur, ama Homebrew bulunamadı. " +
+        "Terminal'e şunu yapıştırıp paneli yeniden aç: " +
+        '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ' +
+        "— ya da Homebrew kurmadan, Ayarlar'dan ücretsiz Groq anahtarıyla bulut motorunu kullan.");
+    }
+
+    /*
+     * 1) ffmpeg — motordan ONCE. Modeli indirip "hazir" dedikten sonra ilk altyazi
+     * denemesinde "ffmpeg bulunamadi" duvarina carpmak, kullanicilarin buyuk
+     * cogunlugunun vazgectigi yerdi. Sistemde varsa dokunulmuyor.
+     */
+    var ffVar = await K.findFfmpeg(true);
+    if (!ffVar) {
+      say("ffmpeg kuruluyor… (ses dönüştürme için gerekli)");
+      try {
+        await installFfmpeg(say);
+        await K.findFfmpeg(true);       // onbellegi tazele
+      } catch (eF) {
+        // Motor kurulumunu bunun yuzunden IPTAL ETME: kullanici ffmpeg'i elle de
+        // kurabilir, ama neyin eksik kaldigini bilerek devam etsin.
+        K.log("ffmpeg otomatik kurulamadi: " + eF.message);
+        say("ffmpeg kurulamadı, motor kurulumuna devam ediliyor…");
+      }
+    }
+
     /* 1) motor derlemesi — zaten varsa atla */
     var haveExe = !!K.whisperLocal({ skipModel: true });
     var wantBuild = opts.useGpu ? "cuda" : "cpu";
@@ -400,7 +432,12 @@ window.KEngine = (function () {
     }
 
     cleanEngineParts(dir);
-    return { model: model, build: installedBuild(), vad: !!vadPath() };
+    return {
+      model: model,
+      build: installedBuild(),
+      vad: !!vadPath(),
+      ffmpeg: !!(await K.findFfmpeg(true))
+    };
   }
 
   /*
@@ -466,8 +503,212 @@ window.KEngine = (function () {
     return { args: args, vad: !!vp };
   }
 
+  /* ---------------- ffmpeg kurulumu ---------------- */
+
+  /*
+   * ffmpeg olmadan HICBIR SEY calismaz: hem yerel hem bulut motoru sesin once
+   * ffmpeg'den gecmesini bekliyor. Kullanicilarin cogunun takildigi yer burasiydi.
+   *
+   * Neden paket yoneticisine guvenmiyoruz: winget her Windows'ta yok, kurumsal
+   * makinelerde kapali olabiliyor, ve kurulum basarili olsa bile PATH'i CALISAN
+   * Premiere surecine yansitmiyor — kullanici "kurdum ama gormuyor" durumunda kaliyor.
+   * Bu yuzden motoru nasil indiriyorsak ffmpeg'i de oyle indirip kendi klasorumuze
+   * koyuyoruz; PATH'e, yonetici hakkina, kuruluma bagimli degiliz.
+   */
+  var FFMPEG_KAYNAKLARI = {
+    win: [
+      {
+        /*
+         * BtbN LGPL derlemesi. Iki sebeple birinci sirada:
+         * 1) URL ve ARSIV ICI YOL ikisi de kalici — etiket kelimesi kelimesine
+         *    "latest", klasor adi zip adiyla ayni ve icinde surum yok.
+         * 2) LGPLv3: MIT bir urun icin en temiz secim (GPL-only x264/x265 yok,
+         *    ki bizim isimizde kullanilmiyorlar zaten).
+         */
+        url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip",
+        sizeMB: 141,
+        desen: "*/bin/ffmpeg.exe",
+        strip: 2
+      },
+      {
+        // Yedek: ffmpeg.org'un onerdigi gyan.dev derlemesi (GPLv3).
+        // Klasor adinda surum var (ffmpeg-<surum>-essentials_build) — bu yuzden
+        // sabit yol degil, joker desen kullaniyoruz.
+        url: "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+        sizeMB: 105,
+        desen: "*/bin/ffmpeg.exe",
+        strip: 2
+      }
+    ],
+    /*
+     * macOS: mimariye gore SECILIR. evermeet.cx bilerek kullanilmiyor —
+     * yalnizca Intel ikilisi yayinliyor ve Apple Silicon'da "Bad CPU type"
+     * hatasi verir; Premiere Apple Silicon'da native arm64 calistigi icin
+     * panel de arm64'tur.
+     */
+    macArm: [
+      {
+        url: "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip",
+        sizeMB: 27,
+        desen: "ffmpeg",
+        strip: 0
+      }
+    ],
+    macIntel: [
+      {
+        url: "https://ffmpeg.martin-riedl.de/redirect/latest/macos/amd64/release/ffmpeg.zip",
+        sizeMB: 32,
+        desen: "ffmpeg",
+        strip: 0
+      },
+      {
+        url: "https://evermeet.cx/ffmpeg/getrelease/zip",   // yalnizca Intel icin gecerli
+        sizeMB: 25,
+        desen: "ffmpeg",
+        strip: 0
+      }
+    ]
+  };
+
+  function ffmpegKaynaklari() {
+    if (!K.MAC) return FFMPEG_KAYNAKLARI.win;
+    var arm = false;
+    try { arm = K.os.arch() === "arm64"; } catch (e) {}
+    return arm ? FFMPEG_KAYNAKLARI.macArm : FFMPEG_KAYNAKLARI.macIntel;
+  }
+
+  /*
+   * ffmpeg'i indirip panelin klasorune kur. onStatus(mesaj) ile ilerleme bildirir.
+   * Basarili olursa calisabilir dosyanin tam yolunu, olmazsa hata firlatir.
+   */
+  /*
+   * Ayni anda iki kurulum baslamasin: Ayarlar'daki dugme ile altyazi akisindaki
+   * otomatik kurulum ust uste binebiliyor ve ikisi de AYNI zip dosyasina yazip
+   * AYNI hedefi olusturmaya calisirdi. Ikinci cagri birincinin sonucunu bekler.
+   */
+  var _ffmpegIsi = null;
+
+  function installFfmpeg(onStatus) {
+    if (_ffmpegIsi) return _ffmpegIsi;
+    _ffmpegIsi = ffmpegKur(onStatus);
+    // sonuc ne olursa olsun kilidi birak, ama sonucu cagirana aynen ilet
+    _ffmpegIsi.then(function () { _ffmpegIsi = null; }, function () { _ffmpegIsi = null; });
+    return _ffmpegIsi;
+  }
+
+  async function ffmpegKur(onStatus) {
+    var say = onStatus || function () {};
+    if (!K.nodeOK) throw new Error("Bu ortamda kurulamaz — Premiere içinde dene.");
+
+    var dir = K.ffmpegDir();
+    K.fs.mkdirSync(dir, { recursive: true });
+
+    var hedef = K.path.join(dir, K.MAC ? "ffmpeg" : "ffmpeg.exe");
+    var kaynaklar = ffmpegKaynaklari();
+    var sonHata = "";
+
+    for (var i = 0; i < kaynaklar.length; i++) {
+      var kaynak = kaynaklar[i];
+      var zip = K.path.join(dir, "ffmpeg-indirme.zip");
+      try {
+        say("ffmpeg iniyor… (" + fmtMB(kaynak.sizeMB) + ")");
+        var d = await K.download(kaynak.url, zip, function (f) {
+          say("ffmpeg iniyor… %" + Math.round(f * 100) + " (" + fmtMB(kaynak.sizeMB) + ")");
+        }, 0, undefined, { key: "ffmpeg:" + i, expectedMB: kaynak.sizeMB });
+        if (!d.ok) { sonHata = d.error || "indirilemedi"; continue; }
+
+        say("ffmpeg açılıyor…");
+        var cikti = await ffmpegCikar(zip, dir, kaynak);
+        try { K.fs.unlinkSync(zip); } catch (eZ) {}
+        if (!cikti) { sonHata = "arşiv açılamadı"; continue; }
+
+        if (K.MAC) {
+          // indirilen dosya calistirilabilir degil: calistirma izni ver
+          try { K.fs.chmodSync(hedef, 493); } catch (eC) {}   // 0755
+          /*
+           * Gatekeeper karantinasi: internetten inen her dosyaya
+           * com.apple.quarantine ozniteligi konur ve calistirilmak istendiginde
+           * "gelistirici dogrulanamadi" diye engellenir. Kendi indirdigimiz
+           * ikilide bunu temizliyoruz, yoksa ffmpeg mac'te hic calismaz.
+           */
+          try { await K.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", hedef], { timeout: 30000 }); } catch (eQ) {}
+        }
+
+        // GERCEKTEN calisiyor mu? Varligina degil, cikisina bak.
+        say("ffmpeg doğrulanıyor…");
+        var t = await K.run(hedef, ["-version"], { timeout: 60000 });
+        if (t.code !== 0 || !/ffmpeg version/i.test(String(t.stdout) + String(t.stderr))) {
+          try { K.fs.unlinkSync(hedef); } catch (eD) {}
+          sonHata = "indirilen ffmpeg çalışmadı";
+          continue;
+        }
+
+        var s = K.settings();
+        s.ffmpeg = hedef;            // aday listesinde en one gecsin
+        K.saveSettings();
+        K.log("ffmpeg kuruldu: " + hedef);
+        return hedef;
+      } catch (e) {
+        sonHata = e && e.message ? e.message : String(e);
+        try { K.fs.unlinkSync(zip); } catch (eZ2) {}
+      }
+    }
+    throw new Error("ffmpeg kurulamadı: " + sonHata);
+  }
+
+  /*
+   * Arsivden YALNIZ ffmpeg ikilisini cikar. Windows'un yerlesik bsdtar'i joker
+   * desen + --strip-components destekliyor; boylece 100 MB'lik arsivden ffplay,
+   * ffprobe ve belgeler acilmadan tek dosya aliniyor.
+   * Joker desteklenmezse tumunu acip dosyayi arayan yedege dusulur.
+   */
+  async function ffmpegCikar(zip, dir, kaynak) {
+    var hedefAd = K.MAC ? "ffmpeg" : "ffmpeg.exe";
+    var hedef = K.path.join(dir, hedefAd);
+    try { K.fs.unlinkSync(hedef); } catch (e) {}
+
+    if (!K.MAC) {
+      var tarExe = K.path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe");
+      if (K.fs.existsSync(tarExe)) {
+        var r = await K.run(tarExe, ["-xf", zip, "-C", dir,
+          "--strip-components=" + kaynak.strip, kaynak.desen], { timeout: 300000 });
+        if (r.code === 0 && K.fs.existsSync(hedef)) return true;
+      }
+    }
+
+    // Yedek: arsivi tumuyle ac, ikiliyi bul, tasi, gerisini temizle
+    var gecici = K.path.join(dir, "_ac");
+    try { K.fs.rmSync(gecici, { recursive: true, force: true }); } catch (e2) {}
+    var ok = await K.unzip(zip, gecici);
+    if (!ok) return false;
+
+    var bulunan = ikiliAra(gecici, hedefAd, 4);
+    if (bulunan) {
+      try { K.fs.copyFileSync(bulunan, hedef); } catch (e3) { return false; }
+    }
+    try { K.fs.rmSync(gecici, { recursive: true, force: true }); } catch (e4) {}
+    return !!bulunan && K.fs.existsSync(hedef);
+  }
+
+  function ikiliAra(kok, ad, derinlik) {
+    if (derinlik < 0) return null;
+    var girisler;
+    try { girisler = K.fs.readdirSync(kok, { withFileTypes: true }); } catch (e) { return null; }
+    for (var i = 0; i < girisler.length; i++) {
+      var tam = K.path.join(kok, girisler[i].name);
+      if (girisler[i].isDirectory()) {
+        var alt = ikiliAra(tam, ad, derinlik - 1);
+        if (alt) return alt;
+      } else if (girisler[i].name.toLowerCase() === ad.toLowerCase()) {
+        return tam;
+      }
+    }
+    return null;
+  }
+
   return {
     MODELS: MODELS,
+    installFfmpeg: installFfmpeg,
     modelById: modelById,
     installedModels: installedModels,
     activeModel: activeModel,

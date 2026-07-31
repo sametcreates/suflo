@@ -96,7 +96,9 @@ powershell -ExecutionPolicy Bypass -File tools/install.ps1
 
 ### ffmpeg neden gerekli?
 
-Hem yerel hem bulut motoru sesi ffmpeg ile çıkarıp 16 kHz'e çeviriyor — yani ffmpeg her iki durumda da şart. Panel Ayarlar sekmesinden tek tıkla kurar (Windows'ta winget, macOS'ta Homebrew).
+Hem yerel hem bulut motoru sesi ffmpeg ile çıkarıp 16 kHz'e çeviriyor — yani ffmpeg her iki durumda da şart. **Panel bunu kendisi halleder:** motoru kurarken ya da ilk altyazıda ffmpeg yoksa indirip kendi klasörüne koyar (`%APPDATA%\Kesit\ffmpeg`, macOS'ta `~/Library/Application Support/Suflo/ffmpeg`). Sistemde zaten ffmpeg varsa ona dokunulmaz.
+
+Paket yöneticisine (winget) bilerek güvenilmiyor: her Windows'ta bulunmuyor, kurumsal makinelerde kapalı olabiliyor ve kurulum başarılı olsa bile PATH'i **çalışan** Premiere sürecine yansıtmıyor. macOS'ta Homebrew varsa önce o denenir.
 
 ## Kullanım notları
 

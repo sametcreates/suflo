@@ -98,6 +98,10 @@
     <div id="cap-setup" class="setup-note" hidden>
       <p id="cap-setup-text"><strong>Altyazı için bir motor gerek.</strong> En kolayı: yerel motoru kur — hesap, anahtar, internet gerektirmez. NVIDIA ekran kartın varsa otomatik kullanılır.</p>
       <button id="cap-local-install" class="btn primary" style="width:100%">Yerel motoru indir & kur</button>
+      <p class="hint" id="cap-ffmpeg-ipucu" hidden style="margin:8px 0 6px">
+        Not: ses dönüştürme için <b>ffmpeg</b> de gerekiyor (her iki motorda da).
+        Panel bunu ilk kurulumda kendisi indirir, senin bir şey yapmana gerek yok.
+      </p>
       <p class="hint" style="margin:8px 0 6px">ya da hızlı bulut için ücretsiz <a href="#" id="cap-groq-link">Groq anahtarı</a> gir:</p>
       <div class="row">
         <input id="cap-key-input" type="password" placeholder="gsk_… anahtarını yapıştır">
@@ -400,7 +404,7 @@
         <span id="set-ffmpeg-status" class="inline-status">kontrol ediliyor…</span>
       </div>
       <div class="row">
-        <button id="set-ffmpeg-install" class="btn">winget ile kur</button>
+        <button id="set-ffmpeg-install" class="btn">ffmpeg’i indir ve kur</button>
         <button id="set-ffmpeg-recheck" class="btn ghost">Yeniden dene</button>
       </div>
       <div class="field" style="margin-top:8px">

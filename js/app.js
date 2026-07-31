@@ -351,7 +351,8 @@ window.KApp = (function () {
     el("set-ffmpeg-recheck").addEventListener("click", function () { checkFfmpeg(true); });
     el("set-ffmpeg-install").addEventListener("click", installFfmpeg);
     // macOS'ta winget yok — dugme ne yapiyorsa onu yazsin
-    if (K.MAC) el("set-ffmpeg-install").textContent = "Homebrew ile kur";
+    // mac'te Homebrew varsa onunla, yoksa dogrudan indirmeyle kurulur
+    if (K.MAC && K.brewYolu()) el("set-ffmpeg-install").textContent = "Homebrew ile kur";
 
     // Elle ffmpeg yolu: paket yoneticisi kurmak istemeyenler icin (tek dosya indirip gosterir)
     if (el("set-ffmpeg-path")) {
@@ -450,47 +451,62 @@ window.KApp = (function () {
     } else {
       box.className = "inline-status bad";
       // ffmpeg olmadan HEM yerel HEM bulut altyazi calismaz: sebebi ve cikis yolunu soyle
-      box.textContent = K.MAC
-        ? "✕ bulunamadı — altyazı çalışmaz. Homebrew ile kur ya da aşağıya yolu yaz."
-        : "✕ bulunamadı — altyazı çalışmaz. winget ile kur ya da aşağıya yolu yaz.";
+      box.textContent = "✕ bulunamadı — altyazı çalışmaz. Aşağıdaki düğmeye bas, " +
+        "panel indirip kursun (bir kerelik, yaklaşık 100 MB).";
     }
     return ff;
   }
 
+  /*
+   * ffmpeg kurulumu. Paket yoneticisi (winget/brew) DENENMEZ oncelikli yol olarak:
+   * winget her makinede yok, kurumsal makinede kapali olabiliyor ve kurulum
+   * basarili olsa bile PATH'i CALISAN Premiere surecine yansitmiyor. Bunun yerine
+   * ikiliyi dogrudan indirip panelin kendi klasorune koyuyoruz.
+   * macOS'ta Homebrew varsa once o denenir: kullanicinin sistemiyle uyumlu kalir.
+   */
+  var ffmpegKuruluyor = false;
+
   async function installFfmpeg() {
+    if (ffmpegKuruluyor) return;
+    ffmpegKuruluyor = true;
     var box = el("set-ffmpeg-status");
+    var btn = el("set-ffmpeg-install");
+    var eskiEtiket = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; }
     box.className = "inline-status";
-    var r;
-    if (K.MAC) {
-      var brew = K.brewYolu();
-      if (!brew) {
-        box.className = "inline-status bad";
-        box.textContent = "✕ Homebrew yok — brew.sh'tan kur, sonra buraya dön";
-        toast("macOS'ta ffmpeg Homebrew ile kurulur. brew.sh adresindeki tek satırlık " +
-          "komutu Terminal'de çalıştırıp paneli yeniden aç.", "bad");
-        return;
+
+    function say(m) { box.textContent = m; }
+
+    try {
+      if (K.MAC && K.brewYolu()) {
+        say("brew install ffmpeg… (birkaç dakika sürebilir)");
+        await K.run(K.brewYolu(), ["install", "ffmpeg"], { timeout: 1800000 });
+        if (await K.findFfmpeg(true)) {
+          toast("ffmpeg kuruldu", "good");
+          await checkFfmpeg();
+          return;
+        }
+        say("Homebrew kuramadı, doğrudan indiriliyor…");
       }
-      box.textContent = "brew install ffmpeg… (birkaç dakika sürebilir)";
-      r = await K.run(brew, ["install", "ffmpeg"], { timeout: 1800000 });
-    } else {
-      box.textContent = "winget ile kuruluyor… (birkaç dakika sürebilir)";
-      r = await K.run("winget", [
-        "install", "--id", "Gyan.FFmpeg", "-e",
-        "--accept-source-agreements", "--accept-package-agreements"
-      ], { timeout: 480000 });
-    }
-    // Kurulum aracı 0 dönmese de ffmpeg ortaya çıkmış olabilir: sonuca değil GERÇEĞE bak
-    var ff = await K.findFfmpeg(true);
-    if (ff) {
-      toast("ffmpeg kuruldu", "good");
-      await checkFfmpeg();
-    } else {
+
+      await KEngine.installFfmpeg(say);
+      var ff = await K.findFfmpeg(true);
+      if (ff) {
+        toast("ffmpeg hazır — altyazı alabilirsin", "good");
+        await checkFfmpeg();
+        KCaptions.refreshSetup();
+      } else {
+        throw new Error("kurulum sonrası doğrulanamadı");
+      }
+    } catch (e) {
+      var m = K.hataYardimi(e);
       box.className = "inline-status bad";
-      box.textContent = K.MAC
-        ? "✕ brew ffmpeg kuramadı — Terminal'de 'brew install ffmpeg' dene"
-        : "✕ winget başarısız — ffmpeg.org'dan elle kur, Premiere'i yeniden başlat";
-      K.log("ffmpeg kurulumu basarisiz: kod=" + r.code + " " +
-        String(r.stderr || r.stdout).split("\n").slice(-2).join(" ").slice(0, 200));
+      box.textContent = "✕ " + m;
+      toast(m, "bad", 12000);
+      K.log("ffmpeg kurulumu basarisiz: " + (e && e.message ? e.message : e));
+    } finally {
+      ffmpegKuruluyor = false;
+      if (btn) { btn.disabled = false; btn.textContent = eskiEtiket; }
     }
   }
 
