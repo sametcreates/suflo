@@ -173,6 +173,15 @@
   .hero .note { color: var(--faint); font-size: 13.5px; margin-top: 16px; }
   .hero .note b { color: var(--dim); font-weight: 600; }
 
+  /* Telefondan gelene: kurulumun bilgisayarda yapildigini söyle (JS açar) */
+  .mobil-not {
+    margin: 14px auto 0; max-width: 460px;
+    padding: 11px 14px; border-radius: 12px;
+    border: 1px solid var(--line2); background: rgba(139, 124, 246, .08);
+    color: var(--dim); font-size: 13.5px; line-height: 1.55;
+  }
+  .mobil-not b { color: var(--text); font-weight: 600; }
+
   /* ---------- Panel mockup ---------- */
   .mock {
     margin: 58px auto 0; max-width: 430px; text-align: left;
@@ -447,6 +456,8 @@
       <a class="btn ghost" href="#nasil">Nasıl çalışır?</a>
     </div>
     <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v1.7.7</b></p>
+    <p class="mobil-not" id="mobil-not" hidden>📱 Telefondasın: Suflo bilgisayarda, Premiere'in içinde çalışıyor.
+    Bu adresi kendine gönder, bilgisayarında aç: <b>suflo.app</b></p>
 
     <div class="mock" aria-hidden="true">
       <div class="mhead">
@@ -830,11 +841,38 @@
     }
   }
 
-  /* ---------- Isletim sistemine gore CTA metni ---------- */
+  /*
+   * Isletim sistemine gore CTA metni.
+   *
+   * TELEFONDA PLATFORM IDDIA EDILMEZ. iPhone'un kimliginde "like Mac OS X" gecer,
+   * iPadOS ise kendini dogrudan "Macintosh" olarak tanitir; ikisi de "Mac icin indir"
+   * yazdirirdi. Oysa telefondan bakan kisinin bilgisayari pekala Windows olabilir ve
+   * Premiere zaten telefonda yok. Bu yuzden mobilde notr metin + "bilgisayarda ac" notu.
+   */
   try {
-    var mac = /Mac|iPhone|iPad/.test(navigator.platform + " " + navigator.userAgent);
+    var ua = navigator.userAgent || "";
+    var uad = navigator.userAgentData;
+    // iPadOS 13+ kendini Macintosh sanar; tek ayirt edici cok dokunmali ekran
+    var iPadOS = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+    var mobil = /iPhone|iPod|iPad|Android|Mobile/i.test(ua) || iPadOS ||
+                (uad && uad.mobile === true);
+
+    var win = false, mac = false;
+    if (!mobil) {
+      var kaynak = (uad && uad.platform) ? uad.platform : (navigator.platform + " " + ua);
+      win = /Win/i.test(kaynak);
+      mac = !win && /Mac/i.test(kaynak);
+    }
+
     var im = document.getElementById("indir-metin");
-    if (im) im.textContent = mac ? "Mac için ücretsiz indir" : "Windows için ücretsiz indir";
+    if (im) {
+      im.textContent = win ? "Windows için ücretsiz indir"
+        : mac ? "Mac için ücretsiz indir"
+        : "Ücretsiz indir";
+    }
+    // Telefondaki kisiye tek gercek sonraki adim: linki bilgisayarina goturmek
+    var mn = document.getElementById("mobil-not");
+    if (mn && mobil) mn.hidden = false;
   } catch (e) {}
 
   /* ---------- Son surum numarasi (GitHub API, sessizce basarisiz olur) ---------- */
