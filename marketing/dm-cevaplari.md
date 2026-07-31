@@ -58,6 +58,22 @@ Hâlâ yoksa:
 
 ---
 
+## 6b. "ffmpeg bulunamadı" diyor
+
+**v1.7.9'da çözüldü** — panel ffmpeg'i artık kendisi indiriyor. Gelen bu şikâyetin cevabı tek satır:
+
+> Bunu 1.7.9'da çözdüm, panel ffmpeg'i kendisi kuruyor artık. suflo.app'ten son sürümü indirip kurar mısın? Bir şey yapmana gerek kalmayacak.
+
+Eski sürümde kalmak isterse ya da indirme takılırsa:
+
+> Ayarlar > ffmpeg > "ffmpeg'i indir ve kur" düğmesine bas. Yaklaşık 100 MB, bir kerelik. Takılırsa Ayarlar > Destek > "Sorun bildir"e basıp bana yolla.
+
+Neden gerekiyor diye sorarsa:
+
+> ffmpeg sesi videodan ayırıp yapay zekânın anladığı formata çeviriyor. Hem yerel hem bulut motorunda gerekli. Eskiden Windows'un kendi kurucusuna güveniyordum ama her makinede çalışmıyordu, o yüzden artık panel kendisi indiriyor.
+
+---
+
 ## 7. "Motor inmiyor / hata veriyor"
 
 > Panelde Ayarlar (sağ üstteki dişli) > Destek > "Sorun bildir"e bas. Günlüğü kopyalayıp açılan sayfaya yapıştır, ne olduğunu görüp düzelteyim.
