@@ -1732,14 +1732,24 @@ window.KCaptions = (function () {
     var golge = st.kutu ? 0 : 2;
     var altBosluk = st.konum === 2 ? 90 : 40;
 
+    /*
+     * PlayRes çıktı çözünürlüğüyle AYNI olmalı, yoksa font ölçeği kayar:
+     * libass yazı boyutunu PlayRes tabanına göre ölçekler.
+     * "YCbCr Matrix: None" ise renk dönüşümünü kapatır — olmadığında libass
+     * TV aralığı varsayıp saf beyazı 255 yerine 235 çiziyor.
+     */
+    var pw = opts.genislik || 1920;
+    var ph = opts.yukseklik || 1080;
+
     var bas = [
       "[Script Info]",
       "; Suflo ile üretildi — https://suflo.app",
       "ScriptType: v4.00+",
       "WrapStyle: 2",
       "ScaledBorderAndShadow: yes",
-      "PlayResX: 1920",
-      "PlayResY: 1080",
+      "YCbCr Matrix: None",
+      "PlayResX: " + pw,
+      "PlayResY: " + ph,
       "",
       "[V4+ Styles]",
       "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour," +
@@ -1787,6 +1797,116 @@ window.KCaptions = (function () {
     onayBekleyen = null;
     var b = el("cap-apply");
     if (b) { b.textContent = UYGULA_ETIKET; b.classList.remove("warn"); }
+  }
+
+  /* ---------------- Animasyonlu altyazı: timeline'a overlay ---------------- */
+
+  /*
+   * Premiere'in caption izi kelime kelime vurgu yapamıyor (ExtendScript'ten
+   * caption stiline erişim de yok). Bu yüzden altyazıyı ŞEFFAF bir video
+   * katmanı olarak render edip kullanıcının sekansındaki boş bir video
+   * kanalına koyuyoruz: kurgusuna dokunmadan CapCut görünümü elde ediyor.
+   *
+   * Codec qtrle (QuickTime Animation): ölçümde ProRes 4444'ten 12 kat küçük
+   * (26 MB/dk'ya karşı 317) ve 4 kat hızlı, üstelik kayıpsız RGB. Sebebi
+   * içerik: karenin neredeyse tamamı değişmeyen saydam piksel, RLE bunu
+   * mükemmel sıkıştırıyor. Uyumsuzluk çıkarsa ProRes 4444 yedeği var.
+   */
+  async function overlayUygula() {
+    if (segments.length === 0) return;
+    var btn = el("cap-overlay");
+    if (btn) btn.disabled = true;
+    var temizle = [];
+
+    try {
+      status("Sekans bilgisi alınıyor…");
+      var spec = await K.call("KS_overlaySpec", {});
+      if (!spec.ok) throw new Error(spec.error);
+
+      var g = spec.width || 1920, y = spec.height || 1080;
+      // ProRes 4:4:4 tek sayı boyut kabul etmez; qtrle için de zararsız
+      if (g % 2) g++;
+      if (y % 2) y++;
+      var fps = spec.fps > 0 ? spec.fps : 25;
+
+      /*
+       * Overlay sekansın BAŞINDAN başlar (ya da in noktasından), bu yüzden
+       * altyazı zamanları o başlangıca göre kaydırılmalı: ffmpeg'in ürettiği
+       * videonun 0. saniyesi, timeline'da klibin konduğu ana denk gelir.
+       */
+      var baslangic = (scope === "inout" && spec.inPoint > 0) ? spec.inPoint : 0;
+      var cs = cueler();
+      if (!cs.length) throw new Error("Yazılacak altyazı yok.");
+      var sonBitis = cs[cs.length - 1].end - baslangic;
+      var sure = Math.max(1, Math.ceil(sonBitis + 2));
+
+      var karaoke = /^k/.test(el("cap-maxlen").value);
+      var ass = buildAssKaydirilmis(baslangic, { karaoke: karaoke, genislik: g, yukseklik: y });
+
+      // ffmpeg altyazı filtresi mutlak yol kabul etmiyor: kendi klasöründe çalıştır
+      var dizin = K.path.join(K.tmpDir(), "overlay-" + Date.now());
+      K.fs.mkdirSync(dizin, { recursive: true });
+      var assAd = "altyazi.ass";
+      K.fs.writeFileSync(K.path.join(dizin, assAd), ass, "utf8");
+      temizle.push(K.path.join(dizin, assAd));
+
+      var ff = await K.findFfmpeg();
+      if (!ff) throw new Error("ffmpeg bulunamadı.");
+
+      var cikti = K.path.join(K.srtDir(), "suflo-altyazi-" + Date.now() + ".mov");
+      K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
+
+      status("Altyazı katmanı hazırlanıyor… (" + Math.round(sure) + " sn)");
+
+      /*
+       * alpha=1 ZORUNLU: subtitles filtresinde varsayılan false ve yazılmazsa
+       * libass alfayı hiç işlemez — video tamamen görünmez çıkar.
+       * unpremultiply: ffmpeg premultiplied üretir, Premiere straight bekler;
+       * olmadan yazı kenarlarında koyu hale oluşur. Boyuta etkisi yok.
+       */
+      var kaynak = "color=c=black@0.0:s=" + g + "x" + y + ":r=" + fps + ":d=" + sure +
+        ",format=rgba,subtitles=f=" + assAd + ":alpha=1,unpremultiply=inplace=1";
+
+      var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", kaynak, "-c:v", "qtrle", "-an", cikti],
+        { timeout: 3600000, cwd: dizin });
+
+      if (r.code !== 0 || !K.fs.existsSync(cikti)) {
+        throw new Error("Altyazı katmanı üretilemedi: " +
+          String(r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 200));
+      }
+
+      status("Timeline'a yerleştiriliyor…");
+      var yer = await K.call("KS_placeOverlay",
+        { path: cikti, scope: scope, name: "Suflo Altyazı" }, 120000);
+      if (!yer.ok) throw new Error(yer.error);
+
+      var mb = (K.fs.statSync(cikti).size / 1048576).toFixed(1);
+      status("");
+      KApp.toast("Altyazı " + yer.trackName + " katmanına eklendi" +
+        (yer.newTrack ? " (yeni katman açıldı)" : "") + " · " + mb + " MB", "good", 8000);
+      yildizIste();
+    } catch (e) {
+      status("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      temizle.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  /*
+   * Overlay videosu klibin konduğu andan başlar; bu yüzden ASS zamanları
+   * o başlangıca göre sıfırlanır. buildAss doğrudan cueler() okuduğu için
+   * segmentleri geçici olarak kaydırıp geri koyuyoruz.
+   */
+  function buildAssKaydirilmis(offset, opts) {
+    if (!offset) return buildAss(opts);
+    var yedek = segments.map(function (s) { return { start: s.start, end: s.end }; });
+    try {
+      segments.forEach(function (s) { s.start -= offset; s.end -= offset; });
+      return buildAss(opts);
+    } finally {
+      segments.forEach(function (s, i) { s.start = yedek[i].start; s.end = yedek[i].end; });
+    }
   }
 
   async function apply() {
@@ -1919,6 +2039,7 @@ window.KCaptions = (function () {
   function init() {
     el("cap-go").addEventListener("click", go);
     el("cap-apply").addEventListener("click", apply);
+    if (el("cap-overlay")) el("cap-overlay").addEventListener("click", overlayUygula);
     el("cap-save").addEventListener("click", saveAs);
     el("cap-import-srt").addEventListener("click", function (e) { e.preventDefault(); importSrt(); });
     el("cap-preset-save").addEventListener("click", saveUserPreset);

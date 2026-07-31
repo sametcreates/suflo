@@ -1,40 +1,56 @@
-## Suflo 1.8.0 — artık sadece altyazı
+## Suflo 1.9.0 — Premiere'in yapamadığı altyazı
 
-Suflo dört araçlı bir kurgu paneli olarak başlamıştı: SFX kütüphanesi, altyazı, otomatik kesim ve keyframe easing. Bu sürümle **üçünü kaldırdım.** Geriye tek bir iş kaldı: altyazı.
+Premiere'in kendi altyazı izi tek renk ve animasyonsuzdur. Kelime kelime vurgulu, renkli, CapCut tarzı altyazı isteyen herkes bugüne kadar ya para ödedi ya da videoyu başka programa taşıdı. Bu sürümle Suflo onu Premiere'in içinde yapıyor.
 
-### Neden
+### Stilli katman
 
-Dört işi orta düzeyde yapmak yerine bir işi kimsenin yapamadığı kadar iyi yapmak istiyorum. Premiere'in yerleşik altyazısı Türkçe konuşmayı yazıya dökemiyor ve bu üç yıldır çözülmemiş bir eksik. Suflo'nun var olma sebebi bu; gerisi dikkat dağıtıyordu.
+Sonuç ekranında yeni bir düğme var: **"Stilli katman olarak ekle"**.
 
-Beta modüller ayarlardan açılabilen gizli bir seçenekti, yani çoğu kullanıcı zaten görmüyordu. Şimdi kod tabanından da çıktılar.
+Altyazını seçtiğin renk, yazı tipi ve kelime vurgusuyla **şeffaf bir video katmanı** olarak render edip sekansındaki boş bir video kanalına koyuyor. Kurgun bozulmuyor, kliplerin yerinden oynamıyor — üstüne bir katman biniyor, o kadar. Boş kanal yoksa panel yeni bir kanal açıyor.
 
-### Ne değişti
+Premiere'in kendi altyazı izi de duruyor ("Sekansa uygula"). İkisi farklı işe yarıyor:
 
-- **Sekme çubuğu kalktı.** Panel açılınca doğrudan altyazı ekranı geliyor; ayarlara sağ üstteki dişliden girip aynı düğmeyle geri dönüyorsun.
-- Ayarlar'daki **"Beta modülleri göster"** seçeneği ve **SFX klasörleri** bölümü kaldırıldı.
-- Panel paketi küçüldü: arayüzden 7,5 KB, Premiere tarafındaki koddan 7,7 KB fazlalık silindi. Kaldırılan modüllere ait üç JavaScript dosyası ve Premiere'e dokunan beş fonksiyon artık ürünle birlikte gelmiyor.
-- Çeviri seçeneğindeki **"Pro önizleme — lansman süresince ücretsiz"** ibaresi kaldırıldı. Suflo ücretsiz; ileride paralı olacağı imasını taşıyan bir metin üründe durmamalıydı.
+- **Sekansa uygula:** Premiere'in caption izi. Sonradan Premiere içinde düzenlenebilir, ama tek renk ve animasyonsuz.
+- **Stilli katman:** istediğin görünüm, kelime kelime vurgu. Düzenlemek için panele dönersin.
 
-### Değişmeyen
+Teknik tarafı merak edenler için: QuickTime Animation (qtrle) kodeğiyle kayıpsız ve alfa kanallı üretiliyor. Ölçtüm — dakikada ~26 MB, ProRes 4444'ün 12'de biri, üstelik 4 kat hızlı render oluyor.
 
-Altyazı tarafında hiçbir şey eksilmedi. Transkripsiyon, editör, karaoke, çeviri, terim sözlüğü, dört biçimde dışa aktarma, caption izi olarak uygulama — hepsi yerinde.
+### Görünüm ayarları ve canlı önizleme
 
-Kaldırılan modüllere ihtiyacın varsa: kod açık kaynak ve git geçmişinde duruyor, silinmedi.
+Altyazının rengi, yazı tipi, puntosu, kontur kalınlığı, kontur rengi, ekran konumu ve arka plan kutusu artık panelden seçiliyor. Karaoke modunda vurgu rengi de ayrı.
+
+Üstünde **canlı önizleme** var: altyazının videoda nasıl duracağını yazı tipiyle, konumuyla, konturuyla birlikte gösteriyor. "Oynat" düğmesi kelime vurgusunu gerçek zamanlamalarla oynatıyor.
+
+Şablonlar da artık görünümü taşıyor: **Reels** Impact 110 punto ortada, **Belgesel** Georgia 54 punto kutulu, **YouTube** Arial 64 punto altta.
+
+### Kurulum tek dosyaya indi
+
+Eskiden önce ZXP/UXP Installer indirip kurman, sonra `.zxp` dosyasını bulman gerekiyordu. Artık:
+
+1. Kurulum ZIP'ini indir, aç
+2. **Suflo-Kur.bat** (Mac'te **Suflo-Kur.command**) dosyasına çift tıkla
+3. Premiere'i aç
+
+Kurucu paneli doğru yere kopyalıyor, Premiere ayarını yapıyor, Mac'te güvenlik damgasını temizliyor ve kurulumu doğruluyor. Premiere açıkken çalıştırırsan uyarıyor. `.zxp` dosyası da sürüm sayfasında duruyor, ZXP Installer kullanmayı tercih edenler için.
+
+### Sessiz ama önemli düzeltme
+
+ffmpeg'in altyazı filtrelerine Windows'ta mutlak dosya yolu verilemiyor: filtre sözdiziminde iki nokta üst üste parametre ayracı olduğu için `C:/...` ikinci parametre sanılıyor. Bu, stilli katman özelliğini tamamen çalışmaz hale getirirdi. Artık ffmpeg dosyanın kendi klasöründe çalıştırılıyor.
 
 ### Kurulum
 
-1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir (ücretsiz)
-2. `Suflo-1.8.0.zxp` dosyasına çift tıkla
+1. [Kurulum ZIP'ini indir](https://github.com/sametcreates/suflo/releases/latest), aç
+2. Kur dosyasına çift tıkla
 3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
 
 Gereksinim: Premiere 14.4 (2020) ve üstü · Windows veya macOS.
 
 ---
 
+### 1.8.0'da gelenler (hatırlatma)
+
+Suflo tek işe indirgendi: **yalnızca altyazı.** SFX, Kesim ve Motion modülleri üründen çıkarıldı. Sekme çubuğu kalktı, panel doğrudan altyazı ekranıyla açılıyor.
+
 ### 1.7.9'da gelenler (hatırlatma)
 
-**ffmpeg artık panel tarafından kuruluyor.** En çok bildirilen "ffmpeg bulunamadı" sorunu kökten çözüldü: paket yöneticisine güvenmek yerine ikili doğrudan indirilip panelin kendi klasörüne konuyor. Apple Silicon'da doğru mimarideki sürüm iniyor ve macOS karantinası otomatik temizleniyor.
-
-### 1.7.8'de gelenler (hatırlatma)
-
-Hatalar artık çözümü de söylüyor. Ayarlar → Destek → **"Sorun bildir"** günlüğü kopyalayıp önceden doldurulmuş formu açıyor. Türkçe ANSI (windows-1254) SRT dosyaları düzgün açılıyor.
+ffmpeg artık panel tarafından kuruluyor; "ffmpeg bulunamadı" sorunu kökten çözüldü.

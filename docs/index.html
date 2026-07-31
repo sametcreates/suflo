@@ -45,7 +45,7 @@
       "operatingSystem": "Windows, macOS",
       "url": "https://suflo.app/",
       "downloadUrl": "https://github.com/sametcreates/suflo/releases/latest",
-      "softwareVersion": "1.8.0",
+      "softwareVersion": "1.9.0",
       "license": "https://opensource.org/licenses/MIT",
       "inLanguage": "tr",
       "description": "Adobe Premiere Pro için ücretsiz ve açık kaynak yapay zekâ altyazı eklentisi. Türkçe, Azerice, İngilizce, Rusça dahil 99 dil. Bilgisayarda yerel çalışır, kurulumdan sonra internet gerektirmez.",
@@ -76,7 +76,7 @@
         {
           "@type": "Question",
           "name": "Premiere'e altyazı eklentisi nasıl kurulur?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Ücretsiz ZXP/UXP Installer'ı kur, Suflo'nun .zxp dosyasına çift tıkla, Premiere'i yeniden başlat ve Window > Extensions > Suflo menüsünden aç." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Kurulum dosyasını indir, ZIP'i aç ve kur dosyasına çift tıkla (Windows: Suflo-Kur.bat, Mac: Suflo-Kur.command). Sonra Premiere'i yeniden başlat ve Window > Extensions > Suflo menüsünden aç." }
         },
         {
           "@type": "Question",
@@ -455,7 +455,7 @@
       </a>
       <a class="btn ghost" href="#nasil">Nasıl çalışır?</a>
     </div>
-    <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v1.8.0</b></p>
+    <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v1.9.0</b></p>
     <p class="mobil-not" id="mobil-not" hidden>📱 Telefondasın: Suflo bilgisayarda, Premiere'in içinde çalışıyor.
     Bu adresi kendine gönder, bilgisayarında aç: <b>suflo.app</b></p>
 
@@ -651,12 +651,14 @@
     <div class="kur reveal">
       <h3>🪟 Windows</h3>
       <ol>
-        <li><a href="https://aescripts.com/learn/zxp-installer/">ZXP/UXP Installer</a>'ı indir ve kur (ücretsiz, bir kere).</li>
-        <li><a href="https://github.com/sametcreates/suflo/releases/latest">Suflo'nun .zxp dosyasını indir</a>, çift tıkla.</li>
+        <li><a href="https://github.com/sametcreates/suflo/releases/latest">Kurulum dosyasını indir</a> ve ZIP'i aç.</li>
+        <li><b>Suflo-Kur.bat</b> dosyasına çift tıkla. (Windows uyarı verirse "Ek bilgi → Yine de çalıştır".)</li>
         <li>Premiere'i kapat, tekrar aç. <b>Window → Extensions → Suflo</b>.</li>
-        <li>Panelde <b>"Yerel motoru indir &amp; kur"</b> düğmesine bas. Gerisini panel yapar.</li>
       </ol>
-      <p class="kur-not">Ekran kartın NVIDIA ise hızlandırma otomatik açılır.</p>
+      <p class="kur-not">Hepsi bu. Panel gereken motoru ve ses aracını ilk altyazıda kendisi indirir;
+      NVIDIA ekran kartın varsa hızlandırma otomatik açılır.</p>
+      <p class="kur-not"><b>ZXP Installer kullanmayı tercih ediyorsan:</b> aynı sürüm sayfasındaki
+      <code class="satirici">.zxp</code> dosyasını indirip çift tıklayabilirsin.</p>
     </div>
 
     <div class="kur reveal">
@@ -674,8 +676,10 @@
         <li><b>Ses aracını kur.</b> Aynı Terminal'e bunu yapıştır:
           <div class="kod"><pre><code>brew install ffmpeg</code></pre><button class="kopyala" type="button">Kopyala</button></div>
         </li>
-        <li><a href="https://aescripts.com/learn/zxp-installer/">ZXP/UXP Installer</a>'ı indir ve kur (ücretsiz).</li>
-        <li><a href="https://github.com/sametcreates/suflo/releases/latest">Suflo'nun .zxp dosyasını indir</a>, çift tıkla.</li>
+        <li><a href="https://github.com/sametcreates/suflo/releases/latest">Kurulum dosyasını indir</a>, ZIP'i aç,
+          <b>Suflo-Kur.command</b> dosyasına çift tıkla.
+          <span class="kur-not">"Geliştirici doğrulanamadı" derse dosyaya sağ tıkla → <b>Aç</b> → çıkan pencerede yine <b>Aç</b>.</span>
+        </li>
         <li>Premiere'i kapat, tekrar aç. <b>Window → Extensions → Suflo</b>.</li>
         <li>Panelde <b>"Yerel motoru kur (Homebrew)"</b> düğmesine bas. Panel gerisini yapar.</li>
       </ol>
@@ -709,8 +713,9 @@
     </details>
     <details class="reveal">
       <summary>Premiere'e altyazı eklentisi nasıl kurulur?</summary>
-      <p>Ücretsiz ZXP/UXP Installer'ı kur, Suflo'nun .zxp dosyasına çift tıkla, Premiere'i yeniden başlat
-      ve Window &gt; Extensions &gt; Suflo menüsünden aç. Adım adım anlatım <a href="#kurulum">kurulum bölümünde</a>.</p>
+      <p>Kurulum dosyasını indir, ZIP'i aç ve kur dosyasına çift tıkla (Windows: Suflo-Kur.bat,
+      Mac: Suflo-Kur.command). Sonra Premiere'i yeniden başlat ve Window &gt; Extensions &gt; Suflo
+      menüsünden aç. Adım adım anlatım <a href="#kurulum">kurulum bölümünde</a>.</p>
     </details>
     <details class="reveal">
       <summary>Mac'te çalışıyor mu?</summary>

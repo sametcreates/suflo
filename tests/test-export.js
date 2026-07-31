@@ -28,13 +28,22 @@ var kod = [
   kes("function assTc("),
   kes("function assMetin("),
   kes("function assKaraokeSatirlari("),
+  kes("function assRenk("),
   kes("function buildAss(")
 ].join("\n");
 
-// styleText ve segments testin kontrolunde
+/*
+ * styleText ve segments testin kontrolunde. stil() panele bagli oldugu icin
+ * (DOM okur) burada varsayilan gorunumle taklit edilir — bu dosya BICIM
+ * dogrulugunu olcuyor, gorunum dogrulugu tests/test-stil.js'in isi.
+ */
 var f = new Function("SEGMENTS", "STYLE", `
   var segments = SEGMENTS;
   function styleText(t) { return STYLE(t); }
+  function stil() {
+    return { font: "Arial", boyut: 72, renk: "#ffffff", konturRenk: "#000000",
+             vurguRenk: "#8b7cf6", kontur: 4, konum: 2, kutu: false };
+  }
   ${kod}
   return { buildSrt: buildSrt, buildVtt: buildVtt, buildAss: buildAss,
            cueler: cueler, assTc: assTc, assMetin: assMetin };

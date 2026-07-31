@@ -425,3 +425,190 @@ function KS_importSrtAsCaptions(encoded) {
     return KS_ok({ imported: true, captionTrack: created });
   } catch (e) { return KS_err(e); }
 }
+
+/* ---------- Altyazi overlay: video katmanina yerlestir ---------- */
+
+var KS_OVERLAY_BIN   = "Suflo Altyazi";
+var KS_OVERLAY_LABEL = 11; // Magenta
+
+function KS_fps(seq) {
+  var tb = Number(seq.timebase);
+  return (tb > 0) ? (KS_TPS / tb) : 0;
+}
+
+function KS_overlaySpec() {
+  try {
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var st = null;
+    try { st = seq.getSettings(); } catch (eS) {}
+    var inS = 0, outS = 0;
+    try { inS = seq.getInPointAsTime().seconds; outS = seq.getOutPointAsTime().seconds; } catch (eIO) {}
+    return KS_ok({
+      fps:      KS_fps(seq),
+      timebase: String(seq.timebase),
+      width:    st ? Number(st.videoFrameWidth)  : 0,
+      height:   st ? Number(st.videoFrameHeight) : 0,
+      zeroPoint: Number(seq.zeroPoint) / KS_TPS,
+      end:       Number(seq.end) / KS_TPS,
+      inPoint: inS,
+      outPoint: outS,
+      vTracks: seq.videoTracks.numTracks
+    });
+  } catch (e) { return KS_err(e); }
+}
+
+function KS_trackFreeIn(track, aSec, bSec) {
+  try {
+    var n = track.clips.numItems;
+    if (n === 0) return true;
+    for (var i = 0; i < n; i++) {
+      var c = track.clips[i];
+      if (c.end.seconds > aSec + 1e-4 && c.start.seconds < bSec - 1e-4) return false;
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
+function KS_findFreeVideoTrack(seq, aSec, bSec) {
+  for (var i = seq.videoTracks.numTracks - 1; i >= 0; i--) {
+    if (KS_trackFreeIn(seq.videoTracks[i], aSec, bSec)) {
+      var top = i;
+      while (top + 1 < seq.videoTracks.numTracks &&
+             KS_trackFreeIn(seq.videoTracks[top + 1], aSec, bSec)) top++;
+      return top;
+    }
+  }
+  return -1;
+}
+
+function KS_addTopVideoTrack() {
+  var seq0 = app.project.activeSequence;
+  var before = seq0.videoTracks.numTracks;
+  try {
+    app.enableQE();
+    if (typeof qe === "undefined" || !qe.project) return false;
+    var q = qe.project.getActiveSequence();
+    if (!q || !q.addTracks) return false;
+    q.addTracks(1, before, 0, 1, 0, 0, 0);
+  } catch (e) { return false; }
+  return app.project.activeSequence.videoTracks.numTracks > before;
+}
+
+function KS_clipAt(track, sec) {
+  try {
+    for (var i = 0; i < track.clips.numItems; i++) {
+      if (Math.abs(track.clips[i].start.seconds - sec) < 1e-3) return track.clips[i];
+    }
+  } catch (e) {}
+  return null;
+}
+
+function KS_tryPlace(track, item, startSec) {
+  var t = new Time();
+  t.seconds = startSec;
+  var forms = [t.ticks, startSec];
+  for (var k = 0; k < forms.length; k++) {
+    var n0 = track.clips.numItems;
+    try { track.overwriteClip(item, forms[k]); } catch (e) { continue; }
+    var good = KS_clipAt(track, startSec);
+    if (good) return good;
+    if (track.clips.numItems > n0) {
+      for (var j = 0; j < track.clips.numItems; j++) {
+        try {
+          if (track.clips[j].projectItem &&
+              String(track.clips[j].projectItem.nodeId) === String(item.nodeId)) {
+            track.clips[j].remove(0, 0);
+            break;
+          }
+        } catch (eJ) {}
+      }
+    }
+  }
+  return null;
+}
+
+function KS_placeOverlay(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (!p.path || !(new File(p.path)).exists) return KS_err("Overlay dosyasi yok: " + p.path);
+
+    var v = String(app.version).split(".");
+    if (Number(v[0]) === 24 && Number(v[1]) === 2) {
+      return KS_err("Premiere 24.2/24.2.1'de overwriteClip kurguyu kaydiriyor (24.3'te duzeldi).");
+    }
+
+    var bin = KS_findBin(KS_OVERLAY_BIN);
+    app.project.importFiles([p.path], true, bin, false);
+
+    var item = null;
+    try {
+      var hits = app.project.rootItem.findItemsMatchingMediaPath(p.path, 1);
+      if (hits && hits.length) item = hits[0];
+    } catch (eF) {}
+    if (!item) item = KS_findItemByPath(app.project.rootItem, p.path);
+    if (!item) return KS_err("Overlay projeye aktarilamadi.");
+
+    var etiket = String(p.name || "Suflo Altyazi");
+    try { item.name = etiket; } catch (eN) {}
+    try { item.setColorLabel(KS_OVERLAY_LABEL); } catch (eL) {}
+
+    var startSec = 0;
+    if (p.scope === "inout") {
+      try { startSec = seq.getInPointAsTime().seconds; } catch (eI) {}
+    } else {
+      try { startSec = Number(seq.zeroPoint) / KS_TPS; } catch (eZ) {}
+    }
+    var durSec = 0;
+    try { durSec = item.getOutPoint().seconds - item.getInPoint().seconds; } catch (eD) {}
+    if (!(durSec > 0)) durSec = 1 / 30;
+
+    var idx = KS_findFreeVideoTrack(seq, startSec, startSec + durSec);
+    var yeni = false;
+    if (idx < 0) {
+      if (KS_addTopVideoTrack()) {
+        seq = app.project.activeSequence;
+        idx = KS_findFreeVideoTrack(seq, startSec, startSec + durSec);
+        yeni = idx >= 0;
+      }
+    }
+    if (idx < 0) return KS_err("Bos video katmani yok ve yeni katman acilamadi.");
+
+    var clip = KS_tryPlace(seq.videoTracks[idx], item, startSec);
+    if (!clip) return KS_err("Klip katmana yerlestirilemedi.");
+
+    try { clip.name = etiket; } catch (eCn) {}
+    var nodeId = "";
+    try { nodeId = String(clip.nodeId); } catch (eNi) {}
+
+    return KS_ok({
+      track: idx, trackName: "V" + (idx + 1), newTrack: yeni,
+      start: clip.start.seconds, end: clip.end.seconds, nodeId: nodeId
+    });
+  } catch (e) { return KS_err(e); }
+}
+
+function KS_removeOverlay(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var n = 0;
+    for (var i = 0; i < seq.videoTracks.numTracks; i++) {
+      var tr = seq.videoTracks[i];
+      for (var j = tr.clips.numItems - 1; j >= 0; j--) {
+        var c = tr.clips[j];
+        var esles = false;
+        try { if (p.nodeId && String(c.nodeId) === String(p.nodeId)) esles = true; } catch (eA) {}
+        try {
+          if (!esles && p.path && c.projectItem &&
+              String(c.projectItem.getMediaPath()).toLowerCase() === String(p.path).toLowerCase()) esles = true;
+        } catch (eB) {}
+        if (esles) { try { c.remove(0, 0); n++; } catch (eR) {} }
+      }
+    }
+    return KS_ok({ removed: n });
+  } catch (e) { return KS_err(e); }
+}
