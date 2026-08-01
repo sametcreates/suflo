@@ -426,6 +426,41 @@ function KS_importSrtAsCaptions(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- Onizleme icin timeline'dan kare al ---------- */
+
+/*
+ * Panelin onizlemesinde kullanicinin KENDI goruntusunu gostermek icin
+ * playhead'deki kareyi PNG olarak disari alir. Boylece altyazinin gercek
+ * sahne uzerinde nasil duracagi gorulur — duz bir zemin bunu gosteremez.
+ *
+ * exportFramePNG belgelenmis degil ve her surumde bulunmayabilir; yoksa
+ * ok:false doner ve panel duz zemine duser (ozellik kaybolmaz).
+ */
+function KS_grabFrame(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (!p.path) return KS_err("Hedef yol verilmedi.");
+
+    var t = null;
+    try { t = seq.getPlayerPosition(); } catch (eP) {}
+    if (!t) return KS_err("Playhead konumu okunamadi.");
+
+    var yazildi = false;
+    // Surumlere gore iki imza dolasimda: (time, path) ve (path)
+    try {
+      if (seq.exportFramePNG) {
+        try { seq.exportFramePNG(t.ticks, p.path); } catch (e1) { seq.exportFramePNG(p.path); }
+        yazildi = (new File(p.path)).exists;
+      }
+    } catch (e2) {}
+
+    if (!yazildi) return KS_err("Bu Premiere surumunde kare disari alinamiyor.");
+    return KS_ok({ path: p.path, at: t.seconds });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Altyazi overlay: video katmanina yerlestir ---------- */
 
 var KS_OVERLAY_BIN   = "Suflo Altyazi";

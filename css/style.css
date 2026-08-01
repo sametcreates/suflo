@@ -644,26 +644,46 @@ details.adv > *:not(summary) { margin-top: 8px; }
  */
 .onizleme { margin-bottom: 11px; }
 
+/*
+ * Sahne: mümkünse kullanıcının kendi karesi (playhead'den alınır), yoksa
+ * sinematik bir zemin. Satranç deseni denendi ve kaldırıldı — panelin koyu
+ * diline yamalı duruyordu ve altyazının nasıl görüneceğini göstermek yerine
+ * "burası boş" hissi veriyordu.
+ */
 .onizleme-sahne {
   position: relative;
   aspect-ratio: 16 / 9;
+  max-height: 168px;
+  margin: 0 auto;
   border-radius: 9px;
   overflow: hidden;
   border: 1px solid var(--line);
-  /* satranç tahtası: altyazının arkasının saydam olduğunu gösterir */
-  background-color: #20222e;
-  background-image:
-    linear-gradient(45deg, rgba(255,255,255,.028) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(255,255,255,.028) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(255,255,255,.028) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.028) 75%);
-  background-size: 16px 16px;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-color: #0b0c12;
+  background-size: cover;
+  background-position: center;
+}
+/* gerçek kare yokken: ufuk çizgisi hissi veren yumuşak zemin */
+.onizleme-sahne:not(.kare-var)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% 12%, rgba(139, 124, 246, .16), transparent 62%),
+    linear-gradient(180deg, #191c28 0%, #12141d 52%, #0a0b10 100%);
+}
+/* kenarlardan içeri sızan hafif karartma: yazının okunurluğunu gerçekçi kılar */
+.onizleme-sahne::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, .34) 100%);
 }
 
 .onizleme-alt {
   position: absolute;
   left: 4%; right: 4%;
+  z-index: 1;                 /* karartma katmanının üstünde kalsın */
   text-align: center;
   line-height: 1.25;
   word-wrap: break-word;
@@ -695,22 +715,37 @@ details.adv > *:not(summary) { margin-top: 8px; }
   line-height: 1.5;
 }
 
+/*
+ * Düğmeler sahnenin ÜSTÜNDE durur: altyazı alt bantta olduğu için aşağıda
+ * dururlarsa yazının üstüne biniyorlar ve önizleme okunmaz hale geliyor.
+ */
 .onizleme-oynat {
-  display: block;
-  width: 100%;
-  margin-top: 7px;
-  padding: 6px;
-  background: var(--bg3);
-  border: 1px solid var(--line2);
-  border-radius: var(--r-s);
-  color: var(--dim);
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  z-index: 2;
+  padding: 4px 9px;
+  background: rgba(12, 13, 20, .72);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 20px;
+  color: var(--text);
   font: inherit;
-  font-size: 11px;
+  font-size: 10.5px;
   cursor: pointer;
-  transition: background .16s var(--ease), color .16s var(--ease);
+  opacity: .82;
+  transition: opacity .16s var(--ease), background .16s var(--ease);
 }
-.onizleme-oynat:hover { background: var(--raise); color: var(--text); }
-.onizleme-oynat:disabled { opacity: .45; cursor: default; }
+.onizleme-oynat:hover { opacity: 1; background: rgba(20, 22, 32, .9); }
+.onizleme-oynat:disabled { opacity: .35; cursor: default; }
+
+/* Sahnenin altındaki ince bilgi satırı: kaynağın ne olduğunu söyler */
+.onizleme-not {
+  margin: 6px 0 0;
+  font-size: 10px;
+  color: var(--faint);
+  text-align: center;
+}
 
 /* ---------- Renk seçiciler ---------- */
 

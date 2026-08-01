@@ -1589,6 +1589,38 @@ window.KCaptions = (function () {
    * aynı oranı kullanınca panel görüntüsü gerçek çıktıyla aynı olur.
    */
   var onizlemeSaat = null;
+  var onizlemeKare = null;      // playhead'den alınan gerçek kare (file:// URL)
+
+  /*
+   * Kullanıcının kendi görüntüsünü arka plan yap: altyazının GERÇEK sahnede
+   * nasıl durduğunu düz bir zemin gösteremez. Premiere'in kare dışa aktarımı
+   * belgelenmemiş ve her sürümde yok; başarısız olursa sessizce sinematik
+   * zemine düşülür, özellik kaybolmaz.
+   */
+  async function kareTazele() {
+    var not = el("cap-onizleme-not");
+    var sahne = el("cap-sahne");
+    if (!sahne || !K.nodeOK) return;
+    try {
+      if (not) not.textContent = "Timeline'dan kare alınıyor…";
+      var yol = K.path.join(K.tmpDir(), "suflo-onizleme.png");
+      try { K.fs.unlinkSync(yol); } catch (e0) {}
+
+      var r = await K.call("KS_grabFrame", { path: yol }, 30000);
+      if (!r.ok || !K.fs.existsSync(yol)) throw new Error(r.error || "kare alınamadı");
+
+      // aynı dosya adı tarayıcıda önbelleklenir: sorgu ekiyle tazele
+      onizlemeKare = "file:///" + yol.replace(/\\/g, "/") + "?t=" + Date.now();
+      sahne.style.backgroundImage = "url('" + onizlemeKare + "')";
+      sahne.classList.add("kare-var");
+      if (not) not.textContent = "Arka plan: timeline'daki kare · yenilemek için tekrar bas";
+    } catch (e) {
+      onizlemeKare = null;
+      sahne.style.backgroundImage = "";
+      sahne.classList.remove("kare-var");
+      if (not) not.textContent = "Timeline'dan kare alınamadı — temsili zemin gösteriliyor";
+    }
+  }
 
   // Vurgu rengi yalnızca karaoke modunda iş görür; diğer modlarda soluklaştır
   function vurguKutusuDurumu() {
@@ -2070,6 +2102,7 @@ window.KCaptions = (function () {
       });
     });
     if (el("cap-onizleme-oynat")) el("cap-onizleme-oynat").addEventListener("click", onizlemeOynat);
+    if (el("cap-onizleme-kare")) el("cap-onizleme-kare").addEventListener("click", kareTazele);
 
     // Satır uzunluğu karaoke'ye geçince vurgu rengi anlam kazanır: önizleme onu da yansıtsın
     if (el("cap-maxlen")) {
