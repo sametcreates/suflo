@@ -74,6 +74,18 @@ Neden gerekiyor diye sorarsa:
 
 ---
 
+## 6c. Mac: "erişim ayrıcalıklarına sahip olmadığınız için açılamadı"
+
+**v1.9.2'de çözüldü.** Sebebi bendeydi: Windows'ta üretilen ZIP, Mac'in çalıştırma iznini korumuyordu.
+
+> Bu benim hatamdı, kusura bakma — kurulum dosyasını düzelttim. suflo.app'ten son sürümü yeniden indirir misin? Artık çift tıklaman yeterli.
+
+Eski dosyayı elinde tutmak isterse:
+
+> Terminal'i aç, `chmod +x` yaz (sonuna boşluk bırak), sonra Suflo-Kur.command dosyasını Terminal penceresine sürükle ve Enter'a bas. Sonra dosyaya tekrar çift tıkla.
+
+---
+
 ## 7. "Motor inmiyor / hata veriyor"
 
 > Panelde Ayarlar (sağ üstteki dişli) > Destek > "Sorun bildir"e bas. Günlüğü kopyalayıp açılan sayfaya yapıştır, ne olduğunu görüp düzelteyim.

@@ -1,16 +1,20 @@
-## Suflo 1.9.1 — Destek bölümü geri döndü, önizleme yenilendi
+## Suflo 1.9.2 — Mac kurulum hatası düzeltildi
 
-1.9.0'da bir hata yaptım: modülleri kaldırırken Ayarlar'daki **Destek** bölümü de yanlışlıkla silindi. Yani "Sorun bildir" ve "Günlüğü kopyala" düğmeleri kayboldu. Bu sürüm onları geri getiriyor.
+Mac'te kurmaya çalışan birkaç kişi **"erişim ayrıcalıklarına sahip olmadığınız için açılamadı"** hatası aldı. Sebep bendeydi ve kurulum daha başlamadan bitiyordu. Düzeltildi.
 
-Hata sessizdi: panel açılıyor, konsol temiz, yalnızca en altta küçük bir uyarı çıkıyordu. Bir daha yaşanmaması için artık her sürümde **JS'in dokunduğu her arayüz öğesinin gerçekten var olduğu** otomatik kontrol ediliyor.
+### Ne olmuştu
 
-### Önizleme yeniden tasarlandı
+Kurulum paketi Windows'ta üretiliyor ve iki şey ters gidiyordu; ikisi de Windows'ta test ederken görünmüyor, yalnızca Mac'te ortaya çıkıyordu:
 
-Arkadaki satranç deseni kaldırıldı — panelin koyu diline yamalı duruyordu ve "burası boş" hissi veriyordu. Yerine sinematik bir zemin geldi, önizleme daha kompakt oldu ve düğmeler yazının üstünden çekildi.
+**Çalıştırma izni kayboluyordu.** Windows'un arşivleme aracı ZIP dosyalarına Unix izin bilgisini hiç yazmıyor. Mac tarafında `Suflo-Kur.command` çalıştırılamaz halde açılıyor, çift tıklayınca da izin hatası veriyordu.
 
-Asıl yenilik: **"Kare al"** düğmesi. Timeline'daki playhead'in olduğu kareyi arka plan olarak alıyor, yani altyazıyı **kendi görüntünün üstünde** görüyorsun. Temsili bir zemin altyazının gerçekten okunup okunmadığını gösteremez; kendi karen gösterir.
+**Klasör yapısı bozuluyordu.** Aynı araç yol ayracı olarak ters bölü yazıyor (`panel\index.html`), oysa ZIP standardı düz bölü ister. macOS bunu klasör değil, adının içinde ters bölü olan tek bir dosya sanıyor — yani `panel` klasörü hiç oluşmuyor ve kurucu dosyaları bulamıyordu.
 
-(Premiere'in kare dışa aktarımı belgelenmemiş bir API; çalışmadığı sürümlerde panel sessizce sinematik zemine dönüyor, özellik kaybolmuyor.)
+Artık paket üretilirken her iki şey de düzeltiliyor ve her sürümde otomatik kontrol ediliyor: mac kurucusunun çalıştırılabilir olduğu, yolların düz bölü kullandığı ve panelin bütün dosyalarının pakette bulunduğu sınanıyor.
+
+### Elindeki eski dosyayla uğraşmak istersen
+
+Yeniden indirmek en kolayı, ama istersen eski dosyayı da kurtarabilirsin: Terminal'i aç, `chmod +x` yaz (sonuna boşluk bırak), `Suflo-Kur.command` dosyasını Terminal penceresine sürükle, Enter'a bas. Sonra dosyaya tekrar çift tıkla.
 
 ### Kurulum
 
@@ -20,14 +24,10 @@ Asıl yenilik: **"Kare al"** düğmesi. Timeline'daki playhead'in olduğu kareyi
 
 ---
 
+### 1.9.1'de gelenler (hatırlatma)
+
+Ayarlar'daki **Destek** bölümü geri geldi ("Sorun bildir" ve "Günlüğü kopyala"); 1.9.0'da yanlışlıkla silinmişti. Önizleme yeniden tasarlandı ve **"Kare al"** düğmesiyle altyazıyı kendi görüntünün üstünde görebiliyorsun.
+
 ### 1.9.0'da gelenler (hatırlatma)
 
-**Stilli katman:** altyazı, seçtiğin renk ve kelime vurgusuyla şeffaf bir video katmanı olarak timeline'a ekleniyor — Premiere'in caption izinin yapamadığı görünüm. Kurgun bozulmuyor.
-
-**Görünüm ayarları:** renk, yazı tipi, punto, kontur, ekran konumu, arka plan kutusu ve karaoke vurgu rengi panelden seçiliyor; canlı önizleme bunları anında gösteriyor.
-
-**Tek tıkla kurucu:** ZXP Installer bağımlılığı kalktı.
-
-### 1.8.0'da gelenler (hatırlatma)
-
-Suflo tek işe indirgendi: yalnızca altyazı.
+**Stilli katman:** altyazı, seçtiğin renk ve kelime vurgusuyla şeffaf bir video katmanı olarak timeline'a ekleniyor. **Görünüm ayarları:** renk, yazı tipi, punto, kontur, konum. **Tek tıkla kurucu.**

@@ -47,6 +47,15 @@ kodun tamami burada: github.com/sametcreates/suflo
 Mac'te "gelistirici dogrulanamadi" derse: dosyaya sag tikla,
 "Ac" de, cikan pencerede yine "Ac" secenegini tikla.
 
+Mac'te "erisim ayricaliklarina sahip degilsiniz" derse:
+Terminal'i ac, once su komutu yaz (sonuna BOSLUK birak),
+sonra Suflo-Kur.command dosyasini Terminal penceresine SURUKLE
+ve Enter'a bas:
+
+  chmod +x
+
+Sonra dosyaya tekrar cift tikla.
+
 Panel ilk altyazida gerekli motoru kendisi indirir;
 senin ayrica bir sey kurman gerekmez.
 
@@ -62,6 +71,13 @@ if (Test-Path $zip) { Remove-Item $zip -Force }
 
 Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -Force
 Remove-Item $stage -Recurse -Force
+
+# Compress-Archive Unix izin bitlerini yazmaz: macOS'ta .command calistirilamaz
+# halde cikiyor ve kullanici "erisim ayricaliklarina sahip degilsiniz" aliyor.
+node (Join-Path $PSScriptRoot "zip-izin.js") $zip
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "UYARI: ZIP izinleri yazilamadi - macOS kurucusu calismayabilir!" -ForegroundColor Red
+}
 
 $mb = [math]::Round((Get-Item $zip).Length / 1MB, 2)
 Write-Host ""
