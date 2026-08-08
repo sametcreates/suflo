@@ -1,20 +1,39 @@
-## Suflo 1.9.2 — Mac kurulum hatası düzeltildi
+## Suflo 2.0 — Konuşman animasyonlu altyazıya dönüşüyor
 
-Mac'te kurmaya çalışan birkaç kişi **"erişim ayrıcalıklarına sahip olmadığınız için açılamadı"** hatası aldı. Sebep bendeydi ve kurulum daha başlamadan bitiyordu. Düzeltildi.
+Bugüne kadar animasyonlu altyazı iki şekilde yapılıyordu: ya videoyu CapCut'a taşıyordun, ya da hazır şablon alıp **metni elle yazıyordun.** Suflo 2.0 ikisini de gereksiz kılıyor: konuşma otomatik yazıya dökülüyor, seçtiğin animasyonla şeffaf bir katman olarak timeline'ına iniyor. Metin yazmak yok, şablon doldurmak yok, program değiştirmek yok.
 
-### Ne olmuştu
+### 6 animasyon stili
 
-Kurulum paketi Windows'ta üretiliyor ve iki şey ters gidiyordu; ikisi de Windows'ta test ederken görünmüyor, yalnızca Mac'te ortaya çıkıyordu:
+| Stil | Ne yapıyor |
+|---|---|
+| **Aktif kelime** | Satır sabit durur, okunan kelime renklenip hafifçe büyür (Hormozi görünümü) |
+| **Pop** | Kelimeler tek tek büyüyerek gelir |
+| **Zıplama** | Kelimeler taşarak girip yerine oturur |
+| **Karaoke dolgu** | Renk, okunan kelimeyi soldan doldurur |
+| **Yumuşak geçiş** | Satırlar fade ile girer çıkar |
+| **Alttan kayma** | Satır aşağıdan kayarak gelir |
 
-**Çalıştırma izni kayboluyordu.** Windows'un arşivleme aracı ZIP dosyalarına Unix izin bilgisini hiç yazmıyor. Mac tarafında `Suflo-Kur.command` çalıştırılamaz halde açılıyor, çift tıklayınca da izin hatası veriyordu.
+Hepsi kelime zamanlamalarını gerçek transkripsiyondan alıyor — animasyon konuşmayla senkron, elle hizalama yok.
 
-**Klasör yapısı bozuluyordu.** Aynı araç yol ayracı olarak ters bölü yazıyor (`panel\index.html`), oysa ZIP standardı düz bölü ister. macOS bunu klasör değil, adının içinde ters bölü olan tek bir dosya sanıyor — yani `panel` klasörü hiç oluşmuyor ve kurucu dosyaları bulamıyordu.
+### 4 yeni font, paketle birlikte
 
-Artık paket üretilirken her iki şey de düzeltiliyor ve her sürümde otomatik kontrol ediliyor: mac kurucusunun çalıştırılabilir olduğu, yolların düz bölü kullandığı ve panelin bütün dosyalarının pakette bulunduğu sınanıyor.
+**Anton, Archivo Black, Bebas Neue ve Bungee** artık Suflo ile geliyor. Sosyal medya altyazılarının standart fontları bunlar; hiçbirini ayrıca kurman gerekmiyor.
 
-### Elindeki eski dosyayla uğraşmak istersen
+Dördü de tek tek denetlendi: **Türkçe karakterlerin tamamı var** (ğ, ş, İ, ı dahil). Bu önemli çünkü eksik glifli font, yazıyı sessizce karışık fontlu çiziyor — denetimde iki popüler font tam bu yüzden elendi. Hepsi açık lisanslı (SIL OFL), lisans dosyaları pakette.
 
-Yeniden indirmek en kolayı, ama istersen eski dosyayı da kurtarabilirsin: Terminal'i aç, `chmod +x` yaz (sonuna boşluk bırak), `Suflo-Kur.command` dosyasını Terminal penceresine sürükle, Enter'a bas. Sonra dosyaya tekrar çift tıkla.
+### Hazır şablonlar yenilendi
+
+- **Reels — aktif kelime:** Anton, ortada, sarı vurgu
+- **Pop — kelimeler gelir:** Bebas Neue, büyük punto
+- **Karaoke dolgu:** Archivo Black, mor dolgu
+- **Enerjik — zıplama:** Bungee, sarı, çocuk/eğlence içerikleri
+- **YouTube Klasik** ve **Belgesel** duruyor
+
+Şablonu seç, önizlemede oynat, "Stilli katman olarak ekle" — bitti.
+
+### Önizleme animasyonları da gösteriyor
+
+Paneldeki önizleme artık seçtiğin animasyonu gerçek kelime zamanlamalarıyla oynatıyor. Render'da kullanılan font dosyasının aynısıyla çiziyor, yani gördüğün şey çıkacak olan şey.
 
 ### Kurulum
 
@@ -22,12 +41,10 @@ Yeniden indirmek en kolayı, ama istersen eski dosyayı da kurtarabilirsin: Term
 2. Kur dosyasına çift tıkla (Windows: `Suflo-Kur.bat`, Mac: `Suflo-Kur.command`)
 3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
 
+Gereksinim: Premiere 14.4 (2020) ve üstü · Windows veya macOS. Ek program gerekmez; motor ve ffmpeg'i panel kendisi kurar.
+
 ---
 
-### 1.9.1'de gelenler (hatırlatma)
+### 1.9.x'te gelenler (hatırlatma)
 
-Ayarlar'daki **Destek** bölümü geri geldi ("Sorun bildir" ve "Günlüğü kopyala"); 1.9.0'da yanlışlıkla silinmişti. Önizleme yeniden tasarlandı ve **"Kare al"** düğmesiyle altyazıyı kendi görüntünün üstünde görebiliyorsun.
-
-### 1.9.0'da gelenler (hatırlatma)
-
-**Stilli katman:** altyazı, seçtiğin renk ve kelime vurgusuyla şeffaf bir video katmanı olarak timeline'a ekleniyor. **Görünüm ayarları:** renk, yazı tipi, punto, kontur, konum. **Tek tıkla kurucu.**
+Stilli şeffaf katman, görünüm ayarları (renk/font/kontur/konum), canlı önizleme + "Kare al", tek tıkla kurucu, Mac kurulum düzeltmeleri.

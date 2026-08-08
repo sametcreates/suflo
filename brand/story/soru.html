@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px;
+    height: 1920px;
+    background: #0f1017;
+    /* marka ışığı: üstten mor, sağdan mavi sızıntı */
+    background-image:
+      radial-gradient(760px 620px at 50% 12%, rgba(139,124,246,.30), transparent 68%),
+      radial-gradient(620px 520px at 88% 42%, rgba(91,140,255,.16), transparent 70%),
+      radial-gradient(520px 420px at 8% 74%, rgba(139,124,246,.10), transparent 72%);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: #edecf5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 150px 78px 0;
+    overflow: hidden;
+  }
+
+  .marka {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 74px;
+  }
+  .logo { width: 74px; height: 74px; filter: drop-shadow(0 8px 26px rgba(120,108,255,.55)); }
+  .ad { font-size: 42px; font-weight: 700; letter-spacing: .5px; }
+
+  .sure {
+    font-size: 38px;
+    color: #9a9cb4;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .sayi {
+    font-size: 168px;
+    font-weight: 800;
+    line-height: .92;
+    letter-spacing: -6px;
+    background: linear-gradient(135deg, #b9aeff 0%, #7aa2ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .sayi-alt { font-size: 46px; color: #9a9cb4; margin-top: 14px; }
+
+  /* asıl anlatı */
+  .metin {
+    margin-top: 62px;
+    font-size: 44px;
+    line-height: 1.5;
+    text-align: center;
+    color: #c4c6da;
+    max-width: 900px;
+    letter-spacing: -.2px;
+  }
+  .metin b { color: #edecf5; font-weight: 700; }
+
+  .kapanis {
+    margin-top: 40px;
+    font-size: 58px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    color: #edecf5;
+  }
+
+  /* iki soru: story'nin asıl çağrısı, en okunur yerde dursun */
+  .sorular {
+    margin-top: 54px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: center;
+  }
+  .soru {
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: -.6px;
+    color: #cfc9ff;
+    padding: 16px 38px;
+    border: 2px solid rgba(139,124,246,.34);
+    border-radius: 999px;
+    background: rgba(139,124,246,.10);
+    white-space: nowrap;
+  }
+
+  /* soru sticker'ı bu boşluğa konacak */
+  .yer { margin-top: 62px; width: 100%; height: 300px; border-radius: 28px; }
+  body.kilavuz .yer {
+    border: 3px dashed rgba(139,124,246,.28);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(154,156,180,.5); font-size: 30px;
+  }
+  body:not(.kilavuz) .yer span { display: none; }
+
+  .alt {
+    position: absolute;
+    bottom: 104px; left: 0; right: 0;
+    text-align: center;
+    font-size: 34px;
+    color: #626578;
+    letter-spacing: 1.2px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="marka">
+    <svg class="logo" viewBox="0 0 20 20">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#8b7cf6"/>
+          <stop offset="1" stop-color="#5b8cff"/>
+        </linearGradient>
+      </defs>
+      <rect x="1" y="1" width="18" height="18" rx="5" fill="url(#g)"/>
+      <path d="M13.9 7.2 C13.5 5.5 11.9 4.7 10 4.7 C8 4.7 6.3 5.5 6.3 7.1 C6.3 10.7 13.7 9.1 13.7 12.9 C13.7 14.5 12 15.3 10 15.3 C8.1 15.3 6.5 14.5 6.1 12.8"
+            fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    <span class="ad">Suflo</span>
+  </div>
+
+  <div class="sure">4 günde</div>
+  <div class="sayi" id="sayi">339</div>
+  <div class="sayi-alt">kişi indirdi</div>
+
+  <div class="metin">
+    Premiere'de Türkçe altyazı için yazdığım<br>
+    <b>tamamen sınırsız ve ücretsiz</b> eklenti.
+  </div>
+
+  <div class="kapanis">Şimdi sıra sizin.</div>
+
+  <div class="sorular">
+    <div class="soru">Aldığın hatalar nedir?</div>
+    <div class="soru">Neleri eklemek istersin?</div>
+  </div>
+
+  <div class="yer"><span>soru kutusunu buraya koy</span></div>
+  <div class="alt">suflo.app</div>
+
+  <script>
+    /*
+     * ?sayi=339   -> indirme sayısı (her gün değişiyor, API'den beslenir)
+     * ?kilavuz    -> sticker alanını çerçeveli göster (yayınlanmaz)
+     */
+    var q = new URLSearchParams(location.search);
+    if (q.get("sayi")) document.getElementById("sayi").textContent = q.get("sayi");
+    if (q.has("kilavuz")) document.body.classList.add("kilavuz");
+  </script>
+</body>
+</html>

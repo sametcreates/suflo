@@ -28,7 +28,13 @@ function kes(imza) {
 }
 
 /* assRenk + buildAss gerçek kaynaktan; buildAss'in bağımlılıkları taklit edilir */
-var kod = kes("function assRenk(") + "\n" + kes("function buildAss(") + "\n" +
+  var animBlok = (function () {
+    var i = src.indexOf("var ANIMASYONLAR = {");
+    var j = src.indexOf("};", i);
+    return src.slice(i, j + 2);
+  })();
+var kod = animBlok + "\n" + kes("function assCapa(") + "\n" +
+  kes("function assRenk(") + "\n" + kes("function buildAss(") + "\n" +
   kes("function assTc(") + "\n" + kes("function assMetin(") + "\n" +
   kes("function assKaraokeSatirlari(") + "\n" +
   "; return { assRenk: assRenk, buildAss: buildAss };";

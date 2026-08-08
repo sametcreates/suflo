@@ -78,9 +78,11 @@
           <div class="field-row">
             <select id="cap-preset" class="grow">
               <option value="" selected>Özel</option>
+              <option value="reels">Reels — aktif kelime</option>
+              <option value="pop">Pop — kelimeler gelir</option>
+              <option value="karaoke">Karaoke dolgu</option>
+              <option value="enerjik">Enerjik — zıplama</option>
               <option value="yt">YouTube Klasik</option>
-              <option value="reels">Reels / TikTok</option>
-              <option value="karaoke">Karaoke Pop</option>
               <option value="doc">Belgesel</option>
             </select>
             <button id="cap-preset-save" class="star-btn" title="Mevcut ayarları şablonum olarak kaydet">
@@ -150,17 +152,45 @@
           <p class="onizleme-not" id="cap-onizleme-not">Kendi karendeki görünümü denemek için "Kare al"a bas</p>
         </div>
 
+        <div class="field">
+          <label for="cap-animasyon">Animasyon</label>
+          <select id="cap-animasyon">
+            <optgroup label="Her modda">
+              <option value="yok" selected>Yok</option>
+              <option value="fade">Yumuşak geçiş</option>
+              <option value="slide">Alttan kayma</option>
+            </optgroup>
+            <optgroup label="Kelime zamanlı (Satır uzunluğu → Karaoke)">
+              <option value="vurgu">Aktif kelime vurgusu</option>
+              <option value="karaoke">Karaoke dolgu</option>
+              <option value="pop">Pop (kelimeler büyüyerek gelir)</option>
+              <option value="bounce">Zıplama</option>
+            </optgroup>
+          </select>
+          <p class="hint" id="cap-animasyon-ipucu" hidden style="margin:5px 0 0">
+            Kelime zamanlı animasyonlar için yukarıda <b>Satır uzunluğu → Karaoke</b> seç.
+          </p>
+        </div>
+
         <div class="field-grid">
           <div class="field">
             <label for="cap-font">Yazı tipi</label>
             <select id="cap-font">
-              <option value="Arial" selected>Arial</option>
-              <option value="Impact">Impact</option>
-              <option value="Verdana">Verdana</option>
-              <option value="Tahoma">Tahoma</option>
-              <option value="Georgia">Georgia</option>
-              <option value="Trebuchet MS">Trebuchet MS</option>
-              <option value="Courier New">Courier New</option>
+              <optgroup label="Suflo ile gelir">
+                <option value="Anton">Anton</option>
+                <option value="Archivo Black">Archivo Black</option>
+                <option value="Bebas Neue">Bebas Neue</option>
+                <option value="Bungee">Bungee</option>
+              </optgroup>
+              <optgroup label="Sistem">
+                <option value="Arial" selected>Arial</option>
+                <option value="Impact">Impact</option>
+                <option value="Verdana">Verdana</option>
+                <option value="Tahoma">Tahoma</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Trebuchet MS">Trebuchet MS</option>
+                <option value="Courier New">Courier New</option>
+              </optgroup>
             </select>
           </div>
           <div class="field">

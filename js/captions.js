@@ -614,22 +614,35 @@ window.KCaptions = (function () {
     yt: {
       maxlen: "c42", kase: "normal", punct: true,
       stil: { font: "Arial", boyut: 64, renk: "#ffffff", konturRenk: "#000000",
-              vurguRenk: "#ffe14d", kontur: 4, konum: 2, kutu: false }
+              vurguRenk: "#ffe14d", kontur: 4, konum: 2, kutu: false, animasyon: "yok" }
     },
     reels: {
-      maxlen: "w3", kase: "upper", punct: false,
-      stil: { font: "Impact", boyut: 110, renk: "#ffffff", konturRenk: "#000000",
-              vurguRenk: "#ffe14d", kontur: 7, konum: 5, kutu: false }
+      // Hormozi görünümü: satır sabit durur, okunan kelime sarıya döner
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { font: "Anton", boyut: 96, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#ffe14d", kontur: 6, konum: 5, kutu: false, animasyon: "vurgu" }
     },
     karaoke: {
       maxlen: "k1", kase: "upper", punct: false,
-      stil: { font: "Impact", boyut: 100, renk: "#ffffff", konturRenk: "#000000",
-              vurguRenk: "#8b7cf6", kontur: 7, konum: 5, kutu: false }
+      stil: { font: "Archivo Black", boyut: 92, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#8b7cf6", kontur: 6, konum: 5, kutu: false, animasyon: "karaoke" }
+    },
+    pop: {
+      // kelimeler tek tek büyüyerek gelir
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { font: "Bebas Neue", boyut: 108, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#ffe14d", kontur: 5, konum: 5, kutu: false, animasyon: "pop" }
+    },
+    enerjik: {
+      // Bungee + zıplama: çocuk/eğlence içerikleri
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { font: "Bungee", boyut: 76, renk: "#ffe14d", konturRenk: "#1a1a2e",
+              vurguRenk: "#ffffff", kontur: 6, konum: 5, kutu: false, animasyon: "bounce" }
     },
     doc: {
       maxlen: "c60", kase: "normal", punct: true,
       stil: { font: "Georgia", boyut: 54, renk: "#ffffff", konturRenk: "#000000",
-              vurguRenk: "#8b7cf6", kontur: 0, konum: 2, kutu: true }
+              vurguRenk: "#8b7cf6", kontur: 0, konum: 2, kutu: true, animasyon: "fade" }
     }
   };
 
@@ -690,8 +703,26 @@ window.KCaptions = (function () {
       vurguRenk: d("cap-renk-vurgu", "#8b7cf6"),
       kontur: parseInt(d("cap-kontur", "4"), 10),
       konum: parseInt(d("cap-konum", "2"), 10),          // ASS Alignment: 2 alt, 5 orta, 8 üst
-      kutu: !!(el("cap-kutu") && el("cap-kutu").checked)
+      kutu: !!(el("cap-kutu") && el("cap-kutu").checked),
+      animasyon: d("cap-animasyon", "yok")
     };
+  }
+
+  /*
+   * Panelle birlikte gelen fontlar (Google Fonts, OFL lisanslı; lisans dosyaları
+   * fonts/ klasöründe). Hepsi cmap denetiminden geçti: Türkçe glifler TAM —
+   * eksik glifli font libass'te sessizce başka fonta düşer ve yazı karışık çıkar.
+   */
+  var FONTLAR = {
+    "Anton": "Anton.ttf",
+    "Archivo Black": "ArchivoBlack.ttf",
+    "Bebas Neue": "BebasNeue.ttf",
+    "Bungee": "Bungee.ttf"
+  };
+
+  function uzantiDizini() {
+    try { return decodeURI(K.cs.getSystemPath(CSInterface.SystemPath.EXTENSION)); }
+    catch (e) { return ""; }
   }
 
   /*
@@ -741,7 +772,8 @@ window.KCaptions = (function () {
     var esle = {
       "cap-font": st.font, "cap-boyut": st.boyut, "cap-renk": st.renk,
       "cap-renk-kontur": st.konturRenk, "cap-renk-vurgu": st.vurguRenk,
-      "cap-kontur": st.kontur, "cap-konum": st.konum
+      "cap-kontur": st.kontur, "cap-konum": st.konum,
+      "cap-animasyon": st.animasyon
     };
     Object.keys(esle).forEach(function (id) {
       var e = el(id);
@@ -1622,11 +1654,28 @@ window.KCaptions = (function () {
     }
   }
 
-  // Vurgu rengi yalnızca karaoke modunda iş görür; diğer modlarda soluklaştır
+  /*
+   * Bağımlı kontrollerin durumu:
+   * - Vurgu rengi yalnız karaoke/vurgu animasyonlarında iş görür.
+   * - Kelime zamanlı animasyonlar kelime verisi ister (Satır uzunluğu → Karaoke);
+   *   yoksa seçenekler kapatılır ve ipucu gösterilir. Kullanıcının seçimi
+   *   değiştirilmez — buildAss zaten güvenle fade'e düşüyor.
+   */
   function vurguKutusuDurumu() {
+    var kelimeVar = /^k/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
+    var anim = el("cap-animasyon") ? el("cap-animasyon").value : "yok";
+
     var kutu = el("cap-renk-vurgu-kutu");
-    if (!kutu || !el("cap-maxlen")) return;
-    kutu.classList.toggle("pasif", !/^k/.test(el("cap-maxlen").value));
+    if (kutu) kutu.classList.toggle("pasif", !(anim === "karaoke" || anim === "vurgu"));
+
+    var secici = el("cap-animasyon");
+    if (secici) {
+      Array.prototype.forEach.call(secici.options, function (o) {
+        if (ANIMASYONLAR[o.value] && ANIMASYONLAR[o.value].kelimeli) o.disabled = !kelimeVar;
+      });
+    }
+    var ipucu = el("cap-animasyon-ipucu");
+    if (ipucu) ipucu.hidden = kelimeVar || !(ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli);
   }
 
   function onizlemeDurdur() {
@@ -1679,17 +1728,45 @@ window.KCaptions = (function () {
     var bosEski = sahne.querySelector(".onizleme-bos");
     if (bosEski) bosEski.remove();
 
+    /*
+     * Kelimeleri animasyona göre diz. vurguIndex "şu an okunan kelime";
+     * undefined ise durağan görünüm (oynatma yok).
+     */
+    var anim = st.animasyon || "yok";
+    var kelimeli = karaoke && ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli;
+    var oynuyor = vurguIndex !== undefined;
+
     kutu.innerHTML = "";
+    if (oynuyor && !kelimeli) {
+      // satır animasyonları: ilk karede satırın tamamı efektle girer
+      if (anim === "fade") kutu.classList.add("satir-fade");
+      if (anim === "slide") kutu.classList.add("satir-slide");
+    }
+
     ornek.kelimeler.forEach(function (kelime, i) {
+      // pop/bounce oynarken henüz sırası gelmeyen kelime hiç çizilmez
+      if (oynuyor && (anim === "pop" || anim === "bounce") && i > vurguIndex) return;
+
       var s = document.createElement("span");
-      s.textContent = kelime + (i < ornek.kelimeler.length - 1 ? " " : "");
+      s.className = "kelime";
+      s.textContent = kelime + (i < ornek.kelimeler.length - 1 ? " " : "");
       if (st.kutu) {
-        s.className = "kutu";
+        s.classList.add("kutu");
         s.style.background = "rgba(0,0,0,.75)";
       }
-      // karaoke: o an okunan kelime vurgu rengiyle
-      if (karaoke && vurguIndex !== undefined && i === vurguIndex) s.style.color = st.vurguRenk;
-      else if (karaoke && vurguIndex !== undefined && i < vurguIndex) s.style.color = st.vurguRenk;
+
+      if (oynuyor && kelimeli) {
+        if (anim === "karaoke") {
+          if (i <= vurguIndex) s.style.color = st.vurguRenk;
+        } else if (anim === "vurgu") {
+          if (i === vurguIndex) {
+            s.style.color = st.vurguRenk;
+            s.classList.add("kelime-vurgu");
+          }
+        } else if (i === vurguIndex) {
+          s.classList.add(anim === "bounce" ? "kelime-bounce" : "kelime-pop");
+        }
+      }
       kutu.appendChild(s);
     });
   }
@@ -1724,7 +1801,20 @@ window.KCaptions = (function () {
 
     var veri = onizlemeMetni();
     if (!veri.kelimeler.length) return;
+
+    var st = stil();
+    var anim = st.animasyon || "yok";
+    var kelimeli = /^k/.test(el("cap-maxlen").value) &&
+                   ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli;
+
     if (b) b.textContent = "■ Durdur";
+
+    if (!kelimeli) {
+      // satır animasyonu tek seferde oynar (fade/slide girişi), sonra durur
+      onizlemeCiz(0);
+      onizlemeSaat = setTimeout(function () { onizlemeDurdur(); onizlemeCiz(); }, 1600);
+      return;
+    }
 
     var i = 0;
     function adim() {
@@ -1743,32 +1833,76 @@ window.KCaptions = (function () {
     adim();
   }
 
+  /*
+   * ---------------- Animasyon motoru ----------------
+   *
+   * Rakip paketler animasyonlu yazıyı hazır şablon olarak satıyor ve metni
+   * kullanıcı elle yazıyor. Burada tersi yapılır: transkript zaten var,
+   * animasyon ASS override etiketleriyle KOD tarafından üretilir.
+   *
+   * İki sınıf var:
+   *   Kelime zamanlı (karaoke verisi ister): karaoke, vurgu, pop, bounce
+   *   Satır bazlı  (her modda çalışır):      yok, fade, slide
+   *
+   * Kelime zamanlı animasyonlarda çakışma tuzağı: aynı hizada eşzamanlı iki
+   * Dialogue olayı libass'te üst üste binmemek için KAYDIRILIR ve satır zıplar.
+   * Bu yüzden pop/bounce/vurgu olayları hep ARDIŞIK pencereler halinde yazılır
+   * (kelime_i.start → kelime_{i+1}.start): hiçbir an iki olay üst üste gelmez.
+   */
+
+  var ANIMASYONLAR = {
+    yok:     { ad: "Yok",            kelimeli: false },
+    fade:    { ad: "Yumuşak geçiş",  kelimeli: false },
+    slide:   { ad: "Alttan kayma",   kelimeli: false },
+    karaoke: { ad: "Karaoke dolgu",  kelimeli: true },
+    vurgu:   { ad: "Aktif kelime",   kelimeli: true },
+    pop:     { ad: "Pop",            kelimeli: true },
+    bounce:  { ad: "Zıplama",        kelimeli: true }
+  };
+
+  // Konuma göre satırın çapa noktası (slide animasyonunun \move hedefi)
+  function assCapa(konum, pw, ph, altBosluk) {
+    if (konum === 8) return { x: Math.round(pw / 2), y: altBosluk + 20 };
+    if (konum === 5) return { x: Math.round(pw / 2), y: Math.round(ph / 2) };
+    return { x: Math.round(pw / 2), y: ph - altBosluk };
+  }
+
   function buildAss(opts) {
     opts = opts || {};
     var st = opts.stil || stil();
     var font = opts.font || st.font || "Arial";
     var boyut = opts.boyut || st.boyut || 72;
-    var karaoke = !!opts.karaoke;
+    var kelimeVerisi = !!opts.karaoke;      // segmentler kelime zamanlı mı
+
+    /*
+     * Animasyon seçimi. Geriye dönük uyum: eski çağrılar yalnız {karaoke:true}
+     * geçiyordu, o durumda karaoke dolgusu korunur. Kelime zamanlı bir animasyon
+     * istenip elde kelime verisi yoksa fade'e düşülür — bozuk çıktı üretmekten
+     * ve olayları yanlış zamanlamaktan iyidir.
+     */
+    var anim = opts.animasyon || st.animasyon || (kelimeVerisi ? "karaoke" : "yok");
+    if (!ANIMASYONLAR[anim]) anim = "yok";
+    if (ANIMASYONLAR[anim].kelimeli && !kelimeVerisi) anim = "fade";
+
     var cs = cueler();
 
     /*
-     * ASS stil satırı. Karaoke'de SecondaryColour "henüz okunmamış" kelimenin,
-     * PrimaryColour ise okunan kelimenin rengidir — yani \k etiketi soldurmayı
-     * Secondary'den Primary'ye yapar. Bu yüzden vurgu rengi Primary'ye yazılır.
+     * Renk yerleşimi animasyona göre değişir:
+     * karaoke: \k soldurması Secondary'den Primary'ye akar → vurgu Primary'de.
+     * vurgu/pop/bounce: taban metin normal renkte, aktif kelime satır içi
+     * etiketle boyanır → Primary normal renk olmalı.
      */
-    var birincil = karaoke ? assRenk(st.vurguRenk) : assRenk(st.renk);
-    var ikincil = karaoke ? assRenk(st.renk) : assRenk(st.renk);
-    // BorderStyle 3 = yazının arkasına dolu kutu, 1 = yalnız kontur+gölge
+    var birincil = (anim === "karaoke") ? assRenk(st.vurguRenk) : assRenk(st.renk);
+    var ikincil = assRenk(st.renk);
     var kenarBicim = st.kutu ? 3 : 1;
     var arkaRenk = assRenk("#000000", st.kutu ? 0x40 : 0x80);
     var golge = st.kutu ? 0 : 2;
     var altBosluk = st.konum === 2 ? 90 : 40;
 
     /*
-     * PlayRes çıktı çözünürlüğüyle AYNI olmalı, yoksa font ölçeği kayar:
-     * libass yazı boyutunu PlayRes tabanına göre ölçekler.
-     * "YCbCr Matrix: None" ise renk dönüşümünü kapatır — olmadığında libass
-     * TV aralığı varsayıp saf beyazı 255 yerine 235 çiziyor.
+     * PlayRes çıktı çözünürlüğüyle AYNI olmalı, yoksa font ölçeği kayar.
+     * "YCbCr Matrix: None" olmadığında libass TV aralığı varsayıp saf beyazı
+     * 255 yerine 235 çiziyor.
      */
     var pw = opts.genislik || 1920;
     var ph = opts.yukseklik || 1080;
@@ -1796,21 +1930,84 @@ window.KCaptions = (function () {
       "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ];
 
-    if (karaoke) {
+    function olay(bas0, son0, metin) {
+      bas.push("Dialogue: 0," + assTc(bas0) + "," + assTc(son0) + ",Suflo,,0,0,0,," + metin);
+    }
+
+    // Satır bazlı animasyon etiketi (satırın tamamına uygulanır)
+    function satirEtiketi() {
+      if (anim === "fade") return "{\\fad(180,180)}";
+      if (anim === "slide") {
+        var c = assCapa(st.konum, pw, ph, altBosluk);
+        return "{\\move(" + c.x + "," + (c.y + 42) + "," + c.x + "," + c.y + ",0,220)\\fad(150,0)}";
+      }
+      return "";
+    }
+
+    var vurguAss = assRenk(st.vurguRenk);
+
+    if (ANIMASYONLAR[anim].kelimeli) {
       assKaraokeSatirlari(cs).forEach(function (grup) {
-        var bas0 = grup[0].start, son0 = grup[grup.length - 1].end;
-        var parcalar = grup.map(function (c) {
-          var sure = Math.max(1, Math.round((c.end - c.start) * 100)); // santisaniye
-          return "{\\k" + sure + "}" + assMetin(c.text);
-        });
-        bas.push("Dialogue: 0," + assTc(bas0) + "," + assTc(son0) +
-          ",Suflo,,0,0,0,," + parcalar.join(" "));
+        var sonBitis = grup[grup.length - 1].end;
+
+        if (anim === "karaoke") {
+          var parcalar = grup.map(function (c) {
+            var sure = Math.max(1, Math.round((c.end - c.start) * 100)); // santisaniye
+            return "{\\k" + sure + "}" + assMetin(c.text);
+          });
+          olay(grup[0].start, sonBitis, parcalar.join(" "));
+          return;
+        }
+
+        /*
+         * vurgu/pop/bounce: kelime başına BİR ardışık pencere.
+         * Pencere i, kelime i'nin başından bir SONRAKİ kelimenin başına sürer
+         * (son kelimede satırın bitişine). Olaylar hiç örtüşmediği için libass
+         * çakışma kaydırması tetiklenmez, satır yerinde durur.
+         */
+        for (var i = 0; i < grup.length; i++) {
+          var pBas = grup[i].start;
+          var pSon = (i + 1 < grup.length) ? grup[i + 1].start : sonBitis;
+          if (pSon - pBas < 0.01) pSon = pBas + 0.01;
+
+          var parca = [];
+          for (var j = 0; j < grup.length; j++) {
+            var k = assMetin(grup[j].text);
+            if (anim === "vurgu") {
+              // satırın tamamı hep görünür; aktif kelime renk + hafif büyüme alır
+              if (j === i) {
+                parca.push("{\\1c" + vurguAss.replace("&H", "&H") + "\\fscx112\\fscy112\\t(0,90,\\fscx100\\fscy100)}" + k + "{\\r}");
+              } else {
+                parca.push(k);
+              }
+            } else if (j <= i) {
+              // pop/bounce: kelimeler birikerek gelir; yalnız YENİ kelime animasyonlu
+              if (j === i) {
+                var giris = (anim === "pop")
+                  ? "{\\fscx35\\fscy35\\t(0,120,\\fscx100\\fscy100)}"
+                  : "{\\fscx30\\fscy30\\t(0,90,\\fscx122\\fscy122)\\t(90,170,\\fscx100\\fscy100)}";
+                parca.push(giris + k + "{\\r}");
+              } else {
+                parca.push(k);
+              }
+            }
+          }
+          olay(pBas, pSon, parca.join(" "));
+        }
       });
     } else {
-      cs.forEach(function (c) {
-        bas.push("Dialogue: 0," + assTc(c.start) + "," + assTc(c.end) +
-          ",Suflo,,0,0,0,," + assMetin(c.text));
-      });
+      var etiket = satirEtiketi();
+      if (kelimeVerisi) {
+        // kelime segmentleri var ama satır animasyonu istendi: satır olarak birleştir
+        assKaraokeSatirlari(cs).forEach(function (grup) {
+          var metin = grup.map(function (c) { return assMetin(c.text); }).join(" ");
+          olay(grup[0].start, grup[grup.length - 1].end, etiket + metin);
+        });
+      } else {
+        cs.forEach(function (c) {
+          olay(c.start, c.end, etiket + assMetin(c.text));
+        });
+      }
     }
     return bas.join("\n") + "\n";
   }
@@ -1872,8 +2069,10 @@ window.KCaptions = (function () {
       var sonBitis = cs[cs.length - 1].end - baslangic;
       var sure = Math.max(1, Math.ceil(sonBitis + 2));
 
+      var st = stil();
       var karaoke = /^k/.test(el("cap-maxlen").value);
-      var ass = buildAssKaydirilmis(baslangic, { karaoke: karaoke, genislik: g, yukseklik: y });
+      var ass = buildAssKaydirilmis(baslangic,
+        { karaoke: karaoke, animasyon: st.animasyon, genislik: g, yukseklik: y });
 
       // ffmpeg altyazı filtresi mutlak yol kabul etmiyor: kendi klasöründe çalıştır
       var dizin = K.path.join(K.tmpDir(), "overlay-" + Date.now());
@@ -1881,6 +2080,25 @@ window.KCaptions = (function () {
       var assAd = "altyazi.ass";
       K.fs.writeFileSync(K.path.join(dizin, assAd), ass, "utf8");
       temizle.push(K.path.join(dizin, assAd));
+
+      /*
+       * Paket font seçiliyse dosyayı render klasörüne kopyala ve libass'e
+       * fontsdir ile ver. Yol yine GÖRECELİ (fontsdir=.) — mutlak yol,
+       * filtre sözdizimindeki ":" yüzünden burada da patlar.
+       */
+      var fontsdir = "";
+      if (FONTLAR[st.font]) {
+        try {
+          var fKaynak = K.path.join(uzantiDizini(), "fonts", FONTLAR[st.font]);
+          if (K.fs.existsSync(fKaynak)) {
+            K.fs.copyFileSync(fKaynak, K.path.join(dizin, FONTLAR[st.font]));
+            temizle.push(K.path.join(dizin, FONTLAR[st.font]));
+            fontsdir = ":fontsdir=.";
+          } else {
+            K.log("[altyazı] paket font dosyası yok: " + fKaynak);
+          }
+        } catch (eF2) { K.log("[altyazı] font kopyalanamadı: " + eF2.message); }
+      }
 
       var ff = await K.findFfmpeg();
       if (!ff) throw new Error("ffmpeg bulunamadı.");
@@ -1897,7 +2115,7 @@ window.KCaptions = (function () {
        * olmadan yazı kenarlarında koyu hale oluşur. Boyuta etkisi yok.
        */
       var kaynak = "color=c=black@0.0:s=" + g + "x" + y + ":r=" + fps + ":d=" + sure +
-        ",format=rgba,subtitles=f=" + assAd + ":alpha=1,unpremultiply=inplace=1";
+        ",format=rgba,subtitles=f=" + assAd + ":alpha=1" + fontsdir + ",unpremultiply=inplace=1";
 
       var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", kaynak, "-c:v", "qtrle", "-an", cikti],
         { timeout: 3600000, cwd: dizin });
@@ -2050,7 +2268,7 @@ window.KCaptions = (function () {
         icerik = buildVtt();
         ad = "suflo-altyazi.vtt";
       } else if (fmt === "ass") {
-        icerik = buildAss({ karaoke: kelimeModu });
+        icerik = buildAss({ karaoke: kelimeModu, animasyon: stil().animasyon });
         ad = "suflo-altyazi.ass";
         bom = "";
       } else {
@@ -2088,13 +2306,14 @@ window.KCaptions = (function () {
 
     /* Görünüm kontrolleri: her değişiklikte önizleme anında yenilenir ve kaydedilir */
     ["cap-font", "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu",
-     "cap-kontur", "cap-konum", "cap-kutu"].forEach(function (id) {
+     "cap-kontur", "cap-konum", "cap-kutu", "cap-animasyon"].forEach(function (id) {
       var e = el(id);
       if (!e) return;
       // renk seçicide "input" anlık, diğerlerinde "change" yeterli
       var olay = e.type === "color" ? "input" : "change";
       e.addEventListener(olay, function () {
         onizlemeDurdur();
+        vurguKutusuDurumu();     // animasyon değişince ipucu ve vurgu rengi durumu
         onizlemeCiz();
         savePrefs();
         // stil elle değiştiyse artık hazır şablonda değiliz

@@ -20,7 +20,14 @@ function kes(imza) {
 }
 
 // Gercek kaynak: cueler, tc, assTc, assMetin, assKaraokeSatirlari, buildSrt, buildVtt, buildAss
+  var animBlok = (function () {
+    var i = src.indexOf("var ANIMASYONLAR = {");
+    var j = src.indexOf("};", i);
+    return src.slice(i, j + 2);
+  })();
 var kod = [
+  animBlok,
+  kes("function assCapa("),
   kes("function tc(sec, comma)"),
   kes("function cueler("),
   kes("function buildSrt("),

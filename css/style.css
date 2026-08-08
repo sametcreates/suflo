@@ -45,6 +45,15 @@
 
 * { box-sizing: border-box; }
 
+/* ---------- Paket fontlar (OFL, fonts/ klasöründe lisanslarıyla) ----------
+   Önizleme bu fontlarla çizilir; render tarafında aynı dosyalar libass'e
+   fontsdir ile verilir — iki taraf aynı dosyayı okuduğu için önizleme
+   render'la birebir aynı yazıyı gösterir. */
+@font-face { font-family: "Anton";         src: url("../fonts/Anton.ttf");         font-display: block; }
+@font-face { font-family: "Archivo Black"; src: url("../fonts/ArchivoBlack.ttf");  font-display: block; }
+@font-face { font-family: "Bebas Neue";    src: url("../fonts/BebasNeue.ttf");     font-display: block; }
+@font-face { font-family: "Bungee";        src: url("../fonts/Bungee.ttf");        font-display: block; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -695,6 +704,19 @@ details.adv > *:not(summary) { margin-top: 8px; }
 .onizleme-alt.ust   { top: 8%; }
 
 .onizleme-alt b { font-weight: inherit; }          /* vurgulanan kelime */
+
+/* Önizleme animasyonları: ASS'teki \t eğrilerinin CSS karşılıkları */
+.onizleme-alt .kelime { display: inline-block; }
+.kelime-pop    { animation: on-pop .16s ease-out both; }
+.kelime-bounce { animation: on-bounce .24s cubic-bezier(.34,1.56,.64,1) both; }
+.kelime-vurgu  { animation: on-vurgu .12s ease-out both; }
+@keyframes on-pop    { from { transform: scale(.35); opacity: .25; } to { transform: scale(1); opacity: 1; } }
+@keyframes on-bounce { 0% { transform: scale(.3); } 55% { transform: scale(1.22); } 100% { transform: scale(1); } }
+@keyframes on-vurgu  { from { transform: scale(1.12); } to { transform: scale(1); } }
+.satir-fade  { animation: on-fade .28s ease-out both; }
+.satir-slide { animation: on-slide .26s ease-out both; }
+@keyframes on-fade  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes on-slide { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
 .onizleme-alt .kutu {
   padding: .12em .4em;
   border-radius: .12em;

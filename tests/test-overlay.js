@@ -29,7 +29,13 @@ function kes(imza) {
   var son = src.indexOf("\n  }", i);
   return src.slice(i, son + 4);
 }
-var kod = kes("function assRenk(") + "\n" + kes("function buildAss(") + "\n" +
+  var animBlok = (function () {
+    var i = src.indexOf("var ANIMASYONLAR = {");
+    var j = src.indexOf("};", i);
+    return src.slice(i, j + 2);
+  })();
+var kod = animBlok + "\n" + kes("function assCapa(") + "\n" +
+  kes("function assRenk(") + "\n" + kes("function buildAss(") + "\n" +
   kes("function assTc(") + "\n" + kes("function assMetin(") + "\n" +
   kes("function assKaraokeSatirlari(") + "\n" +
   "; return { buildAss: buildAss };";
