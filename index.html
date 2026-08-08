@@ -73,23 +73,19 @@
       <div class="card">
         <div class="card-title">Altyazı ayarları</div>
 
-        <div class="field">
-          <label for="cap-preset">Şablon</label>
-          <div class="field-row">
-            <select id="cap-preset" class="grow">
-              <option value="" selected>Özel</option>
-              <option value="reels">Reels — aktif kelime</option>
-              <option value="pop">Pop — kelimeler gelir</option>
-              <option value="karaoke">Karaoke dolgu</option>
-              <option value="enerjik">Enerjik — zıplama</option>
-              <option value="yt">YouTube Klasik</option>
-              <option value="doc">Belgesel</option>
-            </select>
-            <button id="cap-preset-save" class="star-btn" title="Mevcut ayarları şablonum olarak kaydet">
-              <svg viewBox="0 0 16 16"><path d="M8 2.4 l1.75 3.55 3.9.55 -2.82 2.75 .67 3.9 -3.5-1.84 -3.5 1.84 .67-3.9 -2.82-2.75 3.9-.55 z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
-        </div>
+        <!--
+          Stil seçimi görsel kartlarla yapılır (aşağıda, Görünüm kartında).
+          Bu gizli select yalnızca eski kodun okuduğu değer taşıyıcısıdır.
+        -->
+        <select id="cap-preset" hidden aria-hidden="true">
+          <option value="" selected>Özel</option>
+          <option value="reels">Reels</option>
+          <option value="pop">Pop</option>
+          <option value="karaoke">Karaoke</option>
+          <option value="enerjik">Enerjik</option>
+          <option value="yt">YouTube</option>
+          <option value="doc">Belgesel</option>
+        </select>
 
         <div class="field-grid">
           <div class="field">
@@ -140,19 +136,54 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Görünüm</div>
+        <div class="card-title">Stil</div>
 
-        <!-- Canlı önizleme: altyazının videoda nasıl duracağı, stil değişince anında -->
+        <!--
+          Görsel stil kartları: her kart kendi animasyonunu canlı oynatan bir
+          mini sahne. Tıkla -> stil uygulanır, büyük önizleme oynar. Ürünün
+          yıldız özelliği bir açılır menüye gömülmez.
+        -->
+        <div class="stil-grid" id="cap-stil-grid">
+          <button type="button" class="stil-sec" data-preset="reels">
+            <span class="ss-sahne"><span class="ss-metin ss-anton"><i class="sv">BUNU</i> <i>SEN</i> <i>YAZMADIN</i></span></span>
+            <b>Reels</b><i>aktif kelime</i>
+          </button>
+          <button type="button" class="stil-sec" data-preset="pop">
+            <span class="ss-sahne"><span class="ss-metin ss-bebas ss-pop"><i>TEK</i> <i>TEK</i> <i>GELİR</i></span></span>
+            <b>Pop</b><i>kelime kelime</i>
+          </button>
+          <button type="button" class="stil-sec" data-preset="karaoke">
+            <span class="ss-sahne"><span class="ss-metin ss-archivo ss-dolgu"><i>DOLARAK</i> <i>AKAR</i></span></span>
+            <b>Karaoke</b><i>renk dolgusu</i>
+          </button>
+          <button type="button" class="stil-sec" data-preset="enerjik">
+            <span class="ss-sahne"><span class="ss-metin ss-bungee ss-zipla"><i>ZIP</i> <i>ZIP</i></span></span>
+            <b>Enerjik</b><i>zıplama</i>
+          </button>
+          <button type="button" class="stil-sec" data-preset="yt">
+            <span class="ss-sahne"><span class="ss-metin ss-klasik">Klasik altyazı</span></span>
+            <b>YouTube</b><i>sade, altta</i>
+          </button>
+          <button type="button" class="stil-sec" data-preset="doc">
+            <span class="ss-sahne"><span class="ss-metin ss-belgesel">Belgesel tarzı</span></span>
+            <b>Belgesel</b><i>kutulu, zarif</i>
+          </button>
+        </div>
+
+        <!-- Canlı önizleme: seçilen stil gerçek zamanlamalarla burada oynar -->
         <div class="onizleme" id="cap-onizleme">
           <div class="onizleme-sahne" id="cap-sahne">
             <div class="onizleme-alt" id="cap-onizleme-metin"></div>
             <button type="button" id="cap-onizleme-kare" class="onizleme-oynat" style="right:auto; left:7px" title="Timeline'daki kareyi arka plan olarak al">⛶ Kare al</button>
             <button type="button" id="cap-onizleme-oynat" class="onizleme-oynat" title="Önizlemeyi oynat">▶ Oynat</button>
           </div>
-          <p class="onizleme-not" id="cap-onizleme-not">Kendi karendeki görünümü denemek için "Kare al"a bas</p>
+          <p class="onizleme-not" id="cap-onizleme-not">Bir stile dokun; kendi karende görmek için "Kare al"</p>
         </div>
 
-        <div class="field">
+        <details class="ince-ayar">
+          <summary>İnce ayar <span class="ia-not">animasyon · yazı tipi · renk · konum</span></summary>
+
+        <div class="field" style="margin-top:10px">
           <label for="cap-animasyon">Animasyon</label>
           <select id="cap-animasyon">
             <optgroup label="Her modda">
@@ -243,13 +274,16 @@
           </div>
         </div>
 
-        <div class="field">
+        <div class="field field-row" style="align-items:center; justify-content:space-between">
           <label class="switch" title="Yazının arkasına yarı saydam kutu koy">
             <input id="cap-kutu" type="checkbox">
             <i></i>
             <span>Arka plan kutusu</span>
           </label>
+          <button type="button" id="cap-preset-save" class="link-btn" title="Bu ayarları şablonum olarak kaydet">★ Şablonum yap</button>
         </div>
+
+        </details>
       </div>
 
       <div class="card" id="cap-tracks-card" hidden>

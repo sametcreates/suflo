@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Bungee&family=Archivo+Black&display=swap">
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Aranan ifade basta: kimse "Suflo" aramiyor, "premiere türkçe altyazı" ariyor -->
@@ -45,7 +49,7 @@
       "operatingSystem": "Windows, macOS",
       "url": "https://suflo.app/",
       "downloadUrl": "https://github.com/sametcreates/suflo/releases/latest",
-      "softwareVersion": "2.0.0",
+      "softwareVersion": "2.1.0",
       "license": "https://opensource.org/licenses/MIT",
       "inLanguage": "tr",
       "description": "Adobe Premiere Pro için ücretsiz ve açık kaynak yapay zekâ altyazı eklentisi. Türkçe, Azerice, İngilizce, Rusça dahil 99 dil. Bilgisayarda yerel çalışır, kurulumdan sonra internet gerektirmez.",
@@ -306,6 +310,7 @@
   }
   .stil-demo span { display: inline-block; }
   /* 3 sn'lik dongu: her kelime kendi zaman diliminde efekt alir */
+  .demo-vurgu { font-family: "Anton", sans-serif; letter-spacing: 1px; }
   .demo-vurgu span { animation: sv-renk 2.7s infinite; }
   .demo-vurgu span:nth-child(2) { animation-delay: .9s; }
   .demo-vurgu span:nth-child(3) { animation-delay: 1.8s; }
@@ -313,6 +318,7 @@
     0%, 30% { color: #ffe14d; transform: scale(1.1); }
     33%, 100% { color: #fff; transform: scale(1); }
   }
+  .demo-pop { font-family: "Bebas Neue", sans-serif; font-size: clamp(18px, 2vw, 26px); }
   .demo-pop span { opacity: 0; animation: sv-pop 3.2s infinite; }
   .demo-pop span:nth-child(2) { animation-delay: .55s; }
   .demo-pop span:nth-child(3) { animation-delay: 1.1s; }
@@ -322,6 +328,7 @@
     6%, 78% { opacity: 1; transform: scale(1); }
     86%, 100% { opacity: 0; }
   }
+  .demo-bounce { font-family: "Bungee", sans-serif; color: #ffe14d; }
   .demo-bounce span { opacity: 0; animation: sv-bounce 2.6s infinite; }
   .demo-bounce span:nth-child(2) { animation-delay: .7s; }
   @keyframes sv-bounce {
@@ -519,7 +526,7 @@
       </a>
       <a class="btn ghost" href="#nasil">Nasıl çalışır?</a>
     </div>
-    <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v2.0.0</b></p>
+    <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v2.1.0</b></p>
     <p class="mobil-not" id="mobil-not" hidden>📱 Telefondasın: Suflo bilgisayarda, Premiere'in içinde çalışıyor.
     Bu adresi kendine gönder, bilgisayarında aç: <b>suflo.app</b></p>
 

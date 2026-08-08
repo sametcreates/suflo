@@ -656,6 +656,32 @@ window.KCaptions = (function () {
     vurguKutusuDurumu();
     onizlemeDurdur();
     onizlemeCiz();
+    stilKartiIsaretle(key);
+  }
+
+  // Seçili kartı görsel olarak işaretle (stil elle değişince hiçbiri seçili kalmaz)
+  function stilKartiIsaretle(key) {
+    var grid = el("cap-stil-grid");
+    if (!grid) return;
+    Array.prototype.forEach.call(grid.querySelectorAll(".stil-sec"), function (b) {
+      b.classList.toggle("secili", b.dataset.preset === key);
+    });
+  }
+
+  function initStilKartlari() {
+    var grid = el("cap-stil-grid");
+    if (!grid) return;
+    Array.prototype.forEach.call(grid.querySelectorAll(".stil-sec"), function (b) {
+      b.addEventListener("click", function () {
+        var key = b.dataset.preset;
+        if (el("cap-preset")) el("cap-preset").value = key;
+        applyPreset(key);
+        savePrefs();
+        // dokunmanın karşılığı anında: seçilen stil hemen oynasın
+        if (onizlemeSaat) onizlemeDurdur();
+        onizlemeOynat();
+      });
+    });
   }
 
   // "Şablonum" seçeneğini menüde göster/oluştur
@@ -1973,10 +1999,15 @@ window.KCaptions = (function () {
           var parca = [];
           for (var j = 0; j < grup.length; j++) {
             var k = assMetin(grup[j].text);
+            /*
+             * \t'nin üçüncü parametresi ivme eğrisi: t^accel. accel<1 hızlı
+             * başlayıp yumuşak oturur (ease-out) — "premium" hissin kaynağı
+             * tam bu; doğrusal büyüme mekanik ve ucuz durur.
+             */
             if (anim === "vurgu") {
               // satırın tamamı hep görünür; aktif kelime renk + hafif büyüme alır
               if (j === i) {
-                parca.push("{\\1c" + vurguAss.replace("&H", "&H") + "\\fscx112\\fscy112\\t(0,90,\\fscx100\\fscy100)}" + k + "{\\r}");
+                parca.push("{\\1c" + vurguAss + "\\fscx114\\fscy114\\t(0,110,0.6,\\fscx100\\fscy100)}" + k + "{\\r}");
               } else {
                 parca.push(k);
               }
@@ -1984,8 +2015,8 @@ window.KCaptions = (function () {
               // pop/bounce: kelimeler birikerek gelir; yalnız YENİ kelime animasyonlu
               if (j === i) {
                 var giris = (anim === "pop")
-                  ? "{\\fscx35\\fscy35\\t(0,120,\\fscx100\\fscy100)}"
-                  : "{\\fscx30\\fscy30\\t(0,90,\\fscx122\\fscy122)\\t(90,170,\\fscx100\\fscy100)}";
+                  ? "{\\fscx38\\fscy38\\t(0,90,0.55,\\fscx106\\fscy106)\\t(90,150,\\fscx100\\fscy100)}"
+                  : "{\\fscx30\\fscy30\\t(0,85,0.5,\\fscx124\\fscy124)\\t(85,175,0.8,\\fscx100\\fscy100)}";
                 parca.push(giris + k + "{\\r}");
               } else {
                 parca.push(k);
@@ -2303,6 +2334,9 @@ window.KCaptions = (function () {
     el("cap-shift-fwd").addEventListener("click", function () { shiftAll(0.5); });
     el("cap-add-line").addEventListener("click", function () { insertAfter(segments.length - 1); });
     initYildizBar();
+    initStilKartlari();
+    // acilista secili sablonu kartlara yansit
+    if (el("cap-preset") && el("cap-preset").value) stilKartiIsaretle(el("cap-preset").value);
 
     /* Görünüm kontrolleri: her değişiklikte önizleme anında yenilenir ve kaydedilir */
     ["cap-font", "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu",
@@ -2318,6 +2352,7 @@ window.KCaptions = (function () {
         savePrefs();
         // stil elle değiştiyse artık hazır şablonda değiliz
         if (el("cap-preset")) el("cap-preset").value = "";
+        stilKartiIsaretle("");
       });
     });
     if (el("cap-onizleme-oynat")) el("cap-onizleme-oynat").addEventListener("click", onizlemeOynat);

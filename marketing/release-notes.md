@@ -1,39 +1,24 @@
-## Suflo 2.0 — Konuşman animasyonlu altyazıya dönüşüyor
+## Suflo 2.1 — Stiller artık dokunulacak kadar yakın
 
-Bugüne kadar animasyonlu altyazı iki şekilde yapılıyordu: ya videoyu CapCut'a taşıyordun, ya da hazır şablon alıp **metni elle yazıyordun.** Suflo 2.0 ikisini de gereksiz kılıyor: konuşma otomatik yazıya dökülüyor, seçtiğin animasyonla şeffaf bir katman olarak timeline'ına iniyor. Metin yazmak yok, şablon doldurmak yok, program değiştirmek yok.
+2.0'ın animasyon motorunu bir açılır menüye gömmüştüm; ürünün en güçlü özelliği "Animasyon: Yok" yazan bir satırın arkasında saklanıyordu. Bu sürüm onu hak ettiği yere çıkarıyor.
 
-### 6 animasyon stili
+### Görsel stil kartları
 
-| Stil | Ne yapıyor |
-|---|---|
-| **Aktif kelime** | Satır sabit durur, okunan kelime renklenip hafifçe büyür (Hormozi görünümü) |
-| **Pop** | Kelimeler tek tek büyüyerek gelir |
-| **Zıplama** | Kelimeler taşarak girip yerine oturur |
-| **Karaoke dolgu** | Renk, okunan kelimeyi soldan doldurur |
-| **Yumuşak geçiş** | Satırlar fade ile girer çıkar |
-| **Alttan kayma** | Satır aşağıdan kayarak gelir |
+Şablon menüsü gitti. Yerine **altı canlı kart** geldi: her kart kendi animasyonunu kendi fontuyla sürekli oynatan bir mini sahne. Reels kartında aktif kelime sarıya dönüyor, Pop kartında kelimeler tek tek geliyor, Enerjik kartında zıplıyorlar — daha tıklamadan ne alacağını görüyorsun.
 
-Hepsi kelime zamanlamalarını gerçek transkripsiyondan alıyor — animasyon konuşmayla senkron, elle hizalama yok.
+Karta dokun → stil uygulanır → büyük önizleme gerçek zamanlamalarla oynar. Üç saniyede stil seçilmiş olur.
 
-### 4 yeni font, paketle birlikte
+### İnce ayar katlandı
 
-**Anton, Archivo Black, Bebas Neue ve Bungee** artık Suflo ile geliyor. Sosyal medya altyazılarının standart fontları bunlar; hiçbirini ayrıca kurman gerekmiyor.
+Animasyon, yazı tipi, punto, renk, konum ve kontur kontrolleri artık **"İnce ayar"** başlığının altında, varsayılan kapalı. Kurcalamak isteyene her şey orada; istemeyene sade bir panel. Elle bir şey değiştirdiğinde kart seçimi kalkar — artık "Özel" çalışıyorsun demektir. "★ Şablonum yap" da oraya taşındı.
 
-Dördü de tek tek denetlendi: **Türkçe karakterlerin tamamı var** (ğ, ş, İ, ı dahil). Bu önemli çünkü eksik glifli font, yazıyı sessizce karışık fontlu çiziyor — denetimde iki popüler font tam bu yüzden elendi. Hepsi açık lisanslı (SIL OFL), lisans dosyaları pakette.
+### Animasyonlar yumuşatıldı
 
-### Hazır şablonlar yenilendi
+Kelime girişleri artık doğrusal değil: hızlı başlayıp yumuşak oturuyorlar (easing). Pop hafif taşıp yerine oturuyor, zıplama daha canlı, aktif kelime vurgusu daha akıcı. Fark küçük ama his büyük — mekanik büyüme yerine ağırlığı olan hareket.
 
-- **Reels — aktif kelime:** Anton, ortada, sarı vurgu
-- **Pop — kelimeler gelir:** Bebas Neue, büyük punto
-- **Karaoke dolgu:** Archivo Black, mor dolgu
-- **Enerjik — zıplama:** Bungee, sarı, çocuk/eğlence içerikleri
-- **YouTube Klasik** ve **Belgesel** duruyor
+### Sitede gerçek fontlar
 
-Şablonu seç, önizlemede oynat, "Stilli katman olarak ekle" — bitti.
-
-### Önizleme animasyonları da gösteriyor
-
-Paneldeki önizleme artık seçtiğin animasyonu gerçek kelime zamanlamalarıyla oynatıyor. Render'da kullanılan font dosyasının aynısıyla çiziyor, yani gördüğün şey çıkacak olan şey.
+suflo.app'teki stil demoları artık gerçek altyazı fontlarıyla (Anton, Bebas Neue, Bungee) çiziliyor — sistem fontuyla değil. Gördüğün demo, üreteceğin altyazının ta kendisi.
 
 ### Kurulum
 
@@ -41,10 +26,8 @@ Paneldeki önizleme artık seçtiğin animasyonu gerçek kelime zamanlamalarıyl
 2. Kur dosyasına çift tıkla (Windows: `Suflo-Kur.bat`, Mac: `Suflo-Kur.command`)
 3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
 
-Gereksinim: Premiere 14.4 (2020) ve üstü · Windows veya macOS. Ek program gerekmez; motor ve ffmpeg'i panel kendisi kurar.
-
 ---
 
-### 1.9.x'te gelenler (hatırlatma)
+### 2.0'da gelenler (hatırlatma)
 
-Stilli şeffaf katman, görünüm ayarları (renk/font/kontur/konum), canlı önizleme + "Kare al", tek tıkla kurucu, Mac kurulum düzeltmeleri.
+Konuşmadan otomatik **animasyonlu altyazı**: 6 stil (aktif kelime, pop, zıplama, karaoke dolgu, fade, slide), kelime zamanlamaları gerçek transkripsiyondan. 4 paket font (Anton, Archivo Black, Bebas Neue, Bungee) — hepsi Türkçe karakter denetiminden geçmiş, açık lisanslı.

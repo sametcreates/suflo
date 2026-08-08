@@ -644,6 +644,120 @@ details.adv > *:not(summary) { margin-top: 8px; }
 }
 .field-grid .field { margin-bottom: 11px; }
 
+/* ---------- Stil kartları ---------- */
+
+/*
+ * Ürünün yıldız özelliği: her kart kendi animasyonunu CANLI oynatan bir mini
+ * sahne. Açılır menü yerine dokunulacak, görülecek bir vitrin.
+ */
+.stil-grid {
+  display: grid;
+  /* dar CEP panelinde 2'ye, genişte 3'e oturur */
+  grid-template-columns: repeat(auto-fit, minmax(98px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stil-sec {
+  padding: 0 0 7px;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  transition: border-color .16s var(--ease), transform .14s var(--ease), box-shadow .2s var(--ease);
+}
+.stil-sec:hover { border-color: var(--line2); transform: translateY(-1px); }
+.stil-sec.secili {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(139, 124, 246, .22), var(--glow);
+}
+.stil-sec b { display: block; font-size: 11px; margin-top: 6px; font-weight: 600; }
+.stil-sec i { display: block; font-style: normal; font-size: 9.5px; color: var(--faint); margin-top: 1px; }
+
+.ss-sahne {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  background:
+    radial-gradient(130% 100% at 50% 0%, rgba(139, 124, 246, .16), transparent 62%),
+    linear-gradient(180deg, #171925, #0c0d14);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.ss-metin {
+  font-weight: 800;
+  font-size: 12.5px;
+  letter-spacing: .3px;
+  color: #fff;
+  text-shadow: 0 1.5px 0 #000, 1.5px 0 0 #000, -1.5px 0 0 #000, 0 -1.5px 0 #000;
+  white-space: nowrap;
+}
+.ss-metin i { font-style: normal; display: inline-block; }
+.ss-anton   { font-family: "Anton", sans-serif; }
+.ss-bebas   { font-family: "Bebas Neue", sans-serif; font-size: 15px; }
+.ss-archivo { font-family: "Archivo Black", sans-serif; font-size: 11px; }
+.ss-bungee  { font-family: "Bungee", sans-serif; font-size: 11.5px; color: #ffe14d; }
+.ss-klasik  { font-family: Arial, sans-serif; font-weight: 700; font-size: 11px; }
+.ss-belgesel {
+  font-family: Georgia, serif; font-weight: 700; font-size: 10.5px;
+  text-shadow: none; background: rgba(0, 0, 0, .8); padding: 3px 7px; border-radius: 3px;
+}
+
+/* kart animasyonları: sonsuz döngü, hafif ve akıcı */
+.ss-anton .sv { animation: ss-vurgu 2.4s infinite; }
+@keyframes ss-vurgu {
+  0%, 34% { color: #ffe14d; transform: scale(1.12); }
+  40%, 100% { color: #fff; transform: scale(1); }
+}
+.ss-pop i { opacity: 0; animation: ss-pop 2.7s infinite; }
+.ss-pop i:nth-child(2) { animation-delay: .45s; }
+.ss-pop i:nth-child(3) { animation-delay: .9s; }
+@keyframes ss-pop {
+  0% { opacity: 0; transform: scale(.3); }
+  7%, 74% { opacity: 1; transform: scale(1); }
+  84%, 100% { opacity: 0; }
+}
+.ss-dolgu i { animation: ss-dolgu 2.2s infinite; }
+.ss-dolgu i:nth-child(2) { animation-delay: 1.1s; }
+@keyframes ss-dolgu {
+  0% { color: #fff; }
+  12%, 48% { color: #b9aeff; }
+  60%, 100% { color: #fff; }
+}
+.ss-zipla i { opacity: 0; animation: ss-zipla 2.3s infinite; }
+.ss-zipla i:nth-child(2) { animation-delay: .55s; }
+@keyframes ss-zipla {
+  0% { opacity: 0; transform: scale(.3); }
+  9% { opacity: 1; transform: scale(1.28); }
+  15%, 74% { opacity: 1; transform: scale(1); }
+  84%, 100% { opacity: 0; }
+}
+
+/* İnce ayar: gelişmiş kontroller katlanır, varsayılan kapalı */
+.ince-ayar { margin-top: 4px; }
+.ince-ayar summary {
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--dim);
+  padding: 7px 2px;
+  user-select: none;
+  list-style: none;
+}
+.ince-ayar summary::-webkit-details-marker { display: none; }
+.ince-ayar summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform .18s var(--ease);
+}
+.ince-ayar[open] summary::before { transform: rotate(90deg); }
+.ince-ayar summary:hover { color: var(--text); }
+.ia-not { color: var(--faint); font-size: 10px; margin-left: 4px; }
+
 /* ---------- Canlı önizleme ---------- */
 
 /*

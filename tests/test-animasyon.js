@@ -103,13 +103,13 @@ ok("pop: kelime basina olay", oPop.length === KELIMELER.length, oPop.length);
 ok("pop: ilk olayda 1 kelime, son olayda hepsi",
   oPop[0].indexOf("DÖRT") === -1 && oPop[oPop.length - 1].indexOf("DÖRT") !== -1 &&
   oPop[oPop.length - 1].indexOf("BİR") !== -1, "birikimli");
-ok("pop: buyume \\t etiketi var", /\\fscx35\\fscy35\\t\(0,120/.test(aPop), (aPop.match(/\\t\([^)]*\)/g) || [])[0]);
+ok("pop: buyume \\t etiketi + easing (accel<1) var", /\\fscx38\\fscy38\\t\(0,90,0\.55/.test(aPop), (aPop.match(/\\t\([^)]*\)/g) || [])[0]);
 ok("pop: olaylar ortusmuyor", !ortusmeVar(oPop));
 
 // bounce: cift \t (asma + oturma)
 var aBou = uret("bounce");
-ok("bounce: iki asamali \\t (tasma+oturma)", /\\t\(0,90,[^)]*\\fscx122[^)]*\)\\t\(90,170/.test(aBou),
-  (aBou.match(/\{[^}]*fscx122[^}]*\}/) || ["?"])[0].slice(0, 70));
+ok("bounce: iki asamali \\t (tasma+oturma, easingli)", /\\t\(0,85,0\.5,[^)]*\\fscx124[^)]*\)\\t\(85,175,0\.8/.test(aBou),
+  (aBou.match(/\{[^}]*fscx124[^}]*\}/) || ["?"])[0].slice(0, 80));
 
 // fade / slide: satir olaylari + etiket
 var aFad = uret("fade");
