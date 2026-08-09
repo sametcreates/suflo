@@ -647,3 +647,188 @@ function KS_removeOverlay(encoded) {
     return KS_ok({ removed: n });
   } catch (e) { return KS_err(e); }
 }
+
+/* ---------- Kesim (v2.2 ile geri geldi) ---------- */
+
+function KS_timecode(seconds) {
+  var seq = KS_seq();
+  var t = new Time();
+  t.seconds = seconds;
+  var st = seq.getSettings();
+  return t.getFormatted(st.videoFrameRate, st.videoDisplayFormat);
+}
+
+
+function KS_cloneActiveSeq() {
+  var seq = KS_seq();
+  var before = {};
+  var i, s;
+  for (i = 0; i < app.project.sequences.numSequences; i++) {
+    before[String(app.project.sequences[i].sequenceID)] = 1;
+  }
+  seq.clone();
+  var created = null;
+  for (i = 0; i < app.project.sequences.numSequences; i++) {
+    s = app.project.sequences[i];
+    if (!before[String(s.sequenceID)]) { created = s; break; }
+  }
+  if (!created) return null;
+  try { app.project.activeSequence = created; } catch (e1) {
+    try { app.project.openSequence(created.sequenceID); } catch (e2) {}
+  }
+  return created;
+}
+
+
+function KS_applyCuts(encoded) {
+  try {
+    var p = KS_arg(encoded); // { ranges:[{start,end}], removeMode:"ripple"|"gap"|"select", cloneFirst:bool }
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var ranges = p.ranges || [];
+    if (ranges.length === 0) return KS_err("Kesilecek aralik yok.");
+
+    var newSeqName = "";
+    if (p.cloneFirst) {
+      var cloned = KS_cloneActiveSeq();
+      if (!cloned) return KS_err("Kopya sekans olusturulamadi. 'Bu sekansta' modunu dene.");
+      seq = KS_seq();
+      newSeqName = String(seq.name);
+    }
+
+    app.enableQE();
+    var qseq = qe.project.getActiveSequence();
+
+    // 1) Tum sinirlarda razor
+    var boundaries = [];
+    var r, i, t;
+    for (i = 0; i < ranges.length; i++) { boundaries.push(ranges[i].start); boundaries.push(ranges[i].end); }
+    for (i = 0; i < boundaries.length; i++) {
+      var tc = KS_timecode(boundaries[i]);
+      for (t = 0; t < qseq.numVideoTracks; t++) {
+        try { qseq.getVideoTrackAt(t).razor(tc); } catch (eV) {}
+      }
+      for (t = 0; t < qseq.numAudioTracks; t++) {
+        try { qseq.getAudioTrackAt(t).razor(tc); } catch (eA) {}
+      }
+    }
+
+    // 2) Sessiz araliklarin icindeki kliplere davran (ripple icin sondan basa)
+    var eps = 0.02;
+    var removed = 0, selected = 0;
+    ranges.sort(function (a, b) { return b.start - a.start; });
+
+    function handleTracks(tracks) {
+      for (var ti = 0; ti < tracks.numTracks; ti++) {
+        var tr = tracks[ti];
+        if (tr.isLocked && tr.isLocked()) continue;
+        for (var ci = tr.clips.numItems - 1; ci >= 0; ci--) {
+          var cl = tr.clips[ci];
+          var inside = (cl.start.seconds >= r.start - eps) && (cl.end.seconds <= r.end + eps);
+          if (!inside) continue;
+          if (p.removeMode === "select") {
+            try { cl.setSelected(true, true); selected++; } catch (eS) {}
+          } else {
+            try {
+              cl.remove(p.removeMode === "ripple", false);
+              removed++;
+            } catch (eR) {
+              try { cl.setSelected(true, true); selected++; } catch (eS2) {}
+            }
+          }
+        }
+      }
+    }
+
+    for (i = 0; i < ranges.length; i++) {
+      r = ranges[i];
+      handleTracks(seq.audioTracks);
+      handleTracks(seq.videoTracks);
+    }
+
+    return KS_ok({ cuts: boundaries.length, removed: removed, selected: selected, newSeq: newSeqName });
+  } catch (e) { return KS_err(e); }
+}
+
+
+/* ---------- Ritim: sequence markerlari ---------- */
+
+/*
+ * Vurus zamanlarina sequence marker atar. createMarker saniye alir ve
+ * belgelidir; ad atamasi bazi surumlerde salt-okunur olabilir, o yuzden
+ * ad hatasi marker eklemeyi durdurmaz.
+ */
+function KS_addMarkers(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var times = p.times || [];
+    if (!times.length) return KS_err("Marker zamani yok.");
+    var n = 0;
+    for (var i = 0; i < times.length; i++) {
+      try {
+        var m = seq.markers.createMarker(Number(times[i]));
+        if (m && p.name) { try { m.name = String(p.name); } catch (eN) {} }
+        n++;
+      } catch (eM) {}
+    }
+    if (n === 0) return KS_err("Hicbir marker eklenemedi.");
+    return KS_ok({ added: n });
+  } catch (e) { return KS_err(e); }
+}
+
+/* ---------- Emoji: playhead'e grafik klip ---------- */
+
+/*
+ * PNG'yi projeye alip playhead'de bos bir video kanalina koyar.
+ * Overlay makinesini (KS_findFreeVideoTrack, KS_tryPlace) yeniden kullanir.
+ * Sure ayari denenir; trackItem.end bazi surumlerde salt-okunur olabilir,
+ * o durumda Premiere'in varsayilan duragan gorsel suresi kalir.
+ */
+function KS_placeGraphic(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (!p.path || !(new File(p.path)).exists) return KS_err("Gorsel yok: " + p.path);
+
+    var bin = KS_findBin("Suflo Emoji");
+    app.project.importFiles([p.path], true, bin, false);
+    var item = null;
+    try {
+      var hits = app.project.rootItem.findItemsMatchingMediaPath(p.path, 1);
+      if (hits && hits.length) item = hits[0];
+    } catch (eF) {}
+    if (!item) item = KS_findItemByPath(app.project.rootItem, p.path);
+    if (!item) return KS_err("Gorsel projeye aktarilamadi.");
+    try { if (p.name) item.name = String(p.name); } catch (eN) {}
+
+    var start = 0;
+    try { start = seq.getPlayerPosition().seconds; } catch (eP) {}
+    var dur = Number(p.dur) > 0 ? Number(p.dur) : 1.6;
+
+    var idx = KS_findFreeVideoTrack(seq, start, start + dur);
+    if (idx < 0) {
+      if (KS_addTopVideoTrack()) {
+        seq = app.project.activeSequence;
+        idx = KS_findFreeVideoTrack(seq, start, start + dur);
+      }
+    }
+    if (idx < 0) return KS_err("Bos video katmani yok.");
+
+    var clip = KS_tryPlace(seq.videoTracks[idx], item, start);
+    if (!clip) return KS_err("Gorsel katmana yerlestirilemedi.");
+
+    var sure = 0;
+    try {
+      var t = new Time();
+      t.seconds = start + dur;
+      clip.end = t;
+      sure = dur;
+    } catch (eD) {
+      try { sure = clip.end.seconds - clip.start.seconds; } catch (eD2) {}
+    }
+    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
+  } catch (e) { return KS_err(e); }
+}

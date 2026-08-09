@@ -15,7 +15,11 @@ const TYPES = {
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
-  ".jsx": "text/plain; charset=utf-8"
+  ".jsx": "text/plain; charset=utf-8",
+  ".svg": "image/svg+xml",     // emoji seçici — MIME yanlışsa <img> çizmez
+  ".png": "image/png",
+  ".ttf": "font/ttf",
+  ".ico": "image/x-icon"
 };
 
 http.createServer((req, res) => {

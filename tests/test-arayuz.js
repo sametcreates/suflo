@@ -90,7 +90,21 @@ var ZORUNLU = {
   "set-ffmpeg-install": "ffmpeg kur",
   "tab-captions": "Altyazı görünümü",
   "tab-settings": "Ayarlar görünümü",
-  "update-bar": "Güncelleme şeridi"
+  "update-bar": "Güncelleme şeridi",
+  // v2.2: kesim geri geldi + ritim + emoji
+  "tab-cut": "Kesim görünümü",
+  "cut-analyze": "Sessizlik analizi",
+  "cut-apply": "Kesimleri uygula",
+  "cut-noise": "Gürültü eşiği",
+  "tab-beat": "Ritim görünümü",
+  "beat-analyze": "Ritmi bul",
+  "beat-apply": "Marker at",
+  "beat-bant": "Bant seçimi",
+  "beat-siklik": "Marker sıklığı",
+  "cap-emoji-ac": "Emoji aç düğmesi",
+  "cap-emoji-panel": "Emoji paneli",
+  "cap-emoji-grid": "Emoji ızgarası",
+  "cap-emoji-ara": "Emoji arama"
 };
 var kayip = [];
 Object.keys(ZORUNLU).forEach(function (id) {
@@ -101,15 +115,18 @@ ok("vazgecilmez ogelerin hepsi yerinde", kayip.length === 0,
 
 /* ---------- 5) Kaldırılan modüllerin izi kalmamış olmalı ---------- */
 
+// v2.2: Kesim (magiccut) bilinçli olarak GERİ geldi; SFX ve Motion hâlâ yok
 var kalinti = [];
-["tab-sfx", "tab-cut", "tab-motion", "set-modules", "set-folders", "set-add-folder"].forEach(function (id) {
+["tab-sfx", "tab-motion", "set-modules", "set-folders", "set-add-folder"].forEach(function (id) {
   if (idler[id]) kalinti.push(id);
 });
 ok("kaldirilan modul ogeleri markup'ta YOK", kalinti.length === 0, kalinti.join(" | ") || "temiz");
 
 var betikler = (html.match(/<script src="js\/[^"]+"/g) || []).join(" ");
 ok("kaldirilan modul betikleri yuklenmiyor",
-  !/sfx\.js|magiccut\.js|motion\.js/.test(betikler), betikler);
+  !/sfx\.js|motion\.js/.test(betikler), betikler);
+ok("v2.2 modulleri yukleniyor (magiccut + beat)",
+  /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler), betikler);
 
 /* ---------- 6) Yüklenen her betik diskte var mı ---------- */
 

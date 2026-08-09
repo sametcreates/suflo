@@ -82,10 +82,17 @@ var eksik = gerekli.filter(function (g) {
 });
 ok("panel dosyalarinin tamami pakette", eksik.length === 0, eksik.join(" | ") || gerekli.length + " dosya");
 
-/* ---------- 5) Kaldırılan modüller sızmamış ---------- */
-var sizinti = kayitlar.filter(function (k) { return /(sfx|magiccut|motion)\.js$/i.test(k.ad); });
+/* ---------- 5) Kaldırılan modüller sızmamış, v2.2 modülleri pakette ---------- */
+// v2.2: magiccut (Kesim) bilinçli geri geldi; sfx/motion hâlâ yok
+var sizinti = kayitlar.filter(function (k) { return /(sfx|motion)\.js$/i.test(k.ad); });
 ok("kaldirilan modul dosyalari pakette YOK", sizinti.length === 0,
   sizinti.map(function (k) { return k.ad; }).join(" | ") || "temiz");
+["panel/js/magiccut.js", "panel/js/beat.js"].forEach(function (g) {
+  ok("v2.2 modulu pakette: " + g,
+    kayitlar.some(function (k) { return k.ad === g; }));
+});
+ok("emoji seti pakette", kayitlar.some(function (k) { return /panel\/emoji\/esleme\.json$/.test(k.ad); }));
+ok("emoji lisans atfi pakette", kayitlar.some(function (k) { return /panel\/emoji\/LISANS\.txt$/.test(k.ad); }));
 
 /* ---------- 6) Kurucu betikleri gerçekten iş yapıyor mu ---------- */
 var batKaynak = fs.readFileSync(KOKYOL + "tools/kurucu/Suflo-Kur.bat", "utf8");

@@ -32,6 +32,13 @@
   </header>
 
 
+  
+  <nav class="tabs">
+    <button class="tab active" data-tab="captions"><span>Altyazı</span></button>
+    <button class="tab" data-tab="cut"><span>Kesim</span></button>
+    <button class="tab" data-tab="beat"><span>Ritim</span></button>
+  </nav>
+
   <div id="context-strip" class="context-strip">
     <span id="ctx-text" class="dim">bağlanıyor…</span>
   </div>
@@ -311,6 +318,18 @@
       <div id="cap-result" hidden>
         <div class="result-head">
           <span id="cap-result-info" class="dim"></span>
+          <span class="emoji-sarici" style="position:relative">
+            <button type="button" id="cap-emoji-ac" class="link-btn emoji-ac" title="Emoji ekle">😊</button>
+            <span id="cap-emoji-panel" class="emoji-panel" hidden>
+              <span class="seg-ctl" id="cap-emoji-mod" style="display:flex; margin-bottom:8px">
+                <button type="button" class="on" data-m="metin">Metne ekle</button>
+                <button type="button" data-m="sahne">Sahneye bırak</button>
+              </span>
+              <input id="cap-emoji-ara" type="text" placeholder="ara: ateş, para, gülme…">
+              <span id="cap-emoji-grid" class="emoji-grid"></span>
+              <p class="hint" id="cap-emoji-hint">Seçili satıra eklenir · görseller Twemoji (CC-BY)</p>
+            </span>
+          </span>
           <button id="cap-undo" class="link-btn" title="Geri al (Ctrl+Z)" disabled>↶</button>
           <button id="cap-redo" class="link-btn" title="Yinele (Ctrl+Y)" disabled>↷</button>
           <button id="cap-revert" class="link-btn" hidden>çeviriyi geri al</button>
@@ -372,6 +391,100 @@
       </div>
     </div>
   </section>
+
+  <!-- ================= KESIM ================= -->
+  <section id="tab-cut" class="tabpane">
+    <div class="action-bar">
+      <button id="cut-analyze" class="btn primary big" disabled>
+        <span class="btn-label">Duraksamaları bul</span>
+      </button>
+    </div>
+    <div id="cut-progress" class="progress-line" hidden><i></i></div>
+    <div id="cut-status" class="inline-status"></div>
+
+    <details class="adv">
+      <summary>Hassasiyet</summary>
+      <div class="row">
+        <label>Eşik</label>
+        <input id="cut-noise" type="range" min="-60" max="-20" value="-38">
+        <span id="cut-noise-val" class="mono">-38 dB</span>
+      </div>
+      <div class="row">
+        <label>Min. sessizlik</label>
+        <input id="cut-minsil" type="range" min="0.3" max="2.5" step="0.1" value="0.8">
+        <span id="cut-minsil-val" class="mono">0.8 sn</span>
+      </div>
+      <div class="row">
+        <label>Tampon</label>
+        <input id="cut-pad" type="range" min="0" max="0.5" step="0.05" value="0.15">
+        <span id="cut-pad-val" class="mono">0.15 sn</span>
+      </div>
+    </details>
+
+    <div id="cut-result" hidden>
+      <div class="result-head">
+        <span id="cut-summary" class="dim"></span>
+      </div>
+      <div id="cut-bar" class="cut-bar" title="Turuncu: kesilecek — tıklayıp kapatabilirsin"></div>
+      <details class="adv">
+        <summary>Kesim listesi</summary>
+        <div id="cut-ranges" class="segments"></div>
+      </details>
+      <div class="seg-ctl full" id="cut-target">
+        <button class="on" data-m="clone">Kopya sekansta<em>önerilen</em></button>
+        <button data-m="here">Bu sekansta</button>
+      </div>
+      <div class="row" id="cut-here-row" hidden>
+        <label>Yöntem</label>
+        <select id="cut-mode">
+          <option value="select" selected>Sadece kes + seç</option>
+          <option value="gap">Sil, boşluk bırak</option>
+          <option value="ripple">Ripple sil</option>
+        </select>
+      </div>
+      <button id="cut-apply" class="btn primary big">Kesimleri uygula</button>
+    </div>
+  </section>
+
+  <!-- ================= RITIM ================= -->
+  <section id="tab-beat" class="tabpane">
+    <div class="card">
+      <div class="card-title">Ritim işaretleri</div>
+      <p class="hint" style="margin-bottom:10px">Seçili klibin sesindeki vuruşları bulur ve
+      timeline'a marker atar. Müziğe kesmek için markerlara hizalanırsın.</p>
+      <div class="field-grid">
+        <div class="field">
+          <label for="beat-bant">Vuruş tipi</label>
+          <select id="beat-bant">
+            <option value="bass" selected>Bas — kick, 808</option>
+            <option value="tiz">Tiz — snare, hi-hat</option>
+            <option value="hepsi">Hepsi</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="beat-siklik">Sıklık</label>
+          <select id="beat-siklik">
+            <option value="1" selected>Her vuruş</option>
+            <option value="2">2 vuruşta bir</option>
+            <option value="4">4 vuruşta bir</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <button id="beat-analyze" class="btn primary big" disabled>
+      <span class="btn-label">Ritmi bul<em id="beat-info">önce timeline'da bir klip seç</em></span>
+    </button>
+    <div id="beat-progress" class="progress-line" hidden><i></i></div>
+    <div id="beat-status" class="inline-status"></div>
+    <div id="beat-result" hidden>
+      <div class="result-head">
+        <span id="beat-result-info" class="dim"></span>
+      </div>
+      <div id="beat-bar" class="beat-bar" aria-hidden="true"></div>
+      <button id="beat-apply" class="btn primary big">Markerları timeline'a at</button>
+    </div>
+  </section>
+
 
 
 
@@ -489,6 +602,8 @@
   <script src="js/bridge.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/captions.js"></script>
+  <script src="js/magiccut.js"></script>
+  <script src="js/beat.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

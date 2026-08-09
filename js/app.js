@@ -117,8 +117,10 @@ window.KApp = (function () {
     });
     var hedef = el("tab-" + ad);
     if (hedef) hedef.classList.add("active");
-    var d = document.querySelector(".solo-gear");
-    if (d) d.classList.toggle("active", ad === "settings");
+    // sekme çubuğu + dişli: aktif işareti tek yerden
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.classList.toggle("active", b.dataset.tab === ad);
+    });
     if (tabListeners[ad]) tabListeners[ad]();
   }
 
@@ -135,10 +137,12 @@ window.KApp = (function () {
       if (el("tab-settings").classList.contains("active")) { e.preventDefault(); ayarlardanCik(); }
     });
 
-    // Dişli: ayarlar kapalıysa açar, açıksa altyazıya döner
-    Array.prototype.forEach.call(document.querySelectorAll('[data-tab="settings"]'), function (b) {
+    // Sekmeler: dişli aç/kapa gibi davranır, diğerleri doğrudan geçer
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
       b.addEventListener("click", function () {
-        goster(el("tab-settings").classList.contains("active") ? "captions" : "settings");
+        var ad = b.dataset.tab;
+        if (ad === "settings" && el("tab-settings").classList.contains("active")) ad = "captions";
+        goster(ad);
       });
     });
   }
@@ -585,6 +589,8 @@ window.KApp = (function () {
     guvenli("sekmeler", initTabs);
     guvenli("ayarlar", initSettings);
     guvenli("Altyazı", function () { KCaptions.init(); });
+    guvenli("Kesim", function () { KCut.init(); });
+    guvenli("Ritim", function () { KBeat.init(); });
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);
     if (el("update-kapat")) {

@@ -1,0 +1,4 @@
+Bu klasordeki emoji gorselleri Twemoji projesindendir.
+Telif: Twitter, Inc ve katkida bulunanlar; devami jdecked/twemoji.
+Lisans: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+Kaynak: https://github.com/jdecked/twemoji

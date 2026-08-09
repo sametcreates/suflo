@@ -1,24 +1,31 @@
-## Suflo 2.1 — Stiller artık dokunulacak kadar yakın
+## Suflo 2.2 — Kesim geri döndü, ritim geldi, emoji geldi
 
-2.0'ın animasyon motorunu bir açılır menüye gömmüştüm; ürünün en güçlü özelliği "Animasyon: Yok" yazan bir satırın arkasında saklanıyordu. Bu sürüm onu hak ettiği yere çıkarıyor.
+"Altyazının baronu" olduk; şimdi baronun çevresini kuruyoruz. Bu sürüm panele iki sekme ve altyazı düzenleyiciye bir emoji seçici ekliyor — üçü de tamamen makinede çalışıyor, hiçbir şey internete gitmiyor.
 
-### Görsel stil kartları
+### Otomatik kesim geri döndü (Kesim sekmesi)
 
-Şablon menüsü gitti. Yerine **altı canlı kart** geldi: her kart kendi animasyonunu kendi fontuyla sürekli oynatan bir mini sahne. Reels kartında aktif kelime sarıya dönüyor, Pop kartında kelimeler tek tek geliyor, Enerjik kartında zıplıyorlar — daha tıklamadan ne alacağını görüyorsun.
+Seçili klibin sesindeki duraksamaları bulur, turuncu şeritte gösterir, istemediğin kesimi tek tıkla kapatırsın, "Kesimleri uygula" ile timeline'da keser. Hassasiyet ayarları (eşik dB, en kısa sessizlik, pay) ince ayar başlığının altında. Jump-cut'lı konuşma videosu kurgulayanlar için dakikalar kazandırır.
 
-Karta dokun → stil uygulanır → büyük önizleme gerçek zamanlamalarla oynar. Üç saniyede stil seçilmiş olur.
+### Ritim sekmesi — vuruşa marker
 
-### İnce ayar katlandı
+Seçili klibin müziğindeki vuruşları bulur ve timeline'a **sequence marker** olarak atar; kesimlerini markerlara hizalarsın. İki bant var: **Bas** (kick/808) ve **Tiz** (snare/hi-hat) — spektral akı analiziyle ayrılıyor, "her vuruş / 2'de 1 / 4'te 1" sıklık seçenekli. BPM tahmini de gösteriliyor. Pazarlama cilası değil, gerçek sinyal işleme: FFT + uyarlanır eşik + parabolik tepe interpolasyonu.
 
-Animasyon, yazı tipi, punto, renk, konum ve kontur kontrolleri artık **"İnce ayar"** başlığının altında, varsayılan kapalı. Kurcalamak isteyene her şey orada; istemeyene sade bir panel. Elle bir şey değiştirdiğinde kart seçimi kalkar — artık "Özel" çalışıyorsun demektir. "★ Şablonum yap" da oraya taşındı.
+### Emoji seçici
 
-### Animasyonlar yumuşatıldı
+Altyazı düzenleyicinin üstünde 😊 düğmesi: 51 emojilik seçilmiş set, Türkçe arama ("ateş", "para", "gülme"…). İki mod:
 
-Kelime girişleri artık doğrusal değil: hızlı başlayıp yumuşak oturuyorlar (easing). Pop hafif taşıp yerine oturuyor, zıplama daha canlı, aktif kelime vurgusu daha akıcı. Fark küçük ama his büyük — mekanik büyüme yerine ağırlığı olan hareket.
+- **Metne ekle** — emoji karakteri seçili satıra, imlecin olduğu yere girer. "Sekansa uygula" yolunda Premiere kendi motoruyla renkli çizer.
+- **Sahneye bırak** — emoji, playhead'e şeffaf bir **grafik klip** olarak iner; Motion'la büyütüp konumlandırırsın. Viral kurgudaki "kocaman 🔥 pat diye girer" görünümü.
 
-### Sitede gerçek fontlar
+Dürüstlük notu: stilli katman motoru (libass) emoji çizemiyor — emojili satırla stilli katman istersen panel seni uyarır ve doğru yola yönlendirir; sessizce emoji yutmaz.
 
-suflo.app'teki stil demoları artık gerçek altyazı fontlarıyla (Anton, Bebas Neue, Bungee) çiziliyor — sistem fontuyla değil. Gördüğün demo, üreteceğin altyazının ta kendisi.
+Panel içindeki emoji görselleri [Twemoji](https://github.com/jdecked/twemoji)'den (CC-BY 4.0). Apple'ın emoji çizimleri Apple'ın telifli eseri olduğu için hiçbir eklenti onları yasal olarak paketleyemez; "Metne ekle" modunda eklenen karakterler Premiere'de sistemin (Windows/macOS) kendi emojileriyle çizilir — Mac'te Apple emojileri olarak görünür.
+
+### Ayrıca
+
+- BPM tahmini kare kuantalamasından etkilenmiyor artık (120 BPM'lik parçada 115 gösterme hatası giderildi)
+- Marker zamanları alt-kare hassasiyetinde (parabolik interpolasyon)
+- 19 + 11 + 23 yeni otomatik test (ritim, kesim, emoji hattı)
 
 ### Kurulum
 
@@ -28,6 +35,6 @@ suflo.app'teki stil demoları artık gerçek altyazı fontlarıyla (Anton, Bebas
 
 ---
 
-### 2.0'da gelenler (hatırlatma)
+### 2.1'de gelenler (hatırlatma)
 
-Konuşmadan otomatik **animasyonlu altyazı**: 6 stil (aktif kelime, pop, zıplama, karaoke dolgu, fade, slide), kelime zamanlamaları gerçek transkripsiyondan. 4 paket font (Anton, Archivo Black, Bebas Neue, Bungee) — hepsi Türkçe karakter denetiminden geçmiş, açık lisanslı.
+Görsel stil kartları: altı canlı kart, her biri kendi animasyonunu kendi fontuyla oynatıyor. İnce ayar katlandı, kelime girişlerine easing geldi, sitede gerçek fontlar.

@@ -2074,6 +2074,17 @@ window.KCaptions = (function () {
    */
   async function overlayUygula() {
     if (segments.length === 0) return;
+    /*
+     * Emoji bekçisi: libass emojiyi HİÇ çizemiyor (denendi — tofu bile değil,
+     * boş). Sessizce emojisiz render etmek kullanıcıyı "neden kayboldu" diye
+     * bırakır; dürüst olan burada durup yol göstermek.
+     */
+    if (emojiIceriyorMu()) {
+      status("Altyazıda emoji var. Stilli katman motoru emoji çizemiyor; " +
+        "emojili altyazı için \"Sekansa uygula\"yı kullan (Premiere renkli çizer) " +
+        "ya da emojileri kaldırıp tekrar dene.", "warn");
+      return;
+    }
     var btn = el("cap-overlay");
     if (btn) btn.disabled = true;
     var temizle = [];
@@ -2242,6 +2253,190 @@ window.KCaptions = (function () {
     }
   }
 
+  /* ---------------- Emoji seçici ---------------- */
+
+  /*
+   * Görsel emoji seti: Twemoji SVG'leri (CC-BY 4.0, emoji/LISANS.txt).
+   * Apple'ın emoji çizimleri Apple'ın telifli eseri olduğu için paketlenemez;
+   * görsel set kullanmanın asıl değeri tutarlılık — karakter olarak eklenen
+   * emoji her platformda farklı çizilir, görsel her yerde aynıdır.
+   *
+   * İki mod:
+   *   Metne ekle   → emoji KARAKTERİ seçili satıra girer. "Sekansa uygula"
+   *                  yolunda Premiere kendi motoruyla renkli çizer.
+   *                  Stilli katmanda ÇİZİLEMEZ (libass emoji desteklemiyor,
+   *                  kanıtlandı: tofu bile değil, boş) — o yol uyarıyla durur.
+   *   Sahneye bırak → SVG panelde PNG'ye çevrilir, playhead'e küçük bir
+   *                  grafik klip olarak iner. Viral kurgudaki "kocaman 🔥
+   *                  pat diye girer" görünümü budur ve libass'ten bağımsızdır.
+   */
+  var EMOJI_ARAMA = {
+    "😂": "gulme komik lol", "🤣": "gulme yerlere komik", "😅": "ter gulme",
+    "😍": "ask kalp goz begen", "🥹": "duygu aglamakli tatli", "😮": "sasirma vay",
+    "😱": "sok korku cigLik", "🤯": "beyin patlama sok", "🙄": "goz devirme biktim",
+    "😭": "aglama huzun", "🥶": "soguk donma", "😴": "uyku sikici", "🤔": "dusunme acaba",
+    "😎": "havali gozluk", "✅": "onay tamam dogru tik", "❌": "hayir yanlis iptal",
+    "⚠️": "uyari dikkat", "❗": "unlem onemli", "❓": "soru", "💯": "yuz tam mukemmel",
+    "👇": "asagi ok", "👆": "yukari ok", "👉": "sag ok isaret", "🔝": "top zirve ust",
+    "👍": "begen tamam", "👎": "begenme koty", "👏": "alkis bravo", "🙏": "tesekkur dua rica",
+    "🤝": "anlasma el sikisma", "💪": "guc kas", "🤞": "sans dilek",
+    "🔥": "ates alev viral", "💰": "para kese zengin", "🤑": "para goz dolar",
+    "💸": "para ucan harcama", "📈": "grafik artis buyume", "🚀": "roket firlama",
+    "⭐": "yildiz favori", "🏆": "kupa sampiyon birinci", "🎯": "hedef isabet",
+    "⚡": "simsek hizli enerji", "🎬": "klaket film kurgu", "🎥": "kamera video",
+    "🎧": "kulaklik muzik ses", "🎵": "nota muzik", "📱": "telefon mobil",
+    "💡": "fikir ampul", "⏰": "saat alarm zaman", "📌": "pin sabit not",
+    "🎁": "hediye kutu", "❤️": "kalp ask sevgi"
+  };
+
+  var emojiEsleme = null;      // karakter -> svg dosya adı
+  var emojiMod = "metin";
+  var sonSegmentGirdisi = null;
+
+  function emojiDizini() {
+    return nodeVarMi() ? K.path.join(uzantiDizini(), "emoji") : "emoji";
+  }
+  function nodeVarMi() { return !!(K && K.nodeOK); }
+
+  async function emojiEslemeYukle() {
+    if (emojiEsleme) return emojiEsleme;
+    try {
+      if (nodeVarMi()) {
+        emojiEsleme = JSON.parse(K.fs.readFileSync(K.path.join(emojiDizini(), "esleme.json"), "utf8"));
+      } else {
+        emojiEsleme = await (await fetch("emoji/esleme.json")).json();
+      }
+    } catch (e) {
+      K.log("[emoji] esleme yuklenemedi: " + e.message);
+      emojiEsleme = {};
+    }
+    return emojiEsleme;
+  }
+
+  function emojiGridCiz(filtre) {
+    var grid = el("cap-emoji-grid");
+    if (!grid || !emojiEsleme) return;
+    grid.innerHTML = "";
+    var f = (filtre || "").toLocaleLowerCase("tr").trim();
+    Object.keys(emojiEsleme).forEach(function (ch) {
+      if (f && (EMOJI_ARAMA[ch] || "").indexOf(f) === -1) return;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.title = (EMOJI_ARAMA[ch] || "").split(" ")[0];
+      var img = document.createElement("img");
+      img.alt = ch;
+      img.src = (nodeVarMi() ? "file:///" + emojiDizini().replace(/\\/g, "/") + "/" : "emoji/") + emojiEsleme[ch];
+      b.appendChild(img);
+      b.addEventListener("click", function () { emojiSec(ch); });
+      grid.appendChild(b);
+    });
+  }
+
+  function emojiSec(ch) {
+    if (emojiMod === "sahne") { emojiSahneyeBirak(ch); return; }
+    var inp = sonSegmentGirdisi;
+    if (!inp || !inp.isConnected) {
+      KApp.toast("Önce listeden bir altyazı satırına tıkla.", "warn");
+      return;
+    }
+    var i = parseInt(inp.dataset.i, 10);
+    var bas = inp.selectionStart != null ? inp.selectionStart : inp.value.length;
+    var son = inp.selectionEnd != null ? inp.selectionEnd : bas;
+    // emoji ile metin arasında boşluk bırak: "kelime🔥" değil "kelime 🔥"
+    var sol = inp.value.slice(0, bas);
+    var ek = (sol && !/\s$/.test(sol) ? " " : "") + ch;
+    inp.value = sol + ek + inp.value.slice(son);
+    if (!isNaN(i) && segments[i]) { segments[i].text = inp.value; saveDraftSoon(); }
+    inp.focus();
+    var yeniKonum = bas + ek.length;
+    try { inp.setSelectionRange(yeniKonum, yeniKonum); } catch (e) {}
+    onizlemeCiz();
+  }
+
+  /*
+   * SVG -> 512px PNG -> playhead'e grafik klip. PNG şeffaf; Premiere'de
+   * Motion ile büyütülüp konumlanabilir. Süre ayarı denenir ama bazı
+   * sürümlerde trackItem.end salt-okunur — o durumda Premiere'in varsayılan
+   * durağan görsel süresi kalır, kullanıcı kırpar.
+   */
+  async function emojiSahneyeBirak(ch) {
+    if (!nodeVarMi()) { KApp.toast("Sahneye bırakma yalnız Premiere içinde çalışır.", "warn"); return; }
+    try {
+      var svgYol = K.path.join(emojiDizini(), emojiEsleme[ch]);
+      var svg = K.fs.readFileSync(svgYol, "utf8");
+
+      var png = await new Promise(function (resolve, reject) {
+        var img = new Image();
+        img.onload = function () {
+          var c = document.createElement("canvas");
+          c.width = 512; c.height = 512;
+          c.getContext("2d").drawImage(img, 0, 0, 512, 512);
+          resolve(c.toDataURL("image/png"));
+        };
+        img.onerror = function () { reject(new Error("SVG çizilemedi")); };
+        img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+      });
+
+      var hedef = K.path.join(K.srtDir(), "emoji-" + emojiEsleme[ch].replace(".svg", "") + ".png");
+      K.fs.mkdirSync(K.path.dirname(hedef), { recursive: true });
+      K.fs.writeFileSync(hedef, png.split(",")[1], "base64");
+
+      var r = await K.call("KS_placeGraphic", { path: hedef, dur: 1.6, name: "Emoji " + ch }, 60000);
+      if (!r.ok) throw new Error(r.error);
+      KApp.toast(ch + " " + r.trackName + " katmanına, playhead'e bırakıldı", "good");
+    } catch (e) {
+      KApp.toast("Emoji bırakılamadı: " + e.message, "bad");
+    }
+  }
+
+  function initEmoji() {
+    var ac = el("cap-emoji-ac");
+    var panel = el("cap-emoji-panel");
+    if (!ac || !panel) return;
+
+    ac.addEventListener("click", async function (e) {
+      e.stopPropagation();
+      if (panel.hidden) {
+        await emojiEslemeYukle();
+        emojiGridCiz(el("cap-emoji-ara").value);
+        panel.hidden = false;
+        el("cap-emoji-ara").focus();
+      } else panel.hidden = true;
+    });
+    document.addEventListener("click", function (e) {
+      if (!panel.hidden && !panel.contains(e.target) && e.target !== ac) panel.hidden = true;
+    });
+    el("cap-emoji-ara").addEventListener("input", function () { emojiGridCiz(this.value); });
+
+    Array.prototype.forEach.call(el("cap-emoji-mod").querySelectorAll("button"), function (b) {
+      b.addEventListener("click", function () {
+        Array.prototype.forEach.call(el("cap-emoji-mod").querySelectorAll("button"), function (x) {
+          x.classList.remove("on");
+        });
+        b.classList.add("on");
+        emojiMod = b.dataset.m;
+        el("cap-emoji-hint").textContent = emojiMod === "sahne"
+          ? "Playhead'e grafik klip olarak iner · Twemoji (CC-BY)"
+          : "Seçili satıra eklenir · görseller Twemoji (CC-BY)";
+      });
+    });
+
+    // hangi satırın aktif olduğunu izle (emoji oraya girer)
+    el("cap-segments").addEventListener("focusin", function (e) {
+      if (e.target && e.target.tagName === "INPUT" && e.target.dataset.i !== undefined) {
+        sonSegmentGirdisi = e.target;
+      }
+    });
+  }
+
+  // Astral (surrogate) karakter = pratikte emoji. Stilli katman yolunun bekçisi.
+  function emojiIceriyorMu() {
+    for (var i = 0; i < segments.length; i++) {
+      if (/[\uD800-\uDFFF☀-➿⭐❗✅❌]/.test(segments[i].text || "")) return true;
+    }
+    return false;
+  }
+
   /*
    * Ucuncu basarili uygulamadan sonra BIR KEZ yildiz iste.
    * Kurallar bilincli: (1) mutlu anda sorulur, isin ortasinda degil, (2) omurde tek sefer,
@@ -2335,6 +2530,7 @@ window.KCaptions = (function () {
     el("cap-add-line").addEventListener("click", function () { insertAfter(segments.length - 1); });
     initYildizBar();
     initStilKartlari();
+    initEmoji();
     // acilista secili sablonu kartlara yansit
     if (el("cap-preset") && el("cap-preset").value) stilKartiIsaretle(el("cap-preset").value);
 
