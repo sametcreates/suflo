@@ -654,8 +654,18 @@ function KS_timecode(seconds) {
   var seq = KS_seq();
   var t = new Time();
   t.seconds = seconds;
-  var st = seq.getSettings();
-  return t.getFormatted(st.videoFrameRate, st.videoDisplayFormat);
+  /*
+   * getSettings().videoFrameRate BU API'DE YOK (v1.9'da kanıtlandı — overlay
+   * fps'i bu yüzden timebase'ten alınır). Eski kod onu getFormatted'a verip
+   * exception fırlatıyordu; razor'lar sessizce atlanıyor, kesim "çalışmıyor"
+   * görünüyordu. Tek karenin süresi = seq.timebase tick'i; getFormatted'ın
+   * beklediği kare hızı Time'ı budur.
+   */
+  var kare = new Time();
+  kare.ticks = String(seq.timebase);
+  var df = 0;
+  try { df = seq.getSettings().videoDisplayFormat; } catch (e) {}
+  return t.getFormatted(kare, df);
 }
 
 

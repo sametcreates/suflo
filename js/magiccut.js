@@ -28,7 +28,15 @@ window.KCut = (function () {
     var ctx = KApp.ctx();
     el("cut-analyze").disabled = busy || !ctx.sel;
     if (ctx.connected && !ctx.sel && !busy) status("Timeline'da bir klip seç.");
-    else if (!busy) status("");
+    else if (!busy) {
+      /*
+       * Uyarı/hata mesajına DOKUNMA: analyze'ın finally'si setBusy(false) →
+       * buraya geliyor ve eski kod status("") ile hatayı daha kullanıcı
+       * okuyamadan siliyordu — "tıklıyorum, hiçbir şey olmuyor" bunun sonucu.
+       */
+      var e = el("cut-status");
+      if (!/warn|bad/.test(e.className)) status("");
+    }
   }
 
   /* ---------------- Analiz ---------------- */
@@ -75,6 +83,18 @@ window.KCut = (function () {
         "-f", "null", "-"
       ]);
       var sil = parseSilence(res.stderr || "");
+      K.log("[kesim] ffmpeg kod=" + res.code + " ham aralik=" + sil.length +
+        " sure=" + dur.toFixed(1) + " esik=" + noise + "dB");
+      /*
+       * ffmpeg hata verdiyse (ses akışı yok, dosya okunamadı, codec eksik…)
+       * bunu "duraksama yok" diye yutma — eski davranış kullanıcıyı eşikle
+       * boğuşturuyordu, oysa sorun bambaşkaydı.
+       */
+      if (sil.length === 0 && res.code !== 0) {
+        throw new Error("ses analizi başarısız: " +
+          String(res.stderr || "").split("\n").filter(function (s) { return s.trim(); })
+            .slice(-2).join(" ").slice(0, 180));
+      }
 
       var offset = clip.clipStart;
       ranges = [];

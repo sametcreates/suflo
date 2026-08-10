@@ -1,3 +1,13 @@
+## Suflo 2.2.1 — Kesim düzeltmeleri
+
+2.2.0'daki "Duraksamaları bul" bazı kurulumlarda sonuçsuz görünüyordu. Üç düzeltme:
+
+- **Kesimleri uygulama onarıldı**: razor zamankodu, Premiere API'sinde bulunmayan bir alandan (`videoFrameRate`) türetilmeye çalışılıyordu ve sessizce başarısız oluyordu — artık sekansın kendi zaman tabanından hesaplanıyor.
+- **Hatalar artık görünür**: ffmpeg ses analizinde hata verirse (ses akışı yok, dosya okunamıyor…) eskiden yanıltıcı "duraksama yok" mesajı çıkıyordu, üstelik durum satırı hatayı anında sildiği için çoğu zaman hiçbir şey görünmüyordu. İkisi de düzeldi; gerçek hata mesajı ekranda kalıyor.
+- Kesim analizi artık tanı günlüğüne yazıyor (Ayarlar → Destek → "Günlüğü kopyala" ile paylaşabilirsin).
+
+---
+
 ## Suflo 2.2 — Kesim geri döndü, ritim geldi, emoji geldi
 
 "Altyazının baronu" olduk; şimdi baronun çevresini kuruyoruz. Bu sürüm panele iki sekme ve altyazı düzenleyiciye bir emoji seçici ekliyor — üçü de tamamen makinede çalışıyor, hiçbir şey internete gitmiyor.
