@@ -244,6 +244,45 @@ function ortam(opts) {
   chk("eski surum yayindaysa serit acilmiyor", !bar3 || bar3.hidden !== false,
     bar3 ? bar3.hidden : "seride hic dokunulmadi");
 
+  /*
+   * 6) YALNIZ Kurulum ZIP'li release — v2.2.0'da yaşanan gerçek durum.
+   * Eski kod yalnız .zxp aradığı için düğme sessizce devre dışı kalıyordu
+   * ("güncelleme gelmiyor" şikayeti). ZIP artık birinci sınıf paket.
+   */
+  var e4 = ortam({ mac: false, apiYanit: { status: 200, body: JSON.stringify({
+    tag_name: "v9.9.9",
+    body: "## Suflo 9.9.9\n\nKesim geri geldi, ritim markerlari ve emoji secici eklendi.",
+    assets: [{ name: "Suflo-9.9.9-Kurulum.zip", browser_download_url: "https://ornek/Suflo-9.9.9-Kurulum.zip" }]
+  }) } });
+  if (e4.belgeOlaylari.DOMContentLoaded) { try { e4.belgeOlaylari.DOMContentLoaded(); } catch (eI4) {} }
+  await e4.KApp.checkUpdate();
+  chk("zip-only: serit ACILDI", e4.ogeler["update-bar"].hidden === false);
+  chk("zip-only: indir dugmesi ETKIN (eski hata: devre disiydi)",
+    e4.ogeler["update-indir"].disabled === false);
+  if (e4.ogeler["update-indir"].on_click) await e4.ogeler["update-indir"].on_click();
+  chk("zip-only: Kurulum ZIP'i indirildi",
+    e4.indirmeler.length === 1 && /Kurulum\.zip$/.test(e4.indirmeler[0].hedef),
+    e4.indirmeler[0] && e4.indirmeler[0].hedef);
+  chk("zip-only: kullaniciya AYIKLAMASI soyleniyor (zip icinden .bat calismaz)",
+    /ZIP'i aç|ayıkla/i.test(e4.ogeler["update-not"].textContent),
+    e4.ogeler["update-not"].textContent);
+
+  /* 7) Iki paket birden varsa Kurulum ZIP tercih edilmeli (asil dagitim yolu) */
+  var e5 = ortam({ mac: false, apiYanit: { status: 200, body: JSON.stringify({
+    tag_name: "v9.9.9",
+    body: "## Suflo 9.9.9\n\nIki paketli surum notu deneme metni.",
+    assets: [
+      { name: "Suflo-9.9.9.zxp", browser_download_url: "https://ornek/Suflo-9.9.9.zxp" },
+      { name: "Suflo-9.9.9-Kurulum.zip", browser_download_url: "https://ornek/Suflo-9.9.9-Kurulum.zip" }
+    ]
+  }) } });
+  if (e5.belgeOlaylari.DOMContentLoaded) { try { e5.belgeOlaylari.DOMContentLoaded(); } catch (eI5) {} }
+  await e5.KApp.checkUpdate();
+  if (e5.ogeler["update-indir"].on_click) await e5.ogeler["update-indir"].on_click();
+  chk("iki paketli release'te Kurulum ZIP tercih ediliyor",
+    e5.indirmeler.length === 1 && /Kurulum\.zip$/.test(e5.indirmeler[0].url),
+    e5.indirmeler[0] && e5.indirmeler[0].url);
+
   var kalan = sonuc.filter(function (s) { return s.indexOf("FAIL") === 0; }).length;
   sonuc.forEach(function (s) { console.log(s); });
   console.log("\n" + (sonuc.length - kalan) + "/" + sonuc.length + " gecti");

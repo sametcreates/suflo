@@ -496,7 +496,16 @@ window.KApp = (function () {
       // kullanici bu surumu "gosterme" dediyse rahatsiz etme
       if (K.settings().skipVersion === tag) { K.log("guncelleme v" + tag + " kullanici tarafindan gizlendi"); return; }
 
-      var zxp = (j.assets || []).filter(function (a) { return /\.zxp$/i.test(a.name); })[0];
+      /*
+       * Asıl dağıtım v1.9'dan beri Kurulum ZIP'i; .zxp yalnız ZXP Installer
+       * kullananlar için duruyor. Eskiden burada YALNIZ .zxp aranıyordu —
+       * ZIP'li bir release'te düğme sessizce devre dışı kalıyordu (yaşandı,
+       * v2.2.0). Sıra: Kurulum ZIP > .zxp > release sayfası.
+       */
+      var varliklar = j.assets || [];
+      var zip = varliklar.filter(function (a) { return /-Kurulum\.zip$/i.test(a.name); })[0];
+      var zxp = varliklar.filter(function (a) { return /\.zxp$/i.test(a.name); })[0];
+      var paket = zip || zxp;
       // Surum notunun ilk anlamli satiri: neden guncellesin, bir cumleyle
       var ilkSatir = String(j.body || "").split("\n").map(function (s) {
         return s.replace(/^[#*\->\s]+/, "").trim();
@@ -504,15 +513,17 @@ window.KApp = (function () {
 
       guncelleme = {
         surum: tag,
-        url: zxp ? zxp.browser_download_url : ("https://github.com/" + K.REPO + "/releases/latest"),
-        ad: zxp ? zxp.name : "Suflo-" + tag + ".zxp",
+        url: paket ? paket.browser_download_url : ("https://github.com/" + K.REPO + "/releases/latest"),
+        ad: paket ? paket.name : "Suflo-" + tag + "-Kurulum.zip",
+        zip: !!zip,
         not: ilkSatir.slice(0, 90)
       };
       K.log("guncelleme mevcut: v" + tag);
 
       el("update-baslik").textContent = "Yeni sürüm: v" + tag;
-      el("update-not").textContent = guncelleme.not || "İndir, çift tıkla, Premiere'i yeniden başlat.";
-      el("update-indir").disabled = !zxp;
+      el("update-not").textContent = guncelleme.not ||
+        (guncelleme.zip ? "İndir, ZIP'i aç, kur dosyasına çift tıkla." : "İndir, çift tıkla, Premiere'i yeniden başlat.");
+      el("update-indir").disabled = !paket;
       el("update-bar").hidden = false;
     } catch (e) {}
   }
@@ -546,7 +557,10 @@ window.KApp = (function () {
       }, 0, undefined, { key: "zxp:" + guncelleme.surum });
       if (!d.ok) throw new Error(d.error || "indirilemedi");
       await dosyayiGoster(hedef);
-      el("update-not").textContent = "İndirildi. Dosyaya çift tıkla, sonra Premiere'i yeniden başlat.";
+      // ZIP'in İÇİNDEN çalıştırılan .bat panel dosyalarını bulamaz — önce ayıklatmak şart
+      el("update-not").textContent = guncelleme.zip
+        ? "İndirildi. ZIP'i aç (sağ tık > Tümünü ayıkla), kur dosyasına çift tıkla, Premiere'i yeniden başlat."
+        : "İndirildi. Dosyaya çift tıkla, sonra Premiere'i yeniden başlat.";
       b.textContent = "İndirildi ✓";
       toast("v" + guncelleme.surum + " indirildi: " + hedef, "good");
     } catch (e) {
@@ -605,6 +619,8 @@ window.KApp = (function () {
     }
 
     setTimeout(checkUpdate, 4000);
+    // Panel günlerce açık kalabiliyor; tek açılış kontrolü yeni sürümü hiç göstermezdi
+    setInterval(checkUpdate, 6 * 3600 * 1000);
     // eski geçici ses dosyalarını süpür (disk sessizce dolmasın)
     setTimeout(function () { try { K.sweepTemp(); } catch (e) {} }, 6000);
   }
