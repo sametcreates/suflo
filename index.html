@@ -318,17 +318,28 @@
       <div id="cap-result" hidden>
         <div class="result-head">
           <span id="cap-result-info" class="dim"></span>
-          <span class="emoji-sarici" style="position:relative">
+          <span class="emoji-sarici">
             <button type="button" id="cap-emoji-ac" class="link-btn emoji-ac" title="Emoji ekle">😊</button>
-            <span id="cap-emoji-panel" class="emoji-panel" hidden>
-              <span class="seg-ctl" id="cap-emoji-mod" style="display:flex; margin-bottom:8px">
-                <button type="button" class="on" data-m="metin">Metne ekle</button>
-                <button type="button" data-m="sahne">Sahneye bırak</button>
-              </span>
-              <input id="cap-emoji-ara" type="text" placeholder="ara: ateş, para, gülme…">
-              <span id="cap-emoji-grid" class="emoji-grid"></span>
-              <p class="hint" id="cap-emoji-hint">Seçili satıra eklenir · görseller Twemoji (CC-BY)</p>
-            </span>
+            <div id="cap-emoji-panel" class="emoji-panel" hidden>
+              <div class="emoji-ust">
+                <input id="cap-emoji-ara" type="text" placeholder="ara: ateş, para, gülme, kalp…">
+                <select id="cap-emoji-set" title="Emoji görünümü">
+                  <option value="apple">Apple</option>
+                  <option value="twitter">Twemoji</option>
+                </select>
+                <span class="seg-ctl" id="cap-emoji-mod">
+                  <button type="button" class="on" data-m="metin">Metne ekle</button>
+                  <button type="button" data-m="sahne">Sahneye bırak</button>
+                </span>
+              </div>
+              <div id="cap-emoji-kats" class="emoji-kats"></div>
+              <div id="cap-emoji-durum" class="emoji-durum" hidden>
+                <span id="cap-emoji-durum-metin"></span>
+                <div class="progress-line"><i id="cap-emoji-durum-bar"></i></div>
+              </div>
+              <div id="cap-emoji-grid" class="emoji-grid"></div>
+              <p class="hint" id="cap-emoji-hint">Seçili satıra eklenir · görseller kullanıcı makinesine indirilir</p>
+            </div>
           </span>
           <button id="cap-undo" class="link-btn" title="Geri al (Ctrl+Z)" disabled>↶</button>
           <button id="cap-redo" class="link-btn" title="Yinele (Ctrl+Y)" disabled>↷</button>

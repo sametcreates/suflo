@@ -1,3 +1,17 @@
+## Suflo 2.3.0 — Emoji seçici büyüdü: 3770 emoji, Apple görünümü
+
+51 emojilik mini seçici, tam bir kataloğa dönüştü:
+
+- **3770 emoji** — 9 kategori (Suratlar, İnsanlar, Doğa, Yiyecek, Seyahat, Aktivite, Nesneler, Semboller, Bayraklar), sayaçlı kategori çipleri, ten rengi çeşitleri dahil.
+- **Apple görünümü** — Windows'ta bile. Görsel set ilk kullanımda tek dosya olarak (~20 MB) senin makinene iner; ffmpeg ve Whisper modeliyle aynı model. İstersen Twemoji setine geçebilirsin.
+- **Türkçe arama** — "ateş", "kalp", "para", "gülme", "köpek"… 200'e yakın Türkçe sözcük İngilizce kataloğa köprülenir; İngilizce arama da çalışır.
+- **Sahneye bırak akıllandı** — Mac'te gerçek Apple çizimi her boyutta net (sistem fontundan render); eski CEF'lerde otomatik yedek yollar devreye girer.
+- İnternet yoksa 51 emojilik yerleşik Twemoji yedeği açılır — seçici asla boş kalmaz.
+
+Telif notu: Apple'ın ve Twitter'ın emoji çizimleri pakete ve depoya konmaz (Apple'ın telifli eseri); panel görselleri herkese açık CDN'den doğrudan kullanıcının diskine indirir. Depoda yalnız MIT lisanslı metadata (adlar, kategoriler, koordinatlar) taşınır.
+
+---
+
 ## Suflo 2.2.1 — Kesim düzeltmeleri
 
 2.2.0'daki "Duraksamaları bul" bazı kurulumlarda sonuçsuz görünüyordu. Üç düzeltme:

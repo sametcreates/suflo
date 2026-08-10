@@ -88,7 +88,40 @@ var emojiBolgesi = src.slice(src.indexOf("EMOJI_ARAMA"), src.indexOf("function i
 ok("emoji kodunda \\p{...} yok", emojiBolgesi.indexOf("\\p{") === -1);
 ok("emoji kodunda /u bayragi yok", !/\/[^\/\n]*\/[a-z]*u[a-z]*[\s,;.)]/.test(emojiBolgesi));
 
-/* ================= 3) Paket listeleri emoji klasorunu tasiyor ================= */
+/* ================= 3) Tam katalog (v2.3): 3770 emoji + kategoriler ================= */
+
+var katalog = JSON.parse(fs.readFileSync(pathm.join(EMOJI, "katalog.json"), "utf8"));
+ok("katalogda 3500+ emoji var", katalog.emojiler.length >= 3500, katalog.emojiler.length);
+ok("9 kategori tanimli", katalog.kategoriler.length === 9, katalog.kategoriler.join(", "));
+ok("sheet URL jsdelivr'de ve apple seti", /cdn\.jsdelivr\.net.*emoji-datasource-apple.*64\.png/.test(katalog.sheet.url), katalog.sheet.url);
+
+var bozukGiris = katalog.emojiler.filter(function (e) {
+  return !e.c || typeof e.n !== "string" || typeof e.g !== "number" ||
+    e.g < 0 || e.g > 8 || typeof e.x !== "number" || typeof e.y !== "number" ||
+    e.x < 0 || e.x > 80 || e.y < 0 || e.y > 80;
+});
+ok("her girisin karakter/ad/kategori/koordinati gecerli", bozukGiris.length === 0,
+  bozukGiris.length ? JSON.stringify(bozukGiris[0]) : katalog.emojiler.length + " giris");
+
+var atesler = katalog.emojiler.filter(function (e) { return e.n.indexOf("fire") !== -1; });
+ok("katalogda 'fire' (ates) bulunuyor", atesler.length >= 1, atesler.length);
+ok("kalp aramasi karsiligi var", katalog.emojiler.some(function (e) { return e.n.indexOf("heart") !== -1; }));
+ok("bayrak kategorisi dolu", katalog.emojiler.some(function (e) { return e.g === 8; }));
+
+// TR arama koprusu captions.js'te tanimli ve temel sozcukler esliyor
+var t0 = src.indexOf("var EMOJI_TR = {");
+var t1 = src.indexOf("};", t0);
+ok("EMOJI_TR koprusu captions.js'te var", t0 !== -1 && t1 !== -1);
+var kopru = new Function("return (" + src.slice(t0 + "var EMOJI_TR = ".length, t1 + 1) + ");")();
+["ates", "kalp", "para", "gulme", "kopek", "bayrak"].forEach(function (k) {
+  ok("TR koprusu '" + k + "' -> '" + (kopru[k] || "YOK") + "'", !!kopru[k]);
+});
+
+// eski-CEF tuzagi: yeni emoji kodunda da \p{...} ve /u yasak (bolge buyudu)
+var yeniBolge = src.slice(src.indexOf("var EMOJI_TR"), src.indexOf("function initEmoji"));
+ok("yeni emoji kodunda \\p{...} yok", yeniBolge.indexOf("\\p{") === -1);
+
+/* ================= 4) Paket listeleri emoji klasorunu tasiyor ================= */
 
 ["tools/package.ps1", "tools/kurucu-yap.ps1", "tools/install.ps1", "tools/install.sh"]
   .forEach(function (f) {

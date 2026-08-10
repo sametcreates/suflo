@@ -675,29 +675,73 @@ details.adv > *:not(summary) { margin-top: 8px; }
 /* ---------- Emoji seçici ---------- */
 
 .emoji-ac { font-size: 13px; }
+
+/*
+ * Büyük seçici: küçük popover değil, panelin ortasında ciddi bir katalog
+ * (3770 emoji, kategoriler, arama). Görseller tek spritesheet'ten gelir —
+ * 3770 ayrı istek değil, tek dosya + background-position.
+ */
 .emoji-panel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 40;
-  width: 264px;
-  padding: 10px;
+  position: fixed;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  z-index: 60;
+  width: min(680px, 94vw);
+  max-height: min(560px, 84vh);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
   background: var(--bg2);
   border: 1px solid var(--line2);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  border-radius: 14px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .55);
 }
-.emoji-panel input {
-  width: 100%;
+.emoji-ust {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   margin-bottom: 8px;
-  font-size: 11.5px;
 }
+.emoji-ust input { flex: 1; min-width: 0; font-size: 12px; }
+.emoji-ust select { width: auto; font-size: 11.5px; }
+.emoji-kats {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.emoji-kats button {
+  border: 1px solid var(--line);
+  background: var(--bg3);
+  color: var(--dim);
+  font-size: 10.5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.emoji-kats button.on {
+  background: var(--accent-soft);
+  color: var(--fg);
+  border-color: var(--accent);
+}
+.emoji-kats button b { font-weight: 600; opacity: .6; margin-left: 3px; }
+.emoji-durum { margin-bottom: 8px; font-size: 11px; color: var(--dim); }
 .emoji-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
   gap: 2px;
-  max-height: 168px;
   overflow-y: auto;
+  flex: 1;
+  min-height: 120px;
+  align-content: start;
+}
+.emoji-grid .emoji-baslik {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dim);
+  padding: 8px 2px 3px;
 }
 .emoji-grid button {
   border: none;
@@ -706,10 +750,19 @@ details.adv > *:not(summary) { margin-top: 8px; }
   border-radius: 7px;
   cursor: pointer;
   line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .emoji-grid button:hover { background: var(--accent-soft); }
-.emoji-grid img { width: 24px; height: 24px; }
-.emoji-panel .hint { margin: 7px 0 0; }
+.emoji-grid img { width: 26px; height: 26px; }
+.emoji-grid .em {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  background-repeat: no-repeat;
+}
+.emoji-panel .hint { margin: 8px 0 0; }
 
 /* ---------- Stil kartları ---------- */
 

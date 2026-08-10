@@ -1,4 +1,17 @@
-Bu klasordeki emoji gorselleri Twemoji projesindendir.
-Telif: Twitter, Inc ve katkida bulunanlar; devami jdecked/twemoji.
-Lisans: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
-Kaynak: https://github.com/jdecked/twemoji
+Bu klasorde iki tur icerik var:
+
+1) SVG dosyalari (51 adet): Twemoji projesinden (cevrimdisi yedek set).
+   Telif: Twitter, Inc ve katkida bulunanlar; devami jdecked/twemoji.
+   Lisans: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+   Kaynak: https://github.com/jdecked/twemoji
+
+2) katalog.json: emoji-datasource (iamcal/emoji-data) projesinin METADATA'sindan
+   uretilmistir (adlar, kategoriler, spritesheet koordinatlari). Lisans: MIT.
+   Kaynak: https://github.com/iamcal/emoji-data
+
+Apple ve Twemoji emoji CIZIMLERI bu pakete DAHIL DEGILDIR ve depoda
+dagitilmaz — Apple'in emoji sanati Apple'in telifli eseridir. Panel,
+kullanicinin sectigi gorsel seti (spritesheet) ilk kullanimda dogrudan
+kullanicinin makinesine indirir (cdn.jsdelivr.net uzerinden emoji-datasource
+paketlerinden); indirilen dosyalar kullanicinin kendi diskinde durur ve
+Suflo tarafindan yeniden dagitilmaz.

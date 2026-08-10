@@ -346,7 +346,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "2.2.1";
+  var VERSION = "2.3.0";
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -508,6 +508,18 @@ window.K = (function () {
   function ffmpegDir() {
     if (!nodeOK) return "";
     return path.join(path.dirname(whisperDir()), "ffmpeg");
+  }
+
+  /*
+   * Emoji spritesheet'lerinin yeri (whisper/ffmpeg'in kardeşi). Apple ve
+   * Twemoji çizimleri TELİF nedeniyle pakete konamaz; panel ilk kullanımda
+   * seti buraya indirir — ffmpeg ve model indirmeleriyle aynı model.
+   */
+  function emojiSetDir() {
+    if (!nodeOK) return "";
+    var d = path.join(path.dirname(whisperDir()), "emoji-set");
+    try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); } catch (e) {}
+    return d;
   }
 
   function ffmpegKurulu() {
@@ -1063,6 +1075,7 @@ window.K = (function () {
     isAudio: isAudio,
     tmpDir: tmpDir,
     srtDir: srtDir,
+    emojiSetDir: emojiSetDir,
     MAC: MAC,
     WIN: WIN,
     macMetal: macMetal,
