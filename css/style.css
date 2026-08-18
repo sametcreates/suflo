@@ -1622,3 +1622,13 @@ canvas#mo-canvas {
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover { background: #3d4360; background-clip: content-box; }
+
+/* ---------------- Suflo Pro ---------------- */
+/* pro.js kendi upsell modal CSS'ini enjekte eder; buradakiler panelin
+   temasina oturan tamamlayicilar: rozet konumu + lisans karti. */
+.tab.pro-locked { position: relative; overflow: visible; }
+.tab.pro-locked::after { top: 3px; right: 3px; }
+#cap-overlay.pro-locked, #cap-translate-go.pro-locked { position: relative; }
+#grp-pro #pro-key { flex: 1; min-width: 0; font-family: inherit; letter-spacing: .06em; }
+#grp-pro .inline-status.bad { color: #e05c5c; }
+#pro-buy { color: inherit; }

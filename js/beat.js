@@ -208,6 +208,7 @@ window.KBeat = (function () {
   }
 
   async function analyze() {
+    if (typeof Pro !== "undefined" && !Pro.gate("beat")) return; // Pro: ritim analizi
     if (busy) return;
     clip = KApp.ctx().sel;
     if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }

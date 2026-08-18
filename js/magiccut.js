@@ -58,6 +58,7 @@ window.KCut = (function () {
   }
 
   async function analyze() {
+    if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
     if (busy) return;
     clip = KApp.ctx().sel;
     if (!clip) { status("Önce bir klip seç.", "warn"); return; }
@@ -212,6 +213,7 @@ window.KCut = (function () {
   /* ---------------- Uygulama ---------------- */
 
   async function apply() {
+    if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
     var act = activeRanges().map(function (r) { return { start: r.start, end: r.end }; });
     if (act.length === 0) return;
     el("cut-apply").disabled = true;

@@ -592,6 +592,29 @@
     </div>
 
 
+    <div class="set-group" id="grp-pro">
+      <div class="set-title">Suflo Pro</div>
+
+      <!-- Kilitli durum: anahtar girisi -->
+      <div id="pro-locked-card">
+        <p class="hint" style="margin-bottom:8px">Pro özellikleri (animasyonlu overlay, otomatik kesim, ritim, toplu işlem, çeviri) tek seferlik lisansla açılır. Abonelik yok.</p>
+        <div class="row">
+          <label for="pro-key">Anahtar</label>
+          <input id="pro-key" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+          <button id="pro-activate" class="btn primary">Etkinleştir</button>
+        </div>
+        <div id="pro-msg" class="inline-status"></div>
+        <p class="hint"><a href="#" id="pro-buy">Anahtarın yok mu? Satın al →</a></p>
+      </div>
+
+      <!-- Etkin durum -->
+      <div id="pro-active-card" hidden>
+        <p class="hint" style="margin-bottom:8px">Suflo Pro aktif ✓ <span id="pro-email" class="dim"></span></p>
+        <p class="hint" id="pro-recheck" hidden>Çevrimdışı doğrulama süresi doldu — internete bağlanınca kendiliğinden yenilenir.</p>
+        <button id="pro-deactivate" class="btn">Bu makinede devre dışı bırak</button>
+      </div>
+    </div>
+
     <div class="set-group">
       <div class="set-title">Destek</div>
       <p class="hint" style="margin-bottom:8px">Bir sorun mu var? "Sorun bildir" günlüğü kopyalar ve bildirim sayfasını açar; tek yapman gereken yapıştırmak.</p>
@@ -611,6 +634,7 @@
 
   <script src="js/CSInterface.js"></script>
   <script src="js/bridge.js"></script>
+  <script src="js/pro.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/magiccut.js"></script>

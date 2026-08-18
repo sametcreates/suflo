@@ -591,6 +591,7 @@ window.KCaptions = (function () {
   }
 
   function applyGlossary(segs) {
+    if (typeof Pro !== "undefined" && !Pro.isPro()) return segs;             // Pro: sozluk (sessiz atla)
     var rules = K.settings().glossary || [];
     if (!rules.length) return segs;
     var n = 0;
@@ -933,7 +934,12 @@ window.KCaptions = (function () {
       if (scope === "clip") {
         var sc = await K.call("KS_getSelectedClips");
         if (sc.ok && sc.clips && sc.clips.length > 1) {
-          batchClips = sc.clips;
+          if (typeof Pro !== "undefined" && !Pro.isPro()) {                   // Pro: toplu klip
+            Pro.gate("batch");
+            clip = sc.clips[0];                               // ilk kliple devam et
+          } else {
+            batchClips = sc.clips;
+          }
         } else if (sc.ok && sc.clips && sc.clips.length === 1) {
           clip = sc.clips[0];
         }
@@ -977,6 +983,10 @@ window.KCaptions = (function () {
 
       var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime, "k1"/"kc" karaoke
       var karaoke = /^k/.test(lenVal);
+      if (karaoke && typeof Pro !== "undefined" && !Pro.isPro()) {           // Pro: kelime-zamanlama
+        Pro.gate("karaoke");
+        karaoke = false; lenVal = "w3";                       // satir moduna dus, akisi kirma
+      }
       var mapped = [];
 
       if (batchClips) {
@@ -1352,6 +1362,7 @@ window.KCaptions = (function () {
   }
 
   async function translateAll() {
+    if (typeof Pro !== "undefined" && !Pro.gate("translate")) return; // Pro: ceviri
     if (segments.length === 0) return;
     var target = el("cap-translate").value;
     if (!target) { KApp.toast("Önce hedef dili seç.", "warn"); return; }
@@ -1909,6 +1920,7 @@ window.KCaptions = (function () {
     var anim = opts.animasyon || st.animasyon || (kelimeVerisi ? "karaoke" : "yok");
     if (!ANIMASYONLAR[anim]) anim = "yok";
     if (ANIMASYONLAR[anim].kelimeli && !kelimeVerisi) anim = "fade";
+    if (ANIMASYONLAR[anim].kelimeli && typeof Pro !== "undefined" && !Pro.isPro()) anim = "fade"; // Pro: kelimeli animasyon
 
     var cs = cueler();
 
@@ -2073,6 +2085,7 @@ window.KCaptions = (function () {
    * mükemmel sıkıştırıyor. Uyumsuzluk çıkarsa ProRes 4444 yedeği var.
    */
   async function overlayUygula() {
+    if (typeof Pro !== "undefined" && !Pro.gate("overlay")) return; // Pro: animasyonlu katman
     if (segments.length === 0) return;
     /*
      * Emoji bekçisi: libass emojiyi HİÇ çizemiyor (denendi — tofu bile değil,
@@ -2816,6 +2829,7 @@ window.KCaptions = (function () {
         icerik = buildVtt();
         ad = "suflo-altyazi.vtt";
       } else if (fmt === "ass") {
+        if (typeof Pro !== "undefined" && !Pro.gate("assexport")) return;    // Pro: stilli ASS
         icerik = buildAss({ karaoke: kelimeModu, animasyon: stil().animasyon });
         ad = "suflo-altyazi.ass";
         bom = "";

@@ -241,7 +241,67 @@ window.KApp = (function () {
   }
 
 
+  /* ---------------- Suflo Pro lisans UI ---------------- */
+
+  // Pro durumunu arayüze yansıt: ayar kartları + sekme/buton rozetleri.
+  // pro.js yapılandırılmadıysa (lansman öncesi) markLocked hiçbir şey yapmaz.
+  function reflectPro() {
+    if (!window.Pro) return;
+    var s = Pro.status();
+
+    var locked = el("pro-locked-card"), active = el("pro-active-card");
+    if (locked && active) {
+      locked.hidden = !!s.pro;
+      active.hidden = !s.pro;
+      var em = el("pro-email");
+      if (em) em.textContent = s.email ? "· " + s.email : "";
+      var rc = el("pro-recheck");
+      if (rc) rc.hidden = !s.needsRecheck;
+    }
+
+    // Pro'ya kilitli girişler: sekmeler + tekil butonlar
+    Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
+    Pro.markLocked(el("cap-overlay"), !s.pro);
+    Pro.markLocked(el("cap-translate-go"), !s.pro);
+  }
+
+  function initPro() {
+    if (!window.Pro || !el("pro-activate")) return;
+
+    el("pro-activate").addEventListener("click", function () {
+      var key = el("pro-key").value;
+      var msg = el("pro-msg");
+      msg.textContent = "Etkinleştiriliyor…";
+      msg.className = "inline-status";
+      Pro.activate(key, function (r) {
+        if (r.ok) {
+          msg.textContent = "";
+          toast("Suflo Pro aktif — iyi kurgular! 🎬", "good");
+          reflectPro();
+        } else {
+          msg.textContent = r.error || "Etkinleştirilemedi.";
+          msg.className = "inline-status bad";
+        }
+      });
+    });
+
+    el("pro-deactivate").addEventListener("click", function () {
+      Pro.deactivate(function () {
+        toast("Lisans bu makineden kaldırıldı.");
+        reflectPro();
+      });
+    });
+
+    el("pro-buy").addEventListener("click", function (e) {
+      e.preventDefault();
+      // TODO(lansman): Lemon Squeezy checkout URL'i gelince degistir
+      K.cs.openURLInDefaultBrowser("https://github.com/" + K.REPO + "#suflo-pro");
+    });
+  }
+
   function initSettings() {
+    initPro();
     var s = K.settings();
     el("set-provider").value = s.provider || "groq";
     el("set-apikey").value = s.apiKey || "";
@@ -600,11 +660,22 @@ window.KApp = (function () {
     guvenli("ffmpeg", checkFfmpeg);
     setInterval(pollContext, 2500);
 
+    // Pro lisans durumu EN ÖNCE: modüller isPro()'yu init sırasında okuyabilsin
+    guvenli("Pro", function () {
+      Pro.init();
+      Pro.onUpgrade(function () {
+        goster("settings");
+        var k = el("pro-key"); if (k) k.focus();
+      });
+      Pro.on(reflectPro);
+    });
+
     guvenli("sekmeler", initTabs);
     guvenli("ayarlar", initSettings);
     guvenli("Altyazı", function () { KCaptions.init(); });
     guvenli("Kesim", function () { KCut.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
+    guvenli("Pro-UI", reflectPro);
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);
     if (el("update-kapat")) {
