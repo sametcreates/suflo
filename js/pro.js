@@ -48,14 +48,14 @@
   //    (0 birakirsan sahiplik kontrolu atlanir; URETIMDE MUTLAKA DOLDUR)
   // ================================================================
   var LS = {
-    STORE_ID: 0,      // <-- LS magaza (store) ID'n
-    PRODUCT_ID: 0,    // <-- Suflo Pro urun ID'n
-    VARIANT_ID: 0,    // <-- Suflo Pro varyant ID'n
+    STORE_ID: 454844,     // Suflo magazasi (suflo.lemonsqueezy.com)
+    PRODUCT_ID: 1298713,  // Suflo Pro urunu
+    VARIANT_ID: 0,        // 0 = varyant kontrolu atlanir (store+product yeterli)
     API: 'https://api.lemonsqueezy.com'
   };
 
   // Onbellek imzasi icin gomulu anahtar. GUVENLIK DEGIL, sadece hafif engel.
-  var CACHE_SECRET = 'suflo-pro-2026-CHANGE-ME';
+  var CACHE_SECRET = 'suflo-eaa2195912684818979e11530131f6a2d4c74d81a6eb10f8';
 
   // Cevrimdisi tolerans: son basarili dogrulamadan bu kadar sonra ag olmadan
   // acik kalmaya devam eder (ucakta / air-gapped kurgu odalari icin).

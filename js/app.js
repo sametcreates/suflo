@@ -295,8 +295,8 @@ window.KApp = (function () {
 
     el("pro-buy").addEventListener("click", function (e) {
       e.preventDefault();
-      // TODO(lansman): Lemon Squeezy checkout URL'i gelince degistir
-      K.cs.openURLInDefaultBrowser("https://github.com/" + K.REPO + "#suflo-pro");
+      // Lemon Squeezy checkout — Suflo Pro 749 TL
+      K.cs.openURLInDefaultBrowser("https://suflo.lemonsqueezy.com/checkout/buy/908e6046-8c5b-4473-9418-0860468e331c");
     });
   }
 
