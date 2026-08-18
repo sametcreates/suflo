@@ -53,6 +53,27 @@ Noktalama kaldır/koru · Normal / BÜYÜK HARF / küçük harf (Türkçe İ-ı 
 
 Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır. Uygulanan SRT proje klasörüne yazılır (Premiere dosyayı kopyalamaz, yola referans verir). Model indirmesi kesilirse kaldığı yerden devam eder, ayna sunucu dener, kota/sunucu hatasında inen kısım korunur, yarım dosya kurulu sayılmaz. Vekil sunucu (proxy) Ayarlar'dan girilir; https için CONNECT tüneli kurulur.
 
+## Suflo Pro
+
+Çekirdek Suflo MIT lisanslı ve sonsuza dek ücretsiz — transkripsiyon, editör, dışa aktarım kimsenin kilidi arkasına girmiyor. Pro, üstüne gelen katman: altyazıyı CapCut görünümüne sokan animasyon motoru, sessizlikleri temizleyen otomatik kesim, kurguya tempo veren ritim marker'ları. Tek seferlik **749 TL**, abonelik yok, ömür boyu; lisans anahtarı 3 makinede geçerli → [suflo.app/pro](https://suflo.app/pro)
+
+| Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL) |
+|---|---|
+| Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Animasyonlu altyazı katmanı (CapCut görünümü, overlay) |
+| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Karaoke kelime zamanlaması + kelimeli animasyonlar (vurgu, pop, bounce) |
+| Düz stiller | Otomatik kesim (sessizlik temizleme) |
+| SRT · WebVTT · TXT dışa aktarım | Ritim/beat marker'ları |
+| SRT/VTT içe aktarım | Toplu çoklu klip transkripsiyonu |
+| Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
+| GPU hızlandırma | Stilli ASS dışa aktarım |
+| Emoji seçici | Terim sözlüğü |
+
+Kıyas için: AutoCut yılda ~179 $, Submagic yılda ~228–468 $, Kaps ve Subs aylık dolar aboneliği + dakika kotası. Suflo Pro'da sayaç yok — bir kez öde, bitti.
+
+**Dürüstlük notu:** 2.3.0'da bu özelliklerin hepsi ücretsizdi. 2.4.0'a güncellersen Pro özellikleri kilitlenir — bunu küçük puntoya gömmüyoruz, açıkça söylüyoruz. Güncelleme zorunlu değil; 2.3.0'da kalabilirsin, çalışmaya devam eder. Kod MIT: fork'layıp kendi yolunu da çizebilirsin. Pro'nun gerekçesi basit: Suflo tek geliştirici işi ve Pro geliri geliştirmeyi sürdürülebilir kılıyor. Çekirdek ücretsiz ve açık kaynak kalıyor.
+
+Emoji ve fontlar asla paywall arkasına girmez. Zaten giremez: Apple ve Twemoji görselleri üçüncü taraf telifli, pakete konmuyor — satılacak bir şey yok.
+
 ## Kurulum
 
 **Windows ve macOS**, Premiere 14.4 (2020) ve üstü. Bir kere kurulur, sonra hep hazır.
@@ -112,7 +133,7 @@ Paket yöneticisine (winget) bilerek güvenilmiyor: her Windows'ta bulunmuyor, k
 
 ## Sık sorulanlar
 
-**Gerçekten ücretsiz mi?** Evet. Panel MIT lisanslı açık kaynak; yerel altyazı motoru bilgisayarında çalışır, kimseye ödeme yapmazsın. Groq'u seçersen kendi ücretsiz anahtarını kullanırsın — kart bilgisi istemez.
+**Gerçekten ücretsiz mi?** Çekirdek: evet, sonsuza dek. Transkripsiyon (99 dil, çevrimdışı), altyazı editörü, düz stiller, SRT/VTT/TXT dışa aktarım ve caption izine uygulama MIT lisanslı ve ücretsiz; yerel motor bilgisayarında çalışır, kimseye ödeme yapmazsın. Animasyonlu altyazı, otomatik kesim ve ritim marker'ları gibi ileri özellikler 2.4.0'dan itibaren [Suflo Pro](https://suflo.app/pro)'da — tek seferlik 749 TL, abonelik yok. Dürüst olalım: 2.3.0'da bunlar da ücretsizdi. Güncellemek zorunda değilsin; eski sürüm çalışmaya devam eder, kod da MIT.
 
 **Verilerim nereye gidiyor?** Yerel motorda **sesin hiçbir yere gitmez** — bilgisayarından çıkmaz. Bulut motorunu seçersen ses yalnızca senin seçtiğin sağlayıcıya (Groq/OpenAI) gider. Tek istisna: **çeviri özelliği** buluttan çalışır, yani onu kullanırsan altyazı **metni** sağlayıcıya gönderilir (ses değil). Çeviri yapmazsan yerel motorda hiçbir şey dışarı çıkmaz.
 
@@ -158,13 +179,14 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 
 ## Yol haritası
 
-Suflo yalnızca altyazı yapar ve öyle kalacak. Sıradakiler:
+"Suflo yalnızca altyazı yapar" diyorduk; artık sessizlikleri de kesiyor, ritmi de işaretliyor. Ama hepsi aynı işin etrafında: konuşmayı izlenebilir kurguya çevirmek. Odak bu, dağılmayacak. Sıradakiler:
 
 - Panelde canlı stil önizlemesi (altyazının videoda nasıl görüneceği)
 - Altyazı rengi, yazı tipi, kontur ve ekran konumu seçimi
-- Kelime kelime vurgulu altyazıyı doğrudan timeline'a koyma
 - Konuşmacı ayrımı (podcast ve röportaj kurgusu için)
 - Azerice arayüz çevirisi
+
+Kelime kelime vurgulu altyazıyı timeline'a koyma listeden çıktı — 2.4.0 ile geldi, Pro katmanında.
 
 ## Lisans
 

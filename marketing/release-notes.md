@@ -1,3 +1,58 @@
+## Suflo 2.4.0 — Suflo Pro
+
+Suflo ikiye ayrılıyor: çekirdek altyazı akışı ücretsiz ve MIT kalıyor, viral kurgu katmanı — animasyon, karaoke, kesim, ritim — tek seferlik 749 TL'lik **Suflo Pro**'ya taşınıyor. Abonelik yok, dakika kotası yok; bir kez öde, ömür boyu kullan.
+
+### Ücretsiz kalanlar (sonsuza dek, MIT)
+
+- **Transkripsiyon** — yerel veya bulut, 99 dil, tamamen offline çalışabilir
+- **Altyazı editörü** — bölme, birleştirme, zamanlama, geri alma, taslak kurtarma
+- **Düz stiller**
+- **Dışa aktarım**: SRT, WebVTT, TXT — **içe aktarım**: SRT, VTT
+- **Premiere caption izine uygulama**
+- **GPU hızlandırma**
+- **Emoji seçici** — 3770 emoji, Apple görünümü
+
+Emoji görselleri ve fontlar hiçbir zaman ücretli olmayacak — olamaz da: Apple'ın ve Twemoji'nin çizimleri üçüncü tarafın eseri, zaten pakete konmuyor. Başkasının emeğinden para istemeyiz.
+
+### Pro'ya geçenler
+
+- **Animasyonlu altyazı katmanı** — CapCut görünümü, overlay
+- **Karaoke** — kelime-zamanlama + kelime bazlı animasyonlar (vurgu, pop, bounce)
+- **Otomatik kesim** — sessizlik temizleme
+- **Ritim marker'ları**
+- **Toplu transkripsiyon** — çoklu klip tek seferde
+- **Çeviri** — TR / AZ / EN / RU
+- **Stilli ASS dışa aktarım**
+- **Terim sözlüğü**
+
+Fiyat: **tek seferlik 749 TL** (globalde $34). Lansman haftasina ozel: **LANSMAN** koduyla **549 TL**. Lisans anahtarı 3 makinede geçerli. Kıyas için: AutoCut yılda ~$179 abonelik, Submagic yılda ~$228–468, Kaps ve Subs aylık USD abonelik artı dakika kotası ister. Suflo Pro'yu bir kez alırsın, biter.
+
+### Dürüstlük notu — 2.3.0 kullanıcısına
+
+Bunu saklamayacağız: yukarıdaki Pro özelliklerini 2.3.0'da ücretsiz kullanıyordun. 2.4.0'a güncellersen animasyonlu katman, karaoke, kesim, ritim, toplu transkripsiyon, çeviri, ASS ve sözlük lisans anahtarı ister. Üç şey net olsun:
+
+1. **Güncellemek zorunda değilsin.** 2.3.0 çalışmaya devam eder, kimse elinden almıyor.
+2. **Kod MIT.** Fork'layıp istediğini yapabilirsin; bu hak sürümle değişmez.
+3. **Çekirdek akış** — transkripsiyon, düzenleme, dışa aktarım — hep ücretsiz kalacak.
+
+### Neden paralı?
+
+Suflo'yu bir kişi geliştiriyor. 13 günde 658 indirme güzel bir başlangıç; ama hata düzeltmeleri, yeni Premiere sürümlerine uyum ve yeni özellikler zaman istiyor, zaman da bir yerden finanse edilmek zorunda. Pro geliri o yer. Çekirdek ücretsiz ve açık kaynak kalıyor; Pro, projenin yaşamasını sağlıyor.
+
+### Satın alma
+
+[suflo.app/pro](https://suflo.app/pro) — ödeme Lemon Squeezy üzerinden, anahtar 3 makinede geçerli.
+
+### Kurulum
+
+ZXP tabanlı kurulum değişmedi:
+
+1. [Kurulum ZIP'ini indir](https://github.com/sametcreates/suflo/releases/latest), aç
+2. Kur dosyasına çift tıkla (Windows: `Suflo-Kur.bat`, Mac: `Suflo-Kur.command`)
+3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
+
+---
+
 ## Suflo 2.3.0 — Emoji seçici büyüdü: 3770 emoji, Apple görünümü
 
 51 emojilik mini seçici, tam bir kataloğa dönüştü:
