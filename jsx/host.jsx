@@ -414,15 +414,22 @@ function KS_importSrtAsCaptions(encoded) {
         var r = (fmt === undefined)
           ? seq.createCaptionTrack(item, 0)
           : seq.createCaptionTrack(item, 0, fmt);
-        if (r === false || r === undefined || r === null) return false;
-        return true;
-      } catch (eC) { return false; }
+        if (r === false) return "hayir";
+        if (r === undefined || r === null) return "belirsiz"; // track OLUSMUS olabilir!
+        return "evet";
+      } catch (eC) { return "hayir"; }
     }
-    var created = tryCap(); // varsayilan format zaten Subtitle
-    if (!created && typeof Sequence !== "undefined" && Sequence.CAPTION_FORMAT_SUBTITLE !== undefined) {
-      created = tryCap(Sequence.CAPTION_FORMAT_SUBTITLE);
+    /*
+     * Ikinci deneme YALNIZ kesin basarisizlikta yapilir: "belirsiz" donuste
+     * tekrar denemek ayni SRT'den IKINCI bir altyazi track'i olusturabiliyor.
+     * Belirsizlikte captionTrack:false doner; panel taslagi korur (mevcut
+     * katilik), kullanici track'i timeline'da gorurse zaten dokunmaz.
+     */
+    var d1 = tryCap(); // varsayilan format zaten Subtitle
+    if (d1 === "hayir" && typeof Sequence !== "undefined" && Sequence.CAPTION_FORMAT_SUBTITLE !== undefined) {
+      d1 = tryCap(Sequence.CAPTION_FORMAT_SUBTITLE);
     }
-    return KS_ok({ imported: true, captionTrack: created });
+    return KS_ok({ imported: true, captionTrack: d1 === "evet" });
   } catch (e) { return KS_err(e); }
 }
 
@@ -495,6 +502,8 @@ function KS_overlaySpec() {
 
 function KS_trackFreeIn(track, aSec, bSec) {
   try {
+    // kilitli track'e overwriteClip yazamaz: "bos" degil "dolu" say
+    if (track.isLocked && track.isLocked()) return false;
     var n = track.clips.numItems;
     if (n === 0) return true;
     for (var i = 0; i < n; i++) {
@@ -545,14 +554,22 @@ function KS_tryPlace(track, item, startSec) {
   var forms = [t.ticks, startSec];
   for (var k = 0; k < forms.length; k++) {
     var n0 = track.clips.numItems;
+    /*
+     * Temizlik icin konum imzasi: ayni medyadan track'te ONCEDEN konmus klip
+     * varsa nodeId eslesmesi kullanicinin ESKI klibini silebiliyordu. Yeni
+     * geleni, yerlestirme oncesinde OLMAYAN start konumundan taniriz.
+     */
+    var once = {};
+    for (var q = 0; q < n0; q++) {
+      try { once[String(track.clips[q].start.ticks)] = 1; } catch (eQ) {}
+    }
     try { track.overwriteClip(item, forms[k]); } catch (e) { continue; }
     var good = KS_clipAt(track, startSec);
     if (good) return good;
     if (track.clips.numItems > n0) {
-      for (var j = 0; j < track.clips.numItems; j++) {
+      for (var j = track.clips.numItems - 1; j >= 0; j--) {
         try {
-          if (track.clips[j].projectItem &&
-              String(track.clips[j].projectItem.nodeId) === String(item.nodeId)) {
+          if (!once[String(track.clips[j].start.ticks)]) {
             track.clips[j].remove(0, 0);
             break;
           }
@@ -593,9 +610,10 @@ function KS_placeOverlay(encoded) {
     var startSec = 0;
     if (p.scope === "inout") {
       try { startSec = seq.getInPointAsTime().seconds; } catch (eI) {}
-    } else {
-      try { startSec = Number(seq.zeroPoint) / KS_TPS; } catch (eZ) {}
     }
+    // not: zeroPoint EKLENMEZ — trackItem.start zaten zeroPoint'ten bagimsiz
+    // sekans-ici saniye sayar; eklemek baslangic timecode'u 00:00:00:00
+    // olmayan sekanslarda altyazi katmanini komple kaydiriyordu.
     var durSec = 0;
     try { durSec = item.getOutPoint().seconds - item.getInPoint().seconds; } catch (eD) {}
     if (!(durSec > 0)) durSec = 1 / 30;
@@ -683,9 +701,18 @@ function KS_cloneActiveSeq() {
     if (!before[String(s.sequenceID)]) { created = s; break; }
   }
   if (!created) return null;
-  try { app.project.activeSequence = created; } catch (e1) {
+  /*
+   * Aktiflestirme sessizce basarisiz olabiliyor (kilitli panel, modal dialog).
+   * Dogrulamadan donersek kesimler ORIJINAL sekansa uygulanir — kullanicinin
+   * "kopyada calis" guvencesi bosa cikar. Aktif sekansin kimligini dogrula.
+   */
+  try { app.project.activeSequence = created; } catch (e1) {}
+  var act = KS_seq();
+  if (!act || String(act.sequenceID) !== String(created.sequenceID)) {
     try { app.project.openSequence(created.sequenceID); } catch (e2) {}
+    act = KS_seq();
   }
+  if (!act || String(act.sequenceID) !== String(created.sequenceID)) return null;
   return created;
 }
 
@@ -703,6 +730,9 @@ function KS_applyCuts(encoded) {
       var cloned = KS_cloneActiveSeq();
       if (!cloned) return KS_err("Kopya sekans olusturulamadi. 'Bu sekansta' modunu dene.");
       seq = KS_seq();
+      if (!seq || String(seq.sequenceID) !== String(cloned.sequenceID)) {
+        return KS_err("Kopya sekans aktif edilemedi — 'Bu sekansta' modunu dene.");
+      }
       newSeqName = String(seq.name);
     }
 
@@ -724,8 +754,46 @@ function KS_applyCuts(encoded) {
     }
 
     // 2) Sessiz araliklarin icindeki kliplere davran (ripple icin sondan basa)
-    var eps = 0.02;
+    // eps: sabit 0.02 kare suresinden kucuk kalabiliyordu (24 fps'te kare
+    // 0.0417 sn) — razor'un kareye yuvarladigi parcalar "inside" sayilmiyordu.
+    var tb = 0;
+    try { tb = Number(seq.timebase); } catch (eTb) {}
+    var eps = (tb > 0 ? tb / KS_TPS : 0.02) + 0.005;
     var removed = 0, selected = 0;
+
+    /*
+     * Ripple guvenligi: clip.remove(ripple=true) YALNIZ kendi track'ini
+     * kaydirir. Bir track araligi kliplerle tam kaplamiyorsa o track
+     * digerlerinden az kayar ve timeline KALICI senkron kaybeder.
+     * Boyle bir aralik varsa ripple'i bosluk (gap) moduna dusur ve bildir.
+     */
+    var rippleDustu = false;
+    if (p.removeMode === "ripple") {
+      var kapliMi = function (tracks, rr) {
+        for (var ti2 = 0; ti2 < tracks.numTracks; ti2++) {
+          var tr2 = tracks[ti2];
+          try { if (tr2.isLocked && tr2.isLocked()) continue; } catch (eL2) {}
+          var toplam = 0, sonrasiVar = false, n2 = tr2.clips.numItems;
+          for (var ci2 = 0; ci2 < n2; ci2++) {
+            var c2 = tr2.clips[ci2];
+            if (c2.start.seconds >= rr.start - eps && c2.end.seconds <= rr.end + eps) {
+              toplam += c2.end.seconds - c2.start.seconds;
+            }
+            if (c2.end.seconds > rr.start + eps) sonrasiVar = true;
+          }
+          if (!sonrasiVar) continue; // bu track'te kayacak icerik yok
+          if (toplam < (rr.end - rr.start) - 2 * eps) return false;
+        }
+        return true;
+      };
+      for (i = 0; i < ranges.length; i++) {
+        if (!kapliMi(seq.audioTracks, ranges[i]) || !kapliMi(seq.videoTracks, ranges[i])) {
+          rippleDustu = true;
+          p.removeMode = "gap";
+          break;
+        }
+      }
+    }
     ranges.sort(function (a, b) { return b.start - a.start; });
 
     function handleTracks(tracks) {
@@ -756,7 +824,7 @@ function KS_applyCuts(encoded) {
       handleTracks(seq.videoTracks);
     }
 
-    return KS_ok({ cuts: boundaries.length, removed: removed, selected: selected, newSeq: newSeqName });
+    return KS_ok({ cuts: boundaries.length, removed: removed, selected: selected, newSeq: newSeqName, rippleFallback: rippleDustu });
   } catch (e) { return KS_err(e); }
 }
 
@@ -817,12 +885,21 @@ function KS_placeGraphic(encoded) {
     var start = 0;
     try { start = seq.getPlayerPosition().seconds; } catch (eP) {}
     var dur = Number(p.dur) > 0 ? Number(p.dur) : 1.6;
+    /*
+     * Still once Premiere'in varsayilan duragan gorsel suresiyle (tipik 5 sn)
+     * yerlesir, SONRA kirpilir. Bos-katman kontrolunu istenen 1.6 sn ile
+     * yapmak yetmez: aradaki farkta kalan klipleri overwriteClip ezer.
+     * Kontrolu gercek yerlesme ayak iziyle yap.
+     */
+    var yerlesikDur = 0;
+    try { yerlesikDur = item.getOutPoint().seconds - item.getInPoint().seconds; } catch (eG2) {}
+    var kontrolDur = Math.max(dur, yerlesikDur > 0 ? yerlesikDur : dur);
 
-    var idx = KS_findFreeVideoTrack(seq, start, start + dur);
+    var idx = KS_findFreeVideoTrack(seq, start, start + kontrolDur);
     if (idx < 0) {
       if (KS_addTopVideoTrack()) {
         seq = app.project.activeSequence;
-        idx = KS_findFreeVideoTrack(seq, start, start + dur);
+        idx = KS_findFreeVideoTrack(seq, start, start + kontrolDur);
       }
     }
     if (idx < 0) return KS_err("Bos video katmani yok.");

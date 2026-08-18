@@ -20,7 +20,9 @@ window.KCut = (function () {
   }
 
   function fmt(sec) {
-    var m = Math.floor(sec / 60), s = sec % 60;
+    // once onda birlige yuvarla, sonra bol: 59.97 -> "1:00.0", "0:60.0" degil
+    var t = Math.round(sec * 10) / 10;
+    var m = Math.floor(t / 60), s = t - m * 60;
     return m + ":" + (s < 10 ? "0" : "") + s.toFixed(1);
   }
 
@@ -82,7 +84,7 @@ window.KCut = (function () {
         "-map", "0:a:0?",
         "-af", "silencedetect=noise=" + noise + "dB:d=" + minSil,
         "-f", "null", "-"
-      ]);
+      ], { timeout: Math.max(300000, dur * 2000) });
       var sil = parseSilence(res.stderr || "");
       K.log("[kesim] ffmpeg kod=" + res.code + " ham aralik=" + sil.length +
         " sure=" + dur.toFixed(1) + " esik=" + noise + "dB");
@@ -115,10 +117,21 @@ window.KCut = (function () {
         return;
       }
 
-      status("");
+      /*
+       * ffmpeg hatayla bitti ama yine de aralik bulduysa (zaman asimi, yarim
+       * okuma…) sonuc klibin yalnizca bir kismini kapsiyor olabilir. Bunu tam
+       * sonucmus gibi sunmak, kullanicinin klibin sonundaki sessizlikleri
+       * gozden kacirmasina yol acar — acikca soyle.
+       */
+      var kismi = res.code !== 0 && sil.length > 0;
+      if (kismi) {
+        status("⚠ Analiz tamamlanamadı — öneriler klibin yalnız bir kısmını kapsıyor olabilir. Tekrar dene.", "warn");
+      } else {
+        status("");
+      }
       el("cut-result").hidden = false;
       render();
-      KApp.toast(ranges.length + " kesim önerisi bulundu", "good");
+      KApp.toast(ranges.length + " kesim önerisi bulundu", kismi ? "warn" : "good");
     } catch (e) {
       status("✕ " + e.message, "bad");
     } finally {
@@ -232,7 +245,13 @@ window.KCut = (function () {
         ? "✂ Kopya sekansta uygulandı: " + r.newSeq
         : "✂ " + r.removed + " parça silindi" + (r.selected ? ", " + r.selected + " parça seçildi" : "");
       if (mode === "select") msg = "✂ Kesildi ve seçildi — silmek istersen Shift+Delete";
-      KApp.toast(msg, "good");
+      if (r.rippleFallback) {
+        // host, senkron kaybini onlemek icin ripple'i bosluk moduna dusurdu
+        status("⚠ Bazı track'ler aralığı tam kaplamıyor — senkron bozulmasın diye kesimler boşluk bırakılarak silindi.", "warn");
+        KApp.toast(msg + " (boşluk modunda)", "warn");
+      } else {
+        KApp.toast(msg, "good");
+      }
     } else {
       status("✕ " + r.error, "bad");
     }

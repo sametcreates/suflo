@@ -304,7 +304,7 @@ window.K = (function () {
           // .srt ASLA silinmez: Premiere içe aktarılan altyazıyı kopyalamaz, diskteki yola
           // referans verir — silinirse kullanıcının projesindeki caption izi kırılır.
           if (/\.srt$/i.test(f)) return;
-          if (!/^(cap_|seq_|warmup|montaj_|suflo_)/i.test(f)) return;
+          if (!/^(cap_|seq_|warmup|montaj_|suflo_|beat_)/i.test(f)) return;
           var fp = path.join(dir, f);
           try {
             if (Date.now() - fs.statSync(fp).mtimeMs > 86400000) { fs.unlinkSync(fp); n++; }
