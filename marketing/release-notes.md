@@ -25,7 +25,7 @@ Emoji görselleri ve fontlar hiçbir zaman ücretli olmayacak — olamaz da: App
 - **Stilli ASS dışa aktarım**
 - **Terim sözlüğü**
 
-Fiyat: **tek seferlik 749 TL** (globalde $34). Lansman haftasina ozel: **LANSMAN** koduyla **549 TL**. Lisans anahtarı 3 makinede geçerli. Kıyas için: AutoCut yılda ~$179 abonelik, Submagic yılda ~$228–468, Kaps ve Subs aylık USD abonelik artı dakika kotası ister. Suflo Pro'yu bir kez alırsın, biter.
+Fiyat: **tek seferlik 749 TL** (globalde $34). Lisans anahtarı 3 makinede geçerli. Kıyas için: AutoCut yılda ~$179 abonelik, Submagic yılda ~$228–468, Kaps ve Subs aylık USD abonelik artı dakika kotası ister. Suflo Pro'yu bir kez alırsın, biter.
 
 ### Dürüstlük notu — 2.3.0 kullanıcısına
 
