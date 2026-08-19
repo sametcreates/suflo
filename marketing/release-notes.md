@@ -1,3 +1,11 @@
+## Suflo 2.5.5 — Hazır SFX Kütüphanesi
+
+- **820 hazır SFX:** SUFLO Main SFX Library artık kurulumla birlikte gelir.
+- **Klasör klasör kullanım:** Önce kategori kartını aç, sesi ön dinle ve timeline'a ekle; tek tıkla klasörlere dön.
+- **Daha büyük MOGRT önizlemeleri:** Yazı animasyonları daha net ve anlaşılır görünür.
+- **Kompakt Emoji Assets:** Aynı ekranda daha fazla emoji kartı görünür.
+- SFX dosyaları Pro lisansı etkinleşince klasör seçmeden otomatik kullanıma açılır.
+
 ## Suflo 2.5.4 — Emoji Assets
 
 - Yeni Pro **Emoji Assets** kütüphanesi: kendi PNG, WEBP, GIF ve JPG klasörünü bağla.

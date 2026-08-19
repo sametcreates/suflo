@@ -28,6 +28,20 @@ foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "content", "in
     $p = Join-Path $src $item
     if (Test-Path -LiteralPath $p) { Copy-Item -LiteralPath $p -Destination $destFull -Recurse -Force }
 }
+
+# Gelistirici makinesinde ana SFX arsivi varsa gercek satis paketi gibi kur.
+$sfxSource = $env:SUFLO_SFX_SOURCE
+if (-not $sfxSource) {
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $sfxSource = Join-Path $desktop "SUFLO EDIT VAULT - 20+ GB\03 - SUFLO SFX & AUDIO\Sound Effects\SUFLO - Main SFX Library"
+}
+if (Test-Path -LiteralPath $sfxSource) {
+    $sfxTarget = Join-Path $destFull "content\sfx"
+    if (Test-Path -LiteralPath $sfxTarget) { Remove-Item -LiteralPath $sfxTarget -Recurse -Force }
+    New-Item -ItemType Directory -Path $sfxTarget -Force | Out-Null
+    Copy-Item -LiteralPath $sfxSource -Destination $sfxTarget -Recurse -Force
+    Write-Host "  Ana SFX kutuphanesi eklendi" -ForegroundColor DarkGray
+}
 Write-Host "  Kopyalandi: $destFull" -ForegroundColor DarkGray
 
 Write-Host ""

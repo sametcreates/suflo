@@ -96,6 +96,12 @@ window.KSfx = (function () {
     return d;
   }
 
+  function builtinSfxDir() {
+    if (!K.nodeOK || !K.path || !K.extensionPath) return "";
+    var root = K.extensionPath();
+    return root ? K.path.join(root, "content", "sfx") : "";
+  }
+
   function proGate() {
     return typeof Pro === "undefined" || Pro.gate("sfx");
   }
@@ -116,9 +122,12 @@ window.KSfx = (function () {
 
   function kaynaklar() {
     if (!K.nodeOK || !K.fs || !K.path) return [];
-    var out = [sfxDir()];
+    var out = [];
+    var builtin = builtinSfxDir();
+    if (builtin && K.fs.existsSync(builtin)) out.push(builtin);
+    out.push(sfxDir());
     var ek = String(K.settings().sfxEkKlasor || "").trim();
-    if (ek && K.fs.existsSync(ek) && norm(ek) !== norm(out[0])) out.push(ek);
+    if (ek && K.fs.existsSync(ek) && !out.some(function (p) { return norm(p) === norm(ek); })) out.push(ek);
     return out;
   }
 
@@ -141,7 +150,9 @@ window.KSfx = (function () {
         var rel = f.slice(root.length).replace(/^[\\\/]+/, "");
         var info = folderInfo(root, f);
         var name = stripExt(basename(f));
-        index.push({ name: name, path: f, folder: info.folder, collection: info.collection,
+        var isBuiltin = norm(root) === norm(builtinSfxDir());
+        index.push({ name: name, path: f, folder: info.folder,
+          collection: isBuiltin ? "SUFLO ORIGINALS" : info.collection, builtin: isBuiltin,
           hay: (name + " " + rel).toLowerCase(), smartHay: fold(name + " " + rel) });
       });
     });

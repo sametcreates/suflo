@@ -142,6 +142,7 @@ async function run() {
     /id="tab-sfx"/.test(html) && /src="js\/sfx\.js"/.test(html));
   ok("SFX klasor tarayicisi giris ve geri donus arayuzuyle hazir",
     /id="sfx-folder-browser"/.test(html) && /id="sfx-folder-back"/.test(html));
+  ok("SFX motoru kurulumla gelen paketi otomatik tarar", /content["'],\s*["']sfx/.test(sfxSrc));
   ok("Kutuphane saglik kontrolu arayuzde ve yuklu",
     /id="set-library-health-run"/.test(html) && /src="js\/library-health\.js"/.test(html));
   ok("Harici MOGRT'lar Yazi Animasyonlari'ndan ayri bolumde",

@@ -24,6 +24,18 @@ foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "content", "in
     if (Test-Path $p) { Copy-Item $p -Destination $panel -Recurse -Force }
 }
 
+# Pro kurulumuyla gelen ana SFX kutuphanesi (diger arsivler dahil edilmez).
+$sfxSource = $env:SUFLO_SFX_SOURCE
+if (-not $sfxSource) {
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $sfxSource = Join-Path $desktop "SUFLO EDIT VAULT - 20+ GB\03 - SUFLO SFX & AUDIO\Sound Effects\SUFLO - Main SFX Library"
+}
+if (-not (Test-Path -LiteralPath $sfxSource)) { throw "Ana SFX kutuphanesi bulunamadi: $sfxSource" }
+$sfxTarget = Join-Path $panel "content\sfx"
+if (Test-Path -LiteralPath $sfxTarget) { Remove-Item -LiteralPath $sfxTarget -Recurse -Force }
+New-Item -ItemType Directory -Path $sfxTarget -Force | Out-Null
+Copy-Item -LiteralPath $sfxSource -Destination $sfxTarget -Recurse -Force
+
 # Kurucular paketin köküne
 Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.bat") -Destination $stage -Force
 Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.command") -Destination $stage -Force

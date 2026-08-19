@@ -38,6 +38,20 @@ foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "content", "in
     if (Test-Path $p) { Copy-Item $p -Destination $stage -Recurse -Force }
 }
 
+# Satis paketi: yalnizca ana SFX kutuphanesi. Kaynak repo'ya 1.3 GB binary
+# eklenmez; resmi paket olusturulurken Desktop'taki dogrulanmis arsivden alinir.
+$sfxSource = $env:SUFLO_SFX_SOURCE
+if (-not $sfxSource) {
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $sfxSource = Join-Path $desktop "SUFLO EDIT VAULT - 20+ GB\03 - SUFLO SFX & AUDIO\Sound Effects\SUFLO - Main SFX Library"
+}
+if (-not (Test-Path -LiteralPath $sfxSource)) { throw "Ana SFX kutuphanesi bulunamadi: $sfxSource" }
+$sfxTarget = Join-Path $stage "content\sfx"
+if (Test-Path -LiteralPath $sfxTarget) { Remove-Item -LiteralPath $sfxTarget -Recurse -Force }
+New-Item -ItemType Directory -Path $sfxTarget -Force | Out-Null
+Copy-Item -LiteralPath $sfxSource -Destination $sfxTarget -Recurse -Force
+Write-Host "Ana SFX kutuphanesi eklendi: $sfxSource" -ForegroundColor DarkGray
+
 # kendinden imzali sertifika (yoksa uret)
 if (-not (Test-Path $cert)) {
     & $signer -selfSignedCert TR Istanbul "sametcreates" "sametcreates" $pass $cert | Out-Null
