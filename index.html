@@ -118,8 +118,8 @@
                 <option value="c60">60 karakter</option>
               </optgroup>
               <optgroup label="Karaoke (kelime zamanlı)">
-                <option value="k1">Kelime kelime</option>
-                <option value="kc">Birikimli</option>
+                <option value="k1" data-pro="1">Kelime kelime</option>
+                <option value="kc" data-pro="1">Birikimli</option>
               </optgroup>
             </select>
           </div>
@@ -199,10 +199,12 @@
               <option value="slide">Alttan kayma</option>
             </optgroup>
             <optgroup label="Kelime zamanlı (Satır uzunluğu → Karaoke)">
-              <option value="vurgu">Aktif kelime vurgusu</option>
-              <option value="karaoke">Karaoke dolgu</option>
-              <option value="pop">Pop (kelimeler büyüyerek gelir)</option>
-              <option value="bounce">Zıplama</option>
+              <option value="vurgu" data-pro="1">Aktif kelime vurgusu</option>
+              <option value="karaoke" data-pro="1">Karaoke dolgu</option>
+              <option value="akici" data-pro="1">Akıcı dolgu (pürüzsüz)</option>
+              <option value="yazim" data-pro="1">Daktilo (harf harf)</option>
+              <option value="pop" data-pro="1">Pop (kelimeler büyüyerek gelir)</option>
+              <option value="bounce" data-pro="1">Zıplama</option>
             </optgroup>
           </select>
           <p class="hint" id="cap-animasyon-ipucu" hidden style="margin:5px 0 0">
@@ -597,7 +599,27 @@
 
       <!-- Kilitli durum: anahtar girisi -->
       <div id="pro-locked-card">
-        <p class="hint" style="margin-bottom:8px">Pro özellikleri (animasyonlu overlay, otomatik kesim, ritim, toplu işlem, çeviri) tek seferlik lisansla açılır. Abonelik yok.</p>
+        <div class="pro-ozet">
+          <div>
+            <b>Ücretsiz — her zaman</b>
+            <ul>
+              <li>Transkripsiyon (99 dil, internetsiz)</li>
+              <li>Altyazı editörü + taslak kurtarma</li>
+              <li>SRT · VTT · TXT + caption track</li>
+              <li>Emoji seçici, GPU hızlandırma</li>
+            </ul>
+          </div>
+          <div>
+            <b class="pro-renk">Pro — 749 TL, tek sefer</b>
+            <ul>
+              <li>Animasyonlu altyazı katmanı</li>
+              <li>Karaoke + kelime animasyonları</li>
+              <li>Otomatik kesim · Ritim</li>
+              <li>Toplu klip · Çeviri · Sözlük · ASS</li>
+            </ul>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:8px">Tek seferlik lisans, abonelik yok, 3 makine.</p>
         <div class="row">
           <label for="pro-key">Anahtar</label>
           <input id="pro-key" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">

@@ -1950,6 +1950,8 @@ window.KCaptions = (function () {
     fade:    { ad: "Yumuşak geçiş",  kelimeli: false },
     slide:   { ad: "Alttan kayma",   kelimeli: false },
     karaoke: { ad: "Karaoke dolgu",  kelimeli: true },
+    akici:   { ad: "Akıcı dolgu",    kelimeli: true },
+    yazim:   { ad: "Daktilo",        kelimeli: true },
     vurgu:   { ad: "Aktif kelime",   kelimeli: true },
     pop:     { ad: "Pop",            kelimeli: true },
     bounce:  { ad: "Zıplama",        kelimeli: true }
@@ -2046,7 +2048,9 @@ window.KCaptions = (function () {
       assKaraokeSatirlari(cs).forEach(function (grup) {
         var sonBitis = grup[grup.length - 1].end;
 
-        if (anim === "karaoke") {
+        if (anim === "karaoke" || anim === "akici") {
+          // akici: \kf kelimeyi soldan saga surekli boyar (kesikli \k yerine)
+          var kTag = anim === "akici" ? "\\kf" : "\\k";
           var parcalar = grup.map(function (c, gi) {
             /*
              * \k sureleri ARDISIKTIR: kelimeler arasi duraklama onceki
@@ -2056,7 +2060,7 @@ window.KCaptions = (function () {
              */
             var sonraki = grup[gi + 1];
             var sure = Math.max(1, Math.round(((sonraki ? sonraki.start : c.end) - c.start) * 100)); // santisaniye
-            return "{\\k" + sure + "}" + assMetin(c.text);
+            return "{" + kTag + sure + "}" + assMetin(c.text);
           });
           olay(grup[0].start, sonBitis, parcalar.join(" "));
           return;
@@ -2087,6 +2091,25 @@ window.KCaptions = (function () {
                 parca.push("{\\1c" + vurguAss + "\\fscx114\\fscy114\\t(0,110,0.6,\\fscx100\\fscy100)}" + k + "{\\r}");
               } else {
                 parca.push(k);
+              }
+            } else if (anim === "yazim") {
+              /*
+               * Daktilo: onceki kelimeler duruk, YENI kelime harf harf belirir.
+               * Numara: ikincil renk alfasi tam seffaf ({\2a&HFF&}) + harf
+               * basina \k — karaoke "henuz soylenmemis" harfleri gorunmez
+               * kilar, \k sirasi geldikce harf "yazilir". Pencerenin ~%60'i
+               * yazima harcanir, kalani okunur halde bekler.
+               */
+              if (j < i) parca.push(k);
+              else if (j === i) {
+                var harfler = String(grup[j].text).split("");
+                var csTop = Math.max(4, Math.round((pSon - pBas) * 100));
+                var per = Math.max(2, Math.min(8, Math.floor((csTop * 0.6) / Math.max(1, harfler.length))));
+                var hp = "{\\2a&HFF&}";
+                for (var hh = 0; hh < harfler.length; hh++) {
+                  hp += "{\\k" + per + "}" + assMetin(harfler[hh]);
+                }
+                parca.push(hp);
               }
             } else if (j <= i) {
               // pop/bounce: kelimeler birikerek gelir; yalnız YENİ kelime animasyonlu

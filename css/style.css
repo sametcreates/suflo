@@ -1629,6 +1629,11 @@ canvas#mo-canvas {
 .tab.pro-locked { position: relative; overflow: visible; }
 .tab.pro-locked::after { top: 3px; right: 3px; }
 #cap-overlay.pro-locked, #cap-translate-go.pro-locked { position: relative; }
+.pro-ozet { display: flex; gap: 14px; margin: 2px 0 10px; }
+.pro-ozet > div { flex: 1; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: 8px; padding: 9px 11px; }
+.pro-ozet b { font-size: 11.5px; letter-spacing: .03em; display: block; margin-bottom: 5px; }
+.pro-ozet b.pro-renk { background: linear-gradient(90deg,#8b7cf6,#5b8cff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.pro-ozet ul { margin: 0; padding: 0 0 0 14px; font-size: 11.5px; line-height: 1.75; opacity: .85; }
 #grp-pro #pro-key { flex: 1; min-width: 0; font-family: inherit; letter-spacing: .06em; }
 #grp-pro .inline-status.bad { color: #e05c5c; }
 #pro-buy { color: inherit; }

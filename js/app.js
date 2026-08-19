@@ -264,6 +264,14 @@ window.KApp = (function () {
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
     Pro.markLocked(el("cap-overlay"), !s.pro);
     Pro.markLocked(el("cap-translate-go"), !s.pro);
+
+    // Kilitli secenekler (karaoke modlari, kelimeli animasyonlar) acilir
+    // listede " — PRO" ekiyle gorunsun: kullanici neyin ucretli oldugunu
+    // secmeyi denemeden once gorur
+    Array.prototype.forEach.call(document.querySelectorAll("option[data-pro]"), function (o) {
+      if (!o.dataset.temel) o.dataset.temel = o.textContent;
+      o.textContent = s.pro ? o.dataset.temel : o.dataset.temel + " — PRO";
+    });
   }
 
   function initPro() {
