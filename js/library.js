@@ -201,21 +201,7 @@ window.KLib = (function () {
       ciz();
     });
 
-    // kenar menü: kategori geçişi + araç kısayolları
-    Array.prototype.forEach.call(document.querySelectorAll(".ky-oge"), function (b) {
-      b.addEventListener("click", function () {
-        if (b.disabled) return;
-        var git = b.getAttribute("data-git");
-        if (git) { KApp.goster(git); return; }
-        var kat = b.getAttribute("data-kat");
-        if (!kat) return;
-        kategori = kat;
-        Array.prototype.forEach.call(document.querySelectorAll(".ky-oge[data-kat]"), function (x) {
-          x.classList.toggle("on", x === b);
-        });
-        ciz();
-      });
-    });
+    // kategori gecisi artik global sol menuden gelir (app.js -> setKategori)
 
     var ac = el("yazi-klasor-ac");
     if (ac) ac.addEventListener("click", function () {
@@ -235,5 +221,10 @@ window.KLib = (function () {
     tara();
   }
 
-  return { init: init, tara: tara };
+  function setKategori(kat) {
+    kategori = kat === "fav" ? "fav" : "mogrt";
+    ciz();
+  }
+
+  return { init: init, tara: tara, setKategori: setKategori };
 })();

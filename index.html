@@ -37,12 +37,54 @@
 
 
   
-  <nav class="tabs">
-    <button class="tab active" data-tab="captions"><span>Altyazı</span></button>
-    <button class="tab" data-tab="text"><span>Yazı</span></button>
-    <button class="tab" data-tab="cut"><span>Kesim</span></button>
-    <button class="tab" data-tab="beat"><span>Ritim</span></button>
-  </nav>
+  <div class="govde">
+  <aside class="yan-menu" id="yan-menu">
+    <div class="ky-baslik">Araçlar</div>
+    <button class="ky-oge on" data-tab="captions">
+      <span class="ky-ikon">☰</span>
+      <span class="ky-metin"><b>Altyazı</b><i>transkript · stil</i></span>
+    </button>
+    <button class="ky-oge" data-tab="cut">
+      <span class="ky-ikon">✂</span>
+      <span class="ky-metin"><b>Otomatik Kesim</b><i>sessizlik temizliği</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
+    <button class="ky-oge" data-tab="beat">
+      <span class="ky-ikon">〜</span>
+      <span class="ky-metin"><b>Ritim</b><i>beat marker'ları</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
+
+    <div class="ky-baslik" style="margin-top:12px">Kütüphane</div>
+    <button class="ky-oge" data-tab="text" data-kat="mogrt">
+      <span class="ky-ikon">Ⅱ</span>
+      <span class="ky-metin"><b>Yazı Animasyonları</b><i>MOGRT paketleri</i></span>
+      <span class="ky-adet" id="yazi-sayac">0</span>
+    </button>
+    <button class="ky-oge" data-tab="text" data-kat="fav">
+      <span class="ky-ikon">♥</span>
+      <span class="ky-metin"><b>Favoriler</b><i>işaretlediklerin</i></span>
+      <span class="ky-adet" id="fav-sayac">0</span>
+    </button>
+    <button class="ky-oge pasif" disabled>
+      <span class="ky-ikon">🔊</span>
+      <span class="ky-metin"><b>SFX</b><i>ses kütüphanesi</i></span>
+      <span class="ky-adet soluk">yakında</span>
+    </button>
+    <button class="ky-oge pasif" disabled>
+      <span class="ky-ikon">▶</span>
+      <span class="ky-metin"><b>Motion BG</b><i>hareketli zemin</i></span>
+      <span class="ky-adet soluk">yakında</span>
+    </button>
+
+    <div class="ky-alt">
+      <button class="ky-oge" data-tab="settings">
+        <span class="ky-ikon">⚙</span>
+        <span class="ky-metin"><b>Ayarlar</b><i>motor · dil · lisans</i></span>
+      </button>
+    </div>
+  </aside>
+  <main class="icerik">
 
   <div id="context-strip" class="context-strip">
     <span id="ctx-text" class="dim">bağlanıyor…</span>
@@ -548,44 +590,6 @@
     </div>
 
     <div class="kutuphane">
-      <!-- Sol menu: Rush duzeni — kategoriler + adetler + kilitler -->
-      <aside class="kut-yan">
-        <div class="ky-baslik">Kütüphane</div>
-        <button class="ky-oge on" data-kat="mogrt">
-          <span class="ky-ikon">Ⅱ</span>
-          <span class="ky-metin"><b>Yazı Animasyonları</b><i>MOGRT paketleri</i></span>
-          <span class="ky-adet" id="yazi-sayac">0</span>
-        </button>
-        <button class="ky-oge" data-kat="fav">
-          <span class="ky-ikon">♥</span>
-          <span class="ky-metin"><b>Favoriler</b><i>işaretlediklerin</i></span>
-          <span class="ky-adet" id="fav-sayac">0</span>
-        </button>
-        <button class="ky-oge pasif" disabled>
-          <span class="ky-ikon">🔊</span>
-          <span class="ky-metin"><b>SFX</b><i>ses kütüphanesi</i></span>
-          <span class="ky-adet soluk">yakında</span>
-        </button>
-        <button class="ky-oge pasif" disabled>
-          <span class="ky-ikon">▶</span>
-          <span class="ky-metin"><b>Motion BG</b><i>hareketli zemin</i></span>
-          <span class="ky-adet soluk">yakında</span>
-        </button>
-
-        <div class="ky-baslik" style="margin-top:14px">Araçlar</div>
-        <button class="ky-oge" data-git="cut">
-          <span class="ky-ikon">✂</span>
-          <span class="ky-metin"><b>Otomatik Kesim</b><i>sessizlik temizliği</i></span>
-          <span class="ky-kilit" data-kilit>PRO</span>
-        </button>
-        <button class="ky-oge" data-git="beat">
-          <span class="ky-ikon">〜</span>
-          <span class="ky-metin"><b>Ritim</b><i>beat marker'ları</i></span>
-          <span class="ky-kilit" data-kilit>PRO</span>
-        </button>
-      </aside>
-
-      <!-- Sag icerik: baslik + rozetler + kart izgarasi -->
       <div class="kut-icerik">
         <div class="ki-bas">
           <div>
@@ -758,6 +762,9 @@
       <p class="dim">Suflo <span id="hakkinda-ver">v1.7</span> — Premiere için ücretsiz altyazı paneli.<br>Türkçe ve Azerice dahil 99 dil · abonelik yok, kredi yok, hesap yok.<br>MIT · sametcreates</p>
     </div>
   </section>
+
+  </main>
+  </div>
 
   <div id="toasts" class="toasts"></div>
 

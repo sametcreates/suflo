@@ -121,6 +121,13 @@ window.KApp = (function () {
     Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
       b.classList.toggle("active", b.dataset.tab === ad);
     });
+    // sol menu: ayni sekmeye birden fazla girdi varsa (Yazi/Favoriler) ilkini isaretle
+    var yanAktif = document.querySelector('.yan-menu .ky-oge.on[data-tab="' + ad + '"]');
+    if (!yanAktif) {
+      Array.prototype.forEach.call(document.querySelectorAll(".yan-menu .ky-oge"), function (x) {
+        x.classList.toggle("on", x.dataset.tab === ad && !yanAktif && (yanAktif = x));
+      });
+    }
     if (tabListeners[ad]) tabListeners[ad]();
   }
 
@@ -143,6 +150,19 @@ window.KApp = (function () {
         var ad = b.dataset.tab;
         if (ad === "settings" && el("tab-settings").classList.contains("active")) ad = "captions";
         goster(ad);
+      });
+    });
+
+    // Sol menu: tum bolumler solda (Rush duzeni). data-kat tasiyanlar
+    // Yazi sekmesini ilgili kategoriyle acar (Yazi Animasyonlari / Favoriler).
+    Array.prototype.forEach.call(document.querySelectorAll(".yan-menu .ky-oge[data-tab]"), function (b) {
+      b.addEventListener("click", function () {
+        goster(b.dataset.tab);
+        var kat = b.getAttribute("data-kat");
+        if (kat && window.KLib && KLib.setKategori) KLib.setKategori(kat);
+        Array.prototype.forEach.call(document.querySelectorAll(".yan-menu .ky-oge"), function (x) {
+          x.classList.toggle("on", x === b);
+        });
       });
     });
   }

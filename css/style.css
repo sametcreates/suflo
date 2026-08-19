@@ -1881,3 +1881,35 @@ canvas#mo-canvas {
   .ky-oge { width: auto; }
   .ky-metin i { display: none; }
 }
+
+
+/* ---- v2.5: kalici sol menu (Rush duzeni — tum bolumler solda) ---- */
+.tabs { display: none !important; } /* ust sekme donemi kapandi */
+.govde { display: flex; align-items: stretch; min-height: calc(100vh - 46px); }
+.yan-menu {
+  flex: 0 0 176px;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 10px 8px;
+  border-right: 1px solid var(--line);
+  background: var(--bg2);
+  position: sticky; top: 0;
+  align-self: flex-start;
+  min-height: calc(100vh - 46px);
+}
+.yan-menu .ky-oge { background: transparent; border-color: transparent; }
+.yan-menu .ky-oge:hover { background: var(--bg3); border-color: var(--line); }
+.yan-menu .ky-oge.on { background: var(--accent-soft); border-color: rgba(139,124,246,.5); }
+.ky-alt { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
+.icerik { flex: 1; min-width: 0; padding: 0 10px; }
+.icerik .tabpane { padding-left: 0; padding-right: 0; }
+
+/* tab-text sadelesti: ic kutuphane tam genislik */
+.kutuphane { display: block; }
+.kut-icerik { width: 100%; }
+
+/* dar panel: sol menu ikon rayina doner */
+@media (max-width: 470px) {
+  .yan-menu { flex-basis: 46px; padding: 10px 5px; }
+  .yan-menu .ky-metin, .yan-menu .ky-adet, .yan-menu .ky-kilit, .yan-menu .ky-baslik { display: none; }
+  .yan-menu .ky-oge { justify-content: center; padding: 8px 0; }
+}
