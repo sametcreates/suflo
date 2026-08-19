@@ -391,7 +391,7 @@
           '<li>Toplu islem, ceviri, sozluk, ASS</li>' +
           '<li>Yazi animasyonu kutuphanesi (MOGRT)</li>' +
         '</ul>' +
-        '<div class="pro-upsell-fiyat"><b>749 TL</b><span>tek seferlik \u00b7 3 makine \u00b7 omur boyu</span></div>' +
+        '<div class="pro-upsell-fiyat"><b>749 TL</b><span>tek seferlik \u00b7 abonelik yok \u00b7 omur boyu</span></div>' +
         '<div class="pro-upsell-actions">' +
           '<button id="pro-upsell-go" class="pro-btn-primary">Y\u00fckselt \u2192</button>' +
         '</div>' +
