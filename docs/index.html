@@ -272,28 +272,32 @@ section h2{font-size:clamp(25px,3.4vw,37px)}
 .tel{
   aspect-ratio:9/16;border-radius:18px;position:relative;overflow:hidden;
   background:
-    radial-gradient(130% 85% at 50% 8%,rgba(139,124,246,.16),transparent 60%),
-    linear-gradient(180deg,#1a1d2a 0%,#111420 55%,#0a0b10 100%);
+    linear-gradient(180deg,transparent 48%,rgba(0,0,0,.35) 74%,rgba(0,0,0,.72) 100%),
+    radial-gradient(75% 55% at 24% 20%,rgba(139,124,246,.75),transparent 62%),
+    radial-gradient(70% 50% at 84% 26%,rgba(91,140,255,.7),transparent 60%),
+    radial-gradient(85% 55% at 62% 96%,rgba(242,201,76,.4),transparent 66%),
+    radial-gradient(60% 45% at 10% 88%,rgba(255,120,180,.35),transparent 64%),
+    linear-gradient(150deg,#2a2247,#161d33 58%,#0c0f18);
   border:1px solid var(--line2);
-  box-shadow:0 22px 50px -22px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.06);
+  box-shadow:0 22px 50px -22px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.08);
 }
 .tel::before{content:"";position:absolute;top:9px;left:50%;transform:translateX(-50%);width:60px;height:16px;border-radius:10px;background:#07080c;opacity:.9}
 .tel .sahne{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:18%}
-.altyazi{font-weight:800;text-align:center;font-size:clamp(13px,1.6vw,17px);line-height:1.5;padding:0 8px;text-shadow:0 1px 0 rgba(0,0,0,.85),0 3px 12px rgba(0,0,0,.6)}
+.altyazi{font-weight:800;text-align:center;font-size:clamp(17px,2.3vw,23px);line-height:1.4;padding:0 10px;letter-spacing:-.01em;text-shadow:0 2px 0 rgba(0,0,0,.9),0 4px 16px rgba(0,0,0,.7)}
 .altyazi .kk{display:inline-block;margin:0 .13em}
 .tel .tag-pro{position:absolute;top:10px;right:10px;font-size:9px;font-weight:800;letter-spacing:.08em;padding:3px 7px;border-radius:6px;background:var(--grad);color:#fff}
 .altbilgi{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:0 3px}
 .altbilgi b{font-size:13px}
 .altbilgi i{font-style:normal;font-size:10.5px;color:var(--faint)}
 @keyframes dolgu-a{0%,8%{background-size:0% 100%}38%,100%{background-size:100% 100%}}
-.demo-karaoke .kk{color:rgba(237,236,245,.42);background:var(--grad);background-repeat:no-repeat;background-size:0% 100%;-webkit-background-clip:text;background-clip:text;animation:dolgu-a 3.6s var(--ease) infinite;animation-delay:calc(var(--i)*.5s)}
+.demo-karaoke .kk{color:rgba(255,255,255,.6);background:linear-gradient(90deg,#c9beff,#8fb4ff);background-repeat:no-repeat;background-size:0% 100%;-webkit-background-clip:text;background-clip:text;animation:dolgu-a 3.6s var(--ease) infinite;animation-delay:calc(var(--i)*.5s)}
 @keyframes pop-a{0%,100%{transform:scale(1);background:transparent;color:#fff}9%,22%{transform:scale(1.16);background:var(--sari);color:#14110a;border-radius:.18em}}
 .demo-pop2 .kk{color:#fff;padding:.02em .15em;animation:pop-a 3.2s var(--ease) infinite;animation-delay:calc(var(--i)*.4s)}
-@keyframes giris-a{0%,100%{opacity:0;transform:translateY(13px)}10%,58%{opacity:1;transform:translateY(0)}70%{opacity:0}}
-.demo-reels .satir{display:block;color:#fff;animation:giris-a 4.2s var(--ease) infinite;animation-delay:calc(var(--i)*1.35s);opacity:0}
+@keyframes giris-a{0%{opacity:0;transform:translateY(16px)}22%,100%{opacity:1;transform:translateY(0)}}
+.demo-reels .satir{display:block;color:#fff;animation:giris-a 3.8s var(--ease) infinite;animation-delay:calc(var(--i)*.9s);opacity:0}
 .demo-reels .vv{color:var(--sari)}
-@keyframes harf-a{0%{opacity:0}6%,72%{opacity:1}82%,100%{opacity:0}}
-.demo-daktilo .h{color:#fff;opacity:0;animation:harf-a 3.8s steps(1,end) infinite;animation-delay:calc(var(--i)*.09s)}
+@keyframes harf-a{0%{opacity:0}10%,100%{opacity:1}}
+.demo-daktilo .h{color:#fff;opacity:0;animation:harf-a 4s steps(1,end) infinite;animation-delay:calc(var(--i)*.12s)}
 .demo-daktilo .imlec{display:inline-block;width:.09em;height:1em;background:var(--accent-lite);vertical-align:-.12em;margin-left:.05em;animation:yanip-a 1s steps(1,end) infinite}
 @keyframes yanip-a{0%,49%{opacity:1}50%,100%{opacity:0}}
 .stil-not{margin-top:18px;font-size:13.5px;color:var(--dim);max-width:64ch}
@@ -743,6 +747,11 @@ html.js .reveal.in{opacity:1;transform:none}
         <b>Ⅱ Yazı animasyonu kütüphanesi</b>
         <p>MOGRT paketlerin panelde: ara, favorile, tek tıkla playhead'e ekle.</p>
       </a>
+      <a class="pv" href="/pro">
+        <span class="pv-rozet">PRO</span>
+        <b>☺ Emoji Assets</b>
+        <p>PNG, WEBP ve GIF arşivin büyük kartlarda: ara, favorile, timeline'a bırak.</p>
+      </a>
     </div>
     <p class="pv-cta reveal"><a class="btn ghost" href="/pro">Pro'yu keşfet →</a></p>
   </section>
@@ -795,6 +804,7 @@ html.js .reveal.in{opacity:1;transform:none}
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Animasyonlu altyazı katmanı — karaoke, pop, daktilo</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Otomatik kesim + ritim senkronu</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Yazı animasyonu kütüphanesi (MOGRT)</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Emoji Assets — PNG · WEBP · GIF kütüphanesi</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Toplu klip · çeviri · sözlük · ASS · ömür boyu güncelleme</li>
         </ul>
         <a class="btn primary" href="https://suflo.lemonsqueezy.com/checkout/buy/7707bc43-acc2-4197-8bf4-03fcaf5b7233">Suflo Pro'yu Al →</a>
@@ -815,6 +825,7 @@ html.js .reveal.in{opacity:1;transform:none}
         <tr><th scope="row">Animasyonlu altyazı katmanı + karaoke</th><td class="h">—</td><td class="e">✓</td></tr>
         <tr><th scope="row">Otomatik kesim + ritim senkronu</th><td class="h">—</td><td class="e">✓</td></tr>
         <tr><th scope="row">Yazı animasyonu kütüphanesi (MOGRT)</th><td class="h">—</td><td class="e">✓</td></tr>
+        <tr><th scope="row">Emoji Assets (kendi PNG/WEBP/GIF arşivin)</th><td class="h">—</td><td class="e">✓</td></tr>
         <tr><th scope="row">Toplu klip · çeviri · sözlük · ASS</th><td class="h">—</td><td class="e">✓</td></tr>
         <tr><th scope="row">Fiyat</th><td class="e">Sonsuza dek ücretsiz</td><td class="e"><b>749 TL</b> · tek seferlik · abonelik yok</td></tr>
       </tbody>
@@ -919,7 +930,7 @@ html.js .reveal.in{opacity:1;transform:none}
     <details class="reveal">
       <summary>Suflo Pro'da ne var?</summary>
       <p>Animasyonlu altyazı katmanı (karaoke dolgu, pop, daktilo), otomatik sessizlik kesimi,
-      ritim marker'ları, yazı animasyonu kütüphanesi (MOGRT), toplu klip, çeviri ve stilli ASS.
+      ritim marker'ları, MOGRT/SFX kütüphaneleri, Emoji Assets, toplu klip, çeviri ve stilli ASS.
       Tek seferlik 749 TL, abonelik yok — <a href="/pro">canlı demolarla incele →</a></p>
     </details>
     <details class="reveal">

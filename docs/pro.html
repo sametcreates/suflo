@@ -70,13 +70,17 @@ img{max-width:100%}
 /* ---------- telefon çerçevesi + altyazı demoları ---------- */
 .tel{aspect-ratio:9/16;border-radius:22px;position:relative;overflow:hidden;
   background:
-    radial-gradient(130% 85% at 50% 8%,rgba(139,124,246,.16),transparent 60%),
-    linear-gradient(180deg,#1a1d2a 0%,#111420 55%,#0a0b10 100%);
-  border:1px solid var(--line2);box-shadow:0 24px 60px -24px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.06)}
-.tel::before{content:"";position:absolute;top:10px;left:50%;transform:translateX(-50%);width:74px;height:20px;border-radius:12px;background:#07080c;opacity:.9}
-.tel .sahne{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:18%}
-.altyazi{font-weight:800;text-align:center;font-size:clamp(15px,2.1vw,21px);line-height:1.5;padding:0 10px;
-  text-shadow:0 1px 0 rgba(0,0,0,.85),0 3px 12px rgba(0,0,0,.6)}
+    linear-gradient(180deg,transparent 48%,rgba(0,0,0,.35) 74%,rgba(0,0,0,.72) 100%),
+    radial-gradient(75% 55% at 24% 20%,rgba(139,124,246,.75),transparent 62%),
+    radial-gradient(70% 50% at 84% 26%,rgba(91,140,255,.7),transparent 60%),
+    radial-gradient(85% 55% at 62% 96%,rgba(242,201,76,.4),transparent 66%),
+    radial-gradient(60% 45% at 10% 88%,rgba(255,120,180,.35),transparent 64%),
+    linear-gradient(150deg,#2a2247,#161d33 58%,#0c0f18);
+  border:1px solid var(--line2);box-shadow:0 24px 60px -24px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.08)}
+.tel::before{content:"";position:absolute;top:10px;left:50%;transform:translateX(-50%);width:70px;height:18px;border-radius:12px;background:#07080c;opacity:.85;z-index:2}
+.tel .sahne{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:15%;z-index:1}
+.altyazi{font-weight:800;text-align:center;font-size:clamp(21px,3vw,30px);line-height:1.4;padding:0 12px;letter-spacing:-.01em;
+  text-shadow:0 2px 0 rgba(0,0,0,.9),0 4px 16px rgba(0,0,0,.7)}
 .altyazi .k{display:inline-block;margin:0 .14em}
 .tel .etiket{position:absolute;top:12px;right:12px;display:flex;gap:6px;align-items:center}
 .tag-pro{font-size:9.5px;font-weight:800;letter-spacing:.08em;padding:3px 7px;border-radius:6px;background:var(--grad);color:#fff}
@@ -85,18 +89,18 @@ img{max-width:100%}
 
 /* --- karaoke dolgu: kelime soldan sağa gradyanla dolar --- */
 @keyframes dolgu{0%,8%{background-size:0% 100%}38%,100%{background-size:100% 100%}}
-.demo-karaoke .k{color:rgba(237,236,245,.42);background:var(--grad);background-repeat:no-repeat;background-size:0% 100%;
+.demo-karaoke .k{color:rgba(255,255,255,.6);background:linear-gradient(90deg,#c9beff,#8fb4ff);background-repeat:no-repeat;background-size:0% 100%;
   -webkit-background-clip:text;background-clip:text;animation:dolgu 3.6s var(--ease) infinite;animation-delay:calc(var(--i)*.5s)}
 /* --- pop: aktif kelime büyür + sarı kutu --- */
 @keyframes popv{0%,100%{transform:scale(1);background:transparent;color:#fff}9%,22%{transform:scale(1.16);background:var(--sari);color:#14110a;border-radius:.18em}}
 .demo-pop .k{padding:.02em .16em;animation:popv 3.2s var(--ease) infinite;animation-delay:calc(var(--i)*.4s)}
 /* --- reels: satırlar sırayla yükselir --- */
-@keyframes girisv{0%,100%{opacity:0;transform:translateY(14px)}10%,58%{opacity:1;transform:translateY(0)}70%{opacity:0}}
-.demo-reels .satir{display:block;animation:girisv 4.2s var(--ease) infinite;animation-delay:calc(var(--i)*1.35s);opacity:0}
+@keyframes girisv{0%{opacity:0;transform:translateY(16px)}22%,100%{opacity:1;transform:translateY(0)}}
+.demo-reels .satir{display:block;animation:girisv 3.8s var(--ease) infinite;animation-delay:calc(var(--i)*.9s);opacity:0}
 .demo-reels .vv{color:var(--sari)}
 /* --- daktilo: harf harf yazılır --- */
-@keyframes harf{0%{opacity:0}6%,72%{opacity:1}82%,100%{opacity:0}}
-.demo-daktilo .h{opacity:0;animation:harf 3.8s steps(1,end) infinite;animation-delay:calc(var(--i)*.09s)}
+@keyframes harf{0%{opacity:0}10%,100%{opacity:1}}
+.demo-daktilo .h{opacity:0;animation:harf 4s steps(1,end) infinite;animation-delay:calc(var(--i)*.12s)}
 .demo-daktilo .imlec{display:inline-block;width:.09em;height:1em;background:var(--accent-lite);vertical-align:-.12em;margin-left:.06em;animation:yanip 1s steps(1,end) infinite}
 @keyframes yanip{0%,49%{opacity:1}50%,100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){
@@ -390,6 +394,11 @@ footer span,footer a{font-size:12.5px;color:var(--faint);text-decoration:none}
         <div class="yeni">→ <em>kütüphaneden tek tık</em></div>
         <p>MOGRT paketlerin panelde; sürükleme bile yok, "Ekle" de playhead'e insin.</p>
       </div>
+      <div class="zl">
+        <span class="eski">Emoji arama: klasör · tarayıcı · indirme</span>
+        <div class="yeni">→ <em>DRAG ve devam</em></div>
+        <p>PNG, WEBP ve GIF arşivin büyük kartlarda; ara, favorile, playhead'e bırak.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -518,6 +527,7 @@ footer span,footer a{font-size:12.5px;color:var(--faint);text-decoration:none}
       <div class="oz"><span class="tag-pro">PRO</span><h3>✂️ Otomatik kesim</h3><p>Sessizlikleri bulur, görsel çubukta onaylarsın, tek tıkla temizler. Konuşma videosunda saatlik jump-cut işi dakikaya iner.</p></div>
       <div class="oz"><span class="tag-pro">PRO</span><h3>🥁 Ritim senkronu</h3><p>Müziğin vuruşlarını gerçek sinyal analiziyle bulur, timeline'a marker atar — kesimlerini tempoya oturt.</p></div>
       <div class="oz"><span class="tag-pro">PRO</span><h3>📚 Toplu işlem + çeviri</h3><p>Klipleri sıraya al, tek seferde altyazıla; TR/AZ/EN/RU çeviri, terim sözlüğü, stilli ASS dışa aktarım.</p></div>
+      <div class="oz"><span class="tag-pro">PRO</span><h3>☺ Emoji Assets</h3><p>Kendi PNG, WEBP, GIF ve JPG arşivini bağla. Büyük önizleme, arama, favoriler ve tek tıkla güvenli timeline yerleşimi.</p></div>
       <div class="oz free"><span class="fbadge">ÜCRETSİZ</span><h3>🎙 Türkçe transkripsiyon</h3><p>99 dil, internetsiz, sınırsız. Çekirdek MIT lisanslı — sonsuza dek ücretsiz kalır.</p></div>
       <div class="oz free"><span class="fbadge">ÜCRETSİZ</span><h3>📝 Altyazı editörü</h3><p>Böl, birleştir, zamanla, geri al. SRT/VTT içe-dışa aktarım, Premiere caption izi.</p></div>
     </div>
@@ -544,6 +554,7 @@ footer span,footer a{font-size:12.5px;color:var(--faint);text-decoration:none}
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Animasyonlu altyazı + karaoke + daktilo, tüm stiller</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Otomatik kesim + ritim senkronu</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Toplu işlem, çeviri, sözlük, ASS dışa aktarım</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>MOGRT, SFX ve Emoji Assets yerel kütüphaneleri</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>Ömür boyu güncelleme — bir kez öde, hep senin</li>
       </ul>
 
