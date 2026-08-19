@@ -49,7 +49,7 @@
   // ================================================================
   var LS = {
     STORE_ID: 454844,     // Suflo magazasi (suflo.lemonsqueezy.com)
-    PRODUCT_ID: 1298713,  // Suflo Pro urunu
+    PRODUCT_ID: 1302573,  // Suflo Pro urunu (CANLI — test 1298713 degil)
     VARIANT_ID: 0,        // 0 = varyant kontrolu atlanir (store+product yeterli)
     API: 'https://api.lemonsqueezy.com'
   };

@@ -352,7 +352,7 @@ window.KApp = (function () {
     el("pro-buy").addEventListener("click", function (e) {
       e.preventDefault();
       // Lemon Squeezy checkout — Suflo Pro 749 TL
-      K.cs.openURLInDefaultBrowser("https://suflo.lemonsqueezy.com/checkout/buy/908e6046-8c5b-4473-9418-0860468e331c");
+      K.cs.openURLInDefaultBrowser("https://suflo.lemonsqueezy.com/checkout/buy/7707bc43-acc2-4197-8bf4-03fcaf5b7233");
     });
   }
 
