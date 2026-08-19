@@ -8,10 +8,11 @@
 window.KSfx = (function () {
   "use strict";
 
-  var index = [];          // { name, path, folder, hay }
+  var index = [];          // { name, path, folder, collection, hay }
   var filtered = [];
   var cursor = -1;
   var filterMode = "all"; // all | fav | recent
+  var folderMode = "all";
   var audio = new Audio();
   var playingPath = null;
   var durCache = {};
@@ -53,6 +54,23 @@ window.KSfx = (function () {
   function basename(p) { return String(p || "").replace(/^.*[\\\/]/, ""); }
   function stripExt(n) { return n.replace(/\.[^.]+$/, ""); }
   function norm(p) { return String(p || "").replace(/\\/g, "/").toLowerCase(); }
+  function cleanFolder(n) {
+    n = String(n || "").replace(/^SUFLO\s*-\s*/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+    return n || "Suflo SFX";
+  }
+  function folderInfo(root, file) {
+    var rel = file.slice(root.length).replace(/^[\\\/]+/, "");
+    var parts = rel.split(/[\\\/]/);
+    parts.pop();
+    if (!parts.length) return { folder: "Suflo SFX", collection: cleanFolder(basename(root)) };
+    var collection = cleanFolder(parts[0]);
+    // Vault paket adini kategori olarak gostermek yerine bir alt klasordeki
+    // gercek SFX turunu kullan: WHOOSH, CLICKS, CAMERA, RISERS gibi.
+    var folder = parts.length > 1 && (/^SUFLO\b/i.test(parts[0]) || /\b(?:collection|library)\b/i.test(parts[0]))
+      ? cleanFolder(parts[1])
+      : cleanFolder(parts[0]);
+    return { folder: folder, collection: collection };
+  }
   function fold(s) {
     return String(s || "").toLowerCase()
       .replace(/[ç]/g, "c").replace(/[ğ]/g, "g").replace(/[ıİi]/g, "i")
@@ -121,13 +139,14 @@ window.KSfx = (function () {
         if (seen[key]) return;
         seen[key] = true;
         var rel = f.slice(root.length).replace(/^[\\\/]+/, "");
-        var parts = rel.split(/[\\\/]/);
-        var folder = parts.length > 1 ? parts[0] : basename(root);
+        var info = folderInfo(root, f);
         var name = stripExt(basename(f));
-        index.push({ name: name, path: f, folder: folder, hay: (name + " " + rel).toLowerCase(), smartHay: fold(name + " " + rel) });
+        index.push({ name: name, path: f, folder: info.folder, collection: info.collection,
+          hay: (name + " " + rel).toLowerCase(), smartHay: fold(name + " " + rel) });
       });
     });
-    index.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    index.sort(function (a, b) { return a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name); });
+    refreshFolderOptions();
     var empty = el("sfx-empty"), list = el("sfx-list");
     if (empty) empty.hidden = index.length > 0;
     if (list) list.hidden = index.length === 0;
@@ -136,6 +155,23 @@ window.KSfx = (function () {
   }
 
   /* ---------------- Arama + filtre ---------------- */
+
+  function refreshFolderOptions() {
+    var select = el("sfx-folder-filter");
+    if (!select) return;
+    var counts = {};
+    index.forEach(function (item) { counts[item.folder] = (counts[item.folder] || 0) + 1; });
+    var folders = Object.keys(counts).sort(function (a, b) { return a.localeCompare(b); });
+    if (folderMode !== "all" && !counts[folderMode]) folderMode = "all";
+    select.innerHTML = '<option value="all">Tüm klasörler (' + folders.length + ")</option>";
+    folders.forEach(function (folder) {
+      var option = document.createElement("option");
+      option.value = folder;
+      option.textContent = folder + " (" + counts[folder] + ")";
+      select.appendChild(option);
+    });
+    select.value = folderMode;
+  }
 
   function score(item, terms) {
     var s = 0;
@@ -159,9 +195,10 @@ window.KSfx = (function () {
       index.forEach(function (i) { map[norm(i.path)] = i; });
       pool = sonlar().map(function (p) { return map[norm(p)]; }).filter(Boolean);
     }
+    if (folderMode !== "all") pool = pool.filter(function (i) { return i.folder === folderMode; });
 
     var terms = String(q || "").toLowerCase().split(/\s+/).filter(Boolean);
-    if (!terms.length) filtered = pool.slice(0, 400);
+    if (!terms.length) filtered = pool.slice(0, 600);
     else {
       var scored = [];
       pool.forEach(function (i) {
@@ -169,11 +206,12 @@ window.KSfx = (function () {
         if (sc >= 0) scored.push({ item: i, score: sc });
       });
       scored.sort(function (a, b) { return b.score - a.score || a.item.name.localeCompare(b.item.name); });
-      filtered = scored.slice(0, 400).map(function (x) { return x.item; });
+      filtered = scored.slice(0, 600).map(function (x) { return x.item; });
     }
+    filtered.sort(function (a, b) { return a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name); });
     cursor = -1;
     var count = el("sfx-count");
-    if (count) count.textContent = filtered.length ? filtered.length + (filtered.length === 400 ? "+" : "") + " ses" : "";
+    if (count) count.textContent = filtered.length ? filtered.length + (filtered.length === 600 ? "+" : "") + " ses" : "";
     renderList();
   }
 
@@ -325,7 +363,19 @@ window.KSfx = (function () {
       return;
     }
     var frag = document.createDocumentFragment();
+    var groupCounts = {};
+    filtered.forEach(function (item) { groupCounts[item.folder] = (groupCounts[item.folder] || 0) + 1; });
+    var lastFolder = null;
     filtered.forEach(function (item, i) {
+      if (item.folder !== lastFolder) {
+        lastFolder = item.folder;
+        var group = document.createElement("div");
+        group.className = "sfx-group";
+        group.innerHTML = '<span class="sfx-group-icon">▰</span><b></b><span></span>';
+        group.querySelector("b").textContent = item.folder;
+        group.querySelector("span:last-child").textContent = groupCounts[item.folder] + " ses";
+        frag.appendChild(group);
+      }
       var row = document.createElement("div");
       row.className = "sfx-row" + (i === cursor ? " cur" : "") + (busyPath === item.path ? " busy" : "");
       row.draggable = true;
@@ -344,7 +394,8 @@ window.KSfx = (function () {
       nm.textContent = item.name;
       var sub = document.createElement("div");
       sub.className = "sfx-sub";
-      sub.textContent = item.folder + (durCache[item.path] ? " · " + durCache[item.path] : "");
+      sub.textContent = (item.collection !== item.folder ? item.collection : "Suflo SFX") +
+        (durCache[item.path] ? " · " + durCache[item.path] : "");
       meta.appendChild(nm);
       meta.appendChild(sub);
 
@@ -513,6 +564,11 @@ window.KSfx = (function () {
     el("sfx-yenile").addEventListener("click", buildIndex);
     el("sfx-smart-btn").addEventListener("click", function () { if (smartMode) closeSmart(); else showSmart(); });
     el("sfx-smart-close").addEventListener("click", closeSmart);
+    el("sfx-folder-filter").addEventListener("change", function () {
+      if (smartMode) closeSmart();
+      folderMode = this.value || "all";
+      search(el("sfx-search").value);
+    });
     Array.prototype.forEach.call(el("sfx-filter").querySelectorAll("button"), function (b) {
       b.addEventListener("click", function () { setFilter(b.dataset.f); });
     });
@@ -528,6 +584,11 @@ window.KSfx = (function () {
     chooseFolder: chooseFolder,
     setFilter: setFilter,
     sayisi: function () { return index.length; },
+    klasorSayisi: function () {
+      var seen = {};
+      index.forEach(function (item) { seen[item.folder] = true; });
+      return Object.keys(seen).length;
+    },
     oneriler: smartSuggestions
   };
 })();

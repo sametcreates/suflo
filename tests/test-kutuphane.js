@@ -96,6 +96,7 @@ async function run() {
   vm.runInContext(sfxSrc, ctx, { filename: "js/sfx.js" });
   ctx.KSfx.tara();
   ok("SFX taramasi WAV ve MP3 dosyalarini derinden buluyor", ctx.KSfx.sayisi() === 2, ctx.KSfx.sayisi());
+  ok("SFX dosyalari klasor kategorilerine ayriliyor", ctx.KSfx.klasorSayisi() === 1, ctx.KSfx.klasorSayisi());
   var oneriler = ctx.KSfx.oneriler([{ start: 4.2, end: 5.6, text: "Ama şimdi asıl noktaya gelelim!" }]);
   ok("Akilli SFX altyazi vurgusundan eslesen ses oneriyor",
     oneriler.length === 1 && oneriler[0].item && /whoosh/i.test(oneriler[0].item.name),
@@ -139,13 +140,16 @@ async function run() {
   var html = fs.readFileSync(KOKYOL + "index.html", "utf8");
   ok("SFX Pro sekmesi ve betigi yuklu",
     /id="tab-sfx"/.test(html) && /src="js\/sfx\.js"/.test(html));
+  ok("SFX klasor filtresi arayuzde hazir", /id="sfx-folder-filter"/.test(html));
   ok("Kutuphane saglik kontrolu arayuzde ve yuklu",
     /id="set-library-health-run"/.test(html) && /src="js\/library-health\.js"/.test(html));
   ok("Harici MOGRT'lar Yazi Animasyonlari'ndan ayri bolumde",
     /data-kat="custom"/.test(html) && /Diğer Animasyonlar/.test(html) && /id="custom-sayac"/.test(html));
   var css = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
   ok("MOGRT kartlari buyuk, kirpilmayan profesyonel onizleme kullaniyor",
-    /minmax\(220px,\s*1fr\)/.test(css) && /object-fit:\s*contain/.test(css));
+    /#tab-text \.mogrt-grid\s*\{[^}]*minmax\(300px,\s*1fr\)/s.test(css) && /object-fit:\s*contain/.test(css));
+  ok("Emoji kartlari MOGRT kartlarindan daha kompakt",
+    /\.emoji-assets-grid\s*\{[^}]*minmax\(124px,\s*1fr\)/s.test(css));
   ok("MOGRT kartlarinda DRAG ve LOCKED durumlari acik",
     /<span>DRAG<\/span>/.test(libSrc) && /<span>LOCKED<\/span>/.test(libSrc) && /mogrt-lock/.test(libSrc));
   ok("Aktif MOGRT karti suruklenince playhead'e yerlestiriliyor",

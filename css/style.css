@@ -1306,6 +1306,24 @@ details.adv > *:not(summary) { margin-top: 8px; }
 }
 
 .sfx-filter-actions { display: flex; align-items: center; gap: 7px; }
+.sfx-folder-select {
+  max-width: 190px; height: 29px; padding: 0 25px 0 9px;
+  color: #cbd5e2; background-color: #111923;
+  border: 1px solid #2a394b; border-radius: 6px;
+  font-size: 9.5px; font-weight: 700;
+}
+.sfx-group {
+  position: sticky; top: 0; z-index: 3;
+  display: flex; align-items: center; gap: 7px;
+  min-height: 33px; padding: 7px 10px;
+  color: #dfe6ef; background: rgba(15, 22, 31, .96);
+  border-top: 1px solid #29384a; border-bottom: 1px solid #243143;
+  backdrop-filter: blur(8px);
+}
+.sfx-group:first-child { border-top: 0; }
+.sfx-group b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; letter-spacing: .04em; }
+.sfx-group > span:last-child { color: #68778a; font-size: 8.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.sfx-group-icon { color: #7180ff; font-size: 9px; transform: rotate(90deg); }
 .btn.smart {
   padding: 4px 8px;
   border-color: rgba(139, 124, 246, .34);
@@ -2196,6 +2214,10 @@ body {
   gap: 14px;
   padding: 0 1px 18px;
 }
+#tab-text .mogrt-grid {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
 .mogrt-kart {
   position: relative;
   min-width: 0;
@@ -2308,6 +2330,7 @@ body {
 @media (min-width: 1180px) {
   .yan-menu { flex-basis: 208px; }
   .mogrt-grid { grid-template-columns: repeat(auto-fill, minmax(246px, 1fr)); gap: 16px; }
+  #tab-text .mogrt-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
 }
 @media (max-width: 720px) {
   .yan-menu { flex-basis: 164px; padding-left: 7px; padding-right: 7px; }
@@ -2343,8 +2366,14 @@ body {
 }
 .emoji-assets-toolbar .seg-ctl { width: auto; }
 .emoji-assets-title { margin-bottom: 13px; }
+.emoji-assets-grid {
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 9px;
+}
 .emoji-assets-grid .mogrt-kart { background: linear-gradient(180deg, #121a24, #0d131b); }
 .emoji-assets-grid .mogrt-thumb {
+  width: calc(100% - 12px);
+  margin: 6px 6px 0;
   aspect-ratio: 1 / 1;
   background-color: #0b1017;
   background-image:
@@ -2357,7 +2386,7 @@ body {
 }
 .emoji-assets-grid .mogrt-thumb img {
   object-fit: contain;
-  padding: 16px;
+  padding: 10px;
   background: radial-gradient(circle at 50% 46%, rgba(104,118,255,.1), transparent 62%);
 }
 .emoji-assets-grid .mogrt-source { max-width: calc(100% - 82px); }
@@ -2368,8 +2397,17 @@ body {
   border: 1px solid rgba(176, 190, 210, .28); border-radius: 4px;
   font-size: 7px; font-weight: 850; letter-spacing: .1em;
 }
-.emoji-assets-grid .mogrt-meta b { min-height: 17px; -webkit-line-clamp: 1; }
+.emoji-assets-grid .mogrt-meta { padding: 7px 8px 5px; }
+.emoji-assets-grid .mogrt-meta b { min-height: 15px; font-size: 10.5px; -webkit-line-clamp: 1; }
 .emoji-assets-grid .mogrt-meta i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emoji-assets-grid .mogrt-ekle-btn {
+  width: calc(100% - 12px); min-height: 30px;
+  margin: 0 6px 6px; padding: 0 6px;
+  font-size: 7.5px;
+}
+.emoji-assets-grid .mogrt-kalp { right: 5px; top: 5px; width: 24px; height: 24px; }
+.emoji-assets-grid .mogrt-source { left: 5px; top: 5px; font-size: 6.2px; }
+.emoji-assets-grid .emoji-format { right: 34px; top: 5px; padding: 2px 4px; font-size: 6px; }
 .emoji-assets-empty-icon {
   display: grid; place-items: center;
   width: 48px; height: 48px; margin: 0 auto 10px;
@@ -2384,7 +2422,7 @@ body {
   font-size: 6.5px; letter-spacing: .08em;
 }
 @media (min-width: 1180px) {
-  .emoji-assets-grid { grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); }
+  .emoji-assets-grid { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
 }
 @media (max-width: 720px) {
   .emoji-assets-toolbar { align-items: flex-start; flex-direction: column; }
