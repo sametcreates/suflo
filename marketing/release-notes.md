@@ -1,3 +1,13 @@
+## Suflo 2.5.2 — Yazı Animasyonları düzeltmesi
+
+- 2.5.1'in ilk paketini kuran kullanıcılara düzeltmenin otomatik ulaşması için sürüm numarası yükseltildi.
+- **Yazı Animasyonları** artık yalnızca tam 40 seçilmiş Suflo Original gösterir.
+- Bağlı klasörlerdeki diğer şablonlar ayrı **Bağlı MOGRT'lar** bölümüne taşındı.
+- Vault'taki aynı Suflo efektinin farklı ad veya klasördeki kopyası otomatik elenir.
+- 40 MOGRT'ın tamamı kurulum paketine dahil edildi.
+
+---
+
 ## Suflo 2.5.1 — Akıllı SFX, kütüphane sağlık kontrolü, içerik paketi altyapısı
 
 - **Yazı Animasyonları temizlendi:** bölüm artık tam 40 seçilmiş Suflo Original gösterir; bağlı klasörlerdeki diğer MOGRT'lar ayrı **Bağlı MOGRT'lar** bölümünde tutulur.
