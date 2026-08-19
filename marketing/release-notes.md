@@ -1,3 +1,15 @@
+## Suflo 2.4.1 — Premium panel, Yazı sekmesi, yeni satış sayfası
+
+Görünüş ve keşfedilebilirlik sürümü:
+
+- **Yazı sekmesi (Pro):** MOGRT text animasyonu kütüphanesi — .mogrt dosyalarını Suflo klasörüne at, panel tarar, tek tıkla playhead'e yerleştirir (boş katman seçimi otomatik).
+- **Pro artık görünür:** üst barda PRO rozeti; Kesim/Ritim/Yazı sekmelerinde ne kazandıracağını anlatan tanıtım kartları; yenilenen yükseltme penceresi. Ücretsiz özellikler aynen ücretsiz.
+- **Stil kartları yenilendi:** kartlar dururken en okunur karesini gösterir, üzerine gelince oynar; yumuşak sinematik gölge, premium seçili durum.
+- **suflo.app/pro yenilendi:** canlı animasyon demoları, panel önizlemesi, net fiyat kıyası, 14 gün iade garantisi.
+- Tek tık güncelleme (2.4.0) bu sürümden itibaren işlemeye başlar.
+
+---
+
 ## Suflo 2.4.0 — Suflo Pro
 
 Suflo ikiye ayrılıyor: çekirdek altyazı akışı ücretsiz ve MIT kalıyor, viral kurgu katmanı — animasyon, karaoke, kesim, ritim — tek seferlik 749 TL'lik **Suflo Pro**'ya taşınıyor. Abonelik yok, dakika kotası yok; bir kez öde, ömür boyu kullan.

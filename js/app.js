@@ -272,6 +272,19 @@ window.KApp = (function () {
       if (!o.dataset.temel) o.dataset.temel = o.textContent;
       o.textContent = s.pro ? o.dataset.temel : o.dataset.temel + " — PRO";
     });
+
+    // Header PRO chip: ucretsizde satis, Pro'da statu
+    var chip = el("pro-chip");
+    if (chip) chip.classList.toggle("aktif", !!s.pro);
+
+    // Kilitli sekme tanitim kartlari: Pro'da gizli
+    ["yazi-tanitim", "cut-tanitim", "beat-tanitim"].forEach(function (id) {
+      var t = el(id);
+      if (t) t.hidden = !!s.pro;
+    });
+
+    // MOGRT kartlarindaki PRO rozetleri tazelensin
+    if (window.KLib && el("mogrt-grid") && el("mogrt-grid").children.length) KLib.tara();
   }
 
   function initPro() {
@@ -298,6 +311,19 @@ window.KApp = (function () {
       Pro.deactivate(function () {
         toast("Lisans bu makineden kaldırıldı.");
         reflectPro();
+      });
+    });
+
+    var chipBtn = el("pro-chip");
+    if (chipBtn) chipBtn.addEventListener("click", function () {
+      if (Pro.isPro()) { goster("settings"); return; }
+      Pro.gate("pro"); // upsell modali — oradaki "Anahtarim var" Ayarlar'a goturur
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll(".pro-ac-btn, #yazi-proya-gec"), function (b) {
+      b.addEventListener("click", function () {
+        goster("settings");
+        var k = el("pro-key"); if (k) k.focus();
       });
     });
 
@@ -753,6 +779,7 @@ window.KApp = (function () {
     guvenli("Altyazı", function () { KCaptions.init(); });
     guvenli("Kesim", function () { KCut.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
+    guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
     guvenli("Pro-UI", reflectPro);
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);

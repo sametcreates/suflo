@@ -78,7 +78,9 @@
     batch:     'Toplu (coklu klip) transkripsiyon',
     translate: 'Altyazi cevirisi',
     assexport: 'Stilli ASS disa aktarma',
-    glossary:  'Terim sozlugu + gelismis bul/degistir'
+    glossary:  'Terim sozlugu + gelismis bul/degistir',
+    mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
+    pro:       'Suflo Pro'
   };
 
   // ================================================================
@@ -379,20 +381,34 @@
     wrap.className = 'pro-upsell-backdrop';
     wrap.innerHTML =
       '<div class="pro-upsell-card" role="dialog" aria-modal="true">' +
-        '<div class="pro-upsell-badge">Suflo Pro</div>' +
-        '<h3>' + esc(label) + ' Pro ozelligidir</h3>' +
-        '<p>Tek seferlik satin alma ile omur boyu ac. Internetsiz calisir, abonelik yok.</p>' +
+        '<button id="pro-upsell-x" class="pro-upsell-x" aria-label="Kapat">\u2715</button>' +
+        '<div class="pro-upsell-badge">SUFLO PRO</div>' +
+        '<h3>' + esc(label) + '</h3>' +
+        '<p class="pro-upsell-alt">Bu ozellik Pro ile acilir \u2014 tek seferlik, abonelik yok.</p>' +
+        '<ul class="pro-upsell-liste">' +
+          '<li>Animasyonlu altyazi + karaoke + daktilo</li>' +
+          '<li>Otomatik kesim + ritim senkronu</li>' +
+          '<li>Toplu islem, ceviri, sozluk, ASS</li>' +
+          '<li>Yazi animasyonu kutuphanesi (MOGRT)</li>' +
+        '</ul>' +
+        '<div class="pro-upsell-fiyat"><b>749 TL</b><span>tek seferlik \u00b7 3 makine \u00b7 omur boyu</span></div>' +
         '<div class="pro-upsell-actions">' +
-          '<button id="pro-upsell-go" class="pro-btn-primary">Yukselt / Anahtar Gir</button>' +
-          '<button id="pro-upsell-close" class="pro-btn-ghost">Kapat</button>' +
+          '<button id="pro-upsell-go" class="pro-btn-primary">Y\u00fckselt \u2192</button>' +
         '</div>' +
+        '<button id="pro-upsell-key" class="pro-link-btn">Anahtarim var</button>' +
       '</div>';
     document.body.appendChild(wrap);
 
-    function close() { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
+    function close() { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); document.removeEventListener('keydown', escKapat); }
+    function escKapat(e) { if (e.key === 'Escape') close(); }
     wrap.addEventListener('click', function (e) { if (e.target === wrap) close(); });
-    document.getElementById('pro-upsell-close').onclick = close;
+    document.addEventListener('keydown', escKapat);
+    document.getElementById('pro-upsell-x').onclick = close;
     document.getElementById('pro-upsell-go').onclick = function () {
+      close();
+      if (typeof _onUpgrade === 'function') _onUpgrade(feature);
+    };
+    document.getElementById('pro-upsell-key').onclick = function () {
       close();
       if (typeof _onUpgrade === 'function') _onUpgrade(feature);
     };
@@ -447,11 +463,26 @@
   function ensureUpsellCss() {
     if (_cssDone) return; _cssDone = true;
     var css =
-      '.pro-upsell-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);' +
+      '.pro-upsell-backdrop{position:fixed;inset:0;background:rgba(8,9,14,.6);backdrop-filter:blur(4px);' +
       'display:flex;align-items:center;justify-content:center;z-index:99999}' +
-      '.pro-upsell-card{background:#1b1d24;color:#eef;max-width:340px;width:86%;' +
-      'border:1px solid #3a3f4c;border-radius:12px;padding:20px 22px;text-align:center;' +
-      'font:13px/1.5 system-ui,Segoe UI,sans-serif;box-shadow:0 12px 40px rgba(0,0,0,.5)}' +
+      '@keyframes pro-in{from{opacity:0;transform:scale(.96) translateY(6px)}}' +
+      '.pro-upsell-card{position:relative;background:#161822;color:#edecf5;width:min(360px,92vw);' +
+      'border:1px solid #363b52;border-radius:14px;padding:18px 18px 14px;text-align:center;' +
+      'font:13px/1.5 system-ui,Segoe UI,sans-serif;box-shadow:0 18px 60px rgba(0,0,0,.55);' +
+      'animation:pro-in .18s cubic-bezier(.32,.72,0,1)}' +
+      '.pro-upsell-x{position:absolute;top:10px;right:12px;background:none;border:0;color:#626578;' +
+      'font-size:13px;cursor:pointer;padding:4px}' +
+      '.pro-upsell-x:hover{color:#edecf5}' +
+      '.pro-upsell-alt{margin:0 0 12px;opacity:.75;font-size:12px}' +
+      '.pro-upsell-liste{list-style:none;margin:0 0 14px;padding:0;text-align:left;display:inline-block}' +
+      '.pro-upsell-liste li{font-size:11.5px;color:#9a9cb4;padding-left:16px;position:relative;margin-bottom:3px}' +
+      '.pro-upsell-liste li:before{content:"\\2713";position:absolute;left:0;color:#6fdca0;font-weight:700}' +
+      '.pro-upsell-fiyat{margin-bottom:14px}' +
+      '.pro-upsell-fiyat b{font-size:22px;display:block}' +
+      '.pro-upsell-fiyat span{font-size:10.5px;color:#9a9cb4}' +
+      '.pro-link-btn{background:none;border:0;color:#9a9cb4;font-size:11.5px;cursor:pointer;' +
+      'margin-top:9px;text-decoration:underline;text-underline-offset:3px}' +
+      '.pro-link-btn:hover{color:#edecf5}' +
       '.pro-upsell-badge{display:inline-block;background:linear-gradient(90deg,#7c5cff,#4aa3ff);' +
       'color:#fff;font-weight:700;font-size:11px;letter-spacing:.5px;padding:3px 10px;border-radius:999px;margin-bottom:10px}' +
       '.pro-upsell-card h3{margin:6px 0 4px;font-size:15px}' +

@@ -919,3 +919,49 @@ function KS_placeGraphic(encoded) {
     return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
   } catch (e) { return KS_err(e); }
 }
+
+
+/* ---------- Yazi kutuphanesi: MOGRT yerlestirme ---------- */
+
+/*
+ * .mogrt'yi playhead'e (ya da verilen saniyeye) bos bir video katmanina koyar.
+ * importMGT zamani TICK cinsinden STRING ister (dokumante); saniye -> tick
+ * donusumu Time nesnesiyle yapilir. Donus TrackItem ya da falsy'dir — exception
+ * garantisi yok, o yuzden hem try/catch hem truthiness kontrolu var.
+ */
+function KS_placeMogrt(encoded) {
+  try {
+    var p = KS_arg(encoded); // { path, startSec?, dur? }
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var f = new File(p.path);
+    if (!f.exists) return KS_err("MOGRT bulunamadi: " + p.path);
+
+    var start = Number(p.startSec);
+    if (!(start >= 0)) {
+      try { start = seq.getPlayerPosition().seconds; } catch (eP) { start = 0; }
+    }
+    // yerlestirme ayak izi: mogrt suresi bilinmiyorsa 5 sn varsay (tipik varsayilan)
+    var iz = Number(p.dur) > 0 ? Number(p.dur) : 5;
+
+    var idx = KS_findFreeVideoTrack(seq, start, start + iz);
+    if (idx < 0) {
+      if (KS_addTopVideoTrack()) {
+        seq = app.project.activeSequence;
+        idx = KS_findFreeVideoTrack(seq, start, start + iz);
+      }
+    }
+    if (idx < 0) return KS_err("Bos video katmani yok.");
+
+    var t = new Time();
+    t.seconds = start;
+    var clip = null;
+    try { clip = seq.importMGT(f.fsName, t.ticks, idx, 0); } catch (eM) {}
+    if (!clip) return KS_err("MOGRT yerlestirilemedi — dosya After Effects'ten disa aktarilmis bir .mogrt mi?");
+
+    try { if (p.name) clip.name = String(p.name); } catch (eN) {}
+    var sure = 0;
+    try { sure = clip.end.seconds - clip.start.seconds; } catch (eS) {}
+    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
+  } catch (e) { return KS_err(e); }
+}
