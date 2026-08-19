@@ -241,7 +241,75 @@ window.KApp = (function () {
   }
 
 
+  /* ---------------- Suflo Pro lisans UI ---------------- */
+
+  // Pro durumunu arayüze yansıt: ayar kartları + sekme/buton rozetleri.
+  // pro.js yapılandırılmadıysa (lansman öncesi) markLocked hiçbir şey yapmaz.
+  function reflectPro() {
+    if (!window.Pro) return;
+    var s = Pro.status();
+
+    var locked = el("pro-locked-card"), active = el("pro-active-card");
+    if (locked && active) {
+      locked.hidden = !!s.pro;
+      active.hidden = !s.pro;
+      var em = el("pro-email");
+      if (em) em.textContent = s.email ? "· " + s.email : "";
+      var rc = el("pro-recheck");
+      if (rc) rc.hidden = !s.needsRecheck;
+    }
+
+    // Pro'ya kilitli girişler: sekmeler + tekil butonlar
+    Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
+    Pro.markLocked(el("cap-overlay"), !s.pro);
+    Pro.markLocked(el("cap-translate-go"), !s.pro);
+
+    // Kilitli secenekler (karaoke modlari, kelimeli animasyonlar) acilir
+    // listede " — PRO" ekiyle gorunsun: kullanici neyin ucretli oldugunu
+    // secmeyi denemeden once gorur
+    Array.prototype.forEach.call(document.querySelectorAll("option[data-pro]"), function (o) {
+      if (!o.dataset.temel) o.dataset.temel = o.textContent;
+      o.textContent = s.pro ? o.dataset.temel : o.dataset.temel + " — PRO";
+    });
+  }
+
+  function initPro() {
+    if (!window.Pro || !el("pro-activate")) return;
+
+    el("pro-activate").addEventListener("click", function () {
+      var key = el("pro-key").value;
+      var msg = el("pro-msg");
+      msg.textContent = "Etkinleştiriliyor…";
+      msg.className = "inline-status";
+      Pro.activate(key, function (r) {
+        if (r.ok) {
+          msg.textContent = "";
+          toast("Suflo Pro aktif — iyi kurgular! 🎬", "good");
+          reflectPro();
+        } else {
+          msg.textContent = r.error || "Etkinleştirilemedi.";
+          msg.className = "inline-status bad";
+        }
+      });
+    });
+
+    el("pro-deactivate").addEventListener("click", function () {
+      Pro.deactivate(function () {
+        toast("Lisans bu makineden kaldırıldı.");
+        reflectPro();
+      });
+    });
+
+    el("pro-buy").addEventListener("click", function (e) {
+      e.preventDefault();
+      // Lemon Squeezy checkout — Suflo Pro 749 TL
+      K.cs.openURLInDefaultBrowser("https://suflo.lemonsqueezy.com/checkout/buy/908e6046-8c5b-4473-9418-0860468e331c");
+    });
+  }
+
   function initSettings() {
+    initPro();
     var s = K.settings();
     el("set-provider").value = s.provider || "groq";
     el("set-apikey").value = s.apiKey || "";
@@ -542,6 +610,60 @@ window.KApp = (function () {
     return klasor;
   }
 
+  /*
+   * Tek tık güncelleme: ZIP'i panel kendisi açar ve panel/ içeriğini CEP
+   * klasörünün üstüne kopyalar — "ayıkla + kur dosyasına çift tıkla" adımı
+   * kalkar, kullanıcıya yalnız "Premiere'i yeniden başlat" kalır.
+   * Herhangi bir adım tutmazsa false döner; eski elle-kur akışına düşülür.
+   */
+  async function otomatikKur(zipYolu, surum) {
+    var acilan = K.path.join(K.tmpDir(), "guncelleme-" + surum);
+    try { K.fs.rmSync(acilan, { recursive: true, force: true }); }
+    catch (e0) { try { K.fs.rmdirSync(acilan, { recursive: true }); } catch (e1) {} }
+    if (!(await K.unzip(zipYolu, acilan))) return false;
+
+    // panel/ doğrudan ya da tek alt klasörün içinde olabilir
+    var kaynak = K.path.join(acilan, "panel");
+    if (!K.fs.existsSync(K.path.join(kaynak, "index.html"))) {
+      var altlar = K.fs.readdirSync(acilan);
+      for (var i = 0; i < altlar.length; i++) {
+        var aday = K.path.join(acilan, altlar[i], "panel");
+        if (K.fs.existsSync(K.path.join(aday, "index.html"))) { kaynak = aday; break; }
+      }
+    }
+    if (!K.fs.existsSync(K.path.join(kaynak, "index.html")) ||
+        !K.fs.existsSync(K.path.join(kaynak, "CSXS", "manifest.xml"))) {
+      K.log("[güncelleme] ZIP içinde panel/ bulunamadı — elle kuruluma düşülüyor");
+      return false;
+    }
+
+    var cepHedef = K.MAC
+      ? K.path.join(K.os.homedir(), "Library", "Application Support", "Adobe", "CEP", "extensions", "com.sametcreates.kesit")
+      : K.path.join(process.env.APPDATA || "", "Adobe", "CEP", "extensions", "com.sametcreates.kesit");
+    // klasör yoksa kurulum başka yolla (ZXP Installer'ın kendi dizini) yapılmış
+    // olabilir — yanlış yere kurmaktansa elle akışa düş
+    if (!K.fs.existsSync(cepHedef)) return false;
+
+    var hata = 0;
+    (function kopyala(src, dst) {
+      try { K.fs.mkdirSync(dst, { recursive: true }); } catch (eM) {}
+      K.fs.readdirSync(src).forEach(function (ad) {
+        var s2 = K.path.join(src, ad), d2 = K.path.join(dst, ad);
+        try {
+          if (K.fs.statSync(s2).isDirectory()) kopyala(s2, d2);
+          else K.fs.copyFileSync(s2, d2);
+        } catch (eK) { hata++; K.log("[güncelleme] kopyalanamadı: " + ad + " — " + (eK && eK.message)); }
+      });
+    })(kaynak, cepHedef);
+
+    // doğrulama: hedefteki manifest yeni sürümü taşımalı
+    try {
+      var mf = K.fs.readFileSync(K.path.join(cepHedef, "CSXS", "manifest.xml"), "utf8");
+      if (mf.indexOf(surum) === -1) return false;
+    } catch (eV) { return false; }
+    return hata === 0;
+  }
+
   async function guncellemeyiIndir() {
     if (!guncelleme) return;
     var b = el("update-indir");
@@ -556,6 +678,22 @@ window.KApp = (function () {
         b.textContent = "%" + Math.round(f * 100);
       }, 0, undefined, { key: "zxp:" + guncelleme.surum });
       if (!d.ok) throw new Error(d.error || "indirilemedi");
+
+      // Önce tek tık kurulumu dene — başarırsa kullanıcıya yalnız yeniden başlatma kalır
+      if (guncelleme.zip) {
+        b.textContent = "Kuruluyor…";
+        var kuruldu = false;
+        try { kuruldu = await otomatikKur(hedef, guncelleme.surum); }
+        catch (eOto) { K.log("[güncelleme] oto kurulum hatası: " + (eOto && eOto.message)); }
+        if (kuruldu) {
+          el("update-baslik").textContent = "v" + guncelleme.surum + " kuruldu ✓";
+          el("update-not").textContent = "Premiere'i kapatıp yeniden aç — yeni sürüm hazır.";
+          b.textContent = "Kuruldu ✓";
+          toast("v" + guncelleme.surum + " kuruldu — Premiere'i yeniden başlatman yeter.", "good");
+          return;
+        }
+      }
+
       await dosyayiGoster(hedef);
       // ZIP'in İÇİNDEN çalıştırılan .bat panel dosyalarını bulamaz — önce ayıklatmak şart
       el("update-not").textContent = guncelleme.zip
@@ -600,11 +738,22 @@ window.KApp = (function () {
     guvenli("ffmpeg", checkFfmpeg);
     setInterval(pollContext, 2500);
 
+    // Pro lisans durumu EN ÖNCE: modüller isPro()'yu init sırasında okuyabilsin
+    guvenli("Pro", function () {
+      Pro.init();
+      Pro.onUpgrade(function () {
+        goster("settings");
+        var k = el("pro-key"); if (k) k.focus();
+      });
+      Pro.on(reflectPro);
+    });
+
     guvenli("sekmeler", initTabs);
     guvenli("ayarlar", initSettings);
     guvenli("Altyazı", function () { KCaptions.init(); });
     guvenli("Kesim", function () { KCut.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
+    guvenli("Pro-UI", reflectPro);
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);
     if (el("update-kapat")) {

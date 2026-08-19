@@ -283,6 +283,68 @@ function ortam(opts) {
     e5.indirmeler.length === 1 && /Kurulum\.zip$/.test(e5.indirmeler[0].url),
     e5.indirmeler[0] && e5.indirmeler[0].url);
 
+  /* ---------- otomatikKur: gercek ZIP + sahte CEP klasoru ---------- */
+  await (async function () {
+    var fs2 = require("fs"), path2 = require("path"), os2 = require("os"), cp2 = require("child_process");
+    var TMP2 = path2.join(os2.tmpdir(), "suflo-otokur-test");
+    try { fs2.rmSync(TMP2, { recursive: true, force: true }); } catch (e0) {}
+
+    // 1) sahte guncelleme paketi: panel/index.html + CSXS/manifest.xml (v9.9.9)
+    var pk = path2.join(TMP2, "paket", "panel");
+    fs2.mkdirSync(path2.join(pk, "CSXS"), { recursive: true });
+    fs2.writeFileSync(path2.join(pk, "index.html"), "<html>yeni surum</html>");
+    fs2.writeFileSync(path2.join(pk, "CSXS", "manifest.xml"), '<Ext Version="9.9.9"/>');
+    fs2.mkdirSync(path2.join(pk, "js"), { recursive: true });
+    fs2.writeFileSync(path2.join(pk, "js", "app.js"), "// yeni");
+    var zipYolu = path2.join(TMP2, "Suflo-9.9.9-Kurulum.zip");
+    var tarExe = path2.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe");
+    cp2.execFileSync(tarExe, ["-a", "-cf", zipYolu, "-C", path2.join(TMP2, "paket"), "panel"]);
+
+    // 2) sahte CEP hedefi (eski surum icinde)
+    var cep = path2.join(TMP2, "cep", "Adobe", "CEP", "extensions", "com.sametcreates.kesit");
+    fs2.mkdirSync(path2.join(cep, "CSXS"), { recursive: true });
+    fs2.writeFileSync(path2.join(cep, "index.html"), "<html>eski</html>");
+    fs2.writeFileSync(path2.join(cep, "CSXS", "manifest.xml"), '<Ext Version="1.0.0"/>');
+
+    // 3) otomatikKur'u gercek kaynaktan kes, K stub'la calistir
+    var asrc = fs2.readFileSync(KOKYOL + "js/app.js", "utf8");
+    var oi = asrc.indexOf("async function otomatikKur(");
+    var obody = asrc.slice(oi, asrc.indexOf("\n  }", oi) + 4);
+    var Kstub = {
+      tmpDir: function () { return path2.join(TMP2, "tmp"); },
+      fs: fs2, path: path2, os: os2, MAC: false,
+      log: function () {},
+      unzip: async function (z, d) {
+        fs2.mkdirSync(d, { recursive: true });
+        cp2.execFileSync(tarExe, ["-xf", z, "-C", d]);
+        return true;
+      }
+    };
+    var eskiAppdata = process.env.APPDATA;
+    process.env.APPDATA = path2.join(TMP2, "cep", "Adobe").replace(/[\\\/]Adobe$/, "");
+    // APPDATA stub: cepHedef = APPDATA/Adobe/CEP/... olmali
+    process.env.APPDATA = path2.join(TMP2, "cep");
+    var calistir = new Function("K", "process", "return " + obody.replace("async function otomatikKur", "async function") + ";")(Kstub, process);
+    var ok1 = await calistir(zipYolu, "9.9.9");
+    process.env.APPDATA = eskiAppdata;
+
+    chk("otomatikKur: kurulum basarili donuyor", ok1 === true, ok1);
+    chk("otomatikKur: index.html yeni surumle degisti",
+      fs2.readFileSync(path2.join(cep, "index.html"), "utf8").indexOf("yeni surum") !== -1);
+    chk("otomatikKur: manifest 9.9.9 oldu",
+      fs2.readFileSync(path2.join(cep, "CSXS", "manifest.xml"), "utf8").indexOf("9.9.9") !== -1);
+    chk("otomatikKur: yeni dosya (js/app.js) kopyalandi",
+      fs2.existsSync(path2.join(cep, "js", "app.js")));
+
+    // 4) hedef klasor yoksa false donmeli (yanlis yere kurma korumasi)
+    process.env.APPDATA = path2.join(TMP2, "olmayan");
+    var ok2 = await calistir(zipYolu, "9.9.9");
+    process.env.APPDATA = eskiAppdata;
+    chk("otomatikKur: CEP klasoru yoksa elle akisa dusuyor (false)", ok2 === false, ok2);
+
+    try { fs2.rmSync(TMP2, { recursive: true, force: true }); } catch (eS) {}
+  })();
+
   var kalan = sonuc.filter(function (s) { return s.indexOf("FAIL") === 0; }).length;
   sonuc.forEach(function (s) { console.log(s); });
   console.log("\n" + (sonuc.length - kalan) + "/" + sonuc.length + " gecti");

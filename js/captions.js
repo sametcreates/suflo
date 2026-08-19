@@ -22,8 +22,32 @@ window.KCaptions = (function () {
   var UNDO_MAX = 25;
   var draftTimer = null;
 
+  /*
+   * Uretim anindaki satir modu ("k1" | "kc" | "w" | "plain").
+   * Disa aktarim ve overlay, UI'daki GUNCEL secime degil ekrandaki verinin
+   * gercek bicimine bakmali: "kc" katlama ve mod degisince yanlis \k uretimi
+   * hatalarinin koku UI'dan okumakti.
+   */
+  var segmentsMode = "plain";
+
+  // Motorun algiladigi dil (ISO kodu): dil secimi "Otomatik" iken buyuk/kucuk
+  // harf donusumunun TR/AZ/RU kurallarini uygulayabilmesi icin saklanir.
+  var algilananDil = "";
+
+  // Onizleme/ipucu icin: ekranda veri varsa GERCEK bicimine, henuz uretim
+  // yapilmadiysa UI secimine bak (bir sonraki uretimin bicimini gosterir).
+  function kelimeModuAktif() {
+    if (segments.length) return segmentsMode === "k1";
+    return /^k/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
+  }
+  function dilKodu(x) {
+    x = String(x || "").toLowerCase();
+    if (x.length === 2) return x;
+    return { turkish: "tr", azerbaijani: "az", russian: "ru", english: "en" }[x] || "";
+  }
+
   function snapshot(etiket) {
-    undoStack.push({ segs: JSON.stringify(segments), etiket: etiket || "" });
+    undoStack.push({ segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode });
     if (undoStack.length > UNDO_MAX) undoStack.shift();
     redoStack.length = 0;
     refreshUndoUI();
@@ -31,9 +55,10 @@ window.KCaptions = (function () {
 
   function undo() {
     if (!undoStack.length) return;
-    redoStack.push({ segs: JSON.stringify(segments), etiket: "" });
+    redoStack.push({ segs: JSON.stringify(segments), etiket: "", mode: segmentsMode });
     var st = undoStack.pop();
     segments = JSON.parse(st.segs);
+    if (st.mode) segmentsMode = st.mode;
     render();
     refreshUndoUI();
     saveDraftSoon();          // diskteki taslak ekrandakiyle aynı kalsın
@@ -57,10 +82,11 @@ window.KCaptions = (function () {
 
   // Taslağı diske yaz — panel kapanırsa iş kaybolmaz
   function writeDraft() {
-    if (!segments.length) return;
+    if (!segments.length) { K.clearDraft(); return; } // bosaltilan ekran = bosaltilan taslak
     var ctx = KApp.ctx();
     K.saveDraft({
       segments: segments,
+      mode: segmentsMode,
       sequence: ctx.sequence || "",
       scope: scope,
       ts: Date.now()
@@ -83,6 +109,7 @@ window.KCaptions = (function () {
     if (segments.length) snapshot("taslak kurtarma");
     else { undoStack.length = 0; redoStack.length = 0; }
     segments = JSON.parse(JSON.stringify(d.segments));   // taslak nesnesini takma adla mutasyona uğratma
+    segmentsMode = d.mode || "plain";
     clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil
     el("cap-result").hidden = false;
     render();                                            // önce render, sonra etiket (render eziyor)
@@ -287,6 +314,7 @@ window.KCaptions = (function () {
         (r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 180));
     }
     var parsed = JSON.parse(K.fs.readFileSync(jsonPath, "utf8").toString());
+    try { algilananDil = dilKodu(parsed.result && parsed.result.language); } catch (eDil) {}
     try { K.fs.unlinkSync(jsonPath); } catch (e2) {}
     var segs = (parsed.transcription || []).map(function (t) {
       var s = t.offsets ? t.offsets.from / 1000 : NaN;
@@ -313,10 +341,10 @@ window.KCaptions = (function () {
   function tcParse(t) {
     var s = String(t).trim();
     var m = s.match(/(\d+):(\d+):(\d+)[,.](\d+)/);
-    if (m) return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 1000;
+    if (m) return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + parseFloat("0." + m[4]); // ".5" = 500 ms, 5 ms degil
     // saat alanı olmayan biçim (mm:ss.mmm) — VTT kısa biçimi ve elle düzenlemede yaygın
     var m2 = s.match(/^(\d+):(\d+)[,.](\d+)/);
-    if (m2) return (+m2[1]) * 60 + (+m2[2]) + (+m2[3]) / 1000;
+    if (m2) return (+m2[1]) * 60 + (+m2[2]) + parseFloat("0." + m2[3]);
     // milisaniyesiz biçimler
     var m3 = s.match(/^(\d+):(\d+):(\d+)/);
     if (m3) return (+m3[1]) * 3600 + (+m3[2]) * 60 + (+m3[3]);
@@ -391,6 +419,7 @@ window.KCaptions = (function () {
       if (!res.ok) throw apiError(res.status, await res.text());
       json = await res.json();
     }
+    try { if (json.language) algilananDil = dilKodu(json.language); } catch (eDil2) {}
     // karaoke: kelime dizisi varsa onu kullan (word alanı "word", segment alanı "text")
     if (wordLevel && json.words && json.words.length) {
       var ws = json.words.map(function (w) {
@@ -591,6 +620,7 @@ window.KCaptions = (function () {
   }
 
   function applyGlossary(segs) {
+    if (typeof Pro !== "undefined" && !Pro.isPro()) return segs;             // Pro: sozluk (sessiz atla)
     var rules = K.settings().glossary || [];
     if (!rules.length) return segs;
     var n = 0;
@@ -812,6 +842,7 @@ window.KCaptions = (function () {
 
   function styleLocale() {
     var l = el("cap-lang").value;
+    if (l === "") l = algilananDil; // "Otomatik": motorun algiladigi dile guven
     if (l === "tr") return "tr-TR";
     if (l === "az") return "az";
     if (l === "ru") return "ru";
@@ -907,6 +938,16 @@ window.KCaptions = (function () {
     if (scope === "clip" && !clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
     busy = true;
     setBusy(true);
+    /*
+     * Ekranda duzenlenmis is varken yeni transkript uretmek TEK korumasiz
+     * yikici yoldu: undo yigini temizlenip taslak da eziliyordu. importSrt
+     * kalibi buraya da uygulanir — eski dokuman simdiden yakalanir, asagida
+     * yigina itilir; kullanici Ctrl+Z ile geri donebilir.
+     */
+    var oncekiIs = segments.length
+      ? { segs: JSON.stringify(segments), etiket: "yeni transkript", mode: segmentsMode }
+      : null;
+    algilananDil = "";
     var tempFiles = [];
     try {
       /*
@@ -933,7 +974,12 @@ window.KCaptions = (function () {
       if (scope === "clip") {
         var sc = await K.call("KS_getSelectedClips");
         if (sc.ok && sc.clips && sc.clips.length > 1) {
-          batchClips = sc.clips;
+          if (typeof Pro !== "undefined" && !Pro.isPro()) {                   // Pro: toplu klip
+            Pro.gate("batch");
+            clip = sc.clips[0];                               // ilk kliple devam et
+          } else {
+            batchClips = sc.clips;
+          }
         } else if (sc.ok && sc.clips && sc.clips.length === 1) {
           clip = sc.clips[0];
         }
@@ -977,6 +1023,10 @@ window.KCaptions = (function () {
 
       var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime, "k1"/"kc" karaoke
       var karaoke = /^k/.test(lenVal);
+      if (karaoke && typeof Pro !== "undefined" && !Pro.isPro()) {           // Pro: kelime-zamanlama
+        Pro.gate("karaoke");
+        karaoke = false; lenVal = "w3";                       // satir moduna dus, akisi kirma
+      }
       var mapped = [];
 
       if (batchClips) {
@@ -1052,18 +1102,27 @@ window.KCaptions = (function () {
           }
         }
         segments = lenVal === "kc" ? karaokeCumulative(mapped, 4) : karaokeWords(mapped);
+        segmentsMode = lenVal === "kc" ? "kc" : "k1";
       } else {
         mapped = cleanSegments(mapped);
         mapped = trimOverlongCues(mapped);
         if (/^w\d+$/.test(lenVal)) {
           segments = splitWords(mapped, parseInt(lenVal.slice(1), 10) || 3);
+          segmentsMode = "w";
         } else {
           segments = splitLong(mapped, parseInt(lenVal.slice(1), 10) || 42, 4.5);
+          segmentsMode = "plain";
         }
       }
       applyGlossary(segments);
-      undoStack.length = 0;
-      redoStack.length = 0;
+      if (oncekiIs) {
+        undoStack.push(oncekiIs);
+        if (undoStack.length > UNDO_MAX) undoStack.shift();
+        redoStack.length = 0;
+      } else {
+        undoStack.length = 0;
+        redoStack.length = 0;
+      }
       refreshUndoUI();
       savePrefs();
       if (segments.length === 0) throw new Error("Konuşma bulunamadı.");
@@ -1297,7 +1356,9 @@ window.KCaptions = (function () {
     var end = nx ? Math.min(nx.start - 0.05, start + 1.5) : start + 1.5;
     if (end <= start) end = start + 0.5;
     snapshot("satır ekleme");
-    segments.splice(i + 1, 0, { start: start, end: end, text: "", orig: "" });
+    // orig ALANI YOK: bos dize de string oldugundan "orijinale don" bu satiri
+    // bos metinle ezerdi; alan hic olmayinca revertTranslate dogru atlar.
+    segments.splice(i + 1, 0, { start: start, end: end, text: "" });
     render(); saveDraftSoon();
   }
 
@@ -1352,6 +1413,7 @@ window.KCaptions = (function () {
   }
 
   async function translateAll() {
+    if (typeof Pro !== "undefined" && !Pro.gate("translate")) return; // Pro: ceviri
     if (segments.length === 0) return;
     var target = el("cap-translate").value;
     if (!target) { KApp.toast("Önce hedef dili seç.", "warn"); return; }
@@ -1363,7 +1425,11 @@ window.KCaptions = (function () {
     var btn = el("cap-translate-go");
     btn.disabled = true;
     try {
-      var texts = segments.map(function (s) { return s.text; });
+      // Ceviri surerken kullanici satir boler/silerse indeksler kayar ve
+      // ceviriler yanlis satirlara yazilirdi. Referanslari simdiden yakala:
+      // silinen segmentin cevirisi zararsizca dusar, kalanlar dogru esler.
+      var segsRef = segments.slice();
+      var texts = segsRef.map(function (s) { return s.text; });
       var out = [];
       var BATCH = 60;
       for (var i = 0; i < texts.length; i += BATCH) {
@@ -1393,7 +1459,8 @@ window.KCaptions = (function () {
         }
         out = out.concat(lines);
       }
-      segments.forEach(function (s, i2) {
+      snapshot("çeviri");
+      segsRef.forEach(function (s, i2) {
         if (typeof s.orig !== "string") s.orig = texts[i2];   // zincir çeviride ilk orijinali koru
         s.text = String(out[i2] || "").trim() || s.text;
       });
@@ -1499,6 +1566,7 @@ window.KCaptions = (function () {
       function yerlestir(metin, kodlama) {
         var segs = parseSrt(metin);
         if (!segs.length) { KApp.toast("Dosyada altyazı bulunamadı.", "bad"); return; }
+        segs.sort(function (a, b) { return a.start - b.start; }); // editor zaman sirasi varsayar; sirasiz SRT sureleri cokertiyordu
         /*
          * Ekranda iş varsa üzerine yazmadan önce anlık görüntü al: kullanıcı yanlış
          * dosya seçtiyse Ctrl+Z ile geri dönebilsin. Ekran boşsa yığını temizle, yoksa
@@ -1507,6 +1575,7 @@ window.KCaptions = (function () {
         if (segments.length) snapshot("SRT içe aktarma");
         else { undoStack.length = 0; redoStack.length = 0; }
         segments = segs;
+        segmentsMode = "plain";    // ice aktarilan SRT'de kelime zamani verisi yok
         uygulaEtiketiniSifirla();  // yeni doküman: "yine de uygula" onayı geçersiz
         refreshUndoUI();
         clearRevert();
@@ -1688,7 +1757,7 @@ window.KCaptions = (function () {
    *   değiştirilmez — buildAss zaten güvenle fade'e düşüyor.
    */
   function vurguKutusuDurumu() {
-    var kelimeVar = /^k/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
+    var kelimeVar = kelimeModuAktif();
     var anim = el("cap-animasyon") ? el("cap-animasyon").value : "yok";
 
     var kutu = el("cap-renk-vurgu-kutu");
@@ -1716,7 +1785,7 @@ window.KCaptions = (function () {
     if (!sahne || !kutu) return;
 
     var st = stil();
-    var karaoke = /^k/.test(el("cap-maxlen").value);
+    var karaoke = kelimeModuAktif();
     var olcek = sahne.clientWidth / 1920;
 
     // Yerleşim: ASS Alignment 2/5/8 -> alt/orta/üst
@@ -1805,7 +1874,7 @@ window.KCaptions = (function () {
     if (!segments.length) {
       return { kelimeler: ["Örnek", "altyazı", "böyle", "görünecek"], sureler: null };
     }
-    var karaoke = /^k/.test(el("cap-maxlen").value);
+    var karaoke = kelimeModuAktif();
     if (karaoke) {
       var cs = cueler();
       if (!cs.length) return { kelimeler: [], sureler: null };
@@ -1830,7 +1899,7 @@ window.KCaptions = (function () {
 
     var st = stil();
     var anim = st.animasyon || "yok";
-    var kelimeli = /^k/.test(el("cap-maxlen").value) &&
+    var kelimeli = kelimeModuAktif() &&
                    ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli;
 
     if (b) b.textContent = "■ Durdur";
@@ -1881,6 +1950,8 @@ window.KCaptions = (function () {
     fade:    { ad: "Yumuşak geçiş",  kelimeli: false },
     slide:   { ad: "Alttan kayma",   kelimeli: false },
     karaoke: { ad: "Karaoke dolgu",  kelimeli: true },
+    akici:   { ad: "Akıcı dolgu",    kelimeli: true },
+    yazim:   { ad: "Daktilo",        kelimeli: true },
     vurgu:   { ad: "Aktif kelime",   kelimeli: true },
     pop:     { ad: "Pop",            kelimeli: true },
     bounce:  { ad: "Zıplama",        kelimeli: true }
@@ -1909,6 +1980,7 @@ window.KCaptions = (function () {
     var anim = opts.animasyon || st.animasyon || (kelimeVerisi ? "karaoke" : "yok");
     if (!ANIMASYONLAR[anim]) anim = "yok";
     if (ANIMASYONLAR[anim].kelimeli && !kelimeVerisi) anim = "fade";
+    if (ANIMASYONLAR[anim].kelimeli && typeof Pro !== "undefined" && !Pro.isPro()) anim = "fade"; // Pro: kelimeli animasyon
 
     var cs = cueler();
 
@@ -1976,10 +2048,19 @@ window.KCaptions = (function () {
       assKaraokeSatirlari(cs).forEach(function (grup) {
         var sonBitis = grup[grup.length - 1].end;
 
-        if (anim === "karaoke") {
-          var parcalar = grup.map(function (c) {
-            var sure = Math.max(1, Math.round((c.end - c.start) * 100)); // santisaniye
-            return "{\\k" + sure + "}" + assMetin(c.text);
+        if (anim === "karaoke" || anim === "akici") {
+          // akici: \kf kelimeyi soldan saga surekli boyar (kesikli \k yerine)
+          var kTag = anim === "akici" ? "\\kf" : "\\k";
+          var parcalar = grup.map(function (c, gi) {
+            /*
+             * \k sureleri ARDISIKTIR: kelimeler arasi duraklama onceki
+             * kelimenin penceresine dahil edilmezse dolgu her duraklamada
+             * gercek konusmadan biraz daha one kayar. Son kelime haric sure,
+             * bir SONRAKI kelimenin baslangicina kadar sayilir.
+             */
+            var sonraki = grup[gi + 1];
+            var sure = Math.max(1, Math.round(((sonraki ? sonraki.start : c.end) - c.start) * 100)); // santisaniye
+            return "{" + kTag + sure + "}" + assMetin(c.text);
           });
           olay(grup[0].start, sonBitis, parcalar.join(" "));
           return;
@@ -2010,6 +2091,25 @@ window.KCaptions = (function () {
                 parca.push("{\\1c" + vurguAss + "\\fscx114\\fscy114\\t(0,110,0.6,\\fscx100\\fscy100)}" + k + "{\\r}");
               } else {
                 parca.push(k);
+              }
+            } else if (anim === "yazim") {
+              /*
+               * Daktilo: onceki kelimeler duruk, YENI kelime harf harf belirir.
+               * Numara: ikincil renk alfasi tam seffaf ({\2a&HFF&}) + harf
+               * basina \k — karaoke "henuz soylenmemis" harfleri gorunmez
+               * kilar, \k sirasi geldikce harf "yazilir". Pencerenin ~%60'i
+               * yazima harcanir, kalani okunur halde bekler.
+               */
+              if (j < i) parca.push(k);
+              else if (j === i) {
+                var harfler = String(grup[j].text).split("");
+                var csTop = Math.max(4, Math.round((pSon - pBas) * 100));
+                var per = Math.max(2, Math.min(8, Math.floor((csTop * 0.6) / Math.max(1, harfler.length))));
+                var hp = "{\\2a&HFF&}";
+                for (var hh = 0; hh < harfler.length; hh++) {
+                  hp += "{\\k" + per + "}" + assMetin(harfler[hh]);
+                }
+                parca.push(hp);
               }
             } else if (j <= i) {
               // pop/bounce: kelimeler birikerek gelir; yalnız YENİ kelime animasyonlu
@@ -2073,6 +2173,7 @@ window.KCaptions = (function () {
    * mükemmel sıkıştırıyor. Uyumsuzluk çıkarsa ProRes 4444 yedeği var.
    */
   async function overlayUygula() {
+    if (typeof Pro !== "undefined" && !Pro.gate("overlay")) return; // Pro: animasyonlu katman
     if (segments.length === 0) return;
     /*
      * Emoji bekçisi: libass emojiyi HİÇ çizemiyor (denendi — tofu bile değil,
@@ -2112,7 +2213,7 @@ window.KCaptions = (function () {
       var sure = Math.max(1, Math.ceil(sonBitis + 2));
 
       var st = stil();
-      var karaoke = /^k/.test(el("cap-maxlen").value);
+      var karaoke = segmentsMode === "k1"; // kc DEGIL: kumulatif cue'lar \k ile katlaniyordu
       var ass = buildAssKaydirilmis(baslangic,
         { karaoke: karaoke, animasyon: st.animasyon, genislik: g, yukseklik: y });
 
@@ -2754,7 +2855,13 @@ window.KCaptions = (function () {
   // Astral (surrogate) karakter = pratikte emoji. Stilli katman yolunun bekçisi.
   function emojiIceriyorMu() {
     for (var i = 0; i < segments.length; i++) {
-      if (/[\uD800-\uDFFF☀-➿⭐❗✅❌]/.test(segments[i].text || "")) return true;
+      /*
+       * Yalniz GERCEKTEN renkli cizilen karakterler: surrogate ciftleri,
+       * VS16 secicisi ve Emoji_Presentation=Yes olan dar BMP kumesi.
+       * Eski genis ☀-➿ araligi ♪ ★ ✓ gibi siradan sembolleri de emoji
+       * sayip stilli katmani gereksiz yere engelliyordu.
+       */
+      if (/[\uD800-\uDFFF\uFE0F\u231A\u231B\u23E9-\u23EC\u23F0\u23F3\u25FD\u25FE\u2614\u2615\u2648-\u2653\u267F\u2693\u26A1\u26AA\u26AB\u26BD\u26BE\u26C4\u26C5\u26CE\u26D4\u26EA\u26F2\u26F3\u26F5\u26FA\u26FD\u2705\u270A\u270B\u2728\u274C\u274E\u2753-\u2755\u2757\u2795-\u2797\u27B0\u27BF\u2B1B\u2B1C\u2B50\u2B55]/.test(segments[i].text || "")) return true;
     }
     return false;
   }
@@ -2805,7 +2912,7 @@ window.KCaptions = (function () {
   function saveAs() {
     try {
       var fmt = (el("cap-export-fmt") && el("cap-export-fmt").value) || "srt";
-      var kelimeModu = /^(k1|kc|w\d+)$/.test(el("cap-maxlen").value);
+      var kelimeModu = segmentsMode === "k1" || segmentsMode === "w"; // kc haric: ASS'te metin katlaniyordu
       var icerik, ad, bom = "﻿";
       if (fmt === "txt") {
         var lines = segments.map(function (s) { return styleText(s.text); }).filter(Boolean);
@@ -2816,6 +2923,7 @@ window.KCaptions = (function () {
         icerik = buildVtt();
         ad = "suflo-altyazi.vtt";
       } else if (fmt === "ass") {
+        if (typeof Pro !== "undefined" && !Pro.gate("assexport")) return;    // Pro: stilli ASS
         icerik = buildAss({ karaoke: kelimeModu, animasyon: stil().animasyon });
         ad = "suflo-altyazi.ass";
         bom = "";

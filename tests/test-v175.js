@@ -87,11 +87,25 @@ function tryCapIle(donus) {
   var f = new Function("seq", "item", tbody + "; return tryCap(undefined);");
   return f({ createCaptionTrack: function () { return donus; } }, {});
 }
-chk("tryCap: false -> basarisiz", tryCapIle(false) === false);
-chk("tryCap: undefined -> basarisiz (ESKIDEN basarili sayiliyordu)", tryCapIle(undefined) === false);
-chk("tryCap: null -> basarisiz", tryCapIle(null) === false);
-chk("tryCap: true -> basarili", tryCapIle(true) === true);
-chk("tryCap: nesne -> basarili", tryCapIle({ id: 1 }) === true);
+/*
+ * Yeni uclu sozlesme: "hayir" (kesin basarisiz — tekrar denenebilir),
+ * "belirsiz" (undefined/null: track OLUSMUS olabilir — tekrar denemek ayni
+ * SRT'den ikinci bir altyazi track'i olusturuyordu, ASLA tekrar denenmez),
+ * "evet" (kesin basarili).
+ */
+chk("tryCap: false -> hayir (tekrar denenebilir)", tryCapIle(false) === "hayir");
+chk("tryCap: undefined -> belirsiz (tekrar DENENMEZ: cift track koruması)", tryCapIle(undefined) === "belirsiz");
+chk("tryCap: null -> belirsiz", tryCapIle(null) === "belirsiz");
+chk("tryCap: true -> evet", tryCapIle(true) === "evet");
+chk("tryCap: nesne -> evet", tryCapIle({ id: 1 }) === "evet");
+
+// Tekrar deneme sayaci: "belirsiz" donuste createCaptionTrack TOPLAM 1 kez cagrilmali
+(function () {
+  var kb = hsrc.indexOf("var d1 = tryCap()");
+  var kk = hsrc.indexOf("return KS_ok({ imported: true, captionTrack:", kb);
+  var karar = hsrc.slice(kb, kk);
+  chk("tryCap tekrar denemesi yalniz 'hayir'da", /d1 === "hayir"/.test(karar) && !/d1 === "belirsiz"/.test(karar));
+})();
 
 /* ---------- 5) Kurulum betikleri Premiere 2026 (CSXS 13/14) ---------- */
 var ps1 = fs.readFileSync(KOK + "tools/install.ps1", "utf8");

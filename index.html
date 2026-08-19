@@ -118,8 +118,8 @@
                 <option value="c60">60 karakter</option>
               </optgroup>
               <optgroup label="Karaoke (kelime zamanlı)">
-                <option value="k1">Kelime kelime</option>
-                <option value="kc">Birikimli</option>
+                <option value="k1" data-pro="1">Kelime kelime</option>
+                <option value="kc" data-pro="1">Birikimli</option>
               </optgroup>
             </select>
           </div>
@@ -199,10 +199,12 @@
               <option value="slide">Alttan kayma</option>
             </optgroup>
             <optgroup label="Kelime zamanlı (Satır uzunluğu → Karaoke)">
-              <option value="vurgu">Aktif kelime vurgusu</option>
-              <option value="karaoke">Karaoke dolgu</option>
-              <option value="pop">Pop (kelimeler büyüyerek gelir)</option>
-              <option value="bounce">Zıplama</option>
+              <option value="vurgu" data-pro="1">Aktif kelime vurgusu</option>
+              <option value="karaoke" data-pro="1">Karaoke dolgu</option>
+              <option value="akici" data-pro="1">Akıcı dolgu (pürüzsüz)</option>
+              <option value="yazim" data-pro="1">Daktilo (harf harf)</option>
+              <option value="pop" data-pro="1">Pop (kelimeler büyüyerek gelir)</option>
+              <option value="bounce" data-pro="1">Zıplama</option>
             </optgroup>
           </select>
           <p class="hint" id="cap-animasyon-ipucu" hidden style="margin:5px 0 0">
@@ -592,6 +594,49 @@
     </div>
 
 
+    <div class="set-group" id="grp-pro">
+      <div class="set-title">Suflo Pro</div>
+
+      <!-- Kilitli durum: anahtar girisi -->
+      <div id="pro-locked-card">
+        <div class="pro-ozet">
+          <div>
+            <b>Ücretsiz — her zaman</b>
+            <ul>
+              <li>Transkripsiyon (99 dil, internetsiz)</li>
+              <li>Altyazı editörü + taslak kurtarma</li>
+              <li>SRT · VTT · TXT + caption track</li>
+              <li>Emoji seçici, GPU hızlandırma</li>
+            </ul>
+          </div>
+          <div>
+            <b class="pro-renk">Pro — 749 TL, tek sefer</b>
+            <ul>
+              <li>Animasyonlu altyazı katmanı</li>
+              <li>Karaoke + kelime animasyonları</li>
+              <li>Otomatik kesim · Ritim</li>
+              <li>Toplu klip · Çeviri · Sözlük · ASS</li>
+            </ul>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:8px">Tek seferlik lisans, abonelik yok, 3 makine.</p>
+        <div class="row">
+          <label for="pro-key">Anahtar</label>
+          <input id="pro-key" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+          <button id="pro-activate" class="btn primary">Etkinleştir</button>
+        </div>
+        <div id="pro-msg" class="inline-status"></div>
+        <p class="hint"><a href="#" id="pro-buy">Anahtarın yok mu? Satın al →</a></p>
+      </div>
+
+      <!-- Etkin durum -->
+      <div id="pro-active-card" hidden>
+        <p class="hint" style="margin-bottom:8px">Suflo Pro aktif ✓ <span id="pro-email" class="dim"></span></p>
+        <p class="hint" id="pro-recheck" hidden>Çevrimdışı doğrulama süresi doldu — internete bağlanınca kendiliğinden yenilenir.</p>
+        <button id="pro-deactivate" class="btn">Bu makinede devre dışı bırak</button>
+      </div>
+    </div>
+
     <div class="set-group">
       <div class="set-title">Destek</div>
       <p class="hint" style="margin-bottom:8px">Bir sorun mu var? "Sorun bildir" günlüğü kopyalar ve bildirim sayfasını açar; tek yapman gereken yapıştırmak.</p>
@@ -611,6 +656,7 @@
 
   <script src="js/CSInterface.js"></script>
   <script src="js/bridge.js"></script>
+  <script src="js/pro.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/magiccut.js"></script>

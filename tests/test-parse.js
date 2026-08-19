@@ -35,6 +35,9 @@ function chk(ad, kosul, ek) {
 chk("SRT hh:mm:ss,ms", M.tcParse("00:00:01,380") === 1.38, M.tcParse("00:00:01,380"));
 chk("VTT hh:mm:ss.ms", M.tcParse("00:00:04.000") === 4, M.tcParse("00:00:04.000"));
 chk("elle mm:ss.ms", M.tcParse("01:23.500") === 83.5, M.tcParse("01:23.500"));
+// 1-2 haneli kesir milisaniye SANILMAMALI: ".5" = 500 ms (eski hata: 5 ms okunuyordu)
+chk("elle mm:ss.k tek hane", M.tcParse("01:23.5") === 83.5, M.tcParse("01:23.5"));
+chk("SRT hh:mm:ss,kk cift hane", M.tcParse("00:00:01,38") === 1.38, M.tcParse("00:00:01,38"));
 chk("VTT hh:mm:ss.ms + cue ayarlari",
   M.tcParse("00:00:04.000 align:start position:50%") === 4,
   M.tcParse("00:00:04.000 align:start position:50%"));

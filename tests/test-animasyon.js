@@ -111,6 +111,23 @@ var aBou = uret("bounce");
 ok("bounce: iki asamali \\t (tasma+oturma, easingli)", /\\t\(0,85,0\.5,[^)]*\\fscx124[^)]*\)\\t\(85,175,0\.8/.test(aBou),
   (aBou.match(/\{[^}]*fscx124[^}]*\}/) || ["?"])[0].slice(0, 80));
 
+// akici: karaoke gibi TEK olay ama \kf (puruzsuz dolgu) etiketiyle
+var aAki = uret("akici");
+ok("akici: \\kf etiketleri var", /\{\\kf\d+\}/.test(aAki), (aAki.match(/\{\\kf\d+\}/g) || []).length + " etiket");
+ok("akici: satir basina TEK olay", olaylar(aAki).length === 1, olaylar(aAki).length + " olay");
+ok("akici: kesikli \\k YOK (yalniz \\kf)", !/\{\\k\d+\}/.test(aAki));
+
+// yazim (daktilo): birikimli olaylar + yeni kelime harf harf \k + seffaf 2a numarasi
+var aYaz = uret("yazim");
+var oYaz = olaylar(aYaz);
+ok("yazim: kelime basina olay", oYaz.length === KELIMELER.length, oYaz.length + " olay");
+ok("yazim: gizleme numarasi var ({\\2a&HFF&})", /\{\\2a&HFF&\}/.test(aYaz));
+ok("yazim: harf basina \\k dilimi var", (oYaz[0].match(/\{\\k\d+\}/g) || []).length >= 2,
+  (oYaz[0].match(/\{\\k\d+\}/g) || []).length + " dilim ilk olayda");
+ok("yazim: birikimli (son olay ilk kelimeyi de icerir)",
+  oYaz[oYaz.length - 1].indexOf("BİR") !== -1);
+ok("yazim: olaylar ortusmuyor", !ortusmeVar(oYaz));
+
 // fade / slide: satir olaylari + etiket
 var aFad = uret("fade");
 ok("fade: \\fad etiketi var", /\{\\fad\(180,180\)\}/.test(aFad));

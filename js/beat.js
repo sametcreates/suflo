@@ -86,6 +86,17 @@ window.KBeat = (function () {
    * şeyi, gürültülü şarkıda hiçbir şeyi yakalar.
    */
   function onsetBul(pcm) {
+    if (pcm.length < HOP) return { bass: [], tiz: [] };
+    /*
+     * Kenar dolgusu: dolgusuz halde klibin ilk ~80 ms'si ve son ~100-150 ms'si
+     * hicbir pencereye tam oturmuyor, oradaki vuruslar asla bulunamiyordu.
+     * Basa ve sona 2N sifir ekle; zamanlar asagida geri kaydirilir.
+     */
+    var pad = 2 * N;
+    var kaynakSure = pcm.length / SR;
+    var p2 = new Float32Array(pcm.length + 2 * pad);
+    p2.set(pcm, pad);
+    pcm = p2;
     var frameSayisi = Math.floor((pcm.length - N) / HOP);
     if (frameSayisi < 8) return { bass: [], tiz: [] };
 
@@ -156,7 +167,16 @@ window.KBeat = (function () {
       return out;
     }
 
-    return { bass: tepeler(basAki), tiz: tepeler(tizAki) };
+    // dolgu kaymasini geri al ve kaynak suresine kirp
+    function kaydir(liste) {
+      liste.forEach(function (o) {
+        o.t = o.t - pad / SR;
+        if (o.t < 0) o.t = 0;
+        if (o.t > kaynakSure) o.t = kaynakSure;
+      });
+      return liste;
+    }
+    return { bass: kaydir(tepeler(basAki)), tiz: kaydir(tepeler(tizAki)) };
   }
 
   /*
@@ -208,9 +228,16 @@ window.KBeat = (function () {
   }
 
   async function analyze() {
+    if (typeof Pro !== "undefined" && !Pro.gate("beat")) return; // Pro: ritim analizi
     if (busy) return;
-    clip = KApp.ctx().sel;
-    if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
+    /*
+     * Analiz dakikalarca surebilir; bu sirada kullanici secimi degistirirse
+     * onContext modul degiskeni clip'i null'lar ve analiz TypeError ile
+     * cokerdi. Yerel kopya (k) uzerinden calis: analiz basladigi klibe kilitli.
+     */
+    var k = KApp.ctx().sel;
+    clip = k;
+    if (!k) { status("Önce timeline'da bir klip seç.", "warn"); return; }
     busy = true;
     el("beat-analyze").classList.add("busy");
     el("beat-progress").hidden = false;
@@ -222,8 +249,8 @@ window.KBeat = (function () {
       status("Ses çözülüyor…");
       var ham = K.path.join(K.tmpDir(), "beat_" + Date.now() + ".pcm");
       temizle.push(ham);
-      var r = await K.run(ff, ["-y", "-ss", String(clip.inPoint), "-t", String(clip.dur),
-        "-i", clip.mediaPath, "-ac", "1", "-ar", String(SR), "-f", "s16le", ham],
+      var r = await K.run(ff, ["-y", "-ss", String(k.inPoint), "-t", String(k.dur),
+        "-i", k.mediaPath, "-ac", "1", "-ar", String(SR), "-f", "s16le", ham],
         { timeout: 900000 });
       if (r.code !== 0 || !K.fs.existsSync(ham)) {
         throw new Error("Ses çözülemedi: " + String(r.stderr || "").split("\n").slice(-2).join(" ").slice(0, 140));
@@ -238,19 +265,31 @@ window.KBeat = (function () {
       var sonucB = onsetBul(pcm);
 
       // klip hızı değiştirilmişse kaynak süresi != timeline süresi
-      var timelineSure = clip.clipEnd - clip.clipStart;
-      var hiz = (clip.dur > 0 && timelineSure > 0) ? timelineSure / clip.dur : 1;
+      var timelineSure = k.clipEnd - k.clipStart;
+      var hiz = (k.dur > 0 && timelineSure > 0) ? timelineSure / k.dur : 1;
 
       var bant = el("beat-bant").value;
       vurusler = [];
       if (bant === "bass" || bant === "hepsi") {
-        sonucB.bass.forEach(function (v) { vurusler.push({ t: clip.clipStart + v.t * hiz, guc: v.guc, tip: "bass" }); });
+        sonucB.bass.forEach(function (v) { vurusler.push({ t: k.clipStart + v.t * hiz, guc: v.guc, tip: "bass" }); });
       }
       if (bant === "tiz" || bant === "hepsi") {
-        sonucB.tiz.forEach(function (v) { vurusler.push({ t: clip.clipStart + v.t * hiz, guc: v.guc, tip: "tiz" }); });
+        sonucB.tiz.forEach(function (v) { vurusler.push({ t: k.clipStart + v.t * hiz, guc: v.guc, tip: "tiz" }); });
       }
       vurusler.sort(function (a, b) { return a.t - b.t; });
+      // 'hepsi' bandinda ayni vurus bas+tiz listelerinde iki kez cikabilir:
+      // 60 ms icinde ust uste binenleri tekle, guclu olani tut
+      var tekil = [];
+      vurusler.forEach(function (v) {
+        var son = tekil[tekil.length - 1];
+        if (son && v.t - son.t < 0.06) {
+          if (v.guc > son.guc) tekil[tekil.length - 1] = v;
+        } else tekil.push(v);
+      });
+      vurusler = tekil;
       bpm = bpmTahmin(bant === "tiz" ? sonucB.tiz : sonucB.bass);
+      // bas vurusu az olan parcada (akustik, lo-fi) tize dus — birlesik liste ASLA verilmez
+      if (!bpm && bant === "hepsi") bpm = bpmTahmin(sonucB.tiz);
 
       if (!vurusler.length) {
         status("Belirgin vuruş bulunamadı. Müzik içeren bir klip seç ya da vuruş tipini değiştir.", "warn");
@@ -261,7 +300,7 @@ window.KBeat = (function () {
       status("");
       el("beat-result").hidden = false;
       el("beat-result-info").textContent = vurusler.length + " vuruş" + (bpm ? " · ~" + bpm + " BPM" : "");
-      cizBar(timelineSure);
+      cizBar(timelineSure, k.clipStart);
       KApp.toast(vurusler.length + " vuruş bulundu" + (bpm ? " (" + bpm + " BPM)" : ""), "good");
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
@@ -275,11 +314,10 @@ window.KBeat = (function () {
   }
 
   // Vuruşları yatay bir bantta göster: bas kalın/mor, tiz ince/mavi
-  function cizBar(sure) {
+  function cizBar(sure, t0) {
     var bar = el("beat-bar");
     if (!bar) return;
     bar.innerHTML = "";
-    var t0 = clip.clipStart;
     vurusler.forEach(function (v) {
       var tik = document.createElement("i");
       tik.className = "beat-tik " + v.tip;
@@ -314,6 +352,7 @@ window.KBeat = (function () {
     el("beat-apply").addEventListener("click", apply);
     KApp.onContext(function (ctx) {
       refreshButton();
+      if (busy) return; // analiz surerken sonucu/klibi sifirlama — analiz yerel kopyayla bitiyor
       if (clip && (!ctx.sel || ctx.sel.mediaPath !== clip.mediaPath)) {
         el("beat-result").hidden = true;
         vurusler = [];
