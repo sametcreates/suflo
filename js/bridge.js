@@ -353,7 +353,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "2.5.3";
+  var VERSION = "2.5.4";
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -1001,10 +1001,17 @@ window.K = (function () {
   /* ---------------- Dosya yardımcıları ---------------- */
 
   var AUDIO_EXT = [".wav", ".mp3", ".aif", ".aiff", ".m4a", ".flac", ".ogg", ".wma"];
+  var VISUAL_EXT = [".png", ".webp", ".gif", ".jpg", ".jpeg"];
 
   function isAudio(f) {
     var l = f.toLowerCase();
     for (var i = 0; i < AUDIO_EXT.length; i++) if (l.slice(-AUDIO_EXT[i].length) === AUDIO_EXT[i]) return true;
+    return false;
+  }
+
+  function isVisual(f) {
+    var l = f.toLowerCase();
+    for (var i = 0; i < VISUAL_EXT.length; i++) if (l.slice(-VISUAL_EXT[i].length) === VISUAL_EXT[i]) return true;
     return false;
   }
 
@@ -1026,6 +1033,27 @@ window.K = (function () {
       } else if (isAudio(e.name)) {
         out.push(full);
       }
+    }
+    return out;
+  }
+
+  // Emoji Assets ve ilerideki gorsel kutuphaneleri icin guvenli, sinirli tarama.
+  // Gizli klasor/dosyalar atlanir; arsiv kullanicinin oldugu yerde kalir.
+  function walkVisual(dir, limit, depth) {
+    var out = [];
+    if (!nodeOK) return out;
+    limit = limit || 6000;
+    depth = depth === undefined ? 10 : depth;
+    if (depth < 0) return out;
+    var entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return out; }
+    for (var i = 0; i < entries.length; i++) {
+      if (out.length >= limit) break;
+      var entry = entries[i];
+      if (!entry || entry.name.charAt(0) === ".") continue;
+      var full = path.join(dir, entry.name);
+      if (entry.isDirectory()) out = out.concat(walkVisual(full, limit - out.length, depth - 1));
+      else if (isVisual(entry.name)) out.push(full);
     }
     return out;
   }
@@ -1082,6 +1110,8 @@ window.K = (function () {
     saveSettings: saveSettings,
     walkAudio: walkAudio,
     isAudio: isAudio,
+    walkVisual: walkVisual,
+    isVisual: isVisual,
     tmpDir: tmpDir,
     srtDir: srtDir,
     emojiSetDir: emojiSetDir,

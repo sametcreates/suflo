@@ -10,6 +10,7 @@ window.KLibraryHealth = (function () {
 
   var AUDIO_RE = /\.(wav|mp3|aif|aiff|m4a|flac|ogg|wma)$/i;
   var AUDIO_LIKE_RE = /\.(aac|caf|opus|ac3|amr|ape)$/i;
+  var VISUAL_RE = /\.(png|webp|gif|jpe?g)$/i;
   var lastReport = null;
 
   function el(id) { return document.getElementById(id); }
@@ -42,6 +43,11 @@ window.KLibraryHealth = (function () {
     if (type === "mogrt" && K.extensionPath) {
       var ext = K.extensionPath();
       if (ext) out.push({ path: K.path.join(ext, "content", "mogrt"), label: "Suflo Originals", builtin: true });
+    }
+    if (type === "emoji") {
+      var emojiRoot = String(K.settings().emojiAssetsKlasor || "").trim();
+      if (emojiRoot) out.push({ path: emojiRoot, label: "Bağlı klasör", builtin: false });
+      return out;
     }
     var builtin = K.path.join(baseDir(), type === "mogrt" ? "mogrt" : "sfx");
     out.push({ path: builtin, label: "Suflo klasörü", builtin: true });
@@ -90,7 +96,7 @@ window.KLibraryHealth = (function () {
         var full = K.path.join(dir, entry.name);
         if (entry.isDirectory()) { walk(full, depth - 1); continue; }
 
-        var accepted = type === "mogrt" ? /\.mogrt$/i.test(entry.name) : AUDIO_RE.test(entry.name);
+        var accepted = type === "mogrt" ? /\.mogrt$/i.test(entry.name) : (type === "emoji" ? VISUAL_RE.test(entry.name) : AUDIO_RE.test(entry.name));
         if (!accepted) {
           if (type === "sfx" && AUDIO_LIKE_RE.test(entry.name)) result.unsupported.push(full);
           continue;
@@ -133,7 +139,7 @@ window.KLibraryHealth = (function () {
   }
 
   function makeReport() {
-    var report = { status: "good", checks: [], generatedAt: new Date().toISOString(), mogrt: null, sfx: null };
+    var report = { status: "good", checks: [], generatedAt: new Date().toISOString(), mogrt: null, sfx: null, emoji: null };
     if (!K.nodeOK || !K.fs || !K.path) {
       addCheck(report, "bad", "Dosya erişimi kapalı", "Premiere'i yeniden başlat; panel Node erişimi olmadan yerel arşivi okuyamaz.");
       return report;
@@ -141,9 +147,10 @@ window.KLibraryHealth = (function () {
     addCheck(report, "good", "Panel dosya erişimi", "Hazır");
     report.mogrt = scan("mogrt");
     report.sfx = scan("sfx");
+    report.emoji = scan("emoji");
 
-    [report.mogrt, report.sfx].forEach(function (r) {
-      var ad = r.type === "mogrt" ? "MOGRT" : "SFX";
+    [report.mogrt, report.sfx, report.emoji].forEach(function (r) {
+      var ad = r.type === "mogrt" ? "MOGRT" : (r.type === "emoji" ? "Emoji Assets" : "SFX");
       var missing = r.roots.filter(function (x) { return !x.builtin && !x.directory; });
       if (missing.length) addCheck(report, "bad", ad + " klasörü bulunamadı", missing[0].path);
       else if (!r.count) addCheck(report, "warn", ad + " arşivi boş", "Ayarlar'dan klasör bağla veya dosyaları Suflo klasörüne ekle.");
@@ -162,7 +169,7 @@ window.KLibraryHealth = (function () {
     if (!report) return "";
     var lines = ["Suflo kütüphane sağlık raporu", "Durum: " + report.status.toUpperCase(), "Tarih: " + report.generatedAt];
     report.checks.forEach(function (c) { lines.push("[" + c.status.toUpperCase() + "] " + c.title + (c.detail ? " — " + c.detail : "")); });
-    [report.mogrt, report.sfx].forEach(function (r) {
+    [report.mogrt, report.sfx, report.emoji].forEach(function (r) {
       if (!r) return;
       lines.push("");
       lines.push(r.type.toUpperCase() + ": " + r.count + " dosya, " + formatBytes(r.bytes));

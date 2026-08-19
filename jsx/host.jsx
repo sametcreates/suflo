@@ -939,7 +939,11 @@ function KS_placeGraphic(encoded) {
 
     var start = 0;
     try { start = seq.getPlayerPosition().seconds; } catch (eP) {}
-    var dur = Number(p.dur) > 0 ? Number(p.dur) : 1.6;
+    var medyaDur = 0;
+    try { medyaDur = item.getOutPoint().seconds - item.getInPoint().seconds; } catch (eMd) {}
+    // Unicode secici 1.6 sn davranisini korur. Emoji Assets'teki hareketli GIF
+    // ise kendi gercek suresiyle kalir; duragan asset'ler panelden 5 sn yollar.
+    var dur = p.keepDuration && medyaDur > 0 ? medyaDur : (Number(p.dur) > 0 ? Number(p.dur) : 1.6);
     /*
      * Still once Premiere'in varsayilan duragan gorsel suresiyle (tipik 5 sn)
      * yerlesir, SONRA kirpilir. Bos-katman kontrolunu istenen 1.6 sn ile
@@ -947,7 +951,7 @@ function KS_placeGraphic(encoded) {
      * Kontrolu gercek yerlesme ayak iziyle yap.
      */
     var yerlesikDur = 0;
-    try { yerlesikDur = item.getOutPoint().seconds - item.getInPoint().seconds; } catch (eG2) {}
+    try { yerlesikDur = medyaDur || (item.getOutPoint().seconds - item.getInPoint().seconds); } catch (eG2) {}
     var kontrolDur = Math.max(dur, yerlesikDur > 0 ? yerlesikDur : dur);
 
     var idx = KS_findFreeVideoTrack(seq, start, start + kontrolDur);

@@ -81,6 +81,7 @@
     glossary:  'Terim sozlugu + gelismis bul/degistir',
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
     sfx:       'SFX kutuphanesi + Akilli SFX onerileri',
+    emojiAssets: 'Emoji Assets (PNG / WEBP / GIF kutuphanesi)',
     pro:       'Suflo Pro'
   };
 
@@ -390,7 +391,7 @@
           '<li>Animasyonlu altyazi + karaoke + daktilo</li>' +
           '<li>Otomatik kesim + ritim senkronu</li>' +
           '<li>Toplu islem, ceviri, sozluk, ASS</li>' +
-          '<li>40 Suflo Originals + MOGRT/SFX kutuphaneleri</li>' +
+          '<li>40 Suflo Originals + MOGRT/SFX/Emoji kutuphaneleri</li>' +
           '<li>Altyazidan Akilli SFX onerileri</li>' +
         '</ul>' +
         '<div class="pro-upsell-fiyat"><b>749 TL</b><span>tek seferlik \u00b7 abonelik yok \u00b7 omur boyu</span></div>' +

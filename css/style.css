@@ -2325,3 +2325,68 @@ body {
   .yan-menu .ky-oge { justify-content: center; padding: 7px 0; }
   .icerik { padding: 0 9px; }
 }
+
+/* ---------- Pro Emoji Assets ---------- */
+#tab-emoji-assets { padding-top: 14px; }
+.emoji-assets-head { margin-bottom: 10px; }
+.emoji-assets-head .library-search svg { fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; }
+.emoji-assets-head .library-search input {
+  width: 100%; height: 39px; padding: 0 13px 0 38px;
+  color: #edf2f8; background: #0f151e;
+  border: 1px solid #263344; border-radius: 7px;
+  font-size: 11px; font-weight: 600;
+}
+.emoji-assets-head > .btn:last-child { min-width: 98px; height: 39px; }
+.emoji-assets-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 0 1px 14px;
+}
+.emoji-assets-toolbar .seg-ctl { width: auto; }
+.emoji-assets-title { margin-bottom: 13px; }
+.emoji-assets-grid .mogrt-kart { background: linear-gradient(180deg, #121a24, #0d131b); }
+.emoji-assets-grid .mogrt-thumb {
+  aspect-ratio: 1 / 1;
+  background-color: #0b1017;
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255,255,255,.035) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255,255,255,.035) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.035) 75%);
+  background-size: 22px 22px;
+  background-position: 0 0, 0 11px, 11px -11px, -11px 0;
+}
+.emoji-assets-grid .mogrt-thumb img {
+  object-fit: contain;
+  padding: 16px;
+  background: radial-gradient(circle at 50% 46%, rgba(104,118,255,.1), transparent 62%);
+}
+.emoji-assets-grid .mogrt-source { max-width: calc(100% - 82px); }
+.emoji-format {
+  position: absolute; right: 42px; top: 7px; z-index: 2;
+  padding: 3px 6px;
+  color: #aeb9c8; background: rgba(7, 10, 15, .82);
+  border: 1px solid rgba(176, 190, 210, .28); border-radius: 4px;
+  font-size: 7px; font-weight: 850; letter-spacing: .1em;
+}
+.emoji-assets-grid .mogrt-meta b { min-height: 17px; -webkit-line-clamp: 1; }
+.emoji-assets-grid .mogrt-meta i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emoji-assets-empty-icon {
+  display: grid; place-items: center;
+  width: 48px; height: 48px; margin: 0 auto 10px;
+  color: var(--accent-lite); background: var(--grad-soft);
+  border: 1px solid rgba(112,128,255,.32); border-radius: 14px;
+  font-size: 25px;
+}
+.emoji-assets-grid .mogrt-kart.webp .mogrt-ekle-btn::before {
+  content: "AUTO"; padding: 1px 4px;
+  color: #a9d8ff; background: rgba(58,167,255,.11);
+  border: 1px solid rgba(58,167,255,.24); border-radius: 3px;
+  font-size: 6.5px; letter-spacing: .08em;
+}
+@media (min-width: 1180px) {
+  .emoji-assets-grid { grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); }
+}
+@media (max-width: 720px) {
+  .emoji-assets-toolbar { align-items: flex-start; flex-direction: column; }
+  .emoji-assets-head > .btn:last-child { min-width: 80px; }
+}

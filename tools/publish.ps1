@@ -59,6 +59,7 @@ if ($LASTEXITCODE -ne 0) {
 [xml]$mf = Get-Content (Join-Path $root "CSXS\manifest.xml")
 $version = $mf.ExtensionManifest.ExtensionBundleVersion
 $zxp = Join-Path $root "dist\Suflo-$version.zxp"
+$installer = Join-Path $root "dist\Suflo-$version-Kurulum.zip"
 if (-not (Test-Path $zxp)) {
     Write-Host "Paket yok, uretiliyor..." -ForegroundColor DarkGray
     powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "package.ps1")
@@ -89,7 +90,11 @@ if ($LASTEXITCODE -ne 0) {
     $releaseNotesTemp = Join-Path ([System.IO.Path]::GetTempPath()) ("suflo-release-" + $version + ".md")
     try {
         Set-Content -LiteralPath $releaseNotesTemp -Value $guncelBolum -Encoding UTF8
-        gh release create "v$version" $zxp --title "Suflo $version" --notes-file $releaseNotesTemp
+        if (Test-Path -LiteralPath $installer) {
+            gh release create "v$version" $zxp $installer --title "Suflo $version" --notes-file $releaseNotesTemp
+        } else {
+            gh release create "v$version" $zxp --title "Suflo $version" --notes-file $releaseNotesTemp
+        }
     } finally {
         if (Test-Path -LiteralPath $releaseNotesTemp) { Remove-Item -LiteralPath $releaseNotesTemp -Force }
     }

@@ -12,6 +12,8 @@ var TMP = path.join(os.tmpdir(), "suflo-kutuphane-test");
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
 fs.mkdirSync(path.join(TMP, "deep", "one", "two", "three"), { recursive: true });
 fs.mkdirSync(path.join(TMP, ".hidden"), { recursive: true });
+fs.mkdirSync(path.join(TMP, "Text Effects"), { recursive: true });
+fs.mkdirSync(path.join(TMP, "Logo"), { recursive: true });
 var EXT = path.join(TMP, "extension");
 var BUILTIN = path.join(EXT, "content", "mogrt");
 fs.mkdirSync(BUILTIN, { recursive: true });
@@ -21,6 +23,8 @@ fs.writeFileSync(path.join(BUILTIN, "catalog.json"), JSON.stringify({ items: [
 ] }));
 fs.writeFileSync(path.join(TMP, "root.mogrt"), "mogrt");
 fs.writeFileSync(path.join(TMP, "deep", "one", "two", "three", "nested.mogrt"), "mogrt");
+fs.writeFileSync(path.join(TMP, "Text Effects", "Kid Style.mogrt"), "mogrt");
+fs.writeFileSync(path.join(TMP, "Logo", "Logo Intro.mogrt"), "mogrt");
 fs.writeFileSync(path.join(TMP, ".hidden", "skip.mogrt"), "mogrt");
 fs.writeFileSync(path.join(TMP, "deep", "one", "hit.wav"), "wav");
 fs.writeFileSync(path.join(TMP, "deep", "one", "two", "whoosh.mp3"), "mp3");
@@ -80,9 +84,13 @@ async function run() {
   var libSrc = fs.readFileSync(KOKYOL + "js/library.js", "utf8");
   vm.runInContext(libSrc, ctx, { filename: "js/library.js" });
   await ctx.KLib.tara();
-  ok("MOGRT taramasi derin klasore iniyor", ctx.KLib.hariciSayisi() === 1, ctx.KLib.hariciSayisi());
+  ok("MOGRT taramasi derin klasore iniyor", ctx.KLib.hariciSayisi() === 3, ctx.KLib.hariciSayisi());
   ok("Paketle gelen Suflo Originals otomatik taraniyor", ctx.KLib.yerlesikSayisi() === 1, ctx.KLib.yerlesikSayisi());
-  ok("Vault'taki Suflo Original kopyasi ikinci kart olmuyor", ctx.KLib.sayisi() === 2, ctx.KLib.sayisi());
+  ok("Vault'taki Suflo Original kopyasi ikinci kart olmuyor", ctx.KLib.sayisi() === 4, ctx.KLib.sayisi());
+  ok("Saf text efektleri Yazi Animasyonlari'na gider",
+    ctx.KLib.yaziSayisi() === 2, "yazi=" + ctx.KLib.yaziSayisi());
+  ok("Logo ve genel MOGRT'lar Diger Animasyonlar'a gider",
+    ctx.KLib.digerSayisi() === 2, "diger=" + ctx.KLib.digerSayisi());
 
   var sfxSrc = fs.readFileSync(KOKYOL + "js/sfx.js", "utf8");
   vm.runInContext(sfxSrc, ctx, { filename: "js/sfx.js" });
@@ -97,10 +105,10 @@ async function run() {
   vm.runInContext(healthSrc, ctx, { filename: "js/library-health.js" });
   var saglik = ctx.KLibraryHealth.makeReport();
   ok("Kutuphane saglik kontrolu MOGRT ve SFX sayilarini raporluyor",
-    saglik.mogrt.count === 3 && saglik.sfx.count === 2,
+    saglik.mogrt.count === 5 && saglik.sfx.count === 2,
     "mogrt=" + saglik.mogrt.count + " sfx=" + saglik.sfx.count + " durum=" + saglik.status);
   ok("Kutuphane saglik raporu kopyalanabilir metin uretiyor",
-    /MOGRT: 3 dosya/.test(ctx.KLibraryHealth.reportText(saglik)));
+    /MOGRT: 5 dosya/.test(ctx.KLibraryHealth.reportText(saglik)));
 
   // Icerik paketi OPSIYONELDIR: mekanizma test edilir, payload dayatilmaz.
   // (Resmi pakete yalniz dagitim hakki dogrulanmis dosyalar girer.)
@@ -134,7 +142,7 @@ async function run() {
   ok("Kutuphane saglik kontrolu arayuzde ve yuklu",
     /id="set-library-health-run"/.test(html) && /src="js\/library-health\.js"/.test(html));
   ok("Harici MOGRT'lar Yazi Animasyonlari'ndan ayri bolumde",
-    /data-kat="custom"/.test(html) && /id="custom-sayac"/.test(html));
+    /data-kat="custom"/.test(html) && /Diğer Animasyonlar/.test(html) && /id="custom-sayac"/.test(html));
   var css = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
   ok("MOGRT kartlari buyuk, kirpilmayan profesyonel onizleme kullaniyor",
     /minmax\(220px,\s*1fr\)/.test(css) && /object-fit:\s*contain/.test(css));
@@ -142,6 +150,8 @@ async function run() {
     /<span>DRAG<\/span>/.test(libSrc) && /<span>LOCKED<\/span>/.test(libSrc) && /mogrt-lock/.test(libSrc));
   ok("Aktif MOGRT karti suruklenince playhead'e yerlestiriliyor",
     /setAttribute\("draggable",\s*"true"\)/.test(libSrc) && /addEventListener\("dragend"/.test(libSrc));
+  ok("MOGRT adlari thumbnail islemini beklemeden ekrana ciziliyor",
+    /sayaclar\(\);\s*ciz\(\);\s*\n\s*for \(var qi/.test(libSrc));
 
   var pro = fs.readFileSync(KOKYOL + "js/pro.js", "utf8");
   ok("SFX lisans kapisinda Pro ozelligi", /sfx:\s*'SFX kutuphanesi/.test(pro));

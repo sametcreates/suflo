@@ -26,7 +26,7 @@ function ok(ad, kosul, kanit) {
 }
 
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
-                "js/library.js", "js/sfx.js", "js/library-health.js"];
+                "js/library.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -105,9 +105,13 @@ var ZORUNLU = {
   "tab-sfx": "SFX görünümü",
   "sfx-smart-btn": "Akıllı SFX önerileri",
   "sfx-smart-list": "Akıllı SFX listesi",
+  "tab-emoji-assets": "Emoji Assets görünümü",
+  "emoji-assets-grid": "Emoji Assets kartları",
+  "emoji-assets-search": "Emoji Assets arama",
+  "set-emoji-assets-klasor": "Emoji Assets klasör ayarı",
   "set-library-health-run": "Kütüphane sağlık kontrolü",
   "set-library-health-result": "Kütüphane sağlık raporu",
-  "custom-sayac": "Bağlı MOGRT sayacı",
+  "custom-sayac": "Diğer Animasyonlar sayacı",
   "cap-emoji-ac": "Emoji aç düğmesi",
   "cap-emoji-panel": "Emoji paneli",
   "cap-emoji-grid": "Emoji ızgarası",
@@ -131,8 +135,8 @@ ok("kaldirilan modul ogeleri markup'ta YOK", kalinti.length === 0, kalinti.join(
 
 var betikler = (html.match(/<script src="js\/[^"]+"/g) || []).join(" ");
 ok("kaldirilan Motion betigi yuklenmiyor", !/motion\.js/.test(betikler), betikler);
-ok("aktif moduller yukleniyor (magiccut + beat + sfx + saglik)",
-  /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler) && /sfx\.js/.test(betikler) && /library-health\.js/.test(betikler), betikler);
+ok("aktif moduller yukleniyor (magiccut + beat + sfx + emoji + saglik)",
+  /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler) && /sfx\.js/.test(betikler) && /emoji-assets\.js/.test(betikler) && /library-health\.js/.test(betikler), betikler);
 
 /* ---------- 6) Yüklenen her betik diskte var mı ---------- */
 

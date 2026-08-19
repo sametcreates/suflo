@@ -18,6 +18,7 @@ window.KLib = (function () {
   var arama = "";
   var kategori = "mogrt";   // "mogrt" (Suflo Originals) | "custom" | "fav"
   var busyKart = null;
+  var taraNo = 0;
 
   /* ---------------- klasörler ---------------- */
 
@@ -44,6 +45,14 @@ window.KLib = (function () {
     base = base.replace(/\.mogrt$/i, "");
     base = base.replace(/^SUFLO\s+(?:TEXT|MOGRT)\s*-\s*(?:\d+\s*)?/i, "");
     return base.toLowerCase().replace(/[^a-z0-9\u00c0-\u024f]+/g, "");
+  }
+
+  // Saf yazi hareketleri ustte kalir. Lower third, yorum, liste, logo, ikon,
+  // subtitle ve sosyal paketler metin icerebilse de baska bir kurgu amacidir;
+  // "Diger Animasyonlar" bolumunde gosterilir.
+  function textAnimationMi(relativePath) {
+    var rel = String(relativePath || "").replace(/\\/g, "/");
+    return /(^|\/)(?:Text Animations?|Text Effects?|Typewriter|Text MOGRT Collection)(?:\/|$)/i.test(rel);
   }
 
   function builtinCatalog() {
@@ -109,6 +118,7 @@ window.KLib = (function () {
   }
 
   async function tara() {
+    var buTarama = ++taraNo;
     if (!K.nodeOK || !K.fs || !K.path) {
       paketler = [];
       sayaclar();
@@ -155,6 +165,7 @@ window.KLib = (function () {
     // ayni gorunen ada sahip cift dosyalari tekle (Suflo Originals once gelir)
     var gorulen = {};
     paketler = [];
+    var thumbQueue = [];
     for (var i = 0; i < yollar.length; i++) {
       var tam2 = yollar[i];
       var ad = K.path.basename(tam2).replace(/\.mogrt$/i, "");
@@ -168,27 +179,44 @@ window.KLib = (function () {
       if (gorulen[uniqueKey]) continue;
       gorulen[uniqueKey] = 1;
       var slug = ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || ("paket-" + i);
-      var tp = await thumbCikar(tam2, slug);
-      paketler.push({
+      var relPath = !isBuiltin && ek ? tam2.slice(ek.length).replace(/^[\\\/]+/, "") : "";
+      var group = isBuiltin || textAnimationMi(relPath) ? "text" : "other";
+      var paket = {
         path: tam2,
         ad: ad,
         display: display,
-        thumb: tp ? dataUri(tp) : null,
+        thumb: null,
         builtin: isBuiltin,
-        category: meta && meta.category ? String(meta.category) : "Text Animation"
-      });
+        group: group,
+        category: meta && meta.category ? String(meta.category) : (group === "text" ? "Text Animation" : "Other Animation")
+      };
+      paketler.push(paket);
+      thumbQueue.push({ paket: paket, slug: slug });
     }
+    // Kart adlari ve sayaclar ONCE gorunsun. Buyuk arsivlerde thumbnail acma
+    // saniyeler surebilir; eski akis hepsi bitene dek 0/bos ekran gosteriyordu.
     sayaclar();
     ciz();
+
+    for (var qi = 0; qi < thumbQueue.length; qi++) {
+      if (buTarama !== taraNo) return;
+      var q = thumbQueue[qi];
+      var tp = await thumbCikar(q.paket.path, q.slug);
+      if (buTarama !== taraNo) return;
+      if (tp) q.paket.thumb = dataUri(tp);
+      // Onizlemeleri kucuk partilerle ekrana getir; her dosyada tum grid'i
+      // yeniden kurup paneli titretme.
+      if ((qi + 1) % 8 === 0 || qi === thumbQueue.length - 1) ciz();
+    }
   }
 
   /* ---------------- çizim ---------------- */
 
   function sayaclar() {
     var s1 = el("yazi-sayac");
-    if (s1) s1.textContent = String(paketler.filter(function (p) { return p.builtin; }).length);
+    if (s1) s1.textContent = String(paketler.filter(function (p) { return p.group === "text"; }).length);
     var s0 = el("custom-sayac");
-    if (s0) s0.textContent = String(paketler.filter(function (p) { return !p.builtin; }).length);
+    if (s0) s0.textContent = String(paketler.filter(function (p) { return p.group === "other"; }).length);
     var favSayisi = paketler.filter(function (p) { return favMi(p.ad); }).length;
     var s2 = el("fav-sayac"); if (s2) s2.textContent = String(favSayisi);
   }
@@ -199,8 +227,8 @@ window.KLib = (function () {
     if (!grid) return;
 
     var liste = paketler.filter(function (p) {
-      if (kategori === "mogrt" && !p.builtin) return false;
-      if (kategori === "custom" && p.builtin) return false;
+      if (kategori === "mogrt" && p.group !== "text") return false;
+      if (kategori === "custom" && p.group !== "other") return false;
       if (kategori === "fav" && !favMi(p.ad)) return false;
       return !arama || (p.display + " " + p.ad + " " + p.category).toLowerCase().indexOf(arama) !== -1;
     });
@@ -208,12 +236,12 @@ window.KLib = (function () {
     var baslik = el("ki-baslik"), alt = el("ki-alt");
     if (baslik) baslik.textContent = kategori === "fav"
       ? "Favoriler"
-      : (kategori === "custom" ? "Bağlı MOGRT'lar" : "Yazı Animasyonları");
+      : (kategori === "custom" ? "Diğer Animasyonlar" : "Yazı Animasyonları");
     if (alt) alt.textContent = liste.length
       ? liste.length + " paket timeline'a hazır"
       : (kategori === "fav"
         ? "kalbe tıklayıp favori ekle"
-        : (kategori === "custom" ? "Ayarlar'dan kendi MOGRT klasörünü bağla" : "40 Suflo Originals"));
+        : (kategori === "custom" ? "logo, ikon, lower third ve diğer MOGRT paketleri" : "Suflo Originals + saf text efektleri"));
 
     grid.innerHTML = "";
     if (bos) bos.hidden = paketler.length > 0;
@@ -221,7 +249,7 @@ window.KLib = (function () {
       grid.innerHTML = '<p class="hint" style="grid-column:1/-1">' +
         (kategori === "fav"
           ? "Henüz favori yok — kartların kalbine tıkla."
-          : (kategori === "custom" ? "Bağlı klasörde gösterilecek ek MOGRT yok." : "Aramayla eşleşen paket yok.")) + "</p>";
+          : (kategori === "custom" ? "Bağlı klasörde gösterilecek diğer animasyon yok." : "Aramayla eşleşen yazı animasyonu yok.")) + "</p>";
       return;
     }
 
@@ -353,6 +381,8 @@ window.KLib = (function () {
     setKategori: setKategori,
     sayisi: function () { return paketler.length; },
     yerlesikSayisi: function () { return paketler.filter(function (p) { return p.builtin; }).length; },
-    hariciSayisi: function () { return paketler.filter(function (p) { return !p.builtin; }).length; }
+    hariciSayisi: function () { return paketler.filter(function (p) { return !p.builtin; }).length; },
+    yaziSayisi: function () { return paketler.filter(function (p) { return p.group === "text"; }).length; },
+    digerSayisi: function () { return paketler.filter(function (p) { return p.group === "other"; }).length; }
   };
 })();

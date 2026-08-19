@@ -283,6 +283,7 @@ window.KApp = (function () {
     Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
     Pro.markLocked(document.querySelector('.yan-menu .ky-oge[data-tab="sfx"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.yan-menu .ky-oge[data-tab="emoji-assets"]'), !s.pro);
     Pro.markLocked(el("cap-overlay"), !s.pro);
     Pro.markLocked(el("cap-translate-go"), !s.pro);
 
@@ -299,7 +300,7 @@ window.KApp = (function () {
     if (chip) chip.classList.toggle("aktif", !!s.pro);
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
-    ["yazi-tanitim", "sfx-tanitim", "cut-tanitim", "beat-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "sfx-tanitim", "emoji-assets-tanitim", "cut-tanitim", "beat-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -307,6 +308,7 @@ window.KApp = (function () {
     // MOGRT kartlarindaki PRO rozetleri tazelensin
     if (window.KLib && el("mogrt-grid") && el("mogrt-grid").children.length) KLib.tara();
     if (window.KSfx && el("sfx-list") && el("sfx-list").children.length) KSfx.tara();
+    if (window.KEmojiAssets && el("emoji-assets-grid") && el("emoji-assets-grid").children.length) KEmojiAssets.tara();
   }
 
   function initPro() {
@@ -396,6 +398,26 @@ window.KApp = (function () {
         durum.className = "inline-status good";
         durum.textContent = yol ? "✓ Kaydedildi — SFX kütüphanesi bu klasörü tarayacak" : "Ek SFX klasörü kaldırıldı";
         if (window.KSfx) KSfx.tara();
+      });
+    }
+
+    // Pro Emoji Assets yerel klasoru
+    var ek = el("set-emoji-assets-klasor");
+    if (ek) {
+      ek.value = K.settings().emojiAssetsKlasor || "";
+      el("set-emoji-assets-kaydet").addEventListener("click", function () {
+        var yol = ek.value.trim().replace(/^"|"$/g, "");
+        var durum = el("set-emoji-assets-durum");
+        if (yol && (!K.fs.existsSync(yol) || !K.fs.statSync(yol).isDirectory())) {
+          durum.className = "inline-status bad";
+          durum.textContent = "Klasör bulunamadı: " + yol;
+          return;
+        }
+        K.settings().emojiAssetsKlasor = yol;
+        K.saveSettings();
+        durum.className = "inline-status good";
+        durum.textContent = yol ? "✓ Kaydedildi — Emoji Assets bu klasörü tarayacak" : "Emoji klasörü kaldırıldı";
+        if (window.KEmojiAssets) KEmojiAssets.tara();
       });
     }
 
@@ -844,6 +866,7 @@ window.KApp = (function () {
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
     guvenli("SFX", function () { if (window.KSfx) KSfx.init(); });
+    guvenli("Emoji Assets", function () { if (window.KEmojiAssets) KEmojiAssets.init(); });
     guvenli("Kütüphane kontrolü", function () { if (window.KLibraryHealth) KLibraryHealth.init(); });
     guvenli("Pro-UI", reflectPro);
 

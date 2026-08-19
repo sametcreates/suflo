@@ -1,3 +1,14 @@
+## Suflo 2.5.4 — Emoji Assets
+
+- Yeni Pro **Emoji Assets** kütüphanesi: kendi PNG, WEBP, GIF ve JPG klasörünü bağla.
+- **Yazı Animasyonları boş görünme sorunu giderildi:** kart adları anında çizilir, thumbnail'lar arkadan yüklenir.
+- MOGRT'lar klasör yapısına göre ayrıldı: saf text efektleri **Yazı Animasyonları**'nda; logo, ikon, lower third, liste ve diğer paketler **Diğer Animasyonlar**'da.
+- 172 görsellik yerel arşivde büyük ve net kartlar, arama, favoriler ve son kullanılanlar.
+- DRAG veya tek tıkla playhead'deki güvenli boş video katmanına yerleştirme.
+- WEBP görseller Premiere uyumlu şeffaf PNG'ye yerelde otomatik hazırlanır; GIF hareketi korunur.
+- Dosya adlarındaki indirme sitesi/iOS etiketleri arayüzde temizlenir; dosyanın kendisine dokunulmaz.
+- Ücretsiz Unicode emoji seçici aynen ücretsiz kalır. Pro, görselleri değil yerel arşiv iş akışını açar.
+
 ## Suflo 2.5.3 — Studio arayüzü
 
 - Suflo, daha profesyonel ve Adobe uyumlu **Studio UI** tasarımına geçti.

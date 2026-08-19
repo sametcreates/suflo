@@ -5,6 +5,11 @@
 $ErrorActionPreference = "Stop"
 $src = Split-Path -Parent $PSScriptRoot
 $dest = Join-Path $env:APPDATA "Adobe\CEP\extensions\com.sametcreates.kesit"
+$cepRoot = [IO.Path]::GetFullPath((Join-Path $env:APPDATA "Adobe\CEP\extensions"))
+$destFull = [IO.Path]::GetFullPath($dest)
+if (-not $destFull.StartsWith($cepRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Guvenli olmayan kurulum hedefi: $destFull"
+}
 
 Write-Host "Suflo kuruluyor..." -ForegroundColor Cyan
 
@@ -17,13 +22,13 @@ foreach ($v in 9..14) {
 Write-Host "  PlayerDebugMode acildi (CSXS 9-14)" -ForegroundColor DarkGray
 
 # 2) Dosyalari kopyala
-if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-New-Item -ItemType Directory -Path $dest -Force | Out-Null
-foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "index.html", ".debug")) {
+if (Test-Path -LiteralPath $destFull) { Remove-Item -LiteralPath $destFull -Recurse -Force }
+New-Item -ItemType Directory -Path $destFull -Force | Out-Null
+foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "content", "index.html", "README.md", "LICENSE", ".debug")) {
     $p = Join-Path $src $item
-    if (Test-Path $p) { Copy-Item $p -Destination $dest -Recurse -Force }
+    if (Test-Path -LiteralPath $p) { Copy-Item -LiteralPath $p -Destination $destFull -Recurse -Force }
 }
-Write-Host "  Kopyalandi: $dest" -ForegroundColor DarkGray
+Write-Host "  Kopyalandi: $destFull" -ForegroundColor DarkGray
 
 Write-Host ""
 Write-Host "Bitti. Premiere Pro'yu yeniden baslat, sonra:" -ForegroundColor Green
