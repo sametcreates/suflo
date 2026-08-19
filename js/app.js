@@ -805,6 +805,7 @@ window.KApp = (function () {
 
   return {
     toast: toast,
+    goster: goster,
     onContext: onContext,
     onTab: onTab,
     ctx: function () { return ctx; },

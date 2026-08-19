@@ -211,6 +211,56 @@ details .a{padding:0 18px 17px;color:var(--dim);font-size:14.5px;max-width:66ch}
 .alt-bar .fk span{display:block;font-size:10.5px;color:var(--faint)}
 .alt-bar .btn{flex:1;min-height:48px;padding:11px}
 
+/* ---- akis kiyasi (eski yontem vs suflo) ---- */
+.akis-kiyas{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;margin-top:28px}
+.akis{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.akis.suflo{border-color:rgba(139,124,246,.45);background:linear-gradient(160deg,rgba(139,124,246,.1),rgba(91,140,255,.04) 60%),var(--bg2)}
+.akis b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+.akis.suflo b{color:var(--accent-lite)}
+.akis .adim{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.akis .a{font-size:12px;background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:6px 10px}
+.akis.suflo .a.vurgulu{background:var(--grad);border-color:transparent;color:#fff;font-weight:700}
+.akis .ok-isaret{color:var(--faint);font-size:11px}
+.akis .sonuc{margin-top:10px;font-size:12.5px;color:var(--dim)}
+.akis.suflo .sonuc{color:var(--good);font-weight:700}
+.vs{font-size:13px;font-weight:800;color:var(--faint);background:var(--bg3);border:1px solid var(--line2);border-radius:50%;width:38px;height:38px;display:grid;place-items:center}
+.zaman-liste{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:26px}
+.zl{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.zl .eski{font-size:12.5px;color:var(--faint);text-decoration:line-through;text-decoration-color:rgba(255,139,139,.55)}
+.zl .yeni{font-size:19px;font-weight:800;margin:3px 0 5px}
+.zl .yeni em{font-style:normal;color:var(--good)}
+.zl p{font-size:12.5px;color:var(--dim)}
+
+/* ---- panel kutuphane vitrini ---- */
+.vitrin{margin-top:30px;border:1px solid var(--line2);border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:0 30px 70px -30px rgba(0,0,0,.85)}
+.vt-bar{display:flex;align-items:center;gap:9px;padding:10px 13px;background:var(--bg2);border-bottom:1px solid var(--line)}
+.vt-bar .logo{width:22px;height:22px;border-radius:6px}
+.vt-bar b{font-size:13px}
+.vt-ara{margin-left:auto;font-size:10.5px;color:var(--faint);background:var(--bg3);border:1px solid var(--line);border-radius:7px;padding:5px 12px;letter-spacing:.06em}
+.vt-govde{display:flex;gap:0}
+.vt-yan{flex:0 0 172px;border-right:1px solid var(--line);padding:12px 10px;display:flex;flex-direction:column;gap:6px}
+.vt-k{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding:0 4px 4px;border-bottom:1px solid var(--line)}
+.vt-oge{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:9px;padding:8px 9px;font-size:10.5px}
+.vt-oge.on{border-color:rgba(139,124,246,.5);background:rgba(139,124,246,.12);color:var(--accent-lite);font-weight:700}
+.vt-oge .n{margin-left:auto;font-size:9px;font-weight:700;background:var(--raise, #242838);border-radius:8px;padding:2px 7px}
+.vt-oge.soluk{opacity:.5}
+.vt-oge .kilit{margin-left:auto;font-size:8px;font-weight:800;letter-spacing:.5px;padding:2px 6px;border-radius:5px;background:rgba(139,124,246,.16);border:1px solid rgba(139,124,246,.4);color:var(--accent-lite)}
+.vt-icerik{flex:1;padding:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-content:start}
+.vt-kart{background:var(--bg2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.vt-thumb{aspect-ratio:16/9;display:grid;place-items:center;font-weight:800;font-size:14px;letter-spacing:.3px;position:relative;
+  background:radial-gradient(120% 80% at 50% 12%,rgba(139,124,246,.14),transparent 62%),linear-gradient(180deg,#191c28,#12141d 52%,#0a0b10);
+  border-bottom:1px solid var(--line);text-shadow:0 1px 0 rgba(0,0,0,.85),0 3px 10px rgba(0,0,0,.6)}
+.vt-thumb .kalp{position:absolute;right:6px;top:6px;font-size:9px;color:rgba(237,236,245,.55)}
+.vt-kart .m{display:block;padding:6px 8px 2px;font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vt-ekle{display:block;margin:5px 7px 7px;text-align:center;font-size:10px;font-weight:700;border-radius:7px;padding:6px 0;background:var(--grad);color:#fff}
+@media (max-width:860px){
+  .akis-kiyas{grid-template-columns:1fr;gap:10px}
+  .vs{margin:0 auto}
+  .zaman-liste{grid-template-columns:1fr}
+  .vt-yan{display:none}
+  .vt-icerik{grid-template-columns:repeat(2,1fr)}
+}
+
 footer{border-top:1px solid var(--line);background:var(--bg2);padding:26px 0 90px}
 footer .wrap{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
 footer span,footer a{font-size:12.5px;color:var(--faint);text-decoration:none}
@@ -254,6 +304,9 @@ footer span,footer a{font-size:12.5px;color:var(--faint);text-decoration:none}
         <a class="btn btn-ghost" href="#demolar">▶ Canlı demoyu gör</a>
         <a class="btn btn-buy" href="#fiyat">Pro'yu Al — 749 TL</a>
       </div>
+      <p style="margin-top:12px;font-size:13px;color:var(--faint)">
+        Önce denemek mi istiyorsun? <a href="https://github.com/sametcreates/suflo/releases/latest" style="color:var(--accent-lite)">Ücretsiz sürümü indir</a> — transkripsiyon + editör sonsuza dek bedava.
+      </p>
       <div class="chips">
         <span class="chip"><b>✓</b> Abonelik yok</span>
         <span class="chip"><b>✓</b> 14 gün iade garantisi</span>
@@ -284,6 +337,57 @@ footer span,footer a{font-size:12.5px;color:var(--faint);text-decoration:none}
     <span><b>99 dil</b> · Windows + macOS</span>
   </div>
 </div>
+
+<!-- ═══════════ AKIŞINI BOZMA ═══════════ -->
+<section class="sec">
+  <div class="wrap">
+    <span class="tc">Zaman = para</span>
+    <h2>Akışını bozma.</h2>
+    <p class="lead">Aynı videoyu daha kısa sürede teslim eden kurgucu, saatini daha pahalıya satar. Kaybettiğin vakit klasörlerde, YouTube'da ses ararken ve elle altyazı yazarken gidiyor — Suflo hepsini Premiere'in içinde tutar.</p>
+
+    <div class="akis-kiyas">
+      <div class="akis">
+        <b>Eski yöntem</b>
+        <div class="adim">
+          <span class="a">Premiere</span><span class="ok-isaret">→</span>
+          <span class="a">Explorer</span><span class="ok-isaret">→</span>
+          <span class="a">klasörler</span><span class="ok-isaret">→</span>
+          <span class="a">elle altyazı</span><span class="ok-isaret">→</span>
+          <span class="a">Premiere</span>
+        </div>
+        <p class="sonuc">her geçişte odak sıfırlanır</p>
+      </div>
+      <span class="vs">VS</span>
+      <div class="akis suflo">
+        <b>Suflo yöntemi</b>
+        <div class="adim">
+          <span class="a">Premiere</span><span class="ok-isaret">→</span>
+          <span class="a vurgulu">Suflo</span><span class="ok-isaret">→</span>
+          <span class="a">devam et</span>
+        </div>
+        <p class="sonuc">✓ hiç dışarı çıkmadın</p>
+      </div>
+    </div>
+
+    <div class="zaman-liste">
+      <div class="zl">
+        <span class="eski">Elle altyazı: ~40 dk</span>
+        <div class="yeni">→ <em>dakikalar</em></div>
+        <p>Transkripsiyon bilgisayarında çalışır, animasyonlu katman tek tıkla timeline'a iner.</p>
+      </div>
+      <div class="zl">
+        <span class="eski">Jump-cut temizliği: ~30 dk</span>
+        <div class="yeni">→ <em>tek tık</em></div>
+        <p>Sessizlikleri bulur, görsel çubukta onaylarsın, kalanını Suflo keser.</p>
+      </div>
+      <div class="zl">
+        <span class="eski">Başlık animasyonu: ~20 dk keyframe</span>
+        <div class="yeni">→ <em>kütüphaneden tek tık</em></div>
+        <p>MOGRT paketlerin panelde; sürükleme bile yok, "Ekle" de playhead'e insin.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ═══════════ DEMOLAR ═══════════ -->
 <section class="sec" id="demolar">
@@ -361,6 +465,39 @@ footer span,footer a{font-size:12.5px;color:var(--faint);text-decoration:none}
         <div class="pm-satir"><span>Dil</span><span class="t">Türkçe</span></div>
         <div class="pm-satir"><span>Stil</span><span class="t">Reels · kelime kelime</span></div>
         <div class="pm-btn">Altyazı oluştur</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ KÜTÜPHANE VİTRİNİ ═══════════ -->
+<section class="sec" style="padding-top:14px">
+  <div class="wrap">
+    <span class="tc">Yazı sekmesi</span>
+    <h2>Kütüphanen Premiere'in kalbinde.</h2>
+    <p class="lead">Yazı animasyonu paketlerini panelden yönet: ara, favorile, "Ekle" de — playhead'e, boş katmana otursun. Kendi paketlerini klasöre at, anında listede.</p>
+
+    <div class="vitrin" aria-label="Suflo Yazı kütüphanesi görünümü">
+      <div class="vt-bar">
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M13.9 7.2 C13.5 5.5 11.9 4.7 10 4.7 C8 4.7 6.3 5.5 6.3 7.1 C6.3 10.7 13.7 9.1 13.7 12.9 C13.7 14.5 12 15.3 10 15.3 C8.1 15.3 6.5 14.5 6.1 12.8" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+        <b>Suflo</b><span class="pro-rozet">PRO</span>
+        <span class="vt-ara">PAKET ARA…</span>
+      </div>
+      <div class="vt-govde">
+        <aside class="vt-yan">
+          <span class="vt-k">Kütüphane</span>
+          <span class="vt-oge on">Ⅱ Yazı Animasyonları<span class="n">24</span></span>
+          <span class="vt-oge">♥ Favoriler<span class="n">6</span></span>
+          <span class="vt-oge soluk">🔊 SFX<span class="n">yakında</span></span>
+          <span class="vt-k" style="margin-top:8px">Araçlar</span>
+          <span class="vt-oge">✂ Otomatik Kesim<span class="kilit">PRO</span></span>
+          <span class="vt-oge">〜 Ritim<span class="kilit">PRO</span></span>
+        </aside>
+        <div class="vt-icerik">
+          <div class="vt-kart"><span class="vt-thumb">BAŞLIK<span class="kalp">♥</span></span><span class="m">Alt Bant · Temiz</span><span class="vt-ekle">Ekle</span></div>
+          <div class="vt-kart"><span class="vt-thumb" style="color:var(--sari)">KİNETİK<span class="kalp">♥</span></span><span class="m">Kinetik Başlık</span><span class="vt-ekle">Ekle</span></div>
+          <div class="vt-kart"><span class="vt-thumb"><span class="grad-text">GLOW</span><span class="kalp">♥</span></span><span class="m">Neon Vurgu</span><span class="vt-ekle">Ekle</span></div>
+        </div>
       </div>
     </div>
   </div>

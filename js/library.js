@@ -1,9 +1,10 @@
 /*
  * Suflo — Yazı kütüphanesi (MOGRT text animasyonları)
  *
+ * Rush düzeni: solda kategori menüsü (adet rozetleriyle), sağda büyük kartlar.
  * Kullanıcının mogrt klasörünü tarar, her paketin içindeki thumb.png'yi
- * (mogrt bir ZIP arşividir) önbelleğe çıkarıp kart ızgarasında gösterir;
- * tıklanınca playhead'e yerleştirir (host: KS_placeMogrt).
+ * (mogrt bir ZIP arşividir) önbelleğe çıkarıp kartlarda gösterir; "Ekle"
+ * playhead'e yerleştirir (host: KS_placeMogrt). Kalp = favori (ayarlarda kalıcı).
  *
  * İçerik felsefesi: paketler KULLANICININ dosyalarıdır — panel hiçbir
  * hazır mogrt taşımaz; klasöre ne konursa onu listeler.
@@ -13,17 +14,16 @@ window.KLib = (function () {
 
   function el(id) { return document.getElementById(id); }
 
-  var paketler = [];        // { path, ad, thumb (dataURI|null), boyut }
+  var paketler = [];        // { path, ad, thumb (dataURI|null) }
   var arama = "";
+  var kategori = "mogrt";   // "mogrt" | "fav"
   var busyKart = null;
 
   /* ---------------- klasörler ---------------- */
 
   function kokDir() {
-    // settings.json ile aynı kök: USER_DATA/Kesit
     var sp = K.settingsPath ? K.settingsPath() : null;
-    var kok = sp ? K.path.dirname(sp) : K.path.join(K.os.homedir(), "Kesit");
-    return kok;
+    return sp ? K.path.dirname(sp) : K.path.join(K.os.homedir(), "Kesit");
   }
   function mogrtDir() {
     var d = K.path.join(kokDir(), "mogrt");
@@ -36,6 +36,22 @@ window.KLib = (function () {
     return d;
   }
 
+  /* ---------------- favoriler (ayarlarda kalıcı) ---------------- */
+
+  function favlar() {
+    var s = K.settings();
+    if (!s.mogrtFavs) s.mogrtFavs = [];
+    return s.mogrtFavs;
+  }
+  function favMi(ad) { return favlar().indexOf(ad) !== -1; }
+  function favDegistir(ad) {
+    var f = favlar();
+    var i = f.indexOf(ad);
+    if (i === -1) f.push(ad); else f.splice(i, 1);
+    K.saveSettings();
+    sayaclar();
+  }
+
   /* ---------------- tarama + thumbnail ---------------- */
 
   async function thumbCikar(mogrtYolu, adSlug) {
@@ -43,13 +59,11 @@ window.KLib = (function () {
     var thumbYolu = K.path.join(hedefDir, "thumb.png");
     if (K.fs.existsSync(thumbYolu)) return thumbYolu;
     try {
-      // mogrt = zip; unzip zip uzantisi ister — gecici kopya
       var tmpZip = K.path.join(cacheDir(), adSlug + ".zip");
       K.fs.copyFileSync(mogrtYolu, tmpZip);
       await K.unzip(tmpZip, hedefDir);
       try { K.fs.unlinkSync(tmpZip); } catch (e1) {}
       if (K.fs.existsSync(thumbYolu)) return thumbYolu;
-      // bazi paketlerde ad farkli olabilir: ilk png'yi ara
       var pngler = K.fs.readdirSync(hedefDir).filter(function (f) { return /\.png$/i.test(f); });
       if (pngler.length) return K.path.join(hedefDir, pngler[0]);
     } catch (e) { K.log("[yazi] thumb cikarilamadi: " + adSlug + " — " + (e && e.message)); }
@@ -74,38 +88,46 @@ window.KLib = (function () {
       var ad = f.replace(/\.mogrt$/i, "");
       var slug = ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || ("paket-" + i);
       var tp = await thumbCikar(K.path.join(dir, f), slug);
-      paketler.push({
-        path: K.path.join(dir, f),
-        ad: ad,
-        thumb: tp ? dataUri(tp) : null
-      });
+      paketler.push({ path: K.path.join(dir, f), ad: ad, thumb: tp ? dataUri(tp) : null });
     }
+    sayaclar();
     ciz();
   }
 
   /* ---------------- çizim ---------------- */
 
+  function sayaclar() {
+    var s1 = el("yazi-sayac"); if (s1) s1.textContent = String(paketler.length);
+    var favSayisi = paketler.filter(function (p) { return favMi(p.ad); }).length;
+    var s2 = el("fav-sayac"); if (s2) s2.textContent = String(favSayisi);
+  }
+
   function ciz() {
     var grid = el("mogrt-grid");
     var bos = el("mogrt-bos");
-    var sayac = el("yazi-sayac");
     if (!grid) return;
 
-    var goster = paketler.filter(function (p) {
+    var liste = paketler.filter(function (p) {
+      if (kategori === "fav" && !favMi(p.ad)) return false;
       return !arama || p.ad.toLowerCase().indexOf(arama) !== -1;
     });
-    if (sayac) sayac.textContent = String(paketler.length);
+
+    var baslik = el("ki-baslik"), alt = el("ki-alt");
+    if (baslik) baslik.textContent = kategori === "fav" ? "Favoriler" : "Yazı Animasyonları";
+    if (alt) alt.textContent = liste.length
+      ? liste.length + " paket timeline'a hazır"
+      : (kategori === "fav" ? "kalbe tıklayıp favori ekle" : "timeline'a hazır paketler");
 
     grid.innerHTML = "";
     if (bos) bos.hidden = paketler.length > 0;
-    if (!goster.length && paketler.length) {
-      grid.innerHTML = '<p class="hint" style="grid-column:1/-1">Aramayla eşleşen paket yok.</p>';
+    if (!liste.length && paketler.length) {
+      grid.innerHTML = '<p class="hint" style="grid-column:1/-1">' +
+        (kategori === "fav" ? "Henüz favori yok — kartların kalbine tıkla." : "Aramayla eşleşen paket yok.") + "</p>";
       return;
     }
 
-    goster.forEach(function (p) {
-      var kart = document.createElement("button");
-      kart.type = "button";
+    liste.forEach(function (p) {
+      var kart = document.createElement("div");
       kart.className = "mogrt-kart";
       var proEtiket = (typeof Pro !== "undefined" && !Pro.isPro())
         ? '<span class="mogrt-pro">PRO</span>' : "";
@@ -115,10 +137,19 @@ window.KLib = (function () {
             ? '<img src="' + p.thumb + '" alt="" loading="lazy">'
             : '<span class="mogrt-yazi">' + esc(p.ad.split(/[\s_-]/)[0] || "Aa") + "</span>") +
           proEtiket +
-          '<span class="mogrt-ekle">＋ Playhead\'e ekle</span>' +
+          '<button type="button" class="mogrt-kalp' + (favMi(p.ad) ? " sevildi" : "") + '" title="Favori">♥</button>' +
         "</span>" +
-        '<span class="mogrt-meta"><b>' + esc(p.ad) + "</b><i>MOGRT · yazı animasyonu</i></span>";
-      kart.addEventListener("click", function () { yerlestir(p, kart); });
+        '<span class="mogrt-meta"><b>' + esc(p.ad) + "</b><i>MOGRT · yazı animasyonu</i></span>" +
+        '<button type="button" class="mogrt-ekle-btn">Ekle</button>';
+
+      kart.querySelector(".mogrt-kalp").addEventListener("click", function (e) {
+        e.stopPropagation();
+        favDegistir(p.ad);
+        this.classList.toggle("sevildi", favMi(p.ad));
+        if (kategori === "fav") ciz();
+      });
+      kart.querySelector(".mogrt-ekle-btn").addEventListener("click", function () { yerlestir(p, kart); });
+      kart.querySelector(".mogrt-thumb").addEventListener("click", function () { yerlestir(p, kart); });
       grid.appendChild(kart);
     });
   }
@@ -150,6 +181,15 @@ window.KLib = (function () {
     }
   }
 
+  /* ---------------- kilit rozetleri ---------------- */
+
+  function kilitTazele() {
+    var kilitli = typeof Pro !== "undefined" && !Pro.isPro();
+    Array.prototype.forEach.call(document.querySelectorAll(".ky-kilit[data-kilit]"), function (k) {
+      k.hidden = !kilitli;
+    });
+  }
+
   /* ---------------- başlat ---------------- */
 
   function init() {
@@ -161,11 +201,25 @@ window.KLib = (function () {
       ciz();
     });
 
+    // kenar menü: kategori geçişi + araç kısayolları
+    Array.prototype.forEach.call(document.querySelectorAll(".ky-oge"), function (b) {
+      b.addEventListener("click", function () {
+        if (b.disabled) return;
+        var git = b.getAttribute("data-git");
+        if (git) { KApp.goster(git); return; }
+        var kat = b.getAttribute("data-kat");
+        if (!kat) return;
+        kategori = kat;
+        Array.prototype.forEach.call(document.querySelectorAll(".ky-oge[data-kat]"), function (x) {
+          x.classList.toggle("on", x === b);
+        });
+        ciz();
+      });
+    });
+
     var ac = el("yazi-klasor-ac");
     if (ac) ac.addEventListener("click", function () {
-      var d = mogrtDir();
-      // explorer bazen 1 döndürür — hata sayma
-      K.run(K.MAC ? "open" : "explorer", [d]).catch(function () {});
+      K.run(K.MAC ? "open" : "explorer", [mogrtDir()]).catch(function () {});
     });
 
     var yenile = el("yazi-yenile");
@@ -173,6 +227,9 @@ window.KLib = (function () {
 
     var yol = el("yazi-klasor-yol");
     if (yol) yol.textContent = mogrtDir();
+
+    if (typeof Pro !== "undefined") Pro.on(function () { kilitTazele(); ciz(); });
+    kilitTazele();
 
     KApp.onTab("text", function () { if (!paketler.length) tara(); });
     tara();

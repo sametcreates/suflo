@@ -543,24 +543,68 @@
     </div>
 
     <div class="yazi-ust">
-      <input id="yazi-ara" type="text" placeholder="Paket ara…">
+      <input id="yazi-ara" type="text" placeholder="PAKET ARA…">
       <button id="yazi-yenile" class="btn tiny" title="Klasörü yeniden tara">⟳</button>
     </div>
 
-    <div class="yazi-kategori">
-      <span class="yk on">Yazı animasyonları <b id="yazi-sayac">0</b></span>
-      <span class="yk pasif">SFX <i>yakında</i></span>
-      <span class="yk pasif">Motion BG <i>yakında</i></span>
-    </div>
+    <div class="kutuphane">
+      <!-- Sol menu: Rush duzeni — kategoriler + adetler + kilitler -->
+      <aside class="kut-yan">
+        <div class="ky-baslik">Kütüphane</div>
+        <button class="ky-oge on" data-kat="mogrt">
+          <span class="ky-ikon">Ⅱ</span>
+          <span class="ky-metin"><b>Yazı Animasyonları</b><i>MOGRT paketleri</i></span>
+          <span class="ky-adet" id="yazi-sayac">0</span>
+        </button>
+        <button class="ky-oge" data-kat="fav">
+          <span class="ky-ikon">♥</span>
+          <span class="ky-metin"><b>Favoriler</b><i>işaretlediklerin</i></span>
+          <span class="ky-adet" id="fav-sayac">0</span>
+        </button>
+        <button class="ky-oge pasif" disabled>
+          <span class="ky-ikon">🔊</span>
+          <span class="ky-metin"><b>SFX</b><i>ses kütüphanesi</i></span>
+          <span class="ky-adet soluk">yakında</span>
+        </button>
+        <button class="ky-oge pasif" disabled>
+          <span class="ky-ikon">▶</span>
+          <span class="ky-metin"><b>Motion BG</b><i>hareketli zemin</i></span>
+          <span class="ky-adet soluk">yakında</span>
+        </button>
 
-    <div id="mogrt-grid" class="mogrt-grid"></div>
+        <div class="ky-baslik" style="margin-top:14px">Araçlar</div>
+        <button class="ky-oge" data-git="cut">
+          <span class="ky-ikon">✂</span>
+          <span class="ky-metin"><b>Otomatik Kesim</b><i>sessizlik temizliği</i></span>
+          <span class="ky-kilit" data-kilit>PRO</span>
+        </button>
+        <button class="ky-oge" data-git="beat">
+          <span class="ky-ikon">〜</span>
+          <span class="ky-metin"><b>Ritim</b><i>beat marker'ları</i></span>
+          <span class="ky-kilit" data-kilit>PRO</span>
+        </button>
+      </aside>
 
-    <div id="mogrt-bos" class="mogrt-bos">
-      <span class="mb-ikon">Aa</span>
-      <b>Henüz paket yok</b>
-      <p class="hint">.mogrt dosyalarını aşağıdaki klasöre at, "⟳" ile tara — kartlar burada belirir.</p>
-      <p class="hint mono" id="yazi-klasor-yol" style="word-break:break-all"></p>
-      <button id="yazi-klasor-ac" class="btn" style="margin-top:8px">Klasörü aç</button>
+      <!-- Sag icerik: baslik + rozetler + kart izgarasi -->
+      <div class="kut-icerik">
+        <div class="ki-bas">
+          <div>
+            <b id="ki-baslik">Yazı Animasyonları</b>
+            <span class="dim" id="ki-alt">timeline'a hazır paketler</span>
+          </div>
+          <span class="ki-pill mono">playhead</span>
+        </div>
+
+        <div id="mogrt-grid" class="mogrt-grid"></div>
+
+        <div id="mogrt-bos" class="mogrt-bos">
+          <span class="mb-ikon">Aa</span>
+          <b>Henüz paket yok</b>
+          <p class="hint">.mogrt dosyalarını klasöre at, "⟳" ile tara — kartlar burada belirir.</p>
+          <p class="hint mono" id="yazi-klasor-yol" style="word-break:break-all"></p>
+          <button id="yazi-klasor-ac" class="btn" style="margin-top:8px">Klasörü aç</button>
+        </div>
+      </div>
     </div>
   </section>
 

@@ -1792,3 +1792,92 @@ canvas#mo-canvas {
 }
 .stil-sec.secili b { color: var(--accent-lite); }
 .stil-sec:focus-visible { box-shadow: var(--glow-sm); border-color: var(--accent); }
+
+
+/* ---- Yazi kutuphanesi v2: Rush duzeni ---- */
+.yazi-ust input { text-transform: none; letter-spacing: .04em; }
+.kutuphane { display: flex; gap: 10px; align-items: flex-start; }
+.kut-yan { flex: 0 0 168px; display: flex; flex-direction: column; gap: 5px; }
+.ky-baslik {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--faint); padding: 2px 4px 4px;
+  border-bottom: 1px solid var(--line); margin-bottom: 3px;
+}
+.ky-oge {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 9px;
+  padding: 8px 9px; cursor: pointer; text-align: left; color: var(--text);
+  font-family: inherit; transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.ky-oge:hover { border-color: var(--line2); }
+.ky-oge.on { border-color: rgba(139,124,246,.5); background: var(--accent-soft); }
+.ky-oge.on .ky-metin b { color: var(--accent-lite); }
+.ky-oge.pasif { opacity: .5; cursor: default; }
+.ky-ikon {
+  width: 24px; height: 24px; border-radius: 6px; background: var(--raise);
+  display: grid; place-items: center; font-size: 11px; flex: none;
+}
+.ky-oge.on .ky-ikon { background: var(--grad); color: #fff; }
+.ky-metin { flex: 1; min-width: 0; }
+.ky-metin b { display: block; font-size: 10.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ky-metin i { display: block; font-style: normal; font-size: 8.5px; color: var(--faint); }
+.ky-adet {
+  font-size: 9.5px; font-weight: 700; background: var(--raise); border-radius: 8px;
+  padding: 2px 7px; font-variant-numeric: tabular-nums;
+}
+.ky-adet.soluk { background: none; color: var(--faint); font-weight: 600; letter-spacing: .04em; }
+.ky-kilit {
+  font-size: 8px; font-weight: 800; letter-spacing: .5px;
+  padding: 2px 6px; border-radius: 5px; background: var(--grad-soft);
+  border: 1px solid rgba(139,124,246,.4); color: var(--accent-lite);
+}
+.ky-kilit[hidden] { display: none; }
+
+.kut-icerik { flex: 1; min-width: 0; }
+.ki-bas { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 10px; }
+.ki-bas b { display: block; font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+.ki-bas .dim { font-size: 10.5px; }
+.ki-pill {
+  font-size: 9.5px; color: var(--dim); background: var(--bg2);
+  border: 1px solid var(--line); border-radius: 20px; padding: 4px 10px;
+}
+
+/* kart v2: kalp + tam genislik Ekle dugmesi */
+.mogrt-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 11px; }
+.mogrt-kalp {
+  position: absolute; right: 6px; top: 6px; z-index: 2;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(10,11,16,.65); backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(237,236,245,.65); font-size: 11px; cursor: pointer;
+  transition: color .15s, transform .12s var(--ease);
+}
+.mogrt-kalp:hover { transform: scale(1.12); color: #fff; }
+.mogrt-kalp.sevildi { color: #ff7ab8; }
+.mogrt-ekle-btn {
+  display: block; width: calc(100% - 14px); margin: 0 7px 8px;
+  background: var(--raise); border: 1px solid var(--line2); border-radius: 8px;
+  color: var(--text); font-size: 11px; font-weight: 700; padding: 7px 0;
+  cursor: pointer; text-align: center; font-family: inherit;
+  transition: background .15s var(--ease), border-color .15s var(--ease);
+}
+.mogrt-kart:hover .mogrt-ekle-btn { background: var(--grad); border-color: transparent; color: #fff; }
+.mogrt-kart.busy .mogrt-ekle-btn { color: transparent; position: relative; }
+.mogrt-kart.busy .mogrt-ekle-btn::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px;
+  margin: -6px 0 0 -6px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+  animation: mgspin .7s linear infinite;
+}
+.mogrt-kart.ok .mogrt-ekle-btn { background: var(--good); border-color: transparent; color: #0a2416; }
+.mogrt-meta { padding: 7px 9px 6px; }
+
+/* dar panelde kenar menu yatay cipe doner */
+@media (max-width: 520px) {
+  .kutuphane { flex-direction: column; }
+  .kut-yan { flex-direction: row; flex-wrap: wrap; flex-basis: auto; width: 100%; }
+  .ky-baslik { width: 100%; }
+  .ky-oge { width: auto; }
+  .ky-metin i { display: none; }
+}
