@@ -22,10 +22,12 @@ window.KLib = (function () {
   /* ---------------- klasörler ---------------- */
 
   function kokDir() {
+    if (!K.nodeOK || !K.path || !K.os) return "";
     var sp = K.settingsPath ? K.settingsPath() : null;
     return sp ? K.path.dirname(sp) : K.path.join(K.os.homedir(), "Kesit");
   }
   function mogrtDir() {
+    if (!K.nodeOK || !K.fs || !K.path) return "";
     var d = K.path.join(kokDir(), "mogrt");
     try { if (!K.fs.existsSync(d)) K.fs.mkdirSync(d, { recursive: true }); } catch (e) {}
     return d;
@@ -76,22 +78,31 @@ window.KLib = (function () {
   }
 
   async function tara() {
+    if (!K.nodeOK || !K.fs || !K.path) {
+      paketler = [];
+      sayaclar();
+      ciz();
+      return;
+    }
     /*
      * Iki kaynak: panelin kendi klasoru + kullanicinin gosterdigi EK klasor
      * (Ayarlar > Yazi kutuphanesi). Boylece 20 GB'lik bir arsivi tasimak
-     * gerekmez — oldugu yerden okunur. Alt klasorlere de iner (1 seviye).
+     * gerekmez — oldugu yerden okunur. Vault gibi derin arsivlerin tum alt
+     * klasorlerine iner; gizli klasorleri ve makul olmayan derinligi atlar.
      */
-    function topla(dir) {
+    function topla(dir, limit, derinlik) {
       var out = [];
+      limit = limit || 5000;
+      derinlik = derinlik === undefined ? 12 : derinlik;
+      if (!dir || derinlik < 0 || !K.fs.existsSync(dir)) return out;
       try {
         K.fs.readdirSync(dir).forEach(function (f) {
+          if (out.length >= limit || f.charAt(0) === ".") return;
           var tam = K.path.join(dir, f);
           try {
             if (/\.mogrt$/i.test(f)) out.push(tam);
             else if (K.fs.statSync(tam).isDirectory()) {
-              K.fs.readdirSync(tam).forEach(function (g) {
-                if (/\.mogrt$/i.test(g)) out.push(K.path.join(tam, g));
-              });
+              out = out.concat(topla(tam, limit - out.length, derinlik - 1));
             }
           } catch (e1) {}
         });
@@ -251,5 +262,5 @@ window.KLib = (function () {
     ciz();
   }
 
-  return { init: init, tara: tara, setKategori: setKategori };
+  return { init: init, tara: tara, setKategori: setKategori, sayisi: function () { return paketler.length; } };
 })();

@@ -666,6 +666,56 @@ function KS_removeOverlay(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- SFX kutuphanesi: playhead'e ses yerlestirme ---------- */
+
+function KS_findFreeAudioTrack(seq, aSec, bSec) {
+  for (var i = 0; i < seq.audioTracks.numTracks; i++) {
+    if (KS_trackFreeIn(seq.audioTracks[i], aSec, bSec)) return i;
+  }
+  return -1;
+}
+
+function KS_insertSfx(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (!p.path || !(new File(p.path)).exists) return KS_err("Ses dosyasi bulunamadi: " + p.path);
+
+    var item = KS_findItemByPath(app.project.rootItem, p.path);
+    if (!item) {
+      var bin = KS_findBin("Suflo SFX");
+      app.project.importFiles([p.path], true, bin, false);
+      try {
+        var hits = app.project.rootItem.findItemsMatchingMediaPath(p.path, 1);
+        if (hits && hits.length) item = hits[0];
+      } catch (eF) {}
+      if (!item) item = KS_findItemByPath(app.project.rootItem, p.path);
+    }
+    if (!item) return KS_err("Ses projeye aktarilamadi.");
+    try { if (p.name) item.name = String(p.name); } catch (eN) {}
+
+    var start = 0;
+    try { start = seq.getPlayerPosition().seconds; } catch (eP) {}
+    var dur = 0;
+    try { dur = item.getOutPoint().seconds - item.getInPoint().seconds; } catch (eD) {}
+    if (!(dur > 0)) dur = 5;
+
+    // Yalniz playhead anini degil, sesin kaplayacagi butun araligi kontrol et;
+    // aksi halde overwriteClip ilerideki bir sesi sessizce ezebilir.
+    var idx = KS_findFreeAudioTrack(seq, start, start + dur);
+    if (idx < 0) return KS_err("Sesin suresi boyunca bos bir audio katmani yok. Yeni bir audio katmani acip tekrar dene.");
+
+    var clip = KS_tryPlace(seq.audioTracks[idx], item, start);
+    if (!clip) return KS_err("Ses timeline'a yerlestirilemedi.");
+    try { if (p.name) clip.name = String(p.name); } catch (eCN) {}
+
+    var sure = dur;
+    try { sure = clip.end.seconds - clip.start.seconds; } catch (eS) {}
+    return KS_ok({ track: idx, trackName: "A" + (idx + 1), start: start, dur: sure });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Kesim (v2.2 ile geri geldi) ---------- */
 
 function KS_timecode(seconds) {
