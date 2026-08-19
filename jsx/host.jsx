@@ -695,8 +695,13 @@ function KS_insertSfx(encoded) {
     if (!item) return KS_err("Ses projeye aktarilamadi.");
     try { if (p.name) item.name = String(p.name); } catch (eN) {}
 
-    var start = 0;
-    try { start = seq.getPlayerPosition().seconds; } catch (eP) {}
+    // Akilli SFX bir altyazi vurgusunun kesin zamanini yollar; normal kutuphane
+    // kullaniminda parametre yoktur ve mevcut playhead davranisi korunur.
+    var start = Number(p.time);
+    if (!(start >= 0)) {
+      start = 0;
+      try { start = seq.getPlayerPosition().seconds; } catch (eP) {}
+    }
     var dur = 0;
     try { dur = item.getOutPoint().seconds - item.getInPoint().seconds; } catch (eD) {}
     if (!(dur > 0)) dur = 5;

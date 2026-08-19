@@ -34,6 +34,13 @@ window.K = (function () {
     try { return MAC && nodeOK && os.arch() === "arm64"; } catch (e) { return false; }
   }
 
+  // Paketle gelen Suflo Originals gibi salt-okunur iceriklerin kok yolu.
+  // Ayar/veri klasorunden farklidir: ZXP nereye kurulursa orayi izler.
+  function extensionPath() {
+    try { return cs.getSystemPath(CSInterface.SystemPath.EXTENSION) || ""; }
+    catch (e) { return ""; }
+  }
+
   /* ---------------- ExtendScript ---------------- */
 
   /*
@@ -346,7 +353,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "2.5.0";
+  var VERSION = "2.5.1";
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -1051,6 +1058,7 @@ window.K = (function () {
     call: call,
     run: run,
     settingsPath: settingsPath,
+    extensionPath: extensionPath,
     httpUpload: httpUpload,
     httpJson: httpJson,
     httpGet: httpGet,

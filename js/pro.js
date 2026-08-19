@@ -80,7 +80,7 @@
     assexport: 'Stilli ASS disa aktarma',
     glossary:  'Terim sozlugu + gelismis bul/degistir',
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
-    sfx:       'SFX kutuphanesi (on dinleme + timeline)',
+    sfx:       'SFX kutuphanesi + Akilli SFX onerileri',
     pro:       'Suflo Pro'
   };
 
@@ -390,7 +390,8 @@
           '<li>Animasyonlu altyazi + karaoke + daktilo</li>' +
           '<li>Otomatik kesim + ritim senkronu</li>' +
           '<li>Toplu islem, ceviri, sozluk, ASS</li>' +
-          '<li>Yazi animasyonu kutuphanesi (MOGRT)</li>' +
+          '<li>40 Suflo Originals + MOGRT/SFX kutuphaneleri</li>' +
+          '<li>Altyazidan Akilli SFX onerileri</li>' +
         '</ul>' +
         '<div class="pro-upsell-fiyat"><b>749 TL</b><span>tek seferlik \u00b7 abonelik yok \u00b7 omur boyu</span></div>' +
         '<div class="pro-upsell-actions">' +

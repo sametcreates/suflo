@@ -33,7 +33,7 @@ if (-not $signer) {
 # staging
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
-foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "index.html", "README.md", "LICENSE")) {
+foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "content", "index.html", "README.md", "LICENSE")) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $stage -Recurse -Force }
 }

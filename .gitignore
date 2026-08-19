@@ -7,3 +7,5 @@ settings.json
 .DS_Store
 Thumbs.db
 brand/post1/*.png
+
+content/

@@ -1,16 +1,18 @@
 # Suflo
 
 **Premiere için ücretsiz, açık kaynak altyazı paneli.**
-⭐ Çekirdek sonsuza dek ücretsiz ve MIT. Animasyonlu altyazı, otomatik kesim ve yazı kütüphanesi için **[Suflo Pro →](https://suflo.app/pro)**
+⭐ Çekirdek sonsuza dek ücretsiz ve MIT. Animasyonlu altyazı, otomatik kesim ve MOGRT/SFX kütüphaneleri için **[Suflo Pro →](https://suflo.app/pro)**
 Türkçe ve Azerice dahil 99 dil — abonelik yok, kredi yok, hesap yok.
 
 > Premiere'in yerleşik altyazısı Türkçe konuşmayı yazıya dökemiyor. Suflo döküyor, üstelik bilgisayarında çalışan yapay zekâyla.
 
 ## Özellikler
 
-Suflo tek bir iş yapar: **altyazı.** Seçili klipten, In–Out aralığından ya da tüm sequence'tan
+Suflo konuşmayı izlenebilir kurguya çevirir. Seçili klipten, In–Out aralığından ya da tüm sequence'tan
 transkript çıkarır; panelin içinde düzenlersin; caption izi olarak uygular ya da SRT/VTT/ASS/TXT
-olarak dışa aktarır.
+olarak dışa aktarırsın. Pro katmanında sessizlik kesme, ritim marker'ları,
+yerel MOGRT/SFX kütüphaneleri
+ve altyazıdan Akıllı SFX önerileri bulunur.
 
 | Ne | Nasıl |
 |---|---|
@@ -56,7 +58,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 
 ## Suflo Pro
 
-Çekirdek Suflo MIT lisanslı ve sonsuza dek ücretsiz — transkripsiyon, editör, dışa aktarım kimsenin kilidi arkasına girmiyor. Pro, üstüne gelen katman: altyazıyı CapCut görünümüne sokan animasyon motoru, sessizlikleri temizleyen otomatik kesim, kurguya tempo veren ritim marker'ları. Tek seferlik **749 TL**, abonelik yok, ömür boyu; lisans anahtarı 3 makinede geçerli → [suflo.app/pro](https://suflo.app/pro)
+Çekirdek Suflo MIT lisanslı ve sonsuza dek ücretsiz — transkripsiyon, editör, dışa aktarım kimsenin kilidi arkasına girmiyor. Pro, üstüne gelen katman: altyazı animasyonları, sessizlikleri temizleyen otomatik kesim, ritim marker'ları ve yerel içerik kütüphaneleri. Tek seferlik **749 TL**, abonelik yok, ömür boyu → [suflo.app/pro](https://suflo.app/pro)
 
 | Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL) |
 |---|---|
@@ -68,6 +70,9 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | Terim sözlüğü |
+| — | MOGRT ve SFX kütüphaneleri (kendi arşivini bağla) |
+| — | Altyazıdan Akıllı SFX önerileri |
+| — | Kütüphane sağlık kontrolü ve destek raporu |
 
 Kıyas için: AutoCut yılda ~179 $, Submagic yılda ~228–468 $, Kaps ve Subs aylık dolar aboneliği + dakika kotası. Suflo Pro'da sayaç yok — bir kez öde, bitti.
 
@@ -180,11 +185,12 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 
 ## Yol haritası
 
-"Suflo yalnızca altyazı yapar" diyorduk; artık sessizlikleri de kesiyor, ritmi de işaretliyor. Ama hepsi aynı işin etrafında: konuşmayı izlenebilir kurguya çevirmek. Odak bu, dağılmayacak. Sıradakiler:
+Suflo'nun odağı konuşmayı izlenebilir kurguya çevirmek. Altyazı, sessizlik kesme, ritim,
+MOGRT/SFX kütüphanesi ve Akıllı SFX aynı iş akışında buluşur. Sıradakiler:
 
-- Panelde canlı stil önizlemesi (altyazının videoda nasıl görüneceği)
-- Altyazı rengi, yazı tipi, kontur ve ekran konumu seçimi
 - Konuşmacı ayrımı (podcast ve röportaj kurgusu için)
+- SFX dalga formu ve ses seviyesi eşitleme
+- Suflo içerik paketleri (özgün üretim tamamlandığında)
 - Azerice arayüz çevirisi
 
 Kelime kelime vurgulu altyazıyı timeline'a koyma listeden çıktı — 2.4.0 ile geldi, Pro katmanında.

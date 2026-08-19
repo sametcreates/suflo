@@ -1,87 +1,10 @@
-## Suflo 2.5.0 — MOGRT + SFX kütüphaneleri
+## Suflo 2.5.1 — Akıllı SFX, kütüphane sağlık kontrolü, içerik paketi altyapısı
 
-- MOGRT arşivi artık derin klasörlerin tamamını tarar; büyük Vault yapıları tek klasörden bağlanabilir.
-- Yeni Pro SFX sekmesi: arama, ön dinleme, favoriler, son kullanılanlar ve playhead'e tek tıkla ekleme.
-- Ses yerleştirilmeden önce dosyanın bütün süresi kontrol edilir; timeline'daki mevcut sesler ezilmez.
-- MOGRT ve SFX klasörleri Ayarlar > İçerik kütüphaneleri bölümünden ayrı ayrı bağlanır.
-- İçerikler ZXP içine kopyalanmaz; yerel arşivden okunur. Dağıtım paketine yalnızca yeniden satış hakkı doğrulanmış varlıklar eklenmelidir.
-
-## Suflo 2.4.1 — Premium panel, Yazı sekmesi, yeni satış sayfası
-
-Görünüş ve keşfedilebilirlik sürümü:
-
-- **Yazı sekmesi (Pro):** MOGRT text animasyonu kütüphanesi — .mogrt dosyalarını Suflo klasörüne at, panel tarar, tek tıkla playhead'e yerleştirir (boş katman seçimi otomatik).
-- **Pro artık görünür:** üst barda PRO rozeti; Kesim/Ritim/Yazı sekmelerinde ne kazandıracağını anlatan tanıtım kartları; yenilenen yükseltme penceresi. Ücretsiz özellikler aynen ücretsiz.
-- **Stil kartları yenilendi:** kartlar dururken en okunur karesini gösterir, üzerine gelince oynar; yumuşak sinematik gölge, premium seçili durum.
-- **suflo.app/pro yenilendi:** canlı animasyon demoları, panel önizlemesi, net fiyat kıyası, 14 gün iade garantisi.
-- Tek tık güncelleme (2.4.0) bu sürümden itibaren işlemeye başlar.
-
----
-
-## Suflo 2.4.1 — Premium panel, Yazı sekmesi, yeni satış sayfası
-
-Görünüş ve keşfedilebilirlik sürümü:
-
-- **Yazı sekmesi (Pro):** MOGRT text animasyonu kütüphanesi — .mogrt dosyalarını Suflo klasörüne at, panel tarar, tek tıkla playhead'e yerleştirir (boş katman seçimi otomatik).
-- **Pro artık görünür:** üst barda PRO rozeti; Kesim/Ritim/Yazı sekmelerinde ne kazandıracağını anlatan tanıtım kartları; yenilenen yükseltme penceresi. Ücretsiz özellikler aynen ücretsiz.
-- **Stil kartları yenilendi:** kartlar dururken en okunur karesini gösterir, üzerine gelince oynar; yumuşak sinematik gölge, premium seçili durum.
-- **suflo.app/pro yenilendi:** canlı animasyon demoları, panel önizlemesi, net fiyat kıyası, 14 gün iade garantisi.
-- Tek tık güncelleme (2.4.0) bu sürümden itibaren işlemeye başlar.
-
----
-
-## Suflo 2.4.0 — Suflo Pro
-
-Suflo ikiye ayrılıyor: çekirdek altyazı akışı ücretsiz ve MIT kalıyor, viral kurgu katmanı — animasyon, karaoke, kesim, ritim — tek seferlik 749 TL'lik **Suflo Pro**'ya taşınıyor. Abonelik yok, dakika kotası yok; bir kez öde, ömür boyu kullan.
-
-### Ücretsiz kalanlar (sonsuza dek, MIT)
-
-- **Transkripsiyon** — yerel veya bulut, 99 dil, tamamen offline çalışabilir
-- **Altyazı editörü** — bölme, birleştirme, zamanlama, geri alma, taslak kurtarma
-- **Düz stiller**
-- **Dışa aktarım**: SRT, WebVTT, TXT — **içe aktarım**: SRT, VTT
-- **Premiere caption izine uygulama**
-- **GPU hızlandırma**
-- **Emoji seçici** — 3770 emoji, Apple görünümü
-
-Emoji görselleri ve fontlar hiçbir zaman ücretli olmayacak — olamaz da: Apple'ın ve Twemoji'nin çizimleri üçüncü tarafın eseri, zaten pakete konmuyor. Başkasının emeğinden para istemeyiz.
-
-### Pro'ya geçenler
-
-- **Animasyonlu altyazı katmanı** — CapCut görünümü, overlay
-- **Karaoke** — kelime-zamanlama + kelime bazlı animasyonlar (vurgu, pop, bounce)
-- **Otomatik kesim** — sessizlik temizleme
-- **Ritim marker'ları**
-- **Toplu transkripsiyon** — çoklu klip tek seferde
-- **Çeviri** — TR / AZ / EN / RU
-- **Stilli ASS dışa aktarım**
-- **Terim sözlüğü**
-
-Fiyat: **tek seferlik 749 TL** (globalde $34). Lisans anahtarı 3 makinede geçerli. Kıyas için: AutoCut yılda ~$179 abonelik, Submagic yılda ~$228–468, Kaps ve Subs aylık USD abonelik artı dakika kotası ister. Suflo Pro'yu bir kez alırsın, biter.
-
-### Dürüstlük notu — 2.3.0 kullanıcısına
-
-Bunu saklamayacağız: yukarıdaki Pro özelliklerini 2.3.0'da ücretsiz kullanıyordun. 2.4.0'a güncellersen animasyonlu katman, karaoke, kesim, ritim, toplu transkripsiyon, çeviri, ASS ve sözlük lisans anahtarı ister. Üç şey net olsun:
-
-1. **Güncellemek zorunda değilsin.** 2.3.0 çalışmaya devam eder, kimse elinden almıyor.
-2. **Kod MIT.** Fork'layıp istediğini yapabilirsin; bu hak sürümle değişmez.
-3. **Çekirdek akış** — transkripsiyon, düzenleme, dışa aktarım — hep ücretsiz kalacak.
-
-### Neden paralı?
-
-Suflo'yu bir kişi geliştiriyor. 13 günde 658 indirme güzel bir başlangıç; ama hata düzeltmeleri, yeni Premiere sürümlerine uyum ve yeni özellikler zaman istiyor, zaman da bir yerden finanse edilmek zorunda. Pro geliri o yer. Çekirdek ücretsiz ve açık kaynak kalıyor; Pro, projenin yaşamasını sağlıyor.
-
-### Satın alma
-
-[suflo.app/pro](https://suflo.app/pro) — ödeme Lemon Squeezy üzerinden, anahtar 3 makinede geçerli.
-
-### Kurulum
-
-ZXP tabanlı kurulum değişmedi:
-
-1. [Kurulum ZIP'ini indir](https://github.com/sametcreates/suflo/releases/latest), aç
-2. Kur dosyasına çift tıkla (Windows: `Suflo-Kur.bat`, Mac: `Suflo-Kur.command`)
-3. Premiere'i yeniden başlat → **Window > Extensions > Suflo**
+- **Akıllı SFX araması:** çok kelimeli arama puanlamayla sıralanır; favoriler ve son kullanılanlar ayrı görünümler.
+- **Kütüphane Sağlık Kontrolü:** Ayarlar'dan tek bakışta MOGRT/SFX kaynaklarının durumu; kopyalanabilir tanı raporu.
+- **İçerik paketi altyapısı:** panel, `content/` klasöründeki paketlenmiş MOGRT'leri katalogla birlikte otomatik listeler — resmî Suflo içerik paketleri için zemin hazır.
+- Kullanıcının kendi MOGRT/SFX klasörlerini bağlama özelliği aynen duruyor; derin alt klasör taraması iyileştirildi.
+- Paketleme araçları `content/` klasörünü tanıyor.
 
 ---
 

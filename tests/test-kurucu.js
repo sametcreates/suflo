@@ -76,21 +76,24 @@ ok("Windows kurucusu (.bat) pakette var", !!bat, bat ? bat.ad : "YOK");
 
 /* ---------- 4) Panelin çalışması için gereken dosyalar ---------- */
 var gerekli = ["panel/index.html", "panel/CSXS/manifest.xml", "panel/js/captions.js",
-               "panel/js/bridge.js", "panel/js/app.js", "panel/js/engine.js", "panel/jsx/host.jsx"];
+               "panel/js/bridge.js", "panel/js/app.js", "panel/js/engine.js",
+               "panel/js/sfx.js", "panel/js/library-health.js", "panel/jsx/host.jsx",
+               "panel/content/mogrt/catalog.json"];
 var eksik = gerekli.filter(function (g) {
   return !kayitlar.some(function (k) { return k.ad === g; });
 });
 ok("panel dosyalarinin tamami pakette", eksik.length === 0, eksik.join(" | ") || gerekli.length + " dosya");
 
-/* ---------- 5) Kaldırılan modüller sızmamış, v2.2 modülleri pakette ---------- */
-// v2.2: magiccut (Kesim) bilinçli geri geldi; sfx/motion hâlâ yok
-var sizinti = kayitlar.filter(function (k) { return /(sfx|motion)\.js$/i.test(k.ad); });
-ok("kaldirilan modul dosyalari pakette YOK", sizinti.length === 0,
+/* ---------- 5) Aktif modüller pakette, kaldırılan Motion dışarıda ---------- */
+var sizinti = kayitlar.filter(function (k) { return /motion\.js$/i.test(k.ad); });
+ok("kaldirilan Motion dosyasi pakette YOK", sizinti.length === 0,
   sizinti.map(function (k) { return k.ad; }).join(" | ") || "temiz");
-["panel/js/magiccut.js", "panel/js/beat.js"].forEach(function (g) {
-  ok("v2.2 modulu pakette: " + g,
+["panel/js/magiccut.js", "panel/js/beat.js", "panel/js/sfx.js", "panel/js/library-health.js"].forEach(function (g) {
+  ok("aktif modul pakette: " + g,
     kayitlar.some(function (k) { return k.ad === g; }));
 });
+var originals = kayitlar.filter(function (k) { return /^panel\/content\/mogrt\/.*\.mogrt$/i.test(k.ad); });
+ok("Suflo Originals: 40 text animasyonu kurulum paketinde", originals.length === 40, originals.length);
 ok("emoji seti pakette", kayitlar.some(function (k) { return /panel\/emoji\/esleme\.json$/.test(k.ad); }));
 ok("emoji lisans atfi pakette", kayitlar.some(function (k) { return /panel\/emoji\/LISANS\.txt$/.test(k.ad); }));
 

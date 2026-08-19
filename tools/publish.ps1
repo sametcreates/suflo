@@ -79,7 +79,20 @@ if ($LASTEXITCODE -ne 0) {
         Write-Host "     Notlari guncelle, sonra tekrar calistir." -ForegroundColor DarkGray
         exit 1
     }
-    gh release create "v$version" $zxp --title "Suflo $version" --notes-file $notlar
+    # Yalnizca en ustteki guncel surum bolumunu yayinla. Tum arsivi vermek
+    # eski surumlerin satis/iade metinlerini yeni release aciklamasina tasiyordu.
+    $guncelBolum = @()
+    foreach ($satir in (Get-Content $notlar)) {
+        if ($guncelBolum.Count -gt 0 -and $satir -match '^##\s+') { break }
+        $guncelBolum += $satir
+    }
+    $releaseNotesTemp = Join-Path ([System.IO.Path]::GetTempPath()) ("suflo-release-" + $version + ".md")
+    try {
+        Set-Content -LiteralPath $releaseNotesTemp -Value $guncelBolum -Encoding UTF8
+        gh release create "v$version" $zxp --title "Suflo $version" --notes-file $releaseNotesTemp
+    } finally {
+        if (Test-Path -LiteralPath $releaseNotesTemp) { Remove-Item -LiteralPath $releaseNotesTemp -Force }
+    }
 } else {
     Write-Host "Release v$version zaten var." -ForegroundColor DarkGray
 }

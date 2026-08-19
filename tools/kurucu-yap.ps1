@@ -19,7 +19,7 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $panel -Force | Out-Null
 
 # Panelin çalışması için gereken her şey (kurucu betikleri hariç)
-foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "index.html", "LICENSE")) {
+foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "content", "index.html", "LICENSE")) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $panel -Recurse -Force }
 }

@@ -844,6 +844,7 @@ window.KApp = (function () {
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
     guvenli("SFX", function () { if (window.KSfx) KSfx.init(); });
+    guvenli("Kütüphane kontrolü", function () { if (window.KLibraryHealth) KLibraryHealth.init(); });
     guvenli("Pro-UI", reflectPro);
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);

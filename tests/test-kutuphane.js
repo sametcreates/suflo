@@ -12,6 +12,13 @@ var TMP = path.join(os.tmpdir(), "suflo-kutuphane-test");
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
 fs.mkdirSync(path.join(TMP, "deep", "one", "two", "three"), { recursive: true });
 fs.mkdirSync(path.join(TMP, ".hidden"), { recursive: true });
+var EXT = path.join(TMP, "extension");
+var BUILTIN = path.join(EXT, "content", "mogrt");
+fs.mkdirSync(BUILTIN, { recursive: true });
+fs.writeFileSync(path.join(BUILTIN, "SUFLO TEXT - 01 Built In Test.mogrt"), Buffer.from("PK\x03\x04builtin-mogrt"));
+fs.writeFileSync(path.join(BUILTIN, "catalog.json"), JSON.stringify({ items: [
+  { file: "SUFLO TEXT - 01 Built In Test.mogrt", name: "Built In Test", category: "Test" }
+] }));
 fs.writeFileSync(path.join(TMP, "root.mogrt"), "mogrt");
 fs.writeFileSync(path.join(TMP, "deep", "one", "two", "three", "nested.mogrt"), "mogrt");
 fs.writeFileSync(path.join(TMP, ".hidden", "skip.mogrt"), "mogrt");
@@ -43,6 +50,7 @@ var settings = { mogrtEkKlasor: TMP, sfxEkKlasor: TMP, sfxFavs: [], sfxRecent: [
 var ctx = {
   console: console,
   Promise: Promise,
+  Buffer: Buffer,
   setTimeout: setTimeout,
   clearTimeout: clearTimeout,
   document: {
@@ -57,6 +65,7 @@ var ctx = {
     nodeOK: true,
     fs: fs, path: path, os: os,
     settingsPath: function () { return path.join(TMP, "settings.json"); },
+    extensionPath: function () { return EXT; },
     settings: function () { return settings; },
     saveSettings: function () { return true; },
     walkAudio: walkAudio,
@@ -71,23 +80,55 @@ async function run() {
   var libSrc = fs.readFileSync(KOKYOL + "js/library.js", "utf8");
   vm.runInContext(libSrc, ctx, { filename: "js/library.js" });
   await ctx.KLib.tara();
-  ok("MOGRT taramasi derin klasore iniyor", ctx.KLib.sayisi() === 2, ctx.KLib.sayisi());
+  ok("MOGRT taramasi derin klasore iniyor", ctx.KLib.sayisi() === 3, ctx.KLib.sayisi());
+  ok("Paketle gelen Suflo Originals otomatik taraniyor", ctx.KLib.yerlesikSayisi() === 1, ctx.KLib.yerlesikSayisi());
 
   var sfxSrc = fs.readFileSync(KOKYOL + "js/sfx.js", "utf8");
   vm.runInContext(sfxSrc, ctx, { filename: "js/sfx.js" });
   ctx.KSfx.tara();
   ok("SFX taramasi WAV ve MP3 dosyalarini derinden buluyor", ctx.KSfx.sayisi() === 2, ctx.KSfx.sayisi());
+  var oneriler = ctx.KSfx.oneriler([{ start: 4.2, end: 5.6, text: "Ama şimdi asıl noktaya gelelim!" }]);
+  ok("Akilli SFX altyazi vurgusundan eslesen ses oneriyor",
+    oneriler.length === 1 && oneriler[0].item && /whoosh/i.test(oneriler[0].item.name),
+    oneriler.length ? (oneriler[0].rule.id + " -> " + (oneriler[0].item && oneriler[0].item.name)) : "onerisiz");
+
+  var healthSrc = fs.readFileSync(KOKYOL + "js/library-health.js", "utf8");
+  vm.runInContext(healthSrc, ctx, { filename: "js/library-health.js" });
+  var saglik = ctx.KLibraryHealth.makeReport();
+  ok("Kutuphane saglik kontrolu MOGRT ve SFX sayilarini raporluyor",
+    saglik.mogrt.count === 3 && saglik.sfx.count === 2,
+    "mogrt=" + saglik.mogrt.count + " sfx=" + saglik.sfx.count + " durum=" + saglik.status);
+  ok("Kutuphane saglik raporu kopyalanabilir metin uretiyor",
+    /MOGRT: 3 dosya/.test(ctx.KLibraryHealth.reportText(saglik)));
+
+  // Icerik paketi OPSIYONELDIR: mekanizma test edilir, payload dayatilmaz.
+  // (Resmi pakete yalniz dagitim hakki dogrulanmis dosyalar girer.)
+  var katalogYolu = KOKYOL + "content/mogrt/catalog.json";
+  if (fs.existsSync(katalogYolu)) {
+    var catalog = JSON.parse(fs.readFileSync(katalogYolu, "utf8"));
+    var shipped = fs.readdirSync(KOKYOL + "content/mogrt").filter(function (f) { return /\.mogrt$/i.test(f); });
+    ok("Icerik katalogu gecerli JSON + items dizisi", Array.isArray(catalog.items));
+    ok("Katalogdaki her dosya pakette gercekten var",
+      catalog.items.every(function (item) { return shipped.indexOf(item.file) !== -1; }),
+      "katalog=" + catalog.items.length + " dosya=" + shipped.length);
+  } else {
+    ok("Icerik paketi yok — katalog mekanizmasi bos durumda sorunsuz", true, "opsiyonel");
+  }
 
   var host = fs.readFileSync(KOKYOL + "jsx/host.jsx", "utf8");
   ok("SFX playhead koprusu var", /function KS_insertSfx\(/.test(host));
   ok("SFX bos audio katmanini tum sure icin kontrol ediyor",
     /KS_findFreeAudioTrack\(seq, start, start \+ dur\)/.test(host));
+  ok("Akilli SFX altyazi zamanini host'a iletebiliyor",
+    /var start = Number\(p\.time\)/.test(host));
   ok("SFX yerlestirme guvenli ortak makineyi kullaniyor",
     /KS_tryPlace\(seq\.audioTracks\[idx\], item, start\)/.test(host));
 
   var html = fs.readFileSync(KOKYOL + "index.html", "utf8");
   ok("SFX Pro sekmesi ve betigi yuklu",
     /id="tab-sfx"/.test(html) && /src="js\/sfx\.js"/.test(html));
+  ok("Kutuphane saglik kontrolu arayuzde ve yuklu",
+    /id="set-library-health-run"/.test(html) && /src="js\/library-health\.js"/.test(html));
 
   var pro = fs.readFileSync(KOKYOL + "js/pro.js", "utf8");
   ok("SFX lisans kapisinda Pro ozelligi", /sfx:\s*'SFX kutuphanesi/.test(pro));

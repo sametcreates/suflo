@@ -6,15 +6,15 @@
  * (mogrt bir ZIP arşividir) önbelleğe çıkarıp kartlarda gösterir; "Ekle"
  * playhead'e yerleştirir (host: KS_placeMogrt). Kalp = favori (ayarlarda kalıcı).
  *
- * İçerik felsefesi: paketler KULLANICININ dosyalarıdır — panel hiçbir
- * hazır mogrt taşımaz; klasöre ne konursa onu listeler.
+ * Suflo Originals paketle birlikte salt-okunur gelir. Kullanicinin kendi
+ * dosyalari ise ayri klasorden okunur; hicbiri tasinmaz veya degistirilmez.
  */
 window.KLib = (function () {
   "use strict";
 
   function el(id) { return document.getElementById(id); }
 
-  var paketler = [];        // { path, ad, thumb (dataURI|null) }
+  var paketler = [];        // { path, ad, display, thumb, builtin, category }
   var arama = "";
   var kategori = "mogrt";   // "mogrt" | "fav"
   var busyKart = null;
@@ -31,6 +31,25 @@ window.KLib = (function () {
     var d = K.path.join(kokDir(), "mogrt");
     try { if (!K.fs.existsSync(d)) K.fs.mkdirSync(d, { recursive: true }); } catch (e) {}
     return d;
+  }
+  function builtinMogrtDir() {
+    if (!K.nodeOK || !K.path || !K.extensionPath) return "";
+    var root = K.extensionPath();
+    return root ? K.path.join(root, "content", "mogrt") : "";
+  }
+  function pathKey(p) { return String(p || "").replace(/\\/g, "/").toLowerCase(); }
+
+  function builtinCatalog() {
+    var out = {};
+    var dir = builtinMogrtDir();
+    if (!dir) return out;
+    try {
+      var raw = JSON.parse(K.fs.readFileSync(K.path.join(dir, "catalog.json"), "utf8"));
+      (raw.items || []).forEach(function (item) {
+        if (item && item.file) out[String(item.file).toLowerCase()] = item;
+      });
+    } catch (e) { K.log("[yazi] Suflo Originals katalogu okunamadi: " + (e && e.message)); }
+    return out;
   }
   function cacheDir() {
     var d = K.path.join(kokDir(), "mogrt-cache");
@@ -85,7 +104,8 @@ window.KLib = (function () {
       return;
     }
     /*
-     * Iki kaynak: panelin kendi klasoru + kullanicinin gosterdigi EK klasor
+     * Uc kaynak: paketle gelen Suflo Originals + panelin veri klasoru +
+     * kullanicinin gosterdigi EK klasor
      * (Ayarlar > Yazi kutuphanesi). Boylece 20 GB'lik bir arsivi tasimak
      * gerekmez — oldugu yerden okunur. Vault gibi derin arsivlerin tum alt
      * klasorlerine iner; gizli klasorleri ve makul olmayan derinligi atlar.
@@ -110,21 +130,36 @@ window.KLib = (function () {
       return out;
     }
 
-    var yollar = topla(mogrtDir());
+    var builtinDir = builtinMogrtDir();
+    var builtinFiles = topla(builtinDir);
+    var builtinSet = {};
+    builtinFiles.forEach(function (p) { builtinSet[pathKey(p)] = 1; });
+    var catalog = builtinCatalog();
+    var yollar = builtinFiles.concat(topla(mogrtDir()));
     var ek = (K.settings().mogrtEkKlasor || "").trim();
     if (ek && K.fs.existsSync(ek)) yollar = yollar.concat(topla(ek));
 
-    // ayni ada sahip cift dosyalari tekle (once panel klasoru kazanir)
+    // ayni gorunen ada sahip cift dosyalari tekle (Suflo Originals once gelir)
     var gorulen = {};
     paketler = [];
     for (var i = 0; i < yollar.length; i++) {
       var tam2 = yollar[i];
       var ad = K.path.basename(tam2).replace(/\.mogrt$/i, "");
-      if (gorulen[ad.toLowerCase()]) continue;
-      gorulen[ad.toLowerCase()] = 1;
+      var isBuiltin = !!builtinSet[pathKey(tam2)];
+      var meta = isBuiltin ? catalog[K.path.basename(tam2).toLowerCase()] : null;
+      var display = meta && meta.name ? String(meta.name) : ad.replace(/^SUFLO TEXT\s*-\s*\d+\s*/i, "");
+      if (gorulen[display.toLowerCase()]) continue;
+      gorulen[display.toLowerCase()] = 1;
       var slug = ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || ("paket-" + i);
       var tp = await thumbCikar(tam2, slug);
-      paketler.push({ path: tam2, ad: ad, thumb: tp ? dataUri(tp) : null });
+      paketler.push({
+        path: tam2,
+        ad: ad,
+        display: display,
+        thumb: tp ? dataUri(tp) : null,
+        builtin: isBuiltin,
+        category: meta && meta.category ? String(meta.category) : "Text Animation"
+      });
     }
     sayaclar();
     ciz();
@@ -145,7 +180,7 @@ window.KLib = (function () {
 
     var liste = paketler.filter(function (p) {
       if (kategori === "fav" && !favMi(p.ad)) return false;
-      return !arama || p.ad.toLowerCase().indexOf(arama) !== -1;
+      return !arama || (p.display + " " + p.ad + " " + p.category).toLowerCase().indexOf(arama) !== -1;
     });
 
     var baslik = el("ki-baslik"), alt = el("ki-alt");
@@ -171,11 +206,13 @@ window.KLib = (function () {
         '<span class="mogrt-thumb">' +
           (p.thumb
             ? '<img src="' + p.thumb + '" alt="" loading="lazy">'
-            : '<span class="mogrt-yazi">' + esc(p.ad.split(/[\s_-]/)[0] || "Aa") + "</span>") +
+            : '<span class="mogrt-yazi">' + esc(p.display.split(/[\s_-]/)[0] || "Aa") + "</span>") +
           proEtiket +
           '<button type="button" class="mogrt-kalp' + (favMi(p.ad) ? " sevildi" : "") + '" title="Favori">♥</button>' +
         "</span>" +
-        '<span class="mogrt-meta"><b>' + esc(p.ad) + "</b><i>MOGRT · yazı animasyonu</i></span>" +
+        '<span class="mogrt-meta"><b>' + esc(p.display) + "</b><i>" +
+          (p.builtin ? '<span class="mogrt-original">SUFLO ORIGINAL</span> · ' + esc(p.category) : "MOGRT · yazı animasyonu") +
+        "</i></span>" +
         '<button type="button" class="mogrt-ekle-btn">Ekle</button>';
 
       kart.querySelector(".mogrt-kalp").addEventListener("click", function (e) {
@@ -204,7 +241,7 @@ window.KLib = (function () {
     busyKart = kart;
     kart.classList.add("busy");
     try {
-      var r = await K.call("KS_placeMogrt", { path: p.path, name: p.ad }, 60000);
+      var r = await K.call("KS_placeMogrt", { path: p.path, name: p.display }, 60000);
       if (!r.ok) throw new Error(r.error || "yerleştirilemedi");
       kart.classList.add("ok");
       KApp.toast("Sahneye eklendi · " + r.trackName + ", playhead", "good");
@@ -262,5 +299,11 @@ window.KLib = (function () {
     ciz();
   }
 
-  return { init: init, tara: tara, setKategori: setKategori, sayisi: function () { return paketler.length; } };
+  return {
+    init: init,
+    tara: tara,
+    setKategori: setKategori,
+    sayisi: function () { return paketler.length; },
+    yerlesikSayisi: function () { return paketler.filter(function (p) { return p.builtin; }).length; }
+  };
 })();

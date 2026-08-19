@@ -577,7 +577,7 @@
       <span class="pt-rozet">SUFLO PRO</span>
       <b>Hazır yazı animasyonları — tek tıkla timeline'a</b>
       <ul>
-        <li>MOGRT paketlerini panelden yönet</li>
+        <li>Yazı animasyonu kütüphanesi — paketler tek tıkla timeline'a</li>
         <li>Playhead'e, boş katmana akıllı yerleştirme</li>
         <li>Kendi paketlerini klasöre at, anında listede</li>
       </ul>
@@ -604,9 +604,9 @@
 
         <div id="mogrt-bos" class="mogrt-bos">
           <span class="mb-ikon">Aa</span>
-          <b>Henüz paket yok</b>
-          <p class="hint">.mogrt dosyalarını klasöre at, "⟳" ile tara — kartlar burada belirir.
-      Arşivin başka yerdeyse: Ayarlar → Yazı kütüphanesi → Ek klasör.</p>
+          <b>Yazı animasyonları yüklenemedi</b>
+          <p class="hint">Kütüphaneyi yeniden taramak için "⟳" düğmesine bas.
+      Kendi arşivin başka yerdeyse: Ayarlar → İçerik kütüphaneleri → MOGRT.</p>
           <p class="hint mono" id="yazi-klasor-yol" style="word-break:break-all"></p>
           <button id="yazi-klasor-ac" class="btn" style="margin-top:8px">Klasörü aç</button>
         </div>
@@ -623,6 +623,7 @@
         <li>Binlerce sesi anında ara ve ön dinle</li>
         <li>Favorilerini ve son kullandıklarını kaydet</li>
         <li>Tek tıkla playhead'deki boş audio katmanına ekle</li>
+        <li>Altyazıdaki vurgu anlarına Akıllı SFX öner</li>
       </ul>
       <div class="pt-fiyat"><b>749 TL</b><span>tek sefer · abonelik yok · ömür boyu</span></div>
       <button class="btn primary pro-ac-btn" style="width:100%">Pro'yu aç →</button>
@@ -643,7 +644,17 @@
           <button data-f="fav">★ Favoriler</button>
           <button data-f="recent">Son</button>
         </div>
-        <span id="sfx-count" class="dim"></span>
+        <div class="sfx-filter-actions">
+          <span id="sfx-count" class="dim"></span>
+          <button id="sfx-smart-btn" class="btn smart" title="Altyazıdaki vurgu anlarına ses öner">✦ Akıllı</button>
+        </div>
+      </div>
+      <div id="sfx-smart-panel" class="sfx-smart-panel" hidden>
+        <div class="sfx-smart-head">
+          <div><b>Akıllı SFX önerileri</b><small id="sfx-smart-status">Altyazıdaki vurgu anları taranıyor…</small></div>
+          <button id="sfx-smart-close" class="icon-btn" title="Önerileri kapat">×</button>
+        </div>
+        <div id="sfx-smart-list" class="sfx-smart-list"></div>
       </div>
       <div id="sfx-list" class="list sfx-list"></div>
       <div id="sfx-empty" class="empty-state" hidden>
@@ -750,7 +761,7 @@
 
     <div class="set-group">
       <div class="set-title">İçerik kütüphaneleri</div>
-      <p class="hint" style="margin-bottom:8px">MOGRT ve SFX arşivlerini taşımadan bağla. Suflo bütün alt klasörleri tarar.</p>
+      <p class="hint" style="margin-bottom:8px">Kendi MOGRT ve SFX arşivlerini taşımadan bağla; bütün alt klasörler taranır. Suflo içerik paketi desteği hazır — paket kurulduysa burada görünür.</p>
       <div class="row">
         <label for="set-mogrt-klasor">MOGRT</label>
         <input id="set-mogrt-klasor" type="text" placeholder="örn. C:\Users\sen\Desktop\Edit Kaynakları\MOGRT" spellcheck="false">
@@ -763,6 +774,11 @@
         <button id="set-sfx-kaydet" class="btn">Kaydet</button>
       </div>
       <div id="set-sfx-durum" class="inline-status"></div>
+      <div class="library-health-actions">
+        <button id="set-library-health-run" class="btn primary">Kütüphaneleri kontrol et</button>
+        <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
+      </div>
+      <div id="set-library-health-result" class="library-health" role="status" hidden></div>
     </div>
 
     <div class="set-group" id="grp-pro">
@@ -786,6 +802,7 @@
               <li>Animasyonlu altyazı katmanı</li>
               <li>Karaoke + kelime animasyonları</li>
               <li>Otomatik kesim · Ritim</li>
+              <li>MOGRT · SFX · Akıllı SFX</li>
               <li>Toplu klip · Çeviri · Sözlük · ASS</li>
             </ul>
           </div>
@@ -837,6 +854,7 @@
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>
   <script src="js/sfx.js"></script>
+  <script src="js/library-health.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

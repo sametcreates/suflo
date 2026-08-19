@@ -25,7 +25,8 @@ function ok(ad, kosul, kanit) {
   else { kaldi++; console.log("FAIL " + ad + "   [" + String(kanit).slice(0, 200) + "]"); }
 }
 
-var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js"];
+var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
+                "js/library.js", "js/sfx.js", "js/library-health.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -101,6 +102,11 @@ var ZORUNLU = {
   "beat-apply": "Marker at",
   "beat-bant": "Bant seçimi",
   "beat-siklik": "Marker sıklığı",
+  "tab-sfx": "SFX görünümü",
+  "sfx-smart-btn": "Akıllı SFX önerileri",
+  "sfx-smart-list": "Akıllı SFX listesi",
+  "set-library-health-run": "Kütüphane sağlık kontrolü",
+  "set-library-health-result": "Kütüphane sağlık raporu",
   "cap-emoji-ac": "Emoji aç düğmesi",
   "cap-emoji-panel": "Emoji paneli",
   "cap-emoji-grid": "Emoji ızgarası",
@@ -113,20 +119,19 @@ Object.keys(ZORUNLU).forEach(function (id) {
 ok("vazgecilmez ogelerin hepsi yerinde", kayip.length === 0,
   kayip.length ? kayip.join(" | ") : Object.keys(ZORUNLU).length + " oge dogrulandi");
 
-/* ---------- 5) Kaldırılan modüllerin izi kalmamış olmalı ---------- */
+/* ---------- 5) Aktif ve kaldırılmış modüller doğru mu ---------- */
 
-// v2.2: Kesim (magiccut) bilinçli olarak GERİ geldi; SFX ve Motion hâlâ yok
+// v2.5: SFX geri geldi; eski Motion modülü hâlâ kaldırılmış durumda.
 var kalinti = [];
-["tab-sfx", "tab-motion", "set-modules", "set-folders", "set-add-folder"].forEach(function (id) {
+["tab-motion", "set-modules", "set-folders", "set-add-folder"].forEach(function (id) {
   if (idler[id]) kalinti.push(id);
 });
 ok("kaldirilan modul ogeleri markup'ta YOK", kalinti.length === 0, kalinti.join(" | ") || "temiz");
 
 var betikler = (html.match(/<script src="js\/[^"]+"/g) || []).join(" ");
-ok("kaldirilan modul betikleri yuklenmiyor",
-  !/sfx\.js|motion\.js/.test(betikler), betikler);
-ok("v2.2 modulleri yukleniyor (magiccut + beat)",
-  /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler), betikler);
+ok("kaldirilan Motion betigi yuklenmiyor", !/motion\.js/.test(betikler), betikler);
+ok("aktif moduller yukleniyor (magiccut + beat + sfx + saglik)",
+  /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler) && /sfx\.js/.test(betikler) && /library-health\.js/.test(betikler), betikler);
 
 /* ---------- 6) Yüklenen her betik diskte var mı ---------- */
 

@@ -17,6 +17,34 @@ window.KSfx = (function () {
   var durCache = {};
   var previewTimer = null;
   var busyPath = null;
+  var smartMode = false;
+  var smartCues = [];
+
+  // Dosya adlarinda hem Turkce hem yaygin Ingilizce paket adlari aranir.
+  // Kurallar yerelde calisir; transkript veya dosya adlari hicbir yere gitmez.
+  var SMART_RULES = [
+    { id: "alert", label: "Dikkat", priority: 10,
+      match: /\b(dikkat|uyari|sakın|sakin|onemli|önemli|warning|careful|attention)\b/i,
+      terms: ["alert", "warning", "alarm", "impact", "hit", "uyari", "dikkat"] },
+    { id: "success", label: "Sonuç", priority: 9,
+      match: /\b(sonuc|sonuç|tamam|bitti|basardik|başardık|kazandik|kazandık|success|done|final|result)\b/i,
+      terms: ["success", "win", "complete", "positive", "ding", "sonuc", "final"] },
+    { id: "transition", label: "Geçiş", priority: 8,
+      match: /\b(ama|fakat|ancak|oysa|simdi|şimdi|sonra|but|however|now|next|then)\b/i,
+      terms: ["whoosh", "swoosh", "swish", "transition", "wipe", "gecis", "geçiş"] },
+    { id: "reveal", label: "Göster", priority: 7,
+      match: /\b(bak|iste|işte|gor|gör|goster|göster|look|watch|here|show|reveal)\b/i,
+      terms: ["pop", "reveal", "click", "bubble", "pluck", "goster", "göster"] },
+    { id: "number", label: "Madde", priority: 6,
+      match: /\b(birinci|ikinci|ucuncu|üçüncü|1\.?|2\.?|3\.?|first|second|third)\b/i,
+      terms: ["tick", "click", "tap", "beep", "ui", "pop"] },
+    { id: "question", label: "Soru", priority: 5,
+      match: /\?\s*$/,
+      terms: ["question", "curious", "notification", "pluck", "pop", "hmm"] },
+    { id: "emphasis", label: "Vurgu", priority: 4,
+      match: /!\s*$/,
+      terms: ["impact", "hit", "boom", "punch", "pop", "accent"] }
+  ];
 
   var PLAY_SVG = '<svg viewBox="0 0 12 12"><path d="M2.5 1.5 L10.5 6 L2.5 10.5 Z" fill="currentColor"/></svg>';
   var STOP_SVG = '<svg viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="1.5" fill="currentColor"/></svg>';
@@ -25,6 +53,12 @@ window.KSfx = (function () {
   function basename(p) { return String(p || "").replace(/^.*[\\\/]/, ""); }
   function stripExt(n) { return n.replace(/\.[^.]+$/, ""); }
   function norm(p) { return String(p || "").replace(/\\/g, "/").toLowerCase(); }
+  function fold(s) {
+    return String(s || "").toLowerCase()
+      .replace(/[ç]/g, "c").replace(/[ğ]/g, "g").replace(/[ıİi]/g, "i")
+      .replace(/[ö]/g, "o").replace(/[ş]/g, "s").replace(/[ü]/g, "u")
+      .replace(/[áàâä]/g, "a").replace(/[éèêë]/g, "e");
+  }
 
   function fileUrl(p) {
     return encodeURI("file:///" + p.replace(/\\/g, "/"))
@@ -90,7 +124,7 @@ window.KSfx = (function () {
         var parts = rel.split(/[\\\/]/);
         var folder = parts.length > 1 ? parts[0] : basename(root);
         var name = stripExt(basename(f));
-        index.push({ name: name, path: f, folder: folder, hay: (name + " " + rel).toLowerCase() });
+        index.push({ name: name, path: f, folder: folder, hay: (name + " " + rel).toLowerCase(), smartHay: fold(name + " " + rel) });
       });
     });
     index.sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -141,6 +175,142 @@ window.KSfx = (function () {
     var count = el("sfx-count");
     if (count) count.textContent = filtered.length ? filtered.length + (filtered.length === 400 ? "+" : "") + " ses" : "";
     renderList();
+  }
+
+  /* ---------------- Akilli SFX ---------------- */
+
+  function ruleFor(text) {
+    var t = fold(text);
+    for (var i = 0; i < SMART_RULES.length; i++) {
+      if (SMART_RULES[i].match.test(t)) return SMART_RULES[i];
+    }
+    return null;
+  }
+
+  function bestForRule(rule, used) {
+    var best = null, bestScore = 0;
+    var fav = favlar(), recent = sonlar();
+    index.forEach(function (item) {
+      var h = item.smartHay || fold(item.hay);
+      var sc = 0;
+      rule.terms.forEach(function (term, ti) {
+        var f = fold(term);
+        if (h.indexOf(f) !== -1) sc += Math.max(2, 9 - ti);
+      });
+      if (fav.indexOf(item.path) !== -1) sc += 3;
+      var ri = recent.indexOf(item.path); if (ri !== -1) sc += Math.max(0, 2 - ri / 10);
+      if (used && used[norm(item.path)]) sc -= 2;
+      if (sc > bestScore) { bestScore = sc; best = item; }
+    });
+    return best;
+  }
+
+  function smartSuggestions(segments) {
+    var cues = [], used = {};
+    (segments || []).forEach(function (seg) {
+      var text = String(seg && seg.text || "").trim();
+      if (!text) return;
+      var rule = ruleFor(text);
+      if (!rule) return;
+      var time = Math.max(0, Number(seg.start) || 0);
+      var item = bestForRule(rule, used);
+      var cue = { time: time, end: Number(seg.end) || time, text: text, rule: rule, item: item };
+      var last = cues.length ? cues[cues.length - 1] : null;
+      if (last && time - last.time < 0.8) {
+        if (rule.priority > last.rule.priority) cues[cues.length - 1] = cue;
+        return;
+      }
+      cues.push(cue);
+      if (item) used[norm(item.path)] = 1;
+    });
+    return cues.slice(0, 16);
+  }
+
+  function timeText(sec) {
+    sec = Math.max(0, Number(sec) || 0);
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function smartRender() {
+    var box = el("sfx-smart-list"), status = el("sfx-smart-status");
+    if (!box) return;
+    box.innerHTML = "";
+    var ready = smartCues.filter(function (c) { return !!c.item; }).length;
+    if (status) status.textContent = smartCues.length
+      ? smartCues.length + " vurgu · " + ready + " eşleşen ses"
+      : "Bu altyazıda belirgin bir vurgu noktası bulunamadı.";
+    if (!smartCues.length) {
+      box.innerHTML = '<div class="sfx-smart-empty">“Ama”, “şimdi”, “dikkat”, “sonuç” gibi anlatım dönüşleri ve !/? işaretleri öneri üretir.</div>';
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    smartCues.forEach(function (cue) {
+      var row = document.createElement("div");
+      row.className = "sfx-smart-row" + (cue.item && busyPath === cue.item.path ? " busy" : "");
+
+      var at = document.createElement("button");
+      at.className = "sfx-smart-time";
+      at.textContent = timeText(cue.time);
+      at.title = "Bu ana git";
+      at.onclick = function () { K.call("KS_setPlayerPosition", { sec: cue.time }, 15000); };
+
+      var body = document.createElement("div");
+      body.className = "sfx-smart-body";
+      var title = document.createElement("b");
+      title.textContent = cue.rule.label + (cue.item ? " · " + cue.item.name : "");
+      var quote = document.createElement("small");
+      quote.textContent = "“" + cue.text.slice(0, 88) + (cue.text.length > 88 ? "…" : "") + "”";
+      body.appendChild(title); body.appendChild(quote);
+
+      if (cue.item) {
+        var play = document.createElement("button");
+        play.className = "sfx-smart-preview" + (playingPath === cue.item.path ? " playing" : "");
+        play.innerHTML = playingPath === cue.item.path ? STOP_SVG : PLAY_SVG;
+        play.title = "Ön dinle";
+        play.onclick = function () { preview(cue.item); };
+        var add = document.createElement("button");
+        add.className = "sfx-add";
+        add.textContent = busyPath === cue.item.path ? "Ekleniyor…" : "Bu ana ekle";
+        add.onclick = function () { insert(cue.item, cue.time, cue.rule.label); };
+        row.appendChild(at); row.appendChild(play); row.appendChild(body); row.appendChild(add);
+      } else {
+        var find = document.createElement("button");
+        find.className = "sfx-add"; find.textContent = "Benzerini ara";
+        find.onclick = function () {
+          closeSmart();
+          var input = el("sfx-search"); input.value = cue.rule.terms[0]; input.focus(); search(input.value);
+        };
+        row.appendChild(at); row.appendChild(body); row.appendChild(find);
+      }
+      frag.appendChild(row);
+    });
+    box.appendChild(frag);
+  }
+
+  function showSmart() {
+    if (!proGate()) return;
+    var segs = window.KCaptions && KCaptions.getSegments ? KCaptions.getSegments() : [];
+    if (!segs.length) {
+      KApp.toast("Önce Altyazı sekmesinde bir transkript oluştur", "bad");
+      return;
+    }
+    smartCues = smartSuggestions(segs);
+    smartMode = true;
+    el("sfx-smart-panel").hidden = false;
+    el("sfx-list").hidden = true;
+    el("sfx-empty").hidden = true;
+    el("sfx-smart-btn").classList.add("on");
+    smartRender();
+  }
+
+  function closeSmart() {
+    smartMode = false;
+    var panel = el("sfx-smart-panel"); if (panel) panel.hidden = true;
+    var btn = el("sfx-smart-btn"); if (btn) btn.classList.remove("on");
+    var list = el("sfx-list"), empty = el("sfx-empty");
+    if (list) list.hidden = index.length === 0;
+    if (empty) empty.hidden = index.length > 0;
   }
 
   /* ---------------- Liste ---------------- */
@@ -217,12 +387,17 @@ window.KSfx = (function () {
 
   /* ---------------- On dinleme ---------------- */
 
+  function redraw() {
+    renderList();
+    if (smartMode) smartRender();
+  }
+
   function preview(item) {
     if (!proGate()) return;
     if (playingPath === item.path) {
       audio.pause();
       playingPath = null;
-      renderList();
+      redraw();
       return;
     }
     audio.pause();
@@ -232,13 +407,13 @@ window.KSfx = (function () {
       if (audio.duration && isFinite(audio.duration)) {
         var d = audio.duration;
         durCache[item.path] = Math.floor(d / 60) + ":" + ("0" + Math.floor(d % 60)).slice(-2);
-        renderList();
+        redraw();
       }
     };
     audio.play().catch(function () { KApp.toast("Önizleme açılamadı: " + item.name, "bad"); });
     playingPath = item.path;
-    renderList();
-    audio.onended = function () { playingPath = null; renderList(); };
+    redraw();
+    audio.onended = function () { playingPath = null; redraw(); };
   }
 
   /* ---------------- Aksiyonlar ---------------- */
@@ -249,17 +424,20 @@ window.KSfx = (function () {
     var i = fav.indexOf(item.path);
     if (i === -1) fav.push(item.path); else fav.splice(i, 1);
     K.saveSettings();
-    if (filterMode === "fav") search(el("sfx-search").value); else renderList();
+    if (filterMode === "fav") search(el("sfx-search").value); else redraw();
   }
 
-  async function insert(item) {
+  async function insert(item, atSeconds, cueLabel) {
     if (busyPath || !proGate()) return;
     busyPath = item.path;
-    renderList();
+    redraw();
     try {
-      var r = await K.call("KS_insertSfx", { path: item.path, name: item.name }, 60000);
+      var payload = { path: item.path, name: item.name };
+      if (atSeconds !== undefined && isFinite(Number(atSeconds))) payload.time = Math.max(0, Number(atSeconds));
+      var r = await K.call("KS_insertSfx", payload, 60000);
       if (!r.ok) throw new Error(r.error || "Ses eklenemedi");
-      KApp.toast(item.name + " → " + r.trackName + ", playhead", "good");
+      KApp.toast(item.name + " → " + r.trackName + ", " +
+        (payload.time !== undefined ? timeText(payload.time) + (cueLabel ? " · " + cueLabel : "") : "playhead"), "good");
       var rec = sonlar();
       var i = rec.indexOf(item.path);
       if (i !== -1) rec.splice(i, 1);
@@ -270,7 +448,7 @@ window.KSfx = (function () {
       KApp.toast("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
       busyPath = null;
-      renderList();
+      redraw();
     }
   }
 
@@ -310,12 +488,14 @@ window.KSfx = (function () {
       } else if (e.key === "Escape") {
         audio.pause();
         playingPath = null;
-        renderList();
+        if (smartMode) closeSmart();
+        redraw();
       }
     });
   }
 
   function setFilter(mode) {
+    if (smartMode) closeSmart();
     filterMode = mode === "fav" || mode === "recent" ? mode : "all";
     Array.prototype.forEach.call(el("sfx-filter").querySelectorAll("button"), function (b) {
       b.classList.toggle("on", b.dataset.f === filterMode);
@@ -327,10 +507,12 @@ window.KSfx = (function () {
 
   function init() {
     if (!el("tab-sfx")) return;
-    el("sfx-search").addEventListener("input", function () { search(this.value); });
+    el("sfx-search").addEventListener("input", function () { if (smartMode) closeSmart(); search(this.value); });
     el("sfx-add-folder").addEventListener("click", chooseFolder);
     el("sfx-add-folder-big").addEventListener("click", chooseFolder);
     el("sfx-yenile").addEventListener("click", buildIndex);
+    el("sfx-smart-btn").addEventListener("click", function () { if (smartMode) closeSmart(); else showSmart(); });
+    el("sfx-smart-close").addEventListener("click", closeSmart);
     Array.prototype.forEach.call(el("sfx-filter").querySelectorAll("button"), function (b) {
       b.addEventListener("click", function () { setFilter(b.dataset.f); });
     });
@@ -345,6 +527,7 @@ window.KSfx = (function () {
     tara: buildIndex,
     chooseFolder: chooseFolder,
     setFilter: setFilter,
-    sayisi: function () { return index.length; }
+    sayisi: function () { return index.length; },
+    oneriler: smartSuggestions
   };
 })();

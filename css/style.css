@@ -1305,6 +1305,118 @@ details.adv > *:not(summary) { margin-top: 8px; }
   font-size: 20px; color: var(--accent-lite); background: var(--grad-soft);
 }
 
+.sfx-filter-actions { display: flex; align-items: center; gap: 7px; }
+.btn.smart {
+  padding: 4px 8px;
+  border-color: rgba(139, 124, 246, .34);
+  color: var(--accent-lite);
+  background: var(--grad-soft);
+  font-size: 10.5px;
+}
+.btn.smart:hover, .btn.smart.on {
+  color: #fff;
+  border-color: transparent;
+  background: var(--grad);
+  box-shadow: var(--glow-sm);
+}
+.sfx-smart-panel {
+  margin-bottom: 9px;
+  border: 1px solid rgba(139, 124, 246, .3);
+  border-radius: var(--r);
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(139, 124, 246, .07), var(--bg2) 76px);
+  box-shadow: var(--shadow), var(--edge);
+}
+.sfx-smart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.sfx-smart-head b { display: block; font-size: 11.5px; color: var(--accent-lite); }
+.sfx-smart-head small { display: block; margin-top: 2px; color: var(--faint); font-size: 9.5px; }
+.sfx-smart-list { max-height: calc(100vh - 222px); min-height: 120px; overflow: hidden auto; }
+.sfx-smart-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border-bottom: 1px solid rgba(255, 255, 255, .035);
+  transition: background .14s var(--ease);
+}
+.sfx-smart-row:last-child { border-bottom: none; }
+.sfx-smart-row:hover { background: rgba(255, 255, 255, .035); }
+.sfx-smart-row.busy { opacity: .7; pointer-events: none; }
+.sfx-smart-time {
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--accent-lite);
+  background: var(--raise);
+  font: 600 9.5px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  cursor: pointer;
+}
+.sfx-smart-time:hover { border-color: var(--accent); }
+.sfx-smart-preview {
+  flex: 0 0 24px;
+  display: grid;
+  place-items: center;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  color: var(--dim);
+  background: transparent;
+  cursor: pointer;
+}
+.sfx-smart-preview:hover, .sfx-smart-preview.playing { color: var(--accent-lite); background: var(--raise); }
+.sfx-smart-preview svg { width: 11px; height: 11px; }
+.sfx-smart-body { flex: 1; min-width: 0; }
+.sfx-smart-body b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
+.sfx-smart-body small { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font-size: 9.5px; }
+.sfx-smart-row .sfx-add { opacity: 1; padding: 4px 7px; font-size: 9.5px; }
+.sfx-smart-empty { padding: 24px 18px; text-align: center; color: var(--dim); font-size: 10.5px; line-height: 1.55; }
+
+@media (max-width: 370px) {
+  .sfx-smart-row { gap: 5px; padding-left: 6px; padding-right: 6px; }
+  .sfx-smart-preview { display: none; }
+  .sfx-smart-row .sfx-add { max-width: 64px; white-space: normal; line-height: 1.15; }
+}
+
+/* ---------- Kütüphane sağlık kontrolü ---------- */
+
+.library-health-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 12px;
+}
+.library-health {
+  margin-top: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: var(--bg2);
+  box-shadow: var(--edge);
+}
+.library-health.good { border-color: rgba(72, 207, 142, .35); background: rgba(72, 207, 142, .045); }
+.library-health.warn { border-color: rgba(244, 190, 78, .38); background: rgba(244, 190, 78, .045); }
+.library-health.bad { border-color: rgba(255, 100, 112, .4); background: rgba(255, 100, 112, .045); }
+.library-health-title { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
+.library-health-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 10px currentColor; }
+.library-health.warn .library-health-dot { background: var(--warn); }
+.library-health.bad .library-health-dot { background: var(--bad); }
+.library-health-checks { display: grid; gap: 6px; margin-top: 9px; }
+.library-health-line { display: flex; align-items: flex-start; gap: 7px; color: var(--dim); font-size: 10.5px; }
+.library-health-line > span { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--raise); color: var(--good); font-weight: 800; }
+.library-health-line.warn > span { color: var(--warn); }
+.library-health-line.bad > span { color: var(--bad); }
+.library-health-line b { display: block; color: var(--text); font-weight: 600; }
+.library-health-line small { display: block; margin-top: 1px; color: var(--faint); line-height: 1.4; overflow-wrap: anywhere; }
+.library-health .spinner { width: 12px; height: 12px; border-width: 2px; }
+
 /* ---------- Boş durumlar ---------- */
 
 .empty-state {
@@ -1762,6 +1874,12 @@ canvas#mo-canvas {
 .mogrt-meta { display: block; padding: 7px 9px 8px; }
 .mogrt-meta b { display: block; font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mogrt-meta i { font-style: normal; font-size: 9.5px; color: var(--faint); }
+.mogrt-original {
+  color: var(--accent-lite);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .45px;
+}
 
 .mogrt-bos { text-align: center; padding: 40px 22px; }
 .mogrt-bos .mb-ikon {

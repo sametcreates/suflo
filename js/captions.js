@@ -3083,10 +3083,19 @@ window.KCaptions = (function () {
     refreshSetup();
   }
 
+  // Diger moduller (ornegin Akilli SFX) transkripti okuyabilsin; asil dizi
+  // disaridan degistirilemesin diye yalnizca sade bir kopya verilir.
+  function segmentsSnapshot() {
+    return segments.map(function (s) {
+      return { start: Number(s.start) || 0, end: Number(s.end) || 0, text: String(s.text || "") };
+    });
+  }
+
   return {
     init: init,
     refreshSetup: refreshSetup,
     glossaryText: glossaryText,
-    parseGlossary: parseGlossary
+    parseGlossary: parseGlossary,
+    getSegments: segmentsSnapshot
   };
 })();
