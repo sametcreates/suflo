@@ -1,6 +1,7 @@
 # Suflo
 
 **Premiere için ücretsiz, açık kaynak altyazı paneli.**
+⭐ Çekirdek sonsuza dek ücretsiz ve MIT. Animasyonlu altyazı, otomatik kesim ve yazı kütüphanesi için **[Suflo Pro →](https://suflo.app/pro)**
 Türkçe ve Azerice dahil 99 dil — abonelik yok, kredi yok, hesap yok.
 
 > Premiere'in yerleşik altyazısı Türkçe konuşmayı yazıya dökemiyor. Suflo döküyor, üstelik bilgisayarında çalışan yapay zekâyla.

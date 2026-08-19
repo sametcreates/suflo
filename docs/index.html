@@ -49,7 +49,7 @@
       "operatingSystem": "Windows, macOS",
       "url": "https://suflo.app/",
       "downloadUrl": "https://github.com/sametcreates/suflo/releases/latest",
-      "softwareVersion": "2.3.0",
+      "softwareVersion": "2.4.1",
       "license": "https://opensource.org/licenses/MIT",
       "inLanguage": "tr",
       "description": "Adobe Premiere Pro için ücretsiz ve açık kaynak yapay zekâ altyazı eklentisi. Türkçe, Azerice, İngilizce, Rusça dahil 99 dil. Bilgisayarda yerel çalışır, kurulumdan sonra internet gerektirmez.",
@@ -75,7 +75,7 @@
         {
           "@type": "Question",
           "name": "Suflo gerçekten tamamen ücretsiz mi?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Evet. MIT lisanslı açık kaynak; yapay zekâ motoru kendi bilgisayarında çalışır, kullanım sınırı ve kredi yoktur." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Evet — çekirdek sonsuza dek ücretsiz: MIT lisanslı açık kaynak, yapay zekâ motoru kendi bilgisayarında çalışır, kullanım sınırı ve kredi yoktur. Animasyonlu altyazı ve otomatik kesim gibi ek özellikler isteğe bağlı Suflo Pro'da (tek seferlik)." }
         },
         {
           "@type": "Question",
@@ -485,6 +485,62 @@
     .editor-iki { grid-template-columns: minmax(0, 1fr); gap: 28px; }
     nav .links { display: none; }
   }
+  /* ============================================================
+     Tek marka dili: /pro sayfasiyla ayni tonlar + huni bilesenleri.
+     SEO iskeletine dokunmaz — yalniz gorunum.
+     ============================================================ */
+  :root {
+    --bg: #0f1017; --bg2: #161822; --bg3: #1c1f2b; --raise: #242838;
+    --line: #262a3a; --line2: #363b52;
+    --text: #edecf5; --dim: #9a9cb4; --faint: #626578;
+    --good: #6fdca0; --sari: #f2c94c;
+    --r: 12px; --ease: cubic-bezier(.32, .72, 0, 1);
+  }
+  body { font-size: 16.5px; font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif; }
+  h1, h2 { font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
+
+  .nav-pro {
+    padding: 4px 11px; border-radius: 20px;
+    border: 1px solid rgba(139,124,246,.4);
+    background: linear-gradient(135deg, rgba(139,124,246,.16), rgba(91,140,255,.10));
+    color: var(--accent-lite) !important; font-weight: 700; font-size: 13px;
+  }
+  .nav-pro:hover { background: var(--grad); border-color: transparent; color: #fff !important; }
+
+  .pro-mikro { margin-top: 12px; font-size: 13px; color: var(--faint); }
+  .pro-mikro a { font-weight: 700; }
+
+  .kanit-serit {
+    display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: center;
+    padding: 13px 18px; margin: 6px 0 10px;
+    background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r);
+    font-size: 13.5px; color: var(--dim); text-align: center;
+  }
+  .kanit-serit b { color: var(--text); font-weight: 800; }
+
+  .pv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin-top: 8px; }
+  .pv {
+    position: relative; display: block;
+    background: linear-gradient(160deg, rgba(139,124,246,.12), rgba(91,140,255,.04) 60%), var(--bg2);
+    border: 1px solid rgba(139,124,246,.35); border-radius: var(--r);
+    padding: 18px 16px; color: var(--text); text-decoration: none;
+    transition: transform .14s var(--ease), border-color .16s var(--ease), box-shadow .2s var(--ease);
+  }
+  .pv:hover { transform: translateY(-2px); border-color: rgba(139,124,246,.6); box-shadow: 0 10px 26px -12px rgba(0,0,0,.6); color: var(--text); }
+  .pv-rozet {
+    position: absolute; top: 12px; right: 12px;
+    font-size: 9px; font-weight: 800; letter-spacing: .6px;
+    padding: 2px 7px; border-radius: 5px; background: var(--grad); color: #fff;
+  }
+  .pv b { display: block; font-size: 15px; margin-bottom: 6px; padding-right: 40px; }
+  .pv p { font-size: 13px; color: var(--dim); margin: 0; }
+  .pv-cta { margin-top: 16px; text-align: center; }
+
+  @media (max-width: 720px) {
+    .pv-grid { grid-template-columns: 1fr; }
+    .kanit-serit { font-size: 12.5px; gap: 6px 16px; }
+  }
+
 </style>
 </head>
 <body>
@@ -503,7 +559,7 @@
         <a href="#karsilastirma">Karşılaştırma</a>
         <a href="#kurulum">Kurulum</a>
         <a href="#sss">SSS</a>
-        <a href="/pro">Pro</a>
+        <a href="/pro" class="nav-pro">Pro</a>
         <a href="https://github.com/sametcreates/suflo">GitHub</a>
       </div>
       <a class="nav-cta" href="https://github.com/sametcreates/suflo/releases/latest">İndir</a>
@@ -527,6 +583,7 @@
       </a>
       <a class="btn ghost" href="#nasil">Nasıl çalışır?</a>
     </div>
+    <p class="pro-mikro">Ücretsiz ve açık kaynak. Daha fazlasını isteyenler için <a href="/pro">Suflo Pro →</a></p>
     <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v2.3.0</b></p>
     <p class="mobil-not" id="mobil-not" hidden>📱 Telefondasın: Suflo bilgisayarda, Premiere'in içinde çalışıyor.
     Bu adresi kendine gönder, bilgisayarında aç: <b>suflo.app</b></p>
@@ -549,6 +606,12 @@
       </div>
     </div>
   </header>
+
+  <div class="kanit-serit reveal" aria-label="Sosyal kanıt">
+    <span>İlk 13 günde <b>658 kurulum</b> — sıfır reklamla</span>
+    <span>%100 açık kaynak · <a href="https://github.com/sametcreates/suflo">kodu kendin incele</a></span>
+    <span><b>99 dil</b> · Windows + macOS</span>
+  </div>
 
   <!-- ================= NEDEN ================= -->
   <section id="neden">
@@ -741,6 +804,31 @@
     düzenle, çevir, yeniden uygula. Etiketler ve bozuk karakterler otomatik temizlenir.</p>
   </section>
 
+  <!-- ================= PRO VITRIN ================= -->
+  <section id="pro-vitrin">
+    <p class="kicker reveal">Suflo Pro</p>
+    <h2 class="reveal">Pro'da dahası var.</h2>
+    <p class="lead reveal">Yukarıdakilerin hepsi ücretsiz ve öyle kalacak. Pro, "viral görünsün ve daha hızlı bitsin" katmanını ekler — tek seferlik, abonelik yok.</p>
+    <div class="pv-grid reveal">
+      <a class="pv" href="/pro">
+        <span class="pv-rozet">PRO</span>
+        <b>🎬 Animasyonlu altyazı katmanı</b>
+        <p>Kelime kelime oynayan "CapCut görünümü" — karaoke dolgu, pop, daktilo. Premiere'in kendi altyazısı bunu yapamıyor.</p>
+      </a>
+      <a class="pv" href="/pro">
+        <span class="pv-rozet">PRO</span>
+        <b>✂️ Otomatik kesim + Ritim</b>
+        <p>Sessizlikleri tek tıkla temizle, müziğin vuruşlarına marker at — kurgu tempoya otursun.</p>
+      </a>
+      <a class="pv" href="/pro">
+        <span class="pv-rozet">PRO</span>
+        <b>Ⅱ Yazı animasyonu kütüphanesi</b>
+        <p>MOGRT paketlerin panelde: ara, favorile, tek tıkla playhead'e ekle.</p>
+      </a>
+    </div>
+    <p class="pv-cta reveal"><a class="btn ghost" href="/pro">Pro'yu keşfet →</a></p>
+  </section>
+
   <!-- ================= KARSILASTIRMA ================= -->
   <section id="karsilastirma">
     <p class="kicker reveal">Karşılaştırma</p>
@@ -762,6 +850,31 @@
       </tbody>
     </table>
     </div>
+  </section>
+
+  <!-- ================= UCRETSIZ VS PRO ================= -->
+  <section id="pro-tablo">
+    <p class="kicker reveal">Ücretsiz vs Pro</p>
+    <h2 class="reveal">Ücretsiz sürüm gerçek bir araç. Pro, üstüne gelir.</h2>
+    <div class="cmp-scroll reveal">
+    <table class="cmp">
+      <thead>
+        <tr><td></td><th scope="col" class="suflo">Ücretsiz</th><th scope="col" class="suflo">Pro</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Türkçe transkripsiyon (99 dil, internetsiz)</th><td class="e">✓</td><td class="e">✓</td></tr>
+        <tr><th scope="row">Altyazı editörü + taslak kurtarma</th><td class="e">✓</td><td class="e">✓</td></tr>
+        <tr><th scope="row">SRT · WebVTT · TXT + caption izi</th><td class="e">✓</td><td class="e">✓</td></tr>
+        <tr><th scope="row">GPU hızlandırma + emoji seçici</th><td class="e">✓</td><td class="e">✓</td></tr>
+        <tr><th scope="row">Animasyonlu altyazı katmanı + karaoke</th><td class="h">—</td><td class="e">✓</td></tr>
+        <tr><th scope="row">Otomatik kesim + ritim senkronu</th><td class="h">—</td><td class="e">✓</td></tr>
+        <tr><th scope="row">Yazı animasyonu kütüphanesi (MOGRT)</th><td class="h">—</td><td class="e">✓</td></tr>
+        <tr><th scope="row">Toplu klip · çeviri · sözlük · ASS</th><td class="h">—</td><td class="e">✓</td></tr>
+        <tr><th scope="row">Fiyat</th><td class="e">Sonsuza dek ücretsiz</td><td class="e"><b>749 TL</b> · tek seferlik · abonelik yok</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="pv-cta reveal"><a class="btn ghost" href="/pro">Pro sayfasına git →</a></p>
   </section>
 
   <!-- ================= KURULUM ================= -->
@@ -830,8 +943,10 @@
     </details>
     <details class="reveal">
       <summary>Suflo gerçekten tamamen ücretsiz mi?</summary>
-      <p>Evet. MIT lisanslı açık kaynak; yapay zekâ motoru kendi bilgisayarında çalışır, kullanım sınırı
-      ve kredi yoktur. İstersen hız için ücretsiz bir Groq bulut anahtarı da bağlayabilirsin.</p>
+      <p>Evet — çekirdek sonsuza dek ücretsiz: MIT lisanslı açık kaynak, yapay zekâ motoru kendi
+      bilgisayarında çalışır, kullanım sınırı ve kredi yoktur. Animasyonlu altyazı ve otomatik kesim
+      gibi ek özellikler isteğe bağlı <a href="/pro">Suflo Pro</a>'da (tek seferlik).
+      İstersen hız için ücretsiz bir Groq bulut anahtarı da bağlayabilirsin.</p>
     </details>
     <details class="reveal">
       <summary>Premiere'e altyazı eklentisi nasıl kurulur?</summary>
@@ -856,6 +971,12 @@
       desteklediği 99 dilin tamamı kullanılabilir.</p>
     </details>
     <details class="reveal">
+      <summary>Suflo Pro'da ne var?</summary>
+      <p>Animasyonlu altyazı katmanı (karaoke dolgu, pop, daktilo), otomatik sessizlik kesimi,
+      ritim marker'ları, yazı animasyonu kütüphanesi (MOGRT), toplu klip, çeviri ve stilli ASS.
+      Tek seferlik 749 TL, abonelik yok — <a href="/pro">canlı demolarla incele →</a></p>
+    </details>
+    <details class="reveal">
       <summary>Bilgisayarım yavaşsa?</summary>
       <p>Beş model seçeneği var: en küçüğü 32 MB, zayıf bilgisayarlarda da çalışır. Acelen varsa ücretsiz
       Groq anahtarıyla bulut moduna geçersin: dakikalar değil, saniyeler.</p>
@@ -876,6 +997,7 @@
 
   <footer>
     <div class="fl">
+      <a href="/pro">Suflo Pro</a>
       <a href="https://github.com/sametcreates/suflo">GitHub</a>
       <a href="https://github.com/sametcreates/suflo/releases">Sürüm notları</a>
       <a href="https://instagram.com/suflo.app">Instagram</a>
