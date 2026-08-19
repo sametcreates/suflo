@@ -38,6 +38,18 @@ window.KLib = (function () {
     var root = K.extensionPath();
     return root ? K.path.join(root, "content", "mogrt") : "";
   }
+  // Suflo Pro Paketi: musteri Lemon Squeezy'den indirdigi paketi gosterir.
+  // Icerik eklentiyle GELMEZ (public repoda olsa bedava olurdu) — sadece
+  // satin alan lisanslinin gosterdigi klasorden okunur. Pakette "mogrt" alt
+  // klasoru varsa onu, yoksa kokun kendisini tarariz (topla zaten .mogrt suzer).
+  function proPackMogrtDir() {
+    if (!K.nodeOK || !K.fs || !K.path) return "";
+    var pack = String(K.settings().proPackKlasor || "").trim();
+    if (!pack || !K.fs.existsSync(pack)) return "";
+    var alt = K.path.join(pack, "mogrt");
+    try { if (K.fs.existsSync(alt) && K.fs.statSync(alt).isDirectory()) return alt; } catch (e) {}
+    return pack;
+  }
   function pathKey(p) { return String(p || "").replace(/\\/g, "/").toLowerCase(); }
 
   function mogrtNameKey(value) {
@@ -161,6 +173,11 @@ window.KLib = (function () {
     var yollar = builtinFiles.concat(topla(mogrtDir()));
     var ek = (K.settings().mogrtEkKlasor || "").trim();
     if (ek && K.fs.existsSync(ek)) yollar = yollar.concat(topla(ek));
+    // Suflo Pro Paketi (satin alanin gosterdigi klasor) — resmi animasyonlar
+    var proPackFiles = topla(proPackMogrtDir());
+    var proPackSet = {};
+    proPackFiles.forEach(function (p) { proPackSet[pathKey(p)] = 1; });
+    yollar = yollar.concat(proPackFiles);
 
     // ayni gorunen ada sahip cift dosyalari tekle (Suflo Originals once gelir)
     var gorulen = {};
@@ -170,6 +187,7 @@ window.KLib = (function () {
       var tam2 = yollar[i];
       var ad = K.path.basename(tam2).replace(/\.mogrt$/i, "");
       var isBuiltin = !!builtinSet[pathKey(tam2)];
+      var isPro = !isBuiltin && !!proPackSet[pathKey(tam2)];
       var meta = isBuiltin ? catalog[K.path.basename(tam2).toLowerCase()] : null;
       // Vault'ta ayni Suflo Original farkli bir dosya adi/klasorle bulunabilir.
       // Katalogdaki kaynak adlari bu kopyalari yakalar; yerlesik kart tek kalir.
@@ -180,13 +198,14 @@ window.KLib = (function () {
       gorulen[uniqueKey] = 1;
       var slug = ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || ("paket-" + i);
       var relPath = !isBuiltin && ek ? tam2.slice(ek.length).replace(/^[\\\/]+/, "") : "";
-      var group = isBuiltin || textAnimationMi(relPath) ? "text" : "other";
+      var group = isBuiltin || isPro || textAnimationMi(relPath) ? "text" : "other";
       var paket = {
         path: tam2,
         ad: ad,
         display: display,
         thumb: null,
         builtin: isBuiltin,
+        pro: isPro,
         group: group,
         category: meta && meta.category ? String(meta.category) : (group === "text" ? "Text Animation" : "Other Animation")
       };
@@ -257,7 +276,7 @@ window.KLib = (function () {
       var kart = document.createElement("div");
       var kilitli = typeof Pro !== "undefined" && !Pro.isPro();
       kart.className = "mogrt-kart" + (kilitli ? " locked" : "");
-      var kaynak = p.builtin ? "SUFLO ORIGINAL" : "PERSONAL MOGRT";
+      var kaynak = p.builtin ? "SUFLO ORIGINAL" : (p.pro ? "SUFLO PRO" : "PERSONAL MOGRT");
       var aksiyon = kilitli
         ? '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg><span>LOCKED</span>'
         : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M12 6l4 4-4 4"/></svg><span>DRAG</span>';

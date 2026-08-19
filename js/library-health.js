@@ -55,6 +55,15 @@ window.KLibraryHealth = (function () {
     var extra = String(K.settings()[key] || "").trim();
     var duplicate = out.some(function (root) { return norm(root.path) === norm(extra); });
     if (extra && !duplicate) out.push({ path: extra, label: "Bağlı klasör", builtin: false });
+    // Suflo Pro Paketi (satin alanin gosterdigi klasor)
+    var packRoot = String(K.settings().proPackKlasor || "").trim();
+    if (packRoot) {
+      var sub = K.path.join(packRoot, type === "mogrt" ? "mogrt" : "sfx");
+      var packPath = packRoot;
+      try { if (K.fs && K.fs.existsSync(sub) && K.fs.statSync(sub).isDirectory()) packPath = sub; } catch (e) {}
+      if (!out.some(function (root) { return norm(root.path) === norm(packPath); }))
+        out.push({ path: packPath, label: "Suflo Pro paketi", builtin: false });
+    }
     return out;
   }
 

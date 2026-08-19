@@ -624,11 +624,11 @@
 
         <div id="mogrt-bos" class="mogrt-bos">
           <span class="mb-ikon">Aa</span>
-          <b>Yazı animasyonları yüklenemedi</b>
-          <p class="hint">Kütüphaneyi yeniden taramak için "⟳" düğmesine bas.
-      Kendi arşivin başka yerdeyse: Ayarlar → İçerik kütüphaneleri → MOGRT.</p>
+          <b>Yazı animasyonu kütüphanesi boş</b>
+          <p class="hint">Suflo Pro paketini aldıysan Lemon Squeezy e-postandaki klasörü göster — yazı animasyonları buraya gelir. Kendi arşivin varsa Ayarlar → Kendi arşivlerin.</p>
+          <button id="yazi-propack-yukle" class="btn primary" style="margin-top:8px">Pro paketini yükle…</button>
           <p class="hint mono" id="yazi-klasor-yol" style="word-break:break-all"></p>
-          <button id="yazi-klasor-ac" class="btn" style="margin-top:8px">Klasörü aç</button>
+          <button id="yazi-klasor-ac" class="btn ghost" style="margin-top:8px">Veri klasörünü aç</button>
         </div>
       </div>
     </div>
@@ -684,9 +684,10 @@
       <div id="sfx-list" class="list sfx-list"></div>
       <div id="sfx-empty" class="empty-state" hidden>
         <span class="sfx-empty-icon">♫</span>
-        <b>Henüz SFX klasörü bağlı değil</b>
-        <p>Ses efektleri klasörünü bağla; panelden ara, ön dinle ve timeline'a ekle.</p>
-        <button id="sfx-add-folder-big" class="btn primary">SFX klasörü bağla</button>
+        <b>Henüz ses efekti yok</b>
+        <p>Suflo Pro paketini aldıysan indirdiğin klasörü göster; ya da kendi SFX arşivini bağla. Panelden ara, ön dinle, timeline'a ekle.</p>
+        <button id="sfx-propack-yukle" class="btn primary">Pro paketini yükle…</button>
+        <button id="sfx-add-folder-big" class="btn">Kendi SFX klasörümü bağla</button>
       </div>
     </div>
   </section>
@@ -829,9 +830,19 @@
     </div>
 
 
+    <div class="set-group set-propack">
+      <div class="set-title">Suflo Pro Paketi</div>
+      <p class="hint" style="margin-bottom:8px">Satın aldıysan Lemon Squeezy e-postandaki paketi indir, klasörü burada göster — yazı animasyonları ve SFX otomatik listelenir. İçerik eklentiyle gelmez; yalnızca sana özeldir.</p>
+      <div class="row">
+        <button id="set-propack-yukle" class="btn primary">Pro paketini yükle…</button>
+        <button id="set-propack-kaldir" class="btn ghost" hidden>Kaldır</button>
+      </div>
+      <div id="set-propack-durum" class="inline-status"></div>
+    </div>
+
     <div class="set-group">
-      <div class="set-title">İçerik kütüphaneleri</div>
-      <p class="hint" style="margin-bottom:8px">Suflo Originals ve saf text efektleri Yazı Animasyonları'nda; logo, ikon, lower third ve diğer MOGRT'lar ayrı bölümde gösterilir. Arşivlerin taşınmadan taranır.</p>
+      <div class="set-title">Kendi arşivlerin (opsiyonel)</div>
+      <p class="hint" style="margin-bottom:8px">Kendi MOGRT / SFX / emoji arşivin başka bir klasördeyse buradan göster; taşınmadan olduğu yerden taranır. Suflo Originals ve text efektleri Yazı Animasyonları'nda listelenir.</p>
       <div class="row">
         <label for="set-mogrt-klasor">MOGRT</label>
         <input id="set-mogrt-klasor" type="text" placeholder="örn. C:\Users\sen\Desktop\Edit Kaynakları\MOGRT" spellcheck="false">

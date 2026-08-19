@@ -361,6 +361,58 @@ window.KApp = (function () {
   function initSettings() {
     initPro();
 
+    // ---- Suflo Pro Paketi (LS'ten indirilen resmi icerik; tek klasor = MOGRT + SFX) ----
+    function reflectProPack() {
+      var durum = el("set-propack-durum");
+      var kaldir = el("set-propack-kaldir");
+      var pack = String(K.settings().proPackKlasor || "").trim();
+      var varMi = pack && K.fs && K.fs.existsSync(pack);
+      if (kaldir) kaldir.hidden = !pack;
+      if (!durum) return;
+      if (varMi) {
+        durum.className = "inline-status good";
+        durum.textContent = "✓ Pro paketi bağlı: " + pack;
+      } else if (pack) {
+        durum.className = "inline-status bad";
+        durum.textContent = "Paket klasörü bulunamadı: " + pack;
+      } else {
+        durum.className = "inline-status";
+        durum.textContent = Pro.isPro()
+          ? "Henüz yüklenmedi — Lemon Squeezy e-postandaki paketi indirip klasörü göster."
+          : "Suflo Pro alınca içerik paketini buradan yüklersin.";
+      }
+    }
+    function proPakYukle() {
+      if (!Pro.isPro()) { Pro.gate("propack"); return; }
+      var yol = null;
+      if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
+        var r = window.cep.fs.showOpenDialogEx(false, true, "Suflo Pro paketi klasörünü seç", null, null);
+        if (r && r.data && r.data.length) yol = r.data[0];
+      }
+      if (!yol) return;
+      K.settings().proPackKlasor = yol;
+      K.saveSettings();
+      reflectProPack();
+      if (window.KLib) KLib.tara();
+      if (window.KSfx) KSfx.tara();
+      toast("Suflo Pro paketi bağlandı — kütüphaneler tarandı.", "good");
+    }
+    Array.prototype.forEach.call(
+      document.querySelectorAll("#set-propack-yukle, #yazi-propack-yukle, #sfx-propack-yukle"),
+      function (b) { b.addEventListener("click", proPakYukle); }
+    );
+    var ppKaldir = el("set-propack-kaldir");
+    if (ppKaldir) ppKaldir.addEventListener("click", function () {
+      K.settings().proPackKlasor = "";
+      K.saveSettings();
+      reflectProPack();
+      if (window.KLib) KLib.tara();
+      if (window.KSfx) KSfx.tara();
+      toast("Pro paketi bağlantısı kaldırıldı.");
+    });
+    if (typeof Pro !== "undefined") Pro.on(function () { reflectProPack(); });
+    reflectProPack();
+
     // Yazi kutuphanesi ek klasoru
     var mk = el("set-mogrt-klasor");
     if (mk) {

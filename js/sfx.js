@@ -120,12 +120,25 @@ window.KSfx = (function () {
 
   /* ---------------- Indeks ---------------- */
 
+  // Suflo Pro Paketi: satin alanin Lemon Squeezy'den indirip gosterdigi klasor.
+  // Icerik eklentiyle gelmez; pakette "sfx" alt klasoru varsa onu tarariz.
+  function proPackSfxDir() {
+    if (!K.nodeOK || !K.fs || !K.path) return "";
+    var pack = String(K.settings().proPackKlasor || "").trim();
+    if (!pack || !K.fs.existsSync(pack)) return "";
+    var alt = K.path.join(pack, "sfx");
+    try { if (K.fs.existsSync(alt) && K.fs.statSync(alt).isDirectory()) return alt; } catch (e) {}
+    return pack;
+  }
+
   function kaynaklar() {
     if (!K.nodeOK || !K.fs || !K.path) return [];
     var out = [];
     var builtin = builtinSfxDir();
     if (builtin && K.fs.existsSync(builtin)) out.push(builtin);
     out.push(sfxDir());
+    var pro = proPackSfxDir();
+    if (pro && !out.some(function (p) { return norm(p) === norm(pro); })) out.push(pro);
     var ek = String(K.settings().sfxEkKlasor || "").trim();
     if (ek && K.fs.existsSync(ek) && !out.some(function (p) { return norm(p) === norm(ek); })) out.push(ek);
     return out;
@@ -151,8 +164,10 @@ window.KSfx = (function () {
         var info = folderInfo(root, f);
         var name = stripExt(basename(f));
         var isBuiltin = norm(root) === norm(builtinSfxDir());
+        var isPro = !isBuiltin && norm(root) === norm(proPackSfxDir());
         index.push({ name: name, path: f, folder: info.folder,
-          collection: isBuiltin ? "SUFLO ORIGINALS" : info.collection, builtin: isBuiltin,
+          collection: isBuiltin ? "SUFLO ORIGINALS" : (isPro ? "SUFLO PRO" : info.collection),
+          builtin: isBuiltin, pro: isPro,
           hay: (name + " " + rel).toLowerCase(), smartHay: fold(name + " " + rel) });
       });
     });
