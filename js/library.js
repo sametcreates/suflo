@@ -76,19 +76,44 @@ window.KLib = (function () {
   }
 
   async function tara() {
-    var dir = mogrtDir();
-    var dosyalar = [];
-    try {
-      dosyalar = K.fs.readdirSync(dir).filter(function (f) { return /\.mogrt$/i.test(f); });
-    } catch (e) { dosyalar = []; }
+    /*
+     * Iki kaynak: panelin kendi klasoru + kullanicinin gosterdigi EK klasor
+     * (Ayarlar > Yazi kutuphanesi). Boylece 20 GB'lik bir arsivi tasimak
+     * gerekmez — oldugu yerden okunur. Alt klasorlere de iner (1 seviye).
+     */
+    function topla(dir) {
+      var out = [];
+      try {
+        K.fs.readdirSync(dir).forEach(function (f) {
+          var tam = K.path.join(dir, f);
+          try {
+            if (/\.mogrt$/i.test(f)) out.push(tam);
+            else if (K.fs.statSync(tam).isDirectory()) {
+              K.fs.readdirSync(tam).forEach(function (g) {
+                if (/\.mogrt$/i.test(g)) out.push(K.path.join(tam, g));
+              });
+            }
+          } catch (e1) {}
+        });
+      } catch (e) {}
+      return out;
+    }
 
+    var yollar = topla(mogrtDir());
+    var ek = (K.settings().mogrtEkKlasor || "").trim();
+    if (ek && K.fs.existsSync(ek)) yollar = yollar.concat(topla(ek));
+
+    // ayni ada sahip cift dosyalari tekle (once panel klasoru kazanir)
+    var gorulen = {};
     paketler = [];
-    for (var i = 0; i < dosyalar.length; i++) {
-      var f = dosyalar[i];
-      var ad = f.replace(/\.mogrt$/i, "");
+    for (var i = 0; i < yollar.length; i++) {
+      var tam2 = yollar[i];
+      var ad = K.path.basename(tam2).replace(/\.mogrt$/i, "");
+      if (gorulen[ad.toLowerCase()]) continue;
+      gorulen[ad.toLowerCase()] = 1;
       var slug = ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || ("paket-" + i);
-      var tp = await thumbCikar(K.path.join(dir, f), slug);
-      paketler.push({ path: K.path.join(dir, f), ad: ad, thumb: tp ? dataUri(tp) : null });
+      var tp = await thumbCikar(tam2, slug);
+      paketler.push({ path: tam2, ad: ad, thumb: tp ? dataUri(tp) : null });
     }
     sayaclar();
     ciz();

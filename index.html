@@ -604,7 +604,8 @@
         <div id="mogrt-bos" class="mogrt-bos">
           <span class="mb-ikon">Aa</span>
           <b>Henüz paket yok</b>
-          <p class="hint">.mogrt dosyalarını klasöre at, "⟳" ile tara — kartlar burada belirir.</p>
+          <p class="hint">.mogrt dosyalarını klasöre at, "⟳" ile tara — kartlar burada belirir.
+      Arşivin başka yerdeyse: Ayarlar → Yazı kütüphanesi → Ek klasör.</p>
           <p class="hint mono" id="yazi-klasor-yol" style="word-break:break-all"></p>
           <button id="yazi-klasor-ac" class="btn" style="margin-top:8px">Klasörü aç</button>
         </div>
@@ -704,6 +705,17 @@
       </div>
     </div>
 
+
+    <div class="set-group">
+      <div class="set-title">Yazı kütüphanesi</div>
+      <p class="hint" style="margin-bottom:8px">Kendi MOGRT arşivin başka bir klasördeyse yolunu buraya yapıştır — taşımana gerek yok, panel oradan okur (alt klasörler dahil).</p>
+      <div class="row">
+        <label for="set-mogrt-klasor">Ek klasör</label>
+        <input id="set-mogrt-klasor" type="text" placeholder="örn. C:\Users\sen\Desktop\Edit Kaynakları\MOGRT" spellcheck="false">
+        <button id="set-mogrt-kaydet" class="btn">Kaydet</button>
+      </div>
+      <div id="set-mogrt-durum" class="inline-status"></div>
+    </div>
 
     <div class="set-group" id="grp-pro">
       <div class="set-title">Suflo Pro</div>

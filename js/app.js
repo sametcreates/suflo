@@ -356,6 +356,27 @@ window.KApp = (function () {
 
   function initSettings() {
     initPro();
+
+    // Yazi kutuphanesi ek klasoru
+    var mk = el("set-mogrt-klasor");
+    if (mk) {
+      mk.value = K.settings().mogrtEkKlasor || "";
+      el("set-mogrt-kaydet").addEventListener("click", function () {
+        var yol = mk.value.trim().replace(/^"|"$/g, ""); // yapistirilan tirnaklari temizle
+        var durum = el("set-mogrt-durum");
+        if (yol && !K.fs.existsSync(yol)) {
+          durum.className = "inline-status bad";
+          durum.textContent = "Klasör bulunamadı: " + yol;
+          return;
+        }
+        K.settings().mogrtEkKlasor = yol;
+        K.saveSettings();
+        durum.className = "inline-status good";
+        durum.textContent = yol ? "✓ Kaydedildi — kütüphane bu klasörü de tarayacak" : "Ek klasör kaldırıldı";
+        if (window.KLib) KLib.tara();
+      });
+    }
+
     var s = K.settings();
     el("set-provider").value = s.provider || "groq";
     el("set-apikey").value = s.apiKey || "";
