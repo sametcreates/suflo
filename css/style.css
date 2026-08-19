@@ -1295,6 +1295,15 @@ details.adv > *:not(summary) { margin-top: 8px; }
 }
 .sfx-row:hover .sfx-add, .sfx-row.cur .sfx-add { opacity: 1; }
 .sfx-add:hover { background: var(--grad); border-color: transparent; color: #fff; }
+.sfx-row.busy { opacity: .72; pointer-events: none; }
+.sfx-row.busy .sfx-add { opacity: 1; color: var(--accent-lite); min-width: 70px; }
+.sfx-list { max-height: calc(100vh - 185px); min-height: 180px; }
+.sfx-filter-row .seg-ctl { width: auto; }
+.sfx-empty-icon {
+  display: grid; place-items: center; width: 46px; height: 46px;
+  border: 1.5px dashed var(--line2); border-radius: 12px;
+  font-size: 20px; color: var(--accent-lite); background: var(--grad-soft);
+}
 
 /* ---------- Boş durumlar ---------- */
 

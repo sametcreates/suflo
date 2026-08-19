@@ -1,3 +1,23 @@
+## Suflo 2.5.0 — MOGRT + SFX kütüphaneleri
+
+- MOGRT arşivi artık derin klasörlerin tamamını tarar; büyük Vault yapıları tek klasörden bağlanabilir.
+- Yeni Pro SFX sekmesi: arama, ön dinleme, favoriler, son kullanılanlar ve playhead'e tek tıkla ekleme.
+- Ses yerleştirilmeden önce dosyanın bütün süresi kontrol edilir; timeline'daki mevcut sesler ezilmez.
+- MOGRT ve SFX klasörleri Ayarlar > İçerik kütüphaneleri bölümünden ayrı ayrı bağlanır.
+- İçerikler ZXP içine kopyalanmaz; yerel arşivden okunur. Dağıtım paketine yalnızca yeniden satış hakkı doğrulanmış varlıklar eklenmelidir.
+
+## Suflo 2.4.1 — Premium panel, Yazı sekmesi, yeni satış sayfası
+
+Görünüş ve keşfedilebilirlik sürümü:
+
+- **Yazı sekmesi (Pro):** MOGRT text animasyonu kütüphanesi — .mogrt dosyalarını Suflo klasörüne at, panel tarar, tek tıkla playhead'e yerleştirir (boş katman seçimi otomatik).
+- **Pro artık görünür:** üst barda PRO rozeti; Kesim/Ritim/Yazı sekmelerinde ne kazandıracağını anlatan tanıtım kartları; yenilenen yükseltme penceresi. Ücretsiz özellikler aynen ücretsiz.
+- **Stil kartları yenilendi:** kartlar dururken en okunur karesini gösterir, üzerine gelince oynar; yumuşak sinematik gölge, premium seçili durum.
+- **suflo.app/pro yenilendi:** canlı animasyon demoları, panel önizlemesi, net fiyat kıyası, 14 gün iade garantisi.
+- Tek tık güncelleme (2.4.0) bu sürümden itibaren işlemeye başlar.
+
+---
+
 ## Suflo 2.4.1 — Premium panel, Yazı sekmesi, yeni satış sayfası
 
 Görünüş ve keşfedilebilirlik sürümü:

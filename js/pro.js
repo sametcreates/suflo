@@ -80,6 +80,7 @@
     assexport: 'Stilli ASS disa aktarma',
     glossary:  'Terim sozlugu + gelismis bul/degistir',
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
+    sfx:       'SFX kutuphanesi (on dinleme + timeline)',
     pro:       'Suflo Pro'
   };
 
