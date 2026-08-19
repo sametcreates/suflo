@@ -1,3 +1,10 @@
+## Suflo 2.5.6 — Lisans düzeltmesi + hafif kurulum
+
+- **Lisans doğrulaması düzeltildi:** Suflo Pro satın alan herkes anahtarını sorunsuz etkinleştirir (ürün bağlantısı canlı mağazaya güncellendi).
+- **Çok daha hafif indirme:** Kurulum paketi artık birkaç MB. İçerik kütüphanesi (hazır yazı animasyonları + SFX) ayrı **Suflo Pro Paketi** olarak gelir — satın alınca Lemon Squeezy'den indirip Ayarlar → Suflo Pro Paketi'nden tek tıkla yüklersin.
+- **Panel "Pro'yu Al" bağlantısı** canlı ödeme sayfasına güncellendi.
+- Tüm Pro özellikleri (animasyonlu altyazı, otomatik kesim, ritim, çeviri, ASS, sözlük) kuruluma ihtiyaç duymadan çalışır.
+
 ## Suflo 2.5.5 — Hazır SFX Kütüphanesi
 
 - **820 hazır SFX:** SUFLO Main SFX Library artık kurulumla birlikte gelir.
