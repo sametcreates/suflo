@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<ExtensionManifest ExtensionBundleId="com.sametcreates.kesit" ExtensionBundleName="Suflo" ExtensionBundleVersion="2.5.2" Version="11.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<ExtensionManifest ExtensionBundleId="com.sametcreates.kesit" ExtensionBundleName="Suflo" ExtensionBundleVersion="2.5.3" Version="11.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.sametcreates.kesit.panel" Version="2.5.2"/>
+    <Extension Id="com.sametcreates.kesit.panel" Version="2.5.3"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
@@ -37,12 +37,12 @@
           <Menu>Suflo</Menu>
           <Geometry>
             <Size>
-              <Height>640</Height>
-              <Width>400</Width>
+              <Height>720</Height>
+              <Width>980</Width>
             </Size>
             <MinSize>
-              <Height>400</Height>
-              <Width>320</Width>
+              <Height>480</Height>
+              <Width>360</Width>
             </MinSize>
           </Geometry>
         </UI>

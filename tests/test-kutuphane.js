@@ -135,6 +135,13 @@ async function run() {
     /id="set-library-health-run"/.test(html) && /src="js\/library-health\.js"/.test(html));
   ok("Harici MOGRT'lar Yazi Animasyonlari'ndan ayri bolumde",
     /data-kat="custom"/.test(html) && /id="custom-sayac"/.test(html));
+  var css = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
+  ok("MOGRT kartlari buyuk, kirpilmayan profesyonel onizleme kullaniyor",
+    /minmax\(220px,\s*1fr\)/.test(css) && /object-fit:\s*contain/.test(css));
+  ok("MOGRT kartlarinda DRAG ve LOCKED durumlari acik",
+    /<span>DRAG<\/span>/.test(libSrc) && /<span>LOCKED<\/span>/.test(libSrc) && /mogrt-lock/.test(libSrc));
+  ok("Aktif MOGRT karti suruklenince playhead'e yerlestiriliyor",
+    /setAttribute\("draggable",\s*"true"\)/.test(libSrc) && /addEventListener\("dragend"/.test(libSrc));
 
   var pro = fs.readFileSync(KOKYOL + "js/pro.js", "utf8");
   ok("SFX lisans kapisinda Pro ozelligi", /sfx:\s*'SFX kutuphanesi/.test(pro));

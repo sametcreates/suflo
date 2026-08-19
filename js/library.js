@@ -227,21 +227,25 @@ window.KLib = (function () {
 
     liste.forEach(function (p) {
       var kart = document.createElement("div");
-      kart.className = "mogrt-kart";
-      var proEtiket = (typeof Pro !== "undefined" && !Pro.isPro())
-        ? '<span class="mogrt-pro">PRO</span>' : "";
+      var kilitli = typeof Pro !== "undefined" && !Pro.isPro();
+      kart.className = "mogrt-kart" + (kilitli ? " locked" : "");
+      var kaynak = p.builtin ? "SUFLO ORIGINAL" : "PERSONAL MOGRT";
+      var aksiyon = kilitli
+        ? '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg><span>LOCKED</span>'
+        : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M12 6l4 4-4 4"/></svg><span>DRAG</span>';
       kart.innerHTML =
         '<span class="mogrt-thumb">' +
           (p.thumb
             ? '<img src="' + p.thumb + '" alt="" loading="lazy">'
             : '<span class="mogrt-yazi">' + esc(p.display.split(/[\s_-]/)[0] || "Aa") + "</span>") +
-          proEtiket +
+          '<span class="mogrt-source">' + kaynak + "</span>" +
           '<button type="button" class="mogrt-kalp' + (favMi(p.ad) ? " sevildi" : "") + '" title="Favori">♥</button>' +
+          (kilitli ? '<span class="mogrt-lock"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg></span>' : "") +
         "</span>" +
-        '<span class="mogrt-meta"><b>' + esc(p.display) + "</b><i>" +
-          (p.builtin ? '<span class="mogrt-original">SUFLO ORIGINAL</span> · ' + esc(p.category) : "MOGRT · yazı animasyonu") +
-        "</i></span>" +
-        '<button type="button" class="mogrt-ekle-btn">Ekle</button>';
+        '<span class="mogrt-card-body">' +
+          '<span class="mogrt-meta"><b title="' + esc(p.display) + '">' + esc(p.display) + "</b><i>" + esc(p.category) + " · MOGRT</i></span>" +
+          '<button type="button" class="mogrt-ekle-btn' + (kilitli ? " is-locked" : "") + '" title="' + (kilitli ? "Suflo Pro ile aç" : "Playhead konumuna ekle") + '">' + aksiyon + "</button>" +
+        "</span>";
 
       kart.querySelector(".mogrt-kalp").addEventListener("click", function (e) {
         e.stopPropagation();
@@ -251,6 +255,22 @@ window.KLib = (function () {
       });
       kart.querySelector(".mogrt-ekle-btn").addEventListener("click", function () { yerlestir(p, kart); });
       kart.querySelector(".mogrt-thumb").addEventListener("click", function () { yerlestir(p, kart); });
+      if (!kilitli) {
+        kart.setAttribute("draggable", "true");
+        kart.addEventListener("dragstart", function (e) {
+          kart.classList.add("dragging");
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "copy";
+            try { e.dataTransfer.setData("text/plain", p.path); } catch (e1) {}
+          }
+        });
+        // CEP disina surukleme kesin bir timeline koordinati vermez; birakildiginda
+        // mevcut playhead'e guvenli yerlestirme yapar. Dugmeye tiklamak da ayni isi yapar.
+        kart.addEventListener("dragend", function () {
+          kart.classList.remove("dragging");
+          yerlestir(p, kart);
+        });
+      }
       grid.appendChild(kart);
     });
   }

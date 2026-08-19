@@ -1,3 +1,14 @@
+## Suflo 2.5.3 — Studio arayüzü
+
+- Suflo, daha profesyonel ve Adobe uyumlu **Studio UI** tasarımına geçti.
+- MOGRT kartları büyütüldü; önizlemeler kırpılmadan ve daha net gösteriliyor.
+- Aktif kartlarda **DRAG**, Pro kartlarında belirgin **LOCKED** durumu bulunuyor.
+- MOGRT kartları sürüklenip bırakıldığında mevcut playhead'e güvenli biçimde yerleştiriliyor.
+- Sol menüdeki emoji karakterleri tutarlı çizgi ikonlarla değiştirildi.
+- Panelin başlangıç alanı genişletildi; büyük ekranda daha fazla kart rahatça görülebiliyor.
+
+---
+
 ## Suflo 2.5.2 — Yazı Animasyonları düzeltmesi
 
 - 2.5.1'in ilk paketini kuran kullanıcılara düzeltmenin otomatik ulaşması için sürüm numarası yükseltildi.
