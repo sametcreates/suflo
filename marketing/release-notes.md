@@ -1,8 +1,11 @@
 ## Suflo 2.5.1 — Akıllı SFX, kütüphane sağlık kontrolü, içerik paketi altyapısı
 
+- **Yazı Animasyonları temizlendi:** bölüm artık tam 40 seçilmiş Suflo Original gösterir; bağlı klasörlerdeki diğer MOGRT'lar ayrı **Bağlı MOGRT'lar** bölümünde tutulur.
+- Vault'ta farklı klasör veya dosya adıyla bulunan Suflo Original kopyaları otomatik ayıklanır; aynı efekt ikinci kez görünmez.
+- **40 adet sametcreates yapımı Suflo Originals Text Animation** doğrudan Pro paketine eklendi ve klasör bağlamadan hazır görünür.
 - **Akıllı SFX araması:** çok kelimeli arama puanlamayla sıralanır; favoriler ve son kullanılanlar ayrı görünümler.
 - **Kütüphane Sağlık Kontrolü:** Ayarlar'dan tek bakışta MOGRT/SFX kaynaklarının durumu; kopyalanabilir tanı raporu.
-- **İçerik paketi altyapısı:** panel, `content/` klasöründeki paketlenmiş MOGRT'leri katalogla birlikte otomatik listeler — resmî Suflo içerik paketleri için zemin hazır.
+- **İçerik paketi altyapısı:** panel, `content/` klasöründeki paketlenmiş MOGRT'leri katalogla birlikte otomatik listeler.
 - Kullanıcının kendi MOGRT/SFX klasörlerini bağlama özelliği aynen duruyor; derin alt klasör taraması iyileştirildi.
 - Paketleme araçları `content/` klasörünü tanıyor.
 

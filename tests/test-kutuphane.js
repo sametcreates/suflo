@@ -17,7 +17,7 @@ var BUILTIN = path.join(EXT, "content", "mogrt");
 fs.mkdirSync(BUILTIN, { recursive: true });
 fs.writeFileSync(path.join(BUILTIN, "SUFLO TEXT - 01 Built In Test.mogrt"), Buffer.from("PK\x03\x04builtin-mogrt"));
 fs.writeFileSync(path.join(BUILTIN, "catalog.json"), JSON.stringify({ items: [
-  { file: "SUFLO TEXT - 01 Built In Test.mogrt", name: "Built In Test", category: "Test" }
+  { file: "SUFLO TEXT - 01 Built In Test.mogrt", source: "root.mogrt", name: "Built In Test", category: "Test" }
 ] }));
 fs.writeFileSync(path.join(TMP, "root.mogrt"), "mogrt");
 fs.writeFileSync(path.join(TMP, "deep", "one", "two", "three", "nested.mogrt"), "mogrt");
@@ -80,8 +80,9 @@ async function run() {
   var libSrc = fs.readFileSync(KOKYOL + "js/library.js", "utf8");
   vm.runInContext(libSrc, ctx, { filename: "js/library.js" });
   await ctx.KLib.tara();
-  ok("MOGRT taramasi derin klasore iniyor", ctx.KLib.sayisi() === 3, ctx.KLib.sayisi());
+  ok("MOGRT taramasi derin klasore iniyor", ctx.KLib.hariciSayisi() === 1, ctx.KLib.hariciSayisi());
   ok("Paketle gelen Suflo Originals otomatik taraniyor", ctx.KLib.yerlesikSayisi() === 1, ctx.KLib.yerlesikSayisi());
+  ok("Vault'taki Suflo Original kopyasi ikinci kart olmuyor", ctx.KLib.sayisi() === 2, ctx.KLib.sayisi());
 
   var sfxSrc = fs.readFileSync(KOKYOL + "js/sfx.js", "utf8");
   vm.runInContext(sfxSrc, ctx, { filename: "js/sfx.js" });
@@ -108,6 +109,9 @@ async function run() {
     var catalog = JSON.parse(fs.readFileSync(katalogYolu, "utf8"));
     var shipped = fs.readdirSync(KOKYOL + "content/mogrt").filter(function (f) { return /\.mogrt$/i.test(f); });
     ok("Icerik katalogu gecerli JSON + items dizisi", Array.isArray(catalog.items));
+    ok("Yazi Animasyonlari tam 40 secilmis Suflo Original iceriyor",
+      catalog.items.length === 40 && shipped.length === 40,
+      "katalog=" + catalog.items.length + " dosya=" + shipped.length);
     ok("Katalogdaki her dosya pakette gercekten var",
       catalog.items.every(function (item) { return shipped.indexOf(item.file) !== -1; }),
       "katalog=" + catalog.items.length + " dosya=" + shipped.length);
@@ -129,6 +133,8 @@ async function run() {
     /id="tab-sfx"/.test(html) && /src="js\/sfx\.js"/.test(html));
   ok("Kutuphane saglik kontrolu arayuzde ve yuklu",
     /id="set-library-health-run"/.test(html) && /src="js\/library-health\.js"/.test(html));
+  ok("Harici MOGRT'lar Yazi Animasyonlari'ndan ayri bolumde",
+    /data-kat="custom"/.test(html) && /id="custom-sayac"/.test(html));
 
   var pro = fs.readFileSync(KOKYOL + "js/pro.js", "utf8");
   ok("SFX lisans kapisinda Pro ozelligi", /sfx:\s*'SFX kutuphanesi/.test(pro));

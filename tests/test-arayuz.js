@@ -107,6 +107,7 @@ var ZORUNLU = {
   "sfx-smart-list": "Akıllı SFX listesi",
   "set-library-health-run": "Kütüphane sağlık kontrolü",
   "set-library-health-result": "Kütüphane sağlık raporu",
+  "custom-sayac": "Bağlı MOGRT sayacı",
   "cap-emoji-ac": "Emoji aç düğmesi",
   "cap-emoji-panel": "Emoji paneli",
   "cap-emoji-grid": "Emoji ızgarası",

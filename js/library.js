@@ -16,7 +16,7 @@ window.KLib = (function () {
 
   var paketler = [];        // { path, ad, display, thumb, builtin, category }
   var arama = "";
-  var kategori = "mogrt";   // "mogrt" | "fav"
+  var kategori = "mogrt";   // "mogrt" (Suflo Originals) | "custom" | "fav"
   var busyKart = null;
 
   /* ---------------- klasörler ---------------- */
@@ -39,14 +39,26 @@ window.KLib = (function () {
   }
   function pathKey(p) { return String(p || "").replace(/\\/g, "/").toLowerCase(); }
 
+  function mogrtNameKey(value) {
+    var base = String(value || "").replace(/\\/g, "/").split("/").pop();
+    base = base.replace(/\.mogrt$/i, "");
+    base = base.replace(/^SUFLO\s+(?:TEXT|MOGRT)\s*-\s*(?:\d+\s*)?/i, "");
+    return base.toLowerCase().replace(/[^a-z0-9\u00c0-\u024f]+/g, "");
+  }
+
   function builtinCatalog() {
-    var out = {};
+    var out = { byFile: {}, aliases: {} };
     var dir = builtinMogrtDir();
     if (!dir) return out;
     try {
       var raw = JSON.parse(K.fs.readFileSync(K.path.join(dir, "catalog.json"), "utf8"));
       (raw.items || []).forEach(function (item) {
-        if (item && item.file) out[String(item.file).toLowerCase()] = item;
+        if (!item || !item.file) return;
+        out.byFile[String(item.file).toLowerCase()] = item;
+        [item.file, item.source, item.name].forEach(function (alias) {
+          var key = mogrtNameKey(alias);
+          if (key) out.aliases[key] = true;
+        });
       });
     } catch (e) { K.log("[yazi] Suflo Originals katalogu okunamadi: " + (e && e.message)); }
     return out;
@@ -134,7 +146,8 @@ window.KLib = (function () {
     var builtinFiles = topla(builtinDir);
     var builtinSet = {};
     builtinFiles.forEach(function (p) { builtinSet[pathKey(p)] = 1; });
-    var catalog = builtinCatalog();
+    var catalogInfo = builtinCatalog();
+    var catalog = catalogInfo.byFile;
     var yollar = builtinFiles.concat(topla(mogrtDir()));
     var ek = (K.settings().mogrtEkKlasor || "").trim();
     if (ek && K.fs.existsSync(ek)) yollar = yollar.concat(topla(ek));
@@ -147,9 +160,13 @@ window.KLib = (function () {
       var ad = K.path.basename(tam2).replace(/\.mogrt$/i, "");
       var isBuiltin = !!builtinSet[pathKey(tam2)];
       var meta = isBuiltin ? catalog[K.path.basename(tam2).toLowerCase()] : null;
+      // Vault'ta ayni Suflo Original farkli bir dosya adi/klasorle bulunabilir.
+      // Katalogdaki kaynak adlari bu kopyalari yakalar; yerlesik kart tek kalir.
+      if (!isBuiltin && catalogInfo.aliases[mogrtNameKey(ad)]) continue;
       var display = meta && meta.name ? String(meta.name) : ad.replace(/^SUFLO TEXT\s*-\s*\d+\s*/i, "");
-      if (gorulen[display.toLowerCase()]) continue;
-      gorulen[display.toLowerCase()] = 1;
+      var uniqueKey = mogrtNameKey(display) || display.toLowerCase();
+      if (gorulen[uniqueKey]) continue;
+      gorulen[uniqueKey] = 1;
       var slug = ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || ("paket-" + i);
       var tp = await thumbCikar(tam2, slug);
       paketler.push({
@@ -168,7 +185,10 @@ window.KLib = (function () {
   /* ---------------- çizim ---------------- */
 
   function sayaclar() {
-    var s1 = el("yazi-sayac"); if (s1) s1.textContent = String(paketler.length);
+    var s1 = el("yazi-sayac");
+    if (s1) s1.textContent = String(paketler.filter(function (p) { return p.builtin; }).length);
+    var s0 = el("custom-sayac");
+    if (s0) s0.textContent = String(paketler.filter(function (p) { return !p.builtin; }).length);
     var favSayisi = paketler.filter(function (p) { return favMi(p.ad); }).length;
     var s2 = el("fav-sayac"); if (s2) s2.textContent = String(favSayisi);
   }
@@ -179,21 +199,29 @@ window.KLib = (function () {
     if (!grid) return;
 
     var liste = paketler.filter(function (p) {
+      if (kategori === "mogrt" && !p.builtin) return false;
+      if (kategori === "custom" && p.builtin) return false;
       if (kategori === "fav" && !favMi(p.ad)) return false;
       return !arama || (p.display + " " + p.ad + " " + p.category).toLowerCase().indexOf(arama) !== -1;
     });
 
     var baslik = el("ki-baslik"), alt = el("ki-alt");
-    if (baslik) baslik.textContent = kategori === "fav" ? "Favoriler" : "Yazı Animasyonları";
+    if (baslik) baslik.textContent = kategori === "fav"
+      ? "Favoriler"
+      : (kategori === "custom" ? "Bağlı MOGRT'lar" : "Yazı Animasyonları");
     if (alt) alt.textContent = liste.length
       ? liste.length + " paket timeline'a hazır"
-      : (kategori === "fav" ? "kalbe tıklayıp favori ekle" : "timeline'a hazır paketler");
+      : (kategori === "fav"
+        ? "kalbe tıklayıp favori ekle"
+        : (kategori === "custom" ? "Ayarlar'dan kendi MOGRT klasörünü bağla" : "40 Suflo Originals"));
 
     grid.innerHTML = "";
     if (bos) bos.hidden = paketler.length > 0;
     if (!liste.length && paketler.length) {
       grid.innerHTML = '<p class="hint" style="grid-column:1/-1">' +
-        (kategori === "fav" ? "Henüz favori yok — kartların kalbine tıkla." : "Aramayla eşleşen paket yok.") + "</p>";
+        (kategori === "fav"
+          ? "Henüz favori yok — kartların kalbine tıkla."
+          : (kategori === "custom" ? "Bağlı klasörde gösterilecek ek MOGRT yok." : "Aramayla eşleşen paket yok.")) + "</p>";
       return;
     }
 
@@ -295,7 +323,7 @@ window.KLib = (function () {
   }
 
   function setKategori(kat) {
-    kategori = kat === "fav" ? "fav" : "mogrt";
+    kategori = kat === "fav" ? "fav" : (kat === "custom" ? "custom" : "mogrt");
     ciz();
   }
 
@@ -304,6 +332,7 @@ window.KLib = (function () {
     tara: tara,
     setKategori: setKategori,
     sayisi: function () { return paketler.length; },
-    yerlesikSayisi: function () { return paketler.filter(function (p) { return p.builtin; }).length; }
+    yerlesikSayisi: function () { return paketler.filter(function (p) { return p.builtin; }).length; },
+    hariciSayisi: function () { return paketler.filter(function (p) { return !p.builtin; }).length; }
   };
 })();
