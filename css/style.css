@@ -1306,12 +1306,38 @@ details.adv > *:not(summary) { margin-top: 8px; }
 }
 
 .sfx-filter-actions { display: flex; align-items: center; gap: 7px; }
-.sfx-folder-select {
-  max-width: 190px; height: 29px; padding: 0 25px 0 9px;
-  color: #cbd5e2; background-color: #111923;
-  border: 1px solid #2a394b; border-radius: 6px;
-  font-size: 9.5px; font-weight: 700;
+.sfx-folder-browser {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 9px; padding: 2px 1px 16px;
 }
+.sfx-folder-browser[hidden] { display: none; }
+.sfx-folder-card {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 0; min-height: 58px; padding: 9px 10px;
+  color: #e2e8f1; background: linear-gradient(180deg, #131c27, #101720);
+  border: 1px solid #29384a; border-radius: 8px;
+  cursor: pointer; text-align: left; font-family: inherit;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+.sfx-folder-card:hover { border-color: #536e9c; background: #172231; transform: translateY(-1px); }
+.sfx-folder-icon {
+  display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px;
+  color: #91a0ff; background: rgba(91, 112, 255, .12);
+  border: 1px solid rgba(112, 132, 255, .25); border-radius: 7px;
+}
+.sfx-folder-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+.sfx-folder-meta { flex: 1; min-width: 0; }
+.sfx-folder-meta b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
+.sfx-folder-meta i { display: block; margin-top: 3px; color: #6d7a8c; font-size: 8.8px; font-style: normal; }
+.sfx-folder-arrow { color: #68788d; font-size: 20px; }
+.sfx-folder-nav {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 9px;
+  padding-bottom: 9px; border-bottom: 1px solid #253244;
+}
+.sfx-folder-nav[hidden] { display: none; }
+.sfx-folder-nav > div { min-width: 0; }
+.sfx-folder-nav b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.sfx-folder-nav .dim { display: block; margin-top: 2px; font-size: 8.5px; }
 .sfx-group {
   position: sticky; top: 0; z-index: 3;
   display: flex; align-items: center; gap: 7px;
@@ -2425,6 +2451,7 @@ body {
   .emoji-assets-grid { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
 }
 @media (max-width: 720px) {
+  .sfx-folder-browser { grid-template-columns: 1fr; }
   .emoji-assets-toolbar { align-items: flex-start; flex-direction: column; }
   .emoji-assets-head > .btn:last-child { min-width: 80px; }
 }

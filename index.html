@@ -665,9 +665,6 @@
           <button data-f="recent">Son</button>
         </div>
         <div class="sfx-filter-actions">
-          <select id="sfx-folder-filter" class="sfx-folder-select" title="SFX klasörüne göre filtrele">
-            <option value="all">Tüm klasörler</option>
-          </select>
           <span id="sfx-count" class="dim"></span>
           <button id="sfx-smart-btn" class="btn smart" title="Altyazıdaki vurgu anlarına ses öner">✦ Akıllı</button>
         </div>
@@ -679,6 +676,11 @@
         </div>
         <div id="sfx-smart-list" class="sfx-smart-list"></div>
       </div>
+      <div id="sfx-folder-nav" class="sfx-folder-nav" hidden>
+        <button id="sfx-folder-back" type="button" class="btn">← Klasörlere dön</button>
+        <div><b id="sfx-folder-title"></b><span id="sfx-folder-count" class="dim"></span></div>
+      </div>
+      <div id="sfx-folder-browser" class="sfx-folder-browser"></div>
       <div id="sfx-list" class="list sfx-list"></div>
       <div id="sfx-empty" class="empty-state" hidden>
         <span class="sfx-empty-icon">♫</span>

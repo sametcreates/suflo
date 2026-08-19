@@ -146,7 +146,6 @@ window.KSfx = (function () {
       });
     });
     index.sort(function (a, b) { return a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name); });
-    refreshFolderOptions();
     var empty = el("sfx-empty"), list = el("sfx-list");
     if (empty) empty.hidden = index.length > 0;
     if (list) list.hidden = index.length === 0;
@@ -156,21 +155,30 @@ window.KSfx = (function () {
 
   /* ---------------- Arama + filtre ---------------- */
 
-  function refreshFolderOptions() {
-    var select = el("sfx-folder-filter");
-    if (!select) return;
+  function folderCounts() {
     var counts = {};
     index.forEach(function (item) { counts[item.folder] = (counts[item.folder] || 0) + 1; });
-    var folders = Object.keys(counts).sort(function (a, b) { return a.localeCompare(b); });
-    if (folderMode !== "all" && !counts[folderMode]) folderMode = "all";
-    select.innerHTML = '<option value="all">Tüm klasörler (' + folders.length + ")</option>";
-    folders.forEach(function (folder) {
-      var option = document.createElement("option");
-      option.value = folder;
-      option.textContent = folder + " (" + counts[folder] + ")";
-      select.appendChild(option);
+    return counts;
+  }
+
+  function renderFolderBrowser() {
+    var browser = el("sfx-folder-browser");
+    if (!browser) return;
+    browser.innerHTML = "";
+    var counts = folderCounts();
+    Object.keys(counts).sort(function (a, b) { return a.localeCompare(b); }).forEach(function (folder) {
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "sfx-folder-card";
+      card.innerHTML = '<span class="sfx-folder-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9v9.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 9h17"/></svg></span><span class="sfx-folder-meta"><b></b><i></i></span><span class="sfx-folder-arrow">›</span>';
+      card.querySelector("b").textContent = folder;
+      card.querySelector("i").textContent = counts[folder] + " ses efekti";
+      card.onclick = function () {
+        folderMode = folder;
+        search(el("sfx-search").value);
+      };
+      browser.appendChild(card);
     });
-    select.value = folderMode;
   }
 
   function score(item, terms) {
@@ -338,6 +346,8 @@ window.KSfx = (function () {
     el("sfx-smart-panel").hidden = false;
     el("sfx-list").hidden = true;
     el("sfx-empty").hidden = true;
+    if (el("sfx-folder-browser")) el("sfx-folder-browser").hidden = true;
+    if (el("sfx-folder-nav")) el("sfx-folder-nav").hidden = true;
     el("sfx-smart-btn").classList.add("on");
     smartRender();
   }
@@ -349,6 +359,7 @@ window.KSfx = (function () {
     var list = el("sfx-list"), empty = el("sfx-empty");
     if (list) list.hidden = index.length === 0;
     if (empty) empty.hidden = index.length > 0;
+    renderList();
   }
 
   /* ---------------- Liste ---------------- */
@@ -357,7 +368,25 @@ window.KSfx = (function () {
     var box = el("sfx-list");
     if (!box) return;
     box.innerHTML = "";
+    var query = el("sfx-search") ? String(el("sfx-search").value || "").trim() : "";
+    var folderView = filterMode === "all" && folderMode === "all" && !query;
+    var browser = el("sfx-folder-browser");
+    var nav = el("sfx-folder-nav");
+    if (browser) browser.hidden = !folderView;
+    if (nav) nav.hidden = folderMode === "all";
+    box.hidden = folderView || !index.length;
+    if (folderMode !== "all") {
+      var title = el("sfx-folder-title"), folderCount = el("sfx-folder-count");
+      if (title) title.textContent = folderMode;
+      if (folderCount) folderCount.textContent = filtered.length + " ses";
+    }
     if (!index.length) return;
+    if (folderView) {
+      renderFolderBrowser();
+      var count0 = el("sfx-count");
+      if (count0) count0.textContent = Object.keys(folderCounts()).length + " klasör";
+      return;
+    }
     if (!filtered.length) {
       box.innerHTML = '<div class="empty">Eşleşen ses yok.</div>';
       return;
@@ -367,7 +396,7 @@ window.KSfx = (function () {
     filtered.forEach(function (item) { groupCounts[item.folder] = (groupCounts[item.folder] || 0) + 1; });
     var lastFolder = null;
     filtered.forEach(function (item, i) {
-      if (item.folder !== lastFolder) {
+      if (folderMode === "all" && item.folder !== lastFolder) {
         lastFolder = item.folder;
         var group = document.createElement("div");
         group.className = "sfx-group";
@@ -548,6 +577,7 @@ window.KSfx = (function () {
   function setFilter(mode) {
     if (smartMode) closeSmart();
     filterMode = mode === "fav" || mode === "recent" ? mode : "all";
+    folderMode = "all";
     Array.prototype.forEach.call(el("sfx-filter").querySelectorAll("button"), function (b) {
       b.classList.toggle("on", b.dataset.f === filterMode);
     });
@@ -564,9 +594,8 @@ window.KSfx = (function () {
     el("sfx-yenile").addEventListener("click", buildIndex);
     el("sfx-smart-btn").addEventListener("click", function () { if (smartMode) closeSmart(); else showSmart(); });
     el("sfx-smart-close").addEventListener("click", closeSmart);
-    el("sfx-folder-filter").addEventListener("change", function () {
-      if (smartMode) closeSmart();
-      folderMode = this.value || "all";
+    el("sfx-folder-back").addEventListener("click", function () {
+      folderMode = "all";
       search(el("sfx-search").value);
     });
     Array.prototype.forEach.call(el("sfx-filter").querySelectorAll("button"), function (b) {

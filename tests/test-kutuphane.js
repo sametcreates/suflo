@@ -140,7 +140,8 @@ async function run() {
   var html = fs.readFileSync(KOKYOL + "index.html", "utf8");
   ok("SFX Pro sekmesi ve betigi yuklu",
     /id="tab-sfx"/.test(html) && /src="js\/sfx\.js"/.test(html));
-  ok("SFX klasor filtresi arayuzde hazir", /id="sfx-folder-filter"/.test(html));
+  ok("SFX klasor tarayicisi giris ve geri donus arayuzuyle hazir",
+    /id="sfx-folder-browser"/.test(html) && /id="sfx-folder-back"/.test(html));
   ok("Kutuphane saglik kontrolu arayuzde ve yuklu",
     /id="set-library-health-run"/.test(html) && /src="js\/library-health\.js"/.test(html));
   ok("Harici MOGRT'lar Yazi Animasyonlari'ndan ayri bolumde",
@@ -150,6 +151,8 @@ async function run() {
     /#tab-text \.mogrt-grid\s*\{[^}]*minmax\(300px,\s*1fr\)/s.test(css) && /object-fit:\s*contain/.test(css));
   ok("Emoji kartlari MOGRT kartlarindan daha kompakt",
     /\.emoji-assets-grid\s*\{[^}]*minmax\(124px,\s*1fr\)/s.test(css));
+  ok("SFX ana ekrani uzun liste yerine klasor kartlari kullaniyor",
+    /\.sfx-folder-browser\s*\{[^}]*display:\s*grid/s.test(css) && /renderFolderBrowser/.test(sfxSrc));
   ok("MOGRT kartlarinda DRAG ve LOCKED durumlari acik",
     /<span>DRAG<\/span>/.test(libSrc) && /<span>LOCKED<\/span>/.test(libSrc) && /mogrt-lock/.test(libSrc));
   ok("Aktif MOGRT karti suruklenince playhead'e yerlestiriliyor",
