@@ -1,5 +1,5 @@
 /*
- * Suflo — Pro Emoji Assets
+ * Suflo — Emoji Assets (ucretsiz)
  *
  * Kullanicinin PNG/WEBP/GIF/JPG arsivini oldugu yerden okur. Dosyalari paket
  * icine kopyalamaz; arama, favori, son kullanilan, buyuk onizleme ve playhead'e
@@ -49,7 +49,9 @@ window.KEmojiAssets = (function () {
   }
 
   function proGate() {
-    return typeof Pro === "undefined" || Pro.gate("emojiAssets");
+    // Emoji Assets UCRETSIZDIR (Samet karari, 20 Agu 2026): emoji gorselleri
+    // ucuncu-taraf telifli oldugu icin asla paywall arkasina girmez.
+    return true;
   }
   function favlar() {
     var s = K.settings();
@@ -150,7 +152,7 @@ window.KEmojiAssets = (function () {
       return;
     }
 
-    var locked = typeof Pro !== "undefined" && !Pro.isPro();
+    var locked = false; // Emoji Assets ucretsiz — kart hicbir zaman kilitlenmez
     var frag = document.createDocumentFragment();
     filtered.forEach(function (item) {
       var card = document.createElement("div");

@@ -63,7 +63,7 @@ var names = ctx.KEmojiAssets.adlar();
 ok("Free Download / IOS site etiketi kart adindan siliniyor", names.indexOf("Alien Emoji") !== -1, names.join(" | "));
 ok("Unicode kodu dosya adindan temizleniyor", names.indexOf("Airplane") !== -1, names.join(" | "));
 ok("Gizli klasor ve desteklenmeyen dosya atlanir", names.every(function (n) { return !/secret|ignore/i.test(n); }), names.join(" | "));
-ok("Emoji Assets ayri bir Pro kapisidir", /Pro\.gate\("emojiAssets"\)/.test(src));
+ok("Emoji Assets UCRETSIZDIR — Pro kapisi yok (Samet karari 20 Agu)", !/Pro\.gate\("emojiAssets"\)/.test(src) && /UCRETSIZDIR/.test(src));
 ok("WEBP yalniz yerelde ffmpeg ile PNG olur", /item\.format !== "WEBP"/.test(src) && /"-frames:v", "1"/.test(src));
 ok("Kartlarda buyuk onizleme, DRAG ve LOCKED durumlari var", /<span>LOCKED<\/span>/.test(src) && /"DRAG"/.test(src) && /mogrt-thumb/.test(src));
 ok("Favori ve son kullanilanlar ayarlarda kalicidir", /emojiAssetFavs/.test(src) && /emojiAssetRecent/.test(src));

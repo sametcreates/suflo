@@ -300,7 +300,8 @@ window.KApp = (function () {
     if (chip) chip.classList.toggle("aktif", !!s.pro);
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
-    ["yazi-tanitim", "sfx-tanitim", "emoji-assets-tanitim", "cut-tanitim", "beat-tanitim"].forEach(function (id) {
+    // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
+    ["yazi-tanitim", "sfx-tanitim", "cut-tanitim", "beat-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -476,7 +477,7 @@ window.KApp = (function () {
       });
     }
 
-    // Pro Emoji Assets yerel klasoru
+    // Emoji Assets yerel klasoru (ucretsiz ozellik)
     var ek = el("set-emoji-assets-klasor");
     if (ek) {
       ek.value = K.settings().emojiAssetsKlasor || "";
