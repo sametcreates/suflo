@@ -391,6 +391,21 @@ window.KApp = (function () {
       }
       if (!yol) return;
       K.settings().proPackKlasor = yol;
+      // Pakette emoji/ varsa Emoji Assets'i de otomatik bagla. Kullanicinin
+      // kendi sectigi klasoru ezmeyiz; yalnizca bos ise ya da onceki baglanti
+      // yine paketten otomatik geldiyse guncelleriz.
+      try {
+        var emojiAlt = K.path.join(yol, "emoji");
+        if (K.fs.existsSync(emojiAlt) && K.fs.statSync(emojiAlt).isDirectory()) {
+          var s = K.settings();
+          if (!s.emojiAssetsKlasor || s.emojiAssetsPackAuto) {
+            s.emojiAssetsKlasor = emojiAlt;
+            s.emojiAssetsPackAuto = true;
+            var ei = el("set-emoji-assets-klasor"); if (ei) ei.value = emojiAlt;
+            if (window.KEmojiAssets) KEmojiAssets.tara();
+          }
+        }
+      } catch (ePack) {}
       K.saveSettings();
       reflectProPack();
       if (window.KLib) KLib.tara();
@@ -403,7 +418,15 @@ window.KApp = (function () {
     );
     var ppKaldir = el("set-propack-kaldir");
     if (ppKaldir) ppKaldir.addEventListener("click", function () {
-      K.settings().proPackKlasor = "";
+      var s = K.settings();
+      s.proPackKlasor = "";
+      // Emoji klasoru paketten otomatik baglandiysa onu da temizle
+      if (s.emojiAssetsPackAuto) {
+        s.emojiAssetsKlasor = "";
+        s.emojiAssetsPackAuto = false;
+        var ei = el("set-emoji-assets-klasor"); if (ei) ei.value = "";
+        if (window.KEmojiAssets) KEmojiAssets.tara();
+      }
       K.saveSettings();
       reflectProPack();
       if (window.KLib) KLib.tara();

@@ -82,6 +82,10 @@ async function run() {
   var appSrc = fs.readFileSync(KOK + "js/app.js", "utf8");
   ok("app.js Pro paketi yukleyicisi (native secici + Pro kapisi) iceriyor",
     /proPakYukle/.test(appSrc) && /showOpenDialogEx/.test(appSrc) && /Pro\.gate\("propack"\)/.test(appSrc));
+  ok("app.js paketteki emoji/ klasorunu Emoji Assets'e otomatik bagliyor",
+    /emojiAssetsPackAuto/.test(appSrc) && /K\.path\.join\(yol, "emoji"\)/.test(appSrc));
+  ok("Paket kaldirilinca otomatik emoji baglantisi da temizleniyor",
+    /s\.emojiAssetsPackAuto\) \{[\s\S]{0,200}emojiAssetsKlasor = ""/.test(appSrc));
   var html = fs.readFileSync(KOK + "index.html", "utf8");
   ok("Ayarlarda Suflo Pro Paketi bolumu ve yukle butonu var",
     /id="set-propack-yukle"/.test(html) && /Suflo Pro Paketi/.test(html));
