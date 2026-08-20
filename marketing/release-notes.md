@@ -1,3 +1,10 @@
+## Suflo 2.5.8 — Dümdüz, doğru altyazı
+
+- **Kelime kelime ve birikimli satır modları artık ücretsiz** — kelime zamanlı altyazı için Pro gerekmez.
+- **Emoji Assets'te WEBP düzeltmesi:** animasyonlu WebP dosyaları da artık tek tıkla timeline'a eklenir (dönüşüm panelin içinde yapılır, ffmpeg şart değil).
+- **Emoji Assets tamamen ücretsiz:** kalan PRO rozetleri de kaldırıldı.
+- **Stil/animasyon arayüzü kaldırıldı:** panel dümdüz, doğru altyazıya odaklanır — stilini Premiere'in kendi caption aracından seçersin.
+
 ## Suflo 2.5.7 — Emoji Assets artık ücretsiz
 
 - **Emoji Assets herkese açıldı:** Kendi PNG / WEBP / GIF arşivini bağla, büyük kartlarda ara, tek tıkla timeline'a ekle — artık Pro gerekmez. (Emoji görselleri hiçbir zaman paralı pakete girmez.)

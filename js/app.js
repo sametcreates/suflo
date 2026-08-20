@@ -283,8 +283,8 @@ window.KApp = (function () {
     Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
     Pro.markLocked(document.querySelector('.yan-menu .ky-oge[data-tab="sfx"]'), !s.pro);
-    Pro.markLocked(document.querySelector('.yan-menu .ky-oge[data-tab="emoji-assets"]'), !s.pro);
-    Pro.markLocked(el("cap-overlay"), !s.pro);
+    // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
+    // cap-overlay (stilli katman) arayuzden kaldirildi — kilide gerek yok.
     Pro.markLocked(el("cap-translate-go"), !s.pro);
 
     // Kilitli secenekler (karaoke modlari, kelimeli animasyonlar) acilir

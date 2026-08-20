@@ -48,7 +48,7 @@
     <div class="ky-baslik">Araçlar</div>
     <button class="ky-oge on" data-tab="captions">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6 8h8M6 12h5"/></svg></span>
-      <span class="ky-metin"><b>Altyazı</b><i>transkript · stil</i></span>
+      <span class="ky-metin"><b>Altyazı</b><i>transkript · düzenleme</i></span>
     </button>
     <button class="ky-oge" data-tab="cut">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="5.5" cy="6" r="2.2"/><circle cx="5.5" cy="14" r="2.2"/><path d="M7.5 7.2 16 14M7.5 12.8 16 6"/></svg></span>
@@ -86,7 +86,6 @@
     <button class="ky-oge" data-tab="emoji-assets">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M7 8h.1M12.9 8h.1M7 12c1.7 1.8 4.3 1.8 6 0"/></svg></span>
       <span class="ky-metin"><b>Emoji Assets</b><i>PNG · WEBP · GIF</i></span>
-      <span class="ky-kilit" data-kilit>PRO</span>
       <span class="ky-adet" id="emoji-assets-sayac">0</span>
     </button>
     <button class="ky-oge pasif" disabled>
@@ -182,9 +181,9 @@
                 <option value="c42" selected>42 karakter</option>
                 <option value="c60">60 karakter</option>
               </optgroup>
-              <optgroup label="Karaoke (kelime zamanlı)">
-                <option value="k1" data-pro="1">Kelime kelime</option>
-                <option value="kc" data-pro="1">Birikimli</option>
+              <optgroup label="Kelime zamanlı">
+                <option value="k1">Kelime kelime</option>
+                <option value="kc">Birikimli</option>
               </optgroup>
             </select>
           </div>
@@ -207,14 +206,12 @@
         </div>
       </div>
 
-      <div class="card">
+      <!-- Stil karti GIZLI (Samet karari 20 Agu: "stilleri kaldir, dumduz dogru
+           altyazi yazsin"). DOM'da kaliyor ki captions.js el() referanslari
+           kirilmasin; gorunmez ve erisilmez. -->
+      <div class="card" hidden>
         <div class="card-title">Stil</div>
 
-        <!--
-          Görsel stil kartları: her kart kendi animasyonunu canlı oynatan bir
-          mini sahne. Tıkla -> stil uygulanır, büyük önizleme oynar. Ürünün
-          yıldız özelliği bir açılır menüye gömülmez.
-        -->
         <div class="stil-grid" id="cap-stil-grid">
           <button type="button" class="stil-sec" data-preset="reels">
             <span class="ss-sahne"><span class="ss-metin ss-anton"><i class="sv">BUNU</i> <i>SEN</i> <i>YAZMADIN</i></span></span>
@@ -458,13 +455,11 @@
         </details>
 
         <button id="cap-apply" class="btn primary big">Sekansa uygula</button>
-        <button id="cap-overlay" class="btn outline big" title="Altyazıyı stilli ve animasyonlu biçimde, şeffaf bir video katmanı olarak timeline'a ekler">
-          <svg viewBox="0 0 16 16" class="btn-ic"><rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M4 10.5h8M4 8h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <button id="cap-overlay" class="btn outline big" hidden>
           Stilli katman olarak ekle
         </button>
         <p class="hint" style="margin:-4px 0 8px">
-          <b>Sekansa uygula:</b> Premiere'in kendi altyazı izi — düzenlenebilir, ama tek renk ve animasyonsuz.<br>
-          <b>Stilli katman:</b> seçtiğin renk, font ve kelime vurgusuyla şeffaf video katmanı — Premiere'in yapamadığı görünüm.
+          <b>Sekansa uygula:</b> altyazı Premiere'in kendi caption izine gider — orada düzenlenebilir, stilini Premiere'den seçersin.
         </p>
       </div>
     </div>

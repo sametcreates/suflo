@@ -1021,12 +1021,9 @@ window.KCaptions = (function () {
         tempFiles.push(audioSrc);
       }
 
-      var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime, "k1"/"kc" karaoke
+      var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime, "k1"/"kc" kelime-zamanli
+      // Kelime kelime / birikimli modlar UCRETSIZDIR (Samet karari, 20 Agu 2026)
       var karaoke = /^k/.test(lenVal);
-      if (karaoke && typeof Pro !== "undefined" && !Pro.isPro()) {           // Pro: kelime-zamanlama
-        Pro.gate("karaoke");
-        karaoke = false; lenVal = "w3";                       // satir moduna dus, akisi kirma
-      }
       var mapped = [];
 
       if (batchClips) {

@@ -218,15 +218,42 @@ window.KEmojiAssets = (function () {
     for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
     return (h >>> 0).toString(16);
   }
+  // WEBP'yi panelin kendi Chromium'uyla coz: ffmpeg'in webp decoder'i
+  // ANIMASYONLU WebP'yi desteklemiyor ("skipping unsupported chunk: ANIM"),
+  // tarayici ise hepsini acar. Blob -> createImageBitmap -> canvas -> PNG;
+  // blob'dan geldigi icin canvas taint olmaz, seffaflik korunur.
+  function webpToPngCanvas(srcPath, outPath) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var buf = K.fs.readFileSync(srcPath);
+        var blob = new Blob([new Uint8Array(buf)], { type: "image/webp" });
+        createImageBitmap(blob).then(function (bmp) {
+          var c = document.createElement("canvas");
+          c.width = bmp.width; c.height = bmp.height;
+          c.getContext("2d").drawImage(bmp, 0, 0);
+          var b64 = c.toDataURL("image/png").split(",")[1];
+          K.fs.writeFileSync(outPath, Buffer.from(b64, "base64"));
+          if (bmp.close) bmp.close();
+          resolve(outPath);
+        }).catch(reject);
+      } catch (e) { reject(e); }
+    });
+  }
+
   async function preparePath(item) {
     if (item.format !== "WEBP") return item.path;
     var stat = K.fs.statSync(item.path);
     var out = K.path.join(cacheDir(), "webp-" + hashText(norm(item.path) + "|" + stat.size + "|" + stat.mtimeMs) + ".png");
     if (K.fs.existsSync(out) && K.fs.statSync(out).size > 0) return out;
+    try {
+      return await webpToPngCanvas(item.path, out);
+    } catch (eCanvas) {
+      K.log("[emoji] tarayici WEBP donusumu olmadi, ffmpeg deneniyor: " + (eCanvas && eCanvas.message));
+    }
     var ff = await K.findFfmpeg();
-    if (!ff) throw new Error("WEBP için ffmpeg gerekli. Ayarlar → ffmpeg bölümünden tek tıkla kur.");
-    var r = await K.run(ff, ["-y", "-i", item.path, "-frames:v", "1", out], { timeout: 120000 });
-    if (r.code !== 0 || !K.fs.existsSync(out)) throw new Error("WEBP, Premiere uyumlu PNG'ye hazırlanamadı.");
+    if (!ff) throw new Error("Bu WEBP dosyası açılamadı ve ffmpeg de kurulu değil.");
+    var r = await K.run(ff, ["-y", "-i", item.path, "-frames:v", "1", "-update", "1", out], { timeout: 120000 });
+    if (r.code !== 0 || !K.fs.existsSync(out)) throw new Error("Bu WEBP dosyası Premiere uyumlu PNG'ye çevrilemedi.");
     return out;
   }
 
