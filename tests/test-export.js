@@ -36,6 +36,9 @@ var kod = [
   kes("function assMetin("),
   kes("function assKaraokeSatirlari("),
   kes("function assRenk("),
+  kes("function stilRecetesi("),
+  kes("function yogunlukCarpani("),
+  kes("function vurguKelimesi("),
   kes("function buildAss(")
 ].join("\n");
 

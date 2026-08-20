@@ -150,13 +150,16 @@
         -->
         <select id="cap-preset" hidden aria-hidden="true">
           <option value="" selected>Özel</option>
+          <option value="viral">Viral Vurgu</option>
           <option value="reels">Reels</option>
           <option value="pop">Pop</option>
+          <option value="premium">Premium</option>
           <option value="karaoke">Karaoke</option>
           <option value="enerjik">Enerjik</option>
           <option value="yt">YouTube</option>
           <option value="doc">Belgesel</option>
         </select>
+        <input id="cap-style-family" type="hidden" value="custom">
 
         <div class="field-grid">
           <div class="field">
@@ -206,43 +209,43 @@
         </div>
       </div>
 
-      <!-- Stil karti GIZLI (Samet karari 20 Agu: "stilleri kaldir, dumduz dogru
-           altyazi yazsin"). DOM'da kaliyor ki captions.js el() referanslari
-           kirilmasin; gorunmez ve erisilmez. -->
-      <div class="card" hidden>
-        <div class="card-title">Stil</div>
+      <div class="card stil-katmani-card">
+        <div class="card-title">Stil katmanı <span class="pro-inline">PRO</span></div>
+        <p class="stil-aciklama">Hazır görünüm değil; satır yapısı, vurgu ve hareket birlikte değişir.</p>
 
         <div class="stil-grid" id="cap-stil-grid">
-          <button type="button" class="stil-sec" data-preset="reels">
-            <span class="ss-sahne"><span class="ss-metin ss-anton"><i class="sv">BUNU</i> <i>SEN</i> <i>YAZMADIN</i></span></span>
-            <b>Reels</b><i>aktif kelime</i>
+          <button type="button" class="stil-sec stil-viral" data-preset="viral">
+            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/viral.webm" autoplay loop muted playsinline aria-hidden="true"></video></span>
+            <b>Viral Vurgu</b><i>güçlü aktif kelime</i>
           </button>
-          <button type="button" class="stil-sec" data-preset="pop">
-            <span class="ss-sahne"><span class="ss-metin ss-bebas ss-pop"><i>TEK</i> <i>TEK</i> <i>GELİR</i></span></span>
-            <b>Pop</b><i>kelime kelime</i>
+          <button type="button" class="stil-sec stil-pop" data-preset="pop">
+            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/pop.webm" autoplay loop muted playsinline aria-hidden="true"></video></span>
+            <b>Pop</b><i>renkli, tek tek</i>
           </button>
-          <button type="button" class="stil-sec" data-preset="karaoke">
-            <span class="ss-sahne"><span class="ss-metin ss-archivo ss-dolgu"><i>DOLARAK</i> <i>AKAR</i></span></span>
-            <b>Karaoke</b><i>renk dolgusu</i>
+          <button type="button" class="stil-sec stil-doc" data-preset="doc">
+            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/doc.webm" autoplay loop muted playsinline aria-hidden="true"></video></span>
+            <b>Belgesel</b><i>sakin, zarif bant</i>
           </button>
-          <button type="button" class="stil-sec" data-preset="enerjik">
-            <span class="ss-sahne"><span class="ss-metin ss-bungee ss-zipla"><i>ZIP</i> <i>ZIP</i></span></span>
-            <b>Enerjik</b><i>zıplama</i>
+          <button type="button" class="stil-sec stil-premium" data-preset="premium">
+            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/premium.webm" autoplay loop muted playsinline aria-hidden="true"></video></span>
+            <b>Premium</b><i>minimal, sinematik</i>
           </button>
-          <button type="button" class="stil-sec" data-preset="yt">
-            <span class="ss-sahne"><span class="ss-metin ss-klasik">Klasik altyazı</span></span>
-            <b>YouTube</b><i>sade, altta</i>
-          </button>
-          <button type="button" class="stil-sec" data-preset="doc">
-            <span class="ss-sahne"><span class="ss-metin ss-belgesel">Belgesel tarzı</span></span>
-            <b>Belgesel</b><i>kutulu, zarif</i>
-          </button>
+        </div>
+
+        <div class="field stil-yogunluk">
+          <label for="cap-yogunluk">Hareket şiddeti</label>
+          <select id="cap-yogunluk">
+            <option value="soft">Sakin</option>
+            <option value="balanced" selected>Dengeli</option>
+            <option value="hard">Sert</option>
+          </select>
         </div>
 
         <!-- Canlı önizleme: seçilen stil gerçek zamanlamalarla burada oynar -->
         <div class="onizleme" id="cap-onizleme">
           <div class="onizleme-sahne" id="cap-sahne">
             <div class="onizleme-alt" id="cap-onizleme-metin"></div>
+            <video id="cap-render-onizleme" class="render-onizleme" muted playsinline hidden></video>
             <button type="button" id="cap-onizleme-kare" class="onizleme-oynat" style="right:auto; left:7px" title="Timeline'daki kareyi arka plan olarak al">⛶ Kare al</button>
             <button type="button" id="cap-onizleme-oynat" class="onizleme-oynat" title="Önizlemeyi oynat">▶ Oynat</button>
           </div>
@@ -261,12 +264,17 @@
               <option value="slide">Alttan kayma</option>
             </optgroup>
             <optgroup label="Kelime zamanlı (Satır uzunluğu → Karaoke)">
+              <option value="viral" data-pro="1">Viral aktif kelime</option>
               <option value="vurgu" data-pro="1">Aktif kelime vurgusu</option>
               <option value="karaoke" data-pro="1">Karaoke dolgu</option>
               <option value="akici" data-pro="1">Akıcı dolgu (pürüzsüz)</option>
               <option value="yazim" data-pro="1">Daktilo (harf harf)</option>
               <option value="pop" data-pro="1">Pop (kelimeler büyüyerek gelir)</option>
               <option value="bounce" data-pro="1">Zıplama</option>
+              <option value="premium" data-pro="1">Premium sinematik</option>
+            </optgroup>
+            <optgroup label="Satır stili">
+              <option value="doc" data-pro="1">Belgesel bandı</option>
             </optgroup>
           </select>
           <p class="hint" id="cap-animasyon-ipucu" hidden style="margin:5px 0 0">
@@ -283,6 +291,8 @@
                 <option value="Archivo Black">Archivo Black</option>
                 <option value="Bebas Neue">Bebas Neue</option>
                 <option value="Bungee">Bungee</option>
+                <option value="Lora">Lora</option>
+                <option value="Montserrat">Montserrat</option>
               </optgroup>
               <optgroup label="Sistem">
                 <option value="Arial" selected>Arial</option>
@@ -297,13 +307,7 @@
           </div>
           <div class="field">
             <label for="cap-boyut">Punto</label>
-            <select id="cap-boyut">
-              <option value="48">Küçük (48)</option>
-              <option value="64">Orta (64)</option>
-              <option value="72" selected>Büyük (72)</option>
-              <option value="90">Çok büyük (90)</option>
-              <option value="110">Dev (110)</option>
-            </select>
+            <input id="cap-boyut" type="number" min="36" max="180" step="2" value="72">
           </div>
         </div>
 
@@ -311,6 +315,7 @@
           <div class="field">
             <label for="cap-konum">Konum</label>
             <select id="cap-konum">
+              <option value="1">Alt sol</option>
               <option value="2" selected>Alt</option>
               <option value="5">Orta</option>
               <option value="8">Üst</option>
@@ -318,12 +323,7 @@
           </div>
           <div class="field">
             <label for="cap-kontur">Kontur</label>
-            <select id="cap-kontur">
-              <option value="0">Yok</option>
-              <option value="2">İnce</option>
-              <option value="4" selected>Kalın</option>
-              <option value="7">Çok kalın</option>
-            </select>
+            <input id="cap-kontur" type="number" min="0" max="16" step="1" value="4">
           </div>
         </div>
 
@@ -455,11 +455,12 @@
         </details>
 
         <button id="cap-apply" class="btn primary big">Sekansa uygula</button>
-        <button id="cap-overlay" class="btn outline big" hidden>
-          Stilli katman olarak ekle
+        <button id="cap-overlay" class="btn outline big">
+          Stil katmanı olarak ekle
         </button>
         <p class="hint" style="margin:-4px 0 8px">
-          <b>Sekansa uygula:</b> altyazı Premiere'in kendi caption izine gider — orada düzenlenebilir, stilini Premiere'den seçersin.
+          <b>Sekansa uygula:</b> Premiere'in düzenlenebilir caption izini oluşturur.<br>
+          <b>Stil katmanı:</b> seçtiğin görünümü şeffaf video olarak boş bir katmana yerleştirir.
         </p>
       </div>
     </div>
@@ -918,6 +919,7 @@
   <script src="js/bridge.js"></script>
   <script src="js/pro.js"></script>
   <script src="js/engine.js"></script>
+  <script src="js/style-engine.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/beat.js"></script>

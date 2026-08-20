@@ -36,7 +36,8 @@ function kes(imza) {
 var kod = animBlok + "\n" + kes("function assCapa(") + "\n" +
   kes("function assRenk(") + "\n" + kes("function buildAss(") + "\n" +
   kes("function assTc(") + "\n" + kes("function assMetin(") + "\n" +
-  kes("function assKaraokeSatirlari(") + "\n" +
+  kes("function assKaraokeSatirlari(") + "\n" + kes("function stilRecetesi(") + "\n" +
+  kes("function yogunlukCarpani(") + "\n" + kes("function vurguKelimesi(") + "\n" +
   "; return { assRenk: assRenk, buildAss: buildAss };";
 
 var gecti = 0, kaldi = 0;

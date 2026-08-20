@@ -63,8 +63,8 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 
 | Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL) |
 |---|---|
-| Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Animasyonlu altyazı katmanı (CapCut görünümü, overlay) |
-| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Karaoke kelime zamanlaması + kelimeli animasyonlar (vurgu, pop, bounce) |
+| Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Bağımsız Stil Motoru ve şeffaf video katmanı |
+| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Viral Vurgu · Pop · Belgesel · Premium stil aileleri |
 | Düz stiller | Otomatik kesim (sessizlik temizleme) |
 | SRT · WebVTT · TXT dışa aktarım | Ritim/beat marker'ları |
 | SRT/VTT içe aktarım | Toplu çoklu klip transkripsiyonu |

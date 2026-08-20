@@ -37,7 +37,7 @@ if (-not $signer) {
 # Eski davranis (icerik gomulu) icin: $env:SUFLO_BUNDLE_CONTENT = "1"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
-$stageItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "index.html", "README.md", "LICENSE")
+$stageItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE")
 if ($env:SUFLO_BUNDLE_CONTENT) { $stageItems += "content" }
 foreach ($item in $stageItems) {
     $p = Join-Path $root $item

@@ -284,7 +284,8 @@ window.KApp = (function () {
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
     Pro.markLocked(document.querySelector('.yan-menu .ky-oge[data-tab="sfx"]'), !s.pro);
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
-    // cap-overlay (stilli katman) arayuzden kaldirildi — kilide gerek yok.
+    // Stil katmani gorunur; ucretsiz kullanici kartlari deneyip cikti aninda Pro'ya gecebilir.
+    Pro.markLocked(el("cap-overlay"), !s.pro);
     Pro.markLocked(el("cap-translate-go"), !s.pro);
 
     // Kilitli secenekler (karaoke modlari, kelimeli animasyonlar) acilir

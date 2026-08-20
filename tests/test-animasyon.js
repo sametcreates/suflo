@@ -36,7 +36,9 @@ var animBlok = (function () {
 })();
 var kod = animBlok + "\n" + kes("function assCapa(") + "\n" + kes("function assRenk(") + "\n" +
   kes("function assTc(") + "\n" + kes("function assMetin(") + "\n" +
-  kes("function assKaraokeSatirlari(") + "\n" + kes("function buildAss(") + "\n" +
+  kes("function assKaraokeSatirlari(") + "\n" + kes("function stilRecetesi(") + "\n" +
+  kes("function yogunlukCarpani(") + "\n" + kes("function vurguKelimesi(") + "\n" +
+  kes("function buildAss(") + "\n" +
   "; return { buildAss: buildAss, ANIMASYONLAR: ANIMASYONLAR };";
 
 var gecti = 0, kaldi = 0;
@@ -150,6 +152,26 @@ var stilSatirV = aVur.split("\n").filter(function (l) { return l.indexOf("Style:
 ok("karaoke: Primary=vurgu rengi", stilSatirK.indexOf("&H000000FF") !== -1, stilSatirK.slice(0, 60));
 ok("vurgu: Primary=normal renk (aktif kelime satir icinde boyanir)",
   stilSatirV.indexOf("Suflo,Arial,110,&H00FFFFFF") !== -1, stilSatirV.slice(0, 60));
+
+// Yeni stil aileleri birbirinin varyasyonu degil, ayri hareket receteleridir.
+var viral = uret("viral");
+ok("viral: aktif kelime darbesi + blur temizleme var",
+  /\\fscx62\\fscy62\\blur1\.4/.test(viral) && /\\bord6/.test(viral),
+  (viral.match(/\{[^}]*fscx62[^}]*\}/) || ["?"])[0].slice(0, 100));
+
+var premium = uret("premium");
+ok("premium: grup tek olay + yumusak optik giris", olaylar(premium).length === 1 &&
+  /\\fad\(360,260\)/.test(premium) && /\\blur0\.8/.test(premium), olaylar(premium).length + " olay");
+
+var doc = uret("doc", false);
+ok("belgesel: yavas yukselme + fade", /\\move\([^)]*,0,320\)/.test(doc) && /\\fad\(320,240\)/.test(doc));
+
+var popMotor = motor(Object.assign({}, ST, { aile: "pop", yogunluk: "hard" }));
+var popTek = popMotor.buildAss({ karaoke: true, animasyon: "pop", genislik: 1280, yukseklik: 720 });
+ok("pop ailesi: her olayda tek kelime", olaylar(popTek).length === KELIMELER.length &&
+  olaylar(popTek).every(function (l) {
+    return KELIMELER.filter(function (k) { return l.indexOf(k.text) !== -1; }).length === 1;
+  }), olaylar(popTek).length + " tek-kelime olayi");
 
 /* ================= 2) Görsel doğrulama: gerçek libass ================= */
 

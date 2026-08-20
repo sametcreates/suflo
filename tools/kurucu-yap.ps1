@@ -21,7 +21,7 @@ New-Item -ItemType Directory -Path $panel -Force | Out-Null
 # Panelin çalışması için gereken her şey (kurucu betikleri hariç)
 # Model A: Pro icerik pakete gomulmez; satin alan LS'ten indirip "Pro paketini
 # yukle" ile gosterir. Eski davranis icin: $env:SUFLO_BUNDLE_CONTENT = "1"
-$panelItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "index.html", "LICENSE")
+$panelItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE")
 if ($env:SUFLO_BUNDLE_CONTENT) { $panelItems += "content" }
 foreach ($item in $panelItems) {
     $p = Join-Path $root $item

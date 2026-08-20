@@ -1,3 +1,11 @@
+## Suflo 2.6.0 — Stil Motoru, sıfırdan
+
+- **Dört bağımsız stil ailesi:** Viral Vurgu, Pop, Belgesel ve Premium artık aynı efektin renk/font varyasyonu değil; her birinin satır yapısı, hareket eğrisi, vurgu kuralı ve kompozisyonu ayrı.
+- **Gerçek motor önizlemeleri:** Stil kartları temsili CSS animasyonu yerine dağıtımdaki motorun render ettiği hareketli örnekleri gösterir.
+- **Gerçek canlı önizleme:** Premiere içinde “Oynat”, seçili ayarlarla kısa bir render üretir; “Kare al” kullanıldıysa sonucu kullanıcının kendi görüntüsünde gösterir.
+- **Yeni lisanslı fontlar:** Belgesel için Lora, Premium için Montserrat eklendi. Türkçe karakterler ve gerçek libass renderları test edildi.
+- **Tek kaynaklı motor:** Stil üretimi altyazı editöründen ayrıldı; ASS dışa aktarımı ve timeline katmanı aynı yeni motoru kullanır.
+
 ## Suflo 2.5.8 — Dümdüz, doğru altyazı
 
 - **Kelime kelime ve birikimli satır modları artık ücretsiz** — kelime zamanlı altyazı için Pro gerekmez.

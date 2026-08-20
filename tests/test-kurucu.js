@@ -77,8 +77,11 @@ ok("Windows kurucusu (.bat) pakette var", !!bat, bat ? bat.ad : "YOK");
 /* ---------- 4) Panelin çalışması için gereken dosyalar ---------- */
 var gerekli = ["panel/index.html", "panel/CSXS/manifest.xml", "panel/js/captions.js",
                "panel/js/bridge.js", "panel/js/app.js", "panel/js/engine.js",
-               "panel/js/sfx.js", "panel/js/library-health.js", "panel/jsx/host.jsx",
-               "panel/content/mogrt/catalog.json"];
+               "panel/js/sfx.js", "panel/js/style-engine.js", "panel/js/library-health.js",
+               "panel/jsx/host.jsx", "panel/fonts/Lora.ttf", "panel/fonts/Montserrat.ttf",
+               "panel/fonts/OFL-Lora.txt", "panel/fonts/OFL-Montserrat.txt",
+               "panel/assets/style-previews/viral.webm", "panel/assets/style-previews/pop.webm",
+               "panel/assets/style-previews/doc.webm", "panel/assets/style-previews/premium.webm"];
 var eksik = gerekli.filter(function (g) {
   return !kayitlar.some(function (k) { return k.ad === g; });
 });
@@ -93,7 +96,7 @@ ok("kaldirilan Motion dosyasi pakette YOK", sizinti.length === 0,
     kayitlar.some(function (k) { return k.ad === g; }));
 });
 var originals = kayitlar.filter(function (k) { return /^panel\/content\/mogrt\/.*\.mogrt$/i.test(k.ad); });
-ok("Suflo Originals: 40 text animasyonu kurulum paketinde", originals.length === 40, originals.length);
+ok("LEAN kurulum: Pro MOGRT'ler public pakete gomulmedi", originals.length === 0, originals.length);
 ok("emoji seti pakette", kayitlar.some(function (k) { return /panel\/emoji\/esleme\.json$/.test(k.ad); }));
 ok("emoji lisans atfi pakette", kayitlar.some(function (k) { return /panel\/emoji\/LISANS\.txt$/.test(k.ad); }));
 
