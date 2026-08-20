@@ -478,6 +478,20 @@ window.KApp = (function () {
       });
     }
 
+    // Emoji Assets uzak katalogu: Hostinger'daki catalog.json -> yerel onbellek -> timeline.
+    var eu = el("set-emoji-assets-url");
+    if (eu) {
+      eu.value = K.settings().emojiAssetsCatalogUrl || "";
+      el("set-emoji-assets-url-kaydet").addEventListener("click", function () {
+        var durum = el("set-emoji-assets-url-durum");
+        var ok = window.KEmojiAssets && KEmojiAssets.saveRemoteUrl(eu.value);
+        durum.className = "inline-status " + (ok ? "good" : "bad");
+        durum.textContent = ok
+          ? (eu.value.trim() ? "✓ Katalog kaydedildi — Emoji Assets sekmesinde bağlantı kuruluyor" : "Emoji CDN kaldırıldı")
+          : "Geçerli bir HTTPS catalog.json adresi gir";
+      });
+    }
+
     // Emoji Assets yerel klasoru (ucretsiz ozellik)
     var ek = el("set-emoji-assets-klasor");
     if (ek) {
@@ -491,7 +505,9 @@ window.KApp = (function () {
           return;
         }
         K.settings().emojiAssetsKlasor = yol;
+        if (yol) K.settings().emojiAssetsCatalogUrl = "";
         K.saveSettings();
+        if (eu && yol) eu.value = "";
         durum.className = "inline-status good";
         durum.textContent = yol ? "✓ Kaydedildi — Emoji Assets bu klasörü tarayacak" : "Emoji klasörü kaldırıldı";
         if (window.KEmojiAssets) KEmojiAssets.tara();

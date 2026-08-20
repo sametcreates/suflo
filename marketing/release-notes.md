@@ -1,3 +1,15 @@
+## Suflo 2.6.1 — Stil Motoru v2 + Suflo Cloud Emoji
+
+- Emoji Assets artık Hostinger gibi statik bir sunucudaki güvenli `catalog.json` kataloğuna bağlanabiliyor.
+- Kartlarda hafif WEBP önizlemeler açılıyor; asıl PNG, WEBP, GIF veya JPG yalnızca kullanıcı seçtiğinde indiriliyor.
+- İndirilen dosya boyut ve SHA-256 özetiyle doğrulanıyor, yerel önbelleğe alınıyor ve mevcut güvenli Premiere timeline akışıyla playhead'e ekleniyor.
+- CDN paketleyici CORS/cache ayarlarını, katalog dosyasını ve Hostinger kurulum notunu otomatik üretiyor; dağıtım hakkı onayı olmadan çalışmıyor.
+
+- Viral Vurgu artık iki satırlı, aktif kelimeli ve katmanlı creator kompozisyonu üretiyor.
+- Pop stili renkli sticker kutuları, beyaz çerçeve, gölge ve confetti katmanlarıyla yeniden çizildi.
+- Belgesel ve Premium stilleri editoryal panel, altın cetvel ve sinematik reveal sistemiyle yenilendi.
+- Stil kartları gerçek 16:9 demo sahneleri, okunaklı yakın plan ve kesintisiz animasyon döngüsü kullanıyor.
+
 ## Suflo 2.6.0 — Stil Motoru, sıfırdan
 
 - **Dört bağımsız stil ailesi:** Viral Vurgu, Pop, Belgesel ve Premium artık aynı efektin renk/font varyasyonu değil; her birinin satır yapısı, hareket eğrisi, vurgu kuralı ve kompozisyonu ayrı.

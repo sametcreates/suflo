@@ -2048,6 +2048,95 @@ canvas#mo-canvas {
 .stil-sec.secili b { color: var(--accent-lite); }
 .stil-sec:focus-visible { box-shadow: var(--glow-sm); border-color: var(--accent); }
 
+/* Stil motoru v2: kartlar küçük birer gerçek edit sahnesi gibi okunur. */
+.stil-grid {
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 10px;
+}
+.stil-sec {
+  position: relative;
+  text-align: left;
+  border-color: rgba(255,255,255,.085);
+  background: linear-gradient(180deg, rgba(255,255,255,.025), transparent), #10131b;
+  box-shadow: 0 9px 22px -17px rgba(0,0,0,.95);
+}
+.stil-sec .ss-sahne {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 16 / 9;
+  border-bottom-color: rgba(255,255,255,.07);
+}
+.stil-sec .ss-sahne::after {
+  content: "";
+  position: absolute;
+  inset: 48% 0 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(4,6,10,.34));
+}
+.ss-video { position: absolute; inset: 0; z-index: 0; }
+.ss-kod {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  z-index: 2;
+  padding: 3px 6px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(4,6,10,.5);
+  color: rgba(255,255,255,.82);
+  font-size: 7.5px;
+  font-weight: 750;
+  letter-spacing: .13em;
+  line-height: 1;
+  backdrop-filter: blur(5px);
+}
+.ss-secim {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0;
+  transform: scale(.72);
+  transition: opacity .16s var(--ease), transform .18s var(--ease);
+  box-shadow: 0 3px 12px rgba(86,73,220,.48);
+}
+.stil-sec.secili .ss-secim { opacity: 1; transform: scale(1); }
+.ss-bilgi {
+  display: block;
+  min-height: 48px;
+  padding: 9px 10px 10px;
+}
+.stil-sec .ss-bilgi b {
+  margin: 0 0 3px;
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: .01em;
+}
+.stil-sec .ss-bilgi i {
+  margin: 0;
+  color: var(--faint);
+  font-size: 9.5px;
+  line-height: 1.3;
+}
+.stil-sec:hover .ss-video,
+.stil-sec.secili .ss-video { filter: saturate(1.08) contrast(1.03); }
+.stil-sec.secili {
+  border-color: rgba(139,124,246,.9);
+  box-shadow: 0 0 0 1px rgba(139,124,246,.75), 0 12px 28px -15px rgba(93,75,235,.68);
+}
+.stil-sec.secili .ss-bilgi b { color: #d8d1ff; }
+
 
 /* ---- Yazi kutuphanesi v2: Rush duzeni ---- */
 .yazi-ust input { text-transform: none; letter-spacing: .04em; }

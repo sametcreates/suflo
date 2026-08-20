@@ -10,7 +10,7 @@ Türkçe ve Azerice dahil 99 dil — abonelik yok, kredi yok, hesap yok.
 
 Suflo konuşmayı izlenebilir kurguya çevirir. Seçili klipten, In–Out aralığından ya da tüm sequence'tan
 transkript çıkarır; panelin içinde düzenlersin; caption izi olarak uygular ya da SRT/VTT/ASS/TXT
-olarak dışa aktarırsın. Emoji Assets (kendi PNG/WEBP/GIF arşivin) ücretsizdir.
+olarak dışa aktarırsın. Emoji Assets (yerel klasörün veya bağlı Suflo Cloud kataloğu) ücretsizdir.
 Pro katmanında sessizlik kesme, ritim marker'ları,
 yerel MOGRT/SFX kütüphaneleri
 ve altyazıdan Akıllı SFX önerileri bulunur.
@@ -71,7 +71,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | Terim sözlüğü |
-| Emoji Assets (PNG/WEBP/GIF arşivi, büyük kartlar, favori/son, timeline'a ekleme) | MOGRT ve SFX kütüphaneleri (text ve diğer animasyonlar otomatik ayrılır) |
+| Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | MOGRT ve SFX kütüphaneleri (text ve diğer animasyonlar otomatik ayrılır) |
 | — | Altyazıdan Akıllı SFX önerileri |
 | — | Kütüphane sağlık kontrolü ve destek raporu |
 
@@ -79,7 +79,19 @@ Kıyas için: AutoCut yılda ~179 $, Submagic yılda ~228–468 $, Kaps ve Subs 
 
 **Dürüstlük notu:** 2.3.0'da bu özelliklerin hepsi ücretsizdi. 2.4.0'a güncellersen Pro özellikleri kilitlenir — bunu küçük puntoya gömmüyoruz, açıkça söylüyoruz. Güncelleme zorunlu değil; 2.3.0'da kalabilirsin, çalışmaya devam eder. Kod MIT: fork'layıp kendi yolunu da çizebilirsin. Pro'nun gerekçesi basit: Suflo tek geliştirici işi ve Pro geliri geliştirmeyi sürdürülebilir kılıyor. Çekirdek ücretsiz ve açık kaynak kalıyor.
 
-Unicode emoji seçici, fontlar ve **Emoji Assets** asla paywall arkasına girmez — hepsi ücretsiz katmandadır. Emoji Assets, kullanıcının kendi PNG/WEBP/GIF klasörünü yöneten iş akışıdır; emoji görsellerinin kendisi satılmaz. Apple/Twemoji gibi üçüncü taraf görseller dağıtım hakkı doğrulanmadan pakete konmaz.
+Unicode emoji seçici, fontlar ve **Emoji Assets** asla paywall arkasına girmez — hepsi ücretsiz katmandadır. Emoji Assets, kullanıcının kendi klasörünü veya Suflo Cloud kataloğunu yöneten iş akışıdır; emoji görsellerinin kendisi satılmaz. Apple/Twemoji gibi üçüncü taraf görseller dağıtım hakkı doğrulanmadan pakete konmaz.
+
+### Suflo Cloud Emoji (Hostinger)
+
+Dağıtım hakkı sana ait PNG/WEBP/GIF/JPG klasöründen statik sunucu paketi üret:
+
+```powershell
+node tools\build-emoji-cdn.js --source "D:\lisansli-emojiler" --out "D:\suflo-emoji-cdn" --rights-confirmed --license-name "Suflo owned assets"
+```
+
+Oluşan klasörün içindeki `assets/`, `thumbs/`, `catalog.json` ve `.htaccess` dosyalarını Hostinger'da aynı klasöre yükle. Sonra panelde **Ayarlar → İçerik kütüphaneleri → Emoji CDN** alanına `https://alan-adin/emoji/v1/catalog.json` adresini yapıştır. Panel yalnızca küçük önizlemeleri gösterir; kullanıcı karta bastığında asıl dosyayı indirir, SHA-256 ile doğrular, önbelleğe alır ve Premiere playhead'ine ekler.
+
+`--rights-confirmed`, dağıtım hakkını bilinçli olarak onaylayan güvenlik kapısıdır. Kaynağı veya lisansı belirsiz iOS/Apple görselleri bu pakete konmamalıdır.
 
 ## Kurulum
 

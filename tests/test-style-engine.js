@@ -13,11 +13,12 @@ function ok(name, condition, proof) {
 }
 
 var styles = engine.list();
+ok("motor v2 etkin", engine.version === 2, engine.version);
 ok("dort bagimsiz stil var", styles.map(function (s) { return s.id; }).join(",") === "viral,pop,doc,premium",
   styles.map(function (s) { return s.id; }).join(","));
 
 var expectedFonts = {
-  viral: ["Anton.ttf", "OFL-Anton.txt"],
+  viral: ["ArchivoBlack.ttf", "OFL-ArchivoBlack.txt"],
   pop: ["Bungee.ttf", "OFL-Bungee.txt"],
   doc: ["Lora.ttf", "OFL-Lora.txt"],
   premium: ["Montserrat.ttf", "OFL-Montserrat.txt"]
@@ -40,10 +41,14 @@ var compiled = {};
   ok(id + " Turkce metni koruyor", /BUNU|Hikâyenin/.test(compiled[id].ass));
 });
 
-ok("viral uc kelimelik kompozisyon", compiled.viral.eventCount === 4, compiled.viral.eventCount);
-ok("pop tek kelimelik vuruslar", compiled.pop.eventCount === 4 && /\\frz-/.test(compiled.pop.ass), compiled.pop.eventCount);
-ok("belgesel bant + metin iki katman", compiled.doc.eventCount === 2 && /\\p1/.test(compiled.doc.ass), compiled.doc.eventCount);
-ok("premium tipografi + ince cizgi", compiled.premium.eventCount === 2 && /\\p1/.test(compiled.premium.ass), compiled.premium.eventCount);
+ok("viral iki satir + katmanli creator kompozisyonu",
+  compiled.viral.eventCount >= 14 && /\\N/.test(compiled.viral.ass) && /\\p1/.test(compiled.viral.ass), compiled.viral.eventCount);
+ok("pop sticker + confetti katmanlari",
+  compiled.pop.eventCount >= 28 && /\\frz-/.test(compiled.pop.ass) && /\\p1/.test(compiled.pop.ass), compiled.pop.eventCount);
+ok("belgesel panel + altin cetvel + metin",
+  compiled.doc.eventCount === 5 && /\\move\(/.test(compiled.doc.ass) && /\\p1/.test(compiled.doc.ass), compiled.doc.eventCount);
+ok("premium sinematik panel + reveal + cizgiler",
+  compiled.premium.eventCount === 5 && /\\clip\(/.test(compiled.premium.ass) && /\\p1/.test(compiled.premium.ass), compiled.premium.eventCount);
 ok("dort stilin ASS ciktisi birbirinden farkli", new Set(Object.keys(compiled).map(function (k) { return compiled[k].ass; })).size === 4);
 
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;

@@ -215,20 +215,20 @@
 
         <div class="stil-grid" id="cap-stil-grid">
           <button type="button" class="stil-sec stil-viral" data-preset="viral">
-            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/viral.webm" autoplay loop muted playsinline aria-hidden="true"></video></span>
-            <b>Viral Vurgu</b><i>güçlü aktif kelime</i>
+            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/viral.webm" autoplay loop muted playsinline aria-hidden="true"></video><span class="ss-kod">CREATOR</span><span class="ss-secim">✓</span></span>
+            <span class="ss-bilgi"><b>Viral Vurgu</b><i>katmanlı creator tipografisi</i></span>
           </button>
           <button type="button" class="stil-sec stil-pop" data-preset="pop">
-            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/pop.webm" autoplay loop muted playsinline aria-hidden="true"></video></span>
-            <b>Pop</b><i>renkli, tek tek</i>
+            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/pop.webm" autoplay loop muted playsinline aria-hidden="true"></video><span class="ss-kod">POP</span><span class="ss-secim">✓</span></span>
+            <span class="ss-bilgi"><b>Pop</b><i>sticker kutuları + confetti</i></span>
           </button>
           <button type="button" class="stil-sec stil-doc" data-preset="doc">
-            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/doc.webm" autoplay loop muted playsinline aria-hidden="true"></video></span>
-            <b>Belgesel</b><i>sakin, zarif bant</i>
+            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/doc.webm" autoplay loop muted playsinline aria-hidden="true"></video><span class="ss-kod">STORY</span><span class="ss-secim">✓</span></span>
+            <span class="ss-bilgi"><b>Belgesel</b><i>editoryal alt bant</i></span>
           </button>
           <button type="button" class="stil-sec stil-premium" data-preset="premium">
-            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/premium.webm" autoplay loop muted playsinline aria-hidden="true"></video></span>
-            <b>Premium</b><i>minimal, sinematik</i>
+            <span class="ss-sahne"><video class="ss-video" src="assets/style-previews/premium.webm" autoplay loop muted playsinline aria-hidden="true"></video><span class="ss-kod">CINEMA</span><span class="ss-secim">✓</span></span>
+            <span class="ss-bilgi"><b>Premium</b><i>sinematik başlık sistemi</i></span>
           </button>
         </div>
 
@@ -839,7 +839,13 @@
       </div>
       <div id="set-sfx-durum" class="inline-status"></div>
       <div class="row" style="margin-top:9px">
-        <label for="set-emoji-assets-klasor">Emoji</label>
+        <label for="set-emoji-assets-url">Emoji CDN</label>
+        <input id="set-emoji-assets-url" type="text" placeholder="https://assets.suflo.app/emoji/v1/catalog.json" spellcheck="false">
+        <button id="set-emoji-assets-url-kaydet" class="btn">Bağla</button>
+      </div>
+      <div id="set-emoji-assets-url-durum" class="inline-status"></div>
+      <div class="row" style="margin-top:9px">
+        <label for="set-emoji-assets-klasor">Yerel emoji</label>
         <input id="set-emoji-assets-klasor" type="text" placeholder="örn. C:\Users\sen\Desktop\PNG - EMOJI" spellcheck="false">
         <button id="set-emoji-assets-kaydet" class="btn">Kaydet</button>
       </div>

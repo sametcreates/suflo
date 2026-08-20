@@ -106,7 +106,10 @@ window.K = (function () {
 
   function loadSettings() {
     if (_settings) return _settings;
-    _settings = { folders: [], provider: "local", endpoint: "", apiKey: "", ffmpeg: "", favs: [], recent: [] };
+    _settings = {
+      folders: [], provider: "local", endpoint: "", apiKey: "", ffmpeg: "", favs: [], recent: [],
+      emojiAssetsCatalogUrl: "https://assets.suflo.app/emoji/v1/catalog.json"
+    };
     try {
       var p = settingsPath();
       if (p && fs.existsSync(p)) {
@@ -353,7 +356,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "2.6.0";
+  var VERSION = "2.6.1";
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];

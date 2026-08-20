@@ -35,9 +35,16 @@ if (!zipler.length) {
   process.exit(0);
 }
 
-// en yeni kurulum paketini sına
-zipler.sort();
-var zipYolu = pathm.join(dist, zipler[zipler.length - 1]);
+// Klasorde eski derlemeler kalabilir. Manifestteki TAM surumu sinamazsak
+// yayin kontrolu yanlis pakete yesil isik yakabilir.
+var manifest = fs.readFileSync(pathm.join(KOKYOL, "CSXS", "manifest.xml"), "utf8");
+var surumEslesme = /ExtensionBundleVersion="([^"]+)"/.exec(manifest);
+var paketAdi = surumEslesme ? "Suflo-" + surumEslesme[1] + "-Kurulum.zip" : "";
+if (!paketAdi || zipler.indexOf(paketAdi) === -1) {
+  console.log("FAIL manifest surumunun kurulum paketi yok   [" + (paketAdi || "surum okunamadi") + "]");
+  process.exit(1);
+}
+var zipYolu = pathm.join(dist, paketAdi);
 var buf = fs.readFileSync(zipYolu);
 
 /* ---------- ZIP central directory'sini oku ---------- */
@@ -51,7 +58,7 @@ for (var i = 0; i < buf.length - 46; i++) {
   kayitlar.push({ ad: ad, mod: (disAttr >>> 16) & 0xFFF, sistem: yapanSistem });
 }
 
-ok("kurulum paketi okunabiliyor", kayitlar.length > 0, zipler[zipler.length - 1] + " · " + kayitlar.length + " kayit");
+ok("kurulum paketi okunabiliyor", kayitlar.length > 0, paketAdi + " · " + kayitlar.length + " kayit");
 
 /* ---------- 1) Yol ayracı ---------- */
 var tersBolulu = kayitlar.filter(function (k) { return k.ad.indexOf("\\") !== -1; });

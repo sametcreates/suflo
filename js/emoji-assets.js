@@ -13,6 +13,9 @@ window.KEmojiAssets = (function () {
   var filtered = [];
   var filterMode = "all";
   var busyPath = "";
+  var remoteLoading = false;
+  var remoteError = "";
+  var remoteRequestId = 0;
 
   function el(id) { return document.getElementById(id); }
   function basename(p) { return String(p || "").replace(/^.*[\\\/]/, ""); }
@@ -35,6 +38,20 @@ window.KEmojiAssets = (function () {
   function fileUrl(p) {
     return encodeURI("file:///" + String(p || "").replace(/\\/g, "/"))
       .replace(/#/g, "%23").replace(/\?/g, "%3F");
+  }
+
+  function catalogUrl() { return String(K.settings().emojiAssetsCatalogUrl || "").trim(); }
+  function itemKey(item) { return item && item.key ? item.key : norm(item && item.path); }
+  function previewUrl(item) { return item.remote ? item.preview : fileUrl(item.path); }
+
+  function safeHttpsUrl(value, base, sameOrigin) {
+    var parsed = new URL(String(value || ""), base || undefined);
+    if (parsed.protocol !== "https:") throw new Error("Emoji CDN yalnızca HTTPS kullanabilir.");
+    if (parsed.username || parsed.password) throw new Error("Kimlik bilgili URL kullanılamaz.");
+    if (sameOrigin && parsed.origin !== new URL(sameOrigin).origin) {
+      throw new Error("Emoji dosyaları katalogla aynı sunucuda olmalı.");
+    }
+    return parsed.toString();
   }
 
   function temizAd(file) {
@@ -63,11 +80,18 @@ window.KEmojiAssets = (function () {
     if (!s.emojiAssetRecent) s.emojiAssetRecent = [];
     return s.emojiAssetRecent;
   }
-  function favMi(item) { return favlar().indexOf(item.path) !== -1; }
+  function favMi(item) { return favlar().indexOf(itemKey(item)) !== -1; }
 
   function rootFolder() { return String(K.settings().emojiAssetsKlasor || "").trim(); }
 
   function buildIndex() {
+    if (catalogUrl()) {
+      loadRemoteCatalog();
+      return;
+    }
+    remoteRequestId++;
+    remoteLoading = false;
+    remoteError = "";
     items = [];
     var root = rootFolder();
     if (!K.nodeOK || !K.fs || !K.path || !root || !K.fs.existsSync(root)) {
@@ -93,7 +117,7 @@ window.KEmojiAssets = (function () {
       var format = extname(p).toUpperCase();
       if (format === "JPEG") format = "JPG";
       items.push({
-        path: p, name: name, format: format,
+        path: p, key: "local:" + norm(p), remote: false, name: name, format: format,
         folder: parts.length > 1 ? parts[0] : basename(root),
         size: size,
         hay: fold(name + " " + basename(p) + " " + rel)
@@ -102,6 +126,66 @@ window.KEmojiAssets = (function () {
     items.sort(function (a, b) { return a.name.localeCompare(b.name); });
     sayac();
     search(el("emoji-assets-search") ? el("emoji-assets-search").value : "");
+  }
+
+  async function loadRemoteCatalog() {
+    var url = catalogUrl();
+    if (!url || remoteLoading) return;
+    var requestId = ++remoteRequestId;
+    remoteLoading = true;
+    remoteError = "";
+    items = [];
+    sayac();
+    render();
+    try {
+      url = safeHttpsUrl(url);
+      var response = await K.httpGet(url, { "Cache-Control": "no-cache" });
+      if (!response || response.status !== 200) {
+        throw new Error("Emoji kataloğu açılamadı: HTTP " + (response ? response.status : 0));
+      }
+      var data = JSON.parse(response.body);
+      if (!data || data.schema !== "suflo-emoji-catalog/v1" || !Array.isArray(data.items)) {
+        throw new Error("Emoji kataloğu biçimi geçersiz.");
+      }
+      if (data.items.length > 2000) throw new Error("Emoji kataloğu 2000 öğe sınırını aşıyor.");
+      var catalogOrigin = new URL(url).origin;
+      var seen = {};
+      var loadedItems = data.items.map(function (raw) {
+        var id = String(raw.id || "").trim();
+        var name = String(raw.name || "Emoji").trim().slice(0, 120);
+        var format = String(raw.format || extname(raw.file)).replace(/^\./, "").toUpperCase();
+        if (format === "JPEG") format = "JPG";
+        if (!/^[a-z0-9][a-z0-9._-]{2,100}$/i.test(id) || seen[id]) throw new Error("Geçersiz/tekrarlı emoji kimliği: " + id);
+        if (!/^(PNG|WEBP|GIF|JPG)$/.test(format)) throw new Error("Desteklenmeyen emoji biçimi: " + format);
+        var hash = String(raw.sha256 || "").toLowerCase();
+        if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error("Eksik SHA-256: " + id);
+        var bytes = Number(raw.bytes || 0);
+        if (!(bytes > 0) || bytes > 50 * 1024 * 1024) throw new Error("Geçersiz dosya boyutu: " + id);
+        var file = safeHttpsUrl(raw.file, url, catalogOrigin);
+        var preview = safeHttpsUrl(raw.preview || raw.file, url, catalogOrigin);
+        seen[id] = true;
+        return {
+          id: id, key: "remote:" + id, path: "", remote: true,
+          url: file, preview: preview, sha256: hash,
+          name: name, format: format, folder: "Suflo Cloud", size: bytes,
+          hay: fold(name + " " + (raw.category || "") + " " + (raw.keywords || []).join(" "))
+        };
+      });
+      if (requestId !== remoteRequestId) return;
+      loadedItems.sort(function (a, b) { return a.name.localeCompare(b.name); });
+      items = loadedItems;
+    } catch (e) {
+      if (requestId !== remoteRequestId) return;
+      items = [];
+      remoteError = e && e.message ? e.message : String(e);
+      K.log("[emoji-cdn] " + remoteError);
+      if (window.KApp) KApp.toast("Emoji CDN: " + remoteError, "bad");
+    } finally {
+      if (requestId !== remoteRequestId) return;
+      remoteLoading = false;
+      sayac();
+      search(el("emoji-assets-search") ? el("emoji-assets-search").value : "");
+    }
   }
 
   function sayac() {
@@ -114,8 +198,8 @@ window.KEmojiAssets = (function () {
     if (filterMode === "fav") pool = items.filter(favMi);
     else if (filterMode === "recent") {
       var map = {};
-      items.forEach(function (item) { map[norm(item.path)] = item; });
-      pool = sonlar().map(function (p) { return map[norm(p)]; }).filter(Boolean);
+      items.forEach(function (item) { map[itemKey(item)] = item; });
+      pool = sonlar().map(function (key) { return map[key] || map[norm(key)]; }).filter(Boolean);
     }
     var terms = fold(q).split(/\s+/).filter(Boolean);
     filtered = pool.filter(function (item) {
@@ -137,14 +221,32 @@ window.KEmojiAssets = (function () {
     var grid = el("emoji-assets-grid"), empty = el("emoji-assets-empty");
     if (!grid || !empty) return;
     var root = rootFolder();
-    empty.hidden = !!(root && K.nodeOK && K.fs && K.fs.existsSync(root));
+    var remote = !!catalogUrl();
+    var sourceReady = remote ? (items.length > 0 || remoteLoading) : !!(root && K.nodeOK && K.fs && K.fs.existsSync(root));
+    empty.hidden = sourceReady;
     grid.hidden = !empty.hidden;
     grid.innerHTML = "";
     var count = el("emoji-assets-count");
-    if (count) count.textContent = items.length ? filtered.length + " / " + items.length + " ASSET" : "YEREL ARŞİV";
+    if (count) count.textContent = remote
+      ? (remoteLoading ? "BAĞLANIYOR" : (items.length ? filtered.length + " / " + items.length + " CLOUD" : (remoteError ? "CLOUD HATASI" : "0 CLOUD")))
+      : (items.length ? filtered.length + " / " + items.length + " ASSET" : "YEREL ARŞİV");
     var title = el("emoji-assets-baslik"), alt = el("emoji-assets-alt");
     if (title) title.textContent = filterMode === "fav" ? "Favori Emojiler" : (filterMode === "recent" ? "Son Kullanılanlar" : "Emoji Assets");
-    if (alt) alt.textContent = items.length ? items.length + " görsel bulundu · dosyalar yerinde kalır" : "Kendi görsellerin, Premiere'in içinde";
+    if (alt) alt.textContent = remote
+      ? (remoteLoading ? "Suflo Cloud kataloğu yükleniyor…" : (remoteError || (items.length + " bulut emojisi · seçince indirilir")))
+      : (items.length ? items.length + " görsel bulundu · dosyalar yerinde kalır" : "Kendi görsellerin, Premiere'in içinde");
+    var emptyTitle = empty.querySelector("b"), emptyText = empty.querySelector("p"), emptyButton = empty.querySelector("button");
+    if (remote) {
+      if (emptyTitle) emptyTitle.textContent = remoteError
+        ? "Emoji CDN bağlantısı kurulamadı"
+        : (remoteLoading ? "Suflo Cloud hazırlanıyor" : "Katalogda emoji yok");
+      if (emptyText) emptyText.textContent = remoteError || (remoteLoading ? "Katalog yükleniyor…" : "Yeni emoji paketi sunucuya yüklendiğinde burada görünecek.");
+      if (emptyButton) emptyButton.hidden = true;
+    } else {
+      if (emptyTitle) emptyTitle.textContent = "Henüz emoji klasörü bağlı değil";
+      if (emptyText) emptyText.textContent = "PNG, WEBP veya GIF klasörünü bağla; karttan seçince playhead'e eklenir.";
+      if (emptyButton) emptyButton.hidden = false;
+    }
     if (!empty.hidden) return;
     if (!filtered.length) {
       grid.innerHTML = '<p class="hint" style="grid-column:1/-1">' +
@@ -156,14 +258,15 @@ window.KEmojiAssets = (function () {
     var frag = document.createDocumentFragment();
     filtered.forEach(function (item) {
       var card = document.createElement("div");
-      card.className = "mogrt-kart emoji-asset-kart " + item.format.toLowerCase() + (locked ? " locked" : "") + (busyPath === item.path ? " busy" : "");
+      card.className = "mogrt-kart emoji-asset-kart " + item.format.toLowerCase() + (locked ? " locked" : "") + (busyPath === itemKey(item) ? " busy" : "");
       var action = locked
         ? '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg><span>LOCKED</span>'
-        : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M12 6l4 4-4 4"/></svg><span>' + (busyPath === item.path ? "HAZIRLANIYOR" : "DRAG") + "</span>";
+        : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M12 6l4 4-4 4"/></svg><span>' +
+          (busyPath === itemKey(item) ? "HAZIRLANIYOR" : (item.remote ? "İNDİR + EKLE" : "DRAG")) + "</span>";
       card.innerHTML =
         '<span class="mogrt-thumb">' +
-          '<img src="' + fileUrl(item.path) + '" alt="" loading="lazy">' +
-          '<span class="mogrt-source">PERSONAL EMOJI</span>' +
+          '<img src="' + esc(previewUrl(item)) + '" alt="" loading="lazy">' +
+          '<span class="mogrt-source">' + (item.remote ? "SUFLO CLOUD" : "PERSONAL EMOJI") + '</span>' +
           '<span class="emoji-format">' + esc(item.format) + "</span>" +
           '<button type="button" class="mogrt-kalp' + (favMi(item) ? " sevildi" : "") + '" title="Favori">♥</button>' +
           (locked ? '<span class="mogrt-lock"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg></span>' : "") +
@@ -185,8 +288,8 @@ window.KEmojiAssets = (function () {
           card.classList.add("dragging");
           if (e.dataTransfer) {
             e.dataTransfer.effectAllowed = "copy";
-            try { e.dataTransfer.setData("text/uri-list", fileUrl(item.path)); } catch (e1) {}
-            try { e.dataTransfer.setData("text/plain", item.path); } catch (e2) {}
+            try { e.dataTransfer.setData("text/uri-list", item.remote ? item.url : fileUrl(item.path)); } catch (e1) {}
+            try { e.dataTransfer.setData("text/plain", item.remote ? item.url : item.path); } catch (e2) {}
           }
         });
         card.addEventListener("dragend", function () {
@@ -201,8 +304,8 @@ window.KEmojiAssets = (function () {
 
   function toggleFav(item) {
     if (!proGate()) return;
-    var favs = favlar(), i = favs.indexOf(item.path);
-    if (i === -1) favs.push(item.path); else favs.splice(i, 1);
+    var key = itemKey(item), favs = favlar(), i = favs.indexOf(key);
+    if (i === -1) favs.push(key); else favs.splice(i, 1);
     K.saveSettings();
     search(el("emoji-assets-search").value);
   }
@@ -217,6 +320,34 @@ window.KEmojiAssets = (function () {
     var h = 2166136261;
     for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
     return (h >>> 0).toString(16);
+  }
+  function sha256File(file) {
+    var crypto = require("crypto");
+    var hash = crypto.createHash("sha256");
+    hash.update(K.fs.readFileSync(file));
+    return hash.digest("hex");
+  }
+  async function remotePath(item) {
+    var extension = "." + item.format.toLowerCase().replace("jpg", "jpg");
+    var out = K.path.join(cacheDir(), "cloud-" + item.id + extension);
+    if (K.fs.existsSync(out)) {
+      try {
+        if (K.fs.statSync(out).size === item.size && sha256File(out) === item.sha256) return out;
+      } catch (e0) {}
+      try { K.fs.unlinkSync(out); } catch (e1) {}
+    }
+    var result = await K.download(item.url, out, null, 0, undefined, {
+      key: "emoji:" + item.id + ":" + item.sha256,
+      expectedMB: item.size / 1048576
+    });
+    if (!result || !result.ok || !K.fs.existsSync(out)) {
+      throw new Error("Emoji indirilemedi: " + (result && result.error ? result.error : "bilinmeyen hata"));
+    }
+    if (K.fs.statSync(out).size !== item.size || sha256File(out) !== item.sha256) {
+      try { K.fs.unlinkSync(out); } catch (e2) {}
+      throw new Error("Emoji dosyası doğrulanamadı; indirme iptal edildi.");
+    }
+    return out;
   }
   // WEBP'yi panelin kendi Chromium'uyla coz: ffmpeg'in webp decoder'i
   // ANIMASYONLU WebP'yi desteklemiyor ("skipping unsupported chunk: ANIM"),
@@ -241,25 +372,26 @@ window.KEmojiAssets = (function () {
   }
 
   async function preparePath(item) {
-    if (item.format !== "WEBP") return item.path;
-    var stat = K.fs.statSync(item.path);
-    var out = K.path.join(cacheDir(), "webp-" + hashText(norm(item.path) + "|" + stat.size + "|" + stat.mtimeMs) + ".png");
+    var sourcePath = item.remote ? await remotePath(item) : item.path;
+    if (item.format !== "WEBP") return sourcePath;
+    var stat = K.fs.statSync(sourcePath);
+    var out = K.path.join(cacheDir(), "webp-" + hashText(norm(sourcePath) + "|" + stat.size + "|" + stat.mtimeMs) + ".png");
     if (K.fs.existsSync(out) && K.fs.statSync(out).size > 0) return out;
     try {
-      return await webpToPngCanvas(item.path, out);
+      return await webpToPngCanvas(sourcePath, out);
     } catch (eCanvas) {
       K.log("[emoji] tarayici WEBP donusumu olmadi, ffmpeg deneniyor: " + (eCanvas && eCanvas.message));
     }
     var ff = await K.findFfmpeg();
     if (!ff) throw new Error("Bu WEBP dosyası açılamadı ve ffmpeg de kurulu değil.");
-    var r = await K.run(ff, ["-y", "-i", item.path, "-frames:v", "1", "-update", "1", out], { timeout: 120000 });
+    var r = await K.run(ff, ["-y", "-i", sourcePath, "-frames:v", "1", "-update", "1", out], { timeout: 120000 });
     if (r.code !== 0 || !K.fs.existsSync(out)) throw new Error("Bu WEBP dosyası Premiere uyumlu PNG'ye çevrilemedi.");
     return out;
   }
 
   async function place(item, card) {
     if (busyPath || !proGate()) return;
-    busyPath = item.path;
+    busyPath = itemKey(item);
     render();
     try {
       var path = await preparePath(item);
@@ -268,9 +400,9 @@ window.KEmojiAssets = (function () {
       else payload.dur = 5;
       var r = await K.call("KS_placeGraphic", payload, 120000);
       if (!r.ok) throw new Error(r.error || "Emoji eklenemedi");
-      var rec = sonlar(), i = rec.indexOf(item.path);
+      var key = itemKey(item), rec = sonlar(), i = rec.indexOf(key);
       if (i !== -1) rec.splice(i, 1);
-      rec.unshift(item.path);
+      rec.unshift(key);
       K.settings().emojiAssetRecent = rec.slice(0, 50);
       K.saveSettings();
       KApp.toast(item.name + " → " + r.trackName + ", playhead", "good");
@@ -290,10 +422,33 @@ window.KEmojiAssets = (function () {
       return false;
     }
     K.settings().emojiAssetsKlasor = folder;
+    if (folder) K.settings().emojiAssetsCatalogUrl = "";
     K.saveSettings();
     var input = el("set-emoji-assets-klasor"); if (input) input.value = folder;
+    var remoteInput = el("set-emoji-assets-url"); if (remoteInput && folder) remoteInput.value = "";
     buildIndex();
     if (folder) KApp.toast("Emoji klasörü bağlandı: " + basename(folder), "good");
+    return true;
+  }
+
+  function saveRemoteUrl(value) {
+    value = String(value || "").trim().replace(/^"|"$/g, "");
+    if (value) {
+      try { value = safeHttpsUrl(value); }
+      catch (e) { KApp.toast(e.message, "bad"); return false; }
+      if (!/\/catalog\.json(?:\?|$)/i.test(value)) {
+        KApp.toast("Emoji CDN adresi catalog.json ile bitmeli.", "bad");
+        return false;
+      }
+    }
+    remoteRequestId++;
+    remoteLoading = false;
+    K.settings().emojiAssetsCatalogUrl = value;
+    K.saveSettings();
+    var input = el("set-emoji-assets-url"); if (input) input.value = value;
+    remoteError = "";
+    buildIndex();
+    if (value) KApp.toast("Suflo Cloud kataloğu bağlanıyor…", "good");
     return true;
   }
 
@@ -326,6 +481,8 @@ window.KEmojiAssets = (function () {
     tara: buildIndex,
     chooseFolder: chooseFolder,
     saveFolder: saveFolder,
+    saveRemoteUrl: saveRemoteUrl,
+    loadRemoteCatalog: loadRemoteCatalog,
     setFilter: setFilter,
     sayisi: function () { return items.length; },
     adlar: function () { return items.map(function (x) { return x.name; }); }
