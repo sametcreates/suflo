@@ -1,3 +1,9 @@
+## Suflo 2.5.7 — Emoji Assets artık ücretsiz
+
+- **Emoji Assets herkese açıldı:** Kendi PNG / WEBP / GIF arşivini bağla, büyük kartlarda ara, tek tıkla timeline'a ekle — artık Pro gerekmez. (Emoji görselleri hiçbir zaman paralı pakete girmez.)
+- **Suflo Pro Paketi tek tıkla:** Satın aldıktan sonra indirdiğin paketi Ayarlar → Suflo Pro Paketi'nden göster; `mogrt/`, `sfx/` ve varsa `emoji/` klasörleri otomatik bağlanır.
+- Küçük panel iyileştirmeleri ve metin düzeltmeleri.
+
 ## Suflo 2.5.6 — Lisans düzeltmesi + hafif kurulum
 
 - **Lisans doğrulaması düzeltildi:** Suflo Pro satın alan herkes anahtarını sorunsuz etkinleştirir (ürün bağlantısı canlı mağazaya güncellendi).
