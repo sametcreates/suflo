@@ -364,6 +364,14 @@ section h2{font-size:clamp(25px,3.4vw,37px)}
 .pv b{display:block;font-size:15px;margin-bottom:6px;padding-right:40px}
 .pv p{font-size:13px;color:var(--dim)}
 .pv-cta{margin-top:16px;text-align:center}
+.pv-galeri{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.pvg{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#000}
+.pvg span{display:block;aspect-ratio:16/9}
+.pvg img{width:100%;height:100%;object-fit:cover;display:block}
+.pv-ozet{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:12.5px;color:var(--dim)}
+.pv-ozet i{font-style:normal;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:5px 11px}
+.pv-ozet i b{color:var(--text)}
+@media (max-width:860px){.pv-galeri{grid-template-columns:repeat(2,1fr)}}
 
 /* ---------- bicimler ---------- */
 .bicimler{display:flex;flex-wrap:wrap;gap:9px;margin-top:24px}
@@ -720,7 +728,23 @@ html.js .reveal.in{opacity:1;transform:none}
         <p>Sesleri panelden ara, ön dinle, playhead'e bırak; altyazıdaki vurgu anlarına otomatik öneri.</p>
       </a>
     </div>
-    <p class="pv-cta reveal"><a class="btn ghost" href="/pro">Pro'yu keşfet →</a></p>
+    <div class="pv-galeri reveal" aria-label="Pro paketindeki yazı animasyonlarından örnekler">
+      <figure class="pvg"><span><img src="/gorseller/mogrt/01-smooth-up.webp" alt="Smooth Up yazı animasyonu" loading="lazy"></span></figure>
+      <figure class="pvg"><span><img src="/gorseller/mogrt/02-rainbow-text.webp" alt="Rainbow Text yazı animasyonu" loading="lazy"></span></figure>
+      <figure class="pvg"><span><img src="/gorseller/mogrt/06-gold-text.webp" alt="Gold Text yazı animasyonu" loading="lazy"></span></figure>
+      <figure class="pvg"><span><img src="/gorseller/mogrt/07-futurist.webp" alt="Futurist yazı animasyonu" loading="lazy"></span></figure>
+      <figure class="pvg"><span><img src="/gorseller/mogrt/16-ocean-waves.webp" alt="Ocean Waves yazı animasyonu" loading="lazy"></span></figure>
+      <figure class="pvg"><span><img src="/gorseller/mogrt/13-rock-solidance.webp" alt="Rock Solidance yazı animasyonu" loading="lazy"></span></figure>
+      <figure class="pvg"><span><img src="/gorseller/mogrt/26-jitter-shine.webp" alt="Jitter Shine yazı animasyonu" loading="lazy"></span></figure>
+      <figure class="pvg"><span><img src="/gorseller/mogrt/29-cracked.webp" alt="Cracked yazı animasyonu" loading="lazy"></span></figure>
+    </div>
+    <div class="pv-ozet reveal">
+      <i><b>40</b> hazır yazı animasyonu (MOGRT)</i>
+      <i><b>265</b> ses efekti · 11 klasör</i>
+      <i><b>✦</b> Akıllı SFX önerileri</i>
+      <i><b>YAKINDA</b> Motion BG — ek ücretsiz</i>
+    </div>
+    <p class="pv-cta reveal"><a class="btn ghost" href="/pro#kutuphane">Kütüphanenin tamamını gör →</a></p>
   </section>
 
   <!-- ================= KARSILASTIRMA ================= -->

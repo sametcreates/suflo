@@ -278,6 +278,34 @@ details .a{padding:0 18px 17px;color:var(--dim);font-size:14.5px;max-width:66ch}
 .zl .yeni em{font-style:normal;color:var(--good)}
 .zl p{font-size:12.5px;color:var(--dim)}
 
+/* ---- gercek kutuphane galerisi ---- */
+.lib-sayilar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px}
+.lib-sayilar>div{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:16px 14px;text-align:center}
+.lib-sayilar b{display:block;font-size:34px;font-weight:680;letter-spacing:-.03em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lib-sayilar span{font-size:12.5px;color:var(--dim)}
+.lib-baslik{font-size:17px;margin:30px 0 4px}
+.lib-baslik small{font-weight:450;color:var(--faint);font-size:12.5px;margin-left:8px}
+.mogrt-galeri{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+.mg{margin:0;background:var(--bg2);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:transform .18s var(--ease),border-color .18s var(--ease)}
+.mg:hover{transform:translateY(-2px);border-color:rgba(124,92,255,.45)}
+.mg .gk{display:block;aspect-ratio:16/9;background:#000}
+.mg img{width:100%;height:100%;object-fit:cover;display:block}
+.mg figcaption{font-size:12px;color:var(--dim);padding:8px 11px;display:flex;justify-content:space-between;align-items:center}
+.mg figcaption i{font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.06em;color:var(--accent-lite)}
+.lib-not{margin-top:12px;font-size:13px;color:var(--faint)}
+.sfx-klasorler{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.sfxk{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:13px}
+.sfxk b{font-weight:590}
+.sfxk span{font-size:11.5px;color:var(--faint);font-family:"JetBrains Mono",ui-monospace,monospace}
+.yakinda-bar{display:flex;align-items:center;gap:10px;margin-top:26px;background:linear-gradient(160deg,rgba(124,92,255,.10),rgba(78,167,252,.04) 60%),var(--bg2);border:1px dashed rgba(124,92,255,.4);border-radius:12px;padding:14px 16px;font-size:13.5px}
+.yakinda-bar .rozet-y{font-size:9px;font-weight:800;letter-spacing:.08em;background:var(--grad);color:#fff;border-radius:5px;padding:3px 7px}
+.yakinda-bar span{color:var(--dim)}
+@media (max-width:860px){
+  .lib-sayilar{grid-template-columns:repeat(2,1fr)}
+  .mogrt-galeri{grid-template-columns:repeat(2,1fr)}
+  .sfx-klasorler{grid-template-columns:repeat(2,1fr)}
+}
+
 /* ---- panel kutuphane vitrini ---- */
 .vitrin{margin-top:30px;border:1px solid var(--line2);border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:0 30px 70px -30px rgba(0,0,0,.85)}
 .vt-bar{display:flex;align-items:center;gap:9px;padding:10px 13px;background:var(--bg2);border-bottom:1px solid var(--line)}
@@ -480,36 +508,55 @@ footer span,footer a{font-size:12.5px;color:var(--faint);text-decoration:none}
   </div>
 </section>
 
-<!-- ═══════════ KÜTÜPHANE VİTRİNİ ═══════════ -->
-<section class="sec" style="padding-top:14px">
+<!-- ═══════════ KÜTÜPHANE: GERÇEK İÇERİK ═══════════ -->
+<section class="sec" id="kutuphane" style="padding-top:14px">
   <div class="wrap">
-    <span class="tc">Yazı sekmesi</span>
-    <h2>Kütüphanen Premiere'in kalbinde.</h2>
-    <p class="lead">Yazı animasyonu paketlerini panelden yönet: ara, favorile, "Ekle" de — playhead'e, boş katmana otursun. Kendi paketlerini klasöre at, anında listede.</p>
+    <span class="tc">Pakete dahil — satın alınca e-postana gelir</span>
+    <h2>40 yazı animasyonu. 265 ses efekti.<br>Hepsi panelin içinde.</h2>
+    <p class="lead">Suflo Pro paketi lisansınla birlikte e-postana gelir; panelde "Pro paketini yükle" dersin, bitti. Yazı animasyonları ve ses efektleri Premiere'den çıkmadan aranır, ön izlenir, tek tıkla playhead'e eklenir.</p>
 
-    <div class="vitrin" aria-label="Suflo Yazı kütüphanesi görünümü">
-      <div class="vt-bar">
-        <span class="logo" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M13.9 7.2 C13.5 5.5 11.9 4.7 10 4.7 C8 4.7 6.3 5.5 6.3 7.1 C6.3 10.7 13.7 9.1 13.7 12.9 C13.7 14.5 12 15.3 10 15.3 C8.1 15.3 6.5 14.5 6.1 12.8" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></span>
-        <b>Suflo</b><span class="pro-rozet">PRO</span>
-        <span class="vt-ara">PAKET ARA…</span>
-      </div>
-      <div class="vt-govde">
-        <aside class="vt-yan">
-          <span class="vt-k">Kütüphane</span>
-          <span class="vt-oge on">Ⅱ Yazı Animasyonları<span class="n">24</span></span>
-          <span class="vt-oge">♥ Favoriler<span class="n">6</span></span>
-          <span class="vt-oge"><span aria-hidden="true">🔊</span> SFX<span class="n">265</span></span>
-          <span class="vt-k" style="margin-top:8px">Araçlar</span>
-          <span class="vt-oge">✂ Otomatik Kesim<span class="kilit">PRO</span></span>
-          <span class="vt-oge">〜 Ritim<span class="kilit">PRO</span></span>
-        </aside>
-        <div class="vt-icerik">
-          <div class="vt-kart"><span class="vt-thumb">BAŞLIK<span class="kalp">♥</span></span><span class="m">Alt Bant · Temiz</span><span class="vt-ekle">Ekle</span></div>
-          <div class="vt-kart"><span class="vt-thumb" style="color:var(--sari)">KİNETİK<span class="kalp">♥</span></span><span class="m">Kinetik Başlık</span><span class="vt-ekle">Ekle</span></div>
-          <div class="vt-kart"><span class="vt-thumb"><span class="grad-text">GLOW</span><span class="kalp">♥</span></span><span class="m">Neon Vurgu</span><span class="vt-ekle">Ekle</span></div>
-        </div>
-      </div>
+    <div class="lib-sayilar">
+      <div><b>40</b><span>hazır yazı animasyonu (MOGRT)</span></div>
+      <div><b>265</b><span>ses efekti — WAV · MP3</span></div>
+      <div><b>11</b><span>SFX kategorisi</span></div>
+      <div><b>+∞</b><span>kendi arşivini de bağlayabilirsin</span></div>
     </div>
+
+    <h3 class="lib-baslik">Yazı animasyonları <small>gerçek önizlemeler — panelde de aynen böyle görünür</small></h3>
+    <div class="mogrt-galeri">
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/01-smooth-up.webp" alt="Smooth Up yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Smooth Up<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/02-rainbow-text.webp" alt="Rainbow Text yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Rainbow Text<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/04-old-tv.webp" alt="Old TV yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Old TV<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/06-gold-text.webp" alt="Gold Text yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Gold Text<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/07-futurist.webp" alt="Futurist yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Futurist<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/10-butter-up.webp" alt="Butter Up yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Butter Up<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/13-rock-solidance.webp" alt="Rock Solidance yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Rock Solidance<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/16-ocean-waves.webp" alt="Ocean Waves yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Ocean Waves<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/19-gradient-red-2-0.webp" alt="Gradient Red yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Gradient Red 2.0<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/26-jitter-shine.webp" alt="Jitter Shine yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Jitter Shine<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/29-cracked.webp" alt="Cracked yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Cracked<i>MOGRT</i></figcaption></figure>
+      <figure class="mg"><span class="gk"><img src="/gorseller/mogrt/31-premium-text.webp" alt="Premium Text yazı animasyonu önizlemesi" loading="lazy"></span><figcaption>Premium Text<i>MOGRT</i></figcaption></figure>
+    </div>
+    <p class="lib-not">…ve 28 tane daha: bounce, slide, blur, shrink, typewriter aileleri. Hepsi panelin Yazı sekmesinde, aranabilir.</p>
+
+    <h3 class="lib-baslik">SFX kütüphanesi <small>klasör klasör düzenli — panelden ara, ön dinle, ekle</small></h3>
+    <div class="sfx-klasorler">
+      <div class="sfxk"><b>📷 Camera</b><span>71 ses</span></div>
+      <div class="sfxk"><b>💥 Glitches</b><span>57 ses</span></div>
+      <div class="sfxk"><b>🌪 Epic Whooshes</b><span>44 ses</span></div>
+      <div class="sfxk"><b>⚡ Quick Whips</b><span>31 ses</span></div>
+      <div class="sfxk"><b>🔊 Digital / UI</b><span>18 ses</span></div>
+      <div class="sfxk"><b>💣 Impacts</b><span>14 ses</span></div>
+      <div class="sfxk"><b>📄 Paper Sounds</b><span>10 ses</span></div>
+      <div class="sfxk"><b>⌨️ Keyboard Typing</b><span>7 ses</span></div>
+      <div class="sfxk"><b>🔔 Notifications</b><span>7 ses</span></div>
+      <div class="sfxk"><b>🖱 Clicks</b><span>3 ses</span></div>
+      <div class="sfxk"><b>🫧 Pop Sounds</b><span>3 ses</span></div>
+      <div class="sfxk"><b>✦ Akıllı SFX</b><span>otomatik öneri</span></div>
+    </div>
+    <p class="lib-not">Akıllı SFX, altyazındaki vurgu anlarını bulur ve uygun sesi kendisi önerir — "whoosh aramak" tarih olur.</p>
+
+    <div class="yakinda-bar"><span class="rozet-y">YAKINDA</span><b>Motion BG</b><span>— hareketli arka plan kütüphanesi, Pro paketine ek ücret olmadan eklenecek. Bir kez öde, gelecek içerik de senin.</span></div>
   </div>
 </section>
 
