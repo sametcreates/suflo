@@ -389,11 +389,10 @@
         '<h3>' + esc(label) + '</h3>' +
         '<p class="pro-upsell-alt">Bu ozellik Pro ile acilir \u2014 tek seferlik, abonelik yok.</p>' +
         '<ul class="pro-upsell-liste">' +
-          '<li>Animasyonlu altyazi + karaoke + daktilo</li>' +
-          '<li>Otomatik kesim + ritim senkronu</li>' +
-          '<li>Toplu islem, ceviri, sozluk, ASS</li>' +
-          '<li>Yazi animasyonu (MOGRT) + SFX kutuphaneleri</li>' +
-          '<li>Altyazidan Akilli SFX onerileri</li>' +
+          '<li>Otomatik sessizlik kesimi + ritim marker</li>' +
+          '<li>Hazir yazi animasyonu (MOGRT) kutuphanesi</li>' +
+          '<li>SFX kutuphanesi + Akilli SFX onerileri</li>' +
+          '<li>Toplu islem, ceviri, sozluk, stilli ASS</li>' +
         '</ul>' +
         '<div class="pro-upsell-fiyat"><b>749 TL</b><span>tek seferlik \u00b7 abonelik yok \u00b7 omur boyu</span></div>' +
         '<div class="pro-upsell-actions">' +
