@@ -1,3 +1,12 @@
+## Suflo 2.6.4 — Motion Presetleri
+
+- **12 yeni yerleşik Motion preseti:** Simple Zoom In/Out, Pop In, dört yönlü Slide In, Fade In/Out, Focus Punch, Micro Shake ve Slide Out Right.
+- Timeline'da bir veya birden fazla klip seçip tek tıkla uygulanır; harici `.prfpset` paketi kurmak gerekmez.
+- Preset kartlarında canlı hareket önizlemesi, arama, Slide/Zoom/Fade/Vurgu filtreleri ve favoriler bulunur.
+- Hızlı, Dengeli ve Sinematik süre seçenekleriyle Yumuşak, Normal ve Güçlü hareket seviyeleri eklendi.
+- Ücretsiz kullanıcı bütün presetleri canlı önizlemeli ve kilitli görür; Suflo Pro etkinleşince kartlar anında açılır.
+- Pro MOGRT klasörleri artık Text ve Diğer Animasyonlar olarak doğru kategorilenir; hakları doğrulanmış yeni paketler sonradan karışıklık yaratmadan eklenebilir.
+
 ## Suflo 2.6.3 — Emoji Cloud bağlantı onarımı
 
 - Önceki sürümlerden kalan boş Emoji CDN ayarı artık Suflo Cloud adresini ezmiyor; yerel emoji klasörü kullanılmıyorsa 169 öğelik canlı katalog otomatik bağlanıyor.

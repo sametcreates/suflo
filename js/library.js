@@ -237,7 +237,8 @@ window.KLib = (function () {
     var ek = (K.settings().mogrtEkKlasor || "").trim();
     if (ek && K.fs.existsSync(ek)) yollar = yollar.concat(topla(ek));
     // Suflo Pro Paketi (satin alanin gosterdigi klasor) — resmi animasyonlar
-    var proPackFiles = topla(proPackMogrtDir());
+    var proRoot = proPackMogrtDir();
+    var proPackFiles = topla(proRoot);
     var proPackSet = {};
     proPackFiles.forEach(function (p) { proPackSet[pathKey(p)] = 1; });
     yollar = yollar.concat(proPackFiles);
@@ -261,7 +262,11 @@ window.KLib = (function () {
       gorulen[uniqueKey] = 1;
       var slug = ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || ("paket-" + i);
       var relPath = !isBuiltin && ek ? tam2.slice(ek.length).replace(/^[\\\/]+/, "") : "";
-      var group = isBuiltin || isPro || textAnimationMi(relPath) ? "text" : "other";
+      var relPro = isPro && proRoot ? tam2.slice(proRoot.length).replace(/^[\\\/]+/, "") : "";
+      var proText = isPro && (/^SUFLO\s+TEXT\b/i.test(ad) || textAnimationMi(relPro));
+      var group = isBuiltin || proText || textAnimationMi(relPath) ? "text" : "other";
+      var proFolder = relPro && relPro.indexOf(K.path.sep) !== -1 ? relPro.split(K.path.sep)[0] : "";
+      if (!proFolder && relPro.indexOf("/") !== -1) proFolder = relPro.split("/")[0];
       var paket = {
         path: tam2,
         ad: ad,
@@ -270,7 +275,8 @@ window.KLib = (function () {
         builtin: isBuiltin,
         pro: isPro,
         group: group,
-        category: meta && meta.category ? String(meta.category) : (group === "text" ? "Text Animation" : "Other Animation")
+        category: meta && meta.category ? String(meta.category) :
+          (group === "text" ? "Text Animation" : (proFolder ? proFolder.replace(/[-_]+/g, " ") : "Other Animation"))
       };
       paketler.push(paket);
       thumbQueue.push({ paket: paket, slug: slug });

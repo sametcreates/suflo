@@ -214,6 +214,200 @@ function KS_getSelectedClips() {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- Suflo Pro: yerlesik Motion presetleri ---------- */
+
+function KS_presetTime(sec) {
+  var t = new Time();
+  t.seconds = Math.max(0, Number(sec) || 0);
+  return t;
+}
+
+function KS_presetComponent(clip, matchName, displayNames) {
+  try {
+    var list = clip.components;
+    if (!list) return null;
+    for (var i = 0; i < list.numItems; i++) {
+      var item = list[i];
+      var match = "";
+      var display = "";
+      try { match = String(item.matchName || ""); } catch (e0) {}
+      try { display = String(item.displayName || "").toLowerCase(); } catch (e1) {}
+      if (match === matchName) return item;
+      for (var n = 0; n < displayNames.length; n++) {
+        if (display === String(displayNames[n]).toLowerCase()) return item;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+function KS_presetProperty(component, matchNames, displayNames) {
+  try {
+    if (!component || !component.properties) return null;
+    var list = component.properties;
+    for (var i = 0; i < list.numItems; i++) {
+      var item = list[i];
+      var match = "";
+      var display = "";
+      try { match = String(item.matchName || ""); } catch (e0) {}
+      try { display = String(item.displayName || "").toLowerCase(); } catch (e1) {}
+      for (var m = 0; m < matchNames.length; m++) if (match === matchNames[m]) return item;
+      for (var n = 0; n < displayNames.length; n++) {
+        if (display === String(displayNames[n]).toLowerCase()) return item;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+function KS_presetProps(clip) {
+  var motion = KS_presetComponent(clip, "ADBE Motion", ["Motion", "Hareket"]);
+  var opacity = KS_presetComponent(clip, "ADBE Opacity", ["Opacity", "Opaklik", "Opakl\u0131k"]);
+  return {
+    position: KS_presetProperty(motion, ["ADBE Position"], ["Position", "Konum"]),
+    scale: KS_presetProperty(motion, ["ADBE Scale"], ["Scale", "Olcek", "\u00d6l\u00e7ek"]),
+    opacity: KS_presetProperty(opacity, ["ADBE Opacity"], ["Opacity", "Opaklik", "Opakl\u0131k"])
+  };
+}
+
+function KS_presetCloneValue(value) {
+  if (value && typeof value !== "string" && typeof value.length === "number") {
+    var out = [];
+    for (var i = 0; i < value.length; i++) out.push(value[i]);
+    return out;
+  }
+  return value;
+}
+
+function KS_presetKeys(prop, keys) {
+  if (!prop || !keys || !keys.length) return false;
+  try {
+    prop.setTimeVarying(true);
+    var first = KS_presetTime(keys[0].time);
+    var last = KS_presetTime(keys[keys.length - 1].time);
+    try {
+      if (prop.removeKeyRange) prop.removeKeyRange(first, last, true);
+    } catch (e0) {}
+    for (var i = 0; i < keys.length; i++) {
+      var t = KS_presetTime(keys[i].time);
+      try { prop.addKey(t); } catch (e1) {}
+      prop.setValueAtKey(t, KS_presetCloneValue(keys[i].value), true);
+      // 5, Premiere'in Bezier/ease turudur. Eski surum kabul etmezse
+      // anahtarlar lineer kalir; preset yine calisir.
+      try { if (prop.setInterpolationTypeAtKey) prop.setInterpolationTypeAtKey(t, 5, true); } catch (e2) {}
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
+function KS_presetPositionValue(prop) {
+  try {
+    var v = prop.getValue();
+    if (v && typeof v.length === "number" && v.length >= 2) return [Number(v[0]), Number(v[1])];
+  } catch (e) {}
+  return null;
+}
+
+function KS_presetNumberValue(prop, fallback) {
+  try {
+    var v = Number(prop.getValue());
+    if (isFinite(v)) return v;
+  } catch (e) {}
+  return fallback;
+}
+
+function KS_applyMotionPreset(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var id = String(p.id || "");
+    var allowed = {
+      "simple-zoom-in": 1, "simple-zoom-out": 1, "pop-in": 1,
+      "slide-in-left": 1, "slide-in-right": 1, "slide-in-up": 1, "slide-in-down": 1,
+      "fade-in": 1, "fade-out": 1, "punch": 1, "micro-shake": 1, "slide-out-right": 1
+    };
+    if (!allowed[id]) return KS_err("Bilinmeyen Suflo preseti.");
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var selected = seq.getSelection();
+    if (!selected || !selected.length) return KS_err("Timeline'da en az bir video klibi sec.");
+    var duration = Number(p.duration);
+    if (!isFinite(duration) || duration < 0.18 || duration > 1.5) duration = 0.45;
+    var strength = Number(p.strength);
+    if (!isFinite(strength) || strength < 0.5 || strength > 1.8) strength = 1;
+    var playhead = 0;
+    try { playhead = seq.getPlayerPosition().seconds; } catch (eP) {}
+    var frameW = Number(seq.frameSizeHorizontal) || 1920;
+    var frameH = Number(seq.frameSizeVertical) || 1080;
+    var applied = 0;
+    var skipped = 0;
+
+    for (var i = 0; i < selected.length; i++) {
+      var clip = selected[i];
+      var props = KS_presetProps(clip);
+      if (!props.position && !props.scale && !props.opacity) { skipped++; continue; }
+      var start = Number(clip.start.seconds) || 0;
+      var end = Number(clip.end.seconds) || start;
+      var clipDur = Math.max(0, end - start);
+      if (clipDur < 0.08) { skipped++; continue; }
+      var d = Math.min(duration, Math.max(0.08, clipDur * 0.46));
+      var pos = KS_presetPositionValue(props.position);
+      var scale = KS_presetNumberValue(props.scale, 100);
+      var opacity = KS_presetNumberValue(props.opacity, 100);
+      var normalized = pos && Math.abs(pos[0]) <= 2.5 && Math.abs(pos[1]) <= 2.5;
+      var dx = (normalized ? 0.18 : frameW * 0.18) * strength;
+      var dy = (normalized ? 0.18 : frameH * 0.18) * strength;
+      var changed = false;
+      var t0 = start;
+      var t1 = start + d * 0.78;
+      var t2 = start + d;
+
+      if (id === "simple-zoom-in" && props.scale) {
+        changed = KS_presetKeys(props.scale, [{ time: t0, value: scale * (1 + .12 * strength) }, { time: t1, value: scale * .985 }, { time: t2, value: scale }]) || changed;
+      } else if (id === "simple-zoom-out" && props.scale) {
+        changed = KS_presetKeys(props.scale, [{ time: t0, value: scale * Math.max(.55, 1 - .14 * strength) }, { time: t1, value: scale * 1.015 }, { time: t2, value: scale }]) || changed;
+      } else if (id === "pop-in") {
+        if (props.scale) changed = KS_presetKeys(props.scale, [{ time: t0, value: scale * Math.max(.45, 1 - .28 * strength) }, { time: t1, value: scale * (1 + .08 * strength) }, { time: t2, value: scale }]) || changed;
+        if (props.opacity) changed = KS_presetKeys(props.opacity, [{ time: t0, value: 0 }, { time: start + d * .52, value: opacity }]) || changed;
+      } else if (id.indexOf("slide-in-") === 0 && pos) {
+        var from = [pos[0], pos[1]];
+        if (id === "slide-in-left") from[0] -= dx;
+        if (id === "slide-in-right") from[0] += dx;
+        if (id === "slide-in-up") from[1] -= dy;
+        if (id === "slide-in-down") from[1] += dy;
+        var over = [pos[0] + (pos[0] - from[0]) * .035, pos[1] + (pos[1] - from[1]) * .035];
+        changed = KS_presetKeys(props.position, [{ time: t0, value: from }, { time: t1, value: over }, { time: t2, value: pos }]) || changed;
+        if (props.opacity) changed = KS_presetKeys(props.opacity, [{ time: t0, value: 0 }, { time: start + d * .62, value: opacity }]) || changed;
+      } else if (id === "fade-in" && props.opacity) {
+        changed = KS_presetKeys(props.opacity, [{ time: t0, value: 0 }, { time: t2, value: opacity }]) || changed;
+      } else if (id === "fade-out" && props.opacity) {
+        t0 = end - d; t2 = end;
+        changed = KS_presetKeys(props.opacity, [{ time: t0, value: opacity }, { time: t2, value: 0 }]) || changed;
+      } else if (id === "slide-out-right" && pos) {
+        t0 = end - d; t1 = t0 + d * .22; t2 = end;
+        changed = KS_presetKeys(props.position, [{ time: t0, value: pos }, { time: t1, value: [pos[0] - dx * .035, pos[1]] }, { time: t2, value: [pos[0] + dx, pos[1]] }]) || changed;
+        if (props.opacity) changed = KS_presetKeys(props.opacity, [{ time: t0 + d * .35, value: opacity }, { time: t2, value: 0 }]) || changed;
+      } else if (id === "punch" && props.scale) {
+        var center = playhead > start + d && playhead < end - d ? playhead : start + clipDur * .5;
+        var half = Math.min(d * .5, Math.max(.08, Math.min(center - start, end - center)));
+        changed = KS_presetKeys(props.scale, [{ time: center - half, value: scale }, { time: center, value: scale * (1 + .12 * strength) }, { time: center + half, value: scale }]) || changed;
+      } else if (id === "micro-shake" && pos) {
+        var c = playhead > start + d && playhead < end - d ? playhead : start + clipDur * .5;
+        var span = Math.min(d, Math.max(.16, clipDur * .25));
+        changed = KS_presetKeys(props.position, [
+          { time: c - span * .5, value: pos },
+          { time: c - span * .25, value: [pos[0] - dx * .055, pos[1] + dy * .025] },
+          { time: c, value: [pos[0] + dx * .045, pos[1] - dy * .03] },
+          { time: c + span * .25, value: [pos[0] - dx * .025, pos[1] + dy * .018] },
+          { time: c + span * .5, value: pos }
+        ]) || changed;
+      }
+      if (changed) applied++; else skipped++;
+    }
+    if (!applied) return KS_err("Secili klipte uygulanabilir Motion/Opacity ozelligi bulunamadi.");
+    return KS_ok({ applied: applied, skipped: skipped, preset: id });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Playhead ---------- */
 
 function KS_setPlayerPosition(encoded) {

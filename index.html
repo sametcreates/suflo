@@ -72,6 +72,12 @@
       <span class="ky-metin"><b>Diğer Animasyonlar</b><i>logo · grafik · lower third</i></span>
       <span class="ky-adet" id="custom-sayac">0</span>
     </button>
+    <button class="ky-oge" data-tab="presets">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7"/><circle cx="13" cy="10" r="1.7"/><circle cx="7" cy="15" r="1.7"/></svg></span>
+      <span class="ky-metin"><b>Motion Presetleri</b><i>slide · zoom · pop</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+      <span class="ky-adet" id="preset-sayac">12</span>
+    </button>
     <button class="ky-oge" data-tab="text" data-kat="fav">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16.2 4.2 10.8C1 7.8 5.4 3.4 8.2 6.1L10 7.8l1.8-1.7c2.8-2.7 7.2 1.7 4 4.7z"/></svg></span>
       <span class="ky-metin"><b>Favoriler</b><i>işaretlediklerin</i></span>
@@ -630,6 +636,59 @@
     </div>
   </section>
 
+  <!-- ================= MOTION PRESETLERI ================= -->
+  <section id="tab-presets" class="tabpane">
+    <div class="pro-tanitim" id="preset-tanitim">
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>12 yerleşik Motion preseti</b>
+        <span>Dosya kurmadan seçili klibe Slide, Zoom, Pop, Fade ve vurgu hareketleri uygula.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro preset özeti">
+        <i><strong>12</strong> preset</i><i><strong>1×</strong> tık</i><i><strong>0</strong> eklenti</i>
+      </div>
+      <button class="btn primary" id="preset-proya-gec">12 preseti aç — 749 TL</button>
+    </div>
+
+    <div class="preset-toolbar">
+      <label class="library-search" for="preset-search">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 4.2 4.2"/></svg>
+        <input id="preset-search" type="text" placeholder="Preset ara… örn. slide, zoom, fade">
+      </label>
+      <label class="preset-control">Hız
+        <select id="preset-speed">
+          <option value="0.28">Hızlı</option>
+          <option value="0.45" selected>Dengeli</option>
+          <option value="0.72">Sinematik</option>
+        </select>
+      </label>
+      <label class="preset-control">Güç
+        <select id="preset-strength">
+          <option value="0.72">Yumuşak</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.35">Güçlü</option>
+        </select>
+      </label>
+    </div>
+    <div class="preset-subbar">
+      <div class="seg-ctl" id="preset-filter">
+        <button class="on" data-f="all">Tümü</button>
+        <button data-f="slide">Slide</button>
+        <button data-f="zoom">Zoom</button>
+        <button data-f="fade">Fade</button>
+        <button data-f="impact">Vurgu</button>
+        <button data-f="fav">♥</button>
+      </div>
+      <span id="preset-count" class="dim">12 / 12 preset</span>
+    </div>
+    <div class="preset-note"><span>1</span> Timeline’da klip seç <i>→</i><span>2</span> Presete tıkla <i>→</i><b>Hazır</b></div>
+    <div id="preset-grid" class="preset-grid"></div>
+    <div id="preset-empty" class="empty-state" hidden>
+      <b>Eşleşen preset yok</b>
+      <p>Aramayı veya kategori filtresini değiştir.</p>
+    </div>
+  </section>
+
   <!-- ================= SFX ================= -->
   <section id="tab-sfx" class="tabpane">
     <div class="pro-tanitim" id="sfx-tanitim" hidden>
@@ -817,7 +876,7 @@
         <div><div class="set-title">Pro İçerik Bulutu</div><b id="set-prosync-title">Bir kez etkinleştir, hep güncel kal</b></div>
         <span class="pro-sync-badge" id="set-prosync-badge">AUTO</span>
       </div>
-      <p class="hint" id="set-prosync-detail">Pro lisansını etkinleştirince 40 yazı animasyonu ve 265 SFX otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.</p>
+      <p class="hint" id="set-prosync-detail">Pro lisansıyla 12 yerleşik Motion preseti açılır; 40 yazı animasyonu ve 265 SFX otomatik kurulur. Yeni içeriklerde yalnız değişen dosyalar indirilir.</p>
       <div class="pro-sync-progress" id="set-prosync-progress" hidden><i id="set-prosync-bar"></i></div>
       <div class="row-btns pro-sync-actions">
         <button id="set-prosync-run" class="btn primary">İçerikleri eşitle</button>
@@ -944,6 +1003,7 @@
   <script src="js/magiccut.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>
+  <script src="js/presets.js"></script>
   <script src="js/sfx.js"></script>
   <script src="js/emoji-assets.js"></script>
   <script src="js/library-health.js"></script>

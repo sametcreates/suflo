@@ -287,6 +287,9 @@ window.KApp = (function () {
     // Stil katmani gorunur; ucretsiz kullanici kartlari deneyip cikti aninda Pro'ya gecebilir.
     Pro.markLocked(el("cap-overlay"), !s.pro);
     Pro.markLocked(el("cap-translate-go"), !s.pro);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-kilit]"), function (badge) {
+      badge.hidden = !!s.pro;
+    });
 
     // Kilitli secenekler (karaoke modlari, kelimeli animasyonlar) acilir
     // listede " — PRO" ekiyle gorunsun: kullanici neyin ucretli oldugunu
@@ -312,13 +315,14 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "sfx-tanitim", "cut-tanitim", "beat-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "cut-tanitim", "beat-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
 
     // MOGRT kartlarindaki PRO rozetleri tazelensin
     if (window.KLib && el("mogrt-grid") && el("mogrt-grid").children.length) KLib.tara();
+    if (window.KPresets && el("preset-grid")) KPresets.render();
     if (window.KSfx && el("sfx-list") && el("sfx-list").children.length) KSfx.tara();
     if (window.KEmojiAssets && el("emoji-assets-grid") && el("emoji-assets-grid").children.length) KEmojiAssets.tara();
   }
@@ -1037,6 +1041,7 @@ window.KApp = (function () {
     guvenli("Kesim", function () { KCut.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
+    guvenli("Motion Presetleri", function () { if (window.KPresets) KPresets.init(); });
     guvenli("SFX", function () { if (window.KSfx) KSfx.init(); });
     guvenli("Emoji Assets", function () { if (window.KEmojiAssets) KEmojiAssets.init(); });
     guvenli("Kütüphane kontrolü", function () { if (window.KLibraryHealth) KLibraryHealth.init(); });

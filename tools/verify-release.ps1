@@ -46,6 +46,8 @@ function Test-Archive([string]$path, [string]$kind) {
         $badSeparators = @($names | Where-Object { $_ -match '\\' })
         $required = @(
             '(^|/)js/pro-sync\.js$',
+            '(^|/)js/presets\.js$',
+            '(^|/)jsx/host\.jsx$',
             '(^|/)assets/pro-mogrt-showcase/catalog\.json$',
             '(^|/)assets/pro-sfx-showcase/catalog\.json$',
             '(^|/)CSXS/manifest\.xml$'
@@ -69,4 +71,3 @@ function Test-Archive([string]$path, [string]$kind) {
 Test-Archive $ZxpPath "ZXP"
 Test-Archive $InstallerPath "Kurulum ZIP"
 Write-Host ("Suflo {0} yayin paketleri dogrulandi." -f $version) -ForegroundColor Green
-
