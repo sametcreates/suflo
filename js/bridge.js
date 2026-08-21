@@ -103,18 +103,30 @@ window.K = (function () {
   }
 
   var _settings = null;
+  var DEFAULT_EMOJI_CATALOG_URL = "https://assets.suflo.app/emoji/v1/catalog.json";
 
   function loadSettings() {
     if (_settings) return _settings;
     _settings = {
       folders: [], provider: "local", endpoint: "", apiKey: "", ffmpeg: "", favs: [], recent: [],
-      emojiAssetsCatalogUrl: "https://assets.suflo.app/emoji/v1/catalog.json"
+      emojiAssetsCatalogUrl: DEFAULT_EMOJI_CATALOG_URL
     };
     try {
       var p = settingsPath();
       if (p && fs.existsSync(p)) {
         var disk = JSON.parse(fs.readFileSync(p, "utf8"));
         for (var k in disk) if (disk.hasOwnProperty(k)) _settings[k] = disk[k];
+
+        // 2.6.1/2.6.2'de bos kaydedilmis eski deger, yeni Suflo Cloud
+        // varsayilanini eziyordu. Yerel klasor kullanilmiyorsa bu eski durumu
+        // bir kez onar; kullanicinin sonradan bilerek kapattigi CDN'e dokunma.
+        if (!String(_settings.emojiAssetsKlasor || "").trim() &&
+            !String(_settings.emojiAssetsCatalogUrl || "").trim() &&
+            _settings.emojiAssetsCatalogDisabled !== true) {
+          _settings.emojiAssetsCatalogUrl = DEFAULT_EMOJI_CATALOG_URL;
+          _settings.emojiAssetsCatalogMigrated = "2.6.3";
+          saveSettings();
+        }
       }
     } catch (e) {}
     return _settings;
@@ -356,7 +368,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "2.6.2";
+  var VERSION = "2.6.3";
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];

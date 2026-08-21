@@ -40,7 +40,13 @@ ok("Hostinger cache/CORS dosyasi var", fs.existsSync(path.join(out, ".htaccess")
 ok("kurulum notu pakette", fs.existsSync(path.join(out, "HOSTINGER-KURULUM.txt")));
 var bridgeSource = fs.readFileSync(path.join(ROOT, "js", "bridge.js"), "utf8");
 ok("yeni kurulum Suflo Cloud kataloguna otomatik baglanir",
-  /emojiAssetsCatalogUrl:\s*"https:\/\/assets\.suflo\.app\/emoji\/v1\/catalog\.json"/.test(bridgeSource));
+  /DEFAULT_EMOJI_CATALOG_URL\s*=\s*"https:\/\/assets\.suflo\.app\/emoji\/v1\/catalog\.json"/.test(bridgeSource) &&
+  /emojiAssetsCatalogUrl:\s*DEFAULT_EMOJI_CATALOG_URL/.test(bridgeSource));
+ok("eski bos CDN ayari yerel klasor yoksa otomatik onariliyor",
+  /emojiAssetsCatalogDisabled\s*!==\s*true[\s\S]{0,180}emojiAssetsCatalogUrl\s*=\s*DEFAULT_EMOJI_CATALOG_URL/.test(bridgeSource) &&
+  /emojiAssetsCatalogMigrated\s*=\s*"2\.6\.3"/.test(bridgeSource));
+ok("bilerek kapatilan CDN ile eski bos ayar birbirinden ayriliyor",
+  /emojiAssetsCatalogDisabled\s*=\s*!value/.test(fs.readFileSync(path.join(ROOT, "js", "emoji-assets.js"), "utf8")));
 
 (async function () {
   var settings = {

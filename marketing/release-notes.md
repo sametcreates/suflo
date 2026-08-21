@@ -1,3 +1,10 @@
+## Suflo 2.6.3 — Emoji Cloud bağlantı onarımı
+
+- Önceki sürümlerden kalan boş Emoji CDN ayarı artık Suflo Cloud adresini ezmiyor; yerel emoji klasörü kullanılmıyorsa 169 öğelik canlı katalog otomatik bağlanıyor.
+- Kullanıcı Emoji CDN'i bilerek kapatırsa bu tercih korunuyor; eski bozuk ayarla bilinçli tercih birbirinden ayrılıyor.
+- Yerel emoji klasörü kaldırıldığında, kullanıcı bulut kataloğunu ayrıca kapatmadıysa Suflo Cloud otomatik geri geliyor.
+- Sunucudaki katalog, önizleme ve dosya özetleri yeniden doğrulandı.
+
 ## Suflo 2.6.2 — Pro İçerik Bulutu + premium vitrin
 
 - **Bir kez etkinleştir, sürekli güncel kal:** 40 MOGRT ve 265 SFX lisans doğrulandıktan sonra otomatik kurulur; yeni kataloglarda yalnız değişen dosyalar indirilir.

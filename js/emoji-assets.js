@@ -16,6 +16,7 @@ window.KEmojiAssets = (function () {
   var remoteLoading = false;
   var remoteError = "";
   var remoteRequestId = 0;
+  var DEFAULT_CATALOG_URL = "https://assets.suflo.app/emoji/v1/catalog.json";
 
   function el(id) { return document.getElementById(id); }
   function basename(p) { return String(p || "").replace(/^.*[\\\/]/, ""); }
@@ -422,7 +423,12 @@ window.KEmojiAssets = (function () {
       return false;
     }
     K.settings().emojiAssetsKlasor = folder;
-    if (folder) K.settings().emojiAssetsCatalogUrl = "";
+    if (folder) {
+      K.settings().emojiAssetsCatalogUrl = "";
+      K.settings().emojiAssetsCatalogDisabled = false;
+    } else if (K.settings().emojiAssetsCatalogDisabled !== true) {
+      K.settings().emojiAssetsCatalogUrl = DEFAULT_CATALOG_URL;
+    }
     K.saveSettings();
     var input = el("set-emoji-assets-klasor"); if (input) input.value = folder;
     var remoteInput = el("set-emoji-assets-url"); if (remoteInput && folder) remoteInput.value = "";
@@ -444,6 +450,7 @@ window.KEmojiAssets = (function () {
     remoteRequestId++;
     remoteLoading = false;
     K.settings().emojiAssetsCatalogUrl = value;
+    K.settings().emojiAssetsCatalogDisabled = !value;
     K.saveSettings();
     var input = el("set-emoji-assets-url"); if (input) input.value = value;
     remoteError = "";
