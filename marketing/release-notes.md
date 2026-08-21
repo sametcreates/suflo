@@ -4,6 +4,7 @@
 - Kullanıcı Emoji CDN'i bilerek kapatırsa bu tercih korunuyor; eski bozuk ayarla bilinçli tercih birbirinden ayrılıyor.
 - Yerel emoji klasörü kaldırıldığında, kullanıcı bulut kataloğunu ayrıca kapatmadıysa Suflo Cloud otomatik geri geliyor.
 - Sunucudaki katalog, önizleme ve dosya özetleri yeniden doğrulandı.
+- Hostinger'ın PNG optimizasyonunun dosya özetini değiştirmesi engellendi; asıl emoji dosyası byte-koruyan güvenli akıştan gelirken hafif önizlemeler CDN'de kalıyor.
 
 ## Suflo 2.6.2 — Pro İçerik Bulutu + premium vitrin
 

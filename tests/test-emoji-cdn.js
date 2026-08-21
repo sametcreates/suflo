@@ -31,11 +31,17 @@ var built = cp.spawnSync(process.execPath, [builder,
 ok("Hostinger paketi uretiliyor", built.status === 0, built.stderr);
 var catalog = JSON.parse(fs.readFileSync(path.join(out, "catalog.json"), "utf8"));
 ok("katalog semasi ve adet dogru", catalog.schema === "suflo-emoji-catalog/v1" && catalog.count === 2, catalog.count);
-ok("asset yolları goreli ve statik host uyumlu", catalog.items.every(function (x) { return /^assets\//.test(x.file); }), catalog.items[0].file);
+ok("asil dosyalar CDN donusumunu engelleyen guvenli akistan geliyor",
+  catalog.items.every(function (x) { return /^download\.php\?file=/.test(x.file); }), catalog.items[0].file);
 ok("kartlar icin hafif thumbnail uretiliyor", catalog.items.every(function (x) { return /^thumbs\//.test(x.preview); }), catalog.items[0].preview);
 ok("SHA-256 katalogdaki dosyayla eslesiyor", catalog.items.every(function (x) {
-  return x.sha256 === sha(path.join(out, x.file));
+  var name = decodeURIComponent(String(x.file).replace(/^download\.php\?file=/, ""));
+  return x.sha256 === sha(path.join(out, "assets", name));
 }));
+var streamPhp = path.join(out, "download.php");
+ok("Hostinger icin byte-koruyan PHP indirme gecidi var",
+  fs.existsSync(streamPhp) && /application\/octet-stream/.test(fs.readFileSync(streamPhp, "utf8")) &&
+  /no-transform/.test(fs.readFileSync(streamPhp, "utf8")) && /realpath/.test(fs.readFileSync(streamPhp, "utf8")));
 ok("Hostinger cache/CORS dosyasi var", fs.existsSync(path.join(out, ".htaccess")) && /Access-Control-Allow-Origin/.test(fs.readFileSync(path.join(out, ".htaccess"), "utf8")));
 ok("kurulum notu pakette", fs.existsSync(path.join(out, "HOSTINGER-KURULUM.txt")));
 var bridgeSource = fs.readFileSync(path.join(ROOT, "js", "bridge.js"), "utf8");

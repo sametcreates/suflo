@@ -127,12 +127,17 @@ files.forEach(function (file) {
   var outName = id + extension;
   fs.copyFileSync(file, path.join(assetsDir, outName));
   var rel = "assets/" + outName;
+  // Hostinger hCDN bazi PNG/JPG dosyalarini otomatik optimize edip baytlarini
+  // degistirebiliyor. Onizleme icin bu sorun degil; fakat indirilen asil dosya
+  // katalogdaki SHA-256 ile birebir ayni kalmali. application/octet-stream
+  // donen bu PHP gecidi CDN'in gorsel donusumunu engeller.
+  var downloadRel = "download.php?file=" + encodeURIComponent(outName);
   var thumbName = id + ".webp";
   var thumbRel = thumbnail(file, path.join(thumbsDir, thumbName)) ? "thumbs/" + thumbName : rel;
   items.push({
     id: id,
     name: name,
-    file: baseUrl ? baseUrl + "/" + rel : rel,
+    file: baseUrl ? baseUrl + "/" + downloadRel : downloadRel,
     preview: baseUrl ? baseUrl + "/" + thumbRel : thumbRel,
     format: extension.slice(1).toUpperCase(),
     bytes: bytes,
@@ -157,13 +162,35 @@ var catalog = {
 };
 fs.writeFileSync(path.join(output, "catalog.json"), JSON.stringify(catalog, null, 2) + "\n", "utf8");
 
+var downloadPhp = [
+  "<?php",
+  "declare(strict_types=1);",
+  "$name = isset($_GET['file']) ? (string) $_GET['file'] : '';",
+  "if (!preg_match('/\\A[a-z0-9][a-z0-9._-]{2,180}\\z/i', $name)) { http_response_code(400); exit; }",
+  "$root = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'assets');",
+  "$path = $root !== false ? realpath($root . DIRECTORY_SEPARATOR . $name) : false;",
+  "if ($root === false || $path === false || dirname($path) !== $root || !is_file($path)) { http_response_code(404); exit; }",
+  "header('Content-Type: application/octet-stream');",
+  "header('Content-Length: ' . (string) filesize($path));",
+  "header('Content-Disposition: inline; filename=\"' . basename($path) . '\"');",
+  "header('Cache-Control: public, max-age=31536000, immutable, no-transform');",
+  "header('X-Content-Type-Options: nosniff');",
+  "header('Access-Control-Allow-Origin: *');",
+  "$fp = fopen($path, 'rb');",
+  "if ($fp === false) { http_response_code(500); exit; }",
+  "fpassthru($fp);",
+  "fclose($fp);",
+  ""
+].join("\n");
+fs.writeFileSync(path.join(output, "download.php"), downloadPhp, "utf8");
+
 var htaccess = [
   "Options -Indexes",
   "<IfModule mod_headers.c>",
   "  Header set Access-Control-Allow-Origin \"*\"",
   "  Header set X-Content-Type-Options \"nosniff\"",
   "  <FilesMatch \"\\.(png|webp|gif|jpg|jpeg)$\">",
-  "    Header set Cache-Control \"public, max-age=31536000, immutable\"",
+  "    Header set Cache-Control \"public, max-age=31536000, immutable, no-transform\"",
   "  </FilesMatch>",
   "  <FilesMatch \"catalog\\.json$\">",
   "    Header set Cache-Control \"no-cache, max-age=0\"",
