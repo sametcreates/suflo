@@ -124,7 +124,11 @@ nav .links a:hover{color:var(--text)}
 .hero h1 em{font-style:normal;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero .sub{margin-top:16px;color:var(--dim);font-size:17px;max-width:42ch}
 .cta-row{display:flex;flex-wrap:wrap;gap:11px;margin-top:24px}
+.btn.pro-cta{background:var(--grad);color:#fff;border:0;box-shadow:0 14px 34px -12px rgba(124,92,255,.55);display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;line-height:1.2}
+.btn.pro-cta .pc-alt{font-size:10.5px;font-weight:500;opacity:.82;letter-spacing:.01em}
+.btn.pro-cta:hover{filter:brightness(1.07)}
 .pro-mikro{margin-top:12px;font-size:13px;color:var(--faint)}
+.pro-mikro b{color:var(--dim);font-weight:590}
 .pro-mikro a{font-weight:700}
 .note{margin-top:14px;font-size:12.5px;color:var(--faint)}
 .note b{color:var(--dim)}
@@ -414,9 +418,10 @@ html.js .reveal.in{opacity:1;transform:none}
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 7 8 10.5 11.5 7M3 13h10" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span id="indir-metin">Ücretsiz indir</span>
       </a>
+      <a class="btn pro-cta" href="#fiyat">Suflo Pro — 749 TL <span class="pc-alt">tek seferlik · abonelik yok</span></a>
       <a class="btn ghost" href="#nasil">Nasıl çalışır?</a>
     </div>
-    <p class="pro-mikro">Ücretsiz ve açık kaynak. Daha fazlasını isteyenler için <a href="#pro">Suflo Pro →</a></p>
+    <p class="pro-mikro"><b>Ücretsiz:</b> sınırsız Türkçe altyazı, sonsuza dek. <b>Pro:</b> otomatik kesim, yazı stilleri, 40 animasyon + 265 SFX — <a href="#pro">neler var? →</a></p>
     <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v2.6.3</b></p>
     <p class="mobil-not" id="mobil-not" hidden>📱 Telefondasın: Suflo bilgisayarda, Premiere'in içinde çalışıyor.
     Bu adresi kendine gönder, bilgisayarında aç: <b>suflo.app</b></p>
