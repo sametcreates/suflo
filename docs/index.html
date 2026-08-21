@@ -344,6 +344,45 @@ footer{border-top:1px solid var(--line);margin-top:56px;padding:30px 0 40px;font
 .fl a{color:var(--dim)}
 .gizlilik{margin-top:10px;font-size:11.5px;max-width:70ch}
 
+/* ---------- masterpiece katmani (Rush + blinkl esinli) ---------- */
+/* gradyan vurgu kelimesi */
+.gt{font-style:normal;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* icerik sutununu cerceveleyen ince dikey cizgiler (blinkl) */
+@media(min-width:1260px){
+  body::before,body::after{content:"";position:fixed;top:0;bottom:0;width:1px;z-index:1;pointer-events:none;
+    background:linear-gradient(180deg,transparent,rgba(255,255,255,.055) 14%,rgba(255,255,255,.055) 86%,transparent)}
+  body::before{left:calc(50% - 578px)}
+  body::after{right:calc(50% - 578px)}
+}
+/* hero maketinde secim cercevesi + kose tutamaclari (blinkl) */
+.hero .mock{position:relative}
+.hero .mock::after{content:"";position:absolute;inset:-15px;border:1px dashed rgba(124,92,255,.30);border-radius:22px;pointer-events:none;
+  background:
+    radial-gradient(circle,var(--accent) 2.5px,transparent 3.2px) left -3px top -3px/8px 8px no-repeat,
+    radial-gradient(circle,var(--accent) 2.5px,transparent 3.2px) right -3px top -3px/8px 8px no-repeat,
+    radial-gradient(circle,var(--accent) 2.5px,transparent 3.2px) left -3px bottom -3px/8px 8px no-repeat,
+    radial-gradient(circle,var(--accent) 2.5px,transparent 3.2px) right -3px bottom -3px/8px 8px no-repeat}
+@media(max-width:860px){.hero .mock::after{display:none}}
+/* renk temali Pro kartlari (Rush) */
+.pv{--pva:#7c5cff;--pvg:rgba(124,92,255,.34)}
+.pv-grid .pv:nth-child(1){--pva:#5ad48f;--pvg:rgba(90,212,143,.30)}
+.pv-grid .pv:nth-child(2){--pva:#b07cff;--pvg:rgba(176,124,255,.32)}
+.pv-grid .pv:nth-child(3){--pva:#ffb45c;--pvg:rgba(255,180,92,.28)}
+.pv-grid .pv:nth-child(4){--pva:#4ea7fc;--pvg:rgba(78,167,252,.32)}
+.pv::before{content:"";position:absolute;top:0;left:16px;right:16px;height:2px;border-radius:0 0 4px 4px;opacity:.55;
+  background:linear-gradient(90deg,transparent,var(--pva),transparent)}
+.pv:hover{box-shadow:0 22px 54px -22px var(--pvg);border-color:rgba(255,255,255,.16)}
+.pv-kat{display:inline-block;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:.14em;
+  color:var(--pva);border:1px solid;border-color:color-mix(in srgb,var(--pva) 38%,transparent);border-radius:999px;padding:2.5px 9px;margin-bottom:10px}
+/* sure iddiasi: eski sure ustu cizili, yenisi vurgulu */
+.pv p s{color:var(--faint);text-decoration-color:rgba(255,120,120,.55);text-decoration-thickness:1.5px}
+.pv p em{font-style:normal;font-weight:650;color:var(--pva)}
+/* adim numaralarina accent halka (blinkl 1-2-3) */
+.adim .no{box-shadow:0 0 0 1px rgba(124,92,255,.35),0 0 22px -6px rgba(124,92,255,.5)}
+/* klavye tusu chip'i (blinkl) */
+kbd{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.82em;font-weight:600;color:var(--text);
+  background:var(--bg3,#1a1a21);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 6px;white-space:nowrap}
+
 /* ---------- pro kutuphane (tek sayfa birlesimi) ---------- */
 .lib-baslik{font-size:16.5px;font-weight:590;margin:30px 0 12px;letter-spacing:-.015em}
 .lib-baslik small{display:block;font-size:12.5px;font-weight:450;color:var(--faint);margin-top:3px}
@@ -472,7 +511,7 @@ html.js .reveal.in{opacity:1;transform:none}
   <!-- ================= NASIL ================= -->
   <section id="nasil">
     <p class="kicker reveal">Nasıl çalışır?</p>
-    <h2 class="reveal">Üç adım. Gerisi Suflo'da.</h2>
+    <h2 class="reveal">Üç adım. <em class="gt">Gerisi Suflo'da.</em></h2>
     <p class="lead reveal">Panel Premiere'in içinde yaşar. Dışarıda program yok, dosya taşıma yok.</p>
     <div class="adimlar">
       <div class="adim reveal"><span class="no">1</span>
@@ -493,7 +532,7 @@ html.js .reveal.in{opacity:1;transform:none}
   <!-- ================= HIZ ================= -->
   <section id="hiz">
     <p class="kicker reveal">Hız</p>
-    <h2 class="reveal">22 kata kadar hızlandı.</h2>
+    <h2 class="reveal"><em class="gt">22 kata kadar</em> hızlandı.</h2>
     <p class="lead reveal">Sessizlik atlama (VAD) konuşma olmayan bölümleri motora hiç göndermez.
     NVIDIA kartlarda CUDA, Apple Silicon'da Metal hızlandırma kendiliğinden devreye girer.</p>
     <div class="hiz-kutu reveal" id="hiz-kutu">
@@ -522,9 +561,9 @@ html.js .reveal.in{opacity:1;transform:none}
     Suflo'da düzeltme, uygulamadan önce panelde biter.</p>
     <div class="editor-iki">
       <div>
-        <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Satır satır düzenleme</b><span>Bölme (Enter), birleştirme, silme, araya satır ekleme.</span></div></div>
+        <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Satır satır düzenleme</b><span>Bölme (<kbd>Enter</kbd>), birleştirme, silme, araya satır ekleme.</span></div></div>
         <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Zaman kontrolü</b><span>Çift tıkla elle düzenle, tümünü ±0,5 sn kaydır, zamana tıklayıp playhead'e git.</span></div></div>
-        <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Geri al / yinele</b><span>Ctrl+Z ve Ctrl+Y, 25 adıma kadar. Taslak diske yazılır; çökmede iş kaybolmaz.</span></div></div>
+        <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Geri al / yinele</b><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> ve <kbd>Ctrl</kbd>+<kbd>Y</kbd>, 25 adıma kadar. Taslak diske yazılır; çökmede iş kaybolmaz.</span></div></div>
         <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Terim sözlüğü</b><span>Whisper'ın sürekli yanlış yazdığı isimleri bir kez öğret, her transkriptte otomatik düzelsin.</span></div></div>
         <div class="madde reveal"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Türkçeye duyarlı bul &amp; değiştir</b><span>İ/ı ayrımını doğru yapan, tam kelime eşleşmeli arama.</span></div></div>
       </div>
@@ -612,28 +651,32 @@ html.js .reveal.in{opacity:1;transform:none}
   <section id="pro-vitrin">
     <span id="pro"></span>
     <p class="kicker reveal">Suflo Pro</p>
-    <h2 class="reveal">Pro'da dahası var.</h2>
+    <h2 class="reveal">Pro'da <em class="gt">dahası</em> var.</h2>
     <p class="lead reveal">Yukarıdakilerin hepsi ücretsiz ve öyle kalacak. Pro, "daha hızlı bitir, daha zengin görün" katmanını ekler — tek seferlik, abonelik yok.</p>
     <div class="pv-grid reveal">
       <a class="pv" href="#fiyat">
+        <span class="pv-kat">KESİM</span>
         <span class="pv-rozet">PRO</span>
         <b><span aria-hidden="true">✂️</span> Otomatik sessizlik kesimi</b>
-        <p>Konuşmadaki duraksamaları bulur, önce sana gösterir, onayladığını timeline'da keser. Jump-cut saniyeler sürer.</p>
+        <p>10 dakikalık konuşmada sessizlikleri elle ayıklamak <s>40 dakika</s> → <em>2 dakika</em>. Bulur, gösterir, onayladığını keser.</p>
       </a>
       <a class="pv" href="#fiyat">
+        <span class="pv-kat">RİTİM</span>
         <span class="pv-rozet">PRO</span>
         <b><span aria-hidden="true">🥁</span> Ritim marker'ları</b>
-        <p>Müziğin vuruşlarını bulur (bas/tiz ayrımlı), timeline'a sequence marker atar — kesimlerini beat'e hizala.</p>
+        <p>Beat'i dalga formuna bakıp tahmin etmek <s>15 dakika</s> → <em>tek tık</em>. Bas/tiz ayrımlı gerçek analiz, marker'lar hazır.</p>
       </a>
       <a class="pv" href="#fiyat">
+        <span class="pv-kat">MOGRT</span>
         <span class="pv-rozet">PRO</span>
         <b>Ⅱ Yazı animasyonu kütüphanesi</b>
-        <p>40 MOGRT lisansınla otomatik kurulur: gerçek önizlemeyi gör, ara, favorile, tek tıkla playhead'e ekle.</p>
+        <p>Bir başlığı keyframe'le elle canlandırmak <s>40 dakika</s> → <em>40 saniye</em>. 40 hazır animasyon, tek tıkla playhead'e.</p>
       </a>
       <a class="pv" href="#fiyat">
+        <span class="pv-kat">SFX</span>
         <span class="pv-rozet">PRO</span>
         <b>♫ SFX kütüphanesi + Akıllı SFX</b>
-        <p>265 sesi panelden ara, ön dinle, playhead'e bırak; yeni içerikler otomatik güncellensin.</p>
+        <p>Doğru "whoosh"u internette aramak <s>20 dakika</s> → <em>3 saniye</em>. 265 ses panelde; Akıllı SFX vurgu anına kendisi önerir.</p>
       </a>
     </div>
     <div class="pv-galeri reveal" aria-label="Pro paketindeki yazı animasyonlarından örnekler">
@@ -699,7 +742,7 @@ html.js .reveal.in{opacity:1;transform:none}
   <section id="pro-tablo">
     <span id="fiyat"></span>
     <p class="kicker reveal">Fiyat</p>
-    <h2 class="reveal">Ücretsiz başla. Bir kere öde, ömür boyu senin.</h2>
+    <h2 class="reveal">Ücretsiz başla. Bir kere öde, <em class="gt">ömür boyu senin.</em></h2>
     <div class="fiyatlar reveal">
       <div class="fk">
         <span class="plan">Ücretsiz</span>
