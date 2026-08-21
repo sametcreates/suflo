@@ -114,6 +114,11 @@ nav .links a:hover{color:var(--text)}
 
 /* ---------- hero ---------- */
 .hero{padding:54px 0 26px;display:grid;grid-template-columns:1.08fr .92fr;gap:42px;align-items:center}
+.hero-sol,.hero-sag{min-width:0}
+.hero .sub{margin-top:16px}
+.hero .pro-mikro{margin-top:14px}
+.hero .mock{margin-top:28px}
+.hero .note{margin-top:18px}
 .rozet{
   display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.06em;
   color:var(--dim);background:var(--bg2);border:1px solid var(--line);
@@ -405,7 +410,8 @@ html.js .reveal.in{opacity:1;transform:none}
 }
 
 @media (max-width:860px){
-  .hero{grid-template-columns:1fr;gap:28px;padding:34px 0 18px}
+  .hero{display:flex;flex-direction:column;gap:28px;padding:34px 0 18px}
+  .hero-sag{order:-1}
   .hero h1{font-size:clamp(30px,8vw,40px)}
   .cta-row .btn{width:100%}
   .kanit{grid-template-columns:1fr}
@@ -448,23 +454,12 @@ html.js .reveal.in{opacity:1;transform:none}
 
   <!-- ================= HERO ================= -->
   <header class="hero">
+    <div class="hero-sol">
     <div class="rozet"><i aria-hidden="true"></i>Ücretsiz · Açık kaynak · Sınırsız</div>
-    <h1>Premiere'e <em>Türkçe altyazı.</em></h1>
     <p class="sub">Adobe'un yerleşik aracı Türkçe konuşmayı yazıya dökemiyor.
     Suflo döküyor: bilgisayarında çalışan yapay zekâyla.
     Abonelik yok, kredi yok, sınır yok.</p>
-    <div class="cta-row">
-      <a class="btn primary" id="indir-cta" href="https://github.com/sametcreates/suflo/releases/latest">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 7 8 10.5 11.5 7M3 13h10" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span id="indir-metin">Ücretsiz indir</span>
-      </a>
-      <a class="btn pro-cta" href="#fiyat">Suflo Pro — 749 TL <span class="pc-alt">tek seferlik · abonelik yok</span></a>
-      <a class="btn ghost" href="#nasil">Nasıl çalışır?</a>
-    </div>
     <p class="pro-mikro"><b>Ücretsiz:</b> sınırsız Türkçe altyazı, sonsuza dek. <b>Pro:</b> otomatik kesim, yazı stilleri, 40 animasyon + 265 SFX — <a href="#pro">neler var? →</a></p>
-    <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v2.6.3</b></p>
-    <p class="mobil-not" id="mobil-not" hidden>📱 Telefondasın: Suflo bilgisayarda, Premiere'in içinde çalışıyor.
-    Bu adresi kendine gönder, bilgisayarında aç: <b>suflo.app</b></p>
 
     <div class="mock" aria-hidden="true">
       <div class="mhead">
@@ -482,6 +477,22 @@ html.js .reveal.in{opacity:1;transform:none}
           <div class="mline"><span class="mtime">00:04</span><b data-yazi="kurguya ışık hızı geliyor."></b></div>
         </div>
       </div>
+    </div>
+    </div>
+
+    <div class="hero-sag">
+      <h1>Premiere'e <em>Türkçe altyazı.</em></h1>
+      <div class="cta-row">
+        <a class="btn primary" id="indir-cta" href="https://github.com/sametcreates/suflo/releases/latest">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 7 8 10.5 11.5 7M3 13h10" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span id="indir-metin">Ücretsiz indir</span>
+        </a>
+        <a class="btn pro-cta" href="#fiyat">Suflo Pro — 749 TL <span class="pc-alt">tek seferlik · abonelik yok</span></a>
+        <a class="btn ghost" href="#nasil">Nasıl çalışır?</a>
+      </div>
+      <p class="note">Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · MIT lisansı · <b id="surum">v2.6.3</b></p>
+      <p class="mobil-not" id="mobil-not" hidden>📱 Telefondasın: Suflo bilgisayarda, Premiere'in içinde çalışıyor.
+      Bu adresi kendine gönder, bilgisayarında aç: <b>suflo.app</b></p>
     </div>
   </header>
 
