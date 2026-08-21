@@ -8,6 +8,10 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+[xml]$mf = Get-Content (Join-Path $root "CSXS\manifest.xml")
+$version = $mf.ExtensionManifest.ExtensionBundleVersion
+$zxp = Join-Path $root "dist\Suflo-$version.zxp"
+$installer = Join-Path $root "dist\Suflo-$version-Kurulum.zip"
 
 # gh PATH'te olmayabilir (kurulumdan sonra terminal yenilenmediyse)
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
@@ -28,6 +32,30 @@ if ($LASTEXITCODE -ne 0) {
 $owner = gh api user --jq .login
 Write-Host "GitHub kullanicisi: $owner" -ForegroundColor Cyan
 
+# Her yayinda paketleri mevcut kaynaktan yeniden uret. Eski ama ayni isimli
+# bir ZXP'nin yanlislikla yayinlanmasina izin verme.
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "package.ps1")
+if ($LASTEXITCODE -ne 0) { Write-Host "ZXP uretilemedi." -ForegroundColor Red; exit 1 }
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "kurucu-yap.ps1")
+if ($LASTEXITCODE -ne 0) { Write-Host "Kurulum ZIP'i uretilemedi." -ForegroundColor Red; exit 1 }
+
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "verify-release.ps1")
+if ($LASTEXITCODE -ne 0) { Write-Host "Yayin paketi dogrulamasi gecmedi." -ForegroundColor Red; exit 1 }
+
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "test.ps1")
+if ($LASTEXITCODE -ne 0) { Write-Host "Testler gecmedi; yayin durduruldu." -ForegroundColor Red; exit 1 }
+
+& git diff --check
+if ($LASTEXITCODE -ne 0) { Write-Host "Git bosluk denetimi gecmedi; yayin durduruldu." -ForegroundColor Red; exit 1 }
+
+# Pro Icerik Bulutu canli degilken yeni istemciyi yayinlama: aksi halde odeme
+# yapan kullanicinin ilk otomatik kurulumu 404 ile baslar.
+& node (Join-Path $PSScriptRoot "check-pro-cdn.js")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Yayin durduruldu: once private Pro CDN yuklemesini tamamla." -ForegroundColor Red
+    exit 1
+}
+
 # 1) git deposu + commit
 if (-not (Test-Path (Join-Path $root ".git"))) {
     git init | Out-Null
@@ -40,7 +68,21 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 git add -A
-$null = cmd /c "git commit -m ""Suflo yayin"" >nul 2>&1"
+$staged = @(git diff --cached --name-only)
+$yasak = @($staged | Where-Object {
+    $_ -match '(^|/)dist/' -or $_ -match '\.(p12|mogrt|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' -or $_ -match '(^|/)config\.php$'
+})
+if ($yasak.Count -gt 0) {
+    Write-Host ("Yasakli/gizli dosya stage edildi: {0}" -f ($yasak -join ", ")) -ForegroundColor Red
+    exit 1
+}
+$null = cmd /c "git diff --cached --quiet"
+if ($LASTEXITCODE -ne 0) {
+    & git commit -m "Suflo v$version"
+    if ($LASTEXITCODE -ne 0) { Write-Host "Git commit basarisiz; yayin durduruldu." -ForegroundColor Red; exit 1 }
+} else {
+    Write-Host "Yeni kaynak degisikligi yok; mevcut commit yayinlanacak." -ForegroundColor DarkGray
+}
 
 # 2) repo olustur (varsa gec) + push
 $null = cmd /c "gh repo view $owner/suflo >nul 2>&1"
@@ -56,15 +98,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # 3) Release + zxp
-[xml]$mf = Get-Content (Join-Path $root "CSXS\manifest.xml")
-$version = $mf.ExtensionManifest.ExtensionBundleVersion
-$zxp = Join-Path $root "dist\Suflo-$version.zxp"
-$installer = Join-Path $root "dist\Suflo-$version-Kurulum.zip"
-if (-not (Test-Path $zxp)) {
-    Write-Host "Paket yok, uretiliyor..." -ForegroundColor DarkGray
-    powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "package.ps1")
-    if (-not (Test-Path $zxp)) { Write-Host "Paket uretilemedi." -ForegroundColor Red; exit 1 }
-}
 $null = cmd /c "gh release view v$version >nul 2>&1"
 if ($LASTEXITCODE -ne 0) {
     # Surum notu GERCEKTEN bu surume mi ait? Dosya guncellenmeyi unutulursa

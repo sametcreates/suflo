@@ -18,6 +18,8 @@ const TYPES = {
   ".jsx": "text/plain; charset=utf-8",
   ".svg": "image/svg+xml",     // emoji seçici — MIME yanlışsa <img> çizmez
   ".png": "image/png",
+  ".webp": "image/webp",
+  ".webm": "video/webm",
   ".ttf": "font/ttf",
   ".ico": "image/x-icon"
 };

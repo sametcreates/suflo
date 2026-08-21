@@ -587,15 +587,15 @@
   <!-- ================= YAZI (MOGRT) ================= -->
   <section id="tab-text" class="tabpane">
     <div class="pro-tanitim" id="yazi-tanitim" hidden>
-      <span class="pt-rozet">SUFLO PRO</span>
-      <b>Hazır yazı animasyonları — tek tıkla timeline'a</b>
-      <ul>
-        <li>Yazı animasyonu kütüphanesi — paketler tek tıkla timeline'a</li>
-        <li>Playhead'e, boş katmana akıllı yerleştirme</li>
-        <li>Kendi paketlerini klasöre at, anında listede</li>
-      </ul>
-      <div class="pt-fiyat"><b>749 TL</b><span>tek sefer · abonelik yok · ömür boyu</span></div>
-      <button class="btn primary" id="yazi-proya-gec" style="width:100%">Pro'yu aç →</button>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>40 premium yazı animasyonu</b>
+        <span>Gerçek önizlemeleri incele. Pro'da tek tıkla playhead'e ekle.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro içerik özeti">
+        <i><strong>40</strong> efekt</i><i><strong>1×</strong> lisans</i><i><strong>∞</strong> güncelleme</i>
+      </div>
+      <button class="btn primary" id="yazi-proya-gec">40 efekti aç — 749 TL</button>
     </div>
 
     <div class="yazi-ust">
@@ -620,9 +620,9 @@
 
         <div id="mogrt-bos" class="mogrt-bos">
           <span class="mb-ikon">Aa</span>
-          <b>Yazı animasyonu kütüphanesi boş</b>
-          <p class="hint">Suflo Pro paketini aldıysan Lemon Squeezy e-postandaki klasörü göster — yazı animasyonları buraya gelir. Kendi arşivin varsa Ayarlar → Kendi arşivlerin.</p>
-          <button id="yazi-propack-yukle" class="btn primary" style="margin-top:8px">Pro paketini yükle…</button>
+          <b>Pro içerikleri eşitlemeye hazır</b>
+          <p class="hint">Lisansın aktifse 40 yazı animasyonu güvenli içerik bulutundan otomatik kurulur. Kendi arşivin varsa Ayarlar → Kendi arşivlerin.</p>
+          <button id="yazi-propack-yukle" class="btn primary" style="margin-top:8px">İçerikleri şimdi eşitle</button>
           <p class="hint mono" id="yazi-klasor-yol" style="word-break:break-all"></p>
           <button id="yazi-klasor-ac" class="btn ghost" style="margin-top:8px">Veri klasörünü aç</button>
         </div>
@@ -633,16 +633,15 @@
   <!-- ================= SFX ================= -->
   <section id="tab-sfx" class="tabpane">
     <div class="pro-tanitim" id="sfx-tanitim" hidden>
-      <span class="pt-rozet">SUFLO PRO</span>
-      <b>SFX arşivin — Premiere'den çıkmadan hazır</b>
-      <ul>
-        <li>Binlerce sesi anında ara ve ön dinle</li>
-        <li>Favorilerini ve son kullandıklarını kaydet</li>
-        <li>Tek tıkla playhead'deki boş audio katmanına ekle</li>
-        <li>Altyazıdaki vurgu anlarına Akıllı SFX öner</li>
-      </ul>
-      <div class="pt-fiyat"><b>749 TL</b><span>tek sefer · abonelik yok · ömür boyu</span></div>
-      <button class="btn primary pro-ac-btn" style="width:100%">Pro'yu aç →</button>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>265 seçilmiş SFX, 11 kategori</b>
+        <span>Ara, ön dinle; Akıllı SFX ile doğru vurguya tek tıkla yerleştir.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro içerik özeti">
+        <i><strong>265</strong> ses</i><i><strong>11</strong> kategori</i><i><strong>✦</strong> akıllı</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="sfx">265 SFX'i aç — 749 TL</button>
     </div>
 
     <div id="sfx-main">
@@ -681,8 +680,8 @@
       <div id="sfx-empty" class="empty-state" hidden>
         <span class="sfx-empty-icon">♫</span>
         <b>Henüz ses efekti yok</b>
-        <p>Suflo Pro paketini aldıysan indirdiğin klasörü göster; ya da kendi SFX arşivini bağla. Panelden ara, ön dinle, timeline'a ekle.</p>
-        <button id="sfx-propack-yukle" class="btn primary">Pro paketini yükle…</button>
+        <p>Lisansın aktifse 265 SFX güvenli içerik bulutundan otomatik kurulur. İstersen kendi SFX arşivini de bağlayabilirsin.</p>
+        <button id="sfx-propack-yukle" class="btn primary">İçerikleri şimdi eşitle</button>
         <button id="sfx-add-folder-big" class="btn">Kendi SFX klasörümü bağla</button>
       </div>
     </div>
@@ -813,9 +812,23 @@
     </div>
 
 
-    <div class="set-group set-propack">
-      <div class="set-title">Suflo Pro Paketi</div>
-      <p class="hint" style="margin-bottom:8px">Satın aldıysan Lemon Squeezy e-postandaki paketi indir, klasörü burada göster — yazı animasyonları, SFX ve emoji varlıkları otomatik listelenir. İçerik eklentiyle gelmez; yalnızca sana özeldir.</p>
+    <div class="set-group pro-sync-card" id="set-prosync-card">
+      <div class="pro-sync-head">
+        <div><div class="set-title">Pro İçerik Bulutu</div><b id="set-prosync-title">Bir kez etkinleştir, hep güncel kal</b></div>
+        <span class="pro-sync-badge" id="set-prosync-badge">AUTO</span>
+      </div>
+      <p class="hint" id="set-prosync-detail">Pro lisansını etkinleştirince 40 yazı animasyonu ve 265 SFX otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.</p>
+      <div class="pro-sync-progress" id="set-prosync-progress" hidden><i id="set-prosync-bar"></i></div>
+      <div class="row-btns pro-sync-actions">
+        <button id="set-prosync-run" class="btn primary">İçerikleri eşitle</button>
+        <button id="set-prosync-open" class="btn ghost" hidden>Klasörü aç</button>
+      </div>
+      <div id="set-prosync-status" class="inline-status"></div>
+    </div>
+
+    <div class="set-group set-propack legacy-propack">
+      <div class="set-title">Elle paket bağlama</div>
+      <p class="hint" style="margin-bottom:8px">Eski Pro Pack ZIP'ini daha önce indirdiysen klasörünü burada gösterebilirsin. Normal kullanımda buna gerek yok; Pro İçerik Bulutu otomatik kurar ve günceller.</p>
       <div class="row">
         <button id="set-propack-yukle" class="btn primary">Pro paketini yükle…</button>
         <button id="set-propack-kaldir" class="btn ghost" hidden>Kaldır</button>
@@ -924,6 +937,7 @@
   <script src="js/CSInterface.js"></script>
   <script src="js/bridge.js"></script>
   <script src="js/pro.js"></script>
+  <script src="js/pro-sync.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/style-engine.js"></script>
   <script src="js/captions.js"></script>

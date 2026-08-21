@@ -20,6 +20,7 @@ window.KSfx = (function () {
   var busyPath = null;
   var smartMode = false;
   var smartCues = [];
+  var showcaseFolders = [];
 
   // Dosya adlarinda hem Turkce hem yaygin Ingilizce paket adlari aranir.
   // Kurallar yerelde calisir; transkript veya dosya adlari hicbir yere gitmez.
@@ -106,6 +107,38 @@ window.KSfx = (function () {
     return typeof Pro === "undefined" || Pro.gate("sfx");
   }
 
+  function setShowcase(raw) {
+    if (!raw || !Array.isArray(raw.folders)) return false;
+    showcaseFolders = raw.folders.filter(function (f) { return f && f.name && Number(f.count) > 0; })
+      .map(function (f) { return { name: String(f.name), count: Number(f.count) }; });
+    return showcaseFolders.length > 0;
+  }
+
+  function loadShowcase() {
+    showcaseFolders = [];
+    if (K.nodeOK && K.fs && K.path && K.extensionPath) {
+      try {
+        var file = K.path.join(K.extensionPath(), "assets", "pro-sfx-showcase", "catalog.json");
+        return setShowcase(JSON.parse(K.fs.readFileSync(file, "utf8")));
+      } catch (e) { K.log("[sfx] Pro vitrin katalogu okunamadi: " + (e && e.message)); }
+    }
+    return false;
+  }
+
+  async function loadShowcaseWeb() {
+    try {
+      if (typeof fetch === "function") {
+        var res = await fetch("assets/pro-sfx-showcase/catalog.json", { cache: "no-store" });
+        if (res.ok) return setShowcase(await res.json());
+      }
+    } catch (e) { K.log("[sfx] Pro web vitrini okunamadi: " + (e && e.message)); }
+    return false;
+  }
+
+  function showcaseActive() {
+    return index.length === 0 && showcaseFolders.length > 0 && typeof Pro !== "undefined" && !Pro.isPro();
+  }
+
   function favlar() {
     var s = K.settings();
     if (!s.sfxFavs) s.sfxFavs = [];
@@ -146,12 +179,18 @@ window.KSfx = (function () {
 
   function buildIndex() {
     index = [];
+    loadShowcase();
     if (!K.nodeOK || !K.fs || !K.path) {
-      var empty0 = el("sfx-empty"), list0 = el("sfx-list"), total0 = el("sfx-sayac");
-      if (empty0) empty0.hidden = false;
-      if (list0) list0.hidden = true;
-      if (total0) total0.textContent = "0";
-      search("");
+      function webVitriniCiz() {
+        var empty0 = el("sfx-empty"), list0 = el("sfx-list"), total0 = el("sfx-sayac");
+        var vitrin0 = showcaseActive();
+        if (empty0) empty0.hidden = vitrin0;
+        if (list0) list0.hidden = true;
+        if (total0) total0.textContent = String(vitrin0 ? showcaseFolders.reduce(function (sum, f) { return sum + f.count; }, 0) : 0);
+        search("");
+      }
+      webVitriniCiz();
+      if (!showcaseFolders.length) loadShowcaseWeb().then(webVitriniCiz);
       return;
     }
     var seen = {};
@@ -173,9 +212,11 @@ window.KSfx = (function () {
     });
     index.sort(function (a, b) { return a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name); });
     var empty = el("sfx-empty"), list = el("sfx-list");
-    if (empty) empty.hidden = index.length > 0;
+    var vitrin = showcaseActive();
+    if (empty) empty.hidden = index.length > 0 || vitrin;
     if (list) list.hidden = index.length === 0;
-    var total = el("sfx-sayac"); if (total) total.textContent = String(index.length);
+    var total = el("sfx-sayac");
+    if (total) total.textContent = String(index.length || (vitrin ? showcaseFolders.reduce(function (sum, f) { return sum + f.count; }, 0) : 0));
     search(el("sfx-search") ? el("sfx-search").value : "");
   }
 
@@ -205,6 +246,29 @@ window.KSfx = (function () {
       };
       browser.appendChild(card);
     });
+  }
+
+  function renderShowcaseFolders(query) {
+    var browser = el("sfx-folder-browser");
+    if (!browser) return;
+    browser.innerHTML = "";
+    var q = fold(query || "");
+    var folders = showcaseFolders.filter(function (f) { return !q || fold(f.name).indexOf(q) !== -1; });
+    folders.forEach(function (folder) {
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "sfx-folder-card locked";
+      card.innerHTML = '<span class="sfx-folder-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9v9.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 9h17"/></svg></span><span class="sfx-folder-meta"><b></b><i></i></span><span class="sfx-folder-pro"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg> PRO</span>';
+      card.querySelector("b").textContent = folder.name;
+      card.querySelector("i").textContent = folder.count + " ses efekti · önizleme";
+      card.setAttribute("aria-label", folder.name + " · " + folder.count + " ses efekti · Suflo Pro ile kilidi aç");
+      card.onclick = function () { Pro.gate("sfx"); };
+      browser.appendChild(card);
+    });
+    var count = el("sfx-count");
+    if (count) count.textContent = folders.length
+      ? folders.length + " Pro koleksiyonu · " + showcaseFolders.reduce(function (sum, f) { return sum + f.count; }, 0) + " ses"
+      : "Eşleşen Pro koleksiyonu yok";
   }
 
   function score(item, terms) {
@@ -395,12 +459,19 @@ window.KSfx = (function () {
     if (!box) return;
     box.innerHTML = "";
     var query = el("sfx-search") ? String(el("sfx-search").value || "").trim() : "";
-    var folderView = filterMode === "all" && folderMode === "all" && !query;
+    var vitrin = showcaseActive();
+    var folderView = filterMode === "all" && folderMode === "all" && (!query || vitrin);
     var browser = el("sfx-folder-browser");
     var nav = el("sfx-folder-nav");
     if (browser) browser.hidden = !folderView;
     if (nav) nav.hidden = folderMode === "all";
     box.hidden = folderView || !index.length;
+    if (vitrin) {
+      if (browser) browser.hidden = false;
+      if (nav) nav.hidden = true;
+      renderShowcaseFolders(query);
+      return;
+    }
     if (folderMode !== "all") {
       var title = el("sfx-folder-title"), folderCount = el("sfx-folder-count");
       if (title) title.textContent = folderMode;
@@ -639,6 +710,8 @@ window.KSfx = (function () {
     chooseFolder: chooseFolder,
     setFilter: setFilter,
     sayisi: function () { return index.length; },
+    vitrinSayisi: function () { return showcaseActive() ? showcaseFolders.reduce(function (sum, f) { return sum + f.count; }, 0) : 0; },
+    vitrinKlasorSayisi: function () { return showcaseActive() ? showcaseFolders.length : 0; },
     klasorSayisi: function () {
       var seen = {};
       index.forEach(function (item) { seen[item.folder] = true; });

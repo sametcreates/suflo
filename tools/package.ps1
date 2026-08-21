@@ -31,34 +31,18 @@ if (-not $signer) {
 }
 
 # staging
-# Model A (icerik-kapili): Pro icerik (MOGRT/SFX) eklentiyle GELMEZ — satin alan
-# Lemon Squeezy'den paketi indirir, panelde "Pro paketini yukle" ile gosterir.
-# Boylece hem release birkac MB kalir hem de icerik public'te bedava dusmez.
-# Eski davranis (icerik gomulu) icin: $env:SUFLO_BUNDLE_CONTENT = "1"
+# Pro MOGRT/SFX eklentiye ASLA gomulmez. Lisans etkinlesince Pro Icerik Bulutu
+# bunlari private sunucudan indirir. Eski ortam degiskeni acik kaldiysa ucretli
+# dosyalari public GitHub release'ine sizdirma riskine karsi paketi durdur.
+if ($env:SUFLO_BUNDLE_CONTENT) { throw "SUFLO_BUNDLE_CONTENT desteklenmiyor: Pro icerigi public pakete gomulemez." }
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 $stageItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE")
-if ($env:SUFLO_BUNDLE_CONTENT) { $stageItems += "content" }
 foreach ($item in $stageItems) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $stage -Recurse -Force }
 }
-
-if ($env:SUFLO_BUNDLE_CONTENT) {
-    $sfxSource = $env:SUFLO_SFX_SOURCE
-    if (-not $sfxSource) {
-        $desktop = [Environment]::GetFolderPath("Desktop")
-        $sfxSource = Join-Path $desktop "SUFLO EDIT VAULT - 20+ GB\03 - SUFLO SFX & AUDIO\Sound Effects\SUFLO - Main SFX Library"
-    }
-    if (-not (Test-Path -LiteralPath $sfxSource)) { throw "Ana SFX kutuphanesi bulunamadi: $sfxSource" }
-    $sfxTarget = Join-Path $stage "content\sfx"
-    if (Test-Path -LiteralPath $sfxTarget) { Remove-Item -LiteralPath $sfxTarget -Recurse -Force }
-    New-Item -ItemType Directory -Path $sfxTarget -Force | Out-Null
-    Copy-Item -LiteralPath $sfxSource -Destination $sfxTarget -Recurse -Force
-    Write-Host "Ana SFX kutuphanesi eklendi: $sfxSource" -ForegroundColor DarkGray
-} else {
-    Write-Host "LEAN build (Model A): icerik pakete gomulmedi." -ForegroundColor DarkGray
-}
+Write-Host "LEAN build: Pro icerigi private buluttan gelir, release'e gomulmedi." -ForegroundColor DarkGray
 
 # kendinden imzali sertifika (yoksa uret)
 if (-not (Test-Path $cert)) {

@@ -11,8 +11,7 @@ Türkçe ve Azerice dahil 99 dil — abonelik yok, kredi yok, hesap yok.
 Suflo konuşmayı izlenebilir kurguya çevirir. Seçili klipten, In–Out aralığından ya da tüm sequence'tan
 transkript çıkarır; panelin içinde düzenlersin; caption izi olarak uygular ya da SRT/VTT/ASS/TXT
 olarak dışa aktarırsın. Emoji Assets (yerel klasörün veya bağlı Suflo Cloud kataloğu) ücretsizdir.
-Pro katmanında sessizlik kesme, ritim marker'ları,
-yerel MOGRT/SFX kütüphaneleri
+Pro katmanında sessizlik kesme, ritim marker'ları, otomatik güncellenen 40 MOGRT + 265 SFX kütüphanesi
 ve altyazıdan Akıllı SFX önerileri bulunur.
 
 | Ne | Nasıl |
@@ -71,11 +70,17 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | Terim sözlüğü |
-| Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | MOGRT ve SFX kütüphaneleri (text ve diğer animasyonlar otomatik ayrılır) |
+| Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Pro İçerik Bulutu: 40 MOGRT + 265 SFX, tek kurulum ve otomatik güncelleme |
 | — | Altyazıdan Akıllı SFX önerileri |
 | — | Kütüphane sağlık kontrolü ve destek raporu |
 
-Kıyas için: AutoCut yılda ~179 $, Submagic yılda ~228–468 $, Kaps ve Subs aylık dolar aboneliği + dakika kotası. Suflo Pro'da sayaç yok — bir kez öde, bitti.
+Abonelikli veya kredi tabanlı kurgu panellerinin aksine Suflo Pro'da sayaç ve otomatik yenileme yok — bir kez öde, bitti.
+
+### Pro İçerik Bulutu
+
+Pro lisansı bir kez etkinleştirilir. Panel, 40 yazı animasyonu ile 265 SFX'i private içerik servisinden indirir; sonraki sürümlerde yalnız değişen dosyaları alır. Kesilen indirme kaldığı yerden devam eder ve yeni sürüm tüm SHA-256 kontrollerini geçmeden çalışan kütüphane değişmez. Public GitHub paketinde ücretli MOGRT/SFX bulunmaz; yalnız kilitli kartların küçük önizlemeleri vardır. Sunucu yerleşimi ve Hostinger paketi için [`server/pro-v1/README.md`](server/pro-v1/README.md) dosyasına bak.
+
+Kurulu içeriklerin değişmeyen dosyaları her Premiere açılışında yeniden hashlenmez; boyut/değişiklik zamanı farklıysa anında, her durumda en geç yedi günde bir tam SHA-256 doğrulaması yapılır. Geçici ilk bağlantı hatası otomatik yeniden denenir; kurulu son sağlam sürüm çevrimdışıyken kullanılmaya devam eder.
 
 **Dürüstlük notu:** 2.3.0'da bu özelliklerin hepsi ücretsizdi. 2.4.0'a güncellersen Pro özellikleri kilitlenir — bunu küçük puntoya gömmüyoruz, açıkça söylüyoruz. Güncelleme zorunlu değil; 2.3.0'da kalabilirsin, çalışmaya devam eder. Kod MIT: fork'layıp kendi yolunu da çizebilirsin. Pro'nun gerekçesi basit: Suflo tek geliştirici işi ve Pro geliri geliştirmeyi sürdürülebilir kılıyor. Çekirdek ücretsiz ve açık kaynak kalıyor.
 
@@ -172,6 +177,8 @@ tools/            kur/kaldır/paketle/yayınla/dev-server/test
 
 Önizleme: `node tools/devserver.js` → http://localhost:5177 (Premiere dışında sahte veriyle açılır).
 Paket: `tools/package.ps1` (ZXPSignCmd gerekir) → `dist/Suflo-x.y.z.zxp`.
+Yayın paketi doğrulama: `tools/verify-release.ps1` → imza, gerekli dosyalar, ZIP yolları ve ücretli/gizli içerik sızıntısı.
+Güvenli yayın: `tools/publish.ps1` → güncel paketleri yeniden üretir, doğrulamayı ve tüm testleri geçirir, canlı Pro API hazırsa commit/push/release yapar.
 
 ### Testler
 
@@ -190,6 +197,9 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-burn.js` | ASS'in libass ile videoya gerçekten çizildiği (kare farkı) |
 | `test-hata.js` | Hata rehberi: doğru tavsiye veriyor mu, masum hataya yanlış tavsiye veriyor mu |
 | `test-mac.js` | macOS yolları: Homebrew, Metal, model klasörü, Windows'a özgü kodun çalışmaması |
+| `test-pro-license.js` | Store/product sahipliği, yanlış aktivasyonu geri bırakma, private kimlik sızıntısı |
+| `test-pro-sync.js` | Delta indirme, kaldığı yerden devam, atomik sürüm geçişi, offline geri dönüş |
+| `test-pro-cdn.js` | Private Hostinger ağacı, manifest hash'leri ve yayın öncesi API güvenlik kapısı |
 | `test-v175.js` | Sürüm regresyonları |
 | `seo-kontrol.js` | `docs/` site çıktısı: meta etiketler, JSON-LD, sitemap |
 | `cakisma.js` | CSS sınıf adı çakışmaları (aynı ada iki tanım) |
@@ -203,7 +213,7 @@ MOGRT/SFX/Emoji Assets kütüphanesi ve Akıllı SFX aynı iş akışında bulu�
 
 - Konuşmacı ayrımı (podcast ve röportaj kurgusu için)
 - SFX dalga formu ve ses seviyesi eşitleme
-- Suflo içerik paketleri (özgün üretim tamamlandığında)
+- Yeni yazı animasyonu ve SFX koleksiyonları (Pro İçerik Bulutu üzerinden)
 - Azerice arayüz çevirisi
 
 Kelime kelime vurgulu altyazıyı timeline'a koyma listeden çıktı — 2.4.0 ile geldi, Pro katmanında.

@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "collection": "Suflo Pro SFX",
+  "publicPreviewOnly": true,
+  "total": 265,
+  "folders": [
+    {
+      "name": "CAMERA",
+      "count": 71,
+      "bytes": 14849066
+    },
+    {
+      "name": "Glitches",
+      "count": 57,
+      "bytes": 51359833
+    },
+    {
+      "name": "Epic Whooshes",
+      "count": 44,
+      "bytes": 110210536
+    },
+    {
+      "name": "Quick Whips",
+      "count": 31,
+      "bytes": 4421552
+    },
+    {
+      "name": "Digital",
+      "count": 18,
+      "bytes": 9169545
+    },
+    {
+      "name": "Impacts",
+      "count": 14,
+      "bytes": 59814639
+    },
+    {
+      "name": "PAPER SOUNDS",
+      "count": 10,
+      "bytes": 24660416
+    },
+    {
+      "name": "KEYBOARD TYPING",
+      "count": 7,
+      "bytes": 6346427
+    },
+    {
+      "name": "NOTIFICATIONS",
+      "count": 7,
+      "bytes": 1492202
+    },
+    {
+      "name": "CLICKS",
+      "count": 3,
+      "bytes": 87208
+    },
+    {
+      "name": "POP SOUNDS",
+      "count": 3,
+      "bytes": 1582803
+    }
+  ]
+}

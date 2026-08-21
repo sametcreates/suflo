@@ -156,7 +156,13 @@
     var f = cacheFile();
     if (!f) return;
     obj._sig = sign(obj);
-    try { fs.writeFileSync(f, JSON.stringify(obj), 'utf8'); } catch (e) {}
+    var tmp = f + '.tmp';
+    try {
+      fs.writeFileSync(tmp, JSON.stringify(obj), { encoding: 'utf8', mode: 384 }); // 0600
+      if (fs.existsSync(f)) fs.unlinkSync(f);
+      fs.renameSync(tmp, f);
+      try { fs.chmodSync(f, 384); } catch (eMode) {}
+    } catch (e) { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp) {} }
   }
 
   function readCache() {
@@ -259,8 +265,14 @@
         var lk = data.license_key || {}, meta = data.meta || {};
 
         // --- ZORUNLU GUVENLIK KONTROLLERI ---
-        if (!checkOwnership(meta)) { cb({ ok: false, error: 'Bu anahtar baska bir urune ait.' }); return; }
-        if (lk.status !== 'active') { cb({ ok: false, error: 'Anahtar aktif degil (' + lk.status + ').' }); return; }
+        if (!checkOwnership(meta) || lk.status !== 'active') {
+          // Lemon once aktivasyon olusturur. Yanlis urun anahtari bir koltuk
+          // tuketmesin diye reddederken az once acilan instance'i geri birak.
+          apiPost('/v1/licenses/deactivate', { license_key: key, instance_id: data.instance.id }, function () {
+            cb({ ok: false, error: !checkOwnership(meta) ? 'Bu anahtar baska bir urune ait.' : 'Anahtar aktif degil (' + lk.status + ').' });
+          });
+          return;
+        }
 
         var cache = {
           key: key,
@@ -294,7 +306,7 @@
       function (err, data) {
         if (err || !data) { cb({ ok: false, offline: true }); return; } // cevrimdisi -> onbellege dokunma
         var lk = data.license_key || {};
-        if (data.valid === true && lk.status === 'active') {
+        if (data.valid === true && lk.status === 'active' && checkOwnership(data.meta || {})) {
           c.status = 'active';
           c.expiresAt = lk.expires_at || null;
           c.lastValidated = Date.now();
@@ -375,46 +387,89 @@
 
   function showUpsell(feature) {
     var label = FEATURE_LABELS[feature] || 'Bu ozellik';
+    var isMogrt = feature === 'mogrt' || feature === 'propack';
+    var isSfx = feature === 'sfx';
+    var title = isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 40 yaz\u0131 efekti' :
+      (isSfx ? 'Her vurgu i\u00e7in do\u011fru ses, Premiere\'in i\u00e7inde' : label);
+    var desc = isMogrt ? 'Efektleri sat\u0131n almadan \u00f6nce ger\u00e7ek \u00f6nizlemeleriyle incele. Pro\'da tek t\u0131kla playhead\'e yerle\u015ftir.' :
+      (isSfx ? '265 se\u00e7ilmi\u015f sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
+      'Bu profesyonel i\u015f ak\u0131\u015f\u0131 Suflo Pro ile a\u00e7\u0131l\u0131r. Bir kere al, saya\u00e7 ve abonelik olmadan kullan.');
+    var visual;
+    if (isMogrt) {
+      visual = '<div class="pro-upsell-mogrt" aria-label="Yaz\u0131 efekti \u00f6rnekleri">' +
+        '<img src="assets/pro-mogrt-showcase/previews/01-smooth-up.webp" alt="Smooth Up efekti">' +
+        '<img src="assets/pro-mogrt-showcase/previews/02-rainbow-text.webp" alt="Rainbow Text efekti">' +
+        '<img src="assets/pro-mogrt-showcase/previews/06-gold-text.webp" alt="Gold Text efekti">' +
+      '</div>';
+    } else if (isSfx) {
+      visual = '<div class="pro-upsell-sfx" aria-label="SFX kategorileri">' +
+        '<div class="pro-upsell-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>' +
+        '<div><span>WHOOSH</span><span>IMPACT</span><span>GLITCH</span><span>POP</span></div>' +
+      '</div>';
+    } else {
+      visual = '<div class="pro-upsell-tool"><i>\u2726</i><span><b>Daha h\u0131zl\u0131 bitir</b><small>Tekrarlanan kurgu i\u015fini Suflo\'ya b\u0131rak</small></span></div>';
+    }
     ensureUpsellCss();
     var old = document.getElementById('pro-upsell');
     if (old) old.parentNode.removeChild(old);
+    var previousFocus = document.activeElement;
 
     var wrap = document.createElement('div');
     wrap.id = 'pro-upsell';
     wrap.className = 'pro-upsell-backdrop';
     wrap.innerHTML =
-      '<div class="pro-upsell-card" role="dialog" aria-modal="true">' +
+      '<div class="pro-upsell-card" role="dialog" aria-modal="true" aria-labelledby="pro-upsell-title" aria-describedby="pro-upsell-desc">' +
         '<button id="pro-upsell-x" class="pro-upsell-x" aria-label="Kapat">\u2715</button>' +
-        '<div class="pro-upsell-badge">SUFLO PRO</div>' +
-        '<h3>' + esc(label) + '</h3>' +
-        '<p class="pro-upsell-alt">Bu ozellik Pro ile acilir \u2014 tek seferlik, abonelik yok.</p>' +
+        '<div class="pro-upsell-kicker"><span class="pro-upsell-badge">SUFLO PRO</span><span>\u00d6M\u00dcR BOYU L\u0130SANS</span></div>' +
+        '<h3 id="pro-upsell-title">' + esc(title) + '</h3>' +
+        '<p class="pro-upsell-alt" id="pro-upsell-desc">' + esc(desc) + '</p>' +
+        visual +
+        '<div class="pro-upsell-proof"><i><b>40</b> yaz\u0131 efekti</i><i><b>265</b> SFX</i><i><b>\u221e</b> i\u00e7erik g\u00fcncellemesi</i></div>' +
         '<ul class="pro-upsell-liste">' +
           '<li>Otomatik sessizlik kesimi + ritim marker</li>' +
-          '<li>Hazir yazi animasyonu (MOGRT) kutuphanesi</li>' +
-          '<li>SFX kutuphanesi + Akilli SFX onerileri</li>' +
-          '<li>Toplu islem, ceviri, sozluk, stilli ASS</li>' +
+          '<li>40 MOGRT + 265 SFX, Premiere\'den \u00e7\u0131kmadan</li>' +
+          '<li>Lisans\u0131 bir kez gir; yeni i\u00e7erikler otomatik gelsin</li>' +
         '</ul>' +
-        '<div class="pro-upsell-fiyat"><b>749 TL</b><span>tek seferlik \u00b7 abonelik yok \u00b7 omur boyu</span></div>' +
+        '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K</span><b>749 TL</b><small>abonelik yok \u00b7 dakika limiti yok</small></div>' +
         '<div class="pro-upsell-actions">' +
-          '<button id="pro-upsell-go" class="pro-btn-primary">Y\u00fckselt \u2192</button>' +
+          '<button id="pro-upsell-go" class="pro-btn-primary">Suflo Pro\'yu Al \u2192</button>' +
+          '<button id="pro-upsell-demo" class="pro-btn-ghost">Canl\u0131 demolar\u0131 g\u00f6r</button>' +
         '</div>' +
-        '<button id="pro-upsell-key" class="pro-link-btn">Anahtarim var</button>' +
+        '<button id="pro-upsell-key" class="pro-link-btn">Lisans anahtar\u0131m var</button>' +
       '</div>';
     document.body.appendChild(wrap);
 
-    function close() { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); document.removeEventListener('keydown', escKapat); }
-    function escKapat(e) { if (e.key === 'Escape') close(); }
+    function close() {
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      document.removeEventListener('keydown', escKapat);
+      try { if (previousFocus && previousFocus.focus) previousFocus.focus(); } catch (e) {}
+    }
+    function escKapat(e) {
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key !== 'Tab') return;
+      var ids = ['pro-upsell-x', 'pro-upsell-go', 'pro-upsell-demo', 'pro-upsell-key'];
+      var focusables = ids.map(function (id) { return document.getElementById(id); }).filter(function (n) { return n && !n.disabled; });
+      if (!focusables.length) return;
+      var at = focusables.indexOf(document.activeElement);
+      if (e.shiftKey && (at <= 0)) { e.preventDefault(); focusables[focusables.length - 1].focus(); }
+      else if (!e.shiftKey && at === focusables.length - 1) { e.preventDefault(); focusables[0].focus(); }
+    }
     wrap.addEventListener('click', function (e) { if (e.target === wrap) close(); });
     document.addEventListener('keydown', escKapat);
     document.getElementById('pro-upsell-x').onclick = close;
     document.getElementById('pro-upsell-go').onclick = function () {
       close();
-      if (typeof _onUpgrade === 'function') _onUpgrade(feature);
+      if (typeof _onUpgrade === 'function') _onUpgrade(feature, 'buy');
+    };
+    document.getElementById('pro-upsell-demo').onclick = function () {
+      close();
+      if (typeof _onUpgrade === 'function') _onUpgrade(feature, 'demo');
     };
     document.getElementById('pro-upsell-key').onclick = function () {
       close();
-      if (typeof _onUpgrade === 'function') _onUpgrade(feature);
+      if (typeof _onUpgrade === 'function') _onUpgrade(feature, 'activate');
     };
+    try { document.getElementById('pro-upsell-go').focus(); } catch (e) {}
   }
 
   // Bir DOM elemanina kilit rozeti tak/kaldir (app.js tab butonlari icin)
@@ -434,6 +489,16 @@
       expiresAt: _state.info ? _state.info.expiresAt : null,
       lastValidated: _state.info ? _state.info.lastValidated : null
     };
+  }
+
+  // Pro icerik sunucusu lisansi Lemon Squeezy'de yeniden dogrular. Anahtar
+  // yalniz HTTPS POST govdesinde kullanilir; URL'ye, loga veya ayarlar dosyasina
+  // yazilmaz. Diger moduller ham onbellegi okuyamasin diye kopya dondururuz.
+  function contentCredentials() {
+    if (!isPro()) return null;
+    var c = _state.info || readCache();
+    if (!c || !c.key || !c.instanceId) return null;
+    return { licenseKey: String(c.key), instanceId: String(c.instanceId) };
   }
 
   // ================================================================
@@ -466,34 +531,50 @@
   function ensureUpsellCss() {
     if (_cssDone) return; _cssDone = true;
     var css =
-      '.pro-upsell-backdrop{position:fixed;inset:0;background:rgba(8,9,14,.6);backdrop-filter:blur(4px);' +
-      'display:flex;align-items:center;justify-content:center;z-index:99999}' +
-      '@keyframes pro-in{from{opacity:0;transform:scale(.96) translateY(6px)}}' +
-      '.pro-upsell-card{position:relative;background:#161822;color:#edecf5;width:min(360px,92vw);' +
-      'border:1px solid #363b52;border-radius:14px;padding:18px 18px 14px;text-align:center;' +
-      'font:13px/1.5 system-ui,Segoe UI,sans-serif;box-shadow:0 18px 60px rgba(0,0,0,.55);' +
-      'animation:pro-in .18s cubic-bezier(.32,.72,0,1)}' +
-      '.pro-upsell-x{position:absolute;top:10px;right:12px;background:none;border:0;color:#626578;' +
-      'font-size:13px;cursor:pointer;padding:4px}' +
-      '.pro-upsell-x:hover{color:#edecf5}' +
-      '.pro-upsell-alt{margin:0 0 12px;opacity:.75;font-size:12px}' +
-      '.pro-upsell-liste{list-style:none;margin:0 0 14px;padding:0;text-align:left;display:inline-block}' +
-      '.pro-upsell-liste li{font-size:11.5px;color:#9a9cb4;padding-left:16px;position:relative;margin-bottom:3px}' +
-      '.pro-upsell-liste li:before{content:"\\2713";position:absolute;left:0;color:#6fdca0;font-weight:700}' +
-      '.pro-upsell-fiyat{margin-bottom:14px}' +
-      '.pro-upsell-fiyat b{font-size:22px;display:block}' +
-      '.pro-upsell-fiyat span{font-size:10.5px;color:#9a9cb4}' +
-      '.pro-link-btn{background:none;border:0;color:#9a9cb4;font-size:11.5px;cursor:pointer;' +
-      'margin-top:9px;text-decoration:underline;text-underline-offset:3px}' +
-      '.pro-link-btn:hover{color:#edecf5}' +
-      '.pro-upsell-badge{display:inline-block;background:linear-gradient(90deg,#7c5cff,#4aa3ff);' +
-      'color:#fff;font-weight:700;font-size:11px;letter-spacing:.5px;padding:3px 10px;border-radius:999px;margin-bottom:10px}' +
-      '.pro-upsell-card h3{margin:6px 0 4px;font-size:15px}' +
-      '.pro-upsell-card p{margin:0 0 16px;opacity:.8}' +
-      '.pro-upsell-actions{display:flex;gap:8px;justify-content:center}' +
-      '.pro-btn-primary{background:linear-gradient(90deg,#7c5cff,#4aa3ff);border:0;color:#fff;' +
-      'padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600}' +
-      '.pro-btn-ghost{background:transparent;border:1px solid #444a58;color:#cdd;padding:9px 14px;border-radius:8px;cursor:pointer}' +
+      '.pro-upsell-backdrop{position:fixed;inset:0;background:rgba(4,7,13,.78);backdrop-filter:blur(8px);' +
+      'display:flex;align-items:center;justify-content:center;padding:14px;z-index:99999}' +
+      '@keyframes pro-in{from{opacity:0;transform:scale(.965) translateY(8px)}}' +
+      '.pro-upsell-card{position:relative;overflow:hidden;background:radial-gradient(circle at 84% -12%,rgba(58,167,255,.19),transparent 38%),#111720;' +
+      'color:#f3f6fb;width:min(404px,96vw);max-height:94vh;overflow-y:auto;border:1px solid #34445a;border-radius:16px;' +
+      'padding:18px 18px 14px;text-align:left;font:13px/1.45 system-ui,Segoe UI,sans-serif;' +
+      'box-shadow:0 26px 90px rgba(0,0,0,.7),inset 0 1px rgba(255,255,255,.045);animation:pro-in .2s cubic-bezier(.32,.72,0,1)}' +
+      '.pro-upsell-card:before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,#727cff,#3aa7ff)}' +
+      '.pro-upsell-x{position:absolute;top:10px;right:11px;background:rgba(255,255,255,.04);border:1px solid #2d394b;border-radius:7px;color:#8290a3;' +
+      'font-size:12px;cursor:pointer;padding:5px 7px;line-height:1}' +
+      '.pro-upsell-x:hover{color:#fff;border-color:#53647c}' +
+      '.pro-upsell-kicker{display:flex;align-items:center;gap:7px;margin:0 34px 10px 0;color:#748197;font-size:8px;font-weight:800;letter-spacing:.09em}' +
+      '.pro-upsell-badge{display:inline-block;background:linear-gradient(90deg,#727cff,#3aa7ff);color:#fff;font-weight:900;font-size:8px;letter-spacing:.08em;padding:3px 8px;border-radius:999px}' +
+      '.pro-upsell-card h3{max-width:340px;margin:0 0 5px;font-size:18px;line-height:1.18;letter-spacing:-.02em}' +
+      '.pro-upsell-alt{margin:0 0 12px;color:#9ca8b8;font-size:10.5px;line-height:1.45}' +
+      '.pro-upsell-mogrt{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:0 0 8px}' +
+      '.pro-upsell-mogrt img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border:1px solid #2b394b;border-radius:7px;background:#080b11}' +
+      '.pro-upsell-sfx{margin:0 0 8px;padding:11px;border:1px solid #29374a;border-radius:9px;background:rgba(5,9,15,.5)}' +
+      '.pro-upsell-wave{height:36px;display:flex;align-items:center;justify-content:center;gap:4px}' +
+      '.pro-upsell-wave i{width:4px;height:10px;border-radius:9px;background:linear-gradient(#727cff,#3aa7ff)}' +
+      '.pro-upsell-wave i:nth-child(2n){height:25px}.pro-upsell-wave i:nth-child(3n){height:16px}.pro-upsell-wave i:nth-child(5n){height:32px}' +
+      '.pro-upsell-sfx>div:last-child{display:flex;justify-content:center;gap:4px}' +
+      '.pro-upsell-sfx span{padding:2px 5px;border:1px solid #34445a;border-radius:999px;color:#8593a7;font-size:7px;font-weight:800;letter-spacing:.06em}' +
+      '.pro-upsell-tool{display:flex;align-items:center;gap:10px;margin:0 0 8px;padding:11px;border:1px solid #2b394b;border-radius:9px;background:rgba(8,13,21,.55)}' +
+      '.pro-upsell-tool>i{display:grid;place-items:center;width:31px;height:31px;border-radius:8px;background:linear-gradient(135deg,#727cff,#3aa7ff);font-style:normal}' +
+      '.pro-upsell-tool b,.pro-upsell-tool small{display:block}.pro-upsell-tool small{margin-top:2px;color:#8390a3;font-size:9px}' +
+      '.pro-upsell-proof{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:10px}' +
+      '.pro-upsell-proof i{padding:6px 4px;border:1px solid #263446;border-radius:7px;color:#7f8da0;font-size:7.5px;font-style:normal;text-align:center;text-transform:uppercase}' +
+      '.pro-upsell-proof b{display:block;color:#eaf0f8;font-size:13px;line-height:1.15}' +
+      '.pro-upsell-liste{list-style:none;margin:0 0 11px;padding:0;text-align:left}' +
+      '.pro-upsell-liste li{font-size:9.5px;color:#a5afbd;padding-left:16px;position:relative;margin-bottom:4px}' +
+      '.pro-upsell-liste li:before{content:"\\2713";position:absolute;left:0;color:#6fdca0;font-weight:800}' +
+      '.pro-upsell-fiyat{display:grid;grid-template-columns:auto 1fr;align-items:end;margin:0 0 10px;padding-top:9px;border-top:1px solid #253244}' +
+      '.pro-upsell-fiyat>span{grid-column:1/-1;color:#758298;font-size:7.5px;font-weight:900;letter-spacing:.11em}' +
+      '.pro-upsell-fiyat b{font-size:24px;line-height:1.05;letter-spacing:-.04em}' +
+      '.pro-upsell-fiyat small{padding:0 0 2px 8px;color:#8592a4;font-size:8.5px}' +
+      '.pro-upsell-actions{display:grid;grid-template-columns:1.25fr 1fr;gap:6px}' +
+      '.pro-btn-primary,.pro-btn-ghost{min-height:35px;padding:8px 10px;border-radius:8px;cursor:pointer;font:700 10px system-ui,Segoe UI,sans-serif}' +
+      '.pro-btn-primary{background:linear-gradient(90deg,#727cff,#3aa7ff);border:0;color:#fff;box-shadow:0 10px 24px -12px rgba(58,167,255,.95)}' +
+      '.pro-btn-primary:hover{filter:brightness(1.1)}' +
+      '.pro-btn-ghost{background:#18212d;border:1px solid #34445a;color:#c8d1dd}' +
+      '.pro-btn-ghost:hover{border-color:#53647c;background:#1c2836}' +
+      '.pro-link-btn{display:block;margin:9px auto 0;background:none;border:0;color:#8491a4;font-size:9.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}' +
+      '.pro-link-btn:hover{color:#f1f5fa}' +
       '.pro-locked{position:relative;opacity:.75}' +
       '.pro-locked::after{content:"PRO";position:absolute;top:2px;right:4px;font-size:9px;font-weight:800;' +
       'letter-spacing:.5px;color:#fff;background:linear-gradient(90deg,#7c5cff,#4aa3ff);padding:1px 5px;border-radius:6px}';
@@ -515,6 +596,7 @@
     gate: gate,
     markLocked: markLocked,
     status: status,
+    contentCredentials: contentCredentials,
     on: on,
     onUpgrade: onUpgrade,
     configure: configure,

@@ -19,26 +19,13 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $panel -Force | Out-Null
 
 # Panelin çalışması için gereken her şey (kurucu betikleri hariç)
-# Model A: Pro icerik pakete gomulmez; satin alan LS'ten indirip "Pro paketini
-# yukle" ile gosterir. Eski davranis icin: $env:SUFLO_BUNDLE_CONTENT = "1"
+# Pro MOGRT/SFX pakete ASLA gomulmez; lisans etkinlesince private Pro Icerik
+# Bulutu otomatik kurar. Eski ortam degiskeni public sizinti riskine karsi yasak.
+if ($env:SUFLO_BUNDLE_CONTENT) { throw "SUFLO_BUNDLE_CONTENT desteklenmiyor: Pro icerigi public kurucuya gomulemez." }
 $panelItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE")
-if ($env:SUFLO_BUNDLE_CONTENT) { $panelItems += "content" }
 foreach ($item in $panelItems) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $panel -Recurse -Force }
-}
-
-if ($env:SUFLO_BUNDLE_CONTENT) {
-    $sfxSource = $env:SUFLO_SFX_SOURCE
-    if (-not $sfxSource) {
-        $desktop = [Environment]::GetFolderPath("Desktop")
-        $sfxSource = Join-Path $desktop "SUFLO EDIT VAULT - 20+ GB\03 - SUFLO SFX & AUDIO\Sound Effects\SUFLO - Main SFX Library"
-    }
-    if (-not (Test-Path -LiteralPath $sfxSource)) { throw "Ana SFX kutuphanesi bulunamadi: $sfxSource" }
-    $sfxTarget = Join-Path $panel "content\sfx"
-    if (Test-Path -LiteralPath $sfxTarget) { Remove-Item -LiteralPath $sfxTarget -Recurse -Force }
-    New-Item -ItemType Directory -Path $sfxTarget -Force | Out-Null
-    Copy-Item -LiteralPath $sfxSource -Destination $sfxTarget -Recurse -Force
 }
 
 # Kurucular paketin köküne

@@ -28,6 +28,17 @@ while ((m = re.exec(temiz)) !== null) {
   });
 }
 
+function degerOzeti(v) {
+  v = String(v || "").trim();
+  return { deger: v.replace(/\s*!important\s*$/i, "").trim(), onemli: /!important\s*$/i.test(v) };
+}
+function gercektenEzer(tabanDeger, genelDeger) {
+  var taban = degerOzeti(tabanDeger), genelDegerOzeti = degerOzeti(genelDeger);
+  if (taban.deger === genelDegerOzeti.deger) return false;
+  if (taban.onemli && !genelDegerOzeti.onemli) return false;
+  return true;
+}
+
 // TEK sinifli genel kurallar (ornegin ".empty")
 var genel = {};
 kurallar.forEach(function (k) {
@@ -49,7 +60,7 @@ kurallar.forEach(function (k) {
   genel[mod].forEach(function (g) {
     if (g.sira <= tabanKural.sira) return;         // sonra gelmiyorsa ezmiyor
     var ezilen = Object.keys(g.oz).filter(function (p) {
-      return tabanKural.oz.hasOwnProperty(p) && tabanKural.oz[p] !== g.oz[p];
+      return tabanKural.oz.hasOwnProperty(p) && gercektenEzer(tabanKural.oz[p], g.oz[p]);
     });
     if (ezilen.length) {
       bulgular.push({
@@ -85,12 +96,29 @@ jsDosyalar.forEach(function (f) {
   var re2 = /className\s*=\s*([^;]+);/g, mm2;
   while ((mm2 = re2.exec(src)) !== null) {
     var ifade = mm2[1];
-    riskli.forEach(function (r) {
-      // bilesen sinifiyla BIRLIKTE kullanilan genel sinif adi
-      var kalip = new RegExp('"[^"]*\\b' + r + '\\b[^"]*"');
-      if (kalip.test(ifade) && /-/.test(ifade)) {
+    // String parcaciklarindaki gercek sinif tokenlarini ayikla. Kelime siniri
+    // kullanmak "seg" sinifini "seg-time" icinde bulup yanlis alarm veriyordu.
+    var tokenlar = [], lm, literal = /["']([^"']*)["']/g;
+    while ((lm = literal.exec(ifade)) !== null) {
+      lm[1].split(/\s+/).forEach(function (t) {
+        if (/^[a-zA-Z][\w-]*$/.test(t)) tokenlar.push(t);
+      });
+    }
+    if (tokenlar.length < 2 || !genel[tokenlar[0]]) continue;
+
+    var taban = tokenlar[0];
+    var tabanKural = genel[taban][genel[taban].length - 1];
+    tokenlar.slice(1).filter(function (t, i, a) { return a.indexOf(t) === i; }).forEach(function (mod) {
+      if (!genel[mod]) return;
+      var gercekRisk = genel[mod].some(function (g) {
+        if (g.sira <= tabanKural.sira) return false;
+        return Object.keys(g.oz).some(function (p) {
+          return tabanKural.oz.hasOwnProperty(p) && gercektenEzer(tabanKural.oz[p], g.oz[p]);
+        });
+      });
+      if (gercekRisk) {
         var satir = src.slice(0, mm2.index).split("\n").length;
-        console.log("  RISK " + f + ":" + satir + "  genel '." + r + "' bir bilesenle birlikte: " +
+        console.log("  RISK " + f + ":" + satir + "  genel '." + mod + "' '." + taban + "' bilesenini eziyor: " +
           ifade.replace(/\s+/g, " ").slice(0, 90));
       }
     });

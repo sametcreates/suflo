@@ -26,7 +26,7 @@ function ok(ad, kosul, kanit) {
 }
 
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
-                "js/library.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js"];
+                "js/library.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -111,6 +111,8 @@ var ZORUNLU = {
   "set-emoji-assets-klasor": "Emoji Assets klasör ayarı",
   "set-library-health-run": "Kütüphane sağlık kontrolü",
   "set-library-health-result": "Kütüphane sağlık raporu",
+  "set-prosync-run": "Pro içeriklerini otomatik eşitle",
+  "set-prosync-status": "Pro içerik eşitleme durumu",
   "custom-sayac": "Diğer Animasyonlar sayacı",
   "cap-emoji-ac": "Emoji aç düğmesi",
   "cap-emoji-panel": "Emoji paneli",
@@ -135,8 +137,8 @@ ok("kaldirilan modul ogeleri markup'ta YOK", kalinti.length === 0, kalinti.join(
 
 var betikler = (html.match(/<script src="js\/[^"]+"/g) || []).join(" ");
 ok("kaldirilan Motion betigi yuklenmiyor", !/motion\.js/.test(betikler), betikler);
-ok("aktif moduller yukleniyor (magiccut + beat + sfx + emoji + saglik)",
-  /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler) && /sfx\.js/.test(betikler) && /emoji-assets\.js/.test(betikler) && /library-health\.js/.test(betikler), betikler);
+ok("aktif moduller yukleniyor (magiccut + beat + sfx + emoji + saglik + Pro sync)",
+  /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler) && /sfx\.js/.test(betikler) && /emoji-assets\.js/.test(betikler) && /library-health\.js/.test(betikler) && /pro-sync\.js/.test(betikler), betikler);
 
 /* ---------- 6) Yüklenen her betik diskte var mı ---------- */
 
@@ -147,6 +149,22 @@ var eksikBetik = [];
 });
 ok("index.html'in yukledigi betikler diskte var", eksikBetik.length === 0,
   eksikBetik.join(" | ") || "hepsi mevcut");
+
+/* ---------- 7) Kilitli Pro vitrini klavye ve ekran okuyucuya kapali kalmasin ---------- */
+
+var librarySrc = fs.readFileSync(KOKYOL + "js/library.js", "utf8");
+var sfxSrc = fs.readFileSync(KOKYOL + "js/sfx.js", "utf8");
+var proSrc = fs.readFileSync(KOKYOL + "js/pro.js", "utf8");
+ok("Pro MOGRT kartlarinda anlamli grup, eylem ve favori erisilebilirligi var",
+  /setAttribute\("role", "group"\)/.test(librarySrc) && /aria-pressed/.test(librarySrc) && /Suflo Pro ile kilidi aç/.test(librarySrc));
+ok("Pro SFX koleksiyonlari anlamli buton etiketi tasir", /card\.setAttribute\("aria-label"/.test(sfxSrc));
+ok("Pro satin alma penceresi modal, odak tuzagi ve odak geri donusu tasir",
+  /aria-modal="true"/.test(proSrc) && /focusable/.test(proSrc) && /previousFocus\.focus/.test(proSrc));
+var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8");
+ok("Stil karti etiketi dekoratif onizleme metnini degil ad ve aciklamayi okur",
+  /\.ss-bilgi b/.test(appSrc) && /timeline çıktısı kilitli/.test(appSrc));
+ok("Kutuphane Pro CTA'lari neyin acilacagini ve fiyati gizlemez",
+  /40 efekti aç — 749 TL/.test(html) && /265 SFX'i aç — 749 TL/.test(html));
 
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

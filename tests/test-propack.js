@@ -87,8 +87,13 @@ async function run() {
   ok("Paket kaldirilinca otomatik emoji baglantisi da temizleniyor",
     /s\.emojiAssetsPackAuto\) \{[\s\S]{0,200}emojiAssetsKlasor = ""/.test(appSrc));
   var html = fs.readFileSync(KOK + "index.html", "utf8");
-  ok("Ayarlarda Suflo Pro Paketi bolumu ve yukle butonu var",
-    /id="set-propack-yukle"/.test(html) && /Suflo Pro Paketi/.test(html));
+  ok("Ayarlarda otomatik Pro icerik esitleme ve elle paket yedegi var",
+    /id="set-prosync-run"/.test(html) && /Pro İçerik Bulutu/.test(html) && /id="set-propack-yukle"/.test(html));
+  ["tools/package.ps1", "tools/kurucu-yap.ps1"].forEach(function (file) {
+    var paketSrc = fs.readFileSync(KOK + file, "utf8");
+    ok(file + " ucretli content/ klasorunu public pakete ekleyemez",
+      /SUFLO_BUNDLE_CONTENT desteklenmiyor/.test(paketSrc) && !/stageItems \+= "content"|panelItems \+= "content"/.test(paketSrc));
+  });
 
   console.log("\n" + g + "/" + (g + k) + " gecti");
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}

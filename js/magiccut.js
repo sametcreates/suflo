@@ -206,7 +206,7 @@ window.KCut = (function () {
       t.textContent = fmt(r.start - clip.clipStart);
 
       var d = document.createElement("span");
-      d.className = "seg-dur";
+      d.className = "mc-cut-length";
       d.textContent = "−" + (r.end - r.start).toFixed(2) + " sn";
 
       row.appendChild(cb); row.appendChild(t); row.appendChild(d);

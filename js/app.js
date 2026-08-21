@@ -282,7 +282,7 @@ window.KApp = (function () {
     // Pro'ya kilitli girişler: sekmeler + tekil butonlar
     Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
-    Pro.markLocked(document.querySelector('.yan-menu .ky-oge[data-tab="sfx"]'), !s.pro);
+    // SFX satirinin kendi ky-kilit rozeti var; ikinci bir ::after rozeti ekleme.
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
     // Stil katmani gorunur; ucretsiz kullanici kartlari deneyip cikti aninda Pro'ya gecebilir.
     Pro.markLocked(el("cap-overlay"), !s.pro);
@@ -294,6 +294,16 @@ window.KApp = (function () {
     Array.prototype.forEach.call(document.querySelectorAll("option[data-pro]"), function (o) {
       if (!o.dataset.temel) o.dataset.temel = o.textContent;
       o.textContent = s.pro ? o.dataset.temel : o.dataset.temel + " — PRO";
+    });
+    // Stil kartlari ucretsiz kullanicida canli onizlenebilir; ancak her kart
+    // timeline ciktisinin Pro oldugunu acik bir kilitle anlatir.
+    Array.prototype.forEach.call(document.querySelectorAll(".stil-sec"), function (card) {
+      card.classList.toggle("pro-preview", !s.pro);
+      var ad = card.querySelector(".ss-bilgi b");
+      var aciklama = card.querySelector(".ss-bilgi i");
+      var etiket = ad ? ad.textContent.trim() : "Stil";
+      if (aciklama && aciklama.textContent.trim()) etiket += " — " + aciklama.textContent.trim();
+      card.setAttribute("aria-label", etiket + (s.pro ? "" : " · Pro önizleme, timeline çıktısı kilitli"));
     });
 
     // Header PRO chip: ucretsizde satis, Pro'da statu
@@ -348,8 +358,8 @@ window.KApp = (function () {
 
     Array.prototype.forEach.call(document.querySelectorAll(".pro-ac-btn, #yazi-proya-gec"), function (b) {
       b.addEventListener("click", function () {
-        goster("settings");
-        var k = el("pro-key"); if (k) k.focus();
+        var feature = b.getAttribute("data-pro-feature") || (b.id === "yazi-proya-gec" ? "mogrt" : "pro");
+        Pro.gate(feature);
       });
     });
 
@@ -362,6 +372,57 @@ window.KApp = (function () {
 
   function initSettings() {
     initPro();
+
+    // ---- Pro icerik bulutu: lisans bir kez, MOGRT + SFX otomatik ----
+    (function initProSyncUI() {
+      if (!window.ProSync) return;
+      var runBtn = el("set-prosync-run"), openBtn = el("set-prosync-open");
+      var progress = el("set-prosync-progress"), bar = el("set-prosync-bar");
+      var title = el("set-prosync-title"), detail = el("set-prosync-detail");
+      var badge = el("set-prosync-badge"), status = el("set-prosync-status");
+      function bytes(n) {
+        n = Number(n) || 0;
+        if (n < 1048576) return Math.round(n / 1024) + " KB";
+        return (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
+      }
+      function draw(s) {
+        s = s || ProSync.status();
+        var pro = Pro.isPro();
+        var working = s.phase === "checking" || s.phase === "syncing";
+        if (runBtn) {
+          runBtn.disabled = working;
+          runBtn.textContent = working ? (s.phase === "checking" ? "Kontrol ediliyor…" : "Eşitleniyor…") : (pro ? "Şimdi kontrol et" : "Pro ile otomatik kur");
+        }
+        if (openBtn) openBtn.hidden = !(s.path && K.fs && K.fs.existsSync(s.path));
+        if (progress) progress.hidden = !working;
+        if (bar) bar.style.width = Math.max(2, Math.round((s.progress || 0) * 100)) + "%";
+        if (badge) {
+          badge.className = "pro-sync-badge " + (s.phase === "ready" ? "ready" : (s.phase === "error" ? "error" : ""));
+          badge.textContent = s.phase === "ready" ? (s.offline ? "OFFLINE HAZIR" : "GÜNCEL") : (working ? "SYNC" : "AUTO");
+        }
+        if (title) title.textContent = !pro ? "Pro içerikleri tek tıkla otomatik kurulur" : (s.phase === "ready" ? "Pro kütüphanen hazır" : (working ? "Kütüphanen hazırlanıyor" : "Bir kez etkinleştir, hep güncel kal"));
+        if (detail) {
+          if (s.phase === "syncing") detail.textContent = (s.detail || "İçerikler eşitleniyor") + (s.bytesTotal ? " · " + bytes(s.bytesDone) + " / " + bytes(s.bytesTotal) : "");
+          else if (s.phase === "ready") detail.textContent = "40 yazı animasyonu + 265 SFX kullanıma hazır" + (s.version ? " · içerik " + s.version : "") + ". Yeni içerikler arka planda kontrol edilir.";
+          else if (s.phase === "error") detail.textContent = "Kurulu içeriklerin etkilenmedi. Bağlantı geldiğinde yeniden deneyebilirsin.";
+          else detail.textContent = pro ? "Suflo açıldığında yeni içerikleri kontrol eder; yalnız değişen dosyaları indirir." : "Pro lisansını etkinleştirince 40 yazı animasyonu ve 265 SFX otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.";
+        }
+        if (status) {
+          status.className = "inline-status" + (s.phase === "error" ? " bad" : (s.phase === "ready" ? " good" : ""));
+          status.textContent = s.phase === "error" ? ("✕ " + s.error) : (s.phase === "ready" ? (s.offline ? "✓ Çevrimdışı çalışmaya hazır" : "✓ Otomatik güncelleme açık") : "");
+        }
+      }
+      ProSync.on(draw);
+      if (runBtn) runBtn.addEventListener("click", function () {
+        if (!Pro.isPro()) { Pro.gate("propack"); return; }
+        ProSync.sync({ force: true }).then(function (r) {
+          if (r && r.ok) toast(r.current ? "Pro içerikleri zaten güncel." : "Pro içerikleri hazır.", "good");
+          else if (r && r.error) toast(r.error, "bad", 9000);
+        });
+      });
+      if (openBtn) openBtn.addEventListener("click", function () { ProSync.openFolder(); });
+      if (typeof Pro !== "undefined") Pro.on(function () { draw(ProSync.status()); });
+    })();
 
     // ---- Suflo Pro Paketi (LS'ten indirilen resmi icerik; tek klasor = MOGRT + SFX) ----
     function reflectProPack() {
@@ -380,8 +441,8 @@ window.KApp = (function () {
       } else {
         durum.className = "inline-status";
         durum.textContent = Pro.isPro()
-          ? "Henüz yüklenmedi — Lemon Squeezy e-postandaki paketi indirip klasörü göster."
-          : "Suflo Pro alınca içerik paketini buradan yüklersin.";
+          ? "Otomatik içerik bulutunu kullanıyorsan bu alana gerek yok. Eski ZIP paketin varsa elle bağlayabilirsin."
+          : "Bu alan yalnız eski ZIP paketi olan Pro kullanıcıları için yedektir.";
       }
     }
     function proPakYukle() {
@@ -414,10 +475,20 @@ window.KApp = (function () {
       if (window.KSfx) KSfx.tara();
       toast("Suflo Pro paketi bağlandı — kütüphaneler tarandı.", "good");
     }
-    Array.prototype.forEach.call(
-      document.querySelectorAll("#set-propack-yukle, #yazi-propack-yukle, #sfx-propack-yukle"),
-      function (b) { b.addEventListener("click", proPakYukle); }
-    );
+    var legacyPackBtn = el("set-propack-yukle");
+    if (legacyPackBtn) legacyPackBtn.addEventListener("click", proPakYukle);
+    Array.prototype.forEach.call(document.querySelectorAll("#yazi-propack-yukle, #sfx-propack-yukle"), function (b) {
+      b.addEventListener("click", function () {
+        if (!Pro.isPro()) { Pro.gate("propack"); return; }
+        if (!window.ProSync) { goster("settings"); return; }
+        b.disabled = true;
+        ProSync.sync({ force: true }).then(function (r) {
+          b.disabled = false;
+          if (r && r.ok) toast(r.current ? "Pro içerikleri zaten güncel." : "Pro içerikleri kullanıma hazır.", "good");
+          else if (r && r.error) toast(r.error, "bad", 9000);
+        });
+      });
+    });
     var ppKaldir = el("set-propack-kaldir");
     if (ppKaldir) ppKaldir.addEventListener("click", function () {
       var s = K.settings();
@@ -945,7 +1016,15 @@ window.KApp = (function () {
     // Pro lisans durumu EN ÖNCE: modüller isPro()'yu init sırasında okuyabilsin
     guvenli("Pro", function () {
       Pro.init();
-      Pro.onUpgrade(function () {
+      Pro.onUpgrade(function (feature, intent) {
+        if (intent === "buy") {
+          K.cs.openURLInDefaultBrowser("https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1");
+          return;
+        }
+        if (intent === "demo") {
+          K.cs.openURLInDefaultBrowser("https://suflo.app/pro");
+          return;
+        }
         goster("settings");
         var k = el("pro-key"); if (k) k.focus();
       });
@@ -961,6 +1040,7 @@ window.KApp = (function () {
     guvenli("SFX", function () { if (window.KSfx) KSfx.init(); });
     guvenli("Emoji Assets", function () { if (window.KEmojiAssets) KEmojiAssets.init(); });
     guvenli("Kütüphane kontrolü", function () { if (window.KLibraryHealth) KLibraryHealth.init(); });
+    guvenli("Pro içerik", function () { if (window.ProSync) ProSync.init(); });
     guvenli("Pro-UI", reflectPro);
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);

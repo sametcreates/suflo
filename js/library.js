@@ -14,7 +14,7 @@ window.KLib = (function () {
 
   function el(id) { return document.getElementById(id); }
 
-  var paketler = [];        // { path, ad, display, thumb, builtin, category }
+  var paketler = [];        // gercek paketler + ucretsiz kullanici icin Pro vitrin kartlari
   var arama = "";
   var kategori = "mogrt";   // "mogrt" (Suflo Originals) | "custom" | "fav"
   var busyKart = null;
@@ -84,6 +84,44 @@ window.KLib = (function () {
     } catch (e) { K.log("[yazi] Suflo Originals katalogu okunamadi: " + (e && e.message)); }
     return out;
   }
+
+  // Ucretsiz kurulumdaki satis vitrini. Burada yalniz isimler ve kucuk
+  // onizlemeler vardir; MOGRT dosyalari public pakete girmez.
+  async function showcaseCatalog() {
+    if (K.nodeOK && K.fs && K.path && K.extensionPath) {
+      try {
+        var root = K.extensionPath();
+        if (root) {
+          var raw = JSON.parse(K.fs.readFileSync(K.path.join(root, "assets", "pro-mogrt-showcase", "catalog.json"), "utf8"));
+          return Array.isArray(raw.items) ? raw.items : [];
+        }
+      } catch (e) { K.log("[yazi] Pro vitrin katalogu okunamadi: " + (e && e.message)); }
+    }
+    // Tarayici onizleme modu Node dosya sistemine sahip degildir. Public
+    // katalog yalniz ad + kucuk gorsel tasidigi icin ayni vitrini HTTP'den oku.
+    try {
+      if (typeof fetch === "function") {
+        var res = await fetch("assets/pro-mogrt-showcase/catalog.json", { cache: "no-store" });
+        if (res.ok) {
+          var webRaw = await res.json();
+          return Array.isArray(webRaw.items) ? webRaw.items : [];
+        }
+      }
+    } catch (e2) { K.log("[yazi] Pro web vitrini okunamadi: " + (e2 && e2.message)); }
+    return [];
+  }
+
+  function showcasePreview(item) {
+    var rel = String(item && item.preview || "").replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!/^previews\/[a-z0-9._-]+$/i.test(rel)) return null;
+    return "assets/pro-mogrt-showcase/" + rel;
+  }
+
+  function showcaseVideo(item) {
+    var rel = String(item && item.video || "").replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!/^previews\/[a-z0-9._-]+\.webm$/i.test(rel)) return null;
+    return "assets/pro-mogrt-showcase/" + rel;
+  }
   function cacheDir() {
     var d = K.path.join(kokDir(), "mogrt-cache");
     try { if (!K.fs.existsSync(d)) K.fs.mkdirSync(d, { recursive: true }); } catch (e) {}
@@ -129,10 +167,35 @@ window.KLib = (function () {
     catch (e) { return null; }
   }
 
+  function vitrinEkle(items, gorulen) {
+    (items || []).forEach(function (item, si) {
+      if (!item || !item.name) return;
+      var display = String(item.name);
+      var uniqueKey = mogrtNameKey(item.match || display) || display.toLowerCase();
+      if (gorulen[uniqueKey]) return;
+      var preview = showcasePreview(item);
+      if (!preview) return;
+      gorulen[uniqueKey] = 1;
+      paketler.push({
+        path: "",
+        ad: String(item.id || ("suflo-pro-preview-" + si)),
+        display: display,
+        thumb: preview,
+        video: showcaseVideo(item),
+        builtin: false,
+        pro: true,
+        showcase: true,
+        group: "text",
+        category: String(item.category || "Text Animation")
+      });
+    });
+  }
+
   async function tara() {
     var buTarama = ++taraNo;
     if (!K.nodeOK || !K.fs || !K.path) {
       paketler = [];
+      if (typeof Pro !== "undefined" && !Pro.isPro()) vitrinEkle(await showcaseCatalog(), {});
       sayaclar();
       ciz();
       return;
@@ -212,6 +275,12 @@ window.KLib = (function () {
       paketler.push(paket);
       thumbQueue.push({ paket: paket, slug: slug });
     }
+
+    // Lisansi olmayan kullanici gercek dosyalar kurulmamissa bile urunun ne
+    // sundugunu gorur. Ayni efekt diskte zaten varsa sanal kart eklenmez.
+    if (typeof Pro !== "undefined" && !Pro.isPro()) {
+      vitrinEkle(await showcaseCatalog(), gorulen);
+    }
     // Kart adlari ve sayaclar ONCE gorunsun. Buyuk arsivlerde thumbnail acma
     // saniyeler surebilir; eski akis hepsi bitene dek 0/bos ekran gosteriyordu.
     sayaclar();
@@ -256,8 +325,13 @@ window.KLib = (function () {
     if (baslik) baslik.textContent = kategori === "fav"
       ? "Favoriler"
       : (kategori === "custom" ? "Diğer Animasyonlar" : "Yazı Animasyonları");
+    var vitrinSayisi = liste.filter(function (p) { return p.showcase; }).length;
     if (alt) alt.textContent = liste.length
-      ? liste.length + " paket timeline'a hazır"
+      ? (vitrinSayisi === liste.length
+        ? vitrinSayisi + " Pro efekti · kilidi açınca timeline'a hazır"
+        : (vitrinSayisi
+          ? liste.length + " efekt · " + vitrinSayisi + " Pro önizlemesi"
+          : liste.length + " paket timeline'a hazır"))
       : (kategori === "fav"
         ? "kalbe tıklayıp favori ekle"
         : (kategori === "custom" ? "logo, ikon, lower third ve diğer MOGRT paketleri" : "Suflo Originals + saf text efektleri"));
@@ -274,34 +348,58 @@ window.KLib = (function () {
 
     liste.forEach(function (p) {
       var kart = document.createElement("div");
-      var kilitli = typeof Pro !== "undefined" && !Pro.isPro();
+      var kilitli = !!p.showcase || (typeof Pro !== "undefined" && !Pro.isPro());
       kart.className = "mogrt-kart" + (kilitli ? " locked" : "");
-      var kaynak = p.builtin ? "SUFLO ORIGINAL" : (p.pro ? "SUFLO PRO" : "PERSONAL MOGRT");
+      kart.setAttribute("role", "group");
+      kart.setAttribute("aria-label", p.display + " · " + (kilitli ? "Suflo Pro efekti, kilitli" : "timeline'a eklenebilir MOGRT"));
+      var kaynak = p.builtin ? "SUFLO ORIGINAL" : (p.pro || p.showcase ? "SUFLO PRO" : "PERSONAL MOGRT");
       var aksiyon = kilitli
         ? '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg><span>LOCKED</span>'
         : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M12 6l4 4-4 4"/></svg><span>DRAG</span>';
       kart.innerHTML =
         '<span class="mogrt-thumb">' +
-          (p.thumb
+          (p.video
+            ? '<video class="mogrt-preview-video" muted loop playsinline preload="metadata" poster="' + esc(p.thumb) + '" aria-hidden="true"><source src="' + esc(p.video) + '" type="video/webm"></video>'
+            : (p.thumb
             ? '<img src="' + p.thumb + '" alt="" loading="lazy">'
-            : '<span class="mogrt-yazi">' + esc(p.display.split(/[\s_-]/)[0] || "Aa") + "</span>") +
+            : '<span class="mogrt-yazi">' + esc(p.display.split(/[\s_-]/)[0] || "Aa") + "</span>")) +
           '<span class="mogrt-source">' + kaynak + "</span>" +
-          '<button type="button" class="mogrt-kalp' + (favMi(p.ad) ? " sevildi" : "") + '" title="Favori">♥</button>' +
+          '<button type="button" class="mogrt-kalp' + (favMi(p.ad) ? " sevildi" : "") + '" title="Favori" aria-label="' + esc(p.display) + (favMi(p.ad) ? " favorilerden çıkar" : " favorilere ekle") + '" aria-pressed="' + (favMi(p.ad) ? "true" : "false") + '">♥</button>' +
           (kilitli ? '<span class="mogrt-lock"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg></span>' : "") +
         "</span>" +
         '<span class="mogrt-card-body">' +
           '<span class="mogrt-meta"><b title="' + esc(p.display) + '">' + esc(p.display) + "</b><i>" + esc(p.category) + " · MOGRT</i></span>" +
-          '<button type="button" class="mogrt-ekle-btn' + (kilitli ? " is-locked" : "") + '" title="' + (kilitli ? "Suflo Pro ile aç" : "Playhead konumuna ekle") + '">' + aksiyon + "</button>" +
+          '<button type="button" class="mogrt-ekle-btn' + (kilitli ? " is-locked" : "") + '" title="' + (kilitli ? "Suflo Pro ile aç" : "Playhead konumuna ekle") + '" aria-label="' + esc(p.display) + (kilitli ? " · Suflo Pro ile kilidi aç" : " · playhead konumuna ekle") + '">' + aksiyon + "</button>" +
         "</span>";
 
       kart.querySelector(".mogrt-kalp").addEventListener("click", function (e) {
         e.stopPropagation();
         favDegistir(p.ad);
-        this.classList.toggle("sevildi", favMi(p.ad));
+        var secili = favMi(p.ad);
+        this.classList.toggle("sevildi", secili);
+        this.setAttribute("aria-pressed", secili ? "true" : "false");
+        this.setAttribute("aria-label", p.display + (secili ? " favorilerden çıkar" : " favorilere ekle"));
         if (kategori === "fav") ciz();
       });
       kart.querySelector(".mogrt-ekle-btn").addEventListener("click", function () { yerlestir(p, kart); });
       kart.querySelector(".mogrt-thumb").addEventListener("click", function () { yerlestir(p, kart); });
+      var previewVideo = kart.querySelector(".mogrt-preview-video");
+      if (previewVideo) {
+        kart.addEventListener("mouseenter", function () {
+          var oynat = previewVideo.play();
+          if (oynat && oynat.catch) oynat.catch(function () {});
+        });
+        kart.addEventListener("mouseleave", function () {
+          try { previewVideo.pause(); previewVideo.currentTime = 0; } catch (e0) {}
+        });
+        kart.addEventListener("focusin", function () {
+          var oynat = previewVideo.play();
+          if (oynat && oynat.catch) oynat.catch(function () {});
+        });
+        kart.addEventListener("focusout", function () {
+          try { previewVideo.pause(); previewVideo.currentTime = 0; } catch (e0) {}
+        });
+      }
       if (!kilitli) {
         kart.setAttribute("draggable", "true");
         kart.addEventListener("dragstart", function (e) {
@@ -332,6 +430,14 @@ window.KLib = (function () {
 
   async function yerlestir(p, kart) {
     if (busyKart) return;
+    // Vitrin kartinin arkasinda bilerek dosya yoktur. Ucretsiz kullanicida
+    // satin alma penceresini acar; lisans yeni acildiysa paket esitlemesini
+    // beklemesini soyler ve asla bos path'i Premiere'e gondermez.
+    if (p.showcase) {
+      if (typeof Pro !== "undefined" && !Pro.isPro()) Pro.gate("mogrt");
+      else if (window.KApp) KApp.toast("Pro içeriklerini eşitleyince bu efekt kullanıma açılır.");
+      return;
+    }
     if (typeof Pro !== "undefined" && !Pro.gate("mogrt")) return;
     busyKart = kart;
     kart.classList.add("busy");
@@ -382,7 +488,7 @@ window.KLib = (function () {
     var yol = el("yazi-klasor-yol");
     if (yol) yol.textContent = mogrtDir();
 
-    if (typeof Pro !== "undefined") Pro.on(function () { kilitTazele(); ciz(); });
+    if (typeof Pro !== "undefined") Pro.on(function () { kilitTazele(); tara(); });
     kilitTazele();
 
     KApp.onTab("text", function () { if (!paketler.length) tara(); });
@@ -398,10 +504,14 @@ window.KLib = (function () {
     init: init,
     tara: tara,
     setKategori: setKategori,
-    sayisi: function () { return paketler.length; },
+    // Disariya raporlanan sayilar yalniz gercek dosyalardir. Vitrin kartlari
+    // kutuphane saglik kontrolunde kurulu MOGRT gibi sayilmaz.
+    sayisi: function () { return paketler.filter(function (p) { return !p.showcase; }).length; },
+    gorunenSayisi: function () { return paketler.length; },
+    vitrinSayisi: function () { return paketler.filter(function (p) { return p.showcase; }).length; },
     yerlesikSayisi: function () { return paketler.filter(function (p) { return p.builtin; }).length; },
-    hariciSayisi: function () { return paketler.filter(function (p) { return !p.builtin; }).length; },
-    yaziSayisi: function () { return paketler.filter(function (p) { return p.group === "text"; }).length; },
-    digerSayisi: function () { return paketler.filter(function (p) { return p.group === "other"; }).length; }
+    hariciSayisi: function () { return paketler.filter(function (p) { return !p.builtin && !p.showcase; }).length; },
+    yaziSayisi: function () { return paketler.filter(function (p) { return p.group === "text" && !p.showcase; }).length; },
+    digerSayisi: function () { return paketler.filter(function (p) { return p.group === "other" && !p.showcase; }).length; }
   };
 })();

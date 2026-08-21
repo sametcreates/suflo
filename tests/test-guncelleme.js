@@ -345,6 +345,13 @@ function ortam(opts) {
     try { fs2.rmSync(TMP2, { recursive: true, force: true }); } catch (eS) {}
   })();
 
+  var manifestText = realFs.readFileSync(KOKYOL + "CSXS/manifest.xml", "utf8");
+  var releaseNotes = realFs.readFileSync(KOKYOL + "marketing/release-notes.md", "utf8");
+  var currentVersion = (manifestText.match(/ExtensionBundleVersion="([^"]+)"/) || [])[1] || "";
+  var firstReleaseHeading = (releaseNotes.match(/^##\s+[^\r\n]+/m) || [""])[0];
+  chk("release notunun ilk basligi manifestteki guncel surumle ayni",
+    !!currentVersion && firstReleaseHeading.indexOf(currentVersion) !== -1, firstReleaseHeading + " / " + currentVersion);
+
   var kalan = sonuc.filter(function (s) { return s.indexOf("FAIL") === 0; }).length;
   sonuc.forEach(function (s) { console.log(s); });
   console.log("\n" + (sonuc.length - kalan) + "/" + sonuc.length + " gecti");

@@ -1,3 +1,13 @@
+## Suflo 2.6.2 — Pro İçerik Bulutu + premium vitrin
+
+- **Bir kez etkinleştir, sürekli güncel kal:** 40 MOGRT ve 265 SFX lisans doğrulandıktan sonra otomatik kurulur; yeni kataloglarda yalnız değişen dosyalar indirilir.
+- **Güvenli ve kesintiye dayanıklı eşitleme:** yarım indirme kaldığı yerden sürer, her dosya SHA-256 ile doğrulanır, bozuk yerel içerik otomatik onarılır ve çalışan son sürüm korunur.
+- **Hızlı başlangıç:** değişmeyen 300+ MB içerik her Premiere açılışında yeniden hashlenmez; değişiklikte anında, en geç yedi günde bir tam bütünlük kontrolü yapılır.
+- **Ücretsizden Pro'ya gerçek vitrin:** ücretsiz kullanıcı 40 yazı efektinin gerçek önizlemesini ve 11 kategorideki 265 SFX'i görür; timeline eylemleri net biçimde kilitlidir.
+- **Yeni Pro penceresi:** özelliğe özel örnekler, 749 TL tek seferlik fiyat, satın alma, canlı demo ve mevcut lisansı etkinleştirme yolları tek premium akışta sunulur.
+- **Güçlendirilmiş lisans ve dağıtım:** Lemon Squeezy store/product sahipliği yeniden doğrulanır; ücretli dosyalar public pakete girmez ve canlı Pro API hazır değilse GitHub yayını otomatik durur.
+- **Daha erişilebilir panel:** stil, MOGRT ve SFX kilitleri klavye ve ekran okuyucu için anlamlı etiketler taşır; modal kapanınca odak kullanıcının kaldığı karta döner.
+
 ## Suflo 2.6.1 — Stil Motoru v2 + Suflo Cloud Emoji
 
 - Emoji Assets artık Hostinger gibi statik bir sunucudaki güvenli `catalog.json` kataloğuna bağlanabiliyor.
@@ -155,3 +165,12 @@ Panel içindeki emoji görselleri [Twemoji](https://github.com/jdecked/twemoji)'
 ### 2.1'de gelenler (hatırlatma)
 
 Görsel stil kartları: altı canlı kart, her biri kendi animasyonunu kendi fontuyla oynatıyor. İnce ayar katlandı, kelime girişlerine easing geldi, sitede gerçek fontlar.
+## Suflo 2.6.2 — Pro İçerik Bulutu + premium vitrin
+
+- **Bir kez etkinleştir, hep güncel kal:** 40 yazı animasyonu ve 265 SFX lisans doğrulandıktan sonra otomatik kurulur; yeni içerik sürümünde yalnız değişen dosyalar indirilir.
+- Kesilen indirme kaldığı yerden devam eder. Yeni paket tamamen SHA-256 doğrulanmadan çalışan kütüphane değişmez; aktif sürümle birlikte bir önceki geri dönüş kopyası korunur.
+- Ücretsiz kullanıcılar artık 40 MOGRT'ın gerçek önizlemesini ve 11 kategorideki 265 SFX'i kilitli vitrin olarak görebilir; ücretli dosyaların hiçbiri açık pakete girmez.
+- Yazı stili kartları canlı önizlemeye açık kalırken Pro timeline çıktısı her kartta belirgin kilitle anlatılır.
+- Özelliğe özel yeni Pro penceresi gerçek MOGRT örnekleri, SFX vitrini, net fiyat ve ayrı satın alma / demo / lisans yolları sunar.
+- Lisans doğrulaması hem istemcide hem private içerik servisinde store + product sahipliğini kontrol eder; yanlış ürün aktivasyonu koltuğu geri bırakır.
+- Public paketleyiciler ücretli `content/` klasörünü gömmeyi reddeder. Yayın aracı, private Pro API canlı ve lisans kapısı çalışır durumda değilse sürümü yayınlamaz.

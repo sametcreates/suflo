@@ -1,0 +1,304 @@
+{
+  "version": 1,
+  "collection": "Suflo Pro — Text Animations",
+  "creator": "sametcreates",
+  "publicPreviewOnly": true,
+  "items": [
+    {
+      "id": "01-smooth-up",
+      "name": "Smooth Up",
+      "category": "Motion",
+      "match": "SUFLO TEXT - 01 Smooth Up.mogrt",
+      "preview": "previews/01-smooth-up.webp",
+      "video": "previews/01-smooth-up.webm"
+    },
+    {
+      "id": "02-rainbow-text",
+      "name": "Rainbow Text",
+      "category": "Color",
+      "match": "SUFLO TEXT - 02 Rainbow Text.mogrt",
+      "preview": "previews/02-rainbow-text.webp",
+      "video": "previews/02-rainbow-text.webm"
+    },
+    {
+      "id": "03-orange-text",
+      "name": "Orange Text",
+      "category": "Color",
+      "match": "SUFLO TEXT - 03 Orange Text.mogrt",
+      "preview": "previews/03-orange-text.webp",
+      "video": "previews/03-orange-text.webm"
+    },
+    {
+      "id": "04-old-tv",
+      "name": "Old TV",
+      "category": "Retro",
+      "match": "SUFLO TEXT - 04 Old TV.mogrt",
+      "preview": "previews/04-old-tv.webp",
+      "video": "previews/04-old-tv.webm"
+    },
+    {
+      "id": "05-green-and-grey",
+      "name": "Green and Grey",
+      "category": "Color",
+      "match": "SUFLO TEXT - 05 Green and Grey.mogrt",
+      "preview": "previews/05-green-and-grey.webp",
+      "video": "previews/05-green-and-grey.webm"
+    },
+    {
+      "id": "06-gold-text",
+      "name": "Gold Text",
+      "category": "Color",
+      "match": "SUFLO TEXT - 06 Gold Text.mogrt",
+      "preview": "previews/06-gold-text.webp",
+      "video": "previews/06-gold-text.webm"
+    },
+    {
+      "id": "07-futurist",
+      "name": "Futurist",
+      "category": "Style",
+      "match": "SUFLO TEXT - 07 Futurist.mogrt",
+      "preview": "previews/07-futurist.webp",
+      "video": "previews/07-futurist.webm"
+    },
+    {
+      "id": "08-coovetica-wave",
+      "name": "Coovetica Wave",
+      "category": "Wave",
+      "match": "SUFLO TEXT - 08 Coovetica Wave.mogrt",
+      "preview": "previews/08-coovetica-wave.webp",
+      "video": "previews/08-coovetica-wave.webm"
+    },
+    {
+      "id": "09-right-bounce-slide",
+      "name": "Right Bounce Slide",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 09 Right Bounce Slide.mogrt",
+      "preview": "previews/09-right-bounce-slide.webp"
+    },
+    {
+      "id": "10-butter-up",
+      "name": "Butter Up",
+      "category": "Style",
+      "match": "SUFLO TEXT - 10 Butter Up.mogrt",
+      "preview": "previews/10-butter-up.webp",
+      "video": "previews/10-butter-up.webm"
+    },
+    {
+      "id": "11-zoom-in",
+      "name": "Zoom In",
+      "category": "Motion",
+      "match": "SUFLO TEXT - 11 Zoom In.mogrt",
+      "preview": "previews/11-zoom-in.webp",
+      "video": "previews/11-zoom-in.webm"
+    },
+    {
+      "id": "12-slide-collide",
+      "name": "Slide Collide",
+      "category": "Slide",
+      "match": "SUFLO TEXT - 12 Slide Collide.mogrt",
+      "preview": "previews/12-slide-collide.webp",
+      "video": "previews/12-slide-collide.webm"
+    },
+    {
+      "id": "13-rock-solidance",
+      "name": "Rock Solidance",
+      "category": "Style",
+      "match": "SUFLO TEXT - 13 Rock Solidance.mogrt",
+      "preview": "previews/13-rock-solidance.webp",
+      "video": "previews/13-rock-solidance.webm"
+    },
+    {
+      "id": "14-right-slide",
+      "name": "Right Slide",
+      "category": "Slide",
+      "match": "SUFLO TEXT - 14 Right Slide.mogrt",
+      "preview": "previews/14-right-slide.webp"
+    },
+    {
+      "id": "15-spinning-butter",
+      "name": "Spinning Butter",
+      "category": "Style",
+      "match": "SUFLO TEXT - 15 Spinning Butter.mogrt",
+      "preview": "previews/15-spinning-butter.webp",
+      "video": "previews/15-spinning-butter.webm"
+    },
+    {
+      "id": "16-ocean-waves",
+      "name": "Ocean Waves",
+      "category": "Wave",
+      "match": "SUFLO TEXT - 16 Ocean Waves.mogrt",
+      "preview": "previews/16-ocean-waves.webp",
+      "video": "previews/16-ocean-waves.webm"
+    },
+    {
+      "id": "17-up-bounce-slide",
+      "name": "Up Bounce Slide",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 17 Up Bounce Slide.mogrt",
+      "preview": "previews/17-up-bounce-slide.webp"
+    },
+    {
+      "id": "18-right-bounce-expand",
+      "name": "Right Bounce Expand",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 18 Right Bounce Expand.mogrt",
+      "preview": "previews/18-right-bounce-expand.webp"
+    },
+    {
+      "id": "19-gradient-red-2-0",
+      "name": "Gradient Red 2.0",
+      "category": "Color",
+      "match": "SUFLO TEXT - 19 Gradient Red 2.0.mogrt",
+      "preview": "previews/19-gradient-red-2-0.webp"
+    },
+    {
+      "id": "20-gradient-blue",
+      "name": "Gradient Blue",
+      "category": "Color",
+      "match": "SUFLO TEXT - 20 Gradient Blue.mogrt",
+      "preview": "previews/20-gradient-blue.webp"
+    },
+    {
+      "id": "21-gradient-red",
+      "name": "Gradient Red",
+      "category": "Color",
+      "match": "SUFLO TEXT - 21 Gradient Red.mogrt",
+      "preview": "previews/21-gradient-red.webp"
+    },
+    {
+      "id": "22-down-bounce-slide",
+      "name": "Down Bounce Slide",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 22 Down Bounce Slide.mogrt",
+      "preview": "previews/22-down-bounce-slide.webp"
+    },
+    {
+      "id": "23-down-slide",
+      "name": "Down Slide",
+      "category": "Slide",
+      "match": "SUFLO TEXT - 23 Down Slide.mogrt",
+      "preview": "previews/23-down-slide.webp"
+    },
+    {
+      "id": "24-flex-bounce",
+      "name": "Flex Bounce",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 24 Flex Bounce.mogrt",
+      "preview": "previews/24-flex-bounce.webp"
+    },
+    {
+      "id": "25-down-blur-slide",
+      "name": "Down Blur Slide",
+      "category": "Blur",
+      "match": "SUFLO TEXT - 25 Down Blur Slide.mogrt",
+      "preview": "previews/25-down-blur-slide.webp"
+    },
+    {
+      "id": "26-jitter-shine",
+      "name": "Jitter Shine",
+      "category": "Shine",
+      "match": "SUFLO TEXT - 26 Jitter Shine.mogrt",
+      "preview": "previews/26-jitter-shine.webp"
+    },
+    {
+      "id": "27-up-slide",
+      "name": "Up Slide",
+      "category": "Slide",
+      "match": "SUFLO TEXT - 27 Up Slide.mogrt",
+      "preview": "previews/27-up-slide.webp"
+    },
+    {
+      "id": "28-santhosham",
+      "name": "Santhosham",
+      "category": "Style",
+      "match": "SUFLO TEXT - 28 Santhosham.mogrt",
+      "preview": "previews/28-santhosham.webp",
+      "video": "previews/28-santhosham.webm"
+    },
+    {
+      "id": "29-cracked",
+      "name": "Cracked",
+      "category": "Style",
+      "match": "SUFLO TEXT - 29 Cracked.mogrt",
+      "preview": "previews/29-cracked.webp",
+      "video": "previews/29-cracked.webm"
+    },
+    {
+      "id": "30-left-bounce-expand",
+      "name": "Left Bounce Expand",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 30 Left Bounce Expand.mogrt",
+      "preview": "previews/30-left-bounce-expand.webp"
+    },
+    {
+      "id": "31-premium-text",
+      "name": "Premium Text",
+      "category": "Style",
+      "match": "SUFLO TEXT - 31 Premium Text.mogrt",
+      "preview": "previews/31-premium-text.webp"
+    },
+    {
+      "id": "32-left-bounce-slide",
+      "name": "Left Bounce Slide",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 32 Left Bounce Slide.mogrt",
+      "preview": "previews/32-left-bounce-slide.webp"
+    },
+    {
+      "id": "33-left-blur-slide",
+      "name": "Left Blur Slide",
+      "category": "Blur",
+      "match": "SUFLO TEXT - 33 Left Blur Slide.mogrt",
+      "preview": "previews/33-left-blur-slide.webp"
+    },
+    {
+      "id": "34-left-slide",
+      "name": "Left Slide",
+      "category": "Slide",
+      "match": "SUFLO TEXT - 34 Left Slide.mogrt",
+      "preview": "previews/34-left-slide.webp"
+    },
+    {
+      "id": "35-premium-static",
+      "name": "Premium Static",
+      "category": "Static",
+      "match": "SUFLO TEXT - 35 Premium Static.mogrt",
+      "preview": "previews/35-premium-static.webp"
+    },
+    {
+      "id": "36-static-shine",
+      "name": "Static Shine",
+      "category": "Shine",
+      "match": "SUFLO TEXT - 36 Static Shine.mogrt",
+      "preview": "previews/36-static-shine.webp"
+    },
+    {
+      "id": "37-up-bounce-shrink",
+      "name": "Up Bounce Shrink",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 37 Up Bounce Shrink.mogrt",
+      "preview": "previews/37-up-bounce-shrink.webp"
+    },
+    {
+      "id": "38-right-blur-slide",
+      "name": "Right Blur Slide",
+      "category": "Blur",
+      "match": "SUFLO TEXT - 38 Right Blur Slide.mogrt",
+      "preview": "previews/38-right-blur-slide.webp"
+    },
+    {
+      "id": "39-up-blur-slide",
+      "name": "Up Blur Slide",
+      "category": "Blur",
+      "match": "SUFLO TEXT - 39 Up Blur Slide.mogrt",
+      "preview": "previews/39-up-blur-slide.webp"
+    },
+    {
+      "id": "40-down-bounce-shrink",
+      "name": "Down Bounce Shrink",
+      "category": "Bounce",
+      "match": "SUFLO TEXT - 40 Down Bounce Shrink.mogrt",
+      "preview": "previews/40-down-bounce-shrink.webp"
+    }
+  ]
+}
