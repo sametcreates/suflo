@@ -42,10 +42,17 @@ function FakeProp(value) {
 }
 FakeProp.prototype.getValue = function () { return this.value; };
 FakeProp.prototype.setTimeVarying = function (value) { this.timeVarying = value; };
-FakeProp.prototype.removeKeyRange = function () { this.keys = []; };
+FakeProp.prototype.removeKeyRange = function (start, end) {
+  this.keys = this.keys.filter(function (key) { return key.time < start.seconds || key.time > end.seconds; });
+};
+FakeProp.prototype.removeKey = function (time) {
+  this.keys = this.keys.filter(function (key) { return Math.abs(key.time - time.seconds) > .0001; });
+};
 FakeProp.prototype.addKey = function () {};
 FakeProp.prototype.setValueAtKey = function (time, value) { this.keys.push({ time: time.seconds, value: value }); };
 FakeProp.prototype.setInterpolationTypeAtKey = function () {};
+FakeProp.prototype.areKeyframesSupported = function () { return true; };
+FakeProp.prototype.getKeys = function () { return this.keys.map(function (key) { return { seconds: key.time }; }); };
 
 function list(items) {
   var out = { numItems: items.length };
@@ -60,13 +67,20 @@ var scale = prop("ADBE Scale", "Scale", 100);
 var opacity = prop("ADBE Opacity", "Opacity", 100);
 var motion = { matchName: "ADBE Motion", displayName: "Motion", properties: list([position, scale]) };
 var opacityComponent = { matchName: "ADBE Opacity", displayName: "Opacity", properties: list([opacity]) };
-var clip = { start: { seconds: 2 }, end: { seconds: 7 }, components: list([motion, opacityComponent]) };
+var clip = {
+  start: { seconds: 12 },
+  end: { seconds: 17 },
+  inPoint: { seconds: 37 },
+  outPoint: { seconds: 42 },
+  components: list([motion, opacityComponent]),
+  isSpeedReversed: function () { return false; }
+};
 var selected = [clip];
 var sequence = {
   frameSizeHorizontal: 1920,
   frameSizeVertical: 1080,
   getSelection: function () { return selected; },
-  getPlayerPosition: function () { return { seconds: 4 }; }
+  getPlayerPosition: function () { return { seconds: 14 }; }
 };
 var hostCtx = {
   app: { project: { activeSequence: sequence } },
@@ -90,6 +104,10 @@ function apply(id, duration, strength) {
 var zoom = apply("simple-zoom-in", .45, 1);
 ok("Simple Zoom In secili klibe uygulanir", zoom.ok && zoom.applied === 1, JSON.stringify(zoom));
 ok("Zoom In uc anahtar ve temiz final scale uretir", scale.keys.length === 3 && scale.keys[0].value > 100 && scale.keys[2].value === 100, JSON.stringify(scale.keys));
+ok("anahtar zamanlari timeline yerine klibin kaynak inPoint zamanina yazilir", scale.keys[0].time === 37 && scale.keys[2].time > 37 && scale.keys[2].time < 38, JSON.stringify(scale.keys));
+
+var zoomFast = apply("simple-zoom-in", .28, 1);
+ok("ayni giris preseti farkli hizla yeniden uygulaninca eski anahtar birakmaz", zoomFast.ok && zoomFast.removedKeys === 3 && scale.keys.length === 3 && scale.keys[2].time < 37.3, JSON.stringify({ result: zoomFast, keys: scale.keys }));
 
 position.keys = []; opacity.keys = [];
 var slide = apply("slide-in-left", .45, 1);
@@ -98,7 +116,12 @@ ok("Slide In Left soldan baslayip asil konuma gelir", position.keys[0].value[0] 
 
 opacity.keys = [];
 var fade = apply("fade-out", .45, 1);
-ok("Fade Out klip sonunda sifir opakliga iner", fade.ok && opacity.keys.length === 2 && opacity.keys[1].time === 7 && opacity.keys[1].value === 0, JSON.stringify(opacity.keys));
+ok("Fade Out klibin kaynak outPoint zamaninda sifir opakliga iner", fade.ok && opacity.keys.length === 2 && opacity.keys[1].time === 42 && opacity.keys[1].value === 0, JSON.stringify(opacity.keys));
+
+scale.keys = [];
+scale.getKeys = function () { return []; };
+var silentFailure = apply("simple-zoom-in", .45, 1);
+ok("Premiere anahtari yazmadiysa basarili mesaji verilmez", silentFailure.ok === false, JSON.stringify(silentFailure));
 
 var bad = apply("not-a-real-preset", .45, 1);
 ok("bilinmeyen preset reddedilir", bad.ok === false && /Bilinmeyen/.test(bad.error), JSON.stringify(bad));

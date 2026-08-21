@@ -279,15 +279,40 @@ function KS_presetCloneValue(value) {
   return value;
 }
 
-function KS_presetKeys(prop, keys) {
+var KS_presetRemovedCount = 0;
+
+function KS_presetKeys(prop, keys, clearStart, clearEnd) {
   if (!prop || !keys || !keys.length) return false;
   try {
-    prop.setTimeVarying(true);
-    var first = KS_presetTime(keys[0].time);
-    var last = KS_presetTime(keys[keys.length - 1].time);
     try {
-      if (prop.removeKeyRange) prop.removeKeyRange(first, last, true);
+      if (prop.areKeyframesSupported && !prop.areKeyframesSupported()) return false;
+    } catch (eSupport) {}
+    prop.setTimeVarying(true);
+    var clearA = clearStart === undefined ? Number(keys[0].time) : Number(clearStart);
+    var clearB = clearEnd === undefined ? Number(keys[keys.length - 1].time) : Number(clearEnd);
+    var first = KS_presetTime(Math.min(clearA, clearB));
+    var last = KS_presetTime(Math.max(clearA, clearB));
+    var removedIndividually = false;
+    try {
+      // removeKeyRange bazı Premiere sürümlerinde hata vermeden hiçbir şey
+      // yapmıyor. Var olan anahtarları tek tek silmek daha güvenilir.
+      var existing = prop.getKeys ? prop.getKeys() : null;
+      if (existing && typeof existing.length === "number") {
+        for (var oldKey = existing.length - 1; oldKey >= 0; oldKey--) {
+          var oldSec = Number(existing[oldKey] && existing[oldKey].seconds !== undefined ? existing[oldKey].seconds : existing[oldKey]);
+          if (oldSec >= first.seconds - 0.002 && oldSec <= last.seconds + 0.002) {
+            try {
+              prop.removeKey(existing[oldKey]);
+              KS_presetRemovedCount++;
+              removedIndividually = true;
+            } catch (eRemove) {}
+          }
+        }
+      }
     } catch (e0) {}
+    try {
+      if (!removedIndividually && prop.removeKeyRange) prop.removeKeyRange(first, last);
+    } catch (eRange) {}
     for (var i = 0; i < keys.length; i++) {
       var t = KS_presetTime(keys[i].time);
       try { prop.addKey(t); } catch (e1) {}
@@ -296,8 +321,55 @@ function KS_presetKeys(prop, keys) {
       // anahtarlar lineer kalir; preset yine calisir.
       try { if (prop.setInterpolationTypeAtKey) prop.setInterpolationTypeAtKey(t, 5, true); } catch (e2) {}
     }
-    return true;
+    // Premiere bazen çağrıyı hata vermeden kabul edip anahtar yazmayabiliyor.
+    // Kullanıcıya "uygulandı" demeden önce ilk ve son anahtarın gerçekten
+    // parametre akışında bulunduğunu doğrula.
+    try {
+      var written = prop.getKeys ? prop.getKeys() : null;
+      if (!written || typeof written.length !== "number") return false;
+      var firstFound = false;
+      var lastFound = false;
+      var firstSec = Number(keys[0].time);
+      var lastSec = Number(keys[keys.length - 1].time);
+      for (var k = 0; k < written.length; k++) {
+        var sec = Number(written[k] && written[k].seconds !== undefined ? written[k].seconds : written[k]);
+        if (Math.abs(sec - firstSec) < 0.002) firstFound = true;
+        if (Math.abs(sec - lastSec) < 0.002) lastFound = true;
+      }
+      return firstFound && lastFound;
+    } catch (eVerify) { return false; }
   } catch (e) { return false; }
+}
+
+// ComponentParam anahtar zamanları sequence zamanını değil, klibin kaynak
+// in/out zamanını kullanır. Timeline saniyesini kaynak saniyesine çevirmezsek
+// Premiere çağrıyı kabul eder ama anahtarlar görünür klip aralığının dışında kalır.
+function KS_presetSourceTime(clip, timelineSec, timelineStart, timelineEnd) {
+  var duration = Math.max(0.000001, timelineEnd - timelineStart);
+  var ratio = (Number(timelineSec) - timelineStart) / duration;
+  ratio = Math.max(0, Math.min(1, ratio));
+  var sourceIn = 0;
+  var sourceOut = duration;
+  try { sourceIn = Number(clip.inPoint.seconds); } catch (eIn) {}
+  try { sourceOut = Number(clip.outPoint.seconds); } catch (eOut) {}
+  if (!isFinite(sourceIn)) sourceIn = 0;
+  if (!isFinite(sourceOut) || Math.abs(sourceOut - sourceIn) < 0.000001) sourceOut = sourceIn + duration;
+  var reversed = false;
+  try { if (clip.isSpeedReversed) reversed = !!clip.isSpeedReversed(); } catch (eReverse) {}
+  return reversed ? sourceOut - (sourceOut - sourceIn) * ratio : sourceIn + (sourceOut - sourceIn) * ratio;
+}
+
+function KS_presetClipKeys(clip, timelineStart, timelineEnd, prop, keys, clearTimelineStart, clearTimelineEnd) {
+  var mapped = [];
+  for (var i = 0; i < keys.length; i++) {
+    mapped.push({
+      time: KS_presetSourceTime(clip, keys[i].time, timelineStart, timelineEnd),
+      value: keys[i].value
+    });
+  }
+  var clearStart = clearTimelineStart === undefined ? undefined : KS_presetSourceTime(clip, clearTimelineStart, timelineStart, timelineEnd);
+  var clearEnd = clearTimelineEnd === undefined ? undefined : KS_presetSourceTime(clip, clearTimelineEnd, timelineStart, timelineEnd);
+  return KS_presetKeys(prop, mapped, clearStart, clearEnd);
 }
 
 function KS_presetPositionValue(prop) {
@@ -318,6 +390,7 @@ function KS_presetNumberValue(prop, fallback) {
 
 function KS_applyMotionPreset(encoded) {
   try {
+    KS_presetRemovedCount = 0;
     var p = KS_arg(encoded);
     var id = String(p.id || "");
     var allowed = {
@@ -350,6 +423,7 @@ function KS_applyMotionPreset(encoded) {
       var clipDur = Math.max(0, end - start);
       if (clipDur < 0.08) { skipped++; continue; }
       var d = Math.min(duration, Math.max(0.08, clipDur * 0.46));
+      var clearD = Math.min(1.5, Math.max(0.08, clipDur * 0.46));
       var pos = KS_presetPositionValue(props.position);
       var scale = KS_presetNumberValue(props.scale, 100);
       var opacity = KS_presetNumberValue(props.opacity, 100);
@@ -362,12 +436,12 @@ function KS_applyMotionPreset(encoded) {
       var t2 = start + d;
 
       if (id === "simple-zoom-in" && props.scale) {
-        changed = KS_presetKeys(props.scale, [{ time: t0, value: scale * (1 + .12 * strength) }, { time: t1, value: scale * .985 }, { time: t2, value: scale }]) || changed;
+        changed = KS_presetClipKeys(clip, start, end, props.scale, [{ time: t0, value: scale * (1 + .12 * strength) }, { time: t1, value: scale * .985 }, { time: t2, value: scale }], start, start + clearD) || changed;
       } else if (id === "simple-zoom-out" && props.scale) {
-        changed = KS_presetKeys(props.scale, [{ time: t0, value: scale * Math.max(.55, 1 - .14 * strength) }, { time: t1, value: scale * 1.015 }, { time: t2, value: scale }]) || changed;
+        changed = KS_presetClipKeys(clip, start, end, props.scale, [{ time: t0, value: scale * Math.max(.55, 1 - .14 * strength) }, { time: t1, value: scale * 1.015 }, { time: t2, value: scale }], start, start + clearD) || changed;
       } else if (id === "pop-in") {
-        if (props.scale) changed = KS_presetKeys(props.scale, [{ time: t0, value: scale * Math.max(.45, 1 - .28 * strength) }, { time: t1, value: scale * (1 + .08 * strength) }, { time: t2, value: scale }]) || changed;
-        if (props.opacity) changed = KS_presetKeys(props.opacity, [{ time: t0, value: 0 }, { time: start + d * .52, value: opacity }]) || changed;
+        if (props.scale) changed = KS_presetClipKeys(clip, start, end, props.scale, [{ time: t0, value: scale * Math.max(.45, 1 - .28 * strength) }, { time: t1, value: scale * (1 + .08 * strength) }, { time: t2, value: scale }], start, start + clearD) || changed;
+        if (props.opacity) changed = KS_presetClipKeys(clip, start, end, props.opacity, [{ time: t0, value: 0 }, { time: start + d * .52, value: opacity }], start, start + clearD) || changed;
       } else if (id.indexOf("slide-in-") === 0 && pos) {
         var from = [pos[0], pos[1]];
         if (id === "slide-in-left") from[0] -= dx;
@@ -375,36 +449,38 @@ function KS_applyMotionPreset(encoded) {
         if (id === "slide-in-up") from[1] -= dy;
         if (id === "slide-in-down") from[1] += dy;
         var over = [pos[0] + (pos[0] - from[0]) * .035, pos[1] + (pos[1] - from[1]) * .035];
-        changed = KS_presetKeys(props.position, [{ time: t0, value: from }, { time: t1, value: over }, { time: t2, value: pos }]) || changed;
-        if (props.opacity) changed = KS_presetKeys(props.opacity, [{ time: t0, value: 0 }, { time: start + d * .62, value: opacity }]) || changed;
+        changed = KS_presetClipKeys(clip, start, end, props.position, [{ time: t0, value: from }, { time: t1, value: over }, { time: t2, value: pos }], start, start + clearD) || changed;
+        if (props.opacity) changed = KS_presetClipKeys(clip, start, end, props.opacity, [{ time: t0, value: 0 }, { time: start + d * .62, value: opacity }], start, start + clearD) || changed;
       } else if (id === "fade-in" && props.opacity) {
-        changed = KS_presetKeys(props.opacity, [{ time: t0, value: 0 }, { time: t2, value: opacity }]) || changed;
+        changed = KS_presetClipKeys(clip, start, end, props.opacity, [{ time: t0, value: 0 }, { time: t2, value: opacity }], start, start + clearD) || changed;
       } else if (id === "fade-out" && props.opacity) {
         t0 = end - d; t2 = end;
-        changed = KS_presetKeys(props.opacity, [{ time: t0, value: opacity }, { time: t2, value: 0 }]) || changed;
+        changed = KS_presetClipKeys(clip, start, end, props.opacity, [{ time: t0, value: opacity }, { time: t2, value: 0 }], end - clearD, end) || changed;
       } else if (id === "slide-out-right" && pos) {
         t0 = end - d; t1 = t0 + d * .22; t2 = end;
-        changed = KS_presetKeys(props.position, [{ time: t0, value: pos }, { time: t1, value: [pos[0] - dx * .035, pos[1]] }, { time: t2, value: [pos[0] + dx, pos[1]] }]) || changed;
-        if (props.opacity) changed = KS_presetKeys(props.opacity, [{ time: t0 + d * .35, value: opacity }, { time: t2, value: 0 }]) || changed;
+        changed = KS_presetClipKeys(clip, start, end, props.position, [{ time: t0, value: pos }, { time: t1, value: [pos[0] - dx * .035, pos[1]] }, { time: t2, value: [pos[0] + dx, pos[1]] }], end - clearD, end) || changed;
+        if (props.opacity) changed = KS_presetClipKeys(clip, start, end, props.opacity, [{ time: t0 + d * .35, value: opacity }, { time: t2, value: 0 }], end - clearD, end) || changed;
       } else if (id === "punch" && props.scale) {
         var center = playhead > start + d && playhead < end - d ? playhead : start + clipDur * .5;
         var half = Math.min(d * .5, Math.max(.08, Math.min(center - start, end - center)));
-        changed = KS_presetKeys(props.scale, [{ time: center - half, value: scale }, { time: center, value: scale * (1 + .12 * strength) }, { time: center + half, value: scale }]) || changed;
+        var clearHalf = Math.min(clearD * .5, Math.max(.08, Math.min(center - start, end - center)));
+        changed = KS_presetClipKeys(clip, start, end, props.scale, [{ time: center - half, value: scale }, { time: center, value: scale * (1 + .12 * strength) }, { time: center + half, value: scale }], center - clearHalf, center + clearHalf) || changed;
       } else if (id === "micro-shake" && pos) {
         var c = playhead > start + d && playhead < end - d ? playhead : start + clipDur * .5;
         var span = Math.min(d, Math.max(.16, clipDur * .25));
-        changed = KS_presetKeys(props.position, [
+        var clearSpan = Math.min(clearD, Math.max(.16, clipDur * .25));
+        changed = KS_presetClipKeys(clip, start, end, props.position, [
           { time: c - span * .5, value: pos },
           { time: c - span * .25, value: [pos[0] - dx * .055, pos[1] + dy * .025] },
           { time: c, value: [pos[0] + dx * .045, pos[1] - dy * .03] },
           { time: c + span * .25, value: [pos[0] - dx * .025, pos[1] + dy * .018] },
           { time: c + span * .5, value: pos }
-        ]) || changed;
+        ], c - clearSpan * .5, c + clearSpan * .5) || changed;
       }
       if (changed) applied++; else skipped++;
     }
     if (!applied) return KS_err("Secili klipte uygulanabilir Motion/Opacity ozelligi bulunamadi.");
-    return KS_ok({ applied: applied, skipped: skipped, preset: id });
+    return KS_ok({ applied: applied, skipped: skipped, preset: id, removedKeys: KS_presetRemovedCount });
   } catch (e) { return KS_err(e); }
 }
 

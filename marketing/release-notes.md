@@ -1,3 +1,10 @@
+## Suflo 2.6.5 — Motion Preset düzeltmesi
+
+- Motion preset anahtar kareleri artık timeline'ın mutlak saniyesine değil, seçili klibin gerçek kaynak in/out zamanına yazılır.
+- Kesilmiş, timeline'ın ilerleyen bölümünde duran ve hızlandırılmış kliplerde Slide, Zoom, Fade, Pop ve vurgu hareketleri görünür klip aralığına doğru uygulanır.
+- Premiere anahtar kareleri gerçekten yazmadıysa Suflo artık yanlışlıkla “uygulandı” mesajı göstermez; anlaşılır hata verir.
+- Aynı preset farklı hızla yeniden uygulandığında önceki denemeden kalan fazla anahtar kareler temizlenir.
+
 ## Suflo 2.6.4 — Motion Presetleri
 
 - **12 yeni yerleşik Motion preseti:** Simple Zoom In/Out, Pop In, dört yönlü Slide In, Fade In/Out, Focus Punch, Micro Shake ve Slide Out Right.
