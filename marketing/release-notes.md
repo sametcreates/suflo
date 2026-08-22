@@ -1,3 +1,9 @@
+## Suflo 2.7.2 — 6 yeni imza altyazı stili
+
+- **Keskin, tanınır stiller** (AutoCut topluluk presetleri tarzı, %100 özgün): **Sarı Vurgu** (Hormozi — okunan kelime sararır), **Yeşil Kontur** (MrBeast — kalın kontur), **Kutu** (kelime dolu kutunun içinde), **Neon** (parlak camgöbeği/magenta, oyun-gece), **Temiz** (Montserrat yayın alt bandı), **Zarif** (Lora serif, lifestyle).
+- Her stilin panel kartı artık gerçek örnek kelimeyle görünür — hangi stilin ne olduğu bir bakışta belli.
+- Stil sayısı 4ten 10a çıktı; hepsi mevcut motorla uyumlu, aile: custom parametreleriyle.
+
 ## Suflo 2.7.1 — Otomatik Zoom: stiller + sabit nokta
 
 - **Üç zoom stili (AutoCut tarzı):** Yumuşak (uçlarda içe/dışa yumuşama), Jump Cut (anahtar karesiz sert kesme), Snap-In (hızlı kademeli oturma).

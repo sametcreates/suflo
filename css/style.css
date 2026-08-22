@@ -883,6 +883,25 @@ details.adv > *:not(summary) { margin-top: 8px; }
   font-family: Georgia, serif; font-weight: 700; font-size: 10.5px;
   text-shadow: none; background: rgba(0, 0, 0, .8); padding: 3px 7px; border-radius: 3px;
 }
+/* Suflo imza stilleri — kart örnek görünümleri */
+.ss-kalin {
+  text-shadow:
+    0 2.4px 0 #000, 2.4px 0 0 #000, -2.4px 0 0 #000, 0 -2.4px 0 #000,
+    1.7px 1.7px 0 #000, -1.7px 1.7px 0 #000, 1.7px -1.7px 0 #000, -1.7px -1.7px 0 #000;
+}
+.ss-box {
+  font-style: normal; background: #ff3b3b; color: #fff;
+  padding: 1px 5px; border-radius: 3px; text-shadow: none;
+}
+.ss-neon {
+  color: #45e6ff;
+  text-shadow: 0 0 8px rgba(69, 230, 255, .95), 0 0 2px #052b3a, 0 1.5px 0 #052b3a;
+}
+.ss-neon i { text-shadow: 0 0 8px rgba(255, 77, 240, .9), 0 0 2px #3a0533; }
+.stil-neon .ss-sahne  { background: radial-gradient(120% 100% at 50% 45%, rgba(69, 230, 255, .17), #05070e 72%); }
+.stil-zarif .ss-sahne { background: linear-gradient(180deg, #1b1712, #0b0a08); }
+.stil-kutu .ss-sahne  { background: linear-gradient(180deg, #1a1416, #0d0a0b); }
+.stil-temiz .ss-sahne { background: linear-gradient(180deg, #171a20, #0c0e12); }
 
 /* kart animasyonları: sonsuz döngü, hafif ve akıcı */
 .ss-anton .sv { animation: ss-vurgu 2.4s infinite; }

@@ -673,6 +673,43 @@ window.KCaptions = (function () {
       maxlen: "k1", kase: "upper", punct: false,
       stil: { aile: "pop", yogunluk: "hard", font: "Bungee", boyut: 76, renk: "#ffe14d", konturRenk: "#1a1a2e",
               vurguRenk: "#ffffff", kontur: 6, konum: 5, kutu: false, animasyon: "bounce" }
+    },
+    /* ---- Suflo imza stilleri (keskin, tanınır kimlikler) ---- */
+    sari: {
+      // Hormozi: kalın beyaz, okunan kelime sarı
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { aile: "custom", yogunluk: "balanced", font: "Anton", boyut: 96, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#ffd21e", kontur: 7, konum: 5, kutu: false, animasyon: "vurgu" }
+    },
+    yesil: {
+      // MrBeast/KHABY: çok kalın kontur, okunan kelime parlak yeşil
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { aile: "custom", yogunluk: "hard", font: "Archivo Black", boyut: 88, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#2fe36a", kontur: 9, konum: 5, kutu: false, animasyon: "vurgu" }
+    },
+    kutu: {
+      // Kutu-vurgu: okunan kelime dolu kırmızı kutunun içinde
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { aile: "custom", yogunluk: "balanced", font: "Archivo Black", boyut: 80, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#ff3b3b", kontur: 3, konum: 5, kutu: true, animasyon: "vurgu" }
+    },
+    temiz: {
+      // Yayın-temiz alt bant: Montserrat, sade, okunur (röportaj/eğitim)
+      maxlen: "c42", kase: "normal", punct: true,
+      stil: { aile: "custom", yogunluk: "balanced", font: "Montserrat", boyut: 58, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#8b7cf6", kontur: 2, konum: 2, kutu: false, animasyon: "fade" }
+    },
+    zarif: {
+      // Zarif serif: Lora, ince pill, dingin içerik (moda/lifestyle)
+      maxlen: "c42", kase: "normal", punct: true,
+      stil: { aile: "custom", yogunluk: "balanced", font: "Lora", boyut: 54, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#c5a96b", kontur: 1, konum: 2, kutu: true, animasyon: "fade" }
+    },
+    neon: {
+      // Neon: Bebas parlak camgöbeği, vurgu magenta, gece/oyun içerikleri
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { aile: "custom", yogunluk: "balanced", font: "Bebas Neue", boyut: 92, renk: "#45e6ff", konturRenk: "#052b3a",
+              vurguRenk: "#ff4df0", kontur: 5, konum: 5, kutu: false, animasyon: "vurgu" }
     }
   };
 
