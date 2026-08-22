@@ -52,7 +52,7 @@
     </button>
     <button class="ky-oge" data-tab="cut">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="5.5" cy="6" r="2.2"/><circle cx="5.5" cy="14" r="2.2"/><path d="M7.5 7.2 16 14M7.5 12.8 16 6"/></svg></span>
-      <span class="ky-metin"><b>Otomatik Kesim</b><i>sessizlik temizliği</i></span>
+      <span class="ky-metin"><b>Otomatik Kesim</b><i>sessizlik · jump cut</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
     <button class="ky-oge" data-tab="beat">
@@ -485,9 +485,33 @@
       <div class="pt-fiyat"><b>749 TL</b><span>tek sefer · abonelik yok · ömür boyu</span></div>
       <button class="btn primary pro-ac-btn" style="width:100%">Pro'yu aç →</button>
     </div>
+    <style>
+      .cut-intro{background:var(--grad-soft);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-bottom:12px}
+      .ci-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+      .ci-head svg{width:18px;height:18px;flex:none;color:var(--accent-lite)}
+      .ci-head b{font-size:13.5px;color:var(--text)}
+      .ci-p{font-size:12px;color:var(--dim);line-height:1.55;margin:0 0 11px}
+      .ci-p b{color:var(--text)}
+      .ci-steps{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+      .ci-steps li{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim)}
+      .ci-steps li b{color:var(--text)}
+      .ci-steps li span{flex:none;width:18px;height:18px;border-radius:50%;background:var(--accent-soft);color:var(--accent-lite);font-size:10.5px;font-weight:700;display:grid;place-items:center}
+    </style>
+    <div class="cut-intro" id="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="5.5" cy="6" r="2.2"/><circle cx="5.5" cy="14" r="2.2"/><path d="M7.5 7.2 16 14M7.5 12.8 16 6"/></svg>
+        <b>Konuşmandaki ölü anları saniyede temizle</b>
+      </div>
+      <p class="ci-p">Sessizlikleri otomatik bulur, sana gösterir, onayladığını timeline'da keser. 10 dakikalık konuşmada elle ~40 dakikalık jump-cut işi → <b>2 dakika</b>. Kopya sekansta uygulanır — <b>orijinalin hiç bozulmaz.</b></p>
+      <ol class="ci-steps">
+        <li><span>1</span> Timeline'da bir klip ya da sekans seç</li>
+        <li><span>2</span> <b>Sessizlikleri bul</b>'a bas</li>
+        <li><span>3</span> Turuncu bölümleri kontrol et → <b>Kesimleri uygula</b></li>
+      </ol>
+    </div>
     <div class="action-bar">
       <button id="cut-analyze" class="btn primary big" disabled>
-        <span class="btn-label">Duraksamaları bul</span>
+        <span class="btn-label">Sessizlikleri bul</span>
       </button>
     </div>
     <div id="cut-progress" class="progress-line" hidden><i></i></div>
