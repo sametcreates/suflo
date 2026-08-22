@@ -1,3 +1,9 @@
+## Suflo 2.6.6 — Otomatik Kesim, daha keşfedilebilir
+
+- **Kesim sekmesinde net anlatım:** ne yaptığını, kazancını (elle ~40 dk jump-cut → ~2 dk) ve "orijinalin bozulmaz" güvencesini gösteren boş-durum kartı + 1-2-3 adım.
+- **Ana akıştan keşif:** altyazı uygulandıktan sonra "Konuşma videon mu? Otomatik Kesim ile ölü anları temizle" ipucu çıkar; tek tıkla Kesim sekmesine götürür.
+- **Doğru terim:** "Duraksamaları bul" → "Sessizlikleri bul"; menüde "sessizlik · jump cut".
+
 ## Suflo 2.6.5 — Motion Preset düzeltmesi
 
 - Motion preset anahtar kareleri artık timeline'ın mutlak saniyesine değil, seçili klibin gerçek kaynak in/out zamanına yazılır.
