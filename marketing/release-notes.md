@@ -1,3 +1,8 @@
+## Suflo 2.8.1 — Motion BG senkron düzeltmesi (hotfix)
+
+- **Düzeltildi:** 2.8.0'da Pro içerik eşitleme motionbg (mp4/mov) dosyalarını “desteklenmeyen içerik türü” diye reddedip **tüm senkronu durduruyordu** — artık Motion BG videoları da (yeni MOGRT/SFX ile birlikte) sorunsuz iniyor.
+- 2.8.0 kullanıyorsan bu sürüme güncelle; panel Pro içeriği otomatik tamamlar.
+
 ## Suflo 2.8.0 — Dev icerik guncellemesi (Motion BG + 3 kat MOGRT + SFX)
 
 - **Yeni “Motion BG” kategorisi:** 30 hareketli zemin & overlay (light leak, film grain, gradient, grid, VHS, glitch...). Kartta canli on izleme; tek tıkla playhead’de üst video katmanına düşer. Kendi arşivini de bağlayabilirsin.

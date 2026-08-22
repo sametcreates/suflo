@@ -111,7 +111,8 @@ window.ProSync = (function () {
       throw new Error("Güvensiz içerik yolu.");
     var mogrt = /^mogrt\/.+\.mogrt$/i.test(rel);
     var sfx = /^sfx\/.+\.(wav|mp3|aif|aiff|m4a|flac|ogg|wma)$/i.test(rel);
-    if (!mogrt && !sfx) throw new Error("Desteklenmeyen Pro içerik türü: " + rel);
+    var motionbg = /^motionbg\/.+\.(mp4|mov|m4v|webm)$/i.test(rel);
+    if (!mogrt && !sfx && !motionbg) throw new Error("Desteklenmeyen Pro içerik türü: " + rel);
     var bytes = Number(item.bytes);
     var sha = String(item.sha256 || "").toLowerCase();
     if (!isFinite(bytes) || bytes < 1 || bytes > 4 * 1024 * 1024 * 1024) throw new Error("Geçersiz dosya boyutu: " + rel);

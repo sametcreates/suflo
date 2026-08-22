@@ -16,6 +16,7 @@ var w2 = Buffer.from("RIFF-whoosh-v2-longer");
 var b2 = Buffer.from("PK\x03\x04-mogrt-b-v2");
 var c3 = Buffer.from("PK\x03\x04-mogrt-c-v3");
 var w3 = Buffer.from("RIFF-whoosh-v3-even-longer");
+var v4 = Buffer.from("\x00\x00\x00\x18ftypmp42-motionbg-loop-v4");
 var payloads = {};
 function setPayloads(map) { payloads = map; }
 
@@ -52,6 +53,7 @@ function manifestFetcher() {
   if (manifestMode === "offline") return Promise.reject(new Error("offline"));
   if (manifestMode === "bad-path") return Promise.resolve({ ok: true, token: "t", content_version: "3", files: [file("mogrt/../../escape.mogrt", a1)] });
   if (manifestMode === "bad-hash") return Promise.resolve({ ok: true, token: "t", content_version: "3", files: [{ path: "mogrt/A.mogrt", bytes: a1.length, sha256: "0".repeat(64) }] });
+  if (manifestMode === "motionbg") return Promise.resolve({ ok: true, token: "tm", content_version: "4.0.0", files: [file("mogrt/A.mogrt", a1), file("sfx/Whoosh/w.wav", w1), file("motionbg/Loop.mp4", v4)] });
   if (manifestMode === "v3") return Promise.resolve({ ok: true, token: "t3", content_version: "3.0.0", files: [file("mogrt/A.mogrt", a1), file("mogrt/C.mogrt", c3), file("sfx/Whoosh/w.wav", w3)] });
   if (manifestMode === "v2") return Promise.resolve({ ok: true, token: "t2", content_version: "2.0.0", files: [file("mogrt/A.mogrt", a1), file("mogrt/B.mogrt", b2), file("sfx/Whoosh/w.wav", w2)] });
   return Promise.resolve({ ok: true, token: "t1", content_version: "1.0.0", files: [file("mogrt/A.mogrt", a1), file("sfx/Whoosh/w.wav", w1)] });
@@ -138,6 +140,13 @@ async function run() {
   manifestMode = "offline";
   var offline = await ctx.ProSync.sync();
   ok("Internet yokken kurulu Pro icerikleri calismaya devam eder", offline.ok && offline.offline && ctx.ProSync.status().phase === "ready", JSON.stringify(offline));
+
+  manifestMode = "motionbg";
+  setPayloads({ "mogrt/A.mogrt": a1, "sfx/Whoosh/w.wav": w1, "motionbg/Loop.mp4": v4 });
+  var mbg = await ctx.ProSync.sync();
+  ok("Motion BG (mp4) icerik turu kabul edilir ve indirilir",
+    mbg.ok && fs.existsSync(path.join(settings.proPackKlasor, "motionbg", "Loop.mp4")) &&
+    fs.readFileSync(path.join(settings.proPackKlasor, "motionbg", "Loop.mp4")).equals(v4), JSON.stringify(mbg));
 
   var src = fs.readFileSync(path.join(ROOT, "js", "pro-sync.js"), "utf8");
   ok("Lisans anahtari URL'ye eklenmez", !/license_key[^\n]{0,120}(query|search|encodeURIComponent)/i.test(src));

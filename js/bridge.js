@@ -368,7 +368,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "2.8.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
+  var VERSION = "2.8.1";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
