@@ -1,3 +1,9 @@
+## Suflo 2.7.3 — "Güncel misin?" denetimi
+
+- **Ayarlar → Güncelleme** grubu: mevcut sürüm + tek tıkla "Güncel misin? Denetle" butonu. Güncelsen "Güncelsin ✓" der, yeni sürüm varsa üstte indir şeridi çıkar.
+- Üstteki **sürüm rozeti artık tıklanabilir** — tıklayınca güncellemeleri denetler.
+- Amaç: eski sürümdeki ücretsiz kullanıcılar yeni Pro özelliklerini (otomatik zoom, yeni stiller, kesim) kaçırmasın.
+
 ## Suflo 2.7.2 — 6 yeni imza altyazı stili
 
 - **Keskin, tanınır stiller** (AutoCut topluluk presetleri tarzı, %100 özgün): **Sarı Vurgu** (Hormozi — okunan kelime sararır), **Yeşil Kontur** (MrBeast — kalın kontur), **Kutu** (kelime dolu kutunun içinde), **Neon** (parlak camgöbeği/magenta, oyun-gece), **Temiz** (Montserrat yayın alt bandı), **Zarif** (Lora serif, lifestyle).

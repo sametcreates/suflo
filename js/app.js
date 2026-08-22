@@ -831,17 +831,32 @@ window.KApp = (function () {
     return false;
   }
 
-  async function checkUpdate() {
-    if (!K.nodeOK) return;
+  function guncelDurum(msg, cls) {
+    var e = el("set-guncelleme-durum");
+    if (e) { e.textContent = msg; e.className = "inline-status" + (cls ? " " + cls : ""); }
+  }
+
+  async function checkUpdate(manuel) {
+    if (!K.nodeOK) {
+      if (manuel) { guncelDurum("Bu ortamda denetlenemiyor", "warn"); toast("Güncelleme denetimi Premiere içinde çalışır", "warn"); }
+      return;
+    }
+    if (manuel) guncelDurum("Denetleniyor…");
     try {
       var r = await K.httpGet("https://api.github.com/repos/" + K.REPO + "/releases/latest");
-      if (r.status !== 200) return;
+      if (r.status !== 200) {
+        if (manuel) { guncelDurum("Şu an denetlenemedi", "bad"); toast("Güncelleme denetlenemedi — sonra dene", "bad"); }
+        return;
+      }
       var j = JSON.parse(r.body);
       var tag = String(j.tag_name || "").replace(/^v/, "");
-      if (!tag || !surumDahaYeni(tag, K.VERSION)) return;
+      if (!tag || !surumDahaYeni(tag, K.VERSION)) {
+        if (manuel) { guncelDurum("Güncelsin ✓ (v" + K.VERSION + ")", "good"); toast("En güncel sürümdesin ✓", "good"); }
+        return;
+      }
 
-      // kullanici bu surumu "gosterme" dediyse rahatsiz etme
-      if (K.settings().skipVersion === tag) { K.log("guncelleme v" + tag + " kullanici tarafindan gizlendi"); return; }
+      // kullanici bu surumu "gosterme" dediyse rahatsiz etme — ama MANUEL denetimde goster
+      if (!manuel && K.settings().skipVersion === tag) { K.log("guncelleme v" + tag + " kullanici tarafindan gizlendi"); return; }
 
       /*
        * Asıl dağıtım v1.9'dan beri Kurulum ZIP'i; .zxp yalnız ZXP Installer
@@ -872,7 +887,10 @@ window.KApp = (function () {
         (guncelleme.zip ? "İndir, ZIP'i aç, kur dosyasına çift tıkla." : "İndir, çift tıkla, Premiere'i yeniden başlat.");
       el("update-indir").disabled = !paket;
       el("update-bar").hidden = false;
-    } catch (e) {}
+      if (manuel) { guncelDurum("Yeni sürüm hazır: v" + tag, "good"); toast("Yeni sürüm v" + tag + " hazır — üstteki şeritten indir", "good"); }
+    } catch (e) {
+      if (manuel) { guncelDurum("Denetlenemedi", "bad"); }
+    }
   }
 
   // Indirilen dosyayi kullanicinin onune getir: once dosyayi acmayi dene
@@ -1007,10 +1025,21 @@ window.KApp = (function () {
 
     // Sürüm etiketleri tek kaynaktan (bridge.js VERSION) beslenir: elle yazılan
     // "v1.7" her yayında geride kalıyor, kullanıcı hangi sürümde olduğunu bilemiyordu
-    ["brand-ver", "hakkinda-ver"].forEach(function (id) {
+    ["brand-ver", "hakkinda-ver", "set-ver"].forEach(function (id) {
       var e = el(id);
       if (e) e.textContent = "v" + K.VERSION;
     });
+    // Aktif "Güncel misin?" denetimi: Ayarlar butonu + tıklanabilir sürüm rozeti
+    if (el("set-guncelleme-denetle")) el("set-guncelleme-denetle").addEventListener("click", function () { checkUpdate(true); });
+    if (el("brand-ver")) {
+      el("brand-ver").style.cursor = "pointer";
+      el("brand-ver").title = "Güncellemeleri denetle";
+      el("brand-ver").addEventListener("click", function () {
+        var gear = document.querySelector('.tab[data-tab="settings"]');
+        if (gear) gear.click();
+        checkUpdate(true);
+      });
+    }
 
     // Bağlam yoklaması ve ffmpeg denetimi ÖNCE: modüllerden bağımsız çalışsın
     guvenli("bağlam", pollContext);
