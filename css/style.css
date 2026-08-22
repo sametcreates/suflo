@@ -902,6 +902,15 @@ details.adv > *:not(summary) { margin-top: 8px; }
 .stil-zarif .ss-sahne { background: linear-gradient(180deg, #1b1712, #0b0a08); }
 .stil-kutu .ss-sahne  { background: linear-gradient(180deg, #1a1416, #0d0a0b); }
 .stil-temiz .ss-sahne { background: linear-gradient(180deg, #171a20, #0c0e12); }
+.ss-daktilo {
+  font-family: "Courier New", ui-monospace, monospace; font-weight: 700; font-size: 11px;
+  letter-spacing: 0; text-shadow: 0 1px 3px rgba(0,0,0,.7);
+}
+.ss-daktilo i { color: #6fdca0; animation: ss-blink 1.05s steps(1) infinite; }
+@keyframes ss-blink { 50% { opacity: 0; } }
+.stil-mor .ss-sahne     { background: radial-gradient(120% 100% at 50% 40%, rgba(167,139,250,.15), #0a0910 72%); }
+.stil-sticker .ss-sahne { background: linear-gradient(180deg, #1c1626, #0d0a12); }
+.stil-daktilo .ss-sahne { background: linear-gradient(180deg, #101512, #0a0c0b); }
 
 /* kart animasyonları: sonsuz döngü, hafif ve akıcı */
 .ss-anton .sv { animation: ss-vurgu 2.4s infinite; }

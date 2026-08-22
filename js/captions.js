@@ -710,6 +710,30 @@ window.KCaptions = (function () {
       maxlen: "k1", kase: "upper", punct: false,
       stil: { aile: "custom", yogunluk: "balanced", font: "Bebas Neue", boyut: 92, renk: "#45e6ff", konturRenk: "#052b3a",
               vurguRenk: "#ff4df0", kontur: 5, konum: 5, kutu: false, animasyon: "vurgu" }
+    },
+    beyaz: {
+      // Temiz kalın beyaz — MrBeast/haber: kelime kelime beliren, renksiz güçlü
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { aile: "custom", yogunluk: "balanced", font: "Anton", boyut: 92, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#f0f0f0", kontur: 7, konum: 5, kutu: false, animasyon: "vurgu" }
+    },
+    mor: {
+      // Mor Vurgu — Sarı'nın soğuk kardeşi, marka/teknoloji içerikleri
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { aile: "custom", yogunluk: "balanced", font: "Anton", boyut: 94, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#a78bfa", kontur: 7, konum: 5, kutu: false, animasyon: "vurgu" }
+    },
+    sticker: {
+      // Sticker — Bungee, renkli, zıplayan; eğlence/çocuk içerikleri
+      maxlen: "k1", kase: "upper", punct: false,
+      stil: { aile: "custom", yogunluk: "hard", font: "Bungee", boyut: 74, renk: "#ffe14d", konturRenk: "#1a1a2e",
+              vurguRenk: "#ff6b6b", kontur: 6, konum: 5, kutu: false, animasyon: "bounce" }
+    },
+    daktilo: {
+      // Daktilo — kelime kelime beliren, sakin anlatı/eğitim
+      maxlen: "c42", kase: "normal", punct: true,
+      stil: { aile: "custom", yogunluk: "balanced", font: "Montserrat", boyut: 54, renk: "#ffffff", konturRenk: "#000000",
+              vurguRenk: "#6fdca0", kontur: 2, konum: 2, kutu: false, animasyon: "karaoke" }
     }
   };
 

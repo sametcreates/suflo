@@ -1,3 +1,9 @@
+## Suflo 2.7.6 — Stil katmanı yeniden: 10 tanınır stil
+
+- **Motor-tabanlı 4 eski stil (Viral Vurgu/Pop/Belgesel/Premium) kaldırıldı.** Yerine 10 keskin, tanınır stil: Sarı Vurgu, Yeşil Kontur, Kutu, Neon, Temiz, Zarif, Beyaz Kalın, Mor Vurgu, Sticker, Daktilo.
+- Her stil panelde **gerçek örnek kelimeyle** görünür (AutoCut topluluk-preset tarzı) — hangi stilin ne olduğu bir bakışta belli.
+- Başlık sadeleşti: "Bir görünüm seç — altyazın o stille gelir."
+
 ## Suflo 2.7.5 — Sürüm senkronu düzeltmesi
 
 - **Kritik düzeltme:** panel kendi sürümünü (bridge.js) manifest ile senkronsuz raporluyordu (2.6.5te kalmıştı) — bu yüzden güncel kullanıcılara bile "Güncelle" şeridi çıkıyordu. Artık build sırasında sürüm manifestten otomatik yazılıyor; güncel olan güncel görünür.
