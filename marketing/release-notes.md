@@ -1,3 +1,7 @@
+## Suflo 2.7.5 — Sürüm senkronu düzeltmesi
+
+- **Kritik düzeltme:** panel kendi sürümünü (bridge.js) manifest ile senkronsuz raporluyordu (2.6.5te kalmıştı) — bu yüzden güncel kullanıcılara bile "Güncelle" şeridi çıkıyordu. Artık build sırasında sürüm manifestten otomatik yazılıyor; güncel olan güncel görünür.
+
 ## Suflo 2.7.4 — Kaçırılmaz güncelleme hatırlatıcısı
 
 - Yeni sürüm şeridi artık ✕ ile **kalıcı gizlenmiyor** — yalnız o oturum kapanır, panel yeniden açılınca yumuşakça tekrar hatırlatır. Amaç: eski sürümdeki kullanıcılar yeni Pro özelliklerini kaçırmasın.

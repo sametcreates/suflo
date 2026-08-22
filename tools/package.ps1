@@ -44,6 +44,17 @@ foreach ($item in $stageItems) {
 }
 Write-Host "LEAN build: Pro icerigi private buluttan gelir, release'e gomulmedi." -ForegroundColor DarkGray
 
+# bridge.js VERSION'i manifest'ten OTOMATIK senkronla — surum kaymasini kokten onler
+# (panel kendini eski sanip surekli "Guncelle" gostermesin). Kaynak dosyaya dokunmaz,
+# yalniz paketlenen kopyayi gunceller.
+$bridgeStaged = Join-Path $stage "js\bridge.js"
+if (Test-Path $bridgeStaged) {
+    $raw = [System.IO.File]::ReadAllText($bridgeStaged)
+    $raw = [System.Text.RegularExpressions.Regex]::Replace($raw, 'var VERSION = "[^"]*"', "var VERSION = `"$version`"")
+    [System.IO.File]::WriteAllText($bridgeStaged, $raw, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "bridge.js VERSION -> $version" -ForegroundColor DarkGray
+}
+
 # kendinden imzali sertifika (yoksa uret)
 if (-not (Test-Path $cert)) {
     & $signer -selfSignedCert TR Istanbul "sametcreates" "sametcreates" $pass $cert | Out-Null

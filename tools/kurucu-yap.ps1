@@ -28,6 +28,15 @@ foreach ($item in $panelItems) {
     if (Test-Path $p) { Copy-Item $p -Destination $panel -Recurse -Force }
 }
 
+# bridge.js VERSION'i manifest'ten OTOMATIK senkronla (surum kaymasi = panel hep "Guncelle" der)
+$bridgeStaged = Join-Path $panel "js\bridge.js"
+if (Test-Path $bridgeStaged) {
+    $raw = [System.IO.File]::ReadAllText($bridgeStaged)
+    $raw = [System.Text.RegularExpressions.Regex]::Replace($raw, 'var VERSION = "[^"]*"', "var VERSION = `"$surum`"")
+    [System.IO.File]::WriteAllText($bridgeStaged, $raw, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "bridge.js VERSION -> $surum" -ForegroundColor DarkGray
+}
+
 # Kurucular paketin köküne
 Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.bat") -Destination $stage -Force
 Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.command") -Destination $stage -Force
