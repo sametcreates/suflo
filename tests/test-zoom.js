@@ -65,5 +65,29 @@ chk("anahtar sayisi makul (<= 400)", buyuk.keys.length <= 400, buyuk.keys.length
 var uc = Z.plan({ dur: 10, segments: [], intensity: 99, speed: -5, mode: "speech", interval: 0.1 });
 chk("asiri parametreler kelepcelenir (I tavan .30 + overshoot payi)", uc.keys.every(function (k) { return k.value <= 1.30 * 1.012 + 0.001 && k.value >= 0.99; }));
 
+/* ---- stiller (AutoCut: Yumusak / Jump Cut / Snap-In) ---- */
+var segTest = [{ start: 0, end: 6 }, { start: 8, end: 16 }, { start: 18, end: 30 }];
+var yum = Z.plan({ dur: 30, segments: segTest, style: "smooth", mode: "speech" });
+chk("yumusak stil: 3-anahtarli gecis (overshoot)", yum.style === "smooth" && yum.keys.length > yum.toggles * 2, yum.keys.length);
+
+var jc = Z.plan({ dur: 30, segments: segTest, style: "jumpcut", mode: "speech" });
+chk("jumpcut: stil dogru", jc.style === "jumpcut");
+chk("jumpcut: yumusaktan az anahtar (sert kesme)", jc.keys.length < yum.keys.length, { jc: jc.keys.length, yum: yum.keys.length });
+chk("jumpcut: art arda anahtarlar cok yakin (~kesme)", (function () {
+  for (var i = 1; i < jc.keys.length; i++) {
+    if (jc.keys[i].value !== jc.keys[i - 1].value && (jc.keys[i].time - jc.keys[i - 1].time) < 0.08) return true;
+  }
+  return false;
+})());
+
+var sn = Z.plan({ dur: 30, segments: segTest, style: "snapin", mode: "speech" });
+chk("snapin: stil dogru", sn.style === "snapin");
+chk("snapin: kademeli (yumusaktan cok anahtar)", sn.keys.length >= yum.keys.length, { sn: sn.keys.length, yum: yum.keys.length });
+
+chk("bilinmeyen stil -> smooth", Z.plan({ dur: 20, segments: segTest, style: "zzz", mode: "speech" }).style === "smooth");
+chk("tum stillerde deger araligi korunur", [yum, jc, sn].every(function (pl) {
+  return pl.keys.every(function (k) { return k.value >= 0.99 && k.value <= 1.31; });
+}));
+
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 if (kaldi) process.exit(1);

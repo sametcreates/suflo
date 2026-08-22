@@ -503,6 +503,17 @@ function KS_autoZoom(encoded) {
     if (!seq) return KS_err("Aktif sequence yok.");
     var selected = seq.getSelection();
     if (!selected || !selected.length) return KS_err("Timeline'da bir video klibi sec.");
+    // sabit nokta (0..1, [0.5,0.5]=merkez): merkez disiysa zoom'la senkron
+    // pozisyon kaymasi yazilir; secilen nokta kadrajda sabit kalir.
+    var ax = 0.5, ay = 0.5;
+    if (p.anchor && p.anchor.length >= 2) {
+      ax = Number(p.anchor[0]); ay = Number(p.anchor[1]);
+      if (!isFinite(ax)) ax = 0.5; if (!isFinite(ay)) ay = 0.5;
+      ax = Math.max(0.1, Math.min(0.9, ax)); ay = Math.max(0.1, Math.min(0.9, ay));
+    }
+    var merkezde = Math.abs(ax - 0.5) < 0.01 && Math.abs(ay - 0.5) < 0.01;
+    var frameW = Number(seq.frameSizeHorizontal) || 1920;
+    var frameH = Number(seq.frameSizeVertical) || 1080;
     var applied = 0, skipped = 0;
     for (var i = 0; i < selected.length; i++) {
       var clip = selected[i];
@@ -512,7 +523,12 @@ function KS_autoZoom(encoded) {
       var end = Number(clip.end.seconds) || start;
       if (end - start < 0.2) { skipped++; continue; }
       var base = KS_presetNumberValue(props.scale, 100);
+      var pos0 = KS_presetPositionValue(props.position);
+      var normalized = pos0 && Math.abs(pos0[0]) <= 2.5 && Math.abs(pos0[1]) <= 2.5;
+      var sx = (ax - 0.5) * (normalized ? 1 : frameW);
+      var sy = (ay - 0.5) * (normalized ? 1 : frameH);
       var mapped = [];
+      var posKeys = [];
       for (var k = 0; k < keys.length; k++) {
         var t = Number(keys[k].time);
         var v = Number(keys[k].value);
@@ -520,12 +536,21 @@ function KS_autoZoom(encoded) {
         if (t < start) t = start;
         if (t > end) t = end;
         mapped.push({ time: t, value: base * v });
+        if (!merkezde && pos0) {
+          posKeys.push({ time: t, value: [pos0[0] - sx * (v - 1), pos0[1] - sy * (v - 1)] });
+        }
       }
       if (!mapped.length) { skipped++; continue; }
       var cs = p.clearStart === undefined ? start : Math.max(start, Number(p.clearStart));
       var ce = p.clearEnd === undefined ? end : Math.min(end, Number(p.clearEnd));
-      if (KS_presetClipKeys(clip, start, end, props.scale, mapped, cs, ce)) applied++;
-      else skipped++;
+      var ok = KS_presetClipKeys(clip, start, end, props.scale, mapped, cs, ce);
+      if (!merkezde && posKeys.length && props.position) {
+        KS_presetClipKeys(clip, start, end, props.position, posKeys, cs, ce);
+      } else if (props.position && pos0) {
+        // merkez / anchor kapali: onceki zoom'dan kalan pozisyon kaymalarini geri al
+        KS_presetClipKeys(clip, start, end, props.position, [{ time: start, value: pos0 }, { time: end, value: pos0 }], cs, ce);
+      }
+      if (ok) applied++; else skipped++;
     }
     if (!applied) return KS_err("Secili klipte Motion > Scale ozelligi bulunamadi.");
     return KS_ok({ applied: applied, skipped: skipped, keyCount: keys.length, removedKeys: KS_presetRemovedCount });

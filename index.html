@@ -611,6 +611,36 @@
       <button class="on" data-m="speech">Konuşmaya göre<em>önerilen</em></button>
       <button data-m="rhythm">Ritmik</button>
     </div>
+    <style>
+      .zoom-lbl{font-size:11.5px;font-weight:590;color:var(--dim);margin:14px 0 7px;letter-spacing:.01em}
+      #zoom-stil button em{display:block;font-size:9.5px;font-weight:600;opacity:.7;letter-spacing:.04em;margin-top:1px}
+      .zoom-nokta{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:140px}
+      .zoom-nokta button{aspect-ratio:16/10;border:1px solid var(--line2);border-radius:6px;background:var(--bg3);cursor:pointer;position:relative;transition:border-color .14s,background .14s}
+      .zoom-nokta button::after{content:"";position:absolute;left:50%;top:50%;width:5px;height:5px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background .14s}
+      .zoom-nokta button:hover{border-color:var(--accent)}
+      .zoom-nokta button.on{border-color:var(--accent);background:var(--accent-soft)}
+      .zoom-nokta button.on::after{background:var(--accent-lite);box-shadow:0 0 8px 1px rgba(124,92,255,.5)}
+      .zoom-nokta-not{font-size:11px;color:var(--faint);margin-top:6px}
+    </style>
+    <div class="zoom-lbl">Stil</div>
+    <div class="seg-ctl full" id="zoom-stil">
+      <button class="on" data-s="smooth">Yumuşak<em>önerilen</em></button>
+      <button data-s="jumpcut">Jump Cut<em>sert kesme</em></button>
+      <button data-s="snapin">Snap-In<em>hızlı</em></button>
+    </div>
+    <div class="zoom-lbl">Zoom merkezi <span style="color:var(--faint);font-weight:450">— sabit nokta</span></div>
+    <div class="zoom-nokta" id="zoom-nokta" role="group" aria-label="Zoom merkezi">
+      <button data-a="0.2,0.2" aria-label="sol üst"></button>
+      <button data-a="0.5,0.2" aria-label="üst"></button>
+      <button data-a="0.8,0.2" aria-label="sağ üst"></button>
+      <button data-a="0.2,0.5" aria-label="sol"></button>
+      <button class="on" data-a="0.5,0.5" aria-label="merkez"></button>
+      <button data-a="0.8,0.5" aria-label="sağ"></button>
+      <button data-a="0.2,0.8" aria-label="sol alt"></button>
+      <button data-a="0.5,0.8" aria-label="alt"></button>
+      <button data-a="0.8,0.8" aria-label="sağ alt"></button>
+    </div>
+    <p class="zoom-nokta-not">Dikey (Reels) videoda genelde <b>üst-orta</b> — yüz sabit kalır.</p>
     <div class="row" id="zoom-aralik-satir" hidden>
       <label>Aralık</label>
       <input id="zoom-aralik" type="range" min="2" max="12" step="1" value="5">

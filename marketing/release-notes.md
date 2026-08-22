@@ -1,3 +1,10 @@
+## Suflo 2.7.1 — Otomatik Zoom: stiller + sabit nokta
+
+- **Üç zoom stili (AutoCut tarzı):** Yumuşak (uçlarda içe/dışa yumuşama), Jump Cut (anahtar karesiz sert kesme), Snap-In (hızlı kademeli oturma).
+- **Zoom merkezi / sabit nokta:** 3×3 ızgaradan seç — dikey (Reels) videoda üst-orta seçilince yüz kadrajda sabit kalır; zoom yüze kilitlenir.
+- Merkez dışı seçimde pozisyon, zoomla senkron kayar; merkeze dönünce eski kayma otomatik geri alınır.
+- 24 birim testi (stiller + sabit nokta dahil), tüm takım 30/30 yeşil.
+
 ## Suflo 2.7.0 — Otomatik Zoom
 
 - **Yeni Pro özelliği: Otomatik Zoom.** Konuşmanı dinler, her konuşma başlangıcında yumuşak punch-in / punch-out ritmi kurar — elle keyframe’le saatler süren iş tek tık. Yoğunluk (%6–25) ve hız senin kontrolünde; "Ritmik" modda sabit aralıkla da çalışır.

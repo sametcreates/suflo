@@ -32,13 +32,15 @@ function KZoomSegmentler(silences, dur) {
 function KZoomPlan(opts) {
   /*
    * opts: { dur, segments:[{start,end}] (0-tabanli), intensity (.06-.25),
-   *         speed (sn), mode: "speech"|"rhythm", interval (sn) }
-   * donus: { keys:[{time,value}], mode } — time 0-tabanli sn, value carpan.
+   *         speed (sn), mode: "speech"|"rhythm", interval (sn),
+   *         style: "smooth"|"jumpcut"|"snapin" }  (AutoCut'taki uc stil)
+   * donus: { keys:[{time,value}], mode, style } — time 0-tabanli sn, value carpan.
    */
   var dur = Math.max(0.2, Number(opts.dur) || 0);
   var I = Number(opts.intensity); if (!isFinite(I)) I = 0.12; I = Math.max(0.04, Math.min(0.3, I));
   var d = Number(opts.speed); if (!isFinite(d)) d = 0.45; d = Math.max(0.2, Math.min(0.9, d));
   var interval = Number(opts.interval); if (!isFinite(interval)) interval = 5; interval = Math.max(2, Math.min(15, interval));
+  var style = opts.style === "jumpcut" || opts.style === "snapin" ? opts.style : "smooth";
   var minGap = Math.max(d * 2, 1.2);
 
   var mode = opts.mode === "rhythm" ? "rhythm" : "speech";
@@ -83,6 +85,16 @@ function KZoomPlan(opts) {
     if (t0 <= 0.05) {
       // klip basinda gecis yapacak yer yok: dogrudan hedef degerle basla
       anahtar(0, hedef);
+    } else if (style === "jumpcut") {
+      // sert kesme: bir kare oncesine mevcut deger, kesim aninda hedef
+      anahtar(t0 - 0.04, cur);
+      anahtar(t0, hedef);
+    } else if (style === "snapin") {
+      // hizli kademeli: buyuk adim + iki kucuk oturma adimi
+      anahtar(t0 - 0.04, cur);
+      anahtar(t0, cur + (hedef - cur) * 0.55);
+      anahtar(t0 + 0.09, cur + (hedef - cur) * 0.85);
+      anahtar(t0 + 0.18, hedef);
     } else {
       var ov = hedef > cur ? hedef * 1.012 : hedef * 0.996; // hafif overshoot -> dogal his
       anahtar(t0, cur);
@@ -92,7 +104,7 @@ function KZoomPlan(opts) {
     cur = hedef;
   }
   if (!keys.length || keys[0].time > 0.011) keys.unshift({ time: 0, value: BAZ });
-  return { keys: keys, mode: mode, toggles: temiz.length };
+  return { keys: keys, mode: mode, style: style, toggles: temiz.length };
 }
 
 if (typeof module !== "undefined" && module.exports) {
@@ -123,6 +135,14 @@ if (typeof window !== "undefined") window.KZoom = (function () {
   function deger(id, vars) {
     var n = Number(el(id) && el(id).value);
     return isFinite(n) ? n : vars;
+  }
+
+  function sabitNokta() {
+    // 3x3 grid: data-a="ax,ay" (0..1). Varsayilan merkez.
+    var on = document.querySelector("#zoom-nokta .on");
+    if (!on || !on.dataset.a) return [0.5, 0.5];
+    var p = on.dataset.a.split(",");
+    return [Number(p[0]) || 0.5, Number(p[1]) || 0.5];
   }
 
   function parseSilence(stderr) {
@@ -170,13 +190,15 @@ if (typeof window !== "undefined") window.KZoom = (function () {
         K.log("[zoom] segment=" + segments.length + " sure=" + dur.toFixed(1));
       }
 
+      var stil = (document.querySelector('#zoom-stil .on') || {}).dataset;
       var plan = KZoomPlan({
         dur: dur,
         segments: segments,
         intensity: deger("zoom-yogunluk", 12) / 100,
         speed: deger("zoom-hiz", 0.45),
         mode: mode,
-        interval: deger("zoom-aralik", 5)
+        interval: deger("zoom-aralik", 5),
+        style: stil && stil.s ? stil.s : "smooth"
       });
       if (plan.toggles < 1) { status("Zoom noktası bulunamadı — Ritmik modu dene.", "warn"); return; }
 
@@ -186,6 +208,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
       });
       var result = await K.call("KS_autoZoom", {
         keys: keys,
+        anchor: sabitNokta(),
         clearStart: clip.clipStart,
         clearEnd: clip.clipStart + dur
       }, 30000);
@@ -210,6 +233,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
       var dur = clip.outPoint - clip.inPoint;
       var result = await K.call("KS_autoZoom", {
         keys: [{ time: clip.clipStart, value: 1 }, { time: clip.clipStart + dur, value: 1 }],
+        anchor: sabitNokta(), // merkez-disi uygulandiysa pozisyon da baza doner
         clearStart: clip.clipStart,
         clearEnd: clip.clipStart + dur
       }, 30000);
@@ -234,6 +258,15 @@ if (typeof window !== "undefined") window.KZoom = (function () {
         b.classList.add("on");
         var satir = el("zoom-aralik-satir");
         if (satir) satir.hidden = b.dataset.m !== "rhythm";
+      });
+    });
+    // stil ve sabit nokta secicileri (tekli secim)
+    ["zoom-stil", "zoom-nokta"].forEach(function (grup) {
+      Array.prototype.forEach.call(document.querySelectorAll("#" + grup + " button"), function (b) {
+        b.addEventListener("click", function () {
+          Array.prototype.forEach.call(document.querySelectorAll("#" + grup + " button"), function (x) { x.classList.remove("on"); });
+          b.classList.add("on");
+        });
       });
     });
     // slider etiketleri
