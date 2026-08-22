@@ -820,6 +820,7 @@ window.KApp = (function () {
    * indirilmis .zxp dosyasinin onune getirmek.
    */
   var guncelleme = null;   // { surum, url, ad, not }
+  var updateGizliBuOturum = false;  // ✕ artik KALICI gizlemez: yalniz bu oturum, sonraki acilista tekrar hatirlatir
 
   function surumDahaYeni(yeni, mevcut) {
     var a = String(yeni).split(".").map(Number);
@@ -855,8 +856,9 @@ window.KApp = (function () {
         return;
       }
 
-      // kullanici bu surumu "gosterme" dediyse rahatsiz etme — ama MANUEL denetimde goster
-      if (!manuel && K.settings().skipVersion === tag) { K.log("guncelleme v" + tag + " kullanici tarafindan gizlendi"); return; }
+      // ✕ ile kapatildiysa bu oturumda tekrar acma — ama SONRAKI panel acilisinda
+      // yeniden hatirlat (kalici gizleme yok: eski surumde kalmak donusum kaybi).
+      if (!manuel && updateGizliBuOturum) { return; }
 
       /*
        * Asıl dağıtım v1.9'dan beri Kurulum ZIP'i; .zxp yalnız ZXP Installer
@@ -882,9 +884,9 @@ window.KApp = (function () {
       };
       K.log("guncelleme mevcut: v" + tag);
 
-      el("update-baslik").textContent = "Yeni sürüm: v" + tag;
+      el("update-baslik").textContent = "🎁 Güncelle — yeni özellikler var (v" + tag + ")";
       el("update-not").textContent = guncelleme.not ||
-        (guncelleme.zip ? "İndir, ZIP'i aç, kur dosyasına çift tıkla." : "İndir, çift tıkla, Premiere'i yeniden başlat.");
+        "Otomatik zoom, yeni altyazı stilleri, kesim ve dahası — eski sürümde göremezsin.";
       el("update-indir").disabled = !paket;
       el("update-bar").hidden = false;
       if (manuel) { guncelDurum("Yeni sürüm hazır: v" + tag, "good"); toast("Yeni sürüm v" + tag + " hazır — üstteki şeritten indir", "good"); }
@@ -1082,11 +1084,7 @@ window.KApp = (function () {
     if (el("update-kapat")) {
       el("update-kapat").addEventListener("click", function () {
         el("update-bar").hidden = true;
-        if (guncelleme) {                      // bu sürüm için bir daha gösterme
-          var s = K.settings();
-          s.skipVersion = guncelleme.surum;
-          K.saveSettings();
-        }
+        updateGizliBuOturum = true;   // yalniz bu oturum; panel yeniden acilinca tekrar hatirlatir
       });
     }
 

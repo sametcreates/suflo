@@ -1,3 +1,9 @@
+## Suflo 2.7.4 — Kaçırılmaz güncelleme hatırlatıcısı
+
+- Yeni sürüm şeridi artık ✕ ile **kalıcı gizlenmiyor** — yalnız o oturum kapanır, panel yeniden açılınca yumuşakça tekrar hatırlatır. Amaç: eski sürümdeki kullanıcılar yeni Pro özelliklerini kaçırmasın.
+- Şerit mesajı iştah açıcı: "Güncelle — yeni özellikler var" + ne geldiği.
+- İndir düğmesi artık **Güncelle**.
+
 ## Suflo 2.7.3 — "Güncel misin?" denetimi
 
 - **Ayarlar → Güncelleme** grubu: mevcut sürüm + tek tıkla "Güncel misin? Denetle" butonu. Güncelsen "Güncelsin ✓" der, yeni sürüm varsa üstte indir şeridi çıkar.
