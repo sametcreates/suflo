@@ -256,7 +256,8 @@ window.KLib = (function () {
       // Vault'ta ayni Suflo Original farkli bir dosya adi/klasorle bulunabilir.
       // Katalogdaki kaynak adlari bu kopyalari yakalar; yerlesik kart tek kalir.
       if (!isBuiltin && catalogInfo.aliases[mogrtNameKey(ad)]) continue;
-      var display = meta && meta.name ? String(meta.name) : ad.replace(/^SUFLO TEXT\s*-\s*\d+\s*/i, "");
+      var butonMu = /^SUFLO\s+BUTON\b/i.test(ad);
+      var display = meta && meta.name ? String(meta.name) : ad.replace(/^SUFLO\s+(?:TEXT|BUTON)\s*-\s*(?:\d+\s*)?/i, "");
       var uniqueKey = mogrtNameKey(display) || display.toLowerCase();
       if (gorulen[uniqueKey]) continue;
       gorulen[uniqueKey] = 1;
@@ -264,7 +265,7 @@ window.KLib = (function () {
       var relPath = !isBuiltin && ek ? tam2.slice(ek.length).replace(/^[\\\/]+/, "") : "";
       var relPro = isPro && proRoot ? tam2.slice(proRoot.length).replace(/^[\\\/]+/, "") : "";
       var proText = isPro && (/^SUFLO\s+TEXT\b/i.test(ad) || textAnimationMi(relPro));
-      var group = isBuiltin || proText || textAnimationMi(relPath) ? "text" : "other";
+      var group = butonMu ? "buton" : (isBuiltin || proText || textAnimationMi(relPath) ? "text" : "other");
       var proFolder = relPro && relPro.indexOf(K.path.sep) !== -1 ? relPro.split(K.path.sep)[0] : "";
       if (!proFolder && relPro.indexOf("/") !== -1) proFolder = relPro.split("/")[0];
       var paket = {
@@ -311,6 +312,8 @@ window.KLib = (function () {
     if (s1) s1.textContent = String(paketler.filter(function (p) { return p.group === "text"; }).length);
     var s0 = el("custom-sayac");
     if (s0) s0.textContent = String(paketler.filter(function (p) { return p.group === "other"; }).length);
+    var sb = el("buton-sayac");
+    if (sb) sb.textContent = String(paketler.filter(function (p) { return p.group === "buton"; }).length);
     var favSayisi = paketler.filter(function (p) { return favMi(p.ad); }).length;
     var s2 = el("fav-sayac"); if (s2) s2.textContent = String(favSayisi);
   }
@@ -323,6 +326,7 @@ window.KLib = (function () {
     var liste = paketler.filter(function (p) {
       if (kategori === "mogrt" && p.group !== "text") return false;
       if (kategori === "custom" && p.group !== "other") return false;
+      if (kategori === "buton" && p.group !== "buton") return false;
       if (kategori === "fav" && !favMi(p.ad)) return false;
       return !arama || (p.display + " " + p.ad + " " + p.category).toLowerCase().indexOf(arama) !== -1;
     });
@@ -330,7 +334,8 @@ window.KLib = (function () {
     var baslik = el("ki-baslik"), alt = el("ki-alt");
     if (baslik) baslik.textContent = kategori === "fav"
       ? "Favoriler"
-      : (kategori === "custom" ? "Diğer Animasyonlar" : "Yazı Animasyonları");
+      : (kategori === "buton" ? "Butonlar"
+        : (kategori === "custom" ? "Diğer Animasyonlar" : "Yazı Animasyonları"));
     var vitrinSayisi = liste.filter(function (p) { return p.showcase; }).length;
     if (alt) alt.textContent = liste.length
       ? (vitrinSayisi === liste.length
@@ -502,7 +507,7 @@ window.KLib = (function () {
   }
 
   function setKategori(kat) {
-    kategori = kat === "fav" ? "fav" : (kat === "custom" ? "custom" : "mogrt");
+    kategori = (kat === "fav" || kat === "custom" || kat === "buton") ? kat : "mogrt";
     ciz();
   }
 

@@ -1,3 +1,8 @@
+## Suflo 2.7.7 — Butonlar kütüphanesi
+
+- **Yeni “Butonlar” kategorisi:** 35 hazır animasyonlu buton (Abone Ol, Takip Et, İndir, Sepete Ekle, Beğen, Paylaş, Kaydol…) — hepsi Türkçe adla. Sol menüde ayrı sekme.
+- Lisansla Pro İçerik Bulutundan otomatik iner; panelden aranır, ön izlenir, tek tıkla playhead’e eklenir.
+
 ## Suflo 2.7.6 — Stil katmanı yeniden: 10 tanınır stil
 
 - **Motor-tabanlı 4 eski stil (Viral Vurgu/Pop/Belgesel/Premium) kaldırıldı.** Yerine 10 keskin, tanınır stil: Sarı Vurgu, Yeşil Kontur, Kutu, Neon, Temiz, Zarif, Beyaz Kalın, Mor Vurgu, Sticker, Daktilo.
