@@ -74,6 +74,7 @@
     overlay:   'Animasyonlu altyazi katmani (CapCut gorunumu)',
     karaoke:   'Karaoke / kelime-kelime animasyon',
     cut:       'Otomatik kesim (sessizlik temizleme)',
+    zoom:      'Otomatik Zoom (konusmaya gore punch-in)',
     beat:      'Ritim / beat senkronu',
     batch:     'Toplu (coklu klip) transkripsiyon',
     translate: 'Altyazi cevirisi',

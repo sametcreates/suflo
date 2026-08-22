@@ -315,7 +315,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "cut-tanitim", "beat-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -1042,6 +1042,7 @@ window.KApp = (function () {
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
     guvenli("Motion Presetleri", function () { if (window.KPresets) KPresets.init(); });
+    guvenli("Otomatik Zoom", function () { if (window.KZoom) KZoom.init(); });
     guvenli("SFX", function () { if (window.KSfx) KSfx.init(); });
     guvenli("Emoji Assets", function () { if (window.KEmojiAssets) KEmojiAssets.init(); });
     guvenli("Kütüphane kontrolü", function () { if (window.KLibraryHealth) KLibraryHealth.init(); });

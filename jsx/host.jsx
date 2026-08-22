@@ -484,6 +484,54 @@ function KS_applyMotionPreset(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- Suflo Pro: Otomatik Zoom ---------- */
+
+function KS_autoZoom(encoded) {
+  /*
+   * Panelden hazir plan alir: { keys:[{time,value}], clearStart, clearEnd }.
+   * time = timeline saniyesi, value = CARPAN (1.0 = klibin kendi olcegi).
+   * Secili kliplerin Motion > Scale ozelligine, kaynak-zaman eslemesiyle
+   * (KS_presetClipKeys) anahtar kare yazar; onceki zoom anahtarlarini
+   * clear araligiyla temizler — yeniden uygulamak guvenlidir.
+   */
+  try {
+    KS_presetRemovedCount = 0;
+    var p = KS_arg(encoded);
+    var keys = p && p.keys;
+    if (!keys || !keys.length) return KS_err("Zoom plani bos.");
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var selected = seq.getSelection();
+    if (!selected || !selected.length) return KS_err("Timeline'da bir video klibi sec.");
+    var applied = 0, skipped = 0;
+    for (var i = 0; i < selected.length; i++) {
+      var clip = selected[i];
+      var props = KS_presetProps(clip);
+      if (!props.scale) { skipped++; continue; }
+      var start = Number(clip.start.seconds) || 0;
+      var end = Number(clip.end.seconds) || start;
+      if (end - start < 0.2) { skipped++; continue; }
+      var base = KS_presetNumberValue(props.scale, 100);
+      var mapped = [];
+      for (var k = 0; k < keys.length; k++) {
+        var t = Number(keys[k].time);
+        var v = Number(keys[k].value);
+        if (!isFinite(t) || !isFinite(v) || v <= 0) continue;
+        if (t < start) t = start;
+        if (t > end) t = end;
+        mapped.push({ time: t, value: base * v });
+      }
+      if (!mapped.length) { skipped++; continue; }
+      var cs = p.clearStart === undefined ? start : Math.max(start, Number(p.clearStart));
+      var ce = p.clearEnd === undefined ? end : Math.min(end, Number(p.clearEnd));
+      if (KS_presetClipKeys(clip, start, end, props.scale, mapped, cs, ce)) applied++;
+      else skipped++;
+    }
+    if (!applied) return KS_err("Secili klipte Motion > Scale ozelligi bulunamadi.");
+    return KS_ok({ applied: applied, skipped: skipped, keyCount: keys.length, removedKeys: KS_presetRemovedCount });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Playhead ---------- */
 
 function KS_setPlayerPosition(encoded) {

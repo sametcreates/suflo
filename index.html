@@ -60,6 +60,11 @@
       <span class="ky-metin"><b>Ritim</b><i>beat marker'ları</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
+    <button class="ky-oge" data-tab="zoom">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M13.2 13.2 17 17M9 6.6v4.8M6.6 9h4.8"/></svg></span>
+      <span class="ky-metin"><b>Otomatik Zoom</b><i>konuşmaya göre punch-in</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
 
     <div class="ky-baslik" style="margin-top:12px">Kütüphane</div>
     <button class="ky-oge" data-tab="text" data-kat="mogrt">
@@ -577,6 +582,60 @@
     </div>
   </section>
 
+  <!-- ================= OTOMATIK ZOOM ================= -->
+  <section id="tab-zoom" class="tabpane">
+    <div class="pro-tanitim" id="zoom-tanitim" hidden>
+      <span class="pt-rozet">SUFLO PRO</span>
+      <b>Videona tek tıkla kurgu ritmi kat</b>
+      <ul>
+        <li>Konuşmaya göre zamanlanmış punch-in zoom'lar</li>
+        <li>Yoğunluk ve hız senin kontrolünde</li>
+        <li>Tek tıkla geri alınabilir — klip bozulmaz</li>
+      </ul>
+      <div class="pt-fiyat"><b>749 TL</b><span>tek sefer · abonelik yok · ömür boyu</span></div>
+      <button class="btn primary pro-ac-btn" style="width:100%">Pro'yu aç →</button>
+    </div>
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M13.2 13.2 17 17M9 6.6v4.8M6.6 9h4.8"/></svg>
+        <b>Sabit kadrajı canlandır — elle keyframe yok</b>
+      </div>
+      <p class="ci-p">Konuşmanı dinler, her konuşma başlangıcında yumuşak bir punch-in / punch-out ritmi kurar. Elle keyframe'le <b>saatler</b> süren iş → <b>tek tık</b>. Beğenmezsen "Zoom'u kaldır" ile anında temizlenir.</p>
+      <ol class="ci-steps">
+        <li><span>1</span> Timeline'da konuşma klibini seç</li>
+        <li><span>2</span> Yoğunluk ve hızı ayarla (varsayılanlar çoğu video için ideal)</li>
+        <li><span>3</span> <b>Zoom uygula</b>'ya bas — izle</li>
+      </ol>
+    </div>
+    <div class="seg-ctl full" id="zoom-mode">
+      <button class="on" data-m="speech">Konuşmaya göre<em>önerilen</em></button>
+      <button data-m="rhythm">Ritmik</button>
+    </div>
+    <div class="row" id="zoom-aralik-satir" hidden>
+      <label>Aralık</label>
+      <input id="zoom-aralik" type="range" min="2" max="12" step="1" value="5">
+      <span id="zoom-aralik-val" class="mono">5 sn</span>
+    </div>
+    <div class="row">
+      <label>Yoğunluk</label>
+      <input id="zoom-yogunluk" type="range" min="6" max="25" step="1" value="12">
+      <span id="zoom-yogunluk-val" class="mono">%12</span>
+    </div>
+    <div class="row">
+      <label>Hız</label>
+      <input id="zoom-hiz" type="range" min="0.25" max="0.8" step="0.05" value="0.45">
+      <span id="zoom-hiz-val" class="mono">0.45 sn</span>
+    </div>
+    <div class="action-bar">
+      <button id="zoom-run" class="btn primary big">
+        <span class="btn-label">Zoom uygula</span>
+      </button>
+    </div>
+    <div id="zoom-progress" class="progress-line" hidden><i></i></div>
+    <div id="zoom-status" class="inline-status"></div>
+    <button id="zoom-remove" class="btn outline" style="width:100%">Zoom'u kaldır</button>
+  </section>
+
   <!-- ================= RITIM ================= -->
   <section id="tab-beat" class="tabpane">
     <div class="pro-tanitim" id="beat-tanitim" hidden>
@@ -1041,6 +1100,7 @@
   <script src="js/style-engine.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/magiccut.js"></script>
+  <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>
   <script src="js/presets.js"></script>

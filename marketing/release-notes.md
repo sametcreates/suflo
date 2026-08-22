@@ -1,3 +1,10 @@
+## Suflo 2.7.0 — Otomatik Zoom
+
+- **Yeni Pro özelliği: Otomatik Zoom.** Konuşmanı dinler, her konuşma başlangıcında yumuşak punch-in / punch-out ritmi kurar — elle keyframe’le saatler süren iş tek tık. Yoğunluk (%6–25) ve hız senin kontrolünde; "Ritmik" modda sabit aralıkla da çalışır.
+- Anahtar kareler klibin kendi Scale değeriyle çarpan olarak yazılır: küçültülmüş/kadrajlanmış kliplerde de doğru sonuç.
+- **"Zoom’u kaldır"** ile tek tıkla temizlenir; yeniden uygulamak güvenlidir (eski anahtarlar otomatik silinir).
+- Plan üretici saf ve test edilebilir: 16 yeni birim testi (toplam takım 30 dosya, tümü yeşil).
+
 ## Suflo 2.6.6 — Otomatik Kesim, daha keşfedilebilir
 
 - **Kesim sekmesinde net anlatım:** ne yaptığını, kazancını (elle ~40 dk jump-cut → ~2 dk) ve "orijinalin bozulmaz" güvencesini gösteren boş-durum kartı + 1-2-3 adım.
