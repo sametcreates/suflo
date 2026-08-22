@@ -54,6 +54,21 @@ function walk(dir, base) {
 }
 walk(source, source);
 files.sort(function (a, b) { return a.path.localeCompare(b.path, "en"); });
+/*
+ * Windows harf duyarsiz, Hostinger (Linux) duyarli. Ayni yolun yalniz
+ * buyuk/kucuk harfle ayrilan iki hali pakette sorunsuz gorunur ama sunucuda
+ * biri digerinin uzerine biner ve manifest'teki isim 404 doner. Uretimde yakala.
+ */
+var caseMap = {};
+files.forEach(function (f) {
+  var k = f.path.toLowerCase();
+  (caseMap[k] = caseMap[k] || []).push(f.path);
+});
+var caseClash = Object.keys(caseMap).filter(function (k) { return caseMap[k].length > 1; });
+if (caseClash.length) {
+  fail("Buyuk/kucuk harf cakismasi (Linux sunucuda 404 verir):\n  " +
+    caseClash.map(function (k) { return caseMap[k].join("  <->  "); }).join("\n  "));
+}
 var mogrt = files.filter(function (f) { return /^mogrt\//.test(f.path); }).length;
 var sfx = files.filter(function (f) { return /^sfx\//.test(f.path); }).length;
 var motionbg = files.filter(function (f) { return /^motionbg\//.test(f.path); }).length;
