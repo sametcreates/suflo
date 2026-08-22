@@ -104,10 +104,11 @@
       <span class="ky-metin"><b>Emoji Assets</b><i>PNG · WEBP · GIF</i></span>
       <span class="ky-adet" id="emoji-assets-sayac">0</span>
     </button>
-    <button class="ky-oge pasif" disabled>
+    <button class="ky-oge" data-tab="motionbg">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.8" y="4" width="14.4" height="12" rx="2"/><path d="m8 7 5 3-5 3z"/></svg></span>
-      <span class="ky-metin"><b>Motion BG</b><i>hareketli zemin</i></span>
-      <span class="ky-adet soluk">yakında</span>
+      <span class="ky-metin"><b>Motion BG</b><i>hareketli zemin · overlay</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+      <span class="ky-adet" id="motionbg-sayac">0</span>
     </button>
 
     <div class="ky-alt">
@@ -904,6 +905,43 @@
     </div>
   </section>
 
+  <!-- ================= MOTION BG (Pro — hareketli zeminler / overlay) ================= -->
+  <section id="tab-motionbg" class="tabpane">
+    <div class="pro-tanitim" id="motionbg-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>30 hareketli zemin & overlay</b>
+        <span>Light leak, film grain, gradient, grid, VHS… Tek tıkla playhead'de üst katmana düşer.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro içerik özeti">
+        <i><strong>30</strong> zemin</i><i><strong>4K</strong>'ya kadar</i><i><strong>✦</strong> loop</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="motionbg">Motion BG'yi aç — 749 TL</button>
+    </div>
+
+    <div id="motionbg-main">
+      <div class="sfx-head">
+        <div class="search-wrap">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M10.5 10.5 L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <input id="motionbg-search" type="text" placeholder="Zemin ara…  (light leak · grain · grid)">
+        </div>
+        <button id="motionbg-yenile" class="btn tiny" title="Klasörü yeniden tara">⟳</button>
+        <button id="motionbg-add-folder" class="btn" title="Motion BG klasörü bağla">Klasör bağla</button>
+      </div>
+      <div class="filter-row">
+        <span id="motionbg-count" class="dim"></span>
+      </div>
+      <div id="motionbg-grid" class="mbg-grid"></div>
+      <div id="motionbg-empty" class="empty-state" hidden>
+        <span class="sfx-empty-icon">▦</span>
+        <b>Henüz hareketli zemin yok</b>
+        <p>Lisansın aktifse 30 Motion BG güvenli içerik bulutundan otomatik kurulur. İstersen kendi arşivini de bağlayabilirsin.</p>
+        <button id="motionbg-propack-yukle" class="btn primary">İçerikleri şimdi eşitle</button>
+        <button id="motionbg-add-folder-big" class="btn">Kendi klasörümü bağla</button>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= EMOJI ASSETS (ücretsiz — asla paywall'a girmez) ================= -->
   <section id="tab-emoji-assets" class="tabpane">
     <div id="emoji-assets-main">
@@ -1174,6 +1212,7 @@
   <script src="js/library.js"></script>
   <script src="js/presets.js"></script>
   <script src="js/sfx.js"></script>
+  <script src="js/motionbg.js"></script>
   <script src="js/emoji-assets.js"></script>
   <script src="js/library-health.js"></script>
   <script src="js/app.js"></script>

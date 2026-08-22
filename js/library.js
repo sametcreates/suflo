@@ -55,7 +55,7 @@ window.KLib = (function () {
   function mogrtNameKey(value) {
     var base = String(value || "").replace(/\\/g, "/").split("/").pop();
     base = base.replace(/\.mogrt$/i, "");
-    base = base.replace(/^SUFLO\s+(?:TEXT|MOGRT)\s*-\s*(?:\d+\s*)?/i, "");
+    base = base.replace(/^SUFLO\s+(?:TEXT|BUTON|MOGRT)\s*-\s*(?:\d+[.\)]?\s*)?/i, "");
     return base.toLowerCase().replace(/[^a-z0-9\u00c0-\u024f]+/g, "");
   }
 
@@ -257,7 +257,7 @@ window.KLib = (function () {
       // Katalogdaki kaynak adlari bu kopyalari yakalar; yerlesik kart tek kalir.
       if (!isBuiltin && catalogInfo.aliases[mogrtNameKey(ad)]) continue;
       var butonMu = /^SUFLO\s+BUTON\b/i.test(ad);
-      var display = meta && meta.name ? String(meta.name) : ad.replace(/^SUFLO\s+(?:TEXT|BUTON)\s*-\s*(?:\d+\s*)?/i, "");
+      var display = meta && meta.name ? String(meta.name) : ad.replace(/^SUFLO\s+(?:TEXT|BUTON|MOGRT)\s*-\s*(?:\d+[.\)]?\s*)?/i, "");
       var uniqueKey = mogrtNameKey(display) || display.toLowerCase();
       if (gorulen[uniqueKey]) continue;
       gorulen[uniqueKey] = 1;

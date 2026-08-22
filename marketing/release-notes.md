@@ -1,3 +1,10 @@
+## Suflo 2.8.0 — Dev icerik guncellemesi (Motion BG + 3 kat MOGRT + SFX)
+
+- **Yeni “Motion BG” kategorisi:** 30 hareketli zemin & overlay (light leak, film grain, gradient, grid, VHS, glitch...). Kartta canli on izleme; tek tıkla playhead’de üst video katmanına düşer. Kendi arşivini de bağlayabilirsin.
+- **MOGRT kütüphanesi 3 katına:** +116 yazı animasyonu, +51 element/particle/screen, +20 geçiş. Yazı / Diğer Animasyonlar / Butonlar kategorilerine dağılır.
+- **SFX kütüphanesi ~3 katına:** 265 → 760 seçilmiş ses efekti.
+- Tüm Pro içerik lisansla otomatik, delta olarak iner — sadece yeni dosyalar.
+
 ## Suflo 2.7.7 — Butonlar kütüphanesi
 
 - **Yeni “Butonlar” kategorisi:** 35 hazır animasyonlu buton (Abone Ol, Takip Et, İndir, Sepete Ekle, Beğen, Paylaş, Kaydol…) — hepsi Türkçe adla. Sol menüde ayrı sekme.

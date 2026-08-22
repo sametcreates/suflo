@@ -303,6 +303,7 @@ window.ProSync = (function () {
     setState({ phase: "ready", progress: 1, version: manifest.version, detail: "Pro içerikleri güncel", file: "", downloaded: downloaded || 0, copied: copied || 0, total: manifest.files.length, bytesDone: manifest.totalBytes, bytesTotal: manifest.totalBytes, lastSync: s.proContentLastSync, path: dir, error: "", offline: false });
     try { if (window.KLib) KLib.tara(); } catch (e1) {}
     try { if (window.KSfx) KSfx.tara(); } catch (e2) {}
+    try { if (window.KMotionBG) KMotionBG.tara(); } catch (e4) {}
     // Disk sisirmesin: aktif surum ve bir onceki geri donus kopyasi disindakileri temizle.
     try { pruneReleases(dir, rollback); } catch (e3) {}
   }

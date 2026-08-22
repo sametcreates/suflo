@@ -149,7 +149,8 @@ function safe_content_path(array $cfg, string $relative): string|false {
     foreach (explode('/', $relative) as $part) if ($part === '' || $part === '.' || $part === '..') return false;
     $isMogrt = preg_match('#^mogrt/.+\.mogrt$#iu', $relative) === 1;
     $isSfx = preg_match('#^sfx/.+\.(wav|mp3|aif|aiff|m4a|flac|ogg|wma)$#iu', $relative) === 1;
-    if (!$isMogrt && !$isSfx) return false;
+    $isMotionBg = preg_match('#^motionbg/.+\.(mp4|mov|m4v|webm)$#iu', $relative) === 1;
+    if (!$isMogrt && !$isSfx && !$isMotionBg) return false;
     $root = realpath((string)$cfg['content_root']);
     $file = realpath((string)$cfg['content_root'] . '/' . $relative);
     if ($root === false || $file === false || !is_file($file)) return false;

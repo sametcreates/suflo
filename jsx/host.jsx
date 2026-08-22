@@ -1367,3 +1367,48 @@ function KS_placeMogrt(encoded) {
     return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
   } catch (e) { return KS_err(e); }
 }
+
+/*
+ * Motion BG / overlay video: dosyayi "Suflo Motion BG" bin'ine alir ve
+ * playhead'de bos bir ust video katmanina yerlestirir. MOGRT'tan farki:
+ * bunlar hazir video dosyalari (mp4/mov), importMGT degil importFiles + overwriteClip.
+ */
+function KS_placeMotionBG(encoded) {
+  try {
+    var p = KS_arg(encoded); // { path, startSec?, name? }
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var f = new File(p.path);
+    if (!f.exists) return KS_err("Motion BG bulunamadi: " + p.path);
+
+    var start = Number(p.startSec);
+    if (!(start >= 0)) {
+      try { start = seq.getPlayerPosition().seconds; } catch (eP) { start = 0; }
+    }
+    var iz = Number(p.dur) > 0 ? Number(p.dur) : 5;
+
+    var bin = KS_findBin("Suflo Motion BG");
+    var item = KS_findItemByPath(app.project.rootItem, f.fsName);
+    if (!item) {
+      try { app.project.importFiles([f.fsName], true, bin, false); } catch (eI) {}
+      item = KS_findItemByPath(app.project.rootItem, f.fsName);
+    }
+    if (!item) return KS_err("Motion BG projeye alinamadi.");
+
+    var idx = KS_findFreeVideoTrack(seq, start, start + iz);
+    if (idx < 0) {
+      if (KS_addTopVideoTrack()) {
+        seq = app.project.activeSequence;
+        idx = KS_findFreeVideoTrack(seq, start, start + iz);
+      }
+    }
+    if (idx < 0) return KS_err("Bos video katmani yok.");
+
+    var placed = KS_tryPlace(seq.videoTracks[idx], item, start);
+    if (!placed) return KS_err("Motion BG yerlestirilemedi.");
+    try { if (p.name) placed.name = String(p.name); } catch (eN) {}
+    var sure = 0;
+    try { sure = placed.end.seconds - placed.start.seconds; } catch (eS) {}
+    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
+  } catch (e) { return KS_err(e); }
+}

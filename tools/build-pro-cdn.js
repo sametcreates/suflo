@@ -40,7 +40,9 @@ function walk(dir, base) {
     var rel = path.relative(base, full).split(path.sep).join("/");
     if (entry.isSymbolicLink && entry.isSymbolicLink()) fail("Sembolik bag desteklenmiyor: " + full);
     if (entry.isDirectory()) { walk(full, base); return; }
-    var allowed = /^mogrt\/.+\.mogrt$/i.test(rel) || /^sfx\//i.test(rel) && AUDIO.test(rel);
+    var allowed = /^mogrt\/.+\.mogrt$/i.test(rel)
+      || (/^sfx\//i.test(rel) && AUDIO.test(rel))
+      || /^motionbg\/.+\.(mp4|mov|m4v|webm)$/i.test(rel);
     if (!allowed) return;
     var target = path.join(contentDir, rel.split("/").join(path.sep));
     if (!inside(contentDir, target)) fail("Guvenli olmayan kaynak yolu: " + rel);
@@ -54,12 +56,13 @@ walk(source, source);
 files.sort(function (a, b) { return a.path.localeCompare(b.path, "en"); });
 var mogrt = files.filter(function (f) { return /^mogrt\//.test(f.path); }).length;
 var sfx = files.filter(function (f) { return /^sfx\//.test(f.path); }).length;
+var motionbg = files.filter(function (f) { return /^motionbg\//.test(f.path); }).length;
 if (!mogrt || !sfx) fail("MOGRT veya SFX icerigi bulunamadi.");
 var manifest = {
   schema: 1,
   content_version: version,
   generated_at: new Date().toISOString(),
-  counts: { mogrt: mogrt, sfx: sfx, total: files.length },
+  counts: { mogrt: mogrt, sfx: sfx, motionbg: motionbg, total: files.length },
   total_bytes: files.reduce(function (sum, f) { return sum + f.bytes; }, 0),
   files: files
 };
@@ -78,6 +81,6 @@ fs.writeFileSync(path.join(privateDir, "config.php"), config, "utf8");
 fs.writeFileSync(path.join(upload, "YUKLEME.txt"),
   "Hostinger domain kokunde public_html/ ve private/ klasorlerini ayni seviyeye yukle.\r\n" +
   "API: https://assets.suflo.app/pro/v1/index.php\r\n" +
-  "Icerik: " + version + " | MOGRT=" + mogrt + " | SFX=" + sfx + "\r\n", "utf8");
-console.log("Suflo Pro CDN hazir: version=" + version + " files=" + files.length + " mogrt=" + mogrt + " sfx=" + sfx + " bytes=" + manifest.total_bytes);
+  "Icerik: " + version + " | MOGRT=" + mogrt + " | SFX=" + sfx + " | MotionBG=" + motionbg + "\r\n", "utf8");
+console.log("Suflo Pro CDN hazir: version=" + version + " files=" + files.length + " mogrt=" + mogrt + " sfx=" + sfx + " motionbg=" + motionbg + " bytes=" + manifest.total_bytes);
 console.log("Yukleme klasoru: " + upload);

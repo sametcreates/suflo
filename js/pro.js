@@ -83,6 +83,7 @@
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
     presets:   'Motion presetleri (Slide, Zoom, Pop ve Fade)',
     sfx:       'SFX kutuphanesi + Akilli SFX onerileri',
+    motionbg:  'Motion BG (hareketli zeminler + overlay videolari)',
     emojiAssets: 'Emoji Assets (PNG / WEBP / GIF kutuphanesi)',
     propack:   'Suflo Pro icerik paketi (Motion presetleri + yazi animasyonlari + SFX)',
     pro:       'Suflo Pro'

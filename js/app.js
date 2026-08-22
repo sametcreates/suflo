@@ -1075,6 +1075,7 @@ window.KApp = (function () {
     guvenli("Motion Presetleri", function () { if (window.KPresets) KPresets.init(); });
     guvenli("Otomatik Zoom", function () { if (window.KZoom) KZoom.init(); });
     guvenli("SFX", function () { if (window.KSfx) KSfx.init(); });
+    guvenli("Motion BG", function () { if (window.KMotionBG) KMotionBG.init(); });
     guvenli("Emoji Assets", function () { if (window.KEmojiAssets) KEmojiAssets.init(); });
     guvenli("Kütüphane kontrolü", function () { if (window.KLibraryHealth) KLibraryHealth.init(); });
     guvenli("Pro içerik", function () { if (window.ProSync) ProSync.init(); });

@@ -2055,6 +2055,42 @@ canvas#mo-canvas {
 }
 @keyframes mgspin { to { transform: rotate(360deg); } }
 .mogrt-kart.ok { border-color: var(--good); }
+
+/* ---- Motion BG kartlari ---- */
+.mbg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.mbg-card {
+  position: relative; background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--r); overflow: hidden; aspect-ratio: 16 / 9;
+  transition: border-color .16s var(--ease), transform .14s var(--ease), box-shadow .2s var(--ease);
+}
+.mbg-card:hover { border-color: rgba(139,124,246,.5); transform: translateY(-2px); box-shadow: 0 8px 20px -8px rgba(0,0,0,.6); }
+.mbg-card.busy { opacity: .72; pointer-events: none; }
+.mbg-video { width: 100%; height: 100%; object-fit: cover; display: block; background: #0a0b10; }
+.mbg-name {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 14px 8px 6px; font-size: 10.5px; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.78));
+  pointer-events: none;
+}
+.mbg-fav {
+  position: absolute; right: 5px; top: 5px; z-index: 2;
+  width: 22px; height: 22px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(12,13,20,.6); color: rgba(255,255,255,.55); font-size: 12px; line-height: 1;
+  opacity: 0; transition: opacity .16s var(--ease), color .16s var(--ease);
+}
+.mbg-card:hover .mbg-fav { opacity: 1; }
+.mbg-fav.on { opacity: 1; color: #ff5d8f; }
+.mbg-add {
+  position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%) scale(.96); z-index: 2;
+  opacity: 0; transition: all .16s var(--ease); cursor: pointer;
+  font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap;
+  background: var(--grad); border: none; border-radius: 20px; padding: 7px 15px;
+  box-shadow: 0 4px 14px -4px rgba(0,0,0,.7);
+}
+.mbg-card:hover .mbg-add { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.mbg-card.busy .mbg-add { opacity: 1; }
+
 .mogrt-meta { display: block; padding: 7px 9px 8px; }
 .mogrt-meta b { display: block; font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mogrt-meta i { font-style: normal; font-size: 9.5px; color: var(--faint); }
