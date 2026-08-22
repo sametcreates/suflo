@@ -349,6 +349,32 @@ footer{border-top:1px solid var(--line);margin-top:56px;padding:30px 0 40px;font
 .fl a{color:var(--dim)}
 .gizlilik{margin-top:10px;font-size:11.5px;max-width:70ch}
 
+/* ---------- autocut vitrini ---------- */
+#autocut{padding:8px 0 6px}
+.ac-demo{margin-top:26px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:22px 22px 16px}
+.ac-track{display:grid;grid-template-columns:52px 1fr 46px;align-items:center;gap:12px;margin-bottom:12px}
+.ac-lbl{font-size:11.5px;font-weight:590;color:var(--faint);font-family:"JetBrains Mono",ui-monospace,monospace;text-transform:uppercase;letter-spacing:.08em}
+.ac-lbl.on{color:var(--accent-lite)}
+.ac-bar{display:flex;height:26px;border-radius:7px;overflow:hidden;background:var(--bg3);gap:2px}
+.ac-bar.after{width:80%}
+.ac-bar i{display:block;height:100%}
+.ac-bar .k{background:linear-gradient(180deg,#8b7cf6,#5b8cff)}
+.ac-bar .g{background:repeating-linear-gradient(45deg,rgba(255,140,140,.22),rgba(255,140,140,.22) 5px,transparent 5px,transparent 10px);border:1px dashed rgba(255,140,140,.4);box-sizing:border-box}
+.ac-time{font-size:13px;font-weight:680;color:var(--faint);font-family:"JetBrains Mono",monospace;text-align:right}
+.ac-time.on{color:var(--good)}
+.ac-legend{font-size:11.5px;color:var(--faint);margin:10px 0 0;display:flex;align-items:center;gap:5px}
+.ac-legend .lk,.ac-legend .lg{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle}
+.ac-legend .lk{background:linear-gradient(180deg,#8b7cf6,#5b8cff)}
+.ac-legend .lg{background:repeating-linear-gradient(45deg,rgba(255,140,140,.25),rgba(255,140,140,.25) 4px,transparent 4px,transparent 8px);border:1px dashed rgba(255,140,140,.45)}
+.ac-claim{display:flex;align-items:center;gap:18px;justify-content:center;margin-top:22px}
+.ac-claim .acc{text-align:center}
+.ac-claim .acc b{display:block;font-size:clamp(24px,3.4vw,32px);font-weight:680;letter-spacing:-.02em;color:var(--faint)}
+.ac-claim .acc span{font-size:12px;color:var(--faint)}
+.ac-claim .acc.win b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ac-claim .acc.win span{color:var(--dim)}
+.ac-claim .acc-ok{font-size:24px;color:var(--faint)}
+@media(max-width:620px){.ac-track{grid-template-columns:44px 1fr 40px;gap:8px}.ac-bar.after{width:100%}}
+
 /* ---------- erken erisim fiyat cipasi ---------- */
 .erken-rozet{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:650;letter-spacing:.02em;
   color:#ffd9a8;background:linear-gradient(90deg,rgba(255,140,60,.18),rgba(124,92,255,.14));
@@ -663,6 +689,35 @@ html.js .reveal.in{opacity:1;transform:none}
     </div>
     <p class="bicim-not reveal">İçe aktarma da var: SRT ve WebVTT dosyalarını panele al,
     düzenle, çevir, yeniden uygula. Etiketler ve bozuk karakterler otomatik temizlenir.</p>
+  </section>
+
+  <!-- ================= AUTOCUT ================= -->
+  <section id="autocut">
+    <p class="kicker reveal">Otomatik Kesim · Pro</p>
+    <h2 class="reveal">Konuşmandaki ölü anları <em class="gt">saniyede temizle.</em></h2>
+    <p class="lead reveal">Sessizlikleri kendisi bulur, turuncuyla sana gösterir, onayladığını timeline'da keser. Kopya sekansta çalışır — <b>orijinalin hiç bozulmaz.</b></p>
+    <div class="ac-demo reveal">
+      <div class="ac-track">
+        <span class="ac-lbl">Önce</span>
+        <div class="ac-bar">
+          <i class="k" style="width:12%"></i><i class="g" style="width:10%"></i><i class="k" style="width:9%"></i><i class="g" style="width:13%"></i><i class="k" style="width:11%"></i><i class="g" style="width:8%"></i><i class="k" style="width:14%"></i><i class="g" style="width:11%"></i><i class="k" style="width:12%"></i>
+        </div>
+        <span class="ac-time">6:12</span>
+      </div>
+      <div class="ac-track">
+        <span class="ac-lbl on">Sonra</span>
+        <div class="ac-bar after">
+          <i class="k" style="width:20%"></i><i class="k" style="width:16%"></i><i class="k" style="width:19%"></i><i class="k" style="width:24%"></i><i class="k" style="width:21%"></i>
+        </div>
+        <span class="ac-time on">3:48</span>
+      </div>
+      <p class="ac-legend"><span class="lk"></span> Konuşma &nbsp; <span class="lg"></span> Kesilen sessizlik</p>
+    </div>
+    <div class="ac-claim reveal">
+      <div class="acc"><b>~40 dk</b><span>elle jump-cut</span></div>
+      <div class="acc-ok">→</div>
+      <div class="acc win"><b>2 dk</b><span>Suflo ile</span></div>
+    </div>
   </section>
 
   <!-- ================= PRO VITRIN ================= -->
