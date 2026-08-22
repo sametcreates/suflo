@@ -468,6 +468,22 @@
           <b>Sekansa uygula:</b> Premiere'in düzenlenebilir caption izini oluşturur.<br>
           <b>Stil katmanı:</b> seçtiğin görünümü şeffaf video olarak boş bir katmana yerleştirir.
         </p>
+        <style>
+          .cross-tip{display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
+            background:var(--grad-soft);border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;margin-top:4px;
+            transition:border-color .15s var(--ease),transform .12s var(--ease)}
+          .cross-tip:hover{border-color:var(--line2);transform:translateY(-1px)}
+          .cross-tip .ct-ikon{flex:none;font-size:17px}
+          .cross-tip .ct-metin{font-size:12px;color:var(--dim);line-height:1.5}
+          .cross-tip .ct-metin b{color:var(--text)}
+          .cross-tip .ct-ok{flex:none;margin-left:auto;color:var(--accent-lite);font-size:15px}
+        </style>
+        <button type="button" class="cross-tip"
+          onclick="var els=document.querySelectorAll('.yan-menu .ky-oge');for(var i=0;i&lt;els.length;i++){if(els[i].getAttribute('data-tab')==='cut'){els[i].click();break;}}">
+          <span class="ct-ikon" aria-hidden="true">✂️</span>
+          <span class="ct-metin"><b>Konuşma videon mu?</b> Ölü anları <b>Otomatik Kesim</b> ile saniyede temizle — jump-cut dakikalar değil saniyeler.</span>
+          <span class="ct-ok" aria-hidden="true">→</span>
+        </button>
       </div>
     </div>
   </section>
