@@ -163,6 +163,9 @@ main,.slide{width:1080px;height:1350px}
 .count-tile>strong{font-family:Archivo;font-size:56px;line-height:.88;color:#a396ff}
 .count-tile>b{margin-top:10px;font-size:12px;letter-spacing:.65px}
 .count-tile>span{margin-top:7px;font-size:10px;letter-spacing:.3px;color:#918aa8}
+.mogrt-panel-proof{position:relative;z-index:9;height:270px;margin-top:16px;border:1px solid #3b4058;border-radius:19px;background:linear-gradient(115deg,rgba(14,18,29,.98),rgba(30,25,61,.97));overflow:hidden;display:grid;grid-template-columns:610px 1fr;box-shadow:0 26px 58px rgba(0,0,0,.32)}
+.mogrt-panel-shot{height:100%;overflow:hidden;border-right:1px solid #3d4160;position:relative}.mogrt-panel-shot:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 67%,rgba(21,20,40,.94));pointer-events:none}.mogrt-panel-shot img{display:block;width:100%;height:auto;min-height:100%;object-fit:cover;object-position:top center;transform:scale(1.01);transform-origin:top center}
+.mogrt-panel-copy{padding:29px 25px 24px;display:flex;flex-direction:column}.mogrt-panel-copy>span{color:#aa9eff;font-size:9px;font-weight:900;letter-spacing:1.35px}.mogrt-panel-copy>strong{margin-top:13px;font-family:Archivo;font-size:27px;line-height:1.02;letter-spacing:-.8px}.mogrt-panel-copy>p{margin:13px 0 0;color:#919aaf;font-size:10px;line-height:1.5}.mogrt-panel-copy>div{margin-top:auto;display:flex;flex-wrap:wrap;gap:7px}.mogrt-panel-copy b{padding:8px 9px;border:1px solid #4a4377;border-radius:8px;background:#231e45;color:#b2a9ff;font-size:8px;letter-spacing:.55px}
 .number-row article{height:130px;padding:17px 15px}
 .number-row strong{font-size:39px}
 .number-row b{font-size:14px}

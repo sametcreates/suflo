@@ -1,5 +1,5 @@
 {
-  "renderedAt": "2026-08-23T17:08:36.377Z",
+  "renderedAt": "2026-08-23T17:11:56.548Z",
   "slides": [
     {
       "file": "01-free-hero.png",
@@ -47,8 +47,8 @@
       "file": "07-pro-text-animations.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 672646,
-      "textLength": 297
+      "bytes": 654738,
+      "textLength": 424
     },
     {
       "file": "08-pro-library.png",
