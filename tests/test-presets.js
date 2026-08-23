@@ -25,8 +25,11 @@ var presetCtx = {
 vm.createContext(presetCtx);
 vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "presets.js"), "utf8"), presetCtx, { filename: "js/presets.js" });
 var catalog = presetCtx.window.KPresets.list();
+var packs = presetCtx.window.KPresets.packs();
 var ids = catalog.map(function (p) { return p.id; });
 ok("12 yerlesik Motion preseti var", catalog.length === 12, catalog.length);
+ok("Suflo Smooth paketi 278 efekti ve dogru dosya adini tasir",
+  packs.length === 1 && packs[0].count === 278 && packs[0].file === "Suflo Smooth Editing Pack.prfpset", JSON.stringify(packs));
 ok("preset kimlikleri benzersiz", new Set(ids).size === ids.length, ids.join(","));
 ok("Slide, Zoom, Fade ve Vurgu aileleri var", ["slide", "zoom", "fade", "impact"].every(function (g) {
   return catalog.some(function (p) { return p.group === g; });
@@ -135,6 +138,8 @@ ok("Free kullanici preset kartlarini kilitli gorur", /preset-card.*locked/.test(
 ok("Preset sekmesi arama hiz guc ve filtre kontrollerini tasir",
   /id="tab-presets"/.test(html) && /id="preset-search"/.test(html) && /id="preset-speed"/.test(html) && /id="preset-strength"/.test(html) && /id="preset-filter"/.test(html));
 ok("Preset betigi panel tarafindan yuklenir", /<script src="js\/presets\.js"><\/script>/.test(html));
+ok("Preset paketi sahte uygulanmis mesaji yerine gercek import rehberi acar",
+  /Import Presets/.test(src) && /Dosyayı göster/.test(src) && /ProSync\.sync/.test(src) && !/preset paketi uygulandı/i.test(src));
 
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

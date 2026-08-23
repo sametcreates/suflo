@@ -81,7 +81,7 @@
     assexport: 'Stilli ASS disa aktarma',
     glossary:  'Terim sozlugu + gelismis bul/degistir',
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
-    presets:   'Motion presetleri (Slide, Zoom, Pop ve Fade)',
+    presets:   'Motion ve efekt presetleri (12 tek-tik + 278 efekt)',
     sfx:       'SFX kutuphanesi + Akilli SFX onerileri',
     motionbg:  'Motion BG (hareketli zeminler + overlay videolari)',
     emojiAssets: 'Emoji Assets (PNG / WEBP / GIF kutuphanesi)',
@@ -393,12 +393,12 @@
     var isMogrt = feature === 'mogrt' || feature === 'propack';
     var isSfx = feature === 'sfx';
     var isPreset = feature === 'presets';
-    var title = isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 40 yaz\u0131 efekti' :
+    var title = isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 262 animasyon ve grafik' :
       (isSfx ? 'Her vurgu i\u00e7in do\u011fru ses, Premiere\'in i\u00e7inde' :
-      (isPreset ? 'Slide, Zoom ve Pop hareketleri tek t\u0131kla' : label));
+      (isPreset ? '12 tek-t\u0131k Motion + 278 efektlik Suflo Smooth Pack' : label));
     var desc = isMogrt ? 'Efektleri sat\u0131n almadan \u00f6nce ger\u00e7ek \u00f6nizlemeleriyle incele. Pro\'da tek t\u0131kla playhead\'e yerle\u015ftir.' :
-      (isSfx ? '265 se\u00e7ilmi\u015f sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
-      (isPreset ? 'Klip se\u00e7, hareketi izle ve uygula. Harici preset paketi veya tekrar kurulum gerekmez.' :
+      (isSfx ? '769 se\u00e7ilmi\u015f sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
+      (isPreset ? '12 yerle\u015fik hareketi tek t\u0131kla uygula; 278 efektlik paketi bir kez i\u00e7e aktar ve Premiere\'de kal\u0131c\u0131 kullan.' :
       'Bu profesyonel i\u015f ak\u0131\u015f\u0131 Suflo Pro ile a\u00e7\u0131l\u0131r. Bir kere al, saya\u00e7 ve abonelik olmadan kullan.'));
     var visual;
     if (isMogrt) {
@@ -413,7 +413,7 @@
         '<div><span>WHOOSH</span><span>IMPACT</span><span>GLITCH</span><span>POP</span></div>' +
       '</div>';
     } else if (isPreset) {
-      visual = '<div class="pro-upsell-tool"><i>\u2197</i><span><b>12 yerle\u015fik hareket</b><small>Slide \u00b7 Zoom \u00b7 Pop \u00b7 Fade \u00b7 Punch</small></span></div>';
+      visual = '<div class="pro-upsell-tool"><i>\u2197</i><span><b>290 Motion + efekt preseti</b><small>12 tek-t\u0131k \u00b7 278 Suflo Smooth efekti</small></span></div>';
     } else {
       visual = '<div class="pro-upsell-tool"><i>\u2726</i><span><b>Daha h\u0131zl\u0131 bitir</b><small>Tekrarlanan kurgu i\u015fini Suflo\'ya b\u0131rak</small></span></div>';
     }
@@ -432,10 +432,10 @@
         '<h3 id="pro-upsell-title">' + esc(title) + '</h3>' +
         '<p class="pro-upsell-alt" id="pro-upsell-desc">' + esc(desc) + '</p>' +
         visual +
-        '<div class="pro-upsell-proof"><i><b>40</b> yaz\u0131 efekti</i><i><b>12</b> Motion preset</i><i><b>265</b> SFX</i></div>' +
+        '<div class="pro-upsell-proof"><i><b>262</b> animasyon</i><i><b>290</b> preset</i><i><b>769</b> SFX</i></div>' +
         '<ul class="pro-upsell-liste">' +
           '<li>Otomatik sessizlik kesimi + ritim marker</li>' +
-          '<li>40 MOGRT + 12 Motion preset + 265 SFX</li>' +
+          '<li>262 MOGRT + 290 Motion/efekt preset + 769 SFX</li>' +
           '<li>Lisans\u0131 bir kez gir; yeni i\u00e7erikler otomatik gelsin</li>' +
         '</ul>' +
         '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K</span><b>749 TL</b><small>abonelik yok \u00b7 dakika limiti yok</small></div>' +

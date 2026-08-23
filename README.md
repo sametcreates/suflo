@@ -11,7 +11,7 @@ Türkçe ve Azerice dahil 99 dil — abonelik yok, kredi yok, hesap yok.
 Suflo konuşmayı izlenebilir kurguya çevirir. Seçili klipten, In–Out aralığından ya da tüm sequence'tan
 transkript çıkarır; panelin içinde düzenlersin; caption izi olarak uygular ya da SRT/VTT/ASS/TXT
 olarak dışa aktarırsın. Emoji Assets (yerel klasörün veya bağlı Suflo Cloud kataloğu) ücretsizdir.
-Pro katmanında sessizlik kesme, ritim marker'ları, seçili klibe tek tıkla uygulanan 12 Motion preseti ve otomatik güncellenen 40 MOGRT + 265 SFX kütüphanesi
+Pro katmanında sessizlik kesme, ritim marker'ları, seçili klibe tek tıkla uygulanan 12 Motion preseti, 278 efektlik Suflo Smooth paketi ve otomatik güncellenen 262 MOGRT + 769 SFX + 30 Motion BG kütüphanesi
 ve altyazıdan Akıllı SFX önerileri bulunur.
 
 | Ne | Nasıl |
@@ -70,7 +70,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | Terim sözlüğü |
-| Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | 12 yerleşik Motion preseti + Pro İçerik Bulutu: 40 MOGRT ve 265 SFX |
+| Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 769 SFX ve 30 Motion BG |
 | — | Altyazıdan Akıllı SFX önerileri |
 | — | Kütüphane sağlık kontrolü ve destek raporu |
 
@@ -78,7 +78,7 @@ Abonelikli veya kredi tabanlı kurgu panellerinin aksine Suflo Pro'da sayaç ve 
 
 ### Pro İçerik Bulutu
 
-Pro lisansı bir kez etkinleştirilir. Slide, Zoom, Pop, Fade ve vurgu ailelerindeki 12 yerleşik Motion preseti anında açılır. Panel, 40 yazı animasyonu ile 265 SFX'i private içerik servisinden indirir; sonraki sürümlerde yalnız değişen dosyaları alır. Kesilen indirme kaldığı yerden devam eder ve yeni sürüm tüm SHA-256 kontrollerini geçmeden çalışan kütüphane değişmez. Public GitHub paketinde ücretli MOGRT/SFX bulunmaz; yalnız kilitli kartların küçük önizlemeleri vardır. Sunucu yerleşimi ve Hostinger paketi için [`server/pro-v1/README.md`](server/pro-v1/README.md) dosyasına bak.
+Pro lisansı bir kez etkinleştirilir. Slide, Zoom, Pop, Fade ve vurgu ailelerindeki 12 yerleşik Motion preseti anında açılır. Panel, 262 MOGRT, 769 SFX, 30 Motion BG ve 278 efektlik Suflo Smooth `.prfpset` paketini private içerik servisinden indirir; sonraki sürümlerde yalnız değişen dosyaları alır. Adobe, `.prfpset` içe aktarmayı panel API'sine açmadığı için dosya otomatik indirilir ve Suflo kurulum kartından bir kez Premiere Effects paneline içe aktarılır. Kesilen indirme kaldığı yerden devam eder ve yeni sürüm tüm SHA-256 kontrollerini geçmeden çalışan kütüphane değişmez. Public GitHub paketinde ücretli içerik bulunmaz; yalnız kilitli vitrinler vardır. Sunucu yerleşimi ve Hostinger paketi için [`server/pro-v1/README.md`](server/pro-v1/README.md) dosyasına bak.
 
 Kurulu içeriklerin değişmeyen dosyaları her Premiere açılışında yeniden hashlenmez; boyut/değişiklik zamanı farklıysa anında, her durumda en geç yedi günde bir tam SHA-256 doğrulaması yapılır. Geçici ilk bağlantı hatası otomatik yeniden denenir; kurulu son sağlam sürüm çevrimdışıyken kullanılmaya devam eder.
 

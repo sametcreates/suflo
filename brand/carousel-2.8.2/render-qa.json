@@ -1,0 +1,61 @@
+{
+  "renderedAt": "2026-08-23T14:13:01.951Z",
+  "slides": [
+    {
+      "file": "01-cover.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 838529,
+      "textLength": 290
+    },
+    {
+      "file": "02-one-panel.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 993052,
+      "textLength": 360
+    },
+    {
+      "file": "03-magic-cut.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 794249,
+      "textLength": 232
+    },
+    {
+      "file": "04-auto-zoom.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 851378,
+      "textLength": 300
+    },
+    {
+      "file": "05-pro-cloud.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 826883,
+      "textLength": 281
+    },
+    {
+      "file": "06-smooth-pack.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 979264,
+      "textLength": 307
+    },
+    {
+      "file": "07-caption-styles.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 808500,
+      "textLength": 273
+    },
+    {
+      "file": "08-offer.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 899943,
+      "textLength": 367
+    }
+  ]
+}

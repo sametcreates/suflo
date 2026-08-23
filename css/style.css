@@ -2794,6 +2794,41 @@ body {
 .preset-card.busy .preset-apply::after { content: ""; position: absolute; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 .preset-card.ok { border-color: var(--good); }
 .preset-card.ok .preset-apply { color: #0a2416; border-color: transparent; background: var(--good); }
+.preset-pack-card {
+  grid-column: 1 / -1; display: grid; grid-template-columns: 112px minmax(0,1fr) 126px;
+  align-items: center; gap: 12px; padding: 11px; overflow: visible;
+  border-color: rgba(117,134,255,.42);
+  background: radial-gradient(circle at 4% 50%, rgba(108,125,255,.22), transparent 27%), linear-gradient(120deg,#151d2b,#0d141d);
+}
+.preset-pack-visual {
+  position: relative; min-height: 86px; display: grid; place-items: center; overflow: hidden;
+  border: 1px solid rgba(130,148,255,.4); border-radius: 10px;
+  background: radial-gradient(circle at 70% 15%,rgba(93,255,155,.18),transparent 38%),linear-gradient(145deg,#293867,#111b2c);
+}
+.preset-pack-visual::before { content:""; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px);background-size:17px 17px;opacity:.38 }
+.preset-pack-visual span { position:absolute;left:8px;top:7px;color:#b9c4ff;font-size:8px;font-weight:950;letter-spacing:.14em }
+.preset-pack-visual b { position:relative;color:#fff;font-size:31px;line-height:1;letter-spacing:-.04em;text-shadow:0 8px 22px #000 }
+.preset-pack-visual i { position:absolute;bottom:8px;color:#76efb0;font-size:7px;font-style:normal;font-weight:950;letter-spacing:.17em }
+.preset-pack-visual em { position:absolute;right:7px;top:7px;display:grid;place-items:center;width:23px;height:23px;border-radius:50%;color:#f0d77e;background:rgba(34,29,18,.82);border:1px solid rgba(216,183,83,.42) }
+.preset-pack-visual em svg { width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5 }
+.preset-pack-copy { min-width:0 }
+.preset-pack-copy .preset-pack-label { display:block;margin-bottom:5px;color:#7f91ff;font-size:7px;font-weight:950;letter-spacing:.12em }
+.preset-pack-copy > b { display:block;color:#f1f5ff;font-size:13px;white-space:normal }
+.preset-pack-copy p { margin:4px 0;color:#9ba9bc;font-size:9px }
+.preset-pack-copy small { color:#6f7c8f;font-size:8px }
+.preset-pack-card .preset-pack-install { width:100%;margin:0;position:relative }
+.preset-pack-guide { position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:16px;background:rgba(3,7,13,.82);backdrop-filter:blur(8px) }
+.preset-pack-dialog { position:relative;width:min(430px,96vw);padding:20px;border:1px solid #35465f;border-radius:15px;background:radial-gradient(circle at 90% -10%,rgba(109,127,255,.22),transparent 40%),#111923;box-shadow:0 28px 90px rgba(0,0,0,.72);color:#dce5f3 }
+.preset-pack-x { position:absolute;right:10px;top:10px;width:28px;height:28px;border:1px solid #344257;border-radius:7px;background:#18222f;color:#93a2b8;font-size:18px }
+.preset-pack-kicker { color:#7f91ff;font-size:8px;font-weight:950;letter-spacing:.14em }
+.preset-pack-dialog h3 { margin:8px 0 7px;font-size:19px }
+.preset-pack-dialog p,.preset-pack-dialog li { color:#99a8bc;font-size:10.5px;line-height:1.55 }
+.preset-pack-dialog ol { margin:12px 0;padding-left:21px }
+.preset-pack-dialog li { margin:7px 0 }
+.preset-pack-dialog code { color:#c4ceff }
+.preset-pack-path { padding:8px;border:1px solid #2a394d;border-radius:7px;background:#0b1119;color:#6f7f96;font:8px/1.45 Consolas,monospace;word-break:break-all }
+.preset-pack-actions { display:flex;gap:8px;margin-top:13px }
+.preset-pack-actions .btn { flex:1 }
 
 .preset-card:hover .preset-preview-zoom-in .preset-frame { animation: preset-zoom-in .9s ease-in-out infinite; }
 .preset-card:hover .preset-preview-zoom-out .preset-frame { animation: preset-zoom-out .9s ease-in-out infinite; }
@@ -2829,6 +2864,8 @@ body {
   .preset-subbar { align-items: flex-start; flex-direction: column; }
   .preset-subbar .seg-ctl { width: 100%; overflow-x: auto; }
   .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .preset-pack-card { grid-template-columns:88px minmax(0,1fr);gap:9px }
+  .preset-pack-card .preset-pack-install { grid-column:1 / -1 }
 }
 .emoji-assets-grid .emoji-format { right: 34px; top: 5px; padding: 2px 4px; font-size: 6px; }
 .emoji-assets-empty-icon {

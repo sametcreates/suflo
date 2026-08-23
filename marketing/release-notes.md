@@ -1,3 +1,10 @@
+## Suflo 2.8.2 — Suflo Smooth preset paketi + yeni SFX
+
+- **278 efektlik Suflo Smooth Editing Pack:** Shake, Slide, Zoom, Transition ve Look aileleri Pro İçerik Bulutundan otomatik iner.
+- **Gerçek kurulum akışı:** Adobe `.prfpset` dosyalarını eklenti API'sinden sessizce içe aktarmadığı için Suflo dosyayı seçili olarak açar ve Premiere'deki tek seferlik üç adımı gösterir; yanıltıcı “uygulandı” mesajı vermez.
+- **9 yeni Suflo whoosh:** SFX kütüphanesi 760'tan 769'a çıktı.
+- Eski istemciler uyumlu, filtrelenmiş kataloğu almaya devam eder; 2.8.2 yalnız yeni preset dosyasını ve değişen içerikleri indirir.
+
 ## Suflo 2.8.1 — Motion BG senkron düzeltmesi (hotfix)
 
 - **Düzeltildi:** 2.8.0'da Pro içerik eşitleme motionbg (mp4/mov) dosyalarını “desteklenmeyen içerik türü” diye reddedip **tüm senkronu durduruyordu** — artık Motion BG videoları da (yeni MOGRT/SFX ile birlikte) sorunsuz iniyor.

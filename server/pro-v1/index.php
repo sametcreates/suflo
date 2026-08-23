@@ -4,7 +4,7 @@ declare(strict_types=1);
 /*
  * Suflo Pro Content API
  * - manifest: Lemon Squeezy lisansini dogrular, kisa omurlu indirme tokeni verir
- * - file: token dogrular, public_html disindaki MOGRT/SFX dosyasini stream eder
+ * - file: token dogrular, public_html disindaki Pro dosyalarini stream eder
  *
  * URL'lerde lisans anahtari/tokenu bulunmaz; istemci JSON POST kullanir.
  */
@@ -150,7 +150,8 @@ function safe_content_path(array $cfg, string $relative): string|false {
     $isMogrt = preg_match('#^mogrt/.+\.mogrt$#iu', $relative) === 1;
     $isSfx = preg_match('#^sfx/.+\.(wav|mp3|aif|aiff|m4a|flac|ogg|wma)$#iu', $relative) === 1;
     $isMotionBg = preg_match('#^motionbg/.+\.(mp4|mov|m4v|webm)$#iu', $relative) === 1;
-    if (!$isMogrt && !$isSfx && !$isMotionBg) return false;
+    $isPreset = preg_match('#^presets/.+\.prfpset$#iu', $relative) === 1;
+    if (!$isMogrt && !$isSfx && !$isMotionBg && !$isPreset) return false;
     $root = realpath((string)$cfg['content_root']);
     $file = realpath((string)$cfg['content_root'] . '/' . $relative);
     if ($root === false || $file === false || !is_file($file)) return false;
@@ -171,6 +172,20 @@ if ($action === 'manifest') {
     if (!is_file($manifestPath)) fail_json(503, 'Icerik katalogu hazir degil.');
     $manifest = json_decode((string)file_get_contents($manifestPath), true);
     if (!is_array($manifest) || empty($manifest['content_version']) || empty($manifest['files'])) fail_json(503, 'Icerik katalogu bozuk.');
+    // 2.8.1 ve daha eski istemciler .prfpset yolunu tanimaz. Onlara katalogu
+    // filtreleyerek mevcut MOGRT/SFX/Motion BG esitlemesini bozmadan surdur.
+    $clientVersion = trim((string)($input['client_version'] ?? ''));
+    if ($clientVersion === '' || version_compare($clientVersion, '2.8.2', '<')) {
+        $manifest['files'] = array_values(array_filter($manifest['files'], static function ($item): bool {
+            $path = strtolower(str_replace('\\', '/', (string)($item['path'] ?? '')));
+            return !str_starts_with($path, 'presets/');
+        }));
+        $manifest['total_bytes'] = array_sum(array_map(static fn($item): int => (int)($item['bytes'] ?? 0), $manifest['files']));
+        if (isset($manifest['counts']) && is_array($manifest['counts'])) {
+            $manifest['counts']['presets'] = 0;
+            $manifest['counts']['total'] = count($manifest['files']);
+        }
+    }
     $manifest['ok'] = true;
     $manifest['token'] = make_token($cfg, $instanceId);
     header('Content-Type: application/json; charset=utf-8');

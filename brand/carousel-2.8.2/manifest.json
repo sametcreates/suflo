@@ -1,0 +1,20 @@
+{
+  "name": "Suflo Pro 2.8.2 Sponsored Carousel",
+  "format": "Instagram portrait carousel",
+  "width": 1080,
+  "height": 1350,
+  "slides": 8,
+  "language": "tr-TR",
+  "version": "2.8.2",
+  "url_pattern": "carousel.html?slide={1..8}",
+  "exports": [
+    "01-cover.png",
+    "02-one-panel.png",
+    "03-magic-cut.png",
+    "04-auto-zoom.png",
+    "05-pro-cloud.png",
+    "06-smooth-pack.png",
+    "07-caption-styles.png",
+    "08-offer.png"
+  ]
+}

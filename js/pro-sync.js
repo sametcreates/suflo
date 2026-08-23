@@ -2,7 +2,7 @@
  * Suflo Pro icerik esitleme
  *
  * Lisans bir kez etkinlestirilir. Panel, lisansli manifesti arka planda alir;
- * yalniz yeni/degisen MOGRT ve SFX dosyalarini indirir. Yeni surum tamamen
+ * yalniz yeni/degisen MOGRT, SFX, Motion BG ve preset paketlerini indirir. Yeni surum tamamen
  * dogrulanmadan aktif klasor degismez, bu nedenle yarim indirme calisan paketi
  * bozamaz.
  */
@@ -112,7 +112,8 @@ window.ProSync = (function () {
     var mogrt = /^mogrt\/.+\.mogrt$/i.test(rel);
     var sfx = /^sfx\/.+\.(wav|mp3|aif|aiff|m4a|flac|ogg|wma)$/i.test(rel);
     var motionbg = /^motionbg\/.+\.(mp4|mov|m4v|webm)$/i.test(rel);
-    if (!mogrt && !sfx && !motionbg) throw new Error("Desteklenmeyen Pro içerik türü: " + rel);
+    var preset = /^presets\/.+\.prfpset$/i.test(rel);
+    if (!mogrt && !sfx && !motionbg && !preset) throw new Error("Desteklenmeyen Pro içerik türü: " + rel);
     var bytes = Number(item.bytes);
     var sha = String(item.sha256 || "").toLowerCase();
     if (!isFinite(bytes) || bytes < 1 || bytes > 4 * 1024 * 1024 * 1024) throw new Error("Geçersiz dosya boyutu: " + rel);
