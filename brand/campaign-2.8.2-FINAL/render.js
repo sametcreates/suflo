@@ -13,7 +13,7 @@ var names = [
   "04-free-features.png",
   "05-free-vs-pro-bridge.png",
   "06-pro-tools.png",
-  "07-caption-styles.png",
+  "07-pro-text-animations.png",
   "08-pro-library.png",
   "09-free-vs-pro.png",
   "10-offer-749.png"

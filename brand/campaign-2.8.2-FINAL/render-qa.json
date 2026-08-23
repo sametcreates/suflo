@@ -1,5 +1,5 @@
 {
-  "renderedAt": "2026-08-23T15:56:20.741Z",
+  "renderedAt": "2026-08-23T17:03:07.253Z",
   "slides": [
     {
       "file": "01-free-hero.png",
@@ -33,8 +33,8 @@
       "file": "05-free-vs-pro-bridge.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 562682,
-      "textLength": 422
+      "bytes": 564233,
+      "textLength": 436
     },
     {
       "file": "06-pro-tools.png",
@@ -44,32 +44,32 @@
       "textLength": 363
     },
     {
-      "file": "07-caption-styles.png",
+      "file": "07-pro-text-animations.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 648154,
-      "textLength": 386
+      "bytes": 672646,
+      "textLength": 297
     },
     {
       "file": "08-pro-library.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 730368,
-      "textLength": 464
+      "bytes": 760778,
+      "textLength": 452
     },
     {
       "file": "09-free-vs-pro.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 525834,
-      "textLength": 401
+      "bytes": 527685,
+      "textLength": 415
     },
     {
       "file": "10-offer-749.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 958607,
-      "textLength": 338
+      "bytes": 960262,
+      "textLength": 352
     }
   ]
 }

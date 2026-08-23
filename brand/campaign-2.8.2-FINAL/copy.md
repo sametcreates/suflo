@@ -11,6 +11,7 @@ Her gün edit yapıyorsan Pro tarafında da şunlar var:
 • Magic Cut ile sessizlikleri bulup kesme
 • Auto Zoom ile konuşmaya otomatik zoom ekleme
 • Beat Marker ile ritimleri timeline’a işaretleme
+• Zoom In, Slide Collide, Cracked, Spinning Butter, Ocean Waves, Coolvetica Wave, Rock Solidance ve Jitter Shine dahil 40 yazı animasyonu
 • 10 farklı altyazı stili
 • 262 MOGRT, 769 SFX ve 30 Motion BG
 • 12 tek-tık Motion ve 278 efektlik Suflo Smooth Pack
@@ -24,7 +25,7 @@ https://suflo.app/pro
 
 ## Kısa reklam metni
 
-Premiere’de Türkçe AI altyazı ücretsiz. Her gün edit yapıyorsan Magic Cut, Auto Zoom, Beat Marker, 10 altyazı stili, 262 MOGRT, 769 SFX ve 290 hareket Pro’da. Lansmana özel 1.250 TL yerine 749 TL; tek ödeme, abonelik yok.
+Premiere’de Türkçe AI altyazı ücretsiz. Her gün edit yapıyorsan Magic Cut, Auto Zoom, Beat Marker, 40 yazı animasyonu, 10 altyazı stili, 262 MOGRT, 769 SFX ve 290 hareket Pro’da. Lansmana özel 1.250 TL yerine 749 TL; tek ödeme, abonelik yok.
 
 ## Başlık
 
@@ -40,4 +41,4 @@ Hemen İncele
 
 ## Alt metin
 
-Suflo’nun ücretsiz Türkçe AI altyazı özelliğini; Free ve Pro paket farklarını; Magic Cut, Auto Zoom, Beat Marker, altyazı stilleri, MOGRT, SFX ve Motion kütüphanelerini anlatan on sayfalık Instagram karuseli. Son sayfada Suflo Pro’nun 1.250 TL yerine 749 TL olan lansman fiyatı yer alıyor.
+Suflo’nun ücretsiz Türkçe AI altyazı özelliğini; Free ve Pro paket farklarını; Magic Cut, Auto Zoom, Beat Marker, 40 yazı animasyonu, altyazı stilleri, MOGRT, SFX ve Motion kütüphanelerini anlatan on sayfalık Instagram karuseli. Son sayfada Suflo Pro’nun 1.250 TL yerine 749 TL olan lansman fiyatı yer alıyor.
