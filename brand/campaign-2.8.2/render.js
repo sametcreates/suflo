@@ -1,13 +1,22 @@
-/* Deterministic 1080x1350 carousel renderer + contact sheet. */
 "use strict";
-var fs = require("fs"), path = require("path");
-var playwright = require("playwright"), sharp = require("sharp");
+var fs = require("fs");
+var path = require("path");
+var playwright = require("playwright");
+var sharp = require("sharp");
+
 var dir = __dirname;
-var base = process.argv[2] || "http://127.0.0.1:48733/brand/carousel-2.8.2/carousel.html";
+var base = process.argv[2] || "http://127.0.0.1:48733/brand/campaign-2.8.2/carousel.html";
 var names = [
-  "01-cover.png", "02-one-panel.png", "03-smart-edit.png", "04-text-effects.png",
-  "05-sfx-library.png", "06-motion-presets.png", "07-smooth-pack.png", "08-pro-cloud.png",
-  "09-caption-styles.png", "10-offer.png"
+  "01-cover.png",
+  "02-problem.png",
+  "03-suflo-reveal.png",
+  "04-ai-captions.png",
+  "05-magic-cut-auto-zoom.png",
+  "06-caption-styles.png",
+  "07-pro-library.png",
+  "08-motion-presets.png",
+  "09-content-cloud.png",
+  "10-offer.png"
 ];
 
 (async function () {
@@ -19,9 +28,11 @@ var names = [
   ].filter(Boolean);
   var executablePath = candidates.find(function (file) { return fs.existsSync(file); });
   if (!executablePath) throw new Error("Chrome/Chromium bulunamadi.");
+
   var browser = await playwright.chromium.launch({ headless: true, executablePath: executablePath });
   var page = await browser.newPage({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: 1 });
   var qa = [];
+
   for (var i = 0; i < names.length; i++) {
     await page.goto(base + "?slide=" + (i + 1), { waitUntil: "networkidle" });
     await page.evaluate(function () { return document.fonts.ready; });
@@ -29,11 +40,18 @@ var names = [
       var active = document.querySelector("section.slide.active");
       return {
         activeCount: document.querySelectorAll("section.slide.active").length,
-        body: [document.body.scrollWidth, document.body.scrollHeight],
+        slideCount: document.querySelectorAll("section.slide").length,
+        scriptCount: document.scripts.length,
+        title: document.title,
+        readyState: document.readyState,
+        bodyWidth: document.body.scrollWidth,
+        bodyHeight: document.body.scrollHeight,
         textLength: active ? active.innerText.trim().length : 0
       };
     });
-    if (state.activeCount !== 1 || state.textLength < 30) throw new Error("Slayt gorunmuyor: " + (i + 1));
+    if (state.activeCount !== 1 || state.textLength < 60) throw new Error("Slayt gorunmuyor: " + (i + 1) + " " + JSON.stringify(state));
+    if (state.bodyWidth !== 1080 || state.bodyHeight !== 1350) throw new Error("Canvas tasmasi: " + JSON.stringify(state));
+
     var output = path.join(dir, names[i]);
     await page.screenshot({ path: output, type: "png", clip: { x: 0, y: 0, width: 1080, height: 1350 } });
     var meta = await sharp(output).metadata();
@@ -42,7 +60,11 @@ var names = [
   }
   await browser.close();
 
-  var thumbW = 270, thumbH = 338, gap = 16, sheetW = gap + 5 * (thumbW + gap), sheetH = gap + 2 * (thumbH + gap);
+  var thumbW = 270;
+  var thumbH = 338;
+  var gap = 16;
+  var sheetW = gap + 5 * (thumbW + gap);
+  var sheetH = gap + 2 * (thumbH + gap);
   var layers = [];
   for (var j = 0; j < names.length; j++) {
     layers.push({
@@ -51,9 +73,13 @@ var names = [
       top: gap + Math.floor(j / 5) * (thumbH + gap)
     });
   }
-  await sharp({ create: { width: sheetW, height: sheetH, channels: 4, background: "#090a0e" } })
-    .composite(layers).png().toFile(path.join(dir, "carousel-preview-final.png"));
-  await sharp(path.join(dir, "carousel-preview-final.png")).png().toFile(path.join(dir, "carousel-preview.png"));
+  var previewFinal = path.join(dir, "carousel-preview-final.png");
+  await sharp({ create: { width: sheetW, height: sheetH, channels: 4, background: "#07090f" } })
+    .composite(layers).png().toFile(previewFinal);
+  await sharp(previewFinal).png().toFile(path.join(dir, "carousel-preview.png"));
   fs.writeFileSync(path.join(dir, "render-qa.json"), JSON.stringify({ renderedAt: new Date().toISOString(), slides: qa }, null, 2) + "\n");
-  console.log("Suflo carousel rendered: " + qa.length + " slides, 1080x1350");
-}()).catch(function (error) { console.error(error.stack || error); process.exit(1); });
+  console.log("Suflo campaign rendered: " + qa.length + " slides, 1080x1350");
+}()).catch(function (error) {
+  console.error(error.stack || error);
+  process.exit(1);
+});

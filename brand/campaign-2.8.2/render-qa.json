@@ -1,0 +1,75 @@
+{
+  "renderedAt": "2026-08-23T15:03:12.693Z",
+  "slides": [
+    {
+      "file": "01-cover.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 1185906,
+      "textLength": 222
+    },
+    {
+      "file": "02-problem.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 992140,
+      "textLength": 245
+    },
+    {
+      "file": "03-suflo-reveal.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 972066,
+      "textLength": 242
+    },
+    {
+      "file": "04-ai-captions.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 777294,
+      "textLength": 476
+    },
+    {
+      "file": "05-magic-cut-auto-zoom.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 739188,
+      "textLength": 375
+    },
+    {
+      "file": "06-caption-styles.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 874237,
+      "textLength": 342
+    },
+    {
+      "file": "07-pro-library.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 911052,
+      "textLength": 407
+    },
+    {
+      "file": "08-motion-presets.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 944853,
+      "textLength": 242
+    },
+    {
+      "file": "09-content-cloud.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 772769,
+      "textLength": 519
+    },
+    {
+      "file": "10-offer.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 1191380,
+      "textLength": 318
+    }
+  ]
+}
