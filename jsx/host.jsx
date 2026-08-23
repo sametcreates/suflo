@@ -543,14 +543,34 @@ function KS_packEffect(matchName, displayName) {
   return null;
 }
 
-function KS_packComponent(clip, matchName, displayName, afterIndex) {
+function KS_packComponentCount(clip, matchName, displayName) {
+  var components = clip && clip.components;
+  if (!components) return 0;
+  var count = 0;
+  for (var i = 0; i < components.numItems; i++) {
+    var c = components[i], matched = false;
+    try { if (matchName && String(c.matchName) === String(matchName)) matched = true; } catch (eM) {}
+    try { if (!matched && displayName && String(c.displayName) === String(displayName)) matched = true; } catch (eD) {}
+    if (matched) count++;
+  }
+  return count;
+}
+
+function KS_packComponent(clip, matchName, displayName, skipMatches) {
   var components = clip.components;
   if (!components) return null;
-  var begin = afterIndex === undefined ? 0 : Math.max(0, Number(afterIndex));
-  for (var i = components.numItems - 1; i >= begin; i--) {
-    var c = components[i];
-    try { if (matchName && String(c.matchName) === String(matchName)) return c; } catch (eM) {}
-    try { if (displayName && String(c.displayName) === String(displayName)) return c; } catch (eD) {}
+  var skip = Math.max(0, Number(skipMatches) || 0), seen = 0;
+  // QE yeni efekti her zaman listenin sonuna eklemez. Essential Graphics
+  // kliplerinde standart efektler Text/ucuncu taraf efektlerinin onune girer.
+  // Dizin yerine, eklemeden once var olan ayni efekt sayisini atlayarak yeni
+  // eslesen bileşeni bul.
+  for (var i = 0; i < components.numItems; i++) {
+    var c = components[i], matched = false;
+    try { if (matchName && String(c.matchName) === String(matchName)) matched = true; } catch (eM) {}
+    try { if (!matched && displayName && String(c.displayName) === String(displayName)) matched = true; } catch (eD) {}
+    if (!matched) continue;
+    if (seen >= skip) return c;
+    seen++;
   }
   return null;
 }
@@ -595,6 +615,18 @@ function KS_packSetParam(prop, def, component, clip, speed) {
   var reversed = false;
   try { if (clip.isSpeedReversed) reversed = !!clip.isSpeedReversed(); } catch (eReverse) {}
   var defs = def.keys || [];
+  if (def.color && def.color.length === 4) {
+    try {
+      prop.setColorValue(Number(def.color[0]), Number(def.color[1]), Number(def.color[2]), Number(def.color[3]), true);
+      try {
+        var actual = prop.getColorValue();
+        if (actual && actual.length === 4) {
+          for (var ci = 0; ci < 4; ci++) if (Math.abs(Number(actual[ci]) - Number(def.color[ci])) > 1) return false;
+        }
+      } catch (eColorVerify) {}
+      return true;
+    } catch (eColor) { return false; }
+  }
   if (defs.length) {
     var mapped = [];
     var last = -1e100;
@@ -643,11 +675,11 @@ function KS_applyPackedPresetData(data, opts) {
     for (var ci = 0; ci < data.components.length; ci++) {
       var cdef = data.components[ci];
       if (!cdef || cdef.direct === false) { skippedComponents++; continue; }
-      var before = loc.clip.components ? loc.clip.components.numItems : 0;
       var component = null;
       if (cdef.intrinsic || String(cdef.matchName) === "AE.ADBE Opacity") {
         component = KS_packComponent(loc.clip, cdef.matchName, cdef.displayName);
       } else {
+        var beforeMatches = KS_packComponentCount(loc.clip, cdef.matchName, cdef.displayName);
         var effect = KS_packEffect(cdef.matchName, cdef.displayName);
         if (!effect) {
           skippedComponents++;
@@ -659,7 +691,7 @@ function KS_applyPackedPresetData(data, opts) {
           if (missing.length < 5) missing.push(cdef.displayName || cdef.matchName);
           continue;
         }
-        component = KS_packComponent(loc.clip, cdef.matchName, cdef.displayName, before);
+        component = KS_packComponent(loc.clip, cdef.matchName, cdef.displayName, beforeMatches);
       }
       if (!component) { skippedComponents++; continue; }
       var componentChanged = false;

@@ -1,3 +1,10 @@
+## Suflo 2.8.4 — Presetler seçili klibe güvenilir biçimde uygulanıyor
+
+- Essential Graphics ve yazı kliplerinde Premiere efekti listenin arasına yerleştirse bile Suflo yeni bileşeni gerçek kimliğiyle buluyor.
+- `.prfpset` içindeki sabit değerler artık Adobe'nin doğru `StartKeyframe` alanından okunuyor.
+- 64-bit renk değerleri kayıpsız ARGB kanallarına çevrilip Premiere'in renk API'siyle uygulanıyor.
+- Canlı Premiere testinde `SUFLO Cyan Dropshadow` seçili Graphic klibine 6/6 parametreyle uygulandı ve renk doğrulandı.
+
 ## Suflo 2.8.3 — 290 preset artık panelden uygulanıyor
 
 - **Suflo Native Preset Motoru:** 278 efektlik Suflo Smooth `.prfpset` paketi artık panel içinde gerçek kartlara ayrılıyor; arama, kategori ve favorilerle geziliyor.

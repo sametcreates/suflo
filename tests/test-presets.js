@@ -47,7 +47,7 @@ var fixture = '<?xml version="1.0"?><PremiereData>' +
   '<FilterPresetItem ObjectID="5"><FilterPresets><FilterPreset Index="0" ObjectRef="6"/></FilterPresets></FilterPresetItem>' +
   '<FilterPreset ObjectID="6"><FilterMatchName>AE.ADBE Gaussian Blur 2</FilterMatchName><Component ObjectRef="7"/><AnchorInPoint>0</AnchorInPoint><AnchorOutPoint>127008000000</AnchorOutPoint><Speed>1.</Speed><Type>1</Type></FilterPreset>' +
   '<VideoFilterComponent ObjectID="7"><Component><DisplayName>Gaussian Blur</DisplayName><Params><Param Index="0" ObjectRef="8"/></Params><Intrinsic>false</Intrinsic></Component><MatchName>AE.ADBE Gaussian Blur 2</MatchName></VideoFilterComponent>' +
-  '<VideoComponentParam ObjectID="8"><Name>Blurriness</Name><Keyframes>0,25.;127008000000,0.;</Keyframes><ParameterID>1</ParameterID><ParameterControlType>8</ParameterControlType><IsTimeVarying>true</IsTimeVarying><CurrentValue>25.</CurrentValue></VideoComponentParam>' +
+  '<VideoComponentParam ObjectID="8"><Name>Blurriness</Name><Keyframes>0,25.;127008000000,0.;</Keyframes><ParameterID>1</ParameterID><ParameterControlType>8</ParameterControlType><IsTimeVarying>true</IsTimeVarying><StartKeyframe>-91445760000000000,80.,0,0,0,0,0,0</StartKeyframe><CurrentValue>25.</CurrentValue></VideoComponentParam>' +
   '<TreeItem ObjectID="10"><TreeItemBase><Name>SUFLO Blob Look</Name><Data ObjectRef="11"/></TreeItemBase></TreeItem>' +
   '<FilterPresetItem ObjectID="11"><FilterPresets><FilterPreset Index="0" ObjectRef="12"/></FilterPresets></FilterPresetItem>' +
   '<FilterPreset ObjectID="12"><FilterMatchName>AE.ADBE Lumetri</FilterMatchName><Component ObjectRef="13"/><AnchorInPoint>0</AnchorInPoint><AnchorOutPoint>1</AnchorOutPoint><Type>1</Type></FilterPreset>' +
@@ -59,6 +59,12 @@ ok("prfpset XML katalogu kartlara ayrilir", parsedPack.total === 2 && parsedPack
 ok("standart parametre dogrudan, opak Adobe blobu uyumluluk modudur",
   parsedPack.direct === 1 && parsedPack.fallback === 1 && parsedPack.presets[0].components[0].params[0].keys.length === 2,
   JSON.stringify({ direct: parsedPack.direct, fallback: parsedPack.fallback }));
+ok("sabit preset degeri CurrentValue yerine StartKeyframe'den okunur",
+  parsedPack.presets[0].components[0].params[0].current === 80,
+  parsedPack.presets[0].components[0].params[0].current);
+ok("64-bit Premiere renk degeri kayipsiz ARGB kanallarina ayrilir",
+  JSON.stringify(presetCtx.window.SufloPresetPack.parseColor("-91445760000000000,18374686483698220800,0,0,0,0,0,0")) === JSON.stringify([255, 0, 240, 255]),
+  presetCtx.window.SufloPresetPack.parseColor("-91445760000000000,18374686483698220800,0,0,0,0,0,0"));
 
 function FakeTime() { this.seconds = 0; }
 function FakeProp(value) {
@@ -159,8 +165,10 @@ ok("secim yoksa anlasilir hata doner", empty.ok === false && /en az bir video kl
 var blur = prop("ADBE Gaussian Blur 2-0001", "Blurriness", 0);
 var blurComponent = { matchName: "AE.ADBE Gaussian Blur 2", displayName: "Gaussian Blur", properties: list([blur]) };
 var qeClip = { addVideoEffect: function () {
-  var at = clip.components.numItems;
-  clip.components[at] = blurComponent;
+  // Premiere Essential Graphics kliplerinde yeni standart efekti listenin
+  // sonuna degil, mevcut ozel bileşenlerin onune yerlestirebilir.
+  for (var at = clip.components.numItems; at > 1; at--) clip.components[at] = clip.components[at - 1];
+  clip.components[1] = blurComponent;
   clip.components.numItems++;
 } };
 hostCtx.qe = { project: {
@@ -173,9 +181,21 @@ var packed = JSON.parse(hostCtx.KS_applyPackedPreset(encodeURIComponent(JSON.str
   speed: 1
 }))));
 ok("prfpset karti QE ile efekti ekleyip secili klibe uygular", packed.ok && packed.applied === 1 && packed.appliedParams === 1, JSON.stringify(packed));
+ok("Premiere efekti listenin arasina koysa da yeni bileşen bulunur",
+  clip.components[1] === blurComponent && blur.keys.length === 2,
+  JSON.stringify({ count: clip.components.numItems, keys: blur.keys }));
 ok("paket anahtarlari klibin kaynak araligina yerlestirilir",
   blur.keys.length === 2 && blur.keys[0].time === 37 && blur.keys[1].time === 37.5 && blur.keys[0].value === 25,
   JSON.stringify(blur.keys));
+var colorProp = new FakeProp(0);
+colorProp.setColorValue = function (a, r, g, b) { this.color = [a, r, g, b]; };
+colorProp.getColorValue = function () { return this.color; };
+var colorApplied = hostCtx.KS_packSetParam(colorProp,
+  { direct: true, current: 0, color: [255, 0, 240, 255], keys: [] },
+  { type: 0, anchorIn: 0, anchorOut: 1 }, clip, 1);
+ok("renk parametresi setValue yerine Premiere setColorValue API'siyle uygulanir",
+  colorApplied && JSON.stringify(colorProp.color) === JSON.stringify([255, 0, 240, 255]),
+  JSON.stringify(colorProp.color));
 
 var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 var src = fs.readFileSync(path.join(ROOT, "js", "presets.js"), "utf8");

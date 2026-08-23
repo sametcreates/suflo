@@ -78,6 +78,46 @@ window.SufloPresetPack = (function () {
     return out;
   }
 
+  function startValue(raw) {
+    raw = String(raw || "").trim();
+    var first = raw.indexOf(",");
+    if (first === -1) return null;
+    var rest = raw.slice(first + 1);
+    var second = rest.indexOf(",");
+    return value(second === -1 ? rest : rest.slice(0, second));
+  }
+
+  function startRawValue(raw) {
+    raw = String(raw || "").trim();
+    var first = raw.indexOf(",");
+    if (first === -1) return "";
+    var rest = raw.slice(first + 1);
+    var second = rest.indexOf(",");
+    return (second === -1 ? rest : rest.slice(0, second)).trim();
+  }
+
+  // Premiere renkleri 64-bit, dort adet 16-bit kelime halinde saklar:
+  // alpha, red, green, blue. CEP'in eski JS motorunda BigInt olmadigi icin
+  // ondalik metni guvenli sekilde 65536 tabanina uzun bolmeyle cevir.
+  function colorValue(raw) {
+    var decimal = startRawValue(raw);
+    if (!/^\d+$/.test(decimal)) return null;
+    var words = [];
+    for (var wi = 0; wi < 4; wi++) {
+      var quotient = "", remainder = 0;
+      for (var di = 0; di < decimal.length; di++) {
+        var n = remainder * 10 + Number(decimal.charAt(di));
+        var q = Math.floor(n / 65536);
+        remainder = n % 65536;
+        if (quotient || q) quotient += String(q);
+      }
+      words.unshift(remainder);
+      decimal = quotient || "0";
+    }
+    if (decimal !== "0") return null;
+    return words.map(function (word) { return Math.floor(word / 256); });
+  }
+
   function slug(valueText) {
     return String(valueText || "preset").toLowerCase()
       .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 72) || "preset";
@@ -103,14 +143,21 @@ window.SufloPresetPack = (function () {
   function parseParam(node) {
     if (!node) return null;
     var direct = node.type === "VideoComponentParam" || node.type === "PointComponentParam";
+    var controlType = number(text(node.block, "ParameterControlType"), -1);
+    var startKeyframe = text(node.block, "StartKeyframe");
+    var presetValue = startValue(startKeyframe);
     return {
       index: 0,
       kind: node.type,
       name: text(node.block, "Name"),
       parameterId: number(text(node.block, "ParameterID"), -1),
-      controlType: number(text(node.block, "ParameterControlType"), -1),
+      controlType: controlType,
       timeVarying: text(node.block, "IsTimeVarying") === "true",
-      current: value(text(node.block, "CurrentValue")),
+      // Premiere sabit preset degerini StartKeyframe'de saklar. CurrentValue
+      // bazi kontrollerde UI yuzdesidir (ornegin 255 yerine 100), renklerdeyse
+      // sifir olabilir; bu nedenle yalnız StartKeyframe yoksa ona geri don.
+      current: presetValue !== null ? presetValue : value(text(node.block, "CurrentValue")),
+      color: controlType === 5 ? colorValue(startKeyframe) : null,
       keys: keys(text(node.block, "Keyframes")),
       direct: direct
     };
@@ -215,5 +262,5 @@ window.SufloPresetPack = (function () {
     };
   }
 
-  return { parse: parse, parseValue: value, parseKeys: keys };
+  return { parse: parse, parseValue: value, parseKeys: keys, parseColor: colorValue };
 })();
