@@ -1,3 +1,8 @@
+## Suflo 2.8.6 — Motion BG ses düzeltmesi
+
+- **Düzeltildi:** Motion BG eklerken kaynak videonun **ses izi de timeline'a düşüyordu.** Motion BG görsel bir katmandır — artık yalnızca görüntü eklenir, bağlı ses klibi otomatik temizlenir.
+- Güvenli temizlik: yalnızca **aynı medyadan, aynı konuma** düşen ses klibi silinir — timeline'daki kendi ses klipleriniz etkilenmez.
+
 ## Suflo 2.8.5 — Baştan düzenlenen 1.076 SFX
 
 - SFX kütüphanesi 14 anlaşılır koleksiyonda 1.076 benzersiz sese çıktı; panelde arama, ön dinleme ve timeline'a ekleme aynı akışta çalışıyor.

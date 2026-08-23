@@ -199,7 +199,8 @@ window.KMotionBG = (function () {
     try {
       var r = await K.call("KS_placeMotionBG", { path: item.path, name: item.name }, 60000);
       if (!r.ok) throw new Error(r.error || "Motion BG eklenemedi");
-      KApp.toast(item.name + " → " + r.trackName + ", playhead", "good");
+      KApp.toast(item.name + " → " + r.trackName + ", playhead" +
+        (r.sesSilindi > 0 ? " · ses kaldırıldı" : ""), "good");
     } catch (e) {
       KApp.toast("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {

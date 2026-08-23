@@ -1561,7 +1561,7 @@ function KS_placeGraphic(encoded) {
     } catch (eD) {
       try { sure = clip.end.seconds - clip.start.seconds; } catch (eD2) {}
     }
-    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
+    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure, sesSilindi: sesSilindi });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1616,6 +1616,33 @@ function KS_placeMogrt(encoded) {
  * playhead'de bos bir ust video katmanina yerlestirir. MOGRT'tan farki:
  * bunlar hazir video dosyalari (mp4/mov), importMGT degil importFiles + overwriteClip.
  */
+/*
+ * Motion BG gorsel bir katmandir; kaynak mp4'un ses izi playhead'e istenmeden
+ * dusuyordu. Yerlestirmeden sonra AYNI medyadan, AYNI konumda duran bagli ses
+ * klibini temizler. Kullanicinin onceden koydugu baska klipler etkilenmesin diye
+ * hem medya yolu hem baslangic zamani eslesmek zorunda.
+ */
+function KS_removeLinkedAudio(seq, mediaPath, startSec) {
+  var silindi = 0;
+  try {
+    var hedef = String(mediaPath).toLowerCase();
+    for (var i = 0; i < seq.audioTracks.numTracks; i++) {
+      var tr = seq.audioTracks[i];
+      for (var j = tr.clips.numItems - 1; j >= 0; j--) {
+        var cl = tr.clips[j];
+        try {
+          if (Math.abs(cl.start.seconds - startSec) > 0.05) continue;
+          if (!cl.projectItem) continue;
+          if (String(cl.projectItem.getMediaPath()).toLowerCase() !== hedef) continue;
+          cl.remove(0, 0);
+          silindi++;
+        } catch (eC) {}
+      }
+    }
+  } catch (e) {}
+  return silindi;
+}
+
 function KS_placeMotionBG(encoded) {
   try {
     var p = KS_arg(encoded); // { path, startSec?, name? }
@@ -1650,6 +1677,7 @@ function KS_placeMotionBG(encoded) {
     var placed = KS_tryPlace(seq.videoTracks[idx], item, start);
     if (!placed) return KS_err("Motion BG yerlestirilemedi.");
     try { if (p.name) placed.name = String(p.name); } catch (eN) {}
+    var sesSilindi = KS_removeLinkedAudio(seq, f.fsName, start);
     var sure = 0;
     try { sure = placed.end.seconds - placed.start.seconds; } catch (eS) {}
     return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
