@@ -1,0 +1,75 @@
+{
+  "renderedAt": "2026-08-23T15:38:22.682Z",
+  "slides": [
+    {
+      "file": "01-free-hero.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 887008,
+      "textLength": 278
+    },
+    {
+      "file": "02-why-suflo.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 714847,
+      "textLength": 366
+    },
+    {
+      "file": "03-three-steps.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 616405,
+      "textLength": 313
+    },
+    {
+      "file": "04-free-features.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 612178,
+      "textLength": 511
+    },
+    {
+      "file": "05-free-vs-pro-bridge.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 562938,
+      "textLength": 417
+    },
+    {
+      "file": "06-pro-tools.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 600434,
+      "textLength": 363
+    },
+    {
+      "file": "07-caption-styles.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 646678,
+      "textLength": 385
+    },
+    {
+      "file": "08-pro-library.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 726841,
+      "textLength": 435
+    },
+    {
+      "file": "09-free-vs-pro.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 532136,
+      "textLength": 435
+    },
+    {
+      "file": "10-offer-749.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 960956,
+      "textLength": 324
+    }
+  ]
+}
