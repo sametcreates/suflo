@@ -1,22 +1,26 @@
 {
-  "name": "Suflo Pro 2.8.2 Conversion Campaign",
+  "name": "Suflo 2.8.2 Free-to-Pro Landing Carousel",
   "format": "Instagram portrait carousel",
   "width": 1080,
   "height": 1350,
   "slides": 10,
   "language": "tr-TR",
   "version": "2.8.2",
-  "story": "problem -> product reveal -> workflow -> proof -> offer",
+  "story": "free subtitle hero -> reason -> how it works -> free features -> free/pro bridge -> pro tools -> styles -> library -> comparison -> launch offer",
+  "campaignPrice": {
+    "before": "1.250 TL",
+    "now": "749 TL"
+  },
   "exports": [
-    "01-cover.png",
-    "02-problem.png",
-    "03-suflo-reveal.png",
-    "04-ai-captions.png",
-    "05-magic-cut-auto-zoom.png",
-    "06-caption-styles.png",
-    "07-pro-library.png",
-    "08-motion-presets.png",
-    "09-content-cloud.png",
-    "10-offer.png"
+    "01-free-hero.png",
+    "02-why-suflo.png",
+    "03-three-steps.png",
+    "04-free-features.png",
+    "05-free-vs-pro-bridge.png",
+    "06-pro-tools.png",
+    "07-caption-styles.png",
+    "08-pro-library.png",
+    "09-free-vs-pro.png",
+    "10-offer-749.png"
   ]
 }

@@ -7,16 +7,16 @@ var sharp = require("sharp");
 var dir = __dirname;
 var base = process.argv[2] || "http://127.0.0.1:48733/brand/campaign-2.8.2/carousel.html";
 var names = [
-  "01-cover.png",
-  "02-problem.png",
-  "03-suflo-reveal.png",
-  "04-ai-captions.png",
-  "05-magic-cut-auto-zoom.png",
-  "06-caption-styles.png",
-  "07-pro-library.png",
-  "08-motion-presets.png",
-  "09-content-cloud.png",
-  "10-offer.png"
+  "01-free-hero.png",
+  "02-why-suflo.png",
+  "03-three-steps.png",
+  "04-free-features.png",
+  "05-free-vs-pro-bridge.png",
+  "06-pro-tools.png",
+  "07-caption-styles.png",
+  "08-pro-library.png",
+  "09-free-vs-pro.png",
+  "10-offer-749.png"
 ];
 
 (async function () {
