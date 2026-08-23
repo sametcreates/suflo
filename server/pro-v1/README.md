@@ -17,6 +17,8 @@ private/pro-v1/content/presets/...
 
 `node tools/build-pro-cdn.js <paket-klasoru> <icerik-surumu>` komutu bu yükleme ağacını `dist/pro-cdn/upload/` altında üretir ve güçlü bir token anahtarı oluşturur. Ardından `powershell -ExecutionPolicy Bypass -File tools/pro-cdn-zip.ps1` tek parça Hostinger ZIP'ini üretir.
 
+Çalışan sunucuda yalnız Pro içeriğini güncellemek için `powershell -ExecutionPolicy Bypass -File tools/pro-content-zip.ps1` kullan. Oluşan arşivi `private/pro-v1/` içine çıkar; yalnız `content/` ile `manifest.json` değişir, çalışan `config.php` lisans anahtarı korunur.
+
 Hostinger'da ZIP'i `public_html` klasörünün **bir üstündeki domain köküne** yükleyip çıkart. Çıkarma sonunda `public_html/` ile `private/` aynı seviyede olmalı. `private/pro-v1/config.php` gizli token taşır; bu dosyayı veya Hostinger ZIP'ini GitHub'a, müşteriye ya da public bir URL'ye yükleme.
 
 Yayın öncesi `node tools/check-pro-cdn.js` çalıştır. Geçersiz deneme lisansına JSON `403` dönüyorsa servis ve lisans kapısı hazırdır. `tools/publish.ps1` bu kontrol geçmeden yeni GitHub sürümünü yayınlamaz. `private/` hiçbir zaman public GitHub paketine eklenmez.

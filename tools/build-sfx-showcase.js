@@ -21,7 +21,11 @@ fs.readdirSync(source, { withFileTypes: true }).filter(function (e) { return e.i
   walk(path.join(source, entry.name));
   if (count) folders.push({ name: entry.name.replace(/^SUFLO\s*-\s*/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(), count: count, bytes: bytes });
 });
-folders.sort(function (a, b) { return b.count - a.count || a.name.localeCompare(b.name, "en"); });
+folders.sort(function (a, b) {
+  if (a.name === "sametcreates Essentials") return -1;
+  if (b.name === "sametcreates Essentials") return 1;
+  return b.count - a.count || a.name.localeCompare(b.name, "en");
+});
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(path.join(out, "catalog.json"), JSON.stringify({ version: 1, collection: "Suflo Pro SFX", publicPreviewOnly: true, total: folders.reduce(function (s, f) { return s + f.count; }, 0), folders: folders }, null, 2) + "\n", "utf8");

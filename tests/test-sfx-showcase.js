@@ -26,13 +26,16 @@ var passed = 0, failed = 0;
 function ok(name, condition, evidence) { if (condition) { passed++; console.log("PASS " + name); } else { failed++; console.log("FAIL " + name + "   [" + evidence + "]"); } }
 ctx.KSfx.tara();
 ok("Ucretsiz kurulumda gercek SFX dosyasi yok", ctx.KSfx.sayisi() === 0, ctx.KSfx.sayisi());
-ok("265 Pro SFX kilitli vitrinde gorunur", ctx.KSfx.vitrinSayisi() === 265, ctx.KSfx.vitrinSayisi());
-ok("11 SFX koleksiyonu klasor karti olur", ctx.KSfx.vitrinKlasorSayisi() === 11, ctx.KSfx.vitrinKlasorSayisi());
+ok("1076 Pro SFX kilitli vitrinde gorunur", ctx.KSfx.vitrinSayisi() === 1076, ctx.KSfx.vitrinSayisi());
+ok("14 SFX koleksiyonu klasor karti olur", ctx.KSfx.vitrinKlasorSayisi() === 14, ctx.KSfx.vitrinKlasorSayisi());
 ok("Kilitli SFX karti Pro satis kapisini acar", /card\.onclick\s*=\s*function \(\) \{ Pro\.gate\("sfx"\)/.test(source));
 pro = true; ctx.KSfx.tara();
 ok("Pro aktifken sanal SFX vitrini gercek icerigin yerini tutmaz", ctx.KSfx.vitrinSayisi() === 0, ctx.KSfx.vitrinSayisi());
 var catalog = JSON.parse(fs.readFileSync(path.join(ROOT, "assets", "pro-sfx-showcase", "catalog.json"), "utf8"));
-ok("Public SFX katalogunda ses dosyasi yolu yok", catalog.folders.length === 11 && catalog.total === 265 && !/\.(wav|mp3|aif|m4a)/i.test(JSON.stringify(catalog)));
+ok("Public SFX katalogunda ses dosyasi yolu yok", catalog.folders.length === 14 && catalog.total === 1076 && !/\.(wav|mp3|aif|m4a)/i.test(JSON.stringify(catalog)));
+ok("sametcreates Essentials vitrinde ilk koleksiyondur",
+  catalog.folders[0].name === "sametcreates Essentials" && catalog.folders[0].count === 17,
+  JSON.stringify(catalog.folders[0]));
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
 process.exit(failed ? 1 : 0);

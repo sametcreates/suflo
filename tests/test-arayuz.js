@@ -169,7 +169,7 @@ var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8");
 ok("Stil karti etiketi dekoratif onizleme metnini degil ad ve aciklamayi okur",
   /\.ss-bilgi b/.test(appSrc) && /timeline çıktısı kilitli/.test(appSrc));
 ok("Kutuphane Pro CTA'lari neyin acilacagini ve fiyati gizlemez",
-  /262 içeriği aç — 749 TL/.test(html) && /290 preseti aç — 749 TL/.test(html) && /769 SFX'i aç — 749 TL/.test(html));
+  /262 içeriği aç — 749 TL/.test(html) && /290 preseti aç — 749 TL/.test(html) && /1\.076 SFX'i aç — 749 TL/.test(html));
 
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

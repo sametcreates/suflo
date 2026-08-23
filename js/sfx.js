@@ -233,7 +233,11 @@ window.KSfx = (function () {
     if (!browser) return;
     browser.innerHTML = "";
     var counts = folderCounts();
-    Object.keys(counts).sort(function (a, b) { return a.localeCompare(b); }).forEach(function (folder) {
+    Object.keys(counts).sort(function (a, b) {
+      if (a === "sametcreates Essentials") return -1;
+      if (b === "sametcreates Essentials") return 1;
+      return a.localeCompare(b);
+    }).forEach(function (folder) {
       var card = document.createElement("button");
       card.type = "button";
       card.className = "sfx-folder-card";

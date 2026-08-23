@@ -1,3 +1,11 @@
+## Suflo 2.8.5 — Baştan düzenlenen 1.076 SFX
+
+- SFX kütüphanesi 14 anlaşılır koleksiyonda 1.076 benzersiz sese çıktı; panelde arama, ön dinleme ve timeline'a ekleme aynı akışta çalışıyor.
+- Kökte duran 495 dağınık sesin tamamı doğru koleksiyonlara ayrıldı; kökte başıboş ses kalmadı.
+- `seni seçtim` koleksiyonu `sametcreates Essentials` adıyla yenilendi ve panelde her zaman ilk sırada gösteriliyor.
+- 20+ GB arşivdeki ana SFX kütüphanesinden uygun sesler seçildi; birebir aynı 512 kopya ile müzik dosyaları Pro paketinden çıkarıldı.
+- Mevcut Pro kullanıcıları paketi yeniden kurmaz: Suflo açıldığında yalnız yeni ve değişen içerikler güvenli içerik bulutundan otomatik iner.
+
 ## Suflo 2.8.4 — Presetler seçili klibe güvenilir biçimde uygulanıyor
 
 - Essential Graphics ve yazı kliplerinde Premiere efekti listenin arasına yerleştirse bile Suflo yeni bileşeni gerçek kimliğiyle buluyor.

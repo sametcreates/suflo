@@ -407,9 +407,9 @@ window.KApp = (function () {
         if (title) title.textContent = !pro ? "Pro içerikleri tek tıkla otomatik kurulur" : (s.phase === "ready" ? "Pro kütüphanen hazır" : (working ? "Kütüphanen hazırlanıyor" : "Bir kez etkinleştir, hep güncel kal"));
         if (detail) {
           if (s.phase === "syncing") detail.textContent = (s.detail || "İçerikler eşitleniyor") + (s.bytesTotal ? " · " + bytes(s.bytesDone) + " / " + bytes(s.bytesTotal) : "");
-          else if (s.phase === "ready") detail.textContent = "262 animasyon + 769 SFX + 30 Motion BG + preset paketi hazır" + (s.version ? " · içerik " + s.version : "") + ". Yeni içerikler arka planda kontrol edilir.";
+          else if (s.phase === "ready") detail.textContent = "262 animasyon + 1.076 SFX + 30 Motion BG + preset paketi hazır" + (s.version ? " · içerik " + s.version : "") + ". Yeni içerikler arka planda kontrol edilir.";
           else if (s.phase === "error") detail.textContent = "Kurulu içeriklerin etkilenmedi. Bağlantı geldiğinde yeniden deneyebilirsin.";
-          else detail.textContent = pro ? "Suflo açıldığında yeni içerikleri kontrol eder; yalnız değişen dosyaları indirir." : "Pro lisansını etkinleştirince 262 animasyon, 769 SFX, 30 Motion BG ve preset paketi otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.";
+          else detail.textContent = pro ? "Suflo açıldığında yeni içerikleri kontrol eder; yalnız değişen dosyaları indirir." : "Pro lisansını etkinleştirince 262 animasyon, 1.076 SFX, 30 Motion BG ve preset paketi otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.";
         }
         if (status) {
           status.className = "inline-status" + (s.phase === "error" ? " bad" : (s.phase === "ready" ? " good" : ""));

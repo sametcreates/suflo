@@ -397,7 +397,7 @@
       (isSfx ? 'Her vurgu i\u00e7in do\u011fru ses, Premiere\'in i\u00e7inde' :
       (isPreset ? '290 preset doğrudan Suflo panelinde' : label));
     var desc = isMogrt ? 'Efektleri sat\u0131n almadan \u00f6nce ger\u00e7ek \u00f6nizlemeleriyle incele. Pro\'da tek t\u0131kla playhead\'e yerle\u015ftir.' :
-      (isSfx ? '769 se\u00e7ilmi\u015f sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
+      (isSfx ? '14 koleksiyondaki 1.076 sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
       (isPreset ? '12 yerleşik hareket + Suflo Smooth paketindeki 270 preset seçili klibe doğrudan uygulanır; 8 özel preset uyumluluk modunda açılır.' :
       'Bu profesyonel i\u015f ak\u0131\u015f\u0131 Suflo Pro ile a\u00e7\u0131l\u0131r. Bir kere al, saya\u00e7 ve abonelik olmadan kullan.'));
     var visual;
@@ -432,10 +432,10 @@
         '<h3 id="pro-upsell-title">' + esc(title) + '</h3>' +
         '<p class="pro-upsell-alt" id="pro-upsell-desc">' + esc(desc) + '</p>' +
         visual +
-        '<div class="pro-upsell-proof"><i><b>262</b> animasyon</i><i><b>290</b> preset</i><i><b>769</b> SFX</i></div>' +
+        '<div class="pro-upsell-proof"><i><b>262</b> animasyon</i><i><b>290</b> preset</i><i><b>1.076</b> SFX</i></div>' +
         '<ul class="pro-upsell-liste">' +
           '<li>Otomatik sessizlik kesimi + ritim marker</li>' +
-          '<li>262 MOGRT + 290 Motion/efekt preset + 769 SFX</li>' +
+          '<li>262 MOGRT + 290 Motion/efekt preset + 1.076 SFX</li>' +
           '<li>Lisans\u0131 bir kez gir; yeni i\u00e7erikler otomatik gelsin</li>' +
         '</ul>' +
         '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K</span><b>749 TL</b><small>abonelik yok \u00b7 dakika limiti yok</small></div>' +
