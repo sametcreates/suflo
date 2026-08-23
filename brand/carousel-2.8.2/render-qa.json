@@ -1,61 +1,75 @@
 {
-  "renderedAt": "2026-08-23T14:13:01.951Z",
+  "renderedAt": "2026-08-23T14:32:36.803Z",
   "slides": [
     {
       "file": "01-cover.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 838529,
-      "textLength": 290
+      "bytes": 842246,
+      "textLength": 311
     },
     {
       "file": "02-one-panel.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 993052,
-      "textLength": 360
+      "bytes": 993986,
+      "textLength": 374
     },
     {
-      "file": "03-magic-cut.png",
+      "file": "03-smart-edit.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 794249,
-      "textLength": 232
+      "bytes": 862138,
+      "textLength": 352
     },
     {
-      "file": "04-auto-zoom.png",
+      "file": "04-text-effects.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 851378,
-      "textLength": 300
+      "bytes": 816110,
+      "textLength": 283
     },
     {
-      "file": "05-pro-cloud.png",
+      "file": "05-sfx-library.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 826883,
-      "textLength": 281
+      "bytes": 842608,
+      "textLength": 386
     },
     {
-      "file": "06-smooth-pack.png",
+      "file": "06-motion-presets.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 979264,
-      "textLength": 307
+      "bytes": 882859,
+      "textLength": 388
     },
     {
-      "file": "07-caption-styles.png",
+      "file": "07-smooth-pack.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 808500,
-      "textLength": 273
+      "bytes": 981755,
+      "textLength": 329
     },
     {
-      "file": "08-offer.png",
+      "file": "08-pro-cloud.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 899943,
-      "textLength": 367
+      "bytes": 832174,
+      "textLength": 428
+    },
+    {
+      "file": "09-caption-styles.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 766697,
+      "textLength": 299
+    },
+    {
+      "file": "10-offer.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 919843,
+      "textLength": 416
     }
   ]
 }
