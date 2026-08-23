@@ -104,7 +104,7 @@ if ($LASTEXITCODE -ne 0) {
     # yayina bir onceki surumun notlari gider ve kullanici yanlis sey okur.
     $notlar = Join-Path $root "marketing\release-notes.md"
     if (-not (Test-Path $notlar)) {
-        Write-Host "release-notes.md yok — yayin durduruldu." -ForegroundColor Red; exit 1
+        Write-Host "release-notes.md yok - yayin durduruldu." -ForegroundColor Red; exit 1
     }
     $ilkSatir = (Get-Content $notlar -TotalCount 1)
     if ($ilkSatir -notmatch [regex]::Escape($version)) {

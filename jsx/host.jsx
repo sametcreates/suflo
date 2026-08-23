@@ -484,6 +484,217 @@ function KS_applyMotionPreset(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- Suflo Smooth: .prfpset'i panelden dogrudan uygula ---------- */
+
+function KS_packRead(path) {
+  var f = new File(String(path || ""));
+  if (!f.exists) throw new Error("Preset çalışma dosyası bulunamadı.");
+  if (!/\.json$/i.test(f.name)) throw new Error("Geçersiz preset çalışma dosyası.");
+  try { if (Number(f.length) > 25 * 1024 * 1024) throw new Error("Preset çalışma dosyası çok büyük."); } catch (eSize) {
+    if (/çok büyük/.test(String(eSize))) throw eSize;
+  }
+  if (!f.open("r")) throw new Error("Preset çalışma dosyası açılamadı.");
+  var raw = f.read();
+  f.close();
+  return KJSON.parse(raw);
+}
+
+function KS_packSelectedVideo(seq) {
+  var selected = seq.getSelection();
+  var out = [];
+  if (!selected || !selected.length) return out;
+  for (var ti = 0; ti < seq.videoTracks.numTracks; ti++) {
+    var track = seq.videoTracks[ti];
+    for (var ci = 0; ci < track.clips.numItems; ci++) {
+      var clip = track.clips[ci];
+      for (var si = 0; si < selected.length; si++) {
+        var same = clip === selected[si];
+        try { if (!same && clip.nodeId && selected[si].nodeId) same = String(clip.nodeId) === String(selected[si].nodeId); } catch (eId) {}
+        if (same) { out.push({ clip: clip, track: ti, index: ci }); break; }
+      }
+    }
+  }
+  return out;
+}
+
+function KS_packEffect(matchName, displayName) {
+  var names = [String(displayName || ""), String(matchName || "")];
+  var match = String(matchName || "");
+  if (match.indexOf("AE.ADBE ") === 0) names.push(match.substr(8));
+  for (var i = 0; i < names.length; i++) {
+    if (!names[i]) continue;
+    try {
+      var fx = qe.project.getVideoEffectByName(names[i]);
+      if (fx) return fx;
+    } catch (e) {}
+  }
+  // Bazi Premiere surumleri getVideoEffectByName'de yalniz yerellestirilmis
+  // adi kabul eder. Liste API'si varsa matchName/displayName uzerinden tara.
+  var list = null;
+  try { if (qe.project.getVideoEffectList) list = qe.project.getVideoEffectList(); } catch (eList) {}
+  if (!list) { try { if (qe.project.getVideoEffects) list = qe.project.getVideoEffects(); } catch (eEffects) {} }
+  if (list && typeof list.length === "number") {
+    for (var li = 0; li < list.length; li++) {
+      var item = list[li];
+      try { if (matchName && String(item.matchName || "") === String(matchName)) return item; } catch (eLM) {}
+      try { if (displayName && String(item.displayName || item.name || item) === String(displayName)) return item; } catch (eLD) {}
+    }
+  }
+  return null;
+}
+
+function KS_packComponent(clip, matchName, displayName, afterIndex) {
+  var components = clip.components;
+  if (!components) return null;
+  var begin = afterIndex === undefined ? 0 : Math.max(0, Number(afterIndex));
+  for (var i = components.numItems - 1; i >= begin; i--) {
+    var c = components[i];
+    try { if (matchName && String(c.matchName) === String(matchName)) return c; } catch (eM) {}
+    try { if (displayName && String(c.displayName) === String(displayName)) return c; } catch (eD) {}
+  }
+  return null;
+}
+
+function KS_packProperty(component, def) {
+  if (!component || !component.properties) return null;
+  var props = component.properties;
+  var wanted = String(def.name || "").toLowerCase();
+  if (wanted) {
+    for (var i = 0; i < props.numItems; i++) {
+      try { if (String(props[i].displayName || "").toLowerCase() === wanted) return props[i]; } catch (eN) {}
+    }
+  }
+  var index = Number(def.index);
+  if (isFinite(index) && index >= 0 && index < props.numItems) return props[index];
+  return null;
+}
+
+function KS_packSourceTime(tick, component, sourceIn, sourceOut, speed) {
+  var type = Number(component.type);
+  var pin = Number(component.anchorIn) || 0;
+  var pout = Number(component.anchorOut) || pin;
+  var t = Number(tick) || 0;
+  var dur = Math.max(0.000001, sourceOut - sourceIn);
+  if (type === 0) {
+    var span = Math.max(1, pout - pin);
+    return sourceIn + ((t - pin) / span) * dur;
+  }
+  if (type === 2) return sourceOut - ((pout - t) / KS_TPS) * speed;
+  return sourceIn + ((t - pin) / KS_TPS) * speed;
+}
+
+function KS_packSetParam(prop, def, component, clip, speed) {
+  if (!prop || !def || def.direct === false) return false;
+  var sourceIn = 0, sourceOut = 0;
+  try { sourceIn = Number(clip.inPoint.seconds); } catch (eIn) {}
+  try { sourceOut = Number(clip.outPoint.seconds); } catch (eOut) {}
+  if (!isFinite(sourceIn)) sourceIn = 0;
+  if (!isFinite(sourceOut) || sourceOut <= sourceIn) {
+    try { sourceOut = sourceIn + Math.max(0.001, Number(clip.end.seconds) - Number(clip.start.seconds)); } catch (eDur) { sourceOut = sourceIn + 1; }
+  }
+  var reversed = false;
+  try { if (clip.isSpeedReversed) reversed = !!clip.isSpeedReversed(); } catch (eReverse) {}
+  var defs = def.keys || [];
+  if (defs.length) {
+    var mapped = [];
+    var last = -1e100;
+    for (var i = 0; i < defs.length; i++) {
+      var sec = KS_packSourceTime(defs[i].tick, component, sourceIn, sourceOut, speed);
+      if (reversed) sec = sourceOut - (sec - sourceIn);
+      if (sec < sourceIn - 0.0005 || sec > sourceOut + 0.0005) continue;
+      sec = Math.max(sourceIn, Math.min(sourceOut, sec));
+      if (Math.abs(sec - last) < 0.000001) continue;
+      mapped.push({ time: sec, value: KS_presetCloneValue(defs[i].value) });
+      last = sec;
+    }
+    if (!mapped.length) return false;
+    return KS_presetKeys(prop, mapped, mapped[0].time, mapped[mapped.length - 1].time);
+  }
+  if (def.current === null || def.current === undefined) return false;
+  try {
+    prop.setValue(KS_presetCloneValue(def.current), true);
+    return true;
+  } catch (eSet) { return false; }
+}
+
+function KS_applyPackedPresetData(data, opts) {
+  var seq = KS_seq();
+  if (!seq) return KS_err("Aktif sequence yok.");
+  if (!data || Number(data.schema) !== 1 || !(data.components instanceof Array) || !data.components.length) {
+    return KS_err("Preset verisi geçersiz.");
+  }
+  var selected = KS_packSelectedVideo(seq);
+  if (!selected.length) return KS_err("Timeline'da en az bir video klibi seç.");
+  var speed = Number(opts && opts.speed);
+  if (!isFinite(speed) || speed < .25 || speed > 3) speed = 1;
+  try { app.enableQE(); } catch (eQE) { return KS_err("Premiere efekt motoru açılamadı: " + eQE); }
+  if (typeof qe === "undefined" || !qe.project) return KS_err("Premiere efekt motoru bu sürümde kullanılamıyor.");
+  var qseq = null;
+  try { qseq = qe.project.getActiveSequence(); } catch (eSeq) {}
+  if (!qseq) return KS_err("Aktif sequence efekt motorunda bulunamadı.");
+  var applied = 0, skippedComponents = 0, appliedParams = 0, missing = [];
+
+  for (var si = 0; si < selected.length; si++) {
+    var loc = selected[si];
+    var qclip = null;
+    try { qclip = qseq.getVideoTrackAt(loc.track).getItemAt(loc.index); } catch (eClip) {}
+    if (!qclip) { skippedComponents += data.components.length; continue; }
+    var clipChanged = false;
+    for (var ci = 0; ci < data.components.length; ci++) {
+      var cdef = data.components[ci];
+      if (!cdef || cdef.direct === false) { skippedComponents++; continue; }
+      var before = loc.clip.components ? loc.clip.components.numItems : 0;
+      var component = null;
+      if (cdef.intrinsic || String(cdef.matchName) === "AE.ADBE Opacity") {
+        component = KS_packComponent(loc.clip, cdef.matchName, cdef.displayName);
+      } else {
+        var effect = KS_packEffect(cdef.matchName, cdef.displayName);
+        if (!effect) {
+          skippedComponents++;
+          if (missing.length < 5) missing.push(cdef.displayName || cdef.matchName);
+          continue;
+        }
+        try { qclip.addVideoEffect(effect); } catch (eAdd) {
+          skippedComponents++;
+          if (missing.length < 5) missing.push(cdef.displayName || cdef.matchName);
+          continue;
+        }
+        component = KS_packComponent(loc.clip, cdef.matchName, cdef.displayName, before);
+      }
+      if (!component) { skippedComponents++; continue; }
+      var componentChanged = false;
+      for (var pi = 0; pi < cdef.params.length; pi++) {
+        var prop = KS_packProperty(component, cdef.params[pi]);
+        if (KS_packSetParam(prop, cdef.params[pi], cdef, loc.clip, speed)) {
+          componentChanged = true;
+          appliedParams++;
+        }
+      }
+      if (componentChanged) clipChanged = true;
+      else skippedComponents++;
+    }
+    if (clipChanged) applied++;
+  }
+  if (!applied) {
+    var why = missing.length ? " Eksik efekt: " + missing.join(", ") + "." : "";
+    return KS_err("Preset seçili klibe uygulanamadı." + why);
+  }
+  return KS_ok({
+    applied: applied,
+    skippedComponents: skippedComponents,
+    appliedParams: appliedParams,
+    preset: String(data.name || "Suflo Smooth")
+  });
+}
+
+function KS_applyPackedPreset(encoded) {
+  try {
+    var opts = KS_arg(encoded);
+    var data = opts.data || KS_packRead(opts.path);
+    return KS_applyPackedPresetData(data, opts);
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Suflo Pro: Otomatik Zoom ---------- */
 
 function KS_autoZoom(encoded) {

@@ -1,3 +1,11 @@
+## Suflo 2.8.3 — 290 preset artık panelden uygulanıyor
+
+- **Suflo Native Preset Motoru:** 278 efektlik Suflo Smooth `.prfpset` paketi artık panel içinde gerçek kartlara ayrılıyor; arama, kategori ve favorilerle geziliyor.
+- **270 preset doğrudan timeline'a:** Klibi seç, kartta **Uygula**'ya bas. Suflo efekti ve anahtar kareleri klibin gerçek kaynak in/out aralığına yazar; elle dosya gösterme ve Import Presets adımları yok.
+- **8 özel preset için dürüst uyumluluk modu:** Adobe'nin opak Lumetri/özel veri yapısını kullanan kartlar yanlış sonuç veya sahte “uygulandı” mesajı üretmez; yalnız bu kartlarda Premiere içe aktarma rehberi açılır.
+- **Sürüm ve dil uyumu:** Efektler önce Premiere'in efekt motorunda ad/matchName ile, gerekirse katalog taramasıyla bulunur; eksik üçüncü taraf efekt varsa anlaşılır hata ve güvenli fallback gösterilir.
+- Gerçek 8,2 MB paket 278/278 kart, 270 doğrudan + 8 uyumluluk olarak doğrulandı; 32 test dosyasının tamamı geçti.
+
 ## Suflo 2.8.2 — Suflo Smooth preset paketi + yeni SFX
 
 - **278 efektlik Suflo Smooth Editing Pack:** Shake, Slide, Zoom, Transition ve Look aileleri Pro İçerik Bulutundan otomatik iner.

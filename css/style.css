@@ -2794,6 +2794,19 @@ body {
 .preset-card.busy .preset-apply::after { content: ""; position: absolute; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 .preset-card.ok { border-color: var(--good); }
 .preset-card.ok .preset-apply { color: #0a2416; border-color: transparent; background: var(--good); }
+.preset-pack-entry { border-color: rgba(92,112,187,.34); }
+.preset-pack-entry .preset-preview {
+  background:
+    radial-gradient(circle at 72% 20%, rgba(91, 239, 165, .12), transparent 34%),
+    radial-gradient(circle at 35% 55%, rgba(99, 113, 255, .26), transparent 58%),
+    linear-gradient(145deg, #121a2b, #090e16);
+}
+.preset-pack-entry .preset-frame { border-color: rgba(137,151,255,.5); background: linear-gradient(145deg,#303c72,#18233f); }
+.preset-pack-entry .preset-preview > em { color:#cbd3ff; border-color:rgba(133,149,255,.4); }
+.preset-pack-entry .preset-body i { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.preset-pack-entry.fallback { border-color:rgba(201,165,78,.36); }
+.preset-pack-entry.fallback .preset-apply { color:#e6cf88; border-color:rgba(201,165,78,.42); background:rgba(105,82,30,.18); }
+.preset-pack-entry.fallback .preset-preview > em { color:#ead790; border-color:rgba(201,165,78,.38); background:rgba(54,43,18,.78); }
 .preset-pack-card {
   grid-column: 1 / -1; display: grid; grid-template-columns: 112px minmax(0,1fr) 126px;
   align-items: center; gap: 12px; padding: 11px; overflow: visible;
@@ -2817,6 +2830,7 @@ body {
 .preset-pack-copy p { margin:4px 0;color:#9ba9bc;font-size:9px }
 .preset-pack-copy small { color:#6f7c8f;font-size:8px }
 .preset-pack-card .preset-pack-install { width:100%;margin:0;position:relative }
+.preset-pack-card.ready .preset-pack-install { color:#a9efc8;border-color:rgba(92,202,143,.38);background:rgba(39,108,70,.18) }
 .preset-pack-guide { position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:16px;background:rgba(3,7,13,.82);backdrop-filter:blur(8px) }
 .preset-pack-dialog { position:relative;width:min(430px,96vw);padding:20px;border:1px solid #35465f;border-radius:15px;background:radial-gradient(circle at 90% -10%,rgba(109,127,255,.22),transparent 40%),#111923;box-shadow:0 28px 90px rgba(0,0,0,.72);color:#dce5f3 }
 .preset-pack-x { position:absolute;right:10px;top:10px;width:28px;height:28px;border:1px solid #344257;border-radius:7px;background:#18222f;color:#93a2b8;font-size:18px }

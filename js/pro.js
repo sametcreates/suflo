@@ -81,7 +81,7 @@
     assexport: 'Stilli ASS disa aktarma',
     glossary:  'Terim sozlugu + gelismis bul/degistir',
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
-    presets:   'Motion ve efekt presetleri (12 tek-tik + 278 efekt)',
+    presets:   'Panelden uygulanan 290 Motion ve efekt preseti',
     sfx:       'SFX kutuphanesi + Akilli SFX onerileri',
     motionbg:  'Motion BG (hareketli zeminler + overlay videolari)',
     emojiAssets: 'Emoji Assets (PNG / WEBP / GIF kutuphanesi)',
@@ -395,10 +395,10 @@
     var isPreset = feature === 'presets';
     var title = isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 262 animasyon ve grafik' :
       (isSfx ? 'Her vurgu i\u00e7in do\u011fru ses, Premiere\'in i\u00e7inde' :
-      (isPreset ? '12 tek-t\u0131k Motion + 278 efektlik Suflo Smooth Pack' : label));
+      (isPreset ? '290 preset doğrudan Suflo panelinde' : label));
     var desc = isMogrt ? 'Efektleri sat\u0131n almadan \u00f6nce ger\u00e7ek \u00f6nizlemeleriyle incele. Pro\'da tek t\u0131kla playhead\'e yerle\u015ftir.' :
       (isSfx ? '769 se\u00e7ilmi\u015f sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
-      (isPreset ? '12 yerle\u015fik hareketi tek t\u0131kla uygula; 278 efektlik paketi bir kez i\u00e7e aktar ve Premiere\'de kal\u0131c\u0131 kullan.' :
+      (isPreset ? '12 yerleşik hareket + Suflo Smooth paketindeki 270 preset seçili klibe doğrudan uygulanır; 8 özel preset uyumluluk modunda açılır.' :
       'Bu profesyonel i\u015f ak\u0131\u015f\u0131 Suflo Pro ile a\u00e7\u0131l\u0131r. Bir kere al, saya\u00e7 ve abonelik olmadan kullan.'));
     var visual;
     if (isMogrt) {

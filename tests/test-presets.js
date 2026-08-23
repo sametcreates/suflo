@@ -23,6 +23,7 @@ var presetCtx = {
   setTimeout: function () {}
 };
 vm.createContext(presetCtx);
+vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "preset-pack.js"), "utf8"), presetCtx, { filename: "js/preset-pack.js" });
 vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "presets.js"), "utf8"), presetCtx, { filename: "js/presets.js" });
 var catalog = presetCtx.window.KPresets.list();
 var packs = presetCtx.window.KPresets.packs();
@@ -37,6 +38,27 @@ ok("Slide, Zoom, Fade ve Vurgu aileleri var", ["slide", "zoom", "fade", "impact"
 ok("beklenen amiral presetler katalogda", ["simple-zoom-in", "slide-in-left", "pop-in", "micro-shake"].every(function (id) {
   return ids.indexOf(id) !== -1;
 }));
+
+var fixture = '<?xml version="1.0"?><PremiereData>' +
+  '<Tree ObjectRef="1"/><Tree ObjectID="1"><RootBin ObjectRef="2"/></Tree>' +
+  '<BinTreeItem ObjectID="2"><Items><Item Index="0" ObjectRef="3"/></Items><TreeItemBase><Name>Root</Name></TreeItemBase></BinTreeItem>' +
+  '<BinTreeItem ObjectID="3"><Items><Item Index="0" ObjectRef="4"/><Item Index="1" ObjectRef="10"/></Items><TreeItemBase><Name>SUFLO SMOOTH EDITING PACK</Name></TreeItemBase></BinTreeItem>' +
+  '<TreeItem ObjectID="4"><TreeItemBase><Name>SUFLO Direct Blur</Name><Data ObjectRef="5"/></TreeItemBase></TreeItem>' +
+  '<FilterPresetItem ObjectID="5"><FilterPresets><FilterPreset Index="0" ObjectRef="6"/></FilterPresets></FilterPresetItem>' +
+  '<FilterPreset ObjectID="6"><FilterMatchName>AE.ADBE Gaussian Blur 2</FilterMatchName><Component ObjectRef="7"/><AnchorInPoint>0</AnchorInPoint><AnchorOutPoint>127008000000</AnchorOutPoint><Speed>1.</Speed><Type>1</Type></FilterPreset>' +
+  '<VideoFilterComponent ObjectID="7"><Component><DisplayName>Gaussian Blur</DisplayName><Params><Param Index="0" ObjectRef="8"/></Params><Intrinsic>false</Intrinsic></Component><MatchName>AE.ADBE Gaussian Blur 2</MatchName></VideoFilterComponent>' +
+  '<VideoComponentParam ObjectID="8"><Name>Blurriness</Name><Keyframes>0,25.;127008000000,0.;</Keyframes><ParameterID>1</ParameterID><ParameterControlType>8</ParameterControlType><IsTimeVarying>true</IsTimeVarying><CurrentValue>25.</CurrentValue></VideoComponentParam>' +
+  '<TreeItem ObjectID="10"><TreeItemBase><Name>SUFLO Blob Look</Name><Data ObjectRef="11"/></TreeItemBase></TreeItem>' +
+  '<FilterPresetItem ObjectID="11"><FilterPresets><FilterPreset Index="0" ObjectRef="12"/></FilterPresets></FilterPresetItem>' +
+  '<FilterPreset ObjectID="12"><FilterMatchName>AE.ADBE Lumetri</FilterMatchName><Component ObjectRef="13"/><AnchorInPoint>0</AnchorInPoint><AnchorOutPoint>1</AnchorOutPoint><Type>1</Type></FilterPreset>' +
+  '<VideoFilterComponent ObjectID="13"><Component><DisplayName>Lumetri Color</DisplayName><Params><Param Index="0" ObjectRef="14"/></Params><Intrinsic>false</Intrinsic></Component><MatchName>AE.ADBE Lumetri</MatchName></VideoFilterComponent>' +
+  '<ArbVideoComponentParam ObjectID="14"><Name>Blob</Name><Keyframes></Keyframes><ParameterID>1</ParameterID><IsTimeVarying>false</IsTimeVarying><CurrentValue>opaque</CurrentValue></ArbVideoComponentParam>' +
+  '</PremiereData>';
+var parsedPack = presetCtx.window.SufloPresetPack.parse(fixture);
+ok("prfpset XML katalogu kartlara ayrilir", parsedPack.total === 2 && parsedPack.presets[0].name === "SUFLO Direct Blur", JSON.stringify(parsedPack));
+ok("standart parametre dogrudan, opak Adobe blobu uyumluluk modudur",
+  parsedPack.direct === 1 && parsedPack.fallback === 1 && parsedPack.presets[0].components[0].params[0].keys.length === 2,
+  JSON.stringify({ direct: parsedPack.direct, fallback: parsedPack.fallback }));
 
 function FakeTime() { this.seconds = 0; }
 function FakeProp(value) {
@@ -85,8 +107,10 @@ var sequence = {
   getSelection: function () { return selected; },
   getPlayerPosition: function () { return { seconds: 14 }; }
 };
+sequence.videoTracks = list([{ clips: list([clip]) }]);
+sequence.videoTracks.numTracks = 1;
 var hostCtx = {
-  app: { project: { activeSequence: sequence } },
+  app: { project: { activeSequence: sequence }, enableQE: function () {} },
   Time: FakeTime,
   decodeURIComponent: decodeURIComponent,
   encodeURIComponent: encodeURIComponent,
@@ -132,14 +156,37 @@ selected = [];
 var empty = apply("simple-zoom-in", .45, 1);
 ok("secim yoksa anlasilir hata doner", empty.ok === false && /en az bir video klibi/.test(empty.error), JSON.stringify(empty));
 
+var blur = prop("ADBE Gaussian Blur 2-0001", "Blurriness", 0);
+var blurComponent = { matchName: "AE.ADBE Gaussian Blur 2", displayName: "Gaussian Blur", properties: list([blur]) };
+var qeClip = { addVideoEffect: function () {
+  var at = clip.components.numItems;
+  clip.components[at] = blurComponent;
+  clip.components.numItems++;
+} };
+hostCtx.qe = { project: {
+  getActiveSequence: function () { return { getVideoTrackAt: function () { return { getItemAt: function () { return qeClip; } }; } }; },
+  getVideoEffectByName: function (name) { return name === "Gaussian Blur" || name === "AE.ADBE Gaussian Blur 2" ? { name: name } : null; }
+} };
+selected = [clip];
+var packed = JSON.parse(hostCtx.KS_applyPackedPreset(encodeURIComponent(JSON.stringify({
+  data: { schema: 1, name: "SUFLO Direct Blur", components: parsedPack.presets[0].components },
+  speed: 1
+}))));
+ok("prfpset karti QE ile efekti ekleyip secili klibe uygular", packed.ok && packed.applied === 1 && packed.appliedParams === 1, JSON.stringify(packed));
+ok("paket anahtarlari klibin kaynak araligina yerlestirilir",
+  blur.keys.length === 2 && blur.keys[0].time === 37 && blur.keys[1].time === 37.5 && blur.keys[0].value === 25,
+  JSON.stringify(blur.keys));
+
 var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 var src = fs.readFileSync(path.join(ROOT, "js", "presets.js"), "utf8");
 ok("Free kullanici preset kartlarini kilitli gorur", /preset-card.*locked/.test(src) && /Pro\.gate\("presets"\)/.test(src));
 ok("Preset sekmesi arama hiz guc ve filtre kontrollerini tasir",
   /id="tab-presets"/.test(html) && /id="preset-search"/.test(html) && /id="preset-speed"/.test(html) && /id="preset-strength"/.test(html) && /id="preset-filter"/.test(html));
 ok("Preset betigi panel tarafindan yuklenir", /<script src="js\/presets\.js"><\/script>/.test(html));
-ok("Preset paketi sahte uygulanmis mesaji yerine gercek import rehberi acar",
-  /Import Presets/.test(src) && /Dosyayı göster/.test(src) && /ProSync\.sync/.test(src) && !/preset paketi uygulandı/i.test(src));
+ok("prfpset okuyucu preset betiginden once yuklenir",
+  html.indexOf('js/preset-pack.js') !== -1 && html.indexOf('js/preset-pack.js') < html.indexOf('js/presets.js'));
+ok("Preset paketi standart kartlarda dogrudan motoru, ozel veride gercek import rehberini acar",
+  /KS_applyPackedPreset/.test(src) && /Import Presets/.test(src) && /Dosyayı göster/.test(src) && /ProSync\.sync/.test(src) && !/preset paketi uygulandı/i.test(src));
 
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

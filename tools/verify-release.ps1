@@ -46,6 +46,7 @@ function Test-Archive([string]$path, [string]$kind) {
         $badSeparators = @($names | Where-Object { $_ -match '\\' })
         $required = @(
             '(^|/)js/pro-sync\.js$',
+            '(^|/)js/preset-pack\.js$',
             '(^|/)js/presets\.js$',
             '(^|/)jsx/host\.jsx$',
             '(^|/)assets/pro-mogrt-showcase/catalog\.json$',
