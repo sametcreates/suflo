@@ -30,7 +30,12 @@ fs.mkdirSync(outDir, { recursive: true });
     { selector: '.ky-oge[data-tab="sfx"]', file: "04-sfx.png" },
     { selector: '.ky-oge[data-tab="cut"]', file: "05-magic-cut.png" },
     { selector: '.ky-oge[data-tab="zoom"]', file: "06-auto-zoom.png" },
-    { selector: '.ky-oge[data-tab="emoji-assets"]', file: "07-emoji-assets.png" }
+    { selector: '.ky-oge[data-tab="emoji-assets"]', file: "07-emoji-assets.png" },
+    { selector: '.ky-oge[data-tab="beat"]', file: "08-beat-marker.png" },
+    { selector: '.ky-oge[data-tab="motionbg"]', file: "09-motion-bg.png" },
+    { selector: '.ky-oge[data-tab="text"][data-kat="custom"]', file: "10-other-animations.png" },
+    { selector: '.ky-oge[data-tab="text"][data-kat="buton"]', file: "11-buttons.png" },
+    { selector: '.ky-oge[data-tab="settings"]', file: "12-settings.png" }
   ];
 
   for (var i = 0; i < captures.length; i++) {

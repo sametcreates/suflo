@@ -1,75 +1,75 @@
 {
-  "renderedAt": "2026-08-23T17:11:56.548Z",
+  "renderedAt": "2026-08-23T17:30:50.588Z",
   "slides": [
     {
       "file": "01-free-hero.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 896441,
-      "textLength": 514
+      "bytes": 900431,
+      "textLength": 549
     },
     {
       "file": "02-why-suflo.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 717830,
-      "textLength": 395
+      "bytes": 669159,
+      "textLength": 609
     },
     {
       "file": "03-three-steps.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 616089,
-      "textLength": 324
+      "bytes": 589576,
+      "textLength": 628
     },
     {
       "file": "04-free-features.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 610650,
-      "textLength": 530
+      "bytes": 589334,
+      "textLength": 928
     },
     {
       "file": "05-free-vs-pro-bridge.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 564233,
-      "textLength": 436
+      "bytes": 560692,
+      "textLength": 649
     },
     {
       "file": "06-pro-tools.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 596725,
-      "textLength": 363
+      "bytes": 602711,
+      "textLength": 667
     },
     {
       "file": "07-pro-text-animations.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 654738,
-      "textLength": 424
+      "bytes": 662657,
+      "textLength": 589
     },
     {
       "file": "08-pro-library.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 760778,
-      "textLength": 452
+      "bytes": 752238,
+      "textLength": 646
     },
     {
       "file": "09-free-vs-pro.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 527685,
-      "textLength": 415
+      "bytes": 550332,
+      "textLength": 678
     },
     {
       "file": "10-offer-749.png",
       "width": 1080,
       "height": 1350,
-      "bytes": 960262,
-      "textLength": 352
+      "bytes": 922285,
+      "textLength": 614
     }
   ]
 }
