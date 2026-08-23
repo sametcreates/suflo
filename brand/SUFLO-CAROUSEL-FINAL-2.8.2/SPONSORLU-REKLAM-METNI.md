@@ -2,29 +2,29 @@
 
 ## Ana reklam metni
 
-Premiere’e Türkçe altyazı geldi. Üstelik ücretsiz.
+Premiere’de Türkçe altyazı için hâlâ farklı programlara gidip geliyorsan Suflo’ya bak.
 
-Suflo Free ile Türkçe dahil 99 dilde AI altyazı üret. Metni düzenle; SRT, WebVTT, TXT veya caption izi olarak timeline’a taşı. Yerel AI sayesinde sesin bilgisayarından çıkmaz. Kredi, abonelik ve kullanım limiti yok.
+Videonu seçiyorsun, altyazıyı hazırlıyor ve timeline’a gönderiyorsun. Türkçe dahil 99 dili destekliyor. Üstelik altyazı tarafı tamamen ücretsiz; kredi veya kullanım sınırı yok.
 
-Kurguyu daha hızlı bitirmek isteyenler için Suflo Pro:
+Her gün edit yapıyorsan Pro tarafında da şunlar var:
 
-• Magic Cut ile sessizlikleri temizle
-• Auto Zoom ile konuşmaya vurgu kat
-• Beat Marker ile ritmi timeline’a taşı
-• 10 hazır altyazı stilinden birini seç
-• 262 MOGRT, 769 SFX ve 30 Motion BG’ye panelden ulaş
-• 12 tek-tık Motion ve 278 efektlik Suflo Smooth Pack ile toplam 290 hareket kullan
-• Pro içerik bulutuyla yeni içerikleri otomatik al
+• Magic Cut ile sessizlikleri bulup kesme
+• Auto Zoom ile konuşmaya otomatik zoom ekleme
+• Beat Marker ile ritimleri timeline’a işaretleme
+• 10 farklı altyazı stili
+• 262 MOGRT, 769 SFX ve 30 Motion BG
+• 12 tek-tık Motion ve 278 efektlik Suflo Smooth Pack
+• Yeni içerikleri kendi kontrol eden Pro içerik bulutu
 
-AI altyazı ücretsiz kalır. Pro; hız, stil ve içerik katmanıdır.
+Sadece altyazı yapacaksan Free yeter. Kurguda aynı işleri tekrar tekrar yapıyorsan Pro daha mantıklı.
 
-Suflo Pro lansman fiyatı: 1.250 TL yerine 749 TL. Tek seferlik ödeme, abonelik yok. 3 bilgisayarda kullanım ve 14 gün iade güvencesi.
+Suflo Pro lansmana özel 1.250 TL yerine 749 TL. Tek sefer ödüyorsun; abonelik yok. Lisans 3 bilgisayarda kullanılabiliyor ve 14 gün iade hakkı var.
 
 https://suflo.app/pro
 
 ## Kısa reklam metni
 
-Premiere’de Türkçe AI altyazı ücretsiz. Daha hızlı kurgu isteyenlere Suflo Pro: Magic Cut, Auto Zoom, Beat Marker, 10 altyazı stili, 262 MOGRT, 769 SFX ve 290 hareket. Lansmana özel 1.250 TL yerine 749 TL; tek ödeme, abonelik yok.
+Premiere’de Türkçe AI altyazı ücretsiz. Her gün edit yapıyorsan Magic Cut, Auto Zoom, Beat Marker, 10 altyazı stili, 262 MOGRT, 769 SFX ve 290 hareket Pro’da. Lansmana özel 1.250 TL yerine 749 TL; tek ödeme, abonelik yok.
 
 ## Başlık
 
@@ -32,7 +32,7 @@ Premiere’e Türkçe altyazı. Ücretsiz.
 
 ## Açıklama
 
-Suflo Free ile altyazını, Suflo Pro ile kurgunu tamamla.
+Altyazı için Free. Daha hızlı kurgu için Pro.
 
 ## CTA
 
@@ -40,4 +40,4 @@ Hemen İncele
 
 ## Alt metin
 
-Suflo’nun ücretsiz Türkçe AI altyazı özelliğini, üç adımlı kullanımını, Free ve Pro paket farklarını, Magic Cut, Auto Zoom, Beat Marker, 10 altyazı stili, MOGRT, SFX, Motion kütüphanelerini ve 1.250 TL yerine 749 TL lansman teklifini anlatan on sayfalık Instagram karuseli.
+Suflo’nun ücretsiz Türkçe AI altyazı özelliğini; Free ve Pro paket farklarını; Magic Cut, Auto Zoom, Beat Marker, altyazı stilleri, MOGRT, SFX ve Motion kütüphanelerini anlatan on sayfalık Instagram karuseli. Son sayfada Suflo Pro’nun 1.250 TL yerine 749 TL olan lansman fiyatı yer alıyor.
