@@ -116,8 +116,8 @@ header{position:sticky;top:12px;z-index:60;padding:0 16px;margin-bottom:-72px}
 .hero::before{content:"";position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:min(1300px,150vw);height:640px;
   background:radial-gradient(60% 55% at 50% 40%,rgba(139,124,246,.20),transparent 70%);filter:blur(38px);pointer-events:none;z-index:0}
 .hero .wrap{position:relative;z-index:1}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
-@media(max-width:980px){.hero-grid{grid-template-columns:1fr;gap:44px}.hero{padding:112px 0 64px}}
+.hero-grid{display:grid;grid-template-columns:1fr 1.16fr;gap:48px;align-items:center}
+@media(max-width:980px){.hero-grid{grid-template-columns:1fr;gap:44px}.hero{padding:112px 0 64px}.panel-shot{margin-right:0}}
 .hero h1{margin-bottom:22px}
 .hero .lead{margin-bottom:30px}
 .cta-row{display:flex;gap:12px;flex-wrap:wrap}
@@ -306,13 +306,64 @@ footer{background:var(--bg3);border-top:1px solid var(--line2);padding:56px 0 40
 .fabout p{color:var(--tx3);margin-top:13px;max-width:290px;line-height:1.55}
 .falt{border-top:1px solid var(--line2);padding-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--tx3);font-size:13.5px}
 
+
+/* --- gercek panel ekran goruntusu --- */
+.panel-shot{margin-right:-40px;border:1px solid #2a2a33;border-radius:16px;overflow:hidden;background:#16161c;
+  box-shadow:0 50px 100px -45px rgba(0,0,0,.95),0 0 0 1px rgba(139,124,246,.09);}
+.ps-bar{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#1c1c23;border-bottom:1px solid #26262e}
+.ps-bar i{width:10px;height:10px;border-radius:50%;background:#3a3a46;display:block}
+.ps-bar span{margin-left:8px;font-size:11.5px;color:var(--tx3);font-weight:600}
+.panel-shot img{width:100%;height:auto;display:block}
+
+/* --- HAREKET: kaydirinca beliren ogeler --- */
+.gel{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.gel.gorundu{opacity:1;transform:none}
+.gel.g1{transition-delay:.06s}.gel.g2{transition-delay:.12s}.gel.g3{transition-delay:.18s}
+.gel.g4{transition-delay:.24s}.gel.g5{transition-delay:.3s}.gel.g6{transition-delay:.36s}
+
+/* --- hero girisi --- */
+.hero .eyebrow,.hero h1,.hero .lead,.hero .cta-row,.hero .micro,.hero .panel-shot{
+  opacity:0;transform:translateY(22px);animation:girisAnim .85s cubic-bezier(.16,1,.3,1) forwards}
+.hero .eyebrow{animation-delay:.05s}
+.hero h1{animation-delay:.14s}
+.hero .lead{animation-delay:.26s}
+.hero .cta-row{animation-delay:.36s}
+.hero .micro{animation-delay:.44s}
+.hero .panel-shot{animation-delay:.3s;transform:translateY(30px) scale(.985)}
+@keyframes girisAnim{to{opacity:1;transform:none}}
+
+/* --- hero glow nefes alsin --- */
+.hero::before{animation:nefes 9s ease-in-out infinite}
+@keyframes nefes{0%,100%{opacity:.85;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.07)}}
+
+/* --- sayilar sayarken --- */
+.metrik .n{font-variant-numeric:tabular-nums}
+
+/* --- kart hover derinligi --- */
+.pk,.adim,.plan,.card{transition:transform .28s cubic-bezier(.16,1,.3,1),border-color .28s ease}
+.pk:hover,.adim:hover{transform:translateY(-4px);border-color:rgba(139,124,246,.4)}
+.galeri figure{transition:transform .28s cubic-bezier(.16,1,.3,1),border-color .28s ease}
+.galeri figure:hover{transform:translateY(-4px) scale(1.015);border-color:rgba(139,124,246,.45)}
+.panel-shot{transition:transform .5s cubic-bezier(.16,1,.3,1)}
+.panel-shot:hover{transform:translateY(-5px)}
+
+/* --- galeri sekme gecisi --- */
+.galeri,#g-sfx{animation:sekmeGir .45s cubic-bezier(.16,1,.3,1)}
+@keyframes sekmeGir{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+@media(prefers-reduced-motion:reduce){
+  .gel{opacity:1!important;transform:none!important}
+  .hero .eyebrow,.hero h1,.hero .lead,.hero .cta-row,.hero .micro,.hero .panel-shot{animation:none!important;opacity:1!important;transform:none!important}
+  .hero::before{animation:none!important}
+  .galeri,#g-sfx{animation:none!important}
+}
 ::selection{background:rgba(139,124,246,.3)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
 
-<div class="duyuru">🎉 v2.9.0 hazır — yeni Stil Motoru, Auto Zoom ve Smart SFX 2.0 · <a href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir</a></div>
+<div class="duyuru">🎉 <b id="duyuru-ver">v2.8.6</b> yayında — Motion BG, 1.076 ses efekti ve Azerice desteği · <a href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir</a></div>
 
 <header>
   <div class="hbar">
@@ -339,7 +390,7 @@ footer{background:var(--bg3);border-top:1px solid var(--line2);padding:56px 0 40
     <div class="hero-grid">
       <div>
         <span class="eyebrow">Adobe Premiere Pro eklentisi</span>
-        <h1>Premiere Türkçe<br>duymuyor.<br><span class="ac">Suflo duyuyor.</span></h1>
+        <h1>Premiere'de<br>tamamen ücretsiz,<br><span class="ac">sınırsız altyazı.</span></h1>
         <p class="lead">Videonun sesinden <b>Türkçe ve Azerice altyazıyı</b> kendisi çıkarır. Yapay zekâ senin bilgisayarında çalışır — kredi yok, abonelik yok, kurulumdan sonra internet bile gerekmiyor.</p>
         <div class="cta-row">
           <a class="btn btn-p" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir <small>· kayıt yok</small></a>
@@ -348,29 +399,10 @@ footer{background:var(--bg3);border-top:1px solid var(--line2);padding:56px 0 40
         <p class="micro"><b>Açık kaynak (MIT)</b> · Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · <b id="surum">v2.9.0</b></p>
       </div>
 
-      <div class="mock" aria-label="Suflo panelinin Premiere Pro içindeki görünümü">
-        <div class="mock-bar"><i></i><i></i><i></i><span>Adobe Premiere Pro — proje.prproj</span></div>
-        <div class="mock-body">
-          <div class="mock-mon">
-            <div class="mock-cap">bu videoyu <i>tamamen</i> Suflo ile</div>
-          </div>
-          <div class="mock-panel">
-            <div class="mp-t"><b></b> SUFLO</div>
-            <div class="mp-row"><span>Dil</span><b>Türkçe</b></div>
-            <div class="mp-row"><span>Motor</span><b>Yerel</b></div>
-            <div class="mp-row"><span>Kapsam</span><b>Seçili klip</b></div>
-            <div class="mp-btn">Altyazı oluştur</div>
-            <div class="mp-line"><em>00:04</em><span>bu videoyu tamamen</span></div>
-            <div class="mp-line"><em>00:06</em><span>Suflo ile hazırladım</span></div>
-            <div class="mp-line"><em>00:09</em><span>tek tık yetti</span></div>
-          </div>
-        </div>
-        <div class="mock-tl">
-          <div class="tl-row"><span class="tl-lbl">V2</span><div class="tl-clip c" style="flex:3">ALTYAZI</div><div class="tl-clip c" style="flex:2">ALTYAZI</div><div class="tl-clip c" style="flex:2.4">ALTYAZI</div></div>
-          <div class="tl-row"><span class="tl-lbl">V1</span><div class="tl-clip" style="flex:4"></div><div class="tl-clip" style="flex:2"></div><div class="tl-clip" style="flex:3"></div></div>
-          <div class="tl-row"><span class="tl-lbl">A1</span><div class="tl-clip a" style="flex:9"></div></div>
-        </div>
-      </div>
+      <figure class="panel-shot" aria-label="Suflo panelinin Premiere Pro içindeki gerçek görünümü">
+        <div class="ps-bar"><i></i><i></i><i></i><span>Suflo — Premiere Pro paneli</span></div>
+        <img src="/gorseller/panel.webp" alt="Suflo paneli: altyazı ayarları, stil katmanı ve içerik kütüphanesi" width="1200" height="746" loading="eager" fetchpriority="high">
+      </figure>
     </div>
   </div>
 </section>
@@ -761,7 +793,7 @@ footer{background:var(--bg3);border-top:1px solid var(--line2);padding:56px 0 40
 <!-- ================= KAPANIS ================= -->
 <section class="son">
   <div class="wrap">
-    <h2>Türkçe altyazıyı<br>artık elle yazma.</h2>
+    <h2>Ücretsiz. Sınırsız.<br>Şimdi indir.</h2>
     <p class="lead">İndir, Premiere'i aç, klibi seç. Gerisini Suflo halleder.</p>
     <div class="cta-row">
       <a class="btn btn-p" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir <small>· kayıt yok</small></a>
@@ -816,6 +848,79 @@ footer{background:var(--bg3);border-top:1px solid var(--line2);padding:56px 0 40
 
 <script>
 (function(){
+  // --- Kaydirinca belirme ---
+  // IntersectionObserver bazi ortamlarda callback vermiyor; bu yuzden
+  // olcum getBoundingClientRect ile yapiliyor (her yerde calisir) ve
+  // ayrica 2.5 sn'lik emniyet kilidi her seyi gorunur kiliyor: JS takilsa
+  // bile sayfa asla bos kalmaz.
+  var azHareket = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!azHareket) {
+    var hedefler = [].slice.call(document.querySelectorAll('.shead, .vs .card, .adim, .blok > div, .metrik > div, .pk, .sek, .galeri, .tabw, .tabnot, .plan, .sss details, .kur .card, .son .wrap > *, .liste, .gnot'));
+    hedefler.forEach(function (el, i) {
+      el.classList.add('gel');
+      var k = i % 6; if (k) el.classList.add('g' + k);
+    });
+    var bekleyen = hedefler.slice();
+
+    function ac(el) {
+      el.classList.add('gorundu');
+      if (el.classList.contains('n') === false && el.querySelector) {
+        var sayi = el.querySelector('.n');
+        if (sayi && !sayi.dataset.sayildi) sayac(sayi);
+      }
+    }
+    function kontrol() {
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      for (var i = bekleyen.length - 1; i >= 0; i--) {
+        var r = bekleyen[i].getBoundingClientRect();
+        // r.bottom > 0 sarti YOK: hizli kaydirmada ustte kalan ogeler de acilsin,
+        // yoksa atlanan bolumler kalici gizli kaliyordu.
+        if (r.top < vh * 0.92) { ac(bekleyen[i]); bekleyen.splice(i, 1); }
+      }
+    }
+    // rAF'e BAGLANMA: sekme arka plana atilinca rAF duruyor ve bayrak
+    // kalici takiliyordu -> belirme tamamen duruyordu. Zaman damgali
+    // throttle takilamaz.
+    var sonKontrol = 0;
+    function planla() {
+      var t = Date.now();
+      if (t - sonKontrol < 60) return;
+      sonKontrol = t;
+      kontrol();
+    }
+    window.addEventListener('scroll', planla, { passive: true });
+    window.addEventListener('resize', planla);
+    window.addEventListener('load', planla);
+    kontrol();
+    // Kaydirma olaylari bazi tarayici/ortamlarda duzensiz geliyor.
+    // Dusuk frekansli yoklama garanti saglar; is bitince kendini kapatir.
+    var yoklama = setInterval(function () {
+      kontrol();
+      if (!bekleyen.length) clearInterval(yoklama);
+    }, 220);
+    // EMNIYET: ne olursa olsun her sey gorunsun
+    setTimeout(function () {
+      hedefler.forEach(function (el) { el.classList.add('gorundu'); });
+    }, 2500);
+
+    // --- Metrik sayilari sayarak gelsin ---
+    function sayac(el) {
+      el.dataset.sayildi = '1';
+      var ham = el.textContent.trim();
+      var m = ham.match(/^(d+)(.*)$/);
+      if (!m) return;
+      var hedef = parseInt(m[1], 10), sonek = m[2], baslangic = null;
+      function adim(t) {
+        if (baslangic === null) baslangic = t;
+        var o = Math.min((t - baslangic) / 950, 1);
+        var e = 1 - Math.pow(1 - o, 3);
+        el.textContent = Math.round(hedef * e) + sonek;
+        if (o < 1) requestAnimationFrame(adim);
+      }
+      requestAnimationFrame(adim);
+    }
+  }
+
   // Kutuphane sekmeleri
   var btns = document.querySelectorAll('.sek button');
   var grid = {mogrt:'g-mogrt', buton:'g-buton', mbg:'g-mbg', sfx:'g-sfx'};
@@ -837,6 +942,8 @@ footer{background:var(--bg3);border-top:1px solid var(--line2);padding:56px 0 40
         if (d && d.tag_name) {
           var el = document.getElementById('surum');
           if (el) el.textContent = d.tag_name;
+          var dv = document.getElementById('duyuru-ver');
+          if (dv) dv.textContent = d.tag_name;
         }
       }).catch(function(){});
   } catch(e){}
