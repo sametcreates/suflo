@@ -1,10 +1,12 @@
 /* Canli Pro manifestini yerel uretim manifestiyle karsilastirir ve ornek
  * dosyalari lisansli API uzerinden son baytina kadar yoklar. Anahtar/token yazdirmaz. */
 "use strict";
-var fs = require("fs"), path = require("path"), https = require("https");
+var fs = require("fs"), path = require("path"), https = require("https"), crypto = require("crypto");
 var root = path.join(__dirname, "..");
 var endpoint = process.argv[2] || "https://assets.suflo.app/pro/v1/index.php";
-var localManifestPath = path.join(root, "dist", "pro-cdn", "upload", "private", "pro-v1", "manifest.json");
+var localManifestPath = process.argv[3]
+  ? path.resolve(process.argv[3])
+  : path.join(root, "dist", "pro-cdn", "upload", "private", "pro-v1", "manifest.json");
 var licensePath = path.join(process.env.APPDATA || "", "Suflo", "pro-license.json");
 
 function fail(msg) { console.error("HATA: " + msg); process.exit(1); }
@@ -60,7 +62,26 @@ function stableManifest(m) {
     if (fileRes.status !== 206 || fileRes.bytes !== 1) fail("Ornek dosya okunamadi: " + item.path + " (HTTP " + fileRes.status + ", " + fileRes.bytes + " bayt)");
   }
 
+  // Caption koleksiyonunda yalnız manifest kaydını değil, üç oran ailesinden
+  // gerçek dosya baytlarını da doğrula. Böylece eksik klasör/yarım deploy,
+  // manifest doğru görünse bile yayına çıkamaz.
+  var captionFiles = live.files.filter(function (f) { return /^mogrt\/Caption Styles\/(Landscape|Portrait|Square)\//.test(f.path); });
+  if (captionFiles.length) {
+    if (captionFiles.length !== 51) fail("Caption Styles eksik: " + captionFiles.length + "/51 dosya.");
+    var ratios = ["Landscape", "Portrait", "Square"];
+    for (var ri = 0; ri < ratios.length; ri++) {
+      var ratio = ratios[ri];
+      var caption = captionFiles.find(function (f) { return f.path.indexOf("mogrt/Caption Styles/" + ratio + "/") === 0; });
+      var captionRes = await post({ action: "file", token: live.token, path: caption.path });
+      var captionHash = crypto.createHash("sha256").update(captionRes.body).digest("hex");
+      if (captionRes.status !== 200 || captionRes.bytes !== caption.bytes || captionHash !== caption.sha256) {
+        fail("Caption dosyasi dogrulanamadi: " + caption.path + " (HTTP " + captionRes.status + ", " + captionRes.bytes + " bayt)");
+      }
+    }
+  }
+
   console.log("Canli Pro icerigi dogrulandi: version=" + live.content_version +
     " total=" + live.counts.total + " mogrt=" + live.counts.mogrt + " sfx=" + live.counts.sfx +
-    " motionbg=" + live.counts.motionbg + " presets=" + live.counts.presets + " samples=" + samples.length);
+    " motionbg=" + live.counts.motionbg + " presets=" + live.counts.presets + " samples=" + samples.length +
+    " caption_samples=" + (captionFiles.length ? 3 : 0));
 })().catch(function (e) { fail(e.message || String(e)); });

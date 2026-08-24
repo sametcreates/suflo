@@ -1,10 +1,11 @@
 ## Suflo 2.9.2 — 17 gerçek altyazı stili
 
-- **Stil** bölümü geri geldi; artık Suflo'nun eski sentetik stil kartlarını değil, Premiere'e kurulu gerçek altyazı MOGRT'larını kullanıyor.
+- **Stil** bölümü geri geldi; artık Suflo'nun eski sentetik stil kartlarını değil, Pro İçerik Bulutu'ndan lisanslı kullanıcıya otomatik inen gerçek altyazı MOGRT'larını kullanıyor.
 - Captioneer koleksiyonundaki 51 dosya arayüzde tekrarlanmıyor: **17 stil tek kart** olarak görünüyor; Suflo sekansa göre 9:16, 16:9 veya 1:1 varyantını arka planda otomatik seçiyor.
 - Typewriter, Tiktok, Spinning, Slide, Slant, Obviously, Mr Beast, Motion Blur, Marker, Karaoke, Glitch, Emphasis, Comic, Clean, Block, Arch ve Akira stilleri destekleniyor.
 - Seçilen şablon her altyazı cümlesine gerçek MOGRT klibi olarak yerleşiyor; metin düzenleniyor, başlangıç/bitiş süreleri korunuyor ve yarım kalan işlem güvenle geri alınıyor.
 - Stil kartları ücretsiz kullanıcıda **Pro kilitli** görünür; etkin Pro lisansıyla tek tıkla tüm altyazılara uygulanır.
+- Pro kullanıcı paketi yeniden kurmaz: 51 yeni MOGRT yalnızca bir kez, yaklaşık 99 MB'lık delta güncelleme olarak otomatik eşitlenir. Premiere'e önceden kurulmuş uyumlu yerel şablonlar da kullanılmaya devam eder.
 - Uyumlu şablon bulunmayan sistemlerde boş ekran yerine açık bir kurulum durumu gösterilir.
 
 ## Suflo 2.9.1 — Creator Studio, Suflo Doctor ve güvenilir Pro araçları
