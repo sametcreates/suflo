@@ -949,5 +949,22 @@ footer{background:var(--bg3);border-top:1px solid var(--line2);padding:56px 0 40
   } catch(e){}
 })();
 </script>
+
+<!--
+  Cloudflare Web Analytics — cerez YOK, kisisel veri YOK. Yalniz kac kisi
+  geldigini, hangi ulkeden ve hangi siteden geldiklerini sayar. Token gizli
+  degildir: herkese acik sayfada durur, tek islevi olcumu bu siteye baglamaktir.
+  Yalnizca suflo.app'te yuklenir; yerel onizleme istatistikleri sismesin.
+-->
+<script>
+(function () {
+  if (location.hostname !== "suflo.app") return;
+  var s = document.createElement("script");
+  s.defer = true;
+  s.src = "https://static.cloudflareinsights.com/beacon.min.js";
+  s.setAttribute("data-cf-beacon", '{"token": "0e9cbe24552b412d8b1b6e4d34abe34f"}');
+  document.body.appendChild(s);
+})();
+</script>
 </body>
 </html>
