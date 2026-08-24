@@ -340,6 +340,7 @@ window.KLib = (function () {
     // saniyeler surebilir; eski akis hepsi bitene dek 0/bos ekran gosteriyordu.
     sayaclar();
     ciz();
+    altyaziStilleriniGonder();
 
     for (var qi = 0; qi < thumbQueue.length; qi++) {
       if (buTarama !== taraNo) return;
@@ -352,11 +353,20 @@ window.KLib = (function () {
       // yeniden kurup paneli titretme.
       if ((qi + 1) % 8 === 0 || qi === thumbQueue.length - 1) {
         ciz();
+        altyaziStilleriniGonder();
       }
     }
   }
 
   /* ---------------- çizim ---------------- */
+
+  function altyaziStilleriniGonder() {
+    if (window.KCaptions && typeof window.KCaptions.refreshMogrtStyles === "function") {
+      window.KCaptions.refreshMogrtStyles(paketler.filter(function (p) {
+        return p.group === "caption" && !p.showcase;
+      }));
+    }
+  }
 
   function sayaclar() {
     var s1 = el("yazi-sayac");

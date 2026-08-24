@@ -74,9 +74,10 @@ DOSYALAR.forEach(function (d) {
 ok("korumasiz addEventListener hedefleri markup'ta var",
   korumasiz.length === 0, korumasiz.length ? korumasiz.join(" | ") : "tamam");
 
-ok("Stil Katmani arayuzden kaldirildi",
-  /class="card stil-katmani-card" hidden aria-hidden="true"/.test(html) &&
-  !/id="cap-overlay"/.test(html));
+ok("Stil bolumu 17 gercek Premiere altyazi sablonu icin acik",
+  /class="card stil-katmani-card"/.test(html) &&
+  /17 gerçek altyazı şablonundan birini seç/.test(html) &&
+  !/class="card stil-katmani-card" hidden/.test(html));
 
 /* ---------- 4) Vazgeçilmez öğeler: silinirse ürün işlevini kaybeder ---------- */
 

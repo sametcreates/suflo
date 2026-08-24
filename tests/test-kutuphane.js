@@ -107,8 +107,8 @@ async function run() {
   ok("Eski Subtitle 01-05 kartlari Suflo listesinden guvenle gizlenir",
     ctx.KLib.altyaziStilleri().every(function (item) { return !/^Subtitle\s+0[1-5]$/i.test(item.ad); }),
     ctx.KLib.altyaziStilleri().map(function (item) { return item.ad; }).join(", "));
-  ok("Altyazi sablonlari kaldirilan Stil Katmani motoruna aktarilmaz",
-    captionStyles.length === 0, captionStyles.length);
+  ok("Altyazi sablonlari Stil bolumundeki gercek MOGRT motoruna aktarilir",
+    captionStyles.length === 2, captionStyles.length);
 
   var sfxSrc = fs.readFileSync(KOKYOL + "js/sfx.js", "utf8");
   vm.runInContext(sfxSrc, ctx, { filename: "js/sfx.js" });
@@ -182,8 +182,10 @@ async function run() {
     /data-kat="captions"/.test(html) && /Altyazı Şablonları/.test(html) && /id="caption-sayac"/.test(html));
   ok("Altyazi Sablonlari menude acikca Pro olarak isaretli",
     /data-kat="captions"[\s\S]*?Altyazı Şablonları[\s\S]*?class="ky-kilit" data-kilit>PRO<[\s\S]*?id="caption-sayac"/.test(html));
-  ok("Stil Katmani arayuzu kapali ve eski uygulama dugmesi yok",
-    /class="card stil-katmani-card" hidden aria-hidden="true"/.test(html) && !/id="cap-overlay"/.test(html));
+  ok("Stil bolumu gercek Premiere altyazi sablonlariyla acik",
+    /class="card stil-katmani-card"/.test(html) &&
+    /17 gerçek altyazı şablonundan birini seç/.test(html) &&
+    !/class="card stil-katmani-card" hidden/.test(html));
   var css = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
   ok("MOGRT kartlari buyuk, kirpilmayan profesyonel onizleme kullaniyor",
     /#tab-text \.mogrt-grid\s*\{[^}]*minmax\(300px,\s*1fr\)/s.test(css) && /object-fit:\s*contain/.test(css));
@@ -196,7 +198,10 @@ async function run() {
   ok("Aktif MOGRT karti suruklenince playhead'e yerlestiriliyor",
     /setAttribute\("draggable",\s*"true"\)/.test(libSrc) && /addEventListener\("dragend"/.test(libSrc));
   ok("MOGRT adlari thumbnail islemini beklemeden ekrana ciziliyor",
-    /sayaclar\(\);\s*ciz\(\);\s*\n\s*for \(var qi/.test(libSrc));
+    /sayaclar\(\);\s*ciz\(\);\s*altyaziStilleriniGonder\(\);\s*\n\s*for \(var qi/.test(libSrc));
+  ok("Stil bolumu Captioneer MOGRT listesini kutuphaneden canli aliyor",
+    /refreshMogrtStyles:\s*refreshMogrtStyles/.test(fs.readFileSync(KOKYOL + "js/captions.js", "utf8")) &&
+    /window\.KCaptions\.refreshMogrtStyles/.test(libSrc));
   ok("Altyazi sablonlari Pro kapisindan gecmeden timeline'a gitmiyor",
     /if \(typeof Pro !== "undefined" && !Pro\.gate\("mogrt"\)\) return;/.test(libSrc));
 
