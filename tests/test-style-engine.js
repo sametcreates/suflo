@@ -13,11 +13,14 @@ function ok(name, condition, proof) {
 }
 
 var styles = engine.list();
-ok("motor v2 etkin", engine.version === 2, engine.version);
-ok("dort bagimsiz stil var", styles.map(function (s) { return s.id; }).join(",") === "viral,pop,doc,premium",
+ok("motor v3 etkin", engine.version === 3, engine.version);
+ok("yedi bagimsiz stil var", styles.map(function (s) { return s.id; }).join(",") === "mrbeast,capcut,saas,viral,pop,doc,premium",
   styles.map(function (s) { return s.id; }).join(","));
 
 var expectedFonts = {
+  mrbeast: ["ArchivoBlack.ttf", "OFL-ArchivoBlack.txt"],
+  capcut: ["Montserrat.ttf", "OFL-Montserrat.txt"],
+  saas: ["Montserrat.ttf", "OFL-Montserrat.txt"],
   viral: ["ArchivoBlack.ttf", "OFL-ArchivoBlack.txt"],
   pop: ["Bungee.ttf", "OFL-Bungee.txt"],
   doc: ["Lora.ttf", "OFL-Lora.txt"],
@@ -35,7 +38,7 @@ var wordCues = words.map(function (word, i) {
 });
 var docCues = [{ start: 0, end: 2.5, text: "Hikâyenin başladığı yer, İstanbul'du." }];
 var compiled = {};
-["viral", "pop", "doc", "premium"].forEach(function (id) {
+["mrbeast", "capcut", "saas", "viral", "pop", "doc", "premium"].forEach(function (id) {
   compiled[id] = engine.compile({ styleId: id, cues: id === "doc" ? docCues : wordCues, width: 1280, height: 720 });
   ok(id + " ASS olay uretti", compiled[id].eventCount > 0, compiled[id].eventCount + " olay");
   ok(id + " Turkce metni koruyor", /BUNU|Hikâyenin/.test(compiled[id].ass));
@@ -49,7 +52,13 @@ ok("belgesel panel + altin cetvel + metin",
   compiled.doc.eventCount === 5 && /\\move\(/.test(compiled.doc.ass) && /\\p1/.test(compiled.doc.ass), compiled.doc.eventCount);
 ok("premium sinematik panel + reveal + cizgiler",
   compiled.premium.eventCount === 5 && /\\clip\(/.test(compiled.premium.ass) && /\\p1/.test(compiled.premium.ass), compiled.premium.eventCount);
-ok("dort stilin ASS ciktisi birbirinden farkli", new Set(Object.keys(compiled).map(function (k) { return compiled[k].ass; })).size === 4);
+ok("creator punch mavi derinlik + sari vurgu + punch hareketi",
+  compiled.mrbeast.eventCount >= 12 && /2F8CFF|FF8C2F/i.test(compiled.mrbeast.ass) && /\\t\(/.test(compiled.mrbeast.ass), compiled.mrbeast.eventCount);
+ok("capcut kompakt pill + aktif kelime",
+  compiled.capcut.eventCount >= 6 && /\\p1/.test(compiled.capcut.ass) && /B8FF5A|5AFFB8/i.test(compiled.capcut.ass), compiled.capcut.eventCount);
+ok("saas cam panel + nokta + yumusak hareket",
+  compiled.saas.eventCount >= 8 && /\\blur/.test(compiled.saas.ass) && /\\move\(/.test(compiled.saas.ass), compiled.saas.eventCount);
+ok("yedi stilin ASS ciktisi birbirinden farkli", new Set(Object.keys(compiled).map(function (k) { return compiled[k].ass; })).size === 7);
 
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
 if (!ffmpeg) {

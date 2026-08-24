@@ -24,18 +24,16 @@ Write-Host "  PlayerDebugMode acildi (CSXS 9-14)" -ForegroundColor DarkGray
 # 2) Dosyalari kopyala
 if (Test-Path -LiteralPath $destFull) { Remove-Item -LiteralPath $destFull -Recurse -Force }
 New-Item -ItemType Directory -Path $destFull -Force | Out-Null
-foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "content", "index.html", "README.md", "LICENSE", ".debug")) {
+foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE", ".debug")) {
     $p = Join-Path $src $item
     if (Test-Path -LiteralPath $p) { Copy-Item -LiteralPath $p -Destination $destFull -Recurse -Force }
 }
 
-# Gelistirici makinesinde ana SFX arsivi varsa gercek satis paketi gibi kur.
+# Ucretli icerik normalde Pro Icerik Bulutu / proPackKlasor ile gelir. Yalniz
+# gelistirici acikca SUFLO_SFX_SOURCE verdiyse yerel bir test kopyasi eklenir;
+# masaustundeki buyuk arsivi sessizce eklenti klasorune kopyalama.
 $sfxSource = $env:SUFLO_SFX_SOURCE
-if (-not $sfxSource) {
-    $desktop = [Environment]::GetFolderPath("Desktop")
-    $sfxSource = Join-Path $desktop "SUFLO EDIT VAULT - 20+ GB\03 - SUFLO SFX & AUDIO\Sound Effects\SUFLO - Main SFX Library"
-}
-if (Test-Path -LiteralPath $sfxSource) {
+if ($sfxSource -and (Test-Path -LiteralPath $sfxSource)) {
     $sfxTarget = Join-Path $destFull "content\sfx"
     if (Test-Path -LiteralPath $sfxTarget) { Remove-Item -LiteralPath $sfxTarget -Recurse -Force }
     New-Item -ItemType Directory -Path $sfxTarget -Force | Out-Null

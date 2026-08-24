@@ -73,6 +73,12 @@ ok("Ortak gorsel tarayici PNG WEBP GIF destekliyor", /function walkVisual\(/.tes
 var host = fs.readFileSync(KOKYOL + "jsx/host.jsx", "utf8");
 ok("Emoji playhead'e guvenli bos video katmaniyla ekleniyor", /function KS_placeGraphic\(/.test(host) && /KS_findFreeVideoTrack\(seq, start, start \+ kontrolDur\)/.test(host));
 ok("Hareketli GIF kendi suresini koruyabilir", /p\.keepDuration && medyaDur > 0/.test(host));
+var graphicFn = host.slice(host.indexOf("function KS_placeGraphic("), host.indexOf("/* ---------- Yazi kutuphanesi"));
+var motionBgFn = host.slice(host.indexOf("function KS_placeMotionBG("), host.indexOf("function KS_placeMotionBG(") + 2600);
+ok("Emoji/grafik basari donusu tanimsiz Motion BG degiskeni kullanmiyor",
+  !/sesSilindi/.test(graphicFn), graphicFn.match(/return KS_ok\([^\n]+/) || "return yok");
+ok("Motion BG kaldirdigi bagli ses sayisini panele donduruyor",
+  /sesSilindi:\s*sesSilindi/.test(motionBgFn), motionBgFn.match(/return KS_ok\([^\n]+/) || "return yok");
 
 var html = fs.readFileSync(KOKYOL + "index.html", "utf8");
 ok("Emoji Assets sekmesi, ayari ve betigi arayuzde", /id="tab-emoji-assets"/.test(html) && /id="set-emoji-assets-klasor"/.test(html) && /src="js\/emoji-assets\.js"/.test(html));

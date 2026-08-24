@@ -155,6 +155,8 @@ function KS_getContext() {
         out.seqIn = ip;
         out.seqOut = op;
         out.seqDur = seq.end ? Number(seq.end) / KS_TPS : 0;
+        out.width = Number(seq.frameSizeHorizontal) || 0;
+        out.height = Number(seq.frameSizeVertical) || 0;
       } catch (eIO) {}
       // ses katmanlari (altyazi icin katman secimi)
       try {
@@ -316,10 +318,13 @@ function KS_presetKeys(prop, keys, clearStart, clearEnd) {
     for (var i = 0; i < keys.length; i++) {
       var t = KS_presetTime(keys[i].time);
       try { prop.addKey(t); } catch (e1) {}
-      prop.setValueAtKey(t, KS_presetCloneValue(keys[i].value), true);
+      // Yalniz son anahtarda UI'yi tazele. Her anahtarda true vermek ozellikle
+      // AE efektlerinde Effect Controls'i tekrar tekrar cizip 10-120 sn gecikme
+      // yaratiyordu; anahtar verisinin kendisi false ile de aninda yazilir.
+      prop.setValueAtKey(t, KS_presetCloneValue(keys[i].value), i === keys.length - 1);
       // 5, Premiere'in Bezier/ease turudur. Eski surum kabul etmezse
       // anahtarlar lineer kalir; preset yine calisir.
-      try { if (prop.setInterpolationTypeAtKey) prop.setInterpolationTypeAtKey(t, 5, true); } catch (e2) {}
+      try { if (prop.setInterpolationTypeAtKey) prop.setInterpolationTypeAtKey(t, 5, false); } catch (e2) {}
     }
     // Premiere bazen çağrıyı hata vermeden kabul edip anahtar yazmayabiliyor.
     // Kullanıcıya "uygulandı" demeden önce ilk ve son anahtarın gerçekten
@@ -380,12 +385,32 @@ function KS_presetPositionValue(prop) {
   return null;
 }
 
+function KS_presetPositionValueAt(prop, seconds) {
+  try {
+    if (prop && prop.getValueAtTime) {
+      var v = prop.getValueAtTime(KS_presetTime(seconds));
+      if (v && typeof v.length === "number" && v.length >= 2) return [Number(v[0]), Number(v[1])];
+    }
+  } catch (eAt) {}
+  return KS_presetPositionValue(prop);
+}
+
 function KS_presetNumberValue(prop, fallback) {
   try {
     var v = Number(prop.getValue());
     if (isFinite(v)) return v;
   } catch (e) {}
   return fallback;
+}
+
+function KS_presetNumberValueAt(prop, seconds, fallback) {
+  try {
+    if (prop && prop.getValueAtTime) {
+      var v = Number(prop.getValueAtTime(KS_presetTime(seconds)));
+      if (isFinite(v)) return v;
+    }
+  } catch (eAt) {}
+  return KS_presetNumberValue(prop, fallback);
 }
 
 function KS_applyMotionPreset(encoded) {
@@ -510,17 +535,47 @@ function KS_packSelectedVideo(seq) {
       for (var si = 0; si < selected.length; si++) {
         var same = clip === selected[si];
         try { if (!same && clip.nodeId && selected[si].nodeId) same = String(clip.nodeId) === String(selected[si].nodeId); } catch (eId) {}
-        if (same) { out.push({ clip: clip, track: ti, index: ci }); break; }
+        if (same) {
+          var clipStart = 0, clipEnd = 0, clipName = "";
+          try { clipStart = Number(clip.start.seconds) || 0; } catch (eStart) {}
+          try { clipEnd = Number(clip.end.seconds) || clipStart; } catch (eEnd) {}
+          try { clipName = String(clip.name || ""); } catch (eName) {}
+          out.push({ clip: clip, track: ti, index: ci, start: clipStart, end: clipEnd, name: clipName });
+          break;
+        }
       }
     }
   }
   return out;
 }
 
+function KS_packNormMatchName(value) {
+  return String(value || "").toLowerCase().replace(/^ae\./, "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+}
+
+function KS_packNormDisplay(value) {
+  return String(value || "").toLowerCase()
+    .replace(/[ıİ]/g, "i").replace(/[öÖ]/g, "o").replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s").replace(/[çÇ]/g, "c").replace(/[ğĞ]/g, "g")
+    .replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+}
+
+function KS_packComponentMatches(component, matchName, displayName) {
+  if (!component) return false;
+  try {
+    if (matchName && KS_packNormMatchName(component.matchName) === KS_packNormMatchName(matchName)) return true;
+  } catch (eM) {}
+  try {
+    if (displayName && KS_packNormDisplay(component.displayName) === KS_packNormDisplay(displayName)) return true;
+  } catch (eD) {}
+  return false;
+}
+
 function KS_packEffect(matchName, displayName) {
   var names = [String(displayName || ""), String(matchName || "")];
   var match = String(matchName || "");
   if (match.indexOf("AE.ADBE ") === 0) names.push(match.substr(8));
+  if (match.indexOf("AE.") === 0) names.push(match.substr(3));
   for (var i = 0; i < names.length; i++) {
     if (!names[i]) continue;
     try {
@@ -536,8 +591,8 @@ function KS_packEffect(matchName, displayName) {
   if (list && typeof list.length === "number") {
     for (var li = 0; li < list.length; li++) {
       var item = list[li];
-      try { if (matchName && String(item.matchName || "") === String(matchName)) return item; } catch (eLM) {}
-      try { if (displayName && String(item.displayName || item.name || item) === String(displayName)) return item; } catch (eLD) {}
+      try { if (matchName && KS_packNormMatchName(item.matchName) === KS_packNormMatchName(matchName)) return item; } catch (eLM) {}
+      try { if (displayName && KS_packNormDisplay(item.displayName || item.name || item) === KS_packNormDisplay(displayName)) return item; } catch (eLD) {}
     }
   }
   return null;
@@ -548,10 +603,7 @@ function KS_packComponentCount(clip, matchName, displayName) {
   if (!components) return 0;
   var count = 0;
   for (var i = 0; i < components.numItems; i++) {
-    var c = components[i], matched = false;
-    try { if (matchName && String(c.matchName) === String(matchName)) matched = true; } catch (eM) {}
-    try { if (!matched && displayName && String(c.displayName) === String(displayName)) matched = true; } catch (eD) {}
-    if (matched) count++;
+    if (KS_packComponentMatches(components[i], matchName, displayName)) count++;
   }
   return count;
 }
@@ -565,12 +617,55 @@ function KS_packComponent(clip, matchName, displayName, skipMatches) {
   // Dizin yerine, eklemeden once var olan ayni efekt sayisini atlayarak yeni
   // eslesen bileşeni bul.
   for (var i = 0; i < components.numItems; i++) {
-    var c = components[i], matched = false;
-    try { if (matchName && String(c.matchName) === String(matchName)) matched = true; } catch (eM) {}
-    try { if (!matched && displayName && String(c.displayName) === String(displayName)) matched = true; } catch (eD) {}
-    if (!matched) continue;
+    var c = components[i];
+    if (!KS_packComponentMatches(c, matchName, displayName)) continue;
     if (seen >= skip) return c;
     seen++;
+  }
+  return null;
+}
+
+function KS_packQItemSeconds(item, field) {
+  try {
+    var value = item[field];
+    if (value && value.seconds !== undefined) return Number(value.seconds);
+    var raw = Number(value);
+    if (!isFinite(raw)) return NaN;
+    return Math.abs(raw) > 1000000 ? raw / KS_TPS : raw;
+  } catch (e) { return NaN; }
+}
+
+function KS_packFindQClip(qseq, loc) {
+  var track = null;
+  try { track = qseq.getVideoTrackAt(loc.track); } catch (eTrack) {}
+  if (!track) return null;
+  var direct = null;
+  try { direct = track.getItemAt(loc.index); } catch (eDirect) {}
+  if (direct) {
+    var directStart = KS_packQItemSeconds(direct, "start");
+    if (!isFinite(directStart) || Math.abs(directStart - Number(loc.start || 0)) < .05) return direct;
+  }
+  var count = 0;
+  try { count = Number(track.numItems) || 0; } catch (eCount) {}
+  if (!count) { try { count = Number(track.clips && track.clips.numItems) || 0; } catch (eClips) {} }
+  for (var i = 0; i < count; i++) {
+    var item = null;
+    try { item = track.getItemAt(i); } catch (eItem) {}
+    if (!item) continue;
+    var start = KS_packQItemSeconds(item, "start");
+    var end = KS_packQItemSeconds(item, "end");
+    if (isFinite(start) && Math.abs(start - Number(loc.start || 0)) < .05 &&
+        (!isFinite(end) || Math.abs(end - Number(loc.end || 0)) < .08)) return item;
+  }
+  return direct;
+}
+
+function KS_packWaitForComponent(clip, matchName, displayName, beforeMatches) {
+  var component = null;
+  for (var attempt = 0; attempt < 6; attempt++) {
+    component = KS_packComponent(clip, matchName, displayName, beforeMatches);
+    if (component) return component;
+    try { if (typeof $ !== "undefined" && $.sleep) $.sleep(55); } catch (eSleep) {}
   }
   return null;
 }
@@ -617,7 +712,18 @@ function KS_packSetParam(prop, def, component, clip, speed) {
   var defs = def.keys || [];
   if (def.color && def.color.length === 4) {
     try {
-      prop.setColorValue(Number(def.color[0]), Number(def.color[1]), Number(def.color[2]), Number(def.color[3]), true);
+      var oldColor = null;
+      try { oldColor = prop.getColorValue(); } catch (eOldColor) {}
+      var colorSame = oldColor && oldColor.length === 4;
+      if (colorSame) {
+        for (var oi = 0; oi < 4; oi++) {
+          if (Math.abs(Number(oldColor[oi]) - Number(def.color[oi])) > 0.0001) { colorSame = false; break; }
+        }
+      }
+      if (colorSame) return false;
+      // updateUI=false: her parametrede Effect Controls'i yeniden cizmek buyuk
+      // paketlerde saniyelerce bekletiyor. Deger yine render motoruna yazilir.
+      prop.setColorValue(Number(def.color[0]), Number(def.color[1]), Number(def.color[2]), Number(def.color[3]), false);
       try {
         var actual = prop.getColorValue();
         if (actual && actual.length === 4) {
@@ -644,7 +750,23 @@ function KS_packSetParam(prop, def, component, clip, speed) {
   }
   if (def.current === null || def.current === undefined) return false;
   try {
-    prop.setValue(KS_presetCloneValue(def.current), true);
+    var target = KS_presetCloneValue(def.current);
+    var current = null;
+    try { current = prop.getValue(); } catch (eCurrent) {}
+    var same = false;
+    if (current && target && typeof current !== "string" && typeof target !== "string" &&
+        typeof current.length === "number" && typeof target.length === "number" && current.length === target.length) {
+      same = true;
+      for (var vi = 0; vi < target.length; vi++) {
+        if (Math.abs(Number(current[vi]) - Number(target[vi])) > 0.0001) { same = false; break; }
+      }
+    } else if (typeof current === "number" || typeof target === "number") {
+      same = Math.abs(Number(current) - Number(target)) <= 0.0001;
+    } else {
+      same = String(current) === String(target);
+    }
+    if (same) return false;
+    prop.setValue(target, false);
     return true;
   } catch (eSet) { return false; }
 }
@@ -664,12 +786,12 @@ function KS_applyPackedPresetData(data, opts) {
   var qseq = null;
   try { qseq = qe.project.getActiveSequence(); } catch (eSeq) {}
   if (!qseq) return KS_err("Aktif sequence efekt motorunda bulunamadı.");
-  var applied = 0, skippedComponents = 0, appliedParams = 0, missing = [];
+  var applied = 0, skippedComponents = 0, appliedParams = 0, missing = [], engines = [];
 
   for (var si = 0; si < selected.length; si++) {
     var loc = selected[si];
     var qclip = null;
-    try { qclip = qseq.getVideoTrackAt(loc.track).getItemAt(loc.index); } catch (eClip) {}
+    qclip = KS_packFindQClip(qseq, loc);
     if (!qclip) { skippedComponents += data.components.length; continue; }
     var clipChanged = false;
     for (var ci = 0; ci < data.components.length; ci++) {
@@ -691,9 +813,13 @@ function KS_applyPackedPresetData(data, opts) {
           if (missing.length < 5) missing.push(cdef.displayName || cdef.matchName);
           continue;
         }
-        component = KS_packComponent(loc.clip, cdef.matchName, cdef.displayName, beforeMatches);
+        component = KS_packWaitForComponent(loc.clip, cdef.matchName, cdef.displayName, beforeMatches);
       }
       if (!component) { skippedComponents++; continue; }
+      var engineName = String(cdef.displayName || cdef.matchName || "Efekt");
+      var engineSeen = false;
+      for (var ei = 0; ei < engines.length; ei++) if (engines[ei] === engineName) { engineSeen = true; break; }
+      if (!engineSeen && engines.length < 8) engines.push(engineName);
       var componentChanged = false;
       for (var pi = 0; pi < cdef.params.length; pi++) {
         var prop = KS_packProperty(component, cdef.params[pi]);
@@ -715,6 +841,7 @@ function KS_applyPackedPresetData(data, opts) {
     applied: applied,
     skippedComponents: skippedComponents,
     appliedParams: appliedParams,
+    engines: engines,
     preset: String(data.name || "Suflo Smooth")
   });
 }
@@ -765,8 +892,10 @@ function KS_autoZoom(encoded) {
       var start = Number(clip.start.seconds) || 0;
       var end = Number(clip.end.seconds) || start;
       if (end - start < 0.2) { skipped++; continue; }
-      var base = KS_presetNumberValue(props.scale, 100);
-      var pos0 = KS_presetPositionValue(props.position);
+      var sourceStart = 0;
+      try { sourceStart = Number(clip.inPoint.seconds) || 0; } catch (eSourceStart) {}
+      var base = KS_presetNumberValueAt(props.scale, sourceStart, 100);
+      var pos0 = KS_presetPositionValueAt(props.position, sourceStart);
       var normalized = pos0 && Math.abs(pos0[0]) <= 2.5 && Math.abs(pos0[1]) <= 2.5;
       var sx = (ax - 0.5) * (normalized ? 1 : frameW);
       var sy = (ay - 0.5) * (normalized ? 1 : frameH);
@@ -796,7 +925,7 @@ function KS_autoZoom(encoded) {
       if (ok) applied++; else skipped++;
     }
     if (!applied) return KS_err("Secili klipte Motion > Scale ozelligi bulunamadi.");
-    return KS_ok({ applied: applied, skipped: skipped, keyCount: keys.length, removedKeys: KS_presetRemovedCount });
+    return KS_ok({ applied: applied, skipped: skipped, keyCount: keys.length, removedKeys: KS_presetRemovedCount, engine: "Motion > Scale" });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1561,7 +1690,7 @@ function KS_placeGraphic(encoded) {
     } catch (eD) {
       try { sure = clip.end.seconds - clip.start.seconds; } catch (eD2) {}
     }
-    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure, sesSilindi: sesSilindi });
+    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1608,6 +1737,167 @@ function KS_placeMogrt(encoded) {
     var sure = 0;
     try { sure = clip.end.seconds - clip.start.seconds; } catch (eS) {}
     return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
+  } catch (e) { return KS_err(e); }
+}
+
+/* ---------- Stil Katmani: yerel MOGRT altyazi sablonlari ---------- */
+
+function KS_captionMogrtTextProp(component) {
+  if (!component || !component.properties) return null;
+  var props = component.properties;
+  var names = ["Text", "Source Text", "Edit Text 01 - Text", "Title", "Subtitle"];
+  if (props.getParamForDisplayName) {
+    for (var ni = 0; ni < names.length; ni++) {
+      try {
+        var byName = props.getParamForDisplayName(names[ni]);
+        if (byName) return byName;
+      } catch (eName) {}
+    }
+  }
+  var count = 0;
+  try { count = Number(props.numItems) || Number(props.numProperties) || 0; } catch (eCount) {}
+  for (var i = 0; i < count; i++) {
+    var prop = props[i];
+    var display = "";
+    try { display = String(prop.displayName || ""); } catch (eDisplay) {}
+    if (/(?:^|\s)(?:source\s+)?text(?:$|\s)|altyaz|subtitle|title/i.test(display)) return prop;
+    // AE MOGRT metin kontrolleri getValue() ile JSON metin belgesi verir.
+    try {
+      var raw = prop.getValue();
+      if (typeof raw === "string" && /"(?:textEditValue|mTextParam)"\s*:/.test(raw)) return prop;
+    } catch (eValue) {}
+  }
+  return null;
+}
+
+function KS_captionMogrtTextFromValue(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value !== "string") return String(value);
+  if (!/^\s*\{/.test(value)) return value;
+  try {
+    var obj = KJSON.parse(value);
+    if (obj.textEditValue !== undefined) return String(obj.textEditValue);
+    if (obj.mTextParam !== undefined) return String(obj.mTextParam);
+    if (obj.value && obj.value.strDB && obj.value.strDB.length) return String(obj.value.strDB[0].str || "");
+  } catch (e) {}
+  return value;
+}
+
+function KS_captionMogrtSetText(prop, text) {
+  if (!prop) return false;
+  var raw = null;
+  try { raw = prop.getValue(); } catch (eGet) {}
+  var value = String(text || "").replace(/\r?\n/g, "\r");
+  var payload = value;
+  if (typeof raw === "string" && /^\s*\{/.test(raw)) {
+    try {
+      var obj = KJSON.parse(raw);
+      if (obj.textEditValue !== undefined) obj.textEditValue = value;
+      else if (obj.mTextParam !== undefined) obj.mTextParam = value;
+      else obj.textEditValue = value;
+      if (obj.fontTextRunLength !== undefined) obj.fontTextRunLength = [value.length];
+      if (obj.fontTextRunStart !== undefined) obj.fontTextRunStart = [0];
+      payload = KJSON.stringify(obj);
+    } catch (eJson) { payload = value; }
+  }
+  try { prop.setValue(payload, true); } catch (eSet) { return false; }
+  try { if (typeof $ !== "undefined" && $.sleep) $.sleep(45); } catch (eSleep) {}
+  try {
+    var actual = KS_captionMogrtTextFromValue(prop.getValue());
+    return String(actual).replace(/\r?\n/g, "\r") === value;
+  } catch (eVerify) { return true; }
+}
+
+function KS_prepareCaptionMogrt(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var f = new File(String(p.path || ""));
+    if (!f.exists || !/\.mogrt$/i.test(f.name)) return KS_err("Altyazi MOGRT sablonu bulunamadi.");
+    var start = Math.max(0, Number(p.start) || 0);
+    var end = Math.max(start + .05, Number(p.end) || start + .05);
+    var idx = KS_findFreeVideoTrack(seq, start, end);
+    var yeni = false;
+    if (idx < 0 && KS_addTopVideoTrack()) {
+      seq = app.project.activeSequence;
+      idx = KS_findFreeVideoTrack(seq, start, end);
+      yeni = idx >= 0;
+    }
+    if (idx < 0) return KS_err("Altyazilar icin bos video katmani acilamadi.");
+    return KS_ok({ track: idx, trackName: "V" + (idx + 1), newTrack: yeni });
+  } catch (e) { return KS_err(e); }
+}
+
+function KS_placeCaptionMogrt(encoded) {
+  var clip = null;
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var f = new File(String(p.path || ""));
+    if (!f.exists) return KS_err("Altyazi MOGRT sablonu bulunamadi.");
+    var track = Number(p.track);
+    if (!isFinite(track) || track < 0 || track >= seq.videoTracks.numTracks) return KS_err("Altyazi video katmani bulunamadi.");
+    var start = Math.max(0, Number(p.start) || 0);
+    var end = Math.max(start + .05, Number(p.end) || start + .05);
+    if (!KS_trackFreeIn(seq.videoTracks[track], start, end)) return KS_err("Altyazi katmaninda bu zaman araligi dolu.");
+
+    var at = new Time();
+    at.seconds = start;
+    try { clip = seq.importMGT(f.fsName, at.ticks, track, 0); } catch (eImport) {}
+    if (!clip) return KS_err("MOGRT timeline'a yerlestirilemedi.");
+
+    var batch = String(p.batch || "").replace(/[^a-z0-9_-]/ig, "").slice(0, 40);
+    try { clip.name = "Suflo Caption · " + batch; } catch (eName) {}
+    var component = null;
+    for (var wait = 0; wait < 8 && !component; wait++) {
+      try { component = clip.getMGTComponent(); } catch (eMgt) {}
+      if (!component) try { if (typeof $ !== "undefined" && $.sleep) $.sleep(55); } catch (eWait) {}
+    }
+    if (!component) throw new Error("Bu sablonun duzenlenebilir metin kontrolu Premiere'e acilmadi.");
+    var textProp = KS_captionMogrtTextProp(component);
+    if (!textProp) throw new Error("Sablonda 'Text' kontrolu bulunamadi.");
+    if (!KS_captionMogrtSetText(textProp, String(p.text || ""))) throw new Error("MOGRT altyazi metni dogrulanamadi.");
+
+    var until = new Time();
+    until.seconds = end;
+    try { clip.end = until; } catch (eEnd) {}
+    var actualEnd = 0;
+    try { actualEnd = Number(clip.end.seconds) || 0; } catch (eActual) {}
+    if (Math.abs(actualEnd - end) > .08) {
+      // Bazi surumler end atamasini ilk karede yutuyor; bir kez daha dene.
+      try { clip.end = until; } catch (eEnd2) {}
+      try { actualEnd = Number(clip.end.seconds) || 0; } catch (eActual2) {}
+    }
+    if (Math.abs(actualEnd - end) > .08) throw new Error("MOGRT suresi altyazi zamanina kirpilamadi.");
+
+    return KS_ok({ track: track, trackName: "V" + (track + 1), start: start, end: actualEnd, text: String(p.text || "") });
+  } catch (e) {
+    try { if (clip) clip.remove(0, 0); } catch (eRemove) {}
+    return KS_err(e);
+  }
+}
+
+function KS_removeCaptionMogrtBatch(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var batch = String(p.batch || "").replace(/[^a-z0-9_-]/ig, "").slice(0, 40);
+    var prefix = "Suflo Caption · " + batch;
+    var removed = 0;
+    for (var ti = 0; ti < seq.videoTracks.numTracks; ti++) {
+      var tr = seq.videoTracks[ti];
+      for (var ci = tr.clips.numItems - 1; ci >= 0; ci--) {
+        try {
+          if (String(tr.clips[ci].name || "") !== prefix) continue;
+          tr.clips[ci].remove(0, 0);
+          removed++;
+        } catch (eClip) {}
+      }
+    }
+    return KS_ok({ removed: removed });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1680,6 +1970,6 @@ function KS_placeMotionBG(encoded) {
     var sesSilindi = KS_removeLinkedAudio(seq, f.fsName, start);
     var sure = 0;
     try { sure = placed.end.seconds - placed.start.seconds; } catch (eS) {}
-    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure });
+    return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure, sesSilindi: sesSilindi });
   } catch (e) { return KS_err(e); }
 }

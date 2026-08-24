@@ -234,7 +234,7 @@ window.KPresets = (function () {
     if (busy) return;
     if (typeof Pro !== "undefined" && !Pro.gate("presets")) return;
     busy = preset.id;
-    if (card) card.classList.add("busy");
+    setApplyBusy(card, true);
     try {
       var result = await K.call("KS_applyMotionPreset", {
         id: preset.id,
@@ -249,7 +249,7 @@ window.KPresets = (function () {
       KApp.toast("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
       busy = "";
-      if (card) card.classList.remove("busy");
+      setApplyBusy(card, false);
     }
   }
 
@@ -258,7 +258,7 @@ window.KPresets = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("presets")) return;
     if (!preset.direct) { installPack(PACKS[0], card, true); return; }
     busy = preset.id;
-    if (card) card.classList.add("busy");
+    setApplyBusy(card, true);
     try {
       if (!K.nodeOK || !K.fs || !K.path || !K.settingsPath) throw new Error("Preset çalışma alanı açılamadı.");
       var settingsFile = K.settingsPath();
@@ -294,7 +294,24 @@ window.KPresets = (function () {
       KApp.toast("✕ " + (e && e.message ? e.message : e), "bad", 8000);
     } finally {
       busy = "";
-      if (card) card.classList.remove("busy");
+      setApplyBusy(card, false);
+    }
+  }
+
+  function setApplyBusy(card, active) {
+    if (!card) return;
+    var button = card.querySelector(".preset-apply");
+    var label = button && button.querySelector("span");
+    card.classList.toggle("busy", !!active);
+    if (!button) return;
+    button.disabled = !!active;
+    button.setAttribute("aria-busy", active ? "true" : "false");
+    if (!label) return;
+    if (active) {
+      if (!label.getAttribute("data-idle-label")) label.setAttribute("data-idle-label", label.textContent || "UYGULA");
+      label.textContent = "UYGULANIYOR…";
+    } else {
+      label.textContent = label.getAttribute("data-idle-label") || "UYGULA";
     }
   }
 

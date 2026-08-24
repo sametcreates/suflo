@@ -20,33 +20,57 @@ window.KSfx = (function () {
   var busyPath = null;
   var smartMode = false;
   var smartCues = [];
+  var smartDensity = "balanced";
   var showcaseFolders = [];
+  var currentItem = null;
+  var waveformPeaks = [];
+  var waveformToken = 0;
 
   // Dosya adlarinda hem Turkce hem yaygin Ingilizce paket adlari aranir.
   // Kurallar yerelde calisir; transkript veya dosya adlari hicbir yere gitmez.
   var SMART_RULES = [
+    { id: "money", label: "Para", priority: 12,
+      match: /\b(para|fiyat|tl|dolar|euro|kazanc|kazanç|satın|satin|maliyet|ucuz|pahali|pahalı|money|price|cash|sale)\b/i,
+      terms: ["cash", "coin", "money", "register", "bling", "success", "ding"] },
     { id: "alert", label: "Dikkat", priority: 10,
       match: /\b(dikkat|uyari|sakın|sakin|onemli|önemli|warning|careful|attention)\b/i,
       terms: ["alert", "warning", "alarm", "impact", "hit", "uyari", "dikkat"] },
     { id: "success", label: "Sonuç", priority: 9,
       match: /\b(sonuc|sonuç|tamam|bitti|basardik|başardık|kazandik|kazandık|success|done|final|result)\b/i,
       terms: ["success", "win", "complete", "positive", "ding", "sonuc", "final"] },
+    { id: "surprise", label: "Şaşkınlık", priority: 9,
+      match: /\b(inanilmaz|inanılmaz|sasirdi|şaşırdı|sok|şok|vay|oha|wow|amazing|unbelievable|surprise)\b/i,
+      terms: ["surprise", "wow", "shock", "boing", "pop", "impact"] },
+    { id: "negative", label: "Olumsuz", priority: 9,
+      match: /\b(hata|yanlis|yanlış|kotu|kötü|kaybet|olmaz|hayir|hayır|fail|error|wrong|bad|lose|nope)\b/i,
+      terms: ["fail", "error", "wrong", "negative", "buzzer", "down", "sad"] },
     { id: "transition", label: "Geçiş", priority: 8,
       match: /\b(ama|fakat|ancak|oysa|simdi|şimdi|sonra|but|however|now|next|then)\b/i,
       terms: ["whoosh", "swoosh", "swish", "transition", "wipe", "gecis", "geçiş"] },
     { id: "reveal", label: "Göster", priority: 7,
       match: /\b(bak|iste|işte|gor|gör|goster|göster|look|watch|here|show|reveal)\b/i,
       terms: ["pop", "reveal", "click", "bubble", "pluck", "goster", "göster"] },
+    { id: "tech", label: "Teknoloji", priority: 7,
+      match: /\b(ai|yapay zeka|uygulama|program|telefon|bilgisayar|site|internet|teknoloji|app|software|computer|digital|tech)\b/i,
+      terms: ["digital", "tech", "ui", "click", "beep", "glitch", "notification"] },
     { id: "number", label: "Madde", priority: 6,
       match: /\b(birinci|ikinci|ucuncu|üçüncü|1\.?|2\.?|3\.?|first|second|third)\b/i,
       terms: ["tick", "click", "tap", "beep", "ui", "pop"] },
     { id: "question", label: "Soru", priority: 5,
       match: /\?\s*$/,
       terms: ["question", "curious", "notification", "pluck", "pop", "hmm"] },
+    { id: "speed", label: "Hareket", priority: 5,
+      match: /\b(hizli|hızlı|kos|koş|git|gel|gecis|geçiş|hareket|fast|speed|run|move|go)\b/i,
+      terms: ["whoosh", "swoosh", "swish", "fast", "speed", "passby"] },
+    { id: "time", label: "Zaman", priority: 5,
+      match: /\b(zaman|saniye|dakika|bugun|bugün|yarin|yarın|saat|time|second|minute|today|tomorrow)\b/i,
+      terms: ["clock", "tick", "timer", "beep", "click"] },
     { id: "emphasis", label: "Vurgu", priority: 4,
       match: /!\s*$/,
       terms: ["impact", "hit", "boom", "punch", "pop", "accent"] }
   ];
+  var SMART_SCENE_RULE = { id: "scene", label: "Sahne geçişi", priority: 6,
+    terms: ["whoosh", "swoosh", "transition", "riser", "sweep"] };
 
   var PLAY_SVG = '<svg viewBox="0 0 12 12"><path d="M2.5 1.5 L10.5 6 L2.5 10.5 Z" fill="currentColor"/></svg>';
   var STOP_SVG = '<svg viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="1.5" fill="currentColor"/></svg>';
@@ -327,8 +351,8 @@ window.KSfx = (function () {
     return null;
   }
 
-  function bestForRule(rule, used) {
-    var best = null, bestScore = 0;
+  function rankForRule(rule, used, limit) {
+    var ranked = [];
     var fav = favlar(), recent = sonlar();
     index.forEach(function (item) {
       var h = item.smartHay || fold(item.hay);
@@ -340,30 +364,45 @@ window.KSfx = (function () {
       if (fav.indexOf(item.path) !== -1) sc += 3;
       var ri = recent.indexOf(item.path); if (ri !== -1) sc += Math.max(0, 2 - ri / 10);
       if (used && used[norm(item.path)]) sc -= 2;
-      if (sc > bestScore) { bestScore = sc; best = item; }
+      if (sc > 0) ranked.push({ item: item, score: sc });
     });
-    return best;
+    ranked.sort(function (a, b) { return b.score - a.score || a.item.name.localeCompare(b.item.name); });
+    return ranked.slice(0, limit || 3);
   }
 
-  function smartSuggestions(segments) {
+  function smartSuggestions(segments, options) {
+    options = options || {};
+    var density = options.density || smartDensity || "balanced";
+    var minGap = density === "energetic" ? .62 : (density === "soft" ? 2.3 : 1.05);
+    var maxCues = density === "energetic" ? 28 : (density === "soft" ? 8 : 16);
     var cues = [], used = {};
-    (segments || []).forEach(function (seg) {
+    var ordered = (segments || []).slice().sort(function (a, b) { return Number(a.start) - Number(b.start); });
+    var previous = null;
+    ordered.forEach(function (seg) {
       var text = String(seg && seg.text || "").trim();
       if (!text) return;
       var rule = ruleFor(text);
-      if (!rule) return;
       var time = Math.max(0, Number(seg.start) || 0);
-      var item = bestForRule(rule, used);
-      var cue = { time: time, end: Number(seg.end) || time, text: text, rule: rule, item: item };
+      var pause = previous ? time - Math.max(Number(previous.end) || 0, Number(previous.start) || 0) : 0;
+      if (!rule && density !== "soft" && pause > (density === "energetic" ? .72 : 1.05)) rule = SMART_SCENE_RULE;
+      previous = seg;
+      if (!rule || (density === "soft" && rule.priority < 7)) return;
+      var ranked = rankForRule(rule, used, 3);
+      var item = ranked.length ? ranked[0].item : null;
+      var cue = {
+        time: time, end: Number(seg.end) || time, text: text, rule: rule, item: item,
+        alternatives: ranked.map(function (entry) { return entry.item; }),
+        confidence: ranked.length ? Math.min(99, Math.round(48 + ranked[0].score * 3.4)) : 0
+      };
       var last = cues.length ? cues[cues.length - 1] : null;
-      if (last && time - last.time < 0.8) {
+      if (last && time - last.time < minGap) {
         if (rule.priority > last.rule.priority) cues[cues.length - 1] = cue;
         return;
       }
       cues.push(cue);
       if (item) used[norm(item.path)] = 1;
     });
-    return cues.slice(0, 16);
+    return cues.slice(0, maxCues);
   }
 
   function timeText(sec) {
@@ -378,7 +417,7 @@ window.KSfx = (function () {
     box.innerHTML = "";
     var ready = smartCues.filter(function (c) { return !!c.item; }).length;
     if (status) status.textContent = smartCues.length
-      ? smartCues.length + " vurgu · " + ready + " eşleşen ses"
+      ? smartCues.length + " vurgu · " + ready + " eşleşen ses · yerel analiz"
       : "Bu altyazıda belirgin bir vurgu noktası bulunamadı.";
     if (!smartCues.length) {
       box.innerHTML = '<div class="sfx-smart-empty">“Ama”, “şimdi”, “dikkat”, “sonuç” gibi anlatım dönüşleri ve !/? işaretleri öneri üretir.</div>';
@@ -399,6 +438,12 @@ window.KSfx = (function () {
       body.className = "sfx-smart-body";
       var title = document.createElement("b");
       title.textContent = cue.rule.label + (cue.item ? " · " + cue.item.name : "");
+      if (cue.confidence) {
+        var confidence = document.createElement("span");
+        confidence.className = "sfx-smart-confidence";
+        confidence.textContent = "%" + cue.confidence;
+        title.appendChild(confidence);
+      }
       var quote = document.createElement("small");
       quote.textContent = "“" + cue.text.slice(0, 88) + (cue.text.length > 88 ? "…" : "") + "”";
       body.appendChild(title); body.appendChild(quote);
@@ -409,6 +454,23 @@ window.KSfx = (function () {
         play.innerHTML = playingPath === cue.item.path ? STOP_SVG : PLAY_SVG;
         play.title = "Ön dinle";
         play.onclick = function () { preview(cue.item); };
+        if (cue.alternatives && cue.alternatives.length > 1) {
+          var alternatives = document.createElement("select");
+          alternatives.className = "sfx-smart-alternatives";
+          alternatives.title = "Alternatif ses seç";
+          cue.alternatives.forEach(function (candidate, alternativeIndex) {
+            var option = document.createElement("option");
+            option.value = String(alternativeIndex);
+            option.textContent = alternativeIndex ? "Alternatif · " + candidate.name : "En iyi · " + candidate.name;
+            alternatives.appendChild(option);
+          });
+          alternatives.onchange = function () {
+            cue.item = cue.alternatives[Number(this.value)] || cue.item;
+            smartRender();
+            preview(cue.item);
+          };
+          body.appendChild(alternatives);
+        }
         var add = document.createElement("button");
         add.className = "sfx-add";
         add.textContent = busyPath === cue.item.path ? "Ekleniyor…" : "Bu ana ekle";
@@ -428,6 +490,31 @@ window.KSfx = (function () {
     box.appendChild(frag);
   }
 
+  async function insertAllSmart() {
+    if (busyPath || !proGate()) return;
+    var ready = smartCues.filter(function (cue) { return !!cue.item; });
+    if (!ready.length) { KApp.toast("Eklenecek eşleşen ses yok", "bad"); return; }
+    busyPath = "__smart_batch__";
+    var button = el("sfx-smart-add-all");
+    if (button) { button.disabled = true; button.textContent = "Ekleniyor 0/" + ready.length; }
+    var added = 0;
+    try {
+      for (var i = 0; i < ready.length; i++) {
+        if (button) button.textContent = "Ekleniyor " + (i + 1) + "/" + ready.length;
+        var cue = ready[i];
+        var result = await K.call("KS_insertSfx", { path: cue.item.path, name: cue.item.name, time: cue.time }, 60000);
+        if (result && result.ok) added++;
+      }
+      KApp.toast(added + " Smart SFX timeline'a eklendi", added === ready.length ? "good" : "bad");
+    } catch (e) {
+      KApp.toast("Smart SFX toplu ekleme durdu: " + (e && e.message ? e.message : e), "bad");
+    } finally {
+      busyPath = null;
+      if (button) { button.disabled = false; button.textContent = "Hazırları ekle"; }
+      redraw();
+    }
+  }
+
   function showSmart() {
     if (!proGate()) return;
     var segs = window.KCaptions && KCaptions.getSegments ? KCaptions.getSegments() : [];
@@ -435,7 +522,7 @@ window.KSfx = (function () {
       KApp.toast("Önce Altyazı sekmesinde bir transkript oluştur", "bad");
       return;
     }
-    smartCues = smartSuggestions(segs);
+    smartCues = smartSuggestions(segs, { density: smartDensity });
     smartMode = true;
     el("sfx-smart-panel").hidden = false;
     el("sfx-list").hidden = true;
@@ -571,10 +658,92 @@ window.KSfx = (function () {
   function redraw() {
     renderList();
     if (smartMode) smartRender();
+    updatePlayer();
+  }
+
+  function fallbackPeaks(seedText) {
+    var seed = 17;
+    String(seedText || "suflo").split("").forEach(function (char) { seed = (seed * 31 + char.charCodeAt(0)) >>> 0; });
+    var out = [];
+    for (var i = 0; i < 96; i++) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      var envelope = Math.sin(Math.PI * (i + 1) / 97);
+      out.push(.13 + ((seed >>> 8) % 800) / 1000 * (.55 + envelope * .35));
+    }
+    return out;
+  }
+
+  function drawWaveform() {
+    var canvas = el("sfx-waveform");
+    if (!canvas || !canvas.getContext) return;
+    var ratio = window.devicePixelRatio || 1;
+    var cssWidth = Math.max(180, canvas.clientWidth || 420), cssHeight = Math.max(34, canvas.clientHeight || 58);
+    var width = Math.round(cssWidth * ratio), height = Math.round(cssHeight * ratio);
+    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    var ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, width, height);
+    var peaks = waveformPeaks.length ? waveformPeaks : fallbackPeaks(currentItem && currentItem.name);
+    var progress = audio.duration && isFinite(audio.duration) ? Math.max(0, Math.min(1, audio.currentTime / audio.duration)) : 0;
+    var bars = Math.min(peaks.length, Math.max(28, Math.floor(cssWidth / 4.5)));
+    var gap = 2 * ratio, barW = Math.max(1.3 * ratio, (width - gap * (bars - 1)) / bars);
+    for (var i = 0; i < bars; i++) {
+      var pi = Math.min(peaks.length - 1, Math.floor(i / bars * peaks.length));
+      var amplitude = Math.max(.08, Math.min(1, peaks[pi] || 0));
+      var barH = Math.max(2 * ratio, amplitude * height * .82);
+      var x = i * (barW + gap), y = (height - barH) / 2;
+      ctx.fillStyle = i / bars <= progress ? "#8f8cff" : "rgba(255,255,255,.18)";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, barW, barH, barW / 2);
+      else ctx.rect(x, y, barW, barH);
+      ctx.fill();
+    }
+  }
+
+  function decodeWaveform(item) {
+    var token = ++waveformToken;
+    waveformPeaks = fallbackPeaks(item && item.name);
+    drawWaveform();
+    if (!item || !K.nodeOK || !K.fs) return;
+    try {
+      var file = K.fs.readFileSync(item.path);
+      if (!file || file.length > 32 * 1024 * 1024) return;
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      var copy = new Uint8Array(file.length);
+      for (var bi = 0; bi < file.length; bi++) copy[bi] = file[bi];
+      var context = new AudioCtx();
+      context.decodeAudioData(copy.buffer, function (decoded) {
+        if (token !== waveformToken || !decoded || !decoded.length) { try { context.close(); } catch (e0) {} return; }
+        var channel = decoded.getChannelData(0), count = 120, block = Math.max(1, Math.floor(channel.length / count)), peaks = [];
+        for (var i = 0; i < count; i++) {
+          var start = i * block, end = Math.min(channel.length, start + block), peak = 0;
+          var step = Math.max(1, Math.floor((end - start) / 180));
+          for (var j = start; j < end; j += step) peak = Math.max(peak, Math.abs(channel[j] || 0));
+          peaks.push(Math.min(1, peak * 1.35));
+        }
+        waveformPeaks = peaks;
+        drawWaveform();
+        try { context.close(); } catch (e1) {}
+      }, function () { try { context.close(); } catch (e2) {} });
+    } catch (e) {}
+  }
+
+  function updatePlayer() {
+    var player = el("sfx-player");
+    if (!player) return;
+    player.hidden = !currentItem;
+    if (!currentItem) return;
+    var name = el("sfx-player-name"), folder = el("sfx-player-folder"), toggle = el("sfx-player-toggle"), time = el("sfx-player-time");
+    if (name) name.textContent = currentItem.name;
+    if (folder) folder.textContent = currentItem.folder + (currentItem.collection !== currentItem.folder ? " · " + currentItem.collection : "");
+    if (toggle) { toggle.textContent = playingPath === currentItem.path && !audio.paused ? "■" : "▶"; toggle.title = playingPath === currentItem.path && !audio.paused ? "Durdur" : "Ön dinle"; }
+    if (time) time.textContent = timeText(audio.currentTime) + " / " + timeText(audio.duration || 0);
+    drawWaveform();
   }
 
   function preview(item) {
     if (!proGate()) return;
+    currentItem = item;
     if (playingPath === item.path) {
       audio.pause();
       playingPath = null;
@@ -584,6 +753,7 @@ window.KSfx = (function () {
     audio.pause();
     audio.src = fileUrl(item.path);
     audio.currentTime = 0;
+    decodeWaveform(item);
     audio.onloadedmetadata = function () {
       if (audio.duration && isFinite(audio.duration)) {
         var d = audio.duration;
@@ -591,10 +761,11 @@ window.KSfx = (function () {
         redraw();
       }
     };
+    audio.ontimeupdate = updatePlayer;
     audio.play().catch(function () { KApp.toast("Önizleme açılamadı: " + item.name, "bad"); });
     playingPath = item.path;
     redraw();
-    audio.onended = function () { playingPath = null; redraw(); };
+    audio.onended = function () { playingPath = null; audio.currentTime = 0; redraw(); };
   }
 
   /* ---------------- Aksiyonlar ---------------- */
@@ -695,6 +866,21 @@ window.KSfx = (function () {
     el("sfx-yenile").addEventListener("click", buildIndex);
     el("sfx-smart-btn").addEventListener("click", function () { if (smartMode) closeSmart(); else showSmart(); });
     el("sfx-smart-close").addEventListener("click", closeSmart);
+    el("sfx-smart-add-all").addEventListener("click", insertAllSmart);
+    el("sfx-smart-density").addEventListener("change", function () {
+      smartDensity = this.value || "balanced";
+      var segs = window.KCaptions && KCaptions.getSegments ? KCaptions.getSegments() : [];
+      smartCues = smartSuggestions(segs, { density: smartDensity });
+      smartRender();
+    });
+    el("sfx-player-toggle").addEventListener("click", function () { if (currentItem) preview(currentItem); });
+    el("sfx-player-add").addEventListener("click", function () { if (currentItem) insert(currentItem); });
+    el("sfx-waveform").addEventListener("click", function (event) {
+      if (!currentItem || !audio.duration || !isFinite(audio.duration)) return;
+      var rect = this.getBoundingClientRect();
+      audio.currentTime = Math.max(0, Math.min(audio.duration, (event.clientX - rect.left) / Math.max(1, rect.width) * audio.duration));
+      updatePlayer();
+    });
     el("sfx-folder-back").addEventListener("click", function () {
       folderMode = "all";
       search(el("sfx-search").value);

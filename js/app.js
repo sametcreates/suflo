@@ -284,8 +284,6 @@ window.KApp = (function () {
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
     // SFX satirinin kendi ky-kilit rozeti var; ikinci bir ::after rozeti ekleme.
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
-    // Stil katmani gorunur; ucretsiz kullanici kartlari deneyip cikti aninda Pro'ya gecebilir.
-    Pro.markLocked(el("cap-overlay"), !s.pro);
     Pro.markLocked(el("cap-translate-go"), !s.pro);
     Array.prototype.forEach.call(document.querySelectorAll("[data-kilit]"), function (badge) {
       badge.hidden = !!s.pro;

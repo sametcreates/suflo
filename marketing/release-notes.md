@@ -1,3 +1,31 @@
+## Suflo 2.9.1 — Creator Studio, Suflo Doctor ve güvenilir Pro araçları
+
+- Arayüz baştan sona daha sakin, minimal ve marka moruna uyumlu bir **Creator Studio** diline geçirildi; dar Premiere panellerinde ikon rayına dönüşerek yatay taşmayı önlüyor.
+- Yeni **Suflo Doctor**; Premiere bağlantısını, FFmpeg'i, yerel motor/modeli, GPU'yu, Pro içeriklerini ve kütüphaneleri tek taramada denetliyor, güvenli onarım seçenekleri sunuyor.
+- **Smart SFX 2.0**; Sade/Dengeli/Enerjik yoğunluk, güven puanı, üç alternatif, toplu timeline ekleme ve sarılabilir gerçek dalga önizlemesi getiriyor.
+- **Auto Zoom**, altyazıdaki cümle dönüşleri, duraklamalar, sayılar ve vurgulardan AutoCut benzeri karar noktaları çıkarıyor; hızlandırılmış ve yavaşlatılmış kliplerin timeline süresini doğru kullanıyor.
+- Stil Motoru v3'e gerçek katman ve hareket üreten **Creator Punch**, **CapCut Clean** ve **SaaS Glass** eklendi; gömülü Türkçe fontlarla render hattında doğrulandı.
+- Premiere'in yerel Graphic Templates klasöründeki Captioneer altyazıları ayrı ve açıkça **Pro** işaretli **Altyazı Şablonları** bölümünde tutuluyor. Ücretsiz kullanıcılar şablonları görebiliyor; timeline'a ekleme lisans kapısından geçiyor.
+- Premiere'de hata veren eski `Subtitle 01–05` kalıntıları Suflo kütüphanesinde gösterilmiyor; gerçek Captioneer 16:9, 9:16 ve 1:1 şablonları korunuyor.
+- Karışıklık yaratan **Stil Katmanı** bölümü ve eski katman uygulama düğmesi Altyazı ekranından kaldırıldı. Düzenlenebilir Premiere caption izi için tek ve net **Sekansa uygula** akışı kaldı.
+- Büyük `.prfpset` efektlerinde değişmeyen değerler tekrar yazılmıyor ve Effect Controls paneli yalnız son anahtar karede yenileniyor. İlk uygulamada dakikalar süren bekleme kaldırıldı; motor yalnız doğruladığı klip ve parametreler için başarı bildiriyor.
+
+## Suflo 2.9.0 — Creator Studio
+
+- Arayüz baştan sona daha sakin, minimal ve marka moruna uyumlu bir **Apple tarzı creator studio** diline geçirildi; 560 px altındaki Premiere panellerinde ikon rayına dönüşerek yatay taşmayı önlüyor.
+- Altyazı Stil Motoru v3'e gerçek katman ve hareket üreten **Creator Punch**, **CapCut Clean** ve **SaaS Glass** eklendi. Yedi stilin tamamı gömülü Türkçe fontlarla gerçek libass render hattında doğrulandı.
+- Premiere'in yerel Graphic Templates klasörü otomatik taranıyor; kurulu Captioneer altyazı MOGRT'ları taşınmadan **Altyazı Şablonları** bölümünde görünür. Logo, yorum, lower third, liste, ikon ve podcast şablonları artık yanlışlıkla Yazı Animasyonları'na düşmüyor.
+- **Smart SFX 2.0**, daha geniş anlamsal vurgu kuralları, Sade/Dengeli/Enerjik yoğunluk, güven puanı, üç alternatif, toplu timeline ekleme ve sarılabilir gerçek dalga önizlemesi getiriyor. Analiz yerelde kalıyor.
+- **Auto Zoom**, altyazıdaki cümle dönüşleri, duraklamalar, sayılar ve vurgulardan AutoCut benzeri karar noktaları çıkarıyor; hızlandırılmış/yavaşlatılmış kliplerde timeline süresini doğru kullanıyor.
+- `.prfpset` motoru `AE.` matchName farklarını ve normal timeline/QE klip dizini kaymalarını gideriyor; efekt Premiere tarafından listenin arasına eklense bile doğru bileşeni bulup yalnız gerçek parametre yazıldıysa başarı bildiriyor.
+
+## Suflo 2.8.7 — Suflo Doctor
+
+- Yeni **Suflo Doctor**, Premiere bağlantısını, FFmpeg'i, yerel motor/modeli, GPU'yu, Pro içerikleri, gerçek `.prfpset` paketini ve tüm kütüphaneleri tek taramada kontrol eder.
+- Eksik FFmpeg/motor, yarım Pro eşitlemesi ve artık bulunamayan harici klasör bağlantıları için güvenli tek tık onarım sunar; timeline'a ve medya dosyalarına dokunmaz.
+- Pro manifestindeki her dosyanın varlığı ve boyutu denetlenir; preset paketi açılarak efekt sayısı ile doğrudan/uyumluluk modları doğrulanır.
+- 2.8.6'da grafik/emoji yerleştirmesine yanlışlıkla taşınan Motion BG dönüş alanı düzeltildi; Motion BG artık kaldırdığı bağlı ses sayısını panele doğru bildirir.
+
 ## Suflo 2.8.6 — Motion BG ses düzeltmesi
 
 - **Düzeltildi:** Motion BG eklerken kaynak videonun **ses izi de timeline'a düşüyordu.** Motion BG görsel bir katmandır — artık yalnızca görüntü eklenir, bağlı ses klibi otomatik temizlenir.

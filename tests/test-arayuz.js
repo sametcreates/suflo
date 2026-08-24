@@ -74,12 +74,15 @@ DOSYALAR.forEach(function (d) {
 ok("korumasiz addEventListener hedefleri markup'ta var",
   korumasiz.length === 0, korumasiz.length ? korumasiz.join(" | ") : "tamam");
 
+ok("Stil Katmani arayuzden kaldirildi",
+  /class="card stil-katmani-card" hidden aria-hidden="true"/.test(html) &&
+  !/id="cap-overlay"/.test(html));
+
 /* ---------- 4) Vazgeçilmez öğeler: silinirse ürün işlevini kaybeder ---------- */
 
 var ZORUNLU = {
   "cap-go": "Altyazı oluştur düğmesi",
   "cap-apply": "Sekansa uygula",
-  "cap-overlay": "Stilli katman olarak ekle",
   "cap-save": "Dışa aktar",
   "cap-segments": "Altyazı listesi",
   "cap-lang": "Dil seçimi",
@@ -109,8 +112,9 @@ var ZORUNLU = {
   "emoji-assets-grid": "Emoji Assets kartları",
   "emoji-assets-search": "Emoji Assets arama",
   "set-emoji-assets-klasor": "Emoji Assets klasör ayarı",
-  "set-library-health-run": "Kütüphane sağlık kontrolü",
-  "set-library-health-result": "Kütüphane sağlık raporu",
+  "set-library-health-run": "Suflo Doctor taraması",
+  "set-doctor-fix-all": "Suflo Doctor güvenli onarım",
+  "set-library-health-result": "Suflo Doctor raporu",
   "set-prosync-run": "Pro içeriklerini otomatik eşitle",
   "set-prosync-status": "Pro içerik eşitleme durumu",
   "custom-sayac": "Diğer Animasyonlar sayacı",

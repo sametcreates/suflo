@@ -70,8 +70,10 @@ function FakeTime() { this.seconds = 0; }
 function FakeProp(value) {
   this.value = value;
   this.keys = [];
+  this.keyUi = [];
 }
 FakeProp.prototype.getValue = function () { return this.value; };
+FakeProp.prototype.setValue = function (value, updateUI) { this.value = value; this.valueUi = updateUI; };
 FakeProp.prototype.setTimeVarying = function (value) { this.timeVarying = value; };
 FakeProp.prototype.removeKeyRange = function (start, end) {
   this.keys = this.keys.filter(function (key) { return key.time < start.seconds || key.time > end.seconds; });
@@ -80,8 +82,8 @@ FakeProp.prototype.removeKey = function (time) {
   this.keys = this.keys.filter(function (key) { return Math.abs(key.time - time.seconds) > .0001; });
 };
 FakeProp.prototype.addKey = function () {};
-FakeProp.prototype.setValueAtKey = function (time, value) { this.keys.push({ time: time.seconds, value: value }); };
-FakeProp.prototype.setInterpolationTypeAtKey = function () {};
+FakeProp.prototype.setValueAtKey = function (time, value, updateUI) { this.keys.push({ time: time.seconds, value: value }); this.keyUi.push(updateUI); };
+FakeProp.prototype.setInterpolationTypeAtKey = function (time, type, updateUI) { this.interpolationUi = updateUI; };
 FakeProp.prototype.areKeyframesSupported = function () { return true; };
 FakeProp.prototype.getKeys = function () { return this.keys.map(function (key) { return { seconds: key.time }; }); };
 
@@ -163,16 +165,22 @@ var empty = apply("simple-zoom-in", .45, 1);
 ok("secim yoksa anlasilir hata doner", empty.ok === false && /en az bir video klibi/.test(empty.error), JSON.stringify(empty));
 
 var blur = prop("ADBE Gaussian Blur 2-0001", "Blurriness", 0);
-var blurComponent = { matchName: "AE.ADBE Gaussian Blur 2", displayName: "Gaussian Blur", properties: list([blur]) };
-var qeClip = { addVideoEffect: function () {
+// Premiere bazi surumlerde component.matchName'deki "AE." on ekini dusurur.
+var blurComponent = { matchName: "ADBE Gaussian Blur 2", displayName: "Gaussian Blur", properties: list([blur]) };
+var qeClip = { start: { seconds: 12 }, end: { seconds: 17 }, addVideoEffect: function () {
   // Premiere Essential Graphics kliplerinde yeni standart efekti listenin
   // sonuna degil, mevcut ozel bileşenlerin onune yerlestirebilir.
   for (var at = clip.components.numItems; at > 1; at--) clip.components[at] = clip.components[at - 1];
   clip.components[1] = blurComponent;
   clip.components.numItems++;
 } };
+var wrongQeClip = { start: { seconds: 2 }, end: { seconds: 4 }, addVideoEffect: function () { throw new Error("yanlis klip"); } };
+var qeTrack = {
+  numItems: 2,
+  getItemAt: function (index) { return index === 0 ? wrongQeClip : qeClip; }
+};
 hostCtx.qe = { project: {
-  getActiveSequence: function () { return { getVideoTrackAt: function () { return { getItemAt: function () { return qeClip; } }; } }; },
+  getActiveSequence: function () { return { getVideoTrackAt: function () { return qeTrack; } }; },
   getVideoEffectByName: function (name) { return name === "Gaussian Blur" || name === "AE.ADBE Gaussian Blur 2" ? { name: name } : null; }
 } };
 selected = [clip];
@@ -184,18 +192,35 @@ ok("prfpset karti QE ile efekti ekleyip secili klibe uygular", packed.ok && pack
 ok("Premiere efekti listenin arasina koysa da yeni bileşen bulunur",
   clip.components[1] === blurComponent && blur.keys.length === 2,
   JSON.stringify({ count: clip.components.numItems, keys: blur.keys }));
+ok("QE klip dizini normal timeline'dan kaysa bile baslangic bitis ile dogru klip bulunur",
+  blur.keys.length === 2 && wrongQeClip !== qeClip, JSON.stringify(blur.keys));
+ok("AE. on eki farkli olsa da efekt component'i eslesir",
+  hostCtx.KS_packNormMatchName("AE.ADBE Gaussian Blur 2") === hostCtx.KS_packNormMatchName(blurComponent.matchName),
+  blurComponent.matchName);
 ok("paket anahtarlari klibin kaynak araligina yerlestirilir",
   blur.keys.length === 2 && blur.keys[0].time === 37 && blur.keys[1].time === 37.5 && blur.keys[0].value === 25,
   JSON.stringify(blur.keys));
+ok("buyuk presetlerde Effect Controls yalniz son anahtarda yenilenir",
+  blur.keyUi.length === 2 && blur.keyUi[0] === false && blur.keyUi[1] === true && blur.interpolationUi === false,
+  JSON.stringify({ keyUi: blur.keyUi, interpolationUi: blur.interpolationUi }));
 var colorProp = new FakeProp(0);
-colorProp.setColorValue = function (a, r, g, b) { this.color = [a, r, g, b]; };
+colorProp.setColorValue = function (a, r, g, b, updateUI) { this.color = [a, r, g, b]; this.colorUi = updateUI; };
 colorProp.getColorValue = function () { return this.color; };
 var colorApplied = hostCtx.KS_packSetParam(colorProp,
   { direct: true, current: 0, color: [255, 0, 240, 255], keys: [] },
   { type: 0, anchorIn: 0, anchorOut: 1 }, clip, 1);
 ok("renk parametresi setValue yerine Premiere setColorValue API'siyle uygulanir",
-  colorApplied && JSON.stringify(colorProp.color) === JSON.stringify([255, 0, 240, 255]),
-  JSON.stringify(colorProp.color));
+  colorApplied && JSON.stringify(colorProp.color) === JSON.stringify([255, 0, 240, 255]) && colorProp.colorUi === false,
+  JSON.stringify({ color: colorProp.color, updateUI: colorProp.colorUi }));
+var staticProp = new FakeProp(40);
+var staticApplied = hostCtx.KS_packSetParam(staticProp,
+  { direct: true, current: 80, keys: [] }, { type: 0, anchorIn: 0, anchorOut: 1 }, clip, 1);
+ok("sabit preset degeri tek seferde ve arayuz yenilemeden yazilir",
+  staticApplied && staticProp.value === 80 && staticProp.valueUi === false,
+  JSON.stringify({ value: staticProp.value, updateUI: staticProp.valueUi }));
+ok("zaten ayni olan sabit deger tekrar yazilmaz",
+  hostCtx.KS_packSetParam(staticProp, { direct: true, current: 80, keys: [] },
+    { type: 0, anchorIn: 0, anchorOut: 1 }, clip, 1) === false);
 
 var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 var src = fs.readFileSync(path.join(ROOT, "js", "presets.js"), "utf8");
@@ -207,6 +232,8 @@ ok("prfpset okuyucu preset betiginden once yuklenir",
   html.indexOf('js/preset-pack.js') !== -1 && html.indexOf('js/preset-pack.js') < html.indexOf('js/presets.js'));
 ok("Preset paketi standart kartlarda dogrudan motoru, ozel veride gercek import rehberini acar",
   /KS_applyPackedPreset/.test(src) && /Import Presets/.test(src) && /Dosyayı göster/.test(src) && /ProSync\.sync/.test(src) && !/preset paketi uygulandı/i.test(src));
+ok("Uzun Premiere islemi boyunca kart UYGULANIYOR durumunu ve aria-busy bilgisini gosterir",
+  /UYGULANIYOR…/.test(src) && /aria-busy/.test(src) && /button\.disabled = !!active/.test(src));
 
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

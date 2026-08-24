@@ -1,7 +1,7 @@
 /*
- * Suflo Stil Motoru v2
+ * Suflo Stil Motoru v3
  *
- * Dört preset yalnız renk/font değiştirmez. Her biri kendi kelime kurgusunu,
+ * Yedi preset yalnız renk/font değiştirmez. Her biri kendi kelime kurgusunu,
  * kompozisyonunu, arka plan katmanlarını ve hareket ritmini üretir. Motor DOM'a
  * ve Premiere'e bağımlı değildir; zamanlı cue'lardan katmanlı ASS döndürür.
  */
@@ -13,6 +13,27 @@
   "use strict";
 
   var STYLES = {
+    mrbeast: {
+      id: "mrbeast", name: "Creator Punch", description: "Kalın creator vurgusu ve punch ritmi",
+      text: { maxlen: "k1", kase: "upper", punct: false },
+      style: { aile: "mrbeast", yogunluk: "hard", font: "Archivo Black", fontFile: "ArchivoBlack.ttf",
+        boyut: 132, renk: "#ffffff", konturRenk: "#05070b", vurguRenk: "#ffe342",
+        kontur: 9, konum: 5, kutu: false, animasyon: "mrbeast" }
+    },
+    capcut: {
+      id: "capcut", name: "CapCut Clean", description: "Temiz kelime vurgusu ve kompakt pill",
+      text: { maxlen: "k1", kase: "normal", punct: false },
+      style: { aile: "capcut", yogunluk: "balanced", font: "Montserrat", fontFile: "Montserrat.ttf",
+        boyut: 78, renk: "#ffffff", konturRenk: "#07090d", vurguRenk: "#b8ff5a",
+        kontur: 1, konum: 5, kutu: true, animasyon: "capcut" }
+    },
+    saas: {
+      id: "saas", name: "SaaS Glass", description: "Apple sadeliginde cam altyazi sistemi",
+      text: { maxlen: "k1", kase: "normal", punct: true },
+      style: { aile: "saas", yogunluk: "soft", font: "Montserrat", fontFile: "Montserrat.ttf",
+        boyut: 66, renk: "#f8f9ff", konturRenk: "#090a0f", vurguRenk: "#a9a7ff",
+        kontur: 0, konum: 5, kutu: true, animasyon: "saas" }
+    },
     viral: {
       id: "viral", name: "Viral Vurgu", description: "Katmanlı creator tipografisi",
       text: { maxlen: "k1", kase: "upper", punct: false },
@@ -121,6 +142,9 @@
     if (pos === 8) return { an: 8, x: Math.round(width / 2), y: Math.round(height * 0.22) };
     if (pos === 2) return { an: 2, x: Math.round(width / 2), y: Math.round(height * 0.84) };
     if (pos === 1) return { an: 1, x: Math.round(width * 0.085), y: Math.round(height * 0.855) };
+    if (id === "mrbeast") return { an: 5, x: Math.round(width / 2), y: Math.round(height * 0.64) };
+    if (id === "capcut") return { an: 5, x: Math.round(width / 2), y: Math.round(height * 0.72) };
+    if (id === "saas") return { an: 5, x: Math.round(width / 2), y: Math.round(height * 0.76) };
     if (id === "viral") return { an: 5, x: Math.round(width / 2), y: Math.round(height * 0.67) };
     if (id === "pop") return { an: 5, x: Math.round(width / 2), y: Math.round(height * 0.56) };
     if (id === "premium") return { an: 5, x: Math.round(width / 2), y: Math.round(height * 0.61) };
@@ -130,7 +154,7 @@
   function styleLine(style, id, height) {
     var size = scaled(style.boyut, height);
     var outline = scaled(style.kontur || 0, height);
-    var spacing = id === "premium" ? scaled(5, height) : id === "doc" ? scaled(0.6, height) : 0;
+    var spacing = id === "premium" ? scaled(5, height) : id === "saas" ? scaled(.8, height) : id === "doc" ? scaled(0.6, height) : 0;
     return "Style: Suflo," + style.font + "," + size + "," + assColor(style.renk) + "," +
       assColor(style.renk) + "," + assColor(style.konturRenk) + "," + assColor("#000000", 0x80) +
       ",-1,0,0,0,100,100," + spacing + ",0,1," + outline + ",0," + (style.konum || 5) + ",90,90,70,1";
@@ -138,7 +162,7 @@
 
   function header(style, id, width, height) {
     return [
-      "[Script Info]", "; Suflo Stil Motoru v2", "ScriptType: v4.00+", "WrapStyle: 2",
+      "[Script Info]", "; Suflo Stil Motoru v3", "ScriptType: v4.00+", "WrapStyle: 2",
       "ScaledBorderAndShadow: yes", "YCbCr Matrix: None", "PlayResX: " + width, "PlayResY: " + height, "",
       "[V4+ Styles]",
       "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
@@ -230,6 +254,99 @@
         events.push(dialogue(4, cue.start, activeEnd, baseTag + "\\1c" + assColor(style.renk) +
           "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad" + Math.max(1, scaled(2, height)) + "}" +
           viralMarkup(group, index, style, fs)));
+      });
+    });
+    return events;
+  }
+
+  function renderMrBeast(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "mrbeast", width, height);
+    var fs = scaled(style.boyut, height), outline = Math.max(3, scaled(style.kontur, height));
+    groupWords(cues, 3).forEach(function (group) {
+      var end = group[group.length - 1].end;
+      group.forEach(function (cue, active) {
+        var activeEnd = active + 1 < group.length ? group[active + 1].start : end;
+        activeEnd = Math.max(cue.start + .08, activeEnd);
+        var ms = Math.round(112 / factor), over = Math.round(108 + factor * 3);
+        var motion = "\\fscx92\\fscy92\\t(0," + ms + ",0.38,\\fscx" + over + "\\fscy" + over + ")" +
+          "\\t(" + ms + "," + (ms + 85) + ",0.78,\\fscx100\\fscy100)";
+        var tag = "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" + motion;
+        var plain = viralPlain(group);
+        // Creator kartlarindaki mavi derinlik ikinci bir metin katmanidir;
+        // yalniz outline/shadow degildir, bu nedenle gercek sahnede okunur.
+        events.push(dialogue(1, cue.start, activeEnd, tag + "\\1c" + assColor("#2f8cff") +
+          "\\3c" + assColor("#05070b") + "\\bord" + outline + "\\shad" + scaled(6, height) +
+          "\\xshad" + scaled(7, height) + "\\yshad" + scaled(8, height) + "}" + plain));
+        events.push(dialogue(2, cue.start, activeEnd, tag + "\\1c" + assColor(style.renk) +
+          "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad" + Math.max(1, scaled(2, height)) + "}" +
+          viralMarkup(group, active, style, fs)));
+        var underlineW = Math.max(fs * 1.2, Math.min(width * .28, String(cue.text).length * fs * .54));
+        events.push(dialogue(3, cue.start, activeEnd, shape(a.x - underlineW / 2, a.y + fs * .78,
+          style.vurguRenk, 0x00, roundedRect(underlineW, Math.max(3, fs * .075), fs * .035),
+          "\\fscx0\\t(0," + ms + ",0.55,\\fscx100)\\fad(0,70)")));
+      });
+    });
+    return events;
+  }
+
+  function renderCapCut(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "capcut", width, height);
+    var fs = scaled(style.boyut, height), outline = Math.max(1, scaled(style.kontur, height));
+    groupWords(cues, 4).forEach(function (group) {
+      var start = group[0].start, end = group[group.length - 1].end;
+      var twoLines = group.length >= 3;
+      var firstLine = group.slice(0, twoLines ? 2 : group.length).map(function (cue) { return String(cue.text); }).join(" ");
+      var secondLine = twoLines ? group.slice(2).map(function (cue) { return String(cue.text); }).join(" ") : "";
+      var lineChars = Math.max(firstLine.length, secondLine.length);
+      var panelW = Math.min(width * .76, Math.max(width * .3, fs * (lineChars * .62 + 1.8)));
+      var panelH = fs * (twoLines ? 2.45 : 1.48), left = a.x - panelW / 2, top = a.y - panelH / 2;
+      var ms = Math.round(180 / factor), panel = roundedRect(panelW, panelH, fs * .38);
+      events.push(dialogue(0, start, end, shape(left + scaled(4, height), top + scaled(7, height), "#000000", 0x4a,
+        panel, "\\fad(" + ms + ",130)")));
+      events.push(dialogue(1, start, end, shape(left, top, "#090b10", 0x24,
+        panel, "\\fscy92\\t(0," + ms + ",0.62,\\fscy100)\\fad(" + ms + ",130)")));
+      group.forEach(function (cue, active) {
+        var activeEnd = active + 1 < group.length ? group[active + 1].start : end;
+        activeEnd = Math.max(cue.start + .08, activeEnd);
+        var motion = "\\fscx98\\fscy98\\t(0," + Math.round(95 / factor) + ",0.45,\\fscx102\\fscy102)" +
+          "\\t(" + Math.round(95 / factor) + ",180,0.8,\\fscx100\\fscy100)";
+        events.push(dialogue(2, cue.start, activeEnd, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs +
+          "\\q2" + motion + "\\1c" + assColor(style.renk) + "\\3c" + assColor(style.konturRenk) +
+          "\\bord" + outline + "}" + viralMarkup(group, active, style, fs)));
+      });
+    });
+    return events;
+  }
+
+  function renderSaas(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "saas", width, height);
+    var fs = scaled(style.boyut, height);
+    groupWords(cues, 6).forEach(function (group) {
+      var start = group[0].start, end = group[group.length - 1].end;
+      var twoLines = group.length >= 3;
+      var firstLine = group.slice(0, twoLines ? 2 : group.length).map(function (cue) { return String(cue.text); }).join(" ");
+      var secondLine = twoLines ? group.slice(2).map(function (cue) { return String(cue.text); }).join(" ") : "";
+      var lineChars = Math.max(firstLine.length, secondLine.length);
+      var panelW = Math.min(width * .78, Math.max(width * .36, fs * (lineChars * .6 + 2.4)));
+      var panelH = fs * (twoLines ? 2.48 : 1.58), left = a.x - panelW / 2, top = a.y - panelH / 2;
+      var radius = fs * .42, ms = Math.round(260 / factor), panel = roundedRect(panelW, panelH, radius);
+      events.push(dialogue(0, start, end, shape(left + scaled(4, height), top + scaled(8, height), "#000000", 0x58,
+        panel, "\\blur1.2\\fad(" + ms + ",220)")));
+      // Dis cizgi + cam dolgu iki ayri vektor katmanidir.
+      events.push(dialogue(1, start, end, shape(left - scaled(1, height), top - scaled(1, height), "#ffffff", 0xb4,
+        roundedRect(panelW + scaled(2, height), panelH + scaled(2, height), radius + scaled(1, height)),
+        "\\fscy94\\t(0," + ms + ",0.62,\\fscy100)\\fad(" + ms + ",220)")));
+      events.push(dialogue(2, start, end, shape(left, top, "#161822", 0x28, panel,
+        "\\fscy94\\t(0," + ms + ",0.62,\\fscy100)\\fad(" + ms + ",220)")));
+      events.push(dialogue(3, start, end, shape(left + fs * .42, a.y - fs * .065, style.vurguRenk, 0x00,
+        roundedRect(fs * .13, fs * .13, fs * .065), "\\fad(" + ms + ",220)")));
+      group.forEach(function (cue, active) {
+        var activeEnd = active + 1 < group.length ? group[active + 1].start : end;
+        activeEnd = Math.max(cue.start + .08, activeEnd);
+        var textX = a.x + fs * .16;
+        events.push(dialogue(4, cue.start, activeEnd, "{\\an5\\move(" + Math.round(textX) + "," + Math.round(a.y + scaled(8, height)) + "," +
+          Math.round(textX) + "," + Math.round(a.y) + ",0," + Math.round(150 / factor) + ")\\fs" + fs + "\\q2" +
+          "\\1c" + assColor(style.renk) + "\\bord0\\shad0\\fad(70,150)}" + viralMarkup(group, active, style, fs)));
       });
     });
     return events;
@@ -365,14 +482,17 @@
     var cues = normaliseCues(options.cues, options.offset);
     var factor = intensity(options.intensity || style.yogunluk);
     var events;
-    if (id === "pop") events = renderPop(cues, style, width, height, factor);
+    if (id === "mrbeast") events = renderMrBeast(cues, style, width, height, factor);
+    else if (id === "capcut") events = renderCapCut(cues, style, width, height, factor);
+    else if (id === "saas") events = renderSaas(cues, style, width, height, factor);
+    else if (id === "pop") events = renderPop(cues, style, width, height, factor);
     else if (id === "doc") events = renderDoc(cues, style, width, height, factor);
     else if (id === "premium") events = renderPremium(cues, style, width, height, factor);
     else events = renderViral(cues, style, width, height, factor);
 
     return {
       id: id,
-      version: 2,
+      version: 3,
       style: clone(style),
       fontFiles: [style.fontFile],
       ass: header(style, id, width, height).concat(events).join("\n") + "\n",
@@ -381,7 +501,7 @@
   }
 
   return {
-    version: 2,
+    version: 3,
     preset: preset,
     list: list,
     compile: compile,

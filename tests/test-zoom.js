@@ -22,6 +22,31 @@ chk("orten/sirasiz sessizlikler birlesir", (function () {
   return s.length === 3 && Math.abs(s[1].start - 8) < 0.001 && Math.abs(s[1].end - 10) < 0.001;
 })());
 
+/* ---- AutoCut tarzi akilli karar noktasi ---- */
+var akilli = Z.akilliNoktalar({
+  dur: 24,
+  offset: 100,
+  interval: 5,
+  cues: [
+    { start: 100.2, end: 101.2, text: "Bugün edit hızını konuşuyoruz." },
+    { start: 103.1, end: 104.0, text: "Ama asıl fark burada!" },
+    { start: 108.6, end: 109.4, text: "İkinci adım çok önemli." },
+    { start: 115.2, end: 116.0, text: "ŞİMDİ SONUCA BAK!" }
+  ]
+});
+chk("akilli mod klip baslangicini sifira esler", akilli.length && akilli[0].time === 0, akilli);
+chk("akilli mod cumle donusu ve vurguyu yakalar", akilli.some(function (p) {
+  return p.time > 2.5 && p.time < 3.5 && (p.reason === "turn" || p.reason === "emphasis");
+}) && akilli.some(function (p) { return p.time > 14.5 && p.time < 15.8; }), akilli);
+chk("akilli noktalar timeline suresini asmaz", akilli.every(function (p) { return p.time >= 0 && p.time < 23.88; }), akilli);
+
+var akilliPlan = Z.plan({ dur: 24, points: akilli, mode: "smart", intensity: .12, speed: .45 });
+chk("yeterli cumle verisinde smart mod korunur", akilliPlan.mode === "smart" && akilliPlan.toggles >= 3, akilliPlan);
+
+var ritimDoldur = Z.akilliNoktalar({ dur: 32, interval: 5, cues: [] });
+chk("altyazi yoksa uzun plani kontrollu ritimle doldurur",
+  ritimDoldur.length >= 4 && ritimDoldur.every(function (p, i) { return i === 0 || p.time - ritimDoldur[i - 1].time >= 4.9; }), ritimDoldur);
+
 /* ---- konusma modu plani ---- */
 var p = Z.plan({
   dur: 60,

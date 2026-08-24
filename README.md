@@ -12,7 +12,7 @@ Suflo konuşmayı izlenebilir kurguya çevirir. Seçili klipten, In–Out aralı
 transkript çıkarır; panelin içinde düzenlersin; caption izi olarak uygular ya da SRT/VTT/ASS/TXT
 olarak dışa aktarırsın. Emoji Assets (yerel klasörün veya bağlı Suflo Cloud kataloğu) ücretsizdir.
 Pro katmanında sessizlik kesme, ritim marker'ları, panelden seçili klibe uygulanan 12 Motion preseti + 278 efektlik Suflo Smooth kataloğu ve otomatik güncellenen 262 MOGRT + 1.076 SFX + 30 Motion BG kütüphanesi
-ve altyazıdan Akıllı SFX önerileri bulunur.
+ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 
 | Ne | Nasıl |
 |---|---|
@@ -63,7 +63,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL) |
 |---|---|
 | Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Bağımsız Stil Motoru ve şeffaf video katmanı |
-| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Viral Vurgu · Pop · Belgesel · Premium stil aileleri |
+| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Creator Punch · CapCut Clean · SaaS Glass dahil Stil Motoru v3 |
 | Düz stiller | Otomatik kesim (sessizlik temizleme) |
 | SRT · WebVTT · TXT dışa aktarım | Ritim/beat marker'ları |
 | SRT/VTT içe aktarım | Toplu çoklu klip transkripsiyonu |
@@ -71,7 +71,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | Terim sözlüğü |
 | Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Panelden uygulanan 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 1.076 SFX ve 30 Motion BG |
-| — | Altyazıdan Akıllı SFX önerileri |
+| — | Smart SFX 2.0: yoğunluk, güven puanı, alternatifler, toplu ekleme ve dalga önizlemesi |
 | — | Kütüphane sağlık kontrolü ve destek raporu |
 
 Abonelikli veya kredi tabanlı kurgu panellerinin aksine Suflo Pro'da sayaç ve otomatik yenileme yok — bir kez öde, bitti.

@@ -12,6 +12,10 @@ window.KCaptions = (function () {
   var scope = "clip";  // clip | inout | entire
   var trackSel = {};   // ses katmanı index -> seçili mi (varsayılan: true)
   var lastTrackCount = -1;
+  var mogrtStilleri = [];
+  var secilenMogrt = null;
+  var bekleyenMogrtYolu = "";
+  var mogrtBaglam = { width: 0, height: 0 };
 
   function el(id) { return document.getElementById(id); }
 
@@ -647,6 +651,9 @@ window.KCaptions = (function () {
   }
 
   var PRESETS = {
+    mrbeast: motorPreset("mrbeast"),
+    capcut: motorPreset("capcut"),
+    saas: motorPreset("saas"),
     viral: motorPreset("viral"),
     pop: motorPreset("pop"),
     doc: motorPreset("doc"),
@@ -740,6 +747,8 @@ window.KCaptions = (function () {
   function applyPreset(key) {
     var p = (key === "user") ? K.settings().userPreset : PRESETS[key];
     if (!p) return;
+    secilenMogrt = null;
+    bekleyenMogrtYolu = "";
     el("cap-maxlen").value = p.maxlen;
     el("cap-case").value = p.kase;
     el("cap-punct").checked = p.punct;
@@ -748,6 +757,7 @@ window.KCaptions = (function () {
     onizlemeDurdur();
     onizlemeCiz();
     stilKartiIsaretle(key);
+    uygulamaIpucunuGuncelle();
   }
 
   // Seçili kartı görsel olarak işaretle (stil elle değişince hiçbiri seçili kalmaz)
@@ -755,8 +765,132 @@ window.KCaptions = (function () {
     var grid = el("cap-stil-grid");
     if (!grid) return;
     Array.prototype.forEach.call(grid.querySelectorAll(".stil-sec"), function (b) {
-      b.classList.toggle("secili", b.dataset.preset === key);
+      var mogrtYolu = b.getAttribute("data-mogrt-path") || "";
+      b.classList.toggle("secili", mogrtYolu
+        ? !!(secilenMogrt && secilenMogrt.path === mogrtYolu)
+        : (!secilenMogrt && b.dataset.preset === key));
     });
+  }
+
+  function mogrtOrani(item) {
+    var hay = String((item && item.path) || "") + " " + String((item && item.display) || "");
+    if (/(?:Portrait|9[•x:._-]?16)/i.test(hay)) return "portrait";
+    if (/(?:Landscape|16[•x:._-]?9)/i.test(hay)) return "landscape";
+    if (/(?:Square|1[•x:._-]?1)/i.test(hay)) return "square";
+    return "unknown";
+  }
+
+  function sekansOrani() {
+    var w = Number(mogrtBaglam.width) || 0, h = Number(mogrtBaglam.height) || 0;
+    if (!w || !h) return "portrait";
+    var r = w / h;
+    return r > 1.2 ? "landscape" : (r < .82 ? "portrait" : "square");
+  }
+
+  function oranEtiketi(oran) {
+    return oran === "landscape" ? "16:9" : (oran === "square" ? "1:1" : "9:16");
+  }
+
+  function temizMogrtAdi(item) {
+    return String(item && item.display || "Altyazı Şablonu")
+      .replace(/^\s*(?:16[•x:._-]?9|9[•x:._-]?16|1[•x:._-]?1)\s*/i, "")
+      .replace(/\s+Subtitles?\s*$/i, "") || "Altyazı Şablonu";
+  }
+
+  function uygulamaIpucunuGuncelle() {
+    var hint = el("cap-apply-hint");
+    if (hint) hint.textContent = "Premiere'in düzenlenebilir caption izini oluşturur.";
+  }
+
+  function mogrtStiliniSec(item) {
+    secilenMogrt = item;
+    bekleyenMogrtYolu = "";
+    if (el("cap-style-family")) el("cap-style-family").value = "mogrt";
+    if (el("cap-preset")) el("cap-preset").value = "";
+    stilKartiIsaretle("");
+    uygulamaIpucunuGuncelle();
+    onizlemeDurdur();
+    onizlemeCiz();
+    savePrefs();
+  }
+
+  function mogrtStilleriniCiz() {
+    var grid = el("cap-stil-grid");
+    if (!grid) return;
+    Array.prototype.forEach.call(grid.querySelectorAll(".stil-mogrt-head,.stil-mogrt"), function (n) { n.remove(); });
+    var oran = sekansOrani();
+    var liste = mogrtStilleri.filter(function (item) {
+      var itemOran = mogrtOrani(item);
+      return itemOran === oran || itemOran === "unknown";
+    });
+    if (!liste.length) return;
+    liste.sort(function (a, b) { return temizMogrtAdi(a).localeCompare(temizMogrtAdi(b)); });
+
+    var head = document.createElement("div");
+    head.className = "stil-mogrt-head";
+    var headTitle = document.createElement("b");
+    headTitle.textContent = "Premiere Şablonları";
+    var headMeta = document.createElement("span");
+    headMeta.textContent = oranEtiketi(oran) + " · " + liste.length + " yerel stil";
+    head.appendChild(headTitle);
+    head.appendChild(headMeta);
+    grid.appendChild(head);
+
+    liste.forEach(function (item) {
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "stil-sec stil-mogrt";
+      card.setAttribute("data-mogrt-path", item.path);
+      card.setAttribute("aria-label", temizMogrtAdi(item) + " Premiere altyazı stilini seç");
+      var badge = document.createElement("span");
+      badge.className = "ss-rozet";
+      badge.textContent = "MOGRT";
+      var scene = document.createElement("span");
+      scene.className = "ss-sahne";
+      if (item.thumb) {
+        var img = document.createElement("img");
+        img.src = item.thumb;
+        img.alt = "";
+        scene.appendChild(img);
+      } else {
+        var fallback = document.createElement("span");
+        fallback.className = "stil-mogrt-fallback";
+        fallback.textContent = temizMogrtAdi(item);
+        scene.appendChild(fallback);
+      }
+      var info = document.createElement("span");
+      info.className = "ss-bilgi";
+      var title = document.createElement("b");
+      title.textContent = temizMogrtAdi(item);
+      var sub = document.createElement("i");
+      sub.textContent = "Premiere Graphic Template · gerçek animasyon";
+      info.appendChild(title);
+      info.appendChild(sub);
+      card.appendChild(badge);
+      card.appendChild(scene);
+      card.appendChild(info);
+      card.addEventListener("click", function () { mogrtStiliniSec(item); });
+      grid.appendChild(card);
+    });
+
+    if (bekleyenMogrtYolu) {
+      for (var i = 0; i < mogrtStilleri.length; i++) {
+        if (mogrtStilleri[i].path === bekleyenMogrtYolu) {
+          secilenMogrt = mogrtStilleri[i];
+          bekleyenMogrtYolu = "";
+          if (el("cap-style-family")) el("cap-style-family").value = "mogrt";
+          break;
+        }
+      }
+    }
+    stilKartiIsaretle(el("cap-preset") ? el("cap-preset").value : "");
+    uygulamaIpucunuGuncelle();
+    onizlemeCiz();
+  }
+
+  function refreshMogrtStyles(items) {
+    mogrtStilleri = (items || []).filter(function (item) { return item && item.path; });
+    mogrtStilleriniCiz();
   }
 
   function initStilKartlari() {
@@ -765,6 +899,8 @@ window.KCaptions = (function () {
     Array.prototype.forEach.call(grid.querySelectorAll(".stil-sec"), function (b) {
       b.addEventListener("click", function () {
         var key = b.dataset.preset;
+        secilenMogrt = null;
+        bekleyenMogrtYolu = "";
         if (el("cap-preset")) el("cap-preset").value = key;
         applyPreset(key);
         savePrefs();
@@ -883,6 +1019,7 @@ window.KCaptions = (function () {
       if (p.kase) el("cap-case").value = p.kase;
       if (p.punct !== undefined) el("cap-punct").checked = p.punct;
       if (p.preset !== undefined) el("cap-preset").value = p.preset;
+      bekleyenMogrtYolu = "";
       stiliYaz(p.stil);
     } catch (e) {}
   }
@@ -1856,6 +1993,8 @@ window.KCaptions = (function () {
       try { K.fs.unlinkSync(onizlemeRenderYol); } catch (e2) {}
       onizlemeRenderYol = null;
     }
+    var mogrtImg = el("cap-mogrt-onizleme");
+    if (mogrtImg) mogrtImg.hidden = true;
     var metin = el("cap-onizleme-metin");
     if (metin) metin.hidden = false;
     var not = el("cap-onizleme-not");
@@ -1868,6 +2007,20 @@ window.KCaptions = (function () {
     var sahne = el("cap-sahne");
     var kutu = el("cap-onizleme-metin");
     if (!sahne || !kutu) return;
+
+    var mogrtImg = el("cap-mogrt-onizleme");
+    if (secilenMogrt) {
+      kutu.hidden = true;
+      if (mogrtImg) {
+        if (secilenMogrt.thumb) mogrtImg.src = secilenMogrt.thumb;
+        mogrtImg.hidden = !secilenMogrt.thumb;
+      }
+      var mogrtNot = el("cap-onizleme-not");
+      if (mogrtNot) mogrtNot.textContent = temizMogrtAdi(secilenMogrt) + " · Premiere MOGRT önizlemesi";
+      return;
+    }
+    if (mogrtImg) mogrtImg.hidden = true;
+    kutu.hidden = false;
 
     var st = stil();
     var rec = stilRecetesi(st);
@@ -2016,6 +2169,9 @@ window.KCaptions = (function () {
     if (!cs.length) {
       if (st.aile === "doc") return [{ start: 0.15, end: 2.7, text: "Hikâyenin başladığı yer." }];
       var ornekler = st.aile === "pop" ? ["POP!", "ŞAK!", "VAY!"] :
+        st.aile === "mrbeast" ? ["BU", "FİKİR", "PATLADI"] :
+        st.aile === "capcut" ? ["daha", "hızlı", "edit"] :
+        st.aile === "saas" ? ["Sade", "hızlı", "profesyonel"] :
         st.aile === "premium" ? ["DAHA", "AZ", "DAHA", "İYİ"] : ["BUNU", "SAKIN", "KAÇIRMA"];
       return ornekler.map(function (k, i) {
         return { start: 0.15 + i * 0.68, end: 0.72 + i * 0.68, text: styleText(k) };
@@ -2033,7 +2189,7 @@ window.KCaptions = (function () {
 
   async function motorOnizlemeOynat() {
     var st = stil();
-    var destekli = { viral: true, pop: true, doc: true, premium: true };
+    var destekli = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
     if (!K.nodeOK || !window.SufloStyleEngine || !destekli[st.aile]) return false;
     var ff = await K.findFfmpeg();
     if (!ff) return false;
@@ -2113,8 +2269,28 @@ window.KCaptions = (function () {
       onizlemeCiz();
       return;
     }
+    if (secilenMogrt) {
+      var preview = secilenMogrt.previewVideo;
+      var mogrtImg = el("cap-mogrt-onizleme");
+      var mogrtNot = el("cap-onizleme-not");
+      var mogrtBtn = el("cap-onizleme-oynat");
+      if (!preview || !video) {
+        if (mogrtNot) mogrtNot.textContent = "Animasyon timeline'a eklendiğinde gerçek zamanlamasıyla oynar.";
+        return;
+      }
+      if (mogrtImg) mogrtImg.hidden = true;
+      var metin = el("cap-onizleme-metin");
+      if (metin) metin.hidden = true;
+      video.src = preview;
+      video.hidden = false;
+      video.loop = true;
+      video.play().catch(function () {});
+      if (mogrtBtn) mogrtBtn.textContent = "■ Durdur";
+      if (mogrtNot) mogrtNot.textContent = temizMogrtAdi(secilenMogrt) + " · gerçek MOGRT animasyonu";
+      return;
+    }
     var st = stil();
-    if (K.nodeOK && /^(viral|pop|doc|premium)$/.test(st.aile)) {
+    if (K.nodeOK && /^(mrbeast|capcut|saas|viral|pop|doc|premium)$/.test(st.aile)) {
       onizlemeRenderCalisiyor = true;
       motorOnizlemeOynat().then(function (ok) {
         onizlemeRenderCalisiyor = false;
@@ -2192,7 +2368,13 @@ window.KCaptions = (function () {
       doc:     { aile: "doc", maxWords: 9, spacing: 0.4, shadow: 0, boxAlpha: 0x2b,
                  boxPadding: 14, marginLR: 150, marginV: 82 },
       premium: { aile: "premium", maxWords: 4, spacing: 4, shadow: 3, boxAlpha: 0x40,
-                 boxPadding: 0, marginLR: 150, marginV: 74 }
+                 boxPadding: 0, marginLR: 150, marginV: 74 },
+      mrbeast: { aile: "mrbeast", maxWords: 3, spacing: 0, shadow: 7, boxAlpha: 0x40,
+                 boxPadding: 0, marginLR: 90, marginV: 72 },
+      capcut:  { aile: "capcut", maxWords: 4, spacing: 0, shadow: 1, boxAlpha: 0x24,
+                 boxPadding: 18, marginLR: 100, marginV: 80 },
+      saas:    { aile: "saas", maxWords: 6, spacing: 0.5, shadow: 0, boxAlpha: 0x28,
+                 boxPadding: 20, marginLR: 120, marginV: 86 }
     };
     return tumu[aile] || tumu.custom;
   }
@@ -2227,7 +2409,10 @@ window.KCaptions = (function () {
     viral:   { ad: "Viral vurgu",    kelimeli: true },
     pop:     { ad: "Pop",            kelimeli: true },
     bounce:  { ad: "Zıplama",        kelimeli: true },
-    premium: { ad: "Premium",        kelimeli: true }
+    premium: { ad: "Premium",        kelimeli: true },
+    mrbeast: { ad: "Creator Punch",  kelimeli: true },
+    capcut:  { ad: "CapCut Clean",   kelimeli: true },
+    saas:    { ad: "SaaS Glass",     kelimeli: true }
   };
 
   // Konuma göre satırın çapa noktası (slide animasyonunun \move hedefi)
@@ -2498,6 +2683,57 @@ window.KCaptions = (function () {
 
   /* ---------------- Animasyonlu altyazı: timeline'a overlay ---------------- */
 
+  function mogrtCueleri() {
+    var cs = cueler();
+    if (segmentsMode !== "k1" && segmentsMode !== "w") return cs;
+    return assKaraokeSatirlari(cs, 5).map(function (grup) {
+      return {
+        start: grup[0].start,
+        end: grup[grup.length - 1].end,
+        text: grup.map(function (cue) { return cue.text; }).join(" ")
+      };
+    });
+  }
+
+  async function mogrtStiliniUygula() {
+    if (!secilenMogrt || !secilenMogrt.path) throw new Error("Önce bir Premiere altyazı şablonu seç.");
+    if (!K.nodeOK || !K.fs || !K.fs.existsSync(secilenMogrt.path)) throw new Error("Seçili MOGRT dosyası artık bulunamıyor.");
+    var cs = mogrtCueleri();
+    if (!cs.length) throw new Error("Yazılacak altyazı yok.");
+    var batch = "cap-" + Date.now().toString(36);
+    var prep = await K.call("KS_prepareCaptionMogrt", {
+      path: secilenMogrt.path,
+      start: cs[0].start,
+      end: cs[cs.length - 1].end,
+      batch: batch
+    }, 30000);
+    if (!prep || !prep.ok) throw new Error(prep && prep.error ? prep.error : "Altyazı katmanı hazırlanamadı.");
+
+    var placed = 0;
+    try {
+      for (var i = 0; i < cs.length; i++) {
+        status("MOGRT altyazıları yerleştiriliyor… " + (i + 1) + " / " + cs.length);
+        var r = await K.call("KS_placeCaptionMogrt", {
+          path: secilenMogrt.path,
+          track: prep.track,
+          batch: batch,
+          start: cs[i].start,
+          end: cs[i].end,
+          text: cs[i].text
+        }, 60000);
+        if (!r || !r.ok) throw new Error((r && r.error ? r.error : "MOGRT altyazı yerleştirilemedi.") + " (satır " + (i + 1) + ")");
+        placed++;
+      }
+    } catch (e) {
+      status("Tamamlanamayan MOGRT altyazıları geri alınıyor…", "warn");
+      await K.call("KS_removeCaptionMogrtBatch", { batch: batch }, 30000);
+      throw e;
+    }
+    status("");
+    KApp.toast(placed + " altyazı · " + temizMogrtAdi(secilenMogrt) + " · " + prep.trackName, "good", 8000);
+    yildizIste();
+  }
+
   /*
    * Premiere'in caption izi kelime kelime vurgu yapamıyor (ExtendScript'ten
    * caption stiline erişim de yok). Bu yüzden altyazıyı ŞEFFAF bir video
@@ -2517,17 +2753,19 @@ window.KCaptions = (function () {
      * boş). Sessizce emojisiz render etmek kullanıcıyı "neden kayboldu" diye
      * bırakır; dürüst olan burada durup yol göstermek.
      */
-    if (emojiIceriyorMu()) {
+    if (!secilenMogrt && emojiIceriyorMu()) {
       status("Altyazıda emoji var. Stilli katman motoru emoji çizemiyor; " +
         "emojili altyazı için \"Sekansa uygula\"yı kullan (Premiere renkli çizer) " +
         "ya da emojileri kaldırıp tekrar dene.", "warn");
       return;
     }
-    var btn = el("cap-overlay");
-    if (btn) btn.disabled = true;
     var temizle = [];
 
     try {
+      if (secilenMogrt) {
+        await mogrtStiliniUygula();
+        return;
+      }
       status("Sekans bilgisi alınıyor…");
       var spec = await K.call("KS_overlaySpec", {});
       if (!spec.ok) throw new Error(spec.error);
@@ -2551,7 +2789,7 @@ window.KCaptions = (function () {
 
       var st = stil();
       var stilDerlemesi = null;
-      var yeniStiller = { viral: true, pop: true, doc: true, premium: true };
+      var yeniStiller = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
       var ass;
       if (window.SufloStyleEngine && yeniStiller[st.aile]) {
         stilDerlemesi = window.SufloStyleEngine.compile({
@@ -2641,7 +2879,6 @@ window.KCaptions = (function () {
       status("✕ " + K.hataYardimi(e), "bad");
     } finally {
       temizle.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
-      if (btn) btn.disabled = false;
     }
   }
 
@@ -3284,7 +3521,7 @@ window.KCaptions = (function () {
       } else if (fmt === "ass") {
         if (typeof Pro !== "undefined" && !Pro.gate("assexport")) return;    // Pro: stilli ASS
         var assStil = stil();
-        var yeniAss = { viral: true, pop: true, doc: true, premium: true };
+        var yeniAss = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
         if (window.SufloStyleEngine && yeniAss[assStil.aile]) {
           icerik = window.SufloStyleEngine.compile({
             styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler(),
@@ -3317,7 +3554,6 @@ window.KCaptions = (function () {
   function init() {
     el("cap-go").addEventListener("click", go);
     el("cap-apply").addEventListener("click", apply);
-    if (el("cap-overlay")) el("cap-overlay").addEventListener("click", overlayUygula);
     el("cap-save").addEventListener("click", saveAs);
     el("cap-import-srt").addEventListener("click", function (e) { e.preventDefault(); importSrt(); });
     el("cap-preset-save").addEventListener("click", saveUserPreset);
@@ -3344,6 +3580,8 @@ window.KCaptions = (function () {
       // renk seçicide "input" anlık, diğerlerinde "change" yeterli
       var olay = e.type === "color" ? "input" : "change";
       e.addEventListener(olay, function () {
+        secilenMogrt = null;
+        bekleyenMogrtYolu = "";
         onizlemeDurdur();
         vurguKutusuDurumu();     // animasyon değişince ipucu ve vurgu rengi durumu
         onizlemeCiz();
@@ -3351,6 +3589,7 @@ window.KCaptions = (function () {
         // stil elle değiştiyse artık hazır şablonda değiliz
         if (el("cap-preset")) el("cap-preset").value = "";
         stilKartiIsaretle("");
+        uygulamaIpucunuGuncelle();
       });
     });
     if (el("cap-onizleme-oynat")) el("cap-onizleme-oynat").addEventListener("click", onizlemeOynat);
@@ -3447,6 +3686,7 @@ window.KCaptions = (function () {
     vurguKutusuDurumu();
     onizlemeCiz();
     stilKartiIsaretle(el("cap-preset").value);
+    uygulamaIpucunuGuncelle();
 
     var sonSekans = null;
     KApp.onContext(function (ctx) {
@@ -3454,6 +3694,9 @@ window.KCaptions = (function () {
       if (ctx.sequence !== sonSekans) { sonSekans = ctx.sequence; uygulaEtiketiniSifirla(); }
       refreshButton();
       renderTracks(ctx);
+      var oncekiOran = sekansOrani();
+      mogrtBaglam = { width: Number(ctx.width) || 0, height: Number(ctx.height) || 0 };
+      if (oncekiOran !== sekansOrani()) mogrtStilleriniCiz();
     });
     refreshSetup();
   }
@@ -3471,6 +3714,7 @@ window.KCaptions = (function () {
     refreshSetup: refreshSetup,
     glossaryText: glossaryText,
     parseGlossary: parseGlossary,
-    getSegments: segmentsSnapshot
+    getSegments: segmentsSnapshot,
+    refreshMogrtStyles: function () {}
   };
 })();

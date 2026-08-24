@@ -16,7 +16,7 @@ window.KLib = (function () {
 
   var paketler = [];        // gercek paketler + ucretsiz kullanici icin Pro vitrin kartlari
   var arama = "";
-  var kategori = "mogrt";   // "mogrt" (Suflo Originals) | "custom" | "fav"
+  var kategori = "mogrt";   // "mogrt" | "captions" | "custom" | "buton" | "fav"
   var busyKart = null;
   var taraNo = 0;
 
@@ -50,6 +50,13 @@ window.KLib = (function () {
     try { if (K.fs.existsSync(alt) && K.fs.statSync(alt).isDirectory()) return alt; } catch (e) {}
     return pack;
   }
+  function adobeMogrtDir() {
+    // CEP USER_DATA/Kesit'in bir ustu Adobe'nin ortak kullanici veri klasorudur:
+    // Windows'ta AppData/Roaming, macOS'ta Library/Application Support.
+    if (!K.nodeOK || !K.fs || !K.path) return "";
+    var dir = K.path.join(K.path.dirname(kokDir()), "Adobe", "Common", "Motion Graphics Templates");
+    try { return K.fs.existsSync(dir) && K.fs.statSync(dir).isDirectory() ? dir : ""; } catch (e) { return ""; }
+  }
   function pathKey(p) { return String(p || "").replace(/\\/g, "/").toLowerCase(); }
 
   function mogrtNameKey(value) {
@@ -65,6 +72,27 @@ window.KLib = (function () {
   function textAnimationMi(relativePath) {
     var rel = String(relativePath || "").replace(/\\/g, "/");
     return /(^|\/)(?:Text Animations?|Text Effects?|Typewriter|Text MOGRT Collection)(?:\/|$)/i.test(rel);
+  }
+
+  function mogrtGrubu(ad, relativePath, sourceKind) {
+    var hay = String(relativePath || "").replace(/\\/g, "/") + " " + String(ad || "");
+    if (/^SUFLO\s+BUTON\b/i.test(ad)) return "buton";
+    if (sourceKind === "adobe" && /(?:^|\/)(?:Captioneer|Captions?(?: and)? Subtitles?)(?:\/|$)/i.test(hay)) return "caption";
+    if (/\b(?:subtitles?|captions?)\b/i.test(hay)) return "caption";
+    // Bir MOGRT metin kontrolu tasisa bile asil isi logo, yorum, lower third,
+    // liste, ikon veya sosyal arayuzse saf "Yazi Animasyonu" degildir.
+    if (/\b(?:icons?|speech bubble|thinking bubble|logo|lower[\s_-]*third|comments?|list elements?|podcast title|camera overlay|focus frame|shapes?|transition|electro|energy seamless|grid|magic sparks?)\b/i.test(hay)) return "other";
+    if (/^SUFLO\s+TEXT\b/i.test(ad) || textAnimationMi(relativePath)) return "text";
+    return "other";
+  }
+
+  function pathHash(value) {
+    var h = 2166136261, text = pathKey(value);
+    for (var i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = (h * 16777619) >>> 0;
+    }
+    return ("00000000" + h.toString(16)).slice(-8);
   }
 
   function builtinCatalog() {
@@ -149,15 +177,20 @@ window.KLib = (function () {
   async function thumbCikar(mogrtYolu, adSlug) {
     var hedefDir = K.path.join(cacheDir(), adSlug);
     var thumbYolu = K.path.join(hedefDir, "thumb.png");
-    if (K.fs.existsSync(thumbYolu)) return thumbYolu;
+    var videoYolu = K.path.join(hedefDir, "thumb.mp4");
+    if (K.fs.existsSync(thumbYolu)) {
+      return { thumb: thumbYolu, video: K.fs.existsSync(videoYolu) ? videoYolu : null };
+    }
     try {
       var tmpZip = K.path.join(cacheDir(), adSlug + ".zip");
       K.fs.copyFileSync(mogrtYolu, tmpZip);
       await K.unzip(tmpZip, hedefDir);
       try { K.fs.unlinkSync(tmpZip); } catch (e1) {}
-      if (K.fs.existsSync(thumbYolu)) return thumbYolu;
+      if (K.fs.existsSync(thumbYolu)) {
+        return { thumb: thumbYolu, video: K.fs.existsSync(videoYolu) ? videoYolu : null };
+      }
       var pngler = K.fs.readdirSync(hedefDir).filter(function (f) { return /\.png$/i.test(f); });
-      if (pngler.length) return K.path.join(hedefDir, pngler[0]);
+      if (pngler.length) return { thumb: K.path.join(hedefDir, pngler[0]), video: K.fs.existsSync(videoYolu) ? videoYolu : null };
     } catch (e) { K.log("[yazi] thumb cikarilamadi: " + adSlug + " — " + (e && e.message)); }
     return null;
   }
@@ -242,6 +275,14 @@ window.KLib = (function () {
     var proPackSet = {};
     proPackFiles.forEach(function (p) { proPackSet[pathKey(p)] = 1; });
     yollar = yollar.concat(proPackFiles);
+    // Premiere'in Graphic Templates paneline kurulmus kullanici MOGRT'lari.
+    // Dosyalar tasinmaz; Captioneer gibi yerel altyazi paketleri Suflo'da
+    // otomatik "Altyazi Sablonlari" bolumunde gorunur.
+    var adobeRoot = adobeMogrtDir();
+    var adobeFiles = topla(adobeRoot, 5000, 8);
+    var adobeSet = {};
+    adobeFiles.forEach(function (p) { adobeSet[pathKey(p)] = 1; });
+    yollar = yollar.concat(adobeFiles);
 
     // ayni gorunen ada sahip cift dosyalari tekle (Suflo Originals once gelir)
     var gorulen = {};
@@ -252,6 +293,12 @@ window.KLib = (function () {
       var ad = K.path.basename(tam2).replace(/\.mogrt$/i, "");
       var isBuiltin = !!builtinSet[pathKey(tam2)];
       var isPro = !isBuiltin && !!proPackSet[pathKey(tam2)];
+      var isAdobe = !isBuiltin && !isPro && !!adobeSet[pathKey(tam2)];
+      // Adobe ana klasorunde duran eski Subtitle 01-05 dosyalari Premiere'de
+      // hata veren, genellenmis kalintilar. Captioneer alt klasorundeki gercek
+      // sablonlara dokunmadan yalniz bu bes kok dosyayi Suflo'da gizle.
+      if (isAdobe && /^Subtitle\s+0[1-5]$/i.test(ad) &&
+          pathKey(K.path.dirname(tam2)) === pathKey(adobeRoot)) continue;
       var meta = isBuiltin ? catalog[K.path.basename(tam2).toLowerCase()] : null;
       // Vault'ta ayni Suflo Original farkli bir dosya adi/klasorle bulunabilir.
       // Katalogdaki kaynak adlari bu kopyalari yakalar; yerlesik kart tek kalir.
@@ -261,11 +308,11 @@ window.KLib = (function () {
       var uniqueKey = mogrtNameKey(display) || display.toLowerCase();
       if (gorulen[uniqueKey]) continue;
       gorulen[uniqueKey] = 1;
-      var slug = ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60) || ("paket-" + i);
+      var slug = (ad.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 52) || ("paket-" + i)) + "-" + pathHash(tam2);
       var relPath = !isBuiltin && ek ? tam2.slice(ek.length).replace(/^[\\\/]+/, "") : "";
       var relPro = isPro && proRoot ? tam2.slice(proRoot.length).replace(/^[\\\/]+/, "") : "";
-      var proText = isPro && (/^SUFLO\s+TEXT\b/i.test(ad) || textAnimationMi(relPro));
-      var group = butonMu ? "buton" : (isBuiltin || proText || textAnimationMi(relPath) ? "text" : "other");
+      var relAdobe = isAdobe && adobeRoot ? tam2.slice(adobeRoot.length).replace(/^[\\\/]+/, "") : "";
+      var group = butonMu ? "buton" : (isBuiltin ? "text" : mogrtGrubu(ad, relPro || relPath || relAdobe, isAdobe ? "adobe" : (isPro ? "pro" : "personal")));
       var proFolder = relPro && relPro.indexOf(K.path.sep) !== -1 ? relPro.split(K.path.sep)[0] : "";
       if (!proFolder && relPro.indexOf("/") !== -1) proFolder = relPro.split("/")[0];
       var paket = {
@@ -275,9 +322,10 @@ window.KLib = (function () {
         thumb: null,
         builtin: isBuiltin,
         pro: isPro,
+        localAdobe: isAdobe,
         group: group,
         category: meta && meta.category ? String(meta.category) :
-          (group === "text" ? "Text Animation" : (proFolder ? proFolder.replace(/[-_]+/g, " ") : "Other Animation"))
+          (group === "text" ? "Text Animation" : (group === "caption" ? "Premiere Subtitle Template" : (proFolder ? proFolder.replace(/[-_]+/g, " ") : "Other Animation")))
       };
       paketler.push(paket);
       thumbQueue.push({ paket: paket, slug: slug });
@@ -298,10 +346,13 @@ window.KLib = (function () {
       var q = thumbQueue[qi];
       var tp = await thumbCikar(q.paket.path, q.slug);
       if (buTarama !== taraNo) return;
-      if (tp) q.paket.thumb = dataUri(tp);
+      if (tp && tp.thumb) q.paket.thumb = dataUri(tp.thumb);
+      if (tp && tp.video) q.paket.previewVideo = "file:///" + tp.video.replace(/\\/g, "/");
       // Onizlemeleri kucuk partilerle ekrana getir; her dosyada tum grid'i
       // yeniden kurup paneli titretme.
-      if ((qi + 1) % 8 === 0 || qi === thumbQueue.length - 1) ciz();
+      if ((qi + 1) % 8 === 0 || qi === thumbQueue.length - 1) {
+        ciz();
+      }
     }
   }
 
@@ -312,6 +363,8 @@ window.KLib = (function () {
     if (s1) s1.textContent = String(paketler.filter(function (p) { return p.group === "text"; }).length);
     var s0 = el("custom-sayac");
     if (s0) s0.textContent = String(paketler.filter(function (p) { return p.group === "other"; }).length);
+    var sc = el("caption-sayac");
+    if (sc) sc.textContent = String(paketler.filter(function (p) { return p.group === "caption"; }).length);
     var sb = el("buton-sayac");
     if (sb) sb.textContent = String(paketler.filter(function (p) { return p.group === "buton"; }).length);
     var favSayisi = paketler.filter(function (p) { return favMi(p.ad); }).length;
@@ -325,6 +378,7 @@ window.KLib = (function () {
 
     var liste = paketler.filter(function (p) {
       if (kategori === "mogrt" && p.group !== "text") return false;
+      if (kategori === "captions" && p.group !== "caption") return false;
       if (kategori === "custom" && p.group !== "other") return false;
       if (kategori === "buton" && p.group !== "buton") return false;
       if (kategori === "fav" && !favMi(p.ad)) return false;
@@ -335,7 +389,7 @@ window.KLib = (function () {
     if (baslik) baslik.textContent = kategori === "fav"
       ? "Favoriler"
       : (kategori === "buton" ? "Butonlar"
-        : (kategori === "custom" ? "Diğer Animasyonlar" : "Yazı Animasyonları"));
+        : (kategori === "captions" ? "Altyazı Şablonları" : (kategori === "custom" ? "Diğer Animasyonlar" : "Yazı Animasyonları")));
     var vitrinSayisi = liste.filter(function (p) { return p.showcase; }).length;
     if (alt) alt.textContent = liste.length
       ? (vitrinSayisi === liste.length
@@ -345,7 +399,7 @@ window.KLib = (function () {
           : liste.length + " paket timeline'a hazır"))
       : (kategori === "fav"
         ? "kalbe tıklayıp favori ekle"
-        : (kategori === "custom" ? "logo, ikon, lower third ve diğer MOGRT paketleri" : "Suflo Originals + saf text efektleri"));
+        : (kategori === "captions" ? "Premiere Graphic Templates klasöründeki yerel subtitle MOGRT'ları" : (kategori === "custom" ? "logo, ikon, lower third ve diğer MOGRT paketleri" : "Suflo Originals + saf text efektleri")));
 
     grid.innerHTML = "";
     if (bos) bos.hidden = paketler.length > 0;
@@ -363,7 +417,7 @@ window.KLib = (function () {
       kart.className = "mogrt-kart" + (kilitli ? " locked" : "");
       kart.setAttribute("role", "group");
       kart.setAttribute("aria-label", p.display + " · " + (kilitli ? "Suflo Pro efekti, kilitli" : "timeline'a eklenebilir MOGRT"));
-      var kaynak = p.builtin ? "SUFLO ORIGINAL" : (p.pro || p.showcase ? "SUFLO PRO" : "PERSONAL MOGRT");
+      var kaynak = p.builtin ? "SUFLO ORIGINAL" : (p.pro || p.showcase ? "SUFLO PRO" : (p.localAdobe ? "PREMIERE LOCAL" : "PERSONAL MOGRT"));
       var aksiyon = kilitli
         ? '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg><span>LOCKED</span>'
         : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M12 6l4 4-4 4"/></svg><span>DRAG</span>';
@@ -507,7 +561,7 @@ window.KLib = (function () {
   }
 
   function setKategori(kat) {
-    kategori = (kat === "fav" || kat === "custom" || kat === "buton") ? kat : "mogrt";
+    kategori = (kat === "fav" || kat === "custom" || kat === "buton" || kat === "captions") ? kat : "mogrt";
     ciz();
   }
 
@@ -523,6 +577,8 @@ window.KLib = (function () {
     yerlesikSayisi: function () { return paketler.filter(function (p) { return p.builtin; }).length; },
     hariciSayisi: function () { return paketler.filter(function (p) { return !p.builtin && !p.showcase; }).length; },
     yaziSayisi: function () { return paketler.filter(function (p) { return p.group === "text" && !p.showcase; }).length; },
+    altyaziSayisi: function () { return paketler.filter(function (p) { return p.group === "caption" && !p.showcase; }).length; },
+    altyaziStilleri: function () { return paketler.filter(function (p) { return p.group === "caption" && !p.showcase; }).slice(); },
     digerSayisi: function () { return paketler.filter(function (p) { return p.group === "other" && !p.showcase; }).length; }
   };
 })();

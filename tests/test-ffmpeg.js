@@ -36,8 +36,11 @@ function zipUret(ad, icerik) {
   realFs.writeFileSync(realPath.join(kok, "bin", "ffprobe.exe"), "GEREKSIZ-2");
   realFs.writeFileSync(realPath.join(kok, "doc", "readme.txt"), "GEREKSIZ-3");
   var zip = realPath.join(TMP, ad + ".zip");
-  realCp.spawnSync("powershell", ["-NoProfile", "-Command",
-    "Compress-Archive -Path '" + kok + "' -DestinationPath '" + zip + "' -Force"], { encoding: "utf8" });
+  // Codex/CI alt sureclerinde PowerShell modul politikasi Compress-Archive'i
+  // engelleyebiliyor. Windows'un kendi tar.exe'si ayni gercek ZIP'i daha
+  // bagimsiz ve kararli bicimde uretir.
+  var tarExe = realPath.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe");
+  realCp.spawnSync(tarExe, ["-a", "-cf", zip, "-C", kaynak, realPath.basename(kok)], { encoding: "utf8" });
   return zip;
 }
 

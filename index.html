@@ -72,6 +72,12 @@
       <span class="ky-metin"><b>Yazı Animasyonları</b><i>text efektleri · typewriter</i></span>
       <span class="ky-adet" id="yazi-sayac">0</span>
     </button>
+    <button class="ky-oge" data-tab="text" data-kat="captions">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.8" y="4.2" width="14.4" height="11.6" rx="2"/><path d="M5.6 9h3.2M11.2 9h3.2M5.6 12h8.8"/></svg></span>
+      <span class="ky-metin"><b>Altyazı Şablonları</b><i>Graphic Templates · yerel</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+      <span class="ky-adet" id="caption-sayac">0</span>
+    </button>
     <button class="ky-oge" data-tab="text" data-kat="custom">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h5l1.4 1.7H17v7.3H3z"/><path d="M3 6.5V5h5l1.2 1.5"/></svg></span>
       <span class="ky-metin"><b>Diğer Animasyonlar</b><i>logo · grafik · lower third</i></span>
@@ -167,6 +173,9 @@
         -->
         <select id="cap-preset" hidden aria-hidden="true">
           <option value="" selected>Özel</option>
+          <option value="mrbeast">Creator Punch</option>
+          <option value="capcut">CapCut Clean</option>
+          <option value="saas">SaaS Glass</option>
           <option value="viral">Viral Vurgu</option>
           <option value="reels">Reels</option>
           <option value="pop">Pop</option>
@@ -226,50 +235,41 @@
         </div>
       </div>
 
-      <div class="card stil-katmani-card">
+      <div class="card stil-katmani-card" hidden aria-hidden="true">
         <div class="card-title">Stil katmanı <span class="pro-inline">PRO</span></div>
         <p class="stil-aciklama">Bir görünüm seç — altyazın o stille gelir. Örnekler stilin gerçek halini gösterir.</p>
 
         <div class="stil-grid" id="cap-stil-grid">
-          <button type="button" class="stil-sec stil-sari" data-preset="sari">
-            <span class="ss-sahne"><span class="ss-metin ss-anton">HEDEF <i style="color:#ffd21e">1000</i></span></span>
-            <span class="ss-bilgi"><b>Sarı Vurgu</b><i>okunan kelime sararır</i></span>
+          <button type="button" class="stil-sec stil-mrbeast stil-one-cikan" data-preset="mrbeast">
+            <span class="ss-rozet">CREATOR</span>
+            <span class="ss-sahne"><span class="ss-metin ss-archivo ss-kalin">BU FİKİR<br><i>PATLADI</i></span></span>
+            <span class="ss-bilgi"><b>Creator Punch</b><i>MrBeast tarzı · güçlü vurgu</i></span>
           </button>
-          <button type="button" class="stil-sec stil-yesil" data-preset="yesil">
-            <span class="ss-sahne"><span class="ss-metin ss-archivo ss-kalin">PARA <i style="color:#2fe36a">YOK</i></span></span>
-            <span class="ss-bilgi"><b>Yeşil Kontur</b><i>kalın kontur · MrBeast</i></span>
+          <button type="button" class="stil-sec stil-capcut stil-one-cikan" data-preset="capcut">
+            <span class="ss-rozet">TREND</span>
+            <span class="ss-sahne"><span class="ss-metin ss-montserrat"><span class="ss-pill">daha <i>hızlı</i> edit</span></span></span>
+            <span class="ss-bilgi"><b>CapCut Clean</b><i>temiz pill · aktif kelime</i></span>
           </button>
-          <button type="button" class="stil-sec stil-kutu" data-preset="kutu">
-            <span class="ss-sahne"><span class="ss-metin ss-archivo">TAM <i class="ss-box">VİRAL</i></span></span>
-            <span class="ss-bilgi"><b>Kutu</b><i>kelime kutunun içinde</i></span>
+          <button type="button" class="stil-sec stil-saas stil-one-cikan" data-preset="saas">
+            <span class="ss-rozet">NEW</span>
+            <span class="ss-sahne"><span class="ss-metin ss-montserrat"><span class="ss-glass"><i></i>Sade. Hızlı. Net.</span></span></span>
+            <span class="ss-bilgi"><b>SaaS Glass</b><i>Apple sadeliği · cam katman</i></span>
           </button>
-          <button type="button" class="stil-sec stil-neon" data-preset="neon">
-            <span class="ss-sahne"><span class="ss-metin ss-bebas ss-neon">GECE <i style="color:#ff4df0">MODU</i></span></span>
-            <span class="ss-bilgi"><b>Neon</b><i>parlak · oyun/gece</i></span>
+          <button type="button" class="stil-sec stil-viral" data-preset="viral">
+            <span class="ss-sahne"><span class="ss-metin ss-archivo ss-kalin">BUNU <i>KAÇIRMA</i></span></span>
+            <span class="ss-bilgi"><b>Viral Vurgu</b><i>katmanlı creator tipografisi</i></span>
           </button>
-          <button type="button" class="stil-sec stil-temiz" data-preset="temiz">
-            <span class="ss-sahne"><span class="ss-metin ss-montserrat">net ve okunur</span></span>
-            <span class="ss-bilgi"><b>Temiz</b><i>yayın alt bandı</i></span>
+          <button type="button" class="stil-sec stil-pop" data-preset="pop">
+            <span class="ss-sahne"><span class="ss-metin ss-bungee"><span>ŞAK!</span></span></span>
+            <span class="ss-bilgi"><b>Pop Sticker</b><i>eğlence · renkli vuruşlar</i></span>
           </button>
-          <button type="button" class="stil-sec stil-zarif" data-preset="zarif">
-            <span class="ss-sahne"><span class="ss-metin ss-lora">zarif başlık</span></span>
-            <span class="ss-bilgi"><b>Zarif</b><i>serif · lifestyle</i></span>
+          <button type="button" class="stil-sec stil-doc" data-preset="doc">
+            <span class="ss-sahne"><span class="ss-metin ss-lora"><span class="ss-doc-band">Hikâyenin başladığı yer.</span></span></span>
+            <span class="ss-bilgi"><b>Belgesel</b><i>editoryal alt bant</i></span>
           </button>
-          <button type="button" class="stil-sec stil-beyaz" data-preset="beyaz">
-            <span class="ss-sahne"><span class="ss-metin ss-anton ss-kalin">BÜYÜK HABER</span></span>
-            <span class="ss-bilgi"><b>Beyaz Kalın</b><i>renksiz güçlü · haber</i></span>
-          </button>
-          <button type="button" class="stil-sec stil-mor" data-preset="mor">
-            <span class="ss-sahne"><span class="ss-metin ss-anton">YENİ <i style="color:#a78bfa">SÜRÜM</i></span></span>
-            <span class="ss-bilgi"><b>Mor Vurgu</b><i>marka · teknoloji</i></span>
-          </button>
-          <button type="button" class="stil-sec stil-sticker" data-preset="sticker">
-            <span class="ss-sahne"><span class="ss-metin ss-bungee">ŞAK<i style="color:#ff6b6b">!</i></span></span>
-            <span class="ss-bilgi"><b>Sticker</b><i>renkli · eğlence</i></span>
-          </button>
-          <button type="button" class="stil-sec stil-daktilo" data-preset="daktilo">
-            <span class="ss-sahne"><span class="ss-metin ss-daktilo">yazılıyor<i>|</i></span></span>
-            <span class="ss-bilgi"><b>Daktilo</b><i>kelime kelime · anlatı</i></span>
+          <button type="button" class="stil-sec stil-premium" data-preset="premium">
+            <span class="ss-sahne"><span class="ss-metin ss-montserrat ss-kalin">DAHA <i>İYİ</i></span></span>
+            <span class="ss-bilgi"><b>Premium Sinema</b><i>altın detay · yumuşak reveal</i></span>
           </button>
         </div>
 
@@ -286,6 +286,7 @@
         <div class="onizleme" id="cap-onizleme">
           <div class="onizleme-sahne" id="cap-sahne">
             <div class="onizleme-alt" id="cap-onizleme-metin"></div>
+            <img id="cap-mogrt-onizleme" class="cap-mogrt-onizleme" alt="Seçili Premiere altyazı şablonu" hidden>
             <video id="cap-render-onizleme" class="render-onizleme" muted playsinline hidden></video>
             <button type="button" id="cap-onizleme-kare" class="onizleme-oynat" style="right:auto; left:7px" title="Timeline'daki kareyi arka plan olarak al">⛶ Kare al</button>
             <button type="button" id="cap-onizleme-oynat" class="onizleme-oynat" title="Önizlemeyi oynat">▶ Oynat</button>
@@ -305,6 +306,9 @@
               <option value="slide">Alttan kayma</option>
             </optgroup>
             <optgroup label="Kelime zamanlı (Satır uzunluğu → Karaoke)">
+              <option value="mrbeast" data-pro="1">Creator Punch (MrBeast tarzı)</option>
+              <option value="capcut" data-pro="1">CapCut Clean</option>
+              <option value="saas" data-pro="1">SaaS Glass</option>
               <option value="viral" data-pro="1">Viral aktif kelime</option>
               <option value="vurgu" data-pro="1">Aktif kelime vurgusu</option>
               <option value="karaoke" data-pro="1">Karaoke dolgu</option>
@@ -496,12 +500,8 @@
         </details>
 
         <button id="cap-apply" class="btn primary big">Sekansa uygula</button>
-        <button id="cap-overlay" class="btn outline big">
-          Stil katmanı olarak ekle
-        </button>
-        <p class="hint" style="margin:-4px 0 8px">
-          <b>Sekansa uygula:</b> Premiere'in düzenlenebilir caption izini oluşturur.<br>
-          <b>Stil katmanı:</b> seçtiğin görünümü şeffaf video olarak boş bir katmana yerleştirir.
+        <p class="hint" id="cap-apply-hint" style="margin:-4px 0 8px">
+          Premiere'in düzenlenebilir caption izini oluşturur.
         </p>
         <style>
           .cross-tip{display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
@@ -638,7 +638,7 @@
       </ol>
     </div>
     <div class="seg-ctl full" id="zoom-mode">
-      <button class="on" data-m="speech">Konuşmaya göre<em>önerilen</em></button>
+      <button class="on" data-m="smart">Akıllı ritim<em>AutoCut tarzı</em></button>
       <button data-m="rhythm">Ritmik</button>
     </div>
     <style>
@@ -671,8 +671,8 @@
       <button data-a="0.8,0.8" aria-label="sağ alt"></button>
     </div>
     <p class="zoom-nokta-not">Dikey (Reels) videoda genelde <b>üst-orta</b> — yüz sabit kalır.</p>
-    <div class="row" id="zoom-aralik-satir" hidden>
-      <label>Aralık</label>
+    <div class="row" id="zoom-aralik-satir">
+      <label>Maks. aralık</label>
       <input id="zoom-aralik" type="range" min="2" max="12" step="1" value="5">
       <span id="zoom-aralik-val" class="mono">5 sn</span>
     </div>
@@ -855,7 +855,7 @@
       <div class="pt-copy">
         <span class="pt-rozet">SUFLO PRO</span>
         <b>1.076 düzenlenmiş SFX</b>
-        <span>Ara, ön dinle; Akıllı SFX ile doğru vurguya tek tıkla yerleştir.</span>
+        <span>Ara, dalga üzerinden ön dinle; Smart SFX 2.0 ile doğru vurguya tek tıkla yerleştir.</span>
       </div>
       <div class="pt-proof" aria-label="Pro içerik özeti">
         <i><strong>1.076</strong> ses</i><i><strong>14</strong> koleksiyon</i><i><strong>✦</strong> akıllı</i>
@@ -880,13 +880,28 @@
         </div>
         <div class="sfx-filter-actions">
           <span id="sfx-count" class="dim"></span>
-          <button id="sfx-smart-btn" class="btn smart" title="Altyazıdaki vurgu anlarına ses öner">✦ Akıllı</button>
+          <button id="sfx-smart-btn" class="btn smart" title="Altyazıdaki vurgu anlarına ses öner">✦ Smart SFX 2.0</button>
         </div>
+      </div>
+      <div id="sfx-player" class="sfx-player" hidden>
+        <button id="sfx-player-toggle" class="sfx-player-toggle" title="Ön dinle">▶</button>
+        <div class="sfx-player-meta"><b id="sfx-player-name">Ses seç</b><small id="sfx-player-folder">Ön dinleme</small></div>
+        <canvas id="sfx-waveform" class="sfx-waveform" width="420" height="58" title="Sarmak için dalgaya tıkla"></canvas>
+        <span id="sfx-player-time" class="sfx-player-time">00:00 / 00:00</span>
+        <button id="sfx-player-add" class="btn tiny">Timeline'a ekle</button>
       </div>
       <div id="sfx-smart-panel" class="sfx-smart-panel" hidden>
         <div class="sfx-smart-head">
-          <div><b>Akıllı SFX önerileri</b><small id="sfx-smart-status">Altyazıdaki vurgu anları taranıyor…</small></div>
-          <button id="sfx-smart-close" class="icon-btn" title="Önerileri kapat">×</button>
+          <div><b>Smart SFX 2.0</b><small id="sfx-smart-status">Altyazıdaki vurgu anları taranıyor…</small></div>
+          <div class="sfx-smart-tools">
+            <select id="sfx-smart-density" title="Öneri yoğunluğu">
+              <option value="soft">Sade</option>
+              <option value="balanced" selected>Dengeli</option>
+              <option value="energetic">Enerjik</option>
+            </select>
+            <button id="sfx-smart-add-all" class="btn tiny primary">Hazırları ekle</button>
+            <button id="sfx-smart-close" class="icon-btn" title="Önerileri kapat">×</button>
+          </div>
         </div>
         <div id="sfx-smart-list" class="sfx-smart-list"></div>
       </div>
@@ -1068,6 +1083,26 @@
     </div>
 
 
+    <div class="set-group doctor-card" id="set-doctor-card">
+      <div class="doctor-head">
+        <div class="doctor-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.6 2.8 8 7 10 4.2-2 7-5.4 7-10V6z"/><path d="M8.5 12h2l1.2-2.5 1.7 5 1.1-2.5h2"/></svg>
+        </div>
+        <div>
+          <div class="set-title">Suflo Doctor</div>
+          <b>Eklentiyi baştan sona kontrol et</b>
+          <p>Premiere bağlantısı, FFmpeg, yerel motor, GPU, Pro içerikleri, preset paketi ve kütüphaneler tek raporda.</p>
+        </div>
+        <span class="doctor-badge">DOCTOR</span>
+      </div>
+      <div class="library-health-actions doctor-actions">
+        <button id="set-library-health-run" class="btn primary">Sistemi tara</button>
+        <button id="set-doctor-fix-all" class="btn" hidden>Güvenli sorunları düzelt</button>
+        <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
+      </div>
+      <div id="set-library-health-result" class="library-health" role="status" aria-live="polite" hidden></div>
+    </div>
+
     <div class="set-group pro-sync-card" id="set-prosync-card">
       <div class="pro-sync-head">
         <div><div class="set-title">Pro İçerik Bulutu</div><b id="set-prosync-title">Bir kez etkinleştir, hep güncel kal</b></div>
@@ -1119,11 +1154,6 @@
         <button id="set-emoji-assets-kaydet" class="btn">Kaydet</button>
       </div>
       <div id="set-emoji-assets-durum" class="inline-status"></div>
-      <div class="library-health-actions">
-        <button id="set-library-health-run" class="btn primary">Kütüphaneleri kontrol et</button>
-        <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
-      </div>
-      <div id="set-library-health-result" class="library-health" role="status" hidden></div>
     </div>
 
     <div class="set-group" id="grp-pro">
@@ -1146,7 +1176,7 @@
             <ul>
               <li>Otomatik sessizlik kesimi · Ritim marker</li>
               <li>Hazır yazı animasyonu (MOGRT) kütüphanesi</li>
-              <li>SFX kütüphanesi · Akıllı SFX önerileri</li>
+              <li>SFX kütüphanesi · Smart SFX 2.0 önerileri</li>
               <li>Toplu klip · Çeviri · Sözlük · stilli ASS</li>
               <li>Ömür boyu güncelleme</li>
             </ul>
