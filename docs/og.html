@@ -1,77 +1,87 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>og</title>
+<meta charset="utf-8">
+<title>Suflo — og</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
-  /* Link onizleme karti — 1200x630 (WhatsApp, Telegram, X, LinkedIn, Facebook) */
-  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
-  body {
-    background:
-      radial-gradient(700px 500px at 22% 20%, rgba(139,124,246,.28), transparent 62%),
-      radial-gradient(600px 500px at 88% 88%, rgba(91,140,255,.20), transparent 62%),
-      #0b0c12;
-    font: 16px/1.5 "Segoe UI", system-ui, sans-serif;
-    color: #eceaf6;
-    display: flex; align-items: center;
-    padding: 0 72px; box-sizing: border-box;
-    position: relative;
-  }
-  .sol { width: 690px; }
-  .marka { display: flex; align-items: center; gap: 16px; margin-bottom: 34px; }
-  .marka svg { width: 58px; height: 58px; }
-  .marka span {
-    font-size: 34px; font-weight: 700; letter-spacing: -.3px;
-    background: linear-gradient(135deg, #8b7cf6, #5b8cff);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  h1 {
-    font-size: 60px; line-height: 1.08; letter-spacing: -1.4px;
-    margin: 0 0 22px; font-weight: 700;
-  }
-  h1 em {
-    font-style: normal;
-    background: linear-gradient(135deg, #8b7cf6, #5b8cff);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  p { font-size: 25px; color: #9b9db4; margin: 0 0 30px; }
-  .rozetler { display: flex; gap: 11px; }
-  .rozet {
-    font-size: 18px; padding: 10px 20px; border-radius: 999px;
-    border: 1px solid #2b3048; background: rgba(255,255,255,.035); color: #cfc9ff;
-  }
-  .adres {
-    position: absolute; left: 72px; bottom: 44px;
-    font-size: 22px; color: #6f7290; letter-spacing: .3px;
-  }
-  /* sag tarafta panel gorseli */
-  .sag {
-    position: absolute; right: -40px; top: 50%; transform: translateY(-50%) rotate(-6deg);
-    width: 360px; height: 700px; border-radius: 26px; overflow: hidden;
-    box-shadow: 0 50px 120px rgba(0,0,0,.7), 0 0 0 1px rgba(139,124,246,.3);
-  }
-  .sag img { width: 100%; display: block; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1200px;height:630px;overflow:hidden;
+  font-family:"Plus Jakarta Sans",sans-serif;background:#0a0a0c;color:#f4f4f7;position:relative}
+body::before{content:"";position:absolute;top:-220px;left:50%;transform:translateX(-50%);
+  width:1400px;height:760px;background:radial-gradient(58% 55% at 50% 40%,rgba(139,124,246,.28),transparent 70%);filter:blur(40px)}
+.k{position:relative;z-index:1;height:100%;display:grid;grid-template-columns:1fr 430px;gap:44px;padding:62px 64px}
+
+.sol{display:flex;flex-direction:column;justify-content:center}
+.marka{display:flex;align-items:center;gap:13px;font-weight:800;font-size:30px;letter-spacing:-.5px;margin-bottom:30px}
+.marka svg{width:46px;height:46px}
+h1{font-weight:800;font-size:64px;line-height:1.04;letter-spacing:-2.2px;
+  background:linear-gradient(180deg,#fff,rgba(228,228,236,.9));-webkit-background-clip:text;background-clip:text;color:transparent}
+h1 span{color:#8b7cf6;-webkit-text-fill-color:#8b7cf6}
+.alt{color:#a3a3ad;font-size:24px;font-weight:500;margin-top:20px;line-height:1.45;max-width:600px}
+.alt b{color:#f4f4f7;font-weight:700}
+.rozetler{display:flex;gap:10px;margin-top:32px}
+.rozet{font-size:15px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#8b7cf6;
+  background:rgba(139,124,246,.07);border:1px solid rgba(139,124,246,.35);border-radius:999px;padding:9px 17px}
+.adres{margin-top:auto;font-size:22px;font-weight:800;color:#70707c;letter-spacing:-.3px}
+.adres b{color:#f4f4f7}
+
+/* panel maketi */
+.sag{display:flex;align-items:center}
+.mock{width:100%;border:1px solid #2a2a33;border-radius:14px;overflow:hidden;background:#16161c;
+  box-shadow:0 40px 90px -40px rgba(0,0,0,.95)}
+.bar{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#1c1c23;border-bottom:1px solid #26262e}
+.bar i{width:10px;height:10px;border-radius:50%;background:#3a3a46;display:block}
+.bar span{margin-left:8px;font-size:12px;color:#70707c;font-weight:600}
+.mon{background:#0b0b0f;height:150px;position:relative;display:flex;align-items:flex-end;justify-content:center;padding:14px}
+.mon::before{content:"";position:absolute;inset:12px;border-radius:8px;background:linear-gradient(145deg,#1e2536,#12141d 60%,#0f1016)}
+.cap{position:relative;z-index:1;font-weight:800;font-size:17px;text-shadow:0 2px 8px rgba(0,0,0,.9);padding-bottom:8px}
+.cap i{font-style:normal;color:#ffd21e}
+.pn{padding:14px 13px;font-size:12px}
+.row{display:flex;justify-content:space-between;background:#0e0e13;border:1px solid #24242c;border-radius:7px;padding:8px 11px;margin-bottom:7px;color:#a3a3ad}
+.row b{color:#f4f4f7;font-weight:700}
+.go{background:linear-gradient(100deg,#8b7cf6,#5b8cff);color:#fff;text-align:center;border-radius:8px;padding:10px;font-weight:800;font-size:13px;margin-top:10px}
+.tl{border-top:1px solid #26262e;background:#101015;padding:10px 13px}
+.tr{display:flex;gap:3px;height:14px;margin-bottom:4px}
+.tr:last-child{margin-bottom:0}
+.c{border-radius:3px;background:linear-gradient(180deg,#3c4788,#2b3260)}
+.c.s{background:linear-gradient(180deg,#6b5cc4,#4a3f8f)}
+.c.a{background:linear-gradient(180deg,#2c6a55,#1d4a3b)}
 </style>
 </head>
 <body>
+<div class="k">
   <div class="sol">
     <div class="marka">
-      <svg viewBox="0 0 20 20">
-        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5b8cff"/></linearGradient></defs>
-        <rect x="1" y="1" width="18" height="18" rx="5" fill="url(#g)"/>
-        <path d="M13.9 7.2 C13.5 5.5 11.9 4.7 10 4.7 C8 4.7 6.3 5.5 6.3 7.1 C6.3 10.7 13.7 9.1 13.7 12.9 C13.7 14.5 12 15.3 10 15.3 C8.1 15.3 6.5 14.5 6.1 12.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
-      </svg>
-      <span>Suflo</span>
+      <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5b8cff"/></linearGradient></defs><rect x="1" y="1" width="18" height="18" rx="5" fill="url(#g)"/><path d="M13.9 7.2C13.5 5.5 11.9 4.7 10 4.7 8 4.7 6.3 5.5 6.3 7.1c0 3.6 7.4 2 7.4 5.8 0 1.6-1.7 2.4-3.7 2.4-1.9 0-3.5-.8-3.9-2.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+      Suflo
     </div>
-    <h1>Premiere'e <em>Türkçe altyazı.</em></h1>
-    <p>Adobe'un yapamadığını yapan ücretsiz eklenti.</p>
+    <h1>Premiere Türkçe<br>duymuyor.<br><span>Suflo duyuyor.</span></h1>
+    <p class="alt">Otomatik Türkçe ve Azerice altyazı. <b>Ücretsiz, açık kaynak</b>, bilgisayarında çalışır.</p>
     <div class="rozetler">
-      <div class="rozet">Ücretsiz</div>
-      <div class="rozet">Sınırsız</div>
-      <div class="rozet">İnternetsiz çalışır</div>
+      <span class="rozet">99 dil</span>
+      <span class="rozet">MIT</span>
+      <span class="rozet">Kredi yok</span>
     </div>
-    <div class="adres">suflo.app</div>
+    <div class="adres"><b>suflo</b>.app</div>
   </div>
-  <div class="sag"><img src="panel-og.png" alt=""></div>
+
+  <div class="sag">
+    <div class="mock">
+      <div class="bar"><i></i><i></i><i></i><span>Adobe Premiere Pro</span></div>
+      <div class="mon"><div class="cap">bu videoyu <i>tamamen</i> Suflo ile</div></div>
+      <div class="pn">
+        <div class="row"><span>Dil</span><b>Türkçe</b></div>
+        <div class="row"><span>Motor</span><b>Yerel</b></div>
+        <div class="go">Altyazı oluştur</div>
+      </div>
+      <div class="tl">
+        <div class="tr"><div class="c s" style="flex:3"></div><div class="c s" style="flex:2"></div><div class="c s" style="flex:2.4"></div></div>
+        <div class="tr"><div class="c" style="flex:4"></div><div class="c" style="flex:2"></div><div class="c" style="flex:3"></div></div>
+        <div class="tr"><div class="c a" style="flex:9"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
