@@ -112,6 +112,11 @@ ok("Yarim kalan MOGRT altyazi grubu guvenle temizlenir", removed.ok && removed.r
 
 var captions = fs.readFileSync(path.join(ROOT, "js", "captions.js"), "utf8");
 ok("MOGRT seciliyken libass emoji bekcisi bu yolu engellemez", /if \(!secilenMogrt && emojiIceriyorMu\(\)\)/.test(captions));
+var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+ok("Normal caption ve stilli MOGRT ayri butonlardir",
+  /id="cap-apply"[^>]*>Normal altyazı izi ekle/.test(html) && /id="cap-apply-style"/.test(html));
+ok("Normal buton stilden bagimsiz, stil butonu MOGRT yolunu acar",
+  /apply\(false\)/.test(captions) && /apply\(true\)/.test(captions) && /if \(stilIle\)/.test(captions));
 
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

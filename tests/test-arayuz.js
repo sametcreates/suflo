@@ -83,7 +83,8 @@ ok("Stil bolumu 17 gercek Premiere altyazi sablonu icin acik",
 
 var ZORUNLU = {
   "cap-go": "Altyazı oluştur düğmesi",
-  "cap-apply": "Sekansa uygula",
+  "cap-apply": "Normal altyazı izi ekle",
+  "cap-apply-style": "Seçili stille ekle",
   "cap-save": "Dışa aktar",
   "cap-segments": "Altyazı listesi",
   "cap-lang": "Dil seçimi",

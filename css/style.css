@@ -1972,9 +1972,14 @@ button.seg-time.jump:hover { color: var(--accent-lite); background: rgba(139, 12
 .caption-editor-shortcuts span { display: inline-flex; align-items: center; gap: 4px; }
 .caption-editor-shortcuts i { width: 5px; height: 5px; border-radius: 50%; background: #4fd49a; box-shadow: 0 0 8px rgba(79,212,154,.45); }
 .caption-editor-shortcuts kbd { padding: 1px 4px; border: 1px solid rgba(255,255,255,.09); border-radius: 4px; background: rgba(255,255,255,.035); color: #939bb5; font: inherit; }
+.caption-apply-actions { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 8px; margin-top: 10px; }
+.caption-apply-actions .btn { min-width: 0; margin: 0; white-space: normal; line-height: 1.2; }
+.caption-apply-actions #cap-apply-style:not(:disabled) { border-color: rgba(126,142,255,.62); box-shadow: 0 8px 22px rgba(70,76,190,.16); }
+.caption-apply-actions #cap-apply-style:disabled { opacity: .46; }
 
 @media (max-width: 560px) {
   .caption-editor { padding: 9px; }
+  .caption-apply-actions { grid-template-columns: 1fr; }
   .caption-editor-stats { grid-template-columns: repeat(2, 1fr); }
   .caption-editor .seg { grid-template-columns: 47px minmax(0, 1fr); grid-template-areas: "meta text" "actions actions" "foot foot"; }
   .seg-actions { justify-content: flex-end; opacity: .75; }

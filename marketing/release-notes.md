@@ -1,3 +1,11 @@
+## Suflo 2.9.6 — Normal veya stilli, karar senin
+
+- Caption Editor sonucunda iki bağımsız ekleme yolu artık aynı anda görünüyor: **Normal altyazı izi ekle** ve **Stil seçerek ekle**.
+- Bir MOGRT stili seçmek normal Premiere caption yolunu artık değiştirmiyor veya gizlemiyor. Kullanıcı aynı altyazıyı düzenlenebilir normal caption izi olarak her zaman ekleyebiliyor.
+- Stil seçildiğinde ikinci düğme seçilen şablonun adıyla açılıyor ve yalnız animasyonlu MOGRT yerleştirme yolunu çalıştırıyor.
+- Kalite uyarıları ve tekrar uygulama onayları normal ve stilli yollar için ayrı tutuluyor; bir yolun onayı diğerini yanlışlıkla tetiklemiyor.
+- Dar Premiere panellerinde iki seçenek alt alta, geniş panellerde yan yana ve okunaklı biçimde yerleşiyor.
+
 ## Suflo 2.9.5 — Tek altyazı motoru ve Suflo Caption Editor
 
 - Kullanıcının karşısındaki yerel/bulut motor karmaşası kaldırıldı. Yeni **Suflo Altyazı Motoru** en doğru kurulu modeli ve GPU'yu kullanır; yerel çekirdek çalışmazsa yalnız önceden ayarlanmış güvenli bulut yedeğine geçer.

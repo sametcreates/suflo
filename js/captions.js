@@ -947,13 +947,16 @@ window.KCaptions = (function () {
 
   function uygulamaIpucunuGuncelle() {
     var hint = el("cap-apply-hint");
-    var btn = el("cap-apply");
+    var styleBtn = el("cap-apply-style");
     if (secilenMogrt) {
-      if (hint) hint.textContent = temizMogrtAdi(secilenMogrt) + " şablonunu tüm altyazılara uygular; sekans oranı otomatik seçilir.";
-      if (btn && !onayBekleyen) btn.textContent = "Seçili stili sekansa uygula";
+      if (hint) hint.textContent = "Normal caption izi her zaman kullanılabilir. " + temizMogrtAdi(secilenMogrt) + " seçili; stil düğmesi MOGRT animasyonunu tüm altyazılara uygular.";
+      if (styleBtn) {
+        styleBtn.disabled = false;
+        if (kaliteOnayBekleyen !== "style") styleBtn.textContent = temizMogrtAdi(secilenMogrt) + " ile ekle";
+      }
     } else {
-      if (hint) hint.textContent = "Premiere'in düzenlenebilir caption izini oluşturur.";
-      if (btn && !onayBekleyen) btn.textContent = UYGULA_ETIKET;
+      if (hint) hint.textContent = "Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Animasyonlu ekleme için yukarıdan bir stil seç.";
+      if (styleBtn) { styleBtn.disabled = true; styleBtn.textContent = "Stil seçerek ekle"; }
     }
   }
 
@@ -3192,14 +3195,20 @@ window.KCaptions = (function () {
    */
   var uygulananSekans = {};   // sekans adı -> son uygulama zamanı (oturum içi)
   var onayBekleyen = null;
-  var kaliteOnayBekleyen = false;
-  var UYGULA_ETIKET = "Sekansa uygula";
+  var kaliteOnayBekleyen = "";
+  var UYGULA_ETIKET = "Normal altyazı izi ekle";
 
   function uygulaEtiketiniSifirla() {
     onayBekleyen = null;
-    kaliteOnayBekleyen = false;
+    kaliteOnayBekleyen = "";
     var b = el("cap-apply");
-    if (b) { b.textContent = secilenMogrt ? "Seçili stili sekansa uygula" : UYGULA_ETIKET; b.classList.remove("warn"); }
+    if (b) { b.textContent = UYGULA_ETIKET; b.classList.remove("warn"); }
+    var styleBtn = el("cap-apply-style");
+    if (styleBtn) {
+      styleBtn.disabled = !secilenMogrt;
+      styleBtn.textContent = secilenMogrt ? temizMogrtAdi(secilenMogrt) + " ile ekle" : "Stil seçerek ekle";
+      styleBtn.classList.remove("warn");
+    }
   }
 
   /* ---------------- Animasyonlu altyazı: timeline'a overlay ---------------- */
@@ -3419,16 +3428,22 @@ window.KCaptions = (function () {
     }
   }
 
-  async function apply() {
+  async function apply(stilIle) {
     if (segments.length === 0) return;
+    stilIle = stilIle === true;
+    if (stilIle && !secilenMogrt) {
+      KApp.toast("Önce Altyazı ayarlarından bir stil seç.", "warn");
+      return;
+    }
     var rapor = qualityReport();
     var kritik = Number(rapor.bad) || 0;
     var sekans = (KApp.ctx().sequence || "") || "?";
-    var yeniIzOnayi = !secilenMogrt && uygulananSekans[sekans] && onayBekleyen !== sekans;
-    if ((kritik > 0 && !kaliteOnayBekleyen) || yeniIzOnayi) {
-      if (kritik > 0) kaliteOnayBekleyen = true;
+    var kaliteAnahtari = stilIle ? "style" : "normal";
+    var yeniIzOnayi = !stilIle && uygulananSekans[sekans] && onayBekleyen !== sekans;
+    if ((kritik > 0 && kaliteOnayBekleyen !== kaliteAnahtari) || yeniIzOnayi) {
+      if (kritik > 0) kaliteOnayBekleyen = kaliteAnahtari;
       if (yeniIzOnayi) onayBekleyen = sekans;
-      var uyariBtn = el("cap-apply");
+      var uyariBtn = el(stilIle ? "cap-apply-style" : "cap-apply");
       if (uyariBtn) {
         uyariBtn.textContent = yeniIzOnayi
           ? "Yine de yeni iz ekle" + (kritik > 0 ? " · " + kritik + " sorun" : "")
@@ -3444,10 +3459,11 @@ window.KCaptions = (function () {
       KApp.toast(uyari, "warn", 9000);
       return;
     }
-    if (secilenMogrt) {
+    if (stilIle) {
       if (typeof Pro !== "undefined" && !Pro.gate("mogrt")) return;
       try {
         await mogrtStiliniUygula();
+        uygulaEtiketiniSifirla();
       } catch (eMogrt) {
         status("", "");
         KApp.toast("✕ " + (eMogrt && eMogrt.message ? eMogrt.message : eMogrt), "bad", 8000);
@@ -4106,7 +4122,8 @@ window.KCaptions = (function () {
 
   function init() {
     el("cap-go").addEventListener("click", go);
-    el("cap-apply").addEventListener("click", apply);
+    el("cap-apply").addEventListener("click", function () { apply(false); });
+    el("cap-apply-style").addEventListener("click", function () { apply(true); });
     el("cap-save").addEventListener("click", saveAs);
     el("cap-import-srt").addEventListener("click", function (e) { e.preventDefault(); importSrt(); });
     el("cap-preset-save").addEventListener("click", saveUserPreset);
