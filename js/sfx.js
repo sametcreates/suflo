@@ -163,6 +163,21 @@ window.KSfx = (function () {
     return index.length === 0 && showcaseFolders.length > 0 && typeof Pro !== "undefined" && !Pro.isPro();
   }
 
+  function showcaseTotal() {
+    return showcaseFolders.reduce(function (sum, folder) { return sum + folder.count; }, 0);
+  }
+
+  function warmShowcase() {
+    if (typeof Pro === "undefined" || Pro.isPro()) return;
+    function ready() {
+      var total = el("sfx-sayac");
+      if (total) total.textContent = String(showcaseTotal() || 1076);
+      renderList();
+    }
+    if (loadShowcase()) { ready(); return; }
+    loadShowcaseWeb().then(ready);
+  }
+
   function favlar() {
     var s = K.settings();
     if (!s.sfxFavs) s.sfxFavs = [];
@@ -889,6 +904,9 @@ window.KSfx = (function () {
       b.addEventListener("click", function () { setFilter(b.dataset.f); });
     });
     initKeys();
+    // Yalniz kucuk kategori katalogunu acilista hazirla. 1.076 ses dosyasini
+    // taramadan Free kullanici sayiyi ve 14 kilitli koleksiyonu hemen gorur.
+    warmShowcase();
     KApp.onTab("sfx", function () { if (!index.length) buildIndex(); });
     if (typeof Pro !== "undefined") Pro.on(renderList);
     // +20 GB'a çıkabilen ses arşivi yalnız SFX bölümü açılınca taranır.

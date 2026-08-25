@@ -198,7 +198,8 @@ ok("Buyuk yerel kutuphaneler Premiere acilisinda taranmaz",
 ok("Pro Cloud sessiz guncellemesi Premiere acilisindan bir dakika sonra baslar",
   /setTimeout\(function \(\) \{ sync\(\{ silent: true \}\); \}, 60000\)/.test(proSyncSrc));
 ok("Kutuphane Pro CTA'lari neyin acilacagini ve fiyati gizlemez",
-  /262 içeriği aç — 749 TL/.test(html) && /290 preseti aç — 749 TL/.test(html) && /1\.076 SFX'i aç — 749 TL/.test(html));
+  /Yazı animasyonlarını aç — 749 TL/.test(html) && /290 preseti aç — 749 TL/.test(html) &&
+  /1\.076 SFX'i aç — 749 TL/.test(html) && /Motion BG'yi aç — 749 TL/.test(html));
 
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

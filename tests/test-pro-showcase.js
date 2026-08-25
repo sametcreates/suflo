@@ -11,7 +11,9 @@ var SHOWCASE = path.join(EXT, "assets", "pro-mogrt-showcase");
 fs.mkdirSync(path.join(SHOWCASE, "previews"), { recursive: true });
 fs.writeFileSync(path.join(SHOWCASE, "catalog.json"), JSON.stringify({ items: [
   { id: "01-smooth-up", name: "Smooth Up", category: "Motion", match: "SUFLO TEXT - 01 Smooth Up.mogrt", preview: "previews/01.webp" },
-  { id: "02-premium", name: "Premium Text", category: "Style", match: "SUFLO TEXT - 31 Premium Text.mogrt", preview: "previews/02.webp" }
+  { id: "02-premium", name: "Premium Text", category: "Style", match: "SUFLO TEXT - 31 Premium Text.mogrt", preview: "previews/02.webp" },
+  { id: "03-graphic", name: "Camera Overlay", category: "Graphic Element", group: "other", match: "Elements/Camera Overlay.mogrt" },
+  { id: "04-button", name: "Abone Ol", category: "CTA Button", group: "buton", match: "SUFLO BUTON - Abone Ol.mogrt" }
 ] }));
 fs.writeFileSync(path.join(SHOWCASE, "previews", "01.webp"), "preview");
 fs.writeFileSync(path.join(SHOWCASE, "previews", "02.webp"), "preview");
@@ -43,8 +45,11 @@ async function run() {
   var source = fs.readFileSync(path.join(ROOT, "js", "library.js"), "utf8");
   vm.runInContext(source, ctx, { filename: "js/library.js" });
   await ctx.KLib.tara();
-  ok("Ucretsiz kullanici iki Pro vitrin kartini gorur", ctx.KLib.gorunenSayisi() === 2, ctx.KLib.gorunenSayisi());
-  ok("Vitrin kartlari kilitli Pro onizlemesi olarak sayilir", ctx.KLib.vitrinSayisi() === 2, ctx.KLib.vitrinSayisi());
+  ok("Ucretsiz kullanici tum Pro vitrin gruplarini gorur", ctx.KLib.gorunenSayisi() === 4, ctx.KLib.gorunenSayisi());
+  ok("Vitrin kartlari kilitli Pro onizlemesi olarak sayilir", ctx.KLib.vitrinSayisi() === 4, ctx.KLib.vitrinSayisi());
+  var groups = ctx.KLib.vitrinGruplari();
+  ok("Diger animasyon ve buton vitrinleri ayri gruplarda kalir", groups.text === 2 && groups.other === 1 && groups.buton === 1,
+    JSON.stringify(groups));
   ok("Vitrin gercek MOGRT dosyasi sayilmaz", ctx.KLib.sayisi() === 0 && ctx.KLib.yaziSayisi() === 0, "gercek=" + ctx.KLib.sayisi());
   ok("Vitrin karti bos yolu Premiere'e gondermeden Pro kapisinda durur",
     /if \(p\.showcase\)[\s\S]{0,320}Pro\.gate\("mogrt"\)/.test(source) && /path:\s*""/.test(source));
@@ -57,8 +62,10 @@ async function run() {
   var previews = fs.readdirSync(path.join(ROOT, "assets", "pro-mogrt-showcase", "previews"));
   var stills = previews.filter(function (f) { return /\.webp$/i.test(f); });
   var motions = previews.filter(function (f) { return /\.webm$/i.test(f); });
-  ok("Kurulum vitrini 40 efekt onizlemesi tasir", shippedCatalog.items.length === 40 && stills.length === 40,
-    "katalog=" + shippedCatalog.items.length + " statik=" + stills.length);
+  ok("Kurulum vitrini tum benzersiz Pro animasyonlarini tasir",
+    shippedCatalog.items.length >= 240 && stills.length === shippedCatalog.items.length &&
+      shippedCatalog.groupCounts.text >= 80 && shippedCatalog.groupCounts.other >= 120 && shippedCatalog.groupCounts.buton === 35,
+    "katalog=" + shippedCatalog.items.length + " statik=" + stills.length + " gruplar=" + JSON.stringify(shippedCatalog.groupCounts));
   ok("Hareketli kaynak tasiyan efektler hover onizlemesiyle gelir",
     motions.length > 0 && shippedCatalog.items.filter(function (item) { return item.video; }).length === motions.length,
     "hareketli=" + motions.length);

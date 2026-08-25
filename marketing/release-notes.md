@@ -1,3 +1,11 @@
+## Suflo 2.9.8 — Pro vitrini artık gerçekten dolu
+
+- Ücretsiz kullanıcılar Pro içerikleri bilgisayarlarında kurulu olmasa bile tüm premium kütüphaneyi dolu ve kilitli görür: **84 yazı animasyonu, 17 altyazı stili, 123 grafik/sahne animasyonu ve 35 CTA butonu**.
+- **1.076 SFX**, **30 Motion BG** ve **290 preset** sayıları Suflo açıldığı anda görünür. SFX koleksiyonları ile Motion BG kartları da satın almadan önce güvenli önizleme olarak incelenebilir.
+- Her kategori kendi içeriğini ve faydasını anlatan ayrı satış başlığına kavuştu; kullanıcı doğrudan ilgili Pro özelliği için **749 TL tek ödeme** ekranına gider.
+- Ücretli MOGRT, ses ve video kaynakları public pakete eklenmedi. GitHub sürümünde yalnız küçük WEBP/WEBM önizlemeleri bulunur; gerçek Pro içerikleri lisans etkinleşince özel içerik bulutundan gelir.
+- Büyük yerel arşiv taramaları açılıştan kaldırıldı. Sayaçlar ve vitrin anında gelir; gerçek dosyalar yalnız ilgili bölüm açıldığında tembel yüklenir.
+
 ## Suflo 2.9.7 — Premiere 26.3 bağlantı düzeltmesi
 
 - Premiere Pro 26.3.2'de, özellikle macOS CEP panelinde ilk `pointerdown` olayının kaybolmasıyla üst çubuğun sürekli **bağlanıyor** kalması düzeltildi.

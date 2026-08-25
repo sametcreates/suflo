@@ -20,6 +20,8 @@ window.KLib = (function () {
   var busyKart = null;
   var taraNo = 0;
   var aktifOnizlemeDurdur = null;
+  var tarandi = false;
+  var vitrinKatalogOnbellegi = null;
 
   /* ---------------- klasörler ---------------- */
 
@@ -116,40 +118,57 @@ window.KLib = (function () {
 
   // Ucretsiz kurulumdaki satis vitrini. Burada yalniz isimler ve kucuk
   // onizlemeler vardir; MOGRT dosyalari public pakete girmez.
-  async function showcaseCatalog() {
+  async function publicCatalog(assetRoot, logLabel) {
+    var items = [];
     if (K.nodeOK && K.fs && K.path && K.extensionPath) {
       try {
         var root = K.extensionPath();
         if (root) {
-          var raw = JSON.parse(K.fs.readFileSync(K.path.join(root, "assets", "pro-mogrt-showcase", "catalog.json"), "utf8"));
-          return Array.isArray(raw.items) ? raw.items : [];
+          var raw = JSON.parse(K.fs.readFileSync(K.path.join(root, "assets", assetRoot, "catalog.json"), "utf8"));
+          items = Array.isArray(raw.items) ? raw.items : [];
         }
-      } catch (e) { K.log("[yazi] Pro vitrin katalogu okunamadi: " + (e && e.message)); }
+      } catch (e) { K.log("[yazi] " + logLabel + " okunamadi: " + (e && e.message)); }
     }
-    // Tarayici onizleme modu Node dosya sistemine sahip degildir. Public
-    // katalog yalniz ad + kucuk gorsel tasidigi icin ayni vitrini HTTP'den oku.
-    try {
+    if (!items.length) try {
       if (typeof fetch === "function") {
-        var res = await fetch("assets/pro-mogrt-showcase/catalog.json", { cache: "no-store" });
+        var res = await fetch("assets/" + assetRoot + "/catalog.json", { cache: "no-store" });
         if (res.ok) {
           var webRaw = await res.json();
-          return Array.isArray(webRaw.items) ? webRaw.items : [];
+          items = Array.isArray(webRaw.items) ? webRaw.items : [];
         }
       }
-    } catch (e2) { K.log("[yazi] Pro web vitrini okunamadi: " + (e2 && e2.message)); }
-    return [];
+    } catch (e2) { K.log("[yazi] Web " + logLabel + " okunamadi: " + (e2 && e2.message)); }
+    return items.map(function (item) {
+      var copy = {};
+      Object.keys(item || {}).forEach(function (key) { copy[key] = item[key]; });
+      copy.showcaseRoot = assetRoot;
+      return copy;
+    });
+  }
+
+  async function showcaseCatalog() {
+    if (vitrinKatalogOnbellegi) return vitrinKatalogOnbellegi.slice();
+    var mogrt = await publicCatalog("pro-mogrt-showcase", "Pro animasyon vitrini");
+    var captions = await publicCatalog("pro-caption-showcase", "Pro altyazi vitrini");
+    captions.forEach(function (item) { item.group = "caption"; });
+    vitrinKatalogOnbellegi = mogrt.concat(captions);
+    return vitrinKatalogOnbellegi.slice();
   }
 
   function showcasePreview(item) {
     var rel = String(item && item.preview || "").replace(/\\/g, "/").replace(/^\/+/, "");
     if (!/^previews\/[a-z0-9._-]+$/i.test(rel)) return null;
-    return "assets/pro-mogrt-showcase/" + rel;
+    var root = String(item && item.showcaseRoot || "pro-mogrt-showcase");
+    if (!/^pro-(?:mogrt|caption)-showcase$/i.test(root)) return null;
+    return "assets/" + root + "/" + rel;
   }
 
   function showcaseVideo(item) {
     var rel = String(item && item.video || "").replace(/\\/g, "/").replace(/^\/+/, "");
     if (!/^previews\/[a-z0-9._-]+\.webm$/i.test(rel)) return null;
-    return "assets/pro-mogrt-showcase/" + rel;
+    var root = String(item && item.showcaseRoot || "pro-mogrt-showcase");
+    if (!/^pro-(?:mogrt|caption)-showcase$/i.test(root)) return null;
+    return "assets/" + root + "/" + rel;
   }
   function cacheDir() {
     var d = K.path.join(kokDir(), "mogrt-cache");
@@ -208,7 +227,6 @@ window.KLib = (function () {
       var uniqueKey = mogrtNameKey(item.match || display) || display.toLowerCase();
       if (gorulen[uniqueKey]) return;
       var preview = showcasePreview(item);
-      if (!preview) return;
       gorulen[uniqueKey] = 1;
       paketler.push({
         path: "",
@@ -219,7 +237,7 @@ window.KLib = (function () {
         builtin: false,
         pro: true,
         showcase: true,
-        group: "text",
+        group: item.group === "caption" || item.group === "other" || item.group === "buton" ? item.group : "text",
         category: String(item.category || "Text Animation")
       });
     });
@@ -227,12 +245,16 @@ window.KLib = (function () {
 
   async function tara() {
     var buTarama = ++taraNo;
+    // Sekmeler arasi hizli geciste ayni pahali disk taramasini tekrar baslatma.
+    // Elle yenile butonu tara()'yi dogrudan cagirarak yine yeni tarama yapabilir.
+    tarandi = true;
     if (!K.nodeOK || !K.fs || !K.path) {
       paketler = [];
       if (typeof Pro !== "undefined" && !Pro.isPro()) vitrinEkle(await showcaseCatalog(), {});
       sayaclar();
       ciz();
       altyaziStilleriniGonder();
+      tarandi = true;
       return;
     }
     /*
@@ -358,6 +380,7 @@ window.KLib = (function () {
         altyaziStilleriniGonder();
       }
     }
+    tarandi = true;
   }
 
   /* ---------------- çizim ---------------- */
@@ -381,6 +404,61 @@ window.KLib = (function () {
     if (sb) sb.textContent = String(paketler.filter(function (p) { return p.group === "buton"; }).length);
     var favSayisi = paketler.filter(function (p) { return favMi(p.ad); }).length;
     var s2 = el("fav-sayac"); if (s2) s2.textContent = String(favSayisi);
+    kategoriVitriniTazele();
+  }
+
+  function kategoriVitriniTazele() {
+    var configs = {
+      mogrt: {
+        fallback: 84, title: "84 premium yazı animasyonu",
+        description: "Zoom, bounce, shine, wave ve sosyal metin efektleri. Önizle; Pro'da tek tıkla timeline'a ekle.",
+        cta: "Yazı animasyonlarını aç — 749 TL"
+      },
+      captions: {
+        fallback: 17, title: "17 gerçek altyazı şablonu",
+        description: "Her stil 9:16, 16:9 ve 1:1 oranına hazır. Stilini gör; Pro'da altyazıya doğrudan uygula.",
+        cta: "Altyazı şablonlarını aç — 749 TL"
+      },
+      custom: {
+        fallback: 123, title: "123 grafik ve sahne animasyonu",
+        description: "Sosyal yorumlar, grafik öğeler, geçişler, ikonlar ve lower third'ler tek kütüphanede.",
+        cta: "Tüm animasyonları aç — 749 TL"
+      },
+      buton: {
+        fallback: 35, title: "35 hazır CTA butonu",
+        description: "Abone ol, takip et, indir, paylaş ve satın al çağrılarını playhead'e tek tıkla yerleştir.",
+        cta: "CTA butonlarını aç — 749 TL"
+      },
+      fav: {
+        fallback: 262, title: "262 animasyon ve grafik",
+        description: "Beğendiklerini favorile; Pro açıldığında hazır seçkini doğrudan timeline'da kullan.",
+        cta: "Tüm Pro kütüphanesini aç — 749 TL"
+      }
+    };
+    var cfg = configs[kategori] || configs.mogrt;
+    var grup = kategori === "mogrt" ? "text" : (kategori === "custom" ? "other" : kategori);
+    var visibleCount = kategori === "fav"
+      ? paketler.filter(function (p) { return p.showcase; }).length
+      : paketler.filter(function (p) { return p.group === grup; }).length;
+    var count = visibleCount || cfg.fallback;
+    var title = el("yazi-tanitim-baslik"); if (title) title.textContent = cfg.title.replace(/^\d+/, String(count));
+    var detail = el("yazi-tanitim-aciklama"); if (detail) detail.textContent = cfg.description;
+    var proof = el("yazi-tanitim-adet"); if (proof) proof.textContent = String(count);
+    var cta = el("yazi-proya-gec"); if (cta) cta.textContent = cfg.cta;
+    var pill = el("ki-pill-label");
+    if (pill) pill.textContent = (typeof Pro !== "undefined" && !Pro.isPro()) ? "PRO PREVIEW" : "PREMIERE READY";
+  }
+
+  async function vitriniOnIsit() {
+    if (typeof Pro === "undefined" || Pro.isPro()) return;
+    try {
+      var items = await showcaseCatalog();
+      if (tarandi || Pro.isPro()) return;
+      paketler = [];
+      vitrinEkle(items, {});
+      sayaclar();
+      ciz();
+    } catch (e) { K.log("[yazi] Vitrin on yuklemesi basarisiz: " + (e && e.message)); }
   }
 
   function ciz() {
@@ -594,14 +672,17 @@ window.KLib = (function () {
 
     if (typeof Pro !== "undefined") Pro.on(function () { kilitTazele(); tara(); });
     kilitTazele();
+    kategoriVitriniTazele();
+    vitriniOnIsit();
 
-    KApp.onTab("text", function () { if (!paketler.length) tara(); });
+    KApp.onTab("text", function () { if (!tarandi) tara(); });
     // Büyük MOGRT arşivini Premiere açılırken arka planda tarama. Kullanıcı Yazı
     // bölümünü açtığında onTab üzerinden bir kez yüklenir.
   }
 
   function setKategori(kat) {
     kategori = (kat === "fav" || kat === "custom" || kat === "buton" || kat === "captions") ? kat : "mogrt";
+    kategoriVitriniTazele();
     ciz();
   }
 
@@ -614,6 +695,11 @@ window.KLib = (function () {
     sayisi: function () { return paketler.filter(function (p) { return !p.showcase; }).length; },
     gorunenSayisi: function () { return paketler.length; },
     vitrinSayisi: function () { return paketler.filter(function (p) { return p.showcase; }).length; },
+    vitrinGruplari: function () {
+      var out = { text: 0, caption: 0, other: 0, buton: 0 };
+      paketler.filter(function (p) { return p.showcase; }).forEach(function (p) { if (out[p.group] !== undefined) out[p.group]++; });
+      return out;
+    },
     yerlesikSayisi: function () { return paketler.filter(function (p) { return p.builtin; }).length; },
     hariciSayisi: function () { return paketler.filter(function (p) { return !p.builtin && !p.showcase; }).length; },
     yaziSayisi: function () { return paketler.filter(function (p) { return p.group === "text" && !p.showcase; }).length; },

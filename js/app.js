@@ -361,7 +361,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
