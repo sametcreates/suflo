@@ -124,8 +124,9 @@ window.KEngine = (function () {
     if (!inst.length) return null;
     var want = K.settings().model;
     for (var i = 0; i < inst.length; i++) if (inst[i].id === want) return inst[i];
-    // tercih yoksa: turbo > large > small > base > tiny sırası
-    var order = ["turbo", "large", "small", "base", "tiny"];
+    // tercih yoksa kurulu en doğru modeli seç. Kullanıcı hız istiyorsa model
+    // listesinden Turbo'yu açıkça seçebilir; varsayılan kaliteyi sessizce düşürme.
+    var order = ["large", "turbo", "small", "base", "tiny"];
     for (var o = 0; o < order.length; o++) {
       for (var j = 0; j < inst.length; j++) if (inst[j].id === order[o]) return inst[j];
     }
@@ -487,8 +488,13 @@ window.KEngine = (function () {
       "-l", o.lang || "auto",
       "-oj", "-of", o.outBase,
       "-t", String(o.threads || 4),
-      "-pp"
+      "-pp",
+      "-bs", "5"
     ];
+
+    // Proje sozlugundeki dogru marka/kisi adlari ilk decode gecisine yon verir.
+    // Sonradan metin degistiren bir LLM degildir; ses-model hizalamasini korur.
+    if (o.prompt) args.push("--prompt", String(o.prompt).slice(0, 700));
 
     // VAD: sessizlikleri atla (büyük hız kazancı + halüsinasyon azalır)
     // Not: -vp ve -vsd MİLİSANİYE cinsinden (whisper-cli varsayılanları 30 / 100).

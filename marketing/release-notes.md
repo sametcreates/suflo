@@ -1,3 +1,14 @@
+## Suflo 2.9.5 — Tek altyazı motoru ve Suflo Caption Editor
+
+- Kullanıcının karşısındaki yerel/bulut motor karmaşası kaldırıldı. Yeni **Suflo Altyazı Motoru** en doğru kurulu modeli ve GPU'yu kullanır; yerel çekirdek çalışmazsa yalnız önceden ayarlanmış güvenli bulut yedeğine geçer.
+- Yerel transkripsiyonda daha isabetli sonuç için beam search ve en güçlü kurulu model önceliği getirildi. Proje sözlüğündeki isimler, markalar ve özel terimler artık motorun ilk dinleme yönlendirmesine de ekleniyor.
+- Yeni **Suflo Caption Editor**; kalite puanı, kelime ve okuma hızı istatistiği, düşük güvenli metinler, çakışan zamanlar, aşırı hızlı ve uzun satırlar için canlı uyarılar gösteriyor.
+- Arama, yalnız sorunlu satırları gösterme, tek tıkla nizami metin/zaman düzeltme, zaman koduna tıklayıp playhead'i götürme, 50 adımlı geçmiş ve otomatik taslak kaydı eklendi.
+- Kullanıcının yaptığı tek kelimelik düzeltmeler proje sözlüğüne öğretilebiliyor; sonraki altyazılarda hem transkripsiyon öncesi hem sonrasında kullanılıyor.
+- İsteğe bağlı **AI metin kontrolü** zaman kodlarını ve satır sayısını değiştirmeden yalnız yazım, noktalama ve bariz konuşma tanıma hatalarını denetliyor.
+- Enter ile böl, Alt+Enter ile yeni satır ekle, Ctrl+Enter ile sonraki satıra geç gibi hızlı düzenleme kısayolları eklendi.
+- Kritik okuma hızı, zaman veya güven sorunu bulunan altyazılar timeline'a uygulanmadan önce Suflo açıkça uyarıyor; sorunlu sonuç artık fark edilmeden sekansa gitmiyor.
+
 ## Suflo 2.9.4 — Hızlı açılış ve yeni Suflo Doctor
 
 - Premiere projesi açılırken büyük MOGRT, SFX, emoji ve Motion BG arşivleri artık aynı anda taranmıyor. Suflo önce hafif arayüzünü açıyor; kütüphaneler yalnız ilgili bölüme girildiğinde yükleniyor.

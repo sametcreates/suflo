@@ -195,6 +195,19 @@ window.KApp = (function () {
 
   var installingLocal = false;
 
+  function refreshEngineRoute() {
+    var out = el("set-engine-route");
+    if (!out) return;
+    var s = K.settings();
+    var local = !!KEngine.activeModel() && !!K.whisperLocal();
+    var cloud = s.provider !== "local" && !!s.apiKey;
+    var names = { groq: "Groq", openai: "OpenAI", custom: "özel bağlantı" };
+    if (local && cloud) out.textContent = "Önce yerel yüksek doğruluk · sorun olursa " + (names[s.provider] || "bulut") + " yedeği";
+    else if (local) out.textContent = "Yerel, çevrimdışı ve sınırsız · bulut yedeği kapalı";
+    else if (cloud) out.textContent = "Yerel çekirdek kurulu değil · " + (names[s.provider] || "bulut") + " rotası kullanılacak";
+    else out.textContent = "Motor hazır değil · yerel çekirdeği kur veya bulut yedeği ekle";
+  }
+
   function refreshLocalStatus() {
     var box = el("set-local-status");
     var btn = el("set-local-install");
@@ -216,6 +229,7 @@ window.KApp = (function () {
       btn.hidden = installingLocal;
     }
     refreshModelPicker();
+    refreshEngineRoute();
   }
 
   // Ayarlar'daki model listesi: kurulu olanlar işaretli, seçim kalıcı
@@ -258,7 +272,6 @@ window.KApp = (function () {
 
       var res = await KEngine.install({ modelId: modelId, useGpu: useGpu, onStatus: say });
 
-      el("set-provider").value = "local";
       var donanim = res.build === "cuda" ? " · GPU hızlandırmalı"
         : (res.build === "metal" ? " · Metal hızlandırmalı" : " · CPU");
       toast("Hazır: " + res.model.label.split(" —")[0] + donanim +
@@ -620,6 +633,7 @@ window.KApp = (function () {
 
     el("set-provider").addEventListener("change", function () {
       el("set-custom-row").hidden = this.value !== "custom";
+      refreshEngineRoute();
     });
 
     el("set-local-install").addEventListener("click", function () { installLocalWhisper(); });
@@ -663,6 +677,7 @@ window.KApp = (function () {
       if (K.saveSettings()) toast("Ayarlar kaydedildi", "good");
       else toast("Ayarlar kaydedilemedi", "bad");
       KCaptions.refreshSetup();
+      refreshEngineRoute();
     });
 
     el("lnk-groq").addEventListener("click", function (e) {

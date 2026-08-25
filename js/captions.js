@@ -27,8 +27,12 @@ window.KCaptions = (function () {
 
   var undoStack = [];
   var redoStack = [];
-  var UNDO_MAX = 25;
+  var UNDO_MAX = 50;
   var draftTimer = null;
+  var editorQuery = "";
+  var editorOnlyIssues = false;
+  var selectedSegment = -1;
+  var lastCorrection = null;
 
   /*
    * Uretim anindaki satir modu ("k1" | "kc" | "w" | "plain").
@@ -55,30 +59,34 @@ window.KCaptions = (function () {
   }
 
   function snapshot(etiket) {
-    undoStack.push({ segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode });
+    uygulaEtiketiniSifirla();
+    undoStack.push({ segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, ts: Date.now() });
     if (undoStack.length > UNDO_MAX) undoStack.shift();
     redoStack.length = 0;
     refreshUndoUI();
+    renderHistory();
   }
 
   function undo() {
     if (!undoStack.length) return;
-    redoStack.push({ segs: JSON.stringify(segments), etiket: "", mode: segmentsMode });
+    redoStack.push({ segs: JSON.stringify(segments), etiket: "", mode: segmentsMode, ts: Date.now() });
     var st = undoStack.pop();
     segments = JSON.parse(st.segs);
     if (st.mode) segmentsMode = st.mode;
     render();
     refreshUndoUI();
+    renderHistory();
     saveDraftSoon();          // diskteki taslak ekrandakiyle aynı kalsın
     KApp.toast(st.etiket ? "Geri alındı: " + st.etiket : "Geri alındı");
   }
 
   function redo() {
     if (!redoStack.length) return;
-    undoStack.push({ segs: JSON.stringify(segments), etiket: "" });
+    undoStack.push({ segs: JSON.stringify(segments), etiket: "", mode: segmentsMode, ts: Date.now() });
     segments = JSON.parse(redoStack.pop().segs);
     render();
     refreshUndoUI();
+    renderHistory();
     saveDraftSoon();
   }
 
@@ -153,8 +161,16 @@ window.KCaptions = (function () {
 
   function engineReady() {
     var s = K.settings();
-    if (s.provider === "local") return !!KEngine.activeModel() && !!K.whisperLocal();
-    return !!s.apiKey;
+    return localEngineReady() || (s.provider !== "local" && !!s.apiKey);
+  }
+
+  function localEngineReady() {
+    return !!KEngine.activeModel() && !!K.whisperLocal();
+  }
+
+  function cloudEngineReady() {
+    var s = K.settings();
+    return s.provider !== "local" && !!s.apiKey;
   }
 
   function refreshSetup() {
@@ -209,9 +225,7 @@ window.KCaptions = (function () {
     // is surerken ilerleme yazisini talimatlarla ezme
     if (busy || !ctx.connected) return;
     if (!engineReady()) {
-      status(K.settings().provider === "local"
-        ? "Yerel motor bulunamadı — Ayarlar'dan kur ya da motor değiştir."
-        : "API anahtarı gerekli — yukarıdan gir ya da yerel motoru kur.");
+      status("Suflo Altyazı Motoru hazır değil — yerel çekirdeği kur veya Ayarlar'dan bulut yedeği ekle.");
     } else if (needSel && !ctx.sel) status("Timeline'da konuşma içeren bir klip seç.");
     else if (!needSel && !ctx.hasSeq) status("Önce bir sequence aç.");
     else {
@@ -301,7 +315,8 @@ window.KCaptions = (function () {
       lang: lang,
       outBase: outBase,
       threads: threads,
-      wordLevel: wordLevel
+      wordLevel: wordLevel,
+      prompt: glossaryPrompt()
     });
     var args = built.args;
     K.log("yerel motor: " + (KEngine.installedBuild() === "cuda" ? "GPU" : "CPU") +
@@ -332,7 +347,12 @@ window.KCaptions = (function () {
         s = tcParse(t.timestamps.from);
         e = tcParse(t.timestamps.to);
       }
-      return { start: s || 0, end: e || 0, text: String(t.text || "").trim() };
+      var probs = (t.tokens || []).map(function (token) { return Number(token && token.p); })
+        .filter(function (p) { return isFinite(p) && p >= 0 && p <= 1; });
+      var confidence = probs.length
+        ? probs.reduce(function (n, p) { return n + p; }, 0) / probs.length
+        : (isFinite(Number(t.avg_logprob)) ? Math.exp(Number(t.avg_logprob)) : undefined);
+      return { start: s || 0, end: e || 0, text: String(t.text || "").trim(), confidence: confidence };
     });
     if (wordLevel) {
       K.log("yerel kelime modu: " + segs.length + " parça, ilk3=" +
@@ -398,6 +418,8 @@ window.KCaptions = (function () {
     var cfg = providerConfig();
     if (!cfg.url) throw new Error("Endpoint tanımsız — Ayarlar'a bak.");
     var fields = { model: cfg.model, response_format: "verbose_json" };
+    var prompt = glossaryPrompt();
+    if (prompt) fields.prompt = prompt;
     if (wordLevel) fields["timestamp_granularities[]"] = ["word", "segment"];
     var lang = el("cap-lang").value;
     if (lang) fields.language = lang;
@@ -431,7 +453,7 @@ window.KCaptions = (function () {
     // karaoke: kelime dizisi varsa onu kullan (word alanı "word", segment alanı "text")
     if (wordLevel && json.words && json.words.length) {
       var ws = json.words.map(function (w) {
-        return { start: Number(w.start) || 0, end: Number(w.end) || 0, text: String(w.word || "").trim() };
+        return { start: Number(w.start) || 0, end: Number(w.end) || 0, text: String(w.word || "").trim(), confidence: isFinite(Number(w.confidence)) ? Number(w.confidence) : undefined };
       });
       K.log("bulut kelime modu: " + ws.length + " kelime, ilk3=" +
         ws.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
@@ -445,8 +467,46 @@ window.KCaptions = (function () {
       raw = [{ start: 0, end: durHint || 5, text: json.text }];
     }
     return raw.map(function (s) {
-      return { start: Number(s.start), end: Number(s.end), text: String(s.text || "").trim() };
+      var confidence = isFinite(Number(s.confidence)) ? Number(s.confidence)
+        : (isFinite(Number(s.avg_logprob)) ? Math.exp(Number(s.avg_logprob)) : undefined);
+      return { start: Number(s.start), end: Number(s.end), text: String(s.text || "").trim(), confidence: confidence };
     });
+  }
+
+  /*
+   * Kullanici tek bir "Suflo Altyazi Motoru" gorur. Suflo once yerel ve en
+   * mahrem rotayi dener; kullanici Ayarlar'dan yedek acmissa yalniz yerel
+   * cekirdek basarisiz oldugunda buluta gecer. Bu sayede kolaylik icin hata
+   * toleransindan vazgecilmez.
+   */
+  async function transcribeSuflo(audioPath, durHint, wordLevel, tempFiles) {
+    var errors = [];
+    if (localEngineReady()) {
+      try {
+        status("Suflo Motoru · yerel yüksek doğruluk…");
+        return await transcribeLocal(audioPath, wordLevel);
+      } catch (eLocal) {
+        errors.push("yerel: " + (eLocal && eLocal.message ? eLocal.message : eLocal));
+        K.log("Suflo motoru yerel rota basarisiz: " + errors[errors.length - 1]);
+      }
+    }
+    if (cloudEngineReady()) {
+      var cloudAudio = audioPath;
+      try {
+        if (/\.wav$/i.test(cloudAudio)) {
+          status("Suflo Motoru · güvenli yedek için ses hazırlanıyor…");
+          cloudAudio = await convertAudio(audioPath, { wav: false, durHint: durHint });
+          if (tempFiles) tempFiles.push(cloudAudio);
+        }
+        status("Suflo Motoru · güvenli bulut yedeği…");
+        return await transcribeCloud(cloudAudio, durHint, wordLevel);
+      } catch (eCloud) {
+        errors.push("yedek: " + (eCloud && eCloud.message ? eCloud.message : eCloud));
+      }
+    }
+    throw new Error(errors.length
+      ? "Suflo Altyazı Motoru tamamlayamadı — " + errors.join(" · ")
+      : "Suflo Altyazı Motoru hazır değil — yerel çekirdeği kur veya bulut yedeği ekle.");
   }
 
   /* ---------------- Temizlik + bölme ---------------- */
@@ -482,7 +542,7 @@ window.KCaptions = (function () {
       var end = Math.max(w.end, w.start + 0.12);
       if (words[i + 1] && end > words[i + 1].start) end = words[i + 1].start;
       if (end <= w.start) end = w.start + 0.05;
-      out.push({ start: w.start, end: end, text: w.text });
+      out.push({ start: w.start, end: end, text: w.text, confidence: w.confidence });
     }
     return out;
   }
@@ -499,7 +559,7 @@ window.KCaptions = (function () {
       var end = Math.max(w.end, w.start + 0.12);
       if (words[i + 1] && end > words[i + 1].start) end = words[i + 1].start;
       if (end <= w.start) end = w.start + 0.05;
-      out.push({ start: w.start, end: end, text: line.join(" ") });
+      out.push({ start: w.start, end: end, text: line.join(" "), confidence: w.confidence });
     }
     return out;
   }
@@ -517,7 +577,8 @@ window.KCaptions = (function () {
         out.push({
           start: s.start + step * i,
           end: s.start + step * (i + 1),
-          text: words.slice(i * n, (i + 1) * n).join(" ")
+          text: words.slice(i * n, (i + 1) * n).join(" "),
+          confidence: s.confidence
         });
       }
     });
@@ -540,7 +601,7 @@ window.KCaptions = (function () {
         var yeni = s.start + makul;
         var next = segs[i + 1];
         if (next && yeni > next.start - GAP) yeni = Math.max(s.start + 0.5, next.start - GAP);
-        return { start: s.start, end: yeni, text: s.text };
+        return { start: s.start, end: yeni, text: s.text, confidence: s.confidence };
       }
       return s;
     });
@@ -561,7 +622,7 @@ window.KCaptions = (function () {
       acc = acc.filter(Boolean);
       var step = dur / acc.length;
       acc.forEach(function (w, i) {
-        out.push({ start: s.start + step * i, end: s.start + step * (i + 1), text: w });
+        out.push({ start: s.start + step * i, end: s.start + step * (i + 1), text: w, confidence: s.confidence });
       });
     });
     return out;
@@ -589,6 +650,19 @@ window.KCaptions = (function () {
   function glossaryText() {
     var g = K.settings().glossary || [];
     return g.map(function (r) { return r.from + " => " + r.to; }).join("\n");
+  }
+
+  // Dogru yazimlari motora daha sesi dinlerken ogret. Sonraki deterministik
+  // sozluk gecisi yine kalir; prompt yalniz ilk tahmini guclendirir.
+  function glossaryPrompt() {
+    var rules = K.settings().glossary || [];
+    var correct = [];
+    rules.forEach(function (r) {
+      var t = String(r && r.to || "").trim();
+      if (t && correct.indexOf(t) === -1) correct.push(t);
+    });
+    if (!correct.length) return "";
+    return "Doğru yazılması gereken özel adlar ve terimler: " + correct.join(", ").slice(0, 700) + ".";
   }
 
   /*
@@ -1344,7 +1418,10 @@ window.KCaptions = (function () {
         }
       }
 
-      var useLocal = K.settings().provider === "local";
+      // Kullanici motor secmez: Suflo yerel rota hazirsa WAV, degilse bulut icin
+      // sikistirilmis ses hazirlar. Yerel hata verirse transcribeSuflo kendi MP3
+      // yedegini olusturup guvenli rotaya gecer.
+      var useLocal = localEngineReady();
       var audioSrc, seqOffset, durHint;
 
       var speedFactor = 1;
@@ -1418,9 +1495,7 @@ window.KCaptions = (function () {
             });
             tempFiles.push(ba);
             status(tag + "transkribe ediliyor…");
-            var bRaw = useLocal
-              ? await transcribeLocal(ba, karaoke)
-              : await transcribeCloud(ba, bc.dur, karaoke);
+            var bRaw = await transcribeSuflo(ba, bc.dur, karaoke, tempFiles);
             var bTl = bc.clipEnd - bc.clipStart;
             var bf = (bc.dur > 0 && bTl > 0) ? bTl / bc.dur : 1;
             bRaw.forEach(function (s) {
@@ -1428,7 +1503,8 @@ window.KCaptions = (function () {
               mapped.push({
                 start: bc.clipStart + s.start * bf,
                 end: bc.clipStart + s.end * bf,
-                text: s.text
+                text: s.text,
+                confidence: s.confidence
               });
             });
           } catch (eB) {
@@ -1444,16 +1520,15 @@ window.KCaptions = (function () {
         if (failed.length) KApp.toast(failed.length + " klip atlandı: " + failed.join(", ").slice(0, 100), "bad");
         mapped.sort(function (a, b) { return a.start - b.start; });
       } else {
-        status(useLocal ? "Transkribe ediliyor… (yerel)" : "Transkribe ediliyor…");
-        var raw = useLocal
-          ? await transcribeLocal(audioSrc, karaoke)
-          : await transcribeCloud(audioSrc, durHint, karaoke);
+        status("Suflo Altyazı Motoru dinliyor…");
+        var raw = await transcribeSuflo(audioSrc, durHint, karaoke, tempFiles);
 
         mapped = raw.map(function (s) {
           return {
             start: seqOffset + s.start * speedFactor,
             end: seqOffset + s.end * speedFactor,
-            text: s.text
+            text: s.text,
+            confidence: s.confidence
           };
         }).filter(function (s) { return s.text; });
       }
@@ -1530,6 +1605,203 @@ window.KCaptions = (function () {
 
   /* ---------------- Segment düzenleme ---------------- */
 
+  function qualityOptions() {
+    var len = el("cap-maxlen") ? el("cap-maxlen").value : "c42";
+    var mc = /^c(\d+)$/.exec(len);
+    return {
+      lang: (el("cap-lang") && el("cap-lang").value) || algilananDil || "tr",
+      maxChars: mc ? Number(mc[1]) : 42,
+      wordMode: /^k/.test(len) || segmentsMode === "k1" || segmentsMode === "kc"
+    };
+  }
+
+  function qualityReport() {
+    if (!window.SufloCaptionQuality) return { rows: [], total: segments.length, words: 0, flagged: 0, avgCps: 0, score: 0, bad: 0, warn: 0 };
+    return window.SufloCaptionQuality.analyze(segments, qualityOptions());
+  }
+
+  function updateQualityUI(report) {
+    report = report || qualityReport();
+    var score = el("cap-quality-score");
+    if (score) {
+      score.className = "caption-quality-score " + (report.score >= 90 ? "good" : (report.score >= 72 ? "warn" : "bad"));
+      var strong = score.querySelector("strong");
+      if (strong) strong.textContent = String(report.score);
+    }
+    if (el("cap-stat-lines")) el("cap-stat-lines").textContent = String(report.total);
+    if (el("cap-stat-flags")) el("cap-stat-flags").textContent = String(report.flagged);
+    if (el("cap-stat-speed")) el("cap-stat-speed").textContent = report.avgCps.toFixed(1);
+    if (el("cap-stat-words")) el("cap-stat-words").textContent = String(report.words);
+    if (el("cap-quality-label")) {
+      el("cap-quality-label").textContent = !report.flagged
+        ? "Tüm satırlar okunabilirlik ve zamanlama kontrolünden geçti."
+        : report.flagged + " satır gözden geçirilmeli · " + report.bad + " kritik, " + report.warn + " uyarı";
+    }
+    if (el("cap-result-info")) el("cap-result-info").textContent = report.total + " satır · kalite " + report.score + "/100";
+  }
+
+  function applyEditorFilters() {
+    var box = el("cap-segments");
+    if (!box) return;
+    var oldEmpty = box.querySelector(".editor-filter-empty");
+    if (oldEmpty) oldEmpty.remove();
+    var q = String(editorQuery || "").toLocaleLowerCase("tr");
+    var visible = 0;
+    Array.prototype.forEach.call(box.querySelectorAll(".seg"), function (row) {
+      var i = Number(row.dataset.i);
+      var textMatches = !q || String(segments[i] && segments[i].text || "").toLocaleLowerCase("tr").indexOf(q) !== -1;
+      var show = textMatches && (!editorOnlyIssues || row.classList.contains("flagged"));
+      row.classList.toggle("filtered", !show);
+      if (show) visible++;
+    });
+    if (!visible) {
+      var empty = document.createElement("div");
+      empty.className = "empty editor-filter-empty";
+      empty.textContent = editorOnlyIssues ? "Kontrol gerektiren satır kalmadı." : "Aramana uyan altyazı bulunamadı.";
+      box.appendChild(empty);
+    }
+  }
+
+  function historyTime(ts) {
+    if (!ts) return "";
+    try { return new Date(ts).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }); }
+    catch (e) { return ""; }
+  }
+
+  function restoreHistory(index) {
+    var st = undoStack[index];
+    if (!st) return;
+    redoStack.push({ segs: JSON.stringify(segments), etiket: "geçmişten önce", mode: segmentsMode, ts: Date.now() });
+    segments = JSON.parse(st.segs);
+    if (st.mode) segmentsMode = st.mode;
+    undoStack = undoStack.slice(0, index);
+    render();
+    refreshUndoUI();
+    saveDraftNow();
+    var menu = el("cap-history-menu");
+    if (menu) menu.hidden = true;
+    KApp.toast("Geçmiş sürüm geri getirildi", "good");
+  }
+
+  function renderHistory() {
+    var menu = el("cap-history-menu");
+    if (!menu) return;
+    menu.innerHTML = "";
+    if (!undoStack.length) {
+      var empty = document.createElement("button");
+      empty.type = "button";
+      empty.disabled = true;
+      empty.textContent = "Henüz düzenleme geçmişi yok";
+      menu.appendChild(empty);
+      return;
+    }
+    for (var i = undoStack.length - 1; i >= Math.max(0, undoStack.length - 12); i--) {
+      (function (idx) {
+        var st = undoStack[idx];
+        var b = document.createElement("button");
+        b.type = "button";
+        var label = document.createElement("span");
+        label.textContent = st.etiket || "Düzenleme";
+        var time = document.createElement("small");
+        time.textContent = historyTime(st.ts);
+        b.appendChild(label); b.appendChild(time);
+        b.onclick = function () { restoreHistory(idx); };
+        menu.appendChild(b);
+      })(i);
+    }
+  }
+
+  function correctionFromEdit(before, after) {
+    var a = String(before || "").trim().split(/\s+/);
+    var b = String(after || "").trim().split(/\s+/);
+    if (a.length !== b.length || a.length > 40) return null;
+    var changed = [];
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) changed.push({ from: a[i], to: b[i] });
+    if (changed.length !== 1) return null;
+    var clean = function (x) { return String(x || "").replace(/^[\s"'“”‘’([{]+|[\s"'“”‘’.,!?;:)}\]]+$/g, ""); };
+    var out = { from: clean(changed[0].from), to: clean(changed[0].to) };
+    return out.from && out.to && out.from !== out.to ? out : null;
+  }
+
+  function showLastCorrection(correction) {
+    lastCorrection = correction;
+    var b = el("cap-learn-last");
+    if (!b) return;
+    b.hidden = !correction;
+    b.textContent = correction ? "Bu düzeltmeyi öğren: “" + correction.from + "” → “" + correction.to + "”" : "";
+  }
+
+  function learnLastCorrection() {
+    if (!lastCorrection) return;
+    var s = K.settings();
+    s.glossary = (s.glossary || []).filter(function (r) { return r.from !== lastCorrection.from; });
+    s.glossary.push({ from: lastCorrection.from, to: lastCorrection.to });
+    K.saveSettings();
+    if (el("set-glossary")) el("set-glossary").value = glossaryText();
+    KApp.toast("Suflo öğrendi: " + lastCorrection.from + " → " + lastCorrection.to, "good");
+    showLastCorrection(null);
+  }
+
+  function qualityAutoFix() {
+    if (!segments.length || !window.SufloCaptionQuality) return;
+    var next = window.SufloCaptionQuality.autoFix(segments, qualityOptions());
+    applyGlossary(next);
+    if (JSON.stringify(next) === JSON.stringify(segments)) {
+      KApp.toast("Altyazı zaten nizami görünüyor", "good");
+      return;
+    }
+    snapshot("nizami otomatik düzeltme");
+    segments = next;
+    render(); saveDraftNow();
+    KApp.toast("Metin, satır uzunluğu ve zamanlama düzeltildi", "good");
+  }
+
+  async function proofreadAll() {
+    if (!segments.length) return;
+    var cfg = chatConfig();
+    if (!cfg) {
+      KApp.toast("AI metin kontrolü için Ayarlar > Bulut yedeği bölümüne bir anahtar ekle.", "warn");
+      return;
+    }
+    var btn = el("cap-proofread");
+    btn.disabled = true;
+    try {
+      var refs = segments.slice();
+      var originals = refs.map(function (s) { return s.text; });
+      var corrected = [];
+      var BATCH = 50;
+      for (var i = 0; i < originals.length; i += BATCH) {
+        var chunk = originals.slice(i, i + BATCH);
+        status("AI metin kontrolü… " + Math.min(i + BATCH, originals.length) + "/" + originals.length);
+        var json = await chatCall(cfg, {
+          model: cfg.model,
+          temperature: 0,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: "You proofread subtitle lines. Fix only clear spelling, Turkish punctuation, capitalization and obvious speech-recognition errors. Preserve meaning, tone, slang, names, line order and line count. Never merge, split, censor or rewrite. Reply ONLY as JSON {\"lines\":[...]}, with exactly " + chunk.length + " strings." },
+            { role: "user", content: "Language: " + ((el("cap-lang") && el("cap-lang").value) || algilananDil || "auto") + "\nKnown correct terms: " + glossaryPrompt() + "\nLines:\n" + JSON.stringify(chunk) }
+          ]
+        });
+        var content = json.choices && json.choices[0] && json.choices[0].message.content;
+        var parsed = JSON.parse(content || "{}");
+        if (!parsed.lines || parsed.lines.length !== chunk.length) throw new Error("Kontrol satır sayısı değişti; mevcut metin korunarak işlem durduruldu.");
+        corrected = corrected.concat(parsed.lines);
+      }
+      var changed = 0;
+      corrected.forEach(function (text, i2) { if (String(text || "").trim() && String(text).trim() !== originals[i2]) changed++; });
+      if (!changed) { status(""); KApp.toast("AI kontrolü tamamlandı; açık bir yazım hatası bulunmadı", "good"); return; }
+      snapshot("AI metin kontrolü");
+      refs.forEach(function (s, i3) { s.text = String(corrected[i3] || s.text).trim() || s.text; s.proofread = true; });
+      applyGlossary(segments);
+      status(""); render(); saveDraftNow();
+      KApp.toast(changed + " satır ikinci kontrolden geçirildi", "good");
+    } catch (e) {
+      status("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   function tc(sec, comma) {
     if (sec < 0) sec = 0;
     // önce toplam ms'e yuvarla ki ,999 üstü kesirler saniyeye doğru devretsin
@@ -1547,41 +1819,85 @@ window.KCaptions = (function () {
     onizlemeCiz();
     var box = el("cap-segments");
     box.innerHTML = "";
+    var report = qualityReport();
+    var q = String(editorQuery || "").toLocaleLowerCase("tr");
+    var visible = 0;
     segments.forEach(function (s, i) {
+      var rowQuality = report.rows[i] || { issues: [], cps: 0, duration: Math.max(0, s.end - s.start), flagged: false, bad: false, confidence: s.confidence };
       var row = document.createElement("div");
-      row.className = "seg";
+      row.className = "seg" + (rowQuality.flagged ? " flagged" : "") + (rowQuality.bad ? " bad" : "") + (selectedSegment === i ? " selected" : "");
+      row.dataset.i = String(i);
+      var textMatches = !q || String(s.text || "").toLocaleLowerCase("tr").indexOf(q) !== -1;
+      if (!textMatches || (editorOnlyIssues && !rowQuality.flagged)) row.classList.add("filtered");
+      else visible++;
+      row.onclick = function (ev) {
+        if (ev.target && ev.target.tagName === "BUTTON") return;
+        selectedSegment = i;
+        Array.prototype.forEach.call(box.querySelectorAll(".seg.selected"), function (x) { x.classList.remove("selected"); });
+        row.classList.add("selected");
+      };
+
+      var meta = document.createElement("div");
+      meta.className = "seg-meta";
+      var number = document.createElement("span");
+      number.className = "seg-index";
+      number.textContent = "#" + String(i + 1);
 
       /* zaman: tek tık → playhead, çift tık → elle düzenle */
       var t = document.createElement("button");
       t.className = "seg-time mono jump";
-      t.textContent = tc(s.start, false).slice(3, 8);
+      t.textContent = tc(s.start, false).slice(3, 8) + "–" + tc(s.end, false).slice(3, 8);
       t.title = "Tık: playhead'i götür · Çift tık: zamanı düzenle";
       t.onclick = function () { K.call("KS_setPlayerPosition", { sec: s.start }); };
       t.ondblclick = function () { editTime(i, t); };
+      meta.appendChild(number); meta.appendChild(t);
 
-      var inp = document.createElement("input");
-      inp.type = "text";
+      var textWrap = document.createElement("div");
+      textWrap.className = "seg-text-wrap";
+      var inp = document.createElement("textarea");
+      inp.rows = 1;
       inp.value = s.text;
       inp.dataset.i = String(i);
-      inp.onfocus = function () { inp.dataset.before = inp.value; };
-      inp.oninput = function () { segments[i].text = inp.value; saveDraftSoon(); };
+      function fit() { inp.style.height = "auto"; inp.style.height = Math.min(90, Math.max(30, inp.scrollHeight)) + "px"; }
+      inp.onfocus = function () { inp.dataset.before = inp.value; selectedSegment = i; row.classList.add("selected"); };
+      inp.oninput = function () {
+        segments[i].text = inp.value;
+        fit();
+        updateQualityUI(qualityReport());
+        saveDraftSoon();
+      };
       inp.onblur = function () {
         // metin gerçekten değiştiyse geri alınabilir olsun
         if (inp.dataset.before !== undefined && inp.dataset.before !== inp.value) {
+          var correction = correctionFromEdit(inp.dataset.before, inp.value);
           var eski = JSON.parse(JSON.stringify(segments));
           eski[i].text = inp.dataset.before;
-          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme" });
+          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, ts: Date.now() });
           if (undoStack.length > UNDO_MAX) undoStack.shift();
           redoStack.length = 0;
           refreshUndoUI();
+          renderHistory();
+          if (correction) showLastCorrection(correction);
           inp.dataset.before = inp.value;
         }
       };
-      // Enter: imleç konumundan böl
+      // Enter: bol · Alt+Enter: alta satir ekle · Ctrl+Enter: sonraki satira gec
       inp.onkeydown = function (e) {
-        if (e.key === "Enter") { e.preventDefault(); splitAt(i, inp.selectionStart); }
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (e.altKey) { insertAfter(i); return; }
+        if (e.ctrlKey || e.metaKey) {
+          var next = box.querySelector('textarea[data-i="' + String(i + 1) + '"]');
+          if (next) { next.focus(); next.select(); }
+          return;
+        }
+        splitAt(i, inp.selectionStart);
       };
+      textWrap.appendChild(inp);
+      setTimeout(fit, 0);
 
+      var actions = document.createElement("div");
+      actions.className = "seg-actions";
       var spl = document.createElement("button");
       spl.className = "seg-x";
       spl.textContent = "⤸";
@@ -1604,6 +1920,9 @@ window.KCaptions = (function () {
         }
         segments[i].text = (segments[i].text + " " + nx.text).replace(/\s+/g, " ").trim();
         segments[i].end = nx.end;
+        if (isFinite(Number(segments[i].confidence)) && isFinite(Number(nx.confidence))) {
+          segments[i].confidence = (Number(segments[i].confidence) + Number(nx.confidence)) / 2;
+        }
         segments.splice(i + 1, 1);
         render(); saveDraftSoon();
       };
@@ -1618,11 +1937,36 @@ window.KCaptions = (function () {
         render(); saveDraftSoon();
       };
 
-      row.appendChild(t); row.appendChild(inp);
-      row.appendChild(spl); row.appendChild(mrg); row.appendChild(del);
+      actions.appendChild(spl); actions.appendChild(mrg); actions.appendChild(del);
+
+      var foot = document.createElement("div");
+      foot.className = "seg-foot";
+      var timing = document.createElement("span");
+      timing.textContent = rowQuality.duration.toFixed(1) + " sn · " + rowQuality.cps.toFixed(1) + " kr/sn";
+      foot.appendChild(timing);
+      if (rowQuality.confidence !== null && rowQuality.confidence !== undefined && isFinite(rowQuality.confidence)) {
+        var conf = document.createElement("span");
+        conf.textContent = "%" + Math.round(rowQuality.confidence * 100) + " güven";
+        foot.appendChild(conf);
+      }
+      rowQuality.issues.forEach(function (problem) {
+        var badge = document.createElement("span");
+        badge.className = "seg-issue " + problem.level;
+        badge.textContent = problem.label;
+        foot.appendChild(badge);
+      });
+
+      row.appendChild(meta); row.appendChild(textWrap); row.appendChild(actions); row.appendChild(foot);
       box.appendChild(row);
     });
-    el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula";
+    if (!visible) {
+      var empty = document.createElement("div");
+      empty.className = "empty editor-filter-empty";
+      empty.textContent = editorOnlyIssues ? "Kontrol gerektiren satır kalmadı." : "Aramana uyan altyazı bulunamadı.";
+      box.appendChild(empty);
+    }
+    updateQualityUI(report);
+    renderHistory();
   }
 
   // Boşluksuz yazı sistemleri (Japonca/Çince/Korece): kelime sınırı yok, her yerden bölünür
@@ -1659,8 +2003,8 @@ window.KCaptions = (function () {
     var kesme = s.start + Math.max(0.3, dur * oran);
     if (kesme >= s.end - 0.15) kesme = s.start + dur / 2;
     segments.splice(i, 1,
-      { start: s.start, end: kesme, text: a },
-      { start: kesme, end: s.end, text: b });
+      { start: s.start, end: kesme, text: a, confidence: s.confidence },
+      { start: kesme, end: s.end, text: b, confidence: s.confidence });
     render(); saveDraftSoon();
     KApp.toast("Satır bölündü", "good");
   }
@@ -2848,10 +3192,12 @@ window.KCaptions = (function () {
    */
   var uygulananSekans = {};   // sekans adı -> son uygulama zamanı (oturum içi)
   var onayBekleyen = null;
+  var kaliteOnayBekleyen = false;
   var UYGULA_ETIKET = "Sekansa uygula";
 
   function uygulaEtiketiniSifirla() {
     onayBekleyen = null;
+    kaliteOnayBekleyen = false;
     var b = el("cap-apply");
     if (b) { b.textContent = secilenMogrt ? "Seçili stili sekansa uygula" : UYGULA_ETIKET; b.classList.remove("warn"); }
   }
@@ -3075,6 +3421,29 @@ window.KCaptions = (function () {
 
   async function apply() {
     if (segments.length === 0) return;
+    var rapor = qualityReport();
+    var kritik = Number(rapor.bad) || 0;
+    var sekans = (KApp.ctx().sequence || "") || "?";
+    var yeniIzOnayi = !secilenMogrt && uygulananSekans[sekans] && onayBekleyen !== sekans;
+    if ((kritik > 0 && !kaliteOnayBekleyen) || yeniIzOnayi) {
+      if (kritik > 0) kaliteOnayBekleyen = true;
+      if (yeniIzOnayi) onayBekleyen = sekans;
+      var uyariBtn = el("cap-apply");
+      if (uyariBtn) {
+        uyariBtn.textContent = yeniIzOnayi
+          ? "Yine de yeni iz ekle" + (kritik > 0 ? " · " + kritik + " sorun" : "")
+          : kritik + " kritik sorunla yine de uygula";
+        uyariBtn.classList.add("warn");
+      }
+      var uyari = kritik > 0
+        ? kritik + " kritik altyazı sorunu var. Önce kırmızı satırları kontrol et veya Nizami düzelt'i kullan."
+        : "";
+      if (yeniIzOnayi) {
+        uyari += (uyari ? " " : "") + "Bu sekansa zaten altyazı uygulandı; devam etmek yeni bir altyazı izi ekler.";
+      }
+      KApp.toast(uyari, "warn", 9000);
+      return;
+    }
     if (secilenMogrt) {
       if (typeof Pro !== "undefined" && !Pro.gate("mogrt")) return;
       try {
@@ -3085,7 +3454,6 @@ window.KCaptions = (function () {
       }
       return;
     }
-    var sekans = (KApp.ctx().sequence || "") || "?";
     if (uygulananSekans[sekans] && onayBekleyen !== sekans) {
       onayBekleyen = sekans;
       var btn = el("cap-apply");
@@ -3751,6 +4119,23 @@ window.KCaptions = (function () {
     el("cap-shift-back").addEventListener("click", function () { shiftAll(-0.5); });
     el("cap-shift-fwd").addEventListener("click", function () { shiftAll(0.5); });
     el("cap-add-line").addEventListener("click", function () { insertAfter(segments.length - 1); });
+    if (el("cap-editor-search")) el("cap-editor-search").addEventListener("input", function () {
+      editorQuery = this.value || "";
+      applyEditorFilters();
+    });
+    if (el("cap-filter-issues")) el("cap-filter-issues").addEventListener("click", function () {
+      editorOnlyIssues = !editorOnlyIssues;
+      this.classList.toggle("on", editorOnlyIssues);
+      applyEditorFilters();
+    });
+    if (el("cap-auto-fix")) el("cap-auto-fix").addEventListener("click", qualityAutoFix);
+    if (el("cap-proofread")) el("cap-proofread").addEventListener("click", proofreadAll);
+    if (el("cap-learn-last")) el("cap-learn-last").addEventListener("click", learnLastCorrection);
+    if (el("cap-history")) el("cap-history").addEventListener("click", function () {
+      var menu = el("cap-history-menu");
+      renderHistory();
+      menu.hidden = !menu.hidden;
+    });
     initYildizBar();
     initStilKartlari();
     initEmoji();
@@ -3799,7 +4184,10 @@ window.KCaptions = (function () {
       var t = e.target;
       var yaziyor = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
       var k = e.key.toLowerCase();
-      if (k === "z" && !e.shiftKey && !yaziyor) { e.preventDefault(); undo(); }
+      if (k === "f" && el("cap-result") && !el("cap-result").hidden) {
+        e.preventDefault(); el("cap-editor-search").focus(); el("cap-editor-search").select();
+      }
+      else if (k === "z" && !e.shiftKey && !yaziyor) { e.preventDefault(); undo(); }
       else if ((k === "y" || (k === "z" && e.shiftKey)) && !yaziyor) { e.preventDefault(); redo(); }
     });
 

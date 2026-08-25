@@ -144,7 +144,7 @@
   <!-- ================= ALTYAZI ================= -->
   <section id="tab-captions" class="tabpane active">
     <div id="cap-setup" class="setup-note" hidden>
-      <p id="cap-setup-text"><strong>Altyazı için bir motor gerek.</strong> En kolayı: yerel motoru kur — hesap, anahtar, internet gerektirmez. NVIDIA ekran kartın varsa otomatik kullanılır.</p>
+      <p id="cap-setup-text"><strong>Suflo Altyazı Motoru kurulmalı.</strong> Tek motor; doğru modeli, GPU'yu ve güvenli yedeği kendisi yönetir. Yerel kullanımda hesap, anahtar veya internet gerekmez.</p>
       <button id="cap-local-install" class="btn primary" style="width:100%">Yerel motoru indir & kur</button>
       <p class="hint" id="cap-ffmpeg-ipucu" hidden style="margin:8px 0 6px">
         Not: ses dönüştürme için <b>ffmpeg</b> de gerekiyor (her iki motorda da).
@@ -392,7 +392,37 @@
         <button id="star-close" class="link-btn dim" title="Kapat">✕</button>
       </div>
 
-      <div id="cap-result" hidden>
+      <div id="cap-result" class="caption-editor" hidden>
+        <div class="caption-editor-hero">
+          <div class="caption-editor-title">
+            <span class="caption-editor-eyebrow">SUFLO CAPTION EDITOR</span>
+            <b>Altyazını kontrol et, düzelt ve yayınla.</b>
+            <small id="cap-quality-label">Okunabilirlik ve zamanlama analiz ediliyor…</small>
+          </div>
+          <div class="caption-quality-score" id="cap-quality-score" aria-label="Altyazı kalite puanı">
+            <strong>—</strong><span>/100</span>
+          </div>
+        </div>
+        <div class="caption-editor-stats" aria-label="Altyazı özeti">
+          <span><b id="cap-stat-lines">0</b><small>satır</small></span>
+          <span><b id="cap-stat-flags">0</b><small>kontrol</small></span>
+          <span><b id="cap-stat-speed">0</b><small>karakter/sn</small></span>
+          <span><b id="cap-stat-words">0</b><small>kelime</small></span>
+        </div>
+        <div class="caption-editor-tools">
+          <label class="caption-editor-search">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <input id="cap-editor-search" type="text" placeholder="Altyazıda ara…" autocomplete="off">
+          </label>
+          <button type="button" id="cap-filter-issues" class="btn tiny caption-tool-toggle" title="Yalnız kontrol gerektiren satırları göster">Kontrol gerekenler</button>
+          <button type="button" id="cap-auto-fix" class="btn tiny caption-tool-primary" title="Boşluk, satır uzunluğu, okuma hızı ve zamanlamayı otomatik düzelt">Nizami düzelt</button>
+          <button type="button" id="cap-proofread" class="btn tiny" title="Altyazı metnini bulut yedeğiyle ikinci kez kontrol eder; ses gönderilmez">AI metin kontrolü</button>
+          <span class="caption-history-wrap">
+            <button type="button" id="cap-history" class="btn tiny" title="Düzenleme geçmişi">Geçmiş</button>
+            <span id="cap-history-menu" class="caption-history-menu" hidden></span>
+          </span>
+          <button type="button" id="cap-learn-last" class="btn tiny caption-learn" hidden></button>
+        </div>
         <div class="result-head">
           <span id="cap-result-info" class="dim"></span>
           <span class="emoji-sarici">
@@ -430,6 +460,12 @@
           <button id="cap-save" class="link-btn">indir</button>
         </div>
         <div id="cap-segments" class="segments"></div>
+        <div class="caption-editor-shortcuts">
+          <span><i></i> Otomatik kaydedilir</span>
+          <span><kbd>Enter</kbd> böl</span>
+          <span><kbd>Ctrl+Enter</kbd> sonraki satır</span>
+          <span><kbd>Alt+Enter</kbd> satır ekle</span>
+        </div>
 
         <div class="row shift-row">
           <span class="dim" style="font-size:11px">Tümünü kaydır</span>
@@ -977,24 +1013,23 @@
       <span class="set-back-title">Ayarlar</span>
     </div>
 
-    <div class="set-group">
-      <div class="set-title">Transkripsiyon</div>
-      <div class="row">
-        <label>Motor</label>
-        <select id="set-provider">
-          <option value="local">Yerel — offline, sınırsız (önerilen)</option>
-          <option value="groq">Groq bulut (hızlı, ücretsiz)</option>
-          <option value="openai">OpenAI</option>
-          <option value="custom">Özel endpoint</option>
-        </select>
+    <div class="set-group caption-engine-settings">
+      <div class="set-title">Suflo Altyazı Motoru</div>
+      <div class="suflo-engine-card">
+        <span class="suflo-engine-mark" aria-hidden="true">S</span>
+        <span class="suflo-engine-copy">
+          <b>Tek motor. En doğru kullanılabilir rota.</b>
+          <small id="set-engine-route">Yerel model ve güvenli bulut yedeği kontrol ediliyor…</small>
+        </span>
+        <span class="suflo-engine-live">AKTİF</span>
       </div>
       <div class="row" id="set-local-row">
-        <label>Yerel motor</label>
+        <label>Yerel çekirdek</label>
         <span id="set-local-status" class="inline-status" style="margin:0;flex:1">kontrol ediliyor…</span>
         <button id="set-local-install" class="btn" hidden>İndir & kur</button>
       </div>
       <div class="row">
-        <label>Model</label>
+        <label>Doğruluk modeli</label>
         <select id="set-model" class="grow" title="Büyük model = daha doğru ama yavaş"></select>
       </div>
       <div class="row" id="set-gpu-row" hidden>
@@ -1005,19 +1040,32 @@
           <span>GPU: <b id="set-gpu-name" style="color:var(--accent-lite);font-weight:600"></b></span>
         </label>
       </div>
-      <div class="row" id="set-custom-row" hidden>
-        <label>Endpoint</label>
-        <input id="set-endpoint" type="text" placeholder="https://…/v1/audio/transcriptions">
-      </div>
-      <div class="row">
-        <label>API Key</label>
-        <input id="set-apikey" type="password" placeholder="gsk_… / sk-…">
-      </div>
-      <div class="row">
-        <label></label>
-        <button id="set-save" class="btn">Kaydet</button>
-        <a href="#" id="lnk-groq" class="link-btn">ücretsiz anahtar al →</a>
-      </div>
+      <details class="engine-advanced adv">
+        <summary>Bulut yedeği <span class="ia-not">yerel motor açılamazsa otomatik devreye girer</span></summary>
+        <div class="row">
+          <label>Yedek bağlantı</label>
+          <select id="set-provider">
+            <option value="local">Kapalı — yalnız yerel</option>
+            <option value="groq">Groq (hızlı, ücretsiz)</option>
+            <option value="openai">OpenAI</option>
+            <option value="custom">Özel endpoint</option>
+          </select>
+        </div>
+        <div class="row" id="set-custom-row" hidden>
+          <label>Endpoint</label>
+          <input id="set-endpoint" type="text" placeholder="https://…/v1/audio/transcriptions">
+        </div>
+        <div class="row">
+          <label>API anahtarı</label>
+          <input id="set-apikey" type="password" placeholder="gsk_… / sk-…">
+        </div>
+        <div class="row">
+          <label></label>
+          <button id="set-save" class="btn">Yedeği kaydet</button>
+          <a href="#" id="lnk-groq" class="link-btn">ücretsiz anahtar al →</a>
+        </div>
+        <p class="hint">Suflo önce bilgisayarındaki motoru kullanır. Yalnız yerel motor açılamazsa ses, seçtiğin yedek sağlayıcıya gönderilir.</p>
+      </details>
     </div>
 
     <div class="set-group">
@@ -1225,6 +1273,7 @@
   <script src="js/pro.js"></script>
   <script src="js/pro-sync.js"></script>
   <script src="js/engine.js"></script>
+  <script src="js/caption-quality.js"></script>
   <script src="js/style-engine.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/magiccut.js"></script>

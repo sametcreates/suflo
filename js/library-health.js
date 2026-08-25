@@ -292,31 +292,30 @@ window.KLibraryHealth = (function () {
     var checks = [];
     var settings = K.settings ? K.settings() : {};
     var provider = String(settings.provider || "local");
+    var cloudReady = provider !== "local" && (!!String(settings.apiKey || "").trim() || provider === "custom");
+    var executable = K.whisperLocal ? K.whisperLocal({ skipModel: true }) : null;
+    var ready = K.whisperLocal ? K.whisperLocal() : null;
+    if (!executable) {
+      checks.push({ status: cloudReady ? "warn" : "bad", title: "Yerel motor kurulu değil", detail: cloudReady ? "Suflo bulut yedeğiyle çalışabilir; çevrimdışı kullanım için yerel çekirdeği kur." : "Doctor motoru, modeli ve gerekli yardımcı dosyaları kurabilir.", action: "repair-engine", group: "engine" });
+    } else if (!ready) {
+      checks.push({ status: cloudReady ? "warn" : "bad", title: "Yerel model eksik veya bozuk", detail: "Seçili model yeniden doğrulanmalı.", action: "repair-engine", group: "engine" });
+    } else {
+      try {
+        var probe = await K.run(ready.exe, ["-h"], { timeout: 60000 });
+        if (!probe || probe.code !== 0) throw new Error("motor kod=" + (probe ? probe.code : "?"));
+        var model = window.KEngine && KEngine.activeModel ? KEngine.activeModel() : null;
+        var build = window.KEngine && KEngine.installedBuild ? KEngine.installedBuild() : "cpu";
+        checks.push({ status: "good", title: "Yerel altyazı motoru", detail: (model ? model.label.split(" —")[0] : basename(ready.model)) + " · " + String(build).toUpperCase(), group: "engine" });
+      } catch (eP) {
+        checks.push({ status: cloudReady ? "warn" : "bad", title: "Yerel motor açılmıyor", detail: K.hataYardimi ? K.hataYardimi(eP) : String(eP), action: "repair-engine", group: "engine" });
+      }
+    }
     if (provider !== "local") {
-      // Özel endpoint yerel ağda anahtarsız çalışabilir; Groq/OpenAI ise anahtarsız çalışamaz.
       var needsKey = provider === "groq" || provider === "openai";
       if (needsKey && !String(settings.apiKey || "").trim()) {
-        checks.push({ status: "bad", title: "Bulut API anahtarı eksik", detail: "Ayarlar > Transkripsiyon bölümünden anahtarı gir.", group: "engine" });
+        checks.push({ status: ready ? "warn" : "bad", title: "Bulut yedeği hazır değil", detail: "Yedek bağlantı seçili ancak API anahtarı eksik.", group: "engine" });
       } else {
-        checks.push({ status: "good", title: "Transkripsiyon motoru", detail: provider + " bulut motoru seçili", group: "engine" });
-      }
-    } else {
-      var executable = K.whisperLocal ? K.whisperLocal({ skipModel: true }) : null;
-      var ready = K.whisperLocal ? K.whisperLocal() : null;
-      if (!executable) {
-        checks.push({ status: "bad", title: "Yerel motor kurulu değil", detail: "Doctor motoru, modeli ve gerekli yardımcı dosyaları kurabilir.", action: "repair-engine", group: "engine" });
-      } else if (!ready) {
-        checks.push({ status: "bad", title: "Yerel model eksik veya bozuk", detail: "Seçili model yeniden doğrulanmalı.", action: "repair-engine", group: "engine" });
-      } else {
-        try {
-          var probe = await K.run(ready.exe, ["-h"], { timeout: 60000 });
-          if (!probe || probe.code !== 0) throw new Error("motor kod=" + (probe ? probe.code : "?"));
-          var model = window.KEngine && KEngine.activeModel ? KEngine.activeModel() : null;
-          var build = window.KEngine && KEngine.installedBuild ? KEngine.installedBuild() : "cpu";
-          checks.push({ status: "good", title: "Yerel altyazı motoru", detail: (model ? model.label.split(" —")[0] : basename(ready.model)) + " · " + String(build).toUpperCase(), group: "engine" });
-        } catch (eP) {
-          checks.push({ status: "bad", title: "Yerel motor açılmıyor", detail: K.hataYardimi ? K.hataYardimi(eP) : String(eP), action: "repair-engine", group: "engine" });
-        }
+        checks.push({ status: "good", title: "Otomatik motor yedeği", detail: provider + " · yalnız yerel rota çalışmazsa kullanılır", group: "engine" });
       }
     }
 
