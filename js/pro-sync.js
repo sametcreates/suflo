@@ -459,7 +459,10 @@ window.ProSync = (function () {
     });
     if (lastPro) {
       restoreInstalledState();
-      setTimeout(function () { sync({ silent: true }); }, 4500);
+      // Pro Cloud kontrolü Premiere proje/workspace açılışıyla yarışmamalı.
+      // İçerik zaten yerelde kullanılabilir; sessiz güncelleme uygulama tamamen
+      // sakinleştikten sonra yapılır.
+      setTimeout(function () { sync({ silent: true }); }, 60000);
     }
     timer = setInterval(function () { if (window.Pro && Pro.isPro()) sync({ silent: true }); }, 6 * 3600 * 1000);
   }

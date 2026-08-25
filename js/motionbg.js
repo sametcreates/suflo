@@ -239,7 +239,8 @@ window.KMotionBG = (function () {
     var sync = el("motionbg-propack-yukle"); if (sync) sync.addEventListener("click", function () { if (window.ProSync) ProSync.sync({ force: true }); });
     KApp.onTab("motionbg", function () { if (!index.length) buildIndex(); });
     if (typeof Pro !== "undefined") Pro.on(renderGrid);
-    buildIndex();
+    // Disk taraması Motion BG bölümü ilk açıldığında onTab üzerinden yapılır.
+    renderGrid();
   }
 
   return {

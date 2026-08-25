@@ -173,6 +173,24 @@ ok("Pro satin alma penceresi modal, odak tuzagi ve odak geri donusu tasir",
 var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8");
 ok("Stil karti etiketi dekoratif onizleme metnini degil ad ve aciklamayi okur",
   /\.ss-bilgi b/.test(appSrc) && /timeline çıktısı kilitli/.test(appSrc));
+ok("Premiere acilisinda host yoklamasi calismaz; panelle etkilesimde baslar",
+  /function contextPollingBaslat\(\)/.test(appSrc) &&
+  /document\.addEventListener\("pointerdown", contextPollingBaslat, \{ once: true \}\)/.test(appSrc) &&
+  !/window\.addEventListener\("focus", contextPollingBaslat\)/.test(appSrc) &&
+  !/guvenli\("ffmpeg", checkFfmpeg\);\s*guvenli\("bağlam", pollContext\)/.test(appSrc));
+var librarySrc = fs.readFileSync(KOKYOL + "js/library.js", "utf8");
+var sfxSrc = fs.readFileSync(KOKYOL + "js/sfx.js", "utf8");
+var motionBgSrc = fs.readFileSync(KOKYOL + "js/motionbg.js", "utf8");
+var emojiAssetsSrc = fs.readFileSync(KOKYOL + "js/emoji-assets.js", "utf8");
+var proSyncSrc = fs.readFileSync(KOKYOL + "js/pro-sync.js", "utf8");
+ok("Buyuk yerel kutuphaneler Premiere acilisinda taranmaz",
+  !/setTimeout\(function \(\) \{ if \(!paketler\.length\) tara\(\); \}, 900\)/.test(librarySrc) &&
+  /KApp\.onTab\("sfx", function \(\) \{ if \(!index\.length\) buildIndex\(\); \}\)/.test(sfxSrc) &&
+  !/if \(typeof Pro !== "undefined"\) Pro\.on\(renderList\);\s*buildIndex\(\)/.test(sfxSrc) &&
+  !/if \(typeof Pro !== "undefined"\) Pro\.on\(renderGrid\);\s*buildIndex\(\)/.test(motionBgSrc) &&
+  !/KApp\.onTab\("emoji-assets"[^;]+;\s*buildIndex\(\)/.test(emojiAssetsSrc));
+ok("Pro Cloud sessiz guncellemesi Premiere acilisindan bir dakika sonra baslar",
+  /setTimeout\(function \(\) \{ sync\(\{ silent: true \}\); \}, 60000\)/.test(proSyncSrc));
 ok("Kutuphane Pro CTA'lari neyin acilacagini ve fiyati gizlemez",
   /262 içeriği aç — 749 TL/.test(html) && /290 preseti aç — 749 TL/.test(html) && /1\.076 SFX'i aç — 749 TL/.test(html));
 

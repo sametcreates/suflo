@@ -480,7 +480,8 @@ window.KEmojiAssets = (function () {
     });
     if (typeof Pro !== "undefined") Pro.on(render);
     KApp.onTab("emoji-assets", function () { if (!items.length) buildIndex(); });
-    buildIndex();
+    // Emoji kataloğu ilgili bölüm açılmadan diski ve CDN'i taramasın.
+    render();
   }
 
   return {

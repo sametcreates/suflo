@@ -62,6 +62,10 @@ async function run() {
   ok("Hareketli kaynak tasiyan efektler hover onizlemesiyle gelir",
     motions.length > 0 && shippedCatalog.items.filter(function (item) { return item.video; }).length === motions.length,
     "hareketli=" + motions.length);
+  ok("CEP acilisinda MOGRT vitrini tum WebM decoder'larini birden baslatmaz",
+    /previewVideo\.preload\s*=\s*"none"/.test(source) &&
+    /previewVideo\.removeAttribute\("src"\)/.test(source) &&
+    !/preload="metadata"/.test(source));
   ok("Public vitrinde MOGRT dosyasi yoktur",
     !fs.readdirSync(path.join(ROOT, "assets", "pro-mogrt-showcase"), { recursive: true }).some(function (f) { return /\.mogrt$/i.test(String(f)); }));
 

@@ -38,6 +38,10 @@ ok("Kilitli altyazi karti ozellige ozel satis kapisini acar",
   /Pro\.gate\("captionStyles"\)/.test(source) && /captionStyles:\s*'17 gerçek altyazı stili'/.test(pro));
 ok("Gercek ve vitrin kartlari canonical stil anahtariyla tekillestirilir",
   /item\.styleKey\s*\|\|\s*temizMogrtAdi/.test(source));
+ok("CEP acilisinda 17 WebM decoder'i birden baslatilmaz",
+  /previewVideo\.preload\s*=\s*"none"/.test(source) &&
+  !/motion\.preload\s*=\s*"metadata"/.test(source) &&
+  /previewVideo\.removeAttribute\("src"\)/.test(source));
 ok("Siparis kaynagi Lemon Squeezy siparis verisine eklenir",
   /checkout%5Bcustom%5D%5Bsource%5D=suflo_panel/.test(app) && /app_version/.test(app));
 ok("Web sitesi altyazi stillerini ilk Pro galerisinde gercek onizlemelerle gosterir",

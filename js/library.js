@@ -19,6 +19,7 @@ window.KLib = (function () {
   var kategori = "mogrt";   // "mogrt" | "captions" | "custom" | "buton" | "fav"
   var busyKart = null;
   var taraNo = 0;
+  var aktifOnizlemeDurdur = null;
 
   /* ---------------- klasörler ---------------- */
 
@@ -425,6 +426,7 @@ window.KLib = (function () {
     liste.forEach(function (p) {
       var kart = document.createElement("div");
       var kilitli = !!p.showcase || (typeof Pro !== "undefined" && !Pro.isPro());
+      var previewSrc = p.video || p.previewVideo || "";
       kart.className = "mogrt-kart" + (kilitli ? " locked" : "");
       kart.setAttribute("role", "group");
       kart.setAttribute("aria-label", p.display + " · " + (kilitli ? "Suflo Pro efekti, kilitli" : "timeline'a eklenebilir MOGRT"));
@@ -434,11 +436,9 @@ window.KLib = (function () {
         : '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M12 6l4 4-4 4"/></svg><span>DRAG</span>';
       kart.innerHTML =
         '<span class="mogrt-thumb">' +
-          (p.video
-            ? '<video class="mogrt-preview-video" muted loop playsinline preload="metadata" poster="' + esc(p.thumb) + '" aria-hidden="true"><source src="' + esc(p.video) + '" type="video/webm"></video>'
-            : (p.thumb
+          (p.thumb
             ? '<img src="' + p.thumb + '" alt="" loading="lazy">'
-            : '<span class="mogrt-yazi">' + esc(p.display.split(/[\s_-]/)[0] || "Aa") + "</span>")) +
+            : '<span class="mogrt-yazi">' + esc(p.display.split(/[\s_-]/)[0] || "Aa") + "</span>") +
           '<span class="mogrt-source">' + kaynak + "</span>" +
           '<button type="button" class="mogrt-kalp' + (favMi(p.ad) ? " sevildi" : "") + '" title="Favori" aria-label="' + esc(p.display) + (favMi(p.ad) ? " favorilerden çıkar" : " favorilere ekle") + '" aria-pressed="' + (favMi(p.ad) ? "true" : "false") + '">♥</button>' +
           (kilitli ? '<span class="mogrt-lock"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="9" width="11" height="8" rx="2"/><path d="M7 9V6.7a3 3 0 0 1 6 0V9"/></svg></span>' : "") +
@@ -459,22 +459,50 @@ window.KLib = (function () {
       });
       kart.querySelector(".mogrt-ekle-btn").addEventListener("click", function () { yerlestir(p, kart); });
       kart.querySelector(".mogrt-thumb").addEventListener("click", function () { yerlestir(p, kart); });
-      var previewVideo = kart.querySelector(".mogrt-preview-video");
-      if (previewVideo) {
-        kart.addEventListener("mouseenter", function () {
+      if (previewSrc) {
+        var previewVideo = null;
+        var thumb = kart.querySelector(".mogrt-thumb");
+        var poster = thumb ? thumb.querySelector("img, .mogrt-yazi") : null;
+        function baslat() {
+          // Premiere CEP ayni anda onlarca WebM decoder'i acinca panel ve ana
+          // uygulama kilitlenebiliyor. Decoder yalnizca uzerine gelinen tek kart
+          // icin yaratilir; karttan ayrilinca kaynak tamamen serbest birakilir.
+          if (aktifOnizlemeDurdur && aktifOnizlemeDurdur !== durdur) aktifOnizlemeDurdur();
+          if (!previewVideo && thumb) {
+            previewVideo = document.createElement("video");
+            previewVideo.className = "mogrt-preview-video";
+            previewVideo.muted = true;
+            previewVideo.loop = true;
+            previewVideo.playsInline = true;
+            previewVideo.preload = "none";
+            previewVideo.poster = p.thumb || "";
+            previewVideo.setAttribute("aria-hidden", "true");
+            previewVideo.src = previewSrc;
+            previewVideo.addEventListener("error", durdur, { once: true });
+            if (poster) poster.style.display = "none";
+            thumb.insertBefore(previewVideo, thumb.firstChild);
+          }
+          aktifOnizlemeDurdur = durdur;
           var oynat = previewVideo.play();
           if (oynat && oynat.catch) oynat.catch(function () {});
-        });
-        kart.addEventListener("mouseleave", function () {
-          try { previewVideo.pause(); previewVideo.currentTime = 0; } catch (e0) {}
-        });
-        kart.addEventListener("focusin", function () {
-          var oynat = previewVideo.play();
-          if (oynat && oynat.catch) oynat.catch(function () {});
-        });
-        kart.addEventListener("focusout", function () {
-          try { previewVideo.pause(); previewVideo.currentTime = 0; } catch (e0) {}
-        });
+        }
+        function durdur() {
+          if (previewVideo) {
+            try {
+              previewVideo.pause();
+              previewVideo.removeAttribute("src");
+              previewVideo.load();
+              previewVideo.remove();
+            } catch (e0) {}
+            previewVideo = null;
+          }
+          if (poster) poster.style.display = "";
+          if (aktifOnizlemeDurdur === durdur) aktifOnizlemeDurdur = null;
+        }
+        kart.addEventListener("mouseenter", baslat);
+        kart.addEventListener("mouseleave", durdur);
+        kart.addEventListener("focusin", baslat);
+        kart.addEventListener("focusout", durdur);
       }
       if (!kilitli) {
         kart.setAttribute("draggable", "true");
@@ -568,7 +596,8 @@ window.KLib = (function () {
     kilitTazele();
 
     KApp.onTab("text", function () { if (!paketler.length) tara(); });
-    tara();
+    // Büyük MOGRT arşivini Premiere açılırken arka planda tarama. Kullanıcı Yazı
+    // bölümünü açtığında onTab üzerinden bir kez yüklenir.
   }
 
   function setKategori(kat) {

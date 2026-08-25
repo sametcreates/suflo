@@ -16,6 +16,7 @@ window.KCaptions = (function () {
   var gercekMogrtStilleri = [];
   var mogrtVitrini = [];
   var mogrtVitriniIsi = null;
+  var aktifMogrtOnizlemeDurdur = null;
   var secilenMogrt = null;
   var bekleyenMogrtYolu = "";
   var mogrtBaglam = { width: 0, height: 0 };
@@ -969,27 +970,19 @@ window.KCaptions = (function () {
       badge.textContent = kilitli ? "PRO" : "MOGRT";
       var scene = document.createElement("span");
       scene.className = "ss-sahne";
-      if (item.previewVideo) {
-        var motion = document.createElement("video");
-        motion.className = "stil-mogrt-video";
-        motion.muted = true;
-        motion.loop = true;
-        motion.playsInline = true;
-        motion.preload = "metadata";
-        motion.poster = item.thumb || "";
-        motion.src = item.previewVideo;
-        motion.setAttribute("aria-hidden", "true");
-        scene.appendChild(motion);
-      } else if (item.thumb) {
+      var previewPoster = null;
+      if (item.thumb) {
         var img = document.createElement("img");
         img.src = item.thumb;
         img.alt = "";
         scene.appendChild(img);
+        previewPoster = img;
       } else {
         var fallback = document.createElement("span");
         fallback.className = "stil-mogrt-fallback";
         fallback.textContent = temizMogrtAdi(item);
         scene.appendChild(fallback);
+        previewPoster = fallback;
       }
       var info = document.createElement("span");
       info.className = "ss-bilgi";
@@ -1009,14 +1002,45 @@ window.KCaptions = (function () {
         }
         mogrtStiliniSec(item);
       });
-      var previewVideo = card.querySelector(".stil-mogrt-video");
-      if (previewVideo) {
+      if (item.previewVideo) {
+        var previewVideo = null;
         function baslat() {
+          // CEP, panel acilisinda cok sayida WebM kaynagi ayni anda hazirlaninca
+          // Premiere'in GPU surecini kilitleyebiliyor. Yalniz uzerine gelinen tek
+          // kart icin video yarat; ayrilinca decoder'i tamamen serbest birak.
+          if (aktifMogrtOnizlemeDurdur && aktifMogrtOnizlemeDurdur !== durdur) {
+            aktifMogrtOnizlemeDurdur();
+          }
+          if (!previewVideo) {
+            previewVideo = document.createElement("video");
+            previewVideo.className = "stil-mogrt-video";
+            previewVideo.muted = true;
+            previewVideo.loop = true;
+            previewVideo.playsInline = true;
+            previewVideo.preload = "none";
+            previewVideo.poster = item.thumb || "";
+            previewVideo.setAttribute("aria-hidden", "true");
+            previewVideo.src = item.previewVideo;
+            previewVideo.addEventListener("error", durdur, { once: true });
+            if (previewPoster) previewPoster.style.display = "none";
+            scene.appendChild(previewVideo);
+          }
+          aktifMogrtOnizlemeDurdur = durdur;
           var oynat = previewVideo.play();
           if (oynat && oynat.catch) oynat.catch(function () {});
         }
         function durdur() {
-          try { previewVideo.pause(); previewVideo.currentTime = 0; } catch (e) {}
+          if (previewVideo) {
+            try {
+              previewVideo.pause();
+              previewVideo.removeAttribute("src");
+              previewVideo.load();
+              previewVideo.remove();
+            } catch (e) {}
+            previewVideo = null;
+          }
+          if (previewPoster) previewPoster.style.display = "";
+          if (aktifMogrtOnizlemeDurdur === durdur) aktifMogrtOnizlemeDurdur = null;
         }
         card.addEventListener("mouseenter", baslat);
         card.addEventListener("mouseleave", durdur);

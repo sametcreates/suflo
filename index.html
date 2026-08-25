@@ -1059,23 +1059,37 @@
     </div>
 
 
-    <div class="set-group doctor-card" id="set-doctor-card">
-      <div class="doctor-head">
-        <div class="doctor-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.6 2.8 8 7 10 4.2-2 7-5.4 7-10V6z"/><path d="M8.5 12h2l1.2-2.5 1.7 5 1.1-2.5h2"/></svg>
+      <div class="set-group doctor-card" id="set-doctor-card">
+        <div class="doctor-head">
+          <div class="doctor-mark" aria-hidden="true">
+            <svg viewBox="0 0 28 28">
+              <defs>
+                <linearGradient id="doctor-mark-gradient" x1="3" y1="3" x2="25" y2="25" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#817cff"/>
+                  <stop offset="1" stop-color="#4ca6ff"/>
+                </linearGradient>
+              </defs>
+              <rect x="1" y="1" width="26" height="26" rx="8" fill="url(#doctor-mark-gradient)"/>
+              <path d="M19.2 10.1c-.6-2.2-2.7-3.2-5.2-3.2-2.7 0-4.9 1.1-4.9 3.2 0 4.8 9.8 2.7 9.8 7.7 0 2.2-2.2 3.3-4.9 3.3-2.5 0-4.6-1.1-5.2-3.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="doctor-copy">
+            <div class="doctor-eyebrow"><span></span>Suflo Doctor</div>
+            <b>Suflo'nun durumunu tek taramada gör.</b>
+            <p>Premiere bağlantısı, altyazı motoru, Pro içerikleri ve presetler güvenle kontrol edilir.</p>
+          </div>
+          <button id="set-library-health-run" class="btn primary doctor-scan">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.2 7.4A5.3 5.3 0 1 1 11.7 4"/><path d="M11.6 1.8v2.7H8.9"/></svg>
+            <span>Taramayı başlat</span>
+          </button>
         </div>
-        <div>
-          <div class="set-title">Suflo Doctor</div>
-          <b>Eklentiyi baştan sona kontrol et</b>
-          <p>Premiere bağlantısı, FFmpeg, yerel motor, GPU, Pro içerikleri, preset paketi ve kütüphaneler tek raporda.</p>
+        <div class="doctor-scope" aria-label="Kontrol edilen bölümler">
+          <span>Premiere</span><span>Altyazı motoru</span><span>Pro Cloud</span><span>Presetler</span>
         </div>
-        <span class="doctor-badge">DOCTOR</span>
-      </div>
-      <div class="library-health-actions doctor-actions">
-        <button id="set-library-health-run" class="btn primary">Sistemi tara</button>
-        <button id="set-doctor-fix-all" class="btn" hidden>Güvenli sorunları düzelt</button>
-        <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
-      </div>
+        <div class="library-health-actions doctor-actions">
+          <button id="set-doctor-fix-all" class="btn" hidden>Güvenli sorunları düzelt</button>
+          <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
+        </div>
       <div id="set-library-health-result" class="library-health" role="status" aria-live="polite" hidden></div>
     </div>
 

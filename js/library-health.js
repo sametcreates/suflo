@@ -514,6 +514,13 @@ window.KLibraryHealth = (function () {
 
   function setWorking(label) {
     var box = el("set-library-health-result");
+    var runBtn = el("set-library-health-run");
+    if (runBtn) {
+      if (!runBtn._doctorIdleHtml) runBtn._doctorIdleHtml = runBtn.innerHTML;
+      runBtn.classList.add("is-scanning");
+      runBtn.setAttribute("aria-busy", "true");
+      runBtn.innerHTML = '<span class="spinner"></span><span>İşlem sürüyor…</span>';
+    }
     if (box) {
       box.hidden = false; box.className = "library-health checking";
       box.innerHTML = '<div class="library-health-title"><span class="spinner"></span><b>' + esc(label || "Suflo taranıyor…") + '</b></div><div class="doctor-progress">Timeline ve medya dosyaları değiştirilmez.</div>';
@@ -523,6 +530,13 @@ window.KLibraryHealth = (function () {
 
   function clearWorking() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all"), function (b) { b.disabled = false; });
+    var runBtn = el("set-library-health-run");
+    if (runBtn) {
+      if (runBtn._doctorIdleHtml) runBtn.innerHTML = runBtn._doctorIdleHtml;
+      runBtn._doctorIdleHtml = "";
+      runBtn.classList.remove("is-scanning");
+      runBtn.removeAttribute("aria-busy");
+    }
   }
 
   async function run() {

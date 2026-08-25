@@ -1,3 +1,11 @@
+## Suflo 2.9.4 — Hızlı açılış ve yeni Suflo Doctor
+
+- Premiere projesi açılırken büyük MOGRT, SFX, emoji ve Motion BG arşivleri artık aynı anda taranmıyor. Suflo önce hafif arayüzünü açıyor; kütüphaneler yalnız ilgili bölüme girildiğinde yükleniyor.
+- Panel, proje veya çalışma alanı açılışında Premiere'e aralıksız bağlam sorgusu göndermiyor. Canlı klip/sekans takibi kullanıcı panelle etkileşince başlıyor.
+- Yüzlerce MOGRT önizlemesi aynı anda oynatılmıyor; hareketli önizleme kartın üzerine gelince yükleniyor. Büyük kütüphanelerde ilk açılış ve kaydırma belirgin biçimde hafifledi.
+- **Suflo Doctor** baştan tasarlandı: yabancı kalkan simgesi ve uzun banner görünümü kaldırıldı; gerçek Suflo amblemi, kompakt kontrol kapsamı ve tek satırlık tarama aksiyonu getirildi.
+- Doctor'ın tarama, güvenli onarım ve rapor kopyalama mantığı korundu. Tarama sırasında buton griye düşmek yerine markalı işlem durumunu gösteriyor; sonuçlar daha okunaklı bir tanı kartında açılıyor.
+
 ## Suflo 2.9.3 — Pro vitrini ve daha kısa satın alma yolu
 
 - Ücretsiz kullanıcılar artık Pro dosyaları bilgisayarlarında olmasa bile **17 gerçek altyazı stilini** Stil bölümünde kilitli olarak görüyor; 17 kartın tamamında MOGRT'ın kendi hareketli önizlemesi oynuyor.

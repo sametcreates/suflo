@@ -891,7 +891,9 @@ window.KSfx = (function () {
     initKeys();
     KApp.onTab("sfx", function () { if (!index.length) buildIndex(); });
     if (typeof Pro !== "undefined") Pro.on(renderList);
-    buildIndex();
+    // +20 GB'a çıkabilen ses arşivi yalnız SFX bölümü açılınca taranır.
+    // Açılışta taramak Premiere çalışma alanının yüklenmesini bloke ediyordu.
+    renderList();
   }
 
   return {

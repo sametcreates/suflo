@@ -110,6 +110,17 @@ window.KApp = (function () {
     }
   }
 
+  var contextPollingBasladi = false;
+  function contextPollingBaslat() {
+    if (contextPollingBasladi) return;
+    contextPollingBasladi = true;
+    guvenli("bağlam", pollContext);
+    setInterval(function () {
+      // Gizli/dock'ta pasif panel Premiere'e gereksiz host komutu gondermesin.
+      if (!document.hasFocus || document.hasFocus()) pollContext();
+    }, 2500);
+  }
+
   /* ---------------- Görünüm: Altyazı ↔ Ayarlar ---------------- */
 
   /*
@@ -1055,10 +1066,13 @@ window.KApp = (function () {
       });
     }
 
-    // Bağlam yoklaması ve ffmpeg denetimi ÖNCE: modüllerden bağımsız çalışsın
-    guvenli("bağlam", pollContext);
+    // Premiere 26.3'te arka plandaki periyodik evalScript yoklamasi, ozellikle
+    // proje/workspace acilirken ana uygulamayi kilitleyebiliyor. Panelin acilmasi
+    // icin host baglami zorunlu degil. Premiere onceki calisma alaninda Suflo'yu
+    // aktif birakmissa `focus` olayi da proje acilisinda gelir; bu nedenle yalniz
+    // kullanicinin panel icindeki ilk gercek etkilesiminde yoklamayi baslat.
     guvenli("ffmpeg", checkFfmpeg);
-    setInterval(pollContext, 2500);
+    document.addEventListener("pointerdown", contextPollingBaslat, { once: true });
 
     // Pro lisans durumu EN ÖNCE: modüller isPro()'yu init sırasında okuyabilsin
     guvenli("Pro", function () {

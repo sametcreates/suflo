@@ -176,6 +176,9 @@ async function run() {
   ok("SFX motoru kurulumla gelen paketi otomatik tarar", /content["'],\s*["']sfx/.test(sfxSrc));
   ok("Suflo Doctor arayuzde, guvenli onarimla ve geriye uyumlu betikle yuklu",
     /Suflo Doctor/.test(html) && /id="set-doctor-fix-all"/.test(html) && /id="set-library-health-run"/.test(html) && /src="js\/library-health\.js"/.test(html));
+  ok("Suflo Doctor gercek marka amblemi ve kompakt tarama arayuzu kullaniyor",
+    /id="doctor-mark-gradient"/.test(html) && /class="btn primary doctor-scan"/.test(html) &&
+    /class="doctor-scope"/.test(html) && !/class="doctor-badge"/.test(html));
   ok("Harici MOGRT'lar Yazi Animasyonlari'ndan ayri bolumde",
     /data-kat="custom"/.test(html) && /Diğer Animasyonlar/.test(html) && /id="custom-sayac"/.test(html));
   ok("Premiere altyazi MOGRT'lari ayri bolumde gorunur",
