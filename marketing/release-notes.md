@@ -1,3 +1,9 @@
+## Suflo 2.9.7 — Premiere 26.3 bağlantı düzeltmesi
+
+- Premiere Pro 26.3.2'de, özellikle macOS CEP panelinde ilk `pointerdown` olayının kaybolmasıyla üst çubuğun sürekli **bağlanıyor** kalması düzeltildi.
+- Bağlantı yokken paneldeki tıklama ve klavye etkileşimleri güvenli bir anlık yeniden deneme başlatıyor; proje açılışındaki ağır arka plan yoklaması geri getirilmiyor.
+- Suflo Doctor Premiere bağlantısını doğruladığında ana Altyazı ekranının klip/sekans bağlamı da hemen yenileniyor. Doctor yeşilken **Altyazı oluştur** düğmesinin pasif kalması giderildi.
+
 ## Suflo 2.9.6 — Normal veya stilli, karar senin
 
 - Caption Editor sonucunda iki bağımsız ekleme yolu artık aynı anda görünüyor: **Normal altyazı izi ekle** ve **Stil seçerek ekle**.

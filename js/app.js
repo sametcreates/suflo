@@ -112,13 +112,26 @@ window.KApp = (function () {
 
   var contextPollingBasladi = false;
   function contextPollingBaslat() {
-    if (contextPollingBasladi) return;
+    // 26.3'te ilk pointer olayi bazi macOS/CEP kombinasyonlarinda panele
+    // ulasmiyor. Yoklama daha once baslamissa bile gercek bir kullanici
+    // etkilesimi, baglam takili kalmisken anlik yeniden deneme yapabilsin.
+    if (contextPollingBasladi) {
+      if (!ctx.connected) guvenli("bağlam", pollContext);
+      return;
+    }
     contextPollingBasladi = true;
     guvenli("bağlam", pollContext);
     setInterval(function () {
       // Gizli/dock'ta pasif panel Premiere'e gereksiz host komutu gondermesin.
       if (!document.hasFocus || document.hasFocus()) pollContext();
     }, 2500);
+  }
+
+  function contextEtkilesim() {
+    // Arka planda host yoklamasi yapma: yalniz kullanici panelle gercekten
+    // etkilesmisse baslat/yeniden dene. `click`, pointerdown'in Mac CEP'te
+    // kayboldugu durumu; keydown ise klavye kullananlari kapsar.
+    if (!ctx.connected) contextPollingBaslat();
   }
 
   /* ---------------- Görünüm: Altyazı ↔ Ayarlar ---------------- */
@@ -1086,8 +1099,12 @@ window.KApp = (function () {
     // icin host baglami zorunlu degil. Premiere onceki calisma alaninda Suflo'yu
     // aktif birakmissa `focus` olayi da proje acilisinda gelir; bu nedenle yalniz
     // kullanicinin panel icindeki ilk gercek etkilesiminde yoklamayi baslat.
+    // Yalniz pointerdown'a guvenmiyoruz: Premiere 26.3.2 + macOS'ta bu olay
+    // bazen CEP paneline dusmuyor ve arayuz sonsuza kadar "baglaniyor" kaliyor.
     guvenli("ffmpeg", checkFfmpeg);
-    document.addEventListener("pointerdown", contextPollingBaslat, { once: true });
+    document.addEventListener("pointerdown", contextEtkilesim, true);
+    document.addEventListener("click", contextEtkilesim, true);
+    document.addEventListener("keydown", contextEtkilesim, true);
 
     // Pro lisans durumu EN ÖNCE: modüller isPro()'yu init sırasında okuyabilsin
     guvenli("Pro", function () {
@@ -1145,6 +1162,7 @@ window.KApp = (function () {
     onContext: onContext,
     onTab: onTab,
     ctx: function () { return ctx; },
+    refreshContext: contextPollingBaslat,
     installLocalWhisper: installLocalWhisper,
     checkUpdate: checkUpdate
   };

@@ -176,9 +176,14 @@ ok("Stil karti etiketi dekoratif onizleme metnini degil ad ve aciklamayi okur",
   /\.ss-bilgi b/.test(appSrc) && /timeline çıktısı kilitli/.test(appSrc));
 ok("Premiere acilisinda host yoklamasi calismaz; panelle etkilesimde baslar",
   /function contextPollingBaslat\(\)/.test(appSrc) &&
-  /document\.addEventListener\("pointerdown", contextPollingBaslat, \{ once: true \}\)/.test(appSrc) &&
+  /document\.addEventListener\("pointerdown", contextEtkilesim, true\)/.test(appSrc) &&
+  /document\.addEventListener\("click", contextEtkilesim, true\)/.test(appSrc) &&
+  /document\.addEventListener\("keydown", contextEtkilesim, true\)/.test(appSrc) &&
   !/window\.addEventListener\("focus", contextPollingBaslat\)/.test(appSrc) &&
   !/guvenli\("ffmpeg", checkFfmpeg\);\s*guvenli\("bağlam", pollContext\)/.test(appSrc));
+var doctorSrc = fs.readFileSync(KOKYOL + "js/library-health.js", "utf8");
+ok("Doctor taramasi ana ekran Premiere baglamini da yeniler",
+  /KApp\.refreshContext\(\)/.test(doctorSrc) && /refreshContext: contextPollingBaslat/.test(appSrc));
 var librarySrc = fs.readFileSync(KOKYOL + "js/library.js", "utf8");
 var sfxSrc = fs.readFileSync(KOKYOL + "js/sfx.js", "utf8");
 var motionBgSrc = fs.readFileSync(KOKYOL + "js/motionbg.js", "utf8");

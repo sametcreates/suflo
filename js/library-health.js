@@ -545,6 +545,10 @@ window.KLibraryHealth = (function () {
     try {
       lastReport = makeReport();
       await runAsyncChecks(lastReport);
+      // Doctor Premiere koprusunu basariyla sorgulamissa ana ekran da ayni
+      // baglami hemen alsin. Boylece Doctor yesilken ust cubukta
+      // "baglaniyor" kalmasi ve Altyazi olustur butonunun pasifligi gider.
+      if (window.KApp && KApp.refreshContext) KApp.refreshContext();
       render(lastReport);
       return lastReport;
     } catch (e) {
