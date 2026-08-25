@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "collection": "Suflo Pro — Caption Styles",
+  "creator": "Suflo Pro",
+  "publicPreviewOnly": true,
+  "styleCount": 17,
+  "ratioCount": 3,
+  "fileCount": 51,
+  "items": [
+    {
+      "id": "01-akira",
+      "name": "Akira",
+      "styleKey": "Akira",
+      "category": "Subtitle Style",
+      "preview": "previews/01-akira.webp",
+      "video": "previews/01-akira.webm"
+    },
+    {
+      "id": "02-arch",
+      "name": "Arch",
+      "styleKey": "Arch",
+      "category": "Subtitle Style",
+      "preview": "previews/02-arch.webp",
+      "video": "previews/02-arch.webm"
+    },
+    {
+      "id": "03-block",
+      "name": "Block",
+      "styleKey": "Block",
+      "category": "Subtitle Style",
+      "preview": "previews/03-block.webp",
+      "video": "previews/03-block.webm"
+    },
+    {
+      "id": "04-clean",
+      "name": "Clean",
+      "styleKey": "Clean",
+      "category": "Subtitle Style",
+      "preview": "previews/04-clean.webp",
+      "video": "previews/04-clean.webm"
+    },
+    {
+      "id": "05-comic",
+      "name": "Comic",
+      "styleKey": "Comic",
+      "category": "Subtitle Style",
+      "preview": "previews/05-comic.webp",
+      "video": "previews/05-comic.webm"
+    },
+    {
+      "id": "06-emphasis",
+      "name": "Emphasis",
+      "styleKey": "Emphasis",
+      "category": "Subtitle Style",
+      "preview": "previews/06-emphasis.webp",
+      "video": "previews/06-emphasis.webm"
+    },
+    {
+      "id": "07-glitch",
+      "name": "Glitch",
+      "styleKey": "Glitch",
+      "category": "Subtitle Style",
+      "preview": "previews/07-glitch.webp",
+      "video": "previews/07-glitch.webm"
+    },
+    {
+      "id": "08-karaoke",
+      "name": "Karaoke",
+      "styleKey": "Karaoke",
+      "category": "Subtitle Style",
+      "preview": "previews/08-karaoke.webp",
+      "video": "previews/08-karaoke.webm"
+    },
+    {
+      "id": "09-marker",
+      "name": "Marker",
+      "styleKey": "Marker",
+      "category": "Subtitle Style",
+      "preview": "previews/09-marker.webp",
+      "video": "previews/09-marker.webm"
+    },
+    {
+      "id": "10-motion-blur",
+      "name": "Motion Blur",
+      "styleKey": "Motion Blur",
+      "category": "Subtitle Style",
+      "preview": "previews/10-motion-blur.webp",
+      "video": "previews/10-motion-blur.webm"
+    },
+    {
+      "id": "11-mr-beast",
+      "name": "Creator Punch",
+      "styleKey": "Mr Beast",
+      "category": "Subtitle Style",
+      "preview": "previews/11-mr-beast.webp",
+      "video": "previews/11-mr-beast.webm"
+    },
+    {
+      "id": "12-obviously",
+      "name": "Bold Statement",
+      "styleKey": "Obviously",
+      "category": "Subtitle Style",
+      "preview": "previews/12-obviously.webp",
+      "video": "previews/12-obviously.webm"
+    },
+    {
+      "id": "13-slant",
+      "name": "Slant",
+      "styleKey": "Slant",
+      "category": "Subtitle Style",
+      "preview": "previews/13-slant.webp",
+      "video": "previews/13-slant.webm"
+    },
+    {
+      "id": "14-slide",
+      "name": "Slide",
+      "styleKey": "Slide",
+      "category": "Subtitle Style",
+      "preview": "previews/14-slide.webp",
+      "video": "previews/14-slide.webm"
+    },
+    {
+      "id": "15-spinning",
+      "name": "Spinning",
+      "styleKey": "Spinning",
+      "category": "Subtitle Style",
+      "preview": "previews/15-spinning.webp",
+      "video": "previews/15-spinning.webm"
+    },
+    {
+      "id": "16-tiktok",
+      "name": "Social Pop",
+      "styleKey": "Tiktok",
+      "category": "Subtitle Style",
+      "preview": "previews/16-tiktok.webp",
+      "video": "previews/16-tiktok.webm"
+    },
+    {
+      "id": "17-typewriter",
+      "name": "Typewriter",
+      "styleKey": "Typewriter",
+      "category": "Subtitle Style",
+      "preview": "previews/17-typewriter.webp",
+      "video": "previews/17-typewriter.webm"
+    }
+  ]
+}

@@ -13,6 +13,9 @@ window.KCaptions = (function () {
   var trackSel = {};   // ses katmanı index -> seçili mi (varsayılan: true)
   var lastTrackCount = -1;
   var mogrtStilleri = [];
+  var gercekMogrtStilleri = [];
+  var mogrtVitrini = [];
+  var mogrtVitriniIsi = null;
   var secilenMogrt = null;
   var bekleyenMogrtYolu = "";
   var mogrtBaglam = { width: 0, height: 0 };
@@ -792,13 +795,79 @@ window.KCaptions = (function () {
   }
 
   function temizMogrtAdi(item) {
-    return String(item && item.display || "Altyazı Şablonu")
+    var ad = String(item && item.display || "Altyazı Şablonu")
       .replace(/^\s*(?:16[•x:._-]?9|9[•x:._-]?16|1[•x:._-]?1)\s*/i, "")
       .replace(/\s+Subtitles?\s*$/i, "") || "Altyazı Şablonu";
+    var halkaAcikAdlar = {
+      "mr beast": "Creator Punch",
+      "tiktok": "Social Pop",
+      "obviously": "Bold Statement"
+    };
+    return halkaAcikAdlar[ad.toLocaleLowerCase("tr-TR")] || ad;
   }
 
   function mogrtStilAnahtari(item) {
-    return temizMogrtAdi(item).toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+    var ham = String(item && item.styleKey || temizMogrtAdi(item));
+    return ham.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+  }
+
+  function mogrtVitrinDosyasi(item, alan, uzanti) {
+    var rel = String(item && item[alan] || "").replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!new RegExp("^previews\\/[a-z0-9._-]+\\." + uzanti + "$", "i").test(rel)) return "";
+    return "assets/pro-caption-showcase/" + rel;
+  }
+
+  function mogrtVitrininiYukle() {
+    if (mogrtVitrini.length) return Promise.resolve(mogrtVitrini);
+    if (mogrtVitriniIsi) return mogrtVitriniIsi;
+    mogrtVitriniIsi = Promise.resolve().then(async function () {
+      var items = [];
+      if (K.nodeOK && K.fs && K.path && K.extensionPath) {
+        try {
+          var root = K.extensionPath();
+          if (root) {
+            var raw = JSON.parse(K.fs.readFileSync(K.path.join(root, "assets", "pro-caption-showcase", "catalog.json"), "utf8"));
+            items = Array.isArray(raw.items) ? raw.items : [];
+          }
+        } catch (e) { K.log("[altyazi] Stil vitrini okunamadi: " + (e && e.message)); }
+      }
+      if (!items.length && typeof fetch === "function") {
+        try {
+          var res = await fetch("assets/pro-caption-showcase/catalog.json", { cache: "no-store" });
+          if (res.ok) {
+            var webRaw = await res.json();
+            items = Array.isArray(webRaw.items) ? webRaw.items : [];
+          }
+        } catch (e2) { K.log("[altyazi] Web stil vitrini okunamadi: " + (e2 && e2.message)); }
+      }
+      mogrtVitrini = items.map(function (item, index) {
+        return {
+          path: "",
+          ad: String(item.id || ("caption-preview-" + index)),
+          display: String(item.name || item.styleKey || "Altyazı Stili"),
+          styleKey: String(item.styleKey || item.name || ""),
+          thumb: mogrtVitrinDosyasi(item, "preview", "webp"),
+          previewVideo: mogrtVitrinDosyasi(item, "video", "webm"),
+          showcase: true,
+          pro: true,
+          group: "caption"
+        };
+      }).filter(function (item) { return item.styleKey && item.thumb; });
+      return mogrtVitrini;
+    }).then(function (items) {
+      mogrtVitriniIsi = null;
+      return items;
+    }, function (err) {
+      mogrtVitriniIsi = null;
+      throw err;
+    });
+    return mogrtVitriniIsi;
+  }
+
+  function mogrtStilleriniBirlestir() {
+    var pro = typeof Pro === "undefined" || Pro.isPro();
+    mogrtStilleri = gercekMogrtStilleri.slice();
+    if (!pro) mogrtStilleri = mogrtStilleri.concat(mogrtVitrini);
   }
 
   function uygulamaIpucunuGuncelle() {
@@ -855,7 +924,10 @@ window.KCaptions = (function () {
     if (!liste.length) {
       var empty = document.createElement("div");
       empty.className = "stil-mogrt-empty";
-      empty.innerHTML = "<b>Altyazı şablonu bulunamadı</b><span>Premiere Graphic Templates klasörüne kurulan uyumlu subtitle MOGRT'ları burada otomatik görünür.</span>";
+      var vitrinBekleniyor = typeof Pro !== "undefined" && !Pro.isPro() && !!mogrtVitriniIsi;
+      empty.innerHTML = vitrinBekleniyor
+        ? "<b>17 stil hazırlanıyor…</b><span>Gerçek MOGRT önizlemeleri yükleniyor.</span>"
+        : "<b>Altyazı şablonu bulunamadı</b><span>Pro lisansını etkinleştirip Ayarlar → Pro İçerikleri bölümünden eşitlemeyi çalıştır.</span>";
       grid.appendChild(empty);
       secilenMogrt = null;
       uygulamaIpucunuGuncelle();
@@ -877,24 +949,38 @@ window.KCaptions = (function () {
     var headTitle = document.createElement("b");
     headTitle.textContent = "Premiere Şablonları";
     var headMeta = document.createElement("span");
-    headMeta.textContent = oranEtiketi(oran) + " · " + liste.length + " yerel stil";
+    var vitrinSayisi = liste.filter(function (item) { return item.showcase; }).length;
+    headMeta.textContent = vitrinSayisi
+      ? liste.length + " stil · 3 oran · gerçek önizleme"
+      : oranEtiketi(oran) + " · " + liste.length + " kullanıma hazır stil";
     head.appendChild(headTitle);
     head.appendChild(headMeta);
     grid.appendChild(head);
 
     liste.forEach(function (item) {
       var card = document.createElement("button");
-      var kilitli = typeof Pro !== "undefined" && !Pro.isPro();
+      var kilitli = !!item.showcase || (typeof Pro !== "undefined" && !Pro.isPro());
       card.type = "button";
       card.className = "stil-sec stil-mogrt" + (kilitli ? " locked" : "");
-      card.setAttribute("data-mogrt-path", item.path);
+      card.setAttribute("data-mogrt-path", item.path || "");
       card.setAttribute("aria-label", temizMogrtAdi(item) + (kilitli ? " · Suflo Pro ile kilidi aç" : " Premiere altyazı stilini seç"));
       var badge = document.createElement("span");
       badge.className = "ss-rozet";
       badge.textContent = kilitli ? "PRO" : "MOGRT";
       var scene = document.createElement("span");
       scene.className = "ss-sahne";
-      if (item.thumb) {
+      if (item.previewVideo) {
+        var motion = document.createElement("video");
+        motion.className = "stil-mogrt-video";
+        motion.muted = true;
+        motion.loop = true;
+        motion.playsInline = true;
+        motion.preload = "metadata";
+        motion.poster = item.thumb || "";
+        motion.src = item.previewVideo;
+        motion.setAttribute("aria-hidden", "true");
+        scene.appendChild(motion);
+      } else if (item.thumb) {
         var img = document.createElement("img");
         img.src = item.thumb;
         img.alt = "";
@@ -910,7 +996,7 @@ window.KCaptions = (function () {
       var title = document.createElement("b");
       title.textContent = temizMogrtAdi(item);
       var sub = document.createElement("i");
-      sub.textContent = kilitli ? "Suflo Pro · gerçek MOGRT animasyonu" : "Premiere Graphic Template · gerçek animasyon";
+      sub.textContent = kilitli ? "Suflo Pro · animasyonu görmek için üzerine gel" : "Premiere Graphic Template · kullanıma hazır";
       info.appendChild(title);
       info.appendChild(sub);
       card.appendChild(badge);
@@ -918,11 +1004,25 @@ window.KCaptions = (function () {
       card.appendChild(info);
       card.addEventListener("click", function () {
         if (kilitli) {
-          if (typeof Pro !== "undefined") Pro.gate("mogrt");
+          if (typeof Pro !== "undefined") Pro.gate("captionStyles");
           return;
         }
         mogrtStiliniSec(item);
       });
+      var previewVideo = card.querySelector(".stil-mogrt-video");
+      if (previewVideo) {
+        function baslat() {
+          var oynat = previewVideo.play();
+          if (oynat && oynat.catch) oynat.catch(function () {});
+        }
+        function durdur() {
+          try { previewVideo.pause(); previewVideo.currentTime = 0; } catch (e) {}
+        }
+        card.addEventListener("mouseenter", baslat);
+        card.addEventListener("mouseleave", durdur);
+        card.addEventListener("focus", baslat);
+        card.addEventListener("blur", durdur);
+      }
       grid.appendChild(card);
     });
     if (secilenMogrt && el("cap-style-family")) el("cap-style-family").value = "mogrt";
@@ -932,8 +1032,15 @@ window.KCaptions = (function () {
   }
 
   function refreshMogrtStyles(items) {
-    mogrtStilleri = (items || []).filter(function (item) { return item && item.path; });
+    gercekMogrtStilleri = (items || []).filter(function (item) { return item && item.path; });
+    mogrtStilleriniBirlestir();
     mogrtStilleriniCiz();
+    if (typeof Pro !== "undefined" && !Pro.isPro()) {
+      mogrtVitrininiYukle().then(function () {
+        mogrtStilleriniBirlestir();
+        mogrtStilleriniCiz();
+      }).catch(function (e) { K.log("[altyazi] Stil vitrini yuklenemedi: " + (e && e.message)); });
+    }
   }
 
   function initStilKartlari() {

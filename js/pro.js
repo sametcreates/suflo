@@ -81,6 +81,7 @@
     assexport: 'Stilli ASS disa aktarma',
     glossary:  'Terim sozlugu + gelismis bul/degistir',
     mogrt:     'Yazi animasyonlari (MOGRT kutuphanesi)',
+    captionStyles: '17 gerçek altyazı stili',
     presets:   'Panelden uygulanan 290 Motion ve efekt preseti',
     sfx:       'SFX kutuphanesi + Akilli SFX onerileri',
     motionbg:  'Motion BG (hareketli zeminler + overlay videolari)',
@@ -391,17 +392,26 @@
   function showUpsell(feature) {
     var label = FEATURE_LABELS[feature] || 'Bu ozellik';
     var isMogrt = feature === 'mogrt' || feature === 'propack';
+    var isCaption = feature === 'captionStyles';
     var isSfx = feature === 'sfx';
     var isPreset = feature === 'presets';
-    var title = isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 262 animasyon ve grafik' :
+    var title = isCaption ? 'Altyazın hazır. Şimdi videon gibi görünsün.' :
+      (isMogrt ? 'Videona edit\u00f6r dokunu\u015fu veren 262 animasyon ve grafik' :
       (isSfx ? 'Her vurgu i\u00e7in do\u011fru ses, Premiere\'in i\u00e7inde' :
-      (isPreset ? '290 preset doğrudan Suflo panelinde' : label));
-    var desc = isMogrt ? 'Efektleri sat\u0131n almadan \u00f6nce ger\u00e7ek \u00f6nizlemeleriyle incele. Pro\'da tek t\u0131kla playhead\'e yerle\u015ftir.' :
+      (isPreset ? '290 preset doğrudan Suflo panelinde' : label)));
+    var desc = isCaption ? 'Creator Punch, Karaoke, Glitch, Typewriter ve 13 stil daha. Birini seç; Suflo tüm altyazı satırlarına ve sekans oranına kendisi uygulasın.' :
+      (isMogrt ? 'Efektleri sat\u0131n almadan \u00f6nce ger\u00e7ek \u00f6nizlemeleriyle incele. Pro\'da tek t\u0131kla playhead\'e yerle\u015ftir.' :
       (isSfx ? '14 koleksiyondaki 1.076 sesi ara, \u00f6n dinle ve Ak\u0131ll\u0131 SFX ile altyaz\u0131 vurgular\u0131na yerle\u015ftir.' :
       (isPreset ? '12 yerleşik hareket + Suflo Smooth paketindeki 270 preset seçili klibe doğrudan uygulanır; 8 özel preset uyumluluk modunda açılır.' :
-      'Bu profesyonel i\u015f ak\u0131\u015f\u0131 Suflo Pro ile a\u00e7\u0131l\u0131r. Bir kere al, saya\u00e7 ve abonelik olmadan kullan.'));
+      'Bu profesyonel i\u015f ak\u0131\u015f\u0131 Suflo Pro ile a\u00e7\u0131l\u0131r. Bir kere al, saya\u00e7 ve abonelik olmadan kullan.')));
     var visual;
-    if (isMogrt) {
+    if (isCaption) {
+      visual = '<div class="pro-upsell-mogrt pro-upsell-caption" aria-label="Gerçek altyazı stili örnekleri">' +
+        '<img src="assets/pro-caption-showcase/previews/11-mr-beast.webp" alt="Creator Punch altyazı stili">' +
+        '<img src="assets/pro-caption-showcase/previews/08-karaoke.webp" alt="Karaoke altyazı stili">' +
+        '<img src="assets/pro-caption-showcase/previews/07-glitch.webp" alt="Glitch altyazı stili">' +
+      '</div>';
+    } else if (isMogrt) {
       visual = '<div class="pro-upsell-mogrt" aria-label="Yaz\u0131 efekti \u00f6rnekleri">' +
         '<img src="assets/pro-mogrt-showcase/previews/01-smooth-up.webp" alt="Smooth Up efekti">' +
         '<img src="assets/pro-mogrt-showcase/previews/02-rainbow-text.webp" alt="Rainbow Text efekti">' +
@@ -417,6 +427,13 @@
     } else {
       visual = '<div class="pro-upsell-tool"><i>\u2726</i><span><b>Daha h\u0131zl\u0131 bitir</b><small>Tekrarlanan kurgu i\u015fini Suflo\'ya b\u0131rak</small></span></div>';
     }
+    var proof = isCaption
+      ? '<div class="pro-upsell-proof"><i><b>17</b> gerçek stil</i><i><b>3</b> video oranı</i><i><b>51</b> MOGRT</i></div>'
+      : '<div class="pro-upsell-proof"><i><b>262</b> animasyon</i><i><b>290</b> preset</i><i><b>1.076</b> SFX</i></div>';
+    var benefits = isCaption
+      ? '<ul class="pro-upsell-liste"><li>Reels, YouTube ve kare video için otomatik oran</li><li>Bir seçimle tüm altyazı satırlarına uygula</li><li>Lisansı gir; dosyalar ve yenileri otomatik gelsin</li></ul>'
+      : '<ul class="pro-upsell-liste"><li>Otomatik sessizlik kesimi + ritim marker</li><li>17 altyazı stili + 262 animasyon + 290 preset + 1.076 SFX</li><li>Lisansı bir kez gir; yeni içerikler otomatik gelsin</li></ul>';
+    var buyText = isCaption ? '17 Stili ve Tüm Pro\'yu Aç \u2192' : 'Suflo Pro\'yu Al \u2192';
     ensureUpsellCss();
     var old = document.getElementById('pro-upsell');
     if (old) old.parentNode.removeChild(old);
@@ -432,16 +449,11 @@
         '<h3 id="pro-upsell-title">' + esc(title) + '</h3>' +
         '<p class="pro-upsell-alt" id="pro-upsell-desc">' + esc(desc) + '</p>' +
         visual +
-        '<div class="pro-upsell-proof"><i><b>262</b> animasyon</i><i><b>290</b> preset</i><i><b>1.076</b> SFX</i></div>' +
-        '<ul class="pro-upsell-liste">' +
-          '<li>Otomatik sessizlik kesimi + ritim marker</li>' +
-          '<li>262 MOGRT + 290 Motion/efekt preset + 1.076 SFX</li>' +
-          '<li>Lisans\u0131 bir kez gir; yeni i\u00e7erikler otomatik gelsin</li>' +
-        '</ul>' +
-        '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K</span><b>749 TL</b><small>abonelik yok \u00b7 dakika limiti yok</small></div>' +
+        proof + benefits +
+        '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K · <s>1.249 TL</s></span><b>749 TL</b><small>abonelik yok \u00b7 dakika limiti yok</small></div>' +
         '<div class="pro-upsell-actions">' +
-          '<button id="pro-upsell-go" class="pro-btn-primary">Suflo Pro\'yu Al \u2192</button>' +
-          '<button id="pro-upsell-demo" class="pro-btn-ghost">Canl\u0131 demolar\u0131 g\u00f6r</button>' +
+          '<button id="pro-upsell-go" class="pro-btn-primary">' + buyText + '</button>' +
+          '<button id="pro-upsell-demo" class="pro-btn-ghost">Tüm Pro\'yu gör</button>' +
         '</div>' +
         '<button id="pro-upsell-key" class="pro-link-btn">Lisans anahtar\u0131m var</button>' +
       '</div>';
@@ -573,6 +585,7 @@
       '.pro-upsell-liste li:before{content:"\\2713";position:absolute;left:0;color:#6fdca0;font-weight:800}' +
       '.pro-upsell-fiyat{display:grid;grid-template-columns:auto 1fr;align-items:end;margin:0 0 10px;padding-top:9px;border-top:1px solid #253244}' +
       '.pro-upsell-fiyat>span{grid-column:1/-1;color:#758298;font-size:7.5px;font-weight:900;letter-spacing:.11em}' +
+      '.pro-upsell-fiyat s{color:#697487;font-weight:700;text-decoration-thickness:1px}' +
       '.pro-upsell-fiyat b{font-size:24px;line-height:1.05;letter-spacing:-.04em}' +
       '.pro-upsell-fiyat small{padding:0 0 2px 8px;color:#8592a4;font-size:8.5px}' +
       '.pro-upsell-actions{display:grid;grid-template-columns:1.25fr 1fr;gap:6px}' +

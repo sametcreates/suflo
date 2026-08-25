@@ -3132,7 +3132,8 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .stil-mogrt-empty b { color:#d8d9df; font-size:10.5px; }
 .stil-mogrt-empty span { max-width:520px; font-size:8.5px; line-height:1.55; }
 .stil-mogrt .ss-sahne { background:#0b0c10; }
-.stil-mogrt .ss-sahne img {
+.stil-mogrt .ss-sahne img,
+.stil-mogrt .ss-sahne video {
   display:block;
   width:100%;
   height:100%;
@@ -3140,11 +3141,15 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   transition:transform .28s cubic-bezier(.22,1,.36,1), filter .2s ease;
 }
 .stil-mogrt:hover .ss-sahne img,
-.stil-mogrt.secili .ss-sahne img { transform:scale(1.025); filter:saturate(1.04) contrast(1.02); }
+.stil-mogrt:hover .ss-sahne video,
+.stil-mogrt.secili .ss-sahne img,
+.stil-mogrt.secili .ss-sahne video { transform:scale(1.025); filter:saturate(1.04) contrast(1.02); }
 .stil-mogrt .ss-rozet { color:#d9d8ff; border-color:rgba(150,145,255,.28); background:rgba(13,13,20,.72); }
 .stil-mogrt.locked { border-color:rgba(190,160,78,.28); }
-.stil-mogrt.locked .ss-sahne img { filter:brightness(.72) saturate(.82); }
-.stil-mogrt.locked:hover .ss-sahne img { filter:brightness(.9) saturate(.96); }
+.stil-mogrt.locked .ss-sahne img,
+.stil-mogrt.locked .ss-sahne video { filter:brightness(.72) saturate(.82); }
+.stil-mogrt.locked:hover .ss-sahne img,
+.stil-mogrt.locked:hover .ss-sahne video { filter:brightness(.96) saturate(1.02); }
 .stil-mogrt.locked .ss-rozet { color:#ffe7a0; border-color:rgba(213,181,91,.45); background:rgba(39,31,10,.78); }
 .stil-mogrt-fallback { max-width:84%; color:#f4f4f7; font-size:14px; font-weight:800; line-height:1.05; text-align:center; }
 .cap-mogrt-onizleme {

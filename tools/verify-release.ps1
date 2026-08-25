@@ -50,6 +50,7 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)js/presets\.js$',
             '(^|/)jsx/host\.jsx$',
             '(^|/)assets/pro-mogrt-showcase/catalog\.json$',
+            '(^|/)assets/pro-caption-showcase/catalog\.json$',
             '(^|/)assets/pro-sfx-showcase/catalog\.json$',
             '(^|/)CSXS/manifest\.xml$'
         )

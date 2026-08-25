@@ -8,6 +8,15 @@ window.KApp = (function () {
 
   function el(id) { return document.getElementById(id); }
 
+  var PRO_CHECKOUT = "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1";
+  function proCheckoutUrl(feature) {
+    var surum = window.K && K.VERSION ? K.VERSION : "unknown";
+    return PRO_CHECKOUT +
+      "?checkout%5Bcustom%5D%5Bsource%5D=suflo_panel" +
+      "&checkout%5Bcustom%5D%5Bfeature%5D=" + encodeURIComponent(String(feature || "pro")) +
+      "&checkout%5Bcustom%5D%5Bapp_version%5D=" + encodeURIComponent(String(surum));
+  }
+
   var ctx = { hasSeq: false, sel: null, sequence: "" };
   var ctxListeners = [];
   var polling = false;
@@ -288,6 +297,8 @@ window.KApp = (function () {
     Array.prototype.forEach.call(document.querySelectorAll("[data-kilit]"), function (badge) {
       badge.hidden = !!s.pro;
     });
+    var styleUpsell = el("cap-style-upsell");
+    if (styleUpsell) styleUpsell.hidden = !!s.pro;
 
     // Kilitli secenekler (karaoke modlari, kelimeli animasyonlar) acilir
     // listede " — PRO" ekiyle gorunsun: kullanici neyin ucretli oldugunu
@@ -365,10 +376,13 @@ window.KApp = (function () {
       });
     });
 
+    var styleUpsell = el("cap-style-upsell");
+    if (styleUpsell) styleUpsell.addEventListener("click", function () { Pro.gate("captionStyles"); });
+
     el("pro-buy").addEventListener("click", function (e) {
       e.preventDefault();
       // Lemon Squeezy checkout — Suflo Pro 749 TL
-      K.cs.openURLInDefaultBrowser("https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1");
+      K.cs.openURLInDefaultBrowser(proCheckoutUrl("settings"));
     });
   }
 
@@ -407,7 +421,7 @@ window.KApp = (function () {
           if (s.phase === "syncing") detail.textContent = (s.detail || "İçerikler eşitleniyor") + (s.bytesTotal ? " · " + bytes(s.bytesDone) + " / " + bytes(s.bytesTotal) : "");
           else if (s.phase === "ready") detail.textContent = "262 animasyon + 1.076 SFX + 30 Motion BG + preset paketi hazır" + (s.version ? " · içerik " + s.version : "") + ". Yeni içerikler arka planda kontrol edilir.";
           else if (s.phase === "error") detail.textContent = "Kurulu içeriklerin etkilenmedi. Bağlantı geldiğinde yeniden deneyebilirsin.";
-          else detail.textContent = pro ? "Suflo açıldığında yeni içerikleri kontrol eder; yalnız değişen dosyaları indirir." : "Pro lisansını etkinleştirince 262 animasyon, 1.076 SFX, 30 Motion BG ve preset paketi otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.";
+          else detail.textContent = pro ? "Suflo açıldığında yeni içerikleri kontrol eder; yalnız değişen dosyaları indirir." : "Pro lisansını etkinleştirince 17 altyazı stili, 262 animasyon, 1.076 SFX, 30 Motion BG ve preset paketi otomatik kurulur. Yeni içerikler geldiğinde yalnız değişen dosyalar indirilir.";
         }
         if (status) {
           status.className = "inline-status" + (s.phase === "error" ? " bad" : (s.phase === "ready" ? " good" : ""));
@@ -1051,7 +1065,7 @@ window.KApp = (function () {
       Pro.init();
       Pro.onUpgrade(function (feature, intent) {
         if (intent === "buy") {
-          K.cs.openURLInDefaultBrowser("https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1");
+          K.cs.openURLInDefaultBrowser(proCheckoutUrl(feature));
           return;
         }
         if (intent === "demo") {

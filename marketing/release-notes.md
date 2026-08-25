@@ -1,3 +1,12 @@
+## Suflo 2.9.3 — Pro vitrini ve daha kısa satın alma yolu
+
+- Ücretsiz kullanıcılar artık Pro dosyaları bilgisayarlarında olmasa bile **17 gerçek altyazı stilini** Stil bölümünde kilitli olarak görüyor; 17 kartın tamamında MOGRT'ın kendi hareketli önizlemesi oynuyor.
+- Creator Punch, Karaoke, Glitch, Typewriter ve diğer stiller satın almadan önce incelenebiliyor. Pro etkinleşince vitrin kartları kayboluyor ve aynı alanda gerçek 9:16, 16:9 veya 1:1 dosyaları kullanıma açılıyor.
+- Stil kartı ve altyazı sonucu, genel bir satış mesajı yerine **17 stil · 3 oran · 51 MOGRT** değerini anlatan özelliğe özel Pro penceresini açıyor.
+- Suflo.app'te altyazı stilleri Pro galerisinin ilk sekmesine taşındı; masaüstü ve mobilde sekiz gerçek animasyon örneği gösteriliyor, eski 7 stil metni güncel 17 stil iş akışıyla değiştirildi.
+- Web ödeme akışı Lemon Squeezy'nin sayfa içi güvenli penceresiyle açılıyor. Panel ve web siparişleri, kişisel veri toplamadan siparişe kaynak/özellik/sürüm bilgisi ekliyor; böylece hangi Pro özelliğinin satış getirdiği ölçülebiliyor.
+- Public kurulumda yalnız yaklaşık 0,36 MB'lık WEBP/WEBM önizlemeleri bulunuyor; ücretli MOGRT dosyaları GitHub paketine girmiyor ve lisanslı Pro Bulutu'nda kalıyor.
+
 ## Suflo 2.9.2 — 17 gerçek altyazı stili
 
 - **Stil** bölümü geri geldi; artık Suflo'nun eski sentetik stil kartlarını değil, Pro İçerik Bulutu'ndan lisanslı kullanıcıya otomatik inen gerçek altyazı MOGRT'larını kullanıyor.

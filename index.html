@@ -471,6 +471,11 @@
         <p class="hint" id="cap-apply-hint" style="margin:-4px 0 8px">
           Premiere'in düzenlenebilir caption izini oluşturur.
         </p>
+        <button type="button" id="cap-style-upsell" class="cross-tip cap-style-upsell" hidden>
+          <span class="ct-ikon" aria-hidden="true">Aa</span>
+          <span class="ct-metin"><b>Altyazın hazırsa tasarım da hazır olsun.</b> 17 gerçek animasyonlu stil; Reels, YouTube ve kare video oranı otomatik.</span>
+          <span class="ct-ok" aria-hidden="true">17 STİL →</span>
+        </button>
         <style>
           .cross-tip{display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
             background:var(--grad-soft);border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;margin-top:4px;
@@ -480,6 +485,9 @@
           .cross-tip .ct-metin{font-size:12px;color:var(--dim);line-height:1.5}
           .cross-tip .ct-metin b{color:var(--text)}
           .cross-tip .ct-ok{flex:none;margin-left:auto;color:var(--accent-lite);font-size:15px}
+          .cap-style-upsell{border-color:rgba(139,124,246,.34);background:linear-gradient(135deg,rgba(139,124,246,.13),rgba(58,167,255,.06))}
+          .cap-style-upsell .ct-ikon{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--grad);color:#fff;font-size:12px;font-weight:900}
+          .cap-style-upsell .ct-ok{font-size:9px;font-weight:850;letter-spacing:.04em;white-space:nowrap}
         </style>
         <button type="button" class="cross-tip"
           onclick="var els=document.querySelectorAll('.yan-menu .ky-oge');for(var i=0;i&lt;els.length;i++){if(els[i].getAttribute('data-tab')==='cut'){els[i].click();break;}}">
@@ -1076,7 +1084,7 @@
         <div><div class="set-title">Pro İçerik Bulutu</div><b id="set-prosync-title">Bir kez etkinleştir, hep güncel kal</b></div>
         <span class="pro-sync-badge" id="set-prosync-badge">AUTO</span>
       </div>
-      <p class="hint" id="set-prosync-detail">Pro lisansıyla 290 preset panelden kullanılır; 262 animasyon, 1.076 SFX ve 30 Motion BG otomatik gelir. Yeni içeriklerde yalnız değişen dosyalar indirilir.</p>
+      <p class="hint" id="set-prosync-detail">Pro lisansıyla 17 altyazı stili ve 290 preset panelden kullanılır; 262 animasyon, 1.076 SFX ve 30 Motion BG otomatik gelir. Yeni içeriklerde yalnız değişen dosyalar indirilir.</p>
       <div class="pro-sync-progress" id="set-prosync-progress" hidden><i id="set-prosync-bar"></i></div>
       <div class="row-btns pro-sync-actions">
         <button id="set-prosync-run" class="btn primary">İçerikleri eşitle</button>

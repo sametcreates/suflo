@@ -231,6 +231,7 @@ window.KLib = (function () {
       if (typeof Pro !== "undefined" && !Pro.isPro()) vitrinEkle(await showcaseCatalog(), {});
       sayaclar();
       ciz();
+      altyaziStilleriniGonder();
       return;
     }
     /*
