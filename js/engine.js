@@ -482,11 +482,18 @@ window.KEngine = (function () {
    * wordLevel: karaoke modu
    */
   function buildArgs(o) {
+    // whisper-cli Windows'ta argv'yi ANSI okur: Turkce karakterli kullanici
+    // adinda model/ses yolu bozulup motor cokuyordu (issue #7). Yol
+    // argumanlari ASCII-guvenli esdegerlerine cevrilir; cikti tabani ayni
+    // fiziksel klasorde kalir ki cagiran outBase + ".json" dosyasini bulsun.
+    var G = (typeof K !== "undefined" && K.guvenliYol)
+      ? K.guvenliYol
+      : function (p) { return p; };
     var args = [
-      "-m", o.model,
-      "-f", o.audio,
+      "-m", G(o.model, "girdi"),
+      "-f", G(o.audio, "girdi"),
       "-l", o.lang || "auto",
-      "-oj", "-of", o.outBase,
+      "-oj", "-of", G(o.outBase, "cikti"),
       "-t", String(o.threads || 4),
       "-pp",
       "-bs", "5"
@@ -500,7 +507,7 @@ window.KEngine = (function () {
     // Not: -vp ve -vsd MİLİSANİYE cinsinden (whisper-cli varsayılanları 30 / 100).
     var vp = vadPath();
     if (vp) {
-      args.push("--vad", "-vm", vp);
+      args.push("--vad", "-vm", G(vp, "girdi"));
       args.push("-vsd", "500");   // 500 ms altındaki sessizlikte segment bölme
       args.push("-vp", "250");    // konuşma sınırlarına 250 ms tampon (kelime yutulmasın)
     }

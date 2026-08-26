@@ -1,3 +1,8 @@
+## Suflo 2.9.9 — Türkçe karakterli kullanıcı adı düzeltmesi
+
+- **Düzeltildi:** Windows kullanıcı adında Türkçe/aksanlı karakter olan makinelerde (örn. `C:\Users\BASIN TEKNİK\...`) yerel motor model yolunu bozuk okuyor ve `kod=3221226505` ile çöküyordu (#7). Whisper'a giden model, ses, çıktı ve VAD yolları artık ASCII-güvenli 8.3 kısa yol olarak veriliyor; 8.3 adlarının kapalı olduğu disklerde girdi bir kez ProgramData altındaki ASCII önbelleğe kopyalanıyor.
+- ffmpeg bu sorundan etkilenmiyordu; koruma yalnızca whisper-cli argümanlarına uygulanır. Gerçek Türkçe adlı klasörle çalışan 13 sınamalık regresyon testi eklendi.
+
 ## Suflo 2.9.8 — Pro vitrini artık gerçekten dolu
 
 - Ücretsiz kullanıcılar Pro içerikleri bilgisayarlarında kurulu olmasa bile tüm premium kütüphaneyi dolu ve kilitli görür: **84 yazı animasyonu, 17 altyazı stili, 123 grafik/sahne animasyonu ve 35 CTA butonu**.

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<ExtensionManifest ExtensionBundleId="com.sametcreates.kesit" ExtensionBundleName="Suflo" ExtensionBundleVersion="2.9.8" Version="11.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<ExtensionManifest ExtensionBundleId="com.sametcreates.kesit" ExtensionBundleName="Suflo" ExtensionBundleVersion="2.9.9" Version="11.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
     <Extension Id="com.sametcreates.kesit.panel" Version="2.9.8"/>
   </ExtensionList>

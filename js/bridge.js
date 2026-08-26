@@ -368,7 +368,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "2.9.8";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
+  var VERSION = "2.9.9";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -548,6 +548,78 @@ window.K = (function () {
     if (!nodeOK) return null;
     var p = path.join(ffmpegDir(), MAC ? "ffmpeg" : "ffmpeg.exe");
     try { return fs.existsSync(p) ? p : null; } catch (e) { return null; }
+  }
+
+  /*
+   * whisper-cli Windows'ta argv'yi char* (ANSI kod sayfasi) okur; kullanici
+   * adinda Turkce/aksanli karakter varsa ("BASIN TEKNİK") model/ses yolu
+   * bozuk gelir ve motor kod=3221226505 ile coker (issue #7). ffmpeg wmain
+   * kullandigi icin etkilenmez — bu koruma yalniz whisper-cli argumanlarina
+   * uygulanir. Cozum sirasi: yol zaten ASCII ise dokunma; degilse 8.3 kisa
+   * yola cevir (ayni dosyanin ASCII takma adi); 8.3 kapaliysa girdiyi
+   * ProgramData altindaki ASCII onbellege bir kez kopyala.
+   */
+  function asciiMi(s) { return /^[\x00-\x7F]*$/.test(String(s)); }
+
+  var kisaYolOnbellek = {};
+  function kisaYol(yol) {
+    if (MAC || !nodeOK || !yol || asciiMi(yol)) return yol;
+    if (kisaYolOnbellek[yol]) return kisaYolOnbellek[yol];
+    try {
+      if (!fs.existsSync(yol)) {
+        // henuz olusmamis cikti taban adi: var olan klasoru kisalt, adi koru
+        var dn = path.dirname(yol), bn = path.basename(yol);
+        if (dn === yol) return yol;
+        var kdn = kisaYol(dn);
+        return (asciiMi(kdn) && asciiMi(bn)) ? path.join(kdn, bn) : yol;
+      }
+      // execSync komutu cmd'ye genis (UTF-16) iletir; icinde " olamaz cunku
+      // Windows dosya adinda " gecersizdir. Basarili 8.3 ciktisi saf ASCII'dir.
+      var cikti = cp.execSync('for %I in ("' + yol + '") do @echo %~sI',
+        { windowsHide: true, timeout: 10000 }).toString();
+      var son = cikti.split(/\r?\n/).filter(function (s) { return s.trim(); }).pop();
+      son = (son || "").trim();
+      if (son && asciiMi(son) && fs.existsSync(son)) {
+        kisaYolOnbellek[yol] = son;
+        return son;
+      }
+    } catch (e) {}
+    return yol;
+  }
+
+  function asciiOnbellekDir() {
+    var kok = process.env.ProgramData || "C:\\ProgramData";
+    var d = path.join(kok, "Suflo", "ascii-onbellek");
+    try { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); } catch (e) {}
+    return d;
+  }
+
+  // Girdi dosyasini ASCII-guvenli onbellege kopyalar (8.3 kapali sistem yedegi).
+  // Ayni ad+boyut tekrar kopyalanmaz — 1 GB'lik model tek sefer tasinir.
+  function asciiKopya(yol) {
+    try {
+      var st = fs.statSync(yol);
+      var ad = path.basename(yol).replace(/[^\x20-\x7E]/g, "_");
+      var hedef = path.join(asciiOnbellekDir(), st.size + "-" + ad);
+      if (!asciiMi(hedef)) return yol;
+      if (!fs.existsSync(hedef) || fs.statSync(hedef).size !== st.size) {
+        fs.copyFileSync(yol, hedef);
+      }
+      return hedef;
+    } catch (e) { return yol; }
+  }
+
+  /*
+   * tur "girdi": var olan dosya — kisa yol, olmazsa kopya.
+   * tur "cikti": yazilacak taban ad — yalniz klasor kisaltilir (kopya olmaz;
+   * cikti ayni fiziksel klasore dussun ki cagiran outBase + ".json" bulabilsin).
+   */
+  function guvenliYol(yol, tur) {
+    if (MAC || !yol || asciiMi(yol)) return yol;
+    var k = kisaYol(yol);
+    if (asciiMi(k)) return k;
+    if (tur === "girdi") return asciiKopya(yol);
+    return yol;
   }
 
   // macOS'ta motor Homebrew ile kurulur; CEP'in PATH'i eksik olabildiği için tam yol aranır
@@ -1115,6 +1187,7 @@ window.K = (function () {
     clearDraft: clearDraft,
     sweepTemp: sweepTemp,
     whisperLocal: whisperLocal,
+    guvenliYol: guvenliYol,
     whisperDir: whisperDir,
     ffmpegDir: ffmpegDir,
     ffmpegKurulu: ffmpegKurulu,
