@@ -3614,3 +3614,10 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   .mbg-card { height: 96px; }
   .emoji-assets-grid .mogrt-thumb { height: 120px; }
 }
+/* Yenilikler: kapatma dugmesi kisa panelde de gorunur kalsin */
+.yenilik-tamam { position: sticky; bottom: 0; box-shadow: 0 -12px 16px -6px var(--bg2, #12141c); }
+@media (max-height: 720px) {
+  .yenilik-satir { padding: 6px 9px; }
+  .yenilik-yazi i { display: none; }
+  .yenilik-ikon { width: 26px; height: 26px; }
+}
