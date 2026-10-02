@@ -33,7 +33,9 @@ var kayipDosya = anahtarlar.filter(function (ch) {
 ok("her eslemenin SVG'si diskte ve dolu", kayipDosya.length === 0,
   kayipDosya.map(function (ch) { return esleme[ch]; }).join(", ") || anahtarlar.length + " dosya");
 
-var src = fs.readFileSync(pathm.join(KOK, "js", "captions.js"), "utf8");
+// Emoji secici 3.0'da js/emoji-picker.js'e ayrildi; bekci (emojiIceriyorMu) captions.js'te
+var src = fs.readFileSync(pathm.join(KOK, "js", "captions.js"), "utf8") + "\n" +
+  fs.readFileSync(pathm.join(KOK, "js", "emoji-picker.js"), "utf8");
 var i0 = src.indexOf("var EMOJI_ARAMA = {");
 var i1 = src.indexOf("};", i0);
 ok("EMOJI_ARAMA captions.js'te var", i0 !== -1 && i1 !== -1);
