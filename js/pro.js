@@ -457,7 +457,7 @@
         '<p class="pro-upsell-alt" id="pro-upsell-desc">' + esc(desc) + '</p>' +
         visual +
         proof + benefits +
-        '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K · <s>1.249 TL</s></span><b>749 TL</b><small>abonelik yok \u00b7 dakika limiti yok</small></div>' +
+        '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K · <s>1.249 TL</s></span><b>749 TL</b><small>+ KDV \u00b7 abonelik yok \u00b7 dakika limiti yok</small></div>' +
         '<div class="pro-upsell-actions">' +
           '<button id="pro-upsell-go" class="pro-btn-primary">' + buyText + '</button>' +
           '<button id="pro-upsell-demo" class="pro-btn-ghost">Tüm Pro\'yu gör</button>' +

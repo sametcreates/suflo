@@ -73,7 +73,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 
 Çekirdek Suflo MIT lisanslı ve sonsuza dek ücretsiz — transkripsiyon, editör, dışa aktarım kimsenin kilidi arkasına girmiyor. Pro, üstüne gelen katman: altyazı animasyonları, sessizlikleri temizleyen otomatik kesim, ritim marker'ları ve yerel içerik kütüphaneleri. Tek seferlik **749 TL**, abonelik yok, ömür boyu → [suflo.app/pro](https://suflo.app/pro)
 
-| Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL) |
+| Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL + KDV) |
 |---|---|
 | Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Bağımsız Stil Motoru ve şeffaf video katmanı |
 | Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Creator Punch · CapCut Clean · SaaS Glass dahil Stil Motoru v3 |
