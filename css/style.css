@@ -3566,3 +3566,12 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 /* Çift dilli altyazı anahtarı (3.0) */
 .cift-dil { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--dim); cursor: pointer; }
 .cift-dil input { margin: 0; accent-color: var(--accent); }
+
+/* ---------- Viral anlar (3.0) ---------- */
+.vr-liste { display: grid; gap: 7px; margin: 8px 0; }
+.vr-kart { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; display: grid; gap: 5px; background: rgba(255,255,255,.02); }
+.vr-ust { display: flex; align-items: center; gap: 8px; }
+.vr-ust b { font-size: 12px; }
+.vr-puan { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #ff5f7a, #ffb547); }
+.vr-alt { font-size: 10.5px; color: var(--dim); }
+.vr-kart .btn { justify-self: start; }

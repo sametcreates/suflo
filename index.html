@@ -515,6 +515,25 @@
           </div>
         </details>
 
+        <details class="adv" id="cap-vr-box">
+          <summary>Viral anlar (Shorts) <span class="tc-yeni">YENİ</span></summary>
+          <p class="hint" style="margin:6px 0 8px">Uzun videodan kancayla başlayan, tek başına anlaşılan 15–60 sn'lik anları bulur. Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez.</p>
+          <div class="row">
+            <button id="cap-vr-bul" class="btn primary" type="button">Viral anları bul</button>
+            <select id="cap-vr-sure" class="grow" title="Klip süresi">
+              <option value="15-35">Kısa (15–35 sn)</option>
+              <option value="20-60" selected>Standart (20–60 sn)</option>
+              <option value="30-90">Uzun (30–90 sn · Reels/YouTube)</option>
+            </select>
+          </div>
+          <div id="cap-vr-durum" class="inline-status"></div>
+          <div id="cap-vr-liste" class="vr-liste"></div>
+          <div class="row" id="cap-vr-aksiyon" hidden>
+            <button id="cap-vr-marker" class="btn tiny" type="button">Marker olarak ekle</button>
+            <button id="cap-vr-kopyala" class="btn tiny" type="button" style="margin-left:auto">Listeyi kopyala</button>
+          </div>
+        </details>
+
         <details class="adv">
           <summary>Bul & değiştir</summary>
           <div class="row">
@@ -1428,11 +1447,13 @@
   <script src="js/chapters.js"></script>
   <script src="js/transitions.js"></script>
   <script src="js/scenes.js"></script>
+  <script src="js/highlights.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
   <script src="js/bolumler.js"></script>
   <script src="js/gecisler.js"></script>
   <script src="js/sahneler.js"></script>
+  <script src="js/viral.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>

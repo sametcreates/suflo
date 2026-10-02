@@ -1916,6 +1916,64 @@ function KS_addChapterMarkers(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/*
+ * Viral anlar (Shorts): sureli marker. p.ranges = [{start, end, name, comment}];
+ * p.replace: once eski Suflo viral marker'larini sil (yorumu "Suflo viral" ile baslayan).
+ */
+function KS_addRangeMarkers(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var list = p.ranges || [];
+    if (!list.length) return KS_err("Aralik yok.");
+    var silinen = 0;
+    if (p.replace) {
+      try {
+        var eski = [];
+        var mk = seq.markers.getFirstMarker();
+        while (mk) {
+          if (String(mk.comments || "").indexOf("Suflo viral") === 0) eski.push(mk);
+          mk = seq.markers.getNextMarker(mk);
+        }
+        for (var e = 0; e < eski.length; e++) { try { seq.markers.deleteMarker(eski[e]); silinen++; } catch (eD) {} }
+      } catch (eR) {}
+    }
+    var n = 0;
+    for (var i = 0; i < list.length; i++) {
+      try {
+        var m = seq.markers.createMarker(Number(list[i].start));
+        if (!m) continue;
+        try { m.name = String(list[i].name || ""); } catch (eN) {}
+        try { m.comments = "Suflo viral: " + String(list[i].comment || ""); } catch (eC) {}
+        try { var son = new Time(); son.seconds = Number(list[i].end); m.end = son; } catch (eE) {}
+        try { if (m.setColorByIndex) m.setColorByIndex(1); } catch (eK) {}   // kirmizi: digerlerinden ayrissin
+        n++;
+      } catch (eM) {}
+    }
+    if (n === 0) return KS_err("Hicbir marker eklenemedi.");
+    return KS_ok({ added: n, removed: silinen });
+  } catch (e) { return KS_err(e); }
+}
+
+// Sekansin In/Out'unu verilen araliga ayarla ve playhead'i basa getir
+function KS_setInOut(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var a = Number(p.start), b = Number(p.end);
+    if (!(b > a)) return KS_err("Gecersiz aralik.");
+    seq.setInPoint(a);
+    seq.setOutPoint(b);
+    try {
+      var t = new Time(); t.seconds = a;
+      seq.setPlayerPosition(t.ticks);
+    } catch (eP) {}
+    return KS_ok({ start: a, end: b });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Emoji: playhead'e grafik klip ---------- */
 
 /*
