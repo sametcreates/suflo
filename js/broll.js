@@ -60,7 +60,7 @@
     var segs = clean(segments);
     if (!segs.length) return [];
     var data;
-    try { data = typeof content === "string" ? JSON.parse(content) : content; } catch (e) { return []; }
+    try { data = typeof content === "string" ? JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")) : content; } catch (e) { return []; }
     var raw = data && (data.broll || data.items || data.suggestions);
     if (!(raw instanceof Array)) return [];
     var maxDur = opts.maxDur || 5, minGap = opts.minGap != null ? opts.minGap : 6;

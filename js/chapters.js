@@ -166,7 +166,7 @@
     var minGap = opts.minGap || YT_MIN_LEN;
     var segs = clean(segments);
     var data;
-    try { data = typeof content === "string" ? JSON.parse(content) : content; } catch (e) { return []; }
+    try { data = typeof content === "string" ? JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")) : content; } catch (e) { return []; }
     var raw = data && (data.chapters || data.Chapters);
     if (!(raw instanceof Array)) return [];
     var starts = segs.map(function (s) { return s.start; });

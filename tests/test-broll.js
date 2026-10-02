@@ -46,5 +46,11 @@ var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 var ui = fs.readFileSync(path.join(__dirname, "..", "js", "broll-ui.js"), "utf8");
 ok("panel: kutu, betikler, metinler textContent ile", /id="cap-br-box"/.test(html) && html.indexOf("js/broll.js") < html.indexOf("js/broll-ui.js") &&
   (ui.match(/innerHTML\s*=/g) || []).length === (ui.match(/innerHTML = "";/g) || []).length && /KS_setPlayerPosition", \{ sec:/.test(ui));
+// tum AI ayristiricilari ```json kod citine dayanikli
+var Hh = require(path.join(__dirname, "..", "js", "highlights.js")), Tt = require(path.join(__dirname, "..", "js", "hook-title.js")), Cc = require(path.join(__dirname, "..", "js", "chapters.js"));
+var s30 = []; for (var z = 0; z < 30; z++) s30.push({ start: z * 5, end: z * 5 + 4, text: "s" + z });
+ok("kod citi: viral, b-roll, kanca, bolumler", Hh.parseResponse("```json\n{\"clips\":[{\"from\":2,\"to\":6,\"title\":\"t\",\"score\":5}]}\n```", s30, {}).length === 1 &&
+  B.parseResponse("```\n{\"broll\":[{\"line\":3,\"keywords\":\"car\"}]}\n```", s30).length === 1 && Tt.parseSuggestions("```json\n{\"hooks\":[\"a *b*\"]}\n```").length === 1 &&
+  /JSON\.parse\(content\.trim\(\)\.replace\(\/\^```/.test(fs.readFileSync(path.join(__dirname, "..", "js", "chapters.js"), "utf8")));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

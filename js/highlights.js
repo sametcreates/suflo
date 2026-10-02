@@ -72,7 +72,7 @@
     if (!segs.length) return [];
     var minDur = opts.minDur || VARSAYILAN.minDur, maxDur = opts.maxDur || VARSAYILAN.maxDur;
     var data;
-    try { data = typeof content === "string" ? JSON.parse(content) : content; } catch (e) { return []; }
+    try { data = typeof content === "string" ? JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")) : content; } catch (e) { return []; }
     var raw = data && (data.clips || data.Clips || data.highlights);
     if (!(raw instanceof Array)) return [];
     var son = segs.length - 1;

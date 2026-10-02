@@ -212,7 +212,7 @@
   // Yanit -> temiz baslik listesi (en fazla 7 kelime, tekrarsiz, markdown temiz)
   function parseSuggestions(content) {
     var data;
-    try { data = typeof content === "string" ? JSON.parse(content) : content; } catch (e) { return []; }
+    try { data = typeof content === "string" ? JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")) : content; } catch (e) { return []; }
     var raw = data && (data.hooks || data.titles || data.Hooks);
     if (!(raw instanceof Array)) return [];
     var gorulen = {};
