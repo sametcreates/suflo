@@ -91,6 +91,12 @@
       <span class="ky-kilit" data-kilit>PRO</span>
       <span class="ky-adet" id="buton-sayac">35</span>
     </button>
+    <button class="ky-oge" data-tab="gecis">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="5" width="6.5" height="10" rx="1.5"/><rect x="11" y="5" width="6.5" height="10" rx="1.5"/><path d="M8 10h4m-1.6-1.6L12 10l-1.6 1.6"/></svg></span>
+      <span class="ky-metin"><b>Geçişler</b><i>zoom · whip · itme · v3.0</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+      <span class="ky-adet" id="gecis-sayac">13</span>
+    </button>
     <button class="ky-oge" data-tab="presets">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7"/><circle cx="13" cy="10" r="1.7"/><circle cx="7" cy="15" r="1.7"/></svg></span>
       <span class="ky-metin"><b>Motion Presetleri</b><i>290 panel preseti</i></span>
@@ -927,6 +933,35 @@
     </div>
   </section>
 
+  <!-- ================= GECISLER (v3.0) ================= -->
+  <section id="tab-gecis" class="tabpane">
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2.5" y="5" width="6.5" height="10" rx="1.5"/><rect x="11" y="5" width="6.5" height="10" rx="1.5"/><path d="M8 10h4"/></svg>
+        <b>Kesimlere tek tıkla geçiş</b>
+      </div>
+      <p class="ci-p">Playhead'i iki klibin birleştiği yere getir, geçişe bas. Suflo iki klibe eşleşik keyframe yazar — <b>eklenti, ayar katmanı ya da MOGRT gerekmez</b>, Premiere'de istediğin gibi düzenlenir.</p>
+    </div>
+    <div class="preset-toolbar">
+      <label class="preset-control">Süre
+        <select id="gecis-sure">
+          <option value="0.3">Hızlı</option>
+          <option value="0.5" selected>Dengeli</option>
+          <option value="0.9">Sinematik</option>
+        </select>
+      </label>
+      <label class="preset-control">Güç
+        <select id="gecis-guc">
+          <option value="0.72">Yumuşak</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.35">Güçlü</option>
+        </select>
+      </label>
+    </div>
+    <div id="gecis-status" class="inline-status"></div>
+    <div id="gecis-grid" class="preset-grid gecis-grid"></div>
+  </section>
+
   <!-- ================= SFX ================= -->
   <section id="tab-sfx" class="tabpane">
     <div class="pro-tanitim" id="sfx-tanitim" hidden>
@@ -1346,9 +1381,11 @@
   <script src="js/captions.js"></script>
   <script src="js/textcut.js"></script>
   <script src="js/chapters.js"></script>
+  <script src="js/transitions.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
   <script src="js/bolumler.js"></script>
+  <script src="js/gecisler.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>

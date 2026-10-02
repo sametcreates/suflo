@@ -75,6 +75,7 @@
     karaoke:   'Karaoke / kelime-kelime animasyon',
     cut:       'Otomatik kesim (sessizlik temizleme)',
     textcut:   'Konusmadan kes (metinle kurgu + dolgu temizligi)',
+    transitions: 'Kesim gecisleri (zoom, whip, itme ve daha fazlasi)',
     zoom:      'Otomatik Zoom (konusmaya gore punch-in)',
     beat:      'Ritim / beat senkronu',
     batch:     'Toplu (coklu klip) transkripsiyon',

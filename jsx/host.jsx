@@ -510,6 +510,105 @@ function KS_applyMotionPreset(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- Kesim gecisleri (v3.0) ---------- */
+
+/*
+ * Playhead'e en yakin kesimde (ayni katmanda A'nin bitip B'nin basladigi an)
+ * iki klibe eslesik keyframe yazar. Plan panelde uretilir (js/transitions.js):
+ *   p.plan = { half, out:{scale,pos,opacity}, in:{...} }
+ *     scale/opacity: [{t, v}] klibin kendi degerinin carpani
+ *     pos: [{t, x, y}] kadraj orani kayma
+ *   p.tolerance: playhead'den en fazla bu kadar uzaktaki kesim (sn)
+ */
+function KS_applyCutTransition(encoded) {
+  try {
+    KS_presetRemovedCount = 0;
+    var p = KS_arg(encoded);
+    var plan = p.plan;
+    if (!plan || !(Number(plan.half) > 0)) return KS_err("Gecis plani gecersiz.");
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var playhead = 0;
+    try { playhead = seq.getPlayerPosition().seconds; } catch (eP) {}
+    var tol = Number(p.tolerance);
+    if (!isFinite(tol) || tol <= 0) tol = 1.0;
+
+    // En yakin kesim: esitlikte ust katman
+    var best = null;
+    for (var ti = 0; ti < seq.videoTracks.numTracks; ti++) {
+      var track = seq.videoTracks[ti];
+      try { if (track.isLocked && track.isLocked()) continue; } catch (eL) {}
+      var n = track.clips.numItems;
+      for (var i = 0; i < n; i++) {
+        var a = track.clips[i];
+        var aEnd = Number(a.end.seconds);
+        for (var j = 0; j < n; j++) {
+          if (i === j) continue;
+          var b = track.clips[j];
+          var bStart = Number(b.start.seconds);
+          if (Math.abs(aEnd - bStart) > 0.02) continue;
+          var dist = Math.abs(bStart - playhead);
+          if (dist > tol) continue;
+          if (!best || dist < best.dist - 0.001 || (Math.abs(dist - best.dist) <= 0.001 && ti > best.track)) {
+            best = { track: ti, a: a, b: b, cut: bStart, dist: dist };
+          }
+        }
+      }
+    }
+    if (!best) return KS_err("Playhead'in yakininda kesim yok. Playhead'i iki klibin birlestigi yere getir.");
+
+    var aStart = Number(best.a.start.seconds), aEnd2 = Number(best.a.end.seconds);
+    var bStart2 = Number(best.b.start.seconds), bEnd = Number(best.b.end.seconds);
+    var half = Math.min(Number(plan.half), (aEnd2 - aStart) * 0.5, (bEnd - bStart2) * 0.5);
+    if (!(half >= 0.08)) return KS_err("Kesimdeki klipler gecis icin cok kisa.");
+    var oran = half / Number(plan.half);   // klip kisaysa plan zamanda sikistirilir
+    var frameW = Number(seq.frameSizeHorizontal) || 1920;
+    var frameH = Number(seq.frameSizeVertical) || 1080;
+    var cut = best.cut;
+
+    // tabanAn: klibin "dinlenme" degerini okuyacagimiz timeline ani (gecis bolgesinin disi).
+    // ValueAt KAYNAK zamani ister: timeline anini klibin kaynak zamanina cevir.
+    function uygula(clip, side, cStart, cEnd, clearA, clearB, tabanAn) {
+      if (!side) return false;
+      var props = KS_presetProps(clip);
+      var changed = false, k, list;
+      var kaynakAn = KS_presetSourceTime(clip, tabanAn, cStart, cEnd);
+      if (side.scale && props.scale) {
+        var sc = KS_presetNumberValueAt(props.scale, kaynakAn, 100);
+        list = [];
+        for (k = 0; k < side.scale.length; k++) list.push({ time: cut + side.scale[k].t * oran, value: sc * Number(side.scale[k].v) });
+        changed = KS_presetClipKeys(clip, cStart, cEnd, props.scale, list, clearA, clearB) || changed;
+      }
+      if (side.opacity && props.opacity) {
+        var op = KS_presetNumberValueAt(props.opacity, kaynakAn, 100);
+        list = [];
+        for (k = 0; k < side.opacity.length; k++) list.push({ time: cut + side.opacity[k].t * oran, value: op * Number(side.opacity[k].v) });
+        changed = KS_presetClipKeys(clip, cStart, cEnd, props.opacity, list, clearA, clearB) || changed;
+      }
+      if (side.pos && props.position) {
+        var pos = KS_presetPositionValueAt(props.position, kaynakAn);
+        if (pos) {
+          // Yeni Premiere surumleri konumu 0..1 normalize tutar; eskiler piksel
+          var norm = Math.abs(pos[0]) <= 2.5 && Math.abs(pos[1]) <= 2.5;
+          var fx = norm ? 1 : frameW, fy = norm ? 1 : frameH;
+          list = [];
+          for (k = 0; k < side.pos.length; k++) {
+            list.push({ time: cut + side.pos[k].t * oran,
+              value: [pos[0] + Number(side.pos[k].x) * fx, pos[1] + Number(side.pos[k].y) * fy] });
+          }
+          changed = KS_presetClipKeys(clip, cStart, cEnd, props.position, list, clearA, clearB) || changed;
+        }
+      }
+      return changed;
+    }
+
+    var outOk = uygula(best.a, plan.out, aStart, aEnd2, cut - half, aEnd2, Math.max(aStart, cut - half - 0.02));
+    var inOk = uygula(best.b, plan["in"], bStart2, bEnd, bStart2, cut + half, Math.min(bEnd, cut + half + 0.02));
+    if (!outOk && !inOk) return KS_err("Kesimdeki kliplerde Motion/Opaklik ozelligi bulunamadi.");
+    return KS_ok({ cut: cut, track: best.track + 1, half: half, out: outOk, "in": inOk, removedKeys: KS_presetRemovedCount });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Suflo Smooth: .prfpset'i panelden dogrudan uygula ---------- */
 
 function KS_packRead(path) {
