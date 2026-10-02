@@ -84,6 +84,12 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] Suflo Stili ile ekle → katmanda yıldız görünmüyor, kelime vurgulu.
 - [ ] SRT indir ve **Normal altyazı izi ekle** → yıldızlar yok, metin temiz.
 
+## 6b'. Kanca başlığı *(sol menü → Kanca Başlığı)*
+- [ ] Başlık yaz → **Önizle** → kare görünüyor; stil/süre/konum değişince önizleme yenileniyor.
+- [ ] Playhead'i bir yere getir → **Playhead'e ekle** → başlık tam o anda, boş üst katmanda; arka plan şeffaf.
+- [ ] 9:16 sekansta başlık üstte ve kadraja sığıyor.
+- [ ] Viral anlar kartında **Başlık ekle** → başlık o anın başına geliyor.
+
 ## 6b. Güvenlik ve sağlamlık
 - [ ] Yeni bir model indir (örn. Base) → kurulum "Model doğrulanıyor…" adımından geçiyor.
 - [ ] Ayarlar → güncelleme denetimi: (bir sonraki sürümde) indirilen paket "Doğrulanıyor…" adımından geçiyor.

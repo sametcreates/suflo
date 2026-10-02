@@ -71,6 +71,11 @@
       <span class="ky-kilit" data-kilit>PRO</span>
       <span class="ky-adet" id="gecis-sayac">13</span>
     </button>
+    <button class="ky-oge" data-tab="kanca">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="5" rx="1.2"/><path d="M5 13h10M7 16h6"/></svg></span>
+      <span class="ky-metin"><b>Kanca Başlığı <em class="ky-yeni">YENİ</em></b><i>Shorts açılış yazısı</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
 
     <div class="ky-baslik" style="margin-top:12px">Kütüphane</div>
     <button class="ky-oge" data-tab="text" data-kat="mogrt">
@@ -1044,6 +1049,63 @@
     <div id="gecis-grid" class="preset-grid gecis-grid"></div>
   </section>
 
+  <!-- ================= KANCA BASLIGI ================= -->
+  <section id="tab-kanca" class="tabpane">
+    <div class="pro-tanitim" id="kanca-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>İlk saniyede tutan başlık</b>
+        <span>Shorts / Reels açılışına animasyonlu başlık kartı. Önizleme ücretsiz; timeline'a eklemek Pro.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>3</strong> stil</i><i><strong>0</strong> MOGRT</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="overlay">Pro'yu aç</button>
+    </div>
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="4.5" width="14" height="5" rx="1.2"/><path d="M5 13h10M7 16h6"/></svg>
+        <b>Kanca başlığı</b>
+      </div>
+      <p class="ci-p">Videonun ilk saniyesine izleyiciyi tutan bir başlık koy. Suflo başlığı şeffaf bir katman olarak <b>playhead'e</b> yerleştirir. <b>*yıldızla*</b> işaretlediğin kelime vurgu renginde çıkar. Viral anlar kartlarındaki <b>Başlık ekle</b> düğmesi de bunu kullanır.</p>
+    </div>
+    <div class="field">
+      <label for="kanca-metin">Başlık</label>
+      <input id="kanca-metin" type="text" maxlength="90" placeholder="Bunu bilmeden *para* biriktirmeye başlama">
+    </div>
+    <div class="preset-toolbar">
+      <label class="preset-control">Stil
+        <select id="kanca-stil">
+          <option value="kutu" selected>Kutu</option>
+          <option value="serit">Şerit</option>
+          <option value="sade">Sade</option>
+        </select>
+      </label>
+      <label class="preset-control">Süre
+        <select id="kanca-sure">
+          <option value="2">2 sn</option>
+          <option value="3" selected>3 sn</option>
+          <option value="4">4 sn</option>
+        </select>
+      </label>
+      <label class="preset-control">Konum
+        <select id="kanca-konum">
+          <option value="ust" selected>Üst</option>
+          <option value="orta">Orta</option>
+        </select>
+      </label>
+      <label class="preset-control">Vurgu
+        <input id="kanca-renk" type="color" value="#ffe600">
+      </label>
+    </div>
+    <div class="row">
+      <button id="kanca-onizle" class="btn" type="button">Önizle</button>
+      <button id="kanca-ekle" class="btn primary grow" type="button">Playhead'e ekle</button>
+    </div>
+    <div id="kanca-durum" class="inline-status"></div>
+    <img id="kanca-resim" class="kanca-resim" alt="Kanca başlığı önizlemesi" hidden>
+  </section>
+
   <!-- ================= SFX ================= -->
   <section id="tab-sfx" class="tabpane">
     <div class="pro-tanitim" id="sfx-tanitim" hidden>
@@ -1473,6 +1535,8 @@
   <script src="js/gecisler.js"></script>
   <script src="js/sahneler.js"></script>
   <script src="js/viral.js"></script>
+  <script src="js/hook-title.js"></script>
+  <script src="js/kanca.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>

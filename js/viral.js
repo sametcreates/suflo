@@ -57,7 +57,20 @@ window.KViral = (function () {
         if (r.ok) KApp.toast("In/Out ayarlandı: " + a.title + " — Dışa aktar (Ctrl+M) ile Shorts'u çıkar", "good");
         else durum("✕ " + r.error, "bad");
       });
-      kart.appendChild(ust); kart.appendChild(alt); kart.appendChild(sec);
+      var baslik = document.createElement("button");
+      baslik.type = "button";
+      baslik.className = "btn tiny";
+      baslik.textContent = "Başlık ekle";
+      baslik.title = "Bu anın başına kanca başlığı koyar (stil ve süre: Kanca Başlığı sekmesi)";
+      baslik.hidden = !window.KKanca;
+      baslik.addEventListener("click", async function () {
+        baslik.disabled = true;
+        try { await KKanca.ekle({ text: a.title, at: a.start }); } finally { baslik.disabled = false; }
+      });
+      var dugmeler = document.createElement("div");
+      dugmeler.className = "vr-dugmeler";
+      dugmeler.appendChild(sec); dugmeler.appendChild(baslik);
+      kart.appendChild(ust); kart.appendChild(alt); kart.appendChild(dugmeler);
       box.appendChild(kart);
     });
     el("cap-vr-aksiyon").hidden = anlar.length === 0;

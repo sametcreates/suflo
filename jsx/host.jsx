@@ -1574,6 +1574,12 @@ function KS_placeOverlay(encoded) {
     if (p.scope === "inout") {
       try { startSec = seq.getInPointAsTime().seconds; } catch (eI) {}
     }
+    // p.at: belirli an (sn) ya da "playhead" (kanca basligi gibi kisa katmanlar)
+    if (p.at === "playhead") {
+      try { startSec = seq.getPlayerPosition().seconds; } catch (eP) {}
+    } else if (typeof p.at === "number" && isFinite(p.at) && p.at >= 0) {
+      startSec = p.at;
+    }
     // not: zeroPoint EKLENMEZ — trackItem.start zaten zeroPoint'ten bagimsiz
     // sekans-ici saniye sayar; eklemek baslangic timecode'u 00:00:00:00
     // olmayan sekanslarda altyazi katmanini komple kaydiriyordu.

@@ -363,7 +363,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "kanca-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -1163,6 +1163,7 @@ window.KApp = (function () {
     guvenli("Geçişler", function () { if (window.KGecis) KGecis.init(); });
     guvenli("Sahne algılama", function () { if (window.KSahne) KSahne.init(); });
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
+    guvenli("Kanca başlığı", function () { if (window.KKanca) KKanca.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
     guvenli("Motion Presetleri", function () { if (window.KPresets) KPresets.init(); });
@@ -1201,6 +1202,7 @@ window.KApp = (function () {
       { ikon: "✂", baslik: "Konuşmadan kes", metin: "ııı, eee ve tekrarları kelimeye tıklayarak videodan çıkar.", sekme: "cut", hedef: "tc-card" },
       { ikon: "🔥", baslik: "Viral anlar (Shorts)", metin: "Uzun videodaki en güçlü 15–60 sn'yi bulur, In/Out'u ayarlar.", sekme: "captions", acilir: "cap-vr-box" },
       { ikon: "Aa", baslik: "Suflo Stilleri", metin: "Hormozi, Neon, Daktilo dahil 12 animasyonlu altyazı.", sekme: "captions", hedef: "cap-stil-grid" },
+      { ikon: "▭", baslik: "Kanca başlığı", metin: "Shorts açılışına animasyonlu başlık kartı, tek tık.", sekme: "kanca" },
       { ikon: "↔", baslik: "Geçişler", metin: "Kesime tek tıkla zoom, whip, itme — eklentisiz.", sekme: "gecis" },
       { ikon: "▦", baslik: "Sahne algılama · vuruşlarda böl", metin: "Klibi sahnelerde ya da müziğin vuruşlarında böl.", sekme: "cut", hedef: "sc-card" },
       { ikon: "§", baslik: "YouTube bölümleri", metin: "Konuşmadan bölüm + AI başlık, açıklamaya kopyala.", sekme: "captions", acilir: "cap-ch-box" }
