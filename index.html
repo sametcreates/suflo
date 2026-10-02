@@ -539,18 +539,24 @@
           </div>
           <div class="yt-ayrac"></div>
           <div class="row">
-            <button id="cap-yt-go" class="btn" type="button" title="Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez">✨ YouTube metni yaz</button>
-            <span class="hint" style="margin:0">Başlık önerileri, açıklama (bölümlerle) ve etiketler</span>
+            <button id="cap-yt-go" class="btn" type="button" title="Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez">✨ Paylaşım metni yaz</button>
+            <select id="cap-yt-platform" class="grow" title="Platform">
+              <option value="youtube" selected>YouTube (başlık, açıklama, etiket)</option>
+              <option value="instagram">Instagram Reels</option>
+              <option value="tiktok">TikTok</option>
+            </select>
           </div>
           <div id="cap-yt-sonuc" class="yt-sonuc" hidden>
-            <label>Başlık önerileri <span class="dim">(tıkla → kopyala)</span></label>
+            <label id="cap-yt-baslik-etiket">Başlık önerileri (tıkla → kopyala)</label>
             <div id="cap-yt-basliklar" class="yt-basliklar"></div>
             <label for="cap-yt-aciklama">Açıklama</label>
             <textarea id="cap-yt-aciklama" rows="7"></textarea>
             <div class="row"><span id="cap-yt-not" class="hint" style="margin:0"></span><button id="cap-yt-kopyala" class="btn tiny" type="button" style="margin-left:auto">Açıklamayı kopyala</button></div>
-            <label for="cap-yt-etiket">Etiketler</label>
-            <input id="cap-yt-etiket" type="text">
-            <div class="row"><button id="cap-yt-etiket-kopyala" class="btn tiny" type="button" style="margin-left:auto">Etiketleri kopyala</button></div>
+            <div id="cap-yt-etiket-sar" style="display:grid;gap:6px">
+              <label for="cap-yt-etiket">Etiketler</label>
+              <input id="cap-yt-etiket" type="text">
+              <div class="row"><button id="cap-yt-etiket-kopyala" class="btn tiny" type="button" style="margin-left:auto">Etiketleri kopyala</button></div>
+            </div>
           </div>
         </details>
 

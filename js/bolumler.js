@@ -133,6 +133,8 @@ window.KChapters = (function () {
   var ytSonuc = null;
   var ytSonYazilan = "";   // kullanici aciklamayi elle degistirdiyse bolum duzenlemesi uzerine yazmasin
 
+  function ytPlatform() { return (el("cap-yt-platform") && el("cap-yt-platform").value) || "youtube"; }
+
   function bolumlerGecerli() { return list.length > 0 && CH.validate(list, { origin: 0, end: bitis() }).ok; }
 
   // Bolumler duzenlenince aciklama (elle degistirilmediyse) yeniden kurulur — yeni AI cagrisi yok
@@ -145,6 +147,7 @@ window.KChapters = (function () {
   }
 
   function ytNot() {
+    if (ytPlatform() !== "youtube") return YM.PLATFORM[ytPlatform()].ad + " · en çok " + YM.PLATFORM[ytPlatform()].aciklama + " karakter";
     if (bolumlerGecerli()) return "Açıklamaya bölümler eklendi.";
     if (list.length) return "Bölümler YouTube kurallarına uymadığı için eklenmedi (uyarıya bak).";
     return "İpucu: önce bölüm önerirsen açıklamaya bölümler de eklenir.";
@@ -153,7 +156,8 @@ window.KChapters = (function () {
   function ytAciklama() {
     if (!ytSonuc) return "";
     var bolumler = bolumlerGecerli() ? CH.format(list, { origin: 0 }) : "";
-    return YM.compose({ aciklama: ytSonuc.aciklama, bolumler: bolumler, hashtagler: ytSonuc.hashtagler });
+    return YM.compose({ aciklama: ytSonuc.aciklama, bolumler: bolumler, hashtagler: ytSonuc.hashtagler,
+      platform: ytPlatform(), kanca: ytSonuc.secilenKanca || ytSonuc.basliklar[0] || "" });
   }
 
   function ytCiz() {
@@ -163,14 +167,24 @@ window.KChapters = (function () {
     ytSonuc.basliklar.forEach(function (t) {
       var b = document.createElement("button");
       b.type = "button"; b.className = "yt-baslik"; b.textContent = t;
-      b.title = "Kopyala (" + t.length + "/100)";
-      b.onclick = function () { panoya(t, "Başlık kopyalandı"); };
+      var yt = ytPlatform() === "youtube";
+      b.title = yt ? "Kopyala (" + t.length + "/100)" : "Bu kancayı açıklamanın ilk satırı yap";
+      b.onclick = function () {
+        if (yt) { panoya(t, "Başlık kopyalandı"); return; }
+        ytSonuc.secilenKanca = t;
+        ytSonYazilan = ytAciklama();
+        el("cap-yt-aciklama").value = ytSonYazilan;
+        KApp.toast("Kanca açıklamanın başına kondu", "good");
+      };
       bas.appendChild(b);
     });
     ytSonYazilan = ytAciklama();
     el("cap-yt-aciklama").value = ytSonYazilan;
     el("cap-yt-etiket").value = ytSonuc.etiketler.join(", ");
     el("cap-yt-not").textContent = ytNot();
+    var yt = ytPlatform() === "youtube";
+    el("cap-yt-baslik-etiket").textContent = yt ? "Başlık önerileri (tıkla → kopyala)" : "Kanca (ilk satır) önerileri (tıkla → açıklamaya koy)";
+    el("cap-yt-etiket-sar").hidden = !yt;
     kutu.hidden = false;
   }
 
@@ -185,12 +199,13 @@ window.KChapters = (function () {
     el("cap-yt-go").disabled = true;
     uyari("Başlık, açıklama ve etiketler yazılıyor…");
     try {
-      var p = YM.buildPrompt(s, { lang: lang() });
+      var pf = ytPlatform();
+      var p = YM.buildPrompt(s, { lang: lang(), platform: pf });
       var json = await KCaptions.chatCall(cfg, {
         model: cfg.model, temperature: 0.6, response_format: { type: "json_object" },
         messages: [{ role: "system", content: p.system }, { role: "user", content: p.user }]
       });
-      var r = YM.parseResponse(json.choices && json.choices[0] && json.choices[0].message.content);
+      var r = YM.parseResponse(json.choices && json.choices[0] && json.choices[0].message.content, { platform: pf });
       if (!r) throw new Error("AI anlamlı bir metin döndürmedi, tekrar dene.");
       ytSonuc = r;
       ytCiz();
@@ -233,6 +248,8 @@ window.KChapters = (function () {
     el("cap-ch-add").addEventListener("click", ekle);
     if (el("cap-yt-go") && YM) {
       el("cap-yt-go").addEventListener("click", ytMetni);
+      // platform degisince eski sonuc (baska platformun sinirlari) gizlenir
+      el("cap-yt-platform").addEventListener("change", function () { ytSonuc = null; el("cap-yt-sonuc").hidden = true; });
       el("cap-yt-kopyala").addEventListener("click", function () { panoya(el("cap-yt-aciklama").value, "Açıklama kopyalandı"); });
       el("cap-yt-etiket-kopyala").addEventListener("click", function () { panoya(el("cap-yt-etiket").value, "Etiketler kopyalandı — YouTube Studio › Etiketler"); });
     }

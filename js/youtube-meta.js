@@ -14,6 +14,13 @@
 
   // YouTube sınırları
   var SINIR = { baslik: 100, aciklama: 5000, etiketToplam: 500, hashtag: 3 };
+  // Platforma göre: açıklama sınırı, hashtag sayısı, etiket alanı var mı
+  var PLATFORM = {
+    youtube: { ad: "YouTube", aciklama: 5000, hashtag: 3, etiket: true },
+    instagram: { ad: "Instagram Reels", aciklama: 2200, hashtag: 5, etiket: false },
+    tiktok: { ad: "TikTok", aciklama: 2200, hashtag: 5, etiket: false }
+  };
+  function platform(p) { return PLATFORM[p] ? p : "youtube"; }
   var DIL = { tr: "Turkish", az: "Azerbaijani", en: "English", ru: "Russian", de: "German", ar: "Arabic",
     es: "Spanish", fr: "French", pt: "Portuguese", it: "Italian", nl: "Dutch", ja: "Japanese" };
 
@@ -33,6 +40,17 @@
   function buildPrompt(segments, opts) {
     opts = opts || {};
     var dil = DIL[opts.lang] || "the transcript's language";
+    var pf = platform(opts.platform);
+    if (pf !== "youtube") {
+      return {
+        system: "You are a short-form social media copywriter for " + PLATFORM[pf].ad + ". From the video transcript, write in " + dil + ": " +
+          "5 opening hook lines for the caption (max 80 characters, makes people stop scrolling, no clickbait lies, at most one emoji); " +
+          "a caption body of 2-4 short lines (value of the video, then a call to action like saving or commenting), no hashtags, no links; " +
+          PLATFORM[pf].hashtag + " hashtags (mix 2 broad and the rest niche, no spaces). " +
+          "Reply ONLY with JSON {\"titles\":[...],\"description\":\"...\",\"tags\":[],\"hashtags\":[...]}.",
+        user: "Transcript:\n" + metin(segments, opts.maxChars)
+      };
+    }
     return {
       system: "You are a YouTube SEO copywriter. From the video transcript, write in " + dil + ": " +
         "5 title options (max 70 characters, curiosity + clear benefit, no clickbait lies, no ALL CAPS, no emojis); " +
@@ -67,7 +85,8 @@
     return JSON.parse(t);
   }
 
-  function parseResponse(content) {
+  function parseResponse(content, opts) {
+    var pf = PLATFORM[platform(opts && opts.platform)];
     var data;
     try { data = jsonOku(content); } catch (e) { return null; }
     if (!data || typeof data !== "object") return null;
@@ -104,8 +123,9 @@
       if (!h || hg[k]) return false;
       hg[k] = 1;
       return true;
-    }).slice(0, SINIR.hashtag);
+    }).slice(0, pf.hashtag);
 
+    if (!pf.etiket) etiketler = [];
     if (!basliklar.length && !aciklama) return null;
     return { basliklar: basliklar, aciklama: aciklama, etiketler: etiketler, hashtagler: hashtagler };
   }
@@ -116,19 +136,23 @@
    */
   function compose(o) {
     o = o || {};
-    var bolum = String(o.bolumler || "").trim();
+    var pf = PLATFORM[platform(o.platform)];
+    // Reels/TikTok aciklamasinda bolum (zaman damgasi) anlamsiz; kanca ilk satira
+    var bolum = pf.etiket ? String(o.bolumler || "").trim() : "";
+    var kanca = pf.etiket ? "" : String(o.kanca || "").trim();
     var etiket = (o.hashtagler || []).join(" ");
     var parcalar = [];
     var govde = String(o.aciklama || "").trim();
-    var sabit = (bolum ? bolum.length + 2 : 0) + (etiket ? etiket.length + 2 : 0);
-    var yer = SINIR.aciklama - sabit;
+    var sabit = (bolum ? bolum.length + 2 : 0) + (etiket ? etiket.length + 2 : 0) + (kanca ? kanca.length + 2 : 0);
+    var yer = pf.aciklama - sabit;
     if (govde.length > yer) govde = yer > 20 ? govde.slice(0, yer - 1).replace(/\s+\S*$/, "") + "…" : "";
+    if (kanca) parcalar.push(kanca);
     if (govde) parcalar.push(govde);
     if (bolum) parcalar.push(bolum);
     if (etiket) parcalar.push(etiket);
     // bolumler tek basina sinirdan uzunsa: son care kirp (YouTube 5000'den uzununu reddeder)
-    return parcalar.join("\n\n").slice(0, SINIR.aciklama);
+    return parcalar.join("\n\n").slice(0, pf.aciklama);
   }
 
-  return { SINIR: SINIR, buildPrompt: buildPrompt, parseResponse: parseResponse, compose: compose, metin: metin };
+  return { SINIR: SINIR, PLATFORM: PLATFORM, buildPrompt: buildPrompt, parseResponse: parseResponse, compose: compose, metin: metin };
 });

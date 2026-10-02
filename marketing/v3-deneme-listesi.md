@@ -68,7 +68,8 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] Başlık/zaman düzenlenebiliyor; kural dışı olunca uyarı çıkıyor.
 - [ ] **YouTube metnini kopyala** → panoya `0:00 Başlık` biçiminde geliyor.
 - [ ] **Marker olarak ekle** → timeline'da başlıklı marker'lar (mümkünse Chapter türünde). Tekrar basınca eskiler yenileniyor.
-- [ ] **✨ YouTube metni yaz** → 5 başlık (tıkla → kopyala), açıklamanın sonunda bölümler ve hashtag'ler, etiketler kopyalanıyor.
+- [ ] Platformu **TikTok** seç → **✨ Paylaşım metni yaz** → kanca önerisine tıklayınca açıklamanın ilk satırı oluyor, etiket alanı gizli, 5 hashtag.
+- [ ] **✨ Paylaşım metni yaz** (YouTube) → 5 başlık (tıkla → kopyala), açıklamanın sonunda bölümler ve hashtag'ler, etiketler kopyalanıyor.
 - [ ] **B-roll önerileri** → **B-roll anlarını bul** → kartlar; zamana tıklayınca playhead oraya gidiyor; **Pexels'te ara** tarayıcıda açılıyor; **Marker olarak ekle** → yeşil süreli marker'lar, viral marker'lara dokunulmuyor.
 
 ## 5b. Viral anlar ve çift dilli altyazı

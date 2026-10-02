@@ -44,5 +44,14 @@ var cokBolum = []; for (var q = 0; q < 400; q++) cokBolum.push(q + ":00 Bölüm 
 var tasan = Y.compose({ aciklama: "metin", bolumler: cokBolum.join("\n") });
 ok("compose: bolumler tek basina tassa da 5000'i asmaz, tek '…' kalmaz", tasan.length <= 5000 && tasan.indexOf("…\n\n") === -1, tasan.length);
 
+/* platformlar */
+var pt = Y.buildPrompt(segs, { lang: "tr", platform: "tiktok" });
+ok("TikTok istemi: kanca + 5 hashtag, YouTube etiketi yok", /TikTok/.test(pt.system) && /5 hashtags/.test(pt.system) && !/search tags/.test(pt.system));
+var ri = Y.parseResponse(JSON.stringify({ titles: ["Kanca"], description: "Gövde", tags: ["a"], hashtags: ["a", "b", "c", "d", "e", "f"] }), { platform: "instagram" });
+ok("Instagram: 5 hashtag, etiket yok", ri.hashtagler.length === 5 && ri.etiketler.length === 0);
+var ci = Y.compose({ aciklama: "Gövde", hashtagler: ["#a"], bolumler: "0:00 Giriş", platform: "instagram", kanca: "Kanca" });
+ok("Instagram aciklamasi: kanca ilk satir, bolum yok", ci === "Kanca\n\nGövde\n\n#a", JSON.stringify(ci));
+ok("Reels/TikTok 2200 siniri", Y.compose({ aciklama: new Array(600).join("kelime "), platform: "tiktok" }).length <= 2200);
+ok("bilinmeyen platform YouTube sayilir", Y.compose({ aciklama: "a", bolumler: "0:00 x", platform: "??" }) === "a\n\n0:00 x");
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
