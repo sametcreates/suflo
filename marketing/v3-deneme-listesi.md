@@ -59,6 +59,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] **Marker at** → sahne başlarında "Sahne" marker'ları.
 - [ ] **Sahnelerde böl** → yalnız seçili klip (ve bağlı sesi) bölünüyor; müzik katmanı bölünmüyor.
 - [ ] Ritim → müzik klibini analiz et → B-roll klibini seç → **Seçili klibi vuruşlarda böl** → B-roll vuruşlarda bölünüyor, müzik bölünmüyor.
+- [ ] Birden çok klip seçip **Sesi iyileştir** → hepsi sırayla işleniyor, her biri kendi altına.
 - [ ] Kesim → **Sesi iyileştir**: konuşmalı klibi seç → **Ölç** (LUFS değeri) → **Sesi iyileştir** → temiz ses altta yeni kanalda, orijinal ses kapalı (gri); **dudak senkronu kaymamış**; ses daha temiz ve yüksek.
 
 ## 5. Bölümler *(Altyazı editörü → Bölümler (YouTube))*

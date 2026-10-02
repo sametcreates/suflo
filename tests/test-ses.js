@@ -98,6 +98,8 @@ ok("parseStreams: sessiz video -> bos", A.parseStreams("  Stream #0:0: Video: h2
 ok("outputChannels: mono kalir, cok kanal stereo", A.outputChannels(1) === 1 && A.outputChannels(6) === 2 && A.outputChannels(2) === 2);
 ok("panel: ilk ses akisi ve sabit kanal; cok akista orijinal kapatilmaz; ses yoksa anlasilir hata",
   /"-map", "0:a:0", "-af", son/.test(sesjs) && /"-ac", String\(AC\.outputChannels/.test(sesjs) && /disableOriginal: ak\.length === 1/.test(sesjs) && /Bu klipte ses yok/.test(sesjs));
-ok("panel: gecikme olculup telafi edilir, cikti -t ile kesilir", /AC\.compensate\(zincir, d\)/.test(sesjs) && /"-af", son, "-t", String\(dur\)/.test(sesjs));
+ok("panel: gecikme olculup telafi edilir, cikti -t ile kesilir", /AC\.compensate\(zincir, await gecikme\(ff, zincir\)\)/.test(sesjs) && /"-af", son, "-t", String\(dur\)/.test(sesjs));
+ok("panel: coklu secimde tum uygun klipler, gecikme bir kez olculur", /KS_getSelectedClips/.test(sesjs) && /for \(var i = 0; i < uygun\.length; i\+\+\)/.test(sesjs) && (sesjs.match(/await gecikme\(/g) || []).length === 1);
+ok("panel: yerlestirilemeyen dosya silinir, yerlesen silinmez", /finally \{\s*if \(!yerlesti\) \{ try \{ K\.fs\.unlinkSync\(cikti\)/.test(sesjs));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

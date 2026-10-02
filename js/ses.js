@@ -100,29 +100,15 @@ window.KSes = (function () {
     }
   }
 
-  async function iyilestir() {
-    if (typeof Pro !== "undefined" && !Pro.gate("audioclean")) return;
-    var c = secim();
-    var hata = AC.clipCheck(c);
-    if (hata) { durum(hata, "warn"); return; }
-    if (busy) return;
-    busy = true; dugmeler();
-    var btn = el("ses-go");
-    var cikti = "", yerlesti = false;
+  // Tek klibi isle ve yerlestir. Doner: { yer, ak, sonra, cikti }
+  async function tekKlip(ff, c, son, o) {
+    var ak = await akislar(ff, c.mediaPath);
+    var dur = c.outPoint - c.inPoint;
+    var ad = String(c.name || "ses").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 40);
+    var cikti = K.path.join(K.srtDir(), "suflo-temiz-" + ad + "-" + Date.now() + ".wav");
+    K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
+    var yerlesti = false;
     try {
-      var ff = await K.findFfmpeg();
-      if (!ff) throw new Error("ffmpeg bulunamadı — Ayarlar sekmesinden kur.");
-      var o = ayarlar();
-      var ak = await akislar(ff, c.mediaPath);
-      var zincir = AC.filterChain(o);
-      durum("Senkron için filtre gecikmesi ölçülüyor…");
-      var d = await gecikme(ff, zincir);
-      var son = AC.compensate(zincir, d);
-      var dur = c.outPoint - c.inPoint;
-      var ad = String(c.name || "ses").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 40);
-      cikti = K.path.join(K.srtDir(), "suflo-temiz-" + ad + "-" + Date.now() + ".wav");
-      K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
-      durum("Ses temizleniyor… (" + Math.round(dur) + " sn)");
       // ilk ses akisi; kanal sayisi sabit (5.1/4 kanalli kamera dosyasi tek stereo klip olsun)
       var r = await K.run(ff, ["-y", "-hide_banner", "-nostats", "-ss", String(c.inPoint), "-t", String(dur), "-i", c.mediaPath,
         "-map", "0:a:0", "-af", son, "-t", String(dur), "-ac", String(AC.outputChannels(ak[0].kanal)), "-ar", "48000", "-c:a", "pcm_s16le", cikti],
@@ -131,7 +117,6 @@ window.KSes = (function () {
         throw new Error("Ses işlenemedi: " + String(r.stderr || "").split("\n").filter(Boolean).slice(-1)[0]);
       }
       // islem sirasinda baska klip secilse de temiz ses BASLADIGI klibin altina gider (c sabit)
-      durum("Timeline'a yerleştiriliyor…");
       var yer = await K.call("KS_placeCleanAudio", {
         path: cikti, start: c.clipStart, end: c.clipEnd, inPoint: c.inPoint, mediaPath: c.mediaPath,
         name: "Suflo temiz · " + (c.name || "ses"),
@@ -140,20 +125,68 @@ window.KSes = (function () {
       }, 120000);
       if (!yer.ok) throw new Error(yer.error);
       yerlesti = true;   // dosya artik projede: hata olsa da silinmez
-      var sonra = await olcum(ff, ["-i", cikti]);
-      var not = yer.disabled ? " · orijinal ses kapatıldı (sağ tık → Etkinleştir ile geri açılır)" :
-        ak.length > 1 ? " · dosyada " + ak.length + " ses akışı var: ilki temizlendi, orijinali elle kapat" :
-        yer.skipped ? " · orijinal ses klibi seçimden uzun (J/L kesim): elle kapat" : "";
-      durum("Bitti: " + AC.describe(sonra.I, AC.HEDEFLER[o.hedef].I) + " · " + yer.trackName + not, "good");
+      return { yer: yer, ak: ak, cikti: cikti };
+    } finally {
+      if (!yerlesti) { try { K.fs.unlinkSync(cikti); } catch (e2) {} }
+    }
+  }
+
+  async function iyilestir() {
+    if (typeof Pro !== "undefined" && !Pro.gate("audioclean")) return;
+    if (busy) return;
+    var c = secim();
+    var hata = AC.clipCheck(c);
+    if (hata) { durum(hata, "warn"); return; }
+    busy = true; dugmeler();
+    var btn = el("ses-go");
+    try {
+      // birden cok klip secildiyse hepsi (bagli video+ses cifti tek sayilir)
+      var liste = [c];
+      try {
+        var sr = await K.call("KS_getSelectedClips", {}, 15000);
+        if (sr && sr.ok && sr.clips && sr.clips.length > 1) liste = sr.clips;
+      } catch (eS) {}
+      var uygun = liste.filter(function (k) { return !AC.clipCheck(k); });
+      var atlanan = liste.length - uygun.length;
+      if (!uygun.length) throw new Error(AC.clipCheck(liste[0]) || "Uygun klip yok.");
+
+      var ff = await K.findFfmpeg();
+      if (!ff) throw new Error("ffmpeg bulunamadı — Ayarlar sekmesinden kur.");
+      var o = ayarlar();
+      var zincir = AC.filterChain(o);
+      durum("Senkron için filtre gecikmesi ölçülüyor…");
+      var son = AC.compensate(zincir, await gecikme(ff, zincir));
+
+      var sonuclar = [], hatalar = [];
+      for (var i = 0; i < uygun.length; i++) {
+        var k = uygun[i];
+        durum((uygun.length > 1 ? (i + 1) + "/" + uygun.length + " · " : "") + "Ses temizleniyor… (" + Math.round(k.outPoint - k.inPoint) + " sn)");
+        try { sonuclar.push(await tekKlip(ff, k, son, o)); }
+        catch (eK) { hatalar.push((k.name || "klip") + ": " + K.hataYardimi(eK)); }
+      }
+      if (!sonuclar.length) throw new Error(hatalar.join("; "));
+
+      var ilk = sonuclar[0];
+      var sonra = await olcum(ff, ["-i", ilk.cikti]);
+      var kapatilan = sonuclar.reduce(function (n, x) { return n + (x.yer.disabled || 0); }, 0);
+      var cokAkis = sonuclar.some(function (x) { return x.ak.length > 1; });
+      var jl = sonuclar.some(function (x) { return x.yer.skipped; });
+      var not = (kapatilan ? " · orijinal ses kapatıldı (sağ tık → Etkinleştir ile geri açılır)" : "") +
+        (cokAkis ? " · birden çok ses akışlı dosyada yalnız ilki temizlendi, orijinali elle kapat" : "") +
+        (jl ? " · seçimden uzun orijinal ses (J/L kesim) elle kapatılmalı" : "") +
+        (atlanan ? " · " + atlanan + " klip atlandı (hızı değişmiş ya da çok kısa)" : "") +
+        (hatalar.length ? " · hata: " + hatalar.join("; ").slice(0, 160) : "");
+      durum("Bitti: " + (sonuclar.length > 1 ? sonuclar.length + " klip · " : "") + AC.describe(sonra.I, AC.HEDEFLER[o.hedef].I) +
+        " · " + ilk.yer.trackName + not, hatalar.length ? "warn" : "good");
       var a = el("ses-audio");
       if (a) {
-        a.src = encodeURI("file:///" + cikti.replace(/\\/g, "/")).replace(/#/g, "%23").replace(/\?/g, "%3F").replace(/'/g, "%27");
+        a.src = encodeURI("file:///" + ilk.cikti.replace(/\\/g, "/")).replace(/#/g, "%23").replace(/\?/g, "%3F").replace(/'/g, "%27");
         a.hidden = false;
       }
-      KApp.toast("Temiz ses " + yer.trackName + " kanalına eklendi" + (yer.newTrack ? " (yeni kanal)" : ""), "good");
+      KApp.toast(sonuclar.length > 1 ? sonuclar.length + " klibin sesi iyileştirildi" :
+        "Temiz ses " + ilk.yer.trackName + " kanalına eklendi" + (ilk.yer.newTrack ? " (yeni kanal)" : ""), "good");
     } catch (e) {
       durum("✕ " + K.hataYardimi(e), "bad");
-      if (cikti && !yerlesti) { try { K.fs.unlinkSync(cikti); } catch (e2) {} }
     } finally {
       busy = false; dugmeler();
       if (btn) btn.disabled = !secim();
