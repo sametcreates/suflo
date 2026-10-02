@@ -537,6 +537,21 @@
             <button id="cap-ch-copy" class="btn tiny" type="button" style="margin-left:auto">YouTube metnini kopyala</button>
             <button id="cap-ch-markers" class="btn tiny" type="button">Marker olarak ekle</button>
           </div>
+          <div class="yt-ayrac"></div>
+          <div class="row">
+            <button id="cap-yt-go" class="btn" type="button" title="Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez">✨ YouTube metni yaz</button>
+            <span class="hint" style="margin:0">Başlık önerileri, açıklama (bölümlerle) ve etiketler</span>
+          </div>
+          <div id="cap-yt-sonuc" class="yt-sonuc" hidden>
+            <label>Başlık önerileri <span class="dim">(tıkla → kopyala)</span></label>
+            <div id="cap-yt-basliklar" class="yt-basliklar"></div>
+            <label for="cap-yt-aciklama">Açıklama</label>
+            <textarea id="cap-yt-aciklama" rows="7"></textarea>
+            <div class="row"><span id="cap-yt-not" class="hint" style="margin:0"></span><button id="cap-yt-kopyala" class="btn tiny" type="button" style="margin-left:auto">Açıklamayı kopyala</button></div>
+            <label for="cap-yt-etiket">Etiketler</label>
+            <input id="cap-yt-etiket" type="text">
+            <div class="row"><button id="cap-yt-etiket-kopyala" class="btn tiny" type="button" style="margin-left:auto">Etiketleri kopyala</button></div>
+          </div>
         </details>
 
         <details class="adv" id="cap-vr-box">
@@ -1577,6 +1592,7 @@
   <script src="js/highlights.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
+  <script src="js/youtube-meta.js"></script>
   <script src="js/bolumler.js"></script>
   <script src="js/gecisler.js"></script>
   <script src="js/sahneler.js"></script>

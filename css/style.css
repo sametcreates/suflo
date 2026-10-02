@@ -3621,3 +3621,11 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   .yenilik-yazi i { display: none; }
   .yenilik-ikon { width: 26px; height: 26px; }
 }
+/* YouTube metni */
+.yt-ayrac { height: 1px; background: var(--line); margin: 10px 0 8px; }
+.yt-sonuc { display: grid; gap: 6px; margin-top: 8px; }
+.yt-sonuc label { font-size: 11px; color: var(--dim); margin-top: 4px; }
+.yt-sonuc textarea, .yt-sonuc input { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; line-height: 1.45; }
+.yt-basliklar { display: grid; gap: 5px; }
+.yt-baslik { text-align: left; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.yt-baslik:hover { border-color: rgba(139,124,246,.55); }
