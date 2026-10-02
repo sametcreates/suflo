@@ -143,8 +143,9 @@
    * acik kalan isaret satir sonunda (lineEnd) kapanir.
    */
   // kapanis yildizindan sonra noktalama olabilir: "*100 TL*."
-  var VURGU_RE = /^\*+|\*+(?=[.,!?;:…»"')\]]*$)/g;
-  var VURGU_SON = /\*[.,!?;:…»"')\]]*$/;
+  // kapanis yildizindan sonra Turkce ek ("*Instagram*'da") ve/veya noktalama olabilir
+  var VURGU_SON = /\*+((?:['’][^\s*'’.,!?;:…»"()\[\]]+)?[.,!?;:…»"'’)\]]*)$/;
+  function isaretsiz(w) { return w.replace(/^\*+/, "").replace(VURGU_SON, "$1"); }
   var VURGU_EN_COK = 6;   // kapanmayan isaret en fazla bu kadar kelime surer
   function markEmphasis(cues) {
     var acik = false, sayac = 0;
@@ -153,7 +154,7 @@
       var dolu = t.replace(/\*/g, "").length > 0;
       // yalniz yildizdan olusan kelime isaret acmaz/kapatmaz
       var bas = dolu && /^\*/.test(t), son = dolu && VURGU_SON.test(t);
-      var temiz = t.replace(VURGU_RE, "");
+      var temiz = isaretsiz(t);
       if (acik && ++sayac > VURGU_EN_COK) acik = false;
       var vurgu = acik || bas;
       if (bas && !son) { acik = true; sayac = 1; }
@@ -178,7 +179,7 @@
   // Isaretleri tamamen kaldir (vurgu desteklemeyen ciktilar icin)
   function stripEmphasis(text) {
     return String(text == null ? "" : text).split(/(\s+)/).map(function (p) {
-      return /\S/.test(p) && p.replace(/\*/g, "") ? p.replace(VURGU_RE, "") : p;
+      return /\S/.test(p) && p.replace(/\*/g, "") ? isaretsiz(p) : p;
     }).join("");
   }
 

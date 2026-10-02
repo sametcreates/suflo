@@ -29,7 +29,8 @@ window.KKanca = (function () {
       stil: el("kanca-stil") ? el("kanca-stil").value : "kutu",
       dur: Number(el("kanca-sure") ? el("kanca-sure").value : 3) || 3,
       konum: el("kanca-konum") ? el("kanca-konum").value : "ust",
-      vurguRenk: el("kanca-renk") ? el("kanca-renk").value : "#ffe600"
+      vurguRenk: el("kanca-renk") ? el("kanca-renk").value : "#ffe600",
+      lang: window.KCaptions && KCaptions.language ? KCaptions.language() : "tr"
     };
     for (var k in ek || {}) if (Object.prototype.hasOwnProperty.call(ek, k)) o[k] = ek[k];
     return o;
@@ -47,7 +48,7 @@ window.KKanca = (function () {
 
   // ASS + fontlari gecici klasore yaz (ffmpeg filtresi goreli yol ister)
   function hazirla(built) {
-    var dizin = K.path.join(K.tmpDir(), "overlay-kanca-" + Date.now());
+    var dizin = K.path.join(K.tmpDir(), "overlay-kanca-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8));
     K.fs.mkdirSync(dizin, { recursive: true });
     K.fs.writeFileSync(K.path.join(dizin, "kanca.ass"), built.ass, "utf8");
     var fontsdir = "";
@@ -71,17 +72,17 @@ window.KKanca = (function () {
     if (busy || !HT) return;
     var o = ayarlar();
     if (!String(o.text).trim()) { durum("Önce bir başlık yaz.", "warn"); return; }
-    var ff = await K.findFfmpeg();
-    if (!ff) { durum("Önizleme için ffmpeg gerekli (Ayarlar → ffmpeg).", "warn"); return; }
-    busy = true;
+    busy = true;   // ilk await'ten ONCE: cift tiklama iki render baslatmasin
     var is = null;
     try {
+      var ff = await K.findFfmpeg();
+      if (!ff) { durum("Önizleme için ffmpeg gerekli (Ayarlar → ffmpeg).", "warn"); return; }
       durum("Önizleme hazırlanıyor…");
       var b = await sekansBoyutu();
       // onizleme kucuk: kisa kenar 540
       var olcek = 540 / Math.min(b.w, b.h);
       var w = Math.round(b.w * olcek / 2) * 2, h = Math.round(b.h * olcek / 2) * 2;
-      var built = HT.build({ text: o.text, stil: o.stil, width: w, height: h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk });
+      var built = HT.build({ text: o.text, stil: o.stil, width: w, height: h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk, lang: o.lang });
       is = hazirla(built);
       var png = K.path.join(is.dizin, "onizleme.png");
       var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", "color=c=0x1c2433:s=" + w + "x" + h + ":d=" + built.dur,
@@ -106,20 +107,21 @@ window.KKanca = (function () {
    */
   async function ekle(ek) {
     if (typeof Pro !== "undefined" && !Pro.gate("overlay")) return false;
-    if (busy || !HT) return false;
+    if (!HT) return false;
+    if (busy) { KApp.toast("Kanca başlığı şu an hazırlanıyor, birazdan tekrar dene.", "warn"); return false; }
     var o = ayarlar(ek);
     if (!String(o.text).trim()) { durum("Önce bir başlık yaz.", "warn"); return false; }
-    var ff = await K.findFfmpeg();
-    if (!ff) { KApp.toast("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad"); return false; }
-    busy = true;
+    busy = true;   // ilk await'ten ONCE: cift tiklama iki katman koymasin
     var btn = el("kanca-ekle");
     if (btn) btn.disabled = true;
     var is = null;
     try {
+      var ff = await K.findFfmpeg();
+      if (!ff) { KApp.toast("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad"); return false; }
       durum("Başlık hazırlanıyor…");
       var b = await sekansBoyutu();
       if (!b.ok) throw new Error("Aktif sekans yok.");
-      var built = HT.build({ text: o.text, stil: o.stil, width: b.w, height: b.h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk });
+      var built = HT.build({ text: o.text, stil: o.stil, width: b.w, height: b.h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk, lang: o.lang });
       is = hazirla(built);
       var cikti = K.path.join(K.srtDir(), "suflo-kanca-" + Date.now() + ".mov");
       K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
@@ -182,6 +184,7 @@ window.KKanca = (function () {
         });
         b.addEventListener("click", function () {
           el("kanca-metin").value = o;
+          el("kanca-resim").hidden = true;
           onizle();
         });
         box.appendChild(b);
@@ -201,6 +204,8 @@ window.KKanca = (function () {
     el("kanca-onizle").addEventListener("click", onizle);
     if (el("kanca-ai")) el("kanca-ai").addEventListener("click", aiOner);
     el("kanca-ekle").addEventListener("click", function () { ekle(); });
+    // metin degisince eski onizleme yaniltmasin
+    el("kanca-metin").addEventListener("input", function () { el("kanca-resim").hidden = true; });
     el("kanca-metin").addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); onizle(); }
     });

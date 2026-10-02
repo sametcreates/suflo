@@ -185,13 +185,20 @@
    * renginde cizer; SRT/VTT/normal caption izi gibi ciktilarda isaret kaldirilir.
    */
   // Kapanis yildizindan sonra noktalama gelebilir: "*100 TL*." (otomatik vurgunun bicimi)
-  var VURGU_UC = /^\*+|\*+(?=[.,!?;:…»"')\]]*$)/g;
+  // Kapanis: yildizdan sonra Turkce ek ("*Instagram*'da") ve/veya noktalama gelebilir
+  var KAPANIS = /\*+((?:['’][^\s*'’.,!?;:…»"()\[\]]+)?[.,!?;:…»"'’)\]]*)$/;
+  function isaretsiz(w) { return w.replace(/^\*+/, "").replace(KAPANIS, "$1"); }
+  function kapaniyor(w) { return KAPANIS.test(w); }
   function stripEmphasis(text) {
     return String(text == null ? "" : text).split(/(\s+)/).map(function (p) {
-      return /\S/.test(p) && p.replace(/\*/g, "") ? p.replace(VURGU_UC, "") : p;
+      return /\S/.test(p) && p.replace(/\*/g, "") ? isaretsiz(p) : p;
     }).join("");
   }
-  function hasEmphasis(text) { return /(^|\s)\*\S|\S\*[.,!?;:…»"')\]]*(\s|$)/.test(String(text || "")); }
+  function hasEmphasis(text) {
+    return String(text || "").split(/\s+/).some(function (w) {
+      return w.replace(/\*/g, "").length > 0 && (/^\*/.test(w) || kapaniyor(w));
+    });
+  }
 
   // Tek kelimeyi isaretle/isareti kaldir (editorde tiklayarak)
   function toggleWord(text, index) {
@@ -201,8 +208,8 @@
       n++;
       if (n !== index) continue;
       var p = parts[i];
-      var m = /^(.*?)([.,!?;:…»"')\]]*)$/.exec(p.replace(VURGU_UC, ""));
-      var isaretli = /^\*/.test(p) && /\*[.,!?;:…»"')\]]*$/.test(p) && p.replace(/\*/g, "").length > 0;
+      var m = /^(.*?)([.,!?;:…»"')\]]*)$/.exec(isaretsiz(p));
+      var isaretli = /^\*/.test(p) && kapaniyor(p) && p.replace(/\*/g, "").length > 0;
       // isaretliyse kaldir; degilse "*kelime*." (noktalama disarida) — tek bicim
       parts[i] = isaretli ? m[1] + m[2] : (m[1] ? "*" + m[1] + "*" + m[2] : p);
       break;
@@ -215,7 +222,7 @@
     var acik = false;
     return String(text || "").trim().split(/\s+/).filter(Boolean).map(function (w) {
       var dolu = w.replace(/\*/g, "").length > 0;
-      var bas = dolu && /^\*/.test(w), son = dolu && /\*[.,!?;:…»"')\]]*$/.test(w);
+      var bas = dolu && /^\*/.test(w), son = dolu && kapaniyor(w);
       var v = acik || bas;
       if (bas && !son) acik = true;
       if (son) acik = false;
@@ -263,6 +270,8 @@
       // imlec kelimenin icinde ya da kenarinda / secim kelimeyle kesisiyor
       if (bas === son ? (bas >= b && bas <= e) : (b < son && e > bas)) secili.push(i);
     }
+    // yalniz yildiz/noktalamadan olusan "kelime" isaretlenmez (her basista yildiz biriktirirdi)
+    secili = secili.filter(function (pi) { return /[^\s*.,!?;:…»«"'’“”()\[\]\-–—]/.test(parts[pi]); });
     if (!secili.length) return { text: text, caret: son };
     if (bas === son && secili.length > 1) secili = [secili[0]];
     var kelimeIdx = [], n = -1;
@@ -275,7 +284,7 @@
       // sonra kalan vurgulu kelimeleri tek tek yeniden isaretle
       var aralikBas = ilk, aralikSon = sonP;
       while (aralikBas > 0 && mask[kelimeIdx[aralikBas]] && !/^\*/.test(parts[aralikBas])) aralikBas -= 2;
-      while (aralikSon < parts.length - 1 && mask[kelimeIdx[aralikSon]] && !/\*[.,!?;:…»"')\]]*$/.test(parts[aralikSon])) aralikSon += 2;
+      while (aralikSon < parts.length - 1 && mask[kelimeIdx[aralikSon]] && !kapaniyor(parts[aralikSon])) aralikSon += 2;
       for (var q = aralikBas; q <= aralikSon; q += 2) {
         var cozulmus = stripEmphasis(parts[q]);
         parts[q] = (q < ilk || q > sonP) ? toggleWord(cozulmus, 0) : cozulmus;

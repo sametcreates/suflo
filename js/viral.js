@@ -128,15 +128,25 @@ window.KViral = (function () {
     busy = true;
     var btn = el("cap-vr-shorts");
     btn.disabled = true;
-    durum(anlar.length + " Shorts sekansı oluşturuluyor" + (dikey ? " (9:16 Auto Reframe birkaç dakika sürebilir)…" : "…"));
+    var liste = anlar.slice();
+    var yapilan = 0, dikeySay = 0, hatalar = [];
     try {
-      var r = await K.call("KS_makeShorts", {
-        ranges: anlar.map(function (a, i) { return { start: a.start, end: a.end, name: "Shorts " + (i + 1) + " · " + a.title }; }),
-        dikey: dikey
-      }, 900000);
-      if (!r.ok) throw new Error(r.error);
-      durum(r.errors && r.errors.length ? "Bazıları atlandı: " + r.errors.join("; ").slice(0, 220) : "", r.errors && r.errors.length ? "warn" : "");
-      KApp.toast(r.made + " Shorts sekansı oluşturuldu" + (r.vertical ? " · " + r.vertical + " dikey (9:16)" : "") +
+      // Aralik basina ayri cagri: ilerleme gorunur, uzun Auto Reframe tek bir
+      // zaman asimina takilip tum isi tekrarlatmaz (cift sekans olusmaz)
+      for (var i = 0; i < liste.length; i++) {
+        durum("Shorts " + (i + 1) + "/" + liste.length + " oluşturuluyor" + (dikey ? " (9:16 Auto Reframe sürebilir)…" : "…"));
+        var a = liste[i];
+        var r = await K.call("KS_makeShorts", {
+          ranges: [{ start: a.start, end: a.end, name: "Shorts " + (i + 1) + " · " + a.title }],
+          dikey: dikey
+        }, 600000);
+        if (!r.ok) { hatalar.push("Shorts " + (i + 1) + ": " + r.error); continue; }
+        yapilan += r.made; dikeySay += r.vertical;
+        (r.errors || []).forEach(function (h) { hatalar.push(h); });
+      }
+      if (!yapilan) throw new Error(hatalar.join("; ") || "Sekans oluşturulamadı.");
+      durum(hatalar.length ? "Bazıları atlandı: " + hatalar.join("; ").slice(0, 220) : "", hatalar.length ? "warn" : "");
+      KApp.toast(yapilan + " Shorts sekansı oluşturuldu" + (dikeySay ? " · " + dikeySay + " dikey (9:16)" : "") +
         " — Proje panelinde \"Suflo Shorts\" kutusu", "good", 8000);
     } catch (e) {
       durum("✕ " + K.hataYardimi(e), "bad");

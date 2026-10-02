@@ -105,5 +105,13 @@ var corr = new Function("CT", kes("function correctionFromEdit(") + "\nreturn co
 ok("vurgu eklemek sozluk duzeltmesi sayilmaz", corr("bu kelime", "bu *kelime*") === null);
 ok("gercek duzeltme yine onerilir (vurgulu kelimede de)", JSON.stringify(corr("bu *kelme*", "bu *kelime*")) === JSON.stringify({ from: "kelme", to: "kelime" }));
 
+
+/* besinci inceleme: ekli kapanis, yildiz biriktirme */
+ok("ekli kapanis: *Instagram*'da yalniz o kelime", JSON.stringify(C.emphasisMask("*Instagram*'da para kazan")) === "[true,false,false]");
+ok("ekli kapanis strip", C.stripEmphasis("*Instagram*’dan para *kazan*!") === "Instagram’dan para kazan!");
+ok("ekli kapanis motor", E.markEmphasis(E.splitToWords([{ start: 0, end: 2, text: "*YouTube*'a gel *hemen*" }])).map(function (c) { return c.text + (c.vurgu ? "!" : ""); }).join(" ") === "YouTube'a! gel hemen!");
+ok("parantezli kapanis", JSON.stringify(C.emphasisMask("bunu *kimse*) bilmiyor")) === "[false,true,false]");
+ok("Ctrl+B yalniz yildizli kelimeye yildiz eklemez", C.toggleRange("a * b", 2, 2).text === "a * b" && C.toggleRange("*", 0, 1).text === "*");
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

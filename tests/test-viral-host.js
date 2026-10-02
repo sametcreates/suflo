@@ -70,5 +70,25 @@ ok("Auto Reframe yoksa yatay sekans yine olusur, uyari doner", ms2.ok && ms2.mad
 delete sequence.createSubsequence;
 ok("createSubsequence yoksa anlasilir hata", call("KS_makeShorts", { ranges: [{ start: 1, end: 20 }] }).ok === false);
 
+
+/* besinci inceleme: In/Out sirasi ve geri yukleme */
+var cagrilar = [];
+sequence.end = String(600 * 254016000000);
+sequence.setInPoint = function (s) { cagrilar.push("in:" + s); seqState.in = s; };
+sequence.setOutPoint = function (s) { cagrilar.push("out:" + s); seqState.out = s; };
+sequence.createSubsequence = function () { return { sequenceID: "z", projectItem: { moveBin: function () {} } }; };
+sequence.getInPointAsTime = function () { return { seconds: 300 }; };
+sequence.getOutPointAsTime = function () { return { seconds: 400 }; };
+call("KS_makeShorts", { ranges: [{ start: 450, end: 480, name: "x" }] });
+ok("yeni In eski Out'tan sonra: once Out sona cekilir", cagrilar.slice(0, 3).join(" ") === "out:600 in:450 out:480", cagrilar.join(" "));
+ok("geri yukleme: Out sona, In, sonra Out (In>Out olmaz)", cagrilar.slice(-3).join(" ") === "out:600 in:300 out:400", cagrilar.join(" "));
+cagrilar = [];
+sequence.getInPointAsTime = function () { return { seconds: -1 }; };
+sequence.getOutPointAsTime = function () { throw new Error("yok"); };
+call("KS_makeShorts", { ranges: [{ start: 10, end: 40, name: "x" }] });
+ok("negatif In / okunamayan Out: 0..son'a doner, hata zinciri kopmaz", cagrilar.slice(-2).join(" ") === "in:0 out:600", cagrilar.join(" "));
+var vj = fs.readFileSync(path.join(__dirname, "..", "js", "viral.js"), "utf8");
+ok("panel aralik basina ayri cagri yapar", /ranges: \[\{ start: a\.start/.test(vj) && /for \(var i = 0; i < liste\.length/.test(vj));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

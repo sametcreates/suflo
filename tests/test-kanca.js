@@ -99,5 +99,13 @@ ok("oneri ayristirma: markdown, tirnak, hashtag, tekrar, bos temizlenir", JSON.s
 ok("oneri ayristirma: bozuk JSON bos", HT.parseSuggestions("{x").length === 0);
 ok("kanca.js: oneriler textContent ile (HTML enjeksiyonu yok)", (kanca.match(/innerHTML\s*=/g) || []).length === (kanca.match(/innerHTML = "";/g) || []).length && /createTextNode\(parca\)/.test(kanca));
 
+
+/* besinci inceleme */
+ok("kanca: ekli vurgu kapanir", JSON.stringify(HT.tokens("*Instagram*'da para kazan")) === JSON.stringify([{ w: "Instagram'da", v: true }, { w: "para", v: false }, { w: "kazan", v: false }]));
+ok("kanca: Ingilizce buyuk harf THIS (THİS degil)", HT.build({ text: "this is it", lang: "en" }).ass.indexOf("THIS IS IT") !== -1);
+ok("kanca: Turkce varsayilan İ", HT.build({ text: "bilgi" }).ass.indexOf("BİLGİ") !== -1);
+ok("kanca.js: dil panelden gecer, busy ilk await'ten once", /lang: o\.lang/.test(kanca) && /busy = true;[^\n]*\n[\s\S]{0,120}await K\.findFfmpeg/.test(kanca));
+ok("kanca.js: mesgulken sessiz kalmaz", /if \(busy\) \{ KApp\.toast/.test(kanca));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

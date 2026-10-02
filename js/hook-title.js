@@ -37,15 +37,19 @@
     return String(v || "").replace(/\\/g, "⧵").replace(/\{/g, "\\{").replace(/\}/g, "\\}");
   }
 
+  // kapanis yildizindan sonra Turkce ek ("*Instagram*'da") ve/veya noktalama olabilir
+  var KAPANIS = /\*+((?:['’][^\s*'’.,!?;:…»"()\[\]]+)?[.,!?;:…»"'’)\]]*)$/;
+
   // "*iki kelime* daha" -> [{ w, v }]
   function tokens(text) {
     var acik = false;
     return String(text || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).map(function (w) {
-      var bas = /^\*/.test(w), son = /\*[.,!?;:…]*$/.test(w) && w.replace(/\*/g, "").length > 0;
+      var dolu = w.replace(/\*/g, "").length > 0;
+      var bas = dolu && /^\*/.test(w), son = dolu && KAPANIS.test(w);
       var v = acik || bas;
       if (bas && !son) acik = true;
       if (son) acik = false;
-      return { w: w.replace(/^\*+/, "").replace(/\*+([.,!?;:…]*)$/, "$1"), v: v };
+      return { w: w.replace(/^\*+/, "").replace(KAPANIS, "$1"), v: v };
     }).filter(function (t) { return t.w; });
   }
 
@@ -70,9 +74,11 @@
     return out;
   }
 
+  // Buyuk harf kurali dile gore: yalniz tr/az'de i -> İ ("THIS", "THİS" degil)
   function kase(text, mod, loc) {
     if (mod !== "upper") return text;
-    try { return text.toLocaleUpperCase(loc || "tr-TR"); } catch (e) { return text.toUpperCase(); }
+    if (!loc) return text.toUpperCase();
+    try { return text.toLocaleUpperCase(loc); } catch (e) { return text.toUpperCase(); }
   }
 
   /*
@@ -86,7 +92,8 @@
     var dur = Math.max(1, Math.min(10, Number(opts.dur) || 3));
     var renk = opts.renk || "#ffffff", vurgu = opts.vurguRenk || "#ffe600";
     var kisa = Math.min(W, H);
-    var toks = tokens(kase(String(opts.text || ""), st.kase, opts.loc));
+    var loc = opts.loc || { tr: "tr-TR", az: "az" }[opts.lang || "tr"];
+    var toks = tokens(kase(String(opts.text || ""), st.kase, loc));
     if (!toks.length) throw new Error("Başlık metni boş.");
     var maxChars = W < H ? 14 : 22;
     var lines = satirlar(toks, maxChars);

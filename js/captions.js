@@ -1851,13 +1851,9 @@ window.KCaptions = (function () {
         var sonuc = CT.autoEmphasis(pencere.join(" ")).split(/\s+/);
         if (sonuc.length !== pencere.length) continue;
         // pencere genelindeki "*a b*" araligi kelime basina "*a*" "*b*" olur
-        var acik = false;
+        var maske = CT.emphasisMask(sonuc.join(" "));
         sonuc.forEach(function (w, k) {
-          var bas = /^\*/.test(w), son = /\*[.,!?;:…]*$/.test(w);
-          var isaretli = acik || bas;
-          if (bas && !son) acik = true;
-          if (son) acik = false;
-          yeni[b + k] = isaretli ? CT.toggleWord(CT.stripEmphasis(w), 0) : w;
+          yeni[b + k] = maske[k] ? CT.toggleWord(CT.stripEmphasis(w), 0) : w;
         });
       }
     } else {

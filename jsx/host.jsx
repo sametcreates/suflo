@@ -1994,8 +1994,11 @@ function KS_makeShorts(encoded) {
     var ranges = p.ranges || [];
     if (!ranges.length) return KS_err("Aralik yok.");
     if (typeof seq.createSubsequence !== "function") return KS_err("Bu Premiere surumu alt sekans olusturmayi desteklemiyor.");
-    var eskiIn = null, eskiOut = null;
-    try { eskiIn = seq.getInPointAsTime().seconds; eskiOut = seq.getOutPointAsTime().seconds; } catch (eIO) {}
+    var eskiIn = null, eskiOut = null, sonSn = 0;
+    try { eskiIn = seq.getInPointAsTime().seconds; } catch (eI0) {}
+    try { eskiOut = seq.getOutPointAsTime().seconds; } catch (eO0) {}
+    try { sonSn = Number(seq.end) / KS_TPS; } catch (eE) {}
+    if (!(sonSn > 0)) sonSn = 1e6;
     var kutu = null;
     try { kutu = KS_findBin("Suflo Shorts"); } catch (eB) {}
     var yapilan = [], hatalar = [], dikeySayisi = 0;
@@ -2005,6 +2008,10 @@ function KS_makeShorts(encoded) {
       var ad = String(r.name || ("Shorts " + (i + 1))).replace(/[\r\n\t]+/g, " ").substring(0, 70);
       if (!(b > a)) { hatalar.push(ad + ": gecersiz aralik"); continue; }
       try {
+        // createSubsequence/autoReframe yeni sekansi acabilir: her turda asil sekans aktif
+        try { app.project.activeSequence = seq; } catch (eAk) {}
+        // Out once sona: yeni In eski Out'tan sonra gelirse Premiere In>Out'u reddedebilir
+        seq.setOutPoint(sonSn);
         seq.setInPoint(a);
         seq.setOutPoint(b);
         var alt = seq.createSubsequence(true);
@@ -2028,10 +2035,11 @@ function KS_makeShorts(encoded) {
     // orijinal sekansa don, In/Out'u geri yukle
     try { app.project.activeSequence = seq; } catch (eA) {}
     try { if (String(KS_seq().sequenceID) !== String(seq.sequenceID)) app.project.openSequence(seq.sequenceID); } catch (eO) {}
-    try {
-      if (eskiIn !== null) seq.setInPoint(eskiIn);
-      if (eskiOut !== null) seq.setOutPoint(eskiOut);
-    } catch (eG) {}
+    // In/Out geri yukle: ayri ayri (biri hata verirse digeri yine yuklensin);
+    // negatif/bos In 0'a, bos Out sekans sonuna doner. Out once sona: In>Out olmasin.
+    try { seq.setOutPoint(sonSn); } catch (eG0) {}
+    try { seq.setInPoint(eskiIn !== null && eskiIn > 0 ? eskiIn : 0); } catch (eG1) {}
+    try { seq.setOutPoint(eskiOut !== null && eskiOut > 0 && eskiOut < sonSn ? eskiOut : sonSn); } catch (eG2) {}
     if (!yapilan.length) return KS_err(hatalar.join("; ") || "Sekans olusturulamadi.");
     return KS_ok({ made: yapilan.length, vertical: dikeySayisi, items: yapilan, errors: hatalar });
   } catch (e) { return KS_err(e); }
