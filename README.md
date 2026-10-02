@@ -222,9 +222,11 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-es3.js` | `jsx/` ExtendScript: ES5+/ES6 kullanımı (forEach, trim, let, =>, JSON, sondaki virgül) yok — yalnız Premiere'de patlayacak hatalar |
 | `test-cef.js` | Panel JS Premiere 14.4 (CEF 74 / Node 12.3) uyumu: `?.`, `??`, `replaceAll` vb. yok; `rmrf` eski Node'da çalışır |
 | `test-kanca.js` | Kanca başlığı: ASS üretimi, libass render (şeffaflık, vurgu rengi), host `at` yerleşimi |
+| `test-kanca-uctan.js` | Kanca başlığı uçtan uca: panelin gerçek ffmpeg komutu → şeffaf qtrle .mov, yerleşim argümanları, temizlik |
 | `test-dinle.js` | Dinle önizlemesi: eski isteğin sesi çalmaz, dosya/tutamaç temizliği, uzun klipte ilk 5 dk |
 | `test-dikey.js` | 9:16: stil ölçeği, güvenli alan konumu, 12 stilde libass taşma kontrolü |
 | `test-ses.js` | Sesi iyileştir: filtre zinciri, ebur128, gecikme ölçümü/telafisi (gerçek ffmpeg), host yerleşimi |
+| `test-ses-uctan.js` | Sesi iyileştir uçtan uca: 5.1 kaynak → stereo, senkron < 1 ms, sessiz klipte anlaşılır hata |
 | `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
 | `test-highlights.js` · `test-viral-host.js` | Viral anlar: satır sınırı, süre uzatma/kırpma, çakışma; süreli marker ve In/Out |
 | `test-scenes.js` | Sahne algılama (gerçek ffmpeg) ve seçili klibi bölme |
