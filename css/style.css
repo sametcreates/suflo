@@ -3602,3 +3602,15 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .kanca-oneri b { color: #ffe600; }
 /* Dikey (9:16) sekans onizlemesi: daha uzun sahne */
 .onizleme-sahne.dikey { max-height: 320px; }
+
+/*
+ * aspect-ratio Chrome 88 ile geldi; Premiere 2020-2021'in CEF 74'unde yok ve bu
+ * kutular 0 yukseklige coker. Eski motorda sabit yukseklik yedegi.
+ */
+@supports not (aspect-ratio: 16 / 9) {
+  .onizleme-sahne { height: 168px; }
+  .onizleme-sahne.dikey { height: 300px; width: 169px; }
+  .mogrt-thumb, .ss-sahne, .stil-sec .ss-sahne, .gecis-sahne { height: 96px; }
+  .mbg-card { height: 96px; }
+  .emoji-assets-grid .mogrt-thumb { height: 120px; }
+}
