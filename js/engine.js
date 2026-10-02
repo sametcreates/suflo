@@ -761,7 +761,7 @@ window.KEngine = (function () {
 
     // Yedek: arsivi tumuyle ac, ikiliyi bul, tasi, gerisini temizle
     var gecici = K.path.join(dir, "_ac");
-    try { K.fs.rmSync(gecici, { recursive: true, force: true }); } catch (e2) {}
+    K.rmrf(gecici);
     var ok = await K.unzip(zip, gecici);
     if (!ok) return false;
 
@@ -769,7 +769,7 @@ window.KEngine = (function () {
     if (bulunan) {
       try { K.fs.copyFileSync(bulunan, hedef); } catch (e3) { return false; }
     }
-    try { K.fs.rmSync(gecici, { recursive: true, force: true }); } catch (e4) {}
+    K.rmrf(gecici);
     return !!bulunan && K.fs.existsSync(hedef);
   }
 

@@ -977,8 +977,7 @@ window.KApp = (function () {
    */
   async function otomatikKur(zipYolu, surum) {
     var acilan = K.path.join(K.tmpDir(), "guncelleme-" + surum);
-    try { K.fs.rmSync(acilan, { recursive: true, force: true }); }
-    catch (e0) { try { K.fs.rmdirSync(acilan, { recursive: true }); } catch (e1) {} }
+    K.rmrf(acilan);
     if (!(await K.unzip(zipYolu, acilan))) return false;
 
     // panel/ doğrudan ya da tek alt klasörün içinde olabilir

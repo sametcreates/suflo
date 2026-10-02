@@ -346,14 +346,18 @@ window.K = (function () {
     } catch (e) {}
   }
 
-  // Temp klasöründe biriken eski ses/JSON artıklarını süpür
-  // fs.rmSync Node 14.14+; Premiere 14.x CEP'i Node 12 tasir
+  // Klasoru icerigiyle sil. fs.rmSync Node 14.14+, rmdirSync({recursive}) 12.10+:
+  // Premiere 14.4'un Node 12.3'unde ikisi de yok, en sonda elle yurunur.
   function rmrf(p) {
     try { if (fs.rmSync) { fs.rmSync(p, { recursive: true, force: true }); return; } } catch (e) {}
-    try { fs.rmdirSync(p, { recursive: true }); return; } catch (e2) {}
-    try { fs.unlinkSync(p); } catch (e3) {}
+    var st;
+    try { st = fs.lstatSync(p); } catch (eS) { return; }   // zaten yok
+    if (!st.isDirectory()) { try { fs.unlinkSync(p); } catch (e3) {} return; }
+    try { fs.readdirSync(p).forEach(function (f) { rmrf(path.join(p, f)); }); } catch (eR) {}
+    try { fs.rmdirSync(p); } catch (e4) {}
   }
 
+  // Temp klasöründe biriken eski ses/JSON artıklarını süpür
   function sweepTemp() {
     if (!nodeOK) return 0;
     var n = 0;
@@ -1250,6 +1254,7 @@ window.K = (function () {
     loadDraft: loadDraft,
     clearDraft: clearDraft,
     sweepTemp: sweepTemp,
+    rmrf: rmrf,
     whisperLocal: whisperLocal,
     guvenliYol: guvenliYol,
     whisperDir: whisperDir,
