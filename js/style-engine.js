@@ -254,11 +254,28 @@
     return best;
   }
 
+  /*
+   * Ilk yedi stilin olcegi. compile() olcekRef'i kisa kenara ayarlar: 16:9'da kisa
+   * kenar zaten yukseklik (cikti degismez); 9:16'da yukseklikle olceklemek yaziyi
+   * 1.78 kat buyutup kadrajdan tasiriyordu.
+   */
+  var olcekRef = 0;
   function scaled(value, height) {
-    return Math.max(1, Math.round(Number(value || 1) * height / 1080));
+    return Math.max(1, Math.round(Number(value || 1) * (olcekRef || height) / 1080));
   }
 
+  // Dikey (9:16) kadrajda TikTok/Reels/Shorts alt arayuzu ~%78'den asagisini kapatir:
+  // orta konumlu stiller en fazla %64'e, alt konum %74'e cekilir.
   function anchor(style, id, width, height) {
+    var a = anchorTemel(style, id, width, height);
+    if (height > width * 1.2) {
+      if (a.an === 5) a.y = Math.min(a.y, Math.round(height * 0.64));
+      else if (a.an === 2 || a.an === 1) a.y = Math.min(a.y, Math.round(height * 0.74));
+    }
+    return a;
+  }
+
+  function anchorTemel(style, id, width, height) {
     var pos = Number(style.konum || 5);
     if (pos === 8) return { an: 8, x: Math.round(width / 2), y: Math.round(height * 0.22) };
     if (pos === 2) return { an: 2, x: Math.round(width / 2), y: Math.round(height * 0.84) };
@@ -352,8 +369,9 @@
 
   function renderViral(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "viral", width, height);
-    var fs = scaled(style.boyut, height), outline = Math.max(2, scaled(style.kontur, height));
+    var fs0 = scaled(style.boyut, height), outline = Math.max(2, scaled(style.kontur, height));
     groupWords(cues, 3).forEach(function (group) {
+      var fs = fitSize(fs0, group, group.length >= 3 ? 2 : 0, style, width, 1.12);
       var start = group[0].start, end = group[group.length - 1].end;
       var longest = group.reduce(function (n, cue) { return Math.max(n, String(cue.text).length); }, 4);
       var twoLines = group.length >= 3;
@@ -387,8 +405,9 @@
 
   function renderMrBeast(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "mrbeast", width, height);
-    var fs = scaled(style.boyut, height), outline = Math.max(3, scaled(style.kontur, height));
+    var fs0 = scaled(style.boyut, height), outline = Math.max(3, scaled(style.kontur, height));
     groupWords(cues, 3).forEach(function (group) {
+      var fs = fitSize(fs0, group, group.length >= 3 ? 2 : 0, style, width, 1.12);
       var end = group[group.length - 1].end;
       group.forEach(function (cue, active) {
         var activeEnd = active + 1 < group.length ? group[active + 1].start : end;
@@ -417,8 +436,10 @@
 
   function renderCapCut(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "capcut", width, height);
-    var fs = scaled(style.boyut, height), outline = Math.max(1, scaled(style.kontur, height));
+    var fs0 = scaled(style.boyut, height), outline = Math.max(1, scaled(style.kontur, height));
     groupWords(cues, 4).forEach(function (group) {
+      // panel kadrajin %76'si: metin panele sigsin
+      var fs = fitSize(fs0, group, group.length >= 3 ? 2 : 0, style, width * .76 / .88, 1.12);
       var start = group[0].start, end = group[group.length - 1].end;
       var twoLines = group.length >= 3;
       var firstLine = group.slice(0, twoLines ? 2 : group.length).map(function (cue) { return String(cue.text); }).join(" ");
@@ -446,8 +467,9 @@
 
   function renderSaas(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "saas", width, height);
-    var fs = scaled(style.boyut, height);
+    var fs0 = scaled(style.boyut, height);
     groupWords(cues, 6).forEach(function (group) {
+      var fs = fitSize(fs0, group, group.length >= 3 ? 2 : 0, style, width * .78 / .88, 1.1);
       var start = group[0].start, end = group[group.length - 1].end;
       var twoLines = group.length >= 3;
       var firstLine = group.slice(0, twoLines ? 2 : group.length).map(function (cue) { return String(cue.text); }).join(" ");
@@ -525,16 +547,35 @@
     return events;
   }
 
+  // balancedText'in en uzun satirinin karakter sayisi (ayni bolme kurali)
+  function dengeliUzunluk(value, max) {
+    var words = String(value || "").split(/\s+/).filter(Boolean);
+    var tum = words.join(" ").length;
+    if (tum <= max || words.length < 3) return tum;
+    var best = tum, bestScore = 9999;
+    for (var i = 1; i < words.length; i++) {
+      var left = words.slice(0, i).join(" ").length, right = words.slice(i).join(" ").length;
+      var score = Math.abs(left - right) + (Math.max(left, right) > max ? 12 : 0);
+      if (score < bestScore) { best = Math.max(left, right); bestScore = score; }
+    }
+    return best;
+  }
+
   function renderDoc(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "doc", width, height);
-    var fs = scaled(style.boyut, height), pad = fs * 0.72;
+    var fsTemel = scaled(style.boyut, height);
     cues.forEach(function (cue) {
-      var markup = balancedText(cue.vurgu ? "*" + cue.text + "*" : cue.text, 38, assColor(style.vurguRenk), assColor(style.renk));
+      // dar kadrajda (9:16) en uzun satir panele sigmiyorsa bu cue icin font kuculur
+      var satirSiniri = width < height ? 22 : 38;   // dikeyde iki kisa satir, tek uzun minik satir degil
+      var enUzun = dengeliUzunluk(stripEmphasis(cue.text), satirSiniri);
+      var fs = Math.max(8, Math.min(fsTemel, Math.floor(width * 0.76 / (enUzun * 0.53 + 0.72 * 2.35))));
+      var pad = fs * 0.72;
+      var markup = balancedText(cue.vurgu ? "*" + cue.text + "*" : cue.text, satirSiniri, assColor(style.vurguRenk), assColor(style.renk));
       cue = { start: cue.start, end: cue.end, text: stripEmphasis(cue.text) };
       var lines = markup.indexOf("\\N") !== -1 ? 2 : 1;
       var maxChars = String(cue.text).split(/\s+/).reduce(function (state, word) {
         var last = state.parts[state.parts.length - 1];
-        if ((last + " " + word).trim().length > 38) state.parts.push(word);
+        if ((last + " " + word).trim().length > satirSiniri) state.parts.push(word);
         else state.parts[state.parts.length - 1] = (last + " " + word).trim();
         return state;
       }, { parts: [""] }).parts.reduce(function (n, part) { return Math.max(n, part.length); }, 10);
@@ -798,6 +839,8 @@
     if (wordBased(id) || options.cueKind === "words") cues = markEmphasis(cues);
     var factor = intensity(options.intensity || style.yogunluk);
     var events;
+    olcekRef = Math.min(width, height);
+    try {
     if (id === "mrbeast") events = renderMrBeast(cues, style, width, height, factor);
     else if (id === "capcut") events = renderCapCut(cues, style, width, height, factor);
     else if (id === "saas") events = renderSaas(cues, style, width, height, factor);
@@ -810,13 +853,15 @@
     else if (id === "ziplama") events = renderZiplama(cues, style, width, height, factor);
     else if (id === "dolgu") events = renderDolgu(cues, style, width, height, factor);
     else events = renderViral(cues, style, width, height, factor);
+    var basliklar = header(style, id, width, height);
+    } finally { olcekRef = 0; }
 
     return {
       id: id,
       version: 3,
       style: clone(style),
       fontFiles: [style.fontFile],
-      ass: header(style, id, width, height).concat(events).join("\n") + "\n",
+      ass: basliklar.concat(events).join("\n") + "\n",
       eventCount: events.length
     };
   }

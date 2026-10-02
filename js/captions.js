@@ -2697,6 +2697,9 @@ window.KCaptions = (function () {
       try { K.fs.unlinkSync(onizlemeRenderYol); } catch (e2) {}
       onizlemeRenderYol = null;
     }
+    // CSS onizlemesi 16:9 sahnede calisir
+    var sahne = el("cap-sahne");
+    if (sahne) { sahne.style.aspectRatio = ""; sahne.classList.remove("dikey"); }
     var mogrtImg = el("cap-mogrt-onizleme");
     if (mogrtImg) mogrtImg.hidden = true;
     var metin = el("cap-onizleme-metin");
@@ -2891,6 +2894,41 @@ window.KCaptions = (function () {
     });
   }
 
+  /*
+   * Onizleme boyutu sekansin oranini izler (yukseklik 540). Dikey (9:16)
+   * sekansta Shorts/Reels/TikTok arayuzunun kapattigi bolgeler isaretlenebilir.
+   */
+  function onizlemeBoyutu(ctx) {
+    var w = Number(ctx && ctx.width) || 0, h = Number(ctx && ctx.height) || 0;
+    if (!(w > 0 && h > 0)) return { w: 960, h: 540, dikey: false };
+    var oran = Math.max(0.4, Math.min(2.4, w / h));
+    return { w: Math.round(540 * oran / 2) * 2, h: 540, dikey: h > w * 1.2 };
+  }
+
+  // TikTok / Reels / Shorts ortak "kapali" bolgeleri (1080x1920 olcumlerinden, oransal):
+  // ust durum cubugu, sag ikon sutunu, alt aciklama + dugmeler
+  var GUVENLI_ALAN = [
+    { x: 0, y: 0, w: 1, h: 0.07 },
+    { x: 0.87, y: 0.35, w: 0.13, h: 0.43 },
+    { x: 0, y: 0.78, w: 1, h: 0.22 }
+  ];
+  function guvenliAlanFiltresi(w, h) {
+    return GUVENLI_ALAN.map(function (b) {
+      var x = Math.round(b.x * w), y = Math.round(b.y * h), bw = Math.round(b.w * w), bh = Math.round(b.h * h);
+      return "drawbox=x=" + x + ":y=" + y + ":w=" + bw + ":h=" + bh + ":color=0xff3b5c@0.22:t=fill," +
+        "drawbox=x=" + x + ":y=" + y + ":w=" + bw + ":h=" + bh + ":color=0xff3b5c@0.7:t=1";
+    }).join(",");
+  }
+
+  function sahneOraniniAyarla(ob) {
+    var sahne = el("cap-sahne");
+    if (!sahne) return;
+    sahne.style.aspectRatio = ob.w + " / " + ob.h;
+    sahne.classList.toggle("dikey", !!ob.dikey);
+    var sar = el("cap-guvenli-sar");
+    if (sar) sar.hidden = !ob.dikey;
+  }
+
   async function motorOnizlemeOynat() {
     var st = stil();
     if (!K.nodeOK || !motorStiliMi(st.aile)) return false;
@@ -2915,8 +2953,10 @@ window.KCaptions = (function () {
 
     try {
       var cues = motorOnizlemeCueleri(st);
+      // Sekansin en-boy oranında onizle: 9:16'da stil yerlesimi farklidir
+      var ob = onizlemeBoyutu(KApp.ctx());
       var built = window.SufloStyleEngine.compile({
-        styleId: st.aile, intensity: st.yogunluk, cues: cues, width: 960, height: 540,
+        styleId: st.aile, intensity: st.yogunluk, cues: cues, width: ob.w, height: ob.h,
         cueKind: cueler().length ? motorCueTuru() : "words",
         overrides: {
           font: st.font, fontFile: fontDosyasi, boyut: st.boyut,
@@ -2932,12 +2972,14 @@ window.KCaptions = (function () {
       var son = cues[cues.length - 1];
       var sure = Math.max(2.2, (son ? son.end : 2) + 0.45);
       var vf = "ass=" + K.path.basename(assYol) + ":fontsdir=.";
+      var guvenli = ob.dikey && el("cap-guvenli-alan") && el("cap-guvenli-alan").checked;
+      if (guvenli) vf += "," + guvenliAlanFiltresi(ob.w, ob.h);
       var args = ["-y"];
       if (onizlemeKareYol && K.fs.existsSync(onizlemeKareYol)) {
         args.push("-loop", "1", "-i", onizlemeKareYol, "-t", sure.toFixed(2),
-          "-vf", "scale=960:540:force_original_aspect_ratio=increase,crop=960:540," + vf);
+          "-vf", "scale=" + ob.w + ":" + ob.h + ":force_original_aspect_ratio=increase,crop=" + ob.w + ":" + ob.h + "," + vf);
       } else {
-        args.push("-f", "lavfi", "-i", "color=c=#101522:s=960x540:r=24:d=" + sure.toFixed(2), "-vf", vf);
+        args.push("-f", "lavfi", "-i", "color=c=#101522:s=" + ob.w + "x" + ob.h + ":r=24:d=" + sure.toFixed(2), "-vf", vf);
       }
       args.push("-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-pix_fmt", "yuv420p", "-an", cikti);
       var r = await K.run(ff, args, { timeout: 120000, cwd: dizin });
@@ -2950,6 +2992,7 @@ window.KCaptions = (function () {
       if (metin) metin.hidden = true;
       video.src = dosyaUrl(cikti) + "?t=" + kimlik;
       video.hidden = false;
+      sahneOraniniAyarla(ob);
       video.loop = true;
       await video.play();
       if (btn) { btn.disabled = false; btn.textContent = "■ Durdur"; }
@@ -3833,6 +3876,10 @@ window.KCaptions = (function () {
     if (el("cap-auto-fix")) el("cap-auto-fix").addEventListener("click", qualityAutoFix);
     if (el("cap-auto-emoji")) el("cap-auto-emoji").addEventListener("click", otomatikEmoji);
     if (el("cap-auto-vurgu")) el("cap-auto-vurgu").addEventListener("click", otomatikVurgu);
+    if (el("cap-guvenli-alan")) el("cap-guvenli-alan").addEventListener("change", function () {
+      var v = el("cap-render-onizleme");
+      if (v && !v.hidden) { onizlemeDurdur(); motorOnizlemeOynat(); }
+    });
     if (el("cap-proofread")) el("cap-proofread").addEventListener("click", proofreadAll);
     if (el("cap-learn-last")) el("cap-learn-last").addEventListener("click", learnLastCorrection);
     if (el("cap-history")) el("cap-history").addEventListener("click", function () {

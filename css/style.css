@@ -3600,3 +3600,5 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .kanca-oneri { text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: inherit; font: inherit; cursor: pointer; }
 .kanca-oneri:hover { border-color: rgba(255,230,0,.55); }
 .kanca-oneri b { color: #ffe600; }
+/* Dikey (9:16) sekans onizlemesi: daha uzun sahne */
+.onizleme-sahne.dikey { max-height: 320px; }

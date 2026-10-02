@@ -38,6 +38,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] **CapCut Clean / SaaS Glass / Premium**: yazı tipi Montserrat görünüyor (önceden yanlış fonttu). *(3.0 düzeltmesi)*
 - [ ] Neon, Daktilo, Zıplayan, Karaoke Dolgu tek tek denendi; görüntüde taşma/kesilme yok.
 - [ ] 9:16 dikey sekansta da konum doğru.
+- [ ] 9:16 sekansta stil önizlemesi dikey oynuyor; **Shorts güvenli alanını göster** açıkken kırmızı bölgeler çıkıyor ve altyazı bu bölgelerin dışında.
 - [ ] Bir Premiere şablonu (MOGRT) seçince düğme "<şablon> ile ekle" oluyor ve MOGRT yolu eskisi gibi çalışıyor.
 - [ ] Paneli kapat-aç → seçili Suflo stili hatırlanıyor.
 
