@@ -56,6 +56,11 @@ function KZoomAkilliNoktalar(opts) {
     if (/[!?]\s*$/.test(text)) { score += 6; reason = "emphasis"; }
     if (/\b(?:\d+|birinci|ikinci|üçüncü|ucuncu|first|second|third)\b/i.test(text)) { score += 4; reason = "number"; }
     if (text === text.toUpperCase() && /[A-ZÇĞİÖŞÜ]/.test(text) && text.length > 2) { score += 3; reason = "emphasis"; }
+    // kullanicinin *isaretledigi* kelime: en guclu aday, kelimenin kendi aninda
+    if (cue.vurgu && isFinite(Number(cue.vurgu.t))) {
+      var vt = Number(cue.vurgu.t) - offset;
+      if (vt >= 0 && vt < dur) candidates.push({ time: vt, score: 14, reason: "keyword" });
+    }
     if (score) candidates.push({ time: time, score: score, reason: reason });
     prev = cue;
   });

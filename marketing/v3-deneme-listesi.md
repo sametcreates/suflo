@@ -87,6 +87,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] Bir satıra elle `*kelime*` yaz → Hormozi / Neon / Belgesel önizlemesinde o kelime vurgu renginde.
 - [ ] Suflo Stili ile ekle → katmanda yıldız görünmüyor, kelime vurgulu.
 - [ ] SRT indir ve **Normal altyazı izi ekle** → yıldızlar yok, metin temiz.
+- [ ] Birkaç kelimeyi vurgula → Otomatik Zoom (Akıllı) → vurgulu kelimelerde punch-in; Akıllı SFX → vurgulu kelimede efekt önerisi ("para" → Para efekti).
 
 ## 6b'. Kanca başlığı *(sol menü → Kanca Başlığı)*
 - [ ] Transkript varken **✨ AI ile öner** → 5 kısa başlık, vurgulu kelime sarı; birine tıkla → kutuya yazılıp önizleniyor.

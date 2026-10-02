@@ -4034,9 +4034,13 @@ window.KCaptions = (function () {
 
   // Diger moduller (ornegin Akilli SFX) transkripti okuyabilsin; asil dizi
   // disaridan degistirilemesin diye yalnizca sade bir kopya verilir.
+  // vurgu: kullanicinin *isaretledigi* ilk kelime ve tahmini ani (Zoom / Akilli SFX kullanir)
   function segmentsSnapshot() {
     return segments.map(function (s) {
-      return { start: Number(s.start) || 0, end: Number(s.end) || 0, text: CT.stripEmphasis(String(s.text || "")) };
+      var o = { start: Number(s.start) || 0, end: Number(s.end) || 0, text: CT.stripEmphasis(String(s.text || "")) };
+      var v = CT.emphasisInfo(s);
+      if (v) o.vurgu = v;
+      return o;
     });
   }
 

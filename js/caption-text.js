@@ -248,6 +248,27 @@
     return parts.join("");
   }
 
+  /*
+   * Satirdaki ilk vurgulu kelime ve tahmini ani (sn): sure, karakter konumuyla
+   * orantili paylastirilir (kelime zamani yoksa). Vurgu yoksa null.
+   *   seg: { start, end, text }
+   */
+  function emphasisInfo(seg) {
+    var text = String(seg && seg.text || "");
+    var mask = emphasisMask(text);
+    var k = mask.indexOf(true);
+    if (k < 0) return null;
+    var kelimeler = stripEmphasis(text).trim().split(/\s+/);
+    var once = kelimeler.slice(0, k).join(" ").length + (k ? 1 : 0);
+    var toplam = Math.max(1, kelimeler.join(" ").length);
+    var a = Number(seg.start) || 0, b = Number(seg.end) || a;
+    return {
+      kelime: String(kelimeler[k] || "").replace(/[.,!?;:…»"')\]]+$/, ""),
+      t: a + (b - a) * (once / toplam),
+      adet: mask.filter(Boolean).length
+    };
+  }
+
   // Modelin ekleyebildigi markdown kalinligi (**x**) tek yildiza indirgenir
   function normalizeEmphasis(text) {
     return String(text == null ? "" : text).replace(/\*\*([^*\n]+)\*\*/g, "*$1*");
@@ -359,6 +380,7 @@
     toggleRange: toggleRange,
     emphasisMask: emphasisMask,
     reapplyEmphasis: reapplyEmphasis,
+    emphasisInfo: emphasisInfo,
     normalizeEmphasis: normalizeEmphasis,
     autoEmphasis: autoEmphasis,
     cleanSegments: cleanSegments,

@@ -398,26 +398,40 @@ window.KSfx = (function () {
       if (!text) return;
       var rule = ruleFor(text);
       var time = Math.max(0, Number(seg.start) || 0);
+      // kullanicinin *isaretledigi* kelime: once kelimenin kendi kurali, efekt kelimenin aninda
+      var isaretli = !!(seg.vurgu && isFinite(Number(seg.vurgu.t)));
+      if (isaretli) {
+        rule = ruleFor(seg.vurgu.kelime) || rule || SMART_RULES.filter(function (r) { return r.id === "emphasis"; })[0];
+        time = Math.max(0, Number(seg.vurgu.t));
+      }
       var pause = previous ? time - Math.max(Number(previous.end) || 0, Number(previous.start) || 0) : 0;
       if (!rule && density !== "soft" && pause > (density === "energetic" ? .72 : 1.05)) rule = SMART_SCENE_RULE;
       previous = seg;
-      if (!rule || (density === "soft" && rule.priority < 7)) return;
+      if (!rule || (density === "soft" && rule.priority < 7 && !isaretli)) return;
       var ranked = rankForRule(rule, used, 3);
       var item = ranked.length ? ranked[0].item : null;
       var cue = {
         time: time, end: Number(seg.end) || time, text: text, rule: rule, item: item,
         alternatives: ranked.map(function (entry) { return entry.item; }),
-        confidence: ranked.length ? Math.min(99, Math.round(48 + ranked[0].score * 3.4)) : 0
+        confidence: ranked.length ? Math.min(99, Math.round(48 + ranked[0].score * 3.4)) : 0,
+        isaretli: isaretli
       };
       var last = cues.length ? cues[cues.length - 1] : null;
+      // yakin iki onerinin guclusu kalir; elle isaretlenen kelime +5 one gecer
       if (last && time - last.time < minGap) {
-        if (rule.priority > last.rule.priority) cues[cues.length - 1] = cue;
+        if (rule.priority + (isaretli ? 5 : 0) > last.rule.priority + (last.isaretli ? 5 : 0)) cues[cues.length - 1] = cue;
         return;
       }
       cues.push(cue);
       if (item) used[norm(item.path)] = 1;
     });
-    return cues.slice(0, maxCues);
+    if (cues.length > maxCues) {
+      // sinir asildi: elle isaretlenenler ve guclu kurallar kalsin, sonra zaman sirasi
+      cues = cues.slice().sort(function (a, b) {
+        return (b.isaretli ? 1 : 0) - (a.isaretli ? 1 : 0) || b.rule.priority - a.rule.priority || a.time - b.time;
+      }).slice(0, maxCues).sort(function (a, b) { return a.time - b.time; });
+    }
+    return cues;
   }
 
   function timeText(sec) {
