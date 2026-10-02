@@ -121,6 +121,27 @@
     return secilen;
   }
 
+  /*
+   * Shorts alt sekansi icin ana transkriptten aralik: [start, end] ile ortusen
+   * satirlar (orta noktasi aralikta olanlar) 0'a kaydirilip kirpilir. Satirlarin
+   * diger alanlari (orig, *vurgu*) korunur. Doner: yeni dizi.
+   */
+  function sliceSegments(segments, start, end) {
+    start = Number(start); end = Number(end);
+    if (!(end > start)) return [];
+    return (segments || []).filter(function (s) {
+      var a = Number(s && s.start), b = Number(s && s.end);
+      if (!isFinite(a) || !isFinite(b)) return false;
+      var orta = (a + b) / 2;
+      return orta >= start && orta <= end;
+    }).map(function (s) {
+      var o = JSON.parse(JSON.stringify(s));
+      o.start = Math.max(0, Number(s.start) - start);
+      o.end = Math.min(end - start, Math.max(o.start + 0.05, Number(s.end) - start));
+      return o;
+    });
+  }
+
   // Sonuç metni (kopyalanabilir liste)
   function format(clips) {
     function tc(sec) {
@@ -133,5 +154,5 @@
     }).join("\n");
   }
 
-  return { VARSAYILAN: VARSAYILAN, buildPrompt: buildPrompt, parseResponse: parseResponse, format: format };
+  return { VARSAYILAN: VARSAYILAN, sliceSegments: sliceSegments, buildPrompt: buildPrompt, parseResponse: parseResponse, format: format };
 });

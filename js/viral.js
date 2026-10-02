@@ -121,6 +121,26 @@ window.KViral = (function () {
     else durum("✕ " + r.error, "bad");
   }
 
+  // Olusan Shorts sekansi -> ana transkriptin o araligi (Altyazi sekmesi yeniden
+  // yaziya dokmeden yukler). Ayarlarda en yeni 30 sekans tutulur.
+  function shortsKaydet(items, an) {
+    if (!window.KCaptions || !KCaptions.rawSegments || !HL.sliceSegments) return;
+    var segs = HL.sliceSegments(KCaptions.rawSegments(), an.start, an.end);
+    if (!segs.length) return;
+    var s = K.settings();
+    var harita = s.shortsAltyazi || {};
+    var kayit = { ad: an.title, start: an.start, end: an.end, mod: KCaptions.mode ? KCaptions.mode() : "plain",
+      ceviriDili: KCaptions.translationLang ? KCaptions.translationLang() : "", segs: segs, ts: Date.now() };
+    items.forEach(function (it) {
+      if (it.id) harita[it.id] = kayit;
+      if (it.dikeyId) harita[it.dikeyId] = kayit;
+    });
+    var anahtarlar = Object.keys(harita).sort(function (x, y) { return (harita[y].ts || 0) - (harita[x].ts || 0); });
+    anahtarlar.slice(30).forEach(function (k) { delete harita[k]; });
+    s.shortsAltyazi = harita;
+    K.saveSettings();
+  }
+
   // Her an icin alt sekans (+ istege bagli 9:16 Auto Reframe), "Suflo Shorts" kutusunda
   async function shortsOlustur() {
     if (!anlar.length || busy) return;
@@ -142,6 +162,7 @@ window.KViral = (function () {
         }, 600000);
         if (!r.ok) { hatalar.push("Shorts " + (i + 1) + ": " + r.error); continue; }
         yapilan += r.made; dikeySay += r.vertical;
+        shortsKaydet(r.items || [], a);
         (r.errors || []).forEach(function (h) { hatalar.push(h); });
       }
       if (!yapilan) throw new Error(hatalar.join("; ") || "Sekans oluşturulamadı.");

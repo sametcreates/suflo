@@ -90,5 +90,18 @@ ok("negatif In / okunamayan Out: 0..son'a doner, hata zinciri kopmaz", cagrilar.
 var vj = fs.readFileSync(path.join(__dirname, "..", "js", "viral.js"), "utf8");
 ok("panel aralik basina ayri cagri yapar", /ranges: \[\{ start: a\.start/.test(vj) && /for \(var i = 0; i < liste\.length/.test(vj));
 
+
+/* Shorts altyazi eslemesi: dikey kopyanin kimligi doner, panel kaydeder ve yukler */
+cagrilar = [];
+sequence.createSubsequence = function () { return { sequenceID: "alt9", projectItem: { moveBin: function () {} },
+  autoReframeSequence: function () { return { sequenceID: "dik9", projectItem: { moveBin: function () {} } }; } }; };
+sequence.getInPointAsTime = function () { return { seconds: 0 }; };
+sequence.getOutPointAsTime = function () { return { seconds: 600 }; };
+var ds = call("KS_makeShorts", { ranges: [{ start: 10, end: 40, name: "x" }], dikey: true });
+ok("dikey kopyanin sekans kimligi doner", ds.ok && ds.items[0].id === "alt9" && ds.items[0].dikeyId === "dik9", JSON.stringify(ds.items));
+var cj = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8");
+ok("panel: viral Shorts eslemesini kaydeder (hem yatay hem dikey)", /shortsKaydet\(r\.items/.test(vj) && /harita\[it\.dikeyId\] = kayit/.test(vj) && /slice\(30\)/.test(vj));
+ok("panel: Shorts sekansinda altyazi ana videodan yuklenir", /id="cap-shorts-al"/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")) && /function shortsAltyazisiAl/.test(cj) && /shortsDugmesi\(ctx\)/.test(cj));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

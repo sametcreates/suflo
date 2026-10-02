@@ -2108,6 +2108,7 @@ function KS_makeShorts(encoded) {
               alt.autoReframeSequence(9, 16, "default", ad + " 9x16", false) : null;
             if (dik) {
               kayit.dikey = true; dikeySayisi++;
+              try { kayit.dikeyId = String(dik.sequenceID); } catch (eDi) {}
               try { if (kutu && dik.projectItem) dik.projectItem.moveBin(kutu); } catch (eM2) {}
             } else hatalar.push(ad + ": 9:16 olusmadi (Auto Reframe yok)");
           } catch (eR) { hatalar.push(ad + ": 9:16 olusmadi (" + eR + ")"); }

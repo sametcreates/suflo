@@ -4021,8 +4021,10 @@ window.KCaptions = (function () {
     stilKartiIsaretle(el("cap-preset").value);
     uygulamaIpucunuGuncelle();
 
+    if (el("cap-shorts-al")) el("cap-shorts-al").addEventListener("click", shortsAltyazisiAl);
     var sonSekans = null;
     KApp.onContext(function (ctx) {
+      shortsDugmesi(ctx);
       // başka sekansa geçildiyse bekleyen "yine de ekle" onayı düşsün
       if (ctx.sequence !== sonSekans) { sonSekans = ctx.sequence; uygulaEtiketiniSifirla(); }
       refreshButton();
@@ -4032,6 +4034,41 @@ window.KCaptions = (function () {
       if (oncekiOran !== sekansOrani()) mogrtStilleriniCiz();
     });
     refreshSetup();
+  }
+
+  /*
+   * Suflo Shorts sekansi acikken: ana videonun transkriptinden o anin satirlari
+   * (viral.js olustururken K.settings().shortsAltyazi'ya yazar) yeniden yaziya
+   * dokmeden yuklenir.
+   */
+  var shortsYuklenen = "";
+  function shortsKaydi(ctx) {
+    var id = ctx && ctx.sequenceId;
+    var harita = (K.settings().shortsAltyazi) || {};
+    return id && harita[id] ? { id: String(id), kayit: harita[id] } : null;
+  }
+  function shortsDugmesi(ctx) {
+    var b = el("cap-shorts-al");
+    if (!b) return;
+    var k = shortsKaydi(ctx);
+    var goster = !!k && k.kayit.segs && k.kayit.segs.length && shortsYuklenen !== k.id;
+    b.hidden = !goster;
+    if (goster) b.textContent = "Bu Shorts'un altyazısını ana videodan al (" + k.kayit.segs.length + " satır)";
+  }
+  function shortsAltyazisiAl() {
+    var k = shortsKaydi(KApp.ctx());
+    if (!k) return;
+    if (segments.length) snapshot("Shorts altyazısı");
+    segments = JSON.parse(JSON.stringify(k.kayit.segs));
+    segmentsMode = k.kayit.mod || "plain";
+    shortsYuklenen = k.id;
+    // ceviri bilgisi satirlarda (orig) kalir; hedef dil kayittan
+    ceviriDili = k.kayit.ceviriDili || "";
+    hideRestore();
+    render();
+    saveDraftNow();
+    shortsDugmesi(KApp.ctx());
+    KApp.toast("Altyazı yüklendi: " + segments.length + " satır · yeniden yazıya dökmeye gerek yok", "good");
   }
 
   // Diger moduller (ornegin Akilli SFX) transkripti okuyabilsin; asil dizi
@@ -4052,6 +4089,10 @@ window.KCaptions = (function () {
     glossaryText: glossaryText,
     parseGlossary: parseGlossary,
     getSegments: segmentsSnapshot,
+    translationLang: function () { return ceviriDili; },
+    // Shorts sekanslari icin ham satirlar (*vurgu* ve orig korunur) ve mod
+    rawSegments: function () { return JSON.parse(JSON.stringify(segments)); },
+    mode: function () { return segmentsMode; },
     refreshEngineStyles: motorStilleriniCiz,
     transcribeWords: transcribeWords,
     // Bulut LLM (Groq/OpenAI) — ceviri ile ayni ayar ve anahtar

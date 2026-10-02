@@ -60,5 +60,13 @@ bosluklu.push({ start: 120, end: 122, text: "uzak" });
 var geri = H.parseResponse({ clips: [{ from: 18, to: 20, title: "g", score: 5 }] }, bosluklu, { minDur: 15, maxDur: 60 });
 chk("ileride uzun bosluk varsa klip geriye dogru uzatilir", geri.length === 1 && geri[0].to === 20 && geri[0].from < 18 && geri[0].end - geri[0].start >= 15, JSON.stringify(geri.map(function (c) { return [c.from, c.to]; })));
 
+
+/* Shorts sekansi icin transkript araligi */
+var ham = [{ start: 8, end: 10, text: "önce" }, { start: 10, end: 13, text: "*bir* iki", orig: "one two" }, { start: 13, end: 15.5, text: "üç" }, { start: 15.2, end: 18, text: "taşan" }];
+var dilim = H.sliceSegments(ham, 10, 16);
+chk("sliceSegments: aralik 0'a kayar, vurgu ve orig korunur", dilim.length === 2 && dilim[0].start === 0 && dilim[0].text === "*bir* iki" && dilim[0].orig === "one two" && dilim[1].end === 5.5, JSON.stringify(dilim));
+chk("sliceSegments: aralik disina tasmaz, kaynak dizi degismez", dilim.every(function (s) { return s.end <= 6; }) && ham[1].start === 10);
+chk("sliceSegments: gecersiz aralik bos", H.sliceSegments(ham, 5, 5).length === 0);
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
