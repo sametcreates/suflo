@@ -81,6 +81,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 
 ## 6a. Anahtar kelime vurgusu *(Altyazı editörü araç çubuğu)*
 - [ ] **Otomatik vurgu** → sayılar (örn. `*100 TL*`) ve satır başına bir önemli kelime yıldızla işaretleniyor; Ctrl+Z geri alıyor.
+- [ ] Satırda bir kelimeye gelip **Ctrl+B** (Mac ⌘B) → kelime `*yıldızlanıyor*`, tekrar basınca kalkıyor; "Bu düzeltmeyi öğren" önerisi çıkmıyor.
 - [ ] Bir satıra elle `*kelime*` yaz → Hormozi / Neon / Belgesel önizlemesinde o kelime vurgu renginde.
 - [ ] Suflo Stili ile ekle → katmanda yıldız görünmüyor, kelime vurgulu.
 - [ ] SRT indir ve **Normal altyazı izi ekle** → yıldızlar yok, metin temiz.

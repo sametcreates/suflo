@@ -246,6 +246,51 @@
     return String(text == null ? "" : text).replace(/\*\*([^*\n]+)\*\*/g, "*$1*");
   }
 
+  /*
+   * Editor kisayolu: [bas, son) secimine (ya da imlecteki kelimeye) dokunan
+   * kelimelerin hepsi vurguluysa vurguyu kaldir, degilse tek *aralik* yap.
+   * Doner: { text, caret } (imlec araligin sonunda)
+   */
+  function toggleRange(text, bas, son) {
+    text = String(text || "");
+    bas = Math.max(0, Math.min(text.length, Number(bas) || 0));
+    son = Math.max(bas, Math.min(text.length, son == null ? bas : Number(son)));
+    var parts = text.split(/(\s+)/), konum = 0, secili = [];
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i], b = konum, e = konum + p.length;
+      konum = e;
+      if (!/\S/.test(p)) continue;
+      // imlec kelimenin icinde ya da kenarinda / secim kelimeyle kesisiyor
+      if (bas === son ? (bas >= b && bas <= e) : (b < son && e > bas)) secili.push(i);
+    }
+    if (!secili.length) return { text: text, caret: son };
+    if (bas === son && secili.length > 1) secili = [secili[0]];
+    var kelimeIdx = [], n = -1;
+    for (var k = 0; k < parts.length; k++) { if (/\S/.test(parts[k])) n++; kelimeIdx[k] = n; }
+    var mask = emphasisMask(text);
+    var hepsi = secili.every(function (pi) { return mask[kelimeIdx[pi]]; });
+    var ilk = secili[0], sonP = secili[secili.length - 1];
+    if (hepsi) {
+      // araligin disinda kalan kisimlar vurgulu kalsin: once tum araligi coz,
+      // sonra kalan vurgulu kelimeleri tek tek yeniden isaretle
+      var aralikBas = ilk, aralikSon = sonP;
+      while (aralikBas > 0 && mask[kelimeIdx[aralikBas]] && !/^\*/.test(parts[aralikBas])) aralikBas -= 2;
+      while (aralikSon < parts.length - 1 && mask[kelimeIdx[aralikSon]] && !/\*[.,!?;:…»"')\]]*$/.test(parts[aralikSon])) aralikSon += 2;
+      for (var q = aralikBas; q <= aralikSon; q += 2) {
+        var cozulmus = stripEmphasis(parts[q]);
+        parts[q] = (q < ilk || q > sonP) ? toggleWord(cozulmus, 0) : cozulmus;
+      }
+    } else {
+      for (var r = ilk; r <= sonP; r += 2) parts[r] = stripEmphasis(parts[r]);
+      var m = /^(.*?)([.,!?;:…»"')\]]*)$/.exec(parts[sonP]);
+      if (ilk === sonP) parts[ilk] = m[1] ? "*" + m[1] + "*" + m[2] : parts[ilk];
+      else { parts[ilk] = "*" + parts[ilk]; parts[sonP] = m[1] + "*" + m[2]; }
+    }
+    var caret = 0;
+    for (var c = 0; c <= sonP; c++) caret += parts[c].length;
+    return { text: parts.join(""), caret: caret };
+  }
+
   var VURGU_DURAK = /^(ve|ile|bir|bu|şu|o|da|de|ki|mi|mı|mu|mü|için|ama|fakat|çünkü|gibi|daha|çok|en|hem|ya|yani|şey|işte|zaten|sonra|önce|kadar|olarak|olan|diye|bunu|şunu|onu|bunun|benim|senin|bizim|onların|the|a|an|and|or|of|to|in|on|is|are|was|that|this|with|for|it|you|your|they|have|just|really|about|because|there|their|what|which|would|could|should)$/i;
   var BIRIM = /^(%|tl|lira|dolar|euro|avro|\$|€|₺|bin|milyon|milyar|yüzde|percent|k|m|dk|sn|saat|gün|yıl|ay|kg|km|x)$/i;
 
@@ -302,6 +347,7 @@
     stripEmphasis: stripEmphasis,
     hasEmphasis: hasEmphasis,
     toggleWord: toggleWord,
+    toggleRange: toggleRange,
     emphasisMask: emphasisMask,
     reapplyEmphasis: reapplyEmphasis,
     normalizeEmphasis: normalizeEmphasis,

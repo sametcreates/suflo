@@ -1768,8 +1768,9 @@ window.KCaptions = (function () {
   }
 
   function correctionFromEdit(before, after) {
-    var a = String(before || "").trim().split(/\s+/);
-    var b = String(after || "").trim().split(/\s+/);
+    // *vurgu* eklemek/kaldirmak yazim duzeltmesi degildir: sozluge onerilmez
+    var a = CT.stripEmphasis(String(before || "")).trim().split(/\s+/);
+    var b = CT.stripEmphasis(String(after || "")).trim().split(/\s+/);
     if (a.length !== b.length || a.length > 40) return null;
     var changed = [];
     for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) changed.push({ from: a[i], to: b[i] });
@@ -2009,7 +2010,18 @@ window.KCaptions = (function () {
         }
       };
       // Enter: bol · Alt+Enter: alta satir ekle · Ctrl+Enter: sonraki satira gec
+      // Ctrl/Cmd+B: imlecteki kelimeyi (ya da secimi) *vurgula* / vurguyu kaldir
       inp.onkeydown = function (e) {
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
+          e.preventDefault();
+          var sonuc = CT.toggleRange(inp.value, inp.selectionStart, inp.selectionEnd);
+          if (sonuc.text !== inp.value) {
+            inp.value = sonuc.text;
+            inp.setSelectionRange(sonuc.caret, sonuc.caret);
+            inp.oninput();
+          }
+          return;
+        }
         if (e.key !== "Enter") return;
         e.preventDefault();
         if (e.altKey) { insertAfter(i); return; }

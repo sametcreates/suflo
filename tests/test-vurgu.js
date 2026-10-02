@@ -92,5 +92,18 @@ ok("normalizeEmphasis: **x** -> *x*", C.normalizeEmphasis("bu **önemli** an") =
 ok("AI kontrolu isaretsiz metin gonderir", /originals\.slice\(i, i \+ BATCH\)\.map\(CT\.stripEmphasis\)/.test(src));
 ok("ceviri istemi isaretleri korumayi ister", /wrap the corresponding translated words in single asterisks/.test(src));
 
+
+/* editor kisayolu Ctrl+B (toggleRange) */
+function tr(x, a, b) { return C.toggleRange(x, a, b).text; }
+ok("Ctrl+B: imlecteki kelime", tr("bu çok önemli", 4, 4) === "bu *çok* önemli");
+ok("Ctrl+B: tekrar basinca kalkar", tr("bu *çok* önemli", 5, 5) === "bu çok önemli");
+ok("Ctrl+B: secim tek aralik olur", tr("bu çok önemli bir şey", 3, 13) === "bu *çok önemli* bir şey");
+ok("Ctrl+B: araliktan tek kelime cikar, digeri vurgulu kalir", tr("bu *çok önemli* bir şey", 4, 6) === "bu çok *önemli* bir şey");
+ok("Ctrl+B: noktalama disarida", tr("100 TL kazandım.", 8, 8) === "100 TL *kazandım*.");
+ok("Ctrl+B: bosluktaki imlec degistirmez", tr("bu   ", 4, 4) === "bu   ");
+var corr = new Function("CT", kes("function correctionFromEdit(") + "\nreturn correctionFromEdit;")(C);
+ok("vurgu eklemek sozluk duzeltmesi sayilmaz", corr("bu kelime", "bu *kelime*") === null);
+ok("gercek duzeltme yine onerilir (vurgulu kelimede de)", JSON.stringify(corr("bu *kelme*", "bu *kelime*")) === JSON.stringify({ from: "kelme", to: "kelime" }));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
