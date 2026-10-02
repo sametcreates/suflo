@@ -470,6 +470,9 @@ window.KCaptions = (function () {
       var confidence = isFinite(Number(s.confidence)) ? Number(s.confidence)
         : (isFinite(Number(s.avg_logprob)) ? Math.exp(Number(s.avg_logprob)) : undefined);
       return { start: Number(s.start), end: Number(s.end), text: String(s.text || "").trim(), confidence: confidence };
+    }).filter(function (s) {
+      // Bozuk/eksik zamanli bulut segmenti NaN olarak SRT'ye sizmasin
+      return isFinite(s.start) && isFinite(s.end) && s.end >= s.start;
     });
   }
 
@@ -1568,6 +1571,13 @@ window.KCaptions = (function () {
         }
       }
       applyGlossary(segments);
+      if (segments.length === 0) {
+        // Eski dokumana geri don: ekrandaki satirlar ile bellek ayrismasin,
+        // bos dizi bir sonraki taslak yazimiyla kayitli isi de silmesin.
+        segments = oncekiIs ? JSON.parse(oncekiIs.segs) : [];
+        if (oncekiIs) segmentsMode = oncekiIs.mode;
+        throw new Error("Konuşma bulunamadı.");
+      }
       if (oncekiIs) {
         undoStack.push(oncekiIs);
         if (undoStack.length > UNDO_MAX) undoStack.shift();
@@ -1578,7 +1588,6 @@ window.KCaptions = (function () {
       }
       refreshUndoUI();
       savePrefs();
-      if (segments.length === 0) throw new Error("Konuşma bulunamadı.");
 
       status("");
       hideRestore();             // ekranda taze iş var: eski taslak teklifi artık geçersiz
@@ -2182,7 +2191,13 @@ window.KCaptions = (function () {
         out = out.concat(lines);
       }
       snapshot("çeviri");
+      // Ceviri surerken elle duzeltilen ya da yeni transkript/ice aktarmayla
+      // ekrandan kalkan satirlarin uzerine yazma: kullanicinin isi kaybolmasin.
+      var guncel = new Set(segments);
+      var atlananDuzenleme = 0;
       segsRef.forEach(function (s, i2) {
+        if (!guncel.has(s)) return;
+        if (s.text !== texts[i2]) { atlananDuzenleme++; return; }
         if (typeof s.orig !== "string") s.orig = texts[i2];   // zincir çeviride ilk orijinali koru
         s.text = String(out[i2] || "").trim() || s.text;
       });
@@ -2190,7 +2205,8 @@ window.KCaptions = (function () {
       status("");
       el("cap-revert").hidden = false;
       render(); saveDraftNow();
-      KApp.toast(texts.length + " satır çevrildi", "good");
+      KApp.toast(texts.length + " satır çevrildi" +
+        (atlananDuzenleme ? " · çeviri sırasında düzenlenen " + atlananDuzenleme + " satıra dokunulmadı" : ""), "good");
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
     } finally {

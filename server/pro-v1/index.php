@@ -58,7 +58,7 @@ function make_token(array $cfg, string $instanceId): string {
     $body = b64url_encode((string)$payload);
     return $body . '.' . b64url_encode(hash_hmac('sha256', $body, (string)$cfg['token_secret'], true));
 }
-function verify_token(array $cfg, string $token): bool {
+function verify_token(array $cfg, string $token): array|false {
     if (strlen($token) > 2048 || substr_count($token, '.') !== 1) return false;
     [$body, $sig] = explode('.', $token, 2);
     $given = b64url_decode($sig);
@@ -67,14 +67,28 @@ function verify_token(array $cfg, string $token): bool {
     if (!hash_equals($expected, $given)) return false;
     $decoded = b64url_decode($body);
     $payload = $decoded === false ? null : json_decode($decoded, true);
-    return is_array($payload) && isset($payload['exp']) && (int)$payload['exp'] >= time() && !empty($payload['iid']);
+    if (!is_array($payload) || !isset($payload['exp']) || (int)$payload['exp'] < time() || empty($payload['iid'])) return false;
+    return $payload;
+}
+
+// Token yalniz onu alan cihazda gecerli olsun: sizan bir token baska makinede
+// tum Pro icerigini indirmeye yetmesin. 3.0 oncesi istemciler instance_id
+// gondermez; 'require_instance' => true ile onlar da kapatilir.
+function token_matches_instance(array $cfg, array $payload, string $instanceId): bool {
+    if ($instanceId === '') return empty($cfg['require_instance']);
+    if (strlen($instanceId) > 256) return false;
+    return hash_equals((string)$payload['iid'], hash('sha256', $instanceId));
 }
 
 function allow_manifest_request(array $cfg): bool {
+    return allow_request($cfg, 'manifest', 15);
+}
+
+function allow_request(array $cfg, string $bucket, int $limit): bool {
     // Lemon Squeezy lisans API kotasini rastgele anahtar denemelerine karsi koru.
     // IP'nin kendisi diske yazilmaz; yalniz SHA-256 dosya adi tutulur. Paylasimli
     // hosting yazmaya izin vermezse gercek musteriyi engellememek icin fail-open.
-    $base = dirname((string)($cfg['manifest_path'] ?? '')) . '/rate-limit';
+    $base = dirname((string)($cfg['manifest_path'] ?? '')) . '/rate-limit/' . $bucket;
     if (!is_dir($base) && !@mkdir($base, 0700, true) && !is_dir($base)) return true;
     $ipHash = hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
     $file = $base . '/' . $ipHash . '.json';
@@ -87,7 +101,7 @@ function allow_manifest_request(array $cfg): bool {
     $window = is_array($saved) ? (int)($saved['window'] ?? 0) : 0;
     $count = is_array($saved) ? (int)($saved['count'] ?? 0) : 0;
     if ($window <= 0 || $now - $window >= 60) { $window = $now; $count = 0; }
-    $allowed = $count < 15;
+    $allowed = $count < $limit;
     if ($allowed) $count++;
     ftruncate($handle, 0); rewind($handle);
     fwrite($handle, json_encode(['window' => $window, 'count' => $count], JSON_UNESCAPED_SLASHES));
@@ -194,8 +208,18 @@ if ($action === 'manifest') {
 }
 
 if ($action === 'file') {
+    // Tam kutuphane ~1.700 dosya; dakikada 600 istek ilk kurulumu yavaslatmaz,
+    // tek IP'den sinirsiz cekimi ise durdurur.
+    if (!allow_request($cfg, 'file', (int)($cfg['file_rate_per_min'] ?? 600))) {
+        header('Retry-After: 60');
+        fail_json(429, 'Cok fazla indirme istegi. Bir dakika sonra tekrar dene.');
+    }
     $token = (string)($input['token'] ?? '');
-    if (!verify_token($cfg, $token)) fail_json(401, 'Indirme oturumu gecersiz veya suresi doldu.');
+    $payload = verify_token($cfg, $token);
+    if ($payload === false) fail_json(401, 'Indirme oturumu gecersiz veya suresi doldu.');
+    if (!token_matches_instance($cfg, $payload, trim((string)($input['instance_id'] ?? '')))) {
+        fail_json(401, 'Indirme oturumu bu cihaza ait degil.');
+    }
     $file = safe_content_path($cfg, (string)($input['path'] ?? ''));
     if ($file === false) fail_json(404, 'Icerik bulunamadi.');
     $size = filesize($file);

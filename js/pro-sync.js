@@ -154,7 +154,7 @@ window.ProSync = (function () {
     try { return JSON.parse(r.body); } catch (e) { throw new Error("İçerik sunucusundan bozuk yanıt geldi."); }
   }
 
-  function defaultDownload(endpoint, token, item, dest, onProgress) {
+  function defaultDownload(endpoint, token, item, dest, onProgress, instanceId) {
     return new Promise(function (resolve, reject) {
       if (!http || !https || !urlmod || !crypto) { reject(new Error("İndirme motoru hazır değil.")); return; }
       ensureDir(K.path.dirname(dest));
@@ -165,7 +165,7 @@ window.ProSync = (function () {
 
       function attempt(offset, retried) {
         var u = urlmod.parse(endpoint);
-        var body = Buffer.from(JSON.stringify({ action: "file", token: token, path: item.path }), "utf8");
+        var body = Buffer.from(JSON.stringify({ action: "file", token: token, path: item.path, instance_id: instanceId || "" }), "utf8");
         var headers = {
           "Accept": "application/octet-stream",
           "Content-Type": "application/json",
@@ -221,7 +221,7 @@ window.ProSync = (function () {
 
   async function fetchFile(manifest, item, dest, onProgress) {
     if (cfg.fileFetcher) return cfg.fileFetcher(cfg.endpoint, manifest.token, item, dest, onProgress);
-    return defaultDownload(cfg.endpoint, manifest.token, item, dest, onProgress);
+    return defaultDownload(cfg.endpoint, manifest.token, item, dest, onProgress, manifest.instanceId);
   }
   function stateMap(state) {
     var out = {};
@@ -341,6 +341,8 @@ window.ProSync = (function () {
       raw = await fetchManifest(creds);
     }
     var manifest = validateManifest(raw);
+    // Sunucu indirme tokenini bu cihaza (instance) baglar; dosya isteklerinde gonderilir.
+    manifest.instanceId = String(creds.instanceId || "");
     var releases = K.path.join(root, "releases");
     var releaseDir = K.path.join(releases, manifest.version);
     if (!inside(releases, releaseDir)) throw new Error("İçerik sürümü güvenli değil.");

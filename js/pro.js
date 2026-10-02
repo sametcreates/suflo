@@ -244,7 +244,10 @@
   }
   function graceOk(c) {
     if (!c || !c.lastValidated) return false;
-    return (Date.now() - c.lastValidated) < GRACE_MS;
+    var gecen = Date.now() - c.lastValidated;
+    // Gelecek tarihli dogrulama (elle duzenlenmis onbellek) toleransi sonsuz
+    // uzatmasin; saat kaymasi icin 10 dk pay birakilir.
+    return gecen > -10 * 60 * 1000 && gecen < GRACE_MS;
   }
 
   // ================================================================
@@ -533,9 +536,12 @@
 
   function configure(cfg) {
     cfg = cfg || {};
-    if (cfg.storeId   != null) LS.STORE_ID   = cfg.storeId;
-    if (cfg.productId != null) LS.PRODUCT_ID = cfg.productId;
-    if (cfg.variantId != null) LS.VARIANT_ID = cfg.variantId;
+    // Yalniz gecerli (pozitif) ID kabul edilir: 0 vermek kilidi tamamen
+    // kapatiyordu ve konsoldan tek satirla Pro acilabiliyordu.
+    function idOk(v) { return Number(v) > 0; }
+    if (idOk(cfg.storeId))   LS.STORE_ID   = Number(cfg.storeId);
+    if (idOk(cfg.productId)) LS.PRODUCT_ID = Number(cfg.productId);
+    if (idOk(cfg.variantId)) LS.VARIANT_ID = Number(cfg.variantId);
   }
 
   // ================================================================

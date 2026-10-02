@@ -929,7 +929,9 @@ window.KApp = (function () {
       guncelleme = {
         surum: tag,
         url: paket ? paket.browser_download_url : ("https://github.com/" + K.REPO + "/releases/latest"),
-        ad: paket ? paket.name : "Suflo-" + tag + "-Kurulum.zip",
+        // Ad dosya yoluna ve "cmd /c start" satirina gider: cmd'nin yeniden
+        // yorumladigi & ^ % gibi karakterler hic iceri girmesin.
+        ad: (paket ? paket.name : "Suflo-" + tag + "-Kurulum.zip").replace(/[^A-Za-z0-9._-]/g, "_"),
         zip: !!zip,
         not: ilkSatir.slice(0, 90)
       };

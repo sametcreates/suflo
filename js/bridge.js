@@ -188,9 +188,12 @@ window.K = (function () {
         }
         resolve({ code: code, stdout: out, stderr: err });
       }
-      child.stdout.on("data", function (d) { out += d.toString(); });
+      // setEncoding: cok baytli harfler parca sinirinda bolunup U+FFFD olmasin
+      if (child.stdout && child.stdout.setEncoding) child.stdout.setEncoding("utf8");
+      if (child.stderr && child.stderr.setEncoding) child.stderr.setEncoding("utf8");
+      child.stdout.on("data", function (d) { out += String(d); });
       child.stderr.on("data", function (d) {
-        var s = d.toString();
+        var s = String(d);
         err += s;
         if (opts.onStderr) opts.onStderr(s);
       });
@@ -259,7 +262,8 @@ window.K = (function () {
           headers: hdrs
         }, function (res) {
           var data = "";
-          res.on("data", function (d) { data += d.toString(); });
+          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+          res.on("data", function (d) { data += d; });
           res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
           res.on("error", function (eRs) { resolve({ status: 0, body: String(eRs) }); });
         });
@@ -357,7 +361,8 @@ window.K = (function () {
         headers: hdrs
       }, function (res) {
         var data = "";
-        res.on("data", function (d) { data += d.toString(); });
+        res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+        res.on("data", function (d) { data += d; });
         res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
         res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
       });
@@ -497,7 +502,8 @@ window.K = (function () {
           headers: hdrs
         }, function (res) {
           var data = "";
-          res.on("data", function (d) { data += d.toString(); });
+          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+          res.on("data", function (d) { data += d; });
           res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
           res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
         });
