@@ -67,6 +67,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] **YouTube metnini kopyala** → panoya `0:00 Başlık` biçiminde geliyor.
 - [ ] **Marker olarak ekle** → timeline'da başlıklı marker'lar (mümkünse Chapter türünde). Tekrar basınca eskiler yenileniyor.
 - [ ] **✨ YouTube metni yaz** → 5 başlık (tıkla → kopyala), açıklamanın sonunda bölümler ve hashtag'ler, etiketler kopyalanıyor.
+- [ ] **B-roll önerileri** → **B-roll anlarını bul** → kartlar; zamana tıklayınca playhead oraya gidiyor; **Pexels'te ara** tarayıcıda açılıyor; **Marker olarak ekle** → yeşil süreli marker'lar, viral marker'lara dokunulmuyor.
 
 ## 5b. Viral anlar ve çift dilli altyazı
 - [ ] En az 5 dakikalık konuşmanın altyazısı → **Viral anlar (Shorts)** → **Viral anları bul** → puanlı 3–5 kart.

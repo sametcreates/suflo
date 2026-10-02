@@ -1162,6 +1162,7 @@ window.KApp = (function () {
     guvenli("Geçişler", function () { if (window.KGecis) KGecis.init(); });
     guvenli("Sahne algılama", function () { if (window.KSahne) KSahne.init(); });
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
+    guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });
     guvenli("Kanca başlığı", function () { if (window.KKanca) KKanca.init(); });
     guvenli("Sesi iyileştir", function () { if (window.KSes) KSes.init(); });
     guvenli("Ritim", function () { KBeat.init(); });

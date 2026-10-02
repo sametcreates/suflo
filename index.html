@@ -577,6 +577,19 @@
           </div>
         </details>
 
+        <details class="adv" id="cap-br-box">
+          <summary>B-roll önerileri <span class="tc-yeni">YENİ</span></summary>
+          <p class="hint" style="margin:6px 0 8px">Konuşmada ara görüntü konacak anları ve stok sitelerinde aranacak kelimeleri bulur. Altyazı metni bulut yedeğine gönderilir; ses gönderilmez.</p>
+          <div class="row">
+            <button id="cap-br-bul" class="btn" type="button">B-roll anlarını bul</button>
+          </div>
+          <div id="cap-br-durum" class="inline-status"></div>
+          <div id="cap-br-liste" class="vr-liste"></div>
+          <div class="row" id="cap-br-aksiyon" hidden>
+            <button id="cap-br-marker" class="btn tiny" type="button">Marker olarak ekle (yeşil)</button>
+          </div>
+        </details>
+
         <details class="adv">
           <summary>Bul & değiştir</summary>
           <div class="row">
@@ -1597,6 +1610,8 @@
   <script src="js/gecisler.js"></script>
   <script src="js/sahneler.js"></script>
   <script src="js/viral.js"></script>
+  <script src="js/broll.js"></script>
+  <script src="js/broll-ui.js"></script>
   <script src="js/hook-title.js"></script>
   <script src="js/kanca.js"></script>
   <script src="js/zoom.js"></script>

@@ -216,6 +216,7 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-vurgu.js` | Anahtar kelime vurgusu: 12 stilde vurgu rengi, otomatik seçim, dışa aktarımda işaret temizliği |
 | `test-vurgu-entegre.js` | Vurgulu kelimeler Otomatik Zoom ve Akıllı SFX'te: an, kural, sınır önceliği |
 | `test-youtube-meta.js` | YouTube metni: başlık/açıklama/etiket/hashtag temizliği ve YouTube sınırları |
+| `test-broll.js` | B-roll önerileri: istem, ayrıştırma, stok arama bağlantıları, host marker etiketi/rengi |
 | `test-es3.js` | `jsx/` ExtendScript: ES5+/ES6 kullanımı (forEach, trim, let, =>, JSON, sondaki virgül) yok — yalnız Premiere'de patlayacak hatalar |
 | `test-cef.js` | Panel JS Premiere 14.4 (CEF 74 / Node 12.3) uyumu: `?.`, `??`, `replaceAll` vb. yok; `rmrf` eski Node'da çalışır |
 | `test-kanca.js` | Kanca başlığı: ASS üretimi, libass render (şeffaflık, vurgu rengi), host `at` yerleşimi |

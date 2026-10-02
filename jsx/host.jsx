@@ -2016,13 +2016,16 @@ function KS_addRangeMarkers(encoded) {
     if (!seq) return KS_err("Aktif sequence yok.");
     var list = p.ranges || [];
     if (!list.length) return KS_err("Aralik yok.");
+    // etiket: yorum oneki (tekrar eklemede yalniz bu onekli marker'lar yenilenir); renk: marker renk indeksi
+    var etiket = String(p.etiket || "Suflo viral");
+    var renk = (typeof p.renk === "number" && p.renk >= 0 && p.renk <= 7) ? p.renk : 1;
     var silinen = 0;
     if (p.replace) {
       try {
         var eski = [];
         var mk = seq.markers.getFirstMarker();
         while (mk) {
-          if (String(mk.comments || "").indexOf("Suflo viral") === 0) eski.push(mk);
+          if (String(mk.comments || "").indexOf(etiket + ":") === 0) eski.push(mk);
           mk = seq.markers.getNextMarker(mk);
         }
         for (var e = 0; e < eski.length; e++) { try { seq.markers.deleteMarker(eski[e]); silinen++; } catch (eD) {} }
@@ -2034,9 +2037,9 @@ function KS_addRangeMarkers(encoded) {
         var m = seq.markers.createMarker(Number(list[i].start));
         if (!m) continue;
         try { m.name = String(list[i].name || ""); } catch (eN) {}
-        try { m.comments = "Suflo viral: " + String(list[i].comment || ""); } catch (eC) {}
+        try { m.comments = etiket + ": " + String(list[i].comment || ""); } catch (eC) {}
         try { var son = new Time(); son.seconds = Number(list[i].end); m.end = son; } catch (eE) {}
-        try { if (m.setColorByIndex) m.setColorByIndex(1); } catch (eK) {}   // kirmizi: digerlerinden ayrissin
+        try { if (m.setColorByIndex) m.setColorByIndex(renk); } catch (eK) {}   // viral: kirmizi, b-roll: yesil
         n++;
       } catch (eM) {}
     }
