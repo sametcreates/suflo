@@ -62,6 +62,14 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] **YouTube metnini kopyala** → panoya `0:00 Başlık` biçiminde geliyor.
 - [ ] **Marker olarak ekle** → timeline'da başlıklı marker'lar (mümkünse Chapter türünde). Tekrar basınca eskiler yenileniyor.
 
+## 5b. Viral anlar ve çift dilli altyazı
+- [ ] En az 5 dakikalık konuşmanın altyazısı → **Viral anlar (Shorts)** → **Viral anları bul** → puanlı 3–5 kart.
+- [ ] Bir kartta **In/Out ayarla** → sekansın In/Out'u o ana geliyor, playhead başında; Ctrl+M ile yalnız o parça dışa aktarılıyor.
+- [ ] **Marker olarak ekle** → kırmızı, süreli marker'lar; tekrar basınca eskiler yenileniyor, senin marker'larına dokunulmuyor.
+- [ ] Altyazıyı İngilizceye çevir → **çift dilli** anahtarı görünüyor → aç → SRT indir: her satırda üstte Türkçe, altta İngilizce.
+- [ ] Çift dilli açıkken **Normal altyazı izi ekle** → Premiere'de iki satırlı caption'lar.
+- [ ] Konuşma dili **Deutsch** seçilerek Almanca bir klip doğru yazıya dökülüyor.
+
 ## 6. Otomatik emoji *(Altyazı editörü araç çubuğu)*
 - [ ] **Otomatik emoji** → birkaç satırın sonuna anlamlı emoji ekleniyor, art arda değil.
 - [ ] Ctrl+Z ile geri alınıyor.

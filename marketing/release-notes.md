@@ -1,6 +1,7 @@
 ## Suflo 3.0.0 — Yapay zekâ ile kurgu
 
 ### Yeni
+- **Viral anlar (Shorts bulucu):** Uzun videonun altyazısından yapay zekâ, kancayla başlayan ve tek başına anlaşılan 15–60 sn'lik anları puanlayarak bulur. Tek tıkla In/Out ayarla ya da kırmızı, süreli marker olarak ekle.
 - **Konuşmadan kes:** Kesim sekmesinde klibi kelime kelime yazıya döker; *ııı, eee, hmm* gibi dolgu seslerini, *"ben ben"* tekrarlarını ve uzun duraksamaları işaretler. Bir kelimeye tıkla, videodan da çıksın. Kopya sekansta uygulanır, orijinal bozulmaz. Türkçe, Azerice, İngilizce ve Rusça.
 - **Suflo Stilleri:** Kendi stil motorumuzla **12 animasyonlu altyazı stili** — yeni Hormozi, Neon, Daktilo, Zıplayan ve Karaoke Dolgu dahil. MOGRT gerekmez; seçince canlı önizleme oynar, "ile ekle" altyazıyı şeffaf video katmanı olarak timeline'a koyar. Premiere şablonları da yanında durur.
 - **Geçişler:** Yeni sekme. Playhead'i kesime getir, tek tıkla 13 geçişten birini uygula: zoom, whip (4 yön), itme, zıplama, punch, sarsıntı, karartma, yumuşak geçiş. Eklenti veya ayar katmanı gerekmez; keyframe'ler Premiere'de düzenlenebilir.
@@ -8,6 +9,8 @@
 - **Otomatik emoji:** Altyazı satırlarına anlamına göre seyrek emoji ekler; Türkçe eklerini tanır, art arda ve tekrar emoji koymaz. Ctrl+Z ile geri alınır.
 - **Sahne algılama:** Kesim sekmesinde. Uzun kayıtlarda ve hazır videolarda sahne değişimlerini görüntüden bulur; marker at ya da seçili klibi sahnelerde böl — müzik katmanına dokunulmaz.
 - **Vuruşlarda böl:** Ritim sekmesinde müziği analiz et, B-roll'u seç, tek tıkla vuruşlarda kes.
+- **Çift dilli altyazı:** Çeviriden sonra "çift dilli" anahtarıyla SRT/VTT ve altyazı izi orijinal + çeviriyi alt alta yazar.
+- **Yeni diller:** Konuşma dili ve çeviri için Almanca, Arapça, İspanyolca, Fransızca, Portekizce, İtalyanca; çeviride ayrıca Felemenkçe ve Japonca.
 
 ### Düzeltildi
 - Bulut altyazı ve çeviride **Türkçe harflerin (ş, ğ, ü…) "�" olarak bozulması** giderildi.
