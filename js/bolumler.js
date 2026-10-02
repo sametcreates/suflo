@@ -36,6 +36,7 @@ window.KChapters = (function () {
   }
 
   function denetle() {
+    ytYenile();
     if (!list.length) { uyari(""); return; }
     var v = CH.validate(list, { origin: 0, end: bitis() });
     if (v.ok) uyari("✓ YouTube kurallarına uygun · " + list.length + " bölüm", "good");
@@ -130,10 +131,28 @@ window.KChapters = (function () {
   /* ---------- YouTube metni: başlık, açıklama (+ bölümler), etiket ---------- */
   var YM = window.SufloYouTubeMeta;
   var ytSonuc = null;
+  var ytSonYazilan = "";   // kullanici aciklamayi elle degistirdiyse bolum duzenlemesi uzerine yazmasin
+
+  function bolumlerGecerli() { return list.length > 0 && CH.validate(list, { origin: 0, end: bitis() }).ok; }
+
+  // Bolumler duzenlenince aciklama (elle degistirilmediyse) yeniden kurulur — yeni AI cagrisi yok
+  function ytYenile() {
+    if (!ytSonuc || !el("cap-yt-aciklama")) return;
+    if (el("cap-yt-aciklama").value !== ytSonYazilan) return;
+    ytSonYazilan = ytAciklama();
+    el("cap-yt-aciklama").value = ytSonYazilan;
+    el("cap-yt-not").textContent = ytNot();
+  }
+
+  function ytNot() {
+    if (bolumlerGecerli()) return "Açıklamaya bölümler eklendi.";
+    if (list.length) return "Bölümler YouTube kurallarına uymadığı için eklenmedi (uyarıya bak).";
+    return "İpucu: önce bölüm önerirsen açıklamaya bölümler de eklenir.";
+  }
 
   function ytAciklama() {
     if (!ytSonuc) return "";
-    var bolumler = list.length && CH.validate(list, { origin: 0, end: bitis() }).ok ? CH.format(list, { origin: 0 }) : "";
+    var bolumler = bolumlerGecerli() ? CH.format(list, { origin: 0 }) : "";
     return YM.compose({ aciklama: ytSonuc.aciklama, bolumler: bolumler, hashtagler: ytSonuc.hashtagler });
   }
 
@@ -148,14 +167,16 @@ window.KChapters = (function () {
       b.onclick = function () { panoya(t, "Başlık kopyalandı"); };
       bas.appendChild(b);
     });
-    el("cap-yt-aciklama").value = ytAciklama();
+    ytSonYazilan = ytAciklama();
+    el("cap-yt-aciklama").value = ytSonYazilan;
     el("cap-yt-etiket").value = ytSonuc.etiketler.join(", ");
-    el("cap-yt-not").textContent = list.length ? "Açıklamaya bölümler eklendi." : "İpucu: önce bölüm önerirsen açıklamaya bölümler de eklenir.";
+    el("cap-yt-not").textContent = ytNot();
     kutu.hidden = false;
   }
 
   async function ytMetni() {
-    if (busy || !YM) return;
+    if (!YM) return;
+    if (busy) { KApp.toast("Başka bir AI işlemi sürüyor, bitince tekrar dene.", "warn"); return; }
     var s = segs();
     if (!s.length) { uyari("Önce altyazı oluştur ya da SRT içe aktar.", "warn"); return; }
     var cfg = KCaptions.chatConfig();
@@ -173,7 +194,7 @@ window.KChapters = (function () {
       if (!r) throw new Error("AI anlamlı bir metin döndürmedi, tekrar dene.");
       ytSonuc = r;
       ytCiz();
-      uyari("");
+      denetle();   // bolum uyarisini silme, guncelle
     } catch (e) {
       uyari("✕ " + K.hataYardimi(e), "bad");
     } finally {

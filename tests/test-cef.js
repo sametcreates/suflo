@@ -64,5 +64,37 @@ var insetSatirlari = css.split("\n").filter(function (l) { return /(^|[;{\s])ins
 var yedeksizInset = insetSatirlari.filter(function (l) { return !/top:[^;]+;\s*right:[^;]+;\s*bottom:[^;]+;\s*left:[^;]+;\s*inset:/.test(l); });
 ok("CSS inset: eski motor icin uzun bicim yedegi var", insetSatirlari.length > 0 && yedeksizInset.length === 0, yedeksizInset.slice(0, 3).join(" | "));
 
+
+// Tum CSS kaynaklari (style.css, index.html <style>, JS icinde uretilen CSS): CEF 74'te olmayan
+// inset (87) ve min()/max()/clamp() (79) her kuralda eski motor icin sade bir yedekle gelmeli
+var kaynaklar = [["css/style.css", fs.readFileSync(path.join(__dirname, "..", "css", "style.css"), "utf8")],
+  ["index.html", fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")]];
+fs.readdirSync(dizin).filter(function (f) { return /\.js$/.test(f) && f !== "CSInterface.js"; }).forEach(function (f) {
+  // JS'te yalniz metin sabitleri (uretilen CSS orada); nesne sabitleri CSS sanilmasin
+  var js = fs.readFileSync(path.join(dizin, f), "utf8");
+  var metinler = js.match(/'(?:[^'\\\n]|\\.)*'/g) || [];
+  kaynaklar.push(["js/" + f, metinler.map(function (x) { return x.slice(1, -1); }).join("")]);
+});
+var cssSorun = [];
+kaynaklar.forEach(function (k) {
+  var re = /\{([^{}]*)\}/g, m;
+  while ((m = re.exec(k[1]))) {
+    var bildirimler = m[1].replace(/\/\*[\s\S]*?\*\//g, "").split(";").map(function (d) { return d.trim(); }).filter(Boolean);
+    var gorulen = {};
+    bildirimler.forEach(function (d) {
+      var c = d.indexOf(":"); if (c < 0) return;
+      var ozellik = d.slice(0, c).trim().toLowerCase(), deger = d.slice(c + 1).trim();
+      if (!/^[a-z-]+$/.test(ozellik)) return;
+      var modern = /(^|[^a-z])(min|max|clamp)\(/.test(deger.replace(/minmax\(/g, ""));
+      if (ozellik === "inset" && !gorulen.left) cssSorun.push(k[0] + ": inset yedeksiz → " + d.slice(0, 50));
+      else if (modern && !gorulen[ozellik]) cssSorun.push(k[0] + ": " + ozellik + " yedeksiz → " + d.slice(0, 50));
+      if (!modern) gorulen[ozellik] = true;
+    });
+  }
+});
+ok("CSS (dosya + HTML + JS): inset ve min()/max()/clamp() yedekli", cssSorun.length === 0, cssSorun.slice(0, 4).join(" | "));
+var ornekRegex = ayikla("function f(x){ return /a'b/.test(x); }\nvar y = o?.p;");
+ok("denetleyici: return'den sonraki regex metin sanilmaz, arkasindaki kod gorunur", /o\?\.p/.test(ornekRegex.split("\n")[1]));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

@@ -34,6 +34,15 @@ ok("compose: 5000 siniri, bolumler korunur", dev.length <= 5000 && /0:00 Giriş\
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 ok("index: youtube-meta bolumler.js'ten ONCE yuklenir", html.indexOf("js/youtube-meta.js") !== -1 && html.indexOf("js/youtube-meta.js") < html.indexOf("js/bolumler.js"));
 var bj = fs.readFileSync(path.join(__dirname, "..", "js", "bolumler.js"), "utf8");
-ok("bolumler: gecerli bolumler aciklamaya eklenir, basliklar textContent", /CH\.validate\(list, \{ origin: 0, end: bitis\(\) \}\)\.ok \? CH\.format/.test(bj) && /b\.textContent = t/.test(bj));
+ok("bolumler: gecerli bolumler aciklamaya eklenir, basliklar textContent", /bolumlerGecerli\(\) \? CH\.format/.test(bj) && /b\.textContent = t/.test(bj));
+
+/* yedinci inceleme: tuhaf LLM ciktisi */
+var t2 = Y.parseResponse("```json\n{\"titles\":\"Tek başlık <b>\",\"description\":[\"p1\",\"p2\"],\"tags\":[{\"tag\":\"a\"},\"b\",{\"x\":1}],\"hashtags\":\"#pre-miere #abc\"}\n```");
+ok("kod citi, metin baslik, dizi aciklama, nesne etiket, metin hashtag", t2 && JSON.stringify(t2.basliklar) === JSON.stringify(["Tek başlık b"]) && t2.aciklama === "p1\n\np2" &&
+  JSON.stringify(t2.etiketler) === JSON.stringify(["a", "b"]) && JSON.stringify(t2.hashtagler) === JSON.stringify(["#premiere", "#abc"]), JSON.stringify(t2));
+var cokBolum = []; for (var q = 0; q < 400; q++) cokBolum.push(q + ":00 Bölüm başlığı uzun");
+var tasan = Y.compose({ aciklama: "metin", bolumler: cokBolum.join("\n") });
+ok("compose: bolumler tek basina tassa da 5000'i asmaz, tek '…' kalmaz", tasan.length <= 5000 && tasan.indexOf("…\n\n") === -1, tasan.length);
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

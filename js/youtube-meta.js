@@ -43,29 +43,49 @@
     };
   }
 
+  // YouTube baslik/aciklamada < ve > kabul etmez
   function temizSatir(s) {
-    return String(s == null ? "" : s).replace(/\*\*?/g, "").replace(/^["'“”‘’\s]+|["'“”‘’\s]+$/g, "")
+    return String(s == null ? "" : s).replace(/\*\*?/g, "").replace(/[<>]/g, "").replace(/^["'“”‘’\s]+|["'“”‘’\s]+$/g, "")
       .replace(/\s+/g, " ").trim();
+  }
+
+  // Model bazen dizi yerine metin, metin yerine nesne dondurur: hepsini metin dizisine indir
+  function diziyeIndir(v, ayirici) {
+    if (v == null) return [];
+    if (typeof v === "string") return ayirici ? v.split(ayirici) : [v];
+    if (!(v instanceof Array)) return [];
+    return v.map(function (x) {
+      if (typeof x === "string" || typeof x === "number") return String(x);
+      if (x && typeof x === "object") return String(x.title || x.tag || x.text || x.name || "");
+      return "";
+    });
+  }
+
+  function jsonOku(content) {
+    if (typeof content !== "string") return content;
+    var t = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+    return JSON.parse(t);
   }
 
   function parseResponse(content) {
     var data;
-    try { data = typeof content === "string" ? JSON.parse(content) : content; } catch (e) { return null; }
+    try { data = jsonOku(content); } catch (e) { return null; }
     if (!data || typeof data !== "object") return null;
     var gorulen = {};
-    var basliklar = (data.titles instanceof Array ? data.titles : []).map(temizSatir).filter(function (t) {
+    var basliklar = diziyeIndir(data.titles || data.title).map(temizSatir).filter(function (t) {
       var k = t.toLocaleLowerCase("tr");
       if (!t || gorulen[k]) return false;
       gorulen[k] = 1;
       return true;
     }).map(function (t) { return t.length > SINIR.baslik ? t.slice(0, SINIR.baslik - 1).replace(/\s+\S*$/, "") + "…" : t; }).slice(0, 5);
 
-    var aciklama = String(data.description == null ? "" : data.description).replace(/\r\n/g, "\n")
-      .replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\n{3,}/g, "\n\n").trim();
+    var acik = data.description instanceof Array ? diziyeIndir(data.description).join("\n\n") : data.description;
+    var aciklama = String(acik == null || typeof acik === "object" ? "" : acik).replace(/\r\n/g, "\n")
+      .replace(/\*\*([^*]+)\*\*/g, "$1").replace(/[<>]/g, "").replace(/\n{3,}/g, "\n\n").trim();
 
     // etiketler: virgulsuz, tekrarsiz, toplam 500 karakter (YouTube virgulleri de sayar)
     var etiketler = [], toplam = 0, eg = {};
-    (data.tags instanceof Array ? data.tags : String(data.tags || "").split(",")).forEach(function (t) {
+    diziyeIndir(data.tags, ",").forEach(function (t) {
       t = temizSatir(t).replace(/^#/, "").replace(/[,<>]/g, " ").replace(/\s+/g, " ").trim();
       var k = t.toLocaleLowerCase("tr");
       if (!t || t.length > 60 || eg[k]) return;
@@ -75,9 +95,9 @@
     });
 
     var hg = {};
-    var hashtagler = (data.hashtags instanceof Array ? data.hashtags : []).map(function (h) {
-      // bosluk ve noktalama hashtag'i keser: tek kelimeye indir
-      var t = temizSatir(h).replace(/^#+/, "").replace(/[\s.,!?;:'"()\[\]{}#]+/g, "");
+    var hashtagler = diziyeIndir(data.hashtags, /\s+/).map(function (h) {
+      // bosluk, tire ve noktalama hashtag'i keser: tek kelimeye indir
+      var t = temizSatir(h).replace(/^#+/, "").replace(/[\s.,!?;:'"()\[\]{}#\-–—\/]+/g, "");
       return t ? "#" + t : "";
     }).filter(function (h) {
       var k = h.toLocaleLowerCase("tr");
@@ -102,11 +122,12 @@
     var govde = String(o.aciklama || "").trim();
     var sabit = (bolum ? bolum.length + 2 : 0) + (etiket ? etiket.length + 2 : 0);
     var yer = SINIR.aciklama - sabit;
-    if (govde.length > yer) govde = govde.slice(0, Math.max(0, yer - 1)).replace(/\s+\S*$/, "") + "…";
+    if (govde.length > yer) govde = yer > 20 ? govde.slice(0, yer - 1).replace(/\s+\S*$/, "") + "…" : "";
     if (govde) parcalar.push(govde);
     if (bolum) parcalar.push(bolum);
     if (etiket) parcalar.push(etiket);
-    return parcalar.join("\n\n");
+    // bolumler tek basina sinirdan uzunsa: son care kirp (YouTube 5000'den uzununu reddeder)
+    return parcalar.join("\n\n").slice(0, SINIR.aciklama);
   }
 
   return { SINIR: SINIR, buildPrompt: buildPrompt, parseResponse: parseResponse, compose: compose, metin: metin };

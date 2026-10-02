@@ -10,6 +10,8 @@ window.KViral = (function () {
   var HL = window.SufloHighlights;
   var anlar = [];
   var busy = false;
+  // anlarin bulundugu transkript ve sekans: Shorts sonra baska sekansta/transkriptte olusturulmasin
+  var bulSegs = null, bulSekans = "";
 
   function el(id) { return document.getElementById(id); }
 
@@ -99,6 +101,8 @@ window.KViral = (function () {
       });
       var content = json.choices && json.choices[0] && json.choices[0].message.content;
       anlar = HL.parseResponse(content, segs, { minDur: s.minDur, maxDur: s.maxDur, adim: p.adim });
+      bulSegs = KCaptions.rawSegments ? KCaptions.rawSegments() : null;
+      bulSekans = String(KApp.ctx().sequenceId || "");
       if (!anlar.length) throw new Error("Uygun an bulunamadı — süreyi değiştirip tekrar dene.");
       durum("");
       render();
@@ -125,7 +129,7 @@ window.KViral = (function () {
   // yaziya dokmeden yukler). Ayarlarda en yeni 30 sekans tutulur.
   function shortsKaydet(items, an) {
     if (!window.KCaptions || !KCaptions.rawSegments || !HL.sliceSegments) return;
-    var segs = HL.sliceSegments(KCaptions.rawSegments(), an.start, an.end);
+    var segs = HL.sliceSegments(bulSegs || KCaptions.rawSegments(), an.start, an.end);
     if (!segs.length) return;
     var s = K.settings();
     var harita = s.shortsAltyazi || {};
@@ -144,6 +148,11 @@ window.KViral = (function () {
   // Her an icin alt sekans (+ istege bagli 9:16 Auto Reframe), "Suflo Shorts" kutusunda
   async function shortsOlustur() {
     if (!anlar.length || busy) return;
+    var simdiki = String(KApp.ctx().sequenceId || "");
+    if (bulSekans && simdiki && simdiki !== bulSekans) {
+      durum("Viral anlar başka bir sekansta bulundu: o sekansı açıp tekrar dene (ya da anları yeniden bul).", "warn");
+      return;
+    }
     var dikey = !!(el("cap-vr-dikey") && el("cap-vr-dikey").checked);
     busy = true;
     var btn = el("cap-vr-shorts");

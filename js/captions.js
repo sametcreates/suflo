@@ -127,8 +127,11 @@ window.KCaptions = (function () {
 
   // Taslağı diske yaz — panel kapanırsa iş kaybolmaz
   function writeDraft() {
-    if (!segments.length) { K.clearDraft(); return; } // bosaltilan ekran = bosaltilan taslak
     var ctx = KApp.ctx();
+    // Ekrandaki Shorts transkripti (hangi sekans acik olursa olsun) ana videonun taslagini
+    // ezmesin: duzenlemeler Shorts kaydina yazilir
+    if (shortsYuklenen) { shortsKaydiGuncelle(); return; }
+    if (!segments.length) { K.clearDraft(); return; } // bosaltilan ekran = bosaltilan taslak
     K.saveDraft({
       segments: segments,
       mode: segmentsMode,
@@ -151,6 +154,7 @@ window.KCaptions = (function () {
   function hideRestore() { var b = el("cap-restore"); if (b) b.hidden = true; }
 
   function restoreDraft(d) {
+    shortsYuklenen = "";
     // Ekranda iş varsa üzerine yazmadan önce anlık görüntü al — Ctrl+Z geri getirsin
     if (segments.length) snapshot("taslak kurtarma");
     else { undoStack.length = 0; redoStack.length = 0; }
@@ -1451,6 +1455,7 @@ window.KCaptions = (function () {
     var oncekiIs = segments.length
       ? durumAl("yeni transkript")
       : null;
+    shortsYuklenen = "";   // yeni transkript: artik Shorts kaydi degil, normal taslak
     algilananDil = "";
     var tempFiles = [];
     try {
@@ -2464,6 +2469,7 @@ window.KCaptions = (function () {
          */
         if (segments.length) snapshot("SRT içe aktarma");
         else { undoStack.length = 0; redoStack.length = 0; }
+        shortsYuklenen = "";
         segments = segs;
         segmentsMode = "plain";    // ice aktarilan SRT'de kelime zamani verisi yok
         uygulaEtiketiniSifirla();  // yeni doküman: "yine de uygula" onayı geçersiz
@@ -4047,6 +4053,17 @@ window.KCaptions = (function () {
     var harita = (K.settings().shortsAltyazi) || {};
     return id && harita[id] ? { id: String(id), kayit: harita[id] } : null;
   }
+  // Shorts transkriptindeki duzenlemeler kendi kaydina (ayarlar) yazilir; ana taslak korunur
+  function shortsKaydiGuncelle() {
+    var s = K.settings();
+    var harita = s.shortsAltyazi || {};
+    if (!harita[shortsYuklenen]) return;
+    harita[shortsYuklenen].segs = JSON.parse(JSON.stringify(segments));
+    harita[shortsYuklenen].mod = segmentsMode;
+    harita[shortsYuklenen].ts = Date.now();
+    K.saveSettings();
+  }
+
   function shortsDugmesi(ctx) {
     var b = el("cap-shorts-al");
     if (!b) return;
@@ -4058,15 +4075,18 @@ window.KCaptions = (function () {
   function shortsAltyazisiAl() {
     var k = shortsKaydi(KApp.ctx());
     if (!k) return;
+    cancelDraft();   // bekleyen ana-video taslak yazimi Shorts satirlariyla calismasin
     if (segments.length) snapshot("Shorts altyazısı");
+    else { undoStack.length = 0; redoStack.length = 0; refreshUndoUI(); }
     segments = JSON.parse(JSON.stringify(k.kayit.segs));
     segmentsMode = k.kayit.mod || "plain";
     shortsYuklenen = k.id;
     // ceviri bilgisi satirlarda (orig) kalir; hedef dil kayittan
     ceviriDili = k.kayit.ceviriDili || "";
     hideRestore();
+    el("cap-result").hidden = false;
+    el("cap-result-info").textContent = segments.length + " satır · Shorts (ana videodan)";
     render();
-    saveDraftNow();
     shortsDugmesi(KApp.ctx());
     KApp.toast("Altyazı yüklendi: " + segments.length + " satır · yeniden yazıya dökmeye gerek yok", "good");
   }

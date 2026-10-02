@@ -561,11 +561,11 @@
   function ensureUpsellCss() {
     if (_cssDone) return; _cssDone = true;
     var css =
-      '.pro-upsell-backdrop{position:fixed;inset:0;background:rgba(4,7,13,.78);backdrop-filter:blur(8px);' +
+      '.pro-upsell-backdrop{position:fixed;top:0;right:0;bottom:0;left:0;inset:0;background:rgba(4,7,13,.78);backdrop-filter:blur(8px);' +
       'display:flex;align-items:center;justify-content:center;padding:14px;z-index:99999}' +
       '@keyframes pro-in{from{opacity:0;transform:scale(.965) translateY(8px)}}' +
       '.pro-upsell-card{position:relative;overflow:hidden;background:radial-gradient(circle at 84% -12%,rgba(58,167,255,.19),transparent 38%),#111720;' +
-      'color:#f3f6fb;width:min(404px,96vw);max-height:94vh;overflow-y:auto;border:1px solid #34445a;border-radius:16px;' +
+      'color:#f3f6fb;width:96vw;max-width:404px;width:min(404px,96vw);max-height:94vh;overflow-y:auto;border:1px solid #34445a;border-radius:16px;' +
       'padding:18px 18px 14px;text-align:left;font:13px/1.45 system-ui,Segoe UI,sans-serif;' +
       'box-shadow:0 26px 90px rgba(0,0,0,.7),inset 0 1px rgba(255,255,255,.045);animation:pro-in .2s cubic-bezier(.32,.72,0,1)}' +
       '.pro-upsell-card:before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,#727cff,#3aa7ff)}' +

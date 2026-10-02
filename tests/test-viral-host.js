@@ -103,5 +103,16 @@ var cj = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8"
 ok("panel: viral Shorts eslemesini kaydeder (hem yatay hem dikey)", /shortsKaydet\(r\.items/.test(vj) && /harita\[it\.dikeyId\] = kayit/.test(vj) && /slice\(30\)/.test(vj));
 ok("panel: Shorts sekansinda altyazi ana videodan yuklenir", /id="cap-shorts-al"/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")) && /function shortsAltyazisiAl/.test(cj) && /shortsDugmesi\(ctx\)/.test(cj));
 
+
+/* yedinci inceleme */
+var wd = cj.slice(cj.indexOf("function writeDraft()"), cj.indexOf("function cancelDraft()"));
+ok("taslak: Shorts transkripti ana videonun taslagini ezmez (kendi kaydina yazilir)", /if \(shortsYuklenen\) \{ shortsKaydiGuncelle\(\); return; \}/.test(wd) && wd.indexOf("shortsKaydiGuncelle") < wd.indexOf("K.saveDraft"));
+var sa = cj.slice(cj.indexOf("function shortsAltyazisiAl()"), cj.indexOf("function shortsAltyazisiAl()") + 1400);
+ok("Shorts yukleme: editor gorunur, bos ekranda geri al yigini sifir, ana taslak yazilmaz",
+  /el\("cap-result"\)\.hidden = false/.test(sa) && /undoStack\.length = 0/.test(sa) && !/saveDraftNow\(\)/.test(sa) && /cancelDraft\(\)/.test(sa));
+ok("yeni transkript / SRT / taslak kurtarma Shorts modunu kapatir", (cj.match(/shortsYuklenen = "";/g) || []).length >= 3);
+ok("viral: anlar baska sekansta bulunduysa Shorts olusturulmaz, bulundugu andaki transkript kullanilir",
+  /bulSekans && simdiki && simdiki !== bulSekans/.test(vj) && /sliceSegments\(bulSegs \|\| KCaptions\.rawSegments\(\)/.test(vj));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
