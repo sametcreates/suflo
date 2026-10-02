@@ -3468,3 +3468,10 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .tc-w.kept { text-decoration: none; background: none; color: var(--text); opacity: 1; }
 .tc-legend .tc-w { cursor: default; }
 .tc-pause { display: inline-block; color: var(--dim); font-size: 10px; padding: 0 4px; border-radius: 4px; background: rgba(255,153,0,.12); }
+
+/* ---------- Bolumler (v3.0) ---------- */
+.ch-list { display: grid; gap: 6px; margin: 8px 0; }
+.ch-row { display: flex; gap: 6px; align-items: center; }
+.ch-row input.ch-time { width: 64px; flex: none; font-family: var(--mono, monospace); text-align: center; }
+.ch-row input.ch-title { flex: 1; min-width: 0; }
+.ch-row .ch-del { flex: none; }

@@ -4221,6 +4221,10 @@ window.KCaptions = (function () {
     parseGlossary: parseGlossary,
     getSegments: segmentsSnapshot,
     transcribeWords: transcribeWords,
+    // Bulut LLM (Groq/OpenAI) — ceviri ile ayni ayar ve anahtar
+    chatConfig: chatConfig,
+    chatCall: chatCall,
+    language: function () { return algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr"; },
     refreshMogrtStyles: refreshMogrtStyles
   };
 })();

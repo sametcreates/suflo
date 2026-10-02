@@ -491,6 +491,22 @@
           sağlayıcıya (Groq/OpenAI) gönderilir. Sesin gönderilmez. Yerel motor kullanıyorsan
           çeviri yapmadığın sürece hiçbir şey bilgisayarından çıkmaz.</p>
 
+        <details class="adv" id="cap-ch-box">
+          <summary>Bölümler (YouTube) <span class="tc-yeni">YENİ</span></summary>
+          <p class="hint" style="margin:6px 0 8px">Konuşmadan YouTube bölümleri çıkarır. Başlıkları düzenle, açıklamaya yapıştır ya da timeline'a marker olarak ekle.</p>
+          <div class="row">
+            <button id="cap-ch-suggest" class="btn" type="button">Bölüm öner</button>
+            <button id="cap-ch-ai" class="btn" type="button" title="Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez">AI ile başlıkla</button>
+          </div>
+          <div id="cap-ch-list" class="ch-list"></div>
+          <div id="cap-ch-warn" class="inline-status"></div>
+          <div class="row" id="cap-ch-actions" hidden>
+            <button id="cap-ch-add" class="btn tiny" type="button">+ bölüm</button>
+            <button id="cap-ch-copy" class="btn tiny" type="button" style="margin-left:auto">YouTube metnini kopyala</button>
+            <button id="cap-ch-markers" class="btn tiny" type="button">Marker olarak ekle</button>
+          </div>
+        </details>
+
         <details class="adv">
           <summary>Bul & değiştir</summary>
           <div class="row">
@@ -1327,8 +1343,10 @@
   <script src="js/style-engine.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/textcut.js"></script>
+  <script src="js/chapters.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
+  <script src="js/bolumler.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>

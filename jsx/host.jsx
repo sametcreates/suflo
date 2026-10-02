@@ -155,6 +155,7 @@ function KS_getContext() {
         out.seqIn = ip;
         out.seqOut = op;
         out.seqDur = seq.end ? Number(seq.end) / KS_TPS : 0;
+        try { out.playhead = seq.getPlayerPosition().seconds; } catch (ePH) {}
         out.width = Number(seq.frameSizeHorizontal) || 0;
         out.height = Number(seq.frameSizeVertical) || 0;
       } catch (eIO) {}
@@ -1623,6 +1624,48 @@ function KS_addMarkers(encoded) {
     }
     if (n === 0) return KS_err("Hicbir marker eklenemedi.");
     return KS_ok({ added: n });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * YouTube bolumleri: her marker kendi basligiyla, mumkunse "Chapter" turunde.
+ * p.chapters = [{ time: sn, name: "Baslik" }]; p.replace: once eski Suflo
+ * bolum marker'larini sil (yorumu "Suflo bolum" olanlar).
+ */
+function KS_addChapterMarkers(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var list = p.chapters || [];
+    if (!list.length) return KS_err("Bolum yok.");
+    var silinen = 0;
+    if (p.replace) {
+      try {
+        var eski = [];
+        var mk = seq.markers.getFirstMarker();
+        while (mk) {
+          if (String(mk.comments || "") === "Suflo bolum") eski.push(mk);
+          mk = seq.markers.getNextMarker(mk);
+        }
+        for (var e = 0; e < eski.length; e++) {
+          try { seq.markers.deleteMarker(eski[e]); silinen++; } catch (eD) {}
+        }
+      } catch (eR) {}
+    }
+    var n = 0, chapterTuru = 0;
+    for (var i = 0; i < list.length; i++) {
+      try {
+        var m = seq.markers.createMarker(Number(list[i].time));
+        if (!m) continue;
+        try { m.name = String(list[i].name || ""); } catch (eN) {}
+        try { m.comments = "Suflo bolum"; } catch (eC) {}
+        try { m.setTypeAsChapter(); chapterTuru++; } catch (eT) {}
+        n++;
+      } catch (eM) {}
+    }
+    if (n === 0) return KS_err("Hicbir marker eklenemedi.");
+    return KS_ok({ added: n, chapterType: chapterTuru, removed: silinen });
   } catch (e) { return KS_err(e); }
 }
 
