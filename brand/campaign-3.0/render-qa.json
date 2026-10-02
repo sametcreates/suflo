@@ -1,0 +1,77 @@
+{
+  "renderedAt": "2026-10-02T23:22:39.594Z",
+  "slides": [
+    {
+      "file": "01-cover.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 1083174,
+      "textLength": 536,
+      "warnings": []
+    },
+    {
+      "file": "02-viral-shorts.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 848065,
+      "textLength": 709,
+      "warnings": []
+    },
+    {
+      "file": "03-hook-title.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 879194,
+      "textLength": 565,
+      "warnings": []
+    },
+    {
+      "file": "04-text-cut.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 719550,
+      "textLength": 729,
+      "warnings": []
+    },
+    {
+      "file": "05-audio-enhance.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 777837,
+      "textLength": 440,
+      "warnings": []
+    },
+    {
+      "file": "06-keyword-emphasis.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 827545,
+      "textLength": 704,
+      "warnings": []
+    },
+    {
+      "file": "07-more-features.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 685102,
+      "textLength": 855,
+      "warnings": []
+    },
+    {
+      "file": "08-free-vs-pro.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 683880,
+      "textLength": 525,
+      "warnings": []
+    },
+    {
+      "file": "09-offer-749.png",
+      "width": 1080,
+      "height": 1350,
+      "bytes": 1136306,
+      "textLength": 581,
+      "warnings": []
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Suflo 3.0 Launch Carousel",
+  "format": "Instagram portrait carousel",
+  "width": 1080,
+  "height": 1350,
+  "slides": 9,
+  "language": "tr-TR",
+  "version": "3.0.0",
+  "story": "cover -> viral moments/shorts -> hook title -> text cut -> audio enhance -> keyword emphasis + styles -> more (b-roll, share text, translation) -> free vs pro -> early-access offer",
+  "campaignPrice": {
+    "before": "1.249 ₺",
+    "now": "749 ₺ + KDV",
+    "note": "Erken erişim fiyatı v3 lansmanından 7 gün sonra biter"
+  },
+  "exports": [
+    "01-cover.png",
+    "02-viral-shorts.png",
+    "03-hook-title.png",
+    "04-text-cut.png",
+    "05-audio-enhance.png",
+    "06-keyword-emphasis.png",
+    "07-more-features.png",
+    "08-free-vs-pro.png",
+    "09-offer-749.png"
+  ],
+  "preview": "carousel-preview.png"
+}
