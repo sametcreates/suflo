@@ -1164,6 +1164,7 @@ window.KApp = (function () {
     guvenli("Sahne algılama", function () { if (window.KSahne) KSahne.init(); });
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
     guvenli("Kanca başlığı", function () { if (window.KKanca) KKanca.init(); });
+    guvenli("Sesi iyileştir", function () { if (window.KSes) KSes.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
     guvenli("Motion Presetleri", function () { if (window.KPresets) KPresets.init(); });
@@ -1202,6 +1203,7 @@ window.KApp = (function () {
       { ikon: "✂", baslik: "Konuşmadan kes", metin: "ııı, eee ve tekrarları kelimeye tıklayarak videodan çıkar.", sekme: "cut", hedef: "tc-card" },
       { ikon: "🔥", baslik: "Viral anlar (Shorts)", metin: "En güçlü 15–60 sn'yi bulur, tek tıkla 9:16 Shorts sekansı yapar.", sekme: "captions", acilir: "cap-vr-box" },
       { ikon: "Aa", baslik: "Suflo Stilleri", metin: "Hormozi, Neon, Daktilo dahil 12 animasyonlu altyazı.", sekme: "captions", hedef: "cap-stil-grid" },
+      { ikon: "♪", baslik: "Sesi iyileştir", metin: "Gürültüyü al, sesi YouTube seviyesine getir — senkron kaymaz.", sekme: "cut", hedef: "ses-card" },
       { ikon: "▭", baslik: "Kanca başlığı", metin: "Shorts açılışına animasyonlu başlık kartı, tek tık.", sekme: "kanca" },
       { ikon: "↔", baslik: "Geçişler", metin: "Kesime tek tıkla zoom, whip, itme — eklentisiz.", sekme: "gecis" },
       { ikon: "▦", baslik: "Sahne algılama · vuruşlarda böl", metin: "Klibi sahnelerde ya da müziğin vuruşlarında böl.", sekme: "cut", hedef: "sc-card" },

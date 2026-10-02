@@ -1690,6 +1690,80 @@ function KS_insertSfx(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/*
+ * Sesi iyilestir: temizlenmis sesi orijinal klibin TAM altina (ayni baslangic)
+ * bos bir ses kanalina koy, orijinal ses klip(ler)ini devre disi birak.
+ * Orijinal silinmez: istenirse Premiere'de yeniden etkinlestirilir.
+ *   p: { path, start, end, mediaPath, name, disableOriginal }
+ */
+function KS_addAudioTrack(seq) {
+  var before = seq.audioTracks.numTracks;
+  try {
+    app.enableQE();
+    if (typeof qe === "undefined" || !qe.project) return false;
+    var q = qe.project.getActiveSequence();
+    if (!q || !q.addTracks) return false;
+    q.addTracks(0, 0, 1, 1, before, 0, 0);
+  } catch (e) { return false; }
+  return app.project.activeSequence.audioTracks.numTracks > before;
+}
+
+function KS_placeCleanAudio(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (!p.path || !(new File(p.path)).exists) return KS_err("Temiz ses dosyasi yok: " + p.path);
+    var start = Number(p.start), end = Number(p.end);
+    if (!(end > start)) return KS_err("Gecersiz aralik.");
+
+    var bin = KS_findBin("Suflo Ses");
+    app.project.importFiles([p.path], true, bin, false);
+    var item = null;
+    try {
+      var hits = app.project.rootItem.findItemsMatchingMediaPath(p.path, 1);
+      if (hits && hits.length) item = hits[0];
+    } catch (eF) {}
+    if (!item) item = KS_findItemByPath(app.project.rootItem, p.path);
+    if (!item) return KS_err("Ses projeye aktarilamadi.");
+    try { if (p.name) item.name = String(p.name); } catch (eN) {}
+
+    var idx = KS_findFreeAudioTrack(seq, start, end);
+    var yeni = false;
+    if (idx < 0) {
+      if (KS_addAudioTrack(seq)) {
+        seq = app.project.activeSequence;
+        idx = KS_findFreeAudioTrack(seq, start, end);
+        yeni = idx >= 0;
+      }
+    }
+    if (idx < 0) return KS_err("Bos ses kanali yok ve yenisi acilamadi. Bir audio kanali ekleyip tekrar dene.");
+    var clip = KS_tryPlace(seq.audioTracks[idx], item, start);
+    if (!clip) return KS_err("Ses timeline'a yerlestirilemedi.");
+    try { if (p.name) clip.name = String(p.name); } catch (eCn) {}
+
+    // ayni medyanin bu aralikla ortusen ORIJINAL ses klipleri devre disi
+    var kapatilan = 0;
+    if (p.disableOriginal !== false && p.mediaPath) {
+      for (var t = 0; t < seq.audioTracks.numTracks; t++) {
+        if (t === idx) continue;
+        var tr = seq.audioTracks[t];
+        for (var c = 0; c < tr.clips.numItems; c++) {
+          var k = tr.clips[c];
+          try {
+            if (!k.projectItem || String(k.projectItem.getMediaPath()) !== String(p.mediaPath)) continue;
+            if (!(k.end.seconds > start + 0.01 && k.start.seconds < end - 0.01)) continue;
+            k.disabled = true;
+            kapatilan++;
+          } catch (eK) {}
+        }
+      }
+    }
+    return KS_ok({ track: idx, trackName: "A" + (idx + 1), newTrack: yeni, disabled: kapatilan,
+      start: clip.start.seconds, end: clip.end.seconds });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Kesim (v2.2 ile geri geldi) ---------- */
 
 function KS_timecode(seconds) {

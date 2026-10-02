@@ -25,6 +25,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Bölümler** *(3.0)* | Konuşmadan YouTube bölümleri, AI başlık, kural denetimi, Chapter marker |
 | **Otomatik emoji** *(3.0)* | Satırın anlamına göre seyrek emoji, Türkçe ek dostu |
 | **Anahtar kelime vurgusu** *(3.0)* | `*kelime*` ya da Otomatik vurgu: sayılar ve önemli kelimeler her stilde vurgu renginde |
+| **Sesi iyileştir** *(3.0)* | Gürültü azaltma + LUFS normalize, gecikme telafili (senkron kaymaz) |
 | **Shorts sekansları** *(3.0)* | Viral anlardan tek tıkla alt sekans + Auto Reframe 9:16 |
 | **Kanca başlığı** *(3.0)* | Shorts açılışına animasyonlu başlık kartı; playhead'e ya da viral anın başına |
 | **Çift dilli altyazı** *(3.0)* | Çeviri sonrası orijinal + çeviri alt alta (SRT/VTT/caption izi) |
@@ -216,6 +217,7 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-kanca.js` | Kanca başlığı: ASS üretimi, libass render (şeffaflık, vurgu rengi), host `at` yerleşimi |
 | `test-dinle.js` | Dinle önizlemesi: eski isteğin sesi çalmaz, dosya/tutamaç temizliği, uzun klipte ilk 5 dk |
 | `test-dikey.js` | 9:16: stil ölçeği, güvenli alan konumu, 12 stilde libass taşma kontrolü |
+| `test-ses.js` | Sesi iyileştir: filtre zinciri, ebur128, gecikme ölçümü/telafisi (gerçek ffmpeg), host yerleşimi |
 | `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
 | `test-highlights.js` · `test-viral-host.js` | Viral anlar: satır sınırı, süre uzatma/kırpma, çakışma; süreli marker ve In/Out |
 | `test-scenes.js` | Sahne algılama (gerçek ffmpeg) ve seçili klibi bölme |

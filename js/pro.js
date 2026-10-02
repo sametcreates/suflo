@@ -74,6 +74,7 @@
     overlay:   'Animasyonlu altyazi katmani (CapCut gorunumu)',
     karaoke:   'Karaoke / kelime-kelime animasyon',
     cut:       'Otomatik kesim (sessizlik temizleme)',
+    audioclean: 'Sesi iyilestir (gurultu azaltma + ses seviyesi)',
     textcut:   'Konusmadan kes (metinle kurgu + dolgu temizligi)',
     transitions: 'Kesim gecisleri (zoom, whip, itme ve daha fazlasi)',
     highlights: 'Viral anlar: uzun videodan Shorts/Reels klipleri',

@@ -775,6 +775,36 @@
         </div>
       </div>
     </div>
+
+    <div class="tc-card" id="ses-card">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8v4M6 5.5v9M9 3v14M12 6.5v7M15 4.5v11"/></svg>
+        <b>Sesi iyileştir</b><span class="tc-yeni">YENİ</span>
+      </div>
+      <p class="ci-p">Seçili klibin konuşmasından <b>uğultu ve oda gürültüsünü</b> alır, sesi platformun istediği seviyeye getirir. Temiz ses klibin tam altına, senkron olarak yeni bir kanala gelir; orijinal ses kapatılır ama silinmez.</p>
+      <div class="row">
+        <label>Hedef</label>
+        <select id="ses-hedef">
+          <option value="youtube" selected>YouTube / Shorts (−14 LUFS)</option>
+          <option value="podcast">Podcast (−16 LUFS)</option>
+          <option value="yayin">TV / yayın (−23 LUFS)</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Temizlik</label>
+        <select id="ses-guc">
+          <option value="hafif">Hafif</option>
+          <option value="standart" selected>Standart</option>
+          <option value="guclu">Güçlü (gürültülü ortam)</option>
+        </select>
+      </div>
+      <div class="action-bar">
+        <button id="ses-olc" class="btn" type="button" disabled>Ölç</button>
+        <button id="ses-go" class="btn primary big" type="button" disabled><span class="btn-label">Sesi iyileştir</span></button>
+      </div>
+      <div id="ses-status" class="inline-status"></div>
+      <audio id="ses-audio" controls hidden style="width:100%;margin-top:8px"></audio>
+    </div>
   </section>
 
   <!-- ================= OTOMATIK ZOOM ================= -->
@@ -1538,6 +1568,8 @@
   <script src="js/emoji-picker.js"></script>
   <script src="js/textcut.js"></script>
   <script src="js/dinle.js"></script>
+  <script src="js/audio-clean.js"></script>
+  <script src="js/ses.js"></script>
   <script src="js/chapters.js"></script>
   <script src="js/transitions.js"></script>
   <script src="js/scenes.js"></script>
