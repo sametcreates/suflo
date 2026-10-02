@@ -956,8 +956,10 @@ window.KApp = (function () {
       var r = await K.run("/usr/bin/open", [yol], { timeout: 20000 });
       if (r.code !== 0) await K.run("/usr/bin/open", ["-R", yol], { timeout: 20000 });
     } else {
-      var w = await K.run("cmd", ["/c", "start", "", yol], { timeout: 20000 });
-      if (w.code !== 0) await K.run("explorer", ["/select,", yol], { timeout: 20000 });
+      // cmd /c start yolu yeniden yorumlar: "Ali&Veli" gibi kullanici adinda bolunuyordu.
+      // explorer dosyayi varsayilan uygulamayla acar (ZXP Installer / zip); cikis kodu
+      // basarida bile 1 olabildigi icin ona bakilmaz.
+      await K.run("explorer", [yol], { timeout: 20000 });
     }
     return klasor;
   }

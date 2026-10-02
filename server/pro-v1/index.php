@@ -48,11 +48,14 @@ function b64url_decode(string $data): string|false {
     if ($pad) $data .= str_repeat('=', 4 - $pad);
     return base64_decode(strtr($data, '-_', '+/'), true);
 }
-function make_token(array $cfg, string $instanceId): string {
+function make_token(array $cfg, string $instanceId, bool $bind = false): string {
     $ttl = max(300, min(14400, (int)($cfg['token_ttl'] ?? 7200)));
     $payload = json_encode([
         'exp' => time() + $ttl,
         'iid' => hash('sha256', $instanceId),
+        // 3.0+ istemci her dosya isteginde instance_id gonderir: bu token icin baglama
+        // require_instance ayarindan bagimsiz ZORUNLU (instance_id'yi atlayarak kacilamaz)
+        'bind' => $bind ? 1 : 0,
         'nonce' => bin2hex(random_bytes(8))
     ], JSON_UNESCAPED_SLASHES);
     $body = b64url_encode((string)$payload);
@@ -75,7 +78,7 @@ function verify_token(array $cfg, string $token): array|false {
 // tum Pro icerigini indirmeye yetmesin. 3.0 oncesi istemciler instance_id
 // gondermez; 'require_instance' => true ile onlar da kapatilir.
 function token_matches_instance(array $cfg, array $payload, string $instanceId): bool {
-    if ($instanceId === '') return empty($cfg['require_instance']);
+    if ($instanceId === '') return empty($cfg['require_instance']) && empty($payload['bind']);
     if (strlen($instanceId) > 256) return false;
     return hash_equals((string)$payload['iid'], hash('sha256', $instanceId));
 }
@@ -201,7 +204,7 @@ if ($action === 'manifest') {
         }
     }
     $manifest['ok'] = true;
-    $manifest['token'] = make_token($cfg, $instanceId);
+    $manifest['token'] = make_token($cfg, $instanceId, $clientVersion !== '' && version_compare($clientVersion, '3.0.0', '>='));
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($manifest, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
