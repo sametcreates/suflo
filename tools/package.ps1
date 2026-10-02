@@ -1,4 +1,4 @@
-# Kesit — dagitim icin .zxp paketi uretir
+# Suflo — dagitim icin .zxp paketi uretir
 #
 # Gereksinim: Adobe ZXPSignCmd
 #   https://github.com/Adobe-CEP/CEP-Resources/tree/master/ZXPSignCMD

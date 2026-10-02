@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Kesit — macOS / Linux gelistirici kurulumu
+# Suflo — macOS gelistirici kurulumu (Premiere Linux'ta yok; yol macOS CEP klasoru)
 set -e
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="$HOME/Library/Application Support/Adobe/CEP/extensions/com.sametcreates.kesit"
 
-echo "Kesit kuruluyor..."
+echo "Suflo kuruluyor..."
 
 # 1) Imzasiz eklentilere izin
 for v in 9 10 11 12 13 14; do
@@ -23,4 +23,4 @@ echo "  Kopyalandi: $DEST"
 
 echo ""
 echo "Bitti. Premiere Pro'yu yeniden baslat, sonra:"
-echo "  Window > Extensions > Kesit"
+echo "  Window > Extensions > Suflo"
