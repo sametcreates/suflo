@@ -15,7 +15,10 @@
   var STILLER = {
     kutu: { ad: "Kutu", font: "Anton", fontFile: "Anton.ttf", genislik: .47, boyut: 118, kase: "upper" },
     serit: { ad: "Şerit", font: "Montserrat", fontFile: "Montserrat-Bold.ttf", genislik: .64, boyut: 76, kase: "normal" },
-    sade: { ad: "Sade", font: "Archivo Black", fontFile: "ArchivoBlack.ttf", genislik: .72, boyut: 92, kase: "upper" }
+    sade: { ad: "Sade", font: "Archivo Black", fontFile: "ArchivoBlack.ttf", genislik: .72, boyut: 92, kase: "upper" },
+    neon: { ad: "Neon", font: "Bebas Neue", fontFile: "BebasNeue.ttf", genislik: .43, boyut: 132, kase: "upper" },
+    // Bungee libass'ta \fs'e gore cok kucuk cizilir (dikey olculeri genis): etiket Archivo Black kullanir
+    etiket: { ad: "Etiket", font: "Archivo Black", fontFile: "ArchivoBlack.ttf", genislik: .72, boyut: 80, kase: "upper" }
   };
 
   function assColor(hex, alpha) {
@@ -142,6 +145,29 @@
         d(1, bas, dur, "{\\an5\\move(" + (cx - Math.round(fs * .6)) + "," + y + "," + cx + "," + y + "," + Math.round(ms * .4) + "," + (ms + 80) + ")" +
           "\\fs" + fs + "\\bord0\\shad0\\1c" + assColor(renk) + "\\alpha&HFF&\\t(" + Math.round(ms * .4) + "," + (ms + 40) + ",\\alpha&H00&)" +
           "\\fad(0," + msOut + ")}" + satirMetni(l, assColor(renk), assColor(vurgu)));
+      } else if (opts.stil === "neon") {
+        // bulanik renkli parilti + beyaz cekirdek; titreyerek yanar
+        var titre = "\\alpha&HFF&\\t(" + gm + "," + (gm + 60) + ",\\alpha&H30&)\\t(" + (gm + 60) + "," + (gm + 110) + ",\\alpha&HA0&)\\t(" + (gm + 110) + "," + (gm + ms) + ",\\alpha&H00&)";
+        // vurgulu kelime: parilti beyaz, cekirdek vurgu renginde (ayni renk parilti icinde kaybolurdu)
+        var parilti = l.map(function (t) {
+          return t.v ? "{\\3c" + assColor("#ffffff") + "}" + esc(t.w) + "{\\3c" + assColor(vurgu) + "}" : esc(t.w);
+        }).join(" ");
+        d(0, bas, dur, "{\\an5\\pos(" + cx + "," + y + ")\\fs" + fs + "\\1a&HFF&\\3c" + assColor(vurgu) + "\\bord" + Math.max(3, Math.round(fs * .12)) +
+          "\\blur" + Math.max(4, Math.round(fs * .16)) + "\\shad0" + titre + "\\fad(0," + msOut + ")}" + parilti);
+        d(1, bas, dur, "{\\an5\\pos(" + cx + "," + y + ")\\fs" + fs + "\\1c" + assColor(renk) + "\\3c" + assColor(vurgu) + "\\bord" + Math.max(1, Math.round(fs * .03)) +
+          "\\blur1\\shad0" + titre + "\\fad(0," + msOut + ")}" + satirMetni(l, assColor(renk), assColor(vurgu)));
+      } else if (opts.stil === "etiket") {
+        // egik beyaz cikartma: golge + beyaz kart, koyu metin; vurgu kelime renkli; sekerek gelir
+        var aci = (i % 2 ? 3 : -3);
+        var o2 = "\\org(" + cx + "," + y + ")\\frz" + aci;
+        var sek = "\\fscx20\\fscy20\\t(" + gm + "," + (gm + ms) + ",0.45,\\fscx112\\fscy112)\\t(" + (gm + ms) + "," + (gm + ms + 110) + ",\\fscx100\\fscy100)";
+        var golge = Math.max(3, Math.round(fs * .08));
+        d(0, 0, dur, "{\\an7\\pos(" + Math.round(cx - kutuW / 2 + golge) + "," + Math.round(y - kutuH / 2 + golge) + ")" + o2 + "\\bord0\\shad0\\1c" + assColor("#000000", 0x60) +
+          "\\alpha&HFF&\\t(" + gm + "," + (gm + 40) + ",\\alpha&H60&)" + sek + "\\fad(0," + msOut + ")\\p1}" + kutuYolu(kutuW, kutuH, fs * .2) + "{\\p0}");
+        d(0, 0, dur, "{\\an7\\pos(" + Math.round(cx - kutuW / 2) + "," + Math.round(y - kutuH / 2) + ")" + o2 + "\\bord0\\shad0\\1c" + assColor("#ffffff") +
+          "\\alpha&HFF&\\t(" + gm + "," + (gm + 40) + ",\\alpha&H00&)" + sek + "\\fad(0," + msOut + ")\\p1}" + kutuYolu(kutuW, kutuH, fs * .2) + "{\\p0}");
+        d(1, 0, dur, "{\\an5\\pos(" + cx + "," + y + ")" + o2 + "\\fs" + fs + "\\bord0\\shad0\\1c" + assColor("#15131f") +
+          "\\alpha&HFF&\\t(" + gm + "," + (gm + 40) + ",\\alpha&H00&)" + sek + "\\fad(0," + msOut + ")}" + satirMetni(l, assColor("#15131f"), assColor(vurgu)));
       } else if (opts.stil === "sade") {
         // buyuk metin asagidan yukselir, golge; vurgu kelime renkli
         d(1, bas, dur, "{\\an5\\move(" + cx + "," + (y + Math.round(fs * .35)) + "," + cx + "," + y + ",0," + ms + ")" +
