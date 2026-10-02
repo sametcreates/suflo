@@ -57,5 +57,12 @@ ok("rmrf: olmayan yol hata vermez", true);
 var kullanim = ["app.js", "engine.js"].every(function (f) { return /K\.rmrf\(/.test(fs.readFileSync(path.join(dizin, f), "utf8")); });
 ok("guncelleme ve motor kurulumu K.rmrf kullanir", kullanim);
 
+
+// CSS: inset (Chrome 87) her kullanimda uzun bicim yedegiyle (top/right/bottom/left)
+var css = fs.readFileSync(path.join(__dirname, "..", "css", "style.css"), "utf8");
+var insetSatirlari = css.split("\n").filter(function (l) { return /(^|[;{\s])inset:/.test(l); });
+var yedeksizInset = insetSatirlari.filter(function (l) { return !/top:[^;]+;\s*right:[^;]+;\s*bottom:[^;]+;\s*left:[^;]+;\s*inset:/.test(l); });
+ok("CSS inset: eski motor icin uzun bicim yedegi var", insetSatirlari.length > 0 && yedeksizInset.length === 0, yedeksizInset.slice(0, 3).join(" | "));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
