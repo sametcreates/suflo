@@ -24,9 +24,11 @@ jobs:
       - name: ffmpeg (Windows)
         if: runner.os == 'Windows'
         run: choco install ffmpeg -y --no-progress
+      # Homebrew'un sade ffmpeg'i libass'siz: altyazi render testleri icin ffmpeg-full (keg-only, PATH'e eklenir)
       - name: ffmpeg (macOS)
         if: runner.os == 'macOS'
-        run: brew install ffmpeg
+        run: |
+          if brew install ffmpeg-full; then echo "$(brew --prefix ffmpeg-full)/bin" >> "$GITHUB_PATH"; else brew install ffmpeg; fi
       - name: Testler
         run: node tools/test.js
 
