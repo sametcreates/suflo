@@ -133,7 +133,7 @@ window.KTextCut = (function () {
         onStatus: function (m, c) { status(m, c); }
       });
       clip = sonuc.clip;
-      sekans = KApp.ctx().sequence || "";
+      sekans = KApp.ctx().sequenceId || KApp.ctx().sequence || "";
       lang = sonuc.lang || "tr";
       words = sonuc.words;
       elle = {};
@@ -159,9 +159,9 @@ window.KTextCut = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("textcut")) return;
     var r = kesimler().map(function (x) { return { start: x.start, end: x.end }; });
     if (!r.length) return;
-    var aktif = KApp.ctx().sequence || "";
+    var aktif = KApp.ctx().sequenceId || KApp.ctx().sequence || "";
     if (sekans && aktif && aktif !== sekans) {
-      status("Bu kesimler \"" + sekans + "\" sekansı için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
+      status("Bu kesimler başka bir sekans için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
       return;
     }
     el("tc-apply").disabled = true;

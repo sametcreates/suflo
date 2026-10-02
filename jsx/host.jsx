@@ -125,6 +125,8 @@ function KS_getContext() {
       app: String(app.version),
       project: app.project ? String(app.project.name) : "",
       sequence: seq ? String(seq.name) : "",
+      // Ad tekil degil (iki "Sequence 01" olabilir): durum anahtarlari icin kimlik
+      sequenceId: seq ? String(seq.sequenceID) : "",
       hasSeq: !!seq,
       sel: null
     };

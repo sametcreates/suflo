@@ -3492,7 +3492,7 @@ window.KCaptions = (function () {
     }
     var rapor = qualityReport();
     var kritik = Number(rapor.bad) || 0;
-    var sekans = (KApp.ctx().sequence || "") || "?";
+    var sekans = (KApp.ctx().sequenceId || KApp.ctx().sequence || "") || "?";
     var kaliteAnahtari = stilIle ? "style" : "normal";
     var yeniIzOnayi = !stilIle && uygulananSekans[sekans] && onayBekleyen !== sekans;
     if ((kritik > 0 && kaliteOnayBekleyen !== kaliteAnahtari) || yeniIzOnayi) {

@@ -97,14 +97,14 @@ window.KApp = (function () {
     pollBasladi = Date.now();
     try {
       var r = await K.call("KS_getContext", undefined, 20000);
-      var prev = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, c: ctx.connected });
+      var prev = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, qi: ctx.sequenceId, c: ctx.connected });
       if (r.ok) {
         ctx = r;
         ctx.connected = true;
       } else {
         ctx = { connected: false, hasSeq: false, sel: null, sequence: "" };
       }
-      var now = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, c: ctx.connected });
+      var now = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, qi: ctx.sequenceId, c: ctx.connected });
       renderContext();
       if (prev !== now) ctxListeners.forEach(function (fn) { fn(ctx); });
     } finally {
