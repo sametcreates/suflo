@@ -24,6 +24,13 @@ window.KCaptions = (function () {
 
   function el(id) { return document.getElementById(id); }
 
+  // Yerel dosya -> URL: "#", "?", "%" ve "'" iceren yollar (O'Neil kullanici adi,
+  // "Proje #2" klasoru) onizlemeyi ve CSS url('...')'yi bozmasin
+  function dosyaUrl(p) {
+    return encodeURI("file:///" + String(p || "").replace(/\\/g, "/"))
+      .replace(/#/g, "%23").replace(/\?/g, "%3F").replace(/'/g, "%27");
+  }
+
   // Saf metin islevleri js/caption-text.js'te (Node testleri dogrudan calistirir)
   var CT = window.SufloCaptionText;
   var cleanSegments = CT.cleanSegments;
@@ -2513,7 +2520,7 @@ window.KCaptions = (function () {
       if (!r.ok || !K.fs.existsSync(yol)) throw new Error(r.error || "kare alınamadı");
 
       // aynı dosya adı tarayıcıda önbelleklenir: sorgu ekiyle tazele
-      onizlemeKare = "file:///" + yol.replace(/\\/g, "/") + "?t=" + Date.now();
+      onizlemeKare = dosyaUrl(yol) + "?t=" + Date.now();
       onizlemeKareYol = yol;
       sahne.style.backgroundImage = "url('" + onizlemeKare + "')";
       sahne.classList.add("kare-var");
@@ -2816,7 +2823,7 @@ window.KCaptions = (function () {
       var metin = el("cap-onizleme-metin");
       if (!video) return false;
       if (metin) metin.hidden = true;
-      video.src = "file:///" + cikti.replace(/\\/g, "/") + "?t=" + kimlik;
+      video.src = dosyaUrl(cikti) + "?t=" + kimlik;
       video.hidden = false;
       video.loop = true;
       await video.play();
@@ -3758,7 +3765,7 @@ window.KCaptions = (function () {
       if (!d.ok) throw new Error(d.error || "emoji seti indirilemedi");
     }
     emojiDurum("");
-    emojiSheetCss = "file:///" + hedef.replace(/\\/g, "/");
+    emojiSheetCss = dosyaUrl(hedef);
   }
 
   /* Gerçek sütun/satır sayısı görselin kendisinden: hücre aralığı 66px (64+2 pay) */
@@ -3839,7 +3846,7 @@ window.KCaptions = (function () {
         b.type = "button";
         var img = document.createElement("img");
         img.alt = ch;
-        img.src = (nodeVarMi() ? "file:///" + emojiDizini().replace(/\\/g, "/") + "/" : "emoji/") + emojiEsleme[ch];
+        img.src = nodeVarMi() ? dosyaUrl(K.path.join(emojiDizini(), emojiEsleme[ch])) : "emoji/" + emojiEsleme[ch];
         b.appendChild(img);
         b.addEventListener("click", function () { emojiSec(ch); });
         grid.appendChild(b);

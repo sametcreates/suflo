@@ -849,9 +849,10 @@ window.K = (function () {
       function onRes(res) {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          var next = res.headers.location.indexOf("http") === 0
-            ? res.headers.location
-            : u.protocol + "//" + u.hostname + res.headers.location;
+          // Goreli Location'i tarayici kuraliyla coz: port ve yol korunur
+          var next;
+          try { next = new URL(res.headers.location, urlStr).href; }
+          catch (eLoc) { next = u.protocol + "//" + u.host + res.headers.location; }
           download(next, destPath, onProgress, redirects + 1, resumeFrom, meta).then(resolve);
           return;
         }

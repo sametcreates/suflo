@@ -372,7 +372,7 @@ window.KLib = (function () {
       var tp = await thumbCikar(q.paket.path, q.slug);
       if (buTarama !== taraNo) return;
       if (tp && tp.thumb) q.paket.thumb = dataUri(tp.thumb);
-      if (tp && tp.video) q.paket.previewVideo = "file:///" + tp.video.replace(/\\/g, "/");
+      if (tp && tp.video) q.paket.previewVideo = encodeURI("file:///" + tp.video.replace(/\\/g, "/")).replace(/#/g, "%23").replace(/\?/g, "%3F");
       // Onizlemeleri kucuk partilerle ekrana getir; her dosyada tum grid'i
       // yeniden kurup paneli titretme.
       if ((qi + 1) % 8 === 0 || qi === thumbQueue.length - 1) {

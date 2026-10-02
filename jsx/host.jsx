@@ -14,7 +14,12 @@ if (typeof KJSON === "undefined") {
       if (t === "boolean") return String(v);
       if (t === "string") {
         var s = v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-                 .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+                 .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
+                 // diger kontrol karakterleri (klip adinda olabilir) JSON'u bozmasin
+                 .replace(/[\x00-\x1f\x7f\u2028\u2029]/g, function (c) {
+                   var h = c.charCodeAt(0).toString(16);
+                   return "\\u" + "0000".substr(h.length) + h;
+                 });
         return '"' + s + '"';
       }
       if (v instanceof Array) {
@@ -46,7 +51,11 @@ if (typeof KJSON === "undefined") {
 
 function KS_arg(encoded) {
   if (!encoded) return {};
-  try { return KJSON.parse(decodeURIComponent(encoded)); } catch (e) { return {}; }
+  var text = decodeURIComponent(encoded);
+  // Argumansiz K.call "undefined"/"null" gonderir: bos nesne
+  if (text === "undefined" || text === "null" || text === "") return {};
+  // Bozuk arguman sessizce {} olup yaniltici hatalara yol acmasin: acikca hata ver
+  try { return KJSON.parse(text); } catch (e) { throw new Error("Panelden gelen arguman okunamadi."); }
 }
 function KS_ok(data) { data = data || {}; data.ok = true; return KJSON.stringify(data); }
 function KS_err(msg) { return KJSON.stringify({ ok: false, error: String(msg) }); }

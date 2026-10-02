@@ -932,6 +932,9 @@ window.KApp = (function () {
         // Ad dosya yoluna ve "cmd /c start" satirina gider: cmd'nin yeniden
         // yorumladigi & ^ % gibi karakterler hic iceri girmesin.
         ad: (paket ? paket.name : "Suflo-" + tag + "-Kurulum.zip").replace(/[^A-Za-z0-9._-]/g, "_"),
+        // GitHub her release dosyasi icin "sha256:<hex>" ozeti yayinlar: indirilen
+        // dosya bununla dogrulanmadan otomatik kurulum yapilmaz
+        sha256: paket && /^sha256:[0-9a-f]{64}$/i.test(String(paket.digest || "")) ? String(paket.digest).slice(7).toLowerCase() : "",
         zip: !!zip,
         not: ilkSatir.slice(0, 90)
       };
@@ -1018,6 +1021,18 @@ window.KApp = (function () {
     return hata === 0;
   }
 
+  function dosyaOzeti(yol) {
+    return new Promise(function (resolve) {
+      try {
+        var h = require("crypto").createHash("sha256");
+        var s = K.fs.createReadStream(yol);
+        s.on("data", function (c) { h.update(c); });
+        s.on("end", function () { resolve(h.digest("hex")); });
+        s.on("error", function () { resolve(""); });
+      } catch (e) { resolve(""); }
+    });
+  }
+
   async function guncellemeyiIndir() {
     if (!guncelleme) return;
     var b = el("update-indir");
@@ -1032,6 +1047,15 @@ window.KApp = (function () {
         b.textContent = "%" + Math.round(f * 100);
       }, 0, undefined, { key: "zxp:" + guncelleme.surum });
       if (!d.ok) throw new Error(d.error || "indirilemedi");
+      if (guncelleme.sha256) {
+        b.textContent = "Doğrulanıyor…";
+        var ozet = await dosyaOzeti(hedef);
+        if (ozet !== guncelleme.sha256) {
+          try { K.fs.unlinkSync(hedef); } catch (eSil) {}
+          K.log("[güncelleme] SHA-256 uyuşmadı: " + ozet + " != " + guncelleme.sha256);
+          throw new Error("indirilen dosya doğrulanamadı (bozuk ya da değiştirilmiş)");
+        }
+      }
 
       // Önce tek tık kurulumu dene — başarırsa kullanıcıya yalnız yeniden başlatma kalır
       if (guncelleme.zip) {
