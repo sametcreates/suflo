@@ -74,7 +74,8 @@ window.KCaptions = (function () {
   function dilKodu(x) {
     x = String(x || "").toLowerCase();
     if (x.length === 2) return x;
-    return { turkish: "tr", azerbaijani: "az", russian: "ru", english: "en" }[x] || "";
+    return { turkish: "tr", azerbaijani: "az", russian: "ru", english: "en", german: "de", arabic: "ar",
+      spanish: "es", french: "fr", portuguese: "pt", italian: "it", dutch: "nl", japanese: "ja" }[x] || "";
   }
 
   function snapshot(etiket) {
@@ -2156,7 +2157,10 @@ window.KCaptions = (function () {
     return !!(c && c.checked && preTranslate);
   }
 
-  var LANG_NAMES = { en: "English", tr: "Turkish", az: "Azerbaijani", ru: "Russian" };
+  var LANG_NAMES = {
+    en: "English", tr: "Turkish", az: "Azerbaijani", ru: "Russian", de: "German", ar: "Arabic",
+    es: "Spanish", fr: "French", pt: "Portuguese", it: "Italian", nl: "Dutch", ja: "Japanese"
+  };
 
   function chatConfig() {
     var s = K.settings();
