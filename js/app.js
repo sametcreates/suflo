@@ -86,6 +86,8 @@ window.KApp = (function () {
   var POLL_BEKCI = 30000;
 
   async function pollContext() {
+    // Premiere hala onceki bir cagriyla mesgul: yeni yoklama kuyruga girip birikmesin
+    if (K.hostMesgul && K.hostMesgul()) return;
     if (polling) {
       if (Date.now() - pollBasladi < POLL_BEKCI) return;
       K.log("baglam yoklamasi takildi (" + Math.round((Date.now() - pollBasladi) / 1000) + " sn), kilit aciliyor");

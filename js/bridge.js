@@ -49,9 +49,32 @@ window.K = (function () {
    * (ornegin baglam yoklamasi) kalici olarak kilitlenir — panel secili klibi gormemeye baslar.
    * Bu yuzden her cagri en gec timeout sonunda MUTLAKA sonuclanir.
    */
+  /*
+   * ExtendScript tek is parcacikli: uzun bir host islemi (ses disa aktarimi,
+   * yuzlerce MOGRT) surerken gonderilen her cagri kuyruga girer. Zaman asimi
+   * promise'i cozer ama evalScript cevabi hala yoldadir. Yanitini henuz
+   * almadigimiz cagrilari sayariz; baglam yoklamasi bekleyen varken yenisini
+   * gondermez (bir saatlik islemde 120 yoklamanin birikmesi engellenir).
+   */
+  var yoldaki = 0;
+  var enEskiYoldaki = 0;
+  function hostMesgul() {
+    // 15 dk'dan uzun cevapsiz kalan cagri takilmistir: yoklamayi sonsuza kilitlemesin
+    return yoldaki > 0 && Date.now() - enEskiYoldaki < 15 * 60000;
+  }
+
   function call(fn, arg, timeout) {
     return new Promise(function (resolve) {
       var bitti = false;
+      var cevaplandi = false;
+      if (yoldaki === 0) enEskiYoldaki = Date.now();
+      yoldaki++;
+      function cevapGeldi() {
+        if (cevaplandi) return;
+        cevaplandi = true;
+        yoldaki = Math.max(0, yoldaki - 1);
+        if (yoldaki > 0) enEskiYoldaki = Date.now();
+      }
       function son(v) {
         if (bitti) return;          // evalScript bazen gecikip sonra da cevap verebiliyor
         bitti = true;
@@ -68,6 +91,7 @@ window.K = (function () {
         : fn + '("' + encodeURIComponent(JSON.stringify(arg)) + '")';
       try {
         cs.evalScript(script, function (res) {
+          cevapGeldi();
           if (res === "EvalScript error.") {
             log("jsx HATA " + fn + ": EvalScript error");
             son({ ok: false, error: "ExtendScript hatası (" + fn + ")" });
@@ -84,6 +108,7 @@ window.K = (function () {
           }
         });
       } catch (eE) {
+        cevapGeldi();
         log("jsx " + fn + ": evalScript cagrilamadi - " + eE.message);
         son({ ok: false, error: "ExtendScript çağrılamadı (" + fn + ")" });
       }
@@ -1200,6 +1225,7 @@ window.K = (function () {
     nodeOK: nodeOK,
     fs: fs, path: path, os: os,
     call: call,
+    hostMesgul: hostMesgul,
     run: run,
     settingsPath: settingsPath,
     extensionPath: extensionPath,
