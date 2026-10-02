@@ -257,6 +257,40 @@ window.KCut = (function () {
     }
   }
 
+  /* ---------------- Dinle (önizleme) ---------------- */
+
+  // Kesimler uygulanmis gibi sesi panelde cal. Filtre js/textcut.js'te (testli).
+  var dinleYol = "";
+  async function dinle() {
+    if (!clip || !window.SufloTextCut) return;
+    var btn = el("cut-dinle");
+    btn.disabled = true;
+    var eski = btn.textContent;
+    btn.textContent = "Hazırlanıyor…";
+    try {
+      var ff = await K.findFfmpeg();
+      if (!ff) throw new Error("ffmpeg bulunamadı.");
+      if (dinleYol) { try { K.fs.unlinkSync(dinleYol); } catch (e0) {} }
+      dinleYol = K.path.join(K.tmpDir(), "suflo_dinle_" + Date.now() + ".mp3");
+      var dur = clip.outPoint - clip.inPoint;
+      var args = ["-y", "-ss", String(clip.inPoint), "-t", String(dur), "-i", clip.mediaPath, "-vn", "-ac", "1", "-b:a", "96k"];
+      var filtre = window.SufloTextCut.previewFilter(activeRanges(), { clipStart: clip.clipStart, clipEnd: clip.clipEnd, dur: dur });
+      if (filtre) args.push("-af", filtre);
+      args.push(dinleYol);
+      var r = await K.run(ff, args, { timeout: Math.max(120000, dur * 1000) });
+      if (r.code !== 0 || !K.fs.existsSync(dinleYol)) throw new Error("Önizleme üretilemedi.");
+      var a = el("cut-audio");
+      a.hidden = false;
+      a.src = encodeURI("file:///" + dinleYol.replace(/\\/g, "/")).replace(/#/g, "%23").replace(/\?/g, "%3F").replace(/'/g, "%27");
+      try { await a.play(); } catch (eP) {}
+    } catch (e) {
+      status("✕ " + e.message, "bad");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = eski;
+    }
+  }
+
   /* ---------------- Başlat ---------------- */
 
   function init() {
@@ -281,6 +315,7 @@ window.KCut = (function () {
 
     el("cut-analyze").addEventListener("click", analyze);
     el("cut-apply").addEventListener("click", apply);
+    if (el("cut-dinle")) el("cut-dinle").addEventListener("click", dinle);
 
     KApp.onContext(function (ctx) {
       refreshButton();
