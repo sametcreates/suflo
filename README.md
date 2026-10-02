@@ -24,6 +24,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Dışa aktarma** | SRT · WebVTT · ASS (stilli, karaoke etiketli) · TXT |
 | **Bölümler** *(3.0)* | Konuşmadan YouTube bölümleri, AI başlık, kural denetimi, Chapter marker |
 | **Otomatik emoji** *(3.0)* | Satırın anlamına göre seyrek emoji, Türkçe ek dostu |
+| **Çift dilli altyazı** *(3.0)* | Çeviri sonrası orijinal + çeviri alt alta (SRT/VTT/caption izi) |
 
 ### Altyazı motorları
 
@@ -75,6 +76,8 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar ve duraksama temizliği, kelimeye tıklayıp kes |
 | — | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Hormozi, Neon, Daktilo…), MOGRT gerekmez |
 | — | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
+| — | **Viral anlar:** uzun videodan 15–60 sn'lik Shorts/Reels anları, In/Out ve süreli marker |
+| — | **Sahne algılama** ve **vuruşlarda bölme**; kesimleri uygulamadan **▶ Dinle** |
 | Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Panelden uygulanan 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 1.076 SFX ve 30 Motion BG |
 | — | Smart SFX 2.0: yoğunluk, güven puanı, alternatifler, toplu ekleme ve dalga önizlemesi |
 | — | Kütüphane sağlık kontrolü ve destek raporu |
@@ -207,6 +210,11 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-chapters.js` | YouTube bölümleri: öneri, kural denetimi, AI yanıtı ayrıştırma |
 | `test-auto-emoji.js` | Otomatik emoji: Türkçe kök eşleşmesi, yoğunluk ve tekrar koruması |
 | `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
+| `test-highlights.js` · `test-viral-host.js` | Viral anlar: satır sınırı, süre uzatma/kırpma, çakışma; süreli marker ve In/Out |
+| `test-scenes.js` | Sahne algılama (gerçek ffmpeg) ve seçili klibi bölme |
+| `test-model-dogrulama.js` | Whisper modellerinin SHA-256 doğrulaması |
+| `test-ceviri-dili.js` | Çeviri sonrası büyük harf kuralının hedef dile uyması |
+| `test-varliklar.js` | Panelin başvurduğu yerel görsellerin gerçekten var olması |
 | `test-utf8.js` | Parça parça gelen HTTP yanıtlarında Türkçe harflerin bozulmaması |
 | `test-parse.js` | SRT/VTT ayrıştırma, etiket ve HTML varlık temizliği, BOM/CRLF |
 | `test-export.js` | SRT/VTT/ASS/TXT çıktıları (ffmpeg ile gerçekten ayrıştırılarak) |
