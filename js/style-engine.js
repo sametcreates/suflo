@@ -257,8 +257,9 @@
 
   /*
    * Ilk yedi stilin olcegi. compile() olcekRef'i kisa kenara ayarlar: 16:9'da kisa
-   * kenar zaten yukseklik (cikti degismez); 9:16'da yukseklikle olceklemek yaziyi
-   * 1.78 kat buyutup kadrajdan tasiriyordu.
+   * kenar zaten yukseklik (taban boyut degismez); 9:16'da yukseklikle olceklemek
+   * yaziyi 1.78 kat buyutup kadrajdan tasiriyordu. Not: kadraja sigmayan cok uzun
+   * kelime gruplari (fitSize) 16:9'da da kucultulur — onceden kadrajdan tasiyordu.
    */
   var olcekRef = 0;
   function scaled(value, height) {
@@ -615,8 +616,13 @@
 
   function renderPremium(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "premium", width, height);
-    var fs = scaled(style.boyut, height);
+    var fs0 = scaled(style.boyut, height);
     groupWords(cues, 4).forEach(function (group) {
+      // metin \clip acilim penceresine (panelin %84'u) sigsin; premiumMarkup ile ayni kirilma
+      var uzun = group.map(function (c) { return c.text; }).join(" ").length > 20;
+      var br = group.length >= 4 || uzun ? Math.ceil(group.length / 2) : 0;
+      if (br >= group.length) br = 0;
+      var fs = fitSize(fs0, group, br, style, width * 0.72 * 0.84 / 0.88, 1.15);
       var start = group[0].start, end = group[group.length - 1].end;
       var markup = premiumMarkup(group, meaningfulWord(group), style);
       var twoLines = markup.indexOf("\\N") !== -1;

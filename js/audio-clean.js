@@ -127,5 +127,30 @@
     return chain + ",atrim=start=" + d.toFixed(5) + ",asetpts=PTS-STARTPTS,apad";
   }
 
-  return { HEDEFLER: HEDEFLER, measureLag: measureLag, compensate: compensate, PROBE_KAYNAK: PROBE_KAYNAK, PROBE_SR: PROBE_SR, GUCLER: GUCLER, filterChain: filterChain, parseEbur128: parseEbur128, describe: describe, clipCheck: clipCheck };
+  /*
+   * "ffmpeg -i dosya" ciktisindan ses akislari: [{ sira, kanal }]
+   * (sira: 0:a:N icin N; kanal: mono 1, stereo 2, 5.1 6, "N channels" N)
+   */
+  function parseStreams(stderr) {
+    var out = [];
+    String(stderr || "").split(/\r?\n/).forEach(function (l) {
+      if (!/Stream #\d+:\d+.*:\s*Audio:/.test(l)) return;
+      var kanal = 0;
+      if (/\bmono\b/.test(l)) kanal = 1;
+      else if (/\bstereo\b/.test(l)) kanal = 2;
+      else {
+        var m = /\b(\d+)\.(\d+)(?:\(\w+\))?\b/.exec(l.split("Hz,")[1] || "");
+        var c = /(\d+)\s+channels/.exec(l);
+        if (c) kanal = Number(c[1]);
+        else if (m) kanal = Number(m[1]) + Number(m[2]);
+      }
+      out.push({ sira: out.length, kanal: kanal || 2 });
+    });
+    return out;
+  }
+
+  // Cikti kanal sayisi: mono kaynak mono kalir, digerleri stereo (5.1 kamera dahil)
+  function outputChannels(kanal) { return Number(kanal) === 1 ? 1 : 2; }
+
+  return { HEDEFLER: HEDEFLER, parseStreams: parseStreams, outputChannels: outputChannels, measureLag: measureLag, compensate: compensate, PROBE_KAYNAK: PROBE_KAYNAK, PROBE_SR: PROBE_SR, GUCLER: GUCLER, filterChain: filterChain, parseEbur128: parseEbur128, describe: describe, clipCheck: clipCheck };
 });

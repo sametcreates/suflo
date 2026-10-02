@@ -62,9 +62,12 @@ function FakeTime() { this.seconds = 0; }
 Object.defineProperty(FakeTime.prototype, "ticks", { get: function () { return String(Math.round(this.seconds * 254016000000)); } });
 function klip(media, a, b) { return { projectItem: { getMediaPath: function () { return media; } }, start: { seconds: a }, end: { seconds: b }, disabled: false }; }
 function iz(clips) { var t = { clips: { numItems: clips.length }, isLocked: function () { return false; } }; clips.forEach(function (c, i) { t.clips[i] = c; }); return t; }
-var orijinal = klip("/v/a.mp4", 10, 20), baska = klip("/v/a.mp4", 40, 50), muzik = klip("/m/x.mp3", 0, 60);
-var A1 = iz([orijinal, baska]), A2 = iz([muzik]);
-var seq = { audioTracks: { numTracks: 2, 0: A1, 1: A2 } };
+function hizali(media, a, b, srcIn) { var k = klip(media, a, b); k.inPoint = { seconds: srcIn }; return k; }
+var orijinal = hizali("/v/a.mp4", 10, 20, 3), baska = hizali("/v/a.mp4", 40, 50, 33), muzik = hizali("/m/x.mp3", 0, 60, 0);
+var jlKesim = hizali("/v/a.mp4", 10, 22, 3);          // ayni hiza ama secimden 2 sn uzun (L-cut)
+var baskaAn = hizali("/v/a.mp4", 12, 18, 90);         // ayni dosyanin baska ani, ortusuyor
+var A1 = iz([orijinal, baska]), A2 = iz([muzik]), A4 = iz([jlKesim]), A5 = iz([baskaAn]);
+var seq = { audioTracks: { numTracks: 4, 0: A1, 1: A2, 2: A4, 3: A5 } };
 var eklenenIz = 0, konan = null;
 var item = { name: "" };
 var ctx = { app: { project: { activeSequence: seq, importFiles: function () {}, rootItem: { children: { numItems: 0 }, createBin: function () { return {}; }, findItemsMatchingMediaPath: function () { return [item]; } } },
@@ -76,14 +79,25 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "jsx", "host.jsx"), "utf8"), ctx);
 ctx.KS_tryPlace = function (track, it, startSec) { var c = klip("/t/temiz.wav", startSec, startSec + 10); track.clips[track.clips.numItems] = c; track.clips.numItems++; konan = { track: track, start: startSec }; return c; };
 function call(fn, arg) { return JSON.parse(ctx[fn](encodeURIComponent(JSON.stringify(arg)))); }
-var r = call("KS_placeCleanAudio", { path: "/t/temiz.wav", start: 10, end: 20, mediaPath: "/v/a.mp4", name: "Suflo temiz" });
-ok("host: dolu kanallarda yeni ses kanali acilir ve klibin basina konur", r.ok && eklenenIz === 1 && konan.start === 10 && r.trackName === "A3", JSON.stringify(r));
-ok("host: yalniz ayni medyanin ortusen klibi kapatilir", orijinal.disabled === true && baska.disabled === false && muzik.disabled === false && r.disabled === 1);
+var r = call("KS_placeCleanAudio", { path: "/t/temiz.wav", start: 10, end: 20, inPoint: 3, mediaPath: "/v/a.mp4", name: "Suflo temiz" });
+ok("host: dolu kanallarda yeni ses kanali acilir ve klibin basina konur", r.ok && eklenenIz === 1 && konan.start === 10 && r.trackName === "A5", JSON.stringify(r));
+ok("host: yalniz ayni hizadaki, aralik icindeki orijinal kapatilir", orijinal.disabled === true && baska.disabled === false && muzik.disabled === false && r.disabled === 1);
+ok("host: J/L kesim ve ayni dosyanin baska ani kapatilmaz, atlandi bildirilir", jlKesim.disabled === false && baskaAn.disabled === false && r.skipped === 2, JSON.stringify(r));
+A2.isMuted = function () { return true; };
+A2.clips.numItems = 0;   // bos ama sessiz kanal
+var r2 = call("KS_placeCleanAudio", { path: "/t/temiz.wav", start: 100, end: 110, inPoint: 93, mediaPath: "/v/a.mp4", disableOriginal: false });
+ok("host: sessize alinmis kanal atlanir", r2.ok && r2.trackName !== "A2", r2.trackName);
 ok("host: gecersiz aralik reddedilir", call("KS_placeCleanAudio", { path: "/t/x.wav", start: 5, end: 5 }).ok === false);
 
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 var sesjs = fs.readFileSync(path.join(__dirname, "..", "js", "ses.js"), "utf8");
 ok("panel: kart, betikler, Pro kapisi", /id="ses-card"/.test(html) && /js\/audio-clean\.js/.test(html) && /js\/ses\.js/.test(html) && /Pro\.gate\("audioclean"\)/.test(sesjs));
+var spl = "  Stream #0:0: Video: h264, yuv420p, 1920x1080\n  Stream #0:1(eng): Audio: aac (LC), 48000 Hz, stereo, fltp (default)\n  Stream #0:2: Audio: pcm_s24le, 48000 Hz, 4 channels, s32\n  Stream #0:3: Audio: ac3, 48000 Hz, 5.1(side), fltp";
+ok("parseStreams: stereo / 4 kanal / 5.1", JSON.stringify(A.parseStreams(spl)) === JSON.stringify([{ sira: 0, kanal: 2 }, { sira: 1, kanal: 4 }, { sira: 2, kanal: 6 }]), JSON.stringify(A.parseStreams(spl)));
+ok("parseStreams: sessiz video -> bos", A.parseStreams("  Stream #0:0: Video: h264").length === 0);
+ok("outputChannels: mono kalir, cok kanal stereo", A.outputChannels(1) === 1 && A.outputChannels(6) === 2 && A.outputChannels(2) === 2);
+ok("panel: ilk ses akisi ve sabit kanal; cok akista orijinal kapatilmaz; ses yoksa anlasilir hata",
+  /"-map", "0:a:0", "-af", son/.test(sesjs) && /"-ac", String\(AC\.outputChannels/.test(sesjs) && /disableOriginal: ak\.length === 1/.test(sesjs) && /Bu klipte ses yok/.test(sesjs));
 ok("panel: gecikme olculup telafi edilir, cikti -t ile kesilir", /AC\.compensate\(zincir, d\)/.test(sesjs) && /"-af", son, "-t", String\(dur\)/.test(sesjs));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

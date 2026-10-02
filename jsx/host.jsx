@@ -1639,7 +1639,10 @@ function KS_removeOverlay(encoded) {
 
 function KS_findFreeAudioTrack(seq, aSec, bSec) {
   for (var i = 0; i < seq.audioTracks.numTracks; i++) {
-    if (KS_trackFreeIn(seq.audioTracks[i], aSec, bSec)) return i;
+    var tr = seq.audioTracks[i];
+    // sessize alinmis kanala konan ses duyulmaz: atla
+    try { if (tr.isMuted && tr.isMuted()) continue; } catch (eM) {}
+    if (KS_trackFreeIn(tr, aSec, bSec)) return i;
   }
   return -1;
 }
@@ -1742,8 +1745,11 @@ function KS_placeCleanAudio(encoded) {
     if (!clip) return KS_err("Ses timeline'a yerlestirilemedi.");
     try { if (p.name) clip.name = String(p.name); } catch (eCn) {}
 
-    // ayni medyanin bu aralikla ortusen ORIJINAL ses klipleri devre disi
-    var kapatilan = 0;
+    // Yalniz temiz sesin TAM yerini tutan orijinal ses klipleri devre disi: ayni medya,
+    // ayni kaynak hizasi (kaynak-timeline farki) ve temiz aralik icinde. J/L kesimde
+    // disari tasan ya da ayni dosyanin baska anindan gelen klipler kapatilmaz.
+    var kapatilan = 0, atlanan = 0, tol = 0.05;
+    var hiza = Number(p.inPoint) - start;
     if (p.disableOriginal !== false && p.mediaPath) {
       for (var t = 0; t < seq.audioTracks.numTracks; t++) {
         if (t === idx) continue;
@@ -1753,13 +1759,16 @@ function KS_placeCleanAudio(encoded) {
           try {
             if (!k.projectItem || String(k.projectItem.getMediaPath()) !== String(p.mediaPath)) continue;
             if (!(k.end.seconds > start + 0.01 && k.start.seconds < end - 0.01)) continue;
+            var ayniHiza = !isFinite(hiza) || Math.abs((k.inPoint.seconds - k.start.seconds) - hiza) < tol;
+            var icinde = k.start.seconds >= start - tol && k.end.seconds <= end + tol;
+            if (!ayniHiza || !icinde) { atlanan++; continue; }
             k.disabled = true;
             kapatilan++;
           } catch (eK) {}
         }
       }
     }
-    return KS_ok({ track: idx, trackName: "A" + (idx + 1), newTrack: yeni, disabled: kapatilan,
+    return KS_ok({ track: idx, trackName: "A" + (idx + 1), newTrack: yeni, disabled: kapatilan, skipped: atlanan,
       start: clip.start.seconds, end: clip.end.seconds });
   } catch (e) { return KS_err(e); }
 }

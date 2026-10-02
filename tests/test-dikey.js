@@ -55,12 +55,19 @@ if (ff) {
   console.log("ATLA render: ffmpeg yok");
 }
 
+// Premium: metin \clip acilim penceresinden genis olmasin (yazi iki yandan kesilmesin)
+var pr = E.compile({ styleId: "premium", cueKind: "lines", width: 1080, height: 1920, cues: [{ start: 0, end: 3, text: "kanalını nasıl büyüteceğini anlatacağım" }] }).ass;
+var prFs = Math.max.apply(null, fsDegerleri(pr));
+var enUzunSatir = Math.max("KANALINI NASIL".length, "BÜYÜTECEĞİNİ ANLATACAĞIM".length);
+ok("premium 9:16: en uzun satir acilim penceresine sigar", enUzunSatir * prFs * 0.64 * 1.15 <= 1080 * 0.72 * 0.84 + 1, prFs);
+
 // Panel: onizleme sekans oranini izler, guvenli alan kutulari
 var src = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8");
 function kes(imza) { var i = src.indexOf(imza); return src.slice(i, src.indexOf("\n  }", i) + 4); }
 var G = new Function(kes("function onizlemeBoyutu(") + "\n" + src.slice(src.indexOf("  var GUVENLI_ALAN"), src.indexOf("  function sahneOraniniAyarla")) +
   "\nreturn { b: onizlemeBoyutu, f: guvenliAlanFiltresi };")();
-ok("onizleme: 9:16 -> 304x540 dikey", JSON.stringify(G.b({ width: 1080, height: 1920 })) === JSON.stringify({ w: 304, h: 540, dikey: true }));
+ok("onizleme: 9:16 -> 320x568 dikey (motorun 320 alt siniriyla ayni)", JSON.stringify(G.b({ width: 1080, height: 1920 })) === JSON.stringify({ w: 320, h: 568, dikey: true }));
+ok("onizleme: 4:5 genislik >= 320", G.b({ width: 1080, height: 1350 }).w >= 320);
 ok("onizleme: sekans yoksa 960x540", JSON.stringify(G.b({})) === JSON.stringify({ w: 960, h: 540, dikey: false }));
 ok("guvenli alan: uc bolge, dolgu + cerceve", (G.f(304, 540).match(/drawbox=/g) || []).length === 6);
 console.log(gecen + "/" + toplam + " gecti");

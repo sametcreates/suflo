@@ -2898,7 +2898,9 @@ window.KCaptions = (function () {
     var w = Number(ctx && ctx.width) || 0, h = Number(ctx && ctx.height) || 0;
     if (!(w > 0 && h > 0)) return { w: 960, h: 540, dikey: false };
     var oran = Math.max(0.4, Math.min(2.4, w / h));
-    return { w: Math.round(540 * oran / 2) * 2, h: 540, dikey: h > w * 1.2 };
+    // kisa kenar en az 320 (stil motoru genisligi 320'ye sabitler; PlayRes video ile ayni kalsin)
+    if (oran < 1) return { w: 320, h: Math.round(320 / oran / 2) * 2, dikey: h > w * 1.2 };
+    return { w: Math.round(540 * oran / 2) * 2, h: 540, dikey: false };
   }
 
   // TikTok / Reels / Shorts ortak "kapali" bolgeleri (1080x1920 olcumlerinden, oransal):

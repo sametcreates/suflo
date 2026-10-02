@@ -64,6 +64,14 @@ window.KSes = (function () {
     return d;
   }
 
+  // Kaynaktaki ses akislari (ffmpeg -i stderr'inden). Ses yoksa anlasilir hata.
+  async function akislar(ff, medya) {
+    var r = await K.run(ff, ["-hide_banner", "-i", medya], { timeout: 60000 });
+    var a = AC.parseStreams(r.stderr);
+    if (!a.length) throw new Error("Bu klipte ses yok.");
+    return a;
+  }
+
   async function olcum(ff, args) {
     var r = await K.run(ff, ["-hide_banner", "-nostats"].concat(args).concat(["-af", "ebur128", "-f", "null", "-"]),
       { timeout: 900000 });
@@ -81,7 +89,8 @@ window.KSes = (function () {
       if (!ff) throw new Error("ffmpeg bulunamadı — Ayarlar sekmesinden kur.");
       durum("Ses ölçülüyor…");
       var dur = c.outPoint - c.inPoint;
-      var m = await olcum(ff, ["-ss", String(c.inPoint), "-t", String(dur), "-i", c.mediaPath, "-vn"]);
+      await akislar(ff, c.mediaPath);
+      var m = await olcum(ff, ["-ss", String(c.inPoint), "-t", String(dur), "-i", c.mediaPath, "-map", "0:a:0"]);
       var h = AC.HEDEFLER[ayarlar().hedef];
       durum("Şu an: " + AC.describe(m.I, h.I) + " · hedef " + h.ad);
     } catch (e) {
@@ -104,6 +113,7 @@ window.KSes = (function () {
       var ff = await K.findFfmpeg();
       if (!ff) throw new Error("ffmpeg bulunamadı — Ayarlar sekmesinden kur.");
       var o = ayarlar();
+      var ak = await akislar(ff, c.mediaPath);
       var zincir = AC.filterChain(o);
       durum("Senkron için filtre gecikmesi ölçülüyor…");
       var d = await gecikme(ff, zincir);
@@ -113,8 +123,9 @@ window.KSes = (function () {
       cikti = K.path.join(K.srtDir(), "suflo-temiz-" + ad + "-" + Date.now() + ".wav");
       K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
       durum("Ses temizleniyor… (" + Math.round(dur) + " sn)");
-      var r = await K.run(ff, ["-y", "-hide_banner", "-nostats", "-ss", String(c.inPoint), "-t", String(dur), "-i", c.mediaPath, "-vn",
-        "-af", son, "-t", String(dur), "-ar", "48000", "-c:a", "pcm_s16le", cikti],
+      // ilk ses akisi; kanal sayisi sabit (5.1/4 kanalli kamera dosyasi tek stereo klip olsun)
+      var r = await K.run(ff, ["-y", "-hide_banner", "-nostats", "-ss", String(c.inPoint), "-t", String(dur), "-i", c.mediaPath,
+        "-map", "0:a:0", "-af", son, "-t", String(dur), "-ac", String(AC.outputChannels(ak[0].kanal)), "-ar", "48000", "-c:a", "pcm_s16le", cikti],
         { timeout: Math.max(180000, dur * 3000) });
       if (r.code !== 0 || !K.fs.existsSync(cikti)) {
         throw new Error("Ses işlenemedi: " + String(r.stderr || "").split("\n").filter(Boolean).slice(-1)[0]);
@@ -122,14 +133,18 @@ window.KSes = (function () {
       // islem sirasinda baska klip secilse de temiz ses BASLADIGI klibin altina gider (c sabit)
       durum("Timeline'a yerleştiriliyor…");
       var yer = await K.call("KS_placeCleanAudio", {
-        path: cikti, start: c.clipStart, end: c.clipEnd, mediaPath: c.mediaPath,
-        name: "Suflo temiz · " + (c.name || "ses"), disableOriginal: true
+        path: cikti, start: c.clipStart, end: c.clipEnd, inPoint: c.inPoint, mediaPath: c.mediaPath,
+        name: "Suflo temiz · " + (c.name || "ses"),
+        // birden cok ses akisi (OBS mikrofon + masaustu gibi): yalniz ilki temizlendi, digerleri kapanmasin
+        disableOriginal: ak.length === 1
       }, 120000);
       if (!yer.ok) throw new Error(yer.error);
       yerlesti = true;   // dosya artik projede: hata olsa da silinmez
       var sonra = await olcum(ff, ["-i", cikti]);
-      durum("Bitti: " + AC.describe(sonra.I, AC.HEDEFLER[o.hedef].I) + " · " + yer.trackName +
-        (yer.disabled ? " · orijinal ses kapatıldı (sağ tık → Etkinleştir ile geri açılır)" : ""), "good");
+      var not = yer.disabled ? " · orijinal ses kapatıldı (sağ tık → Etkinleştir ile geri açılır)" :
+        ak.length > 1 ? " · dosyada " + ak.length + " ses akışı var: ilki temizlendi, orijinali elle kapat" :
+        yer.skipped ? " · orijinal ses klibi seçimden uzun (J/L kesim): elle kapat" : "";
+      durum("Bitti: " + AC.describe(sonra.I, AC.HEDEFLER[o.hedef].I) + " · " + yer.trackName + not, "good");
       var a = el("ses-audio");
       if (a) {
         a.src = encodeURI("file:///" + cikti.replace(/\\/g, "/")).replace(/#/g, "%23").replace(/\?/g, "%3F").replace(/'/g, "%27");
