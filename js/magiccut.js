@@ -62,6 +62,7 @@ window.KCut = (function () {
   async function analyze() {
     if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
     if (busy) return;
+    sesiKapat();
     clip = KApp.ctx().sel;
     if (!clip) { status("Önce bir klip seç.", "warn"); return; }
     busy = true;
@@ -229,6 +230,7 @@ window.KCut = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
     var act = activeRanges().map(function (r) { return { start: r.start, end: r.end }; });
     if (act.length === 0) return;
+    sesiKapat();
     el("cut-apply").disabled = true;
     status("Uygulanıyor…");
     var mode = target === "clone" ? "ripple" : el("cut-mode").value;
@@ -259,32 +261,27 @@ window.KCut = (function () {
 
   /* ---------------- Dinle (önizleme) ---------------- */
 
-  // Kesimler uygulanmis gibi sesi panelde cal. Filtre js/textcut.js'te (testli).
-  var dinleYol = "";
+  // Kesimler uygulanmis gibi sesi panelde cal (ortak oynatici: js/dinle.js)
+  var oynatici = window.KDinle ? window.KDinle("cut-audio") : null;
+  function sesiKapat() { if (oynatici) oynatici.kapat(); }
+
   async function dinle() {
-    if (!clip || !window.SufloTextCut) return;
+    if (!clip || !window.SufloTextCut || !oynatici) return;
     var btn = el("cut-dinle");
     btn.disabled = true;
     var eski = btn.textContent;
     btn.textContent = "Hazırlanıyor…";
+    var benimKlip = clip;
     try {
-      var ff = await K.findFfmpeg();
-      if (!ff) throw new Error("ffmpeg bulunamadı.");
-      if (dinleYol) { try { K.fs.unlinkSync(dinleYol); } catch (e0) {} }
-      dinleYol = K.path.join(K.tmpDir(), "suflo_dinle_" + Date.now() + ".mp3");
       var dur = clip.outPoint - clip.inPoint;
-      var args = ["-y", "-ss", String(clip.inPoint), "-t", String(dur), "-i", clip.mediaPath, "-vn", "-ac", "1", "-b:a", "96k"];
-      var filtre = window.SufloTextCut.previewFilter(activeRanges(), { clipStart: clip.clipStart, clipEnd: clip.clipEnd, dur: dur });
-      if (filtre) args.push("-af", filtre);
-      args.push(dinleYol);
-      var r = await K.run(ff, args, { timeout: Math.max(120000, dur * 1000) });
-      if (r.code !== 0 || !K.fs.existsSync(dinleYol)) throw new Error("Önizleme üretilemedi.");
-      var a = el("cut-audio");
-      a.hidden = false;
-      a.src = encodeURI("file:///" + dinleYol.replace(/\\/g, "/")).replace(/#/g, "%23").replace(/\?/g, "%3F").replace(/'/g, "%27");
-      try { await a.play(); } catch (eP) {}
+      var r = await oynatici.cal({
+        mediaPath: clip.mediaPath, inPoint: clip.inPoint, dur: dur, cuts: activeRanges(),
+        clip: { clipStart: clip.clipStart, clipEnd: clip.clipEnd, dur: dur },
+        gecerli: function () { return clip === benimKlip; }
+      });
+      if (r.ok && r.kisaltildi) status("Uzun klip: ilk " + Math.round(oynatici.MAX_SN / 60) + " dakika dinletiliyor.");
     } catch (e) {
-      status("✕ " + e.message, "bad");
+      status("✕ " + K.hataYardimi(e), "bad");
     } finally {
       btn.disabled = false;
       btn.textContent = eski;
@@ -322,6 +319,7 @@ window.KCut = (function () {
       // seçim değiştiyse eski analiz geçersiz
       if (clip && (!ctx.sel || ctx.sel.mediaPath !== clip.mediaPath || ctx.sel.clipStart !== clip.clipStart)) {
         el("cut-result").hidden = true;
+        sesiKapat();
         ranges = [];
         clip = null;
       }

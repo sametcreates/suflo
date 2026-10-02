@@ -184,13 +184,14 @@
    * Anahtar kelime vurgusu (*kelime*). Suflo Stilleri isaretli kelimeyi vurgu
    * renginde cizer; SRT/VTT/normal caption izi gibi ciktilarda isaret kaldirilir.
    */
-  var VURGU_UC = /^\*+|\*+$/g;
+  // Kapanis yildizindan sonra noktalama gelebilir: "*100 TL*." (otomatik vurgunun bicimi)
+  var VURGU_UC = /^\*+|\*+(?=[.,!?;:…»"')\]]*$)/g;
   function stripEmphasis(text) {
     return String(text == null ? "" : text).split(/(\s+)/).map(function (p) {
       return /\S/.test(p) && p.replace(/\*/g, "") ? p.replace(VURGU_UC, "") : p;
     }).join("");
   }
-  function hasEmphasis(text) { return /(^|\s)\*\S|\S\*(\s|$)/.test(String(text || "")); }
+  function hasEmphasis(text) { return /(^|\s)\*\S|\S\*[.,!?;:…»"')\]]*(\s|$)/.test(String(text || "")); }
 
   // Tek kelimeyi isaretle/isareti kaldir (editorde tiklayarak)
   function toggleWord(text, index) {
@@ -200,10 +201,49 @@
       n++;
       if (n !== index) continue;
       var p = parts[i];
-      parts[i] = /^\*.*\*$/.test(p) && p.length > 2 ? p.slice(1, -1) : "*" + p.replace(VURGU_UC, "") + "*";
+      var m = /^(.*?)([.,!?;:…»"')\]]*)$/.exec(p.replace(VURGU_UC, ""));
+      var isaretli = /^\*/.test(p) && /\*[.,!?;:…»"')\]]*$/.test(p) && p.replace(/\*/g, "").length > 0;
+      // isaretliyse kaldir; degilse "*kelime*." (noktalama disarida) — tek bicim
+      parts[i] = isaretli ? m[1] + m[2] : (m[1] ? "*" + m[1] + "*" + m[2] : p);
       break;
     }
     return parts.join("");
+  }
+
+  // Kelime bazinda isaret durumu: [bool] (cok kelimeli *a b* araliklari dahil)
+  function emphasisMask(text) {
+    var acik = false;
+    return String(text || "").trim().split(/\s+/).filter(Boolean).map(function (w) {
+      var dolu = w.replace(/\*/g, "").length > 0;
+      var bas = dolu && /^\*/.test(w), son = dolu && /\*[.,!?;:…»"')\]]*$/.test(w);
+      var v = acik || bas;
+      if (bas && !son) acik = true;
+      if (son) acik = false;
+      return v;
+    });
+  }
+
+  /*
+   * AI duzeltmesinden donen (isaretsiz) metne eski satirin isaretlerini
+   * kelime sirasiyla geri koy. Kelime sayisi degistiyse null (cagiran eskiyi korur).
+   */
+  function reapplyEmphasis(orig, yeni) {
+    var mask = emphasisMask(orig);
+    if (!mask.some(Boolean)) return yeni;
+    var parts = String(yeni || "").split(/(\s+)/), n = -1;
+    var kelime = parts.filter(function (p) { return /\S/.test(p); }).length;
+    if (kelime !== mask.length) return null;
+    for (var i = 0; i < parts.length; i++) {
+      if (!/\S/.test(parts[i])) continue;
+      n++;
+      if (mask[n]) parts[i] = toggleWord(stripEmphasis(parts[i]), 0);
+    }
+    return parts.join("");
+  }
+
+  // Modelin ekleyebildigi markdown kalinligi (**x**) tek yildiza indirgenir
+  function normalizeEmphasis(text) {
+    return String(text == null ? "" : text).replace(/\*\*([^*\n]+)\*\*/g, "*$1*");
   }
 
   var VURGU_DURAK = /^(ve|ile|bir|bu|şu|o|da|de|ki|mi|mı|mu|mü|için|ama|fakat|çünkü|gibi|daha|çok|en|hem|ya|yani|şey|işte|zaten|sonra|önce|kadar|olarak|olan|diye|bunu|şunu|onu|bunun|benim|senin|bizim|onların|the|a|an|and|or|of|to|in|on|is|are|was|that|this|with|for|it|you|your|they|have|just|really|about|because|there|their|what|which|would|could|should)$/i;
@@ -262,6 +302,9 @@
     stripEmphasis: stripEmphasis,
     hasEmphasis: hasEmphasis,
     toggleWord: toggleWord,
+    emphasisMask: emphasisMask,
+    reapplyEmphasis: reapplyEmphasis,
+    normalizeEmphasis: normalizeEmphasis,
     autoEmphasis: autoEmphasis,
     cleanSegments: cleanSegments,
     karaokeWords: karaokeWords,

@@ -125,6 +125,7 @@ window.KTextCut = (function () {
     if (busy) return;
     if (!window.KCaptions || !KCaptions.transcribeWords) { status("Altyazı motoru yüklenemedi.", "bad"); return; }
     setBusy(true);
+    sesiKapat();   // eski klibin onizlemesi yeni analizle karismasin
     status("Hazırlanıyor…");
     // Analizin BASLADIGI sekans: uzun transkripsiyon sirasinda sekans degisirse karismasin
     var basSekans = KApp.ctx().sequenceId || KApp.ctx().sequence || "";
@@ -161,6 +162,7 @@ window.KTextCut = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("textcut")) return;
     var r = kesimler().map(function (x) { return { start: x.start, end: x.end }; });
     if (!r.length) return;
+    sesiKapat();
     // Bayat olabilecek yoklama yerine Premiere'e taze sor
     var tazeCtx = await K.call("KS_getContext");
     var aktif = tazeCtx.ok ? (tazeCtx.sequenceId || tazeCtx.sequence || "") : "";
@@ -196,42 +198,23 @@ window.KTextCut = (function () {
     }
   }
 
-  // Yerel dosya -> URL ("#", "?", "'" iceren yollar bozulmasin)
-  function dosyaUrl(p) {
-    return encodeURI("file:///" + String(p || "").replace(/\\/g, "/"))
-      .replace(/#/g, "%23").replace(/\?/g, "%3F").replace(/'/g, "%27");
-  }
-
-  function sesiKapat() {
-    var a = el("tc-audio");
-    if (a) { try { a.pause(); } catch (e) {} a.hidden = true; }
-  }
-
   // "Dinle": kesimler uygulanmis gibi sesi panelde cal (timeline'a dokunmaz)
-  var dinleYol = "";
+  var oynatici = window.KDinle ? window.KDinle("tc-audio") : null;
+  function sesiKapat() { if (oynatici) oynatici.kapat(); }
+
   async function dinle() {
-    if (!clip || !words.length) return;
+    if (!clip || !words.length || !oynatici) return;
     var btn = el("tc-dinle");
     btn.disabled = true;
     var eskiYazi = btn.textContent;
     btn.textContent = "Hazırlanıyor…";
+    var benimKlip = clip;
     try {
-      var ff = await K.findFfmpeg();
-      if (!ff) throw new Error("ffmpeg bulunamadı.");
-      if (dinleYol) { try { K.fs.unlinkSync(dinleYol); } catch (e0) {} }
-      dinleYol = K.path.join(K.tmpDir(), "suflo_dinle_" + Date.now() + ".mp3");
-      var args = ["-y", "-ss", String(clip.inPoint), "-t", String(clip.dur), "-i", clip.mediaPath, "-vn", "-ac", "1", "-b:a", "96k"];
-      var filtre = TC.previewFilter(kesimler(), clip);
-      if (filtre) args.push("-af", filtre);
-      args.push(dinleYol);
-      var r = await K.run(ff, args, { timeout: Math.max(120000, clip.dur * 1000) });
-      if (r.code !== 0 || !K.fs.existsSync(dinleYol)) {
-        throw new Error("Önizleme üretilemedi: " + String(r.stderr || "").split("\n").filter(Boolean).slice(-1)[0]);
-      }
-      var a = el("tc-audio");
-      a.hidden = false;
-      a.src = dosyaUrl(dinleYol);
-      try { await a.play(); } catch (eP) {}
+      var r = await oynatici.cal({
+        mediaPath: clip.mediaPath, inPoint: clip.inPoint, dur: clip.dur, cuts: kesimler(), clip: clip,
+        gecerli: function () { return clip === benimKlip; }
+      });
+      if (r.ok && r.kisaltildi) status("Uzun klip: ilk " + Math.round(oynatici.MAX_SN / 60) + " dakika dinletiliyor.");
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
     } finally {

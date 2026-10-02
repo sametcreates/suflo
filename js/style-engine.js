@@ -142,17 +142,24 @@
    * markEmphasis kelime cue'larindaki isaretleri temizleyip cue.vurgu bayragi koyar;
    * acik kalan isaret satir sonunda (lineEnd) kapanir.
    */
-  var VURGU_RE = /^\*+|\*+$/g;
+  // kapanis yildizindan sonra noktalama olabilir: "*100 TL*."
+  var VURGU_RE = /^\*+|\*+(?=[.,!?;:…»"')\]]*$)/g;
+  var VURGU_SON = /\*[.,!?;:…»"')\]]*$/;
+  var VURGU_EN_COK = 6;   // kapanmayan isaret en fazla bu kadar kelime surer
   function markEmphasis(cues) {
-    var acik = false;
+    var acik = false, sayac = 0;
     return (cues || []).map(function (cue) {
       var t = String(cue.text || "");
-      var bas = /^\*/.test(t), son = /\*$/.test(t) && t.replace(/\*/g, "").length > 0;
+      var dolu = t.replace(/\*/g, "").length > 0;
+      // yalniz yildizdan olusan kelime isaret acmaz/kapatmaz
+      var bas = dolu && /^\*/.test(t), son = dolu && VURGU_SON.test(t);
       var temiz = t.replace(VURGU_RE, "");
+      if (acik && ++sayac > VURGU_EN_COK) acik = false;
       var vurgu = acik || bas;
-      if (bas && !son) acik = true;
-      if (son) { vurgu = vurgu || acik; acik = false; }
-      if (cue.lineEnd) acik = false;
+      if (bas && !son) { acik = true; sayac = 1; }
+      if (son) acik = false;
+      // satir/cumle sonunda acik isaret kapanir (kelime modunda lineEnd gelmez)
+      if (cue.lineEnd || /[.!?…]["')\]»]*$/.test(temiz)) acik = false;
       var out = {};
       for (var k in cue) if (Object.prototype.hasOwnProperty.call(cue, k)) out[k] = cue[k];
       out.text = temiz || t;
@@ -170,7 +177,7 @@
 
   // Isaretleri tamamen kaldir (vurgu desteklemeyen ciktilar icin)
   function stripEmphasis(text) {
-    return String(text || "").split(/(\s+)/).map(function (p) {
+    return String(text == null ? "" : text).split(/(\s+)/).map(function (p) {
       return /\S/.test(p) && p.replace(/\*/g, "") ? p.replace(VURGU_RE, "") : p;
     }).join("");
   }

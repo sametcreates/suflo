@@ -78,9 +78,19 @@ window.KCaptions = (function () {
       spanish: "es", french: "fr", portuguese: "pt", italian: "it", dutch: "nl", japanese: "ja" }[x] || "";
   }
 
+  // Geri al yigini girdisi: satirlar + mod + ceviri hedef dili (buyuk harf kurali buna bagli)
+  function durumAl(etiket) {
+    return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili, ts: Date.now() };
+  }
+  function durumYukle(st) {
+    segments = JSON.parse(st.segs);
+    if (st.mode) segmentsMode = st.mode;
+    if (typeof st.cevir === "string") ceviriDili = st.cevir;
+  }
+
   function snapshot(etiket) {
     uygulaEtiketiniSifirla();
-    undoStack.push({ segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, ts: Date.now() });
+    undoStack.push(durumAl(etiket || ""));
     if (undoStack.length > UNDO_MAX) undoStack.shift();
     redoStack.length = 0;
     refreshUndoUI();
@@ -89,10 +99,9 @@ window.KCaptions = (function () {
 
   function undo() {
     if (!undoStack.length) return;
-    redoStack.push({ segs: JSON.stringify(segments), etiket: "", mode: segmentsMode, ts: Date.now() });
+    redoStack.push(durumAl(""));
     var st = undoStack.pop();
-    segments = JSON.parse(st.segs);
-    if (st.mode) segmentsMode = st.mode;
+    durumYukle(st);
     render();
     refreshUndoUI();
     renderHistory();
@@ -102,8 +111,8 @@ window.KCaptions = (function () {
 
   function redo() {
     if (!redoStack.length) return;
-    undoStack.push({ segs: JSON.stringify(segments), etiket: "", mode: segmentsMode, ts: Date.now() });
-    segments = JSON.parse(redoStack.pop().segs);
+    undoStack.push(durumAl(""));
+    durumYukle(redoStack.pop());
     render();
     refreshUndoUI();
     renderHistory();
@@ -1328,8 +1337,12 @@ window.KCaptions = (function () {
   function styleLocale(kaynak) {
     // Cevrilmis metin hedef dilin kuralina uyar: Turkce'den Ingilizceye cevrilen
     // "this" BUYUK HARF'te "THİS" olmasin
-    if (!kaynak && ceviriDili && ceviriVar()) {
-      return { tr: "tr-TR", az: "az", ru: "ru" }[ceviriDili];
+    if (!kaynak && ceviriVar()) {
+      if (ceviriDili) return { tr: "tr-TR", az: "az", ru: "ru" }[ceviriDili];
+      // hedef dil bilinmiyor (3.0 oncesi taslak): kaynak kurali degil, cevrilmis
+      // metinden tahmin — Turkceye ozgu harf varsa tr, yoksa dil-bagimsiz kural
+      var ornek = segments.slice(0, 40).map(function (s) { return s.text; }).join(" ");
+      return /[ğışĞİŞ]/.test(ornek) ? "tr-TR" : undefined;
     }
     var l = el("cap-lang").value;
     if (l === "") l = algilananDil; // "Otomatik": motorun algiladigi dile guven
@@ -1436,7 +1449,7 @@ window.KCaptions = (function () {
      * yigina itilir; kullanici Ctrl+Z ile geri donebilir.
      */
     var oncekiIs = segments.length
-      ? { segs: JSON.stringify(segments), etiket: "yeni transkript", mode: segmentsMode }
+      ? durumAl("yeni transkript")
       : null;
     algilananDil = "";
     var tempFiles = [];
@@ -1607,8 +1620,7 @@ window.KCaptions = (function () {
       if (segments.length === 0) {
         // Eski dokumana geri don: ekrandaki satirlar ile bellek ayrismasin,
         // bos dizi bir sonraki taslak yazimiyla kayitli isi de silmesin.
-        segments = oncekiIs ? JSON.parse(oncekiIs.segs) : [];
-        if (oncekiIs) segmentsMode = oncekiIs.mode;
+        if (oncekiIs) durumYukle(oncekiIs); else segments = [];
         throw new Error("Konuşma bulunamadı.");
       }
       if (oncekiIs) {
@@ -1716,9 +1728,8 @@ window.KCaptions = (function () {
   function restoreHistory(index) {
     var st = undoStack[index];
     if (!st) return;
-    redoStack.push({ segs: JSON.stringify(segments), etiket: "geçmişten önce", mode: segmentsMode, ts: Date.now() });
-    segments = JSON.parse(st.segs);
-    if (st.mode) segmentsMode = st.mode;
+    redoStack.push(durumAl("geçmişten önce"));
+    durumYukle(st);
     undoStack = undoStack.slice(0, index);
     render();
     refreshUndoUI();
@@ -1879,7 +1890,8 @@ window.KCaptions = (function () {
       var corrected = [];
       var BATCH = 50;
       for (var i = 0; i < originals.length; i += BATCH) {
-        var chunk = originals.slice(i, i + BATCH);
+        // *vurgu* isaretleri modele gitmez (dusurur ya da markdown ekler); donuste geri konur
+        var chunk = originals.slice(i, i + BATCH).map(CT.stripEmphasis);
         status("AI metin kontrolü… " + Math.min(i + BATCH, originals.length) + "/" + originals.length);
         var json = await chatCall(cfg, {
           model: cfg.model,
@@ -1895,8 +1907,14 @@ window.KCaptions = (function () {
         if (!parsed.lines || parsed.lines.length !== chunk.length) throw new Error("Kontrol satır sayısı değişti; mevcut metin korunarak işlem durduruldu.");
         corrected = corrected.concat(parsed.lines);
       }
+      corrected = corrected.map(function (text, i2) {
+        var t = String(text || "").trim();
+        if (!t) return originals[i2];
+        var geri = CT.reapplyEmphasis(originals[i2], t);
+        return geri === null ? originals[i2] : geri;   // kelime sayisi degistiyse vurgu kaybolmasin
+      });
       var changed = 0;
-      corrected.forEach(function (text, i2) { if (String(text || "").trim() && String(text).trim() !== originals[i2]) changed++; });
+      corrected.forEach(function (text, i2) { if (text !== originals[i2]) changed++; });
       if (!changed) { status(""); KApp.toast("AI kontrolü tamamlandı; açık bir yazım hatası bulunmadı", "good"); return; }
       snapshot("AI metin kontrolü");
       refs.forEach(function (s, i3) { s.text = String(corrected[i3] || s.text).trim() || s.text; s.proofread = true; });
@@ -1981,7 +1999,7 @@ window.KCaptions = (function () {
           var correction = correctionFromEdit(inp.dataset.before, inp.value);
           var eski = JSON.parse(JSON.stringify(segments));
           eski[i].text = inp.dataset.before;
-          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, ts: Date.now() });
+          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, cevir: ceviriDili, ts: Date.now() });
           if (undoStack.length > UNDO_MAX) undoStack.shift();
           redoStack.length = 0;
           refreshUndoUI();
@@ -2298,7 +2316,8 @@ window.KCaptions = (function () {
             {
               role: "system",
               content: "You translate subtitle lines for video. Reply ONLY with a JSON object {\"lines\": [...]} containing exactly " +
-                chunk.length + " translated lines in the same order. Keep translations short and natural for subtitles. Do not merge or split lines."
+                chunk.length + " translated lines in the same order. Keep translations short and natural for subtitles. Do not merge or split lines. " +
+                "Words wrapped in single asterisks (*word*) are highlighted: wrap the corresponding translated words in single asterisks too. Never add other asterisks or markdown."
             },
             {
               role: "user",
@@ -2323,7 +2342,7 @@ window.KCaptions = (function () {
         if (!guncel.has(s)) return;
         if (s.text !== texts[i2]) { atlananDuzenleme++; return; }
         if (typeof s.orig !== "string") s.orig = texts[i2];   // zincir çeviride ilk orijinali koru
-        s.text = String(out[i2] || "").trim() || s.text;
+        s.text = CT.normalizeEmphasis(String(out[i2] || "").trim()) || s.text;
       });
       ceviriDili = target;
       status("");

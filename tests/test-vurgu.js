@@ -67,5 +67,30 @@ ok("motor cagrilari vurgu ister", (src.match(/cueler\(\{ vurgu: true \}\)/g) || 
 ok("getSegments isaretsiz kopya verir", /text: CT\.stripEmphasis\(String\(s\.text/.test(src));
 ok("index.html: Otomatik vurgu dugmesi", /id="cap-auto-vurgu"/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")));
 
+
+/* dorduncu inceleme: noktalama sonrasi kapanis, acik kalan isaret, AI turu */
+["Bu ürün sadece 100 TL. Gerçekten çok iyi", "Toplam 5 milyon!", "Evet, bunu kesinlikle başardık?"].forEach(function (x) {
+  var a = C.autoEmphasis(x);
+  ok("gidis-donus: strip(auto(x)) === x  [" + x + "]", C.stripEmphasis(a) === x && E.stripEmphasis(a) === x, a + " -> " + C.stripEmphasis(a));
+  var m2 = E.markEmphasis(E.splitToWords([{ start: 0, end: 3, text: a }]));
+  ok("motor: sizinti yok ve vurgu yalniz isaretli kelimede  [" + x + "]", m2.every(function (c) { return c.text.indexOf("*") === -1; }) &&
+    m2.filter(function (c) { return c.vurgu; }).length === C.emphasisMask(a).filter(Boolean).length,
+    JSON.stringify(m2.map(function (c) { return c.text + (c.vurgu ? "!" : ""); })));
+});
+var sonda = E.markEmphasis(E.splitToWords([{ start: 0, end: 3, text: "Evet, kesinlikle *kazandık*! Sonra devam" }]));
+ok("cumle sonu isaret kapanir, sonraki kelimeler vurgusuz", sonda.filter(function (c) { return c.vurgu; }).map(function (c) { return c.text; }).join(" ") === "kazandık!",
+  JSON.stringify(sonda.map(function (c) { return c.text + (c.vurgu ? "!" : ""); })));
+var kelimeler = [{ text: "*önemli" }].concat("a b c d e f g h".split(" ").map(function (w) { return { text: w }; }));
+var km = E.markEmphasis(kelimeler);
+ok("kelime modunda kapanmayan isaret sinirli surer", km.filter(function (c) { return c.vurgu; }).length <= 6 && !km[km.length - 1].vurgu);
+ok("tek basina yildiz isaret acmaz", E.markEmphasis([{ text: "*" }, { text: "a" }, { text: "b" }]).every(function (c) { return !c.vurgu; }));
+ok("toggleWord noktalamayi disarida birakir", C.toggleWord("TL.", 0) === "*TL*." && C.toggleWord("*TL*.", 0) === "TL.");
+ok("reapplyEmphasis: kelime sirasiyla geri koyar", C.reapplyEmphasis("bu *önemli* bir şey", "bu önemli bir şeydi") === "bu *önemli* bir şeydi");
+ok("reapplyEmphasis: kelime sayisi degisirse null", C.reapplyEmphasis("bu *önemli* şey", "bu çok önemli şey") === null);
+ok("reapplyEmphasis: isaretsizde aynen", C.reapplyEmphasis("a b", "a c") === "a c");
+ok("normalizeEmphasis: **x** -> *x*", C.normalizeEmphasis("bu **önemli** an") === "bu *önemli* an");
+ok("AI kontrolu isaretsiz metin gonderir", /originals\.slice\(i, i \+ BATCH\)\.map\(CT\.stripEmphasis\)/.test(src));
+ok("ceviri istemi isaretleri korumayi ister", /wrap the corresponding translated words in single asterisks/.test(src));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

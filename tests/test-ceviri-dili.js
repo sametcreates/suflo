@@ -19,7 +19,10 @@ var M = new Function("DOM", "SEG", [
 var DOM = { "cap-case": { value: "upper" }, "cap-punct": { checked: true }, "cap-lang": { value: "tr" } };
 var segs = [{ text: "this is it", orig: "işte bu" }];
 var m = M(DOM, segs);
-ok("ceviri yokken (dil bilinmiyor) kaynak kurali: Turkce İ", m.styleText("bir şey") === "BİR ŞEY");
+ok("eski taslak (hedef dil kayitsiz), Ingilizce ceviri: THIS (THİS degil)", m.styleText("this is it") === "THIS IS IT", m.styleText("this is it"));
+segs[0] = { text: "bu bir şey", orig: "this is a thing" };
+ok("eski taslak, Turkceye ceviri: Turkce İ kurali tahmin edilir", m.styleText("bir şey") === "BİR ŞEY", m.styleText("bir şey"));
+segs[0] = { text: "this is it", orig: "işte bu" };
 m.set("en");
 ok("Ingilizceye cevrilmis metin BUYUK HARF'te 'THIS' (THİS degil)", m.styleText("this is it") === "THIS IS IT", m.styleText("this is it"));
 ok("orijinal (kaynakDili) metin hala Turkce kuralla", m.styleText("işte bu", true) === "İŞTE BU", m.styleText("işte bu", true));
