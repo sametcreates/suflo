@@ -18,6 +18,7 @@ window.KCaptions = (function () {
   var mogrtVitriniIsi = null;
   var aktifMogrtOnizlemeDurdur = null;
   var secilenMogrt = null;
+  var secilenMotorStili = "";   // Suflo stil motoru (kendi animasyonlu stillerimiz): overlay yolu
   var bekleyenMogrtYolu = "";
   var mogrtBaglam = { width: 0, height: 0 };
 
@@ -724,10 +725,27 @@ window.KCaptions = (function () {
     }
   };
 
+  // Stil motorundaki her stil (yeni eklenenler dahil) tek kaynaktan sablon olur
+  if (window.SufloStyleEngine) {
+    window.SufloStyleEngine.list().forEach(function (mp) {
+      if (!PRESETS[mp.id]) PRESETS[mp.id] = motorPreset(mp.id);
+    });
+  }
+
+  function motorStiliMi(id) { return !!(window.SufloStyleEngine && window.SufloStyleEngine.has(id)); }
+
+  // Altyazi verisinin bicimi: kelime stilleri satir altyazisini kelimelere boler
+  function motorCueTuru() {
+    if (!segments.length || segmentsMode === "k1") return "words";
+    if (segmentsMode === "kc") return "cumulative";
+    return "lines";
+  }
+
   function applyPreset(key) {
     var p = (key === "user") ? K.settings().userPreset : PRESETS[key];
     if (!p) return;
     secilenMogrt = null;
+    secilenMotorStili = motorStiliMi(key) ? key : "";
     bekleyenMogrtYolu = "";
     el("cap-maxlen").value = p.maxlen;
     el("cap-case").value = p.kase;
@@ -850,7 +868,14 @@ window.KCaptions = (function () {
   function uygulamaIpucunuGuncelle() {
     var hint = el("cap-apply-hint");
     var styleBtn = el("cap-apply-style");
-    if (secilenMogrt) {
+    if (!secilenMogrt && secilenMotorStili) {
+      var mAd = (window.SufloStyleEngine.preset(secilenMotorStili) || {}).name || secilenMotorStili;
+      if (hint) hint.textContent = mAd + " seçili: Suflo altyazıyı şeffaf bir video katmanı olarak üretip timeline'ın üst kanalına koyar. Normal caption izi her zaman kullanılabilir.";
+      if (styleBtn) {
+        styleBtn.disabled = false;
+        if (kaliteOnayBekleyen !== "style") styleBtn.textContent = mAd + " ile ekle";
+      }
+    } else if (secilenMogrt) {
       if (hint) hint.textContent = "Normal caption izi her zaman kullanılabilir. " + temizMogrtAdi(secilenMogrt) + " seçili; stil düğmesi MOGRT animasyonunu tüm altyazılara uygular.";
       if (styleBtn) {
         styleBtn.disabled = false;
@@ -865,6 +890,7 @@ window.KCaptions = (function () {
   function mogrtStiliniSec(item) {
     if (typeof Pro !== "undefined" && !Pro.gate("mogrt")) return;
     secilenMogrt = item;
+    secilenMotorStili = "";
     bekleyenMogrtYolu = "";
     if (el("cap-style-family")) el("cap-style-family").value = "mogrt";
     if (el("cap-preset")) el("cap-preset").value = "";
@@ -873,6 +899,83 @@ window.KCaptions = (function () {
     onizlemeDurdur();
     onizlemeCiz();
     savePrefs();
+  }
+
+  /*
+   * Suflo Stilleri: kendi stil motorumuzun animasyonlu stilleri. MOGRT
+   * gerektirmez; secilince canli onizleme gercek libass ciktisini oynatir,
+   * "ile ekle" seffaf bir video katmani uretip timeline'a koyar.
+   */
+  function motorStilleriniCiz() {
+    var grid = el("cap-stil-grid");
+    if (!grid || !window.SufloStyleEngine) return;
+    Array.prototype.forEach.call(grid.querySelectorAll(".stil-motor-head,.stil-motor"), function (n) { n.remove(); });
+    var kilitli = typeof Pro !== "undefined" && !Pro.isPro();
+    var frag = document.createDocumentFragment();
+    var head = document.createElement("div");
+    head.className = "stil-mogrt-head stil-motor-head";
+    var hb = document.createElement("b");
+    hb.textContent = "Suflo Stilleri";
+    var hs = document.createElement("span");
+    hs.textContent = window.SufloStyleEngine.list().length + " animasyonlu stil · After Effects gerekmez";
+    head.appendChild(hb); head.appendChild(hs);
+    frag.appendChild(head);
+    var sel = el("cap-preset");
+    window.SufloStyleEngine.list().forEach(function (mp) {
+      // gizli select eski kodun okudugu degeri tasir: yeni stillerin secenegi de olsun
+      if (sel && !sel.querySelector('option[value="' + mp.id + '"]')) {
+        var opt = document.createElement("option");
+        opt.value = mp.id; opt.textContent = mp.name;
+        sel.appendChild(opt);
+      }
+      var st = mp.style;
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "stil-sec stil-motor stil-motor-" + mp.id;
+      card.dataset.preset = mp.id;
+      card.setAttribute("aria-label", mp.name + " · " + mp.description);
+      var badge = document.createElement("span");
+      badge.className = "ss-rozet";
+      badge.textContent = "SUFLO";   // kilit rozetini Pro modulu kendisi ekliyor
+      var scene = document.createElement("span");
+      scene.className = "ss-sahne";
+      var ornek = document.createElement("span");
+      ornek.className = "sm-ornek";
+      ornek.style.fontFamily = '"' + st.font + '", sans-serif';
+      ornek.style.color = st.renk;
+      ornek.style.setProperty("--sm-vurgu", st.vurguRenk);
+      ornek.style.setProperty("--sm-kontur", st.konturRenk);
+      var kelimeler = mp.text.kase === "upper" ? ["BUNU", "SAKIN", "KAÇIRMA"] : ["Bunu", "sakın", "kaçırma"];
+      kelimeler.forEach(function (k, i) {
+        var w = document.createElement("span");   // <i> degil: .stil-sec i kurali kucultup soluklastiriyor
+        w.className = "sm-k";
+        w.textContent = k;
+        if (i === 1) w.className += " sm-aktif";
+        ornek.appendChild(w);
+        if (i < kelimeler.length - 1) ornek.appendChild(document.createTextNode(" "));
+      });
+      scene.appendChild(ornek);
+      var info = document.createElement("span");
+      info.className = "ss-bilgi";
+      var title = document.createElement("b");
+      title.textContent = mp.name;
+      var sub = document.createElement("i");
+      sub.textContent = mp.description;
+      info.appendChild(title); info.appendChild(sub);
+      card.appendChild(badge); card.appendChild(scene); card.appendChild(info);
+      card.addEventListener("click", function () {
+        // Onizleme herkese acik; timeline'a ekleme Pro (overlay) kapisinda
+        if (el("cap-preset")) el("cap-preset").value = mp.id;
+        if (el("cap-style-family")) el("cap-style-family").value = "motor";
+        applyPreset(mp.id);
+        savePrefs();
+        if (onizlemeSaat) onizlemeDurdur();
+        onizlemeOynat();
+      });
+      frag.appendChild(card);
+    });
+    grid.insertBefore(frag, grid.firstChild);
+    if (secilenMotorStili && !secilenMogrt) stilKartiIsaretle(secilenMotorStili);
   }
 
   function mogrtStilleriniCiz() {
@@ -1127,7 +1230,7 @@ window.KCaptions = (function () {
     "Bebas Neue": "BebasNeue.ttf",
     "Bungee": "Bungee.ttf",
     "Lora": "Lora.ttf",
-    "Montserrat": "Montserrat.ttf"
+    "Montserrat": "Montserrat-Bold.ttf"   // statik Bold: libass degisken fontu secemiyor, DejaVu'ya dusuyordu
   };
 
   function uzantiDizini() {
@@ -1158,6 +1261,7 @@ window.KCaptions = (function () {
         punct: el("cap-punct").checked,
         preset: el("cap-preset").value,
         mogrtPath: secilenMogrt && secilenMogrt.path ? secilenMogrt.path : "",
+        motorStili: secilenMogrt ? "" : secilenMotorStili,
         stil: st
       };
       K.saveSettings();
@@ -1174,6 +1278,7 @@ window.KCaptions = (function () {
       if (p.punct !== undefined) el("cap-punct").checked = p.punct;
       if (p.preset !== undefined) el("cap-preset").value = p.preset;
       bekleyenMogrtYolu = p.mogrtPath || "";
+      secilenMotorStili = !p.mogrtPath && motorStiliMi(p.motorStili) ? p.motorStili : "";
       stiliYaz(p.stil);
     } catch (e) {}
   }
@@ -2643,8 +2748,7 @@ window.KCaptions = (function () {
 
   async function motorOnizlemeOynat() {
     var st = stil();
-    var destekli = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
-    if (!K.nodeOK || !window.SufloStyleEngine || !destekli[st.aile]) return false;
+    if (!K.nodeOK || !motorStiliMi(st.aile)) return false;
     var ff = await K.findFfmpeg();
     if (!ff) return false;
 
@@ -2668,6 +2772,7 @@ window.KCaptions = (function () {
       var cues = motorOnizlemeCueleri(st);
       var built = window.SufloStyleEngine.compile({
         styleId: st.aile, intensity: st.yogunluk, cues: cues, width: 960, height: 540,
+        cueKind: cueler().length ? motorCueTuru() : "words",
         overrides: {
           font: st.font, fontFile: fontDosyasi, boyut: st.boyut,
           renk: st.renk, konturRenk: st.konturRenk, vurguRenk: st.vurguRenk,
@@ -3136,11 +3241,9 @@ window.KCaptions = (function () {
     var b = el("cap-apply");
     if (b) { b.textContent = UYGULA_ETIKET; b.classList.remove("warn"); }
     var styleBtn = el("cap-apply-style");
-    if (styleBtn) {
-      styleBtn.disabled = !secilenMogrt;
-      styleBtn.textContent = secilenMogrt ? temizMogrtAdi(secilenMogrt) + " ile ekle" : "Stil seçerek ekle";
-      styleBtn.classList.remove("warn");
-    }
+    if (styleBtn) styleBtn.classList.remove("warn");
+    // Stil dugmesinin metni/durumu tek yerde: MOGRT ve Suflo Stilleri ayni kurala uyar
+    uygulamaIpucunuGuncelle();
   }
 
   /* ---------------- Animasyonlu altyazı: timeline'a overlay ---------------- */
@@ -3251,12 +3354,12 @@ window.KCaptions = (function () {
 
       var st = stil();
       var stilDerlemesi = null;
-      var yeniStiller = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
       var ass;
-      if (window.SufloStyleEngine && yeniStiller[st.aile]) {
+      if (motorStiliMi(st.aile)) {
         stilDerlemesi = window.SufloStyleEngine.compile({
           styleId: st.aile,
           intensity: st.yogunluk,
+          cueKind: motorCueTuru(),
           cues: cs,
           offset: baslangic,
           width: g,
@@ -3363,7 +3466,7 @@ window.KCaptions = (function () {
   async function apply(stilIle) {
     if (segments.length === 0) return;
     stilIle = stilIle === true;
-    if (stilIle && !secilenMogrt) {
+    if (stilIle && !secilenMogrt && !secilenMotorStili) {
       KApp.toast("Önce Altyazı ayarlarından bir stil seç.", "warn");
       return;
     }
@@ -3389,6 +3492,11 @@ window.KCaptions = (function () {
         uyari += (uyari ? " " : "") + "Bu sekansa zaten altyazı uygulandı; devam etmek yeni bir altyazı izi ekler.";
       }
       KApp.toast(uyari, "warn", 9000);
+      return;
+    }
+    if (stilIle && !secilenMogrt && secilenMotorStili) {
+      await overlayUygula();             // Pro kapisi overlayUygula icinde
+      uygulaEtiketiniSifirla();
       return;
     }
     if (stilIle) {
@@ -4022,10 +4130,9 @@ window.KCaptions = (function () {
       } else if (fmt === "ass") {
         if (typeof Pro !== "undefined" && !Pro.gate("assexport")) return;    // Pro: stilli ASS
         var assStil = stil();
-        var yeniAss = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
-        if (window.SufloStyleEngine && yeniAss[assStil.aile]) {
+        if (motorStiliMi(assStil.aile)) {
           icerik = window.SufloStyleEngine.compile({
-            styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler(),
+            styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler(), cueKind: motorCueTuru(),
             overrides: {
               font: assStil.font, fontFile: FONTLAR[assStil.font], boyut: assStil.boyut,
               renk: assStil.renk, konturRenk: assStil.konturRenk,
@@ -4088,6 +4195,7 @@ window.KCaptions = (function () {
     });
     initYildizBar();
     initStilKartlari();
+    motorStilleriniCiz();
     initEmoji();
     // acilista secili sablonu kartlara yansit
     if (el("cap-preset") && el("cap-preset").value) stilKartiIsaretle(el("cap-preset").value);
@@ -4238,6 +4346,7 @@ window.KCaptions = (function () {
     glossaryText: glossaryText,
     parseGlossary: parseGlossary,
     getSegments: segmentsSnapshot,
+    refreshEngineStyles: motorStilleriniCiz,
     transcribeWords: transcribeWords,
     // Bulut LLM (Groq/OpenAI) — ceviri ile ayni ayar ve anahtar
     chatConfig: chatConfig,

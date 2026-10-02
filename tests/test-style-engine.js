@@ -14,17 +14,24 @@ function ok(name, condition, proof) {
 
 var styles = engine.list();
 ok("motor v3 etkin", engine.version === 3, engine.version);
-ok("yedi bagimsiz stil var", styles.map(function (s) { return s.id; }).join(",") === "mrbeast,capcut,saas,viral,pop,doc,premium",
+ok("12 bagimsiz stil var (7 klasik + 5 v3.0)", styles.map(function (s) { return s.id; }).join(",") ===
+  "mrbeast,capcut,saas,viral,pop,doc,premium,hormozi,neon,daktilo,ziplama,dolgu",
   styles.map(function (s) { return s.id; }).join(","));
+ok("has(): bilinen/bilinmeyen stil", engine.has("neon") && !engine.has("yok"));
 
 var expectedFonts = {
   mrbeast: ["ArchivoBlack.ttf", "OFL-ArchivoBlack.txt"],
-  capcut: ["Montserrat.ttf", "OFL-Montserrat.txt"],
-  saas: ["Montserrat.ttf", "OFL-Montserrat.txt"],
+  capcut: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"],
+  saas: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"],
   viral: ["ArchivoBlack.ttf", "OFL-ArchivoBlack.txt"],
   pop: ["Bungee.ttf", "OFL-Bungee.txt"],
   doc: ["Lora.ttf", "OFL-Lora.txt"],
-  premium: ["Montserrat.ttf", "OFL-Montserrat.txt"]
+  premium: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"],
+  hormozi: ["Anton.ttf", "OFL-Anton.txt"],
+  neon: ["BebasNeue.ttf", "OFL-BebasNeue.txt"],
+  daktilo: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"],
+  ziplama: ["ArchivoBlack.ttf", "OFL-ArchivoBlack.txt"],
+  dolgu: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"]
 };
 Object.keys(expectedFonts).forEach(function (id) {
   expectedFonts[id].forEach(function (file) {
@@ -38,7 +45,7 @@ var wordCues = words.map(function (word, i) {
 });
 var docCues = [{ start: 0, end: 2.5, text: "Hikâyenin başladığı yer, İstanbul'du." }];
 var compiled = {};
-["mrbeast", "capcut", "saas", "viral", "pop", "doc", "premium"].forEach(function (id) {
+styles.map(function (s) { return s.id; }).forEach(function (id) {
   compiled[id] = engine.compile({ styleId: id, cues: id === "doc" ? docCues : wordCues, width: 1280, height: 720 });
   ok(id + " ASS olay uretti", compiled[id].eventCount > 0, compiled[id].eventCount + " olay");
   ok(id + " Turkce metni koruyor", /BUNU|Hikâyenin/.test(compiled[id].ass));
@@ -58,7 +65,20 @@ ok("capcut kompakt pill + aktif kelime",
   compiled.capcut.eventCount >= 6 && /\\p1/.test(compiled.capcut.ass) && /B8FF5A|5AFFB8/i.test(compiled.capcut.ass), compiled.capcut.eventCount);
 ok("saas cam panel + nokta + yumusak hareket",
   compiled.saas.eventCount >= 8 && /\\blur/.test(compiled.saas.ass) && /\\move\(/.test(compiled.saas.ass), compiled.saas.eventCount);
-ok("yedi stilin ASS ciktisi birbirinden farkli", new Set(Object.keys(compiled).map(function (k) { return compiled[k].ass; })).size === 7);
+ok("tum stillerin ASS ciktisi birbirinden farkli", new Set(Object.keys(compiled).map(function (k) { return compiled[k].ass; })).size === styles.length);
+
+/* ---- v3.0: satir altyazisi kelime stillerinde dogru bolunur ---- */
+var satirlar = [{ start: 0, end: 1.6, text: "Bunu gören herkes şaşırdı" }, { start: 1.7, end: 3.2, text: "İstanbul çok güzel" }];
+var bolunmus = engine.splitToWords(satirlar);
+ok("splitToWords: 7 kelime, sure korunur", bolunmus.length === 7 && bolunmus[0].start === 0 && Math.abs(bolunmus[3].end - 1.6) < 1e-9 && bolunmus[4].start === 1.7,
+  JSON.stringify(bolunmus.map(function (w) { return [w.text, +w.start.toFixed(2), +w.end.toFixed(2)]; })));
+ok("splitToWords: satir sonu isaretli", bolunmus[3].lineEnd === true && !bolunmus[2].lineEnd);
+var hz = engine.compile({ styleId: "hormozi", cues: satirlar, cueKind: "lines", width: 1280, height: 720 }).ass;
+ok("kelime stili gruplari satir sinirini asmaz", !/şaşırdı[^\n]*İstanbul/.test(hz) && /İstanbul/.test(hz));
+ok("birikimli cue'dan son kelime", engine.lastWords([{ start: 0, end: 1, text: "bir" }, { start: 1, end: 2, text: "bir iki" }])[1].text === "iki");
+ok("dolgu \\kf karaoke etiketleri", /\\kf\d+/.test(compiled.dolgu.ass));
+ok("neon bulanik parilti katmani", /\\blur\d/.test(compiled.neon.ass) && /\\1a&HFF&/.test(compiled.neon.ass));
+ok("ziplama esneme hareketi", /\\fscx70\\fscy140/.test(compiled.ziplama.ass));
 
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
 if (!ffmpeg) {
@@ -78,8 +98,15 @@ if (!ffmpeg) {
       "-ss", "0.7", "-frames:v", "1", png], { cwd: tmp, encoding: "utf8" });
     ok(id + " gercek libass render", r.status === 0 && fs.existsSync(png) && fs.statSync(png).size > 2000,
       r.status + " / " + (fs.existsSync(png) ? fs.statSync(png).size : 0) + " B");
-    ok(id + " kendi fontunu kullaniyor", String(r.stderr).toLowerCase().indexOf(engine.preset(id).style.font.toLowerCase()) !== -1,
-      engine.preset(id).style.font);
+    // libass'in GERCEKTE sectigi font: "fontselect: (Aile, 700, 0) -> secilen". Yalniz dosyanin
+    // yuklendigini gormek yetmez — degisken Montserrat yuklenip DejaVu'ya dusuyordu.
+    var secimler = String(r.stderr).split(/\r?\n/).filter(function (l) { return /fontselect:/.test(l); });
+    var aile = engine.preset(id).style.font.toLowerCase().replace(/\s+/g, "");
+    var dogru = secimler.length > 0 && secimler.every(function (l) {
+      var hedef = l.split("->")[1] || "";
+      return hedef.toLowerCase().replace(/\s+/g, "").indexOf(aile) !== -1;
+    });
+    ok(id + " kendi fontunu kullaniyor (yedege dusmuyor)", dogru, secimler.join(" | ").slice(0, 180));
   });
   if (process.env.SUFLO_KEEP_STYLE_TEST) console.log("PREVIEW_DIR=" + tmp);
   else try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e2) {}

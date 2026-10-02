@@ -23,14 +23,14 @@
     capcut: {
       id: "capcut", name: "CapCut Clean", description: "Temiz kelime vurgusu ve kompakt pill",
       text: { maxlen: "k1", kase: "normal", punct: false },
-      style: { aile: "capcut", yogunluk: "balanced", font: "Montserrat", fontFile: "Montserrat.ttf",
+      style: { aile: "capcut", yogunluk: "balanced", font: "Montserrat", fontFile: "Montserrat-Bold.ttf",
         boyut: 78, renk: "#ffffff", konturRenk: "#07090d", vurguRenk: "#b8ff5a",
         kontur: 1, konum: 5, kutu: true, animasyon: "capcut" }
     },
     saas: {
       id: "saas", name: "SaaS Glass", description: "Apple sadeliginde cam altyazi sistemi",
       text: { maxlen: "k1", kase: "normal", punct: true },
-      style: { aile: "saas", yogunluk: "soft", font: "Montserrat", fontFile: "Montserrat.ttf",
+      style: { aile: "saas", yogunluk: "soft", font: "Montserrat", fontFile: "Montserrat-Bold.ttf",
         boyut: 66, renk: "#f8f9ff", konturRenk: "#090a0f", vurguRenk: "#a9a7ff",
         kontur: 0, konum: 5, kutu: true, animasyon: "saas" }
     },
@@ -58,13 +58,84 @@
     premium: {
       id: "premium", name: "Premium", description: "Sinematik başlık sistemi",
       text: { maxlen: "k1", kase: "upper", punct: false },
-      style: { aile: "premium", yogunluk: "soft", font: "Montserrat", fontFile: "Montserrat.ttf",
+      style: { aile: "premium", yogunluk: "soft", font: "Montserrat", fontFile: "Montserrat-Bold.ttf",
         boyut: 98, renk: "#f7f5ef", konturRenk: "#08090c", vurguRenk: "#d9bc74",
         kontur: 1, konum: 5, kutu: false, animasyon: "premium" }
+    }
+    ,
+    // ---- v3.0: Suflo'nun kendi animasyonlu stilleri ----
+    hormozi: {
+      id: "hormozi", name: "Hormozi", description: "Kalın büyük harf, aktif kelime renk değiştirip zıplar",
+      text: { maxlen: "k1", kase: "upper", punct: false },
+      style: { aile: "hormozi", yogunluk: "hard", font: "Anton", fontFile: "Anton.ttf",
+        boyut: 124, renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe600",
+        kontur: 8, konum: 5, kutu: false, animasyon: "hormozi" }
+    },
+    neon: {
+      id: "neon", name: "Neon", description: "Parlayan neon ışık, aktif kelime yanar",
+      text: { maxlen: "k1", kase: "upper", punct: false },
+      style: { aile: "neon", yogunluk: "balanced", font: "Bebas Neue", fontFile: "BebasNeue.ttf",
+        boyut: 118, renk: "#f4fbff", konturRenk: "#0b1020", vurguRenk: "#2af5ff",
+        kontur: 2, konum: 5, kutu: false, animasyon: "neon" }
+    },
+    daktilo: {
+      id: "daktilo", name: "Daktilo", description: "Kelimeler yazılıyormuş gibi tek tek belirir",
+      text: { maxlen: "k1", kase: "normal", punct: true },
+      style: { aile: "daktilo", yogunluk: "soft", font: "Montserrat", fontFile: "Montserrat-Bold.ttf",
+        boyut: 70, renk: "#ffffff", konturRenk: "#0a0c12", vurguRenk: "#7cf0a0",
+        kontur: 3, konum: 2, kutu: false, animasyon: "daktilo" }
+    },
+    ziplama: {
+      id: "ziplama", name: "Zıplayan", description: "Her kelime yukarıdan düşüp esneyerek yerine oturur",
+      text: { maxlen: "k1", kase: "upper", punct: false },
+      style: { aile: "ziplama", yogunluk: "balanced", font: "Archivo Black", fontFile: "ArchivoBlack.ttf",
+        boyut: 104, renk: "#ffffff", konturRenk: "#111111", vurguRenk: "#ff5f7a",
+        kontur: 7, konum: 5, kutu: false, animasyon: "ziplama" }
+    },
+    dolgu: {
+      id: "dolgu", name: "Karaoke Dolgu", description: "Satır konuşmayla birlikte soldan sağa dolar",
+      text: { maxlen: "k1", kase: "normal", punct: false },
+      style: { aile: "dolgu", yogunluk: "soft", font: "Montserrat", fontFile: "Montserrat-Bold.ttf",
+        boyut: 78, renk: "#ffffff", konturRenk: "#0a0a0f", vurguRenk: "#8b7cf6",
+        kontur: 4, konum: 2, kutu: false, animasyon: "dolgu" }
     }
   };
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function has(id) { return !!STYLES[id]; }
+  // Kelime zamanli stil mi (satir modundaki altyazi once kelimelere bolunur)
+  function wordBased(id) { return !!STYLES[id] && /^k/.test(STYLES[id].text.maxlen); }
+
+  /*
+   * Satir cue'larini kelime cue'larina bol: sure, kelime uzunluguyla orantili
+   * paylastirilir. Gercek kelime zamani olmayan (SRT/satir modu) altyazilarda
+   * kelime stillerinin anlamli calismasini saglar.
+   */
+  function splitToWords(cues) {
+    var out = [];
+    (cues || []).forEach(function (cue) {
+      var words = String(cue.text || "").trim().split(/\s+/).filter(Boolean);
+      var start = Number(cue.start || 0), end = Number(cue.end || 0);
+      if (words.length <= 1) { if (words.length) out.push({ start: start, end: end, text: words[0], lineEnd: true }); return; }
+      var weights = words.map(function (w) { return w.length + 1; });
+      var total = weights.reduce(function (a, b) { return a + b; }, 0);
+      var t = start;
+      words.forEach(function (w, i) {
+        var d = (end - start) * weights[i] / total;
+        out.push({ start: t, end: i === words.length - 1 ? end : t + d, text: w, lineEnd: i === words.length - 1 });
+        t += d;
+      });
+    });
+    return out;
+  }
+
+  // Birikimli karaoke cue'lari ("bir", "bir iki", ...) -> her cue'nun son kelimesi
+  function lastWords(cues) {
+    return (cues || []).map(function (cue) {
+      var words = String(cue.text || "").trim().split(/\s+/).filter(Boolean);
+      return { start: cue.start, end: cue.end, text: words[words.length - 1] || "" };
+    }).filter(function (c) { return c.text; });
+  }
   function preset(id) { return STYLES[id] ? clone(STYLES[id]) : null; }
   function list() { return Object.keys(STYLES).map(function (id) { return preset(id); }); }
 
@@ -116,7 +187,8 @@
       current.push(cue);
       var next = cues[index + 1];
       var gap = next ? next.start - cue.end : 99;
-      if (current.length >= limit || gap > 0.7 || /[.!?…]$/.test(cue.text)) flush();
+      // lineEnd: satirdan bolunmus kelimelerde gruplar satir sinirini asmaz
+      if (current.length >= limit || gap > 0.7 || cue.lineEnd || /[.!?…]$/.test(cue.text)) flush();
     });
     flush();
     return groups;
@@ -472,6 +544,123 @@
     return events;
   }
 
+  // Hormozi: buyuk harf, aktif kelime sari/yesil donusumlu renk + pop
+  function renderHormozi(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "hormozi", width, height);
+    var fs = scaled(style.boyut, height), outline = Math.max(3, scaled(style.kontur, height));
+    var renkler = [style.vurguRenk, "#3dff6e"];
+    groupWords(cues, 3).forEach(function (group, gi) {
+      var end = group[group.length - 1].end;
+      var vurgu = assColor(renkler[gi % 2]), normal = assColor(style.renk);
+      group.forEach(function (cue, active) {
+        var activeEnd = active + 1 < group.length ? group[active + 1].start : end;
+        activeEnd = Math.max(cue.start + .08, activeEnd);
+        var ms = Math.round(90 / factor), over = Math.round(112 + factor * 4);
+        var words = group.map(function (c, i) {
+          var w = esc(c.text);
+          if (i !== active) return w;
+          return "{\\1c" + vurgu + "\\fscx86\\fscy86\\t(0," + ms + ",\\fscx" + over + "\\fscy" + over + ")" +
+            "\\t(" + ms + "," + (ms + 80) + ",\\fscx100\\fscy100)}" + w + "{\\1c" + normal + "\\fscx100\\fscy100}";
+        });
+        events.push(dialogue(1, cue.start, activeEnd, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
+          "\\1c" + normal + "\\3c" + assColor(style.konturRenk) + "\\bord" + outline +
+          "\\shad" + scaled(5, height) + "\\4c" + assColor("#000000", 0x60) + "}" + words.join(" ")));
+      });
+    });
+    return events;
+  }
+
+  // Neon: bulanik renkli parilti katmani + ince cizgili beyaz metin; aktif kelime yanar
+  function renderNeon(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "neon", width, height);
+    var fs = scaled(style.boyut, height);
+    var glow = assColor(style.vurguRenk), beyaz = assColor(style.renk), soluk = assColor(style.renk, 0x70);
+    groupWords(cues, 4).forEach(function (group) {
+      var start = group[0].start, end = group[group.length - 1].end;
+      var plain = group.map(function (c) { return esc(c.text); }).join(" ");
+      var flicker = "\\alpha&HFF&\\t(0,60,\\alpha&H40&)\\t(60,110,\\alpha&HB0&)\\t(110," + Math.round(200 / factor) + ",\\alpha&H00&)";
+      events.push(dialogue(0, start, end, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2\\1a&HFF&" +
+        "\\3c" + glow + "\\bord" + scaled(10, height) + "\\blur" + scaled(14, height) + "\\shad0" + flicker + "\\fad(0,180)}" + plain));
+      group.forEach(function (cue, active) {
+        var activeEnd = active + 1 < group.length ? group[active + 1].start : end;
+        activeEnd = Math.max(cue.start + .08, activeEnd);
+        var words = group.map(function (c, i) {
+          return (i === active ? "{\\1c" + beyaz + "\\3c" + glow + "\\blur1}" : "{\\1c" + soluk + "\\3c" + glow + "\\blur0}") + esc(c.text);
+        });
+        events.push(dialogue(1, cue.start, activeEnd, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
+          "\\bord" + Math.max(1, scaled(style.kontur, height)) + "\\shad0}" + words.join(" ")));
+      });
+    });
+    return events;
+  }
+
+  // Daktilo: kelimeler sirayla belirir, sonda yanip sonen imlec
+  function renderDaktilo(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "daktilo", width, height);
+    var fs = scaled(style.boyut, height), outline = Math.max(1, scaled(style.kontur, height));
+    var imlec = assColor(style.vurguRenk);
+    groupWords(cues, 6).forEach(function (group) {
+      var end = group[group.length - 1].end;
+      group.forEach(function (cue, k) {
+        var stepEnd = k + 1 < group.length ? group[k + 1].start : end;
+        stepEnd = Math.max(cue.start + .06, stepEnd);
+        var yazilan = group.slice(0, k + 1).map(function (c) { return esc(c.text); }).join(" ");
+        var gizli = group.slice(k + 1).map(function (c) { return esc(c.text); }).join(" ");
+        // Gizli kalan kelimeler de seffaf yazilir: satir genisligi sabit kalir, metin kaymaz
+        var metin = yazilan + "{\\1c" + imlec + "\\t(0,260,\\alpha&HFF&)}_" + "{\\alpha&HFF&}" + (gizli ? " " + gizli : "");
+        events.push(dialogue(1, cue.start, stepEnd, "{\\an" + a.an + "\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
+          "\\1c" + assColor(style.renk) + "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad0}" + metin));
+      });
+    });
+    return events;
+  }
+
+  // Ziplayan: son gelen kelime yukaridan dusup esneyerek oturur, oncekiler kalir
+  function renderZiplama(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "ziplama", width, height);
+    var fs = scaled(style.boyut, height), outline = Math.max(2, scaled(style.kontur, height));
+    var vurgu = assColor(style.vurguRenk), normal = assColor(style.renk);
+    groupWords(cues, 3).forEach(function (group) {
+      var end = group[group.length - 1].end;
+      group.forEach(function (cue, k) {
+        var stepEnd = k + 1 < group.length ? group[k + 1].start : end;
+        stepEnd = Math.max(cue.start + .08, stepEnd);
+        var t1 = Math.round(110 / factor), t2 = t1 + Math.round(90 / factor), t3 = t2 + 70;
+        var words = group.map(function (c, i) {
+          var w = esc(c.text);
+          if (i > k) return "{\\alpha&HFF&}" + w + "{\\alpha&H00&}";
+          if (i < k) return w;
+          return "{\\1c" + vurgu + "\\fscx70\\fscy140\\t(0," + t1 + ",\\fscx118\\fscy82)" +
+            "\\t(" + t1 + "," + t2 + ",\\fscx94\\fscy108)\\t(" + t2 + "," + t3 + ",\\fscx100\\fscy100)}" + w +
+            "{\\1c" + normal + "\\fscx100\\fscy100}";
+        });
+        events.push(dialogue(1, cue.start, stepEnd, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
+          "\\1c" + normal + "\\3c" + assColor(style.konturRenk) + "\\bord" + outline +
+          "\\shad" + scaled(4, height) + "}" + words.join(" ")));
+      });
+    });
+    return events;
+  }
+
+  // Karaoke dolgu: \kf ile satir konusma hizinda soldan saga renklenir
+  function renderDolgu(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "dolgu", width, height);
+    var fs = scaled(style.boyut, height), outline = Math.max(1, scaled(style.kontur, height));
+    groupWords(cues, 6).forEach(function (group) {
+      var start = group[0].start, end = group[group.length - 1].end;
+      var parts = group.map(function (c, i) {
+        var next = group[i + 1];
+        var dur = Math.max(.05, (next ? next.start : c.end) - c.start);
+        return "{\\kf" + Math.round(dur * 100) + "}" + esc(c.text) + (next ? " " : "");
+      });
+      events.push(dialogue(1, start, end, "{\\an" + (a.an || 5) + "\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
+        "\\1c" + assColor(style.vurguRenk) + "\\2c" + assColor(style.renk) +
+        "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad" + scaled(2, height) +
+        "\\fad(" + Math.round(120 / factor) + ",120)}" + parts.join("")));
+    });
+    return events;
+  }
+
   function compile(options) {
     options = options || {};
     var id = STYLES[options.styleId] ? options.styleId : "viral";
@@ -480,6 +669,11 @@
     var width = Math.max(320, Math.round(options.width || 1920));
     var height = Math.max(180, Math.round(options.height || 1080));
     var cues = normaliseCues(options.cues, options.offset);
+    // Kelime stilleri kelime cue'su ister: satir/birikimli altyazi once donusturulur
+    if (wordBased(id)) {
+      if (options.cueKind === "lines") cues = splitToWords(cues);
+      else if (options.cueKind === "cumulative") cues = lastWords(cues);
+    }
     var factor = intensity(options.intensity || style.yogunluk);
     var events;
     if (id === "mrbeast") events = renderMrBeast(cues, style, width, height, factor);
@@ -488,6 +682,11 @@
     else if (id === "pop") events = renderPop(cues, style, width, height, factor);
     else if (id === "doc") events = renderDoc(cues, style, width, height, factor);
     else if (id === "premium") events = renderPremium(cues, style, width, height, factor);
+    else if (id === "hormozi") events = renderHormozi(cues, style, width, height, factor);
+    else if (id === "neon") events = renderNeon(cues, style, width, height, factor);
+    else if (id === "daktilo") events = renderDaktilo(cues, style, width, height, factor);
+    else if (id === "ziplama") events = renderZiplama(cues, style, width, height, factor);
+    else if (id === "dolgu") events = renderDolgu(cues, style, width, height, factor);
     else events = renderViral(cues, style, width, height, factor);
 
     return {
@@ -504,6 +703,10 @@
     version: 3,
     preset: preset,
     list: list,
+    has: has,
+    wordBased: wordBased,
+    splitToWords: splitToWords,
+    lastWords: lastWords,
     compile: compile,
     assColor: assColor,
     timecode: timecode

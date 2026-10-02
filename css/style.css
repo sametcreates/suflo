@@ -3475,3 +3475,26 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .ch-row input.ch-time { width: 64px; flex: none; font-family: var(--mono, monospace); text-align: center; }
 .ch-row input.ch-title { flex: 1; min-width: 0; }
 .ch-row .ch-del { flex: none; }
+
+/* ---------- Suflo Stilleri: kendi motorumuzun kartlari (v3.0) ---------- */
+.stil-motor .ss-sahne { display: grid; place-items: center; padding: 8px; }
+.sm-ornek { font-size: 19px; line-height: 1.15; text-align: center; letter-spacing: .02em;
+  -webkit-text-stroke: 0; text-shadow: 0 0 0 transparent, 0 2px 0 var(--sm-kontur), 0 3px 8px rgba(0,0,0,.6); }
+.sm-ornek .sm-k { font-style: normal; display: inline-block; }
+.sm-ornek .sm-aktif { color: var(--sm-vurgu); }
+.stil-motor-hormozi .sm-ornek, .stil-motor-mrbeast .sm-ornek, .stil-motor-viral .sm-ornek, .stil-motor-ziplama .sm-ornek { font-size: 21px; }
+.stil-motor-hormozi .sm-aktif, .stil-motor-ziplama .sm-aktif, .stil-motor-mrbeast .sm-aktif { transform: scale(1.14); }
+.stil-motor-neon .sm-ornek { color: #f4fbff !important; text-shadow: 0 0 6px var(--sm-vurgu), 0 0 14px var(--sm-vurgu); }
+.stil-motor-neon .sm-ornek .sm-k:not(.sm-aktif) { opacity: .62; }
+.stil-motor-dolgu .sm-ornek .sm-k:first-child, .stil-motor-dolgu .sm-aktif { color: var(--sm-vurgu); }
+.stil-motor-dolgu .sm-ornek .sm-k:last-child { color: #fff; }
+.stil-motor-daktilo .sm-ornek .sm-k:last-child { opacity: 0; }
+.stil-motor-daktilo .sm-ornek .sm-aktif::after { content: "_"; color: var(--sm-vurgu); }
+.stil-motor-daktilo .sm-aktif { color: inherit; }
+.stil-motor-capcut .sm-ornek, .stil-motor-saas .sm-ornek { background: rgba(9,11,16,.78); padding: 5px 9px; border-radius: 9px; }
+.stil-motor-pop .sm-ornek .sm-k { background: #ff4fc8; color: #fff; padding: 1px 4px; border-radius: 4px; transform: rotate(-3deg); }
+.stil-motor-pop .sm-ornek .sm-aktif { background: #42ddff; color: #10131d; transform: rotate(3deg); }
+.stil-motor-doc .sm-ornek { font-size: 15px; border-left: 3px solid var(--sm-vurgu); padding: 4px 8px; background: rgba(7,16,22,.8); }
+.stil-motor-premium .sm-ornek { letter-spacing: .18em; font-size: 15px; }
+.stil-motor:hover .sm-aktif { animation: sm-vurus .5s var(--ease, ease) infinite alternate; }
+@keyframes sm-vurus { from { transform: scale(1); } to { transform: scale(1.16); } }
