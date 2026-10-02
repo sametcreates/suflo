@@ -22,6 +22,8 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Çeviri** | TR · AZ · EN · RU arası, satır satır |
 | **Terim sözlüğü** | Marka ve özel isimlerin doğru yazımını her transkriptte uygular |
 | **Dışa aktarma** | SRT · WebVTT · ASS (stilli, karaoke etiketli) · TXT |
+| **Bölümler** *(3.0)* | Konuşmadan YouTube bölümleri, AI başlık, kural denetimi, Chapter marker |
+| **Otomatik emoji** *(3.0)* | Satırın anlamına göre seyrek emoji, Türkçe ek dostu |
 
 ### Altyazı motorları
 
@@ -70,6 +72,9 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | Terim sözlüğü |
+| Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar ve duraksama temizliği, kelimeye tıklayıp kes |
+| — | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Hormozi, Neon, Daktilo…), MOGRT gerekmez |
+| — | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
 | Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Panelden uygulanan 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 1.076 SFX ve 30 Motion BG |
 | — | Smart SFX 2.0: yoğunluk, güven puanı, alternatifler, toplu ekleme ve dalga önizlemesi |
 | — | Kütüphane sağlık kontrolü ve destek raporu |
@@ -198,6 +203,10 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 |---|---|
 | `test-download.js` | Yarım kalan indirmenin devamı, hangi HTTP hatasında dosya korunur/silinir |
 | `test-caption-text.js` | Halüsinasyon temizliği, karaoke, satır bölme, Türkçe-duyarlı terim sözlüğü |
+| `test-textcut.js` | Konuşmadan kes: dolgu/tekrar algılama, kesim aralıkları, duraksama kısaltma |
+| `test-chapters.js` | YouTube bölümleri: öneri, kural denetimi, AI yanıtı ayrıştırma |
+| `test-auto-emoji.js` | Otomatik emoji: Türkçe kök eşleşmesi, yoğunluk ve tekrar koruması |
+| `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
 | `test-utf8.js` | Parça parça gelen HTTP yanıtlarında Türkçe harflerin bozulmaması |
 | `test-parse.js` | SRT/VTT ayrıştırma, etiket ve HTML varlık temizliği, BOM/CRLF |
 | `test-export.js` | SRT/VTT/ASS/TXT çıktıları (ffmpeg ile gerçekten ayrıştırılarak) |

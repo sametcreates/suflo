@@ -1,3 +1,28 @@
+## Suflo 3.0.0 — Yapay zekâ ile kurgu
+
+### Yeni
+- **Konuşmadan kes:** Kesim sekmesinde klibi kelime kelime yazıya döker; *ııı, eee, hmm* gibi dolgu seslerini, *"ben ben"* tekrarlarını ve uzun duraksamaları işaretler. Bir kelimeye tıkla, videodan da çıksın. Kopya sekansta uygulanır, orijinal bozulmaz. Türkçe, Azerice, İngilizce ve Rusça.
+- **Suflo Stilleri:** Kendi stil motorumuzla **12 animasyonlu altyazı stili** — yeni Hormozi, Neon, Daktilo, Zıplayan ve Karaoke Dolgu dahil. MOGRT gerekmez; seçince canlı önizleme oynar, "ile ekle" altyazıyı şeffaf video katmanı olarak timeline'a koyar. Premiere şablonları da yanında durur.
+- **Geçişler:** Yeni sekme. Playhead'i kesime getir, tek tıkla 13 geçişten birini uygula: zoom, whip (4 yön), itme, zıplama, punch, sarsıntı, karartma, yumuşak geçiş. Eklenti veya ayar katmanı gerekmez; keyframe'ler Premiere'de düzenlenebilir.
+- **Bölümler (YouTube):** Altyazıdan bölüm önerir, istersen AI ile başlık atar, YouTube kurallarını (0:00, en az 3 bölüm, 10 sn) denetler. Açıklamaya kopyala ya da timeline'a Chapter marker'ı olarak ekle.
+- **Otomatik emoji:** Altyazı satırlarına anlamına göre seyrek emoji ekler; Türkçe eklerini tanır, art arda ve tekrar emoji koymaz. Ctrl+Z ile geri alınır.
+
+### Düzeltildi
+- Bulut altyazı ve çeviride **Türkçe harflerin (ş, ğ, ü…) "�" olarak bozulması** giderildi.
+- **Montserrat kullanan altyazı stilleri** (CapCut Clean, SaaS Glass, Premium) libass'te yanlış fontla (DejaVu) çiziliyordu; artık gerçek Montserrat Bold kullanılıyor.
+- "Konuşma bulunamadı" hatasında editör ekranı ile altyazı listesi ayrışmıyor; önceki iş korunuyor.
+- Çeviri sürerken elle düzeltilen satırların üzerine artık yazılmıyor.
+- Zamanı bozuk gelen bulut altyazı satırları SRT'ye sızmıyor.
+
+### Güvenlik
+- Pro içerik indirme izni artık cihaza bağlı; dosya indirmeye istek sınırı eklendi.
+- Pro lisans önbelleği ve yapılandırması kolay atlatılamayacak şekilde sıkılaştırıldı.
+- Güncelleme dosya adı komut satırına güvenli biçimde veriliyor; yayın kontrolü preset ve video dosyası sızıntısını da yakalıyor.
+
+### Geliştirici
+- Testler her push'ta Windows, macOS ve Linux'ta GitHub Actions ile çalışıyor (`node tools/test.js`).
+- Yeni saf modüller (testli): `caption-text`, `textcut`, `chapters`, `auto-emoji`, `transitions`.
+
 ## Suflo 2.9.9 — Türkçe karakterli kullanıcı adı düzeltmesi
 
 - **Düzeltildi:** Windows kullanıcı adında Türkçe/aksanlı karakter olan makinelerde (örn. `C:\Users\BASIN TEKNİK\...`) yerel motor model yolunu bozuk okuyor ve `kod=3221226505` ile çöküyordu (#7). Whisper'a giden model, ses, çıktı ve VAD yolları artık ASCII-güvenli 8.3 kısa yol olarak veriliyor; 8.3 adlarının kapalı olduğu disklerde girdi bir kez ProgramData altındaki ASCII önbelleğe kopyalanıyor.
