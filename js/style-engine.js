@@ -531,7 +531,10 @@
         roundedRect(cardW + fs * 0.11, cardH + fs * 0.11, radius + fs * 0.05), pop)));
       events.push(dialogue(2, cue.start, end, shape(left, top, p.fill, 0x00, path, pop)));
 
-      var textTag = "{\\an5\\pos(" + Math.round(cx) + "," + Math.round(cy) + ")\\fs" + fs + org +
+      // Bungee'yi libass usWin metrikleriyle (1647+927 / 1000) yaklasik yari boyda cizer:
+      // yazi karti doldursun diye buyutulur, uzun kelimede kart genisligine sigdirilir
+      var fsMetin = Math.round(Math.min(fs * 1.75, (cardW - fs * 0.5) / (chars * 0.75 * 0.39)));
+      var textTag = "{\\an5\\pos(" + Math.round(cx) + "," + Math.round(cy) + ")\\fs" + fsMetin + org +
         "\\fscx18\\fscy18\\t(0," + ms + ",0.42,\\fscx" + over + "\\fscy" + over + ")" +
         "\\t(" + ms + "," + (ms + 95) + ",0.78,\\fscx100\\fscy100)\\fad(0,80)";
       events.push(dialogue(3, cue.start, end, textTag + "\\1c" + assColor("#15131f", 0x30) + "\\bord" + outline + "}" + esc(cue.text)));
