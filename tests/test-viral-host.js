@@ -124,5 +124,9 @@ ok("Shorts kaydi ceviri dilini de saklar", /harita\[shortsYuklenen\]\.ceviriDili
 ok("viral: kaynak transkript/sekans AI cagrisindan once yakalanir", vj.indexOf("var segsHam") < vj.indexOf("await KCaptions.chatCall"));
 var rd = cj.slice(cj.indexOf("function restoreDraft(d) {"), cj.indexOf("function restoreDraft(d) {") + 600);
 ok("taslak kurtarma: Shorts bayragi anlik goruntuden SONRA sifirlanir", rd.indexOf('snapshot("taslak kurtarma")') < rd.indexOf('shortsYuklenen = "";'));
+/* createSubsequence(true) hata verirse argumansiz denenir */
+sequence.createSubsequence = function (arg) { if (arg !== undefined) throw new Error("bu surumde arguman yok"); return { sequenceID: "argsiz", projectItem: { moveBin: function () {} } }; };
+var fb = call("KS_makeShorts", { ranges: [{ start: 10, end: 40, name: "x" }] });
+ok("createSubsequence argumansiz yedek", fb.ok && fb.items[0].id === "argsiz", JSON.stringify(fb));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

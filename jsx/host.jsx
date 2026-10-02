@@ -2136,7 +2136,10 @@ function KS_makeShorts(encoded) {
         seq.setOutPoint(sonSn);
         seq.setInPoint(a);
         seq.setOutPoint(b);
-        var alt = seq.createSubsequence(true);
+        var alt = null;
+        try { alt = seq.createSubsequence(true); } catch (eCs) {}
+        // bazi surumler argumani kabul etmez: varsayilan (iz hedeflemesi) ile tekrar dene
+        if (!alt) { try { alt = seq.createSubsequence(); } catch (eCs2) {} }
         if (!alt) { hatalar.push(ad + ": alt sekans olusmadi"); continue; }
         try { alt.name = ad; } catch (eN) {}
         try { if (kutu && alt.projectItem) alt.projectItem.moveBin(kutu); } catch (eM) {}
