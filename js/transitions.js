@@ -93,9 +93,10 @@
       inn.scale = keys([[0, 1 + 0.16 * k], [h, 1]]);
     } else if (id === "shake") {
       var a = 0.018 * k;
-      inn.x = keys([[0, 0], [h * 0.2, -a], [h * 0.4, a * 0.8], [h * 0.6, -a * 0.5], [h * 0.8, a * 0.25], [h, 0]]);
-      inn.y = keys([[0, 0], [h * 0.2, a * 0.6], [h * 0.4, -a * 0.5], [h * 0.6, a * 0.3], [h, 0]]);
-      inn.scale = keys([[0, 1 + 0.05 * k], [h, 1 + 0.05 * k]]);   // kenar boslugu gorunmesin
+      inn.x = keys([[0, 0], [h * 0.16, -a], [h * 0.32, a * 0.8], [h * 0.48, -a * 0.5], [h * 0.64, a * 0.25], [h * 0.8, 0]]);
+      inn.y = keys([[0, 0], [h * 0.16, a * 0.6], [h * 0.32, -a * 0.5], [h * 0.48, a * 0.3], [h * 0.8, 0]]);
+      // sarsinti boyunca hafif buyut (kenar boslugu gorunmesin), sonra klibin kendi olcegine don
+      inn.scale = keys([[0, 1 + 0.05 * k], [h * 0.8, 1 + 0.05 * k], [h, 1]]);
     } else if (id === "dip") {
       out.opacity = keys([[-h, 1], [0, 0]]);
       inn.opacity = keys([[0, 0], [h, 1]]);
@@ -112,20 +113,23 @@
    *   tol: aranacak en buyuk uzaklik (sn)
    * Doner: { track, cut, a (index), b (index) } ya da null. Ust katman oncelikli.
    */
-  function findCut(clips, playhead, tol) {
+  function findCut(clips, playhead, tol, adjTol) {
     tol = tol != null ? tol : 1.0;
+    adjTol = adjTol != null ? adjTol : 0.008;
+    // Katman basina zamana gore sirala; yalniz ardisik ciftler (host ile ayni kural)
+    var idx = clips.map(function (c, i) { return i; });
+    idx.sort(function (x, y) { return clips[x].track - clips[y].track || clips[x].start - clips[y].start; });
     var best = null;
-    for (var i = 0; i < clips.length; i++) {
-      for (var j = 0; j < clips.length; j++) {
-        if (i === j || clips[i].track !== clips[j].track) continue;
-        if (Math.abs(clips[i].end - clips[j].start) > 0.02) continue;
-        var cut = clips[j].start;
-        var dist = Math.abs(cut - playhead);
-        if (dist > tol) continue;
-        var better = !best || dist < best.dist - 0.001 ||
-          (Math.abs(dist - best.dist) <= 0.001 && clips[i].track > best.track);
-        if (better) best = { track: clips[i].track, cut: cut, a: i, b: j, dist: dist };
-      }
+    for (var k = 1; k < idx.length; k++) {
+      var i = idx[k - 1], j = idx[k];
+      if (clips[i].track !== clips[j].track) continue;
+      if (Math.abs(clips[i].end - clips[j].start) > adjTol) continue;
+      var cut = clips[j].start;
+      var dist = Math.abs(cut - playhead);
+      if (dist > tol) continue;
+      var better = !best || dist < best.dist - 0.001 ||
+        (Math.abs(dist - best.dist) <= 0.001 && clips[i].track > best.track);
+      if (better) best = { track: clips[i].track, cut: cut, a: i, b: j, dist: dist };
     }
     return best;
   }

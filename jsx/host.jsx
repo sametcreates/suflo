@@ -520,6 +520,30 @@ function KS_applyMotionPreset(encoded) {
  *     pos: [{t, x, y}] kadraj orani kayma
  *   p.tolerance: playhead'den en fazla bu kadar uzaktaki kesim (sn)
  */
+// Yalniz anahtar sil (yenisini yazmadan): [startSec, endSec] KAYNAK zamani
+function KS_presetClearKeys(prop, startSec, endSec) {
+  if (!prop) return 0;
+  var n = 0;
+  try {
+    var existing = prop.getKeys ? prop.getKeys() : null;
+    if (!existing || typeof existing.length !== "number") return 0;
+    var a = Math.min(startSec, endSec), b = Math.max(startSec, endSec);
+    for (var i = existing.length - 1; i >= 0; i--) {
+      var sec = Number(existing[i] && existing[i].seconds !== undefined ? existing[i].seconds : existing[i]);
+      if (sec >= a - 0.002 && sec <= b + 0.002) {
+        try { prop.removeKey(existing[i]); n++; KS_presetRemovedCount++; } catch (eR) {}
+      }
+    }
+  } catch (e) {}
+  return n;
+}
+
+function KS_isGraphicClip(c) {
+  try { if (c.isMGT && c.isMGT()) return true; } catch (eM) {}
+  try { if (!c.projectItem) return true; } catch (eP) {}
+  return false;
+}
+
 function KS_applyCutTransition(encoded) {
   try {
     KS_presetRemovedCount = 0;
@@ -532,29 +556,47 @@ function KS_applyCutTransition(encoded) {
     try { playhead = seq.getPlayerPosition().seconds; } catch (eP) {}
     var tol = Number(p.tolerance);
     if (!isFinite(tol) || tol <= 0) tol = 1.0;
+    // Bitisiklik toleransi yarim kare: 60 fps'de bir karelik bosluk kesim sayilmasin
+    var kare = Number(seq.timebase) / KS_TPS;
+    var bitisik = isFinite(kare) && kare > 0 ? kare * 0.5 : 0.008;
+    var MAX_HALF = 0.8;   // js/transitions.js'teki en buyuk yari sure
 
-    // En yakin kesim: esitlikte ust katman
-    var best = null;
+    var secili = [];
+    try { var sa = seq.getSelection(); if (sa) for (var s0 = 0; s0 < sa.length; s0++) secili.push(sa[s0]); } catch (eS) {}
+    function seciliMi(c) {
+      for (var q = 0; q < secili.length; q++) {
+        if (secili[q] === c || (c.nodeId && secili[q].nodeId && String(c.nodeId) === String(secili[q].nodeId))) return true;
+      }
+      return false;
+    }
+
+    // Klipler katman icinde zamana gore sirali: yalniz ardisik ciftler karsilastirilir
+    // (binlerce klipli kesilmis konusmada da hizli). Secim varsa yalniz secili klibe
+    // dokunan kesimler; yoksa altyazi/grafik (MOGRT) sinirlari atlanir.
+    var bestSel = null, bestAny = null;
     for (var ti = 0; ti < seq.videoTracks.numTracks; ti++) {
       var track = seq.videoTracks[ti];
       try { if (track.isLocked && track.isLocked()) continue; } catch (eL) {}
       var n = track.clips.numItems;
+      var onceki = null;
       for (var i = 0; i < n; i++) {
-        var a = track.clips[i];
-        var aEnd = Number(a.end.seconds);
-        for (var j = 0; j < n; j++) {
-          if (i === j) continue;
-          var b = track.clips[j];
-          var bStart = Number(b.start.seconds);
-          if (Math.abs(aEnd - bStart) > 0.02) continue;
-          var dist = Math.abs(bStart - playhead);
-          if (dist > tol) continue;
-          if (!best || dist < best.dist - 0.001 || (Math.abs(dist - best.dist) <= 0.001 && ti > best.track)) {
-            best = { track: ti, a: a, b: b, cut: bStart, dist: dist };
+        var c = track.clips[i];
+        var cur = { c: c, s: Number(c.start.seconds), e: Number(c.end.seconds) };
+        if (onceki && Math.abs(onceki.e - cur.s) <= bitisik) {
+          var dist = Math.abs(cur.s - playhead);
+          if (dist <= tol) {
+            var aday = { track: ti, a: onceki.c, b: cur.c, cut: cur.s, dist: dist };
+            if (secili.length && (seciliMi(onceki.c) || seciliMi(cur.c))) {
+              if (!bestSel || dist < bestSel.dist - 0.001) bestSel = aday;
+            } else if (!KS_isGraphicClip(onceki.c) && !KS_isGraphicClip(cur.c)) {
+              if (!bestAny || dist < bestAny.dist - 0.001 || (Math.abs(dist - bestAny.dist) <= 0.001 && ti > bestAny.track)) bestAny = aday;
+            }
           }
         }
+        onceki = cur;
       }
     }
+    var best = bestSel || bestAny;
     if (!best) return KS_err("Playhead'in yakininda kesim yok. Playhead'i iki klibin birlestigi yere getir.");
 
     var aStart = Number(best.a.start.seconds), aEnd2 = Number(best.a.end.seconds);
@@ -565,6 +607,19 @@ function KS_applyCutTransition(encoded) {
     var frameW = Number(seq.frameSizeHorizontal) || 1920;
     var frameH = Number(seq.frameSizeVertical) || 1080;
     var cut = best.cut;
+
+    // Onceki bir gecisin (hangi tur olursa olsun) izi kalmasin: bu kesimde herhangi bir
+    // gecisin dokunabilecegi en genis pencere temizlenir, taban degeri onun DISINDAN okunur.
+    var wA = Math.min(MAX_HALF, (aEnd2 - aStart) * 0.5), wB = Math.min(MAX_HALF, (bEnd - bStart2) * 0.5);
+    function temizle(clip, cStart, cEnd, t0, t1) {
+      var props = KS_presetProps(clip);
+      var a = KS_presetSourceTime(clip, t0, cStart, cEnd), b = KS_presetSourceTime(clip, t1, cStart, cEnd);
+      KS_presetClearKeys(props.scale, a, b);
+      KS_presetClearKeys(props.position, a, b);
+      KS_presetClearKeys(props.opacity, a, b);
+    }
+    temizle(best.a, aStart, aEnd2, cut - wA, aEnd2);
+    temizle(best.b, bStart2, bEnd, bStart2, cut + wB);
 
     // tabanAn: klibin "dinlenme" degerini okuyacagimiz timeline ani (gecis bolgesinin disi).
     // ValueAt KAYNAK zamani ister: timeline anini klibin kaynak zamanina cevir.
@@ -602,8 +657,8 @@ function KS_applyCutTransition(encoded) {
       return changed;
     }
 
-    var outOk = uygula(best.a, plan.out, aStart, aEnd2, cut - half, aEnd2, Math.max(aStart, cut - half - 0.02));
-    var inOk = uygula(best.b, plan["in"], bStart2, bEnd, bStart2, cut + half, Math.min(bEnd, cut + half + 0.02));
+    var outOk = uygula(best.a, plan.out, aStart, aEnd2, cut - half, aEnd2, Math.max(aStart, cut - wA - 0.02));
+    var inOk = uygula(best.b, plan["in"], bStart2, bEnd, bStart2, cut + half, Math.min(bEnd, cut + wB + 0.02));
     if (!outOk && !inOk) return KS_err("Kesimdeki kliplerde Motion/Opaklik ozelligi bulunamadi.");
     return KS_ok({ cut: cut, track: best.track + 1, half: half, out: outOk, "in": inOk, removedKeys: KS_presetRemovedCount });
   } catch (e) { return KS_err(e); }

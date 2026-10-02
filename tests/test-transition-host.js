@@ -34,7 +34,8 @@ function makeClip(start, end, inPoint) {
     opacity: prop("ADBE Opacity", "Opacity", 100),
     start: { seconds: start }, end: { seconds: end },
     inPoint: { seconds: inPoint }, outPoint: { seconds: inPoint + (end - start) },
-    isSpeedReversed: function () { return false; }
+    isSpeedReversed: function () { return false; },
+    projectItem: {}, nodeId: "n" + start + "-" + end
   };
   c.components = list([
     { matchName: "ADBE Motion", displayName: "Motion", properties: list([c.pos, c.scale]) },
@@ -45,11 +46,13 @@ function makeClip(start, end, inPoint) {
 
 var A = makeClip(0, 5, 10), B = makeClip(5, 9, 20), C = makeClip(9.5, 12, 30);
 var playhead = 5.2;
+var secim = [];
 var tracks = list([{ clips: list([A, B, C]), isLocked: function () { return false; } }]);
 tracks.numTracks = 1;
 var sequence = {
   frameSizeHorizontal: 1920, frameSizeVertical: 1080, videoTracks: tracks,
-  getSelection: function () { return []; },
+  timebase: String(254016000000 / 25),
+  getSelection: function () { return secim; },
   getPlayerPosition: function () { return { seconds: playhead }; }
 };
 var ctx = {
@@ -79,7 +82,48 @@ ok("whip-left: B sagdan (normalize konum > 1.3) gelir ve 0.5'e oturur", w.ok && 
 
 var tekrar = uygula("zoom-in");
 ok("ayni gecis tekrar uygulaninca eski anahtarlar temizlenir (birikmez)", tekrar.ok && A.scale.keys.length === 3 && B.scale.keys.length === 3, A.scale.keys.length + "/" + B.scale.keys.length);
+ok("tur degisince (zoom -> whip) once yazilan konum anahtarlari da temizlendi", B.pos.keys.length === 0 || B.pos.keys.every(function (k) { return k.time > 20.8; }), JSON.stringify(B.pos.keys));
 
+// Uzun gecis sonra kisa gecis: eski egrinin ici okunmaz, olcek ust uste binmez
+uygula("zoom-in", { duration: 1.2 });
+uygula("zoom-in", { duration: 0.4 });
+var bSon = B.scale.keys.slice().sort(function (x, y) { return x.time - y.time; });
+ok("uzun->kisa tekrar: B yalniz yeni 3 anahtar, son deger 100", bSon.length === 3 && bSon[2].value === 100 && bSon[0].value < 150, JSON.stringify(bSon));
+var aSon = A.scale.keys.slice().sort(function (x, y) { return x.time - y.time; });
+ok("uzun->kisa tekrar: A taban degeri 100'den baslar", aSon.length === 3 && aSon[0].value === 100, JSON.stringify(aSon));
+
+var sh = uygula("shake");
+var bShake = B.scale.keys.slice().sort(function (x, y) { return x.time - y.time; });
+ok("sarsinti sonunda klip kendi olcegine (100) doner", sh.ok && bShake[bShake.length - 1].value === 100, JSON.stringify(bShake));
+uygula("shake");
+var bShake2 = B.scale.keys.slice().sort(function (x, y) { return x.time - y.time; });
+ok("sarsinti tekrarinda olcek ust uste binmez", bShake2[0].value === bShake[0].value, bShake[0].value + " -> " + bShake2[0].value);
+
+// MOGRT altyazi sinirlari atlanir, secim tercih edilir
+var M1 = makeClip(4.5, 5.2, 70), M2 = makeClip(5.2, 6, 80);
+M1.isMGT = function () { return true; }; M2.isMGT = function () { return true; };
+var t2 = list([{ clips: list([A, B, C]), isLocked: function () { return false; } }, { clips: list([M1, M2]), isLocked: function () { return false; } }]);
+t2.numTracks = 2;
+sequence.videoTracks = t2;
+playhead = 5.2;
+var mg = uygula("punch");
+ok("ust katmandaki MOGRT siniri (5.2) degil footage kesimi (5) secilir", mg.ok && mg.cut === 5 && mg.track === 1, JSON.stringify(mg));
+var D0 = makeClip(5.0, 5.2, 90), E0 = makeClip(5.2, 7, 95);
+var t3 = list([{ clips: list([A, B, C]), isLocked: function () { return false; } }, { clips: list([D0, E0]), isLocked: function () { return false; } }]);
+t3.numTracks = 2;
+sequence.videoTracks = t3;
+secim = [A];
+var sec = uygula("punch");
+ok("secim varsa secili klibin kesimi tercih edilir (daha uzak olsa da)", sec.ok && sec.cut === 5 && sec.track === 1, JSON.stringify(sec));
+secim = [];
+// Bir karelik bosluk kesim sayilmaz (25 fps: 0.04 sn)
+var G1 = makeClip(30, 32, 0), G2 = makeClip(32.04, 35, 0);
+var t4 = list([{ clips: list([G1, G2]), isLocked: function () { return false; } }]); t4.numTracks = 1;
+sequence.videoTracks = t4; playhead = 32;
+ok("bir karelik bosluk kesim sayilmaz", uygula("dip").ok === false);
+sequence.videoTracks = tracks;
+
+playhead = 5.2;
 // Kisa klip: gecis yarisi klibin yarisina sikistirilir
 var D = makeClip(20, 20.4, 50), E = makeClip(20.4, 25, 60);
 tracks[0].clips = list([D, E]);

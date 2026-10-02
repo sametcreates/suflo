@@ -24,7 +24,7 @@ liste.forEach(function (t) {
     var ks = p["in"][prop];
     ks.forEach(function (k) { if (k.t < -1e-9 || k.t > p.half + 1e-9) { ok = false; neden = "B " + prop + " t=" + k.t; } });
     var notr = prop === "scale" || prop === "opacity" ? 1 : 0;
-    if (t.id !== "shake" && Math.abs(son(ks).v - notr) > 1e-9) { ok = false; neden = "B " + prop + " notre donmuyor: " + son(ks).v; }
+    if (Math.abs(son(ks).v - notr) > 1e-9) { ok = false; neden = "B " + prop + " notre donmuyor: " + son(ks).v; }
   });
   chk(t.id + ": zamanlar kesimin dogru yaninda, B notre doner", ok, neden);
   chk(t.id + ": en az bir ozellik", Object.keys(p.out).length + Object.keys(p["in"]).length > 0);
