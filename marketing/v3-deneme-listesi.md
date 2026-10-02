@@ -79,6 +79,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] **Shorts sekansları oluştur** (9:16 açık) → "Suflo Shorts" kutusunda her an için bir sekans + "9x16" dikey kopyası; dikeyde konuşan kişi kadrajda; orijinal sekansın In/Out'u değişmemiş.
 - [ ] Oluşan bir Shorts sekansını (yatay ya da 9x16) aç → Altyazı sekmesinde **"Bu Shorts'un altyazısını ana videodan al"** düğmesi → satırlar 0:00'dan başlıyor ve konuşmayla eşleşiyor; Suflo Stiliyle eklenebiliyor.
 - [ ] Altyazıyı İngilizceye çevir → **çift dilli** anahtarı görünüyor → aç → SRT indir: her satırda üstte Türkçe, altta İngilizce.
+- [ ] **Çok dilli SRT paketi** → EN + DE seç → Masaüstünde "Suflo altyazilar …" klasörü: kaynak dil + en.srt + de.srt; zamanlar aynı; ekrandaki altyazı değişmedi.
 - [ ] Çift dilli açıkken **Normal altyazı izi ekle** → Premiere'de iki satırlı caption'lar.
 - [ ] Konuşma dili **Deutsch** seçilerek Almanca bir klip doğru yazıya dökülüyor.
 

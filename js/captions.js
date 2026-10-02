@@ -2298,6 +2298,44 @@ window.KCaptions = (function () {
     return await res.json();
   }
 
+  /*
+   * Metin dizisini hedef dile cevir (60'arlik parcalar, satir sayisi korunur).
+   * *vurgu* isaretleri modelden korunmasi istenir. Doner: ceviri dizisi.
+   */
+  async function metinleriCevir(cfg, texts, target, ilerleme) {
+    var out = [];
+    var BATCH = 60;
+    for (var i = 0; i < texts.length; i += BATCH) {
+      if (ilerleme) ilerleme(Math.min(i + BATCH, texts.length), texts.length);
+      var chunk = texts.slice(i, i + BATCH);
+      var json = await chatCall(cfg, {
+        model: cfg.model,
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "You translate subtitle lines for video. Reply ONLY with a JSON object {\"lines\": [...]} containing exactly " +
+              chunk.length + " translated lines in the same order. Keep translations short and natural for subtitles. Do not merge or split lines. " +
+              "Words wrapped in single asterisks (*word*) are highlighted: wrap the corresponding translated words in single asterisks too. Never add other asterisks or markdown."
+          },
+          {
+            role: "user",
+            content: "Translate to " + (LANG_NAMES[target] || target) + ":\n" + JSON.stringify(chunk)
+          }
+        ]
+      });
+      var content = json.choices && json.choices[0] && json.choices[0].message.content;
+      var parsed = JSON.parse(String(content || "{}").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
+      var lines = parsed.lines || parsed.Lines;
+      if (!lines || lines.length !== chunk.length) {
+        throw new Error("Çeviri satır sayısı tutmadı (" + (lines ? lines.length : 0) + "/" + chunk.length + ") — tekrar dene.");
+      }
+      out = out.concat(lines);
+    }
+    return out;
+  }
+
   async function translateAll() {
     if (typeof Pro !== "undefined" && !Pro.gate("translate")) return; // Pro: ceviri
     if (segments.length === 0) return;
@@ -2316,36 +2354,7 @@ window.KCaptions = (function () {
       // silinen segmentin cevirisi zararsizca dusar, kalanlar dogru esler.
       var segsRef = segments.slice();
       var texts = segsRef.map(function (s) { return s.text; });
-      var out = [];
-      var BATCH = 60;
-      for (var i = 0; i < texts.length; i += BATCH) {
-        status("Çevriliyor… " + Math.min(i + BATCH, texts.length) + "/" + texts.length);
-        var chunk = texts.slice(i, i + BATCH);
-        var json = await chatCall(cfg, {
-          model: cfg.model,
-          temperature: 0.2,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: "You translate subtitle lines for video. Reply ONLY with a JSON object {\"lines\": [...]} containing exactly " +
-                chunk.length + " translated lines in the same order. Keep translations short and natural for subtitles. Do not merge or split lines. " +
-                "Words wrapped in single asterisks (*word*) are highlighted: wrap the corresponding translated words in single asterisks too. Never add other asterisks or markdown."
-            },
-            {
-              role: "user",
-              content: "Translate to " + (LANG_NAMES[target] || target) + ":\n" + JSON.stringify(chunk)
-            }
-          ]
-        });
-        var content = json.choices && json.choices[0] && json.choices[0].message.content;
-        var parsed = JSON.parse(content);
-        var lines = parsed.lines || parsed.Lines;
-        if (!lines || lines.length !== chunk.length) {
-          throw new Error("Çeviri satır sayısı tutmadı (" + (lines ? lines.length : 0) + "/" + chunk.length + ") — tekrar dene.");
-        }
-        out = out.concat(lines);
-      }
+      var out = await metinleriCevir(cfg, texts, target, function (n, top) { status("Çevriliyor… " + n + "/" + top); });
       snapshot("çeviri");
       // Ceviri surerken elle duzeltilen ya da yeni transkript/ice aktarmayla
       // ekrandan kalkan satirlarin uzerine yazma: kullanicinin isi kaybolmasin.
@@ -2369,6 +2378,91 @@ window.KCaptions = (function () {
     } finally {
       btn.disabled = false;
     }
+  }
+
+  /*
+   * Cok dilli SRT paketi: secilen her dile cevirip ayri SRT yazar (YouTube'un cok
+   * dilli altyazisi icin). Ekrandaki altyazi DEGISMEZ. Kaynak: ceviri yapilmissa
+   * orijinal satirlar (s.orig), degilse ekrandaki metin. Zamanlar cueler() ile ayni.
+   */
+  async function cokDilliPaket() {
+    if (typeof Pro !== "undefined" && !Pro.gate("translate")) return;
+    if (!segments.length) return;
+    var diller = Array.prototype.map.call(document.querySelectorAll(".cap-paket-dil:checked"), function (x) { return x.value; });
+    if (!diller.length) { KApp.toast("En az bir dil seç.", "warn"); return; }
+    var cfg = chatConfig();
+    if (!cfg) { KApp.toast("Çeviri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    var btn = el("cap-paket-go");
+    btn.disabled = true;
+    try {
+      var kaynak = segments.map(function (s) {
+        return { start: s.start, end: s.end, text: CT.stripEmphasis(typeof s.orig === "string" ? s.orig : s.text) };
+      });
+      var zaman = paketZamanlari(kaynak);
+      var metinler = zaman.map(function (z) { return kaynak[z.i].text; });
+      var klasor = K.path.join(K.os.homedir(), "Desktop");
+      if (!K.fs.existsSync(klasor)) klasor = K.os.homedir();
+      klasor = K.path.join(klasor, "Suflo altyazilar " + new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-"));
+      K.fs.mkdirSync(klasor, { recursive: true });
+      var kaynakDil = algilananDil || (el("cap-lang") && el("cap-lang").value) || "kaynak";
+      K.fs.writeFileSync(K.path.join(klasor, kaynakDil + ".srt"), "\uFEFF" + paketSrt(zaman, metinler, kaynakDil), "utf8");
+      var yazilan = 1, hatalar = [];
+      for (var d = 0; d < diller.length; d++) {
+        var dil = diller[d];
+        if (dil === kaynakDil) continue;
+        try {
+          var out = await metinleriCevir(cfg, metinler, dil, function (n, top) {
+            status((LANG_NAMES[dil] || dil) + " · " + n + "/" + top + " (" + (d + 1) + "/" + diller.length + ")");
+          });
+          var temiz = out.map(function (t, i) { return CT.stripEmphasis(String(t || "").trim()) || metinler[i]; });
+          K.fs.writeFileSync(K.path.join(klasor, dil + ".srt"), "\uFEFF" + paketSrt(zaman, temiz, dil), "utf8");
+          yazilan++;
+        } catch (eD) { hatalar.push((LANG_NAMES[dil] || dil) + ": " + K.hataYardimi(eD)); }
+      }
+      status(hatalar.length ? "Bazı diller atlandı: " + hatalar.join("; ").slice(0, 200) : "", hatalar.length ? "warn" : "");
+      KApp.toast(yazilan + " SRT yazıldı → " + klasor, "good", 9000);
+    } catch (e) {
+      status("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // cueler() ile ayni zamanlama kurali (en az 0.3 sn, sonraki satirla cakisma yok); bos satir atlanir
+  function paketZamanlari(list) {
+    var out = [];
+    list.forEach(function (s, i) {
+      if (!String(s.text || "").trim()) return;
+      var end = Math.max(s.end, s.start + 0.3);
+      var next = list[i + 1];
+      if (next && end > next.start) end = Math.max(next.start, s.start + 0.05);
+      out.push({ i: i, start: s.start, end: end });
+    });
+    return out;
+  }
+
+  // styleText'in dile ozel hali: buyuk/kucuk harf kurali hedef dilden (de/en'de "i" -> "I")
+  function paketStil(t, dil) {
+    var mode = el("cap-case").value;
+    var out = String(t || "");
+    if (!el("cap-punct").checked) {
+      out = out.replace(/[.,!?;:…»«""()\-–—\u060C\u061F\u061B]/g, " ").replace(/\s+/g, " ").trim();
+    }
+    var loc = { tr: "tr-TR", az: "az", ru: "ru" }[dil];
+    if (mode === "upper") out = loc ? out.toLocaleUpperCase(loc) : out.toUpperCase();
+    else if (mode === "lower") out = loc ? out.toLocaleLowerCase(loc) : out.toLowerCase();
+    return out;
+  }
+
+  function paketSrt(zaman, metinler, dil) {
+    var out = [];
+    zaman.forEach(function (z, k) {
+      out.push(String(k + 1));
+      out.push(tc(z.start, true) + " --> " + tc(z.end, true));
+      out.push(paketStil(metinler[k], dil));
+      out.push("");
+    });
+    return out.join("\r\n");
   }
 
   function revertTranslate() {
@@ -3860,6 +3954,7 @@ window.KCaptions = (function () {
     el("cap-import-srt").addEventListener("click", function (e) { e.preventDefault(); importSrt(); });
     el("cap-preset-save").addEventListener("click", saveUserPreset);
     el("cap-translate-go").addEventListener("click", translateAll);
+    if (el("cap-paket-go")) el("cap-paket-go").addEventListener("click", cokDilliPaket);
     el("cap-revert").addEventListener("click", revertTranslate);
     el("cap-fr-go").addEventListener("click", findReplace);
     el("cap-fr-glossary").addEventListener("click", addToGlossary);

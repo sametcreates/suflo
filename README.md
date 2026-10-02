@@ -216,6 +216,7 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-vurgu.js` | Anahtar kelime vurgusu: 12 stilde vurgu rengi, otomatik seçim, dışa aktarımda işaret temizliği |
 | `test-vurgu-entegre.js` | Vurgulu kelimeler Otomatik Zoom ve Akıllı SFX'te: an, kural, sınır önceliği |
 | `test-youtube-meta.js` | YouTube metni: başlık/açıklama/etiket/hashtag temizliği ve YouTube sınırları |
+| `test-paket.js` | Çok dilli SRT paketi: zamanlama, dile göre büyük harf, ortak çeviri fonksiyonu |
 | `test-broll.js` | B-roll önerileri: istem, ayrıştırma, stok arama bağlantıları, host marker etiketi/rengi |
 | `test-api-probe.js` | Doctor: Premiere API yoklaması (alt sekans, Auto Reframe, QE, marker, klip kapatma) projeye dokunmadan |
 | `test-es3.js` | `jsx/` ExtendScript: ES5+/ES6 kullanımı (forEach, trim, let, =>, JSON, sondaki virgül) yok — yalnız Premiere'de patlayacak hatalar |

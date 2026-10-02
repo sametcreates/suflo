@@ -3630,3 +3630,4 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .yt-basliklar { display: grid; gap: 5px; }
 .yt-baslik { text-align: left; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
 .yt-baslik:hover { border-color: rgba(139,124,246,.55); }
+.paket-diller { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; margin-bottom: 8px; }
