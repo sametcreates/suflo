@@ -49,6 +49,12 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] Ölçeği/konumu önceden değiştirilmiş (örn. %120) klipte geçiş o değerden başlayıp ona dönüyor.
 - [ ] Hem eski Premiere'de (piksel konum) hem yenisinde (normalize konum) whip doğru yönde.
 
+## 4b. Sahne algılama ve vuruşlarda bölme
+- [ ] Kesim → **Sahne algılama**: birkaç farklı çekimden oluşan bir klibi seç → **Sahneleri bul** → değişim sayısı mantıklı.
+- [ ] **Marker at** → sahne başlarında "Sahne" marker'ları.
+- [ ] **Sahnelerde böl** → yalnız seçili klip (ve bağlı sesi) bölünüyor; müzik katmanı bölünmüyor.
+- [ ] Ritim → müzik klibini analiz et → B-roll klibini seç → **Seçili klibi vuruşlarda böl** → B-roll vuruşlarda bölünüyor, müzik bölünmüyor.
+
 ## 5. Bölümler *(Altyazı editörü → Bölümler (YouTube))*
 - [ ] **Bölüm öner** → 0:00 dahil liste geliyor, "YouTube kurallarına uygun" yazıyor.
 - [ ] **AI ile başlıkla** (Groq anahtarı) → anlamlı Türkçe başlıklar.
@@ -60,6 +66,12 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] **Otomatik emoji** → birkaç satırın sonuna anlamlı emoji ekleniyor, art arda değil.
 - [ ] Ctrl+Z ile geri alınıyor.
 - [ ] Normal caption izine eklenince emojiler renkli görünüyor.
+
+## 6b. Güvenlik ve sağlamlık
+- [ ] Yeni bir model indir (örn. Base) → kurulum "Model doğrulanıyor…" adımından geçiyor.
+- [ ] Ayarlar → güncelleme denetimi: (bir sonraki sürümde) indirilen paket "Doğrulanıyor…" adımından geçiyor.
+- [ ] Bir saatlik sekansta "Sekans" kapsamıyla altyazı al → işlem sırasında panel donmuyor, bittiğinde bekleyen işlem yığını yok.
+- [ ] Adında `#` olan bir klasördeki projede "Kare al" önizlemesi görünüyor.
 
 ## 7. Pro sunucusu *(Hostinger)*
 - [ ] Yeni `server/pro-v1/index.php` yüklendi.

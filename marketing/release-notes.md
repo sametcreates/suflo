@@ -6,6 +6,8 @@
 - **Geçişler:** Yeni sekme. Playhead'i kesime getir, tek tıkla 13 geçişten birini uygula: zoom, whip (4 yön), itme, zıplama, punch, sarsıntı, karartma, yumuşak geçiş. Eklenti veya ayar katmanı gerekmez; keyframe'ler Premiere'de düzenlenebilir.
 - **Bölümler (YouTube):** Altyazıdan bölüm önerir, istersen AI ile başlık atar, YouTube kurallarını (0:00, en az 3 bölüm, 10 sn) denetler. Açıklamaya kopyala ya da timeline'a Chapter marker'ı olarak ekle.
 - **Otomatik emoji:** Altyazı satırlarına anlamına göre seyrek emoji ekler; Türkçe eklerini tanır, art arda ve tekrar emoji koymaz. Ctrl+Z ile geri alınır.
+- **Sahne algılama:** Kesim sekmesinde. Uzun kayıtlarda ve hazır videolarda sahne değişimlerini görüntüden bulur; marker at ya da seçili klibi sahnelerde böl — müzik katmanına dokunulmaz.
+- **Vuruşlarda böl:** Ritim sekmesinde müziği analiz et, B-roll'u seç, tek tıkla vuruşlarda kes.
 
 ### Düzeltildi
 - Bulut altyazı ve çeviride **Türkçe harflerin (ş, ğ, ü…) "�" olarak bozulması** giderildi.
@@ -13,11 +15,17 @@
 - "Konuşma bulunamadı" hatasında editör ekranı ile altyazı listesi ayrışmıyor; önceki iş korunuyor.
 - Çeviri sürerken elle düzeltilen satırların üzerine artık yazılmıyor.
 - Zamanı bozuk gelen bulut altyazı satırları SRT'ye sızmıyor.
+- Uzun Premiere işlemleri (ses dışa aktarımı) sırasında arka plan sorguları birikmiyor.
+- "#", "%" veya "'" içeren klasör/kullanıcı adlarında önizlemeler bozulmuyor; klip adındaki görünmez karakterler panel yanıtını bozmuyor.
+- Aynı adlı iki sekans artık birbirine karışmıyor.
+- Eski geçici render ve önizleme klasörleri otomatik temizleniyor.
 
 ### Güvenlik
 - Pro içerik indirme izni artık cihaza bağlı; dosya indirmeye istek sınırı eklendi.
 - Pro lisans önbelleği ve yapılandırması kolay atlatılamayacak şekilde sıkılaştırıldı.
 - Güncelleme dosya adı komut satırına güvenli biçimde veriliyor; yayın kontrolü preset ve video dosyası sızıntısını da yakalıyor.
+- **Otomatik güncelleme** indirilen dosyayı GitHub'ın SHA-256 özetiyle doğruluyor; uyuşmazsa kurmuyor.
+- **Whisper modelleri** indirildikten sonra HuggingFace'in SHA-256 değeriyle doğrulanıyor; bozuk model kurulu sayılmıyor.
 
 ### Geliştirici
 - Testler her push'ta Windows, macOS ve Linux'ta GitHub Actions ile çalışıyor (`node tools/test.js`).
