@@ -56,9 +56,14 @@ ctx.window.KKanca.ekle({ at: 12.5 }).then(function (sonuc) {
     for (var i = 3; i < raw.length; i += 4) { if (raw[i] > 200) opak++; else if (raw[i] < 10) seffaf++; }
     ok("kare: baslik opak, zemin seffaf", opak > 5000 && seffaf > raw.length / 4 * 0.7, "opak " + opak + " seffaf " + seffaf);
   }
+  return ctx.window.KKanca.onizle().then(function () {
+    var img = DOM["kanca-resim"];
+    ok("onizleme: dikey sekansta PNG uretildi (guvenli alanla)", img.hidden === false && /^data:image\/png;base64,/.test(img.src || "") && (img.src || "").length > 2000, (img.src || "").slice(0, 40));
+  }).then(function () {
   var kalan = fs.readdirSync(tmp);
   ok("gecici overlay-kanca klasoru temizlendi", kalan.length === 0, kalan.join(","));
   try { fs.rmSync(kok, { recursive: true, force: true }); } catch (e) {}
   console.log(gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);
+  });
 }).catch(function (e) { console.log("FAIL istisna " + e.stack); process.exit(1); });

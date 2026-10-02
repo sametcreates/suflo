@@ -258,9 +258,19 @@
     }).slice(0, 8);
   }
 
+  // TikTok / Reels / Shorts arayuzunun kapattigi bolgeler (Altyazi onizlemesiyle ayni oranlar)
+  var GUVENLI_ALAN = [{ x: 0, y: 0, w: 1, h: 0.07 }, { x: 0.87, y: 0.35, w: 0.13, h: 0.43 }, { x: 0, y: 0.78, w: 1, h: 0.22 }];
+  function safeZoneFilter(w, h) {
+    return GUVENLI_ALAN.map(function (b) {
+      var x = Math.round(b.x * w), y = Math.round(b.y * h), bw = Math.round(b.w * w), bh = Math.round(b.h * h);
+      return "drawbox=x=" + x + ":y=" + y + ":w=" + bw + ":h=" + bh + ":color=0xff3b5c@0.22:t=fill," +
+        "drawbox=x=" + x + ":y=" + y + ":w=" + bw + ":h=" + bh + ":color=0xff3b5c@0.7:t=1";
+    }).join(",");
+  }
+
   function list() {
     return Object.keys(STILLER).map(function (id) { return { id: id, ad: STILLER[id].ad }; });
   }
 
-  return { STILLER: STILLER, build: build, suggestPrompt: suggestPrompt, parseSuggestions: parseSuggestions, tokens: tokens, satirlar: satirlar, list: list };
+  return { STILLER: STILLER, safeZoneFilter: safeZoneFilter, build: build, suggestPrompt: suggestPrompt, parseSuggestions: parseSuggestions, tokens: tokens, satirlar: satirlar, list: list };
 });

@@ -86,7 +86,7 @@ window.KKanca = (function () {
       is = hazirla(built);
       var png = K.path.join(is.dizin, "onizleme.png");
       var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", "color=c=0x1c2433:s=" + w + "x" + h + ":d=" + built.dur,
-        "-vf", "subtitles=f=kanca.ass" + is.fontsdir, "-ss", String(Math.min(1.2, built.dur * 0.5)), "-frames:v", "1", png],
+        "-vf", "subtitles=f=kanca.ass" + is.fontsdir + (h > w * 1.2 ? "," + HT.safeZoneFilter(w, h) : ""), "-ss", String(Math.min(1.2, built.dur * 0.5)), "-frames:v", "1", png],
         { timeout: 60000, cwd: is.dizin });
       if (r.code !== 0 || !K.fs.existsSync(png)) throw new Error("Önizleme üretilemedi: " + String(r.stderr || "").split("\n").slice(-2).join(" ").slice(0, 160));
       var img = el("kanca-resim");
