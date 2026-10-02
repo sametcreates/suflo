@@ -20,6 +20,13 @@ jobs:
       - name: ffmpeg (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # render/libass/ses testleri Windows ve macOS'ta da kossun (yol, font, CRLF farklari)
+      - name: ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
+      - name: ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
       - name: Testler
         run: node tools/test.js
 
