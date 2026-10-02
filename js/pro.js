@@ -419,9 +419,9 @@
       '</div>';
     } else if (isMogrt) {
       visual = '<div class="pro-upsell-mogrt" aria-label="Yaz\u0131 efekti \u00f6rnekleri">' +
-        '<img src="assets/pro-mogrt-showcase/previews/01-smooth-up.webp" alt="Smooth Up efekti">' +
-        '<img src="assets/pro-mogrt-showcase/previews/02-rainbow-text.webp" alt="Rainbow Text efekti">' +
-        '<img src="assets/pro-mogrt-showcase/previews/06-gold-text.webp" alt="Gold Text efekti">' +
+        '<img src="assets/pro-mogrt-showcase/previews/001-smooth-up.webp" alt="Smooth Up efekti">' +
+        '<img src="assets/pro-mogrt-showcase/previews/002-rainbow-text.webp" alt="Rainbow Text efekti">' +
+        '<img src="assets/pro-mogrt-showcase/previews/006-gold-text.webp" alt="Gold Text efekti">' +
       '</div>';
     } else if (isSfx) {
       visual = '<div class="pro-upsell-sfx" aria-label="SFX kategorileri">' +
