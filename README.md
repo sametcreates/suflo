@@ -19,16 +19,22 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
 | **Karaoke** | Kelime kelime ve birikimli mod; kelime zamanlarıyla |
-| **Çeviri** | TR · AZ · EN · RU arası, satır satır |
+| **Çeviri** | TR · AZ · EN · RU · DE · AR · ES · FR · PT · IT (+ NL, JA hedef), satır satır; **çok dilli SRT paketi** |
 | **Terim sözlüğü** | Marka ve özel isimlerin doğru yazımını her transkriptte uygular |
 | **Dışa aktarma** | SRT · WebVTT · ASS (stilli, karaoke etiketli) · TXT |
+| **Konuşmadan kes** *(3.0)* | Iıı/eee, tekrar ve duraksamaları kelimeye tıklayarak kes; ▶ Dinle önizlemesi |
 | **Bölümler** *(3.0)* | Konuşmadan YouTube bölümleri, AI başlık, kural denetimi, Chapter marker |
+| **Paylaşım metni** *(3.0)* | YouTube başlık/açıklama/etiket; Reels ve TikTok kanca + açıklama + hashtag |
+| **B-roll önerileri** *(3.0)* | Ara görüntü anları + İngilizce stok arama kelimeleri, yeşil marker |
 | **Otomatik emoji** *(3.0)* | Satırın anlamına göre seyrek emoji, Türkçe ek dostu |
 | **Anahtar kelime vurgusu** *(3.0)* | `*kelime*` ya da Otomatik vurgu: sayılar ve önemli kelimeler her stilde vurgu renginde |
 | **Sesi iyileştir** *(3.0)* | Gürültü azaltma + LUFS normalize, gecikme telafili (senkron kaymaz) |
-| **Shorts sekansları** *(3.0)* | Viral anlardan tek tıkla alt sekans + Auto Reframe 9:16 |
+| **Shorts sekansları** *(3.0)* | Viral anlardan tek tıkla alt sekans + Auto Reframe 9:16; altyazısı ana transkriptten hazır |
 | **Kanca başlığı** *(3.0)* | Shorts açılışına animasyonlu başlık kartı; playhead'e ya da viral anın başına |
 | **Çift dilli altyazı** *(3.0)* | Çeviri sonrası orijinal + çeviri alt alta (SRT/VTT/caption izi) |
+| **Geçişler** *(3.0)* | Kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz keyframe |
+| **Sahne algılama** *(3.0)* | Sahne değişimlerinde marker ya da bölme; vuruşlarda bölme |
+| **Suflo Doctor** | Premiere bağlantısı, motor, Pro içerik ve 3.0 API uyumluluğu tek taramada |
 
 ### Altyazı motorları
 
