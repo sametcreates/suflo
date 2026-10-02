@@ -725,10 +725,12 @@ window.KCaptions = (function () {
     }
   };
 
-  // Stil motorundaki her stil (yeni eklenenler dahil) tek kaynaktan sablon olur
+  // Stil motorundaki her stil (yeni eklenenler dahil) tek kaynaktan sablon olur.
+  // Ayni adli eski "custom" sablonlari (neon, daktilo) EZER: kart motor stilini
+  // gosteriyor; eski sablon kalsaydi "Neon ile ekle" eski ASS yoluna dusuyordu.
   if (window.SufloStyleEngine) {
     window.SufloStyleEngine.list().forEach(function (mp) {
-      if (!PRESETS[mp.id]) PRESETS[mp.id] = motorPreset(mp.id);
+      PRESETS[mp.id] = motorPreset(mp.id);
     });
   }
 
@@ -745,7 +747,8 @@ window.KCaptions = (function () {
     var p = (key === "user") ? K.settings().userPreset : PRESETS[key];
     if (!p) return;
     secilenMogrt = null;
-    secilenMotorStili = motorStiliMi(key) ? key : "";
+    // "user" (Şablonum) gibi anahtarlar motor stili tasiyabilir: stilin ailesine bak
+    secilenMotorStili = motorStiliMi(key) ? key : (p.stil && motorStiliMi(p.stil.aile) ? p.stil.aile : "");
     bekleyenMogrtYolu = "";
     el("cap-maxlen").value = p.maxlen;
     el("cap-case").value = p.kase;
@@ -981,7 +984,8 @@ window.KCaptions = (function () {
   function mogrtStilleriniCiz() {
     var grid = el("cap-stil-grid");
     if (!grid) return;
-    Array.prototype.forEach.call(grid.querySelectorAll(".stil-mogrt-head,.stil-mogrt,.stil-mogrt-empty"), function (n) { n.remove(); });
+    // Suflo Stilleri basligi da .stil-mogrt-head tasir: ona dokunma
+    Array.prototype.forEach.call(grid.querySelectorAll(".stil-mogrt-head:not(.stil-motor-head),.stil-mogrt,.stil-mogrt-empty"), function (n) { n.remove(); });
     var oran = sekansOrani();
     var istenenAnahtar = secilenMogrt ? mogrtStilAnahtari(secilenMogrt) : "";
     if (bekleyenMogrtYolu) {
@@ -1278,7 +1282,9 @@ window.KCaptions = (function () {
       if (p.punct !== undefined) el("cap-punct").checked = p.punct;
       if (p.preset !== undefined) el("cap-preset").value = p.preset;
       bekleyenMogrtYolu = p.mogrtPath || "";
-      secilenMotorStili = !p.mogrtPath && motorStiliMi(p.motorStili) ? p.motorStili : "";
+      // 3.0 oncesi tercihlerde motorStili alani yok: stil ailesinden cikar
+      secilenMotorStili = p.mogrtPath ? "" : (motorStiliMi(p.motorStili) ? p.motorStili :
+        (p.stil && motorStiliMi(p.stil.aile) ? p.stil.aile : ""));
       stiliYaz(p.stil);
     } catch (e) {}
   }
@@ -4214,9 +4220,11 @@ window.KCaptions = (function () {
         vurguKutusuDurumu();     // animasyon değişince ipucu ve vurgu rengi durumu
         onizlemeCiz();
         savePrefs();
-        // stil elle değiştiyse artık hazır şablonda değiliz
+        // stil elle değiştiyse artık hazır şablonda değiliz; aile hâlâ bir Suflo
+        // stiliyse o stil (ince ayarlı haliyle) seçili kalır ve kartı işaretli görünür
         if (el("cap-preset")) el("cap-preset").value = "";
-        stilKartiIsaretle("");
+        secilenMotorStili = motorStiliMi(stil().aile) ? stil().aile : "";
+        stilKartiIsaretle(secilenMotorStili);
         uygulamaIpucunuGuncelle();
       });
     });

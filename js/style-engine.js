@@ -163,7 +163,9 @@
   }
 
   function esc(value) {
-    return String(value || "").replace(/\{/g, "\\{").replace(/\}/g, "\\}").replace(/\r?\n/g, "\\N");
+    // Ters bolu ASS komutu baslatir (\N, \h, \n): kullanici metninde benzer gorunen
+    // isarete cevrilir. Satir sonu, ters bolu donusumunden SONRA \N olur.
+    return String(value || "").replace(/\\/g, "\u29F5").replace(/\{/g, "\\{").replace(/\}/g, "\\}").replace(/\r?\n/g, "\\N");
   }
 
   function normaliseCues(cues, offset) {
@@ -544,13 +546,61 @@
     return events;
   }
 
+  /*
+   * v3.0 stilleri icin yerlesim yardimcilari. Font boyutu kisa kenara gore
+   * olceklenir (9:16'da yukseklige gore buyuyup kadrajdan tasmasin), 3+
+   * kelimelik gruplar iki dengeli satira bolunur ve en uzun satir kadraj
+   * genisliginin %88'ini asarsa boyut kucultulur.
+   */
+  var KARAKTER_GENISLIK = { "Anton": .47, "Bebas Neue": .43, "Archivo Black": .72, "Montserrat": .64, "Bungee": .8, "Lora": .55 };
+
+  function minScaled(value, width, height) {
+    return Math.max(1, Math.round(Number(value || 1) * Math.min(width, height) / 1080));
+  }
+
+  // Grup icin satir kirilma indeksi (ikinci satirin ilk kelimesi); 0 = tek satir
+  function breakIndex(group, minWords) {
+    if (group.length < (minWords || 3)) return 0;
+    var best = 1, bestScore = 1e9;
+    for (var i = 1; i < group.length; i++) {
+      var left = group.slice(0, i).map(function (c) { return c.text; }).join(" ").length;
+      var right = group.slice(i).map(function (c) { return c.text; }).join(" ").length;
+      var score = Math.abs(left - right);
+      if (score < bestScore) { best = i; bestScore = score; }
+    }
+    return best;
+  }
+
+  function fitSize(fs, group, br, style, width, extra) {
+    var k = KARAKTER_GENISLIK[style.font] || .62;
+    var lines = br ? [group.slice(0, br), group.slice(br)] : [group];
+    var longest = lines.reduce(function (n, ln) {
+      return Math.max(n, ln.map(function (c) { return String(c.text); }).join(" ").length);
+    }, 1);
+    var maxW = width * .88;
+    var need = longest * fs * k * (extra || 1);
+    return need > maxW ? Math.max(8, Math.floor(fs * maxW / need)) : fs;
+  }
+
+  // Kelimeleri birlestir; br indeksinde \N
+  function joinWords(parts, br) {
+    var out = "";
+    for (var i = 0; i < parts.length; i++) {
+      if (i > 0) out += (br && i === br) ? "\\N" : " ";
+      out += parts[i];
+    }
+    return out;
+  }
+
   // Hormozi: buyuk harf, aktif kelime sari/yesil donusumlu renk + pop
   function renderHormozi(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "hormozi", width, height);
-    var fs = scaled(style.boyut, height), outline = Math.max(3, scaled(style.kontur, height));
+    var outline = Math.max(3, minScaled(style.kontur, width, height));
     var renkler = [style.vurguRenk, "#3dff6e"];
     groupWords(cues, 3).forEach(function (group, gi) {
       var end = group[group.length - 1].end;
+      var br = breakIndex(group, 3);
+      var fs = fitSize(minScaled(style.boyut, width, height), group, br, style, width, 1.12);
       var vurgu = assColor(renkler[gi % 2]), normal = assColor(style.renk);
       group.forEach(function (cue, active) {
         var activeEnd = active + 1 < group.length ? group[active + 1].start : end;
@@ -564,31 +614,35 @@
         });
         events.push(dialogue(1, cue.start, activeEnd, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
           "\\1c" + normal + "\\3c" + assColor(style.konturRenk) + "\\bord" + outline +
-          "\\shad" + scaled(5, height) + "\\4c" + assColor("#000000", 0x60) + "}" + words.join(" ")));
+          "\\shad" + minScaled(5, width, height) + "\\4c" + assColor("#000000", 0x60) + "}" + joinWords(words, br)));
       });
     });
     return events;
   }
 
-  // Neon: bulanik renkli parilti katmani + ince cizgili beyaz metin; aktif kelime yanar
+  // Neon: bulanik renkli parilti katmani + ince cizgili metin; aktif kelime tam parlak
   function renderNeon(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "neon", width, height);
-    var fs = scaled(style.boyut, height);
-    var glow = assColor(style.vurguRenk), beyaz = assColor(style.renk), soluk = assColor(style.renk, 0x70);
+    var glow = assColor(style.vurguRenk), beyaz = assColor(style.renk);
     groupWords(cues, 4).forEach(function (group) {
       var start = group[0].start, end = group[group.length - 1].end;
-      var plain = group.map(function (c) { return esc(c.text); }).join(" ");
-      var flicker = "\\alpha&HFF&\\t(0,60,\\alpha&H40&)\\t(60,110,\\alpha&HB0&)\\t(110," + Math.round(200 / factor) + ",\\alpha&H00&)";
+      var br = breakIndex(group, 3);
+      var fs = fitSize(minScaled(style.boyut, width, height), group, br, style, width);
+      var plain = joinWords(group.map(function (c) { return esc(c.text); }), br);
+      // Parilti: dolgu her zaman seffaf (\1a), yalniz bulanik kontur (\3a) titreyerek yanar.
+      // \alpha kullanilmaz: \1a'yi ezip her kelimenin altina beyaz dolgu ciziyordu.
+      var flicker = "\\3a&HFF&\\t(0,60,\\3a&H40&)\\t(60,110,\\3a&HB0&)\\t(110," + Math.round(200 / factor) + ",\\3a&H00&)";
       events.push(dialogue(0, start, end, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2\\1a&HFF&" +
-        "\\3c" + glow + "\\bord" + scaled(10, height) + "\\blur" + scaled(14, height) + "\\shad0" + flicker + "\\fad(0,180)}" + plain));
+        "\\3c" + glow + "\\bord" + minScaled(10, width, height) + "\\blur" + minScaled(14, width, height) + "\\shad0" + flicker + "\\fad(0,180)}" + plain));
       group.forEach(function (cue, active) {
         var activeEnd = active + 1 < group.length ? group[active + 1].start : end;
         activeEnd = Math.max(cue.start + .08, activeEnd);
+        // Soluk kelime: \1a ile yari saydam (libass \1c icindeki alfa baytini yok sayar)
         var words = group.map(function (c, i) {
-          return (i === active ? "{\\1c" + beyaz + "\\3c" + glow + "\\blur1}" : "{\\1c" + soluk + "\\3c" + glow + "\\blur0}") + esc(c.text);
+          return (i === active ? "{\\1a&H00&\\3c" + glow + "\\blur1}" : "{\\1a&H78&\\3c" + glow + "\\blur0}") + esc(c.text);
         });
         events.push(dialogue(1, cue.start, activeEnd, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
-          "\\bord" + Math.max(1, scaled(style.kontur, height)) + "\\shad0}" + words.join(" ")));
+          "\\1c" + beyaz + "\\bord" + Math.max(1, minScaled(style.kontur, width, height)) + "\\shad0}" + joinWords(words, br)));
       });
     });
     return events;
@@ -597,19 +651,24 @@
   // Daktilo: kelimeler sirayla belirir, sonda yanip sonen imlec
   function renderDaktilo(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "daktilo", width, height);
-    var fs = scaled(style.boyut, height), outline = Math.max(1, scaled(style.kontur, height));
+    var outline = Math.max(1, minScaled(style.kontur, width, height));
     var imlec = assColor(style.vurguRenk);
     groupWords(cues, 6).forEach(function (group) {
       var end = group[group.length - 1].end;
+      var br = breakIndex(group, 4);
+      var fs = fitSize(minScaled(style.boyut, width, height), group, br, style, width);
       group.forEach(function (cue, k) {
         var stepEnd = k + 1 < group.length ? group[k + 1].start : end;
         stepEnd = Math.max(cue.start + .06, stepEnd);
-        var yazilan = group.slice(0, k + 1).map(function (c) { return esc(c.text); }).join(" ");
-        var gizli = group.slice(k + 1).map(function (c) { return esc(c.text); }).join(" ");
-        // Gizli kalan kelimeler de seffaf yazilir: satir genisligi sabit kalir, metin kaymaz
-        var metin = yazilan + "{\\1c" + imlec + "\\t(0,260,\\alpha&HFF&)}_" + "{\\alpha&HFF&}" + (gizli ? " " + gizli : "");
+        // Gizli kelimeler de seffaf yazilir: satir duzeni sabit kalir, metin kaymaz
+        var parts = group.map(function (c, i) {
+          var w = esc(c.text);
+          if (i < k) return w;
+          if (i === k) return w + "{\\1c" + imlec + "\\t(0,260,\\alpha&HFF&)}_{\\alpha&HFF&}";
+          return w;
+        });
         events.push(dialogue(1, cue.start, stepEnd, "{\\an" + a.an + "\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
-          "\\1c" + assColor(style.renk) + "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad0}" + metin));
+          "\\1c" + assColor(style.renk) + "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad0}" + joinWords(parts, br)));
       });
     });
     return events;
@@ -618,10 +677,12 @@
   // Ziplayan: son gelen kelime yukaridan dusup esneyerek oturur, oncekiler kalir
   function renderZiplama(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "ziplama", width, height);
-    var fs = scaled(style.boyut, height), outline = Math.max(2, scaled(style.kontur, height));
+    var outline = Math.max(2, minScaled(style.kontur, width, height));
     var vurgu = assColor(style.vurguRenk), normal = assColor(style.renk);
     groupWords(cues, 3).forEach(function (group) {
       var end = group[group.length - 1].end;
+      var br = breakIndex(group, 3);
+      var fs = fitSize(minScaled(style.boyut, width, height), group, br, style, width, 1.18);
       group.forEach(function (cue, k) {
         var stepEnd = k + 1 < group.length ? group[k + 1].start : end;
         stepEnd = Math.max(cue.start + .08, stepEnd);
@@ -636,7 +697,7 @@
         });
         events.push(dialogue(1, cue.start, stepEnd, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
           "\\1c" + normal + "\\3c" + assColor(style.konturRenk) + "\\bord" + outline +
-          "\\shad" + scaled(4, height) + "}" + words.join(" ")));
+          "\\shad" + minScaled(4, width, height) + "}" + joinWords(words, br)));
       });
     });
     return events;
@@ -645,18 +706,20 @@
   // Karaoke dolgu: \kf ile satir konusma hizinda soldan saga renklenir
   function renderDolgu(cues, style, width, height, factor) {
     var events = [], a = anchor(style, "dolgu", width, height);
-    var fs = scaled(style.boyut, height), outline = Math.max(1, scaled(style.kontur, height));
+    var outline = Math.max(1, minScaled(style.kontur, width, height));
     groupWords(cues, 6).forEach(function (group) {
       var start = group[0].start, end = group[group.length - 1].end;
+      var br = breakIndex(group, 4);
+      var fs = fitSize(minScaled(style.boyut, width, height), group, br, style, width);
       var parts = group.map(function (c, i) {
         var next = group[i + 1];
         var dur = Math.max(.05, (next ? next.start : c.end) - c.start);
-        return "{\\kf" + Math.round(dur * 100) + "}" + esc(c.text) + (next ? " " : "");
+        return "{\\kf" + Math.round(dur * 100) + "}" + esc(c.text);
       });
       events.push(dialogue(1, start, end, "{\\an" + (a.an || 5) + "\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
         "\\1c" + assColor(style.vurguRenk) + "\\2c" + assColor(style.renk) +
-        "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad" + scaled(2, height) +
-        "\\fad(" + Math.round(120 / factor) + ",120)}" + parts.join("")));
+        "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad" + minScaled(2, width, height) +
+        "\\fad(" + Math.round(120 / factor) + ",120)}" + joinWords(parts, br)));
     });
     return events;
   }

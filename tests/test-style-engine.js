@@ -80,6 +80,22 @@ ok("dolgu \\kf karaoke etiketleri", /\\kf\d+/.test(compiled.dolgu.ass));
 ok("neon bulanik parilti katmani", /\\blur\d/.test(compiled.neon.ass) && /\\1a&HFF&/.test(compiled.neon.ass));
 ok("ziplama esneme hareketi", /\\fscx70\\fscy140/.test(compiled.ziplama.ass));
 
+/* ---- v3.0 inceleme duzeltmeleri ---- */
+var dikey = [{ start: 0, end: 2, text: "BUNU ASLA KAÇIRMAMALISIN" }];
+["hormozi", "neon", "ziplama", "daktilo", "dolgu"].forEach(function (id) {
+  // daktilo/dolgu 4+ kelimede boler (satir stili); digerleri 3+
+  var girdi = /^(daktilo|dolgu)$/.test(id) ? [{ start: 0, end: 2, text: "Bunu asla kaçırmamalısın arkadaşlar" }] : dikey;
+  var d = engine.compile({ styleId: id, cues: girdi, cueKind: "lines", width: 1080, height: 1920 }).ass;
+  var fsMax = Math.max.apply(null, (d.match(/\\fs(\d+)/g) || ["\\fs0"]).map(function (x) { return Number(x.slice(3)); }));
+  ok(id + " 9:16'da font kisa kenara gore (yukseklige gore buyuyup tasmaz)", fsMax > 0 && fsMax <= engine.preset(id).style.boyut, fsMax);
+  ok(id + " cok kelimeli grup iki satira bolunur", /\\N/.test(d));
+});
+var nAss = compiled.neon.ass;
+ok("neon soluk kelime \\1a ile (libass \\1c alfasini yok sayar)", /\\1a&H78&/.test(nAss));
+ok("neon parilti katmani \\alpha ile dolguyu acmaz", !/\\alpha&H00&/.test(nAss.split("\n").filter(function (l) { return /^Dialogue: 0,/.test(l); }).join("\n")));
+var kac = engine.compile({ styleId: "viral", cues: [{ start: 0, end: 1, text: "a\\Nb {x}" }] }).ass;
+ok("kullanici metnindeki ters bolu ASS komutu olmaz", kac.indexOf("a\\Nb") === -1 && kac.indexOf("a\u29F5Nb") !== -1);
+
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
 if (!ffmpeg) {
   console.log("(ffmpeg yok - gercek stil renderlari atlandi)");
