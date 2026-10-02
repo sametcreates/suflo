@@ -160,10 +160,11 @@ window.KCaptions = (function () {
   function hideRestore() { var b = el("cap-restore"); if (b) b.hidden = true; }
 
   function restoreDraft(d) {
-    shortsYuklenen = "";
     // Ekranda iş varsa üzerine yazmadan önce anlık görüntü al — Ctrl+Z geri getirsin
+    // (anlık görüntü Shorts bayragini da tasir: sifirlama ONDAN sonra)
     if (segments.length) snapshot("taslak kurtarma");
     else { undoStack.length = 0; redoStack.length = 0; }
+    shortsYuklenen = "";
     segments = JSON.parse(JSON.stringify(d.segments));   // taslak nesnesini takma adla mutasyona uğratma
     segmentsMode = d.mode || "plain";
     clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil

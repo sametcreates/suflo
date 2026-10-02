@@ -122,5 +122,7 @@ ok("yeni transkript: Shorts modu yalniz basarida kapanir", goKod.indexOf('shorts
 ok("uygulama: Shorts uygulaninca ana taslak silinmez", /if \(!shortsYuklenen\) K\.clearDraft\(\);/.test(cj));
 ok("Shorts kaydi ceviri dilini de saklar", /harita\[shortsYuklenen\]\.ceviriDili = ceviriDili;/.test(cj));
 ok("viral: kaynak transkript/sekans AI cagrisindan once yakalanir", vj.indexOf("var segsHam") < vj.indexOf("await KCaptions.chatCall"));
+var rd = cj.slice(cj.indexOf("function restoreDraft(d) {"), cj.indexOf("function restoreDraft(d) {") + 600);
+ok("taslak kurtarma: Shorts bayragi anlik goruntuden SONRA sifirlanir", rd.indexOf('snapshot("taslak kurtarma")') < rd.indexOf('shortsYuklenen = "";'));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
