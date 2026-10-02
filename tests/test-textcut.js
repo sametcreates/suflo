@@ -65,5 +65,22 @@ var ik = T.classify([w(0, .4, "yavaş"), w(.45, .8, "yavaş"), w(1, 1.3, "ben"),
 chk("Turkce ikileme (yavaş yavaş) tekrar sayilmaz, kekemelik (ben ben) sayilir", ik[0] === null && ik[2] === "repeat", JSON.stringify(ik));
 var kisa = T.buildCuts([w(0, 1, "a"), w(1, 1.05, "ı"), w(1.05, 2, "b")], [false, true, false], {});
 chk("kullanicinin sildigi cok kisa kelime de kesilir", kisa.length === 1 && kisa[0].start === 1 && kisa[0].end === 1.05, JSON.stringify(kisa));
+/* "Dinle" onizlemesi */
+var pf = T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 });
+chk("previewFilter: klip-ici kaynak zamanlari", pf === "aselect='not(between(t,1.000,2.000)+between(t,4.000,4.500))',asetpts=N/SR/TB", pf);
+chk("previewFilter: %200 hizda kaynak zamani iki kati", /between\(t,2\.000,4\.000\)/.test(T.previewFilter([{ start: 11, end: 12 }], { clipStart: 10, clipEnd: 15, dur: 10 })));
+chk("previewFilter: kesim yoksa bos", T.previewFilter([], { clipStart: 0, clipEnd: 5, dur: 5 }) === "");
+var cpx = require("child_process"), fsx = require("fs"), osx = require("os"), px = require("path");
+if (!cpx.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error) {
+  var dir = fsx.mkdtempSync(px.join(osx.tmpdir(), "suflo-dinle-"));
+  var giris = px.join(dir, "ses.wav"), cikis = px.join(dir, "onizleme.wav");
+  cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=10", giris]);
+  // gercek panel argumanlari: -ss inPoint -t dur, ardindan filtre
+  var r = cpx.spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-ss", "0", "-t", "10", "-i", giris, "-vn", "-af", pf, cikis], { encoding: "utf8" });
+  var sure = Number(cpx.spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", cikis], { encoding: "utf8" }).stdout);
+  chk("gercek ffmpeg: 10 sn - 1.5 sn kesim = 8.5 sn onizleme", r.status === 0 && Math.abs(sure - 8.5) < 0.05, sure + " " + (r.stderr || ""));
+  try { fsx.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
+} else console.log("ATLA gercek ffmpeg onizleme testi");
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

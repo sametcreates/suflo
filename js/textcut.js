@@ -208,7 +208,28 @@
     return "Iıı, eee, hmm, şey, yani... ıı, ee.";
   }
 
+  /*
+   * "Dinle" onizlemesi: kesimler uygulanmis gibi sesi tek dosyada duyur.
+   * cuts sequence zamaninda; ffmpeg klibin kaynagindan -ss inPoint -t dur ile
+   * okur, bu yuzden zamanlar klip-ici KAYNAK saniyesine cevrilir (hiz carpani).
+   *   clip: { clipStart, clipEnd, dur }   (dur = kaynak sure)
+   * Doner: ffmpeg -af ifadesi; kesim yoksa "" (oldugu gibi cal).
+   */
+  function previewFilter(cuts, clip) {
+    var tl = Number(clip.clipEnd) - Number(clip.clipStart);
+    var hiz = Number(clip.dur) > 0 && tl > 0 ? tl / Number(clip.dur) : 1;
+    var parcalar = (cuts || []).map(function (c) {
+      var a = Math.max(0, (Number(c.start) - Number(clip.clipStart)) / hiz);
+      var b = Math.max(0, (Number(c.end) - Number(clip.clipStart)) / hiz);
+      return b > a ? "between(t," + a.toFixed(3) + "," + b.toFixed(3) + ")" : "";
+    }).filter(Boolean);
+    if (!parcalar.length) return "";
+    // aselect kesilen ornekleri atar, asetpts zamani kesintisiz yeniden numaralar
+    return "aselect='not(" + parcalar.join("+") + ")',asetpts=N/SR/TB";
+  }
+
   return {
+    previewFilter: previewFilter,
     normalize: normalize,
     fillerKind: fillerKind,
     classify: classify,
