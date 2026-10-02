@@ -11,6 +11,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 ---
 
 ## 1. Temel (her sürümde)
+- [ ] **İlk iş:** Bir sekans açıkken Ayarlar → **Suflo Doctor → Taramayı başlat** → "Suflo 3.0 Premiere API'leri" satırı yeşil mi? Sarıysa raporu kopyalayıp gönder (hangi özelliğin bu sürümde çalışmayacağını söyler).
 - [ ] Panel açılıyor, üst çubukta **v3.0.0** yazıyor, "bağlanıyor" kalmıyor.
 - [ ] İlk açılışta **"Suflo 3.0"** yenilikler penceresi çıkıyor; bir maddeye basınca ilgili bölüm açılıyor; panel yeniden açılınca pencere bir daha gelmiyor.
 - [ ] Bir klipten **Altyazı oluştur** çalışıyor (yerel motor).

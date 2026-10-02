@@ -2048,6 +2048,42 @@ function KS_addRangeMarkers(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/*
+ * Suflo Doctor: 3.0 ozelliklerinin dayandigi Premiere API'leri bu kurulumda var mi?
+ * Projeye DOKUNMAZ (yalniz typeof / ozellik okuma). Aktif sekans yoksa sekans
+ * API'leri "bilinmiyor" (null) doner.
+ */
+function KS_apiProbe() {
+  var out = { app: "", seq: false, subsequence: null, autoReframe: null, qe: false, qeAddTracks: null,
+    markers: null, trackItemDisabled: null, trackMuted: null };
+  try { out.app = String(app.version); } catch (eV) {}
+  var seq = null;
+  try { seq = KS_seq(); } catch (eS) {}
+  if (seq) {
+    out.seq = true;
+    try { out.subsequence = typeof seq.createSubsequence === "function"; } catch (e1) { out.subsequence = false; }
+    try { out.autoReframe = typeof seq.autoReframeSequence === "function"; } catch (e2) { out.autoReframe = false; }
+    try { out.markers = !!(seq.markers && typeof seq.markers.createMarker === "function"); } catch (e3) { out.markers = false; }
+    try {
+      var bulundu = false;
+      for (var t = 0; t < seq.audioTracks.numTracks && !bulundu; t++) {
+        var tr = seq.audioTracks[t];
+        if (out.trackMuted === null) out.trackMuted = typeof tr.isMuted === "function";
+        if (tr.clips.numItems > 0) { out.trackItemDisabled = typeof tr.clips[0].disabled === "boolean"; bulundu = true; }
+      }
+    } catch (e4) {}
+  }
+  try {
+    app.enableQE();
+    out.qe = typeof qe !== "undefined" && !!qe.project;
+    if (out.qe && seq) {
+      var q = qe.project.getActiveSequence();
+      out.qeAddTracks = !!(q && typeof q.addTracks === "function");
+    }
+  } catch (eQ) { out.qe = false; }
+  return KS_ok(out);
+}
+
 // Sekansin In/Out'unu verilen araliga ayarla ve playhead'i basa getir
 function KS_setInOut(encoded) {
   try {
