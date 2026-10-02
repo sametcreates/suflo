@@ -54,7 +54,8 @@ function make_token(array $cfg, string $instanceId, bool $bind = false): string 
         'exp' => time() + $ttl,
         'iid' => hash('sha256', $instanceId),
         // 3.0+ istemci her dosya isteginde instance_id gonderir: bu token icin baglama
-        // require_instance ayarindan bagimsiz ZORUNLU (instance_id'yi atlayarak kacilamaz)
+        // require_instance ayarindan bagimsiz zorunlu. client_version istemcinin beyani
+        // oldugundan tam koruma icin 2.x emekliye ayrilinca require_instance => true yapilmali.
         'bind' => $bind ? 1 : 0,
         'nonce' => bin2hex(random_bytes(8))
     ], JSON_UNESCAPED_SLASHES);

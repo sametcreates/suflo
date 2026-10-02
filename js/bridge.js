@@ -56,25 +56,27 @@ window.K = (function () {
    * almadigimiz cagrilari sayariz; baglam yoklamasi bekleyen varken yenisini
    * gondermez (bir saatlik islemde 120 yoklamanin birikmesi engellenir).
    */
-  var yoldaki = 0;
-  var enEskiYoldaki = 0;
+  // id -> { bas: gonderim ani, sinir: bu sureden sonra "kayip cevap" sayilir }
+  var yoldakiler = {};
+  var cagriNo = 0;
   function hostMesgul() {
-    // 15 dk'dan uzun cevapsiz kalan cagri takilmistir: yoklamayi sonsuza kilitlemesin
-    return yoldaki > 0 && Date.now() - enEskiYoldaki < 15 * 60000;
+    var simdi = Date.now(), mesgul = false;
+    Object.keys(yoldakiler).forEach(function (id) {
+      var c = yoldakiler[id];
+      // Cevabi hic gelmeyen (kaybolan) cagri yoklamayi sonsuza kilitlemesin:
+      // zaman asiminin iki kati gecince yoldan dusulur
+      if (simdi - c.bas > c.sinir) delete yoldakiler[id];
+      else mesgul = true;
+    });
+    return mesgul;
   }
 
   function call(fn, arg, timeout) {
     return new Promise(function (resolve) {
       var bitti = false;
-      var cevaplandi = false;
-      if (yoldaki === 0) enEskiYoldaki = Date.now();
-      yoldaki++;
-      function cevapGeldi() {
-        if (cevaplandi) return;
-        cevaplandi = true;
-        yoldaki = Math.max(0, yoldaki - 1);
-        if (yoldaki > 0) enEskiYoldaki = Date.now();
-      }
+      var id = ++cagriNo;
+      yoldakiler[id] = { bas: Date.now(), sinir: Math.min(2 * (timeout || 60000), 2 * 3600000) };
+      function cevapGeldi() { delete yoldakiler[id]; }
       function son(v) {
         if (bitti) return;          // evalScript bazen gecikip sonra da cevap verebiliyor
         bitti = true;
@@ -345,6 +347,13 @@ window.K = (function () {
   }
 
   // Temp klasöründe biriken eski ses/JSON artıklarını süpür
+  // fs.rmSync Node 14.14+; Premiere 14.x CEP'i Node 12 tasir
+  function rmrf(p) {
+    try { if (fs.rmSync) { fs.rmSync(p, { recursive: true, force: true }); return; } } catch (e) {}
+    try { fs.rmdirSync(p, { recursive: true }); return; } catch (e2) {}
+    try { fs.unlinkSync(p); } catch (e3) {}
+  }
+
   function sweepTemp() {
     if (!nodeOK) return 0;
     var n = 0;
@@ -361,7 +370,7 @@ window.K = (function () {
             try {
               var ds = fs.statSync(fp);
               if (ds.isDirectory() && Date.now() - ds.mtimeMs > 86400000) {
-                fs.rmSync(fp, { recursive: true, force: true }); n++;
+                rmrf(fp); n++;
               }
             } catch (eD) {}
             return;
@@ -381,7 +390,7 @@ window.K = (function () {
         fs.readdirSync(ad).forEach(function (f) {
           if (/\.bin$/i.test(f)) return;
           var fp2 = path.join(ad, f);
-          try { if (Date.now() - fs.statSync(fp2).mtimeMs > 86400000) { fs.rmSync(fp2, { recursive: true, force: true }); n++; } } catch (eA) {}
+          try { if (Date.now() - fs.statSync(fp2).mtimeMs > 86400000) { rmrf(fp2); n++; } } catch (eA) {}
         });
       }
     } catch (eAs) {}

@@ -30,6 +30,17 @@ ok("esik: hassasiyet adlari ve sinir", S.esik("yuksek") < S.esik("dusuk") && S.e
 var args = S.ffmpegArgs("a b.mp4", { ss: 3, t: 4, hassasiyet: "orta" });
 ok("ffmpegArgs: -ss/-t girdiden once, yol tek arguman", args.indexOf("-ss") < args.indexOf("-i") && args[args.indexOf("-i") + 1] === "a b.mp4");
 
+var meta = [
+  "[Parsed_metadata_2 @ 0x1] frame:0    pts:25600   pts_time:2",
+  "[Parsed_metadata_2 @ 0x1] lavfi.scene_score=0.412000",
+  "[Parsed_metadata_2 @ 0x1] frame:1    pts:26112   pts_time:2.04",
+  "[Parsed_metadata_2 @ 0x1] lavfi.scene_score=0.950000"
+].join("\n");
+var pm = S.parse(meta);
+ok("parse (metadata=print): zaman ve skor", pm.length === 2 && pm[0].skor === 0.412 && pm[1].skor === 0.95, JSON.stringify(pm));
+var cm = S.clean(pm, { minGap: 1 });
+ok("clean: yakin iki degisimden skoru yuksek olan kalir", cm.length === 1 && cm[0].t === 2.04, JSON.stringify(cm));
+
 /* ---- gercek ffmpeg (varsa) ---- */
 var ff = !cp.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error;
 if (ff) {
@@ -41,6 +52,7 @@ if (ff) {
   var r = cp.spawnSync("ffmpeg", S.ffmpegArgs(vid, {}), { encoding: "utf8" });
   var bulunan = S.clean(S.parse(r.stderr), { dur: 7.5 }).map(function (x) { return x.t; });
   ok("gercek video: 2. ve 5. saniyede sahne degisimi", JSON.stringify(bulunan) === "[2,5]", JSON.stringify(bulunan));
+  ok("gercek video: scene skoru okunuyor", S.parse(r.stderr).every(function (x) { return x.skor > 0; }), JSON.stringify(S.parse(r.stderr)));
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
 } else {
   console.log("ATLA gercek video testi (ffmpeg yok)");
@@ -84,6 +96,25 @@ secim = [];
 ok("split: secim yoksa anlasilir hata", /sec/.test(bol({ times: [12] }).error));
 secim = [V];
 ok("split: klip disi anlar hata verir", bol({ times: [1, 30] }).ok === false);
+
+// Farkli katman ve zamanda iki secili klip: secili olmayan klip (V0'daki W) kesilmez
+var W = { start: { seconds: 30 }, end: { seconds: 40 }, nodeId: "w" };   // V0, secili DEGIL
+var X = { start: { seconds: 30 }, end: { seconds: 40 }, nodeId: "x" };   // V1, secili
+sequence.videoTracks = tracks([[W], [V, X]]);
+sequence.audioTracks = tracks([[], []]);
+secim = [V, X];
+razor = [];
+var iki = bol({ times: [12, 35] });
+ok("split: her an yalniz secili klibin oldugu katmanda kesilir", iki.ok && JSON.stringify(razor.sort()) === JSON.stringify(["V1@TC12", "V1@TC35"]), JSON.stringify(razor));
+
+// Kilitli katman: razor hata verirse "bolundu" denmez
+var eskiQ = qseq.getVideoTrackAt;
+qseq.getVideoTrackAt = function () { return { razor: function () { throw new Error("kilitli"); } }; };
+secim = [V];
+sequence.audioTracks = tracks([[], []]);
+var kilit = bol({ times: [12] });
+ok("split: hicbir razor basarili degilse hata", kilit.ok === false, JSON.stringify(kilit));
+qseq.getVideoTrackAt = eskiQ;
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

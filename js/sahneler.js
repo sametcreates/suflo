@@ -52,6 +52,9 @@ window.KSahne = (function () {
     var sc = await K.call("KS_getSelectedClips");
     if (!sc.ok || !sc.clips || !sc.clips.length) { status("Timeline'da bir video klibi seç.", "warn"); return; }
     clip = sc.clips[0];
+    // Yeni analiz: eski sonuc basarisiz analizde de ekranda kalmasin
+    sahneler = [];
+    el("sc-result").hidden = true;
     setBusy(true);
     status("Görüntü taranıyor… (" + Math.round(clip.dur) + " sn)");
     try {
@@ -84,7 +87,15 @@ window.KSahne = (function () {
 
   async function uygula(bol) {
     if (typeof Pro !== "undefined" && !Pro.gate("cut")) return;
-    if (!sahneler.length) return;
+    if (!sahneler.length || !clip) return;
+    // Bolme yalniz analiz edilen klibe: secim degistiyse baska klibi bu zamanlarda kesme
+    if (bol) {
+      var sc = await K.call("KS_getSelectedClips");
+      var ayni = sc.ok && (sc.clips || []).some(function (c) {
+        return c.mediaPath === clip.mediaPath && Math.abs(c.clipStart - clip.clipStart) < 0.01;
+      });
+      if (!ayni) { status("Sahneler başka bir klip için bulundu — o klibi seç ya da yeniden tara.", "warn"); return; }
+    }
     var times = sahneler.map(function (s) { return s.t; });
     try {
       var r = bol

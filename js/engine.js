@@ -115,14 +115,12 @@ window.KEngine = (function () {
     var depo = hfDepo(item);
     if (!depo || !item.file) return "";
     if (!HF_AGAC[depo]) {
-      var adresler = ["https://huggingface.co/api/models/" + depo + "/tree/main",
-        "https://hf-mirror.com/api/models/" + depo + "/tree/main"];
-      for (var i = 0; i < adresler.length && !HF_AGAC[depo]; i++) {
-        try {
-          var r = await K.httpGet(adresler[i], { "Accept": "application/json" });
-          if (r.status === 200) HF_AGAC[depo] = JSON.parse(r.body);
-        } catch (e) {}
-      }
+      // Yalniz huggingface.co: dosya aynadan indiyse ozeti de aynadan almak, degistirilmis
+      // bir aynanin kendi dosyasini onaylamasi olurdu. Ulasilamazsa "bilinmiyor".
+      try {
+        var r = await K.httpGet("https://huggingface.co/api/models/" + depo + "/tree/main", { "Accept": "application/json" });
+        if (r.status === 200) HF_AGAC[depo] = JSON.parse(r.body);
+      } catch (e) {}
     }
     return hfBeklenenOzet(HF_AGAC[depo], item.file);
   }

@@ -23,7 +23,7 @@
 
   /*
    * ffmpeg argümanları. Kare küçültülür (analiz hızlanır, skor değişmez sayılır);
-   * ses yok sayılır. Çıktı stderr'deki showinfo satırlarıdır.
+   * ses yok sayılır. Çıktı stderr'deki metadata=print satırlarıdır (zaman + skor).
    */
   function ffmpegArgs(mediaPath, opts) {
     opts = opts || {};
@@ -31,25 +31,29 @@
     if (opts.ss != null) args.push("-ss", String(opts.ss));
     if (opts.t != null) args.push("-t", String(opts.t));
     args.push("-i", mediaPath, "-an", "-sn", "-dn",
-      "-vf", "scale=320:-2,select='gt(scene\\," + esik(opts.hassasiyet).toFixed(2) + ")',showinfo",
+      // metadata=print: secilen her karenin zamani VE scene skoru (showinfo skoru yazmaz)
+      "-vf", "scale=320:-2,select='gt(scene\\," + esik(opts.hassasiyet).toFixed(2) + ")',metadata=print:key=lavfi.scene_score",
       "-f", "null", "-");
     return args;
   }
 
   /*
-   * showinfo satırlarından pts_time'ları al. Doner: [{ t, skor }] (girdi saniyesi,
-   * -ss'e göre 0 tabanlı). Skor, satırda "scene_score" varsa okunur.
+   * metadata/showinfo satırlarından pts_time ve scene skorunu al. Doner: [{ t, skor }]
+   * (girdi saniyesi, -ss'e göre 0 tabanlı; skor yoksa null).
    */
   function parse(stderr) {
     var out = [];
     String(stderr || "").split(/\r?\n/).forEach(function (line) {
-      if (line.indexOf("Parsed_showinfo") === -1) return;
+      // metadata=print: "frame:0 pts:.. pts_time:2" satiri, ardindan "lavfi.scene_score=0.9"
+      // (eski showinfo bicimi de okunur)
+      if (line.indexOf("Parsed_metadata") === -1 && line.indexOf("Parsed_showinfo") === -1) return;
+      var s = /lavfi\.scene_score=([\d.]+)/.exec(line);
+      if (s && out.length && out[out.length - 1].skor == null) { out[out.length - 1].skor = parseFloat(s[1]); return; }
       var m = /pts_time:\s*(-?[\d.]+)/.exec(line);
       if (!m) return;
       var t = parseFloat(m[1]);
       if (!isFinite(t) || t < 0) return;
-      var s = /scene_score[=:]\s*([\d.]+)/.exec(line);
-      out.push({ t: t, skor: s ? parseFloat(s[1]) : null });
+      out.push({ t: t, skor: null });
     });
     out.sort(function (a, b) { return a.t - b.t; });
     return out;

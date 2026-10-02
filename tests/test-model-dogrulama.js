@@ -42,7 +42,8 @@ ok("hfBeklenenOzet: LFS olmayan / bozuk girdi bos", E._hfBeklenenOzet([{ path: "
   fs.writeFileSync(yol3, Buffer.from("x"));
   agacYaniti = null;
   ok("API'ye ulasilamazsa kurulum engellenmez (dosya kalir)", await E._modelDogrula(model3, yol3) === true && fs.existsSync(yol3));
-  ok("API iki kaynaktan denendi (huggingface + ayna)", istekler.filter(function (u) { return /ag\/yok/.test(u); }).length === 2, istekler.join(" "));
+  ok("ozet yalniz huggingface.co'dan istenir (ayna kendi dosyasini onaylamaz)",
+    istekler.filter(function (u) { return /ag\/yok/.test(u); }).length === 1 && istekler.every(function (u) { return /^https:\/\/huggingface\.co\//.test(u); }), istekler.join(" "));
 
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
   console.log(gecen + "/" + toplam + " gecti");

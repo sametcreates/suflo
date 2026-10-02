@@ -239,6 +239,9 @@ window.KBeat = (function () {
     clip = k;
     if (!k) { status("Önce timeline'da bir klip seç.", "warn"); return; }
     busy = true;
+    // Yeni analiz: eski sonuc (baska klibin vuruslari) bu analiz basarisiz olsa da kalmasin
+    vurusler = [];
+    el("beat-result").hidden = true;
     el("beat-analyze").classList.add("busy");
     el("beat-progress").hidden = false;
     var temizle = [];

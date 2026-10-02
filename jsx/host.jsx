@@ -694,7 +694,9 @@ function KS_splitSelectedAt(encoded) {
     var sel = seq.getSelection();
     if (!sel || !sel.length) return KS_err("Timeline'da bolunecek klibi sec.");
 
-    var vIdx = {}, aIdx = {}, lo = null, hi = null, ti, ci, si;
+    // katman -> o katmandaki SECILI kliplerin araliklari: bir an yalniz o katmanda
+    // secili bir klibin icine dusuyorsa kesilir (secili olmayan klip kesilmez)
+    var vIdx = {}, aIdx = {}, lo = null, ti, ci, si;
     function tara(tracks, hedef) {
       for (ti = 0; ti < tracks.numTracks; ti++) {
         var tr = tracks[ti];
@@ -702,14 +704,19 @@ function KS_splitSelectedAt(encoded) {
           var c = tr.clips[ci];
           for (si = 0; si < sel.length; si++) {
             if (c === sel[si] || (c.nodeId && sel[si].nodeId && String(c.nodeId) === String(sel[si].nodeId))) {
-              hedef[ti] = 1;
-              var a = Number(c.start.seconds), b = Number(c.end.seconds);
-              if (lo === null || a < lo) lo = a;
-              if (hi === null || b > hi) hi = b;
+              if (!hedef[ti]) hedef[ti] = [];
+              hedef[ti].push([Number(c.start.seconds), Number(c.end.seconds)]);
+              lo = 1;
             }
           }
         }
       }
+    }
+    function icinde(araliklar, t) {
+      for (var q = 0; q < araliklar.length; q++) {
+        if (t > araliklar[q][0] + 0.02 && t < araliklar[q][1] - 0.02) return true;
+      }
+      return false;
     }
     tara(seq.videoTracks, vIdx);
     tara(seq.audioTracks, aIdx);
@@ -720,10 +727,20 @@ function KS_splitSelectedAt(encoded) {
     var kesilen = 0, k;
     for (var i = 0; i < times.length; i++) {
       var t = Number(times[i]);
-      if (!(t > lo + 0.02 && t < hi - 0.02)) continue;
-      var tc = KS_timecode(t);
-      for (k in vIdx) { if (vIdx.hasOwnProperty(k)) { try { qseq.getVideoTrackAt(Number(k)).razor(tc); } catch (eV) {} } }
-      for (k in aIdx) { if (aIdx.hasOwnProperty(k)) { try { qseq.getAudioTrackAt(Number(k)).razor(tc); } catch (eA) {} } }
+      var tc = null, basarili = 0;
+      for (k in vIdx) {
+        if (vIdx.hasOwnProperty(k) && icinde(vIdx[k], t)) {
+          if (tc === null) tc = KS_timecode(t);
+          try { qseq.getVideoTrackAt(Number(k)).razor(tc); basarili++; } catch (eV) {}
+        }
+      }
+      for (k in aIdx) {
+        if (aIdx.hasOwnProperty(k) && icinde(aIdx[k], t)) {
+          if (tc === null) tc = KS_timecode(t);
+          try { qseq.getAudioTrackAt(Number(k)).razor(tc); basarili++; } catch (eA) {}
+        }
+      }
+      if (!basarili) continue;   // kilitli katman vb.: "bolundu" denmesin
       if (p.markers) {
         try {
           var m = seq.markers.createMarker(t);

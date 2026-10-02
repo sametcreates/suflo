@@ -126,6 +126,8 @@ window.KTextCut = (function () {
     if (!window.KCaptions || !KCaptions.transcribeWords) { status("Altyazı motoru yüklenemedi.", "bad"); return; }
     setBusy(true);
     status("Hazırlanıyor…");
+    // Analizin BASLADIGI sekans: uzun transkripsiyon sirasinda sekans degisirse karismasin
+    var basSekans = KApp.ctx().sequenceId || KApp.ctx().sequence || "";
     try {
       var dilSecimi = (el("cap-lang") && el("cap-lang").value) || "tr";
       var sonuc = await KCaptions.transcribeWords({
@@ -133,7 +135,7 @@ window.KTextCut = (function () {
         onStatus: function (m, c) { status(m, c); }
       });
       clip = sonuc.clip;
-      sekans = KApp.ctx().sequenceId || KApp.ctx().sequence || "";
+      sekans = basSekans;
       lang = sonuc.lang || "tr";
       words = sonuc.words;
       elle = {};
@@ -159,7 +161,9 @@ window.KTextCut = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("textcut")) return;
     var r = kesimler().map(function (x) { return { start: x.start, end: x.end }; });
     if (!r.length) return;
-    var aktif = KApp.ctx().sequenceId || KApp.ctx().sequence || "";
+    // Bayat olabilecek yoklama yerine Premiere'e taze sor
+    var tazeCtx = await K.call("KS_getContext");
+    var aktif = tazeCtx.ok ? (tazeCtx.sequenceId || tazeCtx.sequence || "") : "";
     if (sekans && aktif && aktif !== sekans) {
       status("Bu kesimler başka bir sekans için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
       return;
