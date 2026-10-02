@@ -25,6 +25,8 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] "Ara sözler" anahtarını aç → *şey, yani, işte* işaretleniyor.
 - [ ] Duraksama "0,6 sn'ye kısalt" → uzun boşluklarda ⏸ etiketi görünüyor.
 - [ ] **Kesimleri uygula** (Kopya sekansta) → yeni sekans açılıyor, kesimler doğru yerde, **ses ve görüntü senkron**.
+- [ ] **▶ Dinle** → kesimler uygulanmış ses panelde çalıyor; işaretlenen kelimeler duyulmuyor, timeline değişmiyor.
+- [ ] Otomatik Kesim sonucunda da **▶ Dinle** sessizlikleri çıkarılmış sesi çalıyor.
 - [ ] Kesim sonrası konuşma doğal duyuluyor (kelime ortasından kesilmiyor). Kesilmişse: hangi kelimede, günlükle bildir.
 - [ ] Timeline'da boş yere tıklayınca liste kaybolmuyor; başka klip seçince sıfırlanıyor.
 

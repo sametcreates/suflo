@@ -2,7 +2,7 @@
 
 ### Yeni
 - **Viral anlar (Shorts bulucu):** Uzun videonun altyazısından yapay zekâ, kancayla başlayan ve tek başına anlaşılan 15–60 sn'lik anları puanlayarak bulur. Tek tıkla In/Out ayarla ya da kırmızı, süreli marker olarak ekle.
-- **Konuşmadan kes:** Kesim sekmesinde klibi kelime kelime yazıya döker; *ııı, eee, hmm* gibi dolgu seslerini, *"ben ben"* tekrarlarını ve uzun duraksamaları işaretler. Bir kelimeye tıkla, videodan da çıksın. Kopya sekansta uygulanır, orijinal bozulmaz. Türkçe, Azerice, İngilizce ve Rusça.
+- **Konuşmadan kes:** Kesim sekmesinde klibi kelime kelime yazıya döker; *ııı, eee, hmm* gibi dolgu seslerini, *"ben ben"* tekrarlarını ve uzun duraksamaları işaretler. Bir kelimeye tıkla, videodan da çıksın. Kopya sekansta uygulanır, orijinal bozulmaz. Türkçe, Azerice, İngilizce ve Rusça. **▶ Dinle** ile sonucu uygulamadan önce panelde duy (Otomatik Kesim'de de var).
 - **Suflo Stilleri:** Kendi stil motorumuzla **12 animasyonlu altyazı stili** — yeni Hormozi, Neon, Daktilo, Zıplayan ve Karaoke Dolgu dahil. MOGRT gerekmez; seçince canlı önizleme oynar, "ile ekle" altyazıyı şeffaf video katmanı olarak timeline'a koyar. Premiere şablonları da yanında durur.
 - **Geçişler:** Yeni sekme. Playhead'i kesime getir, tek tıkla 13 geçişten birini uygula: zoom, whip (4 yön), itme, zıplama, punch, sarsıntı, karartma, yumuşak geçiş. Eklenti veya ayar katmanı gerekmez; keyframe'ler Premiere'de düzenlenebilir.
 - **Bölümler (YouTube):** Altyazıdan bölüm önerir, istersen AI ile başlık atar, YouTube kurallarını (0:00, en az 3 bölüm, 10 sn) denetler. Açıklamaya kopyala ya da timeline'a Chapter marker'ı olarak ekle.
@@ -10,6 +10,7 @@
 - **Sahne algılama:** Kesim sekmesinde. Uzun kayıtlarda ve hazır videolarda sahne değişimlerini görüntüden bulur; marker at ya da seçili klibi sahnelerde böl — müzik katmanına dokunulmaz.
 - **Vuruşlarda böl:** Ritim sekmesinde müziği analiz et, B-roll'u seç, tek tıkla vuruşlarda kes.
 - **Çift dilli altyazı:** Çeviriden sonra "çift dilli" anahtarıyla SRT/VTT ve altyazı izi orijinal + çeviriyi alt alta yazar.
+- **Yenilikler penceresi:** 3.0'ı ilk açışta yeni özellikler tek ekranda; her biri tek tıkla ilgili bölümü açar.
 - **Yeni diller:** Konuşma dili ve çeviri için Almanca, Arapça, İspanyolca, Fransızca, Portekizce, İtalyanca; çeviride ayrıca Felemenkçe ve Japonca.
 
 ### Düzeltildi
