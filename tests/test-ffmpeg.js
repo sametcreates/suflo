@@ -107,7 +107,9 @@ function ortam(opts) {
              * tar.exe GERCEKTEN calissin (arsiv acmayi olcuyoruz);
              * ffmpeg -version ise taklit edilsin (gercek ikili indirmeyelim).
              */
-            var ffmpegDogrulama = /ffmpeg(\.exe)?$/i.test(String(cmd)) && args && args[0] === "-version";
+            // -version ve libass yoklamasi (-filters) taklit edilir
+            var ffmpegDogrulama = /ffmpeg(\.exe)?$/i.test(String(cmd)) && args && (args[0] === "-version" || args.indexOf("-filters") !== -1);
+            var filtreYoklama = ffmpegDogrulama && args.indexOf("-filters") !== -1;
             var handlers = {};
             var child = {
               stdout: { on: function (e, f) { handlers.out = f; } },
@@ -123,7 +125,7 @@ function ortam(opts) {
                 var icerik = "";
                 try { icerik = String(realFs.readFileSync(cmd)); } catch (e) {}
                 if (varMi && icerik.indexOf("SAHTE-FFMPEG-IKILISI") === 0) {
-                  if (handlers.out) handlers.out(Buffer.from("ffmpeg version 9.9.9-test\n"));
+                  if (handlers.out) handlers.out(Buffer.from(filtreYoklama ? " ... subtitles         V->V       Render text subtitles\n" : "ffmpeg version 9.9.9-test\n"));
                   if (handlers.close) handlers.close(0);
                 } else {
                   if (handlers.err) handlers.err(Buffer.from("not recognized"));
@@ -186,6 +188,7 @@ function kaynaklariDegistir(KEngine, urls) {
 
   /* ============ 2) Olmayan mutlak yollar surec baslatmadan atlaniyor ============ */
   var ffmpegDenemeleri = e2.komutlar.filter(function (k) { return /ffmpeg/i.test(k.cmd); });
+  // aday basina -version + libass yoklamasi (-filters): bulunan tek aday icin en fazla 2 surec
   chk("olmayan adaylar icin surec baslatilmiyor (hiz)",
     ffmpegDenemeleri.length <= 2, ffmpegDenemeleri.length + " deneme yapildi");
 
