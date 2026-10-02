@@ -146,7 +146,7 @@
     }
     var total = segs.length ? segs[segs.length - 1].end - origin : 0;
     var hedef = Math.max(3, Math.min(opts.max || 12, Math.round(total / (opts.every || 90))));
-    var dil = { tr: "Turkish", az: "Azerbaijani", en: "English", ru: "Russian" }[opts.lang || "tr"] || "the transcript's language";
+    var dil = { tr: "Turkish", az: "Azerbaijani", en: "English", ru: "Russian", de: "German", ar: "Arabic", es: "Spanish", fr: "French", pt: "Portuguese", it: "Italian", nl: "Dutch", ja: "Japanese" }[opts.lang || "tr"] || "the transcript's language";
     return {
       system: "You split a video transcript into YouTube chapters. Reply ONLY with JSON " +
         "{\"chapters\":[{\"t\":seconds,\"title\":\"...\"}]}. The first chapter must have t=0. " +

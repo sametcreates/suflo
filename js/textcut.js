@@ -38,8 +38,19 @@
       // "а" Rusca'da cok yaygin baglac ("ve/ama"): kesin dolgu degil, ara soz
       kesin: ["э", "м", "эм", "ээ", "хм"],
       yumusak: ["а", "ну", "типа", "как бы", "короче", "вот"]
-    }
+    },
+    // Tek harfli "a", "e" bu dillerde gercek sozcuk (ve, -e, var): dolgu sayilmaz
+    de: { kesin: ["äh", "ähm", "öh", "hm", "m", "mhm"], yumusak: ["also", "halt", "quasi", "sozusagen", "irgendwie"] },
+    es: { kesin: ["eh", "ehm", "em", "hm", "mm"], yumusak: ["pues", "o sea", "bueno", "este", "vale"] },
+    fr: { kesin: ["euh", "heu", "hum", "hm", "bah"], yumusak: ["genre", "bref", "en fait", "du coup", "voilà"] },
+    it: { kesin: ["ehm", "ehh", "mmh", "hm", "uhm"], yumusak: ["cioè", "tipo", "allora", "insomma", "praticamente"] },
+    pt: { kesin: ["hum", "hm", "ehh", "éé", "ãh"], yumusak: ["tipo", "então", "né", "assim", "sabe"] },
+    ar: { kesin: ["اه", "امم", "مم", "هم"], yumusak: ["يعني", "طيب", "اممم"] }
   };
+
+  // Tablosu olmayan dil: yalniz her dilde anlamsiz kapali-agiz sesleri. Turkce
+  // tabloya dusmek "a"/"e" gibi gercek sozcukleri kesiyordu.
+  var EVRENSEL = { kesin: ["hm", "m", "mm", "mhm"], yumusak: [] };
 
   /*
    * Turkce ikilemeler ("yavaş yavaş", "koşa koşa") kekemelik degil, dilin
@@ -69,7 +80,7 @@
   }
 
   function fillerKind(text, lang) {
-    var tablo = DOLGU[lang] || DOLGU.tr;
+    var tablo = DOLGU[lang] || EVRENSEL;
     var n = normalize(text, lang);
     if (!n) return null;
     var sq = squeeze(n);
@@ -202,10 +213,20 @@
    * motoru onlari yazmaya iter; yazmasa bile duraksama kesimi o bosluklari yakalar.
    */
   function fillerPrompt(lang) {
-    if (lang === "en") return "Umm, uh, er, so... I mean, like, hmm.";
-    if (lang === "ru") return "Э-э, м-м, ну, это самое, хм.";
-    if (lang === "az") return "Ee, ıı, hmm, yəni, şey.";
-    return "Iıı, eee, hmm, şey, yani... ıı, ee.";
+    var ipucu = {
+      tr: "Iıı, eee, hmm, şey, yani... ıı, ee.",
+      en: "Umm, uh, er, so... I mean, like, hmm.",
+      ru: "Э-э, м-м, ну, это самое, хм.",
+      az: "Ee, ıı, hmm, yəni, şey.",
+      de: "Äh, ähm, hm, also... halt, sozusagen.",
+      es: "Eh, ehm, pues... o sea, bueno, este.",
+      fr: "Euh, heu, hum... en fait, du coup, bah.",
+      it: "Ehm, mmh, cioè... allora, tipo, insomma.",
+      pt: "Hum, ãh, então... tipo, né, assim.",
+      ar: "اه، امم، يعني... طيب."
+    };
+    // Bilinmeyen dilde Turkce ipucu motoru yanlis dile cekerdi: tarafsiz ses ipucu
+    return ipucu[lang] || "Hmm, mm.";
   }
 
   /*

@@ -49,5 +49,16 @@ for (var k = 0; k < 4; k++) az.push({ start: k * 5, end: k * 5 + 4.6, text: "x" 
 var ra = H.parseResponse({ clips: [{ from: 0, to: 0, title: "a", score: 5 }] }, az, {});
 chk("kisa videoda da uzatma calisir", ra.length === 1 && ra[0].end - ra[0].start >= 15, JSON.stringify(ra));
 
+/* ucuncu inceleme duzeltmeleri */
+chk("null girdi tum sonucu bozmaz, atlanir", H.parseResponse({ clips: [null, { from: null, to: 0 }, { from: 10, to: 17, title: "t", score: 5 }] }, segs, {}).length === 1);
+var sp = H.buildPrompt(segs, { maxChars: 800 });
+var sr = H.parseResponse({ clips: [{ from: 18, to: 18, title: "s", score: 5 }] }, segs, { adim: sp.adim });
+chk("seyreltilmis istemde klip gizli satirlari da kapsar", sp.adim > 1 && sr[0] && sr[0].to >= 18 + sp.adim - 1, sp.adim + " / " + JSON.stringify(sr[0] && [sr[0].from, sr[0].to]));
+var bosluklu = [];
+for (var q = 0; q < 21; q++) bosluklu.push({ start: q * 2, end: q * 2 + 1.8, text: "s" + q });
+bosluklu.push({ start: 120, end: 122, text: "uzak" });
+var geri = H.parseResponse({ clips: [{ from: 18, to: 20, title: "g", score: 5 }] }, bosluklu, { minDur: 15, maxDur: 60 });
+chk("ileride uzun bosluk varsa klip geriye dogru uzatilir", geri.length === 1 && geri[0].to === 20 && geri[0].from < 18 && geri[0].end - geri[0].start >= 15, JSON.stringify(geri.map(function (c) { return [c.from, c.to]; })));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

@@ -39,11 +39,12 @@
     var lines = segs.map(function (s, i) { return "[" + i + "] [" + Math.round(s.start) + "s] " + s.text; });
     // Cok uzun metin: satirlari esit aralikla seyrelt (numaralar korunur)
     var toplam = lines.reduce(function (a, l) { return a + l.length + 1; }, 0);
+    var adim = 1;
     if (toplam > maxChars) {
-      var adim = Math.ceil(toplam / maxChars);
+      adim = Math.ceil(toplam / maxChars);
       lines = lines.filter(function (l, i) { return i % adim === 0; });
     }
-    var dil = { tr: "Turkish", az: "Azerbaijani", en: "English", ru: "Russian" }[opts.lang || "tr"] || "the transcript's language";
+    var dil = { tr: "Turkish", az: "Azerbaijani", en: "English", ru: "Russian", de: "German", ar: "Arabic", es: "Spanish", fr: "French", pt: "Portuguese", it: "Italian", nl: "Dutch", ja: "Japanese" }[opts.lang || "tr"] || "the transcript's language";
     return {
       system: "You are a short-form video editor. From a long talk transcript, pick the " + adet +
         " best standalone clips for YouTube Shorts / Reels / TikTok. Each clip must: start with a strong hook " +
@@ -52,7 +53,9 @@
         "Reply ONLY with JSON {\"clips\":[{\"from\":<first line number>,\"to\":<last line number>," +
         "\"title\":\"<catchy title, max 7 words, in " + dil + ">\",\"hook\":\"<why it works, max 12 words, in " + dil +
         ">\",\"score\":<1-10 virality>}]} ordered by score, best first.",
-      user: "Transcript lines as [line number] [start seconds] text:\n" + lines.join("\n")
+      user: "Transcript lines as [line number] [start seconds] text:\n" + lines.join("\n"),
+      // seyreltme adimi: model yalniz her adim'inci satiri gordu (parseResponse'a verilir)
+      adim: adim
     };
   }
 
@@ -73,16 +76,27 @@
     var raw = data && (data.clips || data.Clips || data.highlights);
     if (!(raw instanceof Array)) return [];
     var son = segs.length - 1;
+    var adim = Math.max(1, Math.round(Number(opts.adim) || 1));
     var adaylar = [];
     raw.forEach(function (c) {
-      var a = Math.round(num(c && c.from)), b = Math.round(num(c && c.to));
+      // null / eksik girdi: atla (num(null) 0 olur ve modelin secmedigi bir klip uretirdi)
+      if (!c || typeof c !== "object" || c.from == null || c.to == null) return;
+      var a = Math.round(num(c.from)), b = Math.round(num(c.to));
       if (!isFinite(a) || !isFinite(b)) return;
       if (a > b) { var t = a; a = b; b = t; }
       a = Math.max(0, Math.min(son, a));
       b = Math.max(0, Math.min(son, b));
-      // cok kisa: once sona, sonra basa dogru satir ekle
+      // Seyreltilmis istemde model "to" olarak gordugu son satiri verdi; dusunce
+      // gizli satirlarda (to+1 .. to+adim-1) suruyor olabilir: o satirlari da kapsa
+      if (adim > 1) b = Math.min(son, b + adim - 1);
+      // cok kisa: once sona dogru uzat; sona eklemek ust siniri asacaksa (uzun bosluk)
+      // basa dogru uzat
       while (segs[b].end - segs[a].start < minDur && (b < son || a > 0)) {
-        if (b < son) b++; else a--;
+        var ileri = b < son && segs[b + 1].end - segs[a].start <= maxDur;
+        if (ileri) b++;
+        else if (a > 0) a--;
+        else if (b < son) b++;
+        else break;
       }
       // cok uzun: sondan kirp (kanca basta kalsin)
       while (segs[b].end - segs[a].start > maxDur && b > a) b--;

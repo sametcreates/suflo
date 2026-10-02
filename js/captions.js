@@ -123,6 +123,7 @@ window.KCaptions = (function () {
     K.saveDraft({
       segments: segments,
       mode: segmentsMode,
+      ceviriDili: ceviriDili,
       sequence: ctx.sequence || "",
       scope: scope,
       ts: Date.now()
@@ -147,6 +148,7 @@ window.KCaptions = (function () {
     segments = JSON.parse(JSON.stringify(d.segments));   // taslak nesnesini takma adla mutasyona uğratma
     segmentsMode = d.mode || "plain";
     clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil
+    ceviriDili = d.ceviriDili || "";                     // taslak çevrilmişse hedef dil (s.orig satırlarda)
     el("cap-result").hidden = false;
     render();                                            // önce render, sonra etiket (render eziyor)
     el("cap-result-info").textContent = segments.length + " satır · kurtarıldı";
@@ -1323,7 +1325,12 @@ window.KCaptions = (function () {
 
   /* ---------------- Stil ---------------- */
 
-  function styleLocale() {
+  function styleLocale(kaynak) {
+    // Cevrilmis metin hedef dilin kuralina uyar: Turkce'den Ingilizceye cevrilen
+    // "this" BUYUK HARF'te "THİS" olmasin
+    if (!kaynak && ceviriDili && ceviriVar()) {
+      return { tr: "tr-TR", az: "az", ru: "ru" }[ceviriDili];
+    }
     var l = el("cap-lang").value;
     if (l === "") l = algilananDil; // "Otomatik": motorun algiladigi dile guven
     if (l === "tr") return "tr-TR";
@@ -1332,14 +1339,15 @@ window.KCaptions = (function () {
     return undefined;
   }
 
-  function styleText(t) {
+  // kaynakDili: true ise metin orijinal (s.orig) — kaynak dilin buyuk/kucuk harf kurali
+  function styleText(t, kaynakDili) {
     var mode = el("cap-case").value;
     var keepPunct = el("cap-punct").checked;
     var out = t;
     if (!keepPunct) {
-      out = out.replace(/[.,!?;:…»«""()\-–—]/g, " ").replace(/\s+/g, " ").trim();
+      out = out.replace(/[.,!?;:…»«""()\-–—\u060C\u061F\u061B]/g, " ").replace(/\s+/g, " ").trim();   // + Arapça ، ؟ ؛
     }
-    var loc = styleLocale();
+    var loc = kaynakDili ? styleLocale(true) : styleLocale();
     if (mode === "upper") out = loc ? out.toLocaleUpperCase(loc) : out.toUpperCase();
     else if (mode === "lower") out = loc ? out.toLocaleLowerCase(loc) : out.toLowerCase();
     return out;
@@ -1646,7 +1654,7 @@ window.KCaptions = (function () {
     var len = el("cap-maxlen") ? el("cap-maxlen").value : "c42";
     var mc = /^c(\d+)$/.exec(len);
     return {
-      lang: (el("cap-lang") && el("cap-lang").value) || algilananDil || "tr",
+      lang: (ceviriDili && ceviriVar() ? ceviriDili : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || "tr",
       maxChars: mc ? Number(mc[1]) : 42,
       wordMode: /^k/.test(len) || segmentsMode === "k1" || segmentsMode === "kc"
     };
@@ -1869,6 +1877,7 @@ window.KCaptions = (function () {
   }
 
   function render() {
+    ceviriDugmeleriniGuncelle();   // geri al/yinele/taslak sonrasi da satirlarla tutarli
     // Gerçek satırlar geldiğinde/değiştiğinde önizleme de onlardan beslensin
     onizlemeCiz();
     var box = el("cap-segments");
@@ -2142,9 +2151,25 @@ window.KCaptions = (function () {
    * taşınır: bölme/birleştirme/silme/sıralama index eşlemesini bozduğu için index tabanlı
    * saklama, geri alındığında metinleri yanlış satırlara yazıyordu.
    */
-  var preTranslate = null; // yalnızca "çeviri yapıldı" bayrağı
+  /*
+   * Ceviri durumu ayri bir bayrakta DEGIL, veride: s.orig tasiyan satir varsa
+   * belge cevrilmistir. Bayrak geri al/yinele, taslak kurtarma ve yeni
+   * transkriptten sonra satirlarla ayrisiyordu (dugmeler yanlis gorunuyordu).
+   */
+  var ceviriDili = "";     // son cevirinin hedef dili (buyuk harf ve kalite kurallari icin)
+  function ceviriVar() {
+    for (var i = 0; i < segments.length; i++) if (typeof segments[i].orig === "string") return true;
+    return false;
+  }
+  function ceviriDugmeleriniGuncelle() {
+    var var_ = ceviriVar();
+    var b = el("cap-revert");
+    if (b) b.hidden = !var_;
+    var c = el("cap-cift-dil-sar");
+    if (c) c.hidden = !var_;
+  }
   function clearRevert() {
-    preTranslate = null;
+    ceviriDili = "";
     var b = el("cap-revert");
     if (b) b.hidden = true;
     var c = el("cap-cift-dil-sar");
@@ -2154,7 +2179,7 @@ window.KCaptions = (function () {
   // Çeviri sonrası "çift dilli": orijinal + çeviri alt alta (SRT/VTT/normal iz)
   function ciftDilAcik() {
     var c = el("cap-cift-dil");
-    return !!(c && c.checked && preTranslate);
+    return !!(c && c.checked && ceviriVar());
   }
 
   var LANG_NAMES = {
@@ -2254,7 +2279,7 @@ window.KCaptions = (function () {
         if (typeof s.orig !== "string") s.orig = texts[i2];   // zincir çeviride ilk orijinali koru
         s.text = String(out[i2] || "").trim() || s.text;
       });
-      preTranslate = true;
+      ceviriDili = target;
       status("");
       el("cap-revert").hidden = false;
       if (el("cap-cift-dil-sar")) el("cap-cift-dil-sar").hidden = false;
@@ -2269,7 +2294,7 @@ window.KCaptions = (function () {
   }
 
   function revertTranslate() {
-    if (!preTranslate) return;
+    if (!ceviriVar()) return;
     var atlanan = 0;
     snapshot("çeviriyi geri al");
     segments.forEach(function (s) {
@@ -2429,7 +2454,7 @@ window.KCaptions = (function () {
       var txt = styleText(s.text);
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
       if (cift && typeof s.orig === "string") {
-        var asil = styleText(s.orig);
+        var asil = styleText(s.orig, true);
         if (asil && asil !== txt) txt = asil + "\n" + txt;
       }
       // minimum 0.3 sn gorunum — ama bir sonraki cue ile CAKISMA (karaoke'de kritik)
@@ -3902,7 +3927,8 @@ window.KCaptions = (function () {
     // Bulut LLM (Groq/OpenAI) — ceviri ile ayni ayar ve anahtar
     chatConfig: chatConfig,
     chatCall: chatCall,
-    language: function () { return algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr"; },
+    // Bolum/viral basliklari ekrandaki metnin dilinde: ceviri varsa hedef dil
+    language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr"; },
     refreshMogrtStyles: refreshMogrtStyles
   };
 })();

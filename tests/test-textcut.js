@@ -82,5 +82,11 @@ if (!cpx.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error) {
   try { fsx.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
 } else console.log("ATLA gercek ffmpeg onizleme testi");
 
+/* yeni diller: gercek tek harfli sozcukler dolgu degil, dile ozgu dolgular yakalanir */
+chk("es/fr/it/pt: 'a' ve 'e' sozcuk, dolgu degil", ["es", "fr", "it", "pt"].every(function (l) { return T.fillerKind("a", l) === null && T.fillerKind("e", l) === null; }));
+chk("de 'äh', fr 'euh', it 'ehm' kesin dolgu", T.fillerKind("Äh,", "de") === "filler" && T.fillerKind("euh", "fr") === "filler" && T.fillerKind("ehm", "it") === "filler");
+chk("tablosu olmayan dil (nl): yalniz evrensel sesler", T.fillerKind("hm", "nl") === "filler" && T.fillerKind("e", "nl") === null);
+chk("fillerPrompt: bilinmeyen dilde Turkce ipucu yok", !/ı|şey/.test(T.fillerPrompt("nl")) && /äh/i.test(T.fillerPrompt("de")));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

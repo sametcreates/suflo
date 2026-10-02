@@ -85,7 +85,7 @@ window.KViral = (function () {
         messages: [{ role: "system", content: p.system }, { role: "user", content: p.user }]
       });
       var content = json.choices && json.choices[0] && json.choices[0].message.content;
-      anlar = HL.parseResponse(content, segs, s);
+      anlar = HL.parseResponse(content, segs, { minDur: s.minDur, maxDur: s.maxDur, adim: p.adim });
       if (!anlar.length) throw new Error("Uygun an bulunamadı — süreyi değiştirip tekrar dene.");
       durum("");
       render();
