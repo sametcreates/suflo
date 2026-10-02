@@ -3450,3 +3450,21 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   .sfx-filter-row { align-items:flex-start; flex-wrap:wrap; }
   .sfx-filter-actions { width:100%; justify-content:space-between; }
 }
+
+/* ---------- Konusmadan kes (v3.0) ---------- */
+.tc-card { margin-top: 18px; background: var(--grad-soft); border: 1px solid var(--line); border-radius: var(--r); padding: 13px 14px; }
+.tc-yeni { margin-left: auto; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; color: var(--accent-lite); background: var(--accent-soft); border-radius: 999px; padding: 2px 8px; }
+.tc-opts { display: grid; gap: 8px; margin-bottom: 10px; }
+.tc-opts .switch span { font-size: 12px; }
+.tc-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; font-size: 10.5px; }
+.tc-words { max-height: 280px; overflow: auto; line-height: 1.9; font-size: 13px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg-2, rgba(0,0,0,.18)); margin-bottom: 10px; }
+.tc-w { display: inline-block; padding: 0 3px; margin: 0 1px; border-radius: 4px; cursor: pointer; color: var(--text); }
+.tc-w:hover { background: rgba(255,255,255,.08); }
+.tc-w.filler, .tc-w.repeat, .tc-w.soft, .tc-w.cut { text-decoration: line-through; text-decoration-thickness: 2px; }
+.tc-w.filler { background: rgba(255,153,0,.18); color: #ffb54d; }
+.tc-w.repeat { background: rgba(255,99,132,.16); color: #ff8fa6; }
+.tc-w.soft { background: rgba(162,155,254,.16); color: #b9b3ff; }
+.tc-w.cut { background: rgba(255,255,255,.08); color: var(--dim); }
+.tc-w.kept { text-decoration: none; background: none; color: var(--text); opacity: 1; }
+.tc-legend .tc-w { cursor: default; }
+.tc-pause { display: inline-block; color: var(--dim); font-size: 10px; padding: 0 4px; border-radius: 4px; background: rgba(255,153,0,.12); }

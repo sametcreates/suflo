@@ -161,7 +161,12 @@ window.KCaptions = (function () {
     return [];
   }
 
+  // Baska bir sekme (or. Konusmadan kes) motoru kullanirken ilerleme oraya akar
+  var durumYonlendir = null;
+  var ekIpucu = "";
+
   function status(msg, cls) {
+    if (durumYonlendir) { durumYonlendir(msg, cls); return; }
     var e = el("cap-status");
     e.className = "inline-status" + (cls ? " " + cls : "");
     e.textContent = msg || "";
@@ -539,8 +544,63 @@ window.KCaptions = (function () {
       var t = String(r && r.to || "").trim();
       if (t && correct.indexOf(t) === -1) correct.push(t);
     });
-    if (!correct.length) return "";
-    return "Doğru yazılması gereken özel adlar ve terimler: " + correct.join(", ").slice(0, 700) + ".";
+    var terim = correct.length
+      ? "Doğru yazılması gereken özel adlar ve terimler: " + correct.join(", ").slice(0, 700) + "."
+      : "";
+    return (ekIpucu ? ekIpucu + (terim ? " " : "") : "") + terim;
+  }
+
+  /*
+   * Secili klibin KELIME zamanli transkripti (sequence zamaninda). Altyazi
+   * editorune dokunmaz; Konusmadan kes gibi baska araclar kullanir.
+   *   opts.clip      KS_getSelectedClips'ten bir klip (yoksa secim okunur)
+   *   opts.prompt    motora ek ipucu (or. dolgu seslerini yazdirmak icin)
+   *   opts.onStatus  ilerleme mesajlari
+   * Doner: { clip, lang, words: [{start, end, text, confidence}] }
+   */
+  async function transcribeWords(opts) {
+    opts = opts || {};
+    if (busy) throw new Error("Altyazı motoru şu an başka bir iş yapıyor — bitmesini bekle.");
+    if (!engineReady()) throw new Error("Önce Altyazı sekmesinden Suflo Altyazı Motoru'nu kur (ya da Groq anahtarı gir).");
+    var clip = opts.clip;
+    if (!clip) {
+      var sc = await K.call("KS_getSelectedClips");
+      if (!sc.ok || !sc.clips || !sc.clips.length) throw new Error("Timeline'da konuşma içeren bir klip seç.");
+      clip = sc.clips[0];
+    }
+    busy = true;
+    durumYonlendir = opts.onStatus || function () {};
+    ekIpucu = String(opts.prompt || "");
+    var temp = [];
+    try {
+      status("Ses çıkarılıyor…");
+      var audio = await convertAudio(clip.mediaPath, {
+        wav: localEngineReady(), ss: clip.inPoint, t: clip.dur, durHint: clip.dur
+      });
+      temp.push(audio);
+      var raw = await transcribeSuflo(audio, clip.dur, true, temp);
+      var tl = clip.clipEnd - clip.clipStart;
+      var hiz = (clip.dur > 0 && tl > 0) ? tl / clip.dur : 1;
+      var words = raw.map(function (w) {
+        return {
+          start: clip.clipStart + w.start * hiz,
+          end: clip.clipStart + w.end * hiz,
+          text: String(w.text || "").trim(),
+          confidence: w.confidence
+        };
+      }).filter(function (w) {
+        // yalniz noktalamadan olusan belirtecler kelime degil
+        return w.text.replace(/[.,!?;:…"'«»]/g, "").trim() && isFinite(w.start) && isFinite(w.end);
+      });
+      words.sort(function (a, b) { return a.start - b.start; });
+      return { clip: clip, lang: algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr", words: words };
+    } finally {
+      temp.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
+      ekIpucu = "";
+      durumYonlendir = null;
+      busy = false;
+      refreshButton();
+    }
   }
 
   function applyGlossary(segs) {
@@ -4160,6 +4220,7 @@ window.KCaptions = (function () {
     glossaryText: glossaryText,
     parseGlossary: parseGlossary,
     getSegments: segmentsSnapshot,
+    transcribeWords: transcribeWords,
     refreshMogrtStyles: refreshMogrtStyles
   };
 })();

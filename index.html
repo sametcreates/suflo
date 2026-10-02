@@ -628,6 +628,49 @@
       </div>
       <button id="cut-apply" class="btn primary big">Kesimleri uygula</button>
     </div>
+
+    <!-- Konusmadan kes: metinle kurgu + dolgu temizligi (v3.0) -->
+    <div class="tc-card" id="tc-card">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h6"/><path d="m13 13 4 4m0-4-4 4"/></svg>
+        <b>Konuşmadan kes</b><span class="tc-yeni">YENİ</span>
+      </div>
+      <p class="ci-p">Klibi yazıya döker; <b>ııı, eee</b> gibi dolgu seslerini, <b>tekrarları</b> ve uzun duraksamaları işaretler. Bir kelimeye tıkla — videodan da çıkar. Kopya sekansta uygulanır.</p>
+      <div class="tc-opts">
+        <label class="switch"><input id="tc-filler" type="checkbox" checked><i></i><span>Dolgu sesleri (ııı, eee, hmm)</span></label>
+        <label class="switch"><input id="tc-repeat" type="checkbox" checked><i></i><span>Tekrarlar (ben ben)</span></label>
+        <label class="switch"><input id="tc-soft" type="checkbox"><i></i><span>Ara sözler (şey, yani, işte)</span></label>
+        <div class="row">
+          <label>Duraksama</label>
+          <select id="tc-pause">
+            <option value="">Dokunma</option>
+            <option value="1">1 sn'ye kısalt</option>
+            <option value="0.6" selected>0,6 sn'ye kısalt</option>
+            <option value="0.35">0,35 sn'ye kısalt (hızlı tempo)</option>
+          </select>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button id="tc-analyze" class="btn primary big" disabled>
+          <span class="btn-label">Konuşmayı yazıya dök</span>
+        </button>
+      </div>
+      <div id="tc-progress" class="progress-line" hidden><i></i></div>
+      <div id="tc-status" class="inline-status"></div>
+      <div id="tc-result" hidden>
+        <div class="result-head">
+          <span id="tc-summary" class="dim"></span>
+          <button id="tc-reset" class="btn tiny" type="button">Önerilere dön</button>
+        </div>
+        <div class="tc-legend"><span class="tc-w filler">dolgu</span><span class="tc-w repeat">tekrar</span><span class="tc-w soft">ara söz</span><span class="tc-w cut">elle silinen</span></div>
+        <div id="tc-words" class="tc-words" title="Kelimeye tıkla: kes / geri al"></div>
+        <div class="seg-ctl full" id="tc-target">
+          <button class="on" data-m="clone">Kopya sekansta<em>önerilen</em></button>
+          <button data-m="here">Bu sekansta</button>
+        </div>
+        <button id="tc-apply" class="btn primary big">Kesimleri uygula</button>
+      </div>
+    </div>
   </section>
 
   <!-- ================= OTOMATIK ZOOM ================= -->
@@ -1283,7 +1326,9 @@
   <script src="js/caption-text.js"></script>
   <script src="js/style-engine.js"></script>
   <script src="js/captions.js"></script>
+  <script src="js/textcut.js"></script>
   <script src="js/magiccut.js"></script>
+  <script src="js/konusma-kes.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>
