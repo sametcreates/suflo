@@ -3712,6 +3712,7 @@ window.KCaptions = (function () {
 
       var ff = await K.findFfmpeg();
       if (!ff) throw new Error("ffmpeg bulunamadı.");
+      if (K.libassUyarisi && K.libassUyarisi()) throw new Error(K.libassUyarisi());
 
       var cikti = K.path.join(K.srtDir(), "suflo-altyazi-" + Date.now() + ".mov");
       K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });

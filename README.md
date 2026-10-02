@@ -227,6 +227,7 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-api-probe.js` | Doctor: Premiere API yoklaması (alt sekans, Auto Reframe, QE, marker, klip kapatma) projeye dokunmadan |
 | `test-es3.js` | `jsx/` ExtendScript: ES5+/ES6 kullanımı (forEach, trim, let, =>, JSON, sondaki virgül) yok — yalnız Premiere'de patlayacak hatalar |
 | `test-cef.js` | Panel JS Premiere 14.4 (CEF 74 / Node 12.3) uyumu: `?.`, `??`, `replaceAll` vb. yok; `rmrf` eski Node'da çalışır |
+| `test-ffmpeg-secim.js` | ffmpeg seçimi: libass'li aday tercih edilir; libass'siz (Homebrew sade) ffmpeg'de anlaşılır uyarı |
 | `test-kanca.js` | Kanca başlığı: ASS üretimi, libass render (şeffaflık, vurgu rengi), host `at` yerleşimi |
 | `test-kanca-uctan.js` | Kanca başlığı uçtan uca: panelin gerçek ffmpeg komutu → şeffaf qtrle .mov, yerleşim argümanları, temizlik |
 | `test-dinle.js` | Dinle önizlemesi: eski isteğin sesi çalmaz, dosya/tutamaç temizliği, uzun klipte ilk 5 dk |

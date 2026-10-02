@@ -1121,9 +1121,27 @@ window.K = (function () {
     return list;
   }
 
+  /*
+   * libass (subtitles/ass filtresi) olan ffmpeg tercih edilir: Suflo Stilleri, kanca
+   * basligi ve stil onizlemesi onsuz calismaz. Homebrew'un sade "ffmpeg"i gibi
+   * libass'siz bir derleme yalniz baska aday yoksa secilir; _libass=false olur.
+   */
+  var _libass = null;
+  async function libassVar(aday) {
+    var r = await run(aday, ["-hide_banner", "-filters"], { timeout: 15000 });
+    return /\ssubtitles\s/.test(String(r.stdout || "") + String(r.stderr || ""));
+  }
+  function ffmpegLibass() { return _libass; }
+  // Stilli islemler oncesi: libass yoksa kullaniciya ne yapacagini soyleyen mesaj, varsa ""
+  function libassUyarisi() {
+    return _libass === false ? "Bu ffmpeg altyazı çizemiyor (libass yok — örn. Homebrew'un sade ffmpeg'i). " +
+      "Ayarlar → ffmpeg'den Suflo'nun ffmpeg'ini kur." : "";
+  }
+
   async function findFfmpeg(force) {
     if (_ffmpeg && !force) return _ffmpeg;
     var cands = ffmpegCandidates();
+    var yedek = null;
     for (var i = 0; i < cands.length; i++) {
       /*
        * Mutlak yollar once diskte yoklanir: olmayan bir dosya icin surec baslatmak
@@ -1144,12 +1162,17 @@ window.K = (function () {
       }
       var r = await run(aday, ["-version"], { timeout: 15000 });
       if (r.code === 0 && /ffmpeg version/i.test(r.stdout + r.stderr)) {
-        _ffmpeg = aday;
-        return _ffmpeg;
+        if (await libassVar(aday)) {
+          _ffmpeg = aday; _libass = true;
+          return _ffmpeg;
+        }
+        if (!yedek) yedek = aday;   // calisiyor ama libass'siz: daha iyisi yoksa bu
       }
     }
-    _ffmpeg = null;
-    return null;
+    _ffmpeg = yedek;
+    _libass = yedek ? false : null;
+    if (yedek) log("[ffmpeg] libass'siz derleme secildi: " + yedek);
+    return _ffmpeg;
   }
 
   /* ---------------- Dosya yardımcıları ---------------- */
@@ -1263,6 +1286,8 @@ window.K = (function () {
     download: download,
     unzip: unzip,
     findFfmpeg: findFfmpeg,
+    ffmpegLibass: ffmpegLibass,
+    libassUyarisi: libassUyarisi,
     settings: loadSettings,
     saveSettings: saveSettings,
     walkAudio: walkAudio,

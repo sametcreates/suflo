@@ -77,6 +77,7 @@ window.KKanca = (function () {
     try {
       var ff = await K.findFfmpeg();
       if (!ff) { durum("Önizleme için ffmpeg gerekli (Ayarlar → ffmpeg).", "warn"); return; }
+      if (K.libassUyarisi && K.libassUyarisi()) { durum(K.libassUyarisi(), "warn"); return; }
       durum("Önizleme hazırlanıyor…");
       var b = await sekansBoyutu();
       // onizleme kucuk: kisa kenar 540
@@ -118,6 +119,7 @@ window.KKanca = (function () {
     try {
       var ff = await K.findFfmpeg();
       if (!ff) { KApp.toast("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad"); return false; }
+      if (K.libassUyarisi && K.libassUyarisi()) throw new Error(K.libassUyarisi());
       durum("Başlık hazırlanıyor…");
       var b = await sekansBoyutu();
       if (!b.ok) throw new Error("Aktif sekans yok.");

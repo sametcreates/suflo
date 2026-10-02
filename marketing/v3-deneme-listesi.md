@@ -115,6 +115,9 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] 2.9.x panelde de eşitleme hâlâ çalışıyor (`require_instance` = false iken).
 - [ ] Kullanıcıların çoğu 3.0'a geçince `config.php` içinde `'require_instance' => true` yap.
 
+## 7b. macOS ffmpeg
+- [ ] (Mac) Yalnız Homebrew ffmpeg'i varken Suflo Doctor "FFmpeg altyazı çizemiyor (libass yok)" uyarısı veriyor; **FFmpeg'i onar** → Suflo'nun ffmpeg'i kuruluyor, stiller çalışıyor.
+
 ## 8. Ücretsiz kullanıcı
 - [ ] Pro olmayan kurulumda Konuşmadan kes, Suflo Stilleri ekleme ve Geçişler Pro penceresini açıyor; önizlemeler açık.
 - [ ] Bölümler ve Otomatik emoji ücretsiz çalışıyor.
