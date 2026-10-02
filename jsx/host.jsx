@@ -609,6 +609,71 @@ function KS_applyCutTransition(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- Secili klibi verilen anlarda bol (sahne / vurus) — v3.0 ---------- */
+
+/*
+ * Yalniz SECILI kliplerin bulundugu katmanlari (bagli ses dahil) keser;
+ * muzik gibi baska katmanlara dokunmaz. Sure secili kliplerin araligi
+ * disindaki anlar atlanir.
+ *   p.times: [sn] sequence zamani
+ *   p.markers: true ise ayrica her ana marker koyar (p.name ile)
+ */
+function KS_splitSelectedAt(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var times = p.times || [];
+    if (!times.length) return KS_err("Bolunecek an yok.");
+    var sel = seq.getSelection();
+    if (!sel || !sel.length) return KS_err("Timeline'da bolunecek klibi sec.");
+
+    var vIdx = {}, aIdx = {}, lo = null, hi = null, ti, ci, si;
+    function tara(tracks, hedef) {
+      for (ti = 0; ti < tracks.numTracks; ti++) {
+        var tr = tracks[ti];
+        for (ci = 0; ci < tr.clips.numItems; ci++) {
+          var c = tr.clips[ci];
+          for (si = 0; si < sel.length; si++) {
+            if (c === sel[si] || (c.nodeId && sel[si].nodeId && String(c.nodeId) === String(sel[si].nodeId))) {
+              hedef[ti] = 1;
+              var a = Number(c.start.seconds), b = Number(c.end.seconds);
+              if (lo === null || a < lo) lo = a;
+              if (hi === null || b > hi) hi = b;
+            }
+          }
+        }
+      }
+    }
+    tara(seq.videoTracks, vIdx);
+    tara(seq.audioTracks, aIdx);
+    if (lo === null) return KS_err("Secili klip timeline'da bulunamadi.");
+
+    app.enableQE();
+    var qseq = qe.project.getActiveSequence();
+    var kesilen = 0, k;
+    for (var i = 0; i < times.length; i++) {
+      var t = Number(times[i]);
+      if (!(t > lo + 0.02 && t < hi - 0.02)) continue;
+      var tc = KS_timecode(t);
+      for (k in vIdx) { if (vIdx.hasOwnProperty(k)) { try { qseq.getVideoTrackAt(Number(k)).razor(tc); } catch (eV) {} } }
+      for (k in aIdx) { if (aIdx.hasOwnProperty(k)) { try { qseq.getAudioTrackAt(Number(k)).razor(tc); } catch (eA) {} } }
+      if (p.markers) {
+        try {
+          var m = seq.markers.createMarker(t);
+          if (m && p.name) m.name = String(p.name);
+        } catch (eM) {}
+      }
+      kesilen++;
+    }
+    if (!kesilen) return KS_err("Verilen anlarin hicbiri secili klibin icinde degil.");
+    var katman = 0;
+    for (k in vIdx) if (vIdx.hasOwnProperty(k)) katman++;
+    for (k in aIdx) if (aIdx.hasOwnProperty(k)) katman++;
+    return KS_ok({ cuts: kesilen, tracks: katman });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Suflo Smooth: .prfpset'i panelden dogrudan uygula ---------- */
 
 function KS_packRead(path) {

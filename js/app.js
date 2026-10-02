@@ -1133,6 +1133,7 @@ window.KApp = (function () {
     guvenli("Konuşmadan kes", function () { if (window.KTextCut) KTextCut.init(); });
     guvenli("Bölümler", function () { if (window.KChapters) KChapters.init(); });
     guvenli("Geçişler", function () { if (window.KGecis) KGecis.init(); });
+    guvenli("Sahne algılama", function () { if (window.KSahne) KSahne.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
     guvenli("Motion Presetleri", function () { if (window.KPresets) KPresets.init(); });

@@ -694,6 +694,36 @@
         <button id="tc-apply" class="btn primary big">Kesimleri uygula</button>
       </div>
     </div>
+
+    <!-- Sahne algilama (v3.0) -->
+    <div class="tc-card" id="sc-card">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/><path d="M8 4.5v11M12.5 4.5v11"/></svg>
+        <b>Sahne algılama</b><span class="tc-yeni">YENİ</span>
+      </div>
+      <p class="ci-p">Uzun kayıtlarda, derlemelerde ve hazır videolarda <b>sahne değişimlerini</b> görüntüden bulur. Marker at ya da seçili klibi sahne sahne böl — müzik katmanına dokunulmaz.</p>
+      <div class="row">
+        <label>Hassasiyet</label>
+        <select id="sc-hassas">
+          <option value="yuksek">Yüksek (daha çok sahne)</option>
+          <option value="orta" selected>Orta</option>
+          <option value="dusuk">Düşük (yalnız belirgin geçişler)</option>
+        </select>
+      </div>
+      <div class="action-bar">
+        <button id="sc-analyze" class="btn primary big" disabled><span class="btn-label">Sahneleri bul</span></button>
+      </div>
+      <div id="sc-progress" class="progress-line" hidden><i></i></div>
+      <div id="sc-status" class="inline-status"></div>
+      <div id="sc-result" hidden>
+        <div class="result-head"><span id="sc-summary" class="dim"></span></div>
+        <div id="sc-bar" class="cut-bar" aria-hidden="true"></div>
+        <div class="row">
+          <button id="sc-markers" class="btn" type="button">Marker at</button>
+          <button id="sc-split" class="btn primary" type="button">Sahnelerde böl</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ================= OTOMATIK ZOOM ================= -->
@@ -827,6 +857,8 @@
       </div>
       <div id="beat-bar" class="beat-bar" aria-hidden="true"></div>
       <button id="beat-apply" class="btn primary big">Markerları timeline'a at</button>
+      <button id="beat-split" class="btn outline big" title="Önce bölünecek klibi (örn. B-roll) seç; müzik katmanına dokunulmaz">Seçili klibi vuruşlarda böl <em class="ky-yeni">YENİ</em></button>
+      <p class="hint" style="margin:6px 0 0">Vuruşlarda bölmek için müziği analiz ettikten sonra timeline'da bölünecek görüntü klibini seç.</p>
     </div>
   </section>
 
@@ -1393,10 +1425,12 @@
   <script src="js/textcut.js"></script>
   <script src="js/chapters.js"></script>
   <script src="js/transitions.js"></script>
+  <script src="js/scenes.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
   <script src="js/bolumler.js"></script>
   <script src="js/gecisler.js"></script>
+  <script src="js/sahneler.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>
