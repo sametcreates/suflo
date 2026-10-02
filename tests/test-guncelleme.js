@@ -317,6 +317,7 @@ function ortam(opts) {
       tmpDir: function () { return path2.join(TMP2, "tmp"); },
       fs: fs2, path: path2, os: os2, MAC: false,
       log: function () {},
+      rmrf: function (d) { try { fs2.rmSync(d, { recursive: true, force: true }); } catch (eR) {} },
       unzip: async function (z, d) {
         fs2.mkdirSync(d, { recursive: true });
         cp2.execFileSync(tarExe, ["-xf", z, "-C", d]);

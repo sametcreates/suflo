@@ -41,7 +41,7 @@ ok("denetleyici: uclu ?.5 ve metin/yorum yanlis alarm vermez, gercek ?. bulunur"
 
 // rmrf: Node 12.3'teki gibi fs.rmSync ve rmdirSync({recursive}) yokken de klasoru siler
 var os = require("os");
-var bsrc = fs.readFileSync(path.join(__dirname, "..", "js", "bridge.js"), "utf8");
+var bsrc = fs.readFileSync(path.join(__dirname, "..", "js", "bridge.js"), "utf8").replace(/\r\n/g, "\n");   // Windows CRLF
 var bi = bsrc.indexOf("  function rmrf(p) {"), bj = bsrc.indexOf("\n  }\n", bi) + 4;
 var eskiFs = { lstatSync: fs.lstatSync, unlinkSync: fs.unlinkSync, readdirSync: fs.readdirSync,
   rmdirSync: function (p, o) { if (o && o.recursive) throw new Error("Node 12.3: recursive yok"); return fs.rmdirSync(p); } };
@@ -59,7 +59,7 @@ ok("guncelleme ve motor kurulumu K.rmrf kullanir", kullanim);
 
 
 // CSS: inset (Chrome 87) her kullanimda uzun bicim yedegiyle (top/right/bottom/left)
-var css = fs.readFileSync(path.join(__dirname, "..", "css", "style.css"), "utf8");
+var css = fs.readFileSync(path.join(__dirname, "..", "css", "style.css"), "utf8").replace(/\r\n/g, "\n");
 var insetSatirlari = css.split("\n").filter(function (l) { return /(^|[;{\s])inset:/.test(l); });
 var yedeksizInset = insetSatirlari.filter(function (l) { return !/top:[^;]+;\s*right:[^;]+;\s*bottom:[^;]+;\s*left:[^;]+;\s*inset:/.test(l); });
 ok("CSS inset: eski motor icin uzun bicim yedegi var", insetSatirlari.length > 0 && yedeksizInset.length === 0, yedeksizInset.slice(0, 3).join(" | "));
