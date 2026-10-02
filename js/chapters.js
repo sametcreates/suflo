@@ -69,6 +69,8 @@
     var end = segs[segs.length - 1].end;
     var total = end - origin;
     var hedef = Math.max(1, Math.min(max, Math.round(total / every)));
+    // YouTube en az 3 bolum ister: sigiyorsa (3 x minGap) kisa videoda da 3 oner
+    if (hedef < 3 && total >= 3 * minGap) hedef = 3;
 
     var adaylar = [];
     for (var i = 1; i < segs.length; i++) {

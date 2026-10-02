@@ -35,10 +35,21 @@
       yumusak: ["like", "you know", "i mean", "basically", "actually", "so"]
     },
     ru: {
-      kesin: ["э", "м", "а", "эм", "ээ", "хм"],
-      yumusak: ["ну", "типа", "как бы", "короче", "вот"]
+      // "а" Rusca'da cok yaygin baglac ("ve/ama"): kesin dolgu degil, ara soz
+      kesin: ["э", "м", "эм", "ээ", "хм"],
+      yumusak: ["а", "ну", "типа", "как бы", "короче", "вот"]
     }
   };
+
+  /*
+   * Turkce ikilemeler ("yavaş yavaş", "koşa koşa") kekemelik degil, dilin
+   * kendisi: tekrar olarak isaretlenmez. Kekemelik cogunlukla kisa islev
+   * sozcuklerinde ve zamirlerde olur ("ben ben", "bu bu").
+   */
+  var IKILEME = ["yavaş", "çok", "koşa", "güle", "ağır", "tek", "ara", "sık", "yan", "uzun", "kısa",
+    "büyük", "küçük", "sıcak", "soğuk", "ayrı", "iyi", "güzel", "bol", "kat", "derin", "yeni", "eski",
+    "renk", "çeşit", "bölük", "parça", "damla", "akın", "sıra", "kıvrım", "dolu", "hızlı", "ağlaya",
+    "gide", "bile", "döne", "düşe", "gülüm", "boy", "kimi", "yer", "tıka", "bas", "çabuk", "acı"];
 
   function locOf(lang) {
     return lang === "az" ? "az" : (lang === "tr" ? "tr" : undefined);
@@ -86,7 +97,8 @@
       if (!kind && opts.repeats !== false) {
         var next = words[i + 1];
         var a = normalize(w.text, lang);
-        if (next && a && a.length > 1 && a === normalize(next.text, lang) &&
+        var ikileme = (lang === "tr" || lang === "az") && IKILEME.indexOf(a) !== -1;
+        if (next && a && a.length > 1 && !ikileme && a === normalize(next.text, lang) &&
             Number(next.start) - Number(w.end) <= maxRepeatGap) {
           kind = "repeat";
         }
@@ -162,7 +174,11 @@
     // 3) Sinirla, kisalari at, birlestir
     raw = raw.map(function (r) {
       return { start: Math.max(lo, r.start), end: Math.min(hi, r.end), reason: r.reason };
-    }).filter(function (r) { return r.end - r.start >= minCut; });
+    }).filter(function (r) {
+      // Kullanicinin sildigi kelime ne kadar kisa olursa olsun kesilir (1 kare);
+      // minCut yalniz otomatik duraksama kesimlerine uygulanir
+      return r.end - r.start >= (r.reason === "word" ? 0.04 : minCut);
+    });
     raw.sort(function (x, y) { return x.start - y.start; });
     var out = [];
     raw.forEach(function (r) {

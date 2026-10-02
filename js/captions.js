@@ -563,17 +563,23 @@ window.KCaptions = (function () {
     opts = opts || {};
     if (busy) throw new Error("Altyazı motoru şu an başka bir iş yapıyor — bitmesini bekle.");
     if (!engineReady()) throw new Error("Önce Altyazı sekmesinden Suflo Altyazı Motoru'nu kur (ya da Groq anahtarı gir).");
-    var clip = opts.clip;
-    if (!clip) {
-      var sc = await K.call("KS_getSelectedClips");
-      if (!sc.ok || !sc.clips || !sc.clips.length) throw new Error("Timeline'da konuşma içeren bir klip seç.");
-      clip = sc.clips[0];
-    }
+    // busy, ilk await'ten ONCE alinir: secim beklenirken "Altyazı oluştur"a basilirsa
+    // iki is ayni durum degiskenlerini (ekIpucu, durumYonlendir) paylasmasin
     busy = true;
-    durumYonlendir = opts.onStatus || function () {};
-    ekIpucu = String(opts.prompt || "");
+    refreshButton();
+    // Bu klibin dili altyazi belgesinin algilanan dilini ezmesin
+    var belgeDili = algilananDil;
     var temp = [];
     try {
+      var clip = opts.clip;
+      if (!clip) {
+        var sc = await K.call("KS_getSelectedClips");
+        if (!sc.ok || !sc.clips || !sc.clips.length) throw new Error("Timeline'da konuşma içeren bir klip seç.");
+        clip = sc.clips[0];
+      }
+      durumYonlendir = opts.onStatus || function () {};
+      ekIpucu = String(opts.prompt || "");
+      algilananDil = "";
       status("Ses çıkarılıyor…");
       var audio = await convertAudio(clip.mediaPath, {
         wav: localEngineReady(), ss: clip.inPoint, t: clip.dur, durHint: clip.dur
@@ -597,6 +603,7 @@ window.KCaptions = (function () {
       return { clip: clip, lang: algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr", words: words };
     } finally {
       temp.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
+      algilananDil = belgeDili;
       ekIpucu = "";
       durumYonlendir = null;
       busy = false;

@@ -10,6 +10,7 @@ window.KTextCut = (function () {
 
   var TC = window.SufloTextCut;
   var clip = null;
+  var sekans = "";     // analizin yapildigi sekans: baska sekansa kesim uygulanmasin
   var lang = "tr";
   var words = [];      // [{start, end, text}]
   var oneri = [];      // classify sonucu: "filler" | "repeat" | "soft" | null
@@ -132,6 +133,7 @@ window.KTextCut = (function () {
         onStatus: function (m, c) { status(m, c); }
       });
       clip = sonuc.clip;
+      sekans = KApp.ctx().sequence || "";
       lang = sonuc.lang || "tr";
       words = sonuc.words;
       elle = {};
@@ -157,6 +159,11 @@ window.KTextCut = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("textcut")) return;
     var r = kesimler().map(function (x) { return { start: x.start, end: x.end }; });
     if (!r.length) return;
+    var aktif = KApp.ctx().sequence || "";
+    if (sekans && aktif && aktif !== sekans) {
+      status("Bu kesimler \"" + sekans + "\" sekansı için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
+      return;
+    }
     el("tc-apply").disabled = true;
     status("Uygulanıyor…");
     try {
@@ -176,7 +183,7 @@ window.KTextCut = (function () {
         }
         // Timeline degisti: eski zamanlar artik gecersiz
         el("tc-result").hidden = true;
-        words = []; oneri = []; elle = {}; clip = null;
+        words = []; oneri = []; elle = {}; clip = null; sekans = "";
       } else {
         status("✕ " + res.error, "bad");
       }

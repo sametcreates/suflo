@@ -42,5 +42,12 @@ var az = E.suggest(segs, { lang: "tr", density: 0.12 });
 chk("suggest: yogunluk siniri", az.length === 1, az.length);
 chk("suggest: girdiyi degistirmez", segs[0].text === "para kazanmanın yolu");
 
+/* inceleme duzeltmeleri */
+chk("hasEmoji: ⏰ ve ⭐ (BMP disi olmayan semboller) taninir", E.hasEmoji("o zaman ⏰") && E.hasEmoji("⭐"));
+chk("ayni satira ikinci kez emoji eklenmez", E.suggest([{ text: "saat kaçta ⏰" }], { density: 1 }).length === 0);
+chk("gevsek kokler eslesmez (yapmak, büyük, o zaman)", ["yapmak istiyorum", "büyük ev", "o zaman gel"].every(function (t) { return E.pick(t, "tr") === null; }));
+chk("Ingilizce gevsek kokler eslesmez (later, apple, window, hotel)", ["see you later", "apple", "window", "hotel"].every(function (t) { return E.pick(t, "en") === null; }));
+chk("olu kurallar calisir: don't -> ❌, won -> 🏆", E.pick("don't do it", "en") === "❌" && E.pick("I won the race", "en") === "🏆");
+chk("para kazandim hala 💰", E.pick("para kazandım", "tr") === "💰");
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

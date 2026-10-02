@@ -25,13 +25,13 @@
     tr: [
       ["💰", ["para", "kazan", "zengin", "maaş", "gelir", "bütçe", "dolar", "euro", "lira"]],
       ["💸", ["harca", "masraf", "borç", "pahalı", "ödeme", "zarar"]],
-      ["📈", ["büyü", "artış", "artıyor", "arttı", "yüksel", "grafik", "istatistik", "satış"]],
+      ["📈", ["büyüme", "büyüyor", "büyüdü", "artış", "artıyor", "arttı", "yüksel", "grafik", "istatistik", "satış"]],
       ["🚀", ["başla", "hızlı", "roket", "uçuyor", "uçtu", "fırla", "lansman", "patla"]],
       ["🔥", ["ateş", "sıcak", "efsane", "harika", "muhteşem", "çılgın", "viral", "trend"]],
       ["💡", ["fikir", "ipucu", "tüyo", "öneri", "püf", "akıl", "çözüm"]],
       ["⚠️", ["dikkat", "uyarı", "tehlike", "sakın", "hata", "yanlış"]],
       ["✅", ["doğru", "başar", "bitir", "hallet", "kesinlikle"]],
-      ["❌", ["hayır", "asla", "yasak", "olmaz", "yapma"]],
+      ["❌", ["hayır", "asla", "yasak", "olmaz", "yapma "]],
       ["❓", ["neden", "niye", "nasıl", "acaba", "soru"]],
       ["🤔", ["düşün", "merak", "sanırım", "belki"]],
       ["😂", ["güldü", "gülme", "komik", "espri", "şaka", "kahkaha"]],
@@ -40,9 +40,9 @@
       ["❤️", ["seviyorum", "sevdim", "seviyor", "kalp", "teşekkür", "minnet"]],
       ["🙏", ["lütfen", "rica ", "dua ", "dualar", "şükür"]],
       ["💪", ["güçlü", "spor", "antrenman", "kaslar", "pes etme", "azim"]],
-      ["🏆", ["kazandı", "şampiyon", "ödül", "birinci", "zafer", "rekor"]],
+      ["🏆", ["kazanan", "şampiyon", "ödül", "birinci", "zafer", "rekor"]],
       ["🎯", ["hedef", "amaç", "odak", "nişan"]],
-      ["⏰", ["zaman", "saat", "dakika", "geç kal", "acele", "erken"]],
+      ["⏰", ["saat ", "saatte", "dakika", "geç kal", "acele", "erken"]],
       ["📱", ["telefon", "uygulama", "instagram", "tiktok", "mesaj", "iphone", "android"]],
       ["🎬", ["video", "film", "kurgu", "montaj", "sahne", "çekim"]],
       ["🎥", ["kamera", "kayıt", "lens"]],
@@ -63,21 +63,21 @@
       ["💸", ["spend", "expensive", "debt", "cost", "pay"]],
       ["📈", ["grow", "increase", "rise", "sales", "chart"]],
       ["🚀", ["launch", "start", "fast", "rocket", "boost"]],
-      ["🔥", ["fire", "hot", "amazing", "insane", "crazy", "viral", "awesome"]],
+      ["🔥", ["fire", "hot ", "amazing", "insane", "crazy", "viral", "awesome"]],
       ["💡", ["idea", "tip", "hack", "trick", "solution"]],
       ["⚠️", ["warning", "careful", "danger", "mistake", "wrong"]],
       ["✅", ["correct", "done", "yes", "success", "right"]],
-      ["❌", ["never", "don't", "forbidden"]],
+      ["❌", ["never", "don t ", "forbidden"]],
       ["❓", ["why", "how", "question"]],
       ["🤔", ["think", "wonder", "maybe", "perhaps"]],
       ["😂", ["funny", "laugh", "joke", "lol"]],
       ["😱", ["scary", "shock", "unbelievable"]],
       ["❤️", ["love", "heart", "thank"]],
       ["💪", ["strong", "power", "workout", "gym"]],
-      ["🏆", ["win", "champion", "award", "record"]],
+      ["🏆", ["win ", "winner", "won ", "champion", "award", "record"]],
       ["🎯", ["goal", "target", "focus"]],
-      ["⏰", ["time", "hour", "minute", "late", "hurry"]],
-      ["📱", ["phone", "app", "instagram", "tiktok", "message"]],
+      ["⏰", ["time ", "hour", "minute", "late ", "hurry"]],
+      ["📱", ["phone", "app ", "apps ", "instagram", "tiktok", "message"]],
       ["🎬", ["video", "film", "edit", "scene"]],
       ["🎵", ["music", "song", "beat"]],
       ["🎁", ["gift", "giveaway", "free", "surprise"]],
@@ -85,7 +85,8 @@
     ]
   };
 
-  var EMOJI_RE = /[☀-➿\uD83C-􏰀-\uDFFF]/;
+  // Diger semboller (⏰ 23F0, ⭐ 2B50) + cesitli semboller + astral (cift vekil) emojiler
+  var EMOJI_RE = /[\u2300-\u23FF\u2600-\u27BF\u2B00-\u2BFF]|[\uD83C-\uDBFF][\uDC00-\uDFFF]/;
 
   function loc(lang) { return lang === "az" ? "az" : (lang === "en" ? undefined : "tr"); }
 

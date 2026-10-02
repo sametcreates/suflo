@@ -41,8 +41,10 @@ chk("ardisik silinenler tek kesimde birlesir", ard.length === 1 && yakin(ard[0].
 var bas = T.buildCuts(cumle, [true, false, false, false, false, false], { edge: 0.05, clipStart: 0 });
 chk("bastaki kelime: klip baslangicina tasmaz", bas[0] && bas[0].start === 0, JSON.stringify(bas));
 
-var sik = T.buildCuts([w(0, 1, "a"), w(1, 1.05, "ıı"), w(1.05, 2, "b")], [false, true, false], { gap: 0.1, minCut: 0.12 });
-chk("cok kisa kesim (<minCut) atlanir", sik.length === 0, JSON.stringify(sik));
+// minCut yalniz otomatik duraksama kesimlerine uygulanir: 0.64 sn'lik bosluk 0.6'ya
+// indirilirken dogan 0.04 sn'lik kesim anlamsiz, atlanir
+var sik = T.buildCuts([w(0, 1, "a"), w(1.64, 2, "b")], [false, false], { maxPause: 0.6, minCut: 0.12 });
+chk("cok kisa duraksama kesimi (<minCut) atlanir", sik.length === 0, JSON.stringify(sik));
 
 var dur = T.buildCuts([w(0, 1, "bir"), w(4, 5, "iki"), w(5.2, 6, "üç")], [false, false, false], { maxPause: 0.6 });
 chk("uzun duraksama 0.6 sn'ye indirilir", dur.length === 1 && yakin(dur[0].start, 1.3) && yakin(dur[0].end, 3.7) && dur[0].reason === "pause", JSON.stringify(dur));
@@ -57,5 +59,11 @@ chk("dolgu + duraksama birlesip cakismasiz", karisik.every(function (r, i) { ret
 chk("totalSeconds", yakin(T.totalSeconds([{ start: 1, end: 2 }, { start: 3, end: 3.5 }]), 1.5));
 chk("fillerPrompt Turkce", /ıı/.test(T.fillerPrompt("tr")));
 
+/* inceleme duzeltmeleri */
+chk("Rusca 'а' baglaci kesin dolgu degil", T.fillerKind("а", "ru") === "soft");
+var ik = T.classify([w(0, .4, "yavaş"), w(.45, .8, "yavaş"), w(1, 1.3, "ben"), w(1.35, 1.6, "ben")], { lang: "tr" });
+chk("Turkce ikileme (yavaş yavaş) tekrar sayilmaz, kekemelik (ben ben) sayilir", ik[0] === null && ik[2] === "repeat", JSON.stringify(ik));
+var kisa = T.buildCuts([w(0, 1, "a"), w(1, 1.05, "ı"), w(1.05, 2, "b")], [false, true, false], {});
+chk("kullanicinin sildigi cok kisa kelime de kesilir", kisa.length === 1 && kisa[0].start === 1 && kisa[0].end === 1.05, JSON.stringify(kisa));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

@@ -29,6 +29,7 @@ window.KChapters = (function () {
 
   // "1:23", "01:02:03", "83" -> saniye; gecersizse NaN
   function zamanOku(str) {
+    if (!String(str || "").trim()) return NaN;   // bos alan 0:00 sayilmasin
     var p = String(str || "").trim().split(":").map(Number);
     if (!p.length || p.some(function (x) { return !isFinite(x) || x < 0; })) return NaN;
     return p.reduce(function (a, x) { return a * 60 + x; }, 0);

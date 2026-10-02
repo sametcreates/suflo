@@ -48,5 +48,10 @@ chk("parseResponse: cok yakin ve bozuk elendi", pr.length === 3, JSON.stringify(
 chk("parseResponse: bozuk JSON bos liste", C.parseResponse("{bozuk", segs).length === 0);
 chk("suggest: bos girdi", C.suggest([]).length === 0);
 
+/* inceleme duzeltmesi: kisa videoda en az 3 bolum */
+var kisaSeg = [];
+for (var kt = 0; kt < 120; kt += 4) kisaSeg.push({ start: kt, end: kt + 3.6, text: "satır " + kt + "." });
+var kisaOneri = C.suggest(kisaSeg);
+chk("2 dakikalik videoda 3 bolum, YouTube kuralina uygun", kisaOneri.length === 3 && C.validate(kisaOneri, { end: 120 }).ok, kisaOneri.length);
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
