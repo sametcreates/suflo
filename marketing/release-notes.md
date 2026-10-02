@@ -9,6 +9,7 @@
 - **Otomatik emoji:** Altyazı satırlarına anlamına göre seyrek emoji ekler; Türkçe eklerini tanır, art arda ve tekrar emoji koymaz. Ctrl+Z ile geri alınır.
 - **Anahtar kelime vurgusu:** Altyazıda `*kelime*` yazdığın ya da **Otomatik vurgu**nun seçtiği kelimeler (sayılar, para, yüzde ve satırın en önemli kelimesi) tüm Suflo Stillerinde sürekli vurgu renginde görünür. SRT, VTT ve normal caption izinde yıldızlar otomatik temizlenir.
 - **Kanca başlığı:** Shorts/Reels açılışı için animasyonlu başlık kartı (Kutu, Şerit, Sade). Playhead'e ya da Viral anlar kartından o anın başına tek tıkla şeffaf katman olarak eklenir; `*kelime*` vurgu renginde. Önizleme ücretsiz.
+- **Shorts sekansları:** Viral anlardan tek tıkla her an için ayrı sekans (Proje panelinde "Suflo Shorts" kutusu); istersen Premiere Auto Reframe ile 9:16 dikey kopyası da çıkar. Orijinal sekansa dokunulmaz.
 - **Sahne algılama:** Kesim sekmesinde. Uzun kayıtlarda ve hazır videolarda sahne değişimlerini görüntüden bulur; marker at ya da seçili klibi sahnelerde böl — müzik katmanına dokunulmaz.
 - **Vuruşlarda böl:** Ritim sekmesinde müziği analiz et, B-roll'u seç, tek tıkla vuruşlarda kes.
 - **Çift dilli altyazı:** Çeviriden sonra "çift dilli" anahtarıyla SRT/VTT ve altyazı izi orijinal + çeviriyi alt alta yazar.

@@ -69,6 +69,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] En az 5 dakikalık konuşmanın altyazısı → **Viral anlar (Shorts)** → **Viral anları bul** → puanlı 3–5 kart.
 - [ ] Bir kartta **In/Out ayarla** → sekansın In/Out'u o ana geliyor, playhead başında; Ctrl+M ile yalnız o parça dışa aktarılıyor.
 - [ ] **Marker olarak ekle** → kırmızı, süreli marker'lar; tekrar basınca eskiler yenileniyor, senin marker'larına dokunulmuyor.
+- [ ] **Shorts sekansları oluştur** (9:16 açık) → "Suflo Shorts" kutusunda her an için bir sekans + "9x16" dikey kopyası; dikeyde konuşan kişi kadrajda; orijinal sekansın In/Out'u değişmemiş.
 - [ ] Altyazıyı İngilizceye çevir → **çift dilli** anahtarı görünüyor → aç → SRT indir: her satırda üstte Türkçe, altta İngilizce.
 - [ ] Çift dilli açıkken **Normal altyazı izi ekle** → Premiere'de iki satırlı caption'lar.
 - [ ] Konuşma dili **Deutsch** seçilerek Almanca bir klip doğru yazıya dökülüyor.

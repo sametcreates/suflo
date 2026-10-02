@@ -121,6 +121,31 @@ window.KViral = (function () {
     else durum("✕ " + r.error, "bad");
   }
 
+  // Her an icin alt sekans (+ istege bagli 9:16 Auto Reframe), "Suflo Shorts" kutusunda
+  async function shortsOlustur() {
+    if (!anlar.length || busy) return;
+    var dikey = !!(el("cap-vr-dikey") && el("cap-vr-dikey").checked);
+    busy = true;
+    var btn = el("cap-vr-shorts");
+    btn.disabled = true;
+    durum(anlar.length + " Shorts sekansı oluşturuluyor" + (dikey ? " (9:16 Auto Reframe birkaç dakika sürebilir)…" : "…"));
+    try {
+      var r = await K.call("KS_makeShorts", {
+        ranges: anlar.map(function (a, i) { return { start: a.start, end: a.end, name: "Shorts " + (i + 1) + " · " + a.title }; }),
+        dikey: dikey
+      }, 900000);
+      if (!r.ok) throw new Error(r.error);
+      durum(r.errors && r.errors.length ? "Bazıları atlandı: " + r.errors.join("; ").slice(0, 220) : "", r.errors && r.errors.length ? "warn" : "");
+      KApp.toast(r.made + " Shorts sekansı oluşturuldu" + (r.vertical ? " · " + r.vertical + " dikey (9:16)" : "") +
+        " — Proje panelinde \"Suflo Shorts\" kutusu", "good", 8000);
+    } catch (e) {
+      durum("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      busy = false;
+      btn.disabled = false;
+    }
+  }
+
   function kopyala() {
     var txt = HL.format(anlar);
     function bitti() { KApp.toast("Liste kopyalandı", "good"); }
@@ -140,6 +165,7 @@ window.KViral = (function () {
     if (!HL || !el("cap-vr-box")) return;
     el("cap-vr-bul").addEventListener("click", bul);
     el("cap-vr-marker").addEventListener("click", markerEkle);
+    if (el("cap-vr-shorts")) el("cap-vr-shorts").addEventListener("click", shortsOlustur);
     el("cap-vr-kopyala").addEventListener("click", kopyala);
   }
 

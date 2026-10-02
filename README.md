@@ -25,6 +25,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Bölümler** *(3.0)* | Konuşmadan YouTube bölümleri, AI başlık, kural denetimi, Chapter marker |
 | **Otomatik emoji** *(3.0)* | Satırın anlamına göre seyrek emoji, Türkçe ek dostu |
 | **Anahtar kelime vurgusu** *(3.0)* | `*kelime*` ya da Otomatik vurgu: sayılar ve önemli kelimeler her stilde vurgu renginde |
+| **Shorts sekansları** *(3.0)* | Viral anlardan tek tıkla alt sekans + Auto Reframe 9:16 |
 | **Kanca başlığı** *(3.0)* | Shorts açılışına animasyonlu başlık kartı; playhead'e ya da viral anın başına |
 | **Çift dilli altyazı** *(3.0)* | Çeviri sonrası orijinal + çeviri alt alta (SRT/VTT/caption izi) |
 

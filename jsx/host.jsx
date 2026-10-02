@@ -1980,6 +1980,63 @@ function KS_setInOut(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/*
+ * Viral anlardan Shorts sekanslari: her aralik icin alt sekans (createSubsequence,
+ * tum izler), istenirse Premiere Auto Reframe ile 9:16 kopyasi. Sekanslar
+ * "Suflo Shorts" kutusuna gider; orijinal sekansin In/Out'u ve aktifligi geri yuklenir.
+ *   p.ranges: [{ start, end, name }]   p.dikey: true -> 9:16 Auto Reframe
+ */
+function KS_makeShorts(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var ranges = p.ranges || [];
+    if (!ranges.length) return KS_err("Aralik yok.");
+    if (typeof seq.createSubsequence !== "function") return KS_err("Bu Premiere surumu alt sekans olusturmayi desteklemiyor.");
+    var eskiIn = null, eskiOut = null;
+    try { eskiIn = seq.getInPointAsTime().seconds; eskiOut = seq.getOutPointAsTime().seconds; } catch (eIO) {}
+    var kutu = null;
+    try { kutu = KS_findBin("Suflo Shorts"); } catch (eB) {}
+    var yapilan = [], hatalar = [], dikeySayisi = 0;
+    for (var i = 0; i < ranges.length; i++) {
+      var r = ranges[i];
+      var a = Number(r.start), b = Number(r.end);
+      var ad = String(r.name || ("Shorts " + (i + 1))).replace(/[\r\n\t]+/g, " ").substring(0, 70);
+      if (!(b > a)) { hatalar.push(ad + ": gecersiz aralik"); continue; }
+      try {
+        seq.setInPoint(a);
+        seq.setOutPoint(b);
+        var alt = seq.createSubsequence(true);
+        if (!alt) { hatalar.push(ad + ": alt sekans olusmadi"); continue; }
+        try { alt.name = ad; } catch (eN) {}
+        try { if (kutu && alt.projectItem) alt.projectItem.moveBin(kutu); } catch (eM) {}
+        var kayit = { name: ad, id: String(alt.sequenceID), dikey: false };
+        if (p.dikey) {
+          try {
+            var dik = typeof alt.autoReframeSequence === "function" ?
+              alt.autoReframeSequence(9, 16, "default", ad + " 9x16", false) : null;
+            if (dik) {
+              kayit.dikey = true; dikeySayisi++;
+              try { if (kutu && dik.projectItem) dik.projectItem.moveBin(kutu); } catch (eM2) {}
+            } else hatalar.push(ad + ": 9:16 olusmadi (Auto Reframe yok)");
+          } catch (eR) { hatalar.push(ad + ": 9:16 olusmadi (" + eR + ")"); }
+        }
+        yapilan.push(kayit);
+      } catch (eS) { hatalar.push(ad + ": " + eS); }
+    }
+    // orijinal sekansa don, In/Out'u geri yukle
+    try { app.project.activeSequence = seq; } catch (eA) {}
+    try { if (String(KS_seq().sequenceID) !== String(seq.sequenceID)) app.project.openSequence(seq.sequenceID); } catch (eO) {}
+    try {
+      if (eskiIn !== null) seq.setInPoint(eskiIn);
+      if (eskiOut !== null) seq.setOutPoint(eskiOut);
+    } catch (eG) {}
+    if (!yapilan.length) return KS_err(hatalar.join("; ") || "Sekans olusturulamadi.");
+    return KS_ok({ made: yapilan.length, vertical: dikeySayisi, items: yapilan, errors: hatalar });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- Emoji: playhead'e grafik klip ---------- */
 
 /*

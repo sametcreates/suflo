@@ -39,5 +39,36 @@ var io = call("KS_setInOut", { start: 50, end: 90 });
 ok("In/Out ve playhead ayarlandi", io.ok && seqState.in === 50 && seqState.out === 90 && seqState.ph === String(50 * 254016000000), JSON.stringify(seqState));
 ok("gecersiz aralik reddedilir", call("KS_setInOut", { start: 9, end: 3 }).ok === false);
 
+
+/* KS_makeShorts: alt sekans + 9:16 */
+var olusan = [], tasinan = [], aktifler = [];
+var kutuItem = { type: 2, name: "Suflo Shorts" };
+ctx.app.project.rootItem = { children: { numItems: 1, 0: kutuItem }, createBin: function () { return kutuItem; } };
+sequence.sequenceID = "ana";
+sequence.getInPointAsTime = function () { return { seconds: 5 }; };
+sequence.getOutPointAsTime = function () { return { seconds: 500 }; };
+var reframeVar = true;
+sequence.createSubsequence = function (ignore) {
+  var alt = { sequenceID: "alt" + olusan.length, ignore: ignore, inn: seqState.in, out: seqState.out,
+    projectItem: { moveBin: function (b) { tasinan.push(b.name); } },
+    autoReframeSequence: reframeVar ? function (n, d, m, ad) { var x = { sequenceID: "dik" + olusan.length, name: ad, n: n, d: d, projectItem: { moveBin: function (b) { tasinan.push(b.name); } } }; olusan.push(x); return x; } : undefined };
+  olusan.push(alt);
+  ctx.app.project.activeSequence = alt;   // Premiere yeni sekansi acar
+  return alt;
+};
+ctx.app.project.openSequence = function (id) { aktifler.push(id); };
+Object.defineProperty(ctx.app.project, "activeSequence", { configurable: true, writable: true, value: sequence });
+var ms = call("KS_makeShorts", { ranges: [{ start: 50, end: 90, name: "Shorts 1 · Sır" }, { start: 200, end: 230, name: "Shorts 2" }, { start: 9, end: 3, name: "bozuk" }], dikey: true });
+ok("iki alt sekans + iki dikey olustu, bozuk aralik raporlandi", ms.ok && ms.made === 2 && ms.vertical === 2 && ms.errors.length === 1, JSON.stringify(ms));
+ok("alt sekans dogru In/Out ile, tum izler (ignoreTrackTargeting)", olusan[0].inn === 50 && olusan[0].out === 90 && olusan[0].ignore === true);
+ok("ad verildi, 9:16 Auto Reframe 9x16 oranla", olusan[0].name === "Shorts 1 · Sır" && olusan[1].n === 9 && olusan[1].d === 16 && /9x16$/.test(olusan[1].name));
+ok("sekanslar Suflo Shorts kutusunda", tasinan.length === 4 && tasinan.every(function (n) { return n === "Suflo Shorts"; }));
+ok("orijinal sekans geri aktif ve In/Out geri yuklendi", ctx.app.project.activeSequence === sequence && seqState.in === 5 && seqState.out === 500);
+reframeVar = false;
+var ms2 = call("KS_makeShorts", { ranges: [{ start: 10, end: 40, name: "x" }], dikey: true });
+ok("Auto Reframe yoksa yatay sekans yine olusur, uyari doner", ms2.ok && ms2.made === 1 && ms2.vertical === 0 && /9:16/.test(ms2.errors[0]), JSON.stringify(ms2));
+delete sequence.createSubsequence;
+ok("createSubsequence yoksa anlasilir hata", call("KS_makeShorts", { ranges: [{ start: 1, end: 20 }] }).ok === false);
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
