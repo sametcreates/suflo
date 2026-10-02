@@ -330,14 +330,36 @@ window.K = (function () {
           // .srt ASLA silinmez: Premiere içe aktarılan altyazıyı kopyalamaz, diskteki yola
           // referans verir — silinirse kullanıcının projesindeki caption izi kırılır.
           if (/\.srt$/i.test(f)) return;
-          if (!/^(cap_|seq_|warmup|montaj_|suflo_|beat_)/i.test(f)) return;
           var fp = path.join(dir, f);
+          // Geçici çalışma KLASÖRLERİ (overlay render, stil önizleme, açılmış güncelleme)
+          if (/^(overlay-|suflo-style-preview|guncelleme-)/i.test(f)) {
+            try {
+              var ds = fs.statSync(fp);
+              if (ds.isDirectory() && Date.now() - ds.mtimeMs > 86400000) {
+                fs.rmSync(fp, { recursive: true, force: true }); n++;
+              }
+            } catch (eD) {}
+            return;
+          }
+          if (!/^(cap_|seq_|warmup|montaj_|suflo_|beat_)/i.test(f)) return;
           try {
             if (Date.now() - fs.statSync(fp).mtimeMs > 86400000) { fs.unlinkSync(fp); n++; }
           } catch (e2) {}
         });
       } catch (e) {}
     });
+    // ASCII önbelleği (Windows, 8.3 kapalı disk yedeği): ses/çıktı kopyaları birikmesin.
+    // .bin modelleri bilerek kalır — her transkripsiyonda 1 GB yeniden kopyalanmasın.
+    try {
+      var ad = path.join(process.env.ProgramData || "C:\\ProgramData", "Suflo", "ascii-onbellek");
+      if (process.platform === "win32" && fs.existsSync(ad)) {
+        fs.readdirSync(ad).forEach(function (f) {
+          if (/\.bin$/i.test(f)) return;
+          var fp2 = path.join(ad, f);
+          try { if (Date.now() - fs.statSync(fp2).mtimeMs > 86400000) { fs.rmSync(fp2, { recursive: true, force: true }); n++; } } catch (eA) {}
+        });
+      }
+    } catch (eAs) {}
     if (n) log("temp temizligi: " + n + " dosya silindi");
     return n;
   }
