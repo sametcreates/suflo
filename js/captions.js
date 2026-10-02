@@ -1667,6 +1667,23 @@ window.KCaptions = (function () {
     KApp.toast("Metin, satır uzunluğu ve zamanlama düzeltildi", "good");
   }
 
+  // Anlamina gore satir sonlarina emoji: seyrek, tekrarsiz, Ctrl+Z ile geri alinir
+  function otomatikEmoji() {
+    if (!segments.length || !window.SufloAutoEmoji) return;
+    var dil = algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr";
+    var oneriler = window.SufloAutoEmoji.suggest(segments, { lang: dil === "en" ? "en" : "tr" });
+    if (!oneriler.length) {
+      KApp.toast("Emojiye uygun satır bulunamadı", "warn");
+      return;
+    }
+    snapshot("otomatik emoji");
+    oneriler.forEach(function (o) {
+      segments[o.index].text = window.SufloAutoEmoji.append(segments[o.index].text, o.emoji);
+    });
+    render(); saveDraftNow();
+    KApp.toast(oneriler.length + " satıra emoji eklendi · beğenmezsen Ctrl+Z", "good");
+  }
+
   async function proofreadAll() {
     if (!segments.length) return;
     var cfg = chatConfig();
@@ -4061,6 +4078,7 @@ window.KCaptions = (function () {
       applyEditorFilters();
     });
     if (el("cap-auto-fix")) el("cap-auto-fix").addEventListener("click", qualityAutoFix);
+    if (el("cap-auto-emoji")) el("cap-auto-emoji").addEventListener("click", otomatikEmoji);
     if (el("cap-proofread")) el("cap-proofread").addEventListener("click", proofreadAll);
     if (el("cap-learn-last")) el("cap-learn-last").addEventListener("click", learnLastCorrection);
     if (el("cap-history")) el("cap-history").addEventListener("click", function () {
