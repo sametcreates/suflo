@@ -52,7 +52,7 @@
     </button>
     <button class="ky-oge" data-tab="cut">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="5.5" cy="6" r="2.2"/><circle cx="5.5" cy="14" r="2.2"/><path d="M7.5 7.2 16 14M7.5 12.8 16 6"/></svg></span>
-      <span class="ky-metin"><b>Otomatik Kesim</b><i>sessizlik · jump cut</i></span>
+      <span class="ky-metin"><b>Otomatik Kesim <em class="ky-yeni">YENİ</em></b><i>sessizlik · konuşma · dolgu</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
     <button class="ky-oge" data-tab="beat">
@@ -64,6 +64,12 @@
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M13.2 13.2 17 17M9 6.6v4.8M6.6 9h4.8"/></svg></span>
       <span class="ky-metin"><b>Otomatik Zoom</b><i>konuşmaya göre punch-in</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
+    <button class="ky-oge" data-tab="gecis">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="5" width="6.5" height="10" rx="1.5"/><rect x="11" y="5" width="6.5" height="10" rx="1.5"/><path d="M8 10h4m-1.6-1.6L12 10l-1.6 1.6"/></svg></span>
+      <span class="ky-metin"><b>Geçişler <em class="ky-yeni">YENİ</em></b><i>zoom · whip · itme</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+      <span class="ky-adet" id="gecis-sayac">13</span>
     </button>
 
     <div class="ky-baslik" style="margin-top:12px">Kütüphane</div>
@@ -90,12 +96,6 @@
       <span class="ky-metin"><b>Butonlar</b><i>abone ol · takip et · indir</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
       <span class="ky-adet" id="buton-sayac">35</span>
-    </button>
-    <button class="ky-oge" data-tab="gecis">
-      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="5" width="6.5" height="10" rx="1.5"/><rect x="11" y="5" width="6.5" height="10" rx="1.5"/><path d="M8 10h4m-1.6-1.6L12 10l-1.6 1.6"/></svg></span>
-      <span class="ky-metin"><b>Geçişler</b><i>zoom · whip · itme · v3.0</i></span>
-      <span class="ky-kilit" data-kilit>PRO</span>
-      <span class="ky-adet" id="gecis-sayac">13</span>
     </button>
     <button class="ky-oge" data-tab="presets">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7"/><circle cx="13" cy="10" r="1.7"/><circle cx="7" cy="15" r="1.7"/></svg></span>
@@ -567,15 +567,15 @@
   <!-- ================= KESIM ================= -->
   <section id="tab-cut" class="tabpane">
     <div class="pro-tanitim" id="cut-tanitim" hidden>
-      <span class="pt-rozet">SUFLO PRO</span>
-      <b>Duraksamaları tek tıkla temizle</b>
-      <ul>
-        <li>Sessizlikleri otomatik bulur</li>
-        <li>Kopya sekansta güvenli uygular</li>
-        <li>Eşik ve tampon senin kontrolünde</li>
-      </ul>
-      <div class="pt-fiyat"><b>749 TL</b><span>tek sefer · abonelik yok · ömür boyu</span></div>
-      <button class="btn primary pro-ac-btn" style="width:100%">Pro'yu aç →</button>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Sessizliği ve dolgu seslerini temizle</b>
+        <span>Duraksamaları bul; "ııı / eee" ve tekrarları kelimeye tıklayarak kes. Kopya sekansta güvenli uygulanır.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>2</strong> mod</i><i><strong>4</strong> dil</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="cut">Otomatik kesimi aç — 749 TL</button>
     </div>
     <style>
       .cut-intro{background:var(--grad-soft);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-bottom:12px}
@@ -699,15 +699,15 @@
   <!-- ================= OTOMATIK ZOOM ================= -->
   <section id="tab-zoom" class="tabpane">
     <div class="pro-tanitim" id="zoom-tanitim" hidden>
-      <span class="pt-rozet">SUFLO PRO</span>
-      <b>Videona tek tıkla kurgu ritmi kat</b>
-      <ul>
-        <li>Konuşmaya göre zamanlanmış punch-in zoom'lar</li>
-        <li>Yoğunluk ve hız senin kontrolünde</li>
-        <li>Tek tıkla geri alınabilir — klip bozulmaz</li>
-      </ul>
-      <div class="pt-fiyat"><b>749 TL</b><span>tek sefer · abonelik yok · ömür boyu</span></div>
-      <button class="btn primary pro-ac-btn" style="width:100%">Pro'yu aç →</button>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Videona tek tıkla kurgu ritmi kat</b>
+        <span>Konuşmaya göre zamanlanmış punch-in zoom'lar; yoğunluk ve hız senin kontrolünde, tek tıkla geri alınır.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>✦</strong> akıllı</i><i><strong>3</strong> yoğunluk</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="zoom">Otomatik zoom'u aç — 749 TL</button>
     </div>
     <div class="cut-intro">
       <div class="ci-head">
@@ -783,15 +783,15 @@
   <!-- ================= RITIM ================= -->
   <section id="tab-beat" class="tabpane">
     <div class="pro-tanitim" id="beat-tanitim" hidden>
-      <span class="pt-rozet">SUFLO PRO</span>
-      <b>Kesimlerini müziğin ritmine oturt</b>
-      <ul>
-        <li>Vuruşları gerçek sinyal analiziyle bulur</li>
-        <li>Timeline'a marker atar, BPM gösterir</li>
-        <li>Bas / tiz bandı ayrımı</li>
-      </ul>
-      <div class="pt-fiyat"><b>749 TL</b><span>tek sefer · abonelik yok · ömür boyu</span></div>
-      <button class="btn primary pro-ac-btn" style="width:100%">Pro'yu aç →</button>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Kesimlerini müziğin ritmine oturt</b>
+        <span>Vuruşları gerçek sinyal analiziyle bulur, timeline'a marker atar, BPM gösterir; bas ve tiz bandı ayrı.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>BPM</strong> tespiti</i><i><strong>2</strong> bant</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="beat">Ritim araçlarını aç — 749 TL</button>
     </div>
     <div class="card">
       <div class="card-title">Ritim işaretleri</div>
@@ -935,6 +935,17 @@
 
   <!-- ================= GECISLER (v3.0) ================= -->
   <section id="tab-gecis" class="tabpane">
+    <div class="pro-tanitim" id="gecis-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Kesimlere tek tıkla 13 geçiş</b>
+        <span>Zoom, whip, itme, zıplama, karartma… Kartın üzerine gelerek önizle; Pro'da kesime tek tıkla uygula.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>13</strong> geçiş</i><i><strong>0</strong> eklenti</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="transitions">Geçişleri aç — 749 TL</button>
+    </div>
     <div class="cut-intro">
       <div class="ci-head">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2.5" y="5" width="6.5" height="10" rx="1.5"/><rect x="11" y="5" width="6.5" height="10" rx="1.5"/><path d="M8 10h4"/></svg>
