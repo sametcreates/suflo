@@ -117,7 +117,7 @@
       var words = String(cue.text || "").trim().split(/\s+/).filter(Boolean);
       var start = Number(cue.start || 0), end = Number(cue.end || 0);
       if (words.length <= 1) { if (words.length) out.push({ start: start, end: end, text: words[0], lineEnd: true }); return; }
-      var weights = words.map(function (w) { return w.length + 1; });
+      var weights = words.map(function (w) { return w.replace(/\*/g, "").length + 1; });
       var total = weights.reduce(function (a, b) { return a + b; }, 0);
       var t = start;
       words.forEach(function (w, i) {
@@ -136,6 +136,45 @@
       return { start: cue.start, end: cue.end, text: words[words.length - 1] || "" };
     }).filter(function (c) { return c.text; });
   }
+  /*
+   * Anahtar kelime vurgusu: altyazi metninde *kelime* ya da *iki kelime* ile
+   * isaretlenen kelimeler her stilde surekli vurgu renginde cizilir.
+   * markEmphasis kelime cue'larindaki isaretleri temizleyip cue.vurgu bayragi koyar;
+   * acik kalan isaret satir sonunda (lineEnd) kapanir.
+   */
+  var VURGU_RE = /^\*+|\*+$/g;
+  function markEmphasis(cues) {
+    var acik = false;
+    return (cues || []).map(function (cue) {
+      var t = String(cue.text || "");
+      var bas = /^\*/.test(t), son = /\*$/.test(t) && t.replace(/\*/g, "").length > 0;
+      var temiz = t.replace(VURGU_RE, "");
+      var vurgu = acik || bas;
+      if (bas && !son) acik = true;
+      if (son) { vurgu = vurgu || acik; acik = false; }
+      if (cue.lineEnd) acik = false;
+      var out = {};
+      for (var k in cue) if (Object.prototype.hasOwnProperty.call(cue, k)) out[k] = cue[k];
+      out.text = temiz || t;
+      if (vurgu && temiz) out.vurgu = true;
+      return out;
+    }).filter(function (c) { return String(c.text).replace(/\*/g, "").trim(); });
+  }
+
+  // Satir metnini kelime parcalarina ayir: [{ w, v }] (v = vurgulu)
+  function emphasisTokens(text) {
+    var words = String(text || "").trim().split(/\s+/).filter(Boolean);
+    var cues = words.map(function (w, i) { return { text: w, lineEnd: i === words.length - 1 }; });
+    return markEmphasis(cues).map(function (c) { return { w: c.text, v: !!c.vurgu }; });
+  }
+
+  // Isaretleri tamamen kaldir (vurgu desteklemeyen ciktilar icin)
+  function stripEmphasis(text) {
+    return String(text || "").split(/(\s+)/).map(function (p) {
+      return /\S/.test(p) && p.replace(/\*/g, "") ? p.replace(VURGU_RE, "") : p;
+    }).join("");
+  }
+
   function preset(id) { return STYLES[id] ? clone(STYLES[id]) : null; }
   function list() { return Object.keys(STYLES).map(function (id) { return preset(id); }); }
 
@@ -197,6 +236,7 @@
   }
 
   function meaningfulWord(group) {
+    for (var v = 0; v < group.length; v++) if (group[v].vurgu) return v;
     var ignore = /^(ve|ile|bir|bu|şu|o|da|de|mi|mı|mu|mü|için|ama|the|a|an|and|or|of|to)$/i;
     var best = 0, score = -99;
     group.forEach(function (cue, index) {
@@ -268,9 +308,14 @@
       assColor(color, alpha) + (extra || "") + "\\p1}" + path + "{\\p0}";
   }
 
-  function balancedText(value, max) {
-    var words = String(value || "").split(/\s+/).filter(Boolean);
-    if (String(value || "").length <= max || words.length < 3) return esc(value);
+  // accent/normal verilirse *vurgulu* kelimeler o renkte yazilir
+  function balancedText(value, max, accent, normal) {
+    var tokens = emphasisTokens(value);
+    var words = tokens.map(function (t) { return t.w; });
+    var parts = tokens.map(function (t) {
+      return t.v && accent ? "{\\1c" + accent + "}" + esc(t.w) + "{\\1c" + normal + "}" : esc(t.w);
+    });
+    if (words.join(" ").length <= max || words.length < 3) return parts.join(" ");
     var best = 1, bestScore = 9999;
     for (var i = 1; i < words.length; i++) {
       var left = words.slice(0, i).join(" ").length;
@@ -278,14 +323,14 @@
       var score = Math.abs(left - right) + (Math.max(left, right) > max ? 12 : 0);
       if (score < bestScore) { best = i; bestScore = score; }
     }
-    return esc(words.slice(0, best).join(" ")) + "\\N" + esc(words.slice(best).join(" "));
+    return parts.slice(0, best).join(" ") + "\\N" + parts.slice(best).join(" ");
   }
 
   function viralMarkup(group, active, style, fontSize) {
     var normal = assColor(style.renk), accent = assColor(style.vurguRenk);
     var words = group.map(function (cue, index) {
       var word = esc(cue.text);
-      if (index !== active) return word;
+      if (index !== active) return cue.vurgu ? "{\\1c" + accent + "}" + word + "{\\1c" + normal + "}" : word;
       return "{\\1c" + accent + "\\fs" + Math.round(fontSize * 1.11) + "}" + word +
         "{\\1c" + normal + "\\fs" + fontSize + "}";
     });
@@ -439,7 +484,7 @@
     cues.forEach(function (cue, index) {
       var next = cues[index + 1], end = next ? next.start : cue.end;
       end = Math.max(cue.start + 0.24, end);
-      var p = palettes[index % palettes.length], off = offsets[index % offsets.length];
+      var p = cue.vurgu ? { fill: style.vurguRenk, text: "#15131f", accent: "#ffffff" } : palettes[index % palettes.length], off = offsets[index % offsets.length];
       var cx = a.x + width * off[0], cy = a.y + height * off[1];
       var chars = Math.max(3, String(cue.text).length);
       var cardW = Math.min(width * 0.58, Math.max(fs * 2.45, fs * (chars * 0.6 + 0.9)));
@@ -477,7 +522,8 @@
     var events = [], a = anchor(style, "doc", width, height);
     var fs = scaled(style.boyut, height), pad = fs * 0.72;
     cues.forEach(function (cue) {
-      var markup = balancedText(cue.text, 38);
+      var markup = balancedText(cue.vurgu ? "*" + cue.text + "*" : cue.text, 38, assColor(style.vurguRenk), assColor(style.renk));
+      cue = { start: cue.start, end: cue.end, text: stripEmphasis(cue.text) };
       var lines = markup.indexOf("\\N") !== -1 ? 2 : 1;
       var maxChars = String(cue.text).split(/\s+/).reduce(function (state, word) {
         var last = state.parts[state.parts.length - 1];
@@ -509,7 +555,7 @@
   function premiumMarkup(group, highlight, style) {
     var normal = assColor(style.renk), gold = assColor(style.vurguRenk);
     var words = group.map(function (cue, index) {
-      return index === highlight ? "{\\1c" + gold + "}" + esc(cue.text) + "{\\1c" + normal + "}" : esc(cue.text);
+      return index === highlight || cue.vurgu ? "{\\1c" + gold + "}" + esc(cue.text) + "{\\1c" + normal + "}" : esc(cue.text);
     });
     if (words.length >= 4 || words.join(" ").length > 20) {
       var half = Math.ceil(words.length / 2);
@@ -608,7 +654,8 @@
         var ms = Math.round(90 / factor), over = Math.round(112 + factor * 4);
         var words = group.map(function (c, i) {
           var w = esc(c.text);
-          if (i !== active) return w;
+          // anahtar kelime grup renginden bagimsiz hep ana vurgu renginde
+          if (i !== active) return c.vurgu ? "{\\1c" + assColor(style.vurguRenk) + "}" + w + "{\\1c" + normal + "}" : w;
           return "{\\1c" + vurgu + "\\fscx86\\fscy86\\t(0," + ms + ",\\fscx" + over + "\\fscy" + over + ")" +
             "\\t(" + ms + "," + (ms + 80) + ",\\fscx100\\fscy100)}" + w + "{\\1c" + normal + "\\fscx100\\fscy100}";
         });
@@ -639,7 +686,7 @@
         activeEnd = Math.max(cue.start + .08, activeEnd);
         // Soluk kelime: \1a ile yari saydam (libass \1c icindeki alfa baytini yok sayar)
         var words = group.map(function (c, i) {
-          return (i === active ? "{\\1a&H00&\\3c" + glow + "\\blur1}" : "{\\1a&H78&\\3c" + glow + "\\blur0}") + esc(c.text);
+          return (i === active || c.vurgu ? "{\\1a&H00&\\3c" + glow + "\\blur1}" : "{\\1a&H78&\\3c" + glow + "\\blur0}") + esc(c.text);
         });
         events.push(dialogue(1, cue.start, activeEnd, "{\\an5\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
           "\\1c" + beyaz + "\\bord" + Math.max(1, minScaled(style.kontur, width, height)) + "\\shad0}" + joinWords(words, br)));
@@ -663,6 +710,7 @@
         // Gizli kelimeler de seffaf yazilir: satir duzeni sabit kalir, metin kaymaz
         var parts = group.map(function (c, i) {
           var w = esc(c.text);
+          if (c.vurgu) w = "{\\1c" + imlec + "}" + w + "{\\1c" + assColor(style.renk) + "}";
           if (i < k) return w;
           if (i === k) return w + "{\\1c" + imlec + "\\t(0,260,\\alpha&HFF&)}_{\\alpha&HFF&}";
           return w;
@@ -690,7 +738,7 @@
         var words = group.map(function (c, i) {
           var w = esc(c.text);
           if (i > k) return "{\\alpha&HFF&}" + w + "{\\alpha&H00&}";
-          if (i < k) return w;
+          if (i < k) return c.vurgu ? "{\\1c" + vurgu + "}" + w + "{\\1c" + normal + "}" : w;
           return "{\\1c" + vurgu + "\\fscx70\\fscy140\\t(0," + t1 + ",\\fscx118\\fscy82)" +
             "\\t(" + t1 + "," + t2 + ",\\fscx94\\fscy108)\\t(" + t2 + "," + t3 + ",\\fscx100\\fscy100)}" + w +
             "{\\1c" + normal + "\\fscx100\\fscy100}";
@@ -714,6 +762,9 @@
       var parts = group.map(function (c, i) {
         var next = group[i + 1];
         var dur = Math.max(.05, (next ? next.start : c.end) - c.start);
+        // vurgulu kelime: dolmadan once de vurgu rengini tasir (\\2c), biraz buyuk
+        if (c.vurgu) return "{\\kf" + Math.round(dur * 100) + "\\2c" + assColor(style.vurguRenk) + "\\fscx112\\fscy112}" +
+          esc(c.text) + "{\\2c" + assColor(style.renk) + "\\fscx100\\fscy100}";
         return "{\\kf" + Math.round(dur * 100) + "}" + esc(c.text);
       });
       events.push(dialogue(1, start, end, "{\\an" + (a.an || 5) + "\\pos(" + a.x + "," + a.y + ")\\fs" + fs + "\\q2" +
@@ -737,6 +788,7 @@
       if (options.cueKind === "lines") cues = splitToWords(cues);
       else if (options.cueKind === "cumulative") cues = lastWords(cues);
     }
+    if (wordBased(id) || options.cueKind === "words") cues = markEmphasis(cues);
     var factor = intensity(options.intensity || style.yogunluk);
     var events;
     if (id === "mrbeast") events = renderMrBeast(cues, style, width, height, factor);
@@ -770,6 +822,8 @@
     wordBased: wordBased,
     splitToWords: splitToWords,
     lastWords: lastWords,
+    markEmphasis: markEmphasis,
+    stripEmphasis: stripEmphasis,
     compile: compile,
     assColor: assColor,
     timecode: timecode

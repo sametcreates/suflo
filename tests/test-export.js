@@ -47,8 +47,10 @@ var kod = [
  * (DOM okur) burada varsayilan gorunumle taklit edilir — bu dosya BICIM
  * dogrulugunu olcuyor, gorunum dogrulugu tests/test-stil.js'in isi.
  */
+globalThis.__SufloCT = require(require("path").join(__dirname, "..", "js", "caption-text.js"));
 var f = new Function("SEGMENTS", "STYLE", `
   var segments = SEGMENTS;
+  var CT = globalThis.__SufloCT;
   function styleText(t) { return STYLE(t); }
   function stil() {
     return { font: "Arial", boyut: 72, renk: "#ffffff", konturRenk: "#000000",

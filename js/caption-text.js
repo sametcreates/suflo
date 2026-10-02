@@ -180,7 +180,89 @@
     return out;
   }
 
+  /*
+   * Anahtar kelime vurgusu (*kelime*). Suflo Stilleri isaretli kelimeyi vurgu
+   * renginde cizer; SRT/VTT/normal caption izi gibi ciktilarda isaret kaldirilir.
+   */
+  var VURGU_UC = /^\*+|\*+$/g;
+  function stripEmphasis(text) {
+    return String(text == null ? "" : text).split(/(\s+)/).map(function (p) {
+      return /\S/.test(p) && p.replace(/\*/g, "") ? p.replace(VURGU_UC, "") : p;
+    }).join("");
+  }
+  function hasEmphasis(text) { return /(^|\s)\*\S|\S\*(\s|$)/.test(String(text || "")); }
+
+  // Tek kelimeyi isaretle/isareti kaldir (editorde tiklayarak)
+  function toggleWord(text, index) {
+    var parts = String(text || "").split(/(\s+)/), n = -1;
+    for (var i = 0; i < parts.length; i++) {
+      if (!/\S/.test(parts[i])) continue;
+      n++;
+      if (n !== index) continue;
+      var p = parts[i];
+      parts[i] = /^\*.*\*$/.test(p) && p.length > 2 ? p.slice(1, -1) : "*" + p.replace(VURGU_UC, "") + "*";
+      break;
+    }
+    return parts.join("");
+  }
+
+  var VURGU_DURAK = /^(ve|ile|bir|bu|şu|o|da|de|ki|mi|mı|mu|mü|için|ama|fakat|çünkü|gibi|daha|çok|en|hem|ya|yani|şey|işte|zaten|sonra|önce|kadar|olarak|olan|diye|bunu|şunu|onu|bunun|benim|senin|bizim|onların|the|a|an|and|or|of|to|in|on|is|are|was|that|this|with|for|it|you|your|they|have|just|really|about|because|there|their|what|which|would|could|should)$/i;
+  var BIRIM = /^(%|tl|lira|dolar|euro|avro|\$|€|₺|bin|milyon|milyar|yüzde|percent|k|m|dk|sn|saat|gün|yıl|ay|kg|km|x)$/i;
+
+  /*
+   * Otomatik vurgu: sayilar (birimiyle: "100 TL", "%50", "3 milyon") her zaman;
+   * sayisiz ve 4+ kelimelik satirda en anlamli tek kelime. Elle isaretlenmis
+   * satirlara dokunulmaz. Doner: yeni metin (degisiklik yoksa ayni metin).
+   */
+  function autoEmphasis(text) {
+    var t = String(text || "");
+    if (!t.trim() || hasEmphasis(t)) return t;
+    var parts = t.split(/(\s+)/);
+    var idx = [];
+    for (var i = 0; i < parts.length; i++) if (/\S/.test(parts[i])) idx.push(i);
+    var isaret = {};
+    idx.forEach(function (pi, k) {
+      if (/\d/.test(parts[pi])) {
+        isaret[k] = true;
+        var sonraki = idx[k + 1];
+        var temiz = sonraki != null ? parts[sonraki].replace(/[.,!?;:…]+$/, "") : "";
+        if (sonraki != null && BIRIM.test(temiz)) isaret[k + 1] = true;
+      }
+    });
+    if (!Object.keys(isaret).length && idx.length >= 4) {
+      var en = -1, puan = 0;
+      idx.forEach(function (pi, k) {
+        var w = parts[pi].replace(/[^0-9A-Za-z\u00C0-\u024F\u0400-\u04FF]/g, "");
+        if (VURGU_DURAK.test(w) || w.length < 5) return;
+        var p = w.length + (/[!?]$/.test(parts[pi]) ? 3 : 0);
+        if (p > puan) { puan = p; en = k; }
+      });
+      if (en >= 0) isaret[en] = true;
+    }
+    var ks = Object.keys(isaret).map(Number).sort(function (a, b) { return a - b; });
+    if (!ks.length) return t;
+    // ardisik isaretli kelimeler tek * ... * araliginda birlesir
+    var gruplar = [];
+    ks.forEach(function (k) {
+      var g = gruplar[gruplar.length - 1];
+      if (g && g[1] === k - 1) g[1] = k; else gruplar.push([k, k]);
+    });
+    gruplar.forEach(function (g) {
+      var a = idx[g[0]], b = idx[g[1]];
+      // sondaki noktalama yildizin disinda kalsin: "*100 TL*."
+      var m = /^(.*?)([.,!?;:…]*)$/.exec(parts[b]);
+      parts[a] = "*" + parts[a];
+      if (a === b) m = /^(.*?)([.,!?;:…]*)$/.exec(parts[a]);
+      parts[b] = m[1] + "*" + m[2];
+    });
+    return parts.join("");
+  }
+
   return {
+    stripEmphasis: stripEmphasis,
+    hasEmphasis: hasEmphasis,
+    toggleWord: toggleWord,
+    autoEmphasis: autoEmphasis,
     cleanSegments: cleanSegments,
     karaokeWords: karaokeWords,
     karaokeCumulative: karaokeCumulative,

@@ -24,6 +24,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Dışa aktarma** | SRT · WebVTT · ASS (stilli, karaoke etiketli) · TXT |
 | **Bölümler** *(3.0)* | Konuşmadan YouTube bölümleri, AI başlık, kural denetimi, Chapter marker |
 | **Otomatik emoji** *(3.0)* | Satırın anlamına göre seyrek emoji, Türkçe ek dostu |
+| **Anahtar kelime vurgusu** *(3.0)* | `*kelime*` ya da Otomatik vurgu: sayılar ve önemli kelimeler her stilde vurgu renginde |
 | **Çift dilli altyazı** *(3.0)* | Çeviri sonrası orijinal + çeviri alt alta (SRT/VTT/caption izi) |
 
 ### Altyazı motorları
@@ -209,6 +210,7 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-textcut.js` | Konuşmadan kes: dolgu/tekrar algılama, kesim aralıkları, duraksama kısaltma |
 | `test-chapters.js` | YouTube bölümleri: öneri, kural denetimi, AI yanıtı ayrıştırma |
 | `test-auto-emoji.js` | Otomatik emoji: Türkçe kök eşleşmesi, yoğunluk ve tekrar koruması |
+| `test-vurgu.js` | Anahtar kelime vurgusu: 12 stilde vurgu rengi, otomatik seçim, dışa aktarımda işaret temizliği |
 | `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
 | `test-highlights.js` · `test-viral-host.js` | Viral anlar: satır sınırı, süre uzatma/kırpma, çakışma; süreli marker ve In/Out |
 | `test-scenes.js` | Sahne algılama (gerçek ffmpeg) ve seçili klibi bölme |

@@ -1818,6 +1818,52 @@ window.KCaptions = (function () {
     KApp.toast(oneriler.length + " satıra emoji eklendi · beğenmezsen Ctrl+Z", "good");
   }
 
+  /*
+   * Otomatik anahtar kelime vurgusu: sayilar (birimiyle) ve satir basina en
+   * anlamli tek kelime *isaretlenir*. Suflo Stilleri bunlari vurgu renginde
+   * cizer. Kelime modunda 6'li pencereler satir gibi degerlendirilir.
+   */
+  function otomatikVurgu() {
+    if (!segments.length) return;
+    if (segmentsMode === "kc") {
+      KApp.toast("Birikimli karaoke modunda vurgu yok; Kelime ya da Satır modunu kullan.", "warn");
+      return;
+    }
+    var yeni = segments.map(function (s) { return s.text; });
+    if (segmentsMode === "k1" || segmentsMode === "w") {
+      for (var b = 0; b < segments.length; b += 6) {
+        var pencere = yeni.slice(b, b + 6);
+        if (pencere.some(CT.hasEmphasis)) continue;
+        var tekSozcuk = pencere.every(function (w) { return !/\s/.test(String(w).trim()); });
+        if (!tekSozcuk) continue;
+        var sonuc = CT.autoEmphasis(pencere.join(" ")).split(/\s+/);
+        if (sonuc.length !== pencere.length) continue;
+        // pencere genelindeki "*a b*" araligi kelime basina "*a*" "*b*" olur
+        var acik = false;
+        sonuc.forEach(function (w, k) {
+          var bas = /^\*/.test(w), son = /\*[.,!?;:…]*$/.test(w);
+          var isaretli = acik || bas;
+          if (bas && !son) acik = true;
+          if (son) acik = false;
+          yeni[b + k] = isaretli ? CT.toggleWord(CT.stripEmphasis(w), 0) : w;
+        });
+      }
+    } else {
+      yeni = yeni.map(function (t) { return CT.autoEmphasis(t); });
+    }
+    var n = 0;
+    yeni.forEach(function (t, i) { if (t !== segments[i].text) n++; });
+    if (!n) {
+      KApp.toast("Vurgulanacak yeni kelime bulunamadı (işaretli satırlara dokunulmaz).", "warn");
+      return;
+    }
+    snapshot("otomatik vurgu");
+    yeni.forEach(function (t, i) { segments[i].text = t; });
+    render(); saveDraftNow();
+    KApp.toast(n + " " + (segmentsMode === "k1" || segmentsMode === "w" ? "kelime" : "satır") +
+      " vurgulandı · Suflo Stillerinde vurgu renginde görünür · Ctrl+Z ile geri al", "good");
+  }
+
   async function proofreadAll() {
     if (!segments.length) return;
     var cfg = chatConfig();
@@ -2447,14 +2493,17 @@ window.KCaptions = (function () {
    */
   // opts.ciftDil: ceviri yapilmis satirlarda ust satir orijinal, alt satir ceviri
   // (yalniz SRT/VTT ve normal caption izi; stilli yollar kelime gruplar, tek dil kalir)
+  // opts.vurgu: *anahtar kelime* isaretleri korunur (yalniz Suflo Stilleri cizer);
+  // diger tum ciktilarda isaret kaldirilir
   function cueler(opts) {
     var out = [];
     var cift = !!(opts && opts.ciftDil);
+    var vurguKoru = !!(opts && opts.vurgu);
     segments.forEach(function (s, i) {
-      var txt = styleText(s.text);
+      var txt = styleText(vurguKoru ? s.text : CT.stripEmphasis(s.text));
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
       if (cift && typeof s.orig === "string") {
-        var asil = styleText(s.orig, true);
+        var asil = styleText(CT.stripEmphasis(s.orig), true);
         if (asil && asil !== txt) txt = asil + "\n" + txt;
       }
       // minimum 0.3 sn gorunum — ama bir sonraki cue ile CAKISMA (karaoke'de kritik)
@@ -2784,12 +2833,12 @@ window.KCaptions = (function () {
       };
     }
     var orta = segments[Math.floor(segments.length / 2)] || segments[0];
-    var metin = styleText(orta.text || "");
+    var metin = styleText(CT.stripEmphasis(orta.text || ""));
     return { kelimeler: metin ? metin.split(/\s+/) : [], sureler: null };
   }
 
   function motorOnizlemeCueleri(st) {
-    var cs = cueler();
+    var cs = cueler({ vurgu: true });
     if (!cs.length) {
       if (st.aile === "doc") return [{ start: 0.15, end: 2.7, text: "Hikâyenin başladığı yer." }];
       var ornekler = st.aile === "pop" ? ["POP!", "ŞAK!", "VAY!"] :
@@ -3425,7 +3474,7 @@ window.KCaptions = (function () {
           styleId: st.aile,
           intensity: st.yogunluk,
           cueKind: motorCueTuru(),
-          cues: cs,
+          cues: cueler({ vurgu: true }),
           offset: baslangic,
           width: g,
           height: y,
@@ -3686,7 +3735,7 @@ window.KCaptions = (function () {
       var kelimeModu = segmentsMode === "k1" || segmentsMode === "w"; // kc haric: ASS'te metin katlaniyordu
       var icerik, ad, bom = "﻿";
       if (fmt === "txt") {
-        var lines = segments.map(function (s) { return styleText(s.text); }).filter(Boolean);
+        var lines = segments.map(function (s) { return styleText(CT.stripEmphasis(s.text)); }).filter(Boolean);
         if (!lines.length) { KApp.toast("Yazılacak metin yok.", "bad"); return; }
         icerik = lines.join("\r\n");
         ad = "suflo-transkript.txt";
@@ -3698,7 +3747,7 @@ window.KCaptions = (function () {
         var assStil = stil();
         if (motorStiliMi(assStil.aile)) {
           icerik = window.SufloStyleEngine.compile({
-            styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler(), cueKind: motorCueTuru(),
+            styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler({ vurgu: true }), cueKind: motorCueTuru(),
             overrides: {
               font: assStil.font, fontFile: FONTLAR[assStil.font], boyut: assStil.boyut,
               renk: assStil.renk, konturRenk: assStil.konturRenk,
@@ -3752,6 +3801,7 @@ window.KCaptions = (function () {
     });
     if (el("cap-auto-fix")) el("cap-auto-fix").addEventListener("click", qualityAutoFix);
     if (el("cap-auto-emoji")) el("cap-auto-emoji").addEventListener("click", otomatikEmoji);
+    if (el("cap-auto-vurgu")) el("cap-auto-vurgu").addEventListener("click", otomatikVurgu);
     if (el("cap-proofread")) el("cap-proofread").addEventListener("click", proofreadAll);
     if (el("cap-learn-last")) el("cap-learn-last").addEventListener("click", learnLastCorrection);
     if (el("cap-history")) el("cap-history").addEventListener("click", function () {
@@ -3912,7 +3962,7 @@ window.KCaptions = (function () {
   // disaridan degistirilemesin diye yalnizca sade bir kopya verilir.
   function segmentsSnapshot() {
     return segments.map(function (s) {
-      return { start: Number(s.start) || 0, end: Number(s.end) || 0, text: String(s.text || "") };
+      return { start: Number(s.start) || 0, end: Number(s.end) || 0, text: CT.stripEmphasis(String(s.text || "")) };
     });
   }
 

@@ -7,6 +7,7 @@
 - **Geçişler:** Yeni sekme. Playhead'i kesime getir, tek tıkla 13 geçişten birini uygula: zoom, whip (4 yön), itme, zıplama, punch, sarsıntı, karartma, yumuşak geçiş. Eklenti veya ayar katmanı gerekmez; keyframe'ler Premiere'de düzenlenebilir.
 - **Bölümler (YouTube):** Altyazıdan bölüm önerir, istersen AI ile başlık atar, YouTube kurallarını (0:00, en az 3 bölüm, 10 sn) denetler. Açıklamaya kopyala ya da timeline'a Chapter marker'ı olarak ekle.
 - **Otomatik emoji:** Altyazı satırlarına anlamına göre seyrek emoji ekler; Türkçe eklerini tanır, art arda ve tekrar emoji koymaz. Ctrl+Z ile geri alınır.
+- **Anahtar kelime vurgusu:** Altyazıda `*kelime*` yazdığın ya da **Otomatik vurgu**nun seçtiği kelimeler (sayılar, para, yüzde ve satırın en önemli kelimesi) tüm Suflo Stillerinde sürekli vurgu renginde görünür. SRT, VTT ve normal caption izinde yıldızlar otomatik temizlenir.
 - **Sahne algılama:** Kesim sekmesinde. Uzun kayıtlarda ve hazır videolarda sahne değişimlerini görüntüden bulur; marker at ya da seçili klibi sahnelerde böl — müzik katmanına dokunulmaz.
 - **Vuruşlarda böl:** Ritim sekmesinde müziği analiz et, B-roll'u seç, tek tıkla vuruşlarda kes.
 - **Çift dilli altyazı:** Çeviriden sonra "çift dilli" anahtarıyla SRT/VTT ve altyazı izi orijinal + çeviriyi alt alta yazar.

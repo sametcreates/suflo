@@ -78,6 +78,12 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] Ctrl+Z ile geri alınıyor.
 - [ ] Normal caption izine eklenince emojiler renkli görünüyor.
 
+## 6a. Anahtar kelime vurgusu *(Altyazı editörü araç çubuğu)*
+- [ ] **Otomatik vurgu** → sayılar (örn. `*100 TL*`) ve satır başına bir önemli kelime yıldızla işaretleniyor; Ctrl+Z geri alıyor.
+- [ ] Bir satıra elle `*kelime*` yaz → Hormozi / Neon / Belgesel önizlemesinde o kelime vurgu renginde.
+- [ ] Suflo Stili ile ekle → katmanda yıldız görünmüyor, kelime vurgulu.
+- [ ] SRT indir ve **Normal altyazı izi ekle** → yıldızlar yok, metin temiz.
+
 ## 6b. Güvenlik ve sağlamlık
 - [ ] Yeni bir model indir (örn. Base) → kurulum "Model doğrulanıyor…" adımından geçiyor.
 - [ ] Ayarlar → güncelleme denetimi: (bir sonraki sürümde) indirilen paket "Doğrulanıyor…" adımından geçiyor.
