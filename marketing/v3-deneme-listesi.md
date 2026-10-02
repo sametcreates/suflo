@@ -12,6 +12,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 
 ## 1. Temel (her sürümde)
 - [ ] Panel açılıyor, üst çubukta **v3.0.0** yazıyor, "bağlanıyor" kalmıyor.
+- [ ] İlk açılışta **"Suflo 3.0"** yenilikler penceresi çıkıyor; bir maddeye basınca ilgili bölüm açılıyor; panel yeniden açılınca pencere bir daha gelmiyor.
 - [ ] Bir klipten **Altyazı oluştur** çalışıyor (yerel motor).
 - [ ] Groq anahtarıyla **bulut** altyazı: Türkçe karakterler (ş ğ ü ö ç ı İ) bozulmadan geliyor. *(3.0 düzeltmesi)*
 - [ ] Çeviri: TR → EN çevir; çeviri sürerken bir satırı elle düzelt → o satırın üzerine yazılmadığını gör. *(3.0 düzeltmesi)*

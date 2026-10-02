@@ -1187,6 +1187,75 @@ window.KApp = (function () {
     setInterval(checkUpdate, 6 * 3600 * 1000);
     // eski geçici ses dosyalarını süpür (disk sessizce dolmasın)
     setTimeout(function () { try { K.sweepTemp(); } catch (e) {} }, 6000);
+    setTimeout(function () { try { yenilikleriGoster(); } catch (eY) {} }, 900);
+  }
+
+  /*
+   * "Suflo 3.0'da yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (Kesim sekmesinin altinda, editorun katlanir bolumlerinde);
+   * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
+   */
+  var YENILIKLER = {
+    surum: "3.0",
+    maddeler: [
+      { ikon: "✂", baslik: "Konuşmadan kes", metin: "ııı, eee ve tekrarları kelimeye tıklayarak videodan çıkar.", sekme: "cut", hedef: "tc-card" },
+      { ikon: "🔥", baslik: "Viral anlar (Shorts)", metin: "Uzun videodaki en güçlü 15–60 sn'yi bulur, In/Out'u ayarlar.", sekme: "captions", acilir: "cap-vr-box" },
+      { ikon: "Aa", baslik: "Suflo Stilleri", metin: "Hormozi, Neon, Daktilo dahil 12 animasyonlu altyazı.", sekme: "captions", hedef: "cap-stil-grid" },
+      { ikon: "↔", baslik: "Geçişler", metin: "Kesime tek tıkla zoom, whip, itme — eklentisiz.", sekme: "gecis" },
+      { ikon: "▦", baslik: "Sahne algılama · vuruşlarda böl", metin: "Klibi sahnelerde ya da müziğin vuruşlarında böl.", sekme: "cut", hedef: "sc-card" },
+      { ikon: "§", baslik: "YouTube bölümleri", metin: "Konuşmadan bölüm + AI başlık, açıklamaya kopyala.", sekme: "captions", acilir: "cap-ch-box" }
+    ]
+  };
+
+  function yenilikleriGoster() {
+    var s = K.settings();
+    if (s.yeniliklerGoruldu === YENILIKLER.surum) return;
+    var arka = document.createElement("div");
+    arka.className = "yenilik-arka";
+    arka.setAttribute("role", "dialog");
+    arka.setAttribute("aria-label", "Suflo " + YENILIKLER.surum + " yenilikleri");
+    var kutu = document.createElement("div");
+    kutu.className = "yenilik-kutu";
+    var bas = document.createElement("div");
+    bas.className = "yenilik-bas";
+    bas.innerHTML = "<span>YENİ</span><b>Suflo " + YENILIKLER.surum + "</b><i>Yapay zekâ ile kurgu</i>";
+    kutu.appendChild(bas);
+    function kapat() {
+      try { s.yeniliklerGoruldu = YENILIKLER.surum; K.saveSettings(); } catch (e) {}
+      if (arka.parentNode) arka.parentNode.removeChild(arka);
+    }
+    YENILIKLER.maddeler.forEach(function (m) {
+      var satir = document.createElement("button");
+      satir.type = "button";
+      satir.className = "yenilik-satir";
+      var ik = document.createElement("span"); ik.className = "yenilik-ikon"; ik.textContent = m.ikon;
+      var yazi = document.createElement("span"); yazi.className = "yenilik-yazi";
+      var b = document.createElement("b"); b.textContent = m.baslik;
+      var t = document.createElement("i"); t.textContent = m.metin;
+      yazi.appendChild(b); yazi.appendChild(t);
+      var git = document.createElement("span"); git.className = "yenilik-git"; git.textContent = "Göster →";
+      satir.appendChild(ik); satir.appendChild(yazi); satir.appendChild(git);
+      satir.addEventListener("click", function () {
+        kapat();
+        goster(m.sekme);
+        if (m.acilir && el(m.acilir)) { el(m.acilir).open = true; }
+        var odak = el(m.hedef || m.acilir);
+        if (odak && odak.scrollIntoView) { try { odak.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (eS) { odak.scrollIntoView(); } }
+      });
+      kutu.appendChild(satir);
+    });
+    var tamam = document.createElement("button");
+    tamam.type = "button";
+    tamam.className = "btn primary yenilik-tamam";
+    tamam.textContent = "Başlayalım";
+    tamam.addEventListener("click", kapat);
+    kutu.appendChild(tamam);
+    arka.appendChild(kutu);
+    arka.addEventListener("click", function (e) { if (e.target === arka) kapat(); });
+    document.addEventListener("keydown", function esc(e) {
+      if (e.key === "Escape") { document.removeEventListener("keydown", esc); kapat(); }
+    });
+    document.body.appendChild(arka);
   }
 
   document.addEventListener("DOMContentLoaded", init);
