@@ -44,6 +44,11 @@ function zipUret(ad, icerik) {
   return zip;
 }
 
+if (process.platform !== "win32") {
+  // ZIP'ler Windows'un tar.exe'siyle uretilir ve kurulum Windows yoluyla calisir
+  console.log("ATLA test-ffmpeg: yalniz Windows'ta calisir");
+  process.exit(0);
+}
 var zipIyi = zipUret("iyi", "SAHTE-FFMPEG-IKILISI");
 if (!realFs.existsSync(zipIyi)) { console.log("FAIL test zip'i uretilemedi (powershell?)"); process.exit(1); }
 

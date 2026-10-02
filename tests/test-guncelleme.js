@@ -284,7 +284,8 @@ function ortam(opts) {
     e5.indirmeler[0] && e5.indirmeler[0].url);
 
   /* ---------- otomatikKur: gercek ZIP + sahte CEP klasoru ---------- */
-  await (async function () {
+  // Windows'un tar.exe'si ve CEP klasor duzeni gerekir
+  if (process.platform === "win32") await (async function () {
     var fs2 = require("fs"), path2 = require("path"), os2 = require("os"), cp2 = require("child_process");
     var TMP2 = path2.join(os2.tmpdir(), "suflo-otokur-test");
     try { fs2.rmSync(TMP2, { recursive: true, force: true }); } catch (e0) {}

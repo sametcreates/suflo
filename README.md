@@ -182,9 +182,14 @@ Güvenli yayın: `tools/publish.ps1` → güncel paketleri yeniden üretir, doğ
 
 ### Testler
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\test.ps1
+```bash
+node tools/test.js            # Windows, macOS, Linux
+node tools/test.js --hizli    # ffmpeg gerektirenleri atla
 ```
+
+Windows'ta `powershell -ExecutionPolicy Bypass -File tools\test.ps1` de aynı işi yapar.
+Her push'ta GitHub Actions testleri Windows, macOS ve Linux'ta çalıştırır (`.github/workflows/test.yml`).
+Windows'a özgü bölümler (8.3 kısa yol, `tar.exe` ile ZIP) diğer sistemlerde kendini atlar.
 
 Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanmış mantık üzerinde
 çalışmazlar. Bu yüzden bir test kırıldığında gerçekten ürün kırılmış demektir.
@@ -192,6 +197,8 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | Dosya | Ne ölçer |
 |---|---|
 | `test-download.js` | Yarım kalan indirmenin devamı, hangi HTTP hatasında dosya korunur/silinir |
+| `test-caption-text.js` | Halüsinasyon temizliği, karaoke, satır bölme, Türkçe-duyarlı terim sözlüğü |
+| `test-utf8.js` | Parça parça gelen HTTP yanıtlarında Türkçe harflerin bozulmaması |
 | `test-parse.js` | SRT/VTT ayrıştırma, etiket ve HTML varlık temizliği, BOM/CRLF |
 | `test-export.js` | SRT/VTT/ASS/TXT çıktıları (ffmpeg ile gerçekten ayrıştırılarak) |
 | `test-burn.js` | ASS'in libass ile videoya gerçekten çizildiği (kare farkı) |
