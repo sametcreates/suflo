@@ -2146,6 +2146,14 @@ window.KCaptions = (function () {
     preTranslate = null;
     var b = el("cap-revert");
     if (b) b.hidden = true;
+    var c = el("cap-cift-dil-sar");
+    if (c) c.hidden = true;
+  }
+
+  // Çeviri sonrası "çift dilli": orijinal + çeviri alt alta (SRT/VTT/normal iz)
+  function ciftDilAcik() {
+    var c = el("cap-cift-dil");
+    return !!(c && c.checked && preTranslate);
   }
 
   var LANG_NAMES = { en: "English", tr: "Turkish", az: "Azerbaijani", ru: "Russian" };
@@ -2245,6 +2253,7 @@ window.KCaptions = (function () {
       preTranslate = true;
       status("");
       el("cap-revert").hidden = false;
+      if (el("cap-cift-dil-sar")) el("cap-cift-dil-sar").hidden = false;
       render(); saveDraftNow();
       KApp.toast(texts.length + " satır çevrildi" +
         (atlananDuzenleme ? " · çeviri sırasında düzenlenen " + atlananDuzenleme + " satıra dokunulmadı" : ""), "good");
@@ -2407,11 +2416,18 @@ window.KCaptions = (function () {
    * Stil uygulanmış, çakışması giderilmiş cue listesi.
    * TÜM dışa aktarma biçimleri bunu kullanır — biçimler arası davranış ayrışmasın.
    */
-  function cueler() {
+  // opts.ciftDil: ceviri yapilmis satirlarda ust satir orijinal, alt satir ceviri
+  // (yalniz SRT/VTT ve normal caption izi; stilli yollar kelime gruplar, tek dil kalir)
+  function cueler(opts) {
     var out = [];
+    var cift = !!(opts && opts.ciftDil);
     segments.forEach(function (s, i) {
       var txt = styleText(s.text);
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
+      if (cift && typeof s.orig === "string") {
+        var asil = styleText(s.orig);
+        if (asil && asil !== txt) txt = asil + "\n" + txt;
+      }
       // minimum 0.3 sn gorunum — ama bir sonraki cue ile CAKISMA (karaoke'de kritik)
       var end = Math.max(s.end, s.start + 0.3);
       var next = segments[i + 1];
@@ -2421,9 +2437,9 @@ window.KCaptions = (function () {
     return out;
   }
 
-  function buildSrt() {
+  function buildSrt(opts) {
     var out = [];
-    cueler().forEach(function (c, i) {
+    cueler(opts).forEach(function (c, i) {
       out.push(String(i + 1));
       out.push(tc(c.start, true) + " --> " + tc(c.end, true));
       out.push(c.text);
@@ -2433,9 +2449,9 @@ window.KCaptions = (function () {
   }
 
   // WebVTT — YouTube, web oynatıcılar ve sosyal platformların istediği biçim
-  function buildVtt() {
+  function buildVtt(opts) {
     var out = ["WEBVTT", ""];
-    cueler().forEach(function (c, i) {
+    cueler(opts).forEach(function (c, i) {
       out.push(String(i + 1));
       out.push(tc(c.start, false) + " --> " + tc(c.end, false));
       out.push(c.text);
@@ -3540,7 +3556,7 @@ window.KCaptions = (function () {
       return;
     }
     try {
-      var srt = buildSrt();
+      var srt = buildSrt({ ciftDil: ciftDilAcik() });
       if (!srt) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
       // Premiere içe aktardığı SRT'yi KOPYALAMAZ, diskteki yola referans verir. Bu yüzden
       // temp'e yazmak yasak (biz ya da Windows süpürünce projedeki altyazı kırılır):
@@ -3646,7 +3662,7 @@ window.KCaptions = (function () {
         icerik = lines.join("\r\n");
         ad = "suflo-transkript.txt";
       } else if (fmt === "vtt") {
-        icerik = buildVtt();
+        icerik = buildVtt({ ciftDil: ciftDilAcik() });
         ad = "suflo-altyazi.vtt";
       } else if (fmt === "ass") {
         if (typeof Pro !== "undefined" && !Pro.gate("assexport")) return;    // Pro: stilli ASS
@@ -3666,7 +3682,7 @@ window.KCaptions = (function () {
         ad = "suflo-altyazi.ass";
         bom = "";
       } else {
-        icerik = buildSrt();
+        icerik = buildSrt({ ciftDil: ciftDilAcik() });
         ad = "suflo-altyazi.srt";
       }
       if (!icerik) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }

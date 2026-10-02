@@ -3562,3 +3562,7 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   padding: 2px 4px; border-radius: 4px; color: #0b1a10; background: #7cf0a0;
 }
 @media (max-width: 470px) { .yan-menu .ky-kilit { display: none; } }
+
+/* Çift dilli altyazı anahtarı (3.0) */
+.cift-dil { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--dim); cursor: pointer; }
+.cift-dil input { margin: 0; accent-color: var(--accent); }
