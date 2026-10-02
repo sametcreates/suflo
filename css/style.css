@@ -3596,3 +3596,7 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 /* Kanca basligi */
 .kanca-resim { display: block; width: 100%; max-height: 360px; object-fit: contain; margin-top: 10px; border-radius: 8px; background: #1c2433; border: 1px solid var(--line, rgba(255,255,255,.08)); }
 .vr-dugmeler { display: flex; gap: 6px; flex-wrap: wrap; }
+.kanca-oneriler { display: grid; gap: 6px; margin: 8px 0; }
+.kanca-oneri { text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: inherit; font: inherit; cursor: pointer; }
+.kanca-oneri:hover { border-color: rgba(255,230,0,.55); }
+.kanca-oneri b { color: #ffe600; }

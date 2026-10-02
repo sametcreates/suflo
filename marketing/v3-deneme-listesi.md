@@ -87,6 +87,7 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] SRT indir ve **Normal altyazı izi ekle** → yıldızlar yok, metin temiz.
 
 ## 6b'. Kanca başlığı *(sol menü → Kanca Başlığı)*
+- [ ] Transkript varken **✨ AI ile öner** → 5 kısa başlık, vurgulu kelime sarı; birine tıkla → kutuya yazılıp önizleniyor.
 - [ ] Başlık yaz → **Önizle** → kare görünüyor; stil/süre/konum değişince önizleme yenileniyor.
 - [ ] Playhead'i bir yere getir → **Playhead'e ekle** → başlık tam o anda, boş üst katmanda; arka plan şeffaf.
 - [ ] 9:16 sekansta başlık üstte ve kadraja sığıyor.

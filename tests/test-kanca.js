@@ -84,5 +84,20 @@ var kanca = fs.readFileSync(path.join(__dirname, "..", "js", "kanca.js"), "utf8"
 ok("kanca.js: ekleme Pro kapili, onizleme degil", /async function ekle[\s\S]*?Pro\.gate\("overlay"\)/.test(kanca) && !/async function onizle\(\)[\s\S]*?Pro\.gate[\s\S]*?async function ekle/.test(kanca));
 ok("kanca.js: gecici klasor sweepTemp onekiyle", /"overlay-kanca-"/.test(kanca));
 
+
+/* AI kanca onerileri */
+var uzunSeg = [];
+for (var u = 0; u < 400; u++) uzunSeg.push({ start: u * 3, end: u * 3 + 2.5, text: "cümle " + u + " *vurgu* burada anlatılıyor" });
+var sp = HT.suggestPrompt(uzunSeg, { lang: "tr" });
+ok("oneri istemi: Turkce, 7 kelime, yildiz kurali", /Turkish/.test(sp.system) && /max 7 words/.test(sp.system) && /single asterisks/.test(sp.system));
+ok("oneri istemi: uzun metin kirpilir, eski yildizlar gitmez", sp.user.length < 6300 && sp.user.indexOf("*") === -1, sp.user.length);
+var ar = HT.suggestPrompt(uzunSeg, { lang: "en", aralik: { start: 30, end: 45 } });
+ok("oneri istemi: aralik verilirse yalniz o anin metni", /cümle 10 /.test(ar.user) && !/cümle 20 /.test(ar.user) && /English/.test(ar.system));
+var po = HT.parseSuggestions(JSON.stringify({ hooks: ["\"Bunu **kimse** bilmiyor\"", "Bunu *kimse* bilmiyor", "#shorts 3 adımda *zengin* ol", "tek *yildiz", "", null,
+  "bir iki üç dört beş altı yedi sekiz dokuz on onbir"] }));
+ok("oneri ayristirma: markdown, tirnak, hashtag, tekrar, bos temizlenir", JSON.stringify(po) === JSON.stringify(["Bunu *kimse* bilmiyor", "3 adımda *zengin* ol", "tek yildiz", "bir iki üç dört beş altı yedi sekiz dokuz"]), JSON.stringify(po));
+ok("oneri ayristirma: bozuk JSON bos", HT.parseSuggestions("{x").length === 0);
+ok("kanca.js: oneriler textContent ile (HTML enjeksiyonu yok)", (kanca.match(/innerHTML\s*=/g) || []).length === (kanca.match(/innerHTML = "";/g) || []).length && /createTextNode\(parca\)/.test(kanca));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

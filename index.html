@@ -1077,6 +1077,11 @@
       <label for="kanca-metin">Başlık</label>
       <input id="kanca-metin" type="text" maxlength="90" placeholder="Bunu bilmeden *para* biriktirmeye başlama">
     </div>
+    <div class="row">
+      <button id="kanca-ai" class="btn tiny" type="button" title="Altyazıdan 5 kanca başlığı önerir (Groq/OpenAI anahtarı; yalnız metin gönderilir)">✨ AI ile öner</button>
+      <span class="hint" style="margin:0">Önce Altyazı sekmesinde transkript oluştur.</span>
+    </div>
+    <div id="kanca-oneriler" class="kanca-oneriler" hidden></div>
     <div class="preset-toolbar">
       <label class="preset-control">Stil
         <select id="kanca-stil">

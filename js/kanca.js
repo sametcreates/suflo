@@ -149,9 +149,57 @@ window.KKanca = (function () {
     }
   }
 
+  // Transkriptten AI kanca onerileri; tiklayinca baslik kutusuna yazilir
+  async function aiOner() {
+    if (busy || !window.KCaptions) return;
+    var segs = KCaptions.getSegments ? KCaptions.getSegments() : [];
+    if (!segs.length) { durum("Önce Altyazı sekmesinde transkript oluştur.", "warn"); return; }
+    var cfg = KCaptions.chatConfig && KCaptions.chatConfig();
+    if (!cfg) { KApp.toast("AI önerisi için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    busy = true;
+    var btn = el("kanca-ai");
+    btn.disabled = true;
+    durum("Kanca başlıkları yazılıyor…");
+    try {
+      var p = HT.suggestPrompt(segs, { lang: KCaptions.language ? KCaptions.language() : "tr" });
+      var json = await KCaptions.chatCall(cfg, {
+        model: cfg.model, temperature: 0.8, response_format: { type: "json_object" },
+        messages: [{ role: "system", content: p.system }, { role: "user", content: p.user }]
+      });
+      var oneriler = HT.parseSuggestions(json.choices && json.choices[0] && json.choices[0].message.content);
+      if (!oneriler.length) throw new Error("Öneri alınamadı, tekrar dene.");
+      var box = el("kanca-oneriler");
+      box.innerHTML = "";
+      oneriler.forEach(function (o) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "kanca-oneri";
+        // *vurgu* kelimesi kalin gosterilir (textContent: HTML enjeksiyonu yok)
+        o.split(/(\*[^*]+\*)/).forEach(function (parca) {
+          if (!parca) return;
+          if (/^\*[^*]+\*$/.test(parca)) { var v = document.createElement("b"); v.textContent = parca.slice(1, -1); b.appendChild(v); }
+          else b.appendChild(document.createTextNode(parca));
+        });
+        b.addEventListener("click", function () {
+          el("kanca-metin").value = o;
+          onizle();
+        });
+        box.appendChild(b);
+      });
+      box.hidden = false;
+      durum("");
+    } catch (e) {
+      durum("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      busy = false;
+      btn.disabled = false;
+    }
+  }
+
   function init() {
     if (!HT || !el("tab-kanca")) return;
     el("kanca-onizle").addEventListener("click", onizle);
+    if (el("kanca-ai")) el("kanca-ai").addEventListener("click", aiOner);
     el("kanca-ekle").addEventListener("click", function () { ekle(); });
     el("kanca-metin").addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); onizle(); }

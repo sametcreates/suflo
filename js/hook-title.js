@@ -166,9 +166,68 @@
     return { ass: ass, fontFiles: [st.fontFile], dur: dur, satir: lines.length };
   }
 
+  var DIL_ADI = { tr: "Turkish", az: "Azerbaijani", en: "English", ru: "Russian", de: "German", ar: "Arabic",
+    es: "Spanish", fr: "French", pt: "Portuguese", it: "Italian", nl: "Dutch", ja: "Japanese" };
+
+  /*
+   * AI ile kanca basligi onerisi istemi. Metin cok uzunsa basi (ilk ~%60) ve
+   * esit aralikli ornekler alinir: kanca cogu zaman videonun vaadinden cikar.
+   * opts: { lang, adet, maxChars, aralik: {start, end} (yalniz o anin metni) }
+   */
+  function suggestPrompt(segments, opts) {
+    opts = opts || {};
+    var segs = (segments || []).filter(function (s) {
+      if (!s || !String(s.text || "").trim()) return false;
+      if (opts.aralik) return Number(s.end) > opts.aralik.start && Number(s.start) < opts.aralik.end;
+      return true;
+    });
+    var metin = segs.map(function (s) { return String(s.text).replace(/\*/g, "").replace(/\s+/g, " ").trim(); }).join(" ");
+    var max = opts.maxChars || 6000;
+    if (metin.length > max) {
+      var bas = metin.slice(0, Math.round(max * 0.6));
+      var kalan = metin.slice(Math.round(max * 0.6));
+      var parca = 5, boy = Math.round(max * 0.4 / parca), adim = Math.floor(kalan.length / parca);
+      var ornek = [];
+      for (var i = 0; i < parca; i++) ornek.push(kalan.substr(i * adim, boy));
+      metin = bas + " … " + ornek.join(" … ");
+    }
+    var dil = DIL_ADI[opts.lang] || "the transcript's language";
+    var adet = opts.adet || 5;
+    return {
+      system: "You write on-screen hook titles for the first second of YouTube Shorts / Reels / TikTok. Write " + adet +
+        " different hooks in " + dil + " for this video: max 7 words each, curiosity or a bold promise, no clickbait lies, " +
+        "no hashtags, no emojis, no quotes. Wrap the single most important word (or number with its unit) in single asterisks, " +
+        "like *this*. Reply ONLY with JSON {\"hooks\":[\"...\"]}.",
+      user: "Transcript:\n" + metin
+    };
+  }
+
+  // Yanit -> temiz baslik listesi (en fazla 7 kelime, tekrarsiz, markdown temiz)
+  function parseSuggestions(content) {
+    var data;
+    try { data = typeof content === "string" ? JSON.parse(content) : content; } catch (e) { return []; }
+    var raw = data && (data.hooks || data.titles || data.Hooks);
+    if (!(raw instanceof Array)) return [];
+    var gorulen = {};
+    return raw.map(function (h) {
+      var t = String(h == null ? "" : h).replace(/\*\*([^*]+)\*\*/g, "*$1*").replace(/^["'“”‘’\s]+|["'“”‘’\s]+$/g, "")
+        .replace(/#\S+/g, "").replace(/\s+/g, " ").trim();
+      var kelimeler = t.split(" ");
+      if (kelimeler.length > 9) t = kelimeler.slice(0, 9).join(" ");
+      // tek kalan yildiz (kirpma/hata) -> yildizlari tamamen at
+      if ((t.match(/\*/g) || []).length % 2) t = t.replace(/\*/g, "");
+      return t;
+    }).filter(function (t) {
+      var k = t.replace(/\*/g, "").toLocaleLowerCase("tr");
+      if (!k || gorulen[k]) return false;
+      gorulen[k] = 1;
+      return true;
+    }).slice(0, 8);
+  }
+
   function list() {
     return Object.keys(STILLER).map(function (id) { return { id: id, ad: STILLER[id].ad }; });
   }
 
-  return { STILLER: STILLER, build: build, tokens: tokens, satirlar: satirlar, list: list };
+  return { STILLER: STILLER, build: build, suggestPrompt: suggestPrompt, parseSuggestions: parseSuggestions, tokens: tokens, satirlar: satirlar, list: list };
 });
