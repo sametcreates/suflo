@@ -21,5 +21,9 @@ ok("paket: ekrandaki altyazi degismez (segments yazilmaz), kaynak orig, vurgu te
 ok("paket: Pro kapisi ve ortak ceviri fonksiyonu", /Pro\.gate\("translate"\)/.test(pk) && /await metinleriCevir\(cfg, metinler, dil/.test(pk));
 ok("translateAll da ortak ceviri fonksiyonunu kullanir", /var out = await metinleriCevir\(cfg, texts, target/.test(src));
 ok("index: paket kutusu ve dil secimleri", /id="cap-paket-box"/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")));
+DOM["cap-punct"].checked = false;
+var bosSrt = M.srt(M.z([{ start: 0, end: 1, text: "bir" }, { start: 1, end: 2, text: "…" }, { start: 2, end: 3, text: "üç" }]), ["bir", "…", "çok\n\n\nsatır"], "tr");
+ok("bos kalan satir atlanir, numaralar ardisik, ic bos satirlar kapanir", /^1\r\n[^\r]+\r\nBİR\r\n\r\n2\r\n[^\r]+\r\nÇOK SATIR\r\n/.test(bosSrt) && bosSrt.indexOf("3\r\n") === -1, JSON.stringify(bosSrt));
+ok("paket: kelime/karaoke modunda reddedilir", /if \(segmentsMode !== "plain"\)/.test(pk));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

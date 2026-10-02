@@ -205,6 +205,7 @@ window.KChapters = (function () {
         model: cfg.model, temperature: 0.6, response_format: { type: "json_object" },
         messages: [{ role: "system", content: p.system }, { role: "user", content: p.user }]
       });
+      if (ytPlatform() !== pf) { uyari("Platform değişti — tekrar yaz.", "warn"); return; }
       var r = YM.parseResponse(json.choices && json.choices[0] && json.choices[0].message.content, { platform: pf });
       if (!r) throw new Error("AI anlamlı bir metin döndürmedi, tekrar dene.");
       ytSonuc = r;

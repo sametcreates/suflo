@@ -80,12 +80,18 @@ window.KCaptions = (function () {
 
   // Geri al yigini girdisi: satirlar + mod + ceviri hedef dili (buyuk harf kurali buna bagli)
   function durumAl(etiket) {
-    return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili, ts: Date.now() };
+    return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili,
+      shorts: shortsYuklenen, ts: Date.now() };
   }
+  // shorts: ekrandaki belgenin Shorts kaydi mi (geri alinca taslak dogru yere yazilsin)
   function durumYukle(st) {
     segments = JSON.parse(st.segs);
     if (st.mode) segmentsMode = st.mode;
     if (typeof st.cevir === "string") ceviriDili = st.cevir;
+    if (typeof st.shorts === "string") {
+      shortsYuklenen = st.shorts;
+      try { shortsDugmesi(KApp.ctx()); } catch (eS) {}
+    }
   }
 
   function snapshot(etiket) {
@@ -1455,7 +1461,6 @@ window.KCaptions = (function () {
     var oncekiIs = segments.length
       ? durumAl("yeni transkript")
       : null;
-    shortsYuklenen = "";   // yeni transkript: artik Shorts kaydi degil, normal taslak
     algilananDil = "";
     var tempFiles = [];
     try {
@@ -1642,6 +1647,7 @@ window.KCaptions = (function () {
       status("");
       hideRestore();             // ekranda taze iş var: eski taslak teklifi artık geçersiz
       clearRevert();             // yeni doküman — eski çevirinin orijinalleri buraya ait değil
+      shortsYuklenen = "";       // yeni transkript (basariyla geldi): artik Shorts kaydi degil, normal taslak
       uygulaEtiketiniSifirla();  // yeni transkript: uygula düğmesi normal haline dönsün
       el("cap-result").hidden = false;
       el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula";
@@ -2001,7 +2007,7 @@ window.KCaptions = (function () {
           var correction = correctionFromEdit(inp.dataset.before, inp.value);
           var eski = JSON.parse(JSON.stringify(segments));
           eski[i].text = inp.dataset.before;
-          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, cevir: ceviriDili, ts: Date.now() });
+          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, cevir: ceviriDili, shorts: shortsYuklenen, ts: Date.now() });
           if (undoStack.length > UNDO_MAX) undoStack.shift();
           redoStack.length = 0;
           refreshUndoUI();
@@ -2388,6 +2394,10 @@ window.KCaptions = (function () {
   async function cokDilliPaket() {
     if (typeof Pro !== "undefined" && !Pro.gate("translate")) return;
     if (!segments.length) return;
+    if (segmentsMode !== "plain") {
+      KApp.toast("Çok dilli paket satır modunda çalışır: kelime/karaoke modunda her kelime ayrı çevrilirdi. Satır uzunluğunu \"Satır\" yapıp yeniden oluştur.", "warn", 8000);
+      return;
+    }
     var diller = Array.prototype.map.call(document.querySelectorAll(".cap-paket-dil:checked"), function (x) { return x.value; });
     if (!diller.length) { KApp.toast("En az bir dil seç.", "warn"); return; }
     var cfg = chatConfig();
@@ -2402,9 +2412,14 @@ window.KCaptions = (function () {
       var metinler = zaman.map(function (z) { return kaynak[z.i].text; });
       var klasor = K.path.join(K.os.homedir(), "Desktop");
       if (!K.fs.existsSync(klasor)) klasor = K.os.homedir();
-      klasor = K.path.join(klasor, "Suflo altyazilar " + new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-"));
+      var t0 = new Date();
+      function iki(n) { return (n < 10 ? "0" : "") + n; }
+      // yerel saat, saniyeli: ayni dakikada iki paket birbirini ezmesin (Windows'ta ":" yok)
+      klasor = K.path.join(klasor, "Suflo altyazilar " + t0.getFullYear() + "-" + iki(t0.getMonth() + 1) + "-" + iki(t0.getDate()) +
+        " " + iki(t0.getHours()) + "." + iki(t0.getMinutes()) + "." + iki(t0.getSeconds()));
       K.fs.mkdirSync(klasor, { recursive: true });
-      var kaynakDil = algilananDil || (el("cap-lang") && el("cap-lang").value) || "kaynak";
+      var kaynakDil = algilananDil || (el("cap-lang") && el("cap-lang").value) || "";
+      if (!kaynakDil) kaynakDil = "kaynak";   // "Otomatik" ve taslaktan: dil bilinmiyor
       K.fs.writeFileSync(K.path.join(klasor, kaynakDil + ".srt"), "\uFEFF" + paketSrt(zaman, metinler, kaynakDil), "utf8");
       var yazilan = 1, hatalar = [];
       for (var d = 0; d < diller.length; d++) {
@@ -2455,11 +2470,14 @@ window.KCaptions = (function () {
   }
 
   function paketSrt(zaman, metinler, dil) {
-    var out = [];
+    var out = [], no = 0;
     zaman.forEach(function (z, k) {
-      out.push(String(k + 1));
+      // bos satir SRT'yi bozar: once stil, bos kalani atla; metindeki bos satirlari kapat
+      var metin = paketStil(String(metinler[k] || "").replace(/\r?\n\s*\n+/g, "\n").trim(), dil);
+      if (!metin.trim()) return;
+      out.push(String(++no));
       out.push(tc(z.start, true) + " --> " + tc(z.end, true));
-      out.push(paketStil(metinler[k], dil));
+      out.push(metin);
       out.push("");
     });
     return out.join("\r\n");
@@ -3829,7 +3847,8 @@ window.KCaptions = (function () {
           // Yalnızca iş gerçekten sekansa yerleştiyse taslağı sil.
           // cancelDraft şart: 1,2 sn içinde bir tuş vuruşu olduysa zamanlayıcı taslağı diriltir.
           cancelDraft();
-          K.clearDraft();
+          // Shorts transkripti uygulandiysa ana videonun taslagi (uygulanmamis is olabilir) silinmez
+          if (!shortsYuklenen) K.clearDraft();
           hideRestore();
           KApp.toast("Altyazı izi oluşturuldu", "good");
           yildizIste();
@@ -4155,6 +4174,7 @@ window.KCaptions = (function () {
     if (!harita[shortsYuklenen]) return;
     harita[shortsYuklenen].segs = JSON.parse(JSON.stringify(segments));
     harita[shortsYuklenen].mod = segmentsMode;
+    harita[shortsYuklenen].ceviriDili = ceviriDili;
     harita[shortsYuklenen].ts = Date.now();
     K.saveSettings();
   }

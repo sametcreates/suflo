@@ -100,7 +100,7 @@ sequence.getOutPointAsTime = function () { return { seconds: 600 }; };
 var ds = call("KS_makeShorts", { ranges: [{ start: 10, end: 40, name: "x" }], dikey: true });
 ok("dikey kopyanin sekans kimligi doner", ds.ok && ds.items[0].id === "alt9" && ds.items[0].dikeyId === "dik9", JSON.stringify(ds.items));
 var cj = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8");
-ok("panel: viral Shorts eslemesini kaydeder (hem yatay hem dikey)", /shortsKaydet\(r\.items/.test(vj) && /harita\[it\.dikeyId\] = kayit/.test(vj) && /slice\(30\)/.test(vj));
+ok("panel: viral Shorts eslemesini kaydeder (hem yatay hem dikey)", /shortsKaydet\(r\.items/.test(vj) && /harita\[it\.dikeyId\] = JSON\.parse\(JSON\.stringify\(kayit\)\)/.test(vj) && /slice\(30\)/.test(vj));
 ok("panel: Shorts sekansinda altyazi ana videodan yuklenir", /id="cap-shorts-al"/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")) && /function shortsAltyazisiAl/.test(cj) && /shortsDugmesi\(ctx\)/.test(cj));
 
 
@@ -114,5 +114,13 @@ ok("yeni transkript / SRT / taslak kurtarma Shorts modunu kapatir", (cj.match(/s
 ok("viral: anlar baska sekansta bulunduysa Shorts olusturulmaz, bulundugu andaki transkript kullanilir",
   /bulSekans && simdiki && simdiki !== bulSekans/.test(vj) && /sliceSegments\(bulSegs \|\| KCaptions\.rawSegments\(\)/.test(vj));
 
+/* sekizinci inceleme */
+ok("geri al yigini Shorts durumunu tasir ve geri yukler", /shorts: shortsYuklenen, ts: Date\.now\(\)/.test(cj) && /if \(typeof st\.shorts === "string"\) \{\s*shortsYuklenen = st\.shorts;/.test(cj) &&
+  /cevir: ceviriDili, shorts: shortsYuklenen, ts: Date\.now\(\) \}\);/.test(cj));
+var goKod = cj.slice(cj.indexOf("var oncekiIs = segments.length"), cj.indexOf('el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula"'));
+ok("yeni transkript: Shorts modu yalniz basarida kapanir", goKod.indexOf('shortsYuklenen = "";') > goKod.indexOf("clearRevert();"));
+ok("uygulama: Shorts uygulaninca ana taslak silinmez", /if \(!shortsYuklenen\) K\.clearDraft\(\);/.test(cj));
+ok("Shorts kaydi ceviri dilini de saklar", /harita\[shortsYuklenen\]\.ceviriDili = ceviriDili;/.test(cj));
+ok("viral: kaynak transkript/sekans AI cagrisindan once yakalanir", vj.indexOf("var segsHam") < vj.indexOf("await KCaptions.chatCall"));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

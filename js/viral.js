@@ -90,6 +90,9 @@ window.KViral = (function () {
     busy = true;
     el("cap-vr-bul").disabled = true;
     durum("Yapay zekâ konuşmayı izliyor…");
+    // AI cagrisi surerken sekans/transkript degisebilir: kaynak simdiden yakalanir
+    var segsHam = KCaptions.rawSegments ? KCaptions.rawSegments() : null;
+    var sekansHam = String(KApp.ctx().sequenceId || "");
     try {
       var s = sureler();
       var p = HL.buildPrompt(segs, { lang: KCaptions.language ? KCaptions.language() : "tr", minDur: s.minDur, maxDur: s.maxDur, adet: 5 });
@@ -101,8 +104,8 @@ window.KViral = (function () {
       });
       var content = json.choices && json.choices[0] && json.choices[0].message.content;
       anlar = HL.parseResponse(content, segs, { minDur: s.minDur, maxDur: s.maxDur, adim: p.adim });
-      bulSegs = KCaptions.rawSegments ? KCaptions.rawSegments() : null;
-      bulSekans = String(KApp.ctx().sequenceId || "");
+      bulSegs = segsHam;
+      bulSekans = sekansHam;
       if (!anlar.length) throw new Error("Uygun an bulunamadı — süreyi değiştirip tekrar dene.");
       durum("");
       render();
@@ -135,9 +138,10 @@ window.KViral = (function () {
     var harita = s.shortsAltyazi || {};
     var kayit = { ad: an.title, start: an.start, end: an.end, mod: KCaptions.mode ? KCaptions.mode() : "plain",
       ceviriDili: KCaptions.translationLang ? KCaptions.translationLang() : "", segs: segs, ts: Date.now() };
+    // her sekansin kendi kopyasi: yatay Shorts'ta duzenleme dikeyi degistirmesin
     items.forEach(function (it) {
-      if (it.id) harita[it.id] = kayit;
-      if (it.dikeyId) harita[it.dikeyId] = kayit;
+      if (it.id) harita[it.id] = JSON.parse(JSON.stringify(kayit));
+      if (it.dikeyId) harita[it.dikeyId] = JSON.parse(JSON.stringify(kayit));
     });
     var anahtarlar = Object.keys(harita).sort(function (x, y) { return (harita[y].ts || 0) - (harita[x].ts || 0); });
     anahtarlar.slice(30).forEach(function (k) { delete harita[k]; });
