@@ -8,7 +8,7 @@
   </url>
   <url>
     <loc>https://suflo.app/blog/</loc>
-    <lastmod>2026-08-21</lastmod>
+    <lastmod>2026-10-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -51,6 +51,30 @@
   <url>
     <loc>https://suflo.app/blog/premiere-ses-iyilestirme-gurultu-azaltma</loc>
     <lastmod>2026-10-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor</loc>
+    <lastmod>2026-10-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://suflo.app/blog/premiere-turkce-altyazi-otomatik</loc>
+    <lastmod>2026-10-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://suflo.app/blog/autocut-firecut-alternatifi</loc>
+    <lastmod>2026-10-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://suflo.app/blog/opusclip-alternatifi-premiere</loc>
+    <lastmod>2026-10-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
