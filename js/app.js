@@ -86,6 +86,8 @@ window.KApp = (function () {
   var POLL_BEKCI = 30000;
 
   async function pollContext() {
+    // Premiere hala onceki bir cagriyla mesgul: yeni yoklama kuyruga girip birikmesin
+    if (K.hostMesgul && K.hostMesgul()) return;
     if (polling) {
       if (Date.now() - pollBasladi < POLL_BEKCI) return;
       K.log("baglam yoklamasi takildi (" + Math.round((Date.now() - pollBasladi) / 1000) + " sn), kilit aciliyor");
@@ -95,14 +97,14 @@ window.KApp = (function () {
     pollBasladi = Date.now();
     try {
       var r = await K.call("KS_getContext", undefined, 20000);
-      var prev = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, c: ctx.connected });
+      var prev = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, qi: ctx.sequenceId, c: ctx.connected });
       if (r.ok) {
         ctx = r;
         ctx.connected = true;
       } else {
         ctx = { connected: false, hasSeq: false, sel: null, sequence: "" };
       }
-      var now = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, c: ctx.connected });
+      var now = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, qi: ctx.sequenceId, c: ctx.connected });
       renderContext();
       if (prev !== now) ctxListeners.forEach(function (fn) { fn(ctx); });
     } finally {
@@ -361,7 +363,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "kanca-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -929,7 +931,12 @@ window.KApp = (function () {
       guncelleme = {
         surum: tag,
         url: paket ? paket.browser_download_url : ("https://github.com/" + K.REPO + "/releases/latest"),
-        ad: paket ? paket.name : "Suflo-" + tag + "-Kurulum.zip",
+        // Ad dosya yoluna ve "cmd /c start" satirina gider: cmd'nin yeniden
+        // yorumladigi & ^ % gibi karakterler hic iceri girmesin.
+        ad: (paket ? paket.name : "Suflo-" + tag + "-Kurulum.zip").replace(/[^A-Za-z0-9._-]/g, "_"),
+        // GitHub her release dosyasi icin "sha256:<hex>" ozeti yayinlar: indirilen
+        // dosya bununla dogrulanmadan otomatik kurulum yapilmaz
+        sha256: paket && /^sha256:[0-9a-f]{64}$/i.test(String(paket.digest || "")) ? String(paket.digest).slice(7).toLowerCase() : "",
         zip: !!zip,
         not: ilkSatir.slice(0, 90)
       };
@@ -954,8 +961,10 @@ window.KApp = (function () {
       var r = await K.run("/usr/bin/open", [yol], { timeout: 20000 });
       if (r.code !== 0) await K.run("/usr/bin/open", ["-R", yol], { timeout: 20000 });
     } else {
-      var w = await K.run("cmd", ["/c", "start", "", yol], { timeout: 20000 });
-      if (w.code !== 0) await K.run("explorer", ["/select,", yol], { timeout: 20000 });
+      // cmd /c start yolu yeniden yorumlar: "Ali&Veli" gibi kullanici adinda bolunuyordu.
+      // explorer dosyayi varsayilan uygulamayla acar (ZXP Installer / zip); cikis kodu
+      // basarida bile 1 olabildigi icin ona bakilmaz.
+      await K.run("explorer", [yol], { timeout: 20000 });
     }
     return klasor;
   }
@@ -968,8 +977,7 @@ window.KApp = (function () {
    */
   async function otomatikKur(zipYolu, surum) {
     var acilan = K.path.join(K.tmpDir(), "guncelleme-" + surum);
-    try { K.fs.rmSync(acilan, { recursive: true, force: true }); }
-    catch (e0) { try { K.fs.rmdirSync(acilan, { recursive: true }); } catch (e1) {} }
+    K.rmrf(acilan);
     if (!(await K.unzip(zipYolu, acilan))) return false;
 
     // panel/ doğrudan ya da tek alt klasörün içinde olabilir
@@ -1014,6 +1022,18 @@ window.KApp = (function () {
     return hata === 0;
   }
 
+  function dosyaOzeti(yol) {
+    return new Promise(function (resolve) {
+      try {
+        var h = require("crypto").createHash("sha256");
+        var s = K.fs.createReadStream(yol);
+        s.on("data", function (c) { h.update(c); });
+        s.on("end", function () { resolve(h.digest("hex")); });
+        s.on("error", function () { resolve(""); });
+      } catch (e) { resolve(""); }
+    });
+  }
+
   async function guncellemeyiIndir() {
     if (!guncelleme) return;
     var b = el("update-indir");
@@ -1028,6 +1048,15 @@ window.KApp = (function () {
         b.textContent = "%" + Math.round(f * 100);
       }, 0, undefined, { key: "zxp:" + guncelleme.surum });
       if (!d.ok) throw new Error(d.error || "indirilemedi");
+      if (guncelleme.sha256) {
+        b.textContent = "Doğrulanıyor…";
+        var ozet = await dosyaOzeti(hedef);
+        if (ozet !== guncelleme.sha256) {
+          try { K.fs.unlinkSync(hedef); } catch (eSil) {}
+          K.log("[güncelleme] SHA-256 uyuşmadı: " + ozet + " != " + guncelleme.sha256);
+          throw new Error("indirilen dosya doğrulanamadı (bozuk ya da değiştirilmiş)");
+        }
+      }
 
       // Önce tek tık kurulumu dene — başarırsa kullanıcıya yalnız yeniden başlatma kalır
       if (guncelleme.zip) {
@@ -1128,6 +1157,14 @@ window.KApp = (function () {
     guvenli("ayarlar", initSettings);
     guvenli("Altyazı", function () { KCaptions.init(); });
     guvenli("Kesim", function () { KCut.init(); });
+    guvenli("Konuşmadan kes", function () { if (window.KTextCut) KTextCut.init(); });
+    guvenli("Bölümler", function () { if (window.KChapters) KChapters.init(); });
+    guvenli("Geçişler", function () { if (window.KGecis) KGecis.init(); });
+    guvenli("Sahne algılama", function () { if (window.KSahne) KSahne.init(); });
+    guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
+    guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });
+    guvenli("Kanca başlığı", function () { if (window.KKanca) KKanca.init(); });
+    guvenli("Sesi iyileştir", function () { if (window.KSes) KSes.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
     guvenli("Motion Presetleri", function () { if (window.KPresets) KPresets.init(); });
@@ -1152,6 +1189,77 @@ window.KApp = (function () {
     setInterval(checkUpdate, 6 * 3600 * 1000);
     // eski geçici ses dosyalarını süpür (disk sessizce dolmasın)
     setTimeout(function () { try { K.sweepTemp(); } catch (e) {} }, 6000);
+    setTimeout(function () { try { yenilikleriGoster(); } catch (eY) {} }, 900);
+  }
+
+  /*
+   * "Suflo 3.0'da yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (Kesim sekmesinin altinda, editorun katlanir bolumlerinde);
+   * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
+   */
+  var YENILIKLER = {
+    surum: "3.0",
+    maddeler: [
+      { ikon: "✂", baslik: "Konuşmadan kes", metin: "ııı, eee ve tekrarları kelimeye tıklayarak videodan çıkar.", sekme: "cut", hedef: "tc-card" },
+      { ikon: "🔥", baslik: "Viral anlar (Shorts)", metin: "En güçlü 15–60 sn'yi bulur, tek tıkla 9:16 Shorts sekansı yapar.", sekme: "captions", acilir: "cap-vr-box" },
+      { ikon: "Aa", baslik: "Suflo Stilleri", metin: "Hormozi, Neon, Daktilo dahil 12 animasyonlu altyazı.", sekme: "captions", hedef: "cap-stil-grid" },
+      { ikon: "♪", baslik: "Sesi iyileştir", metin: "Gürültüyü al, sesi YouTube seviyesine getir — senkron kaymaz.", sekme: "cut", hedef: "ses-card" },
+      { ikon: "▭", baslik: "Kanca başlığı", metin: "Shorts açılışına animasyonlu başlık kartı, tek tık.", sekme: "kanca" },
+      { ikon: "↔", baslik: "Geçişler", metin: "Kesime tek tıkla zoom, whip, itme — eklentisiz.", sekme: "gecis" },
+      { ikon: "▦", baslik: "Sahne algılama · vuruşlarda böl", metin: "Klibi sahnelerde ya da müziğin vuruşlarında böl.", sekme: "cut", hedef: "sc-card" },
+      { ikon: "§", baslik: "YouTube bölümleri", metin: "Konuşmadan bölüm + AI başlık, açıklamaya kopyala.", sekme: "captions", acilir: "cap-ch-box" }
+    ]
+  };
+
+  function yenilikleriGoster() {
+    var s = K.settings();
+    if (s.yeniliklerGoruldu === YENILIKLER.surum) return;
+    var arka = document.createElement("div");
+    arka.className = "yenilik-arka";
+    arka.setAttribute("role", "dialog");
+    arka.setAttribute("aria-label", "Suflo " + YENILIKLER.surum + " yenilikleri");
+    var kutu = document.createElement("div");
+    kutu.className = "yenilik-kutu";
+    var bas = document.createElement("div");
+    bas.className = "yenilik-bas";
+    bas.innerHTML = "<span>YENİ</span><b>Suflo " + YENILIKLER.surum + "</b><i>Yapay zekâ ile kurgu</i>";
+    kutu.appendChild(bas);
+    function kapat() {
+      try { s.yeniliklerGoruldu = YENILIKLER.surum; K.saveSettings(); } catch (e) {}
+      if (arka.parentNode) arka.parentNode.removeChild(arka);
+    }
+    YENILIKLER.maddeler.forEach(function (m) {
+      var satir = document.createElement("button");
+      satir.type = "button";
+      satir.className = "yenilik-satir";
+      var ik = document.createElement("span"); ik.className = "yenilik-ikon"; ik.textContent = m.ikon;
+      var yazi = document.createElement("span"); yazi.className = "yenilik-yazi";
+      var b = document.createElement("b"); b.textContent = m.baslik;
+      var t = document.createElement("i"); t.textContent = m.metin;
+      yazi.appendChild(b); yazi.appendChild(t);
+      var git = document.createElement("span"); git.className = "yenilik-git"; git.textContent = "Göster →";
+      satir.appendChild(ik); satir.appendChild(yazi); satir.appendChild(git);
+      satir.addEventListener("click", function () {
+        kapat();
+        goster(m.sekme);
+        if (m.acilir && el(m.acilir)) { el(m.acilir).open = true; }
+        var odak = el(m.hedef || m.acilir);
+        if (odak && odak.scrollIntoView) { try { odak.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (eS) { odak.scrollIntoView(); } }
+      });
+      kutu.appendChild(satir);
+    });
+    var tamam = document.createElement("button");
+    tamam.type = "button";
+    tamam.className = "btn primary yenilik-tamam";
+    tamam.textContent = "Başlayalım";
+    tamam.addEventListener("click", kapat);
+    kutu.appendChild(tamam);
+    arka.appendChild(kutu);
+    arka.addEventListener("click", function (e) { if (e.target === arka) kapat(); });
+    document.addEventListener("keydown", function esc(e) {
+      if (e.key === "Escape") { document.removeEventListener("keydown", esc); kapat(); }
+    });
+    document.body.appendChild(arka);
   }
 
   document.addEventListener("DOMContentLoaded", init);

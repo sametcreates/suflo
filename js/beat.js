@@ -239,6 +239,9 @@ window.KBeat = (function () {
     clip = k;
     if (!k) { status("Önce timeline'da bir klip seç.", "warn"); return; }
     busy = true;
+    // Yeni analiz: eski sonuc (baska klibin vuruslari) bu analiz basarisiz olsa da kalmasin
+    vurusler = [];
+    el("beat-result").hidden = true;
     el("beat-analyze").classList.add("busy");
     el("beat-progress").hidden = false;
     var temizle = [];
@@ -346,19 +349,34 @@ window.KBeat = (function () {
     }
   }
 
+  // Vuruslarda bol (v3.0): muzigi analiz et, sonra B-roll'u sec ve vuruslarda kes.
+  // Vurus zamanlari sequence zamaninda oldugu icin secim degisse de gecerlidir.
+  async function bol() {
+    if (typeof Pro !== "undefined" && !Pro.gate("beat")) return;
+    if (!vurusler.length) return;
+    var siklik = parseInt(el("beat-siklik").value, 10) || 1;
+    var secilen = vurusler.filter(function (v, i) { return i % siklik === 0; });
+    var btn = el("beat-split");
+    btn.disabled = true;
+    try {
+      var r = await K.call("KS_splitSelectedAt", { times: secilen.map(function (v) { return v.t; }) }, 300000);
+      if (!r.ok) throw new Error(r.error);
+      KApp.toast("✂ Seçili klip " + r.cuts + " vuruşta bölündü", "good");
+    } catch (e) {
+      status("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   function init() {
     if (!el("beat-analyze")) return;
     el("beat-analyze").addEventListener("click", analyze);
     el("beat-apply").addEventListener("click", apply);
-    KApp.onContext(function (ctx) {
-      refreshButton();
-      if (busy) return; // analiz surerken sonucu/klibi sifirlama — analiz yerel kopyayla bitiyor
-      if (clip && (!ctx.sel || ctx.sel.mediaPath !== clip.mediaPath)) {
-        el("beat-result").hidden = true;
-        vurusler = [];
-        clip = null;
-      }
-    });
+    if (el("beat-split")) el("beat-split").addEventListener("click", bol);
+    // Sonuc bir sonraki analize kadar kalir: "muzigi analiz et, sonra B-roll'u sec
+    // ve vuruslarda bol" akisi secim degisince sonucun silinmemesini gerektirir.
+    KApp.onContext(function () { refreshButton(); });
     refreshButton();
   }
 

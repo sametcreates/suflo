@@ -49,9 +49,34 @@ window.K = (function () {
    * (ornegin baglam yoklamasi) kalici olarak kilitlenir — panel secili klibi gormemeye baslar.
    * Bu yuzden her cagri en gec timeout sonunda MUTLAKA sonuclanir.
    */
+  /*
+   * ExtendScript tek is parcacikli: uzun bir host islemi (ses disa aktarimi,
+   * yuzlerce MOGRT) surerken gonderilen her cagri kuyruga girer. Zaman asimi
+   * promise'i cozer ama evalScript cevabi hala yoldadir. Yanitini henuz
+   * almadigimiz cagrilari sayariz; baglam yoklamasi bekleyen varken yenisini
+   * gondermez (bir saatlik islemde 120 yoklamanin birikmesi engellenir).
+   */
+  // id -> { bas: gonderim ani, sinir: bu sureden sonra "kayip cevap" sayilir }
+  var yoldakiler = {};
+  var cagriNo = 0;
+  function hostMesgul() {
+    var simdi = Date.now(), mesgul = false;
+    Object.keys(yoldakiler).forEach(function (id) {
+      var c = yoldakiler[id];
+      // Cevabi hic gelmeyen (kaybolan) cagri yoklamayi sonsuza kilitlemesin:
+      // zaman asiminin iki kati gecince yoldan dusulur
+      if (simdi - c.bas > c.sinir) delete yoldakiler[id];
+      else mesgul = true;
+    });
+    return mesgul;
+  }
+
   function call(fn, arg, timeout) {
     return new Promise(function (resolve) {
       var bitti = false;
+      var id = ++cagriNo;
+      yoldakiler[id] = { bas: Date.now(), sinir: Math.min(2 * (timeout || 60000), 2 * 3600000) };
+      function cevapGeldi() { delete yoldakiler[id]; }
       function son(v) {
         if (bitti) return;          // evalScript bazen gecikip sonra da cevap verebiliyor
         bitti = true;
@@ -68,6 +93,7 @@ window.K = (function () {
         : fn + '("' + encodeURIComponent(JSON.stringify(arg)) + '")';
       try {
         cs.evalScript(script, function (res) {
+          cevapGeldi();
           if (res === "EvalScript error.") {
             log("jsx HATA " + fn + ": EvalScript error");
             son({ ok: false, error: "ExtendScript hatası (" + fn + ")" });
@@ -84,6 +110,7 @@ window.K = (function () {
           }
         });
       } catch (eE) {
+        cevapGeldi();
         log("jsx " + fn + ": evalScript cagrilamadi - " + eE.message);
         son({ ok: false, error: "ExtendScript çağrılamadı (" + fn + ")" });
       }
@@ -188,9 +215,12 @@ window.K = (function () {
         }
         resolve({ code: code, stdout: out, stderr: err });
       }
-      child.stdout.on("data", function (d) { out += d.toString(); });
+      // setEncoding: cok baytli harfler parca sinirinda bolunup U+FFFD olmasin
+      if (child.stdout && child.stdout.setEncoding) child.stdout.setEncoding("utf8");
+      if (child.stderr && child.stderr.setEncoding) child.stderr.setEncoding("utf8");
+      child.stdout.on("data", function (d) { out += String(d); });
       child.stderr.on("data", function (d) {
-        var s = d.toString();
+        var s = String(d);
         err += s;
         if (opts.onStderr) opts.onStderr(s);
       });
@@ -259,7 +289,8 @@ window.K = (function () {
           headers: hdrs
         }, function (res) {
           var data = "";
-          res.on("data", function (d) { data += d.toString(); });
+          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+          res.on("data", function (d) { data += d; });
           res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
           res.on("error", function (eRs) { resolve({ status: 0, body: String(eRs) }); });
         });
@@ -315,6 +346,17 @@ window.K = (function () {
     } catch (e) {}
   }
 
+  // Klasoru icerigiyle sil. fs.rmSync Node 14.14+, rmdirSync({recursive}) 12.10+:
+  // Premiere 14.4'un Node 12.3'unde ikisi de yok, en sonda elle yurunur.
+  function rmrf(p) {
+    try { if (fs.rmSync) { fs.rmSync(p, { recursive: true, force: true }); return; } } catch (e) {}
+    var st;
+    try { st = fs.lstatSync(p); } catch (eS) { return; }   // zaten yok
+    if (!st.isDirectory()) { try { fs.unlinkSync(p); } catch (e3) {} return; }
+    try { fs.readdirSync(p).forEach(function (f) { rmrf(path.join(p, f)); }); } catch (eR) {}
+    try { fs.rmdirSync(p); } catch (e4) {}
+  }
+
   // Temp klasöründe biriken eski ses/JSON artıklarını süpür
   function sweepTemp() {
     if (!nodeOK) return 0;
@@ -326,14 +368,36 @@ window.K = (function () {
           // .srt ASLA silinmez: Premiere içe aktarılan altyazıyı kopyalamaz, diskteki yola
           // referans verir — silinirse kullanıcının projesindeki caption izi kırılır.
           if (/\.srt$/i.test(f)) return;
-          if (!/^(cap_|seq_|warmup|montaj_|suflo_|beat_)/i.test(f)) return;
           var fp = path.join(dir, f);
+          // Geçici çalışma KLASÖRLERİ (overlay render, stil önizleme, açılmış güncelleme)
+          if (/^(overlay-|suflo-style-preview|guncelleme-)/i.test(f)) {
+            try {
+              var ds = fs.statSync(fp);
+              if (ds.isDirectory() && Date.now() - ds.mtimeMs > 86400000) {
+                rmrf(fp); n++;
+              }
+            } catch (eD) {}
+            return;
+          }
+          if (!/^(cap_|seq_|warmup|montaj_|suflo_|beat_)/i.test(f)) return;
           try {
             if (Date.now() - fs.statSync(fp).mtimeMs > 86400000) { fs.unlinkSync(fp); n++; }
           } catch (e2) {}
         });
       } catch (e) {}
     });
+    // ASCII önbelleği (Windows, 8.3 kapalı disk yedeği): ses/çıktı kopyaları birikmesin.
+    // .bin modelleri bilerek kalır — her transkripsiyonda 1 GB yeniden kopyalanmasın.
+    try {
+      var ad = path.join(process.env.ProgramData || "C:\\ProgramData", "Suflo", "ascii-onbellek");
+      if (process.platform === "win32" && fs.existsSync(ad)) {
+        fs.readdirSync(ad).forEach(function (f) {
+          if (/\.bin$/i.test(f)) return;
+          var fp2 = path.join(ad, f);
+          try { if (Date.now() - fs.statSync(fp2).mtimeMs > 86400000) { rmrf(fp2); n++; } } catch (eA) {}
+        });
+      }
+    } catch (eAs) {}
     if (n) log("temp temizligi: " + n + " dosya silindi");
     return n;
   }
@@ -357,7 +421,8 @@ window.K = (function () {
         headers: hdrs
       }, function (res) {
         var data = "";
-        res.on("data", function (d) { data += d.toString(); });
+        res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+        res.on("data", function (d) { data += d; });
         res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
         res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
       });
@@ -368,7 +433,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "2.9.9";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
+  var VERSION = "3.0.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -497,7 +562,8 @@ window.K = (function () {
           headers: hdrs
         }, function (res) {
           var data = "";
-          res.on("data", function (d) { data += d.toString(); });
+          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+          res.on("data", function (d) { data += d; });
           res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
           res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
         });
@@ -843,9 +909,10 @@ window.K = (function () {
       function onRes(res) {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          var next = res.headers.location.indexOf("http") === 0
-            ? res.headers.location
-            : u.protocol + "//" + u.hostname + res.headers.location;
+          // Goreli Location'i tarayici kuraliyla coz: port ve yol korunur
+          var next;
+          try { next = new URL(res.headers.location, urlStr).href; }
+          catch (eLoc) { next = u.protocol + "//" + u.host + res.headers.location; }
           download(next, destPath, onProgress, redirects + 1, resumeFrom, meta).then(resolve);
           return;
         }
@@ -1054,9 +1121,27 @@ window.K = (function () {
     return list;
   }
 
+  /*
+   * libass (subtitles/ass filtresi) olan ffmpeg tercih edilir: Suflo Stilleri, kanca
+   * basligi ve stil onizlemesi onsuz calismaz. Homebrew'un sade "ffmpeg"i gibi
+   * libass'siz bir derleme yalniz baska aday yoksa secilir; _libass=false olur.
+   */
+  var _libass = null;
+  async function libassVar(aday) {
+    var r = await run(aday, ["-hide_banner", "-filters"], { timeout: 15000 });
+    return /\ssubtitles\s/.test(String(r.stdout || "") + String(r.stderr || ""));
+  }
+  function ffmpegLibass() { return _libass; }
+  // Stilli islemler oncesi: libass yoksa kullaniciya ne yapacagini soyleyen mesaj, varsa ""
+  function libassUyarisi() {
+    return _libass === false ? "Bu ffmpeg altyazı çizemiyor (libass yok — örn. Homebrew'un sade ffmpeg'i). " +
+      "Ayarlar → ffmpeg'den Suflo'nun ffmpeg'ini kur." : "";
+  }
+
   async function findFfmpeg(force) {
     if (_ffmpeg && !force) return _ffmpeg;
     var cands = ffmpegCandidates();
+    var yedek = null;
     for (var i = 0; i < cands.length; i++) {
       /*
        * Mutlak yollar once diskte yoklanir: olmayan bir dosya icin surec baslatmak
@@ -1077,12 +1162,17 @@ window.K = (function () {
       }
       var r = await run(aday, ["-version"], { timeout: 15000 });
       if (r.code === 0 && /ffmpeg version/i.test(r.stdout + r.stderr)) {
-        _ffmpeg = aday;
-        return _ffmpeg;
+        if (await libassVar(aday)) {
+          _ffmpeg = aday; _libass = true;
+          return _ffmpeg;
+        }
+        if (!yedek) yedek = aday;   // calisiyor ama libass'siz: daha iyisi yoksa bu
       }
     }
-    _ffmpeg = null;
-    return null;
+    _ffmpeg = yedek;
+    _libass = yedek ? false : null;
+    if (yedek) log("[ffmpeg] libass'siz derleme secildi: " + yedek);
+    return _ffmpeg;
   }
 
   /* ---------------- Dosya yardımcıları ---------------- */
@@ -1171,6 +1261,7 @@ window.K = (function () {
     nodeOK: nodeOK,
     fs: fs, path: path, os: os,
     call: call,
+    hostMesgul: hostMesgul,
     run: run,
     settingsPath: settingsPath,
     extensionPath: extensionPath,
@@ -1186,6 +1277,7 @@ window.K = (function () {
     loadDraft: loadDraft,
     clearDraft: clearDraft,
     sweepTemp: sweepTemp,
+    rmrf: rmrf,
     whisperLocal: whisperLocal,
     guvenliYol: guvenliYol,
     whisperDir: whisperDir,
@@ -1194,6 +1286,8 @@ window.K = (function () {
     download: download,
     unzip: unzip,
     findFfmpeg: findFfmpeg,
+    ffmpegLibass: ffmpegLibass,
+    libassUyarisi: libassUyarisi,
     settings: loadSettings,
     saveSettings: saveSettings,
     walkAudio: walkAudio,

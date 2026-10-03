@@ -5,7 +5,7 @@ var KOKYOL = require("path").join(__dirname, "..").split("\\").join("/") + "/";
  * GERCEK app.js + bridge.js'i once "macOS" sonra "Windows" gibi davranan sahte
  * ortamlarda calistirir; GitHub API yaniti taklit edilir. Olculen: serit aciliyor
  * mu, dogru surum yaziliyor mu, indirme dogru klasore gidiyor mu ve dosya
- * platformun DOGRU komutuyla aciliyor mu (mac: /usr/bin/open, win: cmd start).
+ * platformun DOGRU komutuyla aciliyor mu (mac: /usr/bin/open, win: explorer).
  */
 var realFs = require("fs");
 var vm = require("vm");
@@ -213,8 +213,10 @@ function ortam(opts) {
       chk("mac: Windows komutu (cmd/explorer) CAGRILMADI",
         !e.komutlar.some(function (k) { return /^(cmd|explorer|powershell)$/i.test(String(k.cmd)); }), hepsi);
     } else {
-      chk("win: cmd start ile acildi",
-        acmaKomutlari.some(function (k) { return String(k.cmd) === "cmd" && (k.args || []).indexOf("start") !== -1; }), hepsi);
+      // explorer: cmd /c start yolu yeniden yorumlayip "Ali&Veli" gibi kullanici adinda boluyordu
+      chk("win: explorer ile acildi (cmd /c start degil)",
+        acmaKomutlari.some(function (k) { return String(k.cmd) === "explorer"; }) &&
+        !e.komutlar.some(function (k) { return String(k.cmd) === "cmd" && (k.args || []).indexOf("start") !== -1; }), hepsi);
       chk("win: mac komutu (/usr/bin/open) CAGRILMADI",
         !e.komutlar.some(function (k) { return String(k.cmd).indexOf("/usr/bin/open") === 0; }), hepsi);
     }
@@ -284,7 +286,8 @@ function ortam(opts) {
     e5.indirmeler[0] && e5.indirmeler[0].url);
 
   /* ---------- otomatikKur: gercek ZIP + sahte CEP klasoru ---------- */
-  await (async function () {
+  // Windows'un tar.exe'si ve CEP klasor duzeni gerekir
+  if (process.platform === "win32") await (async function () {
     var fs2 = require("fs"), path2 = require("path"), os2 = require("os"), cp2 = require("child_process");
     var TMP2 = path2.join(os2.tmpdir(), "suflo-otokur-test");
     try { fs2.rmSync(TMP2, { recursive: true, force: true }); } catch (e0) {}
@@ -314,6 +317,7 @@ function ortam(opts) {
       tmpDir: function () { return path2.join(TMP2, "tmp"); },
       fs: fs2, path: path2, os: os2, MAC: false,
       log: function () {},
+      rmrf: function (d) { try { fs2.rmSync(d, { recursive: true, force: true }); } catch (eR) {} },
       unzip: async function (z, d) {
         fs2.mkdirSync(d, { recursive: true });
         cp2.execFileSync(tarExe, ["-xf", z, "-C", d]);

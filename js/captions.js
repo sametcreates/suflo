@@ -18,10 +18,29 @@ window.KCaptions = (function () {
   var mogrtVitriniIsi = null;
   var aktifMogrtOnizlemeDurdur = null;
   var secilenMogrt = null;
+  var secilenMotorStili = "";   // Suflo stil motoru (kendi animasyonlu stillerimiz): overlay yolu
   var bekleyenMogrtYolu = "";
   var mogrtBaglam = { width: 0, height: 0 };
 
   function el(id) { return document.getElementById(id); }
+
+  // Yerel dosya -> URL: "#", "?", "%" ve "'" iceren yollar (O'Neil kullanici adi,
+  // "Proje #2" klasoru) onizlemeyi ve CSS url('...')'yi bozmasin
+  function dosyaUrl(p) {
+    return encodeURI("file:///" + String(p || "").replace(/\\/g, "/"))
+      .replace(/#/g, "%23").replace(/\?/g, "%3F").replace(/'/g, "%27");
+  }
+
+  // Saf metin islevleri js/caption-text.js'te (Node testleri dogrudan calistirir)
+  var CT = window.SufloCaptionText;
+  var cleanSegments = CT.cleanSegments;
+  var karaokeWords = CT.karaokeWords;
+  var karaokeCumulative = CT.karaokeCumulative;
+  var splitWords = CT.splitWords;
+  var trimOverlongCues = CT.trimOverlongCues;
+  var splitLong = CT.splitLong;
+  var parseGlossary = CT.parseGlossary;
+  function trReplace(text, from, to) { return CT.trReplace(text, from, to, styleLocale() || "tr"); }
 
   /* ---------------- Geri alma yığını + taslak kaydı ---------------- */
 
@@ -55,12 +74,29 @@ window.KCaptions = (function () {
   function dilKodu(x) {
     x = String(x || "").toLowerCase();
     if (x.length === 2) return x;
-    return { turkish: "tr", azerbaijani: "az", russian: "ru", english: "en" }[x] || "";
+    return { turkish: "tr", azerbaijani: "az", russian: "ru", english: "en", german: "de", arabic: "ar",
+      spanish: "es", french: "fr", portuguese: "pt", italian: "it", dutch: "nl", japanese: "ja" }[x] || "";
+  }
+
+  // Geri al yigini girdisi: satirlar + mod + ceviri hedef dili (buyuk harf kurali buna bagli)
+  function durumAl(etiket) {
+    return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili,
+      shorts: shortsYuklenen, ts: Date.now() };
+  }
+  // shorts: ekrandaki belgenin Shorts kaydi mi (geri alinca taslak dogru yere yazilsin)
+  function durumYukle(st) {
+    segments = JSON.parse(st.segs);
+    if (st.mode) segmentsMode = st.mode;
+    if (typeof st.cevir === "string") ceviriDili = st.cevir;
+    if (typeof st.shorts === "string") {
+      shortsYuklenen = st.shorts;
+      try { shortsDugmesi(KApp.ctx()); } catch (eS) {}
+    }
   }
 
   function snapshot(etiket) {
     uygulaEtiketiniSifirla();
-    undoStack.push({ segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, ts: Date.now() });
+    undoStack.push(durumAl(etiket || ""));
     if (undoStack.length > UNDO_MAX) undoStack.shift();
     redoStack.length = 0;
     refreshUndoUI();
@@ -69,10 +105,9 @@ window.KCaptions = (function () {
 
   function undo() {
     if (!undoStack.length) return;
-    redoStack.push({ segs: JSON.stringify(segments), etiket: "", mode: segmentsMode, ts: Date.now() });
+    redoStack.push(durumAl(""));
     var st = undoStack.pop();
-    segments = JSON.parse(st.segs);
-    if (st.mode) segmentsMode = st.mode;
+    durumYukle(st);
     render();
     refreshUndoUI();
     renderHistory();
@@ -82,8 +117,8 @@ window.KCaptions = (function () {
 
   function redo() {
     if (!redoStack.length) return;
-    undoStack.push({ segs: JSON.stringify(segments), etiket: "", mode: segmentsMode, ts: Date.now() });
-    segments = JSON.parse(redoStack.pop().segs);
+    undoStack.push(durumAl(""));
+    durumYukle(redoStack.pop());
     render();
     refreshUndoUI();
     renderHistory();
@@ -98,11 +133,15 @@ window.KCaptions = (function () {
 
   // Taslağı diske yaz — panel kapanırsa iş kaybolmaz
   function writeDraft() {
-    if (!segments.length) { K.clearDraft(); return; } // bosaltilan ekran = bosaltilan taslak
     var ctx = KApp.ctx();
+    // Ekrandaki Shorts transkripti (hangi sekans acik olursa olsun) ana videonun taslagini
+    // ezmesin: duzenlemeler Shorts kaydina yazilir
+    if (shortsYuklenen) { shortsKaydiGuncelle(); return; }
+    if (!segments.length) { K.clearDraft(); return; } // bosaltilan ekran = bosaltilan taslak
     K.saveDraft({
       segments: segments,
       mode: segmentsMode,
+      ceviriDili: ceviriDili,
       sequence: ctx.sequence || "",
       scope: scope,
       ts: Date.now()
@@ -122,11 +161,14 @@ window.KCaptions = (function () {
 
   function restoreDraft(d) {
     // Ekranda iş varsa üzerine yazmadan önce anlık görüntü al — Ctrl+Z geri getirsin
+    // (anlık görüntü Shorts bayragini da tasir: sifirlama ONDAN sonra)
     if (segments.length) snapshot("taslak kurtarma");
     else { undoStack.length = 0; redoStack.length = 0; }
+    shortsYuklenen = "";
     segments = JSON.parse(JSON.stringify(d.segments));   // taslak nesnesini takma adla mutasyona uğratma
     segmentsMode = d.mode || "plain";
     clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil
+    ceviriDili = d.ceviriDili || "";                     // taslak çevrilmişse hedef dil (s.orig satırlarda)
     el("cap-result").hidden = false;
     render();                                            // önce render, sonra etiket (render eziyor)
     el("cap-result-info").textContent = segments.length + " satır · kurtarıldı";
@@ -150,7 +192,12 @@ window.KCaptions = (function () {
     return [];
   }
 
+  // Baska bir sekme (or. Konusmadan kes) motoru kullanirken ilerleme oraya akar
+  var durumYonlendir = null;
+  var ekIpucu = "";
+
   function status(msg, cls) {
+    if (durumYonlendir) { durumYonlendir(msg, cls); return; }
     var e = el("cap-status");
     e.className = "inline-status" + (cls ? " " + cls : "");
     e.textContent = msg || "";
@@ -318,16 +365,68 @@ window.KCaptions = (function () {
       wordLevel: wordLevel,
       prompt: glossaryPrompt()
     });
-    var args = built.args;
     K.log("yerel motor: " + (KEngine.installedBuild() === "cuda" ? "GPU" : "CPU") +
       ", VAD " + (built.vad ? "acik" : "kapali") +
       ", model " + String(lw.model).replace(/^.*[\\\/]/, ""));
 
-    var r = await K.run(lw.exe, args, {
+    var segs = await yerelCalistir(lw.exe, built.args, outBase, "");
+
+    /*
+     * Takilma kurtarma: whisper bir satira takilip sesin sonuna kadar onu
+     * tekrarladiysa (cleanSegments sonra bunlari atar, altyazi orada biter),
+     * sesi takilma noktasindan kes ve o parcayi onceki metne bakmadan (-mc 0)
+     * yeniden coz. Sozluk ipucu --carry-initial-prompt ile korunur.
+     */
+    var ti = CT.sondaTakilma(segs, wordLevel ? 6 : 3);
+    var sesSure = /\.wav$/i.test(audioPath) ? wavDuration(audioPath) : 0;
+    if (ti >= 0 && sesSure - segs[ti].start > 5) {
+      var kesBas = Math.max(0, segs[ti].start);
+      K.log("yerel motor takildi: " + kesBas.toFixed(1) + " sn'den itibaren '" +
+        String(segs[ti].text).slice(0, 40) + "' tekrarlaniyor (" + (segs.length - ti) +
+        " satir) - kalan ses yeniden cozuluyor");
+      var parca = outBase + "_kalan.wav";
+      try {
+        var ff = await K.findFfmpeg();
+        var rk = await K.run(ff, ["-y", "-ss", kesBas.toFixed(3), "-i", audioPath, "-c:a", "pcm_s16le", parca],
+          { timeout: 900000 });
+        if (rk.code !== 0 || !K.fs.existsSync(parca)) throw new Error("ses kesilemedi");
+        var ek = KEngine.buildArgs({
+          model: lw.model, audio: parca, lang: lang, outBase: outBase + "_kalan",
+          threads: threads, wordLevel: wordLevel, prompt: glossaryPrompt()
+        }).args.concat(["-mc", "0"]);
+        var kalan;
+        try {
+          // eski whisper-cli (or. Homebrew) bu bayragi tanimayabilir: o zaman bayraksiz dene
+          kalan = await yerelCalistir(lw.exe, ek.indexOf("--prompt") !== -1 ? ek.concat(["--carry-initial-prompt"]) : ek,
+            outBase + "_kalan", " · kalan kısım");
+        } catch (eCarry) {
+          kalan = await yerelCalistir(lw.exe, ek, outBase + "_kalan", " · kalan kısım");
+        }
+        kalan.forEach(function (sg) { sg.start += kesBas; sg.end += kesBas; });
+        var yeniden = CT.sondaTakilma(kalan, wordLevel ? 6 : 3);
+        K.log("takilma kurtarma: " + kalan.length + " satir eklendi" +
+          (yeniden >= 0 ? " (kalan kisim da tekrarla bitiyor)" : ""));
+        if (kalan.length) segs = segs.slice(0, ti).concat(kalan);
+      } catch (eK) {
+        K.log("takilma kurtarma basarisiz: " + (eK && eK.message ? eK.message : eK));
+      } finally {
+        try { K.fs.unlinkSync(parca); } catch (eP) {}
+      }
+    }
+    if (wordLevel) {
+      K.log("yerel kelime modu: " + segs.length + " parça, ilk3=" +
+        segs.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
+    }
+    return segs;
+  }
+
+  // whisper-cli'yi calistir, JSON ciktisini segmentlere cevir
+  async function yerelCalistir(exe, args, outBase, etiket) {
+    var r = await K.run(exe, args, {
       timeout: 7200000,
       onStderr: function (s) {
         var m = s.match(/progress\s*=\s*(\d+)%/);
-        if (m) status("Transkribe ediliyor… %" + m[1] + " (yerel)");
+        if (m) status("Transkribe ediliyor… %" + m[1] + " (yerel" + etiket + ")");
       }
     });
     var jsonPath = outBase + ".json";
@@ -337,9 +436,9 @@ window.KCaptions = (function () {
         (r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 180));
     }
     var parsed = JSON.parse(K.fs.readFileSync(jsonPath, "utf8").toString());
-    try { algilananDil = dilKodu(parsed.result && parsed.result.language); } catch (eDil) {}
+    if (!etiket) { try { algilananDil = dilKodu(parsed.result && parsed.result.language); } catch (eDil) {} }
     try { K.fs.unlinkSync(jsonPath); } catch (e2) {}
-    var segs = (parsed.transcription || []).map(function (t) {
+    return (parsed.transcription || []).map(function (t) {
       var s = t.offsets ? t.offsets.from / 1000 : NaN;
       var e = t.offsets ? t.offsets.to / 1000 : NaN;
       // offsets bozuksa timestamps dizgesinden coz ("00:00:01,380")
@@ -354,11 +453,6 @@ window.KCaptions = (function () {
         : (isFinite(Number(t.avg_logprob)) ? Math.exp(Number(t.avg_logprob)) : undefined);
       return { start: s || 0, end: e || 0, text: String(t.text || "").trim(), confidence: confidence };
     });
-    if (wordLevel) {
-      K.log("yerel kelime modu: " + segs.length + " parça, ilk3=" +
-        segs.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
-    }
-    return segs;
   }
 
   /*
@@ -470,6 +564,9 @@ window.KCaptions = (function () {
       var confidence = isFinite(Number(s.confidence)) ? Number(s.confidence)
         : (isFinite(Number(s.avg_logprob)) ? Math.exp(Number(s.avg_logprob)) : undefined);
       return { start: Number(s.start), end: Number(s.end), text: String(s.text || "").trim(), confidence: confidence };
+    }).filter(function (s) {
+      // Bozuk/eksik zamanli bulut segmenti NaN olarak SRT'ye sizmasin
+      return isFinite(s.start) && isFinite(s.end) && s.end >= s.start;
     });
   }
 
@@ -509,143 +606,7 @@ window.KCaptions = (function () {
       : "Suflo Altyazı Motoru hazır değil — yerel çekirdeği kur veya bulut yedeği ekle.");
   }
 
-  /* ---------------- Temizlik + bölme ---------------- */
-
-  // Whisper'ın bilinen halüsinasyonlarını süz
-  function cleanSegments(segs) {
-    var out = [];
-    var junk = /^(altyaz[ıi]\s*m\.?\s*k\.?|abone olmay[ıi] unutmay[ıi]n)$/i;
-    var lastText = "", repeat = 0;
-    for (var i = 0; i < segs.length; i++) {
-      var t = segs[i].text;
-      if (!t) continue;
-      var norm = t.toLowerCase().replace(/[.,!?;:…]/g, "").replace(/\s+/g, " ").trim();
-      if (!norm) continue; // sadece noktalamadan olusan segment ("...")
-      if (junk.test(norm)) continue;
-      if (norm === lastText) {
-        repeat++;
-        if (repeat >= 2) continue; // 3+ kez aynı satır: takılma, at
-      } else { repeat = 0; }
-      lastText = norm;
-      out.push(segs[i]);
-    }
-    return out;
-  }
-
-  /* ---------------- Karaoke ---------------- */
-
-  // kelime cue'ları: her kelime kendi zamanında, bir sonrakiyle çakışmadan
-  function karaokeWords(words) {
-    var out = [];
-    for (var i = 0; i < words.length; i++) {
-      var w = words[i];
-      var end = Math.max(w.end, w.start + 0.12);
-      if (words[i + 1] && end > words[i + 1].start) end = words[i + 1].start;
-      if (end <= w.start) end = w.start + 0.05;
-      out.push({ start: w.start, end: end, text: w.text, confidence: w.confidence });
-    }
-    return out;
-  }
-
-  // birikimli karaoke: satır kelime kelime dolar (n kelimede ya da uzun boşlukta sıfırlanır)
-  function karaokeCumulative(words, n) {
-    var out = [];
-    var line = [];
-    for (var i = 0; i < words.length; i++) {
-      var w = words[i];
-      var prev = words[i - 1];
-      if (line.length >= n || (prev && w.start - prev.end > 1.2)) line = [];
-      line.push(w.text);
-      var end = Math.max(w.end, w.start + 0.12);
-      if (words[i + 1] && end > words[i + 1].start) end = words[i + 1].start;
-      if (end <= w.start) end = w.start + 0.05;
-      out.push({ start: w.start, end: end, text: line.join(" "), confidence: w.confidence });
-    }
-    return out;
-  }
-
-  // kelime modu: her satırda en fazla n kelime, süre orantılı bölünür
-  function splitWords(segs, n) {
-    var out = [];
-    segs.forEach(function (s) {
-      var words = String(s.text || "").trim().split(/\s+/).filter(Boolean);
-      if (!words.length) return;
-      var pieces = Math.ceil(words.length / n);
-      var dur = s.end - s.start;
-      var step = dur / pieces;
-      for (var i = 0; i < pieces; i++) {
-        out.push({
-          start: s.start + step * i,
-          end: s.start + step * (i + 1),
-          text: words.slice(i * n, (i + 1) * n).join(" "),
-          confidence: s.confidence
-        });
-      }
-    });
-    return out;
-  }
-
-  /*
-   * Whisper (özellikle VAD açıkken) bir cue'nun sonunu sonraki konuşma başlayana
-   * kadar uzatabiliyor: 3 saniyelik cümle 17 saniye ekranda kalıyor.
-   * Metnin okunması için gereken makul süreyi aşan sonları kırp.
-   */
-  function trimOverlongCues(segs) {
-    var GAP = 0.12;
-    return segs.map(function (s, i) {
-      var chars = s.text.length;
-      // ~13 karakter/sn okuma hızı + 0.7 sn tampon, en az 1.2 sn
-      var makul = Math.max(1.2, chars / 13 + 0.7);
-      var dur = s.end - s.start;
-      if (dur > makul * 1.8) {
-        var yeni = s.start + makul;
-        var next = segs[i + 1];
-        if (next && yeni > next.start - GAP) yeni = Math.max(s.start + 0.5, next.start - GAP);
-        return { start: s.start, end: yeni, text: s.text, confidence: s.confidence };
-      }
-      return s;
-    });
-  }
-
-  function splitLong(segs, maxChars, maxDur) {
-    var out = [];
-    segs.forEach(function (s) {
-      var text = String(s.text || "").trim();
-      var dur = s.end - s.start;
-      if (!text) return;
-      if (text.length <= maxChars && dur <= maxDur) { out.push(s); return; }
-      var pieces = Math.ceil(Math.max(text.length / maxChars, dur / maxDur));
-      var words = text.split(/\s+/);
-      var per = Math.ceil(words.length / pieces);
-      var acc = [];
-      for (var i = 0; i < pieces; i++) acc.push(words.slice(i * per, (i + 1) * per).join(" "));
-      acc = acc.filter(Boolean);
-      var step = dur / acc.length;
-      acc.forEach(function (w, i) {
-        out.push({ start: s.start + step * i, end: s.start + step * (i + 1), text: w, confidence: s.confidence });
-      });
-    });
-    return out;
-  }
-
   /* ---------------- Terim sözlüğü ---------------- */
-
-  /*
-   * Whisper Türkçe'de marka/kişi adlarını ve jargonu tutarlı biçimde yanlış yazar.
-   * Sözlük transkripsiyon SONRASI çalışır — dil algılamayı ve çıktıyı bozmaz,
-   * deterministiktir, kullanıcı sonucu görüp kuralı düzeltebilir.
-   * Biçim: her satır "yanlış => doğru"
-   */
-  function parseGlossary(text) {
-    var out = [];
-    String(text || "").split(/\r?\n/).forEach(function (line) {
-      var m = line.split("=>");
-      if (m.length !== 2) return;
-      var from = m[0].trim(), to = m[1].trim();
-      if (from) out.push({ from: from, to: to });
-    });
-    return out;
-  }
 
   function glossaryText() {
     var g = K.settings().glossary || [];
@@ -661,44 +622,70 @@ window.KCaptions = (function () {
       var t = String(r && r.to || "").trim();
       if (t && correct.indexOf(t) === -1) correct.push(t);
     });
-    if (!correct.length) return "";
-    return "Doğru yazılması gereken özel adlar ve terimler: " + correct.join(", ").slice(0, 700) + ".";
+    var terim = correct.length
+      ? "Doğru yazılması gereken özel adlar ve terimler: " + correct.join(", ").slice(0, 700) + "."
+      : "";
+    return (ekIpucu ? ekIpucu + (terim ? " " : "") : "") + terim;
   }
 
   /*
-   * Harf/rakam sınırı testi. Unicode özellik kaçışları (\p{L}) Chromium 64+ ister; REGEX
-   * LİTERALİ olarak yazılırsa eski CEF'te ayrıştırma anında SyntaxError verir ve tüm modül
-   * düşer (panel bomboş açılır). new RegExp ile kurulunca hata yakalanabilir hale gelir.
+   * Secili klibin KELIME zamanli transkripti (sequence zamaninda). Altyazi
+   * editorune dokunmaz; Konusmadan kes gibi baska araclar kullanir.
+   *   opts.clip      KS_getSelectedClips'ten bir klip (yoksa secim okunur)
+   *   opts.prompt    motora ek ipucu (or. dolgu seslerini yazdirmak icin)
+   *   opts.onStatus  ilerleme mesajlari
+   * Doner: { clip, lang, words: [{start, end, text, confidence}] }
    */
-  var HARF = (function () {
-    try { return new RegExp("[\\p{L}\\p{N}]", "u"); }
-    catch (eU) {
-      // eski CEF yedegi: carpma (00D7) ve bolme (00F7) isaretleri dislanir
-      return new RegExp("[0-9A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u024F" +
-        "\\u0370-\\u1FFF\\u2C00-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD]");
-    }
-  })();
-
-  // Türkçe-duyarlı kelime bazlı değiştirme (İ/ı eşleşmesi doğru çalışır)
-  function trReplace(text, from, to) {
-    var loc = styleLocale() || "tr";
-    var lowText = text.toLocaleLowerCase(loc);
-    var lowFrom = from.toLocaleLowerCase(loc);
-    if (lowText.indexOf(lowFrom) === -1) return text;
-    var out = "";
-    var i = 0;
-    var harf = HARF;
-    while (i < text.length) {
-      if (lowText.startsWith(lowFrom, i)) {
-        var oncesi = i === 0 ? "" : text[i - 1];
-        var sonrasi = text[i + from.length] || "";
-        var sinirOK = (!oncesi || !harf.test(oncesi)) && (!sonrasi || !harf.test(sonrasi));
-        if (sinirOK) { out += to; i += from.length; continue; }
+  async function transcribeWords(opts) {
+    opts = opts || {};
+    if (busy) throw new Error("Altyazı motoru şu an başka bir iş yapıyor — bitmesini bekle.");
+    if (!engineReady()) throw new Error("Önce Altyazı sekmesinden Suflo Altyazı Motoru'nu kur (ya da Groq anahtarı gir).");
+    // busy, ilk await'ten ONCE alinir: secim beklenirken "Altyazı oluştur"a basilirsa
+    // iki is ayni durum degiskenlerini (ekIpucu, durumYonlendir) paylasmasin
+    busy = true;
+    refreshButton();
+    // Bu klibin dili altyazi belgesinin algilanan dilini ezmesin
+    var belgeDili = algilananDil;
+    var temp = [];
+    try {
+      var clip = opts.clip;
+      if (!clip) {
+        var sc = await K.call("KS_getSelectedClips");
+        if (!sc.ok || !sc.clips || !sc.clips.length) throw new Error("Timeline'da konuşma içeren bir klip seç.");
+        clip = sc.clips[0];
       }
-      out += text[i];
-      i++;
+      durumYonlendir = opts.onStatus || function () {};
+      ekIpucu = String(opts.prompt || "");
+      algilananDil = "";
+      status("Ses çıkarılıyor…");
+      var audio = await convertAudio(clip.mediaPath, {
+        wav: localEngineReady(), ss: clip.inPoint, t: clip.dur, durHint: clip.dur
+      });
+      temp.push(audio);
+      var raw = await transcribeSuflo(audio, clip.dur, true, temp);
+      var tl = clip.clipEnd - clip.clipStart;
+      var hiz = (clip.dur > 0 && tl > 0) ? tl / clip.dur : 1;
+      var words = raw.map(function (w) {
+        return {
+          start: clip.clipStart + w.start * hiz,
+          end: clip.clipStart + w.end * hiz,
+          text: String(w.text || "").trim(),
+          confidence: w.confidence
+        };
+      }).filter(function (w) {
+        // yalniz noktalamadan olusan belirtecler kelime degil
+        return w.text.replace(/[.,!?;:…"'«»]/g, "").trim() && isFinite(w.start) && isFinite(w.end);
+      });
+      words.sort(function (a, b) { return a.start - b.start; });
+      return { clip: clip, lang: algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr", words: words };
+    } finally {
+      temp.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
+      algilananDil = belgeDili;
+      ekIpucu = "";
+      durumYonlendir = null;
+      busy = false;
+      refreshButton();
     }
-    return out;
   }
 
   function applyGlossary(segs) {
@@ -822,10 +809,30 @@ window.KCaptions = (function () {
     }
   };
 
+  // Stil motorundaki her stil (yeni eklenenler dahil) tek kaynaktan sablon olur.
+  // Ayni adli eski "custom" sablonlari (neon, daktilo) EZER: kart motor stilini
+  // gosteriyor; eski sablon kalsaydi "Neon ile ekle" eski ASS yoluna dusuyordu.
+  if (window.SufloStyleEngine) {
+    window.SufloStyleEngine.list().forEach(function (mp) {
+      PRESETS[mp.id] = motorPreset(mp.id);
+    });
+  }
+
+  function motorStiliMi(id) { return !!(window.SufloStyleEngine && window.SufloStyleEngine.has(id)); }
+
+  // Altyazi verisinin bicimi: kelime stilleri satir altyazisini kelimelere boler
+  function motorCueTuru() {
+    if (!segments.length || segmentsMode === "k1") return "words";
+    if (segmentsMode === "kc") return "cumulative";
+    return "lines";
+  }
+
   function applyPreset(key) {
     var p = (key === "user") ? K.settings().userPreset : PRESETS[key];
     if (!p) return;
     secilenMogrt = null;
+    // "user" (Şablonum) gibi anahtarlar motor stili tasiyabilir: stilin ailesine bak
+    secilenMotorStili = motorStiliMi(key) ? key : (p.stil && motorStiliMi(p.stil.aile) ? p.stil.aile : "");
     bekleyenMogrtYolu = "";
     el("cap-maxlen").value = p.maxlen;
     el("cap-case").value = p.kase;
@@ -948,7 +955,14 @@ window.KCaptions = (function () {
   function uygulamaIpucunuGuncelle() {
     var hint = el("cap-apply-hint");
     var styleBtn = el("cap-apply-style");
-    if (secilenMogrt) {
+    if (!secilenMogrt && secilenMotorStili) {
+      var mAd = (window.SufloStyleEngine.preset(secilenMotorStili) || {}).name || secilenMotorStili;
+      if (hint) hint.textContent = mAd + " seçili: Suflo altyazıyı şeffaf bir video katmanı olarak üretip timeline'ın üst kanalına koyar. Normal caption izi her zaman kullanılabilir.";
+      if (styleBtn) {
+        styleBtn.disabled = false;
+        if (kaliteOnayBekleyen !== "style") styleBtn.textContent = mAd + " ile ekle";
+      }
+    } else if (secilenMogrt) {
       if (hint) hint.textContent = "Normal caption izi her zaman kullanılabilir. " + temizMogrtAdi(secilenMogrt) + " seçili; stil düğmesi MOGRT animasyonunu tüm altyazılara uygular.";
       if (styleBtn) {
         styleBtn.disabled = false;
@@ -963,6 +977,7 @@ window.KCaptions = (function () {
   function mogrtStiliniSec(item) {
     if (typeof Pro !== "undefined" && !Pro.gate("mogrt")) return;
     secilenMogrt = item;
+    secilenMotorStili = "";
     bekleyenMogrtYolu = "";
     if (el("cap-style-family")) el("cap-style-family").value = "mogrt";
     if (el("cap-preset")) el("cap-preset").value = "";
@@ -973,10 +988,88 @@ window.KCaptions = (function () {
     savePrefs();
   }
 
+  /*
+   * Suflo Stilleri: kendi stil motorumuzun animasyonlu stilleri. MOGRT
+   * gerektirmez; secilince canli onizleme gercek libass ciktisini oynatir,
+   * "ile ekle" seffaf bir video katmani uretip timeline'a koyar.
+   */
+  function motorStilleriniCiz() {
+    var grid = el("cap-stil-grid");
+    if (!grid || !window.SufloStyleEngine) return;
+    Array.prototype.forEach.call(grid.querySelectorAll(".stil-motor-head,.stil-motor"), function (n) { n.remove(); });
+    var kilitli = typeof Pro !== "undefined" && !Pro.isPro();
+    var frag = document.createDocumentFragment();
+    var head = document.createElement("div");
+    head.className = "stil-mogrt-head stil-motor-head";
+    var hb = document.createElement("b");
+    hb.textContent = "Suflo Stilleri";
+    var hs = document.createElement("span");
+    hs.textContent = window.SufloStyleEngine.list().length + " animasyonlu stil · After Effects gerekmez";
+    head.appendChild(hb); head.appendChild(hs);
+    frag.appendChild(head);
+    var sel = el("cap-preset");
+    window.SufloStyleEngine.list().forEach(function (mp) {
+      // gizli select eski kodun okudugu degeri tasir: yeni stillerin secenegi de olsun
+      if (sel && !sel.querySelector('option[value="' + mp.id + '"]')) {
+        var opt = document.createElement("option");
+        opt.value = mp.id; opt.textContent = mp.name;
+        sel.appendChild(opt);
+      }
+      var st = mp.style;
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "stil-sec stil-motor stil-motor-" + mp.id;
+      card.dataset.preset = mp.id;
+      card.setAttribute("aria-label", mp.name + " · " + mp.description);
+      var badge = document.createElement("span");
+      badge.className = "ss-rozet";
+      badge.textContent = "SUFLO";   // kilit rozetini Pro modulu kendisi ekliyor
+      var scene = document.createElement("span");
+      scene.className = "ss-sahne";
+      var ornek = document.createElement("span");
+      ornek.className = "sm-ornek";
+      ornek.style.fontFamily = '"' + st.font + '", sans-serif';
+      ornek.style.color = st.renk;
+      ornek.style.setProperty("--sm-vurgu", st.vurguRenk);
+      ornek.style.setProperty("--sm-kontur", st.konturRenk);
+      var kelimeler = mp.text.kase === "upper" ? ["BUNU", "SAKIN", "KAÇIRMA"] : ["Bunu", "sakın", "kaçırma"];
+      kelimeler.forEach(function (k, i) {
+        var w = document.createElement("span");   // <i> degil: .stil-sec i kurali kucultup soluklastiriyor
+        w.className = "sm-k";
+        w.textContent = k;
+        if (i === 1) w.className += " sm-aktif";
+        ornek.appendChild(w);
+        if (i < kelimeler.length - 1) ornek.appendChild(document.createTextNode(" "));
+      });
+      scene.appendChild(ornek);
+      var info = document.createElement("span");
+      info.className = "ss-bilgi";
+      var title = document.createElement("b");
+      title.textContent = mp.name;
+      var sub = document.createElement("i");
+      sub.textContent = mp.description;
+      info.appendChild(title); info.appendChild(sub);
+      card.appendChild(badge); card.appendChild(scene); card.appendChild(info);
+      card.addEventListener("click", function () {
+        // Onizleme herkese acik; timeline'a ekleme Pro (overlay) kapisinda
+        if (el("cap-preset")) el("cap-preset").value = mp.id;
+        if (el("cap-style-family")) el("cap-style-family").value = "motor";
+        applyPreset(mp.id);
+        savePrefs();
+        if (onizlemeSaat) onizlemeDurdur();
+        onizlemeOynat();
+      });
+      frag.appendChild(card);
+    });
+    grid.insertBefore(frag, grid.firstChild);
+    if (secilenMotorStili && !secilenMogrt) stilKartiIsaretle(secilenMotorStili);
+  }
+
   function mogrtStilleriniCiz() {
     var grid = el("cap-stil-grid");
     if (!grid) return;
-    Array.prototype.forEach.call(grid.querySelectorAll(".stil-mogrt-head,.stil-mogrt,.stil-mogrt-empty"), function (n) { n.remove(); });
+    // Suflo Stilleri basligi da .stil-mogrt-head tasir: ona dokunma
+    Array.prototype.forEach.call(grid.querySelectorAll(".stil-mogrt-head:not(.stil-motor-head),.stil-mogrt,.stil-mogrt-empty"), function (n) { n.remove(); });
     var oran = sekansOrani();
     var istenenAnahtar = secilenMogrt ? mogrtStilAnahtari(secilenMogrt) : "";
     if (bekleyenMogrtYolu) {
@@ -1225,7 +1318,7 @@ window.KCaptions = (function () {
     "Bebas Neue": "BebasNeue.ttf",
     "Bungee": "Bungee.ttf",
     "Lora": "Lora.ttf",
-    "Montserrat": "Montserrat.ttf"
+    "Montserrat": "Montserrat-Bold.ttf"   // statik Bold: libass degisken fontu secemiyor, DejaVu'ya dusuyordu
   };
 
   function uzantiDizini() {
@@ -1256,6 +1349,7 @@ window.KCaptions = (function () {
         punct: el("cap-punct").checked,
         preset: el("cap-preset").value,
         mogrtPath: secilenMogrt && secilenMogrt.path ? secilenMogrt.path : "",
+        motorStili: secilenMogrt ? "" : secilenMotorStili,
         stil: st
       };
       K.saveSettings();
@@ -1272,6 +1366,9 @@ window.KCaptions = (function () {
       if (p.punct !== undefined) el("cap-punct").checked = p.punct;
       if (p.preset !== undefined) el("cap-preset").value = p.preset;
       bekleyenMogrtYolu = p.mogrtPath || "";
+      // 3.0 oncesi tercihlerde motorStili alani yok: stil ailesinden cikar
+      secilenMotorStili = p.mogrtPath ? "" : (motorStiliMi(p.motorStili) ? p.motorStili :
+        (p.stil && motorStiliMi(p.stil.aile) ? p.stil.aile : ""));
       stiliYaz(p.stil);
     } catch (e) {}
   }
@@ -1295,7 +1392,16 @@ window.KCaptions = (function () {
 
   /* ---------------- Stil ---------------- */
 
-  function styleLocale() {
+  function styleLocale(kaynak) {
+    // Cevrilmis metin hedef dilin kuralina uyar: Turkce'den Ingilizceye cevrilen
+    // "this" BUYUK HARF'te "THİS" olmasin
+    if (!kaynak && ceviriVar()) {
+      if (ceviriDili) return { tr: "tr-TR", az: "az", ru: "ru" }[ceviriDili];
+      // hedef dil bilinmiyor (3.0 oncesi taslak): kaynak kurali degil, cevrilmis
+      // metinden tahmin — Turkceye ozgu harf varsa tr, yoksa dil-bagimsiz kural
+      var ornek = segments.slice(0, 40).map(function (s) { return s.text; }).join(" ");
+      return /[ğışĞİŞ]/.test(ornek) ? "tr-TR" : undefined;
+    }
     var l = el("cap-lang").value;
     if (l === "") l = algilananDil; // "Otomatik": motorun algiladigi dile guven
     if (l === "tr") return "tr-TR";
@@ -1304,14 +1410,15 @@ window.KCaptions = (function () {
     return undefined;
   }
 
-  function styleText(t) {
+  // kaynakDili: true ise metin orijinal (s.orig) — kaynak dilin buyuk/kucuk harf kurali
+  function styleText(t, kaynakDili) {
     var mode = el("cap-case").value;
     var keepPunct = el("cap-punct").checked;
     var out = t;
     if (!keepPunct) {
-      out = out.replace(/[.,!?;:…»«""()\-–—]/g, " ").replace(/\s+/g, " ").trim();
+      out = out.replace(/[.,!?;:…»«""()\-–—\u060C\u061F\u061B]/g, " ").replace(/\s+/g, " ").trim();   // + Arapça ، ؟ ؛
     }
-    var loc = styleLocale();
+    var loc = kaynakDili ? styleLocale(true) : styleLocale();
     if (mode === "upper") out = loc ? out.toLocaleUpperCase(loc) : out.toUpperCase();
     else if (mode === "lower") out = loc ? out.toLocaleLowerCase(loc) : out.toLowerCase();
     return out;
@@ -1400,7 +1507,7 @@ window.KCaptions = (function () {
      * yigina itilir; kullanici Ctrl+Z ile geri donebilir.
      */
     var oncekiIs = segments.length
-      ? { segs: JSON.stringify(segments), etiket: "yeni transkript", mode: segmentsMode }
+      ? durumAl("yeni transkript")
       : null;
     algilananDil = "";
     var tempFiles = [];
@@ -1568,6 +1675,12 @@ window.KCaptions = (function () {
         }
       }
       applyGlossary(segments);
+      if (segments.length === 0) {
+        // Eski dokumana geri don: ekrandaki satirlar ile bellek ayrismasin,
+        // bos dizi bir sonraki taslak yazimiyla kayitli isi de silmesin.
+        if (oncekiIs) durumYukle(oncekiIs); else segments = [];
+        throw new Error("Konuşma bulunamadı.");
+      }
       if (oncekiIs) {
         undoStack.push(oncekiIs);
         if (undoStack.length > UNDO_MAX) undoStack.shift();
@@ -1578,11 +1691,11 @@ window.KCaptions = (function () {
       }
       refreshUndoUI();
       savePrefs();
-      if (segments.length === 0) throw new Error("Konuşma bulunamadı.");
 
       status("");
       hideRestore();             // ekranda taze iş var: eski taslak teklifi artık geçersiz
       clearRevert();             // yeni doküman — eski çevirinin orijinalleri buraya ait değil
+      shortsYuklenen = "";       // yeni transkript (basariyla geldi): artik Shorts kaydi degil, normal taslak
       uygulaEtiketiniSifirla();  // yeni transkript: uygula düğmesi normal haline dönsün
       el("cap-result").hidden = false;
       el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula";
@@ -1612,7 +1725,7 @@ window.KCaptions = (function () {
     var len = el("cap-maxlen") ? el("cap-maxlen").value : "c42";
     var mc = /^c(\d+)$/.exec(len);
     return {
-      lang: (el("cap-lang") && el("cap-lang").value) || algilananDil || "tr",
+      lang: (ceviriDili && ceviriVar() ? ceviriDili : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || "tr",
       maxChars: mc ? Number(mc[1]) : 42,
       wordMode: /^k/.test(len) || segmentsMode === "k1" || segmentsMode === "kc"
     };
@@ -1674,9 +1787,8 @@ window.KCaptions = (function () {
   function restoreHistory(index) {
     var st = undoStack[index];
     if (!st) return;
-    redoStack.push({ segs: JSON.stringify(segments), etiket: "geçmişten önce", mode: segmentsMode, ts: Date.now() });
-    segments = JSON.parse(st.segs);
-    if (st.mode) segmentsMode = st.mode;
+    redoStack.push(durumAl("geçmişten önce"));
+    durumYukle(st);
     undoStack = undoStack.slice(0, index);
     render();
     refreshUndoUI();
@@ -1715,8 +1827,9 @@ window.KCaptions = (function () {
   }
 
   function correctionFromEdit(before, after) {
-    var a = String(before || "").trim().split(/\s+/);
-    var b = String(after || "").trim().split(/\s+/);
+    // *vurgu* eklemek/kaldirmak yazim duzeltmesi degildir: sozluge onerilmez
+    var a = CT.stripEmphasis(String(before || "")).trim().split(/\s+/);
+    var b = CT.stripEmphasis(String(after || "")).trim().split(/\s+/);
     if (a.length !== b.length || a.length > 40) return null;
     var changed = [];
     for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) changed.push({ from: a[i], to: b[i] });
@@ -1759,6 +1872,65 @@ window.KCaptions = (function () {
     KApp.toast("Metin, satır uzunluğu ve zamanlama düzeltildi", "good");
   }
 
+  // Anlamina gore satir sonlarina emoji: seyrek, tekrarsiz, Ctrl+Z ile geri alinir
+  function otomatikEmoji() {
+    if (!segments.length || !window.SufloAutoEmoji) return;
+    var dil = algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr";
+    var oneriler = window.SufloAutoEmoji.suggest(segments, { lang: dil === "en" ? "en" : "tr" });
+    if (!oneriler.length) {
+      KApp.toast("Emojiye uygun satır bulunamadı", "warn");
+      return;
+    }
+    snapshot("otomatik emoji");
+    oneriler.forEach(function (o) {
+      segments[o.index].text = window.SufloAutoEmoji.append(segments[o.index].text, o.emoji);
+    });
+    render(); saveDraftNow();
+    KApp.toast(oneriler.length + " satıra emoji eklendi · beğenmezsen Ctrl+Z", "good");
+  }
+
+  /*
+   * Otomatik anahtar kelime vurgusu: sayilar (birimiyle) ve satir basina en
+   * anlamli tek kelime *isaretlenir*. Suflo Stilleri bunlari vurgu renginde
+   * cizer. Kelime modunda 6'li pencereler satir gibi degerlendirilir.
+   */
+  function otomatikVurgu() {
+    if (!segments.length) return;
+    if (segmentsMode === "kc") {
+      KApp.toast("Birikimli karaoke modunda vurgu yok; Kelime ya da Satır modunu kullan.", "warn");
+      return;
+    }
+    var yeni = segments.map(function (s) { return s.text; });
+    if (segmentsMode === "k1" || segmentsMode === "w") {
+      for (var b = 0; b < segments.length; b += 6) {
+        var pencere = yeni.slice(b, b + 6);
+        if (pencere.some(CT.hasEmphasis)) continue;
+        var tekSozcuk = pencere.every(function (w) { return !/\s/.test(String(w).trim()); });
+        if (!tekSozcuk) continue;
+        var sonuc = CT.autoEmphasis(pencere.join(" ")).split(/\s+/);
+        if (sonuc.length !== pencere.length) continue;
+        // pencere genelindeki "*a b*" araligi kelime basina "*a*" "*b*" olur
+        var maske = CT.emphasisMask(sonuc.join(" "));
+        sonuc.forEach(function (w, k) {
+          yeni[b + k] = maske[k] ? CT.toggleWord(CT.stripEmphasis(w), 0) : w;
+        });
+      }
+    } else {
+      yeni = yeni.map(function (t) { return CT.autoEmphasis(t); });
+    }
+    var n = 0;
+    yeni.forEach(function (t, i) { if (t !== segments[i].text) n++; });
+    if (!n) {
+      KApp.toast("Vurgulanacak yeni kelime bulunamadı (işaretli satırlara dokunulmaz).", "warn");
+      return;
+    }
+    snapshot("otomatik vurgu");
+    yeni.forEach(function (t, i) { segments[i].text = t; });
+    render(); saveDraftNow();
+    KApp.toast(n + " " + (segmentsMode === "k1" || segmentsMode === "w" ? "kelime" : "satır") +
+      " vurgulandı · Suflo Stillerinde vurgu renginde görünür · Ctrl+Z ile geri al", "good");
+  }
+
   async function proofreadAll() {
     if (!segments.length) return;
     var cfg = chatConfig();
@@ -1774,7 +1946,8 @@ window.KCaptions = (function () {
       var corrected = [];
       var BATCH = 50;
       for (var i = 0; i < originals.length; i += BATCH) {
-        var chunk = originals.slice(i, i + BATCH);
+        // *vurgu* isaretleri modele gitmez (dusurur ya da markdown ekler); donuste geri konur
+        var chunk = originals.slice(i, i + BATCH).map(CT.stripEmphasis);
         status("AI metin kontrolü… " + Math.min(i + BATCH, originals.length) + "/" + originals.length);
         var json = await chatCall(cfg, {
           model: cfg.model,
@@ -1790,8 +1963,14 @@ window.KCaptions = (function () {
         if (!parsed.lines || parsed.lines.length !== chunk.length) throw new Error("Kontrol satır sayısı değişti; mevcut metin korunarak işlem durduruldu.");
         corrected = corrected.concat(parsed.lines);
       }
+      corrected = corrected.map(function (text, i2) {
+        var t = String(text || "").trim();
+        if (!t) return originals[i2];
+        var geri = CT.reapplyEmphasis(originals[i2], t);
+        return geri === null ? originals[i2] : geri;   // kelime sayisi degistiyse vurgu kaybolmasin
+      });
       var changed = 0;
-      corrected.forEach(function (text, i2) { if (String(text || "").trim() && String(text).trim() !== originals[i2]) changed++; });
+      corrected.forEach(function (text, i2) { if (text !== originals[i2]) changed++; });
       if (!changed) { status(""); KApp.toast("AI kontrolü tamamlandı; açık bir yazım hatası bulunmadı", "good"); return; }
       snapshot("AI metin kontrolü");
       refs.forEach(function (s, i3) { s.text = String(corrected[i3] || s.text).trim() || s.text; s.proofread = true; });
@@ -1818,6 +1997,7 @@ window.KCaptions = (function () {
   }
 
   function render() {
+    ceviriDugmeleriniGuncelle();   // geri al/yinele/taslak sonrasi da satirlarla tutarli
     // Gerçek satırlar geldiğinde/değiştiğinde önizleme de onlardan beslensin
     onizlemeCiz();
     var box = el("cap-segments");
@@ -1875,7 +2055,7 @@ window.KCaptions = (function () {
           var correction = correctionFromEdit(inp.dataset.before, inp.value);
           var eski = JSON.parse(JSON.stringify(segments));
           eski[i].text = inp.dataset.before;
-          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, ts: Date.now() });
+          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, cevir: ceviriDili, shorts: shortsYuklenen, ts: Date.now() });
           if (undoStack.length > UNDO_MAX) undoStack.shift();
           redoStack.length = 0;
           refreshUndoUI();
@@ -1885,7 +2065,18 @@ window.KCaptions = (function () {
         }
       };
       // Enter: bol · Alt+Enter: alta satir ekle · Ctrl+Enter: sonraki satira gec
+      // Ctrl/Cmd+B: imlecteki kelimeyi (ya da secimi) *vurgula* / vurguyu kaldir
       inp.onkeydown = function (e) {
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
+          e.preventDefault();
+          var sonuc = CT.toggleRange(inp.value, inp.selectionStart, inp.selectionEnd);
+          if (sonuc.text !== inp.value) {
+            inp.value = sonuc.text;
+            inp.setSelectionRange(sonuc.caret, sonuc.caret);
+            inp.oninput();
+          }
+          return;
+        }
         if (e.key !== "Enter") return;
         e.preventDefault();
         if (e.altKey) { insertAfter(i); return; }
@@ -2091,14 +2282,41 @@ window.KCaptions = (function () {
    * taşınır: bölme/birleştirme/silme/sıralama index eşlemesini bozduğu için index tabanlı
    * saklama, geri alındığında metinleri yanlış satırlara yazıyordu.
    */
-  var preTranslate = null; // yalnızca "çeviri yapıldı" bayrağı
+  /*
+   * Ceviri durumu ayri bir bayrakta DEGIL, veride: s.orig tasiyan satir varsa
+   * belge cevrilmistir. Bayrak geri al/yinele, taslak kurtarma ve yeni
+   * transkriptten sonra satirlarla ayrisiyordu (dugmeler yanlis gorunuyordu).
+   */
+  var ceviriDili = "";     // son cevirinin hedef dili (buyuk harf ve kalite kurallari icin)
+  function ceviriVar() {
+    for (var i = 0; i < segments.length; i++) if (typeof segments[i].orig === "string") return true;
+    return false;
+  }
+  function ceviriDugmeleriniGuncelle() {
+    var var_ = ceviriVar();
+    var b = el("cap-revert");
+    if (b) b.hidden = !var_;
+    var c = el("cap-cift-dil-sar");
+    if (c) c.hidden = !var_;
+  }
   function clearRevert() {
-    preTranslate = null;
+    ceviriDili = "";
     var b = el("cap-revert");
     if (b) b.hidden = true;
+    var c = el("cap-cift-dil-sar");
+    if (c) c.hidden = true;
   }
 
-  var LANG_NAMES = { en: "English", tr: "Turkish", az: "Azerbaijani", ru: "Russian" };
+  // Çeviri sonrası "çift dilli": orijinal + çeviri alt alta (SRT/VTT/normal iz)
+  function ciftDilAcik() {
+    var c = el("cap-cift-dil");
+    return !!(c && c.checked && ceviriVar());
+  }
+
+  var LANG_NAMES = {
+    en: "English", tr: "Turkish", az: "Azerbaijani", ru: "Russian", de: "German", ar: "Arabic",
+    es: "Spanish", fr: "French", pt: "Portuguese", it: "Italian", nl: "Dutch", ja: "Japanese"
+  };
 
   function chatConfig() {
     var s = K.settings();
@@ -2134,6 +2352,44 @@ window.KCaptions = (function () {
     return await res.json();
   }
 
+  /*
+   * Metin dizisini hedef dile cevir (60'arlik parcalar, satir sayisi korunur).
+   * *vurgu* isaretleri modelden korunmasi istenir. Doner: ceviri dizisi.
+   */
+  async function metinleriCevir(cfg, texts, target, ilerleme) {
+    var out = [];
+    var BATCH = 60;
+    for (var i = 0; i < texts.length; i += BATCH) {
+      if (ilerleme) ilerleme(Math.min(i + BATCH, texts.length), texts.length);
+      var chunk = texts.slice(i, i + BATCH);
+      var json = await chatCall(cfg, {
+        model: cfg.model,
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "You translate subtitle lines for video. Reply ONLY with a JSON object {\"lines\": [...]} containing exactly " +
+              chunk.length + " translated lines in the same order. Keep translations short and natural for subtitles. Do not merge or split lines. " +
+              "Words wrapped in single asterisks (*word*) are highlighted: wrap the corresponding translated words in single asterisks too. Never add other asterisks or markdown."
+          },
+          {
+            role: "user",
+            content: "Translate to " + (LANG_NAMES[target] || target) + ":\n" + JSON.stringify(chunk)
+          }
+        ]
+      });
+      var content = json.choices && json.choices[0] && json.choices[0].message.content;
+      var parsed = JSON.parse(String(content || "{}").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
+      var lines = parsed.lines || parsed.Lines;
+      if (!lines || lines.length !== chunk.length) {
+        throw new Error("Çeviri satır sayısı tutmadı (" + (lines ? lines.length : 0) + "/" + chunk.length + ") — tekrar dene.");
+      }
+      out = out.concat(lines);
+    }
+    return out;
+  }
+
   async function translateAll() {
     if (typeof Pro !== "undefined" && !Pro.gate("translate")) return; // Pro: ceviri
     if (segments.length === 0) return;
@@ -2152,45 +2408,25 @@ window.KCaptions = (function () {
       // silinen segmentin cevirisi zararsizca dusar, kalanlar dogru esler.
       var segsRef = segments.slice();
       var texts = segsRef.map(function (s) { return s.text; });
-      var out = [];
-      var BATCH = 60;
-      for (var i = 0; i < texts.length; i += BATCH) {
-        status("Çevriliyor… " + Math.min(i + BATCH, texts.length) + "/" + texts.length);
-        var chunk = texts.slice(i, i + BATCH);
-        var json = await chatCall(cfg, {
-          model: cfg.model,
-          temperature: 0.2,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: "You translate subtitle lines for video. Reply ONLY with a JSON object {\"lines\": [...]} containing exactly " +
-                chunk.length + " translated lines in the same order. Keep translations short and natural for subtitles. Do not merge or split lines."
-            },
-            {
-              role: "user",
-              content: "Translate to " + (LANG_NAMES[target] || target) + ":\n" + JSON.stringify(chunk)
-            }
-          ]
-        });
-        var content = json.choices && json.choices[0] && json.choices[0].message.content;
-        var parsed = JSON.parse(content);
-        var lines = parsed.lines || parsed.Lines;
-        if (!lines || lines.length !== chunk.length) {
-          throw new Error("Çeviri satır sayısı tutmadı (" + (lines ? lines.length : 0) + "/" + chunk.length + ") — tekrar dene.");
-        }
-        out = out.concat(lines);
-      }
+      var out = await metinleriCevir(cfg, texts, target, function (n, top) { status("Çevriliyor… " + n + "/" + top); });
       snapshot("çeviri");
+      // Ceviri surerken elle duzeltilen ya da yeni transkript/ice aktarmayla
+      // ekrandan kalkan satirlarin uzerine yazma: kullanicinin isi kaybolmasin.
+      var guncel = new Set(segments);
+      var atlananDuzenleme = 0;
       segsRef.forEach(function (s, i2) {
+        if (!guncel.has(s)) return;
+        if (s.text !== texts[i2]) { atlananDuzenleme++; return; }
         if (typeof s.orig !== "string") s.orig = texts[i2];   // zincir çeviride ilk orijinali koru
-        s.text = String(out[i2] || "").trim() || s.text;
+        s.text = CT.normalizeEmphasis(String(out[i2] || "").trim()) || s.text;
       });
-      preTranslate = true;
+      ceviriDili = target;
       status("");
       el("cap-revert").hidden = false;
+      if (el("cap-cift-dil-sar")) el("cap-cift-dil-sar").hidden = false;
       render(); saveDraftNow();
-      KApp.toast(texts.length + " satır çevrildi", "good");
+      KApp.toast(texts.length + " satır çevrildi" +
+        (atlananDuzenleme ? " · çeviri sırasında düzenlenen " + atlananDuzenleme + " satıra dokunulmadı" : ""), "good");
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
     } finally {
@@ -2198,8 +2434,105 @@ window.KCaptions = (function () {
     }
   }
 
+  /*
+   * Cok dilli SRT paketi: secilen her dile cevirip ayri SRT yazar (YouTube'un cok
+   * dilli altyazisi icin). Ekrandaki altyazi DEGISMEZ. Kaynak: ceviri yapilmissa
+   * orijinal satirlar (s.orig), degilse ekrandaki metin. Zamanlar cueler() ile ayni.
+   */
+  async function cokDilliPaket() {
+    if (typeof Pro !== "undefined" && !Pro.gate("translate")) return;
+    if (!segments.length) return;
+    if (segmentsMode !== "plain") {
+      KApp.toast("Çok dilli paket satır modunda çalışır: kelime/karaoke modunda her kelime ayrı çevrilirdi. Satır uzunluğunu \"Satır\" yapıp yeniden oluştur.", "warn", 8000);
+      return;
+    }
+    var diller = Array.prototype.map.call(document.querySelectorAll(".cap-paket-dil:checked"), function (x) { return x.value; });
+    if (!diller.length) { KApp.toast("En az bir dil seç.", "warn"); return; }
+    var cfg = chatConfig();
+    if (!cfg) { KApp.toast("Çeviri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    var btn = el("cap-paket-go");
+    btn.disabled = true;
+    try {
+      var kaynak = segments.map(function (s) {
+        return { start: s.start, end: s.end, text: CT.stripEmphasis(typeof s.orig === "string" ? s.orig : s.text) };
+      });
+      var zaman = paketZamanlari(kaynak);
+      var metinler = zaman.map(function (z) { return kaynak[z.i].text; });
+      var klasor = K.path.join(K.os.homedir(), "Desktop");
+      if (!K.fs.existsSync(klasor)) klasor = K.os.homedir();
+      var t0 = new Date();
+      function iki(n) { return (n < 10 ? "0" : "") + n; }
+      // yerel saat, saniyeli: ayni dakikada iki paket birbirini ezmesin (Windows'ta ":" yok)
+      klasor = K.path.join(klasor, "Suflo altyazilar " + t0.getFullYear() + "-" + iki(t0.getMonth() + 1) + "-" + iki(t0.getDate()) +
+        " " + iki(t0.getHours()) + "." + iki(t0.getMinutes()) + "." + iki(t0.getSeconds()));
+      K.fs.mkdirSync(klasor, { recursive: true });
+      var kaynakDil = algilananDil || (el("cap-lang") && el("cap-lang").value) || "";
+      if (!kaynakDil) kaynakDil = "kaynak";   // "Otomatik" ve taslaktan: dil bilinmiyor
+      K.fs.writeFileSync(K.path.join(klasor, kaynakDil + ".srt"), "\uFEFF" + paketSrt(zaman, metinler, kaynakDil), "utf8");
+      var yazilan = 1, hatalar = [];
+      for (var d = 0; d < diller.length; d++) {
+        var dil = diller[d];
+        if (dil === kaynakDil) continue;
+        try {
+          var out = await metinleriCevir(cfg, metinler, dil, function (n, top) {
+            status((LANG_NAMES[dil] || dil) + " · " + n + "/" + top + " (" + (d + 1) + "/" + diller.length + ")");
+          });
+          var temiz = out.map(function (t, i) { return CT.stripEmphasis(String(t || "").trim()) || metinler[i]; });
+          K.fs.writeFileSync(K.path.join(klasor, dil + ".srt"), "\uFEFF" + paketSrt(zaman, temiz, dil), "utf8");
+          yazilan++;
+        } catch (eD) { hatalar.push((LANG_NAMES[dil] || dil) + ": " + K.hataYardimi(eD)); }
+      }
+      status(hatalar.length ? "Bazı diller atlandı: " + hatalar.join("; ").slice(0, 200) : "", hatalar.length ? "warn" : "");
+      KApp.toast(yazilan + " SRT yazıldı → " + klasor, "good", 9000);
+    } catch (e) {
+      status("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // cueler() ile ayni zamanlama kurali (en az 0.3 sn, sonraki satirla cakisma yok); bos satir atlanir
+  function paketZamanlari(list) {
+    var out = [];
+    list.forEach(function (s, i) {
+      if (!String(s.text || "").trim()) return;
+      var end = Math.max(s.end, s.start + 0.3);
+      var next = list[i + 1];
+      if (next && end > next.start) end = Math.max(next.start, s.start + 0.05);
+      out.push({ i: i, start: s.start, end: end });
+    });
+    return out;
+  }
+
+  // styleText'in dile ozel hali: buyuk/kucuk harf kurali hedef dilden (de/en'de "i" -> "I")
+  function paketStil(t, dil) {
+    var mode = el("cap-case").value;
+    var out = String(t || "");
+    if (!el("cap-punct").checked) {
+      out = out.replace(/[.,!?;:…»«""()\-–—\u060C\u061F\u061B]/g, " ").replace(/\s+/g, " ").trim();
+    }
+    var loc = { tr: "tr-TR", az: "az", ru: "ru" }[dil];
+    if (mode === "upper") out = loc ? out.toLocaleUpperCase(loc) : out.toUpperCase();
+    else if (mode === "lower") out = loc ? out.toLocaleLowerCase(loc) : out.toLowerCase();
+    return out;
+  }
+
+  function paketSrt(zaman, metinler, dil) {
+    var out = [], no = 0;
+    zaman.forEach(function (z, k) {
+      // bos satir SRT'yi bozar: once stil, bos kalani atla; metindeki bos satirlari kapat
+      var metin = paketStil(String(metinler[k] || "").replace(/\r?\n\s*\n+/g, "\n").trim(), dil);
+      if (!metin.trim()) return;
+      out.push(String(++no));
+      out.push(tc(z.start, true) + " --> " + tc(z.end, true));
+      out.push(metin);
+      out.push("");
+    });
+    return out.join("\r\n");
+  }
+
   function revertTranslate() {
-    if (!preTranslate) return;
+    if (!ceviriVar()) return;
     var atlanan = 0;
     snapshot("çeviriyi geri al");
     segments.forEach(function (s) {
@@ -2296,6 +2629,7 @@ window.KCaptions = (function () {
          */
         if (segments.length) snapshot("SRT içe aktarma");
         else { undoStack.length = 0; redoStack.length = 0; }
+        shortsYuklenen = "";
         segments = segs;
         segmentsMode = "plain";    // ice aktarilan SRT'de kelime zamani verisi yok
         uygulaEtiketiniSifirla();  // yeni doküman: "yine de uygula" onayı geçersiz
@@ -2350,11 +2684,21 @@ window.KCaptions = (function () {
    * Stil uygulanmış, çakışması giderilmiş cue listesi.
    * TÜM dışa aktarma biçimleri bunu kullanır — biçimler arası davranış ayrışmasın.
    */
-  function cueler() {
+  // opts.ciftDil: ceviri yapilmis satirlarda ust satir orijinal, alt satir ceviri
+  // (yalniz SRT/VTT ve normal caption izi; stilli yollar kelime gruplar, tek dil kalir)
+  // opts.vurgu: *anahtar kelime* isaretleri korunur (yalniz Suflo Stilleri cizer);
+  // diger tum ciktilarda isaret kaldirilir
+  function cueler(opts) {
     var out = [];
+    var cift = !!(opts && opts.ciftDil);
+    var vurguKoru = !!(opts && opts.vurgu);
     segments.forEach(function (s, i) {
-      var txt = styleText(s.text);
+      var txt = styleText(vurguKoru ? s.text : CT.stripEmphasis(s.text));
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
+      if (cift && typeof s.orig === "string") {
+        var asil = styleText(CT.stripEmphasis(s.orig), true);
+        if (asil && asil !== txt) txt = asil + "\n" + txt;
+      }
       // minimum 0.3 sn gorunum — ama bir sonraki cue ile CAKISMA (karaoke'de kritik)
       var end = Math.max(s.end, s.start + 0.3);
       var next = segments[i + 1];
@@ -2364,9 +2708,9 @@ window.KCaptions = (function () {
     return out;
   }
 
-  function buildSrt() {
+  function buildSrt(opts) {
     var out = [];
-    cueler().forEach(function (c, i) {
+    cueler(opts).forEach(function (c, i) {
       out.push(String(i + 1));
       out.push(tc(c.start, true) + " --> " + tc(c.end, true));
       out.push(c.text);
@@ -2376,9 +2720,9 @@ window.KCaptions = (function () {
   }
 
   // WebVTT — YouTube, web oynatıcılar ve sosyal platformların istediği biçim
-  function buildVtt() {
+  function buildVtt(opts) {
     var out = ["WEBVTT", ""];
-    cueler().forEach(function (c, i) {
+    cueler(opts).forEach(function (c, i) {
       out.push(String(i + 1));
       out.push(tc(c.start, false) + " --> " + tc(c.end, false));
       out.push(c.text);
@@ -2463,7 +2807,7 @@ window.KCaptions = (function () {
       if (!r.ok || !K.fs.existsSync(yol)) throw new Error(r.error || "kare alınamadı");
 
       // aynı dosya adı tarayıcıda önbelleklenir: sorgu ekiyle tazele
-      onizlemeKare = "file:///" + yol.replace(/\\/g, "/") + "?t=" + Date.now();
+      onizlemeKare = dosyaUrl(yol) + "?t=" + Date.now();
       onizlemeKareYol = yol;
       sahne.style.backgroundImage = "url('" + onizlemeKare + "')";
       sahne.classList.add("kare-var");
@@ -2515,6 +2859,9 @@ window.KCaptions = (function () {
       try { K.fs.unlinkSync(onizlemeRenderYol); } catch (e2) {}
       onizlemeRenderYol = null;
     }
+    // CSS onizlemesi 16:9 sahnede calisir
+    var sahne = el("cap-sahne");
+    if (sahne) { sahne.style.aspectRatio = ""; sahne.classList.remove("dikey"); }
     var mogrtImg = el("cap-mogrt-onizleme");
     if (mogrtImg) mogrtImg.hidden = true;
     var metin = el("cap-onizleme-metin");
@@ -2682,12 +3029,12 @@ window.KCaptions = (function () {
       };
     }
     var orta = segments[Math.floor(segments.length / 2)] || segments[0];
-    var metin = styleText(orta.text || "");
+    var metin = styleText(CT.stripEmphasis(orta.text || ""));
     return { kelimeler: metin ? metin.split(/\s+/) : [], sureler: null };
   }
 
   function motorOnizlemeCueleri(st) {
-    var cs = cueler();
+    var cs = cueler({ vurgu: true });
     if (!cs.length) {
       if (st.aile === "doc") return [{ start: 0.15, end: 2.7, text: "Hikâyenin başladığı yer." }];
       var ornekler = st.aile === "pop" ? ["POP!", "ŞAK!", "VAY!"] :
@@ -2709,10 +3056,46 @@ window.KCaptions = (function () {
     });
   }
 
+  /*
+   * Onizleme boyutu sekansin oranini izler (yukseklik 540). Dikey (9:16)
+   * sekansta Shorts/Reels/TikTok arayuzunun kapattigi bolgeler isaretlenebilir.
+   */
+  function onizlemeBoyutu(ctx) {
+    var w = Number(ctx && ctx.width) || 0, h = Number(ctx && ctx.height) || 0;
+    if (!(w > 0 && h > 0)) return { w: 960, h: 540, dikey: false };
+    var oran = Math.max(0.4, Math.min(2.4, w / h));
+    // kisa kenar en az 320 (stil motoru genisligi 320'ye sabitler; PlayRes video ile ayni kalsin)
+    if (oran < 1) return { w: 320, h: Math.round(320 / oran / 2) * 2, dikey: h > w * 1.2 };
+    return { w: Math.round(540 * oran / 2) * 2, h: 540, dikey: false };
+  }
+
+  // TikTok / Reels / Shorts ortak "kapali" bolgeleri (1080x1920 olcumlerinden, oransal):
+  // ust durum cubugu, sag ikon sutunu, alt aciklama + dugmeler
+  var GUVENLI_ALAN = [
+    { x: 0, y: 0, w: 1, h: 0.07 },
+    { x: 0.87, y: 0.35, w: 0.13, h: 0.43 },
+    { x: 0, y: 0.78, w: 1, h: 0.22 }
+  ];
+  function guvenliAlanFiltresi(w, h) {
+    return GUVENLI_ALAN.map(function (b) {
+      var x = Math.round(b.x * w), y = Math.round(b.y * h), bw = Math.round(b.w * w), bh = Math.round(b.h * h);
+      return "drawbox=x=" + x + ":y=" + y + ":w=" + bw + ":h=" + bh + ":color=0xff3b5c@0.22:t=fill," +
+        "drawbox=x=" + x + ":y=" + y + ":w=" + bw + ":h=" + bh + ":color=0xff3b5c@0.7:t=1";
+    }).join(",");
+  }
+
+  function sahneOraniniAyarla(ob) {
+    var sahne = el("cap-sahne");
+    if (!sahne) return;
+    sahne.style.aspectRatio = ob.w + " / " + ob.h;
+    sahne.classList.toggle("dikey", !!ob.dikey);
+    var sar = el("cap-guvenli-sar");
+    if (sar) sar.hidden = !ob.dikey;
+  }
+
   async function motorOnizlemeOynat() {
     var st = stil();
-    var destekli = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
-    if (!K.nodeOK || !window.SufloStyleEngine || !destekli[st.aile]) return false;
+    if (!K.nodeOK || !motorStiliMi(st.aile)) return false;
     var ff = await K.findFfmpeg();
     if (!ff) return false;
 
@@ -2734,8 +3117,11 @@ window.KCaptions = (function () {
 
     try {
       var cues = motorOnizlemeCueleri(st);
+      // Sekansin en-boy oranında onizle: 9:16'da stil yerlesimi farklidir
+      var ob = onizlemeBoyutu(KApp.ctx());
       var built = window.SufloStyleEngine.compile({
-        styleId: st.aile, intensity: st.yogunluk, cues: cues, width: 960, height: 540,
+        styleId: st.aile, intensity: st.yogunluk, cues: cues, width: ob.w, height: ob.h,
+        cueKind: cueler().length ? motorCueTuru() : "words",
         overrides: {
           font: st.font, fontFile: fontDosyasi, boyut: st.boyut,
           renk: st.renk, konturRenk: st.konturRenk, vurguRenk: st.vurguRenk,
@@ -2750,12 +3136,14 @@ window.KCaptions = (function () {
       var son = cues[cues.length - 1];
       var sure = Math.max(2.2, (son ? son.end : 2) + 0.45);
       var vf = "ass=" + K.path.basename(assYol) + ":fontsdir=.";
+      var guvenli = ob.dikey && el("cap-guvenli-alan") && el("cap-guvenli-alan").checked;
+      if (guvenli) vf += "," + guvenliAlanFiltresi(ob.w, ob.h);
       var args = ["-y"];
       if (onizlemeKareYol && K.fs.existsSync(onizlemeKareYol)) {
         args.push("-loop", "1", "-i", onizlemeKareYol, "-t", sure.toFixed(2),
-          "-vf", "scale=960:540:force_original_aspect_ratio=increase,crop=960:540," + vf);
+          "-vf", "scale=" + ob.w + ":" + ob.h + ":force_original_aspect_ratio=increase,crop=" + ob.w + ":" + ob.h + "," + vf);
       } else {
-        args.push("-f", "lavfi", "-i", "color=c=#101522:s=960x540:r=24:d=" + sure.toFixed(2), "-vf", vf);
+        args.push("-f", "lavfi", "-i", "color=c=#101522:s=" + ob.w + "x" + ob.h + ":r=24:d=" + sure.toFixed(2), "-vf", vf);
       }
       args.push("-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-pix_fmt", "yuv420p", "-an", cikti);
       var r = await K.run(ff, args, { timeout: 120000, cwd: dizin });
@@ -2766,8 +3154,9 @@ window.KCaptions = (function () {
       var metin = el("cap-onizleme-metin");
       if (!video) return false;
       if (metin) metin.hidden = true;
-      video.src = "file:///" + cikti.replace(/\\/g, "/") + "?t=" + kimlik;
+      video.src = dosyaUrl(cikti) + "?t=" + kimlik;
       video.hidden = false;
+      sahneOraniniAyarla(ob);
       video.loop = true;
       await video.play();
       if (btn) { btn.disabled = false; btn.textContent = "■ Durdur"; }
@@ -3204,11 +3593,9 @@ window.KCaptions = (function () {
     var b = el("cap-apply");
     if (b) { b.textContent = UYGULA_ETIKET; b.classList.remove("warn"); }
     var styleBtn = el("cap-apply-style");
-    if (styleBtn) {
-      styleBtn.disabled = !secilenMogrt;
-      styleBtn.textContent = secilenMogrt ? temizMogrtAdi(secilenMogrt) + " ile ekle" : "Stil seçerek ekle";
-      styleBtn.classList.remove("warn");
-    }
+    if (styleBtn) styleBtn.classList.remove("warn");
+    // Stil dugmesinin metni/durumu tek yerde: MOGRT ve Suflo Stilleri ayni kurala uyar
+    uygulamaIpucunuGuncelle();
   }
 
   /* ---------------- Animasyonlu altyazı: timeline'a overlay ---------------- */
@@ -3315,17 +3702,17 @@ window.KCaptions = (function () {
       var cs = cueler();
       if (!cs.length) throw new Error("Yazılacak altyazı yok.");
       var sonBitis = cs[cs.length - 1].end - baslangic;
-      var sure = Math.max(1, Math.ceil(sonBitis + 2));
+      var sure = CT.katmanSuresi(sonBitis, (Number(spec.end) || 0) - baslangic, fps);
 
       var st = stil();
       var stilDerlemesi = null;
-      var yeniStiller = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
       var ass;
-      if (window.SufloStyleEngine && yeniStiller[st.aile]) {
+      if (motorStiliMi(st.aile)) {
         stilDerlemesi = window.SufloStyleEngine.compile({
           styleId: st.aile,
           intensity: st.yogunluk,
-          cues: cs,
+          cueKind: motorCueTuru(),
+          cues: cueler({ vurgu: true }),
           offset: baslangic,
           width: g,
           height: y,
@@ -3372,6 +3759,7 @@ window.KCaptions = (function () {
 
       var ff = await K.findFfmpeg();
       if (!ff) throw new Error("ffmpeg bulunamadı.");
+      if (K.libassUyarisi && K.libassUyarisi()) throw new Error(K.libassUyarisi());
 
       var cikti = K.path.join(K.srtDir(), "suflo-altyazi-" + Date.now() + ".mov");
       K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
@@ -3431,13 +3819,13 @@ window.KCaptions = (function () {
   async function apply(stilIle) {
     if (segments.length === 0) return;
     stilIle = stilIle === true;
-    if (stilIle && !secilenMogrt) {
+    if (stilIle && !secilenMogrt && !secilenMotorStili) {
       KApp.toast("Önce Altyazı ayarlarından bir stil seç.", "warn");
       return;
     }
     var rapor = qualityReport();
     var kritik = Number(rapor.bad) || 0;
-    var sekans = (KApp.ctx().sequence || "") || "?";
+    var sekans = (KApp.ctx().sequenceId || KApp.ctx().sequence || "") || "?";
     var kaliteAnahtari = stilIle ? "style" : "normal";
     var yeniIzOnayi = !stilIle && uygulananSekans[sekans] && onayBekleyen !== sekans;
     if ((kritik > 0 && kaliteOnayBekleyen !== kaliteAnahtari) || yeniIzOnayi) {
@@ -3457,6 +3845,11 @@ window.KCaptions = (function () {
         uyari += (uyari ? " " : "") + "Bu sekansa zaten altyazı uygulandı; devam etmek yeni bir altyazı izi ekler.";
       }
       KApp.toast(uyari, "warn", 9000);
+      return;
+    }
+    if (stilIle && !secilenMogrt && secilenMotorStili) {
+      await overlayUygula();             // Pro kapisi overlayUygula icinde
+      uygulaEtiketiniSifirla();
       return;
     }
     if (stilIle) {
@@ -3480,7 +3873,7 @@ window.KCaptions = (function () {
       return;
     }
     try {
-      var srt = buildSrt();
+      var srt = buildSrt({ ciftDil: ciftDilAcik() });
       if (!srt) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
       // Premiere içe aktardığı SRT'yi KOPYALAMAZ, diskteki yola referans verir. Bu yüzden
       // temp'e yazmak yasak (biz ya da Windows süpürünce projedeki altyazı kırılır):
@@ -3503,7 +3896,8 @@ window.KCaptions = (function () {
           // Yalnızca iş gerçekten sekansa yerleştiyse taslağı sil.
           // cancelDraft şart: 1,2 sn içinde bir tuş vuruşu olduysa zamanlayıcı taslağı diriltir.
           cancelDraft();
-          K.clearDraft();
+          // Shorts transkripti uygulandiysa ana videonun taslagi (uygulanmamis is olabilir) silinmez
+          if (!shortsYuklenen) K.clearDraft();
           hideRestore();
           KApp.toast("Altyazı izi oluşturuldu", "good");
           yildizIste();
@@ -3519,505 +3913,6 @@ window.KCaptions = (function () {
     }
   }
 
-  /* ---------------- Emoji seçici ---------------- */
-
-  /*
-   * Görsel emoji seti: Twemoji SVG'leri (CC-BY 4.0, emoji/LISANS.txt).
-   * Apple'ın emoji çizimleri Apple'ın telifli eseri olduğu için paketlenemez;
-   * görsel set kullanmanın asıl değeri tutarlılık — karakter olarak eklenen
-   * emoji her platformda farklı çizilir, görsel her yerde aynıdır.
-   *
-   * İki mod:
-   *   Metne ekle   → emoji KARAKTERİ seçili satıra girer. "Sekansa uygula"
-   *                  yolunda Premiere kendi motoruyla renkli çizer.
-   *                  Stilli katmanda ÇİZİLEMEZ (libass emoji desteklemiyor,
-   *                  kanıtlandı: tofu bile değil, boş) — o yol uyarıyla durur.
-   *   Sahneye bırak → SVG panelde PNG'ye çevrilir, playhead'e küçük bir
-   *                  grafik klip olarak iner. Viral kurgudaki "kocaman 🔥
-   *                  pat diye girer" görünümü budur ve libass'ten bağımsızdır.
-   */
-  var EMOJI_ARAMA = {
-    "😂": "gulme komik lol", "🤣": "gulme yerlere komik", "😅": "ter gulme",
-    "😍": "ask kalp goz begen", "🥹": "duygu aglamakli tatli", "😮": "sasirma vay",
-    "😱": "sok korku cigLik", "🤯": "beyin patlama sok", "🙄": "goz devirme biktim",
-    "😭": "aglama huzun", "🥶": "soguk donma", "😴": "uyku sikici", "🤔": "dusunme acaba",
-    "😎": "havali gozluk", "✅": "onay tamam dogru tik", "❌": "hayir yanlis iptal",
-    "⚠️": "uyari dikkat", "❗": "unlem onemli", "❓": "soru", "💯": "yuz tam mukemmel",
-    "👇": "asagi ok", "👆": "yukari ok", "👉": "sag ok isaret", "🔝": "top zirve ust",
-    "👍": "begen tamam", "👎": "begenme koty", "👏": "alkis bravo", "🙏": "tesekkur dua rica",
-    "🤝": "anlasma el sikisma", "💪": "guc kas", "🤞": "sans dilek",
-    "🔥": "ates alev viral", "💰": "para kese zengin", "🤑": "para goz dolar",
-    "💸": "para ucan harcama", "📈": "grafik artis buyume", "🚀": "roket firlama",
-    "⭐": "yildiz favori", "🏆": "kupa sampiyon birinci", "🎯": "hedef isabet",
-    "⚡": "simsek hizli enerji", "🎬": "klaket film kurgu", "🎥": "kamera video",
-    "🎧": "kulaklik muzik ses", "🎵": "nota muzik", "📱": "telefon mobil",
-    "💡": "fikir ampul", "⏰": "saat alarm zaman", "📌": "pin sabit not",
-    "🎁": "hediye kutu", "❤️": "kalp ask sevgi"
-  };
-
-  /*
-   * TR arama köprüsü: katalogdaki adlar İngilizce (emoji-data). Türkçe sorgu
-   * önce burada İngilizce karşılıklarına genişletilir, sonra adlarda aranır.
-   * Anahtarlar aksansız yazılır; sorgu da aksansızlaştırılır (ateş -> ates).
-   */
-  var EMOJI_TR = {
-    "ates": "fire", "alev": "fire", "kalp": "heart", "ask": "heart love", "sevgi": "heart",
-    "gulme": "laugh joy rofl", "komik": "laugh joy", "aglama": "cry sob tear", "uzgun": "sad cry",
-    "opucuk": "kiss", "para": "money dollar bank", "zengin": "money", "el": "hand",
-    "alkis": "clap", "dua": "pray", "tesekkur": "pray thanks", "roket": "rocket",
-    "yildiz": "star", "gunes": "sun", "ay": "moon", "kopek": "dog", "kedi": "cat",
-    "yemek": "food", "pizza": "pizza", "kahve": "coffee", "cay": "tea", "bayrak": "flag",
-    "turkiye": "turkey", "azerbaycan": "azerbaijan", "futbol": "soccer", "basketbol": "basketball",
-    "muzik": "music note", "kamera": "camera", "video": "video movie", "film": "movie clapper",
-    "telefon": "phone", "bilgisayar": "computer laptop", "ucak": "airplane", "araba": "car",
-    "ev": "house home", "agac": "tree", "cicek": "flower blossom", "deniz": "water wave ocean",
-    "yagmur": "rain", "kar": "snow", "dondurma": "ice cream", "pasta": "cake",
-    "dogumgunu": "birthday", "hediye": "gift", "kitap": "book", "kalem": "pencil pen",
-    "makas": "scissors", "kilit": "lock", "anahtar": "key", "saat": "clock watch",
-    "zaman": "clock hourglass", "uyari": "warning", "yasak": "prohibited no",
-    "tik": "check", "onay": "check", "tamam": "check ok", "carpi": "cross mark",
-    "hayir": "cross no", "soru": "question", "unlem": "exclamation", "ok": "arrow",
-    "yukari": "up", "asagi": "down", "sag": "right", "sol": "left", "guclu": "muscle flex",
-    "kas": "muscle", "bebek": "baby", "kadin": "woman", "erkek": "man", "adam": "man",
-    "aile": "family", "gozluk": "glasses sunglasses", "kral": "crown king", "tac": "crown",
-    "kafatasi": "skull", "olum": "skull death", "hayalet": "ghost", "seytan": "imp devil",
-    "melek": "angel halo innocent", "palyaco": "clown", "maymun": "monkey", "aslan": "lion",
-    "ayi": "bear", "tavsan": "rabbit", "yilan": "snake", "balik": "fish", "kus": "bird",
-    "kelebek": "butterfly", "ari": "bee honeybee", "orumcek": "spider", "at": "horse",
-    "inek": "cow", "domuz": "pig", "panda": "panda", "elma": "apple", "muz": "banana",
-    "cilek": "strawberry", "karpuz": "watermelon", "uzum": "grapes", "limon": "lemon",
-    "biber": "pepper", "ekmek": "bread", "peynir": "cheese", "yumurta": "egg",
-    "tavuk": "chicken", "patates": "fries potato", "makarna": "spaghetti", "bira": "beer",
-    "sarap": "wine", "sise": "bottle", "top": "ball", "oyun": "game video game",
-    "kupa": "trophy", "sampiyon": "trophy medal", "madalya": "medal", "hedef": "dart target",
-    "beyin": "brain", "goz": "eye", "agiz": "mouth", "dil": "tongue", "burun": "nose",
-    "kulak": "ear", "ayak": "foot", "sus": "shush quiet", "sessiz": "mute quiet",
-    "uyku": "sleep zzz", "havali": "sunglasses cool", "sok": "shock astonished exploding",
-    "korku": "fear scream", "kizgin": "angry rage", "sinirli": "angry", "dusunme": "thinking",
-    "utanma": "flushed blush", "ter": "sweat", "hasta": "sick ill mask thermometer",
-    "parti": "party tada confetti", "kutlama": "party tada", "dans": "dance dancer",
-    "isik": "light bulb", "fikir": "bulb idea", "simsek": "zap lightning", "enerji": "zap",
-    "bomba": "bomb", "silah": "pistol", "bicak": "knife", "cekic": "hammer",
-    "ingiliz anahtari": "wrench", "temizlik": "soap sponge broom", "tuvalet": "toilet",
-    "banyo": "bath shower", "polis": "police", "doktor": "health worker doctor",
-    "asci": "cook chef", "ogretmen": "teacher", "yazilim": "technologist computer",
-    "grafik": "chart", "artis": "chart increasing", "dusus": "chart decreasing",
-    "takvim": "calendar", "posta": "mail envelope", "mektup": "envelope", "kutu": "package box",
-    "cop": "wastebasket trash", "pil": "battery", "buyutec": "magnifying",
-    "mikrofon": "microphone", "kulaklik": "headphone", "hoparlor": "speaker loud",
-    "zil": "bell", "gemi": "ship boat", "tren": "train", "bisiklet": "bicycle bike",
-    "motor": "motorcycle", "otobus": "bus", "dunya": "earth globe world", "harita": "map",
-    "cadir": "tent camping", "dag": "mountain", "plaj": "beach", "sehir": "city",
-    "gece": "night", "gokkusagi": "rainbow", "bulut": "cloud", "ruzgar": "wind",
-    "sicak": "hot fire", "soguk": "cold freezing"
-  };
-
-  var emojiKatalog = null;     // katalog.json — 3770 emoji, kategoriler, sheet koordinatları
-  var emojiEsleme = null;      // 51 Twemoji SVG (çevrimdışı yedek)
-  var emojiMod = "metin";
-  var emojiSetAdi = "apple";   // apple | twitter — spritesheet seçimi
-  var emojiKatSecim = -1;      // -1 = tümü
-  var emojiSheetCss = null;    // hazır sheet'in CSS url'i
-  var emojiGeo = null;         // { cols, rows } sprite geometrisi
-  var sonSegmentGirdisi = null;
-
-  function trAksansiz(s) {
-    return String(s).toLocaleLowerCase("tr")
-      .replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s")
-      .replace(/ı/g, "i").replace(/ö/g, "o").replace(/ç/g, "c");
-  }
-
-  function emojiDizini() {
-    return nodeVarMi() ? K.path.join(uzantiDizini(), "emoji") : "emoji";
-  }
-  function nodeVarMi() { return !!(K && K.nodeOK); }
-
-  async function emojiEslemeYukle() {
-    if (emojiEsleme) return emojiEsleme;
-    try {
-      if (nodeVarMi()) {
-        emojiEsleme = JSON.parse(K.fs.readFileSync(K.path.join(emojiDizini(), "esleme.json"), "utf8"));
-      } else {
-        emojiEsleme = await (await fetch("emoji/esleme.json")).json();
-      }
-    } catch (e) {
-      K.log("[emoji] esleme yuklenemedi: " + e.message);
-      emojiEsleme = {};
-    }
-    return emojiEsleme;
-  }
-
-  async function emojiKatalogYukle() {
-    if (emojiKatalog) return emojiKatalog;
-    try {
-      if (nodeVarMi()) {
-        emojiKatalog = JSON.parse(K.fs.readFileSync(K.path.join(emojiDizini(), "katalog.json"), "utf8"));
-      } else {
-        emojiKatalog = await (await fetch("emoji/katalog.json")).json();
-      }
-      /*
-       * Geometri TAHMİNİ (gerçek ölçüm sheet yüklenince yapılır): katalogdan
-       * maxX+1 sütun saymak YANILTIR — Apple görseli olmayan hücreler katalog
-       * dışı kalınca sütun eksik sayılıyor ve sprite'lar yarım hücre kayıyordu.
-       */
-      var mx = 0, my = 0;
-      emojiKatalog.emojiler.forEach(function (e) {
-        if (e.x > mx) mx = e.x;
-        if (e.y > my) my = e.y;
-      });
-      emojiGeo = { cols: mx + 1, rows: my + 1 };
-    } catch (e) {
-      K.log("[emoji] katalog yuklenemedi: " + e.message);
-      emojiKatalog = null;
-    }
-    return emojiKatalog;
-  }
-
-  function emojiDurum(metin, oran) {
-    var kutu = el("cap-emoji-durum");
-    if (!kutu) return;
-    kutu.hidden = !metin;
-    el("cap-emoji-durum-metin").textContent = metin || "";
-    var bar = el("cap-emoji-durum-bar");
-    if (bar) bar.style.width = (oran != null ? Math.round(oran * 100) : 0) + "%";
-  }
-
-  /*
-   * Spritesheet: Apple/Twemoji çizimleri TELİF nedeniyle pakete konamaz
-   * (Apple'ın emoji sanatı Apple'ın eseridir). Panel seti ilk kullanımda
-   * KULLANICININ makinesine indirir — ffmpeg ve Whisper modeliyle aynı
-   * model; repo yalnız MIT lisanslı metadata taşır. Tek dosya (20 MB),
-   * 3770 ayrı istek değil.
-   */
-  async function emojiSheetHazirla() {
-    var url = emojiKatalog.sheet.url.replace("-apple", "-" + emojiSetAdi).replace("/apple/", "/" + emojiSetAdi + "/");
-    if (!nodeVarMi()) { emojiSheetCss = url; return; }   // tarayıcı önizlemesi: doğrudan CDN
-
-    var hedef = K.path.join(K.emojiSetDir(), emojiSetAdi + "-64.png");
-    var varMi = false;
-    try { varMi = K.fs.existsSync(hedef) && K.fs.statSync(hedef).size > 1000000; } catch (e) {}
-    if (!varMi) {
-      emojiDurum((emojiSetAdi === "apple" ? "Apple" : "Twemoji") +
-        " emoji seti indiriliyor (~20 MB, tek seferlik)…", 0);
-      var d = await K.download(url, hedef, function (f) {
-        emojiDurum("Emoji seti indiriliyor… %" + Math.round(f * 100), f);
-      }, 0, undefined, { key: "emoji:" + emojiSetAdi });
-      if (!d.ok) throw new Error(d.error || "emoji seti indirilemedi");
-    }
-    emojiDurum("");
-    emojiSheetCss = "file:///" + hedef.replace(/\\/g, "/");
-  }
-
-  /* Gerçek sütun/satır sayısı görselin kendisinden: hücre aralığı 66px (64+2 pay) */
-  function emojiGeoOlc() {
-    return new Promise(function (resolve) {
-      var img = new Image();
-      img.onload = function () {
-        var c = Math.round(img.naturalWidth / 66);
-        var r = Math.round(img.naturalHeight / 66);
-        if (c > 0 && r > 0) emojiGeo = { cols: c, rows: r };
-        resolve();
-      };
-      img.onerror = function () { resolve(); };   // katalog tahminiyle devam
-      img.src = emojiSheetCss;
-    });
-  }
-
-  function emojiKatCiz() {
-    var kutu = el("cap-emoji-kats");
-    if (!kutu || !emojiKatalog) return;
-    kutu.innerHTML = "";
-    var sayilar = {};
-    emojiKatalog.emojiler.forEach(function (e) { sayilar[e.g] = (sayilar[e.g] || 0) + 1; });
-
-    function cip(ad, deger, sayi) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = ad;
-      if (sayi) {
-        var n = document.createElement("b");
-        n.textContent = String(sayi);
-        b.appendChild(n);
-      }
-      if (deger === emojiKatSecim) b.className = "on";
-      b.addEventListener("click", function () {
-        emojiKatSecim = deger;
-        el("cap-emoji-ara").value = "";
-        emojiKatCiz();
-        emojiGridCiz();
-      });
-      kutu.appendChild(b);
-    }
-    cip("Tümü", -1, emojiKatalog.emojiler.length);
-    emojiKatalog.kategoriler.forEach(function (ad, i) { cip(ad, i, sayilar[i] || 0); });
-  }
-
-  function emojiHucre(e) {
-    var b = document.createElement("button");
-    b.type = "button";
-    b.title = e.n.split(" ").slice(0, 4).join(" ");
-    var s = document.createElement("span");
-    s.className = "em";
-    /*
-     * Yüzde tabanlı sprite konumlama: piksel tabanlı ofset, kesirli ölçekte
-     * hücre hücre kayma biriktiriyordu (her emoji yarım görünüyordu).
-     * bg-size = kolon*%100 iken pozisyon x/(kolon-1) tam hücre başına düşer —
-     * ölçekten bağımsız, kaymasız.
-     */
-    s.style.backgroundImage = "url('" + emojiSheetCss + "')";
-    s.style.backgroundSize = (emojiGeo.cols * 100) + "% " + (emojiGeo.rows * 100) + "%";
-    s.style.backgroundPosition =
-      (e.x * 100 / (emojiGeo.cols - 1)) + "% " + (e.y * 100 / (emojiGeo.rows - 1)) + "%";
-    b.appendChild(s);
-    b.addEventListener("click", function () { emojiSec(e.c, e); });
-    return b;
-  }
-
-  function emojiGridCiz() {
-    var grid = el("cap-emoji-grid");
-    if (!grid) return;
-    grid.innerHTML = "";
-
-    /* Katalog ya da sheet yoksa: 51 Twemoji SVG ile çevrimdışı yedek */
-    if (!emojiKatalog || !emojiSheetCss) {
-      if (!emojiEsleme) return;
-      Object.keys(emojiEsleme).forEach(function (ch) {
-        var b = document.createElement("button");
-        b.type = "button";
-        var img = document.createElement("img");
-        img.alt = ch;
-        img.src = (nodeVarMi() ? "file:///" + emojiDizini().replace(/\\/g, "/") + "/" : "emoji/") + emojiEsleme[ch];
-        b.appendChild(img);
-        b.addEventListener("click", function () { emojiSec(ch); });
-        grid.appendChild(b);
-      });
-      return;
-    }
-
-    var sorgu = trAksansiz(el("cap-emoji-ara").value).trim();
-    var jetonlar = sorgu ? sorgu.split(/\s+/).map(function (j) {
-      return EMOJI_TR[j] ? j + " " + EMOJI_TR[j] : j;   // TR köprüsü: her jeton EN karşılıklarıyla genişler
-    }) : [];
-
-    var parca = document.createDocumentFragment();
-    var sonKat = -9;
-    var sayi = 0;
-    for (var i = 0; i < emojiKatalog.emojiler.length; i++) {
-      var e = emojiKatalog.emojiler[i];
-      if (!sorgu && emojiKatSecim !== -1 && e.g !== emojiKatSecim) continue;
-      if (sorgu) {
-        var metin = e.n + " " + (EMOJI_ARAMA[e.c] || "");
-        var uydu = true;
-        for (var j = 0; j < jetonlar.length; j++) {
-          var secenekler = jetonlar[j].split(" ");
-          var biri = false;
-          for (var k = 0; k < secenekler.length; k++) {
-            if (secenekler[k] && metin.indexOf(secenekler[k]) !== -1) { biri = true; break; }
-          }
-          if (!biri) { uydu = false; break; }
-        }
-        if (!uydu) continue;
-      }
-      // "Tümü" görünümünde kategori başlıkları (aramada gereksiz)
-      if (!sorgu && emojiKatSecim === -1 && e.g !== sonKat) {
-        sonKat = e.g;
-        var bas = document.createElement("div");
-        bas.className = "emoji-baslik";
-        bas.textContent = emojiKatalog.kategoriler[e.g];
-        parca.appendChild(bas);
-      }
-      parca.appendChild(emojiHucre(e));
-      sayi++;
-    }
-    grid.appendChild(parca);
-    if (sorgu && sayi === 0) {
-      var yok = document.createElement("div");
-      yok.className = "emoji-baslik";
-      yok.textContent = "Sonuç yok — İngilizce de deneyebilirsin (fire, heart…)";
-      grid.appendChild(yok);
-    }
-  }
-
-  function emojiSec(ch, giris) {
-    if (emojiMod === "sahne") { emojiSahneyeBirak(ch, giris); return; }
-    var inp = sonSegmentGirdisi;
-    if (!inp || !inp.isConnected) {
-      KApp.toast("Önce listeden bir altyazı satırına tıkla.", "warn");
-      return;
-    }
-    var i = parseInt(inp.dataset.i, 10);
-    var bas = inp.selectionStart != null ? inp.selectionStart : inp.value.length;
-    var son = inp.selectionEnd != null ? inp.selectionEnd : bas;
-    // emoji ile metin arasında boşluk bırak: "kelime🔥" değil "kelime 🔥"
-    var sol = inp.value.slice(0, bas);
-    var ek = (sol && !/\s$/.test(sol) ? " " : "") + ch;
-    inp.value = sol + ek + inp.value.slice(son);
-    if (!isNaN(i) && segments[i]) { segments[i].text = inp.value; saveDraftSoon(); }
-    inp.focus();
-    var yeniKonum = bas + ek.length;
-    try { inp.setSelectionRange(yeniKonum, yeniKonum); } catch (e) {}
-    onizlemeCiz();
-  }
-
-  /*
-   * Emoji -> 512px şeffaf PNG -> playhead'e grafik klip. Üç çizim yolu,
-   * kalite sırasıyla:
-   *   1) Sistem emoji fontu canvas'ta (Mac: Apple Color Emoji = GERÇEK Apple
-   *      çizimi, her boyutta net; Win: Segoe UI Emoji). Piksel sayımıyla
-   *      doğrulanır — eski CEF'lerde renkli font çizilemeyebiliyor.
-   *   2) Paketteki 51 Twemoji SVG'den biriyse: vektörden 512'ye, net.
-   *   3) İndirilen spritesheet'in 64px hücresi büyütülür (yumuşatmalı; en son çare).
-   */
-  function emojiPikselVarMi(ctx) {
-    var v = ctx.getImageData(96, 96, 320, 320).data;
-    var dolu = 0;
-    for (var i = 3; i < v.length; i += 4) { if (v[i] > 8) dolu++; }
-    return dolu > 400;
-  }
-
-  async function emojiSahneyeBirak(ch, giris) {
-    if (!nodeVarMi()) { KApp.toast("Sahneye bırakma yalnız Premiere içinde çalışır.", "warn"); return; }
-    try {
-      var c = document.createElement("canvas");
-      c.width = 512; c.height = 512;
-      var ctx = c.getContext("2d");
-
-      // 1) sistem emoji fontu
-      ctx.font = "440px \"Apple Color Emoji\",\"Segoe UI Emoji\",\"Noto Color Emoji\",sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(ch, 256, 276);
-
-      if (!emojiPikselVarMi(ctx)) {
-        ctx.clearRect(0, 0, 512, 512);
-        var svgAd = emojiEsleme && emojiEsleme[ch];
-        if (svgAd) {
-          // 2) paket Twemoji SVG
-          var svg = K.fs.readFileSync(K.path.join(emojiDizini(), svgAd), "utf8");
-          await new Promise(function (resolve, reject) {
-            var img = new Image();
-            img.onload = function () { ctx.drawImage(img, 0, 0, 512, 512); resolve(); };
-            img.onerror = function () { reject(new Error("SVG çizilemedi")); };
-            img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-          });
-        } else if (emojiSheetCss && giris) {
-          // 3) spritesheet hücresi
-          await new Promise(function (resolve, reject) {
-            var img = new Image();
-            img.onload = function () {
-              ctx.imageSmoothingEnabled = true;
-              ctx.drawImage(img, giris.x * 66 + 1, giris.y * 66 + 1, 64, 64, 0, 0, 512, 512);
-              resolve();
-            };
-            img.onerror = function () { reject(new Error("sheet okunamadı")); };
-            img.src = emojiSheetCss;
-          });
-        } else {
-          throw new Error("bu emoji çizilemedi");
-        }
-      }
-
-      var kod = Array.from(ch).map(function (k) {
-        return k.codePointAt(0).toString(16);
-      }).join("-");
-      var hedef = K.path.join(K.srtDir(), "emoji-" + kod + ".png");
-      K.fs.mkdirSync(K.path.dirname(hedef), { recursive: true });
-      K.fs.writeFileSync(hedef, c.toDataURL("image/png").split(",")[1], "base64");
-
-      var r = await K.call("KS_placeGraphic", { path: hedef, dur: 1.6, name: "Emoji " + ch }, 60000);
-      if (!r.ok) throw new Error(r.error);
-      KApp.toast(ch + " " + r.trackName + " katmanına, playhead'e bırakıldı", "good");
-    } catch (e) {
-      KApp.toast("Emoji bırakılamadı: " + e.message, "bad");
-    }
-  }
-
-  async function emojiPaneliDoldur() {
-    await emojiEslemeYukle();          // çevrimdışı yedek her koşulda hazır olsun
-    await emojiKatalogYukle();
-    if (emojiKatalog) {
-      try {
-        await emojiSheetHazirla();
-        await emojiGeoOlc();
-      } catch (e) {
-        K.log("[emoji] sheet hazirlanamadi: " + e.message);
-        emojiDurum("Set indirilemedi — çevrimdışı yedek gösteriliyor (51 emoji).");
-        emojiSheetCss = null;
-      }
-    }
-    emojiKatCiz();
-    emojiGridCiz();
-  }
-
-  function initEmoji() {
-    var ac = el("cap-emoji-ac");
-    var panel = el("cap-emoji-panel");
-    if (!ac || !panel) return;
-
-    try { emojiSetAdi = K.settings().emojiSet || "apple"; } catch (e) {}
-    var setSec = el("cap-emoji-set");
-    if (setSec) setSec.value = emojiSetAdi;
-
-    ac.addEventListener("click", async function (e) {
-      e.stopPropagation();
-      if (panel.hidden) {
-        panel.hidden = false;
-        el("cap-emoji-ara").focus();
-        await emojiPaneliDoldur();
-      } else panel.hidden = true;
-    });
-    document.addEventListener("click", function (e) {
-      if (!panel.hidden && !panel.contains(e.target) && e.target !== ac) panel.hidden = true;
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && !panel.hidden) panel.hidden = true;
-    });
-
-    var araZaman = null;
-    el("cap-emoji-ara").addEventListener("input", function () {
-      if (araZaman) clearTimeout(araZaman);
-      araZaman = setTimeout(emojiGridCiz, 120);   // 3770 hücreyi her tuşta değil, nefes alınca çiz
-    });
-
-    if (setSec) {
-      setSec.addEventListener("change", async function () {
-        emojiSetAdi = setSec.value;
-        emojiSheetCss = null;
-        try {
-          var s = K.settings();
-          s.emojiSet = emojiSetAdi;
-          K.saveSettings();
-        } catch (e) {}
-        try {
-          await emojiSheetHazirla();
-          await emojiGeoOlc();
-        } catch (e2) { emojiDurum("Set indirilemedi: " + e2.message); }
-        emojiGridCiz();
-      });
-    }
-
-    Array.prototype.forEach.call(el("cap-emoji-mod").querySelectorAll("button"), function (b) {
-      b.addEventListener("click", function () {
-        Array.prototype.forEach.call(el("cap-emoji-mod").querySelectorAll("button"), function (x) {
-          x.classList.remove("on");
-        });
-        b.classList.add("on");
-        emojiMod = b.dataset.m;
-        el("cap-emoji-hint").textContent = emojiMod === "sahne"
-          ? "Playhead'e grafik klip olarak iner · Mac'te gerçek Apple çizimi"
-          : "Seçili satıra eklenir · görseller kullanıcı makinesine indirilir";
-      });
-    });
-
-    // hangi satırın aktif olduğunu izle (emoji oraya girer)
-    el("cap-segments").addEventListener("focusin", function (e) {
-      if (e.target && e.target.tagName === "INPUT" && e.target.dataset.i !== undefined) {
-        sonSegmentGirdisi = e.target;
-      }
-    });
-  }
-
-  // Astral (surrogate) karakter = pratikte emoji. Stilli katman yolunun bekçisi.
   function emojiIceriyorMu() {
     for (var i = 0; i < segments.length; i++) {
       /*
@@ -4080,20 +3975,19 @@ window.KCaptions = (function () {
       var kelimeModu = segmentsMode === "k1" || segmentsMode === "w"; // kc haric: ASS'te metin katlaniyordu
       var icerik, ad, bom = "﻿";
       if (fmt === "txt") {
-        var lines = segments.map(function (s) { return styleText(s.text); }).filter(Boolean);
+        var lines = segments.map(function (s) { return styleText(CT.stripEmphasis(s.text)); }).filter(Boolean);
         if (!lines.length) { KApp.toast("Yazılacak metin yok.", "bad"); return; }
         icerik = lines.join("\r\n");
         ad = "suflo-transkript.txt";
       } else if (fmt === "vtt") {
-        icerik = buildVtt();
+        icerik = buildVtt({ ciftDil: ciftDilAcik() });
         ad = "suflo-altyazi.vtt";
       } else if (fmt === "ass") {
         if (typeof Pro !== "undefined" && !Pro.gate("assexport")) return;    // Pro: stilli ASS
         var assStil = stil();
-        var yeniAss = { mrbeast: true, capcut: true, saas: true, viral: true, pop: true, doc: true, premium: true };
-        if (window.SufloStyleEngine && yeniAss[assStil.aile]) {
+        if (motorStiliMi(assStil.aile)) {
           icerik = window.SufloStyleEngine.compile({
-            styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler(),
+            styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler({ vurgu: true }), cueKind: motorCueTuru(),
             overrides: {
               font: assStil.font, fontFile: FONTLAR[assStil.font], boyut: assStil.boyut,
               renk: assStil.renk, konturRenk: assStil.konturRenk,
@@ -4106,7 +4000,7 @@ window.KCaptions = (function () {
         ad = "suflo-altyazi.ass";
         bom = "";
       } else {
-        icerik = buildSrt();
+        icerik = buildSrt({ ciftDil: ciftDilAcik() });
         ad = "suflo-altyazi.srt";
       }
       if (!icerik) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
@@ -4128,6 +4022,7 @@ window.KCaptions = (function () {
     el("cap-import-srt").addEventListener("click", function (e) { e.preventDefault(); importSrt(); });
     el("cap-preset-save").addEventListener("click", saveUserPreset);
     el("cap-translate-go").addEventListener("click", translateAll);
+    if (el("cap-paket-go")) el("cap-paket-go").addEventListener("click", cokDilliPaket);
     el("cap-revert").addEventListener("click", revertTranslate);
     el("cap-fr-go").addEventListener("click", findReplace);
     el("cap-fr-glossary").addEventListener("click", addToGlossary);
@@ -4146,6 +4041,12 @@ window.KCaptions = (function () {
       applyEditorFilters();
     });
     if (el("cap-auto-fix")) el("cap-auto-fix").addEventListener("click", qualityAutoFix);
+    if (el("cap-auto-emoji")) el("cap-auto-emoji").addEventListener("click", otomatikEmoji);
+    if (el("cap-auto-vurgu")) el("cap-auto-vurgu").addEventListener("click", otomatikVurgu);
+    if (el("cap-guvenli-alan")) el("cap-guvenli-alan").addEventListener("change", function () {
+      var v = el("cap-render-onizleme");
+      if (v && !v.hidden) { onizlemeDurdur(); motorOnizlemeOynat(); }
+    });
     if (el("cap-proofread")) el("cap-proofread").addEventListener("click", proofreadAll);
     if (el("cap-learn-last")) el("cap-learn-last").addEventListener("click", learnLastCorrection);
     if (el("cap-history")) el("cap-history").addEventListener("click", function () {
@@ -4155,7 +4056,16 @@ window.KCaptions = (function () {
     });
     initYildizBar();
     initStilKartlari();
-    initEmoji();
+    motorStilleriniCiz();
+    // Emoji seçici ayrı modülde (js/emoji-picker.js); altyazı durumuna bu arayüzle bağlanır
+    if (window.KEmojiPicker) {
+      KEmojiPicker.init({
+        segments: function () { return segments; },
+        kaydet: saveDraftSoon,
+        onizle: onizlemeCiz,
+        uzantiDizini: uzantiDizini
+      });
+    }
     // acilista secili sablonu kartlara yansit
     if (el("cap-preset") && el("cap-preset").value) stilKartiIsaretle(el("cap-preset").value);
 
@@ -4173,9 +4083,11 @@ window.KCaptions = (function () {
         vurguKutusuDurumu();     // animasyon değişince ipucu ve vurgu rengi durumu
         onizlemeCiz();
         savePrefs();
-        // stil elle değiştiyse artık hazır şablonda değiliz
+        // stil elle değiştiyse artık hazır şablonda değiliz; aile hâlâ bir Suflo
+        // stiliyse o stil (ince ayarlı haliyle) seçili kalır ve kartı işaretli görünür
         if (el("cap-preset")) el("cap-preset").value = "";
-        stilKartiIsaretle("");
+        secilenMotorStili = motorStiliMi(stil().aile) ? stil().aile : "";
+        stilKartiIsaretle(secilenMotorStili);
         uygulamaIpucunuGuncelle();
       });
     });
@@ -4278,8 +4190,10 @@ window.KCaptions = (function () {
     stilKartiIsaretle(el("cap-preset").value);
     uygulamaIpucunuGuncelle();
 
+    if (el("cap-shorts-al")) el("cap-shorts-al").addEventListener("click", shortsAltyazisiAl);
     var sonSekans = null;
     KApp.onContext(function (ctx) {
+      shortsDugmesi(ctx);
       // başka sekansa geçildiyse bekleyen "yine de ekle" onayı düşsün
       if (ctx.sequence !== sonSekans) { sonSekans = ctx.sequence; uygulaEtiketiniSifirla(); }
       refreshButton();
@@ -4291,11 +4205,65 @@ window.KCaptions = (function () {
     refreshSetup();
   }
 
+  /*
+   * Suflo Shorts sekansi acikken: ana videonun transkriptinden o anin satirlari
+   * (viral.js olustururken K.settings().shortsAltyazi'ya yazar) yeniden yaziya
+   * dokmeden yuklenir.
+   */
+  var shortsYuklenen = "";
+  function shortsKaydi(ctx) {
+    var id = ctx && ctx.sequenceId;
+    var harita = (K.settings().shortsAltyazi) || {};
+    return id && harita[id] ? { id: String(id), kayit: harita[id] } : null;
+  }
+  // Shorts transkriptindeki duzenlemeler kendi kaydina (ayarlar) yazilir; ana taslak korunur
+  function shortsKaydiGuncelle() {
+    var s = K.settings();
+    var harita = s.shortsAltyazi || {};
+    if (!harita[shortsYuklenen]) return;
+    harita[shortsYuklenen].segs = JSON.parse(JSON.stringify(segments));
+    harita[shortsYuklenen].mod = segmentsMode;
+    harita[shortsYuklenen].ceviriDili = ceviriDili;
+    harita[shortsYuklenen].ts = Date.now();
+    K.saveSettings();
+  }
+
+  function shortsDugmesi(ctx) {
+    var b = el("cap-shorts-al");
+    if (!b) return;
+    var k = shortsKaydi(ctx);
+    var goster = !!k && k.kayit.segs && k.kayit.segs.length && shortsYuklenen !== k.id;
+    b.hidden = !goster;
+    if (goster) b.textContent = "Bu Shorts'un altyazısını ana videodan al (" + k.kayit.segs.length + " satır)";
+  }
+  function shortsAltyazisiAl() {
+    var k = shortsKaydi(KApp.ctx());
+    if (!k) return;
+    cancelDraft();   // bekleyen ana-video taslak yazimi Shorts satirlariyla calismasin
+    if (segments.length) snapshot("Shorts altyazısı");
+    else { undoStack.length = 0; redoStack.length = 0; refreshUndoUI(); }
+    segments = JSON.parse(JSON.stringify(k.kayit.segs));
+    segmentsMode = k.kayit.mod || "plain";
+    shortsYuklenen = k.id;
+    // ceviri bilgisi satirlarda (orig) kalir; hedef dil kayittan
+    ceviriDili = k.kayit.ceviriDili || "";
+    hideRestore();
+    el("cap-result").hidden = false;
+    el("cap-result-info").textContent = segments.length + " satır · Shorts (ana videodan)";
+    render();
+    shortsDugmesi(KApp.ctx());
+    KApp.toast("Altyazı yüklendi: " + segments.length + " satır · yeniden yazıya dökmeye gerek yok", "good");
+  }
+
   // Diger moduller (ornegin Akilli SFX) transkripti okuyabilsin; asil dizi
   // disaridan degistirilemesin diye yalnizca sade bir kopya verilir.
+  // vurgu: kullanicinin *isaretledigi* ilk kelime ve tahmini ani (Zoom / Akilli SFX kullanir)
   function segmentsSnapshot() {
     return segments.map(function (s) {
-      return { start: Number(s.start) || 0, end: Number(s.end) || 0, text: String(s.text || "") };
+      var o = { start: Number(s.start) || 0, end: Number(s.end) || 0, text: CT.stripEmphasis(String(s.text || "")) };
+      var v = CT.emphasisInfo(s);
+      if (v) o.vurgu = v;
+      return o;
     });
   }
 
@@ -4305,6 +4273,17 @@ window.KCaptions = (function () {
     glossaryText: glossaryText,
     parseGlossary: parseGlossary,
     getSegments: segmentsSnapshot,
+    translationLang: function () { return ceviriDili; },
+    // Shorts sekanslari icin ham satirlar (*vurgu* ve orig korunur) ve mod
+    rawSegments: function () { return JSON.parse(JSON.stringify(segments)); },
+    mode: function () { return segmentsMode; },
+    refreshEngineStyles: motorStilleriniCiz,
+    transcribeWords: transcribeWords,
+    // Bulut LLM (Groq/OpenAI) — ceviri ile ayni ayar ve anahtar
+    chatConfig: chatConfig,
+    chatCall: chatCall,
+    // Bolum/viral basliklari ekrandaki metnin dilinde: ceviri varsa hedef dil
+    language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr"; },
     refreshMogrtStyles: refreshMogrtStyles
   };
 })();

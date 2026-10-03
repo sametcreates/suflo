@@ -41,7 +41,7 @@ function Test-Archive([string]$path, [string]$kind) {
     $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $path))
     try {
         $names = @($zip.Entries | ForEach-Object FullName)
-        $paid = @($names | Where-Object { $_ -match '\.(mogrt|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' })
+        $paid = @($names | Where-Object { $_ -match '\.(mogrt|prfpset|mov|mp4|m4v|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' })
         $private = @($names | Where-Object { $_ -match '(^|/)(private|server)(/|$)|(^|/)config\.php$' })
         $badSeparators = @($names | Where-Object { $_ -match '\\' })
         $required = @(

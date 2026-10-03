@@ -47,8 +47,10 @@ var kod = [
  * (DOM okur) burada varsayilan gorunumle taklit edilir — bu dosya BICIM
  * dogrulugunu olcuyor, gorunum dogrulugu tests/test-stil.js'in isi.
  */
+globalThis.__SufloCT = require(require("path").join(__dirname, "..", "js", "caption-text.js"));
 var f = new Function("SEGMENTS", "STYLE", `
   var segments = SEGMENTS;
+  var CT = globalThis.__SufloCT;
   function styleText(t) { return STYLE(t); }
   function stil() {
     return { font: "Arial", boyut: 72, renk: "#ffffff", konturRenk: "#000000",
@@ -142,6 +144,19 @@ chk("karaoke: satir suresi ilk kelimeden son kelimeye",
 
 /* ---------------- 3) Kacis ve Turkce ---------------- */
 var ozel = f([{ start: 0, end: 1, text: "sus{lu} ve \u00e7\u0131k\u0131\u015f" }], duz);
+
+/* ---- 3.0: cift dilli altyazi (orijinal + ceviri) ---- */
+var cift = f([
+  { start: 0, end: 1, text: "Hello friends", orig: "Merhaba arkadaşlar" },
+  { start: 1, end: 2, text: "Same", orig: "Same" },
+  { start: 2, end: 3, text: "Not translated" }
+], duz);
+var ciftSrt = cift.buildSrt({ ciftDil: true });
+chk("cift dilli SRT: ust satir orijinal, alt satir ceviri", ciftSrt.indexOf("Merhaba arkadaşlar\nHello friends") !== -1, JSON.stringify(ciftSrt.slice(0, 80)));
+chk("cift dilli: ayni metin iki kez yazilmaz", ciftSrt.indexOf("Same\nSame") === -1);
+chk("cift dilli: cevirisi olmayan satir tek satir", ciftSrt.indexOf("Not translated") !== -1 && ciftSrt.indexOf("\nNot translated\n") === -1 || /3\r\n[^\r]*\r\nNot translated\r\n/.test(ciftSrt));
+chk("varsayilan (secenek yok) tek dilli", cift.buildSrt().indexOf("Merhaba") === -1);
+chk("cift dilli VTT", cift.buildVtt({ ciftDil: true }).indexOf("Merhaba arkadaşlar\nHello friends") !== -1);
 var oass = ozel.buildAss({});
 chk("ASS: susly parantez kacirildi", /sus\\\{lu\\\}/.test(oass), (oass.match(/^Dialogue.*/m) || [""])[0]);
 chk("ASS: Turkce karakterler korundu", /\u00e7\u0131k\u0131\u015f/.test(oass));

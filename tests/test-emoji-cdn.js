@@ -33,7 +33,13 @@ var catalog = JSON.parse(fs.readFileSync(path.join(out, "catalog.json"), "utf8")
 ok("katalog semasi ve adet dogru", catalog.schema === "suflo-emoji-catalog/v1" && catalog.count === 2, catalog.count);
 ok("asil dosyalar CDN donusumunu engelleyen guvenli akistan geliyor",
   catalog.items.every(function (x) { return /^download\.php\?file=/.test(x.file); }), catalog.items[0].file);
-ok("kartlar icin hafif thumbnail uretiliyor", catalog.items.every(function (x) { return /^thumbs\//.test(x.preview); }), catalog.items[0].preview);
+// Thumbnail ffmpeg ile uretilir; ffmpeg yoksa arac bilerek asil dosyaya duser
+var ffmpegVar = !cp.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error;
+if (ffmpegVar) {
+  ok("kartlar icin hafif thumbnail uretiliyor", catalog.items.every(function (x) { return /^thumbs\//.test(x.preview); }), catalog.items[0].preview);
+} else {
+  ok("ffmpeg yokken onizleme asil dosyaya duser", catalog.items.every(function (x) { return x.preview && x.preview === x.file || /^assets\//.test(x.preview); }), catalog.items[0].preview);
+}
 ok("SHA-256 katalogdaki dosyayla eslesiyor", catalog.items.every(function (x) {
   var name = decodeURIComponent(String(x.file).replace(/^download\.php\?file=/, ""));
   return x.sha256 === sha(path.join(out, "assets", name));

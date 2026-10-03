@@ -10,7 +10,8 @@ var KOKYOL = require("path").join(__dirname, "..").split("\\").join("/") + "/";
 var fs = require("fs");
 
 var app = fs.readFileSync(KOKYOL + "js/app.js", "utf8");
-var yml = fs.readFileSync(KOKYOL + ".github/ISSUE_TEMPLATE/hata-bildirimi.yml", "utf8");
+// Windows checkout'u CRLF getirebilir; satir sonlarini normalle
+var yml = fs.readFileSync(KOKYOL + ".github/ISSUE_TEMPLATE/hata-bildirimi.yml", "utf8").replace(/\r\n/g, "\n");
 
 var gecti = 0, kaldi = 0;
 function ok(ad, kosul, kanit) {

@@ -71,7 +71,10 @@ var ctx = {
     whisperLocal: function (opts) { return { exe: ENGINE, model: opts && opts.skipModel ? null : MODEL, dir: path.dirname(ENGINE) }; },
     findFfmpeg: async function () { return ffmpegReady ? FFMPEG : null; },
     run: async function () { return { code: 0, stdout: "ok", stderr: "" }; },
-    call: async function () { return { ok: true, app: "26.3.0", hasSeq: true, sequence: "Doctor Test" }; },
+    call: async function (fn) {
+      if (fn === "KS_apiProbe") return { ok: true, app: "26.3.0", seq: true, subsequence: true, autoReframe: true, qe: true, qeAddTracks: true, markers: true, trackItemDisabled: true, trackMuted: true };
+      return { ok: true, app: "26.3.0", hasSeq: true, sequence: "Doctor Test" };
+    },
     httpGet: async function () { return { status: 200, body: JSON.stringify({ tag_name: "v2.8.6" }) }; },
     hataYardimi: function (e) { return String(e && e.message ? e.message : e); },
     log: function () {}

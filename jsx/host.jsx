@@ -14,7 +14,12 @@ if (typeof KJSON === "undefined") {
       if (t === "boolean") return String(v);
       if (t === "string") {
         var s = v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-                 .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+                 .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
+                 // diger kontrol karakterleri (klip adinda olabilir) JSON'u bozmasin
+                 .replace(/[\x00-\x1f\x7f\u2028\u2029]/g, function (c) {
+                   var h = c.charCodeAt(0).toString(16);
+                   return "\\u" + "0000".substr(h.length) + h;
+                 });
         return '"' + s + '"';
       }
       if (v instanceof Array) {
@@ -46,7 +51,11 @@ if (typeof KJSON === "undefined") {
 
 function KS_arg(encoded) {
   if (!encoded) return {};
-  try { return KJSON.parse(decodeURIComponent(encoded)); } catch (e) { return {}; }
+  var text = decodeURIComponent(encoded);
+  // Argumansiz K.call "undefined"/"null" gonderir: bos nesne
+  if (text === "undefined" || text === "null" || text === "") return {};
+  // Bozuk arguman sessizce {} olup yaniltici hatalara yol acmasin: acikca hata ver
+  try { return KJSON.parse(text); } catch (e) { throw new Error("Panelden gelen arguman okunamadi."); }
 }
 function KS_ok(data) { data = data || {}; data.ok = true; return KJSON.stringify(data); }
 function KS_err(msg) { return KJSON.stringify({ ok: false, error: String(msg) }); }
@@ -116,6 +125,8 @@ function KS_getContext() {
       app: String(app.version),
       project: app.project ? String(app.project.name) : "",
       sequence: seq ? String(seq.name) : "",
+      // Ad tekil degil (iki "Sequence 01" olabilir): durum anahtarlari icin kimlik
+      sequenceId: seq ? String(seq.sequenceID) : "",
       hasSeq: !!seq,
       sel: null
     };
@@ -155,6 +166,7 @@ function KS_getContext() {
         out.seqIn = ip;
         out.seqOut = op;
         out.seqDur = seq.end ? Number(seq.end) / KS_TPS : 0;
+        try { out.playhead = seq.getPlayerPosition().seconds; } catch (ePH) {}
         out.width = Number(seq.frameSizeHorizontal) || 0;
         out.height = Number(seq.frameSizeVertical) || 0;
       } catch (eIO) {}
@@ -506,6 +518,242 @@ function KS_applyMotionPreset(encoded) {
     }
     if (!applied) return KS_err("Secili klipte uygulanabilir Motion/Opacity ozelligi bulunamadi.");
     return KS_ok({ applied: applied, skipped: skipped, preset: id, removedKeys: KS_presetRemovedCount });
+  } catch (e) { return KS_err(e); }
+}
+
+/* ---------- Kesim gecisleri (v3.0) ---------- */
+
+/*
+ * Playhead'e en yakin kesimde (ayni katmanda A'nin bitip B'nin basladigi an)
+ * iki klibe eslesik keyframe yazar. Plan panelde uretilir (js/transitions.js):
+ *   p.plan = { half, out:{scale,pos,opacity}, in:{...} }
+ *     scale/opacity: [{t, v}] klibin kendi degerinin carpani
+ *     pos: [{t, x, y}] kadraj orani kayma
+ *   p.tolerance: playhead'den en fazla bu kadar uzaktaki kesim (sn)
+ */
+// Yalniz anahtar sil (yenisini yazmadan): [startSec, endSec] KAYNAK zamani
+function KS_presetClearKeys(prop, startSec, endSec) {
+  if (!prop) return 0;
+  var n = 0;
+  try {
+    var existing = prop.getKeys ? prop.getKeys() : null;
+    if (!existing || typeof existing.length !== "number") return 0;
+    var a = Math.min(startSec, endSec), b = Math.max(startSec, endSec);
+    for (var i = existing.length - 1; i >= 0; i--) {
+      var sec = Number(existing[i] && existing[i].seconds !== undefined ? existing[i].seconds : existing[i]);
+      if (sec >= a - 0.002 && sec <= b + 0.002) {
+        try { prop.removeKey(existing[i]); n++; KS_presetRemovedCount++; } catch (eR) {}
+      }
+    }
+  } catch (e) {}
+  return n;
+}
+
+function KS_isGraphicClip(c) {
+  try { if (c.isMGT && c.isMGT()) return true; } catch (eM) {}
+  try { if (!c.projectItem) return true; } catch (eP) {}
+  return false;
+}
+
+function KS_applyCutTransition(encoded) {
+  try {
+    KS_presetRemovedCount = 0;
+    var p = KS_arg(encoded);
+    var plan = p.plan;
+    if (!plan || !(Number(plan.half) > 0)) return KS_err("Gecis plani gecersiz.");
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var playhead = 0;
+    try { playhead = seq.getPlayerPosition().seconds; } catch (eP) {}
+    var tol = Number(p.tolerance);
+    if (!isFinite(tol) || tol <= 0) tol = 1.0;
+    // Bitisiklik toleransi yarim kare: 60 fps'de bir karelik bosluk kesim sayilmasin
+    var kare = Number(seq.timebase) / KS_TPS;
+    var bitisik = isFinite(kare) && kare > 0 ? kare * 0.5 : 0.008;
+    var MAX_HALF = 0.8;   // js/transitions.js'teki en buyuk yari sure
+
+    var secili = [];
+    try { var sa = seq.getSelection(); if (sa) for (var s0 = 0; s0 < sa.length; s0++) secili.push(sa[s0]); } catch (eS) {}
+    function seciliMi(c) {
+      for (var q = 0; q < secili.length; q++) {
+        if (secili[q] === c || (c.nodeId && secili[q].nodeId && String(c.nodeId) === String(secili[q].nodeId))) return true;
+      }
+      return false;
+    }
+
+    // Klipler katman icinde zamana gore sirali: yalniz ardisik ciftler karsilastirilir
+    // (binlerce klipli kesilmis konusmada da hizli). Secim varsa yalniz secili klibe
+    // dokunan kesimler; yoksa altyazi/grafik (MOGRT) sinirlari atlanir.
+    var bestSel = null, bestAny = null;
+    for (var ti = 0; ti < seq.videoTracks.numTracks; ti++) {
+      var track = seq.videoTracks[ti];
+      try { if (track.isLocked && track.isLocked()) continue; } catch (eL) {}
+      var n = track.clips.numItems;
+      var onceki = null;
+      for (var i = 0; i < n; i++) {
+        var c = track.clips[i];
+        var cur = { c: c, s: Number(c.start.seconds), e: Number(c.end.seconds) };
+        if (onceki && Math.abs(onceki.e - cur.s) <= bitisik) {
+          var dist = Math.abs(cur.s - playhead);
+          if (dist <= tol) {
+            var aday = { track: ti, a: onceki.c, b: cur.c, cut: cur.s, dist: dist };
+            if (secili.length && (seciliMi(onceki.c) || seciliMi(cur.c))) {
+              if (!bestSel || dist < bestSel.dist - 0.001) bestSel = aday;
+            } else if (!KS_isGraphicClip(onceki.c) && !KS_isGraphicClip(cur.c)) {
+              if (!bestAny || dist < bestAny.dist - 0.001 || (Math.abs(dist - bestAny.dist) <= 0.001 && ti > bestAny.track)) bestAny = aday;
+            }
+          }
+        }
+        onceki = cur;
+      }
+    }
+    var best = bestSel || bestAny;
+    if (!best) return KS_err("Playhead'in yakininda kesim yok. Playhead'i iki klibin birlestigi yere getir.");
+
+    var aStart = Number(best.a.start.seconds), aEnd2 = Number(best.a.end.seconds);
+    var bStart2 = Number(best.b.start.seconds), bEnd = Number(best.b.end.seconds);
+    var half = Math.min(Number(plan.half), (aEnd2 - aStart) * 0.5, (bEnd - bStart2) * 0.5);
+    if (!(half >= 0.08)) return KS_err("Kesimdeki klipler gecis icin cok kisa.");
+    var oran = half / Number(plan.half);   // klip kisaysa plan zamanda sikistirilir
+    var frameW = Number(seq.frameSizeHorizontal) || 1920;
+    var frameH = Number(seq.frameSizeVertical) || 1080;
+    var cut = best.cut;
+
+    // Onceki bir gecisin (hangi tur olursa olsun) izi kalmasin: bu kesimde herhangi bir
+    // gecisin dokunabilecegi en genis pencere temizlenir, taban degeri onun DISINDAN okunur.
+    var wA = Math.min(MAX_HALF, (aEnd2 - aStart) * 0.5), wB = Math.min(MAX_HALF, (bEnd - bStart2) * 0.5);
+    function temizle(clip, cStart, cEnd, t0, t1) {
+      var props = KS_presetProps(clip);
+      var a = KS_presetSourceTime(clip, t0, cStart, cEnd), b = KS_presetSourceTime(clip, t1, cStart, cEnd);
+      KS_presetClearKeys(props.scale, a, b);
+      KS_presetClearKeys(props.position, a, b);
+      KS_presetClearKeys(props.opacity, a, b);
+    }
+    temizle(best.a, aStart, aEnd2, cut - wA, aEnd2);
+    temizle(best.b, bStart2, bEnd, bStart2, cut + wB);
+
+    // tabanAn: klibin "dinlenme" degerini okuyacagimiz timeline ani (gecis bolgesinin disi).
+    // ValueAt KAYNAK zamani ister: timeline anini klibin kaynak zamanina cevir.
+    function uygula(clip, side, cStart, cEnd, clearA, clearB, tabanAn) {
+      if (!side) return false;
+      var props = KS_presetProps(clip);
+      var changed = false, k, list;
+      var kaynakAn = KS_presetSourceTime(clip, tabanAn, cStart, cEnd);
+      if (side.scale && props.scale) {
+        var sc = KS_presetNumberValueAt(props.scale, kaynakAn, 100);
+        list = [];
+        for (k = 0; k < side.scale.length; k++) list.push({ time: cut + side.scale[k].t * oran, value: sc * Number(side.scale[k].v) });
+        changed = KS_presetClipKeys(clip, cStart, cEnd, props.scale, list, clearA, clearB) || changed;
+      }
+      if (side.opacity && props.opacity) {
+        var op = KS_presetNumberValueAt(props.opacity, kaynakAn, 100);
+        list = [];
+        for (k = 0; k < side.opacity.length; k++) list.push({ time: cut + side.opacity[k].t * oran, value: op * Number(side.opacity[k].v) });
+        changed = KS_presetClipKeys(clip, cStart, cEnd, props.opacity, list, clearA, clearB) || changed;
+      }
+      if (side.pos && props.position) {
+        var pos = KS_presetPositionValueAt(props.position, kaynakAn);
+        if (pos) {
+          // Yeni Premiere surumleri konumu 0..1 normalize tutar; eskiler piksel
+          var norm = Math.abs(pos[0]) <= 2.5 && Math.abs(pos[1]) <= 2.5;
+          var fx = norm ? 1 : frameW, fy = norm ? 1 : frameH;
+          list = [];
+          for (k = 0; k < side.pos.length; k++) {
+            list.push({ time: cut + side.pos[k].t * oran,
+              value: [pos[0] + Number(side.pos[k].x) * fx, pos[1] + Number(side.pos[k].y) * fy] });
+          }
+          changed = KS_presetClipKeys(clip, cStart, cEnd, props.position, list, clearA, clearB) || changed;
+        }
+      }
+      return changed;
+    }
+
+    var outOk = uygula(best.a, plan.out, aStart, aEnd2, cut - half, aEnd2, Math.max(aStart, cut - wA - 0.02));
+    var inOk = uygula(best.b, plan["in"], bStart2, bEnd, bStart2, cut + half, Math.min(bEnd, cut + wB + 0.02));
+    if (!outOk && !inOk) return KS_err("Kesimdeki kliplerde Motion/Opaklik ozelligi bulunamadi.");
+    return KS_ok({ cut: cut, track: best.track + 1, half: half, out: outOk, "in": inOk, removedKeys: KS_presetRemovedCount });
+  } catch (e) { return KS_err(e); }
+}
+
+/* ---------- Secili klibi verilen anlarda bol (sahne / vurus) — v3.0 ---------- */
+
+/*
+ * Yalniz SECILI kliplerin bulundugu katmanlari (bagli ses dahil) keser;
+ * muzik gibi baska katmanlara dokunmaz. Sure secili kliplerin araligi
+ * disindaki anlar atlanir.
+ *   p.times: [sn] sequence zamani
+ *   p.markers: true ise ayrica her ana marker koyar (p.name ile)
+ */
+function KS_splitSelectedAt(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var times = p.times || [];
+    if (!times.length) return KS_err("Bolunecek an yok.");
+    var sel = seq.getSelection();
+    if (!sel || !sel.length) return KS_err("Timeline'da bolunecek klibi sec.");
+
+    // katman -> o katmandaki SECILI kliplerin araliklari: bir an yalniz o katmanda
+    // secili bir klibin icine dusuyorsa kesilir (secili olmayan klip kesilmez)
+    var vIdx = {}, aIdx = {}, lo = null, ti, ci, si;
+    function tara(tracks, hedef) {
+      for (ti = 0; ti < tracks.numTracks; ti++) {
+        var tr = tracks[ti];
+        for (ci = 0; ci < tr.clips.numItems; ci++) {
+          var c = tr.clips[ci];
+          for (si = 0; si < sel.length; si++) {
+            if (c === sel[si] || (c.nodeId && sel[si].nodeId && String(c.nodeId) === String(sel[si].nodeId))) {
+              if (!hedef[ti]) hedef[ti] = [];
+              hedef[ti].push([Number(c.start.seconds), Number(c.end.seconds)]);
+              lo = 1;
+            }
+          }
+        }
+      }
+    }
+    function icinde(araliklar, t) {
+      for (var q = 0; q < araliklar.length; q++) {
+        if (t > araliklar[q][0] + 0.02 && t < araliklar[q][1] - 0.02) return true;
+      }
+      return false;
+    }
+    tara(seq.videoTracks, vIdx);
+    tara(seq.audioTracks, aIdx);
+    if (lo === null) return KS_err("Secili klip timeline'da bulunamadi.");
+
+    app.enableQE();
+    var qseq = qe.project.getActiveSequence();
+    var kesilen = 0, k;
+    for (var i = 0; i < times.length; i++) {
+      var t = Number(times[i]);
+      var tc = null, basarili = 0;
+      for (k in vIdx) {
+        if (vIdx.hasOwnProperty(k) && icinde(vIdx[k], t)) {
+          if (tc === null) tc = KS_timecode(t);
+          try { qseq.getVideoTrackAt(Number(k)).razor(tc); basarili++; } catch (eV) {}
+        }
+      }
+      for (k in aIdx) {
+        if (aIdx.hasOwnProperty(k) && icinde(aIdx[k], t)) {
+          if (tc === null) tc = KS_timecode(t);
+          try { qseq.getAudioTrackAt(Number(k)).razor(tc); basarili++; } catch (eA) {}
+        }
+      }
+      if (!basarili) continue;   // kilitli katman vb.: "bolundu" denmesin
+      if (p.markers) {
+        try {
+          var m = seq.markers.createMarker(t);
+          if (m && p.name) m.name = String(p.name);
+        } catch (eM) {}
+      }
+      kesilen++;
+    }
+    if (!kesilen) return KS_err("Verilen anlarin hicbiri secili klibin icinde degil.");
+    var katman = 0;
+    for (k in vIdx) if (vIdx.hasOwnProperty(k)) katman++;
+    for (k in aIdx) if (aIdx.hasOwnProperty(k)) katman++;
+    return KS_ok({ cuts: kesilen, tracks: katman });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1263,6 +1511,27 @@ function KS_clipAt(track, sec) {
   return null;
 }
 
+/*
+ * Premiere klibi en yakin KARE sinirina oturtur: 25 fps'te 41.62 sn (1040.5. kare)
+ * 41.60/41.64'e duser ve 1 ms'lik KS_clipAt eslesmez. O zaman yerlestirmeden once
+ * OLMAYAN ve istenen ana en fazla bir kare uzak klibi yeni klip say.
+ */
+function KS_yeniKlipYakin(track, once, sec) {
+  var kare = 1 / 24;
+  try {
+    var tb = Number(app.project.activeSequence.timebase);
+    if (tb > 0) kare = tb / 254016000000;
+  } catch (eT) {}
+  try {
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var c = track.clips[i];
+      if (once[String(c.start.ticks)]) continue;
+      if (Math.abs(c.start.seconds - sec) <= kare + 1e-3) return c;
+    }
+  } catch (e) {}
+  return null;
+}
+
 function KS_tryPlace(track, item, startSec) {
   var t = new Time();
   t.seconds = startSec;
@@ -1279,7 +1548,7 @@ function KS_tryPlace(track, item, startSec) {
       try { once[String(track.clips[q].start.ticks)] = 1; } catch (eQ) {}
     }
     try { track.overwriteClip(item, forms[k]); } catch (e) { continue; }
-    var good = KS_clipAt(track, startSec);
+    var good = KS_clipAt(track, startSec) || KS_yeniKlipYakin(track, once, startSec);
     if (good) return good;
     if (track.clips.numItems > n0) {
       for (var j = track.clips.numItems - 1; j >= 0; j--) {
@@ -1325,6 +1594,12 @@ function KS_placeOverlay(encoded) {
     var startSec = 0;
     if (p.scope === "inout") {
       try { startSec = seq.getInPointAsTime().seconds; } catch (eI) {}
+    }
+    // p.at: belirli an (sn) ya da "playhead" (kanca basligi gibi kisa katmanlar)
+    if (p.at === "playhead") {
+      try { startSec = seq.getPlayerPosition().seconds; } catch (eP) {}
+    } else if (typeof p.at === "number" && isFinite(p.at) && p.at >= 0) {
+      startSec = p.at;
     }
     // not: zeroPoint EKLENMEZ — trackItem.start zaten zeroPoint'ten bagimsiz
     // sekans-ici saniye sayar; eklemek baslangic timecode'u 00:00:00:00
@@ -1385,7 +1660,10 @@ function KS_removeOverlay(encoded) {
 
 function KS_findFreeAudioTrack(seq, aSec, bSec) {
   for (var i = 0; i < seq.audioTracks.numTracks; i++) {
-    if (KS_trackFreeIn(seq.audioTracks[i], aSec, bSec)) return i;
+    var tr = seq.audioTracks[i];
+    // sessize alinmis kanala konan ses duyulmaz: atla
+    try { if (tr.isMuted && tr.isMuted()) continue; } catch (eM) {}
+    if (KS_trackFreeIn(tr, aSec, bSec)) return i;
   }
   return -1;
 }
@@ -1433,6 +1711,86 @@ function KS_insertSfx(encoded) {
     var sure = dur;
     try { sure = clip.end.seconds - clip.start.seconds; } catch (eS) {}
     return KS_ok({ track: idx, trackName: "A" + (idx + 1), start: start, dur: sure });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Sesi iyilestir: temizlenmis sesi orijinal klibin TAM altina (ayni baslangic)
+ * bos bir ses kanalina koy, orijinal ses klip(ler)ini devre disi birak.
+ * Orijinal silinmez: istenirse Premiere'de yeniden etkinlestirilir.
+ *   p: { path, start, end, mediaPath, name, disableOriginal }
+ */
+function KS_addAudioTrack(seq) {
+  var before = seq.audioTracks.numTracks;
+  try {
+    app.enableQE();
+    if (typeof qe === "undefined" || !qe.project) return false;
+    var q = qe.project.getActiveSequence();
+    if (!q || !q.addTracks) return false;
+    q.addTracks(0, 0, 1, 1, before, 0, 0);
+  } catch (e) { return false; }
+  return app.project.activeSequence.audioTracks.numTracks > before;
+}
+
+function KS_placeCleanAudio(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (!p.path || !(new File(p.path)).exists) return KS_err("Temiz ses dosyasi yok: " + p.path);
+    var start = Number(p.start), end = Number(p.end);
+    if (!(end > start)) return KS_err("Gecersiz aralik.");
+
+    var bin = KS_findBin("Suflo Ses");
+    app.project.importFiles([p.path], true, bin, false);
+    var item = null;
+    try {
+      var hits = app.project.rootItem.findItemsMatchingMediaPath(p.path, 1);
+      if (hits && hits.length) item = hits[0];
+    } catch (eF) {}
+    if (!item) item = KS_findItemByPath(app.project.rootItem, p.path);
+    if (!item) return KS_err("Ses projeye aktarilamadi.");
+    try { if (p.name) item.name = String(p.name); } catch (eN) {}
+
+    var idx = KS_findFreeAudioTrack(seq, start, end);
+    var yeni = false;
+    if (idx < 0) {
+      if (KS_addAudioTrack(seq)) {
+        seq = app.project.activeSequence;
+        idx = KS_findFreeAudioTrack(seq, start, end);
+        yeni = idx >= 0;
+      }
+    }
+    if (idx < 0) return KS_err("Bos ses kanali yok ve yenisi acilamadi. Bir audio kanali ekleyip tekrar dene.");
+    var clip = KS_tryPlace(seq.audioTracks[idx], item, start);
+    if (!clip) return KS_err("Ses timeline'a yerlestirilemedi.");
+    try { if (p.name) clip.name = String(p.name); } catch (eCn) {}
+
+    // Yalniz temiz sesin TAM yerini tutan orijinal ses klipleri devre disi: ayni medya,
+    // ayni kaynak hizasi (kaynak-timeline farki) ve temiz aralik icinde. J/L kesimde
+    // disari tasan ya da ayni dosyanin baska anindan gelen klipler kapatilmaz.
+    var kapatilan = 0, atlanan = 0, tol = 0.05;
+    var hiza = Number(p.inPoint) - start;
+    if (p.disableOriginal !== false && p.mediaPath) {
+      for (var t = 0; t < seq.audioTracks.numTracks; t++) {
+        if (t === idx) continue;
+        var tr = seq.audioTracks[t];
+        for (var c = 0; c < tr.clips.numItems; c++) {
+          var k = tr.clips[c];
+          try {
+            if (!k.projectItem || String(k.projectItem.getMediaPath()) !== String(p.mediaPath)) continue;
+            if (!(k.end.seconds > start + 0.01 && k.start.seconds < end - 0.01)) continue;
+            var ayniHiza = !isFinite(hiza) || Math.abs((k.inPoint.seconds - k.start.seconds) - hiza) < tol;
+            var icinde = k.start.seconds >= start - tol && k.end.seconds <= end + tol;
+            if (!ayniHiza || !icinde) { atlanan++; continue; }
+            k.disabled = true;
+            kapatilan++;
+          } catch (eK) {}
+        }
+      }
+    }
+    return KS_ok({ track: idx, trackName: "A" + (idx + 1), newTrack: yeni, disabled: kapatilan, skipped: atlanan,
+      start: clip.start.seconds, end: clip.end.seconds });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1623,6 +1981,218 @@ function KS_addMarkers(encoded) {
     }
     if (n === 0) return KS_err("Hicbir marker eklenemedi.");
     return KS_ok({ added: n });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * YouTube bolumleri: her marker kendi basligiyla, mumkunse "Chapter" turunde.
+ * p.chapters = [{ time: sn, name: "Baslik" }]; p.replace: once eski Suflo
+ * bolum marker'larini sil (yorumu "Suflo bolum" olanlar).
+ */
+function KS_addChapterMarkers(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var list = p.chapters || [];
+    if (!list.length) return KS_err("Bolum yok.");
+    var silinen = 0;
+    if (p.replace) {
+      try {
+        var eski = [];
+        var mk = seq.markers.getFirstMarker();
+        while (mk) {
+          if (String(mk.comments || "") === "Suflo bolum") eski.push(mk);
+          mk = seq.markers.getNextMarker(mk);
+        }
+        for (var e = 0; e < eski.length; e++) {
+          try { seq.markers.deleteMarker(eski[e]); silinen++; } catch (eD) {}
+        }
+      } catch (eR) {}
+    }
+    var n = 0, chapterTuru = 0;
+    for (var i = 0; i < list.length; i++) {
+      try {
+        var m = seq.markers.createMarker(Number(list[i].time));
+        if (!m) continue;
+        try { m.name = String(list[i].name || ""); } catch (eN) {}
+        try { m.comments = "Suflo bolum"; } catch (eC) {}
+        try { m.setTypeAsChapter(); chapterTuru++; } catch (eT) {}
+        n++;
+      } catch (eM) {}
+    }
+    if (n === 0) return KS_err("Hicbir marker eklenemedi.");
+    return KS_ok({ added: n, chapterType: chapterTuru, removed: silinen });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Viral anlar (Shorts): sureli marker. p.ranges = [{start, end, name, comment}];
+ * p.replace: once eski Suflo viral marker'larini sil (yorumu "Suflo viral" ile baslayan).
+ */
+function KS_addRangeMarkers(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var list = p.ranges || [];
+    if (!list.length) return KS_err("Aralik yok.");
+    // etiket: yorum oneki (tekrar eklemede yalniz bu onekli marker'lar yenilenir); renk: marker renk indeksi
+    var etiket = String(p.etiket || "Suflo viral");
+    var renk = (typeof p.renk === "number" && p.renk >= 0 && p.renk <= 7) ? p.renk : 1;
+    var silinen = 0;
+    if (p.replace) {
+      try {
+        var eski = [];
+        var mk = seq.markers.getFirstMarker();
+        while (mk) {
+          if (String(mk.comments || "").indexOf(etiket + ":") === 0) eski.push(mk);
+          mk = seq.markers.getNextMarker(mk);
+        }
+        for (var e = 0; e < eski.length; e++) { try { seq.markers.deleteMarker(eski[e]); silinen++; } catch (eD) {} }
+      } catch (eR) {}
+    }
+    var n = 0;
+    for (var i = 0; i < list.length; i++) {
+      try {
+        var m = seq.markers.createMarker(Number(list[i].start));
+        if (!m) continue;
+        try { m.name = String(list[i].name || ""); } catch (eN) {}
+        try { m.comments = etiket + ": " + String(list[i].comment || ""); } catch (eC) {}
+        // Marker.end SANIYE (sayi) alir: Premiere 26.5'te Time nesnesi "Illegal Parameter
+        // type" atiyordu ve marker'lar suresiz kaliyordu. Time yalniz yedek.
+        try { m.end = Number(list[i].end); } catch (eE) {
+          try { var son = new Time(); son.seconds = Number(list[i].end); m.end = son; } catch (eE2) {}
+        }
+        try { if (m.setColorByIndex) m.setColorByIndex(renk); } catch (eK) {}   // viral: kirmizi, b-roll: yesil
+        n++;
+      } catch (eM) {}
+    }
+    if (n === 0) return KS_err("Hicbir marker eklenemedi.");
+    return KS_ok({ added: n, removed: silinen });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Suflo Doctor: 3.0 ozelliklerinin dayandigi Premiere API'leri bu kurulumda var mi?
+ * Projeye DOKUNMAZ (yalniz typeof / ozellik okuma). Aktif sekans yoksa sekans
+ * API'leri "bilinmiyor" (null) doner.
+ */
+function KS_apiProbe() {
+  var out = { app: "", seq: false, subsequence: null, autoReframe: null, qe: false, qeAddTracks: null,
+    markers: null, trackItemDisabled: null, trackMuted: null };
+  try { out.app = String(app.version); } catch (eV) {}
+  var seq = null;
+  try { seq = KS_seq(); } catch (eS) {}
+  if (seq) {
+    out.seq = true;
+    try { out.subsequence = typeof seq.createSubsequence === "function"; } catch (e1) { out.subsequence = false; }
+    try { out.autoReframe = typeof seq.autoReframeSequence === "function"; } catch (e2) { out.autoReframe = false; }
+    try { out.markers = !!(seq.markers && typeof seq.markers.createMarker === "function"); } catch (e3) { out.markers = false; }
+    try {
+      var bulundu = false;
+      for (var t = 0; t < seq.audioTracks.numTracks && !bulundu; t++) {
+        var tr = seq.audioTracks[t];
+        if (out.trackMuted === null) out.trackMuted = typeof tr.isMuted === "function";
+        if (tr.clips.numItems > 0) { out.trackItemDisabled = typeof tr.clips[0].disabled === "boolean"; bulundu = true; }
+      }
+    } catch (e4) {}
+  }
+  try {
+    app.enableQE();
+    out.qe = typeof qe !== "undefined" && !!qe.project;
+    if (out.qe && seq) {
+      var q = qe.project.getActiveSequence();
+      out.qeAddTracks = !!(q && typeof q.addTracks === "function");
+    }
+  } catch (eQ) { out.qe = false; }
+  return KS_ok(out);
+}
+
+// Sekansin In/Out'unu verilen araliga ayarla ve playhead'i basa getir
+function KS_setInOut(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var a = Number(p.start), b = Number(p.end);
+    if (!(b > a)) return KS_err("Gecersiz aralik.");
+    seq.setInPoint(a);
+    seq.setOutPoint(b);
+    try {
+      var t = new Time(); t.seconds = a;
+      seq.setPlayerPosition(t.ticks);
+    } catch (eP) {}
+    return KS_ok({ start: a, end: b });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Viral anlardan Shorts sekanslari: her aralik icin alt sekans (createSubsequence,
+ * tum izler), istenirse Premiere Auto Reframe ile 9:16 kopyasi. Sekanslar
+ * "Suflo Shorts" kutusuna gider; orijinal sekansin In/Out'u ve aktifligi geri yuklenir.
+ *   p.ranges: [{ start, end, name }]   p.dikey: true -> 9:16 Auto Reframe
+ */
+function KS_makeShorts(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var ranges = p.ranges || [];
+    if (!ranges.length) return KS_err("Aralik yok.");
+    if (typeof seq.createSubsequence !== "function") return KS_err("Bu Premiere surumu alt sekans olusturmayi desteklemiyor.");
+    var eskiIn = null, eskiOut = null, sonSn = 0;
+    try { eskiIn = seq.getInPointAsTime().seconds; } catch (eI0) {}
+    try { eskiOut = seq.getOutPointAsTime().seconds; } catch (eO0) {}
+    try { sonSn = Number(seq.end) / KS_TPS; } catch (eE) {}
+    if (!(sonSn > 0)) sonSn = 1e6;
+    var kutu = null;
+    try { kutu = KS_findBin("Suflo Shorts"); } catch (eB) {}
+    var yapilan = [], hatalar = [], dikeySayisi = 0;
+    for (var i = 0; i < ranges.length; i++) {
+      var r = ranges[i];
+      var a = Number(r.start), b = Number(r.end);
+      var ad = String(r.name || ("Shorts " + (i + 1))).replace(/[\r\n\t]+/g, " ").substring(0, 70);
+      if (!(b > a)) { hatalar.push(ad + ": gecersiz aralik"); continue; }
+      try {
+        // createSubsequence/autoReframe yeni sekansi acabilir: her turda asil sekans aktif
+        try { app.project.activeSequence = seq; } catch (eAk) {}
+        // Out once sona: yeni In eski Out'tan sonra gelirse Premiere In>Out'u reddedebilir
+        seq.setOutPoint(sonSn);
+        seq.setInPoint(a);
+        seq.setOutPoint(b);
+        var alt = null;
+        try { alt = seq.createSubsequence(true); } catch (eCs) {}
+        // bazi surumler argumani kabul etmez: varsayilan (iz hedeflemesi) ile tekrar dene
+        if (!alt) { try { alt = seq.createSubsequence(); } catch (eCs2) {} }
+        if (!alt) { hatalar.push(ad + ": alt sekans olusmadi"); continue; }
+        try { alt.name = ad; } catch (eN) {}
+        try { if (kutu && alt.projectItem) alt.projectItem.moveBin(kutu); } catch (eM) {}
+        var kayit = { name: ad, id: String(alt.sequenceID), dikey: false };
+        if (p.dikey) {
+          try {
+            var dik = typeof alt.autoReframeSequence === "function" ?
+              alt.autoReframeSequence(9, 16, "default", ad + " 9x16", false) : null;
+            if (dik) {
+              kayit.dikey = true; dikeySayisi++;
+              try { kayit.dikeyId = String(dik.sequenceID); } catch (eDi) {}
+              try { if (kutu && dik.projectItem) dik.projectItem.moveBin(kutu); } catch (eM2) {}
+            } else hatalar.push(ad + ": 9:16 olusmadi (Auto Reframe yok)");
+          } catch (eR) { hatalar.push(ad + ": 9:16 olusmadi (" + eR + ")"); }
+        }
+        yapilan.push(kayit);
+      } catch (eS) { hatalar.push(ad + ": " + eS); }
+    }
+    // orijinal sekansa don, In/Out'u geri yukle
+    try { app.project.activeSequence = seq; } catch (eA) {}
+    try { if (String(KS_seq().sequenceID) !== String(seq.sequenceID)) app.project.openSequence(seq.sequenceID); } catch (eO) {}
+    // In/Out geri yukle: ayri ayri (biri hata verirse digeri yine yuklensin);
+    // negatif/bos In 0'a, bos Out sekans sonuna doner. Out once sona: In>Out olmasin.
+    try { seq.setOutPoint(sonSn); } catch (eG0) {}
+    try { seq.setInPoint(eskiIn !== null && eskiIn > 0 ? eskiIn : 0); } catch (eG1) {}
+    try { seq.setOutPoint(eskiOut !== null && eskiOut > 0 && eskiOut < sonSn ? eskiOut : sonSn); } catch (eG2) {}
+    if (!yapilan.length) return KS_err(hatalar.join("; ") || "Sekans olusturulamadi.");
+    return KS_ok({ made: yapilan.length, vertical: dikeySayisi, items: yapilan, errors: hatalar });
   } catch (e) { return KS_err(e); }
 }
 

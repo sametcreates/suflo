@@ -50,7 +50,9 @@ ok("icerik birebir ayni (ayni dosya ya da birebir kopya)",
 /* ---- cikti tabani: klasor kisalir, dosya ayni fiziksel yere duser ---- */
 var outBase = path.join(turkDir, "ses_w");
 var c = Y.guvenliYol(outBase, "cikti");
-ok("cikti tabani ASCII'ye cevrildi", asciiMi(c), c);
+// Cikti tabani cmd'nin 8.3 kisa adlariyla cevrilir: yalniz gercek Windows'ta olculebilir
+if (process.platform === "win32") ok("cikti tabani ASCII'ye cevrildi", asciiMi(c), c);
+else console.log("ATLA cikti tabani ASCII'ye cevrildi (8.3 kisa ad yalniz Windows)");
 if (asciiMi(c)) {
   fs.writeFileSync(c + ".json", "{\"deneme\":1}");
   ok("kisa yola yazilan cikti UZUN yoldan okunabiliyor (ayni klasor)",

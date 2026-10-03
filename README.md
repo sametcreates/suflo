@@ -19,9 +19,22 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
 | **Karaoke** | Kelime kelime ve birikimli mod; kelime zamanlarıyla |
-| **Çeviri** | TR · AZ · EN · RU arası, satır satır |
+| **Çeviri** | TR · AZ · EN · RU · DE · AR · ES · FR · PT · IT (+ NL, JA hedef), satır satır; **çok dilli SRT paketi** |
 | **Terim sözlüğü** | Marka ve özel isimlerin doğru yazımını her transkriptte uygular |
 | **Dışa aktarma** | SRT · WebVTT · ASS (stilli, karaoke etiketli) · TXT |
+| **Konuşmadan kes** *(3.0)* | Iıı/eee, tekrar ve duraksamaları kelimeye tıklayarak kes; ▶ Dinle önizlemesi |
+| **Bölümler** *(3.0)* | Konuşmadan YouTube bölümleri, AI başlık, kural denetimi, Chapter marker |
+| **Paylaşım metni** *(3.0)* | YouTube başlık/açıklama/etiket; Reels ve TikTok kanca + açıklama + hashtag |
+| **B-roll önerileri** *(3.0)* | Ara görüntü anları + İngilizce stok arama kelimeleri, yeşil marker |
+| **Otomatik emoji** *(3.0)* | Satırın anlamına göre seyrek emoji, Türkçe ek dostu |
+| **Anahtar kelime vurgusu** *(3.0)* | `*kelime*` ya da Otomatik vurgu: sayılar ve önemli kelimeler her stilde vurgu renginde |
+| **Sesi iyileştir** *(3.0)* | Gürültü azaltma + LUFS normalize, gecikme telafili (senkron kaymaz) |
+| **Shorts sekansları** *(3.0)* | Viral anlardan tek tıkla alt sekans + Auto Reframe 9:16; altyazısı ana transkriptten hazır |
+| **Kanca başlığı** *(3.0)* | Shorts açılışına animasyonlu başlık kartı; playhead'e ya da viral anın başına |
+| **Çift dilli altyazı** *(3.0)* | Çeviri sonrası orijinal + çeviri alt alta (SRT/VTT/caption izi) |
+| **Geçişler** *(3.0)* | Kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz keyframe |
+| **Sahne algılama** *(3.0)* | Sahne değişimlerinde marker ya da bölme; vuruşlarda bölme |
+| **Suflo Doctor** | Premiere bağlantısı, motor, Pro içerik ve 3.0 API uyumluluğu tek taramada |
 
 ### Altyazı motorları
 
@@ -60,7 +73,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 
 Çekirdek Suflo MIT lisanslı ve sonsuza dek ücretsiz — transkripsiyon, editör, dışa aktarım kimsenin kilidi arkasına girmiyor. Pro, üstüne gelen katman: altyazı animasyonları, sessizlikleri temizleyen otomatik kesim, ritim marker'ları ve yerel içerik kütüphaneleri. Tek seferlik **749 TL**, abonelik yok, ömür boyu → [suflo.app/pro](https://suflo.app/pro)
 
-| Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL) |
+| Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL + KDV) |
 |---|---|
 | Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Bağımsız Stil Motoru ve şeffaf video katmanı |
 | Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Creator Punch · CapCut Clean · SaaS Glass dahil Stil Motoru v3 |
@@ -70,6 +83,11 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | Terim sözlüğü |
+| Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar ve duraksama temizliği, kelimeye tıklayıp kes |
+| — | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Hormozi, Neon, Daktilo…), MOGRT gerekmez |
+| — | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
+| — | **Viral anlar:** uzun videodan 15–60 sn'lik Shorts/Reels anları, In/Out ve süreli marker |
+| — | **Sahne algılama** ve **vuruşlarda bölme**; kesimleri uygulamadan **▶ Dinle** |
 | Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Panelden uygulanan 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 1.076 SFX ve 30 Motion BG |
 | — | Smart SFX 2.0: yoğunluk, güven puanı, alternatifler, toplu ekleme ve dalga önizlemesi |
 | — | Kütüphane sağlık kontrolü ve destek raporu |
@@ -182,9 +200,14 @@ Güvenli yayın: `tools/publish.ps1` → güncel paketleri yeniden üretir, doğ
 
 ### Testler
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\test.ps1
+```bash
+node tools/test.js            # Windows, macOS, Linux
+node tools/test.js --hizli    # ffmpeg gerektirenleri atla
 ```
+
+Windows'ta `powershell -ExecutionPolicy Bypass -File tools\test.ps1` de aynı işi yapar.
+Her push'ta GitHub Actions testleri Windows, macOS ve Linux'ta çalıştırır (`.github/workflows/test.yml`).
+Windows'a özgü bölümler (8.3 kısa yol, `tar.exe` ile ZIP) diğer sistemlerde kendini atlar.
 
 Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanmış mantık üzerinde
 çalışmazlar. Bu yüzden bir test kırıldığında gerçekten ürün kırılmış demektir.
@@ -192,6 +215,32 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | Dosya | Ne ölçer |
 |---|---|
 | `test-download.js` | Yarım kalan indirmenin devamı, hangi HTTP hatasında dosya korunur/silinir |
+| `test-caption-text.js` | Halüsinasyon temizliği, karaoke, satır bölme, Türkçe-duyarlı terim sözlüğü |
+| `test-textcut.js` | Konuşmadan kes: dolgu/tekrar algılama, kesim aralıkları, duraksama kısaltma |
+| `test-chapters.js` | YouTube bölümleri: öneri, kural denetimi, AI yanıtı ayrıştırma |
+| `test-auto-emoji.js` | Otomatik emoji: Türkçe kök eşleşmesi, yoğunluk ve tekrar koruması |
+| `test-vurgu.js` | Anahtar kelime vurgusu: 12 stilde vurgu rengi, otomatik seçim, dışa aktarımda işaret temizliği |
+| `test-vurgu-entegre.js` | Vurgulu kelimeler Otomatik Zoom ve Akıllı SFX'te: an, kural, sınır önceliği |
+| `test-youtube-meta.js` | YouTube metni: başlık/açıklama/etiket/hashtag temizliği ve YouTube sınırları |
+| `test-paket.js` | Çok dilli SRT paketi: zamanlama, dile göre büyük harf, ortak çeviri fonksiyonu |
+| `test-broll.js` | B-roll önerileri: istem, ayrıştırma, stok arama bağlantıları, host marker etiketi/rengi |
+| `test-api-probe.js` | Doctor: Premiere API yoklaması (alt sekans, Auto Reframe, QE, marker, klip kapatma) projeye dokunmadan |
+| `test-es3.js` | `jsx/` ExtendScript: ES5+/ES6 kullanımı (forEach, trim, let, =>, JSON, sondaki virgül) yok — yalnız Premiere'de patlayacak hatalar |
+| `test-cef.js` | Panel JS Premiere 14.4 (CEF 74 / Node 12.3) uyumu: `?.`, `??`, `replaceAll` vb. yok; `rmrf` eski Node'da çalışır |
+| `test-ffmpeg-secim.js` | ffmpeg seçimi: libass'li aday tercih edilir; libass'siz (Homebrew sade) ffmpeg'de anlaşılır uyarı |
+| `test-kanca.js` | Kanca başlığı: ASS üretimi, libass render (şeffaflık, vurgu rengi), host `at` yerleşimi |
+| `test-kanca-uctan.js` | Kanca başlığı uçtan uca: panelin gerçek ffmpeg komutu → şeffaf qtrle .mov, yerleşim argümanları, temizlik |
+| `test-dinle.js` | Dinle önizlemesi: eski isteğin sesi çalmaz, dosya/tutamaç temizliği, uzun klipte ilk 5 dk |
+| `test-dikey.js` | 9:16: stil ölçeği, güvenli alan konumu, 12 stilde libass taşma kontrolü |
+| `test-ses.js` | Sesi iyileştir: filtre zinciri, ebur128, gecikme ölçümü/telafisi (gerçek ffmpeg), host yerleşimi |
+| `test-ses-uctan.js` | Sesi iyileştir uçtan uca: 5.1 kaynak → stereo, senkron < 1 ms, sessiz klipte anlaşılır hata |
+| `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
+| `test-highlights.js` · `test-viral-host.js` | Viral anlar: satır sınırı, süre uzatma/kırpma, çakışma; süreli marker ve In/Out |
+| `test-scenes.js` | Sahne algılama (gerçek ffmpeg) ve seçili klibi bölme |
+| `test-model-dogrulama.js` | Whisper modellerinin SHA-256 doğrulaması |
+| `test-ceviri-dili.js` | Çeviri sonrası büyük harf kuralının hedef dile uyması |
+| `test-varliklar.js` | Panelin başvurduğu yerel görsellerin gerçekten var olması |
+| `test-utf8.js` | Parça parça gelen HTTP yanıtlarında Türkçe harflerin bozulmaması |
 | `test-parse.js` | SRT/VTT ayrıştırma, etiket ve HTML varlık temizliği, BOM/CRLF |
 | `test-export.js` | SRT/VTT/ASS/TXT çıktıları (ffmpeg ile gerçekten ayrıştırılarak) |
 | `test-burn.js` | ASS'in libass ile videoya gerçekten çizildiği (kare farkı) |

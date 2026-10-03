@@ -1,0 +1,40 @@
+name: Testler
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # render/libass/ses testleri Windows ve macOS'ta da kossun (yol, font, CRLF farklari)
+      - name: ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
+      # Homebrew'un sade ffmpeg'i libass'siz: altyazi render testleri icin ffmpeg-full (keg-only, PATH'e eklenir)
+      - name: ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if brew install ffmpeg-full; then echo "$(brew --prefix ffmpeg-full)/bin" >> "$GITHUB_PATH"; else brew install ffmpeg; fi
+      - name: Testler
+        run: node tools/test.js
+
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Pro sunucusu sozdizimi
+        run: php -l server/pro-v1/index.php && php -l server/pro-v1/config.example.php

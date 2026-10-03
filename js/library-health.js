@@ -262,16 +262,52 @@ window.KLibraryHealth = (function () {
     } catch (eD) {}
   }
 
+  /*
+   * 3.0 ozelliklerinin Premiere API gereksinimleri (KS_apiProbe). null = aktif
+   * sekans yokken sinanamadi. Doner: Doctor kontrol satirlari.
+   */
+  function apiKontrolleri(a) {
+    var out = [];
+    var gerek = [
+      { k: "subsequence", ad: "Alt sekans (createSubsequence)", etki: "Shorts sekansları oluşturulamaz" },
+      { k: "autoReframe", ad: "Auto Reframe", etki: "Shorts'un 9:16 kopyası çıkmaz (yatay sekans yine oluşur)" },
+      { k: "markers", ad: "Marker API", etki: "Bölüm, viral ve B-roll marker'ları eklenemez" },
+      { k: "qeAddTracks", ad: "QE kanal ekleme", etki: "Boş kanal yoksa Sesi iyileştir / katmanlar yeni kanal açamaz" },
+      { k: "trackItemDisabled", ad: "Klip devre dışı bırakma", etki: "Sesi iyileştir orijinal sesi kapatamaz (elle kapat)" }
+    ];
+    var eksik = [], bilinmeyen = [];
+    gerek.forEach(function (g) {
+      if (a[g.k] === false) eksik.push(g);
+      else if (a[g.k] === null || a[g.k] === undefined) bilinmeyen.push(g.ad);
+    });
+    if (!a.qe) eksik.push({ ad: "QE DOM", etki: "Razor kesimleri ve kanal ekleme çalışmaz" });
+    if (!eksik.length) {
+      out.push({ status: "good", title: "Suflo 3.0 Premiere API'leri",
+        detail: bilinmeyen.length ? "Sınananların hepsi var · sekans açıp tekrar tara: " + bilinmeyen.join(", ") : "Hepsi bu Premiere sürümünde mevcut",
+        group: "premiere" });
+    } else {
+      eksik.forEach(function (g) {
+        out.push({ status: "warn", title: "Premiere'de yok: " + g.ad, detail: g.etki, group: "premiere" });
+      });
+    }
+    return out;
+  }
+
   async function premiereChecks() {
     if (!K.call) return [{ status: "warn", title: "Premiere bağlantısı sınanamadı", detail: "Paneli Premiere içinde açıp tekrar tara.", group: "premiere" }];
     try {
       var r = await K.call("KS_getContext", undefined, 8000);
       if (!r || !r.ok) throw new Error(r && r.error ? r.error : "yanıt alınamadı");
-      return [{
+      var sonuc = [{
         status: "good", title: "Premiere bağlantısı",
         detail: "Premiere " + (r.app || "?") + (r.hasSeq ? " · sekans: " + (r.sequence || "açık") : " · aktif sekans yok"),
         group: "premiere"
       }];
+      try {
+        var a = await K.call("KS_apiProbe", undefined, 8000);
+        if (a && a.ok) apiKontrolleri(a).forEach(function (c) { sonuc.push(c); });
+      } catch (eA) {}
+      return sonuc;
     } catch (e) {
       return [{ status: "bad", title: "Premiere bağlantısı yanıt vermiyor", detail: K.hataYardimi ? K.hataYardimi(e) : String(e), group: "premiere" }];
     }
@@ -282,6 +318,9 @@ window.KLibraryHealth = (function () {
     try {
       var ff = await K.findFfmpeg(true);
       if (!ff) return [{ status: "bad", title: "FFmpeg bulunamadı", detail: "Altyazı, kesim, zoom ve ritim analizi çalışmaz.", action: "repair-ffmpeg", group: "engine" }];
+      if (K.ffmpegLibass && K.ffmpegLibass() === false) {
+        return [{ status: "warn", title: "FFmpeg altyazı çizemiyor (libass yok)", detail: ff + " · Suflo Stilleri ve kanca başlığı çalışmaz; Suflo'nun ffmpeg'ini kur.", action: "repair-ffmpeg", group: "engine" }];
+      }
       return [{ status: "good", title: "FFmpeg", detail: ff, group: "engine" }];
     } catch (e) {
       return [{ status: "bad", title: "FFmpeg çalışmıyor", detail: K.hataYardimi ? K.hataYardimi(e) : String(e), action: "repair-ffmpeg", group: "engine" }];
@@ -703,6 +742,7 @@ window.KLibraryHealth = (function () {
     formatBytes: formatBytes,
     repair: repair,
     repairAll: repairAll,
+    apiKontrolleri: apiKontrolleri,
     last: function () { return lastReport; }
   };
   window.KDoctor = api;

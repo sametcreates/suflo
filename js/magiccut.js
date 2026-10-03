@@ -62,6 +62,7 @@ window.KCut = (function () {
   async function analyze() {
     if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
     if (busy) return;
+    sesiKapat();
     clip = KApp.ctx().sel;
     if (!clip) { status("Önce bir klip seç.", "warn"); return; }
     busy = true;
@@ -229,6 +230,7 @@ window.KCut = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
     var act = activeRanges().map(function (r) { return { start: r.start, end: r.end }; });
     if (act.length === 0) return;
+    sesiKapat();
     el("cut-apply").disabled = true;
     status("Uygulanıyor…");
     var mode = target === "clone" ? "ripple" : el("cut-mode").value;
@@ -257,6 +259,35 @@ window.KCut = (function () {
     }
   }
 
+  /* ---------------- Dinle (önizleme) ---------------- */
+
+  // Kesimler uygulanmis gibi sesi panelde cal (ortak oynatici: js/dinle.js)
+  var oynatici = window.KDinle ? window.KDinle("cut-audio") : null;
+  function sesiKapat() { if (oynatici) oynatici.kapat(); }
+
+  async function dinle() {
+    if (!clip || !window.SufloTextCut || !oynatici) return;
+    var btn = el("cut-dinle");
+    btn.disabled = true;
+    var eski = btn.textContent;
+    btn.textContent = "Hazırlanıyor…";
+    var benimKlip = clip;
+    try {
+      var dur = clip.outPoint - clip.inPoint;
+      var r = await oynatici.cal({
+        mediaPath: clip.mediaPath, inPoint: clip.inPoint, dur: dur, cuts: activeRanges(),
+        clip: { clipStart: clip.clipStart, clipEnd: clip.clipEnd, dur: dur },
+        gecerli: function () { return clip === benimKlip; }
+      });
+      if (r.ok && r.kisaltildi) status("Uzun klip: ilk " + Math.round(oynatici.MAX_SN / 60) + " dakika dinletiliyor.");
+    } catch (e) {
+      status("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = eski;
+    }
+  }
+
   /* ---------------- Başlat ---------------- */
 
   function init() {
@@ -281,12 +312,14 @@ window.KCut = (function () {
 
     el("cut-analyze").addEventListener("click", analyze);
     el("cut-apply").addEventListener("click", apply);
+    if (el("cut-dinle")) el("cut-dinle").addEventListener("click", dinle);
 
     KApp.onContext(function (ctx) {
       refreshButton();
       // seçim değiştiyse eski analiz geçersiz
       if (clip && (!ctx.sel || ctx.sel.mediaPath !== clip.mediaPath || ctx.sel.clipStart !== clip.clipStart)) {
         el("cut-result").hidden = true;
+        sesiKapat();
         ranges = [];
         clip = null;
       }

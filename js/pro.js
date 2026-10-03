@@ -74,6 +74,10 @@
     overlay:   'Animasyonlu altyazi katmani (CapCut gorunumu)',
     karaoke:   'Karaoke / kelime-kelime animasyon',
     cut:       'Otomatik kesim (sessizlik temizleme)',
+    audioclean: 'Sesi iyilestir (gurultu azaltma + ses seviyesi)',
+    textcut:   'Konusmadan kes (metinle kurgu + dolgu temizligi)',
+    transitions: 'Kesim gecisleri (zoom, whip, itme ve daha fazlasi)',
+    highlights: 'Viral anlar: uzun videodan Shorts/Reels klipleri',
     zoom:      'Otomatik Zoom (konusmaya gore punch-in)',
     beat:      'Ritim / beat senkronu',
     batch:     'Toplu (coklu klip) transkripsiyon',
@@ -244,7 +248,10 @@
   }
   function graceOk(c) {
     if (!c || !c.lastValidated) return false;
-    return (Date.now() - c.lastValidated) < GRACE_MS;
+    var gecen = Date.now() - c.lastValidated;
+    // Gelecek tarihli dogrulama (elle duzenlenmis onbellek) toleransi sonsuz
+    // uzatmasin; saat kaymasi icin 10 dk pay birakilir.
+    return gecen > -10 * 60 * 1000 && gecen < GRACE_MS;
   }
 
   // ================================================================
@@ -413,9 +420,9 @@
       '</div>';
     } else if (isMogrt) {
       visual = '<div class="pro-upsell-mogrt" aria-label="Yaz\u0131 efekti \u00f6rnekleri">' +
-        '<img src="assets/pro-mogrt-showcase/previews/01-smooth-up.webp" alt="Smooth Up efekti">' +
-        '<img src="assets/pro-mogrt-showcase/previews/02-rainbow-text.webp" alt="Rainbow Text efekti">' +
-        '<img src="assets/pro-mogrt-showcase/previews/06-gold-text.webp" alt="Gold Text efekti">' +
+        '<img src="assets/pro-mogrt-showcase/previews/001-smooth-up.webp" alt="Smooth Up efekti">' +
+        '<img src="assets/pro-mogrt-showcase/previews/002-rainbow-text.webp" alt="Rainbow Text efekti">' +
+        '<img src="assets/pro-mogrt-showcase/previews/006-gold-text.webp" alt="Gold Text efekti">' +
       '</div>';
     } else if (isSfx) {
       visual = '<div class="pro-upsell-sfx" aria-label="SFX kategorileri">' +
@@ -450,7 +457,7 @@
         '<p class="pro-upsell-alt" id="pro-upsell-desc">' + esc(desc) + '</p>' +
         visual +
         proof + benefits +
-        '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K · <s>1.249 TL</s></span><b>749 TL</b><small>abonelik yok \u00b7 dakika limiti yok</small></div>' +
+        '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K · <s>1.249 TL</s></span><b>749 TL</b><small>+ KDV \u00b7 abonelik yok \u00b7 dakika limiti yok</small></div>' +
         '<div class="pro-upsell-actions">' +
           '<button id="pro-upsell-go" class="pro-btn-primary">' + buyText + '</button>' +
           '<button id="pro-upsell-demo" class="pro-btn-ghost">Tüm Pro\'yu gör</button>' +
@@ -533,9 +540,12 @@
 
   function configure(cfg) {
     cfg = cfg || {};
-    if (cfg.storeId   != null) LS.STORE_ID   = cfg.storeId;
-    if (cfg.productId != null) LS.PRODUCT_ID = cfg.productId;
-    if (cfg.variantId != null) LS.VARIANT_ID = cfg.variantId;
+    // Yalniz gecerli (pozitif) ID kabul edilir: 0 vermek kilidi tamamen
+    // kapatiyordu ve konsoldan tek satirla Pro acilabiliyordu.
+    function idOk(v) { return Number(v) > 0; }
+    if (idOk(cfg.storeId))   LS.STORE_ID   = Number(cfg.storeId);
+    if (idOk(cfg.productId)) LS.PRODUCT_ID = Number(cfg.productId);
+    if (idOk(cfg.variantId)) LS.VARIANT_ID = Number(cfg.variantId);
   }
 
   // ================================================================
@@ -551,11 +561,11 @@
   function ensureUpsellCss() {
     if (_cssDone) return; _cssDone = true;
     var css =
-      '.pro-upsell-backdrop{position:fixed;inset:0;background:rgba(4,7,13,.78);backdrop-filter:blur(8px);' +
+      '.pro-upsell-backdrop{position:fixed;top:0;right:0;bottom:0;left:0;inset:0;background:rgba(4,7,13,.78);backdrop-filter:blur(8px);' +
       'display:flex;align-items:center;justify-content:center;padding:14px;z-index:99999}' +
       '@keyframes pro-in{from{opacity:0;transform:scale(.965) translateY(8px)}}' +
       '.pro-upsell-card{position:relative;overflow:hidden;background:radial-gradient(circle at 84% -12%,rgba(58,167,255,.19),transparent 38%),#111720;' +
-      'color:#f3f6fb;width:min(404px,96vw);max-height:94vh;overflow-y:auto;border:1px solid #34445a;border-radius:16px;' +
+      'color:#f3f6fb;width:96vw;max-width:404px;width:min(404px,96vw);max-height:94vh;overflow-y:auto;border:1px solid #34445a;border-radius:16px;' +
       'padding:18px 18px 14px;text-align:left;font:13px/1.45 system-ui,Segoe UI,sans-serif;' +
       'box-shadow:0 26px 90px rgba(0,0,0,.7),inset 0 1px rgba(255,255,255,.045);animation:pro-in .2s cubic-bezier(.32,.72,0,1)}' +
       '.pro-upsell-card:before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,#727cff,#3aa7ff)}' +

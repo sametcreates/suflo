@@ -154,7 +154,7 @@ window.ProSync = (function () {
     try { return JSON.parse(r.body); } catch (e) { throw new Error("İçerik sunucusundan bozuk yanıt geldi."); }
   }
 
-  function defaultDownload(endpoint, token, item, dest, onProgress) {
+  function defaultDownload(endpoint, token, item, dest, onProgress, instanceId) {
     return new Promise(function (resolve, reject) {
       if (!http || !https || !urlmod || !crypto) { reject(new Error("İndirme motoru hazır değil.")); return; }
       ensureDir(K.path.dirname(dest));
@@ -163,9 +163,10 @@ window.ProSync = (function () {
       try { if (K.fs.existsSync(part)) existing = K.fs.statSync(part).size; } catch (e0) {}
       if (existing >= item.bytes) { try { K.fs.unlinkSync(part); } catch (e1) {} existing = 0; }
 
+      var bekleme = 0;   // 429 (hiz siniri) icin kac kez beklendi
       function attempt(offset, retried) {
         var u = urlmod.parse(endpoint);
-        var body = Buffer.from(JSON.stringify({ action: "file", token: token, path: item.path }), "utf8");
+        var body = Buffer.from(JSON.stringify({ action: "file", token: token, path: item.path, instance_id: instanceId || "" }), "utf8");
         var headers = {
           "Accept": "application/octet-stream",
           "Content-Type": "application/json",
@@ -178,6 +179,15 @@ window.ProSync = (function () {
           if (offset > 0 && res.statusCode === 200 && !retried) {
             res.resume(); try { K.fs.unlinkSync(part); } catch (e2) {}
             attempt(0, true); return;
+          }
+          // Hiz siniri: tum esitlemeyi bozma, sunucunun dedigi kadar bekleyip ayni dosyayi yeniden iste
+          if (res.statusCode === 429 && bekleme < 5) {
+            res.resume();
+            bekleme++;
+            var ra = Number(res.headers["retry-after"]);
+            var ms = Math.min(90, isFinite(ra) && ra > 0 ? ra : 30) * 1000;
+            setTimeout(function () { attempt(offset, retried); }, ms);
+            return;
           }
           var accepted = res.statusCode === 200 || (res.statusCode === 206 && offset > 0);
           if (!accepted) {
@@ -221,7 +231,7 @@ window.ProSync = (function () {
 
   async function fetchFile(manifest, item, dest, onProgress) {
     if (cfg.fileFetcher) return cfg.fileFetcher(cfg.endpoint, manifest.token, item, dest, onProgress);
-    return defaultDownload(cfg.endpoint, manifest.token, item, dest, onProgress);
+    return defaultDownload(cfg.endpoint, manifest.token, item, dest, onProgress, manifest.instanceId);
   }
   function stateMap(state) {
     var out = {};
@@ -341,6 +351,8 @@ window.ProSync = (function () {
       raw = await fetchManifest(creds);
     }
     var manifest = validateManifest(raw);
+    // Sunucu indirme tokenini bu cihaza (instance) baglar; dosya isteklerinde gonderilir.
+    manifest.instanceId = String(creds.instanceId || "");
     var releases = K.path.join(root, "releases");
     var releaseDir = K.path.join(releases, manifest.version);
     if (!inside(releases, releaseDir)) throw new Error("İçerik sürümü güvenli değil.");

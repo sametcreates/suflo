@@ -84,6 +84,72 @@ window.KEngine = (function () {
     }
   };
 
+  /* ---------------- Model bütünlüğü ---------------- */
+
+  /*
+   * Modeller yalnız boyutla denetleniyordu: kesik/bozuk ya da ayna tarafından
+   * değiştirilmiş dosya "kurulu" sayılabilirdi. HuggingFace'in herkese açık
+   * dosya ağacı API'si her LFS dosyasının SHA-256'sını (lfs.oid) verir; indirme
+   * bitince dosya onunla karşılaştırılır. API'ye ulaşılamazsa (kurumsal ağ)
+   * boyut denetimiyle devam edilir — kurulum engellenmez.
+   */
+  var HF_AGAC = {};
+
+  function hfDepo(item) {
+    var u = (item.urls || [])[0] || "";
+    var m = /huggingface\.co\/([^\/]+\/[^\/]+)\/resolve\/main\//.exec(u);
+    return m ? m[1] : "";
+  }
+
+  // Ağaç yanıtından dosyanın beklenen SHA-256'sı ("" = bilinmiyor)
+  function hfBeklenenOzet(agac, dosya) {
+    if (!Array.isArray(agac)) return "";
+    for (var i = 0; i < agac.length; i++) {
+      var e = agac[i];
+      if (e && e.path === dosya && e.lfs && /^[0-9a-f]{64}$/i.test(String(e.lfs.oid || ""))) return String(e.lfs.oid).toLowerCase();
+    }
+    return "";
+  }
+
+  async function hfOzetGetir(item) {
+    var depo = hfDepo(item);
+    if (!depo || !item.file) return "";
+    if (!HF_AGAC[depo]) {
+      // Yalniz huggingface.co: dosya aynadan indiyse ozeti de aynadan almak, degistirilmis
+      // bir aynanin kendi dosyasini onaylamasi olurdu. Ulasilamazsa "bilinmiyor".
+      try {
+        var r = await K.httpGet("https://huggingface.co/api/models/" + depo + "/tree/main", { "Accept": "application/json" });
+        if (r.status === 200) HF_AGAC[depo] = JSON.parse(r.body);
+      } catch (e) {}
+    }
+    return hfBeklenenOzet(HF_AGAC[depo], item.file);
+  }
+
+  function dosyaOzeti(yol) {
+    return new Promise(function (resolve) {
+      try {
+        var h = require("crypto").createHash("sha256");
+        var st = K.fs.createReadStream(yol);
+        st.on("data", function (c) { h.update(c); });
+        st.on("end", function () { resolve(h.digest("hex")); });
+        st.on("error", function () { resolve(""); });
+      } catch (e) { resolve(""); }
+    });
+  }
+
+  // true: doğrulandı ya da doğrulanamadı (bilinmiyor); false: uyuşmadı (dosya silinir)
+  async function modelDogrula(item, yol, say) {
+    var beklenen = "";
+    try { beklenen = await hfOzetGetir(item); } catch (e) {}
+    if (!beklenen) { K.log("[model] SHA-256 bilinmiyor, boyut denetimiyle devam: " + item.file); return true; }
+    if (say) say("Model doğrulanıyor…");
+    var ozet = await dosyaOzeti(yol);
+    if (ozet === beklenen) { K.log("[model] SHA-256 dogrulandi: " + item.file); return true; }
+    K.log("[model] SHA-256 UYUSMADI: " + item.file + " " + ozet + " != " + beklenen);
+    try { K.fs.unlinkSync(yol); } catch (e2) {}
+    return false;
+  }
+
   function modelById(id) {
     for (var i = 0; i < MODELS.length; i++) if (MODELS[i].id === id) return MODELS[i];
     return null;
@@ -382,6 +448,9 @@ window.KEngine = (function () {
         say(model.label + " iniyor… %" + Math.round(f * 100) + " (" + fmtMB(model.sizeMB) + ")");
       }, "model:" + model.id);
       if (!d3.ok) throw indirmeHatasi(model.label.split(" —")[0], d3, model);
+      if (!(await modelDogrula(model, mPath, say))) {
+        throw new Error(model.label.split(" —")[0] + " indirildi ama doğrulanamadı (bozuk dosya). Tekrar dene.");
+      }
     }
 
     /* 3) VAD — küçük, sessizlikleri atlayıp hızlandırır */
@@ -390,6 +459,7 @@ window.KEngine = (function () {
       var vPath = K.path.join(dir, "models", VAD.file);
       var d4 = await fetchFile(VAD, vPath, null, "vad");
       if (!d4.ok) K.log("VAD indirilemedi (kritik degil): " + d4.error);
+      else if (!(await modelDogrula(VAD, vPath, null))) K.log("VAD dogrulanamadi, silindi (kritik degil)");
     }
 
     var s = K.settings();
@@ -691,7 +761,7 @@ window.KEngine = (function () {
 
     // Yedek: arsivi tumuyle ac, ikiliyi bul, tasi, gerisini temizle
     var gecici = K.path.join(dir, "_ac");
-    try { K.fs.rmSync(gecici, { recursive: true, force: true }); } catch (e2) {}
+    K.rmrf(gecici);
     var ok = await K.unzip(zip, gecici);
     if (!ok) return false;
 
@@ -699,7 +769,7 @@ window.KEngine = (function () {
     if (bulunan) {
       try { K.fs.copyFileSync(bulunan, hedef); } catch (e3) { return false; }
     }
-    try { K.fs.rmSync(gecici, { recursive: true, force: true }); } catch (e4) {}
+    K.rmrf(gecici);
     return !!bulunan && K.fs.existsSync(hedef);
   }
 
@@ -732,6 +802,9 @@ window.KEngine = (function () {
     installedBuild: installedBuild,
     install: install,
     buildArgs: buildArgs,
-    fmtMB: fmtMB
+    fmtMB: fmtMB,
+    _hfBeklenenOzet: hfBeklenenOzet,
+    _hfDepo: hfDepo,
+    _modelDogrula: modelDogrula
   };
 })();

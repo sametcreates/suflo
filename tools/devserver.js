@@ -1,7 +1,7 @@
 /*
- * Kesit — panel arayüzünü tarayıcıda önizlemek için basit statik sunucu.
+ * Suflo — panel arayüzünü tarayıcıda önizlemek için basit statik sunucu.
  * Premiere'e bağlanmaz; sadece HTML/CSS/JS'i doğrulamak içindir.
- *   node kesit/tools/devserver.js
+ *   node tools/devserver.js
  */
 const http = require("http");
 const fs = require("fs");
@@ -34,4 +34,4 @@ http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
     res.end(data);
   });
-}).listen(PORT, () => console.log("Kesit önizleme: http://localhost:" + PORT));
+}).listen(PORT, () => console.log("Suflo önizleme: http://localhost:" + PORT));
