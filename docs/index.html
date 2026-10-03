@@ -462,6 +462,51 @@ details[open] p{animation:sssAc .38s cubic-bezier(.16,1,.3,1)}
 }
 ::selection{background:rgba(139,124,246,.3)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* --- 3.0 vitrini: sekmeli, gorselli yenilikler --- */
+.vitrin{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;align-items:start;margin:0 0 56px;scroll-margin-top:90px}
+.vt-sekmeler{display:flex;flex-direction:column;gap:8px}
+.vt-rozet{display:inline-flex;align-self:flex-start;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:2.4px;color:var(--ac);margin:0 0 8px 4px}
+.vt-rozet::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(92,209,144,.15)}
+.vt-sekme{position:relative;display:block;width:100%;text-align:left;font:inherit;color:var(--tx2);background:transparent;border:1px solid transparent;border-radius:16px;padding:16px 18px 16px 58px;cursor:pointer;overflow:hidden;transition:background .25s,border-color .25s,color .25s}
+.vt-sekme:hover{background:rgba(255,255,255,.025);color:var(--tx)}
+.vt-sekme:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.vt-sekme .vt-no{position:absolute;left:18px;top:16px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--tx3);border:1px solid var(--line);transition:all .25s}
+.vt-sekme b{display:block;font-size:17px;letter-spacing:-.3px;line-height:26px;color:inherit}
+.vt-sekme .vt-acik{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s ease}
+.vt-sekme .vt-acik>span{overflow:hidden;color:var(--tx2);font-size:14.5px;line-height:1.55}
+.vt-sekme.on{background:var(--card);border-color:var(--line);color:var(--tx);box-shadow:inset 0 1px rgba(255,255,255,.045)}
+.vt-sekme.on .vt-no{background:var(--grad);border-color:transparent;color:#fff}
+.vt-sekme.on .vt-acik{grid-template-rows:1fr}
+.vt-sekme.on .vt-acik>span{padding-top:6px}
+.vt-sekme .vt-bar{position:absolute;left:18px;right:18px;bottom:0;height:2px;background:var(--line2);border-radius:2px;opacity:0}
+.vt-sekme .vt-bar i{display:block;height:100%;width:0;background:var(--grad);border-radius:2px}
+.vitrin.oto .vt-sekme.on .vt-bar{opacity:1}
+.vitrin.oto .vt-sekme.on .vt-bar i{animation:vtdol var(--vt-sure,7s) linear forwards}
+@keyframes vtdol{to{width:100%}}
+.vt-sahne{position:relative;border-radius:22px;border:1px solid var(--line);background:#0c0c12;box-shadow:0 40px 90px -40px rgba(91,140,255,.35),inset 0 1px rgba(255,255,255,.05);overflow:hidden;aspect-ratio:2016/1570}
+.vt-sahne::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:radial-gradient(120% 70% at 50% 0,rgba(139,124,246,.10),transparent 60%)}
+.vt-panel{position:absolute;inset:0;margin:0;display:grid;place-items:center;padding:14px;opacity:0;visibility:hidden;transform:scale(.985);transition:opacity .45s ease,transform .6s ease,visibility 0s linear .45s;pointer-events:none}
+.vt-panel.on{opacity:1;visibility:visible;transform:none;pointer-events:auto;transition-delay:0s}
+.vt-panel img{max-width:100%;max-height:100%;width:auto;height:auto;border-radius:12px}
+.vt-not{position:absolute;right:14px;bottom:12px;z-index:1;font-size:11px;color:var(--tx3);letter-spacing:.3px}
+.vt-mobil{display:none}
+@media(max-width:900px){
+  .vitrin{grid-template-columns:1fr;gap:14px;margin-bottom:44px}
+  .vt-sekmeler{flex-direction:row;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:24px;gap:8px;margin:0 -24px;padding:2px 24px 6px;scrollbar-width:none}
+  .vt-sekmeler::-webkit-scrollbar{display:none}
+  .vt-rozet{display:none}
+  .vt-sekme{flex:0 0 auto;width:auto;scroll-snap-align:start;padding:10px 14px 10px 44px;border-radius:999px;border-color:var(--line)}
+  .vt-sekme .vt-no{left:10px;top:50%;transform:translateY(-50%);width:24px;height:24px}
+  .vt-sekme b{font-size:14.5px;line-height:22px;white-space:nowrap}
+  .vt-sekme .vt-acik,.vt-sekme .vt-bar{display:none}
+  .vt-sahne{border-radius:18px}
+  .vt-mobil{display:block;color:var(--tx2);font-size:15px;line-height:1.55;min-height:3.1em}
+}
+
+/* --- Pro kartlari: tek kalan son kart tam satira yayilsin --- */
+@media(min-width:821px){.prokart .pk:last-child:nth-child(odd){grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){.vt-panel,.vt-sekme .vt-acik{transition:none!important}.vitrin .vt-bar i{animation:none!important}}
 </style>
 <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
 </head>
@@ -680,6 +725,27 @@ details[open] p{animation:sssAc .38s cubic-bezier(.16,1,.3,1)}
       <span class="eyebrow">Suflo Pro</span>
       <h2>Altyazı hazır.<br>Peki kurgunun geri kalanı?</h2>
       <p class="lead">Sessizlikleri kesmek, konuşmaya göre zoom yapmak, doğru "whoosh"u aramak, animasyon bulmak — asıl zaman buraya gidiyor. Pro bu katmanı otomatikleştirir.</p>
+    </div>
+
+    <!-- 3.0 vitrini: gorseller brand/campaign-3.0/vitrin.js ile uretilir -->
+    <div class="vitrin" id="yeni">
+      <div class="vt-sekmeler" role="tablist" aria-label="Suflo 3.0 yenilikleri">
+        <span class="vt-rozet">3.0'DA YENİ</span>
+        <button type="button" class="vt-sekme on" role="tab" id="vt-t0" aria-controls="vt-p0" aria-selected="true"><span class="vt-no">01</span><b>Uzun videodan Shorts</b><span class="vt-acik"><span>Yapay zekâ altyazıyı okur, kancayla başlayan 15–60 sn'lik anları puanlar. Tek tıkla her biri ayrı sekans ve 9:16 kopya olur.</span></span><span class="vt-bar"><i></i></span></button>
+        <button type="button" class="vt-sekme" role="tab" id="vt-t1" aria-controls="vt-p1" aria-selected="false" tabindex="-1"><span class="vt-no">02</span><b>Kanca başlığı</b><span class="vt-acik"><span>Shorts ve Reels açılışına 5 stilde başlık kartı. AI transkriptten 5 başlık önerir; vurgulu kelime renkli çıkar.</span></span><span class="vt-bar"><i></i></span></button>
+        <button type="button" class="vt-sekme" role="tab" id="vt-t2" aria-controls="vt-p2" aria-selected="false" tabindex="-1"><span class="vt-no">03</span><b>Konuşmadan kes</b><span class="vt-acik"><span>"Iıı", "eee", tekrarlar ve uzun duraksamalar işaretlenir. Kelimeye tıkla, videodan da çıksın; ▶ Dinle ile önce duy.</span></span><span class="vt-bar"><i></i></span></button>
+        <button type="button" class="vt-sekme" role="tab" id="vt-t3" aria-controls="vt-p3" aria-selected="false" tabindex="-1"><span class="vt-no">04</span><b>Sesi iyileştir</b><span class="vt-acik"><span>Uğultu ve oda gürültüsü gider, ses −14 LUFS'a oturur. Dudak senkronu korunur, orijinal ses silinmez.</span></span><span class="vt-bar"><i></i></span></button>
+        <button type="button" class="vt-sekme" role="tab" id="vt-t4" aria-controls="vt-p4" aria-selected="false" tabindex="-1"><span class="vt-no">05</span><b>Kelime vurgusu</b><span class="vt-acik"><span>*Yıldız* ya da Ctrl+B ile önemli kelime parlar. 12 animasyonlu Suflo Stilinin hepsinde, zoom ve SFX de onu izler.</span></span><span class="vt-bar"><i></i></span></button>
+      </div>
+      <div class="vt-sahne">
+        <figure class="vt-panel on" role="tabpanel" id="vt-p0" aria-labelledby="vt-t0"><img src="/gorseller/v3/viral-shorts.webp" alt="Uzun sekansta puanlanmış üç viral an ve bunlardan oluşan üç dikey Shorts sekansı" width="2016" height="1570" loading="lazy" decoding="async"></figure>
+        <figure class="vt-panel" role="tabpanel" id="vt-p1" aria-labelledby="vt-t1"><img src="/gorseller/v3/kanca-basligi.webp" alt="Kutu, Şerit, Sade, Neon ve Etiket stillerinde kanca başlıkları ve AI'nın önerdiği beş başlık" width="2016" height="1506" loading="lazy" decoding="async"></figure>
+        <figure class="vt-panel" role="tabpanel" id="vt-p2" aria-labelledby="vt-t2"><img src="/gorseller/v3/konusmadan-kes.webp" alt="Transkriptte işaretlenmiş dolgu sesleri, tekrar ve duraksama; kesimlerden sonra kısalan kopya sekans" width="2016" height="912" loading="lazy" decoding="async"></figure>
+        <figure class="vt-panel" role="tabpanel" id="vt-p3" aria-labelledby="vt-t3"><img src="/gorseller/v3/sesi-iyilestir.webp" alt="Gürültülü ve temizlenmiş ses dalgası karşılaştırması ile YouTube, podcast ve yayın için LUFS hedefleri" width="2016" height="1244" loading="lazy" decoding="async"></figure>
+        <figure class="vt-panel" role="tabpanel" id="vt-p4" aria-labelledby="vt-t4"><img src="/gorseller/v3/kelime-vurgusu.webp" alt="Editörde yıldızla vurgulanan kelimenin altyazıda renkli çıkması ve 12 animasyonlu altyazı stili" width="2016" height="1532" loading="lazy" decoding="async"></figure>
+        <span class="vt-not">temsilî görsel</span>
+      </div>
+      <p class="vt-mobil" aria-hidden="true"></p>
     </div>
 
     <div class="prokart">
@@ -1255,6 +1321,69 @@ details[open] p{animation:sssAc .38s cubic-bezier(.16,1,.3,1)}
   s.src = "https://static.cloudflareinsights.com/beacon.min.js";
   s.setAttribute("data-cf-beacon", '{"token": "0e9cbe24552b412d8b1b6e4d34abe34f"}');
   document.body.appendChild(s);
+})();
+</script>
+<script>
+(function(){
+  var azHareket = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // --- 3.0 vitrini: sekmeler ---
+  // Ekranda kaldigi surece 7 sn'de bir kendiliginden ilerler; kullanici bir
+  // sekmeye dokundugu ya da uzerine geldigi an durur ve bir daha baslamaz.
+  var v = document.getElementById('yeni');
+  if (v) {
+    var sekmeler = [].slice.call(v.querySelectorAll('.vt-sekme'));
+    var paneller = [].slice.call(v.querySelectorAll('.vt-panel'));
+    var mobil = v.querySelector('.vt-mobil');
+    var aktif = 0, zaman = null, oto = !azHareket, SURE = 7000;
+    function sec(i, odakla) {
+      aktif = (i + sekmeler.length) % sekmeler.length;
+      sekmeler.forEach(function (s, k) {
+        var on = k === aktif;
+        s.classList.toggle('on', on);
+        s.setAttribute('aria-selected', on ? 'true' : 'false');
+        s.tabIndex = on ? 0 : -1;
+        paneller[k].classList.toggle('on', on);
+        // gorsel yalniz secilince insin (lazy), ilk acilista hepsi inmesin
+        if (on) { var im = paneller[k].querySelector('img'); if (im) im.loading = 'eager'; }
+      });
+      if (mobil) mobil.textContent = sekmeler[aktif].querySelector('.vt-acik').textContent;
+      if (odakla) sekmeler[aktif].focus({ preventScroll: true });
+      // mobilde yatay seritte secili sekme gorunsun (yalniz serit kayar, sayfa degil)
+      var ser = sekmeler[aktif].parentNode;
+      if (ser.scrollWidth > ser.clientWidth) {
+        var sol = ser.scrollLeft + sekmeler[aktif].getBoundingClientRect().left - ser.getBoundingClientRect().left - 24;
+        ser.scrollTo({ left: Math.max(0, sol), behavior: azHareket ? 'auto' : 'smooth' });
+      }
+      // ilerleme cubugu animasyonunu bastan baslat
+      if (oto) { v.classList.remove('oto'); void v.offsetWidth; v.classList.add('oto'); }
+    }
+    function durdur() { oto = false; v.classList.remove('oto'); clearTimeout(zaman); }
+    function planla() {
+      clearTimeout(zaman);
+      if (!oto) return;
+      zaman = setTimeout(function () {
+        var r = v.getBoundingClientRect();
+        var gorunur = r.top < innerHeight && r.bottom > 0 && !document.hidden;
+        // ekran disindayken ilerleme; cubugu bastan baslat ki gorunce dolu beklemesin
+        sec(gorunur ? aktif + 1 : aktif, false);
+        planla();
+      }, SURE);
+    }
+    sekmeler.forEach(function (s, k) {
+      s.addEventListener('click', function () { durdur(); sec(k, false); });
+      s.addEventListener('keydown', function (e) {
+        var y = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+        if (e.key === 'Home') y = -aktif; if (e.key === 'End') y = sekmeler.length - 1 - aktif;
+        if (y === undefined) return;
+        e.preventDefault(); durdur(); sec(aktif + y, true);
+      });
+    });
+    v.querySelector('.vt-sahne').addEventListener('mouseenter', durdur);
+    v.style.setProperty('--vt-sure', SURE / 1000 + 's');
+    sec(0, false);
+    planla();
+  }
 })();
 </script>
 </body>
