@@ -1,8 +1,150 @@
 # Kurucunun yapacakları (v3.1 / v4 yol haritası)
 
-Kodla çözülemeyen, gerçek dünya girdisi isteyen işler. Her özellik kendi bölümünü ekler. Bu işler yapılmadan da ilgili özellik çalışır; aşağıdaki adımlar onu tamamlar.
+Kodla çözülemeyen, gerçek dünya girdisi isteyen işler. Kod, o girdi yokken de çalışır
+(rehber "kendi klibinle" moduna düşer, satış ekranları eski yola düşer vb.). Bu dosya, her
+özelliğin tam haliyle açılması için **senin** yapman gerekenleri sırasıyla listeler.
+Her özellik kendi bölümünü ekler.
 
-## SEO ve yardım sayfaları (docs/blog)
+---
+
+## 1. İlk altyazın 2 dakikada (ilk açılış rehberi, örnek klip, AI anahtar sihirbazı)
+
+**Şu an durum:** Rehber, anahtar sihirbazı, AI düğmelerindeki "anahtar gerekli · 1 dk"
+çipleri, motor kilidi ve "panel görünmüyor" rehberi hazır. Eksik olan tek şey **örnek
+klip**: `assets/onboarding/ornek.json` olmadığı için 2. adım "Örnekte dene" yerine
+"Timeline'da bir klip seç ve Altyazı oluştur'a bas" diyor ve ilk başarılı altyazıda
+tamamlanıyor. Klibi ekleyince, kodda hiçbir değişiklik olmadan "Örnekte dene" açılır.
+
+### 1.1 Örnek klibi kaydet (yaklaşık 30 dk)
+
+Kendi yüzün ve sesin, **haklarının tamamı sende** (müzik yok, başka kişi yok, marka
+logosu yok). Klip MIT lisanslı depoyla birlikte dağıtılacak.
+
+- Süre: **15 saniye**, Türkçe, net konuşma, sessiz oda.
+- Görüntü: dikey 9:16 (Reels/Shorts kullanıcısının sekansı da dikey olur), ışık önden.
+- Önerilen metin (bir sayı ve bir özel ad, vurgu ve sözlük özelliklerini de gösterir):
+
+  > Merhaba, ben Samet. Bu klip Suflo'nun örnek videosu. Premiere'in Türkçe
+  > altyazısı yok; Suflo bunu bilgisayarında, iki dakikada, ücretsiz yapıyor.
+
+### 1.2 Dört dosyayı üret (ffmpeg ile, yaklaşık 10 dk)
+
+Kayıt `kayit.mov` olsun. Komutları depo kökünde çalıştır:
+
+```bash
+mkdir -p assets/onboarding
+
+# 1) Video: 720x1280, 30 fps, H.264 + mono AAC. Hedef ≤ 1,5 MB (test 2 MB üstünü reddeder).
+ffmpeg -y -i kayit.mov -t 15 \
+  -vf "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=30" \
+  -c:v libx264 -preset slow -crf 28 -profile:v high -pix_fmt yuv420p -movflags +faststart \
+  -c:a aac -b:a 96k -ac 1 assets/onboarding/ornek-tr.mp4
+#    1,5 MB'ı geçerse -crf 30 ya da 32 ile tekrar dene.
+
+# 2) Yerel motor için WAV: 16 kHz mono 16-bit PCM (whisper ffmpeg'siz okur; ~480 KB)
+ffmpeg -y -i assets/onboarding/ornek-tr.mp4 -vn -ac 1 -ar 16000 -c:a pcm_s16le assets/onboarding/ornek-tr.wav
+
+# 3) Groq bulut rotası için MP3 (~120 KB)
+ffmpeg -y -i assets/onboarding/ornek-tr.mp4 -vn -ac 1 -ar 16000 -b:a 64k assets/onboarding/ornek-tr.mp3
+```
+
+### 1.3 Hazır transkripti üret ve ELLE kontrol et (yaklaşık 15 dk)
+
+Motoru ya da anahtarı henüz olmayan kullanıcı bu transkripti görür; hatasız olmalı.
+Turbo modeli Suflo'nun kendi klasöründe zaten var
+(Windows: `%APPDATA%\Kesit\whisper\models`, Mac: `~/Library/Application Support/Suflo/whisper/models`).
+
+```bash
+# kelime zamanları (kelime kelime / birikimli modlar için)
+whisper-cli -m <models>/ggml-large-v3-turbo-q5_0.bin -f assets/onboarding/ornek-tr.wav -l tr -oj -ml 1 -sow -of kelimeler
+# satırlar (satır modları için)
+whisper-cli -m <models>/ggml-large-v3-turbo-q5_0.bin -f assets/onboarding/ornek-tr.wav -l tr -oj -of satirlar
+# panelin okuduğu biçime çevir
+node tools/ornek-transkript.js --kelime kelimeler.json --satir satirlar.json > assets/onboarding/ornek-tr.words.json
+```
+
+Sonra `assets/onboarding/ornek-tr.words.json` dosyasını aç ve **yalnız metinleri** düzelt
+(yazım, büyük harf, "Suflo" gibi özel adlar, noktalama). `start`/`end` değerlerine dokunma.
+`kelimeler.json` ve `satirlar.json` geçici dosyalar, depoya ekleme.
+
+### 1.4 Manifesti yaz
+
+`assets/onboarding/ornek.json`:
+
+```json
+{
+  "surum": 1,
+  "lang": "tr",
+  "video": "ornek-tr.mp4",
+  "wav": "ornek-tr.wav",
+  "mp3": "ornek-tr.mp3",
+  "words": "ornek-tr.words.json",
+  "sure": 15,
+  "sekans": "Suflo Deneme"
+}
+```
+
+### 1.5 Doğrula ve gönder
+
+```bash
+node tools/test.js
+```
+
+`test-varliklar.js` şunları denetler: manifest geçerli, listelenen dosyalar var, her biri
+2 MB'tan küçük, WAV 16 kHz mono 16-bit PCM, transkriptte en az 8 kelime var, klasörde
+manifestte olmayan medya yok. Yayın denetimi (`tools/verify-release.ps1`) bu klasördeki
+mp4/wav/mp3'e izin verir ve paket içinde `ornek.json` arar.
+
+Dosyaları ekle: `git add assets/onboarding/ornek.json assets/onboarding/ornek-tr.*`
+README'nin lisans bölümüne bir satır ekle: "assets/onboarding içindeki örnek klip
+Samet'e aittir; Suflo ile birlikte dağıtılır."
+
+### 1.6 Premiere'de elle deneme (yayından önce, yaklaşık 20 dk)
+
+Taze kurulumu taklit etmek için Premiere kapalıyken ayar dosyasını **yedekle** ve sil
+(anahtarın ve tercihlerin de içinde; denemeden sonra yedeği geri koy):
+Windows'ta `%APPDATA%\Kesit\settings.json`, Mac'te `~/Library/Application Support/Kesit/settings.json`.
+Yalnız rehberi yeniden görmek istersen Ayarlar > Destek > "Kurulum rehberini aç" yeter;
+taze kurulum davranışını (yenilikler penceresinin çıkmaması dahil) görmek için dosya silinmeli.
+
+1. Premiere 25.6+ / 2026'da paneli `Window > Extensions (Legacy) > Suflo` ile aç.
+   "Suflo 3.0'da yeni" penceresi **çıkmamalı**, Altyazı sekmesinin üstünde
+   "İlk altyazın 2 dakikada" kartı ve şeridin altında "Kurulum 0/4" çipi görünmeli.
+2. Panel açılırken Premiere donmamalı; kartta hiçbir şeye basmadan proje açıp kapat.
+3. **Motor:** "Yerel motoru indir & kur" → Small (190 MB) iner, ffmpeg arkada iner
+   (Ayarlar > ffmpeg satırında ilerlemesi görünür). NVIDIA'lı makinede cuBLAS **inmemeli**.
+4. **Örnek:** "Örnekte dene" → Proje panelinde "Suflo Ornek" kutusu, "Suflo Deneme" sekansı
+   açılmalı, klip seçili olmalı; altyazı satırları gelmeli; "Normal altyazı izi ekle"
+   yanıp sönmeli. İkinci kez basınca yeni kutu/sekans **oluşmamalı**.
+   Eski Premiere'de (createNewSequenceFromClips yoksa) "Klibi Yeni Öğe simgesine sürükle" demeli.
+5. Motor kurmadan (yeni ayar dosyasıyla) "Örnekte dene" → "örnek transkript" etiketli satırlar.
+6. **Stil:** "Stilleri gör" → Creator Punch kendi satırlarınla oynamalı (ffmpeg yoksa sessizce
+   DOM önizlemesi). "Tamam" deyince önceki stil (ücretsiz kullanıcıda "Özel") geri gelmeli.
+   "Timeline'a koy" ücretsizde Pro penceresini açmalı.
+7. **AI:** "Anahtarı bağla" → "Ücretsiz anahtar al" tarayıcıda console.groq.com/keys açmalı.
+   Anahtarı kopyala → "Panodan al" doldurmalı → "Doğrula ve kaydet". Ayarlar > Bulut yedeği'nde
+   anahtar görünmeli; "Yedeği kaydet"e basınca silinmemeli. İnterneti kesip dene: "kaydedildi
+   ama doğrulanamadı" demeli, "geçersiz" dememeli. Yanlış anahtarda "kabul etmedi" demeli.
+8. AI düğmeleri (Viral anlar, Çevir, AI metin kontrolü, Bölümler AI, Paylaşım metni, B-roll,
+   Kanca AI) anahtar yokken yanlarında "anahtar gerekli · 1 dk" çipi göstermeli; ücretsiz
+   kullanıcıda Viral anlar/Çevir önce Pro penceresini açmalı.
+9. Kartı ✕ ile kapat → Ayarlar > Destek > "Kurulum rehberini aç" geri getirmeli.
+10. Ayarlar > Suflo Doctor: "Klipten sekans" satırı (eski Premiere'de sarı) ve
+    "Panel menüde görünmüyor mu? →" bağlantısı site sayfasını açmalı.
+11. Mac'te Homebrew olmayan makinede 1. adım "Ücretsiz anahtarla başla" önermeli ve
+    sihirbazda "sesin Groq'a gider" uyarısı görünmeli.
+
+### 1.7 Site ve reklam
+
+- `docs/blog/premiere-suflo-paneli-gorunmuyor.html` main'e birleşince suflo.app'te yayına girer;
+  destek DM'lerinde bu bağlantıyı kullan.
+- Yol haritasındaki büyüme maddesi: "2 dakikada ilk Türkçe altyazı" ekran kaydını (30-60 sn)
+  bu rehberle çek; sitenin üst bölümüne ve reklamlara koy. Pazarlamada **"2 dakikada"** de,
+  "60 saniye" deme (Windows'ta indirmeler yüzünden doğru değil).
+
+---
+
+## 2. SEO ve yardım sayfaları (docs/blog)
 
 Yeni sayfalar:
 
@@ -15,7 +157,7 @@ Hepsi `docs/sitemap.xml` ve `docs/blog/index.html` içinde. `tests/test-blog.js`
 
 **Neden senin işin:** Rakip fiyatları yol haritası araştırmasından (`marketing/v4-yol-haritasi.json` → `plan.competitor_table`) alındı. O oturumda üreticilerin sitelerine doğrudan erişilemedi; rakamlar arama sonucu özetlerinden ve üçüncü taraf incelemelerden derlendi. Ayrıca Premiere 25.6 ve sonrasındaki menü adı (`Window > Extensions (Legacy)`) gerçek bir Premiere'de denenmedi. Sayfalar bu yüzden "Ekim 2026 itibarıyla" diye tarihli ve kaynaklı.
 
-### 1. Rakip fiyatlarını doğrula (tanıtmadan önce, sonra her 3 ayda bir)
+### 2.1 Rakip fiyatlarını doğrula (tanıtmadan önce, sonra her 3 ayda bir)
 
 1. Şu sayfaları aç ve rakamları sayfalardaki tablolarla karşılaştır:
    - FireCut: https://firecut.ai/pricing/all/ → Starter / Pro / Max aylık ve yıllık fiyat, deneme süresi (7 gün), aylık planlarda iade süresi (3 gün).
@@ -25,13 +167,16 @@ Hepsi `docs/sitemap.xml` ve `docs/blog/index.html` içinde. `tests/test-blog.js`
 3. Tarihleri güncelle: "Ekim 2026 itibarıyla" ve "Fiyatlar: Ekim 2026" ifadelerini yeni aya çevir, `Güncel:` satırını, JSON-LD'deki `dateModified` değerini ve `docs/sitemap.xml` içindeki `<lastmod>` değerini değiştir.
 4. `node tools/test.js` çalıştır, commit'le.
 
-### 2. Premiere 2026'daki menü adını doğrula
+### 2.2 Premiere 2026'daki menü adını doğrula
 
 1. Windows'ta ve Mac'te Premiere 26.x'i aç, Suflo'yu menüde bul.
 2. Panel `Window > Extensions (Legacy) > Suflo` altında değilse `docs/blog/premiere-suflo-paneli-gorunmuyor.html` (hızlı kontrol, 1. bölüm, temiz kurulum adımları, HowTo ve SSS) ile `docs/blog/premiere-turkce-altyazi-otomatik.html` (1. adım) içindeki menü yolunu düzelt.
-3. `tests/test-blog.js` içindeki "rehber yeni ve eski menu yolunu veriyor" denetimini aynı yola çevir.
+3. Aynı yol kurucuların bitiş metinlerinde, README'de ve Suflo Doctor'da da geçer: `tools/install.ps1`, `tools/install.sh`,
+   `tools/kurucu-yap.ps1`, `tools/kurucu/Suflo-Kur.bat`, `tools/kurucu/Suflo-Kur.command`, `README.md`. Hepsini birlikte düzelt.
+4. `tests/test-blog.js` içindeki "rehber yeni ve eski menu yolunu veriyor" ve `tests/test-panel-rehberi.js` içindeki
+   "Extensions (Legacy) yolu" denetimlerini aynı yola çevir.
 
-### 3. Google'a haber ver
+### 2.3 Google'a haber ver
 
 1. Google Search Console → Site haritaları → `https://suflo.app/sitemap.xml` adresini yeniden gönder.
 2. URL denetimi → dört yeni adres için tek tek "Dizine eklenmesini iste":
@@ -40,7 +185,7 @@ Hepsi `docs/sitemap.xml` ve `docs/blog/index.html` içinde. `tests/test-blog.js`
    - https://suflo.app/blog/autocut-firecut-alternatifi
    - https://suflo.app/blog/opusclip-alternatifi-premiere
 
-### 4. Suflo değiştikçe sayfaları güncel tut
+### 2.4 Suflo değiştikçe sayfaları güncel tut
 
 - Suflo Pro fiyatı değişirse karşılaştırma sayfalarındaki tutarları ve SSS'leri güncelle: `grep -n "749" docs/blog/*.html`.
 - Yeni özellik yayına girince (ör. podcast kamera geçişi, senaryoya göre tekrar temizliği, marka kiti, tek tıkla ilk taslak) "Suflo'da (henüz) olmayanlar" listelerinden çıkar. Yayına girmeden listeden çıkarma.
