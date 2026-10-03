@@ -41,7 +41,19 @@
     temiz.kapandi = k.kapandi === true;
     temiz.bitti = k.bitti === true;
     if (typeof k.model === "string" && /^[a-z0-9-]{2,20}$/.test(k.model)) temiz.model = k.model;
+    if (stilYedegiGecerli(k.stilYedek)) temiz.stilYedek = k.stilYedek;
     return temiz;
+  }
+
+  /*
+   * Stil adımının önizleme öncesi görünümü (KCaptions.stilYedegi()): panel deneme
+   * sürerken kapanırsa bir sonraki açılışta geri konsun diye kayıtta durur.
+   * Yalnız düz nesne ve makul boyut kabul edilir.
+   */
+  function stilYedegiGecerli(y) {
+    if (!y || typeof y !== "object" || Array.isArray(y)) return false;
+    if (!y.alan || typeof y.alan !== "object" || Array.isArray(y.alan)) return false;
+    try { return JSON.stringify(y).length <= 20000; } catch (e) { return false; }
   }
 
   /*
@@ -53,7 +65,9 @@
    *   g.apiKey            bulut/AI anahtarı var mı
    *   g.uygulandi         daha önce sekansa en az bir altyazı uygulandı mı
    * Döner:
-   *   "tam"  taze kurulum ya da hiç başlayamamış (modelsiz, anahtarsız, uygulamasız) kullanıcı
+   *   "tam"  taze kurulum, hiç başlayamamış (modelsiz, anahtarsız, uygulamasız) kullanıcı
+   *          ya da rehberi başlamış ama bitirmemiş/kapatmamış kullanıcı (kayıt var:
+   *          kayıt yalnız rehber tam kartken yazılır)
    *   "cip"  yükselten ama anahtarı olmayan kullanıcı: yalnız "AI anahtarı" çipi
    *   "yok"  rehber bitti ya da kapatıldı ya da gerek yok
    */
@@ -62,6 +76,7 @@
     var ob = g.onboarding;
     if (ob && (ob.kapandi === true || ob.bitti === true)) return "yok";
     if (!g.ayarDosyasiVardi) return "tam";
+    if (ob && typeof ob === "object" && Number(ob.surum) > 0) return "tam";
     var takili = !g.modelVar && !g.apiKey && !g.uygulandi;
     if (takili) return "tam";
     if (!g.apiKey) return "cip";
@@ -124,6 +139,99 @@
     // Çok düşük bellekte (Premiere'i zaten zorlayan makine) daha küçük model
     if (model === "small" && Number(o.ramGB) > 0 && Number(o.ramGB) < 4) model = "base";
     return { bulut: false, model: model, sizeMB: BOYUT[model], gpuOner: o.gpu === "cuda" };
+  }
+
+  /*
+   * Stil denemesi bitince kayıtlı altyazı tercihi (settings.capPrefs): YALNIZ görünüm
+   * alanları önizleme öncesine döner, deneme sırasında kaydedilen başka tercihler (ör.
+   * altyazı dili) kalır. Önceden tercih yoksa görünüm alanları silinir (açılışta
+   * varsayılan görünüm). Döner: yeni capPrefs ya da null (hiç tercih kalmadı: sil).
+   *   simdi: şu anki settings.capPrefs · eski: önizleme öncesi capPrefs (ya da null)
+   */
+  var STIL_TERCIHLERI = ["maxlen", "kase", "punct", "preset", "mogrtPath", "motorStili", "stil"];
+  function stilTercihiGeriYukle(simdi, eski) {
+    var kaynak = eski && typeof eski === "object" ? eski : null;
+    if (!simdi || typeof simdi !== "object") return kaynak ? JSON.parse(JSON.stringify(kaynak)) : null;
+    var out = JSON.parse(JSON.stringify(simdi));
+    STIL_TERCIHLERI.forEach(function (k) {
+      if (kaynak && Object.prototype.hasOwnProperty.call(kaynak, k)) out[k] = JSON.parse(JSON.stringify(kaynak[k] === undefined ? null : kaynak[k]));
+      else delete out[k];
+    });
+    return Object.keys(out).length ? out : null;
+  }
+
+  /*
+   * Rehberin "Yerel motoru indir & kur" seçenekleri (app.js installLocalWhisper'a gider).
+   *   o: { model, cudaKurulu (çalışan cuBLAS motoru zaten kurulu), ornekVar }
+   * İlk kurulumda cuBLAS (646 MB) inmez; ama kurulu cuBLAS motoru CPU sürümüyle
+   * EZİLMEZ (useGpu:false CPU zip'ini indirip GPU hızlandırmayı sessizce kapatırdı).
+   * ffmpeg yalnız örnek klip varken arkaya bırakılır: örnek hazır WAV ile çözülür;
+   * örnek yokken ilk altyazı ffmpeg ister ve indirme ilerlemesi kurulum düğmesinde görünsün.
+   */
+  function kurulumSecenekleri(o) {
+    o = o || {};
+    return { modelId: o.model || ONBOARDING_MODELI, useGpu: !!o.cudaKurulu, ffmpegArkada: !!o.ornekVar };
+  }
+
+  /*
+   * Yapay zekâ özelliklerinden hangileri Pro? (Pro kapısı anahtardan ÖNCE çalışır;
+   * ücretsiz kullanıcıya "anahtarla çalışır" denmesin.) Ad → Pro.gate özellik anahtarı.
+   */
+  var PRO_AI = { "Çeviri": "translate", "Çok dilli SRT paketi": "translate", "Viral anlar": "highlights", "B-roll önerileri": "highlights" };
+  function aiProOzelligi(ozellik) {
+    return Object.prototype.hasOwnProperty.call(PRO_AI, ozellik) ? PRO_AI[ozellik] : "";
+  }
+
+  // Rehberin 4. adımı ve anahtar sihirbazı: Pro durumuna göre dürüst özellik listesi
+  function aiMetni(pro, tamam) {
+    if (pro) {
+      return tamam ? "Yapay zekâ açık: çeviri, AI metin kontrolü, viral anlar, B-roll önerileri ve bölüm başlıkları hazır."
+        : "Çeviri, AI metin kontrolü, viral anlar, B-roll önerileri, bölüm başlıkları ve paylaşım metni ücretsiz bir Groq anahtarıyla çalışır.";
+    }
+    return tamam ? "Yapay zekâ açık: AI metin kontrolü, bölüm başlıkları, paylaşım metni ve kanca önerileri hazır. Çeviri, viral anlar ve B-roll Pro'da."
+      : "AI metin kontrolü, bölüm başlıkları, paylaşım metni ve kanca önerileri ücretsiz bir Groq anahtarıyla çalışır. Çeviri, viral anlar ve B-roll önerileri Pro'da aynı anahtarla açılır.";
+  }
+
+  /*
+   * KS_importSample hata kodu → kullanıcı metni (host.jsx ES3 ve ASCII; Türkçe metin
+   * ve İngilizce çevirisi burada). Bilinmeyen kodda host'un iletisi, o da yoksa genel metin.
+   */
+  var ORNEK_HATALARI = {
+    "proje-yok": "Açık proje yok. Önce bir proje aç ya da yeni bir proje oluştur, sonra tekrar dene.",
+    "yol-yok": "Örnek klip bulunamadı. Suflo'yu yeniden kurmayı dene.",
+    "dosya-yok": "Örnek klip bulunamadı. Suflo'yu yeniden kurmayı dene.",
+    "ice-alinamadi": "Örnek klip projeye alınamadı. Premiere'de açık bir pencere varsa kapatıp tekrar dene."
+  };
+  function ornekHataMetni(r) {
+    var kod = r && typeof r.kod === "string" ? r.kod : "";
+    if (kod && Object.prototype.hasOwnProperty.call(ORNEK_HATALARI, kod)) return ORNEK_HATALARI[kod];
+    return r && r.error ? String(r.error) : "Premiere örnek klibi alamadı.";
+  }
+
+  /*
+   * KS_importSample sonucu ne yapılır?
+   *   "hazir"    sekans açık ve klip içinde: altyazı çıkar, "Normal altyazı izi ekle" vurgulanır
+   *   "surukle"  sekans kurulamadı (eski Premiere): altyazı çıkar ama uygula vurgulanmaz;
+   *              kullanıcı klibi Yeni Öğe simgesine sürükleyip açılan sekansta uygular
+   *   "ac"       sekans var ama etkinleştirilemedi (modal pencere vb.): altyazı ÇIKMAZ —
+   *              yoksa örnek altyazı kullanıcının açık sekansına uygulanabilirdi
+   */
+  function ornekSonucu(r) {
+    if (!r || !r.ok) return "hata";
+    if (r.needsDrag) return "surukle";
+    if (r.active === false) return "ac";
+    return "hazir";
+  }
+
+  /*
+   * "Atla" hangi adımı atlar? Kullanıcı bir başlığı açtıysa (sırayı beklemeden) ve o
+   * adım hâlâ bekliyorsa onu; değilse sıradakini.
+   */
+  function atlanacakAdim(h, acikAdim) {
+    if (!h) return null;
+    var d = acikAdim && h.adimlar ? h.adimlar[acikAdim] : "";
+    if (d === "bekliyor" || d === "yok") return acikAdim;
+    return h.siradaki || null;
   }
 
   /*
@@ -284,6 +392,14 @@
     adimlariHesapla: adimlariHesapla,
     ilerlemeMetni: ilerlemeMetni,
     modelSec: modelSec,
+    kurulumSecenekleri: kurulumSecenekleri,
+    aiProOzelligi: aiProOzelligi,
+    aiMetni: aiMetni,
+    ornekHataMetni: ornekHataMetni,
+    ornekSonucu: ornekSonucu,
+    atlanacakAdim: atlanacakAdim,
+    stilYedegiGecerli: stilYedegiGecerli,
+    stilTercihiGeriYukle: stilTercihiGeriYukle,
     anahtarAyikla: anahtarAyikla,
     anahtarSonucu: anahtarSonucu,
     modelGecisi: modelGecisi,

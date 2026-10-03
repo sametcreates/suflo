@@ -69,8 +69,11 @@ if ($LASTEXITCODE -ne 0) {
 
 git add -A
 $staged = @(git diff --cached --name-only)
+# Ilk acilis rehberinin ornek klibi (assets/onboarding/*.mp4|wav|mp3, kurucunun kendi kaydi) ses
+# yasagina takilmaz; desen tools/verify-release.ps1'deki $onboardingMedia ile AYNI olmali (test denetler).
+$onboardingMedia = '(^|/)assets/onboarding/[^/]+\.(mp4|wav|mp3)$'
 $yasak = @($staged | Where-Object {
-    $_ -match '(^|/)dist/' -or $_ -match '\.(p12|mogrt|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' -or $_ -match '(^|/)config\.php$'
+    $_ -match '(^|/)dist/' -or ($_ -match '\.(p12|mogrt|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' -and $_ -notmatch $onboardingMedia) -or $_ -match '(^|/)config\.php$'
 })
 if ($yasak.Count -gt 0) {
     Write-Host ("Yasakli/gizli dosya stage edildi: {0}" -f ($yasak -join ", ")) -ForegroundColor Red

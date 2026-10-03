@@ -136,6 +136,10 @@ var rp = premiere({ proje: false }).cagir({ path: KLIP, seqName: "Suflo Deneme" 
 ok("acik proje yoksa KS_err", rp.ok === false && /proje/i.test(rp.error), JSON.stringify(rp));
 var ry = premiere().cagir({ seqName: "Suflo Deneme" });
 ok("yol verilmezse KS_err", ry.ok === false, JSON.stringify(ry));
+// Panel metni koddan kurar (Turkce + Ingilizce sozluk panelde; host ES3/ASCII)
+ok("hatalar kod tasir: proje-yok / dosya-yok / yol-yok", rp.kod === "proje-yok" && rd.kod === "dosya-yok" && ry.kod === "yol-yok", [rp.kod, rd.kod, ry.kod].join(","));
+var SO = require(path.join(__dirname, "..", "js", "onboarding-steps.js"));
+ok("panel her host hata kodu icin duzgun Turkce metin bilir", [rp, rd, ry].every(function (x) { return SO.ornekHataMetni(x) !== x.error && /[ıİşŞğĞçÇöÖüÜ]/.test(SO.ornekHataMetni(x)); }));
 
 /* 7) Var olan sekansta klip yoksa (kullanici silmis) surukleme istenir */
 var pk = premiere();

@@ -2,10 +2,12 @@
  * Suflo — "İlk altyazın 2 dakikada" (ilk açılış rehberi)
  *
  * Altyazı sekmesinin üstündeki #ilk-adim kartı dört adım yürütür:
- *   1 Motor  dile uygun küçük model (Türkçe: Small 190 MB), ffmpeg arkada
+ *   1 Motor  dile uygun küçük model (Türkçe: Small 190 MB); örnek klip varsa ffmpeg arkada,
+ *            kurulu cuBLAS motoru korunur. Adım atlanınca #cap-setup sekmedeki yerine döner
  *   2 Örnek  15 sn'lik Türkçe örnek klip projeye alınır, altyazısı çıkar
  *            (örnek dosyalar yoksa: "kendi klibinle ilk altyazı")
- *   3 Stil   Creator Punch kendi altyazınla önizlenir (tercih geri yüklenir)
+ *   3 Stil   Creator Punch kendi altyazınla önizlenir (önceki görünüm geri gelir;
+ *            kullanıcı bir karta ya da görünüm ayarına kendisi dokunursa onun seçimi kalır)
  *   4 AI     ücretsiz Groq anahtarı sihirbazı (doğrulama + panodan alma)
  * Ayrıca: bağlam şeridinin kardeşi #onb-chip ("Kurulum 2/4"), AI düğmelerinin
  * yanında "anahtar gerekli · 1 dk" çipleri, Ayarlar > Destek'te "Kurulum
@@ -32,7 +34,7 @@ window.KOnboarding = (function () {
   var kararDegeri = "yok";
   var kayit = null;
   var ornekBilgi;            // undefined: bakılmadı · null: yok · { kok, m }
-  var stilYedek = null;      // stil adımı açıkken önceki altyazı görünümü
+  var stilYedek = null;      // stil adımı açıkken önceki altyazı görünümü (kayit.stilYedek'te de durur)
   var stilDeneniyor = false;
   var anahtarOzellik = "";
   var dogrulaniyor = false;
@@ -41,6 +43,7 @@ window.KOnboarding = (function () {
   var acikAdim = "";         // kullanıcının başlığına tıklayıp açtığı adım (sırayı beklemeden)
 
   // Anahtar isteyen yapay zekâ düğmeleri: yanlarına "anahtar gerekli · 1 dk" çipi
+  // (Pro'ya bağlı olanlar SO.aiProOzelligi ile bulunur: ücretsizde çip yerine düğmenin Pro rozeti konuşur)
   var AI_HEDEFLER = [
     { id: "cap-proofread", ozellik: "AI metin kontrolü" },
     { id: "cap-translate-go", ozellik: "Çeviri" },
@@ -59,6 +62,19 @@ window.KOnboarding = (function () {
   function anahtarVar() { return !!String(K.settings().apiKey || "").trim(); }
   function aiHazir() {
     try { return !!(window.KCaptions && KCaptions.chatConfig && KCaptions.chatConfig()); } catch (e) { return anahtarVar(); }
+  }
+  function proMu() { return !!(window.Pro && Pro.isPro && Pro.isPro()); }
+  // Bu yapay zekâ özelliği bu kullanıcıda açık mı? (Pro kapısı sessiz sorulur)
+  function ozellikAcik(ozellik) {
+    var anahtar = SO.aiProOzelligi(ozellik);
+    if (!anahtar || !window.Pro || !Pro.gate) return true;
+    try { return Pro.gate(anahtar, { silent: true }) === true; } catch (e) { return true; }
+  }
+  function cudaKurulu() {
+    try {
+      return !!(window.KEngine && KEngine.installedBuild && KEngine.installedBuild() === "cuda" &&
+        K.whisperLocal && K.whisperLocal({ skipModel: true }));
+    } catch (e) { return false; }
   }
   function uygulandi() {
     var s = K.settings();
@@ -160,7 +176,11 @@ window.KOnboarding = (function () {
     return basladi && kararDegeri === "tam" && !kayit.kapandi;
   }
 
-  // Tek kurulum kartı: rehber açıkken #cap-setup motor adımının içine taşınır
+  /*
+   * Tek kurulum kartı: #cap-setup YALNIZ motor adımının gövdesi görünürken (aktif ya da
+   * başlığından açılmış) o adımın içine taşınır. Adım atlanınca/kapanınca kart Altyazı
+   * sekmesindeki eski yerine döner: motor yokken kurulum düğmesi hiç gözden kaybolmaz.
+   */
   function setupYerlestir(kartta) {
     var setup = el("cap-setup"), govde = el("ia-motor-govde");
     if (!setup || !govde) return;
@@ -187,7 +207,8 @@ window.KOnboarding = (function () {
       kart.hidden = !acik;
       kart.classList.toggle("bitti", h.bitti);
     }
-    setupYerlestir(acik);
+    var motorEk = acik && motorEkVar(h);
+    setupYerlestir(acik && adimGovdesiAcik(h, "motor", motorEk));
     cipCiz(h, acik);
     if (!acik) return;
 
@@ -200,9 +221,13 @@ window.KOnboarding = (function () {
       var li = el("ia-" + ad);
       if (!li) return;
       var d = h.adimlar[ad];
+      var ek = ad === "motor" && motorEk;
       li.className = "ia-adim " + (d === "tamam" ? "tamam" : (d === "atlandi" ? "atlandi" : (h.siradaki === ad ? "aktif" : "bekliyor"))) +
-        (acikAdim === ad ? " acik" : "");
+        ((acikAdim === ad || ek) ? " acik" : "");
       yaz("ia-" + ad + "-rozet", d === "tamam" ? "✓" : (d === "atlandi" ? "atlandı" : ""));
+      // klavye ve ekran okuyucu: başlık bir düğme, gövdenin açık olup olmadığını söyler
+      var bas = el("ia-" + ad + "-bas");
+      if (bas) bas.setAttribute("aria-expanded", adimGovdesiAcik(h, ad, ek) ? "true" : "false");
     });
     motorCiz(h);
     ornekCiz(h);
@@ -211,11 +236,33 @@ window.KOnboarding = (function () {
     gorunur("ilk-adim-atla", !!h.siradaki);
   }
 
+  // Adımın gövdesi görünüyor mu (CSS: .aktif ya da .acik)
+  function adimGovdesiAcik(h, ad, ek) {
+    return h.siradaki === ad || acikAdim === ad || !!ek;
+  }
+
+  // İlk altyazıdan SONRA isteğe bağlı ekler (daha doğru model, NVIDIA hızlandırma) var mı
+  function motorEkBilgisi(h) {
+    var aktif = null;
+    try { aktif = window.KEngine ? KEngine.activeModel() : null; } catch (e) {}
+    var ilkSonra = h.adimlar.ornek === "tamam" && h.adimlar.motor === "tamam" && !!aktif;
+    var turboVar = false;
+    try { turboVar = KEngine.installedModels().some(function (m) { return m.id === "turbo" || m.id === "large"; }); } catch (eT) {}
+    var gpu = null;
+    try { gpu = KEngine.gpuInfo(); } catch (eG) {}
+    var cudaYok = !!(gpu && gpu.kind === "cuda" && KEngine.installedBuild() !== "cuda");
+    return { aktif: aktif, turbo: ilkSonra && !turboVar, cublas: ilkSonra && cudaYok };
+  }
+  function motorEkVar(h) {
+    var b = motorEkBilgisi(h);
+    return b.turbo || b.cublas;
+  }
+
   function motorCiz(h) {
     var hazir = h.adimlar.motor === "tamam";
     var secim = modelSecimi();
-    var aktif = null;
-    try { aktif = window.KEngine ? KEngine.activeModel() : null; } catch (e) {}
+    var ekBilgi = motorEkBilgisi(h);
+    var aktif = ekBilgi.aktif;
     if (hazir) {
       yaz("ia-motor-metin", aktif
         ? "Hazır: " + aktif.label.split(" —")[0] + " · yerel, çevrimdışı ve sınırsız."
@@ -224,24 +271,15 @@ window.KOnboarding = (function () {
       yaz("ia-motor-metin", "Mac'te yerel motor Homebrew ile kurulur ve Homebrew bulunamadı. En hızlı başlangıç: ücretsiz Groq anahtarıyla bulut motoru.");
     } else {
       yaz("ia-motor-metin", (secim.model === "base" ? "Base" : "Small") + " modeli (" + secim.sizeMB +
-        " MB) iner; ffmpeg arkada kurulur. Hesap, abonelik ya da kredi yok.");
+        " MB) iner. Hesap, abonelik ya da kredi yok.");
     }
     gorunur("ia-motor-bulut", !hazir && !!secim.bulut);
 
     // İlk altyazıdan SONRA isteğe bağlı: daha doğru model ve NVIDIA hızlandırma
-    var ilkSonra = h.adimlar.ornek === "tamam" && hazir && !!aktif;
-    var turboVar = false;
-    try { turboVar = KEngine.installedModels().some(function (m) { return m.id === "turbo" || m.id === "large"; }); } catch (eT) {}
-    var gpu = null;
-    try { gpu = KEngine.gpuInfo(); } catch (eG) {}
-    var cudaYok = !!(gpu && gpu.kind === "cuda" && KEngine.installedBuild() !== "cuda");
-    var ekVar = ilkSonra && (!turboVar || cudaYok);
-    gorunur("ia-turbo", ilkSonra && !turboVar);
-    gorunur("ia-cublas", ilkSonra && cudaYok);
-    gorunur("ia-motor-ek", ekVar);
-    // tamamlanmış motor adımı kapalı durur; "Daha doğru model" varsa açık kalsın
-    var li = el("ia-motor");
-    if (li) li.classList.toggle("acik", ekVar || acikAdim === "motor");
+    // (tamamlanmış motor adımı kapalı durur; bunlar varsa ciz() onu "acik" çizer)
+    gorunur("ia-turbo", ekBilgi.turbo);
+    gorunur("ia-cublas", ekBilgi.cublas);
+    gorunur("ia-motor-ek", ekBilgi.turbo || ekBilgi.cublas);
   }
 
   function ornekCiz(h) {
@@ -256,18 +294,21 @@ window.KOnboarding = (function () {
       yaz("ia-ornek-metin", motorHazir
         ? "15 saniyelik Türkçe örnek klip projene alınır (Suflo Ornek kutusu, Suflo Deneme sekansı) ve altyazısı çıkar."
         : "Motor kurulmadan da olur: örnek klip projene alınır, elle doğrulanmış örnek transkript yüklenir.");
+    } else if (!motorHazir) {
+      // kendi klibinle: motor (ya da anahtar) olmadan "Altyazı oluştur" kapalı kalır
+      yaz("ia-ornek-metin", "Önce motoru kur: kendi klibinden altyazı çıkarmak için yerel motor ya da ücretsiz bir Groq anahtarı gerekir.");
     } else {
       yaz("ia-ornek-metin", "Timeline'da bir klip seç ve Altyazı oluştur'a bas.");
     }
     if (dugme) {
       dugme.hidden = d === "tamam";
-      dugme.textContent = ornekModu ? "Örnekte dene" : "Altyazı oluştur'a git";
+      dugme.textContent = ornekModu ? "Örnekte dene" : (motorHazir ? "Altyazı oluştur'a git" : "Motoru kur");
       dugme.disabled = ornekSuruyor;
     }
   }
 
   function stilCiz(h) {
-    var pro = !!(window.Pro && Pro.isPro && Pro.isPro());
+    var pro = proMu();
     yaz("ia-stil-metin", h.adimlar.stil === "tamam"
       ? "Stil adımı tamam. Stilleri her zaman aşağıdaki Stil kartından önizleyebilirsin."
       : "Creator Punch'ı kendi altyazınla önizle. Normal altyazı izi ücretsiz; animasyonlu stil katmanı " +
@@ -275,10 +316,9 @@ window.KOnboarding = (function () {
     gorunur("ia-stil-dugmeler", h.adimlar.stil !== "tamam");
   }
 
+  // Ücretsiz kullanıcıya Pro özellikleri "anahtarla çalışır" diye vaat edilmez (SO.aiMetni)
   function aiCiz(h) {
-    yaz("ia-ai-metin", h.adimlar.ai === "tamam"
-      ? "Yapay zekâ açık: çeviri, AI metin kontrolü, viral anlar ve bölüm başlıkları hazır."
-      : "Çeviri, AI metin kontrolü, viral anlar, bölüm başlıkları ve paylaşım metni ücretsiz bir Groq anahtarıyla çalışır.");
+    yaz("ia-ai-metin", SO.aiMetni(proMu(), h.adimlar.ai === "tamam"));
     gorunur("ia-ai-ac", h.adimlar.ai !== "tamam");
   }
 
@@ -302,12 +342,14 @@ window.KOnboarding = (function () {
   }
 
   // Yapay zekâ düğmeleri tıklanabilir kalır (Pro kapısı önce çalışsın); anahtar
-  // yoksa yanlarında sihirbazı açan küçük bir çip durur
+  // yoksa yanlarında sihirbazı açan küçük bir çip durur. Pro'ya bağlı düğmede (Çeviri,
+  // Viral anlar, B-roll) ücretsiz kullanıcıya çip gösterilmez: anahtar onu açmaz.
   function cipleriGuncelle() {
-    var gerek = !aiHazir();
+    var anahtarYok = !aiHazir();
     AI_HEDEFLER.forEach(function (h) {
       var hedef = el(h.id);
       if (!hedef || !hedef.parentNode) return;
+      var gerek = anahtarYok && ozellikAcik(h.ozellik);
       var cip = document.getElementById(h.id + "-anahtar");
       if (!cip) {
         if (!gerek) return;
@@ -345,11 +387,14 @@ window.KOnboarding = (function () {
     ciz();
   }
 
+  // Başlığından açılmış ve hâlâ bekleyen bir adım varsa "Atla" onu, yoksa sıradakini atlar
   function adimiAtla() {
     var h = SO.adimlariHesapla(kayit, gercekler());
-    if (!h.siradaki) return;
-    if (h.siradaki === "stil") stilKapat();
-    kayit.adimlar[h.siradaki] = "atlandi";
+    var ad = SO.atlanacakAdim(h, acikAdim);
+    if (!ad) return;
+    if (ad === "stil") stilKapat();
+    kayit.adimlar[ad] = "atlandi";
+    if (acikAdim === ad) acikAdim = "";
     kayitYaz();
     durum("");
     ciz();
@@ -382,13 +427,14 @@ window.KOnboarding = (function () {
   }
 
   // Rehber açıkken motor kurulumu (captions.js #cap-local-install, tıklamada okunur)
+  // (kurulu cuBLAS motoru korunur; ffmpeg yalnız örnek klip varken arkaya bırakılır — SO.kurulumSecenekleri)
   function kurulumSecenekleri() {
     if (!rehberAcik() || kayit.bitti) return null;
     var secim = modelSecimi();
     if (secim.bulut) return null;
     kayit.model = secim.model;
     kayitYaz();
-    return { modelId: secim.model, useGpu: false, ffmpegArkada: true };
+    return SO.kurulumSecenekleri({ model: secim.model, cudaKurulu: cudaKurulu(), ornekVar: !!ornekOku() });
   }
 
   // Örnek klip dosyalarını ayar klasörüne kopyala: güncelleme eklenti klasörünü
@@ -407,6 +453,17 @@ window.KOnboarding = (function () {
       out[k] = dst;
     });
     return out;
+  }
+
+  // Motor yokken 2. adım (kendi klibinle) kullanıcıyı 1. adımın kurulum kartına götürür
+  function motoraGit() {
+    KApp.goster("captions");
+    acikAdim = "motor";
+    ciz();
+    kaydir(el("ia-motor"));
+    var b = el("cap-local-install");
+    if (b && b.focus && !b.disabled) { try { b.focus(); } catch (e) {} }
+    durum("Önce motoru kur ya da ücretsiz anahtar gir; sonra kendi klibinden altyazı çıkar.");
   }
 
   function ilkAltyaziyaGit() {
@@ -432,7 +489,11 @@ window.KOnboarding = (function () {
   async function ornekDeneTikla() {
     if (ornekSuruyor) return;
     var o = ornekOku();
-    if (!o) { ilkAltyaziyaGit(); return; }
+    if (!o) {
+      if (SO.adimlariHesapla(kayit, gercekler()).adimlar.motor !== "tamam") motoraGit();
+      else ilkAltyaziyaGit();
+      return;
+    }
     ornekSuruyor = true;
     var dugme = el("ia-ornek-dene");
     if (dugme) dugme.disabled = true;
@@ -442,8 +503,17 @@ window.KOnboarding = (function () {
       var veri = SO.ornekKelimeleri(JSON.parse(K.fs.readFileSync(yerel.words, "utf8")));
       durum("Örnek klip projene alınıyor…");
       var r = await K.call("KS_importSample", { path: yerel.video, seqName: o.m.sekans }, 60000);
-      if (!r || !r.ok) throw new Error(r && r.error ? r.error : "Premiere örnek klibi alamadı.");
+      if (!r || !r.ok) throw new Error(SO.ornekHataMetni(r));
       KApp.pollNow();
+      var sonuc = SO.ornekSonucu(r);
+      if (sonuc === "ac") {
+        // Sekans var ama açılamadı (modal pencere vb.): altyazı çıkarılmaz, yoksa
+        // "Normal altyazı izi ekle" örneği kullanıcının açık sekansına koyardı
+        durum("\"" + o.m.sekans + "\" sekansı açılamadı. Proje panelinde ona çift tıkla, sonra tekrar dene.", "warn");
+        return;
+      }
+      // uygula yalnız örneğin kendi sekansına (bilinmiyorsa — sürükleme — koruma yok)
+      if (KCaptions.ornekHedefi) KCaptions.ornekHedefi(sonuc === "hazir" ? r.sequenceId : "");
       var offset = Number(r.offset) || 0;
       var basarili = false;
       if (KCaptions.engineReady()) {
@@ -455,10 +525,13 @@ window.KOnboarding = (function () {
       }
       if (basarili) {
         adimTamam("ornek");
-        durum(r.needsDrag
-          ? "Klibi Yeni Öğe simgesine sürükle; sekans açılınca \"Normal altyazı izi ekle\"ye bas."
-          : "Altyazın hazır. \"Normal altyazı izi ekle\" ile sekansa uygula — ücretsiz.", r.needsDrag ? "warn" : "good");
-        sekansaUygulaVurgula();
+        if (sonuc === "surukle") {
+          // sekans kurulamadı: uygula düğmesi vurgulanmaz (açık sekans kullanıcınınki olabilir)
+          durum("Klibi Yeni Öğe simgesine sürükle; sekans açılınca \"Normal altyazı izi ekle\"ye bas.", "warn");
+        } else {
+          durum("Altyazın hazır. \"Normal altyazı izi ekle\" ile sekansa uygula — ücretsiz.", "good");
+          sekansaUygulaVurgula();
+        }
       } else if (r.needsDrag) {
         durum("Klibi Yeni Öğe simgesine sürükle, sonra tekrar dene.", "warn");
       } else {
@@ -474,8 +547,21 @@ window.KOnboarding = (function () {
 
   /* ---------------- Stil adımı ---------------- */
 
+  /*
+   * Önizleme öncesi görünüm (stilYedek) bellekte VE kayıtta (settings.onboarding.stilYedek)
+   * durur: deneme sürerken panel kapanırsa bir sonraki açılışta geri konur — ücretsiz
+   * kullanıcının varsayılanı sessizce Pro stiline dönmesin. Kullanıcı stil kartına ya da
+   * bir görünüm ayarına KENDİSİ dokunursa bu bilinçli seçimdir: yedek bırakılır.
+   */
+  function stilYedekAyarla(y) {
+    stilYedek = y || null;
+    if (stilYedek && SO.stilYedegiGecerli(stilYedek)) kayit.stilYedek = stilYedek;
+    else delete kayit.stilYedek;
+    kayitYaz();
+  }
+
   function stilGoster() {
-    if (!stilYedek) stilYedek = KCaptions.stilYedegi();
+    if (!stilYedek) stilYedekAyarla(KCaptions.stilYedegi());
     KApp.goster("captions");
     stilDeneniyor = true;
     try { KCaptions.stilDene(STIL_ORNEGI); } finally { stilDeneniyor = false; }
@@ -484,12 +570,17 @@ window.KOnboarding = (function () {
       : "Creator Punch önizleniyor. Altyazın çıkınca kendi satırlarınla oynar.");
   }
 
-  // Adım kapanınca önceki görünüm geri gelir (kullanıcı kendisi bir karta bastıysa o seçim kalır)
+  // Adım kapanınca önceki görünüm geri gelir (kullanıcı kendisi bir seçim yaptıysa o kalır)
   function stilKapat() {
     if (!stilYedek) return;
     var y = stilYedek;
-    stilYedek = null;
+    stilYedekAyarla(null);
     try { KCaptions.stilYedeginiYukle(y); } catch (e) { K.log("[rehber] stil geri yuklenemedi: " + (e && e.message)); }
+  }
+
+  // Kullanıcının kendi stil seçimi: geri yükleme yapılmaz
+  function stilSecildi() {
+    if (stilYedek && !stilDeneniyor) stilYedekAyarla(null);
   }
 
   function stilTamam() {
@@ -498,15 +589,20 @@ window.KOnboarding = (function () {
     durum("");
   }
 
-  // TIKLAMA: stilli katmanı timeline'a koy (Pro overlay; ücretsizde satış penceresi)
+  /*
+   * TIKLAMA: stilli katmanı timeline'a koy (Pro overlay; ücretsizde satış penceresi).
+   * Seçili bir stil varsa (önizlenen Creator Punch, kullanıcının sonradan dokunduğu kart
+   * ya da daha önce kaydettiği stil) O uygulanır; hiç stil yoksa Creator Punch önizlenip konur.
+   */
   function stilKoyTikla() {
-    if (!(window.Pro && Pro.isPro && Pro.isPro())) {
+    if (!proMu()) {
       if (window.Pro && Pro.gate) Pro.gate("captionStyles");
       return;
     }
     if (!KCaptions.hasSegments()) { KApp.toast("Önce altyazı oluştur ya da örnekte dene.", "warn"); return; }
-    if (!stilYedek) stilGoster();
-    stilYedek = null;   // kullanıcı bu stili bilerek kullandı: geri yükleme yok
+    var secili = KCaptions.stilSecili ? KCaptions.stilSecili() : !!stilYedek;
+    if (!secili) stilGoster();
+    if (stilYedek) stilYedekAyarla(null);   // kullanıcı bu stili bilerek kullandı: geri yükleme yok
     Promise.resolve(KCaptions.applyStyled()).then(function () { adimTamam("stil"); });
   }
 
@@ -561,11 +657,17 @@ window.KOnboarding = (function () {
       return;
     }
     anahtarOzellik = String(ozellik || "");
-    yaz("onb-anahtar-neden", anahtarOzellik
-      ? anahtarOzellik + " ücretsiz bir Groq anahtarıyla çalışır. Bir kez bağla, tüm yapay zekâ özellikleri açılsın."
-      : "Çeviri, AI metin kontrolü, viral anlar, bölüm başlıkları ve paylaşım metni ücretsiz bir Groq anahtarıyla çalışır.");
-    // Bulut motoru (Mac'te Homebrew yokken): ses Groq'a gider — açıkça söylenir
-    gorunur("onb-anahtar-onay", baglam === "motor");
+    yaz("onb-anahtar-neden", anahtarOzellik && ozellikAcik(anahtarOzellik)
+      ? anahtarOzellik + " ücretsiz bir Groq anahtarıyla çalışır. Bir kez bağlaman yeter."
+      : SO.aiMetni(proMu(), false));
+    /*
+     * Yerel motor hazır değilken kaydedilen anahtar bulut motorunu da açar (anahtarKaydet
+     * sağlayıcıyı Groq yapar): sonraki "Altyazı oluştur"da ses Groq'a gider. Hangi
+     * düğmeden gelinirse gelinsin bu açıkça söylenir.
+     */
+    var bulut = baglam === "motor";
+    try { if (KCaptions.anahtarSesiBulutaGonderir) bulut = bulut || KCaptions.anahtarSesiBulutaGonderir(); } catch (eB) {}
+    gorunur("onb-anahtar-onay", bulut);
     modalDurum("");
     modal.hidden = false;
     var girdi = el("onb-anahtar-girdi");
@@ -622,7 +724,7 @@ window.KOnboarding = (function () {
       : (sonuc.durum === "limit" ? "Anahtar geçerli ve kaydedildi. Groq şu an yoğun; birkaç saniye sonra dene."
         : "İnternete ulaşılamadı; anahtar doğrulanamadı ama kaydedildi. Bağlantı gelince çalışır.");
     anahtarModalKapat();
-    KApp.toast(mesaj + (ozellik ? " · " + ozellik + " şimdi çalışır, düğmeye tekrar bas." : ""),
+    KApp.toast(mesaj + (ozellik && ozellikAcik(ozellik) ? " · " + ozellik + " şimdi çalışır, düğmeye tekrar bas." : ""),
       sonuc.durum === "ok" ? "good" : "warn", 8000);
     yenile();
   }
@@ -636,9 +738,9 @@ window.KOnboarding = (function () {
 
   function olaylariBagla() {
     tikla("ilk-adim-kapat", kapat);
+    // başlıklar <button>: fare, Enter ve Boşluk aynı "click"i üretir
     SO.ADIMLAR.forEach(function (ad) {
-      var li = el("ia-" + ad);
-      var bas = li && li.querySelector ? li.querySelector(".ia-adim-bas") : null;
+      var bas = el("ia-" + ad + "-bas");
       if (bas) bas.addEventListener("click", function () { adimBasligi(ad); });
     });
     tikla("ilk-adim-atla", adimiAtla);
@@ -667,21 +769,29 @@ window.KOnboarding = (function () {
       if (e.key === "Escape" && modal && !modal.hidden) { e.preventDefault(); anahtarModalKapat(); }
     });
 
-    // Kullanıcı stil kartına KENDİSİ dokunursa bu bilinçli seçimdir: geri yükleme yapılmaz
+    // Kullanıcı stil kartına ya da bir görünüm ayarına KENDİSİ dokunursa bu bilinçli
+    // seçimdir: geri yükleme yapılmaz (stilDene değerleri koddan yazar, olay üretmez)
     var grid = el("cap-stil-grid");
-    if (grid) grid.addEventListener("click", function () {
-      if (stilYedek && !stilDeneniyor) stilYedek = null;
-    }, true);
+    if (grid) grid.addEventListener("click", stilSecildi, true);
+    var kontroller = window.KCaptions && KCaptions.stilKontrolleri ? KCaptions.stilKontrolleri() : [];
+    kontroller.forEach(function (id) {
+      var e = el(id);
+      if (!e) return;
+      e.addEventListener("change", stilSecildi);
+      e.addEventListener("input", stilSecildi);
+    });
 
     document.addEventListener("suflo:ayar", yenile);
     if (window.KCaptions && KCaptions.onSonuc) {
       KCaptions.onSonuc(function () {
         if (!basladi) return;
-        if (kayit.adimlar.ornek !== "tamam") { kayit.adimlar.ornek = "tamam"; kayitYaz(); }
+        // kayıt yalnız rehber tam kartken yazılır (varlığı "rehber sürüyor" demektir)
+        if (kararDegeri === "tam" && kayit.adimlar.ornek !== "tamam") { kayit.adimlar.ornek = "tamam"; kayitYaz(); }
         yenile();
       });
     }
-    if (window.Pro && Pro.on) Pro.on(function () { if (basladi) ciz(); });
+    // Pro durumu değişince metinler ve Pro'ya bağlı düğmelerin çipleri de tazelensin
+    if (window.Pro && Pro.on) Pro.on(function () { if (basladi) yenile(); });
   }
 
   function init() {
@@ -691,6 +801,11 @@ window.KOnboarding = (function () {
     kayit = SO.kayitDuzelt(s.onboarding);
     kararDegeri = kararVer();
     basladi = true;
+    // Önceki oturum stil denemesi sürerken kapandı: önceki görünümü geri koy
+    if (kayit.stilYedek) {
+      stilYedek = kayit.stilYedek;
+      stilKapat();
+    }
     if (kararDegeri === "tam") {
       // Taze kurulumda "Suflo 3.0'da yeni" penceresi rehberin üstüne binmesin
       if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.0";

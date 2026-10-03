@@ -3667,6 +3667,9 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .ia-adim.aktif { border-color: rgba(139, 124, 246, .55); background: var(--accent-soft); }
 .ia-adim.tamam, .ia-adim.atlandi { opacity: .72; }
 .ia-adim-bas { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+/* başlık bir <button>: klavyeyle açılır (Enter/Boşluk); düğme görünümü sıfırlanır, tarayıcının odak çizgisi kalır */
+button.ia-adim-bas { width: 100%; margin: 0; padding: 0; border: 0; background: none; color: inherit; font-family: inherit; text-align: left; }
+button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 .ia-adim-bas b { color: var(--text); }
 .ia-no {
   flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%;

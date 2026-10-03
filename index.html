@@ -173,9 +173,9 @@
       <div class="ia-cubuk"><i id="ilk-adim-cubuk"></i></div>
       <ol class="ia-adimlar">
         <li id="ia-motor" class="ia-adim" data-adim="motor">
-          <div class="ia-adim-bas"><span class="ia-no">1</span><b>Motoru kur</b><span class="ia-rozet" id="ia-motor-rozet"></span></div>
+          <button type="button" class="ia-adim-bas" id="ia-motor-bas" aria-expanded="false" aria-controls="ia-motor-govde"><span class="ia-no">1</span><b>Motoru kur</b><span class="ia-rozet" id="ia-motor-rozet"></span></button>
           <div class="ia-govde" id="ia-motor-govde">
-            <p class="ia-metin" id="ia-motor-metin">Small modeli (190 MB) iner; ffmpeg arkada kurulur.</p>
+            <p class="ia-metin" id="ia-motor-metin">Small modeli (190 MB) iner.</p>
             <button type="button" id="ia-motor-bulut" class="btn primary" hidden>Ücretsiz anahtarla başla</button>
             <div class="row-btns ia-ek" id="ia-motor-ek" hidden>
               <button type="button" id="ia-turbo" class="btn tiny" hidden title="574 MB · Türkçede daha az hata">Daha doğru model (Turbo)</button>
@@ -184,15 +184,15 @@
           </div>
         </li>
         <li id="ia-ornek" class="ia-adim" data-adim="ornek">
-          <div class="ia-adim-bas"><span class="ia-no">2</span><b id="ia-ornek-baslik">Örnekte dene</b><span class="ia-rozet" id="ia-ornek-rozet"></span></div>
-          <div class="ia-govde">
+          <button type="button" class="ia-adim-bas" id="ia-ornek-bas" aria-expanded="false" aria-controls="ia-ornek-govde"><span class="ia-no">2</span><b id="ia-ornek-baslik">Örnekte dene</b><span class="ia-rozet" id="ia-ornek-rozet"></span></button>
+          <div class="ia-govde" id="ia-ornek-govde">
             <p class="ia-metin" id="ia-ornek-metin">Timeline'da bir klip seç ve Altyazı oluştur'a bas.</p>
             <button type="button" id="ia-ornek-dene" class="btn primary">Örnekte dene</button>
           </div>
         </li>
         <li id="ia-stil" class="ia-adim" data-adim="stil">
-          <div class="ia-adim-bas"><span class="ia-no">3</span><b>Stilini seç</b><span class="ia-rozet" id="ia-stil-rozet"></span></div>
-          <div class="ia-govde">
+          <button type="button" class="ia-adim-bas" id="ia-stil-bas" aria-expanded="false" aria-controls="ia-stil-govde"><span class="ia-no">3</span><b>Stilini seç</b><span class="ia-rozet" id="ia-stil-rozet"></span></button>
+          <div class="ia-govde" id="ia-stil-govde">
             <p class="ia-metin" id="ia-stil-metin">Creator Punch'ı kendi altyazınla önizle.</p>
             <div class="row-btns" id="ia-stil-dugmeler">
               <button type="button" id="ia-stil-goster" class="btn primary">Stilleri gör</button>
@@ -202,9 +202,9 @@
           </div>
         </li>
         <li id="ia-ai" class="ia-adim" data-adim="ai">
-          <div class="ia-adim-bas"><span class="ia-no">4</span><b>Yapay zekâyı aç</b><em class="ia-etiket">ücretsiz · 1 dk</em><span class="ia-rozet" id="ia-ai-rozet"></span></div>
-          <div class="ia-govde">
-            <p class="ia-metin" id="ia-ai-metin">Çeviri, AI metin kontrolü, viral anlar, bölüm başlıkları ve paylaşım metni ücretsiz bir Groq anahtarıyla çalışır.</p>
+          <button type="button" class="ia-adim-bas" id="ia-ai-bas" aria-expanded="false" aria-controls="ia-ai-govde"><span class="ia-no">4</span><b>Yapay zekâyı aç</b><em class="ia-etiket">ücretsiz · 1 dk</em><span class="ia-rozet" id="ia-ai-rozet"></span></button>
+          <div class="ia-govde" id="ia-ai-govde">
+            <p class="ia-metin" id="ia-ai-metin">AI metin kontrolü, bölüm başlıkları, paylaşım metni ve kanca önerileri ücretsiz bir Groq anahtarıyla çalışır. Çeviri, viral anlar ve B-roll önerileri Pro'da aynı anahtarla açılır.</p>
             <button type="button" id="ia-ai-ac" class="btn primary">Anahtarı bağla</button>
           </div>
         </li>
@@ -227,6 +227,7 @@
         <input id="cap-key-input" type="password" placeholder="gsk_… anahtarını yapıştır">
         <button id="cap-key-save" class="btn">Kaydet</button>
       </div>
+      <p class="hint onb-onay" style="margin:6px 0 0">Bulut motorunda altyazı için sesin Groq'a gönderilir. Yerel motorda ses bilgisayarından çıkmaz.</p>
     </div>
 
     <div id="cap-main">
@@ -1675,7 +1676,7 @@
       <button type="button" id="onb-anahtar-kapat" class="onb-modal-x" aria-label="Kapat">✕</button>
       <span class="onb-modal-ust">ÜCRETSİZ · 1 DAKİKA</span>
       <b id="onb-anahtar-baslik">Yapay zekâyı aç</b>
-      <p class="hint" id="onb-anahtar-neden">Çeviri, AI metin kontrolü, viral anlar, bölüm başlıkları ve paylaşım metni ücretsiz bir Groq anahtarıyla çalışır.</p>
+      <p class="hint" id="onb-anahtar-neden">AI metin kontrolü, bölüm başlıkları, paylaşım metni ve kanca önerileri ücretsiz bir Groq anahtarıyla çalışır. Çeviri, viral anlar ve B-roll önerileri Pro'da aynı anahtarla açılır.</p>
       <p class="hint onb-onay" id="onb-anahtar-onay" hidden>Bulut motorunda altyazı çıkarmak için sesin Groq'a gider. Yerel motoru sonra kurarsan ses bilgisayarından çıkmaz.</p>
       <ol class="onb-modal-adimlar">
         <li>
@@ -1691,7 +1692,7 @@
       </ol>
       <button type="button" id="onb-anahtar-kaydet" class="btn primary big">Doğrula ve kaydet</button>
       <div id="onb-anahtar-durum" class="inline-status"></div>
-      <p class="hint onb-gizlilik">Anahtar yalnız bu bilgisayarda, Suflo ayarlarında saklanır. Yapay zekâ özelliklerinde yalnız altyazı metni gönderilir; ses gönderilmez.</p>
+      <p class="hint onb-gizlilik">Anahtar yalnız bu bilgisayarda, Suflo ayarlarında saklanır. Metin özellikleri (çeviri, AI metin kontrolü, başlıklar) Groq'a yalnız altyazı metnini gönderir.</p>
     </div>
   </div>
 

@@ -59,6 +59,8 @@ function KS_arg(encoded) {
 }
 function KS_ok(data) { data = data || {}; data.ok = true; return KJSON.stringify(data); }
 function KS_err(msg) { return KJSON.stringify({ ok: false, error: String(msg) }); }
+// Panel metni koda gore kurar (Turkce + Ingilizce sozluk panelde); error yalniz gunluk/yedek icin
+function KS_errKod(kod, msg) { return KJSON.stringify({ ok: false, kod: String(kod), error: String(msg) }); }
 
 var KS_TPS = 254016000000; // Premiere ticks / saniye
 
@@ -2150,11 +2152,11 @@ function KS_sampleClipIn(seq, mediaPath) {
 function KS_importSample(encoded) {
   try {
     var p = KS_arg(encoded);
-    if (!app.project || !app.project.rootItem) return KS_err("Acik proje yok. Once bir proje ac ya da yeni proje olustur.");
+    if (!app.project || !app.project.rootItem) return KS_errKod("proje-yok", "Acik proje yok. Once bir proje ac ya da yeni proje olustur.");
     var yol = String(p.path || "");
-    if (!yol) return KS_err("Ornek klip yolu verilmedi.");
+    if (!yol) return KS_errKod("yol-yok", "Ornek klip yolu verilmedi.");
     var dosya = new File(yol);
-    if (!dosya.exists) return KS_err("Ornek klip bulunamadi: " + yol);
+    if (!dosya.exists) return KS_errKod("dosya-yok", "Ornek klip bulunamadi: " + yol);
     var seqAdi = String(p.seqName || "Suflo Deneme").replace(/[\r\n\t]+/g, " ").substring(0, 60);
     var i, s;
 
@@ -2172,7 +2174,7 @@ function KS_importSample(encoded) {
       oge = KS_findItemByPath(kutu, yol) || KS_findItemByPath(app.project.rootItem, yol);
       iceAlindi = true;
     }
-    if (!oge) return KS_err("Ornek klip projeye alinamadi.");
+    if (!oge) return KS_errKod("ice-alinamadi", "Ornek klip projeye alinamadi.");
 
     var seq = null;
     for (i = 0; i < app.project.sequences.numSequences; i++) {

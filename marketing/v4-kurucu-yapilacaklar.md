@@ -92,10 +92,14 @@ node tools/test.js
 
 `test-varliklar.js` şunları denetler: manifest geçerli, listelenen dosyalar var, her biri
 2 MB'tan küçük, WAV 16 kHz mono 16-bit PCM, transkriptte en az 8 kelime var, klasörde
-manifestte olmayan medya yok. Yayın denetimi (`tools/verify-release.ps1`) bu klasördeki
-mp4/wav/mp3'e izin verir ve paket içinde `ornek.json` arar.
+manifestte olmayan medya yok. Yayın denetimi (`tools/verify-release.ps1`) ve yayın betiği
+(`tools/publish.ps1`, aynı desenle) bu klasördeki mp4/wav/mp3'e izin verir; başka yerdeki
+ses dosyaları yine yasak. Yayın denetimi paket içinde `ornek.json` arar
+(`tests/test-panel-rehberi.js` iki betiğin desenini birlikte denetler).
 
 Dosyaları ekle: `git add assets/onboarding/ornek.json assets/onboarding/ornek-tr.*`
+(`tools/publish.ps1` zaten `git add -A` ile yeni dosyaları da commit'ler; elle eklemek
+yalnız yayından önce ayrı bir commit istiyorsan gerekir.)
 README'nin lisans bölümüne bir satır ekle: "assets/onboarding içindeki örnek klip
 Samet'e aittir; Suflo ile birlikte dağıtılır."
 
@@ -111,23 +115,43 @@ taze kurulum davranışını (yenilikler penceresinin çıkmaması dahil) görme
    "Suflo 3.0'da yeni" penceresi **çıkmamalı**, Altyazı sekmesinin üstünde
    "İlk altyazın 2 dakikada" kartı ve şeridin altında "Kurulum 0/4" çipi görünmeli.
 2. Panel açılırken Premiere donmamalı; kartta hiçbir şeye basmadan proje açıp kapat.
-3. **Motor:** "Yerel motoru indir & kur" → Small (190 MB) iner, ffmpeg arkada iner
-   (Ayarlar > ffmpeg satırında ilerlemesi görünür). NVIDIA'lı makinede cuBLAS **inmemeli**.
+3. **Motor:** "Yerel motoru indir & kur" → Small (190 MB) iner. Örnek klip varken ffmpeg
+   arkada iner (Ayarlar > ffmpeg satırında ilerlemesi görünür; hemen "Altyazı oluştur"a
+   basarsan durum satırında da yüzde akmalı). Örnek klip yoksa ffmpeg kurulum düğmesinde
+   ilerlemesiyle önce iner. NVIDIA'lı makinede cuBLAS **inmemeli**; daha önce cuBLAS motoru
+   kurulmuşsa (Ayarlar > motor satırı "GPU") rehberden kurulum onu CPU'ya **düşürmemeli**.
+   1. adımda "Atla"ya bas: kurulum kartı ("Yerel motoru indir & kur") rehberin altında,
+   sekmenin üstünde görünür kalmalı; 2. adım "Önce motoru kur" demeli ve düğmesi "Motoru kur"
+   olmalı, basınca 1. adım açılıp kurulum kartı içine gelmeli. Paneli kapatıp açınca da öyle.
 4. **Örnek:** "Örnekte dene" → Proje panelinde "Suflo Ornek" kutusu, "Suflo Deneme" sekansı
    açılmalı, klip seçili olmalı; altyazı satırları gelmeli; "Normal altyazı izi ekle"
    yanıp sönmeli. İkinci kez basınca yeni kutu/sekans **oluşmamalı**.
-   Eski Premiere'de (createNewSequenceFromClips yoksa) "Klibi Yeni Öğe simgesine sürükle" demeli.
+   Eski Premiere'de (createNewSequenceFromClips yoksa) "Klibi Yeni Öğe simgesine sürükle" demeli
+   ve "Normal altyazı izi ekle" **yanıp sönmemeli**. Örnek altyazı yüklüyken kendi sekansını
+   açıp "Normal altyazı izi ekle"ye basarsan "Bu örnek altyazı Suflo Deneme sekansı için"
+   uyarısı çıkmalı, kendi sekansına iz **eklenmemeli**.
+   Proje açık değilken (Premiere Ana ekranı) "Örnekte dene" düzgün Türkçe "Açık proje yok…" demeli.
+   Kurtarılmamış taslak varken ("Kurtar: N satır" düğmesi görünür) "Örnekte dene"ye bas:
+   "Kurtar" düğmesi kaybolmamalı ve basınca eski iş gelmeli.
 5. Motor kurmadan (yeni ayar dosyasıyla) "Örnekte dene" → "örnek transkript" etiketli satırlar.
 6. **Stil:** "Stilleri gör" → Creator Punch kendi satırlarınla oynamalı (ffmpeg yoksa sessizce
    DOM önizlemesi). "Tamam" deyince önceki stil (ücretsiz kullanıcıda "Özel") geri gelmeli.
-   "Timeline'a koy" ücretsizde Pro penceresini açmalı.
+   Önizlemeden sonra yazı boyutunu/rengini değiştirip ya da başka bir karta dokunup "Tamam"
+   dersen **senin** seçimin kalmalı; arada altyazı dilini değiştirdiysen dil de kalmalı.
+   "Stilleri gör"e basıp Premiere'i kapat, yeniden aç: önceki stil geri gelmiş olmalı.
+   "Timeline'a koy" ücretsizde Pro penceresini açmalı; Pro'da önizlemeden sonra Karaoke
+   kartına dokunup basınca Karaoke konmalı (Creator Punch değil).
 7. **AI:** "Anahtarı bağla" → "Ücretsiz anahtar al" tarayıcıda console.groq.com/keys açmalı.
    Anahtarı kopyala → "Panodan al" doldurmalı → "Doğrula ve kaydet". Ayarlar > Bulut yedeği'nde
    anahtar görünmeli; "Yedeği kaydet"e basınca silinmemeli. İnterneti kesip dene: "kaydedildi
    ama doğrulanamadı" demeli, "geçersiz" dememeli. Yanlış anahtarda "kabul etmedi" demeli.
-8. AI düğmeleri (Viral anlar, Çevir, AI metin kontrolü, Bölümler AI, Paylaşım metni, B-roll,
-   Kanca AI) anahtar yokken yanlarında "anahtar gerekli · 1 dk" çipi göstermeli; ücretsiz
-   kullanıcıda Viral anlar/Çevir önce Pro penceresini açmalı.
+   Yerel motor kurulu değilken sihirbaz (hangi düğmeden açılırsa açılsın) "sesin Groq'a gider"
+   satırını göstermeli; yerel motor kuruluyken göstermemeli.
+8. AI düğmeleri anahtar yokken: ücretsiz kullanıcıda yalnız AI metin kontrolü, Bölümler AI,
+   Paylaşım metni ve Kanca AI yanında "anahtar gerekli · 1 dk" çipi olmalı; Viral anlar,
+   Çevir ve B-roll yanında çip **olmamalı** (Pro penceresini açarlar). Pro kullanıcıda yedisinde
+   de çip olmalı. 4. adımın metni ücretsizde çeviri/viral/B-roll'un Pro'da olduğunu söylemeli.
+   Klavyeyle: Tab ile adım başlıklarına gel, Enter/Boşluk adımı açıp kapatmalı.
 9. Kartı ✕ ile kapat → Ayarlar > Destek > "Kurulum rehberini aç" geri getirmeli.
 10. Ayarlar > Suflo Doctor: "Klipten sekans" satırı (eski Premiere'de sarı) ve
     "Panel menüde görünmüyor mu? →" bağlantısı site sayfasını açmalı.

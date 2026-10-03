@@ -48,6 +48,13 @@ window.KCaptions = (function () {
   var redoStack = [];
   var UNDO_MAX = 50;
   var draftTimer = null;
+  /*
+   * Ekrandaki belge rehberin örnek klibinin transkripti mi? Örnek ASLA taslak olarak
+   * yazılmaz (tek draft.json'daki, henüz kurtarılmamış işi ezmesin) ve "Kurtar" teklifini
+   * gizlemez. ornekSekansId: örneğin ait olduğu "Suflo Deneme" sekansı (uygula koruması).
+   */
+  var ornekBelge = false;
+  var ornekSekansId = "";
   var editorQuery = "";
   var editorOnlyIssues = false;
   var selectedSegment = -1;
@@ -81,7 +88,7 @@ window.KCaptions = (function () {
   // Geri al yigini girdisi: satirlar + mod + ceviri hedef dili (buyuk harf kurali buna bagli)
   function durumAl(etiket) {
     return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili,
-      shorts: shortsYuklenen, ts: Date.now() };
+      shorts: shortsYuklenen, ornek: ornekBelge, ts: Date.now() };
   }
   // shorts: ekrandaki belgenin Shorts kaydi mi (geri alinca taslak dogru yere yazilsin)
   function durumYukle(st) {
@@ -92,6 +99,9 @@ window.KCaptions = (function () {
       shortsYuklenen = st.shorts;
       try { shortsDugmesi(KApp.ctx()); } catch (eS) {}
     }
+    // geri alınan belge örnek değilse taslak yazımı yeniden açılır (aynı belgedeki
+    // metin düzenleme anlık görüntüsü bayrak taşımaz: o zaman bayrak değişmez)
+    if (typeof st.ornek === "boolean") ornekBelge = st.ornek;
   }
 
   function snapshot(etiket) {
@@ -133,6 +143,7 @@ window.KCaptions = (function () {
 
   // Taslağı diske yaz — panel kapanırsa iş kaybolmaz
   function writeDraft() {
+    if (ornekBelge) return;   // rehberin örnek transkripti: kayıtlı (kurtarılmamış) taslağa dokunma
     var ctx = KApp.ctx();
     // Ekrandaki Shorts transkripti (hangi sekans acik olursa olsun) ana videonun taslagini
     // ezmesin: duzenlemeler Shorts kaydina yazilir
@@ -165,6 +176,7 @@ window.KCaptions = (function () {
     if (segments.length) snapshot("taslak kurtarma");
     else { undoStack.length = 0; redoStack.length = 0; }
     shortsYuklenen = "";
+    ornekBelge = false;
     segments = JSON.parse(JSON.stringify(d.segments));   // taslak nesnesini takma adla mutasyona uğratma
     segmentsMode = d.mode || "plain";
     clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil
@@ -1702,7 +1714,10 @@ window.KCaptions = (function () {
       savePrefs();
 
       status("");
-      hideRestore();             // ekranda taze iş var: eski taslak teklifi artık geçersiz
+      // ekranda taze iş var: eski taslak teklifi artık geçersiz — örnek klip hariç
+      // (örnek taslak sayılmaz; kurtarılmamış iş "Kurtar" ile hâlâ geri gelebilsin)
+      ornekBelge = !!ornek;
+      if (!ornek) hideRestore();
       clearRevert();             // yeni doküman — eski çevirinin orijinalleri buraya ait değil
       shortsYuklenen = "";       // yeni transkript (basariyla geldi): artik Shorts kaydi degil, normal taslak
       uygulaEtiketiniSifirla();  // yeni transkript: uygula düğmesi normal haline dönsün
@@ -1758,7 +1773,7 @@ window.KCaptions = (function () {
     segmentsMode = kurulan.mode;
     applyGlossary(segments);
     algilananDil = veri.lang || "tr";
-    hideRestore();
+    ornekBelge = true;         // taslak yazılmaz, "Kurtar" teklifi gizlenmez
     clearRevert();
     uygulaEtiketiniSifirla();
     el("cap-result").hidden = false;
@@ -2695,6 +2710,7 @@ window.KCaptions = (function () {
         if (segments.length) snapshot("SRT içe aktarma");
         else { undoStack.length = 0; redoStack.length = 0; }
         shortsYuklenen = "";
+        ornekBelge = false;
         segments = segs;
         segmentsMode = "plain";    // ice aktarilan SRT'de kelime zamani verisi yok
         uygulaEtiketiniSifirla();  // yeni doküman: "yine de uygula" onayı geçersiz
@@ -3884,6 +3900,11 @@ window.KCaptions = (function () {
   async function apply(stilIle) {
     if (segments.length === 0) return;
     stilIle = stilIle === true;
+    // Rehberin örnek altyazısı yalnız kendi "Suflo Deneme" sekansına: başka sekans açıksa uygulama
+    if (ornekBelge && ornekSekansId && KApp.ctx().sequenceId && String(KApp.ctx().sequenceId) !== ornekSekansId) {
+      KApp.toast("Bu örnek altyazı Suflo Deneme sekansı için. Önce o sekansı aç, sonra uygula.", "warn", 8000);
+      return;
+    }
     if (stilIle && !secilenMogrt && !secilenMotorStili) {
       KApp.toast("Önce Altyazı ayarlarından bir stil seç.", "warn");
       return;
@@ -3961,9 +3982,10 @@ window.KCaptions = (function () {
           // Yalnızca iş gerçekten sekansa yerleştiyse taslağı sil.
           // cancelDraft şart: 1,2 sn içinde bir tuş vuruşu olduysa zamanlayıcı taslağı diriltir.
           cancelDraft();
-          // Shorts transkripti uygulandiysa ana videonun taslagi (uygulanmamis is olabilir) silinmez
-          if (!shortsYuklenen) K.clearDraft();
-          hideRestore();
+          // Shorts transkripti ya da rehberin örneği uygulandıysa ana videonun taslağı
+          // (uygulanmamış iş olabilir) silinmez, "Kurtar" teklifi de kalır
+          if (!shortsYuklenen && !ornekBelge) K.clearDraft();
+          if (!ornekBelge) hideRestore();
           KApp.toast("Altyazı izi oluşturuldu", "good");
           yildizIste();
         } else {
@@ -4303,6 +4325,7 @@ window.KCaptions = (function () {
     segments = JSON.parse(JSON.stringify(k.kayit.segs));
     segmentsMode = k.kayit.mod || "plain";
     shortsYuklenen = k.id;
+    ornekBelge = false;
     // ceviri bilgisi satirlarda (orig) kalir; hedef dil kayittan
     ceviriDili = k.kayit.ceviriDili || "";
     hideRestore();
@@ -4345,6 +4368,18 @@ window.KCaptions = (function () {
     return true;
   }
 
+  /*
+   * Anahtarı kaydetmek altyazı sesini buluta (Groq) gönderecek mi? anahtarKaydet yerel
+   * motor yokken sağlayıcıyı "groq" yapar; go() yerel motor hazır değilse bulut rotasını
+   * kullanır. Sihirbaz bu durumda açık onay satırını gösterir.
+   */
+  function anahtarSesiBulutaGonderir() {
+    if (localEngineReady()) return false;
+    var s = K.settings();
+    if (s.provider === "local" || !s.provider) return !K.whisperLocal();
+    return true;
+  }
+
   // Ayar değişti: AI çipleri, rehber ve motor rotası tazelensin
   function ayarDegisti(neden) {
     try { document.dispatchEvent(new CustomEvent("suflo:ayar", { detail: { neden: neden || "" } })); } catch (e) {}
@@ -4381,8 +4416,16 @@ window.KCaptions = (function () {
     secilenMotorStili = y.motor || "";
     secilenMogrt = y.mogrt || null;
     bekleyenMogrtYolu = y.bekleyen || "";
+    /*
+     * Kayıtlı tercihte YALNIZ görünüm alanları önceki haline döner; deneme sırasında
+     * kaydedilen başka tercihler (ör. altyazı dili) korunur. Önceden tercih yoksa
+     * görünüm alanları silinir (açılışta varsayılan görünüm gelir), gerisi kalır.
+     */
     var s = K.settings();
-    if (y.prefs) s.capPrefs = JSON.parse(y.prefs); else delete s.capPrefs;
+    var eski = null;
+    try { eski = y.prefs ? JSON.parse(y.prefs) : null; } catch (eP) { eski = null; }
+    var yeni = window.SufloOnboarding ? window.SufloOnboarding.stilTercihiGeriYukle(s.capPrefs, eski) : eski;
+    if (yeni) s.capPrefs = yeni; else delete s.capPrefs;
     K.saveSettings();
     vurguKutusuDurumu();
     onizlemeCiz();
@@ -4431,6 +4474,13 @@ window.KCaptions = (function () {
     stilYedegi: stilYedegi,
     stilYedeginiYukle: stilYedeginiYukle,
     stilDene: stilDene,
+    // Kullanıcının seçili bir animasyonlu stili (Suflo stili ya da MOGRT) var mı
+    stilSecili: function () { return !!(secilenMogrt || secilenMotorStili); },
+    // Bilinçli görünüm değişikliği sayılan kontroller (rehber: stil yedeğini bırakır)
+    stilKontrolleri: function () { return STIL_ALANLARI.concat(["cap-punct", "cap-kutu"]); },
+    // Rehberin örnek klibi: altyazı yalnız bu sekansa uygulanır ("" = bilinmiyor)
+    ornekHedefi: function (seqId) { ornekSekansId = seqId ? String(seqId) : ""; },
+    anahtarSesiBulutaGonderir: anahtarSesiBulutaGonderir,
     applyStyled: function () { return apply(true); },
     hasSegments: function () { return segments.length > 0; },
     engineReady: engineReady,

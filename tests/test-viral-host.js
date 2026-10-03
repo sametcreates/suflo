@@ -124,7 +124,7 @@ ok("geri al yigini Shorts durumunu tasir ve geri yukler", /shorts: shortsYuklene
   /cevir: ceviriDili, shorts: shortsYuklenen, ts: Date\.now\(\) \}\);/.test(cj));
 var goKod = cj.slice(cj.indexOf("var oncekiIs = segments.length"), cj.indexOf('el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula"'));
 ok("yeni transkript: Shorts modu yalniz basarida kapanir", goKod.indexOf('shortsYuklenen = "";') > goKod.indexOf("clearRevert();"));
-ok("uygulama: Shorts uygulaninca ana taslak silinmez", /if \(!shortsYuklenen\) K\.clearDraft\(\);/.test(cj));
+ok("uygulama: Shorts (ya da rehberin ornegi) uygulaninca ana taslak silinmez", /if \(!shortsYuklenen(?: && !ornekBelge)?\) K\.clearDraft\(\);/.test(cj));
 ok("Shorts kaydi ceviri dilini de saklar", /harita\[shortsYuklenen\]\.ceviriDili = ceviriDili;/.test(cj));
 ok("viral: kaynak transkript/sekans AI cagrisindan once yakalanir", vj.indexOf("var segsHam") < vj.indexOf("await KCaptions.chatCall"));
 var rd = cj.slice(cj.indexOf("function restoreDraft(d) {"), cj.indexOf("function restoreDraft(d) {") + 600);

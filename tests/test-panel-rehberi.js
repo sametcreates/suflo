@@ -1,5 +1,5 @@
 // Suflo testi: "panel menüde görünmüyor" (en sık destek mesajı) panel dışında çözülür:
-// site rehberi, Doctor bağlantısı, kurucu son metinleri, README; + yayın denetimi örnek klibe izin verir.
+// site rehberi, Doctor bağlantısı, kurucu son metinleri, README; + yayın denetimi ve yayın betiği örnek klibe izin verir.
 var fs = require("fs"), path = require("path");
 var KOK = path.join(__dirname, "..");
 var gecen = 0, toplam = 0;
@@ -47,6 +47,21 @@ if (desen) {
 ok("verify-release: ücretli medya denetimi örnek klibi dışarıda tutar", /-and \$_ -notmatch \$onboardingMedia/.test(vr));
 ok("verify-release: depoda ya da pakette örnek varsa ornek.json zorunlu", /if \(\$ornekVar -or \$sample\.Count\) \{ \$required \+= '\(\^\|\/\)assets\/onboarding\/ornek\\\.json\$' \}/.test(vr) &&
   /Test-Path -LiteralPath \(Join-Path \$root "assets\\onboarding\\ornek\.json"\) -PathType Leaf/.test(vr));
+
+/* ---- yayın betiği: aynı örnek klip istisnası (yoksa örnekli yayın publish.ps1'de durur) ---- */
+var pub = oku("tools/publish.ps1");
+var pubDesen = (pub.match(/\$onboardingMedia = '([^']+)'/) || [])[1];
+ok("publish.ps1: örnek klip deseni verify-release.ps1 ile aynı", !!pubDesen && pubDesen === desen, pubDesen);
+var kapi = pub.match(/\$_ -match '\(\^\|\/\)dist\/' -or \(\$_ -match '([^']+)' -and \$_ -notmatch \$onboardingMedia\) -or \$_ -match '([^']+)'/);
+ok("publish.ps1: ses yasağı örnek klibi dışarıda tutar", !!kapi, kapi && kapi[0]);
+if (kapi && pubDesen) {
+  var sesRe = new RegExp(kapi[1], "i"), ornekRe = new RegExp(pubDesen, "i"), digerRe = new RegExp(kapi[2], "i");
+  var yasakMi = function (f) { return /(^|\/)dist\//i.test(f) || (sesRe.test(f) && !ornekRe.test(f)) || digerRe.test(f); };
+  ok("publish.ps1: assets/onboarding mp4/wav/mp3 stage edilebilir", !yasakMi("assets/onboarding/ornek-tr.wav") && !yasakMi("assets/onboarding/ornek-tr.mp3") &&
+    !yasakMi("assets/onboarding/ornek-tr.mp4") && !yasakMi("assets/onboarding/ornek.json"));
+  ok("publish.ps1: başka ses, alt klasör, p12, dist, config.php yine yasak", yasakMi("content/sfx/a.wav") && yasakMi("assets/pro-sfx-showcase/x.mp3") &&
+    yasakMi("assets/onboarding/alt/x.wav") && yasakMi("imza.p12") && yasakMi("dist/Suflo.zip") && yasakMi("server/pro-v1/config.php"));
+}
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

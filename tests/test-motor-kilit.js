@@ -4,6 +4,8 @@
 //     kullanıcının o arada seçtiği modeli ezmez (SufloOnboarding.modelGecisi)
 //   * install() modül düzeyinde kilitli (app.js + Doctor aynı .part'a yazmasın)
 //   * ffmpegArkada: ffmpeg motordan ÖNCE indirilmez, model inince arka planda başlar
+//   * rehber kurulumu kurulu cuBLAS motorunu CPU sürümüyle ezmez
+//   * installFfmpeg kilidi ilerlemeyi her bekleyene iletir
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var SO = require(path.join(__dirname, "..", "js", "onboarding-steps.js"));
 var gecen = 0, toplam = 0;
@@ -113,6 +115,37 @@ Promise.all([a, b]).then(function (r) {
   var m3 = motor({ ffmpeg: true, ayarlar: { provider: "local", engineBuild: "cpu" } });
   return m3.E.install({ modelId: "small" }).then(function (r) {
     ok("ffmpeg varsa önden arama yapılır, arka plan işi yok", m3.ffAranma() >= 2 && r.ffmpegIsi === null && r.ffmpeg === true);
+  });
+}).then(function () {
+  // Rehberin kurulum seçenekleri kurulu cuBLAS motorunu CPU zip'iyle EZMEZ
+  var m4 = motor({ ayarlar: { provider: "local", engineBuild: "cuda" } });
+  var secenek = SO.kurulumSecenekleri({ model: "small", cudaKurulu: true });
+  return m4.E.install(secenek).then(function (r) {
+    var motorIndirme = m4.indirmeler.filter(function (x) { return /^motor:/.test(x.anahtar); });
+    ok("cuBLAS kuruluyken rehber kurulumu motor indirmez, derleme 'cuda' kalır", motorIndirme.length === 0 && m4.ayarlar.engineBuild === "cuda" && r.build === "cuda",
+      JSON.stringify(m4.indirmeler.map(function (x) { return x.anahtar; })));
+    // Eski davranış (useGpu:false) neden hataydı: CPU zip'i cuBLAS'ın üstüne inerdi
+    var m5 = motor({ ayarlar: { provider: "local", engineBuild: "cuda" } });
+    return m5.E.install({ modelId: "small", useGpu: false }).then(function () { return null; }, function () { return null; }).then(function () {
+      ok("(karşılaştırma) useGpu:false kurulu cuBLAS'ta 'motor:cpu' indirir", m5.indirmeler.some(function (x) { return x.anahtar === "motor:cpu"; }));
+    });
+  });
+}).then(function () {
+  // ffmpeg kilidi ilerlemeyi her bekleyene iletir (arkadaki kurulum + "Altyazı oluştur")
+  var m6 = motor();
+  var a = [], b = [];
+  var f1 = m6.E.installFfmpeg(function (x) { a.push(x); });
+  var f2 = m6.E.installFfmpeg(function (x) { b.push(x); });
+  ok("eşzamanlı installFfmpeg aynı işi paylaşır", f1 === f2);
+  ok("sonradan katılan son ilerleme metnini hemen alır", b.length === 1 && b[0] === a[a.length - 1] && /ffmpeg iniyor/.test(b[0]), JSON.stringify(b));
+  return f1.then(function () { ok("test ağı yok: ffmpeg kurulamamalıydı", false); }, function () {
+    ok("sonraki ilerleme mesajları da ikinci bekleyene akar", b.length >= 2 && b.length === a.length, a.length + " / " + b.length);
+    return new Promise(function (coz) { setTimeout(coz, 0); });
+  }).then(function () {
+    var c = [];
+    var f3 = m6.E.installFfmpeg(function (x) { c.push(x); });
+    ok("iş bitince kilit ve dinleyiciler bırakılır (yeni iş, eski bekleyene mesaj yok)", f3 !== f1 && c.length >= 1 && b.length === a.length);
+    return f3.then(null, function () {});
   });
 }).then(function () {
   console.log(gecen + "/" + toplam + " gecti");

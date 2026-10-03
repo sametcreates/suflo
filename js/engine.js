@@ -731,12 +731,38 @@ window.KEngine = (function () {
    * AYNI hedefi olusturmaya calisirdi. Ikinci cagri birincinin sonucunu bekler.
    */
   var _ffmpegIsi = null;
+  var _ffmpegDinleyici = [];   // surmekte olan isin ilerlemesini bekleyen her cagiran
+  var _ffmpegSon = "";         // son ilerleme metni: sonradan katilan bos ekranda beklemesin
 
+  /*
+   * Ikinci cagri yalniz sonucu degil ILERLEMEYI de paylasir: rehber ffmpeg'i arkada
+   * baslatip kullanici hemen "Altyazi olustur"a basinca durum satiri "ffmpeg kuruluyor…"
+   * da donup kalmasin, yuzde aksin.
+   */
   function installFfmpeg(onStatus) {
-    if (_ffmpegIsi) return _ffmpegIsi;
-    _ffmpegIsi = ffmpegKur(onStatus);
-    // sonuc ne olursa olsun kilidi birak, ama sonucu cagirana aynen ilet
-    _ffmpegIsi.then(function () { _ffmpegIsi = null; }, function () { _ffmpegIsi = null; });
+    if (!_ffmpegIsi) {
+      var dinleyiciler = [];
+      _ffmpegDinleyici = dinleyiciler;
+      _ffmpegSon = "";
+      if (typeof onStatus === "function") dinleyiciler.push(onStatus);
+      var is = ffmpegKur(function (m) {
+        if (_ffmpegDinleyici === dinleyiciler) _ffmpegSon = m;
+        dinleyiciler.slice().forEach(function (fn) {
+          try { fn(m); } catch (eD) { K.log("ffmpeg ilerleme dinleyicisi: " + (eD && eD.message ? eD.message : eD)); }
+        });
+      });
+      _ffmpegIsi = is;
+      // sonuc ne olursa olsun kilidi birak, ama sonucu cagirana aynen ilet
+      var birak = function () {
+        if (_ffmpegIsi === is) { _ffmpegIsi = null; _ffmpegDinleyici = []; _ffmpegSon = ""; }
+      };
+      is.then(birak, birak);
+      return is;
+    }
+    if (typeof onStatus === "function" && _ffmpegDinleyici.indexOf(onStatus) === -1) {
+      _ffmpegDinleyici.push(onStatus);
+      if (_ffmpegSon) { try { onStatus(_ffmpegSon); } catch (eS) {} }
+    }
     return _ffmpegIsi;
   }
 
