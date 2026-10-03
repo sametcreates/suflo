@@ -41,9 +41,11 @@ function satirNo(src, idx) { return src.slice(0, idx).split("\n").length; }
 // tumu: true → harf içeren HER metin (Türkçe sezgisi yerine); kapsamda "keep" listesi düşülür
 function extractHtml(src, tumu) {
   var out = [];
-  var temiz = src.replace(/<!--[\s\S]*?-->|<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi, function (m) {
+  // Açılış etiketi tırnaklı öznitelikleri bütün okur: placeholder="a => b" içindeki ">"
+  // etiketi erken kapatıp sonraki tüm tırnakların eşini kaydırmasın
+  var temiz = src.replace(/<!--[\s\S]*?-->|<(script|style|textarea)\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?<\/\1>/gi, function (m) {
     // satır numaraları korunsun; textarea'nın kendi açılış etiketini (placeholder) bırak
-    var t = /^<textarea/i.test(m) ? m.match(/^<textarea\b[^>]*>/i)[0] : "";
+    var t = /^<textarea/i.test(m) ? m.match(/^<textarea\b(?:[^>"']|"[^"]*"|'[^']*')*>/i)[0] : "";
     return t + m.slice(t.length).replace(/[^\n]/g, " ");
   });
   var re = /<(?:[^>"']|"[^"]*"|'[^']*')*>/g, m, son = 0;

@@ -179,6 +179,44 @@
   }
 
   /*
+   * Motor çıktısından (sekans zamanına taşınmış) ekrandaki altyazı satırları.
+   * captions.js go() ve rehberin hazır örnek transkripti (ornekYukle) AYNI yolu
+   * kullanır: iki yol ayrışırsa örnekte görülen satırlar gerçek çıktıyla tutmaz.
+   *   lenVal: "k1" kelime kelime · "kc" birikimli · "wN" N kelime · "cN" N karakter
+   * Döner: { segments, mode } — mode: "k1" | "kc" | "w" | "plain"
+   */
+  function segmentleriKur(mapped, lenVal) {
+    lenVal = String(lenVal || "c42");
+    var liste = (mapped || []).slice();
+    if (/^k/.test(lenVal)) {
+      // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer
+      liste = liste.filter(function (s) {
+        return String(s.text || "").replace(/[.,!?;:…]/g, "").trim();
+      });
+      // bozulmuş kelime zamanı korumasi: 8+ kelime var ama hepsi ayni ana yigilmis
+      if (liste.length >= 8) {
+        var tMin = liste[0].start, tMax = liste[0].start;
+        liste.forEach(function (s) {
+          if (s.start < tMin) tMin = s.start;
+          if (s.start > tMax) tMax = s.start;
+        });
+        if (tMax - tMin < 1) {
+          var hata = new Error("Motor kelime zamanlarını veremedi (tüm kelimeler aynı anda). " +
+            "Ayarlar > Destek'ten günlüğü kopyalayıp bildir; şimdilik satır modunu kullan.");
+          hata.ayrinti = liste.length + " kelimenin tümü " + tMin.toFixed(2) + " sn civarında";
+          throw hata;
+        }
+      }
+      return lenVal === "kc"
+        ? { segments: karaokeCumulative(liste, 4), mode: "kc" }
+        : { segments: karaokeWords(liste), mode: "k1" };
+    }
+    liste = trimOverlongCues(cleanSegments(liste));
+    if (/^w\d+$/.test(lenVal)) return { segments: splitWords(liste, parseInt(lenVal.slice(1), 10) || 3), mode: "w" };
+    return { segments: splitLong(liste, parseInt(lenVal.slice(1), 10) || 42, 4.5), mode: "plain" };
+  }
+
+  /*
    * Whisper Türkçe'de marka/kişi adlarını ve jargonu tutarlı biçimde yanlış yazar.
    * Sözlük transkripsiyon SONRASI çalışır — dil algılamayı ve çıktıyı bozmaz,
    * deterministiktir, kullanıcı sonucu görüp kuralı düzeltebilir.
@@ -442,6 +480,7 @@
     splitWords: splitWords,
     trimOverlongCues: trimOverlongCues,
     splitLong: splitLong,
+    segmentleriKur: segmentleriKur,
     parseGlossary: parseGlossary,
     trReplace: trReplace
   };

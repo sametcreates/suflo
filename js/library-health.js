@@ -29,6 +29,9 @@ window.KLibraryHealth = (function () {
     libraries: "Kütüphaneler"
   };
   var GROUP_ORDER = ["system", "premiere", "engine", "pro", "libraries"];
+  // En sık destek mesajı: "Suflo menüde yok". Panel açılmadan önce olduğu için
+  // çözüm panel dışında, sitede; Doctor raporu ve kartı bu sayfayı gösterir.
+  var PANEL_REHBERI = "https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor";
 
   function el(id) { return document.getElementById(id); }
   function norm(p) { return String(p || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase(); }
@@ -273,7 +276,8 @@ window.KLibraryHealth = (function () {
       { k: "autoReframe", ad: "Auto Reframe", etki: "Shorts'un 9:16 kopyası çıkmaz (yatay sekans yine oluşur)" },
       { k: "markers", ad: "Marker API", etki: "Bölüm, viral ve B-roll marker'ları eklenemez" },
       { k: "qeAddTracks", ad: "QE kanal ekleme", etki: "Boş kanal yoksa Sesi iyileştir / katmanlar yeni kanal açamaz" },
-      { k: "trackItemDisabled", ad: "Klip devre dışı bırakma", etki: "Sesi iyileştir orijinal sesi kapatamaz (elle kapat)" }
+      { k: "trackItemDisabled", ad: "Klip devre dışı bırakma", etki: "Sesi iyileştir orijinal sesi kapatamaz (elle kapat)" },
+      { k: "seqFromClips", ad: "Klipten sekans (createNewSequenceFromClips)", etki: "Rehberin örnek klibi sekansa kendiliğinden konmaz; klibi Yeni Öğe simgesine sürüklemen gerekir" }
     ];
     var eksik = [], bilinmeyen = [];
     gerek.forEach(function (g) {
@@ -480,7 +484,8 @@ window.KLibraryHealth = (function () {
 
   function reportText(report) {
     if (!report) return "";
-    var lines = ["Suflo Doctor raporu", "Sürüm: " + (report.version || "?"), "Durum: " + report.status.toUpperCase(), "Tarih: " + report.generatedAt];
+    var lines = ["Suflo Doctor raporu", "Sürüm: " + (report.version || "?"), "Durum: " + report.status.toUpperCase(), "Tarih: " + report.generatedAt,
+      "Panel menüde görünmüyorsa: " + PANEL_REHBERI];
     var group = "";
     orderedChecks(report).forEach(function (c) {
       if (c.group !== group) {
@@ -723,6 +728,11 @@ window.KLibraryHealth = (function () {
     var box = el("set-library-health-result");
     if (runBtn) runBtn.addEventListener("click", function () { run(); });
     if (copyBtn) copyBtn.addEventListener("click", copyReport);
+    var panelRehberi = el("set-doctor-panel-rehberi");
+    if (panelRehberi) panelRehberi.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (K.cs && K.cs.openURLInDefaultBrowser) K.cs.openURLInDefaultBrowser(PANEL_REHBERI);
+    });
     if (fixAllBtn) fixAllBtn.addEventListener("click", repairAll);
     if (box) box.addEventListener("click", function (event) {
       var target = event.target;
@@ -743,6 +753,7 @@ window.KLibraryHealth = (function () {
     repair: repair,
     repairAll: repairAll,
     apiKontrolleri: apiKontrolleri,
+    PANEL_REHBERI: PANEL_REHBERI,
     last: function () { return lastReport; }
   };
   window.KDoctor = api;

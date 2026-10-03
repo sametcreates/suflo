@@ -2080,8 +2080,10 @@ function KS_addRangeMarkers(encoded) {
  */
 function KS_apiProbe() {
   var out = { app: "", seq: false, subsequence: null, autoReframe: null, qe: false, qeAddTracks: null,
-    markers: null, trackItemDisabled: null, trackMuted: null };
+    markers: null, trackItemDisabled: null, trackMuted: null, seqFromClips: null };
   try { out.app = String(app.version); } catch (eV) {}
+  // Rehberin ornek klibi icin (KS_importSample): yalniz typeof — ASLA cagrilmaz
+  try { out.seqFromClips = !!(app.project && typeof app.project.createNewSequenceFromClips === "function"); } catch (eF) { out.seqFromClips = false; }
   var seq = null;
   try { seq = KS_seq(); } catch (eS) {}
   if (seq) {
@@ -2107,6 +2109,117 @@ function KS_apiProbe() {
     }
   } catch (eQ) { out.qe = false; }
   return KS_ok(out);
+}
+
+/* ---------- Ilk acilis rehberi: ornek klibi projeye al ---------- */
+
+// Sekansta medyasi verilen yol olan ilk video klip ({ clip, start }) ya da null
+function KS_sampleClipIn(seq, mediaPath) {
+  var hedef = String(mediaPath).toLowerCase();
+  try {
+    for (var t = 0; t < seq.videoTracks.numTracks; t++) {
+      var tr = seq.videoTracks[t];
+      for (var c = 0; c < tr.clips.numItems; c++) {
+        var cl = tr.clips[c];
+        try {
+          if (cl.projectItem && String(cl.projectItem.getMediaPath()).toLowerCase() === hedef) {
+            var bas = 0;
+            try { bas = Number(cl.start.seconds) || 0; } catch (eS) {}
+            return { clip: cl, start: bas };
+          }
+        } catch (eC) {}
+      }
+    }
+  } catch (eT) {}
+  return null;
+}
+
+/*
+ * Rehberin "Ornekte dene" adimi. p: { path, seqName }
+ *   1) acik proje ve var olan dosya sart
+ *   2) "Suflo Ornek" kutusu
+ *   3) ayni medya zaten projedeyse o oge yeniden kullanilir, yoksa importFiles
+ *   4) ayni adli ("Suflo Deneme") sekans varsa o kullanilir
+ *   5) yoksa createNewSequenceFromClips (typeof ile) — donus degerine GUVENILMEZ:
+ *      once/sonra sequenceID farkiyla yeni sekans bulunur (KS_cloneActiveSeq gibi)
+ *   6) sekans aktiflestirilir ve DOGRULANIR, klip secilir
+ * Doner: { imported, sequenceId, created, reused, needsDrag, active, selected, offset }
+ * API yoksa yalniz ice alir, needsDrag:true doner: panel "Klibi Yeni Oge simgesine
+ * surukle" der.
+ */
+function KS_importSample(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    if (!app.project || !app.project.rootItem) return KS_err("Acik proje yok. Once bir proje ac ya da yeni proje olustur.");
+    var yol = String(p.path || "");
+    if (!yol) return KS_err("Ornek klip yolu verilmedi.");
+    var dosya = new File(yol);
+    if (!dosya.exists) return KS_err("Ornek klip bulunamadi: " + yol);
+    var seqAdi = String(p.seqName || "Suflo Deneme").replace(/[\r\n\t]+/g, " ").substring(0, 60);
+    var i, s;
+
+    var kutu = KS_findBin("Suflo Ornek");
+    var oge = null, iceAlindi = false;
+    try {
+      if (typeof app.project.rootItem.findItemsMatchingMediaPath === "function") {
+        var esler = app.project.rootItem.findItemsMatchingMediaPath(yol, 1);
+        if (esler && esler.length) oge = esler[0];
+      }
+    } catch (eF) {}
+    if (!oge) oge = KS_findItemByPath(app.project.rootItem, yol);
+    if (!oge) {
+      app.project.importFiles([yol], true, kutu, false);
+      oge = KS_findItemByPath(kutu, yol) || KS_findItemByPath(app.project.rootItem, yol);
+      iceAlindi = true;
+    }
+    if (!oge) return KS_err("Ornek klip projeye alinamadi.");
+
+    var seq = null;
+    for (i = 0; i < app.project.sequences.numSequences; i++) {
+      s = app.project.sequences[i];
+      if (s && String(s.name) === seqAdi) { seq = s; break; }
+    }
+    var olusturuldu = false, yeniden = !!seq;
+    if (!seq) {
+      if (typeof app.project.createNewSequenceFromClips !== "function") {
+        return KS_ok({ imported: iceAlindi, sequenceId: "", created: false, reused: false, needsDrag: true, active: false, selected: false, offset: 0 });
+      }
+      var once = {};
+      for (i = 0; i < app.project.sequences.numSequences; i++) {
+        once[String(app.project.sequences[i].sequenceID)] = 1;
+      }
+      try { app.project.createNewSequenceFromClips(seqAdi, [oge], kutu); } catch (eYeni) {}
+      for (i = 0; i < app.project.sequences.numSequences; i++) {
+        s = app.project.sequences[i];
+        if (!once[String(s.sequenceID)]) { seq = s; break; }
+      }
+      if (!seq) {
+        return KS_ok({ imported: iceAlindi, sequenceId: "", created: false, reused: false, needsDrag: true, active: false, selected: false, offset: 0 });
+      }
+      olusturuldu = true;
+      try { if (String(seq.name) !== seqAdi) seq.name = seqAdi; } catch (eAd) {}
+    }
+
+    // Aktiflestirme sessizce basarisiz olabilir (modal pencere): kimligi dogrula
+    try { app.project.activeSequence = seq; } catch (e1) {}
+    var act = KS_seq();
+    if (!act || String(act.sequenceID) !== String(seq.sequenceID)) {
+      try { app.project.openSequence(seq.sequenceID); } catch (e2) {}
+      act = KS_seq();
+    }
+    var aktif = !!(act && String(act.sequenceID) === String(seq.sequenceID));
+
+    var secildi = false, offset = 0;
+    var bulunan = KS_sampleClipIn(seq, yol);
+    if (bulunan) {
+      offset = bulunan.start;
+      if (aktif) {
+        try { bulunan.clip.setSelected(true, true); secildi = true; } catch (eSec) {}
+      }
+    }
+    return KS_ok({ imported: iceAlindi, sequenceId: String(seq.sequenceID), created: olusturuldu, reused: yeniden,
+      needsDrag: !bulunan && !olusturuldu, active: aktif, selected: secildi, offset: offset });
+  } catch (e) { return KS_err(e); }
 }
 
 // Sekansin In/Out'unu verilen araliga ayarla ve playhead'i basa getir

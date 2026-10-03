@@ -129,6 +129,13 @@ window.KApp = (function () {
     }, 2500);
   }
 
+  // Kullanıcı eyleminden sonra (ör. rehber örnek klibi yeni sekansta açtı) bağlamı
+  // beklemeden tazele. Yalnız tıklama işleyicilerinden çağrılır.
+  function pollNow() {
+    if (!contextPollingBasladi) { contextPollingBaslat(); return; }
+    guvenli("bağlam", pollContext);
+  }
+
   function contextEtkilesim() {
     // Arka planda host yoklamasi yapma: yalniz kullanici panelle gercekten
     // etkilesmisse baslat/yeniden dene. `click`, pointerdown'in Mac CEP'te
@@ -264,12 +271,21 @@ window.KApp = (function () {
     sel.value = active ? active.id : (K.settings().model || "turbo");
   }
 
-  async function installLocalWhisper(progressEl) {
-    if (installingLocal) return;
-    if (!K.nodeOK) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return; }
+  /*
+   * opts (isteğe bağlı, rehber): { modelId, useGpu, ffmpegArkada }
+   *   modelId      Ayarlar'daki seçim yerine bu model (rehber: Türkçe için Small)
+   *   useGpu       true/false: GPU kararını zorla (rehber: ilk kurulumda cuBLAS İNMEZ)
+   *   ffmpegArkada ffmpeg motordan sonra arka planda insin (ilk altyazı beklemesin)
+   * Döner: kurulum sonucu (KEngine.install) ya da hata/iptalde null.
+   */
+  async function installLocalWhisper(progressEl, opts) {
+    opts = opts || {};
+    if (installingLocal) return null;
+    if (!K.nodeOK) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return null; }
     installingLocal = true;
     var box = el("set-local-status");
     var kurulumHatasi = null;
+    var sonuc = null;
     // ilerleme metnini yazdığımız öğenin kendi etiketi: iş bitince geri konur,
     // yoksa kurulum kartındaki düğme "Motor iniyor… %62" yazısında donup kalıyor
     var progressEski = progressEl ? progressEl.textContent : null;
@@ -282,10 +298,25 @@ window.KApp = (function () {
     try {
       say("Donanım kontrol ediliyor…");
       var gpu = await KEngine.detectGpu(true);
-      var useGpu = gpu.kind === "cuda" && el("set-gpu") ? el("set-gpu").checked : (gpu.kind === "cuda");
-      var modelId = (el("set-model") && el("set-model").value) || K.settings().model || "turbo";
+      var useGpu = typeof opts.useGpu === "boolean" ? (opts.useGpu && gpu.kind === "cuda")
+        : (gpu.kind === "cuda" && el("set-gpu") ? el("set-gpu").checked : (gpu.kind === "cuda"));
+      var modelId = opts.modelId || (el("set-model") && el("set-model").value) || K.settings().model || "turbo";
 
-      var res = await KEngine.install({ modelId: modelId, useGpu: useGpu, onStatus: say });
+      var res = await KEngine.install({
+        modelId: modelId, useGpu: useGpu, onStatus: say, ffmpegArkada: !!opts.ffmpegArkada,
+        onFfmpeg: function (m) {
+          var fb = el("set-ffmpeg-status");
+          if (fb) { fb.className = "inline-status"; fb.textContent = m; }
+        }
+      });
+      sonuc = res;
+      if (res.ffmpegIsi) {
+        // ffmpeg arka planda iniyor: bittiğinde Ayarlar'daki durum ve kurulum notu tazelensin
+        res.ffmpegIsi.then(function () {
+          checkFfmpeg();
+          KCaptions.refreshSetup();
+        });
+      }
 
       var donanim = res.build === "cuda" ? " · GPU hızlandırmalı"
         : (res.build === "metal" ? " · Metal hızlandırmalı" : " · CPU");
@@ -306,6 +337,7 @@ window.KApp = (function () {
         box.textContent = "✕ " + kurulumHatasi;
       }
     }
+    return sonuc;
   }
 
 
@@ -683,6 +715,8 @@ window.KApp = (function () {
       refreshLocalStatus();
     });
     refreshLocalStatus();
+    // Rehber (anahtar sihirbazı, "Daha doğru model") ayar değiştirdiyse Ayarlar da görsün
+    document.addEventListener("suflo:ayar", function () { refreshLocalStatus(); });
 
     el("set-save").addEventListener("click", function () {
       var st = K.settings();
@@ -693,6 +727,8 @@ window.KApp = (function () {
       else toast("Ayarlar kaydedilemedi", "bad");
       KCaptions.refreshSetup();
       refreshEngineRoute();
+      // AI "anahtar gerekli" çipleri ve rehber yeni anahtarı görsün
+      if (KCaptions.ayarDegisti) KCaptions.ayarDegisti("ayarlar");
     });
 
     el("lnk-groq").addEventListener("click", function (e) {
@@ -1174,6 +1210,9 @@ window.KApp = (function () {
     guvenli("Emoji Assets", function () { if (window.KEmojiAssets) KEmojiAssets.init(); });
     guvenli("Kütüphane kontrolü", function () { if (window.KLibraryHealth) KLibraryHealth.init(); });
     guvenli("Pro içerik", function () { if (window.ProSync) ProSync.init(); });
+    // İlk açılış rehberi: yalnız Node gerçeklerini okur, kullanıcı tıklamadan
+    // Premiere'e (evalScript) hiçbir şey göndermez
+    guvenli("Onboarding", function () { if (window.KOnboarding) KOnboarding.init(); });
     guvenli("Pro-UI", reflectPro);
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);
@@ -1189,7 +1228,14 @@ window.KApp = (function () {
     setInterval(checkUpdate, 6 * 3600 * 1000);
     // eski geçici ses dosyalarını süpür (disk sessizce dolmasın)
     setTimeout(function () { try { K.sweepTemp(); } catch (e) {} }, 6000);
-    setTimeout(function () { try { yenilikleriGoster(); } catch (eY) {} }, 900);
+    // Rehberin tam kartı açıksa "yenilikler" penceresi üstüne binmesin (taze kurulum
+    // zaten yeniliklerGoruldu alır; takılı kullanıcıya rehber yeter)
+    setTimeout(function () {
+      try {
+        var rehber = window.KOnboarding && KOnboarding.karar ? KOnboarding.karar() : "yok";
+        if (rehber !== "tam") yenilikleriGoster();
+      } catch (eY) {}
+    }, 900);
   }
 
   /*
@@ -1271,6 +1317,8 @@ window.KApp = (function () {
     onTab: onTab,
     ctx: function () { return ctx; },
     refreshContext: contextPollingBaslat,
+    pollNow: pollNow,
+    yenilikSurumu: function () { return YENILIKLER.surum; },
     installLocalWhisper: installLocalWhisper,
     checkUpdate: checkUpdate
   };

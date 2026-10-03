@@ -159,7 +159,11 @@ window.KKanca = (function () {
     var segs = KCaptions.getSegments ? KCaptions.getSegments() : [];
     if (!segs.length) { durum("Önce Altyazı sekmesinde transkript oluştur.", "warn"); return; }
     var cfg = KCaptions.chatConfig && KCaptions.chatConfig();
-    if (!cfg) { KApp.toast("AI önerisi için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    if (!cfg) {
+      if (window.KOnboarding) KOnboarding.anahtarIste("Kanca önerileri");
+      else KApp.toast("AI önerisi için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      return;
+    }
     busy = true;
     var btn = el("kanca-ai");
     btn.disabled = true;

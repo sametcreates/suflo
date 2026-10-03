@@ -256,6 +256,8 @@ window.KCaptions = (function () {
       }
     }
     refreshButton();
+    // kurulum/anahtar durumu degisti: rehber adimlari yalniz Node gercekleriyle tazelenir
+    if (window.KOnboarding && KOnboarding.yenile) { try { KOnboarding.yenile(); } catch (eO) {} }
   }
 
   function refreshButton() {
@@ -347,11 +349,15 @@ window.KCaptions = (function () {
 
   /* ---------------- Motorlar ---------------- */
 
-  async function transcribeLocal(audioPath, wordLevel) {
+  // dilAyari: rehberin örnek klibi gibi çağrılar #cap-lang'i ve kayıtlı tercihi
+  // değiştirmeden kendi dilini geçirir (undefined → panelde seçili dil)
+  async function transcribeLocal(audioPath, wordLevel, dilAyari) {
     var lw = K.whisperLocal();
     if (!lw) throw new Error("Yerel motor kurulu değil — Ayarlar'dan kur.");
-    var outBase = audioPath.replace(/\.wav$/i, "") + "_w";
-    var lang = el("cap-lang").value || "auto";
+    // çıktı tabanı geçici klasörde: rehberin örnek WAV'ı ayar klasöründe duruyor,
+    // whisper'ın JSON'u (ve takılma kurtarmanın parçası) oraya yazılmasın
+    var outBase = K.path.join(K.tmpDir(), K.path.basename(audioPath).replace(/\.wav$/i, "") + "_w");
+    var lang = (dilAyari !== undefined ? dilAyari : el("cap-lang").value) || "auto";
     var threads = 4;
     try { threads = Math.max(2, Math.min(8, K.os.cpus().length - 2)); } catch (e) {}
 
@@ -508,14 +514,14 @@ window.KCaptions = (function () {
     return new Error("API " + status + ": " + String(body).slice(0, 160));
   }
 
-  async function transcribeCloud(audioPath, durHint, wordLevel) {
+  async function transcribeCloud(audioPath, durHint, wordLevel, dilAyari) {
     var cfg = providerConfig();
     if (!cfg.url) throw new Error("Endpoint tanımsız — Ayarlar'a bak.");
     var fields = { model: cfg.model, response_format: "verbose_json" };
     var prompt = glossaryPrompt();
     if (prompt) fields.prompt = prompt;
     if (wordLevel) fields["timestamp_granularities[]"] = ["word", "segment"];
-    var lang = el("cap-lang").value;
+    var lang = dilAyari !== undefined ? dilAyari : el("cap-lang").value;
     if (lang) fields.language = lang;
     var buf = K.fs.readFileSync(audioPath);
 
@@ -576,19 +582,26 @@ window.KCaptions = (function () {
    * cekirdek basarisiz oldugunda buluta gecer. Bu sayede kolaylik icin hata
    * toleransindan vazgecilmez.
    */
-  async function transcribeSuflo(audioPath, durHint, wordLevel, tempFiles) {
+  /*
+   * secenek (isteğe bağlı): { dil, bulutSes }
+   *   dil      #cap-lang yerine bu dil (rehberin örnek klibi: "tr")
+   *   bulutSes bulut rotası için hazır sıkıştırılmış ses (örnek klibin MP3'ü):
+   *            WAV'ı ffmpeg ile dönüştürmeye gerek kalmaz
+   */
+  async function transcribeSuflo(audioPath, durHint, wordLevel, tempFiles, secenek) {
+    secenek = secenek || {};
     var errors = [];
     if (localEngineReady()) {
       try {
         status("Suflo Motoru · yerel yüksek doğruluk…");
-        return await transcribeLocal(audioPath, wordLevel);
+        return await transcribeLocal(audioPath, wordLevel, secenek.dil);
       } catch (eLocal) {
         errors.push("yerel: " + (eLocal && eLocal.message ? eLocal.message : eLocal));
         K.log("Suflo motoru yerel rota basarisiz: " + errors[errors.length - 1]);
       }
     }
     if (cloudEngineReady()) {
-      var cloudAudio = audioPath;
+      var cloudAudio = secenek.bulutSes || audioPath;
       try {
         if (/\.wav$/i.test(cloudAudio)) {
           status("Suflo Motoru · güvenli yedek için ses hazırlanıyor…");
@@ -596,7 +609,7 @@ window.KCaptions = (function () {
           if (tempFiles) tempFiles.push(cloudAudio);
         }
         status("Suflo Motoru · güvenli bulut yedeği…");
-        return await transcribeCloud(cloudAudio, durHint, wordLevel);
+        return await transcribeCloud(cloudAudio, durHint, wordLevel, secenek.dil);
       } catch (eCloud) {
         errors.push("yedek: " + (eCloud && eCloud.message ? eCloud.message : eCloud));
       }
@@ -1493,11 +1506,19 @@ window.KCaptions = (function () {
 
   /* ---------------- Ana akış ---------------- */
 
-  async function go() {
-    if (busy) return;
+  /*
+   * opts.ornek (yalnız rehberin "Örnekte dene" adımı): { wav, mp3, lang, offset, sure }
+   * Hazır 16 kHz mono WAV doğrudan yerel motora, MP3 buluta gider: ffmpeg ön
+   * denetimi, kapsam/ses dışa aktarımı atlanır; #cap-lang ve kayıtlı tercih
+   * değişmez. Tıklama işleyicisi MouseEvent geçirdiği için opts.ornek ayrıca sınanır.
+   */
+  async function go(opts) {
+    if (busy) return false;
+    var ornek = (opts && opts.ornek && opts.ornek.wav) ? opts.ornek : null;
     var ctx = KApp.ctx();
     var clip = ctx.sel;
-    if (scope === "clip" && !clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
+    if (!ornek && scope === "clip" && !clip) { status("Önce timeline'da bir klip seç.", "warn"); return false; }
+    var basarili = false;
     busy = true;
     setBusy(true);
     /*
@@ -1517,7 +1538,9 @@ window.KCaptions = (function () {
        * suruyor; kontrolu sonraya birakmak, kullanicinin bes dakika bekleyip
        * "ffmpeg bulunamadi" duymasi demekti. Kurulum gerekiyorsa simdi olsun.
        */
-      if (!(await K.findFfmpeg())) {
+      // Rehberin örnek klibi hazır WAV/MP3 ile gelir: ffmpeg gerekmez (ilk altyazı
+      // 141 MB'lık ffmpeg indirmesini beklemesin)
+      if (!ornek && !(await K.findFfmpeg())) {
         status("ffmpeg kuruluyor… (bir kerelik, ses dönüştürme için gerekli)");
         try {
           await KEngine.installFfmpeg(function (m) { status(m); });
@@ -1533,10 +1556,17 @@ window.KCaptions = (function () {
       // yedegini olusturup guvenli rotaya gecer.
       var useLocal = localEngineReady();
       var audioSrc, seqOffset, durHint;
+      var motorSecenek = null;
 
       var speedFactor = 1;
       var batchClips = null; // coklu klip: [clip, ...] — tek klipte null kalir
-      if (scope === "clip") {
+      if (ornek) {
+        // ornek dosyalari ayar klasorunde kalici: tempFiles'a EKLENMEZ (silinmesin)
+        audioSrc = ornek.wav;
+        seqOffset = Number(ornek.offset) || 0;
+        durHint = Number(ornek.sure) || wavDuration(ornek.wav) || 15;
+        motorSecenek = { dil: ornek.lang || "tr", bulutSes: ornek.mp3 || "" };
+      } else if (scope === "clip") {
         var sc = await K.call("KS_getSelectedClips");
         if (sc.ok && sc.clips && sc.clips.length > 1) {
           if (typeof Pro !== "undefined" && !Pro.isPro()) {                   // Pro: toplu klip
@@ -1631,7 +1661,7 @@ window.KCaptions = (function () {
         mapped.sort(function (a, b) { return a.start - b.start; });
       } else {
         status("Suflo Altyazı Motoru dinliyor…");
-        var raw = await transcribeSuflo(audioSrc, durHint, karaoke, tempFiles);
+        var raw = await transcribeSuflo(audioSrc, durHint, karaoke, tempFiles, motorSecenek);
 
         mapped = raw.map(function (s) {
           return {
@@ -1643,37 +1673,16 @@ window.KCaptions = (function () {
         }).filter(function (s) { return s.text; });
       }
 
-      if (karaoke) {
-        // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer
-        mapped = mapped.filter(function (s) {
-          return s.text.replace(/[.,!?;:…]/g, "").trim();
-        });
-        // bozulmuş kelime zamanı korumasi: 8+ kelime var ama hepsi ayni ana yigilmis
-        if (mapped.length >= 8) {
-          var tMin = mapped[0].start, tMax = mapped[0].start;
-          mapped.forEach(function (s) {
-            if (s.start < tMin) tMin = s.start;
-            if (s.start > tMax) tMax = s.start;
-          });
-          if (tMax - tMin < 1) {
-            K.log("karaoke HATA: " + mapped.length + " kelimenin tümü " + tMin.toFixed(2) + " sn civarında");
-            throw new Error("Motor kelime zamanlarını veremedi (tüm kelimeler aynı anda). " +
-              "Ayarlar > Destek'ten günlüğü kopyalayıp bildir; şimdilik satır modunu kullan.");
-          }
-        }
-        segments = lenVal === "kc" ? karaokeCumulative(mapped, 4) : karaokeWords(mapped);
-        segmentsMode = lenVal === "kc" ? "kc" : "k1";
-      } else {
-        mapped = cleanSegments(mapped);
-        mapped = trimOverlongCues(mapped);
-        if (/^w\d+$/.test(lenVal)) {
-          segments = splitWords(mapped, parseInt(lenVal.slice(1), 10) || 3);
-          segmentsMode = "w";
-        } else {
-          segments = splitLong(mapped, parseInt(lenVal.slice(1), 10) || 42, 4.5);
-          segmentsMode = "plain";
-        }
+      // Satir kurma tek yerde (caption-text.js): rehberin hazir ornek transkripti de
+      // ayni yolu kullanir, iki cikti hic ayrismaz
+      var kurulan;
+      try { kurulan = CT.segmentleriKur(mapped, lenVal); }
+      catch (eKur) {
+        if (eKur && eKur.ayrinti) K.log("karaoke HATA: " + eKur.ayrinti);
+        throw eKur;
       }
+      segments = kurulan.segments;
+      segmentsMode = kurulan.mode;
       applyGlossary(segments);
       if (segments.length === 0) {
         // Eski dokumana geri don: ekrandaki satirlar ile bellek ayrismasin,
@@ -1703,6 +1712,7 @@ window.KCaptions = (function () {
       // Uzun bir transkripsiyon bitti: kullanıcı hiçbir şeye dokunmasa da taslak diskte olsun
       saveDraftNow();
       KApp.toast(segments.length + " altyazı satırı hazır", "good");
+      basarili = true;
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
     } finally {
@@ -1710,6 +1720,55 @@ window.KCaptions = (function () {
       busy = false;
       setBusy(false);
     }
+    if (basarili) sonucBildir({ kaynak: ornek ? "ornek" : "go", satir: segments.length });
+    return basarili;
+  }
+
+  /*
+   * Başarılı transkript dinleyicileri (rehber: "ilk altyazı" adımı). Dinleyici
+   * hatası altyazı akışını bozmasın diye her biri ayrı sarılır.
+   */
+  var sonucDinleyiciler = [];
+  function onSonuc(fn) { if (typeof fn === "function") sonucDinleyiciler.push(fn); }
+  function sonucBildir(bilgi) {
+    sonucDinleyiciler.forEach(function (fn) {
+      try { fn(bilgi); } catch (e) { K.log("[altyazı] sonuç dinleyicisi: " + (e && e.message ? e.message : e)); }
+    });
+  }
+
+  /*
+   * Rehberin hazır örnek transkripti (motor ya da anahtar henüz yokken): go() ile
+   * AYNI satır kurma yolu (CT.segmentleriKur) ve aynı anlık görüntü/geri al akışı.
+   *   veri: SufloOnboarding.ornekKelimeleri() çıktısı { lang, words, segments }
+   *   offset: klibin sekanstaki başlangıcı (sn)
+   */
+  function ornekYukle(veri, offset) {
+    if (busy || !veri || !window.SufloOnboarding) return false;
+    var lenVal = el("cap-maxlen").value;
+    var girdi = window.SufloOnboarding.ornekGirdisi(veri, lenVal, offset);
+    if (!girdi.length) return false;
+    var kurulan = CT.segmentleriKur(girdi, lenVal);
+    if (!kurulan.segments.length) return false;
+    // Ekranda iş varsa üzerine yazmadan önce anlık görüntü: Ctrl+Z geri getirir
+    // (anlık görüntü Shorts bayrağını taşır: sıfırlama ONDAN sonra)
+    if (segments.length) snapshot("örnek transkript");
+    else { undoStack.length = 0; redoStack.length = 0; }
+    shortsYuklenen = "";
+    segments = kurulan.segments;
+    segmentsMode = kurulan.mode;
+    applyGlossary(segments);
+    algilananDil = veri.lang || "tr";
+    hideRestore();
+    clearRevert();
+    uygulaEtiketiniSifirla();
+    el("cap-result").hidden = false;
+    render();                                            // önce render, sonra etiket (render eziyor)
+    el("cap-result-info").textContent = segments.length + " satır · örnek transkript";
+    refreshUndoUI();
+    renderHistory();
+    saveDraftNow();
+    sonucBildir({ kaynak: "ornekYukle", satir: segments.length });
+    return true;
   }
 
   function setBusy(b) {
@@ -1935,7 +1994,8 @@ window.KCaptions = (function () {
     if (!segments.length) return;
     var cfg = chatConfig();
     if (!cfg) {
-      KApp.toast("AI metin kontrolü için Ayarlar > Bulut yedeği bölümüne bir anahtar ekle.", "warn");
+      if (window.KOnboarding) KOnboarding.anahtarIste("AI metin kontrolü");
+      else KApp.toast("AI metin kontrolü için Ayarlar > Bulut yedeği bölümüne bir anahtar ekle.", "warn");
       return;
     }
     var btn = el("cap-proofread");
@@ -2397,7 +2457,8 @@ window.KCaptions = (function () {
     if (!target) { KApp.toast("Önce hedef dili seç.", "warn"); return; }
     var cfg = chatConfig();
     if (!cfg) {
-      KApp.toast("Çeviri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      if (window.KOnboarding) KOnboarding.anahtarIste("Çeviri");
+      else KApp.toast("Çeviri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
       return;
     }
     var btn = el("cap-translate-go");
@@ -2449,7 +2510,11 @@ window.KCaptions = (function () {
     var diller = Array.prototype.map.call(document.querySelectorAll(".cap-paket-dil:checked"), function (x) { return x.value; });
     if (!diller.length) { KApp.toast("En az bir dil seç.", "warn"); return; }
     var cfg = chatConfig();
-    if (!cfg) { KApp.toast("Çeviri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    if (!cfg) {
+      if (window.KOnboarding) KOnboarding.anahtarIste("Çok dilli SRT paketi");
+      else KApp.toast("Çeviri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      return;
+    }
     var btn = el("cap-paket-go");
     btn.disabled = true;
     try {
@@ -4158,19 +4223,12 @@ window.KCaptions = (function () {
       K.cs.openURLInDefaultBrowser("https://console.groq.com/keys");
     });
     el("cap-local-install").addEventListener("click", function () {
-      KApp.installLocalWhisper(el("cap-local-install"));
+      // Rehber açıksa hızlı başlangıç: dile uygun küçük model, ffmpeg arkada, GPU sonra
+      var rehber = window.KOnboarding && KOnboarding.kurulumSecenekleri ? KOnboarding.kurulumSecenekleri() : null;
+      KApp.installLocalWhisper(el("cap-local-install"), rehber);
     });
     el("cap-key-save").addEventListener("click", function () {
-      var v = el("cap-key-input").value.trim();
-      if (!v) return;
-      var s = K.settings();
-      s.apiKey = v;
-      if (s.provider === "local" && !K.whisperLocal()) s.provider = "groq";
-      K.saveSettings();
-      document.getElementById("set-apikey").value = v;
-      document.getElementById("set-provider").value = s.provider;
-      refreshSetup();
-      KApp.toast("Anahtar kaydedildi", "good");
+      if (anahtarKaydet(el("cap-key-input").value)) KApp.toast("Anahtar kaydedildi", "good");
     });
 
     // şablon seçimi kontrolleri günceller; elle değişiklik şablonu "Özel"e düşürür
@@ -4255,6 +4313,100 @@ window.KCaptions = (function () {
     KApp.toast("Altyazı yüklendi: " + segments.length + " satır · yeniden yazıya dökmeye gerek yok", "good");
   }
 
+  /*
+   * Bulut/AI anahtarını kaydet (altyazı kurulum kartı ve rehberin anahtar sihirbazı).
+   * Sağlayıcı kuralı: yerel motor hazırsa "local" kalır (anahtar yalnız AI metin
+   * özellikleri için kullanılır), değilse Groq bulut rotası açılır. secenek.saglayici
+   * "groq" ise (sihirbaz Groq'ta doğruladı) OpenAI/özel ayarı Groq'a çevrilir.
+   * Ayarlar'daki alanlara da yansıtılır: yoksa sonraki "Yedeği kaydet" anahtarı siler.
+   */
+  function anahtarKaydet(v, secenek) {
+    v = String(v || "").trim();
+    if (!v) return false;
+    secenek = secenek || {};
+    var s = K.settings();
+    s.apiKey = v;
+    if (s.provider === "local" || !s.provider) {
+      if (!K.whisperLocal()) s.provider = "groq";
+    } else if (secenek.saglayici === "groq") {
+      s.provider = "groq";
+    }
+    K.saveSettings();
+    var ak = document.getElementById("set-apikey");
+    var sp = document.getElementById("set-provider");
+    if (ak) ak.value = v;
+    if (sp) {
+      sp.value = s.provider || "local";
+      var ozel = document.getElementById("set-custom-row");
+      if (ozel) ozel.hidden = sp.value !== "custom";
+    }
+    refreshSetup();
+    ayarDegisti("anahtar");
+    return true;
+  }
+
+  // Ayar değişti: AI çipleri, rehber ve motor rotası tazelensin
+  function ayarDegisti(neden) {
+    try { document.dispatchEvent(new CustomEvent("suflo:ayar", { detail: { neden: neden || "" } })); } catch (e) {}
+  }
+
+  /*
+   * Rehberin stil adımı: Creator Punch gibi bir Suflo stilini geçici dener.
+   * Tercih KAYDEDİLMEZ; stilYedegi() ile alınan önceki durum adım kapanınca
+   * stilYedeginiYukle() ile geri konur — ücretsiz kullanıcının varsayılanı
+   * sessizce Pro stiline dönmesin.
+   */
+  var STIL_ALANLARI = ["cap-preset", "cap-maxlen", "cap-case", "cap-style-family", "cap-yogunluk", "cap-font",
+    "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu", "cap-kontur", "cap-konum", "cap-animasyon"];
+  function stilYedegi() {
+    var y = {
+      alan: {},
+      punct: !!(el("cap-punct") && el("cap-punct").checked),
+      kutu: !!(el("cap-kutu") && el("cap-kutu").checked),
+      motor: secilenMotorStili, mogrt: secilenMogrt, bekleyen: bekleyenMogrtYolu,
+      prefs: K.settings().capPrefs ? JSON.stringify(K.settings().capPrefs) : null
+    };
+    STIL_ALANLARI.forEach(function (id) { var e = el(id); if (e) y.alan[id] = e.value; });
+    return y;
+  }
+  function stilYedeginiYukle(y) {
+    if (!y || !y.alan) return;
+    onizlemeDurdur();
+    STIL_ALANLARI.forEach(function (id) {
+      var e = el(id);
+      if (e && y.alan[id] !== undefined) e.value = y.alan[id];
+    });
+    if (el("cap-punct")) el("cap-punct").checked = y.punct;
+    if (el("cap-kutu")) el("cap-kutu").checked = y.kutu;
+    secilenMotorStili = y.motor || "";
+    secilenMogrt = y.mogrt || null;
+    bekleyenMogrtYolu = y.bekleyen || "";
+    var s = K.settings();
+    if (y.prefs) s.capPrefs = JSON.parse(y.prefs); else delete s.capPrefs;
+    K.saveSettings();
+    vurguKutusuDurumu();
+    onizlemeCiz();
+    stilKartiIsaretle(secilenMogrt ? "" : (y.alan["cap-preset"] || secilenMotorStili));
+    uygulamaIpucunuGuncelle();
+  }
+  function stilDene(id) {
+    if (!PRESETS[id]) return false;
+    if (el("cap-preset")) el("cap-preset").value = id;
+    applyPreset(id);
+    var grid = el("cap-stil-grid");
+    if (grid && grid.scrollIntoView) {
+      try { grid.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (eS) { grid.scrollIntoView(); }
+    }
+    // Gercek stil motoru onizlemesi ffmpeg ister; yoksa sessizce atla (DOM onizlemesi kalir)
+    K.findFfmpeg().then(function (ff) {
+      if (!ff || !motorStiliMi(stil().aile)) return;
+      if (onizlemeSaat) onizlemeDurdur();
+      onizlemeRenderCalisiyor = true;
+      return motorOnizlemeOynat().then(function () { onizlemeRenderCalisiyor = false; });
+    }).catch(function () { onizlemeRenderCalisiyor = false; });
+    return true;
+  }
+
   // Diger moduller (ornegin Akilli SFX) transkripti okuyabilsin; asil dizi
   // disaridan degistirilemesin diye yalnizca sade bir kopya verilir.
   // vurgu: kullanicinin *isaretledigi* ilk kelime ve tahmini ani (Zoom / Akilli SFX kullanir)
@@ -4270,6 +4422,19 @@ window.KCaptions = (function () {
   return {
     init: init,
     refreshSetup: refreshSetup,
+    // Rehber (js/onboarding.js): örnek klip, hazır transkript, anahtar, stil denemesi
+    go: go,
+    ornekYukle: ornekYukle,
+    onSonuc: onSonuc,
+    anahtarKaydet: anahtarKaydet,
+    ayarDegisti: ayarDegisti,
+    stilYedegi: stilYedegi,
+    stilYedeginiYukle: stilYedeginiYukle,
+    stilDene: stilDene,
+    applyStyled: function () { return apply(true); },
+    hasSegments: function () { return segments.length > 0; },
+    engineReady: engineReady,
+    localEngineReady: localEngineReady,
     glossaryText: glossaryText,
     parseGlossary: parseGlossary,
     getSegments: segmentsSnapshot,

@@ -143,6 +143,8 @@
   <div id="context-strip" class="context-strip">
     <span id="ctx-text" class="dim">bağlanıyor…</span>
   </div>
+  <!-- Rehber ilerleme çipi: şeridin KARDEŞİ (şerit her yoklamada innerHTML ile yeniden kuruluyor) -->
+  <button type="button" id="onb-chip" class="onb-chip" hidden>Kurulum 0/4</button>
 
   <!-- Güncelleme şeridi: toast 3 saniyede kayboluyordu, kurgu yapan kullanıcı hiç görmüyordu -->
   <div id="update-bar" class="update-bar" hidden>
@@ -157,6 +159,62 @@
 
   <!-- ================= ALTYAZI ================= -->
   <section id="tab-captions" class="tabpane active">
+    <!-- İlk açılış rehberi: "İlk altyazın 2 dakikada". Açıkken #cap-setup motor adımına taşınır (tek kurulum kartı). -->
+    <div id="ilk-adim" class="ilk-adim" hidden>
+      <div class="ia-ust">
+        <span class="ia-isaret" aria-hidden="true">2<small>dk</small></span>
+        <span class="ia-baslik-sar">
+          <b id="ilk-adim-baslik">İlk altyazın 2 dakikada</b>
+          <small id="ilk-adim-alt">Dört kısa adım · istediğini atlayabilirsin</small>
+        </span>
+        <span class="ia-sayac" id="ilk-adim-sayac">0/4</span>
+        <button type="button" id="ilk-adim-kapat" class="link-btn ia-kapat" title="Rehberi kapat (Ayarlar > Destek'ten yeniden açılır)">✕</button>
+      </div>
+      <div class="ia-cubuk"><i id="ilk-adim-cubuk"></i></div>
+      <ol class="ia-adimlar">
+        <li id="ia-motor" class="ia-adim" data-adim="motor">
+          <div class="ia-adim-bas"><span class="ia-no">1</span><b>Motoru kur</b><span class="ia-rozet" id="ia-motor-rozet"></span></div>
+          <div class="ia-govde" id="ia-motor-govde">
+            <p class="ia-metin" id="ia-motor-metin">Small modeli (190 MB) iner; ffmpeg arkada kurulur.</p>
+            <button type="button" id="ia-motor-bulut" class="btn primary" hidden>Ücretsiz anahtarla başla</button>
+            <div class="row-btns ia-ek" id="ia-motor-ek" hidden>
+              <button type="button" id="ia-turbo" class="btn tiny" hidden title="574 MB · Türkçede daha az hata">Daha doğru model (Turbo)</button>
+              <button type="button" id="ia-cublas" class="btn tiny" hidden title="NVIDIA ekran kartıyla 5-15 kat hızlı (646 MB)">GPU hızlandırma (NVIDIA)</button>
+            </div>
+          </div>
+        </li>
+        <li id="ia-ornek" class="ia-adim" data-adim="ornek">
+          <div class="ia-adim-bas"><span class="ia-no">2</span><b id="ia-ornek-baslik">Örnekte dene</b><span class="ia-rozet" id="ia-ornek-rozet"></span></div>
+          <div class="ia-govde">
+            <p class="ia-metin" id="ia-ornek-metin">Timeline'da bir klip seç ve Altyazı oluştur'a bas.</p>
+            <button type="button" id="ia-ornek-dene" class="btn primary">Örnekte dene</button>
+          </div>
+        </li>
+        <li id="ia-stil" class="ia-adim" data-adim="stil">
+          <div class="ia-adim-bas"><span class="ia-no">3</span><b>Stilini seç</b><span class="ia-rozet" id="ia-stil-rozet"></span></div>
+          <div class="ia-govde">
+            <p class="ia-metin" id="ia-stil-metin">Creator Punch'ı kendi altyazınla önizle.</p>
+            <div class="row-btns" id="ia-stil-dugmeler">
+              <button type="button" id="ia-stil-goster" class="btn primary">Stilleri gör</button>
+              <button type="button" id="ia-stil-koy" class="btn">Timeline'a koy <span class="pro-inline">PRO</span></button>
+              <button type="button" id="ia-stil-tamam" class="btn ghost">Tamam</button>
+            </div>
+          </div>
+        </li>
+        <li id="ia-ai" class="ia-adim" data-adim="ai">
+          <div class="ia-adim-bas"><span class="ia-no">4</span><b>Yapay zekâyı aç</b><em class="ia-etiket">ücretsiz · 1 dk</em><span class="ia-rozet" id="ia-ai-rozet"></span></div>
+          <div class="ia-govde">
+            <p class="ia-metin" id="ia-ai-metin">Çeviri, AI metin kontrolü, viral anlar, bölüm başlıkları ve paylaşım metni ücretsiz bir Groq anahtarıyla çalışır.</p>
+            <button type="button" id="ia-ai-ac" class="btn primary">Anahtarı bağla</button>
+          </div>
+        </li>
+      </ol>
+      <div class="ia-alt">
+        <span id="ia-durum" class="inline-status"></span>
+        <button type="button" id="ilk-adim-atla" class="link-btn" title="Bu adımı atla">Atla</button>
+      </div>
+    </div>
+
     <div id="cap-setup" class="setup-note" hidden>
       <p id="cap-setup-text"><strong>Suflo Altyazı Motoru kurulmalı.</strong> Tek motor; doğru modeli, GPU'yu ve güvenli yedeği kendisi yönetir. Yerel kullanımda hesap, anahtar veya internet gerekmez.</p>
       <button id="cap-local-install" class="btn primary" style="width:100%">Yerel motoru indir & kur</button>
@@ -1478,6 +1536,7 @@
         <div class="library-health-actions doctor-actions">
           <button id="set-doctor-fix-all" class="btn" hidden>Güvenli sorunları düzelt</button>
           <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
+          <a href="#" id="set-doctor-panel-rehberi" class="link-btn" title="Premiere 25.6+ ve 2026: Window > Extensions (Legacy) > Suflo">Panel menüde görünmüyor mu? →</a>
         </div>
       <div id="set-library-health-result" class="library-health" role="status" aria-live="polite" hidden></div>
     </div>
@@ -1585,6 +1644,7 @@
       <div class="row-btns">
         <button id="set-report" class="btn primary">Sorun bildir</button>
         <button id="set-copy-log" class="btn">Günlüğü kopyala</button>
+        <button id="set-onb-ac" class="btn" type="button" title="İlk altyazı rehberini Altyazı sekmesinin üstünde yeniden aç">Kurulum rehberini aç</button>
       </div>
     </div>
 
@@ -1608,6 +1668,32 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
+
+  <!-- Yapay zekâ anahtarı sihirbazı (rehberin 4. adımı ve AI düğmelerinin "anahtar gerekli" çipi) -->
+  <div id="onb-anahtar" class="onb-modal-arka" hidden role="dialog" aria-modal="true" aria-labelledby="onb-anahtar-baslik">
+    <div class="onb-modal">
+      <button type="button" id="onb-anahtar-kapat" class="onb-modal-x" aria-label="Kapat">✕</button>
+      <span class="onb-modal-ust">ÜCRETSİZ · 1 DAKİKA</span>
+      <b id="onb-anahtar-baslik">Yapay zekâyı aç</b>
+      <p class="hint" id="onb-anahtar-neden">Çeviri, AI metin kontrolü, viral anlar, bölüm başlıkları ve paylaşım metni ücretsiz bir Groq anahtarıyla çalışır.</p>
+      <p class="hint onb-onay" id="onb-anahtar-onay" hidden>Bulut motorunda altyazı çıkarmak için sesin Groq'a gider. Yerel motoru sonra kurarsan ses bilgisayarından çıkmaz.</p>
+      <ol class="onb-modal-adimlar">
+        <li>
+          <button type="button" id="onb-anahtar-al" class="btn primary">Ücretsiz anahtar al</button>
+          <small>Groq'ta giriş yap, "Create API Key"e bas, anahtarı kopyala.</small>
+        </li>
+        <li>
+          <div class="row">
+            <input id="onb-anahtar-girdi" type="password" placeholder="gsk_… anahtarını yapıştır" autocomplete="off" spellcheck="false">
+            <button type="button" id="onb-anahtar-pano" class="btn">Panodan al</button>
+          </div>
+        </li>
+      </ol>
+      <button type="button" id="onb-anahtar-kaydet" class="btn primary big">Doğrula ve kaydet</button>
+      <div id="onb-anahtar-durum" class="inline-status"></div>
+      <p class="hint onb-gizlilik">Anahtar yalnız bu bilgisayarda, Suflo ayarlarında saklanır. Yapay zekâ özelliklerinde yalnız altyazı metni gönderilir; ses gönderilmez.</p>
+    </div>
+  </div>
 
   <script src="js/CSInterface.js"></script>
   <script src="js/bridge.js"></script>
@@ -1648,6 +1734,8 @@
   <script src="js/motionbg.js"></script>
   <script src="js/emoji-assets.js"></script>
   <script src="js/library-health.js"></script>
+  <script src="js/onboarding-steps.js"></script>
+  <script src="js/onboarding.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

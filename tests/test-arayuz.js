@@ -26,7 +26,8 @@ function ok(ad, kosul, kanit) {
 }
 
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
-                "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js"];
+                "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
+                "js/onboarding.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -128,7 +129,15 @@ var ZORUNLU = {
   "cap-emoji-ac": "Emoji aç düğmesi",
   "cap-emoji-panel": "Emoji paneli",
   "cap-emoji-grid": "Emoji ızgarası",
-  "cap-emoji-ara": "Emoji arama"
+  "cap-emoji-ara": "Emoji arama",
+  // v3.1: ilk acilis rehberi ("Ilk altyazin 2 dakikada")
+  "ilk-adim": "Ilk altyazi rehberi karti",
+  "onb-chip": "Rehber ilerleme cipi",
+  "onb-anahtar": "AI anahtari sihirbazi",
+  "set-onb-ac": "Ayarlar > Destek > Kurulum rehberini ac",
+  "cap-setup": "Motor kurulum notu (rehber karti icine tasinir)",
+  "cap-local-install": "Yerel motoru kur",
+  "cap-key-save": "Anahtari kaydet"
 };
 var kayip = [];
 Object.keys(ZORUNLU).forEach(function (id) {
@@ -148,6 +157,8 @@ ok("kaldirilan modul ogeleri markup'ta YOK", kalinti.length === 0, kalinti.join(
 
 var betikler = (html.match(/<script src="js\/[^"]+"/g) || []).join(" ");
 ok("kaldirilan Motion betigi yuklenmiyor", !/motion\.js/.test(betikler), betikler);
+ok("rehber modulleri yukleniyor (onboarding-steps + onboarding)",
+  /onboarding-steps\.js/.test(betikler) && /js\/onboarding\.js/.test(betikler), betikler);
 ok("aktif moduller yukleniyor (magiccut + beat + preset + sfx + emoji + saglik + Pro sync)",
   /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler) && /presets\.js/.test(betikler) && /sfx\.js/.test(betikler) && /emoji-assets\.js/.test(betikler) && /library-health\.js/.test(betikler) && /pro-sync\.js/.test(betikler), betikler);
 

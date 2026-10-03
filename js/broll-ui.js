@@ -73,7 +73,11 @@ window.KBroll = (function () {
     var segs = window.KCaptions ? KCaptions.getSegments() : [];
     if (!segs.length) { durum("Önce altyazı oluştur ya da SRT içe aktar.", "warn"); return; }
     var cfg = KCaptions.chatConfig();
-    if (!cfg) { KApp.toast("B-roll önerileri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    if (!cfg) {
+      if (window.KOnboarding) KOnboarding.anahtarIste("B-roll önerileri");
+      else KApp.toast("B-roll önerileri için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      return;
+    }
     busy = true;
     el("cap-br-bul").disabled = true;
     durum("Konuşmada görselleştirilecek anlar aranıyor…");

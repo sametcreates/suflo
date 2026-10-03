@@ -83,7 +83,11 @@ window.KChapters = (function () {
     var s = segs();
     if (!s.length) { uyari("Önce altyazı oluştur ya da SRT içe aktar.", "warn"); return; }
     var cfg = KCaptions.chatConfig();
-    if (!cfg) { KApp.toast("AI başlıklar için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    if (!cfg) {
+      if (window.KOnboarding) KOnboarding.anahtarIste("AI bölüm başlıkları");
+      else KApp.toast("AI başlıklar için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      return;
+    }
     busy = true;
     el("cap-ch-ai").disabled = true;
     uyari("AI bölümleri çıkarıyor…");
@@ -194,7 +198,11 @@ window.KChapters = (function () {
     var s = segs();
     if (!s.length) { uyari("Önce altyazı oluştur ya da SRT içe aktar.", "warn"); return; }
     var cfg = KCaptions.chatConfig();
-    if (!cfg) { KApp.toast("YouTube metni için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    if (!cfg) {
+      if (window.KOnboarding) KOnboarding.anahtarIste("Paylaşım metni");
+      else KApp.toast("YouTube metni için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      return;
+    }
     busy = true;
     el("cap-yt-go").disabled = true;
     uyari("Başlık, açıklama ve etiketler yazılıyor…");

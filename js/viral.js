@@ -86,7 +86,11 @@ window.KViral = (function () {
     var toplam = segs[segs.length - 1].end - segs[0].start;
     if (toplam < 60) { durum("Viral an bulmak için en az 1 dakikalık konuşma gerekir.", "warn"); return; }
     var cfg = KCaptions.chatConfig();
-    if (!cfg) { KApp.toast("Viral anlar için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    if (!cfg) {
+      if (window.KOnboarding) KOnboarding.anahtarIste("Viral anlar");
+      else KApp.toast("Viral anlar için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      return;
+    }
     busy = true;
     el("cap-vr-bul").disabled = true;
     durum("Yapay zekâ konuşmayı izliyor…");

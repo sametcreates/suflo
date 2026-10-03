@@ -131,6 +131,12 @@ window.K = (function () {
 
   var _settings = null;
   var DEFAULT_EMOJI_CATALOG_URL = "https://assets.suflo.app/emoji/v1/catalog.json";
+  /*
+   * settings.json bu yuklemeden ONCE var miydi? Yoksa taze kurulum: ilk acilis
+   * rehberi ("Ilk altyazin 2 dakikada") tam kartla acilir. Ilk saveSettings dosyayi
+   * olusturdugu icin bu bilgi yalniz ilk okumada guvenilir; burada bir kez saklanir.
+   */
+  var _ayarDosyasiVardi = false;
 
   function loadSettings() {
     if (_settings) return _settings;
@@ -140,6 +146,7 @@ window.K = (function () {
     };
     try {
       var p = settingsPath();
+      _ayarDosyasiVardi = !!(p && fs.existsSync(p));
       if (p && fs.existsSync(p)) {
         var disk = JSON.parse(fs.readFileSync(p, "utf8"));
         for (var k in disk) if (disk.hasOwnProperty(k)) _settings[k] = disk[k];
@@ -1290,6 +1297,7 @@ window.K = (function () {
     libassUyarisi: libassUyarisi,
     settings: loadSettings,
     saveSettings: saveSettings,
+    ayarDosyasiVardi: function () { loadSettings(); return _ayarDosyasiVardi; },
     walkAudio: walkAudio,
     isAudio: isAudio,
     walkVisual: walkVisual,
