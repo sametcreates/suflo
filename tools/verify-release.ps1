@@ -9,6 +9,10 @@ $root = Split-Path -Parent $PSScriptRoot
 $version = [string]$manifest.ExtensionManifest.ExtensionBundleVersion
 if (-not $ZxpPath) { $ZxpPath = Join-Path $root ("dist\Suflo-{0}.zxp" -f $version) }
 if (-not $InstallerPath) { $InstallerPath = Join-Path $root ("dist\Suflo-{0}-Kurulum.zip" -f $version) }
+# Ilk acilis rehberinin ornek klibi (kurucunun kendi sesi/yuzu, MIT ile dagitilir): bu klasordeki
+# mp4/wav/mp3 ucretli icerik sayilmaz. Depoda ornek.json varsa pakette de olmali.
+$onboardingMedia = '(^|/)assets/onboarding/[^/]+\.(mp4|wav|mp3)$'
+$ornekVar = Test-Path -LiteralPath (Join-Path $root "assets\onboarding\ornek.json") -PathType Leaf
 
 foreach ($path in @($ZxpPath, $InstallerPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -41,7 +45,8 @@ function Test-Archive([string]$path, [string]$kind) {
     $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $path))
     try {
         $names = @($zip.Entries | ForEach-Object FullName)
-        $paid = @($names | Where-Object { $_ -match '\.(mogrt|prfpset|mov|mp4|m4v|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' })
+        $paid = @($names | Where-Object { $_ -match '\.(mogrt|prfpset|mov|mp4|m4v|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' -and $_ -notmatch $onboardingMedia })
+        $sample = @($names | Where-Object { $_ -match $onboardingMedia })
         $private = @($names | Where-Object { $_ -match '(^|/)(private|server)(/|$)|(^|/)config\.php$' })
         $badSeparators = @($names | Where-Object { $_ -match '\\' })
         $required = @(
@@ -54,6 +59,7 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)assets/pro-sfx-showcase/catalog\.json$',
             '(^|/)CSXS/manifest\.xml$'
         )
+        if ($ornekVar -or $sample.Count) { $required += '(^|/)assets/onboarding/ornek\.json$' }
         $missing = @()
         foreach ($pattern in $required) {
             if (-not ($names | Where-Object { $_ -match $pattern } | Select-Object -First 1)) { $missing += $pattern }
@@ -64,7 +70,7 @@ function Test-Archive([string]$path, [string]$kind) {
         }
         $item = Get-Item -LiteralPath $path
         $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
-        Write-Host ("{0}: {1} oge, {2:N2} MB, SHA256 {3}" -f $kind,$names.Count,($item.Length / 1MB),$hash) -ForegroundColor Green
+        Write-Host ("{0}: {1} oge, {2:N2} MB, SHA256 {3}, ornek klip dosyasi {4}" -f $kind,$names.Count,($item.Length / 1MB),$hash,$sample.Count) -ForegroundColor Green
     } finally {
         $zip.Dispose()
     }

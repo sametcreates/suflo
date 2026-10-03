@@ -16,6 +16,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 
 | Ne | Nasıl |
 |---|---|
+| **İlk altyazın 2 dakikada** *(3.1)* | İlk açılışta 4 adımlı rehber: hızlı küçük model (Türkçe: Small, 190 MB, ffmpeg arkada), örnek klipte deneme, stil önizlemesi, ücretsiz Groq anahtarı sihirbazı (panodan al + doğrula). AI düğmelerinde "anahtar gerekli · 1 dk" kısayolu |
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
 | **Karaoke** | Kelime kelime ve birikimli mod; kelime zamanlarıyla |
@@ -124,8 +125,8 @@ Oluşan klasörün içindeki `assets/`, `thumbs/`, `catalog.json` ve `.htaccess`
 
 1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir ve kur (ücretsiz).
 2. [Son sürüm `.zxp` dosyasını indir](https://github.com/sametcreates/suflo/releases/latest), çift tıkla.
-3. Premiere'i kapat, tekrar aç → `Window > Extensions > Suflo`.
-4. Panelde **"Yerel motoru indir & kur"** düğmesine bas. Gerisini panel yapar.
+3. Premiere'i kapat, tekrar aç → `Window > Extensions (Legacy) > Suflo` (Premiere 25.6+ ve 2026) ya da `Window > Extensions > Suflo` (daha eski sürümler).
+4. Altyazı sekmesinin üstündeki **"İlk altyazın 2 dakikada"** rehberini izle: motoru kurar, örnek klipte dener, stilini ve yapay zekâyı açarsın. Gerisini panel yapar.
 
 NVIDIA ekran kartın varsa hızlandırma otomatik açılır.
 
@@ -148,12 +149,14 @@ Mac'te iki yardımcı program gerekiyor. Panel bunları senin için kurar, ama �
    ```
 4. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir ve kur (ücretsiz).
 5. [Son sürüm `.zxp` dosyasını indir](https://github.com/sametcreates/suflo/releases/latest), çift tıkla.
-6. Premiere'i kapat, tekrar aç → `Window > Extensions > Suflo`.
-7. Panelde **"Yerel motoru kur (Homebrew)"** düğmesine bas.
+6. Premiere'i kapat, tekrar aç → `Window > Extensions (Legacy) > Suflo` (Premiere 25.6+ ve 2026) ya da `Window > Extensions > Suflo` (daha eski sürümler).
+7. Rehberde ya da panelde **"Yerel motoru kur (Homebrew)"** düğmesine bas. Homebrew yoksa rehber ücretsiz Groq anahtarıyla buluttan başlatır.
 
 **Neden Homebrew?** whisper.cpp macOS için hazır ikili yayınlamıyor (resmi sürüm dosyaları yalnız Windows ve Ubuntu); Mac'te bu araçları kurmanın standart yolu Homebrew. Panel `brew install whisper-cpp` çalıştırır, modelleri kendisi indirir.
 
 **Apple Silicon'da (M1 ve sonrası) GPU hızlandırma (Metal) kendiliğinden açıktır** — ayrı bir sürüm indirmek gerekmez.
+
+**Panel menüde görünmüyor mu?** Premiere'i tamamen kapatıp yeniden aç; 25.6+ ve 2026'da yol `Window > Extensions (Legacy)`. Adım adım kontrol listesi: [suflo.app/blog/premiere-suflo-paneli-gorunmuyor](https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor)
 
 **Homebrew istemiyorum:** ffmpeg'i [evermeet.cx](https://evermeet.cx/ffmpeg/)'ten tek dosya olarak indir, panelde `Ayarlar > ffmpeg > Elle yol` alanına yerini yaz, ücretsiz Groq anahtarıyla bulut modunu kullan. (Bu durumda ses Groq'a gider ve internet gerekir.)
 

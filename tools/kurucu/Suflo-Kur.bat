@@ -78,10 +78,14 @@ echo   ====================================
 echo.
 echo   Simdi:
 echo     1. Premiere Pro'yu ac ^(acikken kurduysan kapatip yeniden ac^)
-echo     2. Ustteki menuden:  Window ^> Extensions ^> Suflo
+echo     2. Ustteki menuden:
+echo          Premiere 25.6+ / 2026 : Window ^> Extensions (Legacy) ^> Suflo
+echo          Daha eski surumler    : Window ^> Extensions ^> Suflo
 echo.
-echo   Ilk altyazida panel gerekli motoru kendisi indirir.
+echo   Ilk acilista "Ilk altyazin 2 dakikada" rehberi seni adim adim goturur;
+echo   gerekli motoru panel kendisi indirir.
 echo.
+echo   Menude Suflo yoksa: https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor
 echo   Takilirsan: https://suflo.app
 echo.
 pause

@@ -16,11 +16,13 @@ echo "  PlayerDebugMode acildi (CSXS 9-12)"
 # 2) Dosyalari kopyala
 rm -rf "$DEST"
 mkdir -p "$DEST"
-for item in CSXS css js jsx fonts emoji index.html .debug; do
+for item in CSXS css js jsx fonts emoji assets index.html .debug; do
   [ -e "$SRC/$item" ] && cp -R "$SRC/$item" "$DEST/"
 done
 echo "  Kopyalandi: $DEST"
 
 echo ""
 echo "Bitti. Premiere Pro'yu yeniden baslat, sonra:"
-echo "  Window > Extensions > Suflo"
+echo "  Premiere 25.6+ / 2026:  Window > Extensions (Legacy) > Suflo"
+echo "  Daha eski surumler:     Window > Extensions > Suflo"
+echo "  Menude yoksa: https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor"

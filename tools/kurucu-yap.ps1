@@ -51,7 +51,12 @@ KURULUM (2 adim)
   Windows : "Suflo-Kur.bat" dosyasina cift tikla
   Mac     : "Suflo-Kur.command" dosyasina cift tikla
 
-  Sonra Premiere Pro'yu ac:  Window > Extensions > Suflo
+  Sonra Premiere Pro'yu ac ve paneli menuden sec:
+    Premiere 25.6+ / 2026 : Window > Extensions (Legacy) > Suflo
+    Daha eski surumler    : Window > Extensions > Suflo
+
+  Menude Suflo yoksa: Premiere'i tamamen kapatip yeniden ac.
+  Hala yoksa: https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor
 
 Not: Windows "Bilinmeyen yayimci" uyarisi verirse
 "Ek bilgi" > "Yine de calistir" de. Suflo acik kaynak,
@@ -69,8 +74,8 @@ ve Enter'a bas:
 
 Sonra dosyaya tekrar cift tikla.
 
-Panel ilk altyazida gerekli motoru kendisi indirir;
-senin ayrica bir sey kurman gerekmez.
+Panel ilk acilista "Ilk altyazin 2 dakikada" rehberini gosterir:
+gerekli motoru kendisi indirir, senin ayrica bir sey kurman gerekmez.
 
 Yardim: https://suflo.app
 Surum : $surum

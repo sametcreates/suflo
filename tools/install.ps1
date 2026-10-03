@@ -44,4 +44,6 @@ Write-Host "  Kopyalandi: $destFull" -ForegroundColor DarkGray
 
 Write-Host ""
 Write-Host "Bitti. Premiere Pro'yu yeniden baslat, sonra:" -ForegroundColor Green
-Write-Host "  Window > Extensions > Suflo" -ForegroundColor Green
+Write-Host "  Premiere 25.6+ / 2026:  Window > Extensions (Legacy) > Suflo" -ForegroundColor Green
+Write-Host "  Daha eski surumler:     Window > Extensions > Suflo" -ForegroundColor Green
+Write-Host "  Menude yoksa: https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor" -ForegroundColor DarkGray
