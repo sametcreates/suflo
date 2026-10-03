@@ -13,9 +13,10 @@
   "use strict";
 
   // Whisper'ın bilinen halüsinasyonlarını süz
+  var JUNK = /^(altyaz[ıi]\s*m\.?\s*k\.?|abone olmay[ıi] unutmay[ıi]n)$/i;
   function cleanSegments(segs) {
     var out = [];
-    var junk = /^(altyaz[ıi]\s*m\.?\s*k\.?|abone olmay[ıi] unutmay[ıi]n)$/i;
+    var junk = JUNK;
     var lastText = "", repeat = 0;
     for (var i = 0; i < segs.length; i++) {
       var t = segs[i].text;
@@ -31,6 +32,40 @@
       out.push(segs[i]);
     }
     return out;
+  }
+
+  /*
+   * Whisper bazen ayni satira takilip sesin SONUNA kadar onu tekrarlar
+   * (art arda kisa, tekrarli ifadelerden sonra; sonuna cogu kez "Altyazi M.K."
+   * gibi bir halusinasyon ekler). cleanSegments tekrarlari attigi icin altyazi
+   * orada bitmis gibi gorunur. Takilmanin basladigi indeksi doner, yoksa -1:
+   *  - transkript (bos/halusinasyon satirlari sayilmadan) en az `enAz` ayni
+   *    satirla bitiyorsa, ya da
+   *  - herhangi bir yerde `uzun` (varsayilan 8) ya da daha fazla ayni satir
+   *    art arda geliyorsa (gercek konusmada bu olmaz).
+   * Ortadaki kisa tekrarlar (konusmacinin gercekten tekrar etmesi) sayilmaz.
+   */
+  function sondaTakilma(segs, enAz, uzun) {
+    enAz = enAz || 3;
+    uzun = uzun || 8;
+    function norm(t) {
+      return String(t || "").toLowerCase().replace(/[.,!?;:…]/g, "").replace(/\s+/g, " ").trim();
+    }
+    var dizi = [];
+    for (var i = 0; i < segs.length; i++) {
+      var n = norm(segs[i].text);
+      if (n && !JUNK.test(n)) dizi.push({ i: i, n: n });
+    }
+    if (!dizi.length) return -1;
+    // uzun dizi: ilk gorulen yer
+    for (var a = 0, b; a < dizi.length; a = b) {
+      for (b = a + 1; b < dizi.length && dizi[b].n === dizi[a].n; b++) {}
+      if (b - a >= uzun) return dizi[a].i;
+    }
+    // sona kadar suren dizi
+    var bas = dizi.length - 1;
+    while (bas > 0 && dizi[bas - 1].n === dizi[dizi.length - 1].n) bas--;
+    return dizi.length - bas >= enAz ? dizi[bas].i : -1;
   }
 
   // kelime cue'ları: her kelime kendi zamanında, bir sonrakiyle çakışmadan
@@ -384,6 +419,7 @@
     normalizeEmphasis: normalizeEmphasis,
     autoEmphasis: autoEmphasis,
     cleanSegments: cleanSegments,
+    sondaTakilma: sondaTakilma,
     karaokeWords: karaokeWords,
     karaokeCumulative: karaokeCumulative,
     splitWords: splitWords,

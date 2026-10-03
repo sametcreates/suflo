@@ -9,7 +9,12 @@ var markers = [];
 var seqState = {};
 var sequence = {
   markers: {
-    createMarker: function (t) { var m = { start: t, setColorByIndex: function (i) { this.renk = i; } }; markers.push(m); return m; },
+    createMarker: function (t) {
+      var m = { start: t, setColorByIndex: function (i) { this.renk = i; } }, bitis = { seconds: t };
+      // Premiere 26.5 gibi: end'e sayi (sn) atanir, okununca Time doner; Time atamak hata
+      Object.defineProperty(m, "end", { get: function () { return bitis; }, set: function (v) {
+        if (typeof v !== "number") throw new Error("Illegal Parameter type"); bitis = { seconds: v }; } });
+      markers.push(m); return m; },
     getFirstMarker: function () { return markers[0] || null; },
     getNextMarker: function (m) { var i = markers.indexOf(m); return markers[i + 1] || null; },
     deleteMarker: function (m) { markers.splice(markers.indexOf(m), 1); }

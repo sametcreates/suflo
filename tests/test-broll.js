@@ -26,7 +26,13 @@ ok("arama baglantilari: ilk obek, kodlanmis", u.pexels === "https://www.pexels.c
 var markers = [];
 function FakeTime() { this.seconds = 0; }
 var seq = { markers: {
-  createMarker: function (t) { var m = { start: t, setColorByIndex: function (i) { this.renk = i; } }; markers.push(m); return m; },
+  createMarker: function (t) {
+    var m = { start: t, setColorByIndex: function (i) { this.renk = i; } };
+    // Premiere 26.5 gibi: end yalniz sayi kabul eder, Time nesnesinde "Illegal Parameter type"
+    var bitis = t;
+    Object.defineProperty(m, "end", { get: function () { return bitis; }, set: function (v) {
+      if (typeof v !== "number") throw new Error("Illegal Parameter type"); bitis = v; } });
+    markers.push(m); return m; },
   getFirstMarker: function () { return markers[0] || null; },
   getNextMarker: function (m) { return markers[markers.indexOf(m) + 1] || null; },
   deleteMarker: function (m) { markers.splice(markers.indexOf(m), 1); } } };
@@ -41,6 +47,8 @@ var b2 = call("KS_addRangeMarkers", { ranges: [{ start: 50, end: 55, name: "B-ro
 ok("host: b-roll yesil ve kendi etiketiyle; tekrar eklemede yalniz b-roll yenilenir", b1.ok && b2.removed === 1 && markers.length === 2 &&
   markers[0].comments.indexOf("Suflo viral:") === 0 && markers[0].renk === 1 && markers[1].comments.indexOf("Suflo B-roll:") === 0 && markers[1].renk === 0,
   JSON.stringify(markers.map(function (m) { return [m.comments, m.renk]; })));
+ok("host: marker sureli (end saniye olarak atanir)", markers[0].end === 30 && markers[1].end === 55,
+  JSON.stringify(markers.map(function (m) { return [m.start, m.end]; })));
 
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 var ui = fs.readFileSync(path.join(__dirname, "..", "js", "broll-ui.js"), "utf8");

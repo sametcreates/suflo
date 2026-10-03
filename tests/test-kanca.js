@@ -27,6 +27,11 @@ ok("buyuk harf Turkce: i -> İ", HT.build({ text: "bilgi", stil: "kutu" }).ass.i
 var uzun = HT.build({ text: "çok çok uzun bir başlık metni burada kadraja sığmalı ve taşmamalı tamam mı", stil: "sade", width: 1080, height: 1920 });
 var fsz = Number(/Style: Kanca,[^,]+,(\d+)/.exec(uzun.ass)[1]);
 ok("uzun metinde font kuculur (dikey)", fsz < Math.round(92 * 1080 / 1080), fsz);
+// kutu: vurgu kelime beyaz + koyu kontur (sari kutuda beyaz tek basina okunmuyordu)
+var kutuAss = HT.build({ text: "Bunu bilmeden *cildine* dokunma", stil: "kutu", width: 1080, height: 1920 }).ass;
+ok("kutu: vurgu kelime konturlu beyaz", /\\1c&H00FFFFFF\\3c&H00111111\\bord\d+\}CİLDİNE\{\\1c&H00111111\\bord0\}/.test(kutuAss),
+  (kutuAss.match(/[^\n]{0,60}CİLDİNE[^\n]{0,30}/) || [""])[0]);
+
 var satirlar = HT.satirlar(HT.tokens("a b c d e f g h"), 4);
 ok("satirlar: kelime kaybi yok", satirlar.reduce(function (n, l) { return n + l.length; }, 0) === 8 && satirlar.length <= 3);
 
@@ -64,6 +69,26 @@ var ctx = { app: { version: "25.0.0", project: { activeSequence: seq, importFile
   String: String, Number: Number, Error: Error, File: function () { this.exists = true; }, Folder: function () {} };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "jsx", "host.jsx"), "utf8"), ctx);
+// KS_tryPlace: Premiere klibi kare sinirina oturtur (25 fps'te 41.62 -> 41.64); yeni klip silinmemeli
+(function () {
+  var TPS = 254016000000;
+  ctx.app.project.activeSequence.timebase = String(TPS / 25);
+  var silinen = 0, klipler = [{ start: { seconds: 10, ticks: 10 * TPS } }];
+  var izKatman = { clips: null, overwriteClip: function (it, konum) {
+    var sn = Number(konum) > 1e6 ? Number(konum) / TPS : Number(konum);   // ticks (metin) ya da saniye
+    var kare = Math.round(sn * 25 + 1e-9) / 25;
+    var c = { start: { seconds: kare, ticks: Math.round(kare * TPS) }, remove: function () { silinen++; klipler.splice(klipler.indexOf(c), 1); } };
+    klipler.push(c);
+  } };
+  izKatman.clips = { get numItems() { return klipler.length; } };
+  for (var ki = 0; ki < 5; ki++) (function (k) { Object.defineProperty(izKatman.clips, k, { get: function () { return klipler[k]; } }); })(ki);
+  FakeTime.prototype = { set seconds(v) { this._s = v; this.ticks = String(Math.round(v * TPS)); }, get seconds() { return this._s; } };
+  var yer = ctx.KS_tryPlace(izKatman, {}, 41.62);
+  ok("KS_tryPlace: kare sinirina oturan klip kabul edilir, silinmez", yer && Math.abs(yer.start.seconds - 41.64) < 1e-9 && silinen === 0 && klipler.length === 2,
+    JSON.stringify({ yer: yer && yer.start.seconds, silinen: silinen, adet: klipler.length }));
+  FakeTime.prototype = {};
+  delete ctx.app.project.activeSequence.timebase;
+})();
 ctx.KS_findBin = function () { return {}; };
 ctx.KS_findFreeVideoTrack = function () { return 1; };
 ctx.KS_tryPlace = function (track, it, startSec) { konan.push(startSec); return { start: { seconds: startSec }, end: { seconds: startSec + 3 }, nodeId: "n" }; };

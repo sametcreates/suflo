@@ -115,9 +115,10 @@
     function d(layer, a, b, txt) {
       ev.push("Dialogue: " + layer + "," + tcode(a) + "," + tcode(b) + ",Kanca,,0,0,0,," + txt);
     }
-    function satirMetni(l, normal, accent) {
+    // ekVurgu/ekNormal: vurgulu kelimeye ozel ek ASS etiketleri (or. kontur) ve geri alinisi
+    function satirMetni(l, normal, accent, ekVurgu, ekNormal) {
       return l.map(function (t) {
-        return t.v ? "{\\1c" + accent + "}" + esc(t.w) + "{\\1c" + normal + "}" : esc(t.w);
+        return t.v ? "{\\1c" + accent + (ekVurgu || "") + "}" + esc(t.w) + "{\\1c" + normal + (ekNormal || "") + "}" : esc(t.w);
       }).join(" ");
     }
     function kutuYolu(w, h, r) {
@@ -175,7 +176,9 @@
           "\\shad" + Math.max(1, Math.round(fs * .06)) + "\\4c" + assColor("#000000", 0x50) +
           "\\fad(" + Math.round(ms * .8) + "," + msOut + ")}" + satirMetni(l, assColor(renk), assColor(vurgu)));
       } else {
-        // kutu: vurgu renginde kutu pop ile acilir, metin koyu; vurgu kelime beyaz
+        // kutu: vurgu renginde kutu pop ile acilir, metin koyu; vurgu kelime beyaz.
+        // Beyaz, acik kutu renginde (varsayilan sari #ffe600) okunmuyordu: koyu kontur sart.
+        var vurguKontur = "\\3c" + assColor("#111111") + "\\bord" + Math.max(2, Math.round(fs * .07));
         var org = "\\org(" + cx + "," + y + ")";
         var pop = "\\fscx40\\fscy40\\t(" + gm + "," + (gm + ms) + ",0.5,\\fscx106\\fscy106)\\t(" + (gm + ms) + "," + (gm + ms + 90) + ",\\fscx100\\fscy100)";
         d(0, 0, dur, "{\\an7\\pos(" + Math.round(cx - kutuW / 2) + "," + Math.round(y - kutuH / 2) + ")" + org +
@@ -183,7 +186,7 @@
           pop + "\\fad(0," + msOut + ")\\p1}" + kutuYolu(kutuW, kutuH, fs * .16) + "{\\p0}");
         d(1, 0, dur, "{\\an5\\pos(" + cx + "," + y + ")" + org + "\\frz" + (i % 2 ? 1.2 : -1.2) +
           "\\fs" + fs + "\\bord0\\shad0\\1c" + assColor("#111111") + "\\alpha&HFF&\\t(" + gm + "," + (gm + 40) + ",\\alpha&H00&)" +
-          pop + "\\fad(0," + msOut + ")}" + satirMetni(l, assColor("#111111"), assColor("#ffffff")));
+          pop + "\\fad(0," + msOut + ")}" + satirMetni(l, assColor("#111111"), assColor("#ffffff"), vurguKontur, "\\bord0"));
       }
     });
 

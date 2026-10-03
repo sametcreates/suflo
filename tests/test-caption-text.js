@@ -18,6 +18,25 @@ chk("cleanSegments: noktalama ve kalip atildi, 3. tekrar atildi",
   c.map(function (s) { return s.text; }).join("|") === "Merhaba|tamam|Tamam.|son",
   c.map(function (s) { return s.text; }).join("|"));
 
+/* sondaTakilma: whisper sona kadar ayni satiri tekrarlarsa */
+var tk = [seg(0, 1, "Kozmelan."), seg(1, 2, "Q-switch uygulaması."), seg(2, 3, "Q-switch uygulaması"),
+  seg(3, 4, "q-switch uygulaması."), seg(4, 5, ""), seg(5, 6, "Q-switch uygulaması.")];
+chk("sondaTakilma: sona kadar tekrar -> baslangic indeksi", T.sondaTakilma(tk, 3) === 1, T.sondaTakilma(tk, 3));
+var ortada = [seg(0, 1, "Akne protokolü."), seg(1, 2, "Akne protokolü."), seg(2, 3, "Akne protokolü."), seg(3, 4, "Leke.")];
+chk("sondaTakilma: ortadaki gercek tekrar sayilmaz", T.sondaTakilma(ortada, 3) === -1, T.sondaTakilma(ortada, 3));
+chk("sondaTakilma: 2 tekrar yetmez", T.sondaTakilma([seg(0, 1, "a"), seg(1, 2, "b"), seg(2, 3, "b")], 3) === -1);
+chk("sondaTakilma: kelime modunda esik", T.sondaTakilma([seg(0, 1, "çok"), seg(1, 2, "çok"), seg(2, 3, "çok")], 6) === -1);
+chk("sondaTakilma: bos liste", T.sondaTakilma([], 3) === -1);
+// Premiere'de gorulen gercek desen: 271 tekrar + sonda "Altyazi M.K." halusinasyonu
+var gercek = [seg(0, 1, "Kozmelan."), seg(1, 2, "Q-switch.")];
+for (var gi = 0; gi < 20; gi++) gercek.push(seg(2 + gi, 3 + gi, "Q-switch uygulaması."));
+gercek.push(seg(30, 31, "Altyazı M.K."));
+chk("sondaTakilma: sondaki halusinasyon satiri atlanir", T.sondaTakilma(gercek, 3) === 2, T.sondaTakilma(gercek, 3));
+var uzunOrta = [seg(0, 1, "a")];
+for (var ui = 0; ui < 9; ui++) uzunOrta.push(seg(1 + ui, 2 + ui, "aynı satır"));
+uzunOrta.push(seg(20, 21, "sonra gelen konuşma"));
+chk("sondaTakilma: ortada 8+ ayni satir da takilma", T.sondaTakilma(uzunOrta, 3) === 1, T.sondaTakilma(uzunOrta, 3));
+
 /* karaoke */
 var w = [seg(0, 0.5, "bir"), seg(0.4, 0.9, "iki"), seg(3, 3.01, "üç")];
 var kw = T.karaokeWords(w);

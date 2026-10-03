@@ -365,16 +365,68 @@ window.KCaptions = (function () {
       wordLevel: wordLevel,
       prompt: glossaryPrompt()
     });
-    var args = built.args;
     K.log("yerel motor: " + (KEngine.installedBuild() === "cuda" ? "GPU" : "CPU") +
       ", VAD " + (built.vad ? "acik" : "kapali") +
       ", model " + String(lw.model).replace(/^.*[\\\/]/, ""));
 
-    var r = await K.run(lw.exe, args, {
+    var segs = await yerelCalistir(lw.exe, built.args, outBase, "");
+
+    /*
+     * Takilma kurtarma: whisper bir satira takilip sesin sonuna kadar onu
+     * tekrarladiysa (cleanSegments sonra bunlari atar, altyazi orada biter),
+     * sesi takilma noktasindan kes ve o parcayi onceki metne bakmadan (-mc 0)
+     * yeniden coz. Sozluk ipucu --carry-initial-prompt ile korunur.
+     */
+    var ti = CT.sondaTakilma(segs, wordLevel ? 6 : 3);
+    var sesSure = /\.wav$/i.test(audioPath) ? wavDuration(audioPath) : 0;
+    if (ti >= 0 && sesSure - segs[ti].start > 5) {
+      var kesBas = Math.max(0, segs[ti].start);
+      K.log("yerel motor takildi: " + kesBas.toFixed(1) + " sn'den itibaren '" +
+        String(segs[ti].text).slice(0, 40) + "' tekrarlaniyor (" + (segs.length - ti) +
+        " satir) - kalan ses yeniden cozuluyor");
+      var parca = outBase + "_kalan.wav";
+      try {
+        var ff = await K.findFfmpeg();
+        var rk = await K.run(ff, ["-y", "-ss", kesBas.toFixed(3), "-i", audioPath, "-c:a", "pcm_s16le", parca],
+          { timeout: 900000 });
+        if (rk.code !== 0 || !K.fs.existsSync(parca)) throw new Error("ses kesilemedi");
+        var ek = KEngine.buildArgs({
+          model: lw.model, audio: parca, lang: lang, outBase: outBase + "_kalan",
+          threads: threads, wordLevel: wordLevel, prompt: glossaryPrompt()
+        }).args.concat(["-mc", "0"]);
+        var kalan;
+        try {
+          // eski whisper-cli (or. Homebrew) bu bayragi tanimayabilir: o zaman bayraksiz dene
+          kalan = await yerelCalistir(lw.exe, ek.indexOf("--prompt") !== -1 ? ek.concat(["--carry-initial-prompt"]) : ek,
+            outBase + "_kalan", " · kalan kısım");
+        } catch (eCarry) {
+          kalan = await yerelCalistir(lw.exe, ek, outBase + "_kalan", " · kalan kısım");
+        }
+        kalan.forEach(function (sg) { sg.start += kesBas; sg.end += kesBas; });
+        var yeniden = CT.sondaTakilma(kalan, wordLevel ? 6 : 3);
+        K.log("takilma kurtarma: " + kalan.length + " satir eklendi" +
+          (yeniden >= 0 ? " (kalan kisim da tekrarla bitiyor)" : ""));
+        if (kalan.length) segs = segs.slice(0, ti).concat(kalan);
+      } catch (eK) {
+        K.log("takilma kurtarma basarisiz: " + (eK && eK.message ? eK.message : eK));
+      } finally {
+        try { K.fs.unlinkSync(parca); } catch (eP) {}
+      }
+    }
+    if (wordLevel) {
+      K.log("yerel kelime modu: " + segs.length + " parça, ilk3=" +
+        segs.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
+    }
+    return segs;
+  }
+
+  // whisper-cli'yi calistir, JSON ciktisini segmentlere cevir
+  async function yerelCalistir(exe, args, outBase, etiket) {
+    var r = await K.run(exe, args, {
       timeout: 7200000,
       onStderr: function (s) {
         var m = s.match(/progress\s*=\s*(\d+)%/);
-        if (m) status("Transkribe ediliyor… %" + m[1] + " (yerel)");
+        if (m) status("Transkribe ediliyor… %" + m[1] + " (yerel" + etiket + ")");
       }
     });
     var jsonPath = outBase + ".json";
@@ -384,9 +436,9 @@ window.KCaptions = (function () {
         (r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 180));
     }
     var parsed = JSON.parse(K.fs.readFileSync(jsonPath, "utf8").toString());
-    try { algilananDil = dilKodu(parsed.result && parsed.result.language); } catch (eDil) {}
+    if (!etiket) { try { algilananDil = dilKodu(parsed.result && parsed.result.language); } catch (eDil) {} }
     try { K.fs.unlinkSync(jsonPath); } catch (e2) {}
-    var segs = (parsed.transcription || []).map(function (t) {
+    return (parsed.transcription || []).map(function (t) {
       var s = t.offsets ? t.offsets.from / 1000 : NaN;
       var e = t.offsets ? t.offsets.to / 1000 : NaN;
       // offsets bozuksa timestamps dizgesinden coz ("00:00:01,380")
@@ -401,11 +453,6 @@ window.KCaptions = (function () {
         : (isFinite(Number(t.avg_logprob)) ? Math.exp(Number(t.avg_logprob)) : undefined);
       return { start: s || 0, end: e || 0, text: String(t.text || "").trim(), confidence: confidence };
     });
-    if (wordLevel) {
-      K.log("yerel kelime modu: " + segs.length + " parça, ilk3=" +
-        segs.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
-    }
-    return segs;
   }
 
   /*

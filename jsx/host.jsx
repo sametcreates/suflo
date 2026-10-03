@@ -1511,6 +1511,27 @@ function KS_clipAt(track, sec) {
   return null;
 }
 
+/*
+ * Premiere klibi en yakin KARE sinirina oturtur: 25 fps'te 41.62 sn (1040.5. kare)
+ * 41.60/41.64'e duser ve 1 ms'lik KS_clipAt eslesmez. O zaman yerlestirmeden once
+ * OLMAYAN ve istenen ana en fazla bir kare uzak klibi yeni klip say.
+ */
+function KS_yeniKlipYakin(track, once, sec) {
+  var kare = 1 / 24;
+  try {
+    var tb = Number(app.project.activeSequence.timebase);
+    if (tb > 0) kare = tb / 254016000000;
+  } catch (eT) {}
+  try {
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var c = track.clips[i];
+      if (once[String(c.start.ticks)]) continue;
+      if (Math.abs(c.start.seconds - sec) <= kare + 1e-3) return c;
+    }
+  } catch (e) {}
+  return null;
+}
+
 function KS_tryPlace(track, item, startSec) {
   var t = new Time();
   t.seconds = startSec;
@@ -1527,7 +1548,7 @@ function KS_tryPlace(track, item, startSec) {
       try { once[String(track.clips[q].start.ticks)] = 1; } catch (eQ) {}
     }
     try { track.overwriteClip(item, forms[k]); } catch (e) { continue; }
-    var good = KS_clipAt(track, startSec);
+    var good = KS_clipAt(track, startSec) || KS_yeniKlipYakin(track, once, startSec);
     if (good) return good;
     if (track.clips.numItems > n0) {
       for (var j = track.clips.numItems - 1; j >= 0; j--) {
@@ -2038,7 +2059,11 @@ function KS_addRangeMarkers(encoded) {
         if (!m) continue;
         try { m.name = String(list[i].name || ""); } catch (eN) {}
         try { m.comments = etiket + ": " + String(list[i].comment || ""); } catch (eC) {}
-        try { var son = new Time(); son.seconds = Number(list[i].end); m.end = son; } catch (eE) {}
+        // Marker.end SANIYE (sayi) alir: Premiere 26.5'te Time nesnesi "Illegal Parameter
+        // type" atiyordu ve marker'lar suresiz kaliyordu. Time yalniz yedek.
+        try { m.end = Number(list[i].end); } catch (eE) {
+          try { var son = new Time(); son.seconds = Number(list[i].end); m.end = son; } catch (eE2) {}
+        }
         try { if (m.setColorByIndex) m.setColorByIndex(renk); } catch (eK) {}   // viral: kirmizi, b-roll: yesil
         n++;
       } catch (eM) {}
