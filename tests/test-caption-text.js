@@ -37,6 +37,14 @@ for (var ui = 0; ui < 9; ui++) uzunOrta.push(seg(1 + ui, 2 + ui, "aynı satır")
 uzunOrta.push(seg(20, 21, "sonra gelen konuşma"));
 chk("sondaTakilma: ortada 8+ ayni satir da takilma", T.sondaTakilma(uzunOrta, 3) === 1, T.sondaTakilma(uzunOrta, 3));
 
+/* katmanSuresi: kuyruk sekansi uzatmaz */
+chk("katmanSuresi: uzun sekansta 2 sn kuyruk", T.katmanSuresi(100.3, 454) === 103);
+chk("katmanSuresi: Shorts'ta sekans sonunda biter", T.katmanSuresi(38.0, 38.02) === 38.02, T.katmanSuresi(38.0, 38.02));
+chk("katmanSuresi: 25 fps'te kare izgarasina asagi (36.65 -> 36.64)", Math.abs(T.katmanSuresi(36.63, 36.65, 25) - 36.64) < 1e-9,
+  T.katmanSuresi(36.63, 36.65, 25));
+chk("katmanSuresi: kalan bilinmiyorsa eski davranis", T.katmanSuresi(38.0, 0) === 40);
+chk("katmanSuresi: altyazi sekansa sigmiyorsa kesilmez", T.katmanSuresi(50, 30) === 52);
+
 /* karaoke */
 var w = [seg(0, 0.5, "bir"), seg(0.4, 0.9, "iki"), seg(3, 3.01, "üç")];
 var kw = T.karaokeWords(w);

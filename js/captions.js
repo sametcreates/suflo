@@ -3702,7 +3702,7 @@ window.KCaptions = (function () {
       var cs = cueler();
       if (!cs.length) throw new Error("Yazılacak altyazı yok.");
       var sonBitis = cs[cs.length - 1].end - baslangic;
-      var sure = Math.max(1, Math.ceil(sonBitis + 2));
+      var sure = CT.katmanSuresi(sonBitis, (Number(spec.end) || 0) - baslangic, fps);
 
       var st = stil();
       var stilDerlemesi = null;

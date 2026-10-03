@@ -68,6 +68,22 @@
     return dizi.length - bas >= enAz ? dizi[bas].i : -1;
   }
 
+  /*
+   * Stilli katmanin suresi: son altyazidan sonra 2 sn kuyruk (tam saniyeye
+   * yuvarli). Kuyruk sekansin sonunu GECMEZ: Shorts'ta altyazi sekans sonuna
+   * kadar gidiyor ve katman sekansi ~3 sn bos goruntuyle uzatiyordu. Altyazilar
+   * zaten sekansa sigmiyorsa (kalan bilinmiyor/tutarsiz) dokunulmaz.
+   */
+  function katmanSuresi(sonBitis, sekansKalan, fps) {
+    var sure = Math.max(1, Math.ceil(sonBitis + 2));
+    if (sekansKalan > 0 && sekansKalan >= sonBitis - 0.05 && sure > sekansKalan) {
+      // ffmpeg -t'yi bir sonraki kareye tamamlar: kare izgarasina ASAGI yuvarla ki tek kare bile tasmasin
+      var kare = fps > 0 ? Math.floor(sekansKalan * fps + 1e-6) / fps : sekansKalan;
+      sure = Math.max(sonBitis, kare);
+    }
+    return sure;
+  }
+
   // kelime cue'ları: her kelime kendi zamanında, bir sonrakiyle çakışmadan
   function karaokeWords(words) {
     var out = [];
@@ -420,6 +436,7 @@
     autoEmphasis: autoEmphasis,
     cleanSegments: cleanSegments,
     sondaTakilma: sondaTakilma,
+    katmanSuresi: katmanSuresi,
     karaokeWords: karaokeWords,
     karaokeCumulative: karaokeCumulative,
     splitWords: splitWords,
