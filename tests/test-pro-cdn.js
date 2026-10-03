@@ -36,6 +36,11 @@ ok("GitHub yayini paketi yeniden uretip imza, sizinti ve tum testleri zorunlu tu
   /package\.ps1/.test(publish) && /kurucu-yap\.ps1/.test(publish) && /verify-release\.ps1/.test(publish) && /test\.ps1/.test(publish));
 ok("GitHub commit kapisi gizli/odeme dosyalarini ve commit hatasini durdurur",
   /Yasakli\/gizli dosya stage edildi/.test(publish) && /Git commit basarisiz/.test(publish));
+// PS 5.1 Get-Content BOM'suz UTF-8'i ANSI okur: v3.0.0 release notu "YayÄ±nda" diye bozuk cikti
+ok("publish: surum notu UTF-8 okunur",
+  (publish.match(/Get-Content \$notlar[^\r\n]*/g) || []).length >= 2 &&
+  (publish.match(/Get-Content \$notlar[^\r\n]*/g) || []).every(function (l) { return /-Encoding UTF8/.test(l); }),
+  publish.match(/Get-Content \$notlar[^\r\n]*/g));
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
 try { fs.rmSync(OUT_ROOT, { recursive: true, force: true }); } catch (e2) {}
