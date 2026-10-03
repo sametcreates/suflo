@@ -106,7 +106,7 @@ if ($LASTEXITCODE -ne 0) {
     if (-not (Test-Path $notlar)) {
         Write-Host "release-notes.md yok - yayin durduruldu." -ForegroundColor Red; exit 1
     }
-    $ilkSatir = (Get-Content $notlar -TotalCount 1)
+    $ilkSatir = (Get-Content $notlar -TotalCount 1 -Encoding UTF8)
     if ($ilkSatir -notmatch [regex]::Escape($version)) {
         Write-Host "DUR: release-notes.md '$version' surumunden bahsetmiyor." -ForegroundColor Red
         Write-Host "     Ilk satir: $ilkSatir" -ForegroundColor DarkGray
@@ -116,7 +116,7 @@ if ($LASTEXITCODE -ne 0) {
     # Yalnizca en ustteki guncel surum bolumunu yayinla. Tum arsivi vermek
     # eski surumlerin satis/iade metinlerini yeni release aciklamasina tasiyordu.
     $guncelBolum = @()
-    foreach ($satir in (Get-Content $notlar)) {
+    foreach ($satir in (Get-Content $notlar -Encoding UTF8)) {
         if ($guncelBolum.Count -gt 0 -and $satir -match '^##\s+') { break }
         $guncelBolum += $satir
     }
