@@ -1,4 +1,87 @@
 <!doctype html>
-<html lang="tr"><head><meta charset="utf-8"><title>Suflo v3 — paylaşım kartı</title><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet"><style>
-*{box-sizing:border-box;margin:0}body{width:1200px;height:630px;overflow:hidden;background:#101014;color:#f5f3ef;font-family:Manrope,system-ui,sans-serif}.card{padding:56px 60px;height:100%;display:grid;grid-template-columns:1.2fr 1fr;gap:35px;align-items:center}.copy{height:100%;display:flex;flex-direction:column}.brand{display:flex;gap:12px;align-items:center;font-size:35px;letter-spacing:-2px;font-weight:800}.brand img{width:43px;height:43px}.brand .v3{font-size:13px;letter-spacing:.08em;font-weight:600;border:1px solid #a69afb50;color:#b5a8ef;padding:5px 9px;border-radius:5px;margin-left:10px}h1{font-size:67px;line-height:1.08;font-weight:600;letter-spacing:-4px;margin-top:45px}h1 span{color:#a69afb}.lead{font-size:21px;line-height:1.6;color:#b2acbd;margin-top:22px}.bottom{margin-top:auto;display:flex;align-items:center;justify-content:space-between;font-size:18px;color:#f5f3ef}.bottom span{font-size:13px;color:#aba1bc}.preview{border:1px solid #ffffff25;border-radius:12px;background:#18161e;padding:13px;box-shadow:0 25px 50px #0003}.label{font-size:10px;letter-spacing:.08em;color:#a99bbe;padding:5px 0 13px}.preview>img{display:block;width:100%;border-radius:7px}.features{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.features>span{padding:12px 11px;background:#252030;border:1px solid #ffffff10;border-radius:5px;font-size:11px;color:#d4cce5}.price{margin-top:13px;border-top:1px solid #ffffff12;padding-top:14px;display:flex;align-items:baseline;justify-content:space-between;font-size:11px;color:#ada1c0}.price strong{font-size:26px;color:#f5f3ef;font-weight:600;letter-spacing:-1px}.price small{font-size:10px;color:#a99bbe}
-</style></head><body><div class="card"><div class="copy"><div class="brand"><img src="/favicon.svg" alt="">suflo.<span class="v3">V3.0</span></div><h1>Daha az uğraş.<br><span>Daha iyi kurgu.</span></h1><p class="lead">Ücretsiz Türkçe altyazı.<br>Kurgunun geri kalanı için Suflo Pro.</p><div class="bottom">suflo.app <span>Adobe Premiere Pro eklentisi</span></div></div><div class="preview"><div class="label">SUFLO PRO · GERÇEK ANİMASYON ÖNİZLEMESİ</div><img src="/gorseller/mogrt/12-slide-collide.webp" alt="Slide Collide"><div class="features"><span>Shorts & Reels</span><span>Konuşmadan kesim</span><span>Ses iyileştirme</span><span>1.076 ses efekti</span></div><div class="price"><span>Tek ödeme · Abonelik yok</span><span><strong>749 TL</strong> <small>+ KDV</small></span></div></div></div></body></html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Suflo — og</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1200px;height:630px;overflow:hidden;
+  font-family:"Plus Jakarta Sans",sans-serif;background:#0a0a0c;color:#f4f4f7;position:relative}
+body::before{content:"";position:absolute;top:-220px;left:50%;transform:translateX(-50%);
+  width:1400px;height:760px;background:radial-gradient(58% 55% at 50% 40%,rgba(139,124,246,.28),transparent 70%);filter:blur(40px)}
+.k{position:relative;z-index:1;height:100%;display:grid;grid-template-columns:1fr 430px;gap:44px;padding:62px 64px}
+
+.sol{display:flex;flex-direction:column;justify-content:center}
+.marka{display:flex;align-items:center;gap:13px;font-weight:800;font-size:30px;letter-spacing:-.5px;margin-bottom:30px}
+.marka svg{width:46px;height:46px}
+h1{font-weight:800;font-size:64px;line-height:1.04;letter-spacing:-2.2px;
+  background:linear-gradient(180deg,#fff,rgba(228,228,236,.9));-webkit-background-clip:text;background-clip:text;color:transparent}
+h1 span{color:#8b7cf6;-webkit-text-fill-color:#8b7cf6}
+.alt{color:#a3a3ad;font-size:24px;font-weight:500;margin-top:20px;line-height:1.45;max-width:600px}
+.alt b{color:#f4f4f7;font-weight:700}
+.rozetler{display:flex;gap:10px;margin-top:32px}
+.rozet{font-size:15px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#8b7cf6;
+  background:rgba(139,124,246,.07);border:1px solid rgba(139,124,246,.35);border-radius:999px;padding:9px 17px}
+.adres{margin-top:auto;font-size:22px;font-weight:800;color:#70707c;letter-spacing:-.3px}
+.adres b{color:#f4f4f7}
+
+/* panel maketi */
+.sag{display:flex;align-items:center}
+.mock{width:100%;border:1px solid #2a2a33;border-radius:14px;overflow:hidden;background:#16161c;
+  box-shadow:0 40px 90px -40px rgba(0,0,0,.95)}
+.bar{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#1c1c23;border-bottom:1px solid #26262e}
+.bar i{width:10px;height:10px;border-radius:50%;background:#3a3a46;display:block}
+.bar span{margin-left:8px;font-size:12px;color:#70707c;font-weight:600}
+.mon{background:#0b0b0f;height:150px;position:relative;display:flex;align-items:flex-end;justify-content:center;padding:14px}
+.mon::before{content:"";position:absolute;inset:12px;border-radius:8px;background:linear-gradient(145deg,#1e2536,#12141d 60%,#0f1016)}
+.cap{position:relative;z-index:1;font-weight:800;font-size:17px;text-shadow:0 2px 8px rgba(0,0,0,.9);padding-bottom:8px}
+.cap i{font-style:normal;color:#ffd21e}
+.pn{padding:14px 13px;font-size:12px}
+.row{display:flex;justify-content:space-between;background:#0e0e13;border:1px solid #24242c;border-radius:7px;padding:8px 11px;margin-bottom:7px;color:#a3a3ad}
+.row b{color:#f4f4f7;font-weight:700}
+.go{background:linear-gradient(100deg,#8b7cf6,#5b8cff);color:#fff;text-align:center;border-radius:8px;padding:10px;font-weight:800;font-size:13px;margin-top:10px}
+.tl{border-top:1px solid #26262e;background:#101015;padding:10px 13px}
+.tr{display:flex;gap:3px;height:14px;margin-bottom:4px}
+.tr:last-child{margin-bottom:0}
+.c{border-radius:3px;background:linear-gradient(180deg,#3c4788,#2b3260)}
+.c.s{background:linear-gradient(180deg,#6b5cc4,#4a3f8f)}
+.c.a{background:linear-gradient(180deg,#2c6a55,#1d4a3b)}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="sol">
+    <div class="marka">
+      <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5b8cff"/></linearGradient></defs><rect x="1" y="1" width="18" height="18" rx="5" fill="url(#g)"/><path d="M13.9 7.2C13.5 5.5 11.9 4.7 10 4.7 8 4.7 6.3 5.5 6.3 7.1c0 3.6 7.4 2 7.4 5.8 0 1.6-1.7 2.4-3.7 2.4-1.9 0-3.5-.8-3.9-2.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+      Suflo
+    </div>
+    <h1>Premiere Türkçe<br>duymuyor.<br><span>Suflo duyuyor.</span></h1>
+    <p class="alt">Otomatik Türkçe ve Azerice altyazı. <b>Ücretsiz, açık kaynak</b>, bilgisayarında çalışır.</p>
+    <div class="rozetler">
+      <span class="rozet">99 dil</span>
+      <span class="rozet">MIT</span>
+      <span class="rozet">Kredi yok</span>
+    </div>
+    <div class="adres"><b>suflo</b>.app</div>
+  </div>
+
+  <div class="sag">
+    <div class="mock">
+      <div class="bar"><i></i><i></i><i></i><span>Adobe Premiere Pro</span></div>
+      <div class="mon"><div class="cap">bu videoyu <i>tamamen</i> Suflo ile</div></div>
+      <div class="pn">
+        <div class="row"><span>Dil</span><b>Türkçe</b></div>
+        <div class="row"><span>Motor</span><b>Yerel</b></div>
+        <div class="go">Altyazı oluştur</div>
+      </div>
+      <div class="tl">
+        <div class="tr"><div class="c s" style="flex:3"></div><div class="c s" style="flex:2"></div><div class="c s" style="flex:2.4"></div></div>
+        <div class="tr"><div class="c" style="flex:4"></div><div class="c" style="flex:2"></div><div class="c" style="flex:3"></div></div>
+        <div class="tr"><div class="c a" style="flex:9"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

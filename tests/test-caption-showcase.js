@@ -11,7 +11,6 @@ var library = fs.readFileSync(path.join(ROOT, "js", "library.js"), "utf8");
 var pro = fs.readFileSync(path.join(ROOT, "js", "pro.js"), "utf8");
 var app = fs.readFileSync(path.join(ROOT, "js", "app.js"), "utf8");
 var site = fs.readFileSync(path.join(ROOT, "docs", "index.html"), "utf8");
-var siteJS = fs.readFileSync(path.join(ROOT, "docs", "premium.js"), "utf8");
 
 var passed = 0, failed = 0;
 function ok(name, condition, evidence) {
@@ -45,13 +44,10 @@ ok("CEP acilisinda 17 WebM decoder'i birden baslatilmaz",
   /previewVideo\.removeAttribute\("src"\)/.test(source));
 ok("Siparis kaynagi Lemon Squeezy siparis verisine eklenir",
   /checkout%5Bcustom%5D%5Bsource%5D=suflo_panel/.test(app) && /app_version/.test(app));
-ok("Web sitesi altyazi stillerini erisilebilir Pro sekmesinde gercek onizlemelerle gosterir",
-  /id="tab-captions" role="tab"/.test(site) &&
-  /createGallery\('captions', captions, 'caption-styles', true\)/.test(siteJS) &&
-  /video\.preload = 'none'/.test(siteJS));
+ok("Web sitesi altyazi stillerini ilk Pro galerisinde gercek onizlemelerle gosterir",
+  /class="on" data-g="captions"/.test(site) && (site.match(/gorseller\/caption-styles\/.+?\.webm/g) || []).length >= 8);
 ok("Web odemesi sayfa ici pencere ve kaynak olcumuyle hazirdir",
-  /app\.lemonsqueezy\.com\/js\/lemon\.js/.test(site) && /lemonsqueezy-button/.test(siteJS) &&
-  /url\.searchParams\.set\('checkout\[custom\]\[source\]', 'suflo_website'\)/.test(siteJS));
+  /app\.lemonsqueezy\.com\/js\/lemon\.js/.test(site) && /lemonsqueezy-button/.test(site) && /source%5D=suflo_website/.test(site));
 
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

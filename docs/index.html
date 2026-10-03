@@ -1,133 +1,1261 @@
 <!doctype html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Premiere Türkçe Altyazı & Yapay Zekâ Kurgu | Suflo v3</title>
-  <meta name="description" content="Premiere Pro için ücretsiz Türkçe altyazı. Suflo Pro ile Shorts, konuşmadan kesim, temiz ses ve 1.000+ SFX. Tek ödeme: 749 TL + KDV.">
-  <link rel="canonical" href="https://suflo.app/">
-  <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta name="theme-color" content="#101014">
-  <meta name="author" content="sametcreates">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Suflo">
-  <meta property="og:title" content="Daha az uğraş. Daha iyi kurgu. — Suflo v3">
-  <meta property="og:description" content="Ücretsiz Türkçe altyazı. Pro ile Shorts, konuşmadan kesim, temiz ses ve hazır animasyonlar. Hepsi Premiere'in içinde.">
-  <meta property="og:url" content="https://suflo.app/">
-  <meta property="og:image" content="https://suflo.app/og.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:locale" content="tr_TR">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Suflo v3 — Premiere Pro için yapay zekâ kurgu paketi">
-  <meta name="twitter:description" content="Türkçe altyazı ücretsiz. Kurgunun geri kalanı için Suflo Pro.">
-  <meta name="twitter:image" content="https://suflo.app/og.png">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/premium.css?v=3-20261003">
-  <script src="/premium.js?v=3-20261003" defer></script>
-  <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
-  <script type="application/ld+json">
-  {"@context":"https://schema.org","@graph":[
-    {"@type":"SoftwareApplication","name":"Suflo","applicationCategory":"MultimediaApplication","operatingSystem":"Windows, macOS","softwareVersion":"3.0.0","url":"https://suflo.app/","downloadUrl":"https://github.com/sametcreates/suflo/releases/latest","description":"Adobe Premiere Pro için ücretsiz Türkçe ve Azerice altyazı, transkript düzenleme, SRT ve WebVTT dışa aktarımı.","offers":{"@type":"Offer","price":"0","priceCurrency":"TRY"},"author":{"@type":"Person","name":"sametcreates"}},
-    {"@type":"SoftwareApplication","name":"Suflo Pro","applicationCategory":"MultimediaApplication","operatingSystem":"Windows, macOS","softwareVersion":"3.0.0","url":"https://suflo.app/#fiyat","description":"Premiere Pro için Shorts sekansları, konuşmadan kesim, ses iyileştirme, animasyonlu altyazı, yazı animasyonları ve ses efekti kütüphanesi. Tek ödeme; vergi ödeme sayfasında eklenir.","offers":{"@type":"Offer","price":"749","priceCurrency":"TRY","url":"https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?discount=0"}},
-    {"@type":"FAQPage","mainEntity":[
-      {"@type":"Question","name":"Ücretsiz sürüm bir deneme mi?","acceptedAnswer":{"@type":"Answer","text":"Hayır. Türkçe altyazı oluşturma, transkript düzenleme ve SRT/VTT/TXT dışa aktarma ücretsiz çekirdekte yer alır. Pro; kurgu otomasyonu, animasyonlu stiller ve içerik kütüphaneleri gibi ek araçları açar."}},
-      {"@type":"Question","name":"Pro aylık abonelik mi?","acceptedAnswer":{"@type":"Answer","text":"Hayır. Suflo Pro 749 TL + KDV karşılığında tek seferlik satın alınır; ömür boyu güncellemeler dahildir. Harici API sağlayıcılarının varsa ücret ve kotaları bu satın alıma dahil değildir."}},
-      {"@type":"Question","name":"749 TL son ödeme tutarı mı?","acceptedAnswer":{"@type":"Answer","text":"749 TL vergiler hariç ürün fiyatıdır. Ülkene göre vergi ödeme sayfasında eklenir; ödemeden önce toplam tutarı görebilirsin. Ürünü satın almadan önce ücretsiz sürümü bilgisayarında deneyebilirsin."}},
-      {"@type":"Question","name":"17 stil mi, 51 stil mi?","acceptedAnswer":{"@type":"Answer","text":"17 farklı MOGRT altyazı stili vardır. Her birinin 9:16, 16:9 ve 1:1 dosyaları olduğundan toplam 51 oran dosyası bulunur; aynı stil üç ayrı stil olarak sayılmaz. Bunlara ek olarak v3'te 12 Suflo animasyonlu altyazı stili yer alır."}}
-    ]}
-  ]}
-  </script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Premiere Türkçe Altyazı — Ücretsiz Eklenti | Suflo</title>
+<meta name="description" content="Adobe Premiere Türkçe altyazı yapamıyor, Suflo yapıyor. Sesten otomatik Türkçe ve Azerice altyazı — ücretsiz, açık kaynak, bilgisayarında çalışır.">
+<link rel="canonical" href="https://suflo.app/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="author" content="sametcreates">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Suflo">
+<meta property="og:title" content="Premiere Türkçe Altyazı — Ücretsiz Eklenti | Suflo">
+<meta property="og:description" content="Adobe Premiere Türkçe altyazı yapamıyor, Suflo yapıyor. Otomatik Türkçe ve Azerice altyazı — ücretsiz, açık kaynak, bilgisayarında çalışır.">
+<meta property="og:url" content="https://suflo.app/">
+<meta property="og:image" content="https://suflo.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="tr_TR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Premiere Türkçe Altyazı — Ücretsiz Eklenti | Suflo">
+<meta name="twitter:description" content="Adobe Premiere Türkçe altyazı yapamıyor, Suflo yapıyor. Ücretsiz ve açık kaynak.">
+<meta name="twitter:image" content="https://suflo.app/og.png">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"SoftwareApplication","name":"Suflo","applicationCategory":"MultimediaApplication","applicationSubCategory":"Adobe Premiere Pro eklentisi","operatingSystem":"Windows, macOS","url":"https://suflo.app/","downloadUrl":"https://github.com/sametcreates/suflo/releases/latest","softwareVersion":"3.0.0","license":"https://opensource.org/licenses/MIT","inLanguage":"tr","description":"Adobe Premiere Pro için ücretsiz ve açık kaynak yapay zekâ altyazı eklentisi. Türkçe, Azerice, İngilizce, Rusça dahil 99 dil. Bilgisayarda yerel çalışır, kurulumdan sonra internet gerektirmez.","featureList":["Otomatik Türkçe altyazı","Otomatik Azerice altyazı","Kalite puanlı Suflo Caption Editor","Düşük güven ve okuma hızı uyarıları","Öğrenen terim sözlüğü ile doğru Türkçe yazım","SRT, WebVTT, ASS ve TXT dışa aktarma","NVIDIA GPU ve Apple Metal hızlandırma","Kurulumdan sonra internetsiz çalışma"],"offers":{"@type":"Offer","price":"0","priceCurrency":"TRY"},"interactionStatistic":{"@type":"InteractionCounter","interactionType":"https://schema.org/DownloadAction","userInteractionCount":1229},"author":{"@type":"Person","name":"sametcreates","url":"https://instagram.com/sametcreates"}},{"@type":"SoftwareApplication","name":"Suflo Pro","operatingSystem":"Windows, macOS","applicationCategory":"MultimediaApplication","description":"Suflo'nun ücretli katmanı: otomatik sessizlik kesimi, konuşmaya göre punch-in zoom, ritim marker'ları, 242 benzersiz animasyon (35 buton dahil), 1076 ses efekti, 30 hareketli zemin, 290 preset (278'i Suflo Smooth efekt paketi), 17 gerçek altyazı MOGRT iş akışı, çeviri ve stilli ASS. Tek seferlik ödeme, abonelik yok.","url":"https://suflo.app/#fiyat","offers":{"@type":"Offer","price":"749","priceCurrency":"TRY","url":"https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1","availability":"https://schema.org/InStock"}},{"@type":"HowTo","name":"Adobe Premiere Pro'ya Türkçe altyazı nasıl eklenir","description":"Suflo eklentisiyle Premiere Pro'ya birkaç dakikada otomatik Türkçe altyazı ekleme adımları.","totalTime":"PT5M","tool":[{"@type":"HowToTool","name":"Adobe Premiere Pro 2020 (14.4) veya üstü"}],"step":[{"@type":"HowToStep","position":1,"name":"Suflo'yu indir ve kur","text":"GitHub sürüm sayfasından kurulum dosyasını indir, ZIP'i aç ve kur dosyasına çift tıkla (Windows: Suflo-Kur.bat, Mac: Suflo-Kur.command).","url":"https://suflo.app/#kurulum"},{"@type":"HowToStep","position":2,"name":"Paneli aç","text":"Premiere'i yeniden başlat ve Window > Extensions > Suflo menüsünden paneli aç.","url":"https://suflo.app/#kurulum"},{"@type":"HowToStep","position":3,"name":"Altyazı oluştur","text":"Klibi seç, dili Türkçe bırak ve Altyazı oluştur düğmesine bas. Metni panelde düzenleyip caption izi olarak uygula ya da SRT/VTT olarak dışa aktar.","url":"https://suflo.app/#nasil"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Adobe Premiere Türkçe altyazı yapabiliyor mu?","acceptedAnswer":{"@type":"Answer","text":"Hayır. Premiere'in yerleşik konuşmayı yazıya dökme özelliği 18 dil destekliyor ve bu listede Türkçe de Azerice de yok. Suflo tam bu boşluğu doldurur ve altyazı tarafı tamamen ücretsizdir."}},{"@type":"Question","name":"Suflo gerçekten tamamen ücretsiz mi, şartı ne?","acceptedAnswer":{"@type":"Answer","text":"Şartı yok. Altyazı çekirdeği MIT lisanslı açık kaynak, kodun tamamı GitHub'da. Yapay zekâ senin bilgisayarında çalıştığı için sunucu maliyeti yok, o yüzden ücretsiz kalabiliyor. Kredi, dakika limiti veya kayıt istemez."}},{"@type":"Question","name":"Videolarım buluta yükleniyor mu?","acceptedAnswer":{"@type":"Answer","text":"Varsayılan olarak hayır. Suflo Altyazı Motoru önce bilgisayarındaki yerel çekirdeği kullanır; ses cihazından çıkmaz ve internet gerekmez. İsteğe bağlı bulut yedeği yalnız yerel çekirdek başarısız olduğunda devreye girer."}},{"@type":"Question","name":"Denemek için demo sürümü var mı?","acceptedAnswer":{"@type":"Answer","text":"Demoya gerek yok: ücretsiz sürüm kısıtlı bir deneme değil, tam ve sınırsız araçtır. Türkçe altyazı, düzenleme ve SRT/VTT dışa aktarma sonsuza dek bedava. Suflo Pro yalnızca otomatik kesim, animasyon ve ses kütüphanesi gibi hızlandıran katmanı ekler."}},{"@type":"Question","name":"Hangi Premiere sürümü gerekiyor?","acceptedAnswer":{"@type":"Answer","text":"Adobe Premiere Pro 2020 (sürüm 14.4) ve üstü. Windows ve macOS'ta çalışır; Apple Silicon'da Metal, NVIDIA kartlarda CUDA hızlandırma otomatik açılır."}},{"@type":"Question","name":"Nasıl kurulur?","acceptedAnswer":{"@type":"Answer","text":"Kurulum dosyasını indir, ZIP'i aç ve kur dosyasına çift tıkla (Windows: Suflo-Kur.bat, Mac: Suflo-Kur.command). Sonra Premiere'i yeniden başlat ve Window > Extensions > Suflo menüsünden paneli aç. Toplam iki dakika sürer."}},{"@type":"Question","name":"Pro abonelik mi, tek ödeme mi?","acceptedAnswer":{"@type":"Answer","text":"Tek ödeme. Bir kez ödersin, ömür boyu senindir, güncellemeler ve yeni içerikler dahildir. Aylık ücret, dakika limiti veya otomatik yenileme yok."}},{"@type":"Question","name":"Fiyata KDV dahil mi? İade var mı?","acceptedAnswer":{"@type":"Answer","text":"749 TL fiyata KDV dahil değildir; ödeme sayfasında ülkeye göre eklenir (Türkiye'de %20, toplam yaklaşık 899 TL). Suflo Pro dijital içerik olduğu ve lisans etkinleşince tüm içerik anında indiği için iade yapılmaz. Önce ücretsiz sürüm sınırsız denenebilir."}},{"@type":"Question","name":"Bilgisayar değiştirirsem lisansım ne olur?","acceptedAnswer":{"@type":"Answer","text":"Lisansın kişiseldir ve seninle taşınır. Eski bilgisayarda Ayarlar bölümünden bu makinede devre dışı bırak, yeni bilgisayarda aynı anahtarla etkinleştir."}},{"@type":"Question","name":"Bilgisayarım yavaşsa çalışır mı?","acceptedAnswer":{"@type":"Answer","text":"Beş model seçeneği var; en küçüğü 32 MB ve zayıf bilgisayarlarda da çalışır. Acelen varsa ücretsiz bir Groq bulut anahtarıyla bulut moduna geçebilirsin: dakikalar değil saniyeler sürer."}},{"@type":"Question","name":"Hangi diller destekleniyor?","acceptedAnswer":{"@type":"Answer","text":"Türkçe, Azerice, İngilizce ve Rusça panelden tek tıkla seçilir. Otomatik algıla seçeneğiyle Whisper'ın desteklediği 99 dilin tamamı kullanılabilir."}}]}]}</script>
+
+<style>
+:root{
+  --bg:#0a0a0c; --bg2:#0d0d10; --bg3:#08080a;
+  --card:#141418; --line:#26262e; --line2:#1c1c22;
+  --tx:#f4f4f7; --tx2:#a3a3ad; --tx3:#70707c;
+  --ac:#8b7cf6; --ac2:#5b8cff;
+  --ok:#5cd190;
+  --grad:linear-gradient(100deg,#8b7cf6,#5b8cff);
+  --max:1180px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--tx);font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+.wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+section{padding:104px 0;position:relative;overflow:hidden}
+@media(max-width:760px){section{padding:68px 0}}
+
+/* --- tipografi --- */
+h1,h2,h3{
+  font-weight:800;letter-spacing:-1.1px;line-height:1.06;
+  background:linear-gradient(180deg,#fff 0%,rgba(228,228,236,.88) 92%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+h1{font-size:clamp(38px,6.2vw,64px);letter-spacing:-1.8px}
+h2{font-size:clamp(30px,4.4vw,50px)}
+h3{font-size:22px;letter-spacing:-.5px}
+.lead{color:var(--tx2);font-size:clamp(16px,1.9vw,20px);font-weight:500;max-width:660px;line-height:1.55}
+.lead b{color:var(--tx);font-weight:700}
+.ac{color:var(--ac);-webkit-text-fill-color:var(--ac)}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;
+  color:var(--ac);background:rgba(139,124,246,.06);
+  border:1px solid rgba(139,124,246,.35);border-radius:999px;padding:8px 15px;margin-bottom:22px;
+}
+.shead{margin-bottom:52px}
+.shead .lead{margin-top:18px}
+
+/* --- butonlar --- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border-radius:999px;padding:15px 27px;font-weight:700;font-size:16px;transition:transform .16s ease,filter .16s ease,background .16s ease,border-color .16s ease;white-space:nowrap}
+.btn:hover{transform:translateY(-1px)}
+.btn-p{background:var(--grad);color:#fff;box-shadow:0 10px 30px -12px rgba(120,124,255,.7)}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-s{background:rgba(255,255,255,.045);border:1px solid var(--line);color:var(--tx)}
+.btn-s:hover{background:rgba(255,255,255,.075);border-color:#33333d}
+.btn small{font-weight:600;opacity:.72;font-size:13px}
+.micro{color:var(--tx3);font-size:13.5px;font-weight:500;margin-top:16px}
+.micro b{color:var(--tx2);font-weight:600}
+
+/* --- kart --- */
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:18px;padding:30px;position:relative;overflow:hidden;
+  box-shadow:inset 0 1px rgba(255,255,255,.045);
+}
+.card::before{content:"";position:absolute;inset:0 0 auto;height:120px;background:linear-gradient(180deg,rgba(255,255,255,.03),transparent);pointer-events:none}
+
+/* --- duyuru serid --- */
+.duyuru{background:var(--grad);color:#fff;text-align:center;font-size:13px;font-weight:700;padding:9px 16px;letter-spacing:.2px}
+.duyuru a{text-decoration:underline;text-underline-offset:3px}
+
+/* --- header --- */
+header{position:sticky;top:12px;z-index:60;padding:0 16px;margin-bottom:-72px}
+.hbar{max-width:var(--max);margin:0 auto;height:64px;display:flex;align-items:center;gap:22px;padding:0 12px 0 18px;
+  background:rgba(13,13,17,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1px solid #232329;border-radius:16px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.4px}
+.logo svg{width:30px;height:30px;flex:0 0 auto}
+.hnav{display:flex;gap:26px;margin-left:auto;font-size:15px;font-weight:600;color:var(--tx2)}
+.hnav a{transition:color .16s}
+.hnav a:hover{color:var(--tx)}
+.hcta{display:flex;gap:9px;align-items:center}
+.hcta .btn{padding:11px 19px;font-size:14.5px}
+@media(max-width:900px){.hnav{display:none}.hcta .btn-s{display:none}.hbar{gap:12px}}
+
+/* --- hero --- */
+.hero{padding:132px 0 96px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:min(1300px,150vw);height:640px;
+  background:radial-gradient(60% 55% at 50% 40%,rgba(139,124,246,.20),transparent 70%);filter:blur(38px);pointer-events:none;z-index:0}
+.hero .wrap{position:relative;z-index:1}
+.hero-grid{display:grid;grid-template-columns:1fr 1.16fr;gap:48px;align-items:center}
+@media(max-width:980px){.hero-grid{grid-template-columns:1fr;gap:44px}.hero{padding:112px 0 64px}.panel-shot{margin-right:0}}
+.hero h1{margin-bottom:22px}
+.hero .lead{margin-bottom:30px}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap}
+
+/* --- premiere maketi (hero gorseli) --- */
+.mock{border:1px solid #2a2a33;border-radius:14px;overflow:hidden;background:#16161c;box-shadow:0 40px 80px -40px rgba(0,0,0,.9)}
+.mock-bar{display:flex;align-items:center;gap:7px;padding:10px 13px;background:#1c1c23;border-bottom:1px solid #26262e}
+.mock-bar i{width:10px;height:10px;border-radius:50%;background:#3a3a46;display:block}
+.mock-bar span{margin-left:8px;font-size:11.5px;color:var(--tx3);font-weight:600}
+.mock-body{display:grid;grid-template-columns:1fr 172px;min-height:230px}
+.mock-mon{background:#0b0b0f;position:relative;display:flex;align-items:flex-end;justify-content:center;padding:16px}
+.mock-mon::before{content:"";position:absolute;inset:14px;border-radius:8px;background:linear-gradient(145deg,#1e2536,#12141d 60%,#0f1016)}
+.mock-cap{position:relative;z-index:1;text-align:center;font-weight:800;font-size:15px;letter-spacing:-.2px;
+  text-shadow:0 2px 8px rgba(0,0,0,.9);padding-bottom:12px}
+.mock-cap i{font-style:normal;color:#ffd21e}
+.mock-panel{background:#141419;border-left:1px solid #26262e;padding:12px 11px;font-size:10.5px}
+.mp-t{font-weight:800;font-size:11px;letter-spacing:.4px;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.mp-t b{width:6px;height:6px;border-radius:50%;background:var(--ac);display:block}
+.mp-row{display:flex;justify-content:space-between;align-items:center;background:#0e0e13;border:1px solid #24242c;border-radius:6px;padding:6px 8px;margin-bottom:6px;color:var(--tx2)}
+.mp-row b{color:var(--tx);font-weight:700}
+.mp-btn{background:var(--grad);color:#fff;text-align:center;border-radius:7px;padding:8px;font-weight:800;font-size:11px;margin:9px 0 10px}
+.mp-line{display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;color:var(--tx2);line-height:1.35}
+.mp-line em{font-style:normal;color:var(--ac);font-weight:700;flex:0 0 auto;font-size:9.5px;padding-top:1px}
+.mock-tl{border-top:1px solid #26262e;background:#101015;padding:9px 11px}
+.tl-row{display:flex;gap:3px;height:15px;margin-bottom:4px;align-items:center}
+.tl-row:last-child{margin-bottom:0}
+.tl-lbl{font-size:9px;color:var(--tx3);width:20px;flex:0 0 auto;font-weight:700}
+.tl-clip{border-radius:3px;height:100%;background:linear-gradient(180deg,#3c4788,#2b3260)}
+.tl-clip.a{background:linear-gradient(180deg,#2c6a55,#1d4a3b)}
+.tl-clip.c{background:linear-gradient(180deg,#6b5cc4,#4a3f8f);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff}
+@media(max-width:520px){.mock-body{grid-template-columns:1fr}.mock-panel{border-left:none;border-top:1px solid #26262e}}
+
+/* --- guven bandi --- */
+.trust{border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);background:var(--bg3)}
+.trust .wrap{display:flex;flex-wrap:wrap;gap:14px 44px;align-items:center;justify-content:center;padding-top:22px;padding-bottom:22px}
+.trust b{color:var(--tx);font-weight:800}
+.trust span{color:var(--tx3);font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.trust svg{width:15px;height:15px;color:var(--ac);flex:0 0 auto}
+
+/* --- 18 vs 99 --- */
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px}
+@media(max-width:760px){.vs{grid-template-columns:1fr}}
+.vs .card{padding:34px}
+.vs .n{font-size:76px;font-weight:800;letter-spacing:-3px;line-height:1;margin-bottom:6px}
+.vs .no .n{color:var(--tx3)}
+.vs .ye .n{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.vs .k{font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--tx3);margin-bottom:16px}
+.vs .ye{border-color:rgba(139,124,246,.35)}
+.vs p{color:var(--tx2);font-size:15.5px}
+.diller{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px}
+.diller i{font-style:normal;font-size:12.5px;font-weight:600;color:var(--tx3);background:#0e0e13;border:1px solid var(--line);border-radius:6px;padding:5px 9px}
+.diller i.yok{color:var(--ac);border-color:rgba(139,124,246,.4);background:rgba(139,124,246,.07)}
+
+/* --- adimlar --- */
+.adimlar{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.adimlar{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.adimlar{grid-template-columns:1fr}}
+.adim{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 22px;position:relative;box-shadow:inset 0 1px rgba(255,255,255,.04)}
+.adim .no{font-size:12px;font-weight:800;letter-spacing:2px;color:var(--ac);margin-bottom:12px}
+.adim h3{font-size:18px;margin-bottom:8px}
+.adim p{color:var(--tx2);font-size:14.5px;line-height:1.5}
+.adim.son{border-color:rgba(139,124,246,.38);background:linear-gradient(180deg,rgba(139,124,246,.09),var(--card) 60%)}
+
+/* --- ozellik bloklari --- */
+.blok{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center;margin-bottom:84px}
+.blok:last-child{margin-bottom:0}
+.blok.ters .bmedya{order:-1}
+@media(max-width:900px){.blok{grid-template-columns:1fr;gap:30px;margin-bottom:56px}.blok.ters .bmedya{order:0}}
+.blok h3{font-size:clamp(24px,3vw,34px);margin-bottom:14px;letter-spacing:-.9px}
+.blok p{color:var(--tx2);font-size:16.5px}
+.liste{list-style:none;margin-top:20px;display:flex;flex-direction:column;gap:11px}
+.liste li{display:flex;gap:11px;align-items:flex-start;color:var(--tx2);font-size:15.5px}
+.liste svg{width:19px;height:19px;color:var(--ac);flex:0 0 auto;margin-top:2px}
+.liste b{color:var(--tx);font-weight:700}
+
+/* --- metrik bandi --- */
+.metrik{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;text-align:center}
+@media(max-width:760px){.metrik{grid-template-columns:1fr;gap:14px}}
+.metrik .n{font-size:clamp(52px,7vw,80px);font-weight:800;letter-spacing:-3px;line-height:1;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.metrik p{color:var(--tx2);font-size:15px;margin-top:10px}
+.metrik p b{color:var(--tx);font-weight:700}
+
+/* --- pro kartlari --- */
+.prokart{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:820px){.prokart{grid-template-columns:1fr}}
+.pk{background:var(--card);border:1px solid var(--line);border-radius:19px;padding:32px;box-shadow:inset 0 1px rgba(255,255,255,.045);position:relative;overflow:hidden}
+.pk::before{content:"";position:absolute;inset:0 0 auto;height:110px;background:linear-gradient(180deg,rgba(255,255,255,.028),transparent)}
+.pk .ik{width:46px;height:46px;border-radius:50%;background:rgba(139,124,246,.11);border:1px solid rgba(139,124,246,.3);display:grid;place-items:center;margin-bottom:18px}
+.pk .ik svg{width:22px;height:22px;color:var(--ac)}
+.pk .kat{font-size:10.5px;font-weight:800;letter-spacing:2.4px;color:var(--tx3);margin-bottom:9px}
+.pk h3{font-size:21px;margin-bottom:10px;letter-spacing:-.5px}
+.pk p{color:var(--tx2);font-size:15px;line-height:1.55}
+
+/* --- kutuphane sekmeleri --- */
+.sek{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px}
+.sek button{border:1px solid var(--line);background:var(--card);color:var(--tx2);border-radius:999px;padding:10px 19px;font-size:14.5px;font-weight:700;transition:all .16s}
+.sek button:hover{color:var(--tx);border-color:#33333d}
+.sek button.on{background:rgba(139,124,246,.12);border-color:rgba(139,124,246,.45);color:var(--ac)}
+.sek button i{font-style:normal;opacity:.65;font-weight:600;margin-left:5px}
+.galeri{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.galeri{grid-template-columns:repeat(2,1fr)}}
+.galeri figure{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#000;aspect-ratio:16/9;position:relative}
+.galeri img,.galeri video{width:100%;height:100%;object-fit:cover}
+.galeri figcaption{position:absolute;left:0;right:0;bottom:0;padding:16px 9px 7px;font-size:11.5px;font-weight:700;color:#fff;text-align:center;
+  background:linear-gradient(180deg,transparent,rgba(0,0,0,.85))}
+.galeri.bt figure{aspect-ratio:16/6.2;background:#08080a}
+.galeri.bt img{object-fit:contain;padding:6px}
+.gnot{color:var(--tx3);font-size:14px;margin-top:20px}
+
+/* --- karsilastirma --- */
+.tabw{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+table{width:100%;border-collapse:collapse;min-width:660px;font-size:15px}
+th,td{padding:15px 16px;text-align:center;border-bottom:1px solid var(--line2)}
+tbody tr:last-child td{border-bottom:none}
+th{font-weight:800;font-size:14px;color:var(--tx2)}
+thead th:first-child,tbody th{text-align:left;font-weight:600;color:var(--tx2);width:31%}
+tbody th{font-size:15px}
+th.hi{color:var(--ac)}
+td.hi{background:rgba(139,124,246,.055);font-weight:700}
+td.hi:not(.y):not(.n){color:var(--tx)}
+.y{color:var(--ok);font-weight:800}
+.n{color:#5c5c68}
+.tabnot{color:var(--tx3);font-size:13.5px;margin-top:14px}
+
+/* --- fiyat --- */
+.fiyat{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+@media(max-width:820px){.fiyat{grid-template-columns:1fr}}
+.plan{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:36px;position:relative;overflow:hidden;box-shadow:inset 0 1px rgba(255,255,255,.045)}
+.plan::before{content:"";position:absolute;inset:0 0 auto;height:130px;background:linear-gradient(180deg,rgba(255,255,255,.028),transparent);pointer-events:none}
+.plan.pro{border-color:rgba(139,124,246,.42);background:linear-gradient(180deg,rgba(139,124,246,.07),var(--card) 46%)}
+.rozet{position:absolute;top:0;right:26px;background:var(--grad);color:#fff;font-size:11px;font-weight:800;letter-spacing:2.2px;padding:7px 15px;border-radius:0 0 9px 9px}
+.plan .ad{font-size:13px;font-weight:800;letter-spacing:2.6px;text-transform:uppercase;color:var(--tx3);margin-bottom:16px}
+.plan.pro .ad{color:var(--ac)}
+.pfiyat{display:flex;align-items:baseline;gap:11px;margin-bottom:6px}
+.pfiyat .b{font-size:52px;font-weight:800;letter-spacing:-2.6px;line-height:1}
+.plan.pro .pfiyat .b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pfiyat s{color:#5a5a66;font-size:21px;font-weight:700}
+.pfiyat em{font-style:normal;color:var(--tx3);font-size:15px;font-weight:600}
+.psub{color:var(--tx3);font-size:14px;margin-bottom:24px}
+.psub b{color:var(--ac);font-weight:700}
+.plan ul{list-style:none;display:flex;flex-direction:column;gap:11px;margin:24px 0 28px}
+.plan li{display:flex;gap:10px;align-items:flex-start;font-size:15px;color:var(--tx2)}
+.plan li svg{width:18px;height:18px;flex:0 0 auto;margin-top:2px;color:var(--ok)}
+.plan.pro li svg{color:var(--ac)}
+.plan li b{color:var(--tx);font-weight:700}
+.plan .btn{width:100%}
+.pmicro{color:var(--tx3);font-size:13px;text-align:center;margin-top:13px}
+.psosyal{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--tx2);font-size:14px;margin-top:14px}
+.psosyal b{color:var(--tx)}
+.psosyal .nokta{width:8px;height:8px;border-radius:50%;background:#3ddc84;box-shadow:0 0 0 4px rgba(61,220,132,.15)}
+.pmicro.pnot{font-size:12px;margin-top:6px;line-height:1.5}
+.psub .kdv{color:var(--tx2);font-weight:600}
+.erken-bitis{margin:-14px 0 22px;padding:9px 12px;border-radius:10px;background:rgba(255,200,0,.08);border:1px solid rgba(255,200,0,.25);color:var(--tx2);font-size:14px;font-weight:600}
+.erken-bitis b{color:var(--ac)}
+
+/* --- sss --- */
+.sss{max-width:820px;margin:0 auto}
+details{background:var(--card);border:1px solid rgba(139,124,246,.22);border-radius:14px;margin-bottom:10px;overflow:hidden}
+details[open]{border-color:rgba(139,124,246,.4)}
+summary{padding:19px 22px;font-weight:700;font-size:16.5px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--ac);font-size:22px;font-weight:400;flex:0 0 auto;transition:transform .16s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{padding:0 22px 21px;color:var(--tx2);font-size:15.5px;line-height:1.6}
+details p a{color:var(--ac);text-decoration:underline;text-underline-offset:3px}
+
+/* --- kurulum --- */
+.kur{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.kur{grid-template-columns:1fr}}
+.kur .card{padding:28px}
+.kur h3{font-size:18px;margin-bottom:16px;display:flex;align-items:center;gap:9px}
+.kur ol{margin-left:19px;color:var(--tx2);font-size:15px;display:flex;flex-direction:column;gap:9px}
+.kur code{background:#0e0e13;border:1px solid var(--line);border-radius:5px;padding:2px 7px;font-size:13px;color:var(--tx);font-family:ui-monospace,Menlo,Consolas,monospace}
+
+/* --- kapanis --- */
+.son{text-align:center;position:relative;overflow:hidden;border-top:1px solid var(--line2)}
+.son::before{content:"";position:absolute;top:-40%;left:50%;transform:translateX(-50%);width:1000px;height:700px;
+  background:radial-gradient(50% 50% at 50% 50%,rgba(139,124,246,.20),transparent 70%);filter:blur(30px);pointer-events:none}
+.son .wrap{position:relative;z-index:1}
+.son h2{font-size:clamp(32px,5.4vw,62px);letter-spacing:-2px;margin-bottom:20px}
+.son .lead{margin:0 auto 30px}
+.son .cta-row{justify-content:center}
+
+/* --- footer --- */
+footer{background:var(--bg3);border-top:1px solid var(--line2);padding:56px 0 40px;font-size:14.5px}
+.fgrid{display:grid;grid-template-columns:1.6fr repeat(3,1fr);gap:36px;margin-bottom:36px}
+@media(max-width:760px){.fgrid{grid-template-columns:1fr 1fr;gap:28px}}
+.fgrid h4{font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--tx3);margin-bottom:14px}
+.fgrid ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+.fgrid a{color:var(--tx2);transition:color .16s}
+.fgrid a:hover{color:var(--tx)}
+.fabout p{color:var(--tx3);margin-top:13px;max-width:290px;line-height:1.55}
+.falt{border-top:1px solid var(--line2);padding-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--tx3);font-size:13.5px}
+
+
+/* --- gercek panel ekran goruntusu --- */
+.panel-shot{margin-right:-40px;border:1px solid #2a2a33;border-radius:16px;overflow:hidden;background:#16161c;
+  box-shadow:0 50px 100px -45px rgba(0,0,0,.95),0 0 0 1px rgba(139,124,246,.09);}
+.ps-bar{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#1c1c23;border-bottom:1px solid #26262e}
+.ps-bar i{width:10px;height:10px;border-radius:50%;background:#3a3a46;display:block}
+.ps-bar span{margin-left:8px;font-size:11.5px;color:var(--tx3);font-weight:600}
+.panel-shot img{width:100%;height:auto;display:block}
+
+/* --- HAREKET: kaydirinca beliren ogeler --- */
+.gel{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.gel.gorundu{opacity:1;transform:none}
+.gel.g1{transition-delay:.06s}.gel.g2{transition-delay:.12s}.gel.g3{transition-delay:.18s}
+.gel.g4{transition-delay:.24s}.gel.g5{transition-delay:.3s}.gel.g6{transition-delay:.36s}
+
+/* --- hero girisi --- */
+.hero .eyebrow,.hero h1,.hero .lead,.hero .cta-row,.hero .micro,.hero .panel-shot{
+  opacity:0;transform:translateY(22px);animation:girisAnim .85s cubic-bezier(.16,1,.3,1) forwards}
+.hero .eyebrow{animation-delay:.05s}
+.hero h1{animation-delay:.14s}
+.hero .lead{animation-delay:.26s}
+.hero .cta-row{animation-delay:.36s}
+.hero .micro{animation-delay:.44s}
+.hero .panel-shot{animation-delay:.3s;transform:translateY(30px) scale(.985)}
+@keyframes girisAnim{to{opacity:1;transform:none}}
+
+/* --- hero glow nefes alsin --- */
+.hero::before{animation:nefes 9s ease-in-out infinite}
+@keyframes nefes{0%,100%{opacity:.85;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.07)}}
+
+/* --- sayilar sayarken --- */
+.metrik .n{font-variant-numeric:tabular-nums}
+
+/* --- kart hover derinligi --- */
+.pk,.adim,.plan,.card{transition:transform .28s cubic-bezier(.16,1,.3,1),border-color .28s ease}
+.pk:hover,.adim:hover{transform:translateY(-4px);border-color:rgba(139,124,246,.4)}
+.galeri figure{transition:transform .28s cubic-bezier(.16,1,.3,1),border-color .28s ease}
+.galeri figure:hover{transform:translateY(-4px) scale(1.015);border-color:rgba(139,124,246,.45)}
+.panel-shot{transition:transform .35s ease;will-change:transform}
+.panel-shot.sabit{animation:none;opacity:1}
+
+/* --- galeri sekme gecisi --- */
+.galeri,#g-sfx{animation:sekmeGir .45s cubic-bezier(.16,1,.3,1)}
+@keyframes sekmeGir{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* --- okuma cizgisi (sayfanin en ustunde ilerleme) --- */
+#okuma{position:fixed;top:0;left:0;right:0;height:2px;background:var(--grad);transform:scaleX(0);transform-origin:0 50%;z-index:100;pointer-events:none}
+
+/* --- duyuru seridi: gradyan nefes alir --- */
+.duyuru{background:linear-gradient(100deg,#8b7cf6,#5b8cff,#7d6ef0);background-size:200% 100%;animation:duyuruAk 8s ease-in-out infinite alternate}
+@keyframes duyuruAk{to{background-position:100% 0}}
+
+/* --- header yukaridan suzulsun --- */
+.hbar{animation:hbarGir .6s cubic-bezier(.16,1,.3,1) .1s both}
+@keyframes hbarGir{from{opacity:0;transform:translateY(-16px)}}
+.hnav a{position:relative}
+.hnav a::after{content:"";position:absolute;left:0;bottom:-5px;height:2px;width:100%;border-radius:2px;background:var(--grad);transform:scaleX(0);transform-origin:0 50%;transition:transform .28s cubic-bezier(.16,1,.3,1)}
+.hnav a:hover::after{transform:scaleX(1)}
+
+/* --- basliklar kelime kelime acilir (maske) --- */
+.w{display:inline-block;overflow:hidden;vertical-align:top;padding:.12em .05em .26em;margin:-.12em -.05em -.26em}
+.wi{display:inline-block;transform:translateY(142%);transition:transform .65s cubic-bezier(.16,1,.3,1)}
+h1 .wi,h2 .wi{background:linear-gradient(180deg,#fff 0%,rgba(228,228,236,.88) 92%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.gorundu .wi,.oynat .wi{transform:none}
+.hero h1.kelimeli{animation:none;opacity:1;transform:none}
+
+/* --- hero vurgu yazisi: akan gradyan --- */
+.hero h1 .ac{background:linear-gradient(90deg,#8b7cf6,#5b8cff 35%,#b6aaff 60%,#8b7cf6);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:acAk 5.5s ease-in-out infinite alternate}
+@keyframes acAk{to{background-position:100% 0}}
+
+/* --- panel sahnesi + yuzen bildirim kartlari --- */
+.panel-sahne{position:relative}
+.panel-shot{position:relative}
+.panel-shot::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.06) 50%,transparent 60%);transform:translateX(-130%);animation:tarama 7.5s ease-in-out 2.6s infinite}
+@keyframes tarama{0%{transform:translateX(-130%)}22%{transform:translateX(130%)}100%{transform:translateX(130%)}}
+.chip{position:absolute;display:flex;align-items:center;gap:7px;background:rgba(16,16,21,.92);border:1px solid rgba(139,124,246,.38);border-radius:12px;padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--tx);box-shadow:0 18px 40px -18px rgba(0,0,0,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);white-space:nowrap;z-index:2;opacity:0}
+.chip i{font-style:normal}
+.chip b{color:var(--ok);font-weight:800}
+.chip.c1{top:11%;left:-24px;animation:chipGir .55s cubic-bezier(.16,1,.3,1) 1.05s both,chipYuz 4.6s ease-in-out 1.8s infinite alternate}
+.chip.c2{top:47%;right:-14px;animation:chipGir .55s cubic-bezier(.16,1,.3,1) 1.4s both,chipYuz 5.4s ease-in-out 2.2s infinite alternate}
+.chip.c3{bottom:-18px;left:7%;animation:chipGir .55s cubic-bezier(.16,1,.3,1) 1.75s both,chipYuz 5s ease-in-out 2.5s infinite alternate}
+@keyframes chipGir{from{opacity:0;transform:translateY(14px) scale(.85)}to{opacity:1;transform:none}}
+@keyframes chipYuz{from{transform:translateY(0)}to{transform:translateY(-8px)}}
+@media(max-width:980px){.chip.c1{left:8px}.chip.c2{right:8px}}
+@media(max-width:560px){.chip{font-size:11px;padding:8px 11px}.chip.c2{display:none}}
+
+/* --- kayan serit --- */
+.kayan{padding:36px 0 4px;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
+.kayan-sira{display:flex;width:max-content;animation:kayY 44s linear infinite}
+.kayan-sira.ters{animation:kayYt 52s linear infinite;margin-top:18px}
+.kayan:hover .kayan-sira{animation-play-state:paused}
+.grup{display:flex;align-items:center;gap:34px;padding-right:34px}
+.grup span{font-size:12.5px;font-weight:800;letter-spacing:2.6px;text-transform:uppercase;color:var(--tx3);white-space:nowrap;display:flex;align-items:center;gap:34px}
+.grup span::after{content:"✦";color:var(--ac);font-size:10px;letter-spacing:0;opacity:.7}
+@keyframes kayY{to{transform:translateX(-50%)}}
+@keyframes kayYt{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+
+/* --- pro bolumunde gezinen isik --- */
+#pro::before{content:"";position:absolute;top:6%;left:-140px;width:560px;height:560px;border-radius:50%;background:radial-gradient(circle,rgba(139,124,246,.13),transparent 65%);filter:blur(34px);pointer-events:none;animation:gezin 18s ease-in-out infinite alternate}
+@keyframes gezin{to{transform:translate(70vw,90px)}}
+
+/* --- galeri karolari sekme acilisinda sirayla girer --- */
+.galeri figure,#g-sfx .card{animation:figGir .5s cubic-bezier(.16,1,.3,1) backwards}
+.galeri figure:nth-child(2),#g-sfx .card:nth-child(2){animation-delay:.05s}
+.galeri figure:nth-child(3),#g-sfx .card:nth-child(3){animation-delay:.1s}
+.galeri figure:nth-child(4),#g-sfx .card:nth-child(4){animation-delay:.15s}
+.galeri figure:nth-child(5),#g-sfx .card:nth-child(5){animation-delay:.2s}
+.galeri figure:nth-child(6),#g-sfx .card:nth-child(6){animation-delay:.25s}
+.galeri figure:nth-child(7),#g-sfx .card:nth-child(7){animation-delay:.3s}
+.galeri figure:nth-child(8),#g-sfx .card:nth-child(8){animation-delay:.35s}
+@keyframes figGir{from{opacity:0;transform:translateY(16px) scale(.96)}}
+
+/* --- karsilastirma satirlari soldan sirayla --- */
+.tabw tbody tr{opacity:0;transform:translateX(-16px);transition:opacity .55s cubic-bezier(.16,1,.3,1),transform .55s cubic-bezier(.16,1,.3,1)}
+.tabw.gorundu tbody tr{opacity:1;transform:none}
+.tabw tbody tr:nth-child(2){transition-delay:.05s}.tabw tbody tr:nth-child(3){transition-delay:.1s}
+.tabw tbody tr:nth-child(4){transition-delay:.15s}.tabw tbody tr:nth-child(5){transition-delay:.2s}
+.tabw tbody tr:nth-child(6){transition-delay:.25s}.tabw tbody tr:nth-child(7){transition-delay:.3s}
+.tabw tbody tr:nth-child(8){transition-delay:.35s}.tabw tbody tr:nth-child(9){transition-delay:.4s}
+.tabw tbody tr:nth-child(10){transition-delay:.45s}.tabw tbody tr:nth-child(11){transition-delay:.5s}
+.tabw tbody tr:nth-child(12){transition-delay:.55s}
+
+/* --- sss acilis --- */
+details[open] p{animation:sssAc .38s cubic-bezier(.16,1,.3,1)}
+@keyframes sssAc{from{opacity:0;transform:translateY(-6px)}}
+
+/* --- yazan imlec --- */
+.imlec{color:var(--ac);animation:yanip 1.1s linear infinite}
+@keyframes yanip{0%,49%{opacity:1}50%,100%{opacity:0}}
+
+/* --- ana butonda parlama suzulur --- */
+.btn-p{position:relative;overflow:hidden}
+.btn-p::after{content:"";position:absolute;top:-4px;bottom:-4px;left:-46%;width:34%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.3),transparent);transform:skewX(-18deg) translateX(0);pointer-events:none;animation:parla 5s ease-in-out 2.4s infinite}
+@keyframes parla{0%{transform:skewX(-18deg) translateX(0)}30%{transform:skewX(-18deg) translateX(520%)}100%{transform:skewX(-18deg) translateX(520%)}}
+
+@media(prefers-reduced-motion:reduce){
+  .gel{opacity:1!important;transform:none!important}
+  .hero .eyebrow,.hero h1,.hero .lead,.hero .cta-row,.hero .micro,.hero .panel-shot{animation:none!important;opacity:1!important;transform:none!important}
+  .hero::before{animation:none!important}
+  .galeri,#g-sfx{animation:none!important}
+  .wi{transform:none!important}
+  .chip{animation:none!important;opacity:1!important}
+  .kayan-sira{animation:none!important}
+  .panel-shot::after,.btn-p::after,#pro::before,.duyuru,.hero h1 .ac,.hbar,.imlec{animation:none!important}
+  .tabw tbody tr,.galeri figure,#g-sfx .card{opacity:1!important;transform:none!important;animation:none!important}
+  #okuma{display:none}
+}
+::selection{background:rgba(139,124,246,.3)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+<script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
 </head>
 <body>
-<a class="skip-link" href="#icerik">İçeriğe geç</a>
-<div class="announcement"><span class="new-dot" aria-hidden="true"></span> Suflo v3 yayında <span class="announcement-detail">· Daha fazlası, yine Premiere'in içinde.</span><a href="#yenilikler">Yenilikleri keşfet <span aria-hidden="true">↗</span></a></div>
-<header class="site-header">
-  <div class="wrap nav-bar">
-    <a class="logo" href="/" aria-label="Suflo ana sayfa"><img src="/favicon.svg" width="34" height="34" alt=""><span>suflo<span class="logo-period">.</span></span></a>
-    <nav id="main-nav" aria-label="Ana menü"><a href="#yenilikler">V3'te neler var?</a><a href="#kutuphane">Efekt kütüphanesi</a><a href="#fiyat">Free & Pro</a><a href="#kurulum">Kurulum</a></nav>
-    <div class="nav-actions"><a class="account-link" href="/hesap.html">Lisansım</a><a class="button button-small button-primary" href="#fiyat">Pro'yu keşfet <span aria-hidden="true">↗</span></a><button class="menu-toggle" aria-label="Menüyü aç" aria-expanded="false" aria-controls="main-nav"><span></span><span></span></button></div>
+
+<div id="okuma" aria-hidden="true"></div>
+
+<div class="duyuru">⚡ <b id="duyuru-ver">v3.0</b> yayında — Konuşmadan kes (ııı/eee temizliği), viral anlardan 9:16 Shorts, 12 animasyonlu altyazı stili, 13 geçiş · <a href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir</a></div>
+
+<header>
+  <div class="hbar">
+    <a class="logo" href="#">
+      <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf6"/><stop offset="1" stop-color="#5b8cff"/></linearGradient></defs><rect x="1" y="1" width="18" height="18" rx="5" fill="url(#lg)"/><path d="M13.9 7.2C13.5 5.5 11.9 4.7 10 4.7 8 4.7 6.3 5.5 6.3 7.1c0 3.6 7.4 2 7.4 5.8 0 1.6-1.7 2.4-3.7 2.4-1.9 0-3.5-.8-3.9-2.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+      Suflo
+    </a>
+    <nav class="hnav">
+      <a href="#nasil">Nasıl çalışır</a>
+      <a href="#pro">Pro</a>
+      <a href="#fiyat">Fiyat</a>
+      <a href="#sss">SSS</a>
+    </nav>
+    <div class="hcta">
+      <a class="btn btn-s" href="#fiyat">Pro — 749 TL</a>
+      <a class="btn btn-p" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir</a>
+    </div>
   </div>
 </header>
-<main id="icerik">
-  <section class="hero wrap" aria-labelledby="hero-title">
-    <div class="hero-copy">
-      <div class="eyebrow"><span class="premiere-mark" aria-hidden="true">Pr</span> Premiere Pro eklentisi <span class="version">V3.0</span></div>
-      <h1 id="hero-title">Daha az uğraş.<br><span>Daha iyi kurgu.</span></h1>
-      <p class="hero-lead">Sen hikâyeyi anlat.<br>Altyazıyı, boşlukları ve küçük işleri Suflo'ya bırak.</p>
-      <p class="hero-description">Türkçe altyazı ücretsiz. Pro ile uzun videodan Shorts çıkar, konuşmayı temizle, sesi iyileştir; hazır yazı animasyonları ve efektlerle son dokunuşu yap.</p>
-      <div class="hero-buttons"><a class="button button-primary" href="#fiyat">Suflo Pro'yu keşfet <span aria-hidden="true">↗</span></a><a class="button button-secondary" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir <span aria-hidden="true">↓</span></a></div>
-      <div class="hero-note"><span>Windows & macOS</span><span>Tek ödeme. Abonelik yok.</span></div>
-    </div>
-    <div class="hero-stage" aria-label="Suflo Pro efektlerinden gerçek önizlemeler">
-      <div class="stage-header"><span><span class="new-dot" aria-hidden="true"></span> Kurgunun son dokunuşu</span><span class="stage-status">SUFLO PRO</span></div>
-      <div class="hero-effect"><video class="hero-video" muted loop playsinline preload="none" poster="/gorseller/mogrt/12-slide-collide.webp" aria-label="Slide Collide yazı animasyonu önizlemesi"><source src="/gorseller/mogrt/12-slide-collide.webm" type="video/webm"></video><div class="effect-caption"><span>Slide Collide</span><button class="hero-play" type="button" aria-label="Slide Collide önizlemesini oynat" aria-pressed="false"><span aria-hidden="true">▶</span> Önizle</button></div></div>
-      <div class="stage-trio"><div><span class="mini-label">ALTYAZI</span><img src="/gorseller/caption-styles/08-karaoke.webp" alt="Karaoke altyazı stili örneği" width="640" height="360"></div><div><span class="mini-label">YAZI ANİMASYONU</span><img src="/gorseller/mogrt/06-gold-text.webp" alt="Gold Text yazı animasyonu örneği" width="640" height="360"></div><div><span class="mini-label">MOTION BG</span><img src="/gorseller/motionbg/borealis.webp" alt="Borealis hareketli zemin örneği" width="640" height="360"></div></div>
-      <div class="stage-timeline" aria-hidden="true"><span class="timeline-track">T</span><div class="clip clip-purple">Yazı animasyonu</div><div class="clip clip-blue">Altyazı</div><div class="clip clip-green">SFX</div><div class="playhead"></div></div>
-      <p class="stage-footnote">Gerçek kütüphane önizlemeleri · örnek timeline görünümü</p>
-    </div>
-  </section>
-  <div class="trust-strip"><div class="wrap"><span>İçerik üretenler için.<br><strong>İçerik üreten biri tarafından.</strong></span><div><strong>Ücretsiz</strong><span>Türkçe altyazı</span></div><div><strong>99 dil</strong><span>Whisper desteği</span></div><div><strong>Yerel motor</strong><span>Ses bilgisayarında kalır</span></div><div><strong>749 TL <small>+ KDV</small></strong><span>Pro · tek ödeme</span></div></div></div>
 
-  <section id="yenilikler" class="section wrap">
-    <div class="section-heading"><div><div class="eyebrow">YENİ NESİL SUFLO <span class="tag">V3</span></div><h2>Ham çekimden<br>paylaşılacak videoya.</h2></div><p>Program değiştirmeden, dosya taşıyıp durmadan.<br>İhtiyacın olan araçlar, çalıştığın yerde.</p></div>
-    <div class="feature-grid">
-      <article class="feature feature-shorts"><div class="feature-top"><span class="feature-number">01 / SHORTS</span><span class="tag">PRO</span></div><h3>Uzun videonun<br>iyi anlarını kaçırma.</h3><p>Güçlü anları bul, ayrı sekanslara çevir ve Auto Reframe ile 9:16'ya uyarlayarak Shorts / Reels kurgusuna başla.</p><div class="shorts-visual" aria-label="Shorts iş akışının temsili görünümü"><div class="landscape"><span class="frame-corner"></span><span class="visual-label">ANA SEKANSTA</span><div class="waveform" aria-hidden="true"></div><div class="range-mark">Seçilen an</div></div><span class="visual-arrow" aria-hidden="true">↗</span><div class="portrait"><span class="portrait-hook">İlk cümle<br><em>önemli.</em></span><span class="portrait-caption">Altyazın da hazır.</span><span class="ratio">9:16</span></div></div><div class="feature-bottom">Viral anlar · Shorts sekansları · Kanca başlığı</div></article>
-      <article class="feature feature-cut"><div class="feature-top"><span class="feature-number">02 / KONUŞMADAN KES</span><span class="tag">PRO</span></div><h3>“Iıı, eee…”<br>Orayı geçelim.</h3><p>Dolgu seslerini, tekrarları ve duraksamaları metinden seç. Kesmeden önce dinle; karar sende kalsın.</p><div class="transcript-demo" aria-label="Konuşmadan kesim için örnek metin"><span class="timecode">00:04.20</span><div>Bu videoda <span class="removed">ııı</span> size<br><span class="removed">ben ben</span> bir şey göstereceğim.</div><span class="demo-status"><span aria-hidden="true">✂</span> Dolgu ve tekrar temizliği</span></div><div class="feature-bottom">Metinle kurgu · Dinleme önizlemesi · Sessizlik kesimi</div></article>
-      <article class="feature feature-audio"><div class="feature-top"><span class="feature-number">03 / SESİ İYİLEŞTİR</span><span class="tag">PRO</span></div><h3>Görüntü kadar<br>ses de temiz olsun.</h3><p>Arka plan gürültüsünü azalt, ses seviyesini dengele. Orijinal ses korunur; gecikme telafisiyle senkron gözetilir.</p><div class="audio-visual" aria-label="Ses iyileştirmenin temsili görünümü"><div><span>Ham ses</span><div class="waveform noisy" aria-hidden="true"></div></div><div><span>İyileştirilmiş</span><div class="waveform clean" aria-hidden="true"></div></div><span class="audio-label">Gürültü azaltma + LUFS normalizasyonu</span></div></article>
-      <article class="feature feature-captions"><div class="feature-top"><span class="feature-number">04 / ALTYAZI STİLLERİ</span><span class="tag">PRO</span></div><h3>Okunsun.<br>Bir de iyi görünsün.</h3><p>12 Suflo animasyonlu stili ve 17 MOGRT şablonu. Vurgulu kelimeler, karaoke ve dikey videoya uygun yerleşim.</p><div class="caption-demo"><span>Her kelime</span><strong>yerini bulsun.</strong><span class="caption-style-label">Anahtar kelime vurgusu · temsili stil</span></div></article>
-    </div>
-    <p class="visual-disclosure">Bu bölümdeki iş akışı görselleri temsili olarak tasarlanmıştır. Aşağıdaki kütüphane önizlemeleri gerçek içeriklerden alınmıştır.</p>
-  </section>
+<!-- ================= HERO ================= -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow">Adobe Premiere Pro eklentisi</span>
+        <h1>Premiere'de<br>tamamen ücretsiz,<br><span class="ac">sınırsız altyazı.</span></h1>
+        <p class="lead">Videonun sesinden <b>Türkçe ve Azerice altyazıyı</b> kendisi çıkarır. Yapay zekâ senin bilgisayarında çalışır — kredi yok, abonelik yok, kurulumdan sonra internet bile gerekmiyor.</p>
+        <div class="cta-row">
+          <a class="btn btn-p" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir <small>· kayıt yok</small></a>
+          <a class="btn btn-s" href="#pro">Pro'yu gör — 749 TL</a>
+        </div>
+        <p class="micro"><b>Açık kaynak (MIT)</b> · Windows &amp; macOS · Premiere 2020 (14.4) ve üstü · <b id="surum">v3.0.0</b></p>
+      </div>
 
-  <section id="kutuphane" class="library-section section">
-    <div class="wrap">
-      <div class="section-heading"><div><div class="eyebrow">PRO İÇERİK KÜTÜPHANESİ</div><h2>Bir efekt arıyorsan,<br>önce Suflo'ya bak.</h2></div><p>Yazı, ses, hareket, son dokunuş.<br>Önizle. Seç. Premiere'de kullan.</p></div>
-      <div class="library-tabs" role="tablist" aria-label="Efekt kategorileri"><button id="tab-text" role="tab" aria-selected="true" aria-controls="gallery-text" tabindex="0" data-gallery="text">Yazı animasyonları</button><button id="tab-captions" role="tab" aria-selected="false" aria-controls="gallery-captions" tabindex="-1" data-gallery="captions">Altyazı stilleri <span>17</span></button><button id="tab-backgrounds" role="tab" aria-selected="false" aria-controls="gallery-backgrounds" tabindex="-1" data-gallery="backgrounds">Motion BG <span>30</span></button><button id="tab-buttons" role="tab" aria-selected="false" aria-controls="gallery-buttons" tabindex="-1" data-gallery="buttons">Butonlar <span>35</span></button></div>
-      <div id="gallery-text" class="gallery" role="tabpanel" aria-labelledby="tab-text"></div>
-      <div id="gallery-captions" class="gallery" role="tabpanel" aria-labelledby="tab-captions" hidden></div>
-      <div id="gallery-backgrounds" class="gallery" role="tabpanel" aria-labelledby="tab-backgrounds" hidden></div>
-      <div id="gallery-buttons" class="gallery" role="tabpanel" aria-labelledby="tab-buttons" hidden></div>
-      <noscript><p>Örnek içerikler: Slide Collide, Gold Text, Jitter Shine, Zoom In, Karaoke ve Glitch. Hareketli kütüphane vitrini için JavaScript'i etkinleştir.</p></noscript>
-      <div class="library-bottom"><p>Yukarıdakiler yalnızca bir seçki.<br><strong>242 benzersiz animasyonun tamamı Pro'da.</strong> 35 buton bu sayıya dahildir.</p><a class="text-link" href="#fiyat">Hepsini Pro ile aç <span aria-hidden="true">↗</span></a></div>
-      <div class="sound-preset-grid">
-        <article class="sound-card"><div class="feature-top"><span class="feature-number">SES KÜTÜPHANESİ</span><span class="tag">1.076 SFX</span></div><h3>O “whoosh” burada.</h3><p>Geçişler, vuruşlar, ortamlar, chime'lar… Sesleri panelde dinle ve kurguna ekle. Smart SFX 2.0 ile altyazının bağlamına göre öneri al.</p><div class="sound-list" aria-label="Örnek ses efekti kategorileri"><div><span class="sound-icon" aria-hidden="true">↗</span><span>Whoosh & geçiş<span>Hareketi duyur.</span></span><div class="small-wave" aria-hidden="true"></div></div><div><span class="sound-icon" aria-hidden="true">✦</span><span>Chime & vurgu<span>Önemli anı işaretle.</span></span><div class="small-wave" aria-hidden="true"></div></div><div><span class="sound-icon" aria-hidden="true">◉</span><span>Impact & hit<span>Kesime ağırlık kat.</span></span><div class="small-wave" aria-hidden="true"></div></div></div><small>Kategori örnekleri · sesli oynatıcı değil</small></article>
-        <article class="preset-card"><div class="feature-top"><span class="feature-number">HAREKET & EFEKT</span><span class="tag">290 PRESET</span></div><h3>Keyframe'leri<br>tek tek kurma.</h3><p>12 yerleşik Motion preseti ve 278 efektlik Suflo Smooth paketi. Zoom, slide, shake ve geçişler için hazır başlangıçlar.</p><div class="preset-chips"><span>Zoom in <b>↗</b></span><span>Slide <b>→</b></span><span>Shake <b>≈</b></span><span>Transition <b>⇄</b></span><span>Look <b>◐</b></span></div><div class="preset-note">Seçili kliple çalış.<br>Ayarları kendi kurguna göre düzenle.</div></article>
+      <div class="panel-sahne">
+        <figure class="panel-shot" aria-label="Suflo panelinin Premiere Pro içindeki gerçek görünümü">
+          <div class="ps-bar"><i></i><i></i><i></i><span>Suflo — Premiere Pro paneli</span></div>
+          <img src="/gorseller/panel.webp?v=291" alt="Suflo Creator Studio paneli: araçlar, yazı animasyonları kütüphanesi ve Pro içerikler" width="1200" height="746" loading="eager" fetchpriority="high">
+        </figure>
+        <div class="chip c1" aria-hidden="true">✂️ <i>Sessizlik kesildi</i> <b>−2:41</b></div>
+        <div class="chip c2" aria-hidden="true">💬 <i>Caption izine uygulandı</i></div>
+        <div class="chip c3" aria-hidden="true">🔊 <i>whoosh_hit_04</i> <b>eklendi</b></div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <section id="pro" class="section wrap">
-    <div class="section-heading"><div><div class="eyebrow">TEK PANEL, DAHA FAZLA İŞ</div><h2>Küçük işler birikir.<br>Suflo yanında çalışır.</h2></div><p>Yalnızca altyazı değil.<br>Kurgunun öncesi, kendisi ve sonrası.</p></div>
-    <div class="tools-grid"><article><span class="tool-icon" aria-hidden="true">↗</span><h3>Otomatik Zoom</h3><p>Konuşmanın akışına göre punch-in noktaları. Tek kamerayla çekilen videoya hareket kat.</p><span class="tool-tier">PRO</span></article><article><span class="tool-icon" aria-hidden="true">∿</span><h3>Ritim & sahne</h3><p>Müzik vuruşlarını marker olarak gör. Sahne değişimlerini bul, kesimleri hazırlarken kullan.</p><span class="tool-tier">PRO</span></article><article><span class="tool-icon" aria-hidden="true">⇄</span><h3>13 hazır geçiş</h3><p>Zoom, whip, itme ve daha fazlası. Premiere keyframe'leriyle; başka efekt eklentisi gerekmez.</p><span class="tool-tier">PRO</span></article><article><span class="tool-icon" aria-hidden="true">文</span><h3>Çeviri & çift dil</h3><p>Altyazıyı farklı dillere çevir. Orijinal metni ve çeviriyi alt alta kullan.</p><span class="tool-tier">PRO</span></article><article><span class="tool-icon" aria-hidden="true">▤</span><h3>Bölümler & paylaşım</h3><p>YouTube bölümleri, başlık ve açıklama hazırlığı. Videodan sonraki işleri de toparla.</p><span class="tool-tier">FREE + PRO</span></article><article><span class="tool-icon" aria-hidden="true">⊞</span><h3>B-roll önerileri</h3><p>Ara görüntü eklenebilecek anları ve stok arama terimlerini transkriptinden çıkar.</p><span class="tool-tier">PRO</span></article></div>
-    <p class="provider-note">Yerel altyazı motoru bilgisayarında çalışır. Bulut motorları ve bazı yapay zekâ araçları seçtiğin sağlayıcı için internet/API anahtarı gerektirebilir; sağlayıcının ücret ve kotaları ayrıdır.</p>
-  </section>
+<!-- ================= GUVEN ================= -->
+<div class="trust">
+  <div class="wrap">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0 5-5m-5 5-5-5M4 21h16"/></svg><b data-say>1.229</b>&nbsp;indirme</span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg><b>MIT</b>&nbsp;açık kaynak</span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg><b data-say>30</b>&nbsp;sürüm, aktif geliştirme</span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 2v4m8-4v4"/></svg><b>Tek ödeme</b>, abonelik yok</span>
+  </div>
+</div>
 
-  <section id="ozellikler" class="free-section section">
-    <div class="wrap free-layout"><div><div class="eyebrow"><span class="new-dot" aria-hidden="true"></span> SUFLO FREE</div><h2>Altyazı için<br>kartını çıkarma.</h2><p>Türkçe ve Azerice dahil 99 dil. Metni oluştur, panelde düzenle, Premiere caption izine aktar. Altyazı çekirdeği ücretsiz ve açık kaynak.</p><ul class="check-list"><li>Kredi veya dakika sınırı olmadan yerel transkripsiyon</li><li>Satır bölme, birleştirme ve zamanlama düzenleme</li><li>SRT / WebVTT içe aktarma; SRT / VTT / TXT dışa aktarma</li><li>Yerel modda ses bilgisayarından çıkmaz</li><li>Uyumlu donanımda NVIDIA CUDA / Apple Metal desteği</li></ul><a class="button button-light" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir <span aria-hidden="true">↓</span></a><p class="free-note">Kart yok. Kayıt yok. Filigran yok.</p></div><div class="editor-visual" aria-label="Altyazı editörü iş akışının temsili görünümü"><div class="editor-top"><span><img src="/favicon.svg" width="22" height="22" alt=""> Caption Editor</span><span>TR</span></div><div class="editor-line"><span>00:01.40</span><p>Bir fikrin var.</p><span class="editor-check">✓</span></div><div class="editor-line active"><span>00:03.10</span><p>Şimdi onu <mark>anlatma</mark> zamanı.</p><span class="editor-check">✓</span></div><div class="editor-line"><span>00:05.80</span><p>Altyazısını Suflo hazırlasın.</p><span class="editor-check">✓</span></div><div class="editor-bottom"><span>SRT · VTT · TXT</span><span class="editor-apply">Caption izine uygula ↗</span></div><p>Örnek transkript · temsili arayüz</p></div></div>
-  </section>
+<!-- ================= KAYAN SERIT ================= -->
+<div class="kayan" aria-hidden="true">
+  <div class="kayan-sira">
+    <div class="grup"><span>Türkçe altyazı</span><span>Azerice</span><span>99 dil</span><span>Whisper yerel</span><span>CUDA &amp; Metal</span><span>SRT · VTT · ASS · TXT</span><span>Terim sözlüğü</span><span>İnternetsiz çalışır</span><span>Açık kaynak MIT</span><span>Kredi yok</span></div>
+    <div class="grup"><span>Türkçe altyazı</span><span>Azerice</span><span>99 dil</span><span>Whisper yerel</span><span>CUDA &amp; Metal</span><span>SRT · VTT · ASS · TXT</span><span>Terim sözlüğü</span><span>İnternetsiz çalışır</span><span>Açık kaynak MIT</span><span>Kredi yok</span></div>
+  </div>
+  <div class="kayan-sira ters">
+    <div class="grup"><span>Sessizlik kesimi</span><span>Punch-in zoom</span><span>Ritim marker</span><span>242 benzersiz animasyon</span><span>1.076 ses efekti</span><span>30 Motion BG</span><span>290 preset</span><span>Smart SFX 2.0</span><span>Çeviri</span><span>Stilli ASS</span><span>Creator Punch</span><span>CapCut Clean</span><span>SaaS Glass</span></div>
+    <div class="grup"><span>Sessizlik kesimi</span><span>Punch-in zoom</span><span>Ritim marker</span><span>242 benzersiz animasyon</span><span>1.076 ses efekti</span><span>30 Motion BG</span><span>290 preset</span><span>Smart SFX 2.0</span><span>Çeviri</span><span>Stilli ASS</span><span>Creator Punch</span><span>CapCut Clean</span><span>SaaS Glass</span></div>
+  </div>
+</div>
 
-  <section id="nasil" class="section wrap panel-section">
-    <div class="panel-copy"><div class="eyebrow">ÇALIŞTIĞIN YERDE</div><h2>Başka bir sekmede değil.<br>Premiere'in içinde.</h2><p>Klibini ya da sekansını seç. Panelden aracını aç, sonucu kontrol et ve kurguna uygula. Son karar, her zaman senin.</p><a class="text-link" href="#kurulum">Kurulumu gör <span aria-hidden="true">↗</span></a></div><figure class="product-panel"><div class="window-bar"><span aria-hidden="true">● ● ●</span><span>Suflo · Adobe Premiere Pro</span></div><img src="/gorseller/panel.webp" alt="Suflo panelinin gerçek ekran görüntüsü: araç menüsü ve yazı animasyonları kütüphanesi" width="1200" height="746" loading="lazy"><figcaption>Gerçek Suflo paneli · kütüphane görünümü</figcaption></figure>
-  </section>
-
-  <section id="fiyat" class="pricing-section section">
-    <div class="wrap"><div class="center-heading"><div class="eyebrow">KENDİ TEMPOYLA ÇALIŞANLAR İÇİN</div><h2>Altyazı ücretsiz.<br><span>Kurgunun geri kalanı Pro.</span></h2><p>Abonelik yok. Pro için bir kez öde, güncellemelerle devam et.</p></div>
-    <div class="pricing-grid"><article class="price-card"><div class="price-heading"><h3>Suflo Free</h3><span class="tag">BAŞLAMAK İÇİN</span></div><p>Türkçe altyazıdan başla.</p><div class="price">0 <span>TL</span></div><p class="price-term">Ücretsiz altyazı çekirdeği</p><a class="button button-secondary" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir <span aria-hidden="true">↓</span></a><ul class="check-list"><li>Türkçe & Azerice dahil 99 dil</li><li>Yerel altyazı motoru</li><li>Caption Editor</li><li>Premiere caption izine uygulama</li><li>SRT / VTT / TXT dışa aktarımı</li><li>Emoji seçici & YouTube bölümleri</li></ul><p class="price-footer">Kredi yok · dakika sınırı yok · kart yok</p></article>
-    <article class="price-card price-pro"><div class="price-heading"><h3>Suflo Pro</h3><span class="tag">TAM KURGU PAKETİ</span></div><p>Tek panelde bütün araçların.</p><div class="price">749 <span>TL <small>+ KDV</small></span></div><p class="price-term">Tek ödeme · ömür boyu güncelleme</p><a class="button button-primary buy-link" data-source="pricing" href="https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?discount=0">Suflo Pro'yu al <span aria-hidden="true">↗</span></a><ul class="check-list"><li>Free'deki her şey, ayrıca:</li><li>Shorts sekansları & kanca başlığı</li><li>Konuşmadan kesim & sessizlik temizliği</li><li>Ses iyileştirme · zoom · ritim · 13 geçiş</li><li>12 animasyonlu altyazı stili + 17 MOGRT stili</li><li>242 benzersiz animasyon · 290 preset</li><li>1.076 SFX · Smart SFX 2.0 · 30 Motion BG</li><li>Çeviri · toplu klip · B-roll · terim sözlüğü</li></ul><p class="price-footer">Lisansı etkinleştir, Pro içeriklerini panelden al.</p></article></div>
-    <div class="team-banner"><div><span class="eyebrow">BİRLİKTE ÜRETİYORSANIZ</span><h3>Suflo Pro — Ekip <span>3 kişi</span></h3><p>Ajanslar ve küçük ekipler için.</p></div><div class="team-purchase"><span><strong>1.799 TL</strong> + KDV <small>Tek ödeme · kişi başı yaklaşık 600 TL</small></span><a class="button button-secondary" href="https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?discount=0">Ekip seçeneğini gör <span aria-hidden="true">↗</span></a></div></div>
-    <p class="pricing-note">Vergi, ülkeye göre ödeme sayfasında hesaplanır. Ekip satın alımında ödeme sayfasından “Suflo Pro — Ekip (3 kişi)” varyantını seç. Adobe Premiere Pro ayrı olarak gereklidir ve bu fiyata dahil değildir.</p>
+<!-- ================= PROBLEM ================= -->
+<section id="neden">
+  <div class="wrap">
+    <div class="shead">
+      <span class="eyebrow">Suflo neden var</span>
+      <h2>Adobe'un dil listesinde<br>Türkçe yok.</h2>
+      <p class="lead">Premiere'in kendi "Konuşmayı Metne Dönüştür" özelliği 18 dil destekliyor. Türkçe de Azerice de o listede değil. Yani ya elle yazıyorsun, ya da videonu bir siteye yükleyip dakika başına ödüyorsun.</p>
     </div>
-  </section>
+    <div class="vs">
+      <div class="card no">
+        <div class="k">Premiere'in kendi aracı</div>
+        <div class="n">18</div>
+        <p>desteklenen dil</p>
+        <div class="diller">
+          <i>İngilizce</i><i>Almanca</i><i>İspanyolca</i><i>Fransızca</i><i>İtalyanca</i><i>Portekizce</i><i>Japonca</i><i>Korece</i><i>Çince</i><i>Rusça</i><i>Hollandaca</i><i>+7 dil</i>
+        </div>
+      </div>
+      <div class="card ye">
+        <div class="k">Suflo</div>
+        <div class="n">99</div>
+        <p>desteklenen dil — <b style="color:var(--tx)">Türkçe ve Azerice dahil</b></p>
+        <div class="diller">
+          <i class="yok">Türkçe</i><i class="yok">Azerice</i><i>İngilizce</i><i>Rusça</i><i>Almanca</i><i>Arapça</i><i>Kürtçe</i><i>+92 dil</i>
+        </div>
+      </div>
+    </div>
+    <ul class="liste" style="margin-top:34px;max-width:720px">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v5m0 3.5h.01"/><circle cx="12" cy="12" r="9"/></svg><span>Elle yazmak: 10 dakikalık videoda <b>40–60 dakika</b></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v5m0 3.5h.01"/><circle cx="12" cy="12" r="9"/></svg><span>Dışarıdaki servisler: <b>dakika başına kredi</b> + videonu buluta yüklemek</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v5m0 3.5h.01"/><circle cx="12" cy="12" r="9"/></svg><span>SRT'yi elle içe aktarıp <b>zamanlamayı tek tek düzeltmek</b></span></li>
+    </ul>
+  </div>
+</section>
 
-  <section id="sss" class="section wrap faq-section"><div><div class="eyebrow">AKLINDA KALMASIN</div><h2>Önce birkaç<br>kısa cevap.</h2><p>Kurulumda bir şey takılırsa<br><a href="https://github.com/sametcreates/suflo/issues">bize bildir ↗</a></p></div><div class="faq-list"><details><summary>Ücretsiz sürüm bir deneme mi?</summary><p>Hayır. Türkçe altyazı oluşturma, transkript düzenleme ve SRT/VTT/TXT dışa aktarma ücretsiz çekirdekte yer alır. Pro; kurgu otomasyonu, animasyonlu stiller ve içerik kütüphaneleri gibi ek araçları açar.</p></details><details><summary>Videolarım buluta yükleniyor mu?</summary><p>Yerel altyazı motorunda ses bilgisayarında işlenir. İsteğe bağlı bulut motorunu veya bulut tabanlı bir yapay zekâ aracını seçersen, ilgili ses/metin seçtiğin sağlayıcı tarafından işlenir. Yerel mod ilk kurulum ve model indirmesi sonrasında çevrimdışı kullanılabilir.</p></details><details><summary>Pro aylık abonelik mi?</summary><p>Hayır. Suflo Pro 749 TL + KDV karşılığında tek seferlik satın alınır; ömür boyu güncellemeler dahildir. Harici API sağlayıcılarının varsa ücret ve kotaları bu satın alıma dahil değildir.</p></details><details><summary>749 TL son ödeme tutarı mı?</summary><p>749 TL vergiler hariç ürün fiyatıdır. Ülkene göre vergi ödeme sayfasında eklenir; ödemeden önce toplam tutarı görebilirsin. Ürünü satın almadan önce ücretsiz sürümü bilgisayarında deneyebilirsin.</p></details><details><summary>17 stil mi, 51 stil mi?</summary><p>17 farklı MOGRT altyazı stili vardır. Her birinin 9:16, 16:9 ve 1:1 dosyaları olduğundan toplam 51 oran dosyası bulunur; aynı stil üç ayrı stil olarak sayılmaz. Bunlara ek olarak v3'te 12 Suflo animasyonlu altyazı stili yer alır.</p></details><details><summary>Bilgisayarımda çalışır mı?</summary><p>Suflo Windows ve macOS için kurulum sunar; Premiere Pro 2020 (14.4) ve üstünü destekler. Yeni özelliklerin kullanılabilirliği Premiere sürümüne ve donanıma bağlı olabilir. Önce ücretsiz sürümü deneyip Suflo Doctor ile kurulumu kontrol etmeni öneririz.</p></details><details><summary>Pro içeriklerini nasıl alacağım?</summary><p>Satın alma sonrası verilen lisans anahtarını Suflo'nun Ayarlar bölümünde etkinleştir. Pro içerik kütüphanesi panel üzerinden indirilir; ilk indirme ve içerik güncellemeleri için internet bağlantısı gerekir. Lisansını <a href="/hesap.html">Lisans yönetimi</a> sayfasından da yönetebilirsin.</p></details><details><summary>Altyazı her kelimeyi doğru yazar mı?</summary><p>Hiçbir otomatik transkripsiyon motoru her kayıtta %100 doğruluk garantisi vermez. Gürültü, mikrofon, isimler ve konuşma biçimi sonucu etkileyebilir. Caption Editor'de metni ve zamanlamayı kontrol ederek son halini vermelisin.</p></details></div></section>
+<!-- ================= NASIL ================= -->
+<section id="nasil" style="background:var(--bg2);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)">
+  <div class="wrap">
+    <div class="shead">
+      <span class="eyebrow">Nasıl çalışır</span>
+      <h2>Kur. Seç. Bas.</h2>
+      <p class="lead">Panel Premiere'in içinde açılır. Dosya dışa aktarmak, başka programa geçmek, hesap açmak yok.</p>
+    </div>
+    <div class="adimlar">
+      <div class="adim"><div class="no">01</div><h3>Kur</h3><p>ZIP'i aç, kur dosyasına çift tıkla, Premiere'i yeniden başlat. Toplam iki dakika.</p></div>
+      <div class="adim"><div class="no">02</div><h3>Klibi seç</h3><p>Tek klip, in–out aralığı ya da tüm sekans. Ses katmanını sen seçersin.</p></div>
+      <div class="adim"><div class="no">03</div><h3>Altyazıyı al</h3><p>Türkçe yaz, satır satır düzelt, zamanlamayı kaydır. Sonra caption izine uygula.</p></div>
+      <div class="adim son"><div class="no">04</div><h3>Pro ile devam</h3><p>Sessizlikleri kes, konuşmaya göre zoom yap, animasyon ve ses efekti ekle.</p></div>
+    </div>
+  </div>
+</section>
 
-  <section id="kurulum" class="section wrap install-section"><div class="section-heading"><div><div class="eyebrow">KURULUM</div><h2>Bir panel.<br>Alıştığın Premiere.</h2></div><p>Önce Free'yi kur. Bilgisayarında dene.<br>Pro'ya aynı panelden geç.</p></div><div class="install-grid"><article><span class="install-os">Windows</span><h3>ZIP'i aç. Kurulumu başlat.</h3><ol><li><a href="https://github.com/sametcreates/suflo/releases/latest">Güncel kurulum ZIP'ini indir.</a></li><li>ZIP'i klasöre çıkar; <code>Suflo-Kur.bat</code> dosyasını çalıştır.</li><li>Premiere'i yeniden aç → <strong>Window › Extensions › Suflo</strong>.</li></ol></article><article><span class="install-os">macOS</span><h3>Aynı Suflo. Mac'inde.</h3><ol><li><a href="https://github.com/sametcreates/suflo/releases/latest">Güncel kurulum ZIP'ini indir ve aç.</a></li><li><code>Suflo-Kur.command</code> dosyasıyla kurulum adımlarını izle.</li><li>Premiere'i yeniden aç → <strong>Window › Extensions › Suflo</strong>.</li></ol></article></div><div class="doctor-note"><span class="doctor-symbol" aria-hidden="true">+</span><div><strong>Bir şey takılırsa: Suflo Doctor.</strong><p>Panelde Ayarlar'dan sistem taramasını başlat. Premiere bağlantısı, FFmpeg, yerel motor ve Pro içeriklerini kontrol et.</p></div><a href="https://github.com/sametcreates/suflo/releases/latest">Kurulum & sürüm notları ↗</a></div></section>
-  <section class="closing"><div class="wrap"><div class="eyebrow">SUFLO V3</div><h2>İyi kurgu, senin elinden.<br><span>Küçük işler, Suflo'dan.</span></h2><div class="hero-buttons"><a class="button button-primary buy-link" data-source="footer" href="https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?discount=0">Pro'yu al — 749 TL + KDV <span aria-hidden="true">↗</span></a><a class="button button-secondary" href="https://github.com/sametcreates/suflo/releases/latest">Önce ücretsiz dene <span aria-hidden="true">↓</span></a></div></div></section>
-</main>
-<footer class="wrap footer"><div class="footer-top"><div><a class="logo" href="/" aria-label="Suflo ana sayfa"><img src="/favicon.svg" width="34" height="34" alt=""><span>suflo<span class="logo-period">.</span></span></a><p>Premiere'de üretmeye devam et.<br>Bir sametcreates projesi.</p></div><div class="footer-links"><div><span>ÜRÜN</span><a href="#yenilikler">Suflo v3</a><a href="#fiyat">Free & Pro</a><a href="https://github.com/sametcreates/suflo/releases">Sürüm notları</a></div><div><span>YARDIM</span><a href="#kurulum">Kurulum</a><a href="/hesap.html">Lisans yönetimi</a><a href="https://github.com/sametcreates/suflo/issues">Sorun bildir</a></div><div><span>KEŞFET</span><a href="/blog/">Blog</a><a href="https://github.com/sametcreates/suflo">GitHub</a><a href="https://instagram.com/sametcreates">Instagram</a></div></div></div><div class="footer-bottom"><span>© 2026 Suflo · sametcreates</span><span>Adobe ile bağımsızdır; Premiere Pro Adobe'nin markasıdır.</span><span>Çerezsiz web analitiği</span></div></footer>
+<!-- ================= UCRETSIZ OZELLIKLER ================= -->
+<section id="ozellikler">
+  <div class="wrap">
+    <div class="shead">
+      <span class="eyebrow">Ücretsiz katman</span>
+      <h2>Altyazı tarafı<br>sonsuza dek bedava.</h2>
+      <p class="lead">Bu bir deneme sürümü değil. Kısıt yok, kredi yok, filigran yok. Ücretsiz çünkü yapay zekâ senin bilgisayarında çalışıyor — sunucu maliyeti yok.</p>
+    </div>
+
+    <div class="blok">
+      <div>
+        <h3>Sesin bilgisayarından çıkmıyor.</h3>
+        <p>Yerel motorda ses hiçbir yere gönderilmez. Kurulumdan sonra internet bağlantısı olmadan da çalışır. Müşteri işi yapıyorsan bu bir özellik değil, zorunluluk.</p>
+        <ul class="liste">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>Whisper</b> modeli kendi makinende çalışır</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>NVIDIA kartta <b>CUDA</b>, Apple Silicon'da <b>Metal</b> hızlandırma</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Acelen varsa isteğe bağlı bulut motoru (Groq / OpenAI)</span></li>
+        </ul>
+      </div>
+      <div class="bmedya card" style="padding:0">
+        <div class="mock" style="border:none;box-shadow:none;border-radius:18px">
+          <div class="mock-bar"><i></i><i></i><i></i><span>Suflo — Ayarlar</span></div>
+          <div style="padding:20px">
+            <div class="mp-row" style="font-size:13px;padding:11px 13px"><span>Motor</span><b>Suflo Altyazı Motoru</b></div>
+            <div class="mp-row" style="font-size:13px;padding:11px 13px"><span>Model</span><b>large-v3-turbo</b></div>
+            <div class="mp-row" style="font-size:13px;padding:11px 13px"><span>Hızlandırma</span><b style="color:var(--ok)">CUDA açık</b></div>
+            <div class="mp-row" style="font-size:13px;padding:11px 13px"><span>İnternet</span><b style="color:var(--ok)">Gerekmiyor</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="blok ters">
+      <div>
+        <h3>Hataları timeline'dan önce yakala.</h3>
+        <p>Yeni Caption Editor düşük güvenli kelimeleri, hızlı okunan satırları ve bozuk zamanları sen aramadan gösterir. Son karar her zaman sende kalır.</p>
+        <ul class="liste">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Satır satır düzenleme, birleştirme ve <b>bölme</b></span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>Kalite puanı</b>, okuma hızı ve düşük güven uyarıları</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Tek tıkla nizami düzeltme, arama ve <b>50 adımlı geçmiş</b></span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>Öğrenen terim sözlüğü</b>: düzeltmen sonraki videoya taşınır</span></li>
+        </ul>
+      </div>
+      <div class="bmedya card">
+        <div class="mp-line" style="font-size:14px;margin-bottom:11px"><em style="font-size:12px">00:04</em><span>bu videoyu tamamen <b style="color:var(--tx)">Suflo</b> ile hazırladım</span></div>
+        <div class="mp-line" style="font-size:14px;margin-bottom:11px"><em style="font-size:12px">00:07</em><span>altyazıyı kendisi çıkardı</span></div>
+        <div class="mp-line" style="font-size:14px;margin-bottom:11px;background:rgba(139,124,246,.08);border-radius:7px;padding:7px 9px"><em style="font-size:12px">00:10</em><span>ben sadece bir yeri düzelttim<span class="imlec">|</span></span></div>
+        <div class="mp-line" style="font-size:14px"><em style="font-size:12px">00:13</em><span>ve timeline'a bastım</span></div>
+      </div>
+    </div>
+
+    <div class="blok">
+      <div>
+        <h3>Nereye istersen çıkar.</h3>
+        <p>Premiere'in caption izine tek tıkla uygula, ya da dosya olarak dışa aktar. Stilli altyazı istiyorsan ASS formatında karaoke etiketleriyle birlikte çıkar.</p>
+        <ul class="liste">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Premiere <b>caption izi</b> — doğrudan sekansa</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>SRT</b> · <b>WebVTT</b> · <b>ASS</b> · <b>TXT</b> dışa aktarma</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Hazır SRT/VTT dosyanı <b>içe aktarıp</b> düzenle ya da çevir</span></li>
+        </ul>
+      </div>
+      <div class="bmedya" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="card" style="padding:22px;text-align:center"><div style="font-size:24px;font-weight:800;letter-spacing:-1px">SRT</div><div style="color:var(--tx3);font-size:13px;margin-top:4px">evrensel</div></div>
+        <div class="card" style="padding:22px;text-align:center"><div style="font-size:24px;font-weight:800;letter-spacing:-1px">VTT</div><div style="color:var(--tx3);font-size:13px;margin-top:4px">web</div></div>
+        <div class="card" style="padding:22px;text-align:center"><div style="font-size:24px;font-weight:800;letter-spacing:-1px">ASS</div><div style="color:var(--tx3);font-size:13px;margin-top:4px">stilli</div></div>
+        <div class="card" style="padding:22px;text-align:center"><div style="font-size:24px;font-weight:800;letter-spacing:-1px">TXT</div><div style="color:var(--tx3);font-size:13px;margin-top:4px">transkript</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= METRIK ================= -->
+<section style="background:var(--bg3);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:76px 0">
+  <div class="wrap">
+    <div class="metrik">
+      <div><div class="n">99</div><p><b>dil</b> destekleniyor<br>Premiere'in kendi aracı: 18</p></div>
+      <div><div class="n">22×</div><p><b>GPU hızlandırma</b> ile<br>CPU'ya göre kazanç</p></div>
+      <div><div class="n">0 ₺</div><p>altyazı için ödediğin tutar<br><b>sonsuza dek</b></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PRO KOPRU ================= -->
+<section id="pro">
+  <div class="wrap">
+    <div class="shead">
+      <span class="eyebrow">Suflo Pro</span>
+      <h2>Altyazı hazır.<br>Peki kurgunun geri kalanı?</h2>
+      <p class="lead">Sessizlikleri kesmek, konuşmaya göre zoom yapmak, doğru "whoosh"u aramak, animasyon bulmak — asıl zaman buraya gidiyor. Pro bu katmanı otomatikleştirir.</p>
+    </div>
+
+    <div class="prokart">
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18M18 3v18M3 8h18M3 16h18"/></svg></div>
+        <div class="kat">KURGU</div>
+        <h3>Boşluklar tek tıkta gider.</h3>
+        <p>Konuşma aralarındaki sessizlikleri bulur ve keser. 20 dakikalık ham çekim, izlenebilir 12 dakikaya iner — hem de kopya sekansta, aslına dokunmadan.</p>
+      </div>
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"/><path d="m16 15 5 5m0-5-5 5"/></svg></div>
+        <div class="kat">YENİ · KONUŞMA · SHORTS</div>
+        <h3>"Iıı, eee" bir tıkla gider.</h3>
+        <p>Klibi kelime kelime yazıya döker; dolgu seslerini, "ben ben" tekrarlarını ve uzun duraksamaları işaretler. Bir kelimeye tıkla — videodan da çıksın. Uygulamadan önce ▶ Dinle ile sonucu duy.</p>
+      </div>
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M10 7h4M12 15.5l-2-2.5h4z"/></svg></div>
+        <div class="kat">YENİ · SHORTS</div>
+        <h3>Bir saatlik videodan 5 Shorts.</h3>
+        <p>Yapay zekâ kancayla başlayan en güçlü 15–60 sn'lik anları bulur; tek tıkla her biri için sekans ve Auto Reframe ile 9:16 kopyası çıkar. Kanca başlığı ve hazır altyazı da gelir — yeniden yazıya dökmek yok.</p>
+      </div>
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="7" height="12" rx="1.5"/><rect x="14" y="6" width="7" height="12" rx="1.5"/><path d="M10 12h4"/></svg></div>
+        <div class="kat">YENİ · GEÇİŞ</div>
+        <h3>13 geçiş, sıfır eklenti.</h3>
+        <p>Playhead'i kesime getir, tek tıkla zoom, whip, itme, zıplama ya da karartma. Ayar katmanı veya MOGRT yok — keyframe'ler Premiere'de düzenlenebilir. Sahne algılama ve vuruşlarda bölme de burada.</p>
+      </div>
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4M11 8.5v5M8.5 11h5"/></svg></div>
+        <div class="kat">KAMERA</div>
+        <h3>Tek kameraya ikinci açı hissi.</h3>
+        <p>Altyazıdaki cümle dönüşleri, duraklamalar ve vurgulardan karar noktaları çıkarır; yumuşak, jump-cut ya da snap punch-in zoom'u kendisi yerleştirir. Şiddet ve odak ayarlanabilir.</p>
+      </div>
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v3M8 8v11M12 5v14M16 9v6M20 12v3"/></svg></div>
+        <div class="kat">SES</div>
+        <h3>Müziğe göre kes, sayarak değil.</h3>
+        <p>Parçanın bas ve tiz vuruşlarını bulup sekansa marker bırakır. BPM'i de söyler. Ritme oturan kurgu artık kulakla değil, gözle yapılır.</p>
+      </div>
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 10v4"/><path d="M21 5l-3 3"/></svg></div>
+        <div class="kat">YENİ · SES</div>
+        <h3>Temiz ses, senkron kaymadan.</h3>
+        <p>Uğultu ve oda gürültüsünü alır, sesi YouTube'un istediği −14 LUFS'a getirir. Filtrenin gecikmesini ölçüp geri aldığı için dudak senkronu kaymaz; orijinal ses silinmez. Birden çok klip tek seferde.</p>
+      </div>
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14M12 4v16M8 20h8"/></svg></div>
+        <div class="kat">STİL</div>
+        <h3>29 stil. Tek tek uğraşmak yok.</h3>
+        <p>17 gerçek MOGRT stili + Hormozi, Neon, Daktilo, Karaoke Dolgu dahil 12 Suflo animasyonlu stil. Önemli kelimeler vurgu renginde; 9:16'da altyazı TikTok/Reels butonlarının altında kalmaz.</p>
+      </div>
+      <div class="pk">
+        <div class="ik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></div>
+        <div class="kat">YENİ · B-ROLL</div>
+        <h3>Ne göstereceğini de söyler.</h3>
+        <p>Konuşmada ara görüntü konacak anları ve stok sitelerinde aranacak kelimeleri bulur; yeşil marker bırakır, Pexels araması tek tık. YouTube başlığı, açıklaması ve etiketleri ise ücretsiz sürümde.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= KUTUPHANE ================= -->
+<section id="kutuphane" style="background:var(--bg2);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)">
+  <div class="wrap">
+    <div class="shead">
+      <span class="eyebrow">Pro içerik kütüphanesi</span>
+      <h2>Aramayı bırak.<br>Panelde zaten var.</h2>
+      <p class="lead">Lisansı etkinleştirdiğin an içerikler güvenli bulut üzerinden panele iner. Ara, ön izle, playhead'e bırak — Premiere'den hiç çıkmadan.</p>
+    </div>
+
+    <div class="sek" role="tablist">
+      <button class="on" data-g="captions" role="tab" aria-selected="true">Altyazı Stilleri <i>17</i></button>
+      <button data-g="mogrt" role="tab" aria-selected="false">Animasyonlar <i>242</i></button>
+      <button data-g="buton" role="tab" aria-selected="false">Butonlar <i>35</i></button>
+      <button data-g="mbg" role="tab" aria-selected="false">Motion BG <i>30</i></button>
+      <button data-g="sfx" role="tab" aria-selected="false">Ses efektleri <i>1.076</i></button>
+    </div>
+
+    <div class="galeri" id="g-captions">
+      <figure><video muted loop playsinline preload="metadata" poster="/gorseller/caption-styles/11-mr-beast.webp"><source src="/gorseller/caption-styles/11-mr-beast.webm" type="video/webm"></video><figcaption>Creator Punch</figcaption></figure>
+      <figure><video muted loop playsinline preload="metadata" poster="/gorseller/caption-styles/08-karaoke.webp"><source src="/gorseller/caption-styles/08-karaoke.webm" type="video/webm"></video><figcaption>Karaoke</figcaption></figure>
+      <figure><video muted loop playsinline preload="metadata" poster="/gorseller/caption-styles/07-glitch.webp"><source src="/gorseller/caption-styles/07-glitch.webm" type="video/webm"></video><figcaption>Glitch</figcaption></figure>
+      <figure><video muted loop playsinline preload="metadata" poster="/gorseller/caption-styles/15-spinning.webp"><source src="/gorseller/caption-styles/15-spinning.webm" type="video/webm"></video><figcaption>Spinning</figcaption></figure>
+      <figure><video muted loop playsinline preload="metadata" poster="/gorseller/caption-styles/06-emphasis.webp"><source src="/gorseller/caption-styles/06-emphasis.webm" type="video/webm"></video><figcaption>Emphasis</figcaption></figure>
+      <figure><video muted loop playsinline preload="metadata" poster="/gorseller/caption-styles/05-comic.webp"><source src="/gorseller/caption-styles/05-comic.webm" type="video/webm"></video><figcaption>Comic</figcaption></figure>
+      <figure><video muted loop playsinline preload="metadata" poster="/gorseller/caption-styles/02-arch.webp"><source src="/gorseller/caption-styles/02-arch.webm" type="video/webm"></video><figcaption>Arch</figcaption></figure>
+      <figure><video muted loop playsinline preload="metadata" poster="/gorseller/caption-styles/16-tiktok.webp"><source src="/gorseller/caption-styles/16-tiktok.webm" type="video/webm"></video><figcaption>Social Pop</figcaption></figure>
+    </div>
+
+    <div class="galeri" id="g-mogrt" hidden>
+      <figure><img src="/gorseller/mogrt/12-slide-collide.webp" alt="Slide Collide yazı animasyonu" loading="lazy" width="640" height="360"><figcaption>Slide Collide</figcaption></figure>
+      <figure><img src="/gorseller/mogrt/26-jitter-shine.webp" alt="Jitter Shine yazı animasyonu" loading="lazy" width="640" height="360"><figcaption>Jitter Shine</figcaption></figure>
+      <figure><img src="/gorseller/mogrt/06-gold-text.webp" alt="Gold Text yazı animasyonu" loading="lazy" width="640" height="360"><figcaption>Gold Text</figcaption></figure>
+      <figure><img src="/gorseller/mogrt/07-futurist.webp" alt="Futurist yazı animasyonu" loading="lazy" width="640" height="360"><figcaption>Futurist</figcaption></figure>
+      <figure><img src="/gorseller/mogrt/29-cracked.webp" alt="Cracked yazı animasyonu" loading="lazy" width="640" height="360"><figcaption>Cracked</figcaption></figure>
+      <figure><img src="/gorseller/mogrt/11-zoom-in.webp" alt="Zoom In yazı animasyonu" loading="lazy" width="640" height="360"><figcaption>Zoom In</figcaption></figure>
+      <figure><img src="/gorseller/mogrt/02-rainbow-text.webp" alt="Trippy Text yazı animasyonu" loading="lazy" width="640" height="360"><figcaption>Trippy Text</figcaption></figure>
+      <figure><img src="/gorseller/mogrt/16-ocean-waves.webp" alt="Ocean Waves yazı animasyonu" loading="lazy" width="640" height="360"><figcaption>Ocean Waves</figcaption></figure>
+    </div>
+
+    <div class="galeri bt" id="g-buton" hidden>
+      <figure><img src="/gorseller/buton/Abone Ol.webp" alt="Abone Ol butonu" loading="lazy"><figcaption>Abone Ol</figcaption></figure>
+      <figure><img src="/gorseller/buton/Takip Et.webp" alt="Takip Et butonu" loading="lazy"><figcaption>Takip Et</figcaption></figure>
+      <figure><img src="/gorseller/buton/Begen.webp" alt="Beğen butonu" loading="lazy"><figcaption>Beğen</figcaption></figure>
+      <figure><img src="/gorseller/buton/Indir.webp" alt="İndir butonu" loading="lazy"><figcaption>İndir</figcaption></figure>
+      <figure><img src="/gorseller/buton/Kaydol.webp" alt="Kaydol butonu" loading="lazy"><figcaption>Kaydol</figcaption></figure>
+      <figure><img src="/gorseller/buton/Paylas.webp" alt="Paylaş butonu" loading="lazy"><figcaption>Paylaş</figcaption></figure>
+      <figure><img src="/gorseller/buton/Gonder.webp" alt="Gönder butonu" loading="lazy"><figcaption>Gönder</figcaption></figure>
+      <figure><img src="/gorseller/buton/Mesaj.webp" alt="Mesaj butonu" loading="lazy"><figcaption>Mesaj</figcaption></figure>
+    </div>
+
+    <div class="galeri" id="g-mbg" hidden>
+      <figure><img src="/gorseller/motionbg/lightleak.webp" alt="Light Leak hareketli zemin" loading="lazy"><figcaption>Light Leak</figcaption></figure>
+      <figure><img src="/gorseller/motionbg/pastel.webp" alt="Pastel gradient hareketli zemin" loading="lazy"><figcaption>Pastel</figcaption></figure>
+      <figure><img src="/gorseller/motionbg/wavy.webp" alt="Gradient Wave hareketli zemin" loading="lazy"><figcaption>Gradient Wave</figcaption></figure>
+      <figure><img src="/gorseller/motionbg/borealis.webp" alt="Borealis hareketli zemin" loading="lazy"><figcaption>Borealis</figcaption></figure>
+      <figure><img src="/gorseller/motionbg/film.webp" alt="Film overlay" loading="lazy"><figcaption>Film Overlay</figcaption></figure>
+      <figure><img src="/gorseller/motionbg/paper.webp" alt="Kağıt doku zemin" loading="lazy"><figcaption>Paper</figcaption></figure>
+      <figure><img src="/gorseller/motionbg/grid.webp" alt="Grid hareketli zemin" loading="lazy"><figcaption>Grid</figcaption></figure>
+      <figure><img src="/gorseller/motionbg/topo.webp" alt="Topografya zemin" loading="lazy"><figcaption>Topography</figcaption></figure>
+    </div>
+
+    <div id="g-sfx" hidden>
+      <div class="prokart" style="grid-template-columns:repeat(4,1fr);gap:10px">
+        <div class="card" style="padding:20px"><div style="font-size:30px;font-weight:800;letter-spacing:-1.5px;color:var(--ac)">342</div><div style="color:var(--tx2);font-size:14px;margin-top:3px">Whoosh &amp; Swish</div></div>
+        <div class="card" style="padding:20px"><div style="font-size:30px;font-weight:800;letter-spacing:-1.5px;color:var(--ac)">119</div><div style="color:var(--tx2);font-size:14px;margin-top:3px">UI &amp; Bildirim</div></div>
+        <div class="card" style="padding:20px"><div style="font-size:30px;font-weight:800;letter-spacing:-1.5px;color:var(--ac)">84</div><div style="color:var(--tx2);font-size:14px;margin-top:3px">Riser &amp; Build-up</div></div>
+        <div class="card" style="padding:20px"><div style="font-size:30px;font-weight:800;letter-spacing:-1.5px;color:var(--ac)">77</div><div style="color:var(--tx2);font-size:14px;margin-top:3px">Komedi &amp; Tepki</div></div>
+        <div class="card" style="padding:20px"><div style="font-size:30px;font-weight:800;letter-spacing:-1.5px;color:var(--ac)">73</div><div style="color:var(--tx2);font-size:14px;margin-top:3px">Kamera &amp; Deklanşör</div></div>
+        <div class="card" style="padding:20px"><div style="font-size:30px;font-weight:800;letter-spacing:-1.5px;color:var(--ac)">72</div><div style="color:var(--tx2);font-size:14px;margin-top:3px">Tuş &amp; Tık</div></div>
+        <div class="card" style="padding:20px"><div style="font-size:30px;font-weight:800;letter-spacing:-1.5px;color:var(--ac)">67</div><div style="color:var(--tx2);font-size:14px;margin-top:3px">Impact &amp; Vuruş</div></div>
+        <div class="card" style="padding:20px"><div style="font-size:30px;font-weight:800;letter-spacing:-1.5px;color:var(--ac)">+7</div><div style="color:var(--tx2);font-size:14px;margin-top:3px">koleksiyon daha</div></div>
+      </div>
+      <p class="gnot"><b style="color:var(--tx2)">✦ Smart SFX 2.0:</b> altyazındaki vurgu anlarını yerelde bulur; uygun sesi, güven puanını ve alternatiflerini gösterir. İstersen hazır önerilerin hepsini tek seferde timeline'a ekler.</p>
+    </div>
+
+    <p class="gnot">Ayrıca <b style="color:var(--tx2)">290 preset</b> — 12 yerleşik + 278 efektlik Suflo Smooth paketi (shake, slide, zoom, transition, look). 17 altyazı stilinin 51 oran dosyası lisansı etkinleştirdiğin an otomatik iner; yeni içeriklerde paketi baştan indirmen gerekmez. <b style="color:var(--tx2)">Hepsi tek ödemeye dahil.</b></p>
+  </div>
+</section>
+
+<!-- ================= KARSILASTIRMA ================= -->
+<section id="karsilastirma">
+  <div class="wrap">
+    <div class="shead">
+      <span class="eyebrow">Karşılaştırma</span>
+      <h2>Neden Suflo?</h2>
+      <p class="lead">Asıl rakip başka bir eklenti değil — Premiere'in zaten sende olan aracı. Farkı satır satır görelim.</p>
+    </div>
+    <div class="tabw">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Premiere'in<br>kendi aracı</th>
+            <th class="hi">Suflo<br>Ücretsiz</th>
+            <th class="hi">Suflo<br>Pro</th>
+            <th>Abonelikli<br>araçlar</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th>Türkçe altyazı</th><td class="n">yok</td><td class="hi y">✓</td><td class="hi y">✓</td><td class="y">✓</td></tr>
+          <tr><th>Azerice altyazı</th><td class="n">yok</td><td class="hi y">✓</td><td class="hi y">✓</td><td class="n">çoğunda yok</td></tr>
+          <tr><th>Desteklenen dil</th><td>18</td><td class="hi">99</td><td class="hi">99</td><td>değişken</td></tr>
+          <tr><th>Ücret</th><td>Premiere aboneliği</td><td class="hi">0 ₺</td><td class="hi">749 ₺ + KDV, tek ödeme</td><td>aylık abonelik</td></tr>
+          <tr><th>Kredi / dakika limiti</th><td class="y">yok</td><td class="hi y">yok</td><td class="hi y">yok</td><td class="n">var</td></tr>
+          <tr><th>Video buluta çıkıyor mu?</th><td class="y">hayır</td><td class="hi y">hayır</td><td class="hi y">hayır</td><td class="n">evet</td></tr>
+          <tr><th>İnternetsiz çalışma</th><td class="n">hayır</td><td class="hi y">✓</td><td class="hi y">✓</td><td class="n">hayır</td></tr>
+          <tr><th>Kaynak kodu açık</th><td class="n">hayır</td><td class="hi y">MIT</td><td class="hi y">MIT çekirdek</td><td class="n">hayır</td></tr>
+          <tr><th>Otomatik sessizlik kesimi</th><td class="n">yok</td><td class="n">—</td><td class="hi y">✓</td><td>bazısında</td></tr>
+          <tr><th>Dolgu sesi (ııı/eee) ve tekrar temizliği</th><td class="n">yok</td><td class="n">—</td><td class="hi y">✓</td><td>bazısında</td></tr>
+          <tr><th>Kesim geçişleri (eklentisiz)</th><td class="n">yok</td><td class="n">—</td><td class="hi y">13</td><td class="n">ayrı satılır</td></tr>
+          <tr><th>YouTube bölümleri</th><td class="n">yok</td><td class="hi y">✓</td><td class="hi y">✓ + AI başlık</td><td>bazısında</td></tr>
+          <tr><th>Punch-in zoom · ritim marker</th><td class="n">yok</td><td class="n">—</td><td class="hi y">✓</td><td>bazısında</td></tr>
+          <tr><th>Hazır animasyon &amp; SFX</th><td class="n">yok</td><td class="n">—</td><td class="hi y">242 + 1.076</td><td class="n">ayrı satılır</td></tr>
+          <tr><th>Ömür boyu güncelleme</th><td>—</td><td class="hi y">✓</td><td class="hi y">✓</td><td class="n">abonelik bitince durur</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tabnot">Premiere'in desteklediği dil listesi Adobe'un resmî dokümantasyonuna dayanır. Abonelikli araçlar kategorisi genel piyasa durumunu tarif eder; ürünler arasında farklılık gösterebilir.</p>
+  </div>
+</section>
+
+<!-- ================= FIYAT ================= -->
+<section id="fiyat" style="background:var(--bg2);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)">
+  <div class="wrap">
+    <div class="shead" style="text-align:center">
+      <span class="eyebrow">Fiyat</span>
+      <h2>Ücretsiz başla.<br>İstersen bir kere öde.</h2>
+      <p class="lead" style="margin-left:auto;margin-right:auto">Altyazı için ödeme yok. Pro, kurgunun geri kalanını otomatikleştiren isteğe bağlı katman.</p>
+    </div>
+
+    <div class="fiyat">
+      <div class="plan">
+        <div class="ad">Suflo</div>
+        <div class="pfiyat"><span class="b">0 ₺</span><em>sonsuza dek</em></div>
+        <p class="psub">Açık kaynak · MIT lisansı · kayıt gerekmez</p>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>Sınırsız</b> Türkçe ve Azerice altyazı</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>99 dil · yerel yapay zekâ · internetsiz</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Satır satır düzenleme · terim sözlüğü</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>SRT · VTT · ASS · TXT dışa aktarma</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>3.770 emojili seçici · otomatik emoji</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>YouTube bölümleri</b> + başlık, açıklama, etiket</span></li>
+        </ul>
+        <a class="btn btn-s" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir</a>
+        <p class="pmicro">Kayıt yok · kart yok · indir ve çalıştır</p>
+      </div>
+
+      <div class="plan pro">
+        <div class="rozet">ERKEN ERİŞİM</div>
+        <div class="ad">Suflo Pro</div>
+        <div class="pfiyat"><s>1.249 ₺</s><span class="b">749 ₺</span><em>tek ödeme</em></div>
+        <p class="psub"><b>500 ₺ indirim</b> · erken erişim fiyatı · <span class="kdv">+ KDV</span></p>
+        <p class="erken-bitis" id="erken-bitis" hidden></p>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Ücretsiz sürümdeki <b>her şey</b></span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Otomatik sessizlik kesimi · punch-in zoom · ritim</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>Konuşmadan kes</b> · 13 geçiş · sahne algılama</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>Viral anlar</b> → tek tıkla 9:16 Shorts sekansları · kanca başlığı</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>Sesi iyileştir</b> (−14 LUFS) · B-roll önerileri</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>242 benzersiz animasyon</b> (35 buton dahil) · 290 preset</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>1.076 ses efekti</b> + Smart SFX 2.0</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>29 altyazı stili</b> · 17 MOGRT + 12 Suflo animasyonlu</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span><b>30 hareketli zemin</b> · otomatik içerik güncelleme</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Toplu klip · çeviri · stilli ASS</span></li>
+        </ul>
+        <a class="btn btn-p lemonsqueezy-button" href="https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?checkout%5Bcustom%5D%5Bsource%5D=suflo_website&amp;checkout%5Bcustom%5D%5Bfeature%5D=pricing&amp;checkout%5Bcustom%5D%5Bapp_version%5D=3.0.0">Pro'yu al — 749 ₺</a>
+        <p class="psosyal"><span class="nokta"></span><b>75+ içerik üreticisi</b> Suflo Pro'yu seçti</p>
+        <p class="pmicro">Güvenli ödeme · tek ödeme · abonelik yok · ömür boyu güncelleme</p>
+        <p class="pmicro pnot">KDV ödeme sayfasında ülkene göre eklenir (Türkiye %20 → toplam ≈ 899 ₺). Dijital ürün olduğu için iade yapılmaz — almadan önce ücretsiz sürümü sınırsız dene.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SSS ================= -->
+<section id="sss">
+  <div class="wrap">
+    <div class="shead" style="text-align:center">
+      <span class="eyebrow">Sık sorulanlar</span>
+      <h2>Kısa cevaplar.</h2>
+    </div>
+    <div class="sss">
+      <details open><summary>Gerçekten tamamen ücretsiz mi, şartı ne?</summary><p>Şartı yok. Altyazı çekirdeği MIT lisanslı açık kaynak — <a href="https://github.com/sametcreates/suflo">kodun tamamı GitHub'da</a>, istersen kendin derleyebilirsin. Yapay zekâ senin bilgisayarında çalıştığı için sunucu maliyeti yok, o yüzden ücretsiz kalabiliyor. Kredi, dakika limiti veya kayıt istemez.</p></details>
+      <details><summary>Videolarım buluta yükleniyor mu?</summary><p>Varsayılan olarak hayır. Suflo Altyazı Motoru önce bilgisayarındaki yerel çekirdeği kullanır; ses cihazından çıkmaz ve internet olmadan çalışır. Ayarlardan isteğe bağlı bulut yedeği açtıysan yalnız yerel çekirdek başarısız olduğunda ses seçtiğin sağlayıcıya gider. Çeviri ve isteğe bağlı AI metin kontrolü yalnız altyazı metnini gönderir.</p></details>
+      <details><summary>Adobe Premiere neden Türkçe altyazı yapamıyor?</summary><p>Premiere'in "Konuşmayı Metne Dönüştür" özelliği 18 dil destekliyor ve Adobe'un resmî listesinde Türkçe de Azerice de yok. Bu bir ayar meselesi değil, motorun desteklemediği bir dil. Suflo bu boşluğu Whisper modeliyle doldurur.</p></details>
+      <details><summary>Hangi Premiere sürümü gerekiyor?</summary><p>Adobe Premiere Pro 2020 (sürüm 14.4) ve üstü. Windows ve macOS'ta çalışır. Apple Silicon'da Metal, NVIDIA kartlarda CUDA hızlandırma otomatik açılır — GPU yoksa da CPU ile çalışır, sadece daha yavaş olur.</p></details>
+      <details><summary>Kurulumu zor mu?</summary><p>Hayır, iki dakika. ZIP'i indir, aç, kur dosyasına çift tıkla (Windows'ta <code>Suflo-Kur.bat</code>, Mac'te <code>Suflo-Kur.command</code>). Premiere'i yeniden başlat, <b>Window &gt; Extensions &gt; Suflo</b> menüsünden paneli aç. ZXP Installer gibi ek bir programa gerek yok.</p></details>
+      <details><summary>Demo sürümü var mı?</summary><p>Demoya gerek yok: ücretsiz sürüm kısıtlı bir deneme değil, tam ve sınırsız araçtır. Türkçe altyazı, düzenleme ve dışa aktarma sonsuza dek bedava. Pro yalnızca otomatik kesim, animasyon ve ses kütüphanesi gibi hızlandıran katmanı ekler — yani önce ücretsizini kullan, ihtiyaç duyarsan geç.</p></details>
+      <details><summary>Pro abonelik mi, tek ödeme mi?</summary><p>Tek ödeme. Bir kez ödersin, ömür boyu senindir. Güncellemeler ve sürüm çıktıkça eklenen yeni içerikler dahildir. Aylık ücret, dakika limiti veya otomatik yenileme yok.</p></details>
+      <details><summary>Fiyata KDV dahil mi? İade var mı?</summary><p>749 ₺ fiyata KDV dahil değildir; ödeme sayfasında bulunduğun ülkeye göre eklenir (Türkiye'de %20, toplam yaklaşık 899 ₺). Suflo Pro dijital içeriktir: lisansı etkinleştirdiğin an tüm animasyonlar, ses efektleri ve presetler bilgisayarına iner. Bu yüzden iade yapılmaz. Karar vermeden önce ücretsiz sürümü sınırsız kullanabilir, panelde Pro özelliklerinin canlı önizlemelerine bakabilirsin.</p></details>
+      <details><summary>Bilgisayar değiştirirsem lisansım ne olur?</summary><p>Lisansın kişiseldir ve seninle taşınır. Eski bilgisayarda Ayarlar bölümünden bu makinede devre dışı bırakırsın, yeni bilgisayarda aynı anahtarla etkinleştirirsin. <a href="/hesap.html">Lisans yönetimi sayfası</a> üzerinden de yapabilirsin.</p></details>
+      <details><summary>Bilgisayarım yavaş, çalışır mı?</summary><p>Beş model seçeneği var; en küçüğü 32 MB ve zayıf bilgisayarlarda da çalışır (doğruluk biraz düşer). Acelen varsa ücretsiz bir Groq bulut anahtarıyla bulut moduna geçebilirsin — dakikalar değil saniyeler sürer.</p></details>
+      <details><summary>Pro içerikleri nasıl geliyor?</summary><p>Lisansı etkinleştirdiğin an panel içerikleri güvenli içerik bulutundan otomatik indirir. Elle dosya taşıman gerekmez. Yeni içerik eklendiğinde yalnızca değişenler iner, paketi baştan indirmezsin.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= KURULUM ================= -->
+<section id="kurulum" style="background:var(--bg3);border-top:1px solid var(--line2)">
+  <div class="wrap">
+    <div class="shead">
+      <span class="eyebrow">Kurulum</span>
+      <h2>İki dakika, üç adım.</h2>
+    </div>
+    <div class="kur">
+      <div class="card">
+        <h3>🪟 Windows</h3>
+        <ol>
+          <li><a href="https://github.com/sametcreates/suflo/releases/latest" style="color:var(--ac);text-decoration:underline;text-underline-offset:3px">Kurulum ZIP'ini indir</a> ve klasöre çıkar.</li>
+          <li><code>Suflo-Kur.bat</code> dosyasına çift tıkla.</li>
+          <li>Premiere'i yeniden başlat → <b>Window &gt; Extensions &gt; Suflo</b>.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>🍎 macOS</h3>
+        <ol>
+          <li><a href="https://github.com/sametcreates/suflo/releases/latest" style="color:var(--ac);text-decoration:underline;text-underline-offset:3px">Kurulum ZIP'ini indir</a> ve klasöre çıkar.</li>
+          <li><code>Suflo-Kur.command</code> dosyasına çift tıkla (gerekirse sağ tık → Aç).</li>
+          <li>Premiere'i yeniden başlat → <b>Window &gt; Extensions &gt; Suflo</b>.</li>
+        </ol>
+      </div>
+    </div>
+    <p class="gnot">Yerel yapay zekâ motoru ve ffmpeg ilk çalıştırmada panelden tek tıkla kurulur — ayrıca bir şey indirmen gerekmez. Bir şey ters giderse <b style="color:var(--tx2)">Suflo Doctor</b> paneldeki tek taramayla Premiere bağlantısını, FFmpeg'i, motoru ve içerikleri denetler; güvenli onarım seçenekleri sunar.</p>
+  </div>
+</section>
+
+<!-- ================= KAPANIS ================= -->
+<section class="son">
+  <div class="wrap">
+    <h2>Ücretsiz. Sınırsız.<br>Şimdi indir.</h2>
+    <p class="lead">İndir, Premiere'i aç, klibi seç. Gerisini Suflo halleder.</p>
+    <div class="cta-row">
+      <a class="btn btn-p" href="https://github.com/sametcreates/suflo/releases/latest">Ücretsiz indir <small>· kayıt yok</small></a>
+      <a class="btn btn-s lemonsqueezy-button" href="https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?checkout%5Bcustom%5D%5Bsource%5D=suflo_website&amp;checkout%5Bcustom%5D%5Bfeature%5D=footer&amp;checkout%5Bcustom%5D%5Bapp_version%5D=3.0.0">Pro'yu al — 749 ₺</a>
+    </div>
+    <p class="micro">Kart gerekmiyor. Kaydolmana gerek yok. İndir ve çalıştır.</p>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap">
+    <div class="fgrid">
+      <div class="fabout">
+        <a class="logo" href="#"><svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="18" height="18" rx="5" fill="url(#lg)"/><path d="M13.9 7.2C13.5 5.5 11.9 4.7 10 4.7 8 4.7 6.3 5.5 6.3 7.1c0 3.6 7.4 2 7.4 5.8 0 1.6-1.7 2.4-3.7 2.4-1.9 0-3.5-.8-3.9-2.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg> Suflo</a>
+        <p>Adobe Premiere Pro için Türkçe altyazı eklentisi. Açık kaynak, MIT lisanslı. <b style="color:var(--tx2)">sametcreates</b> tarafından geliştiriliyor.</p>
+      </div>
+      <div>
+        <h4>Ürün</h4>
+        <ul>
+          <li><a href="https://github.com/sametcreates/suflo/releases/latest">İndir</a></li>
+          <li><a href="#pro">Suflo Pro</a></li>
+          <li><a href="#fiyat">Fiyat</a></li>
+          <li><a href="https://github.com/sametcreates/suflo/releases">Sürüm notları</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Kaynaklar</h4>
+        <ul>
+          <li><a href="#kurulum">Kurulum</a></li>
+          <li><a href="/blog/">Blog</a></li>
+          <li><a href="#sss">SSS</a></li>
+          <li><a href="/hesap.html">Lisans yönetimi</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Proje</h4>
+        <ul>
+          <li><a href="https://github.com/sametcreates/suflo">GitHub</a></li>
+          <li><a href="https://github.com/sametcreates/suflo/issues">Sorun bildir</a></li>
+          <li><a href="https://instagram.com/sametcreates">Instagram</a></li>
+          <li><a href="https://opensource.org/licenses/MIT">MIT lisansı</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="falt">
+      <span>© 2026 Suflo · sametcreates</span>
+      <span>Çerez yok · takip yok · anonim analitik</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  // --- Kaydirinca belirme ---
+  // IntersectionObserver bazi ortamlarda callback vermiyor; bu yuzden
+  // olcum getBoundingClientRect ile yapiliyor (her yerde calisir) ve
+  // ayrica 2.5 sn'lik emniyet kilidi her seyi gorunur kiliyor: JS takilsa
+  // bile sayfa asla bos kalmaz.
+  var azHareket = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!azHareket) {
+    var hedefler = [].slice.call(document.querySelectorAll('.trust span, .shead, .vs .card, .adim, .blok > div, .metrik > div, .pk, .sek, .galeri, .tabw, .tabnot, .plan, .sss details, .kur .card, .son .wrap > *, .liste, .gnot'));
+    hedefler.forEach(function (el, i) {
+      el.classList.add('gel');
+      var k = i % 6; if (k) el.classList.add('g' + k);
+    });
+    var bekleyen = hedefler.slice();
+
+    function ac(el) {
+      el.classList.add('gorundu');
+      if (el.querySelectorAll) {
+        [].forEach.call(el.querySelectorAll('.n, [data-say]'), function (s) {
+          if (!s.dataset.sayildi) sayac(s);
+        });
+      }
+      if ((el.classList.contains('n') || el.hasAttribute('data-say')) && !el.dataset.sayildi) sayac(el);
+    }
+    function kontrol() {
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      for (var i = bekleyen.length - 1; i >= 0; i--) {
+        var r = bekleyen[i].getBoundingClientRect();
+        // r.bottom > 0 sarti YOK: hizli kaydirmada ustte kalan ogeler de acilsin,
+        // yoksa atlanan bolumler kalici gizli kaliyordu.
+        if (r.top < vh * 0.92) { ac(bekleyen[i]); bekleyen.splice(i, 1); }
+      }
+    }
+    // rAF'e BAGLANMA: sekme arka plana atilinca rAF duruyor ve bayrak
+    // kalici takiliyordu -> belirme tamamen duruyordu. Zaman damgali
+    // throttle takilamaz.
+    var sonKontrol = 0;
+    function planla() {
+      var t = Date.now();
+      if (t - sonKontrol < 60) return;
+      sonKontrol = t;
+      kontrol();
+    }
+    window.addEventListener('scroll', planla, { passive: true });
+    window.addEventListener('resize', planla);
+    window.addEventListener('load', planla);
+    kontrol();
+    // Kaydirma olaylari bazi tarayici/ortamlarda duzensiz geliyor.
+    // Dusuk frekansli yoklama garanti saglar; is bitince kendini kapatir.
+    var yoklama = setInterval(function () {
+      kontrol();
+      if (!bekleyen.length) clearInterval(yoklama);
+    }, 220);
+    // EMNIYET: ne olursa olsun her sey gorunsun
+    setTimeout(function () {
+      hedefler.forEach(function (el) { el.classList.add('gorundu'); });
+    }, 2500);
+
+    // --- Metrik sayilari sayarak gelsin ---
+    function sayac(el) {
+      el.dataset.sayildi = '1';
+      var ham = el.textContent.trim();
+      var m = ham.match(/^([\d.]+)(.*)$/);
+      if (!m) return;
+      var noktali = m[1].indexOf('.') > -1;
+      var hedef = parseInt(m[1].split('.').join(''), 10);
+      if (isNaN(hedef)) return;
+      var sonek = m[2], baslangic = null;
+      function bicim(x) {
+        var s = String(x);
+        return noktali ? s.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : s;
+      }
+      function adim(t) {
+        if (baslangic === null) baslangic = t;
+        var o = Math.min((t - baslangic) / 950, 1);
+        var e = 1 - Math.pow(1 - o, 3);
+        el.textContent = bicim(Math.round(hedef * e)) + sonek;
+        if (o < 1) requestAnimationFrame(adim);
+      }
+      requestAnimationFrame(adim);
+    }
+
+    // --- Basliklar kelime kelime acilsin ---
+    // Metin JS ile kelimelere sarilir; JS calismazsa baslik duz metin olarak
+    // gorunur kalir (asla bos sayfa riski yok). .ac gibi ic elemanlar tek
+    // parca halinde sarilir ki gradyanlari bozulmasin.
+    function parcala(el) {
+      if (el.dataset.parcalandi) return;
+      el.dataset.parcalandi = '1';
+      var gecikme = 0, adimMs = 50;
+      function sar(icerik) {
+        var w = document.createElement('span'); w.className = 'w';
+        var wi = document.createElement('span'); wi.className = 'wi';
+        if (typeof icerik === 'string') wi.textContent = icerik;
+        else wi.appendChild(icerik);
+        wi.style.transitionDelay = (gecikme / 1000) + 's';
+        gecikme += adimMs;
+        w.appendChild(wi);
+        return w;
+      }
+      var eski = [].slice.call(el.childNodes);
+      el.textContent = '';
+      eski.forEach(function (n) {
+        if (n.nodeType === 3) {
+          n.textContent.split(/(\s+)/).forEach(function (p) {
+            if (!p) return;
+            if (/^\s+$/.test(p)) el.appendChild(document.createTextNode(' '));
+            else el.appendChild(sar(p));
+          });
+        } else if (n.nodeName === 'BR') { el.appendChild(n); }
+        else { el.appendChild(sar(n)); }
+      });
+    }
+    try {
+      [].forEach.call(document.querySelectorAll('.shead h2, .son h2'), function (h) {
+        h.classList.add('split'); parcala(h);
+      });
+      var h1 = document.querySelector('.hero h1');
+      if (h1) {
+        h1.classList.add('kelimeli');
+        parcala(h1);
+        setTimeout(function () { h1.classList.add('oynat'); }, 250);
+      }
+    } catch (eS) {}
+
+    // --- Panel karti: giris animasyonu bitince tilt devralir ---
+    var kart = document.querySelector('.panel-shot');
+    if (kart) {
+      kart.addEventListener('animationend', function (ev) {
+        if (ev.animationName === 'girisAnim') kart.classList.add('sabit');
+      });
+      if (window.matchMedia && matchMedia('(pointer:fine)').matches) {
+        var sahne = document.querySelector('.panel-sahne') || kart;
+        sahne.addEventListener('mousemove', function (e) {
+          if (!kart.classList.contains('sabit')) return;
+          var r = kart.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          var x = (e.clientX - r.left) / r.width - .5;
+          var y = (e.clientY - r.top) / r.height - .5;
+          kart.style.transform = 'perspective(1100px) rotateY(' + (x * 5).toFixed(2) + 'deg) rotateX(' + (-y * 3.5).toFixed(2) + 'deg)';
+        });
+        sahne.addEventListener('mouseleave', function () { kart.style.transform = ''; });
+      }
+    }
+  }
+
+  // --- Okuma cizgisi ---
+  var okuma = document.getElementById('okuma');
+  function okumaGuncelle() {
+    if (!okuma) return;
+    var d = document.documentElement;
+    var y = window.pageYOffset || d.scrollTop || 0;
+    var max = (d.scrollHeight - d.clientHeight) || 1;
+    okuma.style.transform = 'scaleX(' + Math.min(y / max, 1) + ')';
+  }
+  window.addEventListener('scroll', okumaGuncelle, { passive: true });
+  window.addEventListener('resize', okumaGuncelle);
+  okumaGuncelle();
+
+  // Kutuphane sekmeleri
+  var btns = document.querySelectorAll('.sek button');
+  var grid = {captions:'g-captions', mogrt:'g-mogrt', buton:'g-buton', mbg:'g-mbg', sfx:'g-sfx'};
+  btns.forEach(function(b){
+    b.addEventListener('click', function(){
+      btns.forEach(function(x){ x.classList.remove('on'); x.setAttribute('aria-selected','false'); });
+      b.classList.add('on'); b.setAttribute('aria-selected','true');
+      Object.keys(grid).forEach(function(k){
+        var el = document.getElementById(grid[k]);
+        if (el) el.hidden = (k !== b.dataset.g);
+      });
+    });
+  });
+  [].forEach.call(document.querySelectorAll('.galeri video'), function(video){
+    var figure = video.closest('figure');
+    function play(){ var p = video.play(); if (p && p.catch) p.catch(function(){}); }
+    function stop(){ try { video.pause(); video.currentTime = 0; } catch(e){} }
+    if (figure) {
+      figure.addEventListener('mouseenter', play);
+      figure.addEventListener('mouseleave', stop);
+      figure.addEventListener('focusin', play);
+      figure.addEventListener('focusout', stop);
+    }
+  });
+  // Canli surum numarasi (GitHub'dan)
+  try {
+    fetch('https://api.github.com/repos/sametcreates/suflo/releases/latest')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if (d && d.tag_name) {
+          var el = document.getElementById('surum');
+          if (el) el.textContent = d.tag_name;
+          var dv = document.getElementById('duyuru-ver');
+          if (dv) dv.textContent = d.tag_name;
+        }
+      }).catch(function(){});
+  } catch(e){}
+  // Erken erisim geri sayimi: v3.0.0 yayinindan 7 gun sonra biter.
+  // Sure dolunca kutu kendiliginden gizlenir (fiyat Lemon'da elle guncellenir).
+  try {
+    var eb = document.getElementById('erken-bitis');
+    if (eb) fetch('https://api.github.com/repos/sametcreates/suflo/releases/tags/v3.0.0')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        var t = d && Date.parse(d.published_at);
+        if (!t) return;
+        var bitis = t + 7 * 864e5, kalan = bitis - Date.now();
+        if (kalan <= 0) return;
+        var tarih = new Date(bitis).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
+        var gun = Math.ceil(kalan / 864e5);
+        eb.innerHTML = '⏳ Erken erişim fiyatı <b>' + tarih + '</b> tarihinde bitiyor' +
+          (gun <= 1 ? ' — <b>son gün</b>' : ' — <b>' + gun + ' gün</b> kaldı') + '. Sonra 1.249 ₺.';
+        eb.hidden = false;
+      }).catch(function(){});
+  } catch(e){}
+})();
+</script>
+
+<!--
+  Cloudflare Web Analytics — cerez YOK, kisisel veri YOK. Yalniz kac kisi
+  geldigini, hangi ulkeden ve hangi siteden geldiklerini sayar. Token gizli
+  degildir: herkese acik sayfada durur, tek islevi olcumu bu siteye baglamaktir.
+  Yalnizca suflo.app'te yuklenir; yerel onizleme istatistikleri sismesin.
+-->
+<script>
+(function () {
+  if (location.hostname !== "suflo.app") return;
+  var s = document.createElement("script");
+  s.defer = true;
+  s.src = "https://static.cloudflareinsights.com/beacon.min.js";
+  s.setAttribute("data-cf-beacon", '{"token": "0e9cbe24552b412d8b1b6e4d34abe34f"}');
+  document.body.appendChild(s);
+})();
+</script>
 </body>
 </html>
