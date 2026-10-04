@@ -19,6 +19,8 @@ window.KViral = (function () {
   var bulSure = { minDur: 20, maxDur: 60 };
   // In/Out en son hangi karttan ayarlandi (kenar kayinca In/Out canli guncellenir)
   var sonInOutId = null;
+  // her basarili aramada artar: canli sekans sorgusu surerken biten aramayi ayirt eder
+  var aramaNesli = 0;
   // id -> kart ogesi; id -> [{ b, kenar, yon }] (komsu kart kayinca yalniz dugme durumlari tazelenir)
   var kartlar = {}, kenarDugmeleri = {};
 
@@ -114,10 +116,12 @@ window.KViral = (function () {
     });
   }
 
+  // Cakisma yalniz EKRANDAKI kartlarla denetlenir: "Yalnız ≥60" ile gizlenen an, gorunen
+  // kartin kenarini sebebi gorunmeden kilitlemesin (marker ve Shorts da yalniz gorunenleri kullanir)
   function kenarAyar(a) {
     return {
       hardMin: 5, hardMax: 180, minDur: bulSure.minDur, maxDur: bulSure.maxDur,
-      others: anlar.filter(function (o) { return o.id !== a.id; })
+      others: gorunenler().filter(function (o) { return o.id !== a.id; })
     };
   }
 
@@ -300,9 +304,26 @@ window.KViral = (function () {
     var a = null;
     gorunenler().forEach(function (x) { if (x.id === id) a = x; });
     if (!eski || !a || !eski.parentNode) { render(); return; }
+    // odak bu kartin bir kenar dugmesindeyse yeni kartta ayni dugmeye gecer (klavyeyle art arda ±1)
+    var odak = null, aktif = document.activeElement;
+    (kenarDugmeleri[id] || []).forEach(function (d) { if (aktif && d.b === aktif) odak = d; });
     var yeni = kart(a);
     eski.parentNode.replaceChild(yeni, eski);
     kartlar[id] = yeni;
+    if (odak) kenarOdakla(id, odak.kenar, odak.yon);
+  }
+
+  // Ayni dugme artik kapaliysa ayni kenarin ters yonu, sonra diger kenarin dugmeleri
+  function kenarOdakla(id, kenar, yon) {
+    var obur = kenar === "start" ? "end" : "start";
+    var sira = [[kenar, yon], [kenar, -yon], [obur, yon], [obur, -yon]];
+    var dugmeler = kenarDugmeleri[id] || [];
+    for (var i = 0; i < sira.length; i++) {
+      for (var j = 0; j < dugmeler.length; j++) {
+        var d = dugmeler[j];
+        if (d.kenar === sira[i][0] && d.yon === sira[i][1] && !d.b.disabled) { d.b.focus(); return; }
+      }
+    }
   }
 
   // Bir kart kayinca digerlerinin cakisma durumu degisir: onlari yeniden cizmeden dugmelerini tazele
@@ -318,18 +339,35 @@ window.KViral = (function () {
 
   /* ---------------- kart eylemleri ---------------- */
 
-  function baskaSekansta() {
-    var simdiki = String(KApp.ctx().sequenceId || "");
+  /*
+   * Premiere'deki etkin sekans, CANLI sorgu. KApp.ctx() yalnız panel odaktayken 2,5 sn'de
+   * bir tazelenir: kullanıcı Premiere'de sekans değiştirip hemen panele dönerse eski kalır.
+   * KS_setInOut ve KS_makeShorts kimlik denetlemeden ETKİN sekansa yazar, bu yüzden
+   * denetim bayat bağlamla yapılmaz. Döner: sekans kimliği ("" = sekans yok), sorgu
+   * başarısızsa null.
+   */
+  async function etkinSekans() {
+    var c = await K.call("KS_getContext", undefined, 20000);
+    return c && c.ok ? String(c.sequenceId || "") : null;
+  }
+
+  // Anlar başka bir sekansta mı bulundu (canlı sorgu; sorgu başarısızsa son bilinen bağlam)
+  async function baskaSekansta() {
+    var simdiki = await etkinSekans();
+    if (simdiki === null) simdiki = String(KApp.ctx().sequenceId || "");
     return !!(bulSekans && simdiki && simdiki !== bulSekans);
   }
 
   async function onizle(id) {
-    var k = indeks(id);
-    if (k < 0) return;
-    if (baskaSekansta()) {
+    if (indeks(id) < 0) return;
+    var nesil = aramaNesli;
+    if (await baskaSekansta()) {
       durum("Viral anlar başka bir sekansta bulundu: o sekansı açıp tekrar dene (ya da anları yeniden bul).", "warn");
       return;
     }
+    // sorgu surerken yeni arama bitmis olabilir (id'ler 1'den yeniden baslar): eski karta ait tiklama
+    var k = indeks(id);
+    if (k < 0 || nesil !== aramaNesli) return;
     var a = anlar[k];
     var r = await K.call("KS_setInOut", { start: a.start, end: a.end });
     if (r.ok) {
@@ -345,16 +383,24 @@ window.KViral = (function () {
     if (!yeni) {
       // kart cizildikten sonra komsu kart buyumus olabilir: durumu tazele
       kartiYenile(id);
-      durum("Bu kenar daha fazla kaydırılamaz: başka bir anla çakışır ya da 5–180 sn sınırını aşar.", "warn");
+      durum("Bu kenar daha fazla kaydırılamaz: başka bir anla çakışır, 5–180 sn sınırını aşar ya da cümle ortasına düşer.", "warn");
       return;
     }
     anlar[k] = yeni;
     durum("");
     kartiYenile(id);
     kenarlariTazele(id);
-    // In/Out bu karttan ayarlandiysa ve hala ayni sekanstaysak canli guncelle
-    if (sonInOutId === id && bulSekans && String(KApp.ctx().sequenceId || "") === bulSekans) {
-      var r = await K.call("KS_setInOut", { start: yeni.start, end: yeni.end });
+    // In/Out bu karttan ayarlandiysa ve Premiere'de (canli sorgu) hala ayni sekans aciksa guncelle
+    if (sonInOutId === id && bulSekans) {
+      var simdiki = await etkinSekans();
+      // sorgu surerken yeni arama ya da baska kaydirma olmus olabilir: en guncel kenarlar
+      var k2 = indeks(id);
+      if (sonInOutId !== id || k2 < 0) return;
+      if (simdiki !== bulSekans) {
+        if (simdiki) durum("In/Out güncellenmedi: Premiere'de başka bir sekans açık.", "warn");
+        return;
+      }
+      var r = await K.call("KS_setInOut", { start: anlar[k2].start, end: anlar[k2].end });
       if (!r.ok) durum("✕ " + r.error, "bad");
     }
   }
@@ -394,10 +440,12 @@ window.KViral = (function () {
         messages: [{ role: "system", content: p.system }, { role: "user", content: p.user }]
       });
       var content = json.choices && json.choices[0] && json.choices[0].message.content;
-      var bulunan = HL.parseResponse(content, segs, { minDur: s.minDur, maxDur: s.maxDur, adim: p.adim });
+      // istenen adetten fazlasi donerse puani en yuksek o kadar an kalir
+      var bulunan = HL.parseResponse(content, segs, { minDur: s.minDur, maxDur: s.maxDur, adim: p.adim, adet: o.adet });
       if (!bulunan.length) throw new Error("Uygun an bulunamadı — süreyi değiştirip tekrar dene.");
       // basarili arama: tum durum birlikte degisir (hata olursa onceki sonuclar bozulmadan kalir)
       anlar = bulunan.map(function (a, i) { a.id = i + 1; a.kancaNo = 0; return a; });
+      aramaNesli++;
       bulSegsTemiz = temiz;
       bulSure = s;
       bulSegs = segsHam;
@@ -451,17 +499,17 @@ window.KViral = (function () {
   // Ekrandaki her an icin alt sekans (+ istege bagli 9:16 Auto Reframe), "Suflo Shorts" kutusunda
   async function shortsOlustur() {
     if (!anlar.length || busy) return;
-    if (baskaSekansta()) {
-      durum("Viral anlar başka bir sekansta bulundu: o sekansı açıp tekrar dene (ya da anları yeniden bul).", "warn");
-      return;
-    }
     var dikey = !!(el("cap-vr-dikey") && el("cap-vr-dikey").checked);
     busy = true;
     var btn = el("cap-vr-shorts");
     btn.disabled = true;
-    var liste = gorunenler();
     var yapilan = 0, dikeySay = 0, hatalar = [];
     try {
+      if (await baskaSekansta()) {
+        durum("Viral anlar başka bir sekansta bulundu: o sekansı açıp tekrar dene (ya da anları yeniden bul).", "warn");
+        return;
+      }
+      var liste = gorunenler();
       // Aralik basina ayri cagri: ilerleme gorunur, uzun Auto Reframe tek bir
       // zaman asimina takilip tum isi tekrarlatmaz (cift sekans olusmaz)
       for (var i = 0; i < liste.length; i++) {

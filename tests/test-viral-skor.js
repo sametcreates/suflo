@@ -62,6 +62,12 @@ ok("eski puan 8 → 80, legacy:true", pl.score === 80 && pl.legacy === true && p
 ok("eski puan 11-100 aynen; >100 kırpılır", H.puanla({ score: 72 }).score === 72 && H.puanla({ score: "64" }).score === 64 && H.puanla({ score: 140 }).score === 100);
 var py = H.puanla({});
 ok("puan yok → 50, legacy:true", py.score === 50 && py.legacy === true && H.puanla({ score: null }).score === 50 && H.puanla({ score: "?" }).score === 50);
+// 0-10 olcegi tek kez normalize edilir: cubuklar 10/10/0/10/0 iken toplam 7 (70 degil)
+var zayif = H.puanla({ sub: { hook: 1, standalone: 1, emotion: 0, value: 1, payoff: 0 } });
+ok("puanla: 0-10 ölçeğinde zayıf klip 7 (çift normalize yok), çubuklarla tutarlı", zayif.score === 7 && J(zayif.sub) === J({ hook: 10, standalone: 10, emotion: 0, value: 10, payoff: 0 }) &&
+  zayif.score === W({ hook: 1, standalone: 1, emotion: 0, value: 1, payoff: 0 }), J(zayif));
+ok("puanla: hepsi 1 (0-10) → 10, hepsi ≤1 klip 100 almaz", H.puanla({ sub: { hook: 1, standalone: 1, emotion: 1, value: 1, payoff: 1 } }).score === 10 &&
+  H.puanla({ sub: { hook: 0.9, standalone: 0.8, emotion: 0.7, value: 0.6, payoff: 0.5 } }).score === 8);
 ok("bozuk sub → eski puana düşer", H.puanla({ sub: { hook: "x" }, score: 7 }).score === 70 && H.puanla({ sub: "yüksek", score: 7 }).legacy === true);
 ok("puanBandi: ≥80 iyi, 60-79 orta, <60 zayıf", H.puanBandi(80) === "iyi" && H.puanBandi(100) === "iyi" && H.puanBandi(79) === "orta" && H.puanBandi(60) === "orta" &&
   H.puanBandi(59) === "zayif" && H.puanBandi(0) === "zayif");
@@ -101,6 +107,12 @@ var kw = H.snapEdges(k1, { from: 13, to: 44 }, { minDur: 5, maxDur: 20 });
 ok("snap (k1 kelime modu): ≥0,6 sn duraksama cümle sınırı sayılır", kw.to === 49 && kw.from === 10, J(kw));
 var kisaDurak = H.clean([{ start: 0, end: 1, text: "a" }, { start: 1.5, end: 2.5, text: "b" }, { start: 3.2, end: 4, text: "c" }]);
 ok("duraksama eşiği 0,6 sn (0,5 sınır değil, 0,7 sınır)", !H.cumleBitisi(kisaDurak, 0) && H.cumleBitisi(kisaDurak, 1) && H.cumleBitisi(kisaDurak, 2) && H.cumleBasi(kisaDurak, 0));
+// Model bir satir eksik verdi: from satiri onceki cumlenin kuyrugu ("w5.") -> bir satir ileri, geri 6 sn degil
+var kuyruk = H.clean((function () { var o = []; for (var q = 0; q < 30; q++) o.push({ start: q * 2, end: q * 2 + 1.8, text: "w" + q + ((q + 1) % 3 === 0 ? "." : "") }); return o; })());
+var ky = H.snapEdges(kuyruk, { from: 5, to: 20 }, { minDur: 15, maxDur: 60 });
+ok("snap: from önceki cümlenin kuyruğuysa bir satır ileri (önceki düşünce kancanın önüne geçmez)", ky.from === 6 && ky.to === 20, J(ky));
+var kyKisa = H.snapEdges(kuyruk, { from: 5, to: 11 }, { minDur: 14, maxDur: 60 });
+ok("snap: ileri geçiş minDur'u bozarsa eski kural (geriye cümle başına)", kyKisa.from === 3 && kyKisa.to === 11, J(kyKisa));
 var snapGirdi = { from: 3, to: 9 };
 H.snapEdges(c3, snapGirdi, { minDur: 15, maxDur: 60 });
 ok("snap: girdi değişmez", snapGirdi.from === 3 && snapGirdi.to === 9);
@@ -130,6 +142,13 @@ ok("ayrıştırma: eski biçim (score 7, hook) → 70, legacy, gerekçe = eski h
 var olcek = pr.filter(function (c) { return c.title === "Ölçeksiz"; })[0];
 ok("ayrıştırma: 0-10 alt puanlar → 90", olcek && olcek.score === 90 && olcek.sub.hook === 90);
 ok("ayrıştırma: puana göre sıralı, 0-100", pr.map(function (c) { return c.score; }).join(",") === "90,75,70", pr.map(function (c) { return c.score; }).join(","));
+function altP(v) { return { hook: v, standalone: v, emotion: v, value: v, payoff: v }; }
+var bes = { clips: [{ from: 3, to: 8, title: "p50", sub: altP(50) }, { from: 12, to: 17, title: "p90", sub: altP(90) }, { from: 21, to: 26, title: "p70", sub: altP(70) },
+  { from: 30, to: 35, title: "p80", sub: altP(80) }, { from: 39, to: 44, title: "p60", sub: altP(60) }] };
+var ad3 = H.parseResponse(bes, cumleliSegs(60, 3), { minDur: 15, maxDur: 60, adet: 3 });
+ok("ayrıştırma: adet verilirse en yüksek puanlı adet kadar an (fazlası atılır)", ad3.map(function (c) { return c.title; }).join(",") === "p90,p80,p70", ad3.map(function (c) { return c.title; }).join(","));
+ok("ayrıştırma: adet yoksa sınır yok; adet 3-10'a sıkıştırılır", H.parseResponse(bes, cumleliSegs(60, 3), { minDur: 15, maxDur: 60 }).length === 5 &&
+  H.parseResponse(bes, cumleliSegs(60, 3), { minDur: 15, maxDur: 60, adet: 1 }).length === 3 && H.parseResponse(bes, cumleliSegs(60, 3), { minDur: 15, maxDur: 60, adet: 50 }).length === 5);
 var pdisi = H.parseResponse({ clips: [{ from: 1, to: 9, title: "t", score: 5 }] }, cumleliSegs(60, 3), { minDur: 15, maxDur: 50 });
 ok("ayrıştırma: maxDur'u (%15 içinde) aşan snap disiSure işaretler", pdisi.length === 1 && pdisi[0].to === 11 && pdisi[0].end - pdisi[0].start > 50 && pdisi[0].disiSure === true && pr.every(function (c) { return c.disiSure === false; }), J(pdisi));
 
@@ -148,6 +167,17 @@ var e4 = H.moveEdge(ms, klip, "start", -1, ayar);
 ok("−1 (baş): bir sonraki cümle başına", e4 && e4.from === 6 && e4.to === 8, e4 && J([e4.from, e4.to]));
 ok("girdi değişmez, kopya ayrı nesne (sub/hooks dahil)", J(klip) === dondur && e1 !== klip && e1.sub !== klip.sub && e1.hooks !== klip.hooks && e1.id === 1 && e1.title === "x");
 ok("min/max dışına çıkmak serbest ama disiSure işaretlenir", e2.disiSure === true && e2.end - e2.start < 15 && e1.disiSure === false, J([e1.disiSure, e2.disiSure]));
+// Uzun cumle (noktali transkript): 20 sn icinde sinir yok diye cumle ortasina tek satir adim atilmaz
+var uzun = H.clean(["a", "b.", "c", "d", "e", "f", "g", "h.", "i", "j."].map(function (x, q) { return { start: q * 5, end: q * 5 + 4.6, text: x }; }));
+var ay1 = { hardMin: 1, hardMax: 180, minDur: 15, maxDur: 60, others: [] };
+var u1 = H.moveEdge(uzun, { from: 0, to: 7, start: 0, end: 39.6 }, "end", -1, ay1);
+ok("−1 (son), 30 sn'lik cümle: önceki cümle sonuna (cümle ortasına değil)", u1 && u1.to === 1 && H.cumleBitisi(uzun, u1.to), u1 && u1.to);
+ok("tek cümlelik klipte −1 (baş ve son) → null (düğme kapalı)", H.moveEdge(uzun, { from: 2, to: 7, start: 10, end: 39.6 }, "start", -1, ay1) === null &&
+  H.moveEdge(uzun, { from: 2, to: 7, start: 10, end: 39.6 }, "end", -1, ay1) === null);
+var u2 = H.moveEdge(uzun, { from: 0, to: 1, start: 0, end: 9.6 }, "end", 1, ay1);
+var u3 = H.moveEdge(uzun, { from: 8, to: 9, start: 40, end: 49.6 }, "start", 1, ay1);
+ok("+1 cümle, 30 sn'lik cümle: tam cümle eklenir (uzaklık sınırı yok)", u2 && u2.to === 7 && u3 && u3.from === 2, J([u2 && u2.to, u3 && u3.from]));
+ok("+1 cümle sert üst sınırı aşarsa → null (tek satır yedeği yok)", H.moveEdge(uzun, { from: 0, to: 1, start: 0, end: 9.6 }, "end", 1, { hardMin: 1, hardMax: 30 }) === null);
 var noktasizMs = H.clean(cumleliSegs(60, 1000));
 var tekSatir = H.moveEdge(noktasizMs, { from: 10, to: 14, start: 50, end: 74.6 }, "end", 1, ayar);
 ok("noktalama yoksa tek satır kayar", tekSatir && tekSatir.to === 15, tekSatir && tekSatir.to);

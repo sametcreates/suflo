@@ -1,6 +1,7 @@
 // Suflo testi: Viral Skor 2.0 panel akışı (js/viral.js) — sahte DOM + sahte K/KCaptions ile:
 // ayarların kalıcılığı, istem seçenekleri, kart (halka, alt puan çubukları, kanca seçimi),
-// ±1 cümle düğmeleri (yalnız o kart yenilenir, In/Out canlı), filtre/sıralama, marker ve kopyalama
+// ±1 cümle düğmeleri (yalnız o kart yenilenir, odak korunur, In/Out canlı ve canlı sekans
+// denetimli), gizli anın kenarı kilitlememesi, adet sınırı, filtre/sıralama, marker ve kopyalama
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var KOK = path.join(__dirname, "..");
 var H = require(path.join(KOK, "js", "highlights.js"));
@@ -26,7 +27,9 @@ function Oge(tag, id) {
       this.children[i] = yeni; yeni.parentNode = this; eski.parentNode = null; return eski;
     },
     addEventListener: function (t, fn) { (this._olay[t] = this._olay[t] || []).push(fn); },
-    select: function () {}, focus: function () {}
+    select: function () {},
+    // tarayici gibi: kapali dugme odak almaz
+    focus: function () { if (this._belge && !this.disabled) this._belge.activeElement = this; }
   };
   Object.defineProperty(o, "innerHTML", {
     get: function () { return ""; },
@@ -75,22 +78,28 @@ function ortam(opts) {
   });
   var govdeEl = Oge("body");
   var say = { call: [], toast: [], kaydet: 0, kanca: [], pano: [], chat: [] };
-  var durum = { seq: "seq1", segs: cumleli(60), yanit: opts.yanit, hata: null };
+  // seq: Premiere'deki CANLI etkin sekans (KS_getContext); ctxSeq: KApp.ctx()'in bayat
+  // olabilecek onbellegi (tanimsizsa seq ile ayni)
+  var durum = { seq: "seq1", ctxSeq: undefined, segs: cumleli(60), yanit: opts.yanit, hata: null };
   var ayarlar = opts.ayarlar || {};
+  var belge = {
+    getElementById: function (id) { return ogeler[id] || null; },
+    createElement: function (t) { var o = Oge(t); o._belge = belge; return o; },
+    body: govdeEl, activeElement: govdeEl, execCommand: function () { return true; }
+  };
+  Object.keys(ogeler).forEach(function (id) { ogeler[id]._belge = belge; });
   var win = {
-    document: {
-      getElementById: function (id) { return ogeler[id] || null; },
-      createElement: function (t) { return Oge(t); },
-      body: govdeEl, execCommand: function () { return true; }
-    },
+    document: belge,
     navigator: { clipboard: { writeText: function (t) { say.pano.push(t); return Promise.resolve(); } } },
     // yerlesik nesneler (JSON, Array...) baglamin kendi alemi: disaridan verilirse "instanceof Array" bozulur
     setTimeout: setTimeout,
     K: {
       settings: function () { return ayarlar; }, saveSettings: function () { say.kaydet++; return true; },
       call: function (fn, arg) {
-        say.call.push({ fn: fn, arg: JSON.parse(JSON.stringify(arg)) });
+        say.call.push({ fn: fn, arg: arg === undefined ? undefined : JSON.parse(JSON.stringify(arg)) });
+        if (fn === "KS_getContext") return Promise.resolve({ ok: true, sequenceId: durum.seq, hasSeq: !!durum.seq });
         if (fn === "KS_addRangeMarkers") return Promise.resolve({ ok: true, added: arg.ranges.length });
+        if (fn === "KS_makeShorts") return Promise.resolve({ ok: true, made: 1, vertical: 0, items: [] });
         return Promise.resolve({ ok: true });
       },
       hataYardimi: function (e) { return String(e && e.message || e); }
@@ -107,7 +116,7 @@ function ortam(opts) {
       language: function () { return "tr"; }
     },
     KApp: {
-      ctx: function () { return { sequenceId: durum.seq }; },
+      ctx: function () { return { sequenceId: durum.ctxSeq !== undefined ? durum.ctxSeq : durum.seq }; },
       toast: function (m) { say.toast.push(m); }
     },
     KKanca: { ekle: function (o) { say.kanca.push(o); return Promise.resolve(true); } },
@@ -125,6 +134,8 @@ function kartBul(t, baslik) {
   return kartlar(t).filter(function (k) { return sinifli(k, "vr-baslik")[0].textContent === baslik; })[0];
 }
 function dugme(k, metin) { return hepsi(k, function (c) { return c.tagName === "BUTTON" && c.textContent === metin; }); }
+// Premiere'i degistiren cagrilar (KS_getContext salt okuma sorgusudur, sayilmaz)
+function yazanlar(t) { return t.say.call.filter(function (c) { return c.fn !== "KS_getContext"; }); }
 
 // Yanit: A (alt puanli, 85), B (eski puan 7 -> 70), C (dusuk alt puanlar -> 40); B ve C komsu
 var YANIT = { clips: [
@@ -194,15 +205,22 @@ async function calistir() {
   ok("kart: kenar satırı ◀ +1 cümle, −1 | −1, +1 cümle ▶", kenarlar.every(function (m) { return dugme(A, m).length; }) && dugme(A, "−1").length === 2 &&
     sinifli(A, "vr-sinir")[0].children.map(function (c) { return c.textContent; }).join(" ") === "◀ +1 cümle −1 | −1 +1 cümle ▶");
   var bSon = dugme(B, "+1 cümle ▶")[0];
-  ok("komşu ana (C) çakışacak büyüme düğmesi kapalı", bSon.disabled === true && dugme(B, "−1")[1].disabled === false, J([bSon.disabled]));
+  // C (40) "Yalnız ≥60" ile gizli: ekranda komşu kart yokken B'nin kenarı sebepsiz kilitlenmez
+  // (görünen komşu kartın kilitlemesi aşağıda, filtre kapalıyken denetlenir)
+  ok("gizli (60 altı) an görünen kartın büyüme düğmesini kapatmaz", bSon.disabled === false && dugme(B, "−1")[1].disabled === false &&
+    t.el["cap-vr-bilgi"].textContent === "1 an gizli (60 altı)", J([bSon.disabled]));
   var bOnce = B;
   var sureA = sinifli(A, "vr-sure")[0].textContent;
+  dugme(A, "+1 cümle ▶")[0].focus();
   await tetikle(dugme(A, "+1 cümle ▶")[0], "click");
   var A2 = kartBul(t, "Büyük itiraf");
+  ok("kart yenilenince odak aynı kenar düğmesinde kalır (klavyeyle art arda ±1)", t.win.document.activeElement === dugme(A2, "+1 cümle ▶")[0] &&
+    t.win.document.activeElement.parentNode && kartBul(t, "Büyük itiraf") === A2, t.win.document.activeElement && t.win.document.activeElement.textContent);
   ok("+1 cümle ▶: yalnız o kart yeniden çizilir, süre etiketi güncellenir", A2 !== A && kartBul(t, "Eski biçim") === bOnce && sinifli(A2, "vr-sure")[0].textContent !== sureA &&
     /^0:15–0:59 · 45 sn$/.test(sinifli(A2, "vr-sure")[0].textContent), sinifli(A2, "vr-sure")[0].textContent);
   ok("kart yenilenince kanca seçimi korunur", hepsi(A2, function (c) { return c.tagName === "INPUT" && c.type === "radio"; })[2].checked === true);
-  ok("In/Out bu karttan ayarlanmadıysa kenar kaydırmak Premiere'e dokunmaz", t.say.call.filter(function (c) { return c.fn === "KS_setInOut"; }).length === 0);
+  ok("In/Out bu karttan ayarlanmadıysa kenar kaydırmak Premiere'e dokunmaz", t.say.call.filter(function (c) { return c.fn === "KS_setInOut"; }).length === 0 &&
+    t.say.call.filter(function (c) { return c.fn === "KS_getContext"; }).length === 0);
   await tetikle(dugme(A2, "Önizle")[0], "click");
   var io = t.say.call.filter(function (c) { return c.fn === "KS_setInOut"; });
   ok("Önizle: KS_setInOut anın sekans zamanlarıyla", io.length === 1 && io[0].arg.start === 15 && io[0].arg.end === 59.6, J(io));
@@ -213,17 +231,30 @@ async function calistir() {
   ok("In/Out bu karttansa ve sekans aynıysa kenar kayınca In/Out canlı güncellenir (arama anındaki satırlarla)", io.length === 2 && io[1].arg.start === 15 && io[1].arg.end === 44.6, J(io));
   var A3 = kartBul(t, "Büyük itiraf");
   ok("−1: süre 30 sn, ayar aralığında (uyarı yok)", /^0:15–0:44 · 30 sn$/.test(sinifli(A3, "vr-sure")[0].textContent) && !/uyari/.test(sinifli(A3, "vr-sure")[0].className));
+  dugme(A3, "−1")[1].focus();
   await tetikle(dugme(A3, "−1")[1], "click");
   var A4 = kartBul(t, "Büyük itiraf");
+  ok("tek cümlelik klipte sondan −1 kapalı (cümle ortasına düşmez); odak aynı kenarın +1 düğmesine geçer",
+    dugme(A4, "−1")[1].disabled === true && t.win.document.activeElement === dugme(A4, "+1 cümle ▶")[0],
+    J([dugme(A4, "−1")[1].disabled, t.win.document.activeElement && t.win.document.activeElement.textContent]));
   ok("hazır ayarın dışına çıkmak serbest, süre etiketi sarı (uyari)", /uyari/.test(sinifli(A4, "vr-sure")[0].className) && /15 sn/.test(sinifli(A4, "vr-sure")[0].textContent) &&
     /dışında/.test(sinifli(A4, "vr-sure")[0].title), sinifli(A4, "vr-sure")[0].textContent + " " + sinifli(A4, "vr-sure")[0].className);
+  // Kullanici Premiere'de baska sekansa gecti; panel odakta degildi, KApp.ctx() hala seq1 diyor (bayat)
   t.durum.seq = "baska";
-  var once = t.say.call.length;
+  t.durum.ctxSeq = "seq1";
+  var once = yazanlar(t).length, sorgu = t.say.call.filter(function (c) { return c.fn === "KS_getContext"; }).length;
   await tetikle(dugme(A4, "+1 cümle ▶")[0], "click");
-  ok("başka sekans aktifse In/Out güncellenmez", t.say.call.length === once);
+  ok("başka sekans aktifse In/Out güncellenmez (bayat bağlama değil canlı sorguya bakılır)", yazanlar(t).length === once &&
+    t.say.call.filter(function (c) { return c.fn === "KS_getContext"; }).length === sorgu + 1 && /In\/Out güncellenmedi/.test(t.el["cap-vr-durum"].textContent),
+    t.el["cap-vr-durum"].textContent);
   await tetikle(dugme(kartBul(t, "Büyük itiraf"), "Önizle")[0], "click");
-  ok("başka sekansta Önizle uyarır, Premiere'e dokunmaz", t.say.call.length === once && /başka bir sekansta/.test(t.el["cap-vr-durum"].textContent));
+  ok("başka sekansta Önizle uyarır, Premiere'e dokunmaz (bağlam bayatken de)", yazanlar(t).length === once && /başka bir sekansta/.test(t.el["cap-vr-durum"].textContent));
+  // tersi: onbellek eski bir baska sekansi gosteriyor ama Premiere'de dogru sekans acik -> Onizle calisir
   t.durum.seq = "seq1";
+  t.durum.ctxSeq = "baska";
+  await tetikle(dugme(kartBul(t, "Büyük itiraf"), "Önizle")[0], "click");
+  ok("Önizle canlı sekans aynıysa bayat bağlama rağmen In/Out ayarlar", yazanlar(t).length === once + 1 && yazanlar(t)[once].fn === "KS_setInOut");
+  t.durum.ctxSeq = undefined;
 
   /* ---------- 5) filtre / sıralama ---------- */
   t.el["cap-vr-min"].checked = false;
@@ -249,6 +280,13 @@ async function calistir() {
   var pano = t.say.pano[0] || "";
   ok("Listeyi kopyala ayrıntılı biçimi kullanır (puan + alt puanlar + seçili kanca)", /^1\. Büyük itiraf \(0:15–[^)]+\) · 85\/100 tahmini \(kanca 90 · bağımsızlık 85/.test(pano) &&
     /\n   Kanca: Gerçek şok/.test(pano) && /2\. Eski biçim \([^)]+\) · 70\/100 tahmini — Eski gerekçe/.test(pano), pano);
+  t.durum.seq = "baska";
+  t.durum.ctxSeq = "seq1";
+  await tetikle(t.el["cap-vr-shorts"], "click");
+  ok("Shorts: Premiere'de başka sekans açıksa (bağlam bayat olsa da) sekans oluşturulmaz", t.say.call.filter(function (c) { return c.fn === "KS_makeShorts"; }).length === 0 &&
+    /başka bir sekansta/.test(t.el["cap-vr-durum"].textContent) && t.el["cap-vr-shorts"].disabled === false);
+  t.durum.seq = "seq1";
+  t.durum.ctxSeq = undefined;
   await tetikle(t.el["cap-vr-shorts"], "click");
   var sh = t.say.call.filter(function (c) { return c.fn === "KS_makeShorts"; });
   ok("Shorts: KS_makeShorts çağrısı değişmedi (aralık + ad + dikey)", sh.length === 3 && J(Object.keys(sh[0].arg).sort()) === J(["dikey", "ranges"]) &&
@@ -264,13 +302,25 @@ async function calistir() {
   await tetikle(t.el["cap-vr-bul"], "click");
   ok("hepsi 60 altı + ≥60: en iyi 2 an, kesik çerçeve ve bilgi satırı", kartlar(t).length === 2 && kartlar(t).every(function (k) { return /dusuk/.test(k.className); }) &&
     t.el["cap-vr-bilgi"].textContent === "60 ve üstü an yok — en iyi 2 an gösteriliyor", t.el["cap-vr-bilgi"].textContent);
-  var n = t.say.call.length, ilkKart = kartlar(t)[0], ileri = dugme(ilkKart, "+1 cümle ▶")[0];
+  var n = yazanlar(t).length, ilkKart = kartlar(t)[0], ileri = dugme(ilkKart, "+1 cümle ▶")[0];
   var sureOnce = sinifli(ilkKart, "vr-sure")[0].textContent;
   await tetikle(ileri, "click");
-  ok("yeni arama In/Out bağını sıfırlar: kenar kayar ama Premiere'e dokunulmaz", !ileri.disabled && t.say.call.length === n &&
+  ok("yeni arama In/Out bağını sıfırlar: kenar kayar ama Premiere'e dokunulmaz", !ileri.disabled && yazanlar(t).length === n &&
     sinifli(kartlar(t)[0], "vr-sure")[0].textContent !== sureOnce, sureOnce + " → " + sinifli(kartlar(t)[0], "vr-sure")[0].textContent);
   var dis = t.win.KViral.liste();
   ok("KViral.liste(): ekrandaki anlar (Shorts paketi için), kopya", dis.length === 2 && dis[0].low === true && typeof dis[0].score === "number" && dis[0] !== dis[1]);
+
+  /* ---------- 8) adet: model fazlasını döndürse de en iyi N an ---------- */
+  function alt(v) { return { hook: v, standalone: v, emotion: v, value: v, payoff: v }; }
+  var cok = ortam({ ayarlar: { viralAdet: 3 }, yanit: { clips: [
+    { from: 3, to: 8, title: "p50", sub: alt(50) }, { from: 12, to: 17, title: "p90", sub: alt(90) }, { from: 21, to: 26, title: "p70", sub: alt(70) },
+    { from: 30, to: 35, title: "p80", sub: alt(80) }, { from: 39, to: 44, title: "p60", sub: alt(60) }
+  ] } });
+  cok.win.KViral.init();
+  await tetikle(cok.el["cap-vr-bul"], "click");
+  ok("adet 3: model 5 an döndürse de en yüksek puanlı 3 an kalır, bildirim 3 der", /pick the 3 best/.test(cok.say.chat[0].messages[0].content) &&
+    kartlar(cok).map(function (k) { return sinifli(k, "vr-baslik")[0].textContent; }).join(",") === "p90,p80,p70" && cok.say.toast[0] === "3 viral an bulundu" &&
+    cok.win.KViral.liste().length === 3, kartlar(cok).map(function (k) { return sinifli(k, "vr-baslik")[0].textContent; }).join(",") + " / " + cok.say.toast[0]);
 }
 
 calistir().then(function () {

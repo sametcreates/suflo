@@ -28,7 +28,7 @@
   var DURAK = 0.6;
   // snapEdges: "to" ileri kayarken maxDur en fazla %15 asilabilir; "from" en fazla 8 sn geri kayar
   var SNAP_TOLERANS = 1.15, BAS_GERI = 8;
-  // moveEdge: bir cumle siniri en fazla bu kadar (sn) otede aranir; yoksa tek satir adim
+  // moveEdge, noktalamasiz transkript: duraksama siniri en fazla bu kadar (sn) otede aranir; yoksa tek satir adim
   var ADIM_PENCERE = 20;
   var EPS = 0.01;
 
@@ -99,7 +99,13 @@
    * üzerinden yeniden normalize edilir. Geçerli alt puan yoksa null.
    */
   function weightedScore(sub) {
-    var n = normalizeSub(sub);
+    return agirlikliTopla(normalizeSub(sub));
+  }
+
+  // Zaten normalize edilmiş (normalizeSub çıktısı) alt puanların toplamı. Yeniden
+  // normalize ETMEZ: "hepsi ≤10 → ×10" kuralı ikinci kez işlerse zayıf bir klip
+  // (çubuklar 10/10/0/10/0) 7 yerine 70 alırdı.
+  function agirlikliTopla(n) {
     if (!n) return null;
     var top = 0, agirlik = 0;
     ALT_SIRA.forEach(function (k) {
@@ -126,7 +132,7 @@
   function puanla(c) {
     c = c || {};
     var sub = normalizeSub(c.sub || c.subs || c.scores);
-    if (sub) return { score: weightedScore(sub), sub: sub, legacy: false };
+    if (sub) return { score: agirlikliTopla(sub), sub: sub, legacy: false };
     var s = legacyScore(c.score);
     return { score: s === null ? 50 : s, sub: null, legacy: true };
   }
@@ -192,12 +198,20 @@
 
   function sure(segs, a, b) { return segs[b].end - segs[a].start; }
 
+  // Transkriptte en az bir satır cümle sonu noktalamasıyla bitiyor mu (yoksa sınırlar
+  // yalnız duraksamadır ve ±1 cümle gerekirse tek satır adımlarla ilerler)
+  function noktaliMi(segs) {
+    for (var i = 0; i < segs.length; i++) if (cumleSonu(segs[i].text)) return true;
+    return false;
+  }
+
   /*
    * Kenarları cümle sınırına oturt (parseResponse içinde, min/max döngüsünden
    * sonra, çakışma elemeden önce). segs: clean() çıktısı.
    *   to:   ileride maxDur×1.15 içinde ilk cümle sonuna; yoksa minDur'u koruyan son
    *         cümle sonuna geri; ikisi de yoksa değişmez
-   *   from: en fazla 8 sn geri ya da en fazla 1 satır ileri, öncülü cümle sonu olan satıra
+   *   from: en fazla 8 sn geri ya da en fazla 1 satır ileri, öncülü cümle sonu olan satıra;
+   *         from satırı önceki cümlenin kuyruğuysa (kendisi cümle sonu) önce 1 satır ileri
    * Döner: yeni { from, to } (girdi değişmez).
    */
   function snapEdges(segs, clip, opts) {
@@ -223,7 +237,11 @@
     }
     if (!cumleBasi(segs, a)) {
       var yeniA = -1;
-      for (j = a - 1; j >= 0 && segs[a].start - segs[j].start <= BAS_GERI + EPS && sure(segs, j, b) <= ust + EPS; j--) {
+      // a satiri onceki cumlenin kuyrugu (kendisi cumle sonu): modelin satir numarasi
+      // bir eksik. Geri gidip onceki dusunceyi (8 sn'ye kadar) kancanin onune koymak
+      // yerine bir satir ileri, asil cumle basina gec (minDur korunuyorsa)
+      if (cumleBitisi(segs, a) && a + 1 <= b && sure(segs, a + 1, b) >= minEff - EPS) yeniA = a + 1;
+      for (j = a - 1; yeniA < 0 && j >= 0 && segs[a].start - segs[j].start <= BAS_GERI + EPS && sure(segs, j, b) <= ust + EPS; j--) {
         if (cumleBasi(segs, j)) { yeniA = j; break; }
       }
       if (yeniA < 0 && a + 1 <= b && cumleBasi(segs, a + 1) && sure(segs, a + 1, b) >= minEff - EPS) yeniA = a + 1;
@@ -249,7 +267,10 @@
    * Kart düğmeleri: bir kenarı ±1 cümle kaydır.
    *   kenar: "start" | "end";  yon: +1 = bir cümle EKLE (klip uzar), -1 = bir cümle ÇIKAR
    *   opts: { hardMin: 5, hardMax: 180, minDur, maxDur, others: [diğer kartlar] }
-   * Komşu cümle sınırına gider; ADIM_PENCERE içinde sınır yoksa (noktalama yok)
+   * Komşu cümle sınırına gider. Noktalı transkriptte sınır uzaklık sınırı olmadan
+   * aranır (büyürken sert üst sınıra kadar, küçülürken klip içinde); bulunamazsa
+   * null: kenar asla cümle ortasına düşmez (uzun tek cümlelik klipte −1 kapalı).
+   * Noktalama hiç yoksa sınır ADIM_PENCERE içinde aranır (≥0,6 sn duraksama), yoksa
    * tek satır kayar. Sert sınırı bozan ya da başka kartla çakışan hareket → null.
    * Hazır ayarın min/max'ını aşmak serbesttir (bilerek): disiSure işaretlenir.
    * Girdi asla değiştirilmez; döner: yeni klip nesnesi.
@@ -264,23 +285,26 @@
     var hardMax = isFinite(Number(opts.hardMax)) ? Number(opts.hardMax) : 180;
     var minDur = opts.minDur || VARSAYILAN.minDur, maxDur = opts.maxDur || VARSAYILAN.maxDur;
     var buyut = Number(yon) > 0, j, hedef = -1;
+    // noktali: sinir aramasi uzaklikla sinirlanmaz ve tek satir yedegi yok (cumle ortasi olmaz)
+    var noktali = noktaliMi(segs);
+    function yakin(fark) { return noktali || fark <= ADIM_PENCERE + EPS; }
     if (kenar === "end") {
       if (buyut) {
-        for (j = b + 1; j <= son && segs[j].end - segs[b].end <= ADIM_PENCERE + EPS; j++) if (cumleBitisi(segs, j)) { hedef = j; break; }
-        if (hedef < 0 && b + 1 <= son) hedef = b + 1;
+        for (j = b + 1; j <= son && yakin(segs[j].end - segs[b].end) && segs[j].end - segs[a].start <= hardMax + EPS; j++) if (cumleBitisi(segs, j)) { hedef = j; break; }
+        if (hedef < 0 && !noktali && b + 1 <= son) hedef = b + 1;
       } else {
-        for (j = b - 1; j >= a && segs[b].end - segs[j].end <= ADIM_PENCERE + EPS; j--) if (cumleBitisi(segs, j)) { hedef = j; break; }
-        if (hedef < 0 && b - 1 >= a) hedef = b - 1;
+        for (j = b - 1; j >= a && yakin(segs[b].end - segs[j].end); j--) if (cumleBitisi(segs, j)) { hedef = j; break; }
+        if (hedef < 0 && !noktali && b - 1 >= a) hedef = b - 1;
       }
       if (hedef < 0) return null;
       b = hedef;
     } else if (kenar === "start") {
       if (buyut) {
-        for (j = a - 1; j >= 0 && segs[a].start - segs[j].start <= ADIM_PENCERE + EPS; j--) if (cumleBasi(segs, j)) { hedef = j; break; }
-        if (hedef < 0 && a - 1 >= 0) hedef = a - 1;
+        for (j = a - 1; j >= 0 && yakin(segs[a].start - segs[j].start) && segs[b].end - segs[j].start <= hardMax + EPS; j--) if (cumleBasi(segs, j)) { hedef = j; break; }
+        if (hedef < 0 && !noktali && a - 1 >= 0) hedef = a - 1;
       } else {
-        for (j = a + 1; j <= b && segs[j].start - segs[a].start <= ADIM_PENCERE + EPS; j++) if (cumleBasi(segs, j)) { hedef = j; break; }
-        if (hedef < 0 && a + 1 <= b) hedef = a + 1;
+        for (j = a + 1; j <= b && yakin(segs[j].start - segs[a].start); j++) if (cumleBasi(segs, j)) { hedef = j; break; }
+        if (hedef < 0 && !noktali && a + 1 <= b) hedef = a + 1;
       }
       if (hedef < 0) return null;
       a = hedef;
@@ -405,6 +429,7 @@
    *   - süre minDur'dan kısaysa komşu satırlarla uzatılır, maxDur'dan uzunsa kırpılır
    *     (her zaman satır sınırında), sonra kenarlar cümle sınırına oturur
    *   - üst üste binenlerden puanı yüksek olan kalır
+   *   - opts.adet verilirse (3-10'a sıkıştırılır) en çok o kadar an döner (puan sırasıyla)
    *   - hook = hooks[0] || reason (marker yorumu ve eski akışlar için)
    */
   function parseResponse(content, segments, opts) {
@@ -469,6 +494,8 @@
       var cakisir = secilen.some(function (s) { return c.start < s.end - EPS && s.start < c.end - EPS; });
       if (!cakisir) secilen.push(c);
     });
+    // istenen adet (3-10): model fazlasini dondurse de puani en yuksek o kadar an kalir
+    if (opts.adet !== undefined && opts.adet !== null && opts.adet !== "") secilen = secilen.slice(0, adetSinirla(opts.adet));
     return secilen;
   }
 

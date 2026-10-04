@@ -240,8 +240,8 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-ses-uctan.js` | Sesi iyileştir uçtan uca: 5.1 kaynak → stereo, senkron < 1 ms, sessiz klipte anlaşılır hata |
 | `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
 | `test-highlights.js` · `test-viral-host.js` | Viral anlar: satır sınırı, süre uzatma/kırpma, çakışma; süreli marker ve In/Out |
-| `test-viral-skor.js` | Viral Skor 2.0: istem (tür beyaz listesi, adet 3–10, 120 karakter odak), ağırlıklı puan (0–10 ölçeği, eksik alt puan), cümle sınırına oturtma, ±1 cümle, ≥60 filtresi, kopyalanan liste |
-| `test-viral-ui.js` | Viral Skor 2.0 panel akışı (sahte DOM): ayar kalıcılığı, puan halkası ve alt puan çubukları, kanca seçimi → Başlık ekle, kenar kayınca yalnız o kart ve canlı In/Out |
+| `test-viral-skor.js` | Viral Skor 2.0: istem (tür beyaz listesi, adet 3–10, 120 karakter odak), ağırlıklı puan (0–10 ölçeği tek kez, eksik alt puan), cümle sınırına oturtma, ±1 cümle (uzun cümlede cümle ortasına düşmez), adet sınırı, ≥60 filtresi, kopyalanan liste |
+| `test-viral-ui.js` | Viral Skor 2.0 panel akışı (sahte DOM): ayar kalıcılığı, puan halkası ve alt puan çubukları, kanca seçimi → Başlık ekle, kenar kayınca yalnız o kart (odak korunur), canlı sekans sorgusuyla In/Out ve Shorts, gizli an kenarı kilitlemez, adet sınırı |
 | `test-scenes.js` | Sahne algılama (gerçek ffmpeg) ve seçili klibi bölme |
 | `test-model-dogrulama.js` | Whisper modellerinin SHA-256 doğrulaması |
 | `test-ceviri-dili.js` | Çeviri sonrası büyük harf kuralının hedef dile uyması |

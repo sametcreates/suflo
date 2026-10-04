@@ -241,7 +241,8 @@ Hazırlık: Pro lisanslı panel, Groq anahtarı, en az 5 dakikalık konuşmalı 
 1. Altyazı sekmesi > **Viral anlar (Shorts)**: Tür, Adet, Süre seçicileri ve "Ne arıyorsun?
    (isteğe bağlı)" alanı "Viral anları bul" düğmesinin **üstünde** olmalı. Panel daraltılınca
    (yaklaşık 280 px) seçiciler iki sütuna geçmeli, yatay kaydırma çubuğu çıkmamalı.
-2. Tür: Podcast, Adet: 3, odak: "en komik an" → **Viral anları bul**. Her kartta: renkli halka
+2. Tür: Podcast, Adet: 3, odak: "en komik an" → **Viral anları bul**. En çok 3 an gelmeli
+   (bildirim "3 viral an bulundu" ya da daha az; model fazlasını döndürse de). Her kartta: renkli halka
    (≥80 yeşil, 60–79 sarı, <60 kırmızı) içinde puan ve altında "/100 tahmini"; 5 çubuk (Kanca,
    Bağımsızlık, Duygu, Değer, Kapanış); italik neden satırı; 3 kanca başlığı seçeneği;
    "◀ +1 cümle, −1 | −1, +1 cümle ▶" satırı; Önizle ve Başlık ekle. Listenin üstünde sıralama,
@@ -254,9 +255,16 @@ Hazırlık: Pro lisanslı panel, Groq anahtarı, en az 5 dakikalık konuşmalı 
 5. **±1 cümle:** Aynı kartta "+1 cümle ▶" → süre etiketi uzamalı ve (aynı sekanstayken)
    Premiere'deki Out noktası **kendiliğinden** yeni sona kaymalı. "−1" ile geri al. Süre seçili
    aralığın (ör. 20–60 sn) dışına çıkınca süre etiketi sarıya dönmeli. Komşu kartla çakışacak
-   yöndeki düğme gri (basılamaz) olmalı.
+   yöndeki düğme gri (basılamaz) olmalı; "Yalnız ≥60" ile gizlenen bir an ise görünen kartın
+   düğmesini kilitlememeli. Tek cümlelik (ya da tek uzun cümleli) bir kartta "−1" gri olmalı:
+   kenar asla cümle ortasına düşmez. Klavye: Tab ile "+1 cümle ▶"ye gel, Enter'a art arda bas;
+   her basışta bir cümle daha eklenmeli (odak düğmede kalır).
 6. Başka bir sekansı aç → bir kartta Önizle: "Viral anlar başka bir sekansta bulundu" uyarısı
    çıkmalı, In/Out değişmemeli; ±1 cümle kart üzerinde çalışır ama Premiere'e dokunmaz.
+   **Hızlı geçiş denemesi:** bir kartta Önizle → Premiere'de başka bir sekansa (ör. bir
+   "Suflo Shorts" sekansına) geç → **hemen** panele dönüp o kartta "+1 cümle ▶"ye bas. Açık
+   sekansın In/Out'u ve playhead'i değişmemeli; panelde "In/Out güncellenmedi: Premiere'de başka
+   bir sekans açık." yazmalı. Aynı hızlı geçişle **Shorts sekansları oluştur** da uyarı vermeli.
 7. Kanca seçeneklerinden **ikincisini** seç → **Başlık ekle**: timeline'a bu metin gelmeli,
    `*yıldızlı*` kelime vurgu renginde.
 8. "Zamana göre" ve "Yalnız ≥60" → liste **yeni arama yapmadan** değişmeli. Paneli kapatıp aç:
