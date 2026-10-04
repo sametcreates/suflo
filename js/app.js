@@ -358,6 +358,8 @@ window.KApp = (function () {
       var rc = el("pro-recheck");
       if (rc) rc.hidden = !s.needsRecheck;
     }
+    denemeListesiniCiz(s);
+    temizKartiniCiz(s);
 
     // Pro'ya kilitli girişler: sekmeler + tekil butonlar
     Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
@@ -407,6 +409,95 @@ window.KApp = (function () {
     if (window.KEmojiAssets && el("emoji-assets-grid") && el("emoji-assets-grid").children.length) KEmojiAssets.tara();
   }
 
+  /* ---------------- Pro'yu dene: kalan haklar + satın alma sonrası temiz yeniden oluşturma ---------------- */
+
+  // Ücretsizde her aracın kalan deneme hakkı ("Otomatik kesim 2/3"); Pro'da gizli
+  function denemeListesiniCiz(s) {
+    var kart = el("pro-deneme-kart"), liste = el("pro-deneme-liste");
+    if (!kart || !liste) return;
+    var d = s.deneme;
+    kart.hidden = !!s.pro || !d || !d.ozellikler;
+    if (kart.hidden) return;
+    liste.innerHTML = "";
+    d.ozellikler.forEach(function (o) {
+      var li = document.createElement("li");
+      if (o.kalan <= 0) li.className = "bitti";
+      var ad = document.createElement("span");
+      ad.textContent = o.ad;
+      var n = document.createElement("b");
+      n.textContent = o.kalan + "/" + o.hak;
+      li.appendChild(ad);
+      li.appendChild(n);
+      liste.appendChild(li);
+    });
+  }
+
+  var temizMesgul = false;
+  function tarihEtiketi(ts) {
+    var t = new Date(Number(ts) || 0);
+    if (!ts || isNaN(t.getTime())) return "";
+    function iki(n) { return (n < 10 ? "0" : "") + n; }
+    return iki(t.getDate()) + "." + iki(t.getMonth() + 1) + " " + iki(t.getHours()) + ":" + iki(t.getMinutes());
+  }
+
+  // Pro'da, deneme hakkıyla üretilmiş (filigranlı) çıktı kaldıysa listele
+  function temizKartiniCiz(s) {
+    var kart = el("pro-temiz-kart"), liste = el("pro-temiz-liste");
+    if (!kart || !liste || !Pro.denemeCiktilari) return;
+    var kayitlar = s.pro ? Pro.denemeCiktilari() : [];
+    kart.hidden = kayitlar.length === 0;
+    if (temizMesgul) return;   // iş sürerken düğmeler yerinde kalsın
+    liste.innerHTML = "";
+    kayitlar.slice().reverse().forEach(function (k) {
+      var satir = document.createElement("div");
+      satir.className = "pro-temiz-satir";
+      var bilgi = document.createElement("span");
+      var tur = document.createElement("b");
+      tur.textContent = k.tur === "kanca" ? "Kanca başlığı" : "Stilli altyazı";
+      bilgi.appendChild(tur);
+      bilgi.appendChild(document.createTextNode(" · " + (k.sekans || k.sequenceId) + (k.ts ? " · " + tarihEtiketi(k.ts) : "")));
+      var yap = document.createElement("button");
+      yap.type = "button";
+      yap.className = "btn tiny primary";
+      yap.textContent = "Temiz oluştur";
+      yap.addEventListener("click", function () { denemeyiTemizle(k, yap); });
+      var cikar = document.createElement("button");
+      cikar.type = "button";
+      cikar.className = "btn tiny";
+      cikar.textContent = "Listeden çıkar";
+      cikar.title = "Bu çıktıyı yeniden oluşturmayacaksan listeden kaldırır (timeline'a dokunmaz)";
+      cikar.addEventListener("click", function () { if (!temizMesgul) Pro.denemeCiktisiSil(k.path); });
+      satir.appendChild(bilgi);
+      satir.appendChild(yap);
+      satir.appendChild(cikar);
+      liste.appendChild(satir);
+    });
+  }
+
+  async function denemeyiTemizle(k, btn) {
+    if (temizMesgul || !window.SufloOverlayRender) return;
+    if (!Pro.isPro()) { Pro.gate("overlay"); return; }
+    var durum = el("pro-temiz-durum");
+    function yaz(m, c) { if (durum) { durum.textContent = m || ""; durum.className = "inline-status" + (c ? " " + c : ""); } }
+    temizMesgul = true;
+    btn.disabled = true;
+    try {
+      var r = await SufloOverlayRender.temizYenidenOlustur(K, k, { durum: function (m) { yaz(m); } });
+      if (!r.ok) { yaz(r.sekansAc ? r.hata : "✕ " + r.hata, r.sekansAc ? "warn" : "bad"); return; }
+      Pro.denemeCiktisiSil(k.path);
+      yaz("");
+      var eski = r.kaldirmaHatasi ? " · eski filigranlı katman kaldırılamadı, elle sil"
+        : (r.kaldirilan > 0 ? "" : " · eski filigranlı katman bulunamadı, varsa elle sil");
+      toast("Temiz katman " + r.yer.trackName + " katmanına kondu" + eski, eski ? "warn" : "good", 9000);
+    } catch (e) {
+      yaz("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      temizMesgul = false;
+      btn.disabled = false;
+      reflectPro();
+    }
+  }
+
   function initPro() {
     if (!window.Pro || !el("pro-activate")) return;
 
@@ -420,6 +511,10 @@ window.KApp = (function () {
           msg.textContent = "";
           toast("Suflo Pro aktif — iyi kurgular! 🎬", "good");
           reflectPro();
+          // deneme hakkıyla üretilmiş filigranlı çıktı varsa bir kez hatırlat (kart Ayarlar > Suflo Pro'da)
+          if (Pro.denemeCiktilari && Pro.denemeCiktilari().length) {
+            toast("Deneme çıktılarını temiz yeniden oluştur: Suflo Pro kartındaki listeden filigransız hale getir.", "good", 10000);
+          }
         } else {
           msg.textContent = r.error || "Etkinleştirilemedi.";
           msg.className = "inline-status bad";

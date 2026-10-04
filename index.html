@@ -29,7 +29,7 @@
         <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l1.4 3.1L11 4.5 8.5 6.8l.7 3.4L6 8.6 2.8 10.2l.7-3.4L1 4.5l3.6-.4z" fill="currentColor"/></svg>
         <span>PRO</span>
       </button>
-      <span class="brand-ver" id="brand-ver">v1.7</span>
+      <span class="brand-ver" id="brand-ver">v…</span>
       <span class="host-status" title="Premiere bağlantısı">
         <span id="host-dot" class="host-dot"></span>
         <span>PREMIERE</span>
@@ -561,7 +561,7 @@
         </div>
 
         <div class="row">
-          <select id="cap-translate" class="grow" title="Altyazıyı başka dile çevir (ücretsiz; bulut motoru anahtarı gerekir)">
+          <select id="cap-translate" class="grow" title="Altyazıyı başka dile çevir (Pro, 3 ücretsiz deneme hakkı; bulut motoru anahtarı gerekir)">
             <option value="" selected>Çeviri — hedef dil seç</option>
             <option value="en">English'e çevir</option>
             <option value="tr">Türkçe'ye çevir</option>
@@ -1246,7 +1246,7 @@
         <span>Shorts / Reels açılışına animasyonlu başlık kartı. Önizleme ücretsiz; timeline'a eklemek Pro.</span>
       </div>
       <div class="pt-proof" aria-label="Pro özeti">
-        <i><strong>3</strong> stil</i><i><strong>0</strong> MOGRT</i><i><strong>1×</strong> lisans</i>
+        <i><strong>5</strong> stil</i><i><strong>0</strong> MOGRT</i><i><strong>1×</strong> lisans</i>
       </div>
       <button class="btn primary pro-ac-btn" data-pro-feature="overlay">Pro'yu aç</button>
     </div>
@@ -1647,19 +1647,28 @@
               <li>Transkripsiyon (99 dil, internetsiz)</li>
               <li>Altyazı editörü + taslak kurtarma</li>
               <li>SRT · VTT · TXT + caption track</li>
+              <li>Kelime kelime altyazı · terim sözlüğü</li>
               <li>Emoji seçici, GPU hızlandırma</li>
             </ul>
           </div>
           <div>
             <b class="pro-renk">Pro — 749 TL, tek sefer</b>
             <ul>
-              <li>Otomatik sessizlik kesimi · Ritim marker</li>
-              <li>Hazır yazı animasyonu (MOGRT) kütüphanesi</li>
-              <li>SFX kütüphanesi · Smart SFX 2.0 önerileri</li>
-              <li>Toplu klip · Çeviri · Sözlük · stilli ASS</li>
+              <li>Otomatik kesim · Konuşmadan kes (dolgu, tekrar)</li>
+              <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
+              <li>Suflo Stilleri timeline'da · Kanca başlığı</li>
+              <li>Sesi iyileştir · Otomatik zoom · Ritim</li>
+              <li>12 dile çeviri · Toplu klip · stilli ASS</li>
+              <li>MOGRT, SFX, preset ve Motion BG kütüphaneleri</li>
               <li>Ömür boyu güncelleme</li>
             </ul>
           </div>
+        </div>
+        <!-- Pro'yu dene: ucretsiz kullanicinin kalan deneme haklari (app.js reflectPro doldurur) -->
+        <div class="pro-deneme" id="pro-deneme-kart" hidden>
+          <b>Pro'yu dene: her araca 3 hak</b>
+          <p class="hint">Pro araçlarını kendi videonda dene. Hak yalnız işlem başarıyla bitince düşer ve süresi dolmaz. Deneme hakkıyla eklenen stilli altyazı ve kanca başlığında küçük bir suflo.app filigranı olur; Pro'yu alınca temiz yeniden oluşturabilirsin.</p>
+          <ul id="pro-deneme-liste" class="pro-deneme-liste"></ul>
         </div>
         <p class="hint" style="margin-bottom:8px">Tek seferlik lisans, abonelik yok, ömür boyu.</p>
         <div class="row">
@@ -1675,6 +1684,13 @@
       <div id="pro-active-card" hidden>
         <p class="hint" style="margin-bottom:8px">Suflo Pro aktif ✓ <span id="pro-email" class="dim"></span></p>
         <p class="hint" id="pro-recheck" hidden>Çevrimdışı doğrulama süresi doldu — internete bağlanınca kendiliğinden yenilenir.</p>
+        <!-- Satin alma sonrasi: deneme ciktilarini filigransiz yeniden olustur (app.js doldurur) -->
+        <div class="pro-temiz" id="pro-temiz-kart" hidden>
+          <b>Deneme çıktılarını temiz yeniden oluştur</b>
+          <p class="hint">Deneme hakkıyla eklediğin stilli altyazı ve kanca başlıklarında küçük bir suflo.app filigranı var. Suflo her birini filigransız yeniden üretip aynı yere koyar, sonra eskisini kaldırır. Önce o sekansı Premiere'de aç.</p>
+          <div id="pro-temiz-liste" class="pro-temiz-liste"></div>
+          <div id="pro-temiz-durum" class="inline-status"></div>
+        </div>
         <button id="pro-deactivate" class="btn">Bu makinede devre dışı bırak</button>
       </div>
     </div>
@@ -1701,7 +1717,7 @@
 
     <div class="set-group">
       <div class="set-title">Hakkında</div>
-      <p class="dim">Suflo <span id="hakkinda-ver">v1.7</span> — Premiere için ücretsiz altyazı paneli.<br>Türkçe ve Azerice dahil 99 dil · abonelik yok, kredi yok, hesap yok.<br>MIT · sametcreates</p>
+      <p class="dim">Suflo <span id="hakkinda-ver">v…</span> — Premiere için altyazı ve kurgu paneli; altyazı çekirdeği ücretsiz ve açık kaynak.<br>Türkçe ve Azerice dahil 99 dil · abonelik yok, kredi yok, hesap yok.<br>MIT · sametcreates</p>
     </div>
   </section>
 

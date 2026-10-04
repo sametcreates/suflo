@@ -126,7 +126,33 @@ ok("pro.js: confirm yok, kapı senkron (async/await/Promise yok)", !/\bconfirm\(
 ok("pro.js: 'Ücretsiz dene' tıklaması kurar, kapatır, eylemi setTimeout ile yeniden çalıştırır",
   /denemeBaslat\(feature\);\s*close\(\);[\s\S]{0,80}setTimeout\(function \(\) \{ o\.yeniden\(\); \}, 0\)/.test(oku("js/pro.js")));
 
-/* ---------------- 7) davranış: gecisler.js (sahte Pro) ---------------- */
+/* ---------------- 7) Ayarlar: kalan haklar, temiz yeniden oluşturma, metin düzeltmeleri ---------------- */
+function blok(src, id) {
+  var i = src.indexOf('id="' + id + '"');
+  if (i < 0) return "";
+  var bas = src.lastIndexOf("<div", i), derinlik = 0, re = /<\/?div\b/g, m;
+  re.lastIndex = bas;
+  while ((m = re.exec(src))) { derinlik += m[0] === "<div" ? 1 : -1; if (derinlik === 0) return src.slice(bas, m.index + 6); }
+  return "";
+}
+var kilitli = blok(html, "pro-locked-card"), etkin = blok(html, "pro-active-card");
+ok("#pro-deneme-liste kilitli Pro kartının içinde", /id="pro-deneme-liste"/.test(kilitli) && /id="pro-deneme-kart"[^>]*hidden/.test(kilitli));
+ok("temiz yeniden oluşturma kartı etkin Pro kartının içinde", /id="pro-temiz-kart"[^>]*hidden/.test(etkin) && /id="pro-temiz-liste"/.test(etkin) && /Deneme çıktılarını temiz yeniden oluştur/.test(etkin));
+var app = oku("js/app.js");
+var rp = govde(app, "function reflectPro()");
+ok("reflectPro kalan hakları ve temiz kartını çizer", /denemeListesiniCiz\(s\)/.test(rp) && /temizKartiniCiz\(s\)/.test(rp));
+ok("liste satırı 'ad kalan/hak' (Otomatik kesim 2/3), Pro'da gizli", /o\.kalan \+ "\/" \+ o\.hak/.test(govde(app, "function denemeListesiniCiz(")) && /kart\.hidden = !!s\.pro/.test(govde(app, "function denemeListesiniCiz(")));
+var dt = govde(app, "async function denemeyiTemizle(");
+ok("temiz yeniden oluşturma ortak modülle; başarıda kayıt silinir", /SufloOverlayRender\.temizYenidenOlustur\(K, k,/.test(dt) && dt.indexOf("Pro.denemeCiktisiSil(k.path)") > dt.indexOf("if (!r.ok)"));
+ok("etkinleştirmeden sonra deneme çıktısı varsa bir kez hatırlatılır", /if \(Pro\.denemeCiktilari && Pro\.denemeCiktilari\(\)\.length\) \{\s*toast\("Deneme çıktılarını temiz yeniden oluştur/.test(app));
+ok("Pro karşılaştırması: Sözlük yok, yeni araçlar var", !/Sözlük/.test(kilitli.split('class="pro-renk"')[1] || "") &&
+  ["Konuşmadan kes", "viral puan", "Geçişler", "Suflo Stilleri timeline'da", "Kanca başlığı", "Sesi iyileştir", "Otomatik zoom", "Ritim", "12 dile çeviri"].every(function (x) { return kilitli.indexOf(x) !== -1; }));
+ok("ücretsiz sütunu: kelime kelime altyazı ve terim sözlüğü", /<li>Kelime kelime altyazı · terim sözlüğü<\/li>/.test(kilitli));
+ok("kanca başlığı tanıtımı 5 stil (seçicideki stil sayısı)", /<strong>5<\/strong> stil/.test(blok(html, "kanca-tanitim")) && html.match(/id="kanca-stil">[\s\S]*?<\/select>/)[0].match(/<option /g).length === 5);
+ok("eski 'v1.7' ve 'ücretsiz altyazı paneli' yedekleri yok", !/v1\.7</.test(html) && !/ücretsiz altyazı paneli/.test(html));
+ok("çeviri ipucu artık 'ücretsiz' demiyor", !/başka dile çevir \(ücretsiz/.test(html));
+
+/* ---------------- 8) davranış: gecisler.js (sahte Pro) ---------------- */
 function gecisCalistir(o) {
   var olay = {}, cagri = [], harcanan = [], toastlar = [], kapi = [];
   function e(id) {

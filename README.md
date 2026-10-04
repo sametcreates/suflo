@@ -17,6 +17,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | Ne | Nasıl |
 |---|---|
 | **İlk altyazın 2 dakikada** *(3.1)* | İlk açılışta 4 adımlı rehber: hızlı küçük model (Türkçe: Small, 190 MB, ffmpeg arkada), örnek klipte deneme, stil önizlemesi, ücretsiz Groq anahtarı sihirbazı (panodan al + doğrula). AI düğmelerinde "anahtar gerekli · 1 dk" kısayolu |
+| **Pro'yu dene** *(3.1)* | Kodla çalışan her Pro aracına kendi videonda 3 deneme hakkı: otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir, Suflo Stilleri katmanı ve kanca başlığı, çeviri, ritim. Haklar süresiz; hak yalnız işlem başarıyla bitince düşer. Deneme stilli katmanlarında küçük bir suflo.app filigranı olur, Pro'yu alınca temiz yeniden oluşturulur |
 | **Viral Skor 2.0** *(3.1)* | Viral anlara açıklamalı 0–100 puan: kanca, bağımsızlık, duygu, değer ve kapanış alt puanları ile tek satırlık neden (toplam yerelde hesaplanır). Tür (podcast, eğitim, komedi…), adet (3–10) ve "ne arıyorsun?" odağı; klipler cümle ortasında başlamaz/bitmez, kartta ±1 cümle düğmeleri; 3 kanca başlığı seçeneği "Başlık ekle"ye gider. Puanlar tahmindir, izlenme garantisi değildir |
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
@@ -82,12 +83,12 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Düz stiller | Otomatik kesim (sessizlik temizleme) |
 | SRT · WebVTT · TXT dışa aktarım | Ritim/beat marker'ları |
 | SRT/VTT içe aktarım | Toplu çoklu klip transkripsiyonu |
-| Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
+| Premiere caption izine uygulama | 12 dile çeviri + çok dilli SRT paketi |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
-| Emoji seçici | Terim sözlüğü |
+| Emoji seçici | **Sesi iyileştir** · **Otomatik zoom** · **Kanca başlığı** |
 | Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar ve duraksama temizliği, kelimeye tıklayıp kes |
-| — | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Hormozi, Neon, Daktilo…), MOGRT gerekmez |
-| — | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
+| Terim sözlüğü (`yanlış => doğru`, her transkriptte) | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Hormozi, Neon, Daktilo…) timeline'da, MOGRT gerekmez |
+| Kelime kelime ve birikimli (karaoke) altyazı izi | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
 | — | **Viral anlar:** uzun videodan 15–90 sn'lik Shorts/Reels anları, açıklamalı 0–100 puan (Viral Skor 2.0), cümle güvenli kenarlar, In/Out ve süreli marker |
 | — | **Sahne algılama** ve **vuruşlarda bölme**; kesimleri uygulamadan **▶ Dinle** |
 | Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Panelden uygulanan 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 1.076 SFX ve 30 Motion BG |
@@ -95,6 +96,8 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | — | Kütüphane sağlık kontrolü ve destek raporu |
 
 Abonelikli veya kredi tabanlı kurgu panellerinin aksine Suflo Pro'da sayaç ve otomatik yenileme yok — bir kez öde, bitti.
+
+**Pro'yu dene.** Almadan önce kendi videonda dene: kodla çalışan her Pro aracına (otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir, Suflo Stilleri katmanı ve kanca başlığı, çeviri, ritim) **3 deneme hakkın** var. Haklar süresiz; hak yalnız işlem başarıyla bitince düşer (hata ya da boş sonuç hak yemez; yalnız analiz eden adımlar da hak yemez). Deneme hakkıyla eklenen stilli altyazı katmanı ve kanca başlığının sağ üstünde küçük, yarı saydam bir `suflo.app` filigranı olur; SRT/VTT, Premiere caption izi, ses ve kesimler **hiçbir zaman** filigranlanmaz. Pro'yu etkinleştirince Ayarlar › Suflo Pro'daki "Deneme çıktılarını temiz yeniden oluştur" listesi, o sekans açıkken her deneme çıktısını filigransız yeniden üretip aynı yere koyar ve eskisini kaldırır. İçerik kütüphaneleri (MOGRT, SFX, Motion BG, preset, altyazı MOGRT stilleri), toplu klip ve stilli ASS dışa aktarma denemeye açık değil. Kalan hakların Ayarlar › Suflo Pro'da görünür.
 
 ### Pro İçerik Bulutu
 
@@ -252,7 +255,11 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-burn.js` | ASS'in libass ile videoya gerçekten çizildiği (kare farkı) |
 | `test-hata.js` | Hata rehberi: doğru tavsiye veriyor mu, masum hataya yanlış tavsiye veriyor mu |
 | `test-mac.js` | macOS yolları: Homebrew, Metal, model klasörü, Windows'a özgü kodun çalışmaması |
-| `test-pro-license.js` | Store/product sahipliği, yanlış aktivasyonu geri bırakma, private kimlik sızıntısı |
+| `test-pro-license.js` | Store/product sahipliği, yanlış aktivasyonu geri bırakma, private kimlik sızıntısı; deneme hakları: kurmadan kapı kapalı, harcama imzalı yazılır, kurcalanmış/bozuk depo 0 hak verir, ayna silinen dosyayı geri doldurmaz, "Ücretsiz dene" düğmesi kurar ve eylemi yeniden çalıştırır, Pro'da deneme dosyası yazılmaz |
+| `test-deneme.js` | Pro'yu dene durum mantığı: 9 araç 3'er hak, kütüphaneler 0, harca alttan sınırlı ve girdiyi değiştirmez, birleştirmede büyük kazanır, lisans biçimli nesne reddedilir, deneme çıktısı kaydı (en çok 10, font adı yol içeremez) |
+| `test-filigran.js` | Deneme filigranı: tek stil + tek olay, idempotent, ilk stilin fontu, `\an9` ve `&H66&`, dikeyde daha aşağıda, son olayı kapsar, özgün satırlar bayt bayt aynı; libass'le gerçek render'da yalnız filigranlıda sağ üst dolu |
+| `test-overlay-render.js` | Ortak şeffaf katman render'ı (gerçek ffmpeg: qtrle, alfa, çift boyut) ve temiz yeniden oluşturma: sekans eşleşmezse dokunmaz, önce yerleştirir, yalnız başarıda `{path}` ile kaldırır (nodeId asla), render sırasında sekans değişirse yerleştirmez |
+| `test-deneme-baglanti.js` | Deneme bağlantıları: 9 araç deneme kapısında, hak yalnız başarı dalında düşer, kütüphane/MOGRT/toplu/ASS kapıları denemesiz, zoom kaldırma kapısız, ücretsizde MOGRT stili reddedilir, filigran yalnız stilli katman ve kanca başlığında, betik sırası, Ayarlar kartları ve Pro tablosu; gecisler.js'te hata/başarı davranışı |
 | `test-pro-sync.js` | Delta indirme, kaldığı yerden devam, atomik sürüm geçişi, offline geri dönüş |
 | `test-pro-cdn.js` | Private Hostinger ağacı, manifest hash'leri ve yayın öncesi API güvenlik kapısı |
 | `test-v175.js` | Sürüm regresyonları |
