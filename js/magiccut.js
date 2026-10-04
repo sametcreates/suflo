@@ -256,6 +256,8 @@ window.KCut = (function () {
       } else {
         KApp.toast(msg, "good");
       }
+      // ilk uygulanan kesim: davet seridinin anlarindan biri (mesgulken/yildiz seridi acikken cikmaz)
+      if (KApp.davetAni) KApp.davetAni("cut");
     } else {
       status("✕ " + r.error, "bad");
     }

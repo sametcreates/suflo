@@ -474,6 +474,14 @@
         <button id="star-go" class="link-btn">Yıldız ver</button>
         <button id="star-close" class="link-btn dim" title="Kapat">✕</button>
       </div>
+      <!-- Davet şeridi: ilk kesim, ilk Shorts ya da 5. başarılı uygulamadan sonra (js/davet.js işin yapıldığı yere taşır). Modal değil. -->
+      <div id="davet-bar" class="star-bar davet-bar" hidden role="status">
+        <span id="davet-bar-metin">Suflo işini kolaylaştırdıysa bir arkadaşına önerir misin?</span>
+        <button id="davet-bar-paylas" class="link-btn" type="button" title="Davet metnini kopyalar">Paylaş</button>
+        <button id="davet-bar-secenek" class="link-btn" type="button" title="Ayarlar › Davet et, kazan">Seçenekler</button>
+        <button id="davet-bar-asla" class="link-btn dim" type="button">Bir daha gösterme</button>
+        <button id="davet-bar-kapat" class="link-btn dim" type="button" title="Kapat" aria-label="Kapat">✕</button>
+      </div>
 
       <div id="cap-result" class="caption-editor" hidden>
         <div class="caption-editor-hero">
@@ -627,6 +635,9 @@
             <div id="cap-yt-basliklar" class="yt-basliklar"></div>
             <label for="cap-yt-aciklama">Açıklama</label>
             <textarea id="cap-yt-aciklama" rows="7"></textarea>
+            <label class="check-label yt-kredi" title="İsteğe bağlı: açıklamanın en sonuna kısa bir kredi satırı ekler. Platform sınırını aşarsa önce bu satır çıkar.">
+              <input id="cap-yt-kredi" type="checkbox"> Sona Suflo kredi satırı ekle (suflo.app)
+            </label>
             <div class="row"><span id="cap-yt-not" class="hint" style="margin:0"></span><button id="cap-yt-kopyala" class="btn tiny" type="button" style="margin-left:auto">Açıklamayı kopyala</button></div>
             <div id="cap-yt-etiket-sar" style="display:grid;gap:6px">
               <label for="cap-yt-etiket">Etiketler</label>
@@ -1684,6 +1695,20 @@
       <div id="pro-active-card" hidden>
         <p class="hint" style="margin-bottom:8px">Suflo Pro aktif ✓ <span id="pro-email" class="dim"></span></p>
         <p class="hint" id="pro-recheck" hidden>Çevrimdışı doğrulama süresi doldu — internete bağlanınca kendiliğinden yenilenir.</p>
+        <!-- Etkinleştirmeden hemen sonra bir kez (js/davet.js): yanıt isteğe bağlı, Geç'e basılabilir -->
+        <div class="pro-kaynak" id="pro-kaynak" hidden>
+          <b>Bizi nereden duydun?</b>
+          <div class="pro-kaynak-secenek">
+            <button type="button" class="btn tiny" data-kaynak="youtube">YouTube</button>
+            <button type="button" class="btn tiny" data-kaynak="instagram">Instagram</button>
+            <button type="button" class="btn tiny" data-kaynak="tiktok">TikTok</button>
+            <button type="button" class="btn tiny" data-kaynak="arkadas">Bir arkadaşım</button>
+            <button type="button" class="btn tiny" data-kaynak="kod">Davet kodu</button>
+            <button type="button" class="btn tiny" data-kaynak="google">Google</button>
+            <button type="button" class="btn tiny" data-kaynak="diger">Diğer</button>
+            <button type="button" class="link-btn dim" id="pro-kaynak-atla">Geç</button>
+          </div>
+        </div>
         <!-- Satin alma sonrasi: deneme ciktilarini filigransiz yeniden olustur (app.js doldurur) -->
         <div class="pro-temiz" id="pro-temiz-kart" hidden>
           <b>Deneme çıktılarını temiz yeniden oluştur</b>
@@ -1693,6 +1718,45 @@
         </div>
         <button id="pro-deactivate" class="btn">Bu makinede devre dışı bırak</button>
       </div>
+    </div>
+
+    <!-- Davet et, kazan (js/davet.js): Pro sahibine kişisel indirim kodu, herkese paylaşım bağlantısı -->
+    <div class="set-group davet-kart" id="grp-davet">
+      <div class="set-title">Davet et, kazan</div>
+      <div id="davet-kodlu" hidden>
+        <p class="hint">Arkadaşların bu kodla Suflo Pro'yu indirimli alır. Davetlerin biriktikçe ödül paketleri açılır ve Pro içerik bulutuyla kendiliğinden iner.</p>
+        <div class="davet-kod-satir">
+          <code id="davet-kod" class="davet-kod" title="Davet kodun">SFL······</code>
+          <button id="davet-kopyala" class="btn primary" type="button">Kopyala</button>
+        </div>
+        <div class="davet-ilerleme" id="davet-ilerleme" role="img" aria-label="Davet ilerlemesi">
+          <div class="davet-ilerleme-ust"><b id="davet-ilerleme-metin">0/1 davet</b><span id="davet-odul" class="dim"></span></div>
+          <div class="davet-cubuk"><i id="davet-bar-dolu"></i></div>
+        </div>
+      </div>
+      <div id="davet-serbest">
+        <p class="hint" id="davet-serbest-not">Bağlantı yalnız kimden geldiğini gösterir, kişisel bilgi taşımaz.</p>
+        <div class="row">
+          <input id="davet-link" type="text" readonly spellcheck="false" aria-label="Paylaşım bağlantın">
+          <button id="davet-paylas" class="btn primary" type="button">Suflo'yu paylaş</button>
+        </div>
+      </div>
+      <div class="davet-kanallar">
+        <button id="davet-wa" class="btn tiny" type="button" title="WhatsApp'ta paylaş">WhatsApp</button>
+        <button id="davet-x" class="btn tiny" type="button" title="X'te paylaş">X</button>
+        <button id="davet-ig" class="btn tiny" type="button" title="Instagram'ın paylaşım bağlantısı yok: metni kopyalar, hikâyene ya da DM'e yapıştırırsın">Instagram</button>
+        <button id="davet-story" class="btn tiny" type="button" hidden title="1080×1920 Story kartı: PNG olarak masaüstüne kaydedilir">Story kartı</button>
+      </div>
+      <details class="adv davet-girilen-sar" id="davet-girilen-sar">
+        <summary>Arkadaşından davet kodu aldın mı?</summary>
+        <p class="hint" style="margin:6px 0 8px">Kodu bir kez kaydet: Suflo Pro'yu panelden alırken indirim ödeme sayfasına kendiliğinden eklenir.</p>
+        <div class="row">
+          <input id="davet-girilen" type="text" placeholder="SFLXXXXXX" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Davet kodu">
+          <button id="davet-girilen-kaydet" class="btn" type="button">Kaydet</button>
+        </div>
+      </details>
+      <div id="davet-durum" class="inline-status"></div>
+      <p class="hint"><a href="#" id="davet-ortaklik">İçerik üreticisi misin? Ortaklık programı →</a></p>
     </div>
 
     <div class="set-group">
@@ -1776,6 +1840,7 @@
   <script src="js/highlights.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
+  <script src="js/referral-core.js"></script>
   <script src="js/youtube-meta.js"></script>
   <script src="js/bolumler.js"></script>
   <script src="js/gecisler.js"></script>
@@ -1796,6 +1861,7 @@
   <script src="js/library-health.js"></script>
   <script src="js/onboarding-steps.js"></script>
   <script src="js/onboarding.js"></script>
+  <script src="js/davet.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

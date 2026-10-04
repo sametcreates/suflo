@@ -525,6 +525,13 @@ details.adv > *:not(summary) { margin-top: 8px; }
 .star-bar span { flex: 1; min-width: 0; }
 .star-bar .link-btn { flex: 0 0 auto; }
 
+/* Davet şeridi (davet et, kazan): yıldız şeridinin görünümü; metin üstte, düğmeler altında.
+   CEF 74'te flex gap yok: aralıklar margin ile */
+.davet-bar { flex-wrap: wrap; }
+.davet-bar span { flex: 1 1 100%; margin-bottom: 4px; }
+.davet-bar .link-btn { margin-right: 12px; }
+.davet-bar #davet-bar-kapat { margin-left: auto; margin-right: 0; }
+
 /* Ayarlardan çıkış çubuğu — solo modda sekme çubuğu gizli olduğu için tek görünür yol */
 .set-back-bar {
   display: flex;
@@ -3802,3 +3809,31 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .onb-gizlilik { font-size: 10px; color: var(--faint); }
 .ia-adim-bas { cursor: pointer; user-select: none; }
 .ia-adim-bas:hover b { color: var(--accent-lite); }
+
+/* ---------- Davet et, kazan (Ayarlar › #grp-davet) ----------
+   CEF 74 (Premiere 14.4) flex gap ve overflow-wrap:anywhere bilmez: aralıklar margin ile */
+.davet-kod-satir { display: flex; align-items: center; margin: 8px 0 10px; }
+.davet-kod {
+  flex: 1 1 auto; min-width: 0; margin-right: 8px; padding: 8px 10px;
+  border: 1px dashed var(--accent); border-radius: var(--r); background: var(--bg3);
+  color: var(--text); font: 700 17px/1.2 Consolas, Menlo, "Courier New", monospace; letter-spacing: .12em;
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.davet-kanallar { display: flex; flex-wrap: wrap; margin: 6px 0 2px; }
+.davet-kanallar .btn { margin: 0 6px 6px 0; }
+.davet-ilerleme { margin: 4px 0 8px; }
+.davet-ilerleme-ust { display: flex; align-items: baseline; justify-content: space-between; font-size: 11px; margin-bottom: 5px; }
+.davet-ilerleme-ust b { color: var(--text); margin-right: 8px; white-space: nowrap; }
+.davet-ilerleme-ust span { min-width: 0; text-align: right; word-wrap: break-word; }
+.davet-cubuk { height: 6px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--line2); overflow: hidden; }
+.davet-cubuk i { display: block; width: 0; height: 100%; background: var(--accent); background: var(--grad); transition: width .4s var(--ease); }
+#davet-link { flex: 1 1 auto; min-width: 0; }
+#davet-paylas { flex: 0 0 auto; white-space: nowrap; }
+.davet-girilen-sar { margin: 6px 0 4px; }
+.yt-kredi { margin: 2px 0 4px; }
+
+/* "Bizi nereden duydun?": Pro etkinleşince bir kez */
+.pro-kaynak { margin: 6px 0 10px; padding: 9px 10px 4px; border: 1px solid var(--line2); border-radius: var(--r); background: var(--bg3); }
+.pro-kaynak b { display: block; margin-bottom: 7px; font-size: 12px; color: var(--text); }
+.pro-kaynak-secenek { display: flex; flex-wrap: wrap; align-items: center; }
+.pro-kaynak-secenek .btn, .pro-kaynak-secenek .link-btn { margin: 0 6px 6px 0; }

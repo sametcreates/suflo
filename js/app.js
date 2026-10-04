@@ -11,10 +11,18 @@ window.KApp = (function () {
   var PRO_CHECKOUT = "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1";
   function proCheckoutUrl(feature) {
     var surum = window.K && K.VERSION ? K.VERSION : "unknown";
-    return PRO_CHECKOUT +
+    var url = PRO_CHECKOUT +
       "?checkout%5Bcustom%5D%5Bsource%5D=suflo_panel" +
       "&checkout%5Bcustom%5D%5Bfeature%5D=" + encodeURIComponent(String(feature || "pro")) +
       "&checkout%5Bcustom%5D%5Bapp_version%5D=" + encodeURIComponent(String(surum));
+    // Arkadaşından aldığı davet kodunu kaydettiyse indirim ödeme sayfasına kendiliğinden gelir
+    var kod = window.KDavet && KDavet.odemeKodu ? KDavet.odemeKodu() : "";
+    return window.SufloReferral ? SufloReferral.withDiscount(url, kod) : url;
+  }
+
+  // Davet şeridi anı: ilk kesim (magiccut.js), ilk Shorts (viral.js), 5. başarılı uygulama (captions.js)
+  function davetAni(olay) {
+    try { if (window.KDavet && KDavet.ani) KDavet.ani(olay); } catch (e) { K.log("davet: " + (e && e.message ? e.message : e)); }
   }
 
   var ctx = { hasSeq: false, sel: null, sequence: "" };
@@ -526,6 +534,10 @@ window.KApp = (function () {
           // deneme hakkıyla üretilmiş filigranlı çıktı varsa bir kez hatırlat (kart Ayarlar > Suflo Pro'da)
           if (Pro.denemeCiktilari && Pro.denemeCiktilari().length) {
             toast("Deneme çıktılarını temiz yeniden oluştur: Suflo Pro kartındaki listeden filigransız hale getir.", "good", 10000);
+          }
+          // Bir kez "Bizi nereden duydun?" ve davet kodunu hemen iste (sunucu kapalıysa sessizce geçer)
+          if (window.KDavet) {
+            try { KDavet.kaynakSor(); KDavet.kodGetir(true); } catch (eD) {}
           }
         } else {
           msg.textContent = r.error || "Etkinleştirilemedi.";
@@ -1325,6 +1337,7 @@ window.KApp = (function () {
     // İlk açılış rehberi: yalnız Node gerçeklerini okur, kullanıcı tıklamadan
     // Premiere'e (evalScript) hiçbir şey göndermez
     guvenli("Onboarding", function () { if (window.KOnboarding) KOnboarding.init(); });
+    guvenli("Davet", function () { if (window.KDavet) KDavet.init(); });
     guvenli("Pro-UI", reflectPro);
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);
@@ -1431,6 +1444,8 @@ window.KApp = (function () {
     refreshContext: contextPollingBaslat,
     pollNow: pollNow,
     yenilikSurumu: function () { return YENILIKLER.surum; },
+    davetAni: davetAni,
+    proCheckoutUrl: proCheckoutUrl,
     installLocalWhisper: installLocalWhisper,
     checkUpdate: checkUpdate
   };

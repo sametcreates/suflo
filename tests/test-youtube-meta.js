@@ -77,5 +77,8 @@ ok("bolumler tek basina tasinca kredi eklenmez", tasanKredi === tasan && tasanKr
 var sinirTam = new Array(5000 - KREDI.length - 2 + 1).join("c");
 ok("kredi tam sigiyorsa eklenir (5000 dahil)", Y.compose({ aciklama: sinirTam, kredi: KREDI }).length === 5000 &&
   /suflo\.app$/.test(Y.compose({ aciklama: sinirTam, kredi: KREDI })));
+var bj2 = fs.readFileSync(path.join(__dirname, "..", "js", "bolumler.js"), "utf8");
+ok("bolumler.js ytAciklama krediyi gecer, kutu #cap-yt-kredi", /kredi:\s*krediSatiri\(\)/.test(bj2) && /cap-yt-kredi/.test(bj2) && html.indexOf('id="cap-yt-kredi"') !== -1);
+ok("kredi kutusunun varsayilani: Pro degilse acik, kullanici secene dek", /typeof s\.krediSatiri === "boolean"/.test(bj2) && /Pro\.isPro\(\)/.test(bj2));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

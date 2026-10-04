@@ -486,5 +486,8 @@ window.ProSync = (function () {
     if (options.fileFetcher) cfg.fileFetcher = options.fileFetcher;
   }
 
-  return { init: init, sync: sync, status: status, on: on, openFolder: openFolder, configure: configure, rootDir: rootDir, VERSION: "1.0.0" };
+  // Pro icerik API'si (davet kodu ve "nereden duydun" da ayni adrese gider: js/davet.js)
+  function endpoint() { return cfg.endpoint; }
+
+  return { init: init, sync: sync, status: status, on: on, openFolder: openFolder, configure: configure, rootDir: rootDir, endpoint: endpoint, VERSION: "1.0.0" };
 })();

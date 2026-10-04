@@ -559,6 +559,8 @@ window.KViral = (function () {
       durum(hatalar.length ? "Bazıları atlandı: " + hatalar.join("; ").slice(0, 220) : "", hatalar.length ? "warn" : "");
       KApp.toast(yapilan + " Shorts sekansı oluşturuldu" + (dikeySay ? " · " + dikeySay + " dikey (9:16)" : "") +
         " — Proje panelinde \"Suflo Shorts\" kutusu", "good", 8000);
+      // ilk Shorts: davet seridinin anlarindan biri (karar gecikmeli verilir, busy o zaman bitmis olur)
+      if (KApp.davetAni) KApp.davetAni("shorts");
     } catch (e) {
       durum("✕ " + K.hataYardimi(e), "bad");
     } finally {

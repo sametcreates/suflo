@@ -161,7 +161,48 @@ window.KChapters = (function () {
     if (!ytSonuc) return "";
     var bolumler = bolumlerGecerli() ? CH.format(list, { origin: 0 }) : "";
     return YM.compose({ aciklama: ytSonuc.aciklama, bolumler: bolumler, hashtagler: ytSonuc.hashtagler,
-      platform: ytPlatform(), kanca: ytSonuc.secilenKanca || ytSonuc.basliklar[0] || "" });
+      platform: ytPlatform(), kanca: ytSonuc.secilenKanca || ytSonuc.basliklar[0] || "", kredi: krediSatiri() });
+  }
+
+  /*
+   * "Made with Suflo" kredi satiri (davet et, kazan): aciklamanin en sonuna, isteğe bağlı.
+   * Kullanici secene dek varsayilan: Pro degilse acik, Pro'da kapali. Satir kopyalanmadan once
+   * textarea'da hep gorunur; sinira sigmazsa ilk o duser (youtube-meta.js compose).
+   */
+  function krediAcik() {
+    var s = K.settings();
+    if (typeof s.krediSatiri === "boolean") return s.krediSatiri;
+    return !(typeof Pro !== "undefined" && Pro.isPro());
+  }
+  function krediMetni() {
+    return window.SufloReferral ? SufloReferral.creditLine(lang()) : "Altyazılar: Suflo · suflo.app";
+  }
+  function krediSatiri() { return krediAcik() ? krediMetni() : ""; }
+
+  function krediKutusunuCiz() {
+    var k = el("cap-yt-kredi");
+    if (k) k.checked = krediAcik();
+  }
+
+  function krediDegisti() {
+    var s = K.settings();
+    s.krediSatiri = !!el("cap-yt-kredi").checked;
+    K.saveSettings();
+    if (!ytSonuc || !el("cap-yt-aciklama")) return;
+    var ta = el("cap-yt-aciklama");
+    if (ta.value === ytSonYazilan) {
+      ytSonYazilan = ytAciklama();
+      ta.value = ytSonYazilan;
+      return;
+    }
+    // Elle duzenlenmis aciklama: yalniz son satiri ekle/cikar, kullanicinin metnine dokunma
+    var satir = krediMetni(), v = ta.value.replace(/\s+$/, "");
+    var sinir = YM.PLATFORM[ytPlatform()] ? YM.PLATFORM[ytPlatform()].aciklama : 5000;
+    if (s.krediSatiri) {
+      if (v.slice(-satir.length) !== satir && v.length + 2 + satir.length <= sinir) ta.value = (v ? v + "\n\n" : "") + satir;
+    } else if (v.slice(-satir.length) === satir) {
+      ta.value = v.slice(0, v.length - satir.length).replace(/\s+$/, "");
+    }
   }
 
   function ytCiz() {
@@ -261,6 +302,12 @@ window.KChapters = (function () {
       el("cap-yt-platform").addEventListener("change", function () { ytSonuc = null; el("cap-yt-sonuc").hidden = true; });
       el("cap-yt-kopyala").addEventListener("click", function () { panoya(el("cap-yt-aciklama").value, "Açıklama kopyalandı"); });
       el("cap-yt-etiket-kopyala").addEventListener("click", function () { panoya(el("cap-yt-etiket").value, "Etiketler kopyalandı — YouTube Studio › Etiketler"); });
+      if (el("cap-yt-kredi")) {
+        krediKutusunuCiz();
+        el("cap-yt-kredi").addEventListener("change", krediDegisti);
+        // Pro etkinlesince varsayilan degisir (kullanici secmediyse)
+        if (typeof Pro !== "undefined" && Pro.on) Pro.on(function () { if (typeof K.settings().krediSatiri !== "boolean") krediKutusunuCiz(); });
+      }
     }
   }
 

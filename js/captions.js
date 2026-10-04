@@ -4003,21 +4003,22 @@ window.KCaptions = (function () {
    * Ucuncu basarili uygulamadan sonra BIR KEZ yildiz iste.
    * Kurallar bilincli: (1) mutlu anda sorulur, isin ortasinda degil, (2) omurde tek sefer,
    * (3) kapatilabilir ve isi engellemez. Erken veya tekrarlayan istek uruna zarar verir.
+   * Sayac yildizdan sonra da surer: 5. basarili uygulama davet seridinin anidir (js/davet.js;
+   * yildiz seridi acikken ya da Premiere mesgulken cikmaz, 30 gunde en cok bir kez).
    */
   function yildizIste() {
     var s = K.settings();
-    if (s.yildizSoruldu) return;
     s.basariliUygulama = (s.basariliUygulama || 0) + 1;
     K.saveSettings();
-    if (s.basariliUygulama < 3) return;
-
-    s.yildizSoruldu = true;
-    K.saveSettings();
-
-    // toast yerine kalici, kapatilabilir bir serit: kullanici hazir oldugunda tiklar
-    var bar = el("star-bar");
-    if (!bar) return;
-    bar.hidden = false;
+    if (!s.yildizSoruldu && s.basariliUygulama >= 3) {
+      s.yildizSoruldu = true;
+      K.saveSettings();
+      // toast yerine kalici, kapatilabilir bir serit: kullanici hazir oldugunda tiklar
+      var bar = el("star-bar");
+      if (bar) bar.hidden = false;
+      return;
+    }
+    if (window.KApp && KApp.davetAni) KApp.davetAni({ type: "apply", count: s.basariliUygulama });
   }
 
   function initYildizBar() {

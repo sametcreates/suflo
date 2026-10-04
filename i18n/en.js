@@ -2025,6 +2025,77 @@
     "Bu sekansta deneme klibi bulunamadı: temiz katman ilk konduğu yere kondu ({}, {} sn)": "No trial clip found in this sequence: the clean layer was placed where the trial first went ({}, {} s)"
   });
 
+  /* ============ Invite & earn (js/davet.js, js/referral-core.js, Settings › #grp-davet) ============ */
+  add({
+    "Davet et, kazan": "Invite & earn",
+    "Suflo işini kolaylaştırdıysa bir arkadaşına önerir misin?": "If Suflo made your work easier, would you recommend it to a friend?",
+    "Kesim tamam! Suflo işini kolaylaştırdıysa bir arkadaşına önerir misin?": "Cut done! If Suflo made your work easier, would you recommend it to a friend?",
+    "Shorts'ların hazır! Suflo işini kolaylaştırdıysa bir arkadaşına önerir misin?": "Your Shorts are ready! If Suflo made your work easier, would you recommend it to a friend?",
+    "Davet metnini kopyalar": "Copies the invite text",
+    "Paylaş": "Share",
+    "Ayarlar › Davet et, kazan": "Settings › Invite & earn",
+    "Seçenekler": "Options",
+    "Bir daha gösterme": "Don't show again",
+    "İsteğe bağlı: açıklamanın en sonuna kısa bir kredi satırı ekler. Platform sınırını aşarsa önce bu satır çıkar.": "Optional: adds a short credit line at the very end of the description. If the text would go over the platform limit, this line is dropped first.",
+    "Sona Suflo kredi satırı ekle (suflo.app)": "Add a Suflo credit line at the end (suflo.app)",
+    "Altyazılar: Suflo · suflo.app": "Captions: Suflo · suflo.app",
+    "Bizi nereden duydun?": "Where did you hear about us?",
+    "Bir arkadaşım": "A friend",
+    "Davet kodu": "Invite code",
+    "Diğer": "Other",
+    "Geç": "Skip",
+    "Teşekkürler!": "Thank you!",
+    "Arkadaşların bu kodla Suflo Pro'yu indirimli alır. Davetlerin biriktikçe ödül paketleri açılır ve Pro içerik bulutuyla kendiliğinden iner.": "Your friends get Suflo Pro at a discount with this code. As your invites add up, reward packs unlock and download automatically through the Pro content cloud.",
+    "Davet kodun": "Your invite code",
+    "Davet ilerlemesi": "Invite progress",
+    "{n}/{n} davet": "{}/{} invites",
+    "{n} davet": "{} invites",
+    "Bağlantı yalnız kimden geldiğini gösterir, kişisel bilgi taşımaz.": "The link only shows who it came from and carries no personal data.",
+    "Kişisel indirim kodun hazır olunca burada görünür. Şimdilik bu bağlantıyı paylaş.": "Your personal discount code will show up here once it's ready. For now, share this link.",
+    "Paylaşım bağlantın": "Your share link",
+    "Suflo'yu paylaş": "Share Suflo",
+    "WhatsApp'ta paylaş": "Share on WhatsApp",
+    "X'te paylaş": "Share on X",
+    "Instagram'ın paylaşım bağlantısı yok: metni kopyalar, hikâyene ya da DM'e yapıştırırsın": "Instagram has no share link: this copies the text so you can paste it into your story or a DM",
+    "1080×1920 Story kartı: PNG olarak masaüstüne kaydedilir": "1080×1920 Story card: saved to your desktop as a PNG",
+    "Story kartı": "Story card",
+    "Story kartı hazırlanıyor…": "Preparing the Story card…",
+    "Story kartı için ffmpeg gerekli (Ayarlar → ffmpeg).": "The Story card needs ffmpeg (Settings → ffmpeg).",
+    "Story kartı üretilemedi: {}": "Couldn't create the Story card: {}",
+    "Masaüstüne kaydedildi: {}": "Saved to your desktop: {}",
+    "Story kartı masaüstünde: {}": "Your Story card is on the desktop: {}",
+    "Arkadaşından davet kodu aldın mı?": "Got an invite code from a friend?",
+    "Kodu bir kez kaydet: Suflo Pro'yu panelden alırken indirim ödeme sayfasına kendiliğinden eklenir.": "Save the code once: when you buy Suflo Pro from the panel, the discount is added to the checkout page automatically.",
+    "Davet kodu kaldırıldı.": "Invite code removed.",
+    "Bu bir Suflo davet kodu değil: SFL ile başlar, 9 karakterdir.": "That's not a Suflo invite code: it starts with SFL and has 9 characters.",
+    "Kod kaydedildi: Pro'yu panelden alırken indirim ödeme sayfasına kendiliğinden eklenir.": "Code saved: when you buy Pro from the panel, the discount is added to the checkout page automatically.",
+    "Davet metni kopyalandı: WhatsApp'ta ya da DM'de yapıştır": "Invite text copied: paste it on WhatsApp or in a DM",
+    "Paylaşım metni kopyalandı: bir arkadaşına yapıştır": "Share text copied: paste it to a friend",
+    "Metin kopyalandı: Instagram hikâyene ya da DM'e yapıştır": "Text copied: paste it into your Instagram story or a DM",
+    "Davet metni kopyalandı. Diğer seçenekler: Ayarlar › Davet et, kazan": "Invite text copied. More options: Settings › Invite & earn",
+    "İçerik üreticisi misin? Ortaklık programı →": "Are you a creator? Affiliate program →",
+    "Davet ödülün indirildi: yeni SFX ve altyazı şablonları kütüphanende": "Your invite reward has downloaded: new SFX and caption templates are in your library",
+    // Reward tiers (referral-core.js ODUL; the panel already passes the UI language)
+    "Davetçi paketi: MOGRT altyazı şablonları ve yaklaşık 30 SFX": "Inviter pack: MOGRT caption templates and about 30 SFX",
+    "Kurucu paketi ve beta erişimi": "Founder pack and beta access",
+    "Seninle iletişime geçeceğiz": "We'll get in touch with you",
+    // Share texts and the Story card are built per language inside referral-core.js (METIN.en, STORY.en);
+    // these entries keep the dictionary complete and identical to that English copy
+    "Premiere'de altyazılarımı Suflo ile yapıyorum: ücretsiz, Türkçe biliyor ve bilgisayarında çalışıyor. Suflo Pro'yu almak istersen davet kodumla %{y} indirim: {kod}": "I make my Premiere captions with Suflo: it's free and runs on your own computer. Want Suflo Pro? My invite code gets you {y}% off: {kod}",
+    "Premiere'de altyazılarımı Suflo ile yapıyorum: ücretsiz, Türkçe biliyor ve bilgisayarında çalışıyor.": "I make my Premiere captions with Suflo: it's free and runs on your own computer.",
+    "Premiere'de altyazılarımı Suflo ile yapıyorum. Ücretsiz; Pro'da davet kodumla %{y} indirim: {kod}": "I make my Premiere captions with Suflo. It's free; my invite code gets you {y}% off Pro: {kod}",
+    "Premiere'de altyazılarımı Suflo ile yapıyorum: ücretsiz, Türkçe biliyor, bilgisayarında çalışıyor.": "I make my Premiere captions with Suflo: free, and it runs on your own computer.",
+    "Altyazılarımı Suflo ile yapıyorum 🎬 Premiere paneli, ücretsiz. Pro'da %{y} indirim için davet kodum: {kod}": "I make my captions with Suflo 🎬 A free Premiere panel. My invite code for {y}% off Pro: {kod}",
+    "Altyazılarımı Suflo ile yapıyorum 🎬 Premiere paneli, ücretsiz.": "I make my captions with Suflo 🎬 A free Premiere panel.",
+    "SUFLO · PREMIERE PANELİ": "SUFLO · PREMIERE PANEL",
+    "Premiere'de altyazı": "Premiere captions",
+    "2 dakikada": "in 2 minutes",
+    "DAVET KODUM": "MY INVITE CODE",
+    "Suflo Pro'da %{y} indirim": "{y}% off Suflo Pro",
+    "Ücretsiz indir · Windows ve macOS": "Free download · Windows and macOS",
+    "Ücretsiz ve açık kaynak": "Free and open source"
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   var P = [
     // "1.076 SFX" style Turkish thousands → English
@@ -2062,6 +2133,7 @@
     "suflo => Suflo sametkreyts => sametcreates rils => Reels", "https://assets.suflo.app/emoji/v1/catalog.json", "XXXX-XXXX-XXXX-XXXX",
     "Podcast (−16 LUFS)", "YouTube / Shorts (−14 LUFS)", "Normal", "Aa", "-38 dB",
     "Suflo Deneme",   // Premiere sequence name created by the first-run guide
+    "Instagram", "WhatsApp", "Google", "TikTok", "SFL······", "SFLXXXXXX", "suflo.app",   // invite & earn: brands, code mask
     "Podcast"];       // Viral Score genre (same word in English)
   S["ASS · stilli"] = "ASS · styled";
 
