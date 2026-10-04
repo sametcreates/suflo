@@ -64,6 +64,8 @@ window.KApp = (function () {
 
   var CLAP_IC = '<svg class="ctx-ic" viewBox="0 0 16 16"><path d="M1.8 6.2 h12.4 v6.4 a1.4 1.4 0 0 1 -1.4 1.4 h-9.6 a1.4 1.4 0 0 1 -1.4-1.4 z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2.2 6.2 L3.4 3.3 L14.2 4.6 L13.4 6.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M6.4 3.7 L5.4 6.2 M9.9 4.1 L8.9 6.2" stroke="currentColor" stroke-width="1.1"/></svg>';
 
+  // Klip ve sekans adı kullanıcı içeriği: İngilizce arayüzde "Giriş.mp4" "Intro.mp4" olmasın
+  // (sel-name span'ı data-i18n-skip taşır)
   function renderContext() {
     var elx = el("ctx-text");
     var dot = el("host-dot");
@@ -82,12 +84,12 @@ window.KApp = (function () {
       var pill = (ctx.selCount > 1)
         ? ctx.selCount + " klip seçili"
         : ctx.sel.dur.toFixed(1) + " sn";
-      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name"></span>' +
+      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name" data-i18n-skip></span>' +
         '<span class="pill live"></span>';
       strip.querySelector(".sel-name").textContent = ctx.sel.name;
       strip.querySelector(".pill").textContent = pill;
     } else {
-      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name"></span>' +
+      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name" data-i18n-skip></span>' +
         '<span class="pill">Klip seçilmedi</span>';
       strip.querySelector(".sel-name").textContent = ctx.sequence;
     }
@@ -481,7 +483,13 @@ window.KApp = (function () {
       var tur = document.createElement("b");
       tur.textContent = k.tur === "kanca" ? "Kanca başlığı" : "Stilli altyazı";
       bilgi.appendChild(tur);
-      bilgi.appendChild(document.createTextNode(" · " + (k.sekans || k.sequenceId) + (k.ts ? " · " + tarihEtiketi(k.ts) : "")));
+      // sekans adı kullanıcı içeriği: arayüz çevirisine girmesin
+      var sekansAdi = document.createElement("span");
+      sekansAdi.setAttribute("data-i18n-skip", "");
+      sekansAdi.textContent = String(k.sekans || k.sequenceId);
+      bilgi.appendChild(document.createTextNode(" · "));
+      bilgi.appendChild(sekansAdi);
+      if (k.ts) bilgi.appendChild(document.createTextNode(" · " + tarihEtiketi(k.ts)));
       var yap = document.createElement("button");
       yap.type = "button";
       yap.className = "btn tiny primary";

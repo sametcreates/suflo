@@ -227,7 +227,15 @@ window.KBeat = (function () {
     var b = el("beat-analyze");
     if (!b) return;
     b.disabled = busy || !ctx.sel;
-    el("beat-info").textContent = ctx.sel ? ctx.sel.name : "önce timeline'da bir klip seç";
+    // klip adı kullanıcı içeriği: arayüz çevirisine girmesin (ipucu metni çevrilir)
+    var info = el("beat-info");
+    info.textContent = ctx.sel ? "" : "önce timeline'da bir klip seç";
+    if (ctx.sel) {
+      var ad = document.createElement("span");
+      if (ad.setAttribute) ad.setAttribute("data-i18n-skip", "");
+      ad.textContent = ctx.sel.name;
+      info.appendChild(ad);
+    }
   }
 
   async function analyze() {

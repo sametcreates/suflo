@@ -137,6 +137,13 @@ window.K = (function () {
    * olusturdugu icin bu bilgi yalniz ilk okumada guvenilir; burada bir kez saklanir.
    */
   var _ayarDosyasiVardi = false;
+  /*
+   * settings.json vardi ama okunamadi/cozulemedi (yarim yazim, elle duzenleme, antivirus
+   * kilidi): bu oturumdaki ilk kayit onu varsayilanlarla EZMESIN. 3.1'de rehber ve davet
+   * acilista kaydettigi icin dosya kullanici hicbir sey yapmadan kaybolurdu. Ilk kayittan
+   * once dosya settings.bozuk-<zaman>.json olarak saklanir; saklanamazsa yazilmaz.
+   */
+  var _okunamayanAyar = "";
 
   function loadSettings() {
     if (_settings) return _settings;
@@ -148,7 +155,11 @@ window.K = (function () {
       var p = settingsPath();
       _ayarDosyasiVardi = !!(p && fs.existsSync(p));
       if (p && fs.existsSync(p)) {
-        var disk = JSON.parse(fs.readFileSync(p, "utf8"));
+        _okunamayanAyar = p;
+        // Not Defteri UTF-8'i BOM ile kaydedebilir: JSON.parse BOM'da hata verir
+        var disk = JSON.parse(String(fs.readFileSync(p, "utf8")).replace(/^\uFEFF/, ""));
+        if (!disk || typeof disk !== "object" || Array.isArray(disk)) throw new Error("settings.json nesne degil");
+        _okunamayanAyar = "";
         for (var k in disk) if (disk.hasOwnProperty(k)) _settings[k] = disk[k];
 
         // 2.6.1/2.6.2'de bos kaydedilmis eski deger, yeni Suflo Cloud
@@ -169,7 +180,17 @@ window.K = (function () {
   function saveSettings() {
     try {
       var p = settingsPath();
-      if (p) fs.writeFileSync(p, JSON.stringify(loadSettings(), null, 2), "utf8");
+      var ayar = loadSettings();
+      if (p && _okunamayanAyar === p) {
+        if (fs.existsSync(p)) {
+          var yedek = path.join(path.dirname(p), "settings.bozuk-" + Date.now() + ".json");
+          try { fs.copyFileSync(p, yedek); }
+          catch (eY) { try { log("ayarlar: okunamayan settings.json yedeklenemedi, uzerine yazilmadi"); } catch (eL) {} return false; }
+          try { log("ayarlar: okunamayan settings.json yedeklendi: " + path.basename(yedek)); } catch (eL2) {}
+        }
+        _okunamayanAyar = "";
+      }
+      if (p) fs.writeFileSync(p, JSON.stringify(ayar, null, 2), "utf8");
       return true;
     } catch (e) { return false; }
   }

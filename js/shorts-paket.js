@@ -163,6 +163,7 @@ window.KShortsPaket = (function () {
       ad.className = "paket-kisa-ad";
       ad.textContent = k.ad;   // AI metni: yalnız textContent
       ad.title = k.ad;
+      if (ad.setAttribute) ad.setAttribute("data-i18n-skip", "");   // anın başlığı kullanıcı içeriği: arayüz çevirisine girmez
       satir.appendChild(ad);
       var cipler = document.createElement("div");
       cipler.className = "paket-cipler";
