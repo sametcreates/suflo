@@ -96,5 +96,40 @@ chk("EN + Otomatik ipucunda Turkce dolgu yok", !/ı|şey/.test(T.fillerPrompt(T.
 var kkKaynak = fsx.readFileSync(px.join(__dirname, "..", "js", "konusma-kes.js"), "utf8");
 chk("konusma-kes: dolgu ipucu promptLang + arayuz diliyle (|| \"tr\" yok)", /TC\.promptLang\(/.test(kkKaynak) && !/cap-lang"\)\.value\) \|\| "tr"/.test(kkKaynak));
 
+
+/* ---- v4 Tek Tık Temizlik uzantilari (geriye uyumlu) ---- */
+var ek = T.parseExtraFillers("tr: yani yani\nen: you see\nböyle\n# yorum\n\n");
+chk("parseExtraFillers: dil onekli ve oneksiz satirlar", JSON.stringify(ek) === JSON.stringify({ tr: ["yani yani"], en: ["you see"], "*": ["böyle"] }), JSON.stringify(ek));
+var ekCumle = [w(0, .3, "Yani"), w(.35, .6, "yani,"), w(.7, 1, "geldim"), w(1.1, 1.4, "böyle")];
+var ekTr = T.classify(ekCumle, { lang: "tr", extraFillers: ek });
+chk("extraFillers: cok sozcuklu tr dolgu + her dilde gecerli satir", JSON.stringify(ekTr) === JSON.stringify(["filler", "filler", null, "filler"]), JSON.stringify(ekTr));
+var ekEn = T.classify([w(0, .3, "yani"), w(.35, .6, "yani"), w(1, 1.2, "you"), w(1.3, 1.5, "see")], { lang: "en", extraFillers: "tr: yani yani\nen: you see" });
+chk("extraFillers: dile gore uygulanir (en'de tr dolgu yok, metin girdisi de olur)", ekEn[0] !== "filler" && ekEn[1] !== "filler" && ekEn[2] === "filler" && ekEn[3] === "filler", JSON.stringify(ekEn));
+var eskiCikti = JSON.stringify(T.classify(cumle, { lang: "tr" }));
+chk("phraseRepeats/extraFillers verilmezse cikti aynen", eskiCikti === JSON.stringify(k1) && JSON.stringify(T.classify(cumle, { lang: "tr", phraseRepeats: false })) === eskiCikti);
+var yb = [w(0, .2, "bu"), w(.25, .6, "ürünü"), w(.7, 1, "ııı"), w(1.1, 1.3, "bu"), w(1.35, 1.7, "ürünü"), w(1.8, 2.4, "kesinlikle")];
+var ybK = T.classify(yb, { lang: "tr", phraseRepeats: true });
+chk("phraseRepeats: 'bu ürünü ııı bu ürünü' ilk kopya falsestart", ybK[0] === "falsestart" && ybK[1] === "falsestart" && ybK[2] === "filler" && ybK[3] === null && ybK[4] === null, JSON.stringify(ybK));
+chk("phraseRepeats kapaliyken (varsayilan) falsestart yok", T.classify(yb, { lang: "tr" }).indexOf("falsestart") === -1);
+chk("stemEq: önek ve ilk 4 harf", T.stemEq("size", "sizlere") === false && T.stemEq("video", "videoda") && T.stemEq("kamera", "kamerayı") && T.stemEq("sizlerle", "sizlere") && !T.stemEq("bu", "bunu"));
+
+var cok = [];
+for (var ci = 0; ci < 500; ci++) cok.push({ start: ci * 1.0, end: ci * 1.0 + 0.85 });
+var cc = T.capCuts(cok, { max: 300, mergeGap: 0.25 });
+chk("capCuts: 500 kesim <=300'e iner, birlesme bildirilir", cc.ranges.length <= 300 && cc.merged > 0, cc.ranges.length + " / merged " + cc.merged);
+chk("capCuts: sirali ve cakismasiz", cc.ranges.every(function (r, i) { return i === 0 || r.start > cc.ranges[i - 1].end; }));
+var seyrek = [];
+for (var si = 0; si < 400; si++) seyrek.push({ start: si * 3, end: si * 3 + (si % 2 ? 0.5 : 0.2) });
+var cs2 = T.capCuts(seyrek, { max: 300 });
+chk("capCuts: uzak kesimler birlesmez, en kisalar birakilir (konusma yutulmaz)", cs2.ranges.length === 300 && cs2.merged === 0 && cs2.dropped === 100 &&
+  cs2.ranges.filter(function (r) { return r.end - r.start > 0.4; }).length === 200, JSON.stringify([cs2.ranges.length, cs2.merged, cs2.dropped]));
+var az = T.capCuts([{ start: 1, end: 2 }], {});
+chk("capCuts: sinir altinda dokunmaz", az.ranges.length === 1 && az.merged === 0 && az.dropped === 0);
+var inv = T.invertRanges([{ start: 0, end: 1 }, { start: 3, end: 4 }, { start: 3.5, end: 5 }, { start: 9, end: 12 }], 0, 10);
+chk("invertRanges: kenarlarda dogru", JSON.stringify(inv) === JSON.stringify([{ start: 1, end: 3 }, { start: 5, end: 9 }]), JSON.stringify(inv));
+chk("invertRanges: bos liste tum aralik", JSON.stringify(T.invertRanges([], 2, 5)) === JSON.stringify([{ start: 2, end: 5 }]));
+chk("previewFilter: varsayilan bayt bayt ayni", T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }) === pf);
+var only = T.previewFilter([{ start: 11, end: 12 }, { start: 14, end: 14.5 }], { clipStart: 10, clipEnd: 20, dur: 10 }, null, { only: true });
+chk("previewFilter only: aselect between()", only === "aselect='between(t,1.000,2.000)+between(t,4.000,4.500)',asetpts=N/SR/TB", only);
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
