@@ -445,3 +445,136 @@ haklar geri **dolmamalı** (bu da denenecek bir davranış).
 - Reels'te paylaşılan deneme çıktıları `suflo.app` filigranı taşır: ilk haftalarda yorumlarda/etiketlerde
   "suflo.app" görürsen o içerik üreticisine ulaş (Pro kodu ya da paylaşım izni), satın aldıysa Ayarlar'daki
   temiz yeniden oluşturmayı hatırlat.
+
+---
+
+## 5. Davet et, kazan (davet kodları, paylaşım kartı, isteğe bağlı "Made with Suflo")
+
+**Şu an durum:** Panel ve site tarafı hazır, sunucu tarafı **uyuyor**. Sen açana dek:
+
+- Ayarlar'daki "Davet et, kazan" kartı herkese (Pro sahibine de) kişisel bilgi taşımayan
+  `https://suflo.app/?ref=xxxxxxxxxx` paylaşım bağlantısını, WhatsApp/X/Instagram düğmelerini ve
+  "Ortaklık ve davet" sayfasını gösterir. Sunucu `503 referral_disabled` döndüğü sürece Pro'ya kod
+  gösterilmez; panel hata vermez, sessizce paylaşım bağlantısına düşer.
+- Davet şeridi (ilk kesim, ilk Shorts, 5. altyazı uygulaması; 30 günde en çok bir kez; iş sürerken ve
+  yıldız şeridi açıkken çıkmaz) ve paylaşım metnindeki kredi satırı kutusu sunucudan bağımsız çalışır.
+- "Bizi nereden duydun?" Pro etkinleşince bir kez sorulur; yanıt sunucuda
+  `private/pro-v1/attribution.jsonl` dosyasına (gün, yanıt, lisansın SHA-256'sı) eklenir. Eski
+  sunucu 400 dönerse panel bunu yok sayar.
+- Site, `?d=KOD` ve `?ref=...` parametrelerini 30 gün saklar ve "Pro'yu al" bağlantılarına ekler.
+
+Davet kodu açılınca: Pro sahibine `SFL` + 6 karakterlik bir kod üretilir (Lemon Squeezy'de %15, tek
+seferlik, en çok 50 kullanım, yalnız Suflo Pro varyantlarında). Sayaç; ödenmiş, iade edilmemiş, 14
+günden eski ve davet edenin kendi e-postası olmayan siparişlerin farklı e-postalarını sayar. 1 davet
+"Davetçi", 3 davet "Kurucu" paketini açar; 10 davette kartta "seninle iletişime geçeceğiz" yazar
+(ödülü sen elle verirsin).
+
+### 5.1 Sunucuyu güncelle (yaklaşık 15 dk)
+
+1. Yeni `server/pro-v1/index.php`'yi sunucudaki `public_html/pro/v1/index.php` üzerine yükle
+   (en kolayı: `node tools/build-pro-cdn.js <paket> <surum>` ile üret, yalnız `index.php`'yi al).
+2. Sunucudaki **çalışan** `private/pro-v1/config.php`'yi yeniden üretme; açıp `];` satırından önce
+   şunları ekle (önceki satırın sonuna virgül koymayı unutma):
+   ```php
+       'ls_api_key' => '',
+       'referral_enabled' => false,
+       'referral_percent' => 15,
+       'referral_max' => 50,
+       'referral_variant_ids' => [],
+       'referrals_path' => __DIR__ . '/referrals.json',
+       'attribution_path' => __DIR__ . '/attribution.jsonl',
+       'davet_dir' => __DIR__ . '/davet'
+   ```
+3. `node tools/check-pro-cdn.js` çalıştır. "Pro API hazir" ve "Davet ucu hazir (HTTP 503, uyuyan
+   ozellik)" yazmalı. 400 görürsen `index.php` yüklenmemiştir.
+
+Bu noktada her şey eski gibi çalışır; 3.0 panelleri hiçbir fark görmez.
+
+### 5.2 Lemon Squeezy hazırlığı (yaklaşık 20 dk)
+
+1. **Varyant kimlikleri:** Lemon Squeezy → Products → Suflo Pro → her varyantın (TRY ve 5. maddede
+   açılacak USD varyantı) kimliğini not et (varyant düzenleme sayfasının adresindeki sayı). Bunlar
+   `referral_variant_ids` olacak, ör. `[123456, 123457]`. Liste boşken özellik açılmaz.
+2. **API anahtarı:** Settings → API → "+" ile yeni anahtar oluştur, adı `suflo-davet`. Anahtar
+   **tüm mağazaya** yetkilidir (indirim, iade, müşteri verisi). Yalnız sunucudaki
+   `private/pro-v1/config.php` içindeki `'ls_api_key' => '...'` satırına yapıştır. GitHub'a, panele,
+   e-postaya, sohbete, ekran görüntüsüne asla koyma. Sızdığından şüphelenirsen hemen sil ve yenisini
+   oluştur. Yayın sırasında `tools/verify-release.ps1`, anahtarın pakete girmediğini denetler
+   (yerelde `SUFLO_LS_API_KEY` ortam değişkenini tanımlarsan anahtarın kendisini de arar).
+3. **Ödeme bağlantısında indirim kodu:** Lemon Squeezy'nin `checkout[discount_code]=KOD` adres
+   parametresiyle indirimi ödeme sayfasında hazır doldurduğunu bir kez doğrula: Discounts'ta elle
+   `SFLTEST22` adında %15'lik bir kod aç, `https://suflo.app/?d=SFLTEST22` adresini aç, "Pro'yu al"a bas.
+   Ödeme penceresinde indirim satırı görünmeli. Görünmüyorsa panel ve site yine çalışır ama alıcı kodu
+   elle yazmak zorunda kalır; bu durumda bana haber ver. Sonra `SFLTEST22`'yi sil.
+
+### 5.3 Test satın alımı ve açma (yaklaşık 30 dk)
+
+1. Önce **test modunda** dene: Lemon Squeezy'de "Test mode"u aç, test modu API anahtarı oluştur. Test
+   modundaki ürün ve varyant kimlikleri canlıdakinden farklıdır; deneme süresince `config.php`'de
+   `product_id`, `referral_variant_ids` ve `ls_api_key`'i test modu değerleriyle değiştir (eski
+   değerleri bir kenara yaz), `'referral_enabled' => true` yap.
+2. Test modunda bir Suflo Pro satın al (kart: `4242 4242 4242 4242`), test lisansını panelde etkinleştir.
+   Ayarlar › Davet et, kazan kartında `SFL…` kodu ve `0/1 davet` görünmeli. Lemon Squeezy →
+   Discounts'ta `Davet SFL…` adında, %15, 50 kullanımlık, Suflo Pro'ya sınırlı bir indirim oluşmalı.
+3. Başka bir e-postayla `https://suflo.app/?d=SFL…` adresinden ikinci bir test satın alımı yap. Ödeme
+   sayfasında %15 indirim uygulanmalı. Sayaç ancak 14 gün sonra `1/1` olur (iade suistimaline karşı
+   bilerek gecikmeli); bu adımda `0/1` görmen normal.
+4. `config.php`'yi **canlı** değerlere geri çevir (canlı `product_id`, canlı varyant kimlikleri, canlı
+   API anahtarı), `'referral_enabled' => true` bırak. Test modunda oluşan `referrals.json`'u sil
+   (canlı lisanslarla eşleşmez, ama karışıklık olmasın).
+5. Kendi canlı lisansınla kartı bir kez aç: kod gelmeli. Gelmezse `'referral_enabled' => false` yap;
+   panel hemen paylaşım bağlantısına döner.
+
+### 5.4 Ödül paketleri (yaklaşık 1 saat, sonra her güncellemede)
+
+1. Pro paket klasörüne şu klasörleri ekle:
+   - `davet/t1/mogrt/` ve `davet/t1/sfx/`: "Davetçi" (1 davet): birkaç altyazı MOGRT şablonu ve
+     yaklaşık 30 ses efekti. Suflo Stili koyma: stiller açık kaynak koddur, ödül olamaz.
+   - `davet/t3/mogrt/` ve `davet/t3/sfx/`: "Kurucu" (3 davet): ayrı bir paket.
+2. `node tools/build-pro-cdn.js <paket> <surum>` çalıştır; çıktıda `davet=N` yazar ve
+   `private/pro-v1/davet/manifest.json` oluşur. Ana katalog (`manifest.json`) bu klasörden etkilenmez.
+3. `powershell -ExecutionPolicy Bypass -File tools/pro-content-zip.ps1` ile içerik arşivini al ve
+   sunucuda `private/pro-v1/` içine çıkar (`davet/` klasörü de gelir, `config.php`'ye dokunmaz).
+4. Ödüller yalnız **3.1.0 ve yeni** panellere gider (3.0 bilinmeyen yolda tüm eşitlemeyi durdururdu).
+   Panel ödülleri `pro-content/davet/` altına indirir, hiç silmez; SFX ve Grafikler'de Pro
+   koleksiyonunda görünür.
+5. 3 davetteki "erken erişim" sözü ve 10 davetteki iletişim senin elinde: `referrals.json`'da
+   `"tier": 10` olan kayıtları ayda bir kontrol et (kayıtta e-posta yok, yalnız özet; kişiyi Lemon
+   Squeezy'de indirim kodunun siparişlerinden bulursun).
+
+### 5.5 Site ve ortaklık
+
+- `docs/ortaklik.html` yayında. "E-postayla yaz" düğmesi, sayfadaki `data-eposta=""` alanına herkese
+  açık bir adres yazana dek gizli; o zamana dek yalnız Instagram düğmesi görünür. Kişisel Gmail'ini
+  yazma; `ortaklik@` gibi bir yönlendirme adresi aç.
+- "Ortaklık programına katıl" düğmesi `https://suflo.lemonsqueezy.com/affiliates` adresine gider.
+  Lemon Squeezy → Affiliates'i açmadan önce Türkiye'de ödeme alabildiğini doğrula (PayPal 2016'dan beri
+  yok); açamıyorsan düğmeyi sayfadan kaldır, IBAN'lı kişisel kod yolunu bırak.
+- İçerik üreticisi kodları (ör. `EDITORALI15`) Lemon Squeezy → Discounts'ta elle açılır; panelin
+  `SFL` kodlarıyla karışmaz. Ayda bir Discounts → kod → siparişler listesinden payı hesaplayıp IBAN'a
+  gönder.
+- Sitede indirim bilgisi "%15 davet indirimi uygulandı" sabit yazılı. `referral_percent`'i
+  değiştirirsen `docs/index.html` ve `docs/ortaklik.html`'deki %15'leri de değiştir.
+
+### 5.6 Premiere'de elle deneme (yayından önce, yaklaşık 25 dk)
+
+1. **Ücretsiz panel:** Ayarlar › Davet et, kazan kartında `suflo.app/?ref=` bağlantısı, Kopyala,
+   WhatsApp, X ve Instagram (yalnız kopyalar) çalışmalı. WhatsApp ve X tarayıcıda Türkçe karakterleri
+   bozulmadan açmalı.
+2. **Şerit:** yeni bir ayar dosyasıyla (ya da `davet` ayarlarını silerek) ilk konuşmadan kes / sessizlik
+   kesiminin uygulanmasından sonra altta modal olmayan davet şeridi çıkmalı; işlem sürerken çıkmamalı.
+   "Bir daha gösterme"den sonra ilk Shorts'ta ve 5. altyazı uygulamasında çıkmamalı. 3. altyazı
+   uygulamasında yine GitHub yıldız şeridi çıkmalı, ikisi aynı anda görünmemeli.
+3. **Kredi satırı:** Bölümler › YouTube metni › "Sona Suflo kredi satırı ekle" ücretsizde varsayılan
+   açık, Pro'da kapalı olmalı; işaretleyince satır metnin en sonunda görünmeli, kopyalanan metin
+   kutudakiyle aynı olmalı.
+4. **Pro, sunucu kapalı:** Pro lisansla kart yine paylaşım bağlantısını göstermeli, hata vermemeli.
+5. **Pro, sunucu açık (5.3'ten sonra):** kod, "0/1 davet" ilerlemesi, Kopyala ve "Story kartı". Story
+   kartı masaüstüne `Suflo-Davet-SFL….png` (1080x1920) kaydetmeli; kodu ve `suflo.app/?d=` adresini
+   okunaklı göstermeli. libass uyarısı olan makinede düğme gizli olmalı.
+6. **"Bizi nereden duydun?":** lisansı devre dışı bırakıp yeniden etkinleştir; soru yalnız ilk
+   etkinleştirmede bir kez çıkmalı, "Geç" ile kapanmalı. Seçim sonrası sunucudaki
+   `attribution.jsonl`'a bir satır eklenmeli.
+7. **Ödüller (5.4'ten sonra, 3.1.0 panelle):** tier'i 1 olan bir lisansla Pro içeriklerini eşitle;
+   `pro-content/davet/t1/` dolmalı, SFX'te ödül sesleri "SUFLO PRO" koleksiyonunda görünmeli,
+   bir sesi timeline'a sürükleyip Premiere açıkken yeniden eşitleme hatasız bitmeli.
