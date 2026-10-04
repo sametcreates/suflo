@@ -103,6 +103,16 @@ Kurulum: dalı ZXP olarak paketle (`tools/package.ps1`) ya da geliştirici kurul
 - [ ] 9:16 sekansta başlık üstte ve kadraja sığıyor.
 - [ ] Viral anlar kartında **Başlık ekle** → başlık o anın başına geliyor.
 
+## 6c. Podcast Modu *(sol menü → Podcast)*
+- [ ] 2 kameralı + 2 mikrofonlu (her biri ayrı katmanda) bir sekansta **Sekansı tara** → tabloda A / B, mikrofon A1 / A2, kamera V1 / V2 önerili; üçüncü uzun video katmanı varsa geniş plan olarak önerili, logo / yazı katmanı önerilmiyor.
+- [ ] **Analiz et** → her mikrofon satırı "Premiere'den dışa aktarılıyor… → ses çözülüyor… → hazır"; bir mikrofonu Premiere'de susturup (M) analiz et → yine çalışıyor ve susturma geri geliyor.
+- [ ] Boş / kapalı bir mikrofon katmanı seç → o satır "sessiz — kapalı veya solo mu?".
+- [ ] Ritim sürgüleri ve kutular → önizleme ve "N kamera geçişi · A %… · B %…" anında değişiyor; en kısa planı 1 sn, bekleme 100 ms yap → 400 üstünde "Çok sık geçiş" uyarısı.
+- [ ] **Kamera geçişlerini uygula** (Pro) → "<sekans> - Suflo Podcast" kopyası açılıyor; V1 / V2 yalnız geçiş anlarında kesik, her anda tek kamera açık, ses katmanları ve üstteki logo katmanı aynı. Ctrl+Z birkaç kez basınca geri alınıyor.
+- [ ] Kamera klipleri sesle **bağlıyken** uygula → ses klipleri kapanmamış olmalı (gerekirse "bağlı N ses klibi açık tutuldu" notu) ya da "bağlantısını kopar (Ctrl+L)" hatası.
+- [ ] Bir kamera katmanını kilitle → uygula: "Kamera katmanı kilitli: V…" hatası, kopya oluşmuyor. Multicam kaynak klibi olan katman kamera listesinde görünmüyor.
+- [ ] **Konuşmacı renkleri** açık → Altyazı sekmesinde Suflo Stili önizlemesi ve "Suflo Stilleri ile ekle" katmanında her konuşmacı kendi renginde; kapalıyken eskisi gibi.
+
 ## 6b. Güvenlik ve sağlamlık
 - [ ] Yeni bir model indir (örn. Base) → kurulum "Model doğrulanıyor…" adımından geçiyor.
 - [ ] Ayarlar → güncelleme denetimi: (bir sonraki sürümde) indirilen paket "Doğrulanıyor…" adımından geçiyor.

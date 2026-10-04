@@ -859,3 +859,49 @@ sekanslı akış Premiere'de **hiç denenmedi**: aşağıdaki liste bunun için.
 - Ana demo: "1 video → 5 bitmiş Shorts, Premiere'in içinde, kredi yok". Ekran kaydı: Viral anları
   bul → Pakete al → Paketi oluştur → 5 Short'u art arda oynat → TXT'deki hazır metinler.
   OpusClip / Klap / Submagic karşılaştırmasında "dakika kredisi yok, video buluta gitmez" vurgusu.
+
+## 10. Podcast Modu (mikrofona göre otomatik kamera geçişi + konuşmacı renkli altyazı)
+
+Kod tamam ve testli; **senden anahtar, hesap ya da sunucu değişikliği istemiyor**. Pro özelliği
+(`multicam`), deneme hakkı yok; analiz ve önizleme ücretsiz, timeline'a uygulamak Pro.
+Kapsam v1 = "her konuşmacının kendi mikrofonu" (Mod A). Tek mikrofona karışık kayıtta konuşmacı
+ayırma (Mod B), yüz takibi ve multicam kaynak sekansında açı değiştirme kapsam dışı. Premiere'de
+**hiç denenmedi**; özellikle iki davranış doğrulanmadı ve kod ikisine de koruma koyuyor:
+bağlı video klibini kapatmanın sesini de kapatıp kapatmadığı (ses durumu önce alınıp sonra geri
+yüklenir) ve `KS_exportAudio`'nun tek katmanı susturma ile ayırması (susturulmuş istenen katman
+geçici açılır, sonra geri yüklenir).
+
+### 10.1 Deneme kaydı hazırla (yaklaşık 15 dk, bir kez)
+
+1. İki kişilik 3-5 dakikalık bir sohbet kaydet: iki kamera (telefon da olur), **her kişiye ayrı
+   yaka mikrofonu** (ya da iki kanallı kayıtta L / R ayrı). Bir bölümde ikiniz aynı anda konuşun
+   (çapraz konuşma), bir bölümde biriniz 20 sn'den uzun tek başına konuşsun.
+2. Premiere'de kameraları senkronla (Synchronize › Audio), her kamerayı ayrı video katmanına
+   (V1 = sen, V2 = konuk), her mikrofonu ayrı ses katmanına (A1 = sen, A2 = konuk) koy. İstersen
+   geniş plan için üçüncü bir kamerayı V3'e koy. Multicam kaynak sekansı KULLANMA.
+3. Bu sekansı `Suflo Podcast Deneme` adıyla sakla; aşağıdaki liste ve tanıtım videosu bunu kullanır.
+
+### 10.2 Premiere'de elle deneme (yaklaşık 30 dk; Premiere 24.x / 25.x ve 14.4 ayrı ayrı)
+
+Liste `marketing/v3-deneme-listesi.md` › 6c'de. Özellikle şunlara bak ve sonucu bana yaz:
+- Uygulamadan sonra **ses katmanlarında kapanan klip var mı?** Varsa paneldeki son durum satırını
+  ve Premiere sürümünü yaz (bağlı klip koruması o sürümde nasıl davrandı).
+- **Ctrl+Z** ile kaç adımda geri alındığı (Premiere undo gruplamayı desteklemiyor; Kopyada
+  uygula bu yüzden varsayılan).
+- 1 saatlik bir podcast'te analiz süresi (mikrofon başına bir Premiere dışa aktarımı yapılır).
+
+### 10.3 Bilinen sınırlar (bilerek kapsam dışı)
+
+- Multicam kaynak sekansı: açıyı değiştirecek API yok, panel reddeder ve kameraları ayrı
+  katmanlara koymayı söyler.
+- Premiere'in kendi altyazı izi (SRT) renk taşıyamaz; konuşmacı renkleri yalnız Suflo Stilleri
+  katmanında ve ASS dışa aktarımında.
+- Analiz bellekte tutulur; panel kapanınca konuşmacı renkleri için yeniden analiz gerekir.
+- Mikrofon dışa aktarılamazsa yalnız düz klipte (tek klip, birleşik / multicam değil, dosyası başka
+  mikrofonla paylaşılmayan) dosyadan okuma yedeği var.
+
+### 10.4 Tanıtım (isteğe bağlı)
+
+- "AutoPod ayda 29 $; Suflo'da Podcast Modu tek seferlik Pro'nun içinde" karşılaştırması. Ekran
+  kaydı: Sekansı tara → Analiz et → önizleme çubukları → Kopyada uygula → oynat.
+
