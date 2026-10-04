@@ -27,7 +27,7 @@ function ok(ad, kosul, kanit) {
 
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
                 "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
-                "js/onboarding.js"];
+                "js/onboarding.js", "js/viral.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -137,7 +137,18 @@ var ZORUNLU = {
   "set-onb-ac": "Ayarlar > Destek > Kurulum rehberini ac",
   "cap-setup": "Motor kurulum notu (rehber karti icine tasinir)",
   "cap-local-install": "Yerel motoru kur",
-  "cap-key-save": "Anahtari kaydet"
+  "cap-key-save": "Anahtari kaydet",
+  // v3.1: Viral Skor 2.0 (tur, adet, odak, siralama, >=60 filtresi, tahmin notu)
+  "cap-vr-box": "Viral anlar kutusu",
+  "cap-vr-bul": "Viral anlari bul",
+  "cap-vr-tur": "Viral tur secimi",
+  "cap-vr-adet": "Viral an sayisi",
+  "cap-vr-odak": "Viral odak metni",
+  "cap-vr-sure": "Viral klip suresi",
+  "cap-vr-sira": "Viral siralama",
+  "cap-vr-min": "Yalniz >=60 filtresi",
+  "cap-vr-not": "Puan tahmin notu",
+  "cap-vr-liste": "Viral an kartlari"
 };
 var kayip = [];
 Object.keys(ZORUNLU).forEach(function (id) {

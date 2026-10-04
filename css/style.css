@@ -3571,11 +3571,50 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 /* ---------- Viral anlar (3.0) ---------- */
 .vr-liste { display: grid; gap: 7px; margin: 8px 0; }
 .vr-kart { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; display: grid; gap: 5px; background: rgba(255,255,255,.02); }
-.vr-ust { display: flex; align-items: center; gap: 8px; }
+/* grid: flex gap CEF 74'te (Premiere 2020-2021) yok */
+.vr-ust { display: grid; grid-template-columns: auto 1fr; grid-column-gap: 9px; align-items: center; }
 .vr-ust b { font-size: 12px; }
 .vr-puan { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #ff5f7a, #ffb547); }
 .vr-alt { font-size: 10.5px; color: var(--dim); }
 .vr-kart .btn { justify-self: start; }
+
+/* ---------- Viral Skor 2.0 (3.1): yalnız grid; flex gap, aspect-ratio ve :is() CEF 74'te yok ---------- */
+.vr-ayarlar { display: grid; grid-template-columns: 1.3fr .7fr 1.4fr; grid-column-gap: 6px; grid-row-gap: 6px; margin: 0 0 9px; }
+.vr-alan { display: grid; grid-row-gap: 3px; min-width: 0; font-size: 10.5px; color: var(--dim); }
+.vr-alan select { width: 100%; min-width: 0; }
+.vr-odak { grid-column: 1 / -1; width: 100%; min-width: 0; }
+@media (max-width: 300px) { .vr-ayarlar { grid-template-columns: 1fr 1fr; } }
+.vr-liste-ust { display: grid; grid-template-columns: auto auto 1fr; grid-column-gap: 10px; align-items: center; margin: 8px 0 2px; }
+.vr-bilgi { justify-self: end; text-align: right; font-size: 10px; color: var(--faint); }
+.vr-not { margin: 4px 0 0; }
+.vr-kart.dusuk { border-style: dashed; }
+.vr-skor { display: grid; justify-items: center; grid-row-gap: 2px; align-self: start; }
+.vr-ring { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--faint); background: rgba(255,255,255,.08); }
+.vr-ring.iyi { color: var(--good); }
+.vr-ring.orta { color: var(--warn); }
+.vr-ring.zayif { color: var(--bad); }
+.vr-ring-ic { width: 31px; height: 31px; border-radius: 50%; display: grid; place-items: center; background: var(--bg2); color: var(--text); font-size: 12.5px; font-weight: 800; }
+.vr-skor small { font-size: 8px; line-height: 1; color: var(--faint); white-space: nowrap; }
+.vr-bilgi-blok { display: grid; grid-row-gap: 2px; min-width: 0; }
+.vr-baslik { font-size: 12px; overflow-wrap: break-word; }
+.vr-sure { font-size: 10.5px; color: var(--dim); }
+.vr-sure.uyari { color: var(--warn); cursor: help; }
+.vr-dusuk { justify-self: start; font-size: 9px; font-weight: 700; color: var(--warn); }
+.vr-neden { font-size: 10.5px; font-style: italic; line-height: 1.45; color: var(--dim); }
+.vr-barlar { display: grid; grid-template-columns: auto 1fr 22px; grid-column-gap: 7px; grid-row-gap: 3px; align-items: center; font-size: 10px; }
+.vr-bar-ad { color: var(--dim); white-space: nowrap; cursor: help; }
+.vr-bar { display: block; height: 4px; border-radius: 2px; overflow: hidden; background: rgba(255,255,255,.08); }
+.vr-bar i { display: block; height: 100%; border-radius: 2px; background: var(--grad); }
+.vr-bar-deger { text-align: right; color: var(--faint); }
+.vr-kancalar { display: grid; grid-row-gap: 2px; }
+.vr-kanca-bas { font-size: 10px; color: var(--faint); }
+.vr-kanca { display: grid; grid-template-columns: auto 1fr; grid-column-gap: 6px; align-items: center; padding: 3px 6px; border: 1px solid transparent; border-radius: 6px; font-size: 11px; cursor: pointer; }
+.vr-kanca:hover { border-color: var(--line2); }
+.vr-kanca input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+.vr-kanca b { color: #ffe600; }
+.vr-sinir { display: grid; grid-template-columns: auto auto 1fr auto auto; grid-column-gap: 4px; align-items: center; }
+.vr-sinir-ayrac { text-align: center; color: var(--faint); }
+.vr-eylem { display: grid; grid-auto-flow: column; grid-auto-columns: max-content; grid-column-gap: 6px; }
 
 /* ---------- "Suflo 3.0'da yeni" penceresi ---------- */
 .yenilik-arka { position: fixed; top: 0; right: 0; bottom: 0; left: 0; inset: 0; z-index: 9000; background: rgba(5,7,12,.72); display: grid; place-items: center; padding: 16px; backdrop-filter: blur(3px); }

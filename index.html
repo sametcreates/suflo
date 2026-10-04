@@ -638,16 +638,56 @@
 
         <details class="adv" id="cap-vr-box">
           <summary>Viral anlar (Shorts) <span class="tc-yeni">YENİ</span></summary>
-          <p class="hint" style="margin:6px 0 8px">Uzun videodan kancayla başlayan, tek başına anlaşılan 15–60 sn'lik anları bulur. Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez.</p>
+          <p class="hint" style="margin:6px 0 8px">Uzun videodan kancayla başlayan, tek başına anlaşılan anları bulur; her ana nedenini açıklayan 0–100 puan ve 3 kanca başlığı verir. Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez.</p>
+          <div class="vr-ayarlar">
+            <label class="vr-alan">Tür
+              <select id="cap-vr-tur" title="Videonun türü: yapay zekâ anları buna göre seçer ve puanlar">
+                <option value="genel" selected>Genel</option>
+                <option value="podcast">Podcast</option>
+                <option value="egitim">Eğitim</option>
+                <option value="komedi">Komedi</option>
+                <option value="motivasyon">Motivasyon</option>
+                <option value="inceleme">Ürün inceleme</option>
+                <option value="roportaj">Röportaj</option>
+                <option value="oyun">Oyun</option>
+              </select>
+            </label>
+            <label class="vr-alan">Adet
+              <select id="cap-vr-adet" title="Kaç an bulunsun">
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5" selected>5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+              </select>
+            </label>
+            <label class="vr-alan">Süre
+              <select id="cap-vr-sure" title="Klip süresi">
+                <option value="15-35">Kısa (15–35 sn)</option>
+                <option value="20-60" selected>Standart (20–60 sn)</option>
+                <option value="30-90">Uzun (30–90 sn · Reels/YouTube)</option>
+              </select>
+            </label>
+            <input id="cap-vr-odak" class="vr-odak" type="text" maxlength="120" placeholder="Ne arıyorsun? (isteğe bağlı)" title="Örneğin: fiyat tartışması, komik anlar, en iyi tavsiye. Yapay zekâ bu anları öne alır.">
+          </div>
           <div class="row">
             <button id="cap-vr-bul" class="btn primary" type="button">Viral anları bul</button>
-            <select id="cap-vr-sure" class="grow" title="Klip süresi">
-              <option value="15-35">Kısa (15–35 sn)</option>
-              <option value="20-60" selected>Standart (20–60 sn)</option>
-              <option value="30-90">Uzun (30–90 sn · Reels/YouTube)</option>
-            </select>
           </div>
           <div id="cap-vr-durum" class="inline-status"></div>
+          <div class="vr-liste-ust" id="cap-vr-liste-ust" hidden>
+            <select id="cap-vr-sira" class="slim" title="Sıralama">
+              <option value="puan" selected>Puana göre</option>
+              <option value="zaman">Zamana göre</option>
+            </select>
+            <label class="check-label" title="Yalnız 60 ve üstü puan alan anları göster (hiçbiri yoksa en iyi 2 an kalır)">
+              <input id="cap-vr-min" type="checkbox"> Yalnız ≥60
+            </label>
+            <span id="cap-vr-bilgi" class="vr-bilgi"></span>
+          </div>
+          <p class="hint vr-not" id="cap-vr-not" hidden>Puanlar yapay zekâ tahminidir; izlenme garantisi değildir.</p>
           <div id="cap-vr-liste" class="vr-liste"></div>
           <div class="row" id="cap-vr-aksiyon" hidden>
             <button id="cap-vr-shorts" class="btn tiny primary" type="button" title="Her an için ayrı bir sekans oluşturur (Suflo Shorts kutusu); orijinal sekansa dokunmaz">Shorts sekansları oluştur</button>

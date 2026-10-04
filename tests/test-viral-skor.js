@@ -191,5 +191,19 @@ var fk = H.format([{ title: "T", start: 0, end: 30, reason: "neden", hooks: ["bi
 ok("format(detay): eski puanlı an yalnız toplam; seçili kanca ayrı satırda, yıldızsız", fk === "1. T (0:00–0:30, 30 sn) · 64/100 tahmini — neden\n   Kanca: iki", fk);
 ok("secilenKanca: kancaNo, yoksa ilki, hiç yoksa boş", H.secilenKanca({ hooks: ["a", "b"], kancaNo: 1 }) === "b" && H.secilenKanca({ hooks: ["a"], kancaNo: 5 }) === "a" && H.secilenKanca({}) === "");
 
+/* ================= panel: tür seçenekleri modülle aynı ================= */
+var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+var turSec = html.slice(html.indexOf('id="cap-vr-tur"'), html.indexOf("</select>", html.indexOf('id="cap-vr-tur"')));
+var secenekler = [], re = /<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g, m;
+while ((m = re.exec(turSec))) secenekler.push(m[1] + "=" + m[2]);
+ok("index.html tür seçenekleri TURLER ile birebir (sıra ve ad)", secenekler.join("|") === H.TUR_SIRA.map(function (t) { return t + "=" + H.TURLER[t].ad; }).join("|"), secenekler.join("|"));
+var adetSec = html.slice(html.indexOf('id="cap-vr-adet"'), html.indexOf("</select>", html.indexOf('id="cap-vr-adet"')));
+ok("adet seçenekleri 3-10, varsayılan 5", (adetSec.match(/<option value="(\d+)"/g) || []).join("").replace(/<option value="/g, "").replace(/"/g, ",") === "3,4,5,6,7,8,9,10," &&
+  /<option value="5" selected>/.test(adetSec));
+ok("odak alanı en çok 120 karakter, ipucu metniyle", /id="cap-vr-odak"[^>]*maxlength="120"[^>]*placeholder="Ne arıyorsun\? \(isteğe bağlı\)"/.test(html));
+ok("liste üstünde sıralama, ≥60 filtresi ve tahmin notu", html.indexOf('id="cap-vr-sira"') > 0 && html.indexOf('id="cap-vr-min"') > 0 &&
+  /Puanlar yapay zekâ tahminidir; izlenme garantisi değildir\./.test(html) && html.indexOf('id="cap-vr-sira"') < html.indexOf('id="cap-vr-liste"') &&
+  html.indexOf('id="cap-vr-tur"') < html.indexOf('id="cap-vr-bul"'));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
