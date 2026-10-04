@@ -319,7 +319,7 @@ window.KViral = (function () {
     if (var_ && liste.length && liste[0].low) bilgi = "60 ve üstü an yok — en iyi " + liste.length + " an gösteriliyor";
     else if (var_ && liste.length < anlar.length) bilgi = (anlar.length - liste.length) + " an gizli (60 altı)";
     el("cap-vr-bilgi").textContent = bilgi;
-    if (el("cap-paket")) el("cap-paket").hidden = !var_ || !window.KShortsPaket;
+    if (el("cap-paket") && window.KShortsPaket) el("cap-paket").hidden = !var_ && !KShortsPaket.yarimIsVar();
     paketTazele();
   }
 

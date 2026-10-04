@@ -515,10 +515,12 @@ window.KShortsPaket = (function () {
       if (j && !el("cap-paket-liste").childNodes.length) listeCiz(j);
       guncelle();
     });
+    // panel yeniden açıldıysa ekranda an yoktur: yarım iş varsa kutu yine görünür (Devam et için)
     var yarim = kayitliIs();
-    if (yarim) listeCiz(yarim);
+    if (yarim) { el("cap-paket").hidden = false; listeCiz(yarim); }
     guncelle();
   }
 
-  return { init: init, guncelle: guncelle, calisiyor: function () { return calisiyorMu; } };
+  return { init: init, guncelle: guncelle, calisiyor: function () { return calisiyorMu; },
+    yarimIsVar: function () { try { return calisiyorMu || !!kayitliIs(); } catch (e) { return false; } } };
 })();

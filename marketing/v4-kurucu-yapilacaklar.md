@@ -775,3 +775,76 @@ Yeni site sayfası `docs/stil.html` (suflo.app/stil) ve 12 Suflo Stilinin vitrin
   renk) bir blog yazısında ya da sabit gönderide topla.
 - Kullanıcıların kendi yerel yazı tiplerini yüklemesi (TTF ad tablosu + Türkçe glif denetimi)
   bilerek ertelendi; istek gelirse sıradaki sürüm.
+
+## 9. Tek Tık Shorts Paketi (anlar → 9:16 sekanslar → marka altyazı, kanca, ilerleme çubuğu, CTA, logo → paylaşım paketi)
+
+Kod tamam ve testli; **senden anahtar, hesap ya da sunucu değişikliği istemiyor**. Pro özelliği
+(`shortsPaket`), deneme hakkı yok. AI anahtarı yoksa paylaşım metni yapay zekâsız hazırlanır
+(başlık + anın gerekçesi + 3 genel hashtag); ffmpeg / libass yoksa altyazı, kanca ve çerçeve
+adımları gerekçesiyle atlanır, sekanslar ve metin yine üretilir. Tek başına zincirlenmiş çok
+sekanslı akış Premiere'de **hiç denenmedi**: aşağıdaki liste bunun için.
+
+### 9.1 Premiere'de elle deneme (yaklaşık 30 dk; Premiere 24.3+ ve 14.4 ayrı ayrı)
+
+1. **Hazırlık:** 3-5 dakikalık konuşmalı bir video, 16:9 sekans. Altyazı sekmesinde yazıya dök,
+   Viral anlar › "Viral anları bul". Kartlarda "Pakete al" kutusu 60 ve üstü puanlılarda işaretli
+   gelmeli; "Shorts Paketi" kutusu kartların altında, düğme "Paketi oluştur (N Shorts)".
+2. **Seçenekler:** Altyazı stili listesinde yalnız Suflo Stilleri olmalı (Altyazı sekmesinde seçili
+   Suflo Stili varsayılan). Altyazı sekmesinde bir MOGRT stili seçiliyken kutuyu aç: "Seçili MOGRT
+   stili pakette kullanılamaz" notu görünmeli. Marka Kiti'nde logo yoksa "Logo" yanında "(Marka
+   Kiti'nde logo yok)" yazmalı. CTA'da "Kendi metnim…" seçince 40 karakterlik kutu açılmalı.
+3. **Paket (Pro):** 3 an işaretli, her şey açık, Paketi oluştur. Beklenen sıra: önce 3 sekans +
+   9x16 kopyaları "Suflo Shorts" kutusunda (Auto Reframe birkaç dakika sürebilir), sonra her
+   9:16 Short açılır ve içine sırayla "Suflo Paket · Altyazı", "Suflo Paket · Kanca",
+   "Suflo Paket · Çerçeve" katmanları 0. saniyeden konur. Liste satırlarında çipler sırayla
+   "çalışıyor" → "tamam" olmalı. Bitince ana sekans yeniden açık olmalı.
+4. **Görüntü:** her Short'ta altyazı seçilen stilde ve platform arayüzünden uzakta; kanca ilk
+   saniyelerde kartta seçtiğin metinle; ilerleme çubuğu üstte (durum çubuğunun altında) soldan
+   sağa dolmalı ve videonun SONUNDA tam dolu olmalı; son ~2,5 sn'de CTA ("Takip et"); Marka Kiti
+   logosu seçtiğin köşede. Çerçeve katmanı Short'tan uzun OLMAMALI. 8 sn'den kısa bir an ekle:
+   o Short'ta CTA olmamalı (satırda "CTA atlandı: Short 8 sn'den kısa").
+5. **Dosyalar:** proje klasöründe `Suflo-Shorts-paylasim-paketi-<tarih>.txt` ve `.csv` olmalı;
+   bildirimdeki "Klasörü aç" (ve kutudaki düğme) klasörü açmalı. TXT'yi Not Defteri'nde, CSV'yi
+   Google Sheets'te aç: Türkçe harfler doğru, her Short için YouTube Shorts / TikTok / Reels
+   metinleri ayrı. **Not:** Türkçe Excel CSV'de ayırıcı olarak `;` bekler; virgüllü CSV'yi Excel'de
+   Veri › Metinden ile açmak gerekebilir (Sheets ve Numbers doğrudan açar).
+6. **Kredi satırı:** "Kredi satırı" kapalıyken açıklamalarda "Altyazılar: Suflo" OLMAMALI;
+   açıkken her açıklamanın en sonunda olmalı.
+7. **İptal / Devam et:** 3 anlık pakette 2. Short'un altyazısı sırasında İptal: o adım bitince
+   durmalı, ana sekans açılmalı, "Devam et" görünmeli. Paneli kapatıp aç (ya da Premiere'i yeniden
+   başlat), Viral anlar kutusunu aç: "Devam et" yine görünmeli; basınca biten adımlar
+   TEKRARLANMADAN kalan adımlar yapılmalı (aynı katman iki kez konmamalı).
+8. **Sekans değiştirme:** paket çalışırken Premiere'de elle başka bir sekansa geç: o adım
+   "Etkin sekans değişti; katman konmadı" hatasıyla düşmeli, paket diğer adımlarla sürmeli,
+   hiçbir katman yanlış sekansa konmamalı. Sonra Devam et ile hatalı adım tamamlanmalı.
+9. **Miras altyazı:** ana sekansa önce "Suflo Stilleri ile ekle" ile altyazı katmanı koy, sonra
+   paketi çalıştır: Short'larda altyazı adımı "atlandı" (kaynaktaki katman kopyalandı) olmalı,
+   çift altyazı olmamalı. Premiere'in kendi altyazı izi (Captions track) varsa Short'a da
+   kopyalanır; panel bunu göremez, gerekirse elle sil.
+10. **Başka sekansta bulunan anlar:** anları bulduktan sonra başka bir sekans aç, Paketi oluştur:
+    "Viral anlar başka bir sekansta bulundu" uyarısı, hiçbir sekans oluşmamalı.
+11. **Auto Reframe olmayan sürüm (14.4 / 22.x öncesi):** Paketi oluştur "yatay sekanslarla
+    hazırlansın mı?" sorusu sormalı; Hayır → hiçbir şey olmamalı; Evet → yatay Shorts, katmanlar
+    16:9 boyutunda.
+12. **AI anahtarı yok:** Ayarlar'dan anahtarı sil, paketi çalıştır: metin adımı yine "tamam",
+    TXT'de başlık = anın başlığı, açıklama = anın gerekçesi + `#shorts #keşfet #viral`.
+13. **Groq kota (429):** çok sayıda Short (8-10) ile dene: metin adımları sırayla (aynı anda değil)
+    çalışmalı; kota dolarsa panel bekleyip yeniden denemeli, en sonunda yedeğe düşmeli.
+14. **Uzun Auto Reframe:** 90 sn'lik bir an ile dene: 600 sn içinde bitmezse panel sekansı adıyla
+    bulup devam etmeli (aynı Short iki kez oluşmamalı).
+15. **İngilizce arayüz:** Ayarlar › English: kutu "Shorts Pack", düğme "Create pack (N Shorts)",
+    CTA seçenekleri İngilizce. Video Türkçe ise CTA videoya Türkçe yazılmalı ("Takip et"), TXT
+    etiketleri İngilizce.
+
+### 9.2 Bilinen sınırlar (bilerek kapsam dışı)
+
+- AME kuyruğuna dışa aktarma yok (doğrulanabilir .epr yok); Short'ları Premiere'de Ctrl+M ile çıkar.
+- Auto Reframe yoksa ortadan kırpma yedeği yok (setSettings doğrulanmadı); yatay paket önerilir.
+- Bölünmüş ekran / ekran paylaşımı yerleşimleri sonraki sürümde.
+- YouTube Shorts hashtag'leri 3 ile sınırlı (YouTube başlığın üstünde yalnız ilk 3'ü gösterir).
+
+### 9.3 Tanıtım (isteğe bağlı)
+
+- Ana demo: "1 video → 5 bitmiş Shorts, Premiere'in içinde, kredi yok". Ekran kaydı: Viral anları
+  bul → Pakete al → Paketi oluştur → 5 Short'u art arda oynat → TXT'deki hazır metinler.
+  OpusClip / Klap / Submagic karşılaştırmasında "dakika kredisi yok, video buluta gitmez" vurgusu.
