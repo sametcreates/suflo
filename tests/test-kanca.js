@@ -130,7 +130,8 @@ ok("kanca: ekli vurgu kapanir", JSON.stringify(HT.tokens("*Instagram*'da para ka
 ok("kanca: Ingilizce buyuk harf THIS (THİS degil)", HT.build({ text: "this is it", lang: "en" }).ass.indexOf("THIS IS IT") !== -1);
 ok("kanca: Turkce varsayilan İ", HT.build({ text: "bilgi" }).ass.indexOf("BİLGİ") !== -1);
 ok("kanca.js: dil panelden gecer, busy ilk await'ten once", /lang: o\.lang/.test(kanca) && /busy = true;[^\n]*\n[\s\S]{0,120}await K\.findFfmpeg/.test(kanca));
-ok("kanca.js: mesgulken sessiz kalmaz", /if \(busy\) \{ KApp\.toast/.test(kanca));
+// Shorts paketi (ek.sessiz) bildirim yerine { ok: false, hata } alır; panelden çağrıda bildirim kalır
+ok("kanca.js: mesgulken sessiz kalmaz", /if \(busy\) \{\s*(?:if \(!sessiz\) )?KApp\.toast/.test(kanca) && /return bitmedi\("Kanca başlığı şu an hazırlanıyor/.test(kanca));
 
 /* Marka Kiti: kanca basligi yazi tipi + renk */
 var lora = HT.build({ text: "Bunu *bil*", stil: "kutu", font: "Lora", renk: "#123456", vurguRenk: "#abcdef" });

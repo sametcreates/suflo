@@ -118,7 +118,7 @@ ok("Shorts yukleme: editor gorunur, bos ekranda geri al yigini sifir, ana taslak
 ok("yeni transkript / SRT / taslak kurtarma Shorts modunu kapatir", (cj.match(/shortsYuklenen = "";/g) || []).length >= 3);
 ok("viral: anlar baska sekansta bulunduysa Shorts olusturulmaz, bulundugu andaki transkript kullanilir",
   /bulSekans && simdiki !== bulSekans/.test(vj) && /var d = await sekansDenetle\(\);\s*if \(d\.uyari\) \{ durum\(d\.uyari, "warn"\); return; \}\s*var liste = gorunenler\(\);/.test(vj) &&
-  /sliceSegments\(bulSegs \|\| KCaptions\.rawSegments\(\)/.test(vj));
+  /sliceSegments\((?:kaynakSegs \|\| )?bulSegs \|\| KCaptions\.rawSegments\(\)/.test(vj));
 
 /* sekizinci inceleme */
 ok("geri al yigini Shorts durumunu tasir ve geri yukler", /shorts: shortsYuklenen, ts: Date\.now\(\)/.test(cj) && /if \(typeof st\.shorts === "string"\) \{\s*shortsYuklenen = st\.shorts;/.test(cj) &&

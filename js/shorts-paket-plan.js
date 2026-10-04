@@ -48,7 +48,12 @@
     "secim-yok": "Pakete alınacak an seçilmedi.",
     mogrt: "MOGRT stilleri pakette kullanılamaz: her altyazı satırı ayrı Premiere çağrısı ister. Bir Suflo Stili seç.",
     "reframe-yok": "Bu Premiere sürümünde Auto Reframe yok: 9:16 paket yapılamaz. Yatay paket için onay ver ya da Premiere'i güncelle.",
-    iptal: "iptal edildi"
+    iptal: "iptal edildi",
+    "altyazi-bos": "Short'ta altyazı satırı yok",
+    "9x16-yok": "9:16 kopya oluşmadı: Short yatay kaldı",
+    "kanca-miras": "kaynaktaki kanca başlığı Short'a da kopyalandı; gerekirse sil",
+    "ai-hata": "AI yanıt vermedi: paylaşım metni yapay zekâsız hazırlandı",
+    "ai-bozuk": "AI yanıtı okunamadı: paylaşım metni yapay zekâsız hazırlandı"
   };
 
   var GENEL_HASHTAG = { tr: ["#shorts", "#keşfet", "#viral"], en: ["#shorts", "#fyp", "#viral"] };
@@ -245,7 +250,7 @@
     if (o.hook) ust.push("On-screen hook: " + yildizsiz(o.hook).slice(0, 120));
     return {
       system: "You are a short-form social media copywriter. For ONE vertical short clip, write posting copy in " + dil +
-        " for three platforms at once. youtube (YouTube Shorts): 3 title options (max 70 characters, curiosity + clear benefit), " +
+        " for three platforms in a single reply. youtube (YouTube Shorts): 3 title options (max 70 characters, curiosity + clear benefit), " +
         "a description of 1-3 sentences without links, 3 hashtags. tiktok: 3 opening hook lines (max 80 characters), a caption " +
         "body of 1-3 short lines ending with a call to action (comment, save or follow), 5 hashtags. reels (Instagram Reels): " +
         "same shape as tiktok, 5 hashtags. No clickbait lies, no ALL CAPS, at most one emoji per platform, hashtags without spaces. " +

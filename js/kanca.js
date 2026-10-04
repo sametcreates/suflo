@@ -128,22 +128,36 @@ window.KKanca = (function () {
   /*
    * Basligi timeline'a ekle.
    *   ek.text / ek.at (sn; verilmezse playhead) — Viral anlar kartlari kullanir
+   *   ek.stil / ek.dur — karttaki secimin yerine (Shorts paketi)
+   *   ek.expectSeqId — katman yalniz bu sekansa konur (KS_placeOverlay reddeder)
+   *   ek.ad — katmanin adi (varsayilan "Suflo Kanca · <metin>")
+   *   ek.sessiz — bildirim / durum satiri yok; hata da { ok: false, hata } olarak doner
+   * Doner: basarida { ok: true, yer, dur } (eski cagiranlar icin truthy), hatada false
    */
   async function ekle(ek) {
+    var sessiz = !!(ek && ek.sessiz);
+    function bitmedi(m) { return sessiz ? { ok: false, hata: String(m || "") } : false; }
     // Pro (ucretsizde stilli katmanla ortak 3 deneme hakki; deneme ciktisi filigranli)
-    if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { ekle(ek); } })) return false;
-    if (!HT) return false;
-    if (busy) { KApp.toast("Kanca başlığı şu an hazırlanıyor, birazdan tekrar dene.", "warn"); return false; }
+    if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { ekle(ek); }, silent: sessiz })) return bitmedi("Pro gerekli.");
+    if (!HT) return bitmedi("Kanca modülü yüklenemedi.");
+    if (busy) {
+      if (!sessiz) KApp.toast("Kanca başlığı şu an hazırlanıyor, birazdan tekrar dene.", "warn");
+      return bitmedi("Kanca başlığı şu an hazırlanıyor, birazdan tekrar dene.");
+    }
     var o = ayarlar(ek);
-    if (!String(o.text).trim()) { durum("Önce bir başlık yaz.", "warn"); return false; }
+    if (!String(o.text).trim()) { if (!sessiz) durum("Önce bir başlık yaz.", "warn"); return bitmedi("Önce bir başlık yaz."); }
     busy = true;   // ilk await'ten ONCE: cift tiklama iki katman koymasin
     var btn = el("kanca-ekle");
     if (btn) btn.disabled = true;
+    function yaz(m, c) { if (!sessiz) durum(m, c); }
     try {
       var ff = await K.findFfmpeg();
-      if (!ff) { KApp.toast("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad"); return false; }
+      if (!ff) {
+        if (!sessiz) KApp.toast("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad");
+        return bitmedi("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).");
+      }
       if (K.libassUyarisi && K.libassUyarisi()) throw new Error(K.libassUyarisi());
-      durum("Başlık hazırlanıyor…");
+      yaz("Başlık hazırlanıyor…");
       var b = await sekansBoyutu();
       if (!b.ok) throw new Error("Aktif sekans yok.");
       var built = insaEt(o, b.w, b.h);
@@ -159,13 +173,15 @@ window.KKanca = (function () {
         assAd: "kanca.ass", onek: "overlay-kanca-", fontDizini: K.path.join(uzantiDizini(), "fonts"), timeout: 300000,
         hataOneki: "Başlık katmanı üretilemedi: "
       });
-      durum("Timeline'a yerleştiriliyor…");
+      yaz("Timeline'a yerleştiriliyor…");
       var at = typeof o.at === "number" && isFinite(o.at) ? Math.max(0, o.at) : "playhead";
-      var ad = "Suflo Kanca · " + String(o.text).replace(/\*/g, "").slice(0, 40);
-      var yer = await K.call("KS_placeOverlay", { path: cikti, at: at, name: ad }, 120000);
+      var ad = typeof o.ad === "string" && o.ad ? o.ad.slice(0, 80) : "Suflo Kanca · " + String(o.text).replace(/\*/g, "").slice(0, 40);
+      var yerArg = { path: cikti, at: at, name: ad };
+      if (o.expectSeqId) yerArg.expectSeqId = String(o.expectSeqId);
+      var yer = await K.call("KS_placeOverlay", yerArg, 120000);
       if (!yer.ok) throw new Error(yer.error);
-      durum("");
-      KApp.toast("Kanca başlığı " + yer.trackName + " katmanına eklendi" + (yer.newTrack ? " (yeni katman)" : ""), "good");
+      yaz("");
+      if (!sessiz) KApp.toast("Kanca başlığı " + yer.trackName + " katmanına eklendi" + (yer.newTrack ? " (yeni katman)" : ""), "good");
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("overlay", KApp.toast);   // deneme: yalniz basarida
       if (filigranli && window.SufloOverlayRender) {
         await SufloOverlayRender.denemeKaydet(K, Pro, {
@@ -173,8 +189,9 @@ window.KKanca = (function () {
           assTemiz: built.ass, fontFiles: built.fontFiles, g: b.w, y: b.h, fps: b.fps, sure: built.dur
         });
       }
-      return true;
+      return { ok: true, yer: yer, dur: built.dur };
     } catch (e) {
+      if (sessiz) return bitmedi(K.hataYardimi(e));
       durum("✕ " + K.hataYardimi(e), "bad");
       KApp.toast("Kanca başlığı eklenemedi: " + K.hataYardimi(e), "bad");
       return false;

@@ -42,7 +42,8 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "js", "kanca.js"), "utf8"), ctx);
 
 ctx.window.KKanca.ekle({ at: 12.5 }).then(function (sonuc) {
-  ok("ekle basarili doner", sonuc === true, JSON.stringify(toastlar));
+  ok("ekle basarili doner ({ ok, yer, dur }: eski cagiranlar icin truthy)", !!sonuc && sonuc.ok === true && sonuc.yer && sonuc.yer.trackName === "V3" && sonuc.dur === 2,
+    JSON.stringify(sonuc) + " " + JSON.stringify(toastlar));
   var yer = cagrilar.filter(function (c) { return c.fn === "KS_placeOverlay"; })[0];
   ok("KS_placeOverlay: verilen an ve ad", yer && yer.arg.at === 12.5 && /^Suflo Kanca · Bunu bilmeden para/.test(yer.arg.name), yer && JSON.stringify(yer.arg));
   var mov = yer && yer.arg.path;
@@ -57,7 +58,27 @@ ctx.window.KKanca.ekle({ at: 12.5 }).then(function (sonuc) {
     for (var i = 3; i < raw.length; i += 4) { if (raw[i] > 200) opak++; else if (raw[i] < 10) seffaf++; }
     ok("kare: baslik opak, zemin seffaf", opak > 5000 && seffaf > raw.length / 4 * 0.7, "opak " + opak + " seffaf " + seffaf);
   }
-  return ctx.window.KKanca.onizle().then(function () {
+  // Shorts paketi secenekleri: stil / sure / an / beklenen sekans / ad, sessiz
+  var toastOnce = toastlar.length;
+  return ctx.window.KKanca.ekle({ text: "Paket *kanca*", at: 0, stil: "sade", dur: 1.5, expectSeqId: "dik9", ad: "Suflo Paket · Kanca", sessiz: true }).then(function (r2) {
+    var yer2 = cagrilar.filter(function (c) { return c.fn === "KS_placeOverlay"; }).pop();
+    ok("ekle: expectSeqId ve ad KS_placeOverlay'e gecer, an 0", r2 && r2.ok && yer2.arg.expectSeqId === "dik9" && yer2.arg.name === "Suflo Paket · Kanca" && yer2.arg.at === 0,
+      JSON.stringify(yer2 && yer2.arg));
+    ok("ekle: secilen sure kullanilir, sessizde bildirim yok", r2.dur === 1.5 && toastlar.length === toastOnce, JSON.stringify(r2) + " " + JSON.stringify(toastlar.slice(toastOnce)));
+    var eskiCall = K.call;
+    K.call = function (fn, arg) {
+      if (fn === "KS_placeOverlay") return Promise.resolve({ ok: false, error: "Etkin sekans degisti; katman konmadi." });
+      return eskiCall(fn, arg);
+    };
+    return ctx.window.KKanca.ekle({ text: "x", at: 0, expectSeqId: "baska", sessiz: true }).then(function (r3) {
+      ok("ekle sessiz hata: { ok: false, hata } doner, bildirim yok", r3 && r3.ok === false && /Etkin sekans degisti/.test(r3.hata) && toastlar.length === toastOnce, JSON.stringify(r3));
+      return ctx.window.KKanca.ekle({ text: "x", at: 0, expectSeqId: "baska" });
+    }).then(function (r4) {
+      ok("ekle sessiz degilken hata: eskisi gibi false ve bildirim", r4 === false && toastlar.length === toastOnce + 1);
+      K.call = eskiCall;
+    });
+  }).then(function () {
+  return ctx.window.KKanca.onizle(); }).then(function () {
     var img = DOM["kanca-resim"];
     ok("onizleme: dikey sekansta PNG uretildi (guvenli alanla)", img.hidden === false && /^data:image\/png;base64,/.test(img.src || "") && (img.src || "").length > 2000, (img.src || "").slice(0, 40));
   }).then(function () {

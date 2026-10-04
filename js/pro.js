@@ -88,6 +88,7 @@
     textcut:   'Konusmadan kes (metinle kurgu + dolgu temizligi)',
     transitions: 'Kesim gecisleri (zoom, whip, itme ve daha fazlasi)',
     highlights: 'Viral anlar: uzun videodan Shorts/Reels klipleri',
+    shortsPaket: 'Tek Tık Shorts Paketi: anlardan bitmiş Shorts ve paylaşım metinleri',
     zoom:      'Otomatik Zoom (konusmaya gore punch-in)',
     beat:      'Ritim / beat senkronu',
     batch:     'Toplu (coklu klip) transkripsiyon',

@@ -36,11 +36,21 @@ window.KApp = (function () {
 
   /* ---------------- Toast ---------------- */
 
-  function toast(msg, kind, sure) {
+  // eylem (isteğe bağlı): { metin, fn } — bildirimde tek düğme (ör. "Klasörü aç")
+  function toast(msg, kind, sure, eylem) {
     var box = el("toasts");
     var t = document.createElement("div");
     t.className = "toast" + (kind ? " " + kind : "");
     t.textContent = msg;
+    if (eylem && eylem.metin && typeof eylem.fn === "function") {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn tiny toast-eylem";
+      b.textContent = eylem.metin;
+      b.addEventListener("click", function () { try { eylem.fn(); } catch (e) {} });
+      t.appendChild(document.createTextNode(" "));
+      t.appendChild(b);
+    }
     box.appendChild(t);
     setTimeout(function () {
       t.classList.add("out");
@@ -1415,6 +1425,7 @@ window.KApp = (function () {
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
     guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });
     guvenli("Kanca başlığı", function () { if (window.KKanca) KKanca.init(); });
+    guvenli("Shorts Paketi", function () { if (window.KShortsPaket) KShortsPaket.init(); });
     guvenli("Marka Kiti", function () { if (window.KMarkaKiti) KMarkaKiti.init(); });
     guvenli("Sesi iyileştir", function () { if (window.KSes) KSes.init(); });
     guvenli("Ritim", function () { KBeat.init(); });

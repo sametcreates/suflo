@@ -2190,6 +2190,7 @@ canvas#mo-canvas {
   word-break: break-word;
   white-space: pre-line; /* hata rehberi "Çözüm:" satırı için */
 }
+.toast-eylem { pointer-events: auto; margin-left: 6px; vertical-align: baseline; }
 .toast.good { border-left-color: var(--good); }
 .toast.bad { border-left-color: var(--bad); }
 .toast.out { opacity: 0; transform: translateY(8px); transition: all .28s var(--ease); }
@@ -3900,3 +3901,25 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .pro-kaynak b { display: block; margin-bottom: 7px; font-size: 12px; color: var(--text); }
 .pro-kaynak-secenek { display: flex; flex-wrap: wrap; align-items: center; }
 .pro-kaynak-secenek .btn, .pro-kaynak-secenek .link-btn { margin: 0 6px 6px 0; }
+
+/* ---------- Tek Tık Shorts Paketi (viral anlar kutusu) ---------- */
+
+.vr-paket-sec { margin-right: 4px; font-size: 10.5px; }
+.vr-paket { margin-top: 10px; }
+.paket-stil-alan { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.paket-secenekler { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.paket-satir { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.paket-satir input[type="color"] { width: 28px; height: 22px; padding: 0; border: 1px solid var(--line2); border-radius: 4px; background: transparent; }
+.paket-satir .vr-odak { flex: 1 1 140px; min-width: 120px; }
+.paket-not { display: inline; margin: 0; }
+.paket-liste { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.paket-kisa { border: 1px solid var(--line); border-radius: var(--r-s); padding: 6px 8px; }
+.paket-kisa-ad { font-size: 11px; color: var(--dim); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paket-cipler { display: flex; flex-wrap: wrap; gap: 4px; }
+.paket-cip { font-size: 10px; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--line2); color: var(--faint); }
+.paket-cip.calisiyor { border-color: var(--accent); color: var(--accent-lite); }
+.paket-cip.tamam { border-color: var(--good); color: var(--good); }
+.paket-cip.hata { border-color: var(--bad); color: var(--bad); }
+.paket-cip.atlandi { border-style: dashed; opacity: .7; }
+.paket-kisa-not { font-size: 10px; color: var(--faint); margin-top: 3px; line-height: 1.5; }
+.paket-kisa-not.hata { color: var(--bad); }

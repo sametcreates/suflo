@@ -222,8 +222,30 @@ window.KViral = (function () {
     return row;
   }
 
+  // Tek Tık Shorts Paketi: bu an pakete girsin mi (varsayılan: puanı 60 ve üstü)
+  function paketKutusu(a) {
+    var lbl = olustur("label", "check-label vr-paket-sec");
+    lbl.title = "Bu an Shorts Paketi'ne girsin mi";
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!a.paketSec;
+    cb.addEventListener("change", function () {
+      var k = indeks(a.id);
+      if (k >= 0) anlar[k].paketSec = cb.checked;
+      paketTazele();
+    });
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(" Pakete al"));
+    return lbl;
+  }
+
+  function paketTazele() {
+    if (window.KShortsPaket && KShortsPaket.guncelle) { try { KShortsPaket.guncelle(); } catch (e) {} }
+  }
+
   function eylemler(a) {
     var row = olustur("div", "vr-eylem");
+    if (window.KShortsPaket) row.appendChild(paketKutusu(a));
     var onz = olustur("button", "btn tiny");
     onz.type = "button";
     onz.textContent = "Önizle";
@@ -297,6 +319,8 @@ window.KViral = (function () {
     if (var_ && liste.length && liste[0].low) bilgi = "60 ve üstü an yok — en iyi " + liste.length + " an gösteriliyor";
     else if (var_ && liste.length < anlar.length) bilgi = (anlar.length - liste.length) + " an gizli (60 altı)";
     el("cap-vr-bilgi").textContent = bilgi;
+    if (el("cap-paket")) el("cap-paket").hidden = !var_ || !window.KShortsPaket;
+    paketTazele();
   }
 
   // Yalniz tek karti yeniden ciz (kenar kaydirma): diger kartlarin secimi ve odagi korunur
@@ -435,6 +459,7 @@ window.KViral = (function () {
     // Pro (ucretsizde 3 deneme hakki; hak yalniz an bulununca duser)
     if (typeof Pro !== "undefined" && !Pro.gate("highlights", { deneme: true, yeniden: bul })) return;
     if (busy || !HL) return;
+    if (paketCalisiyor()) { durum("Shorts Paketi hazırlanırken yeni arama yapılamaz.", "warn"); return; }
     var segs = window.KCaptions ? KCaptions.getSegments() : [];
     if (!segs.length) { durum("Önce altyazı oluştur ya da SRT içe aktar.", "warn"); return; }
     var toplam = segs[segs.length - 1].end - segs[0].start;
@@ -474,7 +499,7 @@ window.KViral = (function () {
       // "" = okunamadi: denetimler kapanmaz, ilk basarili Onizle/Shorts sekansi baglar
       var sekansHam = await sekansSorgu;
       // basarili arama: tum durum birlikte degisir (hata olursa onceki sonuclar bozulmadan kalir)
-      anlar = bulunan.map(function (a, i) { a.id = i + 1; a.kancaNo = 0; return a; });
+      anlar = bulunan.map(function (a, i) { a.id = i + 1; a.kancaNo = 0; a.paketSec = Number(a.score) >= 60; return a; });
       aramaNesli++;
       bulSegsTemiz = temiz;
       bulSure = s;
@@ -508,9 +533,10 @@ window.KViral = (function () {
 
   // Olusan Shorts sekansi -> ana transkriptin o araligi (Altyazi sekmesi yeniden
   // yaziya dokmeden yukler). Ayarlarda en yeni 30 sekans tutulur.
-  function shortsKaydet(items, an) {
+  // kaynakSegs: Shorts Paketi işin başında yakaladığı transkripti verir (iş sürerken değişmesin)
+  function shortsKaydet(items, an, kaynakSegs) {
     if (!window.KCaptions || !KCaptions.rawSegments || !HL.sliceSegments) return;
-    var segs = HL.sliceSegments(bulSegs || KCaptions.rawSegments(), an.start, an.end);
+    var segs = HL.sliceSegments(kaynakSegs || bulSegs || KCaptions.rawSegments(), an.start, an.end);
     if (!segs.length) return;
     var s = K.settings();
     var harita = s.shortsAltyazi || {};
@@ -528,8 +554,13 @@ window.KViral = (function () {
   }
 
   // Ekrandaki her an icin alt sekans (+ istege bagli 9:16 Auto Reframe), "Suflo Shorts" kutusunda
+  function paketCalisiyor() {
+    return !!(window.KShortsPaket && KShortsPaket.calisiyor && KShortsPaket.calisiyor());
+  }
+
   async function shortsOlustur() {
     if (!anlar.length || busy) return;
+    if (paketCalisiyor()) { durum("Shorts Paketi hazırlanıyor; bitince tekrar dene.", "warn"); return; }
     var dikey = !!(el("cap-vr-dikey") && el("cap-vr-dikey").checked);
     busy = true;
     var btn = el("cap-vr-shorts");
@@ -602,7 +633,22 @@ window.KViral = (function () {
 
   /*
    * Ekrandaki anlar (filtre + sıralama uygulanmış kopyalar). Seçili kanca başlığı
-   * için HL.secilenKanca(an). Shorts paketi (yol haritası 8. madde) bunu kullanır.
+   * için HL.secilenKanca(an). Shorts paketi (js/shorts-paket.js) şunları kullanır:
+   *   paketAnlari  — ekrandaki ve "Pakete al" işaretli anlar (kopya; kartın seçili kancasıyla)
+   *   sekansDenetle / sekansiBagla — anlar bu sekansta mı bulundu (Shorts oluştur ile aynı denetim)
+   *   kaynakSegs   — arama anındaki ham transkript (kopya); shortsKaydet — Shorts altyazı kaydı
+   *   tur          — videonun türü (paylaşım metni istemine)
    */
-  return { init: init, liste: gorunenler };
+  return {
+    init: init, liste: gorunenler,
+    paketAnlari: function () {
+      return gorunenler().filter(function (a) { return a.paketSec; }).map(function (a) { return JSON.parse(JSON.stringify(a)); });
+    },
+    sekansDenetle: sekansDenetle,
+    sekansiBagla: function (sekans) { sekansiBagla(sekans, aramaNesli); },
+    kaynakSegs: function () { return bulSegs ? JSON.parse(JSON.stringify(bulSegs)) : null; },
+    shortsKaydet: shortsKaydet,
+    tur: function () { return secenekler().tur; },
+    mesgul: function () { return busy; }
+  };
 })();

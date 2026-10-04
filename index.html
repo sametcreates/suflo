@@ -744,6 +744,52 @@
             <button id="cap-vr-marker" class="btn tiny" type="button">Marker olarak ekle</button>
             <button id="cap-vr-kopyala" class="btn tiny" type="button" style="margin-left:auto">Listeyi kopyala</button>
           </div>
+          <details class="adv vr-paket" id="cap-paket" hidden>
+            <summary>Shorts Paketi <span class="tc-yeni">PRO</span></summary>
+            <p class="hint" style="margin:6px 0 8px">"Pakete al" işaretli anlardan tek tıkla bitmiş Shorts: 9:16 sekans, markalı altyazı, kanca başlığı, ilerleme çubuğu, kapanış çağrısı, logo ve paylaşım metinleri. Her parça ayrı katmandır; istediğini silip değiştirebilirsin.</p>
+            <label class="vr-alan paket-stil-alan">Altyazı stili
+              <select id="cap-paket-stil" title="Paketteki altyazıların Suflo Stili (MOGRT stilleri pakette kullanılamaz)"></select>
+            </label>
+            <p class="hint paket-not" id="cap-paket-mogrt-not" hidden>Seçili MOGRT stili pakette kullanılamaz: her altyazı satırı ayrı Premiere çağrısı ister. Pakette buradaki Suflo Stili kullanılır.</p>
+            <div class="paket-secenekler">
+              <label class="check-label" title="Shorts transkriptinden, seçili stilde şeffaf altyazı katmanı (emojiler çizilemediği için atılır)"><input id="cap-paket-altyazi" type="checkbox" checked> Altyazı</label>
+              <label class="check-label" title="Kartta seçtiğin kanca başlığı ilk saniyelerde (stil ve süre Kanca Başlığı sekmesinden ya da Marka Kiti'nden)"><input id="cap-paket-kanca" type="checkbox" checked> Kanca</label>
+              <div class="paket-satir">
+                <label class="check-label" title="Videonun ne kadarının kaldığını gösteren çubuk"><input id="cap-paket-ilerleme" type="checkbox" checked> İlerleme çubuğu</label>
+                <select id="cap-paket-ilerleme-konum" class="slim" title="Çubuğun yeri (altta platform arayüzü kapatabilir; üst önerilir)">
+                  <option value="ust" selected>Üstte</option>
+                  <option value="alt">Altta</option>
+                </select>
+                <select id="cap-paket-ilerleme-stil" class="slim" title="Çubuğun görünümü">
+                  <option value="ince" selected>İnce</option>
+                  <option value="kalin">Kalın</option>
+                  <option value="kapsul">Kapsül</option>
+                </select>
+                <input id="cap-paket-ilerleme-renk" type="color" value="#8b7cf6" title="Çubuğun rengi">
+              </div>
+              <div class="paket-satir">
+                <label class="check-label" title="Son saniyelerde kapanış çağrısı (8 sn'den kısa Shorts'ta eklenmez)"><input id="cap-paket-cta" type="checkbox" checked> Kapanış çağrısı (CTA)</label>
+                <select id="cap-paket-cta-metin" class="slim" title="CTA metni (videonun dilinde yazılır)">
+                  <option value="takip" selected>Takip et</option>
+                  <option value="part2">Part 2 profilde</option>
+                  <option value="link">Link açıklamada</option>
+                  <option value="ozel">Kendi metnim…</option>
+                </select>
+                <input id="cap-paket-cta-ozel" class="vr-odak" type="text" maxlength="40" placeholder="En çok 40 karakter" hidden>
+              </div>
+              <label class="check-label" title="Ayarlar › Marka Kiti'ndeki köşe logosu"><input id="cap-paket-logo" type="checkbox" checked> Logo <span class="hint paket-not" id="cap-paket-logo-not" hidden>(Marka Kiti'nde logo yok)</span></label>
+              <label class="check-label" title="Her Short için YouTube Shorts, TikTok ve Reels başlığı, açıklaması ve hashtag'leri (AI anahtarı yoksa yapay zekâsız yedek). Klasöre .txt ve .csv olarak yazılır."><input id="cap-paket-metin" type="checkbox" checked> Paylaşım paketi</label>
+              <label class="check-label" title="Açıklamaların sonuna isteğe bağlı 'Altyazılar: Suflo · suflo.app' satırı"><input id="cap-paket-kredi" type="checkbox"> Kredi satırı</label>
+            </div>
+            <div class="row">
+              <button id="cap-paket-olustur" class="btn primary" type="button" disabled>Paketi oluştur (0 Shorts)</button>
+              <button id="cap-paket-iptal" class="btn tiny" type="button" hidden title="Sıradaki adımdan önce durur; bitenler kalır">İptal</button>
+              <button id="cap-paket-devam" class="btn tiny" type="button" hidden title="Yarım kalan paketi kaldığı yerden sürdür (biten adımlar tekrarlanmaz)">Devam et</button>
+              <button id="cap-paket-klasor" class="btn tiny" type="button" hidden style="margin-left:auto">Klasörü aç</button>
+            </div>
+            <div id="cap-paket-durum" class="inline-status"></div>
+            <div id="cap-paket-liste" class="paket-liste"></div>
+          </details>
         </details>
 
         <details class="adv" id="cap-br-box">
@@ -2012,6 +2058,9 @@
   <script src="js/broll-ui.js"></script>
   <script src="js/hook-title.js"></script>
   <script src="js/kanca.js"></script>
+  <script src="js/shorts-ekler.js"></script>
+  <script src="js/shorts-paket-plan.js"></script>
+  <script src="js/shorts-paket.js"></script>
   <script src="js/marka-kiti-ui.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
