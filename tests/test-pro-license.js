@@ -79,6 +79,7 @@ function baglam(appdata, o) {
     KApp: { toast: function (m, t) { toastlar.push([m, t]); } },
     require: function (name) {
       if (name === "https") return fakeHttps;
+      if (name === "fs" && o.fs) return o.fs;
       if (name === "os") return { hostname: function () { return "test-pc"; }, homedir: os.homedir };
       return require(name);
     }
@@ -148,6 +149,41 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   ok("deneme: kurcalanmis localStorage aynasi da 0 hak", baglam(DT, { ls: kotuLs }).Pro.denemeKalan("cut") === 0);
   ok("deneme: deneme.js yuklenmediyse deneme kapali (her sey kilitli kalir)", baglam(DT, { deneme: false }).Pro.denemeBaslat("cut") === false &&
     baglam(DT, { deneme: false }).Pro.status().deneme === null);
+
+  // Inceleme bulgusu: gecici okuma hatasi (EBUSY: antivirus yeni yazilan dosyayi tutuyor) depoyu
+  // kurcalanmis sayip 9 aracin 27 hakkini birden silmemeli; harcama bellekteki duruma yapilir
+  var EF = path.join(TMP, "deneme-ebusy");
+  fs.mkdirSync(EF, { recursive: true });
+  var EDF = path.join(EF, "Suflo", "pro-deneme.json");
+  var kilit = { kalan: 0, kod: "EBUSY" };
+  var kilitliFs = Object.create(fs);
+  kilitliFs.readFileSync = function (f) {
+    if (String(f) === EDF && kilit.kalan > 0) { kilit.kalan--; var h = new Error(kilit.kod + ": resource busy or locked"); h.code = kilit.kod; throw h; }
+    return fs.readFileSync.apply(fs, arguments);
+  };
+  var els1 = sahteLs();
+  var e1 = baglam(EF, { ls: els1, fs: kilitliFs });
+  e1.Pro.denemeBaslat("cut"); e1.Pro.denemeHarca("cut");
+  ok("okuma hatası: ön koşul cut 2/3, zoom 3/3", e1.Pro.denemeKalan("cut") === 2 && e1.Pro.denemeKalan("zoom") === 3 && fs.existsSync(EDF));
+  e1.Pro.denemeBaslat("zoom");
+  kilit.kalan = 1;
+  var zoomKalan = e1.Pro.denemeHarca("zoom");
+  ok("okuma hatası (EBUSY): harcama bellekteki duruma yapılır, öteki haklar silinmez", zoomKalan === 2 && e1.Pro.denemeKalan("cut") === 2 &&
+    e1.Pro.denemeKalan("overlay") === 3 && e1.Pro.status().deneme.toplamKalan === 25, zoomKalan + " / " + JSON.stringify(e1.Pro.status().deneme));
+  var e2 = baglam(EF, { ls: els1 });
+  ok("okuma hatası: yeni oturumda cut 2, zoom 2, overlay 3 (tükenmiş durum diske yazılmadı)",
+    e2.Pro.denemeKalan("cut") === 2 && e2.Pro.denemeKalan("zoom") === 2 && e2.Pro.denemeKalan("overlay") === 3, [e2.Pro.denemeKalan("cut"), e2.Pro.denemeKalan("zoom"), e2.Pro.denemeKalan("overlay")].join(","));
+  ok("okuma hatası: okunamayan dosyanın üstüne yazılmadı (eski harcamalar korunur)", JSON.parse(fs.readFileSync(EDF, "utf8")).kullanilan.zoom === undefined);
+  e2.Pro.denemeBaslat("beat"); e2.Pro.denemeHarca("beat");
+  ok("okuma hatası geçince: dosya ve ayna birleşip yazılır", JSON.parse(fs.readFileSync(EDF, "utf8")).kullanilan.zoom === 1 &&
+    JSON.parse(fs.readFileSync(EDF, "utf8")).kullanilan.beat === 1 && JSON.parse(fs.readFileSync(EDF, "utf8")).kullanilan.cut === 1);
+  ["EPERM", "EACCES", "EMFILE"].forEach(function (kod) {
+    kilit.kalan = 1; kilit.kod = kod;
+    var e3 = baglam(EF, { ls: sahteLs(), fs: kilitliFs });
+    ok("okuma hatası (" + kod + ") açılışta hakları tüketmez", e3.Pro.denemeKalan("overlay") === 3, e3.Pro.denemeKalan("overlay"));
+  });
+  fs.writeFileSync(EDF, "{bozuk json");
+  ok("okuma hatası düzeltmesi bozuk içeriği hâlâ tükenmiş sayar", baglam(EF, { ls: sahteLs(), fs: kilitliFs }).Pro.denemeKalan("overlay") === 0);
 
   // Upsell: "Ucretsiz dene · N hakkin var" -> kur, kapat, eylemi yeniden calistir
   var d5 = baglam(DT, { ls: sahteLs() });

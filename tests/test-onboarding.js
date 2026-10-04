@@ -326,7 +326,9 @@ while ((m = tre.exec(temiz))) {
   var once = obSrc.slice(Math.max(0, m.index - 60), m.index);
   var tanim = /function\s+$/.test(once);
   var tikBagla = /tikla\("[\w-]+", $/.test(once) || /addEventListener\("click", $/.test(once);
-  if (!tanim && !tikBagla) tiklaRef.push(ad + " @" + temiz.slice(0, m.index).split("\n").length);
+  // Pro'yu dene: kapı işleyiciyi yalnız satış penceresindeki "Ücretsiz dene" TIKLAMASIYLA yeniden çalıştırır
+  var denemeTiklamasi = /Pro\.gate\("[A-Za-z]+", \{ deneme: true, yeniden: $/.test(once);
+  if (!tanim && !tikBagla && !denemeTiklamasi) tiklaRef.push(ad + " @" + temiz.slice(0, m.index).split("\n").length);
 }
 ok("*Tikla işleyicileri yalnız click olayına bağlanır (init'ten çağrılmaz)", tiklaHelper && tiklaRef.length === 0, tiklaRef.join(" | "));
 
@@ -334,7 +336,7 @@ ok("*Tikla işleyicileri yalnız click olayına bağlanır (init'ten çağrılma
 var html = fs.readFileSync(path.join(KOK, "index.html"), "utf8");
 function sahte(opts) {
   opts = opts || {};
-  var say = { call: 0, eval: 0, poll: 0, run: 0, kaydet: 0, ornekYukle: 0, go: 0, toast: [], stilDene: [], stilGeri: 0, styled: 0, ornekHedefi: [], gate: [] };
+  var say = { call: 0, eval: 0, poll: 0, run: 0, kaydet: 0, ornekYukle: 0, go: 0, toast: [], stilDene: [], stilGeri: 0, styled: 0, ornekHedefi: [], gate: [], gateOpts: [] };
   var ogeler = {};
   function Oge(id, tag) {
     var o = {
@@ -399,7 +401,8 @@ function sahte(opts) {
       stilYedegi: function () { return { alan: { "cap-preset": "" }, prefs: null }; },
       stilYedeginiYukle: function () { say.stilGeri++; },
       stilDene: function (id) { say.stilDene.push(id); return true; },
-      stilSecili: function () { return !!opts.stilSecili || say.stilDene.length > 0; },
+      stilSecili: function () { return !!opts.stilSecili || !!opts.mogrt || say.stilDene.length > 0; },
+      mogrtSecili: function () { return !!opts.mogrt; },
       stilKontrolleri: function () { return ["cap-preset", "cap-boyut", "cap-renk", "cap-maxlen"]; },
       ornekHedefi: function (id) { say.ornekHedefi.push(id); },
       anahtarSesiBulutaGonderir: function () { return !!opts.bulut; },
@@ -410,7 +413,9 @@ function sahte(opts) {
       yenilikSurumu: function () { return "3.0"; }, toast: function (m) { say.toast.push(m); }, goster: function () {},
       pollNow: function () { say.poll++; }, refreshContext: function () { say.poll++; }, installLocalWhisper: function () { return Promise.resolve(null); }
     },
-    Pro: { isPro: function () { return !!opts.pro; }, gate: function (f, o) { if (!(o && o.silent)) say.gate.push(f); return !!opts.pro; }, on: function () {} },
+    Pro: { isPro: function () { return !!opts.pro; }, on: function () {},
+      // kurulu: "Ücretsiz dene"ye basılmış (deneme kabul eden kapı geçer)
+      gate: function (f, o) { if (!(o && o.silent)) { say.gate.push(f); say.gateOpts.push(o || null); } return !!opts.pro || !!(opts.kurulu && o && o.deneme === true); } },
     document: belge
   };
   win.window = win;
@@ -614,6 +619,29 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     s3.OB.init();
     s3.ogeler["ia-stil-koy"]._olay.click[0]();
     ok("hiç stil seçili değilse Creator Punch önizlenip konur", J(s3.say.stilDene) === J(["mrbeast"]) && s3.say.styled === 1 && s3.ayarlar.onboarding.stilYedek === undefined);
+    /* İnceleme bulgusu: ücretsizde 'Timeline'a koy' Suflo Stili için bile denemesiz kütüphane penceresini (captionStyles)
+       açıyordu; Altyazı sekmesindeki aynı eylem stilli katman denemesini (3 hak, filigran) sunuyor */
+    var s3b = sahte({ ayarVardi: false, segments: true, model: true });
+    s3b.OB.init();
+    s3b.ogeler["ia-stil-goster"]._olay.click[0]();
+    s3b.ogeler["ia-stil-koy"]._olay.click[0]();
+    var s3bOps = s3b.say.gateOpts[0] || {};
+    ok("ücretsiz 'Timeline'a koy' (Suflo Stili): stilli katman denemesi sunulur, kütüphane penceresi değil", J(s3b.say.gate) === J(["overlay"]) &&
+      s3bOps.deneme === true && typeof s3bOps.yeniden === "function" && s3b.say.styled === 0, J(s3b.say.gate));
+    ok("ücretsiz: pencere kapatılırsa önizleme yedeği kalır ('Tamam' önceki görünümü getirir)", !!s3b.ayarlar.onboarding.stilYedek);
+    var s3c = sahte({ ayarVardi: false, segments: true, model: true, kurulu: true });
+    s3c.OB.init();
+    s3c.ogeler["ia-stil-goster"]._olay.click[0]();
+    s3c.ogeler["ia-stil-koy"]._olay.click[0]();
+    ok("ücretsiz, deneme kurulu: stil timeline'a konur (overlayUygula hakkı başarıda düşürür)", s3c.say.styled === 1 && s3c.ayarlar.onboarding.stilYedek === undefined, J(s3c.say));
+    var s3d = sahte({ ayarVardi: false, segments: true, model: true, mogrt: true });
+    s3d.OB.init();
+    s3d.ogeler["ia-stil-koy"]._olay.click[0]();
+    ok("ücretsiz, MOGRT stili seçili: kütüphane penceresi (deneme yok), uygulanmaz", J(s3d.say.gate) === J(["captionStyles"]) && s3d.say.styled === 0, J(s3d.say.gate));
+    var s3e = sahte({ ayarVardi: false, model: true });
+    s3e.OB.init();
+    s3e.ogeler["ia-stil-koy"]._olay.click[0]();
+    ok("altyazı yokken önce altyazı ister (pencere açılmaz)", s3e.say.gate.length === 0 && s3e.say.toast.indexOf("Önce altyazı oluştur ya da örnekte dene.") !== -1, J(s3e.say.toast));
     var s4 = sahte({ ayarVardi: false, segments: true, model: true });
     s4.OB.init();
     s4.ogeler["ia-stil-goster"]._olay.click[0]();

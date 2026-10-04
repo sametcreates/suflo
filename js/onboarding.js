@@ -602,16 +602,21 @@ window.KOnboarding = (function () {
   }
 
   /*
-   * TIKLAMA: stilli katmanı timeline'a koy (Pro overlay; ücretsizde satış penceresi).
+   * TIKLAMA: stilli katmanı timeline'a koy (Pro overlay).
    * Seçili bir stil varsa (önizlenen Creator Punch, kullanıcının sonradan dokunduğu kart
    * ya da daha önce kaydettiği stil) O uygulanır; hiç stil yoksa Creator Punch önizlenip konur.
+   * Ücretsizde Suflo Stili, Altyazı sekmesindeki "… ile ekle" gibi stilli katman deneme hakkıyla
+   * (filigranlı) konur: pencere "Ücretsiz dene" sunar, kurulunca bu tıklama yeniden çalışır.
+   * Seçili stil bir MOGRT ise kütüphane penceresi (deneme yok).
    */
   function stilKoyTikla() {
-    if (!proMu()) {
-      if (window.Pro && Pro.gate) Pro.gate("captionStyles");
-      return;
-    }
     if (!KCaptions.hasSegments()) { KApp.toast("Önce altyazı oluştur ya da örnekte dene.", "warn"); return; }
+    if (!proMu()) {
+      if (!window.Pro || !Pro.gate) return;
+      if (KCaptions.mogrtSecili && KCaptions.mogrtSecili()) { Pro.gate("captionStyles"); return; }
+      // Pencere kapatılırsa önizleme yedeği kalır: "Tamam" önceki görünümü yine geri getirir
+      if (!Pro.gate("overlay", { deneme: true, yeniden: stilKoyTikla })) return;
+    }
     var secili = KCaptions.stilSecili ? KCaptions.stilSecili() : !!stilYedek;
     if (!secili) stilGoster();
     if (stilYedek) stilYedekAyarla(null);   // kullanıcı bu stili bilerek kullandı: geri yükleme yok

@@ -4462,6 +4462,8 @@ window.KCaptions = (function () {
     stilDene: stilDene,
     // Kullanıcının seçili bir animasyonlu stili (Suflo stili ya da MOGRT) var mı
     stilSecili: function () { return !!(secilenMogrt || secilenMotorStili); },
+    // Seçili stil bir MOGRT mi (Pro kütüphanesi; Suflo Stillerinin aksine deneme hakkı yok)
+    mogrtSecili: function () { return !!secilenMogrt; },
     // Bilinçli görünüm değişikliği sayılan kontroller (rehber: stil yedeğini bırakır)
     stilKontrolleri: function () { return STIL_ALANLARI.concat(["cap-punct", "cap-kutu"]); },
     // Rehberin örnek klibi: altyazı yalnız bu sekansa uygulanır ("" = bilinmiyor)

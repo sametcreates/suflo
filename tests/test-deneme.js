@@ -1,5 +1,5 @@
 // Suflo testi: js/deneme.js — Pro'yu dene: her araca 3 kalıcı hak (saf durum mantığı)
-var path = require("path");
+var fs = require("fs"), path = require("path");
 var D = require(path.join(__dirname, "..", "js", "deneme.js"));
 var gecen = 0, toplam = 0;
 function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 300) + "]" : "")); }
@@ -59,6 +59,31 @@ var oz = D.ozet({ v: 1, kullanilan: { cut: 1, overlay: 3 } });
 ok("ozet: 9 satır, kalan ve toplam", oz.ozellikler.length === 9 && oz.hak === 3 && oz.toplamKalan === 27 - 4 &&
   oz.ozellikler[0].id === "cut" && oz.ozellikler[0].kalan === 2 && oz.ozellikler[0].ad === "Otomatik kesim", JSON.stringify(oz.ozellikler[0]));
 ok("harcama mesajı", D.harcamaMesaji(2) === "1 deneme hakkı kullanıldı · 2 kaldı" && /hakkın bitti/.test(D.harcamaMesaji(0)), D.harcamaMesaji(2));
+
+/* ---------------- tanıtım kartından kurulan deneme ---------------- */
+// Her tanıtım düğmesi (index.html .pro-ac-btn) deneme listesindeyse aracın gerçekten var olan asıl
+// düğmesine yönlendirir; düğmenin adı ipucundaki adla aynı (ad değişirse ipucu yalan söylemesin)
+var HTML = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+var tanitimlar = [], tre = /class="btn primary pro-ac-btn" data-pro-feature="([a-z]+)"/g, tm;
+while ((tm = tre.exec(HTML))) tanitimlar.push(tm[1]);
+ok("tanıtım düğmeleri bulundu", tanitimlar.length >= 7, tanitimlar.join(","));
+var tanitimSorun = [];
+tanitimlar.forEach(function (f) {
+  var ip = D.tanitimIpucu(f);
+  if (!D.listede(f)) { if (ip !== null) tanitimSorun.push(f + ": listede değil ama ipucu var"); return; }
+  if (!ip || !ip.hedef) { tanitimSorun.push(f + ": hedef yok"); return; }
+  var i = HTML.indexOf('id="' + ip.hedef + '"');
+  if (i < 0) { tanitimSorun.push(f + ": #" + ip.hedef + " index.html'de yok"); return; }
+  if (/tekrar tıkla/.test(ip.mesaj) || !/^Deneme açık: şimdi /.test(ip.mesaj)) tanitimSorun.push(f + ": mesaj " + ip.mesaj);
+  if (ip.eylem) {
+    var etiket = HTML.slice(i, HTML.indexOf("</button>", i)).replace(/<em[\s\S]*?<\/em>/g, "").replace(/<[^>]*>/g, "").replace(/^[^>]*>/, "").replace(/\s+/g, " ").trim();
+    if (etiket !== ip.eylem) tanitimSorun.push(f + ": düğme '" + etiket + "' ≠ ipucu '" + ip.eylem + "'");
+    if (ip.mesaj.indexOf('"' + ip.eylem + '"') === -1) tanitimSorun.push(f + ": mesaj eylemi adlandırmıyor");
+  }
+});
+ok("tanıtım ipuçları: listedeki her araç var olan asıl düğmeyi adıyla gösterir", tanitimSorun.length === 0, tanitimSorun.join(" | "));
+ok("tanıtım ipucu: kütüphane ve bilinmeyen özellikte null", D.tanitimIpucu("sfx") === null && D.tanitimIpucu("motionbg") === null && D.tanitimIpucu("__proto__") === null);
+ok("tanıtım ipucu: tanıtımı olmayan listedeki araçta genel mesaj", D.tanitimIpucu("textcut").hedef === "" && /aracın kendi düğmesine bas/.test(D.tanitimIpucu("textcut").mesaj));
 
 /* ---------------- deneme çıktıları ---------------- */
 function kayit(n, ek) {

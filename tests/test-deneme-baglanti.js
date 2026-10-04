@@ -73,7 +73,13 @@ jsDosyalari.forEach(function (f) {
     }
   });
 });
-ok("tarama deneme kapılarını buluyor (14 kapı)", denemeli.length === 14, denemeli.join(" | "));
+ok("tarama deneme kapılarını buluyor (15 kapı: 14 araç + rehberin stil adımı)", denemeli.length === 15, denemeli.join(" | "));
+// Rehberin "Timeline'a koy"u Altyazı sekmesindeki "… ile ekle" ile aynı stilli katman denemesini sunar;
+// MOGRT stili seçiliyse denemesiz kütüphane penceresi (inceleme bulgusu: Suflo Stili için de captionStyles açılıyordu)
+var koy = govde(oku("js/onboarding.js"), "function stilKoyTikla()");
+ok("onboarding stilKoyTikla: Suflo Stili için overlay denemesi, MOGRT için kütüphane", /Pro\.gate\("overlay", \{ deneme: true, yeniden: stilKoyTikla \}\)/.test(koy) &&
+  /KCaptions\.mogrtSecili\(\)\) \{ Pro\.gate\("captionStyles"\); return; \}/.test(koy) && koy.indexOf("mogrtSecili") < koy.indexOf('Pro.gate("overlay"') &&
+  koy.indexOf('Pro.gate("overlay"') < koy.indexOf("KCaptions.applyStyled()"), koy.slice(0, 300));
 ok("kütüphane / MOGRT / toplu / ASS / Shorts paketi kapıları deneme almaz", yanlis.length === 0, yanlis.join(" | "));
 ["js/sahneler.js", "js/broll-ui.js", "js/library.js", "js/presets.js", "js/sfx.js", "js/motionbg.js", "js/emoji-assets.js", "js/library-health.js"].forEach(function (f) {
   ok(f + ": deneme hiç geçmez", !/deneme/.test(ayikla(oku(f))));
@@ -144,8 +150,17 @@ ok("reflectPro kalan hakları ve temiz kartını çizer", /denemeListesiniCiz\(s
 ok("liste satırı 'ad kalan/hak' (Otomatik kesim 2/3), Pro'da gizli", /o\.kalan \+ "\/" \+ o\.hak/.test(govde(app, "function denemeListesiniCiz(")) && /kart\.hidden = !!s\.pro/.test(govde(app, "function denemeListesiniCiz(")));
 var dt = govde(app, "async function denemeyiTemizle(");
 ok("temiz yeniden oluşturma ortak modülle; başarıda kayıt silinir", /SufloOverlayRender\.temizYenidenOlustur\(K, k,/.test(dt) && dt.indexOf("Pro.denemeCiktisiSil(k.path)") > dt.indexOf("if (!r.ok)"));
-ok("Pro tanıtım kartı düğmeleri denemeyi sunar (pro.js listede olmayanı süzer)", /Pro\.gate\(feature, \{ deneme: true \}\);/.test(app) &&
+ok("Pro tanıtım kartı düğmeleri denemeyi sunar (pro.js listede olmayanı süzer)", /Pro\.gate\(feature, \{ deneme: true, yeniden: function \(\) \{ denemeyeYonlendir\(feature\); \} \}\);/.test(app) &&
   /Dm\.listede\(feature\) && Number\(o\.kalan\) > 0/.test(oku("js/pro.js")));
+// İnceleme bulgusu: kurulu deneme kapıyı sessizce geçirdiği için tanıtım düğmesi (satın alma yolu) ölü kalıyordu
+var tanitimBas = app.indexOf('querySelectorAll(".pro-ac-btn, #yazi-proya-gec")');
+var tanitimIsl = app.slice(tanitimBas, app.indexOf("var styleUpsell", tanitimBas));
+ok("tanıtım düğmesi: deneme kuruluysa satın alma penceresi (deneme kapısı değil)",
+  /if \(Pro\.denemeAcik && Pro\.denemeAcik\(feature\)\) \{ Pro\.gate\(feature\); return; \}/.test(tanitimIsl) &&
+  tanitimIsl.indexOf("Pro.denemeAcik(feature)") < tanitimIsl.indexOf("deneme: true"), tanitimIsl.slice(0, 200));
+var yonlendir = govde(app, "function denemeyeYonlendir(");
+ok("tanıtımdan kurulan deneme aracın asıl düğmesini adıyla gösterir ('tekrar tıkla' demez)", /SufloDeneme\.tanitimIpucu\(feature\)/.test(yonlendir) &&
+  /toast\(ip\.mesaj/.test(yonlendir) && /scrollIntoView/.test(yonlendir) && !/tekrar tıkla/.test(tanitimIsl + yonlendir));
 ok("etkinleştirmeden sonra deneme çıktısı varsa bir kez hatırlatılır", /if \(Pro\.denemeCiktilari && Pro\.denemeCiktilari\(\)\.length\) \{\s*toast\("Deneme çıktılarını temiz yeniden oluştur/.test(app));
 ok("Pro karşılaştırması: Sözlük yok, yeni araçlar var", !/Sözlük/.test(kilitli.split('class="pro-renk"')[1] || "") &&
   ["Konuşmadan kes", "viral puan", "Geçişler", "Suflo Stilleri timeline'da", "Kanca başlığı", "Sesi iyileştir", "Otomatik zoom", "Ritim", "12 dile çeviri"].every(function (x) { return kilitli.indexOf(x) !== -1; }));

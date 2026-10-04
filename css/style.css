@@ -2198,17 +2198,21 @@ canvas#mo-canvas {
 .pro-deneme { margin: 0 0 10px; padding: 9px 11px; border: 1px solid rgba(114,124,255,.28); border-radius: 8px; background: rgba(114,124,255,.06); }
 .pro-deneme > b { display: block; font-size: 11.5px; margin-bottom: 3px; }
 .pro-deneme .hint { margin: 0 0 7px; }
-.pro-deneme-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 3px 12px; font-size: 11px; }
-.pro-deneme-liste li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,.06); }
-.pro-deneme-liste li b { font-variant-numeric: tabular-nums; color: var(--accent-lite); }
+/* CEF 74 (Premiere 2020-2021): flex gap (Chrome 84) ve overflow-wrap:anywhere (80) yok; grid aralığı ve kenar boşluğu */
+.pro-deneme-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-gap: 3px 12px; gap: 3px 12px; font-size: 11px; }
+.pro-deneme-liste li { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,.06); }
+.pro-deneme-liste li span { min-width: 0; overflow-wrap: break-word; word-break: break-word; }
+.pro-deneme-liste li b { flex: none; margin-left: 8px; font-variant-numeric: tabular-nums; color: var(--accent-lite); }
 .pro-deneme-liste li.bitti { opacity: .5; }
 .pro-deneme-liste li.bitti b { color: inherit; }
 /* Satin alma sonrasi: deneme ciktilarini temiz yeniden olustur */
 .pro-temiz { margin: 0 0 10px; padding: 9px 11px; border: 1px solid rgba(111,220,160,.3); border-radius: 8px; background: rgba(111,220,160,.05); }
 .pro-temiz > b { display: block; font-size: 11.5px; margin-bottom: 3px; }
 .pro-temiz .hint { margin: 0 0 7px; }
-.pro-temiz-satir { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; font-size: 11px; }
-.pro-temiz-satir > span { flex: 1; min-width: 140px; overflow-wrap: anywhere; }
+.pro-temiz-satir { display: flex; align-items: center; flex-wrap: wrap; padding: 2px 0; font-size: 11px; }
+.pro-temiz-satir > * { margin: 2px 6px 2px 0; }
+.pro-temiz-satir > :last-child { margin-right: 0; }
+.pro-temiz-satir > span { flex: 1; min-width: 140px; overflow-wrap: break-word; word-break: break-word; }
 #grp-pro #pro-key { flex: 1; min-width: 0; font-family: inherit; letter-spacing: .06em; }
 #grp-pro .inline-status.bad { color: #e05c5c; }
 #pro-buy { color: inherit; }

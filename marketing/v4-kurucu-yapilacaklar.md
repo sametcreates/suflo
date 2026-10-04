@@ -350,7 +350,11 @@ haklar geri **dolmamalı** (bu da denenecek bir davranış).
    "Kesimleri uygula" → kesimler uygulanmalı, "1 deneme hakkı kullanıldı · 2 kaldı" bildirimi çıkmalı, Ayarlar'da 2/3.
    Tekrar "Sessizlikleri bul" yeniden satış penceresini açmalı ("2 hakkın var").
    Sekmenin üstündeki tanıtım kartında "Otomatik kesimi aç — 749 TL" → pencerede yine "Ücretsiz dene";
-   basınca "Deneme açık — tekrar tıkla" bildirimi çıkmalı ve "Sessizlikleri bul" pencere açmadan çalışmalı.
+   basınca `Deneme açık: şimdi "Sessizlikleri bul" düğmesine bas` bildirimi çıkmalı, sekme o düğmeye
+   kaymalı ve "Sessizlikleri bul" pencere açmadan çalışmalı. Deneme açıkken tanıtım düğmesine yeniden
+   basınca satın alma penceresi açılmalı ("Ücretsiz dene" olmadan); düğme tepkisiz **kalmamalı**.
+   Zoom ("Zoom uygula"), Ritim ("Ritmi bul"), Kanca başlığı ("Playhead'e ekle") ve Geçişler (geçiş
+   kartı) tanıtım kartlarında da bildirim doğru düğmenin adını söylemeli.
    SFX ve Motion BG tanıtım kartlarında "Ücretsiz dene" **olmamalı**.
 3. **Hata hak yemez:** Klip seçmeden ya da kilitli track'te uygulamayı dene → hata mesajı, hak düşmemeli.
    Sesi iyileştir'i sesi olmayan bir klipte dene → hata, hak aynı.
@@ -358,7 +362,9 @@ haklar geri **dolmamalı** (bu da denenecek bir davranış).
    Lisans anahtarım var → yeniden ✕. Esc kapatmalı, odak tıkladığın düğmeye dönmeli.
 5. **Konuşmadan kes, Viral anlar, Çeviri, Çok dilli SRT paketi, Geçişler, Ritim (marker ya da vuruşlarda
    böl), Sesi iyileştir:** her birinde "Ücretsiz dene" → işlem kendiliğinden çalışmalı → başarıda tek
-   hak düşmeli. Viral anlarda Groq anahtarı yoksa anahtar sihirbazı açılmalı, hak düşmemeli. Çok dilli
+   hak düşmeli. Ritimde aynı analizden önce "Markerları timeline'a at", sonra bir B-roll seçip
+   "Seçili klibi vuruşlarda böl" → bölme satış penceresi açmadan çalışmalı ve toplamda **tek** hak
+   düşmeli (ters sırada da tek hak); yeni bir "Ritmi bul" yeniden pencere açmalı. Viral anlarda Groq anahtarı yoksa anahtar sihirbazı açılmalı, hak düşmemeli. Çok dilli
    pakette yalnız kaynak dil seçiliyse (çeviri yok) hak düşmemeli. Sahne algılama ve B-roll önerileri
    satış penceresinde "Ücretsiz dene" **göstermemeli**.
 6. **Otomatik zoom:** Deneme hakkıyla zoom ekle → "Zoom'u kaldır" kapısız çalışmalı; hakkı
@@ -373,6 +379,11 @@ haklar geri **dolmamalı** (bu da denenecek bir davranış).
    "Deneme yalnız Suflo Stilleri için" uyarısı çıkmalı.
 9. **Kanca başlığı:** Kanca sekmesinde "Playhead'e ekle" (ve Viral anlar kartında "Başlık ekle") → stilli
    katmanla **aynı** hak sayacından düşmeli; başlıkta sağ üstte filigran olmalı, önizleme PNG'sinde olmamalı.
+9b. **Kurulum rehberi stil adımı:** lisanssız panelde Altyazı sekmesindeki "İlk adım" kartının 3. adımında
+    "Stilleri gör" → "Timeline'a koy": pencerede "17 gerçek altyazı stili" kütüphane tanıtımı **değil**,
+    stilli katman penceresi ("Ücretsiz dene · N hakkın var", filigran notu) çıkmalı. Pencereyi kapatıp
+    "Tamam" de: önceki altyazı görünümü geri gelmeli. Yeniden "Timeline'a koy" → "Ücretsiz dene": Creator
+    Punch katmanı filigranlı konmalı ve stilli katman sayacından tek hak düşmeli (örnek klipte de düşer).
 10. **Hak bitince:** bir aracın 3 hakkını bitir → satış penceresinde "Ücretsiz dene" düğmesi çıkmamalı,
     "Suflo Pro'yu Al" birincil olmalı; Ayarlar'da o satır `0/3` ve soluk.
 11. **Temiz yeniden oluşturma (en önemlisi, `KS_removeOverlay` ilk kez burada kullanılıyor):**
@@ -393,7 +404,13 @@ haklar geri **dolmamalı** (bu da denenecek bir davranış).
 12. **Pro kullanıcısı:** lisanslıyken hiçbir yerde "Ücretsiz dene" ya da deneme listesi görünmemeli,
     katmanlarda filigran olmamalı ve `pro-deneme.json` **oluşmamalı**.
 13. Eski Premiere'de (2020/2021, CEF 74) 2. ve 7. adımı tekrarla: pencere ve "kendiliğinden yeniden
-    çalışma" aynı davranmalı.
+    çalışma" aynı davranmalı. Ayarlar › Suflo Pro'da deneme listesinde "Stilli altyazı ve kanca başlığı"
+    adı `3/3` sayısına yapışmamalı; Pro'yla açılan "Deneme çıktılarını temiz yeniden oluştur" kartında
+    "Temiz oluştur" ile "Listeden çıkar" arasında boşluk olmalı ve boşluksuz uzun bir sekans adı
+    (ör. `Roportaj_2026_10_04_final_v3`) panelden taşmadan alt satıra kırılmalı.
+14. **Okuma hatası hakları silmez:** Windows'ta antivirüs `pro-deneme.json`'u kısa süre kilitlerse
+    (taramada) haklar sıfırlanmamalı; bunu elle zorlamak zor, yalnız Ayarlar'daki sayıların bir hak
+    harcamasından sonra beklenmedik biçimde `0/3`'e düşmediğine bak.
 
 ### 4.2 Yayından sonra site ve pazarlama metinleri
 

@@ -429,13 +429,17 @@
       return Dm.birlestir(j, Dm.bos());   // _sig'siz temiz kopya
     } catch (e) { return Dm.tukenmis(); }
   }
-  // Dosya yoksa null (taze); okunamiyorsa ya da kurcalanmissa tukenmis
+  // Dosya yoksa null (taze); imza ya da bicim bozuksa tukenmis. Gecici okuma hatasi
+  // (EBUSY / EPERM / EACCES / EMFILE: antivirus, dosya kilidi) kurcalama DEGIL: OKUNAMADI
+  // doner ve birlestirmede atlanir; bellekteki ve localStorage'daki haklar korunur.
+  var OKUNAMADI = { okunamadi: true };
+  var _dosyaOkunamadi = false;   // son okumada dosya okunamadi: ustune yazilmaz
   function denemeDosyadan() {
     var f = denemeFile();
     if (!f) return null;
     var ham;
     try { ham = fs.readFileSync(f, 'utf8'); }
-    catch (e) { return e && e.code === 'ENOENT' ? null : DM().tukenmis(); }
+    catch (e) { return e && e.code === 'ENOENT' ? null : OKUNAMADI; }
     return imzaliDurum(ham);
   }
   function denemeLsden() {
@@ -450,7 +454,9 @@
     var Dm = DM();
     if (!Dm) return null;
     if (!_deneme || taze) {
-      var d = Dm.birlestir(denemeDosyadan() || Dm.bos(), denemeLsden() || Dm.bos());
+      var dosya = denemeDosyadan();
+      _dosyaOkunamadi = dosya === OKUNAMADI;
+      var d = Dm.birlestir(dosya && !_dosyaOkunamadi ? dosya : Dm.bos(), denemeLsden() || Dm.bos());
       _deneme = _deneme ? Dm.birlestir(_deneme, d) : d;
     }
     return _deneme;
@@ -460,7 +466,9 @@
     var obj = Dm.birlestir(d, Dm.bos());
     obj._sig = sign(obj);
     var metin = JSON.stringify(obj);
-    atomikYaz(denemeFile(), metin);
+    // Okunamayan dosyanin ustune yazilmaz (icindeki harcamalar silinmesin); durum localStorage
+    // aynasinda kalir, dosya yeniden okunabildiginde birlestirilip yazilir
+    if (!_dosyaOkunamadi) atomikYaz(denemeFile(), metin);
     var ls = lsAl();
     if (ls) { try { ls.setItem(DENEME_LS, metin); } catch (e) {} }
   }

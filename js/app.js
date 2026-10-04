@@ -498,6 +498,17 @@ window.KApp = (function () {
     }
   }
 
+  // Tanıtım kartından kurulan deneme: aracın asıl düğmesinin adını söyle ve onu göster
+  function denemeyeYonlendir(feature) {
+    var ip = window.SufloDeneme && SufloDeneme.tanitimIpucu ? SufloDeneme.tanitimIpucu(feature) : null;
+    if (!ip) return;
+    toast(ip.mesaj, "good", 7000);
+    var hedef = ip.hedef ? el(ip.hedef) : null;
+    if (!hedef) return;
+    try { hedef.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { try { hedef.scrollIntoView(); } catch (e2) {} }
+    if (!hedef.disabled && hedef.tagName === "BUTTON") { try { hedef.focus({ preventScroll: true }); } catch (e3) {} }
+  }
+
   function initPro() {
     if (!window.Pro || !el("pro-activate")) return;
 
@@ -538,9 +549,12 @@ window.KApp = (function () {
     Array.prototype.forEach.call(document.querySelectorAll(".pro-ac-btn, #yazi-proya-gec"), function (b) {
       b.addEventListener("click", function () {
         var feature = b.getAttribute("data-pro-feature") || (b.id === "yazi-proya-gec" ? "mogrt" : "pro");
+        // Deneme zaten kuruluysa satın alma penceresi: kurulu deneme kapıyı sessizce geçirip bu
+        // düğmeyi (satın alma yolunu) ölü bırakmasın
+        if (Pro.denemeAcik && Pro.denemeAcik(feature)) { Pro.gate(feature); return; }
         // Deneme listesindeki araçlarda (kesim, zoom, ritim, geçiş, kanca) pencere "Ücretsiz dene" de sunar;
-        // yeniden çalıştırılacak eylem yok: kurulunca "Deneme açık — tekrar tıkla" der. Kütüphaneler denemesiz.
-        Pro.gate(feature, { deneme: true });
+        // kurulunca aracın asıl düğmesine yönlendirir. Kütüphaneler denemesiz (pro.js süzer).
+        Pro.gate(feature, { deneme: true, yeniden: function () { denemeyeYonlendir(feature); } });
       });
     });
 

@@ -118,6 +118,25 @@
     return k > 0 ? "1 deneme hakkı kullanıldı · " + k + " kaldı" : "1 deneme hakkı kullanıldı · bu araçta hakkın bitti";
   }
 
+  /* ---------------- Tanıtım kartından kurulan deneme ---------------- */
+  // Sekmenin üstündeki "…aç — 749 TL" düğmesi aracın kendisi değil: deneme kurulunca kullanıcı
+  // aracın asıl düğmesine yönlendirilir (hedef: index.html'deki öğe kimliği, eylem: düğmenin adı)
+  var TANITIM = {
+    cut: { hedef: "cut-analyze", eylem: "Sessizlikleri bul" },
+    zoom: { hedef: "zoom-run", eylem: "Zoom uygula" },
+    beat: { hedef: "beat-analyze", eylem: "Ritmi bul" },
+    transitions: { hedef: "gecis-grid", eylem: "" },
+    overlay: { hedef: "kanca-ekle", eylem: "Playhead'e ekle" }
+  };
+
+  function tanitimIpucu(f) {
+    if (!listede(f)) return null;
+    var t = sahip(TANITIM, f) ? TANITIM[f] : { hedef: "", eylem: "" };
+    var mesaj = t.eylem ? "Deneme açık: şimdi \"" + t.eylem + "\" düğmesine bas"
+      : (f === "transitions" ? "Deneme açık: şimdi istediğin geçişin düğmesine bas" : "Deneme açık: şimdi aracın kendi düğmesine bas");
+    return { hedef: t.hedef, eylem: t.eylem, mesaj: mesaj };
+  }
+
   /* ---------------- Deneme çıktıları (temiz yeniden oluşturma) ---------------- */
 
   var CIKTI_MAX = 10;
@@ -151,7 +170,7 @@
   return {
     HAK: HAK, SURUM: SURUM, OZELLIKLER: OZELLIKLER.slice(), AD: AD, CIKTI_MAX: CIKTI_MAX,
     listede: listede, bos: bos, tukenmis: tukenmis, gecerliMi: gecerliMi, kalan: kalan, harca: harca,
-    birlestir: birlestir, ozet: ozet, harcamaMesaji: harcamaMesaji,
+    birlestir: birlestir, ozet: ozet, harcamaMesaji: harcamaMesaji, tanitimIpucu: tanitimIpucu,
     ciktiGecerliMi: ciktiGecerliMi, ciktiEkle: ciktiEkle, ciktiSil: ciktiSil
   };
 });

@@ -93,6 +93,15 @@ kaynaklar.forEach(function (k) {
   }
 });
 ok("CSS (dosya + HTML + JS): inset ve min()/max()/clamp() yedekli", cssSorun.length === 0, cssSorun.slice(0, 4).join(" | "));
+// Pro'yu dene satırları (Ayarlar › Suflo Pro): flex gap (Chrome 84) ve overflow-wrap:anywhere (80)
+// CEF 74'te yok — düğmeler bitişik kalıyor, uzun sekans adı panelden taşıyordu (inceleme bulgusu)
+var denemeKurallari = [], kre = /([^{}]*(?:pro-deneme|pro-temiz)[^{}]*)\{([^{}]*)\}/g, km;
+while ((km = kre.exec(css))) denemeKurallari.push({ secici: km[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), govde: km[2] });
+var denemeCssSorun = denemeKurallari.filter(function (k) {
+  return (/display:\s*(inline-)?flex/.test(k.govde) && /(^|[;\s])(row-|column-)?gap:/.test(k.govde)) || /overflow-wrap:\s*anywhere/.test(k.govde);
+}).map(function (k) { return k.secici; });
+ok("Pro'yu dene CSS: flex gap ve overflow-wrap:anywhere yok (CEF 74)", denemeKurallari.length >= 6 && denemeCssSorun.length === 0, denemeKurallari.length + " kural · " + denemeCssSorun.join(" | "));
+
 var ornekRegex = ayikla("function f(x){ return /a'b/.test(x); }\nvar y = o?.p;");
 ok("denetleyici: return'den sonraki regex metin sanilmaz, arkasindaki kod gorunur", /o\?\.p/.test(ornekRegex.split("\n")[1]));
 
