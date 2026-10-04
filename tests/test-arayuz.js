@@ -283,7 +283,7 @@ ok("betik sırası: style-share → marka-kiti → style-engine → overlay-rend
   betikSira("style-engine.js") < betikSira("overlay-render.js") && betikSira("overlay-render.js") < betikSira("captions.js") && betikSira("hook-title.js") < betikSira("kanca.js") &&
   betikSira("kanca.js") < betikSira("marka-kiti-ui.js") && betikSira("marka-kiti-ui.js") < betikSira("app.js"));
 ok("Marka Kiti kartı app.js'ten başlatılır", /KMarkaKiti\.init\(\)/.test(fs.readFileSync(KOKYOL + "js/app.js", "utf8")));
-function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src.slice(i, src.indexOf("\n  }\n", i) + 4); }
+function fnGovde(src, imza) { src = String(src).replace(/\r\n/g, "\n"); var i = src.indexOf(imza); return i < 0 ? "" : src.slice(i, src.indexOf("\n  }\n", i) + 4); }
 var ap = fnGovde(capSrc, "function applyPreset(");
 ok("applyPreset: kit açıkken stiliYaz(mergeBrandKit(preset, kit))", /stiliYaz\(kit \? window\.SufloMarkaKiti\.mergeBrandKit\(p\.stil, kit\) : p\.stil\)/.test(ap));
 var ku = fnGovde(capSrc, "function stilKoduUygula(");

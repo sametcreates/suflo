@@ -197,7 +197,7 @@ if (!ffmpeg) {
     fs.copyFileSync(path.join(root, "fonts", r.fontFiles[0]), path.join(tmp, r.fontFiles[0]));
     var p = cp.spawnSync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i",
       "color=c=black@0:s=" + EW + "x" + EH + ":r=25:d=3.6,format=rgba,subtitles=f=guvenli.ass:alpha=1:fontsdir=.,select='eq(n\\,11)+eq(n\\,33)+eq(n\\,56)+eq(n\\,78)'",
-      "-vsync", "0", "-f", "rawvideo", "-pix_fmt", "rgba", "-"], { cwd: tmp, maxBuffer: 64 * 1024 * 1024 });
+      "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgba", "-"], { cwd: tmp, maxBuffer: 64 * 1024 * 1024 });
     var b = p.stdout || Buffer.alloc(0), kare = EW * EH * 4, enSag = -1;
     for (var f = 0; f + kare <= b.length; f += kare) {
       for (var y = 0; y < EH; y++) for (var x = EW - 1; x > enSag; x--) { if (b[f + (y * EW + x) * 4 + 3] > 16) { enSag = x; break; } }
