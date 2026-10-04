@@ -386,21 +386,37 @@ haklar geri **dolmamalı** (bu da denenecek bir davranış).
     Punch katmanı filigranlı konmalı ve stilli katman sayacından tek hak düşmeli (örnek klipte de düşer).
 10. **Hak bitince:** bir aracın 3 hakkını bitir → satış penceresinde "Ücretsiz dene" düğmesi çıkmamalı,
     "Suflo Pro'yu Al" birincil olmalı; Ayarlar'da o satır `0/3` ve soluk.
-11. **Temiz yeniden oluşturma (en önemlisi, `KS_removeOverlay` ilk kez burada kullanılıyor):**
+11. **Temiz yeniden oluşturma (en önemlisi; `ProjectItem.changeMediaPath` ilk kez burada kullanılıyor):**
     7 ve 9'da filigranlı katmanlar ürettiğin sekans açıkken Pro anahtarını etkinleştir.
+    Nasıl çalışır: Suflo temiz .mov'u üretir ve projedeki deneme öğesini **yerinde** ona bağlar
+    (Premiere'deki Replace Footage'ın aynısı). Timeline'daki klipler yerinde kalır, yalnız filigran
+    gider. Premiere değiştiremezse yedek yol devreye girer: hiç dokunulmamış tek klip yeni temiz
+    kliple değiştirilir; düzenlenmiş klibe dokunulmaz, temiz dosyanın yolu gösterilir.
     - "Suflo Pro aktif" ile birlikte bir kez "Deneme çıktılarını temiz yeniden oluştur…" bildirimi çıkmalı;
       Ayarlar › Suflo Pro'da "Deneme çıktılarını temiz yeniden oluştur" kartında her çıktı bir satır olmalı.
     - Başka bir sekans açıkken "Temiz oluştur" → "O sekansı aç: <ad>." demeli, timeline'a dokunmamalı.
-    - Doğru sekansta "Temiz oluştur" → filigransız yeni katman **aynı başlangıç anına** (başka bir V-kanalına
-      ya da yeni kanala) konmalı, filigranlı eski katman timeline'dan **kaldırılmalı**; satır listeden gitmeli.
-      Aynı sekansta kullanıcının başka Suflo katmanlarına (ör. daha önce Pro'yla eklenmiş stil katmanları,
-      eski kanca başlıkları) **dokunulmamalı**: yalnız o deneme dosyasının klibi silinir.
-    - Filigranlı katmanı elle silip "Temiz oluştur" → temiz katman konmalı, "eski filigranlı katman
-      bulunamadı, varsa elle sil" uyarısı çıkmalı.
-    - Render uzun sürerken başka sekansa geç → temiz katman yanlış sekansa **konmamalı** ("O sekansı aç").
+    - **Dokunulmamış katman:** doğru sekansta "Temiz oluştur" → "Filigran kaldırıldı: deneme dosyası
+      projede temiz olanla değiştirildi…" bildirimi; klip **aynı izde, aynı yerde** kalmalı ve oynatınca
+      `suflo.app` görünmemeli (gerekirse playhead'i oynat ya da render çubuğunu yenile). Proje panelinde
+      öğenin adı aynı kalmalı; sağ tık › Reveal in Explorer/Finder `suflo-temiz-…mov` dosyasını açmalı. Satır
+      listeden gitmeli.
+    - **Düzenlenmiş katman (bulgunun kendisi, mutlaka dene):** yeni bir deneme katmanı ekle, sonra
+      (a) 5 sn sağa taşı, (b) baştan 1 sn kırp, (c) jiletle (C) ikiye böl ve ikinci parçayı kaydır,
+      (d) Alt ile sürükleyip başka bir yere kopyala, (e) Effect Controls'ta Scale'i %80 yap.
+      Pro'yu etkinleştirip "Temiz oluştur" → bu düzenlemelerin **hepsi** olduğu gibi kalmalı (konum,
+      kırpma, parçalar, kopya, ölçek), yalnız filigran gitmeli. Ek klip konmamalı, yeni iz açılmamalı.
+    - Aynı sekansta kullanıcının başka Suflo katmanlarına (ör. daha önce Pro'yla eklenmiş stil katmanları,
+      eski kanca başlıkları) **dokunulmamalı**.
+    - Filigranlı katmanı timeline'dan silip (öğe projede kalır) "Temiz oluştur" → öğe temizlenmeli,
+      timeline'a yeni klip **konmamalı**.
+    - Render uzun sürerken başka sekansa geç → öğe yine yerinde temizlenmeli (proje düzeyinde bir değişiklik).
     - "Listeden çıkar" yalnız listeden kaldırmalı, timeline'a dokunmamalı.
-    Proje panelindeki "Suflo" kutusunda eski filigranlı .mov öğesi kalır (timeline'dan çıkar, projeden
-    silinmez); bu beklenen davranış.
+    - Yedek yol yalnız Premiere değiştirmeyi reddederse çalışır; elle zorlamak zor. Panel günlüğünde
+      (`[temiz] yerinde değiştirilemedi: …`) bir satır görürsen sebebini bana ilet. O zaman beklenen:
+      dokunulmamış tek klip → "Temiz katman Vn katmanına kondu", düzenlenmiş klip → sarı uyarıda
+      "Deneme klibi timeline'da düzenlenmiş…" + temiz dosya yolu, timeline'a hiç dokunulmamış olmalı.
+    Eski filigranlı .mov dosyası Suflo'nun altyazı klasöründe kalır (artık projede kullanılmaz); bu
+    beklenen davranış.
 12. **Pro kullanıcısı:** lisanslıyken hiçbir yerde "Ücretsiz dene" ya da deneme listesi görünmemeli,
     katmanlarda filigran olmamalı ve `pro-deneme.json` **oluşmamalı**.
 13. Eski Premiere'de (2020/2021, CEF 74) 2. ve 7. adımı tekrarla: pencere ve "kendiliğinden yeniden

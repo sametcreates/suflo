@@ -1,5 +1,7 @@
 // Suflo testi: js/overlay-render.js — ortak şeffaf katman render'ı ve satın alma sonrası
-// deneme çıktısının temiz yeniden oluşturulması (yerleştir → YALNIZ sonra {path} ile kaldır)
+// deneme çıktısının temiz yeniden oluşturulması: önce projede yerinde değiştir (düzenlemeler
+// korunur); olmazsa yalnız ilk hâlindeki tek klibi yenile (yerleştir → YALNIZ sonra {path} ile
+// kaldır), düzenlenmiş klibe dokunma
 var fs = require("fs"), path = require("path"), os = require("os"), cp = require("child_process");
 var OR = require(path.join(__dirname, "..", "js", "overlay-render.js"));
 var gecen = 0, toplam = 0;
@@ -41,6 +43,15 @@ function sahteK(o) {
         var seq = (o.sekanslar || ["seq-1"])[Math.min(n - 1, (o.sekanslar || ["seq-1"]).length - 1)];
         return Promise.resolve({ ok: true, sequenceId: seq, sequence: "x" });
       }
+      if (fn === "KS_swapOverlayMedia") {
+        if (o.swapHata) return Promise.resolve({ ok: false, error: "EvalScript error." });
+        var sw = o.swap || { items: 1, swapped: 1, reason: "" };
+        return Promise.resolve({ ok: true, items: sw.items, swapped: sw.swapped, reason: sw.reason || "" });
+      }
+      if (fn === "KS_overlayInstances") {
+        if (o.ornekHata) return Promise.resolve({ ok: false, error: "Aktif sequence yok." });
+        return Promise.resolve({ ok: true, frame: 1 / 25, instances: o.ornekler !== undefined ? o.ornekler : [ilk()] });
+      }
       if (fn === "KS_placeOverlay") return Promise.resolve(o.yerHata ? { ok: false, error: "Klip katmana yerlestirilemedi." } : { ok: true, trackName: "V4", start: arg.at, end: arg.at + 3 });
       if (fn === "KS_removeOverlay") return Promise.resolve(o.silHata ? { ok: false, error: "x" } : { ok: true, removed: 1 });
       return Promise.resolve({ ok: false });
@@ -50,8 +61,13 @@ function sahteK(o) {
 }
 var kayit = { tur: "altyazi", sequenceId: "seq-1", sekans: "Röportaj 01", start: 12.5, path: path.join(srt, "suflo-altyazi-1.mov"), ad: "Suflo Stil · mrbeast",
   assTemiz: ASS, fontFiles: ["ArchivoBlack.ttf", "../ArchivoBlack.ttf"], g: 641, y: 360, fps: 25, sure: 3 };
+// deneme klibi ilk konduğu gibi: tek örnek, kayıttaki başlangıç, kırpılmamış (3 sn)
+function ilk(ek) { return Object.assign({ track: 2, trackName: "V3", start: 12.5, end: 15.5, inPoint: 0, outPoint: 3 }, ek || {}); }
+var SWAP_YOK = { items: 1, swapped: 0, reason: "canChangeMediaPath false" };
 function adlar(K) { return K.cagrilar.map(function (c) { return c.fn; }).join(","); }
-function srtMovlar() { return fs.readdirSync(srt).filter(function (f) { return /^suflo-temiz-/.test(f); }); }
+// render'ın yazdığı temiz dosya (ffmpeg argümanlarının sonu): silinip silinmediğine dosya adıyla bakılır
+// (Date.now() aynı milisaniyeye düşerse sayım yanıltır)
+function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
 
 (async function () {
   // 1) başka sekans açık: render bile yok
@@ -60,42 +76,122 @@ function srtMovlar() { return fs.readdirSync(srt).filter(function (f) { return /
   ok("sekans eşleşmiyor: 'O sekansı aç' + ad, render/yerleştirme/kaldırma yok", !r1.ok && r1.sekansAc && r1.hata === "O sekansı aç: Röportaj 01." &&
     K1.calisan.length === 0 && adlar(K1) === "KS_getContext", JSON.stringify(r1) + " " + adlar(K1));
 
-  // 2) başarılı: yerleştir, SONRA yalnız {path} ile kaldır
+  // 2) başarılı: projede yerinde değiştir (changeMediaPath) — timeline'a yerleştirme/kaldırma YOK
   var K2 = sahteK();
   var r2 = await OR.temizYenidenOlustur(K2, kayit);
-  ok("başarılı akış: bağlam → render → bağlam → yerleştir → kaldır", r2.ok && adlar(K2) === "KS_getContext,KS_getContext,KS_placeOverlay,KS_removeOverlay" && r2.kaldirilan === 1, adlar(K2) + " " + JSON.stringify(r2));
-  var yer = K2.cagrilar[2].arg, sil = K2.cagrilar[3].arg;
-  ok("yerleştirme: yeni temiz dosya, kaydın başlangıcı ve adı", yer.path !== kayit.path && /suflo-temiz-altyazi-\d+\.mov$/.test(yer.path) && yer.at === 12.5 && yer.name === "Suflo Stil · mrbeast" && fs.existsSync(yer.path), JSON.stringify(yer));
-  ok("kaldırma YALNIZ {path} ile (nodeId asla)", JSON.stringify(Object.keys(sil)) === '["path"]' && sil.path === kayit.path, JSON.stringify(sil));
+  ok("yerinde değiştirme: bağlam → render → değiştir; yerleştirme/kaldırma yok", r2.ok && r2.yontem === "degistir" && adlar(K2) === "KS_getContext,KS_swapOverlayMedia" &&
+    r2.degisen === 1 && r2.degismeyen === 0, adlar(K2) + " " + JSON.stringify(r2));
+  var sw2 = K2.cagrilar[1].arg;
+  ok("değiştirme: eski deneme yolu → yeni temiz dosya", sw2.path === kayit.path && sw2.newPath === r2.path && /suflo-temiz-altyazi-\d+\.mov$/.test(sw2.newPath) &&
+    fs.existsSync(sw2.newPath) && JSON.stringify(Object.keys(sw2)) === '["path","newPath"]', JSON.stringify(sw2));
   var c = K2.calisan[0];
   ok("render: kayıttaki temiz ASS, çift boyut, kayıttaki fps/süre, göreli fontsdir", c.args[4] === "color=c=black@0.0:s=642x360:r=25:d=3,format=rgba,subtitles=f=altyazi.ass:alpha=1:fontsdir=.,unpremultiply=inplace=1" &&
     fs.existsSync(c.cwd) === false && c.dosyalar.sort().join(",") === "ArchivoBlack.ttf,altyazi.ass", c.args[4] + " " + c.dosyalar.join(","));
   ok("kayıttaki font yolu klasör dışına çıkamaz (yalnız dosya adı kopyalanır)", c.dosyalar.indexOf("..") === -1 && !fs.existsSync(path.join(tmp, "ArchivoBlack.ttf")));
+  var K2b = sahteK({ swap: { items: 3, swapped: 2 } });
+  var r2b = await OR.temizYenidenOlustur(K2b, kayit);
+  ok("kısmi değiştirme: başarı ama değişmeyen öğe sayısı döner", r2b.ok && r2b.yontem === "degistir" && r2b.degisen === 2 && r2b.degismeyen === 1, JSON.stringify(r2b));
+  // İnceleme bulgusu: yerinde değiştirme sekanstan bağımsız (proje öğesi); render sırasında sekans değişse de güvenli
+  var K2c = sahteK({ sekanslar: ["seq-1", "seq-9"] });
+  var r2c = await OR.temizYenidenOlustur(K2c, kayit);
+  ok("yerinde değiştirme render sırasında sekans değişse de yapılır (proje düzeyinde)", r2c.ok && r2c.yontem === "degistir" && adlar(K2c) === "KS_getContext,KS_swapOverlayMedia", adlar(K2c));
 
-  // 3) yerleştirme başarısız: eski katmana dokunulmaz, yeni dosya silinir
-  var once = srtMovlar().length;
-  var K3 = sahteK({ yerHata: true });
+  // 3) yedek yol: değiştirilemedi + tek, ilk hâlinde klip → yerleştir, SONRA yalnız {path} ile kaldır
+  var K3 = sahteK({ swap: SWAP_YOK });
   var r3 = await OR.temizYenidenOlustur(K3, kayit);
-  ok("yerleştirme başarısız: KS_removeOverlay çağrılmaz", !r3.ok && adlar(K3).indexOf("KS_removeOverlay") === -1 && /yerlestirilemedi/.test(r3.hata), adlar(K3));
-  ok("yerleştirme başarısız: üretilen temiz dosya silinir", srtMovlar().length === once, srtMovlar().join(","));
+  ok("yedek: ilk hâlindeki tek klip → bağlam → render → değiştir(0) → bağlam → örnekler → yerleştir → kaldır",
+    r3.ok && r3.yontem === "yerineKoy" && adlar(K3) === "KS_getContext,KS_swapOverlayMedia,KS_getContext,KS_overlayInstances,KS_placeOverlay,KS_removeOverlay" && r3.kaldirilan === 1,
+    adlar(K3) + " " + JSON.stringify(r3));
+  var yer = K3.cagrilar[4].arg, sil = K3.cagrilar[5].arg;
+  ok("yedek yerleştirme: yeni temiz dosya, kaydın başlangıcı ve adı", yer.path !== kayit.path && /suflo-temiz-altyazi-\d+\.mov$/.test(yer.path) && yer.at === 12.5 && yer.name === "Suflo Stil · mrbeast" && fs.existsSync(yer.path), JSON.stringify(yer));
+  ok("kaldırma YALNIZ {path} ile (nodeId asla)", JSON.stringify(Object.keys(sil)) === '["path"]' && sil.path === kayit.path, JSON.stringify(sil));
+  ok("örnek sorgusu yalnız {path} ile", JSON.stringify(K3.cagrilar[3].arg) === JSON.stringify({ path: kayit.path }));
+  var K3b = sahteK({ swapHata: true });
+  var r3b = await OR.temizYenidenOlustur(K3b, kayit);
+  ok("değiştirme çağrısı hata verirse de yedek yola geçilir", r3b.ok && r3b.yontem === "yerineKoy", adlar(K3b));
+  var K3c = sahteK({ swap: { items: 0, swapped: 0, reason: "proje ogesi yok" }, ornekler: [ilk({ start: 12.5 + 0.01, end: 15.5 + 0.01 })] });
+  ok("bir karenin altındaki sapma düzenleme sayılmaz", (await OR.temizYenidenOlustur(K3c, kayit)).yontem === "yerineKoy", adlar(K3c));
 
-  // 4) render başarısız: yerleştirme/kaldırma yok
-  var K4 = sahteK({ renderHata: true });
-  var r4 = await OR.temizYenidenOlustur(K4, kayit);
-  ok("render başarısız: hata mesajı, Premiere'e dokunulmaz", !r4.ok && /Altyazı katmanı üretilemedi: Error opening kotu filtre/.test(r4.hata) && adlar(K4) === "KS_getContext", r4.hata + " " + adlar(K4));
-  var K4b = sahteK({ ff: null });
-  var r4b = await OR.temizYenidenOlustur(K4b, kayit);
-  ok("ffmpeg yok: anlaşılır hata", !r4b.ok && r4b.hata === "ffmpeg bulunamadı.", r4b.hata);
+  // 4) İnceleme bulgusu: düzenlenmiş deneme klibi (taşınmış/kırpılmış/bölünmüş/çoğaltılmış) EZİLMEZ
+  var duzenler = [
+    ["taşınmış (12 sn'ye)", [ilk({ start: 12, end: 15 })]],
+    ["baştan kırpılmış", [ilk({ start: 13, inPoint: 0.5 })]],
+    ["sondan kırpılmış (2 sn)", [ilk({ end: 14.5, outPoint: 2 })]],
+    ["jilet ile bölünmüş (iki parça)", [ilk({ end: 14, outPoint: 1.5 }), ilk({ start: 14, inPoint: 1.5 })]],
+    ["ripple ile kaymış parçalar", [ilk({ end: 13.5, outPoint: 1 }), ilk({ start: 13.5, end: 15.5, inPoint: 2, outPoint: 3 })]],
+    ["iki yere kopyalanmış", [ilk(), ilk({ track: 3, trackName: "V4", start: 40, end: 43 })]],
+    ["hızı değiştirilmiş (%200)", [ilk({ end: 14 })]]
+  ];
+  for (var di = 0; di < duzenler.length; di++) {
+    var Kd = sahteK({ swap: SWAP_YOK, ornekler: duzenler[di][1] });
+    var rd = await OR.temizYenidenOlustur(Kd, kayit);
+    ok("düzenlenmiş klip — " + duzenler[di][0] + ": yerleştirme/kaldırma YOK, elle değiştirme yolu",
+      !rd.ok && rd.elle === true && adlar(Kd).indexOf("KS_placeOverlay") === -1 && adlar(Kd).indexOf("KS_removeOverlay") === -1 &&
+      rd.path === renderCiktisi(Kd) && fs.existsSync(rd.path) && rd.hata.indexOf(rd.path) !== -1 && /Replace Footage/.test(rd.hata) && rd.hata.indexOf("\"Suflo Stil · mrbeast\"") !== -1,
+      adlar(Kd) + " " + JSON.stringify(rd).slice(0, 200));
+  }
 
-  // 5) render sırasında başka sekansa geçildi
-  var K5 = sahteK({ sekanslar: ["seq-1", "seq-9"] });
-  var r5 = await OR.temizYenidenOlustur(K5, kayit);
-  ok("render sırasında sekans değişti: yerleştirilmez, dosya silinir", !r5.ok && r5.sekansAc && adlar(K5) === "KS_getContext,KS_getContext" && srtMovlar().length === once, adlar(K5));
+  // 5) hiç örnek yok (kullanıcı timeline'dan silmiş): kaydın başlangıcına konur, kaldırma çağrısı yok
+  var K5y = sahteK({ swap: { items: 0, swapped: 0 }, ornekler: [] });
+  var r5y = await OR.temizYenidenOlustur(K5y, kayit);
+  ok("örnek yok: temiz klip ilk konduğu ana, kaldırma yok", r5y.ok && r5y.yontem === "yerlestir" && adlar(K5y) === "KS_getContext,KS_swapOverlayMedia,KS_getContext,KS_overlayInstances,KS_placeOverlay" &&
+    K5y.cagrilar[4].arg.at === 12.5, adlar(K5y) + " " + JSON.stringify(r5y));
+  var K5h = sahteK({ swap: SWAP_YOK, ornekHata: true });
+  var r5h = await OR.temizYenidenOlustur(K5h, kayit);
+  ok("örnek sorgusu başarısız: Premiere'e dokunulmaz, dosya silinir", !r5h.ok && /Aktif sequence yok/.test(r5h.hata) && adlar(K5h).indexOf("KS_placeOverlay") === -1 && !fs.existsSync(renderCiktisi(K5h)), adlar(K5h));
 
-  // 6) eski katman kaldırılamadı: başarı ama uyarı
-  var K6 = sahteK({ silHata: true });
-  var r6 = await OR.temizYenidenOlustur(K6, Object.assign({}, kayit, { tur: "kanca" }));
-  ok("kaldırma başarısız: temiz katman yerinde, uyarı döner; kanca ASS adı", r6.ok && r6.kaldirilan === 0 && r6.kaldirmaHatasi && /suflo-temiz-kanca-/.test(r6.path) && /subtitles=f=kanca\.ass/.test(K6.calisan[0].args[4]), JSON.stringify(r6));
+  // 6) yerleştirme başarısız: eski katmana dokunulmaz, yeni dosya silinir
+  var K6 = sahteK({ yerHata: true, swap: SWAP_YOK });
+  var r6 = await OR.temizYenidenOlustur(K6, kayit);
+  ok("yerleştirme başarısız: KS_removeOverlay çağrılmaz", !r6.ok && adlar(K6).indexOf("KS_removeOverlay") === -1 && /yerlestirilemedi/.test(r6.hata), adlar(K6));
+  ok("yerleştirme başarısız: üretilen temiz dosya silinir", !fs.existsSync(renderCiktisi(K6)), renderCiktisi(K6));
+
+  // 7) render başarısız: Premiere'e dokunulmaz
+  var K7 = sahteK({ renderHata: true });
+  var r7 = await OR.temizYenidenOlustur(K7, kayit);
+  ok("render başarısız: hata mesajı, Premiere'e dokunulmaz", !r7.ok && /Altyazı katmanı üretilemedi: Error opening kotu filtre/.test(r7.hata) && adlar(K7) === "KS_getContext", r7.hata + " " + adlar(K7));
+  var K7b = sahteK({ ff: null });
+  var r7b = await OR.temizYenidenOlustur(K7b, kayit);
+  ok("ffmpeg yok: anlaşılır hata", !r7b.ok && r7b.hata === "ffmpeg bulunamadı.", r7b.hata);
+
+  // 8) yedek yolda render sırasında başka sekansa geçildi
+  var K8 = sahteK({ sekanslar: ["seq-1", "seq-9"], swap: SWAP_YOK });
+  var r8 = await OR.temizYenidenOlustur(K8, kayit);
+  ok("yedek yol + render sırasında sekans değişti: yerleştirilmez, dosya silinir", !r8.ok && r8.sekansAc && adlar(K8) === "KS_getContext,KS_swapOverlayMedia,KS_getContext" && !fs.existsSync(renderCiktisi(K8)), adlar(K8));
+
+  // 9) eski katman kaldırılamadı: başarı ama uyarı
+  var K9 = sahteK({ silHata: true, swap: SWAP_YOK });
+  var r9 = await OR.temizYenidenOlustur(K9, Object.assign({}, kayit, { tur: "kanca" }));
+  ok("kaldırma başarısız: temiz katman yerinde, uyarı döner; kanca ASS adı", r9.ok && r9.kaldirilan === 0 && r9.kaldirmaHatasi && /suflo-temiz-kanca-/.test(r9.path) && /subtitles=f=kanca\.ass/.test(K9.calisan[0].args[4]), JSON.stringify(r9));
+
+  /* ---------------- saf: ilkHalinde + bildirim metinleri ---------------- */
+  var IH = OR.ilkHalinde;
+  ok("ilkHalinde: dokunulmamış tek klip", IH(kayit, [ilk()], 1 / 25) === true);
+  ok("ilkHalinde: kare yuvarlaması (süre bir kare uzun) düzenleme sayılmaz", IH(Object.assign({}, kayit, { sure: 12.34 }), [ilk({ end: 12.5 + 12.36, outPoint: 12.36 })], 1 / 25) === true);
+  ok("ilkHalinde: bir kare taşıma, iki kare kırpma düzenlemedir", IH(kayit, [ilk({ start: 12.54, end: 15.54 })], 1 / 25) === false && IH(kayit, [ilk({ end: 15.42, outPoint: 2.92 })], 1 / 25) === false);
+  ok("ilkHalinde: örnek yok / iki örnek / bozuk sayı → false", IH(kayit, [], 1 / 25) === false && IH(kayit, [ilk(), ilk()], 1 / 25) === false &&
+    IH(kayit, [ilk({ start: -1 })], 1 / 25) === false && IH(kayit, [ilk({ inPoint: "x" })], 1 / 25) === false && IH(null, [ilk()]) === false);
+  ok("ilkHalinde: kare bilinmiyorsa kaydın fps'i", IH(kayit, [ilk({ start: 12.51, end: 15.51 })], 0) === true && IH(kayit, [ilk({ start: 12.6, end: 15.6 })], 0) === false);
+  var m1 = OR.sonucMesaji({ yontem: "degistir", degisen: 1, degismeyen: 0 });
+  ok("bildirim: yerinde değiştirme iyi haber, düzenlemelerin duruyor", m1.tur === "good" && /Filigran kaldırıldı/.test(m1.metin) && /düzenlemelerin aynen duruyor/.test(m1.metin), m1.metin);
+  var m2 = OR.sonucMesaji({ yontem: "degistir", degisen: 1, degismeyen: 2, path: "/x/temiz.mov" });
+  ok("bildirim: kısmi değiştirme uyarı + temiz dosya yolu", m2.tur === "warn" && /2 proje öğesi değiştirilemedi/.test(m2.metin) && /\/x\/temiz\.mov$/.test(m2.metin), m2.metin);
+  var m3 = OR.sonucMesaji({ yontem: "yerlestir", yer: { trackName: "V4", start: 12.5 } });
+  ok("bildirim: örnek yoksa ilk konduğu yer (iz, sn) söylenir", m3.tur === "warn" && m3.metin === "Bu sekansta deneme klibi bulunamadı: temiz katman ilk konduğu yere kondu (V4, 12,5 sn)", m3.metin);
+  var m4 = OR.sonucMesaji({ yontem: "yerineKoy", yer: { trackName: "V4" }, kaldirilan: 1 });
+  var m5 = OR.sonucMesaji({ yontem: "yerineKoy", yer: { trackName: "V4" }, kaldirilan: 0, kaldirmaHatasi: "x" });
+  ok("bildirim: yerine koyma (mevcut metinler)", m4.tur === "good" && m4.metin === "Temiz katman V4 katmanına kondu" &&
+    m5.tur === "warn" && m5.metin === "Temiz katman V4 katmanına kondu · eski filigranlı katman kaldırılamadı, elle sil", m4.metin + " | " + m5.metin);
+  var I18N = require(path.join(__dirname, "..", "js", "i18n.js"));
+  I18N.setDictionary(require(path.join(__dirname, "..", "i18n", "en.js")));
+  var elle = OR.elleMesaji({ ad: "Suflo Kanca · Bu hata pahalı" }, "C:\\Users\\Şule\\Suflo · Altyazı\\suflo-temiz-kanca-1.mov");
+  var elleEn = I18N.translate(elle), m2En = I18N.translate(OR.sonucMesaji({ yontem: "degistir", degismeyen: 1, path: "/Ş · x/t.mov" }).metin);
+  ok("İngilizce: Premiere öğe adı ve dosya yolu çevrilmeden kalır", /^The trial clip was edited/.test(elleEn) && elleEn.indexOf("\"Suflo Kanca · Bu hata pahalı\"") !== -1 &&
+    /Clean file: C:\\Users\\Şule\\Suflo · Altyazı\\suflo-temiz-kanca-1\.mov$/.test(elleEn) && /^Watermark partly removed: 1 project item couldn't .*: \/Ş · x\/t\.mov$/.test(m2En), elleEn + " | " + m2En);
+  ["degistir", "yerlestir", "yerineKoy"].forEach(function (y) {
+    var t = I18N.translate(OR.sonucMesaji({ yontem: y, degisen: 1, degismeyen: 0, yer: { trackName: "V4", start: 3 }, kaldirilan: 1 }).metin);
+    ok("İngilizce bildirim: " + y, !/[ıİşŞğĞ]/.test(t) && /^(Watermark|No trial|Clean layer)/.test(t), t);
+  });
 
   ok("bozuk kayıt: hiçbir çağrı yok", !(await OR.temizYenidenOlustur(sahteK(), { tur: "altyazi" })).ok);
   ok("geçici render klasörleri temizlendi", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));

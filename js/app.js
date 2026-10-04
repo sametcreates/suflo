@@ -483,12 +483,13 @@ window.KApp = (function () {
     btn.disabled = true;
     try {
       var r = await SufloOverlayRender.temizYenidenOlustur(K, k, { durum: function (m) { yaz(m); } });
-      if (!r.ok) { yaz(r.sekansAc ? r.hata : "✕ " + r.hata, r.sekansAc ? "warn" : "bad"); return; }
+      // elle: deneme klibi düzenlenmiş ve yerinde değiştirilemedi; timeline'a dokunulmadı, kayıt listede kalır
+      if (!r.ok) { yaz(r.sekansAc || r.elle ? r.hata : "✕ " + r.hata, r.sekansAc || r.elle ? "warn" : "bad"); return; }
       Pro.denemeCiktisiSil(k.path);
-      yaz("");
-      var eski = r.kaldirmaHatasi ? " · eski filigranlı katman kaldırılamadı, elle sil"
-        : (r.kaldirilan > 0 ? "" : " · eski filigranlı katman bulunamadı, varsa elle sil");
-      toast("Temiz katman " + r.yer.trackName + " katmanına kondu" + eski, eski ? "warn" : "good", 9000);
+      var son = SufloOverlayRender.sonucMesaji(r);
+      // uyarı satırı kartta kalsın (bildirim kaybolur; içinde dosya yolu olabilir)
+      yaz(son.tur === "warn" ? son.metin : "", son.tur === "warn" ? "warn" : "");
+      toast(son.metin, son.tur, 9000);
     } catch (e) {
       yaz("✕ " + K.hataYardimi(e), "bad");
     } finally {

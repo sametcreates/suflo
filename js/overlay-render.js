@@ -99,15 +99,79 @@
     }
   }
 
+  // Türkçe ondalık: 12.5 → "12,5"
+  function saniyeMetni(x) {
+    var n = Math.round((Number(x) || 0) * 10) / 10;
+    return String(n).replace(".", ",");
+  }
+
+  /*
+   * Deneme katmanı timeline'da ilk konduğu gibi mi? Tek örnek; başlangıcı kayıttaki an;
+   * baştan ve sondan kırpılmamış; hızı değişmemiş. Yalnız o zaman "yeni temiz klibi koy,
+   * eskisini kaldır" kurguyu bozmaz. ornekler: KS_overlayInstances çıktısı (sn).
+   * Tolerans: başlangıç ve giriş için yarım kare, süre için bir kare (render kare yuvarlaması).
+   */
+  function ilkHalinde(kayit, ornekler, kare) {
+    if (!kayit || !ornekler || ornekler.length !== 1) return false;
+    var o = ornekler[0];
+    var k = Number(kare) > 0 ? Number(kare) : (Number(kayit.fps) > 0 ? 1 / Number(kayit.fps) : 1 / 24);
+    if (Number(kayit.fps) > 0) k = Math.max(k, 1 / Number(kayit.fps));
+    var yarim = k / 2 + 0.002, tam = k + 0.002;
+    var bas = Number(o.start), bit = Number(o.end), gir = Number(o.inPoint), cik = Number(o.outPoint), sure = Number(kayit.sure);
+    if (![bas, bit, gir, cik, sure, Number(kayit.start)].every(function (x) { return isFinite(x) && x >= 0; })) return false;
+    return Math.abs(bas - Number(kayit.start)) <= yarim &&
+      Math.abs(gir) <= yarim &&
+      Math.abs(cik - sure) <= tam &&
+      Math.abs((bit - bas) - sure) <= tam;
+  }
+
+  // Düzenlenmiş deneme klibi: timeline'a dokunulmaz, temiz dosya elle bağlanır (Replace Footage)
+  function elleMesaji(kayit, temizYol) {
+    var ad = kayit && kayit.ad ? kayit.ad : "Suflo Stil";
+    return "Deneme klibi timeline'da düzenlenmiş (taşınmış, kırpılmış, bölünmüş ya da kopyalanmış); kurgun bozulmasın diye Suflo ona dokunmadı. " +
+      "Proje panelinde \"" + ad + "\" öğesine sağ tıkla, Replace Footage ile temiz dosyayı seç (düzenlemelerin korunur), sonra listeden çıkar. Temiz dosya: " + temizYol;
+  }
+
+  /*
+   * Başarılı temiz yeniden oluşturma için bildirim: { metin, tur: "good"|"warn" }.
+   *   degistir:  deneme dosyası projede yerinde temiz olanla değiştirildi (düzenlemeler korunur)
+   *   yerineKoy: tek, düzenlenmemiş klip vardı: temiz klip aynı ana kondu, eskisi kaldırıldı
+   *   yerlestir: bu sekansta deneme klibi yoktu: temiz klip ilk konduğu ana kondu
+   */
+  function sonucMesaji(r) {
+    r = r || {};
+    if (r.yontem === "degistir") {
+      var kalan = Number(r.degismeyen) || 0;
+      return kalan > 0
+        ? { metin: "Filigran kısmen kaldırıldı: " + kalan + " proje öğesi değiştirilemedi. Proje panelinde ona sağ tıkla, Replace Footage ile temiz dosyayı seç: " + (r.path || ""), tur: "warn" }
+        : { metin: "Filigran kaldırıldı: deneme dosyası projede temiz olanla değiştirildi, timeline'daki düzenlemelerin aynen duruyor", tur: "good" };
+    }
+    var iz = r.yer && r.yer.trackName ? r.yer.trackName : "V?";
+    if (r.yontem === "yerlestir") {
+      var an = r.yer && typeof r.yer.start === "number" ? r.yer.start : 0;
+      return { metin: "Bu sekansta deneme klibi bulunamadı: temiz katman ilk konduğu yere kondu (" + iz + ", " + saniyeMetni(an) + " sn)", tur: "warn" };
+    }
+    var eski = r.kaldirmaHatasi ? " · eski filigranlı katman kaldırılamadı, elle sil"
+      : (Number(r.kaldirilan) > 0 ? "" : " · eski filigranlı katman bulunamadı, varsa elle sil");
+    return { metin: "Temiz katman " + iz + " katmanına kondu" + eski, tur: eski ? "warn" : "good" };
+  }
+
   /*
    * Satın alma sonrası: deneme çıktısını (filigranlı) filigransız yeniden üret ve değiştir.
    *   1) Premiere'de kaydın sekansı açık olmalı (değilse "O sekansı aç")
    *   2) kaydedilen temiz ASS aynı boyut/fps/süreyle yeniden render edilir
-   *   3) KS_placeOverlay ile kaydın başlangıcına konur
-   *   4) YALNIZ yerleştirme başarılıysa eski katman KS_removeOverlay ile kaldırılır: yalnız
-   *      {path} verilir, ASLA nodeId verilmez (host.jsx: nodeId eşleşmesi kullanıcının eski
-   *      kliplerini silebiliyordu). Deneme dosyasının yolu benzersizdir (zaman damgalı).
-   * Döner: { ok, hata?, sekansAc?, yer?, kaldirilan?, kaldirmaHatasi?, path? }
+   *   3) ÖNCE yerinde değiştirme: KS_swapOverlayMedia projedeki deneme öğesini temiz dosyaya
+   *      bağlar (changeMediaPath). Kullanıcının taşıdığı, kırptığı, böldüğü, kopyaladığı her
+   *      klip ve eklediği efektler olduğu gibi kalır. Proje düzeyinde: sekans değişse de güvenli.
+   *   4) Değiştirilemezse (yedek yol) sekans yeniden doğrulanır ve deneme klibinin ŞİMDİKİ hâline
+   *      bakılır (KS_overlayInstances, yalnız okur):
+   *        - tek ve ilk hâlinde klip: temiz klip kaydın başlangıcına konur, YALNIZ yerleştirme
+   *          başarılıysa eskisi KS_removeOverlay ile kaldırılır: yalnız {path} verilir, ASLA nodeId
+   *          (host.jsx: nodeId eşleşmesi kullanıcının eski kliplerini silebiliyordu)
+   *        - hiç klip yok: temiz klip kaydın başlangıcına konur (kaldırılacak bir şey yok)
+   *        - düzenlenmiş (taşınmış/kırpılmış/bölünmüş/çoğaltılmış): timeline'a DOKUNULMAZ; temiz
+   *          dosya bırakılır ve elle bağlama (Replace Footage) yolu söylenir ({ elle: true })
+   * Döner: { ok, hata?, sekansAc?, elle?, yontem?, yer?, kaldirilan?, kaldirmaHatasi?, degisen?, degismeyen?, path? }
    */
   async function temizYenidenOlustur(K, kayit, o) {
     o = o || {};
@@ -136,18 +200,38 @@
       ciktiyiSil();
       return { ok: false, hata: e && e.message ? e.message : String(e) };
     }
-    // Render dakikalar sürebilir: bu arada başka sekansa geçildiyse yanlış sekansa koyma
+
+    // 3) yerinde değiştir: timeline'daki her düzenleme korunur
+    var sw = await K.call("KS_swapOverlayMedia", { path: kayit.path, newPath: cikti }, 60000);
+    var degisen = sw && sw.ok ? (Number(sw.swapped) || 0) : 0;
+    if (degisen > 0) {
+      return { ok: true, yontem: "degistir", path: cikti, degisen: degisen, degismeyen: Math.max(0, (Number(sw.items) || 0) - degisen) };
+    }
+    var sebep = (sw && (sw.reason || sw.error)) || "-";
+    if (K.log) K.log("[temiz] yerinde değiştirilemedi: " + sebep);
+
+    // 4) yedek yol. Render dakikalar sürebilir: bu arada başka sekansa geçildiyse yanlış sekansa koyma
     var s2 = await ayniSekans();
     if (!s2.ok) { ciktiyiSil(); return s2; }
+    var d = await K.call("KS_overlayInstances", { path: kayit.path }, 30000);
+    if (!d || !d.ok) {
+      ciktiyiSil();
+      return { ok: false, hata: (d && d.error) || "Premiere yanıt vermedi." };
+    }
+    var ornekler = d.instances || [];
+    if (ornekler.length && !ilkHalinde(kayit, ornekler, d.frame)) {
+      return { ok: false, elle: true, path: cikti, hata: elleMesaji(kayit, cikti) };
+    }
 
     var yer = await K.call("KS_placeOverlay", { path: cikti, at: kayit.start, name: kayit.ad || "Suflo Stil" }, 120000);
     if (!yer || !yer.ok) {
       ciktiyiSil();
       return { ok: false, hata: (yer && yer.error) || "Temiz katman timeline'a konamadı." };
     }
+    if (!ornekler.length) return { ok: true, yontem: "yerlestir", yer: yer, path: cikti, kaldirilan: 0, kaldirmaHatasi: "" };
     var kal = await K.call("KS_removeOverlay", { path: kayit.path }, 60000);
     return {
-      ok: true, yer: yer, path: cikti,
+      ok: true, yontem: "yerineKoy", yer: yer, path: cikti,
       kaldirilan: kal && kal.ok ? (Number(kal.removed) || 0) : 0,
       kaldirmaHatasi: kal && kal.ok ? "" : ((kal && kal.error) || "Eski katman kaldırılamadı.")
     };
@@ -170,5 +254,9 @@
     } catch (e) { return false; }
   }
 
-  return { ciftBoyut: ciftBoyut, kaynak: kaynak, ffmpegArgs: ffmpegArgs, render: render, temizYenidenOlustur: temizYenidenOlustur, denemeKaydet: denemeKaydet };
+  return {
+    ciftBoyut: ciftBoyut, kaynak: kaynak, ffmpegArgs: ffmpegArgs, render: render,
+    ilkHalinde: ilkHalinde, elleMesaji: elleMesaji, sonucMesaji: sonucMesaji,
+    temizYenidenOlustur: temizYenidenOlustur, denemeKaydet: denemeKaydet
+  };
 });

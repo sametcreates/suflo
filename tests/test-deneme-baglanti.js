@@ -120,6 +120,13 @@ ok("KS_removeOverlay yalnız {path} ile çağrılır", kaldirma.length >= 1 && k
 var ortak = oku("js/overlay-render.js");
 ok("temiz yeniden oluşturma: önce yerleştir, yalnız başarıda kaldır", ortak.indexOf('K.call("KS_placeOverlay"') < ortak.indexOf('K.call("KS_removeOverlay"') &&
   /if \(!yer \|\| !yer\.ok\) \{[\s\S]{0,120}return \{ ok: false/.test(ortak));
+// İnceleme bulgusu: kullanıcının taşıdığı/kırptığı/böldüğü deneme katmanı ezilmesin
+ok("temiz yeniden oluşturma: önce projede yerinde değiştir; yedek yol düzenlenmiş klibe dokunmaz",
+  ortak.indexOf('K.call("KS_swapOverlayMedia"') > 0 && ortak.indexOf('K.call("KS_swapOverlayMedia"') < ortak.indexOf('K.call("KS_overlayInstances"') &&
+  ortak.indexOf('K.call("KS_overlayInstances"') < ortak.indexOf('K.call("KS_placeOverlay"') &&
+  /!ilkHalinde\(kayit, ornekler, d\.frame\)\) \{\s*return \{ ok: false, elle: true/.test(ortak));
+var hostSrc = oku("jsx/host.jsx");
+ok("host: KS_swapOverlayMedia ve KS_overlayInstances tanımlı", /function KS_swapOverlayMedia\(encoded\)/.test(hostSrc) && /function KS_overlayInstances\(encoded\)/.test(hostSrc));
 
 /* ---------------- 6) yükleme sırası, eşzamanlı kapı ---------------- */
 var html = oku("index.html");

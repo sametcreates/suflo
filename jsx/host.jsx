@@ -1658,6 +1658,89 @@ function KS_removeOverlay(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/*
+ * Satin alma sonrasi temiz yeniden olusturma (js/overlay-render.js temizYenidenOlustur).
+ * Yol karsilastirmasi: Windows'ta buyuk/kucuk harf ve \ ile / farki onemsiz.
+ */
+function KS_yolAnahtari(p) {
+  return String(p || "").replace(/\\/g, "/").toLowerCase();
+}
+
+// Projede medya yolu birebir eslesen TUM ogeler (kutular dahil, ozyinelemeli)
+function KS_itemsByPath(container, anahtar, out) {
+  var n = 0;
+  try { n = container.children.numItems; } catch (eN) {}
+  for (var i = 0; i < n; i++) {
+    var it = container.children[i];
+    if (!it) continue;
+    if (it.type === 2) { KS_itemsByPath(it, anahtar, out); continue; }
+    try { if (it.getMediaPath && KS_yolAnahtari(it.getMediaPath()) === anahtar) out.push(it); } catch (e) {}
+  }
+  return out;
+}
+
+/*
+ * Deneme dosyasini projede temiz dosyayla degistir (ProjectItem.changeMediaPath): timeline'daki
+ * her ornek (tasinmis, kirpilmis, bolunmus, kopyalanmis, baska sekanstaki) ve klibe eklenen
+ * efektler aynen kalir. Yalniz yolu birebir eslesen ogeler; basari getMediaPath ile dogrulanir.
+ * Doner: { items, swapped, reason }. swapped 0 ise cagiran timeline'a dokunmadan yedek yola gecer.
+ */
+function KS_swapOverlayMedia(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    if (!p.path || !p.newPath) return KS_err("Overlay yolu yok.");
+    if (!(new File(p.newPath)).exists) return KS_err("Temiz dosya yok: " + p.newPath);
+    var ogeler = KS_itemsByPath(app.project.rootItem, KS_yolAnahtari(p.path), []);
+    var yeni = KS_yolAnahtari(p.newPath), n = 0, sebep = ogeler.length ? "" : "proje ogesi yok";
+    for (var i = 0; i < ogeler.length; i++) {
+      var it = ogeler[i];
+      if (!it.changeMediaPath) { sebep = "changeMediaPath yok"; continue; }
+      try {
+        if (it.canChangeMediaPath && !it.canChangeMediaPath()) { sebep = "canChangeMediaPath false"; continue; }
+      } catch (eC) {}
+      try { it.changeMediaPath(p.newPath, false); } catch (eM) { sebep = String(eM); }
+      var simdi = "";
+      try { simdi = KS_yolAnahtari(it.getMediaPath()); } catch (eG) {}
+      if (simdi === yeni) n++;
+      else if (!sebep) sebep = "yol degismedi";
+    }
+    return KS_ok({ items: ogeler.length, swapped: n, reason: sebep });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Deneme katmaninin aktif sekanstaki ornekleri (YALNIZ okur, hicbir seyi degistirmez): iz,
+ * baslangic/bitis (sekans sn) ve kaynak in/out (sn). Yerinde degistirme olmazsa temiz yeniden
+ * olusturma, kullanicinin duzenledigi katmani ezmemek icin buna bakar.
+ */
+function KS_overlayInstances(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (!p.path) return KS_err("Overlay yolu yok.");
+    var anahtar = KS_yolAnahtari(p.path);
+    var liste = [];
+    for (var i = 0; i < seq.videoTracks.numTracks; i++) {
+      var tr = seq.videoTracks[i];
+      for (var j = 0; j < tr.clips.numItems; j++) {
+        var c = tr.clips[j], yol = "";
+        try { if (c.projectItem) yol = KS_yolAnahtari(c.projectItem.getMediaPath()); } catch (eP) {}
+        if (yol !== anahtar) continue;
+        var o = { track: i, trackName: "V" + (i + 1), start: -1, end: -1, inPoint: -1, outPoint: -1 };
+        try { o.start = c.start.seconds; } catch (e1) {}
+        try { o.end = c.end.seconds; } catch (e2) {}
+        try { o.inPoint = c.inPoint.seconds; } catch (e3) {}
+        try { o.outPoint = c.outPoint.seconds; } catch (e4) {}
+        liste.push(o);
+      }
+    }
+    var kare = 0;
+    try { var tb = Number(seq.timebase); if (tb > 0) kare = tb / 254016000000; } catch (eT) {}
+    return KS_ok({ instances: liste, frame: kare });
+  } catch (e) { return KS_err(e); }
+}
+
 /* ---------- SFX kutuphanesi: playhead'e ses yerlestirme ---------- */
 
 function KS_findFreeAudioTrack(seq, aSec, bSec) {

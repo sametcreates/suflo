@@ -2011,7 +2011,7 @@
     "Pro'yu dene: her araca 3 hak": "Try Pro: 3 tries per tool",
     "Pro araçlarını kendi videonda dene. Hak yalnız işlem başarıyla bitince düşer ve süresi dolmaz. Deneme hakkıyla eklenen stilli altyazı ve kanca başlığında küçük bir suflo.app filigranı olur; Pro'yu alınca temiz yeniden oluşturabilirsin.": "Try the Pro tools on your own footage. A try is used only when the job succeeds, and tries never expire. Styled captions and hook titles added with a try carry a small suflo.app watermark; once you buy Pro you can re-render them clean.",
     "Deneme çıktılarını temiz yeniden oluştur": "Re-render trial outputs clean",
-    "Deneme hakkıyla eklediğin stilli altyazı ve kanca başlıklarında küçük bir suflo.app filigranı var. Suflo her birini filigransız yeniden üretip aynı yere koyar, sonra eskisini kaldırır. Önce o sekansı Premiere'de aç.": "The styled captions and hook titles you added with trial tries carry a small suflo.app watermark. Suflo re-renders each one without it, places it at the same spot, then removes the old one. Open that sequence in Premiere first.",
+    "Deneme hakkıyla eklediğin stilli altyazı ve kanca başlıklarında küçük bir suflo.app filigranı var. Suflo her birini filigransız yeniden üretir ve projedeki deneme dosyasını temiz olanla değiştirir: timeline'da taşıdığın, kırptığın ya da böldüğün klipler olduğu gibi kalır. Önce o sekansı Premiere'de aç.": "The styled captions and hook titles you added with trial tries carry a small suflo.app watermark. Suflo re-renders each one without it and swaps the trial file in your project for the clean one: clips you moved, trimmed or split on the timeline stay exactly as they are. Open that sequence in Premiere first.",
     "Stilli altyazı": "Styled captions",
     "Temiz oluştur": "Render clean",
     "Listeden çıkar": "Remove from list",
@@ -2020,7 +2020,9 @@
     " · eski filigranlı katman bulunamadı, varsa elle sil": "· old watermarked layer not found, delete it manually if it's there",
     "Temiz katman {} katmanına kondu{}": "Clean layer placed on track {}{}",
     "Temiz katman {} katmanına kondu": "Clean layer placed on track {}",
-    "Deneme çıktılarını temiz yeniden oluştur: Suflo Pro kartındaki listeden filigransız hale getir.": "Re-render trial outputs clean: remove the watermark from the list on the Suflo Pro card."
+    "Deneme çıktılarını temiz yeniden oluştur: Suflo Pro kartındaki listeden filigransız hale getir.": "Re-render trial outputs clean: remove the watermark from the list on the Suflo Pro card.",
+    "Filigran kaldırıldı: deneme dosyası projede temiz olanla değiştirildi, timeline'daki düzenlemelerin aynen duruyor": "Watermark removed: the trial file in your project was swapped for the clean one, and your timeline edits are untouched",
+    "Bu sekansta deneme klibi bulunamadı: temiz katman ilk konduğu yere kondu ({}, {} sn)": "No trial clip found in this sequence: the clean layer was placed where the trial first went ({}, {} s)"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */
@@ -2039,7 +2041,12 @@
       return m[1] + " " + w;
     }],
     // "Bu Shorts'un…" style possessives are handled by exact keys; "Premiere'e geç" etc. too.
-    [/^V(\d+) katmanına eklendi$/, "Added to track V$1"]
+    [/^V(\d+) katmanına eklendi$/, "Added to track V$1"],
+    // Try Pro clean re-render: the Premiere project item name and file path stay verbatim ($ = raw, not translated)
+    [/^Filigran kısmen kaldırıldı: (\d+) proje öğesi değiştirilemedi\. Proje panelinde ona sağ tıkla, Replace Footage ile temiz dosyayı seç: ([\s\S]*)$/,
+      function (m) { return "Watermark partly removed: " + m[1] + " project item" + (m[1] === "1" ? "" : "s") + " couldn't be swapped. Right-click " + (m[1] === "1" ? "it" : "them") + " in the Project panel, choose Replace Footage and pick the clean file: " + m[2]; }],
+    [/^Deneme klibi timeline'da düzenlenmiş \(taşınmış, kırpılmış, bölünmüş ya da kopyalanmış\); kurgun bozulmasın diye Suflo ona dokunmadı\. Proje panelinde "([\s\S]+?)" öğesine sağ tıkla, Replace Footage ile temiz dosyayı seç \(düzenlemelerin korunur\), sonra listeden çıkar\. Temiz dosya: ([\s\S]+)$/,
+      "The trial clip was edited on the timeline (moved, trimmed, split or duplicated), so Suflo left it alone to keep your edit intact. In the Project panel, right-click \"$1\", choose Replace Footage and pick the clean file (your edits are kept), then remove it from the list. Clean file: $2"]
   ];
 
   // Intentionally identical in English (brands, product/feature names, fonts, formats, keys).
