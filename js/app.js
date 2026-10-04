@@ -6,6 +6,9 @@
 window.KApp = (function () {
   "use strict";
 
+  // Tarayıcı penceresi / Premiere iletişim kutusu DOM değil: çevirmen göremez, metin burada çevrilir
+  function uiMetni(s) { return window.SufloI18n ? SufloI18n.tr(s) : s; }
+
   function el(id) { return document.getElementById(id); }
 
   // Ödeme bağlantısı js/pricing.js'te: gösterilen fiyatla aynı para birimi (USD varyantı
@@ -699,7 +702,7 @@ window.KApp = (function () {
       if (!Pro.isPro()) { Pro.gate("propack"); return; }
       var yol = null;
       if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
-        var r = window.cep.fs.showOpenDialogEx(false, true, "Suflo Pro paketi klasörünü seç", null, null);
+        var r = window.cep.fs.showOpenDialogEx(false, true, uiMetni("Suflo Pro paketi klasörünü seç"), null, null);
         if (r && r.data && r.data.length) yol = r.data[0];
       }
       if (!yol) return;

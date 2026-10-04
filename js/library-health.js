@@ -9,6 +9,9 @@
 window.KLibraryHealth = (function () {
   "use strict";
 
+  // Tarayıcı penceresi / Premiere iletişim kutusu DOM değil: çevirmen göremez, metin burada çevrilir
+  function uiMetni(s) { return window.SufloI18n ? SufloI18n.tr(s) : s; }
+
   var AUDIO_RE = /\.(wav|mp3|aif|aiff|m4a|flac|ogg|wma)$/i;
   var AUDIO_LIKE_RE = /\.(aac|caf|opus|ac3|amr|ape)$/i;
   var VISUAL_RE = /\.(png|webp|gif|jpe?g)$/i;
@@ -663,7 +666,7 @@ window.KLibraryHealth = (function () {
 
   async function repair(action) {
     if (busy || !action) return;
-    if (action === "clear-folders" && window.confirm && !window.confirm("Yalnız artık bulunamayan harici klasör bağlantıları temizlensin mi? Dosyalar silinmez.")) return;
+    if (action === "clear-folders" && window.confirm && !window.confirm(uiMetni("Yalnız artık bulunamayan harici klasör bağlantıları temizlensin mi? Dosyalar silinmez."))) return;
     busy = true;
     setWorking((ACTIONS[action] || "Sorun") + " çalışıyor…");
     try {
@@ -684,7 +687,7 @@ window.KLibraryHealth = (function () {
     if (busy || !lastReport) return;
     var actions = repairableActions(lastReport);
     if (!actions.length) return;
-    if (window.confirm && !window.confirm("Doctor yalnız güvenli kurulum, eşitleme ve bozuk klasör bağlantılarını onaracak. Timeline ve medya dosyalarına dokunulmayacak. Devam edilsin mi?")) return;
+    if (window.confirm && !window.confirm(uiMetni("Doctor yalnız güvenli kurulum, eşitleme ve bozuk klasör bağlantılarını onaracak. Timeline ve medya dosyalarına dokunulmayacak. Devam edilsin mi?"))) return;
     busy = true;
     setWorking("Güvenli sorunlar düzeltiliyor…");
     var errors = [];

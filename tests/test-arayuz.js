@@ -255,6 +255,13 @@ ok("altyazı dili bilinmezken 'tr' yerine arayüz dili", !/\|\| "tr"; \}?,?\s*$/
   (capSrc.match(/\|\| arayuzDili\(\)/g) || []).length >= 4);
 ok("İngilizcede kayıtlı tercih yoksa altyazı dili Otomatik",
   /if \(!p\) \{ if \(arayuzDili\(\) === "en" && el\("cap-lang"\)\) el\("cap-lang"\)\.value = ""; return; \}/.test(capSrc));
+var diyalogEksik = [];
+fs.readdirSync(KOKYOL + "js").filter(function (f) { return /\.js$/.test(f); }).forEach(function (f) {
+  fs.readFileSync(KOKYOL + "js/" + f, "utf8").split("\n").forEach(function (satir, i) {
+    if (/window\.confirm\(|showOpenDialogEx\(/.test(satir) && /["']/.test(satir) && satir.indexOf("uiMetni(") === -1) diyalogEksik.push(f + ":" + (i + 1));
+  });
+});
+ok("confirm() ve klasör seçme pencereleri arayüz dilinde (uiMetni)", diyalogEksik.length === 0, diyalogEksik.join(" | "));
 ok("Premiere bin/marker adları anahtar olarak aynı kalır", /Suflo Altyazi/.test(fs.readFileSync(KOKYOL + "jsx/host.jsx", "utf8")));
 
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");

@@ -8,6 +8,9 @@
 window.KSfx = (function () {
   "use strict";
 
+  // Tarayıcı penceresi / Premiere iletişim kutusu DOM değil: çevirmen göremez, metin burada çevrilir
+  function uiMetni(s) { return window.SufloI18n ? SufloI18n.tr(s) : s; }
+
   var index = [];          // { name, path, folder, collection, hay }
   var filtered = [];
   var cursor = -1;
@@ -864,7 +867,7 @@ window.KSfx = (function () {
   function chooseFolder() {
     if (!proGate()) return;
     if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
-      var res = window.cep.fs.showOpenDialogEx(false, true, "SFX klasörü seç", null, null);
+      var res = window.cep.fs.showOpenDialogEx(false, true, uiMetni("SFX klasörü seç"), null, null);
       if (res && res.data && res.data.length) saveFolder(res.data[0]);
       return;
     }
