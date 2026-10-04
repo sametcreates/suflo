@@ -1292,10 +1292,13 @@ function KS_exportAudio(encoded) {
     if (sysEpr) eprList.push(sysEpr);
     if (eprList.length === 0) return KS_err("WAV export preseti bulunamadi. 'Secili klip' kapsamini kullan.");
 
-    // katman secimi: secilmeyenleri gecici sustur, export sonrasi geri al
+    // katman secimi: secilmeyenleri gecici sustur, export sonrasi geri al.
+    // unmuteWanted (Podcast Modu, istege bagli): istenen katman kullanicida susturulmussa
+    // gecici olarak acilir; finally'de her katman eski haline doner. Varsayilan davranis ayni.
     var savedMute = null;
     var i, tr;
-    if (p.tracks && p.tracks.length > 0 && p.tracks.length < seq.audioTracks.numTracks) {
+    var ac = p.unmuteWanted ? true : false;
+    if (p.tracks && p.tracks.length > 0 && (p.tracks.length < seq.audioTracks.numTracks || ac)) {
       var want = {};
       for (i = 0; i < p.tracks.length; i++) want[p.tracks[i]] = 1;
       savedMute = [];
@@ -1305,6 +1308,7 @@ function KS_exportAudio(encoded) {
         try { was = tr.isMuted(); } catch (eM) {}
         savedMute.push(was);
         if (!want[i] && !was) { try { tr.setMute(1); } catch (eS) {} }
+        else if (want[i] && was && ac) { try { tr.setMute(0); } catch (eU) {} }
       }
     }
     function restoreMute() {
@@ -2044,6 +2048,238 @@ function KS_applyCuts(encoded) {
     }
 
     return KS_ok({ cuts: boundaries.length, removed: removed, selected: selected, newSeq: newSeqName, rippleFallback: rippleDustu });
+  } catch (e) { return KS_err(e); }
+}
+
+
+/* ---------- Podcast Modu: mikrofona gore kamera gecisi ---------- */
+
+/*
+ * Kamera katmanlari yalniz KENDI acilis / kapanis anlarinda (QE razor) kesilir; parcalar
+ * klip.disabled ile acilip kapanir. KS_applyCuts'a dokunulmaz. Multicam kaynak sekansinda
+ * aci degistirecek API yok: oyle klipler bastan reddedilir.
+ */
+var KS_MC_EPS = 0.02;
+
+function KS_mcKlipBayrak(cl, ad) {
+  try {
+    var pi = cl.projectItem;
+    if (!pi || typeof pi[ad] !== "function") return false;
+    return pi[ad]() ? true : false;
+  } catch (e) { return false; }
+}
+
+function KS_mcIzBilgi(tr, i, video) {
+  var o = { index: i, name: "", locked: false, muted: false, clipCount: 0, first: 0, last: 0, hasMulticam: false, hasMerged: false };
+  try { o.name = String(tr.name || ""); } catch (eN) {}
+  try { o.locked = tr.isLocked && tr.isLocked() ? true : false; } catch (eL) {}
+  try { o.muted = tr.isMuted && tr.isMuted() ? true : false; } catch (eM) {}
+  var n = 0;
+  try { n = tr.clips.numItems; } catch (eC) {}
+  o.clipCount = n;
+  var yollar = {};
+  for (var ci = 0; ci < n; ci++) {
+    var cl = tr.clips[ci];
+    var bas = Number(cl.start.seconds), son = Number(cl.end.seconds);
+    if (ci === 0 || bas < o.first) o.first = bas;
+    if (son > o.last) o.last = son;
+    if (KS_mcKlipBayrak(cl, "isMulticamClip")) o.hasMulticam = true;
+    if (KS_mcKlipBayrak(cl, "isMergedClip")) o.hasMerged = true;
+    if (!video) {
+      try { yollar[String(cl.projectItem.getMediaPath())] = 1; } catch (eP) {}
+    }
+  }
+  // Duz ses klibi (tek klip, tek dosya, birlesik / multicam degil): Premiere disa aktaramazsa
+  // panel sesi dogrudan dosyadan okuyabilir
+  if (!video && n === 1 && !o.hasMulticam && !o.hasMerged) {
+    try {
+      var c0 = tr.clips[0];
+      var yol = String(c0.projectItem.getMediaPath() || "");
+      if (yol) o.plain = { path: yol, start: Number(c0.start.seconds), end: Number(c0.end.seconds), inPoint: Number(c0.inPoint.seconds) };
+    } catch (eD) {}
+  }
+  return o;
+}
+
+function KS_getTrackLayout() {
+  try {
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var v = [], a = [], i;
+    for (i = 0; i < seq.videoTracks.numTracks; i++) v.push(KS_mcIzBilgi(seq.videoTracks[i], i, true));
+    for (i = 0; i < seq.audioTracks.numTracks; i++) a.push(KS_mcIzBilgi(seq.audioTracks[i], i, false));
+    var sure = 0;
+    try { sure = Number(seq.end) / KS_TPS; } catch (eS) {}
+    return KS_ok({ seqId: String(seq.sequenceID), name: String(seq.name), duration: sure, video: v, audio: a });
+  } catch (e) { return KS_err(e); }
+}
+
+// Kamera katmanlarini dogrula: hata varsa HICBIR degisiklik yapilmadan doner
+function KS_mcIzDenetle(seq, camTracks) {
+  if (!camTracks || !camTracks.length) return { kod: "iz_yok", track: -1, error: "Kamera katmani secilmedi." };
+  for (var i = 0; i < camTracks.length; i++) {
+    var ti = Number(camTracks[i]);
+    if (!(ti >= 0) || ti >= seq.videoTracks.numTracks) return { kod: "iz_yok", track: ti, error: "Video katmani bulunamadi: V" + (ti + 1) };
+    var tr = seq.videoTracks[ti];
+    var bilgi = KS_mcIzBilgi(tr, ti, true);
+    if (bilgi.locked) return { kod: "kilitli", track: ti, error: "Katman kilitli: V" + (ti + 1) };
+    if (!bilgi.clipCount) return { kod: "bos", track: ti, error: "Katmanda klip yok: V" + (ti + 1) };
+    if (bilgi.hasMulticam) return { kod: "multicam", track: ti, error: "Multicam kaynak klibi desteklenmiyor: V" + (ti + 1) };
+  }
+  return null;
+}
+
+function KS_mcHata(h) {
+  return KJSON.stringify({ ok: false, kod: h.kod, track: h.track, error: h.error });
+}
+
+function KS_multicamPrepare(encoded) {
+  try {
+    var p = KS_arg(encoded); // { camTracks:[...], cloneFirst:bool, cloneName?, seqId? }
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (p.seqId && String(seq.sequenceID) !== String(p.seqId)) {
+      return KS_mcHata({ kod: "sekans", track: -1, error: "Aktif sekans degisti; sekansi yeniden tara." });
+    }
+    var h = KS_mcIzDenetle(seq, p.camTracks);
+    if (h) return KS_mcHata(h);
+    var kopya = false;
+    if (p.cloneFirst) {
+      var cloned = KS_cloneActiveSeq();
+      if (!cloned) return KS_mcHata({ kod: "kopya", track: -1, error: "Kopya sekans olusturulamadi. 'Bu sekansta' modunu dene." });
+      seq = KS_seq();
+      if (!seq || String(seq.sequenceID) !== String(cloned.sequenceID)) {
+        return KS_mcHata({ kod: "kopya", track: -1, error: "Kopya sekans aktif edilemedi." });
+      }
+      if (p.cloneName) { try { seq.name = String(p.cloneName); } catch (eN) {} }
+      kopya = true;
+    }
+    return KS_ok({ seqId: String(seq.sequenceID), name: String(seq.name), cloned: kopya });
+  } catch (e) { return KS_err(e); }
+}
+
+// t anindaki kamera katmani (plan [{s,e,t}] sirali; ikili arama)
+function KS_mcIzAt(plan, t) {
+  if (!plan || !plan.length) return -1;
+  if (t < Number(plan[0].s)) return Number(plan[0].t);
+  var lo = 0, hi = plan.length - 1;
+  while (lo < hi) {
+    var mid = Math.floor((lo + hi + 1) / 2);
+    if (Number(plan[mid].s) <= t) lo = mid; else hi = mid - 1;
+  }
+  return Number(plan[lo].t);
+}
+
+function KS_mcSekansDenetle(p) {
+  var seq = KS_seq();
+  if (!seq) return { seq: null, hata: KS_err("Aktif sequence yok.") };
+  if (!p.seqId || String(seq.sequenceID) !== String(p.seqId)) {
+    return { seq: null, hata: KS_mcHata({ kod: "sekans", track: -1, error: "Aktif sekans degisti; islem durduruldu." }) };
+  }
+  return { seq: seq, hata: null };
+}
+
+function KS_multicamRazor(encoded) {
+  try {
+    var p = KS_arg(encoded); // { seqId, cuts:[{track,t}] }
+    var d = KS_mcSekansDenetle(p);
+    if (d.hata) return d.hata;
+    var seq = d.seq;
+    var cuts = p.cuts || [];
+    var izler = [], gor = {}, i;
+    for (i = 0; i < cuts.length; i++) {
+      var k = String(Number(cuts[i].track));
+      if (!gor[k]) { gor[k] = 1; izler.push(Number(cuts[i].track)); }
+    }
+    var h = izler.length ? KS_mcIzDenetle(seq, izler) : null;
+    if (h) return KS_mcHata(h);
+
+    app.enableQE();
+    var qseq = qe.project.getActiveSequence();
+    var kesilen = 0, atlanan = 0;
+    for (i = 0; i < cuts.length; i++) {
+      var ti = Number(cuts[i].track), t = Number(cuts[i].t);
+      var tr = seq.videoTracks[ti], ic = false;
+      // yalniz bir klibin icine dusen an kesilir (klip sinirinda ya da boslukta razor yok)
+      for (var ci = 0; ci < tr.clips.numItems; ci++) {
+        var cl = tr.clips[ci];
+        if (t > Number(cl.start.seconds) + KS_MC_EPS && t < Number(cl.end.seconds) - KS_MC_EPS) { ic = true; break; }
+      }
+      if (!ic) { atlanan++; continue; }
+      try { qseq.getVideoTrackAt(ti).razor(KS_timecode(t)); kesilen++; } catch (eR) { atlanan++; }
+    }
+    return KS_ok({ cuts: kesilen, skipped: atlanan });
+  } catch (e) { return KS_err(e); }
+}
+
+// Ses kliplerinin aci/kapa durumu (bagli klip korumasi icin)
+function KS_mcSesFoto(seq) {
+  var foto = [];
+  for (var ti = 0; ti < seq.audioTracks.numTracks; ti++) {
+    var tr = seq.audioTracks[ti];
+    for (var ci = 0; ci < tr.clips.numItems; ci++) {
+      var cl = tr.clips[ci];
+      var kapali = false;
+      try { kapali = cl.disabled ? true : false; } catch (eD) {}
+      foto.push({ cl: cl, s: Number(cl.start.seconds), e: Number(cl.end.seconds), d: kapali });
+    }
+  }
+  return foto;
+}
+
+function KS_multicamEnable(encoded) {
+  try {
+    var p = KS_arg(encoded); // { seqId, plan:[{s,e,t}], camTracks:[...], from, to }
+    var d = KS_mcSekansDenetle(p);
+    if (d.hata) return d.hata;
+    var seq = d.seq;
+    var plan = p.plan || [];
+    if (!plan.length) return KS_err("Kamera plani bos.");
+    var h = KS_mcIzDenetle(seq, p.camTracks);
+    if (h) return KS_mcHata(h);
+    var from = (p.from === undefined || p.from === null) ? -1e9 : Number(p.from);
+    var to = (p.to === undefined || p.to === null) ? 1e12 : Number(p.to);
+
+    // BAGLI KLIP KORUMASI: video klibini kapatmak bagli sesini de kapatiyor olabilir
+    // (dogrulanmamis davranis). Once tum ses kliplerinin durumu alinir, sonra geri yuklenir.
+    var foto = KS_mcSesFoto(seq);
+    var yazilan = [], degisen = 0, ayni = 0, i, ci;
+    for (i = 0; i < p.camTracks.length; i++) {
+      var ti = Number(p.camTracks[i]);
+      var tr = seq.videoTracks[ti];
+      for (ci = 0; ci < tr.clips.numItems; ci++) {
+        var cl = tr.clips[ci];
+        var bas = Number(cl.start.seconds), son = Number(cl.end.seconds);
+        var orta = (bas + son) / 2;
+        if (orta < from || orta >= to) continue;
+        var kapat = KS_mcIzAt(plan, orta) !== ti;
+        var simdi = false;
+        try { simdi = cl.disabled ? true : false; } catch (eG) {}
+        if (simdi === kapat) { ayni++; continue; }   // degismeyen deger yeniden yazilmaz
+        try { cl.disabled = kapat; degisen++; yazilan.push({ cl: cl, d: kapat }); } catch (eW) {}
+      }
+    }
+
+    var geriYuklenen = 0;
+    for (i = 0; i < foto.length; i++) {
+      var f = foto[i], suan = false;
+      try { suan = f.cl.disabled ? true : false; } catch (eF) {}
+      if (suan !== f.d) {
+        try { f.cl.disabled = f.d; geriYuklenen++; } catch (eS) {}
+      }
+    }
+    if (geriYuklenen) {
+      // ses geri yuklenince video da geri dondu mu? (iki yonlu bag) — o zaman calisamayiz
+      for (i = 0; i < yazilan.length; i++) {
+        var v = false;
+        try { v = yazilan[i].cl.disabled ? true : false; } catch (eV) {}
+        if (v !== yazilan[i].d) {
+          return KJSON.stringify({ ok: false, kod: "linkedConflict", linkedRestored: geriYuklenen,
+            error: "Kamera kliplerinin bagi sesle birlikte aciliyor/kapaniyor. Kamera kliplerinin baglantisini kopar (Ctrl+L)." });
+        }
+      }
+    }
+    return KS_ok({ changed: degisen, unchanged: ayni, linkedRestored: geriYuklenen });
   } catch (e) { return KS_err(e); }
 }
 
