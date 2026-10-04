@@ -2327,7 +2327,13 @@
     "Motion BG bulunamadi: {}": "Motion BG not found: {}",
     "Motion BG projeye alinamadi.": "Couldn't import the Motion BG into the project.",
     "Motion BG yerlestirilemedi.": "Couldn't place the Motion BG.",
-    "Klip katmana yerlestirilemedi.": "Couldn't place the clip on the track."
+    "Klip katmana yerlestirilemedi.": "Couldn't place the clip on the track.",
+    "Etkin sekans degisti; katman konmadi.": "The active sequence changed; the layer wasn't placed.",
+    "Kaynak sekans acilamadi; Shorts olusturulmadi.": "Couldn't open the source sequence; no Shorts were created.",
+    "Sekans kimligi yok.": "No sequence ID.",
+    "Sekans projede bulunamadi (silinmis olabilir).": "Sequence not found in the project (it may have been deleted).",
+    "Sekans acilamadi.": "Couldn't open the sequence.",
+    "Sekans adi yok.": "No sequence name."
   });
 
   // Prices: one pattern family whose output comes from js/pricing.js (SufloPricing).

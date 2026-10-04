@@ -1571,6 +1571,10 @@ function KS_placeOverlay(encoded) {
     var p = KS_arg(encoded);
     var seq = KS_seq();
     if (!seq) return KS_err("Aktif sequence yok.");
+    // Shorts paketi: katman yalniz beklenen sekansa (kullanici arada sekans degistirdiyse o adim durur)
+    if (p.expectSeqId && String(seq.sequenceID) !== String(p.expectSeqId)) {
+      return KS_err("Etkin sekans degisti; katman konmadi.");
+    }
     if (!p.path || !(new File(p.path)).exists) return KS_err("Overlay dosyasi yok: " + p.path);
 
     var v = String(app.version).split(".");
@@ -2337,6 +2341,12 @@ function KS_makeShorts(encoded) {
   try {
     var p = KS_arg(encoded);
     var seq = KS_seq();
+    // p.sourceId (Shorts paketi): alt sekans YALNIZ kaynak sekanstan; etkin olan bir Short ise
+    // once kaynak acilir, acilamazsa reddedilir (Short'un alt sekansi olusmasin)
+    if (p.sourceId && (!seq || String(seq.sequenceID) !== String(p.sourceId))) {
+      seq = KS_activateSeq(p.sourceId);
+      if (!seq) return KS_err("Kaynak sekans acilamadi; Shorts olusturulmadi.");
+    }
     if (!seq) return KS_err("Aktif sequence yok.");
     var ranges = p.ranges || [];
     if (!ranges.length) return KS_err("Aralik yok.");
@@ -2393,6 +2403,139 @@ function KS_makeShorts(encoded) {
     try { seq.setOutPoint(eskiOut !== null && eskiOut > 0 && eskiOut < sonSn ? eskiOut : sonSn); } catch (eG2) {}
     if (!yapilan.length) return KS_err(hatalar.join("; ") || "Sekans olusturulamadi.");
     return KS_ok({ made: yapilan.length, vertical: dikeySayisi, items: yapilan, errors: hatalar });
+  } catch (e) { return KS_err(e); }
+}
+
+/* ---------- Tek Tik Shorts Paketi: sekans kimligiyle calisma ---------- */
+
+var KS_PAKET_ONEKI = "Suflo Paket \u00B7";
+
+// Projedeki sekans (kimlikle) ya da null
+function KS_seqById(id) {
+  var hedef = String(id || "");
+  if (!hedef) return null;
+  try {
+    for (var i = 0; i < app.project.sequences.numSequences; i++) {
+      var s = app.project.sequences[i];
+      if (String(s.sequenceID) === hedef) return s;
+    }
+  } catch (e) {}
+  return null;
+}
+
+// Sekansi etkin yap (activeSequence, olmazsa openSequence) ve dogrula: etkin sekans ya da null
+function KS_activateSeq(id) {
+  var hedef = String(id || "");
+  var s = KS_seqById(hedef);
+  if (!s) return null;
+  var a = null;
+  try { a = KS_seq(); } catch (e0) {}
+  if (a && String(a.sequenceID) === hedef) return a;
+  try { app.project.activeSequence = s; } catch (e1) {}
+  try { a = KS_seq(); } catch (e2) { a = null; }
+  if (!a || String(a.sequenceID) !== hedef) {
+    try { app.project.openSequence(hedef); } catch (e3) {}
+    try { a = KS_seq(); } catch (e4) { a = null; }
+  }
+  return a && String(a.sequenceID) === hedef ? a : null;
+}
+
+function KS_basliyor(metin, onek) {
+  return String(metin || "").substring(0, onek.length) === onek;
+}
+
+// Video izlerindeki "Suflo Paket ·" adli kliplerin adlari (devamda konmus katmanlar tanınir)
+function KS_paketKatmanlari(seq) {
+  var out = [];
+  try {
+    for (var t = 0; t < seq.videoTracks.numTracks; t++) {
+      var tr = seq.videoTracks[t];
+      for (var c = 0; c < tr.clips.numItems; c++) {
+        var ad = "";
+        try { ad = String(tr.clips[c].name); } catch (eA) {}
+        if (KS_basliyor(ad, KS_PAKET_ONEKI)) out.push(ad);
+      }
+    }
+  } catch (e) {}
+  return out;
+}
+
+/*
+ * Sekansi kimligiyle ac ve dogrula. Doner: { id, name, width, height, end, fps,
+ * paket: ["Suflo Paket · …" klip adlari] } — yaniti kaybolan bir adimin koydugu katman
+ * devam ederken tekrar konmasin.
+ */
+function KS_openSequenceById(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    if (!p.id) return KS_err("Sekans kimligi yok.");
+    if (!KS_seqById(p.id)) return KS_err("Sekans projede bulunamadi (silinmis olabilir).");
+    var seq = KS_activateSeq(p.id);
+    if (!seq) return KS_err("Sekans acilamadi.");
+    var st = null;
+    try { st = seq.getSettings(); } catch (eS) {}
+    var son = 0;
+    try { son = Number(seq.end) / KS_TPS; } catch (eE) {}
+    return KS_ok({
+      id: String(seq.sequenceID), name: String(seq.name),
+      width: st ? Number(st.videoFrameWidth) : 0, height: st ? Number(st.videoFrameHeight) : 0,
+      end: son, fps: KS_fps(seq), paket: KS_paketKatmanlari(seq)
+    });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Adiyla sekans (en son olusturulani). 600 sn'lik KS_makeShorts cagrisi zaman asimina
+ * ugrasa da Auto Reframe bitmis olabilir: panel kimligi buradan geri alir.
+ * p.haric: bilinen kimlikler (baska Short'a ait olani alma). Doner: { id, name, count }
+ */
+function KS_findSequenceByName(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var ad = String(p.name || "");
+    if (!ad) return KS_err("Sekans adi yok.");
+    var haric = {};
+    var liste = p.haric || [];
+    for (var h = 0; h < liste.length; h++) haric[String(liste[h])] = 1;
+    var bulunan = null, n = 0;
+    for (var i = 0; i < app.project.sequences.numSequences; i++) {
+      var s = app.project.sequences[i];
+      if (String(s.name) !== ad || haric[String(s.sequenceID)]) continue;
+      bulunan = s; n++;
+    }
+    return KS_ok({ id: bulunan ? String(bulunan.sequenceID) : "", name: ad, count: n });
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Short'a kaynaktan miras kalan Suflo katmanlari. createSubsequence tum izleri kopyalar:
+ * kaynaktaki altyazi katmani Short'ta da vardir (ve Auto Reframe onu da kirpar). Ada ve
+ * "Suflo Altyazi" kutusuna gore sayilir; paketin kendi katmanlari ("Suflo Paket ·") ayri.
+ * Premiere'in kendi altyazi izi buradan gorulemez (panel yalniz uyarir).
+ * Doner: { altyazi, kanca, paket, toplam }
+ */
+function KS_sequenceSufloLayers(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = p.id ? KS_seqById(p.id) : KS_seq();
+    if (!seq) return KS_err("Sekans projede bulunamadi (silinmis olabilir).");
+    var out = { altyazi: 0, kanca: 0, paket: 0, toplam: 0 };
+    for (var t = 0; t < seq.videoTracks.numTracks; t++) {
+      var tr = seq.videoTracks[t];
+      for (var c = 0; c < tr.clips.numItems; c++) {
+        var cl = tr.clips[c];
+        var ad = "", dosya = "", kutu = false;
+        try { ad = String(cl.name); } catch (eA) {}
+        try { dosya = String(cl.projectItem.getMediaPath()).replace(/\\/g, "/"); dosya = dosya.substring(dosya.lastIndexOf("/") + 1).toLowerCase(); } catch (eM) {}
+        try { kutu = String(cl.projectItem.treePath).replace(/\\/g, "/").indexOf("/" + KS_OVERLAY_BIN + "/") !== -1; } catch (eT) {}
+        if (KS_basliyor(ad, KS_PAKET_ONEKI)) { out.paket++; continue; }
+        if (KS_basliyor(ad, "Suflo Kanca") || /^suflo-(temiz-)?kanca-/.test(dosya)) { out.kanca++; out.toplam++; continue; }
+        if (KS_basliyor(ad, "Suflo Stil") || KS_basliyor(ad, "Suflo Altyazi") || /^suflo-(temiz-)?altyazi-/.test(dosya) || kutu) {
+          out.altyazi++; out.toplam++;
+        }
+      }
+    }
+    return KS_ok(out);
   } catch (e) { return KS_err(e); }
 }
 
