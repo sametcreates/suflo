@@ -310,5 +310,27 @@ ok("paylaşım bağlantısı arayüz dilinde (EN → /en/stil)", (capSrc.match(/
 ok("önizleme ortak builder ile (previewArgs + logoHazirla)", /SufloOverlayRender\.previewArgs\(/.test(fnGovde(capSrc, "async function motorOnizlemeOynat(")) &&
   /SufloOverlayRender\.logoHazirla\(/.test(fnGovde(capSrc, "async function motorOnizlemeOynat(")));
 
+/* ---------- Podcast Modu ---------- */
+var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8"), proSrc = fs.readFileSync(KOKYOL + "js/pro.js", "utf8");
+var mcUi = fs.readFileSync(KOKYOL + "js/multicam-ui.js", "utf8");
+ok("Podcast: kenar çubuğunda Kanca Başlığı'ndan hemen sonra, PRO kilidi ve YENİ rozetiyle",
+  html.indexOf('data-tab="podcast"') > html.indexOf('data-tab="kanca"') && html.indexOf('data-tab="podcast"') < html.indexOf('<div class="ky-baslik" style="margin-top:12px">Kütüphane</div>') &&
+  /data-tab="podcast">[\s\S]{0,400}<b>Podcast <em class="ky-yeni">YENİ<\/em><\/b>[\s\S]{0,200}data-kilit>PRO/.test(html));
+["tab-podcast", "pc-tara", "pc-esleme", "pc-genis", "pc-analiz", "pc-izler", "pc-min", "pc-max", "pc-hassas", "pc-hold", "pc-capraz", "pc-periyot-ac", "pc-periyot",
+  "pc-onizleme", "pc-ozet", "pc-uyari", "pc-hedef", "pc-uygula", "pc-renk", "pc-progress", "pc-durum", "podcast-tanitim"].forEach(function (id) {
+  ok("Podcast: #" + id + " var", !!idler[id]);
+});
+ok("Podcast: 'Her konuşmacının kendi mikrofonu olmalı' arayüzde yazar", /Her konuşmacının kendi mikrofonu olmalı/.test(html));
+ok("Podcast: SRT altyazı izinin renk taşıyamadığı söylenir", /altyazı katmanı \(SRT\) renk taşıyamaz/.test(html));
+ok("Podcast: betik sırası multicam.js → multicam-ui.js → app.js", betikSira("multicam.js") > 0 && betikSira("multicam.js") < betikSira("multicam-ui.js") && betikSira("multicam-ui.js") < betikSira("app.js") &&
+  betikSira("style-engine.js") < betikSira("multicam-ui.js"));
+ok("Podcast: app.js başlatır, kilitler ve tanıtım kartını Pro'da gizler", /KMulticam\.init\(\)/.test(appSrc) && /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="podcast"\]'\), !s\.pro\)/.test(appSrc) && /"podcast-tanitim"/.test(appSrc));
+ok("Podcast: Pro anahtarı multicam (etiket + uygula kapısı)", /multicam:\s+'Podcast Modu/.test(proSrc) && /Pro\.gate\("multicam"\)/.test(fnGovde(mcUi, "async function uygula(")));
+var uyg = fnGovde(mcUi, "async function uygula(");
+ok("Podcast: önce hazırlık, sonra TÜM kesimler, sonra TÜM aç/kapa", uyg.indexOf("KS_multicamPrepare") > 0 && uyg.indexOf("KS_multicamPrepare") < uyg.indexOf("KS_multicamRazor") &&
+  uyg.indexOf("KS_multicamRazor") < uyg.indexOf("KS_multicamEnable"));
+ok("Podcast: mikrofon dışa aktarımı unmuteWanted ve gömülü epr ile, geçici dosya silinir", /KS_exportAudio", \{ scope: "entire", epr: bundledEpr\(\), tracks: \[sp\.mic\], unmuteWanted: true \}/.test(mcUi) && /silInput: true/.test(mcUi));
+ok("Podcast: altyazının üç derleme noktası konuşmacı renklerinden geçer", (capSrc.match(/SufloStyleEngine\.compile\(konusmaciRenkleri\(/g) || []).length === 3 && /bundledEpr: bundledEpr/.test(capSrc));
+
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

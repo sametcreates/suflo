@@ -3925,3 +3925,54 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .paket-cip.atlandi { border-style: dashed; opacity: .7; }
 .paket-kisa-not { font-size: 10px; color: var(--faint); margin-top: 3px; line-height: 1.5; }
 .paket-kisa-not.hata { color: var(--bad); }
+
+/* ---------- Podcast Modu ---------- */
+
+.pc-adim {
+  margin: 14px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.pc-adim b {
+  display: inline-block;
+  width: 18px; height: 18px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-align: center;
+  line-height: 16px;
+  font-size: 10.5px;
+}
+.pc-esleme { margin: 10px 0 8px; }
+/* CSS grid (CEF 74'te flex gap yok): ad · mikrofon · kamera · renk */
+.pc-satir {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) 30px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.pc-satir > * { margin-right: 6px; min-width: 0; }
+.pc-satir > *:last-child { margin-right: 0; }
+.pc-satir input[type="text"], .pc-satir select { width: 100%; }
+.pc-satir input[type="color"] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-s); background: none; }
+.pc-bas span { font-size: 10.5px; color: var(--faint); }
+.pc-izler { margin: 8px 0; }
+.pc-iz { font-size: 11px; color: var(--dim); margin-bottom: 3px; }
+.pc-iz.good { color: var(--good); }
+.pc-iz.bad { color: var(--bad); }
+.pc-onizleme {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  align-items: center;
+  margin: 10px 0 6px;
+}
+.pc-kam { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; margin-bottom: 6px; }
+.pc-bar { height: 14px; margin-bottom: 6px; }
+.pc-bar .pc-on { min-width: 1px; }
+.pc-ozet { font-size: 11px; margin-bottom: 6px; }
+#pc-periyot { width: 64px; margin-left: 8px; }

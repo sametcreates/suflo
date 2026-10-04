@@ -187,6 +187,15 @@ window.KCaptions = (function () {
     refreshUndoUI();
   }
 
+  /*
+   * Podcast Modu: konuşmacı renkleri açıksa her cue'ya konuşmacı (mikrofon analizinden) ve
+   * renkleri eklenir; kapalıyken seçenekler aynen döner (stil motoru çıktısı değişmez).
+   * Segmentlere konuşmacı yazılmaz: bölme, birleştirme ve geri alma onu kaybederdi.
+   */
+  function konusmaciRenkleri(o) {
+    try { return window.KMulticam && KMulticam.captionOptions ? KMulticam.captionOptions(o) : o; } catch (e) { return o; }
+  }
+
   // panelle birlikte gelen WAV export presetleri (once 16 kHz, olmazsa 48 kHz)
   function bundledEpr() {
     try {
@@ -3500,8 +3509,12 @@ window.KCaptions = (function () {
     var bas = Math.max(0, Math.floor(cs.length / 2) - Math.floor(adet / 2));
     var secilen = cs.slice(bas, bas + adet);
     var ilk = secilen[0].start;
+    // Podcast Modu: önizleme zamanı kaydırılır; konuşmacı kaydırmadan önce sekans zamanından alınır
+    var MC = window.KMulticam && KMulticam.colorsEnabled && KMulticam.colorsEnabled() ? KMulticam : null;
     return secilen.map(function (c) {
-      return { start: c.start - ilk + 0.15, end: c.end - ilk + 0.15, text: c.text };
+      var o = { start: c.start - ilk + 0.15, end: c.end - ilk + 0.15, text: c.text };
+      if (MC) o.speaker = MC.speakerFor(c.start, c.end);
+      return o;
     });
   }
 
@@ -3568,11 +3581,11 @@ window.KCaptions = (function () {
       var cues = motorOnizlemeCueleri(st);
       // Sekansin en-boy oranında onizle: 9:16'da stil yerlesimi farklidir
       var ob = onizlemeBoyutu(KApp.ctx());
-      var built = window.SufloStyleEngine.compile({
+      var built = window.SufloStyleEngine.compile(konusmaciRenkleri({
         styleId: st.aile, intensity: st.yogunluk, cues: cues, width: ob.w, height: ob.h,
         cueKind: cueler().length ? motorCueTuru() : "words",
         overrides: motorAyarlari(st)
-      });
+      }));
       K.fs.writeFileSync(assYol, built.ass, "utf8");
       if (fontDosyasi) {
         var kaynak = K.path.join(uzantiDizini(), "fonts", fontDosyasi);
@@ -4166,7 +4179,7 @@ window.KCaptions = (function () {
       var stilDerlemesi = null;
       var ass;
       if (motorStiliMi(st.aile)) {
-        stilDerlemesi = window.SufloStyleEngine.compile({
+        stilDerlemesi = window.SufloStyleEngine.compile(konusmaciRenkleri({
           styleId: st.aile,
           intensity: st.yogunluk,
           cueKind: motorCueTuru(),
@@ -4175,7 +4188,7 @@ window.KCaptions = (function () {
           width: g,
           height: y,
           overrides: motorAyarlari(st)
-        });
+        }));
         ass = stilDerlemesi.ass;
       } else {
         // Eski kayitli ozel sablonlar yalnız geriye donuk uyumluluk icin kalir.
@@ -4423,10 +4436,10 @@ window.KCaptions = (function () {
         if (typeof Pro !== "undefined" && !Pro.gate("assexport")) return;    // Pro: stilli ASS
         var assStil = stil();
         if (motorStiliMi(assStil.aile)) {
-          icerik = window.SufloStyleEngine.compile({
+          icerik = window.SufloStyleEngine.compile(konusmaciRenkleri({
             styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler({ vurgu: true }), cueKind: motorCueTuru(),
             overrides: motorAyarlari(assStil)
-          }).ass;
+          })).ass;
         } else {
           icerik = buildAss({ karaoke: kelimeModu, animasyon: assStil.animasyon });
         }
@@ -4886,6 +4899,8 @@ window.KCaptions = (function () {
     chatCall: chatCall,
     // Bolum/viral basliklari ekrandaki metnin dilinde: ceviri varsa hedef dil
     language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili(); },
-    refreshMogrtStyles: refreshMogrtStyles
+    refreshMogrtStyles: refreshMogrtStyles,
+    // Podcast Modu: mikrofonları ayrı ayrı dışa aktarırken aynı gömülü WAV presetleri
+    bundledEpr: bundledEpr
   };
 })();

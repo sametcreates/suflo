@@ -188,5 +188,42 @@ ok("stil motoru: rengi verilmeyen konuşmacı stilin kendi renginde (önek yok)"
 ok("splitToWords / lastWords konuşmacıyı taşır", SE.splitToWords([{ start: 0, end: 1, text: "a b", speaker: 2 }]).every(function (c) { return c.speaker === 2; }) &&
   SE.lastWords([{ start: 0, end: 1, text: "a b", speaker: 1 }])[0].speaker === 1 && SE.splitToWords([{ start: 0, end: 1, text: "a" }])[0].speaker === undefined);
 
+/* ---------- eşleme önerisi, denetim, PCM yardımcıları ---------- */
+var lay = { audio: [{ index: 0, name: "Audio 1", clipCount: 1 }, { index: 1, name: "Ayşe mik", clipCount: 1 }, { index: 2, name: "Müzik", clipCount: 0 }],
+  video: [{ index: 0, clipCount: 1, first: 0, last: 600 }, { index: 1, clipCount: 1, first: 0, last: 600, hasMulticam: true }, { index: 2, clipCount: 1, first: 0, last: 600 },
+    { index: 3, clipCount: 1, first: 0, last: 598 }, { index: 4, clipCount: 1, first: 0, last: 5 }] };
+var sm = M.suggestMapping(lay);
+ok("suggestMapping: katman sırasıyla, multicam katmanı atlanır, varsayılan ad harf", js(sm.speakers) === js([{ name: "A", mic: 0, cam: 0 }, { name: "Ayşe mik", mic: 1, cam: 2 }]) && sm.wide === 3, js(sm));
+lay.video[3].last = 20;
+ok("suggestMapping: kameralar kadar uzun olmayan katman (logo / yazı) geniş plan önerilmez", M.suggestMapping(lay).wide === -1);
+ok("suggestMapping: 3 konuşmacı istenirse eksik mikrofon -1", M.suggestMapping(lay, 3).speakers[2].mic === -1);
+ok("checkMapping: kendi mikrofonu, kamera, geniş plan çakışması", M.checkMapping({ speakers: [{ mic: 0, cam: 0 }, { mic: 0, cam: 1 }], wide: -1 }).kod === "mik_ayni" &&
+  M.checkMapping({ speakers: [{ mic: 0, cam: 0 }, { mic: 1, cam: -1 }], wide: -1 }).kod === "kam_yok" &&
+  M.checkMapping({ speakers: [{ mic: 0, cam: 0 }, { mic: -1, cam: 1 }], wide: -1 }).kod === "mik_yok" &&
+  M.checkMapping({ speakers: [{ mic: 0, cam: 0 }, { mic: 1, cam: 1 }], wide: 1 }).kod === "genis_ayni" &&
+  M.checkMapping({ speakers: [{ mic: 0, cam: 0 }], wide: -1 }).kod === "sayi" &&
+  M.checkMapping({ speakers: [{ mic: 0, cam: 0 }, { mic: 1, cam: 0 }], wide: 2 }) === null);
+ok("padSeries: eksik uç tabanla dolar", js(M.padSeries([[1, 2], [3]], 3)) === js([[1, 2, M.FLOOR], [3, M.FLOOR, M.FLOOR]]));
+ok("bufferToInt16: küçük uçlu işaretli 16 bit", js(Array.from(M.bufferToInt16(Buffer.from([0xff, 0x7f, 0x00, 0x80, 0x01, 0x00, 0x07])))) === js([32767, -32768, 1]));
+var pa = M.pcmArgs("C:\\Çekim ş\\a.wav", "o.pcm", { ss: 1.5, t: 10 });
+ok("pcmArgs: 8 kHz mono s16le; ss / t girdiden önce", pa.join(" ").indexOf("-ss 1.5 -t 10 -i C:\\Çekim ş\\a.wav -vn -ac 1 -ar 8000 -f s16le") > 0 && pa[pa.length - 1] === "o.pcm", pa.join(" "));
+
+/* ---------- panel: altyazı seçenekleri (konuşmacı renkleri kapalıyken aynen döner) ---------- */
+var vm = require("vm"), fs = require("fs");
+var kutular = { "pc-renk": { checked: false } };
+var pctx = { window: { SufloMulticam: M, KApp: { ctx: function () { return { sequenceId: "s1" }; } } }, document: { getElementById: function (id) { return kutular[id] || null; } }, Object: Object, Number: Number };
+vm.createContext(pctx);
+vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "js", "multicam-ui.js"), "utf8"), pctx);
+var KM = pctx.window.KMulticam;
+KM._kur({ seqId: "s1", seqIds: { s1: 1 }, duration: 1, act: [0, 0, 0, 0, 0, 1, 1, 1, 1, 1], win: 0.1 }, { speakers: [{ name: "A", color: "#ff0000" }, { name: "B", color: "#00ff00" }], wide: -1 });
+var giris = { cues: [{ start: 0, end: 0.4, text: "a" }, { start: 0.5, end: 1, text: "b" }], offset: 0 };
+ok("panel: renk anahtarı kapalıyken seçenekler aynen döner", KM.captionOptions(giris) === giris && giris.speakerColors === undefined && giris.cues[0].speaker === undefined);
+kutular["pc-renk"].checked = true;
+var cikis = KM.captionOptions({ cues: giris.cues.concat([{ start: 9, end: 9.5, text: "c" }, { start: 0, end: 0.4, text: "d", speaker: -1 }]) });
+ok("panel: açıkken cue'lara konuşmacı ve renkler eklenir; kapsam dışı / önceden atanmış cue'ya dokunulmaz", js(cikis.cues.map(function (c) { return c.speaker; })) === js([0, 1, undefined, -1]) &&
+  js(cikis.speakerColors) === js(["#ff0000", "#00ff00"]) && giris.cues[0].speaker === undefined, js(cikis));
+pctx.window.KApp.ctx = function () { return { sequenceId: "baska" }; };
+ok("panel: başka bir sekans açıkken renkler uygulanmaz", KM.colorsEnabled() === false);
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

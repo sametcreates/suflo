@@ -387,6 +387,7 @@ window.KApp = (function () {
     // Pro'ya kilitli girişler: sekmeler + tekil butonlar
     Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.ky-oge[data-tab="podcast"]'), !s.pro);
     // SFX satirinin kendi ky-kilit rozeti var; ikinci bir ::after rozeti ekleme.
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
     Pro.markLocked(el("cap-translate-go"), !s.pro);
@@ -422,7 +423,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "kanca-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "kanca-tanitim", "podcast-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -1426,6 +1427,7 @@ window.KApp = (function () {
     guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });
     guvenli("Kanca başlığı", function () { if (window.KKanca) KKanca.init(); });
     guvenli("Shorts Paketi", function () { if (window.KShortsPaket) KShortsPaket.init(); });
+    guvenli("Podcast Modu", function () { if (window.KMulticam) KMulticam.init(); });
     guvenli("Marka Kiti", function () { if (window.KMarkaKiti) KMarkaKiti.init(); });
     guvenli("Sesi iyileştir", function () { if (window.KSes) KSes.init(); });
     guvenli("Ritim", function () { KBeat.init(); });

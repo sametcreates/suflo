@@ -76,6 +76,11 @@
       <span class="ky-metin"><b>Kanca Başlığı <em class="ky-yeni">YENİ</em></b><i>Shorts açılış yazısı</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
+    <button class="ky-oge" data-tab="podcast">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M5 9.5a5 5 0 0 0 10 0M10 14.5v3M7 17.5h6"/></svg></span>
+      <span class="ky-metin"><b>Podcast <em class="ky-yeni">YENİ</em></b><i>mikrofona göre kamera geçişi</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
 
     <div class="ky-baslik" style="margin-top:12px">Kütüphane</div>
     <button class="ky-oge" data-tab="text" data-kat="mogrt">
@@ -1415,6 +1420,93 @@
     <img id="kanca-resim" class="kanca-resim" alt="Kanca başlığı önizlemesi" hidden>
   </section>
 
+  <!-- ================= Podcast Modu ================= -->
+  <section id="tab-podcast" class="tabpane">
+    <div class="pro-tanitim" id="podcast-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Konuşan kişiye kendiliğinden geç</b>
+        <span>Her mikrofonu dinler, kim konuşuyorsa onun kamerasını açar. Analiz ve önizleme ücretsiz; timeline'a uygulamak Pro.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>2–4</strong> konuşmacı</i><i><strong>0</strong> eklenti</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="multicam">Pro'yu aç</button>
+    </div>
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M5 9.5a5 5 0 0 0 10 0M10 14.5v3M7 17.5h6"/></svg>
+        <b>Podcast Modu</b>
+      </div>
+      <p class="ci-p">Kim konuşuyorsa onun kamerası açılır. <b>Her konuşmacının kendi mikrofonu olmalı</b> (ayrı ses katmanı) ve kameralar senkronlu, her biri kendi video katmanında olmalı. Suflo kamera katmanlarını yalnız geçiş anlarında keser ve parçaları açıp kapatır; ses ve diğer katmanlara dokunmaz.</p>
+    </div>
+
+    <div class="pc-adim"><b>1</b> Sekans</div>
+    <button id="pc-tara" class="btn" type="button">Sekansı tara</button>
+    <div id="pc-esleme" class="pc-esleme" hidden></div>
+    <div id="pc-esleme-alt" hidden>
+      <div class="row">
+        <button id="pc-ekle" class="btn tiny" type="button">+ Konuşmacı</button>
+        <button id="pc-cikar" class="btn tiny" type="button">− Konuşmacı</button>
+      </div>
+      <div class="row">
+        <label for="pc-genis">Geniş plan (isteğe bağlı)</label>
+        <select id="pc-genis"><option value="-1">Yok</option></select>
+      </div>
+      <p class="hint">Multicam kaynak sekansı desteklenmez (açıyı değiştirecek API yok). Tek mikrofona karışık kayıt için konuşmacı ayırma sonraki sürümde.</p>
+
+      <div class="pc-adim"><b>2</b> Analiz</div>
+      <button id="pc-analiz" class="btn primary" type="button">Analiz et</button>
+      <div id="pc-izler" class="pc-izler"></div>
+    </div>
+
+    <div id="pc-sonuc" hidden>
+      <div class="pc-adim"><b>3</b> Ritim</div>
+      <div class="row">
+        <label for="pc-min">En kısa plan</label>
+        <input id="pc-min" type="range" min="1" max="6" step="0.5" value="2">
+        <span id="pc-min-val" class="mono">2 sn</span>
+      </div>
+      <div class="row">
+        <label for="pc-max">En uzun plan</label>
+        <input id="pc-max" type="range" min="6" max="40" step="1" value="12">
+        <span id="pc-max-val" class="mono">12 sn</span>
+      </div>
+      <div class="row">
+        <label for="pc-hassas">Hassasiyet</label>
+        <input id="pc-hassas" type="range" min="3" max="12" step="1" value="6">
+        <span id="pc-hassas-val" class="mono">6 dB</span>
+      </div>
+      <div class="row">
+        <label for="pc-hold">Bekleme</label>
+        <input id="pc-hold" type="range" min="100" max="1500" step="100" value="400">
+        <span id="pc-hold-val" class="mono">400 ms</span>
+      </div>
+      <label class="switch"><input id="pc-capraz" type="checkbox" checked><i></i><span>Çapraz konuşmada geniş plan</span></label>
+      <div class="row">
+        <label class="switch"><input id="pc-periyot-ac" type="checkbox"><i></i><span>Her N saniyede geniş plan</span></label>
+        <input id="pc-periyot" type="number" min="8" max="120" step="1" value="20" aria-label="Geniş plan aralığı (sn)">
+      </div>
+      <p class="hint">En uzun planı aşan tek kişilik konuşmaya ve çapraz konuşmaya yalnız geniş plan seçiliyse geçilir.</p>
+      <div id="pc-onizleme" class="pc-onizleme" aria-label="Kamera planı önizlemesi"></div>
+      <div id="pc-ozet" class="dim pc-ozet"></div>
+      <div id="pc-uyari" class="inline-status warn" hidden></div>
+
+      <div class="pc-adim"><b>4</b> Uygula</div>
+      <div class="seg-ctl full" id="pc-hedef">
+        <button class="on" data-m="clone" type="button">Kopyada uygula<em>önerilen</em></button>
+        <button data-m="here" type="button">Bu sekansta</button>
+      </div>
+      <button id="pc-uygula" class="btn primary big" type="button">Kamera geçişlerini uygula</button>
+
+      <div class="pc-adim"><b>5</b> Konuşmacı renkleri</div>
+      <label class="switch"><input id="pc-renk" type="checkbox"><i></i><span>Altyazıda her konuşmacı kendi renginde</span></label>
+      <p class="hint">Renkler yukarıdaki tablodan. Suflo Stilleri katmanında ve ASS dışa aktarımında geçerli; Premiere'in kendi altyazı katmanı (SRT) renk taşıyamaz.</p>
+    </div>
+    <div id="pc-progress" class="progress-line" hidden><i></i></div>
+    <div id="pc-durum" class="inline-status" role="status" aria-live="polite"></div>
+  </section>
+
   <!-- ================= SFX ================= -->
   <section id="tab-sfx" class="tabpane">
     <div class="pro-tanitim" id="sfx-tanitim" hidden>
@@ -2061,6 +2153,8 @@
   <script src="js/shorts-ekler.js"></script>
   <script src="js/shorts-paket-plan.js"></script>
   <script src="js/shorts-paket.js"></script>
+  <script src="js/multicam.js"></script>
+  <script src="js/multicam-ui.js"></script>
   <script src="js/marka-kiti-ui.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>

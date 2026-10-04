@@ -89,6 +89,7 @@
     transitions: 'Kesim gecisleri (zoom, whip, itme ve daha fazlasi)',
     highlights: 'Viral anlar: uzun videodan Shorts/Reels klipleri',
     shortsPaket: 'Tek Tık Shorts Paketi: anlardan bitmiş Shorts ve paylaşım metinleri',
+    multicam:  'Podcast Modu: mikrofona göre otomatik kamera geçişi',
     zoom:      'Otomatik Zoom (konusmaya gore punch-in)',
     beat:      'Ritim / beat senkronu',
     batch:     'Toplu (coklu klip) transkripsiyon',

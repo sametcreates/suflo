@@ -306,6 +306,102 @@
     return { plan: birlesik, cuts: cuts, tracks: tracks };
   }
 
+
+  /*
+   * Katman düzeninden eşleme önerisi (Sekansı tara). Katman sırasıyla: klipli ses katmanları
+   * mikrofon, klipli (multicam olmayan) video katmanları kamera; konuşmacı sayısı 2–4.
+   * Konuşmacılardan fazla kamera katmanı varsa ve kameralar kadar uzunsa sıradaki geniş plan olur.
+   * Dönüş: { speakers: [{ name, mic, cam }], wide: video sırası ya da -1 }
+   */
+  var HARF = ["A", "B", "C", "D"];
+  function suggestMapping(layout, n) {
+    layout = layout || {};
+    var ses = (layout.audio || []).filter(function (t) { return t.clipCount > 0; });
+    var vid = (layout.video || []).filter(function (t) { return t.clipCount > 0 && !t.hasMulticam; });
+    if (!n) n = Math.max(2, Math.min(4, ses.length, Math.max(2, vid.length)));
+    n = Math.max(2, Math.min(4, n));
+    var sp = [];
+    for (var i = 0; i < n; i++) {
+      var a = ses[i], v = vid[i];
+      var ad = a && a.name && !/^(audio|ses|a)\s*\d+$/i.test(a.name) ? String(a.name).slice(0, 24) : HARF[i];
+      sp.push({ name: ad, mic: a ? a.index : -1, cam: v ? v.index : -1 });
+    }
+    // geniş plan yalnız kameralar kadar uzun bir katmansa önerilir (logo / yazı katmanı kesilmesin)
+    var ref = 0;
+    for (i = 0; i < n; i++) if (vid[i]) ref = Math.max(ref, vid[i].last - vid[i].first);
+    var aday = vid[n], w = aday && ref > 0 && (aday.last - aday.first) >= ref * 0.9 ? aday.index : -1;
+    return { speakers: sp, wide: w };
+  }
+
+  // Eşleme denetimi: hata kodları panelde metne çevrilir
+  function checkMapping(m) {
+    var sp = (m && m.speakers) || [];
+    if (sp.length < 2 || sp.length > 4) return { kod: "sayi" };
+    var mic = {}, i;
+    for (i = 0; i < sp.length; i++) {
+      if (!(sp[i].mic >= 0)) return { kod: "mik_yok", i: i };
+      if (!(sp[i].cam >= 0)) return { kod: "kam_yok", i: i };
+      if (mic[sp[i].mic]) return { kod: "mik_ayni", i: i };
+      mic[sp[i].mic] = 1;
+    }
+    if (m.wide >= 0) for (i = 0; i < sp.length; i++) if (sp[i].cam === m.wide) return { kod: "genis_ayni", i: i };
+    return null;
+  }
+
+  /*
+   * Ses dosyası → 8 kHz mono 16 bit ham PCM → dBFS serisi. dep: { run(cmd, args, opts) → Promise<{ code }>,
+   * fs, path }. o: { ff, input, tmpDir, ss, t, offset (sn, başa eklenen sessizlik), silInput, win }
+   * Geçici dosyalar (ham PCM ve silInput ise girdi) her durumda silinir.
+   */
+  var PCM_SR = 8000;
+  function pcmArgs(input, out, o) {
+    o = o || {};
+    var a = ["-hide_banner", "-nostdin", "-y"];
+    if (o.ss > 0) a.push("-ss", String(o.ss));
+    if (o.t > 0) a.push("-t", String(o.t));
+    a.push("-i", input, "-vn", "-ac", "1", "-ar", String(PCM_SR), "-f", "s16le", "-acodec", "pcm_s16le", out);
+    return a;
+  }
+  function bufferToInt16(buf) {
+    var n = Math.floor(buf.length / 2), out = new Int16Array(n);
+    for (var i = 0; i < n; i++) { var v = buf[2 * i] | (buf[2 * i + 1] << 8); out[i] = v >= 32768 ? v - 65536 : v; }
+    return out;
+  }
+  function energyFromFile(dep, o) {
+    o = o || {};
+    var win = num(o.win, 0.1);
+    var raw = dep.path.join(o.tmpDir, "suflo-podcast-" + Date.now() + "-" + Math.floor(Math.random() * 1e6) + ".pcm");
+    function temizle() {
+      try { if (dep.fs.existsSync(raw)) dep.fs.unlinkSync(raw); } catch (e1) {}
+      if (o.silInput) { try { if (dep.fs.existsSync(o.input)) dep.fs.unlinkSync(o.input); } catch (e2) {} }
+    }
+    var is;
+    try {
+      is = Promise.resolve(dep.run(o.ff, pcmArgs(o.input, raw, o), { timeout: num(o.timeout, 1800000) }));
+    } catch (e) { temizle(); return Promise.reject(e); }
+    return is.then(function (r) {
+      if (!r || r.code !== 0 || !dep.fs.existsSync(raw)) {
+        throw new Error("ffmpeg ses çözülemedi" + (r && r.stderr ? ": " + String(r.stderr).split(/\r?\n/).filter(Boolean).slice(-1)[0] : ""));
+      }
+      var seri = energyFromPcm(bufferToInt16(dep.fs.readFileSync(raw)), PCM_SR, win);
+      var bas = Math.round(num(o.offset, 0) / win);
+      if (bas > 0) { var on = []; for (var i = 0; i < bas; i++) on.push(FLOOR); seri = on.concat(seri); }
+      temizle();
+      return seri;
+    }).catch(function (e) { temizle(); throw e; });
+  }
+
+  // Mikrofon serilerini aynı uzunluğa getir (eksik uç sessizlik)
+  function padSeries(series, n) {
+    var m = n || 0;
+    (series || []).forEach(function (s) { m = Math.max(m, (s || []).length); });
+    return (series || []).map(function (s) {
+      s = (s || []).slice(0, m);
+      while (s.length < m) s.push(FLOOR);
+      return s;
+    });
+  }
+
   return {
     FLOOR: FLOOR, SILENCE: SILENCE, CROSSTALK: CROSSTALK, WIDE: WIDE, GATE_OFF: GATE_OFF,
     SESSIZ_P95: SESSIZ_P95, COK_GECIS: COK_GECIS,
@@ -320,6 +416,13 @@
     speakerFor: speakerFor,
     planStats: planStats,
     chunk: chunk,
-    hostPlan: hostPlan
+    hostPlan: hostPlan,
+    suggestMapping: suggestMapping,
+    checkMapping: checkMapping,
+    pcmArgs: pcmArgs,
+    bufferToInt16: bufferToInt16,
+    energyFromFile: energyFromFile,
+    padSeries: padSeries,
+    PCM_SR: PCM_SR
   };
 });
