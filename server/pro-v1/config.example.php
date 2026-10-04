@@ -10,5 +10,19 @@ return [
     'product_id' => 1302656,
     'variant_id' => 0,
     'content_root' => __DIR__ . '/content',
-    'manifest_path' => __DIR__ . '/manifest.json'
+    'manifest_path' => __DIR__ . '/manifest.json',
+
+    // ---- Davet et, kazan (uyuyan ozellik) ----
+    // Lemon Squeezy API anahtari TUM MAGAZAYA yetkilidir (indirim, iade). Yalniz bu private
+    // dosyada durur; GitHub'a, panele, ZIP'e asla girmez. Sizdigindan supheleniyorsan hemen
+    // Lemon Squeezy > Settings > API'den sil ve yenisini olustur.
+    'ls_api_key' => '',
+    // Anahtari ekleyip ?d=KOD ile bir test-modu satin alimini bitirmeden true yapma.
+    'referral_enabled' => false,
+    'referral_percent' => 15,          // davet indirimi (%)
+    'referral_max' => 50,              // bir kodun en cok kullanim sayisi
+    'referral_variant_ids' => [],      // indirimin gecerli oldugu varyantlar (TRY ve USD), bos = kapali
+    'referrals_path' => __DIR__ . '/referrals.json',
+    'attribution_path' => __DIR__ . '/attribution.jsonl',
+    'davet_dir' => __DIR__ . '/davet'  // davet/t1 ve davet/t3 odul paketleri + manifest.json
 ];

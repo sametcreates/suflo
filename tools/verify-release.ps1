@@ -14,6 +14,35 @@ if (-not $InstallerPath) { $InstallerPath = Join-Path $root ("dist\Suflo-{0}-Kur
 $onboardingMedia = '(^|/)assets/onboarding/[^/]+\.(mp4|wav|mp3)$'
 $ornekVar = Test-Path -LiteralPath (Join-Path $root "assets\onboarding\ornek.json") -PathType Leaf
 
+# Davet et, kazan: Lemon Squeezy API anahtari TUM MAGAZAYA yetkilidir ve yalniz sunucudaki private
+# config.php'de durur. Paketteki metin dosyalarinda gomulu bir Bearer tokeni, dolu bir ls_api_key
+# ya da (yerelde biliniyorsa) anahtarin kendisi bulunursa yayin durur. Panelin kullanicinin kendi
+# Groq anahtarini gonderdigi "Bearer " + degisken kodu serbesttir; yalniz sabit token aranir.
+$lsKeys = @()
+if ($env:SUFLO_LS_API_KEY) { $lsKeys += [string]$env:SUFLO_LS_API_KEY }
+foreach ($cfgPath in @((Join-Path $root "dist\pro-cdn\upload\private\pro-v1\config.php"), (Join-Path $root "server\pro-v1\config.php"))) {
+    if (Test-Path -LiteralPath $cfgPath -PathType Leaf) {
+        $m = [regex]::Match((Get-Content -Raw -LiteralPath $cfgPath), "'ls_api_key'\s*=>\s*'([^']+)'")
+        if ($m.Success) { $lsKeys += $m.Groups[1].Value }
+    }
+}
+$secretPatterns = @(
+    'Bearer\s+[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{10,}',
+    'Bearer\s+eyJ[A-Za-z0-9_\-]{10,}',
+    "ls_api_key'?\s*=>\s*'[^']+'"
+)
+function Test-Secrets($zip, [string]$kind) {
+    $hits = @()
+    foreach ($entry in $zip.Entries) {
+        if ($entry.FullName -notmatch '\.(js|jsx|html|htm|json|php|txt|md|xml|css|ps1|sh|bat|cmd)$') { continue }
+        $reader = New-Object System.IO.StreamReader($entry.Open())
+        try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        foreach ($pattern in $secretPatterns) { if ($text -match $pattern) { $hits += $entry.FullName; break } }
+        foreach ($key in $lsKeys) { if ($key -and $text.Contains($key)) { $hits += $entry.FullName; break } }
+    }
+    return @($hits | Select-Object -Unique)
+}
+
 foreach ($path in @($ZxpPath, $InstallerPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         Write-Host ("Eksik yayin dosyasi: {0}" -f $path) -ForegroundColor Red
@@ -64,8 +93,10 @@ function Test-Archive([string]$path, [string]$kind) {
         foreach ($pattern in $required) {
             if (-not ($names | Where-Object { $_ -match $pattern } | Select-Object -First 1)) { $missing += $pattern }
         }
-        if ($paid.Count -or $private.Count -or $badSeparators.Count -or $missing.Count) {
-            Write-Host ("{0} arsiv denetimi basarisiz: paid={1} private={2} separator={3} missing={4}" -f $kind,$paid.Count,$private.Count,$badSeparators.Count,$missing.Count) -ForegroundColor Red
+        $secrets = @(Test-Secrets $zip $kind)
+        if ($paid.Count -or $private.Count -or $badSeparators.Count -or $missing.Count -or $secrets.Count) {
+            Write-Host ("{0} arsiv denetimi basarisiz: paid={1} private={2} separator={3} missing={4} secret={5}" -f $kind,$paid.Count,$private.Count,$badSeparators.Count,$missing.Count,$secrets.Count) -ForegroundColor Red
+            if ($secrets.Count) { Write-Host ("Gizli anahtar izi: {0}" -f ($secrets -join ', ')) -ForegroundColor Red }
             exit 1
         }
         $item = Get-Item -LiteralPath $path
