@@ -274,6 +274,13 @@ ok("kullanıcı içeriği kapları index.html'de var", yok.length === 0, yok.joi
 var kapsama = require(path.join(__dirname, "..", "tools", "i18n-coverage.js")).rapor();
 ok("kapsama: index.html >= %98", kapsama.html.yuzde >= 98, kapsama.html.yuzde.toFixed(1) + "% · " + kapsama.html.eksik.map(function (x) { return x.text; }).slice(0, 3).join(" | "));
 ok("kapsama: js metinleri >= %95", kapsama.js.yuzde >= 95, kapsama.js.yuzde.toFixed(1) + "%");
+ok("kapsama: jsx/host.jsx KS_err metinleri >= %95", kapsama.host.toplam >= 50 && kapsama.host.yuzde >= 95,
+  kapsama.host.toplam + " metin · %" + kapsama.host.yuzde.toFixed(1) + " · " + kapsama.host.eksik.map(function (x) { return x.text; }).slice(0, 3).join(" | "));
+I.setDictionary(EN);
+ok("host hataları: birleşik ve cümleli biçimler", T("✕ Aktif sequence yok.") === "✕ No active sequence." &&
+  T("Ses disari alinamadi. 'Secili klip' kapsamini dene.") === "Couldn't export the audio. Try the 'Selected clip' scope." &&
+  T("Preset seçili klibe uygulanamadı. Eksik efekt: Lumetri Color.") === "Couldn't apply the preset to the selected clip. Missing effect: Lumetri Color.",
+  T("Preset seçili klibe uygulanamadı. Eksik efekt: Lumetri Color."));
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
