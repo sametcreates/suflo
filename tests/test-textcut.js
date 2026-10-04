@@ -125,6 +125,37 @@ chk("capCuts: uzak kesimler birlesmez, en kisalar birakilir (konusma yutulmaz)",
   cs2.ranges.filter(function (r) { return r.end - r.start > 0.4; }).length === 200, JSON.stringify([cs2.ranges.length, cs2.merged, cs2.dropped]));
 var az = T.capCuts([{ start: 1, end: 2 }], {});
 chk("capCuts: sinir altinda dokunmaz", az.ranges.length === 1 && az.merged === 0 && az.dropped === 0);
+// capCuts: kesimler arasindaki kisa tutulan kelimeler ("ıı ve ıı ve ...") birlesmeyle yutulmaz
+var kvW = [], kvR = [], kvT = 0;
+for (var kv = 0; kv < 400; kv++) {
+  kvW.push({ start: kvT, end: kvT + 0.3, text: "ıı" }); kvR.push(true); kvT += 0.3;
+  kvW.push({ start: kvT, end: kvT + 0.18, text: "ve" }); kvR.push(false); kvT += 0.18;
+}
+var kvCuts = T.buildCuts(kvW, kvR);
+var kvKeep = kvW.filter(function (x, i) { return !kvR[i]; });
+var kvC = T.capCuts(kvCuts, { max: 300, mergeGap: 0.25, keep: kvKeep });
+var yutulan = kvKeep.filter(function (x) {
+  var o = (x.start + x.end) / 2;
+  return kvC.ranges.some(function (r) { return o > r.start && o < r.end; });
+}).length;
+chk("capCuts keep: arada tutulan kisa kelime varsa kesimler birlesmez (konusma yutulmaz)", kvCuts.length === 400 && kvC.merged === 0 && kvC.ranges.length === 300 && yutulan === 0,
+  JSON.stringify([kvCuts.length, kvC.merged, kvC.ranges.length, yutulan]));
+var kvBos = T.capCuts(cok, { max: 300, mergeGap: 0.25, keep: [] });
+chk("capCuts keep: bosluklarda konusma yoksa yine birlesir", kvBos.merged > 0 && kvBos.ranges.length <= 300);
+
+// phraseRepeats: siradan cumleler yarim baslangic sayilmaz (normal konusma hizi 0.35 sn/kelime)
+function hizli(metin) { var t = 0; return metin.split(" ").map(function (x) { var o = w(t, t + 0.3, x); t += 0.35; return o; }); }
+[["Bu kitap çok güzel, bu kitabı herkese öneririm.", "tr"], ["Sabah kalktım ve sonra kahvaltı yaptım ve sonra işe gittim.", "tr"],
+  ["Önce soğanı doğruyoruz, önce soğanları kavuruyoruz.", "tr"], ["I think it works and I think you will like it.", "en"]].forEach(function (c) {
+  var k = T.classify(hizli(c[0]), { lang: c[1], phraseRepeats: true });
+  chk("phraseRepeats negatif: '" + c[0] + "'", k.indexOf("falsestart") === -1, JSON.stringify(k));
+});
+var cumleArasi = [w(0, .3, "Şimdi"), w(.4, .7, "size"), w(1.7, 2, "Şimdi"), w(2.1, 2.4, "size"), w(2.5, 2.9, "ışığı")];
+chk("phraseRepeats: 1 sn duraksamayla ayrilan tekrar cumle ici sayilmaz (retakes'in isi)", T.classify(cumleArasi, { lang: "tr", phraseRepeats: true }).indexOf("falsestart") === -1);
+var noktali = [w(0, .3, "Bu"), w(.35, .6, "video."), w(.7, 1, "Bu"), w(1.05, 1.4, "videoda")];
+chk("phraseRepeats: ilk kopya cumleyi bitirdiyse isaretlenmez", T.classify(noktali, { lang: "tr", phraseRepeats: true }).indexOf("falsestart") === -1);
+var enIc = T.classify(hizli("I think I think this is it"), { lang: "en", phraseRepeats: true });
+chk("phraseRepeats: bitisik 'I think I think' ilk kopya", enIc[0] === "falsestart" && enIc[1] === "falsestart" && enIc[2] === null, JSON.stringify(enIc));
 var inv = T.invertRanges([{ start: 0, end: 1 }, { start: 3, end: 4 }, { start: 3.5, end: 5 }, { start: 9, end: 12 }], 0, 10);
 chk("invertRanges: kenarlarda dogru", JSON.stringify(inv) === JSON.stringify([{ start: 1, end: 3 }, { start: 5, end: 9 }]), JSON.stringify(inv));
 chk("invertRanges: bos liste tum aralik", JSON.stringify(T.invertRanges([], 2, 5)) === JSON.stringify([{ start: 2, end: 5 }]));

@@ -27,7 +27,7 @@ ok("i18n: senaryo ve inceleme listesi kullanıcı içeriği", i18n.USER_CONTENT_
 
 var kk = oku("js/konusma-kes.js");
 var uygula = kk.slice(kk.indexOf("async function apply()"), kk.indexOf("// \"Dinle\""));
-ok("uygula: önce capCuts (300), sonra KS_applyCuts", uygula.indexOf("TC.capCuts(kesimler(), { max: 300, mergeGap: 0.25 })") !== -1 && uygula.indexOf("capCuts") < uygula.indexOf("KS_applyCuts"));
+ok("uygula: önce capCuts (300, tutulan kelimeler yutulmaz), sonra KS_applyCuts", uygula.indexOf("TC.capCuts(kesimler(), { max: 300, mergeGap: 0.25, keep: tutulan })") !== -1 && uygula.indexOf("capCuts") < uygula.indexOf("KS_applyCuts"));
 ok("uygula: '300+ kesim birleştirildi' uyarısı", /"300\+ kesim birleştirildi"/.test(uygula));
 ok("uygula: ripple + kopya sekans + '— Suflo Temiz' adı", /removeMode: "ripple", cloneFirst: target === "clone"/.test(uygula) && /" — Suflo Temiz"/.test(uygula));
 ok("Yalnız kesilecekleri dinle: only:true", /only: true/.test(kk) && /oynatici\.MAX_SN \+ " kesim dinletiliyor/.test(kk));
@@ -36,7 +36,7 @@ ok("AI: sıralı chatCall + bayat cevap koruması + hata uyarısı", /await KCap
 ok("AI: anahtar yoksa #tc-ai kapalı", /ai\.disabled = !hazir/.test(kk));
 ok("Yeniden yazıya dök önbelleği atlar", /cache: zorla \? false : undefined/.test(kk) && /analyze\(true\)/.test(kk));
 ok("çip tıklaması: elle[] grubu temizlenir ve yeniden sınıflanır", /function cekimSec\(g, sid\) \{\s*grupSecim\[grupAnahtari\(g\)\] = \{ keep: sid, on: true \};\s*grupElleTemizle\(g\);\s*yenidenSinifla\(\);/.test(kk));
-ok("inceleme işareti elle[]'ye yazar (tek doğruluk kaynağı)", /row\.words\.forEach\(function \(i\) \{ elle\[i\] = isaretli;/.test(kk));
+ok("inceleme işareti elle[]'ye yazar (tek doğruluk kaynağı)", /function elleYaz\(ws, deger\) \{\s*ws\.forEach\(function \(i\) \{ elle\[i\] = deger;/.test(kk) && /elleYaz\(row\.words, isaretli\)/.test(kk));
 ok("zaman bağlantısı KS_setPlayerPosition", /K\.call\("KS_setPlayerPosition", \{ sec: row\.start \}\)/.test(kk));
 ok("ek dolgular sınıflamaya gider", /extraFillers: K\.settings\(\)\.extraFillers/.test(kk));
 

@@ -23,7 +23,8 @@ window.KTextCut = (function () {
   var tk = null;       // RT.detect sonucu (gruplar)
   var elle = {};       // index -> true (kes) / false (koru): öneriyi ezer
   var grupSecim = {};  // "takes" anahtarı -> { keep, on }: kullanıcının grup kararları
-  var korunanDuraksama = {};   // inceleme listesinde işareti kaldırılan duraksama kesimleri
+  var korunanDuraksama = {};   // işareti kaldırılan duraksama kesimleri: anahtar -> { start, end }
+  var kaldirilan = [];         // incelemede işareti kaldırılan kelime parçaları: [{ words, reason, start, end }]
   var aiGruplari = null;       // doğrulanmış AI grupları (bu klip için)
   var aiSurum = 0, aiMesgul = 0;   // aiMesgul: süren AI geçişinin sürümü (0 = yok)
   var onbellektenMi = false;
@@ -108,6 +109,10 @@ window.KTextCut = (function () {
         if (sec.on != null) g.on = sec.on;
       });
       etiket = RT.labelWords(words, tk);
+      // Tekrar çekim grubuna giren cümlelerde karar yalnız grubun: cümle içi kuralın
+      // (classify phraseRepeats) "falsestart"ı işaretsiz bir orta güvenli grubu kesmesin
+      var wi = RT.wordIndex(tk);
+      Object.keys(wi).forEach(function (k) { if (oneri[k] === "falsestart") oneri[k] = null; });
       etiket.forEach(function (e, i) { if (e === "retake" || e === "falsestart") oneri[i] = e; });
     }
   }
@@ -117,16 +122,27 @@ window.KTextCut = (function () {
     return !!oneri[i];
   }
 
-  function kesimler() {
+  function duraksamaAnahtari(r) { return Number(r.start).toFixed(2); }
+
+  // hamMi: kullanıcının koruduğu duraksamalar da dahil (inceleme listesindeki işaretsiz satırlar için)
+  function kesimler(hamMi) {
     var removed = words.map(function (w, i) { return kesilsinMi(i); });
     var pause = el("tc-pause").value;
-    return TC.buildCuts(words, removed, {
+    var r = TC.buildCuts(words, removed, {
       maxPause: pause === "" ? null : Number(pause),
       clipStart: clip ? clip.clipStart : undefined,
       clipEnd: clip ? clip.clipEnd : undefined
-    }).filter(function (r) {
-      return !(r.reason === "pause" && korunanDuraksama[r.start.toFixed(2)]);
     });
+    if (hamMi) return r;
+    return r.filter(function (x) {
+      return !(x.reason === "pause" && korunanDuraksama.hasOwnProperty(duraksamaAnahtari(x)));
+    });
+  }
+
+  function duraksamaDegistir(r, koru) {
+    var k = duraksamaAnahtari(r);
+    if (koru) korunanDuraksama[k] = { start: r.start, end: r.end };
+    else delete korunanDuraksama[k];
   }
 
   function grupBul(gid) {
@@ -202,6 +218,8 @@ window.KTextCut = (function () {
     var pause = el("tc-pause").value;
     var maxPause = pause === "" ? null : Number(pause);
     var frag = document.createDocumentFragment();
+    var duraksamaKesimleri = {};
+    kesimler(true).forEach(function (r) { if (r.reason === "pause") duraksamaKesimleri[duraksamaAnahtari(r)] = r; });
     var ilkCekim = {};
     if (tk) tk.groups.forEach(function (g) { ilkCekim[tk.sents[g.takes[0]].a] = g; });
     words.forEach(function (w, i) {
@@ -210,8 +228,17 @@ window.KTextCut = (function () {
       if (maxPause && i > 0 && w.start - words[i - 1].end > maxPause) {
         var p = document.createElement("span");
         p.className = "tc-pause";
+        p.setAttribute("data-i18n-ui", "");
         p.textContent = "⏸ " + (w.start - words[i - 1].end).toFixed(1) + " sn";
-        p.title = "Uzun duraksama — " + maxPause + " sn'ye kısaltılacak";
+        var pk = duraksamaKesimleri[(Number(words[i - 1].end) + maxPause / 2).toFixed(2)];
+        if (pk) {
+          var korunan = korunanDuraksama.hasOwnProperty(duraksamaAnahtari(pk));
+          p.className += korunan ? " kept" : "";
+          p.title = korunan ? "Uzun duraksama — olduğu gibi kalacak. Tıkla: kısalt" : "Uzun duraksama — " + maxPause + " sn'ye kısaltılacak. Tıkla: olduğu gibi kalsın";
+          (function (r0, k0) { p.onclick = function () { duraksamaDegistir(r0, !k0); render(); }; })(pk, korunan);
+        } else {
+          p.title = "Uzun duraksama — " + maxPause + " sn'ye kısaltılacak";
+        }
         frag.appendChild(p);
       }
       var s = document.createElement("span");
@@ -239,7 +266,8 @@ window.KTextCut = (function () {
 
   /*
    * Tek inceleme listesi: kesilecek her parça bir satır (işaretli) + işaretlenmemiş
-   * adaylar (orta güvenli gruplar, senaryo dışı cümleler). İşaret elle[]'ye yazar.
+   * adaylar (orta güvenli gruplar, senaryo dışı cümleler) + kullanıcının işaretini
+   * kaldırdığı parçalar (işaretsiz kalır, yeniden işaretlenebilir). İşaret elle[]'ye yazar.
    */
   function inceleme() {
     var box = el("tc-review");
@@ -249,6 +277,18 @@ window.KTextCut = (function () {
     var cut = words.map(function (w, i) { return kesilsinMi(i); });
     var satirlar = RT ? RT.reviewRows({ words: words, cut: cut, labels: oneri, elle: elle, cuts: r, res: tk }) :
       r.map(function (x) { return { type: "range", start: x.start, end: x.end, reason: x.reason === "pause" ? "duraksama" : "dolgu", checked: true, words: [] }; });
+    // işareti kaldırılan kelime parçaları: kelimeler hâlâ kalıyorsa işaretsiz satır
+    kaldirilan = kaldirilan.filter(function (e) { return e.words.every(function (i) { return !cut[i]; }); });
+    kaldirilan.forEach(function (e) {
+      satirlar.push({ type: "kaldirilan", start: e.start, end: e.end, reason: e.reason, checked: false, words: e.words });
+    });
+    // korunan duraksamalar: kesim hâlâ önerilse işaretsiz satır
+    kesimler(true).forEach(function (x) {
+      if (x.reason === "pause" && korunanDuraksama.hasOwnProperty(duraksamaAnahtari(x))) {
+        satirlar.push({ type: "duraksama", start: x.start, end: x.end, reason: "duraksama", checked: false, words: [] });
+      }
+    });
+    satirlar.sort(function (a, b) { return a.start - b.start; });
     el("tc-review-head").hidden = !satirlar.length;
     var frag = document.createDocumentFragment();
     var cs = clip ? clip.clipStart : 0;
@@ -258,6 +298,7 @@ window.KTextCut = (function () {
       var cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = row.checked;
+      cb.setAttribute("data-i18n-ui", "");   // inceleme listesi kullanıcı içeriği: ipucu yine çevrilsin
       cb.title = row.checked ? "İşareti kaldır: bu parça kalsın" : "İşaretle: bu parça kesilsin";
       cb.onchange = function () { satirDegisti(row, cb.checked); };
       var neden = document.createElement("span");
@@ -272,9 +313,12 @@ window.KTextCut = (function () {
       zaman.onclick = function () { K.call("KS_setPlayerPosition", { sec: row.start }); };
       var metin = document.createElement("span");
       metin.className = "tc-rv-text";
-      metin.textContent = row.words.length
-        ? row.words.slice(0, 14).map(function (i) { return words[i].text; }).join(" ") + (row.words.length > 14 ? " …" : "")
-        : "⏸ " + (row.end - row.start).toFixed(1) + " sn";
+      if (row.words.length) {
+        metin.textContent = row.words.slice(0, 14).map(function (i) { return words[i].text; }).join(" ") + (row.words.length > 14 ? " …" : "");
+      } else {
+        metin.setAttribute("data-i18n-ui", "");
+        metin.textContent = "⏸ " + (row.end - row.start).toFixed(1) + " sn";
+      }
       d.appendChild(cb);
       d.appendChild(neden);
       d.appendChild(zaman);
@@ -290,24 +334,55 @@ window.KTextCut = (function () {
     box.appendChild(frag);
   }
 
+  function elleYaz(ws, deger) {
+    ws.forEach(function (i) { elle[i] = deger; if (elle[i] === !!oneri[i]) delete elle[i]; });
+  }
+
+  // Satırın tüm kelimeleri AÇIK tek bir tekrar çekim grubunun atılan çekimlerinde mi? (grup döner)
+  function atilanCekimGrubu(ws) {
+    if (!tk || !ws.length) return null;
+    var wi = RT.wordIndex(tk), gid = null;
+    for (var n = 0; n < ws.length; n++) {
+      var m = wi[ws[n]];
+      if (!m || m.rol === "keep" || (gid !== null && m.group !== gid)) return null;
+      gid = m.group;
+    }
+    var g = grupBul(gid);
+    return g && g.on ? g : null;
+  }
+
+  function grupAcKapa(g, acik) {
+    var sec = grupSecim[grupAnahtari(g)] || {};
+    sec.on = acik;
+    if (sec.keep == null) sec.keep = g.keep;
+    grupSecim[grupAnahtari(g)] = sec;
+    grupElleTemizle(g);
+    yenidenSinifla();
+  }
+
   function satirDegisti(row, isaretli) {
     if (row.type === "group") {
       var g = grupBul(row.gid);
       if (!g) return;
-      var sec = grupSecim[grupAnahtari(g)] || {};
-      sec.on = isaretli;
-      if (sec.keep == null) sec.keep = g.keep;
-      grupSecim[grupAnahtari(g)] = sec;
-      grupElleTemizle(g);
-      yenidenSinifla();
+      grupAcKapa(g, isaretli);
     } else if (row.type === "offscript") {
-      row.words.forEach(function (i) { elle[i] = isaretli; if (elle[i] === !!oneri[i]) delete elle[i]; });
+      elleYaz(row.words, isaretli);
+    } else if (row.type === "kaldirilan") {
+      if (isaretli) {
+        elleYaz(row.words, true);
+        kaldirilan = kaldirilan.filter(function (e) { return e.words.join(",") !== row.words.join(","); });
+      }
     } else if (row.words.length) {
-      row.words.forEach(function (i) { elle[i] = isaretli; if (elle[i] === !!oneri[i]) delete elle[i]; });
+      // tekrar çekim satırı: karar grubun (özet ve çipler de "kalıyor" desin), grup satırı işaretsiz kalır
+      var tg = isaretli ? null : atilanCekimGrubu(row.words);
+      if (tg) grupAcKapa(tg, false);
+      else {
+        elleYaz(row.words, isaretli);
+        if (!isaretli) kaldirilan.push({ words: row.words.slice(), reason: row.reason, start: row.start, end: row.end });
+      }
     } else {
-      // yalnız duraksama
-      if (isaretli) delete korunanDuraksama[row.start.toFixed(2)];
-      else korunanDuraksama[row.start.toFixed(2)] = true;
+      // yalnız duraksama (işaretsiz satır da yeniden işaretlenebilir)
+      duraksamaDegistir(row, !isaretli);
     }
     render();
   }
@@ -324,13 +399,19 @@ window.KTextCut = (function () {
     el("tc-dinle-cuts").disabled = r.length === 0;
   }
 
-  function klipAnahtari(c) {
-    return c ? [c.mediaPath, Number(c.clipStart).toFixed(3), Number(c.clipEnd).toFixed(3), Number(c.inPoint || 0).toFixed(3)].join("|") : "";
+  // Bellek içi önbellek anahtarı: klip + istenen dil (#cap-lang) + motor kimliği (disk önbelleği gibi)
+  function klipAnahtari(c, dil, motor) {
+    return c ? [c.mediaPath, Number(c.clipStart).toFixed(3), Number(c.clipEnd).toFixed(3), Number(c.inPoint || 0).toFixed(3),
+      dil || "auto", motor || ""].join("|") : "";
+  }
+
+  function motorKimligi() {
+    try { return KCaptions.motorKimligi ? String(KCaptions.motorKimligi() || "") : ""; } catch (e) { return ""; }
   }
 
   function sifirla() {
     words = []; oneri = []; etiket = []; tk = null; elle = {}; clip = null; sekans = "";
-    grupSecim = {}; korunanDuraksama = {}; aiGruplari = null; aiSurum++; aiMesgul = 0;
+    grupSecim = {}; korunanDuraksama = {}; kaldirilan = []; aiGruplari = null; aiSurum++; aiMesgul = 0;
   }
 
   // zorla: "Yeniden yazıya dök" — disk ve bellek önbelleğini atla
@@ -348,20 +429,25 @@ window.KTextCut = (function () {
     try {
       var arayuz = window.SufloI18n ? SufloI18n.getLang() : "tr";
       var dilSecimi = TC.promptLang(el("cap-lang") && el("cap-lang").value, "", arayuz);
-      // bellek içi önbellek: aynı klip (politika/senaryo değişikliği yeniden yazıya dökmez)
-      var secili = KApp.ctx().sel;
-      var anahtar = secili ? klipAnahtari(secili) : "";
+      // bellek içi önbellek: aynı klip (politika/senaryo değişikliği yeniden yazıya dökmez).
+      // Seçim Premiere'e TAZE sorulur: 2.5 sn'lik bağlam yoklaması eski klibi gösterebilir
+      var istenenDil = (el("cap-lang") && el("cap-lang").value) || "auto";
+      var sc = await K.call("KS_getSelectedClips");
+      var secili = sc && sc.ok && sc.clips && sc.clips.length ? sc.clips[0] : null;
+      var anahtar = secili ? klipAnahtari(secili, istenenDil, motorKimligi()) : "";
       var sonuc = null;
       if (!zorla && anahtar) {
         for (var b = 0; b < bellek.length; b++) if (bellek[b].anahtar === anahtar) { sonuc = bellek[b].sonuc; sonuc.fromCache = true; break; }
       }
       if (!sonuc) {
-        sonuc = await KCaptions.transcribeWords({
+        var istek = {
           prompt: TC.fillerPrompt(dilSecimi),
           cache: zorla ? false : undefined,
           onStatus: function (m, c) { status(m, c); }
-        });
-        var a2 = klipAnahtari(sonuc.clip);
+        };
+        if (secili) istek.clip = secili;
+        sonuc = await KCaptions.transcribeWords(istek);
+        var a2 = klipAnahtari(sonuc.clip, istenenDil, sonuc.motor || motorKimligi());
         bellek = bellek.filter(function (x) { return x.anahtar !== a2; });
         bellek.push({ anahtar: a2, sonuc: sonuc });
         if (bellek.length > 6) bellek.shift();
@@ -435,7 +521,9 @@ window.KTextCut = (function () {
   async function apply() {
     if (typeof Pro !== "undefined" && !Pro.gate("textcut", { deneme: true, yeniden: apply })) return;
     // Premiere yüzlerce kesimde yavaşlar: en fazla 300 (yakın kesimler birleşir, en kısalar kalır)
-    var sinirli = TC.capCuts(kesimler(), { max: 300, mergeGap: 0.25 });
+    // birleşme yalnız arasında tutulan kelime olmayan boşluklarda (konuşma yutulmaz)
+    var tutulan = words.filter(function (w, i) { return !kesilsinMi(i); });
+    var sinirli = TC.capCuts(kesimler(), { max: 300, mergeGap: 0.25, keep: tutulan });
     var r = sinirli.ranges.map(function (x) { return { start: x.start, end: x.end }; });
     if (!r.length) return;
     if (sinirli.merged || sinirli.dropped) {
@@ -454,7 +542,11 @@ window.KTextCut = (function () {
     try {
       var arg = { ranges: r, removeMode: "ripple", cloneFirst: target === "clone" };
       // kopya sekansın adı: "<sekans> — Suflo Temiz"; dokunulmamış özgün sekans yedektir
-      if (target === "clone" && tazeCtx.ok && tazeCtx.sequence) arg.cloneName = String(tazeCtx.sequence) + " — Suflo Temiz";
+      // (ad Premiere'e veri olarak gider, çevirmen görmez: arayüz diliyle burada kurulur)
+      if (target === "clone" && tazeCtx.ok && tazeCtx.sequence) {
+        var ek = window.SufloI18n && SufloI18n.getLang && SufloI18n.getLang() === "en" ? " — Suflo Clean" : " — Suflo Temiz";
+        arg.cloneName = String(tazeCtx.sequence) + ek;
+      }
       var res = await K.call("KS_applyCuts", arg, 900000);
       if (res.ok) {
         if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("textcut", KApp.toast);   // deneme: yalniz basarida
@@ -539,7 +631,7 @@ window.KTextCut = (function () {
     el("tc-retranscribe").addEventListener("click", function () { analyze(true); });
     el("tc-apply").addEventListener("click", apply);
     el("tc-reset").addEventListener("click", function () {
-      elle = {}; grupSecim = {}; korunanDuraksama = {};
+      elle = {}; grupSecim = {}; korunanDuraksama = {}; kaldirilan = [];
       if (words.length) yenidenSinifla();
       render();
     });

@@ -421,6 +421,7 @@ function sahte(opts) {
       pollNow: function () { say.poll++; }, refreshContext: function () { say.poll++; }, installLocalWhisper: function () { return Promise.resolve(null); }
     },
     Pro: { isPro: function () { return !!opts.pro; }, on: function () {},
+      denemeKalan: function (f) { return opts.pro ? 0 : ((opts.deneme && opts.deneme[f]) || 0); },
       // kurulu: "Ücretsiz dene"ye basılmış (deneme kabul eden kapı geçer)
       gate: function (f, o) { if (!(o && o.silent)) { say.gate.push(f); say.gateOpts.push(o || null); } return !!opts.pro || !!(opts.kurulu && o && o.deneme === true); } },
     document: belge
@@ -446,6 +447,10 @@ function cipGorunur(t, id) {
 ok("ücretsiz kullanıcı: ücretsiz AI düğmelerinin yanına 'anahtar gerekli · 1 dk' çipi", ["cap-proofread", "cap-ch-ai", "cap-yt-go", "kanca-ai"].every(function (id) { return cipGorunur(t1, id); }));
 ok("ücretsiz kullanıcı: Pro'ya bağlı Çeviri/Viral/B-roll yanında anahtar çipi YOK (anahtar onları açmaz)",
   ["cap-translate-go", "cap-vr-bul", "cap-br-bul"].every(function (id) { return !cipGorunur(t1, id); }));
+ok("ücretsiz, deneme hakkı bitmiş: 'AI tekrar gruplama' yanında anahtar çipi YOK", !cipGorunur(t1, "tc-ai-lbl"));
+var tDeneme = sahte({ ayarVardi: false, deneme: { textcut: 3 } });
+tDeneme.OB.init();
+ok("ücretsiz ama Konuşmadan kes deneme hakkı var: 'AI tekrar gruplama' yanında anahtar çipi", cipGorunur(tDeneme, "tc-ai-lbl") && !cipGorunur(tDeneme, "cap-vr-bul"));
 var tPro = sahte({ ayarVardi: false, pro: true });
 tPro.OB.init();
 ok("Pro kullanıcı: yedi AI düğmesinin hepsinde anahtar çipi", ["cap-proofread", "cap-translate-go", "cap-ch-ai", "cap-yt-go", "cap-vr-bul", "cap-br-bul", "kanca-ai"].every(function (id) { return cipGorunur(tPro, id); }));

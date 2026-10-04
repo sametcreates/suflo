@@ -67,6 +67,7 @@ function ortam(o) {
   var say = { call: [], toast: [], chat: 0, tw: [] };
   var clip = { mediaPath: "/v/a.mp4", inPoint: 0, dur: 40, clipStart: 10, clipEnd: 50, name: "a" };
   var ctx = { sel: clip, sequence: "Vlog", sequenceId: "S1" };
+  var secim = { clip: clip };   // Premiere'in TAZE seçimi (ctx.sel 2.5 sn'lik yoklama, bayat olabilir)
   var cevaplar = o.chat || [];
   var sandbox = {
     window: {}, console: console, setTimeout: setTimeout, clearTimeout: clearTimeout, Promise: Promise, JSON: JSON, Math: Math,
@@ -81,11 +82,16 @@ function ortam(o) {
       settings: function () { return { extraFillers: o.extraFillers || "" }; },
       log: function () {},
       hataYardimi: function (e) { return e && e.message ? e.message : String(e); },
-      call: function (fn, arg) { say.call.push([fn, arg]); return Promise.resolve(fn === "KS_getContext" ? { ok: true, sequence: "Vlog", sequenceId: "S1" } : { ok: true, newSeq: arg && arg.cloneName, removed: 1 }); }
+      call: function (fn, arg) {
+        say.call.push([fn, arg]);
+        if (fn === "KS_getSelectedClips") return Promise.resolve({ ok: true, clips: [secim.clip] });
+        return Promise.resolve(fn === "KS_getContext" ? { ok: true, sequence: "Vlog", sequenceId: "S1" } : { ok: true, newSeq: arg && arg.cloneName, removed: 1 });
+      }
     },
     KApp: { ctx: function () { return ctx; }, toast: function (m, c) { say.toast.push([m, c]); }, onContext: function () {} },
     KCaptions: {
-      transcribeWords: function (op) { say.tw.push(op); return Promise.resolve({ clip: clip, lang: "tr", words: kelimeler(10), fromCache: !!o.fromCache }); },
+      transcribeWords: function (op) { say.tw.push(op); var c = op.clip || clip; return Promise.resolve({ clip: c, lang: "tr", words: kelimeler(c.clipStart), fromCache: !!o.fromCache, motor: "yerel:small" }); },
+      motorKimligi: function () { return "yerel:small"; },
       chatConfig: function () { return o.anahtar ? { model: "m" } : null; },
       chatCall: function () {
         say.chat++;
@@ -101,8 +107,9 @@ function ortam(o) {
   sandbox.window.SufloRetakes = require(path.join(KOK, "js", "retakes.js"));
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(KOK, "js", "konusma-kes.js"), "utf8"), sandbox);
+  if (o.dil) sandbox.window.SufloI18n = sandbox.SufloI18n = { getLang: function () { return o.dil; } };
   sandbox.window.KTextCut.init();
-  return { el: ogeler, say: say, ctx: ctx, sb: sandbox };
+  return { el: ogeler, say: say, ctx: ctx, sb: sandbox, secim: secim, clip: clip };
 }
 
 (async function () {
@@ -125,6 +132,38 @@ function ortam(o) {
   ok("inceleme: işaretli tekrar çekim + işaretsiz yarım başlangıç adayı", rv.some(function (r) { return r.children[1].textContent === "tekrar çekim" && r.children[0].checked; }) &&
     rv.some(function (r) { return r.children[1].textContent === "yarım başlangıç" && !r.children[0].checked; }), rv.map(function (r) { return r.children[1].textContent + (r.children[0].checked ? "+" : "-"); }).join(" "));
 
+  // bulut tarzı (1 sn duraksamalı) 'Şimdi size ⏸ Şimdi size ışığı…': orta güven grubu işaretsiz; cümle içi kural kesmez
+  var simdi = E.el["tc-words"].children.filter(function (c) { return c.tagName === "SPAN" && c.textContent === "Şimdi"; });
+  ok("orta güvenli yarım başlangıç kelimeleri kesilmez (cümle içi kural grubu ezmez)", simdi.length === 2 && simdi.every(function (c) { return !/falsestart|retake|cut/.test(c.className); }), simdi.map(function (c) { return c.className; }).join(" | "));
+  ok("inceleme: işaretli 'yarım başlangıç' satırı yok", !rv.some(function (r) { return r.children[1].textContent === "yarım başlangıç" && r.children[0].checked; }));
+  ok("inceleme işaret ipucu çevrilebilir (data-i18n-ui)", rv.every(function (r) { return r.children[0].getAttribute("data-i18n-ui") === ""; }));
+
+  // duraksama satırı: işaret kaldırılınca satır kalır (işaretsiz), yeniden işaretlenebilir
+  function rvBul(neden, isaretli) { return E.el["tc-review"].children.filter(function (r) { return r.children[1].textContent === neden && r.children[0].checked === isaretli; }); }
+  var dur0 = rvBul("duraksama", true).length;
+  var dur = rvBul("duraksama", true)[0];
+  ok("duraksama satırı metni çevrilebilir ada (data-i18n-ui)", dur && dur.children[dur.children.length - 1].getAttribute("data-i18n-ui") === "" && /^⏸ /.test(dur.children[dur.children.length - 1].textContent));
+  dur.children[0].checked = false; dur.children[0].onchange();
+  ok("duraksama işareti kaldırılınca satır işaretsiz kalır", rvBul("duraksama", true).length === dur0 - 1 && rvBul("duraksama", false).length === 1);
+  var pauseSpan = sinifli(E.el["tc-words"], "tc-pause").filter(function (c) { return / kept/.test(c.className); });
+  ok("kelime görünümündeki ⏸ korunan duraksamayı gösterir ve tıklanabilir", pauseSpan.length === 1 && typeof pauseSpan[0].onclick === "function" && /olduğu gibi kalacak/.test(pauseSpan[0].title), pauseSpan.length);
+  pauseSpan[0].onclick();
+  ok("⏸ tıklanınca duraksama yeniden kısaltılır", rvBul("duraksama", true).length === dur0 && rvBul("duraksama", false).length === 0);
+  var dur2 = rvBul("duraksama", true)[0];
+  dur2.children[0].checked = false; dur2.children[0].onchange();
+  var durOff = rvBul("duraksama", false)[0];
+  durOff.children[0].checked = true; durOff.children[0].onchange();
+  ok("işaretsiz duraksama satırı yeniden işaretlenebilir", rvBul("duraksama", true).length === dur0 && rvBul("duraksama", false).length === 0);
+
+  // dolgu satırı: işaret kaldırılınca satır kalır, yeniden işaretlenince kelime yine kesilir
+  var dolgu = rvBul("dolgu", true)[0];
+  dolgu.children[0].checked = false; dolgu.children[0].onchange();
+  var iii = function () { return E.el["tc-words"].children.filter(function (c) { return c.tagName === "SPAN" && c.textContent === "ııı"; })[0]; };
+  ok("dolgu işareti kaldırılınca satır işaretsiz kalır, kelime kalır", rvBul("dolgu", false).length === 1 && / kept/.test(iii().className));
+  var dolguOff = rvBul("dolgu", false)[0];
+  dolguOff.children[0].checked = true; dolguOff.children[0].onchange();
+  ok("işaretsiz dolgu satırı yeniden işaretlenince kesilir", rvBul("dolgu", true).length === 1 && rvBul("dolgu", false).length === 0 && / filler/.test(iii().className));
+
   // çip: ilk çekimi tut
   sinifli(tekrarSatiri, "tc-chip")[0].onclick();
   var tekrar2 = sinifli(E.el["tc-words"], "tc-take-row").filter(function (r) { return r.children[0].textContent === "Tekrar ×2"; })[0];
@@ -145,8 +184,10 @@ function ortam(o) {
   // inceleme: tekrar çekim satırının işaretini kaldır → elle korunur
   var tk = E.el["tc-review"].children.filter(function (r) { return r.children[1].textContent === "tekrar çekim"; })[0];
   tk.children[0].checked = false; tk.children[0].onchange();
-  ok("işaret kaldırılınca o parça kalır (kelime görünümü de)", !E.el["tc-review"].children.some(function (r) { return r.children[1].textContent === "tekrar çekim"; }) &&
+  ok("tekrar çekim işareti kaldırılınca grup kapanır: satır işaretsiz kalır, kelimeler kalır", !E.el["tc-review"].children.some(function (r) { return r.children[1].textContent === "tekrar çekim" && r.children[0].checked; }) &&
+    E.el["tc-review"].children.some(function (r) { return r.children[1].textContent === "tekrar çekim" && !r.children[0].checked; }) &&
     sinifli(E.el["tc-words"], "retake").length === 0);
+  ok("tekrar çekim işareti kaldırılınca özet 'tekrar çekim' saymaz (yalnız yarım başlangıç)", / · 1 tekrar çekim$/.test(E.el["tc-summary"].textContent), E.el["tc-summary"].textContent);
   await tetikle(E.el["tc-reset"], "click");
   ok("Önerilere dön: grup kararları ve elle sıfırlanır", sinifli(E.el["tc-words"], "retake").length === 6 && / · 1 tekrar çekim$/.test(E.el["tc-summary"].textContent));
 
@@ -169,6 +210,25 @@ function ortam(o) {
   ok("aynı klip ikinci kez: bellekten, 'önbellekten' satırı görünür", E.say.tw.length === 2 && E.el["tc-cache"].hidden === false, E.say.tw.length);
   await tetikle(E.el["tc-retranscribe"], "click"); await bekle();
   ok("Yeniden yazıya dök: cache:false", E.say.tw.length === 3 && E.say.tw[2].cache === false);
+  ok("transcribeWords'e taze seçilen klip verilir", E.say.tw[2].clip === E.clip);
+  // bayat bağlam: ctx.sel hâlâ eski klip, Premiere'de B seçili → bellek ıskalar, B yazıya dökülür
+  var klipB = { mediaPath: "/v/b.mp4", inPoint: 0, dur: 40, clipStart: 60, clipEnd: 100, name: "b" };
+  E.secim.clip = klipB;
+  await tetikle(E.el["tc-analyze"], "click"); await bekle();
+  ok("bayat ctx.sel: taze seçim (B) yazıya dökülür, A'nın transkripti gelmez", E.say.tw.length === 4 && E.say.tw[3].clip === klipB && E.el["tc-cache"].hidden === true, E.say.tw.length);
+  E.secim.clip = E.clip;
+  E.el["cap-lang"].value = "en";
+  await tetikle(E.el["tc-analyze"], "click"); await bekle();
+  ok("dil değişince bellek ıskalar (anahtar dil içerir)", E.say.tw.length === 5, E.say.tw.length);
+  await tetikle(E.el["tc-analyze"], "click"); await bekle();
+  ok("aynı dil + klip: bellekten", E.say.tw.length === 5 && E.el["tc-cache"].hidden === false, E.say.tw.length);
+
+  // İngilizce arayüz: kopya sekans adı İngilizce
+  var EN = ortam({ dil: "en" });
+  await tetikle(EN.el["tc-analyze"], "click"); await bekle();
+  await tetikle(EN.el["tc-apply"], "click"); await bekle();
+  var acEn = EN.say.call.filter(function (c) { return c[0] === "KS_applyCuts"; })[0];
+  ok("EN arayüz: '<sekans> — Suflo Clean'", acEn && acEn[1].cloneName === "Vlog — Suflo Clean", JSON.stringify(acEn && acEn[1].cloneName));
 
   /* ---- AI geçişi ---- */
   var A = ortam({ anahtar: true, chat: ['```json\n{"groups":[{"ids":[0,5],"keep":5},{"ids":[1,2],"keep":1}]}\n```'] });

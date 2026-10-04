@@ -667,7 +667,8 @@ aynı para birimindedir; senin bir şey yapmana gerek yok, satış bugün de ça
 Konuşmadan kes kartı artık baştan alınan cümleleri de bulur. Kod tamam ve testli; **senden gerçek
 dünya girdisi istemiyor** (anahtar, hesap, kayıt yok). AI gruplaması kullanıcının mevcut Groq
 anahtarıyla çalışır, anahtar yoksa düğme kapalı durur ve yanında "anahtar gerekli · 1 dk" çipi
-çıkar (yalnız Pro'da; ücretsiz kullanıcıda Pro rozeti konuşur). Önbellek
+çıkar (Pro'da ve Konuşmadan kes deneme hakkı kalan ücretsiz kullanıcıda; hakkı bitmiş
+ücretsiz kullanıcı kartı zaten Pro kapısında görür). Önbellek
 `%APPDATA%\Kesit\transcripts` (Mac: `~/Library/Application Support/Kesit/transcripts`) altında
 en çok 50 transkript / 100 MB tutar. Yapman gerekenler yalnız Premiere'de elle deneme ve tanıtım:
 

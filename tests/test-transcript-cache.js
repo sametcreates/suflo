@@ -114,6 +114,9 @@ var cap = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8
 var tw = cap.slice(cap.indexOf("async function transcribeWords"), cap.indexOf("function applyGlossary"));
 chk("transcribeWords: önbellek busy denetiminden önce", tw.indexOf("transcriptCache().get(") !== -1 && tw.indexOf("transcriptCache().get(") < tw.indexOf("if (busy) throw"));
 chk("transcribeWords: opts.cache === false önbelleği atlar", /opts\.cache !== false/.test(tw));
+chk("transcribeWords: anahtar sonucu GERÇEKTEN yazan rotayla (yerel düşüp bulut yazdıysa bulut)", /transcribeSuflo\(audio, clip\.dur, true, temp, rota\)/.test(tw) &&
+  /motorOnce\.engine = rota\.motor/.test(tw) && /secenek\.motor = yerelKimlik\(\)/.test(cap) && /secenek\.motor = bulutKimlik\(\)/.test(cap));
+chk("altyazı yazımı da gerçek rotayla anahtarlanır", /onbMeta\.engine = rotaSecenek\.motor/.test(cap));
 chk("transcribeWords: ıskada 'dolgu' olarak yazar, 'dolgu' önce aranır", /onbellekMeta\(clip, istenenDil, "dolgu"\)/.test(tw) && /prompts: \["dolgu", "altyazi"\]/.test(tw));
 chk("go(): yalnız tek klip + karaoke iken 'altyazi' yazar", /scope === "clip" && karaoke && clip\) \? onbellekMeta\(clip, .*"altyazi"\)/.test(cap));
 chk("rawSegments transkript kaynağı olarak kullanılmaz", !/rawSegments/.test(fs.readFileSync(path.join(__dirname, "..", "js", "konusma-kes.js"), "utf8")));

@@ -139,47 +139,64 @@
   }
 
   /*
-   * Cumle ici yeniden baslama: 2-4 belirteclik bir dizi, 8 belirtec icinde ve
-   * <=1.5 sn sonra yeniden baslarsa ("bu ürünü ııı bu ürünü kesinlikle",
-   * "bu video bu videoda") ILK kopya "falsestart" olur. Dolgular atlanir;
-   * ikileme ("yavaş yavaş") ve tek sozcuk tekrari ("ben ben", repeat kurali) bu
-   * kuralin isi degil. Doner: isaretlenecek kelime indeksleri.
+   * Cumle ici yeniden baslama: 2-4 belirteclik bir dizi HEMEN ardindan (arada
+   * yalniz dolgu olabilir) yeniden baslarsa ("bu ürünü ııı bu ürünü kesinlikle",
+   * "bu video bu videoda") ILK kopya "falsestart" olur. Siki kurallar (siradan
+   * cumleler kesilmesin: "Bu kitap çok güzel, bu kitabı ..." isaretlenmez):
+   *   - kopyalar bitisik: arada dolgu disinda sozcuk yok (8 belirtec penceresi yok)
+   *   - son belirtec disindakiler birebir ayni; yalniz son belirtec kok esitligi
+   *     ("video/videoda") ile eslesebilir
+   *   - ilk kopya cumle sonu noktalamasiyla bitmez, kopyalar arasinda >=0.6 sn
+   *     duraksama yoktur (cumleler arasi tekrar, retakes.js'nin isi), toplam <=1.5 sn
+   * Ikileme ("yavaş yavaş") ve tek sozcuk tekrari ("ben ben", repeat kurali) bu
+   * kuralin isi degil. Doner: isaretlenecek kelime indeksleri (yalniz ilk kopya).
    */
+  var RESTART_DURAKSAMA = 0.6;
   function findRestarts(words, lang) {
     var toks = [];
+    var gecerli = [];
     for (var i = 0; i < words.length; i++) {
       if (!valid(words[i])) continue;
+      gecerli.push(i);
       if (fillerKind(words[i].text, lang)) continue;
       var n = normalize(words[i].text, lang).replace(/ /g, "");
       if (n) toks.push({ i: i, t: n, w: words[i] });
     }
+    // iki kelime indeksi arasinda (dolgular dahil) uzun duraksama var mi
+    function duraksamaVar(i1, i2) {
+      var onceki = null;
+      for (var g = 0; g < gecerli.length; g++) {
+        var ix = gecerli[g];
+        if (ix < i1) continue;
+        if (ix > i2) break;
+        if (onceki != null && Number(words[ix].start) - Number(words[onceki].end) >= RESTART_DURAKSAMA) return true;
+        onceki = ix;
+      }
+      return false;
+    }
     var isaret = {};
     var ikilemeDil = lang === "tr" || lang === "az";
     for (var a = 0; a < toks.length; a++) {
-      var bulundu = false;
-      for (var len = 4; len >= 2 && !bulundu; len--) {
-        if (a + len > toks.length) continue;
+      for (var len = 4; len >= 2; len--) {
+        var b = a + len;
+        if (b + len > toks.length) continue;
         var hepsiIkileme = true;
         for (var q = 0; q < len; q++) {
           if (!(ikilemeDil && IKILEME.indexOf(toks[a + q].t) !== -1)) hepsiIkileme = false;
         }
         if (hepsiIkileme) continue;
-        // ikinci kopya ilk kopyanin hemen ardindan (en fazla 8 belirtec icinde) baslar
-        for (var b = a + len; b <= a + 8 && b + len <= toks.length; b++) {
-          var bosluk = Number(toks[b].w.start) - Number(toks[a + len - 1].w.end);
-          if (bosluk > 1.5) break;
-          if (toks[b].t !== toks[a].t) continue;   // ilk sozcuk birebir ayni olmali
-          var esit = true;
-          for (var r = 1; r < len; r++) {
-            if (!stemEq(toks[a + r].t, toks[b + r].t)) { esit = false; break; }
-          }
-          // arada kalan belirtecler de ilk kopyanin parcasi (vazgecilen baslangic)
-          if (esit && b - a <= 8) {
-            for (var x = a; x < b; x++) isaret[toks[x].i] = true;
-            bulundu = true;
-            break;
-          }
+        var esit = true;
+        for (var r = 0; r < len; r++) {
+          var son = r === len - 1;
+          if (son ? !stemEq(toks[a + r].t, toks[b + r].t) : toks[a + r].t !== toks[b + r].t) { esit = false; break; }
         }
+        if (!esit) continue;
+        var ilkSon = toks[b - 1].w;
+        if (/[.!?…]["'”’»)]*\s*$/.test(String(ilkSon.text || ""))) continue;   // ilk kopya cumleyi bitirdi
+        if (Number(toks[b].w.start) - Number(ilkSon.end) > 1.5) continue;
+        if (duraksamaVar(toks[a].i, toks[b].i)) continue;
+        for (var x = a; x < b; x++) isaret[toks[x].i] = true;
+        break;
       }
     }
     return Object.keys(isaret).map(Number).sort(function (p, q2) { return p - q2; });
@@ -324,7 +341,9 @@
   /*
    * Premiere yuzlerce kesimde yavaslar (FireCut: ~500 kesimden sonra). Once
    * mergeGap'ten kisa bosluklu komsu kesimler birlesir (aradaki nefes de gider);
-   * hala max'tan fazlaysa EN KISA kesimler birakilir — konusma asla yutulmaz.
+   * hala max'tan fazlaysa EN KISA kesimler birakilir.
+   *   opts.keep [{start, end}]: tutulan kelimeler. Ortasi bosluga dusen bir
+   *   tutulan kelime varsa o iki kesim BIRLESMEZ — konusma asla yutulmaz.
    * Doner: { ranges, merged (birlesen kesim sayisi), dropped (birakilan) }.
    */
   function capCuts(ranges, opts) {
@@ -339,10 +358,19 @@
       return o;
     }).sort(function (a, b) { return a.start - b.start; });
     if (list.length <= max) return { ranges: list, merged: 0, dropped: 0 };
+    var ortalar = (opts.keep || []).filter(valid).map(function (w) {
+      return (Number(w.start) + Number(w.end)) / 2;
+    }).sort(function (a, b) { return a - b; });
+    var oi = 0;
+    // (a, b) acik araliginda tutulan kelime ortasi var mi (a artan sirada sorulur)
+    function konusmaVar(a, b) {
+      while (oi < ortalar.length && ortalar[oi] <= a) oi++;
+      return oi < ortalar.length && ortalar[oi] < b;
+    }
     var out = [], merged = 0;
     list.forEach(function (r) {
       var last = out[out.length - 1];
-      if (last && r.start - last.end <= mergeGap) {
+      if (last && r.start - last.end <= mergeGap && !(r.start > last.end && konusmaVar(last.end, r.start))) {
         if (r.end > last.end) last.end = r.end;
         merged++;
       } else out.push(r);
