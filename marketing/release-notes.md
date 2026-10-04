@@ -12,6 +12,25 @@
 - **English (beta):** Arayüz artık İngilizce de; Ayarlar › Destek › Arayüz dili. Yeniden yüklemeden geçer; Premiere'deki bin ve marker adları değişmez.
 - **Yenilikler penceresi:** 3.1'i ilk açışta yeni özellikler tek ekranda; her biri tek tıkla ilgili bölümü açar.
 
+### İyileştirildi
+- **Paylaşım metni:** YouTube açıklamasına isteğe bağlı "Suflo ile yapıldı" kredi satırı (karakter sınırına takılınca ilk o düşer).
+- **Stil adları:** Clean Pill ve Bold Box olarak yenilendi; kayıtlı tercihler aynen çalışır, render çıktısı değişmedi.
+- **Kurulum:** Suflo-Kur.bat / .command Türkçe ve İngilizce yazar; onayda E/e ve Y/y kabul edilir.
+- **Premiere hata metinleri** İngilizce arayüzde İngilizce; onay ve klasör seçme pencereleri arayüz dilinde.
+- **Konuşmadan kes:** "Otomatik" dilde dolgu ipucu arayüz diline göre seçilir; "Yalnız kesilecekleri dinle" ile yalnız kesilecek parçalar çalar.
+- **Panel görünmüyor** rehberi sitede (Extensions (Legacy) yolu dahil).
+
+### Düzeltildi
+- Kurulum onayında **Y** (Yes) artık kurulumu iptal etmiyor.
+- Viral anlarda eski sekans bağlamı Önizle / Shorts düğmelerini yanlışlıkla kilitlemiyor; etkin sekans bilinmiyorsa Premiere'e yazılmıyor.
+- Rehberin stil adımında ücretsiz kullanıcının denediği stil, kapatınca önceki görünüme dönüyor.
+- Deneme hakları geçici dosya okuma hatasında silinmiyor.
+
+### Geliştirici
+- Yeni saf modüller (testli): `retakes`, `transcript-cache`, `shorts-paket-plan`, `shorts-ekler`, `multicam`, `marka-kiti`, `style-share`, `deneme`, `filigran`, `overlay-render`, `referral-core`, `davet`, `pricing`, `diller`, `onboarding-steps`.
+- Stil motoru varsayılan çıktısı 144 durumluk özetle bayt bayt korunuyor; Shorts Paketi ve Podcast Modu gerçek ffmpeg'li uçtan uca testlerle denetleniyor.
+- Davet ödülleri sunucu kanalı yalnız 3.1.0 ve üstü istemcilere açılır; eski istemciler etkilenmez.
+
 ## Suflo 3.0.0 — Yapay zekâ ile kurgu
 
 ### Yeni

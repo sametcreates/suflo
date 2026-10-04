@@ -886,7 +886,7 @@ geçici açılır, sonra geri yüklenir).
 
 ### 10.2 Premiere'de elle deneme (yaklaşık 30 dk; Premiere 24.x / 25.x ve 14.4 ayrı ayrı)
 
-Liste `marketing/v3-deneme-listesi.md` › 6c'de. Özellikle şunlara bak ve sonucu bana yaz:
+Liste `marketing/v3.1-deneme-listesi.md` › 8'de (ilk sürümü `v3-deneme-listesi.md` › 6c). Özellikle şunlara bak ve sonucu bana yaz:
 - Uygulamadan sonra **ses katmanlarında kapanan klip var mı?** Varsa paneldeki son durum satırını
   ve Premiere sürümünü yaz (bağlı klip koruması o sürümde nasıl davrandı).
 - **Ctrl+Z** ile kaç adımda geri alındığı (Premiere undo gruplamayı desteklemiyor; Kopyada
@@ -933,19 +933,20 @@ bağlantısı `suflo.app/en/pro.html`.
 3. Arayüzü English yap, bir Pro düğmesinin upsell penceresinde örnek bağlantısının
    `suflo.app/en/pro.html`'i açtığını gör.
 
-### 11.2 Yayından sonra site metinleri (yaklaşık 45 dk)
+### 11.2 Site metinleri (Türkçe site hazır, İngilizce site sende; yaklaşık 20 dk)
 
-Site, sürüm yayınlanmadan yeni özellikleri vaat etmesin diye bilerek değiştirilmedi. 3.1.0 GitHub'da
-yayınlanınca:
+Türkçe ana sayfa (`docs/index.html`) bu dalda 3.1 için güncellendi: duyuru şeridi "v3.1 yayında"
+ve dört yeni özellik, ücretsiz kartında "Pro araçlarına 3 ücretsiz deneme · English arayüz (beta)",
+Pro kartında tekrar çekim temizliği, 0–100 viral puan, Tek Tık Shorts Paketi, Podcast Modu ve
+Marka Kiti satırları, JSON-LD `softwareVersion` 3.1.0 ve Pro açıklaması, ödeme bağlantılarında
+`app_version=3.1.0`, `#surum` v3.1.0, site haritasında `lastmod`. "+ KDV", iade yok notu, erken
+erişim geri sayımı ve "75+ içerik üreticisi" satırı olduğu gibi kaldı.
 
-1. `docs/index.html`: Pro kartına ve özellik listesine **Tek Tık Shorts Paketi**, **Podcast Modu**,
-   **tekrar çekim temizliği** ve **Marka Kiti** satırlarını ekle (Shorts Paketi ve Podcast Modu
-   "deneme hakkı yok"). JSON-LD'de `softwareVersion`'ı `3.1.0` yap, Suflo Pro `description`'ına ve
-   `featureList`'e aynı özellikleri ekle; ödeme bağlantılarındaki `app_version%5D=3.0.0`'ı `3.1.0` yap;
-   `#surum` metnini `v3.1.0` yap. Erken erişim geri sayımı `v3.0.0` etiketine bakıyor; yeni bir
-   kampanya yapmayacaksan olduğu gibi bırak.
-2. `docs/en/index.html`: aynı dört özelliği İngilizce ekle (One-click Shorts package, Podcast Mode,
-   retake cleanup, Brand kit); JSON-LD'yi eşitle.
-3. `docs/sitemap.xml`'de değişen sayfaların `lastmod`'unu güncelle.
-4. `node tests/seo-kontrol.js` (ayrıca `node tools/test.js` bunu da koşar) yeşil kalmalı.
-
+1. **Sıra önemli:** siteyi yayınlayan dala (main / GitHub Pages) bu değişiklikleri **3.1.0 GitHub
+   sürümü yayınlandıktan sonra** al. Önce alırsan site henüz indirilemeyen özellikleri vaat eder
+   (sayfa sürüm numarasını GitHub'dan canlı okuduğu için şeritte "v3.0.0" görünür).
+2. Erken erişim geri sayımı `v3.0.0` etiketine bakıyor; yeni bir kampanya yapmayacaksan dokunma.
+3. `docs/en/index.html`: aynı dört özelliği İngilizce ekle (One-click Shorts package, Podcast Mode,
+   retake cleanup, Brand kit); JSON-LD'yi eşitle. (Bu dalda yapılmadı.)
+4. `node tools/test.js` (SEO denetimi dahil) yeşil kalmalı.
+5. Premiere'de elle deneme listesi: `marketing/v3.1-deneme-listesi.md`.
