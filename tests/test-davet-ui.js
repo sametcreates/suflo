@@ -289,7 +289,9 @@ async function calis() {
 
   /* ---------- diger modullerle baglanti (kaynak denetimi) ---------- */
   var app = fs.readFileSync(path.join(KOK, "js", "app.js"), "utf8");
-  ok("app.js: proCheckoutUrl arkadastan gelen kodu withDiscount ile ekler", /SufloReferral\.withDiscount\(url, kod\)/.test(app) && /KDavet\.odemeKodu\(\)/.test(app));
+  var fiyatSrc = fs.readFileSync(path.join(KOK, "js", "pricing.js"), "utf8");
+  ok("app.js: proCheckoutUrl arkadastan gelen kodu withDiscount ile ekler (js/pricing.js)", /SufloPricing\.checkoutUrl\([^;]*, kod\)/.test(app) &&
+    /KDavet\.odemeKodu\(\)/.test(app) && /R\.withDiscount\(url, discountCode/.test(fiyatSrc));
   ok("app.js: KApp.davetAni disari acik, Pro etkinlesince kaynak sorulur", /davetAni: davetAni/.test(app) && /KDavet\.kaynakSor\(\)/.test(app) && /guvenli\("Davet"/.test(app));
   var cap = fs.readFileSync(path.join(KOK, "js", "captions.js"), "utf8");
   var yi = cap.slice(cap.indexOf("function yildizIste()"), cap.indexOf("function initYildizBar()"));

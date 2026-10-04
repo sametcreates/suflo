@@ -25,7 +25,10 @@ ok("· ile birleşik durum satırı parça parça", T("Hazır: Turbo · GPU hız
 ok("ön ek simge korunur", T("✨ AI ile öner") === "✨ Suggest with AI", T("✨ AI ile öner"));
 ok("bilinmeyen metin aynen döner", T("Bilinmeyen bir şey") === "Bilinmeyen bir şey" && T("röportaj_final.mp4") === "röportaj_final.mp4");
 ok("metin olmayan / boş / yalnız sayı aynen döner", T(null) === null && T("") === "" && T(42) === 42 && T("  12:30  ") === "  12:30  ");
-ok("fiyatlar TRY", T("Otomatik kesimi aç — 749 TL") === "Unlock Auto Cut — 749 TRY");
+var Fiyat = require(path.join(__dirname, "..", "js", "pricing.js"));
+ok("fiyatlar tek kalıptan: SufloPricing.label('en') (USD varyantı yokken TRY)", T("Otomatik kesimi aç — 749 TL") === "Unlock Auto Cut — " + Fiyat.label("en") &&
+  T("749 TL") === Fiyat.label("en") && Fiyat.label("en") === "749 TRY (≈ $19)" && T("Pro — 749 TL, tek sefer") === "Pro — 749 TRY (≈ $19), one-time",
+  T("Otomatik kesimi aç — 749 TL"));
 
 // Sabit nokta: hiçbir İngilizce değer başka bir şeye çevrilmez (gözlemci döngüsü buna dayanır)
 var bozuk = [];

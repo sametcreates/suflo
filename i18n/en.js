@@ -266,7 +266,7 @@
     "Duraksamaları bul; \"ııı / eee\" ve tekrarları kelimeye tıklayarak kes. Kopya sekansta güvenli uygulanır.": "Find pauses; cut \"um / uh\" and repeats by clicking words. Applied safely on a duplicate sequence.",
     "Pro özeti": "Pro summary",
     "lisans": "license",
-    "Otomatik kesimi aç — 749 TL": "Unlock Auto Cut — 749 TRY",
+    "Otomatik kesimi aç": "Unlock Auto Cut",
     "Konuşmandaki ölü anları saniyede temizle": "Remove dead air from your talk in seconds",
     "Sessizlikleri otomatik bulur, sana gösterir, onayladığını timeline'da keser. 10 dakikalık konuşmada elle ~40 dakikalık jump-cut işi →": "Finds silences automatically, shows them to you and cuts the ones you approve on the timeline. ~40 minutes of manual jump cuts on a 10-minute talk →",
     "2 dakika": "2 minutes",
@@ -336,7 +336,7 @@
     "Konuşmaya göre zamanlanmış punch-in zoom'lar; yoğunluk ve hız senin kontrolünde, tek tıkla geri alınır.": "Punch-in zooms timed to the speech; you control intensity and speed, and it undoes in one click.",
     "akıllı": "smart",
     "yoğunluk": "intensity",
-    "Otomatik zoom'u aç — 749 TL": "Unlock Auto Zoom — 749 TRY",
+    "Otomatik zoom'u aç": "Unlock Auto Zoom",
     "Sabit kadrajı canlandır — elle keyframe yok": "Bring static shots to life — no manual keyframes",
     "Konuşmanı dinler, her konuşma başlangıcında yumuşak bir punch-in / punch-out ritmi kurar. Elle keyframe'le": "Listens to your speech and builds a smooth punch-in / punch-out rhythm at each phrase. Work that takes",
     "saatler": "hours",
@@ -372,7 +372,7 @@
     "Zoom'u kaldır": "Remove zoom",
     "Kesimlerini müziğin ritmine oturt": "Cut to the beat of the music",
     "Vuruşları gerçek sinyal analiziyle bulur, timeline'a marker atar, BPM gösterir; bas ve tiz bandı ayrı.": "Detects beats with real signal analysis, drops markers on the timeline and shows BPM; bass and treble bands separately.",
-    "Ritim araçlarını aç — 749 TL": "Unlock beat tools — 749 TRY",
+    "Ritim araçlarını aç": "Unlock beat tools",
     "Ritim işaretleri": "Beat markers",
     "Seçili klibin sesindeki vuruşları bulur ve timeline'a marker atar. Müziğe kesmek için markerlara hizalanırsın.": "Finds the beats in the selected clip's audio and adds timeline markers. Snap to the markers to cut to the music.",
     "Vuruş tipi": "Beat type",
@@ -396,7 +396,7 @@
     "Pro içerik özeti": "Pro content summary",
     "içerik": "items",
     "güncelleme": "updates",
-    "Yazı animasyonlarını aç — 749 TL": "Unlock text animations — 749 TRY",
+    "Yazı animasyonlarını aç": "Unlock text animations",
     "Yazı animasyonu ara…": "Search text animations…",
     "Kütüphaneyi yeniden tara": "Rescan library",
     "timeline'a hazır paketler": "timeline-ready packs",
@@ -406,7 +406,7 @@
     "Veri klasörünü aç": "Open data folder",
     "Seçili klibe karttan uygula. Suflo Smooth paketindeki 270 preset native çalışır; 8 özel preset Premiere uyumluluk modunu kullanır.": "Apply from a card to the selected clip. The 270 presets in the Suflo Smooth pack run natively; 8 special presets use Premiere compatibility mode.",
     "Pro preset özeti": "Pro preset summary",
-    "290 preseti aç — 749 TL": "Unlock 290 presets — 749 TRY",
+    "290 preseti aç": "Unlock 290 presets",
     "Preset ara… örn. slide, zoom, fade": "Search presets… e.g. slide, zoom, fade",
     "Hızlı": "Fast",
     "Güç": "Power",
@@ -423,7 +423,7 @@
     "Kesimlere tek tıkla 13 geçiş": "13 one-click transitions for your cuts",
     "Zoom, whip, itme, zıplama, karartma… Kartın üzerine gelerek önizle; Pro'da kesime tek tıkla uygula.": "Zoom, whip, push, bounce, dip to black… Hover a card to preview; with Pro, apply to a cut in one click.",
     "geçiş": "transitions",
-    "Geçişleri aç — 749 TL": "Unlock transitions — 749 TRY",
+    "Geçişleri aç": "Unlock transitions",
     "Kesimlere tek tıkla geçiş": "One-click transitions for your cuts",
     "Playhead'i iki klibin birleştiği yere getir, geçişe bas. Suflo iki klibe eşleşik keyframe yazar —": "Move the playhead to where two clips meet and click a transition. Suflo writes matched keyframes on both clips —",
     "eklenti, ayar katmanı ya da MOGRT gerekmez": "no plugins, adjustment layers or MOGRTs needed",
@@ -459,7 +459,7 @@
     "1.076 düzenlenmiş SFX": "1,076 curated SFX",
     "Ara, dalga üzerinden ön dinle; Smart SFX 2.0 ile doğru vurguya tek tıkla yerleştir.": "Search, preview on the waveform, and place on the right beat in one click with Smart SFX 2.0.",
     "ses": "sounds",
-    "1.076 SFX'i aç — 749 TL": "Unlock 1,076 SFX — 749 TRY",
+    "1.076 SFX'i aç": "Unlock 1,076 SFX",
     "Ses ara… (↓↑ gez · Enter ekle)": "Search sounds… (↓↑ browse · Enter add)",
     "Klasörü yeniden tara": "Rescan folder",
     "SFX klasörü bağla": "Link SFX folder",
@@ -486,7 +486,7 @@
     "zemin": "backgrounds",
     "'ya kadar": "and up",
     "Light leak, film grain, gradient, grid, VHS… Tek tıkla playhead'de üst katmana düşer.": "Light leaks, film grain, gradients, grids, VHS… One click drops it on the top track at the playhead.",
-    "Motion BG'yi aç — 749 TL": "Unlock Motion BG — 749 TRY",
+    "Motion BG'yi aç": "Unlock Motion BG",
     "Zemin ara… (light leak · grain · grid)": "Search backgrounds… (light leak · grain · grid)",
     "Motion BG klasörü bağla": "Link Motion BG folder",
     "Henüz hareketli zemin yok": "No motion backgrounds yet",
@@ -1314,16 +1314,16 @@
   add({
     "17 gerçek altyazı şablonu": "17 real caption templates",
     "Her stil 9:16, 16:9 ve 1:1 oranına hazır. Stilini gör; Pro'da altyazıya doğrudan uygula.": "Every style is ready for 9:16, 16:9 and 1:1. See your style; with Pro, apply it straight to your captions.",
-    "Altyazı şablonlarını aç — 749 TL": "Unlock caption templates — 749 TRY",
+    "Altyazı şablonlarını aç": "Unlock caption templates",
     "123 grafik ve sahne animasyonu": "123 graphic and scene animations",
     "Sosyal yorumlar, grafik öğeler, geçişler, ikonlar ve lower third'ler tek kütüphanede.": "Social comments, graphic elements, transitions, icons and lower thirds in one library.",
-    "Tüm animasyonları aç — 749 TL": "Unlock all animations — 749 TRY",
+    "Tüm animasyonları aç": "Unlock all animations",
     "35 hazır CTA butonu": "35 ready-made CTA buttons",
     "Abone ol, takip et, indir, paylaş ve satın al çağrılarını playhead'e tek tıkla yerleştir.": "Drop subscribe, follow, download, share and buy calls to action at the playhead in one click.",
-    "CTA butonlarını aç — 749 TL": "Unlock CTA buttons — 749 TRY",
+    "CTA butonlarını aç": "Unlock CTA buttons",
     "262 animasyon ve grafik": "262 animations and graphics",
     "Beğendiklerini favorile; Pro açıldığında hazır seçkini doğrudan timeline'da kullan.": "Favorite the ones you like; once Pro is unlocked, use your picks straight on the timeline.",
-    "Tüm Pro kütüphanesini aç — 749 TL": "Unlock the full Pro library — 749 TRY",
+    "Tüm Pro kütüphanesini aç": "Unlock the full Pro library",
     "{n} Pro efekti · kilidi açınca timeline'a hazır": "{} Pro effects · timeline-ready once unlocked",
     "{n} efekt · {} Pro önizlemesi": "{} effects · {} Pro previews",
     "{n} paket timeline'a hazır": "{} packs ready for the timeline",
@@ -1502,9 +1502,6 @@
     "Suflo Pro'yu Al →": "Get Suflo Pro →",
     "ÖMÜR BOYU LİSANS": "LIFETIME LICENSE",
     "TEK SEFERLİK ·": "ONE-TIME ·",
-    "1.249 TL": "1,249 TRY",
-    "749 TL": "749 TRY",
-    "+ KDV · abonelik yok · dakika limiti yok": "+ VAT · no subscription · no minute limits",
     "Tüm Pro'yu gör": "See all of Pro",
     "Lisans anahtarım var": "I have a license key"
   });
@@ -1853,7 +1850,6 @@
     "sirket.local, 10.0.0.5": "company.local, 10.0.0.5",
     "Presetler": "Presets",
     "Yerel emoji": "Local emoji",
-    "Pro — 749 TL, tek sefer": "Pro — 749 TRY, one-time",
     "Normal": "Normal"
   });
 
@@ -2098,7 +2094,24 @@
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */
+  // Prices: one pattern family whose output comes from js/pricing.js (SufloPricing).
+  // The shown price always matches the checkout the button opens: until the USD variant
+  // exists, English shows "749 TRY (≈ $19)" and opens the TRY checkout.
+  function pricing() {
+    var Pr = root && root.SufloPricing;
+    if (!Pr && typeof require === "function") { try { Pr = require("../js/pricing.js"); } catch (e) { Pr = null; } }
+    return Pr;
+  }
+  function enPrice() { var Pr = pricing(); return Pr ? Pr.label("en") : "749 TRY"; }
+  function enWas() { var Pr = pricing(); return Pr ? Pr.wasLabel("en") : "1,249 TRY"; }
+  function enTax() { var Pr = pricing(); return Pr ? Pr.taxLabel("en") : "+ tax"; }
   var P = [
+    [/^749 TL$/, function () { return enPrice(); }],
+    [/^1\.249 TL$/, function () { return enWas(); }],
+    [/^\+ KDV · abonelik yok · dakika limiti yok$/, function () { return enTax() + " · no subscription · no minute limits"; }],
+    [/^Pro — 749 TL, tek sefer$/, function () { return "Pro — " + enPrice() + ", one-time"; }],
+    // "Otomatik kesimi aç — 749 TL" → "Unlock Auto Cut — $39"
+    [/^([\s\S]+?) — 749 TL$/, function (m, t) { return t(m[1]) + " — " + enPrice(); }],
     // "1.076 SFX" style Turkish thousands → English
     [/^(\d{1,3})\.(\d{3}) (SFX|ses|dosya)$/, function (m) { return m[1] + "," + m[2] + (m[3] === "SFX" ? " SFX" : m[3] === "ses" ? " sounds" : " files"); }],
     // "12,5 sn" decimals and durations

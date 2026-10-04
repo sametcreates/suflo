@@ -562,6 +562,14 @@
 
   function onUpgrade(fn) { _onUpgrade = fn; }
 
+  // Fiyat kutusu tek kaynaktan (js/pricing.js); her zaman Türkçe yazılır, İngilizce arayüzde
+  // çevirmen fiyatı SufloPricing.label('en') ile değiştirir (gösterilen = açılan ödeme)
+  function fiyatKutusu() {
+    var P = typeof window !== 'undefined' ? window.SufloPricing : null;
+    if (P && P.upsellPriceHtml) return P.upsellPriceHtml('tr');
+    return '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K · <s>1.249 TL</s></span><b>749 TL</b><small>+ KDV \u00b7 abonelik yok \u00b7 dakika limiti yok</small></div>';
+  }
+
   function showUpsell(feature, o) {
     o = o || {};
     var Dm = DM();
@@ -626,7 +634,7 @@
         '<p class="pro-upsell-alt" id="pro-upsell-desc">' + esc(desc) + '</p>' +
         visual +
         proof + benefits +
-        '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K · <s>1.249 TL</s></span><b>749 TL</b><small>+ KDV \u00b7 abonelik yok \u00b7 dakika limiti yok</small></div>' +
+        fiyatKutusu() +
         '<div class="pro-upsell-actions">' +
           (denemeHakki > 0
             ? '<button id="pro-upsell-deneme" class="pro-btn-primary pro-upsell-trial">' + esc('Ücretsiz dene · ' + denemeHakki + ' hakkın var') + '</button>' +

@@ -8,16 +8,16 @@ window.KApp = (function () {
 
   function el(id) { return document.getElementById(id); }
 
-  var PRO_CHECKOUT = "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1";
+  // Ödeme bağlantısı js/pricing.js'te: gösterilen fiyatla aynı para birimi (USD varyantı
+  // yokken İngilizce arayüz de TRY ödemesini açar)
+  function arayuzDili() {
+    try { return window.SufloI18n ? SufloI18n.getLang() : "tr"; } catch (e) { return "tr"; }
+  }
   function proCheckoutUrl(feature) {
     var surum = window.K && K.VERSION ? K.VERSION : "unknown";
-    var url = PRO_CHECKOUT +
-      "?checkout%5Bcustom%5D%5Bsource%5D=suflo_panel" +
-      "&checkout%5Bcustom%5D%5Bfeature%5D=" + encodeURIComponent(String(feature || "pro")) +
-      "&checkout%5Bcustom%5D%5Bapp_version%5D=" + encodeURIComponent(String(surum));
     // Arkadaşından aldığı davet kodunu kaydettiyse indirim ödeme sayfasına kendiliğinden gelir
     var kod = window.KDavet && KDavet.odemeKodu ? KDavet.odemeKodu() : "";
-    return window.SufloReferral ? SufloReferral.withDiscount(url, kod) : url;
+    return SufloPricing.checkoutUrl(arayuzDili(), feature, surum, kod);
   }
 
   // Davet şeridi anı: ilk kesim (magiccut.js), ilk Shorts (viral.js), 5. başarılı uygulama (captions.js)
@@ -576,13 +576,15 @@ window.KApp = (function () {
 
     el("pro-buy").addEventListener("click", function (e) {
       e.preventDefault();
-      // Lemon Squeezy checkout — Suflo Pro 749 TL
+      // Lemon Squeezy checkout (fiyat ve para birimi: js/pricing.js)
       K.cs.openURLInDefaultBrowser(proCheckoutUrl("settings"));
     });
   }
 
   function initSettings() {
     initPro();
+    // Pro karşılaştırmasındaki fiyat tek kaynaktan (js/pricing.js); İngilizcede çevirmen değiştirir
+    if (el("set-pro-fiyat") && window.SufloPricing) el("set-pro-fiyat").textContent = SufloPricing.settingsRow("tr");
 
     // ---- Pro icerik bulutu: lisans bir kez, MOGRT + SFX otomatik ----
     (function initProSyncUI() {
