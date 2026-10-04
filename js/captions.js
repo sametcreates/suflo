@@ -653,16 +653,106 @@ window.KCaptions = (function () {
     return (ekIpucu ? ekIpucu + (terim ? " " : "") : "") + terim;
   }
 
+  /* ---------------- Transkript önbelleği ---------------- */
+
+  /*
+   * js/transcript-cache.js: kelimeler KAYNAK zamanında, USER_DATA/Kesit/transcripts/.
+   * KCaptions.rawSegments() KULLANILMAZ: onlar altyazı satırları, kullanıcının
+   * düzeltmelerini içerir ve dolgu ipucu olmadan yazıya dökülmüştür.
+   */
+  var _onbellek;
+  function transcriptCache() {
+    if (_onbellek !== undefined) return _onbellek;
+    _onbellek = null;
+    try {
+      if (!K.nodeOK || !window.SufloTranscriptCache || !K.settingsPath()) return null;
+      _onbellek = window.SufloTranscriptCache.create({
+        fs: K.fs, path: K.path, crypto: require("crypto"),
+        dir: K.path.join(K.path.dirname(K.settingsPath()), "transcripts")
+      });
+    } catch (e) { _onbellek = null; }
+    return _onbellek;
+  }
+
+  // Hangi motor + model yazdı: farklı motorun transkripti önbellekten karışmasın
+  function motorKimligi() {
+    try {
+      if (localEngineReady()) { var m = KEngine.activeModel(); return "yerel:" + (m && m.id || "?"); }
+      if (cloudEngineReady()) { var c = providerConfig(); return "bulut:" + c.model + "@" + String(c.url || "").replace(/^https?:\/\//, "").split("/")[0]; }
+    } catch (e) {}
+    return "";
+  }
+
+  // Önbellek anahtarı için klip bilgisi; dosya okunamıyorsa null (önbellek atlanır)
+  function onbellekMeta(clip, lang, prompt) {
+    try {
+      if (!clip || !clip.mediaPath || !K.nodeOK) return null;
+      var st = K.fs.statSync(clip.mediaPath);
+      var motor = motorKimligi();
+      if (!motor) return null;
+      return {
+        mediaPath: String(clip.mediaPath), size: st.size, mtimeMs: Math.round(Number(st.mtimeMs) || 0),
+        inPoint: Number(clip.inPoint) || 0, dur: Number(clip.dur) || 0,
+        lang: lang || "auto", engine: motor, prompt: prompt
+      };
+    } catch (e) { return null; }
+  }
+
+  // Kaynak-göreli kelimeleri sequence zamanına eşle (klip başlangıcı + hız)
+  function kelimeleriEsle(raw, clip) {
+    var tl = clip.clipEnd - clip.clipStart;
+    var hiz = (clip.dur > 0 && tl > 0) ? tl / clip.dur : 1;
+    var words = raw.map(function (w) {
+      return {
+        start: clip.clipStart + w.start * hiz,
+        end: clip.clipStart + w.end * hiz,
+        text: String(w.text || "").trim(),
+        confidence: w.confidence
+      };
+    }).filter(function (w) {
+      // yalniz noktalamadan olusan belirtecler kelime degil
+      return w.text.replace(/[.,!?;:…"'«»]/g, "").trim() && isFinite(w.start) && isFinite(w.end);
+    });
+    words.sort(function (a, b) { return a.start - b.start; });
+    return words;
+  }
+
+  function onbellegiTemizle() {
+    var c = transcriptCache();
+    return c ? c.clear() : 0;
+  }
+
   /*
    * Secili klibin KELIME zamanli transkripti (sequence zamaninda). Altyazi
    * editorune dokunmaz; Konusmadan kes gibi baska araclar kullanir.
    *   opts.clip      KS_getSelectedClips'ten bir klip (yoksa secim okunur)
    *   opts.prompt    motora ek ipucu (or. dolgu seslerini yazdirmak icin)
    *   opts.onStatus  ilerleme mesajlari
-   * Doner: { clip, lang, words: [{start, end, text, confidence}] }
+   *   opts.cache     false: önbelleği atla ("Yeniden yazıya dök")
+   * Doner: { clip, lang, words: [{start, end, text, confidence}], fromCache }
+   * Önbellek, meşgul/motor denetiminden ÖNCE bakılır: motor kurulu olmasa ya da
+   * altyazı işi sürse de daha önce yazıya dökülmüş klip anında açılır.
    */
   async function transcribeWords(opts) {
     opts = opts || {};
+    var istenenDil = (el("cap-lang") && el("cap-lang").value) || "auto";
+    if (opts.cache !== false && transcriptCache()) {
+      var onClip = opts.clip;
+      if (!onClip) {
+        var sc0 = await K.call("KS_getSelectedClips");
+        if (sc0.ok && sc0.clips && sc0.clips.length) onClip = sc0.clips[0];
+      }
+      var om = onClip ? onbellekMeta(onClip, istenenDil, "dolgu") : null;
+      var bulunan = om ? transcriptCache().get(om, { prompts: ["dolgu", "altyazi"] }) : null;
+      if (bulunan && bulunan.words.length) {
+        K.log("transkript önbellekten: " + bulunan.words.length + " kelime (" + bulunan.prompt + (bulunan.covering ? ", kapsayan" : "") + ")");
+        return {
+          clip: onClip, lang: bulunan.lang || (istenenDil !== "auto" ? istenenDil : "") || arayuzDili(),
+          words: kelimeleriEsle(bulunan.words, onClip), fromCache: true
+        };
+      }
+      if (onClip && !opts.clip) opts.clip = onClip;
+    }
     if (busy) throw new Error("Altyazı motoru şu an başka bir iş yapıyor — bitmesini bekle.");
     if (!engineReady()) throw new Error("Önce Altyazı sekmesinden Suflo Altyazı Motoru'nu kur (ya da Groq anahtarı gir).");
     // busy, ilk await'ten ONCE alinir: secim beklenirken "Altyazı oluştur"a basilirsa
@@ -687,22 +777,12 @@ window.KCaptions = (function () {
         wav: localEngineReady(), ss: clip.inPoint, t: clip.dur, durHint: clip.dur
       });
       temp.push(audio);
+      var motorOnce = onbellekMeta(clip, istenenDil, "dolgu");   // motor kimliği yazımdan ÖNCE
       var raw = await transcribeSuflo(audio, clip.dur, true, temp);
-      var tl = clip.clipEnd - clip.clipStart;
-      var hiz = (clip.dur > 0 && tl > 0) ? tl / clip.dur : 1;
-      var words = raw.map(function (w) {
-        return {
-          start: clip.clipStart + w.start * hiz,
-          end: clip.clipStart + w.end * hiz,
-          text: String(w.text || "").trim(),
-          confidence: w.confidence
-        };
-      }).filter(function (w) {
-        // yalniz noktalamadan olusan belirtecler kelime degil
-        return w.text.replace(/[.,!?;:…"'«»]/g, "").trim() && isFinite(w.start) && isFinite(w.end);
-      });
-      words.sort(function (a, b) { return a.start - b.start; });
-      return { clip: clip, lang: algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili(), words: words };
+      var words = kelimeleriEsle(raw, clip);
+      var dil = algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili();
+      if (motorOnce && raw.length && transcriptCache()) transcriptCache().put(motorOnce, { words: raw, lang: dil });
+      return { clip: clip, lang: dil, words: words, fromCache: false };
     } finally {
       temp.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
       algilananDil = belgeDili;
@@ -1719,7 +1799,13 @@ window.KCaptions = (function () {
         mapped.sort(function (a, b) { return a.start - b.start; });
       } else {
         status("Suflo Altyazı Motoru dinliyor…");
+        // Önbellek: yalnız tek klip + kelime zamanlı (k1/kc) transkript, "altyazi" etiketiyle
+        // (dolgu ipucu yok: Konuşmadan kes "dolgu" girdisini tercih eder, yoksa bunu kullanır)
+        var onbMeta = (!ornek && scope === "clip" && karaoke && clip) ? onbellekMeta(clip, el("cap-lang").value || "auto", "altyazi") : null;
         var raw = await transcribeSuflo(audioSrc, durHint, karaoke, tempFiles, motorSecenek);
+        if (onbMeta && raw.length && transcriptCache()) {
+          transcriptCache().put(onbMeta, { words: raw, lang: algilananDil || el("cap-lang").value || "" });
+        }
 
         mapped = raw.map(function (s) {
           return {
@@ -4539,6 +4625,8 @@ window.KCaptions = (function () {
     mode: function () { return segmentsMode; },
     refreshEngineStyles: motorStilleriniCiz,
     transcribeWords: transcribeWords,
+    transcriptCache: transcriptCache,
+    onbellegiTemizle: onbellegiTemizle,
     // Bulut LLM (Groq/OpenAI) — ceviri ile ayni ayar ve anahtar
     chatConfig: chatConfig,
     chatCall: chatCall,
