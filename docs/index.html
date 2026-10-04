@@ -269,6 +269,8 @@ td.hi:not(.y):not(.n){color:var(--tx)}
 .psosyal{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--tx2);font-size:14px;margin-top:14px}
 .psosyal b{color:var(--tx)}
 .psosyal .nokta{width:8px;height:8px;border-radius:50%;background:#3ddc84;box-shadow:0 0 0 4px rgba(61,220,132,.15)}
+.pmicro.pdavet{color:var(--ok);font-weight:600}
+.pmicro.pdavet[hidden]{display:none}
 .pmicro.pnot{font-size:12px;margin-top:6px;line-height:1.5}
 .psub .kdv{color:var(--tx2);font-weight:600}
 .erken-bitis{margin:-14px 0 22px;padding:9px 12px;border-radius:10px;background:rgba(255,200,0,.08);border:1px solid rgba(255,200,0,.25);color:var(--tx2);font-size:14px;font-weight:600}
@@ -463,6 +465,69 @@ details[open] p{animation:sssAc .38s cubic-bezier(.16,1,.3,1)}
 ::selection{background:rgba(139,124,246,.3)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
+<script id="davet-site">
+/* Davet et, kazan: ?d=SFLXXXXXX (Pro sahibinin davet kodu) ve ?ref=xxxxxxxxxx (ucretsiz paylasim)
+   lemon.js'ten once okunur, 30 gun bu tarayicida tutulur ve Lemon Squeezy odeme baglantilarina
+   checkout[discount_code] / checkout[custom][ref] olarak eklenir. Kod disinda hicbir sey saklanmaz. */
+(function () {
+  var KOD = /^SFL[A-Z2-7]{6}$/, REF = /^[a-z2-7]{10}$/;
+  var IND = "checkout%5Bdiscount_code%5D", RP = "checkout%5Bcustom%5D%5Bref%5D";
+  var OMUR = 30 * 864e5, simdi = Date.now();
+  function oku(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function yaz(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
+  function param(ad) {
+    var m = new RegExp("[?&]" + ad + "=([^&#]*)").exec(String(window.location.search || ""));
+    if (!m) return "";
+    try { return decodeURIComponent(m[1].replace(/\+/g, " ")); } catch (e) { return ""; }
+  }
+  var d = param("d").replace(/[\s\-]+/g, "").toUpperCase(), r = param("ref").toLowerCase();
+  if (KOD.test(d)) yaz("suflo_davet", JSON.stringify({ d: d, t: simdi }));
+  if (REF.test(r)) yaz("suflo_ref", JSON.stringify({ r: r, t: simdi }));
+  function al(k, re, alan) {
+    var o = null;
+    try { o = JSON.parse(oku(k) || "null"); } catch (e) { o = null; }
+    if (!o || !re.test(String(o[alan])) || !(simdi - Number(o.t) < OMUR && simdi - Number(o.t) > -864e5)) return "";
+    return String(o[alan]);
+  }
+  var kod = KOD.test(d) ? d : al("suflo_davet", KOD, "d");
+  var ref = REF.test(r) ? r : al("suflo_ref", REF, "r");
+  if (!kod && !ref) return;
+  function koy(url, ad, deger) {
+    var s = String(url || ""), hash = "", h = s.indexOf("#");
+    if (h !== -1) { hash = s.slice(h); s = s.slice(0, h); }
+    var q = s.indexOf("?"), taban = q === -1 ? s : s.slice(0, q), hedef = decodeURIComponent(ad);
+    var parca = (q === -1 ? [] : s.slice(q + 1).split("&")).filter(function (p) {
+      if (!p) return false;
+      var k = p.split("=")[0];
+      try { k = decodeURIComponent(k); } catch (e) {}
+      return k !== hedef;
+    });
+    parca.push(ad + "=" + encodeURIComponent(deger));
+    return taban + "?" + parca.join("&") + hash;
+  }
+  function duzelt(a) {
+    var href = a.getAttribute("href") || "";
+    if (!/^https:\/\/[a-z0-9-]+\.lemonsqueezy\.com\/checkout\//i.test(href)) return;
+    if (kod) href = koy(href, IND, kod);
+    if (ref) href = koy(href, RP, ref);
+    a.setAttribute("href", href);
+  }
+  function hepsi() {
+    var l = document.querySelectorAll("a.lemonsqueezy-button");
+    for (var i = 0; i < l.length; i++) duzelt(l[i]);
+    var n = document.getElementById("davet-bilgi");
+    if (n && kod) { n.hidden = false; var c = n.querySelector("b"); if (c) c.textContent = kod; }
+  }
+  // lemon.js adresi tiklamada okur; yakalama asamasi ondan once calisir
+  document.addEventListener("click", function (e) {
+    var t = e.target;
+    while (t && t.nodeType === 1 && !(t.classList && t.classList.contains("lemonsqueezy-button"))) t = t.parentNode;
+    if (t && t.nodeType === 1) duzelt(t);
+  }, true);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", hepsi);
+  else hepsi();
+})();
+</script>
 <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
 </head>
 <body>
@@ -907,6 +972,7 @@ details[open] p{animation:sssAc .38s cubic-bezier(.16,1,.3,1)}
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg><span>Toplu klip · çeviri · stilli ASS</span></li>
         </ul>
         <a class="btn btn-p lemonsqueezy-button" href="https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?checkout%5Bcustom%5D%5Bsource%5D=suflo_website&amp;checkout%5Bcustom%5D%5Bfeature%5D=pricing&amp;checkout%5Bcustom%5D%5Bapp_version%5D=3.0.0">Pro'yu al — 749 ₺</a>
+        <p class="pmicro pdavet" id="davet-bilgi" hidden>%15 davet indirimi uygulandı · <b></b></p>
         <p class="psosyal"><span class="nokta"></span><b>75+ içerik üreticisi</b> Suflo Pro'yu seçti</p>
         <p class="pmicro">Güvenli ödeme · tek ödeme · abonelik yok · ömür boyu güncelleme</p>
         <p class="pmicro pnot">KDV ödeme sayfasında ülkene göre eklenir (Türkiye %20 → toplam ≈ 899 ₺). Dijital ürün olduğu için iade yapılmaz — almadan önce ücretsiz sürümü sınırsız dene.</p>
@@ -1004,6 +1070,7 @@ details[open] p{animation:sssAc .38s cubic-bezier(.16,1,.3,1)}
           <li><a href="/blog/">Blog</a></li>
           <li><a href="#sss">SSS</a></li>
           <li><a href="/hesap.html">Lisans yönetimi</a></li>
+          <li><a href="/ortaklik.html">Ortaklık ve davet</a></li>
         </ul>
       </div>
       <div>

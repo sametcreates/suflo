@@ -138,7 +138,7 @@ async function calis() {
   ok("ucretsizken sunucuya istek gitmez", o.say.istek.length === 0);
   ok("Story karti ucretsizde gizli", o.el["davet-story"].hidden);
   tetikle(o.el["davet-ortaklik"], "click", { preventDefault: function () {} });
-  ok("ortaklik baglantisi suflo.app/ortaklik", o.say.url[o.say.url.length - 1] === "https://suflo.app/ortaklik");
+  ok("ortaklik baglantisi suflo.app/ortaklik.html", o.say.url[o.say.url.length - 1] === "https://suflo.app/ortaklik.html");
 
   /* ---------- arkadastan gelen kod ---------- */
   ok("arkadastan kod kutusu ucretsizde gorunur", !o.el["davet-girilen-sar"].hidden);

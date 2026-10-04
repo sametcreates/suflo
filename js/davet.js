@@ -17,7 +17,7 @@ window.KDavet = (function () {
   var R = window.SufloReferral;
   var YENILEME_MS = 6 * 3600 * 1000;   // sunucudaki kod/sayac en sik 6 saatte bir sorulur
   var ISTEK_MS = 15000;
-  var ORTAKLIK_URL = "https://suflo.app/ortaklik";
+  var ORTAKLIK_URL = "https://suflo.app/ortaklik.html";
   var KAYNAKLAR = ["youtube", "instagram", "tiktok", "arkadas", "kod", "google", "diger"];
   var istekte = false, storyMesgul = false, sonDeneme = 0;
 
