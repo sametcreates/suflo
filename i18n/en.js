@@ -1649,6 +1649,7 @@
     "Uygun an bulunamadı — süreyi değiştirip tekrar dene.": "No suitable moments found — change the length and try again.",
     "{n} viral an marker'ı eklendi (kırmızı, süreli)": "{} viral moment markers added (red, with duration)",
     "Viral anlar başka bir sekansta bulundu: o sekansı açıp tekrar dene (ya da anları yeniden bul).": "The viral moments were found in another sequence: open that sequence and try again (or find the moments again).",
+    "Premiere'de etkin sekans yok ya da okunamadı: anların bulunduğu sekansı açıp tekrar dene.": "No active sequence in Premiere, or it couldn't be read: open the sequence with the moments and try again.",
     "Shorts {}/{} oluşturuluyor": "Creating Shorts {}/{}",
     "Shorts {}/{} oluşturuluyor{}": "Creating Shorts {}/{}{}",
     "(9:16 Auto Reframe sürebilir)…": "(9:16 Auto Reframe may take a while)…",

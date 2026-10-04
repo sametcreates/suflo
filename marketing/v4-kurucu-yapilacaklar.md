@@ -265,6 +265,9 @@ Hazırlık: Pro lisanslı panel, Groq anahtarı, en az 5 dakikalık konuşmalı 
    "Suflo Shorts" sekansına) geç → **hemen** panele dönüp o kartta "+1 cümle ▶"ye bas. Açık
    sekansın In/Out'u ve playhead'i değişmemeli; panelde "In/Out güncellenmedi: Premiere'de başka
    bir sekans açık." yazmalı. Aynı hızlı geçişle **Shorts sekansları oluştur** da uyarı vermeli.
+   **Ters hızlı geçiş:** Premiere'de başka bir sekansa geç → **hemen** panele dönüp "Viral anları
+   bul"a bas. Anlar bu (yeni açtığın) sekansa ait sayılmalı: Önizle In/Out'u ayarlamalı, Shorts
+   oluşmalı, "başka bir sekansta" uyarısı **çıkmamalı**.
 7. Kanca seçeneklerinden **ikincisini** seç → **Başlık ekle**: timeline'a bu metin gelmeli,
    `*yıldızlı*` kelime vurgu renginde.
 8. "Zamana göre" ve "Yalnız ≥60" → liste **yeni arama yapmadan** değişmeli. Paneli kapatıp aç:

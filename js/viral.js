@@ -12,7 +12,8 @@ window.KViral = (function () {
   // Ana liste (parseResponse sırası, her an kalıcı bir id taşır); ekrandaki görünüm filtreSirala ile türetilir
   var anlar = [];
   var busy = false;
-  // anlarin bulundugu transkript ve sekans: Shorts sonra baska sekansta/transkriptte olusturulmasin
+  // anlarin bulundugu transkript ve sekans: Shorts sonra baska sekansta/transkriptte olusturulmasin.
+  // bulSekans "" = arama aninda sekans okunamadi: ilk basarili Onizle/Shorts canli sekansi baglar
   var bulSegs = null, bulSekans = "";
   // aramanin gordugu temiz satirlar: from/to indeksleri buna gore (sonraki altyazi duzenlemeleri kaydirmasin)
   var bulSegsTemiz = null;
@@ -351,18 +352,39 @@ window.KViral = (function () {
     return c && c.ok ? String(c.sequenceId || "") : null;
   }
 
-  // Anlar başka bir sekansta mı bulundu (canlı sorgu; sorgu başarısızsa son bilinen bağlam)
-  async function baskaSekansta() {
+  // Canlı sorgu; başarısızsa son bilinen bağlam (arama ve denetim aynı kaynağı kullanır)
+  async function sekansOku() {
     var simdiki = await etkinSekans();
-    if (simdiki === null) simdiki = String(KApp.ctx().sequenceId || "");
-    return !!(bulSekans && simdiki && simdiki !== bulSekans);
+    return simdiki === null ? String(KApp.ctx().sequenceId || "") : simdiki;
+  }
+
+  /*
+   * Anlar etkin sekansa yazılabilir mi? Döner: { sekans, uyari } — uyari boşsa yazılabilir.
+   * Etkin sekans bilinmiyorsa (sekans yok ya da Premiere'e ulaşılamadı) yazılmaz: KS_setInOut
+   * ve KS_makeShorts hangi sekansa yazacağını denetlemez. Arama anında sekans okunamadıysa
+   * (bulSekans "") denetim geçer; çağıran ilk başarılı yazmadan sonra sekansiBagla() der.
+   */
+  async function sekansDenetle() {
+    var simdiki = await sekansOku();
+    if (!simdiki) return { sekans: "", uyari: "Premiere'de etkin sekans yok ya da okunamadı: anların bulunduğu sekansı açıp tekrar dene." };
+    if (bulSekans && simdiki !== bulSekans) {
+      return { sekans: simdiki, uyari: "Viral anlar başka bir sekansta bulundu: o sekansı açıp tekrar dene (ya da anları yeniden bul)." };
+    }
+    return { sekans: simdiki, uyari: "" };
+  }
+
+  // Arama anında bilinmeyen sekans, anların ilk yazıldığı sekans olur (yalnız aynı aramada)
+  function sekansiBagla(sekans, nesil) {
+    if (!bulSekans && sekans && nesil === aramaNesli) bulSekans = sekans;
   }
 
   async function onizle(id) {
     if (indeks(id) < 0) return;
     var nesil = aramaNesli;
-    if (await baskaSekansta()) {
-      durum("Viral anlar başka bir sekansta bulundu: o sekansı açıp tekrar dene (ya da anları yeniden bul).", "warn");
+    var d = await sekansDenetle();
+    if (d.uyari) {
+      // sorgu surerken yeni arama bitmisse eski kartin uyarisi yeni sonucun ustune yazilmasin
+      if (nesil === aramaNesli) durum(d.uyari, "warn");
       return;
     }
     // sorgu surerken yeni arama bitmis olabilir (id'ler 1'den yeniden baslar): eski karta ait tiklama
@@ -371,7 +393,8 @@ window.KViral = (function () {
     var a = anlar[k];
     var r = await K.call("KS_setInOut", { start: a.start, end: a.end });
     if (r.ok) {
-      sonInOutId = id;
+      // yazma surerken yeni arama bittiyse In/Out eski ana ait: yeni kartlara baglanmaz
+      if (nesil === aramaNesli) { sekansiBagla(d.sekans, nesil); sonInOutId = id; }
       KApp.toast("In/Out ayarlandı: " + a.title + " — Dışa aktar (Ctrl+M) ile Shorts'u çıkar", "good");
     } else durum("✕ " + r.error, "bad");
   }
@@ -391,6 +414,7 @@ window.KViral = (function () {
     kartiYenile(id);
     kenarlariTazele(id);
     // In/Out bu karttan ayarlandiysa ve Premiere'de (canli sorgu) hala ayni sekans aciksa guncelle
+    // (basarili Onizle bilinmeyen sekansi baglar: sonInOutId varken bulSekans hep doludur)
     if (sonInOutId === id && bulSekans) {
       var simdiki = await etkinSekans();
       // sorgu surerken yeni arama ya da baska kaydirma olmus olabilir: en guncel kenarlar
@@ -423,9 +447,12 @@ window.KViral = (function () {
     busy = true;
     el("cap-vr-bul").disabled = true;
     durum("Yapay zekâ konuşmayı izliyor…");
-    // AI cagrisi surerken sekans/transkript degisebilir: kaynak simdiden yakalanir
+    // AI cagrisi surerken sekans/transkript degisebilir: kaynak simdiden yakalanir.
+    // Sekans Onizle/Shorts denetimiyle AYNI kaynaktan, canli sorguyla okunur: KApp.ctx()
+    // panel odakta degilken tazelenmez, bayat kimlik dogru sekanstaki anlari "baska
+    // sekansta" sayardi. Sorgu simdi gonderilir, AI cagrisiyla paralel yurur (bekleme eklemez).
     var segsHam = KCaptions.rawSegments ? KCaptions.rawSegments() : null;
-    var sekansHam = String(KApp.ctx().sequenceId || "");
+    var sekansSorgu = sekansOku();
     var temiz = HL.clean(segs);
     try {
       var s = sureler();
@@ -443,6 +470,8 @@ window.KViral = (function () {
       // istenen adetten fazlasi donerse puani en yuksek o kadar an kalir
       var bulunan = HL.parseResponse(content, segs, { minDur: s.minDur, maxDur: s.maxDur, adim: p.adim, adet: o.adet });
       if (!bulunan.length) throw new Error("Uygun an bulunamadı — süreyi değiştirip tekrar dene.");
+      // "" = okunamadi: denetimler kapanmaz, ilk basarili Onizle/Shorts sekansi baglar
+      var sekansHam = await sekansSorgu;
       // basarili arama: tum durum birlikte degisir (hata olursa onceki sonuclar bozulmadan kalir)
       anlar = bulunan.map(function (a, i) { a.id = i + 1; a.kancaNo = 0; return a; });
       aramaNesli++;
@@ -505,10 +534,8 @@ window.KViral = (function () {
     btn.disabled = true;
     var yapilan = 0, dikeySay = 0, hatalar = [];
     try {
-      if (await baskaSekansta()) {
-        durum("Viral anlar başka bir sekansta bulundu: o sekansı açıp tekrar dene (ya da anları yeniden bul).", "warn");
-        return;
-      }
+      var d = await sekansDenetle();
+      if (d.uyari) { durum(d.uyari, "warn"); return; }
       var liste = gorunenler();
       // Aralik basina ayri cagri: ilerleme gorunur, uzun Auto Reframe tek bir
       // zaman asimina takilip tum isi tekrarlatmaz (cift sekans olusmaz)
@@ -521,6 +548,8 @@ window.KViral = (function () {
         }, 600000);
         if (!r.ok) { hatalar.push("Shorts " + (i + 1) + ": " + r.error); continue; }
         yapilan += r.made; dikeySay += r.vertical;
+        // busy: bu surede yeni arama baslamaz, nesil degismez
+        if (r.made) sekansiBagla(d.sekans, aramaNesli);
         shortsKaydet(r.items || [], a);
         (r.errors || []).forEach(function (h) { hatalar.push(h); });
       }

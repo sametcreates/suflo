@@ -80,7 +80,8 @@ function ortam(opts) {
   var say = { call: [], toast: [], kaydet: 0, kanca: [], pano: [], chat: [] };
   // seq: Premiere'deki CANLI etkin sekans (KS_getContext); ctxSeq: KApp.ctx()'in bayat
   // olabilecek onbellegi (tanimsizsa seq ile ayni)
-  var durum = { seq: "seq1", ctxSeq: undefined, segs: cumleli(60), yanit: opts.yanit, hata: null };
+  // aiSirasinda: AI cagrisi surerken calisir (kullanici o arada Premiere'de sekans degistirir)
+  var durum = { seq: "seq1", ctxSeq: undefined, ctxHata: false, aiSirasinda: null, inOutSirasinda: null, segs: cumleli(60), yanit: opts.yanit, hata: null };
   var ayarlar = opts.ayarlar || {};
   var belge = {
     getElementById: function (id) { return ogeler[id] || null; },
@@ -97,7 +98,13 @@ function ortam(opts) {
       settings: function () { return ayarlar; }, saveSettings: function () { say.kaydet++; return true; },
       call: function (fn, arg) {
         say.call.push({ fn: fn, arg: arg === undefined ? undefined : JSON.parse(JSON.stringify(arg)) });
-        if (fn === "KS_getContext") return Promise.resolve({ ok: true, sequenceId: durum.seq, hasSeq: !!durum.seq });
+        if (fn === "KS_getContext") {
+          // ctxHata: Premiere'e ulasilamadi (zaman asimi / mesgul) -> K.call {ok:false} doner
+          if (durum.ctxHata) return Promise.resolve({ ok: false, error: "Premiere yanıt vermedi (KS_getContext)" });
+          return Promise.resolve({ ok: true, sequenceId: durum.seq, hasSeq: !!durum.seq });
+        }
+        // inOutSirasinda: KS_setInOut yanit vermeden once calisir (o arada yeni arama biter)
+        if (fn === "KS_setInOut" && durum.inOutSirasinda) { var f = durum.inOutSirasinda; durum.inOutSirasinda = null; return f().then(function () { return { ok: true }; }); }
         if (fn === "KS_addRangeMarkers") return Promise.resolve({ ok: true, added: arg.ranges.length });
         if (fn === "KS_makeShorts") return Promise.resolve({ ok: true, made: 1, vertical: 0, items: [] });
         return Promise.resolve({ ok: true });
@@ -110,6 +117,7 @@ function ortam(opts) {
       chatConfig: function () { return { model: "m", key: "k" }; },
       chatCall: function (cfg, body) {
         say.chat.push(body);
+        if (durum.aiSirasinda) durum.aiSirasinda();
         if (durum.hata) return Promise.reject(new Error(durum.hata));
         return Promise.resolve({ choices: [{ message: { content: JSON.stringify(durum.yanit) } }] });
       },
@@ -211,6 +219,8 @@ async function calistir() {
     t.el["cap-vr-bilgi"].textContent === "1 an gizli (60 altı)", J([bSon.disabled]));
   var bOnce = B;
   var sureA = sinifli(A, "vr-sure")[0].textContent;
+  // arama sekansi bir kez canli sorgular; kenar kaydirma bunun ustune sorgu eklememeli
+  var aramaSorgusu = t.say.call.filter(function (c) { return c.fn === "KS_getContext"; }).length;
   dugme(A, "+1 cümle ▶")[0].focus();
   await tetikle(dugme(A, "+1 cümle ▶")[0], "click");
   var A2 = kartBul(t, "Büyük itiraf");
@@ -220,7 +230,7 @@ async function calistir() {
     /^0:15–0:59 · 45 sn$/.test(sinifli(A2, "vr-sure")[0].textContent), sinifli(A2, "vr-sure")[0].textContent);
   ok("kart yenilenince kanca seçimi korunur", hepsi(A2, function (c) { return c.tagName === "INPUT" && c.type === "radio"; })[2].checked === true);
   ok("In/Out bu karttan ayarlanmadıysa kenar kaydırmak Premiere'e dokunmaz", t.say.call.filter(function (c) { return c.fn === "KS_setInOut"; }).length === 0 &&
-    t.say.call.filter(function (c) { return c.fn === "KS_getContext"; }).length === 0);
+    aramaSorgusu === 1 && t.say.call.filter(function (c) { return c.fn === "KS_getContext"; }).length === aramaSorgusu);
   await tetikle(dugme(A2, "Önizle")[0], "click");
   var io = t.say.call.filter(function (c) { return c.fn === "KS_setInOut"; });
   ok("Önizle: KS_setInOut anın sekans zamanlarıyla", io.length === 1 && io[0].arg.start === 15 && io[0].arg.end === 59.6, J(io));
@@ -321,6 +331,102 @@ async function calistir() {
   ok("adet 3: model 5 an döndürse de en yüksek puanlı 3 an kalır, bildirim 3 der", /pick the 3 best/.test(cok.say.chat[0].messages[0].content) &&
     kartlar(cok).map(function (k) { return sinifli(k, "vr-baslik")[0].textContent; }).join(",") === "p90,p80,p70" && cok.say.toast[0] === "3 viral an bulundu" &&
     cok.win.KViral.liste().length === 3, kartlar(cok).map(function (k) { return sinifli(k, "vr-baslik")[0].textContent; }).join(",") + " / " + cok.say.toast[0]);
+
+  /* ---------- 9) aramanın sekansı da canlı sorgulanır (bayat bağlam yanlış engel koymaz) ---------- */
+  function sayi(o, fn) { return o.say.call.filter(function (c) { return c.fn === fn; }).length; }
+  // Kullanici seq1'deyken Premiere'de seq2'ye gecti (panel odakta degildi, onbellek hala seq1),
+  // sonra "Viral anlari bul"a tikladi; AI calisirken yoklama onbellegi seq2'ye tazeledi
+  var bayat = ortam({ yanit: YANIT, ayarlar: { viralMinPuan: 0 } });
+  bayat.win.KViral.init();
+  bayat.durum.seq = "seq2";
+  bayat.durum.ctxSeq = "seq1";
+  bayat.durum.aiSirasinda = function () { bayat.durum.ctxSeq = undefined; };
+  await tetikle(bayat.el["cap-vr-bul"], "click");
+  ok("arama: sekans aramanın başında canlı sorgulanır", kartlar(bayat).length === 3 && sayi(bayat, "KS_getContext") === 1, sayi(bayat, "KS_getContext"));
+  var bA = kartBul(bayat, "Büyük itiraf");
+  await tetikle(dugme(bA, "Önizle")[0], "click");
+  var bIo = bayat.say.call.filter(function (c) { return c.fn === "KS_setInOut"; });
+  ok("bayat bağlamla aranan anlar aynı sekansta Önizle'yi engellemez", bIo.length === 1 && bIo[0].arg.start === 15 &&
+    !/başka bir sekansta/.test(bayat.el["cap-vr-durum"].textContent), bayat.el["cap-vr-durum"].textContent);
+  await tetikle(dugme(kartBul(bayat, "Büyük itiraf"), "+1 cümle ▶")[0], "click");
+  bIo = bayat.say.call.filter(function (c) { return c.fn === "KS_setInOut"; });
+  ok("bayat bağlamla aranan anlarda ±1 In/Out'u canlı günceller", bIo.length === 2 && bIo[1].arg.end === 59.6, J(bIo));
+  await tetikle(bayat.el["cap-vr-shorts"], "click");
+  ok("bayat bağlamla aranan anlarda Shorts oluşturulur", sayi(bayat, "KS_makeShorts") === 3 && !/başka bir sekansta/.test(bayat.el["cap-vr-durum"].textContent),
+    bayat.el["cap-vr-durum"].textContent);
+
+  // Arama başladıktan sonra (AI çalışırken) sekans değişirse arama başındaki sekans geçerlidir
+  var arada = ortam({ yanit: YANIT, ayarlar: { viralMinPuan: 0 } });
+  arada.win.KViral.init();
+  arada.durum.aiSirasinda = function () { arada.durum.seq = "seq3"; arada.durum.ctxSeq = "seq3"; };
+  await tetikle(arada.el["cap-vr-bul"], "click");
+  await tetikle(dugme(kartBul(arada, "Büyük itiraf"), "Önizle")[0], "click");
+  ok("AI çalışırken sekans değişirse anlar arama başındaki sekansa aittir", sayi(arada, "KS_setInOut") === 0 &&
+    /başka bir sekansta/.test(arada.el["cap-vr-durum"].textContent), arada.el["cap-vr-durum"].textContent);
+  arada.durum.seq = "seq1"; arada.durum.ctxSeq = undefined;
+  await tetikle(dugme(kartBul(arada, "Büyük itiraf"), "Önizle")[0], "click");
+  ok("arama başındaki sekansa dönünce Önizle çalışır", sayi(arada, "KS_setInOut") === 1);
+
+  // Arama anında sekans bilinemedi (canlı sorgu başarısız, bağlam kopuk): denetimler kapanmaz
+  var bilinmez = ortam({ yanit: YANIT, ayarlar: { viralMinPuan: 0 } });
+  bilinmez.win.KViral.init();
+  bilinmez.durum.ctxHata = true;
+  bilinmez.durum.ctxSeq = "";
+  await tetikle(bilinmez.el["cap-vr-bul"], "click");
+  ok("bilinmeyen sekansla da anlar listelenir", kartlar(bilinmez).length === 3);
+  await tetikle(dugme(kartBul(bilinmez, "Büyük itiraf"), "Önizle")[0], "click");
+  ok("etkin sekans hâlâ okunamıyorsa Önizle Premiere'e yazmaz, uyarır", sayi(bilinmez, "KS_setInOut") === 0 &&
+    /etkin sekans yok ya da okunamadı/.test(bilinmez.el["cap-vr-durum"].textContent), bilinmez.el["cap-vr-durum"].textContent);
+  await tetikle(bilinmez.el["cap-vr-shorts"], "click");
+  ok("etkin sekans hâlâ okunamıyorsa Shorts oluşturulmaz", sayi(bilinmez, "KS_makeShorts") === 0 &&
+    /etkin sekans yok ya da okunamadı/.test(bilinmez.el["cap-vr-durum"].textContent) && bilinmez.el["cap-vr-shorts"].disabled === false);
+  // Premiere yeniden yanıt veriyor: ilk başarılı Önizle anları o sekansa bağlar
+  bilinmez.durum.ctxHata = false;
+  bilinmez.durum.ctxSeq = undefined;
+  await tetikle(dugme(kartBul(bilinmez, "Büyük itiraf"), "Önizle")[0], "click");
+  ok("bilinmeyen sekansta ilk başarılı Önizle In/Out ayarlar", sayi(bilinmez, "KS_setInOut") === 1);
+  bilinmez.durum.seq = "seq2";
+  var yz = yazanlar(bilinmez).length;
+  await tetikle(dugme(kartBul(bilinmez, "Büyük itiraf"), "+1 cümle ▶")[0], "click");
+  ok("bağlanan sekans dışında ±1 In/Out'u güncellemez (denetim sessizce kapanmaz)", yazanlar(bilinmez).length === yz &&
+    /In\/Out güncellenmedi/.test(bilinmez.el["cap-vr-durum"].textContent), bilinmez.el["cap-vr-durum"].textContent);
+  await tetikle(dugme(kartBul(bilinmez, "Büyük itiraf"), "Önizle")[0], "click");
+  await tetikle(bilinmez.el["cap-vr-shorts"], "click");
+  ok("bağlanan sekans dışında Önizle ve Shorts engellenir", yazanlar(bilinmez).length === yz &&
+    /başka bir sekansta/.test(bilinmez.el["cap-vr-durum"].textContent), bilinmez.el["cap-vr-durum"].textContent);
+  bilinmez.durum.seq = "seq1";
+  await tetikle(dugme(kartBul(bilinmez, "Büyük itiraf"), "+1 cümle ▶")[0], "click");
+  ok("bağlanan sekansa dönünce ±1 In/Out'u yine canlı günceller", sayi(bilinmez, "KS_setInOut") === 2);
+
+  // Bilinmeyen sekansta Shorts önce yapılırsa anlar o sekansa bağlanır
+  var sOnce = ortam({ yanit: YANIT, ayarlar: { viralMinPuan: 0 } });
+  sOnce.win.KViral.init();
+  sOnce.durum.ctxHata = true;
+  sOnce.durum.ctxSeq = "";
+  await tetikle(sOnce.el["cap-vr-bul"], "click");
+  sOnce.durum.ctxHata = false;
+  sOnce.durum.ctxSeq = undefined;
+  await tetikle(sOnce.el["cap-vr-shorts"], "click");
+  ok("bilinmeyen sekansta Shorts etkin sekansta oluşturulur", sayi(sOnce, "KS_makeShorts") === 3);
+  sOnce.durum.seq = "seq2";
+  await tetikle(dugme(kartBul(sOnce, "Büyük itiraf"), "Önizle")[0], "click");
+  ok("Shorts'tan sonra anlar o sekansa bağlıdır: başka sekansta Önizle engellenir", sayi(sOnce, "KS_setInOut") === 0 &&
+    /başka bir sekansta/.test(sOnce.el["cap-vr-durum"].textContent), sOnce.el["cap-vr-durum"].textContent);
+
+  // In/Out yazılırken yeni arama biterse eski tıklama yeni kartlara bağlanmaz (id'ler 1'den başlar)
+  var yarisan = ortam({ yanit: YANIT, ayarlar: { viralMinPuan: 0, viralSira: "zaman" } });
+  yarisan.win.KViral.init();
+  yarisan.durum.ctxHata = true;
+  yarisan.durum.ctxSeq = "";
+  await tetikle(yarisan.el["cap-vr-bul"], "click");
+  yarisan.durum.ctxHata = false;
+  yarisan.durum.ctxSeq = undefined;
+  yarisan.durum.inOutSirasinda = function () { return tetikle(yarisan.el["cap-vr-bul"], "click"); };
+  await tetikle(dugme(kartBul(yarisan, "Büyük itiraf"), "Önizle")[0], "click");
+  var yIo = sayi(yarisan, "KS_setInOut");
+  await tetikle(dugme(kartlar(yarisan)[0], "+1 cümle ▶")[0], "click");
+  ok("In/Out yazılırken yeni arama biterse bildirim gelir ama yeni kart bağlanmaz", yIo === 1 && sayi(yarisan, "KS_setInOut") === 1 &&
+    /In\/Out ayarlandı/.test(yarisan.say.toast.join(" | ")), yarisan.say.toast.join(" | "));
 }
 
 calistir().then(function () {

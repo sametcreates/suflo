@@ -117,7 +117,8 @@ ok("Shorts yukleme: editor gorunur, bos ekranda geri al yigini sifir, ana taslak
   /el\("cap-result"\)\.hidden = false/.test(sa) && /undoStack\.length = 0/.test(sa) && !/saveDraftNow\(\)/.test(sa) && /cancelDraft\(\)/.test(sa));
 ok("yeni transkript / SRT / taslak kurtarma Shorts modunu kapatir", (cj.match(/shortsYuklenen = "";/g) || []).length >= 3);
 ok("viral: anlar baska sekansta bulunduysa Shorts olusturulmaz, bulundugu andaki transkript kullanilir",
-  /bulSekans && simdiki && simdiki !== bulSekans/.test(vj) && /sliceSegments\(bulSegs \|\| KCaptions\.rawSegments\(\)/.test(vj));
+  /bulSekans && simdiki !== bulSekans/.test(vj) && /var d = await sekansDenetle\(\);\s*if \(d\.uyari\) \{ durum\(d\.uyari, "warn"\); return; \}\s*var liste = gorunenler\(\);/.test(vj) &&
+  /sliceSegments\(bulSegs \|\| KCaptions\.rawSegments\(\)/.test(vj));
 
 /* sekizinci inceleme */
 ok("geri al yigini Shorts durumunu tasir ve geri yukler", /shorts: shortsYuklenen, ts: Date\.now\(\)/.test(cj) && /if \(typeof st\.shorts === "string"\) \{\s*shortsYuklenen = st\.shorts;/.test(cj) &&
@@ -126,7 +127,8 @@ var goKod = cj.slice(cj.indexOf("var oncekiIs = segments.length"), cj.indexOf('e
 ok("yeni transkript: Shorts modu yalniz basarida kapanir", goKod.indexOf('shortsYuklenen = "";') > goKod.indexOf("clearRevert();"));
 ok("uygulama: Shorts (ya da rehberin ornegi) uygulaninca ana taslak silinmez", /if \(!shortsYuklenen(?: && !ornekBelge)?\) K\.clearDraft\(\);/.test(cj));
 ok("Shorts kaydi ceviri dilini de saklar", /harita\[shortsYuklenen\]\.ceviriDili = ceviriDili;/.test(cj));
-ok("viral: kaynak transkript/sekans AI cagrisindan once yakalanir", vj.indexOf("var segsHam") < vj.indexOf("await KCaptions.chatCall"));
+ok("viral: kaynak transkript/sekans AI cagrisindan once yakalanir (sekans canli sorguyla)", vj.indexOf("var segsHam") < vj.indexOf("await KCaptions.chatCall") &&
+  vj.indexOf("var sekansSorgu = sekansOku();") > 0 && vj.indexOf("var sekansSorgu = sekansOku();") < vj.indexOf("await KCaptions.chatCall"));
 var rd = cj.slice(cj.indexOf("function restoreDraft(d) {"), cj.indexOf("function restoreDraft(d) {") + 600);
 ok("taslak kurtarma: Shorts bayragi anlik goruntuden SONRA sifirlanir", rd.indexOf('snapshot("taslak kurtarma")') < rd.indexOf('shortsYuklenen = "";'));
 /* createSubsequence(true) hata verirse argumansiz denenir */
