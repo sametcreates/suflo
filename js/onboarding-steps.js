@@ -228,6 +228,12 @@
   function aiProOzelligi(ozellik) {
     return Object.prototype.hasOwnProperty.call(PRO_AI, ozellik) ? PRO_AI[ozellik] : "";
   }
+  // Kapısı deneme hakkını da kabul eden (Pro.gate(..., { deneme: true })) Pro özellikleri.
+  // B-roll önerileri deneme kabul etmez: hakkı kalan ücretsiz kullanıcıya anahtar çipi gösterilmez.
+  var PRO_AI_DENEME = { "Çeviri": 1, "Çok dilli SRT paketi": 1, "Viral anlar": 1, "AI tekrar gruplama": 1 };
+  function aiDenemeKabul(ozellik) {
+    return Object.prototype.hasOwnProperty.call(PRO_AI_DENEME, ozellik);
+  }
 
   // Rehberin 4. adımı ve anahtar sihirbazı: Pro durumuna göre dürüst özellik listesi
   function aiMetni(pro, tamam) {
@@ -441,6 +447,7 @@
     modelSec: modelSec,
     kurulumSecenekleri: kurulumSecenekleri,
     aiProOzelligi: aiProOzelligi,
+    aiDenemeKabul: aiDenemeKabul,
     aiMetni: aiMetni,
     ornekHataMetni: ornekHataMetni,
     ornekSonucu: ornekSonucu,

@@ -141,6 +141,20 @@ var r6 = R.detect(cekimler, { lang: "tr", script: senaryo, policy: "son" });
 var g6 = r6.groups.filter(function (g) { return g.takes.indexOf(3) !== -1; })[0];
 chk("detect + senaryo: senaryoya en yakın çekim tutulur", g6 && g6.keep === 3, JSON.stringify(r6.groups));
 chk("detect + senaryo: senaryo dışı listelenir ama işaretlenmez", r6.offscript.indexOf(4) !== -1 && R.labelWords(cekimler, r6).slice(r6.sents[4].a, r6.sents[4].b + 1).every(function (x) { return x === null; }));
+// tek okunan satır, ortasında nefes duraksaması: iki yarı çekim sayılmaz (noktalamalı ve noktalamasız)
+var nefesSenaryo = "Önce tavayı orta ateşte iyice ısıtıyoruz, ardından tereyağını ekleyip eritiyoruz ve tuz serpiyoruz.";
+[["noktalamalı", ["Önce tavayı orta ateşte iyice ısıtıyoruz, ardından", "tereyağını ekleyip eritiyoruz ve tuz serpiyoruz."]],
+ ["noktalamasız", ["önce tavayı orta ateşte iyice ısıtıyoruz ardından", "tereyağını ekleyip eritiyoruz ve tuz serpiyoruz"]]].forEach(function (d) {
+  var w = kur(d[1]);
+  var rn = R.detect(w, { lang: "tr", script: nefesSenaryo });
+  chk("senaryo: nefesle bölünen tek okuma tekrar çekim değil (" + d[0] + ")",
+    rn.groups.length === 0 && R.labelWords(w, rn).every(function (x) { return x === null; }) && rn.offscript.length === 0,
+    JSON.stringify(rn.groups));
+});
+// gerçek çekim yine yakalanır: yarım bırakılan baş + tam okuma
+var yarimBas = kur(["Önce tavayı orta ateşte", "Önce tavayı orta ateşte iyice ısıtıyoruz, ardından tereyağını ekleyip eritiyoruz ve tuz serpiyoruz."]);
+var ry = R.detect(yarimBas, { lang: "tr", script: nefesSenaryo });
+chk("senaryo: yarım baş + tam okuma yine grup, tam okuma tutulur", ry.groups.length === 1 && ry.groups[0].keep === 1, JSON.stringify(ry.groups));
 // performans: 300 satır × 600 cümle < 1 sn
 var kelimeHavuzu = ["kamera", "ışık", "mikrofon", "kurgu", "renk", "ses", "müzik", "geçiş", "yazı", "efekt", "video", "klip", "sahne", "çekim", "plan", "açı", "lens", "odak", "pozlama", "beyaz"];
 var satirlar = [], ses = [];

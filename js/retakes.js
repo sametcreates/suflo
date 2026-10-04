@@ -61,6 +61,24 @@
     return prev[m];
   }
 
+  // tokEq ile LCS'de eşlenen a konumları (a = senaryo satırı): hangi satır parçasını kapsıyor?
+  function lcsKonum(a, b) {
+    var n = a.length, m = b.length, i, j, out = [];
+    if (!n || !m) return out;
+    var T = [];
+    for (i = 0; i <= n; i++) { T.push(new Array(m + 1)); for (j = 0; j <= m; j++) T[i][j] = 0; }
+    for (i = 1; i <= n; i++) for (j = 1; j <= m; j++) {
+      T[i][j] = tokEq(a[i - 1], b[j - 1]) ? T[i - 1][j - 1] + 1 : Math.max(T[i - 1][j], T[i][j - 1]);
+    }
+    i = n; j = m;
+    while (i > 0 && j > 0) {
+      if (tokEq(a[i - 1], b[j - 1]) && T[i][j] === T[i - 1][j - 1] + 1) { out.push(i - 1); i--; j--; }
+      else if (T[i - 1][j] >= T[i][j - 1]) i--;
+      else j--;
+    }
+    return out.reverse();
+  }
+
   /*
    * sim(a, b): { dice, pref }
    *   dice = 2·LCS/(|a|+|b|)
@@ -320,6 +338,7 @@
       else { lineOf[s2] = son; son = c; }
     }
     sonuc.lineOf = lineOf;
+    sonuc.satirlar = lines;
     var satirCekim = {};
     for (var s3 = 0; s3 < S; s3++) {
       var li = lineOf[s3];
@@ -511,12 +530,36 @@
           ln.takes.forEach(function (id) { if (hedef.takes.indexOf(id) !== -1) hedef.scriptScore[id] = ln.scores[id]; });
         } else {
           var temiz = ln.takes.filter(function (id) { return !has(dolu, id); });
-          if (temiz.length < 2) return;
-          var sg = grupKur(temiz, "script");
-          sg.conf = ln.scores[ln.keep] >= 0.7 ? "yuksek" : "orta";
-          sg.scriptScore = ln.scores;
-          temiz.forEach(function (id) { dolu[id] = 1; });
-          groups.push(sg);
+          // Aynı satıra düşen cümleler ancak satırın AYNI kısmını söylüyorsa çekimdir:
+          // tek okumada nefes duraksamasıyla bölünen yarılar ardışık, örtüşmeyen
+          // parçaları kapsar ve tekrar çekim sayılmaz.
+          var satirTok = al.satirlar[ln.line].tok;
+          var kapsam = temiz.map(function (id) {
+            var o = {};
+            lcsKonum(satirTok, sents[id].tok).forEach(function (x) { o[x] = 1; });
+            return o;
+          });
+          var su = UF(temiz.length);
+          for (var x1 = 0; x1 < temiz.length; x1++) for (var x2 = x1 + 1; x2 < temiz.length; x2++) {
+            var k1 = Object.keys(kapsam[x1]), k2 = Object.keys(kapsam[x2]);
+            var az = Math.min(k1.length, k2.length), ortak = 0;
+            if (!az) continue;
+            k1.forEach(function (kk) { if (has(kapsam[x2], kk)) ortak++; });
+            if (ortak / az >= 0.5) su.birlestir(x1, x2);
+          }
+          var kume = {};
+          temiz.forEach(function (id, xi) { var r = su.bul(xi); (kume[r] = kume[r] || []).push(id); });
+          Object.keys(kume).forEach(function (r) {
+            var uy = kume[r];
+            if (uy.length < 2) return;
+            var sg = grupKur(uy, "script");
+            var enIyi = 0;
+            uy.forEach(function (id) { if (!sents[id].yarim && ln.scores[id] > enIyi) enIyi = ln.scores[id]; });
+            sg.conf = enIyi >= 0.7 ? "yuksek" : "orta";
+            sg.scriptScore = ln.scores;
+            uy.forEach(function (id) { dolu[id] = 1; });
+            groups.push(sg);
+          });
         }
         ln.takes.forEach(function (id) { tutulan[id] = 1; });
       });

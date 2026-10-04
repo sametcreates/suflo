@@ -65,13 +65,14 @@ window.KOnboarding = (function () {
     try { return !!(window.KCaptions && KCaptions.chatConfig && KCaptions.chatConfig()); } catch (e) { return anahtarVar(); }
   }
   function proMu() { return !!(window.Pro && Pro.isPro && Pro.isPro()); }
-  // Bu yapay zekâ özelliği bu kullanıcıda açık mı? (Pro kapısı sessiz sorulur; deneme
-  // hakkı kalan ücretsiz kullanıcı da çalıştırabilir: ona da "anahtar gerekli" çipi görünür)
+  // Bu yapay zekâ özelliği bu kullanıcıda açık mı? (Pro kapısı sessiz sorulur; kapısı deneme
+  // kabul eden özellikte hakkı kalan ücretsiz kullanıcı da çalıştırabilir: ona da çip görünür)
   function ozellikAcik(ozellik) {
     var anahtar = SO.aiProOzelligi(ozellik);
     if (!anahtar || !window.Pro || !Pro.gate) return true;
     try {
       if (Pro.gate(anahtar, { silent: true }) === true) return true;
+      if (!SO.aiDenemeKabul(ozellik)) return false;
       return !!(Pro.denemeKalan && Pro.denemeKalan(anahtar) > 0);
     } catch (e) { return true; }
   }

@@ -451,6 +451,14 @@ ok("ücretsiz, deneme hakkı bitmiş: 'AI tekrar gruplama' yanında anahtar çip
 var tDeneme = sahte({ ayarVardi: false, deneme: { textcut: 3 } });
 tDeneme.OB.init();
 ok("ücretsiz ama Konuşmadan kes deneme hakkı var: 'AI tekrar gruplama' yanında anahtar çipi", cipGorunur(tDeneme, "tc-ai-lbl") && !cipGorunur(tDeneme, "cap-vr-bul"));
+// gerçekçi taze deneme deposu: her araçta 3 hak; B-roll kapısı deneme kabul etmez
+var tTaze = sahte({ ayarVardi: false, deneme: { cut: 3, zoom: 3, overlay: 3, beat: 3, textcut: 3, translate: 3, highlights: 3, transitions: 3, captionStyles: 3 } });
+tTaze.OB.init();
+ok("taze deneme deposu: B-roll yanında anahtar çipi YOK (kapısı deneme kabul etmez)", !cipGorunur(tTaze, "cap-br-bul"));
+ok("taze deneme deposu: deneme kabul eden Viral/Çeviri/AI tekrar gruplama yanında çip var",
+  ["cap-vr-bul", "cap-translate-go", "tc-ai-lbl"].every(function (id) { return cipGorunur(tTaze, id); }));
+ok("aiDenemeKabul: B-roll hayır, Viral/Çeviri/AI tekrar gruplama evet",
+  !SO.aiDenemeKabul("B-roll önerileri") && SO.aiDenemeKabul("Viral anlar") && SO.aiDenemeKabul("Çeviri") && SO.aiDenemeKabul("AI tekrar gruplama") && !SO.aiDenemeKabul("AI metin kontrolü"));
 var tPro = sahte({ ayarVardi: false, pro: true });
 tPro.OB.init();
 ok("Pro kullanıcı: yedi AI düğmesinin hepsinde anahtar çipi", ["cap-proofread", "cap-translate-go", "cap-ch-ai", "cap-yt-go", "cap-vr-bul", "cap-br-bul", "kanca-ai"].every(function (id) { return cipGorunur(tPro, id); }));
