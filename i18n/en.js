@@ -1994,7 +1994,11 @@
     "O sekansı aç.": "Open that sequence.",
     "Premiere yanıt vermedi.": "Premiere didn't respond.",
     "Temiz katman timeline'a konamadı.": "Couldn't place the clean layer on the timeline.",
-    "Eski katman kaldırılamadı.": "Couldn't remove the old layer."
+    "Eski katman kaldırılamadı.": "Couldn't remove the old layer.",
+    "Ücretsiz dene · {n} hakkın var": "Try free · {} tries left",
+    "Hak yalnız işlem başarıyla bitince düşer · stilli katmanlarda küçük suflo.app filigranı olur": "A credit is used only when the job succeeds · styled layers get a small suflo.app watermark",
+    "Hak yalnız işlem başarıyla bitince düşer": "A credit is used only when the job succeeds",
+    "Deneme açık — tekrar tıkla": "Trial on — click again"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

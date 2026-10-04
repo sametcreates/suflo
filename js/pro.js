@@ -2,8 +2,10 @@
  * pro.js — Suflo Pro lisans kapisi (license gating)
  * -------------------------------------------------------------
  * Bu modul, sadece SAHIBIN kendi yazdigi Pro ozelliklerini kilitler
- * (animasyonlu overlay, karaoke, otomatik kesim, ritim, toplu transkripsiyon,
- *  ceviri, stilli ASS, sozluk). Ucretsiz MIT cekirdegine dokunmaz.
+ * (animasyonlu overlay, otomatik kesim, ritim, toplu transkripsiyon, ceviri,
+ *  stilli ASS ve icerik kutuphaneleri). Ucretsiz MIT cekirdegine dokunmaz.
+ * Kodla calisan Pro araclarinin her birine ucretsiz kullanici icin 3 kalici
+ * deneme hakki vardir (bkz. 6a ve js/deneme.js).
  *
  * Saglayici: Lemon Squeezy License API (Merchant-of-Record, TR odemeye uygun).
  * CEP + Node (--enable-nodejs) ortaminda calisir: HTTPS cagrisini panelin
@@ -21,7 +23,15 @@
  *   Pro.validate(cb)          -> arka planda yeniden dogrular
  *   Pro.deactivate(cb)        -> bu makinedeki koltugu birakir
  *   Pro.gate(feature, opts)   -> Pro degilse upsell gosterir, false doner
- *   Pro.status()              -> UI icin durum nesnesi
+ *                                opts.deneme: true -> kurulmus deneme hakkiyla gecer (SENKRON kalir)
+ *                                opts.yeniden: fn  -> "Ucretsiz dene"den sonra ayni eylemi yeniden calistirir
+ *                                opts.silent: true -> upsell gosterme
+ *   Pro.denemeHarca(f, bildir)-> yalniz BASARI dalinda: kurulmus hakki harcar, kalan sayiyi doner (-1 = yok)
+ *   Pro.denemeAcik(f)         -> bu ozellikte deneme kurulu mu (Pro degilken)
+ *   Pro.denemeBaslat(f)       -> denemeyi kurar (listede olmayan / hakki biten ozellikte false)
+ *   Pro.filigranGerekli()     -> stilli katman / kanca basligi filigranli mi uretilmeli
+ *   Pro.denemeCiktilari()     -> satin alma sonrasi temiz yeniden olusturulacak deneme ciktilari
+ *   Pro.status()              -> UI icin durum nesnesi (deneme: her aracin kalan hakki)
  *   Pro.on(fn)                -> durum degisince UI'yi tazele
  *   Pro.onUpgrade(fn)         -> "Yukselt" tiklaninca ne olacagini app.js belirler
  *   Pro.configure({...})      -> store/product/variant ID'lerini disardan ver
@@ -120,6 +130,21 @@
 
   function cacheFile()   { var d = appDataDir(); return d ? path.join(d, 'pro-license.json') : null; }
   function machineFile() { var d = appDataDir(); return d ? path.join(d, 'pro-machine.json') : null; }
+  function denemeFile()  { var d = appDataDir(); return d ? path.join(d, 'pro-deneme.json') : null; }
+  function ciktiFile()   { var d = appDataDir(); return d ? path.join(d, 'deneme-ciktilari.json') : null; }
+
+  // Atomik yazim: once .tmp, sonra yerine (yarim yazilmis dosya kalmasin), yalniz sahibi okur (0600)
+  function atomikYaz(f, metin) {
+    if (!f || !fs) return false;
+    var tmp = f + '.tmp';
+    try {
+      fs.writeFileSync(tmp, metin, { encoding: 'utf8', mode: 384 }); // 0600
+      if (fs.existsSync(f)) fs.unlinkSync(f);
+      fs.renameSync(tmp, f);
+      try { fs.chmodSync(f, 384); } catch (eMode) {}
+      return true;
+    } catch (e) { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp) {} return false; }
+  }
 
   // ================================================================
   // Yardimcilar: makine kimligi (koltugu tekrar tekrar yakmamak icin sabit)
@@ -164,13 +189,7 @@
     var f = cacheFile();
     if (!f) return;
     obj._sig = sign(obj);
-    var tmp = f + '.tmp';
-    try {
-      fs.writeFileSync(tmp, JSON.stringify(obj), { encoding: 'utf8', mode: 384 }); // 0600
-      if (fs.existsSync(f)) fs.unlinkSync(f);
-      fs.renameSync(tmp, f);
-      try { fs.chmodSync(f, 384); } catch (eMode) {}
-    } catch (e) { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp) {} }
+    atomikYaz(f, JSON.stringify(obj));
   }
 
   function readCache() {
@@ -387,16 +406,158 @@
     return _state.pro === true;
   }
 
+  // ================================================================
+  // 6a) PRO'YU DENE — her araca 3 kalici hak (js/deneme.js saf mantigi)
+  //     Hak yalniz islem BASARIYLA bitince duser: kapi "kurulu" denemeyle gecer,
+  //     cagiran modul basari dalinda denemeHarca() der. Kurulum yalniz bellekte.
+  //     Onur sistemi (lisans gibi): imza hafif engeldir, guvenlik degil.
+  // ================================================================
+  var DENEME_LS = 'suflo.deneme';
+  var _deneme = null;    // dosya + localStorage birlesimi (bu oturumda yalniz buyur)
+  var _armed = {};       // kurulan denemeler: { cut: true } — kalici DEGIL
+  var _ciktilar = null;  // deneme ciktilari onbellegi
+
+  function DM() { return (typeof window !== 'undefined' && window.SufloDeneme) || null; }
+  function lsAl() { try { return (typeof localStorage !== 'undefined' && localStorage) ? localStorage : null; } catch (e) { return null; } }
+
+  // Imzali metin -> durum. Imza ya da bicim bozuksa TUKENMIS (sifirlanmaz).
+  function imzaliDurum(ham) {
+    var Dm = DM();
+    try {
+      var j = JSON.parse(ham);
+      if (!j || typeof j !== 'object' || j._sig !== sign(j) || !Dm.gecerliMi(j)) return Dm.tukenmis();
+      return Dm.birlestir(j, Dm.bos());   // _sig'siz temiz kopya
+    } catch (e) { return Dm.tukenmis(); }
+  }
+  // Dosya yoksa null (taze); okunamiyorsa ya da kurcalanmissa tukenmis
+  function denemeDosyadan() {
+    var f = denemeFile();
+    if (!f) return null;
+    var ham;
+    try { ham = fs.readFileSync(f, 'utf8'); }
+    catch (e) { return e && e.code === 'ENOENT' ? null : DM().tukenmis(); }
+    return imzaliDurum(ham);
+  }
+  function denemeLsden() {
+    var ls = lsAl();
+    if (!ls) return null;
+    var ham = null;
+    try { ham = ls.getItem(DENEME_LS); } catch (e) { return null; }
+    return ham ? imzaliDurum(ham) : null;
+  }
+  // taze: diskten yeniden oku (harcamadan once; baska bir Premiere ornegi harcamis olabilir)
+  function denemeYukle(taze) {
+    var Dm = DM();
+    if (!Dm) return null;
+    if (!_deneme || taze) {
+      var d = Dm.birlestir(denemeDosyadan() || Dm.bos(), denemeLsden() || Dm.bos());
+      _deneme = _deneme ? Dm.birlestir(_deneme, d) : d;
+    }
+    return _deneme;
+  }
+  function denemeYaz(d) {
+    var Dm = DM();
+    var obj = Dm.birlestir(d, Dm.bos());
+    obj._sig = sign(obj);
+    var metin = JSON.stringify(obj);
+    atomikYaz(denemeFile(), metin);
+    var ls = lsAl();
+    if (ls) { try { ls.setItem(DENEME_LS, metin); } catch (e) {} }
+  }
+
+  function denemeKalan(f) {
+    var Dm = DM();
+    if (!Dm || isPro()) return 0;
+    return Dm.kalan(denemeYukle(false), f);
+  }
+
+  function denemeBaslat(f) {
+    var Dm = DM();
+    if (isPro() || !Dm || !Dm.listede(f) || denemeKalan(f) <= 0) return false;
+    _armed[f] = true;
+    return true;
+  }
+
+  function denemeAcik(f) { return !isPro() && _armed[f] === true; }
+
+  // Yalniz BASARI dalinda cagrilir. Pro'da ya da kurulu deneme yokken hicbir sey yapmaz (-1).
+  // bildir(mesaj, tur): cagiranin bildirimi (KApp.toast) — "1 deneme hakki kullanildi · N kaldi"
+  function denemeHarca(f, bildir) {
+    if (isPro() || _armed[f] !== true) return -1;
+    var Dm = DM();
+    delete _armed[f];
+    if (!Dm) return -1;
+    var yeni = Dm.harca(denemeYukle(true), f);
+    _deneme = yeni;
+    denemeYaz(yeni);
+    var k = Dm.kalan(yeni, f);
+    emit();
+    if (typeof bildir === 'function') { try { bildir(Dm.harcamaMesaji(k), 'good'); } catch (e) {} }
+    return k;
+  }
+
+  // Deneme ciktilari stilli katman ve kanca basligina filigran ekler; Pro temiz uretir
+  function filigranGerekli() { return !isPro(); }
+
+  function denemeOzet() {
+    var Dm = DM();
+    if (!Dm || isPro()) return null;
+    return Dm.ozet(denemeYukle(false));
+  }
+
+  // ---- Deneme ciktilari: satin almadan sonra temiz yeniden olusturmak icin (en cok 10) ----
+  function denemeCiktilari() {
+    var Dm = DM();
+    if (!Dm) return [];
+    if (!_ciktilar) {
+      _ciktilar = [];
+      var f = ciktiFile();
+      if (f) {
+        try {
+          var j = JSON.parse(fs.readFileSync(f, 'utf8'));
+          _ciktilar = Dm.ciktiEkle(j && Array.isArray(j.liste) ? j.liste : [], null);
+        } catch (e) {}
+      }
+    }
+    return _ciktilar.slice();
+  }
+  function ciktilariYaz(liste) {
+    _ciktilar = liste;
+    atomikYaz(ciktiFile(), JSON.stringify({ v: 1, liste: liste }));
+    emit();
+  }
+  function denemeCiktisiEkle(k) {
+    var Dm = DM();
+    if (!Dm || !Dm.ciktiGecerliMi(k)) return false;
+    ciktilariYaz(Dm.ciktiEkle(denemeCiktilari(), k));
+    return true;
+  }
+  function denemeCiktisiSil(yol) {
+    var Dm = DM();
+    if (!Dm) return;
+    ciktilariYaz(Dm.ciktiSil(denemeCiktilari(), yol));
+  }
+
+  function bildirim(msg, tur) {
+    try { if (typeof window !== 'undefined' && window.KApp && window.KApp.toast) window.KApp.toast(msg, tur); } catch (e) {}
+  }
+
   function gate(feature, opts) {
     opts = opts || {};
     if (isPro()) return true;
-    if (opts.silent !== true) showUpsell(feature);
+    var deneme = opts.deneme === true;
+    if (deneme && _armed[feature] === true && denemeKalan(feature) > 0) return true;
+    // Deneme dugmesi yalniz deneme kabul eden cagrilarda (kutuphaneler, toplu klip, ASS hic gormez)
+    if (opts.silent !== true) showUpsell(feature, { kalan: deneme ? denemeKalan(feature) : 0, yeniden: opts.yeniden });
     return false;
   }
 
   function onUpgrade(fn) { _onUpgrade = fn; }
 
-  function showUpsell(feature) {
+  function showUpsell(feature, o) {
+    o = o || {};
+    var Dm = DM();
+    var denemeHakki = (Dm && Dm.listede(feature) && Number(o.kalan) > 0) ? Math.floor(Number(o.kalan)) : 0;
     var label = FEATURE_LABELS[feature] || 'Bu ozellik';
     var isMogrt = feature === 'mogrt' || feature === 'propack';
     var isCaption = feature === 'captionStyles';
@@ -459,7 +620,13 @@
         proof + benefits +
         '<div class="pro-upsell-fiyat"><span>TEK SEFERL\u0130K · <s>1.249 TL</s></span><b>749 TL</b><small>+ KDV \u00b7 abonelik yok \u00b7 dakika limiti yok</small></div>' +
         '<div class="pro-upsell-actions">' +
-          '<button id="pro-upsell-go" class="pro-btn-primary">' + buyText + '</button>' +
+          (denemeHakki > 0
+            ? '<button id="pro-upsell-deneme" class="pro-btn-primary pro-upsell-trial">' + esc('Ücretsiz dene · ' + denemeHakki + ' hakkın var') + '</button>' +
+              '<p class="pro-upsell-trial-note">' + esc(feature === 'overlay'
+                ? 'Hak yalnız işlem başarıyla bitince düşer · stilli katmanlarda küçük suflo.app filigranı olur'
+                : 'Hak yalnız işlem başarıyla bitince düşer') + '</p>'
+            : '') +
+          '<button id="pro-upsell-go" class="' + (denemeHakki > 0 ? 'pro-btn-ghost' : 'pro-btn-primary') + '">' + buyText + '</button>' +
           '<button id="pro-upsell-demo" class="pro-btn-ghost">Tüm Pro\'yu gör</button>' +
         '</div>' +
         '<button id="pro-upsell-key" class="pro-link-btn">Lisans anahtar\u0131m var</button>' +
@@ -474,7 +641,7 @@
     function escKapat(e) {
       if (e.key === 'Escape') { close(); return; }
       if (e.key !== 'Tab') return;
-      var ids = ['pro-upsell-x', 'pro-upsell-go', 'pro-upsell-demo', 'pro-upsell-key'];
+      var ids = ['pro-upsell-x', 'pro-upsell-deneme', 'pro-upsell-go', 'pro-upsell-demo', 'pro-upsell-key'];
       var focusables = ids.map(function (id) { return document.getElementById(id); }).filter(function (n) { return n && !n.disabled; });
       if (!focusables.length) return;
       var at = focusables.indexOf(document.activeElement);
@@ -496,7 +663,16 @@
       close();
       if (typeof _onUpgrade === 'function') _onUpgrade(feature, 'activate');
     };
-    try { document.getElementById('pro-upsell-go').focus(); } catch (e) {}
+    var denemeBtn = document.getElementById('pro-upsell-deneme');
+    if (denemeBtn) denemeBtn.onclick = function () {
+      // window.confirm YOK: kapi senkron kalir, eylem kurulan denemeyle yeniden calisir
+      var kuruldu = denemeBaslat(feature);
+      close();
+      if (!kuruldu) return;
+      if (typeof o.yeniden === 'function') setTimeout(function () { o.yeniden(); }, 0);
+      else bildirim('Deneme açık — tekrar tıkla', 'good');
+    };
+    try { (denemeBtn || document.getElementById('pro-upsell-go')).focus(); } catch (e) {}
   }
 
   // Bir DOM elemanina kilit rozeti tak/kaldir (app.js tab butonlari icin)
@@ -514,7 +690,8 @@
       needsRecheck: _state.needsRecheck,
       email: _state.info ? _state.info.email : '',
       expiresAt: _state.info ? _state.info.expiresAt : null,
-      lastValidated: _state.info ? _state.info.lastValidated : null
+      lastValidated: _state.info ? _state.info.lastValidated : null,
+      deneme: denemeOzet()   // Pro'da null; ucretsizde her aracin kalan hakki
     };
   }
 
@@ -599,6 +776,8 @@
       '.pro-upsell-fiyat b{font-size:24px;line-height:1.05;letter-spacing:-.04em}' +
       '.pro-upsell-fiyat small{padding:0 0 2px 8px;color:#8592a4;font-size:8.5px}' +
       '.pro-upsell-actions{display:grid;grid-template-columns:1.25fr 1fr;gap:6px}' +
+      '.pro-upsell-trial{grid-column:1/-1;min-height:38px;font-size:11px}' +
+      '.pro-upsell-trial-note{grid-column:1/-1;margin:-1px 0 3px;color:#8f9bb0;font-size:9px;line-height:1.4;text-align:center}' +
       '.pro-btn-primary,.pro-btn-ghost{min-height:35px;padding:8px 10px;border-radius:8px;cursor:pointer;font:700 10px system-ui,Segoe UI,sans-serif}' +
       '.pro-btn-primary{background:linear-gradient(90deg,#727cff,#3aa7ff);border:0;color:#fff;box-shadow:0 10px 24px -12px rgba(58,167,255,.95)}' +
       '.pro-btn-primary:hover{filter:brightness(1.1)}' +
@@ -631,6 +810,14 @@
     on: on,
     onUpgrade: onUpgrade,
     configure: configure,
-    VERSION: '1.0.0'
+    denemeHarca: denemeHarca,
+    denemeAcik: denemeAcik,
+    denemeBaslat: denemeBaslat,
+    denemeKalan: denemeKalan,
+    filigranGerekli: filigranGerekli,
+    denemeCiktilari: denemeCiktilari,
+    denemeCiktisiEkle: denemeCiktisiEkle,
+    denemeCiktisiSil: denemeCiktisiSil,
+    VERSION: '1.1.0'
   };
 })();

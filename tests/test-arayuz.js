@@ -193,6 +193,8 @@ ok("Pro MOGRT kartlarinda anlamli grup, eylem ve favori erisilebilirligi var",
 ok("Pro SFX koleksiyonlari anlamli buton etiketi tasir", /card\.setAttribute\("aria-label"/.test(sfxSrc));
 ok("Pro satin alma penceresi modal, odak tuzagi ve odak geri donusu tasir",
   /aria-modal="true"/.test(proSrc) && /focusable/.test(proSrc) && /previousFocus\.focus/.test(proSrc));
+ok("Pro penceresindeki 'Ucretsiz dene' dugmesi odak tuzaginda",
+  /var ids = \[[^\]]*'pro-upsell-deneme'[^\]]*\]/.test(proSrc) && /id="pro-upsell-deneme"/.test(proSrc));
 var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8");
 ok("Stil karti etiketi dekoratif onizleme metnini degil ad ve aciklamayi okur",
   /\.ss-bilgi b/.test(appSrc) && /timeline çıktısı kilitli/.test(appSrc));
