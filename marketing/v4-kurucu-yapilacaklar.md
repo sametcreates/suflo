@@ -300,3 +300,112 @@ videoları ve `Listeyi kopyala` çıktısını gönder; istemdeki kalibrasyon c�
   `node tools/test.js` çalıştır.
 - Pazarlamada "izlenme garantisi", "viral olur" deme; "yapay zekâ tahmini", "nedeniyle
   açıklanan puan" de. Panel de bunu söylüyor.
+
+---
+
+## 4. Pro'yu dene: her araca 3 kalıcı hak (+ deneme filigranı)
+
+**Şu an durum:** Kod tamam ve gerçek dünya girdisi gerektirmiyor (Lemon Squeezy anahtarı, yeni ürün ya
+da sunucu değişikliği yok). Ücretsiz kullanıcı, kodla çalışan 9 Pro aracının her birini kendi videonda
+3 kez dener: otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir,
+stilli altyazı katmanı ve kanca başlığı (ikisi ortak 3 hak), çeviri (çok dilli SRT paketi dahil), ritim.
+Haklar süresiz; hak yalnız işlem **başarıyla** bitince düşer. İçerik kütüphaneleri (MOGRT, SFX, Motion BG,
+preset, Pro paketi, altyazı MOGRT stilleri), toplu klip, stilli ASS dışa aktarma, sahne algılama ve
+B-roll önerileri denemeye açık değil.
+
+Nasıl çalışır, kısaca: Pro düğmesine basan ücretsiz kullanıcı satış penceresinde "Ücretsiz dene · N
+hakkın var" düğmesini görür. Basınca deneme kurulur, pencere kapanır ve aynı işlem kendiliğinden yeniden
+çalışır. Deneme hakkıyla eklenen stilli altyazı katmanı ve kanca başlığının sağ üstünde küçük, yarı saydam
+`suflo.app` yazısı olur (SRT/VTT, caption izi, ses ve kesimlerde asla). Haklar
+`%APPDATA%\Suflo\pro-deneme.json` (Mac: `~/Library/Application Support/Suflo/pro-deneme.json`) dosyasında
+imzalı tutulur ve panelin localStorage'ına (`suflo.deneme`) yansıtılır. Bozuk ya da elle değiştirilmiş
+dosya hakları sıfırlamaz, tüketir. Lisans gibi bu da onur sistemi: iki depoyu birden silen kişi hakları
+geri alır; bu kabul edildi.
+
+Satın alma sonrası: Pro'yu etkinleştiren kullanıcı, deneme hakkıyla ürettiği filigranlı çıktılar varsa
+bir kez "Deneme çıktılarını temiz yeniden oluştur" bildirimi görür. Ayarlar › Suflo Pro kartındaki
+listede her çıktı için "Temiz oluştur" düğmesi var. Kayıtlar `deneme-ciktilari.json` dosyasında (en çok 10).
+
+**Ürün kararı (bilmen gereken):** Terim sözlüğü artık ücretsizde de uygulanıyor. Önceden Ayarlar'da
+kilitsiz görünüyordu ama ücretsiz kullanıcıda transkripte sessizce uygulanmıyordu. Yol haritası onu
+ücretsiz çekirdekte saydığı için Pro tablosundan çıkarıldı ve kod buna uyduruldu. Pro'da kalmasını
+istersen `js/captions.js` → `applyGlossary` başına Pro kapısını geri koy, Ayarlar'daki sözlük kartına
+kilit rozeti ekle ve README ile Ayarlar'daki Pro tablosunu geri çevir.
+
+### 4.1 Premiere'de elle deneme (yayından önce, yaklaşık 40 dk)
+
+Hazırlık: **lisanssız** bir panel (Ayarlar › Suflo Pro › "Bu makinede devre dışı bırak" ya da Pro'suz
+bir kullanıcı hesabı), Groq anahtarı, konuşmalı bir sekans ve çıkarılmış altyazısı, müzikli bir klip.
+Haklar sıfırdan başlasın diye Premiere kapalıyken `pro-deneme.json` ve `deneme-ciktilari.json`
+dosyalarını sil. localStorage aynası da hakları tutar: geliştirici kurulumunda Chrome'da
+`http://localhost:8092` → Console → `localStorage.removeItem("suflo.deneme")`. Yalnız dosyayı silersen
+haklar geri **dolmamalı** (bu da denenecek bir davranış).
+
+1. Ayarlar › Suflo Pro: "Pro'yu dene: her araca 3 hak" kartında 9 satır, her biri `3/3` olmalı.
+   Pro karşılaştırmasında "Sözlük" yazmamalı; ücretsiz sütununda "Kelime kelime altyazı · terim sözlüğü"
+   olmalı. Hakkında satırında "v1.7" ve "ücretsiz altyazı paneli" görünmemeli.
+2. **Otomatik kesim:** Kesim sekmesinde "Analiz et" → satış penceresinde birincil düğme "Ücretsiz dene ·
+   3 hakkın var", altında "Hak yalnız işlem başarıyla bitince düşer" (filigran notu **yok**). Bas: pencere
+   kapanmalı ve analiz **kendiliğinden** başlamalı. Analiz bitince hak düşmemeli (Ayarlar'da hâlâ 3/3).
+   "Uygula" → kesimler uygulanmalı, "1 deneme hakkı kullanıldı · 2 kaldı" bildirimi çıkmalı, Ayarlar'da 2/3.
+   Tekrar "Analiz et" yeniden satış penceresini açmalı ("2 hakkın var").
+3. **Hata hak yemez:** Klip seçmeden ya da kilitli track'te uygulamayı dene → hata mesajı, hak düşmemeli.
+   Sesi iyileştir'i sesi olmayan bir klipte dene → hata, hak aynı.
+4. **Klavye:** satış penceresinde Tab ile dolaş: ✕ → Ücretsiz dene → Suflo Pro'yu Al → Tüm Pro'yu gör →
+   Lisans anahtarım var → yeniden ✕. Esc kapatmalı, odak tıkladığın düğmeye dönmeli.
+5. **Konuşmadan kes, Viral anlar, Çeviri, Çok dilli SRT paketi, Geçişler, Ritim (marker ya da vuruşlarda
+   böl), Sesi iyileştir:** her birinde "Ücretsiz dene" → işlem kendiliğinden çalışmalı → başarıda tek
+   hak düşmeli. Viral anlarda Groq anahtarı yoksa anahtar sihirbazı açılmalı, hak düşmemeli. Çok dilli
+   pakette yalnız kaynak dil seçiliyse (çeviri yok) hak düşmemeli. Sahne algılama ve B-roll önerileri
+   satış penceresinde "Ücretsiz dene" **göstermemeli**.
+6. **Otomatik zoom:** Deneme hakkıyla zoom ekle → "Zoom anahtarlarını temizle" kapısız çalışmalı; hakkı
+   bitmiş kullanıcı da temizleyebilmeli.
+7. **Stilli altyazı katmanı:** Bir Suflo Stili (ör. Creator Punch) seç → "ile ekle" → satış penceresindeki
+   notta "stilli katmanlarda küçük suflo.app filigranı olur" yazmalı. "Ücretsiz dene" → katman V-kanalına
+   konmalı. Premiere'de oynat: sağ üstte küçük, yarı saydam `suflo.app` görünmeli (16:9'da en üstte, 9:16
+   sekansta biraz daha aşağıda, Reels arayüzünün altında). Altyazının kendisi değişmemeli.
+   Aynı altyazıyı "Normal altyazı izi ekle" ile caption izine koy ve SRT/VTT dışa aktar: filigran **olmamalı**.
+8. **MOGRT sızıntısı:** Pro'yken bir altyazı MOGRT stili seç, lisansı devre dışı bırak, paneli kapatıp aç
+   (seçim tercihlerden geri gelir). "ile ekle" → deneme MOGRT'yi uygulamamalı; satış penceresi ya da
+   "Deneme yalnız Suflo Stilleri için" uyarısı çıkmalı.
+9. **Kanca başlığı:** Kanca sekmesinde "Playhead'e ekle" (ve Viral anlar kartında "Başlık ekle") → stilli
+   katmanla **aynı** hak sayacından düşmeli; başlıkta sağ üstte filigran olmalı, önizleme PNG'sinde olmamalı.
+10. **Hak bitince:** bir aracın 3 hakkını bitir → satış penceresinde "Ücretsiz dene" düğmesi çıkmamalı,
+    "Suflo Pro'yu Al" birincil olmalı; Ayarlar'da o satır `0/3` ve soluk.
+11. **Temiz yeniden oluşturma (en önemlisi, `KS_removeOverlay` ilk kez burada kullanılıyor):**
+    7 ve 9'da filigranlı katmanlar ürettiğin sekans açıkken Pro anahtarını etkinleştir.
+    - "Suflo Pro aktif" ile birlikte bir kez "Deneme çıktılarını temiz yeniden oluştur…" bildirimi çıkmalı;
+      Ayarlar › Suflo Pro'da "Deneme çıktılarını temiz yeniden oluştur" kartında her çıktı bir satır olmalı.
+    - Başka bir sekans açıkken "Temiz oluştur" → "O sekansı aç: <ad>." demeli, timeline'a dokunmamalı.
+    - Doğru sekansta "Temiz oluştur" → filigransız yeni katman **aynı başlangıç anına** (başka bir V-kanalına
+      ya da yeni kanala) konmalı, filigranlı eski katman timeline'dan **kaldırılmalı**; satır listeden gitmeli.
+      Aynı sekansta kullanıcının başka Suflo katmanlarına (ör. daha önce Pro'yla eklenmiş stil katmanları,
+      eski kanca başlıkları) **dokunulmamalı**: yalnız o deneme dosyasının klibi silinir.
+    - Filigranlı katmanı elle silip "Temiz oluştur" → temiz katman konmalı, "eski filigranlı katman
+      bulunamadı, varsa elle sil" uyarısı çıkmalı.
+    - Render uzun sürerken başka sekansa geç → temiz katman yanlış sekansa **konmamalı** ("O sekansı aç").
+    - "Listeden çıkar" yalnız listeden kaldırmalı, timeline'a dokunmamalı.
+    Proje panelindeki "Suflo" kutusunda eski filigranlı .mov öğesi kalır (timeline'dan çıkar, projeden
+    silinmez); bu beklenen davranış.
+12. **Pro kullanıcısı:** lisanslıyken hiçbir yerde "Ücretsiz dene" ya da deneme listesi görünmemeli,
+    katmanlarda filigran olmamalı ve `pro-deneme.json` **oluşmamalı**.
+13. Eski Premiere'de (2020/2021, CEF 74) 2. ve 7. adımı tekrarla: pencere ve "kendiliğinden yeniden
+    çalışma" aynı davranmalı.
+
+### 4.2 Yayından sonra site ve pazarlama metinleri
+
+- `docs/index.html`: "Demo sürümü var mı?" sorusunun cevabını (görünen `<details>` ve JSON-LD FAQPage,
+  ikisi birebir aynı) şöyle güncelle: ücretsiz sürüm sınırsız; Pro araçlarının her birini kendi videonda
+  3 kez deneyebilirsin, hak yalnız işlem başarılı olunca düşer. Fiyat kartındaki "almadan önce ücretsiz
+  sürümü sınırsız dene" notuna "Pro araçlarını her birinde 3 kez dene" ekle. "Bu bir deneme sürümü değil.
+  Kısıt yok, kredi yok, filigran yok." cümlesi ücretsiz çekirdek için hâlâ doğru; olduğu gibi kalabilir.
+- Karşılaştırma sayfaları (`docs/blog/autocut-firecut-alternatifi.html`, `docs/blog/opusclip-alternatifi-premiere.html`):
+  2.4'teki madde geçerli: "Pro'da deneme yok" ya da "almadan deneyemezsin" anlamına gelen satırları
+  "her Pro aracında 3 kalıcı deneme hakkı" diye güncelle; iade satırı (iade yok) değişmiyor. SSS'leri
+  `<details>` ve JSON-LD'de birlikte değiştir, `dateModified` ve `docs/sitemap.xml` `<lastmod>`
+  değerlerini güncelle, `node tools/test.js` çalıştır.
+- Destek / satış DM'lerinde "önce dene" itirazına cevap: "Panelde her Pro aracını kendi videonda 3 kez
+  deneyebilirsin; hak yalnız işlem başarılı olunca düşer, süresi yok."
+- Reels'te paylaşılan deneme çıktıları `suflo.app` filigranı taşır: ilk haftalarda yorumlarda/etiketlerde
+  "suflo.app" görürsen o içerik üreticisine ulaş (Pro kodu ya da paylaşım izni), satın aldıysa Ayarlar'daki
+  temiz yeniden oluşturmayı hatırlat.
