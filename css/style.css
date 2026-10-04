@@ -3494,6 +3494,39 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .tc-w.cut { background: rgba(255,255,255,.08); color: var(--dim); }
 .tc-w.kept { text-decoration: none; background: none; color: var(--text); opacity: 1; }
 .tc-legend .tc-w { cursor: default; }
+/* Tek Tık Temizlik: tekrar çekimler, yarım başlangıçlar, tek inceleme listesi */
+.tc-w.retake, .tc-w.falsestart { text-decoration: line-through; text-decoration-thickness: 2px; }
+.tc-w.retake { background: rgba(77,163,255,.16); color: #7cbcff; }
+.tc-w.falsestart { background: rgba(77,163,255,.10); color: #9fcbff; text-decoration-style: dashed; }
+.tc-w.retake-kept { text-decoration: underline; text-decoration-color: #4da3ff; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.tc-take-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 6px 0 2px; font-size: 11px; line-height: 1.4; }
+.tc-take-row.off { opacity: .75; }
+.tc-take-label { color: #7cbcff; font-weight: 600; margin-right: 2px; }
+.tc-take { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.tc-take.keep { border-color: #4da3ff; }
+.tc-take button { background: none; border: 0; color: var(--text); font: inherit; padding: 1px 7px; cursor: pointer; }
+.tc-take button:hover { background: rgba(255,255,255,.08); }
+.tc-take .tc-play { color: var(--dim); border-left: 1px solid var(--line); padding: 1px 5px; }
+.tc-take.keep .tc-chip { color: #7cbcff; font-weight: 700; }
+.tc-conf { font-size: 10px; padding: 0 6px; border-radius: 999px; background: rgba(255,193,7,.14); color: #ffd36b; }
+.tc-ai-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tc-script-box { margin: 4px 0; font-size: 12px; }
+.tc-script-box summary { cursor: pointer; color: var(--dim); }
+.tc-script-box textarea { width: 100%; box-sizing: border-box; margin-top: 6px; min-height: 70px; resize: vertical; }
+.tc-cache { margin: 0 0 6px; font-size: 11px; }
+.tc-review-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin: 4px 0; font-size: 11.5px; }
+.tc-review { max-height: 200px; overflow: auto; margin-bottom: 8px; }
+.tc-review:empty { display: none; }
+.tc-rv { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-bottom: 1px solid var(--line); font-size: 11.5px; min-width: 0; }
+.tc-rv.off { opacity: .7; }
+.tc-rv input { margin: 0; flex: none; }
+.tc-reason { flex: none; font-size: 10px; padding: 0 6px; border-radius: 999px; background: rgba(255,255,255,.08); white-space: nowrap; }
+.tc-reason.r-dolgu { background: rgba(255,153,0,.18); color: #ffb54d; }
+.tc-reason.r-tekrar { background: rgba(255,99,132,.16); color: #ff8fa6; }
+.tc-reason.r-tekrar-cekim, .tc-reason.r-yarim { background: rgba(77,163,255,.16); color: #7cbcff; }
+.tc-reason.r-senaryo-disi { background: rgba(162,155,254,.16); color: #b9b3ff; }
+.tc-time { flex: none; font-variant-numeric: tabular-nums; }
+.tc-rv-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
 .tc-pause { display: inline-block; color: var(--dim); font-size: 10px; padding: 0 4px; border-radius: 4px; background: rgba(255,153,0,.12); }
 
 /* ---------- Bolumler (v3.0) ---------- */

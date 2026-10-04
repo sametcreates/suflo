@@ -51,7 +51,8 @@ window.KOnboarding = (function () {
     { id: "cap-yt-go", ozellik: "Paylaşım metni" },
     { id: "cap-vr-bul", ozellik: "Viral anlar" },
     { id: "cap-br-bul", ozellik: "B-roll önerileri" },
-    { id: "kanca-ai", ozellik: "Kanca önerileri" }
+    { id: "kanca-ai", ozellik: "Kanca önerileri" },
+    { id: "tc-ai-lbl", ozellik: "AI tekrar gruplama" }
   ];
 
   /* ---------------- Gerçekler (yalnız Node) ---------------- */

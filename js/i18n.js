@@ -32,6 +32,8 @@
   var USER_CONTENT_IDS = [
     "cap-segments", "cap-onizleme-metin", "cap-ch-list", "cap-vr-liste", "cap-br-liste",
     "cut-ranges", "cap-yt-aciklama", "cap-yt-basliklar", "cap-yt-etiket", "kanca-metin", "kanca-oneriler", "tc-words",
+    // Konuşmadan kes: yapıştırılan senaryo ve inceleme listesindeki konuşma parçaları
+    "tc-script", "tc-review",
     // Kullanıcının kütüphane dosya adları (bir SFX'in adı "Kapat" ise "Close" olmasın)
     "sfx-list", "emoji-assets-grid"
   ];

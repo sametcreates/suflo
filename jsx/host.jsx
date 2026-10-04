@@ -1932,7 +1932,7 @@ function KS_cloneActiveSeq() {
 
 function KS_applyCuts(encoded) {
   try {
-    var p = KS_arg(encoded); // { ranges:[{start,end}], removeMode:"ripple"|"gap"|"select", cloneFirst:bool }
+    var p = KS_arg(encoded); // { ranges:[{start,end}], removeMode:"ripple"|"gap"|"select", cloneFirst:bool, cloneName? }
     var seq = KS_seq();
     if (!seq) return KS_err("Aktif sequence yok.");
     var ranges = p.ranges || [];
@@ -1946,6 +1946,8 @@ function KS_applyCuts(encoded) {
       if (!seq || String(seq.sequenceID) !== String(cloned.sequenceID)) {
         return KS_err("Kopya sekans aktif edilemedi — 'Bu sekansta' modunu dene.");
       }
+      // Kopya sekansa anlamli ad (or. "Vlog - Suflo Temiz"); ozgun sekans dokunulmamis yedek
+      if (p.cloneName) { try { seq.name = String(p.cloneName); } catch (eN) {} }
       newSeqName = String(seq.name);
     }
 

@@ -27,7 +27,7 @@ function ok(ad, kosul, kanit) {
 
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
                 "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
-                "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js"];
+                "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 

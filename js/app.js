@@ -945,6 +945,43 @@ window.KApp = (function () {
       if (gl.length) el("set-glossary-info").textContent = gl.length + " kural kayıtlı";
     }
 
+    // Konuşmadan kes: kullanıcının ek dolgu sözcükleri ("tr: yani yani") + transkript önbelleği
+    if (el("set-fillers")) {
+      var dolguSay = function (metin) {
+        var p = window.SufloTextCut ? SufloTextCut.parseExtraFillers(metin) : {};
+        var n = 0;
+        Object.keys(p).forEach(function (k) { n += p[k].length; });
+        return n;
+      };
+      el("set-fillers").value = String(s.extraFillers || "");
+      var dolguBilgi = function () {
+        var n = dolguSay(K.settings().extraFillers);
+        el("set-fillers-info").textContent = n ? n + " dolgu kayıtlı" : "";
+      };
+      dolguBilgi();
+      el("set-fillers-save").addEventListener("click", function () {
+        var st = K.settings();
+        st.extraFillers = String(el("set-fillers").value || "").slice(0, 4000);
+        if (K.saveSettings()) toast(dolguSay(st.extraFillers) + " dolgu kaydedildi", "good");
+        else toast("Ayarlar kaydedilemedi", "bad");
+        dolguBilgi();
+        document.dispatchEvent(new CustomEvent("suflo:dolgu"));
+      });
+    }
+    if (el("set-tcache-clear")) {
+      var onbBilgi = function () {
+        var c = KCaptions.transcriptCache && KCaptions.transcriptCache();
+        var st2 = c ? c.stats() : { entries: 0, bytes: 0 };
+        el("set-tcache-info").textContent = st2.entries ? st2.entries + " transkript · " + (st2.bytes / 1048576).toFixed(1) + " MB" : "";
+      };
+      onbBilgi();
+      el("set-tcache-clear").addEventListener("click", function () {
+        var n = KCaptions.onbellegiTemizle ? KCaptions.onbellegiTemizle() : 0;
+        toast(n ? "Transkript önbelleği temizlendi" : "Önbellek zaten boş", n ? "good" : "");
+        onbBilgi();
+      });
+    }
+
     // vekil sunucu — kurumsal ağda indirmeler buradan geçer
     if (el("set-proxy")) {
       el("set-proxy").value = s.proxyUrl || "";

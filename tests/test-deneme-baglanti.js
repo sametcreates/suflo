@@ -21,7 +21,7 @@ function govde(src, imza) {
 var SITELER = [
   ["js/magiccut.js", "async function analyze()", "cut", null, false],
   ["js/magiccut.js", "async function apply()", "cut", "if (r.ok) {", true],
-  ["js/konusma-kes.js", "async function analyze()", "textcut", null, false],
+  ["js/konusma-kes.js", "async function analyze(zorla)", "textcut", null, false],
   ["js/konusma-kes.js", "async function apply()", "textcut", "if (res.ok) {", true],
   ["js/viral.js", "async function bul()", "highlights", "if (!bulunan.length) throw", true],
   ["js/ses.js", "async function iyilestir()", "audioclean", "if (!sonuclar.length) throw", true],

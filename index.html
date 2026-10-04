@@ -878,11 +878,27 @@
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h6"/><path d="m13 13 4 4m0-4-4 4"/></svg>
         <b>Konuşmadan kes</b><span class="tc-yeni">YENİ</span>
       </div>
-      <p class="ci-p">Klibi yazıya döker; <b>ııı, eee</b> gibi dolgu seslerini, <b>tekrarları</b> ve uzun duraksamaları işaretler. Bir kelimeye tıkla — videodan da çıkar. Kopya sekansta uygulanır.</p>
+      <p class="ci-p">Klibi yazıya döker; <b>ııı, eee</b> gibi dolgu seslerini, <b>tekrarları</b>, baştan alınan cümleleri ve uzun duraksamaları işaretler. Bir kelimeye tıkla — videodan da çıkar. Kopya sekansta uygulanır.</p>
       <div class="tc-opts">
         <label class="switch"><input id="tc-filler" type="checkbox" checked><i></i><span>Dolgu sesleri (ııı, eee, hmm)</span></label>
         <label class="switch"><input id="tc-repeat" type="checkbox" checked><i></i><span>Tekrarlar (ben ben)</span></label>
+        <label class="switch"><input id="tc-retake" type="checkbox" checked><i></i><span>Tekrar çekimler (baştan alınan cümleler, yarım başlangıçlar)</span></label>
         <label class="switch"><input id="tc-soft" type="checkbox"><i></i><span>Ara sözler (şey, yani, işte)</span></label>
+        <div class="row">
+          <label>Tekrar çekimde</label>
+          <select id="tc-policy">
+            <option value="son" selected>Son çekimi tut</option>
+            <option value="uzun">En uzunu tut</option>
+            <option value="akici">En akıcıyı tut</option>
+          </select>
+        </div>
+        <div class="tc-ai-row">
+          <label class="switch" id="tc-ai-lbl" title="Yalnız metin gönderilir (ücretsiz Groq anahtarı). Farklı sözcüklerle tekrar edilen cümleleri de bulmaya çalışır; sonuçlar elle onayına bırakılır."><input id="tc-ai" type="checkbox"><i></i><span>AI ile benzer anlatımları da grupla</span></label>
+        </div>
+        <details class="tc-script-box">
+          <summary>Senaryoyu yapıştır (isteğe bağlı)</summary>
+          <textarea id="tc-script" rows="4" placeholder="Okuduğun metni buraya yapıştır. Her cümle için senaryoya en yakın çekim tutulur; senaryoda olmayan konuşmalar listelenir ama kendiliğinden kesilmez."></textarea>
+        </details>
         <div class="row">
           <label>Duraksama</label>
           <select id="tc-pause">
@@ -901,13 +917,17 @@
       <div id="tc-progress" class="progress-line" hidden><i></i></div>
       <div id="tc-status" class="inline-status"></div>
       <div id="tc-result" hidden>
+        <div id="tc-cache" class="tc-cache hint" hidden>önbellekten · <button id="tc-retranscribe" class="link-btn" type="button">Yeniden yazıya dök</button></div>
         <div class="result-head">
           <span id="tc-summary" class="dim"></span>
           <button id="tc-dinle" class="btn tiny" type="button" title="Kesimler uygulanmış gibi sesi dinle (timeline değişmez)">▶ Dinle</button>
+          <button id="tc-dinle-cuts" class="btn tiny" type="button" title="Yalnız kesilecek parçaları art arda dinle (en fazla 300 kesim)">Yalnız kesilecekleri dinle</button>
           <button id="tc-reset" class="btn tiny" type="button">Önerilere dön</button>
         </div>
         <audio id="tc-audio" class="tc-audio" controls hidden></audio>
-        <div class="tc-legend"><span class="tc-w filler">dolgu</span><span class="tc-w repeat">tekrar</span><span class="tc-w soft">ara söz</span><span class="tc-w cut">elle silinen</span></div>
+        <div class="tc-review-head" id="tc-review-head" hidden><b>İnceleme</b><span class="dim">Kesilecek her parça tek satırda. İşareti kaldırırsan o parça kalır.</span></div>
+        <div id="tc-review" class="tc-review"></div>
+        <div class="tc-legend"><span class="tc-w filler">dolgu</span><span class="tc-w repeat">tekrar</span><span class="tc-w retake">tekrar çekim</span><span class="tc-w falsestart">yarım başlangıç</span><span class="tc-w retake-kept">tutulan çekim</span><span class="tc-w soft">ara söz</span><span class="tc-w cut">elle silinen</span></div>
         <div id="tc-words" class="tc-words" title="Kelimeye tıkla: kes / geri al"></div>
         <div class="seg-ctl full" id="tc-target">
           <button class="on" data-m="clone">Kopya sekansta<em>önerilen</em></button>
@@ -1550,6 +1570,20 @@
       <div class="row" style="margin-top:8px">
         <button id="set-glossary-save" class="btn">Sözlüğü kaydet</button>
         <span id="set-glossary-info" class="dim" style="font-size:11px"></span>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <div class="set-title">Ek dolgu sözcükleri <span class="dim" style="font-weight:400">Konuşmadan kes için (Pro)</span></div>
+      <p class="hint" style="margin-bottom:8px">Senin konuşmana özgü dolguları ekle. Her satıra bir dolgu, başına dil kodu: <b>tr: yani yani</b>. Dil kodu yoksa her dilde geçerli olur.</p>
+      <textarea id="set-fillers" class="glossary" rows="3" placeholder="tr: yani yani&#10;tr: hani şey&#10;en: you know what"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="set-fillers-save" class="btn">Dolguları kaydet</button>
+        <span id="set-fillers-info" class="dim" style="font-size:11px"></span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="set-tcache-clear" class="btn ghost">Transkript önbelleğini temizle</button>
+        <span id="set-tcache-info" class="dim" style="font-size:11px"></span>
       </div>
     </div>
 

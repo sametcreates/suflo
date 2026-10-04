@@ -590,7 +590,68 @@
     return n;
   }
 
+  /*
+   * Tek inceleme çekmecesi: her kesim aralığı bir satır (işaretli), artı henüz
+   * kesilmeyen adaylar (orta güvenli gruplar, senaryo dışı cümleler; işaretsiz).
+   *   o.words, o.cut [bool] (son karar: öneri + elle), o.labels [classify + retake etiketi],
+   *   o.elle {i: bool}, o.cuts (buildCuts), o.res (detect sonucu)
+   * Doner: [{ type: "range" | "group" | "offscript", start, end, reason, checked, words: [i], gid?, sid?, conf? }]
+   * reason: "dolgu" | "tekrar" | "tekrar-cekim" | "yarim" | "duraksama" | "senaryo-disi" | "elle"
+   */
+  function reviewRows(o) {
+    var words = o.words || [], cut = o.cut || [], labels = o.labels || [], elle = o.elle || {};
+    var res = o.res, rows = [];
+    var dis = {};
+    if (res && res.offscript) res.offscript.forEach(function (sid) {
+      var s = res.sents[sid];
+      for (var k = s.a; k <= s.b; k++) dis[k] = sid;
+    });
+    var ix = 0;
+    (o.cuts || []).forEach(function (r) {
+      var ws = [];
+      while (ix < words.length && (Number(words[ix].start) + Number(words[ix].end)) / 2 < r.start) ix++;
+      for (var j = ix; j < words.length && (Number(words[j].start) + Number(words[j].end)) / 2 <= r.end; j++) {
+        if (cut[j]) ws.push(j);
+      }
+      var neden = "duraksama";
+      var oncelik = ["retake", "falsestart", "dis", "repeat", "filler", "soft", "elle"];
+      var en = oncelik.length;
+      ws.forEach(function (i) {
+        var l = labels[i], p;
+        if (l === "retake") p = 0;
+        else if (l === "falsestart") p = 1;
+        else if (has(dis, i) && elle[i] === true) p = 2;
+        else if (l === "repeat") p = 3;
+        else if (l === "filler") p = 4;
+        else if (l === "soft") p = 5;
+        else p = 6;
+        if (p < en) en = p;
+      });
+      if (ws.length) neden = ["tekrar-cekim", "yarim", "senaryo-disi", "tekrar", "dolgu", "dolgu", "elle"][en];
+      rows.push({ type: "range", start: r.start, end: r.end, reason: neden, checked: true, words: ws });
+    });
+    if (res) {
+      res.groups.forEach(function (g) {
+        if (g.on) return;
+        var ws = [];
+        g.dropped.forEach(function (sid) { var s = res.sents[sid]; for (var k = s.a; k <= s.b; k++) ws.push(k); });
+        var s0 = res.sents[g.dropped[0]];
+        rows.push({ type: "group", gid: g.id, start: s0 ? s0.start : g.start, end: g.end, reason: g.kind === "falsestart" ? "yarim" : "tekrar-cekim",
+          conf: g.conf, checked: false, words: ws });
+      });
+      (res.offscript || []).forEach(function (sid) {
+        var s = res.sents[sid], ws = [], biri = false;
+        for (var k = s.a; k <= s.b; k++) { ws.push(k); if (cut[k]) biri = true; }
+        if (biri) return;          // (bir kısmı) zaten kesim satırında görünüyor
+        rows.push({ type: "offscript", sid: sid, start: s.start, end: s.end, reason: "senaryo-disi", checked: false, words: ws });
+      });
+    }
+    rows.sort(function (a, b) { return a.start - b.start; });
+    return rows;
+  }
+
   return {
+    reviewRows: reviewRows,
     sentences: sentences,
     tokEq: tokEq,
     tokOf: tokOf,
