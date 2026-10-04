@@ -84,5 +84,15 @@ ok("bolumler.js: Pro.on kutuyu cizer VE aciklamayi yeniler (krediUygula)", /kred
   /function krediDegisti\(\)[\s\S]{0,200}krediUygula\(\)/.test(bj2) && /function krediUygula\(\)[\s\S]{0,200}krediAcik\(\)/.test(bj2));
 ok("bolumler.js ytAciklama krediyi gecer, kutu #cap-yt-kredi", /kredi:\s*krediSatiri\(\)/.test(bj2) && /cap-yt-kredi/.test(bj2) && html.indexOf('id="cap-yt-kredi"') !== -1);
 ok("kredi kutusunun varsayilani: Pro degilse acik, kullanici secene dek", /typeof s\.krediSatiri === "boolean"/.test(bj2) && /Pro\.isPro\(\)/.test(bj2));
+/* Shorts paketi: PLATFORM.shorts */
+var shYanit = JSON.stringify({ titles: [new Array(130).join("u"), "Kısa başlık"], description: "Açıklama.", tags: ["a", "b"],
+  hashtags: ["#bir", "#iki", "#üç", "#dört", "#beş"] });
+var sh = Y.parseResponse(shYanit, { platform: "shorts" });
+ok("shorts: başlık ≤100, etiket yok, 3 hashtag", sh.basliklar[0].length <= 100 && sh.etiketler.length === 0 && sh.hashtagler.join(" ") === "#bir #iki #üç",
+  JSON.stringify(sh).slice(0, 200));
+ok("shorts: açıklamada kanca ilk satırda, bölüm yok", Y.compose({ platform: "shorts", aciklama: "Gövde", hashtagler: ["#a"], kanca: "Kanca", bolumler: "0:00 x" }) ===
+  "Kanca\n\nGövde\n\n#a");
+ok("shorts istemi YouTube Shorts adıyla ve 3 hashtag", /YouTube Shorts/.test(Y.buildPrompt([{ text: "x" }], { platform: "shorts" }).system) &&
+  /3 hashtags/.test(Y.buildPrompt([{ text: "x" }], { platform: "shorts" }).system));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

@@ -18,7 +18,10 @@
   var PLATFORM = {
     youtube: { ad: "YouTube", aciklama: 5000, hashtag: 3, etiket: true },
     instagram: { ad: "Instagram Reels", aciklama: 2200, hashtag: 5, etiket: false },
-    tiktok: { ad: "TikTok", aciklama: 2200, hashtag: 5, etiket: false }
+    tiktok: { ad: "TikTok", aciklama: 2200, hashtag: 5, etiket: false },
+    // Shorts paketi (js/shorts-paket-plan.js): başlık ≤100, etiket alanı yok; YouTube başlığın
+    // üstünde yalnız ilk 3 hashtag'i gösterir, fazlası gürültü
+    shorts: { ad: "YouTube Shorts", aciklama: 5000, hashtag: 3, etiket: false }
   };
   function platform(p) { return PLATFORM[p] ? p : "youtube"; }
   var DIL = { tr: "Turkish", az: "Azerbaijani", en: "English", ru: "Russian", de: "German", ar: "Arabic",
