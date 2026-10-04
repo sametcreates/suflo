@@ -53,5 +53,29 @@ var ci = Y.compose({ aciklama: "Gövde", hashtagler: ["#a"], bolumler: "0:00 Gir
 ok("Instagram aciklamasi: kanca ilk satir, bolum yok", ci === "Kanca\n\nGövde\n\n#a", JSON.stringify(ci));
 ok("Reels/TikTok 2200 siniri", Y.compose({ aciklama: new Array(600).join("kelime "), platform: "tiktok" }).length <= 2200);
 ok("bilinmeyen platform YouTube sayilir", Y.compose({ aciklama: "a", bolumler: "0:00 x", platform: "??" }) === "a\n\n0:00 x");
+
+/* davet: "Made with Suflo" kredi satiri (istege bagli) */
+var KREDI = "Altyazılar: Suflo · suflo.app";
+var krediTam = Y.compose({ aciklama: "Metin.", bolumler: "0:00 Giriş\n1:10 Konu", hashtagler: ["#a", "#b"], kredi: KREDI });
+ok("kredi: en sonda, hashtag'lerden sonra", krediTam === "Metin.\n\n0:00 Giriş\n1:10 Konu\n\n#a #b\n\n" + KREDI, JSON.stringify(krediTam));
+ok("kredisiz cikti degismez", Y.compose({ aciklama: "Metin.", bolumler: "0:00 Giriş\n1:10 Konu", hashtagler: ["#a", "#b"] }) === tam &&
+  Y.compose({ aciklama: "Metin.", bolumler: "0:00 Giriş\n1:10 Konu", hashtagler: ["#a", "#b"], kredi: "" }) === tam &&
+  Y.compose({ aciklama: "Metin.", bolumler: "0:00 Giriş\n1:10 Konu", hashtagler: ["#a", "#b"], kredi: "   " }) === tam);
+ok("kredi Reels'te de en sonda", Y.compose({ aciklama: "Gövde", hashtagler: ["#a"], platform: "instagram", kanca: "Kanca", kredi: KREDI }) ===
+  "Kanca\n\nGövde\n\n#a\n\n" + KREDI);
+// sinira tam sigan metin: kredi eklenince tasacak -> kredi duser, govde KISALMAZ
+var sigan = new Array(4991).join("a");   // 4990 karakter
+var siganSonuc = Y.compose({ aciklama: sigan, kredi: KREDI });
+ok("kredi sinirda ilk duser, govde kisaltilmaz (YouTube 5000)", siganSonuc === sigan && siganSonuc.indexOf(KREDI) === -1, siganSonuc.length);
+var reelsSigan = new Array(2191).join("b");
+ok("kredi sinirda ilk duser (Reels/TikTok 2200)", Y.compose({ aciklama: reelsSigan, platform: "tiktok", kredi: KREDI }) === reelsSigan);
+var devKredi = Y.compose({ aciklama: new Array(800).join("kelime "), bolumler: "0:00 Giriş\n1:10 Konu", kredi: KREDI });
+ok("uzun metinde kredi duser, bolumler kesilmez, 5000 asilmaz", devKredi.length <= 5000 && /0:00 Giriş\n1:10 Konu$/.test(devKredi) && devKredi.indexOf(KREDI) === -1, devKredi.length);
+ok("uzun metinde kredili ve kredisiz cikti ayni (kredi icin govde kirpilmaz)", devKredi === dev);
+var tasanKredi = Y.compose({ aciklama: "metin", bolumler: cokBolum.join("\n"), kredi: KREDI });
+ok("bolumler tek basina tasinca kredi eklenmez", tasanKredi === tasan && tasanKredi.length <= 5000);
+var sinirTam = new Array(5000 - KREDI.length - 2 + 1).join("c");
+ok("kredi tam sigiyorsa eklenir (5000 dahil)", Y.compose({ aciklama: sinirTam, kredi: KREDI }).length === 5000 &&
+  /suflo\.app$/.test(Y.compose({ aciklama: sinirTam, kredi: KREDI })));
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
