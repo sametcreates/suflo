@@ -15,6 +15,8 @@ window.KViral = (function () {
   // anlarin bulundugu transkript ve sekans: Shorts sonra baska sekansta/transkriptte olusturulmasin.
   // bulSekans "" = arama aninda sekans okunamadi: ilk basarili Onizle/Shorts canli sekansi baglar
   var bulSegs = null, bulSekans = "";
+  // bulSegs'in bolumleme modu (k1 / kc / w / plain): Shorts kaydi segs ile ayni andan gelsin
+  var bulMod = "plain";
   // aramanin gordugu temiz satirlar: from/to indeksleri buna gore (sonraki altyazi duzenlemeleri kaydirmasin)
   var bulSegsTemiz = null;
   var bulSure = { minDur: 20, maxDur: 60 };
@@ -478,6 +480,7 @@ window.KViral = (function () {
     // panel odakta degilken tazelenmez, bayat kimlik dogru sekanstaki anlari "baska
     // sekansta" sayardi. Sorgu simdi gonderilir, AI cagrisiyla paralel yurur (bekleme eklemez).
     var segsHam = KCaptions.rawSegments ? KCaptions.rawSegments() : null;
+    var modHam = KCaptions.mode ? KCaptions.mode() : "plain";
     var sekansSorgu = sekansOku();
     var temiz = HL.clean(segs);
     try {
@@ -504,6 +507,7 @@ window.KViral = (function () {
       bulSegsTemiz = temiz;
       bulSure = s;
       bulSegs = segsHam;
+      bulMod = modHam || "plain";
       bulSekans = sekansHam;
       sonInOutId = null;
       durum("");
@@ -534,13 +538,19 @@ window.KViral = (function () {
   // Olusan Shorts sekansi -> ana transkriptin o araligi (Altyazi sekmesi yeniden
   // yaziya dokmeden yukler). Ayarlarda en yeni 30 sekans tutulur.
   // kaynakSegs: Shorts Paketi işin başında yakaladığı transkripti verir (iş sürerken değişmesin)
-  function shortsKaydet(items, an, kaynakSegs) {
+  // kaynakMod: o transkriptin bölümleme modu; segs ile mod hep aynı andan gelir (o an yüklü
+  // altyazının modu değil: kelime kelimeye geçilmişse satırlar tek "kelime" sanılmasın)
+  function shortsKaydet(items, an, kaynakSegs, kaynakMod) {
     if (!window.KCaptions || !KCaptions.rawSegments || !HL.sliceSegments) return;
-    var segs = HL.sliceSegments(kaynakSegs || bulSegs || KCaptions.rawSegments(), an.start, an.end);
+    var kaynak, mod;
+    if (kaynakSegs) { kaynak = kaynakSegs; mod = kaynakMod || "plain"; }
+    else if (bulSegs) { kaynak = bulSegs; mod = bulMod; }
+    else { kaynak = KCaptions.rawSegments(); mod = KCaptions.mode ? KCaptions.mode() : "plain"; }
+    var segs = HL.sliceSegments(kaynak, an.start, an.end);
     if (!segs.length) return;
     var s = K.settings();
     var harita = s.shortsAltyazi || {};
-    var kayit = { ad: an.title, start: an.start, end: an.end, mod: KCaptions.mode ? KCaptions.mode() : "plain",
+    var kayit = { ad: an.title, start: an.start, end: an.end, mod: mod || "plain",
       ceviriDili: KCaptions.translationLang ? KCaptions.translationLang() : "", segs: segs, ts: Date.now() };
     // her sekansin kendi kopyasi: yatay Shorts'ta duzenleme dikeyi degistirmesin
     items.forEach(function (it) {
@@ -636,7 +646,7 @@ window.KViral = (function () {
    * için HL.secilenKanca(an). Shorts paketi (js/shorts-paket.js) şunları kullanır:
    *   paketAnlari  — ekrandaki ve "Pakete al" işaretli anlar (kopya; kartın seçili kancasıyla)
    *   sekansDenetle / sekansiBagla / nesil — anlar bu sekansta mı bulundu (Shorts oluştur ile aynı denetim)
-   *   kaynakSegs   — arama anındaki ham transkript (kopya); shortsKaydet — Shorts altyazı kaydı
+   *   kaynakSegs / kaynakMod — arama anındaki ham transkript (kopya) ve bölümleme modu; shortsKaydet — Shorts altyazı kaydı
    *   tur          — videonun türü (paylaşım metni istemine)
    */
   return {
@@ -649,6 +659,7 @@ window.KViral = (function () {
     sekansiBagla: function (sekans, nesil) { sekansiBagla(sekans, nesil === undefined ? aramaNesli : nesil); },
     nesil: function () { return aramaNesli; },
     kaynakSegs: function () { return bulSegs ? JSON.parse(JSON.stringify(bulSegs)) : null; },
+    kaynakMod: function () { return bulSegs ? bulMod : null; },
     shortsKaydet: shortsKaydet,
     tur: function () { return secenekler().tur; },
     mesgul: function () { return busy; }

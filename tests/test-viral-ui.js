@@ -106,7 +106,10 @@ function ortam(opts) {
         // inOutSirasinda: KS_setInOut yanit vermeden once calisir (o arada yeni arama biter)
         if (fn === "KS_setInOut" && durum.inOutSirasinda) { var f = durum.inOutSirasinda; durum.inOutSirasinda = null; return f().then(function () { return { ok: true }; }); }
         if (fn === "KS_addRangeMarkers") return Promise.resolve({ ok: true, added: arg.ranges.length });
-        if (fn === "KS_makeShorts") return Promise.resolve({ ok: true, made: 1, vertical: 0, items: [] });
+        if (fn === "KS_makeShorts") {
+          var it = durum.shortsItems ? arg.ranges.map(function (r, i) { return { id: "sh" + (say.call.length + i), name: r.name }; }) : [];
+          return Promise.resolve({ ok: true, made: 1, vertical: 0, items: it });
+        }
         return Promise.resolve({ ok: true });
       },
       hataYardimi: function (e) { return String(e && e.message || e); }
@@ -121,7 +124,8 @@ function ortam(opts) {
         if (durum.hata) return Promise.reject(new Error(durum.hata));
         return Promise.resolve({ choices: [{ message: { content: JSON.stringify(durum.yanit) } }] });
       },
-      language: function () { return "tr"; }
+      language: function () { return "tr"; },
+      mode: function () { return durum.mod || "plain"; }
     },
     KApp: {
       ctx: function () { return { sequenceId: durum.ctxSeq !== undefined ? durum.ctxSeq : durum.seq }; },
@@ -427,6 +431,23 @@ async function calistir() {
   await tetikle(dugme(kartlar(yarisan)[0], "+1 cümle ▶")[0], "click");
   ok("In/Out yazılırken yeni arama biterse bildirim gelir ama yeni kart bağlanmaz", yIo === 1 && sayi(yarisan, "KS_setInOut") === 1 &&
     /In\/Out ayarlandı/.test(yarisan.say.toast.join(" | ")), yarisan.say.toast.join(" | "));
+
+  // Shorts altyazı kaydının modu aramanın transkriptinden: sonra kelime kelimeye (k1) geçilse de
+  // satırlar "plain" kalır (yoksa stil motoru cümleyi tek kelime sanar, 9:16'da sıkışır)
+  var modT = ortam({ yanit: YANIT, ayarlar: { viralMinPuan: 0, viralSira: "zaman" } });
+  modT.win.KViral.init();
+  modT.durum.mod = "plain";
+  await tetikle(modT.el["cap-vr-bul"], "click");
+  modT.durum.mod = "k1";
+  modT.durum.shortsItems = true;
+  await tetikle(modT.el["cap-vr-shorts"], "click");
+  var kayitlar = modT.ayarlar.shortsAltyazi || {};
+  var modlar = Object.keys(kayitlar).map(function (k) { return kayitlar[k].mod; });
+  ok("Shorts altyazı kaydı: mod aramanın transkriptinden (o an yüklü k1 değil)", modlar.length > 0 && modlar.every(function (m) { return m === "plain"; }), J(modlar));
+  modT.win.KViral.shortsKaydet([{ id: "pk" }], { start: 0, end: 30, title: "p" }, [{ start: 1, end: 2, text: "tek" }], "k1");
+  modT.win.KViral.shortsKaydet([{ id: "pk2" }], { start: 0, end: 30, title: "p" }, [{ start: 1, end: 2, text: "iki kelime" }]);
+  ok("shortsKaydet: verilen transkriptin modu kullanılır; mod verilmezse plain (yüklü altyazının modu değil)",
+    kayitlar.pk && kayitlar.pk.mod === "k1" && kayitlar.pk2 && kayitlar.pk2.mod === "plain" && modT.win.KViral.kaynakMod() === "plain");
 }
 
 calistir().then(function () {

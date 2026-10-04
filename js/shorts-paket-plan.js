@@ -561,9 +561,20 @@
     }).map(kopya);
   }
 
-  function kaynakEkle(job, segs) {
+  var MODLAR = { k1: 1, kc: 1, w: 1, plain: 1 };
+
+  // mod: segs'in bölümleme modu (k1 / kc / w / plain) — segs ile aynı andan; cue türü buna göre
+  function kaynakEkle(job, segs, mod) {
     (job && job.kisalar || []).forEach(function (k) { k.kaynakSegs = kaynakDilimi(segs, k.start, k.end); });
+    if (job) job.kaynakMod = MODLAR[mod] === 1 ? mod : "plain";
     return job;
+  }
+
+  // İşin transkript modu; eski işte yoksa "plain" (satır satır: o an yüklü altyazının modu
+  // başka transkripte ait olabilir, satırlar kelime sanılırsa tek olaya sıkışır)
+  function kaynakModu(job) {
+    var m = job && job.kaynakMod;
+    return MODLAR[m] === 1 ? m : "plain";
   }
 
   function devamEdilebilir(job) {
@@ -657,6 +668,7 @@
     secimNormalize: secimNormalize,
     planla: planla,
     captionCues: captionCues,
+    kaynakModu: kaynakModu,
     stilAyarlari: stilAyarlari,
     cercevePlani: cercevePlani,
     packPrompt: packPrompt,

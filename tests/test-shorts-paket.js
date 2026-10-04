@@ -186,6 +186,15 @@ ok("kaynakDilimi: orta noktası aralıkta olanlar, zamanlar kaydırılmadan (kop
 var jK = P.kaynakEkle(P.newJob({ plan: P.planla({ anlar: [{ start: 0, end: 7, title: "a" }, { start: 19, end: 23, title: "b" }], yetenek: { autoReframe: true, ffmpeg: true, libass: true } }) }), kSegs);
 ok("kaynakEkle: her Short kendi aralığını taşır (Devam et başka transkripte düşmez)", jK.kisalar[0].kaynakSegs.length === 2 && jK.kisalar[1].kaynakSegs.length === 1 &&
   jK.kisalar[1].kaynakSegs[0].text === "sonra" && JSON.parse(JSON.stringify(jK)).kisalar[0].kaynakSegs[1].start === 4);
+var jM = P.kaynakEkle(P.newJob({ plan: P.planla({ anlar: [{ start: 0, end: 7, title: "a" }], yetenek: { autoReframe: true, ffmpeg: true, libass: true } }) }), kSegs, "k1");
+ok("kaynakEkle/kaynakModu: transkriptin modu işle birlikte saklanır; eski iş ve bilinmeyen mod 'plain'",
+  P.kaynakModu(jM) === "k1" && JSON.parse(JSON.stringify(jM)).kaynakMod === "k1" && P.kaynakModu(jK) === "plain" &&
+  P.kaynakModu({}) === "plain" && P.kaynakModu({ kaynakMod: "zzz" }) === "plain" && P.kaynakModu(null) === "plain");
+// satır transkripti + "plain" mod: kelime tabanlı stil cümleleri kelimelere böler (k1 sanılırsa tek olaya sıkışırdı)
+var satirKayit = { mod: P.kaynakModu(jK), segs: [{ start: 0, end: 3, text: "Bu birinci uzun cümle burada" }, { start: 3, end: 6, text: "ikinci cümle de burada biter" }] };
+var ccS = P.captionCues(satirKayit, { styleId: "mrbeast", lang: "tr" });
+var ccK = P.captionCues({ mod: "k1", segs: satirKayit.segs }, { styleId: "mrbeast", lang: "tr" });
+ok("captionCues: işin modu 'plain' iken cue türü satır (k1 değil)", ccS.cueKind === "lines" && ccK.cueKind === "words");
 
 /* ---------------- CTA gerekçeleri ---------------- */
 var cpBos = P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({ ctaSecim: "ozel", ctaOzel: "  " }), lang: "tr" });

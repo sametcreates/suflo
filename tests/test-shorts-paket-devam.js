@@ -107,7 +107,7 @@ w.SufloShortsEkler = mod("shorts-ekler.js"); w.SufloShortsPlan = mod("shorts-pak
 w.SufloOverlayRender = { render: function () { return Promise.resolve({}); } };
 w.KKanca = { ekle: function (o) { S.ekle.push(o); return Promise.resolve({ ok: true }); } };
 w.KCaptions = {
-  language: function () { return "tr"; }, chatConfig: function () { return null; }, rawSegments: function () { return S.yuklu || []; },
+  language: function () { return "tr"; }, mode: function () { return "k1"; }, chatConfig: function () { return null; }, rawSegments: function () { return S.yuklu || []; },
   stilAyarlari: function () { return { aile: "viral" }; }, mogrtSecili: function () { return false; }
 };
 w.KViral = {
@@ -119,10 +119,11 @@ w.KViral = {
   },
   sekansDenetle: function () { return Promise.resolve({ sekans: "ana", uyari: "" }); },
   kaynakSegs: function () { return S.arama ? JSON.parse(JSON.stringify(S.arama)) : null; },
+  kaynakMod: function () { return S.arama ? (S.aramaMod || "plain") : null; },
   // viral.js shortsKaydet ile aynı: verilen transkript (yoksa arama, yoksa yüklü) dilimlenir
-  shortsKaydet: function (items, an, segs) {
+  shortsKaydet: function (items, an, segs, mod) {
     var kaynak = segs || S.arama || S.yuklu || [];
-    S.kaydedilen.push({ an: an.title, metin: kaynak.map(function (x) { return x.text; }).join(" | ") });
+    S.kaydedilen.push({ an: an.title, metin: kaynak.map(function (x) { return x.text; }).join(" | "), mod: mod });
     var kes = HL.sliceSegments(kaynak, an.start, an.end);
     if (!kes.length) return;
     ayarlar.shortsAltyazi = ayarlar.shortsAltyazi || {};
@@ -162,6 +163,8 @@ function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     ayarlar.shortsPaketIs.kisalar[1].seqId === "alt2" && ayarlar.shortsPaketIs.kisalar[1].dikeyId === "dik2", adlar(yeni).join(" | "));
   ok("Devam et: altyazı kaydı A'nın transkriptinden (B değil)", S.kaydedilen.length === 1 && /A videosu ikinci an/.test(S.kaydedilen[0].metin) && !/B videosu/.test(S.kaydedilen[0].metin),
     JSON.stringify(S.kaydedilen));
+  ok("Devam et: altyazı kaydının modu işin transkriptinden (o an yüklü altyazı k1 olsa da)", S.kaydedilen.length === 1 && S.kaydedilen[0].mod === "plain" &&
+    ayarlar.shortsPaketIs.kaynakMod === "plain", JSON.stringify(S.kaydedilen));
   ok("Devam et: yeni aramaya kaynak sekans bağlanmaz", S.baglanan.length === 0, JSON.stringify(S.baglanan));
   ok("Devam et sonrası paket bitti, Short 2 altyazısı kondu", ayarlar.shortsPaketIs.durum === "bitti" && ayarlar.shortsPaketIs.kisalar[1].adimlar.altyazi === "tamam",
     JSON.stringify(ayarlar.shortsPaketIs.kisalar[1].adimlar));

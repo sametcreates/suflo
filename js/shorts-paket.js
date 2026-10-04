@@ -317,7 +317,8 @@ window.KShortsPaket = (function () {
         // altyazı kaydı işin kendi transkriptinden (o an yüklü olan başka videonun olabilir);
         // eski işte yoksa boş: kayıt yazılmaz, altyazı adımı nedenini söyler
         if (window.KViral && KViral.shortsKaydet) {
-          KViral.shortsKaydet([it], { start: k.start, end: k.end, title: k.baslik }, k.kaynakSegs instanceof Array ? k.kaynakSegs : []);
+          KViral.shortsKaydet([it], { start: k.start, end: k.end, title: k.baslik }, k.kaynakSegs instanceof Array ? k.kaynakSegs : [],
+            P.kaynakModu(job));
         }
         if (bagNesli !== null && window.KViral && KViral.sekansiBagla) KViral.sekansiBagla(job.kaynakId, bagNesli);
         return { ok: true, id: it.id, dikeyId: it.dikeyId || "" };
@@ -541,9 +542,14 @@ window.KShortsPaket = (function () {
       job.kancaSure = kit ? kit.kanca.sure : (Number(el("kanca-sure") ? el("kanca-sure").value : 3) || 3);
       plan.uyarilar.forEach(function (u) { K.log("[shorts-paket] " + nedenMetni(u)); });
       // altyazı kayıtları işin kendi transkriptinden: her Short'a kendi aralığı (Devam et'te de bu kullanılır)
+      // bölümleme modu da aynı yerden (kelime kelimeye geçilse bile satırlar satır kalır)
       var kaynakSegs = KViral.kaynakSegs ? KViral.kaynakSegs() : null;
-      if (!kaynakSegs && window.KCaptions && KCaptions.rawSegments) kaynakSegs = KCaptions.rawSegments();
-      P.kaynakEkle(job, kaynakSegs || []);
+      var kaynakMod = kaynakSegs && KViral.kaynakMod ? KViral.kaynakMod() : null;
+      if (!kaynakSegs && window.KCaptions && KCaptions.rawSegments) {
+        kaynakSegs = KCaptions.rawSegments();
+        kaynakMod = KCaptions.mode ? KCaptions.mode() : "plain";
+      }
+      P.kaynakEkle(job, kaynakSegs || [], kaynakMod);
       if (durdu()) return;
       // atlanacak katmanlar ve uyarılar baştan söylenir (iş bitince değil)
       var onceden = P.atlamaOzeti(plan).map(function (g) {
