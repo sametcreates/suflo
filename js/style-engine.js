@@ -6,10 +6,13 @@
  * ve Premiere'e bağımlı değildir; zamanlı cue'lardan katmanlı ASS döndürür.
  */
 (function (root, factory) {
-  var api = factory();
+  // Paylasim kodu modulu (paket fontlari) style-engine'den ONCE yuklenir; yoksa motor yine calisir
+  var SS = (root && root.SufloStyleShare) || null;
+  if (!SS && typeof require === "function") { try { SS = require("./style-share.js"); } catch (e) { SS = null; } }
+  var api = factory(SS);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloStyleEngine = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function () {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS) {
   "use strict";
 
   var STYLES = {
@@ -262,6 +265,26 @@
    * kelime gruplari (fitSize) 16:9'da da kucultulur — onceden kadrajdan tasiyordu.
    */
   var olcekRef = 0;
+
+  /*
+   * TikTok / Reels / Shorts arayuzunun kapattigi bolgeler (1080x1920 olcumlerinden, oransal):
+   * ust durum cubugu, sag ikon sutunu, alt aciklama + dugmeler. Tek kaynak: panel onizlemesi
+   * (captions.js) ve kanca basligi (hook-title.js) buradan okur.
+   */
+  var GUVENLI_ALAN = [
+    { x: 0, y: 0, w: 1, h: 0.07 },
+    { x: 0.87, y: 0.35, w: 0.13, h: 0.43 },
+    { x: 0, y: 0.78, w: 1, h: 0.22 }
+  ];
+
+  /*
+   * "Platform arayuzunden kacin" (overrides.guvenli) dikey kadrajda: yazi ve paneller
+   * kadrajin %74'u genisligine sigdirilir; ortalanmis metnin sag kenari %87'deki ikon
+   * sutununun solunda kalir. compile() ayarlar, bitince sifirlar. 0 = kapali (cikti ayni).
+   */
+  var guvenliW = 0;
+  function alanW(width) { return guvenliW ? Math.min(width, guvenliW) : width; }
+
   function scaled(value, height) {
     return Math.max(1, Math.round(Number(value || 1) * (olcekRef || height) / 1080));
   }
@@ -377,7 +400,7 @@
       var start = group[0].start, end = group[group.length - 1].end;
       var longest = group.reduce(function (n, cue) { return Math.max(n, String(cue.text).length); }, 4);
       var twoLines = group.length >= 3;
-      var panelW = Math.min(width * 0.76, Math.max(width * 0.32, fs * (twoLines ? Math.max(5.8, longest * 1.35) : group.length * 3.4) + fs));
+      var panelW = Math.min(alanW(width) * 0.76, Math.max(alanW(width) * 0.32, fs * (twoLines ? Math.max(5.8, longest * 1.35) : group.length * 3.4) + fs));
       var panelH = fs * (twoLines ? 2.35 : 1.45);
       var left = a.x - panelW / 2, top = a.y - panelH / 2;
       var radius = fs * 0.22, intro = Math.round(170 / factor);
@@ -427,7 +450,7 @@
         events.push(dialogue(2, cue.start, activeEnd, tag + "\\1c" + assColor(style.renk) +
           "\\3c" + assColor(style.konturRenk) + "\\bord" + outline + "\\shad" + Math.max(1, scaled(2, height)) + "}" +
           viralMarkup(group, active, style, fs)));
-        var underlineW = Math.max(fs * 1.2, Math.min(width * .28, String(cue.text).length * fs * .54));
+        var underlineW = Math.max(fs * 1.2, Math.min(alanW(width) * .28, String(cue.text).length * fs * .54));
         events.push(dialogue(3, cue.start, activeEnd, shape(a.x - underlineW / 2, a.y + fs * .78,
           style.vurguRenk, 0x00, roundedRect(underlineW, Math.max(3, fs * .075), fs * .035),
           "\\fscx0\\t(0," + ms + ",0.55,\\fscx100)\\fad(0,70)")));
@@ -441,13 +464,13 @@
     var fs0 = scaled(style.boyut, height), outline = Math.max(1, scaled(style.kontur, height));
     groupWords(cues, 4).forEach(function (group) {
       // panel kadrajin %76'si: metin panele sigsin
-      var fs = fitSize(fs0, group, group.length >= 3 ? 2 : 0, style, width * .76 / .88, 1.12);
+      var fs = fitSize(fs0, group, group.length >= 3 ? 2 : 0, style, alanW(width) * .76 / .88, 1.12);
       var start = group[0].start, end = group[group.length - 1].end;
       var twoLines = group.length >= 3;
       var firstLine = group.slice(0, twoLines ? 2 : group.length).map(function (cue) { return String(cue.text); }).join(" ");
       var secondLine = twoLines ? group.slice(2).map(function (cue) { return String(cue.text); }).join(" ") : "";
       var lineChars = Math.max(firstLine.length, secondLine.length);
-      var panelW = Math.min(width * .76, Math.max(width * .3, fs * (lineChars * .62 + 1.8)));
+      var panelW = Math.min(alanW(width) * .76, Math.max(alanW(width) * .3, fs * (lineChars * .62 + 1.8)));
       var panelH = fs * (twoLines ? 2.45 : 1.48), left = a.x - panelW / 2, top = a.y - panelH / 2;
       var ms = Math.round(180 / factor), panel = roundedRect(panelW, panelH, fs * .38);
       events.push(dialogue(0, start, end, shape(left + scaled(4, height), top + scaled(7, height), "#000000", 0x4a,
@@ -471,13 +494,13 @@
     var events = [], a = anchor(style, "saas", width, height);
     var fs0 = scaled(style.boyut, height);
     groupWords(cues, 6).forEach(function (group) {
-      var fs = fitSize(fs0, group, group.length >= 3 ? 2 : 0, style, width * .78 / .88, 1.1);
+      var fs = fitSize(fs0, group, group.length >= 3 ? 2 : 0, style, alanW(width) * .78 / .88, 1.1);
       var start = group[0].start, end = group[group.length - 1].end;
       var twoLines = group.length >= 3;
       var firstLine = group.slice(0, twoLines ? 2 : group.length).map(function (cue) { return String(cue.text); }).join(" ");
       var secondLine = twoLines ? group.slice(2).map(function (cue) { return String(cue.text); }).join(" ") : "";
       var lineChars = Math.max(firstLine.length, secondLine.length);
-      var panelW = Math.min(width * .78, Math.max(width * .36, fs * (lineChars * .6 + 2.4)));
+      var panelW = Math.min(alanW(width) * .78, Math.max(alanW(width) * .36, fs * (lineChars * .6 + 2.4)));
       var panelH = fs * (twoLines ? 2.48 : 1.58), left = a.x - panelW / 2, top = a.y - panelH / 2;
       var radius = fs * .42, ms = Math.round(260 / factor), panel = roundedRect(panelW, panelH, radius);
       events.push(dialogue(0, start, end, shape(left + scaled(4, height), top + scaled(8, height), "#000000", 0x58,
@@ -518,7 +541,7 @@
       var p = cue.vurgu ? { fill: style.vurguRenk, text: "#15131f", accent: "#ffffff" } : palettes[index % palettes.length], off = offsets[index % offsets.length];
       var cx = a.x + width * off[0], cy = a.y + height * off[1];
       var chars = Math.max(3, String(cue.text).length);
-      var cardW = Math.min(width * 0.58, Math.max(fs * 2.45, fs * (chars * 0.6 + 0.9)));
+      var cardW = Math.min(alanW(width) * 0.58, Math.max(fs * 2.45, fs * (chars * 0.6 + 0.9)));
       var cardH = fs * 1.16, left = cx - cardW / 2, top = cy - cardH / 2;
       var radius = fs * 0.2, angle = (index % 2 ? 3.2 : -4.2) * factor;
       var ms = Math.round(135 / factor), over = Math.round(112 + 6 * factor);
@@ -573,7 +596,7 @@
       // dar kadrajda (9:16) en uzun satir panele sigmiyorsa bu cue icin font kuculur
       var satirSiniri = width < height ? 22 : 38;   // dikeyde iki kisa satir, tek uzun minik satir degil
       var enUzun = dengeliUzunluk(stripEmphasis(cue.text), satirSiniri);
-      var fs = Math.max(8, Math.min(fsTemel, Math.floor(width * 0.76 / (enUzun * 0.53 + 0.72 * 2.35))));
+      var fs = Math.max(8, Math.min(fsTemel, Math.floor(alanW(width) * 0.76 / (enUzun * 0.53 + 0.72 * 2.35))));
       var pad = fs * 0.72;
       var markup = balancedText(cue.vurgu ? "*" + cue.text + "*" : cue.text, satirSiniri, assColor(style.vurguRenk), assColor(style.renk));
       cue = { start: cue.start, end: cue.end, text: stripEmphasis(cue.text) };
@@ -584,7 +607,7 @@
         else state.parts[state.parts.length - 1] = (last + " " + word).trim();
         return state;
       }, { parts: [""] }).parts.reduce(function (n, part) { return Math.max(n, part.length); }, 10);
-      var panelW = Math.min(width * 0.76, Math.max(width * 0.34, maxChars * fs * 0.53 + pad * 2.35));
+      var panelW = Math.min(alanW(width) * 0.76, Math.max(alanW(width) * 0.34, maxChars * fs * 0.53 + pad * 2.35));
       var panelH = lines * fs * 1.28 + pad * 1.25;
       var left = a.x, top = a.y - panelH;
       var ms = Math.round(360 / factor), slide = scaled(30, height);
@@ -625,11 +648,11 @@
       var uzun = group.map(function (c) { return c.text; }).join(" ").length > 20;
       var br = group.length >= 4 || uzun ? Math.ceil(group.length / 2) : 0;
       if (br >= group.length) br = 0;
-      var fs = fitSize(fs0, group, br, style, width * 0.72 * 0.84 / 0.88, 1.15);
+      var fs = fitSize(fs0, group, br, style, alanW(width) * 0.72 * 0.84 / 0.88, 1.15);
       var start = group[0].start, end = group[group.length - 1].end;
       var markup = premiumMarkup(group, meaningfulWord(group), style);
       var twoLines = markup.indexOf("\\N") !== -1;
-      var panelW = width * 0.72, panelH = fs * (twoLines ? 2.45 : 1.52);
+      var panelW = alanW(width) * 0.72, panelH = fs * (twoLines ? 2.45 : 1.52);
       var left = a.x - panelW / 2, top = a.y - panelH / 2;
       var ms = Math.round(430 / factor), lineW = panelW * 0.25;
       events.push(dialogue(0, start, end, shape(left, top, "#050608", 0x62,
@@ -656,7 +679,8 @@
    * kelimelik gruplar iki dengeli satira bolunur ve en uzun satir kadraj
    * genisliginin %88'ini asarsa boyut kucultulur.
    */
-  var KARAKTER_GENISLIK = { "Anton": .47, "Bebas Neue": .43, "Archivo Black": .72, "Montserrat": .64, "Bungee": .8, "Lora": .55 };
+  // Katsayilar paket fontlariyla birlikte style-share.js'te (tek kaynak)
+  var KARAKTER_GENISLIK = SS ? SS.widths() : { "Anton": .47, "Bebas Neue": .43, "Archivo Black": .72, "Montserrat": .64, "Bungee": .8, "Lora": .55 };
 
   function minScaled(value, width, height) {
     return Math.max(1, Math.round(Number(value || 1) * Math.min(width, height) / 1080));
@@ -681,7 +705,7 @@
     var longest = lines.reduce(function (n, ln) {
       return Math.max(n, ln.map(function (c) { return String(c.text); }).join(" ").length);
     }, 1);
-    var maxW = width * .88;
+    var maxW = alanW(width) * .88;
     var need = longest * fs * k * (extra || 1);
     return need > maxW ? Math.max(8, Math.floor(fs * maxW / need)) : fs;
   }
@@ -833,11 +857,40 @@
     return events;
   }
 
+  /*
+   * Ince ayar degerleri ASS Style satirina ve etiketlere yazilir: once yeniden dogrulanir.
+   * Gecersiz deger stilin kendi degerine duser. Ornek: font "Arial,0,0}{\\pos(0,0)" virgulle
+   * ayrilan Style satirini bozuyordu. Gecerli degerlerde cikti bayt bayt ayni kalir.
+   */
+  var FONT_ADI = /^[A-Za-z0-9 ]{1,40}$/;
+  var HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+  function sayiMi(v) { return typeof v === "number" && isFinite(v); }
+  function guvenliStil(preset, overrides) {
+    var ov = overrides && typeof overrides === "object" ? overrides : {};
+    var style = Object.assign({}, preset);
+    Object.keys(ov).forEach(function (k) {
+      if (k === "__proto__" || k === "constructor" || k === "prototype") return;
+      var v = ov[k];
+      if (k === "font") { if (typeof v === "string" && FONT_ADI.test(v)) style.font = v; return; }
+      if (k === "fontFile" || k === "guvenli") return;   // fontFile asagida yazi tipinden turetilir
+      if (k === "renk" || k === "konturRenk" || k === "vurguRenk") { if (typeof v === "string" && HEX.test(v)) style[k] = v; return; }
+      if (k === "boyut" || k === "kontur") { if (sayiMi(v) && v >= 0 && v <= 1000) style[k] = v; return; }
+      if (k === "konum") { if (v === 1 || v === 2 || v === 5 || v === 8) style.konum = v; return; }
+      if (k === "kutu") { style.kutu = !!v; return; }
+      if (k === "animasyon" || k === "aile" || k === "yogunluk") { if (typeof v === "string" && /^[a-z0-9_-]{1,24}$/.test(v)) style[k] = v; return; }
+    });
+    // fontFile girdiden alinmaz: paket fontuysa dosyasi, stilin kendi fontuysa onunki, degilse yok
+    if (SS && SS.hasFont(style.font)) style.fontFile = SS.fontFile(style.font);
+    else if (style.font === preset.font) style.fontFile = preset.fontFile;
+    else style.fontFile = undefined;
+    return style;
+  }
+
   function compile(options) {
     options = options || {};
     var id = STYLES[options.styleId] ? options.styleId : "viral";
     var source = STYLES[id];
-    var style = Object.assign({}, source.style, options.overrides || {});
+    var style = guvenliStil(source.style, options.overrides);
     var width = Math.max(320, Math.round(options.width || 1920));
     var height = Math.max(180, Math.round(options.height || 1080));
     var cues = normaliseCues(options.cues, options.offset);
@@ -850,6 +903,7 @@
     var factor = intensity(options.intensity || style.yogunluk);
     var events;
     olcekRef = Math.min(width, height);
+    guvenliW = options.overrides && options.overrides.guvenli === true && height > width * 1.2 ? Math.round(width * 0.74) : 0;
     try {
     if (id === "mrbeast") events = renderMrBeast(cues, style, width, height, factor);
     else if (id === "capcut") events = renderCapCut(cues, style, width, height, factor);
@@ -864,7 +918,7 @@
     else if (id === "dolgu") events = renderDolgu(cues, style, width, height, factor);
     else events = renderViral(cues, style, width, height, factor);
     var basliklar = header(style, id, width, height);
-    } finally { olcekRef = 0; }
+    } finally { olcekRef = 0; guvenliW = 0; }
 
     return {
       id: id,
@@ -887,6 +941,7 @@
     markEmphasis: markEmphasis,
     stripEmphasis: stripEmphasis,
     compile: compile,
+    GUVENLI_ALAN: GUVENLI_ALAN,
     assColor: assColor,
     timecode: timecode
   };

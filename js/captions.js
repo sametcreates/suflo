@@ -1447,10 +1447,10 @@ window.KCaptions = (function () {
 
   /*
    * Panelle birlikte gelen fontlar (Google Fonts, OFL lisanslı; lisans dosyaları
-   * fonts/ klasöründe). Hepsi cmap denetiminden geçti: Türkçe glifler TAM —
+   * fonts/ klasöründe). Tek kaynak js/style-share.js (FONTS); aşağıdaki liste yalnız yedek. Hepsi cmap denetiminden geçti: Türkçe glifler TAM —
    * eksik glifli font libass'te sessizce başka fonta düşer ve yazı karışık çıkar.
    */
-  var FONTLAR = {
+  var FONTLAR = (window.SufloStyleShare && window.SufloStyleShare.fontFiles()) || {
     "Anton": "Anton.ttf",
     "Archivo Black": "ArchivoBlack.ttf",
     "Bebas Neue": "BebasNeue.ttf",
@@ -3305,9 +3305,8 @@ window.KCaptions = (function () {
     return { w: Math.round(540 * oran / 2) * 2, h: 540, dikey: false };
   }
 
-  // TikTok / Reels / Shorts ortak "kapali" bolgeleri (1080x1920 olcumlerinden, oransal):
-  // ust durum cubugu, sag ikon sutunu, alt aciklama + dugmeler
-  var GUVENLI_ALAN = [
+  // TikTok / Reels / Shorts ortak "kapali" bolgeleri: tek kaynak stil motoru (SufloStyleEngine.GUVENLI_ALAN)
+  var GUVENLI_ALAN = (typeof window !== "undefined" && window.SufloStyleEngine && window.SufloStyleEngine.GUVENLI_ALAN) || [
     { x: 0, y: 0, w: 1, h: 0.07 },
     { x: 0.87, y: 0.35, w: 0.13, h: 0.43 },
     { x: 0, y: 0.78, w: 1, h: 0.22 }

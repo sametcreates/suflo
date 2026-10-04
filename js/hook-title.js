@@ -6,10 +6,16 @@
  * işaretli kelimeler vurgu renginde. Saf modül: DOM'a, ağa, Premiere'e dokunmaz.
  */
 (function (root, factory) {
-  var api = factory();
+  // Paket fontlari (style-share) ve platform guvenli alani (style-engine) ortak kaynaktan
+  function yukle(ad, dosya) {
+    if (root && root[ad]) return root[ad];
+    if (typeof require === "function") { try { return require(dosya); } catch (e) {} }
+    return null;
+  }
+  var api = factory(yukle("SufloStyleShare", "./style-share.js"), yukle("SufloStyleEngine", "./style-engine.js"));
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloHookTitle = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function () {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS, SE) {
   "use strict";
 
   var STILLER = {
@@ -261,8 +267,8 @@
     }).slice(0, 8);
   }
 
-  // TikTok / Reels / Shorts arayuzunun kapattigi bolgeler (Altyazi onizlemesiyle ayni oranlar)
-  var GUVENLI_ALAN = [{ x: 0, y: 0, w: 1, h: 0.07 }, { x: 0.87, y: 0.35, w: 0.13, h: 0.43 }, { x: 0, y: 0.78, w: 1, h: 0.22 }];
+  // TikTok / Reels / Shorts arayuzunun kapattigi bolgeler: tek kaynak stil motoru (Altyazi onizlemesiyle ayni)
+  var GUVENLI_ALAN = (SE && SE.GUVENLI_ALAN) || [{ x: 0, y: 0, w: 1, h: 0.07 }, { x: 0.87, y: 0.35, w: 0.13, h: 0.43 }, { x: 0, y: 0.78, w: 1, h: 0.22 }];
   function safeZoneFilter(w, h) {
     return GUVENLI_ALAN.map(function (b) {
       var x = Math.round(b.x * w), y = Math.round(b.y * h), bw = Math.round(b.w * w), bh = Math.round(b.h * h);

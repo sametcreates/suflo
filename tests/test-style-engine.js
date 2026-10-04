@@ -96,6 +96,65 @@ ok("neon parilti katmani \\alpha ile dolguyu acmaz", !/\\alpha&H00&/.test(nAss.s
 var kac = engine.compile({ styleId: "viral", cues: [{ start: 0, end: 1, text: "a\\Nb {x}" }] }).ass;
 ok("kullanici metnindeki ters bolu ASS komutu olmaz", kac.indexOf("a\\Nb") === -1 && kac.indexOf("a\u29F5Nb") !== -1);
 
+/* ---- ince ayar dogrulamasi, platform guvenli yerlesimi, degismezlik ---- */
+var crypto = require("crypto");
+function ozet(r) { return crypto.createHash("sha256").update(r.ass).digest("hex").slice(0, 16); }
+// Degisiklik ONCESI motorla uretilen ozetler (tests/style-engine-snapshot.json): guvenli bayragi
+// olmadan cikti bayt bayt ayni kalmali (12 stil × 16:9 / 9:16 × kelime / satir × ince ayar yok / paket / sistem fontu)
+var snap = JSON.parse(fs.readFileSync(path.join(__dirname, "style-engine-snapshot.json"), "utf8"));
+var snapKelime = ["Bunu", "*gören*", "herkes", "şaşırdı", "İstanbul'da", "çok", "güzel", "bir", "gün", "vardı."].map(function (w, i) {
+  return { start: i * 0.5, end: i * 0.5 + 0.44, text: w };
+});
+var snapSatir = [{ start: 0, end: 2.2, text: "Bunu gören herkes *şaşırdı* bugün" }, { start: 2.4, end: 4.6, text: "İstanbul çok güzel, değil mi?" }];
+var snapAyar = {
+  yok: null,
+  ince: { font: "Lora", fontFile: "Lora.ttf", boyut: 90, renk: "#ff3366", konturRenk: "#101010", vurguRenk: "#22ccff", kontur: 3, konum: 2 },
+  sistem: { font: "Arial", boyut: 72, renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#8b7cf6", kontur: 4, konum: 8 }
+};
+var farkli = [], sayilan = 0;
+styles.forEach(function (s) {
+  [[1920, 1080], [1080, 1920]].forEach(function (d) {
+    ["words", "lines"].forEach(function (k) {
+      Object.keys(snapAyar).forEach(function (a) {
+        var o = { styleId: s.id, cues: k === "words" ? snapKelime : snapSatir, cueKind: k, width: d[0], height: d[1] };
+        if (snapAyar[a]) o.overrides = snapAyar[a];
+        var anahtar = s.id + "@" + d[0] + "x" + d[1] + ":" + k + ":" + a;
+        sayilan++;
+        if (snap[anahtar] !== ozet(engine.compile(o))) farkli.push(anahtar);
+        // guvenli bayragi 16:9'da hicbir seyi degistirmez
+        if (d[0] > d[1]) {
+          var og = Object.assign({}, o, { overrides: Object.assign({}, snapAyar[a] || {}, { guvenli: true }) });
+          if (snap[anahtar] !== ozet(engine.compile(og))) farkli.push(anahtar + " +guvenli");
+        }
+      });
+    });
+  });
+});
+ok("guvenli olmadan cikti degisiklik oncesiyle bayt bayt ayni (" + sayilan + " durum) ve 16:9'da guvenli etkisiz", farkli.length === 0 && sayilan === Object.keys(snap).length,
+  farkli.slice(0, 4).join(", "));
+
+function styleAlanlari(ass) {
+  var satir = ass.split("\n").filter(function (l) { return /^Style: /.test(l); })[0] || "";
+  return satir.slice(7).split(",");
+}
+var enjeksiyon = engine.compile({ styleId: "viral", cues: snapKelime, width: 1080, height: 1920, overrides: {
+  font: "Arial,0,0}{\\pos(0,0)", renk: "#}{\\b1", konturRenk: "red", vurguRenk: "#12345g", konum: "guvenli", boyut: "9999}", kontur: {}, fontFile: "../../x.ttf", guvenli: "1"
+} });
+var alanlar = styleAlanlari(enjeksiyon.ass);
+ok("enjekte edilen ince ayar notralize: Style satiri 23 alan", alanlar.length === 23, alanlar.length + " · " + alanlar.join(","));
+ok("enjekte font stilin kendi fontuna duser", alanlar[1] === "Archivo Black" && enjeksiyon.fontFiles[0] === "ArchivoBlack.ttf", alanlar[1] + " " + enjeksiyon.fontFiles);
+ok("enjekte renkler stilin renklerine duser", alanlar[3] === engine.assColor("#ffffff") && alanlar[5] === engine.assColor("#05070b") &&
+  enjeksiyon.style.vurguRenk === "#ffd83d" && alanlar[2] === "118" && alanlar[16] === "8", alanlar.slice(2, 6).join(","));
+ok("ASS'te enjeksiyon izi yok", !/\\b1|pos\(0,0\)|\.\.\/|guvenli/.test(enjeksiyon.ass));
+ok("Alignment alani 1/2/5/8 (guvenli yazilmaz)", /^[1258]$/.test(alanlar[18]), alanlar[18]);
+ok("fontFile girdiden alinmaz, paket fontundan turetilir", engine.compile({ styleId: "viral", cues: snapKelime, overrides: { font: "Lora", fontFile: "../../x.ttf" } }).fontFiles[0] === "Lora.ttf");
+ok("__proto__ ince ayari yok sayilir", engine.compile({ styleId: "viral", cues: snapKelime, overrides: JSON.parse('{"__proto__":{"font":"Lora"}}') }).style.font === "Archivo Black");
+ok("GUVENLI_ALAN disa aktarilir (ust %7, sag ikon sutunu %87, alt %78)", engine.GUVENLI_ALAN.length === 3 && engine.GUVENLI_ALAN[0].h === 0.07 &&
+  engine.GUVENLI_ALAN[1].x === 0.87 && engine.GUVENLI_ALAN[2].y === 0.78);
+var g916 = engine.compile({ styleId: "viral", cues: snapKelime, width: 1080, height: 1920, overrides: { guvenli: true } });
+ok("9:16 + guvenli cikti farkli (yazi daralir)", ozet(g916) !== snap["viral@1080x1920:words:yok"]);
+ok("guvenli sonrasi motor durumu sifirlanir", ozet(engine.compile({ styleId: "viral", cues: snapKelime, cueKind: "words", width: 1080, height: 1920 })) === snap["viral@1080x1920:words:yok"]);
+
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
 if (!ffmpeg) {
   console.log("(ffmpeg yok - gercek stil renderlari atlandi)");
@@ -124,6 +183,29 @@ if (!ffmpeg) {
     });
     ok(id + " kendi fontunu kullaniyor (yedege dusmuyor)", dogru, secimler.join(" | ").slice(0, 180));
   });
+  /*
+   * "Platform arayuzunden kacin": 9:16'da uzun kelimelerle her stilin sag kenari ikon
+   * sutununun (%87) solunda kalir. Olcum gercek libass cizimi: saydam zemin, en sagdaki
+   * gorunur piksel. Hiz icin 540x960'ta (PlayRes 1080x1920, oransal).
+   */
+  var uzunlar = [{ start: 0, end: 0.9, text: "MUHTEŞEMLİKLERİNİZDEN" }, { start: 0.9, end: 1.8, text: "KAÇIRMAMALISINIZ" },
+    { start: 1.8, end: 2.7, text: "İNANILMAZDI" }, { start: 2.7, end: 3.6, text: "ARKADAŞLAR" }];
+  var EW = 540, EH = 960;
+  styles.forEach(function (s) {
+    var r = engine.compile({ styleId: s.id, cues: uzunlar, cueKind: "words", width: 1080, height: 1920, overrides: { guvenli: true } });
+    fs.writeFileSync(path.join(tmp, "guvenli.ass"), r.ass, "utf8");
+    fs.copyFileSync(path.join(root, "fonts", r.fontFiles[0]), path.join(tmp, r.fontFiles[0]));
+    var p = cp.spawnSync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i",
+      "color=c=black@0:s=" + EW + "x" + EH + ":r=25:d=3.6,format=rgba,subtitles=f=guvenli.ass:alpha=1:fontsdir=.,select='eq(n\\,11)+eq(n\\,33)+eq(n\\,56)+eq(n\\,78)'",
+      "-vsync", "0", "-f", "rawvideo", "-pix_fmt", "rgba", "-"], { cwd: tmp, maxBuffer: 64 * 1024 * 1024 });
+    var b = p.stdout || Buffer.alloc(0), kare = EW * EH * 4, enSag = -1;
+    for (var f = 0; f + kare <= b.length; f += kare) {
+      for (var y = 0; y < EH; y++) for (var x = EW - 1; x > enSag; x--) { if (b[f + (y * EW + x) * 4 + 3] > 16) { enSag = x; break; } }
+    }
+    ok(s.id + " 9:16 + guvenli: sag kenar <= %87 (ikon sutunu)", p.status === 0 && b.length >= kare * 4 && enSag > 0 && (enSag + 1) / EW <= 0.87,
+      p.status + " · " + (b.length / kare) + " kare · sag kenar %" + ((enSag + 1) / EW * 100).toFixed(1));
+  });
+
   if (process.env.SUFLO_KEEP_STYLE_TEST) console.log("PREVIEW_DIR=" + tmp);
   else try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e2) {}
 }
