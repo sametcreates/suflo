@@ -28,6 +28,10 @@ ok("çubuk: zemin + dolgu olayı, dolgu \\clip'i 0'dan tam genişliğe \\t ile a
 ok("çubuk: renk ASS sırasıyla (BGR)", /\\1c&H0000FF&/.test(pb.events[1]));
 ok("çubuk: geçersiz renk varsayılana döner", /\\1c&HF67C8B&/.test(E.progressBarEvents({ W: W, H: H, dur: 5, renk: "kırmızı" }).events[1]));
 
+ok("ctaMetni: altyazı dillerinde hazır metin, hazırı olmayanda İngilizce", E.ctaMetni("takip", "", "de") === "Folge für mehr" &&
+  E.ctaMetni("link", "", "es") === "Enlace en la descripción" && E.ctaMetni("part2", "", "ru") === "Часть 2 в профиле" && E.ctaMetni("takip", "", "az") === "Abunə ol" &&
+  E.ctaMetni("takip", "", "ja") === "Follow for more" && E.ctaDiliVar("fr") && !E.ctaDiliVar("ja") && !E.ctaDiliVar("toString") &&
+  ["tr", "en", "az", "de", "es", "fr", "pt", "it", "ru", "ar"].every(function (l) { return ["takip", "part2", "link"].every(function (x) { var t = E.ctaMetni(x, "", l); return t && t.length <= 40; }); }));
 ok("ctaMetni: hazır metin videonun dilinde, özel metin ≤40 ve emojisiz",
   E.ctaMetni("takip", "", "tr") === "Takip et" && E.ctaMetni("link", "", "en") === "Link in description" &&
   E.ctaMetni("ozel", "Abone ol 🔥 ve bildirimleri aç lütfen çok önemli gerçekten", "tr").length <= 40 &&

@@ -818,9 +818,12 @@ sekanslı akış Premiere'de **hiç denenmedi**: aşağıdaki liste bunun için.
    "Etkin sekans değişti; katman konmadı" hatasıyla düşmeli, paket diğer adımlarla sürmeli,
    hiçbir katman yanlış sekansa konmamalı. Sonra Devam et ile hatalı adım tamamlanmalı.
 9. **Miras altyazı:** ana sekansa önce "Suflo Stilleri ile ekle" ile altyazı katmanı koy, sonra
-   paketi çalıştır: Short'larda altyazı adımı "atlandı" (kaynaktaki katman kopyalandı) olmalı,
-   çift altyazı olmamalı. Premiere'in kendi altyazı izi (Captions track) varsa Short'a da
-   kopyalanır; panel bunu göremez, gerekirse elle sil.
+   paketi çalıştır: 9:16 Short'larda kaynaktan kopyalanan (kırpık) altyazı klibi KAPALI (gri,
+   Premiere'de sağ tık › Etkinleştir ile geri açılır) olmalı ve üstünde paketin 9:16 altyazısı
+   ("Suflo Paket · Altyazı") olmalı; satırda "kaynaktan kopyalanan altyazı katmanı kapatıldı" notu.
+   Çift altyazı olmamalı. Yatay pakette kopya katman kalır, altyazı adımı "atlandı" olur.
+   Premiere'in kendi altyazı izi (Captions track) varsa Short'a da kopyalanır; panel bunu
+   göremez, gerekirse elle sil.
 10. **Başka sekansta bulunan anlar:** anları bulduktan sonra başka bir sekans aç, Paketi oluştur:
     "Viral anlar başka bir sekansta bulundu" uyarısı, hiçbir sekans oluşmamalı.
 11. **Auto Reframe olmayan sürüm (14.4 / 22.x öncesi):** Paketi oluştur "yatay sekanslarla
@@ -831,10 +834,18 @@ sekanslı akış Premiere'de **hiç denenmedi**: aşağıdaki liste bunun için.
 13. **Groq kota (429):** çok sayıda Short (8-10) ile dene: metin adımları sırayla (aynı anda değil)
     çalışmalı; kota dolarsa panel bekleyip yeniden denemeli, en sonunda yedeğe düşmeli.
 14. **Uzun Auto Reframe:** 90 sn'lik bir an ile dene: 600 sn içinde bitmezse panel sekansı adıyla
-    bulup devam etmeli (aynı Short iki kez oluşmamalı).
+    bulup devam etmeli (aynı Short iki kez oluşmamalı). Bulamayıp adımı hata yaptıysa Auto Reframe
+    bitince Devam et'e bas: "Suflo Shorts" kutusunda o Short'tan yine TEK yatay + TEK 9x16 olmalı.
 15. **İngilizce arayüz:** Ayarlar › English: kutu "Shorts Pack", düğme "Create pack (N Shorts)",
     CTA seçenekleri İngilizce. Video Türkçe ise CTA videoya Türkçe yazılmalı ("Takip et"), TXT
-    etiketleri İngilizce.
+    etiketleri İngilizce. Almanca / İspanyolca / Fransızca / Portekizce / İtalyanca / Rusça /
+    Arapça / Azerice videoda hazır CTA o dilde; başka dilde İngilizce ve satırda not.
+16. **Devam et başka videoda:** paketi yarıda İptal et, başka bir videoda Viral anlar bul, eski
+    paketi Devam et ile sürdür: kalan Short'ların altyazısı İLK videonun konuşması olmalı.
+    Yarım paket varken "Paketi oluştur": önce "Yarım kalan bir Shorts Paketi var…" sorusu gelmeli.
+17. **libass'sız ffmpeg:** paket başlarken "altyazı, kanca, çerçeve atlanacak: …libass yok"
+    bildirimi gelmeli; sonuç sarı ve "katmansız Short" saymalı, yeşil "hazır" dememeli.
+18. **Hazırlanırken İptal:** "Hazırlanıyor…" yazarken İptal: hiçbir sekans oluşmamalı.
 
 ### 9.2 Bilinen sınırlar (bilerek kapsam dışı)
 

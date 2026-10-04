@@ -3906,17 +3906,19 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 
 .vr-paket-sec { margin-right: 4px; font-size: 10.5px; }
 .vr-paket { margin-top: 10px; }
-.paket-stil-alan { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
-.paket-secenekler { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
-.paket-satir { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* CEF 74: flex gap yok — sütunlar grid-row-gap, sarılan satırlar çocuk margin'iyle */
+.paket-stil-alan { display: grid; grid-row-gap: 4px; margin-bottom: 6px; }
+.paket-secenekler { display: grid; grid-row-gap: 6px; margin: 4px 0 10px; }
+.paket-satir { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: -4px; }
+.paket-satir > * { margin: 0 6px 4px 0; }
 .paket-satir input[type="color"] { width: 28px; height: 22px; padding: 0; border: 1px solid var(--line2); border-radius: 4px; background: transparent; }
 .paket-satir .vr-odak { flex: 1 1 140px; min-width: 120px; }
 .paket-not { display: inline; margin: 0; }
-.paket-liste { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.paket-liste { display: grid; grid-row-gap: 6px; margin-top: 8px; }
 .paket-kisa { border: 1px solid var(--line); border-radius: var(--r-s); padding: 6px 8px; }
 .paket-kisa-ad { font-size: 11px; color: var(--dim); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.paket-cipler { display: flex; flex-wrap: wrap; gap: 4px; }
-.paket-cip { font-size: 10px; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--line2); color: var(--faint); }
+.paket-cipler { display: flex; flex-wrap: wrap; margin-bottom: -4px; }
+.paket-cip { font-size: 10px; padding: 1px 7px; margin: 0 4px 4px 0; border-radius: 9px; border: 1px solid var(--line2); color: var(--faint); }
 .paket-cip.calisiyor { border-color: var(--accent); color: var(--accent-lite); }
 .paket-cip.tamam { border-color: var(--good); color: var(--good); }
 .paket-cip.hata { border-color: var(--bad); color: var(--bad); }

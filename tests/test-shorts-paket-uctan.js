@@ -53,8 +53,8 @@ function cagri(fn, arg) {
     if (arg.sourceId !== "ana") return { ok: false, error: "kaynak yok" };
     makeNo++;
     var r = arg.ranges[0], uzun = r.end - r.start;
-    sekanslar["alt" + makeNo] = { w: 1920, h: 1080, end: uzun };
-    sekanslar["dik" + makeNo] = { w: W, h: H, end: uzun };
+    sekanslar["alt" + makeNo] = { w: 1920, h: 1080, end: uzun, ad: r.name };
+    sekanslar["dik" + makeNo] = { w: W, h: H, end: uzun, ad: r.name + " 9x16" };
     return { ok: true, made: 1, vertical: 1, items: [{ name: r.name, id: "alt" + makeNo, dikeyId: "dik" + makeNo, dikey: true }], errors: [] };
   }
   if (fn === "KS_openSequenceById") {
@@ -62,6 +62,10 @@ function cagri(fn, arg) {
     aktif = arg.id;
     var s = sekanslar[arg.id];
     return { ok: true, id: arg.id, name: arg.id, width: s.w, height: s.h, end: s.end, fps: FPS, paket: [] };
+  }
+  if (fn === "KS_findSequenceByName") {
+    var ids = Object.keys(sekanslar).filter(function (id) { return sekanslar[id].ad === arg.name && (arg.haric || []).indexOf(id) === -1; });
+    return { ok: true, id: ids.length ? ids[ids.length - 1] : "", name: arg.name, count: ids.length, ids: ids };
   }
   if (fn === "KS_sequenceSufloLayers") return { ok: true, altyazi: 0, kanca: 0, paket: 0, toplam: 0 };
   if (fn === "KS_overlaySpec") { var a = sekanslar[aktif]; return { ok: true, width: a.w, height: a.h, fps: FPS, end: a.end }; }
@@ -165,7 +169,7 @@ DOM["cap-paket-ilerleme-stil"].value = "kalin";
 var bas = Date.now();
 dinleyici["cap-paket-olustur:click"]().then(function () {
   var sira = cagrilar.map(function (c) { return c.fn + (c.fn === "KS_placeOverlay" ? "(" + c.arg.name + ")" : "") + (c.fn === "KS_openSequenceById" ? "(" + c.arg.id + ")" : ""); });
-  var beklenen = ["KS_apiProbe", "KS_makeShorts", "KS_makeShorts",
+  var beklenen = ["KS_apiProbe", "KS_findSequenceByName", "KS_findSequenceByName", "KS_makeShorts", "KS_findSequenceByName", "KS_findSequenceByName", "KS_makeShorts",
     "KS_openSequenceById(dik1)", "KS_sequenceSufloLayers", "KS_placeOverlay(Suflo Paket · Altyazı)", "KS_overlaySpec", "KS_placeOverlay(Suflo Paket · Kanca)", "KS_placeOverlay(Suflo Paket · Çerçeve)",
     "KS_openSequenceById(dik2)", "KS_sequenceSufloLayers", "KS_placeOverlay(Suflo Paket · Altyazı)", "KS_overlaySpec", "KS_placeOverlay(Suflo Paket · Kanca)", "KS_placeOverlay(Suflo Paket · Çerçeve)",
     "KS_openSequenceById(ana)", "KS_projectDir"];

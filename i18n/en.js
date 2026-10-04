@@ -2251,7 +2251,7 @@
     "Çubuğun rengi": "Bar color",
     "Son saniyelerde kapanış çağrısı (8 sn'den kısa Shorts'ta eklenmez)": "A call to action in the last seconds (not added to Shorts under 8 s)",
     "Kapanış çağrısı (CTA)": "Call to action (CTA)",
-    "CTA metni (videonun dilinde yazılır)": "CTA text (written in the video's language)",
+    "CTA metni (hazır metinler videonun dilinde; hazırı olmayan dillerde İngilizce)": "CTA text (presets are in the video's language; English for languages without presets)",
     "Takip et": "Follow for more",
     "Part 2 profilde": "Part 2 on my profile",
     "Link açıklamada": "Link in description",
@@ -2323,7 +2323,16 @@
     "Pakete al": "Add to pack",
     "İptal": "Cancel",
     "Shorts Paketi hazırlanırken yeni arama yapılamaz.": "You can't start a new search while the Shorts Pack is being made.",
-    "Shorts Paketi hazırlanıyor; bitince tekrar dene.": "The Shorts Pack is being made; try again when it's done."
+    "Shorts Paketi hazırlanıyor; bitince tekrar dene.": "The Shorts Pack is being made; try again when it's done.",
+    "CTA atlandı: kendi metnin boş": "CTA skipped: your own text is empty",
+    "Bu dil için hazır CTA metni yok: İngilizcesi kondu": "No preset CTA text for this language: the English one was used",
+    "kaynaktan kopyalanan altyazı katmanı Short'ta kapatıldı (9:16'ya yenisi kondu)": "the caption layer copied from the source was turned off in the Short (a new one was made for 9:16)",
+    "katmansız Short (ffmpeg / libass yok)": "Shorts without layers (no ffmpeg / libass)",
+    "Kendi CTA metnini yaz ya da hazır bir metin seç.": "Type your own CTA text or pick a preset.",
+    "Yarım kalan bir Shorts Paketi var. Yeni paket başlarsa onun kalan adımları artık sürdürülemez (oluşan sekanslar projede kalır). Yeni paket başlasın mı?": "There's an unfinished Shorts Pack. If a new pack starts, its remaining steps can't be continued anymore (sequences already made stay in the project). Start a new pack?",
+    "Yarım paket korundu: kaldığı yerden sürdürmek için Devam et.": "The unfinished pack was kept: use Continue to pick up where it stopped.",
+    "hiçbir sekans oluşturulmadı.": "no sequences were created.",
+    "atlanacak": "will be skipped"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

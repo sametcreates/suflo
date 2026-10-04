@@ -75,6 +75,10 @@ ok("openSequenceById: olmayan / boş kimlik", !call("KS_openSequenceById", { id:
 var f1 = call("KS_findSequenceByName", { name: "Shorts 1 · Sır 9x16" });
 ok("findSequenceByName: aynı adlıların en sonuncusu, sayısıyla", f1.ok && f1.id === "s3" && f1.count === 2, JSON.stringify(f1));
 ok("findSequenceByName: bilinen kimlikler hariç tutulur", call("KS_findSequenceByName", { name: "Shorts 1 · Sır 9x16", haric: ["s3"] }).id === "s1");
+ok("findSequenceByName: tüm eşleşen kimlikler (ids), hariçler dışında", (function () {
+  var r = call("KS_findSequenceByName", { name: "Shorts 1 · Sır 9x16" }), r2 = call("KS_findSequenceByName", { name: "Shorts 1 · Sır 9x16", haric: ["s1"] });
+  return r.ids.join() === "s1,s3" && r2.ids.join() === "s3" && call("KS_findSequenceByName", { name: "yok" }).ids.length === 0;
+})());
 ok("findSequenceByName: bulunamazsa boş kimlik, ad yoksa hata", call("KS_findSequenceByName", { name: "yok" }).id === "" && !call("KS_findSequenceByName", {}).ok);
 
 /* KS_sequenceSufloLayers */
@@ -82,6 +86,24 @@ var l1 = call("KS_sequenceSufloLayers", { id: "s1" });
 ok("sequenceSufloLayers: ada, dosya adına ve 'Suflo Altyazi' kutusuna göre sayar; paket ayrı", l1.ok && l1.altyazi === 3 && l1.kanca === 1 && l1.paket === 1 && l1.toplam === 4, JSON.stringify(l1));
 ok("sequenceSufloLayers: temiz Short'ta sıfır", (function () { var r = call("KS_sequenceSufloLayers", { id: "s2" }); return r.ok && r.toplam === 0 && r.altyazi === 0; })());
 ok("sequenceSufloLayers: kimlik verilmezse etkin sekans", (function () { aktif = ana; var r = call("KS_sequenceSufloLayers", {}); return r.ok && r.altyazi === 1; })());
+
+/* KS_disableSufloCaptions: 9:16 Short'ta miras altyazı katmanları kapatılır (paketinki ve kanca dokunulmaz) */
+var d1 = call("KS_disableSufloCaptions", { id: "s1" });
+var kapali = [];
+for (var ti = 0; ti < kisa1.videoTracks.numTracks; ti++) for (var ci = 0; ci < kisa1.videoTracks[ti].clips.numItems; ci++) {
+  var kl = kisa1.videoTracks[ti].clips[ci]; if (kl.disabled === true) kapali.push(kl.name);
+}
+ok("disableSufloCaptions: yalnız miras altyazılar kapanır", d1.ok && d1.altyazi === 3 && d1.kapatilan === 3 && kapali.length === 3 &&
+  kapali.indexOf("Suflo Paket · Altyazı") === -1 && kapali.indexOf("Suflo Kanca · Bunu bil") === -1 && kapali.indexOf("video.mp4") === -1, JSON.stringify(d1) + " " + kapali.join(","));
+ok("disableSufloCaptions: kimliksiz / bilinmeyen sekansta hata, etkin sekansa dokunmaz", !call("KS_disableSufloCaptions", {}).ok && !call("KS_disableSufloCaptions", { id: "yok" }).ok);
+ok("disableSufloCaptions: ikinci çağrı aynı sonucu verir (zaten kapalı)", (function () { var r = call("KS_disableSufloCaptions", { id: "s1" }); return r.ok && r.kapatilan === 3; })());
+ok("disableSufloCaptions: salt-okunur disabled sayılmaz", (function () {
+  var ro = sekans("s9", "ro", [iz([klip("Suflo Stil · x", "C:\\a\\suflo-altyazi-1.mov")])]);
+  Object.defineProperty(ro.videoTracks[0].clips[0], "disabled", { get: function () { return false; }, set: function () {} });
+  tumu.push(ro); proje.sequences[proje.sequences.numSequences] = ro; proje.sequences.numSequences++;
+  var r = call("KS_disableSufloCaptions", { id: "s9" });
+  return r.ok && r.altyazi === 1 && r.kapatilan === 0;
+})());
 
 /* KS_makeShorts sourceId: bir Short açıkken asla Short'un alt sekansı oluşmaz */
 var altKaynak = [];

@@ -17,9 +17,14 @@ window.KShortsPaket = (function () {
   var P = window.SufloShortsPlan, EK = window.SufloShortsEkler, SE = window.SufloStyleEngine;
   var CT = window.SufloCaptionText, OR = window.SufloOverlayRender, MK = window.SufloMarkaKiti;
   var calisiyorMu = false, iptalIstendi = false, sonKlasor = "";
+  // Paketin başladığı Viral anlar aramasının nesli: yalnız o arama hâlâ ekrandaysa kaynak sekansa
+  // bağlanır ("Devam et" ya da yeni arama sonrası null / farklı: bağlanmaz)
+  var bagNesli = null;
 
   var ADIM_ETIKET = { sekans: "sekans", altyazi: "altyazı", kanca: "kanca", cerceve: "çerçeve", metin: "metin" };
   var DURUM_ETIKET = { bekliyor: "sırada", tamam: "tamam", hata: "hata", atlandi: "atlandı", calisiyor: "çalışıyor" };
+  // Çipte durum yalnız renkle anlatılmasın (renk körlüğü, ekran okuyucu)
+  var DURUM_IMI = { bekliyor: "", tamam: "✓ ", hata: "✕ ", atlandi: "– ", calisiyor: "… " };
 
   function el(id) { return document.getElementById(id); }
   function T(s) { var I = window.SufloI18n; return I && I.tr ? I.tr(s) : s; }
@@ -165,21 +170,27 @@ window.KShortsPaket = (function () {
       P.ADIMLAR.forEach(function (a) {
         var d = k.adimlar[a];
         var simdi = aktifAdim && aktifAdim.i === i && aktifAdim.adim === a && calisiyorMu && d === "bekliyor";
+        var gorunen = simdi ? "calisiyor" : d;
         var c = document.createElement("span");
-        c.className = "paket-cip " + (simdi ? "calisiyor" : d);
-        c.textContent = T(ADIM_ETIKET[a]);
-        var aciklama = T(DURUM_ETIKET[simdi ? "calisiyor" : d] || d);
+        c.className = "paket-cip " + gorunen;
+        c.textContent = (DURUM_IMI[gorunen] || "") + T(ADIM_ETIKET[a]);
+        var aciklama = T(DURUM_ETIKET[gorunen] || d);
         if (d === "hata" && k.hatalar[a]) aciklama += ": " + k.hatalar[a];
         if (d === "atlandi" && k.notlar[a]) aciklama += ": " + T(nedenMetni(k.notlar[a]));
         c.title = aciklama;
+        if (c.setAttribute) c.setAttribute("aria-label", T(ADIM_ETIKET[a]) + ": " + aciklama);
         cipler.appendChild(c);
         if (d === "hata" && k.hatalar[a]) notlar.push({ m: T(ADIM_ETIKET[a]) + ": " + k.hatalar[a], hata: true });
+        // kullanıcının kapatmadığı bir katman atlandıysa gerekçesi görünür (ipucuna gömülü kalmaz)
+        if (d === "atlandi" && k.notlar[a] && k.notlar[a] !== "kapali" && k.notlar[a] !== "cerceve-bos") {
+          notlar.push({ m: T(ADIM_ETIKET[a]) + ": " + T(nedenMetni(k.notlar[a])), hata: !!P.YETENEK_NEDENI[k.notlar[a]] });
+        }
       });
-      ["cta", "sekans9x16", "kancaMiras", "logo", "metinAi"].forEach(function (n) {
+      ["cta", "ctaDil", "altyaziMiras", "sekans9x16", "kancaMiras", "logo", "metinAi"].forEach(function (n) {
         if (k.notlar[n]) notlar.push({ m: T(nedenMetni(k.notlar[n])), hata: false });
       });
       satir.appendChild(cipler);
-      notlar.slice(0, 3).forEach(function (n) {
+      notlar.slice(0, 4).forEach(function (n) {
         var e = document.createElement("div");
         e.className = "paket-kisa-not" + (n.hata ? " hata" : "");
         e.textContent = n.m;
@@ -250,27 +261,65 @@ window.KShortsPaket = (function () {
   }
   function sil(p) { try { if (p && K.fs.existsSync(p)) K.fs.unlinkSync(p); } catch (e) {} }
 
-  function bagimliliklar(job, kaynakSegs) {
+  function isKaydet(j) {
+    try { K.settings().shortsPaketIs = j; K.saveSettings(); } catch (e) { K.log("[shorts-paket] iş kaydedilemedi: " + e.message); }
+  }
+
+  // ExtendScript kuyruğu tektir: Auto Reframe sürerken sorgu onun bitmesini bekler (uzun süre)
+  var ARAMA_SURESI = 300000;
+
+  function bagimliliklar(job) {
     var kit = markaKiti();
+
+    function bilinenIdler() {
+      var b = [];
+      job.kisalar.forEach(function (x) { if (x.seqId) b.push(x.seqId); if (x.dikeyId) b.push(x.dikeyId); });
+      return b;
+    }
+
+    // Bu Short için daha önce oluşmuş sekans (yanıtı kaybolan / zaman aşımına uğrayan çağrıdan):
+    // başka Short'ların ve paketten önce aynı adla var olanların kimlikleri hariç
+    async function oncekiSekans(k, sure) {
+      var once = k.sekansOnce || { yat: [], dik: [] };
+      var haric = bilinenIdler().concat(once.yat || [], once.dik || []);
+      var yat = await K.call("KS_findSequenceByName", { name: k.ad, haric: haric }, sure);
+      if (!yat || !yat.ok || !yat.id) return null;
+      var dik = job.dikey ? await K.call("KS_findSequenceByName", { name: k.ad + " 9x16", haric: haric }, sure) : null;
+      return { id: yat.id, dikeyId: dik && dik.ok ? dik.id : "" };
+    }
+
     return {
       makeShorts: async function (k) {
-        var r = await K.call("KS_makeShorts", { ranges: [{ start: k.start, end: k.end, name: k.ad }], dikey: job.dikey, sourceId: job.kaynakId }, 600000);
-        var it = null;
-        if (r && r.ok && r.items && r.items.length) {
-          it = r.items[0];
-          (r.errors || []).forEach(function (h) { if (/9:16/.test(h)) k.notlar.sekans9x16 = "9x16-yok"; });
-        } else if (r && /zaman aşımı|yanıt vermedi/i.test(String(r.error || ""))) {
-          // 600 sn doldu ama Auto Reframe bitmiş olabilir: sekansları adıyla geri al
-          var bilinen = [];
-          job.kisalar.forEach(function (x) { if (x.seqId) bilinen.push(x.seqId); if (x.dikeyId) bilinen.push(x.dikeyId); });
-          var yat = await K.call("KS_findSequenceByName", { name: k.ad, haric: bilinen }, 30000);
-          var dik = job.dikey ? await K.call("KS_findSequenceByName", { name: k.ad + " 9x16", haric: bilinen }, 30000) : null;
-          if (yat && yat.ok && yat.id) it = { id: yat.id, dikeyId: dik && dik.ok ? dik.id : "" };
+        var it = null, r = null;
+        if (!k.sekansOnce) {
+          // ilk deneme: aynı adla zaten var olan sekanslar (eski paket) not edilir, yeniden denemede alınmaz
+          var y0 = await K.call("KS_findSequenceByName", { name: k.ad, haric: [] }, 30000);
+          var d0 = job.dikey ? await K.call("KS_findSequenceByName", { name: k.ad + " 9x16", haric: [] }, 30000) : { ok: true, ids: [] };
+          if (!y0 || !y0.ok || !d0 || !d0.ok) return { ok: false, hata: (y0 && y0.error) || (d0 && d0.error) || nedenMetni("sekans-yok") };
+          k.sekansOnce = { yat: y0.ids || [], dik: d0.ids || [] };
+          isKaydet(job);   // KS_makeShorts'un yanıtı kaybolsa da "Devam et" bu listeyi bilir
+        } else {
+          // önceki deneme sekansı oluşturmuş olabilir: aynı Short ikinci kez yapılmaz
+          it = await oncekiSekans(k, ARAMA_SURESI);
+        }
+        if (!it) {
+          r = await K.call("KS_makeShorts", { ranges: [{ start: k.start, end: k.end, name: k.ad }], dikey: job.dikey, sourceId: job.kaynakId }, 600000);
+          if (r && r.ok && r.items && r.items.length) {
+            it = r.items[0];
+            (r.errors || []).forEach(function (h) { if (/9:16/.test(h)) k.notlar.sekans9x16 = "9x16-yok"; });
+          } else if (r && /zaman aşımı|yanıt vermedi/i.test(String(r.error || ""))) {
+            // 600 sn doldu ama Auto Reframe bitmiş (ya da hâlâ sürüyor) olabilir: sekansları adıyla geri al
+            it = await oncekiSekans(k, ARAMA_SURESI);
+          }
         }
         if (!it || !it.id) return { ok: false, hata: (r && r.error) || nedenMetni("sekans-yok") };
         if (job.dikey && !it.dikeyId) k.notlar.sekans9x16 = "9x16-yok";
-        if (window.KViral && KViral.shortsKaydet) KViral.shortsKaydet([it], { start: k.start, end: k.end, title: k.baslik }, kaynakSegs);
-        if (window.KViral && KViral.sekansiBagla) KViral.sekansiBagla(job.kaynakId);
+        // altyazı kaydı işin kendi transkriptinden (o an yüklü olan başka videonun olabilir);
+        // eski işte yoksa boş: kayıt yazılmaz, altyazı adımı nedenini söyler
+        if (window.KViral && KViral.shortsKaydet) {
+          KViral.shortsKaydet([it], { start: k.start, end: k.end, title: k.baslik }, k.kaynakSegs instanceof Array ? k.kaynakSegs : []);
+        }
+        if (bagNesli !== null && window.KViral && KViral.sekansiBagla) KViral.sekansiBagla(job.kaynakId, bagNesli);
         return { ok: true, id: it.id, dikeyId: it.dikeyId || "" };
       },
 
@@ -279,9 +328,16 @@ window.KShortsPaket = (function () {
         var r = await K.call("KS_openSequenceById", { id: id }, 60000);
         if (!r || !r.ok) return { ok: false, hata: (r && r.error) || nedenMetni("sekans-acilmadi") };
         var l = await K.call("KS_sequenceSufloLayers", { id: id }, 30000);
-        if (l && l.ok && l.kanca > 0) k.notlar.kancaMiras = "kanca-miras";
+        var miras = l && l.ok ? l : null, kapatilan = 0;
+        if (miras && miras.kanca > 0) k.notlar.kancaMiras = "kanca-miras";
+        // 9:16'da kaynaktan gelen altyazı katmanı 16:9 boyunda ve kırpık: kapatılır, yerine Short boyunda yenisi
+        if (miras && miras.altyazi > 0 && k.adimlar.altyazi === "bekliyor" && Number(r.height) > Number(r.width) * 1.2) {
+          var kp = await K.call("KS_disableSufloCaptions", { id: id }, 30000);
+          kapatilan = kp && kp.ok ? Number(kp.kapatilan) || 0 : 0;
+          if (kapatilan) k.notlar.altyaziMiras = "miras-kapatildi";
+        }
         return { ok: true, id: String(r.id || id), width: r.width, height: r.height, end: r.end, fps: r.fps,
-          paket: r.paket || [], miras: l && l.ok ? l : null };
+          paket: r.paket || [], miras: miras, mirasKapatilan: kapatilan };
       },
 
       altyazi: async function (k, ctx) {
@@ -317,6 +373,7 @@ window.KShortsPaket = (function () {
           altyaziKonum: sa.konum, altyaziAcik: k.adimlar.altyazi === "tamam", lang: job.lang,
           font: hk.font, renk: hk.renk, vurguRenk: hk.vurguRenk, ctaStil: kit && kit.kanca && kit.kanca.stil ? kit.kanca.stil : "serit" });
         if (cp.ctaNeden) k.notlar.cta = cp.ctaNeden;
+        if (cp.ctaDilNot) k.notlar.ctaDil = cp.ctaDilNot;
         if (cp.bos) return { atla: cp.ctaNeden || "cerceve-bos" };
         var ass = EK.composeFrameAss({ W: W, H: H, ctaAss: cp.cta ? cp.cta.ass : "", ctaStart: cp.cta ? cp.cta.start : 0, progress: cp.progress });
         var yol = cikti("cerceve", k);
@@ -351,9 +408,7 @@ window.KShortsPaket = (function () {
         return { ok: true, paylasim: P.paketMetni(parsed, k, { lang: job.lang, kredi: kredi }) };
       },
 
-      kaydet: function (j) {
-        try { K.settings().shortsPaketIs = j; K.saveSettings(); } catch (e) { K.log("[shorts-paket] iş kaydedilemedi: " + e.message); }
-      },
+      kaydet: isKaydet,
       ilerleme: function (j, i, adim) {
         aktifAdim = { i: i, adim: adim };
         listeCiz(j);
@@ -402,15 +457,15 @@ window.KShortsPaket = (function () {
 
   /* ---------------- çalıştırma ---------------- */
 
-  async function calistir(job, kaynakSegs) {
+  // iptalIstendi burada sıfırlanmaz: hazırlık sırasında basılan İptal geçerli kalır (olustur / devam sıfırlar)
+  async function calistir(job) {
     calisiyorMu = true;
-    iptalIstendi = false;
     sonKlasor = "";
     guncelle();
     listeCiz(job);
     var dosyalar = null;
     try {
-      await P.runJob(job, bagimliliklar(job, kaynakSegs));
+      await P.runJob(job, bagimliliklar(job));
       if (job.secim.metin || job.kisalar.some(function (k) { return k.adimlar.sekans === "tamam"; })) dosyalar = await dosyalariYaz(job);
     } catch (e) {
       durum("✕ " + K.hataYardimi(e), "bad");
@@ -423,10 +478,12 @@ window.KShortsPaket = (function () {
     }
     var oz = P.ozet(job);
     var mesaj = (job.durum === "iptal" ? T("Paket durduruldu") : T("Shorts Paketi hazır")) + ": " + oz.bitenKisa + "/" + oz.kisa + " " + T("Short tamam") +
+      (oz.eksikKisa ? " · " + oz.eksikKisa + " " + T("katmansız Short (ffmpeg / libass yok)") : "") +
       (oz.hata ? " · " + oz.hata + " " + T("adım hatalı (Devam et ile yeniden dene)") : "") +
       (dosyalar ? " · " + T("paylaşım paketi klasörde") : "");
-    durum(mesaj, oz.hata || job.durum === "iptal" ? "warn" : "good");
-    KApp.toast(mesaj, oz.hata ? "warn" : "good", 10000, dosyalar ? { metin: T("Klasörü aç"), fn: klasoruAc } : null);
+    var uyar = oz.hata || oz.eksikKisa || job.durum === "iptal";
+    durum(mesaj, uyar ? "warn" : "good");
+    KApp.toast(mesaj, uyar ? "warn" : "good", 10000, dosyalar ? { metin: T("Klasörü aç"), fn: klasoruAc } : null);
     if (oz.bitenKisa && KApp.davetAni) KApp.davetAni("shorts");
   }
 
@@ -437,14 +494,34 @@ window.KShortsPaket = (function () {
     if (window.KViral && KViral.mesgul && KViral.mesgul()) { durum(T("Viral anlar şu an meşgul, birazdan tekrar dene."), "warn"); return; }
     var anlar = window.KViral && KViral.paketAnlari ? KViral.paketAnlari() : [];
     if (!anlar.length) { durum(T(nedenMetni("secim-yok")), "warn"); return; }
+    var secim0 = secimOku();
+    if (secim0.cta && secim0.ctaSecim === "ozel" && !String(secim0.ctaOzel || "").trim()) {
+      durum(T("Kendi CTA metnini yaz ya da hazır bir metin seç."), "warn");
+      return;
+    }
+    // yarım iş sessizce silinmesin: yeni paket onun "Devam et" kaydının yerine geçer
+    if (kayitliIs()) {
+      var degistir = window.confirm ? window.confirm(uiMetni("Yarım kalan bir Shorts Paketi var. Yeni paket başlarsa onun kalan adımları artık sürdürülemez (oluşan sekanslar projede kalır). Yeni paket başlasın mı?")) : false;
+      if (!degistir) { durum(T("Yarım paket korundu: kaldığı yerden sürdürmek için Devam et."), "warn"); guncelle(); return; }
+    }
     calisiyorMu = true;   // ilk await'ten ÖNCE: çift tıklama iki paket başlatmasın
+    iptalIstendi = false;
+    bagNesli = null;
     guncelle();
     var basladi = false;
+    function durdu() {
+      if (!iptalIstendi) return false;
+      durum(T("Paket durduruldu") + ": " + T("hiçbir sekans oluşturulmadı."), "warn");
+      return true;
+    }
     try {
       durum(T("Hazırlanıyor…"));
+      var nesil = KViral.nesil ? KViral.nesil() : null;
       var d = await KViral.sekansDenetle();
+      if (durdu()) return;
       if (d.uyari) { durum(T(d.uyari), "warn"); return; }
       var yet = await yetenekler();
+      if (durdu()) return;
       if (!yet.subsequence) { durum(T("Bu Premiere sürümü alt sekans oluşturmayı desteklemiyor."), "warn"); return; }
       var secim = secimOku();
       secimKaydet();
@@ -463,11 +540,20 @@ window.KShortsPaket = (function () {
       job.kancaStil = kit && kit.kanca.stil ? kit.kanca.stil : (el("kanca-stil") ? el("kanca-stil").value : "kutu");
       job.kancaSure = kit ? kit.kanca.sure : (Number(el("kanca-sure") ? el("kanca-sure").value : 3) || 3);
       plan.uyarilar.forEach(function (u) { K.log("[shorts-paket] " + nedenMetni(u)); });
+      // altyazı kayıtları işin kendi transkriptinden: her Short'a kendi aralığı (Devam et'te de bu kullanılır)
       var kaynakSegs = KViral.kaynakSegs ? KViral.kaynakSegs() : null;
+      if (!kaynakSegs && window.KCaptions && KCaptions.rawSegments) kaynakSegs = KCaptions.rawSegments();
+      P.kaynakEkle(job, kaynakSegs || []);
+      if (durdu()) return;
+      // atlanacak katmanlar ve uyarılar baştan söylenir (iş bitince değil)
+      var onceden = P.atlamaOzeti(plan).map(function (g) {
+        return g.adimlar.map(function (a) { return T(ADIM_ETIKET[a]); }).join(", ") + " " + T("atlanacak") + ": " + T(nedenMetni(g.neden));
+      }).concat(plan.uyarilar.map(function (u) { return T(nedenMetni(u)); }));
+      if (onceden.length) KApp.toast(onceden.join(" · "), "warn", 12000);
+      bagNesli = nesil;
       basladi = true;
       calisiyorMu = false;   // calistir yeniden kurar
-      await calistir(job, kaynakSegs);
-      if (plan.uyarilar.length) KApp.toast(plan.uyarilar.map(function (u) { return T(nedenMetni(u)); }).join(" · "), "warn", 8000);
+      await calistir(job);
     } catch (e) {
       durum("✕ " + K.hataYardimi(e), "bad");
     } finally {
@@ -481,8 +567,10 @@ window.KShortsPaket = (function () {
     var job = kayitliIs();
     if (!job) { guncelle(); return; }
     P.resumeJob(job);
-    // panel yeniden açıldıysa arama transkripti yok: kayıtlı Shorts altyazısı ya da ekrandaki transkript kullanılır
-    await calistir(job, window.KViral && KViral.kaynakSegs ? KViral.kaynakSegs() : null);
+    iptalIstendi = false;
+    // ekrandaki arama bu işin olmayabilir: kaynak sekansa bağlanmaz; altyazı kaydı işin kendi transkriptinden
+    bagNesli = null;
+    await calistir(job);
   }
 
   function iptal() {

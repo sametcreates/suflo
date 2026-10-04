@@ -2487,7 +2487,8 @@ function KS_openSequenceById(encoded) {
 /*
  * Adiyla sekans (en son olusturulani). 600 sn'lik KS_makeShorts cagrisi zaman asimina
  * ugrasa da Auto Reframe bitmis olabilir: panel kimligi buradan geri alir.
- * p.haric: bilinen kimlikler (baska Short'a ait olani alma). Doner: { id, name, count }
+ * p.haric: bilinen kimlikler (baska Short'a ait olani alma).
+ * Doner: { id, name, count, ids } — ids: eslesen tum kimlikler (proje sirasiyla)
  */
 function KS_findSequenceByName(encoded) {
   try {
@@ -2497,13 +2498,14 @@ function KS_findSequenceByName(encoded) {
     var haric = {};
     var liste = p.haric || [];
     for (var h = 0; h < liste.length; h++) haric[String(liste[h])] = 1;
-    var bulunan = null, n = 0;
+    var bulunan = null, n = 0, ids = [];
     for (var i = 0; i < app.project.sequences.numSequences; i++) {
       var s = app.project.sequences[i];
       if (String(s.name) !== ad || haric[String(s.sequenceID)]) continue;
       bulunan = s; n++;
+      ids.push(String(s.sequenceID));
     }
-    return KS_ok({ id: bulunan ? String(bulunan.sequenceID) : "", name: ad, count: n });
+    return KS_ok({ id: bulunan ? String(bulunan.sequenceID) : "", name: ad, count: n, ids: ids });
   } catch (e) { return KS_err(e); }
 }
 
@@ -2514,6 +2516,17 @@ function KS_findSequenceByName(encoded) {
  * Premiere'in kendi altyazi izi buradan gorulemez (panel yalniz uyarir).
  * Doner: { altyazi, kanca, paket, toplam }
  */
+function KS_sufloSinifi(cl) {
+  var ad = "", dosya = "", kutu = false;
+  try { ad = String(cl.name); } catch (eA) {}
+  try { dosya = String(cl.projectItem.getMediaPath()).replace(/\\/g, "/"); dosya = dosya.substring(dosya.lastIndexOf("/") + 1).toLowerCase(); } catch (eM) {}
+  try { kutu = String(cl.projectItem.treePath).replace(/\\/g, "/").indexOf("/" + KS_OVERLAY_BIN + "/") !== -1; } catch (eT) {}
+  if (KS_basliyor(ad, KS_PAKET_ONEKI)) return "paket";
+  if (KS_basliyor(ad, "Suflo Kanca") || /^suflo-(temiz-)?kanca-/.test(dosya)) return "kanca";
+  if (KS_basliyor(ad, "Suflo Stil") || KS_basliyor(ad, "Suflo Altyazi") || /^suflo-(temiz-)?altyazi-/.test(dosya) || kutu) return "altyazi";
+  return "";
+}
+
 function KS_sequenceSufloLayers(encoded) {
   try {
     var p = KS_arg(encoded);
@@ -2523,16 +2536,39 @@ function KS_sequenceSufloLayers(encoded) {
     for (var t = 0; t < seq.videoTracks.numTracks; t++) {
       var tr = seq.videoTracks[t];
       for (var c = 0; c < tr.clips.numItems; c++) {
+        var sinif = KS_sufloSinifi(tr.clips[c]);
+        if (sinif === "paket") out.paket++;
+        else if (sinif) { out[sinif]++; out.toplam++; }
+      }
+    }
+    return KS_ok(out);
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * 9:16 Short'a kaynaktan miras kalan altyazi katmanlarini kapat (trackItem.disabled): kaynagin
+ * 16:9 seffaf katmani Auto Reframe'de kirpilir; paket yerine Short boyunda yenisini koyar.
+ * Klip silinmez (kullanici geri acabilir). Doner: { altyazi, kapatilan }
+ */
+function KS_disableSufloCaptions(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = p.id ? KS_seqById(p.id) : null;
+    if (!seq) return KS_err("Sekans projede bulunamadi (silinmis olabilir).");
+    var out = { altyazi: 0, kapatilan: 0 };
+    for (var t = 0; t < seq.videoTracks.numTracks; t++) {
+      var tr = seq.videoTracks[t];
+      for (var c = 0; c < tr.clips.numItems; c++) {
         var cl = tr.clips[c];
-        var ad = "", dosya = "", kutu = false;
-        try { ad = String(cl.name); } catch (eA) {}
-        try { dosya = String(cl.projectItem.getMediaPath()).replace(/\\/g, "/"); dosya = dosya.substring(dosya.lastIndexOf("/") + 1).toLowerCase(); } catch (eM) {}
-        try { kutu = String(cl.projectItem.treePath).replace(/\\/g, "/").indexOf("/" + KS_OVERLAY_BIN + "/") !== -1; } catch (eT) {}
-        if (KS_basliyor(ad, KS_PAKET_ONEKI)) { out.paket++; continue; }
-        if (KS_basliyor(ad, "Suflo Kanca") || /^suflo-(temiz-)?kanca-/.test(dosya)) { out.kanca++; out.toplam++; continue; }
-        if (KS_basliyor(ad, "Suflo Stil") || KS_basliyor(ad, "Suflo Altyazi") || /^suflo-(temiz-)?altyazi-/.test(dosya) || kutu) {
-          out.altyazi++; out.toplam++;
+        if (KS_sufloSinifi(cl) !== "altyazi") continue;
+        out.altyazi++;
+        var kapali = false;
+        try { if (cl.disabled === true) kapali = true; } catch (e0) {}
+        if (!kapali) {
+          try { cl.disabled = true; } catch (e1) {}
+          try { kapali = cl.disabled === true; } catch (e2) { kapali = false; }
         }
+        if (kapali) out.kapatilan++;
       }
     }
     return KS_ok(out);

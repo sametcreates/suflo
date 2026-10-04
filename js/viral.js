@@ -635,7 +635,7 @@ window.KViral = (function () {
    * Ekrandaki anlar (filtre + sıralama uygulanmış kopyalar). Seçili kanca başlığı
    * için HL.secilenKanca(an). Shorts paketi (js/shorts-paket.js) şunları kullanır:
    *   paketAnlari  — ekrandaki ve "Pakete al" işaretli anlar (kopya; kartın seçili kancasıyla)
-   *   sekansDenetle / sekansiBagla — anlar bu sekansta mı bulundu (Shorts oluştur ile aynı denetim)
+   *   sekansDenetle / sekansiBagla / nesil — anlar bu sekansta mı bulundu (Shorts oluştur ile aynı denetim)
    *   kaynakSegs   — arama anındaki ham transkript (kopya); shortsKaydet — Shorts altyazı kaydı
    *   tur          — videonun türü (paylaşım metni istemine)
    */
@@ -645,7 +645,9 @@ window.KViral = (function () {
       return gorunenler().filter(function (a) { return a.paketSec; }).map(function (a) { return JSON.parse(JSON.stringify(a)); });
     },
     sekansDenetle: sekansDenetle,
-    sekansiBagla: function (sekans) { sekansiBagla(sekans, aramaNesli); },
+    // nesil: paketin başladığı aramanın nesli (verilmezse şimdiki); o arama değiştiyse bağlanmaz
+    sekansiBagla: function (sekans, nesil) { sekansiBagla(sekans, nesil === undefined ? aramaNesli : nesil); },
+    nesil: function () { return aramaNesli; },
     kaynakSegs: function () { return bulSegs ? JSON.parse(JSON.stringify(bulSegs)) : null; },
     shortsKaydet: shortsKaydet,
     tur: function () { return secenekler().tur; },

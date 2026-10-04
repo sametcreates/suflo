@@ -53,8 +53,16 @@
     "9x16-yok": "9:16 kopya oluşmadı: Short yatay kaldı",
     "kanca-miras": "kaynaktaki kanca başlığı Short'a da kopyalandı; gerekirse sil",
     "ai-hata": "AI yanıt vermedi: paylaşım metni yapay zekâsız hazırlandı",
-    "ai-bozuk": "AI yanıtı okunamadı: paylaşım metni yapay zekâsız hazırlandı"
+    "ai-bozuk": "AI yanıtı okunamadı: paylaşım metni yapay zekâsız hazırlandı",
+    "cta-bos": "CTA atlandı: kendi metnin boş",
+    "cta-ingilizce": "Bu dil için hazır CTA metni yok: İngilizcesi kondu",
+    "miras-kapatildi": "kaynaktan kopyalanan altyazı katmanı Short'ta kapatıldı (9:16'ya yenisi kondu)"
   };
+
+  // Yetenek eksikliğiyle (kullanıcı seçimi değil) atlanan katmanlar: özette "tamam" sayılmaz
+  var YETENEK_NEDENI = { ffmpeg: 1, libass: 1 };
+  // Kullanıcının kendi seçimi: önceden uyarılmaz
+  var SECIM_NEDENI = { kapali: 1, "cerceve-bos": 1 };
 
   var GENEL_HASHTAG = { tr: ["#shorts", "#keşfet", "#viral"], en: ["#shorts", "#fyp", "#viral"] };
 
@@ -205,12 +213,12 @@
   /*
    * Çerçeve katmanında ne var? o: { W, H, dur (Short süresi), secim, kit, logoAcik, hookDur (kanca
    * konacaksa süresi), altyaziKonum, altyaziAcik, lang, font, renk, vurguRenk, ctaStil }
-   * Döner: { progress?, cta? ({ ass, start, fontFiles }), ctaNeden?, logo: { path, kose, oran, guvenli }|null, bos }
+   * Döner: { progress?, cta? ({ ass, start, fontFiles }), ctaNeden?, ctaDilNot?, logo: { path, kose, oran, guvenli }|null, bos }
    */
   function cercevePlani(o) {
     o = o || {};
     var s = o.secim || secimNormalize({}, o.kit);
-    var out = { progress: null, cta: null, ctaNeden: "", logo: null, bos: true };
+    var out = { progress: null, cta: null, ctaNeden: "", ctaDilNot: "", logo: null, bos: true };
     if (!EK) return out;
     if (s.ilerleme) {
       out.progress = EK.progressBarEvents({ W: o.W, H: o.H, dur: o.dur, renk: s.ilerlemeRenk, konum: s.ilerlemeKonum, stil: s.ilerlemeStil,
@@ -224,6 +232,8 @@
       if (c.ass) out.cta = c;
       else if (c.atla === "kisa") out.ctaNeden = "cta-kisa";
       else if (c.atla === "cakisma") out.ctaNeden = "cta-cakisma";
+      else if (c.atla === "bos") out.ctaNeden = "cta-bos";
+      if (c.ass && s.ctaSecim !== "ozel" && !EK.ctaDiliVar(o.lang)) out.ctaDilNot = "cta-ingilizce";
     }
     if (o.logoAcik && o.kit && o.kit.logo && o.kit.logo.path) {
       out.logo = { path: o.kit.logo.path, kose: o.kit.logo.kose, oran: o.kit.logo.oran, guvenli: o.H > o.W * 1.2 };
@@ -502,18 +512,58 @@
   }
 
   function ozet(job) {
-    var o = { kisa: 0, bitenKisa: 0, tamam: 0, hata: 0, atlandi: 0, bekliyor: 0 };
+    // eksikKisa: hatasız bitti ama ffmpeg / libass yüzünden katmanları konmadı (tamam sayılmaz)
+    var o = { kisa: 0, bitenKisa: 0, eksikKisa: 0, tamam: 0, hata: 0, atlandi: 0, bekliyor: 0 };
     (job && job.kisalar || []).forEach(function (k) {
       o.kisa++;
-      var hatasiz = true;
+      var hatasiz = true, eksik = false;
       ADIMLAR.forEach(function (a) {
         var d = k.adimlar[a];
         if (o[d] !== undefined) o[d]++;
         if (d === "hata" || d === "bekliyor") hatasiz = false;
+        if (d === "atlandi" && YETENEK_NEDENI[k.notlar && k.notlar[a]]) eksik = true;
       });
-      if (hatasiz && k.adimlar.sekans === "tamam") o.bitenKisa++;
+      if (hatasiz && k.adimlar.sekans === "tamam") {
+        if (eksik) o.eksikKisa++;
+        else o.bitenKisa++;
+      }
     });
     return o;
+  }
+
+  /*
+   * Başlamadan gösterilecek atlamalar: kullanıcının kendi kapattıkları dışında, gerekçeye göre
+   * gruplu. plan: planla() sonucu. Döner: [{ neden, adimlar: ["altyazi", …] }]
+   */
+  function atlamaOzeti(plan) {
+    var gruplar = [], indeks = {};
+    (plan && plan.atlananlar || []).forEach(function (x) {
+      if (!x || SECIM_NEDENI[x.neden]) return;
+      if (indeks[x.neden] === undefined) { indeks[x.neden] = gruplar.length; gruplar.push({ neden: x.neden, adimlar: [] }); }
+      var g = gruplar[indeks[x.neden]];
+      if (g.adimlar.indexOf(x.adim) === -1) g.adimlar.push(x.adim);
+    });
+    return gruplar;
+  }
+
+  /*
+   * İşin kaynak transkripti: her Short'a kendi aralığındaki satırlar (zamanlar KAYDIRILMADAN,
+   * orta noktası aralıkta olanlar) yazılır. "Devam et" o an yüklü transkripti değil bunu kullanır.
+   */
+  function kaynakDilimi(segs, start, end) {
+    start = Number(start); end = Number(end);
+    if (!(end > start)) return [];
+    return (segs instanceof Array ? segs : []).filter(function (s) {
+      var a = Number(s && s.start), b = Number(s && s.end);
+      if (!isFinite(a) || !isFinite(b)) return false;
+      var orta = (a + b) / 2;
+      return orta >= start && orta <= end;
+    }).map(kopya);
+  }
+
+  function kaynakEkle(job, segs) {
+    (job && job.kisalar || []).forEach(function (k) { k.kaynakSegs = kaynakDilimi(segs, k.start, k.end); });
+    return job;
   }
 
   function devamEdilebilir(job) {
@@ -526,7 +576,7 @@
   /*
    * İşi çalıştır. deps (hepsi async olabilir):
    *   makeShorts(k, job) → { ok, id, dikeyId, hata }        (1. evre, her an için)
-   *   activate(k, job)   → { ok, paket: [katman adları], miras: { altyazi }, width, height, end, fps, hata }
+   *   activate(k, job)   → { ok, paket: [katman adları], miras: { altyazi }, mirasKapatilan, width, height, end, fps, hata }
    *   altyazi / kanca / cerceve (k, ctx, job) → { ok } | { atla: neden } | { ok: false, hata }
    *   metin(k, job)      → { ok, paylasim }
    *   kaydet(job), ilerleme(job, i, adim), iptalMi(), anaSekansaDon(job)
@@ -571,7 +621,10 @@
               PREMIERE_ADIMLARI.forEach(function (a) {
                 if (k.adimlar[a] === "bekliyor" && konanlar.indexOf(KATMAN[a]) !== -1) markDone(job, s.i, a);
               });
-              if (k.adimlar.altyazi === "bekliyor" && ctx.miras && Number(ctx.miras.altyazi) > 0) markSkip(job, s.i, "altyazi", "miras");
+              // miras altyazı (kaynağın 16:9 katmanı) kapatılamadıysa çift altyazı olmasın diye atlanır
+              if (k.adimlar.altyazi === "bekliyor" && ctx.miras && Number(ctx.miras.altyazi) > (Number(ctx.mirasKapatilan) || 0)) {
+                markSkip(job, s.i, "altyazi", "miras");
+              }
               kaydet();
               continue;
             }
@@ -623,6 +676,10 @@
     resumeJob: resumeJob,
     ozet: ozet,
     devamEdilebilir: devamEdilebilir,
+    atlamaOzeti: atlamaOzeti,
+    kaynakDilimi: kaynakDilimi,
+    kaynakEkle: kaynakEkle,
+    YETENEK_NEDENI: YETENEK_NEDENI,
     runJob: runJob
   };
 });

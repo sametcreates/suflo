@@ -178,6 +178,24 @@ ok("resumeJob: hatalı sekans ve onun yüzünden atlananlar yeniden bekler", job
   !job.kisalar[1].hatalar.sekans && P.nextStep(job).i === 1);
 ok("devamEdilebilir: yarım iş evet, bozuk kayıt hayır", P.devamEdilebilir(job) && !P.devamEdilebilir(null) && !P.devamEdilebilir({ v: 2 }) && !P.devamEdilebilir({ v: 1, kisalar: [] }));
 
+/* ---------------- işin kaynak transkripti ---------------- */
+var kSegs = [{ start: 1, end: 3, text: "önce" }, { start: 4, end: 6, text: "içeride" }, { start: 9.5, end: 11, text: "sınırda" }, { start: 20, end: 22, text: "sonra" }];
+var dil = P.kaynakDilimi(kSegs, 4, 10);
+ok("kaynakDilimi: orta noktası aralıkta olanlar, zamanlar kaydırılmadan (kopya)", dil.length === 1 && dil[0].start === 4 && dil[0].text === "içeride" && dil[0] !== kSegs[1] &&
+  P.kaynakDilimi(kSegs, 9, 12).map(function (x) { return x.text; }).join() === "sınırda" && P.kaynakDilimi(null, 0, 5).length === 0 && P.kaynakDilimi(kSegs, 5, 5).length === 0);
+var jK = P.kaynakEkle(P.newJob({ plan: P.planla({ anlar: [{ start: 0, end: 7, title: "a" }, { start: 19, end: 23, title: "b" }], yetenek: { autoReframe: true, ffmpeg: true, libass: true } }) }), kSegs);
+ok("kaynakEkle: her Short kendi aralığını taşır (Devam et başka transkripte düşmez)", jK.kisalar[0].kaynakSegs.length === 2 && jK.kisalar[1].kaynakSegs.length === 1 &&
+  jK.kisalar[1].kaynakSegs[0].text === "sonra" && JSON.parse(JSON.stringify(jK)).kisalar[0].kaynakSegs[1].start === 4);
+
+/* ---------------- CTA gerekçeleri ---------------- */
+var cpBos = P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({ ctaSecim: "ozel", ctaOzel: "  " }), lang: "tr" });
+ok("cercevePlani: kendi CTA metni boşsa gerekçe 'cta-bos' (sessizce düşmez)", !cpBos.cta && cpBos.ctaNeden === "cta-bos" && !!cpBos.progress);
+var cpDe = P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({}), lang: "de" });
+var cpJa = P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({}), lang: "ja" });
+ok("cercevePlani: hazırı olan dilde not yok, olmayanda 'cta-ingilizce'", cpDe.cta && !cpDe.ctaDilNot && cpJa.cta && cpJa.ctaDilNot === "cta-ingilizce" &&
+  !P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({ ctaSecim: "ozel", ctaOzel: "Abone ol" }), lang: "ja" }).ctaDilNot);
+ok("NEDEN: yeni gerekçeler tanımlı", ["cta-bos", "cta-ingilizce", "miras-kapatildi"].every(function (k) { return typeof P.NEDEN[k] === "string" && P.NEDEN[k].length > 5; }));
+
 /* ---------------- runJob: sahte bağımlılıklar ---------------- */
 function sahte(o) {
   o = o || {};
@@ -248,6 +266,23 @@ function sahte(o) {
   var j6 = await P.runJob(P.newJob({ plan: P.planla({ anlar: [anlar[0]], yetenek: tamYetenek }) }), s6.deps);
   ok("runJob: activate istisnası da adımı hata yapar, iş biter", j6.durum === "bitti" && j6.kisalar[0].adimlar.metin === "tamam" &&
     ["altyazi", "kanca", "cerceve"].some(function (a) { return j6.kisalar[0].adimlar[a] === "hata"; }), JSON.stringify(j6.kisalar[0].adimlar));
+
+  // miras altyazı 9:16'da kapatıldıysa paket kendi altyazısını koyar (kırpık 16:9 katman kalmaz)
+  var s7 = sahte({ miras: 1 });
+  var esAct = s7.deps.activate;
+  s7.deps.activate = function (k) { return esAct(k).then(function (c) { c.mirasKapatilan = 1; return c; }); };
+  var j7 = await P.runJob(P.newJob({ plan: P.planla({ anlar: [anlar[0]], yetenek: tamYetenek }) }), s7.deps);
+  ok("runJob: miras altyazı kapatıldıysa altyazı adımı çalışır", j7.kisalar[0].adimlar.altyazi === "tamam" && s7.log.indexOf("altyazi:1") !== -1, s7.log.join(" "));
+
+  // libass yok: katmanlar yetenek yüzünden atlandı → Short "tamam" sayılmaz, gerekçe baştan bilinir
+  var planL = P.planla({ anlar: [anlar[0]], yetenek: { autoReframe: true, ffmpeg: true, libass: false, groq: true } });
+  var s8 = sahte();
+  var j8 = await P.runJob(P.newJob({ plan: planL }), s8.deps);
+  var oz8 = P.ozet(j8);
+  ok("ozet: ffmpeg/libass yüzünden katmansız Short bitmiş sayılmaz", oz8.bitenKisa === 0 && oz8.eksikKisa === 1 && oz8.hata === 0, JSON.stringify(oz8));
+  var ao = P.atlamaOzeti(planL);
+  ok("atlamaOzeti: gerekçeye göre gruplu, kullanıcının kapattıkları yok", ao.length === 1 && ao[0].neden === "libass" && ao[0].adimlar.join() === "altyazi,kanca,cerceve", JSON.stringify(ao));
+  ok("atlamaOzeti: yalnız kullanıcı kapattıysa boş", P.atlamaOzeti(P.planla({ anlar: [anlar[0]], secim: { altyazi: false }, yetenek: tamYetenek })).length === 0);
 
   console.log(gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);

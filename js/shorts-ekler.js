@@ -29,11 +29,22 @@
   var CTA_EN_KISA_KLIP = 8;      // bu süreden kısa Short'ta CTA yok (kanca ile sıkışır)
   var CTA_KANCA_ARASI = 0.5;     // kanca bittikten en az bu kadar sonra başlar
 
-  // Hazır CTA metinleri: videonun dilinde yazılır (Türkçe/Azerice → Türkçe, gerisi İngilizce)
+  // Hazır CTA metinleri: videonun dilinde (altyazı dilleri); hazırı olmayan dilde İngilizce
   var CTA_HAZIR = {
     tr: { takip: "Takip et", part2: "Part 2 profilde", link: "Link açıklamada" },
-    en: { takip: "Follow for more", part2: "Part 2 on my profile", link: "Link in description" }
+    en: { takip: "Follow for more", part2: "Part 2 on my profile", link: "Link in description" },
+    az: { takip: "Abunə ol", part2: "Part 2 profildə", link: "Link təsvirdə" },
+    de: { takip: "Folge für mehr", part2: "Teil 2 auf meinem Profil", link: "Link in der Beschreibung" },
+    es: { takip: "Sígueme para más", part2: "Parte 2 en mi perfil", link: "Enlace en la descripción" },
+    fr: { takip: "Abonne-toi pour la suite", part2: "Partie 2 sur mon profil", link: "Lien en description" },
+    pt: { takip: "Siga para mais", part2: "Parte 2 no meu perfil", link: "Link na descrição" },
+    it: { takip: "Seguimi per altri", part2: "Parte 2 sul mio profilo", link: "Link in descrizione" },
+    ru: { takip: "Подпишись", part2: "Часть 2 в профиле", link: "Ссылка в описании" },
+    ar: { takip: "تابعني للمزيد", part2: "الجزء 2 في حسابي", link: "الرابط في الوصف" }
   };
+
+  // Hazır CTA metni bu dilde var mı? (yoksa İngilizcesi kullanılır; panel not düşer)
+  function ctaDiliVar(lang) { return Object.prototype.hasOwnProperty.call(CTA_HAZIR, String(lang || "")); }
 
   function renkMi(v) { return typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v); }
   function sayi(v, varsayilan) { var n = Number(v); return isFinite(n) ? n : varsayilan; }
@@ -123,11 +134,11 @@
   }
 
   /*
-   * CTA metni: hazır seçim ("takip" | "part2" | "link") videonun dilinde ya da kullanıcının
-   * metni (≤40 karakter, emojisiz: libass çizemez). Boşsa "".
+   * CTA metni: hazır seçim ("takip" | "part2" | "link") videonun dilinde (hazırı olmayan dilde
+   * İngilizce) ya da kullanıcının metni (≤40 karakter, emojisiz: libass çizemez). Boşsa "".
    */
   function ctaMetni(secim, ozel, lang) {
-    var dil = lang === "tr" || lang === "az" ? "tr" : "en";
+    var dil = ctaDiliVar(lang) ? String(lang) : "en";
     var t = secim === "ozel" ? String(ozel == null ? "" : ozel) : (CTA_HAZIR[dil][secim] || "");
     t = (CT && CT.emojiSil ? CT.emojiSil(t) : t).replace(/[\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim();
     return t.length > 40 ? t.slice(0, 40).trim() : t;
@@ -242,6 +253,7 @@
     progressGeometry: progressGeometry,
     progressBarEvents: progressBarEvents,
     ctaMetni: ctaMetni,
+    ctaDiliVar: ctaDiliVar,
     ctaKonum: ctaKonum,
     ctaEvents: ctaEvents,
     renameStyle: renameStyle,

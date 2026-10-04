@@ -769,7 +769,7 @@
               </div>
               <div class="paket-satir">
                 <label class="check-label" title="Son saniyelerde kapanış çağrısı (8 sn'den kısa Shorts'ta eklenmez)"><input id="cap-paket-cta" type="checkbox" checked> Kapanış çağrısı (CTA)</label>
-                <select id="cap-paket-cta-metin" class="slim" title="CTA metni (videonun dilinde yazılır)">
+                <select id="cap-paket-cta-metin" class="slim" title="CTA metni (hazır metinler videonun dilinde; hazırı olmayan dillerde İngilizce)">
                   <option value="takip" selected>Takip et</option>
                   <option value="part2">Part 2 profilde</option>
                   <option value="link">Link açıklamada</option>
@@ -787,7 +787,7 @@
               <button id="cap-paket-devam" class="btn tiny" type="button" hidden title="Yarım kalan paketi kaldığı yerden sürdür (biten adımlar tekrarlanmaz)">Devam et</button>
               <button id="cap-paket-klasor" class="btn tiny" type="button" hidden style="margin-left:auto">Klasörü aç</button>
             </div>
-            <div id="cap-paket-durum" class="inline-status"></div>
+            <div id="cap-paket-durum" class="inline-status" role="status" aria-live="polite"></div>
             <div id="cap-paket-liste" class="paket-liste"></div>
           </details>
         </details>
