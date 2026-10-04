@@ -37,7 +37,7 @@ if (-not $signer) {
 if ($env:SUFLO_BUNDLE_CONTENT) { throw "SUFLO_BUNDLE_CONTENT desteklenmiyor: Pro icerigi public pakete gomulemez." }
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
-$stageItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE")
+$stageItems = @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE")
 foreach ($item in $stageItems) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $stage -Recurse -Force }

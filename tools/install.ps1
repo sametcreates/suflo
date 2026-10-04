@@ -24,7 +24,7 @@ Write-Host "  PlayerDebugMode acildi (CSXS 9-14)" -ForegroundColor DarkGray
 # 2) Dosyalari kopyala
 if (Test-Path -LiteralPath $destFull) { Remove-Item -LiteralPath $destFull -Recurse -Force }
 New-Item -ItemType Directory -Path $destFull -Force | Out-Null
-foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE", ".debug")) {
+foreach ($item in @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE", ".debug")) {
     $p = Join-Path $src $item
     if (Test-Path -LiteralPath $p) { Copy-Item -LiteralPath $p -Destination $destFull -Recurse -Force }
 }

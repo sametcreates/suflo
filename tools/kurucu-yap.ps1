@@ -22,7 +22,7 @@ New-Item -ItemType Directory -Path $panel -Force | Out-Null
 # Pro MOGRT/SFX pakete ASLA gomulmez; lisans etkinlesince private Pro Icerik
 # Bulutu otomatik kurar. Eski ortam degiskeni public sizinti riskine karsi yasak.
 if ($env:SUFLO_BUNDLE_CONTENT) { throw "SUFLO_BUNDLE_CONTENT desteklenmiyor: Pro icerigi public kurucuya gomulemez." }
-$panelItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE")
+$panelItems = @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE")
 foreach ($item in $panelItems) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $panel -Recurse -Force }
