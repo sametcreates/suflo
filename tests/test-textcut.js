@@ -88,5 +88,13 @@ chk("de 'äh', fr 'euh', it 'ehm' kesin dolgu", T.fillerKind("Äh,", "de") === "
 chk("tablosu olmayan dil (nl): yalniz evrensel sesler", T.fillerKind("hm", "nl") === "filler" && T.fillerKind("e", "nl") === null);
 chk("fillerPrompt: bilinmeyen dilde Turkce ipucu yok", !/ı|şey/.test(T.fillerPrompt("nl")) && /äh/i.test(T.fillerPrompt("de")));
 
+// EN arayuz + "Otomatik" (cap-lang "") Turkce dolgu ipucu gondermemeli
+chk("promptLang: EN arayuz + Otomatik -> en", T.promptLang("", "", "en") === "en" && T.promptLang("auto", "", "en") === "en");
+chk("promptLang: TR arayuz + Otomatik -> tr", T.promptLang("", "", "tr") === "tr" && T.promptLang(undefined, "", "") === "tr");
+chk("promptLang: acik secim ve algilanan dil oncelikli", T.promptLang("de", "", "en") === "de" && T.promptLang("", "ru", "en") === "ru");
+chk("EN + Otomatik ipucunda Turkce dolgu yok", !/ı|şey/.test(T.fillerPrompt(T.promptLang("", "", "en"))));
+var kkKaynak = fsx.readFileSync(px.join(__dirname, "..", "js", "konusma-kes.js"), "utf8");
+chk("konusma-kes: dolgu ipucu promptLang + arayuz diliyle (|| \"tr\" yok)", /TC\.promptLang\(/.test(kkKaynak) && !/cap-lang"\)\.value\) \|\| "tr"/.test(kkKaynak));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

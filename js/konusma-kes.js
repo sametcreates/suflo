@@ -131,14 +131,15 @@ window.KTextCut = (function () {
     // Analizin BASLADIGI sekans: uzun transkripsiyon sirasinda sekans degisirse karismasin
     var basSekans = KApp.ctx().sequenceId || KApp.ctx().sequence || "";
     try {
-      var dilSecimi = (el("cap-lang") && el("cap-lang").value) || "tr";
+      var arayuz = window.SufloI18n ? SufloI18n.getLang() : "tr";
+      var dilSecimi = TC.promptLang(el("cap-lang") && el("cap-lang").value, "", arayuz);
       var sonuc = await KCaptions.transcribeWords({
-        prompt: TC.fillerPrompt(dilSecimi === "auto" ? "tr" : dilSecimi),
+        prompt: TC.fillerPrompt(dilSecimi),
         onStatus: function (m, c) { status(m, c); }
       });
       clip = sonuc.clip;
       sekans = basSekans;
-      lang = sonuc.lang || "tr";
+      lang = sonuc.lang || arayuz;
       words = sonuc.words;
       elle = {};
       if (!words.length) {

@@ -230,6 +230,17 @@
   }
 
   /*
+   * Dolgu ipucunun dili: #cap-lang secimi; "Otomatik" ("" ya da "auto") ise
+   * once motorun algiladigi dil, o da yoksa arayuz dili (EN arayuzde Ingilizce
+   * ipucu; Turkce arayuzde eskisi gibi Turkce).
+   */
+  function promptLang(secim, algilanan, arayuz) {
+    if (secim && secim !== "auto") return secim;
+    if (algilanan && algilanan !== "auto") return algilanan;
+    return arayuz || "tr";
+  }
+
+  /*
    * "Dinle" onizlemesi: kesimler uygulanmis gibi sesi tek dosyada duyur.
    * cuts sequence zamaninda; ffmpeg klibin kaynagindan -ss inPoint -t dur ile
    * okur, bu yuzden zamanlar klip-ici KAYNAK saniyesine cevrilir (hiz carpani).
@@ -260,6 +271,7 @@
     buildCuts: buildCuts,
     totalSeconds: totalSeconds,
     fillerPrompt: fillerPrompt,
+    promptLang: promptLang,
     DOLGU: DOLGU
   };
 });
