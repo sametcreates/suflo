@@ -148,6 +148,53 @@
    * varsayılan görünüm). Döner: yeni capPrefs ya da null (hiç tercih kalmadı: sil).
    *   simdi: şu anki settings.capPrefs · eski: önizleme öncesi capPrefs (ya da null)
    */
+  /*
+   * Stil adımı açıkken (önizleme öncesi görünüm yedekteyken) kullanıcının bir dokunuşu
+   * "bilinçli seçim" mi? Evetse yedek bırakılır ve adım kapanınca görünüm geri alınmaz.
+   *   o.tur     "kart": stil ızgarasında tıklama · "ayar": görünüm kontrolü (change/input)
+   *   o.pro     kullanıcı Pro mu
+   *   o.kart    tıklama bir stil kartında mı (ızgara boşluğu, başlık: false)
+   *   o.kilitli kart kilitli mi (PRO rozetli şablon yalnız satış penceresini açar)
+   *   o.secili  tıklamadan SONRA o kart seçili mi (seçim gerçekten ona geçti mi)
+   *   o.id      ayar kontrolünün kimliği
+   * Ücretsiz kullanıcıda animasyonlu stil katmanı Pro'dur: kart dokunuşları ve yalnız o
+   * katmanı etkileyen ayarlar (yazı tipi, boyut, renk...) önizlemedir, adım kapanınca geri
+   * alınır. Ücretsiz altyazı izini etkileyen ayarlar (satır uzunluğu, harf, noktalama)
+   * bilinçli seçimdir. Kart dokunuşu da seçim sayılsaydı ücretsiz varsayılan sessizce
+   * Pro stiline (tek kelime, BÜYÜK HARF satırlar) dönerdi.
+   */
+  var UCRETSIZ_IZ_AYARLARI = ["cap-maxlen", "cap-case", "cap-punct"];
+  function stilDokunusuSecimMi(o) {
+    o = o || {};
+    if (o.tur === "ayar") return !!o.pro || UCRETSIZ_IZ_AYARLARI.indexOf(String(o.id || "")) !== -1;
+    if (o.tur === "kart") return !!o.pro && !!o.kart && !o.kilitli && !!o.secili;
+    return false;
+  }
+
+  function sinifVar(n, c) {
+    if (!n) return false;
+    if (n.classList && typeof n.classList.contains === "function") return n.classList.contains(c);
+    return (" " + String(n.className || "") + " ").indexOf(" " + c + " ") !== -1;
+  }
+
+  /*
+   * Stil ızgarasındaki bir tıklamanın hedefi: hedeften ızgaraya (kap) doğru çıkıp
+   * .stil-sec kartını bulur. DOM'suz test edilebilsin diye yalnız parentNode/sınıf okur.
+   * Döner: { kart, kilitli, secili } (stilDokunusuSecimMi'ye verilir).
+   */
+  function stilTiklamasi(hedef, kap) {
+    var n = hedef, kart = null;
+    for (var i = 0; n && n !== kap && i < 20; i++) {
+      if (sinifVar(n, "stil-sec")) { kart = n; break; }
+      n = n.parentNode;
+    }
+    return {
+      kart: !!kart,
+      kilitli: !!kart && (sinifVar(kart, "locked") || sinifVar(kart, "pro-locked")),
+      secili: !!kart && sinifVar(kart, "secili")
+    };
+  }
+
   var STIL_TERCIHLERI = ["maxlen", "kase", "punct", "preset", "mogrtPath", "motorStili", "stil"];
   function stilTercihiGeriYukle(simdi, eski) {
     var kaynak = eski && typeof eski === "object" ? eski : null;
@@ -400,6 +447,8 @@
     atlanacakAdim: atlanacakAdim,
     stilYedegiGecerli: stilYedegiGecerli,
     stilTercihiGeriYukle: stilTercihiGeriYukle,
+    stilDokunusuSecimMi: stilDokunusuSecimMi,
+    stilTiklamasi: stilTiklamasi,
     anahtarAyikla: anahtarAyikla,
     anahtarSonucu: anahtarSonucu,
     modelGecisi: modelGecisi,

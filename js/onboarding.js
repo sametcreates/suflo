@@ -550,8 +550,10 @@ window.KOnboarding = (function () {
   /*
    * Önizleme öncesi görünüm (stilYedek) bellekte VE kayıtta (settings.onboarding.stilYedek)
    * durur: deneme sürerken panel kapanırsa bir sonraki açılışta geri konur — ücretsiz
-   * kullanıcının varsayılanı sessizce Pro stiline dönmesin. Kullanıcı stil kartına ya da
-   * bir görünüm ayarına KENDİSİ dokunursa bu bilinçli seçimdir: yedek bırakılır.
+   * kullanıcının varsayılanı sessizce Pro stiline dönmesin. Hangi dokunuşun bilinçli seçim
+   * sayılıp yedeği bıraktığına SO.stilDokunusuSecimMi karar verir: ücretsiz kullanıcıda
+   * kart dokunuşları önizlemedir (adım kapanınca geri alınır); Pro kullanıcıda kilitsiz
+   * bir kartı seçmek ya da bir görünüm ayarını değiştirmek seçimdir.
    */
   function stilYedekAyarla(y) {
     stilYedek = y || null;
@@ -565,9 +567,9 @@ window.KOnboarding = (function () {
     KApp.goster("captions");
     stilDeneniyor = true;
     try { KCaptions.stilDene(STIL_ORNEGI); } finally { stilDeneniyor = false; }
-    durum(KCaptions.hasSegments()
-      ? "Creator Punch kendi altyazınla oynuyor. Diğer kartlara dokunarak da önizleyebilirsin."
-      : "Creator Punch önizleniyor. Altyazın çıkınca kendi satırlarınla oynar.");
+    if (!KCaptions.hasSegments()) durum("Creator Punch önizleniyor. Altyazın çıkınca kendi satırlarınla oynar.");
+    else if (proMu()) durum("Creator Punch kendi altyazınla oynuyor. Beğendiğin karta dokun; seçtiğin stil kalır.");
+    else durum("Creator Punch kendi altyazınla oynuyor. Diğer kartlara dokunarak da önizleyebilirsin; \"Tamam\" deyince önceki görünümün geri gelir.");
   }
 
   // Adım kapanınca önceki görünüm geri gelir (kullanıcı kendisi bir seçim yaptıysa o kalır)
@@ -578,9 +580,19 @@ window.KOnboarding = (function () {
     try { KCaptions.stilYedeginiYukle(y); } catch (e) { K.log("[rehber] stil geri yuklenemedi: " + (e && e.message)); }
   }
 
-  // Kullanıcının kendi stil seçimi: geri yükleme yapılmaz
-  function stilSecildi() {
-    if (stilYedek && !stilDeneniyor) stilYedekAyarla(null);
+  // Stil ızgarasında tıklama: kartın kendi işleyicisinden SONRA (kabarcık evresi) bakılır,
+  // böylece seçimin gerçekten o karta geçip geçmediği (.secili) bilinir
+  function stilIzgarasiTiklandi(e) {
+    if (!stilYedek || stilDeneniyor) return;
+    var t = SO.stilTiklamasi(e && e.target, el("cap-stil-grid"));
+    t.tur = "kart";
+    t.pro = proMu();
+    if (SO.stilDokunusuSecimMi(t)) stilYedekAyarla(null);   // bilinçli seçim: geri yükleme yok
+  }
+
+  function stilAyariDegisti(id) {
+    if (!stilYedek || stilDeneniyor) return;
+    if (SO.stilDokunusuSecimMi({ tur: "ayar", pro: proMu(), id: id })) stilYedekAyarla(null);
   }
 
   function stilTamam() {
@@ -769,16 +781,18 @@ window.KOnboarding = (function () {
       if (e.key === "Escape" && modal && !modal.hidden) { e.preventDefault(); anahtarModalKapat(); }
     });
 
-    // Kullanıcı stil kartına ya da bir görünüm ayarına KENDİSİ dokunursa bu bilinçli
-    // seçimdir: geri yükleme yapılmaz (stilDene değerleri koddan yazar, olay üretmez)
+    // Stil kartına ya da görünüm ayarına dokunuş bilinçli seçim mi (SO.stilDokunusuSecimMi)?
+    // stilDene değerleri koddan yazar, olay üretmez. Izgara dinleyicisi kabarcık evresinde:
+    // kartın kendi işleyicisi seçimi yaptıktan sonra çalışır.
     var grid = el("cap-stil-grid");
-    if (grid) grid.addEventListener("click", stilSecildi, true);
+    if (grid) grid.addEventListener("click", stilIzgarasiTiklandi);
     var kontroller = window.KCaptions && KCaptions.stilKontrolleri ? KCaptions.stilKontrolleri() : [];
     kontroller.forEach(function (id) {
-      var e = el(id);
-      if (!e) return;
-      e.addEventListener("change", stilSecildi);
-      e.addEventListener("input", stilSecildi);
+      var k = el(id);
+      if (!k) return;
+      var degisti = function () { stilAyariDegisti(id); };
+      k.addEventListener("change", degisti);
+      k.addEventListener("input", degisti);
     });
 
     document.addEventListener("suflo:ayar", yenile);

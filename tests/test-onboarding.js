@@ -68,6 +68,29 @@ var yedekli = SO.kayitDuzelt({ surum: 1, stilYedek: { alan: { "cap-preset": "" }
 ok("kayıt stil yedeğini korur; bozuk yedek atılır", !!yedekli.stilYedek && yedekli.stilYedek.alan["cap-preset"] === "" &&
   !SO.kayitDuzelt({ stilYedek: { alan: "x" } }).stilYedek && !SO.kayitDuzelt({ stilYedek: [1] }).stilYedek);
 
+/* ---- stil adımında hangi dokunuş bilinçli seçim (yedeği bırakır)? ---- */
+var SEC = SO.stilDokunusuSecimMi;
+ok("ücretsiz: kart dokunuşu önizlemedir, seçim sayılmaz (kilitsiz ve seçili olsa da)", SEC({ tur: "kart", pro: false, kart: true, kilitli: false, secili: true }) === false);
+ok("Pro: kilitsiz ve seçime geçen karta dokunuş seçimdir", SEC({ tur: "kart", pro: true, kart: true, kilitli: false, secili: true }) === true);
+ok("Pro: kilitli karta (satış penceresi) ya da ızgara boşluğuna dokunuş seçim değil",
+  SEC({ tur: "kart", pro: true, kart: true, kilitli: true, secili: false }) === false && SEC({ tur: "kart", pro: true, kart: false }) === false);
+ok("Pro: seçim karta geçmediyse (.secili yok) seçim değil", SEC({ tur: "kart", pro: true, kart: true, kilitli: false, secili: false }) === false);
+ok("ücretsiz: yalnız ücretsiz izi etkileyen ayar (uzunluk, harf, noktalama) seçimdir",
+  ["cap-maxlen", "cap-case", "cap-punct"].every(function (id) { return SEC({ tur: "ayar", pro: false, id: id }) === true; }) &&
+  ["cap-boyut", "cap-renk", "cap-font", "cap-preset", ""].every(function (id) { return SEC({ tur: "ayar", pro: false, id: id }) === false; }));
+ok("Pro: her görünüm ayarı seçimdir; bilinmeyen tür hiçbir zaman", SEC({ tur: "ayar", pro: true, id: "cap-boyut" }) === true && SEC({ pro: true }) === false && SEC() === false);
+function dugum(sinif, ebeveyn) {
+  return { className: sinif, parentNode: ebeveyn || null };
+}
+var izgara = dugum("stil-grid");
+var kartK = dugum("stil-sec stil-mogrt locked", izgara), kartS = dugum("stil-sec stil-motor secili", izgara);
+var baslik = dugum("stil-mogrt-head stil-motor-head", izgara);
+ok("tıklama hedefi kartın içindeki öğeyse kart bulunur (seçili)", J(SO.stilTiklamasi(dugum("sm-k", dugum("sm-ornek", dugum("ss-sahne", kartS))), izgara)) === J({ kart: true, kilitli: false, secili: true }));
+ok("kilitli şablon kartı kilitli sayılır", J(SO.stilTiklamasi(dugum("", kartK), izgara)) === J({ kart: true, kilitli: true, secili: false }));
+ok("ızgara boşluğu ve başlık kart değil; 'stil-secili' gibi benzer sınıf kart sayılmaz",
+  !SO.stilTiklamasi(izgara, izgara).kart && !SO.stilTiklamasi(dugum("b", baslik), izgara).kart &&
+  !SO.stilTiklamasi(dugum("stil-secili", izgara), izgara).kart && !SO.stilTiklamasi(null, izgara).kart);
+
 /* ---- stil denemesi bitince yalnız görünüm tercihleri döner (dil korunur) ---- */
 var TG = SO.stilTercihiGeriYukle;
 ok("deneme sırasında dil değişti: görünüm önceki, dil yeni", J(TG({ lang: "en", preset: "mrbeast", motorStili: "mrbeast", maxlen: "k1", stil: { aile: "mrbeast" } },
@@ -563,8 +586,24 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     s1.OB.init();
     s1.ogeler["ia-stil-goster"]._olay.click[0]();
     ok("'Stilleri gör' Creator Punch'ı dener, önceki görünüm kayda yazılır", J(s1.say.stilDene) === J(["mrbeast"]) && !!s1.ayarlar.onboarding.stilYedek);
+    function kartTikla(t, siniflar) {
+      var izg = t.ogeler["cap-stil-grid"];
+      var kart = t.win.document.createElement("button");
+      siniflar.forEach(function (c) { kart.classList.add(c); });
+      kart.parentNode = izg;
+      var ic = t.win.document.createElement("span");
+      ic.parentNode = kart;
+      izg._olay.click[0]({ target: ic });
+    }
+    ok("Pro ipucu: dokunulan kart seçim olarak kalır", s1.ogeler["ia-durum"].textContent === "Creator Punch kendi altyazınla oynuyor. Beğendiğin karta dokun; seçtiğin stil kalır.");
+    ok("ızgara dinleyicisi kabarcık evresinde (kartın işleyicisinden sonra)", /grid\.addEventListener\("click", stilIzgarasiTiklandi\);/.test(obSrc));
+    s1.ogeler["cap-stil-grid"]._olay.click[0]({ target: s1.ogeler["cap-stil-grid"] });
+    kartTikla(s1, ["stil-sec", "stil-mogrt", "locked"]);
+    kartTikla(s1, ["stil-sec", "stil-motor"]);
     s1.ogeler["cap-stil-grid"]._olay.click[0]();
-    ok("kullanıcı karta dokununca yedek bırakılır (kayıttan da)", s1.ayarlar.onboarding.stilYedek === undefined);
+    ok("Pro: ızgara boşluğu, kilitli kart ve seçime geçmeyen kart yedeği bırakmaz", !!s1.ayarlar.onboarding.stilYedek);
+    kartTikla(s1, ["stil-sec", "stil-motor", "secili"]);
+    ok("Pro kullanıcı kilitsiz bir kartı seçince yedek bırakılır (kayıttan da)", s1.ayarlar.onboarding.stilYedek === undefined);
     s1.ogeler["ia-stil-koy"]._olay.click[0]();
     ok("'Timeline'a koy' kullanıcının seçtiği stili uygular (Creator Punch'a dönmez)", J(s1.say.stilDene) === J(["mrbeast"]) && s1.say.styled === 1 && s1.say.stilGeri === 0);
     var s2 = sahte({ ayarVardi: false, pro: true, segments: true, model: true, stilSecili: true });
@@ -578,9 +617,45 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     var s4 = sahte({ ayarVardi: false, segments: true, model: true });
     s4.OB.init();
     s4.ogeler["ia-stil-goster"]._olay.click[0]();
-    s4.ogeler["cap-boyut"]._olay.change[0]();
+    s4.ogeler["cap-maxlen"]._olay.change[0]();
     s4.ogeler["ia-stil-tamam"]._olay.click[0]();
-    ok("görünüm ayarını elle değiştiren kullanıcının seçimi 'Tamam'da geri alınmaz", s4.say.stilGeri === 0 && s4.ayarlar.onboarding.adimlar.stil === "tamam");
+    ok("ücretsiz: satır uzunluğunu elle değiştirenin seçimi 'Tamam'da geri alınmaz", s4.say.stilGeri === 0 && s4.ayarlar.onboarding.adimlar.stil === "tamam");
+    var s4b = sahte({ ayarVardi: false, segments: true, model: true, pro: true });
+    s4b.OB.init();
+    s4b.ogeler["ia-stil-goster"]._olay.click[0]();
+    s4b.ogeler["cap-boyut"]._olay.input[0]();
+    s4b.ogeler["ia-stil-tamam"]._olay.click[0]();
+    ok("Pro: görünüm ayarını elle değiştirenin seçimi 'Tamam'da geri alınmaz", s4b.say.stilGeri === 0);
+    /* İnceleme bulgusu: ücretsiz kullanıcı ipucuna uyup kartlara dokununca önizleme kalıcı seçime dönüyordu */
+    var s4c = sahte({ ayarVardi: false, segments: true, model: true });
+    s4c.OB.init();
+    s4c.ogeler["ia-stil-goster"]._olay.click[0]();
+    ok("ücretsiz ipucu: kartlar önizleme, 'Tamam' önceki görünümü geri getirir", s4c.ogeler["ia-durum"].textContent ===
+      "Creator Punch kendi altyazınla oynuyor. Diğer kartlara dokunarak da önizleyebilirsin; \"Tamam\" deyince önceki görünümün geri gelir.");
+    kartTikla(s4c, ["stil-sec", "stil-motor", "secili"]);
+    kartTikla(s4c, ["stil-sec", "stil-motor", "secili"]);
+    s4c.ogeler["cap-boyut"]._olay.change[0]();
+    s4c.ogeler["cap-renk"]._olay.input[0]();
+    ok("ücretsiz: kart dokunuşları ve yalnız animasyonlu katmanı etkileyen ayarlar yedeği bırakmaz", !!s4c.ayarlar.onboarding.stilYedek);
+    var s4d = sahte({ ayarVardi: true, segments: true, model: true, ayarlar: s4c.ayarlar });   // panel bu arada kapandı
+    s4d.OB.init();
+    ok("ücretsiz: kartlara dokunduktan sonra panel kapandıysa açılışta önceki görünüm geri gelir", s4d.say.stilGeri === 1 && s4d.ayarlar.onboarding.stilYedek === undefined);
+    s4c.ogeler["ia-stil-tamam"]._olay.click[0]();
+    ok("ücretsiz: kartlara dokunup 'Tamam' diyende önceki görünüm geri gelir", s4c.say.stilGeri === 1 && s4c.ayarlar.onboarding.stilYedek === undefined &&
+      s4c.ayarlar.onboarding.adimlar.stil === "tamam");
+    var s4e = sahte({ ayarVardi: false, segments: true, model: true });
+    s4e.OB.init();
+    s4e.ogeler["ia-stil-bas"]._olay.click[0]();   // stil adımı başlığından açıldı: "Atla" onu atlar
+    s4e.ogeler["ia-stil-goster"]._olay.click[0]();
+    kartTikla(s4e, ["stil-sec", "stil-motor", "secili"]);
+    s4e.ogeler["ilk-adim-atla"]._olay.click[0]();
+    var s4f = sahte({ ayarVardi: false, segments: true, model: true });
+    s4f.OB.init();
+    s4f.ogeler["ia-stil-goster"]._olay.click[0]();
+    kartTikla(s4f, ["stil-sec", "stil-mogrt", "locked"]);
+    s4f.ogeler["ilk-adim-kapat"]._olay.click[0]();
+    ok("ücretsiz: karta dokunduktan sonra 'Atla' ya da rehberi kapatmak da geri getirir", s4e.say.stilGeri === 1 && s4e.ayarlar.onboarding.adimlar.stil === "atlandi" &&
+      s4f.say.stilGeri === 1 && s4f.ayarlar.onboarding.kapandi === true);
     var s5 = sahte({ ayarVardi: false, segments: true, model: true });
     s5.OB.init();
     s5.ogeler["ia-stil-goster"]._olay.click[0]();
