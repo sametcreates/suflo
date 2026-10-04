@@ -62,8 +62,11 @@ ok("LISANS.txt CC-BY atfi tasiyor", (function () {
 var g0 = src.indexOf("function emojiIceriyorMu(");
 var g1 = src.indexOf("\n  }", g0);
 ok("emojiIceriyorMu captions.js'te var", g0 !== -1 && g1 !== -1);
-var bekci = new Function("segments",
+// emoji kumesi caption-text.js'te (Shorts paketi de onu kullanir): bekci gercek modulle calisir
+var CTmod = require(pathm.join(__dirname, "..", "js", "caption-text.js"));
+var bekciFn = new Function("segments", "CT",
   src.slice(g0, g1 + 4) + "\nreturn emojiIceriyorMu();");
+function bekci(segs) { return bekciFn(segs, CTmod); }
 
 ok("duz metin emoji sayilmiyor", bekci([{ text: "merhaba dunya" }]) === false);
 ok("Turkce karakterler emoji sayilmiyor", bekci([{ text: "ığüşöçİĞÜŞÖÇ" }]) === false);

@@ -486,7 +486,40 @@
     return parts.join("");
   }
 
+  /*
+   * Stilin metin kurali: büyük/küçük harf ve noktalama (captions.js styleText'in saf hâli).
+   * o: { kase: "upper" | "lower" | "normal", punct: bool (false: noktalama boşluğa döner),
+   *      loc: "tr-TR" | "az" | "ru" | undefined } — tr/az'de i → İ, I → ı.
+   * *vurgu* yıldızları noktalama sayılmaz, korunur.
+   */
+  var NOKTALAMA = /[.,!?;:…»«""()\-–—\u060C\u061F\u061B]/g;   // + Arapça ، ؟ ؛
+  function metinStili(t, o) {
+    o = o || {};
+    var out = String(t == null ? "" : t);
+    if (!o.punct) out = out.replace(NOKTALAMA, " ").replace(/\s+/g, " ").trim();
+    var loc = o.loc || undefined;
+    if (o.kase === "upper") out = loc ? out.toLocaleUpperCase(loc) : out.toUpperCase();
+    else if (o.kase === "lower") out = loc ? out.toLocaleLowerCase(loc) : out.toLowerCase();
+    return out;
+  }
+
+  /*
+   * libass'in çizemediği (renkli) emoji: surrogate çiftleri, VS16 ve Emoji_Presentation=Yes
+   * olan dar BMP kümesi. ♪ ★ ✓ gibi sıradan semboller emoji sayılmaz (çizilir).
+   */
+  var EMOJI = /[\uD800-\uDFFF\uFE0F\u231A\u231B\u23E9-\u23EC\u23F0\u23F3\u25FD\u25FE\u2614\u2615\u2648-\u2653\u267F\u2693\u26A1\u26AA\u26AB\u26BD\u26BE\u26C4\u26C5\u26CE\u26D4\u26EA\u26F2\u26F3\u26F5\u26FA\u26FD\u2705\u270A\u270B\u2728\u274C\u274E\u2753-\u2755\u2757\u2795-\u2797\u27B0\u27BF\u2B1B\u2B1C\u2B50\u2B55]/;
+  var EMOJI_TUMU = new RegExp(EMOJI.source + "|\u200D|\u20E3", "g");
+  function emojiVar(text) { return EMOJI.test(String(text || "")); }
+  // Emojiyi (ve birleştirici ZWJ / tuş kapağı izlerini) at, kalan boşlukları topla
+  function emojiSil(text) {
+    return String(text == null ? "" : text).replace(EMOJI_TUMU, " ").replace(/[ \t]+/g, " ")
+      .replace(/ *\n */g, "\n").trim();
+  }
+
   return {
+    metinStili: metinStili,
+    emojiVar: emojiVar,
+    emojiSil: emojiSil,
     stripEmphasis: stripEmphasis,
     hasEmphasis: hasEmphasis,
     toggleWord: toggleWord,

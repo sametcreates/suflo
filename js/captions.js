@@ -1797,17 +1797,10 @@ window.KCaptions = (function () {
   }
 
   // kaynakDili: true ise metin orijinal (s.orig) — kaynak dilin buyuk/kucuk harf kurali
+  // Kural tek kaynakta (caption-text.js metinStili): Shorts paketi aynı kuralı stilin presetiyle uygular
   function styleText(t, kaynakDili) {
-    var mode = el("cap-case").value;
-    var keepPunct = el("cap-punct").checked;
-    var out = t;
-    if (!keepPunct) {
-      out = out.replace(/[.,!?;:…»«""()\-–—\u060C\u061F\u061B]/g, " ").replace(/\s+/g, " ").trim();   // + Arapça ، ؟ ؛
-    }
-    var loc = kaynakDili ? styleLocale(true) : styleLocale();
-    if (mode === "upper") out = loc ? out.toLocaleUpperCase(loc) : out.toUpperCase();
-    else if (mode === "lower") out = loc ? out.toLocaleLowerCase(loc) : out.toLowerCase();
-    return out;
+    return CT.metinStili(t, { kase: el("cap-case").value, punct: el("cap-punct").checked,
+      loc: kaynakDili ? styleLocale(true) : styleLocale() });
   }
 
   // WAV başlığındaki byteRate'ten süreyi hesapla (preset formatından bağımsız)
@@ -4360,12 +4353,11 @@ window.KCaptions = (function () {
   function emojiIceriyorMu() {
     for (var i = 0; i < segments.length; i++) {
       /*
-       * Yalniz GERCEKTEN renkli cizilen karakterler: surrogate ciftleri,
-       * VS16 secicisi ve Emoji_Presentation=Yes olan dar BMP kumesi.
-       * Eski genis ☀-➿ araligi ♪ ★ ✓ gibi siradan sembolleri de emoji
-       * sayip stilli katmani gereksiz yere engelliyordu.
+       * Yalniz GERCEKTEN renkli cizilen karakterler (kume caption-text.js EMOJI'de; Shorts
+       * paketi ayni kumeyle emojiyi atar). Eski genis ☀-➿ araligi ♪ ★ ✓ gibi siradan
+       * sembolleri de emoji sayip stilli katmani gereksiz yere engelliyordu.
        */
-      if (/[\uD800-\uDFFF\uFE0F\u231A\u231B\u23E9-\u23EC\u23F0\u23F3\u25FD\u25FE\u2614\u2615\u2648-\u2653\u267F\u2693\u26A1\u26AA\u26AB\u26BD\u26BE\u26C4\u26C5\u26CE\u26D4\u26EA\u26F2\u26F3\u26F5\u26FA\u26FD\u2705\u270A\u270B\u2728\u274C\u274E\u2753-\u2755\u2757\u2795-\u2797\u27B0\u27BF\u2B1B\u2B1C\u2B50\u2B55]/.test(segments[i].text || "")) return true;
+      if (CT.emojiVar(segments[i].text)) return true;
     }
     return false;
   }

@@ -90,9 +90,16 @@
     try { return text.toLocaleUpperCase(loc); } catch (e) { return text.toUpperCase(); }
   }
 
+  // Diger ASS'lerle birlestirilen kopyalar (Shorts paketinde CTA) kendi stil adini tasir
+  function stilAdi(ad) {
+    return typeof ad === "string" && /^[A-Za-z][A-Za-z0-9]{0,15}$/.test(ad) ? ad : "Kanca";
+  }
+
   /*
-   * opts: { text, stil, width, height, dur, renk, vurguRenk, konum ("ust"|"orta"), loc,
-   *         font (Marka Kiti: paket fontlarindan biri; gecersizse stilin kendi fontu) }
+   * opts: { text, stil, width, height, dur, renk, vurguRenk, konum ("ust"|"orta"|"alt"), loc,
+   *         font (Marka Kiti: paket fontlarindan biri; gecersizse stilin kendi fontu),
+   *         styleName (ASS stil adi; varsayilan "Kanca" — verilmezse cikti bayt bayt eskisi) }
+   * "alt": blok dikeyde platform alt arayuzunun (%78) ustunde, yatayda alt ucte biter.
    * Doner: { ass, fontFiles, dur }
    */
   function build(opts) {
@@ -120,12 +127,15 @@
     if (enUzun * fs * st.genislik > maxW) fs = Math.max(10, Math.floor(maxW / (enUzun * st.genislik)));
     var satirH = fs * 1.18, blokH = satirH * lines.length;
     var cx = Math.round(W / 2);
-    var cy = Math.round(opts.konum === "orta" ? H * .5 : H * (W < H ? .2 : .22) + blokH / 2);
+    var cy = Math.round(opts.konum === "orta" ? H * .5
+      : opts.konum === "alt" ? H * (W < H ? .74 : .84) - blokH / 2
+      : H * (W < H ? .2 : .22) + blokH / 2);
+    var stilAd = stilAdi(opts.styleName);
     var giris = .28, cikis = .22;
 
     var ev = [];
     function d(layer, a, b, txt) {
-      ev.push("Dialogue: " + layer + "," + tcode(a) + "," + tcode(b) + ",Kanca,,0,0,0,," + txt);
+      ev.push("Dialogue: " + layer + "," + tcode(a) + "," + tcode(b) + "," + stilAd + ",,0,0,0,," + txt);
     }
     // ekVurgu/ekNormal: vurgulu kelimeye ozel ek ASS etiketleri (or. kontur) ve geri alinisi
     function satirMetni(l, normal, accent, ekVurgu, ekNormal) {
@@ -207,7 +217,7 @@
       "ScaledBorderAndShadow: yes", "YCbCr Matrix: None", "PlayResX: " + W, "PlayResY: " + H, "",
       "[V4+ Styles]",
       "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-      "Style: Kanca," + st.font + "," + fs + "," + assColor(renk) + "," + assColor(renk) + "," + assColor("#000000") + "," +
+      "Style: " + stilAd + "," + st.font + "," + fs + "," + assColor(renk) + "," + assColor(renk) + "," + assColor("#000000") + "," +
         assColor("#000000", 0x80) + ",-1,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1",
       "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ].concat(ev).join("\n") + "\n";
@@ -287,5 +297,5 @@
     return Object.keys(STILLER).map(function (id) { return { id: id, ad: STILLER[id].ad }; });
   }
 
-  return { STILLER: STILLER, safeZoneFilter: safeZoneFilter, build: build, suggestPrompt: suggestPrompt, parseSuggestions: parseSuggestions, tokens: tokens, satirlar: satirlar, list: list };
+  return { STILLER: STILLER, stilAdi: stilAdi, safeZoneFilter: safeZoneFilter, build: build, suggestPrompt: suggestPrompt, parseSuggestions: parseSuggestions, tokens: tokens, satirlar: satirlar, list: list };
 });
