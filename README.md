@@ -20,6 +20,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Pro'yu dene** *(3.1)* | Kodla çalışan her Pro aracına kendi videonda 3 deneme hakkı: otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir, Suflo Stilleri katmanı ve kanca başlığı, çeviri, ritim. Haklar süresiz; hak yalnız işlem başarıyla bitince düşer. Deneme stilli katmanlarında küçük bir suflo.app filigranı olur, Pro'yu alınca temiz yeniden oluşturulur |
 | **Davet et, kazan** *(3.1)* | Ayarlar'da davet kartı: Pro sahibine kişisel davet kodu (arkadaşına %15 indirim), Kopyala, WhatsApp, X, Instagram ve 1080x1920 Story kartı, "2/3 davet" ilerlemesi; 1 ve 3 davette panele kendiliğinden inen ödül paketleri. Ücretsizde kişisel bilgi taşımayan paylaşım bağlantısı. İlk kesim, ilk Shorts ve 5. uygulamadan sonra modal olmayan bir şerit (30 günde en çok bir kez, "bir daha gösterme"). Paylaşım metnine isteğe bağlı "Altyazılar: Suflo · suflo.app" satırı. Sunucu tarafı kurucu açana dek uyur |
 | **English (beta) arayüz** *(3.1)* | Ayarlar › Destek › Arayüz dili: Türkçe ya da English (beta); yeniden yüklemeden geçer, iş sürerken kilitli. Güncelleyenler Türkçe kalır, taze kurulumda rehberin ilk adımı sorar. İngilizcede fiyat ödemeyle aynı para biriminde (USD ödeme açılana dek "749 TRY (≈ $19)"); altyazı dili Otomatik, seçicide Whisper'ın 99 dili. Premiere'deki bin/marker adları değişmez |
+| **Tek Tık Temizlik** *(3.1)* | Konuşmadan kes'te **tekrar çekimler**: baştan alınan cümleler ve yarım başlangıçlar gruplanır, her grupta bir çekim kalır (son / en uzun / en akıcı; çipten elle seçilir, ▶ ile tek çekim dinlenir). Yalnız komşu cümleler karşılaştırılır, emin olunmayan gruplar işaretsiz listelenir. İsteğe bağlı **senaryo** (senaryoya en yakın çekim kalır, senaryo dışı konuşma yalnız listelenir) ve **AI ile benzer anlatımlar** (Groq anahtarı, sonuçlar onaya bırakılır). Tek **inceleme listesi** (neden çipi, işaret, zaman bağlantısı), "Yalnız kesilecekleri dinle", 300 kesim sınırı, "<sekans> — Suflo Temiz" kopyası. Ayarlar'da **ek dolgu sözcükleri**; **transkript önbelleği** aynı klibi yeniden yazıya dökmez (kesimden kalan alt klipler dahil) |
 | **Viral Skor 2.0** *(3.1)* | Viral anlara açıklamalı 0–100 puan: kanca, bağımsızlık, duygu, değer ve kapanış alt puanları ile tek satırlık neden (toplam yerelde hesaplanır). Tür (podcast, eğitim, komedi…), adet (3–10) ve "ne arıyorsun?" odağı; klipler cümle ortasında başlamaz/bitmez, kartta ±1 cümle düğmeleri; 3 kanca başlığı seçeneği "Başlık ekle"ye gider. Puanlar tahmindir, izlenme garantisi değildir |
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
@@ -88,7 +89,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Premiere caption izine uygulama | 12 dile çeviri + çok dilli SRT paketi |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | **Sesi iyileştir** · **Otomatik zoom** · **Kanca başlığı** |
-| Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar ve duraksama temizliği, kelimeye tıklayıp kes |
+| Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar, tekrar çekim ve duraksama temizliği, kelimeye tıklayıp kes |
 | Terim sözlüğü (`yanlış => doğru`, her transkriptte) | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Bold Box, Neon, Daktilo…) timeline'da, MOGRT gerekmez |
 | Kelime kelime ve birikimli (karaoke) altyazı izi | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
 | — | **Viral anlar:** uzun videodan 15–90 sn'lik Shorts/Reels anları, açıklamalı 0–100 puan (Viral Skor 2.0), cümle güvenli kenarlar, In/Out ve süreli marker |
@@ -227,7 +228,11 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 |---|---|
 | `test-download.js` | Yarım kalan indirmenin devamı, hangi HTTP hatasında dosya korunur/silinir |
 | `test-caption-text.js` | Halüsinasyon temizliği, karaoke, satır bölme, Türkçe-duyarlı terim sözlüğü |
-| `test-textcut.js` | Konuşmadan kes: dolgu/tekrar algılama, kesim aralıkları, duraksama kısaltma |
+| `test-textcut.js` | Konuşmadan kes: dolgu/tekrar algılama, kesim aralıkları, duraksama kısaltma, ek dolgular, cümle içi yeniden başlama, 300 kesim sınırı |
+| `test-retakes.js` | Tek Tık Temizlik: tekrar çekim / yarım başlangıç kuralları, politikalar, yanlış pozitifler (anafora, tarif adımları), senaryo hizalaması (300×600 < 1 sn), AI cevabı doğrulaması |
+| `test-transcript-cache.js` | Transkript önbelleği: kaynak zamanı, kapsayan girdi, LRU, atomik yazım, bozuk dizin, panel bağlantısı |
+| `test-konusma-kes-ui.js` | Konuşmadan kes paneli sahte DOM'da: çekim çipleri, inceleme listesi, AI geçişi (hata, bayat cevap), kopya sekans adı |
+| `test-tek-tik-temizlik.js` | Tek Tık Temizlik kart/ayar/host bağlantıları ve inceleme listesi satırları |
 | `test-chapters.js` | YouTube bölümleri: öneri, kural denetimi, AI yanıtı ayrıştırma |
 | `test-auto-emoji.js` | Otomatik emoji: Türkçe kök eşleşmesi, yoğunluk ve tekrar koruması |
 | `test-vurgu.js` | Anahtar kelime vurgusu: 12 stilde vurgu rengi, otomatik seçim, dışa aktarımda işaret temizliği |

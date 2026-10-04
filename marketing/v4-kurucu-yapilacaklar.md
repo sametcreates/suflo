@@ -661,3 +661,59 @@ aynı para birimindedir; senin bir şey yapmana gerek yok, satış bugün de ça
    1270×760 galeri görselleri ve 30-60 sn'lik İngilizce demo videosu çekilmeli (kitte liste var).
 4. Bundan sonra eklenen her yeni Türkçe metnin İngilizcesi aynı değişiklikte `i18n/en.js`'e girer
    (`tests/test-i18n.js` ve `node tools/i18n-coverage.js` bunu denetler).
+
+## 7. Tek Tık Temizlik (tekrar çekimler, yarım başlangıçlar, take politikası, senaryo, tek inceleme listesi)
+
+Konuşmadan kes kartı artık baştan alınan cümleleri de bulur. Kod tamam ve testli; **senden gerçek
+dünya girdisi istemiyor** (anahtar, hesap, kayıt yok). AI gruplaması kullanıcının mevcut Groq
+anahtarıyla çalışır, anahtar yoksa düğme kapalı durur ve yanında "anahtar gerekli · 1 dk" çipi
+çıkar (yalnız Pro'da; ücretsiz kullanıcıda Pro rozeti konuşur). Önbellek
+`%APPDATA%\Kesit\transcripts` (Mac: `~/Library/Application Support/Kesit/transcripts`) altında
+en çok 50 transkript / 100 MB tutar. Yapman gerekenler yalnız Premiere'de elle deneme ve tanıtım:
+
+### 7.1 Premiere'de elle deneme (yaklaşık 25 dk)
+
+Bir konuşma klibi çek ya da bul: aynı cümleyi 3 kez söyle ("Bugün size … göstereceğim"), bir
+cümleyi yarıda kesip baştan al ("Şimdi size… Şimdi size ışığı göstereceğim"), araya bir kez
+"pardon" de, sonra normal konuşmaya devam et. Çekimler arasında 1-2 sn sus.
+
+1. **Tekrar çekim:** Kurgu › Konuşmadan kes › Konuşmayı yazıya dök. Kelime listesinde grup
+   satırı "Tekrar ×3 · 1 2 3 ✓" çıkmalı; ilk iki çekim mavi ve üstü çizili, üçüncüsü mavi alt
+   çizgili olmalı. "pardon" da atılanlara girmeli. Özet satırının sonunda "· 2 tekrar çekim" yazmalı.
+2. **Çip:** "1" çipine bas: ✓ birinciye geçmeli, kelime renkleri yer değiştirmeli. Her çipin
+   yanındaki ▶ yalnız o çekimi çalmalı.
+3. **Politika:** "Tekrar çekimde" › "En uzunu tut" / "En akıcıyı tut": tutulan çekim değişmeli,
+   yeniden yazıya dökme OLMAMALI (anında).
+4. **Yarım başlangıç:** Groq (bulut) motoruyla yazıya dökersen noktalama gelmez; "Yarım başlangıç ×2"
+   satırı "orta güven" rozetiyle ve işaretsiz gelmeli; İnceleme listesinde işaretsiz satır olarak
+   durmalı. İşaretleyince kesime girmeli.
+5. **İnceleme listesi:** her satırda neden çipi (dolgu / tekrar / tekrar çekim / yarım başlangıç /
+   duraksama / senaryo dışı), işaret ve zaman olmalı. Zamana basınca Premiere'in oynatma kafası
+   oraya gitmeli; işareti kaldırınca kelime listesinde de o parça geri gelmeli.
+6. **Yalnız kesilecekleri dinle:** yalnız silinecek parçalar art arda çalmalı.
+7. **Senaryo:** "Senaryoyu yapıştır" kutusuna okuduğun metni yapıştır: her cümle için senaryoya en
+   yakın çekim kalmalı; senaryoda olmayan bir cümle ("Bu arada abone olun") İnceleme'de
+   "senaryo dışı" olarak işaretsiz görünmeli, kendiliğinden kesilmemeli.
+8. **AI:** Groq anahtarı varken "AI ile benzer anlatımları da grupla"yı aç: "AI benzer anlatımları
+   arıyor…" görünmeli; bulduğu gruplar "AI" ve "orta güven" rozetiyle, işaretsiz gelmeli. Anahtarı
+   geçici olarak bozarsan uyarı çıkmalı ve sezgisel sonuç kalmalı.
+9. **Uygula:** Kopya sekansta uygula: yeni sekansın adı **"<sekans> — Suflo Temiz"** olmalı, özgün
+   sekans dokunulmamış kalmalı. Ses ve görüntü senkronu kaymamalı.
+10. **Önbellek:** aynı klipte tekrar "Konuşmayı yazıya dök": anında açılmalı ve kartta
+    "önbellekten · Yeniden yazıya dök" görünmeli. "Yeniden yazıya dök" motoru yeniden çalıştırmalı.
+    Kesimi uyguladıktan sonra kopya sekansta kalan bir parçayı seçip yazıya dök: yine önbellekten
+    gelmeli (kapsayan girdi). Altyazı sekmesinde tek klip + "Kelime kelime" ile altyazı ürettiysen
+    Konuşmadan kes o klibi de önbellekten açmalı.
+11. **Ayarlar:** Ayarlar › Ek dolgu sözcükleri'ne `tr: yani yani` yaz, kaydet; açık incelemede
+    "yani yani" turuncu dolgu olmalı. "Transkript önbelleğini temizle" sonrası aynı klip yeniden
+    yazıya dökülmeli.
+12. **Çok kesim:** 20 dk'lık dolgu dolu bir klipte 300'den fazla kesim çıkarsa uygulamada
+    "300+ kesim birleştirildi" uyarısı görünmeli ve Premiere donmamalı.
+
+### 7.2 Tanıtım (isteğe bağlı)
+
+- Tekrar çekim temizliği 2026'da rakiplerin (AutoCut Repeat, FireCut, TimeBolt, Cutback) en çok
+  öne çıkardığı özellik; Türkçede en iyi çalışan biz olmalıyız. 15 sn'lik bir önce/sonra videosu
+  (3 çekim → tek tık → temiz) Shorts ve Reels için en güçlü malzeme.
+- **AI'nın "farklı sözcüklerle tekrar"ı bulduğunu pazarlama**: prototipte bu ayrım zayıftı
+  (yalnız 0,60–0,67 aralığı). Mesaj "baştan aldığın cümleleri bulur" olmalı.
