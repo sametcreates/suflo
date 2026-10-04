@@ -266,6 +266,29 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
     var pr = cp.execFileSync("ffprobe", ["-v", "error", "-count_frames", "-show_entries", "stream=codec_name,pix_fmt,nb_read_frames", "-of", "json", cikLogolu.path]).toString();
     var ps = JSON.parse(pr).streams[0];
     ok("logolu çıktı qtrle argb, 2 sn × 25 = 50 kare", ps.codec_name === "qtrle" && ps.pix_fmt === "argb" && Number(ps.nb_read_frames) === 50, pr.replace(/\s+/g, " "));
+    // Deneme (filigranlı) katman: opak logo hiçbir köşede filigranı örtmez (sağ köşeler sola geçer)
+    var FL = require(path.join(__dirname, "..", "js", "filigran.js"));
+    var assF = FL.ekle(ASS, { width: 640, height: 360 });
+    var opakYol = path.join(kok, "opak.png");
+    cp.execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=0x00FF00FF:s=100x100,format=rgba", "-frames:v", "1", opakYol]);
+    var cikF = await OR.render(gercekK, { ass: assF, fontFiles: ["ArchivoBlack.ttf"], g: 640, y: 360, fps: 25, sure: 2, cikti: path.join(srt, "filigran.mov") });
+    var kF = kare(cikF.path);
+    // filigran kutusu: \an9\pos(621,14), boy 10 px → x 540..640, y 10..32
+    function filigranBolgesi(k) { var o = []; for (var fy = 10; fy < 32; fy++) for (var fx = 540; fx < 640; fx++) { var q = (fy * 640 + fx) * 4; o.push(k[q], k[q + 1], k[q + 2], k[q + 3]); } return o.join(","); }
+    var bolgeF = filigranBolgesi(kF), filigranGorunur = bolgeF.split(",").some(function (v, i) { return i % 4 === 3 && Number(v) > 20; });
+    var ortulen = [];
+    for (var ki = 0; ki < 4; ki++) {
+      var kose = ["su", "ss", "as", "au"][ki];
+      var cikK = await OR.render(gercekK, { ass: assF, fontFiles: ["ArchivoBlack.ttf"], g: 640, y: 360, fps: 25, sure: 2, cikti: path.join(srt, "f-" + kose + ".mov"),
+        logo: { path: opakYol, kose: kose, oran: 0.25, guvenli: false } });
+      if (!cikK.logo || filigranBolgesi(kare(cikK.path)) !== bolgeF) ortulen.push(kose);
+    }
+    ok("deneme: filigran görünür ve opak logo hiçbir köşede onu örtmez", filigranGorunur && ortulen.length === 0, ortulen.join(","));
+    ok("filigranaGoreLogo: yalnız filigranlı ASS'te sağ köşe sola geçer, kayıt değişmez", (function () {
+      var lg = { path: "a.png", kose: "su", oran: 0.2 };
+      return OR.filigranaGoreLogo(lg, assF).kose === "ss" && OR.filigranaGoreLogo(lg, ASS) === lg && lg.kose === "su" &&
+        OR.filigranaGoreLogo({ kose: "as" }, assF).kose === "au" && OR.filigranaGoreLogo(null, assF) === null;
+    })());
     var yok = await OR.render(gercekK, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 1, cikti: path.join(srt, "yok.mov"),
       logo: { path: path.join(kok, "olmayan.png"), kose: "su", oran: 0.1 } });
     ok("logo dosyası yoksa logosuz üretilir, logoAtlandi bildirilir", yok.logo === false && yok.logoAtlandi === true && fs.existsSync(yok.path));

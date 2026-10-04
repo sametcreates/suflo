@@ -155,6 +155,57 @@
     return out;
   }
 
+  // Kitin stile işleyen etkin değeri (kit kapalıysa ya da alan boşsa undefined)
+  function kitDegeri(kit, key) {
+    if (!acik(kit)) return undefined;
+    var ov = kitOverrides(kit.stil && kit.stil.overrides);
+    return own(ov, key) ? ov[key] : undefined;
+  }
+  function ayniDeger(a, b) {
+    if (a === undefined || a === null || b === undefined || b === null) return a == null && b == null;
+    return String(a).toLowerCase() === String(b).toLowerCase();
+  }
+  var STIL_ALANLARI = ["font", "renk", "konturRenk", "vurguRenk", "konum"];
+
+  // Kitin stile işleyen kısmı (açık/kapalı, yazı tipi, renkler, konum) değişti mi? Logo / kanca / köşe sayılmaz.
+  function styleFieldsChanged(eski, yeni) {
+    return STIL_ALANLARI.some(function (key) { return !ayniDeger(kitDegeri(eski, key), kitDegeri(yeni, key)); });
+  }
+
+  /*
+   * Kit değişince şimdiki stili yeni kite taşı: yalnız kitin (ya da kit yoksa temel stilin)
+   * koyduğu değerde duran alan değişir; elle ince ayarlanmış ya da paylaşılan koddan gelen
+   * alan (değeri eski kitinkinden farklı) olduğu gibi kalır. Kit kapanınca kitin koyduğu
+   * değer temel stile (base: hazır stilin kendi değerleri) döner.
+   * Döner: { stil, changed: bool }
+   */
+  function rebaseBrandKit(stil, base, eski, yeni) {
+    var out = {}, s = nesne(stil), b = nesne(base), degisti = false;
+    Object.keys(s).forEach(function (key) { out[key] = s[key]; });
+    STIL_ALANLARI.forEach(function (key) {
+      var e = kitDegeri(eski, key), y = kitDegeri(yeni, key);
+      if (ayniDeger(e, y)) return;
+      var beklenen = e !== undefined ? e : b[key];
+      var hedef = y !== undefined ? y : b[key];
+      if (hedef === undefined || !ayniDeger(out[key], beklenen) || ayniDeger(out[key], hedef)) return;
+      out[key] = hedef;
+      degisti = true;
+      if (key === "font" && own(s, "fontFile")) out.fontFile = SS && SS.fontFile(hedef) || s.fontFile;
+    });
+    return { stil: out, changed: degisti };
+  }
+
+  /*
+   * Deneme (filigranlı) katmanda filigran sağ üstte: logo sağ köşelere konamaz, aynı yükseklikteki
+   * sol köşeye geçer (Sağ üst → Sol üst, Sağ alt → Sol alt). Sol yarıdaki logo (en çok %25 + pay)
+   * filigranın sağ kenara dayalı kutusuyla yatayda hiç kesişmez; logonun boyu ne olursa olsun.
+   */
+  function watermarkSafeCorner(kose) {
+    if (kose === "su") return "ss";
+    if (kose === "as") return "au";
+    return KOSELER.indexOf(kose) === -1 ? "ss" : kose;
+  }
+
   /*
    * Kanca başlığı ayarlarına kiti uygula: yazı tipi, yazı rengi, vurgu rengi
    * (kanca.renk varsa o, yoksa kitin vurgu rengi). Stil ve süre kanca kartındaki seçim kalır.
@@ -232,6 +283,9 @@
     isLogoPath: logoYoluMu,
     mergeBrandKit: mergeBrandKit,
     mergeHook: mergeHook,
+    styleFieldsChanged: styleFieldsChanged,
+    rebaseBrandKit: rebaseBrandKit,
+    watermarkSafeCorner: watermarkSafeCorner,
     fromCurrent: fromCurrent,
     logoPlacement: logoPlacement
   };

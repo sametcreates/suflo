@@ -90,6 +90,24 @@
     return sure;
   }
 
+  /*
+   * Marka Kiti logolu katmanın uzanabileceği süre (katman başlangıcına göre, sn):
+   * "entire" → sekans sonu; "inout" → Out noktası (Out > In ise, sekans sonunu aşmaz);
+   * "clip" → 0 (tam süre yok: katman altyazılar boyunca, logosuz katmanla aynı).
+   * Altyazılar bu sınırdan taşıyorsa 0 (logosuz hesap kullanılır).
+   */
+  function logoKatmanKalan(scope, spec, baslangic, sonBitis) {
+    if (scope === "clip") return 0;
+    spec = spec || {};
+    var son = Number(spec.end) || 0;
+    if (scope === "inout") {
+      var gir = Number(spec.inPoint) || 0, cik = Number(spec.outPoint) || 0;
+      if (cik > gir && (son <= 0 || cik < son)) son = cik;
+    }
+    var kalan = son - (Number(baslangic) || 0);
+    return kalan > 0 && kalan >= (Number(sonBitis) || 0) - 0.05 ? kalan : 0;
+  }
+
   // kelime cue'ları: her kelime kendi zamanında, bir sonrakiyle çakışmadan
   function karaokeWords(words) {
     var out = [];
@@ -481,6 +499,7 @@
     cleanSegments: cleanSegments,
     sondaTakilma: sondaTakilma,
     katmanSuresi: katmanSuresi,
+    logoKatmanKalan: logoKatmanKalan,
     karaokeWords: karaokeWords,
     karaokeCumulative: karaokeCumulative,
     splitWords: splitWords,

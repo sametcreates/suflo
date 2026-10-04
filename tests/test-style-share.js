@@ -163,6 +163,54 @@ ok("fromCurrent: kit alanları doldu, açık kalır", fc.on && fc.stil.id === "n
 ok("fromCurrent: konum istenirse", MK.fromCurrent({ font: "Arial", konum: "8" }, null, true).stil.overrides.konum === 8);
 ok("fromCurrent: sistem fontu kite alınmaz", MK.fromCurrent({ font: "Arial" }).stil.overrides.font === undefined);
 
+/* ---------------- kit değişimi: styleFieldsChanged / rebaseBrandKit ---------------- */
+var tabanStil = { aile: "viral", font: "Montserrat", renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe14d", konum: 2, boyut: 80 };
+var kitK = MK.normalize({ on: true, stil: { overrides: { font: "Anton", renk: "#112233", konturRenk: "#000000", vurguRenk: "#ff00aa" } }, logo: { path: "C:/l.png", kose: "ss", oran: 0.1 } }).kit;
+var kitLogo = MK.normalize({ on: true, stil: { overrides: { font: "Anton", renk: "#112233", konturRenk: "#000000", vurguRenk: "#ff00aa" } }, logo: { path: "C:/l.png", kose: "su", oran: 0.2 } }).kit;
+ok("styleFieldsChanged: yalnız logo/köşe/boyut değişimi stil değişimi değil", !MK.styleFieldsChanged(kitK, kitLogo));
+ok("styleFieldsChanged: açma, kapama, font, renk değişimi", MK.styleFieldsChanged(null, kitK) && MK.styleFieldsChanged(kitK, MK.normalize(Object.assign({}, kitK, { on: false })).kit) &&
+  MK.styleFieldsChanged(kitK, MK.normalize({ on: true, stil: { overrides: { font: "Bungee", renk: "#112233", konturRenk: "#000000", vurguRenk: "#ff00aa" } } }).kit));
+// paylaşılan kod (Bungee, kırmızı) kitin üstüne uygulanmış: kit değişimi bunları ezmez
+var kodluStil = Object.assign({}, MK.mergeBrandKit(tabanStil, kitK), { font: "Bungee", renk: "#ff0000" });
+var kitK2 = MK.normalize({ on: true, stil: { overrides: { font: "Lora", renk: "#445566", konturRenk: "#000000", vurguRenk: "#00ffaa" } } }).kit;
+var rb = MK.rebaseBrandKit(kodluStil, tabanStil, kitK, kitK2);
+ok("rebaseBrandKit: koddan gelen font ve renk korunur, kitte duran vurgu yeni kite geçer", rb.changed && rb.stil.font === "Bungee" && rb.stil.renk === "#ff0000" &&
+  rb.stil.vurguRenk === "#00ffaa" && rb.stil.boyut === 80, JSON.stringify(rb.stil));
+var kapat = MK.rebaseBrandKit(MK.mergeBrandKit(tabanStil, kitK), tabanStil, kitK, MK.normalize(Object.assign({}, kitK, { on: false })).kit);
+ok("rebaseBrandKit: kit kapanınca kitin değerleri hazır stilin değerlerine döner", kapat.changed && kapat.stil.font === "Montserrat" && kapat.stil.renk === "#ffffff" &&
+  kapat.stil.vurguRenk === "#ffe14d" && kapat.stil.konum === 2, JSON.stringify(kapat.stil));
+var ac = MK.rebaseBrandKit(tabanStil, tabanStil, MK.normalize({ on: false }).kit, kitK);
+ok("rebaseBrandKit: kit açılınca hazır stil kite geçer (mergeBrandKit ile aynı)", ac.changed &&
+  ["font", "renk", "konturRenk", "vurguRenk", "konum"].every(function (k) { return String(ac.stil[k]) === String(MK.mergeBrandKit(tabanStil, kitK)[k]); }));
+var elle = MK.rebaseBrandKit(Object.assign({}, tabanStil, { renk: "#abcdef" }), tabanStil, MK.normalize({ on: false }).kit, kitK);
+ok("rebaseBrandKit: elle ince ayarlanmış renk kit açılınca da korunur", elle.stil.renk === "#abcdef" && elle.stil.font === "Anton");
+ok("rebaseBrandKit: değişiklik yoksa changed false", !MK.rebaseBrandKit(kodluStil, tabanStil, kitK, kitLogo).changed);
+
+/* ---------------- deneme filigranı: logo filigranın üstüne binmez ---------------- */
+// js/filigran.js: \an9\pos(0.97w, 0.04h | 0.10h), boy = kısa kenar × 0.026; "suflo.app" ≤ 7 × boy genişlik, 1.4 × boy yükseklik (cömert kutu)
+function filigranKutusu(W, H) {
+  var boy = Math.max(10, Math.round(Math.min(W, H) * 0.026)), x2 = Math.round(W * 0.97), y1 = Math.round(H * (H > W ? 0.10 : 0.04));
+  return { x1: x2 - 7 * boy, x2: x2, y1: y1, y2: y1 + 1.4 * boy };
+}
+var cakisan = [];
+[[1920, 1080], [1080, 1920], [1080, 1080], [3840, 2160], [720, 1280]].forEach(function (b) {
+  MK.CORNERS.forEach(function (kose) {
+    [0.08, 0.14, 0.25].forEach(function (oran) {
+      [false, true].forEach(function (guvenli) {
+        var W = b[0], H = b[1], p = MK.logoPlacement(W, H, MK.watermarkSafeCorner(kose), oran, guvenli);
+        var lh = p.lw;   // kare logo (en kötü durum: yükseklik = genişlik; daha uzunu da test edilir)
+        [lh, lh * 2, H].forEach(function (yuk) {   // kare, dikey ve kare boyunda logo
+          var y1 = p.alt ? p.y - yuk : p.y, y2 = p.alt ? p.y : p.y + yuk;
+          var f = filigranKutusu(W, H);
+          if (p.x < f.x2 && p.x + p.lw > f.x1 && y1 < f.y2 && y2 > f.y1) cakisan.push(W + "x" + H + " " + kose + " " + oran + " " + guvenli);
+        });
+      });
+    });
+  });
+});
+ok("deneme: her köşe, oran, logo boyunda logo filigranla kesişmez (sağ köşeler sola geçer)", cakisan.length === 0 && MK.watermarkSafeCorner("su") === "ss" &&
+  MK.watermarkSafeCorner("as") === "au" && MK.watermarkSafeCorner("au") === "au" && MK.watermarkSafeCorner("x") === "ss", cakisan.slice(0, 3).join(" | "));
+
 /* ---------------- logoPlacement ---------------- */
 var W = 1080, H = 1920;
 ["su", "ss", "as", "au"].forEach(function (kose) {
@@ -188,15 +236,16 @@ var adlar = new Function("var window = {}, document = { getElementById: function
   sayfaSrc.slice(sayfaSrc.indexOf("var STILLER = {"), sayfaSrc.indexOf("};", sayfaSrc.indexOf("var STILLER = {")) + 2) + " return STILLER;")();
 ok("sayfadaki stil adları motorla aynı (her Suflo Stili)", JSON.stringify(adlar) === JSON.stringify(E.list().reduce(function (o, p) { o[p.id] = p.name; return o; }, {})), JSON.stringify(adlar));
 ok("her Suflo Stilinin site önizlemesi var", E.list().every(function (p) { return fs.existsSync(path.join(kok, "docs", "gorseller", "suflo-stiller", p.id + ".webm")); }));
-function sayfa(hash) {
-  var D = {};
-  function e(id) { if (!D[id]) D[id] = { id: id, hidden: false, textContent: "", title: "", style: {}, src: "", addEventListener: function () {}, play: function () { return { catch: function () {} }; } }; return D[id]; }
-  var c = { window: {}, document: { getElementById: e, title: "" }, location: { hash: hash }, navigator: {}, decodeURIComponent: decodeURIComponent, String: String, setTimeout: setTimeout };
-  c.window.addEventListener = function () {};
+var BASLIKLAR = { "renk-yazi": "Yazı", "renk-kontur": "Kontur", "renk-vurgu": "Vurgu" };
+function sayfa(hash, dil) {
+  var D = {}, dinle = {};
+  function e(id) { if (!D[id]) D[id] = { id: id, hidden: false, textContent: "", title: BASLIKLAR[id] || "", style: {}, src: "", addEventListener: function () {}, play: function () { return { catch: function () {} }; } }; return D[id]; }
+  var c = { window: {}, document: { getElementById: e, title: "", documentElement: { lang: dil || "tr" } }, location: { hash: hash }, navigator: {}, decodeURIComponent: decodeURIComponent, String: String, setTimeout: setTimeout };
+  c.window.addEventListener = function (ad, f) { dinle[ad] = f; };
   vm.createContext(c);
   vm.runInContext(fs.readFileSync(path.join(kok, "docs", "js", "style-share.js"), "utf8"), c);
   vm.runInContext(sayfaSrc, c);
-  return { D: D, doc: c.document };
+  return { D: D, doc: c.document, hashDegis: function (h) { c.location.hash = h; dinle.hashchange(); } };
 }
 var s1 = sayfa("#" + SS.encode({ styleId: "neon", overrides: { font: "Lora", renk: "#FF0000", vurguRenk: "#00ff00", konum: 8 }, author: "Ayşe_Kurgu" }));
 ok("sayfa: geçerli kod gösterilir (ad, yazar, font, konum, video)", !s1.D["stil-icerik"].hidden && s1.D["stil-hata"].hidden &&
@@ -210,6 +259,37 @@ var s3 = sayfa("#SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzayl
 ok("sayfa: bilinmeyen stil → hata, video yok", !s3.D["stil-hata"].hidden && s3.D["stil-icerik"].hidden && (!s3.D["stil-video"] || s3.D["stil-video"].src === ""));
 var s4 = sayfa("");
 ok("sayfa: kodsuz ziyaret → yalnız nasıl kullanılır", s4.D["stil-hata"].hidden && s4.D["stil-icerik"].hidden);
+
+
+// hashchange: önceki kodun gizlediği renk kutusu yeni kodda geri gelir, başlık birikmez
+var s5 = sayfa("#" + SS.encode({ styleId: "neon", overrides: { renk: "#aaaaaa" } }));
+ok("sayfa: ilk kodda vurgu rengi yok → gizli", s5.D["renk-vurgu"].hidden === true && s5.D["renk-yazi"].title === "Yazı #aaaaaa");
+s5.hashDegis("#" + SS.encode({ styleId: "pop", overrides: { renk: "#ff0000", vurguRenk: "#00ff00", font: "Anton" } }));
+ok("sayfa: hashchange sonrası vurgu kutusu görünür, başlık birikmez", s5.D["renk-vurgu"].hidden === false && s5.D["renk-vurgu"].style.backgroundColor === "#00ff00" &&
+  s5.D["renk-yazi"].title === "Yazı #ff0000" && s5.D["renk-vurgu"].title === "Vurgu #00ff00", s5.D["renk-yazi"].title + " | " + s5.D["renk-vurgu"].hidden);
+s5.hashDegis("#" + SS.encode({ styleId: "doc" }));
+ok("sayfa: renksiz üçüncü kodda kutular gizli, eski renk ve font kalmaz", s5.D["renk-yazi"].hidden && s5.D["renk-vurgu"].hidden &&
+  s5.D["renk-yazi"].style.backgroundColor === "" && s5.D["stil-font"].style.fontFamily === "" && s5.D["stil-font"].textContent === "Stilin kendi yazı tipi");
+
+// İngilizce sayfa (docs/en/stil.html, <html lang="en">)
+var e1 = sayfa("#" + SS.encode({ styleId: "ziplama", overrides: { renk: "#FF0000", konum: 8 }, author: "ayse" }), "en");
+ok("EN sayfa: İngilizce stil adı, konum, başlık, video yolu", e1.D["stil-ad"].textContent === "Bouncy · @ayse" && e1.D["stil-konum"].textContent === "Top" &&
+  e1.doc.title === "Bouncy · Shared Suflo Style" && e1.D["stil-font"].textContent === "The style's own font" &&
+  e1.D["stil-video"].src === "../gorseller/suflo-stiller/ziplama.webm" && e1.D["renk-yazi"].title === "Text #ff0000", JSON.stringify([e1.D["stil-ad"].textContent, e1.doc.title, e1.D["renk-yazi"].title]));
+var e2 = sayfa("#SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzayli" })), "en");
+ok("EN sayfa: hata metni İngilizce", !e2.D["stil-hata"].hidden && e2.D["stil-hata-metin"].textContent === "This style is not available in this Suflo version.");
+var e3 = sayfa("#SFL1.bozuk!!", "en");
+ok("EN sayfa: bozuk kod → İngilizce genel hata", !e3.D["stil-hata"].hidden && !/[ğışİŞ]/.test(e3.D["stil-hata-metin"].textContent) && e3.D["stil-hata-metin"].textContent.length > 10, e3.D["stil-hata-metin"].textContent);
+var enAdlar = new Function("var window = {}, document = { getElementById: function () { return { addEventListener: function () {} }; } }; " +
+  sayfaSrc.slice(sayfaSrc.indexOf("var STILLER_EN = {"), sayfaSrc.indexOf("};", sayfaSrc.indexOf("var STILLER_EN = {")) + 2) + " return STILLER_EN;")();
+var enSoz = require(path.join(kok, "i18n", "en.js"));
+var enSozluk = enSoz.strings;
+ok("EN sayfa: her Suflo Stilinin İngilizce adı var, panelin İngilizce adıyla aynı", E.list().every(function (p) {
+  var cevrilmis = enSozluk && typeof enSozluk === "object" && enSozluk[p.name] ? enSozluk[p.name] : p.name;
+  return enAdlar[p.id] === cevrilmis;
+}), JSON.stringify(enAdlar));
+ok("shareUrl: İngilizce arayüz /en/stil, Türkçe (ya da dil yok) /stil", SS.shareUrl("SFL1.x", "en") === "https://suflo.app/en/stil#SFL1.x" &&
+  SS.shareUrl("SFL1.x", "tr") === "https://suflo.app/stil#SFL1.x" && SS.shareUrl("SFL1.x") === "https://suflo.app/stil#SFL1.x");
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

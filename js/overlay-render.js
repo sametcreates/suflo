@@ -22,6 +22,9 @@
 })(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (MK) {
   "use strict";
 
+  // js/filigran.js filigranliMi ile aynı (STIL = "SufloFiligran")
+  var FILIGRAN_STILI = /^\s*Style:\s*SufloFiligran\s*,/m;
+
   // ProRes 4:4:4 tek sayı boyut kabul etmez; qtrle için de zararsız
   function ciftBoyut(n) {
     n = Math.round(Number(n) || 0);
@@ -117,6 +120,19 @@
     }
   }
 
+  /*
+   * Deneme (filigranlı) katmanda logo filigranın üstüne binmesin: filigran sağ üstte,
+   * sağ köşedeki logo aynı yükseklikteki sol köşeye geçer (MK.watermarkSafeCorner). Kayıttaki ayar değişmez;
+   * satın alma sonrası temiz yeniden oluşturmada logo seçilen köşede çıkar.
+   */
+  function filigranaGoreLogo(logo, ass) {
+    if (!logo || !FILIGRAN_STILI.test(String(ass || ""))) return logo;
+    var out = {};
+    Object.keys(logo).forEach(function (k) { out[k] = logo[k]; });
+    out.kose = MK ? MK.watermarkSafeCorner(logo.kose) : "ss";
+    return out;
+  }
+
   function uzantiFontlari(K) {
     var kok;
     try { kok = decodeURI(K.extensionPath()); } catch (e) { kok = K.extensionPath(); }
@@ -171,7 +187,7 @@
 
       var cikti = o.cikti || K.path.join(K.srtDir(), "suflo-altyazi-" + Date.now() + ".mov");
       K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
-      var logo = o.logo ? logoHazirla(K, dizin, o.logo, g, y) : null;
+      var logo = o.logo ? logoHazirla(K, dizin, filigranaGoreLogo(o.logo, o.ass), g, y) : null;
       if (typeof o.durum === "function") o.durum((o.durumMetni || "Altyazı katmanı hazırlanıyor…") + " (" + Math.round(sure) + " sn)");
       var r = await K.run(ff, buildArgs({ assName: assAd, fontsdir: fontsdir ? "." : "", w: g, h: y, fps: fps, dur: sure, logo: logo, out: cikti }),
         { timeout: o.timeout || 3600000, cwd: dizin });
@@ -341,7 +357,7 @@
 
   return {
     ciftBoyut: ciftBoyut, kaynak: kaynak, ffmpegArgs: ffmpegArgs, buildArgs: buildArgs, previewArgs: previewArgs,
-    logoHazirla: logoHazirla, render: render,
+    logoHazirla: logoHazirla, filigranaGoreLogo: filigranaGoreLogo, render: render,
     ilkHalinde: ilkHalinde, elleMesaji: elleMesaji, sonucMesaji: sonucMesaji,
     temizYenidenOlustur: temizYenidenOlustur, denemeKaydet: denemeKaydet
   };

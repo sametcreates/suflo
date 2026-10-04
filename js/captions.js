@@ -1108,6 +1108,7 @@ window.KCaptions = (function () {
     bekleyenMogrtYolu = "";
     if (el("cap-style-family")) el("cap-style-family").value = "mogrt";
     if (el("cap-preset")) el("cap-preset").value = "";
+    stilKredisi("");   // paylaşılan kodun yazarı MOGRT şablonuna yazılmasın
     stilKartiIsaretle("");
     uygulamaIpucunuGuncelle();
     onizlemeDurdur();
@@ -1663,7 +1664,7 @@ window.KCaptions = (function () {
   function stilPaylas() {
     var k = stilKodu();
     if (!k) { KApp.toast("Paylaşmak için önce bir Suflo Stili seç.", "warn"); return; }
-    panoyaKopyala(k.kod + "\n" + SS.shareUrl(k.kod), k.yazarGecersiz
+    panoyaKopyala(k.kod + "\n" + SS.shareUrl(k.kod, arayuzDili()), k.yazarGecersiz
       ? "Stil kodu kopyalandı (ad yalnız harf, rakam, _ . - içerebilir; kod adsız oluşturuldu)"
       : "Stil kodu ve suflo.app/stil bağlantısı kopyalandı");
   }
@@ -1672,7 +1673,7 @@ window.KCaptions = (function () {
     var k = stilKodu();
     if (!k) { KApp.toast("Dışa aktarmak için önce bir Suflo Stili seç.", "warn"); return; }
     try {
-      var yol = saveToDesktop("suflo-stil-" + secilenMotorStili + ".suflo-stil", k.kod + "\n" + SS.shareUrl(k.kod) + "\n");
+      var yol = saveToDesktop("suflo-stil-" + secilenMotorStili + ".suflo-stil", k.kod + "\n" + SS.shareUrl(k.kod, arayuzDili()) + "\n");
       KApp.toast("Kaydedildi: " + yol, "good", 8000);
     } catch (e) {
       KApp.toast(K.hataYardimi(e), "bad");
@@ -1738,15 +1739,39 @@ window.KCaptions = (function () {
     onizlemeOynat();
   }
 
-  // Ayarlar › Marka Kiti değişti: çip, seçili Suflo Stili ve kanca başlığı tazelenir
+  // Son görülen kit (kapalı da olabilir): değişimde neyin değiştiğini bilmek için
+  var sonKit = null;
+  function kitHam() {
+    try {
+      if (!window.SufloMarkaKiti) return null;
+      return window.SufloMarkaKiti.normalize(K.settings().markaKiti, { styleIds: function (id) { return motorStiliMi(id); } }).kit;
+    } catch (e) { return null; }
+  }
+
+  /*
+   * Ayarlar › Marka Kiti değişti: çip, seçili Suflo Stili ve kanca başlığı tazelenir.
+   * Stil yalnız kitin yazı tipi / renk / konum ya da açık-kapalı durumu değişince güncellenir
+   * (logo, köşe, boyut değişimi stile dokunmaz). Yalnız kitin koyduğu değerde duran alan
+   * değişir: elle ince ayar ve paylaşılan koddan gelen değer korunur; kit kapanınca kitin
+   * koyduğu değer hazır stilin kendi değerine döner. Şablonum (applyPreset gibi) kite karışmaz.
+   */
   function markaKitiDegisti() {
-    var kit = markaKiti();
-    if (kit && !secilenMogrt && motorStiliMi(secilenMotorStili)) {
-      stiliYaz(window.SufloMarkaKiti.mergeBrandKit(stil(), kit));
-      vurguKutusuDurumu();
-      onizlemeDurdur();
-      onizlemeCiz();
-      savePrefs();
+    var MK = window.SufloMarkaKiti;
+    var yeni = kitHam();
+    var eski = sonKit;
+    sonKit = yeni;
+    var sablonum = !!el("cap-preset") && el("cap-preset").value === "user";
+    if (MK && yeni && !secilenMogrt && !sablonum && motorStiliMi(secilenMotorStili) && MK.styleFieldsChanged(eski, yeni)) {
+      var temel = PRESETS[secilenMotorStili];
+      var r = MK.rebaseBrandKit(stil(), temel && temel.stil, eski, yeni);
+      if (r.changed) {
+        stiliYaz(r.stil);
+        stilKredisi("");   // görünüm artık paylaşanınki değil
+        vurguKutusuDurumu();
+        onizlemeDurdur();
+        onizlemeCiz();
+        savePrefs();
+      }
     }
     inceAyarDurumu();
   }
@@ -4136,11 +4161,14 @@ window.KCaptions = (function () {
       var cs = cueler();
       if (!cs.length) throw new Error("Yazılacak altyazı yok.");
       var st = stil();
-      // Marka Kiti logosu yalnız Suflo Stili katmanında; logo varken katman sekansın sonuna kadar sürer
+      // Marka Kiti logosu yalnız Suflo Stili katmanında; logo varken katman seçilen kapsamın
+      // sonuna kadar sürer (tüm sekans: sekans sonu, In/Out: Out noktası, klip: altyazılar boyunca)
       var kit = motorStiliMi(st.aile) ? markaKiti() : null;
       var logo = kit && kit.logo.path ? { path: kit.logo.path, kose: kit.logo.kose, oran: kit.logo.oran, guvenli: !!st.guvenli } : null;
       var sonBitis = cs[cs.length - 1].end - baslangic;
-      var sure = CT.katmanSuresi(sonBitis, (Number(spec.end) || 0) - baslangic, fps, !!logo);
+      var logoKalan = logo ? CT.logoKatmanKalan(scope, spec, baslangic, sonBitis) : 0;
+      var sure = logoKalan > 0 ? CT.katmanSuresi(sonBitis, logoKalan, fps, true)
+        : CT.katmanSuresi(sonBitis, (Number(spec.end) || 0) - baslangic, fps, false);
 
       var stilDerlemesi = null;
       var ass;
@@ -4524,6 +4552,7 @@ window.KCaptions = (function () {
         K.saveSettings();
       });
     }
+    sonKit = kitHam();
     document.addEventListener("suflo:markaKiti", markaKitiDegisti);
     if (el("cap-onizleme-kare")) el("cap-onizleme-kare").addEventListener("click", kareTazele);
 

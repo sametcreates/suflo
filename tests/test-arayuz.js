@@ -298,7 +298,15 @@ ok("ince ayar yalnız Suflo Stilinde, sistem fontları kapalı, güvenli yerleş
   /sar\.hidden = !\(motorda && dikeySekans\(\)\)/.test(iad));
 ok("önizleme, katman, ASS ve paylaşım kodu aynı ince ayarı kullanır (motorAyarlari)", (capSrc.match(/overrides: motorAyarlari\(/g) || []).length === 4, (capSrc.match(/overrides: motorAyarlari\(/g) || []).length);
 var ou2 = fnGovde(capSrc, "async function overlayUygula(");
-ok("katman: kit logosu + tam sekans süresi, logo atlanırsa uyarı", /CT\.katmanSuresi\(.*, !!logo\);/.test(ou2) && /logo: logo,/.test(ou2) && /logoAtlandi/.test(ou2));
+ok("katman: kit logosu kapsamın sonuna kadar (logoKatmanKalan), logo atlanırsa uyarı",
+  /CT\.logoKatmanKalan\(scope, spec, baslangic, sonBitis\)/.test(ou2) && /CT\.katmanSuresi\(sonBitis, logoKalan, fps, true\)/.test(ou2) &&
+  /logo: logo,/.test(ou2) && /logoAtlandi/.test(ou2));
+var mkd = fnGovde(capSrc, "function markaKitiDegisti(");
+ok("kit değişimi: yalnız stil alanı değişince, Şablonum hariç, rebaseBrandKit ile; kredi silinir",
+  /MK\.styleFieldsChanged\(eski, yeni\)/.test(mkd) && /!sablonum/.test(mkd) && /MK\.rebaseBrandKit\(stil\(\), temel && temel\.stil, eski, yeni\)/.test(mkd) &&
+  /stilKredisi\(""\)/.test(mkd) && !/mergeBrandKit/.test(mkd));
+ok("MOGRT stili seçilince paylaşılan kodun kredisi silinir", /stilKredisi\(""\)/.test(fnGovde(capSrc, "function mogrtStiliniSec(")));
+ok("paylaşım bağlantısı arayüz dilinde (EN → /en/stil)", (capSrc.match(/SS\.shareUrl\(k\.kod, arayuzDili\(\)\)/g) || []).length === 2);
 ok("önizleme ortak builder ile (previewArgs + logoHazirla)", /SufloOverlayRender\.previewArgs\(/.test(fnGovde(capSrc, "async function motorOnizlemeOynat(")) &&
   /SufloOverlayRender\.logoHazirla\(/.test(fnGovde(capSrc, "async function motorOnizlemeOynat(")));
 

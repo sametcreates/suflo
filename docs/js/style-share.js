@@ -29,6 +29,7 @@
   var SURUM = 1;
   var EN_UZUN_GIRDI = 2048;
   var PAYLASIM_ADRESI = "https://suflo.app/stil";
+  var PAYLASIM_ADRESI_EN = "https://suflo.app/en/stil";
 
   // Panelle gelen fontlar (Google Fonts, OFL; Türkçe glifler tam). genislik: ortalama
   // karakter genişliği / punto (satır sığdırma hesabı için kaba katsayı)
@@ -241,8 +242,8 @@
     }
   }
 
-  // Paylaşım bağlantısı: kod # ile (sunucuya gitmez, günlüğe düşmez)
-  function shareUrl(code) { return PAYLASIM_ADRESI + "#" + code; }
+  // Paylaşım bağlantısı: kod # ile (sunucuya gitmez, günlüğe düşmez). lang "en": İngilizce sayfa (/en/stil)
+  function shareUrl(code, lang) { return (lang === "en" ? PAYLASIM_ADRESI_EN : PAYLASIM_ADRESI) + "#" + code; }
 
   return {
     PREFIX: ONEK,

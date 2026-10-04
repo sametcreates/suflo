@@ -157,6 +157,30 @@ if (fs.existsSync(stilYol)) {
   var sayfaJs = fs.readFileSync(D + "js/stil-sayfa.js", "utf8");
   chk("stil-sayfa.js: innerHTML / document.write yok, metin textContent ile", !/innerHTML|outerHTML|document\.write|insertAdjacentHTML/.test(sayfaJs) && /textContent/.test(sayfaJs));
   chk("stil-sayfa.js: renk yalnız doğrulanmış hex ile", /SS\.isColor\(deger\)/.test(sayfaJs));
+  chk("stil.html: hreflang tr/en/x-default", /hreflang="tr" href="https:\/\/suflo\.app\/stil"/.test(st) &&
+    /hreflang="en" href="https:\/\/suflo\.app\/en\/stil"/.test(st) && /hreflang="x-default" href="https:\/\/suflo\.app\/en\/stil"/.test(st));
+}
+/* İngilizce paylaşım sayfası: İngilizce panelin "Share style" bağlantısı buraya gelir */
+var stilEnYol = D + "en/stil.html";
+chk("en/stil.html var", fs.existsSync(stilEnYol));
+if (fs.existsSync(stilEnYol)) {
+  var se = fs.readFileSync(stilEnYol, "utf8");
+  var seBaslik = (se.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
+  var seAcik = (se.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
+  chk("en/stil.html: lang=en, canonical, og:locale en_US", /<html lang="en">/.test(se) && /rel="canonical" href="https:\/\/suflo\.app\/en\/stil"/.test(se) &&
+    /property="og:url" content="https:\/\/suflo\.app\/en\/stil"/.test(se) && /og:locale" content="en_US"/.test(se));
+  chk("en/stil.html: title ≤ 60, description 120-160", seBaslik.length > 10 && seBaslik.length <= 60 && /Suflo Style/.test(seBaslik) &&
+    seAcik.length >= 120 && seAcik.length <= 160, seBaslik + " / " + seAcik.length);
+  chk("en/stil.html: hreflang TR sayfasıyla karşılıklı", /hreflang="tr" href="https:\/\/suflo\.app\/stil"/.test(se) &&
+    /hreflang="en" href="https:\/\/suflo\.app\/en\/stil"/.test(se) && /hreflang="x-default" href="https:\/\/suflo\.app\/en\/stil"/.test(se));
+  chk("en/stil.html: site haritasında", sitemapSrc.indexOf("<loc>https://suflo.app/en/stil</loc>") !== -1);
+  var cspE = (se.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/) || [])[1] || "";
+  chk("en/stil.html: CSP script-src 'self', yalnız yerel iki betik", /script-src 'self'(;|$)/.test(cspE) && !/<script(?![^>]*\ssrc=)[^>]*>/.test(se) &&
+    (se.match(/<script src="([^"]+)"/g) || []).join(" ") === '<script src="../js/style-share.js" <script src="../js/stil-sayfa.js"');
+  chk("en/stil.html: Türkçe metin yok, Copy code + Download Suflo", !/[ğışĞİŞ]/.test(se) && /id="kodu-kopyala"[^>]*>Copy code</.test(se) &&
+    /releases\/latest">Download Suflo</.test(se));
+  chk("en/stil.html: aynı öğe kimlikleri (stil-sayfa.js)", ["stil-ad", "stil-yazar-sar", "stil-yazar", "stil-hata", "stil-hata-metin", "stil-icerik", "stil-video",
+    "stil-temel", "stil-font", "renk-yazi", "renk-kontur", "renk-vurgu", "stil-konum", "stil-kod", "kodu-kopyala"].every(function (id) { return se.indexOf('id="' + id + '"') !== -1; }));
 }
 
 chk("TR ana sayfa altbilgisinde English bağlantısı", /<a href="\/en\/" hreflang="en" lang="en">English<\/a>/.test(h));
