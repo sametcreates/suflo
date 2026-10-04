@@ -44,6 +44,19 @@ chk("katmanSuresi: 25 fps'te kare izgarasina asagi (36.65 -> 36.64)", Math.abs(T
   T.katmanSuresi(36.63, 36.65, 25));
 chk("katmanSuresi: kalan bilinmiyorsa eski davranis", T.katmanSuresi(38.0, 0) === 40);
 chk("katmanSuresi: altyazi sekansa sigmiyorsa kesilmez", T.katmanSuresi(50, 30) === 52);
+/* tamSekans (Marka Kiti logosu): katman sekansin kalanini kaplar, kare izgarasinda, asla uzun degil */
+chk("katmanSuresi tamSekans: uzun sekansta kalanin tamami", T.katmanSuresi(10, 454, 25, true) === 454, T.katmanSuresi(10, 454, 25, true));
+var tsFps = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60], tsKotu = [];
+[12.345, 38.02, 61.7071, 100.01, 3599.99].forEach(function (kalan) {
+  tsFps.forEach(function (f) {
+    var s = T.katmanSuresi(5, kalan, f, true), kare = s * f;
+    if (!(s <= kalan + 1e-9 && Math.abs(kare - Math.round(kare)) < 1e-6 && kalan - s < 1 / f)) tsKotu.push(kalan + "@" + f + "=" + s);
+  });
+});
+chk("katmanSuresi tamSekans: kare izgarasinda, sekanstan uzun degil, en fazla bir kare kisa", tsKotu.length === 0, tsKotu.slice(0, 3).join(" "));
+chk("katmanSuresi tamSekans: altyazi sekanstan uzunsa yine sekans kadar", T.katmanSuresi(50, 30, 25, true) === 30);
+chk("katmanSuresi tamSekans: kalan bilinmiyorsa eski davranis", T.katmanSuresi(38.0, 0, 25, true) === 40);
+chk("katmanSuresi tamSekans: fps yoksa kalanin kendisi", T.katmanSuresi(5, 12.3, 0, true) === 12.3);
 
 /* karaoke */
 var w = [seg(0, 0.5, "bir"), seg(0.4, 0.9, "iki"), seg(3, 3.01, "üç")];

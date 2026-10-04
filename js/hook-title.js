@@ -91,15 +91,21 @@
   }
 
   /*
-   * opts: { text, stil, width, height, dur, renk, vurguRenk, konum ("ust"|"orta"), loc }
+   * opts: { text, stil, width, height, dur, renk, vurguRenk, konum ("ust"|"orta"), loc,
+   *         font (Marka Kiti: paket fontlarindan biri; gecersizse stilin kendi fontu) }
    * Doner: { ass, fontFiles, dur }
    */
   function build(opts) {
     opts = opts || {};
     var st = STILLER[opts.stil] || STILLER.kutu;
+    if (SS && typeof opts.font === "string" && SS.hasFont(opts.font) && opts.font !== st.font) {
+      st = { ad: st.ad, font: opts.font, fontFile: SS.fontFile(opts.font), genislik: SS.FONTS[opts.font].genislik, boyut: st.boyut, kase: st.kase };
+    }
     var W = Math.max(320, Math.round(opts.width || 1920)), H = Math.max(180, Math.round(opts.height || 1080));
     var dur = Math.max(1, Math.min(10, Number(opts.dur) || 3));
-    var renk = opts.renk || "#ffffff", vurgu = opts.vurguRenk || "#ffe600";
+    // renkler yalniz #rrggbb (assColor gecersizi beyaza cevirir; vurgu icin kendi varsayilani)
+    var renk = /^#[0-9a-f]{6}$/i.test(String(opts.renk || "")) ? opts.renk : "#ffffff";
+    var vurgu = /^#[0-9a-f]{6}$/i.test(String(opts.vurguRenk || "")) ? opts.vurguRenk : "#ffe600";
     var kisa = Math.min(W, H);
     var loc = opts.loc || { tr: "tr-TR", az: "az" }[opts.lang || "tr"];
     var toks = tokens(kase(String(opts.text || ""), st.kase, loc));

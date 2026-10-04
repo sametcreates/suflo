@@ -132,5 +132,26 @@ ok("kanca: Turkce varsayilan İ", HT.build({ text: "bilgi" }).ass.indexOf("BİLG
 ok("kanca.js: dil panelden gecer, busy ilk await'ten once", /lang: o\.lang/.test(kanca) && /busy = true;[^\n]*\n[\s\S]{0,120}await K\.findFfmpeg/.test(kanca));
 ok("kanca.js: mesgulken sessiz kalmaz", /if \(busy\) \{ KApp\.toast/.test(kanca));
 
+/* Marka Kiti: kanca basligi yazi tipi + renk */
+var lora = HT.build({ text: "Bunu *bil*", stil: "kutu", font: "Lora", renk: "#123456", vurguRenk: "#abcdef" });
+ok("kit fontu 'Lora': Style satiri ve fontFiles", /^Style: Kanca,Lora,/m.test(lora.ass) && JSON.stringify(lora.fontFiles) === "[\"Lora.ttf\"]", lora.fontFiles);
+var sade = HT.build({ text: "Bunu *bil*", stil: "sade", renk: "#123456" });
+ok("renk ince ayari uygulanir (yazi rengi)", sade.ass.indexOf("\\1c&H00563412") !== -1 && /Style: Kanca,Archivo Black,\d+,&H00563412,/.test(sade.ass), sade.ass.split("\n").filter(function (l) { return /^Style/.test(l); })[0]);
+["Arial", "Lora,0,0}{\\pos(0,0)", "../Lora", "__proto__", 5].forEach(function (f) {
+  var r = HT.build({ text: "Bunu bil", stil: "kutu", font: f });
+  ok("gecersiz font yok sayilir: " + String(f).slice(0, 12), /^Style: Kanca,Anton,/m.test(r.ass) && r.fontFiles[0] === "Anton.ttf");
+});
+var kotuRenk = HT.build({ text: "Bunu *bil*", stil: "sade", renk: "#}{\\b1", vurguRenk: "kirmizi" });
+ok("gecersiz renkler varsayilana duser, enjeksiyon yok", kotuRenk.ass.indexOf("\\b1") === -1 && kotuRenk.ass.indexOf("\\1c&H0000E6FF") !== -1 && /Style: Kanca,Archivo Black,\d+,&H00FFFFFF,/.test(kotuRenk.ass));
+var lw = HT.build({ text: "çok uzun bir başlık metni burada kadraja sığmalı", stil: "kutu", font: "Bungee", width: 1080, height: 1920 });
+var lwFs = Number(/Style: Kanca,[^,]+,(\d+)/.exec(lw.ass)[1]);
+ok("kit fontunun genislik katsayisiyla sigdirilir (Bungee genis)", lwFs <= Math.floor(1080 * .84 / (14 * 0.8)) + 1, lwFs);
+ok("hook-title guvenli alani stil motorundan", HT.safeZoneFilter(1080, 1920) === require(path.join(__dirname, "..", "js", "style-engine.js")).GUVENLI_ALAN.map(function (b) {
+  var x = Math.round(b.x * 1080), y = Math.round(b.y * 1920), bw = Math.round(b.w * 1080), bh = Math.round(b.h * 1920);
+  return "drawbox=x=" + x + ":y=" + y + ":w=" + bw + ":h=" + bh + ":color=0xff3b5c@0.22:t=fill,drawbox=x=" + x + ":y=" + y + ":w=" + bw + ":h=" + bh + ":color=0xff3b5c@0.7:t=1";
+}).join(","));
+ok("kanca.js: Marka Kiti acikken ayarlara birlesir (mergeHook)", /SufloMarkaKiti[\s\S]{0,200}mergeHook\(/.test(kanca) && /font: o\.font/.test(kanca));
+ok("kanca.js: ekleme ortak render modulunden (SufloOverlayRender.render)", /SufloOverlayRender\.render\(K,/.test(kanca) && !/"-c:v", "qtrle"/.test(kanca));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

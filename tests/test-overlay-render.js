@@ -14,6 +14,32 @@ ok("kaynak: captions.js'teki zincirin aynısı (alpha=1 + unpremultiply)",
   "color=c=black@0.0:s=1920x1080:r=25:d=12,format=rgba,subtitles=f=altyazi.ass:alpha=1:fontsdir=.,unpremultiply=inplace=1");
 ok("ffmpeg argümanları: lavfi → qtrle, ses yok", JSON.stringify(OR.ffmpegArgs("X", "/o.mov")) === JSON.stringify(["-y", "-f", "lavfi", "-i", "X", "-c:v", "qtrle", "-an", "/o.mov"]));
 
+/* ---------------- buildArgs / previewArgs (Marka Kiti logosu) ---------------- */
+var TABAN = { assName: "altyazi.ass", fontsdir: ".", w: 1920, h: 1080, fps: 25, dur: 12, out: "/o.mov" };
+ok("buildArgs: logo yokken bugünkü argümanların aynısı",
+  JSON.stringify(OR.buildArgs(TABAN)) === JSON.stringify(OR.ffmpegArgs(OR.kaynak({ g: 1920, y: 1080, fps: 25, sure: 12, assAd: "altyazi.ass", fontsdir: ":fontsdir=." }), "/o.mov")));
+ok("buildArgs: fontsdir yoksa filtrede fontsdir yok", OR.buildArgs(Object.assign({}, TABAN, { fontsdir: "" }))[4].indexOf("fontsdir") === -1);
+var logoArg = OR.buildArgs(Object.assign({}, TABAN, { logo: { name: "logo.png", lw: 240, x: 43, y: "1037-overlay_h" } }));
+ok("buildArgs: logo ikinci girdi (-loop 1), bindirme unpremultiply'dan SONRA",
+  JSON.stringify(logoArg.slice(5)) === JSON.stringify(["-loop", "1", "-i", "logo.png", "-filter_complex",
+    "[1:v]scale=240:-2,format=rgba[l];[0:v][l]overlay=x=43:y=1037-overlay_h:format=auto:shortest=1", "-c:v", "qtrle", "-an", "/o.mov"]) &&
+  /unpremultiply=inplace=1$/.test(logoArg[4]), logoArg.join(" "));
+[{ name: "logo.png;rm", lw: 10, x: 1, y: "1" }, { name: "../logo.png", lw: 10, x: 1, y: "1" }, { name: "logo.png", lw: 10, x: 1, y: "1,drawbox" },
+  { name: "logo.gif", lw: 10, x: 1, y: "1" }, { name: "logo.png", lw: "x", x: 1, y: "1" }].forEach(function (l, i) {
+  ok("buildArgs: geçersiz logo yok sayılır (" + i + ")", JSON.stringify(OR.buildArgs(Object.assign({}, TABAN, { logo: l }))) === JSON.stringify(OR.buildArgs(TABAN)));
+});
+var onz = OR.previewArgs({ assName: "p.ass", w: 320, h: 568, dur: 3.2, ekVf: "drawbox=x=0", out: "p.webm" });
+ok("previewArgs: logo yokken eski önizleme komutu (renkli zemin)", JSON.stringify(onz) === JSON.stringify(["-y", "-f", "lavfi", "-i", "color=c=#101522:s=320x568:r=24:d=3.20",
+  "-vf", "ass=p.ass:fontsdir=.,drawbox=x=0", "-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-pix_fmt", "yuv420p", "-an", "p.webm"]), onz.join(" "));
+var onzK = OR.previewArgs({ assName: "p.ass", w: 320, h: 568, dur: 3, kare: "/k.png", out: "p.webm" });
+ok("previewArgs: kare zeminli eski komut", JSON.stringify(onzK.slice(0, 8)) === JSON.stringify(["-y", "-loop", "1", "-i", "/k.png", "-t", "3.00", "-vf"]) &&
+  onzK[8] === "scale=320:568:force_original_aspect_ratio=increase,crop=320:568,ass=p.ass:fontsdir=.");
+var onzL = OR.previewArgs({ assName: "p.ass", w: 320, h: 568, dur: 3, logo: { name: "logo.jpg", lw: 44, x: 12, y: "31" }, ekVf: "drawbox=x=0", out: "p.webm" });
+ok("previewArgs: logo aynı filtreyle, güvenli alan kutuları en üstte",
+  onzL.indexOf("-filter_complex") !== -1 && onzL[onzL.indexOf("-filter_complex") + 1] ===
+  "[0:v]ass=p.ass:fontsdir=.[s];[1:v]scale=44:-2,format=rgba[l];[s][l]overlay=x=12:y=31:format=auto:shortest=1,drawbox=x=0" &&
+  onzL.indexOf("-t") > onzL.indexOf("-filter_complex"), onzL.join(" "));
+
 var kok = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-orender-"));
 var tmp = path.join(kok, "tmp"), srt = path.join(kok, "srt dir #1");
 fs.mkdirSync(tmp); fs.mkdirSync(srt);
@@ -217,6 +243,33 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
     for (var i = 3; i < raw.length; i += 4) { if (raw[i] > 200) opak++; else if (raw[i] < 10) seffaf++; }
     ok("gerçek render: yazı opak, zemin saydam; durum satırı", opak > 500 && seffaf > raw.length / 4 * 0.7 && /hazırlanıyor… \(2 sn\)/.test(durumlar[0]), opak + " / " + seffaf + " " + durumlar[0]);
     ok("gerçek render: geçici klasör silindi", fs.readdirSync(tmp).length === 0);
+
+    // Marka Kiti logosu: %50 alfalı turuncu logo straight alfayla birebir, yazı pikselleri değişmez
+    var logoYol = path.join(kok, "marka logo.png");
+    cp.execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=0xFF33007F:s=64x40,format=rgba", "-frames:v", "1", logoYol]);
+    var cikLogolu = await OR.render(gercekK, { ass: ASS, fontFiles: ["ArchivoBlack.ttf"], g: 640, y: 360, fps: 25, sure: 2, cikti: path.join(srt, "logolu.mov"),
+      logo: { path: logoYol, kose: "ss", oran: 0.1, guvenli: false } });
+    var cikDuz = await OR.render(gercekK, { ass: ASS, fontFiles: ["ArchivoBlack.ttf"], g: 640, y: 360, fps: 25, sure: 2, cikti: path.join(srt, "duz.mov") });
+    ok("logolu render: sonuç logo:true", cikLogolu.logo === true && cikLogolu.logoAtlandi === false && cikDuz.logo === false);
+    function kare(f) { return cp.execFileSync("ffmpeg", ["-v", "error", "-ss", "1", "-i", f, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgba", "-"], { maxBuffer: 1 << 26 }); }
+    var kL = kare(cikLogolu.path), kD = kare(cikDuz.path);
+    // sol üst, oran 0.1 → 64 px genişlik, kenar payı min(640,360)*0.04 = 14
+    var pi = (30 * 640 + 40) * 4;
+    ok("logo pikseli straight alfa (255,51,0,127)", kL[pi] === 255 && kL[pi + 1] === 51 && kL[pi + 2] === 0 && kL[pi + 3] === 127, [kL[pi], kL[pi + 1], kL[pi + 2], kL[pi + 3]].join(","));
+    var fark = 0;
+    for (var yy = 0; yy < 360; yy++) for (var xx = 0; xx < 640; xx++) {
+      if (xx >= 14 && xx < 78 && yy >= 14 && yy < 54) continue;
+      var j = (yy * 640 + xx) * 4;
+      if (kL[j] !== kD[j] || kL[j + 1] !== kD[j + 1] || kL[j + 2] !== kD[j + 2] || kL[j + 3] !== kD[j + 3]) fark++;
+    }
+    ok("logo dışındaki (yazı) pikseller bayt bayt aynı", fark === 0 && kD.length === kL.length, fark + " piksel");
+    var pr = cp.execFileSync("ffprobe", ["-v", "error", "-count_frames", "-show_entries", "stream=codec_name,pix_fmt,nb_read_frames", "-of", "json", cikLogolu.path]).toString();
+    var ps = JSON.parse(pr).streams[0];
+    ok("logolu çıktı qtrle argb, 2 sn × 25 = 50 kare", ps.codec_name === "qtrle" && ps.pix_fmt === "argb" && Number(ps.nb_read_frames) === 50, pr.replace(/\s+/g, " "));
+    var yok = await OR.render(gercekK, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 1, cikti: path.join(srt, "yok.mov"),
+      logo: { path: path.join(kok, "olmayan.png"), kose: "su", oran: 0.1 } });
+    ok("logo dosyası yoksa logosuz üretilir, logoAtlandi bildirilir", yok.logo === false && yok.logoAtlandi === true && fs.existsSync(yok.path));
+    ok("logolu render sonrası geçici klasör silindi", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
   }
 
   try { fs.rmSync(kok, { recursive: true, force: true }); } catch (e) {}

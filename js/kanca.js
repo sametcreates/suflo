@@ -33,7 +33,30 @@ window.KKanca = (function () {
       lang: window.KCaptions && KCaptions.language ? KCaptions.language() : "tr"
     };
     for (var k in ek || {}) if (Object.prototype.hasOwnProperty.call(ek, k)) o[k] = ek[k];
+    // Marka Kiti acikken: yazi tipi, yazi rengi ve vurgu rengi kitten (stil ve sure karttaki secim)
+    var kit = markaKiti();
+    if (kit && window.SufloMarkaKiti) o = window.SufloMarkaKiti.mergeHook(o, kit);
     return o;
+  }
+
+  // Kayitli Marka Kiti (Ayarlar), yalniz aciksa
+  function markaKiti() {
+    try {
+      var MK = window.SufloMarkaKiti;
+      if (!MK || typeof K === "undefined" || !K.settings) return null;
+      var kit = MK.normalize(K.settings().markaKiti).kit;
+      return kit.on ? kit : null;
+    } catch (e) { return null; }
+  }
+
+  function kitIpucu() {
+    var e = el("kanca-kit-not");
+    if (e) e.hidden = !markaKiti();
+  }
+
+  function insaEt(o, w, h) {
+    return HT.build({ text: o.text, stil: o.stil, width: w, height: h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk,
+      renk: o.renk, font: o.font, lang: o.lang });
   }
 
   async function sekansBoyutu() {
@@ -83,7 +106,7 @@ window.KKanca = (function () {
       // onizleme kucuk: kisa kenar 540
       var olcek = 540 / Math.min(b.w, b.h);
       var w = Math.round(b.w * olcek / 2) * 2, h = Math.round(b.h * olcek / 2) * 2;
-      var built = HT.build({ text: o.text, stil: o.stil, width: w, height: h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk, lang: o.lang });
+      var built = insaEt(o, w, h);
       is = hazirla(built);
       var png = K.path.join(is.dizin, "onizleme.png");
       var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", "color=c=0x1c2433:s=" + w + "x" + h + ":d=" + built.dur,
@@ -116,7 +139,6 @@ window.KKanca = (function () {
     busy = true;   // ilk await'ten ONCE: cift tiklama iki katman koymasin
     var btn = el("kanca-ekle");
     if (btn) btn.disabled = true;
-    var is = null;
     try {
       var ff = await K.findFfmpeg();
       if (!ff) { KApp.toast("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad"); return false; }
@@ -124,20 +146,19 @@ window.KKanca = (function () {
       durum("Başlık hazırlanıyor…");
       var b = await sekansBoyutu();
       if (!b.ok) throw new Error("Aktif sekans yok.");
-      var built = HT.build({ text: o.text, stil: o.stil, width: b.w, height: b.h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk, lang: o.lang });
+      var built = insaEt(o, b.w, b.h);
       // Deneme (Pro degil): sag ustte kucuk suflo.app filigrani; temiz ASS satin alma sonrasi icin saklanir
       var filigranli = typeof Pro !== "undefined" && !!Pro.filigranGerekli && Pro.filigranGerekli();
       if (filigranli && !window.SufloFiligran) throw new Error("Deneme filigranı yüklenemedi.");
-      is = hazirla(filigranli ? { ass: window.SufloFiligran.ekle(built.ass, { width: b.w, height: b.h }), fontFiles: built.fontFiles } : built);
+      if (!window.SufloOverlayRender) throw new Error("Katman modülü yüklenemedi.");
       var cikti = K.path.join(K.srtDir(), "suflo-kanca-" + Date.now() + ".mov");
-      K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
-      // alpha=1 + unpremultiply: altyazi katmaniyla ayni seffaflik zinciri
-      var kaynak = "color=c=black@0.0:s=" + b.w + "x" + b.h + ":r=" + b.fps + ":d=" + built.dur +
-        ",format=rgba,subtitles=f=kanca.ass:alpha=1" + is.fontsdir + ",unpremultiply=inplace=1";
-      var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", kaynak, "-c:v", "qtrle", "-an", cikti], { timeout: 300000, cwd: is.dizin });
-      if (r.code !== 0 || !K.fs.existsSync(cikti)) {
-        throw new Error("Başlık katmanı üretilemedi: " + String(r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 200));
-      }
+      // Ortak render (js/overlay-render.js): alpha=1 + unpremultiply, altyazi katmaniyla ayni seffaflik zinciri
+      await window.SufloOverlayRender.render(K, {
+        ass: filigranli ? window.SufloFiligran.ekle(built.ass, { width: b.w, height: b.h }) : built.ass,
+        fontFiles: built.fontFiles, g: b.w, y: b.h, fps: b.fps, sure: built.dur, cikti: cikti,
+        assAd: "kanca.ass", onek: "overlay-kanca-", fontDizini: K.path.join(uzantiDizini(), "fonts"), timeout: 300000,
+        hataOneki: "Başlık katmanı üretilemedi: "
+      });
       durum("Timeline'a yerleştiriliyor…");
       var at = typeof o.at === "number" && isFinite(o.at) ? Math.max(0, o.at) : "playhead";
       var ad = "Suflo Kanca · " + String(o.text).replace(/\*/g, "").slice(0, 40);
@@ -158,7 +179,6 @@ window.KKanca = (function () {
       KApp.toast("Kanca başlığı eklenemedi: " + K.hataYardimi(e), "bad");
       return false;
     } finally {
-      if (is) temizle(is.dizin);
       busy = false;
       if (btn) btn.disabled = false;
     }
@@ -230,7 +250,15 @@ window.KKanca = (function () {
     ["kanca-stil", "kanca-sure", "kanca-konum", "kanca-renk"].forEach(function (id) {
       el(id).addEventListener("change", function () { if (!el("kanca-resim").hidden) onizle(); });
     });
+    kitIpucu();
   }
 
-  return { init: init, ekle: ekle, onizle: onizle };
+  // Marka Kiti degisti (Ayarlar): ipucu ve acik onizleme guncellenir
+  function kitDegisti() {
+    kitIpucu();
+    var img = el("kanca-resim");
+    if (img && !img.hidden) onizle();
+  }
+
+  return { init: init, ekle: ekle, onizle: onizle, kitDegisti: kitDegisti };
 })();

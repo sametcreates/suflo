@@ -73,8 +73,14 @@
    * yuvarli). Kuyruk sekansin sonunu GECMEZ: Shorts'ta altyazi sekans sonuna
    * kadar gidiyor ve katman sekansi ~3 sn bos goruntuyle uzatiyordu. Altyazilar
    * zaten sekansa sigmiyorsa (kalan bilinmiyor/tutarsiz) dokunulmaz.
+   * tamSekans (Marka Kiti logosu): katman sekansin kalanini tam kaplar; kare izgarasina
+   * ASAGI yuvarlanir, hicbir zaman sekanstan uzun olmaz. Kalan bilinmiyorsa eski davranis.
    */
-  function katmanSuresi(sonBitis, sekansKalan, fps) {
+  function katmanSuresi(sonBitis, sekansKalan, fps, tamSekans) {
+    if (tamSekans && sekansKalan > 0) {
+      var tam = fps > 0 ? Math.floor(sekansKalan * fps + 1e-6) / fps : sekansKalan;
+      if (tam > 0) return tam;
+    }
     var sure = Math.max(1, Math.ceil(sonBitis + 2));
     if (sekansKalan > 0 && sekansKalan >= sonBitis - 0.05 && sure > sekansKalan) {
       // ffmpeg -t'yi bir sonraki kareye tamamlar: kare izgarasina ASAGI yuvarla ki tek kare bile tasmasin

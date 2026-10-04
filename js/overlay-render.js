@@ -13,10 +13,13 @@
  * K (bridge.js arayüzü) dışarıdan verilir; bu yüzden modül sahte K ile node'da test edilir.
  */
 (function (root, factory) {
-  var api = factory();
+  // Marka Kiti logo yerlesimi (saf); yoksa logo verilen x/y ile kullanilir
+  var MK = (root && root.SufloMarkaKiti) || null;
+  if (!MK && typeof require === "function") { try { MK = require("./marka-kiti.js"); } catch (e) { MK = null; } }
+  var api = factory(MK);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloOverlayRender = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function () {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (MK) {
   "use strict";
 
   // ProRes 4:4:4 tek sayı boyut kabul etmez; qtrle için de zararsız
@@ -32,6 +35,85 @@
 
   function ffmpegArgs(src, cikti) {
     return ["-y", "-f", "lavfi", "-i", src, "-c:v", "qtrle", "-an", cikti];
+  }
+
+  /*
+   * Marka Kiti logosu: { name (geçici klasördeki göreli ad), lw (genişlik px), x, y (sayı ya da
+   * "<alt kenar>-overlay_h") }. Sayılar ve ad doğrulanır: argümana tırnaksız yazılır.
+   */
+  function logoGecerli(logo) {
+    return !!(logo && /^logo\.(png|jpe?g)$/i.test(String(logo.name || "")) &&
+      Number(logo.lw) >= 2 && isFinite(Number(logo.lw)) && isFinite(Number(logo.x)) &&
+      /^\d+(-overlay_h)?$/.test(String(logo.y)));
+  }
+
+  // [giris][logo] → logo bindirme. Ölçeklenen logo straight alfa (format=rgba); bindirme
+  // unpremultiply'dan SONRA: önce yapılırsa logo rengi ikiye katlanıyor (denendi)
+  function logoFiltresi(logo, giris, logoGiris) {
+    return logoGiris + "scale=" + Math.round(Number(logo.lw)) + ":-2,format=rgba[l];" +
+      giris + "[l]overlay=x=" + Math.round(Number(logo.x)) + ":y=" + logo.y + ":format=auto:shortest=1";
+  }
+
+  /*
+   * Katman render'ının ffmpeg argümanları.
+   * o: { assName, fontsdir ("." ya da ""), w, h, fps, dur, logo?, out }
+   * logo yoksa bugünkü argümanların AYNISI (kaynak + ffmpegArgs).
+   */
+  function buildArgs(o) {
+    o = o || {};
+    var src = kaynak({ g: o.w, y: o.h, fps: o.fps, sure: o.dur, assAd: o.assName,
+      fontsdir: o.fontsdir ? ":fontsdir=" + o.fontsdir : "" });
+    if (!logoGecerli(o.logo)) return ffmpegArgs(src, o.out);
+    return ["-y", "-f", "lavfi", "-i", src, "-loop", "1", "-i", o.logo.name,
+      "-filter_complex", logoFiltresi(o.logo, "[0:v]", "[1:v]"), "-c:v", "qtrle", "-an", o.out];
+  }
+
+  /*
+   * Panel önizlemesi (webm) aynı yerleşimle: stil + logo + isteğe bağlı güvenli alan kutuları.
+   * o: { assName, w, h, dur, kare? (göreli ya da mutlak arka plan resmi), logo?, ekVf?, out }
+   */
+  function previewArgs(o) {
+    o = o || {};
+    var d = Number(o.dur).toFixed(2);
+    var vf = "ass=" + o.assName + ":fontsdir=.";
+    var args = ["-y"], on = "";
+    if (o.kare) {
+      args.push("-loop", "1", "-i", o.kare, "-t", d);
+      on = "scale=" + o.w + ":" + o.h + ":force_original_aspect_ratio=increase,crop=" + o.w + ":" + o.h + ",";
+    } else {
+      args.push("-f", "lavfi", "-i", "color=c=#101522:s=" + o.w + "x" + o.h + ":r=24:d=" + d);
+    }
+    var ek = o.ekVf ? "," + o.ekVf : "";
+    if (logoGecerli(o.logo)) {
+      args.push("-loop", "1", "-i", o.logo.name, "-filter_complex",
+        "[0:v]" + on + vf + "[s];" + logoFiltresi(o.logo, "[s]", "[1:v]") + ek);
+      if (!o.kare) args.push("-t", d);
+    } else {
+      args.push("-vf", on + vf + ek);
+    }
+    args.push("-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-pix_fmt", "yuv420p", "-an", o.out);
+    return args;
+  }
+
+  /*
+   * Kayıttaki logo ayarı ({ path, kose, oran, guvenli }) → geçici klasördeki kopya + yerleşim.
+   * Dosya yoksa / okunamıyorsa null (katman logosuz üretilir, çağıran kullanıcıya söyler).
+   */
+  function logoHazirla(K, dizin, logo, w, h) {
+    if (!logo || !logo.path) return null;
+    var uzanti = (String(logo.path).match(/\.(png|jpe?g)$/i) || [])[1];
+    if (!uzanti) return null;
+    try {
+      if (!K.fs.existsSync(logo.path)) return null;
+      var ad = "logo." + uzanti.toLowerCase();
+      K.fs.copyFileSync(logo.path, K.path.join(dizin, ad));
+      var yer = MK ? MK.logoPlacement(w, h, logo.kose, logo.oran, logo.guvenli)
+        : { lw: Math.max(2, Math.round(w * 0.14 / 2) * 2), x: Math.round(Math.min(w, h) * 0.04), yExpr: String(Math.round(Math.min(w, h) * 0.04)) };
+      return { name: ad, lw: yer.lw, x: yer.x, y: yer.yExpr };
+    } catch (e) {
+      if (K.log) K.log("[katman] logo kopyalanamadı: " + e.message);
+      return null;
+    }
   }
 
   function uzantiFontlari(K) {
@@ -52,8 +134,9 @@
   }
 
   /*
-   * o: { ass, fontFiles, g, y, fps, sure, cikti?, assAd?, onek?, fontDizini?, timeout?, durum?(msg), hataOneki? }
-   * Döner: { path, g, y, fps, sure }. Hata: Error (geçici klasör her durumda silinir).
+   * o: { ass, fontFiles, g, y, fps, sure, cikti?, assAd?, onek?, fontDizini?, timeout?, durum?(msg), durumMetni?,
+   *      hataOneki?, logo?: { path, kose, oran, guvenli } }
+   * Döner: { path, g, y, fps, sure, logo: bool, logoAtlandi: bool }. Hata: Error (geçici klasör her durumda silinir).
    */
   async function render(K, o) {
     o = o || {};
@@ -87,13 +170,14 @@
 
       var cikti = o.cikti || K.path.join(K.srtDir(), "suflo-altyazi-" + Date.now() + ".mov");
       K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
-      if (typeof o.durum === "function") o.durum("Altyazı katmanı hazırlanıyor… (" + Math.round(sure) + " sn)");
-      var r = await K.run(ff, ffmpegArgs(kaynak({ g: g, y: y, fps: fps, sure: sure, assAd: assAd, fontsdir: fontsdir }), cikti),
+      var logo = o.logo ? logoHazirla(K, dizin, o.logo, g, y) : null;
+      if (typeof o.durum === "function") o.durum((o.durumMetni || "Altyazı katmanı hazırlanıyor…") + " (" + Math.round(sure) + " sn)");
+      var r = await K.run(ff, buildArgs({ assName: assAd, fontsdir: fontsdir ? "." : "", w: g, h: y, fps: fps, dur: sure, logo: logo, out: cikti }),
         { timeout: o.timeout || 3600000, cwd: dizin });
       if (r.code !== 0 || !K.fs.existsSync(cikti)) {
         throw new Error(o.hataOneki ? o.hataOneki + stderrSonu(r, 3) : "Altyazı katmanı üretilemedi: " + stderrSonu(r, 3));
       }
-      return { path: cikti, g: g, y: y, fps: fps, sure: sure };
+      return { path: cikti, g: g, y: y, fps: fps, sure: sure, logo: !!logo, logoAtlandi: !!(o.logo && o.logo.path && !logo) };
     } finally {
       klasoruSil(K, dizin);
     }
@@ -194,7 +278,7 @@
       await render(K, {
         ass: kayit.assTemiz, fontFiles: kayit.fontFiles, g: kayit.g, y: kayit.y, fps: kayit.fps, sure: kayit.sure,
         cikti: cikti, assAd: kayit.tur === "kanca" ? "kanca.ass" : "altyazi.ass", onek: "overlay-temiz-",
-        fontDizini: o.fontDizini, durum: o.durum
+        fontDizini: o.fontDizini, durum: o.durum, logo: kayit.logo || null
       });
     } catch (e) {
       ciktiyiSil();
@@ -240,7 +324,7 @@
   /*
    * Deneme (filigranlı) çıktısını, satın alma sonrası temiz yeniden oluşturulsun diye kaydet.
    * Katman az önce konduğu için etkin sekans o sekanstır: kimliği taze sorulur.
-   * k: { tur, start, path, ad, assTemiz, fontFiles, g, y, fps, sure }. Hata işlemi bozmaz (false).
+   * k: { tur, start, path, ad, assTemiz, fontFiles, g, y, fps, sure, logo? }. Hata işlemi bozmaz (false).
    */
   async function denemeKaydet(K, Pro, k) {
     if (!Pro || !Pro.denemeCiktisiEkle || !k) return false;
@@ -255,7 +339,8 @@
   }
 
   return {
-    ciftBoyut: ciftBoyut, kaynak: kaynak, ffmpegArgs: ffmpegArgs, render: render,
+    ciftBoyut: ciftBoyut, kaynak: kaynak, ffmpegArgs: ffmpegArgs, buildArgs: buildArgs, previewArgs: previewArgs,
+    logoHazirla: logoHazirla, render: render,
     ilkHalinde: ilkHalinde, elleMesaji: elleMesaji, sonucMesaji: sonucMesaji,
     temizYenidenOlustur: temizYenidenOlustur, denemeKaydet: denemeKaydet
   };

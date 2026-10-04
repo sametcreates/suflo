@@ -37,6 +37,7 @@ var ctx = { window: {}, document: { getElementById: function (id) { return DOM[i
   KApp: { toast: function (m, c) { toastlar.push([m, c]); } }, Pro: { gate: function () { return true; } },
   decodeURI: decodeURI, Date: Date, Math: Math, String: String, Number: Number, Object: Object, Promise: Promise, Error: Error, isFinite: isFinite };
 ctx.window.SufloHookTitle = require(path.join(__dirname, "..", "js", "hook-title.js"));
+ctx.window.SufloOverlayRender = require(path.join(__dirname, "..", "js", "overlay-render.js"));   // ekleme ortak render'dan
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "js", "kanca.js"), "utf8"), ctx);
 
