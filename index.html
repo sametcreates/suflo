@@ -327,6 +327,10 @@
         <div class="card-title">Stil <span class="card-title-meta">PREMIERE ŞABLONLARI</span> <span class="pro-inline">PRO</span></div>
         <p class="stil-aciklama">17 gerçek altyazı şablonundan birini seç. Suflo, sekansına uygun 9:16, 16:9 veya 1:1 dosyasını arka planda otomatik kullanır.</p>
 
+        <div class="stil-ust-satir">
+          <span class="marka-kiti-cip" id="cap-marka-kiti-cip" hidden title="Ayarlar › Marka Kiti: yazı tipin, renklerin ve logon her Suflo Stiline uygulanır">Marka kiti açık</span>
+          <span class="stil-kredi" id="cap-stil-kredi" hidden title="Bu stil paylaşılan bir koddan geldi"><span>Stil:</span> <b id="cap-stil-kredi-ad" data-i18n-skip></b></span>
+        </div>
         <div class="stil-grid" id="cap-stil-grid"></div>
 
         <div class="field stil-yogunluk" hidden aria-hidden="true">
@@ -353,10 +357,18 @@
           </label>
         </div>
 
-        <details class="ince-ayar" hidden aria-hidden="true">
-          <summary>İnce ayar <span class="ia-not">animasyon · yazı tipi · renk · konum</span></summary>
+        <!-- Paylaşılan stil kodu: herkes yapıştırıp önizleyebilir (timeline'a eklemek Pro) -->
+        <div class="stil-kod-satir" id="cap-stil-kod-sar">
+          <input id="cap-stil-kod" type="text" spellcheck="false" autocomplete="off" maxlength="2048" placeholder="Stil kodu yapıştır (SFL1.…)" aria-label="Stil kodu">
+          <button type="button" id="cap-stil-kod-uygula" class="btn tiny">Uygula</button>
+          <button type="button" id="cap-stil-ice" class="btn tiny ghost" title=".suflo-stil dosyasından stil al">.suflo-stil içe aktar</button>
+        </div>
 
-        <div class="field" style="margin-top:10px">
+        <!-- Yalnız Suflo Stili seçiliyken görünür (captions.js inceAyarDurumu); MOGRT stillerinde gizli -->
+        <details class="ince-ayar" id="cap-ince-ayar">
+          <summary>İnce ayar <span class="ia-not">yazı tipi · renk · konum · paylaş</span></summary>
+
+        <div class="field ia-eski" style="margin-top:10px">
           <label for="cap-animasyon">Animasyon</label>
           <select id="cap-animasyon">
             <optgroup label="Her modda">
@@ -398,7 +410,7 @@
                 <option value="Lora">Lora</option>
                 <option value="Montserrat">Montserrat</option>
               </optgroup>
-              <optgroup label="Sistem">
+              <optgroup label="Sistem" id="cap-font-sistem">
                 <option value="Arial" selected>Arial</option>
                 <option value="Impact">Impact</option>
                 <option value="Verdana">Verdana</option>
@@ -449,13 +461,28 @@
           </div>
         </div>
 
+        <label class="check-label" id="cap-guvenli-yerlesim-sar" hidden title="9:16'da yazıyı TikTok, Reels ve Shorts'un sağdaki ikon sütunundan uzak tutar">
+          <input id="cap-guvenli-yerlesim" type="checkbox"> Platform arayüzünden kaçın
+        </label>
+
         <div class="field field-row" style="align-items:center; justify-content:space-between">
-          <label class="switch" title="Yazının arkasına yarı saydam kutu koy">
-            <input id="cap-kutu" type="checkbox">
-            <i></i>
-            <span>Arka plan kutusu</span>
-          </label>
+          <span class="ia-eski">
+            <label class="switch" title="Yazının arkasına yarı saydam kutu koy">
+              <input id="cap-kutu" type="checkbox">
+              <i></i>
+              <span>Arka plan kutusu</span>
+            </label>
+          </span>
+          <button type="button" id="cap-ia-varsayilan" class="link-btn" title="Stilin kendi ayarlarına dön (Marka Kiti açıksa kitle birlikte)">Varsayılana dön</button>
           <button type="button" id="cap-preset-save" class="link-btn" title="Bu ayarları şablonum olarak kaydet">★ Şablonum yap</button>
+        </div>
+
+        <div class="ia-paylas">
+          <input id="cap-stil-yazar" type="text" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Adın (isteğe bağlı, kodda görünür)" aria-label="Paylaşımda görünecek adın">
+          <div class="row-btns">
+            <button type="button" id="cap-stil-paylas" class="btn tiny" title="Stil kodunu ve suflo.app/stil bağlantısını panoya kopyalar">Stili paylaş</button>
+            <button type="button" id="cap-stil-disa" class="btn tiny ghost" title="Stili masaüstüne .suflo-stil dosyası olarak kaydeder">.suflo-stil dışa aktar</button>
+          </div>
         </div>
 
         </details>
@@ -1337,6 +1364,7 @@
       <button id="kanca-onizle" class="btn" type="button">Önizle</button>
       <button id="kanca-ekle" class="btn primary grow" type="button">Playhead'e ekle</button>
     </div>
+    <p class="hint" id="kanca-kit-not" hidden>Marka kiti açık: yazı tipi ve renkler kitten gelir (Ayarlar › Marka Kiti).</p>
     <div id="kanca-durum" class="inline-status"></div>
     <img id="kanca-resim" class="kanca-resim" alt="Kanca başlığı önizlemesi" hidden>
   </section>
@@ -1546,6 +1574,80 @@
         </div>
         <p class="hint">Suflo önce bilgisayarındaki motoru kullanır. Yalnız yerel motor açılamazsa ses, seçtiğin yedek sağlayıcıya gönderilir.</p>
       </details>
+    </div>
+
+    <div class="set-group marka-kiti-kart" id="grp-marka-kiti">
+      <div class="set-title">Marka Kiti <span class="dim" style="font-weight:400">yazı tipi · renkler · logo</span></div>
+      <p class="hint" style="margin-bottom:8px">Yazı tipin, renklerin ve logon her Suflo Stiline ve kanca başlığına kendiliğinden uygulanır. Düzenlemek ve önizlemek ücretsiz; timeline'a eklemek Pro.</p>
+      <label class="switch">
+        <input id="mk-acik" type="checkbox">
+        <i></i>
+        <span>Marka kitini her stile ve kanca başlığına uygula</span>
+      </label>
+      <div class="field-grid" style="margin-top:8px">
+        <div class="field">
+          <label for="mk-font">Yazı tipi</label>
+          <select id="mk-font">
+            <option value="">Stilin kendi yazı tipi</option>
+            <option value="Anton">Anton</option>
+            <option value="Archivo Black">Archivo Black</option>
+            <option value="Bebas Neue">Bebas Neue</option>
+            <option value="Bungee">Bungee</option>
+            <option value="Lora">Lora</option>
+            <option value="Montserrat">Montserrat</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="mk-konum">Konum</label>
+          <select id="mk-konum">
+            <option value="">Stilin kendi konumu</option>
+            <option value="2">Alt</option>
+            <option value="5">Orta</option>
+            <option value="8">Üst</option>
+            <option value="1">Alt sol</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="switch">
+          <input id="mk-renk-acik" type="checkbox">
+          <i></i>
+          <span>Marka renklerini kullan</span>
+        </label>
+        <div class="renk-satir" style="margin-top:6px">
+          <label class="renk-kutu" title="Yazı rengi"><input type="color" id="mk-renk" value="#ffffff"><span>Yazı</span></label>
+          <label class="renk-kutu" title="Kontur (çevre çizgisi) rengi"><input type="color" id="mk-renk-kontur" value="#000000"><span>Kontur</span></label>
+          <label class="renk-kutu" title="Vurgulanan kelimenin rengi"><input type="color" id="mk-renk-vurgu" value="#8b7cf6"><span>Vurgu</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Logo</label>
+        <div class="row">
+          <span id="mk-logo-ad" class="dim mk-logo-ad" data-i18n-skip></span>
+          <button id="mk-logo-sec" class="btn tiny" type="button" title="PNG (saydam önerilir) ya da JPG">Logo seç</button>
+          <button id="mk-logo-kaldir" class="btn tiny ghost" type="button" hidden>Kaldır</button>
+        </div>
+        <div class="field-grid" style="margin-top:6px">
+          <div class="field">
+            <label for="mk-logo-kose">Köşe</label>
+            <select id="mk-logo-kose">
+              <option value="ss">Sol üst</option>
+              <option value="su">Sağ üst</option>
+              <option value="au">Sol alt</option>
+              <option value="as">Sağ alt</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="mk-logo-oran">Logo boyutu <b id="mk-logo-oran-deger" data-i18n-skip>%14</b></label>
+            <input id="mk-logo-oran" type="range" min="8" max="25" step="1" value="14">
+          </div>
+        </div>
+        <p class="hint">Logo stilli altyazı katmanıyla birlikte sekansın sonuna kadar görünür.</p>
+      </div>
+      <div class="row-btns">
+        <button id="mk-doldur" class="btn" type="button" title="Altyazı sekmesindeki yazı tipi, renk ve konumu kite alır">Şimdiki ayarlardan doldur</button>
+      </div>
+      <span id="mk-durum" class="inline-status"></span>
     </div>
 
     <div class="set-group">
@@ -1910,6 +2012,7 @@
   <script src="js/broll-ui.js"></script>
   <script src="js/hook-title.js"></script>
   <script src="js/kanca.js"></script>
+  <script src="js/marka-kiti-ui.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>

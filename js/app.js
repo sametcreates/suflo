@@ -1415,6 +1415,7 @@ window.KApp = (function () {
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
     guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });
     guvenli("Kanca başlığı", function () { if (window.KKanca) KKanca.init(); });
+    guvenli("Marka Kiti", function () { if (window.KMarkaKiti) KMarkaKiti.init(); });
     guvenli("Sesi iyileştir", function () { if (window.KSes) KSes.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });

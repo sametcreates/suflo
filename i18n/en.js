@@ -2157,6 +2157,79 @@
     "Ücretsiz ve açık kaynak": "Free and open source"
   });
 
+  /* ============ Brand kit, style fine-tuning, shareable style codes (captions.js, js/marka-kiti-ui.js, js/style-share.js) ============ */
+  add({
+    "Ayarlar › Marka Kiti: yazı tipin, renklerin ve logon her Suflo Stiline uygulanır": "Settings › Brand kit: your font, colors and logo are applied to every Suflo Style",
+    "Marka kiti açık": "Brand kit on",
+    "Bu stil paylaşılan bir koddan geldi": "This style came from a shared code",
+    "Stil:": "Style:",
+    "Stil kodu yapıştır (SFL1.…)": "Paste a style code (SFL1.…)",
+    "Stil kodu": "Style code",
+    ".suflo-stil dosyasından stil al": "Load a style from a .suflo-stil file",
+    ".suflo-stil içe aktar": "Import .suflo-stil",
+    ".suflo-stil dışa aktar": "Export .suflo-stil",
+    "yazı tipi · renk · konum · paylaş": "font · color · position · share",
+    "9:16'da yazıyı TikTok, Reels ve Shorts'un sağdaki ikon sütunundan uzak tutar": "On 9:16, keeps the text clear of the icon column on the right in TikTok, Reels and Shorts",
+    "Platform arayüzünden kaçın": "Avoid platform UI",
+    "Stilin kendi ayarlarına dön (Marka Kiti açıksa kitle birlikte)": "Go back to the style's own settings (with the brand kit if it's on)",
+    "Varsayılana dön": "Reset to default",
+    "Adın (isteğe bağlı, kodda görünür)": "Your name (optional, shown in the code)",
+    "Paylaşımda görünecek adın": "Name shown when you share",
+    "Stil kodunu ve suflo.app/stil bağlantısını panoya kopyalar": "Copies the style code and the suflo.app/stil link to the clipboard",
+    "Stili paylaş": "Share style",
+    "Stili masaüstüne .suflo-stil dosyası olarak kaydeder": "Saves the style to your desktop as a .suflo-stil file",
+    "Marka kiti açık: yazı tipi ve renkler kitten gelir (Ayarlar › Marka Kiti).": "Brand kit on: font and colors come from the kit (Settings › Brand kit).",
+    "Marka Kiti": "Brand kit",
+    "yazı tipi · renkler · logo": "font · colors · logo",
+    "Yazı tipin, renklerin ve logon her Suflo Stiline ve kanca başlığına kendiliğinden uygulanır. Düzenlemek ve önizlemek ücretsiz; timeline'a eklemek Pro.":
+      "Your font, colors and logo are applied automatically to every Suflo Style and to hook titles. Editing and previewing are free; adding to the timeline is Pro.",
+    "Marka kitini her stile ve kanca başlığına uygula": "Apply the brand kit to every style and hook title",
+    "Stilin kendi yazı tipi": "Style's own font",
+    "Stilin kendi konumu": "Style's own position",
+    "Marka renklerini kullan": "Use brand colors",
+    "Vurgulanan kelimenin rengi": "Color of the emphasized word",
+    "PNG (saydam önerilir) ya da JPG": "PNG (transparent recommended) or JPG",
+    "Logo seç": "Choose logo",
+    "Köşe": "Corner",
+    "Sol üst": "Top left",
+    "Sağ üst": "Top right",
+    "Sol alt": "Bottom left",
+    "Sağ alt": "Bottom right",
+    "Logo boyutu": "Logo size",
+    "Logo stilli altyazı katmanıyla birlikte sekansın sonuna kadar görünür.": "The logo stays on screen with the styled caption layer until the end of the sequence.",
+    "Altyazı sekmesindeki yazı tipi, renk ve konumu kite alır": "Copies the font, colors and position from the Captions tab into the kit",
+    "Şimdiki ayarlardan doldur": "Fill from current settings",
+    "Paylaşmak için önce bir Suflo Stili seç.": "Pick a Suflo Style first to share it.",
+    "Stil kodu kopyalandı (ad yalnız harf, rakam, _ . - içerebilir; kod adsız oluşturuldu)": "Style code copied (names may only contain letters, digits, _ . -; the code was made without a name)",
+    "Stil kodu ve suflo.app/stil bağlantısı kopyalandı": "Style code and suflo.app/stil link copied",
+    "Dışa aktarmak için önce bir Suflo Stili seç.": "Pick a Suflo Style first to export it.",
+    "Stil kodu uygulandı: {}": "Style code applied: {}",
+    "{n} geçersiz ayar atlandı": "{} invalid settings skipped",
+    "Bu bir .suflo-stil dosyası değil (çok büyük).": "This isn't a .suflo-stil file (too large).",
+    "Marka Kiti logosu bulunamadı; katman logosuz eklendi. Ayarlar › Marka Kiti'nden logoyu yeniden seç.": "Brand kit logo not found; the layer was added without it. Pick the logo again in Settings › Brand kit.",
+    "Katman modülü yüklenemedi.": "The layer module failed to load.",
+    "Başlık katmanı üretilemedi:": "Couldn't render the title layer:",
+    "Altyazı katmanı hazırlanıyor…": "Rendering caption layer…",
+    "Logo dosyası bulunamadı (taşınmış ya da silinmiş olabilir). Yeniden seç.": "Logo file not found (it may have been moved or deleted). Pick it again.",
+    "Logo seç (PNG ya da JPG)": "Choose a logo (PNG or JPG)",
+    "Logo PNG ya da JPG olmalı.": "The logo must be a PNG or JPG.",
+    "Logo dosyası çok büyük (en çok 20 MB).": "The logo file is too large (20 MB max).",
+    "Logo dosyası okunamadı.": "Couldn't read the logo file.",
+    "Sistem yazı tipi kite alınmadı: yalnız Suflo ile gelen yazı tipleri her bilgisayarda aynı görünür.": "The system font wasn't added to the kit: only fonts bundled with Suflo look the same on every computer.",
+    "Doldu. Kullanmak için \"Marka kitini her stile ve kanca başlığına uygula\"yı aç.": "Filled. To use it, turn on \"Apply the brand kit to every style and hook title\".",
+    "Şimdiki ayarlar kite alındı.": "Current settings copied into the kit.",
+    "Stil kimliği geçersiz.": "Invalid style ID.",
+    "Stil kodu boş.": "The style code is empty.",
+    "Stil kodu çok uzun.": "The style code is too long.",
+    "Bu bir Suflo stil kodu değil (SFL1. ile başlamalı).": "This isn't a Suflo style code (it should start with SFL1.).",
+    "Stil kodu bozuk; eksik kopyalanmış olabilir.": "The style code is broken; it may have been copied incompletely.",
+    "Bu kod daha yeni bir Suflo sürümüyle yapılmış; Suflo'yu güncelle.": "This code was made with a newer Suflo version; update Suflo.",
+    "Bu stil bu Suflo sürümünde yok.": "This style isn't in this Suflo version.",
+    "Bu stil bu Suflo sürümünde yok: {}.": "This style isn't in this Suflo version: {}.",
+    "Stil kodundaki yazar adı geçersiz.": "The author name in the style code is invalid.",
+    "Stil kodu okunamadı.": "Couldn't read the style code."
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
@@ -2312,7 +2385,8 @@
     "Suflo Deneme",   // Premiere sequence name created by the first-run guide
     "Instagram", "WhatsApp", "Google", "TikTok", "SFL······", "SFLXXXXXX", "suflo.app",   // invite & earn: brands, code mask
     "Podcast",        // Viral Score genre (same word in English)
-    "English (beta)", "Türkmençe"];   // language pickers show each language in its own name
+    "English (beta)", "Türkmençe",
+    ".suflo-stil,.txt", "Logo"];   // file picker filter (not shown as text)   // language pickers show each language in its own name
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

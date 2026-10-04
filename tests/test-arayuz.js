@@ -27,7 +27,8 @@ function ok(ad, kosul, kanit) {
 
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
                 "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
-                "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js"];
+                "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js",
+                "js/marka-kiti-ui.js", "js/kanca.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -263,6 +264,43 @@ fs.readdirSync(KOKYOL + "js").filter(function (f) { return /\.js$/.test(f); }).f
 });
 ok("confirm() ve klasör seçme pencereleri arayüz dilinde (uiMetni)", diyalogEksik.length === 0, diyalogEksik.join(" | "));
 ok("Premiere bin/marker adları anahtar olarak aynı kalır", /Suflo Altyazi/.test(fs.readFileSync(KOKYOL + "jsx/host.jsx", "utf8")));
+
+/* ---------- Marka Kiti + stil ince ayarı + paylaşılabilir stil kodları ---------- */
+var inceAyar = (html.match(/<details class="ince-ayar"[^>]*>/) || [""])[0];
+ok("ince ayar artık gizli değil (görünürlüğü JS yönetir)", inceAyar && !/\shidden|aria-hidden/.test(inceAyar) && /id="cap-ince-ayar"/.test(inceAyar), inceAyar);
+var yeniIdler = ["cap-ince-ayar", "cap-guvenli-yerlesim", "cap-guvenli-yerlesim-sar", "cap-ia-varsayilan", "cap-stil-paylas", "cap-stil-kod",
+  "cap-stil-kod-uygula", "cap-stil-disa", "cap-stil-ice", "cap-stil-kredi", "cap-stil-kredi-ad", "cap-stil-yazar", "cap-marka-kiti-cip", "cap-font-sistem",
+  "grp-marka-kiti", "mk-acik", "mk-font", "mk-konum", "mk-renk-acik", "mk-renk", "mk-renk-kontur", "mk-renk-vurgu", "mk-logo-sec", "mk-logo-kaldir",
+  "mk-logo-ad", "mk-logo-kose", "mk-logo-oran", "mk-logo-oran-deger", "mk-doldur", "mk-durum", "kanca-kit-not"];
+var yokId = yeniIdler.filter(function (id) { return !idler[id]; });
+ok("yeni id'ler index.html'de", yokId.length === 0, yokId.join(","));
+var ia = html.slice(html.indexOf('id="cap-ince-ayar"'), html.indexOf("</details>", html.indexOf('id="cap-ince-ayar"')));
+ok("animasyon ve arka plan kutusu .ia-eski içinde (Suflo Stilinde gizlenir)", /class="field ia-eski"[\s\S]{0,120}id="cap-animasyon"/.test(ia) && /class="ia-eski"[\s\S]{0,200}id="cap-kutu"/.test(ia));
+ok("kredi adı çeviriden muaf (kullanıcı adı)", /id="cap-stil-kredi-ad" data-i18n-skip/.test(html));
+function betikSira(ad) { return html.indexOf('<script src="js/' + ad + '"'); }
+ok("betik sırası: style-share → marka-kiti → style-engine → overlay-render → captions → hook-title → kanca → marka-kiti-ui → app",
+  betikSira("style-share.js") > 0 && betikSira("style-share.js") < betikSira("marka-kiti.js") && betikSira("marka-kiti.js") < betikSira("style-engine.js") &&
+  betikSira("style-engine.js") < betikSira("overlay-render.js") && betikSira("overlay-render.js") < betikSira("captions.js") && betikSira("hook-title.js") < betikSira("kanca.js") &&
+  betikSira("kanca.js") < betikSira("marka-kiti-ui.js") && betikSira("marka-kiti-ui.js") < betikSira("app.js"));
+ok("Marka Kiti kartı app.js'ten başlatılır", /KMarkaKiti\.init\(\)/.test(fs.readFileSync(KOKYOL + "js/app.js", "utf8")));
+function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src.slice(i, src.indexOf("\n  }\n", i) + 4); }
+var ap = fnGovde(capSrc, "function applyPreset(");
+ok("applyPreset: kit açıkken stiliYaz(mergeBrandKit(preset, kit))", /stiliYaz\(kit \? window\.SufloMarkaKiti\.mergeBrandKit\(p\.stil, kit\) : p\.stil\)/.test(ap));
+var ku = fnGovde(capSrc, "function stilKoduUygula(");
+ok("kod uygula: önce applyPreset(styleId), sonra stiliYaz(tarif), sonra önizleme", ku.indexOf("applyPreset(r.styleId)") > 0 &&
+  ku.indexOf("applyPreset(r.styleId)") < ku.indexOf("stiliYaz(ov)") && ku.indexOf("stiliYaz(ov)") < ku.indexOf("onizlemeOynat()"));
+ok("kod uygula: izinli stiller yalnız Suflo Stilleri", /SS\.decode\(String\(kod \|\| ""\), function \(id\) \{ return motorStiliMi\(id\); \}\)/.test(ku));
+var kr = fnGovde(capSrc, "function stilKredisi(");
+ok("kredi çipi yalnız textContent ve doğrulanmış adla", /b\.textContent = /.test(kr) && !/innerHTML/.test(kr) && /SS\.validAuthor\(ad\)/.test(kr));
+ok("vurgu rengi Suflo Stillerinde etkin", /var motorda = !secilenMogrt && motorStiliMi\(stil\(\)\.aile\);[\s\S]{0,200}!\(motorda \|\|/.test(fnGovde(capSrc, "function vurguKutusuDurumu(")));
+var iad = fnGovde(capSrc, "function inceAyarDurumu(");
+ok("ince ayar yalnız Suflo Stilinde, sistem fontları kapalı, güvenli yerleşim yalnız 9:16", /d\.hidden = !motorda/.test(iad) && /sistem\.disabled = motorda/.test(iad) &&
+  /sar\.hidden = !\(motorda && dikeySekans\(\)\)/.test(iad));
+ok("önizleme, katman, ASS ve paylaşım kodu aynı ince ayarı kullanır (motorAyarlari)", (capSrc.match(/overrides: motorAyarlari\(/g) || []).length === 4, (capSrc.match(/overrides: motorAyarlari\(/g) || []).length);
+var ou2 = fnGovde(capSrc, "async function overlayUygula(");
+ok("katman: kit logosu + tam sekans süresi, logo atlanırsa uyarı", /CT\.katmanSuresi\(.*, !!logo\);/.test(ou2) && /logo: logo,/.test(ou2) && /logoAtlandi/.test(ou2));
+ok("önizleme ortak builder ile (previewArgs + logoHazirla)", /SufloOverlayRender\.previewArgs\(/.test(fnGovde(capSrc, "async function motorOnizlemeOynat(")) &&
+  /SufloOverlayRender\.logoHazirla\(/.test(fnGovde(capSrc, "async function motorOnizlemeOynat(")));
 
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

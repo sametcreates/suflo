@@ -979,6 +979,32 @@ details.adv > *:not(summary) { margin-top: 8px; }
 .ince-ayar[open] summary::before { transform: rotate(90deg); }
 .ince-ayar summary:hover { color: var(--text); }
 .ia-not { color: var(--faint); font-size: 10px; margin-left: 4px; }
+/* İnce ayar yalnız Suflo Stilinde (JS); Suflo Stillerinde işlemeyen kontroller gizli */
+.ince-ayar[hidden], .ia-eski[hidden], #cap-guvenli-yerlesim-sar[hidden] { display: none !important; }
+#cap-guvenli-yerlesim-sar { margin: 2px 0 8px; }
+.ia-paylas { margin: 8px 0 4px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.ia-paylas input[type="text"] { width: 100%; margin-bottom: 6px; }
+.ia-paylas .btn { margin-right: 6px; }
+
+/* Stil kodu yapıştır + kredi + Marka Kiti çipi (CEF 74: flex gap yok, kenar boşluğu) */
+.stil-kod-satir { display: flex; align-items: center; margin: 8px 0 2px; }
+.stil-kod-satir input { flex: 1 1 auto; min-width: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+.stil-kod-satir .btn { flex: none; margin-left: 6px; }
+.stil-ust-satir { display: flex; flex-wrap: wrap; align-items: center; min-height: 0; }
+.stil-ust-satir > span { margin: 0 6px 6px 0; }
+.marka-kiti-cip, .stil-kredi {
+  display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 20px; font-size: 10.5px; font-weight: 700;
+  border: 1px solid rgba(139, 124, 246, .45); background: rgba(139, 124, 246, .12); color: var(--accent-lite, #cfc9ff);
+}
+.stil-kredi { border-color: var(--line); background: transparent; color: var(--dim); font-weight: 600; }
+.stil-kredi b { color: var(--text); margin-left: 3px; }
+.marka-kiti-cip[hidden], .stil-kredi[hidden] { display: none !important; }
+
+/* Ayarlar › Marka Kiti */
+.marka-kiti-kart .renk-kutu input[disabled] { opacity: .4; }
+.mk-logo-ad { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.marka-kiti-kart input[type="range"] { width: 100%; }
+#kanca-kit-not { margin: 6px 0 0; }
 
 /* ---------- Canlı önizleme ---------- */
 
