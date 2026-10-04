@@ -17,6 +17,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | Ne | Nasıl |
 |---|---|
 | **İlk altyazın 2 dakikada** *(3.1)* | İlk açılışta 4 adımlı rehber: hızlı küçük model (Türkçe: Small, 190 MB, ffmpeg arkada), örnek klipte deneme, stil önizlemesi, ücretsiz Groq anahtarı sihirbazı (panodan al + doğrula). AI düğmelerinde "anahtar gerekli · 1 dk" kısayolu |
+| **Viral Skor 2.0** *(3.1)* | Viral anlara açıklamalı 0–100 puan: kanca, bağımsızlık, duygu, değer ve kapanış alt puanları ile tek satırlık neden (toplam yerelde hesaplanır). Tür (podcast, eğitim, komedi…), adet (3–10) ve "ne arıyorsun?" odağı; klipler cümle ortasında başlamaz/bitmez, kartta ±1 cümle düğmeleri; 3 kanca başlığı seçeneği "Başlık ekle"ye gider. Puanlar tahmindir, izlenme garantisi değildir |
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
 | **Karaoke** | Kelime kelime ve birikimli mod; kelime zamanlarıyla |
@@ -87,7 +88,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar ve duraksama temizliği, kelimeye tıklayıp kes |
 | — | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Hormozi, Neon, Daktilo…), MOGRT gerekmez |
 | — | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
-| — | **Viral anlar:** uzun videodan 15–60 sn'lik Shorts/Reels anları, In/Out ve süreli marker |
+| — | **Viral anlar:** uzun videodan 15–90 sn'lik Shorts/Reels anları, açıklamalı 0–100 puan (Viral Skor 2.0), cümle güvenli kenarlar, In/Out ve süreli marker |
 | — | **Sahne algılama** ve **vuruşlarda bölme**; kesimleri uygulamadan **▶ Dinle** |
 | Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Panelden uygulanan 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 1.076 SFX ve 30 Motion BG |
 | — | Smart SFX 2.0: yoğunluk, güven puanı, alternatifler, toplu ekleme ve dalga önizlemesi |
@@ -239,6 +240,8 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-ses-uctan.js` | Sesi iyileştir uçtan uca: 5.1 kaynak → stereo, senkron < 1 ms, sessiz klipte anlaşılır hata |
 | `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
 | `test-highlights.js` · `test-viral-host.js` | Viral anlar: satır sınırı, süre uzatma/kırpma, çakışma; süreli marker ve In/Out |
+| `test-viral-skor.js` | Viral Skor 2.0: istem (tür beyaz listesi, adet 3–10, 120 karakter odak), ağırlıklı puan (0–10 ölçeği, eksik alt puan), cümle sınırına oturtma, ±1 cümle, ≥60 filtresi, kopyalanan liste |
+| `test-viral-ui.js` | Viral Skor 2.0 panel akışı (sahte DOM): ayar kalıcılığı, puan halkası ve alt puan çubukları, kanca seçimi → Başlık ekle, kenar kayınca yalnız o kart ve canlı In/Out |
 | `test-scenes.js` | Sahne algılama (gerçek ffmpeg) ve seçili klibi bölme |
 | `test-model-dogrulama.js` | Whisper modellerinin SHA-256 doğrulaması |
 | `test-ceviri-dili.js` | Çeviri sonrası büyük harf kuralının hedef dile uyması |

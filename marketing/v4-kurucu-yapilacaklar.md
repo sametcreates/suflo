@@ -215,3 +215,77 @@ Hepsi `docs/sitemap.xml` ve `docs/blog/index.html` içinde. `tests/test-blog.js`
 - Yeni özellik yayına girince (ör. podcast kamera geçişi, senaryoya göre tekrar temizliği, marka kiti, tek tıkla ilk taslak) "Suflo'da (henüz) olmayanlar" listelerinden çıkar. Yayına girmeden listeden çıkarma.
 - Pro'ya iade ya da deneme hakkı gelirse "Pro'da iade yok" maddesini ve deneme satırlarını güncelle.
 - Sorun giderme rehberinin adresi (`https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor`) Suflo Doctor ve kurucu bitiş metninden bağlanacak; adresi değiştirme.
+
+---
+
+## 3. Viral Skor 2.0 (açıklamalı 0–100 puan, cümle güvenli kenarlar)
+
+**Şu an durum:** Kod tamam ve gerçek dünya girdisi gerektirmiyor: yapay zekâ adımı, kullanıcının
+zaten girdiği Groq/OpenAI anahtarını kullanır, host (`jsx/host.jsx`) değişmedi. Senin işin
+Premiere'de elle deneme, puanların gerçek videolarda makul dağılıp dağılmadığına bakmak ve
+yayından sonra site metinlerini güncellemek.
+
+Ne değişti, kısaca: Viral anlar kutusunda **Tür** (Genel, Podcast, Eğitim, Komedi, Motivasyon,
+Ürün inceleme, Röportaj, Oyun), **Adet** (3–10) ve **"Ne arıyorsun?"** alanı var. Model her ana
+5 alt puan (kanca, bağımsızlık, duygu, değer, kapanış), bir neden ve 3 kanca başlığı verir;
+toplam puan panelde hesaplanır (`js/highlights.js` → `WEIGHTS`). Klipler cümle ortasında
+başlamaz/bitmez; noktalama yoksa 0,6 sn'lik duraksama cümle sonu sayılır. Kartta ±1 cümle
+düğmeleri, sıralama (puan/zaman) ve "Yalnız ≥60" filtresi var. Seçimler `settings.json`'da
+`viralTur`, `viralAdet`, `viralOdak`, `viralMinPuan`, `viralSira` olarak kalır.
+
+### 3.1 Premiere'de elle deneme (yayından önce, yaklaşık 25 dk)
+
+Hazırlık: Pro lisanslı panel, Groq anahtarı, en az 5 dakikalık konuşmalı bir sekans ve
+çıkarılmış altyazısı. Mümkünse hem Premiere 2020/2021'de (CEF 74) hem 2025/2026'da dene.
+
+1. Altyazı sekmesi > **Viral anlar (Shorts)**: Tür, Adet, Süre seçicileri ve "Ne arıyorsun?
+   (isteğe bağlı)" alanı "Viral anları bul" düğmesinin **üstünde** olmalı. Panel daraltılınca
+   (yaklaşık 280 px) seçiciler iki sütuna geçmeli, yatay kaydırma çubuğu çıkmamalı.
+2. Tür: Podcast, Adet: 3, odak: "en komik an" → **Viral anları bul**. Her kartta: renkli halka
+   (≥80 yeşil, 60–79 sarı, <60 kırmızı) içinde puan ve altında "/100 tahmini"; 5 çubuk (Kanca,
+   Bağımsızlık, Duygu, Değer, Kapanış); italik neden satırı; 3 kanca başlığı seçeneği;
+   "◀ +1 cümle, −1 | −1, +1 cümle ▶" satırı; Önizle ve Başlık ekle. Listenin üstünde sıralama,
+   "Yalnız ≥60" ve "Puanlar yapay zekâ tahminidir; izlenme garantisi değildir." notu.
+3. **Halka eski Premiere'de:** 2020/2021'de halka dairesel dolu görünmeli (CSS conic-gradient,
+   Chromium 69+). Düz gri halka görürsen not et; puan sayısı yine okunur.
+4. **Kenarlar:** Bir kartta **Önizle** → In/Out ve playhead o anın başına gelmeli. Premiere'de
+   In'den Out'a oynat: klip cümle ortasında başlamamalı ve bitmemeli. 5 farklı kartta dene; kaç
+   tanesinin temiz başlayıp bittiğini not et (hedef: 5'te en az 4).
+5. **±1 cümle:** Aynı kartta "+1 cümle ▶" → süre etiketi uzamalı ve (aynı sekanstayken)
+   Premiere'deki Out noktası **kendiliğinden** yeni sona kaymalı. "−1" ile geri al. Süre seçili
+   aralığın (ör. 20–60 sn) dışına çıkınca süre etiketi sarıya dönmeli. Komşu kartla çakışacak
+   yöndeki düğme gri (basılamaz) olmalı.
+6. Başka bir sekansı aç → bir kartta Önizle: "Viral anlar başka bir sekansta bulundu" uyarısı
+   çıkmalı, In/Out değişmemeli; ±1 cümle kart üzerinde çalışır ama Premiere'e dokunmaz.
+7. Kanca seçeneklerinden **ikincisini** seç → **Başlık ekle**: timeline'a bu metin gelmeli,
+   `*yıldızlı*` kelime vurgu renginde.
+8. "Zamana göre" ve "Yalnız ≥60" → liste **yeni arama yapmadan** değişmeli. Paneli kapatıp aç:
+   tür, adet, odak, sıralama ve ≥60 seçimi yerinde olmalı.
+9. **Marker olarak ekle** → kırmızı süreli marker'lar; marker yorumu "Suflo viral: 87/100 · neden".
+10. **Listeyi kopyala** → Not Defteri'ne yapıştır: her satırda "87/100 tahmini (kanca … ·
+    bağımsızlık … · …)" ve altında seçili kanca ("Kanca: …").
+11. "Yalnız ≥60" açıkken **Shorts sekansları oluştur** yalnız ekranda görünen anları yapmalı.
+12. Altyazıda birkaç satırı sil/ekle, sonra bir kartta ±1 cümle: kenar yine doğru cümleye
+    kaymalı (panel aramanın gördüğü transkripti saklar).
+13. Noktalama kapalı ("Noktalama: kaldır") ya da karaoke kelime kelime bir transkriptte
+    yeniden ara: kenarlar duraksamalara oturmalı; ±1 cümle bir duraksamaya ya da tek satıra kaymalı.
+
+### 3.2 Puan dağılımını kontrol et (yayından sonraki ilk hafta, yaklaşık 30 dk)
+
+3–4 farklı türde gerçek videoda (podcast, eğitim, komedi) aramayı çalıştır ve puanları not et.
+İstem modelden "ortalama klip ≈ 50, tüm aralığı kullan, klipleri birbirine göre sırala" diye
+ister. Puanlar yine de hep 75–90'da toplanıyorsa ya da hep 40'ın altındaysa bana örnek
+videoları ve `Listeyi kopyala` çıktısını gönder; istemdeki kalibrasyon cümlesi ya da
+`WEIGHTS` buna göre ayarlanır (`tests/test-viral-skor.js`'teki ağırlık testleri de güncellenir).
+
+### 3.3 Yayından sonra site metinleri
+
+- `docs/blog/opusclip-alternatifi-premiere.html`: "Viral puan" satırını ("Her an için puan,
+  başlık ve 'neden işe yarar' notu") 0–100 puan, 5 alt puan, neden ve 3 kanca başlığı diye
+  güncelle; "Komutla an arama yok" maddesini "Ne arıyorsun?" odak alanı ve tür seçimiyle
+  yeniden yaz (serbest komutla arama artık kısmen var); 2. adımdaki "en iyi 3-5 anı" ifadesini
+  "3–10 anı" yap. SSS metni sayfada iki kez geçer (görünen `<details>` ve JSON-LD); ikisini
+  birlikte değiştir, `dateModified` ve `docs/sitemap.xml` `<lastmod>` değerlerini güncelle,
+  `node tools/test.js` çalıştır.
+- Pazarlamada "izlenme garantisi", "viral olur" deme; "yapay zekâ tahmini", "nedeniyle
+  açıklanan puan" de. Panel de bunu söylüyor.
