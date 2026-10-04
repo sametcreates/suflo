@@ -82,13 +82,16 @@ window.KMulticam = (function () {
     } finally { mesgul = false; }
   }
 
-  function secenek(sel, deger, metin) {
+  // atla: metin kullanıcı içeriği (katman adı) taşır; İngilizce katman sözlükten çevirmesin
+  function secenek(sel, deger, metin, atla) {
     var o = document.createElement("option");
     o.value = String(deger); o.textContent = metin;
+    if (atla && o.setAttribute) o.setAttribute("data-i18n-skip", "");
     sel.appendChild(o);
   }
   function izAdi(t, harf) {
-    return harf + (t.index + 1) + (t.name ? " · " + t.name : "") + (t.clipCount ? "" : " · boş");
+    var bos = window.SufloI18n && SufloI18n.tr ? SufloI18n.tr("boş") : "boş";
+    return harf + (t.index + 1) + (t.name ? " · " + t.name : "") + (t.clipCount ? "" : " · " + bos);
   }
 
   function tabloCiz() {
@@ -111,11 +114,11 @@ window.KMulticam = (function () {
       ad.type = "text"; ad.maxLength = 24; ad.value = sp.name;
       var mik = document.createElement("select");
       secenek(mik, -1, "—");
-      layout.audio.forEach(function (t) { secenek(mik, t.index, izAdi(t, "A")); });
+      layout.audio.forEach(function (t) { secenek(mik, t.index, izAdi(t, "A"), true); });
       mik.value = String(sp.mic);
       var kam = document.createElement("select");
       secenek(kam, -1, "—");
-      layout.video.forEach(function (t) { if (!t.hasMulticam) secenek(kam, t.index, izAdi(t, "V")); });
+      layout.video.forEach(function (t) { if (!t.hasMulticam) secenek(kam, t.index, izAdi(t, "V"), true); });
       kam.value = String(sp.cam);
       var renk = document.createElement("input");
       renk.type = "color"; renk.value = sp.color;
@@ -142,7 +145,7 @@ window.KMulticam = (function () {
     var genis = el("pc-genis");
     genis.innerHTML = "";
     secenek(genis, -1, "Yok");
-    layout.video.forEach(function (t) { if (!t.hasMulticam) secenek(genis, t.index, izAdi(t, "V")); });
+    layout.video.forEach(function (t) { if (!t.hasMulticam) secenek(genis, t.index, izAdi(t, "V"), true); });
     genis.value = String(esleme.wide);
     el("pc-ekle").disabled = esleme.speakers.length >= 4;
     el("pc-cikar").disabled = esleme.speakers.length <= 2;
@@ -351,7 +354,9 @@ window.KMulticam = (function () {
     kameralar.forEach(function (cam) {
       var ad = document.createElement("span");
       ad.className = "pc-kam";
-      ad.textContent = kameraAdi(cam);
+      ad.textContent = cam === M.WIDE && window.SufloI18n && SufloI18n.tr ? SufloI18n.tr("Geniş") : kameraAdi(cam);
+      // konuşmacı adı kullanıcı içeriği: çevirici dokunmasın
+      if (cam !== M.WIDE && ad.setAttribute) ad.setAttribute("data-i18n-skip", "");
       var bar = document.createElement("div");
       bar.className = "cut-bar pc-bar";
       // magiccut renderBar gibi: ardışık span'lar, açık olduğu parçalar kameranın renginde
