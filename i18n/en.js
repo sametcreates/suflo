@@ -2436,7 +2436,20 @@
     "Aktif sekans degisti; islem durduruldu.": "The active sequence changed; the job was stopped.",
     "Kopya sekans aktif edilemedi.": "The sequence copy couldn't be activated.",
     "Kamera plani bos.": "The camera plan is empty.",
-    "Kamera kliplerinin bagi sesle birlikte aciliyor/kapaniyor. Kamera kliplerinin baglantisini kopar (Ctrl+L).": "The camera clips turn on/off together with their linked audio. Unlink the camera clips (Ctrl+L)."
+    "Kamera kliplerinin bagi sesle birlikte aciliyor/kapaniyor. Kamera kliplerinin baglantisini kopar (Ctrl+L).": "The camera clips turn on/off together with their linked audio. Unlink the camera clips (Ctrl+L).",
+    "Orijinal sekans acilamadi.": "Couldn't open the original sequence.",
+    "Bu Premiere surumunde klipler acilip kapatilamiyor (TrackItem.disabled).": "This Premiere version can't turn clips on and off (TrackItem.disabled).",
+    "WAV export preseti bulunamadi.": "No WAV export preset found.",
+    "Ses disari alinamadi: {}": "Couldn't export the audio: {}",
+    // Podcast Mode panel: review fixes
+    "Premiere sesi dışa aktaramadı. Mikrofon katmanını tek, düz bir ses klibi olarak bırak (birleşik / iç içe klip değil) ya da Ayarlar'da WAV dışa aktarım ön ayarını denetle.": "Premiere couldn't export the audio. Keep the mic track as one plain audio clip (not a merged or nested clip), or check the WAV export preset in Settings.",
+    "{} Mikrofon katmanını tek, düz bir ses klibi olarak bırak (birleşik / iç içe klip değil) ya da Ayarlar'da WAV dışa aktarım ön ayarını denetle.": "{} Keep the mic track as one plain audio clip (not a merged or nested clip), or check the WAV export preset in Settings.",
+    "{} klip açılıp kapatılamadı; o anlarda kamera yanlış olabilir": "{} clips couldn't be turned on or off; the camera may be wrong at those points",
+    "{} Orijinal sekansa dokunulmadı.": "{} The original sequence wasn't touched.",
+    "Bu Premiere sürümünde Suflo klipleri açıp kapatamıyor; kamera geçişi uygulanamaz. Premiere'i güncelleyip yeniden dene.": "Suflo can't turn clips on and off in this Premiere version, so camera switching can't be applied. Update Premiere and try again.",
+    "Orijinal sekans açılamadı. Onu Premiere'de açıp yeniden uygula.": "Couldn't open the original sequence. Open it in Premiere and apply again.",
+    // stats line: "Ali %46" → "Ali 46%" (fewest fixed characters, so every more specific "%{}" template wins first)
+    "{} %{n}": "{} {}%"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */
@@ -2578,8 +2591,6 @@
     }],
     // "Bu Shorts'un…" style possessives are handled by exact keys; "Premiere'e geç" etc. too.
     [/^V(\d+) katmanına eklendi$/, "Added to track V$1"],
-    // Podcast Mode stats line: "Geniş %13" (speaker names are the user's own and stay as typed)
-    [/^Geniş %(\d+)$/, "Wide $1%"],
     // Try Pro clean re-render: the Premiere project item name and file path stay verbatim ($ = raw, not translated)
     [/^Filigran kısmen kaldırıldı: (\d+) proje öğesi değiştirilemedi\. Proje panelinde ona sağ tıkla, Replace Footage ile temiz dosyayı seç: ([\s\S]*)$/,
       function (m) { return "Watermark partly removed: " + m[1] + " project item" + (m[1] === "1" ? "" : "s") + " couldn't be swapped. Right-click " + (m[1] === "1" ? "it" : "them") + " in the Project panel, choose Replace Footage and pick the clean file: " + m[2]; }],

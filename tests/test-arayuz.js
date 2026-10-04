@@ -332,5 +332,8 @@ ok("Podcast: önce hazırlık, sonra TÜM kesimler, sonra TÜM aç/kapa", uyg.in
 ok("Podcast: mikrofon dışa aktarımı unmuteWanted ve gömülü epr ile, geçici dosya silinir", /KS_exportAudio", \{ scope: "entire", epr: bundledEpr\(\), tracks: \[sp\.mic\], unmuteWanted: true \}/.test(mcUi) && /silInput: true/.test(mcUi));
 ok("Podcast: altyazının üç derleme noktası konuşmacı renklerinden geçer", (capSrc.match(/SufloStyleEngine\.compile\(konusmaciRenkleri\(/g) || []).length === 3 && /bundledEpr: bundledEpr/.test(capSrc));
 
+ok("Podcast: sessiz mikrofon reddi normalizeSeries'in konuşma seviyesiyle (az konuşan mikrofon reddedilmez)", /M\.speechLevel\(seri\) < M\.SESSIZ_P95/.test(fnGovde(mcUi, "async function micEnerji(")));
+ok("Podcast: hazırlık açık Suflo kopyalarını bilir (kopyada yeniden uygulama)", /seqIds: Object\.keys\(onbellek\.seqIds\)/.test(uyg));
+ok("Podcast: eşleme denetimlerinin erişilebilir adında konuşmacı harfi var", /HARF\[i\][\s\S]{0,120}" · "/.test(mcUi) && /on \+ "Mikrofon ses katmanı"/.test(mcUi));
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

@@ -26,6 +26,7 @@ function klip(bas, son, o) {
     get: function () { return c._d; },
     set: function (v) {
       yazmaSayaci++;
+      if (ortam.salt) return;                               // disabled yazılamayan Premiere
       v = !!v;
       if (c._d === v) return;
       c._d = v;
@@ -55,7 +56,9 @@ function sekansYap(id, v, a) {
     getSettings: function () { return { videoDisplayFormat: 100 }; },
     clone: function () {
       klonSayisi++;
-      var kop = sekansYap(id + "-kopya", v.map(function (t) { return iz(t.name, t._k.map(function (k) { return klip(k.start.seconds, k.end.seconds); })); }),
+      var kid = id + "-kopya", sira = 1;
+      while (sekanslar.some(function (x) { return x.sequenceID === kid; })) kid = id + "-kopya" + (++sira);
+      var kop = sekansYap(kid, v.map(function (t) { return iz(t.name, t._k.map(function (k) { return klip(k.start.seconds, k.end.seconds); })); }),
         a.map(function (t) { return iz(t.name, t._k.slice()); }));
       sekanslar.push(kop); proje.sequences = koleksiyon();
     }
@@ -200,6 +203,45 @@ var sC = podcast("sC", { bagli: true });
 var rc = hepsiniUygula(sC, false);
 ok("bağlı klip: iki yönlü bağda linkedConflict ve Ctrl+L önerisi", !rc.enable[0].ok && rc.enable[0].kod === "linkedConflict" && /Ctrl\+L/.test(rc.enable[0].error), js(rc.enable[0]));
 ortam.bag = "yok";
+
+/* ---------- inceleme düzeltmeleri: kesimden önce bağ denemesi, geri okuma, kopyada yeniden uygulama ---------- */
+function durumlar(seq) {
+  return [seq.videoTracks, seq.audioTracks].map(function (ts) { var o = []; for (var i = 0; i < ts.numTracks; i++) o.push(ts[i]._k.map(function (k) { return k._d; })); return o; });
+}
+ortam.bag = "cift";
+var sP = podcast("sP", { bagli: true });
+var oncePP = js(durumlar(sP));
+razorlar = [];
+var pc = call("KS_multicamPrepare", { camTracks: [0, 1, 2], cloneFirst: false, seqId: "sP" });
+ok("prepare: iki yönlü bağ HİÇBİR kesimden önce linkedConflict, sekans aynen kalır", !pc.ok && pc.kod === "linkedConflict" && razorlar.length === 0 && js(durumlar(sP)) === oncePP &&
+  sP.videoTracks[0]._k.length === 1, js(pc));
+ortam.bag = "tek";
+var sT = podcast("sT", { bagli: true });
+var onceT = js(durumlar(sT));
+var pt = call("KS_multicamPrepare", { camTracks: [0, 1, 2], cloneFirst: false, seqId: "sT" });
+ok("prepare: tek yönlü bağda deneme geçer ve klip / ses durumu geri yüklenir", pt.ok && js(durumlar(sT)) === onceT, js(pt) + " " + js(durumlar(sT)));
+ortam.bag = "yok";
+
+// TrackItem.disabled yazılamayan Premiere: setter yok sayılır
+var sD = podcast("sD");
+ortam.salt = true;
+razorlar = [];
+var pd = call("KS_multicamPrepare", { camTracks: [0, 1, 2], cloneFirst: false, seqId: "sD" });
+ok("prepare: disabled yazılamıyorsa kesimden önce disabledApi", !pd.ok && pd.kod === "disabledApi" && razorlar.length === 0, js(pd));
+var ed2 = call("KS_multicamEnable", { seqId: "sD", plan: hp.plan, camTracks: hp.tracks });
+ok("enable: geri okunan değer tutmazsa başarı sayılmaz (disabledApi, failed > 0)", !ed2.ok && ed2.kod === "disabledApi" && ed2.failed > 0, js(ed2));
+ortam.salt = false;
+
+// kopyada uygula → kopya etkin → ritim değişti → yeniden kopyada uygula: orijinalden yeni kopya
+var sR = podcast("sR");
+var r1p = call("KS_multicamPrepare", { camTracks: [0, 1, 2], cloneFirst: true, cloneName: "R - Suflo Podcast", seqId: "sR", seqIds: ["sR"] });
+ok("yeniden uygulama: ilk kopya etkin", r1p.ok && r1p.cloned && aktif.sequenceID === "sR-kopya", js(r1p));
+var r2p = call("KS_multicamPrepare", { camTracks: [0, 1, 2], cloneFirst: true, cloneName: "R - Suflo Podcast", seqId: "sR", seqIds: ["sR", "sR-kopya"] });
+ok("yeniden uygulama: kopya açıkken orijinal açılıp yeniden kopyalanır ('sekans' hatası yok)", r2p.ok && r2p.cloned && r2p.seqId !== "sR-kopya" && aktif.sequenceID === r2p.seqId, js(r2p));
+var r3p = call("KS_multicamPrepare", { camTracks: [0, 1, 2], cloneFirst: false, seqId: "sR", seqIds: ["sR", "sR-kopya", r2p.seqId] });
+ok("yeniden uygulama 'Bu sekansta': açık Suflo kopyasına uygulanır", r3p.ok && !r3p.cloned && r3p.seqId === r2p.seqId, js(r3p));
+podcast("sYabanci");
+ok("yeniden uygulama: bilinmeyen sekans yine 'sekans' hatası", call("KS_multicamPrepare", { camTracks: [0], cloneFirst: true, seqId: "sR", seqIds: ["sR", "sR-kopya"] }).kod === "sekans");
 
 /* ---------- KS_exportAudio unmuteWanted ---------- */
 var sE = podcast("sE", { mute: true });

@@ -549,6 +549,9 @@
       var next = cues[index + 1], end = next ? next.start : cue.end;
       end = Math.max(cue.start + 0.24, end);
       var p = cue.vurgu ? { fill: style.vurguRenk, text: "#15131f", accent: "#ffffff" } : palettes[index % palettes.length], off = offsets[index % offsets.length];
+      // Podcast Modu: konuşmacı rengi kartın dolgusu olur (metin rengi palet yazısını ezmesin diye
+      // kart boyanır; yazı koyu / açık, okunur olanı)
+      if (style.konusmaciRenk && !cue.vurgu) p = { fill: style.konusmaciRenk, text: parlaklik(style.konusmaciRenk) > 150 ? "#15131f" : "#ffffff", accent: p.accent };
       var cx = a.x + width * off[0], cy = a.y + height * off[1];
       var chars = Math.max(3, String(cue.text).length);
       var cardW = Math.min(alanW(width) * 0.58, Math.max(fs * 2.45, fs * (chars * 0.6 + 0.9)));
@@ -917,6 +920,34 @@
     return kosular;
   }
 
+  function rgb(hex) {
+    var h = String(hex || "").replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
+  }
+  function parlaklik(hex) { var c = rgb(hex); return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]; }
+  // Algıya yakın RGB uzaklığı (0..~765)
+  function renkUzakligi(a, b) {
+    var x = rgb(a), y = rgb(b), rm = (x[0] + y[0]) / 2;
+    var dr = x[0] - y[0], dg = x[1] - y[1], db = x[2] - y[2];
+    return Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db);
+  }
+  var VURGU_YAKIN = 150;
+  // Konuşmacı rengi stilin vurgu rengine yakınsa (sarı konuşmacı + sarı vurgu) etkin kelime ve
+  // *anahtar kelime* kaybolur: o koşuda vurgu stilin asıl yazı rengine (çoğunlukla beyaz) geçer;
+  // o da yakınsa beyaz, o da yakınsa koyu
+  function konusmaciStili(style, renk) {
+    var st = Object.assign({}, style, { renk: renk, konusmaciRenk: renk });
+    if (renkUzakligi(renk, style.vurguRenk) < VURGU_YAKIN) {
+      var adaylar = [style.renk, "#ffffff", "#15131f"];
+      st.vurguRenk = adaylar[adaylar.length - 1];
+      for (var i = 0; i < adaylar.length; i++) {
+        if (renkUzakligi(renk, adaylar[i]) >= VURGU_YAKIN) { st.vurguRenk = adaylar[i]; break; }
+      }
+    }
+    return st;
+  }
+
   function compile(options) {
     options = options || {};
     var id = STYLES[options.styleId] ? options.styleId : "viral";
@@ -963,7 +994,7 @@
       events = [];
       konusmaciKosulari(cues, renkler).forEach(function (kosu) {
         var st = style;
-        if (kosu.renk) { st = Object.assign({}, style, { renk: kosu.renk }); renkOnek = "{\\1c" + assColor(kosu.renk) + "}"; }
+        if (kosu.renk) { st = konusmaciStili(style, kosu.renk); renkOnek = "{\\1c" + assColor(kosu.renk) + "}"; }
         try { events = events.concat(ciz(kosu.cues, st)); } finally { renkOnek = ""; }
       });
     }

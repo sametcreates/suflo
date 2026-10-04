@@ -225,5 +225,69 @@ ok("panel: açıkken cue'lara konuşmacı ve renkler eklenir; kapsam dışı / �
 pctx.window.KApp.ctx = function () { return { sequenceId: "baska" }; };
 ok("panel: başka bir sekans açıkken renkler uygulanmaz", KM.colorsEnabled() === false);
 
+/* ---------- inceleme düzeltmeleri ---------- */
+// az konuşan ama çalışan mikrofon (sürenin ~%3'ü konuşma, kalanı −70 dBFS taban): p95 tabanda, p99 konuşmada
+var azKonusan = [];
+for (var az = 0; az < 1000; az++) azKonusan.push(az % 33 === 0 ? -20 : -70);
+ok("speechLevel: az konuşan mikrofonda konuşma seviyesi p99'dan (sessiz sayılmaz)", M.percentile(azKonusan, 95) < M.SESSIZ_P95 && M.speechLevel(azKonusan) > M.SESSIZ_P95 &&
+  M.normalizeSeries([azKonusan]).silent.length === 0, M.speechLevel(azKonusan));
+var gercekSessiz = []; for (az = 0; az < 1000; az++) gercekSessiz.push(-72 + (az % 3));
+ok("speechLevel: gerçekten sessiz mikrofon hâlâ sessiz", M.speechLevel(gercekSessiz) < M.SESSIZ_P95 && M.normalizeSeries([gercekSessiz]).silent.length === 1);
+ok("speakerFor near: net konuşmacısız aralık en yakın konuşmacıyı alır (önce geriye)", M.speakerFor({ act: src.act, win: 0.1, near: 3 }, 0.5, 0.7) === 1 &&
+  M.speakerFor({ act: [0, 0, -2, -2, 1, 1], win: 0.1, near: 3 }, 0.2, 0.4) === 0 && M.speakerFor({ act: [-1, -1, -2, 1], win: 0.1, near: 3 }, 0, 0.2) === 1 &&
+  M.speakerFor({ act: [-1, -1, -1], win: 0.1, near: 3 }, 0, 0.3) === -1 && M.speakerFor({ act: [0, -1, -1, -1, -1, -1], win: 0.1, near: 0.2 }, 0.4, 0.6) === -1);
+
+// konuşmacı rengi stilin vurgu rengine yakınsa etkin kelime / *anahtar kelime* kaybolmasın
+function vurguKaybolur(styleId, renk) {
+  var o = SE.compile({ styleId: styleId, cueKind: "lines", cues: [{ start: 0, end: 1.5, text: "merhaba *dünya* nasılsın", speaker: 0 }], speakerColors: [renk, "#4fd1ff"] });
+  var vurgu = SE.preset(styleId).style.vurguRenk;
+  var c = function (h) { return SE.assColor(h).slice(4); };   // alfa dışı BGR
+  // stilin vurgusu konuşmacı renginden farklıysa hiç görünmemeli; vurgu beyaza geçer
+  return { stilVurgusu: vurgu.toLowerCase() !== renk.toLowerCase() && o.ass.indexOf(c(vurgu)) >= 0, beyaz: o.ass.indexOf("\\1c" + SE.assColor("#ffffff")) >= 0 };
+}
+var v1 = vurguKaybolur("viral", "#ffd23f"), v2 = vurguKaybolur("daktilo", "#7cf0a0");
+ok("konuşmacı rengi ≈ vurgu rengi: vurgu stilin beyazına geçer (viral sarı, daktilo yeşil)", !v1.stilVurgusu && v1.beyaz && !v2.stilVurgusu && v2.beyaz, js([v1, v2]));
+var v3 = vurguKaybolur("viral", "#4fd1ff");
+ok("konuşmacı rengi vurgudan uzaksa stilin vurgusu korunur", v3.stilVurgusu, js(v3));
+// her stilde konuşmacı rengi satır başı önekinden bağımsız görünür (Pop'ta kart dolgusu)
+var renkCue = [{ start: 0, end: 0.5, text: "merhaba", speaker: 0 }, { start: 0.5, end: 1, text: "dünya", speaker: 0 }, { start: 1.2, end: 1.6, text: "nasılsın", speaker: 1 }, { start: 1.6, end: 2, text: "iyiyim", speaker: 1 }];
+var gorunmez = SE.list().map(function (x) { return x.id || x; }).filter(function (id) {
+  var a = SE.compile({ styleId: id, cueKind: "words", cues: renkCue, speakerColors: ["#ff0000", "#00ff00"] }).ass;
+  a = a.split("{\\1c" + SE.assColor("#ff0000") + "}").join("").split("{\\1c" + SE.assColor("#00ff00") + "}").join("");
+  return a.indexOf(SE.assColor("#ff0000").slice(4)) < 0 || a.indexOf(SE.assColor("#00ff00").slice(4)) < 0;
+});
+ok("konuşmacı rengi her stilde görünür (Pop dahil)", gorunmez.length === 0, gorunmez.join(","));
+
+// panel: analiz çift tıkta tek kez başlar (meşgul ilk await'ten önce)
+var ffSay = 0, ffBitir = null, durumMetni = "";
+function sahteEl(id) {
+  return { id: id, disabled: false, hidden: false, innerHTML: "", className: "", textContent: "", value: "", checked: false, style: {},
+    querySelectorAll: function () { return []; }, querySelector: function () { return null; }, appendChild: function () {} };
+}
+var elems = {};
+["pc-analiz", "pc-izler", "pc-esleme", "pc-genis", "pc-tara", "pc-ekle", "pc-cikar", "pc-sonuc", "pc-onizleme", "pc-ozet", "pc-uyari", "pc-progress"].forEach(function (id) { elems[id] = sahteEl(id); });
+var dctx = { window: { SufloMulticam: M }, Object: Object, Number: Number, Array: Array, Error: Error, Promise: Promise, Math: Math, String: String,
+  K: { findFfmpeg: function () { ffSay++; return new Promise(function (r) { ffBitir = r; }); }, log: function () {} },
+  document: { getElementById: function (id) { if (id === "pc-durum") return { set className(v) {}, set textContent(v) { durumMetni = v; } }; return elems[id] || null; } } };
+vm.createContext(dctx);
+vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "js", "multicam-ui.js"), "utf8"), dctx);
+var KD = dctx.window.KMulticam;
+KD._kur(null, { speakers: [{ name: "A", mic: 0, cam: 0, color: "#ff0000" }, { name: "B", mic: 1, cam: 1, color: "#00ff00" }], wide: -1 }, { seqId: "s1", audio: [], video: [] }, []);
+var a1 = KD._analiz(), a2 = KD._analiz();
+ok("panel: findFfmpeg sürerken ikinci tık yeni analiz başlatmaz, eşleme kilitli", ffSay === 1 && KD._mesgul() === true && elems["pc-analiz"].disabled && elems["pc-genis"].disabled && elems["pc-ekle"].disabled, ffSay);
+ffBitir(null);
+Promise.all([a1, a2]).then(function () {
+  ok("panel: ffmpeg yoksa meşgul ve kilit kalkar", KD._mesgul() === false && !elems["pc-analiz"].disabled && !elems["pc-genis"].disabled && /ffmpeg gerekli/.test(durumMetni), durumMetni);
+  // eski plan + geçersiz analiz: önizleme sonuçları göstermez, hata atmaz
+  KD._kur(null, { speakers: [{ name: "A", color: "#f00" }], wide: -1 }, undefined, [{ start: 0, end: 5, cam: 0 }]);
+  elems["pc-sonuc"].hidden = true;
+  var hata = null;
+  try { KD._onizle(); } catch (e) { hata = e; }
+  ok("panel: analiz geçersizken önizleme sonuçları açmaz ve hata atmaz", !hata && elems["pc-sonuc"].hidden === true, hata && hata.message);
+  bitir();
+});
+
+function bitir() {
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
+}

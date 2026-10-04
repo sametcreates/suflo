@@ -57,6 +57,17 @@
   }
 
   /*
+   * Mikrofonun konuşma seviyesi (dBFS): p95. Sahibi sürenin %5'inden azında konuşan mikrofonda
+   * p95 gürültü tabanına / komşunun sızıntısına denk gelir; p99 p95'ten 6 dB'den fazla yüksekse
+   * konuşma seviyesi oradadır. Sessiz mikrofon reddi de bunu kullanır (az konuşan ama çalışan
+   * mikrofon reddedilmez).
+   */
+  function speechLevel(s) {
+    var p95 = percentile(s, 95), p99 = percentile(s, 99);
+    return p99 - p95 > 6 ? p99 : p95;
+  }
+
+  /*
    * Mikrofonlar arası kazanç farkını sil: her mikrofonun p95'i (konuşma seviyesi) 0 dB'e
    * çekilir. p10 gürültü tabanıdır; tabanın biraz üstünde kalmayan pencere kapıda kalır
    * (GATE_OFF). Kapı konuşma seviyesinin 20 dB yakınına girmez: hep konuşulan bir mikrofonda
@@ -71,14 +82,11 @@
     (series || []).forEach(function (s, k) {
       s = s || [];
       var p95 = percentile(s, 95), p10 = percentile(s, 10);
-      // Sahibi sürenin %5'inden azında konuşan mikrofonda p95 komşunun sızıntısına denk gelir;
-      // p99 p95'ten 6 dB'den fazla yüksekse konuşma seviyesi oradadır
-      var p99 = percentile(s, 99);
-      var ref = p99 - p95 > 6 ? p99 : p95;
+      var ref = speechLevel(s);
       // taban kapısı konuşma seviyesinin 20 dB yakınına girmez (hep konuşulan mikrofonda p10 konuşmadır)
       var kapi = Math.min(p10 + tabanPay, ref - 20);
       out.p95.push(p95); out.p10.push(p10); out.ref.push(ref);
-      if (p95 < esik) out.silent.push(k);
+      if (ref < esik) out.silent.push(k);
       out.levels.push(s.map(function (v) {
         return (v > kapi && v > FLOOR) ? Math.round((v - ref) * 100) / 100 : GATE_OFF;
       }));
@@ -235,12 +243,15 @@
   }
 
   /*
-   * [a, b] aralığında en çok konuşan (activity çoğunluğu). src: { act, win } ya da act dizisi.
+   * [a, b] aralığında en çok konuşan (activity çoğunluğu). src: { act, win, near? } ya da act dizisi.
    * Kimse konuşmuyorsa -1. Eşitlikte aralığın ortasındaki konuşmacı kazanır.
+   * near (sn): aralıkta net konuşmacı yoksa (kısık kelime, gülme, çapraz konuşma) bu kadar
+   * uzaklığa kadar en yakın net konuşmacı alınır; altyazıda tek kelime renksiz kalıp kartı bölmesin.
    */
   function speakerFor(src, a, b) {
     var act = src && src.act ? src.act : src;
     var win = src && src.win ? src.win : 0.1;
+    var near = src && src.near > 0 ? Number(src.near) : 0;
     if (!act || !act.length || !(b >= a)) return -1;
     var i0 = Math.max(0, Math.floor(a / win + 1e-9)), i1 = Math.min(act.length - 1, Math.max(i0, Math.ceil(b / win - 1e-9) - 1));
     if (i0 > act.length - 1) return -1;
@@ -251,7 +262,17 @@
       say[v] = (say[v] || 0) + 1;
       if (say[v] > enN) { enN = say[v]; en = v; }
     }
-    if (en < 0) return -1;
+    if (en < 0) {
+      if (!near) return -1;
+      var adim = Math.round(near / win);
+      for (var d = 1; d <= adim; d++) {
+        // önce geriye (cümlenin sahibi çoğunlukla önceki konuşmacı), sonra ileriye
+        var g = i0 - d, f = i1 + d;
+        if (g >= 0 && act[g] >= 0) return act[g];
+        if (f < act.length && act[f] >= 0) return act[f];
+      }
+      return -1;
+    }
     var orta = act[Math.min(act.length - 1, Math.floor((a + b) / 2 / win))];
     if (orta >= 0 && orta !== en && say[orta] === enN) return orta;
     return en;
@@ -411,7 +432,7 @@
 
   return {
     FLOOR: FLOOR, SILENCE: SILENCE, CROSSTALK: CROSSTALK, WIDE: WIDE, GATE_OFF: GATE_OFF,
-    SESSIZ_P95: SESSIZ_P95, COK_GECIS: COK_GECIS,
+    SESSIZ_P95: SESSIZ_P95, speechLevel: speechLevel, COK_GECIS: COK_GECIS,
     energyFromPcm: energyFromPcm,
     percentile: percentile,
     normalizeSeries: normalizeSeries,

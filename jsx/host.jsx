@@ -2135,11 +2135,19 @@ function KS_mcHata(h) {
 
 function KS_multicamPrepare(encoded) {
   try {
-    var p = KS_arg(encoded); // { camTracks:[...], cloneFirst:bool, cloneName?, seqId? }
+    var p = KS_arg(encoded); // { camTracks:[...], cloneFirst:bool, cloneName?, seqId?, seqIds?:[...] }
     var seq = KS_seq();
     if (!seq) return KS_err("Aktif sequence yok.");
     if (p.seqId && String(seq.sequenceID) !== String(p.seqId)) {
-      return KS_mcHata({ kod: "sekans", track: -1, error: "Aktif sekans degisti; sekansi yeniden tara." });
+      // Etkin sekans bu analizin Suflo kopyasiysa (onceki "Kopyada uygula") yeniden uygulama
+      // calisir: kopya modunda orijinal acilip yeniden kopyalanir, yerinde modda kopyaya uygulanir
+      var bilinen = false, ids = p.seqIds || [], k;
+      for (k = 0; k < ids.length; k++) if (String(ids[k]) === String(seq.sequenceID)) bilinen = true;
+      if (!bilinen) return KS_mcHata({ kod: "sekans", track: -1, error: "Aktif sekans degisti; sekansi yeniden tara." });
+      if (p.cloneFirst) {
+        seq = KS_activateSeq(p.seqId);
+        if (!seq) return KS_mcHata({ kod: "orijinal", track: -1, error: "Orijinal sekans acilamadi." });
+      }
     }
     var h = KS_mcIzDenetle(seq, p.camTracks);
     if (h) return KS_mcHata(h);
@@ -2154,6 +2162,10 @@ function KS_multicamPrepare(encoded) {
       if (p.cloneName) { try { seq.name = String(p.cloneName); } catch (eN) {} }
       kopya = true;
     }
+    // Hicbir kesimden ONCE: klip acma/kapama bu surumde calisiyor mu, kamera sesle iki yonlu
+    // bagli mi? Tek klipte denenir ve geri alinir (sekans net degismez).
+    var b = KS_mcBagDene(seq, p.camTracks);
+    if (b) return KJSON.stringify({ ok: false, kod: b.kod, track: b.track, cloned: kopya, error: b.error });
     return KS_ok({ seqId: String(seq.sequenceID), name: String(seq.name), cloned: kopya });
   } catch (e) { return KS_err(e); }
 }
@@ -2227,6 +2239,50 @@ function KS_mcSesFoto(seq) {
   return foto;
 }
 
+// Ses kliplerini fotograftaki duruma geri yukle; geri yuklenen sayisi
+function KS_mcSesGeri(foto) {
+  var n = 0;
+  for (var i = 0; i < foto.length; i++) {
+    var f = foto[i], suan = false;
+    try { suan = f.cl.disabled ? true : false; } catch (eF) {}
+    if (suan !== f.d) {
+      try { f.cl.disabled = f.d; n++; } catch (eS) {}
+    }
+  }
+  return n;
+}
+
+/*
+ * Bag denemesi: ilk acik kamera klibi kapatilir ve geri okunur (TrackItem.disabled bu
+ * Premiere'de yazilabiliyor mu), kapanan bagli ses geri acilinca video da geri aciliyor mu
+ * (iki yonlu bag). Klip ve sesler eski haline getirilir. Hata: { kod, track, error } ya da null.
+ */
+function KS_mcBagDene(seq, camTracks) {
+  var cl = null, ti = -1, i, ci;
+  for (i = 0; i < camTracks.length && !cl; i++) {
+    var tr = seq.videoTracks[Number(camTracks[i])];
+    for (ci = 0; ci < tr.clips.numItems; ci++) {
+      var k = tr.clips[ci], kapali = true;
+      try { kapali = k.disabled ? true : false; } catch (eD) {}
+      if (!kapali) { cl = k; ti = Number(camTracks[i]); break; }
+    }
+  }
+  if (!cl) return null;
+  var foto = KS_mcSesFoto(seq), sonuc = null, oku = false;
+  try { cl.disabled = true; } catch (eW) {}
+  try { oku = cl.disabled ? true : false; } catch (eR) {}
+  if (!oku) {
+    sonuc = { kod: "disabledApi", track: ti, error: "Bu Premiere surumunde klipler acilip kapatilamiyor (TrackItem.disabled)." };
+  } else if (KS_mcSesGeri(foto)) {
+    var v = false;
+    try { v = cl.disabled ? true : false; } catch (eV) {}
+    if (!v) sonuc = { kod: "linkedConflict", track: ti, error: "Kamera kliplerinin bagi sesle birlikte aciliyor/kapaniyor. Kamera kliplerinin baglantisini kopar (Ctrl+L)." };
+  }
+  try { cl.disabled = false; } catch (eG) {}
+  KS_mcSesGeri(foto);
+  return sonuc;
+}
+
 function KS_multicamEnable(encoded) {
   try {
     var p = KS_arg(encoded); // { seqId, plan:[{s,e,t}], camTracks:[...], from, to }
@@ -2243,7 +2299,7 @@ function KS_multicamEnable(encoded) {
     // BAGLI KLIP KORUMASI: video klibini kapatmak bagli sesini de kapatiyor olabilir
     // (dogrulanmamis davranis). Once tum ses kliplerinin durumu alinir, sonra geri yuklenir.
     var foto = KS_mcSesFoto(seq);
-    var yazilan = [], degisen = 0, ayni = 0, i, ci;
+    var yazilan = [], degisen = 0, ayni = 0, basarisiz = 0, i, ci;
     for (i = 0; i < p.camTracks.length; i++) {
       var ti = Number(p.camTracks[i]);
       var tr = seq.videoTracks[ti];
@@ -2256,17 +2312,18 @@ function KS_multicamEnable(encoded) {
         var simdi = false;
         try { simdi = cl.disabled ? true : false; } catch (eG) {}
         if (simdi === kapat) { ayni++; continue; }   // degismeyen deger yeniden yazilmaz
-        try { cl.disabled = kapat; degisen++; yazilan.push({ cl: cl, d: kapat }); } catch (eW) {}
+        try { cl.disabled = kapat; } catch (eW) {}
+        // geri oku: setter yoksa / yok sayiliyorsa yazma basarili sayilmaz
+        var olan = simdi;
+        try { olan = cl.disabled ? true : false; } catch (eO) {}
+        if (olan === kapat) { degisen++; yazilan.push({ cl: cl, d: kapat }); } else basarisiz++;
       }
     }
 
-    var geriYuklenen = 0;
-    for (i = 0; i < foto.length; i++) {
-      var f = foto[i], suan = false;
-      try { suan = f.cl.disabled ? true : false; } catch (eF) {}
-      if (suan !== f.d) {
-        try { f.cl.disabled = f.d; geriYuklenen++; } catch (eS) {}
-      }
+    var geriYuklenen = KS_mcSesGeri(foto);
+    if (basarisiz && !degisen) {
+      return KJSON.stringify({ ok: false, kod: "disabledApi", failed: basarisiz, linkedRestored: geriYuklenen,
+        error: "Bu Premiere surumunde klipler acilip kapatilamiyor (TrackItem.disabled)." });
     }
     if (geriYuklenen) {
       // ses geri yuklenince video da geri dondu mu? (iki yonlu bag) — o zaman calisamayiz
@@ -2279,7 +2336,7 @@ function KS_multicamEnable(encoded) {
         }
       }
     }
-    return KS_ok({ changed: degisen, unchanged: ayni, linkedRestored: geriYuklenen });
+    return KS_ok({ changed: degisen, unchanged: ayni, failed: basarisiz, linkedRestored: geriYuklenen });
   } catch (e) { return KS_err(e); }
 }
 

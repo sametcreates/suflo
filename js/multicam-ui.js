@@ -108,22 +108,33 @@ window.KMulticam = (function () {
       var sat = document.createElement("div");
       sat.className = "pc-satir";
       var ad = document.createElement("input");
-      ad.type = "text"; ad.maxLength = 24; ad.value = sp.name; ad.setAttribute("aria-label", "Konuşmacı adı");
-      ad.addEventListener("input", function () { sp.name = ad.value.trim() || HARF[i]; planla(); });
+      ad.type = "text"; ad.maxLength = 24; ad.value = sp.name;
       var mik = document.createElement("select");
-      mik.setAttribute("aria-label", "Mikrofon ses katmanı");
       secenek(mik, -1, "—");
       layout.audio.forEach(function (t) { secenek(mik, t.index, izAdi(t, "A")); });
       mik.value = String(sp.mic);
-      mik.addEventListener("change", function () { sp.mic = Number(mik.value); onbellek = null; sonucGizle(); });
       var kam = document.createElement("select");
-      kam.setAttribute("aria-label", "Kamera video katmanı");
       secenek(kam, -1, "—");
       layout.video.forEach(function (t) { if (!t.hasMulticam) secenek(kam, t.index, izAdi(t, "V")); });
       kam.value = String(sp.cam);
-      kam.addEventListener("change", function () { sp.cam = Number(kam.value); planla(); });
       var renk = document.createElement("input");
-      renk.type = "color"; renk.value = sp.color; renk.setAttribute("aria-label", "Konuşmacı rengi");
+      renk.type = "color"; renk.value = sp.color;
+      // ekran okuyucu her satırda hangi konuşmacıda olduğunu duysun: "B · Ali · Mikrofon ses katmanı"
+      function etiketle() {
+        var on = HARF[i] + (sp.name && sp.name !== HARF[i] ? " · " + sp.name : "") + " · ";
+        ad.setAttribute("aria-label", on + "Konuşmacı adı");
+        mik.setAttribute("aria-label", on + "Mikrofon ses katmanı");
+        kam.setAttribute("aria-label", on + "Kamera video katmanı");
+        renk.setAttribute("aria-label", on + "Konuşmacı rengi");
+      }
+      etiketle();
+      ad.addEventListener("input", function () { sp.name = ad.value.trim() || HARF[i]; etiketle(); planla(); });
+      mik.addEventListener("change", function () {
+        if (mesgul) { mik.value = String(sp.mic); return; }
+        sp.mic = Number(mik.value);
+        analizGecersiz();
+      });
+      kam.addEventListener("change", function () { if (mesgul) { kam.value = String(sp.cam); return; } sp.cam = Number(kam.value); planla(); });
       renk.addEventListener("input", function () { sp.color = renk.value; onizlemeCiz(); ayarKaydet(); });
       [ad, mik, kam, renk].forEach(function (x) { sat.appendChild(x); });
       kutuEl.appendChild(sat);
@@ -137,8 +148,26 @@ window.KMulticam = (function () {
     el("pc-cikar").disabled = esleme.speakers.length <= 2;
   }
 
+  // Mikrofon / konuşmacı sayısı değişti: eski analiz ve plan geçersiz
+  function analizGecersiz() {
+    onbellek = null; plan = [];
+    var iz = el("pc-izler");
+    if (iz) iz.innerHTML = "";
+    sonucGizle();
+  }
+
+  // Analiz / uygulama sürerken eşleme değiştirilemez (çalışan analiz eski mikrofonu okur)
+  function kilitle(v) {
+    var kutuEl = el("pc-esleme");
+    if (kutuEl) Array.prototype.forEach.call(kutuEl.querySelectorAll("select, input"), function (x) { x.disabled = v; });
+    ["pc-genis", "pc-tara"].forEach(function (id) { var e = el(id); if (e) e.disabled = v; });
+    var ek = el("pc-ekle"), ck = el("pc-cikar");
+    if (ek) ek.disabled = v || !esleme || esleme.speakers.length >= 4;
+    if (ck) ck.disabled = v || !esleme || esleme.speakers.length <= 2;
+  }
+
   function konusmaciSayisi(fark) {
-    if (!esleme || !layout) return;
+    if (!esleme || !layout || mesgul) return;
     var n = Math.max(2, Math.min(4, esleme.speakers.length + fark));
     if (n === esleme.speakers.length) return;
     if (fark > 0) {
@@ -146,9 +175,8 @@ window.KMulticam = (function () {
       var oneri = M.suggestMapping(layout, n).speakers[i];
       esleme.speakers.push({ name: oneri.name, mic: oneri.mic, cam: oneri.cam, color: RENKLER[i] });
     } else esleme.speakers.pop();
-    onbellek = null; plan = [];
     tabloCiz();
-    sonucGizle();
+    analizGecersiz();
   }
 
   function eslemeHatasi(h) {
@@ -192,6 +220,13 @@ window.KMulticam = (function () {
     return ayni === 1 ? t.plain : null;
   }
 
+  // KS_exportAudio hatası Altyazı sekmesinin "Seçili klip" kapsamını önerir; Podcast'te o kapsam yok
+  function disaAktarimHatasi(hata) {
+    var h = String(hata || "").replace(/\s*'Secili klip' kapsamini (dene|kullan)\.?\s*$/, "").trim();
+    var oneri = "Mikrofon katmanını tek, düz bir ses klibi olarak bırak (birleşik / iç içe klip değil) ya da Ayarlar'da WAV dışa aktarım ön ayarını denetle.";
+    return h ? h + " " + oneri : "Premiere sesi dışa aktaramadı. " + oneri;
+  }
+
   async function micEnerji(i, sp, ff) {
     var etiket = sp.name + " · A" + (sp.mic + 1);
     var dep = { run: K.run, fs: K.fs, path: K.path };
@@ -203,14 +238,14 @@ window.KMulticam = (function () {
       seri = await M.energyFromFile(dep, { ff: ff, input: ex.wav, tmpDir: K.tmpDir(), silInput: true, win: WIN });
     } else {
       var duz = duzKlip(sp.mic);
-      if (!duz) throw new Error(ex.error ? etiket + " · " + ex.error : etiket + ": dışa aktarılamadı");
+      if (!duz) throw new Error(etiket + " · " + disaAktarimHatasi(ex.error));
       K.log("[podcast] dışa aktarım olmadı, düz klipten okunuyor: " + ex.error);
       izSatiri(i, etiket + ": dosyadan okunuyor…");
       seri = await M.energyFromFile(dep, { ff: ff, input: duz.path, tmpDir: K.tmpDir(), silInput: false, win: WIN,
         ss: duz.inPoint, t: duz.end - duz.start, offset: duz.start });
     }
-    var p95 = M.percentile(seri, 95);
-    if (p95 < M.SESSIZ_P95) {
+    // az konuşan ama çalışan mikrofon reddedilmesin: normalizeSeries'in konuşma seviyesi (p95 / p99)
+    if (M.speechLevel(seri) < M.SESSIZ_P95) {
       izSatiri(i, etiket + ": sessiz — kapalı veya solo mu?", "bad");
       var hata = new Error(etiket + ": sessiz — kapalı veya solo mu?");
       hata.gosterildi = true;
@@ -225,13 +260,15 @@ window.KMulticam = (function () {
     if (!esleme || !layout) { durum("Önce sekansı tara.", "bad"); return; }
     var h = M.checkMapping(esleme);
     if (h) { durum(eslemeHatasi(h), "bad"); return; }
-    var ff = await K.findFfmpeg();
-    if (!ff) { durum("Podcast Modu için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad"); return; }
+    // ilk await'ten ÖNCE meşgul: findFfmpeg ilk çalıştırmada saniyeler sürebilir (çift tık iki analiz başlatmasın)
     mesgul = true;
     el("pc-analiz").disabled = true;
-    el("pc-izler").innerHTML = "";
-    sonucGizle();
+    kilitle(true);
     try {
+      var ff = await K.findFfmpeg();
+      if (!ff) { durum("Podcast Modu için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad"); return; }
+      el("pc-izler").innerHTML = "";
+      sonucGizle();
       var bas = await K.call("KS_getTrackLayout");
       if (!bas.ok) throw new Error(bas.error);
       if (bas.seqId !== layout.seqId) throw new Error("Aktif sekans değişti; sekansı yeniden tara.");
@@ -256,6 +293,7 @@ window.KMulticam = (function () {
       ilerleme(null);
       mesgul = false;
       el("pc-analiz").disabled = false;
+      kilitle(false);
     }
   }
 
@@ -303,6 +341,7 @@ window.KMulticam = (function () {
   function onizlemeCiz() {
     var kutuEl = el("pc-onizleme"), sonuc = el("pc-sonuc");
     if (!kutuEl || !sonuc) return;
+    if (!onbellek || !esleme) { sonuc.hidden = true; return; }
     sonuc.hidden = !plan.length;
     kutuEl.innerHTML = "";
     if (!plan.length) return;
@@ -362,16 +401,19 @@ window.KMulticam = (function () {
     var hp = M.hostPlan(plan, esleme.speakers.map(function (s) { return s.cam; }), esleme.wide);
     mesgul = true;
     el("pc-uygula").disabled = true;
+    kilitle(true);
     try {
       durum(hedef === "clone" ? "Kopya sekans hazırlanıyor…" : "Katmanlar denetleniyor…");
       ilerleme(0);
       var ad = (layout && layout.name ? layout.name : "Podcast") + " - Suflo Podcast";
-      var pr = await K.call("KS_multicamPrepare", { camTracks: hp.tracks, cloneFirst: hedef === "clone", cloneName: ad, seqId: onbellek.seqId }, 120000);
+      // seqIds: bu analizden doğan Suflo kopyaları; kopya açıkken yeniden uygulama çalışsın
+      var pr = await K.call("KS_multicamPrepare", { camTracks: hp.tracks, cloneFirst: hedef === "clone", cloneName: ad, seqId: onbellek.seqId,
+        seqIds: Object.keys(onbellek.seqIds) }, 120000);
       if (!pr.ok) throw new Error(hostHatasi(pr));
       onbellek.seqIds[pr.seqId] = 1;
       var razorlar = M.chunk(hp.cuts, RAZOR_PARCA);
       var enablePar = M.chunk(hp.plan, ENABLE_PARCA);
-      var adim = razorlar.length + enablePar.length, yapilan = 0, kesim = 0, degisen = 0, geriAlinan = 0;
+      var adim = razorlar.length + enablePar.length, yapilan = 0, kesim = 0, degisen = 0, geriAlinan = 0, yazilamayan = 0;
       // önce TÜM kesimler (parça sınırında yanlış orta nokta olmasın), sonra TÜM aç/kapa
       for (var i = 0; i < razorlar.length; i++) {
         durum("Kamera katmanları kesiliyor… " + (i + 1) + "/" + razorlar.length);
@@ -386,24 +428,30 @@ window.KMulticam = (function () {
         var re = await K.call("KS_multicamEnable", { seqId: pr.seqId, plan: hp.plan, camTracks: hp.tracks,
           from: j === 0 ? null : g[0].s, to: j === enablePar.length - 1 ? null : g[g.length - 1].e }, 300000);
         if (!re.ok) throw new Error(hostHatasi(re));
-        degisen += re.changed; geriAlinan += re.linkedRestored || 0;
+        degisen += re.changed; geriAlinan += re.linkedRestored || 0; yazilamayan += re.failed || 0;
         ilerleme(++yapilan / adim);
       }
       var st = M.planStats(plan);
       var parcalar = [pr.cloned ? "Kopyada " + st.switches + " kamera geçişi uygulandı" : "Bu sekansta " + st.switches + " kamera geçişi uygulandı",
         kesim + " kesim"];
       if (geriAlinan) parcalar.push("bağlı " + geriAlinan + " ses klibi açık tutuldu");
-      var msg = parcalar.join(" · ");
-      durum(msg, "good");
-      if (window.KApp && KApp.toast) KApp.toast(msg, "good");
+      // geçişin başarısı planla değil Premiere'in gerçekten yazdığıyla ölçülür
+      if (yazilamayan) parcalar.push(yazilamayan + " klip açılıp kapatılamadı; o anlarda kamera yanlış olabilir");
+      var msg = parcalar.join(" · "), cls = yazilamayan ? "warn" : "good";
+      durum(msg, cls);
+      if (window.KApp && KApp.toast) KApp.toast(msg, cls);
     } catch (e) {
       durum(e.message, "bad");
     } finally {
       ilerleme(null);
       mesgul = false;
       el("pc-uygula").disabled = false;
+      kilitle(false);
     }
   }
+
+  // hazırlık kopyayı oluşturduktan sonra durduysa orijinal dokunulmamıştır
+  function kopyaNotu(r) { return r && r.cloned ? " Orijinal sekansa dokunulmadı." : ""; }
 
   function hostHatasi(r) {
     var v = typeof r.track === "number" && r.track >= 0 ? "V" + (r.track + 1) : "";
@@ -413,7 +461,9 @@ window.KMulticam = (function () {
     if (r.kod === "iz_yok") return v ? "Kamera katmanı bulunamadı: " + v + ". Sekansı yeniden tara." : "Kamera katmanı bulunamadı. Sekansı yeniden tara.";
     if (r.kod === "sekans") return "Aktif sekans değişti; işlem durduruldu. Sekansı yeniden tara.";
     if (r.kod === "kopya") return "Kopya sekans oluşturulamadı. 'Bu sekansta' modunu dene.";
-    if (r.kod === "linkedConflict") return "Kamera klipleri sesle bağlı ve birlikte kapanıyor. Kamera kliplerinin bağlantısını kopar (Ctrl+L), sonra yeniden uygula.";
+    if (r.kod === "linkedConflict") return "Kamera klipleri sesle bağlı ve birlikte kapanıyor. Kamera kliplerinin bağlantısını kopar (Ctrl+L), sonra yeniden uygula." + kopyaNotu(r);
+    if (r.kod === "disabledApi") return "Bu Premiere sürümünde Suflo klipleri açıp kapatamıyor; kamera geçişi uygulanamaz. Premiere'i güncelleyip yeniden dene." + kopyaNotu(r);
+    if (r.kod === "orijinal") return "Orijinal sekans açılamadı. Onu Premiere'de açıp yeniden uygula.";
     return r.error || "Premiere işlemi tamamlanamadı.";
   }
 
@@ -427,7 +477,8 @@ window.KMulticam = (function () {
   function speakerFor(a, b) {
     if (!onbellek || !onbellek.act) return -1;
     if (a > onbellek.duration + 0.5) return -1;
-    return M.speakerFor({ act: onbellek.act, win: onbellek.win }, a, b);
+    // net konuşmacısız cue (kısık kelime, gülme, çapraz konuşma) en yakın konuşmacıyı alır
+    return M.speakerFor({ act: onbellek.act, win: onbellek.win, near: 3 }, a, b);
   }
   function speakerColors() {
     return esleme ? esleme.speakers.map(function (s) { return s.color; }) : [];
@@ -461,7 +512,7 @@ window.KMulticam = (function () {
     el("pc-uygula").addEventListener("click", uygula);
     el("pc-ekle").addEventListener("click", function () { konusmaciSayisi(1); });
     el("pc-cikar").addEventListener("click", function () { konusmaciSayisi(-1); });
-    el("pc-genis").addEventListener("change", function () { if (esleme) { esleme.wide = Number(el("pc-genis").value); planla(); } });
+    el("pc-genis").addEventListener("change", function () { if (esleme && !mesgul) { esleme.wide = Number(el("pc-genis").value); planla(); } });
     ["pc-min", "pc-max", "pc-hassas", "pc-hold", "pc-periyot"].forEach(function (id) {
       el(id).addEventListener("input", function () { planla(); });
       el(id).addEventListener("change", ayarKaydet);
@@ -485,6 +536,9 @@ window.KMulticam = (function () {
     captionOptions: captionOptions,
     // testler / tanılama
     _durum: function () { return { layout: layout, esleme: esleme, onbellek: onbellek, plan: plan }; },
-    _kur: function (o, e) { onbellek = o; esleme = e; }
+    _kur: function (o, e, l, p) { onbellek = o; esleme = e; if (l !== undefined) layout = l; if (p !== undefined) plan = p; },
+    _analiz: function () { return analiz(); },
+    _onizle: function () { onizlemeCiz(); },
+    _mesgul: function () { return mesgul; }
   };
 })();

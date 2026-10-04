@@ -889,6 +889,13 @@ Liste `marketing/v3-deneme-listesi.md` › 6c'de. Özellikle şunlara bak ve son
 - **Ctrl+Z** ile kaç adımda geri alındığı (Premiere undo gruplamayı desteklemiyor; Kopyada
   uygula bu yüzden varsayılan).
 - 1 saatlik bir podcast'te analiz süresi (mikrofon başına bir Premiere dışa aktarımı yapılır).
+- `TrackItem.disabled` (klip aç / kapa) o sürümde çalışıyor mu? Panel hiçbir kesimden önce tek
+  klipte dener ve geri alır; çalışmıyorsa "Bu Premiere sürümünde Suflo klipleri açıp kapatamıyor"
+  der ve sekansa dokunmaz. Özellikle 14.4'te bu mesajı görürsen sürümü yaz.
+- Kamera klipleri sesle bağlıyken (Ctrl+L ile koparmadan) **Bu sekansta** uygula: iki yönlü bağ
+  varsa hata kesimlerden ÖNCE gelmeli, sekans parçalanmamalı.
+- Kopyada uygula → En kısa planı değiştir → yeniden uygula (kopya açıkken): orijinalden yeni bir
+  kopya oluşmalı, "sekansı yeniden tara" hatası çıkmamalı.
 
 ### 10.3 Bilinen sınırlar (bilerek kapsam dışı)
 
