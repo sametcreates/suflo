@@ -180,5 +180,36 @@ ok("alt köşe: ffmpeg ifadesi logo yüksekliğini düşer", MK.logoPlacement(19
   MK.logoPlacement(1920, 1080, "au", 0.1, false).yExpr);
 ok("geçersiz köşe → sol üst, oran kırpılır", MK.logoPlacement(1920, 1080, "x", 5).x === 43 && MK.logoPlacement(1920, 1080, "x", 5).lw === 480);
 
+/* ---------------- suflo.app/stil sayfası (docs/js/stil-sayfa.js, sahte DOM) ---------------- */
+var vm = require("vm");
+var E = require(path.join(kok, "js", "style-engine.js"));
+var sayfaSrc = fs.readFileSync(path.join(kok, "docs", "js", "stil-sayfa.js"), "utf8");
+var adlar = new Function("var window = {}, document = { getElementById: function () { return { addEventListener: function () {} }; } }; " +
+  sayfaSrc.slice(sayfaSrc.indexOf("var STILLER = {"), sayfaSrc.indexOf("};", sayfaSrc.indexOf("var STILLER = {")) + 2) + " return STILLER;")();
+ok("sayfadaki stil adları motorla aynı (her Suflo Stili)", JSON.stringify(adlar) === JSON.stringify(E.list().reduce(function (o, p) { o[p.id] = p.name; return o; }, {})), JSON.stringify(adlar));
+ok("her Suflo Stilinin site önizlemesi var", E.list().every(function (p) { return fs.existsSync(path.join(kok, "docs", "gorseller", "suflo-stiller", p.id + ".webm")); }));
+function sayfa(hash) {
+  var D = {};
+  function e(id) { if (!D[id]) D[id] = { id: id, hidden: false, textContent: "", title: "", style: {}, src: "", addEventListener: function () {}, play: function () { return { catch: function () {} }; } }; return D[id]; }
+  var c = { window: {}, document: { getElementById: e, title: "" }, location: { hash: hash }, navigator: {}, decodeURIComponent: decodeURIComponent, String: String, setTimeout: setTimeout };
+  c.window.addEventListener = function () {};
+  vm.createContext(c);
+  vm.runInContext(fs.readFileSync(path.join(kok, "docs", "js", "style-share.js"), "utf8"), c);
+  vm.runInContext(sayfaSrc, c);
+  return { D: D, doc: c.document };
+}
+var s1 = sayfa("#" + SS.encode({ styleId: "neon", overrides: { font: "Lora", renk: "#FF0000", vurguRenk: "#00ff00", konum: 8 }, author: "Ayşe_Kurgu" }));
+ok("sayfa: geçerli kod gösterilir (ad, yazar, font, konum, video)", !s1.D["stil-icerik"].hidden && s1.D["stil-hata"].hidden &&
+  s1.D["stil-ad"].textContent === "Neon · @Ayşe_Kurgu" && s1.D["stil-yazar"].textContent === "@Ayşe_Kurgu" && s1.D["stil-font"].textContent === "Lora" &&
+  s1.D["stil-konum"].textContent === "Üst" && s1.D["stil-video"].src === "gorseller/suflo-stiller/neon.webm", JSON.stringify(s1.D["stil-ad"]));
+ok("sayfa: renkler yalnız doğrulanmış hex, eksik renk gizli", s1.D["renk-yazi"].style.backgroundColor === "#ff0000" && s1.D["renk-vurgu"].style.backgroundColor === "#00ff00");
+ok("sayfa: kontur rengi yoksa kutu gizli", s1.D["renk-kontur"].hidden === true);
+var s2 = sayfa("#" + "SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "viral", author: "<img src=x onerror=alert(1)>" })));
+ok("sayfa: kötü yazar → hata kartı, içerik gizli", !s2.D["stil-hata"].hidden && s2.D["stil-icerik"].hidden && /yazar/.test(s2.D["stil-hata-metin"].textContent));
+var s3 = sayfa("#SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzayli" })));
+ok("sayfa: bilinmeyen stil → hata, video yok", !s3.D["stil-hata"].hidden && s3.D["stil-icerik"].hidden && (!s3.D["stil-video"] || s3.D["stil-video"].src === ""));
+var s4 = sayfa("");
+ok("sayfa: kodsuz ziyaret → yalnız nasıl kullanılır", s4.D["stil-hata"].hidden && s4.D["stil-icerik"].hidden);
+
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

@@ -718,3 +718,60 @@ cümleyi yarıda kesip baştan al ("Şimdi size… Şimdi size ışığı göste
   (3 çekim → tek tık → temiz) Shorts ve Reels için en güçlü malzeme.
 - **AI'nın "farklı sözcüklerle tekrar"ı bulduğunu pazarlama**: prototipte bu ayrım zayıftı
   (yalnız 0,60–0,67 aralığı). Mesaj "baştan aldığın cümleleri bulur" olmalı.
+
+## 8. Marka Kiti + stil ince ayarı + paylaşılabilir stil kodları
+
+Kod tamam ve testli; **senden anahtar ya da hesap istemiyor**. Stil kodları (`SFL1.…`) tamamen
+istemcide çözülür: sunucu yok, kod adresin `#` kısmında durur (sunucuya, günlüğe gitmez).
+Yeni site sayfası `docs/stil.html` (suflo.app/stil) ve 12 Suflo Stilinin vitrin videoları
+`docs/gorseller/suflo-stiller/*.webm` yayına hazır; yeniden üretmek için
+`node tools/render-style-previews.js --site` (libass'li ffmpeg gerekir).
+
+### 8.1 Premiere'de elle deneme (yaklaşık 20 dk)
+
+1. **İnce ayar yalnız Suflo Stilinde:** Altyazı › Stil kartında bir MOGRT şablonu seç: "İnce ayar"
+   görünmemeli. Bir Suflo Stili (ör. Bold Box) seç: "İnce ayar" açılmalı; içinde Animasyon ve
+   Arka plan kutusu OLMAMALI, Yazı tipi listesinde "Sistem" grubu soluk (seçilemez) olmalı.
+   Vurgu rengi kutusu soluk olmamalı ve değişince önizlemede aktif kelimenin rengi değişmeli.
+2. **Platform arayüzünden kaçın:** 1080x1920 bir sekans aç. Kutucuk yalnız 9:16'da görünmeli.
+   Viral Vurgu + uzun kelimeli bir altyazıyla aç/kapat: açıkken önizlemede yazı sağdaki kırmızı
+   ikon sütunu kutusuna girmemeli. 16:9 sekansta kutucuk gizli olmalı.
+3. **Paylaş / yapıştır:** İnce ayar › "Adın" alanına adını yaz, "Stili paylaş"a bas. Panodaki
+   iki satır: `SFL1.…` kodu ve `https://suflo.app/stil#SFL1.…` bağlantısı. Başka bir stil seç,
+   kodu Stil kartındaki "Stil kodu yapıştır" kutusuna yapıştırıp Uygula: aynı stil, renk ve yazı
+   tipi gelmeli; stil ızgarasının üstünde "Stil: @adın" çipi görünmeli; önizleme oynamalı.
+   Bozuk bir kod (son 10 karakteri sil) "Stil kodu bozuk…" uyarısı vermeli, hiçbir şey değişmemeli.
+4. **.suflo-stil:** "dışa aktar" masaüstüne `suflo-stil-<stil>.suflo-stil` yazmalı; "içe aktar" ile
+   aynı dosyayı seçince 3. adımdaki gibi uygulanmalı.
+5. **Varsayılana dön:** ince ayarları boz, "Varsayılana dön": stilin kendi ayarları gelmeli.
+6. **Marka Kiti:** Ayarlar › Marka Kiti: yazı tipi Lora, "Marka renklerini kullan" açık, kendi
+   renklerin, logo olarak saydam bir PNG, köşe Sol üst, boyut %14; "Marka kitini her stile…"yi aç.
+   Altyazı sekmesinde stil ızgarasının üstünde "Marka kiti açık" çipi çıkmalı; her Suflo Stili
+   kartına basınca kitin yazı tipi/renkleriyle gelmeli; önizlemede logo sol üstte görünmeli.
+7. **Logo katmanda:** Pro (ya da deneme hakkı) ile "… ile ekle": katmanda logo sol üstte, yazılar
+   aynen; katman sekansın SONUNA kadar uzamalı (sekanstan uzun olmamalı). Logoyu diskten silip
+   tekrar ekle: "Marka Kiti logosu bulunamadı; katman logosuz eklendi" uyarısı çıkmalı.
+   Logonun kenarlarında koyu hale OLMAMALI (yarı saydam PNG ile kontrol et).
+8. **9:16 + logo:** dikey sekansta "Platform arayüzünden kaçın" açıkken Sağ üst köşe: logo üst
+   çubuğun (%7) altında ve ikon sütununun solunda kalmalı.
+9. **Kanca başlığı:** kit açıkken Kanca sekmesinde "Marka kiti açık: yazı tipi ve renkler kitten
+   gelir" notu görünmeli; önizleme kitin yazı tipiyle çizilmeli.
+10. **Şimdiki ayarlardan doldur:** Altyazı'da bir stil + ince ayar seç, Ayarlar › Marka Kiti ›
+    "Şimdiki ayarlardan doldur": alanlar dolmalı. Sistem yazı tipi (Arial) seçiliyken uyarı vermeli.
+11. **İngilizce arayüz:** Ayarlar › Arayüz dili English: kart başlıkları "Brand kit", "Share style",
+    "Avoid platform UI" olmalı; "Stil: @ad" çipindeki ad çevrilmemeli.
+
+### 8.2 Site
+
+- `docs/stil.html` yayına girince `https://suflo.app/stil#<panelden kopyaladığın kod>` aç:
+  stil adı, yazarın, renk kutuları, yazı tipi, konum ve temel stilin videosu görünmeli; "Kodu
+  kopyala" çalışmalı, "Suflo'yu indir" GitHub releases/latest'e gitmeli. Kodsuz `/stil` yalnız
+  "nasıl kullanılır" kartını göstermeli. Search Console'a sitemap yeniden gönderilebilir.
+
+### 8.3 Tanıtım (isteğe bağlı)
+
+- Her paylaşılan kod bir Suflo reklamı: Instagram/TikTok'ta "stilimi kopyala" gönderilerine
+  `suflo.app/stil#…` bağlantısı koymayı öner. İlk 5-10 hazır kodu (kendi markan, birkaç popüler
+  renk) bir blog yazısında ya da sabit gönderide topla.
+- Kullanıcıların kendi yerel yazı tiplerini yüklemesi (TTF ad tablosu + Türkçe glif denetimi)
+  bilerek ertelendi; istek gelirse sıradaki sürüm.

@@ -1,4 +1,9 @@
-/* Stil kartlari icin, gercek Suflo Stil Motoru ile WebM onizlemeleri uretir. */
+/*
+ * Stil kartlari icin, gercek Suflo Stil Motoru ile WebM onizlemeleri uretir.
+ *   node tools/render-style-previews.js           panel kartlari (assets/style-previews) + site
+ *   node tools/render-style-previews.js --site    yalniz site: suflo.app/stil sayfasinin tum Suflo
+ *                                                 Stilleri vitrini (docs/gorseller/suflo-stiller/<id>.webm)
+ */
 var fs = require("fs");
 var path = require("path");
 var cp = require("child_process");
@@ -44,7 +49,9 @@ function wordCues(words) {
   return cues;
 }
 
-["viral", "pop", "doc", "premium"].forEach(function (id) {
+var yalnizSite = process.argv.indexOf("--site") !== -1;
+
+(yalnizSite ? [] : ["viral", "pop", "doc", "premium"]).forEach(function (id) {
   var cues = id === "doc"
     ? [{ start: 0.2, end: 2.65, text: "Hikâyenin başladığı yer." }]
     : wordCues(samples[id]);
@@ -67,5 +74,34 @@ function wordCues(words) {
   if (result.status !== 0 || !fs.existsSync(webmPath)) {
     throw new Error(id + " onizlemesi uretilemedi: " + String(result.stderr || "").slice(-400));
   }
+  console.log(id + " -> " + path.relative(root, webmPath) + " (" + fs.statSync(webmPath).size + " B)");
+});
+
+/*
+ * Site vitrini: suflo.app/stil#KOD sayfasi kodun temel stilini burada oynatir. Tum motor
+ * stilleri ayni sakin sahne ve ayni ornek cumleyle (kelime zamanli) 480x270 WebM olur.
+ */
+var siteCikti = path.join(root, "docs", "gorseller", "suflo-stiller");
+fs.mkdirSync(siteCikti, { recursive: true });
+var siteSahne = "gradients=s=1280x720:r=24:d=3.2:c0=#0d1220:c1=#24304a:c2=#101522:n=3:type=radial:x0=360:y0=200:x1=1100:y1=640:speed=.01";
+var siteKelimeler = { upper: ["BUNU", "*SAKIN*", "KAÇIRMA", "ARKADAŞLAR"], normal: ["Bunu", "*sakın*", "kaçırma", "arkadaşlar"] };
+engine.list().forEach(function (p) {
+  var id = p.id;
+  var kelimeler = p.text.kase === "upper" ? siteKelimeler.upper : siteKelimeler.normal;
+  var cues = id === "doc"
+    ? [{ start: 0.2, end: 3.0, text: "Hikâyenin *başladığı* yer." }]
+    : kelimeler.map(function (w, i) {
+      return { start: 0.15 + i * 0.7, end: i === kelimeler.length - 1 ? 3.0 : 0.8 + i * 0.7, text: w };
+    });
+  var built = engine.compile({ styleId: id, cues: cues, cueKind: "words", width: 1280, height: 720 });
+  var assName = "_site_" + id + ".ass";
+  var assPath = path.join(siteCikti, assName);
+  var webmPath = path.join(siteCikti, id + ".webm");
+  fs.writeFileSync(assPath, built.ass, "utf8");
+  var vf = "vignette=PI/5,ass=docs/gorseller/suflo-stiller/" + assName + ":fontsdir=fonts,scale=480:270:flags=lanczos";
+  var r = cp.spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", siteSahne, "-vf", vf,
+    "-c:v", "libvpx-vp9", "-crf", "36", "-b:v", "0", "-pix_fmt", "yuv420p", "-an", webmPath], { cwd: root, encoding: "utf8" });
+  try { fs.unlinkSync(assPath); } catch (e) {}
+  if (r.status !== 0 || !fs.existsSync(webmPath)) throw new Error(id + " site onizlemesi uretilemedi: " + String(r.stderr || "").slice(-400));
   console.log(id + " -> " + path.relative(root, webmPath) + " (" + fs.statSync(webmPath).size + " B)");
 });

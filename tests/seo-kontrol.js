@@ -134,6 +134,31 @@ enSayfalar.forEach(function (f) {
       faq.mainEntity.every(function (q, i) { return cozul(sss[i].replace(/<\/?(details|summary)>/g, "")) === q.name; }));
   }
 });
+/* ---------------- suflo.app/stil: paylaşılan stil kodu sayfası ---------------- */
+var stilYol = D + "stil.html";
+chk("stil.html var", fs.existsSync(stilYol));
+if (fs.existsSync(stilYol)) {
+  var st = fs.readFileSync(stilYol, "utf8");
+  var stBaslik = (st.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
+  var stAcik = (st.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
+  chk("stil.html: title ≤ 60 ve Suflo Stili geçiyor", stBaslik.length > 10 && stBaslik.length <= 60 && /Suflo Stili/.test(stBaslik), stBaslik);
+  chk("stil.html: description 120-160", stAcik.length >= 120 && stAcik.length <= 160, stAcik.length + " karakter");
+  chk("stil.html: canonical, og:title/description/url/image, twitter:card, og:locale",
+    /rel="canonical" href="https:\/\/suflo\.app\/stil"/.test(st) && /property="og:title"/.test(st) && /property="og:description"/.test(st) &&
+    /property="og:url" content="https:\/\/suflo\.app\/stil"/.test(st) && /property="og:image" content="https:\/\/suflo\.app\/og\.png"/.test(st) &&
+    /twitter:card/.test(st) && /og:locale" content="tr_TR"/.test(st));
+  chk("stil.html: site haritasında", sitemapSrc.indexOf("<loc>https://suflo.app/stil</loc>") !== -1);
+  var csp = (st.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/) || [])[1] || "";
+  chk("stil.html: CSP script-src 'self' (satır içi betik yok)", /script-src 'self'(;|$)/.test(csp) && !/unsafe-inline[^;]*;?\s*$/.test(csp.split("script-src")[1].split(";")[0]) &&
+    !/<script(?![^>]*\ssrc=)[^>]*>/.test(st), csp);
+  chk("stil.html: yalnız yerel betikler (style-share + stil-sayfa)", (st.match(/<script src="([^"]+)"/g) || []).join(" ") === '<script src="js/style-share.js" <script src="js/stil-sayfa.js"');
+  chk("stil.html: indirme bağlantısı releases/latest", /href="https:\/\/github\.com\/sametcreates\/suflo\/releases\/latest">Suflo'yu indir</.test(st));
+  chk("stil.html: Kodu kopyala düğmesi", /id="kodu-kopyala"[^>]*>Kodu kopyala</.test(st));
+  var sayfaJs = fs.readFileSync(D + "js/stil-sayfa.js", "utf8");
+  chk("stil-sayfa.js: innerHTML / document.write yok, metin textContent ile", !/innerHTML|outerHTML|document\.write|insertAdjacentHTML/.test(sayfaJs) && /textContent/.test(sayfaJs));
+  chk("stil-sayfa.js: renk yalnız doğrulanmış hex ile", /SS\.isColor\(deger\)/.test(sayfaJs));
+}
+
 chk("TR ana sayfa altbilgisinde English bağlantısı", /<a href="\/en\/" hreflang="en" lang="en">English<\/a>/.test(h));
 
 console.log(s.join("\n"));
