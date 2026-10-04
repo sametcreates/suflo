@@ -19,6 +19,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **İlk altyazın 2 dakikada** *(3.1)* | İlk açılışta 4 adımlı rehber: hızlı küçük model (Türkçe: Small, 190 MB, ffmpeg arkada), örnek klipte deneme, stil önizlemesi, ücretsiz Groq anahtarı sihirbazı (panodan al + doğrula). AI düğmelerinde "anahtar gerekli · 1 dk" kısayolu |
 | **Pro'yu dene** *(3.1)* | Kodla çalışan her Pro aracına kendi videonda 3 deneme hakkı: otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir, Suflo Stilleri katmanı ve kanca başlığı, çeviri, ritim. Haklar süresiz; hak yalnız işlem başarıyla bitince düşer. Deneme stilli katmanlarında küçük bir suflo.app filigranı olur, Pro'yu alınca temiz yeniden oluşturulur |
 | **Davet et, kazan** *(3.1)* | Ayarlar'da davet kartı: Pro sahibine kişisel davet kodu (arkadaşına %15 indirim), Kopyala, WhatsApp, X, Instagram ve 1080x1920 Story kartı, "2/3 davet" ilerlemesi; 1 ve 3 davette panele kendiliğinden inen ödül paketleri. Ücretsizde kişisel bilgi taşımayan paylaşım bağlantısı. İlk kesim, ilk Shorts ve 5. uygulamadan sonra modal olmayan bir şerit (30 günde en çok bir kez, "bir daha gösterme"). Paylaşım metnine isteğe bağlı "Altyazılar: Suflo · suflo.app" satırı. Sunucu tarafı kurucu açana dek uyur |
+| **English (beta) arayüz** *(3.1)* | Ayarlar › Destek › Arayüz dili: Türkçe ya da English (beta); yeniden yüklemeden geçer, iş sürerken kilitli. Güncelleyenler Türkçe kalır, taze kurulumda rehberin ilk adımı sorar. İngilizcede fiyat ödemeyle aynı para biriminde (USD ödeme açılana dek "749 TRY (≈ $19)"); altyazı dili Otomatik, seçicide Whisper'ın 99 dili. Premiere'deki bin/marker adları değişmez |
 | **Viral Skor 2.0** *(3.1)* | Viral anlara açıklamalı 0–100 puan: kanca, bağımsızlık, duygu, değer ve kapanış alt puanları ile tek satırlık neden (toplam yerelde hesaplanır). Tür (podcast, eğitim, komedi…), adet (3–10) ve "ne arıyorsun?" odağı; klipler cümle ortasında başlamaz/bitmez, kartta ±1 cümle düğmeleri; 3 kanca başlığı seçeneği "Başlık ekle"ye gider. Puanlar tahmindir, izlenme garantisi değildir |
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
@@ -270,7 +271,12 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-referral-server.js` | `php -S` + Node'da sahte Lemon Squeezy: uyuyan özellik 503, geçersiz lisans 403, JSON:API indirim oluşturma ve kodun yeniden kullanımı, sayaçta iade/ödenmemiş/kendi e-postası/tekrar/14 günden genç siparişlerin dışlanması, 600 sn önbellek, 422 yumuşak hata, yanıtlarda e-posta ve anahtar olmaması, extras yalnız kademe ≥ 1 ve istemci ≥ 3.1.0, `davet/` yolu ref kademesi olmadan reddedilir, attribution kaydı (php yoksa atlanır) |
 | `test-site-davet.js` | suflo.app davet betiği: `?d=` ve `?ref=` doğrulanır, 30 gün saklanır, Lemon Squeezy bağlantılarına `checkout[discount_code]` / `checkout[custom][ref]` olarak eklenir; ortaklık sayfası ve site haritası |
 | `test-v175.js` | Sürüm regresyonları |
-| `seo-kontrol.js` | `docs/` site çıktısı: meta etiketler, JSON-LD, sitemap |
+| `test-i18n.js` | İngilizce arayüz: dil çözümü (güncelleyen Türkçe kalır, taze kurulumda sor), settings.json kaydı, `lang=en`, yeniden yüklemesiz geri dönüş, çok satırlı metin, kapsama (index.html, js, host.jsx ≥ %95), performans |
+| `test-pricing.js` | Fiyat modülü: Türkçe çıktı v3.0 ile bayt bayt aynı, gösterilen fiyat = açılan ödeme (USD varyantı yokken TRY), en.js fiyat kalıbı |
+| `test-marka.js` | Marka güvenli görünen adlar (Clean Pill, Bold Box), kimlikler ve render çıktısı aynı |
+| `test-diller.js` | Altyazı dili seçicisinde Whisper'ın 99 dili ve CJK/Hint glif notu |
+| `test-kurucu-kaynak.js` | İki dilli kurucu (E/e ve Y/y onayı) ve paketleme listelerinde `i18n` |
+| `seo-kontrol.js` | `docs/` site çıktısı: meta etiketler, JSON-LD, sitemap; İngilizce sayfalarda karşılıklı hreflang, og:locale, canlı ödemeyle aynı fiyat ve para birimi |
 | `cakisma.js` | CSS sınıf adı çakışmaları (aynı ada iki tanım) |
 
 `test-export.js` ve `test-burn.js` `ffmpeg` ister; yoksa atlanır.
@@ -286,6 +292,28 @@ MOGRT/SFX/Emoji Assets kütüphanesi ve Akıllı SFX aynı iş akışında bulu�
 - Azerice arayüz çevirisi
 
 Kelime kelime vurgulu altyazıyı timeline'a koyma listeden çıktı — 2.4.0 ile geldi, Pro katmanında.
+
+## English
+
+Suflo is a free, open-source Premiere Pro panel for auto captions with local Whisper (99 languages,
+no uploads, no account), plus an optional one-time-price Pro tier: Auto Cut, text-based cut, viral
+Shorts with an explained 0–100 score, animated caption styles, transitions and content libraries.
+
+- **English interface (beta):** pick English on first launch, or switch any time under
+  Settings › Support › Interface language. No reload needed. Bin and marker names that Suflo creates
+  in Premiere (Suflo Altyazi, Suflo Shorts) stay the same.
+- **Price:** Pro is a one-time purchase. Until the USD checkout opens, the English UI and site show
+  **749 TRY (≈ $19)** and open the TRY checkout, so the price you see is always what you pay.
+  Every Pro tool gives you 3 free tries on your own footage first.
+- **Install:** Premiere Pro 2020 (14.4) or newer on Windows/macOS. Download the
+  [latest release](https://github.com/sametcreates/suflo/releases/latest); the installer is bilingual.
+- **Website and guides:** [suflo.app/en](https://suflo.app/en/) ·
+  [Free local auto captions for Premiere](https://suflo.app/en/blog/free-local-auto-captions-premiere-whisper) ·
+  [OpusClip alternative inside Premiere](https://suflo.app/en/blog/opusclip-alternative-premiere) ·
+  [AutoCut / FireCut alternative](https://suflo.app/en/blog/autocut-firecut-alternative)
+
+Found a string that is still Turkish? [Open an issue](https://github.com/sametcreates/suflo/issues)
+with a screenshot.
 
 ## Lisans
 

@@ -591,3 +591,73 @@ dese de hiçbir ödül inmez.
 7. **Ödüller (5.4'ten sonra, 3.1.0 panelle):** tier'i 1 olan bir lisansla Pro içeriklerini eşitle;
    `pro-content/davet/t1/` dolmalı, SFX'te ödül sesleri "SUFLO PRO" koleksiyonunda görünmeli,
    bir sesi timeline'a sürükleyip Premiere açıkken yeniden eşitleme hatasız bitmeli.
+
+## 6. English (beta) arayüz + global satış (USD fiyat, marka güvenli adlar, İngilizce site)
+
+Panel artık İngilizceyi gerçekten yükler. Dil sırası: `settings.json`'daki `uiLang` → eski
+`localStorage` seçimi → settings.json bu açılıştan önce varsa **Türkçe** (her güncelleyen Türkçe
+kalır; Premiere'in Türkçe arayüzü olmadığı için `navigator.language` çoğu Türk kurulumda `en-US`
+döner, ona güvenilmez) → taze kurulumda rehberin iki dilli 0. adımı sorar. Fiyat tek kaynaktan
+gelir (`js/pricing.js`): USD varyantı açılana kadar İngilizce arayüz ve İngilizce site
+**"749 TRY (≈ $19)"** gösterir ve TRY ödemesini açar. Gösterilen fiyat ile açılan ödeme her zaman
+aynı para birimindedir; senin bir şey yapmana gerek yok, satış bugün de çalışır.
+
+### 6.1 USD varyantını aç (yaklaşık 15 dk, istediğin zaman)
+
+1. Lemon Squeezy › Products › **Suflo Pro** (ürün `1302656`) › Variants › **Add variant**.
+   Ad: `Suflo Pro (USD)`, fiyat **$39**, para birimi USD, "Pay once" (abonelik değil). İstersen
+   karşılaştırma fiyatı olarak $59 yaz. Lisans anahtarı üretimini TRY varyantıyla aynı ayarla aç
+   (aynı aktivasyon sınırı).
+2. Varyantın **Share** düğmesinden ödeme adresini kopyala: `https://suflo.lemonsqueezy.com/checkout/buy/<uuid>`.
+3. `js/pricing.js` içinde `PRICING.en.url` alanına bu adresi yaz (başka bir şeyi değiştirme).
+   Lisans tarafında değişiklik gerekmez: `js/pro.js` ve sunucu `VARIANT_ID 0` ile her varyantı kabul eder.
+4. `node tools/test.js` çalıştır. `tests/seo-kontrol.js` İngilizce sitenin eski TRY fiyatında
+   kaldığını söyleyip **kalacak**: siteyi de güncellemen gerekir (6.2).
+5. Test modunda bir USD satın alımı yap, gelen anahtarı panelde etkinleştir; Pro açılmalı.
+
+### 6.2 İngilizce siteyi USD'ye çevir (USD varyantından sonra, yaklaşık 10 dk)
+
+İngilizce sayfalar (`docs/en/`) fiyatı ve ödeme adresini `js/pricing.js`'ten alarak üretildi;
+`tests/seo-kontrol.js` her sayfada gösterilen fiyatın (`data-price`), ödeme adresinin ve JSON-LD
+`priceCurrency`'nin `SufloPricing`'le aynı olduğunu denetler. USD varyantından sonra:
+
+1. `docs/en/index.html` ve `docs/en/pro.html` içinde `749 TRY (≈ $19)` → `$39`, ödeme adresi →
+   USD varyantının adresi, `"priceCurrency":"TRY"` → `"USD"`, `"price":"749"` → `"39"`.
+   "Checkout is in Turkish lira for now…" ve "Why is the price shown in Turkish lira?" metinlerini sil
+   ya da "Prices in USD, tax added at checkout" diye değiştir. Bloglardaki tablolarda da aynı fiyatı düzelt.
+2. `node tests/seo-kontrol.js` tamamen geçmeli.
+
+### 6.3 Premiere'de elle deneme (yayından önce, yaklaşık 30 dk)
+
+1. **Güncelleyen kullanıcı:** mevcut bir kurulumun üstüne kur (settings.json duruyor). Premiere
+   İngilizce olsa bile panel **Türkçe** açılmalı, 0. adım çıkmamalı.
+2. **Taze kurulum:** `%APPDATA%\Kesit\settings.json`'ı (Mac: `~/Library/Application Support/Kesit/settings.json`)
+   yedekleyip sil. Altyazı sekmesinin üstünde "Arayüz dili · Interface language" kutusu, Premiere'in
+   diline göre vurgulanmış bir düğmeyle çıkmalı. **English (beta)**'ya bas: panel yeniden yüklenmeden
+   İngilizceye geçmeli; altyazı dili Otomatik olmalı; stil kartlarında "Don't miss this" yazmalı.
+3. **Büyük harf:** İngilizcede "SETTINGS" gibi büyük harfli başlıklar noktalı İ ile ("SETTİNGS")
+   yazılmamalı.
+4. **Geri dönüş:** Ayarlar › Destek › Arayüz dili › Türkçe: panel yeniden yüklenmeden Türkçeye dönmeli,
+   açık altyazı ve taslak kaybolmamalı. Bir altyazı oluşturulurken seçici gri (kapalı) olmalı.
+5. **Fiyat:** İngilizcede bir Pro düğmesine bas; pencerede **749 TRY (≈ $19)** yazmalı, "Get Suflo Pro"
+   TRY ödeme sayfasını açmalı. Türkçede her şey eskisi gibi **749 TL**.
+6. **Hata metinleri:** sekans açık değilken Geçişler'den bir geçiş uygula; İngilizcede "No active sequence."
+   görünmeli. Premiere'de oluşan bin/marker adları (Suflo Altyazi, Suflo Shorts) iki dilde aynı kalmalı.
+7. **Diğer diller:** Altyazı › Dil › Diğer diller'den Japonca seç; "Bu alfabe stilli altyazı…"
+   (İngilizcede "The styled caption layer's fonts may not include this script…") notu çıkmalı.
+8. **Kurucu:** Windows `Suflo-Kur.bat`'ı Premiere açıkken çalıştır; soruya `Y` yaz, kurulum devam etmeli
+   (eskiden iptal ediyordu). `H` / `N` iptal etmeli. Mac `.command`'da da aynı.
+9. **Paket:** `tools\kurucu-yap.ps1` ve `tools\package.ps1` ile paket üret; `tools\verify-release.ps1`
+   geçmeli (`i18n/en.js`, `js/i18n.js`, `js/pricing.js` zorunlu). Kurulumdan sonra panel klasöründe
+   `i18n\en.js` olmalı.
+
+### 6.4 İngilizce site ve lansman
+
+1. `docs/en/` sayfaları (ana sayfa, Pro, 3 rehber) sitemap'te; yayından sonra Search Console'da
+   `https://suflo.app/en/` için **URL denetimi › Dizine eklenmeyi iste** yap.
+2. Rakip fiyatlarını (OpusClip, AutoCut, FireCut) 2.1'deki gibi doğrula; İngilizce rehberlerdeki
+   tablolar Türkçe rehberlerle aynı rakamları kullanıyor, ikisini birlikte güncelle.
+3. Product Hunt, Reddit ve X için metinler `marketing/product-hunt-kit.md`'de. Lansman günü öncesinde
+   1270×760 galeri görselleri ve 30-60 sn'lik İngilizce demo videosu çekilmeli (kitte liste var).
+4. Bundan sonra eklenen her yeni Türkçe metnin İngilizcesi aynı değişiklikte `i18n/en.js`'e girer
+   (`tests/test-i18n.js` ve `node tools/i18n-coverage.js` bunu denetler).
