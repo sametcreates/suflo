@@ -331,6 +331,13 @@ while ((m = tre.exec(temiz))) {
   if (!tanim && !tikBagla && !denemeTiklamasi) tiklaRef.push(ad + " @" + temiz.slice(0, m.index).split("\n").length);
 }
 ok("*Tikla işleyicileri yalnız click olayına bağlanır (init'ten çağrılmaz)", tiklaHelper && tiklaRef.length === 0, tiklaRef.join(" | "));
+// 0. adım: arayüz dili (taze kurulumda). Dili kullanıcı seçer; Premiere'in dili yalnız vurguyu belirler
+var dilCizGovde = obSrc.slice(obSrc.indexOf("function dilCiz("), obSrc.indexOf("function dilSec("));
+ok("0. adım yalnız dil seçilmemişken görünür, öneri yalnız vurgu", /I\.needsChoice\(\)/.test(dilCizGovde) && /kutu\.hidden = !sor/.test(dilCizGovde) &&
+  /I\.detect \? I\.detect\(\)/.test(dilCizGovde) && /" primary"/.test(dilCizGovde) && !/switchLang|setLang/.test(dilCizGovde));
+ok("0. adım düğmeleri click'e bağlı, seçim switchLang ile (iş sürerken korumalı)",
+  /tikla\("ia-dil-tr", function \(\) \{ dilSec\("tr"\); \}\)/.test(obSrc) && /tikla\("ia-dil-en", function \(\) \{ dilSec\("en"\); \}\)/.test(obSrc) &&
+  /I\.switchLang\(l, \{ busy: /.test(obSrc) && /dilCiz\(acik\)/.test(obSrc));
 
 // Çalıştırarak: sahte DOM + sahte K ile init → hiçbir Premiere çağrısı yok
 var html = fs.readFileSync(path.join(KOK, "index.html"), "utf8");

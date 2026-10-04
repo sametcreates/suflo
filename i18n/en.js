@@ -2094,6 +2094,30 @@
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */
+  /* ================= English (beta) UI + global sales (v3.1) ================= */
+  add({
+    "Bu alfabe stilli altyazı katmanının yazı tiplerinde olmayabilir; altyazı izi ve SRT her zaman çalışır.": "The styled caption layer's fonts may not include this script; the caption track and SRT always work.",
+    "English (beta): Premiere'deki bin ve marker adları (Suflo Altyazi, Suflo Shorts) aynı kalır. Bir iş sürerken dil değiştirilemez.": "English (beta): bin and marker names in Premiere (Suflo Altyazi, Suflo Shorts) stay as they are. The language can't be changed while a job is running.",
+    "Bir iş sürüyor; arayüz dilini iş bitince değiştir.": "A job is running; change the interface language when it finishes.",
+    "Diğer diller": "More languages",
+    // <optgroup label> (translated since v3.1)
+    "Her modda": "In every mode",
+    "Kelime zamanlı (Satır uzunluğu → Karaoke)": "Word-timed (Line length → Karaoke)",
+    "Kelime zamanlı": "Word-timed",
+    "Satır stili": "Line style",
+    "Sistem": "System",
+    "Suflo ile gelir": "Included with Suflo",
+    "kalan kısım": "remaining part",
+    // invite rewards sync errors (pro-sync.js)
+    "Davet ödül kataloğu geçersiz.": "The invite reward catalog is invalid.",
+    "Bozuk davet ödülü kaydı.": "Corrupt invite reward entry.",
+    "Güvensiz davet ödülü yolu: {}": "Unsafe invite reward path: {}",
+    "Desteklenmeyen davet ödülü: {}": "Unsupported invite reward: {}",
+    "Davet kataloğunda yinelenen dosya: {}": "Duplicate file in the invite catalog: {}",
+    "Davet ödülleri güvenli boyut sınırını aşıyor.": "Invite rewards exceed the safe size limit.",
+    "Güvensiz davet hedefi: {}": "Unsafe invite destination: {}"
+  });
+
   // Prices: one pattern family whose output comes from js/pricing.js (SufloPricing).
   // The shown price always matches the checkout the button opens: until the USD variant
   // exists, English shows "749 TRY (≈ $19)" and opens the TRY checkout.
@@ -2148,7 +2172,8 @@
     "Podcast (−16 LUFS)", "YouTube / Shorts (−14 LUFS)", "Normal", "Aa", "-38 dB",
     "Suflo Deneme",   // Premiere sequence name created by the first-run guide
     "Instagram", "WhatsApp", "Google", "TikTok", "SFL······", "SFLXXXXXX", "suflo.app",   // invite & earn: brands, code mask
-    "Podcast"];       // Viral Score genre (same word in English)
+    "Podcast",        // Viral Score genre (same word in English)
+    "English (beta)", "Türkmençe"];   // language pickers show each language in its own name
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

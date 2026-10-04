@@ -23,7 +23,7 @@
   "use strict";
 
   var LS_KEY = "suflo.uiLang";
-  var ATTRS = ["title", "placeholder", "aria-label", "alt", "data-tip"];
+  var ATTRS = ["title", "placeholder", "aria-label", "alt", "data-tip", "label"];   // label: <optgroup label>
   // Hiç girilmeyen öğeler (kod, stil, kullanıcı metni alanları)
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
   // Kullanıcı içeriği barındıran kaplar: transkript/altyazı düzenleyicisi, önizleme,
@@ -315,9 +315,13 @@
   /* ---------------- DOM ---------------- */
   function isUserZone(el) {
     var id = el.id || (el.getAttribute && el.getAttribute("id"));
-    if (id && USER_CONTENT_IDS.indexOf(id) !== -1) return true;
-    if (el.getAttribute && el.getAttribute("data-i18n-skip") !== null && el.getAttribute("data-i18n-skip") !== undefined) return true;
-    return false;
+    return !!(id && USER_CONTENT_IDS.indexOf(id) !== -1);
+  }
+  // [data-i18n-skip]: hiç girilmez (iki dilli dil seçicileri, büyük listeler)
+  function isSkipped(el) {
+    if (!el.getAttribute) return false;
+    var v = el.getAttribute("data-i18n-skip");
+    return v !== null && v !== undefined;
   }
   function isEditable(el) {
     if (el.isContentEditable) return true;
@@ -372,7 +376,7 @@
         if (tag === "TEXTAREA") translateAttrs(node, false);
         return;
       }
-      if (isEditable(node)) return;
+      if (isEditable(node) || isSkipped(node)) return;
       if (UI_IN_USER_ZONE[tag]) uiAncestor = true;
       // kabın kendi ipucu (ör. tc-words title) arayüz metnidir; kısıt yalnız içindekilere
       translateAttrs(node, inZone && !uiAncestor);
@@ -387,7 +391,7 @@
     var inZone = false, ui = false, p = node.parentNode;
     while (p && p.nodeType === 1) {
       var tag = String(p.tagName || "").toUpperCase();
-      if (SKIP_TAGS[tag] || isEditable(p)) return null;
+      if (SKIP_TAGS[tag] || isEditable(p) || isSkipped(p)) return null;
       if (isUserZone(p)) inZone = true;
       if (UI_IN_USER_ZONE[tag]) ui = true;
       p = p.parentNode;
@@ -414,7 +418,7 @@
         if (c && (!c.inZone || c.ui)) translateText(r.target);
       } else if (r.type === "attributes") {
         var c2 = context(r.target);
-        if (!c2) continue;
+        if (!c2 || isSkipped(r.target)) continue;
         var tg = String(r.target.tagName || "").toUpperCase();
         var zone = c2.inZone, ui = c2.ui || !!UI_IN_USER_ZONE[tg];
         translateAttrs(r.target, zone && !ui);

@@ -161,6 +161,14 @@
   <section id="tab-captions" class="tabpane active">
     <!-- İlk açılış rehberi: "İlk altyazın 2 dakikada". Açıkken #cap-setup motor adımına taşınır (tek kurulum kartı). -->
     <div id="ilk-adim" class="ilk-adim" hidden>
+      <!-- 0. adım (yalnız taze kurulumda): arayüz dili. İki dilli kalır, çevirmen dokunmaz -->
+      <div id="ia-dil" class="ia-dil" hidden data-i18n-skip>
+        <b>Arayüz dili · Interface language</b>
+        <div class="row-btns">
+          <button type="button" id="ia-dil-tr" class="btn" data-dil="tr">Türkçe</button>
+          <button type="button" id="ia-dil-en" class="btn" data-dil="en">English (beta)</button>
+        </div>
+      </div>
       <div class="ia-ust">
         <span class="ia-isaret" aria-hidden="true">2<small>dk</small></span>
         <span class="ia-baslik-sar">
@@ -276,6 +284,7 @@
               <option value="it">Italiano</option>
               <option value="">Otomatik</option>
             </select>
+            <p class="hint" id="cap-lang-glif" hidden>Bu alfabe stilli altyazı katmanının yazı tiplerinde olmayabilir; altyazı izi ve SRT her zaman çalışır.</p>
           </div>
           <div class="field">
             <label for="cap-maxlen">Satır uzunluğu</label>
@@ -1768,6 +1777,14 @@
         <button id="set-copy-log" class="btn">Günlüğü kopyala</button>
         <button id="set-onb-ac" class="btn" type="button" title="İlk altyazı rehberini Altyazı sekmesinin üstünde yeniden aç">Kurulum rehberini aç</button>
       </div>
+      <div class="row" style="margin-top:10px">
+        <label for="set-ui-lang">Arayüz dili</label>
+        <select id="set-ui-lang" data-i18n-skip>
+          <option value="tr">Türkçe</option>
+          <option value="en">English (beta)</option>
+        </select>
+      </div>
+      <p class="hint" id="set-ui-lang-ipucu">English (beta): Premiere'deki bin ve marker adları (Suflo Altyazi, Suflo Shorts) aynı kalır. Bir iş sürerken dil değiştirilemez.</p>
     </div>
 
     <div class="set-group">
@@ -1828,6 +1845,7 @@
   <script src="js/engine.js"></script>
   <script src="js/caption-quality.js"></script>
   <script src="js/caption-text.js"></script>
+  <script src="js/diller.js"></script>
   <script src="js/auto-emoji.js"></script>
   <script src="js/style-engine.js"></script>
   <script src="js/filigran.js"></script>

@@ -702,7 +702,7 @@ window.KCaptions = (function () {
         return w.text.replace(/[.,!?;:…"'«»]/g, "").trim() && isFinite(w.start) && isFinite(w.end);
       });
       words.sort(function (a, b) { return a.start - b.start; });
-      return { clip: clip, lang: algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr", words: words };
+      return { clip: clip, lang: algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili(), words: words };
     } finally {
       temp.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
       algilananDil = belgeDili;
@@ -1018,6 +1018,21 @@ window.KCaptions = (function () {
    * gerektirmez; secilince canli onizleme gercek libass ciktisini oynatir,
    * "ile ekle" seffaf bir video katmani uretip timeline'a koyar.
    */
+  // Stil kartlarındaki örnek sözcükler arayüz dilinde (önizleme kullanıcı bölgesinde, çevirmen dokunmaz)
+  function stilOrnekKelimeleri(buyuk) {
+    var en = arayuzDili() === "en";
+    var k = en ? ["Don't", "miss", "this"] : ["Bunu", "sakın", "kaçırma"];
+    return buyuk ? k.map(function (x) { return x.toLocaleUpperCase(en ? "en-US" : "tr-TR"); }) : k;
+  }
+  function stilOrnekleriniYaz() {
+    var grid = el("cap-stil-grid");
+    if (!grid) return;
+    Array.prototype.forEach.call(grid.querySelectorAll(".sm-ornek"), function (o) {
+      var k = stilOrnekKelimeleri(o.getAttribute("data-kase") === "upper");
+      Array.prototype.forEach.call(o.querySelectorAll(".sm-k"), function (w, i) { if (k[i]) w.textContent = k[i]; });
+    });
+  }
+
   function motorStilleriniCiz() {
     var grid = el("cap-stil-grid");
     if (!grid || !window.SufloStyleEngine) return;
@@ -1057,7 +1072,8 @@ window.KCaptions = (function () {
       ornek.style.color = st.renk;
       ornek.style.setProperty("--sm-vurgu", st.vurguRenk);
       ornek.style.setProperty("--sm-kontur", st.konturRenk);
-      var kelimeler = mp.text.kase === "upper" ? ["BUNU", "SAKIN", "KAÇIRMA"] : ["Bunu", "sakın", "kaçırma"];
+      ornek.setAttribute("data-kase", mp.text.kase === "upper" ? "upper" : "");
+      var kelimeler = stilOrnekKelimeleri(mp.text.kase === "upper");
       kelimeler.forEach(function (k, i) {
         var w = document.createElement("span");   // <i> degil: .stil-sec i kurali kucultup soluklastiriyor
         w.className = "sm-k";
@@ -1381,9 +1397,39 @@ window.KCaptions = (function () {
     } catch (e) {}
   }
 
+  // Dil bilinmediğinde (Otomatik + henüz algılanmadı) arayüz dili: İngilizce arayüzde "tr" varsayımı
+  // İngilizce metni Türkçe büyük harf kuralıyla ("THİS") ve Türkçe istemlerle işlerdi
+  function arayuzDili() {
+    try { return window.SufloI18n ? SufloI18n.getLang() : "tr"; } catch (e) { return "tr"; }
+  }
+
+  // "Diğer diller": Whisper'ın tanıdığı öbür diller (README'deki 99 dil seçicide de olsun)
+  function digerDilleriEkle() {
+    var sel = el("cap-lang");
+    if (!sel || !window.SufloDiller || sel.querySelector("optgroup[data-diger]")) return;
+    var grup = document.createElement("optgroup");
+    grup.label = "Diğer diller";
+    grup.setAttribute("data-diger", "1");
+    SufloDiller.moreLanguages().forEach(function (d) {
+      var o = document.createElement("option");
+      o.value = d[0];
+      o.textContent = d[1];
+      grup.appendChild(o);
+    });
+    sel.appendChild(grup);
+  }
+
+  // CJK / Hint alfabeleri: altyazı izi ve SRT çalışır, stilli katmanın yazı tiplerinde glif olmayabilir
+  function glifUyarisi() {
+    var not = el("cap-lang-glif"), sel = el("cap-lang");
+    if (!not || !sel) return;
+    not.hidden = !(window.SufloDiller && SufloDiller.glyphWarning(sel.value));
+  }
+
   function loadPrefs() {
     var p = K.settings().capPrefs;
-    if (!p) return;
+    // Kayıtlı tercih yokken İngilizce arayüzde altyazı dili Otomatik (Whisper dili kendisi bulur)
+    if (!p) { if (arayuzDili() === "en" && el("cap-lang")) el("cap-lang").value = ""; return; }
     try {
       if (p.lang !== undefined) el("cap-lang").value = p.lang;
       if (p.maxlen) el("cap-maxlen").value = p.maxlen;
@@ -1799,7 +1845,7 @@ window.KCaptions = (function () {
     var len = el("cap-maxlen") ? el("cap-maxlen").value : "c42";
     var mc = /^c(\d+)$/.exec(len);
     return {
-      lang: (ceviriDili && ceviriVar() ? ceviriDili : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || "tr",
+      lang: (ceviriDili && ceviriVar() ? ceviriDili : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || arayuzDili(),
       maxChars: mc ? Number(mc[1]) : 42,
       wordMode: /^k/.test(len) || segmentsMode === "k1" || segmentsMode === "kc"
     };
@@ -1949,7 +1995,7 @@ window.KCaptions = (function () {
   // Anlamina gore satir sonlarina emoji: seyrek, tekrarsiz, Ctrl+Z ile geri alinir
   function otomatikEmoji() {
     if (!segments.length || !window.SufloAutoEmoji) return;
-    var dil = algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr";
+    var dil = algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili();
     var oneriler = window.SufloAutoEmoji.suggest(segments, { lang: dil === "en" ? "en" : "tr" });
     if (!oneriler.length) {
       KApp.toast("Emojiye uygun satır bulunamadı", "warn");
@@ -3091,7 +3137,7 @@ window.KCaptions = (function () {
    */
   function onizlemeMetni() {
     if (!segments.length) {
-      return { kelimeler: ["Örnek", "altyazı", "böyle", "görünecek"], sureler: null };
+      return { kelimeler: arayuzDili() === "en" ? ["This", "is", "your", "caption"] : ["Örnek", "altyazı", "böyle", "görünecek"], sureler: null };
     }
     var karaoke = kelimeModuAktif();
     if (karaoke) {
@@ -4245,13 +4291,23 @@ window.KCaptions = (function () {
       applyPreset(this.value);
       savePrefs();
     });
+    digerDilleriEkle();
     ["cap-maxlen", "cap-case", "cap-punct", "cap-lang"].forEach(function (id) {
       el(id).addEventListener("change", function () {
         if (id !== "cap-lang") el("cap-preset").value = "";
+        if (id === "cap-lang") glifUyarisi();
         savePrefs();
       });
     });
     loadPrefs();
+    glifUyarisi();
+    // Arayüz dili değişince (Ayarlar ya da ilk açılış seçicisi): örnek sözcükler ve kayıtlı
+    // tercih yoksa altyazı dili (İngilizcede Otomatik) yeni dile uyar
+    if (window.SufloI18n && SufloI18n.onChange) SufloI18n.onChange(function (l) {
+      if (!K.settings().capPrefs && el("cap-lang")) { el("cap-lang").value = l === "en" ? "" : "tr"; glifUyarisi(); }
+      stilOrnekleriniYaz();
+      onizlemeCiz();
+    });
     vurguKutusuDurumu();
     onizlemeCiz();
     stilKartiIsaretle(el("cap-preset").value);
@@ -4487,7 +4543,7 @@ window.KCaptions = (function () {
     chatConfig: chatConfig,
     chatCall: chatCall,
     // Bolum/viral basliklari ekrandaki metnin dilinde: ceviri varsa hedef dil
-    language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || "tr"; },
+    language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili(); },
     refreshMogrtStyles: refreshMogrtStyles
   };
 })();

@@ -581,8 +581,45 @@ window.KApp = (function () {
     });
   }
 
+  function arayuzDiliniBaslat() {
+    if (!window.SufloI18n) return;
+    SufloI18n.configure({
+      load: K.settings,
+      save: function () { K.saveSettings(); },
+      settingsExisted: K.ayarDosyasiVardi
+    });
+    if (SufloI18n.getLang() === "en") SufloI18n.start();
+  }
+
+  // Bir Whisper/ffmpeg işi sürüyor mu (dil değişimi o sırada kapalı)
+  function isSuruyor() {
+    try { return !!(K.surecSayisi && K.surecSayisi() > 0); } catch (e) { return false; }
+  }
+
+  // Ayarlar > Destek > Arayüz dili: yeniden yüklemeden geçer (EN → TR özgün metinleri geri koyar)
+  function initDilSecici() {
+    var sec = el("set-ui-lang");
+    if (!sec || !window.SufloI18n) return;
+    sec.value = SufloI18n.getLang();
+    sec.addEventListener("change", function () {
+      if (isSuruyor()) {
+        sec.value = SufloI18n.getLang();
+        toast("Bir iş sürüyor; arayüz dilini iş bitince değiştir.", "warn");
+        return;
+      }
+      SufloI18n.switchLang(sec.value, { busy: isSuruyor });
+    });
+    SufloI18n.onChange(function (l) { sec.value = l; });
+    // İş sürerken seçici kapalı (ucuz yoklama: yalnız disabled bayrağı)
+    setInterval(function () {
+      var mesgul = isSuruyor();
+      if (sec.disabled !== mesgul) sec.disabled = mesgul;
+    }, 1500);
+  }
+
   function initSettings() {
     initPro();
+    initDilSecici();
     // Pro karşılaştırmasındaki fiyat tek kaynaktan (js/pricing.js); İngilizcede çevirmen değiştirir
     if (el("set-pro-fiyat") && window.SufloPricing) el("set-pro-fiyat").textContent = SufloPricing.settingsRow("tr");
 
@@ -1266,6 +1303,10 @@ window.KApp = (function () {
     window.addEventListener("error", function (ev) {
       try { K.log("js hata: " + (ev.message || "") + " @ " + (ev.filename || "") + ":" + (ev.lineno || 0)); } catch (e) {}
     });
+
+    // Arayüz dili EN ÖNCE: bağlam yoklamasından ve her pencereden önce. Dil settings.json'da
+    // (uiLang); eski kurulumlar Türkçe kalır, taze kurulumda rehberin 0. adımı sorar
+    guvenli("Dil", arayuzDiliniBaslat);
 
     // Sürüm etiketleri tek kaynaktan (bridge.js VERSION) beslenir: elle yazılan
     // "v1.7" her yayında geride kalıyor, kullanıcı hangi sürümde olduğunu bilemiyordu

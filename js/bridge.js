@@ -176,6 +176,10 @@ window.K = (function () {
 
   /* ---------------- Süreç çalıştırma ---------------- */
 
+  // Süren alt süreç sayısı (Whisper, ffmpeg…): arayüz dili iş sürerken değiştirilmez
+  var aktifSurec = 0;
+  function surecSayisi() { return aktifSurec; }
+
   function run(cmd, args, opts) {
     opts = opts || {};
     return new Promise(function (resolve) {
@@ -205,16 +209,19 @@ window.K = (function () {
         return;
       }
       var out = "", err = "", done = false;
+      aktifSurec++;
       var timer = setTimeout(function () {
         if (done) return;
         try { child.kill(); } catch (e) {}
         done = true;
+        aktifSurec = Math.max(0, aktifSurec - 1);
         resolve({ code: -1, stdout: out, stderr: err + "\n[zaman aşımı]" });
       }, opts.timeout || 300000);
 
       function finish(code) {
         if (done) return;
         done = true;
+        aktifSurec = Math.max(0, aktifSurec - 1);
         clearTimeout(timer);
         if (code !== 0) {
           log("run HATA [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kod=" + code + " " +
@@ -1297,6 +1304,7 @@ window.K = (function () {
     libassUyarisi: libassUyarisi,
     settings: loadSettings,
     saveSettings: saveSettings,
+    surecSayisi: surecSayisi,
     ayarDosyasiVardi: function () { loadSettings(); return _ayarDosyasiVardi; },
     walkAudio: walkAudio,
     isAudio: isAudio,

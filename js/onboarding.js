@@ -192,6 +192,30 @@ window.KOnboarding = (function () {
     }
   }
 
+  /*
+   * 0. adım (yalnız taze kurulumda, dil henüz seçilmemişken): iki dilli iki düğme.
+   * Premiere'in arayüz dili (navigator.language) yalnız hangi düğmenin vurgulanacağını
+   * belirler; dili kullanıcı seçer. Seçim settings.json'a (uiLang) yazılır.
+   */
+  function dilCiz(acik) {
+    var kutu = el("ia-dil"), I = window.SufloI18n;
+    if (!kutu) return;
+    var sor = !!(acik && I && I.needsChoice && I.needsChoice());
+    kutu.hidden = !sor;
+    if (!sor) return;
+    var oneri = I.detect ? I.detect() : "tr";
+    ["tr", "en"].forEach(function (l) {
+      var b = el("ia-dil-" + l);
+      if (b) b.className = "btn" + (l === oneri ? " primary" : "");
+    });
+  }
+  function dilSec(l) {
+    var I = window.SufloI18n;
+    if (!I || !I.switchLang) return;
+    I.switchLang(l, { busy: function () { return !!(K.surecSayisi && K.surecSayisi() > 0); } });
+    ciz();
+  }
+
   function ciz() {
     if (!basladi) return;
     var h = SO.adimlariHesapla(kayit, gercekler());
@@ -207,6 +231,7 @@ window.KOnboarding = (function () {
       kart.hidden = !acik;
       kart.classList.toggle("bitti", h.bitti);
     }
+    dilCiz(acik);
     var motorEk = acik && motorEkVar(h);
     setupYerlestir(acik && adimGovdesiAcik(h, "motor", motorEk));
     cipCiz(h, acik);
@@ -761,6 +786,8 @@ window.KOnboarding = (function () {
       if (bas) bas.addEventListener("click", function () { adimBasligi(ad); });
     });
     tikla("ilk-adim-atla", adimiAtla);
+    tikla("ia-dil-tr", function () { dilSec("tr"); });
+    tikla("ia-dil-en", function () { dilSec("en"); });
     tikla("ia-motor-bulut", function () { anahtarIste("", "motor"); });
     tikla("ia-ornek-dene", ornekDeneTikla);
     tikla("ia-stil-goster", stilGoster);

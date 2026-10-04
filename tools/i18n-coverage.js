@@ -56,7 +56,7 @@ function extractHtml(src, tumu) {
   while ((m = re.exec(temiz))) {
     if (m.index > son) metin(temiz.slice(son, m.index), son);
     son = m.index + m[0].length;
-    var ar = /\s(title|placeholder|aria-label|alt|data-tip)\s*=\s*("([^"]*)"|'([^']*)')/gi, a;
+    var ar = /\s(title|placeholder|aria-label|alt|data-tip|label)\s*=\s*("([^"]*)"|'([^']*)')/gi, a;
     while ((a = ar.exec(m[0]))) {
       var v = decode(a[3] !== undefined ? a[3] : a[4]).replace(/\s+/g, " ").trim();
       if (tumu ? /[A-Za-z\u00C0-\u024F]{2}/.test(v) : turkceMi(v)) out.push({ text: v, kind: "attr:" + a[1].toLowerCase(), line: satirNo(src, m.index) });
@@ -74,7 +74,8 @@ var YOKSAY = ["Iıı, eee, hmm, şey, yani... ıı, ee.", "Ee, ıı, hmm, yəni,
   "Euh, heu, hum... en fait, du coup, bah.",
   "Français", // dil seçicide dilin kendi adı
   "Pro altyazi vitrini", "Pro animasyon vitrini", // iç katalog adı (hata günlüğü)
-  "{}. {} ({}–{}, {} sn){}"]; // panoya kopyalanan liste
+  "{}. {} ({}–{}, {} sn){}", // panoya kopyalanan liste
+  " (kalan kisim da tekrarla bitiyor)"]; // yalnız günlük (K.log birleştirmesi)
 var REGEX_ONCESI = /^(return|typeof|case|in|of|do|else|void|throw|new|delete|instanceof|yield|await)$/;
 function tokenize(src) {
   var toks = [], i = 0, n = src.length, onceki = "", sonKelime = "";

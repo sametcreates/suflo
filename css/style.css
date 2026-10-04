@@ -3709,6 +3709,10 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   margin: 12px 0 12px;
   box-shadow: var(--shadow);
 }
+/* 0. adım: taze kurulumda arayüz dili (iki dilli). CEF 74: flex gap yok, kenar boşluğu */
+.ia-dil { margin: 0 0 10px; padding: 8px 10px; border: 1px dashed rgba(139, 124, 246, .45); border-radius: 9px; }
+.ia-dil b { display: block; font-size: 12.5px; margin-bottom: 6px; color: var(--text); }
+.ia-dil .btn { margin-right: 6px; }
 .ia-ust { display: flex; align-items: center; gap: 10px; }
 .ia-isaret {
   flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px;

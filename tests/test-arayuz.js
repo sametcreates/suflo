@@ -225,5 +225,37 @@ ok("Kutuphane Pro CTA'lari neyin acilacagini ve fiyati gizlemez",
   /Yazı animasyonlarını aç — 749 TL/.test(html) && /290 preseti aç — 749 TL/.test(html) &&
   /1\.076 SFX'i aç — 749 TL/.test(html) && /Motion BG'yi aç — 749 TL/.test(html));
 
+
+/* ---------- İngilizce (beta) arayüz kablolaması ---------- */
+var sira = ["js/CSInterface.js", "i18n/en.js", "js/i18n.js", "js/bridge.js"].map(function (f) { return html.indexOf('<script src="' + f + '"></script>'); });
+ok("i18n betikleri CSInterface.js'ten sonra, bridge.js'ten önce yüklenir", sira.every(function (x, i) { return x !== -1 && (i === 0 || x > sira[i - 1]); }), sira.join(","));
+var dilSec = /<select id="set-ui-lang"[^>]*>([\s\S]*?)<\/select>/.exec(html);
+ok("Ayarlar > Destek: #set-ui-lang tr ve en (beta) seçenekli",
+  !!dilSec && /<option value="tr">Türkçe<\/option>/.test(dilSec[1]) && /<option value="en">English \(beta\)<\/option>/.test(dilSec[1]) &&
+  html.indexOf('id="set-ui-lang"') > html.indexOf('<div class="set-title">Destek</div>'));
+ok("dil seçicileri çevrilmez (data-i18n-skip): dil adları kendi dilinde kalır",
+  /<select id="set-ui-lang" data-i18n-skip>/.test(html) && /<div id="ia-dil" class="ia-dil" hidden data-i18n-skip>/.test(html));
+ok("ilk açılış rehberinde iki dilli 0. adım (Türkçe / English (beta))",
+  /id="ia-dil-tr"[^>]*>Türkçe</.test(html) && /id="ia-dil-en"[^>]*>English \(beta\)</.test(html) &&
+  html.indexOf('id="ia-dil"') < html.indexOf('id="ia-motor"'));
+var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8");
+var initGovde = appSrc.slice(appSrc.indexOf("  function init() {"));
+ok("KApp.init dili bağlam yoklamasından ve pencerelerden ÖNCE başlatır",
+  initGovde.indexOf('guvenli("Dil", arayuzDiliniBaslat)') !== -1 &&
+  initGovde.indexOf('guvenli("Dil", arayuzDiliniBaslat)') < initGovde.indexOf("checkFfmpeg") &&
+  initGovde.indexOf('guvenli("Dil", arayuzDiliniBaslat)') < initGovde.indexOf("contextEtkilesim") &&
+  initGovde.indexOf('guvenli("Dil", arayuzDiliniBaslat)') < initGovde.indexOf("yenilikleriGoster") &&
+  /SufloI18n\.configure\(\{\s*load: K\.settings,/.test(appSrc) && /settingsExisted: K\.ayarDosyasiVardi/.test(appSrc) &&
+  /if \(SufloI18n\.getLang\(\) === "en"\) SufloI18n\.start\(\);/.test(appSrc));
+ok("dil değişimi iş sürerken kapalı, yeniden yüklemesiz (switchLang)",
+  /SufloI18n\.switchLang\(sec\.value, \{ busy: isSuruyor \}\)/.test(appSrc) && /sec\.disabled = mesgul/.test(appSrc) &&
+  /surecSayisi: surecSayisi/.test(fs.readFileSync(KOKYOL + "js/bridge.js", "utf8")));
+var capSrc = fs.readFileSync(KOKYOL + "js/captions.js", "utf8");
+ok("altyazı dili bilinmezken 'tr' yerine arayüz dili", !/\|\| "tr"; \}?,?\s*$/m.test(capSrc.split("\n").filter(function (l) { return /cap-lang/.test(l); }).join("\n")) &&
+  (capSrc.match(/\|\| arayuzDili\(\)/g) || []).length >= 4);
+ok("İngilizcede kayıtlı tercih yoksa altyazı dili Otomatik",
+  /if \(!p\) \{ if \(arayuzDili\(\) === "en" && el\("cap-lang"\)\) el\("cap-lang"\)\.value = ""; return; \}/.test(capSrc));
+ok("Premiere bin/marker adları anahtar olarak aynı kalır", /Suflo Altyazi/.test(fs.readFileSync(KOKYOL + "jsx/host.jsx", "utf8")));
+
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);
