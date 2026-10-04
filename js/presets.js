@@ -308,7 +308,7 @@ window.KPresets = (function () {
     button.setAttribute("aria-busy", active ? "true" : "false");
     if (!label) return;
     if (active) {
-      if (!label.getAttribute("data-idle-label")) label.setAttribute("data-idle-label", label.textContent || "UYGULA");
+      if (!label.getAttribute("data-idle-label")) label.setAttribute("data-idle-label", (window.SufloI18n && SufloI18n.orig ? SufloI18n.orig(label) : label.textContent) || "UYGULA");
       label.textContent = "UYGULANIYOR…";
     } else {
       label.textContent = label.getAttribute("data-idle-label") || "UYGULA";

@@ -8,6 +8,8 @@ window.KApp = (function () {
 
   // Tarayıcı penceresi / Premiere iletişim kutusu DOM değil: çevirmen göremez, metin burada çevrilir
   function uiMetni(s) { return window.SufloI18n ? SufloI18n.tr(s) : s; }
+  // Bir düğümün özgün (Türkçe) metni; önbelleğe alınan arayüz etiketleri bununla okunur
+  function uiOzgun(n) { return window.SufloI18n && SufloI18n.orig ? SufloI18n.orig(n) : (n ? n.textContent || "" : ""); }
 
   function el(id) { return document.getElementById(id); }
 
@@ -388,7 +390,9 @@ window.KApp = (function () {
     // listede " — PRO" ekiyle gorunsun: kullanici neyin ucretli oldugunu
     // secmeyi denemeden once gorur
     Array.prototype.forEach.call(document.querySelectorAll("option[data-pro]"), function (o) {
-      if (!o.dataset.temel) o.dataset.temel = o.textContent;
+      // temel her zaman özgün Türkçe metin: İngilizce açılışta önbelleğe İngilizce girerse
+      // EN → TR geçişinde geri dönmez (çeviri katmanı " — PRO" ekli metni kendisi çevirir)
+      if (!o.dataset.temel) o.dataset.temel = uiOzgun(o);
       o.textContent = s.pro ? o.dataset.temel : o.dataset.temel + " — PRO";
     });
     // Stil kartlari ucretsiz kullanicida canli onizlenebilir; ancak her kart
@@ -397,8 +401,8 @@ window.KApp = (function () {
       card.classList.toggle("pro-preview", !s.pro);
       var ad = card.querySelector(".ss-bilgi b");
       var aciklama = card.querySelector(".ss-bilgi i");
-      var etiket = ad ? ad.textContent.trim() : "Stil";
-      if (aciklama && aciklama.textContent.trim()) etiket += " — " + aciklama.textContent.trim();
+      var etiket = ad ? uiOzgun(ad).trim() : "Stil";
+      if (aciklama && uiOzgun(aciklama).trim()) etiket += " — " + uiOzgun(aciklama).trim();
       card.setAttribute("aria-label", etiket + (s.pro ? "" : " · Pro önizleme, timeline çıktısı kilitli"));
     });
 
@@ -612,7 +616,11 @@ window.KApp = (function () {
       }
       SufloI18n.switchLang(sec.value, { busy: isSuruyor });
     });
-    SufloI18n.onChange(function (l) { sec.value = l; });
+    SufloI18n.onChange(function (l) {
+      sec.value = l;
+      // EN → TR: Pro ekli seçenek ve stil kartı etiketleri özgün metinden yeniden kurulsun
+      try { reflectPro(); } catch (e) {}
+    });
     // İş sürerken seçici kapalı (ucuz yoklama: yalnız disabled bayrağı)
     setInterval(function () {
       var mesgul = isSuruyor();
@@ -1240,7 +1248,7 @@ window.KApp = (function () {
     if (!guncelleme) return;
     var b = el("update-indir");
     b.disabled = true;
-    var eski = b.textContent;
+    var eski = uiOzgun(b);   // özgün Türkçe: iş sürerken dil değişse de doğru dile döner
     b.textContent = "İniyor…";
     try {
       var indirilenler = K.path.join(K.os.homedir(), "Downloads");

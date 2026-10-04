@@ -208,7 +208,8 @@ window.KTextCut = (function () {
     if (!clip || !words.length || !oynatici) return;
     var btn = el("tc-dinle");
     btn.disabled = true;
-    var eskiYazi = btn.textContent;
+    // özgün Türkçe etiket: iş sürerken arayüz dili değişse de doğru dile döner (çevirmen çevirir)
+    var eskiYazi = window.SufloI18n && SufloI18n.orig ? SufloI18n.orig(btn) : btn.textContent;
     btn.textContent = "Hazırlanıyor…";
     var benimKlip = clip;
     try {

@@ -304,7 +304,10 @@ Shorts with an explained 0–100 score, animated caption styles, transitions and
   in Premiere (Suflo Altyazi, Suflo Shorts) stay the same.
 - **Price:** Pro is a one-time purchase. Until the USD checkout opens, the English UI and site show
   **749 TRY (≈ $19)** and open the TRY checkout, so the price you see is always what you pay.
-  Every Pro tool gives you 3 free tries on your own footage first.
+  Every code-based Pro tool (Auto Cut, text-based cut, viral moments, zoom, transitions, enhance
+  audio, styled captions and hook titles, translation, beat sync) gives you 3 free tries on your own
+  footage first; content libraries (MOGRTs, SFX, Motion BGs, presets), batch clips and the Shorts
+  package are Pro-only.
 - **Install:** Premiere Pro 2020 (14.4) or newer on Windows/macOS. Download the
   [latest release](https://github.com/sametcreates/suflo/releases/latest); the installer is bilingual.
 - **Website and guides:** [suflo.app/en](https://suflo.app/en/) ·

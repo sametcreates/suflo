@@ -639,7 +639,7 @@ window.KSfx = (function () {
         lastFolder = item.folder;
         var group = document.createElement("div");
         group.className = "sfx-group";
-        group.innerHTML = '<span class="sfx-group-icon">▰</span><b></b><span></span>';
+        group.innerHTML = '<span class="sfx-group-icon">▰</span><b></b><span data-i18n-ui></span>';
         group.querySelector("b").textContent = item.folder;
         group.querySelector("span:last-child").textContent = groupCounts[item.folder] + " ses";
         frag.appendChild(group);

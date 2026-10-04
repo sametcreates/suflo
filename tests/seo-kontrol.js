@@ -80,6 +80,10 @@ function alternatif(src) {
 }
 var sitemapSrc = fs.readFileSync(D + "sitemap.xml", "utf8");
 var trDavet = (h.match(/<script id="davet-site">[\s\S]*?<\/script>/) || [""])[0];
+var TR_KARSILIGI_YOK = ["en/pro.html"];
+// noindex yönlendirme sayfaları hreflang taşımaz (Google noindex alternatifleri yok sayar)
+var proYonlendirme = fs.readFileSync(D + "pro.html", "utf8");
+chk("pro.html (noindex yönlendirme) hreflang taşımaz", !/hreflang=/.test(proYonlendirme) && /noindex/.test(proYonlendirme));
 var enSayfalar = ["en/index.html", "en/pro.html", "en/blog/index.html", "en/blog/free-local-auto-captions-premiere-whisper.html",
   "en/blog/opusclip-alternative-premiere.html", "en/blog/autocut-firecut-alternative.html"];
 enSayfalar.forEach(function (f) {
@@ -90,10 +94,19 @@ enSayfalar.forEach(function (f) {
   var can = (e.match(/<link rel="canonical" href="([^"]+)">/) || [])[1] || "";
   var alt = alternatif(e);
   chk(f + ": lang=en, canonical, og:locale en_US", /<html lang="en">/.test(e) && /^https:\/\/suflo\.app\/en\//.test(can) && /og:locale" content="en_US"/.test(e), can);
-  chk(f + ": hreflang tr/en/x-default", alt.en === can && /^https:\/\/suflo\.app\//.test(alt.tr || "") && alt["x-default"] === can, JSON.stringify(alt));
-  var trYol = alt.tr ? dosyaYolu(alt.tr) : "";
-  var trAlt = trYol && fs.existsSync(trYol) ? alternatif(fs.readFileSync(trYol, "utf8")) : {};
-  chk(f + ": karşılıklı hreflang (TR sayfası geri gösterir)", trAlt.en === can && trAlt.tr === alt.tr && trAlt["x-default"] === can, trYol + " " + JSON.stringify(trAlt));
+  // Türkçe karşılığı olmayan sayfa (/en/pro: Türkçe Pro içeriği ana sayfada, /pro noindex
+  // yönlendirme) yalnız en + x-default taşır; tr gösterilirse karşılık dizinlenebilir olmalı
+  var yalnizEN = TR_KARSILIGI_YOK.indexOf(f) !== -1;
+  chk(f + ": hreflang " + (yalnizEN ? "en/x-default (tr yok)" : "tr/en/x-default"), alt.en === can && alt["x-default"] === can &&
+    (yalnizEN ? !alt.tr : /^https:\/\/suflo\.app\//.test(alt.tr || "")), JSON.stringify(alt));
+  if (!yalnizEN) {
+    var trYol = alt.tr ? dosyaYolu(alt.tr) : "";
+    var trSrc = trYol && fs.existsSync(trYol) ? fs.readFileSync(trYol, "utf8") : "";
+    var trAlt = alternatif(trSrc);
+    chk(f + ": karşılıklı hreflang (TR sayfası geri gösterir)", trAlt.en === can && trAlt.tr === alt.tr && trAlt["x-default"] === can, trYol + " " + JSON.stringify(trAlt));
+    var trCan = (trSrc.match(/<link rel="canonical" href="([^"]+)">/) || [])[1] || "";
+    chk(f + ": TR karşılığı dizinlenebilir ve kendi canonical'ı", trCan === alt.tr && !/name="robots" content="[^"]*noindex/.test(trSrc), trCan);
+  }
   var t = (e.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
   var dsc = (e.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
   chk(f + ": başlık <= 60, açıklama 100-160", t.length <= 60 && dsc.length >= 100 && dsc.length <= 160, t.length + " / " + dsc.length);

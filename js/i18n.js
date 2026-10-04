@@ -36,6 +36,9 @@
     "sfx-list", "emoji-assets-grid"
   ];
   var UI_IN_USER_ZONE = { BUTTON: 1, LABEL: 1, OPTION: 1, SELECT: 1 };
+  // Kullanıcı kabının İÇİNDE yine de arayüz olan adacıklar: boş durum / ipucu satırları
+  // (class="empty" | "hint") ve data-i18n-ui işaretli düğümler (ör. SFX grup sayısı "12 ses")
+  var UI_ISLAND_CLASSES = ["empty", "hint"];
 
   var dict = null, patterns = [], cache = {}, cacheSize = 0, lang = null;
   var env = { storage: null, navigator: null };
@@ -212,8 +215,9 @@
 
   /*
    * Dil çözümü (saf): 1) settings.uiLang  2) eski localStorage "suflo.uiLang"
-   * 3) settings.json bu yüklemeden önce vardıysa "tr" (her güncelleyen Türkçe kalır)
-   * 4) null: taze kurulum, kullanıcıya sor. navLang yalnız öneridir, sonucu değiştirmez.
+   * 3) uiLangPending (taze kurulumda soru açık kaldı) → null
+   * 4) settings.json bu yüklemeden önce vardıysa "tr" (her güncelleyen Türkçe kalır)
+   * 5) null: taze kurulum, kullanıcıya sor. navLang yalnız öneridir, sonucu değiştirmez.
    */
   function resolveLang(o) {
     o = o || {};
@@ -221,6 +225,9 @@
     if (s) return s;
     var l = gecerli(o.legacyLS);
     if (l) return l;
+    // taze kurulumda seçim yapılmadan settings.json yazıldıysa (davet kodu, rehber kaydı)
+    // dosya artık var ama soru hâlâ açık: uiLangPending bayrağı onu taşır
+    if (o.pending) return null;
     if (o.settingsExisted) return "tr";
     return null;
   }
@@ -244,7 +251,8 @@
   }
   function girdiler() {
     var a = ayarlar();
-    return { stored: a ? a.uiLang : null, legacyLS: lsOku(), settingsExisted: ayarDosyasiVardi(), navLang: detect() };
+    return { stored: a ? a.uiLang : null, legacyLS: lsOku(), settingsExisted: ayarDosyasiVardi(),
+      pending: !!(a && a.uiLangPending === true), navLang: detect() };
   }
 
   // Ayar deposunu bağla. Eski localStorage seçimi settings.json'a bir kez taşınır.
@@ -259,6 +267,10 @@
         try { if (typeof cfg.save === "function") cfg.save(a); } catch (e) {}
       }
     }
+    // Taze kurulum: soru açık olduğunu ayar nesnesine işaretle. Kendimiz kaydetmeyiz; bu
+    // oturumda ayarları kaydeden her şey (davet kodu, rehber) bayrağı da yazar, böylece
+    // sonraki açılışta dosya var diye "eski kurulum → Türkçe" sanılmaz ve soru yine gelir.
+    if (a && !gecerli(a.uiLang) && resolveLang(girdiler()) === null) a.uiLangPending = true;
     return getLang();
   }
 
@@ -275,6 +287,7 @@
     var a = ayarlar();
     if (a) {
       a.uiLang = l;
+      if (Object.prototype.hasOwnProperty.call(a, "uiLangPending")) delete a.uiLangPending;
       try { if (typeof cfg.save === "function") cfg.save(a); } catch (e) {}
     }
     lsYaz(l);   // ayna: settings.json yazılamazsa da seçim kalsın
@@ -322,6 +335,16 @@
     if (!el.getAttribute) return false;
     var v = el.getAttribute("data-i18n-skip");
     return v !== null && v !== undefined;
+  }
+  function isUiIsland(el) {
+    if (!el.getAttribute) return false;
+    var u = el.getAttribute("data-i18n-ui");
+    if (u !== null && u !== undefined) return true;
+    var c = " " + String(el.getAttribute("class") || "").replace(/\s+/g, " ") + " ";
+    for (var i = 0; i < UI_ISLAND_CLASSES.length; i++) {
+      if (c.indexOf(" " + UI_ISLAND_CLASSES[i] + " ") !== -1) return true;
+    }
+    return false;
   }
   function isEditable(el) {
     if (el.isContentEditable) return true;
@@ -377,7 +400,7 @@
         return;
       }
       if (isEditable(node) || isSkipped(node)) return;
-      if (UI_IN_USER_ZONE[tag]) uiAncestor = true;
+      if (UI_IN_USER_ZONE[tag] || (inZone && isUiIsland(node))) uiAncestor = true;
       // kabın kendi ipucu (ör. tc-words title) arayüz metnidir; kısıt yalnız içindekilere
       translateAttrs(node, inZone && !uiAncestor);
       if (isUserZone(node)) inZone = true;
@@ -393,7 +416,7 @@
       var tag = String(p.tagName || "").toUpperCase();
       if (SKIP_TAGS[tag] || isEditable(p) || isSkipped(p)) return null;
       if (isUserZone(p)) inZone = true;
-      if (UI_IN_USER_ZONE[tag]) ui = true;
+      if (UI_IN_USER_ZONE[tag] || isUiIsland(p)) ui = true;
       p = p.parentNode;
     }
     return { inZone: inZone, ui: ui };
@@ -420,7 +443,7 @@
         var c2 = context(r.target);
         if (!c2 || isSkipped(r.target)) continue;
         var tg = String(r.target.tagName || "").toUpperCase();
-        var zone = c2.inZone, ui = c2.ui || !!UI_IN_USER_ZONE[tg];
+        var zone = c2.inZone, ui = c2.ui || !!UI_IN_USER_ZONE[tg] || isUiIsland(r.target);
         translateAttrs(r.target, zone && !ui);
       }
     }
@@ -492,9 +515,37 @@
   }
   function running() { return !!observer; }
 
+  /*
+   * Bir düğümün ÖZGÜN (Türkçe) metni: çevrilmiş metin düğümleri kayıtlı özgün hâliyle
+   * okunur. Arayüz metnini önbelleğe alıp sonra geri yazan kod (data-temel, eski düğme
+   * etiketi, aria-label) bunu kullanmalı; yoksa İngilizce açılışta önbelleğe İngilizce
+   * girer ve EN → TR geçişinde geri dönmez. Çevrilmemiş düğümde textContent ile aynıdır.
+   */
+  function orig(node) {
+    if (!node) return "";
+    if (node.nodeType === 3) {
+      var v = node.nodeValue || "";
+      var r = origText ? origText.get(node) : null;
+      return r && r.t === v ? r.o : v;
+    }
+    if (node.nodeType !== 1 && node.nodeType !== 9 && node.nodeType !== 11) return "";
+    var kids = node.childNodes;
+    if (!kids) return node.textContent || "";
+    var out = "";
+    for (var i = 0; i < kids.length; i++) out += orig(kids[i]);
+    return out;
+  }
+  // Bir özniteliğin özgün (Türkçe) değeri
+  function origAttrOf(el, a) {
+    if (!el || !el.getAttribute) return null;
+    var v = el.getAttribute(a);
+    var rec = origAttr ? origAttr.get(el) : null;
+    return rec && rec[a] && rec[a].t === v ? rec[a].o : v;
+  }
+
   return {
     LS_KEY: LS_KEY, ATTRS: ATTRS, USER_CONTENT_IDS: USER_CONTENT_IDS,
-    translate: translate, tr: tr, apply: apply, start: start, stop: stop, revert: revert, running: running,
+    translate: translate, tr: tr, orig: orig, origAttr: origAttrOf, apply: apply, start: start, stop: stop, revert: revert, running: running,
     getLang: getLang, setLang: setLang, detect: detect, setDictionary: setDictionary,
     resolveLang: resolveLang, configure: configure, needsChoice: needsChoice, switchLang: switchLang, onChange: onChange,
     _handle: handle,

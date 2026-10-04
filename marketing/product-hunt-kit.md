@@ -45,7 +45,7 @@ What Pro adds (one payment, no subscription, no credits):
   builds 9:16 Shorts sequences with Auto Reframe
 - 12 animated caption styles rendered as a transparent layer, hook titles, transitions, auto zoom,
   enhance audio, translation to 12 languages
-- Every Pro tool gives you 3 free tries on your own footage first
+- Every code-based Pro tool (Auto Cut, text-based cut, viral moments, zoom, transitions, enhance audio, styled captions, translation…) gives you 3 free tries on your own footage first; content libraries (MOGRTs, SFX, Motion BGs, presets) are Pro-only
 
 The English interface is brand new and labelled beta. If you see a Turkish string, tell me and I'll fix it
 the same day. I'd love feedback on accuracy in your language and on the Shorts picker.
@@ -86,7 +86,7 @@ Show HN: Suflo – local Whisper captions inside Adobe Premiere (open source)
 - **Does my video leave my computer?** Not with the local engine. AI features send only caption text,
   with the user's own free Groq key.
 - **Why lira at checkout?** Store is in Türkiye; the bank converts it (about $19). USD checkout is planned.
-- **Refunds / trial?** Use the free tier and the 3 free tries per Pro tool before buying.
+- **Refunds / trial?** Use the free tier and the 3 free tries of every code-based Pro tool before buying (content libraries are Pro-only).
 - **Supported versions?** Premiere Pro 2020 (14.4) and newer, Windows and macOS.
 
 Trademark note for comparison posts: AutoCut, FireCut, OpusClip and Adobe Premiere are trademarks of their

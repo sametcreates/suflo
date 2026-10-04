@@ -244,6 +244,68 @@ ok("switchLang(tr): yeniden yüklemeden geri döner, dinleyiciler haber alır", 
 I2.switchLang("en");
 ok("switchLang(en): çevirir", sb.body.childNodes[1].childNodes[0].nodeValue === "Close" && bilgi.join() === "tr,en");
 
+/* ---------------- inceleme düzeltmeleri ---------------- */
+// orig(): önbelleğe alınan arayüz etiketleri (data-temel, eski düğme metni) özgün Türkçeyi okur
+var secenek = new El("option", { "data-pro": "" }, ["Viral aktif kelime"]);
+var dugme = new El("button", {}, ["Güncellemeyi indir"]);
+sb.body.appendChild(secenek); sb.body.appendChild(dugme);
+I2._handle([{ type: "childList", addedNodes: [secenek] }, { type: "childList", addedNodes: [dugme] }]);
+var temel = I2.orig(secenek), eskiEtiket = I2.orig(dugme);
+ok("orig(): İngilizce açıkken özgün Türkçe metni verir", secenek.childNodes[0].nodeValue !== "Viral aktif kelime" &&
+  temel === "Viral aktif kelime" && eskiEtiket === "Güncellemeyi indir", JSON.stringify([secenek.childNodes[0].nodeValue, temel, eskiEtiket]));
+// kod Türkçe temelden " — PRO" ekli metin yazar → gözlemci çevirir → TR'ye dönüşte Türkçe gelir
+secenek.childNodes = []; secenek.appendChild(new Text(temel + " — PRO"));
+I2._handle([{ type: "childList", addedNodes: [secenek.childNodes[0]] }]);
+var pEN = secenek.childNodes[0].nodeValue;
+I2.switchLang("tr");
+ok("EN → TR: Türkçe temelden yazılan Pro ekli seçenek Türkçeye döner", secenek.childNodes[0].nodeValue === "Viral aktif kelime — PRO" &&
+  pEN !== "Viral aktif kelime — PRO", JSON.stringify([pEN, secenek.childNodes[0].nodeValue]));
+ok("orig(): çevrilmemiş düğümde metnin kendisi", I2.orig(dugme) === "Güncellemeyi indir" && I2.orig(new Text("x")) === "x" && I2.orig(null) === "");
+var ipuclu = new El("button", { title: "Kaydet" }, ["a"]);
+I.apply(ipuclu);
+ok("origAttr(): çevrilmiş özniteliğin özgünü", ipuclu.attrs.title === "Save" && I.origAttr(ipuclu, "title") === "Kaydet");
+
+// Kullanıcı kabındaki arayüz adacıkları: boş durum / ipucu / data-i18n-ui çevrilir, dosya adı çevrilmez
+(function () {
+  I.setDictionary(EN);
+  var ad = new El("div", { "class": "sfx-name" }, ["Kapat"]);
+  var sayi = new El("span", { "data-i18n-ui": "" }, ["12 ses"]);
+  var bos = new El("div", { "class": "empty" }, ["Eşleşen ses yok."]);
+  var liste = new El("div", { id: "sfx-list" }, [new El("div", { "class": "sfx-group" }, [new El("b", {}, ["Kaydet"]), sayi]), ad, bos]);
+  var ipucu = new El("p", { "class": "hint" }, ["Aramayla eşleşen emoji bulunamadı."]);
+  var izgara = new El("div", { id: "emoji-assets-grid" }, [ipucu]);
+  I.apply(new El("body", {}, [liste, izgara]));
+  ok("SFX listesi: dosya ve klasör adı çevrilmez", ad.childNodes[0].nodeValue === "Kapat" && liste.childNodes[0].childNodes[0].childNodes[0].nodeValue === "Kaydet");
+  ok("SFX listesi: boş durum ve grup sayısı çevrilir", bos.childNodes[0].nodeValue === "No matching sounds." && sayi.childNodes[0].nodeValue === "12 sounds",
+    JSON.stringify([bos.childNodes[0].nodeValue, sayi.childNodes[0].nodeValue]));
+  ok("Emoji Assets: ipucu satırı çevrilir", ipucu.childNodes[0].nodeValue !== "Aramayla eşleşen emoji bulunamadı.", ipucu.childNodes[0].nodeValue);
+  // gözlemci yolu: sonradan eklenen boş durum
+  var bos2 = new El("div", { "class": "empty" }, ["Eşleşen ses yok."]);
+  liste.appendChild(bos2);
+  I._handle([{ type: "childList", addedNodes: [bos2] }]);
+  ok("gözlemci: kullanıcı kabına eklenen boş durum çevrilir", bos2.childNodes[0].nodeValue === "No matching sounds.");
+})();
+
+// İlk açılış dil sorusu: seçim yapılmadan settings.json yazılsa da sonraki açılışta yine sorulur
+(function () {
+  var a = {};
+  I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
+  I.configure({ load: function () { return a; }, save: function () {}, settingsExisted: false });
+  ok("taze kurulum: uiLangPending işaretlenir", a.uiLangPending === true && I.needsChoice());
+  // ikinci açılış: dosya artık var (davet/rehber kaydetti), bayrak duruyor
+  var a2 = JSON.parse(JSON.stringify(a));
+  I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
+  I.configure({ load: function () { return a2; }, save: function () {}, settingsExisted: true });
+  ok("sonraki açılış: dosya var ama soru açık → yine sorulur", I.needsChoice() && I.getLang() === "tr");
+  I.setLang("en");
+  ok("seçim yapılınca bayrak kalkar", a2.uiLang === "en" && !("uiLangPending" in a2) && !I.needsChoice());
+  var a3 = {};
+  I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
+  I.configure({ load: function () { return a3; }, save: function () {}, settingsExisted: true });
+  ok("eski kurulum: bayrak yazılmaz, Türkçe kalır", !("uiLangPending" in a3) && !I.needsChoice() && I.getLang() === "tr");
+  ok("resolveLang: pending → null, kayıtlı seçim yine önce", R({ pending: true, settingsExisted: true }) === null && R({ stored: "tr", pending: true }) === "tr");
+})();
+
 /* ---------------- performans bütçesi ---------------- */
 (function () {
   var zoneKids = [], kids = [];
@@ -267,6 +329,15 @@ var YASAK = [/\?\.[A-Za-z_$(\[]/, /\?\?/, /(\|\||&&)=/, /\.replaceAll\s*\(/, /\.
   var sorun = src.split("\n").filter(function (s) { return YASAK.some(function (r) { return r.test(s); }); });
   ok(f + ": ES5 / Chromium 74 uyumlu", sorun.length === 0, sorun.slice(0, 2).join(" | "));
 });
+var appKaynak = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
+ok("app.js: Pro ekli seçenek ve stil kartı etiketi özgün Türkçeden, dil değişince yeniden kurulur",
+  /o\.dataset\.temel = uiOzgun\(o\)/.test(appKaynak) && /uiOzgun\(ad\)/.test(appKaynak) &&
+  /SufloI18n\.onChange\(function \(l\) \{[\s\S]{0,200}reflectPro\(\)/.test(appKaynak) && /var eski = uiOzgun\(b\)/.test(appKaynak));
+ok("önbelleğe alınan düğme etiketleri SufloI18n.orig ile okunur (presets, konusma-kes, magiccut)",
+  ["presets.js", "konusma-kes.js", "magiccut.js"].every(function (f) {
+    return /SufloI18n\.orig\(/.test(fs.readFileSync(path.join(__dirname, "..", "js", f), "utf8"));
+  }));
+ok("sfx.js: grup sayısı data-i18n-ui adacığı", /<span data-i18n-ui><\/span>/.test(fs.readFileSync(path.join(__dirname, "..", "js", "sfx.js"), "utf8")));
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 var yok = I.USER_CONTENT_IDS.filter(function (id) { return html.indexOf('id="' + id + '"') === -1; });
 ok("kullanıcı içeriği kapları index.html'de var", yok.length === 0, yok.join(","));

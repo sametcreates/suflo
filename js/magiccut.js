@@ -273,7 +273,8 @@ window.KCut = (function () {
     if (!clip || !window.SufloTextCut || !oynatici) return;
     var btn = el("cut-dinle");
     btn.disabled = true;
-    var eski = btn.textContent;
+    // özgün Türkçe etiket: iş sürerken arayüz dili değişse de doğru dile döner (çevirmen çevirir)
+    var eski = window.SufloI18n && SufloI18n.orig ? SufloI18n.orig(btn) : btn.textContent;
     btn.textContent = "Hazırlanıyor…";
     var benimKlip = clip;
     try {
