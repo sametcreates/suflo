@@ -1981,6 +1981,22 @@
     "fmt parçası yok": "no fmt chunk"
   });
 
+  /* ================= "Try Pro": 3 lasting trial credits per tool, trial watermark, clean re-render ================= */
+  add({
+    "Otomatik kesim": "Auto cut",
+    "Otomatik zoom": "Auto zoom",
+    "Stilli altyazı ve kanca başlığı": "Styled captions and hook title",
+    "1 deneme hakkı kullanıldı · {n} kaldı": "1 trial credit used · {} left",
+    "1 deneme hakkı kullanıldı · bu araçta hakkın bitti": "1 trial credit used · no credits left for this tool",
+    "Katman boyutu ya da süresi geçersiz.": "Layer size or duration is invalid.",
+    "Deneme kaydı okunamadı.": "Couldn't read the trial record.",
+    "O sekansı aç: {}.": "Open that sequence: {}.",
+    "O sekansı aç.": "Open that sequence.",
+    "Premiere yanıt vermedi.": "Premiere didn't respond.",
+    "Temiz katman timeline'a konamadı.": "Couldn't place the clean layer on the timeline.",
+    "Eski katman kaldırılamadı.": "Couldn't remove the old layer."
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   var P = [
     // "1.076 SFX" style Turkish thousands → English
