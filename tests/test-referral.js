@@ -89,6 +89,13 @@ var il0 = R.ilerleme(0), il10 = R.ilerleme(12);
 ok("ilerleme: 0'da '0/1 davet', 10+ dolu cubuk", il0.metin === "0/1 davet" && il0.oran === 0 && /Davetçi/.test(il0.odul) &&
   il10.metin === "12 davet" && il10.oran === 1 && il10.sonraki === null && /iletişime/.test(il10.odul), il10.metin);
 ok("ilerleme: Ingilizce", R.ilerleme(2, "en").metin === "2/3 invites");
+// iade sonrasi sunucu kademeyi korur (count 2, tier 3): acilmis odul "sonraki" diye gosterilmez
+var ilIade = R.ilerleme(2, "tr", 3);
+ok("ilerleme: kazanilmis kademe 3 iken hedef 10, Kurucu sonraki odul degil", ilIade.kademe === 3 && ilIade.sonraki === 10 &&
+  ilIade.metin === "2/10 davet" && !/Kurucu/.test(ilIade.odul), JSON.stringify(ilIade));
+ok("ilerleme: kademe verilmezse eski davranis", JSON.stringify(R.ilerleme(2, "tr", 0)) === JSON.stringify(R.ilerleme(2)));
+ok("kazanilanKademe: sayi ile sunucu kademesinin buyugu, bozuk deger 0", R.kazanilanKademe(2, 3) === 3 && R.kazanilanKademe(4, 1) === 3 &&
+  R.kazanilanKademe(0, "x") === 0 && R.kazanilanKademe(1, null) === 1 && R.kazanilanKademe(0, 5) === 3);
 
 /* ---------------- davet istemi ---------------- */
 var GUN = 24 * 3600 * 1000, simdi = Date.UTC(2026, 9, 4);

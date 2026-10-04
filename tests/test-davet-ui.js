@@ -127,6 +127,8 @@ async function calis() {
   o.D.ciz();
   ok("davet kimligi kalici (yeniden cizimde degismez)", o.settings.davetRefId === ref);
   ok("ucretsiz: not kisisel bilgi tasimadigini soyler", /kişisel bilgi taşımaz/.test(o.el["davet-serbest-not"].textContent));
+  ok("ucretsiz: odul ve kodun Pro'ya ozel oldugu soylenir", /Pro sahiplerine özel/.test(o.el["davet-serbest-not"].textContent) &&
+    /Pro sahiplerine özel/.test(html.slice(html.indexOf('id="davet-serbest-not"'), html.indexOf('id="davet-serbest-not"') + 300)));
   tetikle(o.el["davet-wa"], "click");
   ok("WhatsApp: wa.me adresi, baglanti kodlu", /^https:\/\/wa\.me\/\?text=/.test(o.say.url[0]) && decodeURIComponent(o.say.url[0].split("text=")[1]).indexOf("https://suflo.app/?ref=" + ref) !== -1, o.say.url[0]);
   tetikle(o.el["davet-x"], "click");
@@ -158,8 +160,8 @@ async function calis() {
   ok("Pro + kapali sunucu: istek ProSync adresine, lisans ve surumle", p.say.istek.length === 1 && p.say.istek[0].url === "https://ornek.test/pro/v1/index.php" &&
     p.say.istek[0].govde.action === "referral" && p.say.istek[0].govde.license_key === "LIC-AAAA" && p.say.istek[0].govde.instance_id === "inst-1" &&
     p.say.istek[0].govde.client_version === "3.1.0", JSON.stringify(p.say.istek[0] && p.say.istek[0].govde));
-  ok("Pro + kapali sunucu: serbest paylasim + 'kod hazir olunca' notu", !p.el["davet-serbest"].hidden && p.el["davet-kodlu"].hidden &&
-    /hazır olunca/.test(p.el["davet-serbest-not"].textContent));
+  ok("Pro + kapali sunucu: serbest paylasim + 'henuz acilmadi' notu", !p.el["davet-serbest"].hidden && p.el["davet-kodlu"].hidden &&
+    /henüz açılmadı/.test(p.el["davet-serbest-not"].textContent));
   ok("Pro'da arkadastan kod kutusu gizli", p.el["davet-girilen-sar"].hidden);
   ok("kapali sunucu onbellege 'kod yok' yazar (6 saat sormaz)", p.settings.davetKod && p.settings.davetKod.kod === "" && p.settings.davetKod.alindi === p.zaman.simdi);
   p.say.sekme.settings();
@@ -194,10 +196,30 @@ async function calis() {
   ok("Kopyala: kodlu metin panoya", acik.say.kopya[0].indexOf("SFLABCDEF") !== -1);
   acik.proYap(true, "LIC-BBBB");
   ok("baska lisansa gecilince eski lisansin kodu gosterilmez", acik.el["davet-kodlu"].hidden && !acik.el["davet-serbest"].hidden);
+  ok("baska lisansa gecince Story karti dugmesi de gizlenir", acik.el["davet-story"].hidden);
   acik.proYap(true, "LIC-AAAA");
   ok("ayni lisansa donunce kod geri gelir", !acik.el["davet-kodlu"].hidden);
   acik.proYap(false);
   ok("Pro bitince kod gizlenir", acik.el["davet-kodlu"].hidden && !acik.el["davet-serbest"].hidden);
+  ok("Pro bitince Story karti dugmesi gizlenir (tiklayinca sessizce hicbir sey yapmazdi)", acik.el["davet-story"].hidden);
+  ok("ilerlemenin altinda 14 gun notu", /14 gün sonra sayılır/.test(html.slice(html.indexOf('id="davet-ilerleme"'), html.indexOf('id="davet-serbest"'))));
+
+  /* ---------- iade sonrasi: sunucu kademeyi korur ---------- */
+  var iade = ortam({ pro: true, sunucu: function () {
+    return { status: 200, body: JSON.stringify({ ok: true, code: "SFLABCDEF", count: 2, tier: 3, percent: 15 }) };
+  } });
+  await iade.D.kodGetir(true);
+  ok("iade sonrasi kademe sunucudan (3), sayidan dusmez", iade.settings.davetKod.kademe === 3, JSON.stringify(iade.settings.davetKod));
+  ok("acilmis Kurucu paketi 'sonraki odul' diye gosterilmez: hedef 10", iade.el["davet-ilerleme-metin"].textContent === "2/10 davet" &&
+    !/Kurucu/.test(iade.el["davet-odul"].textContent), iade.el["davet-ilerleme-metin"].textContent + " " + iade.el["davet-odul"].textContent);
+
+  /* ---------- odul indirildi bildirimi ---------- */
+  var od = ortam({ pro: true });
+  od.D.odulIndi(0);
+  ok("odul inmediyse bildirim yok", od.say.toast.length === 0);
+  od.D.odulIndi(3);
+  ok("odul inince bildirim", od.say.toast.length === 1 && /Davet ödülün indirildi/.test(od.say.toast[0][0]));
+  ok("pro-sync.js syncExtras indirince KDavet.odulIndi cagirir", /KDavet\.odulIndi\(downloaded\)/.test(fs.readFileSync(path.join(KOK, "js", "pro-sync.js"), "utf8")));
   var libassYok = ortam({ pro: true, libassYok: true, settings: { davetKod: acik.settings.davetKod } });
   ok("libass'siz ffmpeg'de Story karti dugmesi gizli", !libassYok.el["davet-kodlu"].hidden && libassYok.el["davet-story"].hidden);
   var bozukKod = ortam({ pro: true, sunucu: function () { return { status: 200, body: JSON.stringify({ ok: true, code: "sfl-kotu", count: 1 }) }; } });

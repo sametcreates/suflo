@@ -78,6 +78,10 @@ var sinirTam = new Array(5000 - KREDI.length - 2 + 1).join("c");
 ok("kredi tam sigiyorsa eklenir (5000 dahil)", Y.compose({ aciklama: sinirTam, kredi: KREDI }).length === 5000 &&
   /suflo\.app$/.test(Y.compose({ aciklama: sinirTam, kredi: KREDI })));
 var bj2 = fs.readFileSync(path.join(__dirname, "..", "js", "bolumler.js"), "utf8");
+// Pro etkinlesince varsayilan degisir: zaten yazilmis aciklama da kutuyla ayni hale gelmeli (kopyalanan = gorunen)
+var proOn = bj2.slice(bj2.indexOf("Pro.on(function () {", bj2.indexOf('"cap-yt-kredi"')));
+ok("bolumler.js: Pro.on kutuyu cizer VE aciklamayi yeniler (krediUygula)", /krediKutusunuCiz\(\);\s*krediUygula\(\);/.test(proOn.slice(0, 300)) &&
+  /function krediDegisti\(\)[\s\S]{0,200}krediUygula\(\)/.test(bj2) && /function krediUygula\(\)[\s\S]{0,200}krediAcik\(\)/.test(bj2));
 ok("bolumler.js ytAciklama krediyi gecer, kutu #cap-yt-kredi", /kredi:\s*krediSatiri\(\)/.test(bj2) && /cap-yt-kredi/.test(bj2) && html.indexOf('id="cap-yt-kredi"') !== -1);
 ok("kredi kutusunun varsayilani: Pro degilse acik, kullanici secene dek", /typeof s\.krediSatiri === "boolean"/.test(bj2) && /Pro\.isPro\(\)/.test(bj2));
 console.log(gecen + "/" + toplam + " gecti");

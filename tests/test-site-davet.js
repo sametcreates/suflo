@@ -14,7 +14,9 @@ var m = /<script id="davet-site">([\s\S]*?)<\/script>/.exec(html);
 ok("davet betigi var", !!m);
 var KOD = m ? m[1] : "";
 ok("davet betigi lemon.js'ten once", m && html.indexOf('<script id="davet-site">') < html.indexOf("app.lemonsqueezy.com/js/lemon.js"));
-ok("indirim bilgisi ogesi gizli baslar", /id="davet-bilgi" hidden/.test(html) && /%15 davet indirimi uygulandı/.test(html));
+ok("indirim bilgisi ogesi gizli baslar", /id="davet-bilgi" hidden/.test(html) && /Davet kodu ödeme sayfasına eklendi/.test(html) &&
+  // kod gecerliligi ve yuzde ancak odemede bilinir: sitede "uygulandi" ya da sabit yuzde vaadi yok
+  !/davet indirimi uygulandı/.test(html) && !/id="davet-bilgi"[^>]*>[^<]*%\d/.test(html));
 ok("altbilgide ortaklik sayfasi", /href="\/ortaklik\.html"/.test(html));
 
 var CHECKOUT = "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31?checkout%5Bcustom%5D%5Bsource%5D=suflo_website&checkout%5Bcustom%5D%5Bfeature%5D=pricing";

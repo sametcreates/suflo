@@ -98,21 +98,22 @@ window.KDavet = (function () {
     var d = sunucuKodu();
     el("davet-kodlu").hidden = !d;
     el("davet-serbest").hidden = !!d;
+    // libass'siz ffmpeg Story kartini cizemez; kodsuz dalda (Pro bitti / baska lisans) da gizlenir
+    el("davet-story").hidden = !d || !!(K.libassUyarisi && K.libassUyarisi());
     if (d) {
       el("davet-kod").textContent = d.kod;
-      var il = R.ilerleme(d.sayi, dil());
+      // sunucu kademeyi iadede dusurmez: kazanilmis odul "sonraki hedef" diye gosterilmez
+      var il = R.ilerleme(d.sayi, dil(), d.kademe);
       el("davet-ilerleme-metin").textContent = il.metin;
       el("davet-odul").textContent = il.odul;
       el("davet-bar-dolu").style.width = Math.round(il.oran * 100) + "%";
       var dolu = el("davet-ilerleme");
       if (dolu) dolu.setAttribute("aria-label", il.metin);
-      // libass'siz ffmpeg Story kartini cizemez: dugmeyi hic gosterme
-      el("davet-story").hidden = !!(K.libassUyarisi && K.libassUyarisi());
     } else {
       el("davet-link").value = R.freeRefUrl(refId());
       el("davet-serbest-not").textContent = proMu()
-        ? "Kişisel indirim kodun hazır olunca burada görünür. Şimdilik bu bağlantıyı paylaş."
-        : "Bağlantı yalnız kimden geldiğini gösterir, kişisel bilgi taşımaz.";
+        ? "Davet kodları henüz açılmadı. Kişisel indirim kodun açılınca burada görünür; o zamana kadar bu bağlantıyı paylaş."
+        : "Davet ödülleri ve kişisel indirim kodu Pro sahiplerine özel. Bu bağlantıyla Suflo'yu yine de paylaşabilirsin: yalnız kimden geldiğini gösterir, kişisel bilgi taşımaz.";
     }
     var girSar = el("davet-girilen-sar");
     if (girSar) girSar.hidden = proMu();
@@ -166,7 +167,8 @@ window.KDavet = (function () {
         s2.davetKod = {
           kod: j.code,
           sayi: Math.max(0, Math.floor(Number(j.count) || 0)),
-          kademe: R.tierFor(j.count),
+          // sunucunun kademesi azalmaz (iade sonrasi da korunur): ikisinin buyugu
+          kademe: R.kazanilanKademe(j.count, j.tier),
           yuzde: yuzde > 0 && yuzde < 100 ? yuzde : R.VARSAYILAN_YUZDE,
           alindi: Date.now(),
           iz: iz
@@ -249,13 +251,19 @@ window.KDavet = (function () {
     s.davetGirilenKod = kod;
     kaydet();
     gir.value = kod;
-    durum("✓ Kod kaydedildi: Pro'yu panelden alırken indirim ödeme sayfasına kendiliğinden eklenir.", "good");
+    durum("✓ Kod kaydedildi: Pro'yu panelden alırken ödeme sayfasına eklenir; indirim orada onaylanır.", "good");
   }
 
   // app.js proCheckoutUrl: odeme baglantisina eklenecek kod ("" = yok)
   function odemeKodu() {
     var k = ayar().davetGirilenKod;
     return R.isValidCode(k) ? k : "";
+  }
+
+  // pro-sync.js syncExtras yeni odul dosyasi indirince cagirir (arka plan esitlemesi sessizdir)
+  function odulIndi(n) {
+    if (!(Number(n) > 0)) return;
+    toast("Davet ödülün indirildi: yeni SFX ve altyazı şablonları kütüphanende", "good", 8000);
   }
 
   /* ---------------- Davet seridi ---------------- */
@@ -368,5 +376,5 @@ window.KDavet = (function () {
     ciz();
   }
 
-  return { init: init, ani: ani, ciz: ciz, kodGetir: kodGetir, kaynakSor: kaynakSor, odemeKodu: odemeKodu, metin: metin };
+  return { init: init, ani: ani, ciz: ciz, kodGetir: kodGetir, kaynakSor: kaynakSor, odemeKodu: odemeKodu, metin: metin, odulIndi: odulIndi };
 })();

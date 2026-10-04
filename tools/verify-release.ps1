@@ -7,6 +7,17 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 [xml]$manifest = Get-Content -LiteralPath (Join-Path $root "CSXS\manifest.xml")
 $version = [string]$manifest.ExtensionManifest.ExtensionBundleVersion
+# Davet odulleri (manifest.extras.davet ve ref kademeli token) sunucuda yalniz belli bir istemci
+# surumunden itibaren gonderilir. Paket o surumden eskiyse karttaki odul vaadi hic gerceklesmez:
+# esik server/pro-v1/index.php'den okunur, manifest surumu altindaysa yayin durur.
+$serverPhp = Join-Path $root "server\pro-v1\index.php"
+if (Test-Path -LiteralPath $serverPhp -PathType Leaf) {
+    $esik = [regex]::Match((Get-Content -Raw -LiteralPath $serverPhp), 'version_compare\(\$clientVersion,\s*''([0-9.]+)'',\s*''>=''\)')
+    if ($esik.Success -and ([version]$version -lt [version]$esik.Groups[1].Value)) {
+        Write-Host ("Surum {0}, davet odullerinin sunucu esigi {1}'in altinda: CSXS/manifest.xml surumunu yukselt." -f $version, $esik.Groups[1].Value) -ForegroundColor Red
+        exit 1
+    }
+}
 if (-not $ZxpPath) { $ZxpPath = Join-Path $root ("dist\Suflo-{0}.zxp" -f $version) }
 if (-not $InstallerPath) { $InstallerPath = Join-Path $root ("dist\Suflo-{0}-Kurulum.zip" -f $version) }
 # Ilk acilis rehberinin ornek klibi (kurucunun kendi sesi/yuzu, MIT ile dagitilir): bu klasordeki

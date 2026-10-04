@@ -553,8 +553,21 @@ Bu noktada her şey eski gibi çalışır; 3.0 panelleri hiçbir fark görmez.
 - İçerik üreticisi kodları (ör. `EDITORALI15`) Lemon Squeezy → Discounts'ta elle açılır; panelin
   `SFL` kodlarıyla karışmaz. Ayda bir Discounts → kod → siparişler listesinden payı hesaplayıp IBAN'a
   gönder.
-- Sitede indirim bilgisi "%15 davet indirimi uygulandı" sabit yazılı. `referral_percent`'i
-  değiştirirsen `docs/index.html` ve `docs/ortaklik.html`'deki %15'leri de değiştir.
+- Sitede `?d=` ile gelen ziyaretçiye yüzde yazmadan "Davet kodu ödeme sayfasına eklendi: SFL… ·
+  indirim ödemede onaylanır" notu çıkar (kodun geçerliliğini ve kalan kullanımını yalnız Lemon Squeezy
+  bilir). `referral_percent`'i değiştirirsen `docs/ortaklik.html`'deki %15'i de değiştir.
+
+### 5.5a Sürüm 3.1.0 olmadan ödül inmez (yayın kapısı)
+
+Sunucu davet ödüllerini (`manifest.extras.davet`) ve ödüllü tokeni yalnız 3.1.0 ve üstünü bildiren
+panele gönderir. Panel bugün 3.0.0 bildiriyor; bu sürümle paketlenirse kart "ödül paketleri açılır"
+dese de hiçbir ödül inmez.
+
+1. Yayından önce `CSXS/manifest.xml` içinde `ExtensionBundleVersion` ve `Extension Version`'ı
+   `3.1.0` yap (`tools/package.ps1` `js/bridge.js` `VERSION`'ı kendiliğinden eşitler).
+2. `tools/verify-release.ps1` sürüm sunucudaki eşiğin altındaysa yayını "Surum …, davet odullerinin
+   sunucu esigi …'in altinda" diyerek durdurur; bu mesajı görürsen 1. adımı atlamışsındır.
+3. `node tests/test-davet-surum-esigi.js` çıktısındaki `INFO` satırı durumu gösterir.
 
 ### 5.6 Premiere'de elle deneme (yayından önce, yaklaşık 25 dk)
 

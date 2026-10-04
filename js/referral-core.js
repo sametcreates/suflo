@@ -213,14 +213,22 @@
     }
   };
 
+  // Kazanilmis kademe: sayidan ve sunucunun azalmayan "tier" alanindan buyuk olani (bilinen kademelerden)
+  function kazanilanKademe(count, tier) {
+    return Math.max(tierFor(count), tierFor(tier));
+  }
+
   /*
    * Ilerleme cubugu: { sayi, kademe, sonraki, oran (0-1), metin "2/3 davet", odul }
    * sonraki null ise (10+) cubuk dolu, odul en ust kademeninki.
+   * earnedTier: sunucu iade sonrasi sayiyi dusurse de kademeyi korur; hedef ve odul
+   * kazanilmis kademenin ustunden secilir (acilmis odul "sonraki" diye gosterilmez).
    */
-  function ilerleme(count, lang) {
+  function ilerleme(count, lang, earnedTier) {
     var n = sayiyaIndir(count);
     var L = dilSec(lang);
-    var sonraki = nextTier(n), kademe = tierFor(n);
+    var kademe = Math.max(tierFor(n), kazanilanKademe(0, earnedTier));
+    var sonraki = nextTier(Math.max(n, kademe));
     var hedef = sonraki || TIERS[TIERS.length - 1];
     return {
       sayi: n, kademe: kademe, sonraki: sonraki,
@@ -373,7 +381,7 @@
     shareUrl: shareUrl, freeRefUrl: freeRefUrl, newRefId: newRefId,
     shareText: shareText, whatsappUrl: whatsappUrl, tweetUrl: tweetUrl, channelUrl: channelUrl,
     withDiscount: withDiscount, withRef: withRef,
-    tierFor: tierFor, nextTier: nextTier, ilerleme: ilerleme,
+    tierFor: tierFor, nextTier: nextTier, ilerleme: ilerleme, kazanilanKademe: kazanilanKademe,
     promptKarari: promptKarari, shouldPrompt: shouldPrompt, olayIsle: olayIsle,
     creditLine: creditLine, storyAss: storyAss, storyDosyaAdi: storyDosyaAdi
   };

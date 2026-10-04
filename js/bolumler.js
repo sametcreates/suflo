@@ -188,7 +188,13 @@ window.KChapters = (function () {
     var s = K.settings();
     s.krediSatiri = !!el("cap-yt-kredi").checked;
     K.saveSettings();
+    krediUygula();
+  }
+
+  // Textarea kopyalanacak metni hep gostersin: kutunun durumuna gore satiri ekle/cikar (kaydetmez)
+  function krediUygula() {
     if (!ytSonuc || !el("cap-yt-aciklama")) return;
+    var acik = krediAcik();
     var ta = el("cap-yt-aciklama");
     if (ta.value === ytSonYazilan) {
       ytSonYazilan = ytAciklama();
@@ -198,7 +204,7 @@ window.KChapters = (function () {
     // Elle duzenlenmis aciklama: yalniz son satiri ekle/cikar, kullanicinin metnine dokunma
     var satir = krediMetni(), v = ta.value.replace(/\s+$/, "");
     var sinir = YM.PLATFORM[ytPlatform()] ? YM.PLATFORM[ytPlatform()].aciklama : 5000;
-    if (s.krediSatiri) {
+    if (acik) {
       if (v.slice(-satir.length) !== satir && v.length + 2 + satir.length <= sinir) ta.value = (v ? v + "\n\n" : "") + satir;
     } else if (v.slice(-satir.length) === satir) {
       ta.value = v.slice(0, v.length - satir.length).replace(/\s+$/, "");
@@ -306,7 +312,12 @@ window.KChapters = (function () {
         krediKutusunuCiz();
         el("cap-yt-kredi").addEventListener("change", krediDegisti);
         // Pro etkinlesince varsayilan degisir (kullanici secmediyse)
-        if (typeof Pro !== "undefined" && Pro.on) Pro.on(function () { if (typeof K.settings().krediSatiri !== "boolean") krediKutusunuCiz(); });
+        // ve zaten yazilmis aciklama da kutuyla ayni hale getirilir (kopyalanan = gorunen)
+        if (typeof Pro !== "undefined" && Pro.on) Pro.on(function () {
+          if (typeof K.settings().krediSatiri === "boolean") return;
+          krediKutusunuCiz();
+          krediUygula();
+        });
       }
     }
   }

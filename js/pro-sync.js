@@ -399,6 +399,8 @@ window.ProSync = (function () {
     if (downloaded) {
       try { if (window.KLib) KLib.tara(); } catch (e1) {}
       try { if (window.KSfx) KSfx.tara(); } catch (e2) {}
+      // sessiz arka plan esitlemesinde de kullanici yeni odulunden haberdar olsun
+      try { if (window.KDavet && KDavet.odulIndi) KDavet.odulIndi(downloaded); } catch (e3) {}
     }
     return { ok: failed === 0, downloaded: downloaded, failed: failed };
   }
