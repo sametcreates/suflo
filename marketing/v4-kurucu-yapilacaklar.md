@@ -344,11 +344,14 @@ haklar geri **dolmamalı** (bu da denenecek bir davranış).
 1. Ayarlar › Suflo Pro: "Pro'yu dene: her araca 3 hak" kartında 9 satır, her biri `3/3` olmalı.
    Pro karşılaştırmasında "Sözlük" yazmamalı; ücretsiz sütununda "Kelime kelime altyazı · terim sözlüğü"
    olmalı. Hakkında satırında "v1.7" ve "ücretsiz altyazı paneli" görünmemeli.
-2. **Otomatik kesim:** Kesim sekmesinde "Analiz et" → satış penceresinde birincil düğme "Ücretsiz dene ·
+2. **Otomatik kesim:** Kesim sekmesinde bir klip seçip "Sessizlikleri bul" → satış penceresinde birincil düğme "Ücretsiz dene ·
    3 hakkın var", altında "Hak yalnız işlem başarıyla bitince düşer" (filigran notu **yok**). Bas: pencere
    kapanmalı ve analiz **kendiliğinden** başlamalı. Analiz bitince hak düşmemeli (Ayarlar'da hâlâ 3/3).
-   "Uygula" → kesimler uygulanmalı, "1 deneme hakkı kullanıldı · 2 kaldı" bildirimi çıkmalı, Ayarlar'da 2/3.
-   Tekrar "Analiz et" yeniden satış penceresini açmalı ("2 hakkın var").
+   "Kesimleri uygula" → kesimler uygulanmalı, "1 deneme hakkı kullanıldı · 2 kaldı" bildirimi çıkmalı, Ayarlar'da 2/3.
+   Tekrar "Sessizlikleri bul" yeniden satış penceresini açmalı ("2 hakkın var").
+   Sekmenin üstündeki tanıtım kartında "Otomatik kesimi aç — 749 TL" → pencerede yine "Ücretsiz dene";
+   basınca "Deneme açık — tekrar tıkla" bildirimi çıkmalı ve "Sessizlikleri bul" pencere açmadan çalışmalı.
+   SFX ve Motion BG tanıtım kartlarında "Ücretsiz dene" **olmamalı**.
 3. **Hata hak yemez:** Klip seçmeden ya da kilitli track'te uygulamayı dene → hata mesajı, hak düşmemeli.
    Sesi iyileştir'i sesi olmayan bir klipte dene → hata, hak aynı.
 4. **Klavye:** satış penceresinde Tab ile dolaş: ✕ → Ücretsiz dene → Suflo Pro'yu Al → Tüm Pro'yu gör →
@@ -358,7 +361,7 @@ haklar geri **dolmamalı** (bu da denenecek bir davranış).
    hak düşmeli. Viral anlarda Groq anahtarı yoksa anahtar sihirbazı açılmalı, hak düşmemeli. Çok dilli
    pakette yalnız kaynak dil seçiliyse (çeviri yok) hak düşmemeli. Sahne algılama ve B-roll önerileri
    satış penceresinde "Ücretsiz dene" **göstermemeli**.
-6. **Otomatik zoom:** Deneme hakkıyla zoom ekle → "Zoom anahtarlarını temizle" kapısız çalışmalı; hakkı
+6. **Otomatik zoom:** Deneme hakkıyla zoom ekle → "Zoom'u kaldır" kapısız çalışmalı; hakkı
    bitmiş kullanıcı da temizleyebilmeli.
 7. **Stilli altyazı katmanı:** Bir Suflo Stili (ör. Creator Punch) seç → "ile ekle" → satış penceresindeki
    notta "stilli katmanlarda küçük suflo.app filigranı olur" yazmalı. "Ücretsiz dene" → katman V-kanalına

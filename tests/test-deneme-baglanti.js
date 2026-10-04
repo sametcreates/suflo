@@ -144,6 +144,8 @@ ok("reflectPro kalan hakları ve temiz kartını çizer", /denemeListesiniCiz\(s
 ok("liste satırı 'ad kalan/hak' (Otomatik kesim 2/3), Pro'da gizli", /o\.kalan \+ "\/" \+ o\.hak/.test(govde(app, "function denemeListesiniCiz(")) && /kart\.hidden = !!s\.pro/.test(govde(app, "function denemeListesiniCiz(")));
 var dt = govde(app, "async function denemeyiTemizle(");
 ok("temiz yeniden oluşturma ortak modülle; başarıda kayıt silinir", /SufloOverlayRender\.temizYenidenOlustur\(K, k,/.test(dt) && dt.indexOf("Pro.denemeCiktisiSil(k.path)") > dt.indexOf("if (!r.ok)"));
+ok("Pro tanıtım kartı düğmeleri denemeyi sunar (pro.js listede olmayanı süzer)", /Pro\.gate\(feature, \{ deneme: true \}\);/.test(app) &&
+  /Dm\.listede\(feature\) && Number\(o\.kalan\) > 0/.test(oku("js/pro.js")));
 ok("etkinleştirmeden sonra deneme çıktısı varsa bir kez hatırlatılır", /if \(Pro\.denemeCiktilari && Pro\.denemeCiktilari\(\)\.length\) \{\s*toast\("Deneme çıktılarını temiz yeniden oluştur/.test(app));
 ok("Pro karşılaştırması: Sözlük yok, yeni araçlar var", !/Sözlük/.test(kilitli.split('class="pro-renk"')[1] || "") &&
   ["Konuşmadan kes", "viral puan", "Geçişler", "Suflo Stilleri timeline'da", "Kanca başlığı", "Sesi iyileştir", "Otomatik zoom", "Ritim", "12 dile çeviri"].every(function (x) { return kilitli.indexOf(x) !== -1; }));

@@ -538,7 +538,9 @@ window.KApp = (function () {
     Array.prototype.forEach.call(document.querySelectorAll(".pro-ac-btn, #yazi-proya-gec"), function (b) {
       b.addEventListener("click", function () {
         var feature = b.getAttribute("data-pro-feature") || (b.id === "yazi-proya-gec" ? "mogrt" : "pro");
-        Pro.gate(feature);
+        // Deneme listesindeki araçlarda (kesim, zoom, ritim, geçiş, kanca) pencere "Ücretsiz dene" de sunar;
+        // yeniden çalıştırılacak eylem yok: kurulunca "Deneme açık — tekrar tıkla" der. Kütüphaneler denemesiz.
+        Pro.gate(feature, { deneme: true });
       });
     });
 
