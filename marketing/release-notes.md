@@ -1,3 +1,17 @@
+## Suflo 3.1.0 — Shorts, podcast ve marka
+
+### Yeni
+- **İlk altyazın 2 dakikada:** İlk açılışta 4 adımlı rehber: hızlı küçük model, örnek klipte deneme, stil önizlemesi ve ücretsiz Groq anahtarı sihirbazı (panodan al, doğrula). AI düğmelerinde "anahtar gerekli · 1 dk" kısayolu.
+- **Tek Tık Shorts Paketi (Pro):** Viral anlar kartlarında "Pakete al", sonra **Paketi oluştur**: her an için 9:16 sekans, seçtiğin Suflo Stilinde altyazı (yeniden yazıya dökmeden), kanca başlığı, ilerleme çubuğu, kapanış çağrısı ve Marka Kiti logosu. Her Short için YouTube Shorts, TikTok ve Reels başlığı, açıklaması ve hashtag'leri; paylaşım paketi proje klasörüne `.txt` ve `.csv` olarak yazılır. Yarım kalan paket **Devam et** ile kaldığı yerden sürer.
+- **Podcast Modu (Pro):** Yeni Podcast sekmesi. Her konuşmacının kendi mikrofonu varsa konuşan kişiye kamera kesimini kendiliğinden yapar (2–4 konuşmacı, isteğe bağlı geniş plan). Ritim ayarları canlı önizlenir, kopya sekansta uygulanır; ses katmanlarına dokunulmaz. Suflo Stillerinde her konuşmacının altyazısı kendi renginde.
+- **Viral Skor 2.0:** Viral anlara açıklamalı 0–100 puan (kanca, bağımsızlık, duygu, değer, kapanış), tür, adet ve "ne arıyorsun?" odağı. Klipler cümle ortasında başlamaz ya da bitmez; kartta ±1 cümle düğmeleri ve 3 kanca başlığı önerisi.
+- **Tek tık temizlik:** Konuşmadan kes artık **tekrar çekimleri** ve yarım başlangıçları gruplar, her grupta bir çekim bırakır (son, en uzun ya da en akıcı; elle de seçilir). İsteğe bağlı senaryo hizalaması, AI ile benzer anlatımlar, Ayarlar'da ek dolgu sözcükleri. Transkript önbelleği aynı klibi yeniden yazıya dökmez.
+- **Marka Kiti ve stil kodları:** Suflo Stillerinde ince ayar (yazı tipi, renkler, punto, konum, 9:16'da platform arayüzünden kaçınma). Ayarlar'daki **Marka Kiti** yazı tipini, renklerini ve köşe logonu her stile ve kanca başlığına uygular. **Stili paylaş** tek satırlık bir kod ve `suflo.app/stil` bağlantısı verir; kodu yapıştıran aynı görünümü alır.
+- **Pro'yu dene:** Kodla çalışan her Pro aracına kendi videonda 3 deneme hakkı; süresi dolmaz, hak yalnız işlem başarıyla bitince düşer. Deneme stilli katmanlarında küçük bir suflo.app filigranı olur; Pro'yu alınca temiz yeniden oluşturulur. Shorts Paketi ve Podcast Modu denemeye açık değil.
+- **Davet et, kazan:** Ayarlar'da davet kartı. Pro sahibine kişisel kod (arkadaşına indirim), 1 ve 3 davette panele kendiliğinden inen ödül paketleri. Ücretsiz sürümde kişisel bilgi taşımayan paylaşım bağlantısı.
+- **English (beta):** Arayüz artık İngilizce de; Ayarlar › Destek › Arayüz dili. Yeniden yüklemeden geçer; Premiere'deki bin ve marker adları değişmez.
+- **Yenilikler penceresi:** 3.1'i ilk açışta yeni özellikler tek ekranda; her biri tek tıkla ilgili bölümü açar.
+
 ## Suflo 3.0.0 — Yapay zekâ ile kurgu
 
 ### Yeni

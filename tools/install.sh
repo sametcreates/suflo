@@ -11,7 +11,7 @@ echo "Suflo kuruluyor..."
 for v in 9 10 11 12 13 14; do
   defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1 2>/dev/null || true
 done
-echo "  PlayerDebugMode acildi (CSXS 9-12)"
+echo "  PlayerDebugMode acildi (CSXS 9-14)"
 
 # 2) Dosyalari kopyala
 rm -rf "$DEST"

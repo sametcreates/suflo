@@ -306,7 +306,7 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 Suflo'nun odağı konuşmayı izlenebilir kurguya çevirmek. Altyazı, sessizlik kesme, ritim,
 MOGRT/SFX/Emoji Assets kütüphanesi ve Akıllı SFX aynı iş akışında buluşur. Sıradakiler:
 
-- Konuşmacı ayrımı (podcast ve röportaj kurgusu için)
+- Tek mikrofona karışık kayıtta konuşmacı ayrımı (Podcast Modu B; ayrı mikrofonlu kayıt 3.1 ile geldi)
 - SFX dalga formu ve ses seviyesi eşitleme
 - Yeni yazı animasyonu ve SFX koleksiyonları (Pro İçerik Bulutu üzerinden)
 - Azerice arayüz çevirisi
@@ -326,8 +326,19 @@ Shorts with an explained 0–100 score, animated caption styles, transitions and
   **749 TRY (≈ $19)** and open the TRY checkout, so the price you see is always what you pay.
   Every code-based Pro tool (Auto Cut, text-based cut, viral moments, zoom, transitions, enhance
   audio, styled captions and hook titles, translation, beat sync) gives you 3 free tries on your own
-  footage first; content libraries (MOGRTs, SFX, Motion BGs, presets), batch clips and the Shorts
-  package are Pro-only.
+  footage first; content libraries (MOGRTs, SFX, Motion BGs, presets), batch clips, the Shorts
+  package and Podcast Mode are Pro-only.
+- **New in 3.1:**
+  - **One-click Shorts package:** turn the viral moments you pick into 9:16 sequences with captions,
+    a hook title, a progress bar, a call to action, your logo and per-platform titles and hashtags.
+  - **Podcast Mode:** automatic camera switching from one mic per speaker (2–4 speakers, optional
+    wide shot), applied on a copy of the sequence; captions in each speaker's color.
+  - **One-click cleanup:** text-based cut now groups retakes and false starts and keeps one take
+    (last, longest or smoothest), with optional script matching and extra filler words.
+  - **Brand kit and style codes:** your font, colors and corner logo on every caption style and hook
+    title; share a style as a one-line code or a [suflo.app/en/stil](https://suflo.app/en/stil.html) link.
+  - **Invite codes:** Pro owners get a personal code (a discount for friends) and reward packs at 1
+    and 3 invites.
 - **Install:** Premiere Pro 2020 (14.4) or newer on Windows/macOS. Download the
   [latest release](https://github.com/sametcreates/suflo/releases/latest); the installer is bilingual.
 - **Website and guides:** [suflo.app/en](https://suflo.app/en/) ·

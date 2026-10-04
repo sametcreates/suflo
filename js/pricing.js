@@ -100,9 +100,15 @@
     return { "@type": "Offer", price: String(o.amount), priceCurrency: o.currency, url: o.url };
   }
 
+  // Upsell "örnek gör" bağlantısı: arayüz diliyle aynı dildeki Pro sayfası
+  function proPageUrl(lang) {
+    return dil(lang) === "en" ? "https://suflo.app/en/pro.html" : "https://suflo.app/pro";
+  }
+
   return {
     PRICING: PRICING, EN_TRY: EN_TRY, TRY_CHECKOUT: TRY_CHECKOUT,
     offer: offer, label: label, wasLabel: wasLabel, taxLabel: taxLabel, currency: currency, usdReady: usdHazir,
-    upsellPriceHtml: upsellPriceHtml, settingsRow: settingsRow, checkoutUrl: checkoutUrl, schemaOffer: schemaOffer
+    upsellPriceHtml: upsellPriceHtml, settingsRow: settingsRow, checkoutUrl: checkoutUrl, schemaOffer: schemaOffer,
+    proPageUrl: proPageUrl
   };
 });

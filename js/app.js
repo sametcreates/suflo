@@ -1406,7 +1406,7 @@ window.KApp = (function () {
           return;
         }
         if (intent === "demo") {
-          K.cs.openURLInDefaultBrowser("https://suflo.app/pro");
+          K.cs.openURLInDefaultBrowser(SufloPricing.proPageUrl(arayuzDili()));
           return;
         }
         goster("settings");
@@ -1469,21 +1469,23 @@ window.KApp = (function () {
   }
 
   /*
-   * "Suflo 3.0'da yeni": surum basina bir kez. Yeni ozellikler sekmelerin
-   * derinliginde (Kesim sekmesinin altinda, editorun katlanir bolumlerinde);
+   * "Suflo 3.1'de yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (Kesim sekmesinin altinda, Ayarlar'in kartlarinda);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
+   * 3.0'dan yukselten kullanicida yeniliklerGoruldu "3.0" oldugundan pencere bir kez acilir.
    */
   var YENILIKLER = {
-    surum: "3.0",
+    surum: "3.1",
+    alt: "Shorts, podcast ve marka",
     maddeler: [
-      { ikon: "✂", baslik: "Konuşmadan kes", metin: "ııı, eee ve tekrarları kelimeye tıklayarak videodan çıkar.", sekme: "cut", hedef: "tc-card" },
-      { ikon: "🔥", baslik: "Viral anlar (Shorts)", metin: "En güçlü 15–60 sn'yi bulur, tek tıkla 9:16 Shorts sekansı yapar.", sekme: "captions", acilir: "cap-vr-box" },
-      { ikon: "Aa", baslik: "Suflo Stilleri", metin: "Bold Box, Neon, Daktilo dahil 12 animasyonlu altyazı.", sekme: "captions", hedef: "cap-stil-grid" },
-      { ikon: "♪", baslik: "Sesi iyileştir", metin: "Gürültüyü al, sesi YouTube seviyesine getir — senkron kaymaz.", sekme: "cut", hedef: "ses-card" },
-      { ikon: "▭", baslik: "Kanca başlığı", metin: "Shorts açılışına animasyonlu başlık kartı, tek tık.", sekme: "kanca" },
-      { ikon: "↔", baslik: "Geçişler", metin: "Kesime tek tıkla zoom, whip, itme — eklentisiz.", sekme: "gecis" },
-      { ikon: "▦", baslik: "Sahne algılama · vuruşlarda böl", metin: "Klibi sahnelerde ya da müziğin vuruşlarında böl.", sekme: "cut", hedef: "sc-card" },
-      { ikon: "§", baslik: "YouTube bölümleri", metin: "Konuşmadan bölüm + AI başlık, açıklamaya kopyala.", sekme: "captions", acilir: "cap-ch-box" }
+      { ikon: "▶", baslik: "Tek Tık Shorts Paketi", metin: "Viral andan altyazılı, kancalı, ilerleme çubuklu hazır Shorts sekansı.", sekme: "captions", acilir: "cap-vr-box" },
+      { ikon: "🎙", baslik: "Podcast Modu", metin: "Mikrofon başına sese göre konuşan kişiye kamera kesimi.", sekme: "podcast" },
+      { ikon: "✂", baslik: "Tek tık temizlik", metin: "Konuşmadan kes artık tekrar çekimleri ve yarım başlangıçları da bulur.", sekme: "cut", hedef: "tc-card" },
+      { ikon: "🔥", baslik: "Viral puan 0–100", metin: "Her ana açıklamalı puan ve üç kanca başlığı önerisi.", sekme: "captions", acilir: "cap-vr-box" },
+      { ikon: "Aa", baslik: "Marka Kiti", metin: "Yazı tipin, renklerin ve logon her altyazıda; stilini kodla paylaş.", sekme: "settings", hedef: "grp-marka-kiti" },
+      { ikon: "★", baslik: "Pro'yu dene", metin: "Her Pro aracına 3 ücretsiz deneme hakkı, süresi dolmaz.", sekme: "settings", hedef: "grp-pro" },
+      { ikon: "♥", baslik: "Davet et, kazan", metin: "Kodunu paylaş; arkadaşın indirim alır, sen ödül paketleri açarsın.", sekme: "settings", hedef: "grp-davet" },
+      { ikon: "EN", baslik: "English arayüz (beta)", metin: "Paneli Ayarlar'dan İngilizceye çevir.", sekme: "settings", hedef: "set-ui-lang" }
     ]
   };
 
@@ -1498,7 +1500,7 @@ window.KApp = (function () {
     kutu.className = "yenilik-kutu";
     var bas = document.createElement("div");
     bas.className = "yenilik-bas";
-    bas.innerHTML = "<span>YENİ</span><b>Suflo " + YENILIKLER.surum + "</b><i>Yapay zekâ ile kurgu</i>";
+    bas.innerHTML = "<span>YENİ</span><b>Suflo " + YENILIKLER.surum + "</b><i>" + YENILIKLER.alt + "</i>";
     kutu.appendChild(bas);
     function kapat() {
       try { s.yeniliklerGoruldu = YENILIKLER.surum; K.saveSettings(); } catch (e) {}

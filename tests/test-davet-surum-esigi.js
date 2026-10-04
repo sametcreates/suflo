@@ -37,9 +37,9 @@ ok("esik satiri extras/davet blogunda", !!esik && php.indexOf("version_compare($
 var surum = (mf.match(/ExtensionBundleVersion="([^"]+)"/) || [])[1];
 var kv = (br.match(/var VERSION = "([^"]+)"/) || [])[1];
 ok("bridge.js VERSION manifest surumuyle ayni (sunucuya giden client_version)", !!surum && surum === kv, surum + " / " + kv);
-// Bilgi: surum esigin altindaysa yayin kapisi durdurur (gorev: 3.1.0'a yukselt). Test bunu hata saymaz,
-// cunku surum yukseltmesi yayin adimidir; yalniz durumu yazar.
-if (esik && surum) console.log("INFO paket " + surum + ", davet odul esigi " + esik + (surumKarsilastir(surum, esik) < 0 ? " -> verify-release.ps1 yayini durdurur" : " -> uygun"));
+// Paket surumu esigin altindaysa karttaki davet odulu vaadi hic gerceklesmez ve verify-release.ps1
+// yayini durdurur; bunu yayin gununu beklemeden burada yakala.
+ok("paket surumu davet odul esiginde ya da ustunde", !!esik && !!surum && surumKarsilastir(surum, esik) >= 0, surum + " / " + esik);
 var ps = oku("js/pro-sync.js");
 ok("pro-sync.js manifest isteginde client_version olarak K.VERSION gonderir", /client_version:\s*K\.VERSION/.test(ps));
 

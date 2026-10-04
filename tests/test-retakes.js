@@ -98,6 +98,25 @@ chk("'ben ben' textcut tekrarı, falsestart değil", k6[0] === "repeat" && k6.in
 var r4 = R.detect(ik.concat(kur(["yavaş yavaş yürüdük eve ama yorulduk."], { bas: 40 })), { lang: "tr" });
 chk("ikileme cümleleri 30 sn'den uzak: gruplanmaz", r4.groups.length === 0);
 
+/* ---- İngilizce (English beta arayüzü İngilizce transkripte de çağırır) ---- */
+var enUc = kur([
+  "Today I want to show you how to add captions in Premiere",
+  "Today I want to show you how to add captions in Premiere.",
+  "Hello everyone and welcome back."
+]);
+var rEn = R.detect(enUc, { lang: "en", policy: "son" });
+chk("EN: tam tekrar çekim ×2 tek grup, sonuncu tutulur", rEn.groups.length === 1 && rEn.groups[0].takes.length === 2 && rEn.groups[0].keep === rEn.groups[0].takes[1], JSON.stringify(grupMetinleri(rEn)));
+var enCue = kur(["These are my three favorite apps for editing.", "let me start over.", "These are my three favorite apps for editing."]);
+var rEnCue = R.detect(enCue, { lang: "en" });
+chk("EN: 'let me start over' atılanlara katılır", rEnCue.groups.length === 1 && rEnCue.groups[0].cues.length === 1 && rEnCue.groups[0].dropped.indexOf(1) !== -1, JSON.stringify(rEnCue.groups));
+var enSorry = kur(["These are my three favorite apps for editing.", "sorry.", "These are my three favorite apps for editing."]);
+var rEnSorry = R.detect(enSorry, { lang: "en" });
+chk("EN: 'sorry' işaret sözü sayılır", rEnSorry.groups.length === 1 && rEnSorry.groups[0].dropped.indexOf(1) !== -1, JSON.stringify(rEnSorry.groups));
+var enAnafora = kur(["For this video I worked really hard.", "For this video I barely slept.", "For this video I spent a lot of money."]);
+chk("EN: anafora gruplanmaz", R.detect(enAnafora, { lang: "en" }).groups.length === 0, JSON.stringify(grupMetinleri(R.detect(enAnafora, { lang: "en" }))));
+var enUzun = kur(["I never said that.", "I never said that again, I promise you all of that."]);
+chk("EN: cümle içindeki 'again' işaret sözü değil", R.detect(enUzun, { lang: "en" }).groups.every(function (g) { return !g.cues.length; }));
+
 /* ---- NEGATİF: anafora, tarif adımları, uzak tekrarlar, araya giren cümleler ---- */
 var anafora = kur(["Bu video için çok çalıştım.", "Bu video için uykusuz kaldım.", "Bu video için para harcadım."]);
 chk("anafora gruplanmaz", R.detect(anafora, { lang: "tr" }).groups.length === 0, JSON.stringify(grupMetinleri(R.detect(anafora, { lang: "tr" }))));

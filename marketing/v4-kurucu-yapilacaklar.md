@@ -560,14 +560,17 @@ Bu noktada her şey eski gibi çalışır; 3.0 panelleri hiçbir fark görmez.
 ### 5.5a Sürüm 3.1.0 olmadan ödül inmez (yayın kapısı)
 
 Sunucu davet ödüllerini (`manifest.extras.davet`) ve ödüllü tokeni yalnız 3.1.0 ve üstünü bildiren
-panele gönderir. Panel bugün 3.0.0 bildiriyor; bu sürümle paketlenirse kart "ödül paketleri açılır"
-dese de hiçbir ödül inmez.
+panele gönderir. Paket sürümü artık 3.1.0 (`CSXS/manifest.xml` ve `js/bridge.js`); bu kapı açık.
 
-1. Yayından önce `CSXS/manifest.xml` içinde `ExtensionBundleVersion` ve `Extension Version`'ı
-   `3.1.0` yap (`tools/package.ps1` `js/bridge.js` `VERSION`'ı kendiliğinden eşitler).
+1. Sürümü bir daha değiştirirsen `CSXS/manifest.xml` içinde `ExtensionBundleVersion` ve
+   `Extension Version`'ı birlikte değiştir (`tools/package.ps1` `js/bridge.js` `VERSION`'ı kendiliğinden
+   eşitler). `marketing/release-notes.md`'nin ilk başlığı da aynı sürümü yazmalı (`tools/publish.ps1`
+   yoksa yayını durdurur, `tests/test-guncelleme.js` de düşer).
 2. `tools/verify-release.ps1` sürüm sunucudaki eşiğin altındaysa yayını "Surum …, davet odullerinin
-   sunucu esigi …'in altinda" diyerek durdurur; bu mesajı görürsen 1. adımı atlamışsındır.
-3. `node tests/test-davet-surum-esigi.js` çıktısındaki `INFO` satırı durumu gösterir.
+   sunucu esigi …'in altinda" diyerek durdurur. `node tests/test-davet-surum-esigi.js` aynı durumu
+   artık hata olarak yakalar.
+3. Panelin "Suflo 3.1'de yeni" penceresi (`js/app.js` `YENILIKLER`) sürümün ilk iki hanesini taşır;
+   `tests/test-yenilikler.js` sürüm büyüyüp liste eski kalırsa düşer.
 
 ### 5.6 Premiere'de elle deneme (yayından önce, yaklaşık 25 dk)
 
@@ -911,4 +914,38 @@ Liste `marketing/v3-deneme-listesi.md` › 6c'de. Özellikle şunlara bak ve son
 
 - "AutoPod ayda 29 $; Suflo'da Podcast Modu tek seferlik Pro'nun içinde" karşılaştırması. Ekran
   kaydı: Sekansı tara → Analiz et → önizleme çubukları → Kopyada uygula → oynat.
+
+## 11. Yayın toparlaması (3.1.0)
+
+Kodda yapılanlar: paket sürümü 3.1.0, `marketing/release-notes.md` başına "Suflo 3.1.0" bölümü,
+panelde "Suflo 3.1'de yeni" penceresi (Shorts Paketi, Podcast Modu, tek tık temizlik, viral puan,
+Marka Kiti, Pro'yu dene, davet, English), Ayarlar'daki Ücretsiz / Pro listesinde Shorts Paketi ve
+Podcast Modu, README'nin İngilizce bölümünde 3.1 özellikleri, İngilizce arayüzde upsell "örnek gör"
+bağlantısı `suflo.app/en/pro.html`.
+
+### 11.1 Yayından önce (yaklaşık 10 dk)
+
+1. `marketing/release-notes.md`'deki 3.1.0 notunu oku, istersen kısalt; GitHub sürüm açıklamasına
+   yalnız bu en üst bölüm gider.
+2. Premiere'de 3.0 ayarları olan bir panelle aç: "Suflo 3.1" yenilikler penceresi bir kez çıkmalı,
+   her satır ilgili sekmeyi ya da Ayarlar kartını açmalı (Podcast sekmesi, Marka Kiti, Davet et, kazan,
+   Arayüz dili). Kapatınca bir daha çıkmamalı. Taze kurulumda rehber açıksa pencere çıkmamalı.
+3. Arayüzü English yap, bir Pro düğmesinin upsell penceresinde örnek bağlantısının
+   `suflo.app/en/pro.html`'i açtığını gör.
+
+### 11.2 Yayından sonra site metinleri (yaklaşık 45 dk)
+
+Site, sürüm yayınlanmadan yeni özellikleri vaat etmesin diye bilerek değiştirilmedi. 3.1.0 GitHub'da
+yayınlanınca:
+
+1. `docs/index.html`: Pro kartına ve özellik listesine **Tek Tık Shorts Paketi**, **Podcast Modu**,
+   **tekrar çekim temizliği** ve **Marka Kiti** satırlarını ekle (Shorts Paketi ve Podcast Modu
+   "deneme hakkı yok"). JSON-LD'de `softwareVersion`'ı `3.1.0` yap, Suflo Pro `description`'ına ve
+   `featureList`'e aynı özellikleri ekle; ödeme bağlantılarındaki `app_version%5D=3.0.0`'ı `3.1.0` yap;
+   `#surum` metnini `v3.1.0` yap. Erken erişim geri sayımı `v3.0.0` etiketine bakıyor; yeni bir
+   kampanya yapmayacaksan olduğu gibi bırak.
+2. `docs/en/index.html`: aynı dört özelliği İngilizce ekle (One-click Shorts package, Podcast Mode,
+   retake cleanup, Brand kit); JSON-LD'yi eşitle.
+3. `docs/sitemap.xml`'de değişen sayfaların `lastmod`'unu güncelle.
+4. `node tests/seo-kontrol.js` (ayrıca `node tools/test.js` bunu da koşar) yeşil kalmalı.
 

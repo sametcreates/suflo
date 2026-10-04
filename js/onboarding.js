@@ -859,8 +859,8 @@ window.KOnboarding = (function () {
       stilKapat();
     }
     if (kararDegeri === "tam") {
-      // Taze kurulumda "Suflo 3.0'da yeni" penceresi rehberin üstüne binmesin
-      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.0";
+      // Taze kurulumda "Suflo 3.1'de yeni" penceresi rehberin üstüne binmesin
+      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.1";
       kayitYaz();
     }
     olaylariBagla();

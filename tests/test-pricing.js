@@ -85,5 +85,10 @@ ok("pricing.js: ES5 / Chromium 74 uyumlu", !src.split("\n").some(function (s) { 
 var sira = ["js/CSInterface.js", "js/pricing.js", "i18n/en.js", "js/i18n.js", "js/bridge.js"].map(function (f) { return html.indexOf('<script src="' + f + '"></script>'); });
 ok("index.html: pricing.js CSInterface'ten sonra, en.js'ten önce", sira.every(function (x, i) { return x !== -1 && (i === 0 || x > sira[i - 1]); }), sira.join(","));
 
+ok("Pro sayfası bağlantısı arayüz diline göre (EN: /en/pro.html, TR ve bilinmeyen: /pro)",
+  P.proPageUrl("en") === "https://suflo.app/en/pro.html" && P.proPageUrl("tr") === "https://suflo.app/pro" && P.proPageUrl() === "https://suflo.app/pro");
+ok("docs/en/pro.html mevcut (EN Pro sayfası bağlantısı boşa düşmez)", fs.existsSync(path.join(KOK, "docs", "en", "pro.html")));
+ok("app.js upsell 'demo' Pro sayfasını dile göre açar", /intent === "demo"[\s\S]{0,120}SufloPricing\.proPageUrl\(arayuzDili\(\)\)/.test(fs.readFileSync(path.join(KOK, "js", "app.js"), "utf8")));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
