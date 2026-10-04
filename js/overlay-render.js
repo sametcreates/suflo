@@ -76,18 +76,19 @@
     o = o || {};
     var d = Number(o.dur).toFixed(2);
     var vf = "ass=" + o.assName + ":fontsdir=.";
-    var args = ["-y"], on = "";
+    var args = ["-y"], on = "", logolu = logoGecerli(o.logo);
     if (o.kare) {
-      args.push("-loop", "1", "-i", o.kare, "-t", d);
+      args.push("-loop", "1", "-i", o.kare);
+      if (!logolu) args.push("-t", d);   // eski komutla aynı sıra (çıktı seçeneği)
       on = "scale=" + o.w + ":" + o.h + ":force_original_aspect_ratio=increase,crop=" + o.w + ":" + o.h + ",";
     } else {
       args.push("-f", "lavfi", "-i", "color=c=#101522:s=" + o.w + "x" + o.h + ":r=24:d=" + d);
     }
     var ek = o.ekVf ? "," + o.ekVf : "";
-    if (logoGecerli(o.logo)) {
+    if (logolu) {
+      // -t burada çıktı seçeneği: iki döngülü girdi de (kare + logo) süreye kırpılır
       args.push("-loop", "1", "-i", o.logo.name, "-filter_complex",
-        "[0:v]" + on + vf + "[s];" + logoFiltresi(o.logo, "[s]", "[1:v]") + ek);
-      if (!o.kare) args.push("-t", d);
+        "[0:v]" + on + vf + "[s];" + logoFiltresi(o.logo, "[s]", "[1:v]") + ek, "-t", d);
     } else {
       args.push("-vf", on + vf + ek);
     }

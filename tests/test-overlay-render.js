@@ -269,6 +269,16 @@ function renderCiktisi(K) { var a = K.calisan[0].args; return a[a.length - 1]; }
     var yok = await OR.render(gercekK, { ass: ASS, fontFiles: [], g: 640, y: 360, fps: 25, sure: 1, cikti: path.join(srt, "yok.mov"),
       logo: { path: path.join(kok, "olmayan.png"), kose: "su", oran: 0.1 } });
     ok("logo dosyası yoksa logosuz üretilir, logoAtlandi bildirilir", yok.logo === false && yok.logoAtlandi === true && fs.existsSync(yok.path));
+    // panel önizlemesi (kare zeminli + logo): iki döngülü girdi süreye kırpılır, webm biter
+    var onzDizin = path.join(kok, "onizleme");
+    fs.mkdirSync(onzDizin);
+    fs.writeFileSync(path.join(onzDizin, "p.ass"), ASS, "utf8");
+    cp.execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=red:s=640x360", "-frames:v", "1", path.join(onzDizin, "kare.png")]);
+    fs.copyFileSync(logoYol, path.join(onzDizin, "logo.png"));
+    var onzR = cp.spawnSync("ffmpeg", OR.previewArgs({ assName: "p.ass", w: 320, h: 180, dur: 1.5, kare: "kare.png",
+      logo: { name: "logo.png", lw: 32, x: 7, y: "173-overlay_h" }, ekVf: "drawbox=x=0:y=0:w=10:h=10:color=red@0.5:t=fill", out: "p.webm" }), { cwd: onzDizin, timeout: 60000 });
+    var onzSure = onzR.status === 0 ? Number(cp.execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path.join(onzDizin, "p.webm")]).toString()) : 0;
+    ok("önizleme (kare + logo) süreye kırpılır", onzR.status === 0 && Math.abs(onzSure - 1.5) < 0.1, onzR.status + " · " + onzSure);
     ok("logolu render sonrası geçici klasör silindi", fs.readdirSync(tmp).length === 0, fs.readdirSync(tmp).join(","));
   }
 
