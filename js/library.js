@@ -296,6 +296,12 @@ window.KLib = (function () {
     // Suflo Pro Paketi (satin alanin gosterdigi klasor) — resmi animasyonlar
     var proRoot = proPackMogrtDir();
     var proPackFiles = topla(proRoot);
+    // Davet odulleri (ProSync <root>/davet/t1|t3/mogrt): Pro'dayken Pro paketiyle birlikte
+    if (window.ProSync && ProSync.davetDir && window.Pro && Pro.isPro()) {
+      var davetKok = "";
+      try { davetKok = ProSync.davetDir(); } catch (eD) { davetKok = ""; }
+      if (davetKok) ["t1", "t3"].forEach(function (t) { proPackFiles = proPackFiles.concat(topla(K.path.join(davetKok, t, "mogrt"))); });
+    }
     var proPackSet = {};
     proPackFiles.forEach(function (p) { proPackSet[pathKey(p)] = 1; });
     yollar = yollar.concat(proPackFiles);

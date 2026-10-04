@@ -18,6 +18,7 @@ var c3 = Buffer.from("PK\x03\x04-mogrt-c-v3");
 var w3 = Buffer.from("RIFF-whoosh-v3-even-longer");
 var v4 = Buffer.from("\x00\x00\x00\x18ftypmp42-motionbg-loop-v4");
 var p5 = Buffer.from('<?xml version="1.0"?><PremiereData><TreeItem ObjectID="1"/></PremiereData>');
+var dx = Buffer.from("RIFF-davet-t1-pop"), dy = Buffer.from("PK\x03\x04-davet-t3-kurucu"), dz = Buffer.from("RIFF-davet-z");
 var payloads = {};
 function setPayloads(map) { payloads = map; }
 
@@ -56,6 +57,15 @@ function manifestFetcher() {
   if (manifestMode === "bad-hash") return Promise.resolve({ ok: true, token: "t", content_version: "3", files: [{ path: "mogrt/A.mogrt", bytes: a1.length, sha256: "0".repeat(64) }] });
   if (manifestMode === "motionbg") return Promise.resolve({ ok: true, token: "tm", content_version: "4.0.0", files: [file("mogrt/A.mogrt", a1), file("sfx/Whoosh/w.wav", w1), file("motionbg/Loop.mp4", v4)] });
   if (manifestMode === "presets") return Promise.resolve({ ok: true, token: "tp", content_version: "5.0.0", files: [file("mogrt/A.mogrt", a1), file("sfx/Whoosh/w.wav", w1), file("presets/Suflo Smooth Editing Pack.prfpset", p5)] });
+  if (/^extras/.test(manifestMode)) {
+    var base = { ok: true, token: "tp", content_version: "5.0.0", files: [file("mogrt/A.mogrt", a1), file("sfx/Whoosh/w.wav", w1), file("presets/Suflo Smooth Editing Pack.prfpset", p5)] };
+    if (manifestMode === "extras") base.extras = { davet: { version: "d.1", files: [file("davet/t1/sfx/Pop/x.wav", dx), file("davet/t3/mogrt/Kurucu.mogrt", dy)] } };
+    if (manifestMode === "extras-badsha") base.extras = { davet: { version: "d.2", files: [{ path: "davet/t1/sfx/z.wav", bytes: dz.length, sha256: "1".repeat(64) }] } };
+    if (manifestMode === "extras-traversal") base.extras = { davet: { version: "d.3", files: [file("davet/t1/sfx/../../../kacak.wav", dz)] } };
+    if (manifestMode === "extras-type") base.extras = { davet: { version: "d.4", files: [file("davet/t1/presets/x.prfpset", dz)] } };
+    if (manifestMode === "extras-t2") base.extras = { davet: { version: "d.5", files: [file("davet/t2/sfx/x.wav", dz)] } };
+    return Promise.resolve(base);
+  }
   if (manifestMode === "v3") return Promise.resolve({ ok: true, token: "t3", content_version: "3.0.0", files: [file("mogrt/A.mogrt", a1), file("mogrt/C.mogrt", c3), file("sfx/Whoosh/w.wav", w3)] });
   if (manifestMode === "v2") return Promise.resolve({ ok: true, token: "t2", content_version: "2.0.0", files: [file("mogrt/A.mogrt", a1), file("mogrt/B.mogrt", b2), file("sfx/Whoosh/w.wav", w2)] });
   return Promise.resolve({ ok: true, token: "t1", content_version: "1.0.0", files: [file("mogrt/A.mogrt", a1), file("sfx/Whoosh/w.wav", w1)] });
@@ -156,6 +166,60 @@ async function run() {
   ok("Premiere .prfpset paketi kabul edilir, dogrulanir ve indirilir",
     presetPack.ok && fs.existsSync(path.join(settings.proPackKlasor, "presets", "Suflo Smooth Editing Pack.prfpset")) &&
     fs.readFileSync(path.join(settings.proPackKlasor, "presets", "Suflo Smooth Editing Pack.prfpset")).equals(p5), JSON.stringify(presetPack));
+
+  /* ---------- davet odulleri (manifest.extras.davet) ---------- */
+  var davetKok = path.join(TMP, "managed", "davet");
+  ok("ProSync.davetDir <root>/davet", ctx.ProSync.davetDir() === davetKok, ctx.ProSync.davetDir());
+  var anaKlasor = settings.proPackKlasor;
+  var anaManifest = fs.readFileSync(path.join(anaKlasor, ".suflo-manifest.json"), "utf8");
+  manifestMode = "extras";
+  setPayloads({ "mogrt/A.mogrt": a1, "sfx/Whoosh/w.wav": w1, "presets/Suflo Smooth Editing Pack.prfpset": p5, "davet/t1/sfx/Pop/x.wav": dx, "davet/t3/mogrt/Kurucu.mogrt": dy });
+  var exOnce = downloadCalls.length;
+  var ex1 = await ctx.ProSync.sync();
+  ok("Davet odulleri <root>/davet altina SHA dogrulamasiyla iner",
+    ex1.ok && ex1.extras && ex1.extras.ok && ex1.extras.downloaded === 2 &&
+    fs.readFileSync(path.join(davetKok, "t1", "sfx", "Pop", "x.wav")).equals(dx) && fs.readFileSync(path.join(davetKok, "t3", "mogrt", "Kurucu.mogrt")).equals(dy),
+    JSON.stringify(ex1));
+  ok("Extras ana surumu ve manifestId'yi degistirmez", ex1.current === true && settings.proPackKlasor === anaKlasor &&
+    JSON.parse(fs.readFileSync(path.join(anaKlasor, ".suflo-manifest.json"), "utf8")).manifestId === JSON.parse(anaManifest).manifestId &&
+    downloadCalls.slice(exOnce).every(function (p) { return /^davet\//.test(p); }), JSON.stringify(downloadCalls.slice(exOnce)));
+  ok("Extras indirildikten sonra durum 'ready'", ctx.ProSync.status().phase === "ready");
+  var exIki = downloadCalls.length;
+  var ex2 = await ctx.ProSync.sync();
+  ok("Degismeyen davet odulu yeniden indirilmez", ex2.ok && ex2.extras.downloaded === 0 && downloadCalls.length === exIki, JSON.stringify(ex2.extras));
+
+  fs.writeFileSync(path.join(davetKok, "t1", "sfx", "Pop", "x.wav"), Buffer.alloc(dx.length, 7));
+  fs.utimesSync(path.join(davetKok, "t1", "sfx", "Pop", "x.wav"), new Date(Date.now() + 5000), new Date(Date.now() + 5000));
+  var ex3 = await ctx.ProSync.sync();
+  ok("Bozulan davet odulu yeniden indirilir", ex3.ok && ex3.extras.downloaded === 1 && fs.readFileSync(path.join(davetKok, "t1", "sfx", "Pop", "x.wav")).equals(dx), JSON.stringify(ex3.extras));
+
+  failOncePath = "davet/t3/mogrt/Kurucu.mogrt";
+  fs.unlinkSync(path.join(davetKok, "t3", "mogrt", "Kurucu.mogrt"));
+  var ex4 = await ctx.ProSync.sync();
+  ok("Extras hatasi ana esitlemeyi bozmaz, durum 'ready' kalir", ex4.ok === true && ex4.extras && ex4.extras.ok === false && ex4.extras.failed === 1 &&
+    ctx.ProSync.status().phase === "ready" && settings.proPackKlasor === anaKlasor, JSON.stringify(ex4));
+
+  manifestMode = "extras-badsha";
+  setPayloads({ "mogrt/A.mogrt": a1, "sfx/Whoosh/w.wav": w1, "presets/Suflo Smooth Editing Pack.prfpset": p5, "davet/t1/sfx/z.wav": dz });
+  var ex5 = await ctx.ProSync.sync();
+  ok("Yanlis SHA'li davet odulu reddedilir ve diskte birakilmaz", ex5.ok === true && ex5.extras.failed === 1 && !fs.existsSync(path.join(davetKok, "t1", "sfx", "z.wav")) &&
+    ctx.ProSync.status().phase === "ready", JSON.stringify(ex5.extras));
+
+  manifestMode = "extras-traversal";
+  var exTOnce = downloadCalls.length;
+  var ex6 = await ctx.ProSync.sync();
+  ok("Davet yolunda gezinme reddedilir, ana esitleme surer", ex6.ok === true && ex6.extras === null && downloadCalls.length === exTOnce &&
+    !fs.existsSync(path.join(TMP, "kacak.wav")) && !fs.existsSync(path.join(TMP, "managed", "kacak.wav")), JSON.stringify(ex6));
+  manifestMode = "extras-type";
+  var ex7 = await ctx.ProSync.sync();
+  ok("Davet altinda yalniz mogrt ve sfx kabul edilir", ex7.ok === true && ex7.extras === null && !fs.existsSync(path.join(davetKok, "t1", "presets")), JSON.stringify(ex7));
+  manifestMode = "extras-t2";
+  var ex8 = await ctx.ProSync.sync();
+  ok("Bilinmeyen kademe klasoru reddedilir", ex8.ok === true && ex8.extras === null && !fs.existsSync(path.join(davetKok, "t2")));
+
+  manifestMode = "presets";
+  var ex9 = await ctx.ProSync.sync();
+  ok("Extras gelmese de kazanilan odul silinmez (budanmaz)", ex9.ok && fs.existsSync(path.join(davetKok, "t1", "sfx", "Pop", "x.wav")));
 
   var src = fs.readFileSync(path.join(ROOT, "js", "pro-sync.js"), "utf8");
   ok("Lisans anahtari URL'ye eklenmez", !/license_key[^\n]{0,120}(query|search|encodeURIComponent)/i.test(src));

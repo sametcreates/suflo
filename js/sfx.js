@@ -203,6 +203,21 @@ window.KSfx = (function () {
     return pack;
   }
 
+  // Davet odulleri (ProSync <root>/davet/t1|t3/sfx): yalniz Pro'dayken, Pro koleksiyonunda
+  function davetSfxDirs() {
+    if (!K.nodeOK || !K.fs || !K.path || !window.ProSync || !ProSync.davetDir) return [];
+    if (!window.Pro || !Pro.isPro()) return [];
+    var base = "";
+    try { base = ProSync.davetDir(); } catch (e0) { base = ""; }
+    if (!base) return [];
+    var out = [];
+    ["t1", "t3"].forEach(function (t) {
+      var d = K.path.join(base, t, "sfx");
+      try { if (K.fs.existsSync(d) && K.fs.statSync(d).isDirectory()) out.push(d); } catch (e) {}
+    });
+    return out;
+  }
+
   function kaynaklar() {
     if (!K.nodeOK || !K.fs || !K.path) return [];
     var out = [];
@@ -211,6 +226,7 @@ window.KSfx = (function () {
     out.push(sfxDir());
     var pro = proPackSfxDir();
     if (pro && !out.some(function (p) { return norm(p) === norm(pro); })) out.push(pro);
+    davetSfxDirs().forEach(function (d) { if (!out.some(function (p) { return norm(p) === norm(d); })) out.push(d); });
     var ek = String(K.settings().sfxEkKlasor || "").trim();
     if (ek && K.fs.existsSync(ek) && !out.some(function (p) { return norm(p) === norm(ek); })) out.push(ek);
     return out;
@@ -233,6 +249,9 @@ window.KSfx = (function () {
       return;
     }
     var seen = {};
+    var proKokler = {};
+    proKokler[norm(proPackSfxDir())] = 1;
+    davetSfxDirs().forEach(function (d) { proKokler[norm(d)] = 1; });
     kaynaklar().forEach(function (root) {
       K.walkAudio(root, 12000, 12).forEach(function (f) {
         var key = norm(f);
@@ -242,7 +261,7 @@ window.KSfx = (function () {
         var info = folderInfo(root, f);
         var name = stripExt(basename(f));
         var isBuiltin = norm(root) === norm(builtinSfxDir());
-        var isPro = !isBuiltin && norm(root) === norm(proPackSfxDir());
+        var isPro = !isBuiltin && !!proKokler[norm(root)];
         index.push({ name: name, path: f, folder: info.folder,
           collection: isBuiltin ? "SUFLO ORIGINALS" : (isPro ? "SUFLO PRO" : info.collection),
           builtin: isBuiltin, pro: isPro,
