@@ -284,7 +284,7 @@ ok("anahtarKaydet: yerel motor hazırsa 'local' kalır, değilse groq; Ayarlar a
 [["js/viral.js", "Viral anlar", "highlights"], ["js/broll-ui.js", "B-roll önerileri", "highlights"], ["js/captions.js", "Çeviri", "translate"]].forEach(function (x) {
   var src = fs.readFileSync(path.join(KOK, x[0]), "utf8");
   var istek = src.indexOf('KOnboarding.anahtarIste("' + x[1] + '")');
-  var kapi = src.lastIndexOf('Pro.gate("' + x[2] + '")', istek);
+  var kapi = src.lastIndexOf('Pro.gate("' + x[2] + '"', istek);
   ok(x[0] + ": anahtar yoksa sihirbaz; Pro kapısı önce", istek > 0 && kapi > 0 && kapi < istek);
 });
 ["js/bolumler.js", "js/kanca.js", "js/captions.js", "js/viral.js", "js/broll-ui.js"].forEach(function (f) {

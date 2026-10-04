@@ -1998,7 +1998,10 @@
     "Ücretsiz dene · {n} hakkın var": "Try free · {} tries left",
     "Hak yalnız işlem başarıyla bitince düşer · stilli katmanlarda küçük suflo.app filigranı olur": "A credit is used only when the job succeeds · styled layers get a small suflo.app watermark",
     "Hak yalnız işlem başarıyla bitince düşer": "A credit is used only when the job succeeds",
-    "Deneme açık — tekrar tıkla": "Trial on — click again"
+    "Deneme açık — tekrar tıkla": "Trial on — click again",
+    "Deneme yalnız Suflo Stilleri için. Bir Suflo Stili seç ya da Pro'ya geç.": "The trial covers Suflo Styles only. Pick a Suflo Style or upgrade to Pro.",
+    "Deneme yalnız Suflo Stilleri için.": "The trial covers Suflo Styles only.",
+    "Deneme filigranı yüklenemedi.": "Couldn't load the trial watermark."
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

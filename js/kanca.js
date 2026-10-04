@@ -107,7 +107,8 @@ window.KKanca = (function () {
    *   ek.text / ek.at (sn; verilmezse playhead) — Viral anlar kartlari kullanir
    */
   async function ekle(ek) {
-    if (typeof Pro !== "undefined" && !Pro.gate("overlay")) return false;
+    // Pro (ucretsizde stilli katmanla ortak 3 deneme hakki; deneme ciktisi filigranli)
+    if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { ekle(ek); } })) return false;
     if (!HT) return false;
     if (busy) { KApp.toast("Kanca başlığı şu an hazırlanıyor, birazdan tekrar dene.", "warn"); return false; }
     var o = ayarlar(ek);
@@ -124,7 +125,10 @@ window.KKanca = (function () {
       var b = await sekansBoyutu();
       if (!b.ok) throw new Error("Aktif sekans yok.");
       var built = HT.build({ text: o.text, stil: o.stil, width: b.w, height: b.h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk, lang: o.lang });
-      is = hazirla(built);
+      // Deneme (Pro degil): sag ustte kucuk suflo.app filigrani; temiz ASS satin alma sonrasi icin saklanir
+      var filigranli = typeof Pro !== "undefined" && !!Pro.filigranGerekli && Pro.filigranGerekli();
+      if (filigranli && !window.SufloFiligran) throw new Error("Deneme filigranı yüklenemedi.");
+      is = hazirla(filigranli ? { ass: window.SufloFiligran.ekle(built.ass, { width: b.w, height: b.h }), fontFiles: built.fontFiles } : built);
       var cikti = K.path.join(K.srtDir(), "suflo-kanca-" + Date.now() + ".mov");
       K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
       // alpha=1 + unpremultiply: altyazi katmaniyla ayni seffaflik zinciri
@@ -141,6 +145,13 @@ window.KKanca = (function () {
       if (!yer.ok) throw new Error(yer.error);
       durum("");
       KApp.toast("Kanca başlığı " + yer.trackName + " katmanına eklendi" + (yer.newTrack ? " (yeni katman)" : ""), "good");
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("overlay", KApp.toast);   // deneme: yalniz basarida
+      if (filigranli && window.SufloOverlayRender) {
+        await SufloOverlayRender.denemeKaydet(K, Pro, {
+          tur: "kanca", start: typeof yer.start === "number" ? yer.start : (typeof at === "number" ? at : 0), path: cikti, ad: ad,
+          assTemiz: built.ass, fontFiles: built.fontFiles, g: b.w, y: b.h, fps: b.fps, sure: built.dur
+        });
+      }
       return true;
     } catch (e) {
       durum("✕ " + K.hataYardimi(e), "bad");

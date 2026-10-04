@@ -432,7 +432,8 @@ window.KViral = (function () {
   /* ---------------- arama ---------------- */
 
   async function bul() {
-    if (typeof Pro !== "undefined" && !Pro.gate("highlights")) return;
+    // Pro (ucretsizde 3 deneme hakki; hak yalniz an bulununca duser)
+    if (typeof Pro !== "undefined" && !Pro.gate("highlights", { deneme: true, yeniden: bul })) return;
     if (busy || !HL) return;
     var segs = window.KCaptions ? KCaptions.getSegments() : [];
     if (!segs.length) { durum("Önce altyazı oluştur ya da SRT içe aktar.", "warn"); return; }
@@ -483,6 +484,7 @@ window.KViral = (function () {
       durum("");
       render();
       KApp.toast(anlar.length + " viral an bulundu", "good");
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("highlights", KApp.toast);   // bos olmayan sonuc
     } catch (e) {
       durum("✕ " + K.hataYardimi(e), "bad");
     } finally {

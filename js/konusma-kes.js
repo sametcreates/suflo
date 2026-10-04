@@ -121,7 +121,8 @@ window.KTextCut = (function () {
   }
 
   async function analyze() {
-    if (typeof Pro !== "undefined" && !Pro.gate("textcut")) return; // Pro: konusmadan kes
+    // Pro: konusmadan kes (ucretsizde 3 deneme hakki; hak yalniz kesim uygulaninca duser)
+    if (typeof Pro !== "undefined" && !Pro.gate("textcut", { deneme: true, yeniden: analyze })) return;
     if (busy) return;
     if (!window.KCaptions || !KCaptions.transcribeWords) { status("Altyazı motoru yüklenemedi.", "bad"); return; }
     setBusy(true);
@@ -159,7 +160,7 @@ window.KTextCut = (function () {
   }
 
   async function apply() {
-    if (typeof Pro !== "undefined" && !Pro.gate("textcut")) return;
+    if (typeof Pro !== "undefined" && !Pro.gate("textcut", { deneme: true, yeniden: apply })) return;
     var r = kesimler().map(function (x) { return { start: x.start, end: x.end }; });
     if (!r.length) return;
     sesiKapat();
@@ -179,6 +180,7 @@ window.KTextCut = (function () {
         cloneFirst: target === "clone"
       }, 900000);
       if (res.ok) {
+        if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("textcut", KApp.toast);   // deneme: yalniz basarida
         status("");
         var msg = res.newSeq ? "✂ Kopya sekansta uygulandı: " + res.newSeq : "✂ " + res.removed + " parça silindi";
         if (res.rippleFallback) {

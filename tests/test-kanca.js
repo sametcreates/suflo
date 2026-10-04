@@ -106,7 +106,7 @@ ok("host: gecersiz at yok sayilir", konan[3] === 0);
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 ok("index: sekme, betikler ve sol menu", /id="tab-kanca"/.test(html) && /js\/hook-title\.js/.test(html) && /js\/kanca\.js/.test(html) && /data-tab="kanca"/.test(html));
 var kanca = fs.readFileSync(path.join(__dirname, "..", "js", "kanca.js"), "utf8");
-ok("kanca.js: ekleme Pro kapili, onizleme degil", /async function ekle[\s\S]*?Pro\.gate\("overlay"\)/.test(kanca) && !/async function onizle\(\)[\s\S]*?Pro\.gate[\s\S]*?async function ekle/.test(kanca));
+ok("kanca.js: ekleme Pro kapili, onizleme degil", /async function ekle[\s\S]*?Pro\.gate\("overlay"/.test(kanca) && !/async function onizle\(\)[\s\S]*?Pro\.gate[\s\S]*?async function ekle/.test(kanca));
 ok("kanca.js: gecici klasor sweepTemp onekiyle", /"overlay-kanca-"/.test(kanca));
 
 

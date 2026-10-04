@@ -60,7 +60,8 @@ window.KCut = (function () {
   }
 
   async function analyze() {
-    if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
+    // Pro: otomatik kesim (ucretsizde 3 deneme hakki; hak yalniz kesim uygulaninca duser)
+    if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: analyze })) return;
     if (busy) return;
     sesiKapat();
     clip = KApp.ctx().sel;
@@ -227,7 +228,7 @@ window.KCut = (function () {
   /* ---------------- Uygulama ---------------- */
 
   async function apply() {
-    if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
+    if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: apply })) return; // Pro: otomatik kesim
     var act = activeRanges().map(function (r) { return { start: r.start, end: r.end }; });
     if (act.length === 0) return;
     sesiKapat();
@@ -242,6 +243,7 @@ window.KCut = (function () {
     }, 900000);
     el("cut-apply").disabled = false;
     if (r.ok) {
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("cut", KApp.toast);   // deneme: yalniz basarida
       status("");
       var msg = r.newSeq
         ? "✂ Kopya sekansta uygulandı: " + r.newSeq

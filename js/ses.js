@@ -132,7 +132,8 @@ window.KSes = (function () {
   }
 
   async function iyilestir() {
-    if (typeof Pro !== "undefined" && !Pro.gate("audioclean")) return;
+    // Pro (ucretsizde 3 deneme hakki; birden cok klip tek seferde de bir hak)
+    if (typeof Pro !== "undefined" && !Pro.gate("audioclean", { deneme: true, yeniden: iyilestir })) return;
     if (busy) return;
     var c = secim();
     var hata = AC.clipCheck(c);
@@ -165,6 +166,8 @@ window.KSes = (function () {
         catch (eK) { hatalar.push((k.name || "klip") + ": " + K.hataYardimi(eK)); }
       }
       if (!sonuclar.length) throw new Error(hatalar.join("; "));
+      // en az bir klibin temiz sesi timeline'da: deneme hakki bir kez duser
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("audioclean", KApp.toast);
 
       var ilk = sonuclar[0];
       var sonra = await olcum(ff, ["-i", ilk.cikti]);

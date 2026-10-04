@@ -713,8 +713,8 @@ window.KCaptions = (function () {
     }
   }
 
+  // Terim sozlugu ucretsiz cekirdekte (Ayarlar'da kilitsiz gorunur; motor istemine de herkes icin gider)
   function applyGlossary(segs) {
-    if (typeof Pro !== "undefined" && !Pro.isPro()) return segs;             // Pro: sozluk (sessiz atla)
     var rules = K.settings().glossary || [];
     if (!rules.length) return segs;
     var n = 0;
@@ -2466,7 +2466,8 @@ window.KCaptions = (function () {
   }
 
   async function translateAll() {
-    if (typeof Pro !== "undefined" && !Pro.gate("translate")) return; // Pro: ceviri
+    // Pro: ceviri (ucretsizde 3 deneme hakki; hak yalniz ceviri yazilinca duser)
+    if (typeof Pro !== "undefined" && !Pro.gate("translate", { deneme: true, yeniden: translateAll })) return;
     if (segments.length === 0) return;
     var target = el("cap-translate").value;
     if (!target) { KApp.toast("Önce hedef dili seç.", "warn"); return; }
@@ -2503,6 +2504,7 @@ window.KCaptions = (function () {
       render(); saveDraftNow();
       KApp.toast(texts.length + " satır çevrildi" +
         (atlananDuzenleme ? " · çeviri sırasında düzenlenen " + atlananDuzenleme + " satıra dokunulmadı" : ""), "good");
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("translate", KApp.toast);   // deneme: yalniz basarida
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
     } finally {
@@ -2516,7 +2518,7 @@ window.KCaptions = (function () {
    * orijinal satirlar (s.orig), degilse ekrandaki metin. Zamanlar cueler() ile ayni.
    */
   async function cokDilliPaket() {
-    if (typeof Pro !== "undefined" && !Pro.gate("translate")) return;
+    if (typeof Pro !== "undefined" && !Pro.gate("translate", { deneme: true, yeniden: cokDilliPaket })) return;
     if (!segments.length) return;
     if (segmentsMode !== "plain") {
       KApp.toast("Çok dilli paket satır modunda çalışır: kelime/karaoke modunda her kelime ayrı çevrilirdi. Satır uzunluğunu \"Satır\" yapıp yeniden oluştur.", "warn", 8000);
@@ -2564,6 +2566,8 @@ window.KCaptions = (function () {
       }
       status(hatalar.length ? "Bazı diller atlandı: " + hatalar.join("; ").slice(0, 200) : "", hatalar.length ? "warn" : "");
       KApp.toast(yazilan + " SRT yazıldı → " + klasor, "good", 9000);
+      // deneme: en az bir dile cevrildiyse (yalniz kaynak SRT yazildiysa hak dusmez)
+      if (yazilan > 1 && typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("translate", KApp.toast);
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
     } finally {
@@ -3432,7 +3436,8 @@ window.KCaptions = (function () {
     var anim = opts.animasyon || st.animasyon || (kelimeVerisi ? "karaoke" : "yok");
     if (!ANIMASYONLAR[anim]) anim = "yok";
     if (ANIMASYONLAR[anim].kelimeli && !kelimeVerisi) anim = "fade";
-    if (ANIMASYONLAR[anim].kelimeli && typeof Pro !== "undefined" && !Pro.isPro()) anim = "fade"; // Pro: kelimeli animasyon
+    // Pro: kelimeli animasyon (stilli katman denemesi kuruluyken de acik)
+    if (ANIMASYONLAR[anim].kelimeli && typeof Pro !== "undefined" && !Pro.isPro() && !(Pro.denemeAcik && Pro.denemeAcik("overlay"))) anim = "fade";
 
     var cs = cueler();
 
@@ -3744,7 +3749,14 @@ window.KCaptions = (function () {
    * mükemmel sıkıştırıyor. Uyumsuzluk çıkarsa ProRes 4444 yedeği var.
    */
   async function overlayUygula() {
-    if (typeof Pro !== "undefined" && !Pro.gate("overlay")) return; // Pro: animasyonlu katman
+    // Pro: animasyonlu katman (ucretsizde kanca basligiyla ortak 3 deneme hakki; deneme ciktisi filigranli)
+    if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { overlayUygula().then(uygulaEtiketiniSifirla); } })) return;
+    // Deneme yalniz Suflo Stilleri icin: tercihlerden geri yuklenen bir MOGRT stili deneme kapisindan sizmasin
+    if (typeof Pro !== "undefined" && !Pro.isPro() && secilenMogrt) {
+      status("Deneme yalnız Suflo Stilleri için. Bir Suflo Stili seç ya da Pro'ya geç.", "warn");
+      KApp.toast("Deneme yalnız Suflo Stilleri için.", "warn");
+      return;
+    }
     if (segments.length === 0) return;
     /*
      * Emoji bekçisi: libass emojiyi HİÇ çizemiyor (denendi — tofu bile değil,
@@ -3757,7 +3769,6 @@ window.KCaptions = (function () {
         "ya da emojileri kaldırıp tekrar dene.", "warn");
       return;
     }
-    var temizle = [];
 
     try {
       if (secilenMogrt) {
@@ -3811,63 +3822,40 @@ window.KCaptions = (function () {
           { karaoke: karaoke, animasyon: st.animasyon, genislik: g, yukseklik: y });
       }
 
-      // ffmpeg altyazı filtresi mutlak yol kabul etmiyor: kendi klasöründe çalıştır
-      var dizin = K.path.join(K.tmpDir(), "overlay-" + Date.now());
-      K.fs.mkdirSync(dizin, { recursive: true });
-      var assAd = "altyazi.ass";
-      K.fs.writeFileSync(K.path.join(dizin, assAd), ass, "utf8");
-      temizle.push(K.path.join(dizin, assAd));
-
       /*
-       * Paket font seçiliyse dosyayı render klasörüne kopyala ve libass'e
-       * fontsdir ile ver. Yol yine GÖRECELİ (fontsdir=.) — mutlak yol,
-       * filtre sözdizimindeki ":" yüzünden burada da patlar.
+       * Deneme hakkıyla (Pro değil) üretilen katmana sağ üstte küçük suflo.app filigranı
+       * eklenir; filigransız ASS satın alma sonrası temiz yeniden oluşturmak için saklanır.
        */
-      var fontsdir = "";
-      var fontDosyalari = stilDerlemesi ? stilDerlemesi.fontFiles : [FONTLAR[st.font]];
-      fontDosyalari.filter(Boolean).forEach(function (fontDosyasi) {
-        try {
-          var fKaynak = K.path.join(uzantiDizini(), "fonts", fontDosyasi);
-          if (K.fs.existsSync(fKaynak)) {
-            K.fs.copyFileSync(fKaynak, K.path.join(dizin, fontDosyasi));
-            temizle.push(K.path.join(dizin, fontDosyasi));
-            fontsdir = ":fontsdir=.";
-          } else {
-            K.log("[stil] paket font dosyası yok: " + fKaynak);
-          }
-        } catch (eF2) { K.log("[stil] font kopyalanamadı: " + eF2.message); }
-      });
-
-      var ff = await K.findFfmpeg();
-      if (!ff) throw new Error("ffmpeg bulunamadı.");
-      if (K.libassUyarisi && K.libassUyarisi()) throw new Error(K.libassUyarisi());
-
-      var cikti = K.path.join(K.srtDir(), "suflo-altyazi-" + Date.now() + ".mov");
-      K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
-
-      status("Altyazı katmanı hazırlanıyor… (" + Math.round(sure) + " sn)");
-
-      /*
-       * alpha=1 ZORUNLU: subtitles filtresinde varsayılan false ve yazılmazsa
-       * libass alfayı hiç işlemez — video tamamen görünmez çıkar.
-       * unpremultiply: ffmpeg premultiplied üretir, Premiere straight bekler;
-       * olmadan yazı kenarlarında koyu hale oluşur. Boyuta etkisi yok.
-       */
-      var kaynak = "color=c=black@0.0:s=" + g + "x" + y + ":r=" + fps + ":d=" + sure +
-        ",format=rgba,subtitles=f=" + assAd + ":alpha=1" + fontsdir + ",unpremultiply=inplace=1";
-
-      var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", kaynak, "-c:v", "qtrle", "-an", cikti],
-        { timeout: 3600000, cwd: dizin });
-
-      if (r.code !== 0 || !K.fs.existsSync(cikti)) {
-        throw new Error("Altyazı katmanı üretilemedi: " +
-          String(r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 200));
+      var filigranli = typeof Pro !== "undefined" && !!Pro.filigranGerekli && Pro.filigranGerekli();
+      var assTemiz = ass;
+      if (filigranli) {
+        if (!window.SufloFiligran) throw new Error("Deneme filigranı yüklenemedi.");
+        ass = window.SufloFiligran.ekle(ass, { width: g, height: y });
       }
 
+      /*
+       * Render ortak modülde (js/overlay-render.js): ASS ve paket fontları geçici klasöre
+       * yazılır, ffmpeg orada çalışır (altyazı filtresi mutlak yol kabul etmez, fontsdir=.).
+       */
+      var fontDosyalari = (stilDerlemesi ? stilDerlemesi.fontFiles : [FONTLAR[st.font]]).filter(Boolean);
+      var cikti = K.path.join(K.srtDir(), "suflo-altyazi-" + Date.now() + ".mov");
+      await window.SufloOverlayRender.render(K, {
+        ass: ass, fontFiles: fontDosyalari, g: g, y: y, fps: fps, sure: sure, cikti: cikti,
+        fontDizini: K.path.join(uzantiDizini(), "fonts"),
+        durum: function (m) { status(m); }
+      });
+
       status("Timeline'a yerleştiriliyor…");
-      var yer = await K.call("KS_placeOverlay",
-        { path: cikti, scope: scope, name: "Suflo Stil · " + (stilDerlemesi ? stilDerlemesi.id : "Özel") }, 120000);
+      var katmanAdi = "Suflo Stil · " + (stilDerlemesi ? stilDerlemesi.id : "Özel");
+      var yer = await K.call("KS_placeOverlay", { path: cikti, scope: scope, name: katmanAdi }, 120000);
       if (!yer.ok) throw new Error(yer.error);
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("overlay", KApp.toast);   // deneme: yalniz basarida
+      if (filigranli && window.SufloOverlayRender.denemeKaydet) {
+        await window.SufloOverlayRender.denemeKaydet(K, Pro, {
+          tur: "altyazi", start: typeof yer.start === "number" ? yer.start : baslangic, path: cikti, ad: katmanAdi,
+          assTemiz: assTemiz, fontFiles: fontDosyalari, g: g, y: y, fps: fps, sure: sure
+        });
+      }
 
       var mb = (K.fs.statSync(cikti).size / 1048576).toFixed(1);
       status("");
@@ -3876,8 +3864,6 @@ window.KCaptions = (function () {
       yildizIste();
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
-    } finally {
-      temizle.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
     }
   }
 

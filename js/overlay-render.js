@@ -153,5 +153,22 @@
     };
   }
 
-  return { ciftBoyut: ciftBoyut, kaynak: kaynak, ffmpegArgs: ffmpegArgs, render: render, temizYenidenOlustur: temizYenidenOlustur };
+  /*
+   * Deneme (filigranlı) çıktısını, satın alma sonrası temiz yeniden oluşturulsun diye kaydet.
+   * Katman az önce konduğu için etkin sekans o sekanstır: kimliği taze sorulur.
+   * k: { tur, start, path, ad, assTemiz, fontFiles, g, y, fps, sure }. Hata işlemi bozmaz (false).
+   */
+  async function denemeKaydet(K, Pro, k) {
+    if (!Pro || !Pro.denemeCiktisiEkle || !k) return false;
+    try {
+      var c = await K.call("KS_getContext", undefined, 15000);
+      if (!c || c.ok === false || !c.sequenceId) return false;
+      k.sequenceId = String(c.sequenceId);
+      k.sekans = String(c.sequence || "");
+      k.ts = Date.now();
+      return Pro.denemeCiktisiEkle(k) === true;
+    } catch (e) { return false; }
+  }
+
+  return { ciftBoyut: ciftBoyut, kaynak: kaynak, ffmpegArgs: ffmpegArgs, render: render, temizYenidenOlustur: temizYenidenOlustur, denemeKaydet: denemeKaydet };
 });
