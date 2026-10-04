@@ -367,6 +367,12 @@
     for (var i = 0; i < n; i++) { var v = buf[2 * i] | (buf[2 * i + 1] << 8); out[i] = v >= 32768 ? v - 65536 : v; }
     return out;
   }
+  // Buffer'ı kopyalamadan örnek dizisi gibi okuyan hafif görünüm (energyFromPcm yalnız length ve [i] ister)
+  function int16Gorunum(buf) {
+    var n = Math.floor(buf.length / 2);
+    if (buf.byteOffset % 2 === 0) return new Int16Array(buf.buffer, buf.byteOffset, n);
+    return bufferToInt16(buf);
+  }
   function energyFromFile(dep, o) {
     o = o || {};
     var win = num(o.win, 0.1);
@@ -383,7 +389,8 @@
       if (!r || r.code !== 0 || !dep.fs.existsSync(raw)) {
         throw new Error("ffmpeg ses çözülemedi" + (r && r.stderr ? ": " + String(r.stderr).split(/\r?\n/).filter(Boolean).slice(-1)[0] : ""));
       }
-      var seri = energyFromPcm(bufferToInt16(dep.fs.readFileSync(raw)), PCM_SR, win);
+      // Buffer doğrudan okunur: saatlik kayıtta ikinci bir Int16 kopyası belleği ikiye katlamasın
+      var seri = energyFromPcm(int16Gorunum(dep.fs.readFileSync(raw)), PCM_SR, win);
       var bas = Math.round(num(o.offset, 0) / win);
       if (bas > 0) { var on = []; for (var i = 0; i < bas; i++) on.push(FLOOR); seri = on.concat(seri); }
       temizle();
