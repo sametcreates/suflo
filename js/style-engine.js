@@ -114,18 +114,24 @@
    * paylastirilir. Gercek kelime zamani olmayan (SRT/satir modu) altyazilarda
    * kelime stillerinin anlamli calismasini saglar.
    */
+  // Podcast Modu: cue'nun konusmaci sirasi (sayi) donusumlerde tasinir; yoksa alan hic eklenmez
+  function konusmaciTasi(kaynak, hedef) {
+    if (kaynak && typeof kaynak.speaker === "number" && isFinite(kaynak.speaker)) hedef.speaker = kaynak.speaker;
+    return hedef;
+  }
+
   function splitToWords(cues) {
     var out = [];
     (cues || []).forEach(function (cue) {
       var words = String(cue.text || "").trim().split(/\s+/).filter(Boolean);
       var start = Number(cue.start || 0), end = Number(cue.end || 0);
-      if (words.length <= 1) { if (words.length) out.push({ start: start, end: end, text: words[0], lineEnd: true }); return; }
+      if (words.length <= 1) { if (words.length) out.push(konusmaciTasi(cue, { start: start, end: end, text: words[0], lineEnd: true })); return; }
       var weights = words.map(function (w) { return w.replace(/\*/g, "").length + 1; });
       var total = weights.reduce(function (a, b) { return a + b; }, 0);
       var t = start;
       words.forEach(function (w, i) {
         var d = (end - start) * weights[i] / total;
-        out.push({ start: t, end: i === words.length - 1 ? end : t + d, text: w, lineEnd: i === words.length - 1 });
+        out.push(konusmaciTasi(cue, { start: t, end: i === words.length - 1 ? end : t + d, text: w, lineEnd: i === words.length - 1 }));
         t += d;
       });
     });
@@ -136,7 +142,7 @@
   function lastWords(cues) {
     return (cues || []).map(function (cue) {
       var words = String(cue.text || "").trim().split(/\s+/).filter(Boolean);
-      return { start: cue.start, end: cue.end, text: words[words.length - 1] || "" };
+      return konusmaciTasi(cue, { start: cue.start, end: cue.end, text: words[words.length - 1] || "" });
     }).filter(function (c) { return c.text; });
   }
   /*
@@ -227,7 +233,7 @@
       if (!value || end <= 0) return;
       start = Math.max(0, start);
       end = Math.max(start + 0.08, end);
-      out.push({ start: start, end: end, text: value });
+      out.push(konusmaciTasi(cue, { start: start, end: end, text: value }));
     });
     return out;
   }
@@ -239,8 +245,10 @@
       current.push(cue);
       var next = cues[index + 1];
       var gap = next ? next.start - cue.end : 99;
-      // lineEnd: satirdan bolunmus kelimelerde gruplar satir sinirini asmaz
-      if (current.length >= limit || gap > 0.7 || cue.lineEnd || /[.!?…]$/.test(cue.text)) flush();
+      // lineEnd: satirdan bolunmus kelimelerde gruplar satir sinirini asmaz;
+      // konusmaci degisince grup kapanir (iki kisinin sozu tek kartta birlesmez)
+      var konusmaciDegisir = next && next.speaker !== cue.speaker;
+      if (current.length >= limit || gap > 0.7 || cue.lineEnd || /[.!?…]$/.test(cue.text) || konusmaciDegisir) flush();
     });
     flush();
     return groups;
@@ -334,8 +342,10 @@
     ];
   }
 
+  // Konusmaci renkleri: compile() o konusmacinin satirlarini cizerken metnin basina {\1c...} koyar
+  var renkOnek = "";
   function dialogue(layer, start, end, value) {
-    return "Dialogue: " + layer + "," + timecode(start) + "," + timecode(end) + ",Suflo,,0,0,0,," + value;
+    return "Dialogue: " + layer + "," + timecode(start) + "," + timecode(end) + ",Suflo,,0,0,0,," + renkOnek + value;
   }
 
   function roundedRect(width, height, radius) {
@@ -886,6 +896,27 @@
     return style;
   }
 
+  // speakerColors: konusmaci sirasina gore "#rrggbb" dizisi; gecerli renk yoksa null (cikti degismez)
+  function konusmaciRenkleri(liste) {
+    if (!liste || typeof liste !== "object") return null;
+    var out = [], var1 = false;
+    for (var i = 0; i < Math.min(16, Number(liste.length) || 0); i++) {
+      var v = liste[i];
+      if (typeof v === "string" && HEX.test(v)) { out[i] = v; var1 = true; } else out[i] = null;
+    }
+    return var1 ? out : null;
+  }
+  function konusmaciKosulari(cues, renkler) {
+    var kosular = [], son = null;
+    cues.forEach(function (cue) {
+      var r = typeof cue.speaker === "number" && renkler[cue.speaker] ? renkler[cue.speaker] : null;
+      var anahtar = typeof cue.speaker === "number" ? cue.speaker : -1;
+      if (!son || son.anahtar !== anahtar) { son = { anahtar: anahtar, renk: r, cues: [] }; kosular.push(son); }
+      son.cues.push(cue);
+    });
+    return kosular;
+  }
+
   function compile(options) {
     options = options || {};
     var id = STYLES[options.styleId] ? options.styleId : "viral";
@@ -894,6 +925,8 @@
     var width = Math.max(320, Math.round(options.width || 1920));
     var height = Math.max(180, Math.round(options.height || 1080));
     var cues = normaliseCues(options.cues, options.offset);
+    // Renk verilmediyse konusmaci alani hic kullanilmaz: varsayilan cikti bayt bayt ayni kalir
+    if (!konusmaciRenkleri(options.speakerColors)) cues.forEach(function (c) { delete c.speaker; });
     // Kelime stilleri kelime cue'su ister: satir/birikimli altyazi once donusturulur
     if (wordBased(id)) {
       if (options.cueKind === "lines") cues = splitToWords(cues);
@@ -902,23 +935,40 @@
     if (wordBased(id) || options.cueKind === "words") cues = markEmphasis(cues);
     var factor = intensity(options.intensity || style.yogunluk);
     var events;
+    var renkler = konusmaciRenkleri(options.speakerColors);
     olcekRef = Math.min(width, height);
     guvenliW = options.overrides && options.overrides.guvenli === true && height > width * 1.2 ? Math.round(width * 0.74) : 0;
+    function ciz(liste, st) {
+      if (id === "mrbeast") return renderMrBeast(liste, st, width, height, factor);
+      if (id === "capcut") return renderCapCut(liste, st, width, height, factor);
+      if (id === "saas") return renderSaas(liste, st, width, height, factor);
+      if (id === "pop") return renderPop(liste, st, width, height, factor);
+      if (id === "doc") return renderDoc(liste, st, width, height, factor);
+      if (id === "premium") return renderPremium(liste, st, width, height, factor);
+      if (id === "hormozi") return renderHormozi(liste, st, width, height, factor);
+      if (id === "neon") return renderNeon(liste, st, width, height, factor);
+      if (id === "daktilo") return renderDaktilo(liste, st, width, height, factor);
+      if (id === "ziplama") return renderZiplama(liste, st, width, height, factor);
+      if (id === "dolgu") return renderDolgu(liste, st, width, height, factor);
+      return renderViral(liste, st, width, height, factor);
+    }
     try {
-    if (id === "mrbeast") events = renderMrBeast(cues, style, width, height, factor);
-    else if (id === "capcut") events = renderCapCut(cues, style, width, height, factor);
-    else if (id === "saas") events = renderSaas(cues, style, width, height, factor);
-    else if (id === "pop") events = renderPop(cues, style, width, height, factor);
-    else if (id === "doc") events = renderDoc(cues, style, width, height, factor);
-    else if (id === "premium") events = renderPremium(cues, style, width, height, factor);
-    else if (id === "hormozi") events = renderHormozi(cues, style, width, height, factor);
-    else if (id === "neon") events = renderNeon(cues, style, width, height, factor);
-    else if (id === "daktilo") events = renderDaktilo(cues, style, width, height, factor);
-    else if (id === "ziplama") events = renderZiplama(cues, style, width, height, factor);
-    else if (id === "dolgu") events = renderDolgu(cues, style, width, height, factor);
-    else events = renderViral(cues, style, width, height, factor);
+    if (!renkler) events = ciz(cues, style);
+    else {
+      /*
+       * Podcast Modu: ardışık aynı konuşmacılı cue'lar bir koşu olur; her koşu kendi
+       * renginde çizilir (metin rengi = konuşmacı rengi, satır başında \1c). Rengi olmayan
+       * konuşmacı ya da konuşmacısız cue stilin kendi renginde kalır.
+       */
+      events = [];
+      konusmaciKosulari(cues, renkler).forEach(function (kosu) {
+        var st = style;
+        if (kosu.renk) { st = Object.assign({}, style, { renk: kosu.renk }); renkOnek = "{\\1c" + assColor(kosu.renk) + "}"; }
+        try { events = events.concat(ciz(kosu.cues, st)); } finally { renkOnek = ""; }
+      });
+    }
     var basliklar = header(style, id, width, height);
-    } finally { olcekRef = 0; guvenliW = 0; }
+    } finally { olcekRef = 0; guvenliW = 0; renkOnek = ""; }
 
     return {
       id: id,
