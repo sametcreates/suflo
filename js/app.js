@@ -1416,7 +1416,7 @@ window.KApp = (function () {
     maddeler: [
       { ikon: "✂", baslik: "Konuşmadan kes", metin: "ııı, eee ve tekrarları kelimeye tıklayarak videodan çıkar.", sekme: "cut", hedef: "tc-card" },
       { ikon: "🔥", baslik: "Viral anlar (Shorts)", metin: "En güçlü 15–60 sn'yi bulur, tek tıkla 9:16 Shorts sekansı yapar.", sekme: "captions", acilir: "cap-vr-box" },
-      { ikon: "Aa", baslik: "Suflo Stilleri", metin: "Hormozi, Neon, Daktilo dahil 12 animasyonlu altyazı.", sekme: "captions", hedef: "cap-stil-grid" },
+      { ikon: "Aa", baslik: "Suflo Stilleri", metin: "Bold Box, Neon, Daktilo dahil 12 animasyonlu altyazı.", sekme: "captions", hedef: "cap-stil-grid" },
       { ikon: "♪", baslik: "Sesi iyileştir", metin: "Gürültüyü al, sesi YouTube seviyesine getir — senkron kaymaz.", sekme: "cut", hedef: "ses-card" },
       { ikon: "▭", baslik: "Kanca başlığı", metin: "Shorts açılışına animasyonlu başlık kartı, tek tık.", sekme: "kanca" },
       { ikon: "↔", baslik: "Geçişler", metin: "Kesime tek tıkla zoom, whip, itme — eklentisiz.", sekme: "gecis" },

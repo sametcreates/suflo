@@ -21,7 +21,7 @@
         kontur: 9, konum: 5, kutu: false, animasyon: "mrbeast" }
     },
     capcut: {
-      id: "capcut", name: "CapCut Clean", description: "Temiz kelime vurgusu ve kompakt pill",
+      id: "capcut", name: "Clean Pill", description: "Temiz kelime vurgusu ve kompakt pill",
       text: { maxlen: "k1", kase: "normal", punct: false },
       style: { aile: "capcut", yogunluk: "balanced", font: "Montserrat", fontFile: "Montserrat-Bold.ttf",
         boyut: 78, renk: "#ffffff", konturRenk: "#07090d", vurguRenk: "#b8ff5a",
@@ -65,7 +65,7 @@
     ,
     // ---- v3.0: Suflo'nun kendi animasyonlu stilleri ----
     hormozi: {
-      id: "hormozi", name: "Hormozi", description: "Kalın büyük harf, aktif kelime renk değiştirip zıplar",
+      id: "hormozi", name: "Bold Box", description: "Kalın büyük harf, aktif kelime renk değiştirip zıplar",
       text: { maxlen: "k1", kase: "upper", punct: false },
       style: { aile: "hormozi", yogunluk: "hard", font: "Anton", fontFile: "Anton.ttf",
         boyut: 124, renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe600",

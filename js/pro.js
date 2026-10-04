@@ -81,7 +81,7 @@
   var _onUpgrade = null;  // "Yukselt" tiklama davranisi (app.js verir)
 
   var FEATURE_LABELS = {
-    overlay:   'Animasyonlu altyazi katmani (CapCut gorunumu)',
+    overlay:   'Animasyonlu altyazi katmani (Suflo Stilleri)',
     karaoke:   'Karaoke / kelime-kelime animasyon',
     cut:       'Otomatik kesim (sessizlik temizleme)',
     audioclean: 'Sesi iyilestir (gurultu azaltma + ses seviyesi)',

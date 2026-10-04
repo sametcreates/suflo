@@ -80,7 +80,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL + KDV) |
 |---|---|
 | Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Bağımsız Stil Motoru ve şeffaf video katmanı |
-| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Creator Punch · CapCut Clean · SaaS Glass dahil Stil Motoru v3 |
+| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Creator Punch · Clean Pill · SaaS Glass dahil Stil Motoru v3 |
 | Düz stiller | Otomatik kesim (sessizlik temizleme) |
 | SRT · WebVTT · TXT dışa aktarım | Ritim/beat marker'ları |
 | SRT/VTT içe aktarım | Toplu çoklu klip transkripsiyonu |
@@ -88,7 +88,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | GPU hızlandırma | Stilli ASS dışa aktarım |
 | Emoji seçici | **Sesi iyileştir** · **Otomatik zoom** · **Kanca başlığı** |
 | Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar ve duraksama temizliği, kelimeye tıklayıp kes |
-| Terim sözlüğü (`yanlış => doğru`, her transkriptte) | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Hormozi, Neon, Daktilo…) timeline'da, MOGRT gerekmez |
+| Terim sözlüğü (`yanlış => doğru`, her transkriptte) | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Bold Box, Neon, Daktilo…) timeline'da, MOGRT gerekmez |
 | Kelime kelime ve birikimli (karaoke) altyazı izi | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
 | — | **Viral anlar:** uzun videodan 15–90 sn'lik Shorts/Reels anları, açıklamalı 0–100 puan (Viral Skor 2.0), cümle güvenli kenarlar, In/Out ve süreli marker |
 | — | **Sahne algılama** ve **vuruşlarda bölme**; kesimleri uygulamadan **▶ Dinle** |

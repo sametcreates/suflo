@@ -3453,7 +3453,7 @@ window.KCaptions = (function () {
     bounce:  { ad: "Zıplama",        kelimeli: true },
     premium: { ad: "Premium",        kelimeli: true },
     mrbeast: { ad: "Creator Punch",  kelimeli: true },
-    capcut:  { ad: "CapCut Clean",   kelimeli: true },
+    capcut:  { ad: "Clean Pill",   kelimeli: true },
     saas:    { ad: "SaaS Glass",     kelimeli: true }
   };
 
