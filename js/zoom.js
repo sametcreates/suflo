@@ -237,7 +237,8 @@ if (typeof window !== "undefined") window.KZoom = (function () {
 
   async function calistir() {
     if (busy) return;
-    if (typeof Pro !== "undefined" && !Pro.gate("zoom")) return; // Pro: otomatik zoom
+    // Pro: otomatik zoom (ucretsizde 3 deneme hakki; hak yalniz anahtar kareler yazilinca duser)
+    if (typeof Pro !== "undefined" && !Pro.gate("zoom", { deneme: true, yeniden: calistir })) return;
     var clip = KApp.ctx().sel;
     if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
     setBusy(true);
@@ -301,6 +302,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
         clearEnd: clip.clipStart + dur
       }, 30000);
       if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Zoom uygulanamadı.");
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);   // deneme: yalniz basarida
       status("");
       KApp.toast(plan.toggles + " zoom hareketi eklendi (" +
         (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")", "good");
@@ -311,9 +313,9 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     }
   }
 
+  // Kapisiz: deneme hakkiyla eklenen zoom'u herkes her zaman geri alabilmeli
   async function kaldir() {
     if (busy) return;
-    if (typeof Pro !== "undefined" && !Pro.gate("zoom")) return;
     var clip = KApp.ctx().sel;
     if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
     setBusy(true);

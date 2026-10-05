@@ -26,7 +26,9 @@ function ok(ad, kosul, kanit) {
 }
 
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
-                "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js"];
+                "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
+                "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js",
+                "js/marka-kiti-ui.js", "js/kanca.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -128,7 +130,26 @@ var ZORUNLU = {
   "cap-emoji-ac": "Emoji aç düğmesi",
   "cap-emoji-panel": "Emoji paneli",
   "cap-emoji-grid": "Emoji ızgarası",
-  "cap-emoji-ara": "Emoji arama"
+  "cap-emoji-ara": "Emoji arama",
+  // v3.1: ilk acilis rehberi ("Ilk altyazin 2 dakikada")
+  "ilk-adim": "Ilk altyazi rehberi karti",
+  "onb-chip": "Rehber ilerleme cipi",
+  "onb-anahtar": "AI anahtari sihirbazi",
+  "set-onb-ac": "Ayarlar > Destek > Kurulum rehberini ac",
+  "cap-setup": "Motor kurulum notu (rehber karti icine tasinir)",
+  "cap-local-install": "Yerel motoru kur",
+  "cap-key-save": "Anahtari kaydet",
+  // v3.1: Viral Skor 2.0 (tur, adet, odak, siralama, >=60 filtresi, tahmin notu)
+  "cap-vr-box": "Viral anlar kutusu",
+  "cap-vr-bul": "Viral anlari bul",
+  "cap-vr-tur": "Viral tur secimi",
+  "cap-vr-adet": "Viral an sayisi",
+  "cap-vr-odak": "Viral odak metni",
+  "cap-vr-sure": "Viral klip suresi",
+  "cap-vr-sira": "Viral siralama",
+  "cap-vr-min": "Yalniz >=60 filtresi",
+  "cap-vr-not": "Puan tahmin notu",
+  "cap-vr-liste": "Viral an kartlari"
 };
 var kayip = [];
 Object.keys(ZORUNLU).forEach(function (id) {
@@ -148,6 +169,8 @@ ok("kaldirilan modul ogeleri markup'ta YOK", kalinti.length === 0, kalinti.join(
 
 var betikler = (html.match(/<script src="js\/[^"]+"/g) || []).join(" ");
 ok("kaldirilan Motion betigi yuklenmiyor", !/motion\.js/.test(betikler), betikler);
+ok("rehber modulleri yukleniyor (onboarding-steps + onboarding)",
+  /onboarding-steps\.js/.test(betikler) && /js\/onboarding\.js/.test(betikler), betikler);
 ok("aktif moduller yukleniyor (magiccut + beat + preset + sfx + emoji + saglik + Pro sync)",
   /magiccut\.js/.test(betikler) && /beat\.js/.test(betikler) && /presets\.js/.test(betikler) && /sfx\.js/.test(betikler) && /emoji-assets\.js/.test(betikler) && /library-health\.js/.test(betikler) && /pro-sync\.js/.test(betikler), betikler);
 
@@ -171,6 +194,8 @@ ok("Pro MOGRT kartlarinda anlamli grup, eylem ve favori erisilebilirligi var",
 ok("Pro SFX koleksiyonlari anlamli buton etiketi tasir", /card\.setAttribute\("aria-label"/.test(sfxSrc));
 ok("Pro satin alma penceresi modal, odak tuzagi ve odak geri donusu tasir",
   /aria-modal="true"/.test(proSrc) && /focusable/.test(proSrc) && /previousFocus\.focus/.test(proSrc));
+ok("Pro penceresindeki 'Ucretsiz dene' dugmesi odak tuzaginda",
+  /var ids = \[[^\]]*'pro-upsell-deneme'[^\]]*\]/.test(proSrc) && /id="pro-upsell-deneme"/.test(proSrc));
 var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8");
 ok("Stil karti etiketi dekoratif onizleme metnini degil ad ve aciklamayi okur",
   /\.ss-bilgi b/.test(appSrc) && /timeline çıktısı kilitli/.test(appSrc));
@@ -201,5 +226,114 @@ ok("Kutuphane Pro CTA'lari neyin acilacagini ve fiyati gizlemez",
   /Yazı animasyonlarını aç — 749 TL/.test(html) && /290 preseti aç — 749 TL/.test(html) &&
   /1\.076 SFX'i aç — 749 TL/.test(html) && /Motion BG'yi aç — 749 TL/.test(html));
 
+
+/* ---------- İngilizce (beta) arayüz kablolaması ---------- */
+var sira = ["js/CSInterface.js", "i18n/en.js", "js/i18n.js", "js/bridge.js"].map(function (f) { return html.indexOf('<script src="' + f + '"></script>'); });
+ok("i18n betikleri CSInterface.js'ten sonra, bridge.js'ten önce yüklenir", sira.every(function (x, i) { return x !== -1 && (i === 0 || x > sira[i - 1]); }), sira.join(","));
+var dilSec = /<select id="set-ui-lang"[^>]*>([\s\S]*?)<\/select>/.exec(html);
+ok("Ayarlar > Destek: #set-ui-lang tr ve en (beta) seçenekli",
+  !!dilSec && /<option value="tr">Türkçe<\/option>/.test(dilSec[1]) && /<option value="en">English \(beta\)<\/option>/.test(dilSec[1]) &&
+  html.indexOf('id="set-ui-lang"') > html.indexOf('<div class="set-title">Destek</div>'));
+ok("dil seçicileri çevrilmez (data-i18n-skip): dil adları kendi dilinde kalır",
+  /<select id="set-ui-lang" data-i18n-skip>/.test(html) && /<div id="ia-dil" class="ia-dil" hidden data-i18n-skip>/.test(html));
+ok("ilk açılış rehberinde iki dilli 0. adım (Türkçe / English (beta))",
+  /id="ia-dil-tr"[^>]*>Türkçe</.test(html) && /id="ia-dil-en"[^>]*>English \(beta\)</.test(html) &&
+  html.indexOf('id="ia-dil"') < html.indexOf('id="ia-motor"'));
+var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8");
+var initGovde = appSrc.slice(appSrc.indexOf("  function init() {"));
+ok("KApp.init dili bağlam yoklamasından ve pencerelerden ÖNCE başlatır",
+  initGovde.indexOf('guvenli("Dil", arayuzDiliniBaslat)') !== -1 &&
+  initGovde.indexOf('guvenli("Dil", arayuzDiliniBaslat)') < initGovde.indexOf("checkFfmpeg") &&
+  initGovde.indexOf('guvenli("Dil", arayuzDiliniBaslat)') < initGovde.indexOf("contextEtkilesim") &&
+  initGovde.indexOf('guvenli("Dil", arayuzDiliniBaslat)') < initGovde.indexOf("yenilikleriGoster") &&
+  /SufloI18n\.configure\(\{\s*load: K\.settings,/.test(appSrc) && /settingsExisted: K\.ayarDosyasiVardi/.test(appSrc) &&
+  /if \(SufloI18n\.getLang\(\) === "en"\) SufloI18n\.start\(\);/.test(appSrc));
+ok("dil değişimi iş sürerken kapalı, yeniden yüklemesiz (switchLang)",
+  /SufloI18n\.switchLang\(sec\.value, \{ busy: isSuruyor \}\)/.test(appSrc) && /sec\.disabled = mesgul/.test(appSrc) &&
+  /surecSayisi: surecSayisi/.test(fs.readFileSync(KOKYOL + "js/bridge.js", "utf8")));
+var capSrc = fs.readFileSync(KOKYOL + "js/captions.js", "utf8");
+ok("altyazı dili bilinmezken 'tr' yerine arayüz dili", !/\|\| "tr"; \}?,?\s*$/m.test(capSrc.split("\n").filter(function (l) { return /cap-lang/.test(l); }).join("\n")) &&
+  (capSrc.match(/\|\| arayuzDili\(\)/g) || []).length >= 4);
+ok("İngilizcede kayıtlı tercih yoksa altyazı dili Otomatik",
+  /if \(!p\) \{ if \(arayuzDili\(\) === "en" && el\("cap-lang"\)\) el\("cap-lang"\)\.value = ""; return; \}/.test(capSrc));
+var diyalogEksik = [];
+fs.readdirSync(KOKYOL + "js").filter(function (f) { return /\.js$/.test(f); }).forEach(function (f) {
+  fs.readFileSync(KOKYOL + "js/" + f, "utf8").split("\n").forEach(function (satir, i) {
+    if (/window\.confirm\(|showOpenDialogEx\(/.test(satir) && /["']/.test(satir) && satir.indexOf("uiMetni(") === -1) diyalogEksik.push(f + ":" + (i + 1));
+  });
+});
+ok("confirm() ve klasör seçme pencereleri arayüz dilinde (uiMetni)", diyalogEksik.length === 0, diyalogEksik.join(" | "));
+ok("Premiere bin/marker adları anahtar olarak aynı kalır", /Suflo Altyazi/.test(fs.readFileSync(KOKYOL + "jsx/host.jsx", "utf8")));
+
+/* ---------- Marka Kiti + stil ince ayarı + paylaşılabilir stil kodları ---------- */
+var inceAyar = (html.match(/<details class="ince-ayar"[^>]*>/) || [""])[0];
+ok("ince ayar artık gizli değil (görünürlüğü JS yönetir)", inceAyar && !/\shidden|aria-hidden/.test(inceAyar) && /id="cap-ince-ayar"/.test(inceAyar), inceAyar);
+var yeniIdler = ["cap-ince-ayar", "cap-guvenli-yerlesim", "cap-guvenli-yerlesim-sar", "cap-ia-varsayilan", "cap-stil-paylas", "cap-stil-kod",
+  "cap-stil-kod-uygula", "cap-stil-disa", "cap-stil-ice", "cap-stil-kredi", "cap-stil-kredi-ad", "cap-stil-yazar", "cap-marka-kiti-cip", "cap-font-sistem",
+  "grp-marka-kiti", "mk-acik", "mk-font", "mk-konum", "mk-renk-acik", "mk-renk", "mk-renk-kontur", "mk-renk-vurgu", "mk-logo-sec", "mk-logo-kaldir",
+  "mk-logo-ad", "mk-logo-kose", "mk-logo-oran", "mk-logo-oran-deger", "mk-doldur", "mk-durum", "kanca-kit-not"];
+var yokId = yeniIdler.filter(function (id) { return !idler[id]; });
+ok("yeni id'ler index.html'de", yokId.length === 0, yokId.join(","));
+var ia = html.slice(html.indexOf('id="cap-ince-ayar"'), html.indexOf("</details>", html.indexOf('id="cap-ince-ayar"')));
+ok("animasyon ve arka plan kutusu .ia-eski içinde (Suflo Stilinde gizlenir)", /class="field ia-eski"[\s\S]{0,120}id="cap-animasyon"/.test(ia) && /class="ia-eski"[\s\S]{0,200}id="cap-kutu"/.test(ia));
+ok("kredi adı çeviriden muaf (kullanıcı adı)", /id="cap-stil-kredi-ad" data-i18n-skip/.test(html));
+function betikSira(ad) { return html.indexOf('<script src="js/' + ad + '"'); }
+ok("betik sırası: style-share → marka-kiti → style-engine → overlay-render → captions → hook-title → kanca → marka-kiti-ui → app",
+  betikSira("style-share.js") > 0 && betikSira("style-share.js") < betikSira("marka-kiti.js") && betikSira("marka-kiti.js") < betikSira("style-engine.js") &&
+  betikSira("style-engine.js") < betikSira("overlay-render.js") && betikSira("overlay-render.js") < betikSira("captions.js") && betikSira("hook-title.js") < betikSira("kanca.js") &&
+  betikSira("kanca.js") < betikSira("marka-kiti-ui.js") && betikSira("marka-kiti-ui.js") < betikSira("app.js"));
+ok("Marka Kiti kartı app.js'ten başlatılır", /KMarkaKiti\.init\(\)/.test(fs.readFileSync(KOKYOL + "js/app.js", "utf8")));
+function fnGovde(src, imza) { src = String(src).replace(/\r\n/g, "\n"); var i = src.indexOf(imza); return i < 0 ? "" : src.slice(i, src.indexOf("\n  }\n", i) + 4); }
+var ap = fnGovde(capSrc, "function applyPreset(");
+ok("applyPreset: kit açıkken stiliYaz(mergeBrandKit(preset, kit))", /stiliYaz\(kit \? window\.SufloMarkaKiti\.mergeBrandKit\(p\.stil, kit\) : p\.stil\)/.test(ap));
+var ku = fnGovde(capSrc, "function stilKoduUygula(");
+ok("kod uygula: önce applyPreset(styleId), sonra stiliYaz(tarif), sonra önizleme", ku.indexOf("applyPreset(r.styleId)") > 0 &&
+  ku.indexOf("applyPreset(r.styleId)") < ku.indexOf("stiliYaz(ov)") && ku.indexOf("stiliYaz(ov)") < ku.indexOf("onizlemeOynat()"));
+ok("kod uygula: izinli stiller yalnız Suflo Stilleri", /SS\.decode\(String\(kod \|\| ""\), function \(id\) \{ return motorStiliMi\(id\); \}\)/.test(ku));
+var kr = fnGovde(capSrc, "function stilKredisi(");
+ok("kredi çipi yalnız textContent ve doğrulanmış adla", /b\.textContent = /.test(kr) && !/innerHTML/.test(kr) && /SS\.validAuthor\(ad\)/.test(kr));
+ok("vurgu rengi Suflo Stillerinde etkin", /var motorda = !secilenMogrt && motorStiliMi\(stil\(\)\.aile\);[\s\S]{0,200}!\(motorda \|\|/.test(fnGovde(capSrc, "function vurguKutusuDurumu(")));
+var iad = fnGovde(capSrc, "function inceAyarDurumu(");
+ok("ince ayar yalnız Suflo Stilinde, sistem fontları kapalı, güvenli yerleşim yalnız 9:16", /d\.hidden = !motorda/.test(iad) && /sistem\.disabled = motorda/.test(iad) &&
+  /sar\.hidden = !\(motorda && dikeySekans\(\)\)/.test(iad));
+ok("önizleme, katman, ASS ve paylaşım kodu aynı ince ayarı kullanır (motorAyarlari)", (capSrc.match(/overrides: motorAyarlari\(/g) || []).length === 4, (capSrc.match(/overrides: motorAyarlari\(/g) || []).length);
+var ou2 = fnGovde(capSrc, "async function overlayUygula(");
+ok("katman: kit logosu kapsamın sonuna kadar (logoKatmanKalan), logo atlanırsa uyarı",
+  /CT\.logoKatmanKalan\(scope, spec, baslangic, sonBitis\)/.test(ou2) && /CT\.katmanSuresi\(sonBitis, logoKalan, fps, true\)/.test(ou2) &&
+  /logo: logo,/.test(ou2) && /logoAtlandi/.test(ou2));
+var mkd = fnGovde(capSrc, "function markaKitiDegisti(");
+ok("kit değişimi: yalnız stil alanı değişince, Şablonum hariç, rebaseBrandKit ile; kredi silinir",
+  /MK\.styleFieldsChanged\(eski, yeni\)/.test(mkd) && /!sablonum/.test(mkd) && /MK\.rebaseBrandKit\(stil\(\), temel && temel\.stil, eski, yeni\)/.test(mkd) &&
+  /stilKredisi\(""\)/.test(mkd) && !/mergeBrandKit/.test(mkd));
+ok("MOGRT stili seçilince paylaşılan kodun kredisi silinir", /stilKredisi\(""\)/.test(fnGovde(capSrc, "function mogrtStiliniSec(")));
+ok("paylaşım bağlantısı arayüz dilinde (EN → /en/stil)", (capSrc.match(/SS\.shareUrl\(k\.kod, arayuzDili\(\)\)/g) || []).length === 2);
+ok("önizleme ortak builder ile (previewArgs + logoHazirla)", /SufloOverlayRender\.previewArgs\(/.test(fnGovde(capSrc, "async function motorOnizlemeOynat(")) &&
+  /SufloOverlayRender\.logoHazirla\(/.test(fnGovde(capSrc, "async function motorOnizlemeOynat(")));
+
+/* ---------- Podcast Modu ---------- */
+var appSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8"), proSrc = fs.readFileSync(KOKYOL + "js/pro.js", "utf8");
+var mcUi = fs.readFileSync(KOKYOL + "js/multicam-ui.js", "utf8");
+ok("Podcast: kenar çubuğunda Kanca Başlığı'ndan hemen sonra, PRO kilidi ve YENİ rozetiyle",
+  html.indexOf('data-tab="podcast"') > html.indexOf('data-tab="kanca"') && html.indexOf('data-tab="podcast"') < html.indexOf('<div class="ky-baslik" style="margin-top:12px">Kütüphane</div>') &&
+  /data-tab="podcast">[\s\S]{0,400}<b>Podcast <em class="ky-yeni">YENİ<\/em><\/b>[\s\S]{0,200}data-kilit>PRO/.test(html));
+["tab-podcast", "pc-tara", "pc-esleme", "pc-genis", "pc-analiz", "pc-izler", "pc-min", "pc-max", "pc-hassas", "pc-hold", "pc-capraz", "pc-periyot-ac", "pc-periyot",
+  "pc-onizleme", "pc-ozet", "pc-uyari", "pc-hedef", "pc-uygula", "pc-renk", "pc-progress", "pc-durum", "podcast-tanitim"].forEach(function (id) {
+  ok("Podcast: #" + id + " var", !!idler[id]);
+});
+ok("Podcast: 'Her konuşmacının kendi mikrofonu olmalı' arayüzde yazar", /Her konuşmacının kendi mikrofonu olmalı/.test(html));
+ok("Podcast: SRT altyazı izinin renk taşıyamadığı söylenir", /altyazı katmanı \(SRT\) renk taşıyamaz/.test(html));
+ok("Podcast: betik sırası multicam.js → multicam-ui.js → app.js", betikSira("multicam.js") > 0 && betikSira("multicam.js") < betikSira("multicam-ui.js") && betikSira("multicam-ui.js") < betikSira("app.js") &&
+  betikSira("style-engine.js") < betikSira("multicam-ui.js"));
+ok("Podcast: app.js başlatır, kilitler ve tanıtım kartını Pro'da gizler", /KMulticam\.init\(\)/.test(appSrc) && /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="podcast"\]'\), !s\.pro\)/.test(appSrc) && /"podcast-tanitim"/.test(appSrc));
+ok("Podcast: Pro anahtarı multicam (etiket + uygula kapısı)", /multicam:\s+'Podcast Modu/.test(proSrc) && /Pro\.gate\("multicam"\)/.test(fnGovde(mcUi, "async function uygula(")));
+var uyg = fnGovde(mcUi, "async function uygula(");
+ok("Podcast: önce hazırlık, sonra TÜM kesimler, sonra TÜM aç/kapa", uyg.indexOf("KS_multicamPrepare") > 0 && uyg.indexOf("KS_multicamPrepare") < uyg.indexOf("KS_multicamRazor") &&
+  uyg.indexOf("KS_multicamRazor") < uyg.indexOf("KS_multicamEnable"));
+ok("Podcast: mikrofon dışa aktarımı unmuteWanted ve gömülü epr ile, geçici dosya silinir", /KS_exportAudio", \{ scope: "entire", epr: bundledEpr\(\), tracks: \[sp\.mic\], unmuteWanted: true \}/.test(mcUi) && /silInput: true/.test(mcUi));
+ok("Podcast: altyazının üç derleme noktası konuşmacı renklerinden geçer", (capSrc.match(/SufloStyleEngine\.compile\(konusmaciRenkleri\(/g) || []).length === 3 && /bundledEpr: bundledEpr/.test(capSrc));
+
+ok("Podcast: sessiz mikrofon reddi normalizeSeries'in konuşma seviyesiyle (az konuşan mikrofon reddedilmez)", /M\.speechLevel\(seri\) < M\.SESSIZ_P95/.test(fnGovde(mcUi, "async function micEnerji(")));
+ok("Podcast: hazırlık açık Suflo kopyalarını bilir (kopyada yeniden uygulama)", /seqIds: Object\.keys\(onbellek\.seqIds\)/.test(uyg));
+ok("Podcast: eşleme denetimlerinin erişilebilir adında konuşmacı harfi var", /HARF\[i\][\s\S]{0,120}" · "/.test(mcUi) && /on \+ "Mikrofon ses katmanı"/.test(mcUi));
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

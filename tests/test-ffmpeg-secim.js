@@ -26,7 +26,10 @@ function kur(adaylar) {
   var m3 = kur([{ ad: "x", calisir: false }]);
   ok("hic ffmpeg yok: null, libass bilinmiyor", (await m3.find(true)) === null && m3.libass() === null);
   var kanca = fs.readFileSync(path.join(__dirname, "..", "js", "kanca.js"), "utf8"), cap = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8");
-  ok("kanca ve stil katmani libass'siz ffmpeg'de anlasilir hata verir", (kanca.match(/K\.libassUyarisi\(\)/g) || []).length >= 2 && /if \(K\.libassUyarisi && K\.libassUyarisi\(\)\) throw new Error/.test(cap));
+  var ortak = fs.readFileSync(path.join(__dirname, "..", "js", "overlay-render.js"), "utf8");
+  // stil katmani render'i ortak modulde (js/overlay-render.js): libass denetimi orada
+  ok("kanca ve stil katmani libass'siz ffmpeg'de anlasilir hata verir", (kanca.match(/K\.libassUyarisi\(\)/g) || []).length >= 2 &&
+    /SufloOverlayRender\.render\(K,/.test(cap) && /if \(K\.libassUyarisi && K\.libassUyarisi\(\)\) throw new Error/.test(ortak));
   console.log(gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);
 })().catch(function (e) { console.log("FAIL istisna " + e.stack); process.exit(1); });

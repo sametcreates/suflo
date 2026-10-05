@@ -29,7 +29,7 @@
         <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l1.4 3.1L11 4.5 8.5 6.8l.7 3.4L6 8.6 2.8 10.2l.7-3.4L1 4.5l3.6-.4z" fill="currentColor"/></svg>
         <span>PRO</span>
       </button>
-      <span class="brand-ver" id="brand-ver">v1.7</span>
+      <span class="brand-ver" id="brand-ver">v…</span>
       <span class="host-status" title="Premiere bağlantısı">
         <span id="host-dot" class="host-dot"></span>
         <span>PREMIERE</span>
@@ -74,6 +74,11 @@
     <button class="ky-oge" data-tab="kanca">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="5" rx="1.2"/><path d="M5 13h10M7 16h6"/></svg></span>
       <span class="ky-metin"><b>Kanca Başlığı <em class="ky-yeni">YENİ</em></b><i>Shorts açılış yazısı</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
+    <button class="ky-oge" data-tab="podcast">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M5 9.5a5 5 0 0 0 10 0M10 14.5v3M7 17.5h6"/></svg></span>
+      <span class="ky-metin"><b>Podcast <em class="ky-yeni">YENİ</em></b><i>mikrofona göre kamera geçişi</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
 
@@ -143,6 +148,8 @@
   <div id="context-strip" class="context-strip">
     <span id="ctx-text" class="dim">bağlanıyor…</span>
   </div>
+  <!-- Rehber ilerleme çipi: şeridin KARDEŞİ (şerit her yoklamada innerHTML ile yeniden kuruluyor) -->
+  <button type="button" id="onb-chip" class="onb-chip" hidden>Kurulum 0/4</button>
 
   <!-- Güncelleme şeridi: toast 3 saniyede kayboluyordu, kurgu yapan kullanıcı hiç görmüyordu -->
   <div id="update-bar" class="update-bar" hidden>
@@ -157,6 +164,70 @@
 
   <!-- ================= ALTYAZI ================= -->
   <section id="tab-captions" class="tabpane active">
+    <!-- İlk açılış rehberi: "İlk altyazın 2 dakikada". Açıkken #cap-setup motor adımına taşınır (tek kurulum kartı). -->
+    <div id="ilk-adim" class="ilk-adim" hidden>
+      <!-- 0. adım (yalnız taze kurulumda): arayüz dili. İki dilli kalır, çevirmen dokunmaz -->
+      <div id="ia-dil" class="ia-dil" hidden data-i18n-skip>
+        <b>Arayüz dili · Interface language</b>
+        <div class="row-btns">
+          <button type="button" id="ia-dil-tr" class="btn" data-dil="tr">Türkçe</button>
+          <button type="button" id="ia-dil-en" class="btn" data-dil="en">English (beta)</button>
+        </div>
+      </div>
+      <div class="ia-ust">
+        <span class="ia-isaret" aria-hidden="true">2<small>dk</small></span>
+        <span class="ia-baslik-sar">
+          <b id="ilk-adim-baslik">İlk altyazın 2 dakikada</b>
+          <small id="ilk-adim-alt">Dört kısa adım · istediğini atlayabilirsin</small>
+        </span>
+        <span class="ia-sayac" id="ilk-adim-sayac">0/4</span>
+        <button type="button" id="ilk-adim-kapat" class="link-btn ia-kapat" title="Rehberi kapat (Ayarlar > Destek'ten yeniden açılır)">✕</button>
+      </div>
+      <div class="ia-cubuk"><i id="ilk-adim-cubuk"></i></div>
+      <ol class="ia-adimlar">
+        <li id="ia-motor" class="ia-adim" data-adim="motor">
+          <button type="button" class="ia-adim-bas" id="ia-motor-bas" aria-expanded="false" aria-controls="ia-motor-govde"><span class="ia-no">1</span><b>Motoru kur</b><span class="ia-rozet" id="ia-motor-rozet"></span></button>
+          <div class="ia-govde" id="ia-motor-govde">
+            <p class="ia-metin" id="ia-motor-metin">Small modeli (190 MB) iner.</p>
+            <button type="button" id="ia-motor-bulut" class="btn primary" hidden>Ücretsiz anahtarla başla</button>
+            <div class="row-btns ia-ek" id="ia-motor-ek" hidden>
+              <button type="button" id="ia-turbo" class="btn tiny" hidden title="574 MB · Türkçede daha az hata">Daha doğru model (Turbo)</button>
+              <button type="button" id="ia-cublas" class="btn tiny" hidden title="NVIDIA ekran kartıyla 5-15 kat hızlı (646 MB)">GPU hızlandırma (NVIDIA)</button>
+            </div>
+          </div>
+        </li>
+        <li id="ia-ornek" class="ia-adim" data-adim="ornek">
+          <button type="button" class="ia-adim-bas" id="ia-ornek-bas" aria-expanded="false" aria-controls="ia-ornek-govde"><span class="ia-no">2</span><b id="ia-ornek-baslik">Örnekte dene</b><span class="ia-rozet" id="ia-ornek-rozet"></span></button>
+          <div class="ia-govde" id="ia-ornek-govde">
+            <p class="ia-metin" id="ia-ornek-metin">Timeline'da bir klip seç ve Altyazı oluştur'a bas.</p>
+            <button type="button" id="ia-ornek-dene" class="btn primary">Örnekte dene</button>
+          </div>
+        </li>
+        <li id="ia-stil" class="ia-adim" data-adim="stil">
+          <button type="button" class="ia-adim-bas" id="ia-stil-bas" aria-expanded="false" aria-controls="ia-stil-govde"><span class="ia-no">3</span><b>Stilini seç</b><span class="ia-rozet" id="ia-stil-rozet"></span></button>
+          <div class="ia-govde" id="ia-stil-govde">
+            <p class="ia-metin" id="ia-stil-metin">Creator Punch'ı kendi altyazınla önizle.</p>
+            <div class="row-btns" id="ia-stil-dugmeler">
+              <button type="button" id="ia-stil-goster" class="btn primary">Stilleri gör</button>
+              <button type="button" id="ia-stil-koy" class="btn">Timeline'a koy <span class="pro-inline">PRO</span></button>
+              <button type="button" id="ia-stil-tamam" class="btn ghost">Tamam</button>
+            </div>
+          </div>
+        </li>
+        <li id="ia-ai" class="ia-adim" data-adim="ai">
+          <button type="button" class="ia-adim-bas" id="ia-ai-bas" aria-expanded="false" aria-controls="ia-ai-govde"><span class="ia-no">4</span><b>Yapay zekâyı aç</b><em class="ia-etiket">ücretsiz · 1 dk</em><span class="ia-rozet" id="ia-ai-rozet"></span></button>
+          <div class="ia-govde" id="ia-ai-govde">
+            <p class="ia-metin" id="ia-ai-metin">AI metin kontrolü, bölüm başlıkları, paylaşım metni ve kanca önerileri ücretsiz bir Groq anahtarıyla çalışır. Çeviri, viral anlar ve B-roll önerileri Pro'da aynı anahtarla açılır.</p>
+            <button type="button" id="ia-ai-ac" class="btn primary">Anahtarı bağla</button>
+          </div>
+        </li>
+      </ol>
+      <div class="ia-alt">
+        <span id="ia-durum" class="inline-status"></span>
+        <button type="button" id="ilk-adim-atla" class="link-btn" title="Bu adımı atla">Atla</button>
+      </div>
+    </div>
+
     <div id="cap-setup" class="setup-note" hidden>
       <p id="cap-setup-text"><strong>Suflo Altyazı Motoru kurulmalı.</strong> Tek motor; doğru modeli, GPU'yu ve güvenli yedeği kendisi yönetir. Yerel kullanımda hesap, anahtar veya internet gerekmez.</p>
       <button id="cap-local-install" class="btn primary" style="width:100%">Yerel motoru indir & kur</button>
@@ -169,6 +240,7 @@
         <input id="cap-key-input" type="password" placeholder="gsk_… anahtarını yapıştır">
         <button id="cap-key-save" class="btn">Kaydet</button>
       </div>
+      <p class="hint onb-onay" style="margin:6px 0 0">Bulut motorunda altyazı için sesin Groq'a gönderilir. Yerel motorda ses bilgisayarından çıkmaz.</p>
     </div>
 
     <div id="cap-main">
@@ -188,7 +260,7 @@
         <select id="cap-preset" hidden aria-hidden="true">
           <option value="" selected>Özel</option>
           <option value="mrbeast">Creator Punch</option>
-          <option value="capcut">CapCut Clean</option>
+          <option value="capcut">Clean Pill</option>
           <option value="saas">SaaS Glass</option>
           <option value="viral">Viral Vurgu</option>
           <option value="reels">Reels</option>
@@ -217,6 +289,7 @@
               <option value="it">Italiano</option>
               <option value="">Otomatik</option>
             </select>
+            <p class="hint" id="cap-lang-glif" hidden>Bu alfabe stilli altyazı katmanının yazı tiplerinde olmayabilir; altyazı izi ve SRT her zaman çalışır.</p>
           </div>
           <div class="field">
             <label for="cap-maxlen">Satır uzunluğu</label>
@@ -259,6 +332,10 @@
         <div class="card-title">Stil <span class="card-title-meta">PREMIERE ŞABLONLARI</span> <span class="pro-inline">PRO</span></div>
         <p class="stil-aciklama">17 gerçek altyazı şablonundan birini seç. Suflo, sekansına uygun 9:16, 16:9 veya 1:1 dosyasını arka planda otomatik kullanır.</p>
 
+        <div class="stil-ust-satir">
+          <span class="marka-kiti-cip" id="cap-marka-kiti-cip" hidden title="Ayarlar › Marka Kiti: yazı tipin, renklerin ve logon her Suflo Stiline uygulanır">Marka kiti açık</span>
+          <span class="stil-kredi" id="cap-stil-kredi" hidden title="Bu stil paylaşılan bir koddan geldi"><span>Stil:</span> <b id="cap-stil-kredi-ad" data-i18n-skip></b></span>
+        </div>
         <div class="stil-grid" id="cap-stil-grid"></div>
 
         <div class="field stil-yogunluk" hidden aria-hidden="true">
@@ -285,10 +362,18 @@
           </label>
         </div>
 
-        <details class="ince-ayar" hidden aria-hidden="true">
-          <summary>İnce ayar <span class="ia-not">animasyon · yazı tipi · renk · konum</span></summary>
+        <!-- Paylaşılan stil kodu: herkes yapıştırıp önizleyebilir (timeline'a eklemek Pro) -->
+        <div class="stil-kod-satir" id="cap-stil-kod-sar">
+          <input id="cap-stil-kod" type="text" spellcheck="false" autocomplete="off" maxlength="2048" placeholder="Stil kodu yapıştır (SFL1.…)" aria-label="Stil kodu">
+          <button type="button" id="cap-stil-kod-uygula" class="btn tiny">Uygula</button>
+          <button type="button" id="cap-stil-ice" class="btn tiny ghost" title=".suflo-stil dosyasından stil al">.suflo-stil içe aktar</button>
+        </div>
 
-        <div class="field" style="margin-top:10px">
+        <!-- Yalnız Suflo Stili seçiliyken görünür (captions.js inceAyarDurumu); MOGRT stillerinde gizli -->
+        <details class="ince-ayar" id="cap-ince-ayar">
+          <summary>İnce ayar <span class="ia-not">yazı tipi · renk · konum · paylaş</span></summary>
+
+        <div class="field ia-eski" style="margin-top:10px">
           <label for="cap-animasyon">Animasyon</label>
           <select id="cap-animasyon">
             <optgroup label="Her modda">
@@ -297,8 +382,8 @@
               <option value="slide">Alttan kayma</option>
             </optgroup>
             <optgroup label="Kelime zamanlı (Satır uzunluğu → Karaoke)">
-              <option value="mrbeast" data-pro="1">Creator Punch (MrBeast tarzı)</option>
-              <option value="capcut" data-pro="1">CapCut Clean</option>
+              <option value="mrbeast" data-pro="1">Creator Punch</option>
+              <option value="capcut" data-pro="1">Clean Pill</option>
               <option value="saas" data-pro="1">SaaS Glass</option>
               <option value="viral" data-pro="1">Viral aktif kelime</option>
               <option value="vurgu" data-pro="1">Aktif kelime vurgusu</option>
@@ -330,7 +415,7 @@
                 <option value="Lora">Lora</option>
                 <option value="Montserrat">Montserrat</option>
               </optgroup>
-              <optgroup label="Sistem">
+              <optgroup label="Sistem" id="cap-font-sistem">
                 <option value="Arial" selected>Arial</option>
                 <option value="Impact">Impact</option>
                 <option value="Verdana">Verdana</option>
@@ -381,13 +466,28 @@
           </div>
         </div>
 
+        <label class="check-label" id="cap-guvenli-yerlesim-sar" hidden title="9:16'da yazıyı TikTok, Reels ve Shorts'un sağdaki ikon sütunundan uzak tutar">
+          <input id="cap-guvenli-yerlesim" type="checkbox"> Platform arayüzünden kaçın
+        </label>
+
         <div class="field field-row" style="align-items:center; justify-content:space-between">
-          <label class="switch" title="Yazının arkasına yarı saydam kutu koy">
-            <input id="cap-kutu" type="checkbox">
-            <i></i>
-            <span>Arka plan kutusu</span>
-          </label>
+          <span class="ia-eski">
+            <label class="switch" title="Yazının arkasına yarı saydam kutu koy">
+              <input id="cap-kutu" type="checkbox">
+              <i></i>
+              <span>Arka plan kutusu</span>
+            </label>
+          </span>
+          <button type="button" id="cap-ia-varsayilan" class="link-btn" title="Stilin kendi ayarlarına dön (Marka Kiti açıksa kitle birlikte)">Varsayılana dön</button>
           <button type="button" id="cap-preset-save" class="link-btn" title="Bu ayarları şablonum olarak kaydet">★ Şablonum yap</button>
+        </div>
+
+        <div class="ia-paylas">
+          <input id="cap-stil-yazar" type="text" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Adın (isteğe bağlı, kodda görünür)" aria-label="Paylaşımda görünecek adın">
+          <div class="row-btns">
+            <button type="button" id="cap-stil-paylas" class="btn tiny" title="Stil kodunu ve suflo.app/stil bağlantısını panoya kopyalar">Stili paylaş</button>
+            <button type="button" id="cap-stil-disa" class="btn tiny ghost" title="Stili masaüstüne .suflo-stil dosyası olarak kaydeder">.suflo-stil dışa aktar</button>
+          </div>
         </div>
 
         </details>
@@ -414,6 +514,14 @@
         <span>Suflo işini görüyorsa GitHub'da bir yıldız bırakır mısın? Duyulmamıza yarıyor.</span>
         <button id="star-go" class="link-btn">Yıldız ver</button>
         <button id="star-close" class="link-btn dim" title="Kapat">✕</button>
+      </div>
+      <!-- Davet şeridi: ilk kesim, ilk Shorts ya da 5. başarılı uygulamadan sonra (js/davet.js işin yapıldığı yere taşır). Modal değil. -->
+      <div id="davet-bar" class="star-bar davet-bar" hidden role="status">
+        <span id="davet-bar-metin">Suflo işini kolaylaştırdıysa bir arkadaşına önerir misin?</span>
+        <button id="davet-bar-paylas" class="link-btn" type="button" title="Davet metnini kopyalar">Paylaş</button>
+        <button id="davet-bar-secenek" class="link-btn" type="button" title="Ayarlar › Davet et, kazan">Seçenekler</button>
+        <button id="davet-bar-asla" class="link-btn dim" type="button">Bir daha gösterme</button>
+        <button id="davet-bar-kapat" class="link-btn dim" type="button" title="Kapat" aria-label="Kapat">✕</button>
       </div>
 
       <div id="cap-result" class="caption-editor" hidden>
@@ -502,7 +610,7 @@
         </div>
 
         <div class="row">
-          <select id="cap-translate" class="grow" title="Altyazıyı başka dile çevir (ücretsiz; bulut motoru anahtarı gerekir)">
+          <select id="cap-translate" class="grow" title="Altyazıyı başka dile çevir (Pro, 3 ücretsiz deneme hakkı; bulut motoru anahtarı gerekir)">
             <option value="" selected>Çeviri — hedef dil seç</option>
             <option value="en">English'e çevir</option>
             <option value="tr">Türkçe'ye çevir</option>
@@ -568,6 +676,9 @@
             <div id="cap-yt-basliklar" class="yt-basliklar"></div>
             <label for="cap-yt-aciklama">Açıklama</label>
             <textarea id="cap-yt-aciklama" rows="7"></textarea>
+            <label class="check-label yt-kredi" title="İsteğe bağlı: açıklamanın en sonuna kısa bir kredi satırı ekler. Platform sınırını aşarsa önce bu satır çıkar.">
+              <input id="cap-yt-kredi" type="checkbox"> Sona Suflo kredi satırı ekle (suflo.app)
+            </label>
             <div class="row"><span id="cap-yt-not" class="hint" style="margin:0"></span><button id="cap-yt-kopyala" class="btn tiny" type="button" style="margin-left:auto">Açıklamayı kopyala</button></div>
             <div id="cap-yt-etiket-sar" style="display:grid;gap:6px">
               <label for="cap-yt-etiket">Etiketler</label>
@@ -579,16 +690,56 @@
 
         <details class="adv" id="cap-vr-box">
           <summary>Viral anlar (Shorts) <span class="tc-yeni">YENİ</span></summary>
-          <p class="hint" style="margin:6px 0 8px">Uzun videodan kancayla başlayan, tek başına anlaşılan 15–60 sn'lik anları bulur. Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez.</p>
+          <p class="hint" style="margin:6px 0 8px">Uzun videodan kancayla başlayan, tek başına anlaşılan anları bulur; her ana nedenini açıklayan 0–100 puan ve 3 kanca başlığı verir. Altyazı metni bulut yedeğine (Groq/OpenAI) gönderilir; ses gönderilmez.</p>
+          <div class="vr-ayarlar">
+            <label class="vr-alan">Tür
+              <select id="cap-vr-tur" title="Videonun türü: yapay zekâ anları buna göre seçer ve puanlar">
+                <option value="genel" selected>Genel</option>
+                <option value="podcast">Podcast</option>
+                <option value="egitim">Eğitim</option>
+                <option value="komedi">Komedi</option>
+                <option value="motivasyon">Motivasyon</option>
+                <option value="inceleme">Ürün inceleme</option>
+                <option value="roportaj">Röportaj</option>
+                <option value="oyun">Oyun</option>
+              </select>
+            </label>
+            <label class="vr-alan">Adet
+              <select id="cap-vr-adet" title="Kaç an bulunsun">
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5" selected>5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+              </select>
+            </label>
+            <label class="vr-alan">Süre
+              <select id="cap-vr-sure" title="Klip süresi">
+                <option value="15-35">Kısa (15–35 sn)</option>
+                <option value="20-60" selected>Standart (20–60 sn)</option>
+                <option value="30-90">Uzun (30–90 sn · Reels/YouTube)</option>
+              </select>
+            </label>
+            <input id="cap-vr-odak" class="vr-odak" type="text" maxlength="120" placeholder="Ne arıyorsun? (isteğe bağlı)" title="Örneğin: fiyat tartışması, komik anlar, en iyi tavsiye. Yapay zekâ bu anları öne alır.">
+          </div>
           <div class="row">
             <button id="cap-vr-bul" class="btn primary" type="button">Viral anları bul</button>
-            <select id="cap-vr-sure" class="grow" title="Klip süresi">
-              <option value="15-35">Kısa (15–35 sn)</option>
-              <option value="20-60" selected>Standart (20–60 sn)</option>
-              <option value="30-90">Uzun (30–90 sn · Reels/YouTube)</option>
-            </select>
           </div>
           <div id="cap-vr-durum" class="inline-status"></div>
+          <div class="vr-liste-ust" id="cap-vr-liste-ust" hidden>
+            <select id="cap-vr-sira" class="slim" title="Sıralama">
+              <option value="puan" selected>Puana göre</option>
+              <option value="zaman">Zamana göre</option>
+            </select>
+            <label class="check-label" title="Yalnız 60 ve üstü puan alan anları göster (hiçbiri yoksa en iyi 2 an kalır)">
+              <input id="cap-vr-min" type="checkbox"> Yalnız ≥60
+            </label>
+            <span id="cap-vr-bilgi" class="vr-bilgi"></span>
+          </div>
+          <p class="hint vr-not" id="cap-vr-not" hidden>Puanlar yapay zekâ tahminidir; izlenme garantisi değildir.</p>
           <div id="cap-vr-liste" class="vr-liste"></div>
           <div class="row" id="cap-vr-aksiyon" hidden>
             <button id="cap-vr-shorts" class="btn tiny primary" type="button" title="Her an için ayrı bir sekans oluşturur (Suflo Shorts kutusu); orijinal sekansa dokunmaz">Shorts sekansları oluştur</button>
@@ -598,6 +749,52 @@
             <button id="cap-vr-marker" class="btn tiny" type="button">Marker olarak ekle</button>
             <button id="cap-vr-kopyala" class="btn tiny" type="button" style="margin-left:auto">Listeyi kopyala</button>
           </div>
+          <details class="adv vr-paket" id="cap-paket" hidden>
+            <summary>Shorts Paketi <span class="tc-yeni">PRO</span></summary>
+            <p class="hint" style="margin:6px 0 8px">"Pakete al" işaretli anlardan tek tıkla bitmiş Shorts: 9:16 sekans, markalı altyazı, kanca başlığı, ilerleme çubuğu, kapanış çağrısı, logo ve paylaşım metinleri. Her parça ayrı katmandır; istediğini silip değiştirebilirsin.</p>
+            <label class="vr-alan paket-stil-alan">Altyazı stili
+              <select id="cap-paket-stil" title="Paketteki altyazıların Suflo Stili (MOGRT stilleri pakette kullanılamaz)"></select>
+            </label>
+            <p class="hint paket-not" id="cap-paket-mogrt-not" hidden>Seçili MOGRT stili pakette kullanılamaz: her altyazı satırı ayrı Premiere çağrısı ister. Pakette buradaki Suflo Stili kullanılır.</p>
+            <div class="paket-secenekler">
+              <label class="check-label" title="Shorts transkriptinden, seçili stilde şeffaf altyazı katmanı (emojiler çizilemediği için atılır)"><input id="cap-paket-altyazi" type="checkbox" checked> Altyazı</label>
+              <label class="check-label" title="Kartta seçtiğin kanca başlığı ilk saniyelerde (stil ve süre Kanca Başlığı sekmesinden ya da Marka Kiti'nden)"><input id="cap-paket-kanca" type="checkbox" checked> Kanca</label>
+              <div class="paket-satir">
+                <label class="check-label" title="Videonun ne kadarının kaldığını gösteren çubuk"><input id="cap-paket-ilerleme" type="checkbox" checked> İlerleme çubuğu</label>
+                <select id="cap-paket-ilerleme-konum" class="slim" title="Çubuğun yeri (altta platform arayüzü kapatabilir; üst önerilir)">
+                  <option value="ust" selected>Üstte</option>
+                  <option value="alt">Altta</option>
+                </select>
+                <select id="cap-paket-ilerleme-stil" class="slim" title="Çubuğun görünümü">
+                  <option value="ince" selected>İnce</option>
+                  <option value="kalin">Kalın</option>
+                  <option value="kapsul">Kapsül</option>
+                </select>
+                <input id="cap-paket-ilerleme-renk" type="color" value="#8b7cf6" title="Çubuğun rengi">
+              </div>
+              <div class="paket-satir">
+                <label class="check-label" title="Son saniyelerde kapanış çağrısı (8 sn'den kısa Shorts'ta eklenmez)"><input id="cap-paket-cta" type="checkbox" checked> Kapanış çağrısı (CTA)</label>
+                <select id="cap-paket-cta-metin" class="slim" title="CTA metni (hazır metinler videonun dilinde; hazırı olmayan dillerde İngilizce)">
+                  <option value="takip" selected>Takip et</option>
+                  <option value="part2">Part 2 profilde</option>
+                  <option value="link">Link açıklamada</option>
+                  <option value="ozel">Kendi metnim…</option>
+                </select>
+                <input id="cap-paket-cta-ozel" class="vr-odak" type="text" maxlength="40" placeholder="En çok 40 karakter" hidden>
+              </div>
+              <label class="check-label" title="Ayarlar › Marka Kiti'ndeki köşe logosu"><input id="cap-paket-logo" type="checkbox" checked> Logo <span class="hint paket-not" id="cap-paket-logo-not" hidden>(Marka Kiti'nde logo yok)</span></label>
+              <label class="check-label" title="Her Short için YouTube Shorts, TikTok ve Reels başlığı, açıklaması ve hashtag'leri (AI anahtarı yoksa yapay zekâsız yedek). Klasöre .txt ve .csv olarak yazılır."><input id="cap-paket-metin" type="checkbox" checked> Paylaşım paketi</label>
+              <label class="check-label" title="Açıklamaların sonuna isteğe bağlı 'Altyazılar: Suflo · suflo.app' satırı"><input id="cap-paket-kredi" type="checkbox"> Kredi satırı</label>
+            </div>
+            <div class="row">
+              <button id="cap-paket-olustur" class="btn primary" type="button" disabled>Paketi oluştur (0 Shorts)</button>
+              <button id="cap-paket-iptal" class="btn tiny" type="button" hidden title="Sıradaki adımdan önce durur; bitenler kalır">İptal</button>
+              <button id="cap-paket-devam" class="btn tiny" type="button" hidden title="Yarım kalan paketi kaldığı yerden sürdür (biten adımlar tekrarlanmaz)">Devam et</button>
+              <button id="cap-paket-klasor" class="btn tiny" type="button" hidden style="margin-left:auto">Klasörü aç</button>
+            </div>
+            <div id="cap-paket-durum" class="inline-status" role="status" aria-live="polite"></div>
+            <div id="cap-paket-liste" class="paket-liste"></div>
+          </details>
         </details>
 
         <details class="adv" id="cap-br-box">
@@ -759,11 +956,27 @@
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h6"/><path d="m13 13 4 4m0-4-4 4"/></svg>
         <b>Konuşmadan kes</b><span class="tc-yeni">YENİ</span>
       </div>
-      <p class="ci-p">Klibi yazıya döker; <b>ııı, eee</b> gibi dolgu seslerini, <b>tekrarları</b> ve uzun duraksamaları işaretler. Bir kelimeye tıkla — videodan da çıkar. Kopya sekansta uygulanır.</p>
+      <p class="ci-p">Klibi yazıya döker; <b>ııı, eee</b> gibi dolgu seslerini, <b>tekrarları</b>, baştan alınan cümleleri ve uzun duraksamaları işaretler. Bir kelimeye tıkla — videodan da çıkar. Kopya sekansta uygulanır.</p>
       <div class="tc-opts">
         <label class="switch"><input id="tc-filler" type="checkbox" checked><i></i><span>Dolgu sesleri (ııı, eee, hmm)</span></label>
         <label class="switch"><input id="tc-repeat" type="checkbox" checked><i></i><span>Tekrarlar (ben ben)</span></label>
+        <label class="switch"><input id="tc-retake" type="checkbox" checked><i></i><span>Tekrar çekimler (baştan alınan cümleler, yarım başlangıçlar)</span></label>
         <label class="switch"><input id="tc-soft" type="checkbox"><i></i><span>Ara sözler (şey, yani, işte)</span></label>
+        <div class="row">
+          <label>Tekrar çekimde</label>
+          <select id="tc-policy">
+            <option value="son" selected>Son çekimi tut</option>
+            <option value="uzun">En uzunu tut</option>
+            <option value="akici">En akıcıyı tut</option>
+          </select>
+        </div>
+        <div class="tc-ai-row">
+          <label class="switch" id="tc-ai-lbl" title="Yalnız metin gönderilir (ücretsiz Groq anahtarı). Farklı sözcüklerle tekrar edilen cümleleri de bulmaya çalışır; sonuçlar elle onayına bırakılır."><input id="tc-ai" type="checkbox"><i></i><span>AI ile benzer anlatımları da grupla</span></label>
+        </div>
+        <details class="tc-script-box">
+          <summary>Senaryoyu yapıştır (isteğe bağlı)</summary>
+          <textarea id="tc-script" rows="4" placeholder="Okuduğun metni buraya yapıştır. Her cümle için senaryoya en yakın çekim tutulur; senaryoda olmayan konuşmalar listelenir ama kendiliğinden kesilmez."></textarea>
+        </details>
         <div class="row">
           <label>Duraksama</label>
           <select id="tc-pause">
@@ -782,13 +995,17 @@
       <div id="tc-progress" class="progress-line" hidden><i></i></div>
       <div id="tc-status" class="inline-status"></div>
       <div id="tc-result" hidden>
+        <div id="tc-cache" class="tc-cache hint" hidden>önbellekten · <button id="tc-retranscribe" class="link-btn" type="button">Yeniden yazıya dök</button></div>
         <div class="result-head">
           <span id="tc-summary" class="dim"></span>
           <button id="tc-dinle" class="btn tiny" type="button" title="Kesimler uygulanmış gibi sesi dinle (timeline değişmez)">▶ Dinle</button>
+          <button id="tc-dinle-cuts" class="btn tiny" type="button" title="Yalnız kesilecek parçaları art arda dinle (en fazla 300 kesim)">Yalnız kesilecekleri dinle</button>
           <button id="tc-reset" class="btn tiny" type="button">Önerilere dön</button>
         </div>
         <audio id="tc-audio" class="tc-audio" controls hidden></audio>
-        <div class="tc-legend"><span class="tc-w filler">dolgu</span><span class="tc-w repeat">tekrar</span><span class="tc-w soft">ara söz</span><span class="tc-w cut">elle silinen</span></div>
+        <div class="tc-review-head" id="tc-review-head" hidden><b>İnceleme</b><span class="dim">Kesilecek her parça tek satırda. İşareti kaldırırsan o parça kalır.</span></div>
+        <div id="tc-review" class="tc-review"></div>
+        <div class="tc-legend"><span class="tc-w filler">dolgu</span><span class="tc-w repeat">tekrar</span><span class="tc-w retake">tekrar çekim</span><span class="tc-w falsestart">yarım başlangıç</span><span class="tc-w retake-kept">tutulan çekim</span><span class="tc-w soft">ara söz</span><span class="tc-w cut">elle silinen</span></div>
         <div id="tc-words" class="tc-words" title="Kelimeye tıkla: kes / geri al"></div>
         <div class="seg-ctl full" id="tc-target">
           <button class="on" data-m="clone">Kopya sekansta<em>önerilen</em></button>
@@ -1147,7 +1364,7 @@
         <span>Shorts / Reels açılışına animasyonlu başlık kartı. Önizleme ücretsiz; timeline'a eklemek Pro.</span>
       </div>
       <div class="pt-proof" aria-label="Pro özeti">
-        <i><strong>3</strong> stil</i><i><strong>0</strong> MOGRT</i><i><strong>1×</strong> lisans</i>
+        <i><strong>5</strong> stil</i><i><strong>0</strong> MOGRT</i><i><strong>1×</strong> lisans</i>
       </div>
       <button class="btn primary pro-ac-btn" data-pro-feature="overlay">Pro'yu aç</button>
     </div>
@@ -1198,8 +1415,96 @@
       <button id="kanca-onizle" class="btn" type="button">Önizle</button>
       <button id="kanca-ekle" class="btn primary grow" type="button">Playhead'e ekle</button>
     </div>
+    <p class="hint" id="kanca-kit-not" hidden>Marka kiti açık: yazı tipi ve renkler kitten gelir (Ayarlar › Marka Kiti).</p>
     <div id="kanca-durum" class="inline-status"></div>
     <img id="kanca-resim" class="kanca-resim" alt="Kanca başlığı önizlemesi" hidden>
+  </section>
+
+  <!-- ================= Podcast Modu ================= -->
+  <section id="tab-podcast" class="tabpane">
+    <div class="pro-tanitim" id="podcast-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Konuşan kişiye kendiliğinden geç</b>
+        <span>Her mikrofonu dinler, kim konuşuyorsa onun kamerasını açar. Analiz ve önizleme ücretsiz; timeline'a uygulamak Pro.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>2–4</strong> konuşmacı</i><i><strong>0</strong> eklenti</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="multicam">Pro'yu aç</button>
+    </div>
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M5 9.5a5 5 0 0 0 10 0M10 14.5v3M7 17.5h6"/></svg>
+        <b>Podcast Modu</b>
+      </div>
+      <p class="ci-p">Kim konuşuyorsa onun kamerası açılır. <b>Her konuşmacının kendi mikrofonu olmalı</b> (ayrı ses katmanı) ve kameralar senkronlu, her biri kendi video katmanında olmalı. Suflo kamera katmanlarını yalnız geçiş anlarında keser ve parçaları açıp kapatır; ses ve diğer katmanlara dokunmaz.</p>
+    </div>
+
+    <div class="pc-adim"><b>1</b> Sekans</div>
+    <button id="pc-tara" class="btn" type="button">Sekansı tara</button>
+    <div id="pc-esleme" class="pc-esleme" hidden></div>
+    <div id="pc-esleme-alt" hidden>
+      <div class="row">
+        <button id="pc-ekle" class="btn tiny" type="button">+ Konuşmacı</button>
+        <button id="pc-cikar" class="btn tiny" type="button">− Konuşmacı</button>
+      </div>
+      <div class="row">
+        <label for="pc-genis">Geniş plan (isteğe bağlı)</label>
+        <select id="pc-genis"><option value="-1">Yok</option></select>
+      </div>
+      <p class="hint">Multicam kaynak sekansı desteklenmez (açıyı değiştirecek API yok). Tek mikrofona karışık kayıt için konuşmacı ayırma sonraki sürümde.</p>
+
+      <div class="pc-adim"><b>2</b> Analiz</div>
+      <button id="pc-analiz" class="btn primary" type="button">Analiz et</button>
+      <div id="pc-izler" class="pc-izler"></div>
+    </div>
+
+    <div id="pc-sonuc" hidden>
+      <div class="pc-adim"><b>3</b> Ritim</div>
+      <div class="row">
+        <label for="pc-min">En kısa plan</label>
+        <input id="pc-min" type="range" min="1" max="6" step="0.5" value="2">
+        <span id="pc-min-val" class="mono">2 sn</span>
+      </div>
+      <div class="row">
+        <label for="pc-max">En uzun plan</label>
+        <input id="pc-max" type="range" min="6" max="40" step="1" value="12">
+        <span id="pc-max-val" class="mono">12 sn</span>
+      </div>
+      <div class="row">
+        <label for="pc-hassas">Hassasiyet</label>
+        <input id="pc-hassas" type="range" min="3" max="12" step="1" value="6">
+        <span id="pc-hassas-val" class="mono">6 dB</span>
+      </div>
+      <div class="row">
+        <label for="pc-hold">Bekleme</label>
+        <input id="pc-hold" type="range" min="100" max="1500" step="100" value="400">
+        <span id="pc-hold-val" class="mono">400 ms</span>
+      </div>
+      <label class="switch"><input id="pc-capraz" type="checkbox" checked><i></i><span>Çapraz konuşmada geniş plan</span></label>
+      <div class="row">
+        <label class="switch"><input id="pc-periyot-ac" type="checkbox"><i></i><span>Her N saniyede geniş plan</span></label>
+        <input id="pc-periyot" type="number" min="8" max="120" step="1" value="20" aria-label="Geniş plan aralığı (sn)">
+      </div>
+      <p class="hint">En uzun planı aşan tek kişilik konuşmaya ve çapraz konuşmaya yalnız geniş plan seçiliyse geçilir.</p>
+      <div id="pc-onizleme" class="pc-onizleme" aria-label="Kamera planı önizlemesi"></div>
+      <div id="pc-ozet" class="dim pc-ozet"></div>
+      <div id="pc-uyari" class="inline-status warn" hidden></div>
+
+      <div class="pc-adim"><b>4</b> Uygula</div>
+      <div class="seg-ctl full" id="pc-hedef">
+        <button class="on" data-m="clone" type="button">Kopyada uygula<em>önerilen</em></button>
+        <button data-m="here" type="button">Bu sekansta</button>
+      </div>
+      <button id="pc-uygula" class="btn primary big" type="button">Kamera geçişlerini uygula</button>
+
+      <div class="pc-adim"><b>5</b> Konuşmacı renkleri</div>
+      <label class="switch"><input id="pc-renk" type="checkbox"><i></i><span>Altyazıda her konuşmacı kendi renginde</span></label>
+      <p class="hint">Renkler yukarıdaki tablodan. Suflo Stilleri katmanında ve ASS dışa aktarımında geçerli; Premiere'in kendi altyazı katmanı (SRT) renk taşıyamaz.</p>
+    </div>
+    <div id="pc-progress" class="progress-line" hidden><i></i></div>
+    <div id="pc-durum" class="inline-status" role="status" aria-live="polite"></div>
   </section>
 
   <!-- ================= SFX ================= -->
@@ -1409,6 +1714,80 @@
       </details>
     </div>
 
+    <div class="set-group marka-kiti-kart" id="grp-marka-kiti">
+      <div class="set-title">Marka Kiti <span class="dim" style="font-weight:400">yazı tipi · renkler · logo</span></div>
+      <p class="hint" style="margin-bottom:8px">Yazı tipin, renklerin ve logon her Suflo Stiline ve kanca başlığına kendiliğinden uygulanır. Düzenlemek ve önizlemek ücretsiz; timeline'a eklemek Pro.</p>
+      <label class="switch">
+        <input id="mk-acik" type="checkbox">
+        <i></i>
+        <span>Marka kitini her stile ve kanca başlığına uygula</span>
+      </label>
+      <div class="field-grid" style="margin-top:8px">
+        <div class="field">
+          <label for="mk-font">Yazı tipi</label>
+          <select id="mk-font">
+            <option value="">Stilin kendi yazı tipi</option>
+            <option value="Anton">Anton</option>
+            <option value="Archivo Black">Archivo Black</option>
+            <option value="Bebas Neue">Bebas Neue</option>
+            <option value="Bungee">Bungee</option>
+            <option value="Lora">Lora</option>
+            <option value="Montserrat">Montserrat</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="mk-konum">Konum</label>
+          <select id="mk-konum">
+            <option value="">Stilin kendi konumu</option>
+            <option value="2">Alt</option>
+            <option value="5">Orta</option>
+            <option value="8">Üst</option>
+            <option value="1">Alt sol</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="switch">
+          <input id="mk-renk-acik" type="checkbox">
+          <i></i>
+          <span>Marka renklerini kullan</span>
+        </label>
+        <div class="renk-satir" style="margin-top:6px">
+          <label class="renk-kutu" title="Yazı rengi"><input type="color" id="mk-renk" value="#ffffff"><span>Yazı</span></label>
+          <label class="renk-kutu" title="Kontur (çevre çizgisi) rengi"><input type="color" id="mk-renk-kontur" value="#000000"><span>Kontur</span></label>
+          <label class="renk-kutu" title="Vurgulanan kelimenin rengi"><input type="color" id="mk-renk-vurgu" value="#8b7cf6"><span>Vurgu</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Logo</label>
+        <div class="row">
+          <span id="mk-logo-ad" class="dim mk-logo-ad" data-i18n-skip></span>
+          <button id="mk-logo-sec" class="btn tiny" type="button" title="PNG (saydam önerilir) ya da JPG">Logo seç</button>
+          <button id="mk-logo-kaldir" class="btn tiny ghost" type="button" hidden>Kaldır</button>
+        </div>
+        <div class="field-grid" style="margin-top:6px">
+          <div class="field">
+            <label for="mk-logo-kose">Köşe</label>
+            <select id="mk-logo-kose">
+              <option value="ss">Sol üst</option>
+              <option value="su">Sağ üst</option>
+              <option value="au">Sol alt</option>
+              <option value="as">Sağ alt</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="mk-logo-oran">Logo boyutu <b id="mk-logo-oran-deger" data-i18n-skip>%14</b></label>
+            <input id="mk-logo-oran" type="range" min="8" max="25" step="1" value="14">
+          </div>
+        </div>
+        <p class="hint">Logo stilli altyazı katmanında görünür: tüm sekansta sonuna kadar, In/Out'ta Out noktasına kadar, klipte altyazılar boyunca. Deneme katmanında sağ üstte filigran olduğu için logo aynı yükseklikteki sol köşeye geçer.</p>
+      </div>
+      <div class="row-btns">
+        <button id="mk-doldur" class="btn" type="button" title="Altyazı sekmesindeki yazı tipi, renk ve konumu kite alır">Şimdiki ayarlardan doldur</button>
+      </div>
+      <span id="mk-durum" class="inline-status"></span>
+    </div>
+
     <div class="set-group">
       <div class="set-title">ffmpeg</div>
       <div class="row">
@@ -1431,6 +1810,20 @@
       <div class="row" style="margin-top:8px">
         <button id="set-glossary-save" class="btn">Sözlüğü kaydet</button>
         <span id="set-glossary-info" class="dim" style="font-size:11px"></span>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <div class="set-title">Ek dolgu sözcükleri <span class="dim" style="font-weight:400">Konuşmadan kes için (Pro)</span></div>
+      <p class="hint" style="margin-bottom:8px">Senin konuşmana özgü dolguları ekle. Her satıra bir dolgu, başına dil kodu: <b>tr: yani yani</b>. Dil kodu yoksa her dilde geçerli olur.</p>
+      <textarea id="set-fillers" class="glossary" rows="3" placeholder="tr: yani yani&#10;tr: hani şey&#10;en: you know what"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="set-fillers-save" class="btn">Dolguları kaydet</button>
+        <span id="set-fillers-info" class="dim" style="font-size:11px"></span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="set-tcache-clear" class="btn ghost">Transkript önbelleğini temizle</button>
+        <span id="set-tcache-info" class="dim" style="font-size:11px"></span>
       </div>
     </div>
 
@@ -1478,6 +1871,7 @@
         <div class="library-health-actions doctor-actions">
           <button id="set-doctor-fix-all" class="btn" hidden>Güvenli sorunları düzelt</button>
           <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
+          <a href="#" id="set-doctor-panel-rehberi" class="link-btn" title="Premiere 25.6+ ve 2026: Window > Extensions (Legacy) > Suflo">Panel menüde görünmüyor mu? →</a>
         </div>
       <div id="set-library-health-result" class="library-health" role="status" aria-live="polite" hidden></div>
     </div>
@@ -1547,19 +1941,30 @@
               <li>Transkripsiyon (99 dil, internetsiz)</li>
               <li>Altyazı editörü + taslak kurtarma</li>
               <li>SRT · VTT · TXT + caption track</li>
+              <li>Kelime kelime altyazı · terim sözlüğü</li>
               <li>Emoji seçici, GPU hızlandırma</li>
             </ul>
           </div>
           <div>
-            <b class="pro-renk">Pro — 749 TL, tek sefer</b>
+            <b class="pro-renk" id="set-pro-fiyat">Pro — 749 TL, tek sefer</b>
             <ul>
-              <li>Otomatik sessizlik kesimi · Ritim marker</li>
-              <li>Hazır yazı animasyonu (MOGRT) kütüphanesi</li>
-              <li>SFX kütüphanesi · Smart SFX 2.0 önerileri</li>
-              <li>Toplu klip · Çeviri · Sözlük · stilli ASS</li>
+              <li>Otomatik kesim · Konuşmadan kes (dolgu, tekrar, tekrar çekim)</li>
+              <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
+              <li>Suflo Stilleri timeline'da · Kanca başlığı</li>
+              <li>Sesi iyileştir · Otomatik zoom · Ritim</li>
+              <li>12 dile çeviri · Toplu klip · stilli ASS</li>
+              <li>Marka Kiti logosu ve stilleri timeline'da</li>
+              <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
+              <li>MOGRT, SFX, preset ve Motion BG kütüphaneleri</li>
               <li>Ömür boyu güncelleme</li>
             </ul>
           </div>
+        </div>
+        <!-- Pro'yu dene: ucretsiz kullanicinin kalan deneme haklari (app.js reflectPro doldurur) -->
+        <div class="pro-deneme" id="pro-deneme-kart" hidden>
+          <b>Pro'yu dene: her araca 3 hak</b>
+          <p class="hint">Pro araçlarını kendi videonda dene. Hak yalnız işlem başarıyla bitince düşer ve süresi dolmaz. Deneme hakkıyla eklenen stilli altyazı ve kanca başlığında küçük bir suflo.app filigranı olur; Pro'yu alınca temiz yeniden oluşturabilirsin.</p>
+          <ul id="pro-deneme-liste" class="pro-deneme-liste"></ul>
         </div>
         <p class="hint" style="margin-bottom:8px">Tek seferlik lisans, abonelik yok, ömür boyu.</p>
         <div class="row">
@@ -1575,8 +1980,69 @@
       <div id="pro-active-card" hidden>
         <p class="hint" style="margin-bottom:8px">Suflo Pro aktif ✓ <span id="pro-email" class="dim"></span></p>
         <p class="hint" id="pro-recheck" hidden>Çevrimdışı doğrulama süresi doldu — internete bağlanınca kendiliğinden yenilenir.</p>
+        <!-- Etkinleştirmeden hemen sonra bir kez (js/davet.js): yanıt isteğe bağlı, Geç'e basılabilir -->
+        <div class="pro-kaynak" id="pro-kaynak" hidden>
+          <b>Bizi nereden duydun?</b>
+          <div class="pro-kaynak-secenek">
+            <button type="button" class="btn tiny" data-kaynak="youtube">YouTube</button>
+            <button type="button" class="btn tiny" data-kaynak="instagram">Instagram</button>
+            <button type="button" class="btn tiny" data-kaynak="tiktok">TikTok</button>
+            <button type="button" class="btn tiny" data-kaynak="arkadas">Bir arkadaşım</button>
+            <button type="button" class="btn tiny" data-kaynak="kod">Davet kodu</button>
+            <button type="button" class="btn tiny" data-kaynak="google">Google</button>
+            <button type="button" class="btn tiny" data-kaynak="diger">Diğer</button>
+            <button type="button" class="link-btn dim" id="pro-kaynak-atla">Geç</button>
+          </div>
+        </div>
+        <!-- Satin alma sonrasi: deneme ciktilarini filigransiz yeniden olustur (app.js doldurur) -->
+        <div class="pro-temiz" id="pro-temiz-kart" hidden>
+          <b>Deneme çıktılarını temiz yeniden oluştur</b>
+          <p class="hint">Deneme hakkıyla eklediğin stilli altyazı ve kanca başlıklarında küçük bir suflo.app filigranı var. Suflo her birini filigransız yeniden üretir ve projedeki deneme dosyasını temiz olanla değiştirir: timeline'da taşıdığın, kırptığın ya da böldüğün klipler olduğu gibi kalır. Önce o sekansı Premiere'de aç.</p>
+          <div id="pro-temiz-liste" class="pro-temiz-liste"></div>
+          <div id="pro-temiz-durum" class="inline-status"></div>
+        </div>
         <button id="pro-deactivate" class="btn">Bu makinede devre dışı bırak</button>
       </div>
+    </div>
+
+    <!-- Davet et, kazan (js/davet.js): Pro sahibine kişisel indirim kodu, herkese paylaşım bağlantısı -->
+    <div class="set-group davet-kart" id="grp-davet">
+      <div class="set-title">Davet et, kazan</div>
+      <div id="davet-kodlu" hidden>
+        <p class="hint">Arkadaşların bu kodla Suflo Pro'yu indirimli alır. Davetlerin biriktikçe ödül paketleri açılır ve Pro içerik bulutuyla kendiliğinden iner.</p>
+        <div class="davet-kod-satir">
+          <code id="davet-kod" class="davet-kod" title="Davet kodun">SFL······</code>
+          <button id="davet-kopyala" class="btn primary" type="button">Kopyala</button>
+        </div>
+        <div class="davet-ilerleme" id="davet-ilerleme" role="img" aria-label="Davet ilerlemesi">
+          <div class="davet-ilerleme-ust"><b id="davet-ilerleme-metin">0/1 davet</b><span id="davet-odul" class="dim"></span></div>
+          <div class="davet-cubuk"><i id="davet-bar-dolu"></i></div>
+          <p class="hint davet-sayim-not">Satın alımlar iade süresi geçince, 14 gün sonra sayılır; sayı birkaç saatte bir güncellenir.</p>
+        </div>
+      </div>
+      <div id="davet-serbest">
+        <p class="hint" id="davet-serbest-not">Davet ödülleri ve kişisel indirim kodu Pro sahiplerine özel. Bu bağlantıyla Suflo'yu yine de paylaşabilirsin: yalnız kimden geldiğini gösterir, kişisel bilgi taşımaz.</p>
+        <div class="row">
+          <input id="davet-link" type="text" readonly spellcheck="false" aria-label="Paylaşım bağlantın">
+          <button id="davet-paylas" class="btn primary" type="button">Suflo'yu paylaş</button>
+        </div>
+      </div>
+      <div class="davet-kanallar">
+        <button id="davet-wa" class="btn tiny" type="button" title="WhatsApp'ta paylaş">WhatsApp</button>
+        <button id="davet-x" class="btn tiny" type="button" title="X'te paylaş">X</button>
+        <button id="davet-ig" class="btn tiny" type="button" title="Instagram'ın paylaşım bağlantısı yok: metni kopyalar, hikâyene ya da DM'e yapıştırırsın">Instagram</button>
+        <button id="davet-story" class="btn tiny" type="button" hidden title="1080×1920 Story kartı: PNG olarak masaüstüne kaydedilir">Story kartı</button>
+      </div>
+      <details class="adv davet-girilen-sar" id="davet-girilen-sar">
+        <summary>Arkadaşından davet kodu aldın mı?</summary>
+        <p class="hint" style="margin:6px 0 8px">Kodu bir kez kaydet: Suflo Pro'yu panelden alırken ödeme sayfasına kendiliğinden eklenir. İndirim ödeme sayfasında onaylanır.</p>
+        <div class="row">
+          <input id="davet-girilen" type="text" placeholder="SFLXXXXXX" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Davet kodu">
+          <button id="davet-girilen-kaydet" class="btn" type="button">Kaydet</button>
+        </div>
+      </details>
+      <div id="davet-durum" class="inline-status"></div>
+      <p class="hint"><a href="#" id="davet-ortaklik">İçerik üreticisi misin? Ortaklık programı →</a></p>
     </div>
 
     <div class="set-group">
@@ -1585,7 +2051,16 @@
       <div class="row-btns">
         <button id="set-report" class="btn primary">Sorun bildir</button>
         <button id="set-copy-log" class="btn">Günlüğü kopyala</button>
+        <button id="set-onb-ac" class="btn" type="button" title="İlk altyazı rehberini Altyazı sekmesinin üstünde yeniden aç">Kurulum rehberini aç</button>
       </div>
+      <div class="row" style="margin-top:10px">
+        <label for="set-ui-lang">Arayüz dili</label>
+        <select id="set-ui-lang" data-i18n-skip>
+          <option value="tr">Türkçe</option>
+          <option value="en">English (beta)</option>
+        </select>
+      </div>
+      <p class="hint" id="set-ui-lang-ipucu">English (beta): Premiere'deki bin ve marker adları (Suflo Altyazi, Suflo Shorts) aynı kalır. Bir iş sürerken dil değiştirilemez.</p>
     </div>
 
     <div class="set-group">
@@ -1600,7 +2075,7 @@
 
     <div class="set-group">
       <div class="set-title">Hakkında</div>
-      <p class="dim">Suflo <span id="hakkinda-ver">v1.7</span> — Premiere için ücretsiz altyazı paneli.<br>Türkçe ve Azerice dahil 99 dil · abonelik yok, kredi yok, hesap yok.<br>MIT · sametcreates</p>
+      <p class="dim">Suflo <span id="hakkinda-ver">v…</span> — Premiere için altyazı ve kurgu paneli; altyazı çekirdeği ücretsiz ve açık kaynak.<br>Türkçe ve Azerice dahil 99 dil · abonelik yok, kredi yok, hesap yok.<br>MIT · sametcreates</p>
     </div>
   </section>
 
@@ -1609,18 +2084,55 @@
 
   <div id="toasts" class="toasts"></div>
 
+  <!-- Yapay zekâ anahtarı sihirbazı (rehberin 4. adımı ve AI düğmelerinin "anahtar gerekli" çipi) -->
+  <div id="onb-anahtar" class="onb-modal-arka" hidden role="dialog" aria-modal="true" aria-labelledby="onb-anahtar-baslik">
+    <div class="onb-modal">
+      <button type="button" id="onb-anahtar-kapat" class="onb-modal-x" aria-label="Kapat">✕</button>
+      <span class="onb-modal-ust">ÜCRETSİZ · 1 DAKİKA</span>
+      <b id="onb-anahtar-baslik">Yapay zekâyı aç</b>
+      <p class="hint" id="onb-anahtar-neden">AI metin kontrolü, bölüm başlıkları, paylaşım metni ve kanca önerileri ücretsiz bir Groq anahtarıyla çalışır. Çeviri, viral anlar ve B-roll önerileri Pro'da aynı anahtarla açılır.</p>
+      <p class="hint onb-onay" id="onb-anahtar-onay" hidden>Bulut motorunda altyazı çıkarmak için sesin Groq'a gider. Yerel motoru sonra kurarsan ses bilgisayarından çıkmaz.</p>
+      <ol class="onb-modal-adimlar">
+        <li>
+          <button type="button" id="onb-anahtar-al" class="btn primary">Ücretsiz anahtar al</button>
+          <small>Groq'ta giriş yap, "Create API Key"e bas, anahtarı kopyala.</small>
+        </li>
+        <li>
+          <div class="row">
+            <input id="onb-anahtar-girdi" type="password" placeholder="gsk_… anahtarını yapıştır" autocomplete="off" spellcheck="false">
+            <button type="button" id="onb-anahtar-pano" class="btn">Panodan al</button>
+          </div>
+        </li>
+      </ol>
+      <button type="button" id="onb-anahtar-kaydet" class="btn primary big">Doğrula ve kaydet</button>
+      <div id="onb-anahtar-durum" class="inline-status"></div>
+      <p class="hint onb-gizlilik">Anahtar yalnız bu bilgisayarda, Suflo ayarlarında saklanır. Metin özellikleri (çeviri, AI metin kontrolü, başlıklar) Groq'a yalnız altyazı metnini gönderir.</p>
+    </div>
+  </div>
+
   <script src="js/CSInterface.js"></script>
+  <script src="js/pricing.js"></script>
+  <script src="i18n/en.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/bridge.js"></script>
+  <script src="js/deneme.js"></script>
   <script src="js/pro.js"></script>
   <script src="js/pro-sync.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/caption-quality.js"></script>
   <script src="js/caption-text.js"></script>
+  <script src="js/diller.js"></script>
   <script src="js/auto-emoji.js"></script>
+  <script src="js/style-share.js"></script>
+  <script src="js/marka-kiti.js"></script>
   <script src="js/style-engine.js"></script>
+  <script src="js/filigran.js"></script>
+  <script src="js/overlay-render.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/emoji-picker.js"></script>
   <script src="js/textcut.js"></script>
+  <script src="js/retakes.js"></script>
+  <script src="js/transcript-cache.js"></script>
   <script src="js/dinle.js"></script>
   <script src="js/audio-clean.js"></script>
   <script src="js/ses.js"></script>
@@ -1630,6 +2142,7 @@
   <script src="js/highlights.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
+  <script src="js/referral-core.js"></script>
   <script src="js/youtube-meta.js"></script>
   <script src="js/bolumler.js"></script>
   <script src="js/gecisler.js"></script>
@@ -1639,6 +2152,12 @@
   <script src="js/broll-ui.js"></script>
   <script src="js/hook-title.js"></script>
   <script src="js/kanca.js"></script>
+  <script src="js/shorts-ekler.js"></script>
+  <script src="js/shorts-paket-plan.js"></script>
+  <script src="js/shorts-paket.js"></script>
+  <script src="js/multicam.js"></script>
+  <script src="js/multicam-ui.js"></script>
+  <script src="js/marka-kiti-ui.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>
@@ -1648,6 +2167,9 @@
   <script src="js/motionbg.js"></script>
   <script src="js/emoji-assets.js"></script>
   <script src="js/library-health.js"></script>
+  <script src="js/onboarding-steps.js"></script>
+  <script src="js/onboarding.js"></script>
+  <script src="js/davet.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

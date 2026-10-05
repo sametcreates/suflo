@@ -41,9 +41,11 @@ function satirNo(src, idx) { return src.slice(0, idx).split("\n").length; }
 // tumu: true → harf içeren HER metin (Türkçe sezgisi yerine); kapsamda "keep" listesi düşülür
 function extractHtml(src, tumu) {
   var out = [];
-  var temiz = src.replace(/<!--[\s\S]*?-->|<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi, function (m) {
+  // Açılış etiketi tırnaklı öznitelikleri bütün okur: placeholder="a => b" içindeki ">"
+  // etiketi erken kapatıp sonraki tüm tırnakların eşini kaydırmasın
+  var temiz = src.replace(/<!--[\s\S]*?-->|<(script|style|textarea)\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?<\/\1>/gi, function (m) {
     // satır numaraları korunsun; textarea'nın kendi açılış etiketini (placeholder) bırak
-    var t = /^<textarea/i.test(m) ? m.match(/^<textarea\b[^>]*>/i)[0] : "";
+    var t = /^<textarea/i.test(m) ? m.match(/^<textarea\b(?:[^>"']|"[^"]*"|'[^']*')*>/i)[0] : "";
     return t + m.slice(t.length).replace(/[^\n]/g, " ");
   });
   var re = /<(?:[^>"']|"[^"]*"|'[^']*')*>/g, m, son = 0;
@@ -54,7 +56,7 @@ function extractHtml(src, tumu) {
   while ((m = re.exec(temiz))) {
     if (m.index > son) metin(temiz.slice(son, m.index), son);
     son = m.index + m[0].length;
-    var ar = /\s(title|placeholder|aria-label|alt|data-tip)\s*=\s*("([^"]*)"|'([^']*)')/gi, a;
+    var ar = /\s(title|placeholder|aria-label|alt|data-tip|label)\s*=\s*("([^"]*)"|'([^']*)')/gi, a;
     while ((a = ar.exec(m[0]))) {
       var v = decode(a[3] !== undefined ? a[3] : a[4]).replace(/\s+/g, " ").trim();
       if (tumu ? /[A-Za-z\u00C0-\u024F]{2}/.test(v) : turkceMi(v)) out.push({ text: v, kind: "attr:" + a[1].toLowerCase(), line: satirNo(src, m.index) });
@@ -72,7 +74,8 @@ var YOKSAY = ["Iıı, eee, hmm, şey, yani... ıı, ee.", "Ee, ıı, hmm, yəni,
   "Euh, heu, hum... en fait, du coup, bah.",
   "Français", // dil seçicide dilin kendi adı
   "Pro altyazi vitrini", "Pro animasyon vitrini", // iç katalog adı (hata günlüğü)
-  "{}. {} ({}–{}, {} sn){}"]; // panoya kopyalanan liste
+  "{}. {} ({}–{}, {} sn){}", // panoya kopyalanan liste
+  " (kalan kisim da tekrarla bitiyor)"]; // yalnız günlük (K.log birleştirmesi)
 var REGEX_ONCESI = /^(return|typeof|case|in|of|do|else|void|throw|new|delete|instanceof|yield|await)$/;
 function tokenize(src) {
   var toks = [], i = 0, n = src.length, onceki = "", sonKelime = "";
@@ -256,6 +259,46 @@ function extractJs(src, file) {
   return out;
 }
 
+/* ---------------- jsx/host.jsx ---------------- */
+// Premiere tarafının panelde gösterilen hata metinleri: KS_err(...) ve KS_errKod(kod, ...).
+// Argüman + ile kuruluyorsa metin parçaları kalır, değişkenler {} olur.
+// Sonuç: [{ text, template, line, file }]
+function extractHost(src, file) {
+  var toks = tokenize(src), out = [];
+  for (var k = 0; k + 1 < toks.length; k++) {
+    var t = toks[k];
+    if (t.t !== "id" || (t.v !== "KS_err" && t.v !== "KS_errKod")) continue;
+    if (!(toks[k + 1].t === "p" && toks[k + 1].v === "(")) continue;
+    if (toks[k - 1] && toks[k - 1].t === "id" && toks[k - 1].v === "function") continue;   // tanımın kendisi
+    // argümanların sonu
+    var d = 0, j = k + 1, bas = k + 2;
+    for (; j < toks.length; j++) {
+      if (toks[j].t !== "p") continue;
+      if (toks[j].v === "(" || toks[j].v === "[" || toks[j].v === "{") d++;
+      else if (toks[j].v === ")" || toks[j].v === "]" || toks[j].v === "}") { d--; if (!d) break; }
+      else if (toks[j].v === "," && d === 1 && t.v === "KS_errKod" && bas === k + 2) bas = j + 1;
+    }
+    if (t.v === "KS_errKod" && bas === k + 2) continue;
+    // + ile ayrılmış üst düzey işlenenler
+    var parcalar = [], ilk = bas, dd = 0;
+    for (var q = bas; q <= j; q++) {
+      var x = toks[q];
+      var son = q === j;
+      if (!son && x.t === "p" && (x.v === "(" || x.v === "[")) dd++;
+      if (!son && x.t === "p" && (x.v === ")" || x.v === "]")) dd--;
+      if (son || (x.t === "p" && x.v === "+" && dd === 0)) {
+        var bitis = q - 1;
+        if (bitis >= ilk) parcalar.push(bitis === ilk && toks[ilk].t === "str" ? { lit: toks[ilk].v } : { lit: null });
+        ilk = q + 1;
+      }
+    }
+    if (!parcalar.some(function (p) { return p.lit !== null && /[A-Za-z]{2}/.test(p.lit); })) continue;   // KS_err(e): yalnız değişken
+    var duz = parcalar.map(function (p) { return p.lit === null ? "{}" : p.lit; }).join("");
+    out.push({ text: duz, template: parcalar, line: satirNo(src, t.s), file: file });
+  }
+  return out;
+}
+
 function ornekler(sablon) {
   var degerler = ["3", "Video", "12.5"];
   return degerler.map(function (d) {
@@ -315,8 +358,17 @@ function rapor() {
     var ok = tam.some(function (s) { return cevrildi(I, s); }) || cevrildi(I, x.text);
     if (!ok) jEksik.push(x);
   });
+  var hostTum = extractHost(fs.readFileSync(path.join(KOK, "jsx", "host.jsx"), "utf8"), "jsx/host.jsx");
+  var xTekil = {}, xEksik = [], xToplam = 0;
+  hostTum.forEach(function (x) {
+    if (xTekil[x.text]) return;
+    xTekil[x.text] = 1; xToplam++;
+    var ok = ornekler(x.template).some(function (s) { return cevrildi(I, s); }) || cevrildi(I, x.text);
+    if (!ok) xEksik.push(x);
+  });
   return {
     html: { toplam: hToplam, eksik: hEksik, yuzde: hToplam ? 100 * (hToplam - hEksik.length) / hToplam : 100 },
+    host: { toplam: xToplam, eksik: xEksik, yuzde: xToplam ? 100 * (xToplam - xEksik.length) / xToplam : 100 },
     js: { toplam: jToplam, eksik: jEksik, yuzde: jToplam ? 100 * (jToplam - jEksik.length) / jToplam : 100 },
     hepsi: { html: hs, js: jsTum }
   };
@@ -339,9 +391,13 @@ if (require.main === module) {
   yaz("js/*.js kullanıcı metinleri", r.js, function (x) {
     return x.file + ":" + x.line + " " + x.template.map(function (p) { return p.lit === null ? "{…}" : p.lit; }).join("").replace(/\n/g, "\\n").slice(0, 110);
   });
-  var gecti = r.html.yuzde >= ESIK;
-  console.log("\n" + (gecti ? "TAMAM" : "YETERSIZ") + ": index.html kapsamı %" + r.html.yuzde.toFixed(1) + " (eşik %" + ESIK + ")");
+  yaz("jsx/host.jsx hata metinleri (KS_err)", r.host, function (x) {
+    return x.file + ":" + x.line + " " + x.text.replace(/\n/g, "\\n").slice(0, 110);
+  });
+  var gecti = r.html.yuzde >= ESIK && r.host.yuzde >= ESIK;
+  console.log("\n" + (gecti ? "TAMAM" : "YETERSIZ") + ": index.html kapsamı %" + r.html.yuzde.toFixed(1) +
+    ", host.jsx kapsamı %" + r.host.yuzde.toFixed(1) + " (eşik %" + ESIK + ")");
   process.exit(gecti ? 0 : 1);
 }
 
-module.exports = { extractHtml: extractHtml, extractJs: extractJs, tokenize: tokenize, turkceMi: turkceMi, rapor: rapor, ornekler: ornekler };
+module.exports = { extractHtml: extractHtml, extractJs: extractJs, extractHost: extractHost, tokenize: tokenize, turkceMi: turkceMi, rapor: rapor, ornekler: ornekler };

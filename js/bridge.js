@@ -131,6 +131,19 @@ window.K = (function () {
 
   var _settings = null;
   var DEFAULT_EMOJI_CATALOG_URL = "https://assets.suflo.app/emoji/v1/catalog.json";
+  /*
+   * settings.json bu yuklemeden ONCE var miydi? Yoksa taze kurulum: ilk acilis
+   * rehberi ("Ilk altyazin 2 dakikada") tam kartla acilir. Ilk saveSettings dosyayi
+   * olusturdugu icin bu bilgi yalniz ilk okumada guvenilir; burada bir kez saklanir.
+   */
+  var _ayarDosyasiVardi = false;
+  /*
+   * settings.json vardi ama okunamadi/cozulemedi (yarim yazim, elle duzenleme, antivirus
+   * kilidi): bu oturumdaki ilk kayit onu varsayilanlarla EZMESIN. 3.1'de rehber ve davet
+   * acilista kaydettigi icin dosya kullanici hicbir sey yapmadan kaybolurdu. Ilk kayittan
+   * once dosya settings.bozuk-<zaman>.json olarak saklanir; saklanamazsa yazilmaz.
+   */
+  var _okunamayanAyar = "";
 
   function loadSettings() {
     if (_settings) return _settings;
@@ -140,8 +153,13 @@ window.K = (function () {
     };
     try {
       var p = settingsPath();
+      _ayarDosyasiVardi = !!(p && fs.existsSync(p));
       if (p && fs.existsSync(p)) {
-        var disk = JSON.parse(fs.readFileSync(p, "utf8"));
+        _okunamayanAyar = p;
+        // Not Defteri UTF-8'i BOM ile kaydedebilir: JSON.parse BOM'da hata verir
+        var disk = JSON.parse(String(fs.readFileSync(p, "utf8")).replace(/^\uFEFF/, ""));
+        if (!disk || typeof disk !== "object" || Array.isArray(disk)) throw new Error("settings.json nesne degil");
+        _okunamayanAyar = "";
         for (var k in disk) if (disk.hasOwnProperty(k)) _settings[k] = disk[k];
 
         // 2.6.1/2.6.2'de bos kaydedilmis eski deger, yeni Suflo Cloud
@@ -162,12 +180,26 @@ window.K = (function () {
   function saveSettings() {
     try {
       var p = settingsPath();
-      if (p) fs.writeFileSync(p, JSON.stringify(loadSettings(), null, 2), "utf8");
+      var ayar = loadSettings();
+      if (p && _okunamayanAyar === p) {
+        if (fs.existsSync(p)) {
+          var yedek = path.join(path.dirname(p), "settings.bozuk-" + Date.now() + ".json");
+          try { fs.copyFileSync(p, yedek); }
+          catch (eY) { try { log("ayarlar: okunamayan settings.json yedeklenemedi, uzerine yazilmadi"); } catch (eL) {} return false; }
+          try { log("ayarlar: okunamayan settings.json yedeklendi: " + path.basename(yedek)); } catch (eL2) {}
+        }
+        _okunamayanAyar = "";
+      }
+      if (p) fs.writeFileSync(p, JSON.stringify(ayar, null, 2), "utf8");
       return true;
     } catch (e) { return false; }
   }
 
   /* ---------------- Süreç çalıştırma ---------------- */
+
+  // Süren alt süreç sayısı (Whisper, ffmpeg…): arayüz dili iş sürerken değiştirilmez
+  var aktifSurec = 0;
+  function surecSayisi() { return aktifSurec; }
 
   function run(cmd, args, opts) {
     opts = opts || {};
@@ -198,16 +230,19 @@ window.K = (function () {
         return;
       }
       var out = "", err = "", done = false;
+      aktifSurec++;
       var timer = setTimeout(function () {
         if (done) return;
         try { child.kill(); } catch (e) {}
         done = true;
+        aktifSurec = Math.max(0, aktifSurec - 1);
         resolve({ code: -1, stdout: out, stderr: err + "\n[zaman aşımı]" });
       }, opts.timeout || 300000);
 
       function finish(code) {
         if (done) return;
         done = true;
+        aktifSurec = Math.max(0, aktifSurec - 1);
         clearTimeout(timer);
         if (code !== 0) {
           log("run HATA [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kod=" + code + " " +
@@ -433,7 +468,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "3.0.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
+  var VERSION = "3.1.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -1290,6 +1325,8 @@ window.K = (function () {
     libassUyarisi: libassUyarisi,
     settings: loadSettings,
     saveSettings: saveSettings,
+    surecSayisi: surecSayisi,
+    ayarDosyasiVardi: function () { loadSettings(); return _ayarDosyasiVardi; },
     walkAudio: walkAudio,
     isAudio: isAudio,
     walkVisual: walkVisual,

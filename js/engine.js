@@ -322,9 +322,28 @@ window.KEngine = (function () {
 
   /*
    * Tam kurulum: motor derlemesi + model (+ VAD).
-   * opts: { modelId, useGpu, onStatus(msg) }
+   * opts: { modelId, useGpu, onStatus(msg), ffmpegArkada }
+   *   ffmpegArkada: ffmpeg'i motordan ONCE kurma; model inince arka planda baslat.
+   *     Rehberin ilk altyazisi hazir 16 kHz WAV kullanir, ffmpeg beklemez. Donuste
+   *     sonuc.ffmpegIsi (promise | null) arka plan kurulumunu izlemek icindir.
+   *
+   * KILIT: app.js (Ayarlar/kurulum karti/rehber) ve library-health.js (Doctor onarimi)
+   * ayni anda kurulum baslatabiliyor; ikisi ayni .part dosyasina yazip yarisirdi.
+   * Surmekte olan kurulum varken gelen cagri onun sonucunu paylasir.
    */
-  async function install(opts) {
+  var _kurulumIsi = null;
+
+  function install(opts) {
+    if (_kurulumIsi) return _kurulumIsi;
+    var is = kurulumYap(opts);
+    _kurulumIsi = is;
+    is.then(function () { _kurulumIsi = null; }, function () { _kurulumIsi = null; });
+    return is;
+  }
+
+  function kurulumSuruyor() { return !!_kurulumIsi; }
+
+  async function kurulumYap(opts) {
     opts = opts || {};
     var say = opts.onStatus || function () {};
     if (!K.nodeOK) throw new Error("Bu ortamda kurulamaz — Premiere içinde dene.");
@@ -352,7 +371,7 @@ window.KEngine = (function () {
      * denemesinde "ffmpeg bulunamadi" duvarina carpmak, kullanicilarin buyuk
      * cogunlugunun vazgectigi yerdi. Sistemde varsa dokunulmuyor.
      */
-    var ffVar = await K.findFfmpeg(true);
+    var ffVar = opts.ffmpegArkada ? true : await K.findFfmpeg(true);
     if (!ffVar) {
       say("ffmpeg kuruluyor… (ses dönüştürme için gerekli)");
       try {
@@ -439,19 +458,8 @@ window.KEngine = (function () {
       K.saveSettings();
     }
 
-    /* 2) model */
-    var mPath = K.path.join(dir, "models", model.file);
-    var already = installedModels().some(function (m) { return m.id === model.id; });
-    if (!already) {
-      say(model.label + " iniyor… (" + fmtMB(model.sizeMB) + ")");
-      var d3 = await fetchFile(model, mPath, function (f) {
-        say(model.label + " iniyor… %" + Math.round(f * 100) + " (" + fmtMB(model.sizeMB) + ")");
-      }, "model:" + model.id);
-      if (!d3.ok) throw indirmeHatasi(model.label.split(" —")[0], d3, model);
-      if (!(await modelDogrula(model, mPath, say))) {
-        throw new Error(model.label.split(" —")[0] + " indirildi ama doğrulanamadı (bozuk dosya). Tekrar dene.");
-      }
-    }
+    /* 2) model — model basina kilitli indirme (installModel ile ayni is paylasilir) */
+    await installModel(model.id, say);
 
     /* 3) VAD — küçük, sessizlikleri atlayıp hızlandırır */
     if (!vadPath()) {
@@ -503,12 +511,65 @@ window.KEngine = (function () {
     }
 
     cleanEngineParts(dir);
+    var ffmpegHazir = !!(await K.findFfmpeg(true));
+    /*
+     * ffmpegArkada: motor hazir, ilk altyazi ffmpeg'siz baslayabilir; ffmpeg (Windows'ta
+     * 141 MB) simdi arka planda iner. Hata kurulumu bozmaz: kullanici dosyasindan altyazi
+     * alirken convertAudio ayni kilitli isi bekler ya da yeniden dener.
+     */
+    var ffmpegIsi = null;
+    if (opts.ffmpegArkada && !ffmpegHazir) {
+      ffmpegIsi = installFfmpeg(opts.onFfmpeg || function () {}).then(function (yol) {
+        return K.findFfmpeg(true).then(function () { return yol; });
+      }, function (eArk) {
+        K.log("ffmpeg arka plan kurulumu basarisiz: " + (eArk && eArk.message ? eArk.message : eArk));
+        return null;
+      });
+    }
     return {
       model: model,
       build: installedBuild(),
       vad: !!vadPath(),
-      ffmpeg: !!(await K.findFfmpeg(true))
+      ffmpeg: ffmpegHazir,
+      ffmpegIsi: ffmpegIsi
     };
+  }
+
+  /*
+   * Yalniz modeli indir + SHA-256 dogrula. settings.provider'a ve settings.model'e
+   * ASLA dokunmaz: hangi modelin kullanilacagina cagiran karar verir (rehberin
+   * "Daha dogru model" dugmesi, modelGecisi kurali). Model basina kilit: ayni
+   * modeli isteyen ikinci cagri ayni indirmeyi bekler (ayni .part dosyasina iki
+   * yazici olmaz).
+   */
+  var _modelIsleri = {};
+
+  function installModel(id, onStatus) {
+    var model = modelById(id);
+    if (!model) return Promise.reject(new Error("Bilinmeyen model: " + id));
+    if (_modelIsleri[model.id]) return _modelIsleri[model.id];
+    var is = modelKur(model, onStatus || function () {});
+    _modelIsleri[model.id] = is;
+    is.then(function () { delete _modelIsleri[model.id]; }, function () { delete _modelIsleri[model.id]; });
+    return is;
+  }
+
+  async function modelKur(model, say) {
+    if (!K.nodeOK) throw new Error("Bu ortamda kurulamaz — Premiere içinde dene.");
+    var dir = K.whisperDir();
+    K.fs.mkdirSync(K.path.join(dir, "models"), { recursive: true });
+    var mPath = K.path.join(dir, "models", model.file);
+    var already = installedModels().some(function (m) { return m.id === model.id; });
+    if (already) return { model: model, already: true };
+    say(model.label + " iniyor… (" + fmtMB(model.sizeMB) + ")");
+    var d3 = await fetchFile(model, mPath, function (f) {
+      say(model.label + " iniyor… %" + Math.round(f * 100) + " (" + fmtMB(model.sizeMB) + ")");
+    }, "model:" + model.id);
+    if (!d3.ok) throw indirmeHatasi(model.label.split(" —")[0], d3, model);
+    if (!(await modelDogrula(model, mPath, say))) {
+      throw new Error(model.label.split(" —")[0] + " indirildi ama doğrulanamadı (bozuk dosya). Tekrar dene.");
+    }
+    return { model: model, already: false };
   }
 
   /*
@@ -670,12 +731,38 @@ window.KEngine = (function () {
    * AYNI hedefi olusturmaya calisirdi. Ikinci cagri birincinin sonucunu bekler.
    */
   var _ffmpegIsi = null;
+  var _ffmpegDinleyici = [];   // surmekte olan isin ilerlemesini bekleyen her cagiran
+  var _ffmpegSon = "";         // son ilerleme metni: sonradan katilan bos ekranda beklemesin
 
+  /*
+   * Ikinci cagri yalniz sonucu degil ILERLEMEYI de paylasir: rehber ffmpeg'i arkada
+   * baslatip kullanici hemen "Altyazi olustur"a basinca durum satiri "ffmpeg kuruluyor…"
+   * da donup kalmasin, yuzde aksin.
+   */
   function installFfmpeg(onStatus) {
-    if (_ffmpegIsi) return _ffmpegIsi;
-    _ffmpegIsi = ffmpegKur(onStatus);
-    // sonuc ne olursa olsun kilidi birak, ama sonucu cagirana aynen ilet
-    _ffmpegIsi.then(function () { _ffmpegIsi = null; }, function () { _ffmpegIsi = null; });
+    if (!_ffmpegIsi) {
+      var dinleyiciler = [];
+      _ffmpegDinleyici = dinleyiciler;
+      _ffmpegSon = "";
+      if (typeof onStatus === "function") dinleyiciler.push(onStatus);
+      var is = ffmpegKur(function (m) {
+        if (_ffmpegDinleyici === dinleyiciler) _ffmpegSon = m;
+        dinleyiciler.slice().forEach(function (fn) {
+          try { fn(m); } catch (eD) { K.log("ffmpeg ilerleme dinleyicisi: " + (eD && eD.message ? eD.message : eD)); }
+        });
+      });
+      _ffmpegIsi = is;
+      // sonuc ne olursa olsun kilidi birak, ama sonucu cagirana aynen ilet
+      var birak = function () {
+        if (_ffmpegIsi === is) { _ffmpegIsi = null; _ffmpegDinleyici = []; _ffmpegSon = ""; }
+      };
+      is.then(birak, birak);
+      return is;
+    }
+    if (typeof onStatus === "function" && _ffmpegDinleyici.indexOf(onStatus) === -1) {
+      _ffmpegDinleyici.push(onStatus);
+      if (_ffmpegSon) { try { onStatus(_ffmpegSon); } catch (eS) {} }
+    }
     return _ffmpegIsi;
   }
 
@@ -801,6 +888,8 @@ window.KEngine = (function () {
     gpuInfo: gpuInfo,
     installedBuild: installedBuild,
     install: install,
+    installModel: installModel,
+    kurulumSuruyor: kurulumSuruyor,
     buildArgs: buildArgs,
     fmtMB: fmtMB,
     _hfBeklenenOzet: hfBeklenenOzet,

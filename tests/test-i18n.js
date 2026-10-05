@@ -25,7 +25,10 @@ ok("· ile birleşik durum satırı parça parça", T("Hazır: Turbo · GPU hız
 ok("ön ek simge korunur", T("✨ AI ile öner") === "✨ Suggest with AI", T("✨ AI ile öner"));
 ok("bilinmeyen metin aynen döner", T("Bilinmeyen bir şey") === "Bilinmeyen bir şey" && T("röportaj_final.mp4") === "röportaj_final.mp4");
 ok("metin olmayan / boş / yalnız sayı aynen döner", T(null) === null && T("") === "" && T(42) === 42 && T("  12:30  ") === "  12:30  ");
-ok("fiyatlar TRY", T("Otomatik kesimi aç — 749 TL") === "Unlock Auto Cut — 749 TRY");
+var Fiyat = require(path.join(__dirname, "..", "js", "pricing.js"));
+ok("fiyatlar tek kalıptan: SufloPricing.label('en') (USD varyantı yokken TRY)", T("Otomatik kesimi aç — 749 TL") === "Unlock Auto Cut — " + Fiyat.label("en") &&
+  T("749 TL") === Fiyat.label("en") && Fiyat.label("en") === "749 TRY (≈ $19)" && T("Pro — 749 TL, tek sefer") === "Pro — 749 TRY (≈ $19), one-time",
+  T("Otomatik kesimi aç — 749 TL"));
 
 // Sabit nokta: hiçbir İngilizce değer başka bir şeye çevrilmez (gözlemci döngüsü buna dayanır)
 var bozuk = [];
@@ -128,25 +131,196 @@ function depo(ilk) {
   var d = {}; if (ilk) d[I.LS_KEY] = ilk;
   return { getItem: function (k) { return Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null; }, setItem: function (k, v) { d[k] = String(v); }, d: d };
 }
-I._setEnv({ storage: depo(), navigator: { language: "tr-TR" } });
-ok("dil: ayar yok + tr-TR → tr", I.getLang() === "tr");
-I._setEnv({ storage: depo(), navigator: { language: "az-AZ" } });
-ok("dil: ayar yok + az → tr", I.getLang() === "tr");
+// resolveLang matrisi (saf)
+var R = I.resolveLang;
+ok("resolveLang: kayıtlı uiLang her şeyi ezer", R({ stored: "en", legacyLS: "tr", settingsExisted: true, navLang: "tr-TR" }) === "en" &&
+  R({ stored: "tr", legacyLS: "en", settingsExisted: false, navLang: "en-US" }) === "tr");
+ok("resolveLang: eski kurulum + navigator en-US → tr (güncelleyen Türkçe kalır)", R({ stored: null, legacyLS: null, settingsExisted: true, navLang: "en-US" }) === "tr");
+ok("resolveLang: taze kurulum → null (kullanıcıya sor)", R({ settingsExisted: false, navLang: "en-US" }) === null && R({}) === null && R() === null);
+ok("resolveLang: eski localStorage değeri geçerli", R({ legacyLS: "en", settingsExisted: true }) === "en" && R({ legacyLS: "tr", settingsExisted: false }) === "tr");
+ok("resolveLang: geçersiz değerler yok sayılır", R({ stored: "de", legacyLS: "xx", settingsExisted: true }) === "tr");
+ok("detect yalnız öneri: tr/az → tr, diğerleri → en", I.detect("tr-TR") === "tr" && I.detect("az") === "tr" && I.detect("en-US") === "en" && I.detect("de-DE") === "en");
+
+// configure: settings.json (K.settings / K.saveSettings) üzerinden
+function ayarDeposu(ilk, vardi) {
+  var a = ilk || {}, kayit = 0;
+  return { cfg: { load: function () { return a; }, save: function () { kayit++; }, settingsExisted: function () { return vardi; } },
+    a: a, kayit: function () { return kayit; } };
+}
+var ad1 = ayarDeposu({}, true);
 I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
-ok("dil: ayar yok + en-US → en", I.getLang() === "en");
-I._setEnv({ storage: depo(), navigator: { language: "de-DE" } });
-ok("dil: ayar yok + de-DE → en", I.getLang() === "en");
-I._setEnv({ storage: depo("tr"), navigator: { language: "en-US" } });
-ok("dil: kayıtlı 'tr' tarayıcı dilini ezer", I.getLang() === "tr");
-var dp = depo();
-I._setEnv({ storage: dp, navigator: { language: "tr-TR" } });
+I.configure(ad1.cfg);
+ok("dil: eski kurulum + en-US Premiere → tr", I.getLang() === "tr" && !I.needsChoice());
+var ad2 = ayarDeposu({}, false);
+I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
+I.configure(ad2.cfg);
+ok("dil: taze kurulum → seçim istenir, o arada Türkçe", I.needsChoice() && I.getLang() === "tr");
 I.setLang("en");
-ok("dil: setLang kaydeder (suflo.uiLang)", dp.d["suflo.uiLang"] === "en" && I.getLang() === "en" && I.LS_KEY === "suflo.uiLang");
+ok("configure: setLang uiLang'i ayarlara yazar ve kaydeder", ad2.a.uiLang === "en" && ad2.kayit() === 1 && I.getLang() === "en" && !I.needsChoice());
+var dp = depo();
+var ad3 = ayarDeposu({}, true);
+I._setEnv({ storage: dp, navigator: { language: "tr-TR" } });
+I.configure(ad3.cfg);
+I.setLang("en");
+ok("dil: localStorage ayna olarak yazılır (suflo.uiLang)", dp.d["suflo.uiLang"] === "en" && I.LS_KEY === "suflo.uiLang");
+var ad4 = ayarDeposu({}, true);
+I._setEnv({ storage: depo("en"), navigator: { language: "tr-TR" } });
+I.configure(ad4.cfg);
+ok("configure: eski localStorage seçimi ayarlara taşınır", ad4.a.uiLang === "en" && ad4.kayit() === 1 && I.getLang() === "en");
+I._setEnv({ storage: depo(), navigator: { language: "tr-TR" } });
+I.configure(ayarDeposu({ uiLang: "en" }, true).cfg);
 ok("tr(): yalnız dil en iken çevirir", I.tr("Kaydet") === "Save");
 I.setLang("tr");
 ok("tr(): dil tr iken aynen döner", I.tr("Kaydet") === "Kaydet");
-I._setEnv({ storage: { getItem: function () { throw new Error("yasak"); }, setItem: function () { throw new Error("yasak"); } }, navigator: { language: "fr" } });
-ok("dil: depolama hata verirse tarayıcı diline düşer", I.getLang() === "en");
+var patlak = { getItem: function () { throw new Error("yasak"); }, setItem: function () { throw new Error("yasak"); } };
+var atti = false;
+try {
+  I._setEnv({ storage: patlak, navigator: { language: "fr" } });
+  I.configure({ load: function () { throw new Error("okunamadı"); }, save: function () { throw new Error("yazılamadı"); }, settingsExisted: true });
+  I.getLang(); I.needsChoice(); I.setLang("en");
+} catch (eP) { atti = true; }
+ok("dil: depolama/ayar istisnası fırlatmaz", !atti && I.getLang() === "en");
+I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
+ok("dil: yapılandırılmamışken Türkçe (navigator dili seçmez)", I.getLang() === "tr");
+
+/* ---------------- çok satırlı metinler ---------------- */
+I.setDictionary(EN);
+ok("çok satır: bütün anahtar tutmazsa satır satır, \\n korunur (bridge.js 'msg\\nÇözüm: …')",
+  T("Kaydet\nÇözüm: Kapat") === "Save\nFix: Close", JSON.stringify(T("Kaydet\nÇözüm: Kapat")));
+ok("çok satır: iki satır da çevrilir", T("Kaydet\nKapat") === "Save\nClose", JSON.stringify(T("Kaydet\nKapat")));
+ok("çok satır: bütün anahtar eşleşmesi önce gelir", T("Satır\n   uzunluğu") === "Line length");
+ok("çok satır: çevrilmeyen satır aynen kalır", T("Kaydet\nröportaj_final.mp4") === "Save\nröportaj_final.mp4");
+
+/* ---------------- start / revert (sahte belge) ---------------- */
+El.prototype.removeAttribute = function (a) { delete this.attrs[a]; };
+function sahteBelge() {
+  var gozlemciler = [];
+  function MO(fn) { this.fn = fn; this.bagli = false; gozlemciler.push(this); }
+  MO.prototype.observe = function () { this.bagli = true; };
+  MO.prototype.disconnect = function () { this.bagli = false; };
+  var b2 = new El("body", {}, [
+    new El("button", { title: "Geri al (Ctrl+Z)" }, ["Altyazı oluştur"]),
+    new El("p", {}, ["Kaydet"]),
+    new El("div", { id: "cap-segments" }, [new El("span", { title: "Kaydet" }, ["Kaydet"])])
+  ]);
+  var html2 = new El("html", { lang: "tr" }, [b2]);
+  return { window: { document: { body: b2, documentElement: html2, title: "Suflo Ayarlar" }, MutationObserver: MO, SufloI18nEN: EN }, gozlemciler: gozlemciler, body: b2, html: html2 };
+}
+var sb = sahteBelge();
+global.window = sb.window;
+delete require.cache[require.resolve(path.join(__dirname, "..", "js", "i18n.js"))];
+var I2 = require(path.join(__dirname, "..", "js", "i18n.js"));
+delete global.window;
+I2.start();
+ok("start(): documentElement.lang = en (uppercase SETTİNGS olmasın)", sb.html.attrs.lang === "en");
+ok("start(): metin, ipucu ve başlık çevrilir; gözlemci bağlı", sb.body.childNodes[0].childNodes[0].nodeValue === "Generate captions" &&
+  sb.body.childNodes[0].attrs.title === "Undo (Ctrl+Z)" && sb.gozlemciler.length === 1 && sb.gozlemciler[0].bagli && I2.running());
+// gözlemci üstünden sonradan değişen metin de kaydedilir
+var p2 = sb.body.childNodes[1].childNodes[0];
+p2.nodeValue = "Kapat";
+I2._handle([{ type: "characterData", target: p2 }]);
+ok("start(): sonradan değişen metin çevrilir", p2.nodeValue === "Close");
+var kodYazdi = new El("b", {}, ["Hazır"]);
+sb.body.appendChild(kodYazdi);
+I2._handle([{ type: "childList", addedNodes: [kodYazdi] }]);
+var revertSonuc = I2.revert();
+ok("revert(): gözlemci ayrılır", revertSonuc === true && !sb.gozlemciler[0].bagli && !I2.running());
+ok("revert(): her metin ve öznitelik özgün hâline döner", sb.body.childNodes[0].childNodes[0].nodeValue === "Altyazı oluştur" &&
+  sb.body.childNodes[0].attrs.title === "Geri al (Ctrl+Z)" && p2.nodeValue === "Kapat" && kodYazdi.childNodes[0].nodeValue === "Hazır",
+  JSON.stringify(metinler(sb.body)));
+ok("revert(): lang ve başlık geri gelir", sb.html.attrs.lang === "tr" && sb.window.document.title === "Suflo Ayarlar");
+ok("revert(): kullanıcı bölgesine hiç dokunulmadı", sb.body.childNodes[2].childNodes[0].childNodes[0].nodeValue === "Kaydet" &&
+  !sb.body.childNodes[2].childNodes[0].yazim);
+// EN → TR → EN yeniden yüklemesiz
+I2.start();
+ok("revert sonrası yeniden start çalışır", sb.body.childNodes[0].childNodes[0].nodeValue === "Generate captions" && sb.html.attrs.lang === "en");
+var bilgi = [];
+I2.onChange(function (l) { bilgi.push(l); });
+var yuklendi = 0;
+var sonucTR = I2.switchLang("tr", { busy: function () { return true; }, reload: function () { yuklendi++; } });
+ok("switchLang(tr): yeniden yüklemeden geri döner, dinleyiciler haber alır", sonucTR === "tr" && yuklendi === 0 &&
+  sb.body.childNodes[0].childNodes[0].nodeValue === "Altyazı oluştur" && p2.nodeValue === "Kapat" && sb.html.attrs.lang === "tr" &&
+  bilgi.join() === "tr", JSON.stringify(metinler(sb.body)));
+I2.switchLang("en");
+ok("switchLang(en): çevirir", sb.body.childNodes[1].childNodes[0].nodeValue === "Close" && bilgi.join() === "tr,en");
+
+/* ---------------- inceleme düzeltmeleri ---------------- */
+// orig(): önbelleğe alınan arayüz etiketleri (data-temel, eski düğme metni) özgün Türkçeyi okur
+var secenek = new El("option", { "data-pro": "" }, ["Viral aktif kelime"]);
+var dugme = new El("button", {}, ["Güncellemeyi indir"]);
+sb.body.appendChild(secenek); sb.body.appendChild(dugme);
+I2._handle([{ type: "childList", addedNodes: [secenek] }, { type: "childList", addedNodes: [dugme] }]);
+var temel = I2.orig(secenek), eskiEtiket = I2.orig(dugme);
+ok("orig(): İngilizce açıkken özgün Türkçe metni verir", secenek.childNodes[0].nodeValue !== "Viral aktif kelime" &&
+  temel === "Viral aktif kelime" && eskiEtiket === "Güncellemeyi indir", JSON.stringify([secenek.childNodes[0].nodeValue, temel, eskiEtiket]));
+// kod Türkçe temelden " — PRO" ekli metin yazar → gözlemci çevirir → TR'ye dönüşte Türkçe gelir
+secenek.childNodes = []; secenek.appendChild(new Text(temel + " — PRO"));
+I2._handle([{ type: "childList", addedNodes: [secenek.childNodes[0]] }]);
+var pEN = secenek.childNodes[0].nodeValue;
+I2.switchLang("tr");
+ok("EN → TR: Türkçe temelden yazılan Pro ekli seçenek Türkçeye döner", secenek.childNodes[0].nodeValue === "Viral aktif kelime — PRO" &&
+  pEN !== "Viral aktif kelime — PRO", JSON.stringify([pEN, secenek.childNodes[0].nodeValue]));
+ok("orig(): çevrilmemiş düğümde metnin kendisi", I2.orig(dugme) === "Güncellemeyi indir" && I2.orig(new Text("x")) === "x" && I2.orig(null) === "");
+var ipuclu = new El("button", { title: "Kaydet" }, ["a"]);
+I.apply(ipuclu);
+ok("origAttr(): çevrilmiş özniteliğin özgünü", ipuclu.attrs.title === "Save" && I.origAttr(ipuclu, "title") === "Kaydet");
+
+// Kullanıcı kabındaki arayüz adacıkları: boş durum / ipucu / data-i18n-ui çevrilir, dosya adı çevrilmez
+(function () {
+  I.setDictionary(EN);
+  var ad = new El("div", { "class": "sfx-name" }, ["Kapat"]);
+  var sayi = new El("span", { "data-i18n-ui": "" }, ["12 ses"]);
+  var bos = new El("div", { "class": "empty" }, ["Eşleşen ses yok."]);
+  var liste = new El("div", { id: "sfx-list" }, [new El("div", { "class": "sfx-group" }, [new El("b", {}, ["Kaydet"]), sayi]), ad, bos]);
+  var ipucu = new El("p", { "class": "hint" }, ["Aramayla eşleşen emoji bulunamadı."]);
+  var izgara = new El("div", { id: "emoji-assets-grid" }, [ipucu]);
+  I.apply(new El("body", {}, [liste, izgara]));
+  ok("SFX listesi: dosya ve klasör adı çevrilmez", ad.childNodes[0].nodeValue === "Kapat" && liste.childNodes[0].childNodes[0].childNodes[0].nodeValue === "Kaydet");
+  ok("SFX listesi: boş durum ve grup sayısı çevrilir", bos.childNodes[0].nodeValue === "No matching sounds." && sayi.childNodes[0].nodeValue === "12 sounds",
+    JSON.stringify([bos.childNodes[0].nodeValue, sayi.childNodes[0].nodeValue]));
+  ok("Emoji Assets: ipucu satırı çevrilir", ipucu.childNodes[0].nodeValue !== "Aramayla eşleşen emoji bulunamadı.", ipucu.childNodes[0].nodeValue);
+  // gözlemci yolu: sonradan eklenen boş durum
+  var bos2 = new El("div", { "class": "empty" }, ["Eşleşen ses yok."]);
+  liste.appendChild(bos2);
+  I._handle([{ type: "childList", addedNodes: [bos2] }]);
+  ok("gözlemci: kullanıcı kabına eklenen boş durum çevrilir", bos2.childNodes[0].nodeValue === "No matching sounds.");
+})();
+
+// İlk açılış dil sorusu: seçim yapılmadan settings.json yazılsa da sonraki açılışta yine sorulur
+(function () {
+  var a = {};
+  I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
+  I.configure({ load: function () { return a; }, save: function () {}, settingsExisted: false });
+  ok("taze kurulum: uiLangPending işaretlenir", a.uiLangPending === true && I.needsChoice());
+  // ikinci açılış: dosya artık var (davet/rehber kaydetti), bayrak duruyor
+  var a2 = JSON.parse(JSON.stringify(a));
+  I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
+  I.configure({ load: function () { return a2; }, save: function () {}, settingsExisted: true });
+  ok("sonraki açılış: dosya var ama soru açık → yine sorulur", I.needsChoice() && I.getLang() === "tr");
+  I.setLang("en");
+  ok("seçim yapılınca bayrak kalkar", a2.uiLang === "en" && !("uiLangPending" in a2) && !I.needsChoice());
+  var a3 = {};
+  I._setEnv({ storage: depo(), navigator: { language: "en-US" } });
+  I.configure({ load: function () { return a3; }, save: function () {}, settingsExisted: true });
+  ok("eski kurulum: bayrak yazılmaz, Türkçe kalır", !("uiLangPending" in a3) && !I.needsChoice() && I.getLang() === "tr");
+  ok("resolveLang: pending → null, kayıtlı seçim yine önce", R({ pending: true, settingsExisted: true }) === null && R({ stored: "tr", pending: true }) === "tr");
+})();
+
+/* ---------------- performans bütçesi ---------------- */
+(function () {
+  var zoneKids = [], kids = [];
+  for (var i = 0; i < 1000; i++) zoneKids.push(new El("span", { title: "Kaydet " + i }, ["Kaydet"]));
+  var zone = new El("div", { id: "cap-segments" }, zoneKids);
+  for (var j = 0; j < 1000; j++) kids.push(new El("div", { title: j % 2 ? "Kaydet" : "Bilinmeyen ipucu " + j }, [j % 3 ? "Altyazı oluştur" : "Bilinmeyen metin " + j]));
+  var govde = new El("body", {}, kids.concat([zone]));
+  I.setDictionary(EN);
+  var bas = Date.now();
+  I.apply(govde);
+  var sure = Date.now() - bas;
+  var dokunuldu = zoneKids.some(function (k) { return k.yazim || k.childNodes[0].nodeValue !== "Kaydet"; });
+  ok("performans: 3000+ düğüm < 400 ms", sure < 400, sure + " ms");
+  ok("performans: #cap-segments kullanıcı bölgesine dokunulmaz", !dokunuldu);
+})();
 
 /* ---------------- dosyalar ---------------- */
 var YASAK = [/\?\.[A-Za-z_$(\[]/, /\?\?/, /(\|\||&&)=/, /\.replaceAll\s*\(/, /\.at\s*\(\s*-?\d/, /\.(findLast|findLastIndex)\s*\(/, /=>/, /\bconst\b|\blet\b|`/];
@@ -155,6 +329,15 @@ var YASAK = [/\?\.[A-Za-z_$(\[]/, /\?\?/, /(\|\||&&)=/, /\.replaceAll\s*\(/, /\.
   var sorun = src.split("\n").filter(function (s) { return YASAK.some(function (r) { return r.test(s); }); });
   ok(f + ": ES5 / Chromium 74 uyumlu", sorun.length === 0, sorun.slice(0, 2).join(" | "));
 });
+var appKaynak = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
+ok("app.js: Pro ekli seçenek ve stil kartı etiketi özgün Türkçeden, dil değişince yeniden kurulur",
+  /o\.dataset\.temel = uiOzgun\(o\)/.test(appKaynak) && /uiOzgun\(ad\)/.test(appKaynak) &&
+  /SufloI18n\.onChange\(function \(l\) \{[\s\S]{0,200}reflectPro\(\)/.test(appKaynak) && /var eski = uiOzgun\(b\)/.test(appKaynak));
+ok("önbelleğe alınan düğme etiketleri SufloI18n.orig ile okunur (presets, konusma-kes, magiccut)",
+  ["presets.js", "konusma-kes.js", "magiccut.js"].every(function (f) {
+    return /SufloI18n\.orig\(/.test(fs.readFileSync(path.join(__dirname, "..", "js", f), "utf8"));
+  }));
+ok("sfx.js: grup sayısı data-i18n-ui adacığı", /<span data-i18n-ui><\/span>/.test(fs.readFileSync(path.join(__dirname, "..", "js", "sfx.js"), "utf8")));
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 var yok = I.USER_CONTENT_IDS.filter(function (id) { return html.indexOf('id="' + id + '"') === -1; });
 ok("kullanıcı içeriği kapları index.html'de var", yok.length === 0, yok.join(","));
@@ -162,6 +345,13 @@ ok("kullanıcı içeriği kapları index.html'de var", yok.length === 0, yok.joi
 var kapsama = require(path.join(__dirname, "..", "tools", "i18n-coverage.js")).rapor();
 ok("kapsama: index.html >= %98", kapsama.html.yuzde >= 98, kapsama.html.yuzde.toFixed(1) + "% · " + kapsama.html.eksik.map(function (x) { return x.text; }).slice(0, 3).join(" | "));
 ok("kapsama: js metinleri >= %95", kapsama.js.yuzde >= 95, kapsama.js.yuzde.toFixed(1) + "%");
+ok("kapsama: jsx/host.jsx KS_err metinleri >= %95", kapsama.host.toplam >= 50 && kapsama.host.yuzde >= 95,
+  kapsama.host.toplam + " metin · %" + kapsama.host.yuzde.toFixed(1) + " · " + kapsama.host.eksik.map(function (x) { return x.text; }).slice(0, 3).join(" | "));
+I.setDictionary(EN);
+ok("host hataları: birleşik ve cümleli biçimler", T("✕ Aktif sequence yok.") === "✕ No active sequence." &&
+  T("Ses disari alinamadi. 'Secili klip' kapsamini dene.") === "Couldn't export the audio. Try the 'Selected clip' scope." &&
+  T("Preset seçili klibe uygulanamadı. Eksik efekt: Lumetri Color.") === "Couldn't apply the preset to the selected clip. Missing effect: Lumetri Color.",
+  T("Preset seçili klibe uygulanamadı. Eksik efekt: Lumetri Color."));
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

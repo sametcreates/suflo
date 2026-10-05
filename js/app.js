@@ -6,15 +6,28 @@
 window.KApp = (function () {
   "use strict";
 
+  // Tarayıcı penceresi / Premiere iletişim kutusu DOM değil: çevirmen göremez, metin burada çevrilir
+  function uiMetni(s) { return window.SufloI18n ? SufloI18n.tr(s) : s; }
+  // Bir düğümün özgün (Türkçe) metni; önbelleğe alınan arayüz etiketleri bununla okunur
+  function uiOzgun(n) { return window.SufloI18n && SufloI18n.orig ? SufloI18n.orig(n) : (n ? n.textContent || "" : ""); }
+
   function el(id) { return document.getElementById(id); }
 
-  var PRO_CHECKOUT = "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1";
+  // Ödeme bağlantısı js/pricing.js'te: gösterilen fiyatla aynı para birimi (USD varyantı
+  // yokken İngilizce arayüz de TRY ödemesini açar)
+  function arayuzDili() {
+    try { return window.SufloI18n ? SufloI18n.getLang() : "tr"; } catch (e) { return "tr"; }
+  }
   function proCheckoutUrl(feature) {
     var surum = window.K && K.VERSION ? K.VERSION : "unknown";
-    return PRO_CHECKOUT +
-      "?checkout%5Bcustom%5D%5Bsource%5D=suflo_panel" +
-      "&checkout%5Bcustom%5D%5Bfeature%5D=" + encodeURIComponent(String(feature || "pro")) +
-      "&checkout%5Bcustom%5D%5Bapp_version%5D=" + encodeURIComponent(String(surum));
+    // Arkadaşından aldığı davet kodunu kaydettiyse indirim ödeme sayfasına kendiliğinden gelir
+    var kod = window.KDavet && KDavet.odemeKodu ? KDavet.odemeKodu() : "";
+    return SufloPricing.checkoutUrl(arayuzDili(), feature, surum, kod);
+  }
+
+  // Davet şeridi anı: ilk kesim (magiccut.js), ilk Shorts (viral.js), 5. başarılı uygulama (captions.js)
+  function davetAni(olay) {
+    try { if (window.KDavet && KDavet.ani) KDavet.ani(olay); } catch (e) { K.log("davet: " + (e && e.message ? e.message : e)); }
   }
 
   var ctx = { hasSeq: false, sel: null, sequence: "" };
@@ -23,11 +36,21 @@ window.KApp = (function () {
 
   /* ---------------- Toast ---------------- */
 
-  function toast(msg, kind, sure) {
+  // eylem (isteğe bağlı): { metin, fn } — bildirimde tek düğme (ör. "Klasörü aç")
+  function toast(msg, kind, sure, eylem) {
     var box = el("toasts");
     var t = document.createElement("div");
     t.className = "toast" + (kind ? " " + kind : "");
     t.textContent = msg;
+    if (eylem && eylem.metin && typeof eylem.fn === "function") {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn tiny toast-eylem";
+      b.textContent = eylem.metin;
+      b.addEventListener("click", function () { try { eylem.fn(); } catch (e) {} });
+      t.appendChild(document.createTextNode(" "));
+      t.appendChild(b);
+    }
     box.appendChild(t);
     setTimeout(function () {
       t.classList.add("out");
@@ -41,6 +64,8 @@ window.KApp = (function () {
 
   var CLAP_IC = '<svg class="ctx-ic" viewBox="0 0 16 16"><path d="M1.8 6.2 h12.4 v6.4 a1.4 1.4 0 0 1 -1.4 1.4 h-9.6 a1.4 1.4 0 0 1 -1.4-1.4 z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2.2 6.2 L3.4 3.3 L14.2 4.6 L13.4 6.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M6.4 3.7 L5.4 6.2 M9.9 4.1 L8.9 6.2" stroke="currentColor" stroke-width="1.1"/></svg>';
 
+  // Klip ve sekans adı kullanıcı içeriği: İngilizce arayüzde "Giriş.mp4" "Intro.mp4" olmasın
+  // (sel-name span'ı data-i18n-skip taşır)
   function renderContext() {
     var elx = el("ctx-text");
     var dot = el("host-dot");
@@ -59,12 +84,12 @@ window.KApp = (function () {
       var pill = (ctx.selCount > 1)
         ? ctx.selCount + " klip seçili"
         : ctx.sel.dur.toFixed(1) + " sn";
-      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name"></span>' +
+      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name" data-i18n-skip></span>' +
         '<span class="pill live"></span>';
       strip.querySelector(".sel-name").textContent = ctx.sel.name;
       strip.querySelector(".pill").textContent = pill;
     } else {
-      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name"></span>' +
+      strip.innerHTML = CLAP_IC + '<span id="ctx-text" class="sel-name" data-i18n-skip></span>' +
         '<span class="pill">Klip seçilmedi</span>';
       strip.querySelector(".sel-name").textContent = ctx.sequence;
     }
@@ -127,6 +152,13 @@ window.KApp = (function () {
       // Gizli/dock'ta pasif panel Premiere'e gereksiz host komutu gondermesin.
       if (!document.hasFocus || document.hasFocus()) pollContext();
     }, 2500);
+  }
+
+  // Kullanıcı eyleminden sonra (ör. rehber örnek klibi yeni sekansta açtı) bağlamı
+  // beklemeden tazele. Yalnız tıklama işleyicilerinden çağrılır.
+  function pollNow() {
+    if (!contextPollingBasladi) { contextPollingBaslat(); return; }
+    guvenli("bağlam", pollContext);
   }
 
   function contextEtkilesim() {
@@ -264,12 +296,21 @@ window.KApp = (function () {
     sel.value = active ? active.id : (K.settings().model || "turbo");
   }
 
-  async function installLocalWhisper(progressEl) {
-    if (installingLocal) return;
-    if (!K.nodeOK) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return; }
+  /*
+   * opts (isteğe bağlı, rehber): { modelId, useGpu, ffmpegArkada }
+   *   modelId      Ayarlar'daki seçim yerine bu model (rehber: Türkçe için Small)
+   *   useGpu       true/false: GPU kararını zorla (rehber: ilk kurulumda cuBLAS İNMEZ)
+   *   ffmpegArkada ffmpeg motordan sonra arka planda insin (ilk altyazı beklemesin)
+   * Döner: kurulum sonucu (KEngine.install) ya da hata/iptalde null.
+   */
+  async function installLocalWhisper(progressEl, opts) {
+    opts = opts || {};
+    if (installingLocal) return null;
+    if (!K.nodeOK) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return null; }
     installingLocal = true;
     var box = el("set-local-status");
     var kurulumHatasi = null;
+    var sonuc = null;
     // ilerleme metnini yazdığımız öğenin kendi etiketi: iş bitince geri konur,
     // yoksa kurulum kartındaki düğme "Motor iniyor… %62" yazısında donup kalıyor
     var progressEski = progressEl ? progressEl.textContent : null;
@@ -282,10 +323,25 @@ window.KApp = (function () {
     try {
       say("Donanım kontrol ediliyor…");
       var gpu = await KEngine.detectGpu(true);
-      var useGpu = gpu.kind === "cuda" && el("set-gpu") ? el("set-gpu").checked : (gpu.kind === "cuda");
-      var modelId = (el("set-model") && el("set-model").value) || K.settings().model || "turbo";
+      var useGpu = typeof opts.useGpu === "boolean" ? (opts.useGpu && gpu.kind === "cuda")
+        : (gpu.kind === "cuda" && el("set-gpu") ? el("set-gpu").checked : (gpu.kind === "cuda"));
+      var modelId = opts.modelId || (el("set-model") && el("set-model").value) || K.settings().model || "turbo";
 
-      var res = await KEngine.install({ modelId: modelId, useGpu: useGpu, onStatus: say });
+      var res = await KEngine.install({
+        modelId: modelId, useGpu: useGpu, onStatus: say, ffmpegArkada: !!opts.ffmpegArkada,
+        onFfmpeg: function (m) {
+          var fb = el("set-ffmpeg-status");
+          if (fb) { fb.className = "inline-status"; fb.textContent = m; }
+        }
+      });
+      sonuc = res;
+      if (res.ffmpegIsi) {
+        // ffmpeg arka planda iniyor: bittiğinde Ayarlar'daki durum ve kurulum notu tazelensin
+        res.ffmpegIsi.then(function () {
+          checkFfmpeg();
+          KCaptions.refreshSetup();
+        });
+      }
 
       var donanim = res.build === "cuda" ? " · GPU hızlandırmalı"
         : (res.build === "metal" ? " · Metal hızlandırmalı" : " · CPU");
@@ -306,6 +362,7 @@ window.KApp = (function () {
         box.textContent = "✕ " + kurulumHatasi;
       }
     }
+    return sonuc;
   }
 
 
@@ -326,10 +383,13 @@ window.KApp = (function () {
       var rc = el("pro-recheck");
       if (rc) rc.hidden = !s.needsRecheck;
     }
+    denemeListesiniCiz(s);
+    temizKartiniCiz(s);
 
     // Pro'ya kilitli girişler: sekmeler + tekil butonlar
     Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.ky-oge[data-tab="podcast"]'), !s.pro);
     // SFX satirinin kendi ky-kilit rozeti var; ikinci bir ::after rozeti ekleme.
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
     Pro.markLocked(el("cap-translate-go"), !s.pro);
@@ -343,7 +403,9 @@ window.KApp = (function () {
     // listede " — PRO" ekiyle gorunsun: kullanici neyin ucretli oldugunu
     // secmeyi denemeden once gorur
     Array.prototype.forEach.call(document.querySelectorAll("option[data-pro]"), function (o) {
-      if (!o.dataset.temel) o.dataset.temel = o.textContent;
+      // temel her zaman özgün Türkçe metin: İngilizce açılışta önbelleğe İngilizce girerse
+      // EN → TR geçişinde geri dönmez (çeviri katmanı " — PRO" ekli metni kendisi çevirir)
+      if (!o.dataset.temel) o.dataset.temel = uiOzgun(o);
       o.textContent = s.pro ? o.dataset.temel : o.dataset.temel + " — PRO";
     });
     // Stil kartlari ucretsiz kullanicida canli onizlenebilir; ancak her kart
@@ -352,8 +414,8 @@ window.KApp = (function () {
       card.classList.toggle("pro-preview", !s.pro);
       var ad = card.querySelector(".ss-bilgi b");
       var aciklama = card.querySelector(".ss-bilgi i");
-      var etiket = ad ? ad.textContent.trim() : "Stil";
-      if (aciklama && aciklama.textContent.trim()) etiket += " — " + aciklama.textContent.trim();
+      var etiket = ad ? uiOzgun(ad).trim() : "Stil";
+      if (aciklama && uiOzgun(aciklama).trim()) etiket += " — " + uiOzgun(aciklama).trim();
       card.setAttribute("aria-label", etiket + (s.pro ? "" : " · Pro önizleme, timeline çıktısı kilitli"));
     });
 
@@ -363,7 +425,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "kanca-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "kanca-tanitim", "podcast-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -373,6 +435,113 @@ window.KApp = (function () {
     if (window.KPresets && el("preset-grid")) KPresets.render();
     if (window.KSfx && el("sfx-list") && el("sfx-list").children.length) KSfx.tara();
     if (window.KEmojiAssets && el("emoji-assets-grid") && el("emoji-assets-grid").children.length) KEmojiAssets.tara();
+  }
+
+  /* ---------------- Pro'yu dene: kalan haklar + satın alma sonrası temiz yeniden oluşturma ---------------- */
+
+  // Ücretsizde her aracın kalan deneme hakkı ("Otomatik kesim 2/3"); Pro'da gizli
+  function denemeListesiniCiz(s) {
+    var kart = el("pro-deneme-kart"), liste = el("pro-deneme-liste");
+    if (!kart || !liste) return;
+    var d = s.deneme;
+    kart.hidden = !!s.pro || !d || !d.ozellikler;
+    if (kart.hidden) return;
+    liste.innerHTML = "";
+    d.ozellikler.forEach(function (o) {
+      var li = document.createElement("li");
+      if (o.kalan <= 0) li.className = "bitti";
+      var ad = document.createElement("span");
+      ad.textContent = o.ad;
+      var n = document.createElement("b");
+      n.textContent = o.kalan + "/" + o.hak;
+      li.appendChild(ad);
+      li.appendChild(n);
+      liste.appendChild(li);
+    });
+  }
+
+  var temizMesgul = false;
+  function tarihEtiketi(ts) {
+    var t = new Date(Number(ts) || 0);
+    if (!ts || isNaN(t.getTime())) return "";
+    function iki(n) { return (n < 10 ? "0" : "") + n; }
+    return iki(t.getDate()) + "." + iki(t.getMonth() + 1) + " " + iki(t.getHours()) + ":" + iki(t.getMinutes());
+  }
+
+  // Pro'da, deneme hakkıyla üretilmiş (filigranlı) çıktı kaldıysa listele
+  function temizKartiniCiz(s) {
+    var kart = el("pro-temiz-kart"), liste = el("pro-temiz-liste");
+    if (!kart || !liste || !Pro.denemeCiktilari) return;
+    var kayitlar = s.pro ? Pro.denemeCiktilari() : [];
+    kart.hidden = kayitlar.length === 0;
+    if (temizMesgul) return;   // iş sürerken düğmeler yerinde kalsın
+    liste.innerHTML = "";
+    kayitlar.slice().reverse().forEach(function (k) {
+      var satir = document.createElement("div");
+      satir.className = "pro-temiz-satir";
+      var bilgi = document.createElement("span");
+      var tur = document.createElement("b");
+      tur.textContent = k.tur === "kanca" ? "Kanca başlığı" : "Stilli altyazı";
+      bilgi.appendChild(tur);
+      // sekans adı kullanıcı içeriği: arayüz çevirisine girmesin
+      var sekansAdi = document.createElement("span");
+      sekansAdi.setAttribute("data-i18n-skip", "");
+      sekansAdi.textContent = String(k.sekans || k.sequenceId);
+      bilgi.appendChild(document.createTextNode(" · "));
+      bilgi.appendChild(sekansAdi);
+      if (k.ts) bilgi.appendChild(document.createTextNode(" · " + tarihEtiketi(k.ts)));
+      var yap = document.createElement("button");
+      yap.type = "button";
+      yap.className = "btn tiny primary";
+      yap.textContent = "Temiz oluştur";
+      yap.addEventListener("click", function () { denemeyiTemizle(k, yap); });
+      var cikar = document.createElement("button");
+      cikar.type = "button";
+      cikar.className = "btn tiny";
+      cikar.textContent = "Listeden çıkar";
+      cikar.title = "Bu çıktıyı yeniden oluşturmayacaksan listeden kaldırır (timeline'a dokunmaz)";
+      cikar.addEventListener("click", function () { if (!temizMesgul) Pro.denemeCiktisiSil(k.path); });
+      satir.appendChild(bilgi);
+      satir.appendChild(yap);
+      satir.appendChild(cikar);
+      liste.appendChild(satir);
+    });
+  }
+
+  async function denemeyiTemizle(k, btn) {
+    if (temizMesgul || !window.SufloOverlayRender) return;
+    if (!Pro.isPro()) { Pro.gate("overlay"); return; }
+    var durum = el("pro-temiz-durum");
+    function yaz(m, c) { if (durum) { durum.textContent = m || ""; durum.className = "inline-status" + (c ? " " + c : ""); } }
+    temizMesgul = true;
+    btn.disabled = true;
+    try {
+      var r = await SufloOverlayRender.temizYenidenOlustur(K, k, { durum: function (m) { yaz(m); } });
+      // elle: deneme klibi düzenlenmiş ve yerinde değiştirilemedi; timeline'a dokunulmadı, kayıt listede kalır
+      if (!r.ok) { yaz(r.sekansAc || r.elle ? r.hata : "✕ " + r.hata, r.sekansAc || r.elle ? "warn" : "bad"); return; }
+      Pro.denemeCiktisiSil(k.path);
+      var son = SufloOverlayRender.sonucMesaji(r);
+      // uyarı satırı kartta kalsın (bildirim kaybolur; içinde dosya yolu olabilir)
+      yaz(son.tur === "warn" ? son.metin : "", son.tur === "warn" ? "warn" : "");
+      toast(son.metin, son.tur, 9000);
+    } catch (e) {
+      yaz("✕ " + K.hataYardimi(e), "bad");
+    } finally {
+      temizMesgul = false;
+      btn.disabled = false;
+      reflectPro();
+    }
+  }
+
+  // Tanıtım kartından kurulan deneme: aracın asıl düğmesinin adını söyle ve onu göster
+  function denemeyeYonlendir(feature) {
+    var ip = window.SufloDeneme && SufloDeneme.tanitimIpucu ? SufloDeneme.tanitimIpucu(feature) : null;
+    if (!ip) return;
+    toast(ip.mesaj, "good", 7000);
+    var hedef = ip.hedef ? el(ip.hedef) : null;
+    if (!hedef) return;
+    try { hedef.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { try { hedef.scrollIntoView(); } catch (e2) {} }
+    if (!hedef.disabled && hedef.tagName === "BUTTON") { try { hedef.focus({ preventScroll: true }); } catch (e3) {} }
   }
 
   function initPro() {
@@ -388,6 +557,14 @@ window.KApp = (function () {
           msg.textContent = "";
           toast("Suflo Pro aktif — iyi kurgular! 🎬", "good");
           reflectPro();
+          // deneme hakkıyla üretilmiş filigranlı çıktı varsa bir kez hatırlat (kart Ayarlar > Suflo Pro'da)
+          if (Pro.denemeCiktilari && Pro.denemeCiktilari().length) {
+            toast("Deneme çıktılarını temiz yeniden oluştur: Suflo Pro kartındaki listeden filigransız hale getir.", "good", 10000);
+          }
+          // Bir kez "Bizi nereden duydun?" ve davet kodunu hemen iste (sunucu kapalıysa sessizce geçer)
+          if (window.KDavet) {
+            try { KDavet.kaynakSor(); KDavet.kodGetir(true); } catch (eD) {}
+          }
         } else {
           msg.textContent = r.error || "Etkinleştirilemedi.";
           msg.className = "inline-status bad";
@@ -411,7 +588,12 @@ window.KApp = (function () {
     Array.prototype.forEach.call(document.querySelectorAll(".pro-ac-btn, #yazi-proya-gec"), function (b) {
       b.addEventListener("click", function () {
         var feature = b.getAttribute("data-pro-feature") || (b.id === "yazi-proya-gec" ? "mogrt" : "pro");
-        Pro.gate(feature);
+        // Deneme zaten kuruluysa satın alma penceresi: kurulu deneme kapıyı sessizce geçirip bu
+        // düğmeyi (satın alma yolunu) ölü bırakmasın
+        if (Pro.denemeAcik && Pro.denemeAcik(feature)) { Pro.gate(feature); return; }
+        // Deneme listesindeki araçlarda (kesim, zoom, ritim, geçiş, kanca) pencere "Ücretsiz dene" de sunar;
+        // kurulunca aracın asıl düğmesine yönlendirir. Kütüphaneler denemesiz (pro.js süzer).
+        Pro.gate(feature, { deneme: true, yeniden: function () { denemeyeYonlendir(feature); } });
       });
     });
 
@@ -420,13 +602,56 @@ window.KApp = (function () {
 
     el("pro-buy").addEventListener("click", function (e) {
       e.preventDefault();
-      // Lemon Squeezy checkout — Suflo Pro 749 TL
+      // Lemon Squeezy checkout (fiyat ve para birimi: js/pricing.js)
       K.cs.openURLInDefaultBrowser(proCheckoutUrl("settings"));
     });
   }
 
+  function arayuzDiliniBaslat() {
+    if (!window.SufloI18n) return;
+    SufloI18n.configure({
+      load: K.settings,
+      save: function () { K.saveSettings(); },
+      settingsExisted: K.ayarDosyasiVardi
+    });
+    if (SufloI18n.getLang() === "en") SufloI18n.start();
+  }
+
+  // Bir Whisper/ffmpeg işi sürüyor mu (dil değişimi o sırada kapalı)
+  function isSuruyor() {
+    try { return !!(K.surecSayisi && K.surecSayisi() > 0); } catch (e) { return false; }
+  }
+
+  // Ayarlar > Destek > Arayüz dili: yeniden yüklemeden geçer (EN → TR özgün metinleri geri koyar)
+  function initDilSecici() {
+    var sec = el("set-ui-lang");
+    if (!sec || !window.SufloI18n) return;
+    sec.value = SufloI18n.getLang();
+    sec.addEventListener("change", function () {
+      if (isSuruyor()) {
+        sec.value = SufloI18n.getLang();
+        toast("Bir iş sürüyor; arayüz dilini iş bitince değiştir.", "warn");
+        return;
+      }
+      SufloI18n.switchLang(sec.value, { busy: isSuruyor });
+    });
+    SufloI18n.onChange(function (l) {
+      sec.value = l;
+      // EN → TR: Pro ekli seçenek ve stil kartı etiketleri özgün metinden yeniden kurulsun
+      try { reflectPro(); } catch (e) {}
+    });
+    // İş sürerken seçici kapalı (ucuz yoklama: yalnız disabled bayrağı)
+    setInterval(function () {
+      var mesgul = isSuruyor();
+      if (sec.disabled !== mesgul) sec.disabled = mesgul;
+    }, 1500);
+  }
+
   function initSettings() {
     initPro();
+    initDilSecici();
+    // Pro karşılaştırmasındaki fiyat tek kaynaktan (js/pricing.js); İngilizcede çevirmen değiştirir
+    if (el("set-pro-fiyat") && window.SufloPricing) el("set-pro-fiyat").textContent = SufloPricing.settingsRow("tr");
 
     // ---- Pro icerik bulutu: lisans bir kez, MOGRT + SFX otomatik ----
     (function initProSyncUI() {
@@ -504,7 +729,7 @@ window.KApp = (function () {
       if (!Pro.isPro()) { Pro.gate("propack"); return; }
       var yol = null;
       if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
-        var r = window.cep.fs.showOpenDialogEx(false, true, "Suflo Pro paketi klasörünü seç", null, null);
+        var r = window.cep.fs.showOpenDialogEx(false, true, uiMetni("Suflo Pro paketi klasörünü seç"), null, null);
         if (r && r.data && r.data.length) yol = r.data[0];
       }
       if (!yol) return;
@@ -683,6 +908,8 @@ window.KApp = (function () {
       refreshLocalStatus();
     });
     refreshLocalStatus();
+    // Rehber (anahtar sihirbazı, "Daha doğru model") ayar değiştirdiyse Ayarlar da görsün
+    document.addEventListener("suflo:ayar", function () { refreshLocalStatus(); });
 
     el("set-save").addEventListener("click", function () {
       var st = K.settings();
@@ -693,6 +920,8 @@ window.KApp = (function () {
       else toast("Ayarlar kaydedilemedi", "bad");
       KCaptions.refreshSetup();
       refreshEngineRoute();
+      // AI "anahtar gerekli" çipleri ve rehber yeni anahtarı görsün
+      if (KCaptions.ayarDegisti) KCaptions.ayarDegisti("ayarlar");
     });
 
     el("lnk-groq").addEventListener("click", function (e) {
@@ -733,6 +962,43 @@ window.KApp = (function () {
       });
       var gl = K.settings().glossary || [];
       if (gl.length) el("set-glossary-info").textContent = gl.length + " kural kayıtlı";
+    }
+
+    // Konuşmadan kes: kullanıcının ek dolgu sözcükleri ("tr: yani yani") + transkript önbelleği
+    if (el("set-fillers")) {
+      var dolguSay = function (metin) {
+        var p = window.SufloTextCut ? SufloTextCut.parseExtraFillers(metin) : {};
+        var n = 0;
+        Object.keys(p).forEach(function (k) { n += p[k].length; });
+        return n;
+      };
+      el("set-fillers").value = String(s.extraFillers || "");
+      var dolguBilgi = function () {
+        var n = dolguSay(K.settings().extraFillers);
+        el("set-fillers-info").textContent = n ? n + " dolgu kayıtlı" : "";
+      };
+      dolguBilgi();
+      el("set-fillers-save").addEventListener("click", function () {
+        var st = K.settings();
+        st.extraFillers = String(el("set-fillers").value || "").slice(0, 4000);
+        if (K.saveSettings()) toast(dolguSay(st.extraFillers) + " dolgu kaydedildi", "good");
+        else toast("Ayarlar kaydedilemedi", "bad");
+        dolguBilgi();
+        document.dispatchEvent(new CustomEvent("suflo:dolgu"));
+      });
+    }
+    if (el("set-tcache-clear")) {
+      var onbBilgi = function () {
+        var c = KCaptions.transcriptCache && KCaptions.transcriptCache();
+        var st2 = c ? c.stats() : { entries: 0, bytes: 0 };
+        el("set-tcache-info").textContent = st2.entries ? st2.entries + " transkript · " + (st2.bytes / 1048576).toFixed(1) + " MB" : "";
+      };
+      onbBilgi();
+      el("set-tcache-clear").addEventListener("click", function () {
+        var n = KCaptions.onbellegiTemizle ? KCaptions.onbellegiTemizle() : 0;
+        toast(n ? "Transkript önbelleği temizlendi" : "Önbellek zaten boş", n ? "good" : "");
+        onbBilgi();
+      });
     }
 
     // vekil sunucu — kurumsal ağda indirmeler buradan geçer
@@ -1038,7 +1304,7 @@ window.KApp = (function () {
     if (!guncelleme) return;
     var b = el("update-indir");
     b.disabled = true;
-    var eski = b.textContent;
+    var eski = uiOzgun(b);   // özgün Türkçe: iş sürerken dil değişse de doğru dile döner
     b.textContent = "İniyor…";
     try {
       var indirilenler = K.path.join(K.os.homedir(), "Downloads");
@@ -1105,6 +1371,10 @@ window.KApp = (function () {
       try { K.log("js hata: " + (ev.message || "") + " @ " + (ev.filename || "") + ":" + (ev.lineno || 0)); } catch (e) {}
     });
 
+    // Arayüz dili EN ÖNCE: bağlam yoklamasından ve her pencereden önce. Dil settings.json'da
+    // (uiLang); eski kurulumlar Türkçe kalır, taze kurulumda rehberin 0. adımı sorar
+    guvenli("Dil", arayuzDiliniBaslat);
+
     // Sürüm etiketleri tek kaynaktan (bridge.js VERSION) beslenir: elle yazılan
     // "v1.7" her yayında geride kalıyor, kullanıcı hangi sürümde olduğunu bilemiyordu
     ["brand-ver", "hakkinda-ver", "set-ver"].forEach(function (id) {
@@ -1144,7 +1414,7 @@ window.KApp = (function () {
           return;
         }
         if (intent === "demo") {
-          K.cs.openURLInDefaultBrowser("https://suflo.app/pro");
+          K.cs.openURLInDefaultBrowser(SufloPricing.proPageUrl(arayuzDili()));
           return;
         }
         goster("settings");
@@ -1164,6 +1434,9 @@ window.KApp = (function () {
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
     guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });
     guvenli("Kanca başlığı", function () { if (window.KKanca) KKanca.init(); });
+    guvenli("Shorts Paketi", function () { if (window.KShortsPaket) KShortsPaket.init(); });
+    guvenli("Podcast Modu", function () { if (window.KMulticam) KMulticam.init(); });
+    guvenli("Marka Kiti", function () { if (window.KMarkaKiti) KMarkaKiti.init(); });
     guvenli("Sesi iyileştir", function () { if (window.KSes) KSes.init(); });
     guvenli("Ritim", function () { KBeat.init(); });
     guvenli("Yazı", function () { if (window.KLib) KLib.init(); });
@@ -1174,6 +1447,10 @@ window.KApp = (function () {
     guvenli("Emoji Assets", function () { if (window.KEmojiAssets) KEmojiAssets.init(); });
     guvenli("Kütüphane kontrolü", function () { if (window.KLibraryHealth) KLibraryHealth.init(); });
     guvenli("Pro içerik", function () { if (window.ProSync) ProSync.init(); });
+    // İlk açılış rehberi: yalnız Node gerçeklerini okur, kullanıcı tıklamadan
+    // Premiere'e (evalScript) hiçbir şey göndermez
+    guvenli("Onboarding", function () { if (window.KOnboarding) KOnboarding.init(); });
+    guvenli("Davet", function () { if (window.KDavet) KDavet.init(); });
     guvenli("Pro-UI", reflectPro);
 
     if (el("update-indir")) el("update-indir").addEventListener("click", guncellemeyiIndir);
@@ -1189,25 +1466,34 @@ window.KApp = (function () {
     setInterval(checkUpdate, 6 * 3600 * 1000);
     // eski geçici ses dosyalarını süpür (disk sessizce dolmasın)
     setTimeout(function () { try { K.sweepTemp(); } catch (e) {} }, 6000);
-    setTimeout(function () { try { yenilikleriGoster(); } catch (eY) {} }, 900);
+    // Rehberin tam kartı açıksa "yenilikler" penceresi üstüne binmesin (taze kurulum
+    // zaten yeniliklerGoruldu alır; takılı kullanıcıya rehber yeter)
+    setTimeout(function () {
+      try {
+        var rehber = window.KOnboarding && KOnboarding.karar ? KOnboarding.karar() : "yok";
+        if (rehber !== "tam") yenilikleriGoster();
+      } catch (eY) {}
+    }, 900);
   }
 
   /*
-   * "Suflo 3.0'da yeni": surum basina bir kez. Yeni ozellikler sekmelerin
-   * derinliginde (Kesim sekmesinin altinda, editorun katlanir bolumlerinde);
+   * "Suflo 3.1'de yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (Kesim sekmesinin altinda, Ayarlar'in kartlarinda);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
+   * 3.0'dan yukselten kullanicida yeniliklerGoruldu "3.0" oldugundan pencere bir kez acilir.
    */
   var YENILIKLER = {
-    surum: "3.0",
+    surum: "3.1",
+    alt: "Shorts, podcast ve marka",
     maddeler: [
-      { ikon: "✂", baslik: "Konuşmadan kes", metin: "ııı, eee ve tekrarları kelimeye tıklayarak videodan çıkar.", sekme: "cut", hedef: "tc-card" },
-      { ikon: "🔥", baslik: "Viral anlar (Shorts)", metin: "En güçlü 15–60 sn'yi bulur, tek tıkla 9:16 Shorts sekansı yapar.", sekme: "captions", acilir: "cap-vr-box" },
-      { ikon: "Aa", baslik: "Suflo Stilleri", metin: "Hormozi, Neon, Daktilo dahil 12 animasyonlu altyazı.", sekme: "captions", hedef: "cap-stil-grid" },
-      { ikon: "♪", baslik: "Sesi iyileştir", metin: "Gürültüyü al, sesi YouTube seviyesine getir — senkron kaymaz.", sekme: "cut", hedef: "ses-card" },
-      { ikon: "▭", baslik: "Kanca başlığı", metin: "Shorts açılışına animasyonlu başlık kartı, tek tık.", sekme: "kanca" },
-      { ikon: "↔", baslik: "Geçişler", metin: "Kesime tek tıkla zoom, whip, itme — eklentisiz.", sekme: "gecis" },
-      { ikon: "▦", baslik: "Sahne algılama · vuruşlarda böl", metin: "Klibi sahnelerde ya da müziğin vuruşlarında böl.", sekme: "cut", hedef: "sc-card" },
-      { ikon: "§", baslik: "YouTube bölümleri", metin: "Konuşmadan bölüm + AI başlık, açıklamaya kopyala.", sekme: "captions", acilir: "cap-ch-box" }
+      { ikon: "▶", baslik: "Tek Tık Shorts Paketi", metin: "Viral andan altyazılı, kancalı, ilerleme çubuklu hazır Shorts sekansı.", sekme: "captions", acilir: "cap-vr-box" },
+      { ikon: "🎙", baslik: "Podcast Modu", metin: "Mikrofon başına sese göre konuşan kişiye kamera kesimi.", sekme: "podcast" },
+      { ikon: "✂", baslik: "Tek tık temizlik", metin: "Konuşmadan kes artık tekrar çekimleri ve yarım başlangıçları da bulur.", sekme: "cut", hedef: "tc-card" },
+      { ikon: "🔥", baslik: "Viral puan 0–100", metin: "Her ana açıklamalı puan ve üç kanca başlığı önerisi.", sekme: "captions", acilir: "cap-vr-box" },
+      { ikon: "Aa", baslik: "Marka Kiti", metin: "Yazı tipin, renklerin ve logon her altyazıda; stilini kodla paylaş.", sekme: "settings", hedef: "grp-marka-kiti" },
+      { ikon: "★", baslik: "Pro'yu dene", metin: "Her Pro aracına 3 ücretsiz deneme hakkı, süresi dolmaz.", sekme: "settings", hedef: "grp-pro" },
+      { ikon: "♥", baslik: "Davet et, kazan", metin: "Kodunu paylaş; arkadaşın indirim alır, sen ödül paketleri açarsın.", sekme: "settings", hedef: "grp-davet" },
+      { ikon: "EN", baslik: "English arayüz (beta)", metin: "Paneli Ayarlar'dan İngilizceye çevir.", sekme: "settings", hedef: "set-ui-lang" }
     ]
   };
 
@@ -1222,7 +1508,7 @@ window.KApp = (function () {
     kutu.className = "yenilik-kutu";
     var bas = document.createElement("div");
     bas.className = "yenilik-bas";
-    bas.innerHTML = "<span>YENİ</span><b>Suflo " + YENILIKLER.surum + "</b><i>Yapay zekâ ile kurgu</i>";
+    bas.innerHTML = "<span>YENİ</span><b>Suflo " + YENILIKLER.surum + "</b><i>" + YENILIKLER.alt + "</i>";
     kutu.appendChild(bas);
     function kapat() {
       try { s.yeniliklerGoruldu = YENILIKLER.surum; K.saveSettings(); } catch (e) {}
@@ -1271,6 +1557,10 @@ window.KApp = (function () {
     onTab: onTab,
     ctx: function () { return ctx; },
     refreshContext: contextPollingBaslat,
+    pollNow: pollNow,
+    yenilikSurumu: function () { return YENILIKLER.surum; },
+    davetAni: davetAni,
+    proCheckoutUrl: proCheckoutUrl,
     installLocalWhisper: installLocalWhisper,
     checkUpdate: checkUpdate
   };

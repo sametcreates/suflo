@@ -25,7 +25,8 @@ window.KGecis = (function () {
   }
 
   async function uygula(t, btn) {
-    if (typeof Pro !== "undefined" && !Pro.gate("transitions")) return;
+    // Pro (ucretsizde 3 deneme hakki; hak yalniz gecis yazilinca duser)
+    if (typeof Pro !== "undefined" && !Pro.gate("transitions", { deneme: true, yeniden: function () { uygula(t, btn); } })) return;
     if (busy) return;
     busy = true;
     if (btn) btn.disabled = true;
@@ -33,6 +34,7 @@ window.KGecis = (function () {
     try {
       var r = await K.call("KS_applyCutTransition", { plan: TR.hostPlan(t.id, secenek()), tolerance: 1.0 }, 60000);
       if (!r.ok) throw new Error(r.error);
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("transitions", KApp.toast);   // deneme: yalniz basarida
       status("");
       KApp.toast("↔ " + t.name + " · V" + r.track + " kesimine eklendi" +
         (r.half < secenek().duration / 2 - 0.01 ? " (kısa klip: süre kısaltıldı)" : ""), "good");

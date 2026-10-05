@@ -26,7 +26,7 @@ var cevap = JSON.stringify({ clips: [
   { from: "x", to: 3, title: "bozuk", score: 3 }
 ] });
 var r = H.parseResponse(cevap, segs, {});
-chk("puana gore sirali", r.length && r[0].score === 9 && r[0].title === "Kimsenin bilmediği sır", JSON.stringify(r.map(function (c) { return c.score; })));
+chk("puana gore sirali (eski 1-10 puan 0-100 olcegine: 9 -> 90)", r.length && r[0].score === 90 && r[0].title === "Kimsenin bilmediği sır", JSON.stringify(r.map(function (c) { return c.score; })));
 chk("satir sinirina oturtulur", r.every(function (c) { return c.start === segs[c.from].start && c.end === segs[c.to].end; }));
 chk("hepsi 15-60 sn", r.every(function (c) { return c.end - c.start >= 15 && c.end - c.start <= 60; }), JSON.stringify(r.map(function (c) { return Math.round(c.end - c.start); })));
 chk("cakisan elendi", !r.some(function (c) { return c.title === "Çakışan"; }));

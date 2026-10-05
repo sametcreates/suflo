@@ -25,6 +25,9 @@ window.KBeat = (function () {
   var vurusler = [];      // { t: timeline saniyesi, guc: 0..1, tip: "bass"|"tiz" }
   var bpm = 0;
   var busy = false;
+  // Pro'yu dene: ritim hakkı analiz başına BİR kez, o analizin ilk timeline çıktısında
+  // (marker ya da bölme) düşer; aynı analizden sonraki çıktılar yeni hak istemez
+  var analizHakDustu = false;
 
   /* ---------------- FFT (radix-2, yerinde) ---------------- */
 
@@ -224,11 +227,20 @@ window.KBeat = (function () {
     var b = el("beat-analyze");
     if (!b) return;
     b.disabled = busy || !ctx.sel;
-    el("beat-info").textContent = ctx.sel ? ctx.sel.name : "önce timeline'da bir klip seç";
+    // klip adı kullanıcı içeriği: arayüz çevirisine girmesin (ipucu metni çevrilir)
+    var info = el("beat-info");
+    info.textContent = ctx.sel ? "" : "önce timeline'da bir klip seç";
+    if (ctx.sel) {
+      var ad = document.createElement("span");
+      if (ad.setAttribute) ad.setAttribute("data-i18n-skip", "");
+      ad.textContent = ctx.sel.name;
+      info.appendChild(ad);
+    }
   }
 
   async function analyze() {
-    if (typeof Pro !== "undefined" && !Pro.gate("beat")) return; // Pro: ritim analizi
+    // Pro: ritim analizi (ucretsizde 3 deneme hakki; hak ilk timeline ciktisinda duser)
+    if (typeof Pro !== "undefined" && !Pro.gate("beat", { deneme: true, yeniden: analyze })) return;
     if (busy) return;
     /*
      * Analiz dakikalarca surebilir; bu sirada kullanici secimi degistirirse
@@ -241,6 +253,7 @@ window.KBeat = (function () {
     busy = true;
     // Yeni analiz: eski sonuc (baska klibin vuruslari) bu analiz basarisiz olsa da kalmasin
     vurusler = [];
+    analizHakDustu = false;
     el("beat-result").hidden = true;
     el("beat-analyze").classList.add("busy");
     el("beat-progress").hidden = false;
@@ -341,6 +354,8 @@ window.KBeat = (function () {
         name: "Vuruş" + (bpm ? " " + bpm + "bpm" : "")
       }, 120000);
       if (!r.ok) throw new Error(r.error);
+      // deneme: analizin ilk timeline ciktisi (marker); sonra bolme ayni analizle hak istemez
+      if (!analizHakDustu && typeof Pro !== "undefined" && Pro.denemeHarca && Pro.denemeHarca("beat", KApp.toast) >= 0) analizHakDustu = true;
       KApp.toast(r.added + " marker atıldı — timeline'da yeşil işaretler", "good");
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");
@@ -352,7 +367,8 @@ window.KBeat = (function () {
   // Vuruslarda bol (v3.0): muzigi analiz et, sonra B-roll'u sec ve vuruslarda kes.
   // Vurus zamanlari sequence zamaninda oldugu icin secim degisse de gecerlidir.
   async function bol() {
-    if (typeof Pro !== "undefined" && !Pro.gate("beat")) return;
+    // Bu analizin hakki ilk ciktisinda (ornegin marker) dustuyse bolme yeni hak ya da pencere istemez
+    if (typeof Pro !== "undefined" && !analizHakDustu && !Pro.gate("beat", { deneme: true, yeniden: bol })) return;
     if (!vurusler.length) return;
     var siklik = parseInt(el("beat-siklik").value, 10) || 1;
     var secilen = vurusler.filter(function (v, i) { return i % siklik === 0; });
@@ -361,6 +377,8 @@ window.KBeat = (function () {
     try {
       var r = await K.call("KS_splitSelectedAt", { times: secilen.map(function (v) { return v.t; }) }, 300000);
       if (!r.ok) throw new Error(r.error);
+      // deneme: analizin ilk timeline ciktisi (bolme); sonra marker ayni analizle hak istemez
+      if (!analizHakDustu && typeof Pro !== "undefined" && Pro.denemeHarca && Pro.denemeHarca("beat", KApp.toast) >= 0) analizHakDustu = true;
       KApp.toast("✂ Seçili klip " + r.cuts + " vuruşta bölündü", "good");
     } catch (e) {
       status("✕ " + K.hataYardimi(e), "bad");

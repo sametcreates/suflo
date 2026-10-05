@@ -22,7 +22,7 @@ New-Item -ItemType Directory -Path $panel -Force | Out-Null
 # Pro MOGRT/SFX pakete ASLA gomulmez; lisans etkinlesince private Pro Icerik
 # Bulutu otomatik kurar. Eski ortam degiskeni public sizinti riskine karsi yasak.
 if ($env:SUFLO_BUNDLE_CONTENT) { throw "SUFLO_BUNDLE_CONTENT desteklenmiyor: Pro icerigi public kurucuya gomulemez." }
-$panelItems = @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE")
+$panelItems = @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE")
 foreach ($item in $panelItems) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $panel -Recurse -Force }
@@ -51,7 +51,12 @@ KURULUM (2 adim)
   Windows : "Suflo-Kur.bat" dosyasina cift tikla
   Mac     : "Suflo-Kur.command" dosyasina cift tikla
 
-  Sonra Premiere Pro'yu ac:  Window > Extensions > Suflo
+  Sonra Premiere Pro'yu ac ve paneli menuden sec:
+    Premiere 25.6+ / 2026 : Window > Extensions (Legacy) > Suflo
+    Daha eski surumler    : Window > Extensions > Suflo
+
+  Menude Suflo yoksa: Premiere'i tamamen kapatip yeniden ac.
+  Hala yoksa: https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor
 
 Not: Windows "Bilinmeyen yayimci" uyarisi verirse
 "Ek bilgi" > "Yine de calistir" de. Suflo acik kaynak,
@@ -69,8 +74,8 @@ ve Enter'a bas:
 
 Sonra dosyaya tekrar cift tikla.
 
-Panel ilk altyazida gerekli motoru kendisi indirir;
-senin ayrica bir sey kurman gerekmez.
+Panel ilk acilista "Ilk altyazin 2 dakikada" rehberini gosterir:
+gerekli motoru kendisi indirir, senin ayrica bir sey kurman gerekmez.
 
 Yardim: https://suflo.app
 Surum : $surum

@@ -90,6 +90,119 @@
   }
 
   /*
+   * Kullanicinin ek dolgu listesi (Ayarlar > "Konuşmadan kes için"): satir basina
+   * bir dolgu, dil onekiyle ("tr: yani yani", "en: you see"). Oneksiz satir her
+   * dilde gecerli ("*"). Doner: { tr: ["yani yani"], "*": [...] } (normalize edilmis).
+   */
+  function parseExtraFillers(metin) {
+    var out = {};
+    String(metin || "").split(/\r?\n/).forEach(function (satir) {
+      var t = satir.trim();
+      if (!t || t.charAt(0) === "#") return;
+      var m = /^([a-z]{2,3})\s*:\s*(.+)$/i.exec(t);
+      var dil = m ? m[1].toLowerCase() : "*";
+      var ifade = normalize(m ? m[2] : t, dil === "*" ? undefined : dil);
+      if (!ifade) return;
+      if (!out[dil]) out[dil] = [];
+      if (out[dil].indexOf(ifade) === -1) out[dil].push(ifade);
+    });
+    return out;
+  }
+
+  // classify icin: bu dilde gecerli ek dolgular, sozcuk dizileri olarak (uzun olan once)
+  function extraFillerList(extra, lang) {
+    if (!extra) return [];
+    if (typeof extra === "string") extra = parseExtraFillers(extra);
+    var liste = [];
+    [lang, "*"].forEach(function (k) {
+      (extra[k] || []).forEach(function (f) {
+        var p = normalize(f, lang);
+        if (p) liste.push(p.split(" "));
+      });
+    });
+    liste.sort(function (a, b) { return b.length - a.length; });
+    return liste;
+  }
+
+  /*
+   * Ucuz Turkce kok esitligi: ayni; ya da biri digerinin onekiyse ve >=3 harf;
+   * ya da ikisi de >=5 harf ve ilk 4 harf ortak ("size/sizlere", "kamera/kamerayı").
+   * Girdi normalize edilmis belirtecler (kesme isareti zaten bosluga donmus olabilir).
+   */
+  function stemEq(a, b) {
+    a = String(a || ""); b = String(b || "");
+    if (!a || !b) return false;
+    if (a === b) return true;
+    var kisa = a.length <= b.length ? a : b, uzun = kisa === a ? b : a;
+    if (kisa.length >= 3 && uzun.indexOf(kisa) === 0) return true;
+    return a.length >= 5 && b.length >= 5 && a.slice(0, 4) === b.slice(0, 4);
+  }
+
+  /*
+   * Cumle ici yeniden baslama: 2-4 belirteclik bir dizi HEMEN ardindan (arada
+   * yalniz dolgu olabilir) yeniden baslarsa ("bu ürünü ııı bu ürünü kesinlikle",
+   * "bu video bu videoda") ILK kopya "falsestart" olur. Siki kurallar (siradan
+   * cumleler kesilmesin: "Bu kitap çok güzel, bu kitabı ..." isaretlenmez):
+   *   - kopyalar bitisik: arada dolgu disinda sozcuk yok (8 belirtec penceresi yok)
+   *   - son belirtec disindakiler birebir ayni; yalniz son belirtec kok esitligi
+   *     ("video/videoda") ile eslesebilir
+   *   - ilk kopya cumle sonu noktalamasiyla bitmez, kopyalar arasinda >=0.6 sn
+   *     duraksama yoktur (cumleler arasi tekrar, retakes.js'nin isi), toplam <=1.5 sn
+   * Ikileme ("yavaş yavaş") ve tek sozcuk tekrari ("ben ben", repeat kurali) bu
+   * kuralin isi degil. Doner: isaretlenecek kelime indeksleri (yalniz ilk kopya).
+   */
+  var RESTART_DURAKSAMA = 0.6;
+  function findRestarts(words, lang) {
+    var toks = [];
+    var gecerli = [];
+    for (var i = 0; i < words.length; i++) {
+      if (!valid(words[i])) continue;
+      gecerli.push(i);
+      if (fillerKind(words[i].text, lang)) continue;
+      var n = normalize(words[i].text, lang).replace(/ /g, "");
+      if (n) toks.push({ i: i, t: n, w: words[i] });
+    }
+    // iki kelime indeksi arasinda (dolgular dahil) uzun duraksama var mi
+    function duraksamaVar(i1, i2) {
+      var onceki = null;
+      for (var g = 0; g < gecerli.length; g++) {
+        var ix = gecerli[g];
+        if (ix < i1) continue;
+        if (ix > i2) break;
+        if (onceki != null && Number(words[ix].start) - Number(words[onceki].end) >= RESTART_DURAKSAMA) return true;
+        onceki = ix;
+      }
+      return false;
+    }
+    var isaret = {};
+    var ikilemeDil = lang === "tr" || lang === "az";
+    for (var a = 0; a < toks.length; a++) {
+      for (var len = 4; len >= 2; len--) {
+        var b = a + len;
+        if (b + len > toks.length) continue;
+        var hepsiIkileme = true;
+        for (var q = 0; q < len; q++) {
+          if (!(ikilemeDil && IKILEME.indexOf(toks[a + q].t) !== -1)) hepsiIkileme = false;
+        }
+        if (hepsiIkileme) continue;
+        var esit = true;
+        for (var r = 0; r < len; r++) {
+          var son = r === len - 1;
+          if (son ? !stemEq(toks[a + r].t, toks[b + r].t) : toks[a + r].t !== toks[b + r].t) { esit = false; break; }
+        }
+        if (!esit) continue;
+        var ilkSon = toks[b - 1].w;
+        if (/[.!?…]["'”’»)]*\s*$/.test(String(ilkSon.text || ""))) continue;   // ilk kopya cumleyi bitirdi
+        if (Number(toks[b].w.start) - Number(ilkSon.end) > 1.5) continue;
+        if (duraksamaVar(toks[a].i, toks[b].i)) continue;
+        for (var x = a; x < b; x++) isaret[toks[x].i] = true;
+        break;
+      }
+    }
+    return Object.keys(isaret).map(Number).sort(function (p, q2) { return p - q2; });
+  }
+
+  /*
    * Her kelimeye bir etiket ver:
    *   "filler"  kesin dolgu sesi
    *   "soft"    yumusak dolgu (yalniz opts.soft acikken)
@@ -101,9 +214,22 @@
     var lang = opts.lang || "tr";
     var maxRepeatGap = opts.maxRepeatGap != null ? opts.maxRepeatGap : 0.8;
     var out = [];
+    // Kullanicinin ek dolgulari (cok sozcuklu olabilir): eslesen dizinin her kelimesi dolgu
+    var ekDolgu = {};
+    var ekListe = extraFillerList(opts.extraFillers, lang);
+    if (ekListe.length) {
+      var normler = words.map(function (x) { return normalize(x && x.text, lang); });
+      for (var e = 0; e < words.length; e++) {
+        for (var f = 0; f < ekListe.length; f++) {
+          var dizi = ekListe[f], tamam = e + dizi.length <= words.length;
+          for (var d = 0; tamam && d < dizi.length; d++) if (normler[e + d] !== dizi[d]) tamam = false;
+          if (tamam) { for (var d2 = 0; d2 < dizi.length; d2++) ekDolgu[e + d2] = true; break; }
+        }
+      }
+    }
     for (var i = 0; i < words.length; i++) {
       var w = words[i];
-      var kind = fillerKind(w.text, lang);
+      var kind = ekDolgu[i] ? "filler" : fillerKind(w.text, lang);
       if (kind === "soft" && !opts.soft) kind = null;
       if (!kind && opts.repeats !== false) {
         var next = words[i + 1];
@@ -115,6 +241,10 @@
         }
       }
       out.push(kind);
+    }
+    // Cumle ici yeniden baslama (varsayilan kapali: eski davranis aynen)
+    if (opts.phraseRepeats) {
+      findRestarts(words, lang).forEach(function (ix) { if (!out[ix]) out[ix] = "falsestart"; });
     }
     return out;
   }
@@ -209,6 +339,72 @@
   }
 
   /*
+   * Premiere yuzlerce kesimde yavaslar (FireCut: ~500 kesimden sonra). Once
+   * mergeGap'ten kisa bosluklu komsu kesimler birlesir (aradaki nefes de gider);
+   * hala max'tan fazlaysa EN KISA kesimler birakilir.
+   *   opts.keep [{start, end}]: tutulan kelimeler. Ortasi bosluga dusen bir
+   *   tutulan kelime varsa o iki kesim BIRLESMEZ — konusma asla yutulmaz.
+   * Doner: { ranges, merged (birlesen kesim sayisi), dropped (birakilan) }.
+   */
+  function capCuts(ranges, opts) {
+    opts = opts || {};
+    var max = opts.max > 0 ? Math.floor(opts.max) : 300;
+    var mergeGap = opts.mergeGap != null ? Number(opts.mergeGap) : 0.25;
+    var list = (ranges || []).filter(function (r) {
+      return r && isFinite(Number(r.start)) && isFinite(Number(r.end)) && Number(r.end) > Number(r.start);
+    }).map(function (r) {
+      var o = {}; for (var k in r) if (Object.prototype.hasOwnProperty.call(r, k)) o[k] = r[k];
+      o.start = Number(r.start); o.end = Number(r.end);
+      return o;
+    }).sort(function (a, b) { return a.start - b.start; });
+    if (list.length <= max) return { ranges: list, merged: 0, dropped: 0 };
+    var ortalar = (opts.keep || []).filter(valid).map(function (w) {
+      return (Number(w.start) + Number(w.end)) / 2;
+    }).sort(function (a, b) { return a - b; });
+    var oi = 0;
+    // (a, b) acik araliginda tutulan kelime ortasi var mi (a artan sirada sorulur)
+    function konusmaVar(a, b) {
+      while (oi < ortalar.length && ortalar[oi] <= a) oi++;
+      return oi < ortalar.length && ortalar[oi] < b;
+    }
+    var out = [], merged = 0;
+    list.forEach(function (r) {
+      var last = out[out.length - 1];
+      if (last && r.start - last.end <= mergeGap && !(r.start > last.end && konusmaVar(last.end, r.start))) {
+        if (r.end > last.end) last.end = r.end;
+        merged++;
+      } else out.push(r);
+    });
+    var dropped = 0;
+    if (out.length > max) {
+      dropped = out.length - max;
+      out = out.map(function (r, i) { return { r: r, i: i }; })
+        .sort(function (a, b) { return (b.r.end - b.r.start) - (a.r.end - a.r.start) || a.i - b.i; })
+        .slice(0, max)
+        .sort(function (a, b) { return a.i - b.i; })
+        .map(function (x) { return x.r; });
+    }
+    return { ranges: out, merged: merged, dropped: dropped };
+  }
+
+  // [lo, hi] icinde araliklarin tumleyeni (tutulan parcalar)
+  function invertRanges(ranges, lo, hi) {
+    lo = Number(lo); hi = Number(hi);
+    if (!(hi > lo)) return [];
+    var list = (ranges || []).map(function (r) {
+      return { start: Math.max(lo, Number(r.start)), end: Math.min(hi, Number(r.end)) };
+    }).filter(function (r) { return isFinite(r.start) && isFinite(r.end) && r.end > r.start; })
+      .sort(function (a, b) { return a.start - b.start; });
+    var out = [], imlec = lo;
+    list.forEach(function (r) {
+      if (r.start > imlec) out.push({ start: imlec, end: r.start });
+      if (r.end > imlec) imlec = r.end;
+    });
+    if (imlec < hi) out.push({ start: imlec, end: hi });
+    return out;
+  }
+
+  /*
    * Whisper dolgu seslerini cogu zaman yazmaz ("ııı"yi atlar). Bu kisa ipucu
    * motoru onlari yazmaya iter; yazmasa bile duraksama kesimi o bosluklari yakalar.
    */
@@ -230,15 +426,28 @@
   }
 
   /*
+   * Dolgu ipucunun dili: #cap-lang secimi; "Otomatik" ("" ya da "auto") ise
+   * once motorun algiladigi dil, o da yoksa arayuz dili (EN arayuzde Ingilizce
+   * ipucu; Turkce arayuzde eskisi gibi Turkce).
+   */
+  function promptLang(secim, algilanan, arayuz) {
+    if (secim && secim !== "auto") return secim;
+    if (algilanan && algilanan !== "auto") return algilanan;
+    return arayuz || "tr";
+  }
+
+  /*
    * "Dinle" onizlemesi: kesimler uygulanmis gibi sesi tek dosyada duyur.
    * cuts sequence zamaninda; ffmpeg klibin kaynagindan -ss inPoint -t dur ile
    * okur, bu yuzden zamanlar klip-ici KAYNAK saniyesine cevrilir (hiz carpani).
    *   clip: { clipStart, clipEnd, dur }   (dur = kaynak sure)
    *   maxSn: yalniz ilk maxSn kaynak saniyesi dinlenecekse sonrasindaki kesimler
    *          atilir (uzun kliplerde komut satiri sinirini asmamak icin)
+   *   opts.only: true ise TERSI — yalniz kesilecek parcalar calinir
+   *          ("Yalnız kesilecekleri dinle"); kesim yoksa "" (calinacak bir sey yok)
    * Doner: ffmpeg -af ifadesi; kesim yoksa "" (oldugu gibi cal).
    */
-  function previewFilter(cuts, clip, maxSn) {
+  function previewFilter(cuts, clip, maxSn, opts) {
     var tl = Number(clip.clipEnd) - Number(clip.clipStart);
     var hiz = Number(clip.dur) > 0 && tl > 0 ? tl / Number(clip.dur) : 1;
     var sinir = Number(maxSn) > 0 ? Number(maxSn) : Infinity;
@@ -248,18 +457,26 @@
       return b > a ? "between(t," + a.toFixed(3) + "," + b.toFixed(3) + ")" : "";
     }).filter(Boolean);
     if (!parcalar.length) return "";
+    if (opts && opts.only) return "aselect='" + parcalar.join("+") + "',asetpts=N/SR/TB";
     // aselect kesilen ornekleri atar, asetpts zamani kesintisiz yeniden numaralar
     return "aselect='not(" + parcalar.join("+") + ")',asetpts=N/SR/TB";
   }
 
   return {
     previewFilter: previewFilter,
+    capCuts: capCuts,
+    invertRanges: invertRanges,
+    parseExtraFillers: parseExtraFillers,
+    stemEq: stemEq,
+    findRestarts: findRestarts,
+    IKILEME: IKILEME,
     normalize: normalize,
     fillerKind: fillerKind,
     classify: classify,
     buildCuts: buildCuts,
     totalSeconds: totalSeconds,
     fillerPrompt: fillerPrompt,
+    promptLang: promptLang,
     DOLGU: DOLGU
   };
 });

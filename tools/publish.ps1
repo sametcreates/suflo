@@ -69,8 +69,11 @@ if ($LASTEXITCODE -ne 0) {
 
 git add -A
 $staged = @(git diff --cached --name-only)
+# Ilk acilis rehberinin ornek klibi (assets/onboarding/*.mp4|wav|mp3, kurucunun kendi kaydi) ses
+# yasagina takilmaz; desen tools/verify-release.ps1'deki $onboardingMedia ile AYNI olmali (test denetler).
+$onboardingMedia = '(^|/)assets/onboarding/[^/]+\.(mp4|wav|mp3)$'
 $yasak = @($staged | Where-Object {
-    $_ -match '(^|/)dist/' -or $_ -match '\.(p12|mogrt|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' -or $_ -match '(^|/)config\.php$'
+    $_ -match '(^|/)dist/' -or ($_ -match '\.(p12|mogrt|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' -and $_ -notmatch $onboardingMedia) -or $_ -match '(^|/)config\.php$'
 })
 if ($yasak.Count -gt 0) {
     Write-Host ("Yasakli/gizli dosya stage edildi: {0}" -f ($yasak -join ", ")) -ForegroundColor Red
@@ -106,7 +109,7 @@ if ($LASTEXITCODE -ne 0) {
     if (-not (Test-Path $notlar)) {
         Write-Host "release-notes.md yok - yayin durduruldu." -ForegroundColor Red; exit 1
     }
-    $ilkSatir = (Get-Content $notlar -TotalCount 1)
+    $ilkSatir = (Get-Content $notlar -TotalCount 1 -Encoding UTF8)
     if ($ilkSatir -notmatch [regex]::Escape($version)) {
         Write-Host "DUR: release-notes.md '$version' surumunden bahsetmiyor." -ForegroundColor Red
         Write-Host "     Ilk satir: $ilkSatir" -ForegroundColor DarkGray
@@ -116,7 +119,7 @@ if ($LASTEXITCODE -ne 0) {
     # Yalnizca en ustteki guncel surum bolumunu yayinla. Tum arsivi vermek
     # eski surumlerin satis/iade metinlerini yeni release aciklamasina tasiyordu.
     $guncelBolum = @()
-    foreach ($satir in (Get-Content $notlar)) {
+    foreach ($satir in (Get-Content $notlar -Encoding UTF8)) {
         if ($guncelBolum.Count -gt 0 -and $satir -match '^##\s+') { break }
         $guncelBolum += $satir
     }

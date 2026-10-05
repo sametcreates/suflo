@@ -60,7 +60,8 @@ window.KCut = (function () {
   }
 
   async function analyze() {
-    if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
+    // Pro: otomatik kesim (ucretsizde 3 deneme hakki; hak yalniz kesim uygulaninca duser)
+    if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: analyze })) return;
     if (busy) return;
     sesiKapat();
     clip = KApp.ctx().sel;
@@ -227,7 +228,7 @@ window.KCut = (function () {
   /* ---------------- Uygulama ---------------- */
 
   async function apply() {
-    if (typeof Pro !== "undefined" && !Pro.gate("cut")) return; // Pro: otomatik kesim
+    if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: apply })) return; // Pro: otomatik kesim
     var act = activeRanges().map(function (r) { return { start: r.start, end: r.end }; });
     if (act.length === 0) return;
     sesiKapat();
@@ -242,6 +243,7 @@ window.KCut = (function () {
     }, 900000);
     el("cut-apply").disabled = false;
     if (r.ok) {
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("cut", KApp.toast);   // deneme: yalniz basarida
       status("");
       var msg = r.newSeq
         ? "✂ Kopya sekansta uygulandı: " + r.newSeq
@@ -254,6 +256,8 @@ window.KCut = (function () {
       } else {
         KApp.toast(msg, "good");
       }
+      // ilk uygulanan kesim: davet seridinin anlarindan biri (mesgulken/yildiz seridi acikken cikmaz)
+      if (KApp.davetAni) KApp.davetAni("cut");
     } else {
       status("✕ " + r.error, "bad");
     }
@@ -269,7 +273,8 @@ window.KCut = (function () {
     if (!clip || !window.SufloTextCut || !oynatici) return;
     var btn = el("cut-dinle");
     btn.disabled = true;
-    var eski = btn.textContent;
+    // özgün Türkçe etiket: iş sürerken arayüz dili değişse de doğru dile döner (çevirmen çevirir)
+    var eski = window.SufloI18n && SufloI18n.orig ? SufloI18n.orig(btn) : btn.textContent;
     btn.textContent = "Hazırlanıyor…";
     var benimKlip = clip;
     try {

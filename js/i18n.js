@@ -7,8 +7,13 @@
  * textarea/input değerlerine dokunulmaz, düzenleyici kaplarında yalnız düğme
  * metinleri ve düğme ipuçları çevrilir.
  *
- * Kablolama v3.1'de: bkz. i18n/README.md. Node'da test edilebilir (saf mantık
- * + küçük DOM arayüzü: nodeType, childNodes, getAttribute, setAttribute).
+ * Kablolama: index.html bu dosyayı CSInterface.js'ten hemen sonra yükler; KApp.init
+ * en başta configure() + (dil "en" ise) start() çağırır. Dil settings.json'daki
+ * uiLang'de durur (localStorage yalnız ayna). Eski kurulumlar Türkçe kalır: Premiere'in
+ * Türkçe arayüzü yok, navigator.language çoğu Türk kurulumda en-US döner.
+ * EN → TR geçişi yeniden yükleme istemez: revert() özgün metinleri geri koyar.
+ * Node'da test edilebilir (saf mantık + küçük DOM arayüzü: nodeType, childNodes,
+ * getAttribute, setAttribute).
  */
 (function (root, factory) {
   var api = factory(root);
@@ -18,7 +23,7 @@
   "use strict";
 
   var LS_KEY = "suflo.uiLang";
-  var ATTRS = ["title", "placeholder", "aria-label", "alt", "data-tip"];
+  var ATTRS = ["title", "placeholder", "aria-label", "alt", "data-tip", "label"];   // label: <optgroup label>
   // Hiç girilmeyen öğeler (kod, stil, kullanıcı metni alanları)
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
   // Kullanıcı içeriği barındıran kaplar: transkript/altyazı düzenleyicisi, önizleme,
@@ -26,12 +31,26 @@
   // metinler ve düğme/alan ipuçları çevrilir; serbest metin (kullanıcının sözleri) kalır.
   var USER_CONTENT_IDS = [
     "cap-segments", "cap-onizleme-metin", "cap-ch-list", "cap-vr-liste", "cap-br-liste",
-    "cut-ranges", "cap-yt-aciklama", "cap-yt-basliklar", "cap-yt-etiket", "kanca-metin", "kanca-oneriler", "tc-words"
+    "cut-ranges", "cap-yt-aciklama", "cap-yt-basliklar", "cap-yt-etiket", "kanca-metin", "kanca-oneriler", "tc-words",
+    // Konuşmadan kes: yapıştırılan senaryo ve inceleme listesindeki konuşma parçaları
+    "tc-script", "tc-review",
+    // Kullanıcının kütüphane dosya adları (bir SFX'in adı "Kapat" ise "Close" olmasın)
+    "sfx-list", "emoji-assets-grid"
   ];
   var UI_IN_USER_ZONE = { BUTTON: 1, LABEL: 1, OPTION: 1, SELECT: 1 };
+  // Kullanıcı kabının İÇİNDE yine de arayüz olan adacıklar: boş durum / ipucu satırları
+  // (class="empty" | "hint") ve data-i18n-ui işaretli düğümler (ör. SFX grup sayısı "12 ses")
+  var UI_ISLAND_CLASSES = ["empty", "hint"];
 
   var dict = null, patterns = [], cache = {}, cacheSize = 0, lang = null;
   var env = { storage: null, navigator: null };
+  // Ayar deposu (configure): { load: () => ayarlar nesnesi, save: () => void, settingsExisted: bool | () => bool }
+  var cfg = null;
+  // Çevirdiğimiz her düğümün özgün hâli: revert() bunları geri koyar (yeniden yüklemesiz EN → TR)
+  var HAS_WM = typeof WeakMap === "function";
+  var origText = HAS_WM ? new WeakMap() : null, origAttr = HAS_WM ? new WeakMap() : null;
+  var origDoc = null;   // { title, lang } start() öncesi
+  var listeners = [];
 
   function loadDefault() {
     var d = root && root.SufloI18nEN;
@@ -149,7 +168,23 @@
     var m = /^(\s*)([\s\S]*?)(\s*)$/.exec(str);
     var out = str;
     if (m[2] && /[A-Za-z\u00C0-\u024F]/.test(m[2])) {
-      var t = lookup(normKey(m[2]));
+      var nk = normKey(m[2]), t = null;
+      if (m[2].indexOf("\n") === -1) t = lookup(nk);
+      else {
+        // Çok satırlı metin: önce bütün anahtarın tam eşleşmesi; tutmazsa satır
+        // satır, "\n" korunur (bridge.js'in "msg\nÇözüm: …" iletisi tek karışık satıra
+        // dönmesin); hiçbir satır çevrilmezse eski bütünleşik arama
+        t = Object.prototype.hasOwnProperty.call(dict, nk) ? dict[nk] : null;
+        if (t === null) {
+          var degisti = false;
+          var satirlar = m[2].split("\n").map(function (x) {
+            var y = translate(x);
+            if (y !== x) degisti = true;
+            return y;
+          });
+          t = degisti ? satirlar.join("\n") : lookup(nk);
+        }
+      }
       if (t !== null && t !== undefined) out = m[1] + t + m[3];
     }
     cache[str] = out;
@@ -165,31 +200,152 @@
     try { return root && root.localStorage ? root.localStorage : null; } catch (e) { return null; }
   }
   function nav() { return env.navigator || (root && root.navigator) || null; }
+  function gecerli(v) { return v === "en" || v === "tr" ? v : null; }
 
-  function detect() {
-    var n = nav();
-    var l = String(n && (n.language || (n.languages && n.languages[0])) || "tr").toLowerCase();
+  // Yalnız öneri: ilk açılıştaki dil seçicide hangi düğmenin vurgulanacağı. Dili KENDİSİ
+  // belirlemez: CEP'te navigator.language Premiere'in arayüz dilidir ve Premiere'in
+  // Türkçe arayüzü olmadığından Türk kullanıcıların çoğunda "en-US" gelir.
+  function detect(navLang) {
+    var l = navLang;
+    if (l === undefined) {
+      var n = nav();
+      l = n && (n.language || (n.languages && n.languages[0]));
+    }
+    l = String(l || "tr").toLowerCase();
     return /^(tr|az)\b/.test(l) ? "tr" : "en";
   }
+
+  /*
+   * Dil çözümü (saf): 1) settings.uiLang  2) eski localStorage "suflo.uiLang"
+   * 3) uiLangPending (taze kurulumda soru açık kaldı) → null
+   * 4) settings.json bu yüklemeden önce vardıysa "tr" (her güncelleyen Türkçe kalır)
+   * 5) null: taze kurulum, kullanıcıya sor. navLang yalnız öneridir, sonucu değiştirmez.
+   */
+  function resolveLang(o) {
+    o = o || {};
+    var s = gecerli(o.stored);
+    if (s) return s;
+    var l = gecerli(o.legacyLS);
+    if (l) return l;
+    // taze kurulumda seçim yapılmadan settings.json yazıldıysa (davet kodu, rehber kaydı)
+    // dosya artık var ama soru hâlâ açık: uiLangPending bayrağı onu taşır
+    if (o.pending) return null;
+    if (o.settingsExisted) return "tr";
+    return null;
+  }
+
+  function lsOku() {
+    var s = storage();
+    try { return s ? s.getItem(LS_KEY) : null; } catch (e) { return null; }
+  }
+  function lsYaz(v) {
+    var s = storage();
+    try { if (s) s.setItem(LS_KEY, v); return !!s; } catch (e) { return false; }
+  }
+  function ayarlar() {
+    if (!cfg || typeof cfg.load !== "function") return null;
+    try { var a = cfg.load(); return a && typeof a === "object" ? a : null; } catch (e) { return null; }
+  }
+  function ayarDosyasiVardi() {
+    if (!cfg) return false;
+    var v = cfg.settingsExisted;
+    try { return !!(typeof v === "function" ? v() : v); } catch (e) { return true; }
+  }
+  function girdiler() {
+    var a = ayarlar();
+    return { stored: a ? a.uiLang : null, legacyLS: lsOku(), settingsExisted: ayarDosyasiVardi(),
+      pending: !!(a && a.uiLangPending === true), navLang: detect() };
+  }
+
+  // Ayar deposunu bağla. Eski localStorage seçimi settings.json'a bir kez taşınır.
+  function configure(o) {
+    cfg = o || null;
+    lang = null;
+    var a = ayarlar();
+    if (a && !gecerli(a.uiLang)) {
+      var eski = gecerli(lsOku());
+      if (eski) {
+        a.uiLang = eski;
+        try { if (typeof cfg.save === "function") cfg.save(a); } catch (e) {}
+      }
+    }
+    // Taze kurulum: soru açık olduğunu ayar nesnesine işaretle. Kendimiz kaydetmeyiz; bu
+    // oturumda ayarları kaydeden her şey (davet kodu, rehber) bayrağı da yazar, böylece
+    // sonraki açılışta dosya var diye "eski kurulum → Türkçe" sanılmaz ve soru yine gelir.
+    if (a && !gecerli(a.uiLang) && resolveLang(girdiler()) === null) a.uiLangPending = true;
+    return getLang();
+  }
+
+  // Taze kurulumda dil henüz seçilmedi mi? (ilk açılış rehberinin 0. adımı)
+  function needsChoice() { return !lang && resolveLang(girdiler()) === null; }
+
   function getLang() {
     if (lang) return lang;
-    var s = storage(), v = null;
-    try { v = s ? s.getItem(LS_KEY) : null; } catch (e) { v = null; }
-    return v === "en" || v === "tr" ? v : detect();
+    return resolveLang(girdiler()) || "tr";
   }
   function setLang(l) {
     l = l === "en" ? "en" : "tr";
-    lang = null;
-    var s = storage();
-    try { if (s) s.setItem(LS_KEY, l); } catch (e) { lang = l; }
+    lang = l;
+    var a = ayarlar();
+    if (a) {
+      a.uiLang = l;
+      if (Object.prototype.hasOwnProperty.call(a, "uiLangPending")) delete a.uiLangPending;
+      try { if (typeof cfg.save === "function") cfg.save(a); } catch (e) {}
+    }
+    lsYaz(l);   // ayna: settings.json yazılamazsa da seçim kalsın
     return l;
+  }
+
+  function onChange(fn) { if (typeof fn === "function") listeners.push(fn); }
+  function bildir(l) {
+    for (var i = 0; i < listeners.length; i++) {
+      try { listeners[i](l); } catch (e) {}
+    }
+  }
+
+  /*
+   * Arayüz dilini değiştir. EN: çevir + gözlemciyi bağla. TR: özgün metinleri geri koy.
+   * Geri koyma yapılamazsa (WeakMap yok) yalnız iş yokken sayfa yeniden yüklenir.
+   * opts.busy(): Whisper/ffmpeg işi sürüyor mu · opts.reload(): yeniden yükleme işlevi.
+   * Sonuç: "en" | "tr" | "reload" | "busy" (hiçbir şey değişmedi)
+   */
+  function switchLang(l, opts) {
+    opts = opts || {};
+    l = l === "en" ? "en" : "tr";
+    var mesgul = false;
+    try { mesgul = !!(opts.busy && opts.busy()); } catch (e) { mesgul = false; }
+    if (l === "tr" && !HAS_WM && mesgul) return "busy";
+    setLang(l);
+    var sonuc = l;
+    if (l === "en") start();
+    else if (!revert()) {
+      var yukle = opts.reload || function () { if (root && root.location) root.location.reload(); };
+      try { yukle(); } catch (e2) {}
+      sonuc = "reload";
+    }
+    bildir(l);
+    return sonuc;
   }
 
   /* ---------------- DOM ---------------- */
   function isUserZone(el) {
     var id = el.id || (el.getAttribute && el.getAttribute("id"));
-    if (id && USER_CONTENT_IDS.indexOf(id) !== -1) return true;
-    if (el.getAttribute && el.getAttribute("data-i18n-skip") !== null && el.getAttribute("data-i18n-skip") !== undefined) return true;
+    return !!(id && USER_CONTENT_IDS.indexOf(id) !== -1);
+  }
+  // [data-i18n-skip]: hiç girilmez (iki dilli dil seçicileri, büyük listeler)
+  function isSkipped(el) {
+    if (!el.getAttribute) return false;
+    var v = el.getAttribute("data-i18n-skip");
+    return v !== null && v !== undefined;
+  }
+  function isUiIsland(el) {
+    if (!el.getAttribute) return false;
+    var u = el.getAttribute("data-i18n-ui");
+    if (u !== null && u !== undefined) return true;
+    var c = " " + String(el.getAttribute("class") || "").replace(/\s+/g, " ") + " ";
+    for (var i = 0; i < UI_ISLAND_CLASSES.length; i++) {
+      if (c.indexOf(" " + UI_ISLAND_CLASSES[i] + " ") !== -1) return true;
+    }
     return false;
   }
   function isEditable(el) {
@@ -202,7 +358,13 @@
     var v = node.nodeValue;
     if (!v || !/[^\s]/.test(v)) return;
     var t = translate(v);
-    if (t !== v) node.nodeValue = t;
+    if (t === v) return;
+    if (origText) {
+      // zaten çevrilmiş bir değerin üstüne yeniden çeviri gelirse en eski Türkçe kalsın
+      var r = origText.get(node);
+      origText.set(node, { o: r && r.t === v ? r.o : v, t: t });
+    }
+    node.nodeValue = t;
   }
   function translateAttrs(el, inZone) {
     if (!el.getAttribute) return;
@@ -213,7 +375,14 @@
       var v = el.getAttribute(a);
       if (typeof v !== "string" || !v) continue;
       var t = translate(v);
-      if (t !== v) el.setAttribute(a, t);
+      if (t === v) continue;
+      if (origAttr) {
+        var rec = origAttr.get(el);
+        if (!rec) { rec = {}; origAttr.set(el, rec); }
+        var eskiR = rec[a];
+        rec[a] = { o: eskiR && eskiR.t === v ? eskiR.o : v, t: t };
+      }
+      el.setAttribute(a, t);
     }
   }
 
@@ -232,8 +401,8 @@
         if (tag === "TEXTAREA") translateAttrs(node, false);
         return;
       }
-      if (isEditable(node)) return;
-      if (UI_IN_USER_ZONE[tag]) uiAncestor = true;
+      if (isEditable(node) || isSkipped(node)) return;
+      if (UI_IN_USER_ZONE[tag] || (inZone && isUiIsland(node))) uiAncestor = true;
       // kabın kendi ipucu (ör. tc-words title) arayüz metnidir; kısıt yalnız içindekilere
       translateAttrs(node, inZone && !uiAncestor);
       if (isUserZone(node)) inZone = true;
@@ -247,9 +416,9 @@
     var inZone = false, ui = false, p = node.parentNode;
     while (p && p.nodeType === 1) {
       var tag = String(p.tagName || "").toUpperCase();
-      if (SKIP_TAGS[tag] || isEditable(p)) return null;
+      if (SKIP_TAGS[tag] || isEditable(p) || isSkipped(p)) return null;
       if (isUserZone(p)) inZone = true;
-      if (UI_IN_USER_ZONE[tag]) ui = true;
+      if (UI_IN_USER_ZONE[tag] || isUiIsland(p)) ui = true;
       p = p.parentNode;
     }
     return { inZone: inZone, ui: ui };
@@ -274,9 +443,9 @@
         if (c && (!c.inZone || c.ui)) translateText(r.target);
       } else if (r.type === "attributes") {
         var c2 = context(r.target);
-        if (!c2) continue;
+        if (!c2 || isSkipped(r.target)) continue;
         var tg = String(r.target.tagName || "").toUpperCase();
-        var zone = c2.inZone, ui = c2.ui || !!UI_IN_USER_ZONE[tg];
+        var zone = c2.inZone, ui = c2.ui || !!UI_IN_USER_ZONE[tg] || isUiIsland(r.target);
         translateAttrs(r.target, zone && !ui);
       }
     }
@@ -287,6 +456,11 @@
   function start(opts) {
     var doc = root && root.document;
     if (!doc || !doc.body) return false;
+    var de = doc.documentElement;
+    if (!origDoc) origDoc = { title: doc.title, lang: de && de.getAttribute ? de.getAttribute("lang") : null };
+    // lang="en" olmadan text-transform:uppercase kuralları Türkçe büyük harf kuralıyla
+    // "SETTİNGS" yazar
+    if (de && de.setAttribute) de.setAttribute("lang", "en");
     apply(doc.body);
     if (doc.title) doc.title = translate(doc.title);
     if (observer || typeof root.MutationObserver !== "function") return !!observer;
@@ -297,11 +471,86 @@
   }
   function stop() { if (observer) { observer.disconnect(); observer = null; } }
 
+  function geriKoy(node) {
+    if (!node) return;
+    if (node.nodeType === 3) {
+      var r = origText.get(node);
+      if (r) {
+        // kod o arada kendi metnini yazdıysa ona dokunma
+        if (node.nodeValue === r.t) node.nodeValue = r.o;
+        origText["delete"](node);
+      }
+      return;
+    }
+    if (node.nodeType === 1) {
+      var rec = origAttr.get(node);
+      if (rec) {
+        for (var a in rec) {
+          if (!Object.prototype.hasOwnProperty.call(rec, a)) continue;
+          if (node.getAttribute(a) === rec[a].t) node.setAttribute(a, rec[a].o);
+        }
+        origAttr["delete"](node);
+      }
+    }
+    var kids = node.childNodes || [];
+    for (var i = 0; i < kids.length; i++) geriKoy(kids[i]);
+  }
+
+  // EN → TR: gözlemciyi ayır, çevrilen her metni ve özniteliği özgün hâline döndür.
+  // false: geri koyma desteklenmiyor (WeakMap yok); çağıran yeniden yüklemeli.
+  function revert() {
+    stop();
+    if (!HAS_WM) return false;
+    var doc = root && root.document;
+    if (!doc || !doc.body) return true;
+    geriKoy(doc.body);
+    if (origDoc) {
+      if (typeof origDoc.title === "string") doc.title = origDoc.title;
+      var de = doc.documentElement;
+      if (de && de.setAttribute) {
+        if (origDoc.lang) de.setAttribute("lang", origDoc.lang);
+        else if (de.removeAttribute) de.removeAttribute("lang");
+      }
+      origDoc = null;
+    }
+    return true;
+  }
+  function running() { return !!observer; }
+
+  /*
+   * Bir düğümün ÖZGÜN (Türkçe) metni: çevrilmiş metin düğümleri kayıtlı özgün hâliyle
+   * okunur. Arayüz metnini önbelleğe alıp sonra geri yazan kod (data-temel, eski düğme
+   * etiketi, aria-label) bunu kullanmalı; yoksa İngilizce açılışta önbelleğe İngilizce
+   * girer ve EN → TR geçişinde geri dönmez. Çevrilmemiş düğümde textContent ile aynıdır.
+   */
+  function orig(node) {
+    if (!node) return "";
+    if (node.nodeType === 3) {
+      var v = node.nodeValue || "";
+      var r = origText ? origText.get(node) : null;
+      return r && r.t === v ? r.o : v;
+    }
+    if (node.nodeType !== 1 && node.nodeType !== 9 && node.nodeType !== 11) return "";
+    var kids = node.childNodes;
+    if (!kids) return node.textContent || "";
+    var out = "";
+    for (var i = 0; i < kids.length; i++) out += orig(kids[i]);
+    return out;
+  }
+  // Bir özniteliğin özgün (Türkçe) değeri
+  function origAttrOf(el, a) {
+    if (!el || !el.getAttribute) return null;
+    var v = el.getAttribute(a);
+    var rec = origAttr ? origAttr.get(el) : null;
+    return rec && rec[a] && rec[a].t === v ? rec[a].o : v;
+  }
+
   return {
     LS_KEY: LS_KEY, ATTRS: ATTRS, USER_CONTENT_IDS: USER_CONTENT_IDS,
-    translate: translate, tr: tr, apply: apply, start: start, stop: stop,
+    translate: translate, tr: tr, orig: orig, origAttr: origAttrOf, apply: apply, start: start, stop: stop, revert: revert, running: running,
     getLang: getLang, setLang: setLang, detect: detect, setDictionary: setDictionary,
+    resolveLang: resolveLang, configure: configure, needsChoice: needsChoice, switchLang: switchLang, onChange: onChange,
     _handle: handle,
-    _setEnv: function (e) { env = { storage: e && e.storage || null, navigator: e && e.navigator || null }; lang = null; }
+    _setEnv: function (e) { env = { storage: e && e.storage || null, navigator: e && e.navigator || null }; lang = null; cfg = e && e.cfg || null; }
   };
 });

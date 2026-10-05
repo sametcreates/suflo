@@ -66,6 +66,126 @@ chk("robots sitemap'i gosteriyor", /Sitemap: https:\/\/suflo\.app\/sitemap\.xml/
   chk("sayfada '" + k + "' geciyor", n >= 2, n + " kez");
 });
 
+/* ---------------- İngilizce site (docs/en): hreflang, canonical, og:locale, fiyat = canlı ödeme ---------------- */
+var Fiyat = require(KOKYOL + "js/pricing.js");
+function dosyaYolu(url) {
+  var p = url.replace(/^https:\/\/suflo\.app\//, "");
+  if (p === "" || /\/$/.test(p)) return D + p + "index.html";
+  return fs.existsSync(D + p + ".html") ? D + p + ".html" : D + p;
+}
+function alternatif(src) {
+  var o = {}, re = /<link rel="alternate" hreflang="([a-z-]+)" href="([^"]+)">/g, m;
+  while ((m = re.exec(src))) o[m[1]] = m[2];
+  return o;
+}
+var sitemapSrc = fs.readFileSync(D + "sitemap.xml", "utf8");
+var trDavet = (h.match(/<script id="davet-site">[\s\S]*?<\/script>/) || [""])[0];
+var TR_KARSILIGI_YOK = ["en/pro.html"];
+// noindex yönlendirme sayfaları hreflang taşımaz (Google noindex alternatifleri yok sayar)
+var proYonlendirme = fs.readFileSync(D + "pro.html", "utf8");
+chk("pro.html (noindex yönlendirme) hreflang taşımaz", !/hreflang=/.test(proYonlendirme) && /noindex/.test(proYonlendirme));
+var enSayfalar = ["en/index.html", "en/pro.html", "en/blog/index.html", "en/blog/free-local-auto-captions-premiere-whisper.html",
+  "en/blog/opusclip-alternative-premiere.html", "en/blog/autocut-firecut-alternative.html"];
+enSayfalar.forEach(function (f) {
+  var yol = D + f;
+  chk("EN sayfa var: " + f, fs.existsSync(yol));
+  if (!fs.existsSync(yol)) return;
+  var e = fs.readFileSync(yol, "utf8");
+  var can = (e.match(/<link rel="canonical" href="([^"]+)">/) || [])[1] || "";
+  var alt = alternatif(e);
+  chk(f + ": lang=en, canonical, og:locale en_US", /<html lang="en">/.test(e) && /^https:\/\/suflo\.app\/en\//.test(can) && /og:locale" content="en_US"/.test(e), can);
+  // Türkçe karşılığı olmayan sayfa (/en/pro: Türkçe Pro içeriği ana sayfada, /pro noindex
+  // yönlendirme) yalnız en + x-default taşır; tr gösterilirse karşılık dizinlenebilir olmalı
+  var yalnizEN = TR_KARSILIGI_YOK.indexOf(f) !== -1;
+  chk(f + ": hreflang " + (yalnizEN ? "en/x-default (tr yok)" : "tr/en/x-default"), alt.en === can && alt["x-default"] === can &&
+    (yalnizEN ? !alt.tr : /^https:\/\/suflo\.app\//.test(alt.tr || "")), JSON.stringify(alt));
+  if (!yalnizEN) {
+    var trYol = alt.tr ? dosyaYolu(alt.tr) : "";
+    var trSrc = trYol && fs.existsSync(trYol) ? fs.readFileSync(trYol, "utf8") : "";
+    var trAlt = alternatif(trSrc);
+    chk(f + ": karşılıklı hreflang (TR sayfası geri gösterir)", trAlt.en === can && trAlt.tr === alt.tr && trAlt["x-default"] === can, trYol + " " + JSON.stringify(trAlt));
+    var trCan = (trSrc.match(/<link rel="canonical" href="([^"]+)">/) || [])[1] || "";
+    chk(f + ": TR karşılığı dizinlenebilir ve kendi canonical'ı", trCan === alt.tr && !/name="robots" content="[^"]*noindex/.test(trSrc), trCan);
+  }
+  var t = (e.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
+  var dsc = (e.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
+  chk(f + ": başlık <= 60, açıklama 100-160", t.length <= 60 && dsc.length >= 100 && dsc.length <= 160, t.length + " / " + dsc.length);
+  var ldler = e.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g) || [];
+  var gecerli = ldler.length > 0 && ldler.every(function (b) { try { JSON.parse(b.replace(/^<script[^>]*>|<\/script>$/g, "")); return true; } catch (x) { return false; } });
+  chk(f + ": ld+json geçerli", gecerli);
+  var ldMetin = ldler.join("");
+  var paralar = (ldMetin.match(/"priceCurrency":"([A-Z]{3})"/g) || []).map(function (x) { return x.slice(-4, -1); });
+  chk(f + ": JSON-LD Offer para birimi canlı ödemeyle aynı (" + Fiyat.currency("en") + ")", paralar.every(function (c) { return c === Fiyat.currency("en"); }), paralar.join(","));
+  var gosterilen = (e.match(/data-price="([^"]+)"/g) || []).map(function (x) { return x.slice(12, -1).replace(/&amp;/g, "&"); });
+  chk(f + ": gösterilen fiyat = SufloPricing.label('en')", gosterilen.every(function (x) { return x === Fiyat.label("en"); }), gosterilen.join(","));
+  var odeme = (e.match(/href="(https:\/\/[a-z0-9.-]+\.lemonsqueezy\.com\/checkout\/buy\/[^"?]+)/g) || []).map(function (x) { return x.slice(6); });
+  chk(f + ": ödeme bağlantısı SufloPricing.offer('en').url", odeme.every(function (u) { return u === Fiyat.offer("en").url; }), odeme.join(","));
+  if (odeme.length) chk(f + ": davet betiği TR ile aynı ve lemon.js'ten önce", e.indexOf(trDavet) !== -1 && trDavet.length > 100 &&
+    e.indexOf('<script id="davet-site">') < e.indexOf("app.lemonsqueezy.com/js/lemon.js") && /id="davet-bilgi" hidden/.test(e));
+  var yol2 = can.replace(/\/$/, "/");
+  chk(f + ": site haritasında", sitemapSrc.indexOf("<loc>" + yol2 + "</loc>") !== -1, yol2);
+  chk(f + ": marka güvenli stil adları", !/CapCut|Hormozi|MrBeast/i.test(e));
+  var sss = e.match(/<details><summary>([\s\S]*?)<\/summary>/g) || [];
+  if (sss.length) {
+    var faq = null;
+    ldler.forEach(function (b) { var o = JSON.parse(b.replace(/^<script[^>]*>|<\/script>$/g, "")); (o["@graph"] || [o]).forEach(function (x) { if (x["@type"] === "FAQPage") faq = x; }); });
+    var cozul = function (x) { return x.replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"); };
+    chk(f + ": SSS yapısal verisi sayfadakiyle aynı", !!faq && faq.mainEntity.length === sss.length &&
+      faq.mainEntity.every(function (q, i) { return cozul(sss[i].replace(/<\/?(details|summary)>/g, "")) === q.name; }));
+  }
+});
+/* ---------------- suflo.app/stil: paylaşılan stil kodu sayfası ---------------- */
+var stilYol = D + "stil.html";
+chk("stil.html var", fs.existsSync(stilYol));
+if (fs.existsSync(stilYol)) {
+  var st = fs.readFileSync(stilYol, "utf8");
+  var stBaslik = (st.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
+  var stAcik = (st.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
+  chk("stil.html: title ≤ 60 ve Suflo Stili geçiyor", stBaslik.length > 10 && stBaslik.length <= 60 && /Suflo Stili/.test(stBaslik), stBaslik);
+  chk("stil.html: description 120-160", stAcik.length >= 120 && stAcik.length <= 160, stAcik.length + " karakter");
+  chk("stil.html: canonical, og:title/description/url/image, twitter:card, og:locale",
+    /rel="canonical" href="https:\/\/suflo\.app\/stil"/.test(st) && /property="og:title"/.test(st) && /property="og:description"/.test(st) &&
+    /property="og:url" content="https:\/\/suflo\.app\/stil"/.test(st) && /property="og:image" content="https:\/\/suflo\.app\/og\.png"/.test(st) &&
+    /twitter:card/.test(st) && /og:locale" content="tr_TR"/.test(st));
+  chk("stil.html: site haritasında", sitemapSrc.indexOf("<loc>https://suflo.app/stil</loc>") !== -1);
+  var csp = (st.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/) || [])[1] || "";
+  chk("stil.html: CSP script-src 'self' (satır içi betik yok)", /script-src 'self'(;|$)/.test(csp) && !/unsafe-inline[^;]*;?\s*$/.test(csp.split("script-src")[1].split(";")[0]) &&
+    !/<script(?![^>]*\ssrc=)[^>]*>/.test(st), csp);
+  chk("stil.html: yalnız yerel betikler (style-share + stil-sayfa)", (st.match(/<script src="([^"]+)"/g) || []).join(" ") === '<script src="js/style-share.js" <script src="js/stil-sayfa.js"');
+  chk("stil.html: indirme bağlantısı releases/latest", /href="https:\/\/github\.com\/sametcreates\/suflo\/releases\/latest">Suflo'yu indir</.test(st));
+  chk("stil.html: Kodu kopyala düğmesi", /id="kodu-kopyala"[^>]*>Kodu kopyala</.test(st));
+  var sayfaJs = fs.readFileSync(D + "js/stil-sayfa.js", "utf8");
+  chk("stil-sayfa.js: innerHTML / document.write yok, metin textContent ile", !/innerHTML|outerHTML|document\.write|insertAdjacentHTML/.test(sayfaJs) && /textContent/.test(sayfaJs));
+  chk("stil-sayfa.js: renk yalnız doğrulanmış hex ile", /SS\.isColor\(deger\)/.test(sayfaJs));
+  chk("stil.html: hreflang tr/en/x-default", /hreflang="tr" href="https:\/\/suflo\.app\/stil"/.test(st) &&
+    /hreflang="en" href="https:\/\/suflo\.app\/en\/stil"/.test(st) && /hreflang="x-default" href="https:\/\/suflo\.app\/en\/stil"/.test(st));
+}
+/* İngilizce paylaşım sayfası: İngilizce panelin "Share style" bağlantısı buraya gelir */
+var stilEnYol = D + "en/stil.html";
+chk("en/stil.html var", fs.existsSync(stilEnYol));
+if (fs.existsSync(stilEnYol)) {
+  var se = fs.readFileSync(stilEnYol, "utf8");
+  var seBaslik = (se.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
+  var seAcik = (se.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
+  chk("en/stil.html: lang=en, canonical, og:locale en_US", /<html lang="en">/.test(se) && /rel="canonical" href="https:\/\/suflo\.app\/en\/stil"/.test(se) &&
+    /property="og:url" content="https:\/\/suflo\.app\/en\/stil"/.test(se) && /og:locale" content="en_US"/.test(se));
+  chk("en/stil.html: title ≤ 60, description 120-160", seBaslik.length > 10 && seBaslik.length <= 60 && /Suflo Style/.test(seBaslik) &&
+    seAcik.length >= 120 && seAcik.length <= 160, seBaslik + " / " + seAcik.length);
+  chk("en/stil.html: hreflang TR sayfasıyla karşılıklı", /hreflang="tr" href="https:\/\/suflo\.app\/stil"/.test(se) &&
+    /hreflang="en" href="https:\/\/suflo\.app\/en\/stil"/.test(se) && /hreflang="x-default" href="https:\/\/suflo\.app\/en\/stil"/.test(se));
+  chk("en/stil.html: site haritasında", sitemapSrc.indexOf("<loc>https://suflo.app/en/stil</loc>") !== -1);
+  var cspE = (se.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/) || [])[1] || "";
+  chk("en/stil.html: CSP script-src 'self', yalnız yerel iki betik", /script-src 'self'(;|$)/.test(cspE) && !/<script(?![^>]*\ssrc=)[^>]*>/.test(se) &&
+    (se.match(/<script src="([^"]+)"/g) || []).join(" ") === '<script src="../js/style-share.js" <script src="../js/stil-sayfa.js"');
+  chk("en/stil.html: Türkçe metin yok, Copy code + Download Suflo", !/[ğışĞİŞ]/.test(se) && /id="kodu-kopyala"[^>]*>Copy code</.test(se) &&
+    /releases\/latest">Download Suflo</.test(se));
+  chk("en/stil.html: aynı öğe kimlikleri (stil-sayfa.js)", ["stil-ad", "stil-yazar-sar", "stil-yazar", "stil-hata", "stil-hata-metin", "stil-icerik", "stil-video",
+    "stil-temel", "stil-font", "renk-yazi", "renk-kontur", "renk-vurgu", "stil-konum", "stil-kod", "kodu-kopyala"].every(function (id) { return se.indexOf('id="' + id + '"') !== -1; }));
+}
+
+chk("TR ana sayfa altbilgisinde English bağlantısı", /<a href="\/en\/" hreflang="en" lang="en">English<\/a>/.test(h));
+
 console.log(s.join("\n"));
 var f = s.filter(function (x) { return x.indexOf("FAIL") === 0; }).length;
 console.log("\n" + (s.length - f) + "/" + s.length + " gecti");
+process.exit(f ? 1 : 0);

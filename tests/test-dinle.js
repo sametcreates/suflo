@@ -57,6 +57,23 @@ function bekle() { return new Promise(function (r) { setImmediate(r); }); }
   ok("iki panel de ortak oynaticiyi kullanir", /KDinle\("tc-audio"\)/.test(kk) && /KDinle\("cut-audio"\)/.test(mc));
   ok("magiccut: analiz, uygulama ve secim degisiminde kapanir", (mc.match(/sesiKapat\(\);/g) || []).length >= 3);
   ok("konusma-kes: analiz ve uygulamada kapanir", (kk.match(/sesiKapat\(\);/g) || []).length >= 2);
+
+  // "Yalnız kesilecekleri dinle": tum klip okunur, filtre yalniz kesimleri secer, en fazla 300 aralik
+  var cokKesim = [];
+  for (var q = 0; q < 320; q++) cokKesim.push({ start: q * 2, end: q * 2 + 0.5 });
+  var p4 = D.cal({ mediaPath: "/m.mp4", inPoint: 0, dur: 900, cuts: cokKesim, clip: { clipStart: 0, clipEnd: 900, dur: 900 }, only: true });
+  await bekle();
+  var a4 = calismalar[calismalar.length - 1];
+  bekleyen.shift()();
+  var r4 = await p4;
+  var af4 = a4[a4.indexOf("-af") + 1];
+  ok("only: tum klip okunur", a4[a4.indexOf("-t") + 1] === "900");
+  ok("only: aselect between (not yok), 300 aralik siniri", /^aselect='between/.test(af4) && (af4.match(/between/g) || []).length === 300, (af4.match(/between/g) || []).length);
+  ok("only: kisaltildi bayragi (320 > 300)", r4.ok && r4.kisaltildi === true);
+  var hata = "";
+  try { await D.cal({ mediaPath: "/m.mp4", inPoint: 0, dur: 60, cuts: [], clip: { clipStart: 0, clipEnd: 60, dur: 60 }, only: true }); } catch (eO) { hata = eO.message; }
+  ok("only: kesim yoksa hata (tum klip calinmaz)", /kesim yok/.test(hata), hata);
+  ok("dinle.js o.only'yi textcut'a gecirir", /only: true/.test(fs.readFileSync(path.join(__dirname, "..", "js", "dinle.js"), "utf8")));
   console.log(gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);
 })().catch(function (e) { console.log("FAIL istisna " + e.stack); process.exit(1); });

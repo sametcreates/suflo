@@ -9,6 +9,9 @@
 window.KEmojiAssets = (function () {
   "use strict";
 
+  // Tarayıcı penceresi / Premiere iletişim kutusu DOM değil: çevirmen göremez, metin burada çevrilir
+  function uiMetni(s) { return window.SufloI18n ? SufloI18n.tr(s) : s; }
+
   var items = [];
   var filtered = [];
   var filterMode = "all";
@@ -462,7 +465,7 @@ window.KEmojiAssets = (function () {
   function chooseFolder() {
     if (!proGate()) return;
     if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
-      var r = window.cep.fs.showOpenDialogEx(false, true, "Emoji Assets klasörü seç", null, null);
+      var r = window.cep.fs.showOpenDialogEx(false, true, uiMetni("Emoji Assets klasörü seç"), null, null);
       if (r && r.data && r.data.length) saveFolder(r.data[0]);
       return;
     }

@@ -16,6 +16,15 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 
 | Ne | Nasıl |
 |---|---|
+| **İlk altyazın 2 dakikada** *(3.1)* | İlk açılışta 4 adımlı rehber: hızlı küçük model (Türkçe: Small, 190 MB, ffmpeg arkada), örnek klipte deneme, stil önizlemesi, ücretsiz Groq anahtarı sihirbazı (panodan al + doğrula). AI düğmelerinde "anahtar gerekli · 1 dk" kısayolu |
+| **Pro'yu dene** *(3.1)* | Kodla çalışan her Pro aracına kendi videonda 3 deneme hakkı: otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir, Suflo Stilleri katmanı ve kanca başlığı, çeviri, ritim. Haklar süresiz; hak yalnız işlem başarıyla bitince düşer. Deneme stilli katmanlarında küçük bir suflo.app filigranı olur, Pro'yu alınca temiz yeniden oluşturulur |
+| **Davet et, kazan** *(3.1)* | Ayarlar'da davet kartı: Pro sahibine kişisel davet kodu (arkadaşına %15 indirim), Kopyala, WhatsApp, X, Instagram ve 1080x1920 Story kartı, "2/3 davet" ilerlemesi; 1 ve 3 davette panele kendiliğinden inen ödül paketleri. Ücretsizde kişisel bilgi taşımayan paylaşım bağlantısı. İlk kesim, ilk Shorts ve 5. uygulamadan sonra modal olmayan bir şerit (30 günde en çok bir kez, "bir daha gösterme"). Paylaşım metnine isteğe bağlı "Altyazılar: Suflo · suflo.app" satırı. Sunucu tarafı kurucu açana dek uyur |
+| **English (beta) arayüz** *(3.1)* | Ayarlar › Destek › Arayüz dili: Türkçe ya da English (beta); yeniden yüklemeden geçer, iş sürerken kilitli. Güncelleyenler Türkçe kalır, taze kurulumda rehberin ilk adımı sorar. İngilizcede fiyat ödemeyle aynı para biriminde (USD ödeme açılana dek "749 TRY (≈ $19)"); altyazı dili Otomatik, seçicide Whisper'ın 99 dili. Premiere'deki bin/marker adları değişmez |
+| **Tek Tık Temizlik** *(3.1)* | Konuşmadan kes'te **tekrar çekimler**: baştan alınan cümleler ve yarım başlangıçlar gruplanır, her grupta bir çekim kalır (son / en uzun / en akıcı; çipten elle seçilir, ▶ ile tek çekim dinlenir). Yalnız komşu cümleler karşılaştırılır, emin olunmayan gruplar işaretsiz listelenir. İsteğe bağlı **senaryo** (senaryoya en yakın çekim kalır, senaryo dışı konuşma yalnız listelenir) ve **AI ile benzer anlatımlar** (Groq anahtarı, sonuçlar onaya bırakılır). Tek **inceleme listesi** (neden çipi, işaret, zaman bağlantısı), "Yalnız kesilecekleri dinle", 300 kesim sınırı, "<sekans> — Suflo Temiz" kopyası. Ayarlar'da **ek dolgu sözcükleri**; **transkript önbelleği** aynı klibi yeniden yazıya dökmez (kesimden kalan alt klipler dahil) |
+| **Marka Kiti ve stil kodları** *(3.1)* | Suflo Stili seçiliyken **İnce ayar**: yazı tipi (paketle gelen 6 font), yazı / kontur / vurgu rengi, punto, kontur, konum ve 9:16'da **Platform arayüzünden kaçın** (yazı TikTok / Reels / Shorts'un sağdaki ikon sütununa taşmaz), Varsayılana dön. **Stili paylaş** tek satırlık bir `SFL1.` kodu ve `suflo.app/stil#KOD` bağlantısı kopyalar; kodu Stil kartındaki kutuya yapıştıran aynı görünümü alır ("Stil: @yazar" kredisiyle), `.suflo-stil` dosyası olarak da dışa / içe aktarılır. Kod yalnız stil ayarlarını taşır, dosya yolu ya da logo içermez; her değer doğrulanır. Ayarlar'da **Marka Kiti**: yazı tipin, renklerin, konumun ve köşe logon her Suflo Stiline ve kanca başlığına kendiliğinden uygulanır. Düzenlemek, önizlemek, paylaşmak ve kod yapıştırmak ücretsiz; timeline'a eklemek Pro (ya da deneme hakkı) |
+| **Viral Skor 2.0** *(3.1)* | Viral anlara açıklamalı 0–100 puan: kanca, bağımsızlık, duygu, değer ve kapanış alt puanları ile tek satırlık neden (toplam yerelde hesaplanır). Tür (podcast, eğitim, komedi…), adet (3–10) ve "ne arıyorsun?" odağı; klipler cümle ortasında başlamaz/bitmez, kartta ±1 cümle düğmeleri; 3 kanca başlığı seçeneği "Başlık ekle"ye gider. Puanlar tahmindir, izlenme garantisi değildir |
+| **Tek Tık Shorts Paketi** *(3.1)* | Viral anlar kartlarında "Pakete al" (60 ve üstü puan varsayılan işaretli), sonra **Paketi oluştur**: her an için 9:16 sekans (Auto Reframe), seçtiğin Suflo Stilinde markalı altyazı (Shorts transkriptinden, yeniden yazıya dökmeden), kartta seçili kanca başlığı ve tek "Çerçeve" katmanında ilerleme çubuğu (üst/alt; ince, kalın, kapsül), kapanış çağrısı ("Takip et", "Part 2 profilde", "Link açıklamada" ya da kendi metnin) ve Marka Kiti logosu. Her Short için YouTube Shorts, TikTok ve Reels başlığı, açıklaması ve hashtag'leri tek AI çağrısıyla (anahtar yoksa yapay zekâsız yedek); paylaşım paketi proje klasörüne `.txt` ve `.csv` olarak yazılır, isteğe bağlı kredi satırıyla. Her parça ayrı katman, bir Short'un hatası diğerlerini durdurmaz; İptal adımlar arasında durur, **Devam et** kaldığı yerden sürer. Kredi harcamaz, Premiere'in içinde çalışır. Pro (deneme hakkı yok) |
+| **Podcast Modu** *(3.1)* | Mikrofona göre otomatik kamera geçişi. **Her konuşmacının kendi mikrofonu olmalı** (ayrı ses katmanı); kameralar senkronlu, her biri kendi video katmanında. Sol menü › Podcast: **Sekansı tara** 2–4 konuşmacı için ad, mikrofon ve kamera eşlemesini katman sırasından önerir (isteğe bağlı geniş plan). **Analiz et** her mikrofonu Premiere'den ayrı dışa aktarır (birleşik klip, polyWAV, iç içe sekans ve klip kazancı dahil), kazanç farkını ve komşu mikrofona sızan sesi ayıklar; sessiz mikrofonu (kapalı / solo) reddeder. Ritim: en kısa plan, en uzun plan, hassasiyet, bekleme, çapraz konuşmada ve her N saniyede geniş plan; plan canlı yeniden hesaplanır, kamera başına renkli önizleme ve "84 kamera geçişi · A %46 · B %41 · Geniş %13" özeti. **Kopyada uygula** (varsayılan) ya da Bu sekansta: kamera katmanları yalnız kendi geçiş anlarında kesilir ve parçalar açılıp kapatılır, ses ve diğer katmanlara dokunulmaz; bağlı sesi koruma, iki yönlü bağda Ctrl+L uyarısı. **Konuşmacı renkleri**: Suflo Stilleri katmanında ve ASS'te her konuşmacı kendi renginde (Premiere'in SRT altyazı izi renk taşıyamaz). Multicam kaynak sekansı desteklenmez; tek mikrofona karışık kayıt sonraki sürümde. Analiz ücretsiz, uygulamak Pro (deneme hakkı yok) |
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
 | **Karaoke** | Kelime kelime ve birikimli mod; kelime zamanlarıyla |
@@ -76,17 +85,19 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL + KDV) |
 |---|---|
 | Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Bağımsız Stil Motoru ve şeffaf video katmanı |
-| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Creator Punch · CapCut Clean · SaaS Glass dahil Stil Motoru v3 |
+| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Creator Punch · Clean Pill · SaaS Glass dahil Stil Motoru v3 |
 | Düz stiller | Otomatik kesim (sessizlik temizleme) |
 | SRT · WebVTT · TXT dışa aktarım | Ritim/beat marker'ları |
 | SRT/VTT içe aktarım | Toplu çoklu klip transkripsiyonu |
-| Premiere caption izine uygulama | TR · AZ · EN · RU çeviri |
+| Premiere caption izine uygulama | 12 dile çeviri + çok dilli SRT paketi |
 | GPU hızlandırma | Stilli ASS dışa aktarım |
-| Emoji seçici | Terim sözlüğü |
-| Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar ve duraksama temizliği, kelimeye tıklayıp kes |
-| — | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Hormozi, Neon, Daktilo…), MOGRT gerekmez |
-| — | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
-| — | **Viral anlar:** uzun videodan 15–60 sn'lik Shorts/Reels anları, In/Out ve süreli marker |
+| Emoji seçici | **Sesi iyileştir** · **Otomatik zoom** · **Kanca başlığı** |
+| Bölümler (YouTube) + otomatik emoji | **Konuşmadan kes:** dolgu sesi, tekrar, tekrar çekim ve duraksama temizliği, kelimeye tıklayıp kes |
+| Terim sözlüğü (`yanlış => doğru`, her transkriptte) | **Suflo Stilleri:** 12 animasyonlu altyazı stili (Bold Box, Neon, Daktilo…) timeline'da, MOGRT gerekmez |
+| Kelime kelime ve birikimli (karaoke) altyazı izi | **Geçişler:** kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz |
+| — | **Viral anlar:** uzun videodan 15–90 sn'lik Shorts/Reels anları, açıklamalı 0–100 puan (Viral Skor 2.0), cümle güvenli kenarlar, In/Out ve süreli marker |
+| — | **Tek Tık Shorts Paketi:** seçili anlardan 9:16 sekans, markalı altyazı, kanca, ilerleme çubuğu, CTA, logo ve paylaşım metinleri |
+| — | **Podcast Modu:** mikrofona göre otomatik kamera geçişi (2–4 konuşmacı, geniş plan) ve konuşmacı renkli altyazı |
 | — | **Sahne algılama** ve **vuruşlarda bölme**; kesimleri uygulamadan **▶ Dinle** |
 | Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Panelden uygulanan 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 1.076 SFX ve 30 Motion BG |
 | — | Smart SFX 2.0: yoğunluk, güven puanı, alternatifler, toplu ekleme ve dalga önizlemesi |
@@ -94,9 +105,13 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 
 Abonelikli veya kredi tabanlı kurgu panellerinin aksine Suflo Pro'da sayaç ve otomatik yenileme yok — bir kez öde, bitti.
 
+**Pro'yu dene.** Almadan önce kendi videonda dene: kodla çalışan her Pro aracına (otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir, Suflo Stilleri katmanı ve kanca başlığı, çeviri, ritim) **3 deneme hakkın** var. Haklar süresiz; hak yalnız işlem başarıyla bitince düşer, hata ya da boş sonuç hak yemez. Otomatik kesim, konuşmadan kes ve ritimde analiz hak yemez; hak timeline'a ilk uygulamada düşer (ritimde aynı analizin markerları ve vuruşlarda bölmesi tek hak). Viral anlarda ise an bulunması bir hak sayılır. Deneme hakkıyla eklenen stilli altyazı katmanı ve kanca başlığının sağ üstünde küçük, yarı saydam bir `suflo.app` filigranı olur; SRT/VTT, Premiere caption izi, ses ve kesimler **hiçbir zaman** filigranlanmaz. Pro'yu etkinleştirince Ayarlar › Suflo Pro'daki "Deneme çıktılarını temiz yeniden oluştur" listesi, o sekans açıkken her deneme çıktısını filigransız yeniden üretir ve projedeki deneme dosyasını temiz olanla değiştirir; timeline'da taşıdığın, kırptığın ya da böldüğün klipler olduğu gibi kalır. Premiere dosyayı değiştiremezse Suflo yalnız hiç dokunulmamış klibi yeniler; düzenlenmiş klibe dokunmaz, temiz dosyanın yolunu verir (Proje panelinde Replace Footage ile sen bağlarsın). İçerik kütüphaneleri (MOGRT, SFX, Motion BG, preset, altyazı MOGRT stilleri), toplu klip ve stilli ASS dışa aktarma denemeye açık değil. Kalan hakların Ayarlar › Suflo Pro'da görünür.
+
 ### Pro İçerik Bulutu
 
 Pro lisansı bir kez etkinleştirilir. Slide, Zoom, Pop, Fade ve vurgu ailelerindeki 12 yerleşik Motion preseti anında açılır. Panel, 262 MOGRT, 14 koleksiyona ayrılmış 1.076 SFX, 30 Motion BG ve 278 efektlik Suflo Smooth `.prfpset` paketini private içerik servisinden indirir; sonraki sürümlerde yalnız değişen dosyaları alır. Suflo Native Preset Motoru paketin XML'ini içeride okur: standart Premiere parametrelerini kullanan 270 preset karttan seçili klibe doğrudan uygulanır. Adobe'nin opak özel verisini kullanan 8 preset ise yanlış sonuç üretmek yerine açıkça Premiere uyumluluk moduna yönlendirilir. Kesilen indirme kaldığı yerden devam eder ve yeni sürüm tüm SHA-256 kontrollerini geçmeden çalışan kütüphane değişmez. Public GitHub paketinde ücretli içerik bulunmaz; yalnız kilitli vitrinler vardır. Sunucu yerleşimi ve Hostinger paketi için [`server/pro-v1/README.md`](server/pro-v1/README.md) dosyasına bak.
+
+**Davet ödülleri.** 3.1 ve yeni panelde, davet kademesi 1 ya da 3 olan Pro sahibine sunucu ana kataloğa dokunmadan ayrı bir `extras.davet` listesi gönderir. Panel ana eşitleme bitince bu dosyaları Pro içerik klasöründeki `davet/` altına SHA-256 doğrulamasıyla indirir; SFX ve Grafikler onları Pro koleksiyonunda gösterir. Ödül klasörü budanmaz, indirme hatası ana eşitlemeyi bozmaz. Davet kodu ve sayaç Lemon Squeezy indirim API'siyle çalışır; anahtar yalnız sunucudaki private `config.php`'de durur (bkz. [`server/pro-v1/README.md`](server/pro-v1/README.md)).
 
 Kurulu içeriklerin değişmeyen dosyaları her Premiere açılışında yeniden hashlenmez; boyut/değişiklik zamanı farklıysa anında, her durumda en geç yedi günde bir tam SHA-256 doğrulaması yapılır. Geçici ilk bağlantı hatası otomatik yeniden denenir; kurulu son sağlam sürüm çevrimdışıyken kullanılmaya devam eder.
 
@@ -124,8 +139,8 @@ Oluşan klasörün içindeki `assets/`, `thumbs/`, `catalog.json` ve `.htaccess`
 
 1. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir ve kur (ücretsiz).
 2. [Son sürüm `.zxp` dosyasını indir](https://github.com/sametcreates/suflo/releases/latest), çift tıkla.
-3. Premiere'i kapat, tekrar aç → `Window > Extensions > Suflo`.
-4. Panelde **"Yerel motoru indir & kur"** düğmesine bas. Gerisini panel yapar.
+3. Premiere'i kapat, tekrar aç → `Window > Extensions (Legacy) > Suflo` (Premiere 25.6+ ve 2026) ya da `Window > Extensions > Suflo` (daha eski sürümler).
+4. Altyazı sekmesinin üstündeki **"İlk altyazın 2 dakikada"** rehberini izle: motoru kurar, örnek klipte dener, stilini ve yapay zekâyı açarsın. Gerisini panel yapar.
 
 NVIDIA ekran kartın varsa hızlandırma otomatik açılır.
 
@@ -148,12 +163,14 @@ Mac'te iki yardımcı program gerekiyor. Panel bunları senin için kurar, ama �
    ```
 4. [ZXP/UXP Installer](https://aescripts.com/learn/zxp-installer/) indir ve kur (ücretsiz).
 5. [Son sürüm `.zxp` dosyasını indir](https://github.com/sametcreates/suflo/releases/latest), çift tıkla.
-6. Premiere'i kapat, tekrar aç → `Window > Extensions > Suflo`.
-7. Panelde **"Yerel motoru kur (Homebrew)"** düğmesine bas.
+6. Premiere'i kapat, tekrar aç → `Window > Extensions (Legacy) > Suflo` (Premiere 25.6+ ve 2026) ya da `Window > Extensions > Suflo` (daha eski sürümler).
+7. Rehberde ya da panelde **"Yerel motoru kur (Homebrew)"** düğmesine bas. Homebrew yoksa rehber ücretsiz Groq anahtarıyla buluttan başlatır.
 
 **Neden Homebrew?** whisper.cpp macOS için hazır ikili yayınlamıyor (resmi sürüm dosyaları yalnız Windows ve Ubuntu); Mac'te bu araçları kurmanın standart yolu Homebrew. Panel `brew install whisper-cpp` çalıştırır, modelleri kendisi indirir.
 
 **Apple Silicon'da (M1 ve sonrası) GPU hızlandırma (Metal) kendiliğinden açıktır** — ayrı bir sürüm indirmek gerekmez.
+
+**Panel menüde görünmüyor mu?** Premiere'i tamamen kapatıp yeniden aç; 25.6+ ve 2026'da yol `Window > Extensions (Legacy)`. Adım adım kontrol listesi: [suflo.app/blog/premiere-suflo-paneli-gorunmuyor](https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor)
 
 **Homebrew istemiyorum:** ffmpeg'i [evermeet.cx](https://evermeet.cx/ffmpeg/)'ten tek dosya olarak indir, panelde `Ayarlar > ffmpeg > Elle yol` alanına yerini yaz, ücretsiz Groq anahtarıyla bulut modunu kullan. (Bu durumda ses Groq'a gider ve internet gerekir.)
 
@@ -216,7 +233,13 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 |---|---|
 | `test-download.js` | Yarım kalan indirmenin devamı, hangi HTTP hatasında dosya korunur/silinir |
 | `test-caption-text.js` | Halüsinasyon temizliği, karaoke, satır bölme, Türkçe-duyarlı terim sözlüğü |
-| `test-textcut.js` | Konuşmadan kes: dolgu/tekrar algılama, kesim aralıkları, duraksama kısaltma |
+| `test-textcut.js` | Konuşmadan kes: dolgu/tekrar algılama, kesim aralıkları, duraksama kısaltma, ek dolgular, cümle içi yeniden başlama, 300 kesim sınırı |
+| `test-retakes.js` | Tek Tık Temizlik: tekrar çekim / yarım başlangıç kuralları, politikalar, yanlış pozitifler (anafora, tarif adımları), senaryo hizalaması (300×600 < 1 sn), AI cevabı doğrulaması |
+| `test-transcript-cache.js` | Transkript önbelleği: kaynak zamanı, kapsayan girdi, LRU, atomik yazım, bozuk dizin, panel bağlantısı |
+| `test-konusma-kes-ui.js` | Konuşmadan kes paneli sahte DOM'da: çekim çipleri, inceleme listesi, AI geçişi (hata, bayat cevap), kopya sekans adı |
+| `test-tek-tik-temizlik.js` | Tek Tık Temizlik kart/ayar/host bağlantıları ve inceleme listesi satırları |
+| `test-style-share.js` | Stil kodları ve Marka Kiti: `SFL1.` gidiş-dönüş (Türkçe yazar, ≤ 600 karakter), bozuk / uzun / yanlış önekli kodlar fırlatmadan reddedilir, enjeksiyon ve `__proto__` temizliği, yerel yollar kodlanmaz, kit normalize ve öncelik, 9:16 logo yerleşimi, suflo.app/stil sayfası |
+| `test-marka-kiti-ui.js` | Ayarlar › Marka Kiti kartı sahte DOM'da: doldurma, renk/konum, logo seçme ve doğrulama, şimdiki ayarlardan doldur |
 | `test-chapters.js` | YouTube bölümleri: öneri, kural denetimi, AI yanıtı ayrıştırma |
 | `test-auto-emoji.js` | Otomatik emoji: Türkçe kök eşleşmesi, yoğunluk ve tekrar koruması |
 | `test-vurgu.js` | Anahtar kelime vurgusu: 12 stilde vurgu rengi, otomatik seçim, dışa aktarımda işaret temizliği |
@@ -228,7 +251,7 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-es3.js` | `jsx/` ExtendScript: ES5+/ES6 kullanımı (forEach, trim, let, =>, JSON, sondaki virgül) yok — yalnız Premiere'de patlayacak hatalar |
 | `test-cef.js` | Panel JS Premiere 14.4 (CEF 74 / Node 12.3) uyumu: `?.`, `??`, `replaceAll` vb. yok; `rmrf` eski Node'da çalışır |
 | `test-ffmpeg-secim.js` | ffmpeg seçimi: libass'li aday tercih edilir; libass'siz (Homebrew sade) ffmpeg'de anlaşılır uyarı |
-| `test-kanca.js` | Kanca başlığı: ASS üretimi, libass render (şeffaflık, vurgu rengi), host `at` yerleşimi |
+| `test-kanca.js` | Kanca başlığı: ASS üretimi, libass render (şeffaflık, vurgu rengi), host `at` yerleşimi, Marka Kiti yazı tipi ve rengi |
 | `test-kanca-uctan.js` | Kanca başlığı uçtan uca: panelin gerçek ffmpeg komutu → şeffaf qtrle .mov, yerleşim argümanları, temizlik |
 | `test-dinle.js` | Dinle önizlemesi: eski isteğin sesi çalmaz, dosya/tutamaç temizliği, uzun klipte ilk 5 dk |
 | `test-dikey.js` | 9:16: stil ölçeği, güvenli alan konumu, 12 stilde libass taşma kontrolü |
@@ -236,6 +259,16 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-ses-uctan.js` | Sesi iyileştir uçtan uca: 5.1 kaynak → stereo, senkron < 1 ms, sessiz klipte anlaşılır hata |
 | `test-transitions.js` · `test-transition-host.js` | Geçiş planları ve host'un sahte Premiere modelinde gerçek keyframe yazımı |
 | `test-highlights.js` · `test-viral-host.js` | Viral anlar: satır sınırı, süre uzatma/kırpma, çakışma; süreli marker ve In/Out |
+| `test-viral-skor.js` | Viral Skor 2.0: istem (tür beyaz listesi, adet 3–10, 120 karakter odak), ağırlıklı puan (0–10 ölçeği tek kez, eksik alt puan), cümle sınırına oturtma, ±1 cümle (uzun cümlede cümle ortasına düşmez), adet sınırı, ≥60 filtresi, kopyalanan liste |
+| `test-viral-ui.js` | Viral Skor 2.0 panel akışı (sahte DOM): ayar kalıcılığı, puan halkası ve alt puan çubukları, kanca seçimi → Başlık ekle, kenar kayınca yalnız o kart (odak korunur), canlı sekans sorgusuyla In/Out ve Shorts, gizli an kenarı kilitlemez, adet sınırı |
+| `test-shorts-ekler.js` | Shorts paketi ekleri (gerçek libass): ilerleme çubuğu 0,5 / 5 / 9,9 sn'de %5 / %50 / %99 dolu, çubuk dışı şeffaf, dikeyde platform arayüzünün dışında (üst ve alt); CTA son N saniyede, "Cta" stil adı, 8 sn altı ve kancayla çakışmada yok; kanca + CTA + çubuk tek ASS'te |
+| `test-shorts-paket.js` | Shorts paketi planı: ffmpeg / libass / AI anahtarı / Auto Reframe eksikliğinde gerekçeli atlama, kutular; stilin harf/noktalama kuralıyla cue'lar (Türkçe İ/ı, emoji atılır, `*vurgu*` kalır, çakışma yok); tek çağrıda üç platform (YouTube 3, TikTok/Reels 5 hashtag, bozuk platform yalnız kendini düşürür); BOM + CRLF TXT/CSV, tırnaklama, kredi satırı; CON ve `:` dosya adları; 429/5xx bekleme; sahte bağımlılıklarla iş sırası, hata yalıtımı, devam, iptal |
+| `test-shorts-host.js` | Shorts paketi host işlevleri (sahte Premiere): sekansı kimlikle aç (openSequence yedeği, doğrulama, konmuş paket katmanları), adıyla bul, miras Suflo katmanlarını say, `sourceId` ile Short'tan alt sekans yapılmaz, `expectSeqId` farklı sekansta reddeder |
+| `test-shorts-paket-uctan.js` | Shorts paketi uçtan uca (sahte K + gerçek ffmpeg): iki an için çağrı sırası, qtrle + alfa katmanlar Short boyunda, LLM 429 sonrası yeniden deneme ve yedek metin, TXT/CSV proje klasöründe, geçici klasörler temiz, Devam et yalnız hatalı adımı yineler |
+| `test-shorts-paket-devam.js` | Shorts paketi panel akışı (sahte K / Premiere / render): Devam et işin kendi transkriptini kullanır ve yeni aramayı kaynak sekansa bağlamaz, zaman aşımından sonra aynı Short ikinci kez oluşmaz, hazırlıkta İptal, yarım iş sorulmadan silinmez, miras altyazı 9:16'da kapatılır, atlanacak katmanlar baştan bildirilir, boş CTA reddedilir, çiplerde durum imi + aria-label |
+| `test-multicam.js` | Podcast Modu saf modülü: bilinen genlikli sinüsün dBFS'i, sessizlik tabanı; 2 konuşmacı −12 / −15 dB sızıntıyla birebir plan, 12 dB kısık konuşmacı normalize sonrası bulunur; 3 konuşmacı sırayla, çapraz konuşmada geniş plan (yoksa tutar), sessizlik tutar, minShot / hold / maxShot / widePeriodic, boşluksuz plan; kameraya özel geçiş anları, camAt, planStats (400 üstü uyarı), speakerFor; eşleme önerisi ve denetimi; stil motoru konuşmacı renkleri (renksiz çıktı bayt bayt aynı, grup konuşmacı sınırını aşmaz); panelin altyazı seçenekleri |
+| `test-multicam-host.js` | Podcast Modu host işlevleri (sahte Premiere + QE): katman düzeni (multicam / birleşik / düz klip), kilitli / multicam / yanlış sekans değişiklikten önce reddedilir, kopya sekans; yalnız kamera katmanları ve yalnız kendi geçişlerinde razor; her an tek kamera açık, değişmeyen değer yazılmaz; bağlı ses geri yüklenir, iki yönlü bağda linkedConflict; parçalı iki aşama = tek geçiş; `KS_exportAudio` unmuteWanted her susturmayı geri yükler, varsayılan davranış aynı |
+| `test-multicam-energy.js` | Podcast Modu enerji hattı (gerçek ffmpeg, Türkçe ve boşluklu yol): sızıntılı iki sentetik WAV → 8 kHz ham PCM → dBFS → plan; geçişler gerçeğin ±0,2 sn içinde, geçici dosyalar silinir, düz klip yedeği sekans zamanına hizalanır |
 | `test-scenes.js` | Sahne algılama (gerçek ffmpeg) ve seçili klibi bölme |
 | `test-model-dogrulama.js` | Whisper modellerinin SHA-256 doğrulaması |
 | `test-ceviri-dili.js` | Çeviri sonrası büyük harf kuralının hedef dile uyması |
@@ -246,11 +279,24 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-burn.js` | ASS'in libass ile videoya gerçekten çizildiği (kare farkı) |
 | `test-hata.js` | Hata rehberi: doğru tavsiye veriyor mu, masum hataya yanlış tavsiye veriyor mu |
 | `test-mac.js` | macOS yolları: Homebrew, Metal, model klasörü, Windows'a özgü kodun çalışmaması |
-| `test-pro-license.js` | Store/product sahipliği, yanlış aktivasyonu geri bırakma, private kimlik sızıntısı |
-| `test-pro-sync.js` | Delta indirme, kaldığı yerden devam, atomik sürüm geçişi, offline geri dönüş |
-| `test-pro-cdn.js` | Private Hostinger ağacı, manifest hash'leri ve yayın öncesi API güvenlik kapısı |
+| `test-pro-license.js` | Store/product sahipliği, yanlış aktivasyonu geri bırakma, private kimlik sızıntısı; deneme hakları: kurmadan kapı kapalı, harcama imzalı yazılır, kurcalanmış/bozuk depo 0 hak verir, ayna silinen dosyayı geri doldurmaz, "Ücretsiz dene" düğmesi kurar ve eylemi yeniden çalıştırır, Pro'da deneme dosyası yazılmaz |
+| `test-deneme.js` | Pro'yu dene durum mantığı: 9 araç 3'er hak, kütüphaneler 0, harca alttan sınırlı ve girdiyi değiştirmez, birleştirmede büyük kazanır, lisans biçimli nesne reddedilir, deneme çıktısı kaydı (en çok 10, font adı yol içeremez) |
+| `test-filigran.js` | Deneme filigranı: tek stil + tek olay, idempotent, ilk stilin fontu, `\an9` ve `&H66&`, dikeyde daha aşağıda, son olayı kapsar, özgün satırlar bayt bayt aynı; libass'le gerçek render'da yalnız filigranlıda sağ üst dolu |
+| `test-overlay-render.js` | Ortak şeffaf katman render'ı (gerçek ffmpeg: qtrle, alfa, çift boyut) ve temiz yeniden oluşturma: sekans eşleşmezse dokunmaz, önce yerleştirir, yalnız başarıda `{path}` ile kaldırır (nodeId asla), render sırasında sekans değişirse yerleştirmez; Marka Kiti logosu (logosuz argümanlar aynı, straight alfa birebir, yazı pikselleri değişmez) |
+| `test-deneme-baglanti.js` | Deneme bağlantıları: 9 araç deneme kapısında, hak yalnız başarı dalında düşer, kütüphane/MOGRT/toplu/ASS kapıları denemesiz, zoom kaldırma kapısız, ücretsizde MOGRT stili reddedilir, filigran yalnız stilli katman ve kanca başlığında, betik sırası, Ayarlar kartları ve Pro tablosu; gecisler.js'te hata/başarı davranışı |
+| `test-pro-sync.js` | Delta indirme, kaldığı yerden devam, atomik sürüm geçişi, offline geri dönüş; davet ödülleri `<kök>/davet` altına SHA kontrolüyle iner, ana sürüm değişmez, hata durumu `ready` bırakır, gezinme ve yanlış SHA reddedilir |
+| `test-pro-cdn.js` | Private Hostinger ağacı, manifest hash'leri ve yayın öncesi API güvenlik kapısı; davet paketi ayrı manifestte, üretim config'i davet özelliğini anahtarsız ve kapalı kurar, `ls_api_key` yalnız config'ten okunur |
+| `test-referral.js` | Davet çekirdeği: `SFL` + 6 kod biçimi, TR/EN paylaşım metinleri (X ≤ 280, Instagram yalnız kopyala), WhatsApp kodlaması, indirimli ödeme bağlantısı `checkout[custom]` alanlarını korur, 1/3/10 kademe sınırları, makine kimliği sızdırmayan davet kimliği, şerit kuralları (30 gün, gelecek zaman, meşgul, yıldız şeridi, 3. değil 5. uygulama), kredi satırı ve Story kartı ASS'i |
+| `test-davet-ui.js` | Davet kartı ve şeridi sahte DOM'da: ücretsiz paylaşım bağlantısı, arkadaştan gelen kod, sunucu kapalı/eski/açık, lisansa bağlı önbellek, Story kartı, "bir daha gösterme", "Bizi nereden duydun?" ve modül bağlantıları |
+| `test-referral-server.js` | `php -S` + Node'da sahte Lemon Squeezy: uyuyan özellik 503, geçersiz lisans 403, JSON:API indirim oluşturma ve kodun yeniden kullanımı, sayaçta iade/ödenmemiş/kendi e-postası/tekrar/14 günden genç siparişlerin dışlanması, 600 sn önbellek, 422 yumuşak hata, yanıtlarda e-posta ve anahtar olmaması, extras yalnız kademe ≥ 1 ve istemci ≥ 3.1.0, `davet/` yolu ref kademesi olmadan reddedilir, attribution kaydı (php yoksa atlanır) |
+| `test-site-davet.js` | suflo.app davet betiği: `?d=` ve `?ref=` doğrulanır, 30 gün saklanır, Lemon Squeezy bağlantılarına `checkout[discount_code]` / `checkout[custom][ref]` olarak eklenir; ortaklık sayfası ve site haritası |
 | `test-v175.js` | Sürüm regresyonları |
-| `seo-kontrol.js` | `docs/` site çıktısı: meta etiketler, JSON-LD, sitemap |
+| `test-i18n.js` | İngilizce arayüz: dil çözümü (güncelleyen Türkçe kalır, taze kurulumda sor), settings.json kaydı, `lang=en`, yeniden yüklemesiz geri dönüş, çok satırlı metin, kapsama (index.html, js, host.jsx ≥ %95), performans |
+| `test-pricing.js` | Fiyat modülü: Türkçe çıktı v3.0 ile bayt bayt aynı, gösterilen fiyat = açılan ödeme (USD varyantı yokken TRY), en.js fiyat kalıbı |
+| `test-marka.js` | Marka güvenli görünen adlar (Clean Pill, Bold Box), kimlikler ve render çıktısı aynı |
+| `test-diller.js` | Altyazı dili seçicisinde Whisper'ın 99 dili ve CJK/Hint glif notu |
+| `test-kurucu-kaynak.js` | İki dilli kurucu (E/e ve Y/y onayı) ve paketleme listelerinde `i18n` |
+| `seo-kontrol.js` | `docs/` site çıktısı: meta etiketler, JSON-LD, sitemap; İngilizce sayfalarda karşılıklı hreflang, og:locale, canlı ödemeyle aynı fiyat ve para birimi |
 | `cakisma.js` | CSS sınıf adı çakışmaları (aynı ada iki tanım) |
 
 `test-export.js` ve `test-burn.js` `ffmpeg` ister; yoksa atlanır.
@@ -260,12 +306,48 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 Suflo'nun odağı konuşmayı izlenebilir kurguya çevirmek. Altyazı, sessizlik kesme, ritim,
 MOGRT/SFX/Emoji Assets kütüphanesi ve Akıllı SFX aynı iş akışında buluşur. Sıradakiler:
 
-- Konuşmacı ayrımı (podcast ve röportaj kurgusu için)
+- Tek mikrofona karışık kayıtta konuşmacı ayrımı (Podcast Modu B; ayrı mikrofonlu kayıt 3.1 ile geldi)
 - SFX dalga formu ve ses seviyesi eşitleme
 - Yeni yazı animasyonu ve SFX koleksiyonları (Pro İçerik Bulutu üzerinden)
 - Azerice arayüz çevirisi
 
 Kelime kelime vurgulu altyazıyı timeline'a koyma listeden çıktı — 2.4.0 ile geldi, Pro katmanında.
+
+## English
+
+Suflo is a free, open-source Premiere Pro panel for auto captions with local Whisper (99 languages,
+no uploads, no account), plus an optional one-time-price Pro tier: Auto Cut, text-based cut, viral
+Shorts with an explained 0–100 score, animated caption styles, transitions and content libraries.
+
+- **English interface (beta):** pick English on first launch, or switch any time under
+  Settings › Support › Interface language. No reload needed. Bin and marker names that Suflo creates
+  in Premiere (Suflo Altyazi, Suflo Shorts) stay the same.
+- **Price:** Pro is a one-time purchase. Until the USD checkout opens, the English UI and site show
+  **749 TRY (≈ $19)** and open the TRY checkout, so the price you see is always what you pay.
+  Every code-based Pro tool (Auto Cut, text-based cut, viral moments, zoom, transitions, enhance
+  audio, styled captions and hook titles, translation, beat sync) gives you 3 free tries on your own
+  footage first; content libraries (MOGRTs, SFX, Motion BGs, presets), batch clips, the Shorts
+  package and Podcast Mode are Pro-only.
+- **New in 3.1:**
+  - **One-click Shorts package:** turn the viral moments you pick into 9:16 sequences with captions,
+    a hook title, a progress bar, a call to action, your logo and per-platform titles and hashtags.
+  - **Podcast Mode:** automatic camera switching from one mic per speaker (2–4 speakers, optional
+    wide shot), applied on a copy of the sequence; captions in each speaker's color.
+  - **One-click cleanup:** text-based cut now groups retakes and false starts and keeps one take
+    (last, longest or smoothest), with optional script matching and extra filler words.
+  - **Brand kit and style codes:** your font, colors and corner logo on every caption style and hook
+    title; share a style as a one-line code or a [suflo.app/en/stil](https://suflo.app/en/stil.html) link.
+  - **Invite codes:** Pro owners get a personal code (a discount for friends) and reward packs at 1
+    and 3 invites.
+- **Install:** Premiere Pro 2020 (14.4) or newer on Windows/macOS. Download the
+  [latest release](https://github.com/sametcreates/suflo/releases/latest); the installer is bilingual.
+- **Website and guides:** [suflo.app/en](https://suflo.app/en/) ·
+  [Free local auto captions for Premiere](https://suflo.app/en/blog/free-local-auto-captions-premiere-whisper) ·
+  [OpusClip alternative inside Premiere](https://suflo.app/en/blog/opusclip-alternative-premiere) ·
+  [AutoCut / FireCut alternative](https://suflo.app/en/blog/autocut-firecut-alternative)
+
+Found a string that is still Turkish? [Open an issue](https://github.com/sametcreates/suflo/issues)
+with a screenshot.
 
 ## Lisans
 

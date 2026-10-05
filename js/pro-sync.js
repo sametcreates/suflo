@@ -138,6 +138,38 @@ window.ProSync = (function () {
     return { version: version, files: files, token: String(raw.token), totalBytes: total, manifestId: id };
   }
 
+  /*
+   * Davet odulleri (manifest.extras.davet): ana katalogdan ayri, yalniz eklenen bir kanal.
+   * Yol davet/t1|t3/ onekini tasir; onekten sonrasi ana katalogla ayni safeItem kuralindan
+   * gecer ama yalniz mogrt/ ve sfx/ kabul edilir. Gecersiz extras ana esitlemeyi bozmaz: null.
+   */
+  function validateExtras(raw) {
+    var ex = raw && raw.extras && raw.extras.davet;
+    if (!ex || typeof ex !== "object") return null;
+    var version = safeVersion(ex.version);
+    if (!Array.isArray(ex.files) || !ex.files.length || ex.files.length > 2000) throw new Error("Davet ödül kataloğu geçersiz.");
+    var seen = {}, total = 0;
+    var files = ex.files.map(function (item) {
+      if (!item || typeof item !== "object") throw new Error("Bozuk davet ödülü kaydı.");
+      var full = String(item.path || "").replace(/\\/g, "/").replace(/^\/+/, "");
+      var m = /^davet\/(t1|t3)\/(.+)$/i.exec(full);
+      if (!m) throw new Error("Güvensiz davet ödülü yolu: " + full);
+      var clean = safeItem({ path: m[2], bytes: item.bytes, sha256: item.sha256 });
+      if (!/^(mogrt|sfx)\//i.test(clean.path)) throw new Error("Desteklenmeyen davet ödülü: " + full);
+      var tier = m[1].toLowerCase();
+      var local = tier + "/" + clean.path;
+      if (seen[local.toLowerCase()]) throw new Error("Davet kataloğunda yinelenen dosya: " + full);
+      seen[local.toLowerCase()] = true; total += clean.bytes;
+      return { path: "davet/" + local, local: local, bytes: clean.bytes, sha256: clean.sha256 };
+    });
+    if (total > 4 * 1024 * 1024 * 1024) throw new Error("Davet ödülleri güvenli boyut sınırını aşıyor.");
+    return { version: version, files: files };
+  }
+  function davetDir() {
+    var root = rootDir();
+    return root ? K.path.join(root, "davet") : "";
+  }
+
   async function fetchManifest(creds) {
     if (cfg.manifestFetcher) return cfg.manifestFetcher(cfg.endpoint, creds);
     var r = await K.httpJson(cfg.endpoint, { "User-Agent": "Suflo-ProSync/" + K.VERSION }, {
@@ -320,6 +352,67 @@ window.ProSync = (function () {
     try { pruneReleases(dir, rollback); } catch (e3) {}
   }
 
+  /*
+   * Davet odullerini <root>/davet/ altina indir. Surum klasoru yok, hic budanmaz (Premiere ice
+   * aktarilmis SFX'i kilitler; kazanilan odul silinmez). Her dosya SHA-256 ile dogrulanir; boyut ve
+   * degisiklik zamani kayitliysa yeniden hashlenmez. Hata atmaz: ana esitlemenin sonucu degismez.
+   */
+  async function syncExtras(manifest, extras) {
+    if (!extras || !extras.files || !extras.files.length) return { ok: true, downloaded: 0 };
+    var dir = davetDir();
+    if (!dir) return { ok: false, downloaded: 0 };
+    var markerFile = K.path.join(dir, ".suflo-davet.json");
+    var marker = readJson(markerFile) || {};
+    var local = marker.localFiles && typeof marker.localFiles === "object" ? marker.localFiles : {};
+    var downloaded = 0, failed = 0;
+    ensureDir(dir);
+    for (var i = 0; i < extras.files.length; i++) {
+      var item = extras.files[i];
+      var dest = K.path.join(dir, item.local.replace(/\//g, K.path.sep));
+      try {
+        if (!inside(dir, dest)) throw new Error("Güvensiz davet hedefi: " + item.path);
+        var key = item.local.toLowerCase();
+        var have = false;
+        if (K.fs.existsSync(dest)) {
+          var st = K.fs.statSync(dest), mt = Math.floor(Number(st.mtimeMs || st.mtime.getTime()));
+          var m = local[key];
+          if (st.size === item.bytes && m && m.sha256 === item.sha256 && m.bytes === st.size && m.mtimeMs === mt) have = true;
+          else if (st.size === item.bytes && (await hashFile(dest)) === item.sha256) have = true;
+        }
+        if (!have) {
+          ensureDir(K.path.dirname(dest));
+          await fetchFile(manifest, { path: item.path, bytes: item.bytes, sha256: item.sha256 }, dest, null);
+          if (K.fs.statSync(dest).size !== item.bytes || (await hashFile(dest)) !== item.sha256) {
+            try { K.fs.unlinkSync(dest); } catch (eDel) {}
+            throw new Error("Doğrulama başarısız: " + item.path);
+          }
+          downloaded++;
+        }
+        var st2 = K.fs.statSync(dest);
+        local[key] = { bytes: st2.size, mtimeMs: Math.floor(Number(st2.mtimeMs || st2.mtime.getTime())), sha256: item.sha256 };
+      } catch (e) {
+        failed++;
+        K.log("[pro-sync] davet ödülü: " + (e && e.message ? e.message : e));
+      }
+    }
+    try { writeJson(markerFile, { schema: 1, version: extras.version, syncedAt: Date.now(), localFiles: local }); } catch (eW) {}
+    if (downloaded) {
+      try { if (window.KLib) KLib.tara(); } catch (e1) {}
+      try { if (window.KSfx) KSfx.tara(); } catch (e2) {}
+      // sessiz arka plan esitlemesinde de kullanici yeni odulunden haberdar olsun
+      try { if (window.KDavet && KDavet.odulIndi) KDavet.odulIndi(downloaded); } catch (e3) {}
+    }
+    return { ok: failed === 0, downloaded: downloaded, failed: failed };
+  }
+  async function extrasAfter(raw, manifest) {
+    var extras = null;
+    try { extras = validateExtras(raw); }
+    catch (e) { K.log("[pro-sync] davet ödülleri atlandı: " + (e && e.message ? e.message : e)); return null; }
+    if (!extras) return null;
+    try { return await syncExtras(manifest, extras); }
+    catch (e2) { K.log("[pro-sync] davet ödülleri: " + (e2 && e2.message ? e2.message : e2)); return { ok: false }; }
+  }
+
   async function runSync(options) {
     options = options || {};
     if (!K.nodeOK || !K.fs || !K.path) throw new Error("Pro içerik eşitleme için dosya erişimi gerekli.");
@@ -358,7 +451,8 @@ window.ProSync = (function () {
     if (!inside(releases, releaseDir)) throw new Error("İçerik sürümü güvenli değil.");
     if (await readyRelease(releaseDir, manifest)) {
       activateRelease(releaseDir, manifest, 0, manifest.files.length, String(K.settings().proPackKlasor || ""));
-      return { ok: true, current: true, version: manifest.version, path: releaseDir };
+      var extrasCur = await extrasAfter(raw, manifest);
+      return { ok: true, current: true, version: manifest.version, path: releaseDir, extras: extrasCur };
     }
 
     var staging = releaseDir + ".staging";
@@ -423,7 +517,8 @@ window.ProSync = (function () {
       if (K.fs.existsSync(releaseDir)) removeTree(releaseDir);
       K.fs.renameSync(staging, releaseDir);
       activateRelease(releaseDir, manifest, downloaded, copied, previousDir);
-      return { ok: true, version: manifest.version, path: releaseDir, downloaded: downloaded, copied: copied };
+      var extrasNew = await extrasAfter(raw, manifest);
+      return { ok: true, version: manifest.version, path: releaseDir, downloaded: downloaded, copied: copied, extras: extrasNew };
     } catch (e) {
       // Dogrulanan staging dosyalari ve .part parcasi kalir; ayni manifestle
       // sonraki deneme kaldigi yerden devam eder. Farkli manifest gelirse ustte temizlenir.
@@ -486,5 +581,8 @@ window.ProSync = (function () {
     if (options.fileFetcher) cfg.fileFetcher = options.fileFetcher;
   }
 
-  return { init: init, sync: sync, status: status, on: on, openFolder: openFolder, configure: configure, rootDir: rootDir, VERSION: "1.0.0" };
+  // Pro icerik API'si (davet kodu ve "nereden duydun" da ayni adrese gider: js/davet.js)
+  function endpoint() { return cfg.endpoint; }
+
+  return { init: init, sync: sync, status: status, on: on, openFolder: openFolder, configure: configure, rootDir: rootDir, davetDir: davetDir, endpoint: endpoint, VERSION: "1.0.0" };
 })();

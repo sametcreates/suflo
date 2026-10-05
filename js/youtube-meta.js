@@ -18,7 +18,10 @@
   var PLATFORM = {
     youtube: { ad: "YouTube", aciklama: 5000, hashtag: 3, etiket: true },
     instagram: { ad: "Instagram Reels", aciklama: 2200, hashtag: 5, etiket: false },
-    tiktok: { ad: "TikTok", aciklama: 2200, hashtag: 5, etiket: false }
+    tiktok: { ad: "TikTok", aciklama: 2200, hashtag: 5, etiket: false },
+    // Shorts paketi (js/shorts-paket-plan.js): başlık ≤100, etiket alanı yok; YouTube başlığın
+    // üstünde yalnız ilk 3 hashtag'i gösterir, fazlası gürültü
+    shorts: { ad: "YouTube Shorts", aciklama: 5000, hashtag: 3, etiket: false }
   };
   function platform(p) { return PLATFORM[p] ? p : "youtube"; }
   var DIL = { tr: "Turkish", az: "Azerbaijani", en: "English", ru: "Russian", de: "German", ar: "Arabic",
@@ -131,12 +134,23 @@
   }
 
   /*
-   * Yapıştırılmaya hazır açıklama: metin + (varsa) bölümler + hashtag'ler.
-   * 5000 karakteri aşarsa önce açıklama metni kısaltılır; bölümler bozulmaz.
+   * Yapıştırılmaya hazır açıklama: metin + (varsa) bölümler + hashtag'ler + (isteğe bağlı) kredi.
+   * o.kredi ("Altyazılar: Suflo · suflo.app") en sona eklenir ve sınır (YouTube 5000,
+   * Reels/TikTok 2200) aşılınca İLK düşen odur: kredi için metin kısaltılmaz, bölümler bozulmaz.
+   * Kredisiz metin sınırı aşarsa açıklama metni kısaltılır; bölümler bozulmaz.
    */
   function compose(o) {
     o = o || {};
     var pf = PLATFORM[platform(o.platform)];
+    var kredi = String(o.kredi || "").replace(/\s+/g, " ").trim();
+    var tasma = { kisaldi: false };
+    var metin = composeGovde(o, pf, tasma);
+    if (!kredi || tasma.kisaldi) return metin;
+    var tam = metin ? metin + "\n\n" + kredi : kredi;
+    return tam.length <= pf.aciklama ? tam : metin;
+  }
+
+  function composeGovde(o, pf, tasma) {
     // Reels/TikTok aciklamasinda bolum (zaman damgasi) anlamsiz; kanca ilk satira
     var bolum = pf.etiket ? String(o.bolumler || "").trim() : "";
     var kanca = pf.etiket ? "" : String(o.kanca || "").trim();
@@ -145,13 +159,15 @@
     var govde = String(o.aciklama || "").trim();
     var sabit = (bolum ? bolum.length + 2 : 0) + (etiket ? etiket.length + 2 : 0) + (kanca ? kanca.length + 2 : 0);
     var yer = pf.aciklama - sabit;
-    if (govde.length > yer) govde = yer > 20 ? govde.slice(0, yer - 1).replace(/\s+\S*$/, "") + "…" : "";
+    if (govde.length > yer) { govde = yer > 20 ? govde.slice(0, yer - 1).replace(/\s+\S*$/, "") + "…" : ""; tasma.kisaldi = true; }
     if (kanca) parcalar.push(kanca);
     if (govde) parcalar.push(govde);
     if (bolum) parcalar.push(bolum);
     if (etiket) parcalar.push(etiket);
     // bolumler tek basina sinirdan uzunsa: son care kirp (YouTube 5000'den uzununu reddeder)
-    return parcalar.join("\n\n").slice(0, pf.aciklama);
+    var sonuc = parcalar.join("\n\n");
+    if (sonuc.length > pf.aciklama) tasma.kisaldi = true;
+    return sonuc.slice(0, pf.aciklama);
   }
 
   return { SINIR: SINIR, PLATFORM: PLATFORM, buildPrompt: buildPrompt, parseResponse: parseResponse, compose: compose, metin: metin };

@@ -12,11 +12,11 @@ var cp = require("child_process");
 var kok = path.resolve(__dirname, "..");
 var testDir = path.join(kok, "tests");
 var hizli = process.argv.indexOf("--hizli") !== -1;
-var ffmpegGerekli = ["test-export.js", "test-burn.js"];
+var ffmpegGerekli = ["test-export.js", "test-burn.js", "test-multicam-energy.js"];
 // libass'li ffmpeg (subtitles/ass filtresi) isteyen render testleri. Bazi dagitimlarin ffmpeg'i
 // (orn. Homebrew'un sade "ffmpeg"i) libass'siz gelir: o zaman bu dosyalar "atlandi" sayilir.
 var libassGerekli = ["test-animasyon.js", "test-burn.js", "test-dikey.js", "test-emoji-cdn.js", "test-kanca.js",
-  "test-kanca-uctan.js", "test-overlay.js", "test-stil.js", "test-style-engine.js"];
+  "test-kanca-uctan.js", "test-overlay.js", "test-shorts-ekler.js", "test-shorts-paket-uctan.js", "test-stil.js", "test-style-engine.js"];
 
 function ffmpegVar() {
   var r = cp.spawnSync("ffmpeg", ["-version"], { stdio: "ignore" });

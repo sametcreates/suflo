@@ -6,10 +6,16 @@
  * işaretli kelimeler vurgu renginde. Saf modül: DOM'a, ağa, Premiere'e dokunmaz.
  */
 (function (root, factory) {
-  var api = factory();
+  // Paket fontlari (style-share) ve platform guvenli alani (style-engine) ortak kaynaktan
+  function yukle(ad, dosya) {
+    if (root && root[ad]) return root[ad];
+    if (typeof require === "function") { try { return require(dosya); } catch (e) {} }
+    return null;
+  }
+  var api = factory(yukle("SufloStyleShare", "./style-share.js"), yukle("SufloStyleEngine", "./style-engine.js"));
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloHookTitle = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function () {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS, SE) {
   "use strict";
 
   var STILLER = {
@@ -84,16 +90,29 @@
     try { return text.toLocaleUpperCase(loc); } catch (e) { return text.toUpperCase(); }
   }
 
+  // Diger ASS'lerle birlestirilen kopyalar (Shorts paketinde CTA) kendi stil adini tasir
+  function stilAdi(ad) {
+    return typeof ad === "string" && /^[A-Za-z][A-Za-z0-9]{0,15}$/.test(ad) ? ad : "Kanca";
+  }
+
   /*
-   * opts: { text, stil, width, height, dur, renk, vurguRenk, konum ("ust"|"orta"), loc }
+   * opts: { text, stil, width, height, dur, renk, vurguRenk, konum ("ust"|"orta"|"alt"), loc,
+   *         font (Marka Kiti: paket fontlarindan biri; gecersizse stilin kendi fontu),
+   *         styleName (ASS stil adi; varsayilan "Kanca" — verilmezse cikti bayt bayt eskisi) }
+   * "alt": blok dikeyde platform alt arayuzunun (%78) ustunde, yatayda alt ucte biter.
    * Doner: { ass, fontFiles, dur }
    */
   function build(opts) {
     opts = opts || {};
     var st = STILLER[opts.stil] || STILLER.kutu;
+    if (SS && typeof opts.font === "string" && SS.hasFont(opts.font) && opts.font !== st.font) {
+      st = { ad: st.ad, font: opts.font, fontFile: SS.fontFile(opts.font), genislik: SS.FONTS[opts.font].genislik, boyut: st.boyut, kase: st.kase };
+    }
     var W = Math.max(320, Math.round(opts.width || 1920)), H = Math.max(180, Math.round(opts.height || 1080));
     var dur = Math.max(1, Math.min(10, Number(opts.dur) || 3));
-    var renk = opts.renk || "#ffffff", vurgu = opts.vurguRenk || "#ffe600";
+    // renkler yalniz #rrggbb (assColor gecersizi beyaza cevirir; vurgu icin kendi varsayilani)
+    var renk = /^#[0-9a-f]{6}$/i.test(String(opts.renk || "")) ? opts.renk : "#ffffff";
+    var vurgu = /^#[0-9a-f]{6}$/i.test(String(opts.vurguRenk || "")) ? opts.vurguRenk : "#ffe600";
     var kisa = Math.min(W, H);
     var loc = opts.loc || { tr: "tr-TR", az: "az" }[opts.lang || "tr"];
     var toks = tokens(kase(String(opts.text || ""), st.kase, loc));
@@ -108,12 +127,15 @@
     if (enUzun * fs * st.genislik > maxW) fs = Math.max(10, Math.floor(maxW / (enUzun * st.genislik)));
     var satirH = fs * 1.18, blokH = satirH * lines.length;
     var cx = Math.round(W / 2);
-    var cy = Math.round(opts.konum === "orta" ? H * .5 : H * (W < H ? .2 : .22) + blokH / 2);
+    var cy = Math.round(opts.konum === "orta" ? H * .5
+      : opts.konum === "alt" ? H * (W < H ? .74 : .84) - blokH / 2
+      : H * (W < H ? .2 : .22) + blokH / 2);
+    var stilAd = stilAdi(opts.styleName);
     var giris = .28, cikis = .22;
 
     var ev = [];
     function d(layer, a, b, txt) {
-      ev.push("Dialogue: " + layer + "," + tcode(a) + "," + tcode(b) + ",Kanca,,0,0,0,," + txt);
+      ev.push("Dialogue: " + layer + "," + tcode(a) + "," + tcode(b) + "," + stilAd + ",,0,0,0,," + txt);
     }
     // ekVurgu/ekNormal: vurgulu kelimeye ozel ek ASS etiketleri (or. kontur) ve geri alinisi
     function satirMetni(l, normal, accent, ekVurgu, ekNormal) {
@@ -195,7 +217,7 @@
       "ScaledBorderAndShadow: yes", "YCbCr Matrix: None", "PlayResX: " + W, "PlayResY: " + H, "",
       "[V4+ Styles]",
       "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-      "Style: Kanca," + st.font + "," + fs + "," + assColor(renk) + "," + assColor(renk) + "," + assColor("#000000") + "," +
+      "Style: " + stilAd + "," + st.font + "," + fs + "," + assColor(renk) + "," + assColor(renk) + "," + assColor("#000000") + "," +
         assColor("#000000", 0x80) + ",-1,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1",
       "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ].concat(ev).join("\n") + "\n";
@@ -261,8 +283,8 @@
     }).slice(0, 8);
   }
 
-  // TikTok / Reels / Shorts arayuzunun kapattigi bolgeler (Altyazi onizlemesiyle ayni oranlar)
-  var GUVENLI_ALAN = [{ x: 0, y: 0, w: 1, h: 0.07 }, { x: 0.87, y: 0.35, w: 0.13, h: 0.43 }, { x: 0, y: 0.78, w: 1, h: 0.22 }];
+  // TikTok / Reels / Shorts arayuzunun kapattigi bolgeler: tek kaynak stil motoru (Altyazi onizlemesiyle ayni)
+  var GUVENLI_ALAN = (SE && SE.GUVENLI_ALAN) || [{ x: 0, y: 0, w: 1, h: 0.07 }, { x: 0.87, y: 0.35, w: 0.13, h: 0.43 }, { x: 0, y: 0.78, w: 1, h: 0.22 }];
   function safeZoneFilter(w, h) {
     return GUVENLI_ALAN.map(function (b) {
       var x = Math.round(b.x * w), y = Math.round(b.y * h), bw = Math.round(b.w * w), bh = Math.round(b.h * h);
@@ -275,5 +297,5 @@
     return Object.keys(STILLER).map(function (id) { return { id: id, ad: STILLER[id].ad }; });
   }
 
-  return { STILLER: STILLER, safeZoneFilter: safeZoneFilter, build: build, suggestPrompt: suggestPrompt, parseSuggestions: parseSuggestions, tokens: tokens, satirlar: satirlar, list: list };
+  return { STILLER: STILLER, stilAdi: stilAdi, safeZoneFilter: safeZoneFilter, build: build, suggestPrompt: suggestPrompt, parseSuggestions: parseSuggestions, tokens: tokens, satirlar: satirlar, list: list };
 });

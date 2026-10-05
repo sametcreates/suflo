@@ -22,7 +22,11 @@ if ([int]$manifest.counts.sfx -lt 1 -or [int]$manifest.counts.mogrt -lt 1) { thr
 
 $zip = Join-Path $root ("dist\Suflo-Pro-Content-" + $version + ".zip")
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
-Compress-Archive -LiteralPath @($content, $manifestPath) -DestinationPath $zip -CompressionLevel Optimal
+# Davet odul paketleri (varsa) ayri klasorde gider; ana katalog ve config.php'ye dokunmaz
+$davet = Join-Path $private "davet"
+$parcalar = @($content, $manifestPath)
+if (Test-Path -LiteralPath (Join-Path $davet "manifest.json") -PathType Leaf) { $parcalar += $davet }
+Compress-Archive -LiteralPath $parcalar -DestinationPath $zip -CompressionLevel Optimal
 & node (Join-Path $PSScriptRoot "zip-izin.js") $zip
 if ($LASTEXITCODE -ne 0) { throw "ZIP yol ayiraclari Hostinger icin duzeltilemedi." }
 

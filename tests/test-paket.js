@@ -18,7 +18,7 @@ ok("SRT bicimi ve numaralandirma", /^1\r\n00:00:00,000 --> 00:00:00,300\r\nKISA\
 ok("buyuk harf: Turkce dosyada İ, Almanca/Ingilizce dosyada I", M.stil("bilgi", "tr") === "BİLGİ" && M.stil("bitte", "de") === "BITTE" && M.stil("this", "en") === "THIS");
 var pk = src.slice(src.indexOf("async function cokDilliPaket()"), src.indexOf("function paketZamanlari("));
 ok("paket: ekrandaki altyazi degismez (segments yazilmaz), kaynak orig, vurgu temiz", !/segments\s*=|s\.text\s*=/.test(pk) && /typeof s\.orig === "string" \? s\.orig : s\.text/.test(pk) && /CT\.stripEmphasis/.test(pk));
-ok("paket: Pro kapisi ve ortak ceviri fonksiyonu", /Pro\.gate\("translate"\)/.test(pk) && /await metinleriCevir\(cfg, metinler, dil/.test(pk));
+ok("paket: Pro kapisi ve ortak ceviri fonksiyonu", /Pro\.gate\("translate"/.test(pk) && /await metinleriCevir\(cfg, metinler, dil/.test(pk));
 ok("translateAll da ortak ceviri fonksiyonunu kullanir", /var out = await metinleriCevir\(cfg, texts, target/.test(src));
 ok("index: paket kutusu ve dil secimleri", /id="cap-paket-box"/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")));
 DOM["cap-punct"].checked = false;

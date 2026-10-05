@@ -24,7 +24,7 @@ Write-Host "  PlayerDebugMode acildi (CSXS 9-14)" -ForegroundColor DarkGray
 # 2) Dosyalari kopyala
 if (Test-Path -LiteralPath $destFull) { Remove-Item -LiteralPath $destFull -Recurse -Force }
 New-Item -ItemType Directory -Path $destFull -Force | Out-Null
-foreach ($item in @("CSXS", "css", "js", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE", ".debug")) {
+foreach ($item in @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE", ".debug")) {
     $p = Join-Path $src $item
     if (Test-Path -LiteralPath $p) { Copy-Item -LiteralPath $p -Destination $destFull -Recurse -Force }
 }
@@ -44,4 +44,6 @@ Write-Host "  Kopyalandi: $destFull" -ForegroundColor DarkGray
 
 Write-Host ""
 Write-Host "Bitti. Premiere Pro'yu yeniden baslat, sonra:" -ForegroundColor Green
-Write-Host "  Window > Extensions > Suflo" -ForegroundColor Green
+Write-Host "  Premiere 25.6+ / 2026:  Window > Extensions (Legacy) > Suflo" -ForegroundColor Green
+Write-Host "  Daha eski surumler:     Window > Extensions > Suflo" -ForegroundColor Green
+Write-Host "  Menude yoksa: https://suflo.app/blog/premiere-suflo-paneli-gorunmuyor" -ForegroundColor DarkGray

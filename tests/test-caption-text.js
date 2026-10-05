@@ -44,6 +44,29 @@ chk("katmanSuresi: 25 fps'te kare izgarasina asagi (36.65 -> 36.64)", Math.abs(T
   T.katmanSuresi(36.63, 36.65, 25));
 chk("katmanSuresi: kalan bilinmiyorsa eski davranis", T.katmanSuresi(38.0, 0) === 40);
 chk("katmanSuresi: altyazi sekansa sigmiyorsa kesilmez", T.katmanSuresi(50, 30) === 52);
+/* tamSekans (Marka Kiti logosu): katman sekansin kalanini kaplar, kare izgarasinda, asla uzun degil */
+chk("katmanSuresi tamSekans: uzun sekansta kalanin tamami", T.katmanSuresi(10, 454, 25, true) === 454, T.katmanSuresi(10, 454, 25, true));
+var tsFps = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60], tsKotu = [];
+[12.345, 38.02, 61.7071, 100.01, 3599.99].forEach(function (kalan) {
+  tsFps.forEach(function (f) {
+    var s = T.katmanSuresi(5, kalan, f, true), kare = s * f;
+    if (!(s <= kalan + 1e-9 && Math.abs(kare - Math.round(kare)) < 1e-6 && kalan - s < 1 / f)) tsKotu.push(kalan + "@" + f + "=" + s);
+  });
+});
+chk("katmanSuresi tamSekans: kare izgarasinda, sekanstan uzun degil, en fazla bir kare kisa", tsKotu.length === 0, tsKotu.slice(0, 3).join(" "));
+chk("katmanSuresi tamSekans: altyazi sekanstan uzunsa yine sekans kadar", T.katmanSuresi(50, 30, 25, true) === 30);
+chk("katmanSuresi tamSekans: kalan bilinmiyorsa eski davranis", T.katmanSuresi(38.0, 0, 25, true) === 40);
+chk("katmanSuresi tamSekans: fps yoksa kalanin kendisi", T.katmanSuresi(5, 12.3, 0, true) === 12.3);
+/* logoKatmanKalan: logolu katman secilen kapsamin sonuna kadar (sekans sonuna degil) */
+var lkSpec = { end: 1200, inPoint: 600, outPoint: 630 };
+chk("logoKatmanKalan: tum sekans → sekans sonu", T.logoKatmanKalan("entire", lkSpec, 0, 20) === 1200);
+chk("logoKatmanKalan: In/Out → Out noktasi (katman In'den baslar)", T.logoKatmanKalan("inout", lkSpec, 600, 25) === 30, T.logoKatmanKalan("inout", lkSpec, 600, 25));
+chk("logoKatmanKalan: In/Out, Out yok ya da In'den once → sekans sonu", T.logoKatmanKalan("inout", { end: 100, inPoint: 10, outPoint: 0 }, 10, 5) === 90 &&
+  T.logoKatmanKalan("inout", { end: 100, inPoint: 10, outPoint: 5 }, 10, 5) === 90);
+chk("logoKatmanKalan: Out sekans sonundan sonra → sekans sonu", T.logoKatmanKalan("inout", { end: 100, inPoint: 10, outPoint: 150 }, 10, 5) === 90);
+chk("logoKatmanKalan: klip → 0 (altyazilar boyunca, tam sekans yok)", T.logoKatmanKalan("clip", lkSpec, 0, 20) === 0);
+chk("logoKatmanKalan: altyazi siniri asiyorsa 0 (logosuz hesap)", T.logoKatmanKalan("inout", lkSpec, 600, 45) === 0);
+chk("logoKatmanKalan: 20 dk sekansta 30 sn In/Out, katman ~30 sn", T.katmanSuresi(25, T.logoKatmanKalan("inout", lkSpec, 600, 25), 25, true) === 30);
 
 /* karaoke */
 var w = [seg(0, 0.5, "bir"), seg(0.4, 0.9, "iki"), seg(3, 3.01, "üç")];

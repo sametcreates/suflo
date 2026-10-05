@@ -38,3 +38,5 @@ jobs:
       - uses: actions/checkout@v5
       - name: Pro sunucusu sozdizimi
         run: php -l server/pro-v1/index.php && php -l server/pro-v1/config.example.php
+      - name: Davet sunucusu (php -S + sahte Lemon Squeezy)
+        run: node tests/test-referral-server.js

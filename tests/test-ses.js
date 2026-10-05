@@ -91,7 +91,7 @@ ok("host: gecersiz aralik reddedilir", call("KS_placeCleanAudio", { path: "/t/x.
 
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 var sesjs = fs.readFileSync(path.join(__dirname, "..", "js", "ses.js"), "utf8");
-ok("panel: kart, betikler, Pro kapisi", /id="ses-card"/.test(html) && /js\/audio-clean\.js/.test(html) && /js\/ses\.js/.test(html) && /Pro\.gate\("audioclean"\)/.test(sesjs));
+ok("panel: kart, betikler, Pro kapisi", /id="ses-card"/.test(html) && /js\/audio-clean\.js/.test(html) && /js\/ses\.js/.test(html) && /Pro\.gate\("audioclean"/.test(sesjs));
 var spl = "  Stream #0:0: Video: h264, yuv420p, 1920x1080\n  Stream #0:1(eng): Audio: aac (LC), 48000 Hz, stereo, fltp (default)\n  Stream #0:2: Audio: pcm_s24le, 48000 Hz, 4 channels, s32\n  Stream #0:3: Audio: ac3, 48000 Hz, 5.1(side), fltp";
 ok("parseStreams: stereo / 4 kanal / 5.1", JSON.stringify(A.parseStreams(spl)) === JSON.stringify([{ sira: 0, kanal: 2 }, { sira: 1, kanal: 4 }, { sira: 2, kanal: 6 }]), JSON.stringify(A.parseStreams(spl)));
 ok("parseStreams: sessiz video -> bos", A.parseStreams("  Stream #0:0: Video: h264").length === 0);

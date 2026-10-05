@@ -43,7 +43,9 @@ ok("CEP acilisinda 17 WebM decoder'i birden baslatilmaz",
   !/motion\.preload\s*=\s*"metadata"/.test(source) &&
   /previewVideo\.removeAttribute\("src"\)/.test(source));
 ok("Siparis kaynagi Lemon Squeezy siparis verisine eklenir",
-  /checkout%5Bcustom%5D%5Bsource%5D=suflo_panel/.test(app) && /app_version/.test(app));
+  // ödeme bağlantısı js/pricing.js'e taşındı (fiyatla aynı para birimi); app.js onu kullanır
+  /checkout%5Bcustom%5D%5Bsource%5D=suflo_panel/.test(fs.readFileSync(path.join(__dirname, "..", "js", "pricing.js"), "utf8")) &&
+  /app_version/.test(fs.readFileSync(path.join(__dirname, "..", "js", "pricing.js"), "utf8")) && /SufloPricing\.checkoutUrl\(/.test(app));
 ok("Web sitesi altyazi stillerini ilk Pro galerisinde gercek onizlemelerle gosterir",
   /class="on" data-g="captions"/.test(site) && (site.match(/gorseller\/caption-styles\/.+?\.webm/g) || []).length >= 8);
 ok("Web odemesi sayfa ici pencere ve kaynak olcumuyle hazirdir",

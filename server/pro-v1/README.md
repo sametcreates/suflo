@@ -28,3 +28,16 @@ Servis, Lemon Squeezy doğrulama kotasını kötüye kullanıma karşı korumak 
 2.8.2 ve yeni istemciler `presets/*.prfpset` içeriğini de alır. Daha eski istemcilere katalog preset yolları filtrelenerek döner; böylece eski MOGRT/SFX/Motion BG kurulumu yeni içerik türü yüzünden kesilmez.
 
 `tools/publish.ps1` her yayında ZXP ve kolay kurulum ZIP'ini yeniden üretir, tüm testleri çalıştırır ve `tools/verify-release.ps1` ile imzayı, arşiv yollarını, gerekli Pro Sync dosyalarını ve ücretli/gizli içerik sızıntısını doğrular. Bu kapılardan biri geçmezse commit, push ve release başlamaz.
+
+## Davet et, kazan (uyuyan özellik)
+
+`index.php` üç yeni işlem taşır: `referral` (Pro sahibinin davet kodu ve davet sayısı), `referral_stats` (yalnız sayı, kod oluşturmaz) ve `attribution` ("Bizi nereden duydun?" yanıtı). Davet işlemleri `config.php` içinde `referral_enabled => true`, dolu bir `ls_api_key` ve en az bir `referral_variant_ids` girilene dek `503 referral_disabled` döner; panel bu durumda sessizce ücretsiz paylaşım bağlantısına düşer. 3.0 istemciler etkilenmez.
+
+- **Kod:** `SFL` + 6 karakter (A-Z, 2-7). Lisans kimliğinin `token_secret` ile HMAC'inden türetilir ama `referrals.json` içinde saklanır; `token_secret` değişse de mevcut kod değişmez. Lemon Squeezy'de `%referral_percent`, en çok `referral_max` kullanım, tek seferlik ve yalnız `referral_variant_ids` varyantlarına geçerli bir indirim olarak açılır.
+- **Sayaç:** indirimi kullanan, ödemesi tamamlanmış, iade edilmemiş, davet edenin kendi e-postası olmayan ve 14 günden eski siparişlerin farklı e-postaları sayılır. Sonuç 600 sn önbellekte tutulur. Kademeler 1 / 3 / 10; kazanılan kademe iadeyle geri düşmez.
+- **Ödüller:** `private/pro-v1/davet/t1/` ve `davet/t3/` altındaki MOGRT/SFX dosyaları, `davet/manifest.json` ile 3.1.0+ istemcilere `manifest.extras.davet` olarak gider. Ana `files[]`, `content_version` ve `counts` değişmez. İndirme tokeni `ref` kademesini taşır; `davet/tN/` yolu yalnız `ref >= N` ise iner. Ödül paketini oluşturmak için paket klasörüne `davet/t1/{mogrt,sfx}/` ve `davet/t3/{mogrt,sfx}/` ekleyip `build-pro-cdn.js` çalıştır.
+- **Kayıtlar:** `referrals.json` yalnız lisans kimliğinin SHA-256'sı, kod, indirim kimliği ve e-posta özetini tutar; `attribution.jsonl` gün, yanıt ve lisans anahtarının SHA-256'sını tutar. İkisi de `private/` altında kalır.
+
+**Güvenlik:** Lemon Squeezy API anahtarı **tüm mağazaya** yetkilidir (indirim, iade, müşteri verisi). Yalnız sunucudaki `private/pro-v1/config.php` dosyasında durur; GitHub'a, panele, ZXP/ZIP'e, e-postaya veya sohbete asla girmez. Sunucu anahtarı yalnız `Authorization` başlığında gönderir, yanıtlara ve günlüklere yazmaz. Sızdığından şüphelenirsen hemen Lemon Squeezy > Settings > API'den sil ve yenisini oluştur. `tools/verify-release.ps1`, paketlerde gömülü bir Bearer tokeni, dolu bir `ls_api_key` ya da (yerelde `SUFLO_LS_API_KEY` veya private config'te biliniyorsa) anahtarın kendisi bulunursa yayını durdurur. `tools/check-pro-cdn.js`, `referral` işleminin `403`/`503` JSON döndüğünü de doğrular.
+
+Çalışan sunucuda `config.php`'yi yeniden üretme: yeni anahtarları (`ls_api_key`, `referral_enabled`, `referral_percent`, `referral_max`, `referral_variant_ids`, `referrals_path`, `attribution_path`, `davet_dir`) `config.example.php`'den elle ekle. Açma adımları `marketing/v4-kurucu-yapilacaklar.md` içindedir.

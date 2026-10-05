@@ -73,8 +73,14 @@
    * yuvarli). Kuyruk sekansin sonunu GECMEZ: Shorts'ta altyazi sekans sonuna
    * kadar gidiyor ve katman sekansi ~3 sn bos goruntuyle uzatiyordu. Altyazilar
    * zaten sekansa sigmiyorsa (kalan bilinmiyor/tutarsiz) dokunulmaz.
+   * tamSekans (Marka Kiti logosu): katman sekansin kalanini tam kaplar; kare izgarasina
+   * ASAGI yuvarlanir, hicbir zaman sekanstan uzun olmaz. Kalan bilinmiyorsa eski davranis.
    */
-  function katmanSuresi(sonBitis, sekansKalan, fps) {
+  function katmanSuresi(sonBitis, sekansKalan, fps, tamSekans) {
+    if (tamSekans && sekansKalan > 0) {
+      var tam = fps > 0 ? Math.floor(sekansKalan * fps + 1e-6) / fps : sekansKalan;
+      if (tam > 0) return tam;
+    }
     var sure = Math.max(1, Math.ceil(sonBitis + 2));
     if (sekansKalan > 0 && sekansKalan >= sonBitis - 0.05 && sure > sekansKalan) {
       // ffmpeg -t'yi bir sonraki kareye tamamlar: kare izgarasina ASAGI yuvarla ki tek kare bile tasmasin
@@ -82,6 +88,24 @@
       sure = Math.max(sonBitis, kare);
     }
     return sure;
+  }
+
+  /*
+   * Marka Kiti logolu katmanın uzanabileceği süre (katman başlangıcına göre, sn):
+   * "entire" → sekans sonu; "inout" → Out noktası (Out > In ise, sekans sonunu aşmaz);
+   * "clip" → 0 (tam süre yok: katman altyazılar boyunca, logosuz katmanla aynı).
+   * Altyazılar bu sınırdan taşıyorsa 0 (logosuz hesap kullanılır).
+   */
+  function logoKatmanKalan(scope, spec, baslangic, sonBitis) {
+    if (scope === "clip") return 0;
+    spec = spec || {};
+    var son = Number(spec.end) || 0;
+    if (scope === "inout") {
+      var gir = Number(spec.inPoint) || 0, cik = Number(spec.outPoint) || 0;
+      if (cik > gir && (son <= 0 || cik < son)) son = cik;
+    }
+    var kalan = son - (Number(baslangic) || 0);
+    return kalan > 0 && kalan >= (Number(sonBitis) || 0) - 0.05 ? kalan : 0;
   }
 
   // kelime cue'ları: her kelime kendi zamanında, bir sonrakiyle çakışmadan
@@ -176,6 +200,44 @@
       });
     });
     return out;
+  }
+
+  /*
+   * Motor çıktısından (sekans zamanına taşınmış) ekrandaki altyazı satırları.
+   * captions.js go() ve rehberin hazır örnek transkripti (ornekYukle) AYNI yolu
+   * kullanır: iki yol ayrışırsa örnekte görülen satırlar gerçek çıktıyla tutmaz.
+   *   lenVal: "k1" kelime kelime · "kc" birikimli · "wN" N kelime · "cN" N karakter
+   * Döner: { segments, mode } — mode: "k1" | "kc" | "w" | "plain"
+   */
+  function segmentleriKur(mapped, lenVal) {
+    lenVal = String(lenVal || "c42");
+    var liste = (mapped || []).slice();
+    if (/^k/.test(lenVal)) {
+      // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer
+      liste = liste.filter(function (s) {
+        return String(s.text || "").replace(/[.,!?;:…]/g, "").trim();
+      });
+      // bozulmuş kelime zamanı korumasi: 8+ kelime var ama hepsi ayni ana yigilmis
+      if (liste.length >= 8) {
+        var tMin = liste[0].start, tMax = liste[0].start;
+        liste.forEach(function (s) {
+          if (s.start < tMin) tMin = s.start;
+          if (s.start > tMax) tMax = s.start;
+        });
+        if (tMax - tMin < 1) {
+          var hata = new Error("Motor kelime zamanlarını veremedi (tüm kelimeler aynı anda). " +
+            "Ayarlar > Destek'ten günlüğü kopyalayıp bildir; şimdilik satır modunu kullan.");
+          hata.ayrinti = liste.length + " kelimenin tümü " + tMin.toFixed(2) + " sn civarında";
+          throw hata;
+        }
+      }
+      return lenVal === "kc"
+        ? { segments: karaokeCumulative(liste, 4), mode: "kc" }
+        : { segments: karaokeWords(liste), mode: "k1" };
+    }
+    liste = trimOverlongCues(cleanSegments(liste));
+    if (/^w\d+$/.test(lenVal)) return { segments: splitWords(liste, parseInt(lenVal.slice(1), 10) || 3), mode: "w" };
+    return { segments: splitLong(liste, parseInt(lenVal.slice(1), 10) || 42, 4.5), mode: "plain" };
   }
 
   /*
@@ -424,7 +486,40 @@
     return parts.join("");
   }
 
+  /*
+   * Stilin metin kurali: büyük/küçük harf ve noktalama (captions.js styleText'in saf hâli).
+   * o: { kase: "upper" | "lower" | "normal", punct: bool (false: noktalama boşluğa döner),
+   *      loc: "tr-TR" | "az" | "ru" | undefined } — tr/az'de i → İ, I → ı.
+   * *vurgu* yıldızları noktalama sayılmaz, korunur.
+   */
+  var NOKTALAMA = /[.,!?;:…»«""()\-–—\u060C\u061F\u061B]/g;   // + Arapça ، ؟ ؛
+  function metinStili(t, o) {
+    o = o || {};
+    var out = String(t == null ? "" : t);
+    if (!o.punct) out = out.replace(NOKTALAMA, " ").replace(/\s+/g, " ").trim();
+    var loc = o.loc || undefined;
+    if (o.kase === "upper") out = loc ? out.toLocaleUpperCase(loc) : out.toUpperCase();
+    else if (o.kase === "lower") out = loc ? out.toLocaleLowerCase(loc) : out.toLowerCase();
+    return out;
+  }
+
+  /*
+   * libass'in çizemediği (renkli) emoji: surrogate çiftleri, VS16 ve Emoji_Presentation=Yes
+   * olan dar BMP kümesi. ♪ ★ ✓ gibi sıradan semboller emoji sayılmaz (çizilir).
+   */
+  var EMOJI = /[\uD800-\uDFFF\uFE0F\u231A\u231B\u23E9-\u23EC\u23F0\u23F3\u25FD\u25FE\u2614\u2615\u2648-\u2653\u267F\u2693\u26A1\u26AA\u26AB\u26BD\u26BE\u26C4\u26C5\u26CE\u26D4\u26EA\u26F2\u26F3\u26F5\u26FA\u26FD\u2705\u270A\u270B\u2728\u274C\u274E\u2753-\u2755\u2757\u2795-\u2797\u27B0\u27BF\u2B1B\u2B1C\u2B50\u2B55]/;
+  var EMOJI_TUMU = new RegExp(EMOJI.source + "|\u200D|\u20E3", "g");
+  function emojiVar(text) { return EMOJI.test(String(text || "")); }
+  // Emojiyi (ve birleştirici ZWJ / tuş kapağı izlerini) at, kalan boşlukları topla
+  function emojiSil(text) {
+    return String(text == null ? "" : text).replace(EMOJI_TUMU, " ").replace(/[ \t]+/g, " ")
+      .replace(/ *\n */g, "\n").trim();
+  }
+
   return {
+    metinStili: metinStili,
+    emojiVar: emojiVar,
+    emojiSil: emojiSil,
     stripEmphasis: stripEmphasis,
     hasEmphasis: hasEmphasis,
     toggleWord: toggleWord,
@@ -437,11 +532,13 @@
     cleanSegments: cleanSegments,
     sondaTakilma: sondaTakilma,
     katmanSuresi: katmanSuresi,
+    logoKatmanKalan: logoKatmanKalan,
     karaokeWords: karaokeWords,
     karaokeCumulative: karaokeCumulative,
     splitWords: splitWords,
     trimOverlongCues: trimOverlongCues,
     splitLong: splitLong,
+    segmentleriKur: segmentleriKur,
     parseGlossary: parseGlossary,
     trReplace: trReplace
   };

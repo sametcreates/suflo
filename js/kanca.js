@@ -33,7 +33,30 @@ window.KKanca = (function () {
       lang: window.KCaptions && KCaptions.language ? KCaptions.language() : "tr"
     };
     for (var k in ek || {}) if (Object.prototype.hasOwnProperty.call(ek, k)) o[k] = ek[k];
+    // Marka Kiti acikken: yazi tipi, yazi rengi ve vurgu rengi kitten (stil ve sure karttaki secim)
+    var kit = markaKiti();
+    if (kit && window.SufloMarkaKiti) o = window.SufloMarkaKiti.mergeHook(o, kit);
     return o;
+  }
+
+  // Kayitli Marka Kiti (Ayarlar), yalniz aciksa
+  function markaKiti() {
+    try {
+      var MK = window.SufloMarkaKiti;
+      if (!MK || typeof K === "undefined" || !K.settings) return null;
+      var kit = MK.normalize(K.settings().markaKiti).kit;
+      return kit.on ? kit : null;
+    } catch (e) { return null; }
+  }
+
+  function kitIpucu() {
+    var e = el("kanca-kit-not");
+    if (e) e.hidden = !markaKiti();
+  }
+
+  function insaEt(o, w, h) {
+    return HT.build({ text: o.text, stil: o.stil, width: w, height: h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk,
+      renk: o.renk, font: o.font, lang: o.lang });
   }
 
   async function sekansBoyutu() {
@@ -83,7 +106,7 @@ window.KKanca = (function () {
       // onizleme kucuk: kisa kenar 540
       var olcek = 540 / Math.min(b.w, b.h);
       var w = Math.round(b.w * olcek / 2) * 2, h = Math.round(b.h * olcek / 2) * 2;
-      var built = HT.build({ text: o.text, stil: o.stil, width: w, height: h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk, lang: o.lang });
+      var built = insaEt(o, w, h);
       is = hazirla(built);
       var png = K.path.join(is.dizin, "onizleme.png");
       var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", "color=c=0x1c2433:s=" + w + "x" + h + ":d=" + built.dur,
@@ -105,49 +128,74 @@ window.KKanca = (function () {
   /*
    * Basligi timeline'a ekle.
    *   ek.text / ek.at (sn; verilmezse playhead) — Viral anlar kartlari kullanir
+   *   ek.stil / ek.dur — karttaki secimin yerine (Shorts paketi)
+   *   ek.expectSeqId — katman yalniz bu sekansa konur (KS_placeOverlay reddeder)
+   *   ek.ad — katmanin adi (varsayilan "Suflo Kanca · <metin>")
+   *   ek.sessiz — bildirim / durum satiri yok; hata da { ok: false, hata } olarak doner
+   * Doner: basarida { ok: true, yer, dur } (eski cagiranlar icin truthy), hatada false
    */
   async function ekle(ek) {
-    if (typeof Pro !== "undefined" && !Pro.gate("overlay")) return false;
-    if (!HT) return false;
-    if (busy) { KApp.toast("Kanca başlığı şu an hazırlanıyor, birazdan tekrar dene.", "warn"); return false; }
+    var sessiz = !!(ek && ek.sessiz);
+    function bitmedi(m) { return sessiz ? { ok: false, hata: String(m || "") } : false; }
+    // Pro (ucretsizde stilli katmanla ortak 3 deneme hakki; deneme ciktisi filigranli)
+    if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { ekle(ek); }, silent: sessiz })) return bitmedi("Pro gerekli.");
+    if (!HT) return bitmedi("Kanca modülü yüklenemedi.");
+    if (busy) {
+      if (!sessiz) KApp.toast("Kanca başlığı şu an hazırlanıyor, birazdan tekrar dene.", "warn");
+      return bitmedi("Kanca başlığı şu an hazırlanıyor, birazdan tekrar dene.");
+    }
     var o = ayarlar(ek);
-    if (!String(o.text).trim()) { durum("Önce bir başlık yaz.", "warn"); return false; }
+    if (!String(o.text).trim()) { if (!sessiz) durum("Önce bir başlık yaz.", "warn"); return bitmedi("Önce bir başlık yaz."); }
     busy = true;   // ilk await'ten ONCE: cift tiklama iki katman koymasin
     var btn = el("kanca-ekle");
     if (btn) btn.disabled = true;
-    var is = null;
+    function yaz(m, c) { if (!sessiz) durum(m, c); }
     try {
       var ff = await K.findFfmpeg();
-      if (!ff) { KApp.toast("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad"); return false; }
+      if (!ff) {
+        if (!sessiz) KApp.toast("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).", "bad");
+        return bitmedi("Kanca başlığı için ffmpeg gerekli (Ayarlar → ffmpeg).");
+      }
       if (K.libassUyarisi && K.libassUyarisi()) throw new Error(K.libassUyarisi());
-      durum("Başlık hazırlanıyor…");
+      yaz("Başlık hazırlanıyor…");
       var b = await sekansBoyutu();
       if (!b.ok) throw new Error("Aktif sekans yok.");
-      var built = HT.build({ text: o.text, stil: o.stil, width: b.w, height: b.h, dur: o.dur, konum: o.konum, vurguRenk: o.vurguRenk, lang: o.lang });
-      is = hazirla(built);
+      var built = insaEt(o, b.w, b.h);
+      // Deneme (Pro degil): sag ustte kucuk suflo.app filigrani; temiz ASS satin alma sonrasi icin saklanir
+      var filigranli = typeof Pro !== "undefined" && !!Pro.filigranGerekli && Pro.filigranGerekli();
+      if (filigranli && !window.SufloFiligran) throw new Error("Deneme filigranı yüklenemedi.");
+      if (!window.SufloOverlayRender) throw new Error("Katman modülü yüklenemedi.");
       var cikti = K.path.join(K.srtDir(), "suflo-kanca-" + Date.now() + ".mov");
-      K.fs.mkdirSync(K.path.dirname(cikti), { recursive: true });
-      // alpha=1 + unpremultiply: altyazi katmaniyla ayni seffaflik zinciri
-      var kaynak = "color=c=black@0.0:s=" + b.w + "x" + b.h + ":r=" + b.fps + ":d=" + built.dur +
-        ",format=rgba,subtitles=f=kanca.ass:alpha=1" + is.fontsdir + ",unpremultiply=inplace=1";
-      var r = await K.run(ff, ["-y", "-f", "lavfi", "-i", kaynak, "-c:v", "qtrle", "-an", cikti], { timeout: 300000, cwd: is.dizin });
-      if (r.code !== 0 || !K.fs.existsSync(cikti)) {
-        throw new Error("Başlık katmanı üretilemedi: " + String(r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 200));
-      }
-      durum("Timeline'a yerleştiriliyor…");
+      // Ortak render (js/overlay-render.js): alpha=1 + unpremultiply, altyazi katmaniyla ayni seffaflik zinciri
+      await window.SufloOverlayRender.render(K, {
+        ass: filigranli ? window.SufloFiligran.ekle(built.ass, { width: b.w, height: b.h }) : built.ass,
+        fontFiles: built.fontFiles, g: b.w, y: b.h, fps: b.fps, sure: built.dur, cikti: cikti,
+        assAd: "kanca.ass", onek: "overlay-kanca-", fontDizini: K.path.join(uzantiDizini(), "fonts"), timeout: 300000,
+        hataOneki: "Başlık katmanı üretilemedi: "
+      });
+      yaz("Timeline'a yerleştiriliyor…");
       var at = typeof o.at === "number" && isFinite(o.at) ? Math.max(0, o.at) : "playhead";
-      var ad = "Suflo Kanca · " + String(o.text).replace(/\*/g, "").slice(0, 40);
-      var yer = await K.call("KS_placeOverlay", { path: cikti, at: at, name: ad }, 120000);
+      var ad = typeof o.ad === "string" && o.ad ? o.ad.slice(0, 80) : "Suflo Kanca · " + String(o.text).replace(/\*/g, "").slice(0, 40);
+      var yerArg = { path: cikti, at: at, name: ad };
+      if (o.expectSeqId) yerArg.expectSeqId = String(o.expectSeqId);
+      var yer = await K.call("KS_placeOverlay", yerArg, 120000);
       if (!yer.ok) throw new Error(yer.error);
-      durum("");
-      KApp.toast("Kanca başlığı " + yer.trackName + " katmanına eklendi" + (yer.newTrack ? " (yeni katman)" : ""), "good");
-      return true;
+      yaz("");
+      if (!sessiz) KApp.toast("Kanca başlığı " + yer.trackName + " katmanına eklendi" + (yer.newTrack ? " (yeni katman)" : ""), "good");
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("overlay", KApp.toast);   // deneme: yalniz basarida
+      if (filigranli && window.SufloOverlayRender) {
+        await SufloOverlayRender.denemeKaydet(K, Pro, {
+          tur: "kanca", start: typeof yer.start === "number" ? yer.start : (typeof at === "number" ? at : 0), path: cikti, ad: ad,
+          assTemiz: built.ass, fontFiles: built.fontFiles, g: b.w, y: b.h, fps: b.fps, sure: built.dur
+        });
+      }
+      return { ok: true, yer: yer, dur: built.dur };
     } catch (e) {
+      if (sessiz) return bitmedi(K.hataYardimi(e));
       durum("✕ " + K.hataYardimi(e), "bad");
       KApp.toast("Kanca başlığı eklenemedi: " + K.hataYardimi(e), "bad");
       return false;
     } finally {
-      if (is) temizle(is.dizin);
       busy = false;
       if (btn) btn.disabled = false;
     }
@@ -159,7 +207,11 @@ window.KKanca = (function () {
     var segs = KCaptions.getSegments ? KCaptions.getSegments() : [];
     if (!segs.length) { durum("Önce Altyazı sekmesinde transkript oluştur.", "warn"); return; }
     var cfg = KCaptions.chatConfig && KCaptions.chatConfig();
-    if (!cfg) { KApp.toast("AI önerisi için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad"); return; }
+    if (!cfg) {
+      if (window.KOnboarding) KOnboarding.anahtarIste("Kanca önerileri");
+      else KApp.toast("AI önerisi için ücretsiz bir Groq anahtarı gerekli — Ayarlar'dan gir.", "bad");
+      return;
+    }
     busy = true;
     var btn = el("kanca-ai");
     btn.disabled = true;
@@ -215,7 +267,15 @@ window.KKanca = (function () {
     ["kanca-stil", "kanca-sure", "kanca-konum", "kanca-renk"].forEach(function (id) {
       el(id).addEventListener("change", function () { if (!el("kanca-resim").hidden) onizle(); });
     });
+    kitIpucu();
   }
 
-  return { init: init, ekle: ekle, onizle: onizle };
+  // Marka Kiti degisti (Ayarlar): ipucu ve acik onizleme guncellenir
+  function kitDegisti() {
+    kitIpucu();
+    var img = el("kanca-resim");
+    if (img && !img.hidden) onizle();
+  }
+
+  return { init: init, ekle: ekle, onizle: onizle, kitDegisti: kitDegisti };
 })();
