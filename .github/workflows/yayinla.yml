@@ -1,0 +1,142 @@
+name: Yayinla
+
+# Suflo surumunu GitHub'in Windows sunucusunda paketler, imzalar ve yayinlar.
+# tools/publish.ps1 ile ayni kapilar: testler, paket dogrulamasi, Pro CDN kontrolu,
+# surum notu ilk satiri. Kurucunun bilgisayari gerekmez.
+# Calistirma: Actions > Yayinla > Run workflow (main).
+
+on:
+  workflow_dispatch:
+    inputs:
+      not_duzelt:
+        description: "Yalniz bu etiketin surum notunu release-notes.md'den yeniden yaz (or. v3.0.0). Bos = yeni surum yayinla."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yayinla
+  cancel-in-progress: false
+
+jobs:
+  yayinla:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Surum
+        id: surum
+        shell: pwsh
+        run: |
+          [xml]$mf = Get-Content CSXS\manifest.xml -Encoding UTF8
+          $v = $mf.ExtensionManifest.ExtensionBundleVersion
+          if (-not $v) { throw "manifest surumu okunamadi" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Surum: $v"
+
+      - name: Surum notu yaz (yalniz duzeltme)
+        if: ${{ inputs.not_duzelt != '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ETIKET: ${{ inputs.not_duzelt }}
+        run: |
+          $v = $env:ETIKET.TrimStart('v')
+          $satirlar = Get-Content marketing\release-notes.md -Encoding UTF8
+          $bolum = @(); $icinde = $false
+          foreach ($s in $satirlar) {
+            if ($s -match '^##\s+') {
+              if ($icinde) { break }
+              if ($s -match [regex]::Escape("Suflo $v")) { $icinde = $true }
+            }
+            if ($icinde) { $bolum += $s }
+          }
+          if (-not $bolum.Count) { throw "release-notes.md icinde 'Suflo $v' bolumu yok" }
+          $f = Join-Path $env:RUNNER_TEMP "not.md"
+          [System.IO.File]::WriteAllLines($f, [string[]]$bolum, (New-Object System.Text.UTF8Encoding($false)))
+          gh release edit $env:ETIKET --notes-file $f
+          if ($LASTEXITCODE -ne 0) { throw "gh release edit basarisiz" }
+
+      - name: Surum zaten var mi
+        if: ${{ inputs.not_duzelt == '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "v${{ steps.surum.outputs.version }}" 2>$null
+          if ($LASTEXITCODE -eq 0) { throw "v${{ steps.surum.outputs.version }} zaten yayinda. Once manifest surumunu yukselt." }
+          exit 0
+
+      - name: ffmpeg
+        if: ${{ inputs.not_duzelt == '' }}
+        run: choco install ffmpeg -y --no-progress
+
+      - name: Testler
+        if: ${{ inputs.not_duzelt == '' }}
+        run: node tools/test.js
+
+      - name: Surum notu kapisi
+        if: ${{ inputs.not_duzelt == '' }}
+        shell: pwsh
+        run: |
+          $ilk = Get-Content marketing\release-notes.md -TotalCount 1 -Encoding UTF8
+          if ($ilk -notmatch [regex]::Escape("${{ steps.surum.outputs.version }}")) { throw "release-notes.md ilk satiri bu surumden bahsetmiyor: $ilk" }
+
+      - name: ZXPSignCmd indir
+        if: ${{ inputs.not_duzelt == '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $agac = gh api "repos/Adobe-CEP/CEP-Resources/git/trees/HEAD?recursive=1" | ConvertFrom-Json
+          $aday = $agac.tree | Where-Object { $_.type -eq 'blob' -and $_.path -match '(?i)ZXPSign.*win.*\.exe$' } | Sort-Object path -Descending
+          if (-not $aday) { $aday = $agac.tree | Where-Object { $_.type -eq 'blob' -and $_.path -match '(?i)ZXPSignCmd.*\.exe$' } | Sort-Object path -Descending }
+          if (-not $aday) { throw "CEP-Resources icinde ZXPSignCmd.exe bulunamadi" }
+          $yol = $aday[0].path
+          Write-Host "ZXPSignCmd: $yol"
+          $url = "https://raw.githubusercontent.com/Adobe-CEP/CEP-Resources/HEAD/" + (($yol -split '/') | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/'
+          Invoke-WebRequest -Uri $url -OutFile tools\ZXPSignCmd.exe
+          if ((Get-Item tools\ZXPSignCmd.exe).Length -lt 100000) { throw "ZXPSignCmd indirmesi gecersiz (LFS isaretcisi olabilir)" }
+
+      - name: Paketle (zxp + kurulum zip) ve dogrula
+        if: ${{ inputs.not_duzelt == '' }}
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1
+          if ($LASTEXITCODE -ne 0) { throw "package.ps1 basarisiz" }
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\kurucu-yap.ps1
+          if ($LASTEXITCODE -ne 0) { throw "kurucu-yap.ps1 basarisiz" }
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\verify-release.ps1
+          if ($LASTEXITCODE -ne 0) { throw "verify-release.ps1 basarisiz" }
+
+      - name: Pro CDN kapisi
+        if: ${{ inputs.not_duzelt == '' }}
+        run: node tools/check-pro-cdn.js
+
+      - name: GitHub surumu
+        if: ${{ inputs.not_duzelt == '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ steps.surum.outputs.version }}"
+          $zxp = "dist\Suflo-$v.zxp"; $zip = "dist\Suflo-$v-Kurulum.zip"
+          foreach ($f in @($zxp, $zip)) { if (-not (Test-Path $f)) { throw "$f uretilmedi" } }
+          $bolum = @()
+          foreach ($s in (Get-Content marketing\release-notes.md -Encoding UTF8)) {
+            if ($bolum.Count -gt 0 -and $s -match '^##\s+') { break }
+            $bolum += $s
+          }
+          $not = Join-Path $env:RUNNER_TEMP "not.md"
+          [System.IO.File]::WriteAllLines($not, [string[]]$bolum, (New-Object System.Text.UTF8Encoding($false)))
+          gh release create "v$v" $zxp $zip --title "Suflo $v" --notes-file $not --target $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "gh release create basarisiz" }
+          Write-Host "YAYINDA: https://github.com/${{ github.repository }}/releases/tag/v$v"
