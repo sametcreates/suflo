@@ -51,6 +51,7 @@ ok("Davet ucu Lemon Squeezy JSON:API'sini Bearer ile cagirir", /Authorization: B
   /CURLOPT_CONNECTTIMEOUT => 8/.test(php) && /CURLOPT_TIMEOUT => 15/.test(php));
 var check = fs.readFileSync(path.join(ROOT, "tools", "check-pro-cdn.js"), "utf8");
 ok("Saglik kapisi davet ucunun 400 degil 403/503 JSON dondugunu dogrular", /action: "referral"/.test(check) && /status === 403 \|\| status === 503/.test(check));
+ok("Eski sunucu (davet ucu 400) yayini yalniz SUFLO_DAVET_ZORUNLU=1 ile durdurur", /status === 400 && process\.env\.SUFLO_DAVET_ZORUNLU !== "1"/.test(check) && /UYARI: Davet ucu yok/.test(check));
 var verify = fs.readFileSync(path.join(ROOT, "tools", "verify-release.ps1"), "utf8");
 ok("Yayin denetimi pakette gomulu Bearer tokeni ve ls_api_key degeri arar", /Test-Secrets/.test(verify) && /Bearer/.test(verify) && /ls_api_key/.test(verify) && /SUFLO_LS_API_KEY/.test(verify));
 var phpVar = cp.spawnSync("php", ["-v"], { encoding: "utf8" });
