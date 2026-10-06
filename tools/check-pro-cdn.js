@@ -28,7 +28,7 @@ function post(obj, cb) {
 
 // Davet et, kazan: sahte lisansla 'referral' 403 (acik) ya da 503 (uyuyan) JSON donmeli. 400
 // "Bilinmeyen islem" sunucunun eski index.php ile kaldigini gosterir; 3.1 paneli yine calisir
-// ama davet karti paylasim baglantisina duser, bu yuzden yayini durdurur.
+// ama davet karti paylasim baglantisina duser: uyari verir, SUFLO_DAVET_ZORUNLU=1 ile durdurur.
 function referralKapisi(sonra) {
   post({ action: "referral", license_key: "suflo-preflight-invalid", instance_id: "suflo-preflight-invalid", client_version: "0.0.0" }, function (err, status, data) {
     if (err) { console.error("HATA: Pro API ulasilamiyor: " + err.message); process.exit(1); }
@@ -38,6 +38,13 @@ function referralKapisi(sonra) {
       return;
     }
     if (status === 429) { console.log("Davet ucu hiz sinirinda (HTTP 429); bir dakika sonra yeniden dene."); process.exit(1); }
+    // 400 = sunucuda hala eski (3.0) index.php: lisans ve Pro icerik calisir, panelin davet karti
+    // sessizce paylasim baglantisina duser. Yayini durdurmaz; SUFLO_DAVET_ZORUNLU=1 ile zorunlu olur.
+    if (status === 400 && process.env.SUFLO_DAVET_ZORUNLU !== "1") {
+      console.log("UYARI: Davet ucu yok (HTTP 400, sunucuda eski index.php). Davet karti paylasim baglantisina duser; server/pro-v1/index.php'yi Hostinger'a yukle.");
+      sonra();
+      return;
+    }
     console.error("HATA: Davet ucu beklenen JSON'u vermedi (HTTP " + status + "). Sunucudaki index.php'yi guncelle.");
     process.exit(1);
   });
