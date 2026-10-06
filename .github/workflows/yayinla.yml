@@ -3,9 +3,12 @@ name: Yayinla
 # Suflo surumunu GitHub'in Windows sunucusunda paketler, imzalar ve yayinlar.
 # tools/publish.ps1 ile ayni kapilar: testler, paket dogrulamasi, Pro CDN kontrolu,
 # surum notu ilk satiri. Kurucunun bilgisayari gerekmez.
-# Calistirma: Actions > Yayinla > Run workflow (main).
+# Calistirma: vX.Y.Z etiketini gonder (git tag v3.1.0 && git push origin v3.1.0)
+# ya da Actions > Yayinla > Run workflow (main).
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       not_duzelt:
@@ -39,11 +42,12 @@ jobs:
           [xml]$mf = Get-Content CSXS\manifest.xml -Encoding UTF8
           $v = $mf.ExtensionManifest.ExtensionBundleVersion
           if (-not $v) { throw "manifest surumu okunamadi" }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$v") { throw "Etiket ($env:GITHUB_REF_NAME) manifest surumuyle (v$v) eslesmiyor" }
           "version=$v" >> $env:GITHUB_OUTPUT
           Write-Host "Surum: $v"
 
       - name: Surum notu yaz (yalniz duzeltme)
-        if: ${{ inputs.not_duzelt != '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) != '' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -66,7 +70,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "gh release edit basarisiz" }
 
       - name: Surum zaten var mi
-        if: ${{ inputs.not_duzelt == '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) == '' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,22 +80,22 @@ jobs:
           exit 0
 
       - name: ffmpeg
-        if: ${{ inputs.not_duzelt == '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) == '' }}
         run: choco install ffmpeg -y --no-progress
 
       - name: Testler
-        if: ${{ inputs.not_duzelt == '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) == '' }}
         run: node tools/test.js
 
       - name: Surum notu kapisi
-        if: ${{ inputs.not_duzelt == '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) == '' }}
         shell: pwsh
         run: |
           $ilk = Get-Content marketing\release-notes.md -TotalCount 1 -Encoding UTF8
           if ($ilk -notmatch [regex]::Escape("${{ steps.surum.outputs.version }}")) { throw "release-notes.md ilk satiri bu surumden bahsetmiyor: $ilk" }
 
       - name: ZXPSignCmd indir
-        if: ${{ inputs.not_duzelt == '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) == '' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -107,7 +111,7 @@ jobs:
           if ((Get-Item tools\ZXPSignCmd.exe).Length -lt 100000) { throw "ZXPSignCmd indirmesi gecersiz (LFS isaretcisi olabilir)" }
 
       - name: Paketle (zxp + kurulum zip) ve dogrula
-        if: ${{ inputs.not_duzelt == '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) == '' }}
         shell: powershell
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1
@@ -118,11 +122,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "verify-release.ps1 basarisiz" }
 
       - name: Pro CDN kapisi
-        if: ${{ inputs.not_duzelt == '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) == '' }}
         run: node tools/check-pro-cdn.js
 
       - name: GitHub surumu
-        if: ${{ inputs.not_duzelt == '' }}
+        if: ${{ format('{0}', inputs.not_duzelt) == '' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
