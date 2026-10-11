@@ -306,9 +306,10 @@ videoları ve `Listeyi kopyala` çıktısını gönder; istemdeki kalibrasyon c�
 ## 4. Pro'yu dene: her araca 3 kalıcı hak (+ deneme filigranı)
 
 **Şu an durum:** Kod tamam ve gerçek dünya girdisi gerektirmiyor (Lemon Squeezy anahtarı, yeni ürün ya
-da sunucu değişikliği yok). Ücretsiz kullanıcı, kodla çalışan 9 Pro aracının her birini kendi videonda
+da sunucu değişikliği yok). Ücretsiz kullanıcı, kodla çalışan 10 Pro aracının her birini kendi videonda
 3 kez dener: otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir,
-stilli altyazı katmanı ve kanca başlığı (ikisi ortak 3 hak), çeviri (çok dilli SRT paketi dahil), ritim.
+stilli altyazı katmanı ve kanca başlığı (ikisi ortak 3 hak), çeviri (çok dilli SRT paketi dahil), ritim,
+hız rampası (3.2 adayı, § 12; hak yalnız en az bir klip rampalanınca, çalıştırma başına bir kez).
 Haklar süresiz; hak yalnız işlem **başarıyla** bitince düşer. İçerik kütüphaneleri (MOGRT, SFX, Motion BG,
 preset, Pro paketi, altyazı MOGRT stilleri), toplu klip, stilli ASS dışa aktarma, sahne algılama ve
 B-roll önerileri denemeye açık değil.
@@ -950,3 +951,60 @@ erişim geri sayımı ve "75+ içerik üreticisi" satırı olduğu gibi kaldı.
    retake cleanup, Brand kit); JSON-LD'yi eşitle. (Bu dalda yapılmadı.)
 4. `node tools/test.js` (SEO denetimi dahil) yeşil kalmalı.
 5. Premiere'de elle deneme listesi: `marketing/v3.1-deneme-listesi.md`.
+
+## 12. Hız Rampası (tek tıkla ağır çekim ve hızlanma; 3.2 adayı)
+
+Kod tamam ve testli (`test-speedramp*.js`); **senden anahtar, hesap ya da sunucu değişikliği istemiyor**.
+Pro özelliği (`speedramp`), 3 deneme hakkı (deneme listesi 9 → 10 araç); eğri kartları, canlı önizleme ve
+"Rampayı kaldır" ücretsiz. Premiere'de **hiç denenmedi**.
+
+Neden böyle kuruldu (kısa): Premiere, Zaman Yeniden Eşleme'yi eklentilere açmıyor (bileşen
+`components`'ta yok, UXP'de yok, QE `addVideoEffect("Time Remapping")` bir şey eklemiyor). Suflo aralığı
+kareye oturan 3–28 parçaya bölüp her parçaya QE `setSpeed` ile kendi sabit hızını yazıyor; sonuç Hız/Süre
+ile düzenlenebilen sıradan klipler. Aralığın yeri ve süresi hiç değişmez (ripple yok; tek izde ripple
+senkronu bozardı). Ses aralıkta kapatılır ya da olduğu gibi bırakılır; sesi hızlandırma kapsam dışı.
+`setSpeed`'in imzası ve birimi belgesiz: host bir kalibrasyon merdiveniyle dener (5/3/2/1 argüman, oran ya
+da yüzde), her adımı geri okur, tutmazsa klibi tek %100 klibe geri getirir; bulunan biçim sürüm başına
+panelde saklanır. Ctrl+Z rampayı tek adımda geri almaz (Premiere'de undo gruplama yok); bu yüzden
+"Rampayı kaldır" ve bildirimdeki "Geri al" var, ilk denemede de "Önce sekansı kopyala" kendiliğinden işaretli.
+
+### 12.1 Premiere'de elle deneme (yaklaşık 45 dk; 26.x / 25.x, mümkünse 22.x–24.x ve 14.4 ayrı ayrı)
+
+Liste `marketing/v3.1-deneme-listesi.md` › 13'te. Sonucu bana yazarken özellikle şunları ekle:
+- Doctor'da hangi Hız Rampası satırının sarı çıktığı ve Premiere sürümü.
+- Günlükteki `cal` (units: ratio / percent, sig: 5 / 5d / 3 / 2 / 1) ve ilk rampanın kaç `setSpeed`
+  denemesi sürdüğü. 14.x'te imza ne çıktı?
+- Bir rampanın Ctrl+Z ile kaç adımda geri alındığı ve günlükteki `undoSteps`.
+- Yavaşlatılan bir parçada Premiere süreyi korudu mu, yoksa boş alana uzadı mı (QE `setSpeed` ikinci
+  argümanı ""). Hızlı parçalarda inPoint / outPoint okumaları ölçekli mi?
+- Bağlı seste "Rampada sesi kapat" sonrası aralık dışındaki sesin hâlâ bağlı olup olmadığı.
+- İç içe sekans öğesi ve kenarında cross dissolve olan klip ne yaptı.
+
+Eğer bir sürümde QE `setSpeed` hiç yoksa ya da kalibrasyon hep başarısız oluyorsa (Doctor'da "QE hız
+yazma (setSpeed)" sarı), söyle: o zaman ffmpeg ile render edilen sürekli eğri yolu (Katman 2) yapılır.
+Premiere bir gün Zaman Yeniden Eşleme'yi betiklere açarsa Doctor "Zaman Yeniden Eşleme API'si açık"
+der; o zaman gerçek anahtar kareler (Katman 3) yazılabilir.
+
+### 12.2 Sürüm (3.2.0) — bu dalda bilerek yapılmadı
+
+`CSXS/manifest.xml` 3.1.0'da kaldı ve `marketing/release-notes.md`'nin ilk satırına dokunulmadı:
+`yayinla.yml`, main'e her gönderimde manifest sürümünün GitHub'da yayını yoksa otomatik yayınlıyor.
+Elle denemeden sonra 3.2.0'a geçerken birlikte yap: manifest ve `js/bridge.js` sürümü, release-notes'un
+başına "Suflo 3.2.0" bölümü, `js/app.js` YENILIKLER (surum + Hız Rampası satırı), rehberin yedek metni ve
+`tests/test-yenilikler.js` beklentileri; README'de *(3.2)* etiketleri zaten var.
+
+### 12.3 Bilinen sınırlar (bilerek kapsam dışı)
+
+- Basamaklı: parçalar sabit hızda (Normal'de en çok 16, Çok'ta 28 parça); gerçek sürekli eğri yok.
+- Ses hızlandırılmaz; "Sesi olduğu gibi bırak"ta rampa içinde kayar, Dengeli'de aralık sonunda yine senkron.
+- Rampadan sonra eklenen zoom / geçiş anahtarları parça başına doğrusal eşlenir: önce rampa, sonra zoom.
+- Kaldırmadan sonra T0/T1'de ve seste görünmez kesikler (through-edit) kalır; iki yan %100, kaynak sürekli.
+- Kısa (12 kareden az) klip, fotoğraf, grafik/MOGRT, ayar katmanı, ters, hızı değişmiş, Zaman Yeniden
+  Eşlemeli, Warp Stabilizer'lı, multicam ve kilitli izdeki klipler reddedilir.
+
+### 12.4 Tanıtım (isteğe bağlı)
+
+- "Premiere'de hız rampası için keyframe sürüklemek yok: eğriyi seç, uygula, Hız/Süre'de düzenle." Ekran
+  kaydı: Darbe kartı → playhead'i vuruş anına koy → Uygula → oynat. Ritme Rampa için müzikli bir B-roll.
+- Önayar adları genel (Ağır Çekim Dalışı, Darbe…); rakip ya da kişi adıyla anılan önayar adı kullanma.
+
