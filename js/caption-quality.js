@@ -164,6 +164,15 @@
         piece.start = cursor;
         piece.end = Math.max(cursor + 0.12, end);
         piece.text = part;
+        // ölçülmüş kelimeler (yerel -ojf) parçalara orta noktalarıyla dağılır; boş kalan parçada alan olmaz
+        if (s.words && s.words.length) {
+          var son = i === parts.length - 1;
+          var ic = s.words.filter(function (w) {
+            var orta = (num(w.start, 0) + num(w.end, 0)) / 2;
+            return (i === 0 || orta >= piece.start) && (son || orta < piece.end);
+          });
+          if (ic.length) piece.words = ic; else delete piece.words;
+        }
         out.push(piece);
         cursor = piece.end;
       });

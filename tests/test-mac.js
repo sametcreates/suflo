@@ -131,6 +131,18 @@ function macOrtam(opts) {
 
 /* ================= 1) Platform tespiti ve yollar ================= */
 var e1 = macOrtam({});
+
+/* ---- whisper argümanları: -ojf her yerel transkripsiyonda (satır ve kelime modu aynı çıktı) ---- */
+var argTaban = { model: "/m/ggml.bin", audio: "/t/a.wav", lang: "tr", outBase: "/t/a_w", threads: 4 };
+var argKelime = e1.KEngine.buildArgs(Object.assign({}, argTaban, { wordLevel: true })).args;
+var argSatir = e1.KEngine.buildArgs(Object.assign({}, argTaban, { wordLevel: false })).args;
+var argYedek = e1.KEngine.buildArgs(Object.assign({}, argTaban, { wordLevel: true, kelimeYedegi: true })).args;
+chk("buildArgs: -ojf var, -oj yok (belirteç zamanı + olasılığı)", argKelime.indexOf("-ojf") !== -1 && argKelime.indexOf("-oj") === -1, argKelime.join(" "));
+chk("buildArgs: kelime modunda -ml / -sow YOK", argKelime.indexOf("-ml") === -1 && argKelime.indexOf("-sow") === -1);
+chk("buildArgs: satır ve kelime modu aynı argümanlar (tek transkripsiyon)", JSON.stringify(argKelime) === JSON.stringify(argSatir));
+chk("buildArgs: belirteçsiz eski derleme yedeği -ml 1 -sow ekler", argYedek.join(" ").indexOf("-ml 1 -sow") !== -1 && argYedek.indexOf("-ojf") !== -1);
+var motorKaynak = realFs.readFileSync(KOK + "engine.js", "utf8");
+chk("GPU ısınma (İngilizce yoklama) turu -oj ile değişmeden kalır", /"-l", "en", "-oj", "-of", out/.test(motorKaynak));
 chk("MAC dogru tespit edildi", e1.K.MAC === true);
 chk("WIN false", e1.K.WIN === false);
 chk("Apple Silicon -> Metal", e1.K.macMetal() === true);

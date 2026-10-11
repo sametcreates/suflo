@@ -516,6 +516,16 @@
       var o = JSON.parse(JSON.stringify(s));
       o.start = Math.max(0, Number(s.start) - start);
       o.end = Math.min(end - start, Math.max(o.start + 0.05, Number(s.end) - start));
+      // ölçülmüş kelime zamanları (yerel -ojf) satırla aynı kaydırmayla Short'un 0'ına taşınır
+      ["words", "origWords"].forEach(function (alan) {
+        if (!(o[alan] instanceof Array)) return;
+        o[alan] = o[alan].map(function (w) {
+          var ws = Math.round((Number(w.start) - start) * 1000) / 1000, we = Math.round((Number(w.end) - start) * 1000) / 1000;
+          w.start = Math.min(o.end, Math.max(o.start, ws));
+          w.end = Math.min(o.end, Math.max(w.start, we));
+          return w;
+        });
+      });
       return o;
     });
   }

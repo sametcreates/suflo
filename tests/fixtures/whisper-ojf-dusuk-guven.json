@@ -1,0 +1,226 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "large",
+		"multilingual": true,
+		"vocab": 51866,
+		"audio": {
+			"ctx": 1500,
+			"state": 1280,
+			"head": 20,
+			"layer": 32
+		},
+		"text": {
+			"ctx": 448,
+			"state": 1280,
+			"head": 20,
+			"layer": 4
+		},
+		"mels": 128,
+		"ftype": 8
+	},
+	"params": {
+		"model": "models/ggml-large-v3-turbo-q5_0.bin",
+		"language": "tr",
+		"translate": false
+	},
+	"result": {
+		"language": "tr"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,600"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2600
+			},
+			"text": " Sufle panelini aç.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50365,
+					"p": 0.9,
+					"t_dtw": -1
+				},
+				{
+					"text": " Su",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,300"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 300
+					},
+					"id": 2746,
+					"p": 0.41,
+					"t_dtw": -1
+				},
+				{
+					"text": "fle",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,700"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 700
+					},
+					"id": 42141,
+					"p": 0.33,
+					"t_dtw": -1
+				},
+				{
+					"text": " panel",
+					"timestamps": {
+						"from": "00:00:00,700",
+						"to": "00:00:01,300"
+					},
+					"offsets": {
+						"from": 700,
+						"to": 1300
+					},
+					"id": 6531,
+					"p": 0.58,
+					"t_dtw": -1
+				},
+				{
+					"text": "ini",
+					"timestamps": {
+						"from": "00:00:01,300",
+						"to": "00:00:01,600"
+					},
+					"offsets": {
+						"from": 1300,
+						"to": 1600
+					},
+					"id": 3812,
+					"p": 0.62,
+					"t_dtw": -1
+				},
+				{
+					"text": " aç",
+					"timestamps": {
+						"from": "00:00:01,600",
+						"to": "00:00:02,300"
+					},
+					"offsets": {
+						"from": 1600,
+						"to": 2300
+					},
+					"id": 41913,
+					"p": 0.47,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,300",
+						"to": "00:00:02,600"
+					},
+					"offsets": {
+						"from": 2300,
+						"to": 2600
+					},
+					"id": 13,
+					"p": 0.55,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_130]",
+					"timestamps": {
+						"from": "00:00:02,600",
+						"to": "00:00:02,600"
+					},
+					"offsets": {
+						"from": 2600,
+						"to": 2600
+					},
+					"id": 50495,
+					"p": 0.3,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,600",
+				"to": "00:00:04,400"
+			},
+			"offsets": {
+				"from": 2600,
+				"to": 4400
+			},
+			"text": " Sonra kaydet.",
+			"tokens": [
+				{
+					"text": " Sonra",
+					"timestamps": {
+						"from": "00:00:02,600",
+						"to": "00:00:03,200"
+					},
+					"offsets": {
+						"from": 2600,
+						"to": 3200
+					},
+					"id": 33478,
+					"p": 0.97,
+					"t_dtw": -1
+				},
+				{
+					"text": " kay",
+					"timestamps": {
+						"from": "00:00:03,200",
+						"to": "00:00:03,700"
+					},
+					"offsets": {
+						"from": 3200,
+						"to": 3700
+					},
+					"id": 8941,
+					"p": 0.96,
+					"t_dtw": -1
+				},
+				{
+					"text": "det",
+					"timestamps": {
+						"from": "00:00:03,700",
+						"to": "00:00:04,200"
+					},
+					"offsets": {
+						"from": 3700,
+						"to": 4200
+					},
+					"id": 9283,
+					"p": 0.99,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,200",
+						"to": "00:00:04,400"
+					},
+					"offsets": {
+						"from": 4200,
+						"to": 4400
+					},
+					"id": 13,
+					"p": 0.94,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

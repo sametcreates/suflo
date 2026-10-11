@@ -610,7 +610,12 @@ window.KEngine = (function () {
 
   /*
    * transcribeLocal için argüman üretir — VAD, beam search, thread, GPU.
-   * wordLevel: karaoke modu
+   * -ojf: JSON'a belirteç başına metin, zaman ve olasılık (p) yazılır. Satır ve
+   * kelime kelime modu AYNI çıktıyı kullanır (js/whisper-words.js kelimelere ayırır),
+   * yerel motorun güven değeri buradan gelir.
+   * wordLevel: artık argümanı değiştirmez (karaoke için ikinci tur gerekmez).
+   * kelimeYedegi: yalnız belirteç yazmayan eski derlemede kelime zamanı için
+   *   eski "-ml 1 -sow" turu (transcribeLocal yalnız o durumda ister).
    */
   function buildArgs(o) {
     // whisper-cli Windows'ta argv'yi ANSI okur: Turkce karakterli kullanici
@@ -624,7 +629,7 @@ window.KEngine = (function () {
       "-m", G(o.model, "girdi"),
       "-f", G(o.audio, "girdi"),
       "-l", o.lang || "auto",
-      "-oj", "-of", G(o.outBase, "cikti"),
+      "-ojf", "-of", G(o.outBase, "cikti"),
       "-t", String(o.threads || 4),
       "-pp",
       "-bs", "5"
@@ -643,7 +648,7 @@ window.KEngine = (function () {
       args.push("-vp", "250");    // konuşma sınırlarına 250 ms tampon (kelime yutulmasın)
     }
 
-    if (o.wordLevel) args.push("-ml", "1", "-sow");
+    if (o.kelimeYedegi) args.push("-ml", "1", "-sow");
     return { args: args, vad: !!vp };
   }
 

@@ -1771,6 +1771,9 @@
     "eskiler yenilendi": "old ones replaced",
     "Proxy CONNECT reddetti: HTTP {}": "Proxy refused CONNECT: HTTP {}",
     "Transkribe ediliyor… %{} (yerel)": "Transcribing… {}% (local)",
+    // eski whisper-cli derlemesi belirteç zamanı vermezse ikinci tur (captions.js transcribeLocal)
+    "Transkribe ediliyor… %{} (yerel · kelime zamanı)": "Transcribing… {}% (local · word timing)",
+    "Transkribe ediliyor… %{} (yerel · kalan kısım)": "Transcribing… {}% (local · remaining part)",
     "Transkribe ediliyor… %{}": "Transcribing… {}%",
     "Transkribe ediliyor…": "Transcribing…",
     "transkribe ediliyor…": "transcribing…",
@@ -2695,6 +2698,7 @@
     "Sistem": "System",
     "Suflo ile gelir": "Included with Suflo",
     "kalan kısım": "remaining part",
+    "kelime zamanı": "word timing",
     // invite rewards sync errors (pro-sync.js)
     "Davet ödül kataloğu geçersiz.": "The invite reward catalog is invalid.",
     "Bozuk davet ödülü kaydı.": "Corrupt invite reward entry.",

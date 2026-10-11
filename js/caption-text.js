@@ -6,11 +6,19 @@
  * captions.js bunlari kullanir; Node testleri ayni kodu dogrudan calistirir.
  */
 (function (root, factory) {
-  var api = factory();
+  // Ölçülmüş kelime zamanları (js/whisper-words.js) bu modülden ÖNCE yüklenir; yoksa eski yol
+  var WW = (root && root.SufloWhisperWords) || null;
+  if (!WW && typeof require === "function") { try { WW = require("./whisper-words.js"); } catch (e) { WW = null; } }
+  var api = factory(WW);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloCaptionText = api;
-})(typeof window !== "undefined" ? window : this, function () {
+})(typeof window !== "undefined" ? window : this, function (WW) {
   "use strict";
+
+  function kelimeli(s) { return !!(s && s.words && s.words.length); }
+  // Boşluksuz yazı (Kana, Çince/Japonca ideogram, Tay): whisper belirteçleri boşlukla başlamaz,
+  // "kelime" satırın tamamıdır; N kelimelik gruplama satırları birleştirirdi
+  var BOSLUKSUZ_YAZI = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\u0E00-\u0E7F]/;
 
   // Whisper'ın bilinen halüsinasyonlarını süz
   var JUNK = /^(altyaz[ıi]\s*m\.?\s*k\.?|abone olmay[ıi] unutmay[ıi]n)$/i;
@@ -173,9 +181,20 @@
       var dur = s.end - s.start;
       if (dur > makul * 1.8) {
         var yeni = s.start + makul;
+        // ölçülmüş kelimeler konuşmanın sürdüğünü gösteriyorsa son kelimeden önce kırpma
+        if (kelimeli(s)) yeni = Math.max(yeni, Math.min(s.end, Number(s.words[s.words.length - 1].end) || yeni));
         var next = segs[i + 1];
         if (next && yeni > next.start - GAP) yeni = Math.max(s.start + 0.5, next.start - GAP);
-        return { start: s.start, end: yeni, text: s.text, confidence: s.confidence };
+        var kirpik = { start: s.start, end: yeni, text: s.text, confidence: s.confidence };
+        if (kelimeli(s)) {
+          var kalan = s.words.filter(function (w) { return Number(w.start) < yeni; }).map(function (w) {
+            var y = { text: w.text, start: w.start, end: Math.min(Number(w.end), yeni) };
+            if (w.p !== undefined) y.p = w.p;
+            return y;
+          });
+          if (kalan.length) kirpik.words = kalan;
+        }
+        return kirpik;
       }
       return s;
     });
@@ -194,9 +213,34 @@
       var acc = [];
       for (var i = 0; i < pieces; i++) acc.push(words.slice(i * per, (i + 1) * per).join(" "));
       acc = acc.filter(Boolean);
+      /*
+       * Ölçülmüş kelimeler metnin kelimeleriyle birebir tutuyorsa parçalar kelime
+       * sınırında, ÖLÇÜLMÜŞ zamanla bölünür (parça = ilk kelimesinin başı); tutmuyorsa
+       * süre eşit paylaşılır ve kelimeler orta noktalarına göre parçalara dağılır.
+       */
+      var olcu = kelimeli(s) && s.words.length === words.length ? s.words : null;
+      var sinirlar = [];
+      if (olcu) {
+        for (var j = 0; j <= acc.length; j++) {
+          var t = j === 0 ? s.start : (j === acc.length ? s.end : Number(olcu[j * per].start));
+          if (!isFinite(t) || t < (sinirlar[j - 1] || s.start) || t > s.end) { olcu = null; break; }
+          sinirlar.push(t);
+        }
+      }
       var step = dur / acc.length;
       acc.forEach(function (w, i) {
-        out.push({ start: s.start + step * i, end: s.start + step * (i + 1), text: w, confidence: s.confidence });
+        var a = olcu ? sinirlar[i] : s.start + step * i;
+        var b = olcu ? sinirlar[i + 1] : s.start + step * (i + 1);
+        var parca = { start: a, end: b, text: w, confidence: s.confidence };
+        if (olcu) parca.words = olcu.slice(i * per, (i + 1) * per);
+        else if (kelimeli(s)) {
+          var ic = s.words.filter(function (k) {
+            var orta = (Number(k.start) + Number(k.end)) / 2;
+            return orta >= a && (orta < b || i === acc.length - 1);
+          });
+          if (ic.length) parca.words = ic;
+        }
+        out.push(parca);
       });
     });
     return out;
@@ -212,7 +256,11 @@
   function segmentleriKur(mapped, lenVal) {
     lenVal = String(lenVal || "c42");
     var liste = (mapped || []).slice();
+    var olculmus = !!WW && liste.some(kelimeli);
     if (/^k/.test(lenVal)) {
+      // Satırlar ölçülmüş kelime taşıyorsa (yerel -ojf) kelime cue'ları onlardan kurulur:
+      // tek transkripsiyon, tek önbellek girdisi. Satırın kelimesi yoksa satırın kendisi tek öğe.
+      if (olculmus) liste = WW.duzlestir(cleanSegments(liste));
       // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer
       liste = liste.filter(function (s) {
         return String(s.text || "").replace(/[.,!?;:…]/g, "").trim();
@@ -235,8 +283,17 @@
         ? { segments: karaokeCumulative(liste, 4), mode: "kc" }
         : { segments: karaokeWords(liste), mode: "k1" };
     }
+    if (/^w\d+$/.test(lenVal)) {
+      var n = parseInt(lenVal.slice(1), 10) || 3;
+      var temiz = cleanSegments(liste);
+      // her satırın ölçülmüş kelimesi varsa: segment sınırını aşan N kelimelik gruplar (duraklama
+      // ve cümle sonunda kırılır); yoksa bugünkü orantılı bölme
+      if (olculmus && temiz.length && temiz.every(kelimeli) && !temiz.some(function (x) { return BOSLUKSUZ_YAZI.test(x.text); })) {
+        return { segments: WW.kelimeGrupla(WW.duzlestir(temiz), n), mode: "w" };
+      }
+      return { segments: splitWords(trimOverlongCues(temiz), n), mode: "w" };
+    }
     liste = trimOverlongCues(cleanSegments(liste));
-    if (/^w\d+$/.test(lenVal)) return { segments: splitWords(liste, parseInt(lenVal.slice(1), 10) || 3), mode: "w" };
     return { segments: splitLong(liste, parseInt(lenVal.slice(1), 10) || 42, 4.5), mode: "plain" };
   }
 

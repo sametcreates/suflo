@@ -133,6 +133,25 @@ styles.forEach(function (s) {
 ok("guvenli olmadan cikti degisiklik oncesiyle bayt bayt ayni (" + sayilan + " durum) ve 16:9'da guvenli etkisiz", farkli.length === 0 && sayilan === Object.keys(snap).length,
   farkli.slice(0, 4).join(", "));
 
+/* ---- Ölçülmüş kelime zamanları (yerel -ojf): cue.words sayısı tutarsa ölçülmüş geçişler ---- */
+var olcuSatir = [{ start: 10, end: 13, text: "Bunu gören *herkes* şaşırdı", words: [
+  { text: "Bunu", start: 10.2, end: 10.5 }, { text: "gören", start: 10.5, end: 11.4 }, { text: "herkes", start: 11.9, end: 12.3 }, { text: "şaşırdı", start: 12.35, end: 12.9 }] }];
+var olcuBol = engine.splitToWords(olcuSatir);
+ok("splitToWords: sayı tutunca ölçülmüş başlangıçlar (vurgu işareti sayılmaz), ilk kelime cue başında, son cue sonunda",
+  olcuBol.length === 4 && olcuBol[0].start === 10 && olcuBol[1].start === 10.5 && olcuBol[2].start === 11.9 && olcuBol[3].start === 12.35 &&
+  olcuBol[0].end === 10.5 && olcuBol[2].end === 12.35 && olcuBol[3].end === 13 && olcuBol[2].text === "*herkes*" && olcuBol[3].lineEnd === true,
+  JSON.stringify(olcuBol.map(function (w) { return [w.text, w.start, w.end]; })));
+var eksik = [{ start: 10, end: 13, text: "Bunu gören herkes şaşırdı bugün", words: olcuSatir[0].words }];
+ok("splitToWords: sayı tutmazsa karakter ağırlıklı yedek (kelimesizle aynı)",
+  JSON.stringify(engine.splitToWords(eksik)) === JSON.stringify(engine.splitToWords([{ start: 10, end: 13, text: "Bunu gören herkes şaşırdı bugün" }])));
+var bozuk = [{ start: 0, end: 2, text: "a b", words: [{ text: "a", start: 1.5, end: 1.6 }, { text: "b", start: 0.2, end: 0.3 }] }];
+var bozukBol = engine.splitToWords(bozuk);
+ok("splitToWords: ölçülmüş başlangıçlar azalmaz ve cue içinde kalır", bozukBol[0].start === 0 && bozukBol[1].start >= bozukBol[0].start && bozukBol[1].start <= 2, JSON.stringify(bozukBol));
+var hzOlcu = engine.compile({ styleId: "hormozi", cues: olcuSatir, cueKind: "lines", offset: 10, width: 1280, height: 720 }).ass;
+var hzKarakter = engine.compile({ styleId: "hormozi", cues: [{ start: 10, end: 13, text: olcuSatir[0].text }], cueKind: "lines", offset: 10, width: 1280, height: 720 }).ass;
+ok("compile: ölçülmüş kelimeler ofsetle taşınır, aktif kelime gerçek anda (1.90 sn) değişir", hzOlcu !== hzKarakter && /0:00:01\.90/.test(hzOlcu), (hzOlcu.match(/Dialogue: [^,]*,[^,]*,[^,]*/g) || []).slice(0, 6).join(" | "));
+ok("compile: kelimesiz cue'larda çıktı değişmez (anlık görüntü yukarıda bayt bayt)", engine.compile({ styleId: "hormozi", cues: satirlar, cueKind: "lines", width: 1280, height: 720 }).ass === hz);
+
 function styleAlanlari(ass) {
   var satir = ass.split("\n").filter(function (l) { return /^Style: /.test(l); })[0] || "";
   return satir.slice(7).split(",");

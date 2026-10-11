@@ -63,7 +63,7 @@ var cm = M([{ start: 0, end: 1, text: "*100 TL* kazandım", orig: "*won* 100" }]
 ok("cueler: varsayilan (SRT/VTT/caption) isaretsiz", cm.cueler()[0].text === "100 TL kazandım");
 ok("cueler: cift dil orijinali de isaretsiz", cm.cueler({ ciftDil: true })[0].text === "won 100\n100 TL kazandım");
 ok("cueler: Suflo Stili icin isaret korunur", cm.cueler({ vurgu: true })[0].text === "*100 TL* kazandım");
-ok("motor cagrilari vurgu ister", (src.match(/cueler\(\{ vurgu: true \}\)/g) || []).length >= 3);
+ok("motor cagrilari vurgu (ve olculmus kelimeleri) ister", (src.match(/cueler\(\{ vurgu: true(, kelimeler: true)? \}\)/g) || []).length >= 3);
 ok("getSegments isaretsiz kopya verir", /text: CT\.stripEmphasis\(String\(s\.text/.test(src));
 ok("index.html: Otomatik vurgu dugmesi", /id="cap-auto-vurgu"/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")));
 

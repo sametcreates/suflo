@@ -120,12 +120,46 @@
     return hedef;
   }
 
+  /*
+   * Ölçülmüş kelime zamanları (yerel motor -ojf, js/whisper-words.js): cue.words sayısı
+   * satırın *vurgu* işaretleri ayıklanmış kelime sayısına eşitse kelime geçişleri
+   * ölçülmüş başlangıçlardan alınır. İlk kelime cue başında, son kelime cue sonunda
+   * biter (satır ekranda boşluksuz kalır). Tutmuyorsa null: karakter ağırlıklı yedek.
+   */
+  function olculmusBaslangiclar(cue, words, start, end) {
+    var olcu = cue.words;
+    if (!olcu || typeof olcu.length !== "number" || !olcu.length) return null;
+    var icerik = words.filter(function (w) { return w.replace(/\*/g, "").length > 0; });
+    if (icerik.length !== olcu.length) return null;
+    var baslar = [], k = 0, onceki = start;
+    for (var i = 0; i < words.length; i++) {
+      var t = onceki;
+      if (words[i].replace(/\*/g, "").length > 0) {
+        var m = Number(olcu[k] && olcu[k].start);
+        k++;
+        if (!isFinite(m)) return null;
+        t = i === 0 ? start : Math.min(end, Math.max(onceki, m));
+      }
+      baslar.push(t);
+      onceki = t;
+    }
+    return baslar;
+  }
+
   function splitToWords(cues) {
     var out = [];
     (cues || []).forEach(function (cue) {
       var words = String(cue.text || "").trim().split(/\s+/).filter(Boolean);
       var start = Number(cue.start || 0), end = Number(cue.end || 0);
       if (words.length <= 1) { if (words.length) out.push(konusmaciTasi(cue, { start: start, end: end, text: words[0], lineEnd: true })); return; }
+      var baslar = olculmusBaslangiclar(cue, words, start, end);
+      if (baslar) {
+        words.forEach(function (w, i) {
+          var son = i === words.length - 1 ? end : baslar[i + 1];
+          out.push(konusmaciTasi(cue, { start: baslar[i], end: son, text: w, lineEnd: i === words.length - 1 }));
+        });
+        return;
+      }
       var weights = words.map(function (w) { return w.replace(/\*/g, "").length + 1; });
       var total = weights.reduce(function (a, b) { return a + b; }, 0);
       var t = start;
@@ -233,7 +267,15 @@
       if (!value || end <= 0) return;
       start = Math.max(0, start);
       end = Math.max(start + 0.08, end);
-      out.push(konusmaciTasi(cue, { start: start, end: end, text: value }));
+      var c = konusmaciTasi(cue, { start: start, end: end, text: value });
+      // Ölçülmüş kelimeler (varsa) aynı ofsetle taşınır; yoksa alan hiç eklenmez (çıktı aynı kalır)
+      if (cue.words && typeof cue.words.length === "number" && cue.words.length) {
+        var ofs = Number(offset || 0);
+        c.words = Array.prototype.map.call(cue.words, function (w) {
+          return { text: String(w && w.text || ""), start: Number(w && w.start) - ofs, end: Number(w && w.end) - ofs };
+        });
+      }
+      out.push(c);
     });
     return out;
   }

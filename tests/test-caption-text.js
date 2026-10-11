@@ -96,5 +96,57 @@ chk("trReplace: kelime siniri", T.trReplace("premiere premier", "premier", "Prem
 chk("trReplace: Turkce buyuk I", T.trReplace("İSTANBUL güzel", "istanbul", "İstanbul") === "İstanbul güzel");
 chk("trReplace: Turkce harf siniri (ş harf sayilir)", T.trReplace("aşk ask", "ask", "X") === "aşk X");
 
+/* ---------------- Ölçülmüş kelime zamanları (yerel -ojf, js/whisper-words.js) ---------------- */
+var fs = require("fs");
+var WW = require(path.join(__dirname, "..", "js", "whisper-words.js"));
+var olcum = WW.segmentleriCoz(fs.readFileSync(path.join(__dirname, "fixtures", "whisper-ojf-tr.json")));
+// go() gibi: klip sekansta 10. saniyede, hız 1
+var esli = WW.zamanEsle(olcum, 10, 1).map(function (s) { return { start: s.start, end: s.end, text: s.text, confidence: s.confidence, words: s.words }; });
+var duzK = WW.duzlestir(esli);
+function sirali(liste) { return liste.every(function (x, i) { return i === 0 || x.start >= liste[i - 1].start; }); }
+function icinde(cue) { return (cue.words || []).every(function (w, i) { return w.start >= cue.start - 1e-9 && w.end <= cue.end + 1e-9 && (i === 0 || w.start >= cue.words[i - 1].start); }); }
+
+var k1 = T.segmentleriKur(esli, "k1");
+chk("k1: satırların ölçülmüş kelimelerinden (tek transkripsiyon), 18 kelime cue'su", k1.mode === "k1" && k1.segments.length === 18 &&
+  k1.segments[1].text === "ışık" && Math.abs(k1.segments[1].start - 10.22) < 1e-9, k1.segments.slice(0, 3).map(function (x) { return x.text + "@" + x.start; }).join(" "));
+chk("k1: başlangıçlar ölçülmüş zamanlar, sıralı, çakışmasız", sirali(k1.segments) && k1.segments.every(function (x, i) {
+  return Math.abs(x.start - duzK[i].start) < 1e-9 && (i === k1.segments.length - 1 || x.end <= k1.segments[i + 1].start + 1e-9);
+}));
+chk("k1: kelime güveni (p) cue'ya geçer", k1.segments[1].confidence === 0.873, k1.segments[1].confidence);
+var kc = T.segmentleriKur(esli, "kc");
+chk("kc: birikimli satır ölçülmüş kelimelerden, uzun duraklamada sıfırlanır", kc.mode === "kc" && kc.segments.length === 18 &&
+  kc.segments[3].text === "Bu ışık hiç de" && kc.segments[4].text === "kötü" && kc.segments[13].text === "Güzel." && sirali(kc.segments),
+  kc.segments.slice(0, 6).map(function (x) { return x.text; }).join(" | "));
+var w3 = T.segmentleriKur(esli, "w3");
+chk("w3: kelimeGrupla — segment sınırını aşar, cümle sonunda kırılır", w3.mode === "w" &&
+  w3.segments.map(function (x) { return x.text; }).join("|") === "Bu ışık hiç|de kötü değil,|değil mi?|Şimdi kamerayı biraz|sola çevirelim.|Güzel.|Peki, sonra tekrar|deneyelim!",
+  w3.segments.map(function (x) { return x.text; }).join("|"));
+chk("w3: her grup kelimelerini taşır; başlangıçlar sıralı ve cue içinde", w3.segments.every(function (x) { return x.words && x.words.length >= 1 && icinde(x); }) && sirali(w3.segments));
+chk("w3: grup başı = ilk ölçülmüş kelime (orantılı bölme değil)", Math.abs(w3.segments[1].start - 10.92) < 1e-9 && Math.abs(w3.segments[2].start - 12.1) < 1e-9, w3.segments[2].start);
+var w3eski = T.segmentleriKur(esli.map(function (s) { return { start: s.start, end: s.end, text: s.text }; }), "w3");
+chk("w3 kelimesiz: bugünkü orantılı bölme (splitWords) aynen", JSON.stringify(w3eski.segments) ===
+  JSON.stringify(T.splitWords(T.trimOverlongCues(T.cleanSegments(esli.map(function (s) { return { start: s.start, end: s.end, text: s.text }; }))), 3)));
+var jp = [{ start: 0, end: 2, text: "今日はいい天気です。", words: [{ text: "今日はいい天気です。", start: 0, end: 2 }] },
+  { start: 2, end: 4, text: "散歩に行きましょう。", words: [{ text: "散歩に行きましょう。", start: 2, end: 4 }] }];
+chk("w3 boşluksuz yazı (Japonca): satırlar birleşmez, bugünkü bölme", T.segmentleriKur(jp, "w3").segments.length === 2);
+var c20 = T.segmentleriKur(esli, "c20");
+chk("c20: uzun satır ölçülmüş kelime sınırında bölünür, parçalar kelimelerini taşır",
+  c20.mode === "plain" && c20.segments.length === 6 && c20.segments[0].text === "Bu ışık hiç de" && Math.abs(c20.segments[1].start - 11.06) < 1e-9 &&
+  c20.segments.every(function (x) { return x.words && icinde(x); }) && sirali(c20.segments),
+  c20.segments.map(function (x) { return x.text + "@" + x.start.toFixed(2); }).join(" | "));
+chk("c42: kısa satırlar kelimeleriyle aynen kalır", T.segmentleriKur(esli, "c42").segments[0].words.length === 8);
+// trimOverlongCues: ölçülmüş son kelimeden önce kırpmaz
+var uzun = { start: 0, end: 17, text: "Bu kısa cümle", words: [{ text: "Bu", start: 0, end: 0.3 }, { text: "kısa", start: 0.4, end: 0.8 }, { text: "cümle", start: 0.9, end: 4.0 }] };
+var kirp = T.trimOverlongCues([uzun])[0];
+chk("trimOverlongCues: VAD uzattığı sonu kırpar ama ölçülmüş son kelimeden önce değil", kirp.end === 4 && kirp.words.length === 3, kirp.end);
+// 8+ kelime aynı ana yığılmış: koruma ölçülmüş kelimelerde de çalışır
+var yigili = [{ start: 5, end: 6, text: "bir iki üç dört beş altı yedi sekiz", words: "bir iki üç dört beş altı yedi sekiz".split(" ").map(function (t) { return { text: t, start: 5.1, end: 5.2 }; }) }];
+var yHata = null;
+try { T.segmentleriKur(yigili, "k1"); } catch (e) { yHata = e; }
+chk("8+ kelime aynı anda: koruma yine fırlatır", yHata && /aynı anda/.test(yHata.message) && /8 kelime/.test(yHata.ayrinti || ""), yHata && yHata.ayrinti);
+// kelimesiz eski karaoke yolu (-ml 1 / bulut kelimeleri) değişmedi
+var eskiK = [seg(0, 0.4, "bir"), seg(0.5, 0.9, "iki"), seg(1.0, 1.3, "...")];
+chk("kelimesiz k1: öğeler kelime, noktalama atılır (eski yol)", T.segmentleriKur(eskiK, "k1").segments.map(function (x) { return x.text; }).join("|") === "bir|iki");
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

@@ -30,7 +30,7 @@ var g1 = C.get(meta);
 chk("put/get gidiş-dönüş (inPoint'e göreli)", g1 && g1.words.length === 4 && g1.words[0].start === 0.5 && g1.words[3].end === 19.6 && g1.lang === "tr" && g1.covering === false, JSON.stringify(g1));
 chk("güven değeri korunur", g1 && g1.words[0].confidence === 0.9 && !("confidence" in g1.words[1]));
 var disk = JSON.parse(fs.readFileSync(path.join(dir, C.key(meta) + ".json"), "utf8"));
-chk("diskte KAYNAK-mutlak zaman", disk.words[0].start === 10.5 && disk.words[3].end === 29.6, JSON.stringify(disk.words[0]));
+chk("diskte KAYNAK-mutlak zaman (gövde v2: segments)", disk.v === 2 && disk.segments[0].start === 10.5 && disk.segments[3].end === 29.6, JSON.stringify(disk.segments[0]));
 
 function degis(k, v) { var m = JSON.parse(JSON.stringify(meta)); m[k] = v; return m; }
 chk("mtime değişince ıska", C.get(degis("mtimeMs", 112)) === null);
@@ -103,6 +103,45 @@ chk("clear() önbelleği boşaltır", C.clear() > 0 && fs.readdirSync(dir).lengt
 var bosC = TCache.create({});
 chk("bağımlılıksız örnek sessizce ıska verir", bosC.get(meta) === null && bosC.put(meta, { words: [] }) === false && bosC.clear() === 0);
 
+/* ---- Gövde v2: satırlar + ölçülmüş kelimeler (yerel -ojf) ---- */
+var C2 = yeni();
+C2.clear();
+var m2 = { mediaPath: "/v/olcu.mp4", size: 2000, mtimeMs: 222, inPoint: 5, dur: 10, lang: "tr", engine: "yerel:turbo", prompt: "altyazi" };
+var satirlar = [
+  { start: 0.5, end: 2.0, text: "Bu ışık değil,", confidence: 0.94, words: [
+    { text: "Bu", start: 0.5, end: 0.7, p: 0.91 }, { text: "ışık", start: 0.7, end: 1.2, p: 0.87 }, { text: "değil,", start: 1.3, end: 1.9, p: 0.98 }] },
+  { start: 6.0, end: 7.5, text: "Tamam.", confidence: 0.97, words: [{ text: "Tamam.", start: 6.1, end: 7.0, p: 0.97 }] }
+];
+chk("v2 put: satırlar + kelimeler yazılır", C2.put(m2, { segments: satirlar, lang: "tr" }) === true);
+var d2 = JSON.parse(fs.readFileSync(path.join(dir, C2.key(m2) + ".json"), "utf8"));
+chk("v2 diskte: satır ve kelimeler KAYNAK-mutlak, p korunur", d2.v === 2 && d2.segments[0].words[1].start === 5.7 && d2.segments[0].words[1].p === 0.87 && d2.segments[1].start === 11, JSON.stringify(d2.segments[0].words[1]));
+var g6 = C2.get(m2);
+chk("v2 get: düz kelime listesi (güven = p) ve satırlar kelimeleriyle", g6 && g6.words.length === 4 && g6.words[2].text === "değil," && g6.words[2].confidence === 0.98 &&
+  g6.segments.length === 2 && g6.segments[0].words.length === 3 && g6.segments[0].confidence === 0.94 && Math.abs(g6.words[3].start - 6.1) < 1e-9, JSON.stringify(g6 && g6.words));
+// satır modu ve kelime modu tek girdiyi paylaşır: Konuşmadan kes 'dolgu' yoksa 'altyazi'yı (satır modundan) kullanır
+var g7 = C2.get(Object.assign({}, m2, { prompt: "dolgu" }), { prompts: ["dolgu", "altyazi"] });
+chk("satır modunda yazılmış girdi kelime düzeyinde servis edilir", g7 && g7.prompt === "altyazi" && g7.words.length === 4 && g7.words[0].text === "Bu");
+chk("kelime modu aynı anahtara yazar (tek girdi)", C2.put(m2, { segments: satirlar, lang: "tr" }) && C2.stats().entries === 1);
+// kapsayan girdi: kelimeler kendi orta noktalarıyla kesilir
+var dar = Object.assign({}, m2, { inPoint: 5.65, dur: 1.5 });   // kaynak 5.65..7.15: yalnız "ışık" ve "değil,"
+var g8 = C2.get(dar);
+chk("kapsayan v2 girdi: kelime düzeyinde kesilir", g8 && g8.covering && g8.words.length === 2 && g8.words[0].text === "ışık" && Math.abs(g8.words[0].start - 0.05) < 1e-9 &&
+  g8.segments.length === 1 && g8.segments[0].words.length === 2, JSON.stringify(g8));
+// eski şema (v1 gövdesi, düz liste) hâlâ servis edilir
+var m1 = Object.assign({}, m2, { mediaPath: "/v/eski.mp4" });
+var k1 = C2.key(m1);
+var v1Govde = JSON.stringify({ v: 1, lang: "tr", words: [{ start: 5.5, end: 5.9, text: "eski", confidence: 0.8 }, { start: 6.0, end: 6.4, text: "girdi" }] });
+fs.writeFileSync(path.join(dir, k1 + ".json"), v1Govde, "utf8");
+var ix = JSON.parse(fs.readFileSync(path.join(dir, "index.json"), "utf8"));
+ix.entries.push({ key: k1, mediaPath: m1.mediaPath, size: m1.size, mtimeMs: m1.mtimeMs, inPoint: 5, dur: 10, lang: "tr", engine: m1.engine, prompt: "altyazi", bytes: v1Govde.length, lastUsed: 1 });
+fs.writeFileSync(path.join(dir, "index.json"), JSON.stringify(ix), "utf8");
+var g9 = C2.get(m1);
+chk("eski şema (v1) girdisi kelimesiz satır olarak servis edilir", g9 && g9.words.length === 2 && g9.words[0].text === "eski" && g9.words[0].confidence === 0.8 &&
+  Math.abs(g9.words[0].start - 0.5) < 1e-9 && !("confidence" in g9.words[1]) && g9.segments.length === 2 && !g9.segments[0].words, JSON.stringify(g9));
+chk("eski düz 'words' put'u da kabul edilir", C2.put(Object.assign({}, m2, { mediaPath: "/v/duz.mp4" }), { words: [{ start: 1, end: 2, text: "düz" }] }) &&
+  C2.get(Object.assign({}, m2, { mediaPath: "/v/duz.mp4" })).words[0].text === "düz");
+C2.clear();
+
 // Node 12.3 uyumu: rmSync/rm, ?. ?? yok
 var kaynak = fs.readFileSync(path.join(__dirname, "..", "js", "transcript-cache.js"), "utf8");
 chk("yalnız Node 12 API'leri (rmSync/rm/promises yok)", !/rmSync|\.rm\(|fs\.promises|\?\.[a-zA-Z_(\[]|\?\?|replaceAll|=>/.test(kaynak));
@@ -118,7 +157,12 @@ chk("transcribeWords: anahtar sonucu GERÇEKTEN yazan rotayla (yerel düşüp bu
   /motorOnce\.engine = rota\.motor/.test(tw) && /secenek\.motor = yerelKimlik\(\)/.test(cap) && /secenek\.motor = bulutKimlik\(\)/.test(cap));
 chk("altyazı yazımı da gerçek rotayla anahtarlanır", /onbMeta\.engine = rotaSecenek\.motor/.test(cap));
 chk("transcribeWords: ıskada 'dolgu' olarak yazar, 'dolgu' önce aranır", /onbellekMeta\(clip, istenenDil, "dolgu"\)/.test(tw) && /prompts: \["dolgu", "altyazi"\]/.test(tw));
-chk("go(): yalnız tek klip + karaoke iken 'altyazi' yazar", /scope === "clip" && karaoke && clip\) \? onbellekMeta\(clip, .*"altyazi"\)/.test(cap));
+chk("go(): tek klipte satır ve kelime modu AYNI 'altyazi' girdisini yazar (karaoke şartı yok)",
+  /scope === "clip" && clip\) \? onbellekMeta\(clip, .*"altyazi"\)/.test(cap) && !/scope === "clip" && karaoke && clip\)/.test(cap));
+chk("go(): yalnız kelime zamanlı sonuç yazılır (bulut satır sonucu Konuşmadan kes'i bozmasın)",
+  /kelimeZamanli = karaoke \|\| WW\.kelimeVar\(raw\)/.test(cap) && /onbMeta && kelimeZamanli && rotaSecenek\.motor/.test(cap) && /put\(onbMeta, \{ segments: raw/.test(cap));
+chk("transcribeWords: satırların ölçülmüş kelimeleri düzleştirilip eşlenir, önbelleğe satırlar yazılır",
+  /kelimeleriEsle\(WW\.duzlestir\(raw\), clip\)/.test(tw) && /put\(motorOnce, \{ segments: raw/.test(tw));
 chk("rawSegments transkript kaynağı olarak kullanılmaz", !/rawSegments/.test(fs.readFileSync(path.join(__dirname, "..", "js", "konusma-kes.js"), "utf8")));
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 chk("index.html: retakes.js ve transcript-cache.js textcut.js'ten sonra", html.indexOf("js/textcut.js") < html.indexOf("js/retakes.js") && html.indexOf("js/retakes.js") < html.indexOf("js/transcript-cache.js"));

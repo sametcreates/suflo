@@ -38,6 +38,23 @@ var word = Q.fixTiming([
 ], { wordMode: true });
 ok("kelime zamanli mod kisa cuelari zorla uzatmaz", word[0].end - word[0].start < .2, word[0]);
 
+/* ---- yerel motor (-ojf): satır güveni belirteç p ortalamasından, düşük güven işaretlenir ---- */
+var WW = require(path.join(ROOT, "js", "whisper-words.js"));
+var yerel = WW.segmentleriCoz(fs.readFileSync(path.join(ROOT, "tests", "fixtures", "whisper-ojf-dusuk-guven.json")));
+ok("yerel satırların güveni tanımlı (eskiden hep undefined)", yerel.every(function (s) { return typeof s.confidence === "number"; }), JSON.stringify(yerel.map(function (s) { return s.confidence; })));
+var yerelRapor = Q.analyze(yerel, { lang: "tr", maxChars: 42 });
+ok("dusuk belirtec p'li yerel satir 'Motor bu metinden emin degil' alir", yerelRapor.rows[0].issues.some(function (x) { return x.code === "confidence" && x.level === "bad" && /emin değil/.test(x.label); }),
+  JSON.stringify(yerelRapor.rows[0].issues));
+ok("emin olunan yerel satir isaretlenmez", !yerelRapor.rows[1].issues.some(function (x) { return x.code === "confidence"; }));
+var k1Yerel = Q.analyze(WW.duzlestir(yerel), { lang: "tr", wordMode: true });
+ok("kelime modunda dusuk p'li kelime ('Sufle' 0.33) isaretlenir", k1Yerel.rows[0].issues.some(function (x) { return x.code === "confidence"; }) && k1Yerel.rows[0].confidence === 0.33);
+var belirtecsiz = WW.segmentleriCoz(fs.readFileSync(path.join(ROOT, "tests", "fixtures", "whisper-oj-belirtecsiz.json")));
+ok("belirtecsiz eski derlemede guven yok, uyari da yok", Q.analyze(belirtecsiz, { lang: "tr" }).rows.every(function (r) { return !r.issues.some(function (x) { return x.code === "confidence"; }); }));
+var bolunen = Q.autoFix([{ start: 0, end: 4, text: "bir iki üç dört beş altı yedi sekiz dokuz on", words: "bir iki üç dört beş altı yedi sekiz dokuz on".split(" ").map(function (t, i) { return { text: t, start: i * 0.4, end: i * 0.4 + 0.3 }; }) }], { lang: "tr", maxChars: 20 });
+ok("nizami duzeltme uzun satiri bolerken olculmus kelimeleri parcalara dagitir", bolunen.length > 1 &&
+  bolunen.reduce(function (n, s) { return n + (s.words ? s.words.length : 0); }, 0) === 10 && bolunen.every(function (s) { return !s.words || s.words.every(function (w) { return (w.start + w.end) / 2 >= s.start - 0.3; }); }),
+  JSON.stringify(bolunen.map(function (s) { return [s.text, s.words && s.words.length]; })));
+
 var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 var captions = fs.readFileSync(path.join(ROOT, "js", "captions.js"), "utf8");
 var engine = fs.readFileSync(path.join(ROOT, "js", "engine.js"), "utf8");
