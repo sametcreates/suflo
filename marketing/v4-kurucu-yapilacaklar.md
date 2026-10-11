@@ -1018,3 +1018,59 @@ başına "Suflo 3.2.0" bölümü, `js/app.js` YENILIKLER (surum + Hız Rampası 
   kaydı: Darbe kartı → playhead'i vuruş anına koy → Uygula → oynat. Ritme Rampa için müzikli bir B-roll.
 - Önayar adları genel (Ağır Çekim Dalışı, Darbe…); rakip ya da kişi adıyla anılan önayar adı kullanma.
 
+
+---
+
+## 3.2
+
+Altı açık kaynak projeden (`marketing/alti-repo-plan.json`, `plan.build_order`) gelen 3.2 adımları.
+Her adım kendi alt bölümünü ekler. Elle Premiere denemeleri `marketing/v3.2-deneme-listesi.md`'de.
+
+### Adım 1: Ölçülmüş kelime zamanları (-ojf)
+
+Ne değişti: yerel motor artık `-oj` yerine `-ojf` ile çalışıyor; whisper.cpp JSON'a belirteç başına metin,
+zaman ve olasılık yazıyor. `js/whisper-words.js` bunları kelimelere çeviriyor (Raunen'den uyarlandı, MIT,
+`THIRD_PARTY_NOTICES.md`). Karaoke için ikinci "-ml 1 -sow" turu kalktı (yalnız belirteç yazmayan eski
+derlemede yedek olarak duruyor), yerel motorun güven değeri geri geldi, satır ve kelime modu aynı
+önbellek girdisini paylaşıyor. Ücretsiz; senin girdin olmadan da tam çalışır.
+
+**1.1 Gerçek bir -ojf fikstürü ekle (isteğe bağlı ama önerilir, yaklaşık 15 dk).**
+Bu oturumda internet kısıtlıydı (Hugging Face'e erişim yoktu), bu yüzden `tests/fixtures/whisper-*.json`
+whisper.cpp v1.9.1'in `examples/cli/cli.cpp` `output_json(full=true)` biçimiyle birebir, elle kısaltılmış
+örnekler. Gerçek bir koşunun çıktısı eklenirse `tests/test-whisper-words.js` onu kendiliğinden bulur ve
+değişmezleri (her satırda kelime ve güven var, kelime metni satır metniyle tutuyor, kelimeler satırın içinde
+ve sıralı) onda da sınar; dosya yokken o bölüm "ATLA" der.
+
+1. "değil", "ışık", "şimdi", "güzel" gibi kelimeler geçen, arada 1–2 sn duraklama olan ~20 sn'lik Türkçe
+   bir konuşma kaydet (kendi sesin; telif yok). Örn. "Bu ışık hiç de kötü değil, değil mi? Şimdi kamerayı
+   biraz sola çevirelim. … Güzel. Peki, sonra tekrar deneyelim!"
+2. 16 kHz mono WAV'a çevir:
+   `ffmpeg -i kayit.m4a -ac 1 -ar 16000 -c:a pcm_s16le ornek-ojf.wav`
+3. Suflo'nun kurduğu motorla çalıştır (VAD açık: Suflo'nun varsayılanı):
+   - Windows (PowerShell):
+     `& "$env:APPDATA\Kesit\whisper\whisper-cli.exe" -m "$env:APPDATA\Kesit\whisper\models\ggml-large-v3-turbo-q5_0.bin" -f ornek-ojf.wav -l tr -ojf -pp -bs 5 --vad -vm "$env:APPDATA\Kesit\whisper\models\ggml-silero-v5.1.2.bin" -vsd 500 -vp 250 -of whisper-ojf-tr-gercek 2> whisper-ojf-tr-gercek.stderr.txt`
+     (`whisper-cli.exe` `whisper\Release\` altındaysa o yolu kullan; model adı Ayarlar'da seçili modele göre değişebilir.)
+   - macOS: `whisper-cli -m "$HOME/Library/Application Support/Suflo/whisper/models/ggml-large-v3-turbo-q5_0.bin" -f ornek-ojf.wav -l tr -ojf -pp -bs 5 --vad -vm "$HOME/Library/Application Support/Suflo/whisper/models/ggml-silero-v5.1.2.bin" -vsd 500 -vp 250 -of whisper-ojf-tr-gercek 2> whisper-ojf-tr-gercek.stderr.txt`
+   (`2>` stderr'i dosyaya yazar: içindeki `vad_segment_info` satırları whisper'ın VAD eşleme tablosu; panel
+   aynı satırlarla belirteç zamanlarını özgün sese taşır.)
+4. Çıkan `whisper-ojf-tr-gercek.json`'da `"params"` içindeki `"model"` satırı kendi kullanıcı adını içeriyorsa
+   yolu `models/ggml-large-v3-turbo-q5_0.bin` yap. Başka bir şeye dokunma (fikstür ham kalmalı).
+5. İki dosyayı `tests/fixtures/whisper-ojf-tr-gercek.json` ve `tests/fixtures/whisper-ojf-tr-gercek.stderr.txt` olarak koy
+   (stderr'de kendi kullanıcı adın geçen yolları `models/...` yap), `node tests/test-whisper-words.js` çalıştır:
+   "gerçek -ojf" ile başlayan üç satır PASS olmalı. Kaldıysa günlükle birlikte bana yaz (VAD zaman tabanı
+   ya da yeni bir belirteç biçimi olabilir). Sonra commit'le.
+
+**1.2 macOS Homebrew motorunu doğrula (yaklaşık 5 dk).** `whisper-cli --help | grep ojf` bir satır
+göstermeli. Göstermiyorsa ya da Ayarlar › Destek › Günlüğü kopyala'da kelime modunda
+"yerel motor belirtec zamani vermedi (eski derleme?)" satırı görünüyorsa `brew upgrade whisper-cpp` yap.
+Eski derlemede de çalışır (eski "-ml 1 -sow" turuna düşer), yalnız iki kat sürer ve satır modunda kelime
+zamanı / güven olmaz.
+
+**1.3 3.2.0 sürüm notu.** Sürüm 3.2.0'a geçerken (`## 12.2` ile birlikte) `marketing/release-notes.md`'nin
+3.2.0 bölümüne şu satırı ekle: "Yerel motor her transkriptte kelime zamanlarını ölçüyor: kelime kelime
+altyazı tek turda, kelime stilleri satır modunda da gerçek konuşma anında, yerel motorda da 'emin değil'
+uyarısı." `js/app.js` YENILIKLER listesine istersen aynı satırın kısası.
+
+**1.4 Paketi doğrula.** `tools/package.ps1` ve `tools/kurucu-yap.ps1` artık `THIRD_PARTY_NOTICES.md`'yi
+pakete koyuyor; `tools/verify-release.ps1` ZXP'de ya da kurulum ZIP'inde `LICENSE` veya
+`THIRD_PARTY_NOTICES.md` yoksa yayını durduruyor. Yayından önce `verify-release.ps1`'in yeşil bittiğini gör.
