@@ -2492,7 +2492,37 @@
     "Süzülme": "Drift",
     "B-roll için hafif dalga": "A gentle wave for B-roll",
     "Ritme Rampa": "Beat Ramp",
-    "Ritim analizindeki vuruşlarda yavaşla (ya da hızlan)": "Slow down (or speed up) on the beats from the Beat analysis"
+    "Ritim analizindeki vuruşlarda yavaşla (ya da hızlan)": "Slow down (or speed up) on the beats from the Beat analysis",
+    // Suflo Doctor rows (js/library-health.js apiKontrolleri)
+    "QE hız yazma (setSpeed)": "QE speed writing (setSpeed)",
+    "Hız Rampası klibe hız yazamaz": "Speed Ramp can't write speed to clips",
+    "Bağlantı koparma (unlinkSelection)": "Unlinking (unlinkSelection)",
+    "Sesle bağlı kliplerde Hız Rampası önce Ctrl+L ile bağlantıyı koparmanı ister": "For clips linked to audio, Speed Ramp asks you to unlink them with Ctrl+L first",
+    "Kare harmanlama (setTimeInterpolationType)": "Frame blending (setTimeInterpolationType)",
+    "Hız Rampası parçalara kare harmanlamayı açamaz; Premiere'de elle aç": "Speed Ramp can't turn on frame blending for the pieces; turn it on by hand in Premiere",
+    "Hız okuma (getSpeed)": "Speed reading (getSpeed)",
+    "Hızı değişmiş klipler süre karşılaştırmasıyla bulunur": "Clips with a changed speed are found by comparing durations",
+    "Zaman Yeniden Eşleme API'si açık": "Time Remapping API available",
+    "Bu Premiere sürümü Zaman Yeniden Eşleme'yi betiklere gösteriyor; Hız Rampası ileride gerçek eğri yazabilir": "This Premiere version exposes Time Remapping to scripts; Speed Ramp may write a real curve in the future",
+    // jsx/host.jsx KS_RAMP_MESAJ fallbacks (ASCII Turkish; the panel normally builds the text from the code)
+    "Bir video klip sec ya da Giris/Cikis koy.": "Select a video clip or set In/Out.",
+    "Grafik, MOGRT, ayar katmani ya da fotografa hiz rampasi uygulanmaz.": "Speed ramps don't work on graphics, MOGRTs, adjustment layers or stills.",
+    "Bu klibin hizi zaten degismis. Once Hiz/Sure'den %100'e al.": "This clip's speed is already changed. Set it back to 100% in Speed/Duration first.",
+    "Ters oynatilan klipte rampa yapilamaz.": "Can't ramp a reversed clip.",
+    "Bu klipte Zaman Yeniden Esleme var gibi gorunuyor; once kapat.": "This clip seems to use Time Remapping; turn it off first.",
+    "Warp Stabilizer hiz degisikligiyle calismaz.": "Warp Stabilizer doesn't work with speed changes.",
+    "Katman kilitli. Kilidi acip yeniden dene.": "The track is locked. Unlock it and try again.",
+    "Multicam ve birlestirilmis kliplerde hiz yazilamiyor.": "Speed can't be written on multicam or merged clips.",
+    "Rampa icin en az 12 kare gerekli.": "A ramp needs at least 12 frames.",
+    "Bu Premiere surumunde QE hiz yazma (setSpeed) yok.": "This Premiere version has no QE speed writing (setSpeed).",
+    "Klip sesle bagli ve bag koparilamiyor. Ctrl+L ile bagi kopar, yeniden uygula.": "The clip is linked to audio and can't be unlinked. Unlink it with Ctrl+L and apply again.",
+    "Medya yetmedi: hizlanma icin klibin sonrasinda yeterli goruntu yok.": "Not enough footage after the clip for the speed-up.",
+    "Premiere hizi kabul etmedi.": "Premiere didn't accept the speed.",
+    "Parcalar beklenen yere oturmadi.": "The pieces didn't land where expected.",
+    "Klip eski haline getirilemedi.": "Couldn't restore the clip.",
+    "Rampa parcalari degismis; Suflo dokunmadi.": "The ramp pieces were changed, so Suflo left them alone.",
+    "Kopya sekans olusturulamadi.": "Couldn't create the copy sequence.",
+    "Rampa plani gecersiz.": "Invalid ramp plan."
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

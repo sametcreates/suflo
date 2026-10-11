@@ -169,6 +169,8 @@ function KS_getContext() {
         out.seqOut = op;
         out.seqDur = seq.end ? Number(seq.end) / KS_TPS : 0;
         try { out.playhead = seq.getPlayerPosition().seconds; } catch (ePH) {}
+        // Hiz rampasinin ucretsiz onizlemesi kare sayisini buradan hesaplar (Premiere'e gitmeden)
+        try { var tbC = Number(seq.timebase); if (tbC > 0) out.frame = tbC / KS_TPS; } catch (eFr) {}
         out.width = Number(seq.frameSizeHorizontal) || 0;
         out.height = Number(seq.frameSizeVertical) || 0;
       } catch (eIO) {}
@@ -879,6 +881,9 @@ function KS_packQItemSeconds(item, field) {
   try {
     var value = item[field];
     if (value && value.seconds !== undefined) return Number(value.seconds);
+    // QE zamani (QETime): secs / ticks
+    if (value && value.secs !== undefined) return Number(value.secs);
+    if (value && typeof value === "object" && value.ticks !== undefined) return Number(value.ticks) / KS_TPS;
     var raw = Number(value);
     if (!isFinite(raw)) return NaN;
     return Math.abs(raw) > 1000000 ? raw / KS_TPS : raw;
@@ -2484,14 +2489,63 @@ function KS_apiProbe() {
       }
     } catch (e4) {}
   }
+  // Hiz Rampasi (3.2): yalniz typeof / ozellik okuma. setSpeed, setReverse ve diger QE yazicilari
+  // ASLA cagrilmaz; QE ogesinin .reverse ozelligi OKUNMAZ (ikisi de 26.3.2'de betigi oldurur).
+  out.speedRead = null; out.qeSetSpeed = null; out.qeTimeInterp = null; out.qeFrameBlend = null; out.interp = null;
+  out.qeUndoIndex = null; out.unlinkSelection = null; out.linkSelection = null; out.timeRemapApi = null;
+  var vIz = -1, vKlip = null;
+  if (seq) {
+    try { out.unlinkSelection = typeof seq.unlinkSelection === "function"; } catch (e5) { out.unlinkSelection = false; }
+    try { out.linkSelection = typeof seq.linkSelection === "function"; } catch (e6) { out.linkSelection = false; }
+    try {
+      for (var vt = 0; vt < seq.videoTracks.numTracks; vt++) {
+        var vtr = seq.videoTracks[vt];
+        if (vtr.clips.numItems > 0) { vIz = vt; vKlip = vtr.clips[0]; break; }
+      }
+    } catch (e7) {}
+    if (vKlip) {
+      try { out.speedRead = typeof vKlip.getSpeed === "function"; } catch (e8) { out.speedRead = false; }
+      // Bilgi amacli: bir gun Zaman Yeniden Esleme bileseni DOM'a acilirsa (Katman 3)
+      out.timeRemapApi = false;
+      try {
+        var bil = vKlip.components;
+        for (var bi = 0; bi < bil.numItems; bi++) {
+          var bad = "";
+          try { bad = String(bil[bi].matchName || "") + " " + String(bil[bi].displayName || ""); } catch (e9) {}
+          if (/time ?remap|zaman yeniden e[s\u015f]leme|remapeamento|velocidade/i.test(bad)) { out.timeRemapApi = true; break; }
+        }
+      } catch (e10) {}
+    }
+  }
   try {
     app.enableQE();
     out.qe = typeof qe !== "undefined" && !!qe.project;
     if (out.qe && seq) {
       var q = qe.project.getActiveSequence();
       out.qeAddTracks = !!(q && typeof q.addTracks === "function");
+      if (vIz >= 0) {
+        var qOge = null;
+        try {
+          var qIz = q && typeof q.getVideoTrackAt === "function" ? q.getVideoTrackAt(vIz) : null;
+          var qn = qIz ? Number(qIz.numItems) || 0 : 0;
+          for (var qj = 0; qj < qn; qj++) {
+            var aday = qIz.getItemAt(qj);
+            var tur = "";
+            try { tur = String(aday.type); } catch (eT) {}
+            if (aday && tur !== "Empty") { qOge = aday; break; }
+          }
+        } catch (eO) {}
+        if (qOge) {
+          out.qeSetSpeed = typeof qOge.setSpeed === "function";
+          out.qeTimeInterp = typeof qOge.setTimeInterpolationType === "function";
+          out.qeFrameBlend = typeof qOge.setFrameBlend === "function";
+        }
+      }
     }
+    if (out.qe) { try { out.qeUndoIndex = typeof qe.project.undoStackIndex === "function"; } catch (eU) { out.qeUndoIndex = false; } }
   } catch (eQ) { out.qe = false; }
+  if (!out.qe) { out.qeSetSpeed = false; out.qeTimeInterp = false; out.qeFrameBlend = false; out.qeUndoIndex = false; }
+  if (out.qeTimeInterp !== null || out.qeFrameBlend !== null) out.interp = !!(out.qeTimeInterp || out.qeFrameBlend);
   return KS_ok(out);
 }
 
@@ -3213,5 +3267,940 @@ function KS_placeMotionBG(encoded) {
     var sure = 0;
     try { sure = placed.end.seconds - placed.start.seconds; } catch (eS) {}
     return KS_ok({ track: idx, trackName: "V" + (idx + 1), start: start, dur: sure, sesSilindi: sesSilindi });
+  } catch (e) { return KS_err(e); }
+}
+
+/* ---------- Hiz Rampasi (v3.2): basamakli dogal rampa ---------- */
+
+/*
+ * Premiere Zaman Yeniden Eslemeyi (Time Remapping) eklentilere acmiyor: bilesen
+ * TrackItem.components'ta gorunmuyor (14.x - 26.x), UXP'de de yok, QE addVideoEffect
+ * ("Time Remapping") basarili deyip bir sey eklemiyor. Suflo araligi kareye oturan
+ * parcalara boler ve her parcaya QE setSpeed ile kendi sabit hizini yazar (plan panelde:
+ * js/speedramp.js). Aralik yerinden ve suresinden oynamaz, ripple yok: sonraki klipler,
+ * altyazi, muzik, marker kaymaz. Her adim geri okunur; bir adim tutmazsa klip tek %100
+ * klibe geri getirilir (KS_rampRestore) — qe.project.undo ASLA cagrilmaz.
+ * GUVENLIK (26.3.2): setReverse cagrilmaz, QE ogesinin .reverse ozelligi OKUNMAZ.
+ * Panel acilisinda bu islevler cagrilmaz; yalniz dugmeye basinca.
+ */
+
+var KS_RAMP_IMZALAR = ["5", "5d", "3", "2", "1"];
+var KS_RAMP_FOTO = /\.(png|jpe?g|psd|tiff?|gif|bmp|webp|ai|eps)$/i;
+var KS_RAMP_MESAJ = {
+  secimYok: "Bir video klip sec ya da Giris/Cikis koy.",
+  grafik: "Grafik, MOGRT, ayar katmani ya da fotografa hiz rampasi uygulanmaz.",
+  hizli: "Bu klibin hizi zaten degismis. Once Hiz/Sure'den %100'e al.",
+  ters: "Ters oynatilan klipte rampa yapilamaz.",
+  remap: "Bu klipte Zaman Yeniden Esleme var gibi gorunuyor; once kapat.",
+  warp: "Warp Stabilizer hiz degisikligiyle calismaz.",
+  kilitli: "Katman kilitli. Kilidi acip yeniden dene.",
+  multicam: "Multicam ve birlestirilmis kliplerde hiz yazilamiyor.",
+  kisa: "Rampa icin en az 12 kare gerekli.",
+  qeYok: "Bu Premiere surumunde QE hiz yazma (setSpeed) yok.",
+  linkedConflict: "Klip sesle bagli ve bag koparilamiyor. Ctrl+L ile bagi kopar, yeniden uygula.",
+  tutamak: "Medya yetmedi: hizlanma icin klibin sonrasinda yeterli goruntu yok.",
+  hizYazilamadi: "Premiere hizi kabul etmedi.",
+  yerlesim: "Parcalar beklenen yere oturmadi.",
+  geriAlinamadi: "Klip eski haline getirilemedi.",
+  degisti: "Rampa parcalari degismis; Suflo dokunmadi.",
+  sekans: "Aktif sekans degisti; islem durduruldu.",
+  kopya: "Kopya sekans olusturulamadi.",
+  plan: "Rampa plani gecersiz."
+};
+
+// { ok:false, kod, error, ...ek } — panel metni koda gore kurar; error yalniz gunluk/yedek
+function KS_rampHata(kod, ek) {
+  var o = { ok: false, kod: String(kod), error: KS_RAMP_MESAJ[kod] || String(kod) };
+  if (ek) { for (var k in ek) { if (ek.hasOwnProperty(k)) o[k] = ek[k]; } }
+  return KJSON.stringify(o);
+}
+
+function KS_rampFrame(seq) {
+  var tb = 0;
+  try { tb = Number(seq.timebase); } catch (e) {}
+  return tb > 0 ? tb / KS_TPS : 1 / 30;
+}
+
+// Ceyrek kare ileri: getFormatted yuvarlasa da kirpsa da istenen kareye duser
+function KS_rampTC(t, frame) { return KS_timecode(Number(t) + frame / 4); }
+
+function KS_rampSleep(ms) {
+  try { if (typeof $ !== "undefined" && $.sleep) $.sleep(ms); } catch (e) {}
+}
+
+function KS_rampDeselect(seq) {
+  var sel = null;
+  try { sel = seq.getSelection(); } catch (e) {}
+  if (!sel) return;
+  for (var i = 0; i < sel.length; i++) {
+    try { sel[i].setSelected(false, true); } catch (e2) {}
+  }
+}
+
+function KS_rampYol(c) {
+  try { if (c && c.projectItem) return String(c.projectItem.getMediaPath() || ""); } catch (e) {}
+  return "";
+}
+
+function KS_rampAyni(a, b) {
+  if (a === b) return true;
+  try { if (a.nodeId && b.nodeId && String(a.nodeId) === String(b.nodeId)) return true; } catch (e) {}
+  return false;
+}
+
+function KS_rampKoleksiyon(col) {
+  var out = [], n = 0;
+  if (!col) return out;
+  try { n = col.numItems !== undefined ? Number(col.numItems) : Number(col.length); } catch (e) {}
+  for (var i = 0; i < (n || 0); i++) {
+    try { if (col[i]) out.push(col[i]); } catch (e2) {}
+  }
+  return out;
+}
+
+// Katmanda baslangici t'ye yarim kareden yakin klip
+function KS_rampClipAt(track, t, frame) {
+  try {
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var c = track.clips[i];
+      if (Math.abs(Number(c.start.seconds) - t) < frame / 2) return c;
+    }
+  } catch (e) {}
+  return null;
+}
+
+// t katmandaki bir klibin kesin icinde mi (kenarda razor yok)
+function KS_rampIcinden(track, t, yari) {
+  try {
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var c = track.clips[i];
+      if (t > Number(c.start.seconds) + yari && t < Number(c.end.seconds) - yari) return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+/*
+ * QE ogesi: getItemAt bosluklari "Empty" oge olarak araya katar, DOM dizini guvenilmez.
+ * Baslangica gore eslesir (KS_packQItemSeconds). .reverse OKUNMAZ.
+ */
+function KS_rampQItem(qseq, ti, t, frame) {
+  var tr = null, n = 0;
+  try { tr = qseq.getVideoTrackAt(ti); } catch (e) {}
+  if (!tr) return null;
+  try { n = Number(tr.numItems) || 0; } catch (eN) {}
+  for (var i = 0; i < n; i++) {
+    var it = null, tur = "";
+    try { it = tr.getItemAt(i); } catch (eI) {}
+    if (!it) continue;
+    try { tur = String(it.type); } catch (eT) {}
+    if (tur === "Empty") continue;
+    var s = KS_packQItemSeconds(it, "start");
+    if (isFinite(s) && Math.abs(s - t) < frame / 2) return it;
+  }
+  return null;
+}
+
+// Klibin hizi (1 = %100): getSpeed, yoksa QE speed, yoksa kaynak / sure
+function KS_rampSpeed(clip, q) {
+  var v = NaN;
+  try { if (clip && typeof clip.getSpeed === "function") v = Math.abs(Number(clip.getSpeed())); } catch (e1) {}
+  if (!(v > 0) && q) {
+    try { v = Math.abs(Number(q.speed)); if (v > 10.5) v = v / 100; } catch (e2) {}
+  }
+  if (!(v > 0) && clip) {
+    try {
+      var d = Number(clip.end.seconds) - Number(clip.start.seconds);
+      if (d > 0) v = (Number(clip.outPoint.seconds) - Number(clip.inPoint.seconds)) / d;
+    } catch (e3) {}
+  }
+  return v > 0 ? v : 1;
+}
+
+// end yazar, geri okur, tutmazsa bir kez daha dener (KS_placeCaptionMogrt gibi); gercek sonu doner
+function KS_rampSetEnd(clip, t) {
+  var hedef = new Time();
+  hedef.seconds = Number(t);
+  try { clip.end = hedef; } catch (e1) {}
+  var son = NaN;
+  try { son = Number(clip.end.seconds); } catch (e2) {}
+  if (!(Math.abs(son - t) < 0.0005)) {
+    try { clip.end = hedef; } catch (e3) {}
+    try { son = Number(clip.end.seconds); } catch (e4) {}
+  }
+  return son;
+}
+
+// 0 kare ornekleme, 1 kare harmanlama, 2 optik akis
+function KS_rampInterp(q, tur) {
+  try { if (typeof q.setTimeInterpolationType === "function") { q.setTimeInterpolationType(tur); return true; } } catch (e1) {}
+  try { if (typeof q.setFrameBlend === "function") { q.setFrameBlend(tur > 0); return true; } } catch (e2) {}
+  return false;
+}
+
+// setSpeed imzalari surumden surume degisiyor (26.x bes arguman ister)
+function KS_rampCall(q, imza, oran, clip) {
+  if (imza === "5") return q.setSpeed(oran, "", false, false, false);
+  if (imza === "5d") {
+    var sure = "";
+    try { sure = String(Math.round((Number(clip.end.seconds) - Number(clip.start.seconds)) * KS_TPS)); } catch (e) {}
+    return q.setSpeed(oran, sure, false, false, false);
+  }
+  if (imza === "3") return q.setSpeed(oran, "", false);
+  if (imza === "2") return q.setSpeed(oran, "");
+  return q.setSpeed(oran);
+}
+
+/*
+ * Kalibrasyon merdiveni. o: { seq, qseq, ti, t (klibin baslangici), frame, v, cal {units, sig}, K }
+ * Onbellekteki imza/birim once; her imzada once oran (v) sonra yuzde (v x 100). Her cagridan
+ * sonra 40 ms bekle ve hizi geri oku: %5 (ya da 1.5/K) icindeyse kabul. Okunan v/100 ya da
+ * v x 100 ise ayni imza obur birimle; 'Not Enough Parameters' / 'Bad argument list' sonraki
+ * imza; 'invalid trackitem' secimi kaldirip bir kez daha; hiz degismediyse 60 ms bekleyip bir
+ * kez daha. En cok 8 cagri. Hiz degisimi kaynak giris noktasini korur: geri alma gerekmez.
+ */
+function KS_rampSetSpeed(o) {
+  var v = Number(o.v), cal = o.cal || {}, i;
+  var tol = Math.max(0.05, 1.5 / Math.max(1, Number(o.K) || 1));
+  var imzalar = [];
+  if (cal.sig) imzalar.push(String(cal.sig));
+  for (i = 0; i < KS_RAMP_IMZALAR.length; i++) {
+    if (KS_RAMP_IMZALAR[i] !== String(cal.sig)) imzalar.push(KS_RAMP_IMZALAR[i]);
+  }
+  var ilk = cal.units === "percent" ? "percent" : "ratio";
+  var cagri = 0, sonHata = "";
+  var clip = KS_rampClipAt(o.seq.videoTracks[o.ti], o.t, o.frame);
+  var q = KS_rampQItem(o.qseq, o.ti, o.t, o.frame);
+  if (!clip || !q || typeof q.setSpeed !== "function") return { ok: false, kod: "qeYok", calls: 0 };
+  var once = KS_rampSpeed(clip, null);
+  if (Math.abs(once - v) / v < 0.001) return { ok: true, units: cal.units || "", sig: cal.sig || "", speed: once, calls: 0 };
+  for (var si = 0; si < imzalar.length && cagri < 8; si++) {
+    var imza = imzalar[si], birim = ilk, denendi = {}, gecersizTekrar = false, ayniTekrar = false;
+    while (cagri < 8) {
+      var oran = birim === "percent" ? v * 100 : v, hata = "";
+      once = KS_rampSpeed(clip, null);
+      cagri++;
+      try { KS_rampCall(q, imza, oran, clip); } catch (e) { hata = String(e && e.message ? e.message : e); }
+      denendi[birim] = 1;
+      if (hata) {
+        sonHata = hata;
+        if (/invalid ?track ?item/i.test(hata) && !gecersizTekrar) {
+          gecersizTekrar = true;
+          KS_rampDeselect(o.seq);
+          clip = KS_rampClipAt(o.seq.videoTracks[o.ti], o.t, o.frame) || clip;
+          q = KS_rampQItem(o.qseq, o.ti, o.t, o.frame) || q;
+          continue;
+        }
+        break;
+      }
+      KS_rampSleep(40);
+      clip = KS_rampClipAt(o.seq.videoTracks[o.ti], o.t, o.frame) || clip;
+      q = KS_rampQItem(o.qseq, o.ti, o.t, o.frame) || q;
+      var oku = KS_rampSpeed(clip, null);
+      if (Math.abs(oku - v) / v <= tol) return { ok: true, units: birim, sig: imza, speed: oku, calls: cagri };
+      var diger = birim === "ratio" ? "percent" : "ratio";
+      var yanlis = birim === "ratio" ? v / 100 : v * 100;
+      if (Math.abs(oku - yanlis) / yanlis <= tol) {
+        if (!denendi[diger]) { birim = diger; continue; }
+        break;
+      }
+      if (Math.abs(oku - once) < 1e-6) {
+        if (!ayniTekrar) { ayniTekrar = true; KS_rampSleep(60); continue; }
+        break;
+      }
+      if (!denendi[diger]) { birim = diger; continue; }
+      break;
+    }
+  }
+  return { ok: false, kod: "hizYazilamadi", calls: cagri, error: sonHata };
+}
+
+function KS_rampUndoIndex() {
+  try {
+    if (typeof qe !== "undefined" && qe && qe.project && typeof qe.project.undoStackIndex === "function") return Number(qe.project.undoStackIndex());
+  } catch (e) {}
+  return null;
+}
+
+/*
+ * Klibin bagli sesi: getLinkedItems varsa onun sonucu, ek olarak ayni medya + ayni kaynak hizasi
+ * (inPoint - start, 0.05 sn) + cakisan ses klipleri (KS_placeCleanAudio kurali). [{clip, track, start, end}]
+ */
+function KS_rampLinkedAudio(seq, clip) {
+  var out = [], bagli = null, t, i, k;
+  try { if (typeof clip.getLinkedItems === "function") bagli = KS_rampKoleksiyon(clip.getLinkedItems()); } catch (e) { bagli = null; }
+  var yol = KS_rampYol(clip).toLowerCase();
+  var cs = Number(clip.start.seconds), ce = Number(clip.end.seconds), hiza = Number(clip.inPoint.seconds) - cs;
+  for (t = 0; t < seq.audioTracks.numTracks; t++) {
+    var tr = seq.audioTracks[t];
+    for (i = 0; i < tr.clips.numItems; i++) {
+      var c = tr.clips[i], es = false;
+      if (bagli) { for (k = 0; k < bagli.length && !es; k++) es = KS_rampAyni(bagli[k], c); }
+      if (!es && yol) {
+        try {
+          es = KS_rampYol(c).toLowerCase() === yol && Math.abs((Number(c.inPoint.seconds) - Number(c.start.seconds)) - hiza) < 0.05 &&
+            Number(c.end.seconds) > cs + 0.001 && Number(c.start.seconds) < ce - 0.001;
+        } catch (e2) { es = false; }
+      }
+      if (es) out.push({ clip: c, track: t, start: Number(c.start.seconds), end: Number(c.end.seconds) });
+    }
+  }
+  return out;
+}
+
+function KS_rampWarpVar(clip) {
+  try {
+    var comps = clip.components;
+    for (var i = 0; i < comps.numItems; i++) {
+      var mn = "", dn = "";
+      try { mn = String(comps[i].matchName || ""); } catch (e1) {}
+      try { dn = KS_packNormDisplay(comps[i].displayName); } catch (e2) {}
+      if (mn.indexOf("SubspaceStabilizer") !== -1 || dn === "warp stabilizer" || dn === "sarsinti onleyici") return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+/*
+ * Rampa uygulanabilir mi? null ya da { kod, pct? }. Hicbir sey degistirmez.
+ * kilitli, grafik (MOGRT / ayar katmani / matte / fotograf), multicam, ters, hizli,
+ * remap (sure ile kaynak uyusmuyor), warp, kisa (12 kareden kisa)
+ */
+function KS_rampCheck(seq, clip, ti) {
+  var tr = seq.videoTracks[ti];
+  try { if (tr.isLocked && tr.isLocked()) return { kod: "kilitli" }; } catch (eL) {}
+  var yol = KS_rampYol(clip);
+  if (KS_isGraphicClip(clip) || !yol || KS_RAMP_FOTO.test(yol)) return { kod: "grafik" };
+  if (KS_mcKlipBayrak(clip, "isMulticamClip") || KS_mcKlipBayrak(clip, "isMergedClip")) return { kod: "multicam" };
+  try { if (typeof clip.isSpeedReversed === "function" && clip.isSpeedReversed()) return { kod: "ters" }; } catch (eR) {}
+  var frame = KS_rampFrame(seq);
+  var hiz = KS_rampSpeed(clip, null);
+  if (Math.abs(hiz - 1) > 0.005) return { kod: "hizli", pct: Math.round(hiz * 100) };
+  var sure = Number(clip.end.seconds) - Number(clip.start.seconds);
+  var kaynak = Number(clip.outPoint.seconds) - Number(clip.inPoint.seconds);
+  if (Math.abs(kaynak - sure) > frame + 0.005 * sure) return { kod: "remap" };
+  if (KS_rampWarpVar(clip)) return { kod: "warp" };
+  if (Math.round(sure / frame) < 12) return { kod: "kisa" };
+  return null;
+}
+
+// Secili ogeler (kimlik ya da nodeId eslesmesi): [{clip, track}]
+function KS_rampSecili(seq, tracks) {
+  var sel = null, out = [];
+  try { sel = seq.getSelection(); } catch (e) {}
+  if (!sel || !sel.length) return out;
+  for (var ti = 0; ti < tracks.numTracks; ti++) {
+    var tr = tracks[ti];
+    for (var ci = 0; ci < tr.clips.numItems; ci++) {
+      var c = tr.clips[ci];
+      for (var si = 0; si < sel.length; si++) {
+        if (KS_rampAyni(c, sel[si])) { out.push({ clip: c, track: ti }); break; }
+      }
+    }
+  }
+  return out;
+}
+
+// Yalniz sesi secilmis bagli cift: ayni medya, ayni hiza, cakisan video klibe cozulur
+function KS_rampSestenVideo(seq, sesler) {
+  var out = [], gor = {};
+  for (var i = 0; i < sesler.length; i++) {
+    var a = sesler[i].clip, yol = KS_rampYol(a).toLowerCase();
+    if (!yol) continue;
+    var hiza = Number(a.inPoint.seconds) - Number(a.start.seconds);
+    for (var ti = 0; ti < seq.videoTracks.numTracks; ti++) {
+      var tr = seq.videoTracks[ti];
+      for (var ci = 0; ci < tr.clips.numItems; ci++) {
+        var c = tr.clips[ci];
+        if (KS_rampYol(c).toLowerCase() !== yol) continue;
+        if (Math.abs((Number(c.inPoint.seconds) - Number(c.start.seconds)) - hiza) >= 0.05) continue;
+        if (!(Number(c.end.seconds) > Number(a.start.seconds) + 0.001 && Number(c.start.seconds) < Number(a.end.seconds) - 0.001)) continue;
+        var anahtar = ti + "@" + Number(c.start.seconds).toFixed(4);
+        if (gor[anahtar]) continue;
+        gor[anahtar] = 1;
+        out.push({ clip: c, track: ti });
+      }
+    }
+  }
+  return out;
+}
+
+/*
+ * SALT OKUR. p: { range: "clips" | "inout" }
+ * clips: secili video klipler (yalniz ses secildiyse bagli videosu); inout: Giris/Cikis'i
+ * kapsayan en ustteki kilitsiz video klip. Aralik kareye oturur; klip kenarina 1 kareden yakin
+ * kenar klip kenarina yapisir.
+ * Doner: { seqId, frame, fps, playhead, appVersion, targets, skipped, caps }
+ */
+function KS_speedRampTargets(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var frame = KS_rampFrame(seq), yari = frame / 2;
+    var aralik = p.range === "inout" ? "inout" : "clips";
+    var playhead = 0, ip = 0, op = 0, i, k;
+    try { playhead = Number(seq.getPlayerPosition().seconds) || 0; } catch (eP) {}
+    var adaylar = [], atlanan = [];
+    if (aralik === "clips") {
+      var sv = KS_packSelectedVideo(seq);
+      for (i = 0; i < sv.length; i++) adaylar.push({ clip: sv[i].clip, track: sv[i].track });
+      if (!adaylar.length) adaylar = KS_rampSestenVideo(seq, KS_rampSecili(seq, seq.audioTracks));
+    } else {
+      try { ip = Number(seq.getInPointAsTime().seconds); op = Number(seq.getOutPointAsTime().seconds); } catch (eIO) {}
+      if (!(op - ip >= frame)) return KS_rampHata("secimYok");
+      var grafikAday = null;
+      for (var vt = seq.videoTracks.numTracks - 1; vt >= 0 && !adaylar.length; vt--) {
+        var vtr = seq.videoTracks[vt];
+        try { if (vtr.isLocked && vtr.isLocked()) continue; } catch (eL) {}
+        for (var ci = 0; ci < vtr.clips.numItems; ci++) {
+          var vc = vtr.clips[ci];
+          if (Number(vc.start.seconds) <= ip + yari && Number(vc.end.seconds) >= op - yari) {
+            var yolV = KS_rampYol(vc);
+            if (KS_isGraphicClip(vc) || !yolV || KS_RAMP_FOTO.test(yolV)) { if (!grafikAday) grafikAday = { clip: vc, track: vt }; break; }
+            adaylar.push({ clip: vc, track: vt });
+            break;
+          }
+        }
+      }
+      if (!adaylar.length && grafikAday) adaylar.push(grafikAday);
+    }
+    if (!adaylar.length) return KS_rampHata("secimYok");
+
+    var hedefler = [], klipler = [];
+    for (i = 0; i < adaylar.length; i++) {
+      var c = adaylar[i].clip, ti = adaylar[i].track;
+      var s = Number(c.start.seconds), e = Number(c.end.seconds);
+      var a = aralik === "inout" ? ip : s, b = aralik === "inout" ? op : e;
+      a = Math.round(a / frame) * frame;
+      b = Math.round(b / frame) * frame;
+      if (Math.abs(a - s) <= frame || a < s) a = s;
+      if (Math.abs(b - e) <= frame || b > e) b = e;
+      var ad = "";
+      try { ad = String(c.name || ""); } catch (eA) {}
+      var h = KS_rampCheck(seq, c, ti);
+      if (!h && Math.round((b - a) / frame) < 12) h = { kod: "kisa" };
+      if (h) {
+        atlanan.push({ name: ad, track: ti, start: s, kod: h.kod, pct: h.pct === undefined ? null : h.pct });
+        continue;
+      }
+      var bag = KS_rampLinkedAudio(seq, c), ses = [];
+      for (k = 0; k < bag.length; k++) ses.push({ track: bag[k].track, start: bag[k].start, end: bag[k].end });
+      var cin = Number(c.inPoint.seconds);
+      hedefler.push({ track: ti, start: s, end: e, inPoint: cin, outPoint: Number(c.outPoint.seconds), mediaPath: KS_rampYol(c), name: ad,
+        rangeStart: a, rangeEnd: b, partial: a > s + yari || b < e - yari, srcIn: cin + (a - s), audio: ses, hasLinked: ses.length > 0 });
+      klipler.push(c);
+    }
+    hedefler.sort(function (x, y) { return (x.rangeStart - y.rangeStart) || (x.track - y.track); });
+
+    var caps = { setSpeed: null, interp: null, unlink: false, disabled: null, undoIndex: false };
+    try { caps.unlink = typeof seq.unlinkSelection === "function"; } catch (eU) {}
+    if (hedefler.length) {
+      try { caps.disabled = typeof klipler[0].disabled === "boolean"; } catch (eD) {}
+      try {
+        app.enableQE();
+        if (typeof qe !== "undefined" && qe && qe.project) {
+          caps.undoIndex = typeof qe.project.undoStackIndex === "function";
+          var qs = qe.project.getActiveSequence();
+          var qi = qs ? KS_rampQItem(qs, hedefler[0].track, hedefler[0].start, frame) : null;
+          caps.setSpeed = !!(qi && typeof qi.setSpeed === "function");
+          caps.interp = !!(qi && (typeof qi.setTimeInterpolationType === "function" || typeof qi.setFrameBlend === "function"));
+        } else caps.setSpeed = false;
+      } catch (eQ) { caps.setSpeed = false; }
+    }
+    var surum = "";
+    try { surum = String(app.version); } catch (eV) {}
+    return KS_ok({ seqId: String(seq.sequenceID), frame: frame, fps: 1 / frame, playhead: playhead, appVersion: surum,
+      targets: hedefler, skipped: atlanan, caps: caps });
+  } catch (e) { return KS_err(e); }
+}
+
+// Hedef klibi yeniden bul: ayni katman, baslangic ve son yarim kare icinde, ayni medya
+function KS_rampHedef(seq, ti, tg, yari) {
+  try {
+    var tr = seq.videoTracks[ti], yol = String(tg.mediaPath || "").toLowerCase();
+    for (var i = 0; i < tr.clips.numItems; i++) {
+      var c = tr.clips[i];
+      if (Math.abs(Number(c.start.seconds) - Number(tg.start)) >= yari) continue;
+      if (Math.abs(Number(c.end.seconds) - Number(tg.end)) >= yari) continue;
+      if (yol && KS_rampYol(c).toLowerCase() !== yol) continue;
+      return c;
+    }
+  } catch (e) {}
+  return null;
+}
+
+// Aralik disinda degismemesi gereken video ogeleri: onceki / sonraki komsu, kismi aralikta dis parcalar
+function KS_rampKomsuFoto(seq, ti, T0, T1, yari, clip) {
+  var tr = seq.videoTracks[ti], foto = [], once = null, sonra = null;
+  var cs = Number(clip.start.seconds), ce = Number(clip.end.seconds), cin = Number(clip.inPoint.seconds), yol = KS_rampYol(clip);
+  for (var i = 0; i < tr.clips.numItems; i++) {
+    var c = tr.clips[i], s = Number(c.start.seconds), e = Number(c.end.seconds);
+    var kayit = { start: s, end: e, inPoint: Number(c.inPoint.seconds), yol: KS_rampYol(c), hiz: 0 };
+    if (e <= cs + yari) once = kayit;
+    else if (s >= ce - yari && !sonra) sonra = kayit;
+  }
+  if (once) foto.push(once);
+  if (sonra) foto.push(sonra);
+  if (T0 > cs + yari) foto.push({ start: cs, end: T0, inPoint: cin, yol: yol, hiz: 1 });
+  if (T1 < ce - yari) foto.push({ start: T1, end: ce, inPoint: cin + (T1 - cs), yol: yol, hiz: 1 });
+  return foto;
+}
+
+function KS_rampKomsuAyni(seq, ti, foto, frame) {
+  var tr = seq.videoTracks[ti], yari = frame / 2;
+  for (var f = 0; f < foto.length; f++) {
+    var k = foto[f], c = KS_rampClipAt(tr, k.start, frame);
+    if (!c) return false;
+    if (Math.abs(Number(c.end.seconds) - k.end) > yari / 2) return false;
+    if (Math.abs(Number(c.inPoint.seconds) - k.inPoint) > yari / 2) return false;
+    if (KS_rampYol(c) !== k.yol) return false;
+    if (k.hiz && Math.abs(KS_rampSpeed(c, null) - 1) > 0.005) return false;
+  }
+  return true;
+}
+
+// [T0, T1] ile cakisan ses ogeleri: { track, start, end, hiza (inPoint - start), d }
+function KS_rampSesFoto(seq, T0, T1) {
+  var foto = [];
+  for (var t = 0; t < seq.audioTracks.numTracks; t++) {
+    var tr = seq.audioTracks[t];
+    for (var i = 0; i < tr.clips.numItems; i++) {
+      var c = tr.clips[i], s = Number(c.start.seconds), e = Number(c.end.seconds);
+      if (!(e > T0 + 0.001 && s < T1 - 0.001)) continue;
+      var kapali = false;
+      try { kapali = c.disabled ? true : false; } catch (eD) {}
+      foto.push({ track: t, start: s, end: e, hiza: Number(c.inPoint.seconds) - s, d: kapali });
+    }
+  }
+  return foto;
+}
+
+/*
+ * Ses ogeleri hala ayni araligi ayni hizayla kapliyor mu (razor kesimleri serbest)? Baglanti
+ * sessizce kopmadiysa video end yazimlari bagli sesi kirpar: burada yakalanir. tut: 'keep'
+ * modunda ac/kapa durumu da ayni olmali.
+ */
+function KS_rampSesAyni(seq, foto, frame, tut) {
+  var yari = frame / 2;
+  for (var f = 0; f < foto.length; f++) {
+    var k = foto[f], tr = seq.audioTracks[k.track], imlec = k.start;
+    if (!tr) return false;
+    for (var i = 0; i < tr.clips.numItems; i++) {
+      var c = tr.clips[i], s = Number(c.start.seconds), e = Number(c.end.seconds);
+      if (!(e > k.start + yari / 2 && s < k.end - yari / 2)) continue;
+      if (Math.abs(s - imlec) > yari / 2) return false;
+      if (Math.abs((Number(c.inPoint.seconds) - s) - k.hiza) > yari / 2) return false;
+      if (tut) {
+        var kapali = false;
+        try { kapali = c.disabled ? true : false; } catch (eD) {}
+        if (kapali !== k.d) return false;
+      }
+      imlec = e;
+    }
+    if (Math.abs(imlec - k.end) > yari / 2) return false;
+  }
+  return true;
+}
+
+// Verilen ses katmanlarinda [T0, T1] icindeki ayni medya parcalari
+function KS_rampSesParcalari(seq, izler, T0, T1, yol, yari) {
+  var out = [], hedef = String(yol || "").toLowerCase();
+  for (var t in izler) {
+    if (!izler.hasOwnProperty(t)) continue;
+    var tr = seq.audioTracks[Number(t)];
+    for (var i = 0; i < tr.clips.numItems; i++) {
+      var c = tr.clips[i], s = Number(c.start.seconds), e = Number(c.end.seconds);
+      if (s < T0 - yari || e > T1 + yari) continue;
+      if (KS_rampYol(c).toLowerCase() !== hedef) continue;
+      out.push({ clip: c, track: Number(t), start: s, end: e });
+    }
+  }
+  return out;
+}
+
+// [t0, t1] icindeki, ilk parcayla ayni medya ve ayni kaynak hizasindaki ses parcalari
+function KS_rampSesHizali(seq, ilk, t0, t1, yari) {
+  var out = [], yol = KS_rampYol(ilk).toLowerCase(), hiza = Number(ilk.inPoint.seconds) - Number(ilk.start.seconds);
+  for (var t = 0; t < seq.audioTracks.numTracks; t++) {
+    var tr = seq.audioTracks[t];
+    for (var i = 0; i < tr.clips.numItems; i++) {
+      var c = tr.clips[i], s = Number(c.start.seconds), e = Number(c.end.seconds);
+      if (s < t0 - yari || e > t1 + yari) continue;
+      if (KS_rampYol(c).toLowerCase() !== yol) continue;
+      if (Math.abs((Number(c.inPoint.seconds) - s) - hiza) > 0.05) continue;
+      out.push({ clip: c, track: t, start: s, end: e });
+    }
+  }
+  return out;
+}
+
+/*
+ * Rampayi geri al: [t0, t1]'deki parcalarin hepsi ayni medya ve ilk parca t0'da, kaynak girisi
+ * srcIn'e 1 kare yakin olmali (yoksa 'degisti', hicbir sey degismez). strict: parcalar bitisik ve
+ * son parca t1'de biter (kullanicinin 'Rampayi kaldir'i); ic geri yuklemede bosluk olabilir.
+ * 2..n kaldirilir (remove(false, false): lift, ripple yok), ilk parca %100'e ve t1'e uzatilir,
+ * kapatilan ses parcalari acilir, kopan bag linkSelection ile yeniden kurulur.
+ */
+function KS_rampRestore(seq, rec, frame, strict) {
+  var sonuc = { ok: false, kod: "degisti", removed: 0, audio: 0 };
+  try {
+    var yari = frame / 2, ti = Number(rec.track), t0 = Number(rec.t0), t1 = Number(rec.t1), i;
+    if (!(ti >= 0) || ti >= seq.videoTracks.numTracks) return sonuc;
+    var tr = seq.videoTracks[ti], parca = [];
+    var yol = String(rec.mediaPath || "").toLowerCase();
+    for (i = 0; i < tr.clips.numItems; i++) {
+      var c = tr.clips[i], s = Number(c.start.seconds), e = Number(c.end.seconds);
+      if (!(e > t0 + yari && s < t1 - yari)) continue;
+      if (s < t0 - yari || e > t1 + yari) return sonuc;
+      parca.push(c);
+    }
+    if (!parca.length) return sonuc;
+    if (Math.abs(Number(parca[0].start.seconds) - t0) > yari) return sonuc;
+    if (Math.abs(Number(parca[0].inPoint.seconds) - Number(rec.srcIn)) > frame + 0.0001) return sonuc;
+    for (i = 0; i < parca.length; i++) {
+      if (KS_rampYol(parca[i]).toLowerCase() !== yol) return sonuc;
+      if (strict && i && Math.abs(Number(parca[i].start.seconds) - Number(parca[i - 1].end.seconds)) > yari) return sonuc;
+    }
+    if (strict && Math.abs(Number(parca[parca.length - 1].end.seconds) - t1) > yari) return sonuc;
+    sonuc.kod = "geriAlinamadi";
+    for (i = parca.length - 1; i >= 1; i--) {
+      try { parca[i].remove(false, false); sonuc.removed++; } catch (eR) {}
+    }
+    var ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
+    if (!ilk) return sonuc;
+    var qseq = null;
+    try {
+      app.enableQE();
+      if (typeof qe !== "undefined" && qe && qe.project) qseq = qe.project.getActiveSequence();
+    } catch (eQ) {}
+    if (Math.abs(KS_rampSpeed(ilk, null) - 1) > 0.002) {
+      if (!qseq) return sonuc;
+      KS_rampDeselect(seq);
+      var hs = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: t0, frame: frame, v: 1, cal: rec.cal || {}, K: Math.round((t1 - t0) / frame) });
+      if (!hs.ok) return sonuc;
+    }
+    var qi = qseq ? KS_rampQItem(qseq, ti, t0, frame) : null;
+    if (qi) KS_rampInterp(qi, 0);
+    ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
+    if (!ilk) return sonuc;
+    KS_rampSetEnd(ilk, t1);
+    ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
+    if (!ilk || Math.abs(Number(ilk.end.seconds) - t1) > yari || Math.abs(KS_rampSpeed(ilk, null) - 1) > 0.005 ||
+        Math.abs(Number(ilk.inPoint.seconds) - Number(rec.srcIn)) > frame + 0.0001) return sonuc;
+    var ses = rec.audio || [];
+    for (i = 0; i < ses.length; i++) {
+      var at = seq.audioTracks[Number(ses[i].track)];
+      var ac = at ? KS_rampClipAt(at, Number(ses[i].start), frame) : null;
+      if (ac) { try { ac.disabled = false; sonuc.audio++; } catch (eA) {} }
+    }
+    if (rec.unlinked && typeof seq.linkSelection === "function") {
+      var bagla = KS_rampSesHizali(seq, ilk, t0, t1, yari);
+      if (bagla.length) {
+        KS_rampDeselect(seq);
+        try { ilk.setSelected(true, true); } catch (eS) {}
+        for (i = 0; i < bagla.length; i++) { try { bagla[i].clip.setSelected(true, true); } catch (eS2) {} }
+        try { seq.linkSelection(); } catch (eL) {}
+        KS_rampDeselect(seq);
+      }
+    }
+    sonuc.ok = true;
+    sonuc.kod = "";
+    return sonuc;
+  } catch (e) {
+    sonuc.ok = false;
+    return sonuc;
+  }
+}
+
+/*
+ * TEK klip. p: { target {track, start, end, mediaPath}, range {start, end}, plan {mode, segments
+ * [[d, v]], srcFrames}, audio 'mute'|'keep', interp {slow 0|1|2, fast 0|1}, cal, expectSeqId,
+ * cloneFirst, cloneName }
+ * 1) her denetim degisiklikten ONCE  2) istenirse kopya sekans  3) foto  4) bagli ses: T0/T1'de
+ * kes, bagi kopar, 'mute' ise aralik icini kapat  5) video T0/T1'de kesilir  6) parca parca:
+ * hiz yaz, gerekirse ucu uzat, sonraki sinirda kes  7) dogrula  8) bozulursa KS_rampRestore
+ */
+function KS_applySpeedRamp(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    if (p.expectSeqId && String(seq.sequenceID) !== String(p.expectSeqId)) return KS_rampHata("sekans");
+    var frame = KS_rampFrame(seq), yari = frame / 2, i, k;
+    var tg = p.target || {}, rg = p.range || {}, pl = p.plan || {};
+    var ti = Number(tg.track), T0 = Number(rg.start), T1 = Number(rg.end);
+
+    // 1) plan ve klip
+    var plParca = pl.segments;
+    if (!(plParca instanceof Array) || plParca.length < 1 || plParca.length > 40 || !(T1 > T0) || !(Number(pl.srcFrames) > 0)) return KS_rampHata("plan");
+    var N = plParca.length, D = [], V = [], topD = 0;
+    for (i = 0; i < N; i++) {
+      var dd = Number(plParca[i] && plParca[i][0]), vv = Number(plParca[i] && plParca[i][1]);
+      if (!(dd >= 1) || Math.floor(dd) !== dd || !(vv >= 0.1 && vv <= 10)) return KS_rampHata("plan");
+      D.push(dd); V.push(vv); topD += dd;
+    }
+    if (topD !== Math.round((T1 - T0) / frame)) return KS_rampHata("plan");
+    if (topD < 12) return KS_rampHata("kisa");
+    if (!(ti >= 0) || ti >= seq.videoTracks.numTracks) return KS_rampHata("degisti");
+    var clip = KS_rampHedef(seq, ti, tg, yari);
+    if (!clip) return KS_rampHata("degisti");
+    var cs = Number(clip.start.seconds), ce = Number(clip.end.seconds);
+    if (T0 < cs - yari || T1 > ce + yari) return KS_rampHata("plan");
+    var h = KS_rampCheck(seq, clip, ti);
+    if (h) return KS_rampHata(h.kod, { pct: h.pct === undefined ? null : h.pct, track: ti });
+    try { app.enableQE(); } catch (eQ) {}
+    if (typeof qe === "undefined" || !qe || !qe.project) return KS_rampHata("qeYok");
+    var qseq = qe.project.getActiveSequence();
+    var q0 = qseq ? KS_rampQItem(qseq, ti, cs, frame) : null;
+    if (!q0 || typeof q0.setSpeed !== "function") return KS_rampHata("qeYok");
+    var bag = KS_rampLinkedAudio(seq, clip);
+    if (bag.length && typeof seq.unlinkSelection !== "function") return KS_rampHata("linkedConflict", { track: ti });
+
+    // 2) kopya sekans (ozgun sekans dokunulmamis yedek kalir)
+    var yeniSeq = "";
+    if (p.cloneFirst) {
+      var kop = KS_cloneActiveSeq();
+      if (!kop) return KS_rampHata("kopya");
+      seq = KS_seq();
+      if (!seq || String(seq.sequenceID) !== String(kop.sequenceID)) return KS_rampHata("kopya");
+      if (p.cloneName) { try { seq.name = String(p.cloneName); } catch (eN) {} }
+      yeniSeq = String(seq.name);
+      clip = KS_rampHedef(seq, ti, tg, yari);
+      qseq = qe.project.getActiveSequence();
+      if (!clip || !qseq) return KS_rampHata("kopya", { newSeq: yeniSeq, seqId: String(seq.sequenceID) });
+      bag = KS_rampLinkedAudio(seq, clip);
+    }
+
+    // 3) foto
+    var seqId = String(seq.sequenceID), mp = KS_rampYol(clip), ad = "";
+    try { ad = String(clip.name || ""); } catch (eA) {}
+    var cin = Number(clip.inPoint.seconds);
+    var srcIn = cin + (T0 - cs);
+    var sigma = srcIn + Number(pl.srcFrames) * frame;
+    var komsu = KS_rampKomsuFoto(seq, ti, T0, T1, yari, clip);
+    var sesFoto = KS_rampSesFoto(seq, T0, T1);
+    var undo0 = KS_rampUndoIndex();
+    var rec = { v: 1, seqId: seqId, track: ti, t0: T0, t1: T1, srcIn: srcIn, mediaPath: mp, name: ad, audio: [], unlinked: false,
+      mode: String(pl.mode || "") };
+    var uyarilar = [], cal = p.cal || {};
+    var bozul = function (kod, ek) {
+      var rs = KS_rampRestore(seq, rec, frame, false);
+      var o = { restored: !!rs.ok, newSeq: yeniSeq, seqId: seqId, track: ti };
+      if (ek) { for (var x in ek) { if (ek.hasOwnProperty(x)) o[x] = ek[x]; } }
+      return KS_rampHata(kod, o);
+    };
+
+    try {
+      // 4) bagli ses
+      if (bag.length) {
+        KS_rampDeselect(seq);
+        var izler = {};
+        for (k = 0; k < bag.length; k++) izler[bag[k].track] = 1;
+        for (var iz in izler) {
+          if (!izler.hasOwnProperty(iz)) continue;
+          var qa = qseq.getAudioTrackAt(Number(iz));
+          if (KS_rampIcinden(seq.audioTracks[Number(iz)], T0, yari)) qa.razor(KS_rampTC(T0, frame));
+          if (KS_rampIcinden(seq.audioTracks[Number(iz)], T1, yari)) qa.razor(KS_rampTC(T1, frame));
+        }
+        var sesParca = KS_rampSesParcalari(seq, izler, T0, T1, mp, yari);
+        try { clip.setSelected(true, true); } catch (eS1) {}
+        for (k = 0; k < sesParca.length; k++) { try { sesParca[k].clip.setSelected(true, true); } catch (eS2) {} }
+        var koptu = false;
+        try { seq.unlinkSelection(); koptu = true; } catch (eU) {}
+        KS_rampDeselect(seq);
+        if (!koptu) return bozul("linkedConflict");
+        rec.unlinked = true;
+        if (p.audio !== "keep") {
+          var kapanmadi = 0;
+          for (k = 0; k < sesParca.length; k++) {
+            var sp = sesParca[k], once = false, kapali = false;
+            try { once = sp.clip.disabled ? true : false; } catch (eD0) {}
+            if (once) continue;   // kullanicinin zaten kapattigi parca: kayda girmez, geri acilmaz
+            try { sp.clip.disabled = true; } catch (eD) {}
+            try { kapali = sp.clip.disabled ? true : false; } catch (eD2) {}
+            if (kapali) rec.audio.push({ track: sp.track, start: sp.start, end: sp.end });
+            else kapanmadi++;
+          }
+          if (kapanmadi) uyarilar.push("sesKapanmadi");
+        }
+      }
+
+      // 5) video: aralik kenarlari klibin kesin icindeyse kes
+      var qv = qseq.getVideoTrackAt(ti);
+      if (T0 > cs + yari) qv.razor(KS_rampTC(T0, frame));
+      if (T1 < ce - yari) qv.razor(KS_rampTC(T1, frame));
+      var R = KS_rampClipAt(seq.videoTracks[ti], T0, frame);
+      if (!R || Math.abs(Number(R.end.seconds) - T1) > yari) return bozul("yerlesim");
+
+      // 6) parca parca kur: hiz baslangici ve kaynak girisini korur; uc yazimlari yalniz
+      // [R.end, T1] icinde buyur, orasi da insa geregi bos (komsuya asla tasmaz)
+      var Ds = [], kuyruk = [], acc = 0, q = T0, Kler = [];
+      for (i = 0; i < N; i++) Ds.push(D[i] * frame);
+      for (i = N - 1; i >= 0; i--) { acc += Ds[i] * V[i]; kuyruk[i] = acc; }
+      var tip = p.interp || {}, yavasTip = Number(tip.slow) || 0, hizliTip = Number(tip.fast) || 0;
+      for (var j = 0; j < N; j++) {
+        var sonParca = j === N - 1, qn = q + Ds[j];
+        // i) kapali dongu: kalan kaynak / kalan plan
+        var duz = (sigma - Number(R.inPoint.seconds)) / kuyruk[j];
+        if (!isFinite(duz)) duz = 1;
+        duz = Math.max(sonParca ? 0.85 : 0.97, Math.min(sonParca ? 1.15 : 1.03, duz));
+        var v = V[j] * duz;
+        // ii) kisa kaldiysa mevcut hizinda T1'e buyut (medya sonu ya da komsu sinirlar; buyume kabul)
+        if (Number(R.end.seconds) < T1 - yari) {
+          KS_rampSetEnd(R, T1);
+          R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
+        }
+        // iii) tam kare sureli hiz iste
+        var span = (Number(R.end.seconds) - Number(R.start.seconds)) * KS_rampSpeed(R, null);
+        var K = Math.max(1, Math.round(span / (v * frame)));
+        var vIst = span / (K * frame) * (1 + 1e-7);
+        KS_rampDeselect(seq);
+        var ss = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: q, frame: frame, v: vIst, cal: cal, K: K });
+        if (!ss.ok) return bozul(ss.kod === "qeYok" ? "yerlesim" : "hizYazilamadi");
+        if (ss.units) cal = { units: ss.units, sig: ss.sig };
+        Kler.push(K);
+        var qi = KS_rampQItem(qseq, ti, q, frame);
+        if (qi) KS_rampInterp(qi, V[j] < 0.98 ? yavasTip : (V[j] > 1.02 ? hizliTip : 0));
+        R = KS_rampClipAt(seq.videoTracks[ti], q, frame);
+        if (!R) return bozul("yerlesim");
+        if (!sonParca) {
+          // iv) sonraki sinirin en az bir kare otesine uzanmali; sonra orada kes
+          if (Number(R.end.seconds) < qn + frame * 0.75) {
+            KS_rampSetEnd(R, T1);
+            R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
+            if (Number(R.end.seconds) < qn + frame * 0.75) return bozul("tutamak");
+          }
+          qv.razor(KS_rampTC(qn, frame));
+          var Rn = KS_rampClipAt(seq.videoTracks[ti], qn, frame);
+          if (!Rn) return bozul("yerlesim");
+          R = Rn;
+          q = qn;
+        } else {
+          // v) son parca tam T1'de biter
+          var bit = KS_rampSetEnd(R, T1);
+          R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
+          // Ince ayar: tam kare yuvarlamasi kaynak sonunu yarim kareden fazla kaydirdiysa, kalan
+          // kaynagi tam tutturan hiza YUKARIDAN yaklas (yavaslatma sureyi korur, hiz tam olur)
+          var vTam = (sigma - Number(R.inPoint.seconds)) / (T1 - q), hizNe = KS_rampSpeed(R, null);
+          if (Math.abs(hizNe - vTam) * (T1 - q) > frame * 0.5 && vTam >= V[j] * 0.85 && vTam <= V[j] * 1.15) {
+            if (vTam > hizNe) {
+              var span2 = (Number(R.end.seconds) - Number(R.start.seconds)) * hizNe;
+              var K2 = Math.max(1, Math.floor(span2 / (vTam * frame) + 1e-9));
+              KS_rampDeselect(seq);
+              var ss2 = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: q, frame: frame, v: span2 / (K2 * frame) * (1 + 1e-7), cal: cal, K: K2 });
+              if (!ss2.ok) return bozul("hizYazilamadi");
+              R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
+              KS_rampSetEnd(R, T1);
+              R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
+            }
+            KS_rampDeselect(seq);
+            var ss3 = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: q, frame: frame, v: vTam, cal: cal, K: Math.round((T1 - q) / frame) });
+            if (!ss3.ok) return bozul("hizYazilamadi");
+            R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
+            bit = KS_rampSetEnd(R, T1);
+          }
+          if (Math.abs(bit - T1) > yari) return bozul("tutamak");
+        }
+      }
+
+      // 7) dogrula: N bitisik parca T0..T1, hizlar plana yakin, komsular ve ses yerinde
+      var tr2 = seq.videoTracks[ti], parcalar = [], hizlar = [];
+      for (i = 0; i < tr2.clips.numItems; i++) {
+        var pc = tr2.clips[i], ps = Number(pc.start.seconds);
+        if (ps > T0 - yari && ps < T1 - yari) parcalar.push(pc);
+      }
+      if (parcalar.length !== N) return bozul("yerlesim");
+      if (Math.abs(Number(parcalar[0].start.seconds) - T0) > yari || Math.abs(Number(parcalar[N - 1].end.seconds) - T1) > yari) return bozul("yerlesim");
+      for (i = 0; i < N; i++) {
+        if (i && Math.abs(Number(parcalar[i].start.seconds) - Number(parcalar[i - 1].end.seconds)) > yari / 2) return bozul("yerlesim");
+        var oku = KS_rampSpeed(parcalar[i], null);
+        hizlar.push(Math.round(oku * 10000) / 10000);
+        // plan payi %5 (son parca kapali dongunun %15'i) + tam kare suresinin yuvarlama payi
+        var izin = (i === N - 1 ? 0.15 : 0.05) + 0.6 / Math.max(1, Kler[i]);
+        if (Math.abs(oku - V[i]) / V[i] > izin) return bozul("hizYazilamadi");
+      }
+      if (!KS_rampKomsuAyni(seq, ti, komsu, frame)) return bozul("yerlesim");
+      if (!KS_rampSesAyni(seq, sesFoto, frame, p.audio === "keep")) return bozul("linkedConflict");
+      var sonP = parcalar[N - 1];
+      var srcSon = Number(sonP.inPoint.seconds) + (Number(sonP.end.seconds) - Number(sonP.start.seconds)) * KS_rampSpeed(sonP, null);
+      var srcErr = Math.abs(srcSon - sigma) / frame;
+      if (srcErr > 2) uyarilar.push("kaynakKaydi");
+
+      // 9) parcalari sec
+      KS_rampDeselect(seq);
+      for (i = 0; i < N; i++) { try { parcalar[i].setSelected(true, true); } catch (eSel) {} }
+      var undo1 = KS_rampUndoIndex();
+      rec.cal = cal;
+      return KS_ok({ pieces: N, track: ti, record: rec, cal: cal, speeds: hizlar, srcErr: Math.round(srcErr * 100) / 100,
+        undoSteps: (undo0 !== null && undo1 !== null) ? undo1 - undo0 : null, newSeq: yeniSeq, seqId: seqId, warnings: uyarilar });
+    } catch (eM) {
+      return bozul("yerlesim", { detail: String(eM) });
+    }
+  } catch (e) { return KS_err(e); }
+}
+
+function KS_rampArdisik(a, b, frame) {
+  if (KS_rampYol(a).toLowerCase() !== KS_rampYol(b).toLowerCase()) return false;
+  if (Math.abs(Number(b.start.seconds) - Number(a.end.seconds)) > frame / 2) return false;
+  var beklenen = Number(a.inPoint.seconds) + (Number(a.end.seconds) - Number(a.start.seconds)) * KS_rampSpeed(a, null);
+  return Math.abs(Number(b.inPoint.seconds) - beklenen) <= frame * 1.5;
+}
+
+// Kayit yoksa secimden: secili parcanin iki yanindaki ayni medya, bitisik, kaynagi devam eden
+// parcalar; en az birinin hizi %100 degilse rampa sayilir
+function KS_rampSecimdenKayit(seq, frame) {
+  var sec = KS_packSelectedVideo(seq);
+  if (!sec.length) return null;
+  var ti = sec[0].track, tr = seq.videoTracks[ti], yari = frame / 2, liste = [], i, ix = -1;
+  for (i = 0; i < tr.clips.numItems; i++) liste.push(tr.clips[i]);
+  for (i = 0; i < liste.length; i++) { if (KS_rampAyni(liste[i], sec[0].clip)) { ix = i; break; } }
+  if (ix < 0) return null;
+  var bas = ix, son = ix;
+  while (bas > 0 && KS_rampArdisik(liste[bas - 1], liste[bas], frame)) bas--;
+  while (son < liste.length - 1 && KS_rampArdisik(liste[son], liste[son + 1], frame)) son++;
+  var degisik = false;
+  for (i = bas; i <= son; i++) { if (Math.abs(KS_rampSpeed(liste[i], null) - 1) > 0.005) degisik = true; }
+  if (!degisik) return null;
+  var ilk = liste[bas], yol = KS_rampYol(ilk);
+  var t0 = Number(ilk.start.seconds), t1 = Number(liste[son].end.seconds);
+  var hiza = Number(ilk.inPoint.seconds) - t0, ses = [], bagli = false;
+  for (var a = 0; a < seq.audioTracks.numTracks; a++) {
+    var at = seq.audioTracks[a];
+    for (var c = 0; c < at.clips.numItems; c++) {
+      var ac = at.clips[c], s = Number(ac.start.seconds), e = Number(ac.end.seconds);
+      if (KS_rampYol(ac).toLowerCase() !== yol.toLowerCase()) continue;
+      if (s < t0 - yari || e > t1 + yari) continue;
+      if (Math.abs((Number(ac.inPoint.seconds) - s) - hiza) > 0.05) continue;
+      bagli = true;
+      var kapali = false;
+      try { kapali = ac.disabled ? true : false; } catch (eD) {}
+      if (kapali) ses.push({ track: a, start: s, end: e });
+    }
+  }
+  var ad = "";
+  try { ad = String(ilk.name || ""); } catch (eA) {}
+  return { v: 1, seqId: String(seq.sequenceID), track: ti, t0: t0, t1: t1, srcIn: Number(ilk.inPoint.seconds), mediaPath: yol,
+    name: ad, audio: ses, unlinked: bagli, mode: "" };
+}
+
+/*
+ * 'Geri al' / 'Rampayi kaldir' (Ctrl+Z rampayi tek adimda geri almaz: QE kayitlari geri
+ * alinir, DOM end/disabled yazimlari cogu zaman alinmaz). p: { record } ya da { fromSelection: true }
+ */
+function KS_removeSpeedRamp(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    var frame = KS_rampFrame(seq);
+    var rec = p.record || null;
+    if (p.fromSelection || !rec) {
+      rec = KS_rampSecimdenKayit(seq, frame);
+      if (!rec) return KS_rampHata("secimYok");
+    } else if (rec.seqId && String(rec.seqId) !== String(seq.sequenceID)) return KS_rampHata("sekans");
+    var rs = KS_rampRestore(seq, rec, frame, true);
+    if (!rs.ok) return KS_rampHata(rs.kod || "degisti", { track: Number(rec.track) });
+    return KS_ok({ track: Number(rec.track), t0: Number(rec.t0), t1: Number(rec.t1), removed: rs.removed, audio: rs.audio, name: String(rec.name || "") });
   } catch (e) { return KS_err(e); }
 }

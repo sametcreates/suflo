@@ -280,7 +280,12 @@ window.KLibraryHealth = (function () {
       { k: "markers", ad: "Marker API", etki: "Bölüm, viral ve B-roll marker'ları eklenemez" },
       { k: "qeAddTracks", ad: "QE kanal ekleme", etki: "Boş kanal yoksa Sesi iyileştir / katmanlar yeni kanal açamaz" },
       { k: "trackItemDisabled", ad: "Klip devre dışı bırakma", etki: "Sesi iyileştir orijinal sesi kapatamaz (elle kapat)" },
-      { k: "seqFromClips", ad: "Klipten sekans (createNewSequenceFromClips)", etki: "Rehberin örnek klibi sekansa kendiliğinden konmaz; klibi Yeni Öğe simgesine sürüklemen gerekir" }
+      { k: "seqFromClips", ad: "Klipten sekans (createNewSequenceFromClips)", etki: "Rehberin örnek klibi sekansa kendiliğinden konmaz; klibi Yeni Öğe simgesine sürüklemen gerekir" },
+      // Hız Rampası (KS_apiProbe yalnız typeof okur; setSpeed hiçbir zaman çağrılmaz)
+      { k: "qeSetSpeed", ad: "QE hız yazma (setSpeed)", etki: "Hız Rampası klibe hız yazamaz" },
+      { k: "unlinkSelection", ad: "Bağlantı koparma (unlinkSelection)", etki: "Sesle bağlı kliplerde Hız Rampası önce Ctrl+L ile bağlantıyı koparmanı ister" },
+      { k: "interp", ad: "Kare harmanlama (setTimeInterpolationType)", etki: "Hız Rampası parçalara kare harmanlamayı açamaz; Premiere'de elle aç" },
+      { k: "speedRead", ad: "Hız okuma (getSpeed)", etki: "Hızı değişmiş klipler süre karşılaştırmasıyla bulunur" }
     ];
     var eksik = [], bilinmeyen = [];
     gerek.forEach(function (g) {
@@ -296,6 +301,11 @@ window.KLibraryHealth = (function () {
       eksik.forEach(function (g) {
         out.push({ status: "warn", title: "Premiere'de yok: " + g.ad, detail: g.etki, group: "premiere" });
       });
+    }
+    // Bilgi: Premiere bir gün Zaman Yeniden Eşleme'yi betiklere açarsa (Hız Rampası Katman 3)
+    if (a.timeRemapApi === true) {
+      out.push({ status: "good", title: "Zaman Yeniden Eşleme API'si açık",
+        detail: "Bu Premiere sürümü Zaman Yeniden Eşleme'yi betiklere gösteriyor; Hız Rampası ileride gerçek eğri yazabilir", group: "premiere" });
     }
     return out;
   }
