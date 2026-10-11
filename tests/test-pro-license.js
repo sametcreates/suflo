@@ -110,7 +110,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   var ls = sahteLs();
   var d1 = baglam(DT, { ls: ls });
   var P = d1.Pro;
-  ok("deneme: dosya yokken her araca 3 hak", P.denemeKalan("cut") === 3 && P.status().deneme.ozellikler.length === 9 && P.status().deneme.toplamKalan === 27, JSON.stringify(P.status().deneme && P.status().deneme.toplamKalan));
+  ok("deneme: dosya yokken her araca 3 hak", P.denemeKalan("cut") === 3 && P.status().deneme.ozellikler.length === 10 && P.status().deneme.toplamKalan === 30, JSON.stringify(P.status().deneme && P.status().deneme.toplamKalan));
   ok("deneme: kurulmadan deneme+silent kapi false", P.gate("cut", { deneme: true, silent: true }) === false && P.gate("cut", { silent: true }) === false);
   ok("deneme: kurulmadan harcama yok (-1), dosya yazilmaz", P.denemeHarca("cut") === -1 && !fs.existsSync(DF));
   ok("deneme: denemeBaslat('mogrt') ve diger kutuphaneler false", ["mogrt", "sfx", "motionbg", "presets", "propack", "captionStyles", "batch", "assexport"].every(function (f) { return P.denemeBaslat(f) === false; }));
@@ -129,7 +129,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   ok("deneme: dosya gecerli _sig ile yazildi", yazilan.v === 1 && yazilan.kullanilan.cut === 1 && yazilan._sig === beklenenSig, JSON.stringify(yazilan));
   ok("deneme: dosya 0600 ve .tmp kalmadi", (process.platform === "win32" || (fs.statSync(DF).mode & 511) === 384) && !fs.existsSync(DF + ".tmp"));
   ok("deneme: localStorage aynasi ayni imzali durumu tutar", ls.d["suflo.deneme"] === fs.readFileSync(DF, "utf8"));
-  ok("deneme: status().deneme cut 2/3", P.status().deneme.ozellikler[0].kalan === 2 && P.status().deneme.toplamKalan === 26);
+  ok("deneme: status().deneme cut 2/3", P.status().deneme.ozellikler[0].kalan === 2 && P.status().deneme.toplamKalan === 29);
 
   var d2 = baglam(DT, { ls: sahteLs() });
   ok("deneme: yeni oturum dosyadan 2 okur (hak suresiz kalir)", d2.Pro.denemeKalan("cut") === 2 && d2.Pro.denemeKalan("zoom") === 3);
@@ -151,7 +151,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
     baglam(DT, { deneme: false }).Pro.status().deneme === null);
 
   // Inceleme bulgusu: gecici okuma hatasi (EBUSY: antivirus yeni yazilan dosyayi tutuyor) depoyu
-  // kurcalanmis sayip 9 aracin 27 hakkini birden silmemeli; harcama bellekteki duruma yapilir
+  // kurcalanmis sayip 10 aracin 30 hakkini birden silmemeli; harcama bellekteki duruma yapilir
   var EF = path.join(TMP, "deneme-ebusy");
   fs.mkdirSync(EF, { recursive: true });
   var EDF = path.join(EF, "Suflo", "pro-deneme.json");
@@ -169,7 +169,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   kilit.kalan = 1;
   var zoomKalan = e1.Pro.denemeHarca("zoom");
   ok("okuma hatası (EBUSY): harcama bellekteki duruma yapılır, öteki haklar silinmez", zoomKalan === 2 && e1.Pro.denemeKalan("cut") === 2 &&
-    e1.Pro.denemeKalan("overlay") === 3 && e1.Pro.status().deneme.toplamKalan === 25, zoomKalan + " / " + JSON.stringify(e1.Pro.status().deneme));
+    e1.Pro.denemeKalan("overlay") === 3 && e1.Pro.status().deneme.toplamKalan === 28, zoomKalan + " / " + JSON.stringify(e1.Pro.status().deneme));
   var e2 = baglam(EF, { ls: els1 });
   ok("okuma hatası: yeni oturumda cut 2, zoom 2, overlay 3 (tükenmiş durum diske yazılmadı)",
     e2.Pro.denemeKalan("cut") === 2 && e2.Pro.denemeKalan("zoom") === 2 && e2.Pro.denemeKalan("overlay") === 3, [e2.Pro.denemeKalan("cut"), e2.Pro.denemeKalan("zoom"), e2.Pro.denemeKalan("overlay")].join(","));

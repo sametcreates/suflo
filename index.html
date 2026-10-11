@@ -71,6 +71,11 @@
       <span class="ky-kilit" data-kilit>PRO</span>
       <span class="ky-adet" id="gecis-sayac">13</span>
     </button>
+    <button class="ky-oge" data-tab="hiz">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14a7 7 0 0 1 14 0"/><path d="M10 14l4-5"/></svg></span>
+      <span class="ky-metin"><b>Hız Rampası <em class="ky-yeni">YENİ</em></b><i>ağır çekim · hızlanma</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
     <button class="ky-oge" data-tab="kanca">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="5" rx="1.2"/><path d="M5 13h10M7 16h6"/></svg></span>
       <span class="ky-metin"><b>Kanca Başlığı <em class="ky-yeni">YENİ</em></b><i>Shorts açılış yazısı</i></span>
@@ -1355,6 +1360,100 @@
     <div id="gecis-grid" class="preset-grid gecis-grid"></div>
   </section>
 
+  <!-- ================= HIZ RAMPASI (v3.2) ================= -->
+  <!-- Eğri kartları ve önizleme ücretsiz; uygulamak Pro (3 deneme). js/speedramp.js + js/hiz-rampasi.js -->
+  <section id="tab-hiz" class="tabpane">
+    <div class="pro-tanitim" id="hiz-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Tek tıkla hız rampası</b>
+        <span>Klibi seç, eğriyi seç, uygula. Premiere'de düzenlenebilir hız parçaları; kurgun kaymaz.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>11</strong> eğri</i><i><strong>0</strong> eklenti</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="speedramp">Hız rampasını aç — 749 TL</button>
+    </div>
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 14a7 7 0 0 1 14 0"/><path d="M10 14l4-5"/></svg>
+        <b>Premiere'de düzenlenebilir hız rampası</b>
+      </div>
+      <p class="ci-p">Premiere, Zaman Yeniden Eşleme'yi eklentilere açmıyor. Suflo rampayı kısa parçalara böler ve her parçaya kendi hızını yazar; hızları Hız/Süre'den değiştirebilirsin. Klibin yeri ve süresi aynı kalır: altyazı, müzik ve sonraki klipler kaymaz.</p>
+    </div>
+    <div class="hiz-hedef-satir">
+      <div id="hiz-hedef" class="hiz-hedef">Timeline'da bir klip seç ya da Giriş/Çıkış (In/Out) koy.</div>
+      <label class="preset-control">Aralık
+        <select id="hiz-aralik">
+          <option value="clips" selected>Seçili klipler (tamamı)</option>
+          <option value="inout">Giriş–Çıkış arası (In/Out)</option>
+        </select>
+      </label>
+    </div>
+    <div id="hiz-grid" class="preset-grid hiz-grid"></div>
+    <div class="hiz-onizleme-kutu">
+      <svg id="hiz-onizleme" class="hiz-onizleme" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Hız eğrisi önizlemesi"></svg>
+      <div id="hiz-ozet" class="hiz-ozet"></div>
+    </div>
+    <div class="preset-toolbar hiz-secenekler">
+      <label class="preset-control">Yoğunluk
+        <select id="hiz-yogunluk">
+          <option value="0.6">Hafif</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.4">Güçlü</option>
+        </select>
+      </label>
+      <label class="preset-control">Yumuşatma
+        <select id="hiz-gecis">
+          <option value="smooth" selected>Yumuşak</option>
+          <option value="linear">Doğrusal</option>
+          <option value="step">Basamaklı</option>
+        </select>
+      </label>
+      <label class="preset-control">Parça
+        <select id="hiz-parca">
+          <option value="few">Az</option>
+          <option value="normal" selected>Normal</option>
+          <option value="many">Çok</option>
+        </select>
+      </label>
+      <label class="preset-control">Kaynak
+        <select id="hiz-kaynak">
+          <option value="auto" selected>Otomatik</option>
+          <option value="balanced">Dengeli</option>
+        </select>
+      </label>
+      <label class="preset-control">Ses
+        <select id="hiz-ses">
+          <option value="mute" selected>Rampada sesi kapat</option>
+          <option value="keep">Sesi olduğu gibi bırak</option>
+        </select>
+      </label>
+      <label class="preset-control">Ağır çekim
+        <select id="hiz-akis">
+          <option value="1" selected>Kare harmanlama</option>
+          <option value="2">Optik akış (yavaş render)</option>
+          <option value="0">Kapalı</option>
+        </select>
+      </label>
+      <label class="preset-control" id="hiz-ritim-yon-kutu" hidden>Vuruş
+        <select id="hiz-ritim-yon">
+          <option value="slow" selected>Vuruşta yavaş</option>
+          <option value="fast">Vuruşta hızlı</option>
+        </select>
+      </label>
+    </div>
+    <label class="switch"><input id="hiz-bulanik" type="checkbox"><i></i><span>Hızlı bölümlerde bulanıklık</span></label>
+    <label class="switch"><input id="hiz-vurus" type="checkbox"><i></i><span>Vuruş anını playhead'e hizala</span></label>
+    <label class="switch"><input id="hiz-kopya" type="checkbox" checked><i></i><span>Önce sekansı kopyala</span></label>
+    <div class="row hiz-eylem">
+      <button id="hiz-kaldir" class="btn" type="button">Rampayı kaldır</button>
+      <button id="hiz-uygula" class="btn primary grow" type="button">Rampayı uygula</button>
+    </div>
+    <div id="hiz-status" class="inline-status"></div>
+    <p class="hint">Ctrl+Z rampayı tek adımda geri almaz; geri almak için Rampayı kaldır'ı kullan. Yakınlaştırma ve geçişleri rampadan sonra ekle.</p>
+  </section>
+
   <!-- ================= KANCA BASLIGI ================= -->
   <section id="tab-kanca" class="tabpane">
     <div class="pro-tanitim" id="kanca-tanitim" hidden>
@@ -1951,7 +2050,7 @@
               <li>Otomatik kesim · Konuşmadan kes (dolgu, tekrar, tekrar çekim)</li>
               <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
               <li>Suflo Stilleri timeline'da · Kanca başlığı</li>
-              <li>Sesi iyileştir · Otomatik zoom · Ritim</li>
+              <li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası</li>
               <li>12 dile çeviri · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
               <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
@@ -2146,6 +2245,8 @@
   <script src="js/youtube-meta.js"></script>
   <script src="js/bolumler.js"></script>
   <script src="js/gecisler.js"></script>
+  <script src="js/speedramp.js"></script>
+  <script src="js/hiz-rampasi.js"></script>
   <script src="js/sahneler.js"></script>
   <script src="js/viral.js"></script>
   <script src="js/broll.js"></script>

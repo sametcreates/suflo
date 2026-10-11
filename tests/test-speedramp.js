@@ -152,7 +152,7 @@ ok("auto: tutamak yetmezse yoğunluk düşer (yogunlukDustu, ≥ 0.6·k, tutama�
 var den = S.plan("darbe", {}, { frames: 100, fps: 25, handleSec: 0 });
 ok("auto: düşürmek de yetmezse balanced (dengeliyeGecti)", den.mode === "balanced" && den.warnings.indexOf("dengeliyeGecti") !== -1 && Math.abs(dvToplam(den) - 100) <= 0.01, js(den.warnings));
 var ffYok = S.plan("giris", {}, { frames: 100, fps: 25, handleSec: null });
-ok("auto: ffmpeg yokken (tutamak null) B > 1 için tam yoğunlukta exact seçilmez", !(ffYok.mode === "exact" && ffYok.k === 1), ffYok.mode + " " + ffYok.k);
+ok("auto: ffmpeg yokken (tutamak null) B > 1 ise exact seçilmez, yoğunluk düşürülmez (dengeliyeGecti)", ffYok.mode === "balanced" && ffYok.k === 1 && ffYok.warnings.indexOf("dengeliyeGecti") !== -1, ffYok.mode + " " + ffYok.k);
 var kis = S.plan("cikis", {}, { frames: 100, fps: 25, handleSec: 100, partial: true });
 ok("kısmi (In/Out) aralık her zaman balanced", kis.mode === "balanced" && kis.warnings.indexOf("dengeliyeGecti") === -1 && Math.abs(dvToplam(kis) - 100) <= 0.01);
 ok("mode balanced seçilince tutamak olsa da balanced", S.plan("cikis", { mode: "balanced" }, { frames: 100, fps: 25, handleSec: 100 }).mode === "balanced");

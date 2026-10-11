@@ -422,6 +422,7 @@
     if (o.mode === "auto" && !clip.partial) {
       sh = bicim(k, "exact");
       if (sigar(sh)) mode = "exact";
+      else if (tutamak === null) uyarilar.push("dengeliyeGecti");   // tutamak bilinmiyor (ffmpeg yok): yoğunluk düşürülmez
       else {
         var kAlt = 0.6 * o.k, shAlt = bicim(kAlt, "exact");
         if (sigar(shAlt)) {

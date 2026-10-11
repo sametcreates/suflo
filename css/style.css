@@ -3634,6 +3634,35 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 @keyframes gs-cross-a { 0% { opacity: 1; } 60%, 100% { opacity: 0; } }
 @keyframes gs-cross-b { 0%, 20% { opacity: 0; } 70%, 100% { opacity: 1; } }
 
+/* ---------- Hız Rampası (v3.2): eğri kartları, log hız ekseni (%25–%800), basamak önizlemesi ---------- */
+/* flex gap CEF 74'te (Premiere 2020-2021) yok: aralıklar kenar boşluğuyla */
+.hiz-hedef-satir { display: flex; align-items: center; justify-content: space-between; margin: 0 0 10px; }
+.hiz-hedef { flex: 1; min-width: 0; margin-right: 8px; font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hiz-hedef b { color: var(--text); font-weight: 700; }
+.hiz-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+.hiz-card { display: flex; flex-direction: column; padding: 8px; text-align: left; color: var(--text); font: inherit; cursor: pointer; }
+.hiz-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 12px 28px -22px #000; }
+.hiz-card.kapali, .hiz-card:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+.hiz-card:focus-visible { outline: 2px solid var(--accent-lite); outline-offset: 2px; }
+.hiz-resim { display: block; margin-bottom: 7px; border-radius: 7px; background: #0b0e15; }
+.hiz-card svg { display: block; width: 100%; height: 56px; }
+.hiz-bilgi b { display: block; font-size: 11.5px; }
+.hiz-bilgi i { display: block; margin-top: 2px; font-style: normal; font-size: 10px; line-height: 1.35; color: var(--faint); }
+.hiz-egri { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.hiz-basamak { fill: var(--accent); fill-opacity: .25; }
+.hiz-taban { stroke: var(--line2); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.hiz-vurus { fill: var(--warn); stroke: #0b0e15; stroke-width: 1.5; }
+.hiz-vurus-cizgi { stroke: var(--warn); stroke-opacity: .45; stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+.hiz-eksen { fill: var(--faint); font-size: 8px; }
+.hiz-onizleme-kutu { margin: 12px 0 10px; padding: 8px; border: 1px solid #263242; border-radius: 10px; background: linear-gradient(180deg, #131b26, #0e151e); }
+.hiz-onizleme { display: block; width: 100%; height: 120px; }
+.hiz-ozet { margin-top: 6px; font-size: 10.5px; color: var(--dim); }
+.hiz-ozet .hiz-not { color: var(--faint); }
+.hiz-secenekler { flex-wrap: wrap; gap: 0; }
+.hiz-secenekler .preset-control { margin: 0 6px 6px 0; }
+.hiz-eylem { margin-top: 10px; }
+.hiz-eylem .btn.grow { flex: 1; }
+
 /* ---------- v3.0 cilalama: yan menu ---------- */
 /* PRO etiketi ikonun kosesine rozet olarak: basliklar artik "Yazı …" diye kesilmez */
 .yan-menu .ky-oge { position: relative; }

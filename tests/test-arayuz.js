@@ -28,7 +28,7 @@ function ok(ad, kosul, kanit) {
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
                 "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
                 "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js",
-                "js/marka-kiti-ui.js", "js/kanca.js"];
+                "js/marka-kiti-ui.js", "js/kanca.js", "js/hiz-rampasi.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -335,5 +335,26 @@ ok("Podcast: altyazının üç derleme noktası konuşmacı renklerinden geçer"
 ok("Podcast: sessiz mikrofon reddi normalizeSeries'in konuşma seviyesiyle (az konuşan mikrofon reddedilmez)", /M\.speechLevel\(seri\) < M\.SESSIZ_P95/.test(fnGovde(mcUi, "async function micEnerji(")));
 ok("Podcast: hazırlık açık Suflo kopyalarını bilir (kopyada yeniden uygulama)", /seqIds: Object\.keys\(onbellek\.seqIds\)/.test(uyg));
 ok("Podcast: eşleme denetimlerinin erişilebilir adında konuşmacı harfi var", /HARF\[i\][\s\S]{0,120}" · "/.test(mcUi) && /on \+ "Mikrofon ses katmanı"/.test(mcUi));
+/* ---------- Hız Rampası (v3.2) ---------- */
+var hizUi = fs.readFileSync(KOKYOL + "js/hiz-rampasi.js", "utf8");
+ok("Hız Rampası: kenar çubuğunda Geçişler'den sonra, Kanca Başlığı'ndan önce; YENİ ve PRO rozetli",
+  html.indexOf('data-tab="hiz"') > html.indexOf('data-tab="gecis"') && html.indexOf('data-tab="hiz"') < html.indexOf('data-tab="kanca"') &&
+  /data-tab="hiz">[\s\S]{0,300}<b>Hız Rampası <em class="ky-yeni">YENİ<\/em><\/b><i>ağır çekim · hızlanma<\/i>[\s\S]{0,80}data-kilit>PRO/.test(html));
+ok("Hız Rampası: sayaç rozeti yok (elle tutulan bir sayı daha olmasın)", !/data-tab="hiz">[\s\S]{0,400}?ky-adet[\s\S]{0,40}<\/button>/.test(html.slice(html.indexOf('data-tab="hiz"'), html.indexOf('data-tab="kanca"'))));
+["tab-hiz", "hiz-tanitim", "hiz-hedef", "hiz-aralik", "hiz-grid", "hiz-onizleme", "hiz-ozet", "hiz-yogunluk", "hiz-gecis", "hiz-parca", "hiz-kaynak", "hiz-ses",
+  "hiz-akis", "hiz-bulanik", "hiz-vurus", "hiz-kopya", "hiz-uygula", "hiz-kaldir", "hiz-status", "hiz-ritim-yon", "hiz-ritim-yon-kutu"].forEach(function (id) {
+  ok("Hız Rampası: #" + id + " var", !!idler[id]);
+});
+ok("Hız Rampası: sekme Geçişler sekmesinden sonra", html.indexOf('id="tab-hiz"') > html.indexOf('id="tab-gecis"') && html.indexOf('id="tab-hiz"') < html.indexOf('id="tab-kanca"'));
+ok("Hız Rampası: betik sırası speedramp.js → hiz-rampasi.js → app.js", betikSira("speedramp.js") > 0 && betikSira("speedramp.js") < betikSira("hiz-rampasi.js") &&
+  betikSira("hiz-rampasi.js") < betikSira("app.js"));
+ok("Hız Rampası: app.js başlatır, kilitler ve tanıtım kartını Pro'da gizler", /KHizRampasi\.init\(\)/.test(appSrc) &&
+  /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="hiz"\]'\), !s\.pro\)/.test(appSrc) && /"hiz-tanitim"/.test(appSrc));
+ok("Hız Rampası: Pro etiketi ve tanıtım düğmesi speedramp", /speedramp: 'Hız rampası: tek tıkla ağır çekim ve hızlanma'/.test(proSrc) &&
+  /data-pro-feature="speedramp">Hız rampasını aç — 749 TL</.test(html));
+ok("Hız Rampası: Ayarlar Pro listesinde", /<li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası<\/li>/.test(html));
+ok("Hız Rampası: Premiere çağrıları yalnız tıklamada (init'te K.call yok)", !/K\.call\(/.test(fnGovde(hizUi, "function init(")) && !/K\.call\(/.test(fnGovde(hizUi, "function render(")) &&
+  !/K\.call\(/.test(fnGovde(hizUi, "function refresh(")) && !/K\.call\(/.test(fnGovde(hizUi, "function onizlemeCiz(")));
+ok("Hız Rampası: Ctrl+Z uyarısı ve kaldırma düğmesi arayüzde", /Ctrl\+Z rampayı tek adımda geri almaz/.test(html) && /id="hiz-kaldir"[^>]*>Rampayı kaldır</.test(html));
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

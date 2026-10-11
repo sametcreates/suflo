@@ -398,5 +398,8 @@ window.KBeat = (function () {
     refreshButton();
   }
 
-  return { init: init, _onsetBul: onsetBul, _bpmTahmin: bpmTahmin };
+  // Hız Rampası (Ritme Rampa) son analizin vuruşlarını okur: timeline saniyesi, kopya
+  function vuruslarKopya() { return vurusler.map(function (v) { return { t: v.t, guc: v.guc, tip: v.tip }; }); }
+
+  return { init: init, vuruslar: vuruslarKopya, bpm: function () { return bpm; }, _onsetBul: onsetBul, _bpmTahmin: bpmTahmin };
 })();
