@@ -2468,6 +2468,33 @@
     "{} %{n}": "{} {}%"
   });
 
+  /* ================= Hız rampası / Speed ramp (js/speedramp.js, js/hiz-rampasi.js, #tab-hiz) ================= */
+  add({
+    // curve presets (js/speedramp.js LIST)
+    "Ağır Çekim Dalışı": "Slow-Mo Dip",
+    "Hızlan, derin ağır çekim, yeniden hızlan": "Speed up, deep slow motion, speed up again",
+    "Darbe": "Impact",
+    "Hızla gel, vuruşta dur gibi yavaşla, hızla çık": "Rush in, near-freeze on the hit, rush out",
+    "Hızlı Giriş": "Rush In",
+    "Hızlı başlar, normale oturur (rampa giriş)": "Starts fast and settles to normal (ramp in)",
+    "Hızlı Çıkış": "Rush Out",
+    "Normal akar, sonda fırlar (rampa çıkış)": "Plays normally, then shoots out (ramp out)",
+    "Doruk Anı": "Peak Moment",
+    "Hızlı yaklaşım, uzun ağır çekim, normale dönüş (yumuşak kahraman anı)": "Fast build-up, long slow-mo, back to normal (smooth hero shot)",
+    "Atılım": "Burst",
+    "Ortada kısa bir flaş hızlanma": "A short flash of speed in the middle",
+    "Zaman Bükümü": "Time Bend",
+    "Hızlı, uzun ağır çekim, hızlı (mermi zamanı hissi)": "Fast, long slow-mo, fast (bullet-time feel)",
+    "Nabız": "Pulse",
+    "Hızlı ve yavaş dönüşümlü montaj ritmi": "Alternating fast and slow montage rhythm",
+    "Vites": "Gear Shift",
+    "Yumuşatmasız sert basamaklar": "Hard steps with no easing",
+    "Süzülme": "Drift",
+    "B-roll için hafif dalga": "A gentle wave for B-roll",
+    "Ritme Rampa": "Beat Ramp",
+    "Ritim analizindeki vuruşlarda yavaşla (ya da hızlan)": "Slow down (or speed up) on the beats from the Beat analysis"
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
