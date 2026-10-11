@@ -54,7 +54,8 @@ function kur(o) {
     KApp: {
       toast: function (m, t, s, e) { toastlar.push({ m: m, t: t, e: e }); },
       ctx: function () { return o.ctx || null; },
-      onContext: function (fn) { dinleyici.ctx = fn; }, onTab: function (ad, fn) { dinleyici.tab[ad] = fn; }
+      onContext: function (fn) { dinleyici.ctx = fn; }, onTab: function (ad, fn) { dinleyici.tab[ad] = fn; },
+      onPoll: function (fn) { dinleyici.poll = fn; }
     },
     Pro: {
       isPro: function () { return !!o.pro; }, on: function () {}, denemeAcik: function () { return !!o.kurulu || !!o.acik; },
@@ -107,7 +108,7 @@ function cevir(n) {
   await a.H.uygula();
   ok("kurulmamışken Premiere'e gidilmez; kapı 'speedramp' + deneme:true + yeniden", a.cagri.length === 0 && a.kapi.length === 1 && a.kapi[0][0] === "speedramp" &&
     a.kapi[0][1].deneme === true && typeof a.kapi[0][1].yeniden === "function" && a.harcanan.length === 0, js(a.kapi));
-  ok("ilk satır kapı (kaynakta)", /async function uygula\(\) \{\n    if \(typeof Pro !== "undefined" && !Pro\.gate\("speedramp", \{ deneme: true, yeniden: function \(\) \{ uygula\(\); \} \}\)\) return;/.test(UYGULA.replace(/\r\n/g, "\n")));
+  ok("ilk satır kapı (kaynakta)", /async function uygula\(ek\) \{\n    if \(typeof Pro !== "undefined" && !Pro\.gate\("speedramp", \{ deneme: true, yeniden: function \(\) \{ uygula\(\); \} \}\)\) return;/.test(UYGULA.replace(/\r\n/g, "\n")));
 
   /* ---------- 2) iki hedef: biri başarılı biri başarısız → tek hak; kayıt + kalibrasyon ---------- */
   var b = kur({ kurulu: true, cevap: function (fn, arg, n) {
@@ -216,7 +217,7 @@ function cevir(n) {
   var kc = k.cagri.filter(function (x) { return x.fn === "KS_removeSpeedRamp"; });
   ok("kaldir() kapısız: kayıt yoksa seçimden kaldırır", k.kapi.length === 0 && kc.length === 1 && kc[0].arg.fromSelection === true &&
     k.toastlar.some(function (t) { return t.m === "Rampa kaldırıldı, klip %100'e döndü"; }), js(kc));
-  var kaldirGovde = UYGULA.slice(UYGULA.indexOf("async function kaldir("), UYGULA.indexOf("function init()"));
+  var kaldirGovde = UYGULA.slice(UYGULA.indexOf("async function kaldirIc("), UYGULA.indexOf("function init()"));
   ok("kaldir() gövdesinde Pro yok", kaldirGovde.length > 100 && !/Pro\./.test(kaldirGovde));
 
   /* ---------- 11) kopya, gerçekten oluşana dek her çağrıda istenir ---------- */
@@ -361,6 +362,141 @@ function cevir(n) {
   var t20 = kur({ kurulu: true, kaynak: "balanced", cevap: function (fn) { return fn === "KS_speedRampTargets" ? hedefler([hedef("C.mp4", 2, 6)]) : { ok: false, kod: "tutamak", restored: true }; } });
   await t20.H.uygula();
   ok("Dengeli + tutamak: 'Dengeli'yi seç' denmez", !/Dengeli'yi seç/.test(t20.dom["hiz-status"].textContent) && /sığmadı/.test(t20.dom["hiz-status"].textContent), t20.dom["hiz-status"].textContent);
+
+  /* ---------- 21) 'Eski rampayı kaldırıp yeniden uygula': kaldırma seçimi boşaltır, hedefler açıkça istenir ---------- */
+  var depo21 = { "suflo.hizRampa.kayitlar": JSON.stringify([{ v: 1, seqId: "s1", track: 0, t0: 2, t1: 6, srcIn: 10, mediaPath: "C:\\cekim\\A.mp4", name: "A", audio: [], unlinked: true, mode: "balanced", preset: "dalis" }]) };
+  var y21 = kur({ kurulu: true, depo: depo21, cevap: function (fn, arg, n) {
+    if (fn === "KS_speedRampTargets") {
+      // gerçek host gibi: kaldırmadan sonra seçim yoksa secimYok; açık hedeflerle (items) geri gelen klip
+      if (arg.items) return hedefler([hedef("A.mp4", 2, 6)]);
+      return y21.cagri.some(function (c) { return c.fn === "KS_removeSpeedRamp"; }) ? { ok: false, kod: "secimYok" }
+        : hedefler([hedef("A.mp4", 3.2, 4)], [{ name: "A.mp4", track: 0, start: 2, kod: "hizli", pct: 40 }]);
+    }
+    if (fn === "KS_removeSpeedRamp") return { ok: true, track: 0, t0: 2, t1: 6, removed: 14, audio: 1, seqId: "s1", kayit: null, warnings: [] };
+    if (fn === "KS_applySpeedRamp") return basari(arg);
+    return { ok: false };
+  } });
+  await y21.H.uygula();
+  var teklif21 = y21.toastlar.filter(function (t) { return t.e && t.e.metin === "Eski rampayı kaldırıp yeniden uygula"; })[0];
+  teklif21.e.fn();
+  await bekle(30);
+  var hd21 = y21.cagri.filter(function (c) { return c.fn === "KS_speedRampTargets"; });
+  ok("kaldırıp yeniden uygula: kayıt kaldırılır, yeniden uygulama geri gelen klibi açıkça ister (items), rampa uygulanır",
+    y21.cagri.filter(function (c) { return c.fn === "KS_removeSpeedRamp"; })[0].arg.record.t0 === 2 && hd21.length === 2 &&
+    js(hd21[1].arg.items) === js([{ track: 0, start: 2 }]) && y21.uygulamalar().length === 1 && y21.uygulamalar()[0].arg.target.start === 2 &&
+    !/✕/.test(y21.dom["hiz-status"].textContent), js(hd21.map(function (c) { return c.arg; })) + " | " + y21.dom["hiz-status"].textContent);
+
+  /* ---------- 22) eğri ve seçenekler iş başında sabit; iş sürerken kart seçimi yok sayılır ---------- */
+  var s22 = kur({ kurulu: true, cevap: function (fn, arg, n) {
+    if (fn === "KS_speedRampTargets") return hedefler([hedef("A.mp4", 2, 6), hedef("B.mp4", 8, 12), hedef("C.mp4", 14, 18)]);
+    if (fn === "KS_applySpeedRamp") {
+      if (arg.target.start === 2) {   // kullanıcı 1. klip uygulanırken 'Vites' kartına tıklar, hizala kutusunu açar
+        var vites = s22.dom["hiz-grid"].children.filter(function (k) { return k.getAttribute("data-id") === "vites"; })[0];
+        vites._o.click();
+        s22.dom["hiz-vurus"].checked = true;
+      }
+      return basari(arg);
+    }
+    return { ok: false };
+  } });
+  await s22.H.uygula();
+  var pr22 = JSON.parse(s22.depo["suflo.hizRampa.kayitlar"]).map(function (k) { return k.preset; });
+  var dalisN = SR.plan("dalis", {}, SR.clipFor(hedef("B.mp4", 8, 12), 0.04, {})).segments.length;
+  ok("iş sürerken kart tıklaması: üç klip de başta seçilen eğriyle (Dalış), seçim değişmedi", js(pr22) === js(["dalis", "dalis", "dalis"]) && s22.H._secili() === "dalis" &&
+    s22.uygulamalar().every(function (c) { return c.arg.plan.segments.length === dalisN; }), js(pr22) + " " + s22.uygulamalar().map(function (c) { return c.arg.plan.segments.length; }));
+  var r22 = kur({ kurulu: true, vuruslar: [{ t: 3, guc: 1 }, { t: 4.5, guc: 1 }, { t: 9, guc: 1 }, { t: 10.5, guc: 1 }], analiz: { seqId: "s1", start: 0, end: 30 }, cevap: function (fn, arg) {
+    if (fn === "KS_speedRampTargets") return hedefler([hedef("A.mp4", 2, 6), hedef("B.mp4", 8, 12)]);
+    if (fn === "KS_applySpeedRamp") {
+      // 1. klipten sonra bağlam yoklaması BAŞKA bir sekansı bildirir (Ritme Rampa 'baska' olur)
+      if (arg.target.start === 2) r22.dinleyici.ctx({ hasSeq: true, app: "26.0.0", sequenceId: "s9", frame: 0.04, sel: null, seqIn: 0, seqOut: 0 });
+      return basari(arg);
+    }
+    return { ok: false };
+  } });
+  r22.H._sec("ritim");
+  await r22.H.uygula();
+  var pr22b = JSON.parse(r22.depo["suflo.hizRampa.kayitlar"]).map(function (k) { return k.preset; });
+  ok("iş sürerken bağlam değişse de kalan klip aynı eğri (Ritme Rampa); uzlaşma iş bitince", js(pr22b) === js(["ritim", "ritim"]) && r22.H._secili() === "dalis", js(pr22b) + " " + r22.H._secili());
+
+  /* ---------- 23) Suflo'nun kopya sekansı analiz sekansıyla aynı timeline ---------- */
+  var k23 = kur({ kurulu: true, vuruslar: [{ t: 3, guc: 1 }, { t: 4.5, guc: 1 }], analiz: { seqId: "s1", start: 0, end: 30 }, cevap: function (fn, arg) {
+    if (fn === "KS_speedRampTargets") return hedefler([hedef("A.mp4", 2, 6)]);
+    return basari(arg);
+  } });
+  k23.H._sec("ritim");
+  await k23.H.uygula();
+  k23.dinleyici.ctx({ hasSeq: true, app: "26.0.0", sequenceId: "s1-kopya", frame: 0.04, sel: null, seqIn: 0, seqOut: 0 });
+  var g23 = k23.dom["hiz-grid"].children.filter(function (k) { return k.getAttribute("data-id") === "ritim"; })[0];
+  ok("Suflo kopyasında (s1-kopya) Ritme Rampa açık kalır, seçim değişmez", k23.H._kopyaSekanslar["s1-kopya"] && k23.H._kopyaSekanslar["s1-kopya"].kaynak === "s1" &&
+    g23.disabled === false && k23.H._secili() === "ritim", js(k23.H._kopyaSekanslar));
+
+  /* ---------- 24) kaldır: seçim host'ta canlı okunur, kayıtlar host'a gider, dönen kayıt silinir ---------- */
+  var depo24 = { "suflo.hizRampa.kayitlar": JSON.stringify([
+    { v: 1, seqId: "s1", track: 0, t0: 2, t1: 6, srcIn: 10, mediaPath: "C:\\cekim\\L.mp4", name: "L", audio: [], unlinked: true, mode: "balanced", preset: "dalis" },
+    { v: 1, seqId: "s1", track: 0, t0: 20, t1: 24, srcIn: 28, mediaPath: "C:\\cekim\\L.mp4", name: "L", audio: [], unlinked: true, mode: "balanced", preset: "darbe" }]) };
+  // panelin önbellekteki bağlamı hâlâ A rampasında (aynı medya: seçim anahtarı değişmedi)
+  var k24 = kur({ depo: depo24, ctx: { hasSeq: true, app: "26.0.0", sequenceId: "s1", sel: { clipStart: 2, clipEnd: 2.4, mediaPath: "C:\\cekim\\L.mp4" } }, cevap: function (fn, arg) {
+    if (fn === "KS_removeSpeedRamp") return { ok: true, track: 0, t0: 20, t1: 24, removed: 9, audio: 1, seqId: "s1", kayit: { seqId: "s1", track: 0, t0: 20 }, warnings: ["sesKayitsiz"] };
+    return { ok: false };
+  } });
+  await k24.H.kaldir();
+  var a24 = k24.cagri.filter(function (c) { return c.fn === "KS_removeSpeedRamp"; })[0].arg;
+  var kalan24 = JSON.parse(k24.depo["suflo.hizRampa.kayitlar"]);
+  ok("kaldır: önbellekteki seçimin kaydı gönderilmez; fromSelection + tüm kayıtlar, host'un eşlediği (B) silinir, A kalır", a24.fromSelection === true && !a24.record &&
+    a24.records.length === 2 && kalan24.length === 1 && kalan24[0].t0 === 2, js(a24) + " " + js(kalan24));
+  ok("kayıtsız kaldırmada ses uyarısı", k24.toastlar.some(function (t) { return /kaydını bulamadı/.test(metin(t.m)) && t.t === "warn"; }), js(k24.toastlar.map(function (t) { return metin(t.m); })));
+
+  /* ---------- 25) her yoklamada canlı bağlam: playhead ve In/Out önizlemeyi tazeler ---------- */
+  var p25 = kur({ cevap: function () { return { ok: false }; } });
+  p25.dom["tab-hiz"].classList.add("active");
+  p25.dom["hiz-vurus"].checked = true;
+  var sel25 = { name: "D.mp4", mediaPath: "C:\\cekim\\D.mp4", clipStart: 2, clipEnd: 6, inPoint: 10, outPoint: 14 };
+  p25.dinleyici.ctx({ hasSeq: true, app: "26.0.0", sequenceId: "s1", frame: 0.04, playhead: 0.5, selCount: 1, sel: sel25 });
+  var once25 = p25.dom["hiz-onizleme"].innerHTML;
+  p25.dinleyici.poll({ hasSeq: true, app: "26.0.0", sequenceId: "s1", frame: 0.04, playhead: 4.2, selCount: 1, sel: sel25 });
+  ok("playhead klibe girince (seçim aynı) darbe anı önizlemede görünür", !/class="hiz-vurus"/.test(once25) && /class="hiz-vurus"/.test(p25.dom["hiz-onizleme"].innerHTML));
+  var i25 = kur({ cevap: function () { return { ok: false }; } });
+  i25.dom["tab-hiz"].classList.add("active");
+  i25.dinleyici.ctx({ hasSeq: true, app: "26.0.0", sequenceId: "s1", frame: 0.04, playhead: 0, selCount: 0, sel: null, seqIn: 0, seqOut: 0, seqDur: 60 });
+  i25.dinleyici.poll({ hasSeq: true, app: "26.0.0", sequenceId: "s1", frame: 0.04, playhead: 0, selCount: 0, sel: null, seqIn: 4, seqOut: 8, seqDur: 60 });
+  ok("seçim yokken In/Out konunca aralık 'inout'a geçer, hedef 'Giriş–Çıkış arası'", i25.dom["hiz-aralik"].value === "inout" && /^Hedef: Giriş–Çıkış arası · 4 sn$/.test(i25.dom["hiz-hedef"].textContent), i25.dom["hiz-hedef"].textContent);
+  var t25 = { hasSeq: true, app: "26.0.0", sequenceId: "s1", frame: 0.04, playhead: 0, selCount: 1, sel: { name: "Canlı.mp4", mediaPath: "C:\\cekim\\Canlı.mp4", clipStart: 30, clipEnd: 33, inPoint: 0, outPoint: 3 } };
+  var o25 = { ctx: null, cevap: function () { return { ok: false }; } };
+  var tt25 = kur(o25);
+  o25.ctx = t25;
+  tt25.dinleyici.tab.hiz();
+  ok("sekmeye girince canlı bağlam (KApp.ctx) kullanılır", /Canlı\.mp4/.test(tt25.dom["hiz-hedef"].textContent), tt25.dom["hiz-hedef"].textContent);
+  var app25 = fs.readFileSync(path.join(KOK, "js", "app.js"), "utf8");
+  ok("app.js: onPoll dinleyicileri her başarılı yoklamada çağrılır ve dışa açık", /pollListeners\.forEach/.test(app25) && /onPoll: onPoll/.test(app25));
+
+  /* ---------- 26) okuma satırı ve metinler ---------- */
+  var q26 = kur({ cevap: function () { return { ok: false }; } });
+  q26.H._medya["c:\\cekim\\f.mp4"] = { duration: 600, fps: 25 };
+  q26.dom["hiz-akis"].value = "1";
+  q26.dinleyici.ctx({ hasSeq: true, app: "26.0.0", sequenceId: "s1", frame: 1 / 50, playhead: 0, selCount: 1, sel: { name: "F.mp4", mediaPath: "C:\\cekim\\F.mp4", clipStart: 2, clipEnd: 6, inPoint: 10, outPoint: 14 } });
+  var var26 = ozet(q26).some(function (x) { return /takılabilir/.test(x); });
+  q26.dom["hiz-akis"].value = "2";
+  q26.dom["hiz-akis"]._o.change();
+  ok("Optik akış zaten seçiliyken 'Optik akış'ı dene' satırı yok (değişince önizleme tazelenir)", var26 && !ozet(q26).some(function (x) { return /takılabilir/.test(x); }), ozet(q26).join(" | "));
+  ok("yoğunluk düştü metni sade ('Tutamak' yok)", !/Tutamak/.test(UYGULA) && I18N.translate("Klibin sonrasında yeterli görüntü yok: yoğunluk düşürüldü") === "Not enough footage after the clip: intensity lowered");
+  var ad26 = cevir({ children: f.H._atlamaParcalari([{ name: "", kod: "grafik" }]).map(function (p) { return typeof p === "object" ? { textContent: p.ad, getAttribute: function (k) { return k === "data-i18n-skip" ? "" : null; } } : { nodeType: 3, textContent: p }; }) });
+  ok("adsız atlanan klip EN: 'unnamed clip'", ad26 === "1 clip skipped: unnamed clip (graphic)", ad26);
+  ok("hata metinleri: inoutKlipYok, duz, linkedBilinmiyor (Ctrl+L vaadi yok) ve İngilizceleri", /tek bir video klibin içinde/.test(f.H._hataMetni({ kod: "inoutKlipYok" })) &&
+    /aynı hızda/.test(f.H._hataMetni({ kod: "duz" })) && !/Ctrl\+L/.test(f.H._hataMetni({ kod: "linkedBilinmiyor" })) &&
+    ["inoutKlipYok", "duz", "linkedBilinmiyor"].every(function (k) { var tr = f.H._hataMetni({ kod: k }); return I18N.translate(tr) !== tr; }));
+  var d26 = kur({ kurulu: true, cevap: function (fn, arg) { return fn === "KS_speedRampTargets" ? hedefler([hedef("A.mp4", 2, 6)]) : basari(arg); } });
+  d26.dom["hiz-gecis"].value = "step";
+  d26.H._sec("cikis");
+  ok("tek hız çıkan plan (Basamaklı Hızlı Çıkış): önizleme nedenini söyler", /aynı hızda/.test(d26.dom["hiz-ozet"].textContent), d26.dom["hiz-ozet"].textContent);
+  await d26.H.uygula();
+  ok("...ve uygulanmaz, hak düşmez, durum satırı aynı metni verir", d26.uygulamalar().length === 0 && d26.harcanan.length === 0 && /aynı hızda/.test(d26.dom["hiz-status"].textContent), d26.dom["hiz-status"].textContent);
+
+  /* ---------- 27) önizleme ölçülen genişlikte (metin ve nokta gerilmez); durum satırı canlı bölge ---------- */
+  var w27 = kur({ cevap: function () { return { ok: false }; } });
+  w27.dom["hiz-onizleme"].getBoundingClientRect = function () { return { width: 520, height: 120 }; };
+  w27.H._sec("darbe");
+  ok("viewBox ölçülen genişlikte (0 0 520 120), taban çizgisi 520'ye", w27.dom["hiz-onizleme"].getAttribute("viewBox") === "0 0 520 120" && /x2="520"/.test(w27.dom["hiz-onizleme"].innerHTML), w27.dom["hiz-onizleme"].getAttribute("viewBox"));
+  ok("#hiz-status role=status aria-live=polite", /<div id="hiz-status" class="inline-status" role="status" aria-live="polite">/.test(html));
 
   console.log("\n" + gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);

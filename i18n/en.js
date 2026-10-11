@@ -2544,7 +2544,7 @@
     "Tam hız: klibin son {n} sn'si kullanılmaz": "Exact speeds: the clip's last {} s isn't used",
     "Tam hız, kaynak aynı kalır": "Exact speeds, same source",
     "Dengeli: hızlar ×{n} ölçeklendi, kaynak aynı kalır": "Balanced: speeds scaled ×{}, same source",
-    "Tutamak yetmedi: yoğunluk düşürüldü": "Not enough handle: intensity lowered",
+    "Klibin sonrasında yeterli görüntü yok: yoğunluk düşürüldü": "Not enough footage after the clip: intensity lowered",
     "Klibin sonrasında yeterli görüntü yok: Dengeli kullanılıyor": "Not enough footage after the clip: using Balanced",
     "Medya süresi okunamadı: Dengeli kullanılıyor": "Couldn't read the media length: using Balanced",
     "Medya süresi okunuyor…": "Reading the media length…",
@@ -2573,6 +2573,7 @@
     "Bu klipte zaten bir hız rampası var.": "This clip already has a speed ramp.",
     "Bu klipte zaten bir hız rampası var. Önce Rampayı kaldır'ı kullan.": "This clip already has a speed ramp. Use Remove ramp first.",
     "Eski rampayı kaldırıp yeniden uygula": "Remove the old ramp and apply again",
+    "Suflo bu rampanın kaydını bulamadı; kapalı sese dokunmadı. Rampadaki ses kapalıysa Premiere'de aç ve klibe bağla.": "Suflo couldn't find its record of this ramp, so it left muted audio alone. If the audio under the ramp is muted, turn it back on in Premiere and link it to the clip.",
     "Ses kapatılamadı; rampadaki sesi Premiere'de elle kapat.": "Couldn't mute the audio; mute the audio over the ramp by hand in Premiere.",
     "Rampanın kaynağı 2 kareden fazla kaydı; sonu kontrol et.": "The ramp's source drifted by more than 2 frames; check the end.",
     "Kopya sekansta uygulandı: {}": "Applied in the copied sequence: {}",
@@ -2598,6 +2599,9 @@
     "{} (plan)": "{} (plan)",
     "{} (vuruş yok)": "{} (no beats)",
     "{} (fazla)": "{} (over the 12-clip limit)",
+    "{} (tek hız)": "{} (single speed)",
+    "tek hız": "single speed",
+    "adsız klip": "unnamed clip",
     "grafik": "graphic",
     "ters": "reversed",
     "kilitli": "locked",
@@ -2615,6 +2619,7 @@
     "vuruş yok": "no beats",
     "hızı %{n}": "speed {}%",
     "Rampa için klip çok kısa": "The clip is too short for a ramp",
+    "Bu ayarlarla rampa oluşmuyor: parçaların hepsi aynı hızda": "These settings don't make a ramp: every piece has the same speed",
     // error texts by code (js/hiz-rampasi.js hataMetni)
     "Bir video klip seç ya da Giriş/Çıkış koy.": "Select a video clip or set In/Out.",
     "Grafik, MOGRT, ayar katmanı ya da fotoğrafa hız rampası uygulanmaz.": "Speed ramps don't work on graphics, MOGRTs, adjustment layers or stills.",
@@ -2636,6 +2641,9 @@
     "Aktif sekans değişti; işlem durduruldu.": "The active sequence changed; stopped.",
     "Kopya sekans oluşturulamadı. Önce sekansı kopyala kutusunu kapatıp dene.": "Couldn't copy the sequence. Untick Copy the sequence first and try again.",
     "Rampa planı geçersiz.": "Invalid ramp plan.",
+    "Bu ayarlarla rampa oluşmuyor: parçaların hepsi aynı hızda. Daha uzun bir aralık, Parça: Çok ya da başka bir Yumuşatma dene.": "These settings don't make a ramp: every piece has the same speed. Try a longer range, Pieces: Many or another Easing.",
+    "Giriş–Çıkış tek bir video klibin içinde olmalı (kilitli ya da gizli katmanlar sayılmaz).": "In and Out must be inside a single video clip (locked or hidden tracks don't count).",
+    "Bu Premiere sürümünde Suflo klibin sesle bağını okuyamıyor ve koparamıyor. Premiere'i güncelle; Doctor'da ayrıntı var.": "In this Premiere version Suflo can't read or break the clip's link to its audio. Update Premiere; Doctor has details.",
     "Premiere işlemi tamamlanamadı.": "The Premiere operation couldn't be completed.",
     // Suflo Doctor rows (js/library-health.js apiKontrolleri)
     "QE hız yazma (setSpeed)": "QE speed writing (setSpeed)",
@@ -2666,7 +2674,10 @@
     "Klip eski haline getirilemedi.": "Couldn't restore the clip.",
     "Rampa parcalari degismis; Suflo dokunmadi.": "The ramp pieces were changed, so Suflo left them alone.",
     "Kopya sekans olusturulamadi.": "Couldn't create the copy sequence.",
-    "Rampa plani gecersiz.": "Invalid ramp plan."
+    "Rampa plani gecersiz.": "Invalid ramp plan.",
+    "Bu ayarlarla rampa olusmuyor: parcalarin hepsi ayni hizda.": "These settings don't make a ramp: every piece has the same speed.",
+    "Giris-Cikis tek bir video klibin icinde olmali (kilitli ya da gizli katmanlar sayilmaz).": "In and Out must be inside a single video clip (locked or hidden tracks don't count).",
+    "Bu Premiere surumunde Suflo klibin sesle bagini okuyamiyor ve koparamiyor.": "In this Premiere version Suflo can't read or break the clip's link to its audio."
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

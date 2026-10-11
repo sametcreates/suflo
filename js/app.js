@@ -63,6 +63,10 @@ window.KApp = (function () {
   /* ---------------- Bağlam ---------------- */
 
   function onContext(fn) { ctxListeners.push(fn); }
+  // Her başarılı yoklamada çağrılır (seçim anahtarı değişmese de): playhead, In/Out, seçili klibin yeri
+  // gibi sık değişen alanlara bakan dinleyici (Hız Rampası önizlemesi) kendi anahtarını karşılaştırır
+  var pollListeners = [];
+  function onPoll(fn) { pollListeners.push(fn); }
 
   var CLAP_IC = '<svg class="ctx-ic" viewBox="0 0 16 16"><path d="M1.8 6.2 h12.4 v6.4 a1.4 1.4 0 0 1 -1.4 1.4 h-9.6 a1.4 1.4 0 0 1 -1.4-1.4 z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2.2 6.2 L3.4 3.3 L14.2 4.6 L13.4 6.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M6.4 3.7 L5.4 6.2 M9.9 4.1 L8.9 6.2" stroke="currentColor" stroke-width="1.1"/></svg>';
 
@@ -134,6 +138,7 @@ window.KApp = (function () {
       var now = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, qi: ctx.sequenceId, c: ctx.connected });
       renderContext();
       if (prev !== now) ctxListeners.forEach(function (fn) { fn(ctx); });
+      if (ctx.connected) pollListeners.forEach(function (fn) { try { fn(ctx); } catch (eP) {} });
     } finally {
       polling = false;
     }
@@ -1558,6 +1563,7 @@ window.KApp = (function () {
     toast: toast,
     goster: goster,
     onContext: onContext,
+    onPoll: onPoll,
     onTab: onTab,
     ctx: function () { return ctx; },
     refreshContext: contextPollingBaslat,

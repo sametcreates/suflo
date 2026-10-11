@@ -87,7 +87,8 @@ var segSorun = [];
   [Math.round(fps * 0.6), Math.round(fps * 2), Math.round(fps * 4.3), Math.round(fps * 30)].forEach(function (F) {
     if (F < 12) return;
     ["few", "normal", "many"].forEach(function (den) {
-      var P = S.DENSITY[den], m = Math.max(P.mmin, Math.round(P.mf * fps));
+      // kısa aralıkta en kısa parça F/3'e iner (yüksek kare hızında tek parçaya düşmesin)
+      var P = S.DENSITY[den], m = Math.max(1, Math.min(Math.max(P.mmin, Math.round(P.mf * fps)), Math.floor(F / 3)));
       ["smooth", "linear", "step"].forEach(function (ease) {
         L.forEach(function (p) {
           var keys = p.beats ? S.beatKeys([0.1, 0.33, 0.52, 0.8], {}, F) : p.keys;
@@ -113,7 +114,24 @@ ok("segment: Σd = F, bitişik, d ≥ m, sayı sınırda, step yalnız anahtar k
 var vSeg = S.segment(vk, "smooth", 125, 25, "normal");
 ok("vites: sınırlar u = 0.40 ve 0.70'te", js(vSeg.map(function (g) { return g.a; })) === js([0, 50, 88]), js(vSeg));
 ok("segment: v parça ortalaması (Σ d·v = F·B)", yakin(vSeg.reduce(function (s, g) { return s + (g.b - g.a) * g.v; }, 0), 125 * 1.165, 1e-6));
-ok("segment: F < 2m tek parça", S.segment(dk, "smooth", 12, 60, "few").length === 1);
+ok("segment: 12 kare, 60 fps, Az: en kısa parça F/3'e iner, tek parçaya düşmez", S.segment(dk, "smooth", 12, 60, "few").length >= 3, S.segment(dk, "smooth", 12, 60, "few").length);
+ok("segment: F < 2m (çok kısa F) yine tek parça", S.segment(dk, "smooth", 2, 60, "few").length === 1);
+// 59.94p'de 13 karelik klip: eskiden tek parça {d:13, v:1} (Dengeli = rampasız, ses yine kapanırdı)
+var p5994 = S.plan("dalis", {}, { frames: 13, fps: 60000 / 1001 });
+ok("plan: 59.94p 13 kare Dalış en az 3 parça, %100'den farklı hızlar", p5994.segments.length >= 3 && p5994.maxV / p5994.minV > 1.5, JSON.stringify(p5994.segments));
+var kisaDuz = [];
+[23.976, 25, 29.97, 50, 59.94].forEach(function (fps) { [13, 20, 23].forEach(function (F) { ["dalis", "darbe", "doruk", "bukum"].forEach(function (id) {
+  try { var pp = S.plan(id, { density: "few" }, { frames: F, fps: fps }); if (pp.segments.length < 2) kisaDuz.push(id + " " + fps + " " + F); } catch (e) { kisaDuz.push(id + " " + fps + " " + F + " " + e.message); }
+}); }); });
+ok("plan: kısa klipler (13–23 kare, 23.976–59.94 fps, Az) hep çok parçalı rampa", kisaDuz.length === 0, kisaDuz.join(" | "));
+var duzHata = null;
+try { S.plan("nabiz", {}, { frames: 12, fps: 25 }); } catch (e) { duzHata = e; }
+ok("plan: tek hız çıkan plan (Nabız 12 kare: parçalar ortalamada %100) 'duz' koduyla atar", !!duzHata && duzHata.kod === "duz" && /aynı hızda/.test(duzHata.message), duzHata && duzHata.message);
+var cikisBas = null;
+try { S.plan("cikis", { ease: "step" }, { frames: 100, fps: 25 }); } catch (e) { cikisBas = e; }
+ok("plan: Basamaklı Hızlı Çıkış (son anahtar t = 1'de, basamak hiç görünmez) duz ile atar", !!cikisBas && cikisBas.kod === "duz");
+var ritimDuz = S.plan("ritim", {}, { frames: 100, fps: 25, beatsU: [] });
+ok("plan: vuruşsuz Ritme Rampa atmaz, vurusYok uyarısıyla döner", ritimDuz.warnings.indexOf("vurusYok") !== -1);
 var cokSeg = S.segment(dk, "smooth", 25 * 60, 25, "many"), azSeg = S.segment(dk, "smooth", 25 * 60, 25, "few");
 ok("yoğunluk: 'many' 'few'den fazla parça", cokSeg.length > azSeg.length && azSeg.length <= 8 && cokSeg.length <= 28, azSeg.length + " / " + cokSeg.length);
 
@@ -122,7 +140,12 @@ var balSorun = [];
 L.forEach(function (p) {
   [12, 40, 101, 250, 1800].forEach(function (F) {
     [0.6, 1, 1.4].forEach(function (k) {
-      var pl = S.plan(p.id, { k: k, mode: "balanced" }, { frames: F, fps: 25, beatsU: [0.2, 0.45, 0.7] });
+      var pl;
+      // 12 karede Nabız'ın parçaları ortalamada %100: tek hız, duz ile atar (aşağıda ayrı denenir)
+      try { pl = S.plan(p.id, { k: k, mode: "balanced" }, { frames: F, fps: 25, beatsU: [0.2, 0.45, 0.7] }); } catch (eD) {
+        if (!(eD.kod === "duz" && p.id === "nabiz" && F === 12)) balSorun.push(p.id + " F" + F + " k" + k + ": " + eD.message);
+        return;
+      }
       var dv = dvToplam(pl);
       if (pl.mode !== "balanced") balSorun.push(p.id + " mod " + pl.mode);
       if (Math.abs(dv - F) > 0.01) balSorun.push(p.id + " F" + F + " k" + k + ": Σdv " + dv);
@@ -261,11 +284,15 @@ ok("clipFor: ffmpeg yok → tutamak null; playhead dışarıda → hizalama yok"
 ok("bilinmeyen kimlik atar", (function () { try { S.plan("yok", {}, { frames: 100, fps: 25 }); return false; } catch (e) { return e.message === "Bilinmeyen rampa: yok"; } })());
 ok("F < 12 atar", (function () { try { S.plan("dalis", {}, { frames: 11, fps: 25 }); return false; } catch (e) { return e.message === "Rampa için klip çok kısa"; } })() &&
   (function () { try { S.plan("dalis", {}, {}); return false; } catch (e) { return /çok kısa/.test(e.message); } })());
+// Tek hız çıkan birleşimler (Basamaklı Hızlı Çıkış, 12 karede Nabız…) 'duz' ile atar: döngülerde atlanır
+var duzSayi = 0;
+function planDene(id, o, c) { try { return S.plan(id, o, c); } catch (e) { if (e.kod === "duz") { duzSayi++; return null; } throw e; } }
 var nanSorun = [];
 L.forEach(function (p) {
   [{}, { mode: "balanced", ease: "linear", density: "many" }, { ease: "step", density: "few", k: 1.5 }].forEach(function (o) {
     [{ frames: 12, fps: 23.976 }, { frames: 777, fps: 59.94, handleSec: 3, hitFrac: 0.7, srcFps: 24, beatsU: [0.1, 0.9] }, { frames: 60, fps: 25, partial: true, hitFrac: 1 }].forEach(function (c) {
-      var pl = S.plan(p.id, o, c);
+      var pl = planDene(p.id, o, c);
+      if (!pl) return;
       if (!nanYok(pl) || !nanYok(S.summary(pl)) || !nanYok(S.steps(pl)) || !nanYok(S.remapKeys(pl, 0))) nanSorun.push(p.id + " " + js(o) + " " + js(c));
     });
   });
@@ -279,7 +306,8 @@ L.forEach(function (p) {
   [{ mode: "balanced" }, { mode: "balanced", density: "many" }, { mode: "balanced", k: 1.5 }, { k: 0.5, ease: "linear" }, { ease: "step" }, {}].forEach(function (o) {
     [12, 25, 37, 60, 100, 125, 181, 333].forEach(function (F) {
       [25, 30000 / 1001].forEach(function (fps) {
-        var pl = S.plan(p.id, o, { frames: F, fps: fps, handleSec: 0 }), top = 0;
+        var pl = planDene(p.id, o, { frames: F, fps: fps, handleSec: 0 }), top = 0;
+        if (!pl) return;
         pl.segments.forEach(function (g) { top += g.d * g.v; });
         if (pl.srcFrames > F && (pl.mode === "balanced" || pl.B <= 1)) asim.push(p.id + " " + js(o) + " " + F + " " + pl.mode + " " + pl.srcFrames);
         else if (pl.mode === "balanced" && Math.abs(top - F) > 0.006) asim.push(p.id + " " + F + " artık " + (top - F));

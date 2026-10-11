@@ -25,9 +25,12 @@ window.KHizRampasi = (function () {
   var aralikElle = false, kopyaElle = false;
   var medya = {};            // medya yolu (küçük harf) → { duration, fps } | null (ffmpeg -i)
   var medyaSuruyor = {};
-  // Bu oturumda Suflo'nun açtığı kopya sekanslar (seqId → ad): bu sekanslardayken kopya kutusu
-  // kendiliğinden işaretlenmez (kopyanın kopyası olmasın; özgün sekans zaten dokunulmadı)
+  // Bu oturumda Suflo'nun açtığı kopya sekanslar (seqId → { ad, kaynak: kopyalanan sekansın seqId'si }):
+  // bu sekanslardayken kopya kutusu kendiliğinden işaretlenmez (kopyanın kopyası olmasın; özgün sekans
+  // zaten dokunulmadı). Kopya özgünle aynı timeline'dır: özgünde yapılan ritim analizi kopyada da geçerli
   var kopyaSekanslar = {};
+  // Bağlam yoklamasının (2.5 sn) önizlemeyi ilgilendiren alanları: playhead, In/Out, seçili klibin yeri
+  var sonAnahtar = "";
 
   function el(id) { return document.getElementById(id); }
 
@@ -160,10 +163,20 @@ window.KHizRampasi = (function () {
     if (!liste || !liste.length) return { durum: "yok", liste: [] };
     try { a = B && typeof B.analiz === "function" ? B.analiz() : null; } catch (e2) { a = null; }
     var seq = String(seqId || (ctx && ctx.sequenceId) || "");
-    if (a && a.seqId && seq && String(a.seqId) !== seq) return { durum: "baska", liste: [] };
+    if (a && a.seqId && seq && !ayniTimeline(String(a.seqId), seq)) return { durum: "baska", liste: [] };
     return { durum: "var", liste: liste, start: a ? a.start : null, end: a ? a.end : null };
   }
   function vuruslar() { return vurusBilgi().liste; }
+  // seq, analiz sekansının kendisi ya da Suflo'nun bu oturumda ondan açtığı (kopyanın kopyası da) kopya mı
+  function ayniTimeline(analiz, seq) {
+    var s = String(seq || ""), adim = 0;
+    while (s && adim++ < 16) {
+      if (s === analiz) return true;
+      var k = kopyaSekanslar[s];
+      s = k && k.kaynak ? String(k.kaynak) : "";
+    }
+    return false;
+  }
   function sn1(x) { return Math.round(Number(x) * 10) / 10; }
   // Plan "vurusYok" dediğinde: analiz yok, başka sekansta ya da bu aralıkta vuruş yok
   function vurusYokMetni(b) {
@@ -217,14 +230,23 @@ window.KHizRampasi = (function () {
     kutu.appendChild(sure);
   }
 
-  function svgCubuklar(p) {
-    return SR.steps(p, W, H).map(function (r) {
+  // Önizleme genişliği: viewBox ölçülen genişlikle kurulur, metin ve vuruş noktası yatayda gerilmez
+  // (preserveAspectRatio="none" yalnız ölçülemezse ya da yeniden çizimden önceki boyutlamada devrede)
+  function onizlemeGenislik(svg) {
+    var w = 0;
+    try { w = svg.getBoundingClientRect ? svg.getBoundingClientRect().width : Number(svg.clientWidth) || 0; } catch (e) { w = 0; }
+    w = Math.round(Number(w) || 0);
+    return w >= 80 ? Math.min(w, 4000) : W;
+  }
+
+  function svgCubuklar(p, gw) {
+    return SR.steps(p, gw || W, H).map(function (r) {
       return '<rect class="hiz-basamak" x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '"></rect>';
     }).join("");
   }
 
   var UYARI = {
-    yogunlukDustu: "Tutamak yetmedi: yoğunluk düşürüldü",
+    yogunlukDustu: "Klibin sonrasında yeterli görüntü yok: yoğunluk düşürüldü",
     dengeliyeGecti: "Klibin sonrasında yeterli görüntü yok: Dengeli kullanılıyor",
     sureYok: "Medya süresi okunamadı: Dengeli kullanılıyor",
     sinirlandi: "Bazı hızlar %10–%1000 sınırına çekildi",
@@ -247,8 +269,9 @@ window.KHizRampasi = (function () {
       else if (UYARI[w]) satir.push(UYARI[w]);
       else if (w === "hitKaydi" && p.hit) satir.push("Darbe anı " + (Math.round(p.hit.err * 100) / 100) + " sn kaydı");
       else if (w === "takilabilir") {
+        // Optik akış zaten seçiliyse öneri anlamsız: satır gösterilmez
         var m = medyaBilgisiOnbellek(h && h.mediaPath), q = m && m.fps ? SR.quality(p, p.fps, m.fps) : null;
-        if (q) satir.push("Kaynak " + m.fps + " fps: %" + Math.round(q.cleanMin * 100) + " altı takılabilir, Optik akış'ı dene");
+        if (q && !(el("hiz-akis") && el("hiz-akis").value === "2")) satir.push("Kaynak " + m.fps + " fps: %" + Math.round(q.cleanMin * 100) + " altı takılabilir, Optik akış'ı dene");
       }
     });
     return satir;
@@ -284,19 +307,21 @@ window.KHizRampasi = (function () {
         hizala: !!el("hiz-vurus").checked && !h.ornek, beats: vuruslar() }));
     } catch (e) {
       svg.innerHTML = "";
-      if (oz) oz.textContent = /çok kısa/.test(e.message) ? "Rampa için en az 12 kare gerekli." : e.message;
+      if (oz) oz.textContent = /çok kısa/.test(e.message) ? "Rampa için en az 12 kare gerekli." : (e.kod === "duz" ? HATA.duz : e.message);
       return;
     }
+    var gw = onizlemeGenislik(svg);
+    if (svg.setAttribute) svg.setAttribute("viewBox", "0 0 " + gw + " " + H);
     var taban = SR.base(H);
     var vurus = "";
     if (p.hit) {
-      var vx = Math.round(p.hit.u * W * 100) / 100, vy = SR.yAt(SR.speedAt(p.keys, p.hit.u, p.ease), H);
+      var vx = Math.round(p.hit.u * gw * 100) / 100, vy = SR.yAt(SR.speedAt(p.keys, p.hit.u, p.ease), H);
       vurus = '<line class="hiz-vurus-cizgi" x1="' + vx + '" x2="' + vx + '" y1="0" y2="' + H + '"></line><circle class="hiz-vurus" cx="' + vx + '" cy="' + vy + '" r="4"></circle>';
     }
-    svg.innerHTML = svgCubuklar(p) +
-      '<line class="hiz-taban" x1="0" x2="' + W + '" y1="' + taban + '" y2="' + taban + '"></line>' +
+    svg.innerHTML = svgCubuklar(p, gw) +
+      '<line class="hiz-taban" x1="0" x2="' + gw + '" y1="' + taban + '" y2="' + taban + '"></line>' +
       '<text class="hiz-eksen" x="3" y="' + (taban - 3) + '">100%</text>' +
-      '<path class="hiz-egri" d="' + SR.path(p.keys, p.ease, W, H) + '"></path>' + vurus;
+      '<path class="hiz-egri" d="' + SR.path(p.keys, p.ease, gw, H) + '"></path>' + vurus;
     ozetYaz(ozetSatirlari(p, fr, h));
   }
 
@@ -350,7 +375,8 @@ window.KHizRampasi = (function () {
   }
 
   function sec(id) {
-    if (!SR.has(id)) return;
+    // Uygulama sürerken eğri değişmez (kalan klipler başka eğriyle rampalanmasın)
+    if (mesgul || !SR.has(id)) return;
     if (id === "ritim" && !vuruslar().length) return;
     secili = id;
     var yon = el("hiz-ritim-yon-kutu");
@@ -371,7 +397,7 @@ window.KHizRampasi = (function () {
   }
 
   function render() {
-    if (secili === "ritim" && !vuruslar().length) secili = "dalis";
+    if (secili === "ritim" && !vuruslar().length && !mesgul) secili = "dalis";
     var yon = el("hiz-ritim-yon-kutu");
     if (yon) yon.hidden = secili !== "ritim";
     kartlar();
@@ -380,16 +406,21 @@ window.KHizRampasi = (function () {
   }
 
   /* ---------------- bağlam ---------------- */
-  function refresh(c) {
-    ctx = c || ctx;
-    // Sekans değişti (analiz başka sekansta kaldı) ya da analiz geldi: Ritme Rampa kartı tazelenir
+  // Sekans değişti (analiz başka sekansta kaldı) ya da analiz geldi: Ritme Rampa kartı tazelenir.
+  // Uygulama sürerken (ilk klibin kopyası Premiere'i kopya sekansa geçirir) eğri seçimi değişmez;
+  // uzlaştırma iş bitince yapılır
+  function vurusUzlas() {
     var vd = vurusBilgi().durum;
-    if (vd !== sonVurusDurum && el("hiz-grid")) {
+    if (vd !== sonVurusDurum && el("hiz-grid") && !mesgul) {
       if (secili === "ritim" && vd !== "var") secili = "dalis";
       var yon = el("hiz-ritim-yon-kutu");
       if (yon) yon.hidden = secili !== "ritim";
       kartlar();
     }
+  }
+  function refresh(c) {
+    ctx = c || ctx;
+    vurusUzlas();
     if (ctx && !aralikElle && el("hiz-aralik")) el("hiz-aralik").value = ctx.sel ? "clips" : (inOutVar(ctx) ? "inout" : "clips");
     // Bu Premiere sürümünde kalibrasyon yoksa ilk rampa kopya sekansta (kullanıcı kutuya dokunmadıysa);
     // Suflo'nun bu oturumda açtığı kopya sekanstaysak yeniden kopyalanmaz
@@ -400,6 +431,22 @@ window.KHizRampasi = (function () {
     if (ctx && ctx.sel && ctx.sel.mediaPath && sekmeAcik()) medyaYokla(ctx.sel.mediaPath);
   }
   function sekmeAcik() { var t = el("tab-hiz"); return !!(t && t.classList && t.classList.contains("active")); }
+  function canliBaglam() { var c = window.KApp && KApp.ctx ? KApp.ctx() : null; return c || ctx; }
+  function baglamAnahtari(c) {
+    if (!c) return "";
+    var s = c.sel || {};
+    return [c.sequenceId, c.playhead, c.seqIn, c.seqOut, s.clipStart, s.clipEnd, s.mediaPath, c.selCount].join("|");
+  }
+  // Her yoklamada (app.js onPoll): seçim anahtarı değişmese de playhead, In/Out ya da aynı medyanın başka
+  // klibine geçiş önizlemeyi ve aralığı tazeler. Sekme kapalıyken yalnız bağlam saklanır.
+  function yoklama(c) {
+    if (!c) return;
+    var a = baglamAnahtari(c);
+    if (a === sonAnahtar) return;
+    if (!sekmeAcik()) { ctx = c; return; }
+    sonAnahtar = a;
+    refresh(c);
+  }
 
   /* ---------------- ffmpeg -i: medya süresi (tutamak) ve kare hızı ---------------- */
   function medyaBilgisiOnbellek(yol) {
@@ -451,6 +498,10 @@ window.KHizRampasi = (function () {
     sekans: "Aktif sekans değişti; işlem durduruldu.",
     kopya: "Kopya sekans oluşturulamadı. Önce sekansı kopyala kutusunu kapatıp dene.",
     plan: "Rampa planı geçersiz.",
+    duz: "Bu ayarlarla rampa oluşmuyor: parçaların hepsi aynı hızda. Daha uzun bir aralık, Parça: Çok ya da başka bir Yumuşatma dene.",
+    inoutKlipYok: "Giriş–Çıkış tek bir video klibin içinde olmalı (kilitli ya da gizli katmanlar sayılmaz).",
+    // getLinkedItems ve unlinkSelection yok: Ctrl+L önerilmez (bağ koparılsa da Suflo bunu göremez)
+    linkedBilinmiyor: "Bu Premiere sürümünde Suflo klibin sesle bağını okuyamıyor ve koparamıyor. Premiere'i güncelle; Doctor'da ayrıntı var.",
     // Rampayı kaldır: seçimde rampa yok (In/Out'tan söz edilmez, kaldırma onu kullanmaz)
     kaldirSecimYok: "Seçili klipte Suflo rampası bulunamadı. Rampanın parçalarından birini seç."
   };
@@ -466,14 +517,15 @@ window.KHizRampasi = (function () {
   }
   var KISA = { grafik: "grafik", ters: "ters", remap: "zaman eşleme", warp: "Warp", kilitli: "kilitli", multicam: "multicam", kisa: "kısa",
     qeYok: "hız yazılamadı", linkedConflict: "bağlı ses", tutamak: "medya yetmedi", hizYazilamadi: "hız yazılamadı", yerlesim: "yerleşmedi",
-    geriAlinamadi: "geri alınamadı", degisti: "değişmiş", sekans: "sekans değişti", plan: "plan", vurusYok: "vuruş yok", fazla: "12 klip sınırı" };
+    geriAlinamadi: "geri alınamadı", degisti: "değişmiş", sekans: "sekans değişti", plan: "plan", vurusYok: "vuruş yok", fazla: "12 klip sınırı",
+    duz: "tek hız", linkedBilinmiyor: "bağlı ses" };
   // "2 klip atlandı: logo.png (grafik), Röportaj (hızı %50)": şablon, her ad ve her neden ayrı düğüm
   function atlamaParcalari(liste) {
     if (!liste || !liste.length) return [];
     var out = [liste.length === 1 ? "1 klip atlandı: " : liste.length + " klip atlandı: "];
     liste.forEach(function (s, i) {
       if (i) out.push(", ");
-      out.push(s.name ? { ad: s.name } : "klip");
+      out.push(s.name ? { ad: s.name } : "adsız klip");
       out.push(" (");
       out.push(s.kod === "hizli" ? "hızı %" + (s.pct !== null && s.pct !== undefined ? s.pct : "?") : (KISA[s.kod] || String(s.kod || "?")));
       out.push(")");
@@ -489,16 +541,22 @@ window.KHizRampasi = (function () {
   }
   function kopyala(o) { var y = {}; for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) y[k] = o[k]; return y; }
 
-  async function uygula() {
+  // ek: { hedefler: [{track, start}] } — seçim yerine bu klipler ('kaldırıp yeniden uygula': kaldırma seçimi
+  // değiştirir, aynı klipler açıkça istenir)
+  async function uygula(ek) {
     if (typeof Pro !== "undefined" && !Pro.gate("speedramp", { deneme: true, yeniden: function () { uygula(); } })) return;
     if (mesgul) return;
     mesgul = true;
     kilitle(true);
+    // Eğri ve seçenekler iş başında sabitlenir: uygulama sürerken kart, kutu ya da bağlam (kopya sekansa
+    // geçiş) kalan klipleri değiştirmesin
+    var presetId = secili, hizala = !!el("hiz-vurus").checked;
     var basarili = [], hatalar = [], atlanan = [], kopyaAdi = "", bildirildi = false;
     try {
       durum("Hedefler okunuyor…");
-      var aralik = el("hiz-aralik").value === "inout" ? "inout" : "clips";
-      var hd = await K.call("KS_speedRampTargets", { range: aralik }, 30000);
+      var acik = ek && ek.hedefler && ek.hedefler.length ? ek.hedefler : null;
+      var aralik = !acik && el("hiz-aralik").value === "inout" ? "inout" : "clips";
+      var hd = await K.call("KS_speedRampTargets", acik ? { range: "clips", items: acik } : { range: aralik }, 30000);
       if (!hd || !hd.ok) throw new Error(hataMetni(hd));
       atlanan = (hd.skipped || []).slice();
       var hedefler = (hd.targets || []).slice(0, EN_COK_KLIP);
@@ -506,12 +564,15 @@ window.KHizRampasi = (function () {
       // Eski bir rampanın parçaları seçiliyse yeniden rampalanmaz: önce kaldırılmalı
       // (hızı %100 olmayan parça ya da tam aralığı kaplamayan %100 parça; Ctrl+Z ile geri dönmüş
       // tek klip engellenmez)
-      var eskiler = [];
+      // (kayitBul her çağrıda depodan yeni nesne okur: aynı kayıt sekans/katman/t0 ile bir kez alınır)
+      var eskiler = [], eskiAnahtar = {};
       hedefler.concat(atlanan).forEach(function (t) {
         var k = kayitBul(hd.seqId, t.track, Number(t.start), t.mediaPath || "");
-        if (!k || eskiler.indexOf(k) !== -1) return;
+        if (!k) return;
+        var a = k.seqId + "|" + k.track + "|" + Number(k.t0).toFixed(3);
+        if (eskiAnahtar[a]) return;
         var parca = t.kod === "hizli" || (!t.kod && rampaParcasi(k, t.start, t.end));
-        if (parca) eskiler.push(k);
+        if (parca) { eskiAnahtar[a] = 1; eskiler.push(k); }
       });
       if (eskiler.length) {
         KApp.toast("Bu klipte zaten bir hız rampası var.", "warn", 9000, { metin: "Eski rampayı kaldırıp yeniden uygula", fn: function () { yenidenUygula(eskiler); } });
@@ -538,29 +599,35 @@ window.KHizRampasi = (function () {
         durum("Rampa uygulanıyor… " + (i + 1) + "/" + hedefler.length);
         var m = await medyaBilgisi(t.mediaPath);
         // vuruş anı yalnız playhead'in altındaki klipte hizalanır; her klip kendi vuruşlarını alır
-        var cl = SR.clipFor(t, hd.frame, { media: m, playhead: hd.playhead, hizala: !!el("hiz-vurus").checked, beats: beats });
+        var cl = SR.clipFor(t, hd.frame, { media: m, playhead: hd.playhead, hizala: hizala, beats: beats });
         var p = null;
-        try { p = SR.plan(secili, o, cl); } catch (eP) { hatalar.push({ t: t, r: { kod: "plan", error: eP.message } }); continue; }
+        try { p = SR.plan(presetId, o, cl); } catch (eP) { hatalar.push({ t: t, r: { kod: eP && eP.kod === "duz" ? "duz" : "plan", error: eP.message } }); continue; }
         if (p.warnings.indexOf("vurusYok") !== -1) { hatalar.push({ t: t, r: { kod: "vurusYok", error: vurusYokMetni(vb) } }); continue; }
         var kopyaIste = kopya && !klonlandi;
         var arg = { target: { track: t.track, start: t.start, end: t.end, mediaPath: t.mediaPath }, range: { start: t.rangeStart, end: t.rangeEnd },
           plan: SR.hostPlan(p), audio: sesModu, interp: interp, cal: kal, expectSeqId: beklenen,
           cloneFirst: kopyaIste, cloneName: kopyaIste ? (t.name ? "Suflo Rampa · " + t.name : "Suflo Rampa").slice(0, 70) : "" };
+        var kaynakSeq = beklenen;
         var r = await K.call("KS_applySpeedRamp", arg, 120000);
         if (r && r.seqId) beklenen = r.seqId;
-        if (r && r.newSeq) { kopyaAdi = r.newSeq; klonlandi = true; kopyaSekanslar[String(r.seqId || "")] = r.newSeq; }
+        if (r && r.newSeq) { kopyaAdi = r.newSeq; klonlandi = true; kopyaSekanslar[String(r.seqId || "")] = { ad: r.newSeq, kaynak: String(kaynakSeq || "") }; }
         // ffmpeg tutamak tahmini tutmadı (değişken kare hızı vb.): bir kez Dengeli ile yeniden dene
+        var p2 = null;
         if (r && !r.ok && r.kod === "tutamak" && p.mode === "exact" && o.mode === "auto" && r.restored !== false) {
           var o2 = kopyala(o);
           o2.mode = "balanced";
-          p = SR.plan(secili, o2, cl);
+          try { p2 = SR.plan(presetId, o2, cl); } catch (eP2) { p2 = null; }
+        }
+        if (p2) {
+          p = p2;
           arg.plan = SR.hostPlan(p);
           arg.cloneFirst = kopya && !klonlandi;
           if (!arg.cloneFirst) arg.cloneName = "";
           arg.expectSeqId = beklenen;
+          kaynakSeq = beklenen;
           r = await K.call("KS_applySpeedRamp", arg, 120000);
           if (r && r.seqId) beklenen = r.seqId;
-          if (r && r.newSeq) { kopyaAdi = r.newSeq; klonlandi = true; kopyaSekanslar[String(r.seqId || "")] = r.newSeq; }
+          if (r && r.newSeq) { kopyaAdi = r.newSeq; klonlandi = true; kopyaSekanslar[String(r.seqId || "")] = { ad: r.newSeq, kaynak: String(kaynakSeq || "") }; }
         }
         if (r && r.ok) {
           basarili.push({ t: t, r: r, p: p });
@@ -588,6 +655,10 @@ window.KHizRampasi = (function () {
       mesgul = false;
       kilitle(false);
       dugmeCiz();
+      // iş sürerken ertelenen uzlaşma (Ritme Rampa kartı, önizleme): şimdi. Kopya kutusuna dokunulmaz
+      // (bağlam henüz kopya sekansı görmemiş olabilir; sonraki yoklama tazeler)
+      vurusUzlas();
+      onizlemeCiz();
     }
   }
 
@@ -609,37 +680,46 @@ window.KHizRampasi = (function () {
     durum(msg, "good");
   }
 
+  // Kaldırma seçimi değiştirir (host geri gelen klibi seçer, iç adımlar seçimi boşaltır): yeniden uygulama
+  // seçimi okumaz, geri gelen klipleri açıkça ister. In/Out aralığında Giriş/Çıkış zaten yerinde.
   async function yenidenUygula(eskiler) {
-    var ok = await kaldir(eskiler);
-    if (ok) uygula();
+    var inout = el("hiz-aralik").value === "inout";
+    var geri = await kaldirIc(eskiler);
+    if (!geri.length) return;
+    uygula(inout ? null : { hedefler: geri.map(function (r) { return { track: r.track, start: r.t0 }; }) });
   }
 
   /* ---------------- kaldır (kapısız: deneme rampası da her zaman geri alınır) ---------------- */
-  async function kaldir(liste) {
-    if (mesgul) return false;
+  // Doner: başarıyla kaldırılanların host sonuçları ({ track, t0, t1, … })
+  async function kaldirIc(liste) {
+    if (mesgul) return [];
     mesgul = true;
     kilitle(true);
-    var tamam = 0;
+    var geri = [];
     try {
       durum("Rampa kaldırılıyor…");
       // Bu Premiere sürümünün setSpeed biçimi: kayıtta yoksa (seçimden kurulan kayıt, eski kayıt) host
       // bunu kullanır; yanlış birimle denemek ilk parçayı bozabilirdi
-      var c = ctx || (window.KApp && KApp.ctx ? KApp.ctx() : null);
+      var c = canliBaglam();
       var kal = c && c.app ? kalibrasyon(String(c.app)) : null;
       var istekler = [];
       if (liste && liste.length) liste.forEach(function (k) { istekler.push({ record: k, cal: kal }); });
-      else {
-        var k = c && c.sel ? kayitBul(c.sequenceId, null, Number(c.sel.clipStart), c.sel.mediaPath) : null;
-        istekler.push(k ? { record: k, cal: kal } : { fromSelection: true, cal: kal });
-      }
-      var hata = null;
+      // Seçim host'ta CANLI okunur: panelin bağlamı aynı medyanın başka klibinde kalmış olabilir. Kayıtlar
+      // host'a gider; seçili parçayı içeren kayıt orada eşlenir, yoksa rampa geometriden kurulur
+      else istekler.push({ fromSelection: true, records: kayitlar(), cal: kal });
+      var hata = null, sesKayitsiz = false;
       for (var i = 0; i < istekler.length; i++) {
         var r = await K.call("KS_removeSpeedRamp", istekler[i], 120000);
-        if (r && r.ok) { tamam++; if (istekler[i].record) kayitSil(istekler[i].record); }
-        else hata = r && r.kod === "secimYok" ? { kod: "kaldirSecimYok" } : r;
+        if (r && r.ok) {
+          geri.push(r);
+          if (istekler[i].record) kayitSil(istekler[i].record);
+          else kayitSil(r.kayit && r.kayit.seqId ? r.kayit : { seqId: r.seqId, track: r.track, t0: r.t0 });
+          if ((r.warnings || []).indexOf("sesKayitsiz") !== -1) sesKayitsiz = true;
+        } else hata = r && r.kod === "secimYok" ? { kod: "kaldirSecimYok" } : r;
       }
-      if (!tamam) throw new Error(hataMetni(hata));
+      if (!geri.length) throw new Error(hataMetni(hata));
       KApp.toast("Rampa kaldırıldı, klip %100'e döndü", "good");
+      if (sesKayitsiz) KApp.toast("Suflo bu rampanın kaydını bulamadı; kapalı sese dokunmadı. Rampadaki ses kapalıysa Premiere'de aç ve klibe bağla.", "warn", 9000);
       durum(hata ? hataMetni(hata) : "", hata ? "warn" : "");
       onizlemeCiz();
     } catch (e) {
@@ -648,8 +728,9 @@ window.KHizRampasi = (function () {
       mesgul = false;
       kilitle(false);
     }
-    return tamam > 0;
+    return geri;
   }
+  async function kaldir(liste) { return (await kaldirIc(liste)).length > 0; }
 
   function init() {
     if (!SR || !el("tab-hiz") || !el("hiz-grid")) return;
@@ -659,10 +740,10 @@ window.KHizRampasi = (function () {
       var e = el(id);
       if (e) e.addEventListener("change", function () { kartlar(); onizlemeCiz(); ayarKaydet(); });
     });
-    ["hiz-parca", "hiz-kaynak", "hiz-vurus"].forEach(function (id) {
+    ["hiz-parca", "hiz-kaynak", "hiz-vurus", "hiz-akis"].forEach(function (id) {
       el(id).addEventListener("change", function () { onizlemeCiz(); ayarKaydet(); });
     });
-    ["hiz-ses", "hiz-akis", "hiz-bulanik"].forEach(function (id) { el(id).addEventListener("change", ayarKaydet); });
+    ["hiz-ses", "hiz-bulanik"].forEach(function (id) { el(id).addEventListener("change", ayarKaydet); });
     el("hiz-aralik").addEventListener("change", function () { aralikElle = true; onizlemeCiz(); });
     el("hiz-kopya").addEventListener("change", function () { kopyaElle = true; });
     el("hiz-uygula").addEventListener("click", function () { uygula(); });
@@ -670,9 +751,24 @@ window.KHizRampasi = (function () {
     el("hiz-uygula").addEventListener("focus", dugmeCiz);
     el("hiz-uygula").addEventListener("mouseenter", dugmeCiz);
     el("hiz-kaldir").addEventListener("click", function () { kaldir(); });
-    if (window.KApp && KApp.onContext) KApp.onContext(refresh);
-    // Ritim analizi başka sekmede yapılır: sekmeye dönünce kartlar (Ritme Rampa) tazelenir
-    if (window.KApp && KApp.onTab) KApp.onTab("hiz", function () { render(); if (ctx && ctx.sel && ctx.sel.mediaPath) medyaYokla(ctx.sel.mediaPath); });
+    if (window.KApp && KApp.onContext) KApp.onContext(function (c) { sonAnahtar = baglamAnahtari(c); refresh(c); });
+    if (window.KApp && KApp.onPoll) KApp.onPoll(yoklama);
+    // Ritim analizi başka sekmede yapılır: sekmeye dönünce kartlar (Ritme Rampa) ve önizleme canlı bağlamla
+    // (playhead, In/Out) tazelenir
+    if (window.KApp && KApp.onTab) KApp.onTab("hiz", function () {
+      ctx = canliBaglam();
+      sonAnahtar = baglamAnahtari(ctx);
+      render();
+      refresh();
+    });
+    // Panel genişliği değişince önizleme yeni genişlikte yeniden çizilir (gerilmiş metin / elips kalmasın)
+    if (typeof window.addEventListener === "function") {
+      var boyutZaman = null;
+      window.addEventListener("resize", function () {
+        if (boyutZaman) clearTimeout(boyutZaman);
+        boyutZaman = setTimeout(function () { boyutZaman = null; if (sekmeAcik()) onizlemeCiz(); }, 150);
+      });
+    }
     if (typeof Pro !== "undefined" && Pro.on) { try { Pro.on(render); } catch (e) {} }
   }
 
@@ -687,6 +783,8 @@ window.KHizRampasi = (function () {
     _atlamaParcalari: atlamaParcalari,
     _hataMetni: hataMetni,
     _refresh: refresh,
+    _yoklama: yoklama,
+    _kopyaSekanslar: kopyaSekanslar,
     _medya: medya
   };
 })();

@@ -281,7 +281,9 @@ var a1Parca = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; }
 ok("1) bağlı ses kapatıldı (silinmedi), bağı koptu", a1Parca.length === 1 && a1Parca[0]._d === true && a1Parca[0]._s === 50 && a1Parca[0]._e === 150 &&
   !a1Parca[0]._bag.some(function (b) { return b._tur === "v"; }) && ortam.unlink === 1 && r1.record.audio.length === 1 && r1.record.unlinked === true, js(r1.record));
 ok("1) müzik ve diğer sesler dokunulmadı", aktif._a[1]._k.length === 1 && aktif._a[1]._k[0]._e === 600 && !aktif._a[1]._k[0]._d && aktif._a[0]._k.filter(function (k) { return k._d; }).length === 1);
-ok("1) yavaş parçalara kare harmanlama, %100 civarına 0", ps1.every(function (k, i) { var v = p1.segments[i].v; return k._interp === (v < 0.98 ? 1 : v > 1.02 ? 0 : 0); }), js(ps1.map(function (k) { return k._interp; })));
+// %100 civarı ve bulanıklık kapalıyken hızlı parçalar klibin özgün ayarında kalır (sahte klipte null)
+ok("1) yavaş parçalara kare harmanlama; %100 civarı ve bulanıksız hızlı parçalara dokunulmaz", ps1.every(function (k, i) { var v = p1.segments[i].v; return k._interp === (v < 0.98 ? 1 : null); }) &&
+  ps1.some(function (k) { return k._interp === null; }), js(ps1.map(function (k) { return k._interp; })));
 ok("1) kayıt: t0/t1/srcIn/mod, kalibrasyon ve parçalar seçili", r1.record.t0 === 2 && r1.record.t1 === 6 && r1.record.srcIn === 10 && r1.record.mode === "balanced" &&
   r1.cal.units === "ratio" && r1.cal.sig === "5" && ps1.every(function (k) { return k._sel; }) && r1.undoSteps > 0, js(r1.cal) + " " + r1.undoSteps);
 ok("1) 26.x: tüm setSpeed çağrıları 5 argümanlı", ortam.cagriArg.length > 0 && ortam.cagriArg.every(function (n) { return n === 5; }), js(ortam.cagriArg));
@@ -370,9 +372,21 @@ var r6d = call("KS_applySpeedRamp", { target: { track: 0, start: 2.04, end: 6, m
 ok("6) ret degisti (klip başka yerde): değişiklik yok", !r6d.ok && r6d.kod === "degisti" && foto() === f6, js(r6d));
 
 /* ---------- 7) unlinkSelection yok + bağlı ses → linkedConflict ---------- */
-z = sahne({ n: 100, unlinkYok: true });
+z = sahne({ n: 100, unlinkYok: true, linkedApi: true });
 var f7 = foto(), r7 = uygula(z, S.hostPlan(p1));
-ok("7) bağlı seste unlinkSelection yoksa linkedConflict, değişiklik yok", !r7.ok && r7.kod === "linkedConflict" && foto() === f7, js(r7));
+ok("7) gerçekten bağlı seste unlinkSelection yoksa linkedConflict, değişiklik yok", !r7.ok && r7.kod === "linkedConflict" && foto() === f7, js(r7));
+z = sahne({ n: 100, unlinkYok: true });
+var f7c = foto(), r7c = uygula(z, S.hostPlan(p1));
+ok("7) getLinkedItems da yoksa (bağ bilinmiyor) linkedBilinmiyor: 'Ctrl+L ile kopar' vaadi yok, değişiklik yok", !r7c.ok && r7c.kod === "linkedBilinmiyor" && foto() === f7c, js(r7c));
+// Ctrl+L ile bağı koparılmış (getLinkedItems boş) aynı medya sesi: eskiden yine linkedConflict (çıkmaz sokak)
+z = sahne({ n: 100, unlinkYok: true, linkedApi: true, bagsiz: true });
+var r7d = uygula(z, S.hostPlan(p1));
+var ses7d = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
+ok("7) Ctrl+L sonrası (bağsız, unlinkSelection yok): uygulanır, bağ koparılmaz, aralıktaki ses kapanır, kayıtta unlinked yok", r7d.ok && ortam.unlink === 0 &&
+  r7d.record.unlinked === false && ses7d.some(function (k) { return k._d && k._s === 50 && k._e === 150; }), js(r7d));
+var k7d = call("KS_removeSpeedRamp", { record: r7d.record });
+ses7d = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
+ok("7) ...ve kaldırınca ses açılır, bağlanmaz (önceden de bağlı değildi)", k7d.ok && ses7d.every(function (k) { return !k._d; }) && ortam.link === 0, js(k7d));
 z = sahne({ n: 100, unlinkYok: true, sessiz: true, bagsiz: true });
 var r7b = uygula(z, S.hostPlan(p1));
 ok("7) sesi olmayan klipte unlinkSelection gerekmez", r7b.ok && ortam.unlink === 0, js(r7b));
@@ -420,8 +434,10 @@ aktif._v[0]._k.forEach(function (k) { k._sel = false; });
 parcalar(z, 50, 150)[2]._sel = true;
 var k11b = call("KS_removeSpeedRamp", { fromSelection: true });
 var ps11b = parcalar(z, 50, 150);
-ok("11) seçim geometrisinden kaldır: kayıtsız da tek %100 klip", r11b.ok && k11b.ok && ps11b.length === 1 && ps11b[0]._v === 1 && ps11b[0]._e === 150 && ps11b[0]._in === 10 &&
-  aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; }).every(function (k) { return !k._d; }), js(k11b));
+// Kayıtsız ses tahmin edilmez (kullanıcı kapatmış olabilir): kapalı ses kapalı kalır, panel uyarır
+ok("11) seçim geometrisinden kaldır: kayıtsız da tek %100 klip; kapalı sese dokunulmaz, sesKayitsiz uyarısı", r11b.ok && k11b.ok && ps11b.length === 1 && ps11b[0]._v === 1 && ps11b[0]._e === 150 && ps11b[0]._in === 10 &&
+  aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; }).some(function (k) { return k._d; }) && k11b.audio === 0 && k11b.warnings.indexOf("sesKayitsiz") !== -1 &&
+  k11b.kayit === null && ortam.link === 0, js(k11b));
 z = sahne({ n: 100 });
 var r11c = uygula(z, S.hostPlan(p1));
 parcalar(z, 50, 150)[3].projectItem = { getMediaPath: function () { return "C:\\baska\\X.mov"; } };
@@ -581,6 +597,149 @@ v20 = aktif._v[0]._k.filter(function (k) { return k._yol === z.K._yol; });
 a20 = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
 ok("20) kısmi rampa yarıda bozulursa da: geri yüklenir, üç video parçası kendi sesleriyle bağlı", !r20b.ok && r20b.restored === true && v20.length === 3 && a20.length === 3 &&
   v20.every(function (v, i) { return bagliMi(v, a20[i]) && v._v === 1; }) && a20.every(function (a) { return !a._d; }), js(r20b));
+
+/* ---------- 21) kaldırınca geri gelen klip seçili; açık hedeflerle (items) yeniden uygulanır ---------- */
+z = sahne({ n: 100 });
+var r21 = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+var k21 = call("KS_removeSpeedRamp", { record: r21.record });
+var sec21 = aktif.getSelection();
+var h21 = call("KS_speedRampTargets", { range: "clips" });
+ok("21) kaldırma geri gelen klibi seçer: 'kaldırıp yeniden uygula' secimYok'a düşmez", k21.ok && sec21.length === 1 && sec21[0]._s === 50 && sec21[0]._e === 150 &&
+  h21.ok && h21.targets.length === 1 && h21.targets[0].start === 2 && h21.targets[0].end === 6, js(h21).slice(0, 200));
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+var h21b = call("KS_speedRampTargets", { range: "clips", items: [{ track: 0, start: 2 }] });
+ok("21) items: seçim boşken açık hedef (katman + başlangıç) klibe çözülür", h21b.ok && h21b.targets.length === 1 && h21b.targets[0].start === 2 && h21b.targets[0].partial === false, js(h21b).slice(0, 200));
+var h21c = call("KS_speedRampTargets", { range: "clips", items: [{ track: 0, start: 3.3 }] });
+ok("21) items: o anda başlayan klip yoksa secimYok", !h21c.ok && h21c.kod === "secimYok", js(h21c));
+
+/* ---------- 22) seçimden kaldırma %100 komşuyu ve başka efektli klibi yutmaz ---------- */
+function bolKomsu(z, f, comps) {
+  // K'yi f karesinde böl: sağ parça aynı çekimin devamı (kaynak sürüyor), istenirse başka bileşenlerle
+  var K = z.K, sag = new Klip({ s: f, e: K._e, inp: K._in + (f - K._s) * ortam.fr, yol: K._yol, dur: K._dur, ad: "Devam", comps: comps });
+  K._e = f; aktif._v[0].ekle(sag);
+  return sag;
+}
+var LUMETRI = [{ matchName: "AE.ADBE Opacity" }, { matchName: "AE.ADBE Motion" }, { matchName: "AE.ADBE Lumetri" }];
+z = sahne({ n: 100 });
+var sag22 = bolKomsu(z, 100, LUMETRI);
+var r22 = call("KS_applySpeedRamp", { target: { track: 0, start: 2, end: 4, mediaPath: z.K._yol }, range: { start: 2, end: 4 },
+  plan: S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 50, fps: 25 })), audio: "mute", interp: {} });
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+parcalar(z, 50, 100)[2]._sel = true;
+var k22 = call("KS_removeSpeedRamp", { fromSelection: true });
+ok("22) sağdaki %100 devam klibi (Lumetri'li) rampaya katılmaz: yerinde, rampa [50–100] tek %100 klip", r22.ok && k22.ok && k22.t0 === 2 && k22.t1 === 4 &&
+  aktif._v[0]._k.indexOf(sag22) !== -1 && sag22._s === 100 && sag22._e === 150 && parcalar(z, 50, 100).length === 1 && parcalar(z, 50, 100)[0]._v === 1, js(k22));
+z = sahne({ n: 100 });
+var sol22 = z.K;
+var K22 = bolKomsu(z, 100);   // sol [50–100] %100 kalır, rampa sağ yarıya
+z.K = K22;
+var r22b = call("KS_applySpeedRamp", { target: { track: 0, start: 4, end: 6, mediaPath: K22._yol }, range: { start: 4, end: 6 },
+  plan: S.hostPlan(S.plan("darbe", { mode: "balanced" }, { frames: 50, fps: 25 })), audio: "mute", interp: {} });
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+parcalar(z, 100, 150)[1]._sel = true;
+var k22b = call("KS_removeSpeedRamp", { fromSelection: true });
+ok("22) soldaki %100 kesik (aynı çekim) rampaya katılmaz: ilk parça sayılmaz, yerinde kalır", r22b.ok && k22b.ok && k22b.t0 === 4 && k22b.t1 === 6 &&
+  aktif._v[0]._k.indexOf(sol22) !== -1 && sol22._s === 50 && sol22._e === 100, js(k22b));
+z = sahne({ n: 100 });
+var r22c = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+var p22c = parcalar(z, 50, 150);
+p22c[p22c.length - 1].components = { numItems: 3, 0: LUMETRI[0], 1: LUMETRI[1], 2: LUMETRI[2] };   // rampanın parçasına sonradan efekt
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+p22c[3]._sel = true;
+var f22c = foto();
+var k22c = call("KS_removeSpeedRamp", { fromSelection: true });
+ok("22) zincirde bileşenleri farklı parça varsa (kayıtsız): degisti, hiçbir şey silinmez", r22c.ok && !k22c.ok && k22c.kod === "degisti" && foto() === f22c, js(k22c));
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+p22c[0]._sel = true;
+var k22d = call("KS_removeSpeedRamp", { fromSelection: true, records: [{ v: 1, seqId: "baska", track: 0, t0: 2, t1: 6 }, r22c.record] });
+ok("22) panel kaydı eşleşirse kayıt kullanılır (efektli parça da rampanın parçası olarak kaldırılır), kayit döner", k22d.ok && k22d.kayit && k22d.kayit.t0 === 2 &&
+  parcalar(z, 50, 150).length === 1 && parcalar(z, 50, 150)[0]._v === 1, js(k22d));
+
+/* ---------- 23) kaldır: canlı seçim + panel kayıtları (eski önbellekli seçim değil) ---------- */
+z = sahne({ n: 400 });
+var r23a = call("KS_applySpeedRamp", { target: hedef(z), range: { start: 2, end: 6 }, plan: S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25, partial: true })), audio: "mute", interp: {} });
+var Kb = aktif._v[0]._k.filter(function (k) { return k._s === 450; })[0] || null;
+var r23b = call("KS_applySpeedRamp", { target: { track: 0, start: 6, end: 18, mediaPath: z.K._yol }, range: { start: 14, end: 18 },
+  plan: S.hostPlan(S.plan("darbe", { mode: "balanced" }, { frames: 100, fps: 25, partial: true })), audio: "mute", interp: {} });
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+parcalar(z, 350, 450)[2]._sel = true;   // B rampasının parçası
+var k23 = call("KS_removeSpeedRamp", { fromSelection: true, records: [r23a.record, r23b.record] });
+ok("23) iki rampa aynı medyada: canlı seçim B'deyse B kaldırılır, A yerinde", r23a.ok && r23b.ok && k23.ok && k23.t0 === 14 && k23.kayit && k23.kayit.t0 === 14 &&
+  parcalar(z, 50, 150).length === r23a.pieces && parcalar(z, 350, 450).length === 1, js(k23) + " " + Kb);
+
+/* ---------- 24) geri yükleme tam %100 (yuvarlama payı yok) ---------- */
+var tam24 = [];
+[["suzulme", { mode: "balanced", ease: "linear", density: "many", k: 0.8 }], ["darbe", { mode: "balanced", ease: "linear", density: "normal", k: 1.3 }]].forEach(function (x) {
+  var zz = sahne({ n: 100 });
+  var pl = S.plan(x[0], x[1], { frames: 100, fps: 25 });
+  var r = uygula(zz, S.hostPlan(pl));
+  var kk = call("KS_removeSpeedRamp", { record: r.record });
+  var ps = parcalar(zz, 50, 150);
+  if (!(Math.abs(pl.segments[0].v - 1) < 0.002 && pl.segments[0].v !== 1)) tam24.push(x[0] + " ilk parça " + pl.segments[0].v + " (senaryo değişti)");
+  if (!r.ok || !kk.ok || ps.length !== 1 || ps[0]._v !== 1 || ps[0]._e !== 150 || Math.abs(kaynakSonu(ps[0]) - 14) > 1e-9) tam24.push(x[0] + " " + js(kk) + " " + js(ps.map(function (k) { return [k._s, k._e, k._v, kaynakSonu(k)]; })));
+});
+ok("24) ilk parçası %99.8 olan rampa (Süzülme, Darbe doğrusal): kaldırınca hız tam 1, kaynak sonu tam 14 sn", tam24.length === 0, tam24.join(" | "));
+
+/* ---------- 25) Clip > Link ile bağlı ayrı kayıt WAV'ı: kapatılır, kaydedilir, yeniden bağlanır ---------- */
+z = sahne({ n: 100, linkedApi: true });
+var wav = new Klip({ s: 50, e: 150, inp: 3, yol: "C:\\ses\\zoom.wav", tur: "a", ad: "zoom.wav" });
+aktif._a.push(new Iz("A3", [wav])); aktif.audioTracks = izler(aktif._a);
+z.K._bag.push(wav); wav._bag = [z.K]; z.KS._bag.push(wav); wav._bag.push(z.KS);
+var r25 = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+var wavlar = aktif._a[2]._k.filter(function (k) { return k._yol === "C:\\ses\\zoom.wav"; });
+ok("25) bağlı WAV aralıkta kapatıldı, kayıtta (audio + ekSes), bağı koptu", r25.ok && wavlar.length === 1 && wavlar[0]._d === true && r25.record.audio.length === 2 &&
+  r25.record.ekSes.length === 1 && r25.record.ekSes[0].yol === "c:\\ses\\zoom.wav" && !wavlar[0]._bag.some(function (b) { return b._tur === "v"; }), js(r25.record));
+var k25 = call("KS_removeSpeedRamp", { record: r25.record });
+var geri25 = parcalar(z, 50, 150)[0];
+wavlar = aktif._a[2]._k.filter(function (k) { return k._yol === "C:\\ses\\zoom.wav"; });
+ok("25) kaldırınca WAV açık ve geri gelen klibe yeniden bağlı", k25.ok && wavlar.every(function (k) { return !k._d; }) && bagliMi(geri25, wavlar[0]), js(k25));
+
+/* ---------- 26) In/Out: gizli katman ve devre dışı klip hedef olmaz; tek klip yoksa inoutKlipYok ---------- */
+z = sahne({ n: 200, inF: 100, outF: 180, v2: [] });
+var alt26 = aktif._v[1].ekle(new Klip({ s: 60, e: 240, inp: 0, yol: "C:\\cekim\\alt_take.mov", ad: "alt_take.mov" }));
+aktif._v[1].isMuted = function () { return true; };
+var h26 = call("KS_speedRampTargets", { range: "inout" });
+ok("26) V2 gizli: In/Out hedefi görünen V1 klibi", h26.ok && h26.targets.length === 1 && h26.targets[0].track === 0, js(h26).slice(0, 160));
+aktif._v[1].isMuted = function () { return false; };
+alt26._d = true;
+var h26b = call("KS_speedRampTargets", { range: "inout" });
+ok("26) V2'deki klip devre dışı: hedef V1", h26b.ok && h26b.targets.length === 1 && h26b.targets[0].track === 0, js(h26b).slice(0, 160));
+z = sahne({ n: 100, inF: 120, outF: 170 });
+var h26c = call("KS_speedRampTargets", { range: "inout" });
+ok("26) In/Out kesimi aşıyor: inoutKlipYok (secimYok değil)", !h26c.ok && h26c.kod === "inoutKlipYok", js(h26c));
+
+/* ---------- 27) zaman aradeğerlemesi: özgün ayar (optik akış) korunur ---------- */
+z = sahne({ n: 100 });
+z.K._interp = 2;
+var p27 = S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 });
+var r27 = uygula(z, S.hostPlan(p27));
+var ps27 = parcalar(z, 50, 150);
+ok("27) %100 civarı / bulanıksız hızlı parçalar özgün optik akışta, yavaşlar kare harmanlamada", r27.ok && ps27.every(function (k, i) { return k._interp === (p27.segments[i].v < 0.98 ? 1 : 2); }) &&
+  r27.record.ilkInterp === null, js(ps27.map(function (k) { return k._interp; })));
+var k27 = call("KS_removeSpeedRamp", { record: r27.record });
+ok("27) kaldırınca ilk parçaya dokunulmaz: özgün optik akış kalır (eskiden 0'a zorlanırdı)", k27.ok && parcalar(z, 50, 150)[0]._interp === 2, js(parcalar(z, 50, 150).map(function (k) { return k._interp; })));
+z = sahne({ n: 100 });
+z.K._interp = 2;
+var r27b = uygula(z, S.hostPlan(S.plan("vites", { mode: "balanced" }, { frames: 100, fps: 25 })), { interp: { slow: 1, fast: 1 } });
+var k27b = call("KS_removeSpeedRamp", { record: r27b.record });
+ok("27) ilk parçaya Suflo yazdıysa (Vites yavaş başlar): kayıtta ilkInterp, kaldırınca 0", r27b.ok && r27b.record.ilkInterp === 1 && k27b.ok && parcalar(z, 50, 150)[0]._interp === 0, js(r27b.record.ilkInterp));
+
+/* ---------- 28) tek hızlı plan: duz, hiçbir şey değişmez ---------- */
+z = sahne({ n: 100 });
+var f28 = foto();
+var r28 = uygula(z, { mode: "balanced", segments: [[50, 1], [50, 1]], srcFrames: 100 });
+var r28b = uygula(z, { mode: "balanced", segments: [[100, 1]], srcFrames: 100 });
+ok("28) tüm parçalar aynı hızda / tek parça: duz, ses kapatılmaz, sekans aynı", !r28.ok && r28.kod === "duz" && !r28b.ok && r28b.kod === "duz" && foto() === f28, js([r28, r28b]));
+
+/* ---------- 29) kullanıcının kapattığı ses kayıtsız kaldırmada açılmaz ---------- */
+z = sahne({ n: 100 });
+z.KS._d = true;
+var r29 = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+parcalar(z, 50, 150)[4]._sel = true;
+var k29 = call("KS_removeSpeedRamp", { fromSelection: true });
+ok("29) kullanıcının kapattığı kamera sesi: kayıtta yok, kayıtsız kaldırmada da kapalı kalır, bağlanmaz", r29.ok && r29.record.audio.length === 0 && k29.ok && k29.audio === 0 &&
+  aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; }).every(function (k) { return k._d; }) && ortam.link === 0, js(k29));
 
 /* ---------- 14) hedefler + tanılama: setReverse / .reverse asla ---------- */
 z = sahne({ n: 100 });

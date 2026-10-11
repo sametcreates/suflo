@@ -307,7 +307,9 @@
     F = Math.max(1, Math.round(Number(F) || 0));
     fps = Number(fps) > 0 ? Number(fps) : 30;
     var P = DENSITY[density] || DENSITY.normal;
-    var m = Math.max(P.mmin, Math.round(P.mf * fps));
+    // Kısa aralıkta en kısa parça F/3'e iner: yüksek kare hızında kısa klip tek parçaya (Dengeli'de
+    // %100, yani rampasız) düşmesin
+    var m = Math.max(1, Math.min(Math.max(P.mmin, Math.round(P.mf * fps)), Math.floor(F / 3)));
     function ort(a, b) { return integ(ks, ease, a / F, b / F) * F / (b - a); }
     function sonuc(runs) { return runs.map(function (r) { return { a: r[0], b: r[1], v: ort(r[0], r[1]) }; }); }
     if (F < 2 * m) return sonuc([[0, F]]);
@@ -404,6 +406,7 @@
    * Doner: { id, mode, k, c, ease, segments: [{d, v (4 ondalık; artığı taşıyan tek parça 6)}], F, fps, srcFrames, B, minV, maxV, hit,
    *          warnings, keys (çizim için, c ile ölçekli) }
    * Uyarı kodları: yogunlukDustu, dengeliyeGecti, sureYok, sinirlandi, takilabilir, vurusYok, hitKaydi.
+   * Atar: F < 12 ("çok kısa"); tek hız çıkan plan (e.kod "duz": tek parça ya da hızlar %1 içinde).
    */
   function plan(id, o, clip) {
     var p = get(id);
@@ -515,6 +518,13 @@
 
     var src = 0, mn = Infinity, mx = 0;
     for (i = 0; i < v.length; i++) { src += d[i] * v[i]; mn = Math.min(mn, v[i]); mx = Math.max(mx, v[i]); }
+    // Tek hız (tek parça ya da hepsi %1 içinde): rampa değil. Dengeli'de bu %100 demek; host yine de
+    // sesi kapatıp "başarılı" derdi. Vuruşsuz Ritme Rampa kendi uyarısıyla (vurusYok) döner.
+    if ((v.length < 2 || mx / mn < 1.01) && sh.warnings.indexOf("vurusYok") === -1) {
+      var duz = new Error("Bu ayarlarla rampa oluşmuyor: parçaların hepsi aynı hızda");
+      duz.kod = "duz";
+      throw duz;
+    }
     var sonuc = {
       id: id, mode: mode, k: yuvarla(k, 3), c: yuvarla(c, 4), ease: o.ease,
       segments: d.map(function (x, j) { return { d: x, v: v[j] }; }),

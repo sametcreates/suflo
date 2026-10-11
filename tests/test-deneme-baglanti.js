@@ -34,7 +34,7 @@ var SITELER = [
   ["js/captions.js", "async function translateAll()", "translate", "var out = await metinleriCevir(", true],
   ["js/captions.js", "async function cokDilliPaket()", "translate", "yazilan > 1 &&", true],
   ["js/captions.js", "async function overlayUygula()", "overlay", "if (!yer.ok) throw", true],
-  ["js/hiz-rampasi.js", "async function uygula()", "speedramp", "if (!basarili.length) throw", true]
+  ["js/hiz-rampasi.js", "async function uygula(ek)", "speedramp", "if (!basarili.length) throw", true]
 ];
 var kapiliOzellikler = {};
 SITELER.forEach(function (s) {
