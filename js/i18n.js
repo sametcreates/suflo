@@ -128,6 +128,12 @@
     if (m && (m[1] || m[3]) && m[2]) {
       var core = m[2];
       if (Object.prototype.hasOwnProperty.call(dict, core)) return m[1] + dict[core] + m[3];
+      // noktayla biten kalıp, önüne simge eklenince ("✕ Katman kilitli: V{n}. Kilidi açıp yeniden dene."):
+      // noktalamasıyla birlikte tam kalıp, noktasız çekirdeğe uyan daha genel kalıptan ("Katman kilitli: {}") önce
+      if (m[1] && m[3]) {
+        p = translatePatterns(core + m[3]);
+        if (p !== null) return m[1] + p;
+      }
       p = translatePatterns(core);
       if (p !== null) return m[1] + p + m[3];
       // son ek noktalama sözlükte zaten kayıtlıysa (ör. "Bekleyin…")

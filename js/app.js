@@ -41,7 +41,9 @@ window.KApp = (function () {
     var box = el("toasts");
     var t = document.createElement("div");
     t.className = "toast" + (kind ? " " + kind : "");
-    t.textContent = msg;
+    // DOM düğümü de olabilir: kullanıcı adları (klip, sekans) data-i18n-skip içinde çevrilmeden kalır
+    if (msg && typeof msg === "object" && msg.nodeType) t.appendChild(msg);
+    else t.textContent = msg;
     if (eylem && eylem.metin && typeof eylem.fn === "function") {
       var b = document.createElement("button");
       b.type = "button";

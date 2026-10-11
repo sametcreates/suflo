@@ -1392,7 +1392,10 @@
     </div>
     <div id="hiz-grid" class="preset-grid hiz-grid"></div>
     <div class="hiz-onizleme-kutu">
-      <svg id="hiz-onizleme" class="hiz-onizleme" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Hız eğrisi önizlemesi"></svg>
+      <!-- aria-label SVG'nin dışında: çeviri SVG'ye girmez, İngilizce ekran okuyucu da çevrilmiş adı duysun -->
+      <div class="hiz-onizleme-cerceve" role="img" aria-label="Hız eğrisi önizlemesi">
+        <svg id="hiz-onizleme" class="hiz-onizleme" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true"></svg>
+      </div>
       <div id="hiz-ozet" class="hiz-ozet"></div>
     </div>
     <div class="preset-toolbar hiz-secenekler">
@@ -1429,11 +1432,11 @@
           <option value="keep">Sesi olduğu gibi bırak</option>
         </select>
       </label>
-      <label class="preset-control">Ağır çekim
+      <label class="preset-control">Yavaş parçalarda
         <select id="hiz-akis">
           <option value="1" selected>Kare harmanlama</option>
           <option value="2">Optik akış (yavaş render)</option>
-          <option value="0">Kapalı</option>
+          <option value="0">Aradeğerleme yok</option>
         </select>
       </label>
       <label class="preset-control" id="hiz-ritim-yon-kutu" hidden>Vuruş
@@ -1444,7 +1447,7 @@
       </label>
     </div>
     <label class="switch"><input id="hiz-bulanik" type="checkbox"><i></i><span>Hızlı bölümlerde bulanıklık</span></label>
-    <label class="switch"><input id="hiz-vurus" type="checkbox"><i></i><span>Vuruş anını playhead'e hizala</span></label>
+    <label class="switch"><input id="hiz-vurus" type="checkbox"><i></i><span>Darbe anını playhead'e hizala</span></label>
     <label class="switch"><input id="hiz-kopya" type="checkbox" checked><i></i><span>Önce sekansı kopyala</span></label>
     <div class="row hiz-eylem">
       <button id="hiz-kaldir" class="btn" type="button">Rampayı kaldır</button>

@@ -968,6 +968,16 @@ da yüzde), her adımı geri okur, tutmazsa klibi tek %100 klibe geri getirir; b
 panelde saklanır. Ctrl+Z rampayı tek adımda geri almaz (Premiere'de undo gruplama yok); bu yüzden
 "Rampayı kaldır" ve bildirimdeki "Geri al" var, ilk denemede de "Önce sekansı kopyala" kendiliğinden işaretli.
 
+İnceleme düzeltmeleri (kısa): her parça TAM hızına yukarıdan yaklaşılarak yazılır (hızlanma süreyi tam
+kareye yuvarlar, yavaşlama tam yazar), uç yalnız o hızda ve yalnız gerektiği kadar uzatılır: Dengeli, klibin
+Out'u medyanın sonu olsa da (kırpılmamış kuyruk) medya istemez. "Rampayı kaldır" hiçbir parçayı silmeden önce
+ilk parçayı %100'e alır (QE yoksa ya da hız yazılamazsa hiçbir şey silinmez); birimi bilinmeyen sürümde birim
+silinecek son parçada yoklanır. In/Out rampadan sonra dış video parçaları kendi seslerine yeniden bağlanır.
+Arayüz adları: yoğunluk **Hafif / Normal / Güçlü** (tasarım notundaki Hafif / Orta / Sert değil: sözlükte "Orta"
+altyazı konumu olarak "Middle", "Sert" "Hard" çevriliyor; "Güçlü" Sesi iyileştir'deki yoğunlukla aynı dil).
+Vuruş anı seçeneği müzik vuruşuyla karışmasın diye "Darbe anını playhead'e hizala"; aradeğerleme seçicisi
+"Yavaş parçalarda: Kare harmanlama / Optik akış / Aradeğerleme yok".
+
 ### 12.1 Premiere'de elle deneme (yaklaşık 45 dk; 26.x / 25.x, mümkünse 22.x–24.x ve 14.4 ayrı ayrı)
 
 Liste `marketing/v3.1-deneme-listesi.md` › 13'te. Sonucu bana yazarken özellikle şunları ekle:
