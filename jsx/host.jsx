@@ -3835,10 +3835,32 @@ function KS_rampSesHizali(seq, ilk, t0, t1, yari) {
   return out;
 }
 
+// Kapatilan ses parcalarini ac, kopan bagi (ilk video parcasi + hizali ses) yeniden kur
+function KS_rampSesGeri(seq, rec, ilk, frame) {
+  var n = 0, i, yari = frame / 2, ses = rec.audio || [];
+  for (i = 0; i < ses.length; i++) {
+    var at = seq.audioTracks[Number(ses[i].track)];
+    var ac = at ? KS_rampClipAt(at, Number(ses[i].start), frame) : null;
+    if (ac) { try { ac.disabled = false; n++; } catch (eA) {} }
+  }
+  if (ilk && rec.unlinked && typeof seq.linkSelection === "function") {
+    var bagla = KS_rampSesHizali(seq, ilk, Number(rec.t0), Number(rec.t1), yari);
+    if (bagla.length) {
+      KS_rampDeselect(seq);
+      try { ilk.setSelected(true, true); } catch (eS) {}
+      for (i = 0; i < bagla.length; i++) { try { bagla[i].clip.setSelected(true, true); } catch (eS2) {} }
+      try { seq.linkSelection(); } catch (eL) {}
+      KS_rampDeselect(seq);
+    }
+  }
+  return n;
+}
+
 /*
  * Rampayi geri al: [t0, t1]'deki parcalarin hepsi ayni medya ve ilk parca t0'da, kaynak girisi
  * srcIn'e 1 kare yakin olmali (yoksa 'degisti', hicbir sey degismez). strict: parcalar bitisik ve
- * son parca t1'de biter (kullanicinin 'Rampayi kaldir'i); ic geri yuklemede bosluk olabilir.
+ * son parca t1'de biter (kullanicinin 'Rampayi kaldir'i); ic geri yuklemede bosluk olabilir ve video
+ * hic kesilmemisse (ozgun klip yerinde) yalniz ses geri yuklenir.
  * 2..n kaldirilir (remove(false, false): lift, ripple yok), ilk parca %100'e ve t1'e uzatilir,
  * kapatilan ses parcalari acilir, kopan bag linkSelection ile yeniden kurulur.
  */
@@ -3849,6 +3871,20 @@ function KS_rampRestore(seq, rec, frame, strict) {
     if (!(ti >= 0) || ti >= seq.videoTracks.numTracks) return sonuc;
     var tr = seq.videoTracks[ti], parca = [];
     var yol = String(rec.mediaPath || "").toLowerCase();
+    if (!strict) {
+      // Ic geri yukleme: video daha kesilmeden / hizi yazilmadan durulduysa ozgun klip yerinde;
+      // yalniz ses geri yuklenir (aralik disindaki kesikler gorunmez kesik olarak kalir)
+      for (i = 0; i < tr.clips.numItems; i++) {
+        var k = tr.clips[i], ks = Number(k.start.seconds), ke = Number(k.end.seconds);
+        if (ks <= t0 + yari && ke >= t1 - yari && KS_rampYol(k).toLowerCase() === yol && Math.abs(KS_rampSpeed(k, null) - 1) <= 0.002 &&
+            Math.abs(Number(k.inPoint.seconds) + (t0 - ks) - Number(rec.srcIn)) <= frame + 0.0001) {
+          sonuc.audio = KS_rampSesGeri(seq, rec, k, frame);
+          sonuc.ok = true;
+          sonuc.kod = "";
+          return sonuc;
+        }
+      }
+    }
     for (i = 0; i < tr.clips.numItems; i++) {
       var c = tr.clips[i], s = Number(c.start.seconds), e = Number(c.end.seconds);
       if (!(e > t0 + yari && s < t1 - yari)) continue;
@@ -3888,22 +3924,7 @@ function KS_rampRestore(seq, rec, frame, strict) {
     ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
     if (!ilk || Math.abs(Number(ilk.end.seconds) - t1) > yari || Math.abs(KS_rampSpeed(ilk, null) - 1) > 0.005 ||
         Math.abs(Number(ilk.inPoint.seconds) - Number(rec.srcIn)) > frame + 0.0001) return sonuc;
-    var ses = rec.audio || [];
-    for (i = 0; i < ses.length; i++) {
-      var at = seq.audioTracks[Number(ses[i].track)];
-      var ac = at ? KS_rampClipAt(at, Number(ses[i].start), frame) : null;
-      if (ac) { try { ac.disabled = false; sonuc.audio++; } catch (eA) {} }
-    }
-    if (rec.unlinked && typeof seq.linkSelection === "function") {
-      var bagla = KS_rampSesHizali(seq, ilk, t0, t1, yari);
-      if (bagla.length) {
-        KS_rampDeselect(seq);
-        try { ilk.setSelected(true, true); } catch (eS) {}
-        for (i = 0; i < bagla.length; i++) { try { bagla[i].clip.setSelected(true, true); } catch (eS2) {} }
-        try { seq.linkSelection(); } catch (eL) {}
-        KS_rampDeselect(seq);
-      }
-    }
+    sonuc.audio = KS_rampSesGeri(seq, rec, ilk, frame);
     sonuc.ok = true;
     sonuc.kod = "";
     return sonuc;
@@ -3985,6 +4006,7 @@ function KS_applySpeedRamp(encoded) {
       mode: String(pl.mode || "") };
     var uyarilar = [], cal = p.cal || {};
     var bozul = function (kod, ek) {
+      rec.cal = cal;
       var rs = KS_rampRestore(seq, rec, frame, false);
       var o = { restored: !!rs.ok, newSeq: yeniSeq, seqId: seqId, track: ti };
       if (ek) { for (var x in ek) { if (ek.hasOwnProperty(x)) o[x] = ek[x]; } }

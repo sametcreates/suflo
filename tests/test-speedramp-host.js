@@ -16,7 +16,7 @@ function sifirla(o) {
   if (ortam) { TOPLAM_REVERSE += ortam.reverseOkundu; TOPLAM_SETREVERSE += ortam.setReverse; }
   ortam = { fr: o.fr || 1 / 25, surum: o.surum || "26", yutucu: !!o.yutucu, undo: 0, setSpeed: 0, razor: [], endYazma: 0, disYazma: 0,
     reverseOkundu: 0, setReverse: 0, interp: [], unlink: 0, link: 0, hataBas: o.hataBas || 0, kotuKlip: null, onceKanca: o.onceKanca || null,
-    setSpeedYok: !!o.setSpeedYok, unlinkYok: !!o.unlinkYok, linkedApi: !!o.linkedApi, disabledSalt: !!o.disabledSalt, cagriArg: [] };
+    setSpeedYok: !!o.setSpeedYok, videoRazorBozuk: !!o.videoRazorBozuk, unlinkYok: !!o.unlinkYok, linkedApi: !!o.linkedApi, disabledSalt: !!o.disabledSalt, cagriArg: [] };
 }
 
 function zaman(sn) { return { seconds: sn, ticks: String(Math.round(sn * TPS)) }; }
@@ -151,7 +151,7 @@ function qeIz(iz) {
     t = k._e;
   });
   return { numItems: ogeler.length, getItemAt: function (j) { return ogeler[j]; },
-    razor: function (tc) { ortam.razor.push(String(tc)); bol(iz, Number(String(tc).replace(/f$/, ""))); } };
+    razor: function (tc) { ortam.razor.push(String(tc)); if (ortam.videoRazorBozuk && iz.name.charAt(0) === "V") return; bol(iz, Number(String(tc).replace(/f$/, ""))); } };
 }
 
 var sekanslar = [], aktif = null;
@@ -463,6 +463,15 @@ ok("13) 29.97 timebase: kırpan getFormatted'a rağmen her kesim planlanan kared
 var fr2997 = 1001 / 30000, erken = 0;
 for (var f = 1; f < 2000; f++) { var tt = new FakeTime(); tt.seconds = f * fr2997; if (Number(tt.getFormatted({ seconds: fr2997 }).replace("f", "")) !== f) erken++; }
 ok("13) sahte getFormatted gerçekten kırpıyor (epsilon'suz kesimler kayardı)", erken > 0, erken + " kare");
+
+/* ---------- 15) video kesilemeden durulursa: video özgün, ses geri yüklenir ---------- */
+z = sahne({ n: 200, inF: 100, outF: 180, videoRazorBozuk: true });
+var p15 = S.plan("dalis", { mode: "balanced" }, { frames: 80, fps: 25, partial: true });
+var r15 = call("KS_applySpeedRamp", { target: hedef(z), range: { start: 4, end: 7.2 }, plan: S.hostPlan(p15), audio: "mute", interp: { slow: 1, fast: 0 } });
+var ses15 = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
+ok("15) video kesilemedi: yerlesim, restored:true, video özgün, ses açık ve yeniden bağlı", !r15.ok && r15.kod === "yerlesim" && r15.restored === true &&
+  aktif._v[0]._k.length === 3 && z.K._s === 50 && z.K._e === 250 && z.K._v === 1 && ses15.every(function (k) { return !k._d; }) &&
+  ses15.some(function (k) { return k._bag.indexOf(z.K) !== -1; }), js(r15) + " " + js(ses15.map(function (k) { return [k._s, k._e, k._d]; })));
 
 /* ---------- 14) hedefler + tanılama: setReverse / .reverse asla ---------- */
 z = sahne({ n: 100 });
