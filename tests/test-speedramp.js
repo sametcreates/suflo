@@ -56,7 +56,31 @@ var vk = S.get("vites").keys;
 ok("tekrarlanan t sert basamak (her geçişte)", ["smooth", "linear", "step"].every(function (e) {
   return yakin(S.speedAt(vk, 0.3999, e), 0.55, 1e-9) && yakin(S.speedAt(vk, 0.4, e), 2.6, 1e-9) && yakin(S.speedAt(vk, 0.6999, e), 2.6, 1e-9) && yakin(S.speedAt(vk, 0.7, e), 0.55, 1e-9);
 }));
-ok("step: sol değeri tutar", yakin(S.speedAt(dk, 0.1, "step"), 1, 1e-12) && yakin(S.speedAt(dk, 0.3, "step"), 2, 1e-12) && yakin(S.speedAt(dk, 1, "step"), 1, 1e-12));
+// step = en yakın anahtar: komşu iki anahtarın ortasında sert geçiş (Dalış: 0.09, 0.29, 0.71, 0.91)
+ok("step: en yakın anahtar, orta noktada sert geçiş", yakin(S.speedAt(dk, 0.05, "step"), 1, 1e-12) && yakin(S.speedAt(dk, 0.0899, "step"), 1, 1e-12) &&
+  yakin(S.speedAt(dk, 0.0901, "step"), 2, 1e-12) && yakin(S.speedAt(dk, 0.28, "step"), 2, 1e-12) && yakin(S.speedAt(dk, 0.3, "step"), 0.3, 1e-12) &&
+  yakin(S.speedAt(dk, 0.9, "step"), 2, 1e-12) && yakin(S.speedAt(dk, 0.92, "step"), 1, 1e-12) && yakin(S.speedAt(dk, 1, "step"), 1, 1e-12));
+var ck = S.get("cikis").keys, gk = S.get("giris").keys;
+ok("step: Hızlı Çıkış sondaki %600'e ulaşır (u = 0.8'den sonra), Hızlı Giriş baştaki %500'ü tutar (u = 0.175'e kadar)",
+  yakin(S.speedAt(ck, 0.79, "step"), 1, 1e-12) && yakin(S.speedAt(ck, 0.81, "step"), 6, 1e-12) && yakin(S.speedAt(ck, 1, "step"), 6, 1e-12) &&
+  yakin(S.speedAt(gk, 0, "step"), 5, 1e-12) && yakin(S.speedAt(gk, 0.17, "step"), 5, 1e-12) && yakin(S.speedAt(gk, 0.18, "step"), 1, 1e-12));
+var ucSorun = [];
+L.forEach(function (p) {
+  if (p.beats) return;
+  var ilk = p.keys[0][1] / 100, son = p.keys[p.keys.length - 1][1] / 100;
+  if (!yakin(S.speedAt(p.keys, 0, "step"), ilk, 1e-12) || !yakin(S.speedAt(p.keys, 1 - 1e-9, "step"), son, 1e-12) || !yakin(S.speedAt(p.keys, 1, "step"), son, 1e-12)) ucSorun.push(p.id + " uç");
+  // her anahtarın hızı eğride görünür (tekrarlanan t'de sol değer hemen öncesinde)
+  p.keys.forEach(function (k) {
+    var v = k[1] / 100;
+    if (!yakin(S.speedAt(p.keys, k[0], "step"), v, 1e-12) && !yakin(S.speedAt(p.keys, Math.max(0, k[0] - 1e-9), "step"), v, 1e-12)) ucSorun.push(p.id + " @" + k[0]);
+  });
+});
+ok("step: her önayarda ilk ve son anahtar uçlarda, her anahtar hızı eğride", ucSorun.length === 0, ucSorun.join(" | "));
+ok("step: tekrarlanan anahtarlar bozulmaz, basamaklama idempotent (çizim/plan anahtarları yeniden okununca aynı)", (function () {
+  var sh = S.shape("dalis", { ease: "step" });
+  return sh.length === 6 + 2 * 4 && [0.05, 0.1, 0.3, 0.5, 0.75, 0.95, 1].every(function (u) { return S.speedAt(sh, u, "step") === S.speedAt(dk, u, "step"); }) &&
+    js(S.shape("vites", { ease: "step" })) === js(S.shape("vites", {}));
+})());
 ok("speedAt {t, v} biçimini de kabul eder", yakin(S.speedAt([{ t: 0, v: 1 }, { t: 1, v: 4 }], 0.5, "linear"), 2, 1e-9));
 
 /* ---------------- B (kaynak / timeline) ---------------- */
@@ -64,6 +88,8 @@ var TABLO = { dalis: 1.006, darbe: 1.404, giris: 1.565, cikis: 1.786, doruk: 0.8
 var bSorun = [];
 Object.keys(TABLO).forEach(function (id) { var b = S.B(S.get(id).keys, "smooth"); if (!yakin(b, TABLO[id], 0.02)) bSorun.push(id + " " + b.toFixed(4)); });
 ok("B() her önayarda tasarım tablosunda (±0.02)", bSorun.length === 0, bSorun.join(" | "));
+ok("integrate step: Hızlı Çıkış 0.8·1 + 0.2·6 = 2, Hızlı Giriş 0.175·5 + 0.825·1", yakin(S.B(ck, "step"), 2, 1e-9) && yakin(S.B(gk, "step"), 0.175 * 5 + 0.825, 1e-9) &&
+  yakin(S.integrate(ck, "step", 0.7, 0.9), 0.1 + 0.6, 1e-9));
 ok("integrate: sabit eğri ve basamak tam", yakin(S.integrate([[0, 200], [1, 200]], "smooth", 0.2, 0.7), 1, 1e-9) &&
   yakin(S.integrate(vk, "smooth", 0, 1), 0.4 * 0.55 + 0.3 * 2.6 + 0.3 * 0.55, 1e-9) && yakin(S.integrate(vk, "smooth", 0.35, 0.45), 0.05 * 0.55 + 0.05 * 2.6, 1e-9));
 
@@ -100,9 +126,10 @@ var segSorun = [];
           if (seg.length > 1 && seg.some(function (g) { return g.b - g.a < m; })) segSorun.push(ad + ": d < m (" + m + ")");
           if (seg.length > P.max) segSorun.push(ad + ": " + seg.length + " > " + P.max);
           if (ease === "step") {
-            var izinli = {};
-            (p.beats ? keys.map(function (k) { return k.t; }) : p.keys.map(function (k) { return k[0]; })).forEach(function (t) { izinli[Math.round(t * F)] = 1; });
-            seg.forEach(function (g) { if (!izinli[g.a]) segSorun.push(ad + ": anahtar dışı kesim " + g.a); });
+            // kesim yalnız hızın değiştiği yerde: tekrarlanan t ya da iki farklı anahtarın ortası
+            var izinli = {}, nk = p.beats ? keys : p.keys.map(function (k) { return { t: k[0], v: k[1] / 100 }; });
+            for (var q = 0; q + 1 < nk.length; q++) if (nk[q + 1].v !== nk[q].v) izinli[Math.round((nk[q].t + nk[q + 1].t) / 2 * F)] = 1;
+            seg.forEach(function (g) { if (g.a && !izinli[g.a]) segSorun.push(ad + ": basamak dışı kesim " + g.a); });
           }
           if (!nanYok(seg)) segSorun.push(ad + ": NaN");
         });
@@ -110,7 +137,7 @@ var segSorun = [];
     });
   });
 });
-ok("segment: Σd = F, bitişik, d ≥ m, sayı sınırda, step yalnız anahtar karelerinde (4 fps × 4 süre × 3 yoğunluk × 3 geçiş × 11)", segSorun.length === 0, segSorun.slice(0, 6).join(" | "));
+ok("segment: Σd = F, bitişik, d ≥ m, sayı sınırda, step yalnız basamak karelerinde (4 fps × 4 süre × 3 yoğunluk × 3 geçiş × 11)", segSorun.length === 0, segSorun.slice(0, 6).join(" | "));
 var vSeg = S.segment(vk, "smooth", 125, 25, "normal");
 ok("vites: sınırlar u = 0.40 ve 0.70'te", js(vSeg.map(function (g) { return g.a; })) === js([0, 50, 88]), js(vSeg));
 ok("segment: v parça ortalaması (Σ d·v = F·B)", yakin(vSeg.reduce(function (s, g) { return s + (g.b - g.a) * g.v; }, 0), 125 * 1.165, 1e-6));
@@ -127,9 +154,32 @@ ok("plan: kısa klipler (13–23 kare, 23.976–59.94 fps, Az) hep çok parçal�
 var duzHata = null;
 try { S.plan("nabiz", {}, { frames: 12, fps: 25 }); } catch (e) { duzHata = e; }
 ok("plan: tek hız çıkan plan (Nabız 12 kare: parçalar ortalamada %100) 'duz' koduyla atar", !!duzHata && duzHata.kod === "duz" && /aynı hızda/.test(duzHata.message), duzHata && duzHata.message);
-var cikisBas = null;
-try { S.plan("cikis", { ease: "step" }, { frames: 100, fps: 25 }); } catch (e) { cikisBas = e; }
-ok("plan: Basamaklı Hızlı Çıkış (son anahtar t = 1'de, basamak hiç görünmez) duz ile atar", !!cikisBas && cikisBas.kod === "duz");
+// Basamaklı Hızlı Çıkış eskiden "duz" ile atardı (step sol değeri tutuyordu, t = 1'deki %600 hiç görünmüyordu)
+var cikisEx = S.plan("cikis", { ease: "step" }, { frames: 100, fps: 25, handleSec: 10 });
+ok("plan: Basamaklı Hızlı Çıkış exact: 80 kare %100, 20 kare %600, kaynak 200 kare", cikisEx.mode === "exact" && cikisEx.segments.length === 2 &&
+  cikisEx.segments[0].d === 80 && yakin(cikisEx.segments[0].v, 1, 1e-5) && cikisEx.segments[1].d === 20 && yakin(cikisEx.segments[1].v, 6, 1e-5) &&
+  yakin(cikisEx.srcFrames, 200, 1e-3) && cikisEx.srcFrames <= 200, js(cikisEx.segments));
+var cikisBal = S.plan("cikis", { ease: "step" }, { frames: 100, fps: 25 });
+ok("plan: Basamaklı Hızlı Çıkış Dengeli (tutamak bilinmiyor): yine 1:6 basamak, Σ d·v = F", cikisBal.mode === "balanced" && cikisBal.segments.length === 2 &&
+  yakin(cikisBal.maxV / cikisBal.minV, 6, 0.01) && cikisBal.segments[1].v > cikisBal.segments[0].v && Math.abs(dvToplam(cikisBal) - 100) <= 0.01, js(cikisBal.segments));
+var stepSorun = [];
+L.forEach(function (p) {
+  if (p.beats) return;
+  var vs = p.keys.map(function (k) { return k[1] / 100; }), en = Math.max.apply(null, vs), az = Math.min.apply(null, vs);
+  [{ handleSec: 1000 }, { handleSec: null }].forEach(function (c) {
+    var pl;
+    try { pl = S.plan(p.id, { ease: "step" }, { frames: 200, fps: 25, handleSec: c.handleSec }); } catch (e) { stepSorun.push(p.id + " " + (e.kod || e.message)); return; }
+    // 200 karede orta noktalar kareye oturur: exact'te uç hızlar aynen, Dengeli'de oran aynen
+    if (pl.mode === "exact" && !(yakin(pl.maxV, en, 1e-3) && yakin(pl.minV, az, 1e-3))) stepSorun.push(p.id + " exact " + pl.minV + "–" + pl.maxV);
+    if (!yakin(pl.maxV / pl.minV, en / az, 0.01 * en / az)) stepSorun.push(p.id + " " + pl.mode + " oran " + (pl.maxV / pl.minV));
+    var ilk = pl.segments[0].v, son = pl.segments[pl.segments.length - 1].v;
+    if (!yakin(ilk / pl.c, vs[0], 1e-3) || !yakin(son / pl.c, vs[vs.length - 1], 1e-3)) stepSorun.push(p.id + " " + pl.mode + " uç parça " + ilk + " / " + son);
+  });
+});
+ok("plan: her önayar Basamaklı'da rampa (duz yok), uç parçalar ilk/son anahtarın hızında, uç hız oranı korunur", stepSorun.length === 0, stepSorun.slice(0, 5).join(" | "));
+var ritStep = S.plan("ritim", { ease: "step", mode: "balanced" }, { frames: 250, fps: 25, beatsU: [0.2, 0.4, 0.6, 0.8] });
+ok("plan: Basamaklı Ritme Rampa vuruşlarda yavaş, aralarda hızlı", [0.2, 0.4, 0.6, 0.8].every(function (u) { return kaynakAn(ritStep, u * 250 + 0.5) - kaynakAn(ritStep, u * 250 - 0.5) < 1; }) &&
+  [0.02, 0.3, 0.5, 0.7, 0.98].every(function (u) { return kaynakAn(ritStep, u * 250 + 0.5) - kaynakAn(ritStep, u * 250 - 0.5) > 1; }), js(ritStep.segments));
 var ritimDuz = S.plan("ritim", {}, { frames: 100, fps: 25, beatsU: [] });
 ok("plan: vuruşsuz Ritme Rampa atmaz, vurusYok uyarısıyla döner", ritimDuz.warnings.indexOf("vurusYok") !== -1);
 var cokSeg = S.segment(dk, "smooth", 25 * 60, 25, "many"), azSeg = S.segment(dk, "smooth", 25 * 60, 25, "few");
@@ -195,6 +245,15 @@ var hizSorun = [];
 var hx = S.plan("doruk", {}, { frames: 200, fps: 25, hitFrac: 0.5 });
 if (hx.mode !== "exact" || Math.abs(kaynakAn(hx, hx.hit.u * hx.F) - 0.5 * 200) > 1) hizSorun.push("doruk exact " + hx.mode + " " + kaynakAn(hx, hx.hit.u * hx.F));
 ok("alignHit: vuruş anındaki kaynak playhead karesine 1 kare içinde (balanced + exact)", hizSorun.length === 0, hizSorun.join(" | "));
+var hizStep = [];
+[0.25, 0.4, 0.5, 0.62].forEach(function (f) {
+  ["darbe", "cikis", "giris", "atilim"].forEach(function (id) {
+    var pl = S.plan(id, { mode: "balanced", ease: "step" }, { frames: 200, fps: 25, hitFrac: f });
+    var src = kaynakAn(pl, pl.hit.u * pl.F);
+    if (Math.abs(src - f * pl.F) > 1) hizStep.push(id + " f" + f + ": " + src.toFixed(2) + " ≠ " + (f * pl.F));
+  });
+});
+ok("alignHit step: basamaklar bükülen eğriyle kayar, vuruş anı yine 1 kare içinde", hizStep.length === 0, hizStep.join(" | "));
 var disari = S.plan("darbe", { mode: "balanced" }, { frames: 200, fps: 25, hitFrac: 0.02 });
 ok("alignHit: aralık dışı hedef [0.1, 0.9]'a sınırlanır (hitKaydi)", disari.hit.u === 0.1 && disari.warnings.indexOf("hitKaydi") !== -1 && disari.hit.err > 0, js(disari.hit));
 var al = S.alignHit(S.get("dalis").keys, 0.5, 0.5, "balanced");
@@ -263,6 +322,10 @@ L.forEach(function (p) {
   if (js(st) !== js(S.steps(pl, 320, 120))) cizSorun.push(p.id + " steps belirlenimci değil");
 });
 ok("thumb() ve steps() belirlenimci, viewBox içinde", cizSorun.length === 0, cizSorun.slice(0, 4).join(" | "));
+var tc = S.thumb("cikis", 120, 56, { ease: "step" });
+ok("thumb/path step: köşeler tam (Hızlı Çıkış: %100'de 96 px'e kadar düz, 96'da dikey sıçrama, %600'de 120'ye)",
+  tc.path === "M0 " + tc.base + " L72 " + tc.base + " L96 " + tc.base + " L96 " + S.yAt(6, 56) + " L120 " + S.yAt(6, 56) &&
+  S.path(S.get("vites").keys, "step", 100, 50).split(" L").length === 6, tc.path);
 ok("thumb: %100 çizgisi log ekseninde (%800 üstte, %25 altta: %100 yukarıdan 3/5)", yakin(S.base(120), 7.2 + 0.6 * 105.6, 0.01), S.base(120));
 ok("yAt: %800 üstte, %25 altta", S.yAt(8, 100) < S.yAt(1, 100) && S.yAt(0.25, 100) > S.yAt(1, 100) && S.yAt(100, 100) === S.yAt(8, 100));
 
@@ -284,7 +347,7 @@ ok("clipFor: ffmpeg yok → tutamak null; playhead dışarıda → hizalama yok"
 ok("bilinmeyen kimlik atar", (function () { try { S.plan("yok", {}, { frames: 100, fps: 25 }); return false; } catch (e) { return e.message === "Bilinmeyen rampa: yok"; } })());
 ok("F < 12 atar", (function () { try { S.plan("dalis", {}, { frames: 11, fps: 25 }); return false; } catch (e) { return e.message === "Rampa için klip çok kısa"; } })() &&
   (function () { try { S.plan("dalis", {}, {}); return false; } catch (e) { return /çok kısa/.test(e.message); } })());
-// Tek hız çıkan birleşimler (Basamaklı Hızlı Çıkış, 12 karede Nabız…) 'duz' ile atar: döngülerde atlanır
+// Tek hız çıkan birleşimler (12 karede Nabız…) 'duz' ile atar: döngülerde atlanır
 var duzSayi = 0;
 function planDene(id, o, c) { try { return S.plan(id, o, c); } catch (e) { if (e.kod === "duz") { duzSayi++; return null; } throw e; } }
 var nanSorun = [];

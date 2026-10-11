@@ -116,11 +116,34 @@
     return out.filter(function (k) { return isFinite(k.t) && k.v > 0; });
   }
 
+  // Basamaklı (step): her anahtar, komşusuyla arasındaki yolun ORTASINA kadar kendi hızını tutar
+  // (en yakın anahtar). Değeri değişen her aralığın ortasına tekrarlanan t eklenerek açık sert
+  // basamağa çevrilir; böylece ilk ve son anahtar da süre kazanır (eskiden step sol değeri
+  // tutuyordu: Hızlı Çıkış'ın t = 1'deki %600'ü hiç görünmez, plan "duz" ile atardı). Çıktıda her
+  // pozitif aralık sabit olduğundan at() "sol değeri tut" ile tam okur. İdempotent: hizalama,
+  // parçalama ve çizim aynı basamakları görür.
+  function basamakla(ks) {
+    var out = [];
+    for (var i = 0; i < ks.length; i++) {
+      var a = ks[i], b = ks[i + 1];
+      out.push({ t: a.t, v: a.v });
+      if (b && b.t > a.t && b.v !== a.v) {
+        var orta = (a.t + b.t) / 2;
+        out.push({ t: orta, v: a.v }, { t: orta, v: b.v });
+      }
+    }
+    return out;
+  }
+  function easeOf(ease) { return EASES.indexOf(ease) !== -1 ? ease : "smooth"; }
+  // normKeys + Basamaklı'da açık basamaklar
+  function hazir(keys, ease) { var ks = normKeys(keys); return ease === "step" ? basamakla(ks) : ks; }
+
   /* ---------------- eğri ---------------- */
 
   // Normalize anahtarlarda u anındaki hız. Aradeğerleme log2(hız) uzayında:
   //   smooth s = (1 − cos πx)/2 (her anahtarda düz teğet, Easy Ease görünümü), linear s = x,
-  //   step sol değeri tutar. Tekrarlanan t sert basamaktır: t anında SAĞ değer geçerli.
+  //   step sol değeri tutar (anahtarlar önce basamakla() ile açık basamağa çevrilmiş olmalı:
+  //   hazir()). Tekrarlanan t sert basamaktır: t anında SAĞ değer geçerli.
   function at(ks, u, ease) {
     var n = ks.length;
     if (!n) return 1;
@@ -140,7 +163,8 @@
   }
 
   function speedAt(keys, u, ease) {
-    return at(normKeys(keys), Number(u), EASES.indexOf(ease) !== -1 ? ease : "smooth");
+    ease = easeOf(ease);
+    return at(hazir(keys, ease), Number(u), ease);
   }
 
   // Bileşik Simpson; anahtar zamanlarında (basamaklar dahil) parçalara bölünür, parçanın
@@ -168,7 +192,8 @@
 
   function integrate(keys, ease, u0, u1) {
     var a = u0 === undefined ? 0 : Number(u0), b = u1 === undefined ? 1 : Number(u1);
-    return integ(normKeys(keys), EASES.indexOf(ease) !== -1 ? ease : "smooth", a, b);
+    ease = easeOf(ease);
+    return integ(hazir(keys, ease), ease, a, b);
   }
   // Kaynak / timeline oranı: eğrinin [0,1] ortalaması
   function B(keys, ease) { return integrate(keys, ease, 0, 1); }
@@ -242,8 +267,9 @@
    * h' [0.1, 0.9]'a sınırlanır; err = ulaşılan ile istenen kaynak arasındaki fark × Lsec (sn).
    */
   function alignHit(keys, hitU, f, mode, ease, Lsec) {
-    ease = EASES.indexOf(ease) !== -1 ? ease : "smooth";
-    var ks = normKeys(keys);
+    ease = easeOf(ease);
+    // Basamaklı'da bükmeden ÖNCE açık basamak: orta noktalar bükülen eğriyle birlikte kayar
+    var ks = hazir(keys, ease);
     hitU = clamp(Number(hitU), 0.01, 0.99);
     f = clamp(Number(f), 0, 1);
     if (!ks.some(function (k) { return Math.abs(k.t - hitU) < 1e-9; })) {
@@ -266,7 +292,8 @@
 
   /* ---------------- biçim ---------------- */
 
-  // Önayar → yoğunluk (v' = v^k), vuruş üretimi, vuruş anı hizalama. k önceden sınırlanmış olmalı.
+  // Önayar → yoğunluk (v' = v^k), vuruş üretimi, Basamaklı'da açık basamaklar, vuruş anı hizalama.
+  // k önceden sınırlanmış olmalı.
   function shapeRaw(p, o, ctx, k) {
     var ks, uyari = [];
     if (p.beats) {
@@ -274,6 +301,7 @@
       if (!ks.length) { uyari.push("vurusYok"); ks = [{ t: 0, v: 1 }, { t: 1, v: 1 }]; }
     } else ks = normKeys(p.keys);
     ks = ks.map(function (x) { return { t: x.t, v: Math.pow(x.v, k) }; });
+    if (o.ease === "step") ks = basamakla(ks);
     var hit = null;
     var f = ctx.hitFrac;
     if (p.hit !== null && p.hit !== undefined && f !== null && f !== undefined && isFinite(Number(f)) && Number(f) >= 0 && Number(f) <= 1) {
@@ -297,13 +325,13 @@
   /*
    * Eğriyi kareye oturan parçalara böler: [{a, b (kare), v}]. Her kare merkezinde 4 alt
    * örnekle okunur; log2(hız) aralığı tau'yu aşmadıkça parça büyür. Sert basamaklar
-   * (tekrarlanan t) kareye yuvarlanıp zorunlu kesim olur; step'te YALNIZ anahtar anlarında
-   * kesilir. Kısa parça komşusuna katılır; parça sayısı sınırı aşılırsa tau × 1.35.
+   * (tekrarlanan t) kareye yuvarlanıp zorunlu kesim olur; step'te YALNIZ basamaklarda (hızın
+   * değiştiği orta noktalarda) kesilir. Kısa parça komşusuna katılır; parça sayısı sınırı aşılırsa tau × 1.35.
    * v = parçanın ortalaması (integral): Σ d·v tam olarak F·B olur.
    */
   function segment(keys, ease, F, fps, density) {
-    var ks = normKeys(keys);
-    ease = EASES.indexOf(ease) !== -1 ? ease : "smooth";
+    ease = easeOf(ease);
+    var ks = hazir(keys, ease);
     F = Math.max(1, Math.round(Number(F) || 0));
     fps = Number(fps) > 0 ? Number(fps) : 30;
     var P = DENSITY[density] || DENSITY.normal;
@@ -316,7 +344,7 @@
 
     var zorunlu = {}, i;
     for (i = 0; i + 1 < ks.length; i++) {
-      if (ks[i + 1].t === ks[i].t || ease === "step") {
+      if (ks[i + 1].t === ks[i].t && (ease !== "step" || ks[i + 1].v !== ks[i].v)) {
         var c = Math.round(ks[i + 1].t * F);
         if (c > 0 && c < F) zorunlu[c] = 1;
       }
@@ -576,10 +604,17 @@
 
   // Eğri yolu (SVG d) — keys [{t, v}] ya da [[t, %]]
   function path(keys, ease, w, h) {
-    var ks = normKeys(keys);
-    ease = EASES.indexOf(ease) !== -1 ? ease : "smooth";
+    ease = easeOf(ease);
+    var ks = hazir(keys, ease);
     w = Number(w) > 0 ? Number(w) : 120; h = Number(h) > 0 ? Number(h) : 56;
     var pad = Math.max(2, h * 0.06), n = Math.max(24, Math.round(w / 2)), parcalar = [];
+    if (ease === "step") {
+      // Basamaklı: köşeler tam (örnekleme dikey kenarı bir örnek aralığı kadar eğerdi)
+      var son = at(ks, 0, ease), nok = [[0, son]];
+      ks.forEach(function (k) { if (k.t > 0 && k.t < 1) { nok.push([k.t, k.v]); son = k.v; } });
+      nok.push([1, son]);
+      return nok.map(function (q, j) { return (j ? "L" : "M") + yuvarla(q[0] * w, 2) + " " + yEkseni(q[1], h, pad); }).join(" ");
+    }
     for (var i = 0; i <= n; i++) {
       var u = i / n;
       var v = at(ks, i === n ? 1 : u, ease);
@@ -598,6 +633,7 @@
     w = Number(w) > 0 ? Number(w) : 120; h = Number(h) > 0 ? Number(h) : 56;
     var ks = p.beats ? beatKeys(ORNEK_VURUS, o, 400) : normKeys(p.keys);
     ks = ks.map(function (x) { return { t: x.t, v: Math.pow(x.v, o.k) }; });
+    if (o.ease === "step") ks = basamakla(ks);
     var pad = Math.max(2, h * 0.06);
     var hit = null;
     if (p.hit !== null && p.hit !== undefined) hit = { x: yuvarla(p.hit * w, 2), y: yEkseni(at(ks, p.hit, o.ease), h, pad) };

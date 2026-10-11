@@ -484,12 +484,21 @@ function cevir(n) {
   ok("hata metinleri: inoutKlipYok, duz, linkedBilinmiyor (Ctrl+L vaadi yok) ve İngilizceleri", /tek bir video klibin içinde/.test(f.H._hataMetni({ kod: "inoutKlipYok" })) &&
     /aynı hızda/.test(f.H._hataMetni({ kod: "duz" })) && !/Ctrl\+L/.test(f.H._hataMetni({ kod: "linkedBilinmiyor" })) &&
     ["inoutKlipYok", "duz", "linkedBilinmiyor"].every(function (k) { var tr = f.H._hataMetni({ kod: k }); return I18N.translate(tr) !== tr; }));
-  var d26 = kur({ kurulu: true, cevap: function (fn, arg) { return fn === "KS_speedRampTargets" ? hedefler([hedef("A.mp4", 2, 6)]) : basari(arg); } });
-  d26.dom["hiz-gecis"].value = "step";
-  d26.H._sec("cikis");
-  ok("tek hız çıkan plan (Basamaklı Hızlı Çıkış): önizleme nedenini söyler", /aynı hızda/.test(d26.dom["hiz-ozet"].textContent), d26.dom["hiz-ozet"].textContent);
+  // 12 karede Nabız: parçalar ortalamada %100 (Basamaklı Hızlı Çıkış eskiden buraya düşerdi; artık 1:6 basamak, aşağıda)
+  var d26 = kur({ kurulu: true, cevap: function (fn, arg) { return fn === "KS_speedRampTargets" ? hedefler([hedef("A.mp4", 2, 2.48)]) : basari(arg); } });
+  d26.dinleyici.ctx({ hasSeq: true, app: "26.0.0", sequenceId: "s1", frame: 0.04, playhead: 0, selCount: 1, sel: { name: "A.mp4", mediaPath: "C:\\cekim\\A.mp4", clipStart: 2, clipEnd: 2.48, inPoint: 10, outPoint: 10.48 } });
+  d26.H._sec("nabiz");
+  ok("tek hız çıkan plan (12 karede Nabız): önizleme nedenini söyler", /aynı hızda/.test(d26.dom["hiz-ozet"].textContent), d26.dom["hiz-ozet"].textContent);
   await d26.H.uygula();
   ok("...ve uygulanmaz, hak düşmez, durum satırı aynı metni verir", d26.uygulamalar().length === 0 && d26.harcanan.length === 0 && /aynı hızda/.test(d26.dom["hiz-status"].textContent), d26.dom["hiz-status"].textContent);
+  var s26 = kur({ kurulu: true, cevap: function (fn, arg) { return fn === "KS_speedRampTargets" ? hedefler([hedef("A.mp4", 2, 6)]) : basari(arg); } });
+  s26.dom["hiz-gecis"].value = "step";
+  s26.H._sec("cikis");
+  ok("Basamaklı Hızlı Çıkış: önizleme 2 parçalı basamak ('aynı hızda' değil)", !/aynı hızda/.test(s26.dom["hiz-ozet"].textContent) && /2 parça/.test(s26.dom["hiz-ozet"].textContent), s26.dom["hiz-ozet"].textContent);
+  await s26.H.uygula();
+  var u26 = s26.uygulamalar(), g26 = u26.length ? u26[0].arg.plan.segments : [];
+  ok("...ve uygulanır: tek çağrı, 2 parça, son parça ilkinin 6 katı hızda, hak bir kez düşer", u26.length === 1 && g26.length === 2 &&
+    Math.abs(g26[1][1] / g26[0][1] - 6) < 0.01 && s26.harcanan.length === 1, js(g26));
 
   /* ---------- 27) önizleme ölçülen genişlikte (metin ve nokta gerilmez); durum satırı canlı bölge ---------- */
   var w27 = kur({ cevap: function () { return { ok: false }; } });
