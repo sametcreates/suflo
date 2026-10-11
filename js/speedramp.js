@@ -17,7 +17,9 @@
  *                         normalize): kaynak = L, iki kenarda kaynak aynı, ses T1'de yine senkron.
  *   auto                  exact sığarsa exact; sığmazsa yoğunluk ikiye bölmeyle düşürülür
  *                         (isteğin 0.6'sından aşağı değil, yogunlukDustu); o da olmazsa
- *                         balanced (dengeliyeGecti). Kısmi (In/Out) aralık hep balanced.
+ *                         balanced (dengeliyeGecti). Medya süresi bilinmiyorsa (ffmpeg yok)
+ *                         B > 1 iken doğrudan balanced (sureYok). Kısmi (In/Out)
+ *                         aralık hep balanced.
  *
  * Zaman ekseni: u ∈ [0,1] ÇIKIŞ (timeline) zamanı; hız = kaynak sn / timeline sn (1 = %100).
  */
@@ -32,11 +34,11 @@
   var LIST = [
     { id: "dalis", name: "Ağır Çekim Dalışı", desc: "Hızlan, derin ağır çekim, yeniden hızlan", group: "agir", hit: 0.5,
       keys: [[0, 100], [0.18, 200], [0.40, 30], [0.60, 30], [0.82, 200], [1, 100]] },
-    { id: "darbe", name: "Darbe", desc: "Hızla gel, vuruşta dur gibi yavaşla, hızla çık", group: "agir", hit: 0.5,
+    { id: "darbe", name: "Darbe", desc: "Hızla gelir, darbe anında neredeyse durur, hızla çıkar", group: "agir", hit: 0.5,
       keys: [[0, 120], [0.24, 300], [0.40, 25], [0.60, 25], [0.76, 300], [1, 120]] },
-    { id: "giris", name: "Hızlı Giriş", desc: "Hızlı başlar, normale oturur (rampa giriş)", group: "rampa", hit: 0.35,
+    { id: "giris", name: "Hızlı Giriş", desc: "Hızlı başlar, normale oturur (rampa girişi)", group: "rampa", hit: 0.35,
       keys: [[0, 500], [0.35, 100], [1, 100]] },
-    { id: "cikis", name: "Hızlı Çıkış", desc: "Normal akar, sonda fırlar (rampa çıkış)", group: "rampa", hit: 0.6,
+    { id: "cikis", name: "Hızlı Çıkış", desc: "Normal akar, sonda fırlar (rampa çıkışı)", group: "rampa", hit: 0.6,
       keys: [[0, 100], [0.60, 100], [1, 600]] },
     { id: "doruk", name: "Doruk Anı", desc: "Hızlı yaklaşım, uzun ağır çekim, normale dönüş (yumuşak kahraman anı)", group: "agir", hit: 0.58,
       keys: [[0, 240], [0.20, 240], [0.36, 28], [0.80, 28], [1, 100]] },
@@ -390,12 +392,18 @@
 
   /* ---------------- plan ---------------- */
 
+  // v[j]'ye artık/d[j] ekler, 6 ondalıkta AŞAĞI yuvarlar: Σ d·v hedefi aşmaz (1e-6: kayan nokta
+  // gürültüsü tam değeri bir basamak düşürmesin)
+  function asagi(v, d, j, artik) {
+    v[j] = clamp(Math.floor((v[j] + artik / d[j]) * 1e6 + 1e-6) / 1e6, MIN_V, MAX_V);
+  }
+
   /*
    * plan(id, o, clip) — clip: { frames (F ≥ 12, tam sayı), fps, partial, handleSec (sn ya da
    * null), hitFrac (ya da null), beatsU (ya da null), srcFps (ya da null) }
    * Doner: { id, mode, k, c, ease, segments: [{d, v (4 ondalık; artığı taşıyan tek parça 6)}], F, fps, srcFrames, B, minV, maxV, hit,
    *          warnings, keys (çizim için, c ile ölçekli) }
-   * Uyarı kodları: yogunlukDustu, dengeliyeGecti, sinirlandi, takilabilir, vurusYok, hitKaydi.
+   * Uyarı kodları: yogunlukDustu, dengeliyeGecti, sureYok, sinirlandi, takilabilir, vurusYok, hitKaydi.
    */
   function plan(id, o, clip) {
     var p = get(id);
@@ -422,7 +430,9 @@
     if (o.mode === "auto" && !clip.partial) {
       sh = bicim(k, "exact");
       if (sigar(sh)) mode = "exact";
-      else if (tutamak === null) uyarilar.push("dengeliyeGecti");   // tutamak bilinmiyor (ffmpeg yok): yoğunluk düşürülmez
+      // medya süresi bilinmiyor (ffmpeg yok, okunamadı ya da ffmpeg -i hâlâ sürüyor): yoğunluk düşürülmez;
+      // "klibin sonrasında görüntü yok" denmez, çünkü bilinmiyor
+      else if (tutamak === null) uyarilar.push("sureYok");
       else {
         var kAlt = 0.6 * o.k, shAlt = bicim(kAlt, "exact");
         if (sigar(shAlt)) {
@@ -480,17 +490,26 @@
         var yeniV = yuvarla(clamp(v[j2] + artik / d[j2], MIN_V, MAX_V), 4);
         v[j2] = yeniV;
       }
-      // çok uzun parçalarda (ör. Vites'in sabit basamakları) 4 ondalık 0.01 kareyi tutturamaz:
-      // son artık en uzun serbest parçaya 6 ondalıkla yazılır
+      // çok uzun parçalarda (ör. Vites'in sabit basamakları) 4 ondalık 0.01 kareyi tutturamaz;
+      // yuvarlama F'yi aşarsa kaynak klibin Out'unu geçer (Out medyanın sonuysa host'ta tutamak):
+      // son artık en uzun serbest parçaya 6 ondalıkla AŞAĞI yazılır, Σ d·v ≤ F
       var kalan = F;
       for (i = 0; i < v.length; i++) kalan -= d[i] * v[i];
-      if (Math.abs(kalan) > 0.005 && sira.length) v[sira[0]] = yuvarla(clamp(v[sira[0]] + kalan / d[sira[0]], MIN_V, MAX_V), 6);
+      if ((kalan < -1e-9 || kalan > 0.005) && sira.length) asagi(v, d, sira[0], kalan);
     } else {
+      var ham = 0, yuv = 0;
       v = v.map(function (x, j) {
         var y = clamp(x, MIN_V, MAX_V);
         if (y !== x) { sinirli[j] = true; sinirlandi = true; }
+        ham += d[j] * y;
         return yuvarla(y, 4);
       });
+      // 4 ondalık yuvarlama eğrinin kaynağından fazlasını istemesin (B ≈ 1 iken tutamaksız seçilen
+      // exact, Out'u kare kesri kadar aşıp medya sonunda takılırdı)
+      for (i = 0; i < v.length; i++) yuv += d[i] * v[i];
+      var serbest2 = v.map(function (x, j) { return j; }).filter(function (j) { return !sinirli[j]; })
+        .sort(function (a, b) { return d[b] - d[a] || a - b; });
+      if (yuv - ham > 1e-9 && serbest2.length) asagi(v, d, serbest2[0], ham - yuv);
     }
     if (sinirlandi) uyarilar.push("sinirlandi");
 

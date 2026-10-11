@@ -16,7 +16,7 @@ function sifirla(o) {
   if (ortam) { TOPLAM_REVERSE += ortam.reverseOkundu; TOPLAM_SETREVERSE += ortam.setReverse; }
   ortam = { fr: o.fr || 1 / 25, surum: o.surum || "26", yutucu: !!o.yutucu, undo: 0, setSpeed: 0, razor: [], endYazma: 0, disYazma: 0,
     reverseOkundu: 0, setReverse: 0, interp: [], unlink: 0, link: 0, hataBas: o.hataBas || 0, kotuKlip: null, onceKanca: o.onceKanca || null,
-    setSpeedYok: !!o.setSpeedYok, videoRazorBozuk: !!o.videoRazorBozuk, unlinkYok: !!o.unlinkYok, linkedApi: !!o.linkedApi, disabledSalt: !!o.disabledSalt, cagriArg: [] };
+    setSpeedYok: !!o.setSpeedYok, videoRazorBozuk: !!o.videoRazorBozuk, unlinkYok: !!o.unlinkYok, linkedApi: !!o.linkedApi, disabledSalt: !!o.disabledSalt, cagriArg: [], cagriDeger: [] };
 }
 
 function zaman(sn) { return { seconds: sn, ticks: String(Math.round(sn * TPS)) }; }
@@ -115,6 +115,7 @@ function bol(iz, f) {
 function hizYaz(k, args) {
   ortam.setSpeed++;
   ortam.cagriArg.push(args.length);
+  ortam.cagriDeger.push(Number(args[0]));
   if (ortam.onceKanca) { var kanca = ortam.onceKanca; ortam.onceKanca = null; kanca(k); }
   if (k._sel) throw new Error("invalid trackitem");
   if (ortam.hataBas && ortam.setSpeed === ortam.hataBas) ortam.kotuKlip = k;
@@ -170,10 +171,11 @@ function sekansYap(id, v, a, o) {
   s.getPlayerPosition = function () { return zaman(s._ph * ortam.fr); };
   s.getInPointAsTime = function () { return zaman(s._in * ortam.fr); };
   s.getOutPointAsTime = function () { return zaman(s._out * ortam.fr); };
+  // Premiere Unlink: seçili her öğe TÜM bağ grubundan çıkar (yalnız seçili çiftler arasındaki bağ değil)
   if (!ortam.unlinkYok) s.unlinkSelection = function () {
     ortam.unlink++;
     var sec = s.getSelection();
-    sec.forEach(function (k) { k._bag = k._bag.filter(function (b) { return sec.indexOf(b) < 0; }); });
+    sec.forEach(function (k) { k._bag.forEach(function (b) { b._bag = b._bag.filter(function (x) { return x !== k; }); }); k._bag = []; });
   };
   s.linkSelection = function () {
     ortam.link++;
@@ -322,10 +324,12 @@ ok("3) geri yükleme qe.project.undo'yu çağırmaz (sahte QE'de undo yok) ve on
 z = sahne({ n: 100, surum: "eski" });
 var r4 = uygula(z, S.hostPlan(S.plan("suzulme", { mode: "balanced" }, { frames: 100, fps: 25 })));
 ok("4) yüzde birimli sürümde kalibrasyon: cal.units 'percent'", r4.ok && r4.cal.units === "percent" && bitisikMi(parcalar(z, 50, 150), 50, 150), js(r4));
+var yanlis4 = ortam.cagriDeger.filter(function (x) { return x < 5; }).length;   // oran birimiyle (≤ %1000 → ≤ 10) giden çağrı
 z = sahne({ n: 100, surum: "eski" });
 var r4b = uygula(z, S.hostPlan(S.plan("suzulme", { mode: "balanced" }, { frames: 100, fps: 25 })), { cal: r4.cal });
-ok("4) önbellekteki kalibrasyon ilk denemede tutar (yanlış birim çağrısı yok)", r4b.ok && r4b.cal.units === "percent" && ortam.setSpeed <= r4b.pieces + 2 && ortam.setSpeed < r4.pieces * 2,
-  ortam.setSpeed + " / " + r4b.pieces);
+// hızlanma yukarıdan yaklaşır (iki çağrı), yavaşlama tek çağrı; önbellekle hiçbir çağrı oran biriminde gitmez
+ok("4) önbellekteki kalibrasyon ilk denemede tutar (yanlış birim çağrısı yok)", r4b.ok && r4b.cal.units === "percent" && yanlis4 > 0 &&
+  ortam.cagriDeger.every(function (x) { return x >= 5; }) && ortam.setSpeed <= 2 * r4b.pieces + 2, ortam.setSpeed + " / " + r4b.pieces + " " + js(ortam.cagriDeger));
 
 /* ---------- 5) setSpeed yok → qeYok, hiç değişiklik yok ---------- */
 z = sahne({ n: 100, setSpeedYok: true });
@@ -472,6 +476,111 @@ var ses15 = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
 ok("15) video kesilemedi: yerlesim, restored:true, video özgün, ses açık ve yeniden bağlı", !r15.ok && r15.kod === "yerlesim" && r15.restored === true &&
   aktif._v[0]._k.length === 3 && z.K._s === 50 && z.K._e === 250 && z.K._v === 1 && ses15.every(function (k) { return !k._d; }) &&
   ses15.some(function (k) { return k._bag.indexOf(z.K) !== -1; }), js(r15) + " " + js(ses15.map(function (k) { return [k._s, k._e, k._d]; })));
+
+/* ---------- 16) kaldır: ilk parça %100'ün altındaysa da tam %100 (yukarıdan yaklaşma) ---------- */
+z = sahne({ n: 100 });
+var p16 = S.plan("suzulme", {}, { frames: 100, fps: 25 });
+var r16 = uygula(z, S.hostPlan(p16));
+var k16 = call("KS_removeSpeedRamp", { record: r16.record });
+var ps16 = parcalar(z, 50, 150), ses16 = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
+ok("16) Süzülme (ilk parça %" + Math.round(p16.segments[0].v * 100) + "): kaldır tam %100, özgün giriş, ses açık ve bağlı", p16.segments[0].v < 1 && r16.ok && k16.ok && ps16.length === 1 &&
+  ps16[0]._v === 1 && ps16[0]._e === 150 && ps16[0]._in === 10 && ses16.every(function (k) { return !k._d; }) && ps16[0]._bag.some(function (b) { return b._tur === "a"; }),
+  js(k16) + " " + js(ps16.map(function (k) { return [k._s, k._e, k._v]; })));
+var kaldirHata = [];
+S.list().forEach(function (pr) {
+  if (pr.beats) return;
+  [{ mode: "balanced" }, {}].forEach(function (o) {
+    var zz = sahne({ n: 100, tutamak: o.mode ? 30 : 0 });
+    var pl = S.plan(pr.id, o, { frames: 100, fps: 25, handleSec: o.mode ? null : 0 });
+    var r = uygula(zz, S.hostPlan(pl));
+    if (!r.ok) { kaldirHata.push(pr.id + " uygula " + r.kod); return; }
+    var k = call("KS_removeSpeedRamp", { record: r.record });
+    var ps = parcalar(zz, 50, 150);
+    if (!k.ok || ps.length !== 1 || ps[0]._v !== 1 || ps[0]._e !== 150 || ps[0]._in !== 10) kaldirHata.push(pr.id + " " + js(o) + " " + js(k) + " " + js(ps.map(function (x) { return [x._s, x._e, +x._v.toFixed(4)]; })));
+  });
+});
+ok("16) her önayar (Dengeli ve tutamaksız otomatik): uygula + kaldır tam %100'e döner", kaldirHata.length === 0, kaldirHata.join(" | "));
+
+/* ---------- 17) Dengeli, klibin Out'u medyanın sonu (tutamak 0): ara adım kaynağı aşmaz ---------- */
+var den17 = [], hiz17 = [];
+S.list().forEach(function (pr) {
+  if (pr.beats) return;
+  [{ mode: "balanced" }, { mode: "balanced", density: "many" }, { mode: "balanced", k: 1.5 }, { mode: "balanced", ease: "linear", density: "few" }].forEach(function (o) {
+    [25, 60, 100, 125].forEach(function (n) {
+      var zz = sahne({ n: n, tutamak: 0 });
+      var pl = S.plan(pr.id, o, { frames: n, fps: 25 });
+      var r = uygula(zz, S.hostPlan(pl));
+      if (!r.ok) { den17.push(pr.id + " " + js(o) + " " + n + " " + r.kod + (r.restored ? "" : " GERİ YÜKLENMEDİ")); return; }
+      var ps = parcalar(zz, 50, 50 + n);
+      if (Math.abs(kaynakSonu(ps[ps.length - 1]) - (10 + n * 0.04)) > 0.04 + 1e-9) den17.push(pr.id + " " + n + " kaynak sonu " + kaynakSonu(ps[ps.length - 1]));
+      ps.forEach(function (k, i) { if (Math.abs(k._v - pl.segments[i].v) / pl.segments[i].v > (i === ps.length - 1 ? 0.15 : 0.04)) hiz17.push(pr.id + " " + n + " parça " + i); });
+    });
+  });
+});
+ok("17) Dengeli + tutamak 0: 10 önayar × 4 seçenek × 4 uzunluk hepsi başarılı, kaynak Out'ta biter", den17.length === 0, den17.length + ": " + den17.slice(0, 6).join(" | "));
+ok("17) Dengeli + tutamak 0: parça hızları plana yakın (tam kare yuvarlaması yok)", hiz17.length === 0, hiz17.slice(0, 6).join(" | "));
+z = sahne({ n: 25, tutamak: 0.04 });
+var r17 = uygula(z, S.hostPlan(S.plan("vites", { mode: "balanced" }, { frames: 25, fps: 25 })));
+ok("17) Vites Dengeli 25 kare, 1 kare tutamak: başarılı", r17.ok, js(r17));
+var oto17 = [];
+S.list().forEach(function (pr) {
+  if (pr.beats) return;
+  [25, 100, 125].forEach(function (n) { [0, null].forEach(function (hs) {
+    var zz = sahne({ n: n, tutamak: 0 });
+    var r = uygula(zz, S.hostPlan(S.plan(pr.id, {}, { frames: n, fps: 25, handleSec: hs })));
+    if (!r.ok) oto17.push(pr.id + " " + n + " " + hs + " " + r.kod);
+  }); });
+});
+ok("17) varsayılan otomatik, tutamak 0 ya da bilinmiyor (ffmpeg yok): hepsi başarılı", oto17.length === 0, oto17.join(" | "));
+
+/* ---------- 18) yüzde birimli sürüm, kayıtsız (seçimden) kaldır ---------- */
+z = sahne({ n: 100, surum: "eski" });
+var r18 = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })), { cal: { units: "percent", sig: "5" } });
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+parcalar(z, 50, 150)[1]._sel = true;
+var k18 = call("KS_removeSpeedRamp", { fromSelection: true });
+var ps18 = parcalar(z, 50, 150);
+ok("18) yüzde birimi, kalibrasyonsuz seçimden kaldır: birim silinecek son parçada yoklanır, tek %100 klip", r18.ok && k18.ok && ps18.length === 1 && ps18[0]._v === 1 &&
+  ps18[0]._e === 150 && ps18[0]._in === 10, js(k18) + " " + js(ps18.map(function (k) { return [k._s, k._e, k._v]; })));
+z = sahne({ n: 100, surum: "eski" });
+r18 = uygula(z, S.hostPlan(S.plan("giris", { mode: "balanced" }, { frames: 100, fps: 25 })), { cal: { units: "percent", sig: "5" } });
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+parcalar(z, 50, 150)[2]._sel = true;
+var once18 = ortam.cagriDeger.length;
+var k18b = call("KS_removeSpeedRamp", { fromSelection: true, cal: { units: "percent", sig: "5" } });
+var ps18b = parcalar(z, 50, 150);
+ok("18) panelin kalibrasyonu seçimden kaldırmada kullanılır: hiç oran birimi çağrısı yok", r18.ok && k18b.ok && ps18b.length === 1 && ps18b[0]._v === 1 && ps18b[0]._e === 150 &&
+  ortam.cagriDeger.slice(once18).every(function (x) { return x >= 5; }), js(k18b) + " " + js(ortam.cagriDeger.slice(once18)));
+
+/* ---------- 19) kaldırırken QE setSpeed yoksa hiçbir parça silinmez ---------- */
+z = sahne({ n: 100 });
+var r19 = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+ortam.setSpeedYok = true;
+var f19 = foto();
+var k19 = call("KS_removeSpeedRamp", { record: r19.record });
+ok("19) setSpeed yok: geriAlinamadi, rampa birebir yerinde (parça silinmedi, boşluk yok)", r19.ok && !k19.ok && k19.kod === "geriAlinamadi" && foto() === f19 &&
+  bitisikMi(parcalar(z, 50, 150), 50, 150), js(k19));
+
+/* ---------- 20) kısmi aralık: dış video parçaları kendi seslerine yeniden bağlanır ---------- */
+function bagliMi(v, a) { return v._bag.indexOf(a) !== -1 && a._bag.indexOf(v) !== -1; }
+z = sahne({ n: 200, inF: 100, outF: 180, linkedApi: true });
+var hd20 = call("KS_speedRampTargets", { range: "inout" }), t20 = hd20.targets[0];
+var r20 = call("KS_applySpeedRamp", { target: { track: 0, start: t20.start, end: t20.end, mediaPath: t20.mediaPath }, range: { start: t20.rangeStart, end: t20.rangeEnd },
+  plan: S.hostPlan(S.plan("darbe", {}, S.clipFor(t20, hd20.frame, {}))), audio: "mute", interp: { slow: 1, fast: 0 } });
+var v20 = aktif._v[0]._k.filter(function (k) { return k._yol === z.K._yol; }), a20 = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
+var vSol = v20[0], vSag = v20[v20.length - 1], aSol = a20[0], aIc = a20[1], aSag = a20[2];
+ok("20) kısmi rampa: [cs,T0] ve [T1,ce] video parçaları kendi sesleriyle bağlı, iç sese bağlı değil", r20.ok && vSol._e === 100 && vSag._s === 180 && bagliMi(vSol, aSol) && bagliMi(vSag, aSag) &&
+  !bagliMi(vSol, aIc) && !bagliMi(vSag, aIc) && !aIc._bag.length && js(r20.record.dis) === js([[2, 4], [7.2, 10]]), js([vSol._bag.map(function (b) { return b._s; }), vSag._bag.map(function (b) { return b._s; }), r20.record.dis]));
+var k20 = call("KS_removeSpeedRamp", { record: r20.record });
+v20 = aktif._v[0]._k.filter(function (k) { return k._yol === z.K._yol; });
+ok("20) kısmi rampayı kaldır: iç parça %100 ve iç sesle, dış parçalar kendi sesleriyle bağlı", k20.ok && v20.length === 3 && v20[1]._v === 1 && bagliMi(v20[1], aIc) && !aIc._d &&
+  bagliMi(v20[0], aSol) && bagliMi(v20[2], aSag), js(k20));
+z = sahne({ n: 200, inF: 100, outF: 180, linkedApi: true, hataBas: 6 });
+var r20b = call("KS_applySpeedRamp", { target: hedef(z), range: { start: 4, end: 7.2 }, plan: S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 80, fps: 25, partial: true })), audio: "mute", interp: {} });
+v20 = aktif._v[0]._k.filter(function (k) { return k._yol === z.K._yol; });
+a20 = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
+ok("20) kısmi rampa yarıda bozulursa da: geri yüklenir, üç video parçası kendi sesleriyle bağlı", !r20b.ok && r20b.restored === true && v20.length === 3 && a20.length === 3 &&
+  v20.every(function (v, i) { return bagliMi(v, a20[i]) && v._v === 1; }) && a20.every(function (a) { return !a._d; }), js(r20b));
 
 /* ---------- 14) hedefler + tanılama: setReverse / .reverse asla ---------- */
 z = sahne({ n: 100 });

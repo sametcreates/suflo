@@ -3461,7 +3461,9 @@ function KS_rampCall(q, imza, oran, clip) {
  */
 function KS_rampSetSpeed(o) {
   var v = Number(o.v), cal = o.cal || {}, i;
-  var tol = Math.max(0.05, 1.5 / Math.max(1, Number(o.K) || 1));
+  // pay en cok %50: kisa parcada (K = 1-2) 'oran' ile yazilan v/100'u (yuzde birimli surum) kabul etmesin
+  var tol = Math.min(0.5, Math.max(0.05, 1.5 / Math.max(1, Number(o.K) || 1)));
+  var kanitBirim = "", kanitImza = "";
   var imzalar = [];
   if (cal.sig) imzalar.push(String(cal.sig));
   for (i = 0; i < KS_RAMP_IMZALAR.length; i++) {
@@ -3501,6 +3503,8 @@ function KS_rampSetSpeed(o) {
       var diger = birim === "ratio" ? "percent" : "ratio";
       var yanlis = birim === "ratio" ? v / 100 : v * 100;
       if (Math.abs(oku - yanlis) / yanlis <= tol) {
+        // guclu kanit: dogru birim obur birim (yanlis birimle kirpilan klip hedefe varamasa da)
+        if (!kanitBirim) { kanitBirim = diger; kanitImza = imza; }
         if (!denendi[diger]) { birim = diger; continue; }
         break;
       }
@@ -3512,7 +3516,64 @@ function KS_rampSetSpeed(o) {
       break;
     }
   }
-  return { ok: false, kod: "hizYazilamadi", calls: cagri, error: sonHata };
+  return { ok: false, kod: "hizYazilamadi", calls: cagri, error: sonHata, units: kanitBirim, sig: kanitImza };
+}
+
+/*
+ * Klibi (baslangici o.t) tam o.v hizina getirir ve o.Kf > 0 ise ucunu o.t + Kf kareye uzatir.
+ * Hizlanma sureyi tam kareye yukari yuvarlar (hiz = kaynak / sure, istenenin altinda kalir);
+ * yavaslama sureyi korur, hizi tam yazar. Bu yuzden hizlanmada hiza YUKARIDAN yaklasilir:
+ * kaynak araligi K2 tam kareye bolunerek v'nin hemen ustune cikilir, sonra v'ye yavaslatilir;
+ * uc en son v hizinda uzatilir. Hicbir ara adim gerekenden fazla kaynak acmaz (hizlanmada once
+ * mevcut, daha dusuk hizda uzatilir). o: { seq, qseq, ti, t, frame, v, Kf, maxSon, cal }
+ * Doner: KS_rampSetSpeed gibi { ok, kod, units, sig, speed, calls }; kod 'tutamak': kaynak yetmedi.
+ */
+function KS_rampHizKur(o) {
+  var v = Number(o.v), fr = o.frame, yari = fr / 2, tr = o.seq.videoTracks[o.ti], cal = o.cal || {}, cagri = 0, tur, R, u, sure, kare;
+  var Kf = Number(o.Kf) || 0, hedefSon = o.t + Kf * fr, maxSon = Number(o.maxSon) || 0;
+  function oku() {
+    R = KS_rampClipAt(tr, o.t, fr);
+    if (!R) return false;
+    u = KS_rampSpeed(R, null);
+    sure = Number(R.end.seconds) - Number(R.start.seconds);
+    kare = Math.round(sure / fr);
+    return true;
+  }
+  function bitir() {
+    if (Kf && Number(R.end.seconds) < hedefSon - yari) { KS_rampSetEnd(R, hedefSon); oku(); }
+    return { ok: true, units: cal.units || "", sig: cal.sig || "", speed: u, calls: cagri };
+  }
+  var yavaslatildi = false;
+  for (tur = 0; tur < 8; tur++) {
+    if (!oku()) return { ok: false, kod: "qeYok", calls: cagri };
+    // uc bu hizda uzatilacak: hedefin ustunde kalan hiz (yuvarlama payi bile) planin kaynagini asar,
+    // o yuzden yukarida kalan hiz bir kez v'ye yavaslatilir; azicik altinda kalmak kabul
+    if (Math.abs(u - v) <= v * 1e-5 || (u < v && v - u <= v * 0.002) || (yavaslatildi && Math.abs(u - v) <= v * 0.002)) return bitir();
+    var istek, Kt;
+    if (v < u) { istek = v; Kt = Math.max(kare, Kf, 1); yavaslatildi = true; }
+    else {
+      if (Kf && Number(R.end.seconds) < hedefSon - yari) {
+        KS_rampSetEnd(R, hedefSon);
+        if (!oku()) return { ok: false, kod: "qeYok", calls: cagri };
+      }
+      var span = sure * u;
+      var K2 = Math.floor(span / (v * fr) + 1e-6);
+      if (K2 >= 1) { istek = span / (K2 * fr) * (1 + 1e-7); Kt = K2; }
+      else if (kare > 1) { istek = span / fr * (1 + 1e-7); Kt = 1; }   // tek kareye: hiz kare kat artar, sonraki tur buyutur
+      else if (maxSon && Number(R.end.seconds) < maxSon - yari) { KS_rampSetEnd(R, maxSon); continue; }
+      else return { ok: false, kod: "tutamak", calls: cagri };
+    }
+    KS_rampDeselect(o.seq);
+    var onceBirim = cal.units || "";
+    var ss = KS_rampSetSpeed({ seq: o.seq, qseq: o.qseq, ti: o.ti, t: o.t, frame: fr, v: istek, cal: cal, K: Kt });
+    cagri += ss.calls || 0;
+    if (ss.units) cal = { units: ss.units, sig: ss.sig };
+    // yanlis birimle kirpilan klip hedefe varamadiysa: birim artik belli, sonraki tur yeniden yaklasir
+    if (!ss.ok && !(ss.kod === "hizYazilamadi" && ss.units && ss.units !== onceBirim)) { ss.calls = cagri; return ss; }
+  }
+  if (!oku()) return { ok: false, kod: "qeYok", calls: cagri };
+  if (Math.abs(u - v) / v <= Math.max(0.05, 1.5 / Math.max(1, Kf))) return bitir();
+  return { ok: false, kod: "hizYazilamadi", calls: cagri, units: cal.units || "", sig: cal.sig || "" };
 }
 
 function KS_rampUndoIndex() {
@@ -3835,23 +3896,50 @@ function KS_rampSesHizali(seq, ilk, t0, t1, yari) {
   return out;
 }
 
-// Kapatilan ses parcalarini ac, kopan bagi (ilk video parcasi + hizali ses) yeniden kur
+// Video ogesini [a, b] icindeki ayni medya ve ayni kaynak hizasindaki ses parcalariyla bagla
+function KS_rampBagla(seq, vk, a, b, frame) {
+  if (!vk || typeof seq.linkSelection !== "function") return false;
+  var bagla = KS_rampSesHizali(seq, vk, a, b, frame / 2);
+  if (!bagla.length) return false;
+  KS_rampDeselect(seq);
+  try { vk.setSelected(true, true); } catch (eS) {}
+  for (var i = 0; i < bagla.length; i++) { try { bagla[i].clip.setSelected(true, true); } catch (eS2) {} }
+  try { seq.linkSelection(); } catch (eL) {}
+  KS_rampDeselect(seq);
+  return true;
+}
+
+/*
+ * Kismi aralikta bag koparilirken butun video ogesi secilir; Premiere Unlink secili ogeyi tum bag
+ * grubundan cikarir, yani aralik disindaki ses parcalarindan da ayrilir. Video T0/T1'de kesildikten
+ * sonra dis parcalar ([cs, T0], [T1, ce]: rec.dis) kendi seslerine yeniden baglanir.
+ */
+function KS_rampDisBagla(seq, rec, frame) {
+  var dis = rec.dis || [], tr = seq.videoTracks[Number(rec.track)], yol = String(rec.mediaPath || "").toLowerCase(), n = 0;
+  if (!tr || !rec.unlinked) return 0;
+  for (var i = 0; i < dis.length; i++) {
+    var a = Number(dis[i][0]), b = Number(dis[i][1]);
+    var vk = KS_rampClipAt(tr, a, frame);
+    if (!vk || Math.abs(Number(vk.end.seconds) - b) > frame / 2 || KS_rampYol(vk).toLowerCase() !== yol) continue;
+    if (KS_rampBagla(seq, vk, a, b, frame)) n++;
+  }
+  return n;
+}
+
+// Kapatilan ses parcalarini ac, kopan bagi (ilk video parcasi + hizali ses, kismi aralikta dis
+// parcalar da) yeniden kur. Video hic kesilmediyse ilk butun klip: kendi araliginin tum sesiyle baglanir.
 function KS_rampSesGeri(seq, rec, ilk, frame) {
-  var n = 0, i, yari = frame / 2, ses = rec.audio || [];
+  var n = 0, i, ses = rec.audio || [];
   for (i = 0; i < ses.length; i++) {
     var at = seq.audioTracks[Number(ses[i].track)];
     var ac = at ? KS_rampClipAt(at, Number(ses[i].start), frame) : null;
     if (ac) { try { ac.disabled = false; n++; } catch (eA) {} }
   }
-  if (ilk && rec.unlinked && typeof seq.linkSelection === "function") {
-    var bagla = KS_rampSesHizali(seq, ilk, Number(rec.t0), Number(rec.t1), yari);
-    if (bagla.length) {
-      KS_rampDeselect(seq);
-      try { ilk.setSelected(true, true); } catch (eS) {}
-      for (i = 0; i < bagla.length; i++) { try { bagla[i].clip.setSelected(true, true); } catch (eS2) {} }
-      try { seq.linkSelection(); } catch (eL) {}
-      KS_rampDeselect(seq);
+  if (rec.unlinked) {
+    if (ilk) {
+      KS_rampBagla(seq, ilk, Math.min(Number(rec.t0), Number(ilk.start.seconds)), Math.max(Number(rec.t1), Number(ilk.end.seconds)), frame);
     }
+    KS_rampDisBagla(seq, rec, frame);
   }
   return n;
 }
@@ -3900,30 +3988,78 @@ function KS_rampRestore(seq, rec, frame, strict) {
     }
     if (strict && Math.abs(Number(parca[parca.length - 1].end.seconds) - t1) > yari) return sonuc;
     sonuc.kod = "geriAlinamadi";
-    for (i = parca.length - 1; i >= 1; i--) {
-      try { parca[i].remove(false, false); sonuc.removed++; } catch (eR) {}
-    }
-    var ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
-    if (!ilk) return sonuc;
+    // Bozucu adim yoksa (strict) her sey yerinde kalir: rampa hala tam, ses kapali ve kayit duruyor.
+    // Bir sey degistiyse ya da ic geri yuklemede (yarim rampa) en azindan ses acilip baglanir.
+    var bozuldu = false;
+    var vazgec = function () {
+      if (!strict || bozuldu) {
+        try { sonuc.audio = KS_rampSesGeri(seq, rec, KS_rampClipAt(seq.videoTracks[ti], t0, frame), frame); } catch (eS) {}
+      }
+      return sonuc;
+    };
     var qseq = null;
     try {
       app.enableQE();
       if (typeof qe !== "undefined" && qe && qe.project) qseq = qe.project.getActiveSequence();
     } catch (eQ) {}
-    if (Math.abs(KS_rampSpeed(ilk, null) - 1) > 0.002) {
-      if (!qseq) return sonuc;
-      KS_rampDeselect(seq);
-      var hs = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: t0, frame: frame, v: 1, cal: rec.cal || {}, K: Math.round((t1 - t0) / frame) });
-      if (!hs.ok) return sonuc;
+    var K = Math.round((t1 - t0) / frame), cal = rec.cal && rec.cal.units ? rec.cal : {};
+    // 1) HICBIR SEY SILINMEDEN ilk parcayi %100'e al (2..n yerindeyken: hizlanma kisaltir, yavaslama
+    // sureyi korur; bos yer gerekmez). QE yoksa ya da hiz yazilamazsa hicbir parca silinmez.
+    if (Math.abs(KS_rampSpeed(parca[0], null) - 1) > 0.002) {
+      var q1 = qseq ? KS_rampQItem(qseq, ti, t0, frame) : null;
+      if (!q1 || typeof q1.setSpeed !== "function") return vazgec();
+      // Birim bilinmiyorsa once SILINECEK son parcada yokla: yanlis birim (oran yerine yuzde ya da
+      // tersi) kaynagi kirpar; o kirpma ilk parcaya degil, zaten kaldirilacak parcaya olur. Yoklama
+      // yarim hiza YAVASLATMADIR: dogru birimde sure korunur ve hiz tam tutar (kisa, yavas parcada da),
+      // dar pay (K 1000) 'degismedi'yi kabul etmez
+      if (!cal.units && parca.length > 1) {
+        var son = parca[parca.length - 1], ts = Number(son.start.seconds), vs = KS_rampSpeed(son, null);
+        var onceSon = [Number(son.end.seconds), vs];
+        KS_rampDeselect(seq);
+        var pr = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: ts, frame: frame, v: vs * 0.5, cal: {}, K: 1000 });
+        if (pr.units) cal = { units: pr.units, sig: pr.sig };
+        var sonK = KS_rampClipAt(seq.videoTracks[ti], ts, frame);
+        if (!sonK || Math.abs(Number(sonK.end.seconds) - onceSon[0]) > 0.0001 || Math.abs(KS_rampSpeed(sonK, null) - onceSon[1]) > 1e-6) bozuldu = true;
+        if (!cal.units) return vazgec();
+      }
+      bozuldu = true;
+      var b1 = KS_rampHizKur({ seq: seq, qseq: qseq, ti: ti, t: t0, frame: frame, v: 1, Kf: 0, maxSon: 0, cal: cal });
+      if (b1.units) cal = { units: b1.units, sig: b1.sig };
+      if (!b1.ok) {
+        // ilk parcanin kaynagi bir kareden kisa (cok yavas, cok kisa parca): 2..n kalktiktan ve uc
+        // uzatildiktan sonra yeniden denenir. Baska her hata: kalan parcalar silinmez.
+        if (b1.kod !== "tutamak") return vazgec();
+      }
+    }
+    // 2) 2..n kaldir (lift, ripple yok). QE islemlerinden sonra yeniden toplanir.
+    bozuldu = true;
+    var tr2 = seq.videoTracks[ti], kalan = [];
+    for (i = 0; i < tr2.clips.numItems; i++) {
+      var c2 = tr2.clips[i], s2 = Number(c2.start.seconds), e2 = Number(c2.end.seconds);
+      if (s2 > t0 + yari && s2 < t1 - yari && e2 <= t1 + yari && KS_rampYol(c2).toLowerCase() === yol) kalan.push(c2);
+    }
+    for (i = kalan.length - 1; i >= 0; i--) {
+      try { kalan[i].remove(false, false); sonuc.removed++; } catch (eR) {}
+    }
+    // 3) ilk parca t1'e: %100'de tam ozgun kaynak; ilk parca hala yavassa once kendi hizinda uzatilir
+    // (daha az kaynak), sonra yukaridan %100'e yaklasilir ve yeniden uzatilir
+    var ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
+    if (!ilk) return vazgec();
+    KS_rampSetEnd(ilk, t1);
+    for (var tur = 0; tur < 2; tur++) {
+      ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
+      if (!ilk) return vazgec();
+      if (Math.abs(KS_rampSpeed(ilk, null) - 1) <= 0.002 && Math.abs(Number(ilk.end.seconds) - t1) <= yari) break;
+      if (!qseq) return vazgec();
+      var b2 = KS_rampHizKur({ seq: seq, qseq: qseq, ti: ti, t: t0, frame: frame, v: 1, Kf: K, maxSon: t1, cal: cal });
+      if (b2.units) cal = { units: b2.units, sig: b2.sig };
+      if (!b2.ok) return vazgec();
     }
     var qi = qseq ? KS_rampQItem(qseq, ti, t0, frame) : null;
     if (qi) KS_rampInterp(qi, 0);
     ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
-    if (!ilk) return sonuc;
-    KS_rampSetEnd(ilk, t1);
-    ilk = KS_rampClipAt(seq.videoTracks[ti], t0, frame);
-    if (!ilk || Math.abs(Number(ilk.end.seconds) - t1) > yari || Math.abs(KS_rampSpeed(ilk, null) - 1) > 0.005 ||
-        Math.abs(Number(ilk.inPoint.seconds) - Number(rec.srcIn)) > frame + 0.0001) return sonuc;
+    if (!ilk || Math.abs(Number(ilk.end.seconds) - t1) > yari || Math.abs(KS_rampSpeed(ilk, null) - 1) > 0.002 ||
+        Math.abs(Number(ilk.inPoint.seconds) - Number(rec.srcIn)) > frame + 0.0001) return vazgec();
     sonuc.audio = KS_rampSesGeri(seq, rec, ilk, frame);
     sonuc.ok = true;
     sonuc.kod = "";
@@ -3999,11 +4135,15 @@ function KS_applySpeedRamp(encoded) {
     var cin = Number(clip.inPoint.seconds);
     var srcIn = cin + (T0 - cs);
     var sigma = srcIn + Number(pl.srcFrames) * frame;
+    // Dengeli tanim geregi araligin kendi kaynagini kullanir: 4 ondalikli plan artigi Out'u asamaz
+    if (String(pl.mode) === "balanced") sigma = Math.min(sigma, srcIn + topD * frame);
     var komsu = KS_rampKomsuFoto(seq, ti, T0, T1, yari, clip);
     var sesFoto = KS_rampSesFoto(seq, T0, T1);
     var undo0 = KS_rampUndoIndex();
     var rec = { v: 1, seqId: seqId, track: ti, t0: T0, t1: T1, srcIn: srcIn, mediaPath: mp, name: ad, audio: [], unlinked: false,
-      mode: String(pl.mode || "") };
+      mode: String(pl.mode || ""), dis: [] };
+    if (T0 > cs + yari) rec.dis.push([cs, T0]);
+    if (T1 < ce - yari) rec.dis.push([T1, ce]);
     var uyarilar = [], cal = p.cal || {};
     var bozul = function (kod, ek) {
       rec.cal = cal;
@@ -4055,75 +4195,60 @@ function KS_applySpeedRamp(encoded) {
       var R = KS_rampClipAt(seq.videoTracks[ti], T0, frame);
       if (!R || Math.abs(Number(R.end.seconds) - T1) > yari) return bozul("yerlesim");
 
-      // 6) parca parca kur: hiz baslangici ve kaynak girisini korur; uc yazimlari yalniz
-      // [R.end, T1] icinde buyur, orasi da insa geregi bos (komsuya asla tasmaz)
+      // 6) parca parca kur: her parca KS_rampHizKur ile TAM hizina getirilir (hizlanmada yukaridan
+      // yaklasma), ucu yalniz o hizda ve yalniz gerektigi kadar uzatilir: kesilmemis parca bir sonraki
+      // sinirin bir kare otesine (orada kesilir), son parca T1'e. Ara adim planin kaynagini (sigma)
+      // asmaz: Dengeli'de klibin Out'u medyanin sonu olsa da yeter. Uc yazimlari yalniz [R.end, T1]
+      // icinde buyur, orasi da insa geregi bos (komsuya asla tasmaz)
       var Ds = [], kuyruk = [], acc = 0, q = T0, Kler = [];
       for (i = 0; i < N; i++) Ds.push(D[i] * frame);
       for (i = N - 1; i >= 0; i--) { acc += Ds[i] * V[i]; kuyruk[i] = acc; }
       var tip = p.interp || {}, yavasTip = Number(tip.slow) || 0, hizliTip = Number(tip.fast) || 0;
       for (var j = 0; j < N; j++) {
         var sonParca = j === N - 1, qn = q + Ds[j];
-        // i) kapali dongu: kalan kaynak / kalan plan
-        var duz = (sigma - Number(R.inPoint.seconds)) / kuyruk[j];
+        R = KS_rampClipAt(seq.videoTracks[ti], q, frame);
+        if (!R) return bozul("yerlesim");
+        // i) kapali dongu: kalan kaynak / kalan plan; son parca kalan kaynagi tam tuketir
+        var kalanKaynak = sigma - Number(R.inPoint.seconds);
+        var duz = kalanKaynak / kuyruk[j];
         if (!isFinite(duz)) duz = 1;
         duz = Math.max(sonParca ? 0.85 : 0.97, Math.min(sonParca ? 1.15 : 1.03, duz));
         var v = V[j] * duz;
-        // ii) kisa kaldiysa mevcut hizinda T1'e buyut (medya sonu ya da komsu sinirlar; buyume kabul)
-        if (Number(R.end.seconds) < T1 - yari) {
-          KS_rampSetEnd(R, T1);
-          R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
+        if (sonParca) {
+          var vTam = kalanKaynak / (T1 - q);
+          if (vTam >= V[j] * 0.85 && vTam <= V[j] * 1.15) v = vTam;
         }
-        // iii) tam kare sureli hiz iste
-        var span = (Number(R.end.seconds) - Number(R.start.seconds)) * KS_rampSpeed(R, null);
-        var K = Math.max(1, Math.round(span / (v * frame)));
-        var vIst = span / (K * frame) * (1 + 1e-7);
-        KS_rampDeselect(seq);
-        var ss = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: q, frame: frame, v: vIst, cal: cal, K: K });
-        if (!ss.ok) return bozul(ss.kod === "qeYok" ? "yerlesim" : "hizYazilamadi");
-        if (ss.units) cal = { units: ss.units, sig: ss.sig };
-        Kler.push(K);
-        var qi = KS_rampQItem(qseq, ti, q, frame);
-        if (qi) KS_rampInterp(qi, V[j] < 0.98 ? yavasTip : (V[j] > 1.02 ? hizliTip : 0));
+        var Kf = sonParca ? Math.round((T1 - q) / frame) : D[j] + 1, hedefSon = sonParca ? T1 - yari : qn + frame * 0.75;
+        var hk = KS_rampHizKur({ seq: seq, qseq: qseq, ti: ti, t: q, frame: frame, v: v, Kf: Kf, maxSon: T1, cal: cal });
+        if (hk.units) cal = { units: hk.units, sig: hk.sig };
+        if (!hk.ok) return bozul(hk.kod === "qeYok" ? "yerlesim" : (hk.kod === "tutamak" ? "tutamak" : "hizYazilamadi"));
         R = KS_rampClipAt(seq.videoTracks[ti], q, frame);
         if (!R) return bozul("yerlesim");
-        if (!sonParca) {
-          // iv) sonraki sinirin en az bir kare otesine uzanmali; sonra orada kes
-          if (Number(R.end.seconds) < qn + frame * 0.75) {
-            KS_rampSetEnd(R, T1);
-            R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
-            if (Number(R.end.seconds) < qn + frame * 0.75) return bozul("tutamak");
+        if (Number(R.end.seconds) < hedefSon) {
+          // ii) medya sonu ucu durdurdu (hizli parcadan sonra az kaynak kaldi, klibin Out'u medyanin sonu):
+          // ulasilan kaynagi (Dengeli'de en az sigma'ya kadarini) Kf kareye yayan biraz daha yavas hiz;
+          // fark kapali dongude sonraki parcalara gecer, dogrulama payi karar verir
+          var ulas = (Number(R.end.seconds) - q) * KS_rampSpeed(R, null);
+          if (String(pl.mode) === "balanced") ulas = Math.max(ulas, sigma - Number(R.inPoint.seconds));
+          var vAlt = ulas / (Kf * frame);
+          if (vAlt < v && vAlt >= V[j] * 0.85) {
+            hk = KS_rampHizKur({ seq: seq, qseq: qseq, ti: ti, t: q, frame: frame, v: vAlt, Kf: Kf, maxSon: T1, cal: cal });
+            if (hk.units) cal = { units: hk.units, sig: hk.sig };
+            if (!hk.ok) return bozul(hk.kod === "qeYok" ? "yerlesim" : (hk.kod === "tutamak" ? "tutamak" : "hizYazilamadi"));
+            R = KS_rampClipAt(seq.videoTracks[ti], q, frame);
+            if (!R) return bozul("yerlesim");
           }
-          qv.razor(KS_rampTC(qn, frame));
-          var Rn = KS_rampClipAt(seq.videoTracks[ti], qn, frame);
-          if (!Rn) return bozul("yerlesim");
-          R = Rn;
-          q = qn;
-        } else {
-          // v) son parca tam T1'de biter
-          var bit = KS_rampSetEnd(R, T1);
-          R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
-          // Ince ayar: tam kare yuvarlamasi kaynak sonunu yarim kareden fazla kaydirdiysa, kalan
-          // kaynagi tam tutturan hiza YUKARIDAN yaklas (yavaslatma sureyi korur, hiz tam olur)
-          var vTam = (sigma - Number(R.inPoint.seconds)) / (T1 - q), hizNe = KS_rampSpeed(R, null);
-          if (Math.abs(hizNe - vTam) * (T1 - q) > frame * 0.5 && vTam >= V[j] * 0.85 && vTam <= V[j] * 1.15) {
-            if (vTam > hizNe) {
-              var span2 = (Number(R.end.seconds) - Number(R.start.seconds)) * hizNe;
-              var K2 = Math.max(1, Math.floor(span2 / (vTam * frame) + 1e-9));
-              KS_rampDeselect(seq);
-              var ss2 = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: q, frame: frame, v: span2 / (K2 * frame) * (1 + 1e-7), cal: cal, K: K2 });
-              if (!ss2.ok) return bozul("hizYazilamadi");
-              R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
-              KS_rampSetEnd(R, T1);
-              R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
-            }
-            KS_rampDeselect(seq);
-            var ss3 = KS_rampSetSpeed({ seq: seq, qseq: qseq, ti: ti, t: q, frame: frame, v: vTam, cal: cal, K: Math.round((T1 - q) / frame) });
-            if (!ss3.ok) return bozul("hizYazilamadi");
-            R = KS_rampClipAt(seq.videoTracks[ti], q, frame) || R;
-            bit = KS_rampSetEnd(R, T1);
-          }
-          if (Math.abs(bit - T1) > yari) return bozul("tutamak");
+          if (Number(R.end.seconds) < hedefSon) return bozul("tutamak");
         }
+        Kler.push(D[j]);
+        var qi = KS_rampQItem(qseq, ti, q, frame);
+        if (qi) KS_rampInterp(qi, V[j] < 0.98 ? yavasTip : (V[j] > 1.02 ? hizliTip : 0));
+        if (!sonParca) {
+          // iii) sonraki sinirin en az bir kare otesine uzandi; orada kes
+          qv.razor(KS_rampTC(qn, frame));
+          if (!KS_rampClipAt(seq.videoTracks[ti], qn, frame)) return bozul("yerlesim");
+          q = qn;
+        } else if (Math.abs(Number(R.end.seconds) - T1) > yari) return bozul("tutamak");
       }
 
       // 7) dogrula: N bitisik parca T0..T1, hizlar plana yakin, komsular ve ses yerinde
@@ -4148,6 +4273,9 @@ function KS_applySpeedRamp(encoded) {
       var srcSon = Number(sonP.inPoint.seconds) + (Number(sonP.end.seconds) - Number(sonP.start.seconds)) * KS_rampSpeed(sonP, null);
       var srcErr = Math.abs(srcSon - sigma) / frame;
       if (srcErr > 2) uyarilar.push("kaynakKaydi");
+
+      // 8) kismi aralik: dis video parcalarini kendi seslerine yeniden bagla (bag koparilirken ayrildilar)
+      KS_rampDisBagla(seq, rec, frame);
 
       // 9) parcalari sec
       KS_rampDeselect(seq);
@@ -4208,7 +4336,9 @@ function KS_rampSecimdenKayit(seq, frame) {
 
 /*
  * 'Geri al' / 'Rampayi kaldir' (Ctrl+Z rampayi tek adimda geri almaz: QE kayitlari geri
- * alinir, DOM end/disabled yazimlari cogu zaman alinmaz). p: { record } ya da { fromSelection: true }
+ * alinir, DOM end/disabled yazimlari cogu zaman alinmaz). p: { record } ya da { fromSelection: true },
+ * ek olarak cal: panelin bu Premiere surumu icin bildigi setSpeed imza/birimi (kayitta yoksa kullanilir;
+ * secimden kurulan kayitta hic yoktur). Yoksa KS_rampRestore birimi silinecek son parcada yoklar.
  */
 function KS_removeSpeedRamp(encoded) {
   try {
@@ -4221,6 +4351,9 @@ function KS_removeSpeedRamp(encoded) {
       rec = KS_rampSecimdenKayit(seq, frame);
       if (!rec) return KS_rampHata("secimYok");
     } else if (rec.seqId && String(rec.seqId) !== String(seq.sequenceID)) return KS_rampHata("sekans");
+    if (!(rec.cal && rec.cal.units) && p.cal && (p.cal.units === "ratio" || p.cal.units === "percent")) {
+      rec.cal = { units: String(p.cal.units), sig: String(p.cal.sig || "") };
+    }
     var rs = KS_rampRestore(seq, rec, frame, true);
     if (!rs.ok) return KS_rampHata(rs.kod || "degisti", { track: Number(rec.track) });
     return KS_ok({ track: Number(rec.track), t0: Number(rec.t0), t1: Number(rec.t1), removed: rs.removed, audio: rs.audio, name: String(rec.name || "") });

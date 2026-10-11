@@ -152,7 +152,8 @@ ok("auto: tutamak yetmezse yoğunluk düşer (yogunlukDustu, ≥ 0.6·k, tutama�
 var den = S.plan("darbe", {}, { frames: 100, fps: 25, handleSec: 0 });
 ok("auto: düşürmek de yetmezse balanced (dengeliyeGecti)", den.mode === "balanced" && den.warnings.indexOf("dengeliyeGecti") !== -1 && Math.abs(dvToplam(den) - 100) <= 0.01, js(den.warnings));
 var ffYok = S.plan("giris", {}, { frames: 100, fps: 25, handleSec: null });
-ok("auto: ffmpeg yokken (tutamak null) B > 1 ise exact seçilmez, yoğunluk düşürülmez (dengeliyeGecti)", ffYok.mode === "balanced" && ffYok.k === 1 && ffYok.warnings.indexOf("dengeliyeGecti") !== -1, ffYok.mode + " " + ffYok.k);
+ok("auto: ffmpeg yokken (tutamak null) B > 1 ise exact seçilmez, yoğunluk düşürülmez; uyarı 'görüntü yok' değil sureYok", ffYok.mode === "balanced" && ffYok.k === 1 &&
+  ffYok.warnings.indexOf("sureYok") !== -1 && ffYok.warnings.indexOf("dengeliyeGecti") === -1, ffYok.mode + " " + ffYok.k + " " + js(ffYok.warnings));
 var kis = S.plan("cikis", {}, { frames: 100, fps: 25, handleSec: 100, partial: true });
 ok("kısmi (In/Out) aralık her zaman balanced", kis.mode === "balanced" && kis.warnings.indexOf("dengeliyeGecti") === -1 && Math.abs(dvToplam(kis) - 100) <= 0.01);
 ok("mode balanced seçilince tutamak olsa da balanced", S.plan("cikis", { mode: "balanced" }, { frames: 100, fps: 25, handleSec: 100 }).mode === "balanced");
@@ -270,6 +271,23 @@ L.forEach(function (p) {
   });
 });
 ok("hiçbir çıktıda NaN yok", nanSorun.length === 0, nanSorun.slice(0, 3).join(" | "));
+
+/* ---------------- yuvarlama kaynağı artırmaz (Out medyanın sonuysa host'ta tutamak olurdu) ---------------- */
+var asim = [];
+L.forEach(function (p) {
+  if (p.beats) return;
+  [{ mode: "balanced" }, { mode: "balanced", density: "many" }, { mode: "balanced", k: 1.5 }, { k: 0.5, ease: "linear" }, { ease: "step" }, {}].forEach(function (o) {
+    [12, 25, 37, 60, 100, 125, 181, 333].forEach(function (F) {
+      [25, 30000 / 1001].forEach(function (fps) {
+        var pl = S.plan(p.id, o, { frames: F, fps: fps, handleSec: 0 }), top = 0;
+        pl.segments.forEach(function (g) { top += g.d * g.v; });
+        if (pl.srcFrames > F && (pl.mode === "balanced" || pl.B <= 1)) asim.push(p.id + " " + js(o) + " " + F + " " + pl.mode + " " + pl.srcFrames);
+        else if (pl.mode === "balanced" && Math.abs(top - F) > 0.006) asim.push(p.id + " " + F + " artık " + (top - F));
+      });
+    });
+  });
+});
+ok("Dengeli ve tutamaksız exact: srcFrames ≤ F (4 ondalık artığı Out'u aşmaz), Dengeli Σ d·v ≈ F", asim.length === 0, asim.slice(0, 4).join(" | "));
 
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
