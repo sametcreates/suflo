@@ -247,7 +247,7 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | `test-vurgu.js` | Anahtar kelime vurgusu: 12 stilde vurgu rengi, otomatik seçim, dışa aktarımda işaret temizliği |
 | `test-vurgu-entegre.js` | Vurgulu kelimeler Otomatik Zoom ve Akıllı SFX'te: an, kural, sınır önceliği |
 | `test-youtube-meta.js` | YouTube metni: başlık/açıklama/etiket/hashtag temizliği ve YouTube sınırları |
-| `test-paket.js` | Çok dilli SRT paketi: zamanlama, dile göre büyük harf, ortak çeviri fonksiyonu |
+| `test-paket.js` | Çok dilli SRT paketi: zamanlama, dile göre büyük harf, ortak çeviri fonksiyonu; yayın paketinde `THIRD_PARTY_NOTICES.md` ve `LICENSE` (package / kurucu / verify-release) |
 | `test-broll.js` | B-roll önerileri: istem, ayrıştırma, stok arama bağlantıları, host marker etiketi/rengi |
 | `test-api-probe.js` | Doctor: Premiere API yoklaması (alt sekans, Auto Reframe, QE, marker, klip kapatma; Hız Rampası için QE setSpeed, kare harmanlama, undo endeksi, unlink/link, getSpeed, Zaman Yeniden Eşleme bileşeni) projeye dokunmadan; yazıcılar ve QE .reverse hiç çağrılmaz |
 | `test-es3.js` | `jsx/` ExtendScript: ES5+/ES6 kullanımı (forEach, trim, let, =>, JSON, sondaki virgül) yok — yalnız Premiere'de patlayacak hatalar |
@@ -359,6 +359,12 @@ Shorts with an explained 0–100 score, animated caption styles, transitions and
 Found a string that is still Turkish? [Open an issue](https://github.com/sametcreates/suflo/issues)
 with a screenshot.
 
-## Lisans
+## Lisanslar / Licenses
 
 MIT — [LICENSE](LICENSE). Dilediğin gibi kullan, değiştir, dağıt.
+
+Başka açık kaynak projelerden uyarlanan bölümler (ör. Raunen'den kelime zamanı ayrıştırma,
+MIT) ve çalışırken indirilen bileşenlerin (whisper.cpp, modeller, ffmpeg) lisansları:
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Portions adapted from other open-source
+projects and the licenses of runtime downloads are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

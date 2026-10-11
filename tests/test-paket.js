@@ -25,5 +25,21 @@ DOM["cap-punct"].checked = false;
 var bosSrt = M.srt(M.z([{ start: 0, end: 1, text: "bir" }, { start: 1, end: 2, text: "…" }, { start: 2, end: 3, text: "üç" }]), ["bir", "…", "çok\n\n\nsatır"], "tr");
 ok("bos kalan satir atlanir, numaralar ardisik, ic bos satirlar kapanir", /^1\r\n[^\r]+\r\nBİR\r\n\r\n2\r\n[^\r]+\r\nÇOK SATIR\r\n/.test(bosSrt) && bosSrt.indexOf("3\r\n") === -1, JSON.stringify(bosSrt));
 ok("paket: kelime/karaoke modunda reddedilir", /if \(segmentsMode !== "plain"\)/.test(pk));
+
+/* ---- Yayın paketi: THIRD_PARTY_NOTICES.md (uyarlanan MIT kodun lisans metni) ---- */
+function okuK(f) { return fs.readFileSync(path.join(__dirname, "..", f), "utf8"); }
+var notice = fs.existsSync(path.join(__dirname, "..", "THIRD_PARTY_NOTICES.md")) ? okuK("THIRD_PARTY_NOTICES.md") : "";
+ok("THIRD_PARTY_NOTICES.md depo kökünde, Raunen girdisi + tam MIT metni + çalışırken indirilenler",
+  /### Raunen/.test(notice) && /063df7b8453b79ca04331bebdeef2eaf5cfe2b99/.test(notice) && /SPDX: `MIT`/.test(notice) &&
+  /Permission is hereby granted, free of charge/.test(notice) && /THE SOFTWARE IS PROVIDED "AS IS"/.test(notice) && /## Runtime downloads \(not bundled\)/.test(notice) &&
+  /whisper\.cpp/.test(notice) && /Silero VAD/.test(notice) && /ffmpeg/.test(notice));
+ok("package.ps1 $stageItems THIRD_PARTY_NOTICES.md'yi ZXP'ye koyar", /\$stageItems = @\([^)]*"THIRD_PARTY_NOTICES\.md"/.test(okuK("tools/package.ps1")));
+ok("kurucu ve geliştirici kurulumları da taşır", /\$panelItems = @\([^)]*"THIRD_PARTY_NOTICES\.md"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /"THIRD_PARTY_NOTICES\.md"/.test(okuK("tools/install.ps1")) && /THIRD_PARTY_NOTICES\.md/.test(okuK("tools/install.sh")));
+var vr = okuK("tools/verify-release.ps1");
+var gerekli = (/\$required = @\(([\s\S]*?)\n\s*\)/.exec(vr) || ["", ""])[1];
+ok("verify-release.ps1: THIRD_PARTY_NOTICES.md ve LICENSE paketten eksikse yayın durur", /THIRD_PARTY_NOTICES\\\.md\$/.test(gerekli) && /LICENSE\$/.test(gerekli) && /missing=\{4\}/.test(vr) && /exit 1/.test(vr), gerekli.slice(-160));
+ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

@@ -100,7 +100,10 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)assets/pro-mogrt-showcase/catalog\.json$',
             '(^|/)assets/pro-caption-showcase/catalog\.json$',
             '(^|/)assets/pro-sfx-showcase/catalog\.json$',
-            '(^|/)CSXS/manifest\.xml$'
+            '(^|/)CSXS/manifest\.xml$',
+            # uyarlanan MIT kodun (Raunen) lisans metni: eksikse dagitim lisansa aykiri olur
+            '(^|/)LICENSE$',
+            '(^|/)THIRD_PARTY_NOTICES\.md$'
         )
         if ($ornekVar -or $sample.Count) { $required += '(^|/)assets/onboarding/ornek\.json$' }
         $missing = @()
