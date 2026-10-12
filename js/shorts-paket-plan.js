@@ -46,7 +46,7 @@
     "cta-kisa": "CTA atlandı: Short 8 sn'den kısa",
     "cta-cakisma": "CTA atlandı: kanca başlığıyla çakışıyordu",
     "secim-yok": "Pakete alınacak an seçilmedi.",
-    mogrt: "MOGRT stilleri pakette kullanılamaz: her altyazı satırı ayrı Premiere çağrısı ister. Bir Suflo Stili seç.",
+    mogrt: "MOGRT stilleri pakette kullanılamaz: her altyazı satırı ayrı Premiere çağrısı ister. Altyazı Efektleri'nden bir görünüm seç.",
     "reframe-yok": "Bu Premiere sürümünde Auto Reframe yok: 9:16 paket yapılamaz. Yatay paket için onay ver ya da Premiere'i güncelle.",
     iptal: "iptal edildi",
     "altyazi-bos": "Short'ta altyazı satırı yok",
@@ -72,6 +72,23 @@
   function yildizsiz(t) { return String(t == null ? "" : t).replace(/\*/g, "").replace(/\s+/g, " ").trim(); }
   function kopya(o) { return JSON.parse(JSON.stringify(o)); }
 
+  /*
+   * Altyazı Efektleri (3.3) oluşturucu ayarı: pakete yalnız bilinen ve düz (metin / sayı / boolean)
+   * alanlar girer; değerleri stil motoru (guvenliStil) yeniden doğrular. Yoksa null.
+   */
+  var EFEKT_SECIM_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime", "font", "renk", "konturRenk", "vurguRenk",
+    "boyut", "kontur", "konum", "kase"];
+  function efektSecimi(e) {
+    if (!e || typeof e !== "object" || e instanceof Array) return null;
+    var out = {}, var1 = false;
+    EFEKT_SECIM_ALANLARI.forEach(function (k) {
+      if (!Object.prototype.hasOwnProperty.call(e, k)) return;
+      var v = e[k];
+      if ((typeof v === "string" && v.length <= 40) || (typeof v === "number" && isFinite(v)) || typeof v === "boolean") { out[k] = v; var1 = true; }
+    });
+    return var1 ? out : null;
+  }
+
   /* ---------------- seçim ---------------- */
 
   /*
@@ -83,7 +100,10 @@
     var k = kit && kit.on ? kit : null;
     function b(v, d) { return typeof v === "boolean" ? v : d; }
     var s = {
-      stilId: typeof r.stilId === "string" ? r.stilId : (k && k.stil && k.stil.id) || "viral",
+      // 3.3: paket altyazısı Altyazı Efektleri ("efekt" + oluşturucu ayarı); eski kayıttaki stil kimliği motorda çizilmeye devam eder
+      stilId: typeof r.stilId === "string" ? r.stilId : (k && k.stil && k.stil.id) || "efekt",
+      gorunum: typeof r.gorunum === "string" && /^[a-z0-9_-]{1,24}$/.test(r.gorunum) ? r.gorunum : "",
+      efekt: efektSecimi(r.efekt),
       altyazi: b(r.altyazi, true),
       kanca: b(r.kanca, true),
       ilerleme: b(r.ilerleme, !k || k.ilerleme.konum !== "yok"),
@@ -194,18 +214,21 @@
   }
 
   /*
-   * Stil motoruna giden ince ayar: stilin kendi değerleri + Marka Kiti (açıksa: yazı tipi, renkler,
-   * konum) + 9:16'da "platform arayüzünden kaçın". Döner: { overrides, konum }
+   * Stil motoruna giden ince ayar: stilin kendi değerleri + Altyazı Efektleri oluşturucu ayarı (efekt,
+   * varsa) + Marka Kiti (açıksa: yazı tipi, renkler, konum) + 9:16'da "platform arayüzünden kaçın".
+   * Döner: { overrides, konum }
    */
-  function stilAyarlari(styleId, kit, dikey) {
+  function stilAyarlari(styleId, kit, dikey, efekt) {
     var p = SE ? SE.preset(styleId) : null;
     var st = p ? p.style : {};
+    var ek = efektSecimi(efekt);
+    if (ek) { st = kopya(st); Object.keys(ek).forEach(function (k) { if (k !== "kase") st[k] = ek[k]; }); }
     if (kit && kit.on && MK) st = MK.mergeBrandKit(st, kit);
-    return {
-      overrides: { font: st.font, renk: st.renk, konturRenk: st.konturRenk, vurguRenk: st.vurguRenk,
-        boyut: st.boyut, kontur: st.kontur, konum: st.konum, guvenli: !!dikey },
-      konum: Number(st.konum) || 5
-    };
+    var ov = { font: st.font, renk: st.renk, konturRenk: st.konturRenk, vurguRenk: st.vurguRenk,
+      boyut: st.boyut, kontur: st.kontur, konum: st.konum, guvenli: !!dikey };
+    // Altyazı Efektleri alanları (giriş / vurgu animasyonu, kelime vurgusu, kalın, italik, satır, kelime)
+    if (SE && SE.EFEKT_ALANLARI && styleId === "efekt") SE.EFEKT_ALANLARI.forEach(function (k) { if (st[k] !== undefined) ov[k] = st[k]; });
+    return { overrides: ov, konum: Number(st.konum) || 5 };
   }
 
   /* ---------------- çerçeve ---------------- */

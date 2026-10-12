@@ -78,6 +78,24 @@ ok("stilAyarlari: Marka Kiti yazı tipi / renk, 9:16'da güvenli yerleşim", (fu
   return s.overrides.font === "Anton" && s.overrides.renk === "#ff0000" && s.overrides.guvenli === true && s.konum === 5;
 })());
 
+/* ---------------- 3.3: Altyazı Efektleri ---------------- */
+var SEm = require(path.join(__dirname, "..", "js", "style-engine.js"));
+ok("secimNormalize: varsayılan stil Altyazı Efektleri; efekt ayarında yalnız bilinen düz alanlar", (function () {
+  var n = P.secimNormalize({ gorunum: "canli", efekt: { giris: "pop", aktif: "glitch", font: "Anton", __proto__: { x: 1 }, kotu: { a: 1 }, boyut: Infinity, kase: "upper" } });
+  return P.secimNormalize({}).stilId === "efekt" && n.gorunum === "canli" && n.efekt.giris === "pop" && n.efekt.aktif === "glitch" && n.efekt.kase === "upper" &&
+    n.efekt.kotu === undefined && n.efekt.boyut === undefined && n.efekt.x === undefined && P.secimNormalize({ gorunum: "../x", efekt: [1] }).gorunum === "" &&
+    P.secimNormalize({ efekt: [1] }).efekt === null;
+})());
+ok("stilAyarlari: efekt ayarı stil motoruna gider (giriş, vurgu, satır, kelime), Marka Kiti üstte, kase girmez", (function () {
+  var k2 = MK.normalize({ on: true, stil: { overrides: { font: "Lora" } } }).kit;
+  var s = P.stilAyarlari("efekt", k2, true, { giris: "zipla", aktif: "titre", satir: 1, kelime: 3, font: "Anton", renk: "#00ff00", kase: "upper" });
+  var r = SEm.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir iki üç" }], cueKind: "lines", width: 1080, height: 1920, overrides: s.overrides });
+  return s.overrides.giris === "zipla" && s.overrides.aktif === "titre" && s.overrides.satir === 1 && s.overrides.kelime === 3 && s.overrides.font === "Lora" &&
+    s.overrides.renk === "#00ff00" && s.overrides.kase === undefined && s.overrides.guvenli === true && r.eventCount > 0 && /\\fscx112/.test(r.ass);
+})());
+ok("stilAyarlari: eski stil kimliği (eski paket işi) efekt alanı almaz, eskisi gibi", JSON.stringify(Object.keys(P.stilAyarlari("hormozi", null, false).overrides)) ===
+  JSON.stringify(["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli"]));
+
 /* ---------------- çerçeve planı ---------------- */
 var cp1 = P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({}), hookDur: 3, altyaziKonum: 2, altyaziAcik: true, lang: "tr" });
 ok("cercevePlani: çubuk + CTA, altyazı altta → CTA üstte", cp1.progress && cp1.cta && !cp1.logo && !cp1.bos && cp1.cta.start === 27.5 &&

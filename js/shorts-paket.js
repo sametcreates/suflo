@@ -15,6 +15,8 @@ window.KShortsPaket = (function () {
   "use strict";
 
   var P = window.SufloShortsPlan, EK = window.SufloShortsEkler, SE = window.SufloStyleEngine;
+  // Altyazı Efektleri (3.3): paketin altyazısı Altyazı sekmesindeki efekt ya da bir hazır görünüm
+  var AE = window.SufloAltyaziEfekt || null;
   var CT = window.SufloCaptionText, OR = window.SufloOverlayRender, MK = window.SufloMarkaKiti;
   var calisiyorMu = false, iptalIstendi = false, sonKlasor = "";
   // Paketin başladığı Viral anlar aramasının nesli: yalnız o arama hâlâ ekrandaysa kaynak sekansa
@@ -61,11 +63,30 @@ window.KShortsPaket = (function () {
 
   /* ---------------- seçim (kutular) ---------------- */
 
+  /*
+   * Paketin altyazı görünümü: "panel" Altyazı sekmesindeki Altyazı Efektleri ayarı (orada eski bir
+   * stil kaydı varsa en yakın görünümü), ya da bir hazır görünüm. Eski seçim (stil kimliği) en yakın
+   * görünüme taşınır. Döner: { gorunum, efekt (oluşturucu ayarı) }
+   */
+  function efektSecimi(deger) {
+    var g = deger || "panel";
+    if (AE && g !== "panel" && !AE.gorunum(g)) g = AE.eskiGorunum(g) || "panel";
+    if (AE && g !== "panel") return { gorunum: g, efekt: AE.gorunum(g).ayar };
+    var C = window.KCaptions;
+    var st = C && C.stilAyarlari ? C.stilAyarlari() : null;
+    var eski = AE && st && st.aile && st.aile !== "efekt" ? AE.eskiStilden(st.aile, st) : null;
+    var efekt = eski || (C && C.efektAyari ? C.efektAyari() : null) || (AE ? AE.VARSAYILAN : null);
+    return { gorunum: "panel", efekt: AE && efekt ? AE.normalize(efekt) : efekt };
+  }
+
   function secimOku() {
     function c(id, d) { var e = el(id); return e ? !!e.checked : d; }
     function v(id, d) { var e = el(id); return e && e.value ? e.value : d; }
+    var ef = efektSecimi(v("cap-paket-stil", "panel"));
     return {
-      stilId: v("cap-paket-stil", "viral"),
+      stilId: "efekt",
+      gorunum: ef.gorunum,
+      efekt: ef.efekt,
       altyazi: c("cap-paket-altyazi", true),
       kanca: c("cap-paket-kanca", true),
       ilerleme: c("cap-paket-ilerleme", true),
@@ -104,22 +125,25 @@ window.KShortsPaket = (function () {
     if (el("cap-paket-cta-ozel")) el("cap-paket-cta-ozel").hidden = !(el("cap-paket-cta-metin") && el("cap-paket-cta-metin").value === "ozel");
   }
 
-  // Stil seçimi: yalnız Suflo Stilleri (stil motoru). Varsayılan: Altyazı sekmesinde seçili Suflo Stili
+  /*
+   * Stil seçimi: Altyazı Efektleri. "Altyazı sekmesindeki efekt" (varsayılan) ya da bir hazır görünüm.
+   * Eski kayıttaki stil kimliği (3.2: Creator Punch, Bold Box…) en yakın görünüme taşınır.
+   */
   function stilleriCiz() {
     var sel = el("cap-paket-stil");
     if (!sel || !SE) return;
-    var kayitli = (K.settings().shortsPaketSecim || {}).stilId;
-    var panel = window.KCaptions && KCaptions.stilAyarlari ? KCaptions.stilAyarlari().aile : "";
+    var kayit = K.settings().shortsPaketSecim || {};
     var mogrt = !!(window.KCaptions && KCaptions.mogrtSecili && KCaptions.mogrtSecili());
     sel.innerHTML = "";
-    SE.list().forEach(function (p) {
+    var secenekler = [{ id: "panel", ad: "Altyazı sekmesindeki efekt" }].concat(AE ? AE.GORUNUMLER.map(function (g) { return { id: g.id, ad: g.ad }; }) : []);
+    secenekler.forEach(function (x) {
       var o = document.createElement("option");
-      o.value = p.id;
-      o.textContent = p.name;
+      o.value = x.id;
+      o.textContent = x.ad;
       sel.appendChild(o);
     });
-    var secilen = SE.has(kayitli) ? kayitli : (SE.has(panel) ? panel : "viral");
-    if (!mogrt && SE.has(panel) && !kayitli) secilen = panel;
+    var secilen = kayit.gorunum === "panel" || (AE && AE.gorunum(kayit.gorunum)) ? kayit.gorunum :
+      (AE && AE.eskiGorunum(kayit.stilId)) || "panel";
     sel.value = secilen;
     if (el("cap-paket-mogrt-not")) el("cap-paket-mogrt-not").hidden = !mogrt;
   }
@@ -345,10 +369,11 @@ window.KShortsPaket = (function () {
       altyazi: async function (k, ctx) {
         var kayit = shortsKaydi(k);
         if (!kayit || !kayit.segs || !kayit.segs.length) return { ok: false, hata: T("Bu Short'un altyazı kaydı yok: Shorts sekansını Altyazı sekmesinde yazıya dökebilirsin.") };
-        var cc = P.captionCues(kayit, { styleId: job.secim.stilId, lang: job.lang });
+        // Altyazı Efektleri: yazım biçimi oluşturucu ayarından (yoksa stilin kendi kuralı)
+        var cc = P.captionCues(kayit, { styleId: job.secim.stilId, lang: job.lang, kase: job.secim.efekt && job.secim.efekt.kase });
         if (!cc.cues.length) return { atla: "altyazi-bos" };
         var W = ciftBoyut(ctx.width, 1080), H = ciftBoyut(ctx.height, 1920), fps = Number(ctx.fps) > 0 ? Number(ctx.fps) : 30;
-        var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2);
+        var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt);
         var der = SE.compile({ styleId: job.secim.stilId, cueKind: cc.cueKind, cues: cc.cues, offset: 0, width: W, height: H, overrides: sa.overrides });
         var sure = CT.katmanSuresi(cc.cues[cc.cues.length - 1].end, Number(ctx.end) || 0, fps, false);
         var yol = cikti("altyazi", k);
@@ -368,7 +393,7 @@ window.KShortsPaket = (function () {
       cerceve: async function (k, ctx) {
         var W = ciftBoyut(ctx.width, 1080), H = ciftBoyut(ctx.height, 1920), fps = Number(ctx.fps) > 0 ? Number(ctx.fps) : 30;
         var dur = Number(ctx.end) > 0 ? Number(ctx.end) : Math.max(1, k.end - k.start);
-        var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2);
+        var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt);
         var hk = kit && MK ? MK.mergeHook({}, kit) : {};
         var cp = P.cercevePlani({ W: W, H: H, dur: dur, secim: job.secim, kit: kit, logoAcik: job.logoAcik,
           hookDur: k.adimlar.kanca === "tamam" || k.adimlar.kanca === "bekliyor" ? job.kancaSure : 0,
@@ -608,7 +633,7 @@ window.KShortsPaket = (function () {
       if (!el("cap-paket").open || calisiyorMu) return;
       var sec = el("cap-paket-stil").value;
       stilleriCiz();
-      if (SE && SE.has(sec)) el("cap-paket-stil").value = sec;
+      if (sec === "panel" || (AE && AE.gorunum(sec))) el("cap-paket-stil").value = sec;
       logoNotu();
       var j = kayitliIs();
       if (j && !el("cap-paket-liste").childNodes.length) listeCiz(j);
