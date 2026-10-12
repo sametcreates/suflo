@@ -16,6 +16,11 @@
  * yerel motorun güven değeri (confidence) yeniden tanımlıdır ve karaoke için ikinci
  * "-ml 1 -sow" turuna gerek kalmaz.
  *
+ * Hassas kelime zamanı (DTW, 3.2 adım 5; Suflo'nun kendi kodu, Raunen'den taşınmadı): motor
+ * "-dtw <ön ayar> -nfa" ile çalıştıysa belirteçler t_dtw yazar (santisaniye, -1 = yok). Kelimenin
+ * başı ilk belirtecinin t_dtw / 100 sn'si, sonu sonraki kelimenin başıdır (segment sonuyla,
+ * offsets.to, sınırlı); t_dtw -1 olan kelime eski yoldan (offsets) zamanlanır.
+ *
  * Saf UMD modülü: DOM yok, dosya sistemi yok, ES5 (CEF 74 / Node 12.3).
  */
 (function (root, factory) {
@@ -91,6 +96,17 @@
     var a = sayi(o.from), b = sayi(o.to);
     if (!isFinite(a) || !isFinite(b)) return null;
     return { from: a / 1000, to: b / 1000 };
+  }
+
+  /*
+   * DTW zamanı (sn, işlenmiş ses tabanında) ya da null. whisper.cpp v1.9.1 t_dtw'yi santisaniye
+   * yazar (whisper_exp_compute_token_level_timestamps_dtw: zaman dizini * 2 + seek) ve -1 "yok"
+   * demektir. --vad açıkken t_dtw de belirteç offsets'i gibi işlenmiş seste: aynı eşlemeden geçer.
+   */
+  function dtwZamani(tok) {
+    if (!tok || tok.t_dtw === null || tok.t_dtw === undefined || tok.t_dtw === "") return null;
+    var t = sayi(tok.t_dtw);
+    return isFinite(t) && t >= 0 ? t / 100 : null;
   }
 
   /*
@@ -187,6 +203,33 @@
   }
 
   /*
+   * DTW başlangıçlarını kelimelere uygular (yerinde). Başlangıç: t_dtw (zaten eşlenmiş ve
+   * segmente sıkıştırılmış). Bitiş: sonraki kelimenin başı; son kelimede segment sonu. Sonraki
+   * kelimenin t_dtw'si yoksa onun offsets başlangıcı kullanılır. Bitiş hiçbir zaman başlangıçtan
+   * önce ve segment sonundan sonra olmaz.
+   */
+  function dtwUygula(kelimeler, sinir) {
+    var n = kelimeler.length, i;
+    var varMi = false;
+    for (i = 0; i < n; i++) if (kelimeler[i].dtw !== null && kelimeler[i].dtw !== undefined) { varMi = true; break; }
+    if (!varMi) return;
+    var baslar = [];
+    for (i = 0; i < n; i++) {
+      var w = kelimeler[i];
+      baslar.push(w.dtw !== null && w.dtw !== undefined ? w.dtw : w.start);
+    }
+    for (i = 0; i < n; i++) {
+      if (kelimeler[i].dtw === null || kelimeler[i].dtw === undefined) continue;
+      var bas = baslar[i];
+      var son = i + 1 < n ? baslar[i + 1] : sinir.end;
+      son = Math.min(son, sinir.end);
+      if (son < bas) son = bas;
+      kelimeler[i].start = bas;
+      kelimeler[i].end = son;
+    }
+  }
+
+  /*
    * Tek whisper segmentini (-ojf "transcription" öğesi) kelimelere ayırır.
    * Alt-kelime belirteçleri birleşir: boşlukla başlayan belirteç yeni kelime açar.
    * Özel belirteçler ve boş belirteçler atlanır; zamansız belirteçler komşuları
@@ -198,6 +241,10 @@
    *   opts.vad     vadEslemesi() sonucu: belirteç zamanları whisper'ın VAD tablosuyla taşınır
    *   opts.vadAcik false: VAD kapalıydı, belirteç zamanları olduğu gibi (yalnız segmente
    *                sıkıştırılır). true / verilmezse tablo yoksa doğrusal hizalama (zamanHizasi).
+   *   opts.dtw     false: t_dtw yok sayılır (yalnız offsets). Verilmezse t_dtw ≥ 0 olan kelime
+   *                DTW'yle zamanlanır: başı t_dtw / 100 sn, sonu sonraki kelimenin başı (son kelimede
+   *                segmentin offsets.to'su), segment sonuna sıkıştırılır.
+   *   opts.sayac   (isteğe bağlı) { toplam, olculen }: t_dtw alanı olan metin belirteçleri ve ≥ 0 olanlar
    * Yalnız noktalamadan oluşan kelime öncekine yapışır (açılış işareti sonrakine); boşlukla
    * ayrılmış tire / uzun tire (" - ", " – ", " — ") kendi kelimesidir: kelimeler satır metniyle tutar.
    * Döner: [{ text, start, end, p? }] (belirteç yoksa [])
@@ -210,6 +257,8 @@
     if (!dizi(tokens) || !tokens.length) return [];
     var sinir = opts.sinir || segmentSiniri(seg);
     var esle = typeof opts.vad === "function" ? opts.vad : (opts.vadAcik === false ? kimlik : zamanHizasi(tokens, sinir));
+    var dtwAcik = opts.dtw !== false;
+    var sayac = opts.sayac && typeof opts.sayac === "object" ? opts.sayac : null;
 
     var liste = [];
     for (var i = 0; i < tokens.length; i++) {
@@ -226,9 +275,15 @@
         son = sinirla(esle(z.to), sinir.start, sinir.end);
         if (son < bas) son = bas;
       }
+      var td = dtwZamani(tok);
+      if (sayac && tok.t_dtw !== undefined && temiz) {
+        sayac.toplam++;
+        if (td !== null) sayac.olculen++;
+      }
       liste.push({
         ham: ham, yeni: /^\s/.test(duz) || !liste.length,
         bas: bas, son: son, p: olasilik(tok.p),
+        dtw: dtwAcik && td !== null ? sinirla(esle(td), sinir.start, sinir.end) : null,
         zamansiz: !temiz || NOKTA.test(temiz),
         agirlik: Math.max(1, temiz.length)
       });
@@ -250,7 +305,10 @@
       if (!zamanli.length) zamanli = g.tok;
       var p = null;
       zamanli.forEach(function (t) { if (t.p !== null && (p === null || t.p < p)) p = t.p; });
-      kelimeler.push({ text: text, start: zamanli[0].bas, end: zamanli[zamanli.length - 1].son, p: p, nokta: NOKTA.test(text) });
+      // DTW: kelimenin ilk (noktalama olmayan) belirtecinin t_dtw'si; o yoksa grubun ilk t_dtw'si
+      var dtw = zamanli[0].dtw;
+      if (dtw === null) for (var di = 0; di < g.tok.length && dtw === null; di++) dtw = g.tok[di].dtw;
+      kelimeler.push({ text: text, start: zamanli[0].bas, end: zamanli[zamanli.length - 1].son, p: p, nokta: NOKTA.test(text), dtw: dtw });
     });
 
     // yalnız noktalamadan oluşan kelime: açılış işareti sonrakine, gerisi öncekine yapışır;
@@ -272,6 +330,10 @@
     }
     if (bekleyen && out.length) out[out.length - 1].text += bekleyen;
 
+    // DTW: t_dtw'si olan kelimenin başı DTW zamanı, sonu sonraki kelimenin başı (son kelimede
+    // segment sonu = offsets.to). t_dtw'si olmayan kelime offsets zamanını korur.
+    if (dtwAcik) dtwUygula(out, sinir);
+
     // sıra ve sınır: başlangıçlar azalmaz, bitiş başlangıçtan önce olmaz
     var onceki = sinir.start;
     return out.map(function (w) {
@@ -292,17 +354,20 @@
    * -ojf çıktısını Suflo segmentlerine çevirir.
    *   json: ayrıştırılmış nesne, JSON metni ya da Buffer (readFileSync çıktısı;
    *         geçersiz UTF-8 varsa bayt düzeyinde birleştirilir)
-   *   bilgi (isteğe bağlı): { dil, belirtecli, vad } doldurulur
+   *   bilgi (isteğe bağlı): { dil, belirtecli, vad, hiza, dtw: { toplam, olculen }, ceviri } doldurulur
    *   secenek.stderr (isteğe bağlı): whisper-cli stderr'i; --vad satırları varsa belirteç
    *         zamanları whisper'ın kendi VAD tablosuyla taşınır (yoksa doğrusal hizalama)
    *   secenek.vadAcik (isteğe bağlı): koşu --vad ile mi yapıldı. false: belirteç zamanları
    *         segmentle aynı tabanda, olduğu gibi kullanılır (doğrusal hizalama YAPILMAZ).
    *         Verilmezse VAD açık olabilir sayılır (tablo yoksa doğrusal hizalama).
+   *   secenek.dtw (isteğe bağlı): false ise t_dtw yok sayılır (yalnız offsets).
    * Döner: [{ start, end, text, confidence, words }] — belirteç yazmayan eski
    * derlemelerde words [] ve confidence undefined.
    */
   function segmentleriCoz(json, bilgi, secenek) {
     var vadAcik = secenek && secenek.vadAcik === false ? false : (secenek && secenek.vadAcik === true ? true : undefined);
+    var dtwSecim = secenek && secenek.dtw === false ? false : undefined;
+    var sayac = { toplam: 0, olculen: 0 };
     var vad = vadAcik !== false && secenek && secenek.stderr ? vadEslemesi(secenek.stderr) : null;
     var veri = json, coz = kimlik;
     if (ikiliMi(json)) {
@@ -317,7 +382,7 @@
     var out = liste.map(function (t) {
       t = t || {};
       var sinir = segmentSiniri(t);
-      var words = kelimelereAyir(t, { coz: coz, sinir: sinir, vad: vad, vadAcik: vadAcik });
+      var words = kelimelereAyir(t, { coz: coz, sinir: sinir, vad: vad, vadAcik: vadAcik, dtw: dtwSecim, sayac: sayac });
       var ps = [];
       (dizi(t.tokens) ? t.tokens : []).forEach(function (tok) {
         if (!tok || OZEL.test(String(tok.text == null ? "" : tok.text))) return;
@@ -343,6 +408,10 @@
       bilgi.vad = !!vad;
       // kelime zamanlarının özgün sese nasıl taşındığı (günlük / tanı için)
       bilgi.hiza = vad ? "vad-tablosu" : (vadAcik === false ? "yok" : "dogrusal");
+      // DTW: t_dtw alanı olan metin belirteçleri / ≥ 0 olanlar (hepsi -1 ise motor DTW'yi kapattı)
+      bilgi.dtw = { toplam: sayac.toplam, olculen: dtwSecim === false ? 0 : sayac.olculen };
+      // -tr ile çalıştıysa metin İngilizce: result.language kaynak dilde kalır, çıktı dili "en"
+      bilgi.ceviri = !!(veri && veri.params && veri.params.translate === true);
     }
     return out;
   }
@@ -549,6 +618,7 @@
     bolmeNoktasi: bolmeNoktasi,
     birlestirKelimeler: birlestirKelimeler,
     segmentSiniri: segmentSiniri,
+    dtwZamani: dtwZamani,
     utf8Coz: utf8Coz
   };
 });

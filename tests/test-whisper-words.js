@@ -200,6 +200,61 @@ if (fs.existsSync(gercekVadsiz)) {
   console.log("ATLA gerçek VAD'siz -ojf fikstürü yok (tests/fixtures/whisper-ojf-tr-gercek-vadsiz.json) — kurucu yapılacaklar ## 3.2");
 }
 
+/* ---------------- 8b) DTW (3.2 adım 5): t_dtw ≥ 0 kelime başı, sonraki kelimeye kadar ---------------- */
+// Fikstür whisper-ojf-tr.json'un aynısı, metin belirteçlerine -dtw ile yazılan t_dtw (santisaniye)
+// eklenmiş: 1. satırın hepsi ölçülü, 2. satırda ' biraz' -1 (yedek), 3. satırın hepsi -1.
+// Biçim gerçek v1.9.1 koşusuyla doğrulandı (nicemlenmiş q5_1 dosyası, -dtw tiny -nfa: t_dtw ≥ 0;
+// -nfa olmadan flash attention DTW'yi kapatır ve hepsi -1 — marketing/v3.2-deneme-listesi.md ## 5).
+var dBilgi = {};
+var d = WW.segmentleriCoz(oku("whisper-ojf-dtw.json"), dBilgi, VADSIZ);
+function zk(w) { return [w.text, w.start, w.end]; }
+ok("DTW: metin ve satır sınırları değişmez", d.length === 3 && d.every(function (s, i) { return s.text === segs[i].text && s.start === segs[i].start && s.end === segs[i].end && metinler(s.words) === s.text; }));
+ok("DTW: kelime başı t_dtw / 100 (ışık 0.26, offsets'te 0.22)", d[0].words[1].text === "ışık" && d[0].words[1].start === 0.26 && d[0].words[0].start === 0.04, JSON.stringify(d[0].words.map(zk)));
+ok("DTW: kelime sonu sonraki kelimenin başı (Bu 0.04–0.26, ışık 0.26–0.68, kötü 1.10–1.50)",
+  d[0].words[0].end === 0.26 && d[0].words[1].end === 0.68 && d[0].words[4].text === "kötü" && d[0].words[4].start === 1.1 && d[0].words[4].end === 1.5, JSON.stringify(d[0].words.map(zk)));
+ok("DTW: alt-kelimeli kelimede ilk belirtecin t_dtw'si ('de'+'ğ'+'il' -> 1.50)", d[0].words[5].text === "değil," && d[0].words[5].start === 1.5 && d[0].words[5].end === 2.14);
+ok("DTW: son kelime segment sonunda biter (offsets.to 3.48; 'mi?' 2.62–3.48)", d[0].words[7].text === "mi?" && d[0].words[7].start === 2.62 && d[0].words[7].end === 3.48, JSON.stringify(zk(d[0].words[7])));
+ok("DTW: t_dtw -1 olan kelime offsets'e düşer (biraz 4.30–4.70)", d[1].words[2].text === "biraz" && d[1].words[2].start === 4.3 && d[1].words[2].end === 4.7, JSON.stringify(d[1].words.map(zk)));
+ok("DTW: yedek kelimeden önceki DTW kelimesi onun offsets başında biter (kamerayı 3.86–4.30)", d[1].words[1].text === "kamerayı" && d[1].words[1].start === 3.86 && d[1].words[1].end === 4.3);
+ok("DTW: hepsi -1 olan satır offsets'le birebir (Güzel. 7.36–7.70)", JSON.stringify(d[2].words) === JSON.stringify(segs[2].words));
+ok("DTW: başlangıçlar azalmaz, kelimeler satır içinde, bitiş ≥ başlangıç", d.every(function (s) {
+  return s.words.every(function (w, i) { return w.start >= s.start && w.end <= s.end && w.end >= w.start && (i === 0 || w.start >= s.words[i - 1].start); });
+}));
+ok("DTW: p ve satır güveni değişmez", d.every(function (s, i) { return s.confidence === segs[i].confidence && s.words.every(function (w, k) { return w.p === segs[i].words[k].p; }); }));
+ok("DTW bilgisi: 37 metin belirtecinde t_dtw alanı, 25'i ölçülü", dBilgi.dtw && dBilgi.dtw.toplam === 37 && dBilgi.dtw.olculen === 25, JSON.stringify(dBilgi.dtw));
+var dKapali = WW.segmentleriCoz(oku("whisper-ojf-dtw.json"), {}, { vadAcik: false, dtw: false });
+ok("secenek.dtw false: t_dtw yok sayılır, offsets'le birebir", JSON.stringify(dKapali) === JSON.stringify(segs));
+var tumuEksi = {};
+WW.segmentleriCoz(oku("whisper-ojf-tr.json"), tumuEksi, VADSIZ);
+ok("DTW istenmemiş / motor kapatmış: alan var, hepsi -1 (otomatik kapatma girdisi)", tumuEksi.dtw.toplam === 37 && tumuEksi.dtw.olculen === 0 && tumuEksi.ceviri === false, JSON.stringify(tumuEksi));
+var eskiBilgi = {};
+WW.segmentleriCoz(oku("whisper-oj-belirtecsiz.json"), eskiBilgi);
+ok("t_dtw alanı hiç yok (eski derleme / -oj): toplam 0", eskiBilgi.dtw.toplam === 0 && eskiBilgi.dtw.olculen === 0);
+// sınır: segment dışına düşen t_dtw segmente sıkıştırılır; sıra korunur
+var tasan = WW.kelimelereAyir({ offsets: { from: 1000, to: 2000 }, text: " a b c", tokens: [
+  { text: " a", offsets: { from: 1000, to: 1300 }, t_dtw: 80 }, { text: " b", offsets: { from: 1300, to: 1600 }, t_dtw: 150 },
+  { text: " c", offsets: { from: 1600, to: 2000 }, t_dtw: 250 }] }, { vadAcik: false });
+ok("DTW: segment dışı t_dtw segmente sıkıştırılır (a 1.0, c ≤ 2.0)", tasan[0].start === 1 && tasan[0].end === 1.5 && tasan[2].start === 2 && tasan[2].end === 2, JSON.stringify(tasan));
+var geri = WW.kelimelereAyir({ offsets: { from: 0, to: 1000 }, text: " a b", tokens: [
+  { text: " a", offsets: { from: 0, to: 400 }, t_dtw: 60 }, { text: " b", offsets: { from: 400, to: 1000 }, t_dtw: 30 }] }, { vadAcik: false });
+ok("DTW: geriye giden t_dtw sırayı bozmaz (b, a'dan önce başlamaz)", geri[1].start >= geri[0].start && geri[0].end >= geri[0].start, JSON.stringify(geri));
+ok("dtwZamani: santisaniye -> sn, -1 / boş / NaN -> null", WW.dtwZamani({ t_dtw: 254 }) === 2.54 && WW.dtwZamani({ t_dtw: -1 }) === null &&
+  WW.dtwZamani({}) === null && WW.dtwZamani({ t_dtw: "x" }) === null && WW.dtwZamani({ t_dtw: 0 }) === 0 && WW.dtwZamani(null) === null);
+// --vad: t_dtw de işlenmiş seste (gerçek koşuda belirteç offsets'iyle aynı taban) -> whisper'ın VAD tablosuyla taşınır
+var vbJson = JSON.parse(vb.toString("utf8"));
+vbJson.transcription[0].tokens.forEach(function (t) { if (t.offsets && !/^\[_/.test(t.text)) t.t_dtw = Math.round(t.offsets.from / 10) + 5; });
+var vbDtw = WW.segmentleriCoz(vbJson, {}, { stderr: vbStderr });
+ok("DTW + VAD tablosu: 'şimdi' t_dtw 2.35 -> özgün 14.15, sonu sonraki kelimenin başı", vbDtw[0].words[2].text === "şimdi" && yakin(vbDtw[0].words[2].start, 14.15) &&
+  yakin(vbDtw[0].words[2].end, vbDtw[0].words[3].start) && yakin(vbDtw[0].words[0].start, 10.05), JSON.stringify(vbDtw[0].words.map(zk)));
+ok("DTW + VAD: son kelime satır sonunda (16.4), hepsi satır içinde", yakin(vbDtw[0].words[vbDtw[0].words.length - 1].end, 16.4) &&
+  vbDtw[0].words.every(function (w) { return w.start >= 10 && w.end <= 16.4; }));
+// -tr: params.translate true -> bilgi.ceviri (çıktı dili "en", result.language kaynakta kalır)
+var cv = JSON.parse(oku("whisper-ojf-tr.json").toString("utf8"));
+cv.params.translate = true;
+var cvBilgi = {};
+WW.segmentleriCoz(cv, cvBilgi, VADSIZ);
+ok("-tr koşusu: bilgi.ceviri true, bilgi.dil kaynak dil (tr)", cvBilgi.ceviri === true && cvBilgi.dil === "tr");
+
 /* ---------------- 9) panel bağlantısı (captions.js, engine.js, index.html) ---------------- */
 var cap = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8").replace(/\r\n/g, "\n");
 var yc = cap.slice(cap.indexOf("async function yerelCalistir"), cap.indexOf("function tcParse("));
@@ -252,7 +307,12 @@ var kaynak = fs.readFileSync(path.join(__dirname, "..", "js", "whisper-words.js"
 ok("Raunen dosya başlığı ve işaretleri", kaynak.indexOf("Portions adapted from Raunen (https://github.com/Zeyphers/raunen), MIT, Copyright (c) 2026 Jacob Szczepaniak. See THIRD_PARTY_NOTICES.md.") !== -1 &&
   /\/\/ Raunen: tokensToWords\n  function kelimelereAyir/.test(kaynak) && /\/\/ Raunen: splitByWords\n  function kelimeGrupla/.test(kaynak));
 ok("ES5: let/const/ok işlevi/for-of/padStart/Object.values yok", !/\b(let|const)\s|=>|\bfor\s*\([^)]*\bof\b|padStart|Object\.values|rmSync/.test(kaynak));
-ok("Raunen'in DTW yolu taşınmadı (t_dtw okunmaz)", !/t_dtw/.test(kaynak.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")));
+// Raunen'in DTW yolu taşınmadı (-nfa vermiyor, t_dtw okumuyor). Suflo'nun kendi DTW'si (3.2 adım 5)
+// t_dtw'yi yalnız dtwZamani()'nda okur ve "Raunen:" işareti taşımaz
+var kodYorumsuz = kaynak.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+var dtwBlok = kaynak.slice(kaynak.indexOf("function dtwZamani"), kaynak.indexOf("\n  }\n", kaynak.indexOf("function dtwZamani")));
+ok("DTW Suflo'nun kendi kodu: t_dtw dtwZamani'nda okunur, dtwUygula / dtwZamani Raunen işareti taşımaz",
+  /t_dtw/.test(kodYorumsuz) && /sayi\(tok\.t_dtw\)/.test(dtwBlok) && !/\/\/ Raunen: [^\n]*\n\s*function dtw/.test(kaynak) && !/Raunen: [^\n]*dtw/i.test(kaynak));
 var notice = fs.readFileSync(path.join(__dirname, "..", "THIRD_PARTY_NOTICES.md"), "utf8");
 ok("THIRD_PARTY_NOTICES: Raunen girdisi (commit, telif, dosya)", /Raunen/.test(notice) && /063df7b/.test(notice) && /Copyright \(c\) 2026 Jacob Szczepaniak/.test(notice) && /js\/whisper-words\.js/.test(notice));
 
