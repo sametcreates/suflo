@@ -6,6 +6,7 @@
 //   * ffmpegArkada: ffmpeg motordan ÖNCE indirilmez, model inince arka planda başlar
 //   * rehber kurulumu kurulu cuBLAS motorunu CPU sürümüyle ezmez
 //   * installFfmpeg kilidi ilerlemeyi her bekleyene iletir
+//   * 3.2 İptal: işi başlatanın jetonu indirmeyi keser (.part korunur); sonradan katılanınki yalnız kendi beklemesini
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var SO = require(path.join(__dirname, "..", "js", "onboarding-steps.js"));
 var gecen = 0, toplam = 0;
@@ -50,7 +51,20 @@ function motor(opts) {
     findFfmpeg: function () { ffAranma++; return Promise.resolve(opts.ffmpeg ? "/usr/bin/ffmpeg" : null); },
     httpGet: function () { return Promise.resolve({ status: 404, body: "" }); },     // SHA bilinmiyor: boyutla devam
     download: function (url, hedef, ilerleme, r, d, meta) {
-      indirmeler.push({ anahtar: meta && meta.key, hedef: hedef });
+      indirmeler.push({ anahtar: meta && meta.key, hedef: hedef, iptal: meta && meta.iptal });
+      if (opts.yavas && meta && meta.iptal) {
+        // 3.2 İptal: jeton gelince istek kesilir, .part korunur (K.download sözleşmesi)
+        return new Promise(function (coz) {
+          var bitti = false;
+          meta.iptal.dinle(function () { if (!bitti) { bitti = true; coz({ ok: false, iptal: true, error: "İptal edildi", kept: 5 * MB }); } });
+          setTimeout(function () {
+            if (bitti) return;
+            bitti = true;
+            vfs[hedef] = Math.round(((meta && meta.expectedMB) || 1) * MB);
+            coz({ ok: true });
+          }, 300);
+        });
+      }
       return new Promise(function (coz) {
         setTimeout(function () {
           if (/^ffmpeg:/.test(meta && meta.key)) { coz({ ok: false, error: "test: ag yok" }); return; }
@@ -146,6 +160,55 @@ Promise.all([a, b]).then(function (r) {
     var f3 = m6.E.installFfmpeg(function (x) { c.push(x); });
     ok("iş bitince kilit ve dinleyiciler bırakılır (yeni iş, eski bekleyene mesaj yok)", f3 !== f1 && c.length >= 1 && b.length === a.length);
     return f3.then(null, function () {});
+  });
+}).then(function () {
+  // 3.2 İptal: işi başlatanın jetonu indirmeyi keser; .part korunur, hata e.iptal taşır
+  function jeton() {
+    var d = [], j = { iptalEdildi: false, iptal: function () { if (j.iptalEdildi) return; j.iptalEdildi = true; d.splice(0).forEach(function (f) { f(); }); },
+      dinle: function (f) { if (j.iptalEdildi) { f(); return function () {}; } d.push(f); return function () { var k = d.indexOf(f); if (k !== -1) d.splice(k, 1); }; } };
+    return j;
+  }
+  var m7 = motor({ yavas: true });
+  var j7 = jeton();
+  var is7 = m7.E.installModel("small", function () {}, j7);
+  setTimeout(function () { j7.iptal(); }, 30);
+  return is7.then(function () { ok("iptal edilen model indirmesi başarılı dönmemeli", false); }, function (e) {
+    ok("installModel iptali: e.iptal, '.part korundu' mesajı", e && e.iptal === true && /inen kısım korundu/.test(e.message), e && e.message);
+    ok("installModel jetonu K.download'a gider (meta.iptal)", m7.indirmeler.length === 1 && m7.indirmeler[0].iptal === j7);
+    ok("iptalden sonra model kurulu sayılmaz, kilit bırakılır", !m7.vfs[path.join("/sanal/whisper", "models", "ggml-small-q5_1.bin")]);
+  }).then(function () {
+    // sonradan katılanın iptali yalnız kendi beklemesini keser; işi başlatan sürer
+    var m8 = motor({ yavas: true });
+    var sahip = jeton(), katilan = jeton();
+    var a8 = m8.E.installModel("small", function () {}, sahip);
+    var b8 = m8.E.installModel("small", function () {}, katilan);
+    setTimeout(function () { katilan.iptal(); }, 20);
+    return b8.then(function () { ok("katılanın beklemesi iptal edilmeliydi", false); }, function (e) {
+      ok("katılan iptal: kendi beklemesi e.iptal ile biter", e && e.iptal === true);
+      return a8.then(function (r) {
+        ok("işi başlatan sürer ve tamamlanır, tek indirme", r && r.model && r.model.id === "small" && m8.indirmeler.length === 1);
+      });
+    });
+  }).then(function () {
+    // install(): iptal edilmiş jetonla motor/model indirmeden durur
+    var m9 = motor({ yavas: true, ayarlar: { provider: "local", engineBuild: "cpu" } });
+    var j9 = jeton();
+    var is9 = m9.E.install({ modelId: "small", useGpu: false, ffmpegArkada: true, iptal: j9 });
+    setTimeout(function () { j9.iptal(); }, 30);
+    return is9.then(function () { ok("iptal edilen kurulum başarılı dönmemeli", false); }, function (e) {
+      ok("install iptali: e.iptal; modeli kaydetmez, kilit bırakılır", e && e.iptal === true && m9.ayarlar.provider === "local" && m9.ayarlar.model === undefined && m9.E.kurulumSuruyor() === false,
+        (e && e.message) + " model=" + m9.ayarlar.model);
+      ok("install iptali: yalnız kesilen indirme var, VAD'e geçilmedi", m9.indirmeler.length === 1 && m9.indirmeler[0].anahtar === "model:small", JSON.stringify(m9.indirmeler.map(function (x) { return x.anahtar; })));
+    });
+  }).then(function () {
+    // installFfmpeg: işi başlatanın iptali sonraki aynaya geçmez
+    var m10 = motor({ yavas: true });
+    var j10 = jeton();
+    var f10 = m10.E.installFfmpeg(function () {}, j10);
+    setTimeout(function () { j10.iptal(); }, 20);
+    return f10.then(function () { ok("iptal edilen ffmpeg kurulumu başarılı dönmemeli", false); }, function (e) {
+      ok("installFfmpeg iptali: e.iptal, ikinci aynaya geçilmez", e && e.iptal === true && m10.indirmeler.length === 1, JSON.stringify(m10.indirmeler.map(function (x) { return x.anahtar; })));
+    });
   });
 }).then(function () {
   console.log(gecen + "/" + toplam + " gecti");
