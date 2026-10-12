@@ -249,6 +249,10 @@ var S = E.spring;
   ok("split: çok noktalı eğride doğru parçaya nokta eklenir", s3.pts.length === 4 && s3.pts[3].x === 1 && yakin(s3.pts[2].x, 0.8, 1e-6) && enBuyukFark(c, s3) < 1e-5);
   ok("split: noktaya çok yakın, sınır dışı, penner ve dolu eğri reddedilir", E.split(c, 0.505) === null && E.split(c, 0.995) === null && E.split(c, NaN) === null &&
     E.split({ type: "penner", name: "quadIn" }, 0.5) === null);
+  // tam çapraz tutamaçlı parçada alt eğrinin tutamacı kendi parçasından taşar: kırpmak şekli bozardı → null
+  var capraz = { type: "bezier", x1: 1, y1: 0, x2: 0, y2: 1 }, ortadan = E.split(capraz, 0.5);
+  ok("split: şekli koruyamayacağı yerde reddeder (tam çapraz tutamaç), ortadan böler", E.split(capraz, 0.2) === null && E.split(capraz, 0.7) === null &&
+    ortadan && enBuyukFark(capraz, ortadan) < 1e-4, ortadan ? enBuyukFark(capraz, ortadan) : "null");
   var dolu = E.builtin("yumusak").curve;
   [0.1, 0.2, 0.3, 0.4, 0.5, 0.6].forEach(function (x) { dolu = E.split(dolu, x) || dolu; });
   ok("split: 8 noktada durur", dolu.pts.length === 8 && E.split(dolu, 0.8) === null && enBuyukFark(E.builtin("yumusak").curve, dolu) < 1e-5);

@@ -705,6 +705,11 @@
     var P012 = [ara(P01[0], P12[0], t), ara(P01[1], P12[1], t)];
     var P123 = [ara(P12[0], P23[0], t), ara(P12[1], P23[1], t)];
     var P = [ara(P012[0], P123[0], t), ara(P012[1], P123[1], t)];
+    // Güçlü çapraz tutamaçlı bir parçada alt eğrilerin tutamaç x'i kendi parçasının dışına
+    // düşebilir; normalize onu kırpar ve şekil değişir. Bu durumda nokta eklenmez (null).
+    var tol = 1e-6;
+    function icinde(v, lo, hi) { return v >= lo - tol && v <= hi + tol; }
+    if (!icinde(P01[0], a.x, P[0]) || !icinde(P012[0], a.x, P[0]) || !icinde(P123[0], P[0], b.x) || !icinde(P23[0], P[0], b.x)) return null;
     var yeni = p.map(function (q) { return { x: q.x, y: q.y, ix: q.ix, iy: q.iy, ox: q.ox, oy: q.oy, smooth: q.smooth }; });
     yeni[i].ox = P01[0]; yeni[i].oy = P01[1];
     yeni[i + 1].ix = P23[0]; yeni[i + 1].iy = P23[1];
