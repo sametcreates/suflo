@@ -91,8 +91,8 @@ SOFTWARE.
 ## Runtime downloads (not bundled) / Çalışırken indirilenler (pakette yok)
 
 Suflo downloads these on the user's computer when the user installs the local engine or
-ffmpeg. They are not part of the Suflo package and keep their own licenses; they are
-listed here for transparency.
+ffmpeg, or first uses the YouTube downloader. They are not part of the Suflo package and keep
+their own licenses; they are listed here for transparency.
 
 - whisper.cpp — https://github.com/ggml-org/whisper.cpp, release `v1.9.1`
   (commit `f049fff95a089aa9969deb009cdd4892b3e74916`), MIT (SPDX: `MIT`),
@@ -111,3 +111,12 @@ listed here for transparency.
     (SPDX: `GPL-3.0-or-later`), Windows fallback;
   - martin-riedl.de macOS builds (https://ffmpeg.martin-riedl.de/) and evermeet.cx
     (https://evermeet.cx/ffmpeg/, Intel Macs only): GPL builds of FFmpeg.
+- yt-dlp — https://github.com/yt-dlp/yt-dlp, The Unlicense (SPDX: `Unlicense`), public domain.
+  Downloaded only when the user first uses the YouTube downloader (3.3): the latest release's
+  platform executable (`yt-dlp.exe` on Windows, `yt-dlp_arm64.exe` on ARM Windows when listed,
+  `yt-dlp_macos` on macOS) together with that same release's `SHA2-256SUMS`; the executable is
+  run only after its SHA-256 matches. Suflo runs it as a separate program with an argument
+  list and includes none of its code. The official yt-dlp executables bundle Python and other
+  third-party components under their own licenses, as documented in the yt-dlp repository. The test
+  fixture `tests/fixtures/yt-dlp-2026.08.19-SHA2-256SUMS.txt` is that release's unmodified
+  checksum list (used to test parsing; not shipped).

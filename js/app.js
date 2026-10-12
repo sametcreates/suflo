@@ -475,6 +475,7 @@ window.KApp = (function () {
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
     Pro.markLocked(document.querySelector('.ky-oge[data-tab="podcast"]'), !s.pro);
     Pro.markLocked(document.querySelector('.ky-oge[data-tab="hiz"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.ky-oge[data-tab="youtube"]'), !s.pro);
     // SFX satirinin kendi ky-kilit rozeti var; ikinci bir ::after rozeti ekleme.
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
     Pro.markLocked(el("cap-translate-go"), !s.pro);
@@ -510,7 +511,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "hiz-tanitim", "kanca-tanitim", "podcast-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "hiz-tanitim", "kanca-tanitim", "podcast-tanitim", "yt-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -1580,6 +1581,8 @@ window.KApp = (function () {
     guvenli("Bölümler", function () { if (window.KChapters) KChapters.init(); });
     guvenli("Geçişler", function () { if (window.KGecis) KGecis.init(); });
     guvenli("Hız rampası", function () { if (window.KHizRampasi) KHizRampasi.init(); });
+    // Panel açılışında Premiere'e / ağa gitmez: proje klasörü sekme açılınca, yt-dlp yalnız düğmelerde
+    guvenli("YouTube indirici", function () { if (window.KYoutube) KYoutube.init(); });
     guvenli("Sahne algılama", function () { if (window.KSahne) KSahne.init(); });
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
     guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });

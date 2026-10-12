@@ -86,6 +86,11 @@
       <span class="ky-metin"><b>Podcast <em class="ky-yeni">YENİ</em></b><i>mikrofona göre kamera geçişi</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
+    <button class="ky-oge" data-tab="youtube">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4" width="15" height="10" rx="3"/><path d="m8.6 6.6 3.6 2.4-3.6 2.4z"/><path d="M6 17h8"/></svg></span>
+      <span class="ky-metin"><b>YouTube İndir <em class="ky-yeni">YENİ</em></b><i>MP3 · 720p · 1080p · 4K</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
 
     <div class="ky-baslik" style="margin-top:12px">Kütüphane</div>
     <button class="ky-oge" data-tab="text" data-kat="mogrt">
@@ -1763,6 +1768,86 @@
     <div id="pc-durum" class="inline-status" role="status" aria-live="polite"></div>
   </section>
 
+  <!-- ================= YOUTUBE INDIRICI (v3.3) ================= -->
+  <!-- Bilgi almak ücretsiz; indirmek Pro (3 deneme). yt-dlp ilk kullanımda iner, SHA-256 ile doğrulanır.
+       js/youtube-indir.js (saf) + js/youtube-indir-ui.js; dosya projede "Suflo İndirilenler" kutusuna girer -->
+  <section id="tab-youtube" class="tabpane">
+    <div class="pro-tanitim" id="yt-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>YouTube'dan Premiere'e tek adımda</b>
+        <span>Bağlantıyı yapıştır, kaliteyi seç; dosya projendeki <b data-i18n-skip>Suflo İndirilenler</b> kutusuna gelir.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>4</strong> kalite</i><i><strong>MP3</strong> yalnız ses</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="youtube">YouTube indiriciyi aç — 749 TL</button>
+    </div>
+    <div class="yt-kart">
+      <label class="yt-etiket" for="yt-url">Video bağlantısı</label>
+      <div class="yt-url-satir">
+        <input id="yt-url" type="text" placeholder="https://www.youtube.com/watch?v=… ya da youtu.be/…" autocomplete="off" spellcheck="false">
+        <button id="yt-yapistir" class="btn" type="button" title="Panodaki bağlantıyı yapıştır">Yapıştır</button>
+      </div>
+      <button id="yt-bilgi" class="btn yt-bilgi-btn" type="button">Bilgi al</button>
+      <div id="yt-onizleme" class="yt-onizleme" hidden>
+        <img id="yt-kucuk" class="yt-kucuk" alt="" hidden>
+        <div class="yt-meta">
+          <b id="yt-baslik" data-i18n-skip></b>
+          <span id="yt-kanal" data-i18n-skip></span>
+          <span id="yt-sure" class="mono"></span>
+        </div>
+      </div>
+      <div class="yt-etiket">Kalite</div>
+      <div class="yt-kaliteler" role="radiogroup" aria-label="Kalite">
+        <button id="yt-k-mp3" class="yt-cip" type="button" role="radio" aria-checked="false" disabled>MP3</button>
+        <button id="yt-k-720" class="yt-cip" type="button" role="radio" aria-checked="false" disabled>720p</button>
+        <button id="yt-k-1080" class="yt-cip" type="button" role="radio" aria-checked="false" disabled>1080p</button>
+        <button id="yt-k-2160" class="yt-cip" type="button" role="radio" aria-checked="false" disabled>4K</button>
+      </div>
+      <p id="yt-kalite-not" class="hint yt-kalite-not"></p>
+      <div class="yt-etiket">Hedef klasör</div>
+      <div class="yt-klasor-satir">
+        <span class="yt-klasor">
+          <span id="yt-klasor-yol" data-i18n-skip hidden></span>
+          <span id="yt-klasor-ipucu"><span>Proje klasörü ›</span> <span data-i18n-skip>Suflo İndirilenler</span></span>
+        </span>
+        <button id="yt-klasor-degistir" class="btn tiny" type="button">Değiştir</button>
+        <button id="yt-klasor-varsayilan" class="btn tiny" type="button" hidden title="Proje klasöründeki varsayılan klasöre dön">Varsayılan</button>
+      </div>
+      <p id="yt-klasor-not" class="hint yt-klasor-not" hidden>Proje kaydedilmemiş: Videolar klasörüne iner.</p>
+      <div class="action-bar yt-eylem">
+        <button id="yt-indir" class="btn primary big" type="button" disabled>İndir</button>
+        <button id="yt-iptal" class="btn outline big iptal-btn" type="button" hidden title="İndirmeyi durdurur; yarım dosyalar silinir">İptal</button>
+      </div>
+      <div id="yt-ilerleme" class="yt-ilerleme" hidden><i id="yt-ilerleme-cubuk"></i></div>
+      <div id="yt-durum" class="inline-status" role="status" aria-live="polite"></div>
+      <p id="yt-js-not" class="hint yt-uyari" hidden></p>
+      <div id="yt-guncelle-kutu" class="yt-guncelle" hidden>
+        <span id="yt-guncelle-metin"></span>
+        <button id="yt-guncelle" class="btn tiny" type="button">Güncelle</button>
+      </div>
+      <div id="yt-sonuc" class="yt-sonuc" hidden>
+        <button id="yt-klasorde-goster" class="btn" type="button">Klasörde göster</button>
+      </div>
+    </div>
+    <p class="hint yt-hatirlatma">Yalnızca indirme hakkın olan içeriği indir: kendi videoların, izin aldığın ya da lisanslı içerik.</p>
+    <p class="hint">yt-dlp (açık kaynak) ilk kullanımda GitHub'dan iner ve SHA-256 ile doğrulanmadan çalıştırılmaz. Oynatma listesinden yalnız bağlantıdaki video iner.</p>
+
+    <!-- İlk indirmede bir kez: onay ayarlarda hatırlanır (ytOnay) -->
+    <div id="yt-onay" class="yt-onay" role="dialog" aria-modal="true" aria-labelledby="yt-onay-baslik" hidden>
+      <div class="yt-onay-kutu">
+        <b id="yt-onay-baslik">İndirmeden önce</b>
+        <p>Yalnızca indirme hakkın olan içeriği indir: kendi videoların, izin aldığın ya da lisanslı içerik. YouTube Kullanım Şartları'na uymak senin sorumluluğunda.</p>
+        <label class="yt-onay-satir"><input id="yt-onay-cb" type="checkbox"><span>Anladım; yalnız indirme hakkım olan içeriği indireceğim.</span></label>
+        <div class="yt-onay-dugmeler">
+          <button id="yt-onay-vazgec" class="btn" type="button">Vazgeç</button>
+          <button id="yt-onay-tamam" class="btn primary" type="button" disabled>Devam et</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= SFX ================= -->
   <section id="tab-sfx" class="tabpane">
     <div class="pro-tanitim" id="sfx-tanitim" hidden>
@@ -2255,6 +2340,7 @@
               <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
               <li>Altyazı Efektleri timeline'da · Kanca başlığı</li>
               <li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası</li>
+              <li>YouTube indirici: MP3 · 720p · 1080p · 4K, projeye otomatik</li>
               <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
               <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
@@ -2469,6 +2555,8 @@
   <script src="js/multicam.js"></script>
   <script src="js/multicam-ui.js"></script>
   <script src="js/marka-kiti-ui.js"></script>
+  <script src="js/youtube-indir.js"></script>
+  <script src="js/youtube-indir-ui.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>

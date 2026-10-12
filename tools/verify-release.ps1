@@ -98,6 +98,9 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.3 Altyazi Efektleri: olusturucu modeli ve tek temel stil (efekt) motoru
             '(^|/)js/altyazi-efekt\.js$',
             '(^|/)js/style-engine\.js$',
+            # 3.3 YouTube indirici: saf karar modulu + panel (yt-dlp pakette YOK, ilk kullanimda iner)
+            '(^|/)js/youtube-indir\.js$',
+            '(^|/)js/youtube-indir-ui\.js$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

@@ -22,7 +22,8 @@ window.KLibraryHealth = (function () {
     "repair-engine": "Motoru onar",
     "sync-pro": "Eşitle",
     "clear-folders": "Bağlantıyı temizle",
-    "check-update": "Güncelle"
+    "check-update": "Güncelle",
+    "update-ytdlp": "yt-dlp'yi güncelle"
   };
   var GROUP_LABELS = {
     system: "Sistem",
@@ -503,9 +504,20 @@ window.KLibraryHealth = (function () {
     }
   }
 
+  /*
+   * YouTube indirici (3.3): yt-dlp kurulu mu, kurulum kaydıyla aynı dosya mı (SHA-256), güncelleme var mı.
+   * Kurulu değilse uyarı değil (ilk kullanımda iner). Satırlar js/youtube-indir.js doctorSatiri'ndan.
+   */
+  async function ytdlpChecks() {
+    if (!window.KYoutube || !KYoutube.doctorSatirlari) return [];
+    try { return await KYoutube.doctorSatirlari(); } catch (e) {
+      return [{ status: "warn", title: "yt-dlp denetlenemedi", detail: String(e && e.message ? e.message : e), group: "system" }];
+    }
+  }
+
   async function runAsyncChecks(report) {
     localSystemChecks(report);
-    var batches = await Promise.all([premiereChecks(), ffmpegChecks(), engineChecks(), networkChecks()]);
+    var batches = await Promise.all([premiereChecks(), ffmpegChecks(), engineChecks(), networkChecks(), ytdlpChecks()]);
     batches.forEach(function (checks) {
       (checks || []).forEach(function (c) { addCheck(report, c.status, c.title, c.detail, c.action, c.group); });
     });
@@ -716,6 +728,11 @@ window.KLibraryHealth = (function () {
       }
       K.saveSettings();
       await refreshLibraries();
+      return;
+    }
+    if (action === "update-ytdlp") {
+      if (!window.KYoutube || !KYoutube.guncelle) throw new Error("YouTube indirici yüklenmedi.");
+      await KYoutube.guncelle(say);
       return;
     }
     if (action === "check-update") {

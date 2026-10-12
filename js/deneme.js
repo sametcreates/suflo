@@ -24,7 +24,7 @@
 
   var HAK = 3;
   var SURUM = 1;
-  var OZELLIKLER = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate"];
+  var OZELLIKLER = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube"];
   // Ayarlar'daki liste ve bildirimler için kısa adlar
   var AD = {
     cut: "Otomatik kesim",
@@ -37,7 +37,8 @@
     translate: "Çeviri",
     beat: "Ritim",
     speedramp: "Hız rampası",
-    offlineTranslate: "Çevrimdışı İngilizce çeviri"
+    offlineTranslate: "Çevrimdışı İngilizce çeviri",
+    youtube: "YouTube indirici"
   };
   var ANAHTAR = /^[A-Za-z]{1,32}$/;   // "__proto__" gibi anahtarlar geçersiz sayılır
   var UST_SINIR = 1000;               // makul olmayan sayılar (elle düzenleme) geçersiz
@@ -129,7 +130,8 @@
     beat: { hedef: "beat-analyze", eylem: "Ritmi bul" },
     transitions: { hedef: "gecis-grid", eylem: "" },
     overlay: { hedef: "kanca-ekle", eylem: "Playhead'e ekle" },
-    speedramp: { hedef: "hiz-uygula", eylem: "Rampayı uygula" }
+    speedramp: { hedef: "hiz-uygula", eylem: "Rampayı uygula" },
+    youtube: { hedef: "yt-bilgi", eylem: "Bilgi al" }   // önce bilgi, sonra İndir (kurulu deneme kapıdan geçer)
   };
 
   function tanitimIpucu(f) {
