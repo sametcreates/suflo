@@ -1445,6 +1445,19 @@
     else if (ornek.cueKind === "cumulative") cues = lastWords(cues);
     return groupWords(markEmphasis(cues), kelime);
   }
+  /*
+   * 3.3 adım 21 (Premiere yerel çıktı, js/caption-mogrt-json.js): Altyazı Efektleri'nin kartları önizleme / katmanla
+   * AYNI kurulur (ornekKartlari: kelimeye bölme → *vurgu* → groupWords(kelime)) ve her kartın satır kırılımı
+   * renderEfekt'inkiyle aynıdır (efektKirilimlari). Döner: [{ kelimeler: [{ start, end, text, vurgu }], kir: [satır başı
+   * indeksleri] }]. Çıktıya dokunmaz.
+   */
+  function efektSatirlari(ornek, overrides) {
+    var style = guvenliStil(STYLES.efekt.style, overrides, "efekt");
+    var satir = tamSayi(style.satir, EFEKT_SATIR, 2), kelime = tamSayi(style.kelime, EFEKT_KELIME, 5);
+    return ornekKartlari(ornek, kelime).map(function (g) {
+      return { kelimeler: g.map(function (c) { return { start: c.start, end: c.end, text: String(c.text), vurgu: !!c.vurgu }; }), kir: efektKirilimlari(g, satir) };
+    });
+  }
   function efektKonumlari(overrides, width, height, ornek) {
     var w = Math.max(320, Math.round(Number(width) || 1920)), h = Math.max(180, Math.round(Number(height) || 1080));
     var style = guvenliStil(STYLES.efekt.style, overrides, "efekt");
@@ -1566,6 +1579,7 @@
     stripEmphasis: stripEmphasis,
     compile: compile,
     efektKonumlari: efektKonumlari,
+    efektSatirlari: efektSatirlari,
     GUVENLI_ALAN: GUVENLI_ALAN,
     // Altyazı Efektleri: animasyon kimlikleri (TranscriptAI şablonunun dizin sırası) ve ek alanlar
     GIRISLER: GIRISLER.slice(),

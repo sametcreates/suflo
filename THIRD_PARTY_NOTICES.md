@@ -75,6 +75,57 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### TranscriptAI (Animated Captions)
+
+- Project: TranscriptAI / Animated Captions — https://github.com/aktugantika/animated-captions-transcriptai
+- Pinned commit: `f1881ea74a228ad5e1a500a98b6753c6e94bf224` (f1881ea)
+- License: MIT (SPDX: `MIT`)
+- Copyright: `Copyright (c) 2026 Aktuğ Antika`
+- Caption template used with the author's permission / Altyazı şablonu yazarın izniyle kullanılır:
+  `assets/mogrt/altyazi-efekt-v1.mogrt` is TranscriptAI's `dist/source/dinamik_altyazi_motoru.mogrt`,
+  unchanged (sha256 `32c2394de3f639fede180bc274e30166daa0375298af5c5f7ae3dfbf73989969`). The Suflo owner
+  (Samet Kaygısız) confirmed the author's permission to bundle it (2026-10-12). Its After Effects project uses
+  only Adobe built-ins (Drop Shadow, Slider Control) and references the system font Arial; no font, footage or
+  third-party plug-in is embedded. `tools/verify-release.ps1` allows exactly this path and hash; any other
+  `.mogrt` still stops a release.
+- Adapted in Suflo:
+  - `jsx/host.jsx` — `KS_placeCaptionJsonMogrt` and `KS_captionJsonParam` adapt the placement steps of
+    `addMOGRTCaption()` in `host/index.jsx` (`importMGT`, `getMGTComponent`, `getParamForDisplayName("JSON_Input")`
+    + `setValue` of the JSON array) to Suflo's style: direct placement on a free video track of the active sequence,
+    read-back verification of `JSON_Input`, `Caption_Position` / Motion › Scale, trimming to the caption range, and
+    removal on any failure. TranscriptAI's nested `CAPTIONS [V]` sequence, QE audio-track removal, audio-track
+    locking and razor trimming were not adopted. The JSON contract
+    (`[highlightRGB, textRGB, font, size, outline, shadow, box, textAnim, hlAnim, lines]`) is followed in
+    `js/altyazi-efekt.js` (`sablonStili`) and `js/caption-mogrt-json.js` (Suflo's own code; data layout only).
+- TranscriptAI's LICENSE (section 5) keeps MOGRT assets outside the MIT grant unless stated otherwise; the
+  template is therefore bundled on the basis of the author's permission above, not the MIT License.
+- Not shipped / Pakette yok: TranscriptAI's fonts, ffmpeg / ffprobe binaries, Python engine (`whisper_engine.py`)
+  and `CSInterface.js`.
+
+```
+MIT License
+
+Copyright (c) 2026 Aktuğ Antika
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
 ## Bundled assets / Pakete dahil varlıklar
 
 - Fonts in `fonts/` (Anton, Archivo Black, Bebas Neue, Bungee, Lora, Montserrat; 3.3 additions below) are
