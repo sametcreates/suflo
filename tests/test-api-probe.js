@@ -33,6 +33,8 @@ var vKlip = { getSpeed: patla("getSpeed"), components: { numItems: 2, 0: { match
 var tamSeq = { createSubsequence: function () { throw new Error("cagrilmamali"); }, autoReframeSequence: function () { throw new Error("cagrilmamali"); },
   markers: { createMarker: function () { throw new Error("cagrilmamali"); } },
   unlinkSelection: patla("unlinkSelection"), linkSelection: patla("linkSelection"),
+  // 3.3 adım 21: Altyazı Efektleri › Premiere yerel; yalnız typeof ile yoklanır, ASLA çağrılmaz
+  importMGT: patla("importMGT"),
   videoTracks: { numTracks: 1, 0: { clips: { numItems: 1, 0: vKlip } } },
   audioTracks: { numTracks: 1, 0: { isMuted: function () { return false; }, clips: { numItems: 1, 0: klip } } } };
 // Rehberin ornek klibi: createNewSequenceFromClips yalniz typeof ile yoklanir, ASLA cagrilmaz

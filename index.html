@@ -579,6 +579,25 @@
             <label class="check-label" id="cap-guvenli-yerlesim-sar" hidden title="9:16'da yazıyı TikTok, Reels ve Shorts'un sağdaki ikon sütunundan uzak tutar">
               <input id="cap-guvenli-yerlesim" type="checkbox"> Platform arayüzünden kaçın
             </label>
+
+            <!-- 3.3 adım 21: çıktı biçimi (captions.js yerelCiktiBagla). Premiere yerel: pakette gelen şablon
+                 (assets/mogrt/altyazi-efekt-v1.mogrt), render yok; Video katmanı: Suflo motoru (libass). Premiere 2022
+                 öncesinde ya da şablon açılamazsa gizlenir / katmana düşülür. -->
+            <div class="field efekt-cikti" id="cap-efekt-cikti-sar">
+              <label for="cap-efekt-cikti">Çıktı</label>
+              <select id="cap-efekt-cikti" title="Premiere yerel: render yok, yazı ve zamanlar Premiere'de düzenlenebilir · Video katmanı: Suflo motoruyla şeffaf video">
+                <option value="yerel" selected>Premiere yerel (render yok)</option>
+                <option value="katman">Video katmanı</option>
+              </select>
+              <div class="efekt-yerel-not" id="cap-yerel-font-not" hidden>
+                <span id="cap-yerel-font-metin"></span>
+                <button type="button" id="cap-yerel-font-kur" class="link-btn" title="Paketteki fontları kullanıcı font klasörüne kopyalar (yönetici izni gerekmez); sonra Premiere'i yeniden başlat">Suflo fontlarını kur</button>
+              </div>
+              <div class="efekt-yerel-not" id="cap-yerel-kayit" hidden>
+                <span id="cap-yerel-kayit-metin"></span>
+                <button type="button" id="cap-yerel-kaldir" class="link-btn" title="Suflo'nun son eklediği yerel altyazı kliplerini açık sekanstan kaldırır">Kaldır</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -2549,6 +2568,7 @@
   <script src="js/marka-kiti.js"></script>
   <script src="js/style-engine.js"></script>
   <script src="js/altyazi-efekt.js"></script>
+  <script src="js/caption-mogrt-json.js"></script>
   <script src="js/filigran.js"></script>
   <script src="js/overlay-render.js"></script>
   <script src="js/captions.js"></script>

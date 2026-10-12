@@ -3052,6 +3052,63 @@
     "Gölge ve arka plan kutusunu da kite al": "Also add the shadow and background box to the kit"
   });
 
+  /* ============ 3.3 step 21: Caption Effects › Premiere native output (bundled TranscriptAI template) ============ */
+  add({
+    "Çıktı": "Output",
+    "Premiere yerel (render yok)": "Premiere native (no render)",
+    "Video katmanı": "Video layer",
+    "Premiere yerel: render yok, yazı ve zamanlar Premiere'de düzenlenebilir · Video katmanı: Suflo motoruyla şeffaf video":
+      "Premiere native: no render, text and timing stay editable in Premiere · Video layer: transparent video from Suflo's engine",
+    "Suflo fontlarını kur": "Install Suflo fonts",
+    "Paketteki fontları kullanıcı font klasörüne kopyalar (yönetici izni gerekmez); sonra Premiere'i yeniden başlat":
+      "Copies the bundled fonts to your user font folder (no admin rights needed); then restart Premiere",
+    "Suflo'nun son eklediği yerel altyazı kliplerini açık sekanstan kaldırır": "Removes the native caption clips Suflo added last from the open sequence",
+    "{} Premiere yerel çıktıda yok: Arial kullanılır, önizleme ile sonuç farklı görünebilir.":
+      "{} isn't available in Premiere native output: Arial is used, so the result may look different from the preview.",
+    "{} bu bilgisayarda kurulu değil: Premiere Arial çizer, önizleme ile sonuç farklı görünebilir.":
+      "{} isn't installed on this computer: Premiere draws Arial, so the result may look different from the preview.",
+    "Fontlar bu sistemde otomatik kurulamıyor; fonts klasöründeki dosyaları elle kur.":
+      "Fonts can't be installed automatically on this system; install the files in the fonts folder by hand.",
+    "Suflo fontları kuruluyor…": "Installing Suflo fonts…",
+    "{} Suflo fontu kuruldu. Premiere'i yeniden başlatın; yeni fontlar ancak o zaman görünür.":
+      "{} Suflo fonts installed. Restart Premiere; the new fonts only appear after a restart.",
+    "Bazı fontlar kurulamadı: {}": "Some fonts couldn't be installed: {}",
+    "Son yerel altyazı: {} klip · {} · {}": "Last native captions: {} clips · {} · {}",
+    "Son yerel altyazı: {} klip · {}": "Last native captions: {} clips · {}",
+    "Kaldırılamadı.": "Couldn't remove.",
+    "{} yerel altyazı klibi kaldırıldı.": "{} native caption clips removed.",
+    "Kaldırılacak klip bulunamadı: altyazıların eklendiği sekansı aç ya da klipler elle silinmiş.":
+      "No clips to remove: open the sequence the captions were added to, or the clips were deleted by hand.",
+    "Premiere yerel şablonu bulunamadı; video katmanı ekleniyor.": "The Premiere native template wasn't found; adding a video layer instead.",
+    "Premiere yoklanıyor…": "Checking Premiere…",
+    "Bu Premiere sürümü yerel altyazı şablonunu desteklemiyor (Premiere 2022 ve üstü gerekir); video katmanı ekleniyor.":
+      "This Premiere version doesn't support the native caption template (Premiere 2022 or later required); adding a video layer instead.",
+    "Premiere yerel altyazı yerleştiriliyor… {} / {}": "Placing Premiere native captions… {} / {}",
+    "yazı tipi Arial": "font Arial",
+    "anahtar kelime vurgusu yerel çıktıda yok": "keyword emphasis isn't shown in native output",
+    "konum / ölçek Premiere'de elle ayarlanmalı": "set position / scale by hand in Premiere",
+    "{} altyazı kartı · {} Premiere klibi · {} · render yok": "{} caption cards · {} Premiere clips · {} · no render",
+    "{} altyazı kartı · {} Premiere klibi · {} · render yok · {}": "{} caption cards · {} Premiere clips · {} · no render · {}",
+    "Premiere yerel şablonu açılamadı ({}); video katmanı ekleniyor.": "Couldn't open the Premiere native template ({}); adding a video layer instead.",
+    "Yerel altyazı yerleştirilemedi.": "Couldn't place native captions.",
+    "Stil motoru yüklenemedi.": "The style engine couldn't be loaded.",
+    "Altyazı Efektleri modeli yüklenemedi.": "The Caption Effects model couldn't be loaded.",
+    "Deneme hakkı filigranlı video katmanı ekler; Premiere yerel çıktı (render yok) Pro'da.":
+      "A trial credit adds a watermarked video layer; Premiere native output (no render) is Pro.",
+    "{} seçili: Suflo altyazıyı Premiere'in kendi klibi olarak (render yok, Premiere'de düzenlenebilir) timeline'ın üst kanalına koyar. Normal caption izi her zaman kullanılabilir.":
+      "{} selected: Suflo places the captions as Premiere's own clip (no render, editable in Premiere) on the top track of the timeline. The normal caption track is always available.",
+    "Şablon içe aktarma (importMGT)": "Template import (importMGT)",
+    "Altyazı Efektleri Premiere yerel klip yerine video katmanı olarak eklenir": "Caption Effects are added as a video layer instead of a Premiere native clip",
+    // jsx/host.jsx (ASCII Turkish)
+    "Altyazi Efektleri sablonu bulunamadi.": "Caption Effects template not found.",
+    "Altyazi verisi bos.": "Caption data is empty.",
+    "Sablon timeline'a yerlestirilemedi (importMGT).": "Couldn't place the template on the timeline (importMGT).",
+    "Sablonun Essential Graphics kontrolleri Premiere'e acilmadi.": "The template's Essential Graphics controls didn't open in Premiere.",
+    "Sablonda 'JSON_Input' kontrolu bulunamadi.": "The template has no 'JSON_Input' control.",
+    "Altyazi verisi sablona yazildi ama geri okunan ayni degil.": "The caption data was written to the template but didn't read back the same.",
+    "Sablon klibi altyazi suresine kirpilamadi.": "Couldn't trim the template clip to the caption duration."
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({

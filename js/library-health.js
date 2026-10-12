@@ -281,6 +281,7 @@ window.KLibraryHealth = (function () {
       { k: "markers", ad: "Marker API", etki: "Bölüm, viral ve B-roll marker'ları eklenemez" },
       { k: "qeAddTracks", ad: "QE kanal ekleme", etki: "Boş kanal yoksa Sesi iyileştir / katmanlar yeni kanal açamaz" },
       { k: "trackItemDisabled", ad: "Klip devre dışı bırakma", etki: "Sesi iyileştir orijinal sesi kapatamaz (elle kapat)" },
+      { k: "importMGT", ad: "Şablon içe aktarma (importMGT)", etki: "Altyazı Efektleri Premiere yerel klip yerine video katmanı olarak eklenir" },
       { k: "seqFromClips", ad: "Klipten sekans (createNewSequenceFromClips)", etki: "Rehberin örnek klibi sekansa kendiliğinden konmaz; klibi Yeni Öğe simgesine sürüklemen gerekir" },
       // Hız Rampası (KS_apiProbe yalnız typeof okur; setSpeed hiçbir zaman çağrılmaz)
       { k: "qeSetSpeed", ad: "QE hız yazma (setSpeed)", etki: "Hız Rampası klibe hız yazamaz" },

@@ -2469,7 +2469,7 @@ function KS_addRangeMarkers(encoded) {
  */
 function KS_apiProbe() {
   var out = { app: "", seq: false, subsequence: null, autoReframe: null, qe: false, qeAddTracks: null,
-    markers: null, trackItemDisabled: null, trackMuted: null, seqFromClips: null };
+    markers: null, trackItemDisabled: null, trackMuted: null, seqFromClips: null, importMGT: null };
   try { out.app = String(app.version); } catch (eV) {}
   // Rehberin ornek klibi icin (KS_importSample): yalniz typeof — ASLA cagrilmaz
   try { out.seqFromClips = !!(app.project && typeof app.project.createNewSequenceFromClips === "function"); } catch (eF) { out.seqFromClips = false; }
@@ -2480,6 +2480,8 @@ function KS_apiProbe() {
     try { out.subsequence = typeof seq.createSubsequence === "function"; } catch (e1) { out.subsequence = false; }
     try { out.autoReframe = typeof seq.autoReframeSequence === "function"; } catch (e2) { out.autoReframe = false; }
     try { out.markers = !!(seq.markers && typeof seq.markers.createMarker === "function"); } catch (e3) { out.markers = false; }
+    // Altyazi Efektleri > Premiere yerel (3.3 adim 21): yalniz typeof, sablon hic ice aktarilmaz
+    try { out.importMGT = typeof seq.importMGT === "function"; } catch (eMg) { out.importMGT = false; }
     try {
       var bulundu = false;
       for (var t = 0; t < seq.audioTracks.numTracks && !bulundu; t++) {
@@ -3264,6 +3266,149 @@ function KS_removeCaptionMogrtBatch(encoded) {
     }
     return KS_ok({ removed: removed });
   } catch (e) { return KS_err(e); }
+}
+
+/* ---------- Altyazi Efektleri > Premiere yerel (3.3 adim 21): kelime vurgulu JSON MOGRT ---------- */
+
+/*
+ * Portions adapted from TranscriptAI / Animated Captions (host/index.jsx, addMOGRTCaption: importMGT +
+ * getMGTComponent + getParamForDisplayName("JSON_Input").setValue), MIT License, Copyright (c) 2026 Aktug Antika.
+ * See THIRD_PARTY_NOTICES.md. Sablon (assets/mogrt/altyazi-efekt-v1.mogrt) yazarin izniyle pakette.
+ *
+ * Suflo bicimi: klip AKTIF sekansta, bos (kilitsiz) bir video izine dogrudan konur. Ic ice sekans, QE,
+ * proje kokunde "CAPTIONS [V]" sekansi, iz kilidi degisikligi, ses izi silme ya da razor YOK; dolu aralik
+ * hicbir zaman ezilmez. JSON_Input yazildiktan sonra geri okunup karsilastirilir. Klibin adi
+ * "Suflo Caption · <batch>": KS_removeCaptionMogrtBatch ayni grubu kaldirir. Herhangi bir hatada klip silinir.
+ * Sablonun EG'deki Highlight_Color kontrolu ifadesince yok sayilir: renk JSON'dan gelir, ona yazilmaz.
+ */
+function KS_captionJsonParam(component, ad) {
+  if (!component || !component.properties) return null;
+  var props = component.properties;
+  try {
+    if (props.getParamForDisplayName) {
+      var p = props.getParamForDisplayName(ad);
+      if (p) return p;
+    }
+  } catch (eAd) {}
+  var n = 0;
+  try { n = Number(props.numItems) || 0; } catch (eN) {}
+  for (var i = 0; i < n; i++) {
+    try { if (String(props[i].displayName || "") === ad) return props[i]; } catch (eI) {}
+  }
+  return null;
+}
+
+function KS_captionJsonHata(kod, mesaj) {
+  var e = new Error(mesaj);
+  e.kod = kod;
+  return e;
+}
+
+// Panelin "Premiere yerel" secenegi icin hafif yoklama: yalniz typeof / ayar okur, hicbir sey yazmaz
+function KS_captionJsonMogrtProbe() {
+  try {
+    var out = { app: "", seq: false, importMGT: null, width: 0, height: 0, fps: 0 };
+    try { out.app = String(app.version); } catch (eV) {}
+    var seq = KS_seq();
+    if (!seq) return KS_ok(out);
+    out.seq = true;
+    try { out.importMGT = typeof seq.importMGT === "function"; } catch (eI) { out.importMGT = false; }
+    try {
+      var st = seq.getSettings();
+      out.width = Number(st.videoFrameWidth) || 0;
+      out.height = Number(st.videoFrameHeight) || 0;
+    } catch (eS) {}
+    try { out.fps = KS_fps(seq); } catch (eF) {}
+    return KS_ok(out);
+  } catch (e) { return KS_err(e); }
+}
+
+// Nokta kontrolu: Premiere degeri [0-1] oraniyla mi piksel mi tutuyor (varsayilan 960,973 px ya da 0.5,0.9)
+function KS_captionJsonKonumYaz(prop, px, oran) {
+  if (!prop || !px || !oran) return false;
+  var simdi = null;
+  try { simdi = prop.getValue(); } catch (eG) {}
+  var oranli = !!(simdi && simdi.length >= 2 && Math.abs(Number(simdi[0])) <= 1.5 && Math.abs(Number(simdi[1])) <= 1.5);
+  var hedef = oranli ? [Number(oran[0]), Number(oran[1])] : [Number(px[0]), Number(px[1])];
+  try { prop.setValue(hedef, true); } catch (eS) { return false; }
+  try {
+    var oku = prop.getValue();
+    var tol = oranli ? 0.002 : 1;
+    return !!(oku && oku.length >= 2 && Math.abs(Number(oku[0]) - hedef[0]) <= tol && Math.abs(Number(oku[1]) - hedef[1]) <= tol);
+  } catch (eO) { return true; }
+}
+
+function KS_captionJsonOlcekYaz(clip, olcek) {
+  var motion = KS_presetComponent(clip, "AE.ADBE Motion", ["Motion", "Hareket"]);
+  if (!motion) motion = KS_presetComponent(clip, "ADBE Motion", ["Motion", "Hareket"]);
+  var sc = KS_presetProperty(motion, ["ADBE Scale"], ["Scale", "Olcek", "Ölçek"]);
+  if (!sc) return false;
+  try { sc.setValue(Number(olcek), true); } catch (eS) { return false; }
+  try { return Math.abs(Number(sc.getValue()) - Number(olcek)) <= 0.5; } catch (eO) { return true; }
+}
+
+/*
+ * p: { path, track, start, end (sn), json (JSON_Input dizgesi), batch, konum: [x, y] (kompozisyon px),
+ *      konumOran: [x, y] (0-1), olcek (Motion > Scale, %) }
+ * Hata kodlari (panel geri doner): dolu, ice-aktarma, bilesen, sozlesme, dogrulama, sure, girdi
+ */
+function KS_placeCaptionJsonMogrt(encoded) {
+  var clip = null;
+  try {
+    var p = KS_arg(encoded);
+    var seq = KS_seq();
+    if (!seq) return KS_errKod("girdi", "Aktif sequence yok.");
+    var f = new File(String(p.path || ""));
+    if (!f.exists || !/\.mogrt$/i.test(f.name)) return KS_errKod("ice-aktarma", "Altyazi Efektleri sablonu bulunamadi.");
+    var json = String(p.json || "");
+    if (!/^\[/.test(json)) return KS_errKod("girdi", "Altyazi verisi bos.");
+    var track = Number(p.track);
+    if (!isFinite(track) || track < 0 || track >= seq.videoTracks.numTracks) return KS_errKod("girdi", "Altyazi video katmani bulunamadi.");
+    var start = Math.max(0, Number(p.start) || 0);
+    var end = Math.max(start + .04, Number(p.end) || start + .04);
+    if (!KS_trackFreeIn(seq.videoTracks[track], start, end)) return KS_errKod("dolu", "Altyazi katmaninda bu zaman araligi dolu.");
+
+    var at = new Time();
+    at.seconds = start;
+    try { clip = seq.importMGT(f.fsName, at.ticks, track, 0); } catch (eImport) {}
+    if (!clip) return KS_errKod("ice-aktarma", "Sablon timeline'a yerlestirilemedi (importMGT).");
+
+    var batch = String(p.batch || "").replace(/[^a-z0-9_-]/ig, "").slice(0, 40);
+    try { clip.name = "Suflo Caption · " + batch; } catch (eName) {}
+    var component = null;
+    for (var wait = 0; wait < 8 && !component; wait++) {
+      try { component = clip.getMGTComponent(); } catch (eMgt) {}
+      if (!component) try { if (typeof $ !== "undefined" && $.sleep) $.sleep(55); } catch (eWait) {}
+    }
+    if (!component) throw KS_captionJsonHata("bilesen", "Sablonun Essential Graphics kontrolleri Premiere'e acilmadi.");
+    var veri = KS_captionJsonParam(component, "JSON_Input");
+    if (!veri) throw KS_captionJsonHata("sozlesme", "Sablonda 'JSON_Input' kontrolu bulunamadi.");
+    if (!KS_captionMogrtSetText(veri, json)) throw KS_captionJsonHata("dogrulama", "Altyazi verisi sablona yazildi ama geri okunan ayni degil.");
+
+    var konumYazildi = false;
+    if (p.konum && p.konumOran) konumYazildi = KS_captionJsonKonumYaz(KS_captionJsonParam(component, "Caption_Position"), p.konum, p.konumOran);
+    var olcekYazildi = true;
+    var olcek = Number(p.olcek);
+    if (isFinite(olcek) && olcek > 0 && Math.abs(olcek - 100) > 0.5) olcekYazildi = KS_captionJsonOlcekYaz(clip, olcek);
+
+    // Sablon 1 saatlik: ucu kirpmak zamani esnetmez (Responsive Design yok); kirpilamazsa klip birakilmaz
+    var until = new Time();
+    until.seconds = end;
+    try { clip.end = until; } catch (eEnd) {}
+    var actualEnd = 0;
+    try { actualEnd = Number(clip.end.seconds) || 0; } catch (eActual) {}
+    if (Math.abs(actualEnd - end) > .08) {
+      try { clip.end = until; } catch (eEnd2) {}
+      try { actualEnd = Number(clip.end.seconds) || 0; } catch (eActual2) {}
+    }
+    if (Math.abs(actualEnd - end) > .08) throw KS_captionJsonHata("sure", "Sablon klibi altyazi suresine kirpilamadi.");
+
+    return KS_ok({ track: track, trackName: "V" + (track + 1), start: start, end: actualEnd, bayt: json.length,
+      konum: konumYazildi, olcek: olcekYazildi });
+  } catch (e) {
+    try { if (clip) clip.remove(0, 0); } catch (eRemove) {}
+    return KS_errKod(e && e.kod ? e.kod : "hata", e && e.message ? e.message : e);
+  }
 }
 
 /*

@@ -3743,6 +3743,10 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-konum-serbest { margin-top: 5px; font-size: 10.5px; color: var(--dim); }
 .efekt-konum-serbest b { color: var(--text); font-weight: 600; margin-right: 6px; }
 .efekt-ipucu { margin: 4px 0 0; font-size: 10px; line-height: 1.4; color: var(--faint); }
+/* 3.3 adım 21: Altyazı Efektleri çıktı seçimi (Premiere yerel / video katmanı) ve notları */
+.efekt-cikti select { width: 100%; }
+.efekt-yerel-not { margin-top: 5px; font-size: 10.5px; line-height: 1.45; color: var(--dim); }
+.efekt-yerel-not .link-btn { margin-left: 6px; }
 /* Önizlemede sürükleyerek konum: artı işareti + "X %50 · Y %85" etiketi (yalnız Altyazı Efektleri seçiliyken) */
 .efekt.etkin .onizleme-sahne { cursor: grab; touch-action: none; }
 .efekt.etkin .onizleme-sahne.surukleniyor { cursor: grabbing; }
