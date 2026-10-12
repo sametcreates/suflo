@@ -264,6 +264,8 @@ function foto() {
 }
 function parcalar(z, a, b) { return aktif._v[0]._k.filter(function (k) { return k._s >= a && k._s < b; }); }
 function kaynakSonu(k) { return k._in + (k._e - k._s) * ortam.fr * k._v; }
+// geri yüklemenin sözleşmesi: TAM %100 (5e-5) ve hiç %100'ün üstünde değil (üstündeyse t1'e uzatma L'den fazla kaynak ister)
+function tam100(k) { return Math.abs(k._v - 1) <= 5e-5 && k._v <= 1 + 1e-9; }
 function bitisikMi(ps, a, b) { if (!ps.length || ps[0]._s !== a || ps[ps.length - 1]._e !== b) return false; for (var i = 1; i < ps.length; i++) if (ps[i]._s !== ps[i - 1]._e) return false; return true; }
 
 /* ---------- 1) tüm klip, balanced, 25p ---------- */
@@ -505,23 +507,44 @@ ok("16) Süzülme (ilk parça %" + Math.round(p16.segments[0].v * 100) + "): kal
 var kaldirHata = [];
 S.list().forEach(function (pr) {
   if (pr.beats) return;
-  [{ mode: "balanced" }, {}].forEach(function (o) {
-    var zz = sahne({ n: 100, tutamak: o.mode ? 30 : 0 });
-    var pl = S.plan(pr.id, o, { frames: 100, fps: 25, handleSec: o.mode ? null : 0 });
-    var r = uygula(zz, S.hostPlan(pl));
-    if (!r.ok) { kaldirHata.push(pr.id + " uygula " + r.kod); return; }
-    var k = call("KS_removeSpeedRamp", { record: r.record });
-    var ps = parcalar(zz, 50, 150);
-    if (!k.ok || ps.length !== 1 || ps[0]._v !== 1 || ps[0]._e !== 150 || ps[0]._in !== 10) kaldirHata.push(pr.id + " " + js(o) + " " + js(k) + " " + js(ps.map(function (x) { return [x._s, x._e, +x._v.toFixed(4)]; })));
+  [{ mode: "balanced" }, {}, { mode: "balanced", ease: "step" }, { mode: "balanced", k: 0.5, density: "few" }, { mode: "balanced", ease: "step", k: 0.5, density: "few" }].forEach(function (o) {
+    (o.mode ? [30, 0] : [0]).forEach(function (tut) {
+      var zz = sahne({ n: 100, tutamak: tut });
+      var pl = S.plan(pr.id, o, { frames: 100, fps: 25, handleSec: o.mode ? null : 0 });
+      var r = uygula(zz, S.hostPlan(pl));
+      if (!r.ok) { kaldirHata.push(pr.id + " " + js(o) + " tutamak " + tut + " uygula " + r.kod); return; }
+      var k = call("KS_removeSpeedRamp", { record: r.record });
+      var ps = parcalar(zz, 50, 150);
+      if (!k.ok || ps.length !== 1 || !tam100(ps[0]) || ps[0]._e !== 150 || ps[0]._in !== 10 || !bitisikMi(aktif._v[0]._k, 0, 190))
+        kaldirHata.push(pr.id + " " + js(o) + " tutamak " + tut + " " + js(k) + " " + js(aktif._v[0]._k.map(function (x) { return [x._s, x._e, +x._v.toFixed(6)]; })));
+    });
   });
 });
-ok("16) her önayar (Dengeli ve tutamaksız otomatik): uygula + kaldır tam %100'e döner", kaldirHata.length === 0, kaldirHata.join(" | "));
+ok("16) her önayar (Dengeli, Basamaklı, k 0.5 Az; tutamak 30 ve 0; tutamaksız otomatik): uygula + kaldır tam %100, iz boşluksuz", kaldirHata.length === 0, kaldirHata.length + ": " + kaldirHata.slice(0, 4).join(" | "));
+// Uzun, yavaş ilk parça: yukarıdan yaklaşma onu %100'ün 5e-5 dışında ama %0,1 içinde bırakır (1.00026);
+// KS_rampSetSpeed 'zaten orada' deyip çağrı yapmazsa geriAlinamadi + 2..n silinmeden boşluk kalırdı.
+// Atılım 250: yaklaşma 1.000046'da (TAM içinde, %100'ün üstünde) kalırsa tutamak 0'da uç bir kare kısa kalırdı
+var uzun16 = [];
+[["cikis", { mode: "balanced", k: 0.5, density: "few" }, 125, 0.8284], ["cikis", { mode: "balanced", ease: "step", k: 0.5, density: "few" }, 100, 0.7752],
+  ["atilim", { mode: "balanced", k: 0.5, density: "few" }, 250, 0.8716]].forEach(function (c) {
+  [0, 30].forEach(function (tut) {
+    var zz = sahne({ n: c[2], tutamak: tut });
+    var pl = S.plan(c[0], c[1], { frames: c[2], fps: 25 });
+    var r = uygula(zz, S.hostPlan(pl));
+    var k = call("KS_removeSpeedRamp", { record: r.record });
+    var ps = parcalar(zz, 50, 50 + c[2]);
+    if (pl.segments[0].v !== c[3] || !r.ok || !k.ok || ps.length !== 1 || !tam100(ps[0]) || ps[0]._e !== 50 + c[2] || ps[0]._in !== 10 || !bitisikMi(aktif._v[0]._k, 0, 90 + c[2]))
+      uzun16.push(c[0] + " " + js(c[1]) + " " + c[2] + " tutamak " + tut + " ilk v " + pl.segments[0].v + " " + js(k) + " " + js(aktif._v[0]._k.map(function (x) { return [x._s, x._e, +x._v.toFixed(6)]; })));
+  });
+});
+ok("16) uzun yavaş ilk parça (Hızlı Çıkış k 0.5 Az, Basamaklı; Atılım 250 kare): kaldır tam %100, boşluk yok, tutamak 0 ve 30", uzun16.length === 0, uzun16.join(" | "));
 
 /* ---------- 17) Dengeli, klibin Out'u medyanın sonu (tutamak 0): ara adım kaynağı aşmaz ---------- */
-var den17 = [], hiz17 = [];
+var den17 = [], hiz17 = [], kal17 = [];
 S.list().forEach(function (pr) {
   if (pr.beats) return;
-  [{ mode: "balanced" }, { mode: "balanced", density: "many" }, { mode: "balanced", k: 1.5 }, { mode: "balanced", ease: "linear", density: "few" }].forEach(function (o) {
+  [{ mode: "balanced" }, { mode: "balanced", density: "many" }, { mode: "balanced", k: 1.5 }, { mode: "balanced", ease: "linear", density: "few" },
+    { mode: "balanced", ease: "step" }, { mode: "balanced", k: 0.5, density: "few" }, { mode: "balanced", ease: "step", k: 0.5, density: "few" }].forEach(function (o) {
     [25, 60, 100, 125].forEach(function (n) {
       var zz = sahne({ n: n, tutamak: 0 });
       var pl = S.plan(pr.id, o, { frames: n, fps: 25 });
@@ -530,10 +553,15 @@ S.list().forEach(function (pr) {
       var ps = parcalar(zz, 50, 50 + n);
       if (Math.abs(kaynakSonu(ps[ps.length - 1]) - (10 + n * 0.04)) > 0.04 + 1e-9) den17.push(pr.id + " " + n + " kaynak sonu " + kaynakSonu(ps[ps.length - 1]));
       ps.forEach(function (k, i) { if (Math.abs(k._v - pl.segments[i].v) / pl.segments[i].v > (i === ps.length - 1 ? 0.15 : 0.04)) hiz17.push(pr.id + " " + n + " parça " + i); });
+      var kd = call("KS_removeSpeedRamp", { record: r.record });
+      var pk = parcalar(zz, 50, 50 + n);
+      if (!kd.ok || pk.length !== 1 || !tam100(pk[0]) || pk[0]._e !== 50 + n || pk[0]._in !== 10 || !bitisikMi(aktif._v[0]._k, 0, 90 + n))
+        kal17.push(pr.id + " " + js(o) + " " + n + " " + (kd.kod || "") + " " + js(aktif._v[0]._k.map(function (x) { return [x._s, x._e, +x._v.toFixed(6)]; })));
     });
   });
 });
-ok("17) Dengeli + tutamak 0: 10 önayar × 4 seçenek × 4 uzunluk hepsi başarılı, kaynak Out'ta biter", den17.length === 0, den17.length + ": " + den17.slice(0, 6).join(" | "));
+ok("17) Dengeli + tutamak 0: 10 önayar × 7 seçenek × 4 uzunluk hepsi başarılı, kaynak Out'ta biter", den17.length === 0, den17.length + ": " + den17.slice(0, 6).join(" | "));
+ok("17) Dengeli + tutamak 0: her rampa kaldırılınca tek tam %100 klip, iz boşluksuz (Basamaklı, k 0.5 dahil)", kal17.length === 0, kal17.length + ": " + kal17.slice(0, 4).join(" | "));
 ok("17) Dengeli + tutamak 0: parça hızları plana yakın (tam kare yuvarlaması yok)", hiz17.length === 0, hiz17.slice(0, 6).join(" | "));
 z = sahne({ n: 25, tutamak: 0.04 });
 var r17 = uygula(z, S.hostPlan(S.plan("vites", { mode: "balanced" }, { frames: 25, fps: 25 })));

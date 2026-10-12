@@ -3455,7 +3455,7 @@ function KS_rampCall(q, imza, oran, clip) {
 }
 
 /*
- * Kalibrasyon merdiveni. o: { seq, qseq, ti, t (klibin baslangici), frame, v, cal {units, sig}, K }
+ * Kalibrasyon merdiveni. o: { seq, qseq, ti, t (klibin baslangici), frame, v, cal {units, sig}, K, tam }
  * Onbellekteki imza/birim once; her imzada once oran (v) sonra yuzde (v x 100). Her cagridan
  * sonra 40 ms bekle ve hizi geri oku: %5 (ya da 1.5/K) icindeyse kabul. Okunan v/100 ya da
  * v x 100 ise ayni imza obur birimle; 'Not Enough Parameters' / 'Bad argument list' sonraki
@@ -3478,7 +3478,9 @@ function KS_rampSetSpeed(o) {
   var q = KS_rampQItem(o.qseq, o.ti, o.t, o.frame);
   if (!clip || !q || typeof q.setSpeed !== "function") return { ok: false, kod: "qeYok", calls: 0 };
   var once = KS_rampSpeed(clip, null);
-  if (Math.abs(once - v) / v < 0.001) return { ok: true, units: cal.units || "", sig: cal.sig || "", speed: once, calls: 0 };
+  // tam (geri yukleme): cagiran KS_rampHizKur hizi 5e-5 ile olcer ve zaten yetersiz buldu; %0,1
+  // icinde 'zaten orada' deyip cagrisiz donmek (ornek 1.00026 -> 1) her turu bos gecirir: hizYazilamadi
+  if (!o.tam && Math.abs(once - v) / v < 0.001) return { ok: true, units: cal.units || "", sig: cal.sig || "", speed: once, calls: 0 };
   for (var si = 0; si < imzalar.length && cagri < 8; si++) {
     var imza = imzalar[si], birim = ilk, denendi = {}, gecersizTekrar = false, ayniTekrar = false;
     while (cagri < 8) {
@@ -3554,8 +3556,10 @@ function KS_rampHizKur(o) {
   for (tur = 0; tur < 8; tur++) {
     if (!oku()) return { ok: false, kod: "qeYok", calls: cagri };
     // uc bu hizda uzatilacak: hedefin ustunde kalan hiz (yuvarlama payi bile) planin kaynagini asar,
-    // o yuzden yukarida kalan hiz bir kez v'ye yavaslatilir; azicik altinda kalmak kabul
-    if (Math.abs(u - v) <= v * (tam ? TAM : 1e-5) || (!tam && ((u < v && v - u <= v * 0.002) || (yavaslatildi && Math.abs(u - v) <= v * 0.002)))) return bitir();
+    // o yuzden yukarida kalan hiz bir kez v'ye yavaslatilir; azicik altinda kalmak kabul. tam'da da:
+    // 1.00004 TAM icinde ama t1'e uzatma L'den fazla kaynak ister (tutamak 0'da uc bir kare kisa kalir)
+    if ((Math.abs(u - v) <= v * (tam ? TAM : 1e-5) && (!tam || u <= v * (1 + 1e-9) || yavaslatildi)) ||
+        (!tam && ((u < v && v - u <= v * 0.002) || (yavaslatildi && Math.abs(u - v) <= v * 0.002)))) return bitir();
     var istek, Kt;
     if (v < u) { istek = v; Kt = Math.max(kare, Kf, 1); yavaslatildi = true; }
     else {
@@ -3572,7 +3576,7 @@ function KS_rampHizKur(o) {
     }
     KS_rampDeselect(o.seq);
     var onceBirim = cal.units || "";
-    var ss = KS_rampSetSpeed({ seq: o.seq, qseq: o.qseq, ti: o.ti, t: o.t, frame: fr, v: istek, cal: cal, K: Kt });
+    var ss = KS_rampSetSpeed({ seq: o.seq, qseq: o.qseq, ti: o.ti, t: o.t, frame: fr, v: istek, cal: cal, K: Kt, tam: tam });
     cagri += ss.calls || 0;
     if (ss.units) cal = { units: ss.units, sig: ss.sig };
     // yanlis birimle kirpilan klip hedefe varamadiysa: birim artik belli, sonraki tur yeniden yaklasir

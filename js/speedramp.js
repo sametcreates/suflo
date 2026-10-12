@@ -351,6 +351,13 @@
       }
     }
 
+    // parçaların hepsi %1 içinde aynı hızda mı (plan bunu "duz" ile reddeder)
+    function tekHiz(runs) {
+      var mn = Infinity, mx = 0;
+      runs.forEach(function (r) { var o = ort(r[0], r[1]); mn = Math.min(mn, o); mx = Math.max(mx, o); });
+      return mx / mn < 1.01;
+    }
+
     function kisaBirlestir(runs) {
       var degisti = true;
       while (degisti && runs.length > 1) {
@@ -381,7 +388,8 @@
     // parça ortalaması, her sınırdaki kaynak tam. Komşular yetmezse en yakın hızlı komşuya katılır.
     function kisaGenislet(runs) {
       function uz(q) { return runs[q][1] - runs[q][0]; }
-      for (var tur = 0; tur < 4 * runs.length + 4 && runs.length > 1; tur++) {
+      // her tur m'den kısa parça sayısını en az bir azaltır: sınır bir kez, baştaki sayıdan
+      for (var tur = 0, enCok = 4 * runs.length + 4; tur < enCok && runs.length > 1; tur++) {
         var r = -1;
         for (var q = 0; q < runs.length; q++) if (uz(q) < m && (r < 0 || uz(q) < uz(r))) r = q;
         if (r < 0) break;
@@ -414,6 +422,16 @@
       kesim.forEach(function (c) { runs.push([s0, c]); s0 = c; });
       runs.push([s0, F]);
       runs = kisaGenislet(runs);
+      // Son çare: dönüşümlü kısa basamaklar birleşip tek hıza eridiyse (ör. Nabız + hizalama, 1 sn
+      // altı klip) en büyük karşıtlığı veren tek kesim: iki parça, ikisi de ≥ m
+      if (kesim.length && F >= 2 * m && tekHiz(runs)) {
+        var enIyi = -1, enFark = 0;
+        for (var c2 = m; c2 <= F - m; c2++) {
+          var fk = Math.abs(lg(ort(0, c2)) - lg(ort(c2, F)));
+          if (fk > enFark + 1e-12) { enFark = fk; enIyi = c2; }
+        }
+        if (enIyi > 0 && enFark > lg(1.01)) runs = [[0, enIyi], [enIyi, F]];
+      }
     } else {
       var fl = new Array(F);
       for (i = 0; i < F; i++) {
@@ -453,6 +471,25 @@
   }
 
   /* ---------------- plan ---------------- */
+
+  // Parçalar boyunca: çıkış karesi x'te tüketilen kaynak (kare) ve kaynak karesi y'nin gösterildiği
+  // çıkış karesi (kaynak bitmişse %100 ile uzatılır)
+  function kaynakAnda(d, v, x) {
+    var t = 0, s = 0;
+    for (var j = 0; j < v.length; j++) {
+      if (t + d[j] >= x) return s + (x - t) * v[j];
+      t += d[j]; s += d[j] * v[j];
+    }
+    return s;
+  }
+  function zamanAnda(d, v, y) {
+    var t = 0, s = 0;
+    for (var j = 0; j < v.length; j++) {
+      if (s + d[j] * v[j] >= y) return t + (y - s) / v[j];
+      t += d[j]; s += d[j] * v[j];
+    }
+    return t + (y - s);
+  }
 
   // v[j]'ye artık/d[j] ekler, 6 ondalıkta AŞAĞI yuvarlar: Σ d·v hedefi aşmaz (1e-6: kayan nokta
   // gürültüsü tam değeri bir basamak düşürmesin)
@@ -578,16 +615,15 @@
 
     var src = 0, mn = Infinity, mx = 0;
     for (i = 0; i < v.length; i++) { src += d[i] * v[i]; mn = Math.min(mn, v[i]); mx = Math.max(mx, v[i]); }
-    // Vuruş anı hatası yazılacak parçalarda ölçülür (sn): eğri üzerinde tam hizalanan an, kısa
-    // parçanın komşusuna katılması ya da sınırlama yüzünden kayabilir. Hedef kaynak: f·F
-    var hitErr = 0;
+    // Vuruş anı yazılacak parçalarda ölçülür (sınırlama, kısa parçanın komşusuna katılması ve
+    // yuvarlama dahil). es: vuruş anında gösterilen kaynak karesinin hedeften (f·F) farkı; et: hedef
+    // kaynak karesinin timeline'da vuruş anından uzaklığı (kare). Ağır çekimde et büyür ama içerik
+    // bir kareden az kayar, hızlıda tersi: ikisi de 1 kareyi aşarsa göze görünür (hitKaydi).
+    // hit.err timeline kayması (sn): panel "Darbe anı X sn kaydı" der
+    var es = 0, et = 0;
     if (sh.hit) {
-      var hx = sh.hit.u * F, ht = 0, hs = 0;
-      for (i = 0; i < v.length; i++) {
-        if (ht + d[i] >= hx) { hs += (hx - ht) * v[i]; break; }
-        ht += d[i]; hs += d[i] * v[i];
-      }
-      hitErr = Math.max(sh.hit.err, Math.abs(hs - sh.hit.f * F) / fps);
+      es = Math.abs(kaynakAnda(d, v, sh.hit.u * F) - sh.hit.f * F);
+      et = Math.abs(zamanAnda(d, v, sh.hit.f * F) - sh.hit.u * F);
     }
     // Tek hız (tek parça ya da hepsi %1 içinde): rampa değil. Dengeli'de bu %100 demek; host yine de
     // sesi kapatıp "başarılı" derdi. Vuruşsuz Ritme Rampa kendi uyarısıyla (vurusYok) döner.
@@ -600,11 +636,11 @@
       id: id, mode: mode, k: yuvarla(k, 3), c: yuvarla(c, 4), ease: o.ease,
       segments: d.map(function (x, j) { return { d: x, v: v[j] }; }),
       F: F, fps: fps, srcFrames: yuvarla(src, 4), B: yuvarla(src / F, 4), minV: mn, maxV: mx,
-      hit: sh.hit ? { u: yuvarla(sh.hit.u, 4), f: sh.hit.f, err: yuvarla(hitErr, 4) } : null,
+      hit: sh.hit ? { u: yuvarla(sh.hit.u, 4), f: sh.hit.f, err: yuvarla(et / fps, 4) } : null,
       warnings: [],
       keys: sh.keys.map(function (x) { return { t: x.t, v: clamp(x.v * c, MIN_V, MAX_V) }; })
     };
-    if (sh.hit && (sh.hit.clamped || hitErr > 1 / fps + 1e-9)) uyarilar.push("hitKaydi");
+    if (sh.hit && Math.min(es, et) > 1 + 1e-6) uyarilar.push("hitKaydi");
     if (Number(clip.srcFps) > 0 && quality(sonuc, fps, Number(clip.srcFps)).warn) uyarilar.push("takilabilir");
     uyarilar.forEach(function (w) { if (sonuc.warnings.indexOf(w) === -1) sonuc.warnings.push(w); });
     return sonuc;
