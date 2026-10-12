@@ -455,6 +455,34 @@ ok("efekt serbest konum + zıpla: hareketli kelime kartın noktasından zıplar"
 ok("efekt serbest konum + glitch: kopyalar kartın noktasının iki yanında", olaylar(efekt({ giris: "yok", aktif: "glitch", konumX: 30, konumY: 40 }))
   .some(function (l) { return /^Dialogue: 0,.*\\pos\(565,432\)/.test(l); }));
 ok("efekt serbest konum + kutu: kutu kartla aynı noktada", /SufloKutu,,0,0,0,,\{\\an5\\pos\(576,432\)/.test(efekt({ giris: "yok", kutu: true, konumX: 30, konumY: 40 })));
+/*
+ * Adım 17 ikinci inceleme: efektKonumlari'nın xSinir'i serbestKart'ın yatay bandı. Örnek kartlar verilince bandın
+ * kenarları, X 5 / 95 isteyen kartın çizildiği yerdir (kart ortası, ±0,15 %); kutu payı ve 9:16 + güvenli alanda ikon
+ * sütunu dahil. Örneksiz (satır ~16 karakter) bant da kadrajın içinde, 5-95'ten dar.
+ */
+(function () {
+  var J = JSON.stringify;
+  var ornekCue = ["Bunu", "*sakın*", "kaçırma", "arkadaşlar", "bugün"].map(function (w, i) { return { start: 0.15 + i * 0.62, end: 0.7 + i * 0.62, text: w }; });
+  function cizilenX(ov, w, h) {
+    var l = olaylar(efekt(Object.assign({ giris: "yok", konumY: 50 }, ov), { cues: ornekCue, w: w, h: h }))[0];
+    return Number(/\\pos\((\d+),/.exec(l)[1]) / w * 100;
+  }
+  [[1920, 1080, {}], [1080, 1920, {}], [1080, 1920, { guvenli: true }], [1080, 1920, { kutu: true, boyut: 50 }], [1920, 1080, { kutu: true, satir: 1, font: "Anton" }]].forEach(function (d) {
+    var ov = Object.assign({}, d[2]), bant = engine.efektKonumlari(ov, d[0], d[1], { cues: ornekCue, cueKind: "words" }).xSinir;
+    var sol = cizilenX(Object.assign({ konumX: 5 }, ov), d[0], d[1]), sag = cizilenX(Object.assign({ konumX: 95 }, ov), d[0], d[1]);
+    ok("efektKonumlari xSinir " + d[0] + "×" + d[1] + " " + J(d[2]) + ": bandın kenarları X 5 / 95 isteyen kartın çizildiği yer",
+      Math.abs(bant[0] - sol) <= 0.15 && Math.abs(bant[1] - sag) <= 0.15 && bant[0] > 5 && bant[1] < 95, J(bant) + " · çizilen " + sol.toFixed(2) + " / " + sag.toFixed(2));
+  });
+  var yok = engine.efektKonumlari({}, 1920, 1080).xSinir, dikG = engine.efektKonumlari({ guvenli: true }, 1080, 1920).xSinir;
+  ok("efektKonumlari xSinir örneksiz: satır ~16 karakterlik kart (1920×1080 Temiz %22,8-77,2); 9:16 + güvenli alanda sağ kenar ikon sütununun solunda",
+    J(yok) === "[22.8,77.2]" && dikG[1] < engine.efektKonumlari({}, 1080, 1920).xSinir[1], J([yok, dikG]));
+  // en geniş kart belirler: kelime 3 → iki kart ("Bunu sakın kaçırma" daha geniş)
+  var iki = engine.efektKonumlari({ kelime: 3, satir: 1 }, 1920, 1080, { cues: ornekCue, cueKind: "words" }).xSinir;
+  var tek = engine.efektKonumlari({ kelime: 3, satir: 1 }, 1920, 1080, { cues: ornekCue.slice(3), cueKind: "words" }).xSinir;
+  ok("efektKonumlari xSinir: birden çok kartta en geniş kartın bandı (dar kart tek başına daha geniş bant verir)", iki[0] > tek[0] && iki[1] < tek[1], J([iki, tek]));
+  ok("efektKonumlari: ornek boş / bozuksa örneksiz bant; çıktı (compile) değişmez", J(engine.efektKonumlari({}, 1920, 1080, { cues: [] }).xSinir) === J(yok) &&
+    J(engine.efektKonumlari({}, 1920, 1080, { cues: "x" }).xSinir) === J(yok) && J(engine.efektKonumlari({}, 1920, 1080, null).xSinir) === J(yok));
+})();
 
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
 if (!ffmpeg) {

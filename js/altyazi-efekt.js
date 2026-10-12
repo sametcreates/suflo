@@ -13,7 +13,7 @@
  *     1:1 eşleme. Yerel (render'sız) MOGRT çıktısı 3.3'ün sonraki adımında bu ek yeri kullanır.
  *     Yalnız veri düzeni izlenir (birlikte çalışabilirlik); şablondan kod alınmadı.
  *   - 3.3 adım 17: gölge (golge), arka plan kutusu (kutu, kutuRenk, kutuOpak), serbest konum
- *     (konumX / konumY, %5-95) ve önizlemede sürükleme: konumNoktasi, surukle (hazır konumlara ±%3
+ *     (konumX / konumY, %5-95; sürüklerken kartın kadraja sığdığı banda) ve önizlemede sürükleme: konumNoktasi, surukle (hazır konumlara ±%3
  *     yapışır), kaydir (ok tuşları), sifirla (çift tık), konumEtiketi ("X %50 · Y %85").
  *     Şablonun sözleşmesinde konum yok: sablonKonumu klibin Motion › Position'ı için oranı verir.
  *
@@ -238,47 +238,52 @@
   /* ---------------- Serbest konum: önizlemede sürükleme (adım 17) ---------------- */
 
   /*
-   * Bu kadrajda hazır konumların noktası (kartın ortası, %) ve serbest konumun dikey sınırı. o: { w, h (sekans; yoksa
-   * 1920×1080), guvenli ("Platform arayüzünden kaçın") }. Stil motoru çizdiği yeri verir: 9:16'da Alt %74'e çekilir,
-   * kart %7-78 bandına sığdırılır; sürükleme, ok tuşu, artı işareti ve etiket bununla çizilenle aynı yerde.
+   * Bu kadrajda hazır konumların noktası (kartın ortası, %) ve serbest konumun dikey / yatay sınırı. o: { w, h (sekans;
+   * yoksa 1920×1080), guvenli ("Platform arayüzünden kaçın"), ornek (önizlemenin kartları: { cues, cueKind }, stil
+   * motorunun compile'ına gidenler) }. Stil motoru çizdiği yeri verir: 9:16'da Alt %74'e çekilir, kart %7-78 bandına
+   * sığdırılır; yatayda kart kadraja (ve ikon sütununun soluna) sığar: X bandı en geniş örnek kartın genişliğine göre
+   * (ornek yoksa satır ~16 karakter). Sürükleme, ok tuşu, artı işareti, etiket ve kaydedilen değer bununla çizilenle aynı.
    * Motor yoksa 16:9 bağlantı noktaları ve %5-95.
    */
   function olcu(ayar, o) {
     o = o || {};
-    var noktalar = {}, ySinir = KONUM_YUZDE.slice(), SE = motor();
+    var noktalar = {}, ySinir = KONUM_YUZDE.slice(), xSinir = KONUM_YUZDE.slice(), SE = motor();
     var r = null;
     if (SE && SE.efektKonumlari) {
       var ov = overrides(ayar);
       ov.guvenli = o.guvenli === true;
-      try { r = SE.efektKonumlari(ov, sayi(o.w) || 1920, sayi(o.h) || 1080); } catch (e) { r = null; }
+      var ornek = o.ornek && typeof o.ornek === "object" ? o.ornek : null;
+      try { r = SE.efektKonumlari(ov, sayi(o.w) || 1920, sayi(o.h) || 1080, ornek); } catch (e) { r = null; }
     }
     KONUMLAR.forEach(function (k) {
       var p = r && r.noktalar && r.noktalar[k], v = KONUM_NOKTALARI[k];
       noktalar[k] = { x: p && sayi(p.x) !== null ? sayi(p.x) : v.x, y: p && sayi(p.y) !== null ? sayi(p.y) : v.y, ad: v.ad };
     });
-    var s = r && r.ySinir, a = s ? sayi(s[0]) : null, b = s ? sayi(s[1]) : null;
-    if (a !== null && b !== null) {
-      var lo = Math.max(KONUM_YUZDE[0], Math.ceil(Math.min(a, b))), hi = Math.min(KONUM_YUZDE[1], Math.floor(Math.max(a, b)));
-      ySinir = lo <= hi ? [lo, hi] : [kirp((a + b) / 2, KONUM_YUZDE), kirp((a + b) / 2, KONUM_YUZDE)];
-    }
-    return { noktalar: noktalar, ySinir: ySinir };
+    return { noktalar: noktalar, ySinir: bant(r && r.ySinir, ySinir), xSinir: bant(r && r.xSinir, xSinir) };
+  }
+  // Motorun bandı (% , bir ondalık) → tam sayı aralığı (%5-95 içinde); bant bir noktaya inmişse o nokta
+  function bant(s, yedek) {
+    var a = s ? sayi(s[0]) : null, b = s ? sayi(s[1]) : null;
+    if (a === null || b === null) return yedek;
+    var lo = Math.max(KONUM_YUZDE[0], Math.ceil(Math.min(a, b))), hi = Math.min(KONUM_YUZDE[1], Math.floor(Math.max(a, b)));
+    return lo <= hi ? [lo, hi] : [kirp((a + b) / 2, KONUM_YUZDE), kirp((a + b) / 2, KONUM_YUZDE)];
   }
 
   /*
-   * Ayarın önizlemedeki noktası (%): serbest konum (dikeyde çizilen banda sığdırılmış: kaydedilen değer başka
-   * kadrajdan kalmış olabilir) ya da hazır konumun kart ortası. o: olcu() gibi.
+   * Ayarın önizlemedeki noktası (%): serbest konum (çizilen banda sığdırılmış: kaydedilen değer başka kadrajdan ya da
+   * daha dar bir örnek metinden kalmış olabilir; motor kartı oraya çizer) ya da hazır konumun kart ortası. o: olcu() gibi.
    */
   function konumNoktasi(ayar, o) {
     var n = normalize(ayar), t = olcu(n, o);
-    if (n.konumX !== null && n.konumY !== null) return { x: n.konumX, y: kirp(n.konumY, t.ySinir), konum: n.konum, serbest: true };
+    if (n.konumX !== null && n.konumY !== null) return { x: kirp(n.konumX, t.xSinir), y: kirp(n.konumY, t.ySinir), konum: n.konum, serbest: true };
     var p = t.noktalar[n.konum];
     return { x: p.x, y: p.y, konum: n.konum, serbest: false };
   }
 
   /*
    * Sürükleme (x, y: kadrajın %'si; kartın ortası) → ayarın konum alanları. En yakın hazır konumun noktasına ±%3
-   * içinde yapışır: o hazır konum seçilir, serbest konum silinir. Değilse tam sayılar: X %5-95, Y çizilen bant
-   * (9:16'da %7-78 içinde). o: olcu() alanları + taban: sürükleme başındaki hazır konum. Yapışmayan noktada hazır konum
+   * içinde yapışır: o hazır konum seçilir, serbest konum silinir. Değilse tam sayılar, çizilen banda sığmış: X kartın
+   * kadraja sığdığı bant (olcu xSinir), Y dikey bant (9:16'da %7-78 içinde). o: olcu() alanları + taban: sürükleme başındaki hazır konum. Yapışmayan noktada hazır konum
    * tabana döner (sürüklerken bir yapışma bölgesinden geçmek hazır konumu değiştirmez; çift tık / sıfırla ona döner).
    * Döner: { konum, konumX, konumY, x, y, yapisti: 0 | hazır konum }
    */
@@ -297,14 +302,14 @@
       if (dx <= YAPISMA && dy <= YAPISMA && dx * dx + dy * dy < enUzak) { en = k; enUzak = dx * dx + dy * dy; }
     });
     if (en) return { konum: en, konumX: null, konumY: null, x: t.noktalar[en].x, y: t.noktalar[en].y, yapisti: en };
-    var kx = kirp(px, KONUM_YUZDE), ky = kirp(py, t.ySinir);
+    var kx = kirp(px, t.xSinir), ky = kirp(py, t.ySinir);
     return { konum: taban, konumX: kx, konumY: ky, x: kx, y: ky, yapisti: 0 };
   }
 
   // Ok tuşu: dx / dy % (Shift ile 5). Hazır konumdan başlanırsa onun kart ortasından; yapışmaz; çizilen banda sığar
   function kaydir(ayar, dx, dy, o) {
     var n = normalize(ayar), t = olcu(n, o), p = konumNoktasi(n, o);
-    var kx = kirp(p.x + (sayi(dx) || 0), KONUM_YUZDE), ky = kirp(p.y + (sayi(dy) || 0), t.ySinir);
+    var kx = kirp(p.x + (sayi(dx) || 0), t.xSinir), ky = kirp(p.y + (sayi(dy) || 0), t.ySinir);
     return { konum: n.konum, konumX: kx, konumY: ky, x: kx, y: ky, yapisti: 0 };
   }
 
@@ -312,6 +317,20 @@
   function sifirla(ayar, o) {
     var n = normalize(ayar), p = olcu(n, o).noktalar[n.konum];
     return { konum: n.konum, konumX: null, konumY: null, x: p.x, y: p.y, yapisti: n.konum };
+  }
+
+  /*
+   * CEP (Premiere paneli): odak metin kutusu / açılır listede değilken basılan tuşlar Premiere'e de gider (ok tuşları
+   * oynatma kafasını kaydırır, Home sekansın başına atlar). Önizleme sahnesi odaktayken konum tuşları panelde tutulur:
+   * window.__adobe_cep__.registerKeyEventsInterest(konumTusIlgisi(mac)); odak gidince "" ile bırakılır. Kodlar işletim
+   * sisteminin sanal tuş kodlarıdır (CEP Cookbook): Windows VK 37-40 oklar, 36 Home, 27 Esc; macOS 123-126 oklar,
+   * 115 Home, 53 Esc. Her tuş Shift'siz ve Shift'li (%5 adım); Ctrl / Alt / Cmd'li hâlleri Premiere'de kalır.
+   */
+  var KONUM_TUSLARI = { win: [37, 38, 39, 40, 36, 27], mac: [123, 124, 125, 126, 115, 53] };
+  function konumTusIlgisi(mac) {
+    var out = [];
+    KONUM_TUSLARI[mac ? "mac" : "win"].forEach(function (k) { out.push({ keyCode: k }); out.push({ keyCode: k, shiftKey: true }); });
+    return JSON.stringify(out);
   }
 
   /*
@@ -326,7 +345,8 @@
 
   /*
    * Yerel MOGRT (3.3 sonraki adım): şablonun JSON sözleşmesinde konum yok; klibin Motion › Position'ı
-   * için kartın ortasının kadraj oranı (0-1). Hazır konumda o konumun noktası.
+   * için kartın ortasının kadraj oranı (0-1). Hazır konumda o konumun noktası; serbest konumda kartın kadraja sığdığı
+   * banda kırpılmış nokta (konumNoktasi; o.ornek ile metnin genişliğine göre), kart kadraj dışına itilmez.
    */
   function sablonKonumu(ayar, o) {
     var p = konumNoktasi(ayar, o);
@@ -405,6 +425,7 @@
     kaydir: kaydir,
     sifirla: sifirla,
     konumEtiketi: konumEtiketi,
+    konumTusIlgisi: konumTusIlgisi,
     sablonKonumu: sablonKonumu,
     sablonIndeksleri: sablonIndeksleri,
     sablonFontu: sablonFontu,

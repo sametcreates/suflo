@@ -1430,9 +1430,22 @@
    * satır ~16 karakter. Dikey bant serbestKart'ın kendi (cömert: satır ≈ 1,3 punto + kontur) tahminiyle: motor kartı
    * oraya sığdırır. 9:16'nın %64 / %74 sınırı, üst çubuk / alt arayüz bandı ve overrides.guvenli ("Platform
    * arayüzünden kaçın") dahil. Çıktıya dokunmaz.
-   * Döner: { noktalar: { 1: { x, y }, 2: …, 5: …, 8: … }, ySinir: [en az, en çok] }
+   * xSinir (adım 17 ikinci inceleme): serbest konumda kartın ortasının yatay bandı, serbestKart'ın kendisiyle (kartın
+   * yarım genişliği + kontur + kutu payı; 9:16'da "Platform arayüzünden kaçın" açıkken sağdaki ikon sütunu). Kartın
+   * genişliği metne bağlı: ornek ({ cues, cueKind }, compile'ınkiler) verilirse kartlar compile gibi kurulur ve EN GENİŞ
+   * kartın bandı alınır (bandın her noktasında önizlemenin her kartı tam o X'te çizilir); verilmezse satır ~16 karakter.
+   * Döner: { noktalar: { 1: { x, y }, 2: …, 5: …, 8: … }, ySinir: [en az, en çok], xSinir: [en az, en çok] }
    */
-  function efektKonumlari(overrides, width, height) {
+  // compile'ın kelime kartları (normaliseCues → kelimeye bölme → *vurgu* işareti → groupWords); ornek yoksa []
+  function ornekKartlari(ornek, kelime) {
+    if (!ornek || !Array.isArray(ornek.cues) || !ornek.cues.length) return [];
+    var cues = normaliseCues(ornek.cues, 0);
+    cues.forEach(function (c) { delete c.speaker; });
+    if (ornek.cueKind === "lines") cues = splitToWords(cues);
+    else if (ornek.cueKind === "cumulative") cues = lastWords(cues);
+    return groupWords(markEmphasis(cues), kelime);
+  }
+  function efektKonumlari(overrides, width, height, ornek) {
     var w = Math.max(320, Math.round(Number(width) || 1920)), h = Math.max(180, Math.round(Number(height) || 1080));
     var style = guvenliStil(STYLES.efekt.style, overrides, "efekt");
     var eskiRef = olcekRef, eskiW = guvenliW;
@@ -1457,7 +1470,23 @@
       if (h > w * 1.2) { ust = Math.max(ust, Math.round(h * GUVENLI_ALAN[0].h)); alt = Math.min(alt, Math.round(h * GUVENLI_ALAN[2].y)); }
       var y0 = ust + bantYarimH, y1 = alt - bantYarimH;
       if (y0 > y1) { y0 = (ust + alt) / 2; y1 = y0; }
-      return { noktalar: noktalar, ySinir: [yuzde(y0, h), yuzde(y1, h)] };
+      // serbestKart'ın yatay bandı: en geniş kartın yarım genişliği (efektSigdir'in küçülttüğü puntoyla) + yatay pay
+      var kGen = KARAKTER_GENISLIK[style.font] || .62, yarimX = 0;
+      var kartlar = ornekKartlari(ornek, kelime);
+      if (kartlar.length) {
+        kartlar.forEach(function (g) {
+          var kir = efektKirilimlari(g, satir), fsK = efektSigdir(fs, g, kir, style, w);
+          var sinir = [0].concat(kir, [g.length]), enUzun = 1;
+          for (var i = 0; i + 1 < sinir.length; i++) enUzun = Math.max(enUzun, parcaUzunlugu(g, sinir[i], sinir[i + 1]));
+          yarimX = Math.max(yarimX, enUzun * fsK * kGen * 1.08 / 2);
+        });
+      } else yarimX = yarimW;
+      yarimX += outline + (efektKutusu(style, "efekt") ? scaled(20, h) : 0);
+      var sol = pay, sag = w - pay;
+      if (h > w * 1.2 && guvenliW) sag = Math.min(sag, Math.round(w * GUVENLI_ALAN[1].x));
+      var x0 = sol + yarimX, x1 = sag - yarimX;
+      if (x0 > x1) { x0 = (sol + sag) / 2; x1 = x0; }
+      return { noktalar: noktalar, ySinir: [yuzde(y0, h), yuzde(y1, h)], xSinir: [yuzde(x0, w), yuzde(x1, w)] };
     } finally { olcekRef = eskiRef; guvenliW = eskiW; }
   }
 

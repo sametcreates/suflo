@@ -179,14 +179,16 @@ var s1 = AE.surukle(tz, 31.4, 40.6), s2 = AE.surukle(tz, 52.9, 74.6), s3 = AE.su
 ok("surukle: serbest nokta tam sayıya yuvarlanır, hazır konum (konum) kalır", s1.konumX === 31 && s1.konumY === 41 && s1.konum === 2 && s1.yapisti === 0, J(s1));
 ok("surukle: hazır konumun kart ortasına ±%3 içinde yapışır (Alt: X 50 · Y 76,9; Orta: 50 · 62), serbest konum silinir",
   s2.konum === 2 && s2.konumX === null && s2.konumY === null && s2.yapisti === 2 && s2.y === 76.9 && s3.konum === 5 && s3.yapisti === 5 && s3.konumX === null, J([s2, s3]));
-ok("surukle: X %5-95'e, Y çizilen banda (kart kadrajda: %11-89) kırpılır; sayı değilse ayar olduğu gibi", s4.konumX === 5 && s4.konumY === 89 && s5.konumX === null && s5.konum === 2, J([s4, s5]));
+// X de çizilen banda (adım 17 ikinci inceleme): örnek metin verilmezse satır ~16 karakterlik kart kadraja sığar (%23-77)
+ok("surukle: X kartın kadraja sığdığı banda (örneksiz 1920×1080 Temiz: %23-77), Y çizilen banda (%11-89) kırpılır; sayı değilse ayar olduğu gibi",
+  J(olc.xSinir) === "[23,77]" && s4.konumX === 23 && s4.konumY === 89 && AE.surukle(tz, 130, 40).konumX === 77 && s5.konumX === null && s5.konum === 2, J([olc.xSinir, s4, s5]));
 ok("surukle: eski bağlantı noktasına (Alt %84, kartın altı) bırakmak yapışmaz (orada kart Alt'tan aşağıda çizilir)", AE.surukle(tz, 50, 84).yapisti === 0);
 var serbest = Object.assign({}, tz, { konumX: 30, konumY: 40 });
 ok("kaydir: ok tuşu %1 (Shift %5); hazır konumdan kart ortasıyla başlar (Alt'tan yukarı ok yazıyı yukarı taşır); yapışmaz; kırpılır",
   J(AE.kaydir(tz, 1, 0).konumX) === "51" && AE.kaydir(tz, 1, 0).konumY === 77 && AE.kaydir(tz, 0, -1).konumY === 76 && AE.kaydir(tz, 0, -1).konumY < olc.noktalar[2].y &&
   AE.kaydir(serbest, 0, -5).konumY === 35 &&
   AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 85 }), 0, -1).konumY === 84 && AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 85 }), 0, -1).konumX === 50 &&
-  AE.kaydir(Object.assign({}, tz, { konumX: 94, konumY: 50 }), 5, 0).konumX === 95 && AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 89 }), 0, 5).konumY === 89);
+  AE.kaydir(Object.assign({}, tz, { konumX: 74, konumY: 50 }), 5, 0).konumX === 77 && AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 89 }), 0, 5).konumY === 89);
 ok("sifirla: serbest konum silinir, hazır konum geçerli (noktası kart ortası)", J(AE.sifirla(serbest)) === '{"konum":2,"konumX":null,"konumY":null,"x":50,"y":76.9,"yapisti":2}');
 ok("konumEtiketi: 'X %31 · Y %41'; yapışınca 'Alt · hazır konum'", AE.konumEtiketi(s1) === "X %31 · Y %41" && AE.konumEtiketi(s2) === "Alt · hazır konum" &&
   AE.konumEtiketi(AE.surukle(tz, 31, 79)) === "Alt sol · hazır konum" && AE.konumEtiketi(null) === "");
@@ -208,6 +210,57 @@ ok("9:16 konumNoktasi: başka kadrajdan kalan serbest Y (85) çizildiği yerde (
 ok("9:16 Alt sol ile Alt'ın yapışma bölgesi örtüşünce en yakın kazanır", AE.surukle(tz, 50, 70.1, D).yapisti === 2 && AE.surukle(tz, olcD.noktalar[1].x - 0.5, 70.1, D).yapisti === 1);
 ok("guvenli (Platform arayüzünden kaçın) ölçüye geçer: Alt sol kartı ikon sütunundan uzak, daha solda",
   AE.konumOlcusu(tz, { w: 1080, h: 1920, guvenli: true }).noktalar[1].x < olcD.noktalar[1].x);
+
+/*
+ * Adım 17 ikinci inceleme: serbest X de çizilen yere kırpılır. Eskiden X yalnız %5-95'e kırpılıyordu: motor kartı kadraja
+ * sığdırınca (serbestKart) etiket / artı işareti / kaydedilen X "%95" derken yazı 16:9'da %74,5'te, 9:16'da %54,6'da
+ * çiziliyordu; kenardan Shift+sol basışları ekranda hiçbir şeyi kımıldatmıyordu. Örnek: panelin gerçek önizlemesine
+ * giden kartlar (transkript yokken motorOnizlemeCueleri'nin cümlesi).
+ */
+var ornekCue = ["Bunu", "*sakın*", "kaçırma", "arkadaşlar", "bugün"].map(function (w, i) { return { start: 0.15 + i * 0.62, end: 0.7 + i * 0.62, text: w }; });
+function cizilenXler(ayar, d) {
+  var ov = AE.overrides(ayar); ov.guvenli = d.guvenli === true;
+  return SE.compile({ styleId: "efekt", cues: ornekCue, cueKind: "words", width: d.w, height: d.h, overrides: ov }).ass.split("\n")
+    .filter(function (l) { return /^Dialogue: [13],/.test(l); })
+    .map(function (l) { var m = /\\pos\((\d+),/.exec(l) || /\\move\([^,]+,[^,]+,(\d+),/.exec(l); return m ? Number(m[1]) / d.w * 100 : null; })
+    .filter(function (x) { return x !== null; });
+}
+// etiketteki X (konumEtiketi) ile her kartın çizildiği X arasındaki en büyük fark
+function etiketFarki(ayar, r, d) {
+  var etiketX = Number(/X %(\d+)/.exec(AE.konumEtiketi(r))[1]);
+  return Math.max.apply(null, cizilenXler(Object.assign({}, ayar, { konum: r.konum, konumX: r.konumX, konumY: r.konumY }), d).map(function (x) { return Math.abs(x - etiketX); }));
+}
+[["9:16", { w: 1080, h: 1920 }], ["9:16 güvenli", { w: 1080, h: 1920, guvenli: true }], ["16:9", { w: 1920, h: 1080 }]].forEach(function (k) {
+  var d = Object.assign({ ornek: { cues: ornekCue, cueKind: "words" } }, k[1]);
+  ["temiz", "kutulu", "vurucu"].forEach(function (gid) {
+    var a = Object.assign({}, AE.gorunum(gid).ayar, { konum: 5 });
+    var sag = AE.surukle(a, 95, 40, d), sol = AE.surukle(a, 5, 40, d);
+    ok(k[0] + " " + gid + ": kenara sürüklenen yazının etiketindeki X, motorun çizdiği X (±%1,5): sağ " + AE.konumEtiketi(sag) + ", sol " + AE.konumEtiketi(sol),
+      etiketFarki(a, sag, k[1]) <= 1.5 && etiketFarki(a, sol, k[1]) <= 1.5 && sag.konumX < 95 && sol.konumX > 5,
+      etiketFarki(a, sag, k[1]).toFixed(2) + " / " + etiketFarki(a, sol, k[1]).toFixed(2));
+  });
+});
+(function () {
+  var D9 = { w: 1080, h: 1920, ornek: { cues: ornekCue, cueKind: "words" } }, a = Object.assign({}, tz, { konum: 5 });
+  var r = AE.surukle(a, 95, 40, D9), adimlar = [r.konumX], ciz = [cizilenXler(Object.assign({}, a, r), D9)[0]];
+  for (var i = 0; i < 2; i++) {
+    r = AE.kaydir(Object.assign({}, a, { konumX: r.konumX, konumY: r.konumY }), -5, 0, D9);
+    adimlar.push(r.konumX); ciz.push(cizilenXler(Object.assign({}, a, r), D9)[0]);
+  }
+  // bu örnekte kart kadrajın ~%85'i: bant %46-54; iki Shift+sol 54 → 49 → 46 (bandın kenarı), yazı her basışta etiket kadar kayar
+  ok("9:16 Temiz: sağ kenardan Shift+sol her basışta yazıyı da kaydırır (etiket ile çizilen X birlikte; eskiden 90→65 boyunca yazı yerinde kalıyordu)",
+    J(adimlar) === "[54,49,46]" && ciz.every(function (x, j) {
+      return Math.abs(x - adimlar[j]) <= 1.5 && (j === 0 || Math.abs((ciz[j - 1] - x) - (adimlar[j - 1] - adimlar[j])) <= 0.5);
+    }), J([adimlar, ciz.map(function (x) { return x.toFixed(1); })]));
+  var eski = Object.assign({}, a, { konumX: 95, konumY: 40 });
+  ok("kaydedilmiş X 95 (eski sürüm / başka kadraj) çizildiği yerde gösterilir; sablonKonumu (Motion › Position) da çizilen yer",
+    AE.konumNoktasi(eski, D9).x === 54 && Math.abs(cizilenXler(eski, D9)[0] - 54) <= 1.5 && AE.sablonKonumu(eski, D9).x === 0.54 &&
+    AE.konumNoktasi(eski, { w: 1920, h: 1080, ornek: D9.ornek }).x === 74, J([AE.konumNoktasi(eski, D9), AE.sablonKonumu(eski, D9)]));
+  var D16 = { w: 1920, h: 1080, ornek: D9.ornek }, o16 = AE.surukle(a, 95, 40, D16), xs = [o16.konumX];
+  for (var j = 0; j < 4; j++) { o16 = AE.kaydir(Object.assign({}, a, { konumX: o16.konumX, konumY: o16.konumY }), -5, 0, D16); xs.push(o16.konumX); }
+  ok("16:9 Orta: sağ kenardan (X %74) dört Shift+sol yazıyı her seferinde %5 kaydırır (eskiden X 95→75 boyunca yazı kımıldamıyordu)",
+    J(xs) === "[74,69,64,59,54]" && xs.every(function (x) { return Math.abs(cizilenXler(Object.assign({}, a, { konumX: x, konumY: 40 }), D16)[0] - x) <= 1.5; }), J(xs));
+})();
 
 /* Sürüklerken yapışma bölgesinden geçmek hazır konumu değiştirmez (taban: sürükleme başındaki hazır konum) */
 var gecis = AE.surukle(tz, 50, 61, { taban: 2 });

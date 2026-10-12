@@ -2021,15 +2021,44 @@ window.KCaptions = (function () {
    * Noktalar kartın ortası, sekansın kadrajına göre (AE.konumOlcusu: 9:16'da motorun %74 / %7-78 sınırları dahil).
    * Premiere çağrısı yok; Pro kapısı yalnız timeline'a eklerken (önizleme ücretsiz).
    */
-  var surukleme = null;   // { id, bas: { konum, x, y }, ofset: { x, y } (%), px: { x, y } (basış), basladi }
+  var surukleme = null;   // { id, bas: { konum, x, y }, ofset: { x, y } (%), px: { x, y } (basış), basladi, olcu }
   var artiSaat = null;
   function konumAktif() { return !!AE && !secilenMogrt && secilenMotorStili === EFEKT; }
-  // Sürükleme modelinin kadrajı: sekansın boyutu (yoksa 1920×1080) ve 9:16'da "Platform arayüzünden kaçın"
+  /*
+   * Sürükleme modelinin kadrajı: sekansın boyutu (yoksa 1920×1080), 9:16'da "Platform arayüzünden kaçın" ve gerçek
+   * önizlemenin kartları (X bandı en geniş kartın kadraja sığdığı yere göre: etiket, artı işareti ve kaydedilen X yazının
+   * çizildiği yer). Sürükleme boyunca basışta ölçülen kullanılır (her harekette transkript yeniden taranmaz).
+   */
   function konumOlcusu() {
+    if (surukleme && surukleme.olcu) return Object.assign({}, surukleme.olcu);
     var c = (window.KApp && window.KApp.ctx) ? window.KApp.ctx() : {};
     var w = Number(c && c.width) || 0, h = Number(c && c.height) || 0;
     if (!(w > 0 && h > 0)) { w = 1920; h = 1080; }
-    return { w: w, h: h, guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked) };
+    return { w: w, h: h, guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked), ornek: konumOrnegi() };
+  }
+  // Gerçek önizlemeye (motorOnizlemeOynat) giden kartlar ve cue türü; ölçülemezse null (motor satır ~16 karakter sayar)
+  function konumOrnegi() {
+    try {
+      var cues = motorOnizlemeCueleri({ aile: EFEKT });
+      return cues && cues.length ? { cues: cues, cueKind: cueler().length ? motorCueTuru() : "words" } : null;
+    } catch (e) { return null; }
+  }
+  /*
+   * CEP, odak metin kutusu / açılır listede değilken basılan tuşları Premiere'e de gönderir: sahnede ok tuşu yazıyı
+   * kaydırırken oynatma kafası da kayardı (Home sekansın başına atlardı). Sahne odaktayken konum tuşları
+   * (AE.konumTusIlgisi: oklar, Home, Esc; Shift'li ve Shift'siz) panelde tutulur, odak gidince bırakılır ("" ilgiyi
+   * siler). Paketteki CSInterface.js'te sarmalayıcı yok: doğrudan window.__adobe_cep__. CEP dışında (test) hiçbir şey yapmaz.
+   */
+  var konumTusTutuluyor = false;
+  function konumTuslariniTut(tut) {
+    tut = !!tut && konumAktif();
+    if (tut === konumTusTutuluyor) return;
+    var cep = window.__adobe_cep__;
+    if (!cep || typeof cep.registerKeyEventsInterest !== "function") return;
+    try {
+      cep.registerKeyEventsInterest(tut ? AE.konumTusIlgisi(!!(K && K.MAC)) : "");
+      konumTusTutuluyor = tut;
+    } catch (e) {}
   }
   function sahneNoktasi(e) {
     var sahne = el("cap-sahne");
@@ -2074,7 +2103,7 @@ window.KCaptions = (function () {
   // n: işaretçinin sahnedeki noktası (%); kartın ortası = n − tutma farkı. Yapışmayan noktada hazır konum sürükleme başındaki
   function konumSuruklemeAdim(n) {
     if (!n || !AE) return;
-    var o = konumOlcusu();
+    var o = konumOlcusu();   // sürüklerken basışta ölçülenin kopyası
     if (surukleme) o.taban = surukleme.bas.konum;
     var f = surukleme && surukleme.ofset ? surukleme.ofset : { x: 0, y: 0 };
     var r = AE.surukle(efektAyari(), n.x - f.x, n.y - f.y, o);
@@ -2120,9 +2149,10 @@ window.KCaptions = (function () {
       if (!n) return;
       var st = stil();
       // Kartın şimdiki ortası: sürükleme kartı tutulduğu yerden taşır (basmak onu işaretçiye zıplatmaz)
-      var p = AE.konumNoktasi(efektAyari(st), konumOlcusu());
+      surukleme = null;
+      var olc = konumOlcusu(), p = AE.konumNoktasi(efektAyari(st), olc);
       surukleme = { id: e.pointerId, bas: { konum: st.konum, x: typeof st.konumX === "number" ? st.konumX : null, y: typeof st.konumY === "number" ? st.konumY : null },
-        ofset: { x: n.x - p.x, y: n.y - p.y }, px: { x: e.clientX, y: e.clientY }, basladi: false };
+        ofset: { x: n.x - p.x, y: n.y - p.y }, px: { x: e.clientX, y: e.clientY }, basladi: false, olcu: olc };
       try { if (sahne.setPointerCapture) sahne.setPointerCapture(e.pointerId); } catch (eC) {}
       if (sahne.focus) { try { sahne.focus(); } catch (eF) {} }
       if (e.preventDefault) e.preventDefault();
@@ -2151,6 +2181,8 @@ window.KCaptions = (function () {
     });
     sahne.addEventListener("keydown", function (e) {
       if (!konumAktif() || (e.target && e.target !== sahne)) return;
+      // Ctrl / Alt / Cmd'li tuşlar Premiere'in (CEP onları panelde tutmaz: konumTuslariniTut); yazı kımıldamaz
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.key === "Escape" && surukleme) { e.preventDefault(); konumSuruklemeBitir(false); return; }
       if (e.key === "Home") { e.preventDefault(); konumSifirla(); return; }
       var adim = e.shiftKey ? 5 : 1;
@@ -2163,8 +2195,12 @@ window.KCaptions = (function () {
       artiGoster(r, 1400);
     });
     // Klavye odağında artı işareti şimdiki noktayı gösterir
-    sahne.addEventListener("focus", function () { if (konumAktif() && !surukleme) artiGoster(AE.konumNoktasi(efektAyari(), konumOlcusu()), 1800); });
-    sahne.addEventListener("blur", function () { if (!surukleme) artiGoster(null); });
+    sahne.addEventListener("focus", function () {
+      if (!konumAktif()) return;
+      konumTuslariniTut(true);
+      if (!surukleme) artiGoster(AE.konumNoktasi(efektAyari(), konumOlcusu()), 1800);
+    });
+    sahne.addEventListener("blur", function () { konumTuslariniTut(false); if (!surukleme) artiGoster(null); });
     if (el("cap-konum-sifirla")) el("cap-konum-sifirla").addEventListener("click", konumSifirla);
   }
 
@@ -2174,6 +2210,8 @@ window.KCaptions = (function () {
    * Öznitelik zaten varsa yeniden yazılmaz (İngilizce arayüzde çeviri gözlemcisi her yazışta yeniden çevirirdi).
    */
   function sahneErisimi(etkin) {
+    // Premiere şablonuna geçildi (sahne odakta kalmış olabilir): konum tuşları yeniden Premiere'in
+    if (!etkin) konumTuslariniTut(false);
     var s = el("cap-sahne");
     if (!s || !s.setAttribute || !s.removeAttribute) return;
     var ERISIM = { tabindex: "0", role: "group", "aria-label": "Önizleme: yazıyı sürükleyerek konumlandır",

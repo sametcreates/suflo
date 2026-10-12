@@ -96,8 +96,10 @@ function ortam(o) {
   dom["cap-sahne"].setPointerCapture = function (id) { yakalanan.push("al:" + id); };
   dom["cap-sahne"].releasePointerCapture = function (id) { yakalanan.push("bırak:" + id); };
   dom["cap-sahne"].focus = function () {};
-  var K = { settings: function () { return ayar; }, saveSettings: function () { kayit++; }, log: function () {} };
+  var K = { settings: function () { return ayar; }, saveSettings: function () { kayit++; }, log: function () {}, MAC: !!o.mac };
   var window = { SufloStyleEngine: SE, SufloStyleShare: SS, SufloMarkaKiti: MK, SufloAltyaziEfekt: AE, KApp: { ctx: function () { return o.ctx || {}; } } };
+  // CEP köprüsü (yalnız verilirse): registerKeyEventsInterest çağrıları kaydedilir
+  if (o.cep) window.__adobe_cep__ = o.cep;
   var kod = [
     govde("function motorPreset("), govde("function motorStiliMi("), govde("function uzunlukSecimi("), govde("function applyPreset("),
     govde("function stilKartiIsaretle("), govde("function efektStili("), govde("function efektAyari("), govde("function efekteGec("),
@@ -107,7 +109,8 @@ function ortam(o) {
     govde("function stilKodu("), govde("function stilKoduUygula("), govde("function varsayilanaDon("),
     govde("function efektVarsayilan("), govde("function sablonumUygula("),
     govde("function efektSayi("), govde("function efektSayiAlani("), govde("function serbestKonumDegeri("), govde("function efektBagimliDurum("),
-    govde("function konumAktif("), govde("function konumOlcusu("), govde("function sahneNoktasi("), govde("function artiGoster("), govde("function konumYaz("),
+    govde("function konumAktif("), govde("function konumOlcusu("), govde("function konumOrnegi("), govde("function konumTuslariniTut("),
+    govde("function motorOnizlemeCueleri("), govde("function sahneNoktasi("), govde("function artiGoster("), govde("function konumYaz("),
     govde("function konumDegisti("), govde("function konumSuruklemeAdim("), govde("function konumSuruklemeBitir("), govde("function konumSifirla("),
     govde("function konumSurukleBagla("), govde("function sahneErisimi("), govde("function stilYedegi("), govde("function stilYedeginiYukle("),
     // oluşturucu kontrolleri ve rehber yedeğinin alan listeleri (EFEKT_KONTROLLERI + efektKontrolleriniBagla, EFEKT_ISARETLERI, STIL_ALANLARI)
@@ -122,7 +125,11 @@ function ortam(o) {
     "var FONTLAR = SS.fontFiles();\n" +
     "var PRESETS = {}; window.SufloStyleEngine.list().forEach(function (p) { PRESETS[p.id] = motorPreset(p.id); });\n" +
     "var onizleme = { durdur: 0, ciz: 0, tazele: [], oynat: 0 };\n" +
-    "var surukleme = null, artiSaat = null;\n" +
+    "var surukleme = null, artiSaat = null, konumTusTutuluyor = false;\n" +
+    // transkript yok: gerçek önizlemenin kartları motorOnizlemeCueleri'nin örnek cümlesi (o.segments ile transkript)
+    "var segments = " + J(o.segments || []) + ";\n" +
+    "var segmentsMode = 'l42'; function styleText(t) { return t; }\n" +
+    "function cueler() { return segments.map(function (s) { return { start: s.start, end: s.end, text: s.text }; }); }\n" +
     "function onizlemeDurdur() { onizleme.durdur++; } function onizlemeCiz() { onizleme.ciz++; } function onizlemeOynat() { onizleme.oynat++; }\n" +
     "function efektOnizlemeTazele(h) { onizleme.tazele.push(!!h); }\n" +
     "function vurguKutusuDurumu() {} function kelimeSiniriDurumu() {} function motorSecenekDurumu() {} function uygulamaIpucunuGuncelle() {}\n" +
@@ -133,6 +140,7 @@ function ortam(o) {
     " efektAyari: efektAyari, konumSurukleBagla: konumSurukleBagla, surukluyor: function () { return !!surukleme; }," +
     " stilYedegi: stilYedegi, stilYedeginiYukle: stilYedeginiYukle, sablonumUygula: sablonumUygula," +
     " efektKontrolleriniBagla: efektKontrolleriniBagla, stilKartiIsaretle: stilKartiIsaretle, efektDomCiz: efektDomCiz, efektKartiSigdir: efektKartiSigdir," +
+    " konumOrnegi: konumOrnegi," +
     " mogrtSec: function (m) { secilenMogrt = m; secilenMotorStili = ''; } };")(
     K, window, { createElement: function (t) { return dugum(t); }, querySelectorAll: function () { return []; } },
     function (id) { return dom[id] || null; }, { toast: function (m, tur) { toastlar.push(m); } }, {});
@@ -422,10 +430,10 @@ tus("ArrowDown");
 var once = [sk.dom["cap-konum-x"].value, sk.dom["cap-konum-y"].value];
 var kayit1 = sk.kayit();
 olay("pointerdown", px(50, 63));
-olay("pointermove", px(20, 30));
+olay("pointermove", px(30, 30));
 var esnada = sk.dom["cap-konum-x"].value;
 tus("Escape");
-ok("Esc sürüklemeyi geri alır (başlangıç noktası), kaydetmez", esnada === "20" && sk.dom["cap-konum-x"].value === once[0] && sk.dom["cap-konum-y"].value === once[1] &&
+ok("Esc sürüklemeyi geri alır (başlangıç noktası), kaydetmez", esnada === "30" && sk.dom["cap-konum-x"].value === once[0] && sk.dom["cap-konum-y"].value === once[1] &&
   !sk.api.surukluyor() && sk.kayit() === kayit1 && !sahne.classList.contains("surukleniyor"));
 olay("pointerdown", px(50, 63));
 olay("pointermove", px(20, 30));
@@ -517,6 +525,94 @@ ok("etiket yazı üst yarıdayken altta durur", (function () {
   (s3.dinle.pointermove || []).forEach(function (f) { f(Object.assign({ pointerId: 1, target: s3 }, px(40, 35))); });
   return o.dom["cap-efekt-arti-etiket"].classList.contains("ust") === false && o.dom["cap-konum-y"].value === "35";
 })());
+/*
+ * Adım 17 ikinci inceleme (1): serbest X çizilen yere kırpılır. 9:16'da (Shorts) yazıyı sağ kenara sürüklemek: etiket,
+ * artı işareti, gizli X ve "Serbest konum" satırı, gerçek önizlemenin (aynı örnek kartlar, aynı ince ayar) libass \pos
+ * X'iyle ±%1,5 aynı. Eskiden "X %95" yazarken yazı ~%55-62'de çiziliyor, Shift+sol basışları yazıyı kımıldatmıyordu.
+ */
+(function () {
+  var xk = ortam({ ctx: { width: 1080, height: 1920 } });
+  xk.api.gorunumUygula("temiz");
+  xk.api.konumSurukleBagla();
+  var xs = xk.dom["cap-sahne"];
+  function xOlay(ad, e) { (xs.dinle[ad] || []).forEach(function (f) { f(Object.assign({ pointerId: 5, button: 0, target: xs, preventDefault: function () {} }, e || {})); }); }
+  // libass önizlemesinin çizdiği X (panelin kendi örnek kartları ve ince ayarıyla; ilk kart)
+  function libassX() {
+    var st = xk.api.stil(), ov = xk.api.motorAyarlari(st);
+    var r = SE.compile({ styleId: "efekt", cues: xk.api.konumOrnegi().cues, cueKind: xk.api.konumOrnegi().cueKind, width: 1080, height: 1920, overrides: ov });
+    var l = r.ass.split("\n").filter(function (x) { return /^Dialogue: 1,/.test(x); })[0];
+    var m = /\\pos\((\d+),/.exec(l) || /\\move\([^,]+,[^,]+,(\d+),/.exec(l);
+    return Number(m[1]) / 1080 * 100;
+  }
+  var bas = AE.konumNoktasi(xk.api.efektAyari(), { w: 1080, h: 1920 });
+  xOlay("pointerdown", px(bas.x, bas.y));
+  xOlay("pointermove", px(98, 40));
+  var etiket = xk.dom["cap-efekt-arti-etiket"].textContent, etiketX = Number(/X %(\d+)/.exec(etiket)[1]);
+  xOlay("pointerup", px(98, 40));
+  var cizilen = libassX();
+  ok("9:16: sağ kenara sürüklenen yazının etiketi / gizli X / Serbest konum satırı gerçek önizlemenin çizdiği X (±%1,5)",
+    etiketX < 95 && xk.dom["cap-konum-x"].value === String(etiketX) && Math.abs(cizilen - etiketX) <= 1.5 &&
+    xk.dom["cap-konum-serbest-deger"].textContent === "X %" + etiketX + " · Y %40" && xk.ayar.capPrefs.stil.konumX === etiketX,
+    etiket + " · çizilen %" + cizilen.toFixed(1));
+  var once = cizilen;
+  (xs.dinle.keydown || []).forEach(function (f) { f({ key: "ArrowLeft", shiftKey: true, target: xs, preventDefault: function () {} }); });
+  ok("9:16: kenardan Shift+sol yazıyı da kaydırır (etiket ve çizilen X birlikte iner)", Number(xk.dom["cap-konum-x"].value) === etiketX - 5 &&
+    Math.abs((once - libassX()) - 5) <= 0.5, xk.dom["cap-konum-x"].value + " · " + libassX().toFixed(1));
+  ok("konumOrnegi: transkript yokken gerçek önizlemenin örnek cümlesi (kelime kartları)", xk.api.konumOrnegi().cueKind === "words" &&
+    xk.api.konumOrnegi().cues.map(function (c) { return c.text; }).join(" ") === "Bunu *sakın* kaçırma arkadaşlar bugün");
+  var tr = ortam({ segments: [{ start: 1, end: 2.4, text: "Kısa satır" }, { start: 2.5, end: 4, text: "Çok daha uzun bir transkript satırı burada" }] });
+  ok("konumOrnegi: transkript varken gerçek önizlemenin satırları (cue türüyle)", tr.api.konumOrnegi().cueKind === "lines" &&
+    /uzun bir transkript/.test(tr.api.konumOrnegi().cues.map(function (c) { return c.text; }).join(" ")));
+})();
+
+/*
+ * Adım 17 ikinci inceleme (2): CEP, odak metin kutusunda değilken tuşları Premiere'e de gönderir (ok tuşu oynatma kafasını
+ * kaydırır, Home sekansın başına atlar). Sahne odaktayken konum tuşları registerKeyEventsInterest ile panelde tutulur,
+ * odak gidince / Premiere şablonuna geçince "" ile bırakılır; panel açılışında CEP çağrısı yok.
+ */
+(function () {
+  function cepOrtami(mac) {
+    var cagrilar = [];
+    var o = ortam({ mac: mac, cep: { registerKeyEventsInterest: function (j) { cagrilar.push(j); } } });
+    o.api.gorunumUygula("temiz");
+    o.api.konumSurukleBagla();
+    o.cagrilar = cagrilar;
+    o.olay = function (ad) { (o.dom["cap-sahne"].dinle[ad] || []).forEach(function (f) { f({ target: o.dom["cap-sahne"] }); }); };
+    return o;
+  }
+  var w = cepOrtami(false);
+  var acilis = w.cagrilar.length;
+  w.olay("focus");
+  var kayit = w.cagrilar[0] ? JSON.parse(w.cagrilar[0]) : [];
+  w.olay("focus");
+  w.olay("blur");
+  ok("CEP tuş ilgisi: açılışta çağrı yok; sahne odaklanınca Windows okları / Home / Esc (Shift'li ve Shift'siz) panelde tutulur, ikinci odak tekrar çağırmaz, odak gidince bırakılır",
+    acilis === 0 && w.cagrilar.length === 2 && kayit.length === 12 && J(kayit.slice(0, 2)) === '[{"keyCode":37},{"keyCode":37,"shiftKey":true}]' &&
+    [37, 38, 39, 40, 36, 27].every(function (k) { return kayit.some(function (x) { return x.keyCode === k && !x.shiftKey; }) && kayit.some(function (x) { return x.keyCode === k && x.shiftKey === true; }); }) &&
+    w.cagrilar[1] === "", J(w.cagrilar));
+  var m = cepOrtami(true);
+  m.olay("focus");
+  ok("CEP tuş ilgisi macOS'ta Mac tuş kodlarıyla (123-126 oklar, 115 Home, 53 Esc)", m.cagrilar.length === 1 &&
+    J(JSON.parse(m.cagrilar[0]).map(function (x) { return x.keyCode; }).filter(function (k, i, a) { return a.indexOf(k) === i; })) === "[123,124,125,126,115,53]");
+  m.api.mogrtSec({ path: "/x.mogrt" });
+  m.api.stilKartiIsaretle("");
+  ok("Premiere şablonuna geçince (sahne odakta kalsa da) tuşlar Premiere'e bırakılır; şablondayken odak tuş tutmaz", m.cagrilar.length === 2 && m.cagrilar[1] === "" &&
+    (m.olay("focus"), m.cagrilar.length === 2), J(m.cagrilar));
+  var yok = ortam();
+  yok.api.gorunumUygula("temiz");
+  yok.api.konumSurukleBagla();
+  ok("CEP dışında (köprü yok) odak / blur hata vermez", (function () { try { (yok.dom["cap-sahne"].dinle.focus || []).forEach(function (f) { f({}); }); (yok.dom["cap-sahne"].dinle.blur || []).forEach(function (f) { f({}); }); return true; } catch (e) { return false; } })());
+  // Ctrl / Alt / Cmd'li ok tuşları panelde tutulmaz: yazı da kımıldamaz (çift işlem yok)
+  var x0 = w.dom["cap-konum-x"].value, engel = 0;
+  ["ctrlKey", "altKey", "metaKey"].forEach(function (mk) {
+    var e = { key: "ArrowRight", shiftKey: false, target: w.dom["cap-sahne"], preventDefault: function () { engel++; } };
+    e[mk] = true;
+    (w.dom["cap-sahne"].dinle.keydown || []).forEach(function (f) { f(e); });
+  });
+  ok("Ctrl / Alt / Cmd + ok: yazı kımıldamaz, olay engellenmez (Premiere'in kısayolu)", engel === 0 && w.dom["cap-konum-x"].value === x0);
+})();
+ok("deneme listesi 17.7: Premiere'in oynatma kafası sahnede ok / Home'la kımıldamaz", /17\.7[\s\S]*oynatma kafası[\s\S]*17\.8/.test(fs.readFileSync(path.join(KOK, "marketing", "v3.3-deneme-listesi.md"), "utf8")));
+
 // Önizleme sahnesinin odak durağı / adı / ipucu yalnız Altyazı Efektleri seçiliyken
 var er = ortam();
 er.api.gorunumUygula("temiz");
