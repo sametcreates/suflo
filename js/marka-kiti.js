@@ -2,7 +2,7 @@
  * Suflo — Marka Kiti (saf modül)
  *
  * Kullanıcının marka görünümü: yazı tipi, yazı / kontur / vurgu rengi, isteğe bağlı konum
- * (yoksa her stilin kendi konumu) ve köşe logosu. Açıkken her Suflo Stiline ve kanca
+ * (yoksa her stilin kendi konumu) ve köşe logosu. Açıkken Altyazı Efektlerine ve kanca
  * başlığına uygulanır. ilerleme (ilerleme çubuğu) ve cta (kapanış çağrısı) alanları
  * burada tanımlıdır; tek tık paket (yol haritası 8. adım) onları kullanır.
  *

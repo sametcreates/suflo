@@ -1,7 +1,7 @@
 /*
  * Suflo — şeffaf katman render'ı (ortak): ASS + fontlar → ffmpeg/libass → qtrle .mov
  *
- * captions.js'teki "Suflo Stilleri ile ekle" (overlayUygula) akışından çıkarıldı; deneme
+ * captions.js'teki "Altyazı Efektleri ile ekle" (overlayUygula) akışından çıkarıldı; deneme
  * çıktılarının satın alma sonrası temiz yeniden oluşturulması da aynı yolu kullanır.
  * Zincir: color=black@0 → format=rgba → subtitles(alpha=1) → unpremultiply → qtrle.
  *   alpha=1 ZORUNLU: yazılmazsa libass alfayı işlemez, video tamamen görünmez çıkar.
@@ -228,7 +228,7 @@
 
   // Düzenlenmiş deneme klibi: timeline'a dokunulmaz, temiz dosya elle bağlanır (Replace Footage)
   function elleMesaji(kayit, temizYol) {
-    var ad = kayit && kayit.ad ? kayit.ad : "Suflo Stil";
+    var ad = kayit && kayit.ad ? kayit.ad : "Suflo Altyazı Efekti";
     return "Deneme klibi timeline'da düzenlenmiş (taşınmış, kırpılmış, bölünmüş ya da kopyalanmış); kurgun bozulmasın diye Suflo ona dokunmadı. " +
       "Proje panelinde \"" + ad + "\" öğesine sağ tıkla, Replace Footage ile temiz dosyayı seç (düzenlemelerin korunur), sonra listeden çıkar. Temiz dosya: " + temizYol;
   }
@@ -324,7 +324,7 @@
       return { ok: false, elle: true, path: cikti, hata: elleMesaji(kayit, cikti) };
     }
 
-    var yer = await K.call("KS_placeOverlay", { path: cikti, at: kayit.start, name: kayit.ad || "Suflo Stil" }, 120000);
+    var yer = await K.call("KS_placeOverlay", { path: cikti, at: kayit.start, name: kayit.ad || "Suflo Altyazı Efekti" }, 120000);
     if (!yer || !yer.ok) {
       ciktiyiSil();
       return { ok: false, hata: (yer && yer.error) || "Temiz katman timeline'a konamadı." };

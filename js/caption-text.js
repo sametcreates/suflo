@@ -677,7 +677,7 @@
   }
 
   /*
-   * Anahtar kelime vurgusu (*kelime*). Suflo Stilleri isaretli kelimeyi vurgu
+   * Anahtar kelime vurgusu (*kelime*). Altyazi Efektleri isaretli kelimeyi vurgu
    * renginde cizer; SRT/VTT/normal caption izi gibi ciktilarda isaret kaldirilir.
    */
   // Kapanis yildizindan sonra noktalama gelebilir: "*100 TL*." (otomatik vurgunun bicimi)

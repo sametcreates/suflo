@@ -1320,7 +1320,7 @@ window.K = (function () {
   }
 
   /*
-   * libass (subtitles/ass filtresi) olan ffmpeg tercih edilir: Suflo Stilleri, kanca
+   * libass (subtitles/ass filtresi) olan ffmpeg tercih edilir: Altyazi Efektleri, kanca
    * basligi ve stil onizlemesi onsuz calismaz. Homebrew'un sade "ffmpeg"i gibi
    * libass'siz bir derleme yalniz baska aday yoksa secilir; _libass=false olur.
    */

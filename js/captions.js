@@ -18,7 +18,12 @@ window.KCaptions = (function () {
   var mogrtVitriniIsi = null;
   var aktifMogrtOnizlemeDurdur = null;
   var secilenMogrt = null;
-  var secilenMotorStili = "";   // Suflo stil motoru (kendi animasyonlu stillerimiz): overlay yolu
+  var secilenMotorStili = "";   // stil motoru (3.3'ten beri arayüzde yalnız "efekt" = Altyazı Efektleri): overlay yolu
+  var secilenGorunum = "";      // Altyazı Efektleri: seçili hazır görünüm ("" = elle ayarlanmış)
+  var sonGorunum = "";          // en son uygulanan hazır görünüm ("Görünüme dön" ona döner)
+  // Altyazı Efektleri oluşturucusunun saf modeli (görünümler, eski stil eşleme): js/altyazi-efekt.js
+  var AE = window.SufloAltyaziEfekt || null;
+  var EFEKT = "efekt";
   var bekleyenMogrtYolu = "";
   var mogrtBaglam = { width: 0, height: 0 };
 
@@ -758,7 +763,7 @@ window.KCaptions = (function () {
   }
 
   // DTW yalnız kelime zamanının görüntüyü belirlediği yerde: kelime kelime / birikimli / N kelime
-  // modları ya da kelime tabanlı Suflo Stili (stil motoru wordBased)
+  // modları ya da kelime tabanlı stil (Altyazı Efektleri; stil motoru wordBased)
   function dtwUygun() {
     var len = el("cap-maxlen") ? el("cap-maxlen").value : "";
     if (/^(k|w\d)/.test(len)) return true;
@@ -1642,18 +1647,27 @@ window.KCaptions = (function () {
   }
 
   function applyPreset(key) {
+    // 3.3: eski Suflo stil kimliği (rehber, eski kayıt) Altyazı Efektleri'nin en yakın görünümüne taşınır
+    if (key !== EFEKT && AE && AE.eskiGorunum(key)) { gorunumUygula(AE.eskiGorunum(key), { oynatma: false, kaydet: false }); return; }
     var p = (key === "user") ? K.settings().userPreset : PRESETS[key];
     if (!p) return;
+    var pStil = p.stil;
+    // Eski Şablonum (eski bir Suflo Stili üzerine kaydedilmiş) da en yakın görünüme taşınır
+    if (pStil && pStil.aile !== EFEKT && AE && AE.eskiStilden(pStil.aile, pStil)) {
+      sonGorunum = AE.eskiGorunum(pStil.aile);
+      pStil = efektStili(AE.eskiStilden(pStil.aile, pStil));
+    }
     secilenMogrt = null;
     // "user" (Şablonum) gibi anahtarlar motor stili tasiyabilir: stilin ailesine bak
-    secilenMotorStili = motorStiliMi(key) ? key : (p.stil && motorStiliMi(p.stil.aile) ? p.stil.aile : "");
+    secilenMotorStili = motorStiliMi(key) ? key : (pStil && motorStiliMi(pStil.aile) ? pStil.aile : "");
+    secilenGorunum = "";
     bekleyenMogrtYolu = "";
     el("cap-maxlen").value = uzunlukSecimi(p.maxlen);
     el("cap-case").value = p.kase;
     el("cap-punct").checked = p.punct;
-    // Marka Kiti acikken hazir Suflo Stili kitin yazi tipi / renk / konumuyla gelir (Sablonum aynen kalir)
+    // Marka Kiti acikken hazir stil kitin yazi tipi / renk / konumuyla gelir (Sablonum aynen kalir)
     var kit = key !== "user" && motorStiliMi(key) ? markaKiti() : null;
-    stiliYaz(kit ? window.SufloMarkaKiti.mergeBrandKit(p.stil, kit) : p.stil);
+    stiliYaz(kit ? window.SufloMarkaKiti.mergeBrandKit(pStil, kit) : pStil);
     stilKredisi("");
     inceAyarDurumu();
     vurguKutusuDurumu();
@@ -1665,9 +1679,18 @@ window.KCaptions = (function () {
     uygulamaIpucunuGuncelle();
   }
 
-  // Seçili kartı görsel olarak işaretle (stil elle değişince hiçbiri seçili kalmaz)
+  // Seçili kartı / görünüm çipini işaretle (stil elle değişince çip seçili kalmaz)
   function stilKartiIsaretle(key) {
-    inceAyarDurumu();   // her seçim değişikliği buradan geçer: ince ayar yalnız Suflo Stilinde görünür
+    inceAyarDurumu();   // her seçim değişikliği buradan geçer: paylaş / kaydet yalnız Altyazı Efektlerinde görünür
+    var efektte = !secilenMogrt && secilenMotorStili === EFEKT;
+    var cipler = el("cap-efekt-gorunumler");
+    if (cipler) Array.prototype.forEach.call(cipler.querySelectorAll(".efekt-cip"), function (b) {
+      var secili = efektte && !!secilenGorunum && b.getAttribute("data-gorunum") === secilenGorunum;
+      b.classList.toggle("secili", secili);
+      b.setAttribute("aria-pressed", secili ? "true" : "false");
+    });
+    var bolum = el("cap-efekt");
+    if (bolum) bolum.classList.toggle("etkin", efektte);
     var grid = el("cap-stil-grid");
     if (!grid) return;
     Array.prototype.forEach.call(grid.querySelectorAll(".stil-sec"), function (b) {
@@ -1811,103 +1834,145 @@ window.KCaptions = (function () {
   }
 
   /*
-   * Suflo Stilleri: kendi stil motorumuzun animasyonlu stilleri. MOGRT
-   * gerektirmez; secilince canli onizleme gercek libass ciktisini oynatir,
-   * "ile ekle" seffaf bir video katmani uretip timeline'a koyar.
+   * ---------------- Altyazı Efektleri (3.3) ----------------
+   * Eski "Suflo Stilleri" kart galerisinin yerinde tek bir oluşturucu: temel stil "efekt"
+   * (js/style-engine.js), görünümü tamamen kontrollerden gelir. "Hazır görünümler" (çipler,
+   * js/altyazi-efekt.js) yalnız kontrolleri doldurur. Önizleme herkese açık ve gerçek libass
+   * çıktısıdır; "… ile ekle" şeffaf katmanı Pro.gate("overlay") (3 deneme hakkı) ile koyar.
+   * Eski stil kimlikleri (kayıt, 3.2 kodu, rehber) en yakın görünüme taşınır; motorda kalırlar.
    */
-  // Stil kartlarındaki örnek sözcükler arayüz dilinde (önizleme kullanıcı bölgesinde, çevirmen dokunmaz)
-  function stilOrnekKelimeleri(buyuk) {
-    var en = arayuzDili() === "en";
-    var k = en ? ["Don't", "miss", "this"] : ["Bunu", "sakın", "kaçırma"];
-    return buyuk ? k.map(function (x) { return x.toLocaleUpperCase(en ? "en-US" : "tr-TR"); }) : k;
-  }
-  function stilOrnekleriniYaz() {
-    var grid = el("cap-stil-grid");
-    if (!grid) return;
-    Array.prototype.forEach.call(grid.querySelectorAll(".sm-ornek"), function (o) {
-      var k = stilOrnekKelimeleri(o.getAttribute("data-kase") === "upper");
-      Array.prototype.forEach.call(o.querySelectorAll(".sm-k"), function (w, i) { if (k[i]) w.textContent = k[i]; });
-    });
+
+  // Oluşturucu ayarı (js/altyazi-efekt.js biçimi) → stil() biçimi
+  function efektStili(ayar) {
+    var a = AE ? AE.normalize(ayar) : ayar;
+    return { aile: EFEKT, yogunluk: "balanced", font: a.font, boyut: a.boyut, renk: a.renk, konturRenk: a.konturRenk,
+      vurguRenk: a.vurguRenk, kontur: a.kontur, konum: a.konum, kutu: false, animasyon: EFEKT,
+      giris: a.giris, aktif: a.aktif, vurgu: a.vurgu, kalin: a.kalin, italik: a.italik, satir: a.satir, kelime: a.kelime };
   }
 
-  function motorStilleriniCiz() {
-    var grid = el("cap-stil-grid");
-    if (!grid || !window.SufloStyleEngine) return;
-    Array.prototype.forEach.call(grid.querySelectorAll(".stil-motor-head,.stil-motor"), function (n) { n.remove(); });
-    var kilitli = typeof Pro !== "undefined" && !Pro.isPro();
-    var frag = document.createDocumentFragment();
-    var head = document.createElement("div");
-    head.className = "stil-mogrt-head stil-motor-head";
-    var hb = document.createElement("b");
-    hb.textContent = "Suflo Stilleri";
-    var hs = document.createElement("span");
-    hs.textContent = window.SufloStyleEngine.list().length + " animasyonlu stil · After Effects gerekmez";
-    head.appendChild(hb); head.appendChild(hs);
-    frag.appendChild(head);
-    var sel = el("cap-preset");
-    window.SufloStyleEngine.list().forEach(function (mp) {
-      // gizli select eski kodun okudugu degeri tasir: yeni stillerin secenegi de olsun
-      if (sel && !sel.querySelector('option[value="' + mp.id + '"]')) {
-        var opt = document.createElement("option");
-        opt.value = mp.id; opt.textContent = mp.name;
-        sel.appendChild(opt);
-      }
-      var st = mp.style;
-      var card = document.createElement("button");
-      card.type = "button";
-      card.className = "stil-sec stil-motor stil-motor-" + mp.id;
-      card.dataset.preset = mp.id;
-      card.setAttribute("aria-label", mp.name + " · " + mp.description);
-      var badge = document.createElement("span");
-      badge.className = "ss-rozet";
-      badge.textContent = "SUFLO";   // kilit rozetini Pro modulu kendisi ekliyor
-      var scene = document.createElement("span");
-      scene.className = "ss-sahne";
+  // stil() → oluşturucu ayarı (yazım biçimi Altyazı ayarlarından)
+  function efektAyari(st) {
+    st = st || stil();
+    return { giris: st.giris, aktif: st.aktif, vurgu: st.vurgu, vurguRenk: st.vurguRenk, renk: st.renk, font: st.font,
+      kalin: st.kalin, italik: st.italik, boyut: st.boyut, kontur: st.kontur, konturRenk: st.konturRenk, konum: st.konum,
+      satir: st.satir, kelime: st.kelime, kase: el("cap-case") ? el("cap-case").value : "normal" };
+  }
+
+  // Seçimi Altyazı Efektleri'ne al (kontrol değerlerine dokunmaz)
+  function efekteGec() {
+    secilenMogrt = null;
+    bekleyenMogrtYolu = "";
+    secilenMotorStili = EFEKT;
+    if (el("cap-style-family")) el("cap-style-family").value = EFEKT;
+    if (el("cap-preset")) el("cap-preset").value = EFEKT;
+  }
+
+  // Seçim / değer değişikliğinin ardından bağımlı durumlar ve DOM önizlemesi
+  function efektSonrasi() {
+    inceAyarDurumu();
+    vurguKutusuDurumu();
+    kelimeSiniriDurumu();
+    motorSecenekDurumu();
+    onizlemeDurdur();
+    onizlemeCiz();
+    stilKartiIsaretle(EFEKT);
+    uygulamaIpucunuGuncelle();
+  }
+
+  /*
+   * Hazır görünümü uygula: kontroller dolar, yazım biçimi görünümünkine geçer. Marka Kiti açıksa
+   * yazı tipi / renkler / konum kitten gelir. opts.oynatma === false: önizleme oynatılmaz;
+   * opts.kaydet === false: tercih yazılmaz (rehberin geçici denemesi).
+   */
+  function gorunumUygula(id, opts) {
+    opts = opts || {};
+    var g = AE && AE.gorunum(id);
+    if (!g) return false;
+    efekteGec();
+    secilenGorunum = sonGorunum = g.id;
+    var st = efektStili(g.ayar);
+    var kit = markaKiti();
+    stiliYaz(kit ? window.SufloMarkaKiti.mergeBrandKit(st, kit) : st);
+    if (el("cap-case") && g.ayar.kase) el("cap-case").value = g.ayar.kase;
+    stilKredisi("");
+    efektSonrasi();
+    if (opts.kaydet !== false) savePrefs();
+    if (opts.oynatma !== false) efektOnizlemeTazele(true);
+    return true;
+  }
+
+  // "Hazır görünümler": küçük çipler (yazı tipinde örnek + ad); rozet yok
+  function gorunumleriCiz() {
+    var kap = el("cap-efekt-gorunumler");
+    if (!kap || !AE) return;
+    kap.innerHTML = "";
+    AE.GORUNUMLER.forEach(function (g) {
+      var a = g.ayar;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "efekt-cip";
+      b.setAttribute("data-gorunum", g.id);
+      b.setAttribute("aria-pressed", "false");
       var ornek = document.createElement("span");
-      ornek.className = "sm-ornek";
-      ornek.style.fontFamily = '"' + st.font + '", sans-serif';
-      ornek.style.color = st.renk;
-      ornek.style.setProperty("--sm-vurgu", st.vurguRenk);
-      ornek.style.setProperty("--sm-kontur", st.konturRenk);
-      ornek.setAttribute("data-kase", mp.text.kase === "upper" ? "upper" : "");
-      var kelimeler = stilOrnekKelimeleri(mp.text.kase === "upper");
-      kelimeler.forEach(function (k, i) {
-        var w = document.createElement("span");   // <i> degil: .stil-sec i kurali kucultup soluklastiriyor
-        w.className = "sm-k";
-        w.textContent = k;
-        if (i === 1) w.className += " sm-aktif";
-        ornek.appendChild(w);
-        if (i < kelimeler.length - 1) ornek.appendChild(document.createTextNode(" "));
-      });
-      scene.appendChild(ornek);
-      var info = document.createElement("span");
-      info.className = "ss-bilgi";
-      var title = document.createElement("b");
-      title.textContent = mp.name;
-      var sub = document.createElement("i");
-      sub.textContent = mp.description;
-      info.appendChild(title); info.appendChild(sub);
-      card.appendChild(badge); card.appendChild(scene); card.appendChild(info);
-      card.addEventListener("click", function () {
-        // Onizleme herkese acik; timeline'a ekleme Pro (overlay) kapisinda
-        if (el("cap-preset")) el("cap-preset").value = mp.id;
-        if (el("cap-style-family")) el("cap-style-family").value = "motor";
-        applyPreset(mp.id);
-        savePrefs();
-        if (onizlemeSaat) onizlemeDurdur();
-        onizlemeOynat();
-      });
-      frag.appendChild(card);
+      ornek.className = "efekt-cip-ornek";
+      ornek.setAttribute("data-i18n-skip", "");
+      ornek.setAttribute("aria-hidden", "true");
+      ornek.style.fontFamily = '"' + a.font + '", sans-serif';
+      ornek.style.fontWeight = a.kalin ? "800" : "500";
+      ornek.style.color = a.renk;
+      ornek.style.setProperty("--efekt-kontur", a.konturRenk);
+      var harf = document.createElement("span");
+      harf.textContent = "A";
+      var vurgu = document.createElement("span");
+      vurgu.textContent = "a";
+      vurgu.style.color = a.vurgu ? a.vurguRenk : a.renk;
+      ornek.appendChild(harf);
+      ornek.appendChild(vurgu);
+      var ad = document.createElement("b");
+      ad.textContent = g.ad;
+      b.appendChild(ornek);
+      b.appendChild(ad);
+      b.addEventListener("click", function () { gorunumUygula(g.id); });
+      kap.appendChild(b);
     });
-    grid.insertBefore(frag, grid.firstChild);
-    if (secilenMotorStili && !secilenMogrt) stilKartiIsaretle(secilenMotorStili);
+    stilKartiIsaretle(EFEKT);
+  }
+
+  /*
+   * Canlı önizleme: kontrol değişince (450 ms sakinlikten sonra) gerçek stil motoru çıktısı yeniden
+   * çizilir. Çizim sürerken gelen değişiklik bitince bir kez daha çizer. ffmpeg yoksa DOM önizlemesi.
+   * Yalnız kullanıcı etkileşiminde çağrılır (panel açılışında Premiere / ffmpeg çağrısı yok).
+   */
+  var efektSaat = null, efektTekrar = false;
+  function efektOnizlemeTazele(hemen) {
+    if (efektSaat) clearTimeout(efektSaat);
+    efektSaat = setTimeout(function () {
+      efektSaat = null;
+      if (secilenMogrt || secilenMotorStili !== EFEKT) return;
+      if (!K.nodeOK) { onizlemeOynatDom(); return; }
+      if (onizlemeRenderCalisiyor) { efektTekrar = true; return; }
+      if (onizlemeSaat) { clearTimeout(onizlemeSaat); onizlemeSaat = null; }
+      onizlemeRenderCalisiyor = true;
+      motorOnizlemeOynat().then(function (ok) {
+        onizlemeRenderCalisiyor = false;
+        if (efektTekrar) { efektTekrar = false; efektOnizlemeTazele(true); }
+        else if (!ok && secilenMotorStili === EFEKT && !secilenMogrt) onizlemeOynatDom();
+      }, function () { onizlemeRenderCalisiyor = false; });
+    }, hemen ? 0 : 450);
+  }
+
+  // En çok kelime kutusu 1-10 (boş / bozuk değer görünümün değerine döner)
+  function efektKelimeSayisi() {
+    var e = el("cap-efekt-kelime");
+    var n = parseInt(e ? e.value : "", 10);
+    if (!isFinite(n)) return 5;
+    return Math.max(1, Math.min(10, n));
   }
 
   function mogrtStilleriniCiz() {
     var grid = el("cap-stil-grid");
     if (!grid) return;
-    // Suflo Stilleri basligi da .stil-mogrt-head tasir: ona dokunma
-    Array.prototype.forEach.call(grid.querySelectorAll(".stil-mogrt-head:not(.stil-motor-head),.stil-mogrt,.stil-mogrt-empty"), function (n) { n.remove(); });
+    Array.prototype.forEach.call(grid.querySelectorAll(".stil-mogrt-head,.stil-mogrt,.stil-mogrt-empty"), function (n) { n.remove(); });
     var oran = sekansOrani();
     var istenenAnahtar = secilenMogrt ? mogrtStilAnahtari(secilenMogrt) : "";
     if (bekleyenMogrtYolu) {
@@ -2075,24 +2140,6 @@ window.KCaptions = (function () {
     }
   }
 
-  function initStilKartlari() {
-    var grid = el("cap-stil-grid");
-    if (!grid) return;
-    Array.prototype.forEach.call(grid.querySelectorAll(".stil-sec"), function (b) {
-      b.addEventListener("click", function () {
-        var key = b.dataset.preset;
-        secilenMogrt = null;
-        bekleyenMogrtYolu = "";
-        if (el("cap-preset")) el("cap-preset").value = key;
-        applyPreset(key);
-        savePrefs();
-        // dokunmanın karşılığı anında: seçilen stil hemen oynasın
-        if (onizlemeSaat) onizlemeDurdur();
-        onizlemeOynat();
-      });
-    });
-  }
-
   // "Şablonum" seçeneğini menüde göster/oluştur
   function ensureUserPresetOption() {
     if (!K.settings().userPreset) return;
@@ -2142,8 +2189,16 @@ window.KCaptions = (function () {
       konum: parseInt(d("cap-konum", "2"), 10),          // ASS Alignment: 2 alt, 5 orta, 8 üst
       kutu: !!(el("cap-kutu") && el("cap-kutu").checked),
       animasyon: d("cap-animasyon", "yok"),
-      // 9:16'da yazı platform arayüzünden (sağ ikon sütunu) uzak durur; yalnız Suflo Stillerinde
-      guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked)
+      // 9:16'da yazı platform arayüzünden (sağ ikon sütunu) uzak durur; yalnız Altyazı Efektlerinde
+      guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked),
+      // Altyazı Efektleri oluşturucusu (3.3): giriş / vurgu animasyonu, kelime vurgusu, kalın, italik, satır, kelime
+      giris: d("cap-efekt-giris", "fade"),
+      aktif: d("cap-efekt-aktif", "yok"),
+      vurgu: !el("cap-efekt-vurgu") || el("cap-efekt-vurgu").checked,
+      kalin: !el("cap-efekt-kalin") || el("cap-efekt-kalin").checked,
+      italik: !!(el("cap-efekt-italik") && el("cap-efekt-italik").checked),
+      satir: Math.max(1, Math.min(3, parseInt(d("cap-efekt-satir", "2"), 10) || 2)),
+      kelime: efektKelimeSayisi()
     };
   }
 
@@ -2152,11 +2207,17 @@ window.KCaptions = (function () {
    * Motor yine de her değeri yeniden doğrular (style-engine.js guvenliStil).
    */
   function motorAyarlari(st) {
-    return {
+    var o = {
       font: st.font, fontFile: FONTLAR[st.font], boyut: st.boyut,
       renk: st.renk, konturRenk: st.konturRenk, vurguRenk: st.vurguRenk,
       kontur: st.kontur, konum: st.konum, guvenli: !!st.guvenli
     };
+    // Altyazı Efektleri alanları yalnız efekt stilinde (eski stillerin kodu / çıktısı değişmesin)
+    if (st.aile === EFEKT) {
+      o.giris = st.giris; o.aktif = st.aktif; o.vurgu = st.vurgu !== false; o.kalin = st.kalin !== false;
+      o.italik = st.italik === true; o.satir = st.satir; o.kelime = st.kelime;
+    }
+    return o;
   }
 
   /*
@@ -2204,6 +2265,8 @@ window.KCaptions = (function () {
         preset: el("cap-preset").value,
         mogrtPath: secilenMogrt && secilenMogrt.path ? secilenMogrt.path : "",
         motorStili: secilenMogrt ? "" : secilenMotorStili,
+        gorunum: secilenGorunum,
+        gorunumTaban: sonGorunum,
         kredi: stilKrediAd,
         stil: st
       };
@@ -2257,6 +2320,16 @@ window.KCaptions = (function () {
       secilenMotorStili = p.mogrtPath ? "" : (motorStiliMi(p.motorStili) ? p.motorStili :
         (p.stil && motorStiliMi(p.stil.aile) ? p.stil.aile : ""));
       stiliYaz(p.stil);
+      if (secilenMotorStili === EFEKT) {
+        secilenGorunum = AE && AE.gorunum(p.gorunum) ? p.gorunum : "";
+        sonGorunum = AE && AE.gorunum(p.gorunumTaban) ? p.gorunumTaban : secilenGorunum;
+      } else if (secilenMotorStili && AE && AE.eskiStilden(secilenMotorStili, p.stil)) {
+        // 3.3: eski Suflo Stili kaydı en yakın görünüme taşınır; kayıttaki yazı tipi, renkler, konum korunur
+        sonGorunum = AE.eskiGorunum(secilenMotorStili);
+        stiliYaz(efektStili(AE.eskiStilden(secilenMotorStili, p.stil)));
+        efekteGec();
+        secilenGorunum = "";
+      }
       if (!p.mogrtPath && p.kredi) stilKredisi(p.kredi);
     } catch (e) {}
   }
@@ -2269,7 +2342,8 @@ window.KCaptions = (function () {
       "cap-font": st.font, "cap-boyut": st.boyut, "cap-renk": st.renk,
       "cap-renk-kontur": st.konturRenk, "cap-renk-vurgu": st.vurguRenk,
       "cap-kontur": st.kontur, "cap-konum": st.konum,
-      "cap-animasyon": st.animasyon
+      "cap-animasyon": st.animasyon,
+      "cap-efekt-giris": st.giris, "cap-efekt-aktif": st.aktif, "cap-efekt-satir": st.satir, "cap-efekt-kelime": st.kelime
     };
     Object.keys(esle).forEach(function (id) {
       var e = el(id);
@@ -2277,6 +2351,9 @@ window.KCaptions = (function () {
     });
     if (el("cap-kutu") && st.kutu !== undefined) el("cap-kutu").checked = !!st.kutu;
     if (el("cap-guvenli-yerlesim") && typeof st.guvenli === "boolean") el("cap-guvenli-yerlesim").checked = st.guvenli;
+    ["vurgu", "kalin", "italik"].forEach(function (k) {
+      if (el("cap-efekt-" + k) && typeof st[k] === "boolean") el("cap-efekt-" + k).checked = st[k];
+    });
   }
 
   /* ---------------- İnce ayar, Marka Kiti, paylaşılabilir stil kodları ---------------- */
@@ -2300,15 +2377,14 @@ window.KCaptions = (function () {
   }
 
   /*
-   * İnce ayar bloğu yalnız Suflo Stili seçiliyken görünür (MOGRT stilinde gizli).
-   * Suflo Stillerinde işe yaramayan animasyon ve arka plan kutusu (.ia-eski) gizlenir;
-   * paketle gelmeyen sistem yazı tipleri kapanır (libass onları sessizce başka fonta çevirir).
+   * "Paylaş ve kaydet" bloğu yalnız Altyazı Efektleri seçiliyken görünür (Premiere şablonunda gizli).
+   * Eski "Özel" kayıtların taşıyıcıları (.ia-eski) hep gizli. Efektte paketle gelmeyen sistem
+   * yazı tipleri kapanır (libass onları sessizce başka fonta çevirir).
    */
   function inceAyarDurumu() {
     var motorda = !secilenMogrt && !!secilenMotorStili;
     var d = el("cap-ince-ayar");
     if (d) d.hidden = !motorda;
-    Array.prototype.forEach.call(document.querySelectorAll(".ia-eski"), function (n) { n.hidden = motorda; });
     var sistem = el("cap-font-sistem");
     if (sistem) sistem.disabled = motorda;
     var font = el("cap-font");
@@ -2320,7 +2396,7 @@ window.KCaptions = (function () {
     if (sar) sar.hidden = !(motorda && dikeySekans());
     var cip = el("cap-marka-kiti-cip");
     if (cip) cip.hidden = !markaKiti();
-    // MOGRT / Suflo Stili değişti: kelime tabanlı stilde "Hassas kelime zamanlaması" görünür
+    // MOGRT / Altyazı Efektleri değişti: kelime tabanlı stilde "Hassas kelime zamanlaması" görünür
     motorSecenekDurumu();
   }
 
@@ -2346,7 +2422,7 @@ window.KCaptions = (function () {
     else yedek();
   }
 
-  // Seçili Suflo Stili + ince ayar → "SFL1." kodu (yerel yol, logo, fontFile koda girmez)
+  // Altyazı Efektleri ayarları → "SFL1." kodu (yerel yol, logo, fontFile koda girmez)
   function stilKodu() {
     if (!SS || secilenMogrt || !motorStiliMi(secilenMotorStili)) return null;
     var st = stil();
@@ -2364,7 +2440,7 @@ window.KCaptions = (function () {
 
   function stilPaylas() {
     var k = stilKodu();
-    if (!k) { KApp.toast("Paylaşmak için önce bir Suflo Stili seç.", "warn"); return; }
+    if (!k) { KApp.toast("Paylaşmak için önce Altyazı Efektleri'nden bir görünüm seç.", "warn"); return; }
     panoyaKopyala(k.kod + "\n" + SS.shareUrl(k.kod, arayuzDili()), k.yazarGecersiz
       ? "Stil kodu kopyalandı (ad yalnız harf, rakam, _ . - içerebilir; kod adsız oluşturuldu)"
       : "Stil kodu ve suflo.app/stil bağlantısı kopyalandı");
@@ -2372,7 +2448,7 @@ window.KCaptions = (function () {
 
   function stilDisaAktar() {
     var k = stilKodu();
-    if (!k) { KApp.toast("Dışa aktarmak için önce bir Suflo Stili seç.", "warn"); return; }
+    if (!k) { KApp.toast("Dışa aktarmak için önce Altyazı Efektleri'nden bir görünüm seç.", "warn"); return; }
     try {
       var yol = saveToDesktop("suflo-stil-" + secilenMotorStili + ".suflo-stil", k.kod + "\n" + SS.shareUrl(k.kod, arayuzDili()) + "\n");
       KApp.toast("Kaydedildi: " + yol, "good", 8000);
@@ -2382,36 +2458,40 @@ window.KCaptions = (function () {
   }
 
   /*
-   * Kodu uygula: önce hazır stil (Marka Kiti açıksa kitle), sonra koddaki ince ayar ve metin
+   * Kodu uygula: önce temel görünüm (Marka Kiti açıksa kitle), sonra koddaki ince ayar ve metin
    * biçimi üstüne yazılır. Önizleme tam olarak timeline'a eklenecek görünümü oynatır.
+   * 3.3: eski Suflo Stili kodu (Creator Punch, Bold Box…) Altyazı Efektleri'nin en yakın görünümüne
+   * taşınır; koddaki yazı tipi, renkler ve konum korunur.
    */
   function stilKoduUygula(kod) {
     if (!SS) return false;
     var d = SS.decode(String(kod || ""), function (id) { return motorStiliMi(id); });
     if (!d.ok) { KApp.toast(d.error, "bad", 8000); return false; }
     var r = d.recipe;
-    if (el("cap-preset")) el("cap-preset").value = r.styleId;
-    if (el("cap-style-family")) el("cap-style-family").value = "motor";
-    applyPreset(r.styleId);
     var ov = {};
     Object.keys(r.overrides).forEach(function (k) { if (k !== "fontFile") ov[k] = r.overrides[k]; });
+    var eskiKimlik = r.styleId !== EFEKT && AE && AE.eskiGorunum(r.styleId) ? r.styleId : "";
+    var taban = eskiKimlik ? AE.eskiGorunum(r.styleId) : (AE ? AE.GORUNUMLER[0].id : "");
+    if (!gorunumUygula(taban, { oynatma: false, kaydet: false })) { efekteGec(); stiliYaz(efektStili({})); }
+    if (eskiKimlik) {
+      var guvenli = ov.guvenli;
+      ov = efektStili(AE.eskiStilden(r.styleId, ov));
+      if (typeof guvenli === "boolean") ov.guvenli = guvenli;
+    }
     stiliYaz(ov);
+    secilenGorunum = AE ? AE.gorunumuBul(efektAyari()) : "";
     if (r.intensity && el("cap-yogunluk")) el("cap-yogunluk").value = r.intensity;
     if (r.text.maxlen) el("cap-maxlen").value = uzunlukSecimi(r.text.maxlen);
     if (r.text.kase) el("cap-case").value = r.text.kase;
     if (typeof r.text.punct === "boolean") el("cap-punct").checked = r.text.punct;
     stilKredisi(r.author || "");
-    vurguKutusuDurumu();
-    kelimeSiniriDurumu();
-    motorSecenekDurumu();
-    onizlemeDurdur();
-    onizlemeCiz();
-    stilKartiIsaretle(r.styleId);
-    uygulamaIpucunuGuncelle();
+    efektSonrasi();
     savePrefs();
-    var ad = (window.SufloStyleEngine.preset(r.styleId) || {}).name || r.styleId;
+    var ad = (window.SufloStyleEngine.preset(EFEKT) || {}).name || EFEKT;
+    var eskiAd = eskiKimlik ? (window.SufloStyleEngine.preset(eskiKimlik) || {}).name || eskiKimlik : "";
     KApp.toast("Stil kodu uygulandı: " + ad + (r.author ? " · @" + r.author : "") +
       (d.warnings.length ? " · " + d.warnings.length + " geçersiz ayar atlandı" : ""), d.warnings.length ? "warn" : "good", 7000);
+    if (eskiAd) KApp.toast("Eski stil kodu en yakın görünüme uyarlandı: " + eskiAd + " → " + (AE.gorunum(taban) || {}).ad, "good", 8000);
     onizlemeOynat();
     return true;
   }
@@ -2434,6 +2514,8 @@ window.KCaptions = (function () {
 
   function varsayilanaDon() {
     if (!motorStiliMi(secilenMotorStili) || secilenMogrt) return;
+    // Altyazı Efektleri: en son uygulanan hazır görünüme (yoksa ilk görünüme) döner
+    if (secilenMotorStili === EFEKT && AE) { gorunumUygula(sonGorunum || AE.GORUNUMLER[0].id); return; }
     var id = secilenMotorStili;
     if (el("cap-preset")) el("cap-preset").value = id;
     applyPreset(id);
@@ -2452,7 +2534,7 @@ window.KCaptions = (function () {
   }
 
   /*
-   * Ayarlar › Marka Kiti değişti: çip, seçili Suflo Stili ve kanca başlığı tazelenir.
+   * Ayarlar › Marka Kiti değişti: çip, Altyazı Efektleri ayarları ve kanca başlığı tazelenir.
    * Stil yalnız kitin yazı tipi / renk / konum ya da açık-kapalı durumu değişince güncellenir
    * (logo, köşe, boyut değişimi stile dokunmaz). Yalnız kitin koyduğu değerde duran alan
    * değişir: elle ince ayar ve paylaşılan koddan gelen değer korunur; kit kapanınca kitin
@@ -2465,7 +2547,9 @@ window.KCaptions = (function () {
     sonKit = yeni;
     var sablonum = !!el("cap-preset") && el("cap-preset").value === "user";
     if (MK && yeni && !secilenMogrt && !sablonum && motorStiliMi(secilenMotorStili) && MK.styleFieldsChanged(eski, yeni)) {
-      var temel = PRESETS[secilenMotorStili];
+      // Altyazı Efektleri'nde temel, en son uygulanan hazır görünüm
+      var taban = secilenMotorStili === EFEKT && AE && AE.gorunum(sonGorunum);
+      var temel = taban ? { stil: efektStili(taban.ayar) } : PRESETS[secilenMotorStili];
       var r = MK.rebaseBrandKit(stil(), temel && temel.stil, eski, yeni);
       if (r.changed) {
         stiliYaz(r.stil);
@@ -3152,7 +3236,7 @@ window.KCaptions = (function () {
 
   /*
    * Otomatik anahtar kelime vurgusu: sayilar (birimiyle) ve satir basina en
-   * anlamli tek kelime *isaretlenir*. Suflo Stilleri bunlari vurgu renginde
+   * anlamli tek kelime *isaretlenir*. Altyazi Efektleri bunlari vurgu renginde
    * cizer. Kelime modunda 6'li pencereler satir gibi degerlendirilir.
    */
   function otomatikVurgu() {
@@ -3189,7 +3273,7 @@ window.KCaptions = (function () {
     yeni.forEach(function (t, i) { segments[i].text = t; });
     render(); saveDraftNow();
     KApp.toast(n + " " + (segmentsMode === "k1" || segmentsMode === "w" ? "kelime" : "satır") +
-      " vurgulandı · Suflo Stillerinde vurgu renginde görünür · Ctrl+Z ile geri al", "good");
+      " vurgulandı · Altyazı Efektlerinde vurgu renginde görünür · Ctrl+Z ile geri al", "good");
   }
 
   async function proofreadAll() {
@@ -4060,11 +4144,11 @@ window.KCaptions = (function () {
    */
   // opts.ciftDil: ceviri yapilmis satirlarda ust satir orijinal, alt satir ceviri
   // (yalniz SRT/VTT ve normal caption izi; stilli yollar kelime gruplar, tek dil kalir)
-  // opts.vurgu: *anahtar kelime* isaretleri korunur (yalniz Suflo Stilleri cizer);
+  // opts.vurgu: *anahtar kelime* isaretleri korunur (yalniz stil motoru / Altyazi Efektleri cizer);
   // diger tum ciktilarda isaret kaldirilir
   /*
    * opts.kelimeler: satırın ölçülmüş kelimeleri (yerel -ojf) cue.words olarak eklenir;
-   * Suflo Stil motoru kelime geçişlerini onlardan alır (sayı tutmazsa kendi yedeği).
+   * Stil motoru (Altyazı Efektleri) kelime geçişlerini onlardan alır (sayı tutmazsa kendi yedeği).
    */
   function cueler(opts) {
     var out = [];
@@ -4242,10 +4326,9 @@ window.KCaptions = (function () {
     var anim = el("cap-animasyon") ? el("cap-animasyon").value : "yok";
 
     var kutu = el("cap-renk-vurgu-kutu");
-    // Suflo Stillerinin hepsi vurgu rengini kullanır (aktif kelime, *vurgu*, panel çizgileri)
-    var motorda = !secilenMogrt && motorStiliMi(stil().aile);
-    if (kutu) kutu.classList.toggle("pasif",
-      !(motorda || anim === "karaoke" || anim === "vurgu" || anim === "viral" || anim === "pop" || anim === "premium"));
+    // Altyazı Efektleri oluşturucusunun kontrolü: vurgu rengi hep seçilebilir (etkin kelime ve *anahtar kelime*);
+    // dokunmak efekti seçer. Eski "Özel" kayıtta da etkileşimli kalır.
+    if (kutu) kutu.classList.remove("pasif");
 
     // Satır modunda ölçülmüş kelimeler varsa karaoke / akıcı dolgu satır içinde gerçek zamanla çalışır
     // (buildAss → assSatirKaraoke); diğer kelimeli animasyonlar kelime modu ister
@@ -4282,7 +4365,7 @@ window.KCaptions = (function () {
     var metin = el("cap-onizleme-metin");
     if (metin) metin.hidden = false;
     var not = el("cap-onizleme-not");
-    if (not) not.textContent = "Bir stile dokun; kendi karende görmek için \"Kare al\"";
+    if (not) not.textContent = "Bir görünüm seç ya da ayarı değiştir; kendi karende görmek için \"Kare al\"";
     var b = el("cap-onizleme-oynat");
     if (b) b.textContent = "▶ Oynat";
   }
@@ -4317,6 +4400,8 @@ window.KCaptions = (function () {
     kutu.style.fontFamily = st.font + ", sans-serif";
     kutu.style.fontSize = Math.max(7, st.boyut * olcek) + "px";
     kutu.style.fontWeight = rec.aile === "doc" ? "600" : "800";
+    kutu.style.fontStyle = "normal";
+    kutu.style.whiteSpace = "";
     kutu.style.color = st.renk;
     kutu.style.letterSpacing = (rec.spacing * olcek) + "px";
     kutu.style.background = st.kutu ? "rgba(5,8,13,.83)" : "transparent";
@@ -4355,6 +4440,7 @@ window.KCaptions = (function () {
     }
     var bosEski = sahne.querySelector(".onizleme-bos");
     if (bosEski) bosEski.remove();
+    if (st.aile === EFEKT) { efektDomCiz(kutu, st, ornek, vurguIndex); return; }
 
     /*
      * Kelimeleri animasyona göre diz. vurguIndex "şu an okunan kelime";
@@ -4416,6 +4502,39 @@ window.KCaptions = (function () {
   }
 
   /*
+   * Altyazı Efektleri'nin DOM önizlemesi (ffmpeg yokken ya da gerçek çizim hazırlanırken): kart en çok
+   * "En çok kelime" kadar kelime, giriş animasyonu ilk karede, vurgu animasyonu konuşulan kelimede.
+   * Gerçek görünüm libass çıktısıdır (motorOnizlemeOynat); bu yalnız yaklaşık bir yedek.
+   */
+  var EFEKT_GIRIS_SINIFI = { pop: "satir-efekt-pop", fade: "satir-fade", yukari: "satir-slide", asagi: "satir-efekt-asagi", zipla: "satir-efekt-zipla" };
+  var EFEKT_AKTIF_SINIFI = { zipla: "kelime-efekt-zipla", titre: "kelime-efekt-titre", glitch: "kelime-efekt-glitch" };
+  function efektDomCiz(kutu, st, ornek, vurguIndex) {
+    kutu.style.fontWeight = st.kalin === false ? "500" : "800";
+    kutu.style.fontStyle = st.italik ? "italic" : "normal";
+    kutu.style.background = "transparent";
+    kutu.style.padding = "0";
+    var oynuyor = vurguIndex !== undefined;
+    var n = Math.max(1, Number(st.kelime) || 5);
+    var bas = oynuyor ? Math.floor(vurguIndex / n) * n : 0;
+    var kelimeler = ornek.kelimeler.slice(bas, bas + n);
+    var etkin = oynuyor ? vurguIndex - bas : -1;
+    kutu.innerHTML = "";
+    if (oynuyor && etkin === 0 && EFEKT_GIRIS_SINIFI[st.giris]) kutu.classList.add(EFEKT_GIRIS_SINIFI[st.giris]);
+    if (Number(st.satir) === 1) kutu.style.whiteSpace = "nowrap";
+    else kutu.style.whiteSpace = "";
+    kelimeler.forEach(function (kelime, i) {
+      var s = document.createElement("span");
+      s.className = "kelime";
+      s.textContent = kelime + (i < kelimeler.length - 1 ? " " : "");
+      if (i === etkin) {
+        if (st.vurgu !== false) s.style.color = st.vurguRenk;
+        if (EFEKT_AKTIF_SINIFI[st.aktif]) s.classList.add(EFEKT_AKTIF_SINIFI[st.aktif]);
+      }
+      kutu.appendChild(s);
+    });
+  }
+
+  /*
    * Önizlemede gösterilecek kelimeler. Gerçek transkript varsa ORTASINDAN bir
    * satır alınır (baştaki satır çoğu videoda "merhaba" gibi kısa ve temsil etmez).
    */
@@ -4452,6 +4571,13 @@ window.KCaptions = (function () {
     var cs = cueler({ vurgu: true, kelimeler: true });
     if (!cs.length) {
       if (st.aile === "doc") return [{ start: 0.15, end: 2.7, text: "Hikâyenin başladığı yer." }];
+      if (st.aile === EFEKT) {
+        // Altyazı Efektleri: iki kart, ikinci kelimesi *anahtar kelime* (vurgu rengi hep görünür)
+        var efektOrnek = arayuzDili() === "en" ? ["Don't", "*miss*", "this", "one", "today"] : ["Bunu", "*sakın*", "kaçırma", "arkadaşlar", "bugün"];
+        return efektOrnek.map(function (k, i) {
+          return { start: 0.15 + i * 0.62, end: 0.7 + i * 0.62, text: styleText(k) };
+        });
+      }
       var ornekler = st.aile === "pop" ? ["POP!", "ŞAK!", "VAY!"] :
         st.aile === "mrbeast" ? ["BU", "FİKİR", "PATLADI"] :
         st.aile === "capcut" ? ["daha", "hızlı", "edit"] :
@@ -4618,7 +4744,7 @@ window.KCaptions = (function () {
       return;
     }
     var st = stil();
-    if (K.nodeOK && /^(mrbeast|capcut|saas|viral|pop|doc|premium)$/.test(st.aile)) {
+    if (K.nodeOK && /^(mrbeast|capcut|saas|viral|pop|doc|premium|efekt)$/.test(st.aile)) {
       onizlemeRenderCalisiyor = true;
       motorOnizlemeOynat().then(function (ok) {
         onizlemeRenderCalisiyor = false;
@@ -4638,8 +4764,9 @@ window.KCaptions = (function () {
 
     var st = stil();
     var anim = st.animasyon || "yok";
-    var kelimeli = kelimeModuAktif() &&
-                   ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli;
+    // Altyazı Efektleri her modda kelime kelime oynar (satır altyazısını motor kelimelere böler)
+    var kelimeli = st.aile === EFEKT || (kelimeModuAktif() &&
+                   ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli);
 
     if (b) b.textContent = "■ Durdur";
 
@@ -4702,7 +4829,9 @@ window.KCaptions = (function () {
       capcut:  { aile: "capcut", maxWords: 4, spacing: 0, shadow: 1, boxAlpha: 0x24,
                  boxPadding: 18, marginLR: 100, marginV: 80 },
       saas:    { aile: "saas", maxWords: 6, spacing: 0.5, shadow: 0, boxAlpha: 0x28,
-                 boxPadding: 20, marginLR: 120, marginV: 86 }
+                 boxPadding: 20, marginLR: 120, marginV: 86 },
+      efekt:   { aile: "efekt", maxWords: Math.max(1, Number(st && st.kelime) || 5), spacing: 0, shadow: 0, boxAlpha: 0x40,
+                 boxPadding: 0, marginLR: 90, marginV: 80 }
     };
     return tumu[aile] || tumu.custom;
   }
@@ -5025,7 +5154,7 @@ window.KCaptions = (function () {
     if (b) { b.textContent = UYGULA_ETIKET; b.classList.remove("warn"); }
     var styleBtn = el("cap-apply-style");
     if (styleBtn) styleBtn.classList.remove("warn");
-    // Stil dugmesinin metni/durumu tek yerde: MOGRT ve Suflo Stilleri ayni kurala uyar
+    // Stil dugmesinin metni/durumu tek yerde: MOGRT ve Altyazi Efektleri ayni kurala uyar
     uygulamaIpucunuGuncelle();
   }
 
@@ -5096,10 +5225,10 @@ window.KCaptions = (function () {
   async function overlayUygula() {
     // Pro: animasyonlu katman (ucretsizde kanca basligiyla ortak 3 deneme hakki; deneme ciktisi filigranli)
     if (typeof Pro !== "undefined" && !Pro.gate("overlay", { deneme: true, yeniden: function () { overlayUygula().then(uygulaEtiketiniSifirla); } })) return;
-    // Deneme yalniz Suflo Stilleri icin: tercihlerden geri yuklenen bir MOGRT stili deneme kapisindan sizmasin
+    // Deneme yalniz Altyazi Efektleri icin: tercihlerden geri yuklenen bir MOGRT stili deneme kapisindan sizmasin
     if (typeof Pro !== "undefined" && !Pro.isPro() && secilenMogrt) {
-      status("Deneme yalnız Suflo Stilleri için. Bir Suflo Stili seç ya da Pro'ya geç.", "warn");
-      KApp.toast("Deneme yalnız Suflo Stilleri için.", "warn");
+      status("Deneme yalnız Altyazı Efektleri için. Bir efekt görünümü seç ya da Pro'ya geç.", "warn");
+      KApp.toast("Deneme yalnız Altyazı Efektleri için.", "warn");
       return;
     }
     if (segments.length === 0) return;
@@ -5139,7 +5268,7 @@ window.KCaptions = (function () {
       var cs = cueler();
       if (!cs.length) throw new Error("Yazılacak altyazı yok.");
       var st = stil();
-      // Marka Kiti logosu yalnız Suflo Stili katmanında; logo varken katman seçilen kapsamın
+      // Marka Kiti logosu yalnız Altyazı Efektleri katmanında; logo varken katman seçilen kapsamın
       // sonuna kadar sürer (tüm sekans: sekans sonu, In/Out: Out noktası, klip: altyazılar boyunca)
       var kit = motorStiliMi(st.aile) ? markaKiti() : null;
       var logo = kit && kit.logo.path ? { path: kit.logo.path, kose: kit.logo.kose, oran: kit.logo.oran, guvenli: !!st.guvenli } : null;
@@ -5194,7 +5323,8 @@ window.KCaptions = (function () {
       if (katman && katman.logoAtlandi) KApp.toast("Marka Kiti logosu bulunamadı; katman logosuz eklendi. Ayarlar › Marka Kiti'nden logoyu yeniden seç.", "warn", 9000);
 
       status("Timeline'a yerleştiriliyor…");
-      var katmanAdi = "Suflo Stil · " + (stilDerlemesi ? stilDerlemesi.id : "Özel");
+      // Premiere'deki klip adı: Altyazı Efektleri katmanı; eski kimlikler (yarım kalmış eski iş) eski adıyla
+      var katmanAdi = stilDerlemesi && stilDerlemesi.id === EFEKT ? "Suflo Altyazı Efekti" : "Suflo Stil · " + (stilDerlemesi ? stilDerlemesi.id : "Özel");
       var yer = await K.call("KS_placeOverlay", { path: cikti, scope: scope, name: katmanAdi }, 120000);
       if (!yer.ok) throw new Error(yer.error);
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("overlay", KApp.toast);   // deneme: yalniz basarida
@@ -5505,8 +5635,7 @@ window.KCaptions = (function () {
       menu.hidden = !menu.hidden;
     });
     initYildizBar();
-    initStilKartlari();
-    motorStilleriniCiz();
+    gorunumleriCiz();
     // Emoji seçici ayrı modülde (js/emoji-picker.js); altyazı durumuna bu arayüzle bağlanır
     if (window.KEmojiPicker) {
       KEmojiPicker.init({
@@ -5519,26 +5648,23 @@ window.KCaptions = (function () {
     // acilista secili sablonu kartlara yansit
     if (el("cap-preset") && el("cap-preset").value) stilKartiIsaretle(el("cap-preset").value);
 
-    /* Görünüm kontrolleri: her değişiklikte önizleme anında yenilenir ve kaydedilir */
-    ["cap-font", "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu", "cap-yogunluk",
-     "cap-kontur", "cap-konum", "cap-kutu", "cap-animasyon", "cap-guvenli-yerlesim"].forEach(function (id) {
+    /*
+     * Altyazı Efektleri kontrolleri: her değişiklik efekti seçer (Premiere şablonu seçiliyse bırakır),
+     * hazır görünüm çipini kaldırır, DOM önizlemesini anında, gerçek motor önizlemesini kısa
+     * sakinlikten sonra tazeler ve kaydeder.
+     */
+    EFEKT_KONTROLLERI.forEach(function (id) {
       var e = el(id);
       if (!e) return;
       // renk seçicide "input" anlık, diğerlerinde "change" yeterli
       var olay = e.type === "color" ? "input" : "change";
       e.addEventListener(olay, function () {
-        secilenMogrt = null;
-        bekleyenMogrtYolu = "";
-        onizlemeDurdur();
-        vurguKutusuDurumu();     // animasyon değişince ipucu ve vurgu rengi durumu
-        onizlemeCiz();
+        if (id === "cap-efekt-kelime") e.value = String(efektKelimeSayisi());
+        efekteGec();
+        secilenGorunum = "";
+        efektSonrasi();
         savePrefs();
-        // stil elle değiştiyse artık hazır şablonda değiliz; aile hâlâ bir Suflo
-        // stiliyse o stil (ince ayarlı haliyle) seçili kalır ve kartı işaretli görünür
-        if (el("cap-preset")) el("cap-preset").value = "";
-        secilenMotorStili = motorStiliMi(stil().aile) ? stil().aile : "";
-        stilKartiIsaretle(secilenMotorStili);
-        uygulamaIpucunuGuncelle();
+        efektOnizlemeTazele();
       });
     });
     if (el("cap-onizleme-oynat")) el("cap-onizleme-oynat").addEventListener("click", onizlemeOynat);
@@ -5694,7 +5820,7 @@ window.KCaptions = (function () {
     // tercih yoksa altyazı dili (İngilizcede Otomatik) yeni dile uyar
     if (window.SufloI18n && SufloI18n.onChange) SufloI18n.onChange(function (l) {
       if (!K.settings().capPrefs && el("cap-lang")) { el("cap-lang").value = l === "en" ? "" : "tr"; glifUyarisi(); }
-      stilOrnekleriniYaz();
+      gorunumleriCiz();
       onizlemeCiz();
     });
     vurguKutusuDurumu();
@@ -5827,17 +5953,26 @@ window.KCaptions = (function () {
    * stilYedeginiYukle() ile geri konur — ücretsiz kullanıcının varsayılanı
    * sessizce Pro stiline dönmesin.
    */
+  // Altyazı Efektleri oluşturucusunun kontrolleri (değişiklik = efekti seç; rehber bilinçli seçim sayar)
+  var EFEKT_KONTROLLERI = ["cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-vurgu", "cap-renk-vurgu", "cap-renk", "cap-renk-kontur",
+    "cap-font", "cap-efekt-kalin", "cap-efekt-italik", "cap-boyut", "cap-kontur", "cap-efekt-satir", "cap-efekt-kelime", "cap-konum",
+    "cap-guvenli-yerlesim"];
+  var EFEKT_ISARETLERI = ["cap-efekt-vurgu", "cap-efekt-kalin", "cap-efekt-italik"];
   var STIL_ALANLARI = ["cap-preset", "cap-maxlen", "cap-case", "cap-style-family", "cap-yogunluk", "cap-font",
-    "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu", "cap-kontur", "cap-konum", "cap-animasyon"];
+    "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu", "cap-kontur", "cap-konum", "cap-animasyon",
+    "cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-satir", "cap-efekt-kelime"];
   function stilYedegi() {
     var y = {
       alan: {},
       punct: !!(el("cap-punct") && el("cap-punct").checked),
       kutu: !!(el("cap-kutu") && el("cap-kutu").checked),
+      isaret: {},
       motor: secilenMotorStili, mogrt: secilenMogrt, bekleyen: bekleyenMogrtYolu,
+      gorunum: secilenGorunum, gorunumTaban: sonGorunum,
       prefs: K.settings().capPrefs ? JSON.stringify(K.settings().capPrefs) : null
     };
     STIL_ALANLARI.forEach(function (id) { var e = el(id); if (e) y.alan[id] = e.value; });
+    EFEKT_ISARETLERI.forEach(function (id) { var e = el(id); if (e) y.isaret[id] = !!e.checked; });
     return y;
   }
   function stilYedeginiYukle(y) {
@@ -5849,9 +5984,12 @@ window.KCaptions = (function () {
     });
     if (el("cap-punct")) el("cap-punct").checked = y.punct;
     if (el("cap-kutu")) el("cap-kutu").checked = y.kutu;
+    if (y.isaret) EFEKT_ISARETLERI.forEach(function (id) { if (el(id) && typeof y.isaret[id] === "boolean") el(id).checked = y.isaret[id]; });
     secilenMotorStili = y.motor || "";
     secilenMogrt = y.mogrt || null;
     bekleyenMogrtYolu = y.bekleyen || "";
+    secilenGorunum = y.gorunum || "";
+    sonGorunum = y.gorunumTaban || "";
     /*
      * Kayıtlı tercihte YALNIZ görünüm alanları önceki haline döner; deneme sırasında
      * kaydedilen başka tercihler (ör. altyazı dili) korunur. Önceden tercih yoksa
@@ -5871,12 +6009,17 @@ window.KCaptions = (function () {
     uygulamaIpucunuGuncelle();
   }
   function stilDene(id) {
-    if (!PRESETS[id]) return false;
-    if (el("cap-preset")) el("cap-preset").value = id;
-    applyPreset(id);
-    var grid = el("cap-stil-grid");
-    if (grid && grid.scrollIntoView) {
-      try { grid.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (eS) { grid.scrollIntoView(); }
+    // 3.3: rehber bir hazır görünümü (ya da eski stil kimliğini, en yakın görünümüyle) dener; tercih yazılmaz
+    var gorunumId = AE ? (AE.gorunum(id) ? id : AE.eskiGorunum(id)) : null;
+    if (gorunumId) gorunumUygula(gorunumId, { oynatma: false, kaydet: false });
+    else {
+      if (!PRESETS[id]) return false;
+      if (el("cap-preset")) el("cap-preset").value = id;
+      applyPreset(id);
+    }
+    var hedef = el("cap-efekt") || el("cap-stil-grid");
+    if (hedef && hedef.scrollIntoView) {
+      try { hedef.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (eS) { hedef.scrollIntoView(); }
     }
     // Gercek stil motoru onizlemesi ffmpeg ister; yoksa sessizce atla (DOM onizlemesi kalir)
     K.findFfmpeg().then(function (ff) {
@@ -5916,10 +6059,13 @@ window.KCaptions = (function () {
     stilDene: stilDene,
     // Kullanıcının seçili bir animasyonlu stili (Suflo stili ya da MOGRT) var mı
     stilSecili: function () { return !!(secilenMogrt || secilenMotorStili); },
-    // Seçili stil bir MOGRT mi (Pro kütüphanesi; Suflo Stillerinin aksine deneme hakkı yok)
+    // Seçili stil bir MOGRT mi (Pro kütüphanesi; Altyazı Efektlerinin aksine deneme hakkı yok)
     mogrtSecili: function () { return !!secilenMogrt; },
     // Bilinçli görünüm değişikliği sayılan kontroller (rehber: stil yedeğini bırakır)
-    stilKontrolleri: function () { return STIL_ALANLARI.concat(["cap-punct", "cap-kutu"]); },
+    stilKontrolleri: function () { return STIL_ALANLARI.concat(["cap-punct", "cap-kutu"], EFEKT_ISARETLERI); },
+    // Altyazı Efektleri (3.3): oluşturucu ayarı (Shorts paketi "Altyazı sekmesindeki görünüm" için) ve görünüm uygulama
+    efektAyari: function () { return efektAyari(); },
+    gorunumUygula: gorunumUygula,
     // Marka Kiti kartı "Şimdiki ayarlardan doldur" için paneldeki görünüm
     stilAyarlari: function () { return stil(); },
     stilKoduUygula: stilKoduUygula,
@@ -5939,7 +6085,7 @@ window.KCaptions = (function () {
     // Shorts sekanslari icin ham satirlar (*vurgu* ve orig korunur) ve mod
     rawSegments: function () { return JSON.parse(JSON.stringify(segments)); },
     mode: function () { return segmentsMode; },
-    refreshEngineStyles: motorStilleriniCiz,
+    refreshEngineStyles: gorunumleriCiz,
     transcribeWords: transcribeWords,
     motorKimligi: motorKimligi,
     transcriptCache: transcriptCache,

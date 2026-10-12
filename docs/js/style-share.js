@@ -1,7 +1,7 @@
 /*
  * Suflo — paylaşılabilir stil kodları (SFL1.…) ve stil ince ayarının doğrulaması
  *
- * Bir Suflo Stili + ince ayarı (yazı tipi, renkler, punto, kontur, konum, platform güvenli
+ * Bir temel stil (3.3'ten beri arayüzde Altyazı Efektleri) + ince ayarı (yazı tipi, renkler, punto, kontur, konum, platform güvenli
  * yerleşimi) + metin biçimi (satır uzunluğu, yazım, noktalama) + isteğe bağlı yazar adı
  * tek satırlık bir koda paketlenir: "SFL1." + base64url(UTF-8 JSON). Kod hem panelde
  * ("Kod yapıştır") hem suflo.app/stil#KOD sayfasında çözülür; bu yüzden aynı dosyanın

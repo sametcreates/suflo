@@ -33,7 +33,7 @@
     zoom: "Otomatik zoom",
     transitions: "Geçişler",
     audioclean: "Sesi iyileştir",
-    overlay: "Stilli altyazı ve kanca başlığı",
+    overlay: "Altyazı Efektleri ve kanca başlığı",
     translate: "Çeviri",
     beat: "Ritim",
     speedramp: "Hız rampası",

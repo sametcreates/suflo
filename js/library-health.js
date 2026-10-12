@@ -336,7 +336,7 @@ window.KLibraryHealth = (function () {
       var ff = await K.findFfmpeg(true);
       if (!ff) return [{ status: "bad", title: "FFmpeg bulunamadı", detail: "Altyazı, kesim, zoom ve ritim analizi çalışmaz.", action: "repair-ffmpeg", group: "engine" }];
       if (K.ffmpegLibass && K.ffmpegLibass() === false) {
-        return [{ status: "warn", title: "FFmpeg altyazı çizemiyor (libass yok)", detail: ff + " · Suflo Stilleri ve kanca başlığı çalışmaz; Suflo'nun ffmpeg'ini kur.", action: "repair-ffmpeg", group: "engine" }];
+        return [{ status: "warn", title: "FFmpeg altyazı çizemiyor (libass yok)", detail: ff + " · Altyazı Efektleri ve kanca başlığı çalışmaz; Suflo'nun ffmpeg'ini kur.", action: "repair-ffmpeg", group: "engine" }];
       }
       return [{ status: "good", title: "FFmpeg", detail: ff, group: "engine" }];
     } catch (e) {

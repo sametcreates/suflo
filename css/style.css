@@ -3654,28 +3654,61 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .ch-row input.ch-title { flex: 1; min-width: 0; }
 .ch-row .ch-del { flex: none; }
 
-/* ---------- Suflo Stilleri: kendi motorumuzun kartlari (v3.0) ---------- */
-.stil-motor .ss-sahne { display: grid; place-items: center; padding: 8px; }
-.sm-ornek { font-size: 19px; line-height: 1.15; text-align: center; letter-spacing: .02em;
-  -webkit-text-stroke: 0; text-shadow: 0 0 0 transparent, 0 2px 0 var(--sm-kontur), 0 3px 8px rgba(0,0,0,.6); }
-.sm-ornek .sm-k { font-style: normal; display: inline-block; }
-.sm-ornek .sm-aktif { color: var(--sm-vurgu); }
-.stil-motor-hormozi .sm-ornek, .stil-motor-mrbeast .sm-ornek, .stil-motor-viral .sm-ornek, .stil-motor-ziplama .sm-ornek { font-size: 21px; }
-.stil-motor-hormozi .sm-aktif, .stil-motor-ziplama .sm-aktif, .stil-motor-mrbeast .sm-aktif { transform: scale(1.14); }
-.stil-motor-neon .sm-ornek { color: #f4fbff !important; text-shadow: 0 0 6px var(--sm-vurgu), 0 0 14px var(--sm-vurgu); }
-.stil-motor-neon .sm-ornek .sm-k:not(.sm-aktif) { opacity: .62; }
-.stil-motor-dolgu .sm-ornek .sm-k:first-child, .stil-motor-dolgu .sm-aktif { color: var(--sm-vurgu); }
-.stil-motor-dolgu .sm-ornek .sm-k:last-child { color: #fff; }
-.stil-motor-daktilo .sm-ornek .sm-k:last-child { opacity: 0; }
-.stil-motor-daktilo .sm-ornek .sm-aktif::after { content: "_"; color: var(--sm-vurgu); }
-.stil-motor-daktilo .sm-aktif { color: inherit; }
-.stil-motor-capcut .sm-ornek, .stil-motor-saas .sm-ornek { background: rgba(9,11,16,.78); padding: 5px 9px; border-radius: 9px; }
-.stil-motor-pop .sm-ornek .sm-k { background: #ff4fc8; color: #fff; padding: 1px 4px; border-radius: 4px; transform: rotate(-3deg); }
-.stil-motor-pop .sm-ornek .sm-aktif { background: #42ddff; color: #10131d; transform: rotate(3deg); }
-.stil-motor-doc .sm-ornek { font-size: 15px; border-left: 3px solid var(--sm-vurgu); padding: 4px 8px; background: rgba(7,16,22,.8); }
-.stil-motor-premium .sm-ornek { letter-spacing: .18em; font-size: 15px; }
-.stil-motor:hover .sm-aktif { animation: sm-vurus .5s var(--ease, ease) infinite alternate; }
-@keyframes sm-vurus { from { transform: scale(1); } to { transform: scale(1.16); } }
+/* ---------- Altyazı Efektleri (3.3): eski Suflo Stilleri galerisinin yerinde tek oluşturucu ---------- */
+.efekt { margin: 2px 0 10px; }
+.efekt-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; margin: 2px 0 8px; }
+.efekt-head b { color: var(--text); font-size: 12px; font-weight: 680; letter-spacing: -.01em; margin-right: 8px; }
+.efekt-head span { color: var(--faint); font-size: 8.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+/* Hazır görünümler: küçük çipler, rozet yok */
+.efekt-gorunumler { display: flex; flex-wrap: wrap; margin: 0 -3px 8px; }
+.efekt-cip {
+  display: inline-flex; align-items: center; margin: 0 3px 6px; padding: 4px 10px 4px 5px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg3); color: var(--dim);
+  font: inherit; font-size: 10.5px; cursor: pointer;
+  transition: border-color .16s var(--ease), color .16s var(--ease), box-shadow .2s var(--ease);
+}
+.efekt-cip:hover { border-color: var(--line2); color: var(--text); }
+.efekt-cip.secili { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 2px rgba(139, 124, 246, .22); }
+.efekt-cip:focus-visible { outline: none; box-shadow: var(--glow-sm); border-color: var(--accent); }
+.efekt-cip b { font-weight: 600; }
+.efekt-cip-ornek {
+  display: inline-block; min-width: 26px; margin-right: 6px; padding: 2px 5px; border-radius: 999px;
+  background: #11131b; font-size: 12px; line-height: 1.15; text-align: center; letter-spacing: .01em;
+  text-shadow: 1px 0 0 var(--efekt-kontur, #000), -1px 0 0 var(--efekt-kontur, #000), 0 1px 0 var(--efekt-kontur, #000), 0 -1px 0 var(--efekt-kontur, #000);
+}
+/* Büyük canlı önizleme */
+.efekt .onizleme-sahne { max-height: 240px; }
+.efekt .onizleme-sahne.dikey { max-height: 380px; }
+/* Ayarlar */
+.efekt-ayarlar .field { margin-bottom: 8px; }
+.efekt-renkler { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.efekt-renkler > .switch { display: inline-flex; margin: 0 10px 6px 0; }
+.efekt-ayarlar input[type="number"] { width: 100%; padding: 8px 10px; font: inherit; font-size: 12.5px; color: var(--text); border: 1px solid var(--line); border-radius: 9px; }
+.efekt-renkler .renk-satir { margin-bottom: 6px; }
+.efekt-font select { min-width: 0; }
+.efekt-bi {
+  display: inline-flex; align-items: center; flex: none; margin-left: 6px; padding: 0 8px; min-height: 26px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--bg3); color: var(--dim);
+  font-size: 10.5px; font-weight: 700; cursor: pointer; user-select: none;
+}
+.efekt-bi input { position: absolute; opacity: 0; pointer-events: none; }
+.efekt-bi:hover { border-color: var(--line2); color: var(--text); }
+.efekt-bi.efekt-italik span { font-style: italic; font-weight: 600; }
+.efekt-bi input:checked + span { color: var(--accent-lite); }
+.efekt-bi input:focus-visible + span { text-decoration: underline; }
+/* DOM yedek önizlemesi (gerçek görünüm libass çıktısıdır) */
+.satir-efekt-pop   { animation: on-efekt-pop .3s cubic-bezier(.22,1,.36,1) both; }
+.satir-efekt-zipla { animation: on-efekt-zipla .3s ease-out both; }
+.satir-efekt-asagi { animation: on-efekt-asagi .3s ease-out both; }
+.kelime-efekt-zipla  { animation: on-efekt-kz .2s ease-out both; }
+.kelime-efekt-titre  { animation: on-efekt-kt .15s steps(4) both; }
+.kelime-efekt-glitch { animation: on-efekt-kg .1s steps(1); }
+@keyframes on-efekt-pop   { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes on-efekt-zipla { 0% { transform: scale(0); } 50% { transform: scale(1.12); } 77% { transform: scale(.96); } 100% { transform: scale(1); } }
+@keyframes on-efekt-asagi { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes on-efekt-kz { 0% { transform: translateY(0); } 50% { transform: translateY(-15%); } 100% { transform: translateY(0); } }
+@keyframes on-efekt-kt { 0% { transform: translate(2px, -2px); } 25% { transform: translate(-2px, 2px); } 50% { transform: translate(2px, 2px); } 75% { transform: translate(-2px, -2px); } 100% { transform: none; } }
+@keyframes on-efekt-kg { from { text-shadow: -3px 0 0 #ff2a55, 3px 0 0 #2af5ff; } to { text-shadow: -3px 0 0 #ff2a55, 3px 0 0 #2af5ff; } }
 
 /* ---------- Gecisler (v3.0) ---------- */
 .gecis-card { display: flex; flex-direction: column; gap: 8px; padding: 10px; }

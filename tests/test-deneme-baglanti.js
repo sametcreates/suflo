@@ -95,7 +95,7 @@ ok("captions.js: MOGRT, toplu klip ve stilli ASS kapıları denemesiz", /Pro\.ga
 var zoom = oku("js/zoom.js");
 ok("zoom.js kaldir(): kapı yok (deneme zoom'u her zaman geri alınır)", !/Pro\./.test(govde(zoom, "async function kaldir()")) && govde(zoom, "async function kaldir()").length > 50);
 var ou = govde(cap, "async function overlayUygula()");
-ok("overlayUygula: ücretsizde seçili MOGRT stilini reddeder", /if \(typeof Pro !== "undefined" && !Pro\.isPro\(\) && secilenMogrt\) \{[\s\S]{0,200}Deneme yalnız Suflo Stilleri için[\s\S]{0,200}return;/.test(ou) &&
+ok("overlayUygula: ücretsizde seçili MOGRT stilini reddeder", /if \(typeof Pro !== "undefined" && !Pro\.isPro\(\) && secilenMogrt\) \{[\s\S]{0,200}Deneme yalnız Altyazı Efektleri için[\s\S]{0,200}return;/.test(ou) &&
   ou.indexOf("!Pro.isPro() && secilenMogrt") < ou.indexOf("mogrtStiliniUygula"));
 ok("eski kelimeli animasyon: deneme kuruluyken düşürülmez", /!Pro\.isPro\(\) && !\(Pro\.denemeAcik && Pro\.denemeAcik\("overlay"\)\)\) anim = "fade"/.test(cap));
 ok("terim sözlüğü ücretsiz (sessiz Pro atlaması yok)", !/Pro\./.test(govde(cap, "function applyGlossary(")));
@@ -173,7 +173,7 @@ ok("tanıtımdan kurulan deneme aracın asıl düğmesini adıyla gösterir ('te
   /toast\(ip\.mesaj/.test(yonlendir) && /scrollIntoView/.test(yonlendir) && !/tekrar tıkla/.test(tanitimIsl + yonlendir));
 ok("etkinleştirmeden sonra deneme çıktısı varsa bir kez hatırlatılır", /if \(Pro\.denemeCiktilari && Pro\.denemeCiktilari\(\)\.length\) \{\s*toast\("Deneme çıktılarını temiz yeniden oluştur/.test(app));
 ok("Pro karşılaştırması: Sözlük yok, yeni araçlar var", !/Sözlük/.test(kilitli.split('class="pro-renk"')[1] || "") &&
-  ["Konuşmadan kes", "viral puan", "Geçişler", "Suflo Stilleri timeline'da", "Kanca başlığı", "Sesi iyileştir", "Otomatik zoom", "Ritim", "Hız rampası", "12 dile çeviri"].every(function (x) { return kilitli.indexOf(x) !== -1; }));
+  ["Konuşmadan kes", "viral puan", "Geçişler", "Altyazı Efektleri timeline'da", "Kanca başlığı", "Sesi iyileştir", "Otomatik zoom", "Ritim", "Hız rampası", "12 dile çeviri"].every(function (x) { return kilitli.indexOf(x) !== -1; }));
 ok("ücretsiz sütunu: kelime kelime altyazı ve terim sözlüğü", /<li>Kelime kelime altyazı · terim sözlüğü<\/li>/.test(kilitli));
 ok("kanca başlığı tanıtımı 5 stil (seçicideki stil sayısı)", /<strong>5<\/strong> stil/.test(blok(html, "kanca-tanitim")) && html.match(/id="kanca-stil">[\s\S]*?<\/select>/)[0].match(/<option /g).length === 5);
 ok("eski 'v1.7' ve 'ücretsiz altyazı paneli' yedekleri yok", !/v1\.7</.test(html) && !/ücretsiz altyazı paneli/.test(html));

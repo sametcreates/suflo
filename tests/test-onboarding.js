@@ -610,7 +610,7 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     var s1 = sahte({ ayarVardi: false, pro: true, segments: true, model: true });
     s1.OB.init();
     s1.ogeler["ia-stil-goster"]._olay.click[0]();
-    ok("'Stilleri gör' Creator Punch'ı dener, önceki görünüm kayda yazılır", J(s1.say.stilDene) === J(["mrbeast"]) && !!s1.ayarlar.onboarding.stilYedek);
+    ok("'Stilleri gör' Altyazı Efektleri'nin Vurucu görünümünü dener, önceki görünüm kayda yazılır", J(s1.say.stilDene) === J(["vurucu"]) && !!s1.ayarlar.onboarding.stilYedek);
     function kartTikla(t, siniflar) {
       var izg = t.ogeler["cap-stil-grid"];
       var kart = t.win.document.createElement("button");
@@ -620,7 +620,7 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
       ic.parentNode = kart;
       izg._olay.click[0]({ target: ic });
     }
-    ok("Pro ipucu: dokunulan kart seçim olarak kalır", s1.ogeler["ia-durum"].textContent === "Creator Punch kendi altyazınla oynuyor. Beğendiğin karta dokun; seçtiğin stil kalır.");
+    ok("Pro ipucu: dokunulan görünüm seçim olarak kalır", s1.ogeler["ia-durum"].textContent === "Altyazı Efektleri kendi altyazınla oynuyor. Beğendiğin görünüme dokun ya da ayarla; seçtiğin efekt kalır.");
     ok("ızgara dinleyicisi kabarcık evresinde (kartın işleyicisinden sonra)", /grid\.addEventListener\("click", stilIzgarasiTiklandi\);/.test(obSrc));
     s1.ogeler["cap-stil-grid"]._olay.click[0]({ target: s1.ogeler["cap-stil-grid"] });
     kartTikla(s1, ["stil-sec", "stil-mogrt", "locked"]);
@@ -629,8 +629,20 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     ok("Pro: ızgara boşluğu, kilitli kart ve seçime geçmeyen kart yedeği bırakmaz", !!s1.ayarlar.onboarding.stilYedek);
     kartTikla(s1, ["stil-sec", "stil-motor", "secili"]);
     ok("Pro kullanıcı kilitsiz bir kartı seçince yedek bırakılır (kayıttan da)", s1.ayarlar.onboarding.stilYedek === undefined);
+    // Altyazı Efektleri › Hazır görünümler (3.3): çip dokunuşu da aynı kurala uyar
+    var s1c = sahte({ ayarVardi: false, pro: true, segments: true, model: true });
+    s1c.OB.init();
+    s1c.ogeler["ia-stil-goster"]._olay.click[0]();
+    var cipKap = s1c.ogeler["cap-efekt-gorunumler"];
+    var cip = s1c.win.document.createElement("button");
+    cip.classList.add("efekt-cip"); cip.parentNode = cipKap;
+    cipKap._olay.click[0]({ target: cip, currentTarget: cipKap });
+    var yedekKaldi = !!s1c.ayarlar.onboarding.stilYedek;
+    cip.classList.add("secili");
+    cipKap._olay.click[0]({ target: cip, currentTarget: cipKap });
+    ok("Pro: seçime geçmeyen görünüm çipi yedeği bırakmaz, seçilen çip bırakır", yedekKaldi && s1c.ayarlar.onboarding.stilYedek === undefined);
     s1.ogeler["ia-stil-koy"]._olay.click[0]();
-    ok("'Timeline'a koy' kullanıcının seçtiği stili uygular (Creator Punch'a dönmez)", J(s1.say.stilDene) === J(["mrbeast"]) && s1.say.styled === 1 && s1.say.stilGeri === 0);
+    ok("'Timeline'a koy' kullanıcının seçtiği stili uygular (Vurucu'ya dönmez)", J(s1.say.stilDene) === J(["vurucu"]) && s1.say.styled === 1 && s1.say.stilGeri === 0);
     var s2 = sahte({ ayarVardi: false, pro: true, segments: true, model: true, stilSecili: true });
     s2.OB.init();
     s2.ogeler["ia-stil-koy"]._olay.click[0]();
@@ -638,7 +650,7 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     var s3 = sahte({ ayarVardi: false, pro: true, segments: true, model: true });
     s3.OB.init();
     s3.ogeler["ia-stil-koy"]._olay.click[0]();
-    ok("hiç stil seçili değilse Creator Punch önizlenip konur", J(s3.say.stilDene) === J(["mrbeast"]) && s3.say.styled === 1 && s3.ayarlar.onboarding.stilYedek === undefined);
+    ok("hiç stil seçili değilse Vurucu görünüm önizlenip konur", J(s3.say.stilDene) === J(["vurucu"]) && s3.say.styled === 1 && s3.ayarlar.onboarding.stilYedek === undefined);
     /* İnceleme bulgusu: ücretsizde 'Timeline'a koy' Suflo Stili için bile denemesiz kütüphane penceresini (captionStyles)
        açıyordu; Altyazı sekmesindeki aynı eylem stilli katman denemesini (3 hak, filigran) sunuyor */
     var s3b = sahte({ ayarVardi: false, segments: true, model: true });
@@ -678,8 +690,8 @@ Promise.resolve(dugme._olay.click[0]()).then(function () {
     var s4c = sahte({ ayarVardi: false, segments: true, model: true });
     s4c.OB.init();
     s4c.ogeler["ia-stil-goster"]._olay.click[0]();
-    ok("ücretsiz ipucu: kartlar önizleme, 'Tamam' önceki görünümü geri getirir", s4c.ogeler["ia-durum"].textContent ===
-      "Creator Punch kendi altyazınla oynuyor. Diğer kartlara dokunarak da önizleyebilirsin; \"Tamam\" deyince önceki görünümün geri gelir.");
+    ok("ücretsiz ipucu: görünümler önizleme, 'Tamam' önceki görünümü geri getirir", s4c.ogeler["ia-durum"].textContent ===
+      "Altyazı Efektleri kendi altyazınla oynuyor. Diğer görünümlere dokunarak da önizleyebilirsin; \"Tamam\" deyince önceki görünümün geri gelir.");
     kartTikla(s4c, ["stil-sec", "stil-motor", "secili"]);
     kartTikla(s4c, ["stil-sec", "stil-motor", "secili"]);
     s4c.ogeler["cap-boyut"]._olay.change[0]();
