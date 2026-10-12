@@ -675,15 +675,17 @@ window.KEngine = (function () {
   /* ---------------- Whisper argümanları ---------------- */
 
   /*
-   * transcribeLocal için argüman üretir — VAD, beam search, thread, GPU.
-   * -ojf: JSON'a belirteç başına metin, zaman ve olasılık (p) yazılır. Satır ve
-   * kelime kelime modu AYNI çıktıyı kullanır (js/whisper-words.js kelimelere ayırır),
-   * yerel motorun güven değeri buradan gelir.
-   * wordLevel: artık argümanı değiştirmez (karaoke için ikinci tur gerekmez).
+   * transcribeLocal için argüman üretir — VAD, çözme modu, thread, DTW, çeviri. Argüman kurma
+   * saf modülde (js/whisper-args.js, SufloWhisperArgs.olustur; Node testleri doğrudan çalıştırır).
+   * -ojf: JSON'a belirteç başına metin, zaman, olasılık (p) ve t_dtw yazılır. Satır ve kelime
+   * kelime modu AYNI çıktıyı kullanır (js/whisper-words.js kelimelere ayırır).
+   * wordLevel: argümanı değiştirmez (karaoke için ikinci tur gerekmez).
    * kelimeYedegi: yalnız belirteç yazmayan eski derlemede kelime zamanı için
    *   eski "-ml 1 -sow" turu (transcribeLocal yalnız o durumda ister).
+   * cozme ("dogru" | "hizli"), dtw (bool), cevir (bool), modelId: whisper-args.js'e bakın.
    */
   function buildArgs(o) {
+    o = o || {};
     // whisper-cli Windows'ta argv'yi ANSI okur: Turkce karakterli kullanici
     // adinda model/ses yolu bozulup motor cokuyordu (issue #7). Yol
     // argumanlari ASCII-guvenli esdegerlerine cevrilir; cikti tabani ayni
@@ -691,31 +693,20 @@ window.KEngine = (function () {
     var G = (typeof K !== "undefined" && K.guvenliYol)
       ? K.guvenliYol
       : function (p) { return p; };
-    var args = [
-      "-m", G(o.model, "girdi"),
-      "-f", G(o.audio, "girdi"),
-      "-l", o.lang || "auto",
-      "-ojf", "-of", G(o.outBase, "cikti"),
-      "-t", String(o.threads || 4),
-      "-pp",
-      "-bs", "5"
-    ];
-
-    // Proje sozlugundeki dogru marka/kisi adlari ilk decode gecisine yon verir.
-    // Sonradan metin degistiren bir LLM degildir; ses-model hizalamasini korur.
-    if (o.prompt) args.push("--prompt", String(o.prompt).slice(0, 700));
-
+    var WAR = typeof window !== "undefined" ? window.SufloWhisperArgs : null;
+    if (!WAR) throw new Error("js/whisper-args.js yüklenmedi");
     // VAD: sessizlikleri atla (büyük hız kazancı + halüsinasyon azalır)
-    // Not: -vp ve -vsd MİLİSANİYE cinsinden (whisper-cli varsayılanları 30 / 100).
     var vp = vadPath();
-    if (vp) {
-      args.push("--vad", "-vm", G(vp, "girdi"));
-      args.push("-vsd", "500");   // 500 ms altındaki sessizlikte segment bölme
-      args.push("-vp", "250");    // konuşma sınırlarına 250 ms tampon (kelime yutulmasın)
-    }
-
-    if (o.kelimeYedegi) args.push("-ml", "1", "-sow");
-    return { args: args, vad: !!vp };
+    var girdi = {};
+    for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) girdi[k] = o[k];
+    girdi.vad = vp;
+    girdi.yol = G;
+    var secim = WAR.secenekler(girdi);
+    return {
+      args: WAR.olustur(girdi), vad: !!vp,
+      cozme: secim.cozme, dtw: secim.dtw, cevir: secim.cevir, modelId: secim.modelId,
+      gunluk: WAR.gunlukMetni(girdi)
+    };
   }
 
   /* ---------------- ffmpeg kurulumu ---------------- */

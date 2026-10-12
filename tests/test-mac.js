@@ -125,6 +125,7 @@ function macOrtam(opts) {
   vm.createContext(sandbox);
   vm.runInContext(realFs.readFileSync(KOK + "bridge.js", "utf8"), sandbox, { filename: "bridge.js" });
   sandbox.K = sandbox.window.K;
+  vm.runInContext(realFs.readFileSync(KOK + "whisper-args.js", "utf8"), sandbox, { filename: "whisper-args.js" });
   vm.runInContext(realFs.readFileSync(KOK + "engine.js", "utf8"), sandbox, { filename: "engine.js" });
   return { K: sandbox.window.K, KEngine: sandbox.window.KEngine, komutlar: kosulanKomutlar, fs: fsStub };
 }

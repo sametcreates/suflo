@@ -57,12 +57,13 @@ ok("nizami duzeltme uzun satiri bolerken olculmus kelimeleri parcalara dagitir",
 
 var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 var captions = fs.readFileSync(path.join(ROOT, "js", "captions.js"), "utf8");
-var engine = fs.readFileSync(path.join(ROOT, "js", "engine.js"), "utf8");
+// whisper-cli argümanları 3.2 adım 5'ten beri js/whisper-args.js'te (engine.js devreder)
+var engine = fs.readFileSync(path.join(ROOT, "js", "engine.js"), "utf8") + "\n" + fs.readFileSync(path.join(ROOT, "js", "whisper-args.js"), "utf8");
 ok("arayuz tek Suflo Altyazi Motoru sunar", /Suflo Altyazı Motoru/.test(html) && /Bulut yedeği/.test(html));
 ok("Caption Editor kalite puani ve filtreleri tasir", /SUFLO CAPTION EDITOR/.test(html) && /cap-quality-score/.test(html) && /cap-filter-issues/.test(html));
 ok("tek motor yerel rota ve yedegi orkestre eder", /function transcribeSuflo/.test(captions) && /localEngineReady/.test(captions) && /cloudEngineReady/.test(captions));
 ok("proje sozlugu decode promptuna girer", /prompt:\s*glossaryPrompt\(\)/.test(captions) && /"--prompt"/.test(engine));
-ok("yerel motor beam search kullanir", /"-bs",\s*"5"/.test(engine));
+ok("yerel motor beam search kullanir (varsayilan 'En dogru')", /dogru: \{ bayrak: \["-bs", "5"\]/.test(engine) && /VARSAYILAN_COZME = "dogru"/.test(engine));
 ok("Caption Editor ikinci metin kontrolunu satir sayisini koruyarak yapar", /async function proofreadAll/.test(captions) && /Never merge, split/.test(captions));
 ok("duzeltme sonraki altyazilar icin ogrenilebilir", /function correctionFromEdit/.test(captions) && /function learnLastCorrection/.test(captions));
 ok("kritik sorunlar timeline oncesi ikinci onay ister", /kritik \+ " kritik sorunla yine de uygula"/.test(captions) && /qualityReport\(\)/.test(captions));
