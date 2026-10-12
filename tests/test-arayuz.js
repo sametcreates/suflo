@@ -276,8 +276,9 @@ var yeniIdler = ["cap-ince-ayar", "cap-guvenli-yerlesim", "cap-guvenli-yerlesim-
 var yokId = yeniIdler.filter(function (id) { return !idler[id]; });
 ok("yeni id'ler index.html'de", yokId.length === 0, yokId.join(","));
 var iaEski = html.slice(html.indexOf('<div class="ia-eski" hidden aria-hidden="true">'), html.indexOf("</div>", html.indexOf('<div class="ia-eski" hidden aria-hidden="true">')));
-ok("eski 'Özel' kayıtların animasyon / kutu / hareket şiddeti taşıyıcıları hep gizli .ia-eski içinde", /id="cap-animasyon"/.test(iaEski) && /id="cap-kutu"/.test(iaEski) &&
-  /id="cap-yogunluk"/.test(iaEski));
+// 3.3 adım 17: arka plan kutusu (cap-kutu) artık Altyazı Efektleri oluşturucusunun görünen anahtarı
+ok("eski 'Özel' kayıtların animasyon / hareket şiddeti taşıyıcıları hep gizli .ia-eski içinde; kutu oluşturucuda", /id="cap-animasyon"/.test(iaEski) &&
+  !/id="cap-kutu"/.test(iaEski) && /id="cap-yogunluk"/.test(iaEski) && /id="cap-efekt-ayarlar"[\s\S]*<input id="cap-kutu" type="checkbox">/.test(html));
 ok("kredi adı çeviriden muaf (kullanıcı adı)", /id="cap-stil-kredi-ad" data-i18n-skip/.test(html));
 function betikSira(ad) { return html.indexOf('<script src="js/' + ad + '"'); }
 ok("betik sırası: style-share → marka-kiti → style-engine → overlay-render → captions → hook-title → kanca → marka-kiti-ui → app",

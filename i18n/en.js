@@ -2858,7 +2858,34 @@
     "Görünüm seçerek ekle": "Pick a look to add",
     "Önce Altyazı Efektleri'nden bir görünüm seç ya da bir Premiere şablonu seç.": "First pick a look in Caption Effects or a Premiere template.",
     "Paylaş ve kaydet › Şablonum yap ile kaydettiğin ayar": "The setting you saved with Share and save › Save as my template",
-    "Şablonun kaydedildi — Hazır görünümlerde ★ Şablonum": "Template saved — find it as ★ My template under Preset looks"
+    "Şablonun kaydedildi — Hazır görünümlerde ★ Şablonum": "Template saved — find it as ★ My template under Preset looks",
+    // 3.3 adım 17: gölge, arka plan kutusu, önizlemede sürükleyerek serbest konum
+    "Kutulu": "Boxed",
+    "Önizleme: yazıyı sürükleyerek konumlandır": "Preview: drag the text to position it",
+    "Yazıyı sürükleyerek konumlandır · ok tuşları %1 (Shift %5) · çift tık hazır konuma döner": "Drag the text to position it · arrow keys 1% (Shift 5%) · double-click returns to the preset position",
+    "Yazının arkasına gölge (gerçek önizlemede ve katmanda aynı)": "A shadow behind the text (same in the real preview and on the layer)",
+    "Gölge": "Shadow",
+    "Gölge rengi": "Shadow color",
+    "Gölge opaklığı (0-100)": "Shadow opacity (0-100)",
+    "Opaklık": "Opacity",
+    "Gölgenin yazıdan uzaklığı (0-20)": "How far the shadow sits from the text (0-20)",
+    "Mesafe": "Distance",
+    "Gölgenin yumuşaklığı (0-30)": "How soft the shadow is (0-30)",
+    "Yumuşaklık": "Softness",
+    "Yazının arkasına satır satır kutu": "A box behind each line of text",
+    "Kutu rengi": "Box color",
+    "Kutu opaklığı (0-100)": "Box opacity (0-100)",
+    "Serbest konum:": "Free position:",
+    "Hazır konuma dön (önizlemede çift tık da olur)": "Back to the preset position (double-clicking the preview works too)",
+    "Sıfırla": "Reset",
+    "İpucu: önizlemede yazıyı sürükleyerek istediğin yere koy.": "Tip: drag the text in the preview to place it anywhere.",
+    "{} · hazır konum": "{} · preset position",
+    "Altyazı sekmesinde sürüklediğin serbest konum için bir konum seç ve \"Şimdiki ayarlardan doldur\"a bas":
+      "For the free position you dragged in the Captions tab, pick a position and press \"Fill from current settings\"",
+    "Serbest konum (Altyazı sekmesinden)": "Free position (from the Captions tab)",
+    "Altyazı Efektleri'ndeki gölge ve arka plan kutusu kite alınır; kit açıkken her görünüme uygulanır":
+      "The shadow and background box from Caption Effects go into the kit; while the kit is on they apply to every look",
+    "Gölge ve arka plan kutusunu da kite al": "Also add the shadow and background box to the kit"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */
@@ -2980,6 +3007,8 @@
   function enWas() { var Pr = pricing(); return Pr ? Pr.wasLabel("en") : "1,249 TRY"; }
   function enTax() { var Pr = pricing(); return Pr ? Pr.taxLabel("en") : "+ tax"; }
   var P = [
+    // Altyazı Efektleri › önizlemede serbest konum etiketi (3.3 adım 17): Türkçe "%50" → İngilizce "50%"
+    [/^X %(\d+) · Y %(\d+)$/, "X $1% · Y $2%"],
     [/^749 TL$/, function () { return enPrice(); }],
     [/^1\.249 TL$/, function () { return enWas(); }],
     [/^\+ KDV · abonelik yok · dakika limiti yok$/, function () { return enTax() + " · no subscription · no minute limits"; }],

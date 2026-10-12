@@ -161,6 +161,48 @@ var eskiKod = Eski32.encode({ styleId: "neon", overrides: { font: "Lora", renk: 
 var yeniC = SS.decode(eskiKod, YENI);
 ok("yeni panel: 3.2 kodu (eski stil) uyarısız çözülür", yeniC.ok && yeniC.warnings.length === 0 && yeniC.recipe.styleId === "neon" && yeniC.recipe.overrides.font === "Lora", JSON.stringify(yeniC));
 
+/* ---------------- 3.3 adım 17: gölge, kutu, serbest konum (isteğe bağlı, yalnız efekt) ---------------- */
+ok("adım 17 alanları ve aralıkları stil motoruyla aynı", SS.EFEKT_ALANLARI.join(",") === E33.EFEKT_ALANLARI.join(",") &&
+  JSON.stringify(SS.ARALIKLAR) === JSON.stringify(E33.ARALIKLAR) && JSON.stringify(SS.GOLGE_VARSAYILAN) === JSON.stringify(E33.GOLGE_VARSAYILAN),
+  JSON.stringify([SS.ARALIKLAR, E33.ARALIKLAR]));
+var a17 = { styleId: "efekt", overrides: Object.assign({}, efTarif.overrides, { golge: { renk: "#112233", opak: 40, mesafe: 8, yumusak: 12 }, kutu: true,
+  kutuRenk: "#AABBCC", kutuOpak: 70, konumX: 30, konumY: 80 }), text: efTarif.text, author: "ayse" };
+var k17 = SS.encode(a17), c17 = SS.decode(k17, YENI), o17 = c17.recipe.overrides;
+ok("adım 17: gölge / kutu / konum gidiş-dönüş, uyarısız (renk küçük harfe)", c17.ok && c17.warnings.length === 0 &&
+  JSON.stringify(o17.golge) === '{"renk":"#112233","opak":40,"mesafe":8,"yumusak":12}' && o17.kutu === true && o17.kutuRenk === "#aabbcc" &&
+  o17.kutuOpak === 70 && o17.konumX === 30 && o17.konumY === 80 && o17.giris === "zipla", JSON.stringify(o17) + " " + c17.warnings.join(","));
+ok("adım 17: tüm alanlarla kod kısa kalır (≤ 700)", k17.length <= 700, k17.length);
+var n17 = SS.decode(SS.encode({ styleId: "efekt", overrides: { golge: null, konumX: null, konumY: null, kutu: false } }), YENI);
+ok("adım 17: null (gölge yok / hazır konum) ve kutu kapalı uyarısız gider gelir", n17.ok && n17.warnings.length === 0 &&
+  n17.recipe.overrides.golge === null && n17.recipe.overrides.konumX === null && n17.recipe.overrides.konumY === null && n17.recipe.overrides.kutu === false,
+  JSON.stringify(n17.recipe.overrides));
+var u17 = [];
+var t17 = SS.sanitizeOverrides({ golge: { renk: "red", opak: 300, mesafe: -2, yumusak: 99, ek: 1 }, kutuOpak: 120, kutuRenk: "#zzz", kutu: "evet",
+  konumX: 2, konumY: 99.6 }, u17);
+ok("adım 17: aralık dışı kırpılır, bozuk alan atılır ya da varsayılana döner; her biri uyarı",
+  JSON.stringify(t17.golge) === '{"renk":"#000000","opak":100,"mesafe":0,"yumusak":30}' && t17.kutuOpak === 100 && t17.kutuRenk === undefined &&
+  t17.kutu === undefined && t17.konumX === 5 && t17.konumY === 95 &&
+  ["golge.renk", "golge.opak", "golge.mesafe", "golge.yumusak", "golge.ek", "kutuOpak", "kutuRenk", "kutu", "konumX", "konumY"].every(function (w) { return u17.indexOf(w) !== -1; }),
+  JSON.stringify(t17) + " " + u17.join(","));
+var u17b = [];
+var t17b = SS.sanitizeOverrides({ golge: "var", konumX: "40", konumY: {} }, u17b);
+ok("adım 17: gölge nesne değilse atılır; konum sayı metni kabul, sayı değilse atılır", t17b.golge === undefined && t17b.konumX === 40 && t17b.konumY === undefined &&
+  u17b.indexOf("golge") !== -1 && u17b.indexOf("konumY") !== -1 && u17b.indexOf("konumX") === -1, JSON.stringify(t17b) + " " + u17b.join(","));
+ok("adım 17: eksik gölge alanı şablon varsayılanı (siyah, %75, 5, 5), uyarısız", JSON.stringify(SS.sanitizeOverrides({ golge: { opak: 30 } }).golge) ===
+  '{"renk":"#000000","opak":30,"mesafe":5,"yumusak":5}');
+var e17 = SS.decode("SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "capcut", overrides: { renk: "#ff0000", golge: { opak: 50 }, kutu: true, kutuRenk: "#ffffff", konumX: 20, konumY: 30 } })), YENI);
+ok("adım 17: eski stil kimliğindeki gölge / kutu / konum alanları uyarıyla atılır", e17.ok && e17.recipe.overrides.renk === "#ff0000" &&
+  ["golge", "kutu", "kutuRenk", "konumX", "konumY"].every(function (k) { return e17.recipe.overrides[k] === undefined && e17.warnings.indexOf(k) !== -1; }), JSON.stringify(e17));
+ok("adım 17: kodlayıcı eski stil kimliğine gölge / kutu / konum yazmaz", JSON.stringify(JSON.parse(SS.b64urlDecode(SS.encode({ styleId: "pop",
+  overrides: { renk: "#ff0000", golge: { opak: 50 }, kutu: true, konumX: 20, konumY: 30 } }).slice(5))).overrides) === '{"renk":"#ff0000"}');
+var eski17 = Eski32.decode("SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "neon", overrides: { renk: "#ff0000", golge: { opak: 50 }, konumX: 20 } })), eskiIzin);
+ok("eski panel (3.2.0): gölge / konum alanlarını uyarıyla atar, gerisini uygular", eski17.ok && eski17.recipe.overrides.renk === "#ff0000" &&
+  eski17.warnings.indexOf("golge") !== -1 && eski17.warnings.indexOf("konumX") !== -1 && eski17.recipe.overrides.golge === undefined, JSON.stringify(eski17));
+ok("adım 17 kodu motorda çizilir: gölge, kutu, serbest konum", (function () {
+  var r = E33.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir iki üç" }], cueKind: "lines", width: 1920, height: 1080, overrides: o17 });
+  return /SufloKutu/.test(r.ass) && /\\4c&H00332211/.test(r.ass) && /\\an5\\pos\(576,/.test(r.ass);
+})());
+
 /* ---------------- docs kopyası ---------------- */
 ok("docs/js/style-share.js bayt bayt aynı", fs.readFileSync(path.join(kok, "docs", "js", "style-share.js")).equals(fs.readFileSync(path.join(kok, "js", "style-share.js"))));
 
@@ -241,6 +283,43 @@ ok("rebaseBrandKit: kit açılınca hazır stil kite geçer (mergeBrandKit ile a
 var elle = MK.rebaseBrandKit(Object.assign({}, tabanStil, { renk: "#abcdef" }), tabanStil, MK.normalize({ on: false }).kit, kitK);
 ok("rebaseBrandKit: elle ince ayarlanmış renk kit açılınca da korunur", elle.stil.renk === "#abcdef" && elle.stil.font === "Anton");
 ok("rebaseBrandKit: değişiklik yoksa changed false", !MK.rebaseBrandKit(kodluStil, tabanStil, kitK, kitLogo).changed);
+
+/* ---------------- 3.3 adım 17: Marka Kiti'nde serbest konum, gölge, kutu (isteğe bağlı) ---------------- */
+var efTaban = { aile: "efekt", font: "Montserrat", renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffd23f", konum: 2, golge: null, kutu: false,
+  kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null };
+var kitXY = MK.normalize({ on: true, stil: { overrides: { konum: 2, konumX: 30, konumY: 120, golge: { opak: 40 }, kutu: true, kutuRenk: "#FFFFFF", kutuOpak: 80 } } });
+ok("kit: serbest konum / gölge / kutu doğrulanır ve saklanır (konum %95'e kırpılır, gölgenin eksik alanı varsayılan)",
+  kitXY.kit.stil.overrides.konumX === 30 && kitXY.kit.stil.overrides.konumY === 95 && JSON.stringify(kitXY.kit.stil.overrides.golge) === '{"renk":"#000000","opak":40,"mesafe":5,"yumusak":5}' &&
+  kitXY.kit.stil.overrides.kutu === true && kitXY.kit.stil.overrides.kutuRenk === "#ffffff" && kitXY.kit.stil.overrides.kutuOpak === 80 &&
+  kitXY.warnings.indexOf("stil.overrides.konumY") !== -1, JSON.stringify(kitXY));
+ok("kit: tek eksenli serbest konum saklanmaz", MK.normalize({ on: true, stil: { overrides: { konumX: 30 } } }).kit.stil.overrides.konumX === undefined);
+var mXY = MK.mergeBrandKit(efTaban, kitXY.kit);
+ok("mergeBrandKit: kitin serbest konumu, gölgesi ve kutusu efekte gelir", mXY.konumX === 30 && mXY.konumY === 95 && mXY.golge.opak === 40 &&
+  mXY.kutu === true && mXY.kutuRenk === "#ffffff" && mXY.kutuOpak === 80, JSON.stringify(mXY));
+var surukStil = Object.assign({}, efTaban, { konumX: 70, konumY: 20 });
+ok("mergeBrandKit: kitte hazır konum varsa stilin serbest konumu silinir (konum bir bütün); kitte konum yoksa kalır",
+  MK.mergeBrandKit(surukStil, MK.normalize({ on: true, stil: { overrides: { konum: 8 } } }).kit).konumX === null &&
+  MK.mergeBrandKit(surukStil, MK.normalize({ on: true, stil: { overrides: { konum: 8 } } }).kit).konum === 8 &&
+  MK.mergeBrandKit(surukStil, MK.normalize({ on: true, stil: { overrides: { renk: "#ff0000" } } }).kit).konumX === 70);
+ok("mergeBrandKit: gölge nesnesi kopyalanır (kit değişmez)", (function () { var x = MK.mergeBrandKit(efTaban, kitXY.kit); x.golge.opak = 1; return kitXY.kit.stil.overrides.golge.opak === 40; })());
+var fcXY = MK.fromCurrent(Object.assign({}, efTaban, { konumX: 44, konumY: 66, golge: { renk: "#112233", opak: 70, mesafe: 4, yumusak: 6 }, kutu: true, kutuOpak: 30 }),
+  { on: true }, true, true);
+ok("fromCurrent: konum istenirse serbest konum da, görünüm istenirse gölge ve kutu da", fcXY.stil.overrides.konum === 2 && fcXY.stil.overrides.konumX === 44 &&
+  fcXY.stil.overrides.konumY === 66 && fcXY.stil.overrides.golge.renk === "#112233" && fcXY.stil.overrides.kutu === true && fcXY.stil.overrides.kutuOpak === 30,
+  JSON.stringify(fcXY.stil.overrides));
+var fcYok = MK.fromCurrent(Object.assign({}, efTaban, { konumX: 44, konumY: 66, golge: { opak: 70 }, kutu: true }), { on: true });
+ok("fromCurrent: istenmezse konum / gölge / kutu kite girmez", ["konum", "konumX", "golge", "kutu", "kutuRenk", "kutuOpak"].every(function (k) {
+  return fcYok.stil.overrides[k] === undefined; }), JSON.stringify(fcYok.stil.overrides));
+ok("fromCurrent: gölgesiz efekt → kitte gölge yok (null), kutu kapalı", (function () {
+  var f = MK.fromCurrent(efTaban, { on: true }, false, true).stil.overrides;
+  return f.golge === null && f.kutu === false;
+})());
+var kitG1 = MK.normalize({ on: true, stil: { overrides: { golge: { opak: 40 } } } }).kit, kitG2 = MK.normalize({ on: true, stil: { overrides: { golge: { opak: 41 } } } }).kit;
+ok("styleFieldsChanged: gölge / kutu / serbest konum değişimi stil değişimi (nesne alan alan karşılaştırılır)", MK.styleFieldsChanged(kitG1, kitG2) &&
+  !MK.styleFieldsChanged(kitG1, MK.normalize({ on: true, stil: { overrides: { golge: { opak: 40 } } } }).kit) &&
+  MK.styleFieldsChanged(kitG1, MK.normalize({ on: true, stil: { overrides: { golge: { opak: 40 }, konumX: 10, konumY: 10 } } }).kit));
+var rbG = MK.rebaseBrandKit(MK.mergeBrandKit(efTaban, kitG1), efTaban, kitG1, MK.normalize({ on: false }).kit);
+ok("rebaseBrandKit: kit kapanınca kitin gölgesi görünümün değerine (gölge yok) döner", rbG.changed && rbG.stil.golge === null, JSON.stringify(rbG.stil));
 
 /* ---------------- deneme filigranı: logo filigranın üstüne binmez ---------------- */
 // js/filigran.js: \an9\pos(0.97w, 0.04h | 0.10h), boy = kısa kenar × 0.026; "suflo.app" ≤ 7 × boy genişlik, 1.4 × boy yükseklik (cömert kutu)
@@ -324,6 +403,9 @@ ok("sayfa: animasyonsuz efekt kodu → efektin kendi değerleri (Belirme / Yok)"
 s6.hashDegis("#" + SS.encode({ styleId: "neon", overrides: { renk: "#ffffff" } }));
 ok("sayfa: eski stil kodunda animasyon satırları ve 3.3 notu gizli, video stilin kendisi", s6.D["stil-giris-sar"].hidden && s6.D["stil-aktif-sar"].hidden &&
   s6.D["stil-surum"].hidden && s6.D["stil-video"].src === "gorseller/suflo-stiller/neon.webm" && /temel stili gösterir/.test(s6.D["stil-not"].textContent));
+var s7 = sayfa("#" + SS.encode({ styleId: "efekt", overrides: { konum: 2, konumX: 30, konumY: 70, golge: { opak: 50 }, kutu: true } }));
+ok("sayfa: serbest konumlu efekt kodu konumu 'Serbest · X %30 · Y %70' gösterir (adım 17)", s7.D["stil-konum"].textContent === "Serbest · X %30 · Y %70" &&
+  sayfa("#" + SS.encode({ styleId: "efekt", overrides: { konumX: 30, konumY: 70 } }), "en").D["stil-konum"].textContent === "Free · X 30% · Y 70%", s7.D["stil-konum"].textContent);
 var e6 = sayfa("#" + SS.encode({ styleId: "efekt", overrides: { giris: "zipla", aktif: "titre" } }), "en");
 ok("EN sayfa: efekt animasyon adları İngilizce, video yolu", e6.D["stil-giris"].textContent === "Bounce" && e6.D["stil-aktif"].textContent === "Shake" &&
   e6.D["stil-video"].src === "../gorseller/suflo-stiller/efekt-zipla-titre.webm");

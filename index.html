@@ -378,10 +378,16 @@
           <div class="efekt-head"><b id="cap-efekt-baslik">Altyazı Efektleri</b><span>önizleme ücretsiz · After Effects gerekmez</span></div>
           <div class="efekt-gorunumler" id="cap-efekt-gorunumler" role="group" aria-label="Hazır görünümler"></div>
 
-          <!-- Canlı önizleme: Altyazı Efektleri gerçek motor çıktısıyla, Premiere şablonu kendi animasyonuyla oynar -->
+          <!-- Canlı önizleme: Altyazı Efektleri gerçek motor çıktısıyla, Premiere şablonu kendi animasyonuyla oynar.
+               3.3 adım 17: Altyazı Efektleri seçiliyken yazı sahnede sürüklenerek konumlanır (captions.js konumSurukle) -->
           <div class="onizleme" id="cap-onizleme">
-            <div class="onizleme-sahne" id="cap-sahne">
+            <div class="onizleme-sahne" id="cap-sahne" tabindex="0" role="group" aria-label="Önizleme: yazıyı sürükleyerek konumlandır"
+                 title="Yazıyı sürükleyerek konumlandır · ok tuşları %1 (Shift %5) · çift tık hazır konuma döner">
               <div class="onizleme-alt" id="cap-onizleme-metin"></div>
+              <div class="efekt-arti" id="cap-efekt-arti" hidden aria-hidden="true">
+                <i class="efekt-arti-dikey"></i><i class="efekt-arti-yatay"></i>
+                <span class="efekt-arti-etiket" id="cap-efekt-arti-etiket"></span>
+              </div>
               <img id="cap-mogrt-onizleme" class="cap-mogrt-onizleme" alt="Seçili Premiere altyazı şablonu" hidden>
               <video id="cap-render-onizleme" class="render-onizleme" muted playsinline hidden></video>
               <button type="button" id="cap-onizleme-kare" class="onizleme-oynat" style="right:auto; left:7px" title="Timeline'daki kareyi arka plan olarak al">⛶ Kare al</button>
@@ -482,6 +488,43 @@
               </div>
             </div>
 
+            <!-- 3.3 adım 17: gölge ve arka plan kutusu (TranscriptAI şablonunun gölge / kutu kontrolleriyle aynı aralıklar) -->
+            <div class="field efekt-katman">
+              <label class="switch" title="Yazının arkasına gölge (gerçek önizlemede ve katmanda aynı)">
+                <input id="cap-efekt-golge" type="checkbox">
+                <i></i>
+                <span>Gölge</span>
+              </label>
+              <div class="efekt-alt" id="cap-efekt-golge-ayar">
+                <label class="renk-kutu" title="Gölge rengi">
+                  <input type="color" id="cap-efekt-golge-renk" value="#000000">
+                  <span>Gölge rengi</span>
+                </label>
+                <div class="efekt-sayilar">
+                  <label class="efekt-sayi" title="Gölge opaklığı (0-100)"><span>Opaklık</span><input id="cap-efekt-golge-opak" type="number" min="0" max="100" step="5" value="75"></label>
+                  <label class="efekt-sayi" title="Gölgenin yazıdan uzaklığı (0-20)"><span>Mesafe</span><input id="cap-efekt-golge-mesafe" type="number" min="0" max="20" step="1" value="5"></label>
+                  <label class="efekt-sayi" title="Gölgenin yumuşaklığı (0-30)"><span>Yumuşaklık</span><input id="cap-efekt-golge-yumusak" type="number" min="0" max="30" step="1" value="5"></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="field efekt-katman">
+              <label class="switch" title="Yazının arkasına satır satır kutu">
+                <input id="cap-kutu" type="checkbox">
+                <i></i>
+                <span>Arka plan kutusu</span>
+              </label>
+              <div class="efekt-alt" id="cap-efekt-kutu-ayar">
+                <label class="renk-kutu" title="Kutu rengi">
+                  <input type="color" id="cap-kutu-renk" value="#000000">
+                  <span>Kutu rengi</span>
+                </label>
+                <div class="efekt-sayilar">
+                  <label class="efekt-sayi" title="Kutu opaklığı (0-100)"><span>Opaklık</span><input id="cap-kutu-opak" type="number" min="0" max="100" step="5" value="50"></label>
+                </div>
+              </div>
+            </div>
+
             <div class="field-grid">
               <div class="field">
                 <label for="cap-efekt-satir">Satır sayısı</label>
@@ -505,6 +548,14 @@
                 <option value="5">Orta</option>
                 <option value="8">Üst</option>
               </select>
+              <!-- Serbest konum (önizlemede sürükle): gizli alanlar %5-95, boşsa hazır konum -->
+              <input id="cap-konum-x" type="hidden" value="">
+              <input id="cap-konum-y" type="hidden" value="">
+              <div class="efekt-konum-serbest" id="cap-konum-serbest" hidden>
+                <span>Serbest konum:</span> <b id="cap-konum-serbest-deger"></b>
+                <button type="button" id="cap-konum-sifirla" class="link-btn" title="Hazır konuma dön (önizlemede çift tık da olur)">Sıfırla</button>
+              </div>
+              <p class="efekt-ipucu">İpucu: önizlemede yazıyı sürükleyerek istediğin yere koy.</p>
             </div>
 
             <label class="check-label" id="cap-guvenli-yerlesim-sar" hidden title="9:16'da yazıyı TikTok, Reels ve Shorts'un sağdaki ikon sütunundan uzak tutar">
@@ -543,7 +594,8 @@
 
         <!--
           Eski (3.0 öncesi "Özel") kayıtların değer taşıyıcıları: arayüzde gösterilmez. Hareket şiddeti
-          stil motoruna gider; animasyon ve arka plan kutusu yalnız eski özel şablonların ASS yolunda.
+          stil motoruna gider; animasyon yalnız eski özel şablonların ASS yolunda. Arka plan kutusu
+          (cap-kutu) 3.3 adım 17'den beri oluşturucuda.
         -->
         <div class="ia-eski" hidden aria-hidden="true">
           <select id="cap-yogunluk">
@@ -569,7 +621,6 @@
             <option value="doc" data-pro="1">Belgesel bandı</option>
           </select>
           <p id="cap-animasyon-ipucu" hidden></p>
-          <input id="cap-kutu" type="checkbox">
         </div>
       </div>
 
@@ -1979,12 +2030,14 @@
         </div>
         <div class="field">
           <label for="mk-konum">Konum</label>
-          <select id="mk-konum">
+          <select id="mk-konum" title="Altyazı sekmesinde sürüklediğin serbest konum için bir konum seç ve &quot;Şimdiki ayarlardan doldur&quot;a bas">
             <option value="">Stilin kendi konumu</option>
             <option value="2">Alt</option>
             <option value="5">Orta</option>
             <option value="8">Üst</option>
             <option value="1">Alt sol</option>
+            <!-- 3.3 adım 17: kitte serbest konum (konumX / konumY) varsa görünür -->
+            <option value="xy" id="mk-konum-xy" hidden>Serbest konum (Altyazı sekmesinden)</option>
           </select>
         </div>
       </div>
@@ -1999,6 +2052,13 @@
           <label class="renk-kutu" title="Kontur (çevre çizgisi) rengi"><input type="color" id="mk-renk-kontur" value="#000000"><span>Kontur</span></label>
           <label class="renk-kutu" title="Vurgulanan kelimenin rengi"><input type="color" id="mk-renk-vurgu" value="#8b7cf6"><span>Vurgu</span></label>
         </div>
+      </div>
+      <div class="field">
+        <label class="switch" title="Altyazı Efektleri'ndeki gölge ve arka plan kutusu kite alınır; kit açıkken her görünüme uygulanır">
+          <input id="mk-gorunum" type="checkbox">
+          <i></i>
+          <span>Gölge ve arka plan kutusunu da kite al</span>
+        </label>
       </div>
       <div class="field">
         <label>Logo</label>

@@ -8,13 +8,16 @@
  * bayt bayt kopyası docs/js/style-share.js'tedir (test denetler).
  *
  * 3.3 Altyazı Efektleri (styleId "efekt"): giriş / vurgu animasyonu, kelime vurgusu, kalın, italik,
- * satır sayısı ve en çok kelime de koda girer. Bu alanları tanımayan eski paneller (3.2 ve öncesi)
- * onları "geçersiz ayar atlandı" uyarısıyla atar; "efekt" stilini hiç tanımadıkları için kodu reddeder.
+ * satır sayısı ve en çok kelime de koda girer; adım 17'den beri isteğe bağlı gölge (golge: { renk, opak,
+ * mesafe, yumusak } ya da null), arka plan kutusu (kutu, kutuRenk, kutuOpak) ve serbest konum (konumX,
+ * konumY: %5-95 ya da null). Bu alanları tanımayan eski paneller (3.2 ve öncesi) onları "geçersiz ayar
+ * atlandı" uyarısıyla atar; "efekt" stilini hiç tanımadıkları için kodu reddeder.
  *
  * Güvenlik: kod yabancı kaynaktan gelir ve değerleri ASS Style satırına yazılır.
  *   - renkler yalnız #rrggbb, yazı tipi yalnız paketle gelen 6 OFL fontundan biri
  *   - konum ∈ {1, 2, 5, 8}; punto 36-180, kontur 0-16 aralığına kırpılır
  *   - giris / aktif sabit kimlik listesinden; satır 1-3, kelime 1-10 aralığına kırpılır
+ *   - gölge opaklığı 0-100, mesafe 0-20, yumuşaklık 0-30; kutu opaklığı 0-100; konum %5-95 (kırpılır)
  *   - bilinmeyen anahtarlar ve __proto__ atılır; fontFile ASLA girdiden alınmaz,
  *     yazı tipinden yerelde türetilir (yol kaçışı olmasın)
  *   - yerel yollar (logo vb.) koda hiç yazılmaz
@@ -64,9 +67,14 @@
   var BAYRAKLAR = ["vurgu", "kalin", "italik"];
   // Yalnız Altyazı Efektleri'nin (styleId "efekt") okuduğu alanlar: eski stil kimliğiyle gelirse uyarıyla atılır
   var EFEKT_STILI = "efekt";
-  var EFEKT_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"];
-  var ALANLAR = ["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli",
-    "giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"];
+  var EFEKT_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime",
+    "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY"];
+  var ALANLAR = ["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli"].concat(EFEKT_ALANLARI);
+  // Gölge (TranscriptAI şablonunun Drop Shadow kontrolleriyle aynı aralık ve varsayılan): stil motorundaki
+  // GOLGE_VARSAYILAN / ARALIKLAR ile aynı; test eşleşmeyi denetler
+  var GOLGE_VARSAYILAN = { renk: "#000000", opak: 75, mesafe: 5, yumusak: 5 };
+  var GOLGE_ARALIK = { opak: [0, 100], mesafe: [0, 20], yumusak: [0, 30] };
+  var KUTU_OPAK = [0, 100], KONUM_YUZDE = [5, 95];
 
   function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }
   function hasFont(name) { return typeof name === "string" && own(FONTS, name); }
@@ -99,8 +107,9 @@
    * İnce ayar değerlerini doğrula. Geçersiz değer atılır (stilin kendi değeri kalır),
    * aralık dışı sayı kırpılır. uyarilar (dizi) verilirse atılan / kırpılan alanlar yazılır.
    * Dönen nesnede yalnız: font + fontFile, renk, konturRenk, vurguRenk, boyut, kontur, konum, guvenli
-   * ve Altyazı Efektleri alanları (giris, aktif, vurgu, kalin, italik, satir, kelime). giris / aktif ""
-   * (stilin kendi değeri) uyarısız atlanır.
+   * ve Altyazı Efektleri alanları (giris, aktif, vurgu, kalin, italik, satir, kelime, golge, kutu, kutuRenk,
+   * kutuOpak, konumX, konumY). giris / aktif "" (stilin kendi değeri) uyarısız atlanır; golge / konumX /
+   * konumY null (gölge yok / hazır konum) olduğu gibi kalır.
    */
   function sanitizeOverrides(o, uyarilar) {
     var out = {};
@@ -144,13 +153,42 @@
       if (typeof o[k] === "boolean") out[k] = o[k];
       else uyar(k);
     });
-    [["satir", 1, 3], ["kelime", 1, 10]].forEach(function (a) {
+    [["satir", 1, 3], ["kelime", 1, 10], ["kutuOpak", KUTU_OPAK[0], KUTU_OPAK[1]],
+      ["konumX", KONUM_YUZDE[0], KONUM_YUZDE[1]], ["konumY", KONUM_YUZDE[0], KONUM_YUZDE[1]]].forEach(function (a) {
       if (!own(o, a[0])) return;
+      if (o[a[0]] === null && (a[0] === "konumX" || a[0] === "konumY")) { out[a[0]] = null; return; }
       var n = sayi(o[a[0]]);
       if (n === null) { uyar(a[0]); return; }
       out[a[0]] = kirp(n, a[1], a[2]);
       if (out[a[0]] !== n) uyar(a[0]);
     });
+    if (own(o, "kutu")) {
+      if (typeof o.kutu === "boolean") out.kutu = o.kutu;
+      else uyar("kutu");
+    }
+    if (own(o, "kutuRenk")) {
+      if (isColor(o.kutuRenk)) out.kutuRenk = o.kutuRenk.toLowerCase();
+      else uyar("kutuRenk");
+    }
+    if (own(o, "golge")) {
+      var g = o.golge;
+      if (g === null || g === false) out.golge = null;
+      else if (typeof g !== "object" || g instanceof Array) uyar("golge");
+      else {
+        // eksik alan şablonun varsayılanı; bozuk alan uyarıyla varsayılana, aralık dışı sayı kırpılır
+        var gt = { renk: GOLGE_VARSAYILAN.renk, opak: GOLGE_VARSAYILAN.opak, mesafe: GOLGE_VARSAYILAN.mesafe, yumusak: GOLGE_VARSAYILAN.yumusak };
+        if (own(g, "renk")) { if (isColor(g.renk)) gt.renk = g.renk.toLowerCase(); else uyar("golge.renk"); }
+        ["opak", "mesafe", "yumusak"].forEach(function (k) {
+          if (!own(g, k)) return;
+          var n = sayi(g[k]);
+          if (n === null) { uyar("golge." + k); return; }
+          gt[k] = kirp(n, GOLGE_ARALIK[k][0], GOLGE_ARALIK[k][1]);
+          if (gt[k] !== n) uyar("golge." + k);
+        });
+        Object.keys(g).forEach(function (k) { if (["renk", "opak", "mesafe", "yumusak"].indexOf(k) === -1) uyar("golge." + k); });
+        out.golge = gt;
+      }
+    }
     Object.keys(o).forEach(function (key) {
       // fontFile de uyarı sayılır: girdiden ASLA alınmaz, yazı tipinden türetilir
       if (ALANLAR.indexOf(key) === -1) uyar(key);
@@ -297,6 +335,10 @@
     FONTS: FONTS,
     GIRISLER: GIRISLER.slice(),
     AKTIFLER: AKTIFLER.slice(),
+    EFEKT_ALANLARI: EFEKT_ALANLARI.slice(),
+    GOLGE_VARSAYILAN: JSON.parse(JSON.stringify(GOLGE_VARSAYILAN)),
+    ARALIKLAR: { golgeOpak: GOLGE_ARALIK.opak.slice(), golgeMesafe: GOLGE_ARALIK.mesafe.slice(), golgeYumusak: GOLGE_ARALIK.yumusak.slice(),
+      kutuOpak: KUTU_OPAK.slice(), konum: KONUM_YUZDE.slice() },
     hasFont: hasFont,
     fontFile: fontFile,
     fontNames: fontNames,

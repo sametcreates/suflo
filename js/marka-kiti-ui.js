@@ -43,12 +43,20 @@ window.KMarkaKiti = (function () {
     if (e) e.textContent = uiDili() === "en" ? n + "%" : "%" + n;
   }
 
+  function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }
+  // Altyazı Efektleri'nden kite alınan görünüm alanları (3.3 adım 17)
+  var GORUNUM_ALANLARI = ["golge", "kutu", "kutuRenk", "kutuOpak"];
+
   // Kayıttaki kit → alanlar
   function doldur(kit) {
     var ov = kit.stil.overrides;
     el("mk-acik").checked = kit.on;
     el("mk-font").value = ov.font || "";
-    el("mk-konum").value = ov.konum ? String(ov.konum) : "";
+    // Serbest konum (Altyazı sekmesinde sürüklenmiş) kitte varsa "Serbest konum" seçeneği görünür ve seçili
+    var xy = typeof ov.konumX === "number" && typeof ov.konumY === "number";
+    if (el("mk-konum-xy")) el("mk-konum-xy").hidden = !xy;
+    el("mk-konum").value = xy ? "xy" : (ov.konum ? String(ov.konum) : "");
+    if (el("mk-gorunum")) el("mk-gorunum").checked = GORUNUM_ALANLARI.some(function (k) { return own(ov, k); });
     var renkVar = !!(ov.renk || ov.konturRenk || ov.vurguRenk);
     el("mk-renk-acik").checked = renkVar;
     if (ov.renk) el("mk-renk").value = ov.renk;
@@ -85,9 +93,17 @@ window.KMarkaKiti = (function () {
   // Alanlar → kit (eski kitin kanca / ilerleme / cta alanları korunur)
   function topla() {
     var eski = oku().kit;
+    var eskiOv = eski.stil.overrides;
     var ov = {};
     if (el("mk-font").value) ov.font = el("mk-font").value;
-    if (el("mk-konum").value) ov.konum = Number(el("mk-konum").value);
+    // "Serbest konum": kitteki konum olduğu gibi kalır (yalnız "Şimdiki ayarlardan doldur" değiştirir)
+    if (el("mk-konum").value === "xy") ["konum", "konumX", "konumY"].forEach(function (k) { if (own(eskiOv, k)) ov[k] = eskiOv[k]; });
+    else if (el("mk-konum").value) ov.konum = Number(el("mk-konum").value);
+    // Gölge ve kutu: anahtar açıkken kitteki değerler kalır; kitte yoksa Altyazı sekmesinden alınır
+    if (el("mk-gorunum") && el("mk-gorunum").checked) {
+      var kaynak = GORUNUM_ALANLARI.some(function (k) { return own(eskiOv, k); }) ? eskiOv : altyazidanGorunum();
+      GORUNUM_ALANLARI.forEach(function (k) { if (own(kaynak, k)) ov[k] = kaynak[k]; });
+    }
     if (el("mk-renk-acik").checked) {
       ov.renk = el("mk-renk").value;
       ov.konturRenk = el("mk-renk-kontur").value;
@@ -143,11 +159,17 @@ window.KMarkaKiti = (function () {
     logoGoster(kaydet(ham).logo.path);
   }
 
-  // Altyazı sekmesindeki yazı tipi / renk / (seçiliyse) konum → kit
+  // Altyazı sekmesindeki gölge ve kutu (Altyazı Efektleri) → kitin görünüm alanları
+  function altyazidanGorunum() {
+    if (!window.KCaptions || !window.KCaptions.stilAyarlari) return {};
+    return MK.fromCurrent(window.KCaptions.stilAyarlari(), null, false, true).stil.overrides;
+  }
+
+  // Altyazı sekmesindeki yazı tipi / renk / (seçiliyse) konum ve serbest konum / (açıksa) gölge ve kutu → kit
   function simdikiden() {
     if (!window.KCaptions || !window.KCaptions.stilAyarlari) return;
     var st = window.KCaptions.stilAyarlari();
-    var kit = MK.fromCurrent(st, oku().kit, !!el("mk-konum").value);
+    var kit = MK.fromCurrent(st, oku().kit, !!el("mk-konum").value, !!(el("mk-gorunum") && el("mk-gorunum").checked));
     doldur(kit);
     if (!(st && window.SufloStyleShare && window.SufloStyleShare.hasFont(st.font))) durum("Sistem yazı tipi kite alınmadı: yalnız Suflo ile gelen yazı tipleri her bilgisayarda aynı görünür.", "warn");
     else if (!MK.isOn(kit)) durum("Doldu. Kullanmak için \"Marka kitini her stile ve kanca başlığına uygula\"yı aç.", "warn");
@@ -162,6 +184,7 @@ window.KMarkaKiti = (function () {
     ["mk-acik", "mk-font", "mk-konum", "mk-renk-acik", "mk-logo-kose"].forEach(function (id) {
       el(id).addEventListener("change", degisti);
     });
+    if (el("mk-gorunum")) el("mk-gorunum").addEventListener("change", degisti);
     ["mk-renk", "mk-renk-kontur", "mk-renk-vurgu"].forEach(function (id) {
       el(id).addEventListener("change", degisti);
     });

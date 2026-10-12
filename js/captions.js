@@ -24,6 +24,10 @@ window.KCaptions = (function () {
   // Altyazı Efektleri oluşturucusunun saf modeli (görünümler, eski stil eşleme): js/altyazi-efekt.js
   var AE = window.SufloAltyaziEfekt || null;
   var EFEKT = "efekt";
+  // Altyazı Efektleri gölge / kutu sayı kutuları (3.3 adım 17): [varsayılan, en az, en çok]; TranscriptAI şablonunun
+  // aralıkları, stil motoru aynısını doğrular. Üstte: stil() modül yüklenirken de çağrılabilir.
+  var EFEKT_SAYILARI = { "cap-efekt-golge-opak": [75, 0, 100], "cap-efekt-golge-mesafe": [5, 0, 20], "cap-efekt-golge-yumusak": [5, 0, 30],
+    "cap-kutu-opak": [50, 0, 100] };
   var bekleyenMogrtYolu = "";
   var mogrtBaglam = { width: 0, height: 0 };
 
@@ -1847,16 +1851,22 @@ window.KCaptions = (function () {
   function efektStili(ayar) {
     var a = AE ? AE.normalize(ayar) : ayar;
     return { aile: EFEKT, yogunluk: "balanced", font: a.font, boyut: a.boyut, renk: a.renk, konturRenk: a.konturRenk,
-      vurguRenk: a.vurguRenk, kontur: a.kontur, konum: a.konum, kutu: false, animasyon: EFEKT,
-      giris: a.giris, aktif: a.aktif, vurgu: a.vurgu, kalin: a.kalin, italik: a.italik, satir: a.satir, kelime: a.kelime };
+      vurguRenk: a.vurguRenk, kontur: a.kontur, konum: a.konum, kutu: a.kutu === true, animasyon: EFEKT,
+      giris: a.giris, aktif: a.aktif, vurgu: a.vurgu, kalin: a.kalin, italik: a.italik, satir: a.satir, kelime: a.kelime,
+      // 3.3 adım 17: gölge (null = yok), arka plan kutusu, serbest konum (null = hazır konum)
+      golge: a.golge ? JSON.parse(JSON.stringify(a.golge)) : null, kutuRenk: a.kutuRenk, kutuOpak: a.kutuOpak,
+      konumX: a.konumX === undefined ? null : a.konumX, konumY: a.konumY === undefined ? null : a.konumY };
   }
 
-  // stil() → oluşturucu ayarı (yazım biçimi Altyazı ayarlarından)
+  // stil() → oluşturucu ayarı (yazım biçimi ve noktalama Altyazı ayarlarından)
   function efektAyari(st) {
     st = st || stil();
     return { giris: st.giris, aktif: st.aktif, vurgu: st.vurgu, vurguRenk: st.vurguRenk, renk: st.renk, font: st.font,
       kalin: st.kalin, italik: st.italik, boyut: st.boyut, kontur: st.kontur, konturRenk: st.konturRenk, konum: st.konum,
-      satir: st.satir, kelime: st.kelime, kase: el("cap-case") ? el("cap-case").value : "normal" };
+      satir: st.satir, kelime: st.kelime, kase: el("cap-case") ? el("cap-case").value : "normal",
+      punct: el("cap-punct") ? !!el("cap-punct").checked : true,
+      golge: st.golge || null, kutu: st.kutu === true, kutuRenk: st.kutuRenk, kutuOpak: st.kutuOpak,
+      konumX: st.konumX === undefined ? null : st.konumX, konumY: st.konumY === undefined ? null : st.konumY };
   }
 
   // Seçimi Altyazı Efektleri'ne al (kontrol değerlerine dokunmaz)
@@ -1895,6 +1905,8 @@ window.KCaptions = (function () {
     var kit = markaKiti();
     stiliYaz(kit ? window.SufloMarkaKiti.mergeBrandKit(st, kit) : st);
     if (el("cap-case") && g.ayar.kase) el("cap-case").value = g.ayar.kase;
+    // Noktalama da görünümle (3.2'de stil seçimi de böyleydi): Vurucu / Canlı / Glitch noktalamasız
+    if (el("cap-punct") && typeof g.ayar.punct === "boolean") el("cap-punct").checked = g.ayar.punct;
     stilKredisi("");
     efektSonrasi();
     if (opts.kaydet !== false) savePrefs();
@@ -1992,6 +2004,135 @@ window.KCaptions = (function () {
     var n = parseInt(e ? e.value : "", 10);
     if (!isFinite(n)) return 5;
     return Math.max(1, Math.min(10, n));
+  }
+
+  /*
+   * ---------------- Serbest konum: önizlemede sürükle (3.3 adım 17) ----------------
+   * Altyazı Efektleri seçiliyken yazının yeri önizleme sahnesinde sürüklenerek ayarlanır: artı işareti ve
+   * "X %50 · Y %85" etiketi; hazır konumlara ±%3 yapışır (js/altyazi-efekt.js surukle). Odaktayken ok tuşları
+   * %1 (Shift %5) kaydırır, çift tık / Home hazır konuma döner, Esc sürüklemeyi geri alır. Sürerken yalnız
+   * DOM önizlemesi ve artı işareti güncellenir; gerçek önizleme (libass) bırakınca bir kez çizilir.
+   * Premiere çağrısı yok; Pro kapısı yalnız timeline'a eklerken (önizleme ücretsiz).
+   */
+  var surukleme = null;   // { id: pointerId, bas: { konum, x, y } }
+  var artiSaat = null;
+  function konumAktif() { return !!AE && !secilenMogrt && secilenMotorStili === EFEKT; }
+  function sahneNoktasi(e) {
+    var sahne = el("cap-sahne");
+    var r = sahne && sahne.getBoundingClientRect ? sahne.getBoundingClientRect() : null;
+    if (!r || !(r.width > 0 && r.height > 0)) return null;
+    return { x: (e.clientX - r.left) / r.width * 100, y: (e.clientY - r.top) / r.height * 100 };
+  }
+  // Artı işareti ve etiket; nokta yoksa gizli. sure (ms) verilirse o kadar sonra kendiliğinden gizlenir.
+  function artiGoster(nokta, sure) {
+    var a = el("cap-efekt-arti");
+    if (artiSaat) { clearTimeout(artiSaat); artiSaat = null; }
+    if (!a) return;
+    if (!nokta || !AE) { a.hidden = true; return; }
+    a.hidden = false;
+    var d = a.querySelector(".efekt-arti-dikey"), y = a.querySelector(".efekt-arti-yatay");
+    if (d) d.style.left = nokta.x + "%";
+    if (y) y.style.top = nokta.y + "%";
+    var et = el("cap-efekt-arti-etiket");
+    if (et) et.textContent = AE.konumEtiketi(nokta);
+    if (sure) artiSaat = setTimeout(function () { artiSaat = null; a.hidden = true; }, sure);
+  }
+  // AE.surukle / kaydir / sifirla sonucunu kontrollere yaz (hazır konum seçicisi + gizli X / Y)
+  function konumYaz(r) {
+    if (!r) return;
+    if (el("cap-konum")) el("cap-konum").value = String(r.konum);
+    if (el("cap-konum-x")) el("cap-konum-x").value = r.konumX === null ? "" : String(r.konumX);
+    if (el("cap-konum-y")) el("cap-konum-y").value = r.konumY === null ? "" : String(r.konumY);
+    efektBagimliDurum();
+  }
+  // Konum değişikliği bitti: efekt seçilir, görünüm çipi yeniden bulunur, kaydedilir, gerçek önizleme tazelenir
+  function konumDegisti() {
+    efekteGec();
+    secilenGorunum = AE ? AE.gorunumuBul(efektAyari()) : "";
+    efektSonrasi();
+    savePrefs();
+    efektOnizlemeTazele();
+  }
+  function konumSuruklemeAdim(n) {
+    if (!n || !AE) return;
+    var r = AE.surukle(efektAyari(), n.x, n.y);
+    konumYaz(r);
+    artiGoster(r);
+    // gerçek önizleme video olarak oynuyorsa (soluk) bırakınca yeniden çizilir; DOM önizlemesi noktayı hemen izler
+    var video = el("cap-render-onizleme");
+    if (!video || video.hidden) onizlemeCiz();
+  }
+  function konumSuruklemeBitir(kaydet) {
+    var sahne = el("cap-sahne");
+    if (!surukleme) return;
+    var s0 = surukleme;
+    surukleme = null;
+    if (sahne) {
+      sahne.classList.remove("surukleniyor");
+      try { if (sahne.releasePointerCapture) sahne.releasePointerCapture(s0.id); } catch (e) {}
+    }
+    if (!kaydet) { konumYaz({ konum: s0.bas.konum, konumX: s0.bas.x, konumY: s0.bas.y }); artiGoster(null); onizlemeCiz(); return; }
+    konumDegisti();
+    // bırakılan nokta kısa süre görünür kalır (hazır konuma yapıştıysa adıyla)
+    var son = AE.konumNoktasi(efektAyari());
+    artiGoster(son.serbest ? son : AE.sifirla(efektAyari()), 1400);
+  }
+  function konumSifirla() {
+    if (!konumAktif()) return;
+    var r = AE.sifirla(efektAyari());
+    konumYaz(r);
+    konumDegisti();
+    artiGoster(r, 1400);
+  }
+  function konumSurukleBagla() {
+    var sahne = el("cap-sahne");
+    if (!sahne || !sahne.addEventListener) return;
+    sahne.addEventListener("pointerdown", function (e) {
+      if (!konumAktif() || (e.button !== undefined && e.button !== 0)) return;
+      // sahnedeki düğmeler (Oynat, Kare al) sürükleme başlatmaz
+      if (e.target && e.target.closest && e.target.closest("button")) return;
+      var n = sahneNoktasi(e);
+      if (!n) return;
+      var st = stil();
+      surukleme = { id: e.pointerId, bas: { konum: st.konum, x: typeof st.konumX === "number" ? st.konumX : null, y: typeof st.konumY === "number" ? st.konumY : null } };
+      try { if (sahne.setPointerCapture) sahne.setPointerCapture(e.pointerId); } catch (eC) {}
+      sahne.classList.add("surukleniyor");
+      if (sahne.focus) { try { sahne.focus(); } catch (eF) {} }
+      if (e.preventDefault) e.preventDefault();
+      konumSuruklemeAdim(n);
+    });
+    sahne.addEventListener("pointermove", function (e) {
+      if (!surukleme || e.pointerId !== surukleme.id) return;
+      konumSuruklemeAdim(sahneNoktasi(e));
+    });
+    sahne.addEventListener("pointerup", function (e) {
+      if (!surukleme || e.pointerId !== surukleme.id) return;
+      konumSuruklemeBitir(true);
+    });
+    sahne.addEventListener("pointercancel", function (e) {
+      if (surukleme && e.pointerId === surukleme.id) konumSuruklemeBitir(false);
+    });
+    sahne.addEventListener("dblclick", function (e) {
+      if (!konumAktif() || (e.target && e.target.closest && e.target.closest("button"))) return;
+      konumSifirla();
+    });
+    sahne.addEventListener("keydown", function (e) {
+      if (!konumAktif() || (e.target && e.target !== sahne)) return;
+      if (e.key === "Escape" && surukleme) { e.preventDefault(); konumSuruklemeBitir(false); return; }
+      if (e.key === "Home") { e.preventDefault(); konumSifirla(); return; }
+      var adim = e.shiftKey ? 5 : 1;
+      var yon = { ArrowLeft: [-adim, 0], ArrowRight: [adim, 0], ArrowUp: [0, -adim], ArrowDown: [0, adim] }[e.key];
+      if (!yon) return;
+      e.preventDefault();
+      var r = AE.kaydir(efektAyari(), yon[0], yon[1]);
+      konumYaz(r);
+      konumDegisti();
+      artiGoster(r, 1400);
+    });
+    // Klavye odağında artı işareti şimdiki noktayı gösterir
+    sahne.addEventListener("focus", function () { if (konumAktif() && !surukleme) artiGoster(AE.konumNoktasi(efektAyari()), 1800); });
+    sahne.addEventListener("blur", function () { if (!surukleme) artiGoster(null); });
+    if (el("cap-konum-sifirla")) el("cap-konum-sifirla").addEventListener("click", konumSifirla);
   }
 
   function mogrtStilleriniCiz() {
@@ -2224,8 +2365,33 @@ window.KCaptions = (function () {
       kalin: !el("cap-efekt-kalin") || el("cap-efekt-kalin").checked,
       italik: !!(el("cap-efekt-italik") && el("cap-efekt-italik").checked),
       satir: Math.max(1, Math.min(3, parseInt(d("cap-efekt-satir", "2"), 10) || 2)),
-      kelime: efektKelimeSayisi()
+      kelime: efektKelimeSayisi(),
+      // 3.3 adım 17: gölge (kapalıysa null), arka plan kutusu (kutu: cap-kutu), serbest konum (boşsa hazır konum)
+      golge: el("cap-efekt-golge") && el("cap-efekt-golge").checked ? {
+        renk: d("cap-efekt-golge-renk", "#000000"),
+        opak: efektSayiAlani("cap-efekt-golge-opak"),
+        mesafe: efektSayiAlani("cap-efekt-golge-mesafe"),
+        yumusak: efektSayiAlani("cap-efekt-golge-yumusak")
+      } : null,
+      kutuRenk: d("cap-kutu-renk", "#000000"),
+      kutuOpak: efektSayiAlani("cap-kutu-opak"),
+      konumX: serbestKonumDegeri("cap-konum-x"),
+      konumY: serbestKonumDegeri("cap-konum-y")
     };
+  }
+
+  // Sayı kutusu: aralığa kırpılmış tam sayı; boş / bozuksa varsayılan
+  function efektSayi(id, varsayilan, en, ust) {
+    var e = el(id);
+    var n = parseInt(e ? e.value : "", 10);
+    return isFinite(n) ? Math.max(en, Math.min(ust, n)) : varsayilan;
+  }
+  function efektSayiAlani(id) { var a = EFEKT_SAYILARI[id]; return efektSayi(id, a[0], a[1], a[2]); }
+  // Serbest konum (gizli alan, %5-95); boşsa null (hazır konum). İki eksenden biri yoksa ikisi de null.
+  function serbestKonumDegeri(id) {
+    var x = parseInt(el("cap-konum-x") ? el("cap-konum-x").value : "", 10), y = parseInt(el("cap-konum-y") ? el("cap-konum-y").value : "", 10);
+    if (!isFinite(x) || !isFinite(y)) return null;
+    return Math.max(5, Math.min(95, id === "cap-konum-x" ? x : y));
   }
 
   /*
@@ -2242,6 +2408,9 @@ window.KCaptions = (function () {
     if (st.aile === EFEKT) {
       o.giris = st.giris; o.aktif = st.aktif; o.vurgu = st.vurgu !== false; o.kalin = st.kalin !== false;
       o.italik = st.italik === true; o.satir = st.satir; o.kelime = st.kelime;
+      // 3.3 adım 17: gölge, arka plan kutusu, serbest konum (motor yine doğrular)
+      o.golge = st.golge || null; o.kutu = st.kutu === true; o.kutuRenk = st.kutuRenk; o.kutuOpak = st.kutuOpak;
+      o.konumX = typeof st.konumX === "number" ? st.konumX : null; o.konumY = typeof st.konumY === "number" ? st.konumY : null;
     }
     return o;
   }
@@ -2396,6 +2565,44 @@ window.KCaptions = (function () {
     ["vurgu", "kalin", "italik"].forEach(function (k) {
       if (el("cap-efekt-" + k) && typeof st[k] === "boolean") el("cap-efekt-" + k).checked = st[k];
     });
+    // 3.3 adım 17: yalnız verilen alanlar yazılır (kısmi kayıt / Marka Kiti / kod öbürlerine dokunmaz)
+    var has = function (k) { return Object.prototype.hasOwnProperty.call(st, k); };
+    if (has("golge") && el("cap-efekt-golge")) {
+      var g = st.golge && typeof st.golge === "object" ? st.golge : null;
+      el("cap-efekt-golge").checked = !!g;
+      if (g) {
+        if (el("cap-efekt-golge-renk") && typeof g.renk === "string") el("cap-efekt-golge-renk").value = g.renk;
+        ["opak", "mesafe", "yumusak"].forEach(function (k) { if (el("cap-efekt-golge-" + k) && typeof g[k] === "number") el("cap-efekt-golge-" + k).value = String(g[k]); });
+      }
+    }
+    if (has("kutuRenk") && el("cap-kutu-renk") && typeof st.kutuRenk === "string") el("cap-kutu-renk").value = st.kutuRenk;
+    if (has("kutuOpak") && el("cap-kutu-opak") && typeof st.kutuOpak === "number") el("cap-kutu-opak").value = String(st.kutuOpak);
+    if ((has("konumX") || has("konumY")) && el("cap-konum-x") && el("cap-konum-y")) {
+      var xy = typeof st.konumX === "number" && typeof st.konumY === "number";
+      el("cap-konum-x").value = xy ? String(st.konumX) : "";
+      el("cap-konum-y").value = xy ? String(st.konumY) : "";
+    }
+    efektBagimliDurum();
+  }
+
+  /*
+   * Gölge / kutu alt kontrolleri anahtar kapalıyken soluk; serbest konum varsa Konum satırında
+   * "Serbest · X %… · Y %…" ve Sıfırla görünür (yalnız Altyazı Efektleri oluşturucusunda).
+   */
+  function efektBagimliDurum() {
+    var golgeAcik = !!(el("cap-efekt-golge") && el("cap-efekt-golge").checked);
+    ["cap-efekt-golge-renk", "cap-efekt-golge-opak", "cap-efekt-golge-mesafe", "cap-efekt-golge-yumusak"].forEach(function (id) { if (el(id)) el(id).disabled = !golgeAcik; });
+    var g = el("cap-efekt-golge-ayar");
+    if (g) g.classList.toggle("pasif", !golgeAcik);
+    var kutuAcik = !!(el("cap-kutu") && el("cap-kutu").checked);
+    ["cap-kutu-renk", "cap-kutu-opak"].forEach(function (id) { if (el(id)) el(id).disabled = !kutuAcik; });
+    var k = el("cap-efekt-kutu-ayar");
+    if (k) k.classList.toggle("pasif", !kutuAcik);
+    var x = serbestKonumDegeri("cap-konum-x"), y = serbestKonumDegeri("cap-konum-y");
+    var satir = el("cap-konum-serbest");
+    if (satir) satir.hidden = x === null;
+    var yazi = el("cap-konum-serbest-deger");
+    if (yazi) yazi.textContent = x === null || !AE ? "" : AE.konumEtiketi({ x: x, y: y });
   }
 
   /* ---------------- İnce ayar, Marka Kiti, paylaşılabilir stil kodları ---------------- */
@@ -4452,6 +4659,9 @@ window.KCaptions = (function () {
     // Yerleşim: ASS Alignment 2/5/8 -> alt/orta/üst
     kutu.className = "onizleme-alt stil-" + rec.aile + " " +
       (st.konum === 8 ? "ust" : st.konum === 5 ? "orta" : "alt");
+    // serbest konum yalnız Altyazı Efektleri'nin DOM önizlemesinde (efektDomCiz); başka stilde silinir
+    kutu.style.left = "";
+    kutu.style.top = "";
     kutu.style.fontFamily = st.font + ", sans-serif";
     kutu.style.fontSize = Math.max(7, st.boyut * olcek) + "px";
     kutu.style.fontWeight = rec.aile === "doc" ? "600" : "800";
@@ -4563,12 +4773,35 @@ window.KCaptions = (function () {
    */
   var EFEKT_GIRIS_SINIFI = { pop: "satir-efekt-pop", fade: "satir-fade", yukari: "satir-slide", asagi: "satir-efekt-asagi", zipla: "satir-efekt-zipla" };
   var EFEKT_AKTIF_SINIFI = { zipla: "kelime-efekt-zipla", titre: "kelime-efekt-titre", glitch: "kelime-efekt-glitch" };
+  function hexRgba(hex, opak) {
+    var h = String(hex || "#000000").replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    return "rgba(" + (parseInt(h.slice(0, 2), 16) || 0) + "," + (parseInt(h.slice(2, 4), 16) || 0) + "," + (parseInt(h.slice(4, 6), 16) || 0) + "," +
+      Math.max(0, Math.min(1, Number(opak) / 100)) + ")";
+  }
   function efektDomCiz(kutu, st, ornek, vurguIndex) {
     // kalın kapalı: 400 (katmanın libass yüzü Montserrat-Regular; tek ağırlıklı fontlar zaten 400)
     kutu.style.fontWeight = st.kalin === false ? "400" : "800";
     kutu.style.fontStyle = st.italik ? "italic" : "normal";
     kutu.style.background = "transparent";
     kutu.style.padding = "0";
+    kutu.style.borderRadius = "0";
+    /*
+     * 3.3 adım 17 (yaklaşık; gerçek görünüm libass çıktısı): serbest konumda kartın ortası noktada; gölge
+     * metin gölgesi (mesafe · cos 45°, yumuşaklık bulanıklık); kutu her kelimenin arkasında satır satır.
+     */
+    var sahne = el("cap-sahne");
+    var olcek = sahne && sahne.clientWidth ? sahne.clientWidth / 1920 : 0.25;
+    var serbest = typeof st.konumX === "number" && typeof st.konumY === "number";
+    kutu.classList.toggle("serbest", serbest);
+    kutu.style.left = serbest ? st.konumX + "%" : "";
+    kutu.style.top = serbest ? st.konumY + "%" : "";
+    if (st.golge) {
+      var gm = Math.max(0, st.golge.mesafe * 0.7071 * olcek), gy = Math.max(0, st.golge.yumusak * olcek);
+      var dusen = gm.toFixed(1) + "px " + gm.toFixed(1) + "px " + gy.toFixed(1) + "px " + hexRgba(st.golge.renk, st.golge.opak);
+      kutu.style.textShadow = (st.kontur > 0 && kutu.style.textShadow && kutu.style.textShadow !== "none" ? kutu.style.textShadow + ", " : "") + dusen;
+    } else if (!(st.kontur > 0)) kutu.style.textShadow = "none";
+    var kutuRengi = st.kutu ? hexRgba(st.kutuRenk, st.kutuOpak) : "";
     var oynuyor = vurguIndex !== undefined;
     var n = Math.max(1, Number(st.kelime) || 5);
     var bas = oynuyor ? Math.floor(vurguIndex / n) * n : 0;
@@ -4582,6 +4815,7 @@ window.KCaptions = (function () {
       var s = document.createElement("span");
       s.className = "kelime";
       s.textContent = kelime + (i < kelimeler.length - 1 ? " " : "");
+      if (kutuRengi) { s.style.background = kutuRengi; s.style.padding = "0 .14em"; }
       if (i === etkin) {
         if (st.vurgu !== false) s.style.color = st.vurguRenk;
         if (EFEKT_AKTIF_SINIFI[st.aktif]) s.classList.add(EFEKT_AKTIF_SINIFI[st.aktif]);
@@ -5747,6 +5981,10 @@ window.KCaptions = (function () {
       var olay = e.type === "color" ? "input" : "change";
       e.addEventListener(olay, function () {
         if (id === "cap-efekt-kelime") e.value = String(efektKelimeSayisi());
+        // Gölge / kutu sayı kutuları aralığa (boşsa varsayılana) döner: kutuda görünen = çizilen
+        if (EFEKT_SAYILARI[id]) e.value = String(efektSayi(id, EFEKT_SAYILARI[id][0], EFEKT_SAYILARI[id][1], EFEKT_SAYILARI[id][2]));
+        // Hazır konum seçildi: serbest (sürüklenmiş) konum bırakılır
+        if (id === "cap-konum") { if (el("cap-konum-x")) el("cap-konum-x").value = ""; if (el("cap-konum-y")) el("cap-konum-y").value = ""; }
         efekteGec();
         secilenGorunum = "";
         efektSonrasi();
@@ -5755,6 +5993,9 @@ window.KCaptions = (function () {
       });
     });
     if (el("cap-onizleme-oynat")) el("cap-onizleme-oynat").addEventListener("click", onizlemeOynat);
+    // 3.3 adım 17: önizlemede sürükleyerek konum (yalnız etkileşimde; açılışta çağrı yok)
+    konumSurukleBagla();
+    efektBagimliDurum();
 
     /* İnce ayar: paylaş, kod yapıştır, .suflo-stil, varsayılana dön, Marka Kiti */
     if (el("cap-stil-paylas")) el("cap-stil-paylas").addEventListener("click", stilPaylas);
@@ -6043,11 +6284,16 @@ window.KCaptions = (function () {
   // Altyazı Efektleri oluşturucusunun kontrolleri (değişiklik = efekti seç; rehber bilinçli seçim sayar)
   var EFEKT_KONTROLLERI = ["cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-vurgu", "cap-renk-vurgu", "cap-renk", "cap-renk-kontur",
     "cap-font", "cap-efekt-kalin", "cap-efekt-italik", "cap-boyut", "cap-kontur", "cap-efekt-satir", "cap-efekt-kelime", "cap-konum",
-    "cap-guvenli-yerlesim"];
-  var EFEKT_ISARETLERI = ["cap-efekt-vurgu", "cap-efekt-kalin", "cap-efekt-italik"];
+    "cap-guvenli-yerlesim",
+    // 3.3 adım 17: gölge ve arka plan kutusu
+    "cap-efekt-golge", "cap-efekt-golge-renk", "cap-efekt-golge-opak", "cap-efekt-golge-mesafe", "cap-efekt-golge-yumusak",
+    "cap-kutu", "cap-kutu-renk", "cap-kutu-opak"];
+  var EFEKT_ISARETLERI = ["cap-efekt-vurgu", "cap-efekt-kalin", "cap-efekt-italik", "cap-efekt-golge"];
   var STIL_ALANLARI = ["cap-preset", "cap-maxlen", "cap-case", "cap-style-family", "cap-yogunluk", "cap-font",
     "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu", "cap-kontur", "cap-konum", "cap-animasyon",
-    "cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-satir", "cap-efekt-kelime"];
+    "cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-satir", "cap-efekt-kelime",
+    "cap-efekt-golge-renk", "cap-efekt-golge-opak", "cap-efekt-golge-mesafe", "cap-efekt-golge-yumusak", "cap-kutu-renk", "cap-kutu-opak",
+    "cap-konum-x", "cap-konum-y"];
   function stilYedegi() {
     var y = {
       alan: {},

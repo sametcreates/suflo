@@ -3702,6 +3702,35 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-bi.efekt-italik span { font-style: italic; font-weight: 600; }
 .efekt-bi input:checked + span { color: var(--accent-lite); }
 .efekt-bi input:focus-visible + span { text-decoration: underline; }
+/* 3.3 adım 17: gölge ve arka plan kutusu (flex gap'siz, CEF 74) */
+.efekt-katman { margin-bottom: 8px; }
+.efekt-katman > .switch { display: inline-flex; margin: 0 0 6px; }
+.efekt-alt { display: flex; align-items: flex-end; flex-wrap: wrap; margin: 0 -3px; transition: opacity .16s var(--ease); }
+.efekt-alt.pasif { opacity: .45; }
+.efekt-alt .renk-kutu { flex: 0 0 auto; min-width: 64px; margin: 0 3px 4px; }
+.efekt-alt .renk-kutu span { text-align: center; line-height: 1.2; }
+.efekt-sayilar { display: flex; flex: 1 1 150px; flex-wrap: wrap; min-width: 0; }
+.efekt-sayi { display: flex; flex-direction: column; flex: 1 1 58px; min-width: 58px; margin: 0 3px 4px; font-size: 10px; color: var(--dim); }
+.efekt-sayi span { margin-bottom: 3px; white-space: nowrap; }
+.efekt-ayarlar .efekt-sayi input[type="number"] { padding: 6px 8px; }
+.efekt-konum-serbest { margin-top: 5px; font-size: 10.5px; color: var(--dim); }
+.efekt-konum-serbest b { color: var(--text); font-weight: 600; margin-right: 6px; }
+.efekt-ipucu { margin: 4px 0 0; font-size: 10px; line-height: 1.4; color: var(--faint); }
+/* Önizlemede sürükleyerek konum: artı işareti + "X %50 · Y %85" etiketi (yalnız Altyazı Efektleri seçiliyken) */
+.efekt.etkin .onizleme-sahne { cursor: grab; touch-action: none; }
+.efekt.etkin .onizleme-sahne.surukleniyor { cursor: grabbing; }
+.onizleme-sahne.surukleniyor .render-onizleme { opacity: .45; }
+.onizleme-sahne:focus { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.efekt-arti { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 2; pointer-events: none; }
+.efekt-arti-dikey, .efekt-arti-yatay { position: absolute; background: rgba(255, 255, 255, .8); box-shadow: 0 0 0 1px rgba(0, 0, 0, .35); }
+.efekt-arti-dikey { top: 0; bottom: 0; width: 1px; }
+.efekt-arti-yatay { left: 0; right: 0; height: 1px; }
+.efekt-arti-etiket {
+  position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%); padding: 2px 9px; border-radius: 20px;
+  background: rgba(12, 13, 20, .82); color: #fff; font-size: 10px; white-space: nowrap;
+}
+/* DOM yedek önizlemesinde serbest konum: kartın ortası noktada */
+.onizleme-alt.serbest { right: auto; bottom: auto; width: max-content; max-width: 92%; transform: translate(-50%, -50%); }
 /* DOM yedek önizlemesi (gerçek görünüm libass çıktısıdır) */
 .satir-efekt-pop   { animation: on-efekt-pop .3s cubic-bezier(.22,1,.36,1) both; }
 .satir-efekt-zipla { animation: on-efekt-zipla .3s ease-out both; }

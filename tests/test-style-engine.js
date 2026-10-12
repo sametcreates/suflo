@@ -127,7 +127,9 @@ eskiStiller.forEach(function (s) {
         sayilan++;
         if (snap[anahtar] !== ozet(engine.compile(o))) farkli.push(anahtar);
         // boş giriş / vurgu animasyonu ve eski stillerde anlamsız efekt alanları: çıktı aynı
-        var oe = Object.assign({}, o, { overrides: Object.assign({}, snapAyar[a] || {}, { giris: "", aktif: "", satir: 3, kelime: 2, vurgu: false }) });
+        // 3.3 adım 17: gölge, kutu, serbest konum da eski stillerde hiçbir şeyi değiştirmez
+        var oe = Object.assign({}, o, { overrides: Object.assign({}, snapAyar[a] || {}, { giris: "", aktif: "", satir: 3, kelime: 2, vurgu: false,
+          golge: { renk: "#ff0000", opak: 80, mesafe: 9, yumusak: 9 }, kutu: true, kutuRenk: "#00ff00", kutuOpak: 70, konumX: 20, konumY: 30 }) });
         if (snap[anahtar] !== ozet(engine.compile(oe))) farkli.push(anahtar + " +efekt");
         // guvenli bayragi 16:9'da hicbir seyi degistirmez
         if (d[0] > d[1]) {
@@ -220,7 +222,7 @@ var efP = engine.preset("efekt");
 ok("efekt: varsayılan görünüm (Temiz) ve kelime stili", efP.name === "Altyazı Efektleri" && efP.style.giris === "fade" && efP.style.aktif === "yok" &&
   efP.style.vurgu === true && efP.style.satir === 2 && efP.style.kelime === 5 && engine.wordBased("efekt"), JSON.stringify(efP.style));
 ok("efekt: animasyon kimlikleri TranscriptAI şablonunun dizin sırasında", engine.GIRISLER.join(",") === "yok,pop,fade,yukari,asagi,zipla" &&
-  engine.AKTIFLER.join(",") === "yok,zipla,titre,glitch" && engine.EFEKT_ALANLARI.join(",") === "giris,aktif,vurgu,kalin,italik,satir,kelime");
+  engine.AKTIFLER.join(",") === "yok,zipla,titre,glitch" && engine.EFEKT_ALANLARI.join(",") === "giris,aktif,vurgu,kalin,italik,satir,kelime,golge,kutu,kutuRenk,kutuOpak,konumX,konumY");
 // 1920x1080, konum 2 (alt): \an2 \pos(960,907); kayma scaled(50) = 50
 var girisBekle = {
   yok: function (l) { return /\{\\an2\\pos\(960,907\)\\fs\d+\\q2/.test(l) && !/\\fscx0|\\fad|\\move/.test(l); },
@@ -343,6 +345,90 @@ var konusmaci = engine.compile({ styleId: "efekt", cues: efKelime.map(function (
   speakerColors: ["#ff0000"], overrides: { aktif: "zipla" } }).ass;
 ok("efekt + Podcast Modu: konuşmacı rengi satıra işler", /\{\\1c&H000000FF\}\{\\an2/.test(konusmaci));
 
+/* ---- 3.3 adım 17: gölge, arka plan kutusu, serbest X / Y konum (yalnız Altyazı Efektleri) ---- */
+function katmanlar(ass) { return olaylar(ass).map(function (l) { return Number(l.split(",")[0].replace("Dialogue: ", "")); }); }
+ok("efekt adım 17 varsayılanı: gölge yok, kutu kapalı, hazır konum; çıktı aynı (boş / kapalı değerler bayt bayt aynı)",
+  efP.style.golge === null && efP.style.kutu === false && efP.style.konumX === null && efP.style.konumY === null &&
+  efekt({ golge: null, kutu: false, kutuRenk: "#ff0000", kutuOpak: 90, konumX: null, konumY: null }) === efekt({}) &&
+  efekt({ golge: false }) === efekt({}) && efekt({ golge: "evet", kutu: "true", konumX: "50", konumY: 40 }) === efekt({}) &&
+  efekt({}).indexOf("SufloKutu") === -1);
+var gol = efekt({ giris: "yok", golge: { renk: "#ff0000", opak: 50, mesafe: 10, yumusak: 6 } });
+var golOl = olaylar(gol);
+var golgeSatir = golOl.filter(function (l) { return /^Dialogue: 1,/.test(l); }), metinSatir = golOl.filter(function (l) { return /^Dialogue: 3,/.test(l); });
+ok("efekt gölge: her metin olayının gölge katmanında (1) aynı zamanlı ikizi; metin 3. katmanda",
+  golgeSatir.length === 5 && metinSatir.length === 5 && golgeSatir.every(function (l, i) { return l.split(",").slice(1, 3).join() === metinSatir[i].split(",").slice(1, 3).join(); }),
+  golOl.length + " olay");
+ok("efekt gölge: \\4c + \\4a (opak %50 → 80) + \\shad mesafe·cos45 (7.1) + \\blur yumuşaklık/2 (3); kontur saydam, dolgu 1/255 (dolu gölge)",
+  golgeSatir.every(function (l) { return /\\1a&HFE&\\3a&HFF&\\4c&H000000FF\\4a&H80&\\shad7\.1\\blur3/.test(l); }), golgeSatir[0]);
+ok("efekt gölge etiketleri yalnız gölge katmanında: metin keskin (\\blur yok, \\shad0)",
+  metinSatir.every(function (l) { return /\\shad0/.test(l) && !/\\blur|\\4a|\\4c/.test(l); }) &&
+  golOl.every(function (l) { return !/\\blur/.test(l) || /^Dialogue: 1,/.test(l); }));
+var golK0 = olaylar(efekt({ giris: "yok", kontur: 0, golge: { opak: 100, mesafe: 0, yumusak: 0 } }));
+ok("efekt gölge, kontur 0 ve mesafe 0: gölge kopyası yine çizilir (dolgu 1/255, ofset 0,01: libass ofset 0'da gölgeyi atlar)",
+  golK0.filter(function (l) { return /^Dialogue: 1,/.test(l); }).every(function (l) { return /\\bord0\\shad0\\1a&HFE&\\3a&HFF&\\4c&H00000000\\4a&H00&\\shad0\.01\}/.test(l); }), golK0[0]);
+var golZ = olaylar(efekt({ giris: "yok", aktif: "zipla", golge: { renk: "#000000", opak: 75, mesafe: 5, yumusak: 5 } }));
+var golZust = golZ.filter(function (l) { return /^Dialogue: 4,/.test(l); }), golZgol = golZ.filter(function (l) { return /^Dialogue: 1,/.test(l); });
+ok("efekt gölge + zıpla: hareketli kelimenin gölgesi onunla zıplar; gölge kopyasında görünür işaret yalnız gölgeyi açar",
+  golZust.length > 0 && golZgol.length === golZ.filter(function (l) { return /^Dialogue: [34],/.test(l); }).length &&
+  golZgol.every(function (l) { return l.indexOf("\\alpha&H00&") === -1; }) && golZgol.some(function (l) { return /\\move\(960,907,960,892/.test(l) && /\{\\4a&H40&\}/.test(l); }), golZgol.slice(0, 3).join(" | "));
+var golG = olaylar(efekt({ giris: "yok", aktif: "glitch", golge: { opak: 75 } }));
+ok("efekt gölge + glitch: glitch kopyaları (2) gölgesiz, metnin altında", golG.filter(function (l) { return /^Dialogue: 2,/.test(l); }).length === 10 &&
+  golG.filter(function (l) { return /^Dialogue: 1,/.test(l); }).length === golG.filter(function (l) { return /^Dialogue: 3,/.test(l); }).length);
+ok("efekt gölge: aralık dışı değerler kırpılır, bozuk alan şablon varsayılanına döner (siyah, 5, 5)",
+  /\\4c&H00000000\\4a&H00&\\shad0\.01\\blur2\.5/.test(olaylar(efekt({ giris: "yok", golge: { renk: "kırmızı", opak: 500, mesafe: -3, yumusak: "x" } }))[0]) &&
+  /\\shad14\.1\\blur15/.test(olaylar(efekt({ giris: "yok", golge: { mesafe: 99, yumusak: 99 } }))[0]));
+ok("efekt gölge 9:16 / 4K: mesafe ve yumuşaklık kısa kenara göre ölçeklenir (2160p'de 2 kat)",
+  /\\shad14\.1\\blur10/.test(olaylar(efekt({ giris: "yok", golge: { mesafe: 10, yumusak: 10 } }, { w: 3840, h: 2160 }))[0]) &&
+  /\\shad7\.1\\blur5/.test(olaylar(efekt({ giris: "yok", golge: { mesafe: 10, yumusak: 10 } }, { w: 1080, h: 1920 }))[0]));
+
+var kut = efekt({ giris: "yok", kutu: true, kutuRenk: "#112233", kutuOpak: 60 });
+var kutStil = kut.split("\n").filter(function (l) { return /^Style: SufloKutu,/.test(l); });
+var kutOl = olaylar(kut).filter(function (l) { return /,SufloKutu,/.test(l); });
+ok("efekt kutu: ikinci stil satırı SufloKutu (BorderStyle 3, aynı yazı tipi / punto / kalın / italik)", kutStil.length === 1 &&
+  styleAlanlari(kut).slice(1, 10).join() === kutStil[0].split(",").slice(1, 10).join() && kutStil[0].split(",")[15] === "3", kutStil[0]);
+ok("efekt kutu: kart başına bir kutu olayı (katman 0), kartın tamamı boyunca; renk \\3c, opaklık %60 → 66, yatay pay 20, dikey pay 0",
+  kutOl.length === 1 && /^Dialogue: 0,0:00:00\.00,0:00:02\.44,SufloKutu,/.test(kutOl[0]) &&
+  /\{\\an2\\pos\(960,907\)\\fs\d+\\q2\\1a&HFF&\\3c&H00332211\\3a&H66&\\xbord20\\ybord0\\shad0\}Bunu gören herkes\\Nşaşırdı bugün$/.test(kutOl[0]), kutOl[0]);
+ok("efekt kutu: metin katmanları üstte (3), kutu metnin satır kırılımıyla aynı", katmanlar(kut).filter(function (n) { return n === 3; }).length === 5 &&
+  olaylar(kut).filter(function (l) { return /^Dialogue: 3,/.test(l); }).every(function (l) { return /\\N/.test(l); }));
+var kutKay = olaylar(efekt({ giris: "yukari", kutu: true })).filter(function (l) { return /SufloKutu/.test(l); })[0];
+var kutPop = olaylar(efekt({ giris: "pop", kutu: true })).filter(function (l) { return /SufloKutu/.test(l); })[0];
+ok("efekt kutu + giriş: kayan girişte kartla kayar, ölçek / saydamlık girişi almaz (şablondaki gibi)",
+  /\{\\an2\\move\(960,957,960,907,0,300\)/.test(kutKay) && /\{\\an2\\pos\(960,907\)/.test(kutPop) && !/\\fscx|\\fad/.test(kutPop + kutKay), kutKay);
+ok("efekt kutu: opaklık kırpılır (150 → 100 = 00), varsayılan renk / opaklık siyah %50",
+  /\\3a&H00&/.test(efekt({ kutu: true, kutuOpak: 150 })) && /\\3c&H00000000\\3a&H80&/.test(efekt({ kutu: true })));
+ok("efekt kutu + gölge: kutu 0, gölge 1, metin 3", (function () {
+  var k = katmanlar(efekt({ giris: "yok", kutu: true, golge: { opak: 50 } }));
+  return k[0] === 0 && k.filter(function (n) { return n === 1; }).length === 5 && k.filter(function (n) { return n === 3; }).length === 5;
+})());
+
+var xy = olaylar(efekt({ giris: "yok", konumX: 30, konumY: 40 }));
+ok("efekt serbest konum: \\an5, kartın ortası X·genişlik, Y·yükseklik (1920×1080'de %30 / %40 → 576, 432)", /^Dialogue: 1,.*\{\\an5\\pos\(576,432\)/.test(xy[0]), xy[0]);
+ok("efekt serbest konum hazır konumun (konum 8) önüne geçer; ikisinden biri yoksa hazır konum",
+  /\{\\an5\\pos\(576,432\)/.test(olaylar(efekt({ giris: "yok", konum: 8, konumX: 30, konumY: 40 }))[0]) &&
+  /\{\\an8\\pos\(960,238\)/.test(olaylar(efekt({ giris: "yok", konum: 8, konumX: 30 }))[0]));
+ok("efekt serbest konum: %5-95'e kırpılır (0 → 5, 120 → 95), kesirli değer yuvarlanır",
+  efekt({ giris: "yok", konumX: 0, konumY: 120 }) === efekt({ giris: "yok", konumX: 5, konumY: 95 }) &&
+  efekt({ giris: "yok", konumX: 30.4, konumY: 39.6 }) === efekt({ giris: "yok", konumX: 30, konumY: 40 }));
+var kenar = olaylar(efekt({ giris: "yok", konumX: 5, konumY: 95, kelime: 5, satir: 1, vurgu: false }));
+var kx = Number(/\\pos\((\d+),(\d+)\)/.exec(kenar[0])[1]), ky = Number(/\\pos\((\d+),(\d+)\)/.exec(kenar[0])[2]);
+ok("efekt serbest konum kenarda: uzun kart kadraja sığdırılır (sol kenar ve alt kenar içeride)", kx > 96 && kx - 380 > 0 && ky < 1027, kx + "," + ky);
+var dik = olaylar(efekt({ giris: "yok", konumX: 50, konumY: 95 }, { w: 1080, h: 1920 }));
+var dikY = Number(/\\pos\(\d+,(\d+)\)/.exec(dik[0])[1]);
+ok("efekt serbest konum 9:16: kart alt arayüzün (%78) üstünde kalır", dikY < 1920 * 0.78 && dikY > 1920 * 0.6, dikY);
+var dikUst = Number(/\\pos\(\d+,(\d+)\)/.exec(olaylar(efekt({ giris: "yok", konumX: 50, konumY: 5 }, { w: 1080, h: 1920 }))[0])[1]);
+ok("efekt serbest konum 9:16: kart üst çubuğun (%7) altında kalır", dikUst > 1920 * 0.07, dikUst);
+var sag = olaylar(efekt({ giris: "yok", konumX: 95, konumY: 50, guvenli: true }, { w: 1080, h: 1920 }));
+var sagX = Number(/\\pos\((\d+),/.exec(sag[0])[1]);
+var sagSerbest = Number(/\\pos\((\d+),/.exec(olaylar(efekt({ giris: "yok", konumX: 95, konumY: 50 }, { w: 1080, h: 1920 }))[0])[1]);
+ok("efekt serbest konum 9:16 + 'Platform arayüzünden kaçın': kart sağdaki ikon sütunundan (%87) uzak, kapalıyken kadraj kenarına dek",
+  sagX < sagSerbest && sagX < 1080 * 0.87, sagX + " / " + sagSerbest);
+ok("efekt serbest konum + zıpla: hareketli kelime kartın noktasından zıplar", olaylar(efekt({ giris: "yok", aktif: "zipla", konumX: 30, konumY: 40 }))
+  .some(function (l) { return /^Dialogue: 2,.*\\move\(576,432,576,417,0,100\)/.test(l); }));
+ok("efekt serbest konum + glitch: kopyalar kartın noktasının iki yanında", olaylar(efekt({ giris: "yok", aktif: "glitch", konumX: 30, konumY: 40 }))
+  .some(function (l) { return /^Dialogue: 0,.*\\pos\(565,432\)/.test(l); }));
+ok("efekt serbest konum + kutu: kutu kartla aynı noktada", /SufloKutu,,0,0,0,,\{\\an5\\pos\(576,432\)/.test(efekt({ giris: "yok", kutu: true, konumX: 30, konumY: 40 })));
+
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
 if (!ffmpeg) {
   console.log("(ffmpeg yok - gercek stil renderlari atlandi)");
@@ -432,6 +518,58 @@ if (!ffmpeg) {
     ok(s.id + " 9:16 + guvenli: sag kenar <= %87 (ikon sutunu)", p.status === 0 && b.length >= kare * 4 && enSag > 0 && (enSag + 1) / EW <= 0.87,
       p.status + " · " + (b.length / kare) + " kare · sag kenar %" + ((enSag + 1) / EW * 100).toFixed(1));
   });
+
+  /*
+   * 3.3 adım 17 gerçek çizimde. Gölge: metnin dolgusu keskin kalır (beyaz piksel sayısı gölgesizle aynı),
+   * gölge yalnız gölge katmanında görünür. Kutu: iki satırın kutuları üst üste binmez (yarı saydam kutunun
+   * rengi satır arasında koyulaşmaz; en çok 2 piksellik kenar yumuşatma çizgisi). 9:16 + güvenli + konumX 95:
+   * sağ kenar ikon sütununun (%87) solunda.
+   */
+  function rgbKare(ass, fontlar, w, h, ss) {
+    var kd = fs.mkdtempSync(path.join(tmp, "k17-"));
+    fontlar.forEach(function (f) { fs.copyFileSync(path.join(root, "fonts", f), path.join(kd, f)); });
+    fs.writeFileSync(path.join(kd, "a.ass"), ass, "utf8");
+    var p = cp.spawnSync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "color=c=#405060:s=" + w + "x" + h + ":d=3", "-vf", "ass=a.ass:fontsdir=.",
+      "-ss", String(ss || 1.2), "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { cwd: kd, maxBuffer: 64 * 1024 * 1024 });
+    return p.stdout || Buffer.alloc(0);
+  }
+  function say(b, f) { var n = 0; for (var i = 0; i + 2 < b.length; i += 3) if (f(b[i], b[i + 1], b[i + 2])) n++; return n; }
+  var k17cues = [{ start: 0, end: 2.5, text: "Gölge keskin mi" }];
+  function k17(ov, w, h) { return engine.compile({ styleId: "efekt", cues: k17cues, cueKind: "lines", width: w || 640, height: h || 360, overrides: Object.assign({ giris: "yok", vurgu: false }, ov) }); }
+  var duz = k17({}), golgeli = k17({ golge: { renk: "#ff0000", opak: 100, mesafe: 12, yumusak: 20 } });
+  var bDuz = rgbKare(duz.ass, duz.fontFiles, 640, 360), bGol = rgbKare(golgeli.ass, golgeli.fontFiles, 640, 360);
+  function beyaz(r, g, b) { return r > 235 && g > 235 && b > 235; }
+  function kirmizi(r, g, b) { return r > 110 && r - g > 50 && r - b > 50; }
+  ok("efekt gölge gerçek çizim: metnin dolgusu keskin (beyaz piksel sayısı gölgesizle aynı), kırmızı gölge görünür",
+    bDuz.length > 0 && Math.abs(say(bGol, beyaz) - say(bDuz, beyaz)) <= say(bDuz, beyaz) * 0.03 && say(bGol, kirmizi) > 400 && say(bDuz, kirmizi) === 0,
+    say(bDuz, beyaz) + " / " + say(bGol, beyaz) + " beyaz · " + say(bGol, kirmizi) + " kırmızı");
+  var gK0 = k17({ kontur: 0, golge: { renk: "#ff0000", opak: 100, mesafe: 20, yumusak: 0 } });
+  var bK0 = rgbKare(gK0.ass, gK0.fontFiles, 640, 360);
+  ok("efekt gölge gerçek çizim, kontur 0: gölge yine çizilir", say(bK0, kirmizi) > 300, say(bK0, kirmizi) + " kırmızı");
+  // konturlu metinde gölge içi dolu (\1a FF'de yalnız kontur halkasıydı: kırmızı alan dolgunun yarısı kadar kalıyordu)
+  var gK8 = k17({ kontur: 4, boyut: 150, golge: { renk: "#ff0000", opak: 100, mesafe: 20, yumusak: 0 } }), gD8 = k17({ kontur: 4, boyut: 150 });
+  var bK8 = rgbKare(gK8.ass, gK8.fontFiles, 640, 360), dolgu8 = say(rgbKare(gD8.ass, gD8.fontFiles, 640, 360), beyaz);
+  ok("efekt gölge gerçek çizim, konturlu: gölge dolu glif (içi boş halka değil)", dolgu8 > 500 && say(bK8, kirmizi) > dolgu8 * 0.8,
+    say(bK8, kirmizi) + " kırmızı / " + dolgu8 + " dolgu");
+  var kutu2 = engine.compile({ styleId: "efekt", cues: [{ start: 0, end: 2.5, text: "Kutunun ilk satırı ve ikinci satırı" }], cueKind: "lines", width: 640, height: 360,
+    overrides: { giris: "yok", vurgu: false, kontur: 0, satir: 2, kelime: 6, kutu: true, kutuRenk: "#00c000", kutuOpak: 60, konumX: 50, konumY: 50 } });
+  var bK = rgbKare(kutu2.ass, kutu2.fontFiles, 640, 360);
+  // kutunun sol payında (metin yok) bir sütun: yeşil kanalı satırlar boyunca sabit kalmalı
+  var sutun = [];
+  for (var yy = 0; yy < 360; yy++) { var i0 = (yy * 640) * 3; var enSolX = -1; for (var xx = 0; xx < 640; xx++) { var j = i0 + xx * 3; if (bK[j + 1] - bK[j] > 40) { enSolX = xx; break; } } sutun.push(enSolX); }
+  var satirlar = sutun.map(function (x, yy) { return x >= 0 ? yy : -1; }).filter(function (yy) { return yy >= 0; });
+  // iki kutunun da içinde kalan sütun; metin pikselleri (kırmızı kanalı yüksek) sayılmaz
+  var solX = Math.max.apply(null, sutun) + 2;
+  var yesiller = satirlar.map(function (yy) { var q = (yy * 640 + solX) * 3; return bK[q] < 60 ? bK[q + 1] : 0; }).filter(function (g) { return g > 0; });
+  var tipik = yesiller.slice().sort(function (a, b) { return a - b; })[Math.floor(yesiller.length / 2)];
+  var aykiri = yesiller.filter(function (g) { return Math.abs(g - tipik) > 12; }).length;
+  ok("efekt kutu gerçek çizim: iki satır kutusu üst üste binmez (yarı saydam renk satır arasında koyulaşmaz)",
+    bK.length > 0 && satirlar.length > 30 && aykiri <= 3, satirlar.length + " satır · tipik G " + tipik + " · aykırı " + aykiri);
+  var sagK = engine.compile({ styleId: "efekt", cues: uzunlar, cueKind: "words", width: 1080, height: 1920,
+    overrides: { giris: "yok", vurgu: false, konumX: 95, konumY: 50, guvenli: true, satir: 1, kelime: 1 } });
+  var bS = rgbKare(sagK.ass, sagK.fontFiles, 1080, 1920, 0.4), enSagX = -1;
+  for (var y2 = 0; y2 < 1920; y2++) for (var x2 = 1079; x2 > enSagX; x2--) { var q = (y2 * 1080 + x2) * 3; if (bS[q] > 200 && bS[q + 1] > 200 && bS[q + 2] > 200) { enSagX = x2; break; } }
+  ok("efekt serbest konum 9:16 + güvenli + X %95 gerçek çizim: sağ kenar <= %87", enSagX > 0 && (enSagX + 1) / 1080 <= 0.87, "sağ kenar %" + ((enSagX + 1) / 1080 * 100).toFixed(1));
 
   if (process.env.SUFLO_KEEP_STYLE_TEST) console.log("PREVIEW_DIR=" + tmp);
   else try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e2) {}

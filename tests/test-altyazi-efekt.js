@@ -22,9 +22,9 @@ ok("temel stil 'efekt' motorda var ve kelime stili", AE.STIL === "efekt" && SE.h
 var ids = AE.GORUNUMLER.map(function (g) { return g.id; });
 ok("4-6 hazır görünüm, kimlikler tekil", ids.length >= 4 && ids.length <= 6 && ids.filter(function (x, i) { return ids.indexOf(x) === i; }).length === ids.length, ids.join(","));
 var efStil = SE.preset("efekt").style;
-ok("ilk görünüm (Temiz) stil motorunun efekt varsayılanıyla birebir", Object.keys(AE.VARSAYILAN).filter(function (k) { return k !== "kase"; }).every(function (k) {
-  return AE.VARSAYILAN[k] === efStil[k];
-}) && AE.GORUNUMLER[0].id === "temiz", J(efStil));
+ok("ilk görünüm (Temiz) stil motorunun efekt varsayılanıyla birebir (yazım ve noktalama: motorun metin kuralı)", Object.keys(AE.VARSAYILAN).filter(function (k) {
+  return k !== "kase" && k !== "punct"; }).every(function (k) { return AE.VARSAYILAN[k] === efStil[k];
+}) && AE.GORUNUMLER[0].id === "temiz" && AE.VARSAYILAN.kase === SE.preset("efekt").text.kase && AE.VARSAYILAN.punct === SE.preset("efekt").text.punct, J(efStil));
 ok("her görünüm doğrulamadan aynen geçer (eksiksiz ve geçerli)", AE.GORUNUMLER.every(function (g) { return J(AE.normalize(g.ayar)) === J(g.ayar); }));
 var kelimeCue = ["Bunu", "*gören*", "herkes", "şaşırdı", "bugün"].map(function (w, i) { return { start: i * 0.5, end: i * 0.5 + 0.44, text: w }; });
 AE.GORUNUMLER.forEach(function (g) {
@@ -39,9 +39,13 @@ ok("gorunum(): kopya döner (değiştirmek listeyi bozmaz), bilinmeyen null", (f
   var g = AE.gorunum("vurucu"); g.ayar.renk = "#000000";
   return AE.gorunum("vurucu").ayar.renk === "#ffffff" && AE.gorunum("uzay") === null && AE.gorunum(undefined) === null;
 })());
-ok("gorunumuBul: görünüm ayarı → kimliği; elle değişince \"\"; yazım biçimi sayılmaz", AE.GORUNUMLER.every(function (g) { return AE.gorunumuBul(g.ayar) === g.id; }) &&
+ok("gorunumuBul: görünüm ayarı → kimliği; elle değişince \"\"; yazım biçimi ve noktalama sayılmaz", AE.GORUNUMLER.every(function (g) { return AE.gorunumuBul(g.ayar) === g.id; }) &&
   AE.gorunumuBul(Object.assign({}, AE.gorunum("vurucu").ayar, { boyut: 90 })) === "" &&
-  AE.gorunumuBul(Object.assign({}, AE.gorunum("vurucu").ayar, { kase: "normal" })) === "vurucu");
+  AE.gorunumuBul(Object.assign({}, AE.gorunum("vurucu").ayar, { kase: "normal", punct: true })) === "vurucu");
+ok("noktalama görünümle: 3.2'nin noktalamasız stillerinin yerini alan Vurucu / Canlı / Glitch noktalamasız, diğerleri noktalamalı; normalize yalnız boolean",
+  AE.gorunum("vurucu").ayar.punct === false && AE.gorunum("canli").ayar.punct === false && AE.gorunum("glitch").ayar.punct === false &&
+  AE.gorunum("temiz").ayar.punct === true && AE.gorunum("zarif").ayar.punct === true && AE.normalize({ punct: "hayır" }).punct === true &&
+  AE.normalize({ punct: false }).punct === false && AE.overrides({ punct: false }).punct === undefined);
 
 /* ---------------- normalize / overrides ---------------- */
 var n = AE.normalize({ giris: "uzay", aktif: "zipla", vurgu: "evet", kalin: false, renk: "#ABCDEF", vurguRenk: "red", font: "Comic Sans",
@@ -53,7 +57,8 @@ ok("normalize: nesne olmayan → varsayılan; taban verilirse eksikler tabandan"
   AE.normalize({ renk: "#111111" }, AE.gorunum("glitch").ayar).font === "Bebas Neue" && AE.normalize({ renk: "#111111" }, AE.gorunum("glitch").ayar).renk === "#111111");
 var ov = AE.overrides({ giris: "pop", aktif: "titre", satir: 1, kelime: 2, kase: "upper" });
 ok("overrides: motorun beklediği alanlar, yazım biçimi (kase) yok", J(Object.keys(ov).sort()) ===
-  J(["aktif", "boyut", "font", "giris", "italik", "kalin", "kelime", "kontur", "konturRenk", "konum", "renk", "satir", "vurgu", "vurguRenk"]) && ov.kase === undefined, J(ov));
+  J(["aktif", "boyut", "font", "giris", "golge", "italik", "kalin", "kelime", "kontur", "konturRenk", "konum", "konumX", "konumY", "kutu", "kutuOpak", "kutuRenk",
+    "renk", "satir", "vurgu", "vurguRenk"]) && ov.kase === undefined, J(ov));
 var ass = SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: ov }).ass;
 ok("oluşturucu → motor: Pop girişi, titreme katmanı, tek satır, kartta en çok 2 kelime", /\\fscx0\\fscy0\\t\(0,300,\\fscx100\\fscy100\)/.test(ass) &&
   /^Dialogue: 2,/m.test(ass) && !/\\N/.test(ass) && ass.split("\n").filter(function (l) { return /^Dialogue: 1,/.test(l); }).length === 5);
@@ -87,8 +92,8 @@ ok("sablonIndeksleri: giriş / vurgu kimliği şablonun textAnim / hlAnim değer
 }) && Object.keys(SABLON_AKTIF).every(function (a) { return AE.sablonIndeksleri({ aktif: a }).hlAnim === SABLON_AKTIF[a]; }));
 var st = AE.sablonStili(AE.gorunum("vurucu").ayar, { olcek: 1920 / 1080 });
 ok("sablonStili: [vurguRGB, yazıRGB, font, punto×ölçek, kontur, gölge, kutu, textAnim, hlAnim]", st.length === 9 && J(st[0]) === "[255,230,0]" &&
-  J(st[1]) === "[255,255,255]" && st[2] === "Anton-Regular" && st[3] === Math.round(112 * 1920 / 1080) && J(st[4]) === "[1,0,0,0,8]" && J(st[5]) === "[0]" &&
-  J(st[6]) === "[0]" && st[7] === 1 && st[8] === 1, J(st));
+  J(st[1]) === "[255,255,255]" && st[2] === "Anton-Regular" && st[3] === Math.round(112 * 1920 / 1080) && J(st[4]) === "[1,0,0,0,8]" &&
+  J(st[5]) === "[1,0,0,0,85,7,0]" && J(st[6]) === "[0]" && st[7] === 1 && st[8] === 1, J(st));
 // Yazı tipi alanı setFont'a giden PostScript adı (TranscriptAI istemcisi gibi aile + kalın + italik → ad);
 // yalnız paketteki yüzler: kurulu olmayan ad şablonda yazı tipini tümden düşürür
 ok("sablonFontu: PostScript adı, kalın paketteki yüzden (Montserrat-Bold / -Regular, Lora-Bold), tek ağırlıklıda Regular",
@@ -124,6 +129,54 @@ ok("sablonFontu adları paketteki dosyaların gerçek PostScript adları", Objec
 var st0 = AE.sablonStili({ vurgu: false, kontur: 0, renk: "#102030" });
 ok("sablonStili: vurgu kapalı → vurgu rengi = yazı rengi; kontur 0 → [0]; ölçek yoksa 1", J(st0[0]) === J(st0[1]) && J(st0[0]) === "[16,32,48]" &&
   J(st0[4]) === "[0]" && st0[3] === AE.VARSAYILAN.boyut, J(st0));
+
+/* ---------------- 3.3 adım 17: gölge, kutu, serbest konum ---------------- */
+ok("adım 17: şablon sözleşmesinde gölge [1,r,g,b,opaklık,mesafe,yumuşaklık], kutu [1,r,g,b,opaklık]; kapalıysa [0]",
+  J(AE.sablonStili(AE.gorunum("kutulu").ayar)[6]) === "[1,0,0,0,65]" && J(AE.sablonStili(AE.gorunum("kutulu").ayar)[5]) === "[0]" &&
+  J(AE.sablonStili({ golge: { renk: "#102030", opak: 40, mesafe: 12, yumusak: 30 } })[5]) === "[1,16,32,48,40,12,30]" &&
+  J(AE.sablonStili(AE.gorunum("temiz").ayar).slice(5, 7)) === "[[0],[0]]");
+var n17 = AE.normalize({ golge: { renk: "MAVI", opak: 400, mesafe: "8", yumusak: -1 }, kutu: "true", kutuRenk: "#ABCDEF", kutuOpak: 140, konumX: 0, konumY: 200 });
+ok("adım 17 normalize: gölge alanları şablon varsayılanına / aralığa, kutu yalnız boolean, renk küçük harf, konum %5-95",
+  J(n17.golge) === '{"renk":"#000000","opak":100,"mesafe":8,"yumusak":0}' && n17.kutu === false && n17.kutuRenk === "#abcdef" && n17.kutuOpak === 100 &&
+  n17.konumX === 5 && n17.konumY === 95, J(n17));
+ok("adım 17 normalize: konum ikisi birlikte (biri eksik / bozuksa hazır konum); gölge null / false = yok",
+  AE.normalize({ konumX: 40 }).konumX === null && AE.normalize({ konumX: 40, konumY: "a" }).konumY === null &&
+  AE.normalize({ konumX: 40, konumY: "60" }).konumY === 60 && AE.normalize({ golge: false }).golge === null &&
+  AE.normalize({ golge: "var" }).golge === null && AE.normalize({ golge: null }, AE.gorunum("vurucu").ayar).golge === null);
+ok("adım 17 gorunumuBul: gölge / kutu / konum değişince görünüm bırakılır; kutu kapalıyken kutu rengi sayılmaz",
+  AE.gorunumuBul(Object.assign({}, AE.gorunum("vurucu").ayar, { golge: null })) === "" &&
+  AE.gorunumuBul(Object.assign({}, AE.gorunum("vurucu").ayar, { golge: { renk: "#000000", opak: 85, mesafe: 8, yumusak: 0 } })) === "" &&
+  AE.gorunumuBul(Object.assign({}, AE.gorunum("temiz").ayar, { konumX: 50, konumY: 50 })) === "" &&
+  AE.gorunumuBul(Object.assign({}, AE.gorunum("temiz").ayar, { kutuRenk: "#ff0000", kutuOpak: 10 })) === "temiz" &&
+  AE.gorunumuBul(Object.assign({}, AE.gorunum("kutulu").ayar, { kutuOpak: 64 })) === "");
+// hazır konum noktaları stil motorunun efekt bağlantı noktasıyla aynı (1920×1080, giriş yok)
+ok("adım 17: hazır konum noktaları motorun yerleşimiyle aynı (±0,5%)", [1, 2, 5, 8].every(function (k) {
+  var l = SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: { konum: k, giris: "yok" } }).ass
+    .split("\n").filter(function (x) { return /^Dialogue: 1,/.test(x); })[0];
+  var m = /\\pos\((\d+),(\d+)\)/.exec(l), p = AE.KONUM_NOKTALARI[k];
+  return m && Math.abs(Number(m[1]) / 19.2 - p.x) <= 0.5 && Math.abs(Number(m[2]) / 10.8 - p.y) <= 0.5;
+}));
+var tz = AE.gorunum("temiz").ayar;
+var s1 = AE.surukle(tz, 31.4, 40.6), s2 = AE.surukle(tz, 52.9, 81.2), s3 = AE.surukle(tz, 47, 60), s4 = AE.surukle(tz, -10, 130), s5 = AE.surukle(tz, "a", 3);
+ok("surukle: serbest nokta tam sayıya yuvarlanır, hazır konum (konum) kalır", s1.konumX === 31 && s1.konumY === 41 && s1.konum === 2 && s1.yapisti === 0, J(s1));
+ok("surukle: hazır konumun ±%3 içinde yapışır (Alt: X 50 · Y 84; Orta: 50 · 62), serbest konum silinir",
+  s2.konum === 2 && s2.konumX === null && s2.konumY === null && s2.yapisti === 2 && s3.konum === 5 && s3.yapisti === 5 && s3.konumX === null, J([s2, s3]));
+ok("surukle: kadraj dışı %5-95'e kırpılır; sayı değilse ayar olduğu gibi", s4.konumX === 5 && s4.konumY === 95 && s5.konumX === null && s5.konum === 2, J([s4, s5]));
+var serbest = Object.assign({}, tz, { konumX: 30, konumY: 40 });
+ok("kaydir: ok tuşu %1 (Shift %5); hazır konumdan noktasıyla başlar; yapışmaz; kırpılır",
+  J(AE.kaydir(tz, 1, 0).konumX) === "51" && AE.kaydir(tz, 1, 0).konumY === 84 && AE.kaydir(serbest, 0, -5).konumY === 35 &&
+  AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 85 }), 0, -1).konumY === 84 && AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 85 }), 0, -1).konumX === 50 &&
+  AE.kaydir(Object.assign({}, tz, { konumX: 94, konumY: 50 }), 5, 0).konumX === 95);
+ok("sifirla: serbest konum silinir, hazır konum geçerli", J(AE.sifirla(serbest)) === '{"konum":2,"konumX":null,"konumY":null,"x":50,"y":84,"yapisti":2}');
+ok("konumEtiketi: 'X %31 · Y %41'; yapışınca 'Alt · hazır konum'", AE.konumEtiketi(s1) === "X %31 · Y %41" && AE.konumEtiketi(s2) === "Alt · hazır konum" &&
+  AE.konumEtiketi(AE.surukle(tz, 9, 86)) === "Alt sol · hazır konum" && AE.konumEtiketi(null) === "");
+ok("konumNoktasi / sablonKonumu: serbest nokta ya da hazır konumun noktası (oran 0-1, Motion › Position için)",
+  J(AE.konumNoktasi(serbest)) === '{"x":30,"y":40,"konum":2,"serbest":true}' && J(AE.sablonKonumu(tz)) === '{"x":0.5,"y":0.84,"serbest":false}' &&
+  J(AE.sablonKonumu(serbest)) === '{"x":0.3,"y":0.4,"serbest":true}');
+var kutuluAss = SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: AE.overrides(AE.gorunum("kutulu").ayar) }).ass;
+ok("Kutulu görünümü motorda kutuyla, Vurucu / Zarif gölgeyle çizilir", /Style: SufloKutu,/.test(kutuluAss) && /\\3a&H59&/.test(kutuluAss) &&
+  /\\4a&H26&\\shad4\.9\}/.test(SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: AE.overrides(AE.gorunum("vurucu").ayar) }).ass) &&
+  /\\shad2\.1\\blur5/.test(SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: AE.overrides(AE.gorunum("zarif").ayar) }).ass));
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

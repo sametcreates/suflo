@@ -111,7 +111,10 @@
     renk("renk-yazi", ov.renk);
     renk("renk-kontur", ov.konturRenk);
     renk("renk-vurgu", ov.vurguRenk);
-    yaz("stil-konum", ov.konum ? KONUM[ov.konum] : M.kendiKonumu);
+    // 3.3 adım 17: serbest konum (önizlemede sürüklenmiş, %5-95) hazır konumun önüne geçer
+    var serbest = typeof ov.konumX === "number" && typeof ov.konumY === "number";
+    yaz("stil-konum", serbest ? (EN ? "Free · X " + ov.konumX + "% · Y " + ov.konumY + "%" : "Serbest · X %" + ov.konumX + " · Y %" + ov.konumY)
+      : ov.konum ? KONUM[ov.konum] : M.kendiKonumu);
     yaz("stil-kod", kod.replace(/\s+/g, ""));
     // Altyazı Efektleri: kodun animasyon çifti yazılır ve oynar; 3.2 ve öncesi bu kodu açmaz
     var efekt = r.styleId === "efekt";
