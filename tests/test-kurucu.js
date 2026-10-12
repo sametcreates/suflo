@@ -55,7 +55,8 @@ for (var i = 0; i < buf.length - 46; i++) {
   var ad = buf.toString("utf8", i + 46, i + 46 + adUz);
   var yapanSistem = buf.readUInt8(i + 5);
   var disAttr = buf.readUInt32LE(i + 38);
-  kayitlar.push({ ad: ad, mod: (disAttr >>> 16) & 0xFFF, sistem: yapanSistem });
+  kayitlar.push({ ad: ad, mod: (disAttr >>> 16) & 0xFFF, sistem: yapanSistem,
+    yontem: buf.readUInt16LE(i + 10), sikisik: buf.readUInt32LE(i + 20), yerel: buf.readUInt32LE(i + 42) });
 }
 
 ok("kurulum paketi okunabiliyor", kayitlar.length > 0, paketAdi + " · " + kayitlar.length + " kayit");
@@ -75,6 +76,17 @@ if (komut) {
     "mod=0" + komut.mod.toString(8) + (komut.mod === 0 ? "  <- Compress-Archive izin yazmamis" : ""));
   ok("arsiv Unix sistemi olarak isaretli (izinler yorumlansin)",
     komut.sistem === 3, "version-made-by ust bayt = " + komut.sistem);
+  // CRLF'li .command macOS'ta "bad interpreter: /bin/bash^M" verir (3.0.0 ve 3.1.0 zip'lerinde oldu)
+  var icerik = null;
+  try {
+    var lh = komut.yerel;
+    var veri = buf.slice(lh + 30 + buf.readUInt16LE(lh + 26) + buf.readUInt16LE(lh + 28));
+    veri = veri.slice(0, komut.sikisik);
+    icerik = komut.yontem === 8 ? require("zlib").inflateRawSync(veri) : (komut.yontem === 0 ? veri : null);
+  } catch (e) { icerik = null; }
+  ok("mac kurucusu LF satir sonlu ve #! ile basliyor (CR/BOM yok)",
+    !!icerik && icerik.indexOf(13) === -1 && icerik[0] === 0x23 && icerik[1] === 0x21,
+    icerik ? (icerik.indexOf(13) === -1 ? icerik.length + " bayt, CR yok" : "CR bayti var -> bad interpreter /bin/bash^M") : "icerik okunamadi");
 }
 
 /* ---------- 3) Windows kurucusu ---------- */

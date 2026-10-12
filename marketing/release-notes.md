@@ -13,7 +13,7 @@
 - **Ses etiketleri altyazıya girmez:** [Müzik], (alkış), ♪ ve [BLANK_AUDIO] gibi konuşma dışı etiketler atılır; konuşmalı satırda yalnız etiket silinir. Erişilebilirlik için Ayarlar › Altyazı › Ses etiketlerini koru.
 - **Sessiz ses uyarısı:** Ses neredeyse tamamen sessizse (kapalı ya da sessize alınmış ses katmanı) Suflo motor çalışmadan önce sorar; boşa transkripsiyon ve API kotası harcanmaz.
 - **Suflo Doctor:** Premiere, Altyazı motoru, Pro Cloud ve Presetler çipleri taramadan önce nötr, taramadan sonra gerçek sonucu gösterir (yeşil / sarı / kırmızı). Yeni satırlar: etkin çözme modu, DTW desteği ve Hız Rampası'nın kullandığı Premiere yetenekleri.
-- **Dışa aktarma:** SRT ve VTT iki satırlı altyazıyı tek altyazı bloğuna yazar; satır modunda ASS karaoke gerçek kelime zamanlarından.
+- **Dışa aktarma:** SRT ve VTT iki satırlı altyazıyı tek altyazı bloğuna yazar; satır modunda ASS karaoke (Pro) gerçek kelime zamanlarından.
 
 ### Düzeltildi
 - Dar panelde sol menü adları kelime ortasından bölünmüyor ("Diğer Animasyonla / r"); uzun açıklama alttaki öğenin üstüne taşmıyor.

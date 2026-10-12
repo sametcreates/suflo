@@ -39,7 +39,9 @@ if (Test-Path $bridgeStaged) {
 
 # Kurucular paketin köküne
 Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.bat") -Destination $stage -Force
-Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.command") -Destination $stage -Force
+# .command LF ve BOM'suz yazilir: CRLF ile macOS "bad interpreter: /bin/bash^M" der (.gitattributes'a ek guvence)
+$cmdMetin = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "kurucu\Suflo-Kur.command")) -replace "`r`n", "`n"
+[System.IO.File]::WriteAllText((Join-Path $stage "Suflo-Kur.command"), $cmdMetin, (New-Object System.Text.UTF8Encoding($false)))
 
 # Kısa yol tarifi: ZIP'i açan kişi ne yapacağını dosya adından anlamalı
 $oku = @"

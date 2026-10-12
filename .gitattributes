@@ -1,0 +1,6 @@
+# Kurulum betiklerinin satir sonlari sabit. Yayin GitHub'in Windows sunucusunda paketlenir;
+# orada git core.autocrlf=true ile cikarir. Suflo-Kur.command CRLF ile pakete girerse macOS
+# "bad interpreter: /bin/bash^M" der ve kurulum hic baslamaz.
+*.command text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf

@@ -789,7 +789,7 @@
     "English arayüz (beta)": "English interface (beta)",
     "Paneli Ayarlar'dan İngilizceye çevir.": "Switch the panel to English in Settings.",
     "Hız rampası ve daha iyi altyazı": "Speed ramps and better captions",
-    "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz.": "One-click slow-mo and speed-ups with 11 curves; your edit never shifts.",
+    "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz (Pro).": "One-click slow-mo and speed-ups with 11 curves; your edit never shifts (Pro).",
     "Canlı altyazı": "Live captions",
     "Satırlar motor yazdıkça akar; kalan süre ve İptal düğmesi.": "Lines stream in as the engine writes them, with time left and a Cancel button.",
     "Okunaklı altyazı": "Readable captions",

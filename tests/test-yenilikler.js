@@ -28,6 +28,12 @@ var hedefler = (Y ? Y.maddeler : []).map(function (m) { return m.sekme + ":" + (
   ok("v3.2 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
 });
 
+// Pro kapılı araçlar pencerede (Pro) işaretli: işaretsiz madde ücretsiz gibi okunur, Uygula'da upsell çıkar
+["Hız Rampası", "Çevrimdışı İngilizce"].forEach(function (b) {
+  var m = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === b; })[0];
+  ok("madde '" + b + "' (Pro) işaretli", !!m && /\(Pro\)\.?$/.test(m.metin), m && m.metin);
+});
+
 // İngilizce karşılıklar
 var EN = require(path.join(KOK, "i18n", "en.js"));
 var sozluk = EN && (EN.strings || EN.dict || EN);

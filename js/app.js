@@ -1636,7 +1636,7 @@ window.KApp = (function () {
     surum: "3.2",
     alt: "Hız rampası ve daha iyi altyazı",
     maddeler: [
-      { ikon: "⏩", baslik: "Hız Rampası", metin: "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz.", sekme: "hiz", hedef: "hiz-grid" },
+      { ikon: "⏩", baslik: "Hız Rampası", metin: "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz (Pro).", sekme: "hiz", hedef: "hiz-grid" },
       { ikon: "▶", baslik: "Canlı altyazı", metin: "Satırlar motor yazdıkça akar; kalan süre ve İptal düğmesi.", sekme: "captions", hedef: "cap-go" },
       { ikon: "≡", baslik: "Okunaklı altyazı", metin: "2 satır × 42 düzen, kısa parçalar birleşir, kelime zamanları ölçülür.", sekme: "captions", hedef: "cap-maxlen" },
       { ikon: "⚙", baslik: "Hızlı ya da En doğru", metin: "Yerel motorda hız ile doğruluk arasında seç.", sekme: "settings", hedef: "set-cozme" },

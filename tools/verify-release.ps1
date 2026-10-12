@@ -111,9 +111,20 @@ function Test-Archive([string]$path, [string]$kind) {
             if (-not ($names | Where-Object { $_ -match $pattern } | Select-Object -First 1)) { $missing += $pattern }
         }
         $secrets = @(Test-Secrets $zip $kind)
-        if ($paid.Count -or $private.Count -or $badSeparators.Count -or $missing.Count -or $secrets.Count) {
-            Write-Host ("{0} arsiv denetimi basarisiz: paid={1} private={2} separator={3} missing={4} secret={5}" -f $kind,$paid.Count,$private.Count,$badSeparators.Count,$missing.Count,$secrets.Count) -ForegroundColor Red
+        # macOS kurucusu (.command/.sh) CR baytı ya da BOM tasirsa "bad interpreter: /bin/bash^M" ile hic calismaz
+        $crlf = @()
+        foreach ($entry in $zip.Entries) {
+            if ($entry.FullName -notmatch '\.(command|sh)$') { continue }
+            $ms = New-Object System.IO.MemoryStream
+            $st = $entry.Open()
+            try { $st.CopyTo($ms) } finally { $st.Dispose() }
+            $bytes = $ms.ToArray()
+            if (($bytes -contains 13) -or $bytes.Length -lt 2 -or $bytes[0] -ne 35 -or $bytes[1] -ne 33) { $crlf += $entry.FullName }
+        }
+        if ($paid.Count -or $private.Count -or $badSeparators.Count -or $missing.Count -or $secrets.Count -or $crlf.Count) {
+            Write-Host ("{0} arsiv denetimi basarisiz: paid={1} private={2} separator={3} missing={4} secret={5} crlf={6}" -f $kind,$paid.Count,$private.Count,$badSeparators.Count,$missing.Count,$secrets.Count,$crlf.Count) -ForegroundColor Red
             if ($secrets.Count) { Write-Host ("Gizli anahtar izi: {0}" -f ($secrets -join ', ')) -ForegroundColor Red }
+            if ($crlf.Count) { Write-Host ("CRLF/BOM'lu kurucu betigi (macOS calistiramaz): {0}" -f ($crlf -join ', ')) -ForegroundColor Red }
             exit 1
         }
         $item = Get-Item -LiteralPath $path
