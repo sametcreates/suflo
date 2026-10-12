@@ -98,6 +98,13 @@ ok("deneme sırasında dil değişti: görünüm önceki, dil yeni", J(TG({ lang
 ok("önceden tercih yoktu: görünüm alanları silinir, dil kalır (tercih silinmez)", J(TG({ lang: "en", preset: "mrbeast", motorStili: "mrbeast", stil: {} }, null)) === J({ lang: "en" }));
 ok("önceden tercih yok, deneme hiçbir şey kaydetmedi → null (sil)", TG(undefined, null) === null && TG({ preset: "mrbeast", motorStili: "mrbeast" }, null) === null);
 ok("şimdiki tercih yoksa önceki aynen döner (kopya)", J(TG(null, { lang: "tr", preset: "" })) === J({ lang: "tr", preset: "" }));
+// 3.3: rehberde denenen hazır görünüm (çip seçimi savePrefs yazar) geri yüklemeden sonra kalmaz
+var denemeSonrasi = TG({ lang: "tr", motorStili: "efekt", gorunum: "glitch", gorunumTaban: "glitch", kredi: "", stil: { aile: "efekt", font: "Bebas Neue" } },
+  { lang: "tr", motorStili: "efekt", gorunum: "temiz", gorunumTaban: "temiz", kredi: "ayse", stil: { aile: "efekt", font: "Montserrat" } });
+ok("deneme görünümü (Glitch) geri yüklemede kalmaz: görünüm, taban ve yazar notu önceki (Temiz, @ayse)",
+  denemeSonrasi.gorunum === "temiz" && denemeSonrasi.gorunumTaban === "temiz" && denemeSonrasi.kredi === "ayse" && denemeSonrasi.stil.font === "Montserrat", J(denemeSonrasi));
+ok("önceden görünüm alanı yoktu (3.2 tercihi): deneme görünümü silinir",
+  J(TG({ lang: "tr", gorunum: "glitch", gorunumTaban: "glitch", stil: {} }, { lang: "tr", stil: { aile: "klasik" } })) === J({ lang: "tr", stil: { aile: "klasik" } }));
 
 /* ---- kurulum seçenekleri: kurulu cuBLAS ezilmez, ffmpeg yalnız örnek varken arkada ---- */
 ok("ilk kurulum: cuBLAS yok, örnek yoksa ffmpeg önden (ilerleme düğmede)", J(SO.kurulumSecenekleri({ model: "small" })) === J({ modelId: "small", useGpu: false, ffmpegArkada: false }));

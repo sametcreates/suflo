@@ -1,7 +1,7 @@
 // Suflo testi: js/altyazi-efekt.js — Altyazı Efektleri oluşturucusunun saf modeli (3.3)
 // Hazır görünümler, ayar doğrulama, stil motoruna giden ince ayar, eski stil kimliklerinin
 // en yakın görünüme taşınması ve TranscriptAI şablonu sözleşmesi (yerel MOGRT ek yeri).
-var path = require("path");
+var path = require("path"), fs = require("fs");
 var kok = path.join(__dirname, "..");
 var AE = require(path.join(kok, "js", "altyazi-efekt.js"));
 var SE = require(path.join(kok, "js", "style-engine.js"));
@@ -87,8 +87,40 @@ ok("sablonIndeksleri: giriş / vurgu kimliği şablonun textAnim / hlAnim değer
 }) && Object.keys(SABLON_AKTIF).every(function (a) { return AE.sablonIndeksleri({ aktif: a }).hlAnim === SABLON_AKTIF[a]; }));
 var st = AE.sablonStili(AE.gorunum("vurucu").ayar, { olcek: 1920 / 1080 });
 ok("sablonStili: [vurguRGB, yazıRGB, font, punto×ölçek, kontur, gölge, kutu, textAnim, hlAnim]", st.length === 9 && J(st[0]) === "[255,230,0]" &&
-  J(st[1]) === "[255,255,255]" && st[2] === "Anton" && st[3] === Math.round(112 * 1920 / 1080) && J(st[4]) === "[1,0,0,0,8]" && J(st[5]) === "[0]" &&
+  J(st[1]) === "[255,255,255]" && st[2] === "Anton-Regular" && st[3] === Math.round(112 * 1920 / 1080) && J(st[4]) === "[1,0,0,0,8]" && J(st[5]) === "[0]" &&
   J(st[6]) === "[0]" && st[7] === 1 && st[8] === 1, J(st));
+// Yazı tipi alanı setFont'a giden PostScript adı (TranscriptAI istemcisi gibi aile + kalın + italik → ad);
+// yalnız paketteki yüzler: kurulu olmayan ad şablonda yazı tipini tümden düşürür
+ok("sablonFontu: PostScript adı, kalın paketteki yüzden (Montserrat-Bold / -Regular, Lora-Bold), tek ağırlıklıda Regular",
+  AE.sablonFontu({ font: "Montserrat", kalin: true }) === "Montserrat-Bold" && AE.sablonFontu({ font: "Montserrat", kalin: false }) === "Montserrat-Regular" &&
+  AE.sablonFontu({ font: "Lora", kalin: true }) === "Lora-Bold" && AE.sablonFontu({ font: "Lora", kalin: false }) === "Lora-Regular" &&
+  AE.sablonFontu({ font: "Archivo Black", kalin: true }) === "ArchivoBlack-Regular" && AE.sablonFontu({ font: "Bebas Neue" }) === "BebasNeue-Regular" &&
+  AE.sablonFontu({ font: "Bungee", kalin: false }) === "Bungee-Regular" && AE.sablonStili(AE.gorunum("temiz").ayar)[2] === "Montserrat-Bold" &&
+  AE.sablonStili(AE.gorunum("zarif").ayar)[2] === "Lora-Regular");
+ok("sablonFontu: paketlenmemiş italik yüz istenmez (Montserrat-Italic kurulu değil → Regular / Bold)",
+  AE.sablonFontu({ font: "Montserrat", kalin: true, italik: true }) === "Montserrat-Bold" && AE.sablonFontu({ font: "Lora", kalin: false, italik: true }) === "Lora-Regular");
+var psAdlari = { "Anton.ttf": "Anton-Regular", "ArchivoBlack.ttf": "ArchivoBlack-Regular", "BebasNeue.ttf": "BebasNeue-Regular", "Bungee.ttf": "Bungee-Regular",
+  "Lora.ttf": "Lora-Regular", "Montserrat-Bold.ttf": "Montserrat-Bold", "Montserrat-Regular.ttf": "Montserrat-Regular" };
+// name tablosundaki PostScript adı (nameID 6, Windows UTF-16BE kaydı) dosyadan okunur
+function psAdi(dosya) {
+  var b = fs.readFileSync(path.join(__dirname, "..", "fonts", dosya)), n = b.readUInt16BE(4);
+  for (var i = 0; i < n; i++) {
+    var r = 12 + i * 16;
+    if (b.toString("latin1", r, r + 4) !== "name") continue;
+    var t = b.readUInt32BE(r + 8), sayi = b.readUInt16BE(t + 2), depo = t + b.readUInt16BE(t + 4);
+    for (var j = 0; j < sayi; j++) {
+      var k = t + 6 + j * 12;
+      if (b.readUInt16BE(k) === 3 && b.readUInt16BE(k + 6) === 6) {
+        var u = b.slice(depo + b.readUInt16BE(k + 10), depo + b.readUInt16BE(k + 10) + b.readUInt16BE(k + 8)), s = "";
+        for (var c = 0; c + 1 < u.length; c += 2) s += String.fromCharCode(u.readUInt16BE(c));
+        return s;
+      }
+    }
+  }
+  return "";
+}
+ok("sablonFontu adları paketteki dosyaların gerçek PostScript adları", Object.keys(psAdlari).every(function (f) { return psAdi(f) === psAdlari[f]; }),
+  Object.keys(psAdlari).map(function (f) { return f + "=" + psAdi(f); }).join(" "));
 var st0 = AE.sablonStili({ vurgu: false, kontur: 0, renk: "#102030" });
 ok("sablonStili: vurgu kapalı → vurgu rengi = yazı rengi; kontur 0 → [0]; ölçek yoksa 1", J(st0[0]) === J(st0[1]) && J(st0[0]) === "[16,32,48]" &&
   J(st0[4]) === "[0]" && st0[3] === AE.VARSAYILAN.boyut, J(st0));

@@ -13,7 +13,7 @@
  *     1:1 eşleme. Yerel (render'sız) MOGRT çıktısı 3.3'ün sonraki adımında bu ek yeri kullanır.
  *     Yalnız veri düzeni izlenir (birlikte çalışabilirlik); şablondan kod alınmadı.
  *
- * Sözleşme sırası (JSON_Input dizisi): [vurguRGB, yaziRGB, font, punto, kontur [1,r,g,b,kalınlık]|[0],
+ * Sözleşme sırası (JSON_Input dizisi): [vurguRGB, yaziRGB, font (PostScript adı), punto, kontur [1,r,g,b,kalınlık]|[0],
  *   gölge [1,r,g,b,opaklık,mesafe,yumuşaklık]|[0], kutu [1,r,g,b,opaklık]|[0], textAnim 0-5, hlAnim 0-3, satırlar]
  *
  * DOM'a, Premiere'e, dosya sistemine dokunmaz. ES5, UMD (Node 12 / CEF 74).
@@ -177,6 +177,31 @@
     return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
   }
 
+  /*
+   * Şablonun yazı tipi alanı (3.) Premiere'in setFont'una giden PostScript adıdır; kalın / italik
+   * yalnız bu adla taşınır (sözleşmede ayrı bayrak yok; TranscriptAI istemcisi de aile + kalın +
+   * italik → PostScript adı eşler). Yalnız Suflo'nun paketlediği yüzler (fonts/ dosyalarının nameID 6'sı
+   * ve Lora'nın adlı örnekleri): kurulu olmayan bir ad (ör. Montserrat-Italic) şablonda yazı tipini
+   * tümden düşürür, eksik yüz yerine en yakın paket yüzü gider. Tek ağırlıklı görüntü fontlarında
+   * (Anton, Archivo Black, Bebas Neue, Bungee) kalın / italik yüz yok; italik hiçbir pakette yok.
+   * Yerel MOGRT adımı bu fontları kullanıcıya kurmalı ya da kurulu değilse libass katmanına düşmeli
+   * (Premiere yalnız sisteme kurulu fontu çizer).
+   */
+  var POSTSCRIPT = {
+    "Anton": { n: "Anton-Regular" },
+    "Archivo Black": { n: "ArchivoBlack-Regular" },
+    "Bebas Neue": { n: "BebasNeue-Regular" },
+    "Bungee": { n: "Bungee-Regular" },
+    "Lora": { n: "Lora-Regular", b: "Lora-Bold" },
+    "Montserrat": { n: "Montserrat-Regular", b: "Montserrat-Bold" }
+  };
+  function sablonFontu(ayar) {
+    var n = normalize(ayar);
+    var e = own(POSTSCRIPT, n.font) ? POSTSCRIPT[n.font] : null;
+    if (!e) return n.font;
+    return n.kalin && e.b ? e.b : e.n;
+  }
+
   function sablonIndeksleri(ayar) {
     var n = normalize(ayar);
     return { textAnim: Math.max(0, idler(GIRISLER).indexOf(n.giris)), hlAnim: Math.max(0, idler(AKTIFLER).indexOf(n.aktif)) };
@@ -192,7 +217,7 @@
     var olcek = o && typeof o.olcek === "number" && isFinite(o.olcek) && o.olcek > 0 ? o.olcek : 1;
     var ind = sablonIndeksleri(n);
     var kontur = n.kontur > 0 ? [1].concat(rgb(n.konturRenk), [n.kontur]) : [0];
-    return [rgb(n.vurgu ? n.vurguRenk : n.renk), rgb(n.renk), n.font, Math.round(n.boyut * olcek), kontur, [0], [0], ind.textAnim, ind.hlAnim];
+    return [rgb(n.vurgu ? n.vurguRenk : n.renk), rgb(n.renk), sablonFontu(n), Math.round(n.boyut * olcek), kontur, [0], [0], ind.textAnim, ind.hlAnim];
   }
 
   return {
@@ -208,6 +233,7 @@
     eskiStilden: eskiStilden,
     gorunumuBul: gorunumuBul,
     sablonIndeksleri: sablonIndeksleri,
+    sablonFontu: sablonFontu,
     sablonStili: sablonStili
   };
 });

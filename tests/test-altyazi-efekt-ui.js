@@ -88,7 +88,8 @@ function ortam(o) {
     govde("function efektSonrasi("), govde("function gorunumUygula("), govde("function gorunumleriCiz("), govde("function efektKelimeSayisi("),
     govde("function stil()"), govde("function motorAyarlari("), govde("function savePrefs("), govde("function loadPrefs("), govde("function stiliYaz("),
     govde("function markaKiti("), govde("function dikeySekans("), govde("function inceAyarDurumu("), govde("function stilKredisi("),
-    govde("function stilKodu("), govde("function stilKoduUygula("), govde("function varsayilanaDon(")
+    govde("function stilKodu("), govde("function stilKoduUygula("), govde("function varsayilanaDon("),
+    govde("function efektVarsayilan("), govde("function sablonumUygula(")
   ].join("\n");
   var api = new Function("K", "window", "document", "el", "KApp", "Pro",
     "var SS = window.SufloStyleShare, AE = window.SufloAltyaziEfekt, EFEKT = 'efekt';\n" +
@@ -206,6 +207,61 @@ var geri = ortam();
 geri.api.stilKoduUygula(k.kod);
 ok("paylaşılan kod alıcıda aynı hazır görünüm olarak tanınır", geri.api.durum().gorunum === "zarif", geri.api.durum().gorunum);
 
+/* ---------------- 5b) ilk açılış, eski "Özel" kaydı, ★ Şablonum ---------------- */
+var ilk = ortam();
+ilk.api.gorunumleriCiz();
+ilk.api.loadPrefs();
+ok("ilk açılış (tercih yok): Altyazı Efektleri › Temiz seçili gelir; tercih yazılmaz, önizleme çizilmez",
+  ilk.api.durum().motor === "efekt" && ilk.api.durum().gorunum === "temiz" && ilk.dom["cap-style-family"].value === "efekt" &&
+  ilk.dom["cap-efekt-gorunumler"].childNodes[0].classList.contains("secili") && !ilk.ayar.capPrefs && ilk.api.onizleme.tazele.length === 0, JSON.stringify(ilk.api.durum()));
+var ozel = ortam({ ayar: { capPrefs: { maxlen: "l42", kase: "normal", punct: true, preset: "", stil: { aile: "custom", font: "Arial", boyut: 64, renk: "#ff0000",
+  konturRenk: "#000000", vurguRenk: "#00ff00", kontur: 4, konum: 2 } } } });
+ozel.api.loadPrefs();
+ok("eski 'Özel' kaydı: efekt seçili, kayıttaki renk / boyut kalır, sistem yazı tipi paket fontuna (Montserrat) döner, sistem grubu kapalı",
+  ozel.api.durum().motor === "efekt" && ozel.api.durum().son === "temiz" && ozel.api.durum().gorunum === "" && ozel.dom["cap-renk"].value === "#ff0000" &&
+  ozel.dom["cap-boyut"].value === "64" && ozel.dom["cap-font"].value === "Montserrat" && ozel.dom["cap-font-sistem"].disabled === true &&
+  ozel.dom["cap-font-sistem"].hidden === true, JSON.stringify([ozel.api.durum(), ozel.dom["cap-font"].value]));
+var mogrtli = ortam({ ayar: { capPrefs: { preset: "", mogrtPath: "/x/Suflo Pop.mogrt", motorStili: "", stil: { aile: "custom", font: "Arial" } } } });
+mogrtli.api.loadPrefs();
+ok("kayıtlı Premiere şablonu (liste henüz yüklenmedi) ezilmez", mogrtli.api.durum().motor === "" && mogrtli.api.durum().mogrt === null);
+var sab = ortam({ ayar: { userPreset: { maxlen: "l42", kase: "upper", punct: false, stil: Object.assign({ aile: "efekt", yogunluk: "balanced", animasyon: "efekt", kutu: false },
+  AE.overrides(Object.assign({}, AE.gorunum("glitch").ayar, { renk: "#abcdef" }))) } } });
+sab.api.gorunumleriCiz();
+var sabCipler = sab.dom["cap-efekt-gorunumler"].childNodes;
+var sabCip = sabCipler[sabCipler.length - 1];
+ok("Şablonum kayıtlıysa hazır görünümlerin sonunda ★ Şablonum çipi", sabCipler.length === AE.GORUNUMLER.length + 1 && sabCip.getAttribute("data-sablonum") === "1" &&
+  metinleri(sabCip).join("") === "★ Şablonum" && sabCip.classList.contains("efekt-cip"));
+sabCip.click();
+ok("★ Şablonum çipi kayıtlı ayarı uygular, seçili görünür, tercihe yazılır, önizlemeyi ister", sab.dom["cap-renk"].value === "#abcdef" &&
+  sab.dom["cap-efekt-aktif"].value === "glitch" && sab.dom["cap-preset"].value === "user" && sab.api.durum().motor === "efekt" && sabCip.classList.contains("secili") &&
+  sab.ayar.capPrefs && sab.ayar.capPrefs.preset === "user" && JSON.stringify(sab.api.onizleme.tazele) === "[true]", JSON.stringify([sab.dom["cap-preset"].value, sab.api.durum()]));
+sab.api.gorunumUygula("temiz");
+ok("başka görünüm seçilince ★ Şablonum çipi seçili kalmaz", !sabCip.classList.contains("secili") && sabCipler[0].classList.contains("secili"));
+ok("Şablonum kaydı çipi hemen gösterir, bildirim çipi anlatır (menü yok)", /gorunumleriCiz\(\);/.test(govde("function saveUserPreset(")) &&
+  /Hazır görünümlerde ★ Şablonum/.test(govde("function saveUserPreset(")) && govde("function saveUserPreset(").indexOf("menüde") === -1);
+
+/* ---------------- 5c) .suflo-stil dışa aktarma adı: görünüme göre, var olan dosya ezilmez ---------------- */
+(function () {
+  var masaustu = {}, yazilan = [];
+  var Kd = { os: { homedir: function () { return "/ev"; } }, path: path,
+    fs: { existsSync: function (p) { return p === "/ev/Desktop" || Object.prototype.hasOwnProperty.call(masaustu, p); },
+      writeFileSync: function (p, v) { masaustu[p] = v; yazilan.push(path.basename(p)); } } };
+  // stilDisaAktar o anki seçimle (motor, görünüm, cap-preset) kurulup çağrılır
+  function disaAktar(motor, gorunum, preset) {
+    new Function("K", "el", "KApp", "SS",
+      "var EFEKT = 'efekt', secilenMotorStili = " + JSON.stringify(motor) + ", secilenGorunum = " + JSON.stringify(gorunum) + ";\n" +
+      "function stilKodu() { return { kod: 'SFL1.x' }; } function arayuzDili() { return 'tr'; }\n" +
+      govde("function saveToDesktop(") + "\n" + govde("function stilDisaAktar(") + "\nreturn stilDisaAktar;")(
+      Kd, function (id) { return id === "cap-preset" ? { value: preset } : null; }, { toast: function () {} }, SS)();
+  }
+  disaAktar("efekt", "vurucu", "efekt");
+  disaAktar("efekt", "vurucu", "efekt");
+  disaAktar("efekt", "", "user");
+  disaAktar("efekt", "", "efekt");
+  ok(".suflo-stil adı görünümden; ikinci dışa aktarma birincinin üzerine yazmaz", yazilan.join(",") ===
+    "suflo-stil-vurucu.suflo-stil,suflo-stil-vurucu-2.suflo-stil,suflo-stil-sablonum.suflo-stil,suflo-stil-ozel.suflo-stil", yazilan.join(","));
+})();
+
 /* ---------------- 6) Premiere Şablonları ve katman ---------------- */
 var mc = govde("function mogrtStilleriniCiz(");
 ok("Premiere Şablonları bölümü olduğu gibi: başlık, oran, vitrin, kilit, hover video", /headTitle\.textContent = "Premiere Şablonları"/.test(mc) && /stil-sec stil-mogrt/.test(mc) &&
@@ -221,8 +277,11 @@ var ou = govde("async function overlayUygula(");
 ok("timeline'a ekleme Pro.gate('overlay') (3 deneme), efekt katmanı 'Suflo Altyazı Efekti' adıyla", /Pro\.gate\("overlay", \{ deneme: true/.test(ou) &&
   /"Suflo Altyazı Efekti"/.test(ou) && /Deneme yalnız Altyazı Efektleri için/.test(ou));
 var oo = govde("function onizlemeOynat(");
+// Çizim sırası (motorCizimiBaslat: tek ffmpeg, eski çizim atılır) ayrıca tests/test-efekt-onizleme.js'te çalıştırılır
 ok("önizleme: efekt gerçek motor çıktısıyla (libass), ffmpeg yoksa DOM yedeği", /premium\|efekt\)\$\/\.test\(st\.aile\)/.test(oo) &&
-  /motorOnizlemeOynat\(\)\.then/.test(govde("function efektOnizlemeTazele(")) && /onizlemeOynatDom\(\)/.test(govde("function efektOnizlemeTazele(")));
+  /motorCizimiBaslat\(/.test(oo) && /motorCizimiBaslat\(/.test(govde("function efektOnizlemeTazele(")) &&
+  /motorOnizlemeOynat\(\)\.then/.test(govde("function motorCizimiBaslat(")) && /onizlemeOynatDom\(\)/.test(govde("function motorCizimiBaslat(")) &&
+  /onizlemeOynatDom\(\)/.test(govde("function efektOnizlemeTazele(")));
 ok("önizleme tazeleme yalnız etkileşimde (açılışta çağrılmaz)", govde("function init(").indexOf("efektOnizlemeTazele(true)") === -1 &&
   govde("function loadPrefs(").indexOf("efektOnizlemeTazele") === -1);
 

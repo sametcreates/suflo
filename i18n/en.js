@@ -2258,6 +2258,7 @@
     "Bu kod daha yeni bir Suflo sürümüyle yapılmış; Suflo'yu güncelle.": "This code was made with a newer Suflo version; update Suflo.",
     "Bu stil bu Suflo sürümünde yok.": "This style isn't in this Suflo version.",
     "Bu stil bu Suflo sürümünde yok: {}.": "This style isn't in this Suflo version: {}.",
+    "Bu stil bu Suflo sürümünde yok: {}. Suflo'yu güncelle.": "This style isn't in this Suflo version: {}. Update Suflo.",
     "Stil kodundaki yazar adı geçersiz.": "The author name in the style code is invalid.",
     "Stil kodu okunamadı.": "Couldn't read the style code."
   });
@@ -2848,7 +2849,16 @@
     "Görünüme dön": "Back to look",
     "Altyazı sekmesindeki efekt": "Effect from the Captions tab",
     "Eski stil kodu en yakın görünüme uyarlandı: {} → {}": "Older style code adapted to the closest look: {} → {}",
-    "Altyazı Efektleri ve kanca başlığı": "Caption Effects and hook title"
+    "Altyazı Efektleri ve kanca başlığı": "Caption Effects and hook title",
+    // Oluşturucunun renk kutuları (genel "Vurgu" / "Kontur" başka yerde Emphasis / Stroke)
+    "Vurgu rengi": "Highlight color",
+    "Kontur rengi": "Outline color",
+    "Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Animasyonlu ekleme için yukarıda bir görünüm seç ya da efekti ayarla.":
+      "A regular add creates Premiere's editable caption track. For animated captions, pick a look above or adjust the effect.",
+    "Görünüm seçerek ekle": "Pick a look to add",
+    "Önce Altyazı Efektleri'nden bir görünüm seç ya da bir Premiere şablonu seç.": "First pick a look in Caption Effects or a Premiere template.",
+    "Paylaş ve kaydet › Şablonum yap ile kaydettiğin ayar": "The setting you saved with Share and save › Save as my template",
+    "Şablonun kaydedildi — Hazır görünümlerde ★ Şablonum": "Template saved — find it as ★ My template under Preset looks"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

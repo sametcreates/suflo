@@ -4,6 +4,9 @@
  *   node tools/render-style-previews.js --site    yalniz site: suflo.app/stil sayfasinin tum temel
  *                                                 stiller vitrini (docs/gorseller/suflo-stiller/<id>.webm)
  *   node tools/render-style-previews.js --site --id efekt   yalniz verilen stil(ler) (virgulle)
+ *   node tools/render-style-previews.js --site --efekt      Altyazi Efektleri: her giris x vurgu animasyonu
+ *                                                 cifti (6 x 4) docs/gorseller/suflo-stiller/efekt-<giris>-<aktif>.webm;
+ *                                                 suflo.app/stil efekt kodunun animasyonunu oynatir (renk / font panelde)
  */
 var fs = require("fs");
 var path = require("path");
@@ -90,7 +93,38 @@ var siteCikti = path.join(root, "docs", "gorseller", "suflo-stiller");
 fs.mkdirSync(siteCikti, { recursive: true });
 var siteSahne = "gradients=s=1280x720:r=24:d=3.2:c0=#0d1220:c1=#24304a:c2=#101522:n=3:type=radial:x0=360:y0=200:x1=1100:y1=640:speed=.01";
 var siteKelimeler = { upper: ["BUNU", "*SAKIN*", "KAÇIRMA", "ARKADAŞLAR"], normal: ["Bunu", "*sakın*", "kaçırma", "arkadaşlar"] };
-engine.list().filter(function (p) { return !yalnizIdler || yalnizIdler.indexOf(p.id) !== -1; }).forEach(function (p) {
+var yalnizEfekt = process.argv.indexOf("--efekt") !== -1;
+
+function siteRender(ad, built) {
+  var assName = "_site_" + ad + ".ass";
+  var assPath = path.join(siteCikti, assName);
+  var webmPath = path.join(siteCikti, ad + ".webm");
+  fs.writeFileSync(assPath, built.ass, "utf8");
+  var vf = "vignette=PI/5,ass=docs/gorseller/suflo-stiller/" + assName + ":fontsdir=fonts,scale=480:270:flags=lanczos";
+  var r = cp.spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", siteSahne, "-vf", vf,
+    "-c:v", "libvpx-vp9", "-crf", "36", "-b:v", "0", "-pix_fmt", "yuv420p", "-an", webmPath], { cwd: root, encoding: "utf8" });
+  try { fs.unlinkSync(assPath); } catch (e) {}
+  if (r.status !== 0 || !fs.existsSync(webmPath)) throw new Error(ad + " site onizlemesi uretilemedi: " + String(r.stderr || "").slice(-400));
+  console.log(ad + " -> " + path.relative(root, webmPath) + " (" + fs.statSync(webmPath).size + " B)");
+}
+
+/*
+ * Altyazi Efektleri: paylasilan efekt kodunun sayfasi kodun giris + vurgu animasyonunu oynatir. Taban
+ * gorunum "Temiz" (beyaz Montserrat, sari vurgu); kodun yazi tipi / renkleri sayfada ayrica yazilir.
+ */
+if (yalnizEfekt) {
+  engine.GIRISLER.forEach(function (giris) {
+    engine.AKTIFLER.forEach(function (aktif) {
+      var cues = siteKelimeler.normal.map(function (w, i) {
+        return { start: 0.15 + i * 0.7, end: i === siteKelimeler.normal.length - 1 ? 3.0 : 0.8 + i * 0.7, text: w };
+      });
+      siteRender("efekt-" + giris + "-" + aktif, engine.compile({ styleId: "efekt", cues: cues, cueKind: "words", width: 1280, height: 720,
+        overrides: { giris: giris, aktif: aktif } }));
+    });
+  });
+}
+
+(yalnizEfekt ? [] : engine.list()).filter(function (p) { return !yalnizIdler || yalnizIdler.indexOf(p.id) !== -1; }).forEach(function (p) {
   var id = p.id;
   var kelimeler = p.text.kase === "upper" ? siteKelimeler.upper : siteKelimeler.normal;
   var cues = id === "doc"
@@ -98,15 +132,5 @@ engine.list().filter(function (p) { return !yalnizIdler || yalnizIdler.indexOf(p
     : kelimeler.map(function (w, i) {
       return { start: 0.15 + i * 0.7, end: i === kelimeler.length - 1 ? 3.0 : 0.8 + i * 0.7, text: w };
     });
-  var built = engine.compile({ styleId: id, cues: cues, cueKind: "words", width: 1280, height: 720, overrides: siteAyar[id] });
-  var assName = "_site_" + id + ".ass";
-  var assPath = path.join(siteCikti, assName);
-  var webmPath = path.join(siteCikti, id + ".webm");
-  fs.writeFileSync(assPath, built.ass, "utf8");
-  var vf = "vignette=PI/5,ass=docs/gorseller/suflo-stiller/" + assName + ":fontsdir=fonts,scale=480:270:flags=lanczos";
-  var r = cp.spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", siteSahne, "-vf", vf,
-    "-c:v", "libvpx-vp9", "-crf", "36", "-b:v", "0", "-pix_fmt", "yuv420p", "-an", webmPath], { cwd: root, encoding: "utf8" });
-  try { fs.unlinkSync(assPath); } catch (e) {}
-  if (r.status !== 0 || !fs.existsSync(webmPath)) throw new Error(id + " site onizlemesi uretilemedi: " + String(r.stderr || "").slice(-400));
-  console.log(id + " -> " + path.relative(root, webmPath) + " (" + fs.statSync(webmPath).size + " B)");
+  siteRender(id, engine.compile({ styleId: id, cues: cues, cueKind: "words", width: 1280, height: 720, overrides: siteAyar[id] }));
 });

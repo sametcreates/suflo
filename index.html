@@ -424,17 +424,18 @@
                 <span>Kelime vurgusu</span>
               </label>
               <div class="renk-satir">
+                <!-- Adlar oluşturucuya özgü ("… rengi"): genel "Vurgu" / "Kontur" girdileri başka yerde Emphasis / Stroke -->
                 <label class="renk-kutu" id="cap-renk-vurgu-kutu" title="Konuşulan kelimenin ve *anahtar kelimenin* rengi">
                   <input type="color" id="cap-renk-vurgu" value="#ffd23f">
-                  <span>Vurgu</span>
+                  <span>Vurgu rengi</span>
                 </label>
                 <label class="renk-kutu" title="Yazı rengi">
                   <input type="color" id="cap-renk" value="#ffffff">
-                  <span>Yazı</span>
+                  <span>Yazı rengi</span>
                 </label>
                 <label class="renk-kutu" title="Kontur (çevre çizgisi) rengi">
                   <input type="color" id="cap-renk-kontur" value="#000000">
-                  <span>Kontur</span>
+                  <span>Kontur rengi</span>
                 </label>
               </div>
             </div>
@@ -451,7 +452,9 @@
                     <option value="Lora">Lora</option>
                     <option value="Montserrat" selected>Montserrat</option>
                   </optgroup>
-                  <optgroup label="Sistem" id="cap-font-sistem">
+                  <!-- Sistem yazı tipleri: Altyazı Efektleri yalnız paketle gelen fontları çizer (libass sistem
+                       fontunu sessizce başka fonta çevirir); grup yalnız eski "Özel" kayıtlarını göstermek için, hep kapalı -->
+                  <optgroup label="Sistem" id="cap-font-sistem" disabled hidden>
                     <option value="Arial">Arial</option>
                     <option value="Impact">Impact</option>
                     <option value="Verdana">Verdana</option>
@@ -461,8 +464,10 @@
                     <option value="Courier New">Courier New</option>
                   </optgroup>
                 </select>
-                <label class="efekt-bi" title="Kalın yazı"><input id="cap-efekt-kalin" type="checkbox" checked><span>Kalın yazı</span></label>
-                <label class="efekt-bi efekt-italik" title="İtalik"><input id="cap-efekt-italik" type="checkbox"><span>İtalik</span></label>
+                <span class="efekt-bi-sar">
+                  <label class="efekt-bi" title="Kalın yazı"><input id="cap-efekt-kalin" type="checkbox" checked><span>Kalın yazı</span></label>
+                  <label class="efekt-bi efekt-italik" title="İtalik"><input id="cap-efekt-italik" type="checkbox"><span>İtalik</span></label>
+                </span>
               </div>
             </div>
 
@@ -922,7 +927,7 @@
 
         <div class="caption-apply-actions" aria-label="Altyazıyı sekansa ekleme biçimi">
           <button id="cap-apply" class="btn outline big">Normal altyazı izi ekle</button>
-          <button id="cap-apply-style" class="btn primary big" disabled>Stil seçerek ekle</button>
+          <button id="cap-apply-style" class="btn primary big" disabled>Görünüm seçerek ekle</button>
         </div>
         <p class="hint" id="cap-apply-hint" style="margin:-4px 0 8px">
           Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Bir stil seçersen animasyonlu MOGRT olarak da ekleyebilirsin.

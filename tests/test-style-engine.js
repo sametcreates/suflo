@@ -265,6 +265,39 @@ var gz = katman(efekt({ giris: "pop", aktif: "zipla" }), 2);
 ok("efekt giriş + zıpla: ilk kelimenin üst katmanı girişle gelir, zıplama 300 ms sonra", /^Dialogue: 2,0:00:00\.00,0:00:00\.30,.*\\fscx0\\fscy0\\t\(0,300/.test(gz[0]) &&
   /^Dialogue: 2,0:00:00\.30,0:00:00\.40,.*\\move\(960,907,960,892,0,100\)/.test(gz[1]), gz.slice(0, 2).join(" | ").slice(0, 300));
 
+/*
+ * Kısa ilk kelime (ve, bu, bir: 120 ms < T = 300 ms): giriş ikinci kelimenin olayında o anki hâlinden
+ * sürer, kart başından T ms sonra (0,20 + 0,30 = 0,50 s) biter. Eskiden ikinci olay girişsizdi:
+ * pop kartı %40'tan %100'e, kayan kartı 30 px tek karede sıçratıyordu.
+ */
+var kisaIlk = [{ start: 0.2, end: 0.32, text: "ve" }, { start: 0.32, end: 0.67, text: "bunu" }, { start: 0.67, end: 1.0, text: "gördük" }];
+function kisa(ov) { return olaylar(efekt(ov, { cues: kisaIlk })); }
+var kisaBekle = {
+  pop: /^Dialogue: 1,0:00:00\.32,0:00:00\.67,.*\\fscx40\\fscy40\\t\(0,180,\\fscx100\\fscy100\)\}/,
+  zipla: /^Dialogue: 1,0:00:00\.32,0:00:00\.67,.*\\fscx90\\fscy90\\t\(0,30,\\fscx112\\fscy112\)\\t\(30,111,\\fscx96\\fscy96\)\\t\(111,180,\\fscx100\\fscy100\)\}/,
+  fade: /^Dialogue: 1,0:00:00\.32,0:00:00\.67,.*\\fade\(153,0,0,0,180,180,180\)\}/,
+  yukari: /^Dialogue: 1,0:00:00\.32,0:00:00\.67,Suflo,,0,0,0,,\{\\an2\\move\(960,937,960,907,0,180\)/,
+  asagi: /^Dialogue: 1,0:00:00\.32,0:00:00\.67,Suflo,,0,0,0,,\{\\an2\\move\(960,877,960,907,0,180\)/
+};
+Object.keys(kisaBekle).forEach(function (g) {
+  var ol = kisa({ giris: g });
+  ok("efekt kısa ilk kelime + giriş " + g + ": giriş ikinci kelimede kaldığı yerden sürer, kart başından 300 ms sonra biter",
+    kisaBekle[g].test(ol[1]) && !/\\fscx|\\fad|\\move/.test(ol[2]), ol[1].slice(0, 200));
+});
+ok("efekt kısa ilk kelime: giriş T ms içinde bittiyse sonraki kelimeye taşınmaz (0,67 s)", kisa({ giris: "pop" })[2].indexOf("\\t(") === -1);
+var kisaZ = katman(efekt({ giris: "pop", aktif: "zipla" }, { cues: kisaIlk }), 2);
+ok("efekt kısa ilk kelime + zıpla: kelime hareketi kaybolmaz (kelime başında, girişle birlikte)",
+  /^Dialogue: 2,0:00:00\.20,0:00:00\.30,.*\\move\(960,907,960,892,0,100\).*\\fscx0\\fscy0\\t\(0,300,/.test(kisaZ[0]) &&
+  /^Dialogue: 2,0:00:00\.30,0:00:00\.32,.*\\move\(960,892,960,907,0,100\).*\\fscx33\\fscy33\\t\(0,200,/.test(kisaZ[1]), kisaZ.slice(0, 2).join(" | ").slice(0, 400));
+var kisaG = katman(efekt({ giris: "fade", aktif: "glitch" }, { cues: kisaIlk }), 0);
+ok("efekt kısa ilk kelime + glitch: ilk kelimenin kopyaları da çıkar, giriş saydamlığıyla",
+  kisaG.length === 6 && /^Dialogue: 0,0:00:00\.22,0:00:00\.32,.*\\fade\(238,0,0,0,280,280,280\)/.test(kisaG[0]), kisaG.slice(0, 1).join("").slice(0, 200));
+// Kayan giriş + zıplayan kelime: iki hareketin toplamı (ilk kırılımda yeni olay), konum sıçramaz
+var kisaK = katman(efekt({ giris: "yukari", aktif: "zipla" }, { cues: kisaIlk }), 2);
+ok("efekt kısa ilk kelime + kayma + zıpla: kelime kayan satırla birlikte zıplar",
+  /^Dialogue: 2,0:00:00\.20,0:00:00\.30,Suflo,,0,0,0,,\{\\an2\\move\(960,957,960,925,0,100\)/.test(kisaK[0]) &&
+  /^Dialogue: 2,0:00:00\.32,0:00:00\.42,Suflo,,0,0,0,,\{\\an2\\move\(960,937,960,905,0,100\)/.test(kisaK[2]), kisaK.slice(0, 3).join(" | ").slice(0, 400));
+
 // Kelime vurgusu
 var vk = olaylar(efekt({ giris: "yok", vurgu: false }));
 ok("efekt: kelime vurgusu ve vurgu animasyonu kapalı → kart tek olay, vurgu rengi yok", vk.length === 1 && vk[0].indexOf("&H003FD2FF") === -1, vk.length + " olay");
@@ -293,6 +326,15 @@ ok("efekt kalın kapalı + italik: Style satırı Bold 0, Italic -1", stK[7] ===
 ok("efekt varsayılan: kalın, düz", styleAlanlari(efekt({}))[7] === "-1" && styleAlanlari(efekt({}))[8] === "0");
 ok("eski stilde kalın / italik alanı çıktıyı değiştirmez", engine.compile({ styleId: "viral", cues: snapKelime, overrides: { kalin: false, italik: true } }).ass ===
   engine.compile({ styleId: "viral", cues: snapKelime }).ass);
+// "Kalın yazı" kapalı: Montserrat'ın statik Regular yüzü (yalnız Bold dosyası varken libass kalını inceltemiyordu)
+ok("efekt kalın kapalı + Montserrat: katmana Montserrat-Regular.ttf gider, açıkken Bold",
+  engine.compile({ styleId: "efekt", cues: efKelime, overrides: { kalin: false } }).fontFiles.join() === "Montserrat-Regular.ttf" &&
+  engine.compile({ styleId: "efekt", cues: efKelime, overrides: { kalin: true } }).fontFiles.join() === "Montserrat-Bold.ttf" &&
+  fs.existsSync(path.join(root, "fonts", "Montserrat-Regular.ttf")));
+ok("efekt kalın kapalı + tek ağırlıklı font (Anton): aynı dosya, Style satırı Bold 0 (libass sahte kalını bırakır)",
+  engine.compile({ styleId: "efekt", cues: efKelime, overrides: { font: "Anton", kalin: false } }).fontFiles.join() === "Anton.ttf");
+ok("eski stilde kalın alanı yazı tipi dosyasını değiştirmez (Clean Pill hep Montserrat-Bold)",
+  engine.compile({ styleId: "capcut", cues: snapKelime, overrides: { kalin: false } }).fontFiles.join() === "Montserrat-Bold.ttf");
 ok("efekt: dize / sayı boolean alanları reddedilir", styleAlanlari(efekt({ kalin: "false", italik: 1 }))[7] === "-1" && styleAlanlari(efekt({ italik: "true" }))[8] === "0");
 ok("efekt: kontur 0 → \\bord0 (en az 1 px'e yuvarlanmaz)", /\\bord0\\shad0/.test(olaylar(efekt({ kontur: 0 }))[0]));
 ok("efekt 9:16 + alt konum: alt arayüzün üstüne (%74) çekilir; orta %62", /\{\\an2\\pos\(540,1421\)/.test(olaylar(efekt({ giris: "yok" }, { w: 1080, h: 1920 }))[0]) &&
@@ -329,6 +371,45 @@ if (!ffmpeg) {
     });
     ok(id + " kendi fontunu kullaniyor (yedege dusmuyor)", dogru, secimler.join(" | ").slice(0, 180));
   });
+  /*
+   * "Kalın yazı" gerçek çizimde: katmanın font klasörüne giden dosyayla Montserrat kalın açık / kapalı
+   * farklı çizilir ve libass kapalıyken Regular yüzü seçer (eskiden iki kare bayt bayt aynıydı).
+   */
+  var kalinKare = {};
+  [true, false].forEach(function (kalin) {
+    var r = engine.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "Merhaba dünya" }], cueKind: "words", width: 640, height: 360,
+      overrides: { kalin: kalin, giris: "yok" } });
+    var kd = path.join(tmp, "kalin-" + kalin);
+    fs.mkdirSync(kd, { recursive: true });
+    r.fontFiles.forEach(function (f) { fs.copyFileSync(path.join(root, "fonts", f), path.join(kd, f)); });
+    fs.writeFileSync(path.join(kd, "a.ass"), r.ass, "utf8");
+    var p = cp.spawnSync("ffmpeg", ["-v", "verbose", "-f", "lavfi", "-i", "color=c=black:s=640x360:d=1", "-vf", "ass=a.ass:fontsdir=.",
+      "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], { cwd: kd, maxBuffer: 16 * 1024 * 1024 });
+    kalinKare[kalin] = { kare: p.stdout || Buffer.alloc(0), secim: String(p.stderr).split(/\r?\n/).filter(function (l) { return /fontselect:/.test(l); }).join(" | ") };
+  });
+  ok("efekt Montserrat kalın kapalı: libass Regular yüzü seçer, kare kalın açıkkinden farklı",
+    kalinKare[false].kare.length > 0 && !kalinKare[false].kare.equals(kalinKare[true].kare) && /-> Montserrat-Regular/.test(kalinKare[false].secim) &&
+    /-> Montserrat-Bold/.test(kalinKare[true].secim), kalinKare[false].secim.slice(0, 160));
+  /*
+   * Kısa ilk kelimede giriş gerçek çizimde de sürekli: pop kartının genişliği 0,31 → 0,32 s (ikinci
+   * kelimenin olayı başlar) arasında sıçramaz (eskiden %36'dan %100'e tek karede).
+   */
+  var popAss = engine.compile({ styleId: "efekt", cues: kisaIlk, cueKind: "words", width: 640, height: 360, overrides: { giris: "pop" } });
+  var pd = path.join(tmp, "pop-kisa");
+  fs.mkdirSync(pd, { recursive: true });
+  fs.copyFileSync(path.join(root, "fonts", "Montserrat-Bold.ttf"), path.join(pd, "Montserrat-Bold.ttf"));
+  fs.writeFileSync(path.join(pd, "a.ass"), popAss.ass, "utf8");
+  var pp = cp.spawnSync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "color=c=black:s=640x360:r=100:d=0.6", "-vf", "ass=a.ass:fontsdir=.",
+    "-f", "rawvideo", "-pix_fmt", "gray", "-"], { cwd: pd, maxBuffer: 64 * 1024 * 1024 });
+  function genislik(n) {
+    var b = pp.stdout || Buffer.alloc(0), fr = 640 * 360, enSol = 640, enSag = -1;
+    if (b.length < (n + 1) * fr) return -1;
+    for (var y = 0; y < 360; y++) for (var x = 0; x < 640; x++) if (b[n * fr + y * 640 + x] > 60) { if (x < enSol) enSol = x; if (x > enSag) enSag = x; }
+    return enSag - enSol + 1;
+  }
+  var g31 = genislik(31), g32 = genislik(32), g50 = genislik(50), g55 = genislik(55);
+  ok("efekt pop + 120 ms ilk kelime: kart ikinci kelimede sıçramaz, tam boya kart başından 300 ms sonra varır",
+    g31 > 0 && g32 - g31 <= g31 * 0.2 && g50 === g55 && g32 < g55 * 0.6, [g31, g32, g50, g55].join(" / "));
   /*
    * "Platform arayuzunden kacin": 9:16'da uzun kelimelerle her stilin sag kenari ikon
    * sutununun (%87) solunda kalir. Olcum gercek libass cizimi: saydam zemin, en sagdaki

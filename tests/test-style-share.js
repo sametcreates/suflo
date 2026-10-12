@@ -12,6 +12,9 @@ var STILLER = ["mrbeast", "capcut", "saas", "viral", "pop", "doc", "premium", "h
 /* ---------------- FONTS ---------------- */
 ok("6 paket fontu", SS.fontNames().join(",") === "Anton,Archivo Black,Bebas Neue,Bungee,Lora,Montserrat", SS.fontNames().join(","));
 ok("font dosyaları gerçekten var", SS.fontNames().every(function (n) { return fs.existsSync(path.join(kok, "fonts", SS.FONTS[n].file)); }));
+ok("normal (kalın olmayan) yüz: Montserrat statik Regular, tek dosyalı fontta aynı dosya; dosyalar var", SS.fontFile("Montserrat", true) === "Montserrat-Regular.ttf" &&
+  SS.fontFile("Montserrat") === "Montserrat-Bold.ttf" && SS.fontFile("Anton", true) === "Anton.ttf" && SS.fontFile("Arial", true) === null &&
+  SS.fontNames().every(function (n) { return fs.existsSync(path.join(kok, "fonts", SS.fontFile(n, true))); }));
 ok("hasFont: proto / bilinmeyen değil", SS.hasFont("Lora") && !SS.hasFont("__proto__") && !SS.hasFont("toString") && !SS.hasFont("Arial"));
 
 /* ---------------- round trip ---------------- */
@@ -119,7 +122,7 @@ ok("efekt: gidiş-dönüş tüm oluşturucu alanlarıyla, uyarısız", efC.ok &&
   ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"].every(function (k) { return efC.recipe.overrides[k] === efTarif.overrides[k]; }),
   JSON.stringify(efC.recipe.overrides) + " " + efC.warnings.join(","));
 ok("efekt kodu kısa kalır (≤ 600)", efKod.length <= 600, efKod.length);
-var efKotu = coz({ v: 1, styleId: "viral", overrides: { giris: "uzay", aktif: "<b>", vurgu: "evet", kalin: 1, italik: null, satir: 9, kelime: 0 } });
+var efKotu = SS.decode("SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "efekt", overrides: { giris: "uzay", aktif: "<b>", vurgu: "evet", kalin: 1, italik: null, satir: 9, kelime: 0 } })), YENI);
 var ok2 = efKotu.recipe.overrides;
 ok("efekt: geçersiz giriş / vurgu ve boolean olmayan bayraklar atılır, satır / kelime kırpılır",
   ok2.giris === undefined && ok2.aktif === undefined && ok2.vurgu === undefined && ok2.kalin === undefined && ok2.italik === undefined &&
@@ -136,11 +139,22 @@ vmEski.runInNewContext(fs.readFileSync(path.join(__dirname, "fixtures", "style-s
 var Eski32 = kutuEski.module.exports;
 // izin listesi işlev olarak (vm bağlamında dizi instanceof Array tutmaz)
 function eskiIzin(id) { return STILLER.indexOf(id) !== -1; }
-var karisik = SS.encode({ styleId: "hormozi", overrides: { renk: "#ff0000", konum: 8, giris: "pop", aktif: "titre", satir: 1 } });
+// 3.3 kodlayıcısı efekt alanlarını eski stil kimliğine yazmaz: eski panelin davranışı elle kurulan kodla denenir
+var karisik = "SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "hormozi", overrides: { renk: "#ff0000", konum: 8, giris: "pop", aktif: "titre", satir: 1 } }));
 var eskiC = Eski32.decode(karisik, eskiIzin);
 ok("eski panel (3.2.0): yeni alanları 'geçersiz ayar' uyarısıyla atar, gerisini uygular", eskiC.ok && eskiC.recipe.overrides.renk === "#ff0000" &&
   eskiC.recipe.overrides.konum === 8 && eskiC.recipe.overrides.giris === undefined && ["giris", "aktif", "satir"].every(function (w) { return eskiC.warnings.indexOf(w) !== -1; }),
   JSON.stringify(eskiC));
+// Eski stil kimliği + efekt alanları (elle yazılmış kod / Shorts işi): uyarısız "geçerli" görünüp animasyonsuz çizilmez
+var eskiGiris = SS.decode(karisik, YENI);
+ok("3.3: eski stil kimliğindeki giriş / vurgu / satır alanları uyarıyla atılır (yalnız Altyazı Efektleri çizer)", eskiGiris.ok &&
+  eskiGiris.recipe.overrides.renk === "#ff0000" && eskiGiris.recipe.overrides.giris === undefined && eskiGiris.recipe.overrides.aktif === undefined &&
+  eskiGiris.recipe.overrides.satir === undefined && ["giris", "aktif", "satir"].every(function (w) { return eskiGiris.warnings.indexOf(w) !== -1; }), JSON.stringify(eskiGiris));
+var eskiKod = JSON.parse(SS.b64urlDecode(SS.encode({ styleId: "neon", overrides: { renk: "#ff0000", giris: "pop", kalin: false, kelime: 3 } }).slice(5)));
+ok("3.3 kodlayıcısı eski stil kimliğine efekt alanı yazmaz; efekt kodu yazar", JSON.stringify(eskiKod.overrides) === '{"renk":"#ff0000"}' &&
+  JSON.parse(SS.b64urlDecode(efKod.slice(5))).overrides.giris === "zipla", JSON.stringify(eskiKod));
+var gelecek = SS.decode("SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzay3d" })), YENI);
+ok("tanınmayan (daha yeni sürümün) stil kimliği: 'Suflo'yu güncelle' denir", !gelecek.ok && gelecek.error === "Bu stil bu Suflo sürümünde yok: uzay3d. Suflo'yu güncelle.", gelecek.error);
 var eskiEf = Eski32.decode(efKod, eskiIzin);
 ok("eski panel (3.2.0): efekt kodunu 'bu sürümde yok' diye reddeder (fırlatmaz)", !eskiEf.ok && /efekt/.test(eskiEf.error), eskiEf.error);
 var eskiKod = Eski32.encode({ styleId: "neon", overrides: { font: "Lora", renk: "#00ff00", konum: 2, boyut: 90 }, text: { kase: "upper" } });
@@ -299,6 +313,28 @@ var s2 = sayfa("#" + "SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "
 ok("sayfa: kötü yazar → hata kartı, içerik gizli", !s2.D["stil-hata"].hidden && s2.D["stil-icerik"].hidden && /yazar/.test(s2.D["stil-hata-metin"].textContent));
 var s3 = sayfa("#SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzayli" })));
 ok("sayfa: bilinmeyen stil → hata, video yok", !s3.D["stil-hata"].hidden && s3.D["stil-icerik"].hidden && (!s3.D["stil-video"] || s3.D["stil-video"].src === ""));
+// Altyazı Efektleri kodu: kodun giriş + vurgu animasyonu yazılır ve o çiftin videosu oynar; 3.3+ notu
+var s6 = sayfa("#" + SS.encode({ styleId: "efekt", overrides: { font: "Bebas Neue", giris: "asagi", aktif: "glitch", vurguRenk: "#2af5ff" } }));
+ok("sayfa: efekt kodu → kendi animasyon çiftinin videosu, giriş / vurgu adları, 3.3 notu", s6.D["stil-video"].src === "gorseller/suflo-stiller/efekt-asagi-glitch.webm" &&
+  s6.D["stil-giris"].textContent === "Aşağı kay" && s6.D["stil-aktif"].textContent === "Glitch" && s6.D["stil-giris-sar"].hidden === false &&
+  s6.D["stil-surum"].hidden === false && /animasyonunu gösterir/.test(s6.D["stil-not"].textContent), s6.D["stil-video"].src);
+s6.hashDegis("#" + SS.encode({ styleId: "efekt", overrides: { renk: "#ffffff" } }));
+ok("sayfa: animasyonsuz efekt kodu → efektin kendi değerleri (Belirme / Yok)", s6.D["stil-video"].src === "gorseller/suflo-stiller/efekt-fade-yok.webm" &&
+  s6.D["stil-giris"].textContent === "Belirme" && s6.D["stil-aktif"].textContent === "Yok");
+s6.hashDegis("#" + SS.encode({ styleId: "neon", overrides: { renk: "#ffffff" } }));
+ok("sayfa: eski stil kodunda animasyon satırları ve 3.3 notu gizli, video stilin kendisi", s6.D["stil-giris-sar"].hidden && s6.D["stil-aktif-sar"].hidden &&
+  s6.D["stil-surum"].hidden && s6.D["stil-video"].src === "gorseller/suflo-stiller/neon.webm" && /temel stili gösterir/.test(s6.D["stil-not"].textContent));
+var e6 = sayfa("#" + SS.encode({ styleId: "efekt", overrides: { giris: "zipla", aktif: "titre" } }), "en");
+ok("EN sayfa: efekt animasyon adları İngilizce, video yolu", e6.D["stil-giris"].textContent === "Bounce" && e6.D["stil-aktif"].textContent === "Shake" &&
+  e6.D["stil-video"].src === "../gorseller/suflo-stiller/efekt-zipla-titre.webm");
+var efP = E.preset("efekt").style;
+var sayfaVars = new Function(sayfaSrc.slice(sayfaSrc.indexOf("var EFEKT_VARSAYILAN = {"), sayfaSrc.indexOf("};", sayfaSrc.indexOf("var EFEKT_VARSAYILAN = {")) + 2) + " return EFEKT_VARSAYILAN;")();
+ok("sayfa: efektin varsayılan animasyonu motorla aynı; her giriş × vurgu çiftinin videosu var", sayfaVars.giris === efP.giris && sayfaVars.aktif === efP.aktif &&
+  E.GIRISLER.every(function (g) { return E.AKTIFLER.every(function (a) { return fs.existsSync(path.join(kok, "docs", "gorseller", "suflo-stiller", "efekt-" + g + "-" + a + ".webm")); }); }));
+ok("sayfa (TR / EN): animasyon satırları ve sürüm notu HTML'de", ["stil.html", "en/stil.html"].every(function (f) {
+  var h = fs.readFileSync(path.join(kok, "docs", f), "utf8");
+  return ["stil-giris-sar", "stil-giris", "stil-aktif-sar", "stil-aktif", "stil-not", "stil-surum"].every(function (id) { return h.indexOf('id="' + id + '"') !== -1; });
+}));
 var s4 = sayfa("");
 ok("sayfa: kodsuz ziyaret → yalnız nasıl kullanılır", s4.D["stil-hata"].hidden && s4.D["stil-icerik"].hidden);
 

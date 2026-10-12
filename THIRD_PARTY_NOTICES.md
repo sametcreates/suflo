@@ -79,7 +79,9 @@ SOFTWARE.
 
 - Fonts in `fonts/` (Anton, Archivo Black, Bebas Neue, Bungee, Lora, Montserrat) are
   licensed under the SIL Open Font License 1.1 (SPDX: `OFL-1.1`). Each font's license text
-  ships next to it as `fonts/OFL-<Family>.txt`.
+  ships next to it as `fonts/OFL-<Family>.txt`. `Montserrat-Bold.ttf` and
+  `Montserrat-Regular.ttf` are static instances (wght 700 / 400) of the bundled variable
+  `Montserrat.ttf`, made with fontTools so libass can select them; same license.
 - Emoji images in `emoji/` come from Twemoji (https://github.com/jdecked/twemoji),
   Copyright Twitter, Inc and other contributors, licensed under CC-BY 4.0
   (SPDX: `CC-BY-4.0`); see `emoji/LISANS.txt`.

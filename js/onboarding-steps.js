@@ -196,7 +196,8 @@
     };
   }
 
-  var STIL_TERCIHLERI = ["maxlen", "kase", "punct", "preset", "mogrtPath", "motorStili", "stil"];
+  // 3.3: Altyazı Efektleri görünümü (seçili / taban çip) ve paylaşılan kodun yazarı da görünümün parçası
+  var STIL_TERCIHLERI = ["maxlen", "kase", "punct", "preset", "mogrtPath", "motorStili", "stil", "gorunum", "gorunumTaban", "kredi"];
   function stilTercihiGeriYukle(simdi, eski) {
     var kaynak = eski && typeof eski === "object" ? eski : null;
     if (!simdi || typeof simdi !== "object") return kaynak ? JSON.parse(JSON.stringify(kaynak)) : null;

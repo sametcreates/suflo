@@ -1008,47 +1008,84 @@
   }
 
   /*
-   * Giriş animasyonu (kartın ilk olay(lar)ı): konum etiketi ve ek etiketler.
-   *   pop    \fscx0\fscy0 → %100
-   *   fade   \fad(T,0)
+   * Giriş animasyonu: anahtar kareler (ms, kart başından; T = 300 ms / hareket şiddeti, diğer
+   * stillerle aynı kural).
+   *   pop    ölçek 0 → %100
+   *   fade   saydamdan opağa (\fad(T,0))
    *   yukari aşağıdan yukarı kayar, asagi yukarıdan aşağı (\move, d = scaled(50))
    *   zipla  0 → %112 → %96 → %100 aşmalı büyüme
-   * T = 300 ms / hareket şiddeti (diğer stillerle aynı kural).
    */
-  function efektGirisi(giris, a, d, T) {
-    var pos = "\\pos(" + a.x + "," + a.y + ")";
-    if (giris === "pop") return { pos: pos, ek: "\\fscx0\\fscy0\\t(0," + T + ",\\fscx100\\fscy100)" };
-    if (giris === "fade") return { pos: pos, ek: "\\fad(" + T + ",0)" };
-    if (giris === "yukari") return { pos: "\\move(" + a.x + "," + (a.y + d) + "," + a.x + "," + a.y + ",0," + T + ")", ek: "" };
-    if (giris === "asagi") return { pos: "\\move(" + a.x + "," + (a.y - d) + "," + a.x + "," + a.y + ",0," + T + ")", ek: "" };
+  function efektGirisi(giris, d, T) {
+    if (giris === "pop") return { olcek: [[0, 0], [T, 100]] };
     if (giris === "zipla") {
       var t1 = Math.round(T * 0.5), t2 = Math.round(T * 0.77);
-      return { pos: pos, ek: "\\fscx0\\fscy0\\t(0," + t1 + ",\\fscx112\\fscy112)\\t(" + t1 + "," + t2 + ",\\fscx96\\fscy96)\\t(" + t2 + "," + T + ",\\fscx100\\fscy100)" };
+      return { olcek: [[0, 0], [t1, 112], [t2, 96], [T, 100]] };
     }
-    return { pos: pos, ek: "" };
+    if (giris === "fade") return { fade: true };
+    if (giris === "yukari") return { kay: d };
+    if (giris === "asagi") return { kay: -d };
+    return null;
   }
 
   /*
-   * Etkin kelimenin hareket parçaları (kelime başından ms cinsinden; konum etiketi tam metin):
-   *   zipla  scaled(15) yukarı ve geri, 2 × 100 ms (\move)
-   *   titre  4 kısa ±scaled(3) \pos sarsıntısı, toplam 150 ms
-   * Son parça (null bitiş) kelime sonuna dek durağan \pos. Süreler hareket şiddetine bölünür.
+   * Kartın girişi, kart başından o ms sonra başlayan olaya o anki hâlinden taşınır: kısa ilk
+   * kelimede (ve, bu, bir…) ikinci kelimenin olayı kartı yarım kalmış girişten tam boya, opaklığa
+   * ya da yerine sıçratmaz; giriş her katmanda kart başından T ms sonra biter. Geçmiş anahtar
+   * kareler atlanır (libass \t'de bitiş 0 "olay sonu" sayılır), o anki değer başlangıç olur.
+   * o = 0'da etiketler girişin kendisidir. Döner: null (giriş yok ya da bitti) ya da
+   * { ek, dy, kalan }: ek ölçek / saydamlık etiketleri, dy olay başındaki kayma (px), kalan ms.
+   */
+  function girisAni(gir, o, T) {
+    if (!gir || o >= T) return null;
+    var kalan = T - o, ek = "", dy = 0;
+    if (gir.olcek) {
+      var k = gir.olcek, v = k[k.length - 1][1], i;
+      for (i = 1; i < k.length; i++) {
+        if (o < k[i][0]) { v = k[i - 1][1] + (k[i][1] - k[i - 1][1]) * (o - k[i - 1][0]) / (k[i][0] - k[i - 1][0]); break; }
+      }
+      v = Math.round(v);
+      ek = "\\fscx" + v + "\\fscy" + v;
+      for (i = 1; i < k.length; i++) {
+        if (k[i][0] - o > 0) ek += "\\t(" + Math.max(0, k[i - 1][0] - o) + "," + (k[i][0] - o) + ",\\fscx" + k[i][1] + "\\fscy" + k[i][1] + ")";
+      }
+    } else if (gir.fade) {
+      // \fade(a1,a2,a3,t1,t2,t3,t4): o anki saydamlıktan kalan sürede opağa
+      ek = o === 0 ? "\\fad(" + T + ",0)" : "\\fade(" + Math.round(255 * kalan / T) + ",0,0,0," + kalan + "," + kalan + "," + kalan + ")";
+    } else if (gir.kay) {
+      dy = Math.round(gir.kay * kalan / T);
+    }
+    return { ek: ek, dy: dy, kalan: kalan };
+  }
+
+  // Konum etiketi: olay başında (x1,y1), t ms sonra (x2,y2); kımıldamıyorsa \pos
+  function konumYaz(x1, y1, x2, y2, t) {
+    if (t > 0 && (x1 !== x2 || y1 !== y2)) return "\\move(" + x1 + "," + y1 + "," + x2 + "," + y2 + ",0," + t + ")";
+    return "\\pos(" + x2 + "," + y2 + ")";
+  }
+  function yolu(x1, y1, x2, y2, t) { return { x1: x1, y1: y1, x2: x2, y2: y2, t: t }; }
+
+  /*
+   * Etkin kelimenin hareket parçaları (kelime hareketinin başından ms; yol: parçanın başında
+   * (x1,y1), t ms sonra (x2,y2), t 0 durağan):
+   *   zipla  scaled(15) yukarı ve geri, 2 × 100 ms
+   *   titre  4 kısa ±scaled(3) sarsıntı, toplam 150 ms
+   * Son parça (null bitiş) kelime sonuna dek durağan. Süreler hareket şiddetine bölünür.
    */
   function efektAktifParcalari(aktif, a, height, factor) {
     var x = a.x, y = a.y;
     if (aktif === "zipla") {
       var d = scaled(15, height), t = Math.max(1, Math.round(100 / factor));
       return [
-        { bas: 0, son: t, pos: "\\move(" + x + "," + y + "," + x + "," + (y - d) + ",0," + t + ")" },
-        { bas: t, son: 2 * t, pos: "\\move(" + x + "," + (y - d) + "," + x + "," + y + ",0," + t + ")" },
-        { bas: 2 * t, son: null, pos: "\\pos(" + x + "," + y + ")" }
+        { bas: 0, son: t, yol: yolu(x, y, x, y - d, t) },
+        { bas: t, son: 2 * t, yol: yolu(x, y - d, x, y, t) },
+        { bas: 2 * t, son: null, yol: yolu(x, y, x, y, 0) }
       ];
     }
     if (aktif === "titre") {
       var s = scaled(3, height), adim = Math.max(1, Math.round(150 / 4 / factor));
       var sapma = [[s, -s], [-s, s], [s, s], [-s, -s]];
-      var out = sapma.map(function (o, i) { return { bas: i * adim, son: (i + 1) * adim, pos: "\\pos(" + (x + o[0]) + "," + (y + o[1]) + ")" }; });
-      out.push({ bas: 4 * adim, son: null, pos: "\\pos(" + x + "," + y + ")" });
+      var out = sapma.map(function (o, i) { return { bas: i * adim, son: (i + 1) * adim, yol: yolu(x + o[0], y + o[1], x + o[0], y + o[1], 0) }; });
+      out.push({ bas: 4 * adim, son: null, yol: yolu(x, y, x, y, 0) });
       return out;
     }
     return [];
@@ -1064,11 +1101,15 @@
     var outline = Number(style.kontur) > 0 ? scaled(style.kontur, height) : 0;
     var normal = assColor(style.renk), vurgu = assColor(style.vurguRenk), kontur = assColor(style.konturRenk);
     var T = Math.max(1, Math.round(300 / factor)), kayma = scaled(50, height);
-    var gir = efektGirisi(giris, a, kayma, T);
+    var gir = efektGirisi(giris, kayma, T);
     // Glitch kopyaları konturun dışına taşsın: görünen renkli saçak scaled(6) genişliğinde
     var glitchMs = Math.max(1, Math.round(100 / factor)), glitchX = scaled(6, height) + outline;
     var parcalar = efektAktifParcalari(aktif, a, height, factor);
+    // Kelime hareketinin süresi (ms): zıpla 2 × 100, titre 150, glitch 100 (şiddete bölünmüş)
+    var hareketMs = parcalar.length ? parcalar[parcalar.length - 1].bas : (aktif === "glitch" ? glitchMs : 0);
+    var taban = yolu(a.x, a.y, a.x, a.y, 0);
     function sn(ms) { return ms / 1000; }
+    function cs(t) { return Math.round(t * 100); }   // ASS zamanı santisaniye
 
     groupWords(cues, kelime).forEach(function (group) {
       var kir = efektKirilimlari(group, satir);
@@ -1087,39 +1128,69 @@
         });
         return (gorunur === "yalniz" ? "{\\alpha&HFF&}" : "") + efektBirlestir(parts, kir);
       }
-      function olay(katman, bas, son, konum, ek, govdeEk, icerik) {
-        if (son - bas < 0.005) return;
+      function yaz(katman, bas, son, konum, ek, govdeEk, icerik) {
         events.push(dialogue(katman, bas, son, "{\\an" + a.an + konum + govde + (govdeEk || "") + ek + "}" + icerik));
+      }
+      /*
+       * Olay [bas, son] (s), yol (yolu()). Kartın ilk T ms'sinde başlayan her olay (taban satır,
+       * hareketli kelime, glitch kopyaları) girişi o anki hâlinden sürdürür (girisAni).
+       */
+      function olay(katman, bas, son, yol, govdeEk, icerik) {
+        if (son - bas < 0.005) return;
+        var an = girisAni(gir, (cs(bas) - cs(kartBas)) * 10, T);
+        var ek = an ? an.ek : "";
+        if (!an || !an.dy) { yaz(katman, bas, son, konumYaz(yol.x1, yol.y1, yol.x2, yol.y2, yol.t), ek, govdeEk, icerik); return; }
+        if (!(yol.t > 0)) { yaz(katman, bas, son, konumYaz(yol.x1, yol.y1 + an.dy, yol.x1, yol.y1, an.kalan), ek, govdeEk, icerik); return; }
+        /*
+         * Kayan giriş + hareketli kelime: iki doğrusal hareketin toplamı ilk kırılıma (kayma ya da
+         * kelime hareketi biter) dek tek \move; olay daha uzunsa kalanı ayrı olay olur.
+         */
+        var D = (cs(son) - cs(bas)) * 10, b = Math.min(an.kalan, yol.t);
+        var bol = b >= 10 && D - b >= 10, uc = bol ? b : D;
+        function nokta(ms) {
+          var k = Math.min(1, ms / yol.t);
+          return [Math.round(yol.x1 + (yol.x2 - yol.x1) * k),
+            Math.round(yol.y1 + (yol.y2 - yol.y1) * k + an.dy * Math.max(0, 1 - ms / an.kalan))];
+        }
+        var p0 = nokta(0), p1 = nokta(uc);
+        if (!bol) { yaz(katman, bas, son, konumYaz(p0[0], p0[1], p1[0], p1[1], uc), ek, govdeEk, icerik); return; }
+        yaz(katman, bas, bas + sn(b), konumYaz(p0[0], p0[1], p1[0], p1[1], b), ek, govdeEk, icerik);
+        var k = b / yol.t;
+        var kalanYol = yol.t > b
+          ? yolu(Math.round(yol.x1 + (yol.x2 - yol.x1) * k), Math.round(yol.y1 + (yol.y2 - yol.y1) * k), yol.x2, yol.y2, yol.t - b)
+          : yolu(yol.x2, yol.y2, yol.x2, yol.y2, 0);
+        olay(katman, bas + sn(b), son, kalanYol, govdeEk, icerik);
       }
 
       // Kelime vurgusu ve vurgu animasyonu kapalıysa kart tek olaydır
       if (!vurguAcik && aktif === "yok") {
-        olay(1, kartBas, kartSon, gir.pos, gir.ek, "", metin(-1, "tum"));
+        olay(1, kartBas, kartSon, taban, "", metin(-1, "tum"));
         return;
       }
       group.forEach(function (cue, k) {
         var adimSon = k + 1 < group.length ? group[k + 1].start : kartSon;
         adimSon = Math.max(cue.start + .08, adimSon);
-        var ilk = k === 0;
-        // Kartın ilk kelimesi giriş animasyonuyla gelir; kelime hareketi giriş bitince başlar
-        var hareketBas = ilk && giris !== "yok" ? Math.min(adimSon, cue.start + sn(T)) : cue.start;
-        var tabanKonum = ilk ? gir.pos : "\\pos(" + a.x + "," + a.y + ")";
-        var tabanEk = ilk ? gir.ek : "";
+        /*
+         * Kelime hareketi kartın ilk kelimesinde giriş bitince başlar; kelime buna yetmeyecek kadar
+         * kısaysa hareket kelimeye sığacak kadar erken (gerekirse kelime başında, girişle birlikte).
+         */
+        var hareketBas = cue.start;
+        if (k === 0 && gir) hareketBas = cue.start + Math.max(0, Math.min(sn(T), adimSon - cue.start - sn(hareketMs)));
         // Zıpla / titre: etkin kelime taban satırda saydam, üst katmanda (aynı satır, yalnız o kelime) hareket eder
-        olay(1, cue.start, adimSon, tabanKonum, tabanEk, "", metin(k, parcalar.length ? "gizli" : "tum"));
+        olay(1, cue.start, adimSon, taban, "", metin(k, parcalar.length ? "gizli" : "tum"));
         if (parcalar.length) {
-          if (hareketBas > cue.start) olay(2, cue.start, hareketBas, tabanKonum, tabanEk, "", metin(k, "yalniz"));
+          if (hareketBas > cue.start) olay(2, cue.start, hareketBas, taban, "", metin(k, "yalniz"));
           parcalar.forEach(function (p) {
             var bas = hareketBas + sn(p.bas), son = p.son === null ? adimSon : Math.min(adimSon, hareketBas + sn(p.son));
-            if (bas < adimSon) olay(2, bas, son, p.pos, "", "", metin(k, "yalniz"));
+            if (bas < adimSon) olay(2, bas, son, p.yol, "", metin(k, "yalniz"));
           });
         }
         if (aktif === "glitch") {
           // Kelimenin altında kırmızı / camgöbeği kopyalar, konturun ötesinde ±scaled(6) kayık, 100 ms
           var gSon = Math.min(adimSon, hareketBas + sn(glitchMs));
           [["#ff2a55", -glitchX], ["#2af5ff", glitchX]].forEach(function (g) {
-            olay(0, hareketBas, gSon, "\\pos(" + (a.x + g[1]) + "," + a.y + ")", "", "\\bord0",
-              metin(k, "yalniz", assColor(g[0])));
+            var gx = a.x + g[1];
+            olay(0, hareketBas, gSon, yolu(gx, a.y, gx, a.y, 0), "\\bord0", metin(k, "yalniz", assColor(g[0])));
           });
         }
       });
@@ -1135,7 +1206,7 @@
   var FONT_ADI = /^[A-Za-z0-9 ]{1,40}$/;
   var HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
   function sayiMi(v) { return typeof v === "number" && isFinite(v); }
-  function guvenliStil(preset, overrides) {
+  function guvenliStil(preset, overrides, id) {
     var ov = overrides && typeof overrides === "object" ? overrides : {};
     var style = Object.assign({}, preset);
     Object.keys(ov).forEach(function (k) {
@@ -1158,8 +1229,10 @@
         return;
       }
     });
-    // fontFile girdiden alinmaz: paket fontuysa dosyasi, stilin kendi fontuysa onunki, degilse yok
-    if (SS && SS.hasFont(style.font)) style.fontFile = SS.fontFile(style.font);
+    // fontFile girdiden alinmaz: paket fontuysa dosyasi, stilin kendi fontuysa onunki, degilse yok.
+    // Altyazı Efektleri'nde "Kalın yazı" kapalıysa fontun normal yüzü (Montserrat-Regular; libass
+    // yalnız Bold dosyası varken kalını inceltemez, ayar çıktıyı değiştirmiyordu)
+    if (SS && SS.hasFont(style.font)) style.fontFile = SS.fontFile(style.font, id === "efekt" && style.kalin === false);
     else if (style.font === preset.font) style.fontFile = preset.fontFile;
     else style.fontFile = undefined;
     return style;
@@ -1218,7 +1291,7 @@
     options = options || {};
     var id = STYLES[options.styleId] ? options.styleId : "viral";
     var source = STYLES[id];
-    var style = guvenliStil(source.style, options.overrides);
+    var style = guvenliStil(source.style, options.overrides, id);
     var width = Math.max(320, Math.round(options.width || 1920));
     var height = Math.max(180, Math.round(options.height || 1080));
     var cues = normaliseCues(options.cues, options.offset);

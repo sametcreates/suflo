@@ -254,8 +254,9 @@ ok("dil değişimi iş sürerken kapalı, yeniden yüklemesiz (switchLang)",
 var capSrc = fs.readFileSync(KOKYOL + "js/captions.js", "utf8");
 ok("altyazı dili bilinmezken 'tr' yerine arayüz dili", !/\|\| "tr"; \}?,?\s*$/m.test(capSrc.split("\n").filter(function (l) { return /cap-lang/.test(l); }).join("\n")) &&
   (capSrc.match(/\|\| arayuzDili\(\)/g) || []).length >= 4);
+// 3.3: kayıtlı tercih yoksa Altyazı Efektleri › Temiz de seçili gelir (efektVarsayilan; tercih yazılmaz)
 ok("İngilizcede kayıtlı tercih yoksa altyazı dili Otomatik",
-  /if \(!p\) \{ if \(arayuzDili\(\) === "en" && el\("cap-lang"\)\) el\("cap-lang"\)\.value = ""; return; \}/.test(capSrc));
+  /if \(!p\) \{ if \(arayuzDili\(\) === "en" && el\("cap-lang"\)\) el\("cap-lang"\)\.value = ""; efektVarsayilan\(true\); return; \}/.test(capSrc));
 var diyalogEksik = [];
 fs.readdirSync(KOKYOL + "js").filter(function (f) { return /\.js$/.test(f); }).forEach(function (f) {
   fs.readFileSync(KOKYOL + "js/" + f, "utf8").split("\n").forEach(function (satir, i) {
@@ -292,15 +293,18 @@ var gu = fnGovde(capSrc, "function gorunumUygula(");
 ok("hazır görünüm: kit açıkken stiliYaz(mergeBrandKit(görünüm, kit)), yazım biçimi görünümden, önizleme tazelenir", /stiliYaz\(kit \? window\.SufloMarkaKiti\.mergeBrandKit\(st, kit\) : st\)/.test(gu) &&
   /el\("cap-case"\)\.value = g\.ayar\.kase/.test(gu) && /efektOnizlemeTazele\(true\)/.test(gu));
 var ku = fnGovde(capSrc, "function stilKoduUygula(");
+// Önizleme efektOnizlemeTazele(true) ile: süren otomatik çizimi "Durdur" saymaz, bitince kodun görünümü çizilir
 ok("kod uygula: önce temel görünüm (eski kod: en yakın görünüm), sonra stiliYaz(tarif), sonra önizleme", ku.indexOf("gorunumUygula(taban") > 0 &&
-  ku.indexOf("gorunumUygula(taban") < ku.indexOf("stiliYaz(ov)") && ku.indexOf("stiliYaz(ov)") < ku.indexOf("onizlemeOynat()") &&
-  /AE\.eskiStilden\(r\.styleId, ov\)/.test(ku));
+  ku.indexOf("gorunumUygula(taban") < ku.indexOf("stiliYaz(ov)") && ku.indexOf("stiliYaz(ov)") < ku.indexOf("efektOnizlemeTazele(true)") &&
+  ku.indexOf("onizlemeOynat()") === -1 && /AE\.eskiStilden\(r\.styleId, ov\)/.test(ku));
 ok("kod uygula: izinli stiller yalnız stil motorununkiler (Altyazı Efektleri + eski kodlar)", /SS\.decode\(String\(kod \|\| ""\), function \(id\) \{ return motorStiliMi\(id\); \}\)/.test(ku));
 var kr = fnGovde(capSrc, "function stilKredisi(");
 ok("kredi çipi yalnız textContent ve doğrulanmış adla", /b\.textContent = /.test(kr) && !/innerHTML/.test(kr) && /SS\.validAuthor\(ad\)/.test(kr));
 ok("vurgu rengi oluşturucuda hep seçilebilir (pasif değil)", /kutu\.classList\.remove\("pasif"\)/.test(fnGovde(capSrc, "function vurguKutusuDurumu(")));
 var iad = fnGovde(capSrc, "function inceAyarDurumu(");
-ok("paylaş / kaydet yalnız Altyazı Efektlerinde, sistem fontları kapalı, güvenli yerleşim yalnız 9:16", /d\.hidden = !motorda/.test(iad) && /sistem\.disabled = motorda/.test(iad) &&
+// Sistem fontları hep kapalı ve gizli: oluşturucu yalnız paket fontlarını çizer (seçilen sistem fontu sessizce dönerdi)
+ok("paylaş / kaydet yalnız Altyazı Efektlerinde, sistem fontları kapalı, güvenli yerleşim yalnız 9:16", /d\.hidden = !motorda/.test(iad) &&
+  /sistem\.disabled = true; sistem\.hidden = true;/.test(iad) && /<optgroup label="Sistem" id="cap-font-sistem" disabled hidden>/.test(html) &&
   /sar\.hidden = !\(motorda && dikeySekans\(\)\)/.test(iad));
 ok("önizleme, katman, ASS ve paylaşım kodu aynı ince ayarı kullanır (motorAyarlari)", (capSrc.match(/overrides: motorAyarlari\(/g) || []).length === 4, (capSrc.match(/overrides: motorAyarlari\(/g) || []).length);
 var ou2 = fnGovde(capSrc, "async function overlayUygula(");

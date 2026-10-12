@@ -3684,8 +3684,14 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-renkler { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .efekt-renkler > .switch { display: inline-flex; margin: 0 10px 6px 0; }
 .efekt-ayarlar input[type="number"] { width: 100%; padding: 8px 10px; font: inherit; font-size: 12.5px; color: var(--text); border: 1px solid var(--line); border-radius: 9px; }
-.efekt-renkler .renk-satir { margin-bottom: 6px; }
-.efekt-font select { min-width: 0; }
+/* Renk kutuları kendi satırında, eşit genişlikte; "… rengi" adları dar panelde ortalı iki satıra iner, taşmaz */
+.efekt-renkler .renk-satir { margin-bottom: 6px; flex: 1 1 100%; }
+.efekt-renkler .renk-kutu { min-width: 0; }
+.efekt-renkler .renk-kutu span { text-align: center; line-height: 1.2; }
+/* Dar panelde (320 px) yazı tipi adı kesilmesin: kalın / italik düğmeleri birlikte alt satıra iner (flex gap'siz, CEF 74) */
+.efekt-font { flex-wrap: wrap; }
+.efekt-font select { flex: 1 1 150px; min-width: 150px; }
+.efekt-bi-sar { display: inline-flex; flex: none; margin: 3px 0; }
 .efekt-bi {
   display: inline-flex; align-items: center; flex: none; margin-left: 6px; padding: 0 8px; min-height: 26px;
   border: 1px solid var(--line); border-radius: 7px; background: var(--bg3); color: var(--dim);

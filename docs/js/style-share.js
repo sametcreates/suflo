@@ -44,8 +44,9 @@
     "Bebas Neue": { file: "BebasNeue.ttf", genislik: 0.43 },
     "Bungee": { file: "Bungee.ttf", genislik: 0.8 },
     "Lora": { file: "Lora.ttf", genislik: 0.55 },
-    // statik Bold: libass değişken fontu seçemiyor, DejaVu'ya düşüyordu
-    "Montserrat": { file: "Montserrat-Bold.ttf", genislik: 0.64 }
+    // statik Bold: libass değişken fontu seçemiyor, DejaVu'ya düşüyordu. normal: "Kalın yazı" kapalıyken
+    // (Altyazı Efektleri) statik Regular; tek ağırlıklı fontlarda libass kalını kendisi üretir
+    "Montserrat": { file: "Montserrat-Bold.ttf", normal: "Montserrat-Regular.ttf", genislik: 0.64 }
   };
 
   var KONUMLAR = [1, 2, 5, 8];
@@ -61,12 +62,19 @@
   var GIRISLER = ["yok", "pop", "fade", "yukari", "asagi", "zipla"];
   var AKTIFLER = ["yok", "zipla", "titre", "glitch"];
   var BAYRAKLAR = ["vurgu", "kalin", "italik"];
+  // Yalnız Altyazı Efektleri'nin (styleId "efekt") okuduğu alanlar: eski stil kimliğiyle gelirse uyarıyla atılır
+  var EFEKT_STILI = "efekt";
+  var EFEKT_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"];
   var ALANLAR = ["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli",
     "giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"];
 
   function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }
   function hasFont(name) { return typeof name === "string" && own(FONTS, name); }
-  function fontFile(name) { return hasFont(name) ? FONTS[name].file : null; }
+  // normal === true: kalın olmayan yüz (ayrı dosyası olan fontta), yoksa fontun tek dosyası
+  function fontFile(name, normal) {
+    if (!hasFont(name)) return null;
+    return normal === true && FONTS[name].normal ? FONTS[name].normal : FONTS[name].file;
+  }
   function fontNames() { return Object.keys(FONTS); }
   function fontFiles() {
     var o = {};
@@ -210,6 +218,7 @@
     var yok = function () {};
     var ov = sanitizeOverrides(r.overrides || {});
     delete ov.fontFile;
+    if (r.styleId !== EFEKT_STILI) EFEKT_ALANLARI.forEach(function (k) { delete ov[k]; });
     var obj = { v: SURUM, styleId: r.styleId };
     if (YOGUNLUK.indexOf(r.intensity) !== -1) obj.intensity = r.intensity;
     if (Object.keys(ov).length) obj.overrides = ov;
@@ -250,7 +259,8 @@
       if (own(obj, "v") && typeof obj.v === "number" && obj.v > SURUM) return hata("Bu kod daha yeni bir Suflo sürümüyle yapılmış; Suflo'yu güncelle.");
       var id = own(obj, "styleId") ? obj.styleId : null;
       if (typeof id !== "string" || !STIL_KIMLIGI.test(id) || !izinli(izinliStiller, id)) {
-        return hata("Bu stil bu Suflo sürümünde yok" + (typeof id === "string" && STIL_KIMLIGI.test(id) ? ": " + id : "") + ".");
+        // Geçerli biçimde ama tanınmayan kimlik: büyük olasılıkla daha yeni bir sürümün stili
+        return hata(typeof id === "string" && STIL_KIMLIGI.test(id) ? "Bu stil bu Suflo sürümünde yok: " + id + ". Suflo'yu güncelle." : "Bu stil bu Suflo sürümünde yok.");
       }
       var author = own(obj, "author") ? obj.author : undefined;
       if (author !== undefined && author !== null && author !== "" && !validAuthor(author)) return hata("Stil kodundaki yazar adı geçersiz.");
@@ -262,6 +272,9 @@
         else uyar("intensity");
       }
       recipe.overrides = sanitizeOverrides(own(obj, "overrides") ? obj.overrides : {}, uyarilar);
+      // Giriş / vurgu animasyonu, satır, kelime… yalnız Altyazı Efektleri'nde çizilir: eski stil kimliğiyle
+      // gelen kod uyarısız "geçerli" görünüp animasyonsuz çizilmesin
+      if (id !== EFEKT_STILI) EFEKT_ALANLARI.forEach(function (k) { if (own(recipe.overrides, k)) { delete recipe.overrides[k]; uyar(k); } });
       recipe.text = metinTemiz(own(obj, "text") ? obj.text : {}, uyar);
       if (validAuthor(author)) recipe.author = author;
       Object.keys(obj).forEach(function (k) {

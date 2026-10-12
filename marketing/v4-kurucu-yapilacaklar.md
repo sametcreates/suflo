@@ -1365,7 +1365,9 @@ varsayılanıyla birebir aynı kalmalı (`js/style-engine.js` › `STYLES.efekt.
 (alt metni "12 animasyonlu altyazı stili") ve varsa Pro sayfasındaki stil kartı ekran görüntüleri. 3.3 panelinden
 Altyazı Efektleri bölümünün yeni ekran görüntüsünü al (Vurucu seçili, önizleme oynarken) ve değiştir; alt metni
 "Altyazı Efektleri: giriş ve vurgu animasyonlu kendi altyazın" yap. `docs/gorseller/suflo-stiller/efekt.webm` stil
-sayfasının yeni vitrini (`node tools/render-style-previews.js --site --id efekt` ile yeniden üretilebilir).
+sayfasının yeni vitrini (`node tools/render-style-previews.js --site --id efekt` ile yeniden üretilebilir). Paylaşılan
+efekt kodunun sayfası kodun giriş × vurgu animasyon çiftini oynatır: `docs/gorseller/suflo-stiller/efekt-<giris>-<aktif>.webm`
+(24 dosya, ~280 KB; `node tools/render-style-previews.js --site --efekt` ile yeniden üretilir, stil motoru değişince yenile).
 
 **16.4 Sürüm notu ve tanıtım (3.3.0'a geçerken).** `marketing/release-notes.md`'nin 3.3.0 bölümüne: "Altyazı
 Efektleri: eski stil galerisinin yerinde kendi altyazı efektini kur: giriş (Pop, Belirme, Yukarı / Aşağı kay, Zıpla) ve
@@ -1377,3 +1379,12 @@ istersen kısası. Eski sürüm notlarındaki (3.0–3.2) "Suflo Stilleri" geçm
 (`dist/source/dinamik_altyazi_motoru.mogrt`, izinli) o adımda pakete girer. `tools/verify-release.ps1` `.mogrt`
 dosyalarını ücretli içerik sayıp yayını durduruyor; adım 21 o dosyayı ayrıca izinli listeye almalı. Oluşturucu
 kontrolleri şablonun JSON sözleşmesine 1:1 eşleniyor (`js/altyazi-efekt.js` › `sablonStili`, `sablonIndeksleri`).
+Yazı tipi alanı PostScript adıdır (`sablonFontu`: Montserrat-Bold, Anton-Regular…; kalın bu adla gider, italik yüz
+pakette yok). Premiere yalnız sisteme **kurulu** fontu çizer: adım 21 paket fontlarını kullanıcıya kurmalı (Windows
+`%LOCALAPPDATA%\Microsoft\Windows\Fonts` + HKCU kaydı, macOS `~/Library/Fonts`) ya da kurulu değilse libass katmanına
+düşmeli; yoksa şablon yazı tipini düşürür (Arial).
+
+**16.6 Yeni statik font: `fonts/Montserrat-Regular.ttf` (bilgi).** "Kalın yazı" kapalıyken libass'in seçtiği Regular yüz;
+`Montserrat-Bold.ttf` gibi paketteki değişken `Montserrat.ttf`'ten fontTools ile üretildi (OFL, aynı lisans dosyası,
+`THIRD_PARTY_NOTICES.md`'de yazılı). `tools/verify-release.ps1` iki statik Montserrat'ı zorunlu tutar; ZXP / kurucu
+`fonts/` klasörünü bütün taşır, ek adım yok.
