@@ -472,27 +472,13 @@
 			"text": " Güzel. Peki, sonra tekrar deneyelim!",
 			"tokens": [
 				{
-					"text": "[_TT_365]",
-					"timestamps": {
-						"from": "00:00:07,300",
-						"to": "00:00:07,300"
-					},
-					"offsets": {
-						"from": 7300,
-						"to": 7300
-					},
-					"id": 50730,
-					"p": 0.512667,
-					"t_dtw": -1
-				},
-				{
 					"text": " Gü",
 					"timestamps": {
-						"from": "00:00:07,300",
+						"from": "00:00:07,360",
 						"to": "00:00:07,480"
 					},
 					"offsets": {
-						"from": 7300,
+						"from": 7360,
 						"to": 7480
 					},
 					"id": 19713,

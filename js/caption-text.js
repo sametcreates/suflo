@@ -261,9 +261,10 @@
       // Satırlar ölçülmüş kelime taşıyorsa (yerel -ojf) kelime cue'ları onlardan kurulur:
       // tek transkripsiyon, tek önbellek girdisi. Satırın kelimesi yoksa satırın kendisi tek öğe.
       if (olculmus) liste = WW.duzlestir(cleanSegments(liste));
-      // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer
+      // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer.
+      // Boşluklu tire (" - ", " — ") ölçülmüş kelimelerde kendi öğesidir: tek başına cue olmaz
       liste = liste.filter(function (s) {
-        return String(s.text || "").replace(/[.,!?;:…]/g, "").trim();
+        return String(s.text || "").replace(/[.,!?;:…\-–—]/g, "").trim();
       });
       // bozulmuş kelime zamanı korumasi: 8+ kelime var ama hepsi ayni ana yigilmis
       if (liste.length >= 8) {

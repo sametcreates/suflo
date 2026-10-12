@@ -2,8 +2,9 @@
  * Suflo — transkript önbelleği
  *
  * Aynı klibi ikinci kez yazıya dökmek dakikalar sürüyordu: Konuşmadan kes'te
- * politika değiştirmek, kesimden sonra kalan alt klibi yeniden incelemek ya da
- * altyazıdan sonra kesime geçmek hep yeniden transkripsiyon demekti.
+ * politika değiştirmek ya da kesimden sonra kalan alt klibi yeniden incelemek hep
+ * yeniden transkripsiyon demekti. (Altyazıdan sonra Konuşmadan kes yine yazıya döker:
+ * dolgu ipucu ister, altyazının ipucusuz girdisini kullanmaz; bkz. istemler.)
  *
  *   - Kelimeler KAYNAK zamanında saklanır (klip başlangıcı/hız eşlemesinden önce),
  *     USER_DATA/Kesit/transcripts/ altında, girdi başına bir JSON.
@@ -17,7 +18,7 @@
  *     [{ start, end, text, confidence, words: [{ text, start, end, p }] }] }. v1 gövdesi
  *     ({ v: 1, words }) geçerli kalır: öğeleri kelimesiz satır sayılır. get() ikisinde de
  *     düz kelime listesi (words) ve satırları (segments) döner; satır ve kelime kelime
- *     altyazı aynı girdiyi paylaşır.
+ *     altyazı aynı girdiyi ("altyazi") paylaşır.
  *
  * Saf çekirdek: fs, path, crypto dışarıdan verilir (panel K.fs ve require('crypto')
  * bağlar). Yalnız Node 12 API'leri (klasör silme yerine dosya dosya unlink).
@@ -284,5 +285,19 @@
     return { key: key, get: get, put: put, clear: clear, stats: stats, dir: dir };
   }
 
-  return { create: create };
+  /*
+   * Kelime transkripti isteyen aracın (captions.js transcribeWords, Konuşmadan kes) istem türleri.
+   *   ekIpucu: motora giden ek ipucu (Konuşmadan kes: textcut.js fillerPrompt, "Iıı, eee, hmm…")
+   * Döner: { ara: [get() için istem sırası], yaz: put() istem türü }
+   * Dolgu ipucuyla istenen transkript YALNIZ dolgu ipucuyla yazılmış girdiden ("dolgu") gelir.
+   * Altyazının girdisi ("altyazi", satır ve kelime modu ortak) ipucusuz yazıya dökülür; Whisper
+   * o turda dolgu seslerini çoğu zaman yazmaz ve dolgu önerileri sessizce boşalırdı. İpucusuz
+   * istek önce "altyazi"yı, sonra "dolgu"yu kabul eder ve sonucunu "altyazi" olarak yazar.
+   */
+  function istemler(ekIpucu) {
+    if (/\S/.test(String(ekIpucu == null ? "" : ekIpucu))) return { ara: ["dolgu"], yaz: "dolgu" };
+    return { ara: ["altyazi", "dolgu"], yaz: "altyazi" };
+  }
+
+  return { create: create, istemler: istemler };
 });

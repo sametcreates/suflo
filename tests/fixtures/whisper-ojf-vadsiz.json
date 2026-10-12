@@ -1,0 +1,337 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "large",
+		"multilingual": true,
+		"vocab": 51866,
+		"audio": {
+			"ctx": 1500,
+			"state": 1280,
+			"head": 20,
+			"layer": 32
+		},
+		"text": {
+			"ctx": 448,
+			"state": 1280,
+			"head": 20,
+			"layer": 4
+		},
+		"mels": 128,
+		"ftype": 8
+	},
+	"params": {
+		"model": "models/ggml-large-v3-turbo-q5_0.bin",
+		"language": "tr",
+		"translate": false
+	},
+	"result": {
+		"language": "tr"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,400"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2400
+			},
+			"text": " Merhaba arkadaşlar.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50365,
+					"p": 0.951,
+					"t_dtw": -1
+				},
+				{
+					"text": " Mer",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,260"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 260
+					},
+					"id": 6197,
+					"p": 0.934,
+					"t_dtw": -1
+				},
+				{
+					"text": "haba",
+					"timestamps": {
+						"from": "00:00:00,260",
+						"to": "00:00:00,700"
+					},
+					"offsets": {
+						"from": 260,
+						"to": 700
+					},
+					"id": 16404,
+					"p": 0.987,
+					"t_dtw": -1
+				},
+				{
+					"text": " arkadaş",
+					"timestamps": {
+						"from": "00:00:00,820",
+						"to": "00:00:01,600"
+					},
+					"offsets": {
+						"from": 820,
+						"to": 1600
+					},
+					"id": 31706,
+					"p": 0.952,
+					"t_dtw": -1
+				},
+				{
+					"text": "lar",
+					"timestamps": {
+						"from": "00:00:01,600",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 1600,
+						"to": 2000
+					},
+					"id": 2200,
+					"p": 0.993,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:02,000",
+						"to": "00:00:02,400"
+					},
+					"offsets": {
+						"from": 2000,
+						"to": 2400
+					},
+					"id": 13,
+					"p": 0.902,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_120]",
+					"timestamps": {
+						"from": "00:00:02,400",
+						"to": "00:00:02,400"
+					},
+					"offsets": {
+						"from": 2400,
+						"to": 2400
+					},
+					"id": 50485,
+					"p": 0.398,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,880",
+				"to": "00:00:07,000"
+			},
+			"offsets": {
+				"from": 4880,
+				"to": 7000
+			},
+			"text": " Şimdi başlayalım.",
+			"tokens": [
+				{
+					"text": " Şimdi",
+					"timestamps": {
+						"from": "00:00:05,300",
+						"to": "00:00:06,000"
+					},
+					"offsets": {
+						"from": 5300,
+						"to": 6000
+					},
+					"id": 22941,
+					"p": 0.948,
+					"t_dtw": -1
+				},
+				{
+					"text": " baş",
+					"timestamps": {
+						"from": "00:00:06,000",
+						"to": "00:00:06,300"
+					},
+					"offsets": {
+						"from": 6000,
+						"to": 6300
+					},
+					"id": 26239,
+					"p": 0.962,
+					"t_dtw": -1
+				},
+				{
+					"text": "lay",
+					"timestamps": {
+						"from": "00:00:06,300",
+						"to": "00:00:06,550"
+					},
+					"offsets": {
+						"from": 6300,
+						"to": 6550
+					},
+					"id": 8781,
+					"p": 0.991,
+					"t_dtw": -1
+				},
+				{
+					"text": "alım",
+					"timestamps": {
+						"from": "00:00:06,550",
+						"to": "00:00:06,900"
+					},
+					"offsets": {
+						"from": 6550,
+						"to": 6900
+					},
+					"id": 24256,
+					"p": 0.985,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:06,900",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 6900,
+						"to": 7000
+					},
+					"id": 13,
+					"p": 0.917,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_350]",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,000"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7000
+					},
+					"id": 50715,
+					"p": 0.421,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,400",
+				"to": "00:00:09,000"
+			},
+			"offsets": {
+				"from": 7400,
+				"to": 9000
+			},
+			"text": " Hazır mısınız?",
+			"tokens": [
+				{
+					"text": " Haz",
+					"timestamps": {
+						"from": "00:00:07,000",
+						"to": "00:00:07,700"
+					},
+					"offsets": {
+						"from": 7000,
+						"to": 7700
+					},
+					"id": 30134,
+					"p": 0.944,
+					"t_dtw": -1
+				},
+				{
+					"text": "ır",
+					"timestamps": {
+						"from": "00:00:07,700",
+						"to": "00:00:07,900"
+					},
+					"offsets": {
+						"from": 7700,
+						"to": 7900
+					},
+					"id": 7930,
+					"p": 0.991,
+					"t_dtw": -1
+				},
+				{
+					"text": " mı",
+					"timestamps": {
+						"from": "00:00:07,900",
+						"to": "00:00:08,200"
+					},
+					"offsets": {
+						"from": 7900,
+						"to": 8200
+					},
+					"id": 12058,
+					"p": 0.973,
+					"t_dtw": -1
+				},
+				{
+					"text": "sınız",
+					"timestamps": {
+						"from": "00:00:08,200",
+						"to": "00:00:08,800"
+					},
+					"offsets": {
+						"from": 8200,
+						"to": 8800
+					},
+					"id": 32511,
+					"p": 0.982,
+					"t_dtw": -1
+				},
+				{
+					"text": "?",
+					"timestamps": {
+						"from": "00:00:08,800",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 8800,
+						"to": 9000
+					},
+					"id": 30,
+					"p": 0.903,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_450]",
+					"timestamps": {
+						"from": "00:00:09,000",
+						"to": "00:00:09,000"
+					},
+					"offsets": {
+						"from": 9000,
+						"to": 9000
+					},
+					"id": 50815,
+					"p": 0.412,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

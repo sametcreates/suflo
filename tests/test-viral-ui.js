@@ -448,6 +448,15 @@ async function calistir() {
   modT.win.KViral.shortsKaydet([{ id: "pk2" }], { start: 0, end: 30, title: "p" }, [{ start: 1, end: 2, text: "iki kelime" }]);
   ok("shortsKaydet: verilen transkriptin modu kullanılır; mod verilmezse plain (yüklü altyazının modu değil)",
     kayitlar.pk && kayitlar.pk.mod === "k1" && kayitlar.pk2 && kayitlar.pk2.mod === "plain" && modT.win.KViral.kaynakMod() === "plain");
+  // ölçülmüş kelimeler settings.json'a yazılmaz (30 kayıt x yatay/dikey; dosya her ayar kaydında baştan yazılır)
+  var kelimeli = [{ start: 1, end: 3, text: "iki kelime", confidence: 0.9, words: [{ text: "iki", start: 1.1, end: 1.5, p: 0.9 }, { text: "kelime", start: 1.6, end: 2.8, p: 0.8 }],
+    origWords: [{ text: "two", start: 1.1, end: 1.5 }], orig: "two words" }];
+  modT.win.KViral.shortsKaydet([{ id: "pw", dikeyId: "pwd" }], { start: 0, end: 30, title: "p" }, kelimeli, "plain");
+  var kw = modT.ayarlar.shortsAltyazi || {};
+  ok("shortsKaydet: Shorts kaydı ölçülmüş kelimeleri (words, origWords) taşımaz; satır, güven ve orijinal metin kalır",
+    kw.pw && kw.pwd && kw.pw.segs.length === 1 && !("words" in kw.pw.segs[0]) && !("origWords" in kw.pw.segs[0]) && !("words" in kw.pwd.segs[0]) &&
+    kw.pw.segs[0].text === "iki kelime" && kw.pw.segs[0].orig === "two words" && kw.pw.segs[0].confidence === 0.9 && kelimeli[0].words.length === 2,
+    J(kw.pw && kw.pw.segs));
 }
 
 calistir().then(function () {

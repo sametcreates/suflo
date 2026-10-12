@@ -3,6 +3,9 @@
 // Fikstürler (tests/fixtures/whisper-*.json) whisper.cpp v1.9.1 examples/cli/cli.cpp
 // output_json(full=true) biçimiyle birebir (sekme girinti, anahtar sırası, özel belirteçler,
 // zamanı olmayan belirteçte timestamps/offsets yazılmaması) kısaltılmış Türkçe örneklerdir.
+// Segment-belirteç düzeni src/whisper.cpp v1.9.1'e göre: pencerenin ilk segmenti dışında
+// başlangıç zaman belirteci segmente yazılmaz, kapanış belirteci segmentin sonundadır
+// (t0 = t1 = segment sonu), ilk metin belirtecinin t0'ı segment başıyla tutmayabilir.
 // Gerçek bir koşudan alınmış ham çıktı tests/fixtures/whisper-ojf-tr-gercek.json olarak
 // eklenirse (marketing/v4-kurucu-yapilacaklar.md, ## 3.2) aşağıdaki değişmezler onda da sınanır.
 var fs = require("fs"), path = require("path");
@@ -20,8 +23,9 @@ function metinler(ws) { return ws.map(function (w) { return w.text; }).join(" ")
 
 /* ---------------- 1) v1.9.1 -ojf: alt-kelime birleşimi, çok baytlı harfler ---------------- */
 var bilgi = {};
-var segs = WW.segmentleriCoz(oku("whisper-ojf-tr.json"), bilgi);
-ok("üç satır, dil ve belirteç bilgisi", segs.length === 3 && bilgi.dil === "tr" && bilgi.belirtecli === true, JSON.stringify(bilgi));
+var VADSIZ = { vadAcik: false };   // bu fikstür VAD'siz koşu: belirteçler segmentle aynı tabanda
+var segs = WW.segmentleriCoz(oku("whisper-ojf-tr.json"), bilgi, VADSIZ);
+ok("üç satır, dil ve belirteç bilgisi", segs.length === 3 && bilgi.dil === "tr" && bilgi.belirtecli === true && bilgi.hiza === "yok", JSON.stringify(bilgi));
 ok("satır metni ve sınırları (ms -> sn)", segs[0].text === "Bu ışık hiç de kötü değil, değil mi?" && segs[0].start === 0 && segs[0].end === 3.48 && segs[2].start === 7.3 && segs[2].end === 9.8);
 ok("çok baytlı harfli alt-kelimeler tek kelime: ' ı'+'ş'+'ık' = ışık, ' de'+'ğ'+'il' = değil",
   metinler(segs[0].words) === "Bu ışık hiç de kötü değil, değil mi?", metinler(segs[0].words));
@@ -32,7 +36,9 @@ ok("sondaki noktalama kelimede kalır, zamanını uzatmaz: 'değil,' 1.44–1.90
 ok("'?' belirteci segment sonuna kadar uzansa da 'mi?' 2.86'da biter", segs[0].words[7].text === "mi?" && segs[0].words[7].end === 2.86, JSON.stringify(segs[0].words[7]));
 ok("kelime p = belirteçlerinin en düşüğü (ışık: 0.873291 -> 0.873)", isik.p === 0.873 && segs[0].words[0].p === 0.912, JSON.stringify(isik));
 ok("noktalama belirtecinin düşük p'si kelimeyi işaretlemez ('değil,' p 0.981)", degil.p === 0.981);
-ok("özel belirteçler ([_BEG_], [_TT_174], [_TT_365]) kelime olmaz", segs.every(function (s) { return s.words.every(function (w) { return !/\[_|<\|/.test(w.text); }); }));
+ok("özel belirteçler ([_BEG_], [_TT_174], [_TT_490]) kelime olmaz", segs.every(function (s) { return s.words.every(function (w) { return !/\[_|<\|/.test(w.text); }); }));
+ok("başlangıç belirteci olmayan segment: ilk kelime ölçülmüş konuşma başında (Güzel. 7.36, segment 7.30)",
+  segs[2].words[0].text === "Güzel." && segs[2].words[0].start === 7.36 && segs[2].words[0].end === 7.7, JSON.stringify(segs[2].words[0]));
 // satır güveni = özel olmayan TÜM belirteçlerin p ortalaması
 var ojf = JSON.parse(oku("whisper-ojf-tr.json").toString("utf8"));
 var ps = ojf.transcription[0].tokens.filter(function (t) { return !/^\s*(\[_|<\|)/.test(t.text); }).map(function (t) { return t.p; });
@@ -41,8 +47,8 @@ ok("satır confidence = özel olmayan belirteç p ortalaması", yakin(segs[0].co
 ok("kelime başlangıçları azalmaz ve satır içinde kalır", segs.every(function (s) {
   return s.words.every(function (w, i) { return w.start >= s.start && w.end <= s.end && w.end >= w.start && (i === 0 || w.start >= s.words[i - 1].start); });
 }));
-ok("JSON metni ve ayrıştırılmış nesne de kabul edilir", JSON.stringify(WW.segmentleriCoz(oku("whisper-ojf-tr.json").toString("utf8"))) === JSON.stringify(segs) &&
-  JSON.stringify(WW.segmentleriCoz(ojf)) === JSON.stringify(segs));
+ok("JSON metni ve ayrıştırılmış nesne de kabul edilir", JSON.stringify(WW.segmentleriCoz(oku("whisper-ojf-tr.json").toString("utf8"), null, VADSIZ)) === JSON.stringify(segs) &&
+  JSON.stringify(WW.segmentleriCoz(ojf, null, VADSIZ)) === JSON.stringify(segs));
 
 /* ---------------- 2) zamansız belirteçler, <|endoftext|> ---------------- */
 var z = WW.segmentleriCoz(oku("whisper-ojf-zamansiz.json"));
@@ -77,6 +83,25 @@ ok("vadEslemesi: whisper tablosu — uçlarda sabit, sessizlik aralığı tek no
 ok("VAD tablosu birden fazla satır parçasını sırayla eşler", yakin(WW.vadEslemesi("vad_segment_info: orig_start: 5.00, orig_end: 6.00, vad_start: 0.00, vad_end: 1.00\n" +
   "vad_segment_info: orig_start: 9.00, orig_end: 10.00, vad_start: 1.20, vad_end: 2.20\nvad_segment_info: orig_start: 20.00, orig_end: 21.00, vad_start: 2.40, vad_end: 3.40")(2.9), 20.5));
 
+/* ---- 3b) VAD kapalı (Silero modeli yok): belirteç zamanları OLDUĞU GİBİ, doğrusal hizalama yok ---- */
+// v1.9.1 gerçek düzeni: 2. ve 3. segmentte başlangıç zaman belirteci yok; ilk metin belirteci
+// 2.'de enerjiyle konuşma başına kaymış (5.30, segment 4.88), 3.'de önceki segmentin sonunda (7.00, segment 7.40)
+var vsBilgi = {};
+var vs = WW.segmentleriCoz(oku("whisper-ojf-vadsiz.json"), vsBilgi, { stderr: "main: processing 'ornek.wav' (160000 samples, 10.0 sec)", vadAcik: false });
+ok("VAD kapalı: kelime zamanları belirteçlerden aynen (Şimdi 5.30–6.00, başlayalım. 6.00–6.90)",
+  vs[1].start === 4.88 && vs[1].words[0].text === "Şimdi" && vs[1].words[0].start === 5.3 && vs[1].words[0].end === 6 &&
+  vs[1].words[1].text === "başlayalım." && vs[1].words[1].start === 6 && vs[1].words[1].end === 6.9 && vsBilgi.hiza === "yok" && vsBilgi.vad === false,
+  JSON.stringify(vs[1].words) + " " + JSON.stringify(vsBilgi));
+ok("VAD kapalı: segment başından önceki belirteç zamanı segmente sıkıştırılır (Hazır 7.40–7.90), gerisi aynen",
+  vs[2].words[0].text === "Hazır" && vs[2].words[0].start === 7.4 && vs[2].words[0].end === 7.9 && vs[2].words[1].text === "mısınız?" && vs[2].words[1].start === 7.9 && vs[2].words[1].end === 8.8,
+  JSON.stringify(vs[2].words));
+ok("VAD kapalı: ilk segment (BEG belirteçli) aynen", vs[0].words.map(function (w) { return w.text + "@" + w.start + "-" + w.end; }).join(" ") === "Merhaba@0-0.7 arkadaşlar.@0.82-2", JSON.stringify(vs[0].words));
+var vsEski = WW.segmentleriCoz(oku("whisper-ojf-vadsiz.json"), {}, { vadAcik: true });
+ok("VAD açık sanılırsa (tablo yok) doğrusal hizalama kelimeleri erkene çekerdi: bu yüzden captions.js --vad'i bildirir",
+  vsEski[1].words[0].start === 4.88 && Math.abs(vsEski[1].words[0].end - 5.753) < 1e-9, JSON.stringify(vsEski[1].words[0]));
+ok("vadAcik false iken stderr'deki VAD satırları da yok sayılır (yanlış tablo uygulanmaz)",
+  WW.segmentleriCoz(oku("whisper-ojf-vadsiz.json"), null, { stderr: vbStderr, vadAcik: false })[1].words[0].start === 5.3);
+
 /* ---------------- 4) belirteçsiz (eski derleme / -oj) ---------------- */
 var e = WW.segmentleriCoz(oku("whisper-oj-belirtecsiz.json"), bilgi);
 ok("belirteçsiz: satırlar gelir, words [] ve confidence undefined", e.length === 2 && e[0].text === "Bu ışık hiç de kötü değil." && e[0].words.length === 0 &&
@@ -94,6 +119,23 @@ var g = b("ğ"), bol = Buffer.concat([
 ]);
 var bs = WW.segmentleriCoz(bol);
 ok("bölünmüş UTF-8 bayt düzeyinde birleşir: 'değil'", bs[0].words.length === 1 && bs[0].words[0].text === "değil" && bs[0].text === "değil" && bs[0].words[0].p === 0.8, JSON.stringify(bs[0]));
+
+/* ---------------- 5b) noktalama: sondaki yapışır, boşluklu tire kendi kelimesi ---------------- */
+function tseg(metin, parcalar) {
+  var t = 0;
+  return { offsets: { from: 0, to: parcalar.length * 300 }, text: metin, tokens: parcalar.map(function (x) { var o = { text: x, offsets: { from: t, to: t + 300 }, p: 0.9 }; t += 300; return o; }) };
+}
+var tr1 = WW.kelimelereAyir(tseg(" Evet - hayır", [" Evet", " -", " hayır"]), { vadAcik: false });
+ok("boşluklu tire kendi kelimesi: Evet | - | hayır ('Evet-' değil), metin satırla aynı", metinler(tr1) === "Evet - hayır" && tr1.length === 3 && tr1[1].text === "-" && tr1[1].start === 0.3, JSON.stringify(tr1));
+ok("uzun tire ve satır başı tiresi de: '— Evet, peki —'", metinler(WW.kelimelereAyir(tseg(" — Evet, peki —", [" —", " Evet", ",", " peki", " —"]), { vadAcik: false })) === "— Evet, peki —");
+ok("boşluksuz tire kelimenin parçası: 'e-posta'", metinler(WW.kelimelereAyir(tseg(" e-posta", [" e", "-", "posta"]), { vadAcik: false })) === "e-posta");
+ok("boşluklu sondaki noktalama yine yapışır (' ?', ' ,'), açılış işareti sonrakine", metinler(WW.kelimelereAyir(tseg(" Ne ? ( bak", [" Ne", " ?", " (", " bak"]), { vadAcik: false })) === "Ne? (bak");
+
+/* ---------------- 5c) ayarlara yazılacak kopya ---------------- */
+var ks = [{ start: 1, end: 2, text: "a b", confidence: 0.9, words: [{ text: "a", start: 1, end: 1.5 }], origWords: [{ text: "x", start: 1, end: 2 }], orig: "x" }];
+var kk = WW.kelimesizKopya(ks);
+ok("kelimesizKopya: words/origWords düşer, gerisi kalır, girdi değişmez", kk.length === 1 && !("words" in kk[0]) && !("origWords" in kk[0]) && kk[0].orig === "x" && kk[0].confidence === 0.9 &&
+  ks[0].words.length === 1 && WW.kelimesizKopya(null).length === 0);
 
 /* ---------------- 6) kelimeGrupla: segment sınırını aşar, duraklama ve cümle sonu ---------------- */
 var duz = WW.duzlestir(segs);
@@ -146,12 +188,25 @@ if (fs.existsSync(gercekYol)) {
 } else {
   console.log("ATLA gerçek -ojf fikstürü yok (tests/fixtures/whisper-ojf-tr-gercek.json) — kurucu yapılacaklar ## 3.2");
 }
+// aynı ses --vad OLMADAN (Silero modeli inmemiş kullanıcı): belirteç zamanları olduğu gibi kullanılır
+var gercekVadsiz = path.join(FIX, "whisper-ojf-tr-gercek-vadsiz.json");
+if (fs.existsSync(gercekVadsiz)) {
+  var gv = WW.segmentleriCoz(fs.readFileSync(gercekVadsiz), {}, { vadAcik: false });
+  ok("gerçek -ojf (VAD'siz): kelime metni satırla tutar, kelimeler satır içinde ve sıralı", gv.length > 0 && gv.every(function (s) {
+    return metinler(s.words).replace(/\s+/g, "") === s.text.replace(/\s+/g, "") &&
+      s.words.every(function (w, i) { return w.start >= s.start && w.end <= s.end && (i === 0 || w.start >= s.words[i - 1].start); });
+  }));
+} else {
+  console.log("ATLA gerçek VAD'siz -ojf fikstürü yok (tests/fixtures/whisper-ojf-tr-gercek-vadsiz.json) — kurucu yapılacaklar ## 3.2");
+}
 
 /* ---------------- 9) panel bağlantısı (captions.js, engine.js, index.html) ---------------- */
 var cap = fs.readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8").replace(/\r\n/g, "\n");
 var yc = cap.slice(cap.indexOf("async function yerelCalistir"), cap.indexOf("function tcParse("));
-ok("yerelCalistir: -ojf JSON'u Buffer ve stderr (VAD tablosu) ile segmentleriCoz'a verir, eski satır içi eşleme yok",
-  /WW\.segmentleriCoz\(K\.fs\.readFileSync\(jsonPath\), bilgi, \{ stderr: r\.stderr \}\)/.test(yc) && !/avg_logprob|t\.tokens/.test(yc));
+ok("yerelCalistir: -ojf JSON'u Buffer, stderr (VAD tablosu) ve koşunun --vad bilgisiyle segmentleriCoz'a verir, eski satır içi eşleme yok",
+  /WW\.segmentleriCoz\(K\.fs\.readFileSync\(jsonPath\), bilgi, \{ stderr: r\.stderr, vadAcik: vadAcik \}\)/.test(yc) &&
+  /var vadAcik = args\.indexOf\("--vad"\) !== -1;/.test(yc) && !/avg_logprob|t\.tokens/.test(yc));
+ok("Shorts kaydı düzenlemesi ölçülmüş kelimeleri settings.json'a yazmaz", /harita\[shortsYuklenen\]\.segs = WW\.kelimesizKopya\(segments\);/.test(cap));
 var tl = cap.slice(cap.indexOf("async function transcribeLocal"), cap.indexOf("async function yerelCalistir"));
 ok("transcribeLocal: -ml 1 -sow yalnız belirteçsiz derlemede kelime gerekince", /if \(wordLevel && segs\.length && !WW\.kelimeVar\(segs\)\)/.test(tl) && /kelimeYedegi: true/.test(tl));
 ok("takılma kurtarma: 'kalan' satırları ve kelimeleri aynı ofsetle kayar", /kalan = WW\.zamanEsle\(kalan, kesBas, 1\)/.test(tl) && !/sg\.start \+= kesBas/.test(tl));

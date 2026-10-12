@@ -1034,10 +1034,23 @@ zaman ve olasılık yazıyor. `js/whisper-words.js` bunları kelimelere çeviriy
 derlemede yedek olarak duruyor), yerel motorun güven değeri geri geldi, satır ve kelime modu aynı
 önbellek girdisini paylaşıyor. Ücretsiz; senin girdin olmadan da tam çalışır.
 
-**1.1 Gerçek bir -ojf fikstürü ekle (isteğe bağlı ama önerilir, yaklaşık 15 dk).**
-Bu oturumda internet kısıtlıydı (Hugging Face'e erişim yoktu), bu yüzden `tests/fixtures/whisper-*.json`
-whisper.cpp v1.9.1'in `examples/cli/cli.cpp` `output_json(full=true)` biçimiyle birebir, elle kısaltılmış
-örnekler. Gerçek bir koşunun çıktısı eklenirse `tests/test-whisper-words.js` onu kendiliğinden bulur ve
+İnceleme düzeltmeleri (bilmen gereken davranışlar):
+- **Konuşmadan kes altyazının transkriptini kullanmaz.** Dolgu ipucuyla ("Iıı, eee, hmm…") ister; altyazı
+  ipucusuz yazıya döküldüğü için o transkriptte dolgular çoğu zaman yok. Altyazıdan sonra Konuşmadan kes
+  yine bir kez yazıya döker (3.1'de karaoke sonrası kullanıyordu, artık hiç kullanmaz); ikinci açılış
+  kendi "dolgu" girdisinden anında gelir. Hız için geri almak istersen `js/transcript-cache.js` › `istemler`.
+- **Shorts kayıtları ölçülmüş kelime taşımaz.** `settings.json` her ayar kaydında baştan yazılıyor; kelimeler
+  dosyayı ~5 kat şişiriyordu. Shorts altyazısında kelime stilleri karakter oranıyla akar (3.1'deki gibi).
+- **VAD'siz koşu** (Silero modeli inmemiş): kelime zamanları whisper'ın belirteç zamanlarından aynen alınır.
+- **Boşluklu tire** (" - ", " — ") kendi kelimesidir; önceki kelimeye yapışmaz ("Evet-" olmaz).
+
+**1.1 Gerçek bir -ojf fikstürü ekle (önerilir, yaklaşık 20 dk).**
+Bu oturumda internet kısıtlıydı (Hugging Face'e erişim yoktu, model indirilemedi), bu yüzden
+`tests/fixtures/whisper-*.json` whisper.cpp v1.9.1'in `examples/cli/cli.cpp` `output_json(full=true)`
+biçimiyle birebir, elle kısaltılmış örnekler. Segment-belirteç düzeni `src/whisper.cpp` v1.9.1'den alındı
+(pencerenin ilk segmenti dışında başlangıç zaman belirteci yok, ilk metin belirtecinin zamanı segment
+başıyla tutmayabilir; VAD'siz örnek `whisper-ojf-vadsiz.json`). Yine de gerçek bir koşu, CI'ın göremediği
+biçim farklarını yakalar. Gerçek bir koşunun çıktısı eklenirse `tests/test-whisper-words.js` onu kendiliğinden bulur ve
 değişmezleri (her satırda kelime ve güven var, kelime metni satır metniyle tutuyor, kelimeler satırın içinde
 ve sıralı) onda da sınar; dosya yokken o bölüm "ATLA" der.
 
@@ -1059,6 +1072,10 @@ ve sıralı) onda da sınar; dosya yokken o bölüm "ATLA" der.
    (stderr'de kendi kullanıcı adın geçen yolları `models/...` yap), `node tests/test-whisper-words.js` çalıştır:
    "gerçek -ojf" ile başlayan üç satır PASS olmalı. Kaldıysa günlükle birlikte bana yaz (VAD zaman tabanı
    ya da yeni bir belirteç biçimi olabilir). Sonra commit'le.
+6. Aynı WAV'ı **VAD olmadan** bir kez daha çalıştır: 3. adımdaki komuttan `--vad -vm "…" -vsd 500 -vp 250`
+   kısmını sil ve `-of whisper-ojf-tr-gercek-vadsiz` yap (stderr gerekmez). Çıkan JSON'u 4. adımdaki gibi
+   temizleyip `tests/fixtures/whisper-ojf-tr-gercek-vadsiz.json` olarak koy; "gerçek -ojf (VAD'siz)" satırı
+   PASS olmalı. İki fikstür de eklenince test o bölümü artık "ATLA" demez.
 
 **1.2 macOS Homebrew motorunu doğrula (yaklaşık 5 dk).** `whisper-cli --help | grep ojf` bir satır
 göstermeli. Göstermiyorsa ya da Ayarlar › Destek › Günlüğü kopyala'da kelime modunda

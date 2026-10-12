@@ -540,6 +540,12 @@ window.KViral = (function () {
   // kaynakSegs: Shorts Paketi işin başında yakaladığı transkripti verir (iş sürerken değişmesin)
   // kaynakMod: o transkriptin bölümleme modu; segs ile mod hep aynı andan gelir (o an yüklü
   // altyazının modu değil: kelime kelimeye geçilmişse satırlar tek "kelime" sanılmasın)
+  function kelimesiz(segs) {
+    var W = window.SufloWhisperWords;
+    if (W && W.kelimesizKopya) return W.kelimesizKopya(segs);
+    return (segs || []).map(function (x) { var y = JSON.parse(JSON.stringify(x)); delete y.words; delete y.origWords; return y; });
+  }
+
   function shortsKaydet(items, an, kaynakSegs, kaynakMod) {
     if (!window.KCaptions || !KCaptions.rawSegments || !HL.sliceSegments) return;
     var kaynak, mod;
@@ -548,6 +554,9 @@ window.KViral = (function () {
     else { kaynak = KCaptions.rawSegments(); mod = KCaptions.mode ? KCaptions.mode() : "plain"; }
     var segs = HL.sliceSegments(kaynak, an.start, an.end);
     if (!segs.length) return;
+    // ölçülmüş kelimeler (words, origWords) settings.json'a yazılmaz: 30 kayıt x yatay/dikey kopya
+    // dosyayı birkaç kat şişirir, her ayar kaydında baştan yazılırdı. Shorts stili karakter oranıyla akar.
+    segs = kelimesiz(segs);
     var s = K.settings();
     var harita = s.shortsAltyazi || {};
     var kayit = { ad: an.title, start: an.start, end: an.end, mod: mod || "plain",

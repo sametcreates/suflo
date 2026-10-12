@@ -99,7 +99,7 @@ chk("trReplace: Turkce harf siniri (ş harf sayilir)", T.trReplace("aşk ask", "
 /* ---------------- Ölçülmüş kelime zamanları (yerel -ojf, js/whisper-words.js) ---------------- */
 var fs = require("fs");
 var WW = require(path.join(__dirname, "..", "js", "whisper-words.js"));
-var olcum = WW.segmentleriCoz(fs.readFileSync(path.join(__dirname, "fixtures", "whisper-ojf-tr.json")));
+var olcum = WW.segmentleriCoz(fs.readFileSync(path.join(__dirname, "fixtures", "whisper-ojf-tr.json")), null, { vadAcik: false });
 // go() gibi: klip sekansta 10. saniyede, hız 1
 var esli = WW.zamanEsle(olcum, 10, 1).map(function (s) { return { start: s.start, end: s.end, text: s.text, confidence: s.confidence, words: s.words }; });
 var duzK = WW.duzlestir(esli);
@@ -147,6 +147,10 @@ chk("8+ kelime aynı anda: koruma yine fırlatır", yHata && /aynı anda/.test(y
 // kelimesiz eski karaoke yolu (-ml 1 / bulut kelimeleri) değişmedi
 var eskiK = [seg(0, 0.4, "bir"), seg(0.5, 0.9, "iki"), seg(1.0, 1.3, "...")];
 chk("kelimesiz k1: öğeler kelime, noktalama atılır (eski yol)", T.segmentleriKur(eskiK, "k1").segments.map(function (x) { return x.text; }).join("|") === "bir|iki");
+// boşluklu tire ölçülmüş kelimelerde kendi öğesidir: k1/kc'de tek başına cue olmaz, w3'te satır metni korunur
+var tireli = [{ start: 0, end: 2, text: "Evet - hayır", words: [{ text: "Evet", start: 0, end: 0.5 }, { text: "-", start: 0.5, end: 0.7 }, { text: "hayır", start: 0.7, end: 2 }] }];
+chk("tire: k1'de '-' cue'su yok, 'Evet-' yok", T.segmentleriKur(tireli, "k1").segments.map(function (x) { return x.text; }).join("|") === "Evet|hayır");
+chk("tire: w3 grubu satır metniyle aynı ('Evet - hayır')", T.segmentleriKur(tireli, "w3").segments.map(function (x) { return x.text; }).join("|") === "Evet - hayır");
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

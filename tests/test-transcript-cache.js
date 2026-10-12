@@ -118,10 +118,25 @@ chk("v2 diskte: satır ve kelimeler KAYNAK-mutlak, p korunur", d2.v === 2 && d2.
 var g6 = C2.get(m2);
 chk("v2 get: düz kelime listesi (güven = p) ve satırlar kelimeleriyle", g6 && g6.words.length === 4 && g6.words[2].text === "değil," && g6.words[2].confidence === 0.98 &&
   g6.segments.length === 2 && g6.segments[0].words.length === 3 && g6.segments[0].confidence === 0.94 && Math.abs(g6.words[3].start - 6.1) < 1e-9, JSON.stringify(g6 && g6.words));
-// satır modu ve kelime modu tek girdiyi paylaşır: Konuşmadan kes 'dolgu' yoksa 'altyazi'yı (satır modundan) kullanır
-var g7 = C2.get(Object.assign({}, m2, { prompt: "dolgu" }), { prompts: ["dolgu", "altyazi"] });
-chk("satır modunda yazılmış girdi kelime düzeyinde servis edilir", g7 && g7.prompt === "altyazi" && g7.words.length === 4 && g7.words[0].text === "Bu");
+// satır modu ve kelime modu tek "altyazi" girdisini paylaşır; ipucusuz kelime isteği onu kelime düzeyinde alır
+var ipucusuz = TCache.istemler("");
+var g7 = C2.get(Object.assign({}, m2, { prompt: ipucusuz.yaz }), { prompts: ipucusuz.ara });
+chk("satır modunda yazılmış girdi ipucusuz kelime isteğine kelime düzeyinde servis edilir", g7 && g7.prompt === "altyazi" && g7.words.length === 4 && g7.words[0].text === "Bu");
 chk("kelime modu aynı anahtara yazar (tek girdi)", C2.put(m2, { segments: satirlar, lang: "tr" }) && C2.stats().entries === 1);
+// Konuşmadan kes dolgu ipucuyla ister: altyazının ipucusuz girdisi ("ııı/eee" yazılmamış) ona VERİLMEZ
+var TC = require(path.join(__dirname, "..", "js", "textcut.js"));
+var dolguIstem = TCache.istemler(TC.fillerPrompt("tr"));
+chk("istemler: dolgu ipucu -> yalnız 'dolgu' aranır ve yazılır; ipucusuz -> 'altyazi' önce",
+  JSON.stringify(dolguIstem) === JSON.stringify({ ara: ["dolgu"], yaz: "dolgu" }) && JSON.stringify(ipucusuz) === JSON.stringify({ ara: ["altyazi", "dolgu"], yaz: "altyazi" }) &&
+  TCache.istemler("  ").yaz === "altyazi" && TCache.istemler(null).yaz === "altyazi" &&
+  ["tr", "en", "de", "xx"].every(function (l) { return TCache.istemler(TC.fillerPrompt(l)).yaz === "dolgu"; }));
+chk("satır modunun 'altyazi' girdisi dolgu ipucuyla istenen transkripte servis EDİLMEZ (Konuşmadan kes yeniden yazıya döker)",
+  C2.get(Object.assign({}, m2, { prompt: dolguIstem.yaz }), { prompts: dolguIstem.ara }) === null);
+chk("dolgu ipucuyla yazılmış girdi ise servis edilir (ikinci analiz önbellekten)",
+  C2.put(Object.assign({}, m2, { prompt: "dolgu" }), { segments: satirlar, lang: "tr" }) &&
+  C2.get(Object.assign({}, m2, { prompt: dolguIstem.yaz }), { prompts: dolguIstem.ara }).prompt === "dolgu");
+C2.clear();
+C2.put(m2, { segments: satirlar, lang: "tr" });
 // kapsayan girdi: kelimeler kendi orta noktalarıyla kesilir
 var dar = Object.assign({}, m2, { inPoint: 5.65, dur: 1.5 });   // kaynak 5.65..7.15: yalnız "ışık" ve "değil,"
 var g8 = C2.get(dar);
@@ -156,7 +171,11 @@ chk("transcribeWords: opts.cache === false önbelleği atlar", /opts\.cache !== 
 chk("transcribeWords: anahtar sonucu GERÇEKTEN yazan rotayla (yerel düşüp bulut yazdıysa bulut)", /transcribeSuflo\(audio, clip\.dur, true, temp, rota\)/.test(tw) &&
   /motorOnce\.engine = rota\.motor/.test(tw) && /secenek\.motor = yerelKimlik\(\)/.test(cap) && /secenek\.motor = bulutKimlik\(\)/.test(cap));
 chk("altyazı yazımı da gerçek rotayla anahtarlanır", /onbMeta\.engine = rotaSecenek\.motor/.test(cap));
-chk("transcribeWords: ıskada 'dolgu' olarak yazar, 'dolgu' önce aranır", /onbellekMeta\(clip, istenenDil, "dolgu"\)/.test(tw) && /prompts: \["dolgu", "altyazi"\]/.test(tw));
+chk("transcribeWords: istem türü ek ipucundan (dolgu ipucu -> yalnız 'dolgu'), arama ve yazım aynı kuraldan",
+  /var istem = onbellekIstemi\(opts\.prompt\);/.test(tw) && /onbellekMeta\(onClip, istenenDil, istem\.yaz\)/.test(tw) &&
+  /transcriptCache\(\)\.get\(om, \{ prompts: istem\.ara \}\)/.test(tw) && /onbellekMeta\(clip, istenenDil, istem\.yaz\)/.test(tw) &&
+  !/prompts: \["dolgu", "altyazi"\]/.test(cap) && /TCM\.istemler\(ekIpucu\)/.test(cap));
+chk("Konuşmadan kes transcribeWords'e dolgu ipucunu verir", /prompt: TC\.fillerPrompt\(dilSecimi\)/.test(fs.readFileSync(path.join(__dirname, "..", "js", "konusma-kes.js"), "utf8")));
 chk("go(): tek klipte satır ve kelime modu AYNI 'altyazi' girdisini yazar (karaoke şartı yok)",
   /scope === "clip" && clip\) \? onbellekMeta\(clip, .*"altyazi"\)/.test(cap) && !/scope === "clip" && karaoke && clip\)/.test(cap));
 chk("go(): yalnız kelime zamanlı sonuç yazılır (bulut satır sonucu Konuşmadan kes'i bozmasın)",

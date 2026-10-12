@@ -31,6 +31,8 @@
   var NOKTA = /^[.,!?;:…"'«»“”‘’„()\[\]{}\-–—¿¡、。，！？・]+$/;
   // Açılış işaretleri SONRAKİ kelimeye yapışır, gerisi öncekine
   var ACILIS = /^[«“‘„(\[{¿¡]+$/;
+  // Boşlukla ayrılmış tire / uzun tire ara söz işaretidir, sondaki noktalama değil: kendi kelimesi kalır
+  var TIRE = /^[\-–—]+$/;
   var CUMLE_SONU = /[.!?…]["'”’»)\]]*$/;
   var HIZA_TOLERANS = 0.02;
 
@@ -94,9 +96,14 @@
   /*
    * whisper.cpp v1.9.1, --vad açıkken SEGMENT zamanlarını özgün sese eşler ama
    * belirteç zamanlarını eşlemez (src/whisper.cpp: whisper_full_get_segment_t0 VAD
-   * tablosundan geçer, whisper_full_get_token_data geçmez). Belirteçler her zaman
-   * segmentin [t0, t1] aralığını kaplar; aralıklar tutmuyorsa belirteç zamanları
-   * segmentin aralığına doğrusal olarak taşınır. VAD kapalıyken birebir aynıdır.
+   * tablosundan geçer, whisper_full_get_token_data geçmez). Yalnız VAD AÇIKKEN ve
+   * stderr'de VAD tablosu (vadEslemesi) bulunamadığında kullanılır: belirteç zamanları
+   * segmentin aralığına doğrusal olarak taşınır.
+   * VAD kapalıyken KULLANILMAZ: belirteçler segmentle aynı zaman tabanındadır ama
+   * aralıkları tutmaz. Pencerenin ilk segmenti dışında segmentin başlangıç zaman
+   * belirteci yazılmaz; ilk metin belirtecinin t0'ı önceki segmentin sonundan başlar ve
+   * ses enerjisine göre konuşma başına kayar (whisper_exp_compute_token_level_timestamps).
+   * O zaman tMin != segment başı olağandır ve doğrusal taşıma kelimeleri erkene çekerdi.
    */
   function zamanHizasi(tokens, sinir) {
     var tMin = Infinity, tMax = -Infinity;
@@ -186,9 +193,13 @@
    * arasına yayılır, hepsi segmente sıkıştırılır. Kelime p = belirteçlerinin en
    * düşük p'si (noktalama belirteci kelimenin zamanına ve p'sine katılmaz).
    * Sondaki noktalama kelimesinde kalır ("değil," / "mi?").
-   *   opts.coz   ikili (latin1) okunmuş metin için UTF-8 çözücü
-   *   opts.sinir segment sınırı (yoksa segmentin kendisinden okunur)
-   *   opts.vad   vadEslemesi() sonucu: belirteç zamanları whisper'ın VAD tablosuyla taşınır
+   *   opts.coz     ikili (latin1) okunmuş metin için UTF-8 çözücü
+   *   opts.sinir   segment sınırı (yoksa segmentin kendisinden okunur)
+   *   opts.vad     vadEslemesi() sonucu: belirteç zamanları whisper'ın VAD tablosuyla taşınır
+   *   opts.vadAcik false: VAD kapalıydı, belirteç zamanları olduğu gibi (yalnız segmente
+   *                sıkıştırılır). true / verilmezse tablo yoksa doğrusal hizalama (zamanHizasi).
+   * Yalnız noktalamadan oluşan kelime öncekine yapışır (açılış işareti sonrakine); boşlukla
+   * ayrılmış tire / uzun tire (" - ", " – ", " — ") kendi kelimesidir: kelimeler satır metniyle tutar.
    * Döner: [{ text, start, end, p? }] (belirteç yoksa [])
    */
   // Raunen: tokensToWords
@@ -198,7 +209,7 @@
     var tokens = seg && seg.tokens;
     if (!dizi(tokens) || !tokens.length) return [];
     var sinir = opts.sinir || segmentSiniri(seg);
-    var esle = typeof opts.vad === "function" ? opts.vad : zamanHizasi(tokens, sinir);
+    var esle = typeof opts.vad === "function" ? opts.vad : (opts.vadAcik === false ? kimlik : zamanHizasi(tokens, sinir));
 
     var liste = [];
     for (var i = 0; i < tokens.length; i++) {
@@ -242,12 +253,13 @@
       kelimeler.push({ text: text, start: zamanli[0].bas, end: zamanli[zamanli.length - 1].son, p: p, nokta: NOKTA.test(text) });
     });
 
-    // yalnız noktalamadan oluşan kelime: açılış işareti sonrakine, gerisi öncekine yapışır
+    // yalnız noktalamadan oluşan kelime: açılış işareti sonrakine, gerisi öncekine yapışır;
+    // boşlukla ayrılmış tire kendi kelimesidir ("Evet - hayır" -> Evet | - | hayır, "Evet-" değil)
     var out = [];
     var bekleyen = "";
     for (var k = 0; k < kelimeler.length; k++) {
       var w = kelimeler[k];
-      if (w.nokta) {
+      if (w.nokta && !TIRE.test(w.text)) {
         var onceVar = out.length > 0;
         var sonraVar = false;
         for (var m = k + 1; m < kelimeler.length; m++) if (!kelimeler[m].nokta) { sonraVar = true; break; }
@@ -283,11 +295,15 @@
    *   bilgi (isteğe bağlı): { dil, belirtecli, vad } doldurulur
    *   secenek.stderr (isteğe bağlı): whisper-cli stderr'i; --vad satırları varsa belirteç
    *         zamanları whisper'ın kendi VAD tablosuyla taşınır (yoksa doğrusal hizalama)
+   *   secenek.vadAcik (isteğe bağlı): koşu --vad ile mi yapıldı. false: belirteç zamanları
+   *         segmentle aynı tabanda, olduğu gibi kullanılır (doğrusal hizalama YAPILMAZ).
+   *         Verilmezse VAD açık olabilir sayılır (tablo yoksa doğrusal hizalama).
    * Döner: [{ start, end, text, confidence, words }] — belirteç yazmayan eski
    * derlemelerde words [] ve confidence undefined.
    */
   function segmentleriCoz(json, bilgi, secenek) {
-    var vad = secenek && secenek.stderr ? vadEslemesi(secenek.stderr) : null;
+    var vadAcik = secenek && secenek.vadAcik === false ? false : (secenek && secenek.vadAcik === true ? true : undefined);
+    var vad = vadAcik !== false && secenek && secenek.stderr ? vadEslemesi(secenek.stderr) : null;
     var veri = json, coz = kimlik;
     if (ikiliMi(json)) {
       var metin = json.toString("utf8");
@@ -301,7 +317,7 @@
     var out = liste.map(function (t) {
       t = t || {};
       var sinir = segmentSiniri(t);
-      var words = kelimelereAyir(t, { coz: coz, sinir: sinir, vad: vad });
+      var words = kelimelereAyir(t, { coz: coz, sinir: sinir, vad: vad, vadAcik: vadAcik });
       var ps = [];
       (dizi(t.tokens) ? t.tokens : []).forEach(function (tok) {
         if (!tok || OZEL.test(String(tok.text == null ? "" : tok.text))) return;
@@ -325,6 +341,8 @@
       bilgi.dil = veri && veri.result && veri.result.language ? coz(String(veri.result.language)) : "";
       bilgi.belirtecli = belirtecli;
       bilgi.vad = !!vad;
+      // kelime zamanlarının özgün sese nasıl taşındığı (günlük / tanı için)
+      bilgi.hiza = vad ? "vad-tablosu" : (vadAcik === false ? "yok" : "dogrusal");
     }
     return out;
   }
@@ -502,7 +520,22 @@
     return hepsi;
   }
 
+  /*
+   * Ayarlara (settings.json) yazılacak satır kopyası: ölçülmüş kelimeler (words, origWords)
+   * düşer. Shorts kayıtları settings.json'da durur ve dosya her ayar değişikliğinde baştan,
+   * girintili yazılır; kelime başına nesne dosyayı birkaç kat şişirirdi. Kelimesiz satırda
+   * stil motoru karakter ağırlıklı yedeğe döner. Girdi değişmez.
+   */
+  function kelimesizKopya(segs) {
+    return (dizi(segs) ? segs : []).map(function (s) {
+      var x = JSON.parse(JSON.stringify(s == null ? null : s));
+      if (x && typeof x === "object") { delete x.words; delete x.origWords; }
+      return x;
+    });
+  }
+
   return {
+    kelimesizKopya: kelimesizKopya,
     kelimelereAyir: kelimelereAyir,
     segmentleriCoz: segmentleriCoz,
     vadEslemesi: vadEslemesi,

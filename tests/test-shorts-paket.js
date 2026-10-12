@@ -183,6 +183,11 @@ var kSegs = [{ start: 1, end: 3, text: "önce" }, { start: 4, end: 6, text: "iç
 var dil = P.kaynakDilimi(kSegs, 4, 10);
 ok("kaynakDilimi: orta noktası aralıkta olanlar, zamanlar kaydırılmadan (kopya)", dil.length === 1 && dil[0].start === 4 && dil[0].text === "içeride" && dil[0] !== kSegs[1] &&
   P.kaynakDilimi(kSegs, 9, 12).map(function (x) { return x.text; }).join() === "sınırda" && P.kaynakDilimi(null, 0, 5).length === 0 && P.kaynakDilimi(kSegs, 5, 5).length === 0);
+// ölçülmüş kelimeler iş kaydına (settings.json › shortsPaketIs) kopyalanmaz: dosya her kayıtta baştan yazılır
+var kSegsW = [{ start: 4, end: 6, text: "içeride", confidence: 0.9, words: [{ text: "içeride", start: 4.1, end: 5.8, p: 0.9 }], origWords: [{ text: "inside", start: 4.1, end: 5.8 }], orig: "inside" }];
+var dilW = P.kaynakDilimi(kSegsW, 4, 10);
+ok("kaynakDilimi: words/origWords kopyalanmaz, satır alanları kalır, girdi değişmez", dilW.length === 1 && !("words" in dilW[0]) && !("origWords" in dilW[0]) &&
+  dilW[0].orig === "inside" && dilW[0].confidence === 0.9 && kSegsW[0].words.length === 1);
 var jK = P.kaynakEkle(P.newJob({ plan: P.planla({ anlar: [{ start: 0, end: 7, title: "a" }, { start: 19, end: 23, title: "b" }], yetenek: { autoReframe: true, ffmpeg: true, libass: true } }) }), kSegs);
 ok("kaynakEkle: her Short kendi aralığını taşır (Devam et başka transkripte düşmez)", jK.kisalar[0].kaynakSegs.length === 2 && jK.kisalar[1].kaynakSegs.length === 1 &&
   jK.kisalar[1].kaynakSegs[0].text === "sonra" && JSON.parse(JSON.stringify(jK)).kisalar[0].kaynakSegs[1].start === 4);
