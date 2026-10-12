@@ -2287,6 +2287,8 @@ window.KCaptions = (function () {
     var belgeDili = algilananDil, yeniBelge = false;
     algilananDil = "";
     var tempFiles = [];
+    // İptal / Vazgeç / yalnız etiket uyarısı: iş bitince (setBusy → refreshButton) silinmesin
+    var sonUyari = "";
     try {
       /*
        * ffmpeg'i EN BASTA hazirla. Sekans kapsaminda ses disa aktarimi dakikalar
@@ -2532,17 +2534,21 @@ window.KCaptions = (function () {
       if (!yeniBelge) algilananDil = belgeDili;  // önceki belge ekranda kaldı: dili de onun
       // İptal: hata değil. Ekrandaki belge, taslak ve geri al yığını olduğu gibi kalır; yarım satır uygulanmaz
       if ((e && e.iptal) || (aktifIptal && aktifIptal.iptalEdildi)) {
-        status("İptal edildi.", "warn");
+        sonUyari = "İptal edildi.";
+        status(sonUyari, "warn");
         K.log("[altyazı] is iptal edildi, gecici dosyalar siliniyor");
       }
       else if (e && (e.vazgecildi || e.uyari)) status(e.message, "warn");
       else status("✕ " + K.hataYardimi(e), "bad");
+      if (!sonUyari && e && (e.vazgecildi || e.uyari)) sonUyari = e.message;
     } finally {
       tempFiles.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
       canliBitir();
       aktifIptal = null;
       busy = false;
       setBusy(false);
+      // refreshButton yalnız kırmızı hatayı korur; uyarı seçim değişene kadar ekranda kalsın
+      if (sonUyari) status(sonUyari, "warn");
     }
     if (basarili) sonucBildir({ kaynak: ornek ? "ornek" : "go", satir: segments.length });
     return basarili;

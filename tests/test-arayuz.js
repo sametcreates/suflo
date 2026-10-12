@@ -407,7 +407,9 @@ ok("#cap-cancel tıklaması jetonu iptal eder (init'te bağlı, Premiere çağr�
 var goG2 = fnGovde(capSrc, "async function go(");
 ok("go(): jeton ve geçici satırlar işle başlar, finally'de bırakılır; İptal 'İptal edildi.' uyarısı (hata değil)",
   /aktifIptal = K\.iptalJetonu \? K\.iptalJetonu\(\) : null;\s*canliBaslat\(\);/.test(goG2) &&
-  /finally \{[\s\S]*canliBitir\(\);\s*aktifIptal = null;/.test(goG2) && /status\("İptal edildi\.", "warn"\)/.test(goG2));
+  /finally \{[\s\S]*canliBitir\(\);\s*aktifIptal = null;/.test(goG2) && /sonUyari = "İptal edildi\.";\s*status\(sonUyari, "warn"\);/.test(goG2) &&
+  // setBusy(false) → refreshButton yalnız kırmızı hatayı korur: "İptal edildi." ondan sonra yeniden yazılır
+  /setBusy\(false\);\s*\/\/[^\n]*\n\s*if \(sonUyari\) status\(sonUyari, "warn"\);/.test(goG2));
 ok("go(): ses dışa aktarımı (senkron ExtendScript) sırasında İptal kapalı, sonra açılır",
   goG2.indexOf("iptalKilidi(true)") > 0 && goG2.indexOf("iptalKilidi(true)") < goG2.indexOf('K.call("KS_exportAudio"') &&
   goG2.indexOf('K.call("KS_exportAudio"') < goG2.indexOf("iptalKilidi(false)") && /Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez/.test(capSrc));
