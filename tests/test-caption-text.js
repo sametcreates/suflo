@@ -152,5 +152,70 @@ var tireli = [{ start: 0, end: 2, text: "Evet - hayır", words: [{ text: "Evet",
 chk("tire: k1'de '-' cue'su yok, 'Evet-' yok", T.segmentleriKur(tireli, "k1").segments.map(function (x) { return x.text; }).join("|") === "Evet|hayır");
 chk("tire: w3 grubu satır metniyle aynı ('Evet - hayır')", T.segmentleriKur(tireli, "w3").segments.map(function (x) { return x.text; }).join("|") === "Evet - hayır");
 
+/* ---------- Ses etiketi filtresi (3.2 adım 2; Raunen NOISE_PATTERNS + Türkçe sözlük) ---------- */
+function metinler(liste) { return liste.map(function (x) { return x.text; }).join("|"); }
+var etiketli = [
+  seg(0, 2, "[BLANK_AUDIO]"), seg(2, 4, "[Müzik]"), seg(4, 5, "(müzik)"), seg(5, 6, "[MÜZİK]"), seg(6, 7, "(Alkış)"),
+  seg(7, 8, "[ALKIŞ]"), seg(8, 9, "(gülüşmeler)"), seg(9, 10, "[Kahkaha]"), seg(10, 11, "[sessizlik]"), seg(11, 12, "(gürültü)"),
+  seg(12, 13, "[anlaşılmıyor]"), seg(13, 14, "(şarkı)"), seg(14, 15, "[nefes]"), seg(15, 16, "(öksürük)"),
+  seg(16, 17, "[Music]"), seg(17, 18, "(applause)"), seg(18, 19, "[LAUGHTER]"), seg(19, 20, "[Silence]"), seg(20, 21, "(noise)"),
+  seg(21, 22, "[INAUDIBLE]"), seg(22, 23, "(singing)"), seg(23, 24, "[cough]"), seg(24, 25, "*laughs*"), seg(25, 26, "*Müzik*"),
+  seg(26, 27, "♪ [Müzik] ♪"), seg(27, 28, "[♪ müzik ♪]"), seg(28, 29, "[Müzik] [Alkış]"), seg(29, 30, "[Müzik]."),
+  seg(30, 31, "Gerçek konuşma.")
+];
+chk("etiket: Türkçe ve İngilizce ses etiketleri (köşeli, parantezli, *..*, ♪ sarılı, büyük harf) atılır",
+  metinler(T.cleanSegments(etiketli)) === "Gerçek konuşma.", metinler(T.cleanSegments(etiketli)));
+var notalar = [seg(0, 1, "♪"), seg(1, 2, "♪♪"), seg(2, 3, "♫ ♪ ♫"), seg(3, 4, "♪ la la la ♪"), seg(4, 5, "Selam")];
+chk("etiket: yalnız ♪/♫ satırları atılır, ♪ arasındaki şarkı sözü kalır", metinler(T.cleanSegments(notalar)) === "♪ la la la ♪|Selam", metinler(T.cleanSegments(notalar)));
+var vurgulu = [seg(0, 1, "Bugün *kelime* çok önemli"), seg(1, 2, "*Instagram*'da paylaş"), seg(2, 3, "*kelime*"), seg(3, 4, "[Konuşmacı 1] Merhaba")];
+chk("etiket: *vurgu* gerçek kelimelerde kalır (yalnız sözlükteki ses adı etikettir); sözlük dışı [..] dokunulmaz",
+  metinler(T.cleanSegments(vurgulu)) === "Bugün *kelime* çok önemli|*Instagram*'da paylaş|*kelime*|[Konuşmacı 1] Merhaba", metinler(T.cleanSegments(vurgulu)));
+var karisik = T.cleanSegments([seg(0, 3, "Merhaba [müzik]"), seg(3, 6, "(Alkış) Teşekkürler!"), seg(6, 9, "Bu ♪ [Müzik] ♪ harika"), seg(9, 10, "Tamam [BLANK_AUDIO].")]);
+chk("etiket: karışık satır konuşmasını korur, satır içi etiket silinir ('Merhaba [müzik]' -> 'Merhaba')",
+  metinler(karisik) === "Merhaba|Teşekkürler!|Bu harika|Tamam.", metinler(karisik));
+chk("gurultuMu: yalnız tam satır etiketse true", T.gurultuMu("[Müzik]") && T.gurultuMu("♪") && T.gurultuMu("[BLANK_AUDIO]") &&
+  !T.gurultuMu("Merhaba [müzik]") && !T.gurultuMu("*kelime*") && !T.gurultuMu("") && !T.gurultuMu("♪ la ♪"));
+var koru = T.cleanSegments([seg(0, 1, "(müzik)"), seg(1, 2, "[MÜZİK]"), seg(2, 3, "*laughs*"), seg(3, 4, "[BLANK_AUDIO]"), seg(4, 5, "♪♪"),
+  seg(5, 6, "Merhaba (alkış)"), seg(6, 7, "[INAUDIBLE]"), seg(7, 8, "♪ [şarkı] ♪"), seg(8, 9, "Bugün *kelime* var")], { etiketKoru: true });
+chk("Ses etiketlerini koru: etiketler '[Müzik]' biçiminde kalır, [BLANK_AUDIO] yine atılır, nota satırı '♪'",
+  metinler(koru) === "[Müzik]|[Müzik]|[Laughs]|♪|Merhaba [Alkış]|[Inaudible]|[Şarkı]|Bugün *kelime* var", metinler(koru));
+var girdi = [seg(0, 3, "Merhaba [müzik]")];
+T.cleanSegments(girdi);
+chk("etiket: girdi satırı değiştirilmez (kopya döner)", girdi[0].text === "Merhaba [müzik]");
+// ölçülmüş kelimeler: etiket kelimeleri atılır, satır kalan kelimeye daralır; koru açıkken tek etiket kelimesi
+var olcEtiket = [
+  { start: 0, end: 4, text: "[Müzik]", words: [{ text: "[Müzik]", start: 0, end: 4, p: 0.3 }] },
+  { start: 4, end: 9, text: "Merhaba arkadaşlar [müzik]", confidence: 0.9, words: [{ text: "Merhaba", start: 4.2, end: 4.8, p: 0.9 },
+    { text: "arkadaşlar", start: 4.9, end: 5.6, p: 0.95 }, { text: "[müzik]", start: 5.7, end: 9, p: 0.3 }] },
+  { start: 9, end: 12, text: "( alkış ) tamam", words: [{ text: "(", start: 9, end: 9.1 }, { text: "alkış", start: 9.1, end: 9.8, p: 0.5 },
+    { text: ")", start: 9.8, end: 9.9 }, { text: "tamam", start: 10, end: 10.5 }] },
+  { start: 12, end: 14, text: "♪♪" }
+];
+var oe = T.cleanSegments(olcEtiket);
+chk("etiket + ölçülmüş kelimeler: etiket kelimeleri atılır, sondaki/baştaki müzik satırı uzatmaz",
+  metinler(oe) === "Merhaba arkadaşlar|tamam" && oe[0].words.length === 2 && oe[0].start === 4 && oe[0].end === 5.6 &&
+  oe[1].words.length === 1 && oe[1].start === 10 && oe[1].end === 12, JSON.stringify(oe.map(function (x) { return [x.start, x.end, x.words.length]; })));
+var k1e = T.segmentleriKur(olcEtiket, "k1");
+chk("k1: yalnız-etiket kelimeleri kelime listesinden atılır", metinler(k1e.segments) === "Merhaba|arkadaşlar|tamam", metinler(k1e.segments));
+chk("kc: etiket kelimesi birikimli satıra girmez", T.segmentleriKur(olcEtiket, "kc").segments.every(function (x) { return !/\[|\(|♪/.test(x.text); }));
+var w3e = T.segmentleriKur(olcEtiket, "w3");
+chk("w3: etiketsiz gruplar", metinler(w3e.segments) === "Merhaba arkadaşlar|tamam", metinler(w3e.segments));
+var k1k = T.segmentleriKur(olcEtiket, "k1", { etiketKoru: true });
+chk("k1 + koru: etiket tek kelime '[Müzik]' / '[Alkış]' (bölünmüş '( alkış )' birleşir)",
+  metinler(k1k.segments) === "[Müzik]|Merhaba|arkadaşlar|[Müzik]|[Alkış]|tamam|♪", metinler(k1k.segments));
+var bulutK = [seg(0, 0.4, "Hello"), seg(0.5, 3, "[Music]"), seg(3, 3.4, "(applause)"), seg(3.5, 4, "world")];
+chk("bulut kelime öğeleri (ölçülmüş değil): etiket öğeleri atılır", metinler(T.segmentleriKur(bulutK, "k1").segments) === "Hello|world");
+var c42e = T.segmentleriKur([seg(0, 2, "[Müzik]"), seg(2, 5, "Merhaba [müzik]")], "c42");
+chk("satır modu: etiket satırı yok, karışık satır konuşmasıyla", metinler(c42e.segments) === "Merhaba");
+chk("satır modu + koru: '[Müzik]' satırı kalır", metinler(T.segmentleriKur([seg(0, 2, "(müzik)"), seg(2, 5, "Merhaba")], "c42", { etiketKoru: true }).segments) === "[Müzik]|Merhaba");
+// Raunen atfı: dosya başlığı, işaretler ve THIRD_PARTY_NOTICES girdisi
+var ctKaynak = require("fs").readFileSync(path.join(__dirname, "..", "js", "caption-text.js"), "utf8").replace(/\r\n/g, "\n");
+chk("caption-text.js: Raunen başlığı ve '// Raunen: <ad>' işaretleri",
+  ctKaynak.indexOf("Portions adapted from Raunen (https://github.com/Zeyphers/raunen), MIT, Copyright (c) 2026 Jacob Szczepaniak. See THIRD_PARTY_NOTICES.md.") !== -1 &&
+  /\/\/ Raunen: NOISE_PATTERNS/.test(ctKaynak) && /\/\/ Raunen: isNoise\n  function gurultuMu/.test(ctKaynak));
+chk("caption-text.js: whisper -sns kullanılmaz (noktalama belirteçlerini de bastırır)", !/"-sns"|--suppress-nst/.test(require("fs").readFileSync(path.join(__dirname, "..", "js", "engine.js"), "utf8")));
+var bildirim = require("fs").readFileSync(path.join(__dirname, "..", "THIRD_PARTY_NOTICES.md"), "utf8");
+chk("THIRD_PARTY_NOTICES: Raunen girdisinde js/caption-text.js (NOISE_PATTERNS)", /`js\/caption-text\.js` — `NOISE_PATTERNS`/.test(bildirim));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

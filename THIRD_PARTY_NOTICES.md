@@ -27,6 +27,15 @@ lisansı ve uyarlanan kodu içeren Suflo dosyalarıyla listelenmiştir.
     UTF-8 merge for older whisper.cpp builds, sentence-end flush). Raunen's DTW path was not
     ported.
   - `tests/test-whisper-words.js` exercises the adapted functions (test cases are Suflo's own).
+  - `js/caption-text.js` — `NOISE_PATTERNS` and `isNoise()` (as `SES_ETIKETLERI` / `gurultuMu`:
+    whole-cue `[BLANK_AUDIO]`, bracketed and parenthesised non-speech tags such as `[music]` or
+    `(applause)`, and `*tag*`), ported from `com.raunen.premiere/js/lib/subtitles.js` to ES5 and
+    extended for Suflo with a Turkish tag vocabulary (`müzik`, `alkış`, `gülüşme(ler)`, `kahkaha`,
+    `sessizlik`, `gürültü`, `anlaşılmıyor`, `şarkı`, `nefes`, `öksürük`), Turkish-aware case folding,
+    ♪/♫-only cues, `*tag*` only for vocabulary words (so Suflo's `*emphasis*` syntax survives),
+    inline tag removal in mixed cues, word-list filtering and an optional "keep tags" mode.
+    `tests/test-caption-text.js` covers it (test cases are Suflo's own). The silent-audio warning
+    (`js/sessiz-ses.js`) takes only the idea of Raunen's peak-below-0.001 check; its code is Suflo's own.
 
 ```
 MIT License

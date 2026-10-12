@@ -4,6 +4,9 @@
  * Altyazi metni ve zamanlamasi uzerinde calisan saf (DOM'suz, durumsuz)
  * islevler: halusinasyon temizligi, karaoke, bolme, terim sozlugu.
  * captions.js bunlari kullanir; Node testleri ayni kodu dogrudan calistirir.
+ *
+ * Portions adapted from Raunen (https://github.com/Zeyphers/raunen), MIT, Copyright (c) 2026 Jacob Szczepaniak. See THIRD_PARTY_NOTICES.md.
+ * (Ses etiketi filtresi: NOISE_PATTERNS / isNoise, Türkçe sözlükle genişletildi.)
  */
 (function (root, factory) {
   // Ölçülmüş kelime zamanları (js/whisper-words.js) bu modülden ÖNCE yüklenir; yoksa eski yol
@@ -20,15 +23,185 @@
   // "kelime" satırın tamamıdır; N kelimelik gruplama satırları birleştirirdi
   var BOSLUKSUZ_YAZI = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\u0E00-\u0E7F]/;
 
+  /*
+   * Ses etiketleri (konuşma olmayan sesler): Whisper müzikte, alkışta, sessizlikte
+   * "[Müzik]", "(alkış)", "*laughs*", "♪♪" ya da "[BLANK_AUDIO]" yazar. Bunlar altyazı değildir.
+   *   - Yalnız etiketten oluşan satır atılır; konuşmayla karışık satır konuşmasını korur,
+   *     satır içindeki etiket silinir ("Merhaba [müzik]" -> "Merhaba").
+   *   - *etiket* yalnız içi sözlükteki bir ses adıysa etikettir: Suflo'nun *vurgu*
+   *     işareti gerçek kelimelerde ("*kelime*") olduğu gibi kalır.
+   *   - "Ses etiketlerini koru" (Ayarlar › Altyazı) açıkken etiketler erişilebilirlik için
+   *     tutulur, "[Müzik]" biçimine getirilir; [BLANK_AUDIO] yine atılır, yalnız notadan
+   *     oluşan satır "♪" olur.
+   * whisper-cli'nin -sns (non-speech token bastırma) bayrağı KULLANILMAZ: noktalama benzeri
+   * belirteçleri de bastırıyor.
+   */
+  // Raunen: NOISE_PATTERNS (sözlük; Türkçe adlar ve çoğul/-ing biçimleri Suflo'nun eki).
+  // Altyazı metni (kullanıcı içeriği), arayüz metni değil: çevrilmez. Küçük harfle yazılır,
+  // "[Müzik]" biçimi ilk harf büyütülerek kurulur (i ile başlayan Türkçe ad yok: "Inaudible" doğru).
+  var SES_ETIKETLERI = ["müzik", "music", "alkış", "alkışlar", "applause", "gülüşme", "gülüşmeler",
+    "kahkaha", "kahkahalar", "laughter", "laughs", "laughing", "sessizlik", "silence", "gürültü",
+    "noise", "anlaşılmıyor", "inaudible", "şarkı", "singing", "nefes", "öksürük", "cough"];
+  // Türkçe-duyarlı katlama: "MÜZİK", "ALKIŞ", "INAUDIBLE" sözlükle eşleşsin (İ/I/ı -> i)
+  function katla(s) { return String(s).replace(/[İIı]/g, "i").toLowerCase(); }
+  var ETIKET_ADI = {};
+  for (var ei = 0; ei < SES_ETIKETLERI.length; ei++) {
+    ETIKET_ADI[katla(SES_ETIKETLERI[ei])] = SES_ETIKETLERI[ei].charAt(0).toUpperCase() + SES_ETIKETLERI[ei].slice(1);
+  }
+  var NOTA = /[\u2669\u266A\u266B\u266C]/;           // ♩ ♪ ♫ ♬
+  var NOTALAR = /[\u2669\u266A\u266B\u266C]/g;
+  // Aday etiket: [..], (..) ya da *..* (içi en çok 40 karakter, satır atlamaz)
+  var ADAY_KAYNAK = "\\[([^\\[\\]\\n]{1,40})\\]|\\(([^()\\n]{1,40})\\)|\\*([^*\\s][^*\\n]{0,39}?)\\*";
+  // nota ile iki yandan sarılmış etiket ("♪ [Müzik] ♪") önce, çıplak etiket sonra
+  var SARILI = new RegExp("[\u2669\u266A\u266B\u266C]\\s*(?:" + ADAY_KAYNAK + ")\\s*[\u2669\u266A\u266B\u266C]", "g");
+  var CIPLAK = new RegExp(ADAY_KAYNAK, "g");
+  // Etiket ya da nota silindikten sonra geriye bunlardan başkası kalmadıysa satır yalnız ses etiketidir
+  var GERI_KALAN = /[^\s.,!?;:…\-–—"'«»“”‘’]/;
+
+  // Etiket içi: { ad: "Müzik" } | { bos: true } ([BLANK_AUDIO]) | null (etiket değil)
+  function etiketIci(ic, yildiz) {
+    var t = String(ic || "").replace(NOTALAR, " ").replace(/[.,!?;:…]+/g, " ").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+    if (!t) return null;
+    if (!yildiz && /^blank[_ ]audio$/i.test(t)) return { bos: true };
+    var ad = ETIKET_ADI[katla(t)];
+    return ad ? { ad: ad } : null;
+  }
+  function etiketleriGez(text, fn) {
+    function degis(tam, a, b, c) {
+      // katılmayan grup CEF 74'te undefined; boş dizgi de olamaz ({1,40})
+      var e = etiketIci(a || b || c, !a && !b && !!c);
+      return e ? fn(e) : tam;
+    }
+    return String(text).replace(SARILI, degis).replace(CIPLAK, degis);
+  }
+
+  /*
+   * Satır yalnız ses etiketinden mi oluşuyor? [BLANK_AUDIO], sözlükteki [..] / (..) / *..*
+   * etiketleri (♪ ile sarılı olabilir) ve yalnız ♪/♫'dan oluşan satır. Konuşma içeren satır false.
+   */
+  // Raunen: isNoise
+  function gurultuMu(text) {
+    var t = String(text == null ? "" : text);
+    if (!/\S/.test(t)) return false;
+    var bulundu = false;
+    var kalan = etiketleriGez(t, function () { bulundu = true; return " "; });
+    if (NOTA.test(kalan)) { bulundu = true; kalan = kalan.replace(NOTALAR, " "); }
+    return bulundu && !GERI_KALAN.test(kalan);
+  }
+
+  /*
+   * Metindeki ses etiketlerini temizle (koru: false) ya da "[Müzik]" biçimine getir (koru: true).
+   * Yalnız etiketten oluşan satır koru kapalıyken "" olur. Etiket yoksa metin AYNEN döner.
+   */
+  function sesEtiketleri(text, koru) {
+    var t = String(text == null ? "" : text);
+    if (!/\S/.test(t)) return t;
+    if (gurultuMu(t)) {
+      if (!koru) return "";
+      var adlar = [];
+      etiketleriGez(t, function (e) {
+        if (e.ad && adlar.indexOf("[" + e.ad + "]") === -1) adlar.push("[" + e.ad + "]");
+        return " ";
+      });
+      if (adlar.length) return adlar.join(" ");
+      return NOTA.test(t) ? "\u266A" : "";          // yalnız nota: "♪"; yalnız [BLANK_AUDIO]: at
+    }
+    var degisti = false;
+    var cikti = etiketleriGez(t, function (e) {
+      degisti = true;
+      return (e.bos || !koru) ? " " : " [" + e.ad + "] ";
+    });
+    if (!degisti) return t;
+    cikti = cikti.replace(/\s+/g, " ").replace(/\s+([.,!?;:…])/g, "$1").replace(/^\s+|\s+$/g, "");
+    // etiketten arta kalan noktalama/nota satırı konuşma değildir
+    if (!GERI_KALAN.test(cikti.replace(NOTALAR, " "))) return koru ? cikti : "";
+    return cikti;
+  }
+
+  function kelimeKopya(w, text, son) {
+    var y = {};
+    for (var k in w) if (Object.prototype.hasOwnProperty.call(w, k)) y[k] = w[k];
+    y.text = text;
+    if (son !== undefined) y.end = son;
+    return y;
+  }
+
+  /*
+   * Kelime listesinden ses etiketi kelimelerini at (koru: "[Müzik]" biçiminde tek kelime yap).
+   * Boşlukla bölünmüş etiket ("(", "alkış", ")" ya da "[Müzik" "]") en çok 4 komşu kelimeyle
+   * birleştirilip denenir. Ölçülmüş kelime (whisper -ojf) ve bulut kelime öğeleri için.
+   */
+  function kelimeEtiketleri(words, koru) {
+    var out = [];
+    var liste = words || [];
+    for (var i = 0; i < liste.length; i++) {
+      var w = liste[i];
+      if (!w) continue;
+      var metin = String(w.text == null ? "" : w.text);
+      var j = i, birlesik = metin;
+      if (!gurultuMu(metin) && /^[\u2669\u266A\u266B\u266C\s]*[\[(*]/.test(metin)) {
+        for (var k = i + 1; k < liste.length && k <= i + 4; k++) {
+          birlesik += " " + String(liste[k] && liste[k].text || "");
+          if (gurultuMu(birlesik)) { j = k; break; }
+        }
+        if (j === i) birlesik = metin;
+      }
+      if (gurultuMu(birlesik)) {
+        var ad = koru ? sesEtiketleri(birlesik, true) : "";
+        if (ad) {
+          var y = kelimeKopya(w, ad, liste[j].end);
+          for (var q = i + 1; q <= j; q++) if (liste[q] && liste[q].p !== undefined && (y.p === undefined || liste[q].p < y.p)) y.p = liste[q].p;
+          out.push(y);
+        }
+        i = j;
+        continue;
+      }
+      var yeni = sesEtiketleri(metin, koru);          // "Merhaba[Müzik]" gibi yapışık
+      if (yeni !== metin) { if (yeni) out.push(kelimeKopya(w, yeni)); continue; }
+      out.push(w);
+    }
+    return out;
+  }
+
+  // Satırın etiketsiz kopyası: metin yeni; ölçülmüş kelimelerden etiketler atılır. Baştaki ya da
+  // sondaki etiket atıldıysa satır o kenarda kalan kelimeye daralır (müzik boyunca ekranda beklemesin)
+  function etiketsizSatir(s, metin, koru) {
+    var y = kelimeKopya(s, metin);
+    if (kelimeli(s)) {
+      var ws = kelimeEtiketleri(s.words, koru);
+      if (ws.length) {
+        y.words = ws;
+        // dokunulmayan kelime aynı nesnedir: kenardaki kelime değiştiyse orada etiket atıldı
+        var a = Number(ws[0].start), b = Number(ws[ws.length - 1].end);
+        if (!koru && ws[0] !== s.words[0] && isFinite(a) && a > y.start && a < y.end) y.start = a;
+        if (!koru && ws[ws.length - 1] !== s.words[s.words.length - 1] && isFinite(b) && b < y.end && b > y.start) y.end = b;
+      } else delete y.words;
+    }
+    return y;
+  }
+
   // Whisper'ın bilinen halüsinasyonlarını süz
   var JUNK = /^(altyaz[ıi]\s*m\.?\s*k\.?|abone olmay[ıi] unutmay[ıi]n)$/i;
-  function cleanSegments(segs) {
+  /*
+   * secenek.etiketKoru: true -> ses etiketleri atılmaz, "[Müzik]" biçimine getirilir
+   * (Ayarlar › Altyazı › Ses etiketlerini koru). Girdi satırları değiştirilmez: etiketli
+   * satırın yerine kopyası döner.
+   */
+  function cleanSegments(segs, secenek) {
+    var koru = !!(secenek && secenek.etiketKoru);
     var out = [];
     var junk = JUNK;
     var lastText = "", repeat = 0;
     for (var i = 0; i < segs.length; i++) {
-      var t = segs[i].text;
+      var s = segs[i];
+      var t = s.text;
       if (!t) continue;
+      var et = sesEtiketleri(t, koru);
+      if (et !== t) {
+        if (!et) continue;                       // yalnız ses etiketi
+        s = etiketsizSatir(s, et, koru);
+        t = et;
+      }
       var norm = t.toLowerCase().replace(/[.,!?;:…]/g, "").replace(/\s+/g, " ").trim();
       if (!norm) continue; // sadece noktalamadan olusan segment ("...")
       if (junk.test(norm)) continue;
@@ -37,7 +210,7 @@
         if (repeat >= 2) continue; // 3+ kez aynı satır: takılma, at
       } else { repeat = 0; }
       lastText = norm;
-      out.push(segs[i]);
+      out.push(s);
     }
     return out;
   }
@@ -251,16 +424,20 @@
    * captions.js go() ve rehberin hazır örnek transkripti (ornekYukle) AYNI yolu
    * kullanır: iki yol ayrışırsa örnekte görülen satırlar gerçek çıktıyla tutmaz.
    *   lenVal: "k1" kelime kelime · "kc" birikimli · "wN" N kelime · "cN" N karakter
+   *   secenek.etiketKoru: ses etiketlerini "[Müzik]" biçiminde tut (varsayılan: at)
    * Döner: { segments, mode } — mode: "k1" | "kc" | "w" | "plain"
    */
-  function segmentleriKur(mapped, lenVal) {
+  function segmentleriKur(mapped, lenVal, secenek) {
     lenVal = String(lenVal || "c42");
+    secenek = secenek || {};
     var liste = (mapped || []).slice();
     var olculmus = !!WW && liste.some(kelimeli);
     if (/^k/.test(lenVal)) {
       // Satırlar ölçülmüş kelime taşıyorsa (yerel -ojf) kelime cue'ları onlardan kurulur:
       // tek transkripsiyon, tek önbellek girdisi. Satırın kelimesi yoksa satırın kendisi tek öğe.
-      if (olculmus) liste = WW.duzlestir(cleanSegments(liste));
+      // Bulut kelime öğelerinde de ses etiketi kelimeleri ("[Music]", "(alkış)") atılır.
+      if (olculmus) liste = WW.duzlestir(cleanSegments(liste, secenek));
+      else liste = kelimeEtiketleri(liste, !!secenek.etiketKoru);
       // kelime bazında yalnız boş/noktalama filtresi; tekrar filtresi meşru kelimeleri yer.
       // Boşluklu tire (" - ", " — ") ölçülmüş kelimelerde kendi öğesidir: tek başına cue olmaz
       liste = liste.filter(function (s) {
@@ -286,7 +463,7 @@
     }
     if (/^w\d+$/.test(lenVal)) {
       var n = parseInt(lenVal.slice(1), 10) || 3;
-      var temiz = cleanSegments(liste);
+      var temiz = cleanSegments(liste, secenek);
       // her satırın ölçülmüş kelimesi varsa: segment sınırını aşan N kelimelik gruplar (duraklama
       // ve cümle sonunda kırılır); yoksa bugünkü orantılı bölme
       if (olculmus && temiz.length && temiz.every(kelimeli) && !temiz.some(function (x) { return BOSLUKSUZ_YAZI.test(x.text); })) {
@@ -294,7 +471,7 @@
       }
       return { segments: splitWords(trimOverlongCues(temiz), n), mode: "w" };
     }
-    liste = trimOverlongCues(cleanSegments(liste));
+    liste = trimOverlongCues(cleanSegments(liste, secenek));
     return { segments: splitLong(liste, parseInt(lenVal.slice(1), 10) || 42, 4.5), mode: "plain" };
   }
 
@@ -588,6 +765,10 @@
     normalizeEmphasis: normalizeEmphasis,
     autoEmphasis: autoEmphasis,
     cleanSegments: cleanSegments,
+    gurultuMu: gurultuMu,
+    sesEtiketleri: sesEtiketleri,
+    kelimeEtiketleri: kelimeEtiketleri,
+    SES_ETIKETLERI: SES_ETIKETLERI.slice(),
     sondaTakilma: sondaTakilma,
     katmanSuresi: katmanSuresi,
     logoKatmanKalan: logoKatmanKalan,
