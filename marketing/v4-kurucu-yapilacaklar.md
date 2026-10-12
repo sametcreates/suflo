@@ -1433,6 +1433,28 @@ Motion › Position'ını `AE.sablonKonumu(ayar)` oranıyla (0-1, kartın ortas�
 "Temiz" / "Zarif" yerine arka plan kutulu **Kutulu**'ya taşınıyor (eski stilin yazı tipi / renkleri / konumu korunur).
 Belgesel'i kutusuz Zarif'e döndürmek istersen `js/altyazi-efekt.js` › `ESKI` (testi `tests/test-altyazi-efekt.js`).
 
+### Adım 18: Seçilmiş yeni fontlar ve kategorili yazı tipi seçicisi
+
+Ne değişti: `fonts/`'a yedi OFL ailesi (google/fonts): Bangers, Chakra Petch (Regular + Bold), Exo 2 (R + B), Inter
+(R + B), Libre Caslon Display, Nunito (R + B), Poppins (R + B); her biri kendi `fonts/OFL-<Aile>.txt`'iyle. Inter,
+Exo 2 ve Nunito upstream değişken fontlardan fontTools ile alınmış statik 400 / 700 örnekleri (iç aile adı aynı;
+ayrılmış ad yok). Hepsi `node tools/font-kontrol.js --az` ile Türkçe + Azerbaycanca TAM; paket büyümesi 1,83 MB
+(bütçe 3 MB). `js/style-share.js` FONTS dört kategoriye ayrıldı (Kalın / Modern / Zarif / Teknik); Altyazı
+Efektleri ve Marka Kiti seçicileri bu gruplarla, her seçenek kendi yüzüyle. Önizleme ücretsiz; yerleştirme mevcut
+`overlay` kapısından (3 deneme), yeni Pro anahtarı yok. Eski 6 fontlu kodlar 3.2 ile birebir aynı; yeni fontlu kodu
+3.2 paneli "font" uyarısıyla açar.
+
+Senin yapacakların:
+
+1. `marketing/v3.3-deneme-listesi.md` § 18'i Windows'ta ve macOS'ta sırayla dene (18.1–18.10).
+2. Yayın öncesi `node tools/font-kontrol.js --az fonts/*.ttf` çalıştır; yalnız Archivo Black ve Bebas Neue
+   "Azerbaycanca EKSIK" demeli (3.2'den beri böyle), başka satır EKSIK olmamalı.
+3. ZXP'yi kurduktan sonra `tools/verify-release.ps1`: yeni 12 `.ttf` ve 7 `OFL-*.txt` zorunlu listede.
+4. suflo.app/stil sayfası yeni aileleri Google Fonts'tan yükler (`docs/stil.html`, `docs/en/stil.html`); site
+   yayınlandıktan sonra Nunito'lu bir kodu aç ve fontun yüklendiğini gör.
+5. İstersen sonraki sürümde Roboto (Apache-2.0, `LICENSE` dosyasıyla) ya da Rajdhani / Jost eklenebilir; bütçede
+   ≈ 1,1 MB yer kaldı.
+
 ### YouTube indirici (sol menü › YouTube İndir; bilgi ücretsiz, indirmek Pro `youtube`, 3 deneme)
 
 Ne değişti: yeni araç. Bağlantı (watch?v=, youtu.be, Shorts, m. / music.youtube.com; oynatma listesinden yalnız o video)
