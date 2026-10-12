@@ -430,6 +430,18 @@ window.KCaptions = (function () {
     if (kutu) kutu.hidden = !canliIs.satirlar.length;
   }
 
+  /*
+   * Geçici dosyayı sil. Windows'ta iptal edilen whisper-cli / ffmpeg (taskkill eşzamansız) sesi birkaç
+   * yüz ms daha kilitli tutabilir: silinemezse kısa aralıklarla üç kez daha denenir.
+   */
+  function geciciSil(f, deneme) {
+    try { K.fs.unlinkSync(f); return; } catch (e) {}
+    try { if (!K.fs.existsSync(f)) return; } catch (e2) { return; }
+    deneme = deneme || 0;
+    if (deneme < 3) setTimeout(function () { geciciSil(f, deneme + 1); }, 1000 * (deneme + 1));
+    else K.log("[altyazı] gecici dosya silinemedi: " + String(f).replace(/^.*[\\\/]/, ""));
+  }
+
   // İş bitti (başarılı, hata ya da iptal): geçici satırlar gider; başarıda yerini nihai satırlar alır
   function canliBitir() {
     canliIs = null;
@@ -481,7 +493,7 @@ window.KCaptions = (function () {
     args.push(out);
     var r = await K.run(ff, args, { timeout: 900000, iptal: iptal });
     if (r.iptal) {
-      try { K.fs.unlinkSync(out); } catch (eI) {}     // yarım WAV/MP3 kalmasın
+      geciciSil(out);                                // yarım WAV/MP3 kalmasın
       throw iptalHatasiYap();
     }
     if (r.code !== 0 || !K.fs.existsSync(out)) {
@@ -729,7 +741,7 @@ window.KCaptions = (function () {
         if (eK && eK.iptal) throw eK;       // İptal: kurtarma hatası sayılmaz, iş durur
         K.log("takilma kurtarma basarisiz: " + (eK && eK.message ? eK.message : eK));
       } finally {
-        try { K.fs.unlinkSync(parca); } catch (eP) {}
+        geciciSil(parca);
       }
     }
     if (wordLevel) {
@@ -2542,7 +2554,7 @@ window.KCaptions = (function () {
       else status("✕ " + K.hataYardimi(e), "bad");
       if (!sonUyari && e && (e.vazgecildi || e.uyari)) sonUyari = e.message;
     } finally {
-      tempFiles.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
+      tempFiles.forEach(function (f) { geciciSil(f); });
       canliBitir();
       aktifIptal = null;
       busy = false;
