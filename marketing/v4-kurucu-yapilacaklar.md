@@ -1479,3 +1479,35 @@ projendeki 'Suflo İndirilenler' kutusuna gelir (Pro, 3 deneme hakkı)." `js/app
 `js/youtube-indir.js` › `varlikAdaylari` güncellenmeli; listede ad yoksa kurulum güvenle durur ("SHA2-256SUMS listesinde
 yt-dlp dosyası yok"). GitHub API'ye ulaşılamazsa (kimliksiz sınır saatte 60 istek) `latest/download` kullanılır; SUMS ve ikili
 yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız yt-dlp kuruluysa).
+
+## 3.4
+
+### 22. Yapay zekâ köprüsü (MCP, Deneysel)
+
+**MCP.1 Güvenlik incelemesi (yayından önce, zorunlu).** Diff üzerinde `/security-review` çalıştır; sonra
+`marketing/v3.4-deneme-listesi.md` › 22.24–22.27'yi elle doğrula (tarayıcıdan fetch / no-cors / form POST / WebSocket,
+sahte Host, jeton, dış ağ). Bağlantı dosyasının izinlerini macOS'ta `ls -l` ile, Windows'ta dosyanın kullanıcı profilinde
+durduğunu kontrol et.
+
+**MCP.2 MCP protokol sürümü.** `mcp/suflo-mcp.js` › `PROTOKOLLER` şu an `2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05`.
+Yayından önce güncel MCP belirtimine (modelcontextprotocol.io › Specification) bak; yeni bir sürüm çıktıysa listeye ekle ve
+Claude Desktop + Claude Code ile `initialize` → `tools/list` → `tools/call` denemesini yap.
+
+**MCP.3 Lemon Squeezy / fiyat sayfası.** Pro özellik listesine "Yapay zekâ köprüsü (MCP, deneysel)" satırı panelde eklendi;
+`docs/pro.html` ve İngilizce sayfada aynı satırı istersen ekle. Deneme anahtarı `mcp` (3 hak) js/deneme.js'te.
+
+**MCP.4 Güvenlik sayfası yayını.** `docs/mcp-guvenlik.html` panelde `https://suflo.app/mcp-guvenlik` olarak açılır. Site
+yayınlandığında adresin çalıştığını doğrula; istersen `docs/sitemap.xml`'e ekle ve İngilizce kopyasını `docs/en/` altına koy.
+
+**MCP.5 Kapsam notu.** Plan adım 22'deki `suflo_egri_uygula` (adım 10, eğri pişirme) bu dalda yok, çünkü adım 10 henüz
+`yerel-34-mcp` dalına gelmedi. Adım 10 birleşince `js/otomasyon.js` › EYLEMLER'e `yaz` sınıfında eklenmeli (Pro kapısı
+adım 10'unki), `js/otomasyon-panel.js` › YURUT'a yürütücüsü, testlere beklenen ad.
+
+**MCP.6 İsteğe bağlı: MCPB paketi.** Claude Desktop'un yerleşik Node'uyla çalışan tek tık kurulum (`.mcpb`) sonraya kaldı;
+biçimi önce doğrula. Şimdilik kullanıcıda Node 18+ gerekir (kart denetler ve ipucu verir).
+
+**MCP.7 Yol haritası.** `marketing/v4-yol-haritasi.md`'deki "Local MCP bridge … reconsider after UXP" ertelemesi alti-repo-plan
+adım 22 kararıyla geçersiz: köprü 3.4'te Deneysel olarak geliyor. O satırı güncellemek istersen "3.4'te deneysel olarak eklendi" yaz.
+
+**MCP.8 Destek cevabı (10 dk).** `marketing/dm-cevaplari.md`'ye: "Claude Suflo'yu göremiyor" → (a) Ayarlar'da köprü açık mı,
+(b) Node 18+ kurulu mu ("Node'u denetle"), (c) Claude Desktop'u yeniden başlattın mı, (d) yazma için "Düzenlemeye izin ver" açık mı.

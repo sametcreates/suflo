@@ -568,9 +568,23 @@ window.KTextCut = (function () {
       } else {
         status("✕ " + res.error, "bad");
       }
+      return res;
     } finally {
       el("tc-apply").disabled = false;
     }
+  }
+
+  // Yapay zekâ köprüsü (MCP, 3.4): "Uygula" düğmesinin aynı işlevi, HER ZAMAN kopya sekansta
+  async function mcpKes() {
+    if (!words.length) return { ok: false, hata: "analiz_yok", mesaj: "Prepare the Text-based cut in the Suflo panel first (no analysed transcript)." };
+    var eski = target;
+    target = "clone";
+    var res;
+    try { res = await apply(); } finally { target = eski; }
+    var st = el("tc-status");
+    if (!res) return { ok: false, hata: "uygulanamadi", mesaj: (st && st.textContent) || "Nothing to cut." };
+    if (!res.ok) return { ok: false, hata: "uygulanamadi", mesaj: res.error || "Not applied." };
+    return { ok: true, kopyaSekans: res.newSeq || "", bosluklu: !!res.rippleFallback };
   }
 
   // "Dinle": kesimler uygulanmis gibi sesi panelde cal (timeline'a dokunmaz)
@@ -681,5 +695,5 @@ window.KTextCut = (function () {
     refreshButton();
   }
 
-  return { init: init };
+  return { init: init, mcpKes: mcpKes };
 })();

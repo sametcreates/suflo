@@ -368,5 +368,6 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     });
   }
 
-  return { init: init };
+  // Yapay zekâ köprüsü (MCP, 3.4): "Zoom uygula" düğmesinin aynı işlevi
+  return { init: init, calistir: calistir };
 })();

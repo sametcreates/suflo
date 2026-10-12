@@ -4243,3 +4243,19 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .pc-bar .pc-on { min-width: 1px; }
 .pc-ozet { font-size: 11px; margin-bottom: 6px; }
 #pc-periyot { width: 64px; margin-left: 8px; }
+
+/* Yapay zekâ köprüsü (MCP, 3.4, Deneysel): Ayarlar kartı (js/otomasyon-panel.js) */
+.mcp-kart .chk { display: flex; align-items: center; margin: 8px 0 2px; font-size: 11.5px; cursor: pointer; }
+.mcp-kart .chk input { margin: 0 6px 0 0; }
+.mcp-kart .mcp-not { margin: 0 0 4px 20px; }
+.mcp-deneysel { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 6px; font-size: 9px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; color: #1b1300; background: #f5b83d; vertical-align: middle; }
+.mcp-acik-rozet { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 6px; font-size: 9px; font-weight: 800; color: #04210f; background: #3ad07a; vertical-align: middle; }
+.mcp-onay-kart { margin: 10px 0; padding: 10px 12px; border: 1px solid #f5b83d; border-radius: 8px; background: rgba(245, 184, 61, .08); }
+.mcp-onay-kart b { display: block; margin-bottom: 4px; }
+.mcp-onay-kart p { margin: 0 0 8px; overflow-wrap: break-word; word-break: break-word; }
+.mcp-onay-kart .dim { margin-left: 8px; font-variant-numeric: tabular-nums; }
+.mcp-etkinlik { list-style: none; margin: 6px 0 0; padding: 0; max-height: 180px; overflow-y: auto; font-size: 11px; }
+.mcp-etkinlik li { display: flex; align-items: baseline; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,.06); }
+.mcp-etkinlik li > * { margin-right: 8px; min-width: 0; overflow-wrap: break-word; word-break: break-word; }
+.mcp-etkinlik li .mcp-ok { color: #3ad07a; }
+.mcp-etkinlik li .mcp-hata { color: #ff7a7a; }

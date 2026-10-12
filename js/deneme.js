@@ -24,7 +24,7 @@
 
   var HAK = 3;
   var SURUM = 1;
-  var OZELLIKLER = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube"];
+  var OZELLIKLER = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube", "mcp"];
   // Ayarlar'daki liste ve bildirimler için kısa adlar
   var AD = {
     cut: "Otomatik kesim",
@@ -38,7 +38,8 @@
     beat: "Ritim",
     speedramp: "Hız rampası",
     offlineTranslate: "Çevrimdışı İngilizce çeviri",
-    youtube: "YouTube indirici"
+    youtube: "YouTube indirici",
+    mcp: "Yapay zekâ köprüsü (MCP)"
   };
   var ANAHTAR = /^[A-Za-z]{1,32}$/;   // "__proto__" gibi anahtarlar geçersiz sayılır
   var UST_SINIR = 1000;               // makul olmayan sayılar (elle düzenleme) geçersiz

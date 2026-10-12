@@ -6067,6 +6067,68 @@ window.KCaptions = (function () {
     }
   }
 
+  /* ---------------- Yapay zekâ köprüsü (MCP, 3.4) ---------------- */
+  // Altyazı sekmesindeki düğmelerin aynı işlevleri; köprü yalnız bunları çağırır.
+
+  function durumOku() {
+    var e = el("cap-status");
+    return e ? { metin: e.textContent || "", kotu: /\bbad\b/.test(e.className) } : { metin: "", kotu: false };
+  }
+
+  // Kapsam / dil / mod düğmelerle aynı yoldan seçilir, sonra "Altyazı oluştur" (go)
+  async function mcpOlustur(o) {
+    o = o || {};
+    if (busy) return { ok: false, hata: "mesgul", mesaj: "Caption generation is already running." };
+    if (o.kapsam && el("cap-scope")) {
+      var b = el("cap-scope").querySelector('button[data-s="' + o.kapsam + '"]');
+      if (b) b.click();
+    }
+    if (o.dil && el("cap-lang")) {
+      var sec = el("cap-lang");
+      var var_ = Array.prototype.some.call(sec.options, function (x) { return x.value === o.dil; });
+      if (!var_) return { ok: false, hata: "dil", mesaj: "Language not offered by Suflo: " + o.dil };
+      sec.value = o.dil;
+    }
+    if (o.mod && el("cap-maxlen")) el("cap-maxlen").value = o.mod === "kelime" ? "k1" : "l42";
+    var sonuc = await go();
+    var d = durumOku();
+    if (sonuc !== true || d.kotu) return { ok: false, hata: "olusturulamadi", mesaj: d.metin || "Caption generation did not start." };
+    return { ok: true, satir: segments.length, durum: d.metin };
+  }
+
+  // "Uygula" (caption track): onay isteyen durumlarda paneldeki uyarı metni döner
+  async function mcpKanala() {
+    if (!segments.length) return { ok: false, hata: "altyazi_yok", mesaj: "There are no captions in the Suflo editor." };
+    await apply(false);
+    var d = durumOku();
+    return d.kotu ? { ok: false, hata: "uygulanamadi", mesaj: d.metin } : { ok: true, satir: segments.length, durum: d.metin };
+  }
+
+  // SRT / VTT / TXT yalnız proje klasörüne (yol seçilemez); var olan dosyanın üstüne yazılmaz
+  async function mcpDisari(bicim) {
+    if (!segments.length) return { ok: false, hata: "altyazi_yok", mesaj: "There are no captions in the Suflo editor." };
+    if (["srt", "vtt", "txt"].indexOf(bicim) === -1) return { ok: false, hata: "gecersiz", mesaj: "srt, vtt or txt" };
+    var pd = await K.call("KS_projectDir");
+    var dir = pd && pd.ok ? String(pd.dir || "") : "";
+    if (!dir) return { ok: false, hata: "proje_kaydedilmemis", mesaj: "Save the Premiere project first: captions are written next to the project file." };
+    var ek = dosyaDilEki(), icerik, ad;
+    if (bicim === "txt") {
+      icerik = segments.map(function (s) { return CL.duzMetin(styleText(CT.stripEmphasis(s.text))); }).filter(Boolean).join("\r\n");
+      ad = "suflo-transkript" + ek + ".txt";
+    } else if (bicim === "vtt") {
+      icerik = buildVtt({ ciftDil: ciftDilAcik() });
+      ad = "suflo-altyazi" + ek + ".vtt";
+    } else {
+      icerik = buildSrt({ ciftDil: ciftDilAcik() });
+      ad = "suflo-altyazi" + ek + ".srt";
+    }
+    if (!icerik) return { ok: false, hata: "altyazi_yok", mesaj: "No caption text to write." };
+    var nokta = ad.lastIndexOf("."), kok = ad.slice(0, nokta), uz = ad.slice(nokta), hedef = ad;
+    for (var i = 2; K.fs.existsSync(K.path.join(dir, hedef)) && i < 1000; i++) hedef = kok + "-" + i + uz;
+    K.fs.writeFileSync(K.path.join(dir, hedef), "\uFEFF" + icerik, "utf8");
+    return { ok: true, dosya: hedef };
+  }
+
   /* ---------------- Başlat ---------------- */
 
   function init() {
@@ -6607,6 +6669,11 @@ window.KCaptions = (function () {
     language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili(); },
     refreshMogrtStyles: refreshMogrtStyles,
     // Podcast Modu: mikrofonları ayrı ayrı dışa aktarırken aynı gömülü WAV presetleri
-    bundledEpr: bundledEpr
+    bundledEpr: bundledEpr,
+    // Yapay zekâ köprüsü (MCP, 3.4)
+    mcpOlustur: mcpOlustur,
+    mcpKanala: mcpKanala,
+    mcpDisari: mcpDisari,
+    mesgulMu: function () { return busy; }
   };
 })();

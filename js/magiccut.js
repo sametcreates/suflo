@@ -291,6 +291,37 @@ window.KCut = (function () {
     } else {
       status("✕ " + r.error, "bad");
     }
+    return r;
+  }
+
+  /* ---------------- Yapay zekâ köprüsü (MCP, 3.4) ---------------- */
+  // Düğmelerin aynı işlevleri (aynı kapı, aynı deneme hakkı); kesim HER ZAMAN kopya sekansta
+  function durumMetni() { var e = el("cut-status"); return e ? { metin: e.textContent || "", kotu: /\bbad\b/.test(e.className) } : { metin: "", kotu: false }; }
+  function kaydir(id, v, alt, ust) {
+    var e = el(id);
+    if (e && typeof v === "number" && isFinite(v)) e.value = String(Math.max(alt, Math.min(ust, v)));
+  }
+  async function mcpAnaliz(o) {
+    o = o || {};
+    kaydir("cut-noise", o.esik_db, -60, -20);
+    kaydir("cut-minsil", o.min_sessizlik, 0.3, 2.5);
+    kaydir("cut-pad", o.pay, 0, 0.5);
+    if (busy) return { ok: false, hata: "mesgul", mesaj: "Auto Cut is already running." };
+    ranges = [];
+    await analyze();
+    var d = durumMetni();
+    if (d.kotu) return { ok: false, hata: "analiz_hatasi", mesaj: d.metin };
+    return { ok: true, klip: clip ? clip.name : "", araliklar: ranges.map(function (r) { return { baslangic: r.start, bitis: r.end }; }), durum: d.metin };
+  }
+  async function mcpKes() {
+    if (!activeRanges().length) return { ok: false, hata: "analiz_yok", mesaj: "Run suflo_sessizlik_analiz first: there are no cut ranges." };
+    var eski = target;
+    target = "clone";   // kopya sekans zorunlu: özgün sekans hiç bozulmaz
+    var r;
+    try { r = await apply(); } finally { target = eski; }
+    if (!r) return { ok: false, hata: "uygulanamadi", mesaj: durumMetni().metin || "Not applied." };
+    if (!r.ok) return { ok: false, hata: "uygulanamadi", mesaj: r.error || "Not applied." };
+    return { ok: true, kopyaSekans: r.newSeq || "", bosluklu: !!r.rippleFallback };
   }
 
   /* ---------------- Dinle (önizleme) ---------------- */
@@ -363,5 +394,5 @@ window.KCut = (function () {
     refreshButton();
   }
 
-  return { init: init };
+  return { init: init, mcpAnaliz: mcpAnaliz, mcpKes: mcpKes };
 })();

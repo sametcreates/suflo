@@ -1,0 +1,239 @@
+// Suflo testi: Yapay zekâ köprüsü (MCP) panel sunucusu — js/otomasyon-sunucu.js
+// Gerçek loopback sunucusu (Node): jeton, Host, tarayıcı başlıkları, yöntem, gövde sınırı,
+// hız ve kuyruk sınırı, bağlantı dosyası (0600, kapanışta silinir), düzenleme izni,
+// yıkıcı eylem onayı (zaman aşımında ret), Pro kapısı (pro_gerekli, hak harcanmaz).
+var fs = require("fs"), os = require("os"), path = require("path"), http = require("http");
+var S = require(path.join(__dirname, "..", "js", "otomasyon-sunucu.js"));
+var gecen = 0, toplam = 0;
+function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 300) + "]" : "")); }
+function js(x) { return JSON.stringify(x); }
+
+var dizin = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-mcp-"));
+var dosya = path.join(dizin, "Kesit", "otomasyon.json");
+
+function istek(port, o) {
+  o = o || {};
+  return new Promise(function (resolve) {
+    var govde = o.govde === undefined ? JSON.stringify({ ad: "suflo_baglam", args: {} }) : o.govde;
+    var h = {
+      "Host": "127.0.0.1:" + port,
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + o.token
+    };
+    if (o.basliklar) for (var k in o.basliklar) { if (o.basliklar[k] === null) delete h[k]; else h[k] = o.basliklar[k]; }
+    if (govde !== null) h["Content-Length"] = Buffer.byteLength(govde);
+    var r = http.request({ host: "127.0.0.1", port: port, method: o.yontem || "POST", path: o.yol || "/v1/eylem", headers: h, setHost: false }, function (res) {
+      var p = [];
+      res.on("data", function (c) { p.push(c); });
+      res.on("end", function () {
+        var j = null;
+        try { j = JSON.parse(Buffer.concat(p).toString("utf8")); } catch (e) {}
+        resolve({ kod: res.statusCode, govde: j, basliklar: res.headers });
+      });
+    });
+    r.on("error", function (e) { resolve({ kod: 0, hata: e }); });
+    if (govde !== null) r.end(govde); else r.end();
+  });
+}
+
+function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+async function main() {
+  var cagrilar = [], kayitlar = [], harcanan = [], onaylar = [];
+  var izin = { duzenleme: false, onay: true };
+  var proDurum = { cut: { ok: false } };
+  var onayYaniti = null;   // null: hiç yanıt verme (zaman aşımı)
+  var kapanma = [];
+  var sunucu = S.olustur({
+    dosya: dosya,
+    onaySuresi: 300,
+    yurut: function (ad, args, baglam) {
+      cagrilar.push([ad, args, baglam]);
+      if (ad === "suflo_doktor") return new Promise(function (r) { setTimeout(function () { r({ ok: true }); }, 400); });
+      if (ad === "suflo_secim") return { ok: true, klipler: [{ name: "a", mediaPath: "/Users/x/Movies/gizli.mov" }] };
+      if (ad === "suflo_sessizlik_analiz") { harcanan.push("cut"); return { ok: true, araliklar: [] }; }
+      if (ad === "suflo_altyazi_kanala") return { ok: false, error: "Aktif sequence yok." };
+      return { ok: true, ad: ad };
+    },
+    izinler: function () { return izin; },
+    onayIste: function (ad, args, ozet) { onaylar.push([ad, ozet]); return onayYaniti === null ? new Promise(function () {}) : Promise.resolve(onayYaniti); },
+    proIzin: function (f) { return proDurum[f] || { ok: false }; },
+    kayit: function (k) { kayitlar.push(k); },
+    onKapandi: function (n) { kapanma.push(n); }
+  });
+  var r0 = await sunucu.baslat();
+  var port = r0.port, token = sunucu._token();
+  ok("rastgele port, 64 haneli onaltılık jeton", port > 0 && /^[0-9a-f]{64}$/.test(token));
+
+  /* ---- bağlantı dosyası ---- */
+  var b = JSON.parse(fs.readFileSync(dosya, "utf8"));
+  ok("otomasyon.json: v, port, token, pid, baslangic", b.v === 1 && b.port === port && b.token === token && b.pid === process.pid && !isNaN(Date.parse(b.baslangic)), js(b));
+  if (process.platform !== "win32") ok("otomasyon.json modu 0600 (POSIX)", (fs.statSync(dosya).mode & 511) === 384, (fs.statSync(dosya).mode & 511).toString(8));
+  ok("geçici dosya kalmaz", fs.readdirSync(path.dirname(dosya)).length === 1, fs.readdirSync(path.dirname(dosya)).join(","));
+
+  /* ---- yalnız 127.0.0.1 ---- */
+  var ifs = os.networkInterfaces(), dis = null;
+  Object.keys(ifs).forEach(function (n) { (ifs[n] || []).forEach(function (a) { if (!dis && a.family === "IPv4" && !a.internal) dis = a.address; }); });
+  if (dis) {
+    var disSonuc = await new Promise(function (resolve) {
+      var r = http.request({ host: dis, port: port, method: "POST", path: "/v1/eylem" }, function () { resolve("baglandi"); });
+      r.on("error", function (e) { resolve(e.code); });
+      r.setTimeout(2000, function () { r.destroy(); resolve("zaman"); });
+      r.end("{}");
+    });
+    ok("dış arayüzden bağlanılamaz (0.0.0.0'a bağlı değil)", disSonuc !== "baglandi", disSonuc);
+  }
+  ok("kaynak: listen(0, '127.0.0.1'), 0.0.0.0 yok", /\.listen\(0, "127\.0\.0\.1"/.test(fs.readFileSync(path.join(__dirname, "..", "js", "otomasyon-sunucu.js"), "utf8")) &&
+    !/0\.0\.0\.0"/.test(fs.readFileSync(path.join(__dirname, "..", "js", "otomasyon-sunucu.js"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
+
+  /* ---- kimlik ---- */
+  var r = await istek(port, { token: token });
+  ok("doğru jetonla okuma eylemi 200", r.kod === 200 && r.govde.ok === true && r.govde.sonuc.ad === "suflo_baglam", js(r.govde));
+  r = await istek(port, { token: null, basliklar: { Authorization: null } });
+  ok("jetonsuz 401", r.kod === 401 && r.govde.hata === "jeton");
+  r = await istek(port, { token: token.slice(0, 63) + (token[63] === "a" ? "b" : "a") });
+  ok("yanlış jeton 401", r.kod === 401);
+  r = await istek(port, { token: token + "00" });
+  ok("farklı uzunlukta jeton 401", r.kod === 401);
+  r = await istek(port, { token: token, basliklar: { Authorization: "Basic " + token } });
+  ok("Bearer dışı şema 401", r.kod === 401);
+
+  /* ---- tarayıcı / DNS rebinding ---- */
+  r = await istek(port, { token: token, basliklar: { Origin: "https://kotu.example" } });
+  ok("Origin varsa 403", r.kod === 403);
+  r = await istek(port, { token: token, basliklar: { Referer: "https://kotu.example/" } });
+  ok("Referer varsa 403", r.kod === 403);
+  r = await istek(port, { token: token, basliklar: { "Sec-Fetch-Mode": "no-cors" } });
+  ok("Sec-Fetch-* varsa 403", r.kod === 403);
+  r = await istek(port, { token: token, basliklar: { Upgrade: "websocket", Connection: "Upgrade" } });
+  ok("WebSocket yükseltmesi 403 / bağlantı kurulamaz", r.kod === 403 || r.kod === 0, r.kod);
+  r = await istek(port, { token: token, basliklar: { Host: "kotu.example:" + port } });
+  ok("yanlış Host 403", r.kod === 403);
+  r = await istek(port, { token: token, basliklar: { Host: "localhost:" + port } });
+  ok("localhost Host da 403 (tam eşleşme 127.0.0.1:<port>)", r.kod === 403);
+  r = await istek(port, { token: token, yontem: "OPTIONS", govde: null });
+  var corsYok = Object.keys(r.basliklar || {}).every(function (k) { return !/^access-control-/i.test(k); });
+  ok("OPTIONS 403, CORS başlığı yok", r.kod === 403 && corsYok, js(r.basliklar));
+  r = await istek(port, { token: token, yontem: "GET", govde: null });
+  ok("GET 405", r.kod === 405);
+  r = await istek(port, { token: token, yol: "/v1/baska" });
+  ok("başka yol 404", r.kod === 404);
+  r = await istek(port, { token: token, yol: "/v1/eylem?x=1" });
+  ok("sorgu dizesi 404", r.kod === 404);
+  r = await istek(port, { token: token, basliklar: { "Content-Type": "text/plain" } });
+  ok("Content-Type application/json değilse 415 (form POST)", r.kod === 415);
+  r = await istek(port, { token: token, basliklar: { "Content-Type": "application/x-www-form-urlencoded" } });
+  ok("form-urlencoded 415", r.kod === 415);
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "x", args: {}, dolgu: new Array(270 * 1024).join("a") }) });
+  ok("256 KB üstü gövde 413", r.kod === 413, r.kod);
+  r = await istek(port, { token: token, govde: "{bozuk" });
+  ok("bozuk JSON 400", r.kod === 400 && r.govde.hata === "json");
+
+  /* ---- doğrulama ---- */
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "execute_extendscript", args: { code: "app.quit()" } }) });
+  ok("listede olmayan eylem 404 bilinmeyen_eylem, yürütülmez", r.kod === 404 && r.govde.hata === "bilinmeyen_eylem" && !cagrilar.some(function (c) { return c[0] === "execute_extendscript"; }));
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_baglam", args: { yol: "C:\\" } }) });
+  ok("bilinmeyen anahtar 400", r.kod === 400 && r.govde.hata === "gecersiz");
+
+  /* ---- çıktı temizliği ---- */
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_secim", args: {} }) });
+  ok("yanıtta mutlak yol yok (dosya adı)", r.govde.sonuc.klipler[0].mediaPath === "gizli.mov", js(r.govde));
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_altyazi_kanala", args: {} }) });
+  ok("yazma eylemi düzenleme izni kapalıyken 403 izin_yok, yürütülmez", r.kod === 403 && r.govde.hata === "izin_yok" && !cagrilar.some(function (c) { return c[0] === "suflo_altyazi_kanala"; }));
+  izin.duzenleme = true;
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_altyazi_kanala", args: {} }) });
+  ok("izin açıkken eylemin kendi hatası ok:false olarak döner", r.kod === 200 && r.govde.ok === false && /Aktif sequence/.test(r.govde.mesaj), js(r.govde));
+
+  /* ---- Pro kapısı ---- */
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_sessizlik_analiz", args: {} }) });
+  ok("Pro yoksa ve hak yoksa 402 pro_gerekli, yürütülmez, hak harcanmaz", r.kod === 402 && r.govde.hata === "pro_gerekli" && harcanan.length === 0 && !cagrilar.some(function (c) { return c[0] === "suflo_sessizlik_analiz"; }), js(r.govde));
+  proDurum.cut = { ok: true, deneme: true };
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_sessizlik_analiz", args: { esik_db: -40 } }) });
+  var son = cagrilar[cagrilar.length - 1];
+  ok("deneme hakkı varsa yürütülür, yürütücüye deneme: true geçer", r.kod === 200 && son[0] === "suflo_sessizlik_analiz" && son[2].deneme === true && son[1].esik_db === -40);
+
+  /* ---- yıkıcı eylem onayı ---- */
+  proDurum.cut = { ok: true, deneme: false };
+  onayYaniti = null;
+  var bas = Date.now();
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_sessizlik_kes", args: {} }) });
+  ok("onay gelmezse zaman aşımında reddedilir, yürütülmez", r.kod === 403 && r.govde.hata === "reddedildi" && Date.now() - bas >= 250 &&
+    !cagrilar.some(function (c) { return c[0] === "suflo_sessizlik_kes"; }) && onaylar[0][1] === "Sessizlikleri kes (kopyada)", js(r.govde));
+  onayYaniti = false;
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_sessizlik_kes", args: {} }) });
+  ok("Reddet: 403 reddedildi", r.kod === 403 && r.govde.hata === "reddedildi");
+  onayYaniti = true;
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_sessizlik_kes", args: {} }) });
+  ok("Onayla: yürütülür", r.kod === 200 && r.govde.ok === true && cagrilar.some(function (c) { return c[0] === "suflo_sessizlik_kes"; }));
+  izin.onay = false;
+  var onaySayisi = onaylar.length;
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_sessizlik_kes", args: {} }) });
+  ok("'Yıkıcı eylemlerde onay iste' kapalıyken kart sorulmaz", r.kod === 200 && onaylar.length === onaySayisi);
+  izin.onay = true;
+  izin.duzenleme = false;
+  r = await istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_sessizlik_kes", args: {} }) });
+  ok("yıkıcı eylem de düzenleme izni ister (onay kartından önce)", r.kod === 403 && r.govde.hata === "izin_yok" && onaylar.length === onaySayisi);
+
+  /* ---- etkinlik kaydı ---- */
+  ok("her çağrı kaydedilir (ad, sonuç, kod)", kayitlar.length >= 10 && kayitlar.some(function (k) { return k.ad === "suflo_sessizlik_kes" && k.kod === "reddedildi"; }) &&
+    kayitlar.some(function (k) { return k.ad === "suflo_baglam" && k.sonuc === "ok"; }));
+
+  /* ---- kuyruk: aynı anda tek eylem, en çok 4 bekleyen ---- */
+  var once = cagrilar.length;
+  var paralel = [];
+  for (var i = 0; i < 6; i++) paralel.push(istek(port, { token: token, govde: JSON.stringify({ ad: "suflo_doktor", args: {} }) }));
+  var sonuclar = await Promise.all(paralel);
+  var kodlar = sonuclar.map(function (x) { return x.kod; }).sort();
+  ok("1 çalışan + 4 kuyruk, 6. istek 429", js(kodlar) === js([200, 200, 200, 200, 200, 429]), js(kodlar));
+  ok("eylemler sırayla (eşzamanlı değil) yürütüldü", cagrilar.length - once === 5);
+
+  /* ---- jeton yenileme ---- */
+  var eski = token;
+  sunucu.jetonYenile();
+  token = sunucu._token();
+  r = await istek(port, { token: eski });
+  var r2 = await istek(port, { token: token });
+  ok("Yeni jeton: eskisi 401, dosya güncellendi", r.kod === 401 && r2.kod === 200 && token !== eski && JSON.parse(fs.readFileSync(dosya, "utf8")).token === token);
+
+  /* ---- kapanış ---- */
+  sunucu.durdur("kapat");
+  ok("durdur: bağlantı dosyası silinir", !fs.existsSync(dosya));
+  r = await istek(port, { token: token });
+  ok("durdur: port artık dinlemiyor", r.kod === 0);
+  ok("onKapandi bildirilir", kapanma[0] === "kapat");
+
+  /* ---- hız sınırı ---- */
+  var hizli = S.olustur({ dosya: dosya, dakikaSiniri: 5, yurut: function () { return { ok: true }; } });
+  var hp = (await hizli.baslat()).port, ht = hizli._token();
+  var hk = [];
+  for (var q = 0; q < 7; q++) hk.push((await istek(hp, { token: ht })).kod);
+  ok("dakika sınırı aşılınca 429", js(hk) === js([200, 200, 200, 200, 200, 429, 429]), js(hk));
+  ok("varsayılan sınır dakikada 120", S.DAKIKA_SINIRI === 120 && S.KUYRUK_SINIRI === 4 && S.GOVDE_SINIRI === 256 * 1024 && S.ONAY_SURESI === 60000 && S.BOSTA_KAPANMA === 30 * 60000);
+  hizli.durdur();
+
+  /* ---- boşta kapanma ---- */
+  var bosta = [];
+  var bs = S.olustur({ dosya: dosya, bostaKapanma: 200, yurut: function () { return { ok: true }; }, onKapandi: function (n) { bosta.push(n); } });
+  await bs.baslat();
+  await bekle(450);
+  ok("çağrı gelmezse kendiliğinden kapanır, dosya silinir", bosta[0] === "bosta" && !bs.acikMi() && !fs.existsSync(dosya));
+
+  /* ---- Premiere meşgul: yazma eylemi bekler, zaman aşımında 503 ---- */
+  var mesgul = true;
+  var ms = S.olustur({ dosya: dosya, mesgulBekleme: 300, izinler: function () { return { duzenleme: true, onay: true }; },
+    mesgulMu: function () { return mesgul; }, yurut: function () { return { ok: true }; } });
+  var mp = (await ms.baslat()).port, mt = ms._token();
+  r = await istek(mp, { token: mt, govde: JSON.stringify({ ad: "suflo_oynatma_kafasi", args: { saniye: 3 } }) });
+  ok("Premiere meşgulken yazma eylemi 503 premiere_mesgul", r.kod === 503 && r.govde.hata === "premiere_mesgul", js(r.govde));
+  r = await istek(mp, { token: mt });
+  ok("okuma eylemi meşgulken de yanıt verir", r.kod === 200);
+  setTimeout(function () { mesgul = false; }, 100);
+  r = await istek(mp, { token: mt, govde: JSON.stringify({ ad: "suflo_oynatma_kafasi", args: { saniye: 3 } }) });
+  ok("meşguliyet bitince yazma eylemi yürütülür", r.kod === 200 && r.govde.ok === true);
+  ms.durdur();
+
+  try { fs.rmdirSync(path.join(dizin, "Kesit")); fs.rmdirSync(dizin); } catch (e) {}
+  console.log("\n" + gecen + "/" + toplam + " gecti");
+  process.exit(gecen === toplam ? 0 : 1);
+}
+main().catch(function (e) { console.log("FAIL beklenmeyen hata " + (e && e.stack)); process.exit(1); });

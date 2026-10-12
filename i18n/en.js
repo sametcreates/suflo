@@ -3206,6 +3206,75 @@
 
   // Intentionally identical in English (brands, product/feature names, fonts, formats, keys).
   // Only used by tools/i18n-coverage.js so these don't count as missing.
+  /* ================= Yapay zekâ köprüsü (MCP, 3.4, Deneysel) ================= */
+  add({
+    "Yapay zekâ köprüsü (MCP)": "AI bridge (MCP)",
+    "Yapay zekâ köprüsü": "AI bridge",
+    "Deneysel": "Experimental",
+    "AÇIK": "ON",
+    "Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.":
+      "An AI assistant such as Claude can run Suflo's own tasks for you: generating captions, adding markers, cutting silences on a sequence copy. It is not a general Premiere remote control; only this computer can connect, and it turns off after 30 idle minutes.",
+    "Köprüyü aç": "Turn bridge on",
+    "Köprüyü kapat": "Turn bridge off",
+    "Yeni jeton": "New token",
+    "Eski jeton anında geçersiz olur": "The old token stops working immediately",
+    "Düzenlemeye izin ver": "Allow editing",
+    "Kapalıyken asistan yalnız okur (bağlam, izler, altyazı). Açıkken marker, altyazı ve kesim gibi değişiklikler yapabilir.":
+      "When off, the assistant can only read (context, tracks, captions). When on, it can make changes such as markers, captions and cuts.",
+    "Yıkıcı eylemlerde onay iste": "Ask before destructive actions",
+    "Yapay zekâ asistanı bunu yapmak istiyor": "The AI assistant wants to do this",
+    "Onayla": "Approve",
+    "Reddet": "Deny",
+    "Claude'a bağla": "Connect to Claude",
+    "Claude Desktop: Ayarlar → Geliştirici → Yapılandırmayı düzenle, kopyalanan satırları ekle. Claude Code: komutu terminale yapıştır.":
+      "Claude Desktop: Settings → Developer → Edit config, add the copied lines. Claude Code: paste the command into a terminal.",
+    "Claude Desktop ayarını kopyala": "Copy Claude Desktop config",
+    "Claude Code komutunu kopyala": "Copy Claude Code command",
+    "Node'u denetle": "Check Node",
+    "Etkinlik (son 50 çağrı)": "Activity (last 50 calls)",
+    "Güvenlik modeli →": "Security model →",
+    "Yapay zekâ köprüsü (MCP, deneysel)": "AI bridge (MCP, experimental)",
+    "Yapay zekâ köprüsü onay bekliyor: {}": "AI bridge is waiting for approval: {}",
+    "Henüz çağrı yok.": "No calls yet.",
+    "30 dakika çağrı gelmedi: köprü kapandı.": "No calls for 30 minutes: the bridge turned off.",
+    "Yapay zekâ köprüsü kapandı (30 dakika boşta)": "AI bridge turned off (30 minutes idle)",
+    "Node aranıyor…": "Looking for Node…",
+    "Node bulunamadı: Claude Desktop ya da Claude Code köprüyü \"node\" ile başlatır. nodejs.org'dan Node 18 ya da üstünü kur.":
+      "Node not found: Claude Desktop or Claude Code starts the bridge with \"node\". Install Node 18 or later from nodejs.org.",
+    "Node {} eski: köprü için Node 18 ya da üstü gerekir.": "Node {} is too old: the bridge needs Node 18 or later.",
+    "Node {} hazır.": "Node {} is ready.",
+    "Bu ortamda köprü açılamaz (Node yok).": "The bridge cannot run here (no Node).",
+    "Köprü açılıyor…": "Turning the bridge on…",
+    "Köprü açık: yalnız bu bilgisayardan (127.0.0.1), 30 dakika boşta kalırsa kapanır.": "Bridge on: this computer only (127.0.0.1); it turns off after 30 idle minutes.",
+    "✕ Köprü açılamadı: {}": "✕ Could not turn the bridge on: {}",
+    "Köprü kapalı.": "Bridge off.",
+    "Yeni jeton oluşturuldu: eski jeton artık geçmez": "New token created: the old token no longer works",
+    "Claude Desktop ayarı kopyalandı": "Claude Desktop config copied",
+    "Claude Code komutu kopyalandı": "Claude Code command copied",
+    "Bölüm": "Chapter",
+    "Bağlamı oku": "Read context",
+    "İzleri oku": "Read tracks",
+    "Seçimi oku": "Read selection",
+    "Altyazıyı oku": "Read captions",
+    "İş durumu": "Job status",
+    "Doktor": "Doctor",
+    "Oynatma kafasını taşı": "Move playhead",
+    "Oynatma kafasını taşı: {} sn": "Move playhead: {} s",
+    "Marker ekle": "Add markers",
+    "Marker ekle: {} marker": "Add markers: {} markers",
+    "Marker ekle: {} bölüm": "Add markers: {} chapters",
+    "Altyazı oluştur": "Generate captions",
+    "Altyazı oluştur: {}": "Generate captions: {}",
+    "Altyazıyı kanala koy": "Put captions on a caption track",
+    "Altyazıyı dışa aktar": "Export captions",
+    "Altyazıyı dışa aktar: {}": "Export captions: {}",
+    "Sessizlikleri bul": "Find silences",
+    "Otomatik zoom": "Auto zoom",
+    "Sessizlikleri kes (kopyada)": "Cut silences (on a copy)",
+    "Konuşmadan kes (kopyada)": "Text-based cut (on a copy)",
+    "Hız rampası uygula": "Apply speed ramp"
+  });
+
   var KEEP = ["Suflo", "Suflo Pro", "Suflo Doctor", "SUFLO PRO", "SUFLO CAPTION EDITOR", "PREMIERE CREATOR STUDIO", "PRO", "PREMIERE",
     "PREMIERE READY", "SFX", "Emoji Assets", "PNG · WEBP · GIF", "Motion BG", "ffmpeg", "In → Out", "Creator Punch", "Clean Pill", "Bold Box",
     "SaaS Glass", "Reels", "Pop", "Premium", "Karaoke", "YouTube", "Azərbaycanca", "Azərbaycan", "English", "Deutsch", "Español",
@@ -3222,7 +3291,12 @@
     "Podcast",        // Viral Score genre (same word in English)
     "English (beta)", "Türkmençe",
     ".suflo-stil,.txt", "Logo",
-    "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US"];   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US",
+    // AI bridge (MCP): English tool descriptions and error texts for the AI assistant (never shown in the panel)
+    "List the clips currently selected on the timeline (name, track, start/end in seconds).",
+    "Add up to 200 markers to the active sequence. With bolum=true they are added as chapter markers (YouTube chapters).",
+    "Spoken language code, e.g. tr, en or auto.", "satir = sentence lines, kelime = word-by-word captions.",
+    "Editing is not allowed: turn on 'Düzenlemeye izin ver' (Allow editing) in Suflo > Settings > AI bridge."];   // file picker filter (not shown as text)   // language pickers show each language in its own name
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

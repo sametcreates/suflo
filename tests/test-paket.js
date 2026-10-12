@@ -48,5 +48,17 @@ ok("3.3 'Kalın yazı' kapalı: statik Montserrat Regular / Bold pakette (fonts/
   fs.existsSync(path.join(__dirname, "..", "fonts", "Montserrat-Regular.ttf")) && /Montserrat-Regular\.ttf/.test(notice), gerekli.slice(0, 600));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
 
+/* ---- 3.4 Yapay zekâ köprüsü (MCP): mcp/ klasörü her pakette, .debug hiçbirinde ---- */
+var pk = okuK("tools/package.ps1"), ky = okuK("tools/kurucu-yap.ps1");
+ok("MCP: package.ps1 $stageItems ve kurucu $panelItems mcp/ taşır", /\$stageItems = @\([^)]*"mcp"/.test(pk) && /\$panelItems = @\([^)]*"mcp"/.test(ky) &&
+  /"mcp"/.test(okuK("tools/install.ps1")) && /\bmcp\b/.test(okuK("tools/install.sh")));
+ok("MCP: ZXP/kurucu listelerinde .debug yok", !/\$stageItems = @\([^)]*"\.debug"/.test(pk) && !/\$panelItems = @\([^)]*"\.debug"/.test(ky));
+ok("MCP: verify-release shim'i ve üç panel dosyasını zorunlu tutar", /mcp\/suflo-mcp\\\.js\$/.test(gerekli) && /js\/otomasyon\\\.js\$/.test(gerekli) &&
+  /js\/otomasyon-sunucu\\\.js\$/.test(gerekli) && /js\/otomasyon-panel\\\.js\$/.test(gerekli), gerekli.slice(0, 300));
+ok("MCP: shim js/otomasyon.js'i göreli yoldan ister (paket düzeni: <ext>/mcp + <ext>/js)", /require\("\.\.\/js\/otomasyon\.js"\)/.test(okuK("mcp/suflo-mcp.js")) && fs.existsSync(path.join(__dirname, "..", "mcp", "suflo-mcp.js")));
+var ih = okuK("index.html");
+var sira = ["js/deneme.js", "js/pro.js", "js/captions.js", "js/magiccut.js", "js/konusma-kes.js", "js/hiz-rampasi.js", "js/zoom.js", "js/otomasyon.js", "js/otomasyon-sunucu.js", "js/otomasyon-panel.js", "js/app.js"].map(function (f) { return ih.indexOf('<script src="' + f + '"></script>'); });
+ok("MCP: index.html betik sırası (kayıt → sunucu → panel → app)", sira.every(function (x, i) { return x > 0 && (i === 0 || x > sira[i - 1]); }), sira.join(","));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
