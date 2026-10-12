@@ -538,7 +538,41 @@ window.KLibraryHealth = (function () {
     return out;
   }
 
+  // Karttaki dört çip (Premiere, Altyazı motoru, Pro Cloud, Presetler) taramanın gerçek sonucunu
+  // gösterir: o bölümdeki en kötü durum; denetim yoksa "" (nötr). Presetler, Pro grubundaki preset
+  // denetimleridir; Pro Cloud geri kalanı
+  var CIPLER = {
+    premiere: function (c) { return c.group === "premiere"; },
+    engine: function (c) { return c.group === "engine"; },
+    pro: function (c) { return c.group === "pro" && !/preset/i.test(c.title); },
+    preset: function (c) { return c.group === "pro" && /preset/i.test(c.title); }
+  };
+  var CIP_SIRA = { good: 1, warn: 2, bad: 3 };
+  function cipDurumlari(report) {
+    var out = {};
+    Object.keys(CIPLER).forEach(function (k) {
+      var en = "";
+      ((report && report.checks) || []).forEach(function (c) {
+        if (CIPLER[k](c) && (CIP_SIRA[c.status] || 0) > (CIP_SIRA[en] || 0)) en = c.status;
+      });
+      out[k] = en;
+    });
+    return out;
+  }
+  var CIP_METNI = { good: "sorun yok", warn: "uyarı var", bad: "düzeltilmesi gereken sorun var", "": "denetlenmedi" };
+  function cipleriCiz(report) {
+    var d = cipDurumlari(report);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-cip]"), function (s) {
+      var k = s.getAttribute("data-doctor-cip");
+      var durum = report ? (d[k] || "") : "";
+      s.className = durum;
+      if (report) s.setAttribute("title", uiMetni(s.textContent) + ": " + uiMetni(CIP_METNI[durum]));
+      else s.removeAttribute("title");
+    });
+  }
+
   function render(report) {
+    cipleriCiz(report);
     var box = el("set-library-health-result");
     var copy = el("set-library-health-copy");
     var fixAll = el("set-doctor-fix-all");
@@ -766,6 +800,7 @@ window.KLibraryHealth = (function () {
     repair: repair,
     repairAll: repairAll,
     apiKontrolleri: apiKontrolleri,
+    cipDurumlari: cipDurumlari,
     PANEL_REHBERI: PANEL_REHBERI,
     last: function () { return lastReport; }
   };

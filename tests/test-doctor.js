@@ -114,6 +114,21 @@ async function main() {
   ok("Gercek prfpset Doctor tarafindan parse edilir", check(report, "Premiere preset paketi").detail.indexOf("1 efekt") !== -1);
   ok("Doctor raporu destek icin kopyalanabilir", /Suflo Doctor raporu/.test(ctx.KDoctor.reportText(report)));
 
+  // Karttaki çipler gerçek sonucu gösterir: bölümdeki en kötü durum, denetim yoksa nötr ("")
+  var cip = ctx.KDoctor.cipDurumlari(report);
+  ok("Doctor çipleri tarama sonucundan (Premiere, motor, Pro, Presetler hazır)", cip.premiere === "good" && cip.engine === "good" && cip.pro === "good" && cip.preset === "good", JSON.stringify(cip));
+  var cip2 = ctx.KDoctor.cipDurumlari({ checks: [
+    { status: "good", group: "premiere", title: "Premiere bağlantısı" }, { status: "warn", group: "premiere", title: "Premiere'de yok: X" },
+    { status: "bad", group: "engine", title: "FFmpeg bulunamadı" }, { status: "good", group: "engine", title: "GPU" },
+    { status: "good", group: "pro", title: "Suflo Pro lisansı" }, { status: "bad", group: "pro", title: "Preset paketi okunamıyor" }] });
+  ok("Doctor çipi bölümün en kötü durumunu alır; Presetler Pro'dan ayrı", cip2.premiere === "warn" && cip2.engine === "bad" && cip2.pro === "good" && cip2.preset === "bad", JSON.stringify(cip2));
+  var cip3 = ctx.KDoctor.cipDurumlari({ checks: [{ status: "good", group: "pro", title: "Lisans durumu" }] });
+  ok("Denetimi olmayan çip nötr kalır (Free: preset denetimi yok)", cip3.preset === "" && cip3.premiere === "" && cip3.pro === "good", JSON.stringify(cip3));
+  var css = fs.readFileSync(path.join(ROOT, "css", "style.css"), "utf8"), html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+  ok("Doctor çipleri: Premiere sabit yeşil değil; durum sınıfları var; HTML'de dört çip data-doctor-cip ile",
+    !/doctor-scope span:first-child::before/.test(css) && /\.doctor-scope span\.good::before/.test(css) && /\.doctor-scope span\.bad::before/.test(css) &&
+    ["premiere", "engine", "pro", "preset"].every(function (k) { return html.indexOf('data-doctor-cip="' + k + '"') !== -1; }));
+
   fs.mkdirSync(path.join(RELEASES, "2026.08.25.1.staging"), { recursive: true });
   var staged = ctx.KDoctor.makeReport();
   await ctx.KDoctor.runAsyncChecks(staged);

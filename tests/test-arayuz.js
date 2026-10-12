@@ -340,6 +340,13 @@ var hizUi = fs.readFileSync(KOKYOL + "js/hiz-rampasi.js", "utf8");
 ok("Hız Rampası: kenar çubuğunda Geçişler'den sonra, Kanca Başlığı'ndan önce; YENİ ve PRO rozetli",
   html.indexOf('data-tab="hiz"') > html.indexOf('data-tab="gecis"') && html.indexOf('data-tab="hiz"') < html.indexOf('data-tab="kanca"') &&
   /data-tab="hiz">[\s\S]{0,300}<b>Hız Rampası <em class="ky-yeni">YENİ<\/em><\/b><i>ağır çekim · hızlanma<\/i>[\s\S]{0,80}data-kilit>PRO/.test(html));
+var yanCss = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
+// Ekran görüntüsü (3.1.0, 164 px menü): "Diğer Animasyonla / r" kelime ortasından bölünüyor, uzun ad ve açıklama
+// alttaki öğenin üstüne taşıyordu
+ok("Yan menü: adlar kelime ortasından bölünmez, en çok 2 satır; açıklama tek satır; öğeler büzülmez; dar menüde sayaç gizli",
+  !/\.yan-menu \.ky-metin b \{[^}]*overflow-wrap:\s*anywhere/.test(yanCss) && /\.yan-menu \.ky-metin b \{[^}]*-webkit-line-clamp:\s*2/.test(yanCss) &&
+  /\.yan-menu \.ky-metin i \{[^}]*text-overflow:\s*ellipsis/.test(yanCss) && /\.yan-menu \.ky-oge \{\s*flex-shrink:\s*0/.test(yanCss) &&
+  /@media \(min-width: 561px\) and \(max-width: 720px\) \{ \.yan-menu \.ky-adet \{ display: none; \} \}/.test(yanCss));
 ok("Hız Rampası: sayaç rozeti yok (elle tutulan bir sayı daha olmasın)", !/data-tab="hiz">[\s\S]{0,400}?ky-adet[\s\S]{0,40}<\/button>/.test(html.slice(html.indexOf('data-tab="hiz"'), html.indexOf('data-tab="kanca"'))));
 ["tab-hiz", "hiz-tanitim", "hiz-hedef", "hiz-aralik", "hiz-grid", "hiz-onizleme", "hiz-ozet", "hiz-yogunluk", "hiz-gecis", "hiz-parca", "hiz-kaynak", "hiz-ses",
   "hiz-akis", "hiz-bulanik", "hiz-vurus", "hiz-kopya", "hiz-uygula", "hiz-kaldir", "hiz-status", "hiz-ritim-yon", "hiz-ritim-yon-kutu"].forEach(function (id) {

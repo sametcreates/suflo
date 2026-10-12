@@ -1641,12 +1641,19 @@ details.adv > *:not(summary) { margin-top: 8px; }
   margin: 13px 0 0 56px;
 }
 .doctor-scope span {
-  display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px;
+  display: inline-flex; align-items: center; padding: 4px 7px;
   border: 1px solid rgba(255,255,255,.065); border-radius: 999px;
   color: #858691; background: rgba(255,255,255,.025); font-size: 8px; font-weight: 600;
 }
-.doctor-scope span::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: #6d6f79; }
-.doctor-scope span:first-child::before { background: #76d99d; box-shadow: 0 0 8px rgba(118,217,157,.55); }
+/* Nokta taramadan önce nötr; tarama sonucuna göre yeşil / sarı / kırmızı (eskiden Premiere her
+   zaman yeşil, ötekiler gri görünüp "sorun var" gibi okunuyordu). CEF 74'te flex gap yok: margin */
+.doctor-scope span::before { content: ""; flex: none; width: 4px; height: 4px; margin-right: 5px; border-radius: 50%; background: #6d6f79; }
+.doctor-scope span.good::before { background: #76d99d; box-shadow: 0 0 8px rgba(118,217,157,.55); }
+.doctor-scope span.warn::before { background: #f2c45a; box-shadow: 0 0 8px rgba(242,196,90,.5); }
+.doctor-scope span.bad::before { background: #ff6b6b; box-shadow: 0 0 8px rgba(255,107,107,.55); }
+.doctor-scope span.good { color: #a9dcb9; }
+.doctor-scope span.warn { color: #e9cf8f; }
+.doctor-scope span.bad { color: #ffaaaa; }
 .doctor-actions { flex-wrap: wrap; margin: 0 0 0 56px; }
 .doctor-actions .btn:not([hidden]) { min-height: 30px; margin-top: 11px; }
 @media (max-width: 560px) {
@@ -3671,8 +3678,19 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   font-size: 6.4px; line-height: 1; padding: 2px 3px; border-radius: 4px; letter-spacing: .3px;
   background: #2a2350; border-color: rgba(171,145,255,.55); box-shadow: 0 2px 6px -2px rgba(0,0,0,.8);
 }
-/* Uzun adlar ("Yazı Animasyonları") kesilmek yerine iki satıra sarar */
-.yan-menu .ky-metin b { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; overflow-wrap: anywhere; }
+/* Uzun adlar ("Yazı Animasyonları") kesilmek yerine en çok iki satıra sarar, yalnız kelime
+   aralarından (overflow-wrap:anywhere "Animasyonla / r" diye bölüyordu) */
+.yan-menu .ky-metin b {
+  white-space: normal; overflow: hidden; text-overflow: clip; line-height: 1.2;
+  overflow-wrap: normal; word-break: normal;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+/* Açıklama tek satır; sığmazsa "…" (iki satıra sarıp alttaki öğenin üstüne taşıyordu) */
+.yan-menu .ky-metin i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Sütundaki öğeler büzülmez: uzun ad öğeyi uzatır, komşusunun üstüne binmez; menü kayar */
+.yan-menu .ky-oge { flex-shrink: 0; }
+/* Dar menüde (164 px) sayaç rozeti ada yer bırakmıyordu (metne 53 px kalıyordu): gizlenir */
+@media (min-width: 561px) and (max-width: 720px) { .yan-menu .ky-adet { display: none; } }
 .ky-yeni {
   display: inline-block; vertical-align: 1px; margin-left: 4px; font-style: normal; font-size: 6.6px; font-weight: 800; letter-spacing: .5px; line-height: 1;
   padding: 2px 4px; border-radius: 4px; color: #0b1a10; background: #7cf0a0;
