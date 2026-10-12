@@ -138,20 +138,39 @@ window.KEngine = (function () {
   }
 
   // true: doğrulandı ya da doğrulanamadı (bilinmiyor); false: uyuşmadı (dosya silinir)
-  async function modelDogrula(item, yol, say) {
+  // sonuc (isteğe bağlı, 3.4 adım 19): sonuc.durum = "dogrulandi" | "bilinmiyor" | "uyusmadi" —
+  // içe aktarma "doğrulanmadı" durumunu kullanıcıya sormak için ayırt eder
+  async function modelDogrula(item, yol, say, sonuc) {
+    sonuc = sonuc || {};
     var beklenen = "";
     try { beklenen = await hfOzetGetir(item); } catch (e) {}
-    if (!beklenen) { K.log("[model] SHA-256 bilinmiyor, boyut denetimiyle devam: " + item.file); return true; }
+    if (!beklenen) { sonuc.durum = "bilinmiyor"; K.log("[model] SHA-256 bilinmiyor, boyut denetimiyle devam: " + item.file); return true; }
     if (say) say("Model doğrulanıyor…");
     var ozet = await dosyaOzeti(yol);
-    if (ozet === beklenen) { K.log("[model] SHA-256 dogrulandi: " + item.file); return true; }
+    if (ozet === beklenen) { sonuc.durum = "dogrulandi"; K.log("[model] SHA-256 dogrulandi: " + item.file); return true; }
+    sonuc.durum = "uyusmadi";
     K.log("[model] SHA-256 UYUSMADI: " + item.file + " " + ozet + " != " + beklenen);
     try { K.fs.unlinkSync(yol); } catch (e2) {}
     return false;
   }
 
+  function MIA() { return (typeof window !== "undefined" && window.SufloModelIceAktar) || null; }
+
+  // İçe aktarılmış özel modeller (settings.ozelModeller; 3.4 adım 19). Katalogda yoklar, doğrulanmazlar.
+  function ozelModeller() {
+    var mia = MIA();
+    if (!mia) return [];
+    var liste = [];
+    try { liste = mia.ozelListeyeEkle(K.settings().ozelModeller, null); } catch (e) { liste = []; }
+    return liste.map(function (x) { return mia.ozelModelKaydi(x.file, x.sizeMB * 1048576); });
+  }
+
   function modelById(id) {
     for (var i = 0; i < MODELS.length; i++) if (MODELS[i].id === id) return MODELS[i];
+    if (/^ozel:/.test(String(id || ""))) {
+      var oz = ozelModeller();
+      for (var j = 0; j < oz.length; j++) if (oz[j].id === id) return oz[j];
+    }
     return null;
   }
 
@@ -170,6 +189,11 @@ window.KEngine = (function () {
           // yarım kalmış dosyayı kurulu sayma (beklenenin %85'inden küçükse)
           if (size > m.sizeMB * 1048576 * 0.85) out.push(m);
         }
+      });
+      // içe aktarılmış özel modeller: dosya duruyor ve 1 MB'tan büyükse kurulu
+      ozelModeller().forEach(function (m) {
+        if (files.indexOf(m.file) === -1) return;
+        try { if (K.fs.statSync(K.path.join(mdir, m.file)).size > 1048576) out.push(m); } catch (e2) {}
       });
     } catch (e) {}
     return out;
@@ -627,6 +651,7 @@ window.KEngine = (function () {
     var mPath = K.path.join(dir, "models", model.file);
     var already = installedModels().some(function (m) { return m.id === model.id; });
     if (already) return { model: model, already: true };
+    if (model.ozel) throw new Error("Özel model dosyası bulunamadı: Ayarlar › Motor › Model dosyası içe aktar ile yeniden ekle.");
     say(model.label + " iniyor… (" + fmtMB(model.sizeMB) + ")");
     var d3 = await fetchFile(model, mPath, function (f) {
       say(model.label + " iniyor… %" + Math.round(f * 100) + " (" + fmtMB(model.sizeMB) + ")");
@@ -637,6 +662,138 @@ window.KEngine = (function () {
     }
     return { model: model, already: false };
   }
+
+  /* ---------------- Çevrimdışı model içe aktarma (3.4 adım 19) ---------------- */
+
+  /*
+   * Kurumsal ağda huggingface.co'ya ulaşılamayan kullanıcı, modeli başka bir bilgisayarda indirip
+   * buradan kurar. Kararlar js/model-ice-aktar.js'te (saf); burada dosya işleri:
+   *   1. ilk 4 bayt + boyut denetimi (ggml imzası, > 1 MB, <= 4 GB)
+   *   2. katalog kimliği dosya adından; eşleşmezse yalnız onayla "Özel model"
+   *   3. hedef doluysa SESSİZCE ÜZERİNE YAZILMAZ: onay istenir
+   *   4. <hedef>.ice-aktar.part'a kopyala -> katalog modeliyse modelDogrula (SHA-256);
+   *      ağ yoksa "doğrulanmadı" onayı; uyuşmazsa ya da onay yoksa .part silinir
+   *   5. .part -> hedef (rename); seçim bu modele geçer
+   * secenek: { onayla: async function (tur, metin) -> bool, say: function (metin) }
+   *   tur: "ozel" | "ustune-yaz" | "dogrulanmadi"
+   * Döner: { ok: true, id, file, durum: "dogrulandi"|"dogrulanmadi"|"ozel" } ya da { ok: false, vazgecildi: true }
+   * Kullanıcının seçtiği kaynak dosyaya ASLA dokunulmaz (yalnız okunur).
+   */
+  var _iceAktariliyor = false;
+
+  function dosyaKopyala(kaynak, hedef, ilerleme) {
+    return new Promise(function (resolve, reject) {
+      var toplam = 0, giden = 0, bitti = false;
+      try { toplam = K.fs.statSync(kaynak).size; } catch (e0) {}
+      function son(e) { if (bitti) return; bitti = true; if (e) reject(e); else resolve(giden); }
+      var oku, yaz;
+      try {
+        oku = K.fs.createReadStream(kaynak);
+        yaz = K.fs.createWriteStream(hedef);
+      } catch (e1) { son(e1); return; }
+      oku.on("data", function (c) {
+        giden += c.length;
+        if (ilerleme && toplam) ilerleme(giden / toplam);
+      });
+      oku.on("error", function (e2) { try { yaz.destroy(); } catch (e3) {} son(e2); });
+      yaz.on("error", function (e4) { try { oku.destroy(); } catch (e5) {} son(e4); });
+      yaz.on("finish", function () {
+        if (toplam && giden !== toplam) son(new Error("Kopya eksik: " + giden + "/" + toplam + " bayt"));
+        else son(null);
+      });
+      oku.pipe(yaz);
+    });
+  }
+
+  function ayniYol(a, b) {
+    function n(p) { var r = K.path.resolve(p); return K.WIN ? r.toLowerCase() : r; }
+    try { return n(a) === n(b); } catch (e) { return false; }
+  }
+
+  async function modelIceAktar(kaynak, secenek) {
+    secenek = secenek || {};
+    var mia = MIA();
+    if (!mia) throw new Error("Model içe aktarma modülü yüklenmedi.");
+    if (!K.nodeOK) throw new Error("Bu ortamda kurulamaz — Premiere içinde dene.");
+    if (_iceAktariliyor) throw new Error("Başka bir model içe aktarılıyor; bitmesini bekle.");
+    var onayla = typeof secenek.onayla === "function" ? secenek.onayla : function () { return false; };
+    var say = typeof secenek.say === "function" ? secenek.say : function () {};
+    _iceAktariliyor = true;
+    try {
+      var st;
+      try { st = K.fs.statSync(kaynak); } catch (eS) { throw new Error("Dosya okunamadı: " + mia.dosyaAdi(kaynak)); }
+      if (!st.isFile()) throw new Error("Bir model dosyası (.bin) seç.");
+      var bas = require("buffer").Buffer.alloc(4), fd = null, okunan = 0;
+      try { fd = K.fs.openSync(kaynak, "r"); okunan = K.fs.readSync(fd, bas, 0, 4, 0); }
+      catch (eR) { throw new Error("Dosya okunamadı: " + mia.dosyaAdi(kaynak)); }
+      finally { if (fd !== null) { try { K.fs.closeSync(fd); } catch (eC) {} } }
+      var den = mia.basligiDenetle(okunan >= 4 ? bas : bas.slice(0, okunan), st.size);
+      if (!den.ok) throw new Error(den.mesaj);
+
+      var ad = mia.dosyaAdi(kaynak);
+      var item = mia.katalogEslestir(ad, MODELS);
+      if (item) {
+        var bd = mia.katalogBoyutDenetle(item, st.size);
+        if (!bd.ok) throw new Error(bd.mesaj);
+      }
+      var ozel = null;
+      if (!item) {
+        if (!(await onayla("ozel", mia.ozelUyari(ad, mia.aileTahmin(ad, MODELS))))) return { ok: false, vazgecildi: true };
+        ozel = mia.ozelModelKaydi(mia.ozelDosyaAdi(ad, MODELS), st.size);
+      }
+      var hedefAd = item ? item.file : ozel.file;
+      var mdir = K.path.join(K.whisperDir(), "models");
+      K.fs.mkdirSync(mdir, { recursive: true });
+      var hedef = K.path.join(mdir, hedefAd);
+      if (ayniYol(kaynak, hedef)) throw new Error("Bu dosya zaten Suflo'nun model klasöründe: yeniden içe aktarmaya gerek yok.");
+      var hedefVar = false;
+      try { hedefVar = K.fs.existsSync(hedef); } catch (eE) {}
+      if (hedefVar && !(await onayla("ustune-yaz", mia.ustuneYazSorusu(hedefAd)))) return { ok: false, vazgecildi: true };
+
+      var part = hedef + mia.PART_EKI;
+      var durum = item ? "dogrulandi" : "ozel";
+      try {
+        try { K.fs.unlinkSync(part); } catch (eU) {}
+        say("Model kopyalanıyor…");
+        await dosyaKopyala(kaynak, part, function (f) { say("Model kopyalanıyor… %" + Math.round(f * 100)); });
+        if (item) {
+          var sonuc = {};
+          if (!(await modelDogrula(item, part, say, sonuc))) {
+            throw new Error(item.label.split(" —")[0] + " doğrulanamadı: SHA-256 uyuşmadı (bozuk ya da farklı bir dosya). Kurulmadı.");
+          }
+          if (sonuc.durum === "bilinmiyor") {
+            if (!(await onayla("dogrulanmadi", mia.dogrulanmadiSorusu(item.label.split(" —")[0])))) {
+              try { K.fs.unlinkSync(part); } catch (eV) {}
+              return { ok: false, vazgecildi: true };
+            }
+            durum = "dogrulanmadi";
+          }
+        }
+        // onay alındı (ya da hedef boştu): eskiyi kaldır, .part'ı yerine koy
+        try { if (K.fs.existsSync(hedef)) K.fs.unlinkSync(hedef); } catch (eD) {}
+        K.fs.renameSync(part, hedef);
+      } catch (e) {
+        try { K.fs.unlinkSync(part); } catch (eP) {}
+        throw e;
+      }
+
+      var s = K.settings();
+      if (ozel) s.ozelModeller = mia.ozelListeyeEkle(s.ozelModeller, ozel);
+      var kayitlar = s.modelIceAktarma && typeof s.modelIceAktarma === "object" ? s.modelIceAktarma : {};
+      kayitlar[hedefAd] = durum;
+      s.modelIceAktarma = kayitlar;
+      var id = item ? item.id : ozel.id;
+      s.model = id;
+      K.saveSettings();
+      K.log("[model] ice aktarildi: " + hedefAd + " (" + durum + ")");
+      return { ok: true, id: id, file: hedefAd, durum: durum, model: item || ozel };
+    } finally {
+      _iceAktariliyor = false;
+    }
+  }
+
+  // Doctor "Model kaynaklarını sına": motor sürüm arşivinin adresi (ana makinesi sınanır)
+  function motorKaynakAdresi() { return BUILDS.cpu.urls[0]; }
 
   /*
    * Kısa sessiz sesle bir tur çalıştırıp CUDA çekirdek önbelleğini doldur.
@@ -970,6 +1127,9 @@ window.KEngine = (function () {
     kurulumSuruyor: kurulumSuruyor,
     buildArgs: buildArgs,
     fmtMB: fmtMB,
+    modelIceAktar: modelIceAktar,
+    ozelModeller: ozelModeller,
+    motorKaynakAdresi: motorKaynakAdresi,
     _hfBeklenenOzet: hfBeklenenOzet,
     _hfDepo: hfDepo,
     _modelDogrula: modelDogrula

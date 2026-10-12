@@ -96,6 +96,8 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "preset-pack.js"), "utf8"), ctx, { filename: "js/preset-pack.js" });
 // 3.2 adım 5: Doctor çözme modu ve DTW satırları (js/whisper-args.js doctorSatirlari)
 vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "whisper-args.js"), "utf8"), ctx, { filename: "js/whisper-args.js" });
+// 3.4 adım 19: "Model kaynaklarını sına" satırları (js/ag-dayanim.js kaynakSatirlari)
+vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "ag-dayanim.js"), "utf8"), ctx, { filename: "js/ag-dayanim.js" });
 vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "library-health.js"), "utf8"), ctx, { filename: "js/library-health.js" });
 
 var passed = 0, failed = 0;
@@ -156,6 +158,45 @@ async function main() {
   ok("Doctor çipleri: Premiere sabit yeşil değil; durum sınıfları var; HTML'de dört çip data-doctor-cip ile",
     !/doctor-scope span:first-child::before/.test(css) && /\.doctor-scope span\.good::before/.test(css) && /\.doctor-scope span\.bad::before/.test(css) &&
     ["premiere", "engine", "pro", "preset"].every(function (k) { return html.indexOf('data-doctor-cip="' + k + '"') !== -1; }));
+
+  // 3.4 adım 19 — Model kaynaklarını sına: 5 sn HEAD, yalnız düğmeyle; DNS filtresi ve HTTPS denetimi anlatılır
+  var headCagri = [], dnsSorgu = [];
+  var eskiGet = ctx.K.httpGet;
+  ctx.K.httpGet = async function (u, h, s) {
+    if (s && s.method === "HEAD") {
+      headCagri.push({ u: u, s: s });
+      if (/huggingface\.co/.test(u)) return { status: 200, body: "", caDenendi: true };
+      if (/hf-mirror\.com/.test(u)) return { status: 0, body: "Error: unable to verify the first certificate", kod: "UNABLE_TO_VERIFY_LEAF_SIGNATURE", caDenendi: true };
+      return { status: 0, body: "Error: getaddrinfo ENOTFOUND github.com", kod: "ENOTFOUND" };
+    }
+    return eskiGet(u, h, s);
+  };
+  ctx.K.dnsEngeli = async function (host) { dnsSorgu.push(host); return host === "github.com" ? "146.112.61.106" : ""; };
+  ctx.KEngine.motorKaynakAdresi = function () { return "https://github.com/ggerganov/whisper.cpp/releases/download/v1.9.1/whisper-blas-bin-x64.zip"; };
+  var normal = ctx.KDoctor.makeReport();
+  await ctx.KDoctor.runAsyncChecks(normal);
+  ok("adım 19: normal Doctor taraması model kaynaklarına istek atmaz (yalnız düğme)", headCagri.length === 0, headCagri.length);
+  var kaynaklar = await ctx.KDoctor.kaynakSina();
+  ok("adım 19: üç kaynağa 5 sn zaman aşımlı HEAD (huggingface.co, hf-mirror.com, motor sürüm sunucusu)",
+    headCagri.length === 3 && headCagri.every(function (c) { return c.s.timeout === 5000 && c.s.method === "HEAD"; }) &&
+    ["https://huggingface.co/", "https://hf-mirror.com/", "https://github.com/"].every(function (u) { return headCagri.some(function (c) { return c.u === u; }); }),
+    JSON.stringify(headCagri.map(function (c) { return c.u; })));
+  function kSatir(host) { return kaynaklar.filter(function (c) { return c.title === "Model kaynağı: " + host; })[0]; }
+  var kHf = kSatir("huggingface.co"), kAyna = kSatir("hf-mirror.com"), kMotor = kSatir("github.com");
+  ok("adım 19: ulaşılan kaynak iyi (kurumsal sertifikayla ulaşıldığı yazılır)", kHf && kHf.status === "good" && kHf.group === "engine" && /HTTP 200/.test(kHf.detail) && /kurumsal sertifikayla/.test(kHf.detail), kHf && kHf.detail);
+  ok("adım 19: sertifika hatası 'HTTPS denetimi' olarak anlatılır, içe aktarma önerilir", kAyna && kAyna.status === "bad" && /HTTPS bağlantılarını denetliyor/.test(kAyna.detail) && /bir kez daha denedi/.test(kAyna.detail) && /Model dosyası içe aktar/.test(kAyna.detail), kAyna && kAyna.detail);
+  ok("adım 19: Umbrella aralığına çözülen ad kurumsal filtre olarak anlatılır", kMotor && kMotor.status === "bad" && /Kurumsal ağ filtresi github\.com adresini engelliyor \(Cisco Umbrella, 146\.112\.61\.106\)/.test(kMotor.detail), kMotor && kMotor.detail);
+  ok("adım 19: DNS yalnız ulaşılamayan kaynaklar için sorulur", dnsSorgu.length === 2 && dnsSorgu.indexOf("huggingface.co") === -1, dnsSorgu.join(","));
+  var ekli = ctx.KDoctor.kaynakSatirlariniEkle(normal, kaynaklar);
+  ekli = ctx.KDoctor.kaynakSatirlariniEkle(ekli, kaynaklar);
+  ok("adım 19: tekrar sınama satırları çoğaltmaz, rapor durumu yeniden hesaplanır",
+    ekli.checks.filter(function (c) { return c.kaynak; }).length === 3 && ekli.status === "bad", ekli.status);
+  var temiz = ctx.KDoctor.kaynakSatirlariniEkle(ekli, ctx.SufloAgDayanim.kaynakSatirlari([{ ad: "x", host: "huggingface.co", status: 403 }]));
+  ok("adım 19: HTTP 403 uyarı (filtre olabilir), eski satırlar gider", temiz.checks.filter(function (c) { return c.kaynak; }).length === 1 &&
+    temiz.checks.filter(function (c) { return c.kaynak; })[0].status === "warn" && /HTTP 403/.test(temiz.checks.filter(function (c) { return c.kaynak; })[0].detail));
+  var htmlD = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+  ok("adım 19: Doctor kartında 'Model kaynaklarını sına' düğmesi", /id="set-doctor-kaynak"[^>]*>Model kaynaklarını sına</.test(htmlD));
+  ctx.K.httpGet = eskiGet;
 
   fs.mkdirSync(path.join(RELEASES, "2026.08.25.1.staging"), { recursive: true });
   var staged = ctx.KDoctor.makeReport();

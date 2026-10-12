@@ -597,6 +597,61 @@ window.K = (function () {
     return n;
   }
 
+  /* ---------------- Kurumsal ağ dayanıklılığı (3.4 adım 19, js/ag-dayanim.js) ---------------- */
+
+  function AG() { return (typeof window !== "undefined" && window.SufloAgDayanim) || null; }
+
+  /*
+   * İşletim sisteminin güvendiği ek kök sertifikalar (PEM). Oturum boyunca bellekte saklanır;
+   * diske yazılmaz. Windows: sabit PowerShell betiği (argüman dizisi, girdi eklenmez);
+   * macOS: security find-certificate. Linux / hata: boş liste.
+   */
+  var _ekPem = null, _ekPemIsi = null;
+  function ekSertifikalar() {
+    if (_ekPem) return Promise.resolve(_ekPem);
+    if (_ekPemIsi) return _ekPemIsi;
+    var ag = AG();
+    var komut = ag && nodeOK ? ag.sertifikaKomutu(process.platform) : null;
+    if (!komut) { _ekPem = []; return Promise.resolve(_ekPem); }
+    _ekPemIsi = run(komut.cmd, komut.args, { timeout: 20000 }).then(function (r) {
+      _ekPem = r && r.code === 0 ? ag.pemleriAyikla(r.stdout) : [];
+      _ekPemIsi = null;
+      log("sistem kok sertifikalari: " + _ekPem.length + " adet");
+      return _ekPem;
+    }, function () { _ekPem = []; _ekPemIsi = null; return _ekPem; });
+    return _ekPemIsi;
+  }
+
+  // Yeniden deneme için ca: tls.rootCertificates (Node 12.3+; yoksa atlanır) + ek kökler. Ek kök yoksa null.
+  function ekCaListesi() {
+    var ag = AG();
+    if (!ag || !nodeOK) return Promise.resolve(null);
+    return ekSertifikalar().then(function (pemler) {
+      var kokler = null;
+      try { kokler = require("tls").rootCertificates; } catch (e) { kokler = null; }
+      return ag.caListesi(kokler, pemler);
+    }, function () { return null; });
+  }
+
+  /*
+   * DNS filtresi: ad 146.112.0.0/16 (Cisco Umbrella) ya da 0.0.0.0'a çözülüyor mu?
+   * Döner: engelleyen adres ya da "" (çözülemedi / engel yok). En çok 3 sn bekler.
+   */
+  function dnsEngeli(host) {
+    return new Promise(function (resolve) {
+      var ag = AG();
+      if (!ag || !nodeOK || !host) { resolve(""); return; }
+      var bitti = false;
+      function son(x) { if (!bitti) { bitti = true; clearTimeout(t); resolve(x); } }
+      var t = setTimeout(function () { son(""); }, 3000);
+      try {
+        require("dns").lookup(String(host), { all: true }, function (err, adresler) {
+          son(err ? "" : ag.dnsEngelAdresi(adresler || []));
+        });
+      } catch (e) { son(""); }
+    });
+  }
+
   /* ---------------- HTTP GET (güncelleme kontrolü) ---------------- */
 
   /*
@@ -604,10 +659,22 @@ window.K = (function () {
    * (https hedefe CONNECT tüneli, http hedefe mutlak adresli istek). Yalnız doğrudan bağlantıya izin
    * veren ağlarda sürüm denetimleri (GitHub API) hep başarısız olmasın.
    */
-  function httpGet(urlStr, headers) {
+  /*
+   * secenek (3.4 adım 19, isteğe bağlı): { method: "HEAD", timeout: ms } — Doctor "Model kaynaklarını
+   * sına" 5 sn'lik HEAD ister. Sertifika hatasında (kurumsal HTTPS denetimi) istek BİR KEZ
+   * ca = tls.rootCertificates + sistem kökleri ile yeniden denenir (bkz. ekCaListesi); dönüşte
+   * caDenendi: true. Hata dönüşünde kod: Node hata kodu (ör. ENOTFOUND).
+   */
+  function httpGet(urlStr, headers, secenek) {
+    secenek = secenek || {};
     return new Promise(function (resolve0) {
       var bitti = false;
-      function resolve(x) { if (!bitti) { bitti = true; resolve0(x); } }
+      function resolve(x) {
+        if (bitti) return;
+        bitti = true;
+        if (secenek.caDenendi && x) x.caDenendi = true;
+        resolve0(x);
+      }
       if (!nodeOK) { resolve({ status: 0, body: "Node erişimi yok" }); return; }
       var proto, u;
       try {
@@ -616,23 +683,45 @@ window.K = (function () {
       } catch (e) { resolve({ status: 0, body: String(e) }); return; }
       var hdrs = { "User-Agent": "Suflo-Panel" };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
+      var yontem = secenek.method === "HEAD" ? "HEAD" : "GET";
       var reqOpts = {
         hostname: u.hostname,
         port: u.port || (u.protocol === "http:" ? 80 : 443),
         path: u.pathname + (u.search || ""),
+        method: yontem,
         headers: hdrs
       };
+      if (secenek.ca && u.protocol === "https:") reqOpts.ca = secenek.ca;
+      function hataDonus(e3) {
+        // kurumsal HTTPS denetimi: sistemin güvendiği köklerle bir kez daha (doğrulama hep açık)
+        if (!secenek.caDenendi && u.protocol === "https:" && AG() && AG().sertifikaHatasiMi(e3)) {
+          log("sertifika hatasi (" + (e3 && e3.code ? e3.code : "?") + "), sistem kokleriyle bir kez daha: " + u.hostname);
+          ekCaListesi().then(function (ca) {
+            if (bitti) return;
+            if (!ca) { resolve({ status: 0, body: String(e3), kod: e3 && e3.code ? String(e3.code) : "" }); return; }
+            var s2 = {};
+            for (var k2 in secenek) if (secenek.hasOwnProperty(k2)) s2[k2] = secenek[k2];
+            s2.ca = ca; s2.caDenendi = true;
+            httpGet(urlStr, headers, s2).then(resolve);
+          });
+          return;
+        }
+        resolve({ status: 0, body: String(e3), kod: e3 && e3.code ? String(e3.code) : "" });
+      }
       function fire(extra) {
         if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) reqOpts[k] = extra[k];
-        var req = proto.get(reqOpts, function (res) {
+        if (bitti) { try { if (extra && extra.socket) extra.socket.destroy(); } catch (eS0) {} return; }
+        // GET eskisi gibi proto.get (kendiliğinden end eder); HEAD için request + end
+        var req = (yontem === "HEAD" ? proto.request : proto.get).call(proto, reqOpts, function (res) {
           var data = "";
           res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
           res.on("data", function (d) { data += d; });
           res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
           res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
         });
-        req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
-        req.setTimeout(20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+        req.on("error", hataDonus);
+        req.setTimeout(secenek.timeout > 0 ? secenek.timeout : 20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" }); });
+        if (yontem === "HEAD") req.end();
       }
       var pu = null;
       try { pu = proxyFor(u); } catch (eP) { pu = null; }
@@ -640,14 +729,14 @@ window.K = (function () {
         var h2 = Object.assign({ Host: u.hostname }, hdrs);
         var au = proxyAuth(pu);
         if (au) h2["Proxy-Authorization"] = au;
-        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, headers: h2 };
+        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, method: yontem, headers: h2 };
         proto = require("http");
         fire();
       } else if (pu) {
         connectTunnel(pu, u, function (err, socket) {
           if (err) {
             log("proxy tuneli kurulamadi (httpGet): " + err.message);
-            resolve({ status: 0, body: String(err.message || err) });
+            resolve({ status: 0, body: String(err.message || err), kod: err && err.code ? String(err.code) : "" });
             return;
           }
           if (bitti) { try { socket.destroy(); } catch (eS) {} return; }
@@ -720,6 +809,17 @@ window.K = (function () {
     { // disk dolu
       re: /ENOSPC|no space left|not enough space|yeterli alan/i,
       tip: "Diskte yer kalmamış. 2 GB kadar yer aç, tekrar dene; indirme kaldığı yerden devam eder."
+    },
+    { // 3.4 adım 19: DNS filtresi (Cisco Umbrella / 0.0.0.0) — downloadTeshisli ekler
+      re: /Kurumsal ağ filtresi/,
+      tip: "BT ekibinden huggingface.co, hf-mirror.com ve github.com için izin iste ya da modeli başka bir " +
+        "bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur."
+    },
+    { // 3.4 adım 19: kurumsal HTTPS denetimi; Suflo sistemin güvendiği köklerle bir kez yeniden dener
+      re: /UNABLE_TO_GET_ISSUER_CERT_LOCALLY|SELF_SIGNED_CERT_IN_CHAIN|CERT_UNTRUSTED|UNABLE_TO_VERIFY_LEAF_SIGNATURE|local issuer certificate|self.signed certificate in certificate chain|unable to verify the first certificate|certificate not trusted/i,
+      tip: "Ağın HTTPS bağlantılarını denetliyor (kurumsal güvenlik yazılımı). Suflo bilgisayarın güvendiği " +
+        "sertifikalarla bir kez daha denedi. BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip " +
+        "Ayarlar › Motor › Model dosyası içe aktar ile kur."
     },
     { // ağ: DNS, kopma, güvenlik duvarı, sertifika, indirme/istek zaman aşımı
       re: /ENOTFOUND|EAI_AGAIN|getaddrinfo|ETIMEDOUT|ECONNRESET|ECONNREFUSED|socket hang up|SELF_SIGNED|CERT_|indirme zaman aşımı|timed? ?out/i,
@@ -1076,6 +1176,32 @@ window.K = (function () {
    *   iptal: K.iptalJetonu() — iptalde istek kesilir, .part KORUNUR (sonraki deneme kaldigi
    *   yerden devam eder) ve { ok: false, iptal: true, kept } doner.
    */
+  /*
+   * Dışa açılan indirici (3.4 adım 19): download() + DNS filtresi teşhisi. İndirme başarısızsa
+   * (iptal değilse) son denenen ana makinenin adı çözülür; 146.112.0.0/16 (Cisco Umbrella) ya da
+   * 0.0.0.0 ise hataya "Kurumsal ağ filtresi … engelliyor" eklenir ve dnsEngeli alanı dolar.
+   */
+  function downloadTeshisli(urlStr, destPath, onProgress, redirects, resumeFrom, meta) {
+    var izle = {};
+    var m2 = {};
+    if (meta) for (var k in meta) if (meta.hasOwnProperty(k)) m2[k] = meta[k];
+    m2._izle = izle;
+    return download(urlStr, destPath, onProgress, redirects, resumeFrom, m2).then(function (r) {
+      if (!r || r.ok || r.iptal) return r;
+      var host = izle.host;
+      if (!host) { try { host = new URL(urlStr).hostname; } catch (e) { host = ""; } }
+      return dnsEngeli(host).then(function (adres) {
+        var ag = AG();
+        if (adres && ag) {
+          r.dnsEngeli = adres;
+          r.error = String(r.error || "") + " — " + ag.dnsEngelTeshis(host, adres);
+          log("DNS filtresi: " + host + " -> " + adres);
+        }
+        return r;
+      });
+    });
+  }
+
   function download(urlStr, destPath, onProgress, redirects, resumeFrom, meta) {
     redirects = redirects || 0;
     meta = meta || {};
@@ -1095,6 +1221,8 @@ window.K = (function () {
         u = new URL(urlStr);
         proto = require(u.protocol === "http:" ? "http" : "https");
       } catch (e) { resolve({ ok: false, error: String(e) }); return; }
+      // son denenen ana makine (yönlendirmeden sonra CDN olabilir): DNS filtresi ipucu için
+      if (meta._izle) meta._izle.host = u.hostname;
 
       var partPath0 = destPath + ".part";
       var sidePath = destPath + ".part.json";
@@ -1262,11 +1390,34 @@ window.K = (function () {
           return;
         }
         if (extra) for (var k in extra) reqOpts[k] = extra[k];
+        // 3.4 adım 19: sertifika yeniden denemesinde sistemin güvendiği kökler (doğrulama AÇIK kalır)
+        if (meta.ca && u.protocol === "https:") reqOpts.ca = meta.ca;
         var req = proto.get(reqOpts, onRes);
         aktifReq = req;
         // ag hatasinda .part korunur ki sonraki deneme kaldigi yerden devam etsin
         req.on("error", function (eq) {
-          resolve({ ok: false, error: String(eq), kept: partSize() });
+          var ag = AG();
+          if (!bitti && !meta.caDenendi && u.protocol === "https:" && ag && ag.sertifikaHatasiMi(eq)) {
+            // kurumsal HTTPS denetimi: bir kez, ca = tls.rootCertificates + sistem kökleri ile
+            log("sertifika hatasi (" + (eq && eq.code ? eq.code : "?") + "), sistem kokleriyle bir kez daha: " + u.hostname);
+            ekCaListesi().then(function (ca) {
+              if (bitti) return;
+              if (!ca) { resolve({ ok: false, error: String(eq), kept: partSize(), sertifika: true }); return; }
+              var meta2 = {};
+              for (var mk in meta) if (meta.hasOwnProperty(mk)) meta2[mk] = meta[mk];
+              meta2.ca = ca;
+              meta2.caDenendi = true;
+              download(urlStr, destPath, onProgress, redirects, resumeFrom, meta2).then(function (r2) {
+                if (r2 && !r2.ok && !r2.iptal) {
+                  r2.caDenendi = true;
+                  if (ag.sertifikaHatasiMi(r2.error)) r2.sertifika = true;
+                }
+                resolve(r2);
+              });
+            });
+            return;
+          }
+          resolve({ ok: false, error: String(eq), kept: partSize(), sertifika: !!(ag && ag.sertifikaHatasiMi(eq)) });
         });
         req.setTimeout(1800000, function () {
           req.destroy();
@@ -1549,7 +1700,11 @@ window.K = (function () {
     whisperDir: whisperDir,
     ffmpegDir: ffmpegDir,
     ffmpegKurulu: ffmpegKurulu,
-    download: download,
+    download: downloadTeshisli,
+    dnsEngeli: dnsEngeli,
+    ekSertifikalar: ekSertifikalar,
+    // yalnız testler: oturum önbelleğini doldur (işletim sistemi komutu çalıştırılmadan)
+    _ekSertifikaOnbellek: function (pemler) { _ekPem = Array.isArray(pemler) ? pemler.slice() : null; _ekPemIsi = null; },
     unzip: unzip,
     findFfmpeg: findFfmpeg,
     ffmpegLibass: ffmpegLibass,

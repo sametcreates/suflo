@@ -201,8 +201,17 @@ var ornekler = [
   "rate_limit exceeded",
   "Premiere yanıt vermedi (KS_getContext)",
   "Motor çalıştırılamadı: kod=1",
-  "Error: spawn ffmpeg ENOENT"
+  "Error: spawn ffmpeg ENOENT",
+  // 3.4 adım 19: DNS filtresi teşhisi ve kurumsal HTTPS denetimi
+  "Error: getaddrinfo ENOTFOUND — Kurumsal ağ filtresi huggingface.co adresini engelliyor (Cisco Umbrella, 146.112.61.106).",
+  "Error: unable to get local issuer certificate"
 ];
+ok("3.4 adım 19: sertifika hatası genel ağ ipucunu değil HTTPS denetimi çözümünü alır",
+  iceriyor("Error: self signed certificate in certificate chain", "HTTPS bağlantılarını denetliyor") &&
+  iceriyor("UNABLE_TO_VERIFY_LEAF_SIGNATURE", "Model dosyası içe aktar"), coz("Error: self signed certificate in certificate chain"));
+ok("3.4 adım 19: DNS filtresi teşhisi ENOTFOUND'a rağmen kurumsal filtre çözümünü alır",
+  iceriyor("Error: getaddrinfo ENOTFOUND huggingface.co — Kurumsal ağ filtresi huggingface.co adresini engelliyor (ad 0.0.0.0 adresine yönlendiriliyor).", "BT ekibinden"),
+  coz("Error: getaddrinfo ENOTFOUND huggingface.co — Kurumsal ağ filtresi"));
 var kapsanan = {};
 ornekler.forEach(function (m) {
   var c = win.hataYardimi(m);

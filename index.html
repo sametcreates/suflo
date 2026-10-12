@@ -2020,6 +2020,12 @@
         <label>Doğruluk modeli</label>
         <select id="set-model" class="grow" title="Büyük model = daha doğru ama yavaş"></select>
       </div>
+      <!-- 3.4 adım 19: çevrimdışı model içe aktarma (js/model-ice-aktar.js + KEngine.modelIceAktar) -->
+      <div class="row">
+        <label></label>
+        <button id="set-model-ice" class="btn" type="button" title="Modeli başka bir bilgisayarda indirdiysen buradan kur (.bin)">Model dosyası içe aktar</button>
+      </div>
+      <p class="hint" id="set-model-ice-ipucu">İnternet yoksa ya da şirket ağı model indirmeyi engelliyorsa: modeli (ör. ggml-large-v3-turbo-q5_0.bin) başka bir bilgisayarda indir, buradan seç. Katalogdaki modeller SHA-256 ile doğrulanır; tanınmayan dosya yalnız Özel model olarak eklenir.</p>
       <!-- Çözme modu (3.2 adım 5, js/whisper-args.js): yalnız yerel motor; varsayılan Türkçe kıyasa dek En doğru -->
       <div class="row">
         <label for="set-cozme">Çözme</label>
@@ -2259,6 +2265,7 @@
         <div class="library-health-actions doctor-actions">
           <button id="set-doctor-fix-all" class="btn" hidden>Güvenli sorunları düzelt</button>
           <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
+          <button id="set-doctor-kaynak" class="btn ghost" type="button" title="huggingface.co, hf-mirror.com ve motor sürüm sunucusuna 5 saniyelik deneme isteği">Model kaynaklarını sına</button>
           <a href="#" id="set-doctor-panel-rehberi" class="link-btn" title="Premiere 25.6+ ve 2026: Window > Extensions (Legacy) > Suflo">Panel menüde görünmüyor mu? →</a>
         </div>
       <div id="set-library-health-result" class="library-health" role="status" aria-live="polite" hidden></div>
@@ -2503,11 +2510,13 @@
   <script src="js/pricing.js"></script>
   <script src="i18n/en.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/ag-dayanim.js"></script>
   <script src="js/bridge.js"></script>
   <script src="js/deneme.js"></script>
   <script src="js/pro.js"></script>
   <script src="js/pro-sync.js"></script>
   <script src="js/whisper-args.js"></script>
+  <script src="js/model-ice-aktar.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/caption-layout.js"></script>
   <script src="js/caption-quality.js"></script>

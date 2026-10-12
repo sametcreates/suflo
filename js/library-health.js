@@ -422,6 +422,73 @@ window.KLibraryHealth = (function () {
     }
   }
 
+  /*
+   * 3.4 adım 19 — "Model kaynaklarını sına": huggingface.co, hf-mirror.com ve motor sürüm
+   * sunucusuna 5 sn zaman aşımlı HEAD isteği (paralel). Yanıt gelmezse ya da 403 dönerse ad
+   * çözülür: 146.112.0.0/16 (Cisco Umbrella) / 0.0.0.0 kurumsal filtre olarak anlatılır.
+   * Satırlar js/ag-dayanim.js kaynakSatirlari ile kurulur (group "engine", kaynak: true).
+   * Yalnız düğmeyle çalışır: panel açılışında ve normal taramada ağ isteği yapılmaz.
+   */
+  async function kaynakSina() {
+    var ag = window.SufloAgDayanim;
+    if (!ag || !K.httpGet) return [];
+    var motorUrl = window.KEngine && KEngine.motorKaynakAdresi ? KEngine.motorKaynakAdresi() : "";
+    var adresler = ag.kaynakAdresleri(motorUrl);
+    var sonuclar = await Promise.all(adresler.map(async function (a) {
+      var t0 = Date.now(), r = null;
+      try { r = await K.httpGet(a.url, {}, { method: "HEAD", timeout: ag.SINAMA_ZAMAN_ASIMI }); }
+      catch (e) { r = { status: 0, body: String(e && e.message ? e.message : e) }; }
+      r = r || { status: 0, body: "" };
+      var s = {
+        id: a.id, ad: a.ad, host: a.host, status: Number(r.status) || 0,
+        hata: r.status ? "" : String(r.body || r.kod || "bağlantı kurulamadı"),
+        sure: Date.now() - t0, caDenendi: !!r.caDenendi, dnsEngelAdresi: ""
+      };
+      if ((!s.status || s.status === 403) && K.dnsEngeli) {
+        try { s.dnsEngelAdresi = await K.dnsEngeli(a.host); } catch (eD) { s.dnsEngelAdresi = ""; }
+      }
+      return s;
+    }));
+    return ag.kaynakSatirlari(sonuclar);
+  }
+
+  // Önceki sınama satırlarını at, yenilerini ekle, genel durumu yeniden hesapla
+  function kaynakSatirlariniEkle(report, satirlar) {
+    report.checks = (report.checks || []).filter(function (c) { return !c.kaynak; });
+    (satirlar || []).forEach(function (c) {
+      report.checks.push({ status: c.status, title: c.title, detail: c.detail || "", action: "", group: c.group || "engine", kaynak: true });
+    });
+    report.status = "good";
+    report.checks.forEach(function (c) {
+      if (c.status === "bad") report.status = "bad";
+      else if (c.status === "warn" && report.status === "good") report.status = "warn";
+    });
+    return report;
+  }
+
+  async function kaynaklariSina() {
+    if (busy) return lastReport;
+    busy = true;
+    setWorking("Model kaynakları sınanıyor…");
+    try {
+      var satirlar = await kaynakSina();
+      lastReport = kaynakSatirlariniEkle(lastReport || makeReport(), satirlar);
+      var kotu = satirlar.filter(function (c) { return c.status !== "good"; }).length;
+      if (window.KApp) {
+        KApp.toast(kotu ? "Bazı model kaynaklarına ulaşılamıyor: ayrıntı Doctor raporunda" : "Tüm model kaynaklarına ulaşılıyor", kotu ? "warn" : "good", kotu ? 9000 : 4500);
+      }
+      render(lastReport);
+      return lastReport;
+    } catch (e) {
+      if (window.KApp) KApp.toast(K.hataYardimi ? K.hataYardimi(e) : String(e), "bad", 9000);
+      if (lastReport) render(lastReport);
+      return lastReport;
+    } finally {
+      busy = false;
+      clearWorking();
+    }
+  }
+
   function proChecks(report) {
     if (!window.Pro || !Pro.status) return;
     var license = Pro.status();
@@ -645,11 +712,11 @@ window.KLibraryHealth = (function () {
       box.hidden = false; box.className = "library-health checking";
       box.innerHTML = '<div class="library-health-title"><span class="spinner"></span><b>' + esc(label || "Suflo taranıyor…") + '</b></div><div class="doctor-progress">Timeline ve medya dosyaları değiştirilmez.</div>';
     }
-    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all"), function (b) { b.disabled = true; });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all, #set-doctor-kaynak"), function (b) { b.disabled = true; });
   }
 
   function clearWorking() {
-    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all"), function (b) { b.disabled = false; });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all, #set-doctor-kaynak"), function (b) { b.disabled = false; });
     var runBtn = el("set-library-health-run");
     if (runBtn) {
       if (runBtn._doctorIdleHtml) runBtn.innerHTML = runBtn._doctorIdleHtml;
@@ -816,6 +883,8 @@ window.KLibraryHealth = (function () {
       if (K.cs && K.cs.openURLInDefaultBrowser) K.cs.openURLInDefaultBrowser(PANEL_REHBERI);
     });
     if (fixAllBtn) fixAllBtn.addEventListener("click", repairAll);
+    var kaynakBtn = el("set-doctor-kaynak");
+    if (kaynakBtn) kaynakBtn.addEventListener("click", function () { kaynaklariSina(); });
     if (box) box.addEventListener("click", function (event) {
       var target = event.target;
       while (target && target !== box && !target.getAttribute("data-doctor-action")) target = target.parentNode;
@@ -836,6 +905,9 @@ window.KLibraryHealth = (function () {
     repairAll: repairAll,
     apiKontrolleri: apiKontrolleri,
     cipDurumlari: cipDurumlari,
+    kaynakSina: kaynakSina,
+    kaynaklariSina: kaynaklariSina,
+    kaynakSatirlariniEkle: kaynakSatirlariniEkle,
     PANEL_REHBERI: PANEL_REHBERI,
     last: function () { return lastReport; }
   };

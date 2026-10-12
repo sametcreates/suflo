@@ -364,6 +364,14 @@ window.KApp = (function () {
       o.textContent = (kurulu ? "✓ " : "") + m.label + " — " + KEngine.fmtMB(m.sizeMB);
       sel.appendChild(o);
     });
+    // 3.4 adım 19: içe aktarılmış özel modeller (yalnız diskte duranlar)
+    KEngine.installedModels().forEach(function (m) {
+      if (!m.ozel) return;
+      var o2 = document.createElement("option");
+      o2.value = m.id;
+      o2.textContent = "✓ " + m.label + " — " + KEngine.fmtMB(m.sizeMB);
+      sel.appendChild(o2);
+    });
     sel.value = active ? active.id : (K.settings().model || "turbo");
   }
 
@@ -449,6 +457,49 @@ window.KApp = (function () {
     return sonuc;
   }
 
+
+  /*
+   * 3.4 adım 19 — çevrimdışı model içe aktarma. Dosya seçici .bin süzgeçli; denetim, SHA-256 ve
+   * kopyalama KEngine.modelIceAktar'da. Onaylar (Özel model, üzerine yazma, doğrulanmadı) burada
+   * sorulur: hiçbiri varsayılan olarak kabul edilmez.
+   */
+  var modelIceAktariliyor = false;
+  async function modelDosyasiIceAktar() {
+    if (modelIceAktariliyor) return;
+    if (!K.nodeOK || !KEngine.modelIceAktar) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return; }
+    if (installingLocal) { toast("Motor kurulumu sürüyor; bitince içe aktar.", "warn"); return; }
+    var yol = null;
+    if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
+      var r = window.cep.fs.showOpenDialogEx(false, false, uiMetni("Whisper model dosyasını seç (.bin)"), "", ["bin"]);
+      if (r && r.data && r.data.length) yol = r.data[0];
+    }
+    if (!yol) return;
+    var box = el("set-local-status"), btn = el("set-model-ice");
+    modelIceAktariliyor = true;
+    if (btn) btn.disabled = true;
+    var hata = null;
+    try {
+      var sonuc = await KEngine.modelIceAktar(yol, {
+        say: function (m) { box.className = "inline-status"; box.textContent = m; },
+        onayla: function (tur, metin) { return Promise.resolve(!!(window.confirm && window.confirm(uiMetni(metin)))); }
+      });
+      if (sonuc && sonuc.ok) {
+        var ad = sonuc.model && sonuc.model.label ? sonuc.model.label.split(" —")[0] : sonuc.file;
+        if (sonuc.durum === "dogrulandi") toast("Model içe aktarıldı ve doğrulandı: " + ad, "good");
+        else if (sonuc.durum === "dogrulanmadi") toast("Model içe aktarıldı (doğrulanmadı): " + ad, "warn", 8000);
+        else toast("Özel model eklendi: " + ad, "warn", 8000);
+      }
+    } catch (e) {
+      hata = K.hataYardimi(e);
+      toast(hata, "bad", 12000);
+    } finally {
+      modelIceAktariliyor = false;
+      if (btn) btn.disabled = false;
+      refreshLocalStatus();
+      if (window.KCaptions && KCaptions.refreshSetup) KCaptions.refreshSetup();
+      if (hata) { box.className = "inline-status bad"; box.textContent = "✕ " + hata; }
+    }
+  }
 
   /* ---------------- Suflo Pro lisans UI ---------------- */
 
@@ -973,6 +1024,8 @@ window.KApp = (function () {
     });
 
     el("set-local-install").addEventListener("click", function (ev) { if (kurulumTikiGecerli(ev)) installLocalWhisper(); });
+    // 3.4 adım 19: Ayarlar › Motor › Model dosyası içe aktar (ücretsiz, çevrimdışı kurulum)
+    if (el("set-model-ice")) el("set-model-ice").addEventListener("click", modelDosyasiIceAktar);
     // İptal: Ayarlar'da ve Altyazı kurulum kartında (indirme kesilir, .part korunur)
     if (el("set-local-cancel")) el("set-local-cancel").addEventListener("click", kurulumuIptalEt);
     if (el("cap-local-cancel")) el("cap-local-cancel").addEventListener("click", kurulumuIptalEt);
