@@ -458,6 +458,77 @@ a.link-btn { display: inline-block; }
 .inline-status.bad { color: var(--bad); }
 .inline-status.warn { color: var(--warn); }
 
+/* Sessiz ses uyarısı (Altyazı ve Konuşmadan kes): motor çalışmadan önce sorar */
+.sessiz-uyari {
+  display: block;
+  margin: -2px 0 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(234, 200, 119, .45);
+  border-radius: var(--r-s);
+  background: rgba(234, 200, 119, .08);
+  color: var(--warn);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.sessiz-uyari[hidden] { display: none !important; }
+.sessiz-uyari-metin { display: block; margin-bottom: 7px; word-break: break-word; }
+.sessiz-uyari-btns { display: flex; flex-wrap: wrap; }
+.sessiz-uyari-btns .btn { margin: 0 6px 0 0; }
+
+/* ---------- İptal düğmesi ve canlı transkripsiyon (3.2) ---------- */
+
+/* "Altyazı oluştur" / "Sessizlikleri bul" iş sürerken bunun yerini alır */
+.btn.iptal-btn { margin-bottom: 10px; border-color: rgba(234, 200, 119, .45); color: var(--warn); }
+.btn.iptal-btn:hover:not(:disabled) { background: rgba(234, 200, 119, .10); border-color: rgba(234, 200, 119, .75); color: #fff; }
+.btn.iptal-btn:disabled { opacity: .55; cursor: not-allowed; }
+/* .btn.busy display:inline-flex veriyor: iş sürerken gizlenen düğme yine de görünmesin */
+.btn.iptal-btn[hidden], .kurulum-iptal[hidden], #cap-go[hidden], #cut-analyze[hidden] { display: none !important; }
+.kurulum-iptal { display: block; margin: 6px auto 0; color: var(--warn); }
+
+/* Motor çalışırken akan geçici satırlar: soluk, salt okunur, "canlı" rozetli */
+.canli-kutu {
+  margin: -2px 0 10px;
+  border: 1px dashed rgba(255, 255, 255, .12);
+  border-radius: var(--r-s);
+  background: rgba(255, 255, 255, .02);
+}
+.canli-kutu[hidden] { display: none !important; }
+/* CEF 74 (Premiere 2020-2021): flex gap (Chrome 84) yok — aralıklar margin ile */
+.canli-ust { display: flex; align-items: center; padding: 6px 9px 4px; font-size: 10.5px; color: var(--faint); }
+.canli-rozet {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(239, 83, 80, .14);
+  color: #f28b82;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+.canli-rozet::before { content: ""; flex: 0 0 auto; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor; animation: canli-nabiz 1.4s ease-in-out infinite; }
+@keyframes canli-nabiz { 50% { opacity: .25; } }
+.canli-not { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.canli-liste { max-height: 150px; overflow-y: auto; padding: 0 0 4px; }
+.canli-satir {
+  display: flex;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--dim);
+  opacity: .78;
+  cursor: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.canli-satir:last-child { opacity: 1; }
+.canli-zaman { flex: 0 0 auto; margin-right: 8px; color: var(--faint); font-size: 10.5px; padding-top: 1px; }
+.canli-metin { min-width: 0; word-break: break-word; }
+@media (prefers-reduced-motion: reduce) { .canli-rozet::before { animation: none; } }
+
 /* ---------- Açılır ayrıntı ---------- */
 
 details.adv { margin-bottom: 10px; }
@@ -652,6 +723,16 @@ details.adv > *:not(summary) { margin-top: 8px; }
 .field select { padding-right: 28px; }
 
 .field-row { display: flex; align-items: center; gap: 9px; }
+/* Satır uzunluğu › Kelime sınırı (3.2 adım 4) */
+.field-row .kelime-siniri { flex: 0 0 64px; width: 64px; }
+.field-row .kelime-siniri + .hint { margin: 0; min-width: 0; }
+/* Yerel motor seçenekleri (3.2 adım 5): Hassas kelime zamanlaması (DTW) ve çevrimdışı İngilizce */
+.cap-dtw { margin: 2px 0 8px; }
+.cap-cevir-en { margin-top: 6px; }
+.cap-cevir-en .pro-inline { margin-left: 2px; }
+.cap-cevir-en-not { margin: 4px 0 0; }
+.cap-cevir-en-not .link-btn { padding: 0; margin-left: 2px; }
+#cap-dtw-sar[hidden], #cap-dtw-not[hidden], #cap-cevir-en-sar[hidden], #cap-cevir-en-not[hidden] { display: none !important; }
 .field-row .grow { flex: 1; }
 
 .field-grid {
@@ -1641,12 +1722,19 @@ details.adv > *:not(summary) { margin-top: 8px; }
   margin: 13px 0 0 56px;
 }
 .doctor-scope span {
-  display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px;
+  display: inline-flex; align-items: center; padding: 4px 7px;
   border: 1px solid rgba(255,255,255,.065); border-radius: 999px;
   color: #858691; background: rgba(255,255,255,.025); font-size: 8px; font-weight: 600;
 }
-.doctor-scope span::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: #6d6f79; }
-.doctor-scope span:first-child::before { background: #76d99d; box-shadow: 0 0 8px rgba(118,217,157,.55); }
+/* Nokta taramadan önce nötr; tarama sonucuna göre yeşil / sarı / kırmızı (eskiden Premiere her
+   zaman yeşil, ötekiler gri görünüp "sorun var" gibi okunuyordu). CEF 74'te flex gap yok: margin */
+.doctor-scope span::before { content: ""; flex: none; width: 4px; height: 4px; margin-right: 5px; border-radius: 50%; background: #6d6f79; }
+.doctor-scope span.good::before { background: #76d99d; box-shadow: 0 0 8px rgba(118,217,157,.55); }
+.doctor-scope span.warn::before { background: #f2c45a; box-shadow: 0 0 8px rgba(242,196,90,.5); }
+.doctor-scope span.bad::before { background: #ff6b6b; box-shadow: 0 0 8px rgba(255,107,107,.55); }
+.doctor-scope span.good { color: #a9dcb9; }
+.doctor-scope span.warn { color: #e9cf8f; }
+.doctor-scope span.bad { color: #ffaaaa; }
 .doctor-actions { flex-wrap: wrap; margin: 0 0 0 56px; }
 .doctor-actions .btn:not([hidden]) { min-height: 30px; margin-top: 11px; }
 @media (max-width: 560px) {
@@ -1829,10 +1917,13 @@ button.seg-time.jump:hover { color: var(--accent-lite); background: rgba(139, 12
 .mc-cut-length { margin-left: auto; color: var(--warn); font-size: 10.5px; }
 .cut-seg.off { opacity: .38; }
 
-/* zaman damgası düzenleme kutusu (çift tıkta açılır) */
+/* zaman damgası düzenleme kutusu (çift tıkta açılır): "başlangıç – bitiş", metnin üstüne taşar */
 .seg-time-edit {
   flex: 0 0 auto;
-  width: 92px;
+  position: relative;
+  z-index: 3;
+  width: 178px;
+  max-width: calc(100vw - 48px);
   padding: 3px 6px !important;
   font-size: 10.5px !important;
   border-radius: 5px;
@@ -3634,6 +3725,35 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 @keyframes gs-cross-a { 0% { opacity: 1; } 60%, 100% { opacity: 0; } }
 @keyframes gs-cross-b { 0%, 20% { opacity: 0; } 70%, 100% { opacity: 1; } }
 
+/* ---------- Hız Rampası (v3.2): eğri kartları, log hız ekseni (%25–%800), basamak önizlemesi ---------- */
+/* flex gap CEF 74'te (Premiere 2020-2021) yok: aralıklar kenar boşluğuyla */
+.hiz-hedef-satir { display: flex; align-items: center; justify-content: space-between; margin: 0 0 10px; }
+.hiz-hedef { flex: 1; min-width: 0; margin-right: 8px; font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hiz-hedef b { color: var(--text); font-weight: 700; }
+.hiz-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+.hiz-card { display: flex; flex-direction: column; padding: 8px; text-align: left; color: var(--text); font: inherit; cursor: pointer; }
+.hiz-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 12px 28px -22px #000; }
+.hiz-card.kapali, .hiz-card:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+.hiz-card:focus-visible { outline: 2px solid var(--accent-lite); outline-offset: 2px; }
+.hiz-resim { display: block; margin-bottom: 7px; border-radius: 7px; background: #0b0e15; }
+.hiz-card svg { display: block; width: 100%; height: 56px; }
+.hiz-bilgi b { display: block; font-size: 11.5px; }
+.hiz-bilgi i { display: block; margin-top: 2px; font-style: normal; font-size: 10px; line-height: 1.35; color: var(--faint); }
+.hiz-egri { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.hiz-basamak { fill: var(--accent); fill-opacity: .25; }
+.hiz-taban { stroke: var(--line2); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.hiz-vurus { fill: var(--warn); stroke: #0b0e15; stroke-width: 1.5; }
+.hiz-vurus-cizgi { stroke: var(--warn); stroke-opacity: .45; stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+.hiz-eksen { fill: var(--faint); font-size: 8px; }
+.hiz-onizleme-kutu { margin: 12px 0 10px; padding: 8px; border: 1px solid #263242; border-radius: 10px; background: linear-gradient(180deg, #131b26, #0e151e); }
+.hiz-onizleme { display: block; width: 100%; height: 120px; }
+.hiz-ozet { margin-top: 6px; font-size: 10.5px; color: var(--dim); }
+.hiz-ozet .hiz-not { color: var(--faint); }
+.hiz-secenekler { flex-wrap: wrap; gap: 0; }
+.hiz-secenekler .preset-control { margin: 0 6px 6px 0; }
+.hiz-eylem { margin-top: 10px; }
+.hiz-eylem .btn.grow { flex: 1; }
+
 /* ---------- v3.0 cilalama: yan menu ---------- */
 /* PRO etiketi ikonun kosesine rozet olarak: basliklar artik "Yazı …" diye kesilmez */
 .yan-menu .ky-oge { position: relative; }
@@ -3642,8 +3762,19 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   font-size: 6.4px; line-height: 1; padding: 2px 3px; border-radius: 4px; letter-spacing: .3px;
   background: #2a2350; border-color: rgba(171,145,255,.55); box-shadow: 0 2px 6px -2px rgba(0,0,0,.8);
 }
-/* Uzun adlar ("Yazı Animasyonları") kesilmek yerine iki satıra sarar */
-.yan-menu .ky-metin b { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; overflow-wrap: anywhere; }
+/* Uzun adlar ("Yazı Animasyonları") kesilmek yerine en çok iki satıra sarar, yalnız kelime
+   aralarından (overflow-wrap:anywhere "Animasyonla / r" diye bölüyordu) */
+.yan-menu .ky-metin b {
+  white-space: normal; overflow: hidden; text-overflow: clip; line-height: 1.2;
+  overflow-wrap: normal; word-break: normal;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+/* Açıklama tek satır; sığmazsa "…" (iki satıra sarıp alttaki öğenin üstüne taşıyordu) */
+.yan-menu .ky-metin i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Sütundaki öğeler büzülmez: uzun ad öğeyi uzatır, komşusunun üstüne binmez; menü kayar */
+.yan-menu .ky-oge { flex-shrink: 0; }
+/* Dar menüde (164 px) sayaç rozeti ada yer bırakmıyordu (metne 53 px kalıyordu): gizlenir */
+@media (min-width: 561px) and (max-width: 720px) { .yan-menu .ky-adet { display: none; } }
 .ky-yeni {
   display: inline-block; vertical-align: 1px; margin-left: 4px; font-style: normal; font-size: 6.6px; font-weight: 800; letter-spacing: .5px; line-height: 1;
   padding: 2px 4px; border-radius: 4px; color: #0b1a10; background: #7cf0a0;

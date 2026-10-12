@@ -593,6 +593,10 @@
     "Vekil sunucu": "Proxy server",
     "Kurumsal ağdaysan model indirmeleri buradan geçer. Boş bırakırsan sistem ayarı (HTTPS_PROXY) kullanılır.": "On a corporate network, model downloads go through this. Leave empty to use the system setting (HTTPS_PROXY).",
     "Suflo'nun durumunu tek taramada gör.": "See Suflo's health in a single scan.",
+    "sorun yok": "no issues",
+    "uyarı var": "has warnings",
+    "düzeltilmesi gereken sorun var": "has issues to fix",
+    "denetlenmedi": "not checked",
     "Premiere bağlantısı, altyazı motoru, Pro içerikleri ve presetler güvenle kontrol edilir.": "Safely checks the Premiere connection, caption engine, Pro content and presets.",
     "Taramayı başlat": "Start scan",
     "Kontrol edilen bölümler": "Checked areas",
@@ -784,6 +788,16 @@
     "Kodunu paylaş; arkadaşın indirim alır, sen ödül paketleri açarsın.": "Share your code: your friend gets a discount, you unlock reward packs.",
     "English arayüz (beta)": "English interface (beta)",
     "Paneli Ayarlar'dan İngilizceye çevir.": "Switch the panel to English in Settings.",
+    "Hız rampası ve daha iyi altyazı": "Speed ramps and better captions",
+    "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz (Pro).": "One-click slow-mo and speed-ups with 11 curves; your edit never shifts (Pro).",
+    "Canlı altyazı": "Live captions",
+    "Satırlar motor yazdıkça akar; kalan süre ve İptal düğmesi.": "Lines stream in as the engine writes them, with time left and a Cancel button.",
+    "Okunaklı altyazı": "Readable captions",
+    "2 satır × 42 düzen, kısa parçalar birleşir, kelime zamanları ölçülür.": "2 × 42 layout, short pieces merged, measured word timings.",
+    "Hızlı ya da En doğru": "Fast or Most accurate",
+    "Yerel motorda hız ile doğruluk arasında seç.": "Choose between speed and accuracy for the local engine.",
+    "Çevrimdışı İngilizce": "Offline English",
+    "Konuşmayı internetsiz İngilizce altyazıya çevir (Pro).": "Turn speech into English captions without internet (Pro).",
     "Göster →": "Show →",
     "Başlayalım": "Let's go"
   });
@@ -1771,6 +1785,9 @@
     "eskiler yenilendi": "old ones replaced",
     "Proxy CONNECT reddetti: HTTP {}": "Proxy refused CONNECT: HTTP {}",
     "Transkribe ediliyor… %{} (yerel)": "Transcribing… {}% (local)",
+    // eski whisper-cli derlemesi belirteç zamanı vermezse ikinci tur (captions.js transcribeLocal)
+    "Transkribe ediliyor… %{} (yerel · kelime zamanı)": "Transcribing… {}% (local · word timing)",
+    "Transkribe ediliyor… %{} (yerel · kalan kısım)": "Transcribing… {}% (local · remaining part)",
     "Transkribe ediliyor… %{}": "Transcribing… {}%",
     "Transkribe ediliyor…": "Transcribing…",
     "transkribe ediliyor…": "transcribing…",
@@ -2468,6 +2485,332 @@
     "{} %{n}": "{} {}%"
   });
 
+  /* ================= Hız rampası / Speed ramp (js/speedramp.js, js/hiz-rampasi.js, #tab-hiz) ================= */
+  add({
+    // curve presets (js/speedramp.js LIST)
+    "Ağır Çekim Dalışı": "Slow-Mo Dip",
+    "Hızlan, derin ağır çekim, yeniden hızlan": "Speed up, deep slow motion, speed up again",
+    "Darbe": "Impact",
+    "Hızla gelir, darbe anında neredeyse durur, hızla çıkar": "Rushes in, nearly freezes on the hit, rushes out",
+    "Hızlı Giriş": "Rush In",
+    "Hızlı başlar, normale oturur (rampa girişi)": "Starts fast and settles to normal (ramp in)",
+    "Hızlı Çıkış": "Rush Out",
+    "Normal akar, sonda fırlar (rampa çıkışı)": "Plays normally, then shoots out (ramp out)",
+    "Doruk Anı": "Peak Moment",
+    "Hızlı yaklaşım, uzun ağır çekim, normale dönüş (yumuşak kahraman anı)": "Fast build-up, long slow-mo, back to normal (smooth hero shot)",
+    "Atılım": "Burst",
+    "Ortada kısa bir flaş hızlanma": "A short flash of speed in the middle",
+    "Zaman Bükümü": "Time Bend",
+    "Hızlı, uzun ağır çekim, hızlı (mermi zamanı hissi)": "Fast, long slow-mo, fast (bullet-time feel)",
+    "Nabız": "Pulse",
+    "Hızlı ve yavaş dönüşümlü montaj ritmi": "Alternating fast and slow montage rhythm",
+    "Vites": "Gear Shift",
+    "Yumuşatmasız sert basamaklar": "Hard steps with no easing",
+    "Süzülme": "Drift",
+    "B-roll için hafif dalga": "A gentle wave for B-roll",
+    "Ritme Rampa": "Beat Ramp",
+    "Ritim analizindeki vuruşlarda yavaşla (ya da hızlan)": "Slow down (or speed up) on the beats from the Beat analysis",
+    // sidebar, promo card, intro (index.html #tab-hiz)
+    "Hız Rampası": "Speed Ramp",
+    "ağır çekim · hızlanma": "slow-mo · speed-up",
+    "Tek tıkla hız rampası": "One-click speed ramps",
+    "Klibi seç, eğriyi seç, uygula. Premiere'de düzenlenebilir hız parçaları; kurgun kaymaz.": "Pick a clip, pick a curve, apply. You get speed segments you can still edit in Premiere, and your edit doesn't shift.",
+    "eğri": "curves",
+    "Hız rampasını aç": "Unlock speed ramps",
+    "Premiere'de düzenlenebilir hız rampası": "Speed ramps you can edit in Premiere",
+    "Premiere, Zaman Yeniden Eşleme'yi eklentilere açmıyor. Suflo rampayı kısa parçalara böler ve her parçaya kendi hızını yazar; hızları Hız/Süre'den değiştirebilirsin. Klibin yeri ve süresi aynı kalır: altyazı, müzik ve sonraki klipler kaymaz.": "Premiere doesn't let extensions use Time Remapping. Suflo splits the ramp into short pieces and gives each its own speed, which you can change under Speed/Duration. The clip keeps its place and length, so captions, music and later clips don't move.",
+    // target row
+    "Timeline'da bir klip seç ya da Giriş/Çıkış (In/Out) koy.": "Select a clip on the timeline or set In/Out marks.",
+    "Hedef:": "Target:",
+    "Giriş–Çıkış arası": "Between In and Out",
+    "Aralık": "Range",
+    "Seçili klipler (tamamı)": "Selected clips (whole)",
+    "Giriş–Çıkış arası (In/Out)": "Between In and Out",
+    "Hız eğrisi önizlemesi": "Speed curve preview",
+    // options
+    "Yumuşatma": "Easing",
+    "Doğrusal": "Linear",
+    "Basamaklı": "Stepped",
+    "Parça": "Pieces",
+    "Kaynak": "Source",
+    "Ses": "Audio",
+    "Rampada sesi kapat": "Mute audio over the ramp",
+    "Sesi olduğu gibi bırak": "Leave audio as is",
+    "Ağır çekim": "Slow motion",
+    "Yavaş parçalarda": "On slow pieces",
+    "Kare harmanlama": "Frame blending",
+    "Optik akış (yavaş render)": "Optical flow (slow render)",
+    "Aradeğerleme yok": "No interpolation",
+    "Kapalı": "Off",
+    "Vuruşta yavaş": "Slow on the beat",
+    "Vuruşta hızlı": "Fast on the beat",
+    "Hızlı bölümlerde bulanıklık": "Blur fast parts",
+    "Vuruş anını playhead'e hizala": "Line up the hit with the playhead",
+    "Darbe anını playhead'e hizala": "Line up the hit with the playhead",
+    "Önce sekansı kopyala": "Copy the sequence first",
+    "Rampayı uygula": "Apply ramp",
+    "Rampayı kaldır": "Remove ramp",
+    "Ctrl+Z rampayı tek adımda geri almaz; geri almak için Rampayı kaldır'ı kullan. Yakınlaştırma ve geçişleri rampadan sonra ekle.": "Ctrl+Z won't undo a ramp in one step; use Remove ramp to undo it. Add zooms and transitions after the ramp.",
+    "Hız rampası": "Speed ramp",
+    "Hız rampası: tek tıkla ağır çekim ve hızlanma": "Speed ramp: one-click slow-mo and speed-ups",
+    "Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası": "Enhance audio · Auto zoom · Beat · Speed ramp",
+    // readout (#hiz-ozet)
+    "{n} parça · en yavaş %{n} · en hızlı %{n}": "{} pieces · slowest {}% · fastest {}%",
+    "Süre aynı: {n} sn · kaynak {n} sn": "Same length: {} s · uses {} s of source",
+    "Tam hız (klibin sonrasındaki görüntü kullanılır)": "Exact speeds (uses footage after the clip)",
+    "Tam hız: klibin son {n} sn'si kullanılmaz": "Exact speeds: the clip's last {} s isn't used",
+    "Tam hız, kaynak aynı kalır": "Exact speeds, same source",
+    "Dengeli: hızlar ×{n} ölçeklendi, kaynak aynı kalır": "Balanced: speeds scaled ×{}, same source",
+    "Klibin sonrasında yeterli görüntü yok: yoğunluk düşürüldü": "Not enough footage after the clip: intensity lowered",
+    "Klibin sonrasında yeterli görüntü yok: Dengeli kullanılıyor": "Not enough footage after the clip: using Balanced",
+    "Medya süresi okunamadı: Dengeli kullanılıyor": "Couldn't read the media length: using Balanced",
+    "Medya süresi okunuyor…": "Reading the media length…",
+    "Bazı hızlar %10–%1000 sınırına çekildi": "Some speeds were capped to the 10%–1000% range",
+    "Önce Ritim sekmesinde müziği analiz et": "Analyze the music in the Beat tab first",
+    "Ritim analizi başka bir sekansta yapıldı; bu sekansta müziği analiz et": "The beat analysis was done in another sequence; analyze the music in this one",
+    "Bu aralıkta vuruş yok (analiz edilen müzik {n}–{n} sn)": "No beats in this range (analyzed music: {}–{} s)",
+    "Bu aralıkta vuruş yok": "No beats in this range",
+    "Bu klip bir hız rampasının parçası · değiştirmek için önce Rampayı kaldır": "This clip is part of a speed ramp · use Remove ramp before changing it",
+    "Bu klip bir hız rampasının parçası": "This clip is part of a speed ramp",
+    "değiştirmek için önce Rampayı kaldır": "use Remove ramp before changing it",
+    "Uygulanan eğri: {}": "Applied curve: {}",
+    "Vuruş anı {n} sn kaydı": "Hit point shifted by {} s",
+    "Darbe anı {n} sn kaydı": "Hit point shifted by {} s",
+    "Kaynak {n} fps: %{n} altı takılabilir, Optik akış'ı dene": "Source is {} fps: below {}% may stutter, try Optical flow",
+    "Rampa için en az 12 kare gerekli.": "A ramp needs at least 12 frames.",
+    // progress, toasts
+    "Hedefler okunuyor…": "Reading targets…",
+    "Rampa uygulanıyor… {n}/{n}": "Applying ramp… {}/{}",
+    "Rampa kaldırılıyor…": "Removing ramp…",
+    "⏩ {} · {n} parça · V{n}": "⏩ {} · {} pieces · V{}",
+    "{n} klibe rampa uygulandı": "Ramp applied to {} clips",
+    "{n} klip atlandı: {}": "{} clips skipped: {}",
+    "Ctrl+Z bunu tek adımda geri almaz; Rampayı kaldır'ı kullan.": "Ctrl+Z won't undo this in one step; use Remove ramp.",
+    "Rampa kaldırıldı, klip %100'e döndü": "Ramp removed, clip back to 100%",
+    "Bu klipte zaten bir hız rampası var.": "This clip already has a speed ramp.",
+    "Bu klipte zaten bir hız rampası var. Önce Rampayı kaldır'ı kullan.": "This clip already has a speed ramp. Use Remove ramp first.",
+    "Eski rampayı kaldırıp yeniden uygula": "Remove the old ramp and apply again",
+    "Suflo bu rampanın kaydını bulamadı; kapalı sese dokunmadı. Rampadaki ses kapalıysa Premiere'de aç ve klibe bağla.": "Suflo couldn't find its record of this ramp, so it left muted audio alone. If the audio under the ramp is muted, turn it back on in Premiere and link it to the clip.",
+    "Ses kapatılamadı; rampadaki sesi Premiere'de elle kapat.": "Couldn't mute the audio; mute the audio over the ramp by hand in Premiere.",
+    "Rampanın kaynağı 2 kareden fazla kaydı; sonu kontrol et.": "The ramp's source drifted by more than 2 frames; check the end.",
+    "Kopya sekansta uygulandı: {}": "Applied in the copied sequence: {}",
+    "Kopya sekansta uygulandı": "Applied in the copied sequence",
+    "Kopya sekans açık": "The copied sequence is open",
+    "Özgün sekansına dokunulmadı.": "Your original sequence wasn't touched.",
+    "1 klip atlandı": "1 clip skipped",
+    // skip reasons ("2 klip atlandı: logo.png (grafik), Röportaj (hızı %50)")
+    "{} (grafik)": "{} (graphic)",
+    "{} (ters)": "{} (reversed)",
+    "{} (zaman eşleme)": "{} (time remapping)",
+    "{} (Warp)": "{} (Warp)",
+    "{} (kilitli)": "{} (locked)",
+    "{} (multicam)": "{} (multicam)",
+    "{} (kısa)": "{} (too short)",
+    "{} (hız yazılamadı)": "{} (speed not written)",
+    "{} (bağlı ses)": "{} (linked audio)",
+    "{} (medya yetmedi)": "{} (not enough media)",
+    "{} (yerleşmedi)": "{} (didn't land)",
+    "{} (geri alınamadı)": "{} (not restored)",
+    "{} (değişmiş)": "{} (changed)",
+    "{} (sekans değişti)": "{} (sequence changed)",
+    "{} (plan)": "{} (plan)",
+    "{} (vuruş yok)": "{} (no beats)",
+    "{} (fazla)": "{} (over the 12-clip limit)",
+    "{} (tek hız)": "{} (single speed)",
+    "tek hız": "single speed",
+    "adsız klip": "unnamed clip",
+    "grafik": "graphic",
+    "ters": "reversed",
+    "kilitli": "locked",
+    "medya yetmedi": "not enough media",
+    "12 klip sınırı": "12-clip limit",
+    "{} (hızı %{n})": "{} (speed {}%)",
+    "zaman eşleme": "time remapping",
+    "kısa": "too short",
+    "hız yazılamadı": "speed not written",
+    "bağlı ses": "linked audio",
+    "yerleşmedi": "didn't land",
+    "geri alınamadı": "not restored",
+    "değişmiş": "changed",
+    "sekans değişti": "sequence changed",
+    "vuruş yok": "no beats",
+    "hızı %{n}": "speed {}%",
+    "Rampa için klip çok kısa": "The clip is too short for a ramp",
+    "Bu ayarlarla rampa oluşmuyor: parçaların hepsi aynı hızda": "These settings don't make a ramp: every piece has the same speed",
+    // error texts by code (js/hiz-rampasi.js hataMetni)
+    "Bir video klip seç ya da Giriş/Çıkış koy.": "Select a video clip or set In/Out.",
+    "Grafik, MOGRT, ayar katmanı ya da fotoğrafa hız rampası uygulanmaz.": "Speed ramps don't work on graphics, MOGRTs, adjustment layers or stills.",
+    "Bu klibin hızı zaten %{n}. Önce Hız/Süre'den %100'e al ya da Rampayı kaldır'ı kullan.": "This clip is already at {}%. Set it back to 100% in Speed/Duration or use Remove ramp.",
+    "Ters oynatılan klipte rampa yapılamaz.": "Can't ramp a reversed clip.",
+    "Bu klipte Zaman Yeniden Eşleme var gibi görünüyor; önce kapat.": "This clip seems to use Time Remapping; turn it off first.",
+    "Warp Stabilizer hız değişikliğiyle çalışmaz. Klibi iç içe sekans yapıp yeniden dene.": "Warp Stabilizer doesn't work with speed changes. Nest the clip and try again.",
+    "Katman kilitli: V{n}. Kilidi açıp yeniden dene.": "Track V{} is locked. Unlock it and try again.",
+    "Multicam ve birleştirilmiş kliplerde hız yazılamıyor.": "Speed can't be written on multicam or merged clips.",
+    "Bu Premiere sürümünde Suflo hız yazamıyor. Premiere'i güncelle; Doctor'da ayrıntı var.": "Suflo can't write speed in this Premiere version. Update Premiere; Doctor has details.",
+    "Klip sesle bağlı ve bu sürümde bağ koparılamıyor. Klibi seç, Ctrl+L ile bağlantıyı kopar, yeniden uygula.": "The clip is linked to audio and this version can't unlink it. Select it, press Ctrl+L to unlink, then apply again.",
+    "Medya yetmedi: hızlanma için klibin sonrasında yeterli görüntü yok. Kaynak: Dengeli'yi seç.": "Not enough footage after the clip for the speed-up. Choose Source: Balanced.",
+    "Medya yetmedi: rampa klibin görüntüsüne sığmadı; klip eski haline getirildi. Daha hafif yoğunluk ya da daha uzun bir aralık dene.": "Not enough footage: the ramp didn't fit the clip's media, so the clip was restored. Try a lighter intensity or a longer range.",
+    "Seçili klipte Suflo rampası bulunamadı. Rampanın parçalarından birini seç.": "No Suflo ramp found on the selected clip. Select one of the ramp's pieces.",
+    "Premiere hızı kabul etmedi; klip eski haline getirildi.": "Premiere didn't accept the speed; the clip was restored.",
+    "Parçalar beklenen yere oturmadı; klip eski haline getirildi.": "The pieces didn't land where expected; the clip was restored.",
+    "Klip eski haline getirilemedi. Ctrl+Z ile geri al ya da kopya sekansı kullan.": "Couldn't restore the clip. Undo with Ctrl+Z or use the copied sequence.",
+    "Rampa parçaları değişmiş; Suflo bunlara dokunmadı.": "The ramp pieces were changed, so Suflo left them alone.",
+    "Aktif sekans değişti; işlem durduruldu.": "The active sequence changed; stopped.",
+    "Kopya sekans oluşturulamadı. Önce sekansı kopyala kutusunu kapatıp dene.": "Couldn't copy the sequence. Untick Copy the sequence first and try again.",
+    "Rampa planı geçersiz.": "Invalid ramp plan.",
+    "Bu ayarlarla rampa oluşmuyor: parçaların hepsi aynı hızda. Daha uzun bir aralık, Parça: Çok ya da başka bir Yumuşatma dene.": "These settings don't make a ramp: every piece has the same speed. Try a longer range, Pieces: Many or another Easing.",
+    "Giriş–Çıkış tek bir video klibin içinde olmalı (kilitli ya da gizli katmanlar sayılmaz).": "In and Out must be inside a single video clip (locked or hidden tracks don't count).",
+    "Bu Premiere sürümünde Suflo klibin sesle bağını okuyamıyor ve koparamıyor. Premiere'i güncelle; Doctor'da ayrıntı var.": "In this Premiere version Suflo can't read or break the clip's link to its audio. Update Premiere; Doctor has details.",
+    "Premiere işlemi tamamlanamadı.": "The Premiere operation couldn't be completed.",
+    // Suflo Doctor rows (js/library-health.js apiKontrolleri)
+    "QE hız yazma (setSpeed)": "QE speed writing (setSpeed)",
+    "Hız Rampası klibe hız yazamaz": "Speed Ramp can't write speed to clips",
+    "Bağlantı koparma (unlinkSelection)": "Unlinking (unlinkSelection)",
+    "Sesle bağlı kliplerde Hız Rampası önce Ctrl+L ile bağlantıyı koparmanı ister": "For clips linked to audio, Speed Ramp asks you to unlink them with Ctrl+L first",
+    "Kare harmanlama (setTimeInterpolationType)": "Frame blending (setTimeInterpolationType)",
+    "Hız Rampası parçalara kare harmanlamayı açamaz; Premiere'de elle aç": "Speed Ramp can't turn on frame blending for the pieces; turn it on by hand in Premiere",
+    "Hız okuma (getSpeed)": "Speed reading (getSpeed)",
+    "Hızı değişmiş klipler süre karşılaştırmasıyla bulunur": "Clips with a changed speed are found by comparing durations",
+    "Zaman Yeniden Eşleme API'si açık": "Time Remapping API available",
+    "Bu Premiere sürümü Zaman Yeniden Eşleme'yi betiklere gösteriyor; Hız Rampası ileride gerçek eğri yazabilir": "This Premiere version exposes Time Remapping to scripts; Speed Ramp may write a real curve in the future",
+    // jsx/host.jsx KS_RAMP_MESAJ fallbacks (ASCII Turkish; the panel normally builds the text from the code)
+    "Bir video klip sec ya da Giris/Cikis koy.": "Select a video clip or set In/Out.",
+    "Grafik, MOGRT, ayar katmani ya da fotografa hiz rampasi uygulanmaz.": "Speed ramps don't work on graphics, MOGRTs, adjustment layers or stills.",
+    "Bu klibin hizi zaten degismis. Once Hiz/Sure'den %100'e al.": "This clip's speed is already changed. Set it back to 100% in Speed/Duration first.",
+    "Ters oynatilan klipte rampa yapilamaz.": "Can't ramp a reversed clip.",
+    "Bu klipte Zaman Yeniden Esleme var gibi gorunuyor; once kapat.": "This clip seems to use Time Remapping; turn it off first.",
+    "Warp Stabilizer hiz degisikligiyle calismaz.": "Warp Stabilizer doesn't work with speed changes.",
+    "Katman kilitli. Kilidi acip yeniden dene.": "The track is locked. Unlock it and try again.",
+    "Multicam ve birlestirilmis kliplerde hiz yazilamiyor.": "Speed can't be written on multicam or merged clips.",
+    "Rampa icin en az 12 kare gerekli.": "A ramp needs at least 12 frames.",
+    "Bu Premiere surumunde QE hiz yazma (setSpeed) yok.": "This Premiere version has no QE speed writing (setSpeed).",
+    "Klip sesle bagli ve bag koparilamiyor. Ctrl+L ile bagi kopar, yeniden uygula.": "The clip is linked to audio and can't be unlinked. Unlink it with Ctrl+L and apply again.",
+    "Medya yetmedi: hizlanma icin klibin sonrasinda yeterli goruntu yok.": "Not enough footage after the clip for the speed-up.",
+    "Premiere hizi kabul etmedi.": "Premiere didn't accept the speed.",
+    "Parcalar beklenen yere oturmadi.": "The pieces didn't land where expected.",
+    "Klip eski haline getirilemedi.": "Couldn't restore the clip.",
+    "Rampa parcalari degismis; Suflo dokunmadi.": "The ramp pieces were changed, so Suflo left them alone.",
+    "Kopya sekans olusturulamadi.": "Couldn't create the copy sequence.",
+    "Rampa plani gecersiz.": "Invalid ramp plan.",
+    "Bu ayarlarla rampa olusmuyor: parcalarin hepsi ayni hizda.": "These settings don't make a ramp: every piece has the same speed.",
+    "Giris-Cikis tek bir video klibin icinde olmali (kilitli ya da gizli katmanlar sayilmaz).": "In and Out must be inside a single video clip (locked or hidden tracks don't count).",
+    "Bu Premiere surumunde Suflo klibin sesle bagini okuyamiyor ve koparamiyor.": "In this Premiere version Suflo can't read or break the clip's link to its audio."
+  });
+
+  /* ============ 3.2 step 2: sound tag filter + silent audio guard (caption-text.js, sessiz-ses.js, Settings › #grp-altyazi) ============ */
+  add({
+    "Ses etiketlerini koru": "Keep sound tags",
+    "Erişilebilirlik: işitme engelli izleyiciler müziği ve alkışı altyazıdan okur": "Accessibility: deaf and hard-of-hearing viewers read music and applause in the captions",
+    "Kapalıyken motorun yazdığı [Müzik], (alkış), [BLANK_AUDIO] ve yalnız ♪ satırları atılır; konuşmalı satırda yalnız etiket silinir. Açıkken etiketler [Müzik] biçiminde kalır. Yeni transkriptlerde geçerli.": "When off, the [Music], (applause), [BLANK_AUDIO] and ♪-only lines the engine writes are dropped; in a line with speech only the tag is removed. When on, tags are kept in [Music] form. Applies to new transcripts.",
+    "Yine de devam et": "Continue anyway",
+    "Vazgeç": "Cancel",
+    "Ses neredeyse tamamen sessiz: ses kanalları kapalı ya da sessize alınmış olabilir (Altyazı › Ses katmanları).": "The audio is almost completely silent: the audio tracks may be turned off or muted (Captions › Audio tracks).",
+    "Ses neredeyse tamamen sessiz: seçili klibin bu aralığında duyulur ses yok. Ses ayrı bir klipteyse (harici mikrofon) o klibi seç.": "The audio is almost completely silent: there is no audible sound in this range of the selected clip. If the sound is on a separate clip (external microphone), select that clip.",
+    "Vazgeçildi: ses neredeyse tamamen sessiz.": "Cancelled: the audio is almost completely silent.",
+    "{n} sessiz klip atlandı: {}": "{} silent clips skipped: {}",
+    "Uyarıyı göster": "Show warning",
+    "Yalnız ses etiketi vardı ([Müzik], alkış…), konuşma yok. Etiketleri altyazıda tutmak için: Ayarlar › Altyazı › Ses etiketlerini koru.":
+      "There were only sound tags ([Music], applause…), no speech. To keep tags in the captions: Settings › Captions › Keep sound tags."
+  });
+
+  /* ================= Canlı transkripsiyon / Live transcription (3.2 step 3: js/whisper-akis.js) ================= */
+  add({
+    // status line parts: "12 satır · %34 · ~1 dk 20 sn kaldı · 3,1× gerçek zaman" (each part translated alone)
+    "%{n}": "{}%",
+    // "12 satır · %34" (no time left yet): more specific than the stats-line "{} %{n}" template
+    "{} · %{n}": "{} · {}%",
+    "~{} kaldı": "~{} left",
+    "{n} dk {n} sn": "{} min {} s",
+    // live rows box (#cap-canli) and the Cancel button that replaces "Altyazı oluştur" while a job runs
+    "canlı": "live",
+    "Canlı transkripsiyon": "Live transcription",
+    "Geçici satırlar: motor bitince düzenlenebilir altyazıyla değişir.": "Provisional lines: replaced by editable captions when the engine finishes.",
+    "İşi durdurur: geçici ses ve çıktı dosyaları silinir (kurulu motor ve model kalır), ekrandaki altyazı olduğu gibi kalır.": "Stops the job: temporary audio and output files are deleted (the installed engine and model are kept), and the captions on screen stay as they are.",
+    "Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez. Bitince İptal açılır.": "Premiere is exporting the audio; this step can't be interrupted. Cancel becomes available when it's done.",
+    "İptal ediliyor…": "Canceling…",
+    "İptal edildi.": "Canceled.",
+    "İptal edildi": "Canceled",
+    // Auto Cut: Cancel replaces "Sessizlikleri bul" while ffmpeg analyzes
+    "ffmpeg analizini durdurur; önceki sonuç ekranda kalır": "Stops the ffmpeg analysis; the previous result stays on screen",
+    // engine / model / ffmpeg download cancel (Settings and the caption setup card)
+    "İndirmeyi iptal et": "Cancel download",
+    "İnen kısım korunur; yeniden kurunca kaldığı yerden devam eder": "The downloaded part is kept; installing again resumes where it left off",
+    "İndirme iptal edildi — inen kısım korundu, yeniden başlatınca kaldığı yerden devam eder.": "Download canceled — the downloaded part was kept; starting again resumes where it left off.",
+    // Cancel while waiting on a download another install started (guide, Doctor, Create captions): that download keeps going
+    "Bekleme iptal edildi — başka bir kurulum indirmeye devam ediyor.": "Stopped waiting — another install is still downloading."
+  });
+
+  /* ================= Okunabilir altyazı düzeni / Readable caption layout (3.2 step 4: js/caption-layout.js) ================= */
+  add({
+    // Line length menu, word limit (Captions › settings)
+    "2 satır × 42 (YouTube/TV)": "2 lines × 42 (YouTube/TV)",
+    "Kelime sınırı": "Word limit",
+    "Satır modunda bir satıra en çok kaç kelime girer (0 = kapalı, 2–12). Kelime zamanı olan transkriptte geçerli.":
+      "The most words one caption can hold in line mode (0 = off, 2–12). Applies to transcripts with word timings.",
+    "0 = kapalı · satır modunda bir satırdaki en çok kelime": "0 = off · most words per caption in line mode",
+    // Caption Editor: Shift+Enter inserts a line break inside the caption
+    "alt satır": "line break",
+    "Tek zaman: satırı taşı · başlangıç – bitiş: satırın sınırlarını değiştir": "One time: move the line · start – end: change the line's start and end",
+    "Zaman biçimi: dd:ss.mmm ya da dd:ss.mmm – dd:ss.mmm (örn. 01:23.500 – 01:25.000)": "Time format: mm:ss.mmm or mm:ss.mmm – mm:ss.mmm (e.g. 01:23.500 – 01:25.000)",
+    // Settings › Captions
+    "En kısa süre (sn)": "Minimum duration (s)",
+    "En uzun süre (sn)": "Maximum duration (s)",
+    "Kısa parçaları birleştir": "Merge short fragments",
+    "Arası 0,2 saniyeden kısa olan komşu parçalar birlikte sığıyorsa tek altyazı olur": "Neighboring fragments less than 0.2 s apart become one caption if they fit together",
+    "Satır modlarında (32 / 42 karakter, 2 satır × 42) yeni transkriptlerde geçerli: altyazı en kısa sürenin altında kalmaz (sonraki satıra kadar boşluk varsa), en uzun süreyi aşmaz (uzun satır bölünür). Kelime zamanı olmayan transkriptte (bulut yedeği) yalnız 2 satır × 42'de geçerli; 32 / 42 karakter eski bölmeyi izler. Birleştirme kelime zamanı olmayan kısa parçaları toplar (kelime zamanlı satırlar zaten en az parçayla kurulur), cümle sonunu aşmaz, satır uzunluğunu ve kelime sınırını korur.":
+      "Applies to new transcripts in line modes (32 / 42 characters, 2 lines × 42): a caption stays on screen at least the minimum duration (when there's room before the next one) and never longer than the maximum (longer lines are split). Without word timings (cloud fallback) these apply only to 2 lines × 42; 32 / 42 characters keep the classic split. Merging joins short fragments that have no word timings (word-timed captions are already built from as few pieces as possible), never crosses the end of a sentence, and keeps the line length and word limit."
+  });
+
+  /* ================= Yerel motor seçenekleri / Local engine options (3.2 step 5: js/whisper-args.js) ================= */
+  add({
+    // Settings › Suflo Caption Engine › Decoding
+    "Çözme": "Decoding",
+    "Yerel motorun metni nasıl çözdüğü": "How the local engine decodes the text",
+    "En doğru — beam search (önerilen)": "Most accurate — beam search (recommended)",
+    "Hızlı — tek aday": "Fast — single candidate",
+    "En doğru her adımda 5 adayı karşılaştırır. Hızlı tek adayla çözer: uzun videoda belirgin hızlıdır, gürültülü ya da telefon kaydında daha çok hata yapabilir. Yalnız yerel motorda geçerli; yeni transkriptlerde.":
+      "Most accurate compares 5 candidates at every step. Fast decodes with a single candidate: noticeably faster on long videos, but it can make more mistakes on noisy or phone recordings. Local engine only; applies to new transcripts.",
+    // Captions card: precise word timing (DTW)
+    "Hassas kelime zamanlaması (DTW, biraz daha yavaş)": "Precise word timing (DTW, slightly slower)",
+    "Yerel motor kelime başlarını ses ile metnin hizalamasından (DTW) ölçer: kelime kelime ve karaoke altyazıda vurgu sözcüğün söylendiği anda yanar. Transkripsiyon biraz uzar.":
+      "The local engine measures where each word starts by aligning the audio with the text (DTW): in word-by-word and karaoke captions the highlight lights up exactly when the word is spoken. Transcription takes a little longer.",
+    "Bu model ve motor derlemesinde DTW zamanı gelmedi, otomatik kapatıldı; kelime zamanı belirteç zamanından geliyor.":
+      "This model and engine build returned no DTW timings, so DTW was turned off automatically; word timing comes from token timestamps.",
+    "DTW bir sonraki transkriptte yeniden denenecek": "DTW will be tried again on the next transcript",
+    // Captions card › Language: offline English
+    "İngilizceye çevir (çevrimdışı)": "Translate to English (offline)",
+    "Konuşmayı internetsiz İngilizce altyazıya çevirir: yerel motor, Small ya da Large model. Pro (3 ücretsiz deneme hakkı). Diğer diller için Caption Editor'daki Çeviri.":
+      "Turns speech into English captions without internet: local engine, Small or Large model. Pro (3 free trial runs). For other languages, use Translate in the Caption Editor.",
+    "Çevrimdışı İngilizce çeviri yerel motorla çalışır: Ayarlar'dan yerel çekirdeği kur ya da çeviriyi kapat.":
+      "Offline English translation runs on the local engine: install the local core in Settings or turn translation off.",
+    "Turbo çeviri için eğitilmedi: çevrimdışı İngilizce çeviri Small ve Large modelinde çalışır.":
+      "Turbo wasn't trained for translation: offline English translation works with the Small and Large models.",
+    "Çevrimdışı İngilizce çeviri Small ve Large modelinde çalışır (Tiny ve Base'in çevirisi zayıf).":
+      "Offline English translation works with the Small and Large models (Tiny and Base translate poorly).",
+    "Large'a geç": "Switch to Large",
+    "Small'a geç": "Switch to Small",
+    "Ayarlar'da model indir": "Download a model in Settings",
+    "Model: {} · çevrimdışı İngilizce çeviri hazır": "Model: {} · offline English translation ready",
+    "Suflo Motoru · yerel · İngilizceye çevriliyor…": "Suflo Engine · local · translating to English…",
+    "Suflo Motoru · yerel · hızlı çözme…": "Suflo Engine · local · fast decoding…",
+    "{n} altyazı satırı hazır · İngilizce (çevrimdışı)": "{} caption lines ready · English (offline)",
+    "js/whisper-args.js yüklenmedi": "js/whisper-args.js was not loaded",
+    // Pro / trial (js/deneme.js, js/pro.js)
+    "Çevrimdışı İngilizce çeviri": "Offline English translation",
+    "Çevrimdışı İngilizce çeviri: internetsiz, yerel motorla": "Offline English translation: no internet, on the local engine",
+    "12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS": "Translation into 12 languages · offline English · Batch clips · styled ASS",
+    // Suflo Doctor › Caption engine
+    "Çözme modu": "Decoding mode",
+    "Hızlı · açgözlü çözme (-bs 1 -bo 1)": "Fast · greedy decoding (-bs 1 -bo 1)",
+    "En doğru · beam search (-bs 5)": "Most accurate · beam search (-bs 5)",
+    "Hassas kelime zamanlaması (DTW)": "Precise word timing (DTW)",
+    "Bu motor derlemesi -dtw / -nfa tanımıyor · kelime zamanı belirteç zamanından gelir": "This engine build doesn't support -dtw / -nfa · word timing comes from token timestamps",
+    "Bu model için DTW ön ayarı yok · kelime zamanı belirteç zamanından gelir": "No DTW preset for this model · word timing comes from token timestamps",
+    "Bu model ve derlemede DTW zamanı gelmedi, otomatik kapatıldı ({})": "This model and build returned no DTW timings, turned off automatically ({})",
+    "Açık · desteklenir ({})": "On · supported ({})",
+    "Kapalı · desteklenir ({})": "Off · supported ({})"
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
@@ -2483,6 +2826,7 @@
     "Sistem": "System",
     "Suflo ile gelir": "Included with Suflo",
     "kalan kısım": "remaining part",
+    "kelime zamanı": "word timing",
     // invite rewards sync errors (pro-sync.js)
     "Davet ödül kataloğu geçersiz.": "The invite reward catalog is invalid.",
     "Bozuk davet ödülü kaydı.": "Corrupt invite reward entry.",
@@ -2597,6 +2941,8 @@
     // "12,5 sn" decimals and durations
     [/^([−+-]?\d+(?:[.,]\d+)?) ?sn$/, function (m) { return m[1].replace(",", ".") + " s"; }],
     [/^([−+-]?\d+(?:[.,]\d+)?) ?dk$/, function (m) { return m[1].replace(",", ".") + " min"; }],
+    // live transcription realtime factor: "3,1× gerçek zaman" → "3.1× real time"
+    [/^(\d+(?:,\d+)?)× gerçek zaman$/, function (m) { return m[1].replace(",", ".") + "× real time"; }],
     // "3 klip", "1 satır", "5 kelime"…
     [/^(\d+) (klip|satır|kelime|bölüm|kesim|vuruş|sahne|parça|dosya|ses|efekt|içerik|stil|geçiş|zemin)$/, function (m) {
       var w = { "klip": "clips", "satır": "lines", "kelime": "words", "bölüm": "chapters", "kesim": "cuts", "vuruş": "beats",
@@ -2610,6 +2956,9 @@
     // Try Pro clean re-render: the Premiere project item name and file path stay verbatim ($ = raw, not translated)
     [/^Filigran kısmen kaldırıldı: (\d+) proje öğesi değiştirilemedi\. Proje panelinde ona sağ tıkla, Replace Footage ile temiz dosyayı seç: ([\s\S]*)$/,
       function (m) { return "Watermark partly removed: " + m[1] + " project item" + (m[1] === "1" ? "" : "s") + " couldn't be swapped. Right-click " + (m[1] === "1" ? "it" : "them") + " in the Project panel, choose Replace Footage and pick the clean file: " + m[2]; }],
+    // silent-audio guard, batch: the clip name stays verbatim ($3 = raw, not translated)
+    [/^Ses neredeyse tamamen sessiz: klip (\d+)\/(\d+) \(([\s\S]+)\) içinde duyulur ses yok\. Bu karar sonraki sessiz kliplere de uygulanır: Vazgeç onları atlar, sesli klipler yine yazıya dökülür\.$/,
+      "The audio is almost completely silent: clip $1/$2 ($3) has no audible sound. This choice also applies to later silent clips: Cancel skips them, clips with sound are still transcribed."],
     [/^Deneme klibi timeline'da düzenlenmiş \(taşınmış, kırpılmış, bölünmüş ya da kopyalanmış\); kurgun bozulmasın diye Suflo ona dokunmadı\. Proje panelinde "([\s\S]+?)" öğesine sağ tıkla, Replace Footage ile temiz dosyayı seç \(düzenlemelerin korunur\), sonra listeden çıkar\. Temiz dosya: ([\s\S]+)$/,
       "The trial clip was edited on the timeline (moved, trimmed, split or duplicated), so Suflo left it alone to keep your edit intact. In the Project panel, right-click \"$1\", choose Replace Footage and pick the clean file (your edits are kept), then remove it from the list. Clean file: $2"]
   ];
@@ -2621,7 +2970,7 @@
     "SaaS Glass", "Reels", "Pop", "Premium", "Karaoke", "YouTube", "Azərbaycanca", "Azərbaycan", "English", "Deutsch", "Español",
     "Français", "Português", "Italiano", "Anton", "Archivo Black", "Bebas Neue", "Bungee", "Lora", "Montserrat", "Arial", "Impact",
     "Verdana", "Tahoma", "Georgia", "Trebuchet MS", "Courier New", "Apple", "Twemoji", "SRT", "WebVTT", "ASS · stilli", "TXT", "Enter",
-    "Ctrl+Enter", "Alt+Enter", "Instagram Reels", "TikTok", "Jump Cut", "Snap-In", "BPM", "native", "Slide", "Zoom", "Fade", "MOGRT",
+    "Ctrl+Enter", "Alt+Enter", "Shift+Enter", "Instagram Reels", "TikTok", "Jump Cut", "Snap-In", "BPM", "native", "Slide", "Zoom", "Fade", "MOGRT",
     "Neon", "✦ Smart SFX 2.0", "Smart SFX 2.0", "loop", "GPU:", "OpenAI", "Endpoint", "Premiere", "Pro Cloud", "AUTO", "Emoji CDN",
     "SRT · VTT · TXT + caption track", "MIT · sametcreates", "Platform", "https://…/v1/audio/transcriptions", "gsk_… / sk-…",
     "suflo => Suflo sametkreyts => sametcreates rils => Reels", "https://assets.suflo.app/emoji/v1/catalog.json", "XXXX-XXXX-XXXX-XXXX",

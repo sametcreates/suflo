@@ -551,7 +551,7 @@ window.KOnboarding = (function () {
         durum("Örnek klibin altyazısı çıkarılıyor…");
         basarili = await KCaptions.go({ ornek: { wav: yerel.wav, mp3: yerel.mp3 || "", lang: o.m.lang, offset: offset, sure: o.m.sure } });
       } else {
-        basarili = KCaptions.ornekYukle(veri, offset);
+        basarili = KCaptions.ornekYukle(veri, offset, o.m.sure);
         if (basarili) KApp.toast("Örnek transkript yüklendi. Motoru kurunca kendi kliplerinden de böyle çıkar.", "good", 7000);
       }
       if (basarili) {
@@ -860,7 +860,7 @@ window.KOnboarding = (function () {
     }
     if (kararDegeri === "tam") {
       // Taze kurulumda "Suflo 3.1'de yeni" penceresi rehberin üstüne binmesin
-      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.1";
+      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.2";
       kayitYaz();
     }
     olaylariBagla();

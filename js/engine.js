@@ -245,19 +245,60 @@ window.KEngine = (function () {
 
   function fmtMB(n) { return n >= 1024 ? (n / 1024).toFixed(1) + " GB" : n + " MB"; }
 
+  /* ---------------- İptal (3.2: Altyazı oluştur'un İptal'i ve kurulum İptal'i) ---------------- */
+
+  // Kullanıcı indirmeyi iptal etti: .part korunur, sonraki kurulum kaldığı yerden devam eder
+  var INDIRME_IPTAL = "İndirme iptal edildi — inen kısım korundu, yeniden başlatınca kaldığı yerden devam eder.";
+  function iptalHatasi(mesaj) {
+    if (K.iptalHatasi) return K.iptalHatasi(mesaj);
+    var e = new Error(mesaj || "İptal edildi");
+    e.iptal = true;
+    return e;
+  }
+  function iptalDenetle(iptal, mesaj) {
+    if (iptal && iptal.iptalEdildi) throw iptalHatasi(mesaj || INDIRME_IPTAL);
+  }
+  // Sonradan katılanın İptal'i: indirme DURMAZ (onu başka bir kurulum başlattı), yalnız bu bekleme biter.
+  // "İndirme iptal edildi" demek yanlış olurdu: indirme bant genişliği kullanmaya devam ediyor.
+  var BEKLEME_IPTAL = "Bekleme iptal edildi — başka bir kurulum indirmeye devam ediyor.";
+  /*
+   * Kilitli (paylaşılan) bir işi bekleyen ikinci çağıranın iptali yalnız KENDİ beklemesini
+   * keser: işi başlatan (örn. rehberin arka plan ffmpeg kurulumu) sürer. İşi başlatanın
+   * jetonu ise indirmenin kendisine gider.
+   *   sahip    işi başlatanın jetonu: katılan aynı jetonu taşıyorsa iptal indirmeyi zaten keser,
+   *            iş kendi "İndirme iptal edildi" hatasıyla biter (bekleme mesajı verilmez)
+   *   iptalde  (isteğe bağlı) katılanın beklemesi iptalle bitince bir kez çağrılır: örn. ilerleme
+   *            dinleyicisini sökmek (yoksa süren indirme iptal edilen işin durum satırına yazmaya devam eder)
+   */
+  function iptalliBekle(is, iptal, sahip, iptalde) {
+    if (!iptal || iptal === sahip || typeof iptal.dinle !== "function") return is;
+    return new Promise(function (resolve, reject) {
+      var birak = iptal.dinle(function () {
+        if (typeof iptalde === "function") {
+          try { iptalde(); } catch (eI) { K.log("iptal temizligi: " + (eI && eI.message ? eI.message : eI)); }
+        }
+        reject(iptalHatasi(BEKLEME_IPTAL));
+      });
+      is.then(function (v) { birak(); resolve(v); }, function (e) { birak(); reject(e); });
+    });
+  }
+
   // Aynalı + ilerlemeli indirme.
   // label aynı zamanda mantıksal kimlik: yarım dosya (.part) yalnızca aynı kimliğe devam eder,
   // böylece aynalar arası devam korunur ama farklı dosyalar birbirine eklenmez.
-  async function fetchFile(item, destPath, onPct, label) {
+  // iptal: K.iptalJetonu() — iptalde sonraki aynaya geçilmez, { ok: false, iptal: true } döner
+  async function fetchFile(item, destPath, onPct, label, iptal) {
     var urls = item.urls || [item.url];
     var lastErr = "";
     var kept = 0;
     for (var i = 0; i < urls.length; i++) {
+      if (iptal && iptal.iptalEdildi) return { ok: false, iptal: true, error: "İptal edildi", kept: kept };
       if (i > 0) K.log("indirme aynasi deneniyor (" + (i + 1) + "/" + urls.length + "): " + label);
       var r = await K.download(urls[i], destPath, function (f) {
         if (onPct) onPct(f);
-      }, 0, undefined, { key: label, expectedMB: item.sizeMB });
+      }, 0, undefined, { key: label, expectedMB: item.sizeMB, iptal: iptal || null });
       if (r.ok) return { ok: true };
+      if (r.iptal) return { ok: false, iptal: true, error: "İptal edildi", kept: r.kept || kept };
       lastErr = r.error || "bilinmeyen hata";
       if (r.kept) kept = r.kept;
       K.log("indirme basarisiz [" + label + "] kaynak " + (i + 1) + ": " + lastErr);
@@ -270,6 +311,7 @@ window.KEngine = (function () {
    * yoksa kullanıcı her şeyin baştan ineceğini sanıp vazgeçiyor ya da klasörü siliyor.
    */
   function indirmeHatasi(ad, d, item) {
+    if (d && d.iptal) return iptalHatasi(INDIRME_IPTAL);
     var m = ad + " indirilemedi: " + d.error;
     if (d.kept > 1048576 && item && item.sizeMB) {
       m += " — %" + Math.round(d.kept / (item.sizeMB * 1048576) * 100) +
@@ -322,7 +364,7 @@ window.KEngine = (function () {
 
   /*
    * Tam kurulum: motor derlemesi + model (+ VAD).
-   * opts: { modelId, useGpu, onStatus(msg), ffmpegArkada }
+   * opts: { modelId, useGpu, onStatus(msg), ffmpegArkada, iptal }
    *   ffmpegArkada: ffmpeg'i motordan ONCE kurma; model inince arka planda baslat.
    *     Rehberin ilk altyazisi hazir 16 kHz WAV kullanir, ffmpeg beklemez. Donuste
    *     sonuc.ffmpegIsi (promise | null) arka plan kurulumunu izlemek icindir.
@@ -330,14 +372,22 @@ window.KEngine = (function () {
    * KILIT: app.js (Ayarlar/kurulum karti/rehber) ve library-health.js (Doctor onarimi)
    * ayni anda kurulum baslatabiliyor; ikisi ayni .part dosyasina yazip yarisirdi.
    * Surmekte olan kurulum varken gelen cagri onun sonucunu paylasir.
+   *
+   * IPTAL (opts.iptal, K.iptalJetonu): isi baslatanin jetonu indirmelere gider (istek kesilir,
+   * .part korunur) ve adimlar arasinda denetlenir; Homebrew kurulumu ve arsiv acma yarida
+   * kesilmez (yarim kurulum birakmasin), bitince iptal edilir. Sonradan katilanin jetonu
+   * yalniz kendi beklemesini keser.
    */
   var _kurulumIsi = null;
+  var _kurulumJetonu = null;   // işi başlatanın iptal jetonu (iptalliBekle: aynı jetonla katılan)
 
   function install(opts) {
-    if (_kurulumIsi) return _kurulumIsi;
+    if (_kurulumIsi) return iptalliBekle(_kurulumIsi, opts && opts.iptal, _kurulumJetonu);
     var is = kurulumYap(opts);
     _kurulumIsi = is;
-    is.then(function () { _kurulumIsi = null; }, function () { _kurulumIsi = null; });
+    _kurulumJetonu = (opts && opts.iptal) || null;
+    var birak = function () { if (_kurulumIsi === is) { _kurulumIsi = null; _kurulumJetonu = null; } };
+    is.then(birak, birak);
     return is;
   }
 
@@ -346,6 +396,7 @@ window.KEngine = (function () {
   async function kurulumYap(opts) {
     opts = opts || {};
     var say = opts.onStatus || function () {};
+    var iptal = opts.iptal || null;
     if (!K.nodeOK) throw new Error("Bu ortamda kurulamaz — Premiere içinde dene.");
 
     var dir = K.whisperDir();
@@ -375,9 +426,10 @@ window.KEngine = (function () {
     if (!ffVar) {
       say("ffmpeg kuruluyor… (ses dönüştürme için gerekli)");
       try {
-        await installFfmpeg(say);
+        await installFfmpeg(say, iptal);
         await K.findFfmpeg(true);       // onbellegi tazele
       } catch (eF) {
+        if (eF && eF.iptal) throw eF;   // kullanici iptal etti: motora gecme
         // Motor kurulumunu bunun yuzunden IPTAL ETME: kullanici ffmpeg'i elle de
         // kurabilir, ama neyin eksik kaldigini bilerek devam etsin.
         K.log("ffmpeg otomatik kurulamadi: " + eF.message);
@@ -386,6 +438,7 @@ window.KEngine = (function () {
     }
 
     /* 1) motor derlemesi — zaten varsa atla */
+    iptalDenetle(iptal);
     var haveExe = !!K.whisperLocal({ skipModel: true });
     var wantBuild = opts.useGpu ? "cuda" : "cpu";
 
@@ -424,7 +477,7 @@ window.KEngine = (function () {
       var zipPath = K.path.join(dir, "engine-" + build.id + ".zip");
       var d1 = await fetchFile(build, zipPath, function (f) {
         say("Motor iniyor… %" + Math.round(f * 100) + " (" + fmtMB(build.sizeMB) + ")");
-      }, "motor:" + build.id);
+      }, "motor:" + build.id, iptal);
       if (!d1.ok) throw indirmeHatasi("Motor", d1, build);
 
       say("Motor açılıyor…");
@@ -442,7 +495,7 @@ window.KEngine = (function () {
         var zp2 = K.path.join(dir, "engine-" + cpu.id + ".zip");
         var d2 = await fetchFile(cpu, zp2, function (f) {
           say("CPU motoru iniyor… %" + Math.round(f * 100));
-        }, "motor:cpu");
+        }, "motor:cpu", iptal);
         if (!d2.ok) throw indirmeHatasi("CPU motoru", d2, cpu);
         var ok2 = await K.unzip(zp2, dir);
         try { K.fs.unlinkSync(zp2); } catch (e) {}
@@ -459,13 +512,16 @@ window.KEngine = (function () {
     }
 
     /* 2) model — model basina kilitli indirme (installModel ile ayni is paylasilir) */
-    await installModel(model.id, say);
+    iptalDenetle(iptal);
+    await installModel(model.id, say, iptal);
 
     /* 3) VAD — küçük, sessizlikleri atlayıp hızlandırır */
+    iptalDenetle(iptal);
     if (!vadPath()) {
       say("Sessizlik dedektörü iniyor… (2 MB)");
       var vPath = K.path.join(dir, "models", VAD.file);
-      var d4 = await fetchFile(VAD, vPath, null, "vad");
+      var d4 = await fetchFile(VAD, vPath, null, "vad", iptal);
+      if (d4.iptal) throw indirmeHatasi("VAD", d4, VAD);
       if (!d4.ok) K.log("VAD indirilemedi (kritik degil): " + d4.error);
       else if (!(await modelDogrula(VAD, vPath, null))) K.log("VAD dogrulanamadi, silindi (kritik degil)");
     }
@@ -490,7 +546,10 @@ window.KEngine = (function () {
         var zp3 = K.path.join(dir, "engine-" + BUILDS.cpu.id + ".zip");
         var d5 = await fetchFile(BUILDS.cpu, zp3, function (f) {
           say("CPU motoru iniyor… %" + Math.round(f * 100));
-        }, "motor:cpu");
+        }, "motor:cpu", iptal);
+        // İptal: indirme kesilir, .part korunur (yeniden kurunca kaldığı yerden); CUDA DLL'leri
+        // silinmiş durum ağ hatasındakiyle aynı. Kullanıcıya "Hazır" değil iptal uyarısı gider.
+        if (d5.iptal) throw indirmeHatasi("CPU motoru", d5, BUILDS.cpu);
         var ok3 = d5.ok && await K.unzip(zp3, dir);
         try { K.fs.unlinkSync(zp3); } catch (e) {}
         if (ok3) {
@@ -543,18 +602,25 @@ window.KEngine = (function () {
    * yazici olmaz).
    */
   var _modelIsleri = {};
+  var _modelJetonlari = {};   // model başına işi başlatanın iptal jetonu
 
-  function installModel(id, onStatus) {
+  // iptal (isteğe bağlı): K.iptalJetonu() — işi başlatanınki indirmeyi keser, sonradan katılanınki
+  // yalnız kendi beklemesini
+  function installModel(id, onStatus, iptal) {
     var model = modelById(id);
     if (!model) return Promise.reject(new Error("Bilinmeyen model: " + id));
-    if (_modelIsleri[model.id]) return _modelIsleri[model.id];
-    var is = modelKur(model, onStatus || function () {});
+    if (_modelIsleri[model.id]) return iptalliBekle(_modelIsleri[model.id], iptal, _modelJetonlari[model.id]);
+    var is = modelKur(model, onStatus || function () {}, iptal);
     _modelIsleri[model.id] = is;
-    is.then(function () { delete _modelIsleri[model.id]; }, function () { delete _modelIsleri[model.id]; });
+    _modelJetonlari[model.id] = iptal || null;
+    var birak = function () {
+      if (_modelIsleri[model.id] === is) { delete _modelIsleri[model.id]; delete _modelJetonlari[model.id]; }
+    };
+    is.then(birak, birak);
     return is;
   }
 
-  async function modelKur(model, say) {
+  async function modelKur(model, say, iptal) {
     if (!K.nodeOK) throw new Error("Bu ortamda kurulamaz — Premiere içinde dene.");
     var dir = K.whisperDir();
     K.fs.mkdirSync(K.path.join(dir, "models"), { recursive: true });
@@ -564,7 +630,7 @@ window.KEngine = (function () {
     say(model.label + " iniyor… (" + fmtMB(model.sizeMB) + ")");
     var d3 = await fetchFile(model, mPath, function (f) {
       say(model.label + " iniyor… %" + Math.round(f * 100) + " (" + fmtMB(model.sizeMB) + ")");
-    }, "model:" + model.id);
+    }, "model:" + model.id, iptal);
     if (!d3.ok) throw indirmeHatasi(model.label.split(" —")[0], d3, model);
     if (!(await modelDogrula(model, mPath, say))) {
       throw new Error(model.label.split(" —")[0] + " indirildi ama doğrulanamadı (bozuk dosya). Tekrar dene.");
@@ -609,10 +675,17 @@ window.KEngine = (function () {
   /* ---------------- Whisper argümanları ---------------- */
 
   /*
-   * transcribeLocal için argüman üretir — VAD, beam search, thread, GPU.
-   * wordLevel: karaoke modu
+   * transcribeLocal için argüman üretir — VAD, çözme modu, thread, DTW, çeviri. Argüman kurma
+   * saf modülde (js/whisper-args.js, SufloWhisperArgs.olustur; Node testleri doğrudan çalıştırır).
+   * -ojf: JSON'a belirteç başına metin, zaman, olasılık (p) ve t_dtw yazılır. Satır ve kelime
+   * kelime modu AYNI çıktıyı kullanır (js/whisper-words.js kelimelere ayırır).
+   * wordLevel: argümanı değiştirmez (karaoke için ikinci tur gerekmez).
+   * kelimeYedegi: yalnız belirteç yazmayan eski derlemede kelime zamanı için
+   *   eski "-ml 1 -sow" turu (transcribeLocal yalnız o durumda ister).
+   * cozme ("dogru" | "hizli"), dtw (bool), cevir (bool), modelId: whisper-args.js'e bakın.
    */
   function buildArgs(o) {
+    o = o || {};
     // whisper-cli Windows'ta argv'yi ANSI okur: Turkce karakterli kullanici
     // adinda model/ses yolu bozulup motor cokuyordu (issue #7). Yol
     // argumanlari ASCII-guvenli esdegerlerine cevrilir; cikti tabani ayni
@@ -620,31 +693,20 @@ window.KEngine = (function () {
     var G = (typeof K !== "undefined" && K.guvenliYol)
       ? K.guvenliYol
       : function (p) { return p; };
-    var args = [
-      "-m", G(o.model, "girdi"),
-      "-f", G(o.audio, "girdi"),
-      "-l", o.lang || "auto",
-      "-oj", "-of", G(o.outBase, "cikti"),
-      "-t", String(o.threads || 4),
-      "-pp",
-      "-bs", "5"
-    ];
-
-    // Proje sozlugundeki dogru marka/kisi adlari ilk decode gecisine yon verir.
-    // Sonradan metin degistiren bir LLM degildir; ses-model hizalamasini korur.
-    if (o.prompt) args.push("--prompt", String(o.prompt).slice(0, 700));
-
+    var WAR = typeof window !== "undefined" ? window.SufloWhisperArgs : null;
+    if (!WAR) throw new Error("js/whisper-args.js yüklenmedi");
     // VAD: sessizlikleri atla (büyük hız kazancı + halüsinasyon azalır)
-    // Not: -vp ve -vsd MİLİSANİYE cinsinden (whisper-cli varsayılanları 30 / 100).
     var vp = vadPath();
-    if (vp) {
-      args.push("--vad", "-vm", G(vp, "girdi"));
-      args.push("-vsd", "500");   // 500 ms altındaki sessizlikte segment bölme
-      args.push("-vp", "250");    // konuşma sınırlarına 250 ms tampon (kelime yutulmasın)
-    }
-
-    if (o.wordLevel) args.push("-ml", "1", "-sow");
-    return { args: args, vad: !!vp };
+    var girdi = {};
+    for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) girdi[k] = o[k];
+    girdi.vad = vp;
+    girdi.yol = G;
+    var secim = WAR.secenekler(girdi);
+    return {
+      args: WAR.olustur(girdi), vad: !!vp,
+      cozme: secim.cozme, dtw: secim.dtw, cevir: secim.cevir, modelId: secim.modelId,
+      gunluk: WAR.gunlukMetni(girdi)
+    };
   }
 
   /* ---------------- ffmpeg kurulumu ---------------- */
@@ -731,6 +793,7 @@ window.KEngine = (function () {
    * AYNI hedefi olusturmaya calisirdi. Ikinci cagri birincinin sonucunu bekler.
    */
   var _ffmpegIsi = null;
+  var _ffmpegJetonu = null;    // isi baslatanin iptal jetonu
   var _ffmpegDinleyici = [];   // surmekte olan isin ilerlemesini bekleyen her cagiran
   var _ffmpegSon = "";         // son ilerleme metni: sonradan katilan bos ekranda beklemesin
 
@@ -739,7 +802,9 @@ window.KEngine = (function () {
    * baslatip kullanici hemen "Altyazi olustur"a basinca durum satiri "ffmpeg kuruluyor…"
    * da donup kalmasin, yuzde aksin.
    */
-  function installFfmpeg(onStatus) {
+  // iptal (isteğe bağlı): işi başlatanınki indirmeyi keser (.part korunur), sonradan katılanınki
+  // (örn. rehberin arka plan kurulumu sürerken Altyazı oluştur'un İptal'i) yalnız kendi beklemesini
+  function installFfmpeg(onStatus, iptal) {
     if (!_ffmpegIsi) {
       var dinleyiciler = [];
       _ffmpegDinleyici = dinleyiciler;
@@ -750,23 +815,33 @@ window.KEngine = (function () {
         dinleyiciler.slice().forEach(function (fn) {
           try { fn(m); } catch (eD) { K.log("ffmpeg ilerleme dinleyicisi: " + (eD && eD.message ? eD.message : eD)); }
         });
-      });
+      }, iptal);
       _ffmpegIsi = is;
+      _ffmpegJetonu = iptal || null;
       // sonuc ne olursa olsun kilidi birak, ama sonucu cagirana aynen ilet
       var birak = function () {
-        if (_ffmpegIsi === is) { _ffmpegIsi = null; _ffmpegDinleyici = []; _ffmpegSon = ""; }
+        if (_ffmpegIsi === is) { _ffmpegIsi = null; _ffmpegJetonu = null; _ffmpegDinleyici = []; _ffmpegSon = ""; }
       };
       is.then(birak, birak);
       return is;
     }
-    if (typeof onStatus === "function" && _ffmpegDinleyici.indexOf(onStatus) === -1) {
-      _ffmpegDinleyici.push(onStatus);
+    var liste = _ffmpegDinleyici, eklendi = false;
+    var zatenIptal = !!(iptal && iptal.iptalEdildi);
+    if (!zatenIptal && typeof onStatus === "function" && liste.indexOf(onStatus) === -1) {
+      liste.push(onStatus);
+      eklendi = true;
       if (_ffmpegSon) { try { onStatus(_ffmpegSon); } catch (eS) {} }
     }
-    return _ffmpegIsi;
+    // Katılanın İptal'i: ilerleme dinleyicisi de sökülür. Yoksa arkada süren indirme, iptal edilmiş
+    // Altyazı oluştur'un durum satırına "ffmpeg iniyor… %31" yazmaya devam ederdi.
+    return iptalliBekle(_ffmpegIsi, iptal, _ffmpegJetonu, function () {
+      if (!eklendi) return;
+      var k = liste.indexOf(onStatus);
+      if (k !== -1) liste.splice(k, 1);
+    });
   }
 
-  async function ffmpegKur(onStatus) {
+  async function ffmpegKur(onStatus, iptal) {
     var say = onStatus || function () {};
     if (!K.nodeOK) throw new Error("Bu ortamda kurulamaz — Premiere içinde dene.");
 
@@ -782,9 +857,11 @@ window.KEngine = (function () {
       var zip = K.path.join(dir, "ffmpeg-indirme.zip");
       try {
         say("ffmpeg iniyor… (" + fmtMB(kaynak.sizeMB) + ")");
+        iptalDenetle(iptal);
         var d = await K.download(kaynak.url, zip, function (f) {
           say("ffmpeg iniyor… %" + Math.round(f * 100) + " (" + fmtMB(kaynak.sizeMB) + ")");
-        }, 0, undefined, { key: "ffmpeg:" + i, expectedMB: kaynak.sizeMB });
+        }, 0, undefined, { key: "ffmpeg:" + i, expectedMB: kaynak.sizeMB, iptal: iptal || null });
+        if (d.iptal) throw iptalHatasi(INDIRME_IPTAL);   // sonraki aynaya geçme; .part korunur
         if (!d.ok) { sonHata = d.error || "indirilemedi"; continue; }
 
         say("ffmpeg açılıyor…");
@@ -819,6 +896,7 @@ window.KEngine = (function () {
         K.log("ffmpeg kuruldu: " + hedef);
         return hedef;
       } catch (e) {
+        if (e && e.iptal) throw e;
         sonHata = e && e.message ? e.message : String(e);
         try { K.fs.unlinkSync(zip); } catch (eZ2) {}
       }

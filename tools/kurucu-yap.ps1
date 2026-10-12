@@ -22,7 +22,7 @@ New-Item -ItemType Directory -Path $panel -Force | Out-Null
 # Pro MOGRT/SFX pakete ASLA gomulmez; lisans etkinlesince private Pro Icerik
 # Bulutu otomatik kurar. Eski ortam degiskeni public sizinti riskine karsi yasak.
 if ($env:SUFLO_BUNDLE_CONTENT) { throw "SUFLO_BUNDLE_CONTENT desteklenmiyor: Pro icerigi public kurucuya gomulemez." }
-$panelItems = @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE")
+$panelItems = @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE", "THIRD_PARTY_NOTICES.md")
 foreach ($item in $panelItems) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $panel -Recurse -Force }
@@ -39,7 +39,9 @@ if (Test-Path $bridgeStaged) {
 
 # Kurucular paketin köküne
 Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.bat") -Destination $stage -Force
-Copy-Item (Join-Path $PSScriptRoot "kurucu\Suflo-Kur.command") -Destination $stage -Force
+# .command LF ve BOM'suz yazilir: CRLF ile macOS "bad interpreter: /bin/bash^M" der (.gitattributes'a ek guvence)
+$cmdMetin = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "kurucu\Suflo-Kur.command")) -replace "`r`n", "`n"
+[System.IO.File]::WriteAllText((Join-Path $stage "Suflo-Kur.command"), $cmdMetin, (New-Object System.Text.UTF8Encoding($false)))
 
 # Kısa yol tarifi: ZIP'i açan kişi ne yapacağını dosya adından anlamalı
 $oku = @"

@@ -67,6 +67,10 @@ var dilim = H.sliceSegments(ham, 10, 16);
 chk("sliceSegments: aralik 0'a kayar, vurgu ve orig korunur", dilim.length === 2 && dilim[0].start === 0 && dilim[0].text === "*bir* iki" && dilim[0].orig === "one two" && dilim[1].end === 5.5, JSON.stringify(dilim));
 chk("sliceSegments: aralik disina tasmaz, kaynak dizi degismez", dilim.every(function (s) { return s.end <= 6; }) && ham[1].start === 10);
 chk("sliceSegments: gecersiz aralik bos", H.sliceSegments(ham, 5, 5).length === 0);
+var olcuHam = [{ start: 20, end: 22, text: "bir iki", words: [{ text: "bir", start: 20.1, end: 20.6, p: 0.9 }, { text: "iki", start: 21.0, end: 21.8 }] }];
+var olcuDilim = H.sliceSegments(olcuHam, 19, 30);
+chk("sliceSegments: olculmus kelimeler satirla ayni kaydirmayla Short'un 0'ina", olcuDilim[0].start === 1 && olcuDilim[0].words[0].start === 1.1 && olcuDilim[0].words[1].end === 2.8 &&
+  olcuDilim[0].words[0].p === 0.9 && olcuHam[0].words[0].start === 20.1, JSON.stringify(olcuDilim[0].words));
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

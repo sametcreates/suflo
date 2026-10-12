@@ -33,6 +33,16 @@ window.KCaptions = (function () {
 
   // Saf metin islevleri js/caption-text.js'te (Node testleri dogrudan calistirir)
   var CT = window.SufloCaptionText;
+  // Ölçülmüş kelime zamanları (yerel motor -ojf): ayrıştırma, düzleştirme, editörde taşıma
+  var WW = window.SufloWhisperWords;
+  // Okunabilir satır düzeni (2 satır × 42 kırılımı, düzenlemede kelime hizalama): saf modül js/caption-layout.js
+  var CL = window.SufloCaptionLayout;
+  // Sessiz ses denetimi (motor çalışmadan önce tepe < 0,001): saf modül js/sessiz-ses.js
+  var SSES = window.SufloSessizSes || null;
+  // Canlı transkripsiyon (whisper-cli stdout satırları, ilerleme yumuşatma): saf modül js/whisper-akis.js
+  var WA = window.SufloWhisperAkis || null;
+  // Yerel motor seçenekleri (Hızlı / En doğru, DTW, çevrimdışı İngilizce): saf modül js/whisper-args.js
+  var WAR = window.SufloWhisperArgs || null;
   var cleanSegments = CT.cleanSegments;
   var karaokeWords = CT.karaokeWords;
   var karaokeCumulative = CT.karaokeCumulative;
@@ -78,6 +88,16 @@ window.KCaptions = (function () {
     if (segments.length) return segmentsMode === "k1";
     return /^k/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
   }
+  /*
+   * Kayıtta (taslak, Shorts kaydı) belge dili yoksa (3.2 öncesi kayıt): çevrimdışı İngilizce işareti
+   * taşıyan satırlar "en", değilse "" (dil bilinmiyor: Altyazı › Dil seçimine düşülür). Ekrandaki
+   * önceki belgenin dili yeni belgeye geçmez.
+   */
+  function kayitDili(kayitDil, segs) {
+    if (typeof kayitDil === "string") return kayitDil;
+    for (var i = 0; segs && i < segs.length; i++) if (segs[i] && segs[i].cikisDili === "en") return "en";
+    return "";
+  }
   function dilKodu(x) {
     x = String(x || "").toLowerCase();
     if (x.length === 2) return x;
@@ -86,15 +106,17 @@ window.KCaptions = (function () {
   }
 
   // Geri al yigini girdisi: satirlar + mod + ceviri hedef dili (buyuk harf kurali buna bagli)
+  // + belgenin dili (algilananDil): cevrimdisi Ingilizce belgeden geri donulen Turkce belge "en" kalmasin
   function durumAl(etiket) {
     return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili,
-      shorts: shortsYuklenen, ornek: ornekBelge, ts: Date.now() };
+      dil: algilananDil, shorts: shortsYuklenen, ornek: ornekBelge, ts: Date.now() };
   }
   // shorts: ekrandaki belgenin Shorts kaydi mi (geri alinca taslak dogru yere yazilsin)
   function durumYukle(st) {
     segments = JSON.parse(st.segs);
     if (st.mode) segmentsMode = st.mode;
     if (typeof st.cevir === "string") ceviriDili = st.cevir;
+    if (typeof st.dil === "string") algilananDil = st.dil;
     if (typeof st.shorts === "string") {
       shortsYuklenen = st.shorts;
       try { shortsDugmesi(KApp.ctx()); } catch (eS) {}
@@ -153,6 +175,7 @@ window.KCaptions = (function () {
       segments: segments,
       mode: segmentsMode,
       ceviriDili: ceviriDili,
+      dil: algilananDil,
       sequence: ctx.sequence || "",
       scope: scope,
       ts: Date.now()
@@ -181,6 +204,7 @@ window.KCaptions = (function () {
     segmentsMode = d.mode || "plain";
     clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil
     ceviriDili = d.ceviriDili || "";                     // taslak çevrilmişse hedef dil (s.orig satırlarda)
+    algilananDil = kayitDili(d.dil, segments);           // taslağın dili (ekrandaki belgeninki değil)
     el("cap-result").hidden = false;
     render();                                            // önce render, sonra etiket (render eziyor)
     el("cap-result-info").textContent = segments.length + " satır · kurtarıldı";
@@ -277,6 +301,7 @@ window.KCaptions = (function () {
       }
     }
     refreshButton();
+    motorSecenekDurumu();
     // kurulum/anahtar durumu degisti: rehber adimlari yalniz Node gercekleriyle tazelenir
     if (window.KOnboarding && KOnboarding.yenile) { try { KOnboarding.yenile(); } catch (eO) {} }
   }
@@ -321,10 +346,142 @@ window.KCaptions = (function () {
     };
   }
 
+  /* ---------------- İptal ve canlı (geçici) satırlar ---------------- */
+
+  /*
+   * Altyazı oluştur'un süren işi. Yalnız go() kurar: Konuşmadan kes'in transcribeWords'ü
+   * (aynı motor yolu) akış göstermez ve iptal düğmesi taşımaz (ikisi de null kalır).
+   *   aktifIptal  K.iptalJetonu(): ffmpeg, whisper-cli (yeniden çözme turları dahil), ffmpeg
+   *               kurulumu ve bulut yüklemesi aynı jetonla kesilir; adımlar arasında denetlenir
+   *   canliIs     { satirlar, parca, ofset, carpan, onEk }: motor çalışırken stdout'tan akan
+   *               geçici satırlar. segments'e, taslağa, transkript önbelleğine ve geri al
+   *               yığınına ASLA girmez; nihai JSON gelince (ya da iş bitince) silinir.
+   */
+  var aktifIptal = null;
+  var canliIs = null;
+  var CANLI_GOSTER = 200;        // DOM'da en çok bu kadar geçici satır (sayaç hepsini sayar)
+  var IPTAL_IPUCU = "İşi durdurur: geçici ses ve çıktı dosyaları silinir (kurulu motor ve model kalır), ekrandaki altyazı olduğu gibi kalır.";
+  var IPTAL_KILITLI = "Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez. Bitince İptal açılır.";
+
+  function iptalHatasiYap() {
+    if (K.iptalHatasi) return K.iptalHatasi("İptal edildi.");
+    var e = new Error("İptal edildi.");
+    e.iptal = true;
+    return e;
+  }
+  // adımlar arasında: kullanıcı İptal'e bastıysa işi burada bitir
+  function iptalDenetle() {
+    if (aktifIptal && aktifIptal.iptalEdildi) throw iptalHatasiYap();
+  }
+
+  // setBusy(true) anı: "İptal" "Altyazı oluştur"un yerinde belirir; çift tıklamanın ikinci tıkı işi iptal etmesin
+  var iptalAcilis = 0;
+  // setBusy(false) anı: "Altyazı oluştur" "İptal"in yerinde yeniden belirir; İptal'e çift tıkın ikinci tıkı yeni iş başlatmasın
+  var baslatAcilis = 0;
+
+  function iptalEt(ev) {
+    if (!busy || !aktifIptal || aktifIptal.iptalEdildi) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, iptalAcilis)) return;
+    var b = el("cap-cancel");
+    if (b) b.disabled = true;
+    K.log("[altyazı] kullanici iptal etti");
+    status("İptal ediliyor…", "warn");
+    aktifIptal.iptal();
+  }
+
+  // Ses dışa aktarımı (KS_exportAudio) senkron ExtendScript: o sırada İptal kapalı, ipucu nedenini söyler
+  function iptalKilidi(kilitli) {
+    var b = el("cap-cancel");
+    if (!b) return;
+    b.disabled = !!kilitli || !!(aktifIptal && aktifIptal.iptalEdildi);
+    b.title = kilitli ? IPTAL_KILITLI : IPTAL_IPUCU;
+  }
+
+  function canliZaman(sn) {
+    var t = tc(sn, false);
+    return sn >= 3600 ? t.slice(0, 8) : t.slice(3, 8);
+  }
+
+  function canliBaslat() {
+    canliIs = { satirlar: [], parca: 0, ofset: 0, carpan: 1, onEk: "" };
+    var liste = el("cap-canli-liste");
+    if (liste) liste.innerHTML = "";
+    var kutu = el("cap-canli");
+    if (kutu) kutu.hidden = true;            // ilk satır gelince açılır
+  }
+
+  function canliSatirDom(r) {
+    var d = document.createElement("div");
+    d.className = "canli-satir";
+    var t = document.createElement("span");
+    t.className = "canli-zaman mono";
+    t.textContent = canliZaman(r.start);
+    var m = document.createElement("span");
+    m.className = "canli-metin";
+    m.textContent = r.text;                  // kullanıcı içeriği: yalnız textContent
+    d.appendChild(t);
+    d.appendChild(m);
+    return d;
+  }
+
+  // Yeni geçici satırları ekle (yalnız canliIs; belgeye dokunmaz)
+  function canliEkle(yeni) {
+    if (!canliIs || !yeni || !yeni.length) return;
+    var liste = el("cap-canli-liste");
+    for (var i = 0; i < yeni.length; i++) {
+      var r = { start: yeni[i].start, end: yeni[i].end, text: yeni[i].text, parca: canliIs.parca };
+      canliIs.satirlar.push(r);
+      if (liste) liste.appendChild(canliSatirDom(r));
+    }
+    if (!liste) return;
+    while (liste.childNodes.length > CANLI_GOSTER) liste.removeChild(liste.firstChild);
+    liste.scrollTop = liste.scrollHeight;
+    var kutu = el("cap-canli");
+    if (kutu) kutu.hidden = false;
+  }
+
+  // Takılma kurtarması: bu parçanın takılma noktasından sonraki geçici satırları (tekrarlanan satır)
+  // sil; kalan sesin yeniden çözümü kendi satırlarını kendi ofsetiyle ekler
+  function canliKirp(sinirSn) {
+    if (!canliIs) return;
+    var parca = canliIs.parca;
+    canliIs.satirlar = canliIs.satirlar.filter(function (r) { return r.parca !== parca || r.start < sinirSn - 0.001; });
+    var liste = el("cap-canli-liste");
+    if (!liste) return;
+    liste.innerHTML = "";
+    canliIs.satirlar.slice(-CANLI_GOSTER).forEach(function (r) { liste.appendChild(canliSatirDom(r)); });
+    liste.scrollTop = liste.scrollHeight;
+    var kutu = el("cap-canli");
+    if (kutu) kutu.hidden = !canliIs.satirlar.length;
+  }
+
+  /*
+   * Geçici dosyayı sil. Windows'ta iptal edilen whisper-cli / ffmpeg (taskkill eşzamansız) sesi birkaç
+   * yüz ms daha kilitli tutabilir: silinemezse kısa aralıklarla üç kez daha denenir.
+   */
+  function geciciSil(f, deneme) {
+    try { K.fs.unlinkSync(f); return; } catch (e) {}
+    try { if (!K.fs.existsSync(f)) return; } catch (e2) { return; }
+    deneme = deneme || 0;
+    if (deneme < 3) setTimeout(function () { geciciSil(f, deneme + 1); }, 1000 * (deneme + 1));
+    else K.log("[altyazı] gecici dosya silinemedi: " + String(f).replace(/^.*[\\\/]/, ""));
+  }
+
+  // İş bitti (başarılı, hata ya da iptal): geçici satırlar gider; başarıda yerini nihai satırlar alır
+  function canliBitir() {
+    canliIs = null;
+    var liste = el("cap-canli-liste");
+    if (liste) liste.innerHTML = "";
+    var kutu = el("cap-canli");
+    if (kutu) kutu.hidden = true;
+  }
+
   /* ---------------- Ses hazırlama ---------------- */
 
   // Kaynak dosyadan (klip) ya da hazır WAV'dan (sequence exportu) motorun istediği formata çevir
+  // opts.iptal: K.iptalJetonu() — ffmpeg süreç ağacı öldürülür, yarım çıktı silinir
   async function convertAudio(srcPath, opts) {
+    var iptal = opts.iptal || null;
     var ff = await K.findFfmpeg();
     if (!ff) {
       /*
@@ -333,9 +490,10 @@ window.KCaptions = (function () {
        */
       status("ffmpeg kuruluyor… (bir kerelik, ses dönüştürme için gerekli)");
       try {
-        await KEngine.installFfmpeg(function (m) { status(m); });
+        await KEngine.installFfmpeg(function (m) { status(m); }, iptal);
         ff = await K.findFfmpeg(true);
       } catch (eF) {
+        if (eF && eF.iptal) throw eF;
         throw new Error("ffmpeg kurulamadı: " + (eF && eF.message ? eF.message : eF) +
           " — Ayarlar > ffmpeg bölümünden elle bir yol gösterebilirsin.");
       }
@@ -351,12 +509,25 @@ window.KCaptions = (function () {
     } else {
       // 24 MB API sınırına sığması için uzun seslerde bitrate düşür
       var br = (opts.durHint && opts.durHint > 2700) ? "32k" : "64k";
-      args = args.concat(["-b:a", br]);
+      // volumedetect: bulut rotasında sessiz ses denetiminin tepesi aynı geçişte ölçülür (ek okuma yok).
+      // ffmpeg kullanıcı -af zincirini -ac/-ar dönüşümünden ÖNCE çalıştırır: ölçüm yüklenen sesle
+      // (mono, 16 kHz) aynı olsun diye zincir önce o biçime iner. Ters fazlı stereo (ters bağlanmış
+      // yaka mikrofonu) mono'da birbirini siler: yüklenen dosya gibi ölçüm de "sessiz" der.
+      args = args.concat(["-af", SESSIZ_OLCUM_ZINCIRI, "-b:a", br]);
     }
     args.push(out);
-    var r = await K.run(ff, args, { timeout: 900000 });
+    var r = await K.run(ff, args, { timeout: 900000, iptal: iptal });
+    if (r.iptal) {
+      geciciSil(out);                                // yarım WAV/MP3 kalmasın
+      throw iptalHatasiYap();
+    }
     if (r.code !== 0 || !K.fs.existsSync(out)) {
       throw new Error("Ses hazırlanamadı: " + (r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 180));
+    }
+    if (!wav && SSES) {
+      var tepeMp3 = SSES.volumedetectTepe(r.stderr);
+      if (Object.keys(mp3Tepeleri).length > 32) mp3Tepeleri = {};
+      if (isFinite(tepeMp3)) mp3Tepeleri[out] = tepeMp3;
     }
     if (!wav) {
       var mb = K.fs.statSync(out).size / 1048576;
@@ -368,11 +539,297 @@ window.KCaptions = (function () {
     return out;
   }
 
+  /* ---------------- Sessiz ses denetimi ---------------- */
+
+  /*
+   * Motor (yerel ya da bulut yüklemesi) çalışmadan ÖNCE hazırlanan sesin tepesi:
+   * WAV dosyadan 1 MB parçalarla okunur, MP3'te convertAudio'nun ffmpeg volumedetect ölçümü
+   * kullanılır. Tepe 0,001'in (~ -60 dBFS) altındaysa satır içi uyarı: "Yine de devam et" /
+   * "Vazgeç". Kapsam: Altyazı oluştur (tek klip, toplu klip, In/Out, sekans; Viral anlar bu
+   * transkripti kullanır) ve Konuşmadan kes (transcribeWords). Ölçülemeyen ses engellemez.
+   */
+  var mp3Tepeleri = {};          // convertAudio MP3 çıktısı -> volumedetect tepesi
+  var SESSIZ_OLCUM_ZINCIRI = "aformat=sample_rates=16000:channel_layouts=mono,volumedetect";
+  var SESSIZ_SEKANS = "Ses neredeyse tamamen sessiz: ses kanalları kapalı ya da sessize alınmış olabilir (Altyazı › Ses katmanları).";
+  var SESSIZ_KLIP = "Ses neredeyse tamamen sessiz: seçili klibin bu aralığında duyulur ses yok. Ses ayrı bir klipteyse (harici mikrofon) o klibi seç.";
+  // Toplu klip: hangi klip olduğu ve kararın sonraki sessiz kliplere de uygulandığı söylenir
+  function sessizTopluMetni(sira, toplam, ad) {
+    return "Ses neredeyse tamamen sessiz: klip " + sira + "/" + toplam + " (" + ad + ") içinde duyulur ses yok. " +
+      "Bu karar sonraki sessiz kliplere de uygulanır: Vazgeç onları atlar, sesli klipler yine yazıya dökülür.";
+  }
+
+  // Kullanıcı vazgeçti: hata değil, uyarı olarak gösterilir
+  function vazgecHatasi() {
+    var e = new Error("Vazgeçildi: ses neredeyse tamamen sessiz.");
+    e.vazgecildi = true;
+    return e;
+  }
+
+  // Kutunun sekmesi: { ad: "captions" (tab-captions), acik }; sekme bulunamazsa null
+  function sessizSekmesi(kutu) {
+    for (var d = kutu; d; d = d.parentNode) {
+      if (d.classList && d.classList.contains("tabpane")) return { ad: String(d.id || "").replace(/^tab-/, ""), acik: d.classList.contains("active") };
+    }
+    return null;
+  }
+
+  // Satır içi uyarı kutusu (modal değil): "<kutu>-devam" -> true, "<kutu>-vazgec" -> false.
+  // İş cevabı beklerken ilerleme çubuğu durur ("<önek>-progress" gizlenir, cevaptan sonra geri gelir).
+  // Kutunun sekmesi açık değilse (kullanıcı uzun dışa aktarımda başka sekmeye geçti) uzun bir uyarı
+  // bildirimi çıkar; "Uyarıyı göster" o sekmeye götürür.
+  function sessizOnay(kutuId, metin) {
+    return new Promise(function (resolve) {
+      var kutu = el(kutuId), devam = el(kutuId + "-devam"), vazgec = el(kutuId + "-vazgec"), yazi = el(kutuId + "-metin");
+      if (!kutu || !devam || !vazgec) { resolve(true); return; }     // arayüz yoksa engelleme
+      if (yazi) yazi.textContent = metin;
+      kutu.hidden = false;
+      var ilerleme = el(kutuId.replace(/-sessiz$/, "-progress"));
+      var ilerlemeAcik = !!(ilerleme && !ilerleme.hidden);
+      if (ilerlemeAcik) ilerleme.hidden = true;
+      var iptalBirak = null;
+      function bitir(cevap) {
+        if (iptalBirak) { iptalBirak(); iptalBirak = null; }
+        kutu.hidden = true;
+        devam.onclick = null;
+        vazgec.onclick = null;
+        if (ilerlemeAcik) ilerleme.hidden = false;
+        resolve(cevap);
+      }
+      // soru açıkken İptal: soru kapanır, iş "İptal edildi" ile biter (çağıran jetonu denetler)
+      if (aktifIptal && typeof aktifIptal.dinle === "function") iptalBirak = aktifIptal.dinle(function () { bitir(false); });
+      devam.onclick = function () { bitir(true); };
+      vazgec.onclick = function () { bitir(false); };
+      function odakla() {
+        try { kutu.scrollIntoView({ block: "nearest" }); } catch (eK) {}
+        // klavyede Enter güvenli seçeneği seçsin: boşa transkripsiyon / kota harcamamak
+        try { vazgec.focus(); } catch (eF) {}
+      }
+      var sekme = sessizSekmesi(kutu);
+      if (sekme && !sekme.acik && typeof KApp !== "undefined" && KApp && typeof KApp.toast === "function") {
+        try {
+          KApp.toast(metin, "warn", 20000, { metin: "Uyarıyı göster", fn: function () {
+            if (kutu.hidden) return;                     // çoktan cevaplandı
+            if (sekme.ad && typeof KApp.goster === "function") KApp.goster(sekme.ad);
+            odakla();
+          } });
+        } catch (eT) {}
+      }
+      odakla();
+    });
+  }
+
+  /*
+   * Döner: true = motoru çalıştır, false = kullanıcı vazgeçti.
+   *   secenek.kutu   uyarı kutusu ("cap-sessiz" | "tc-sessiz")
+   *   secenek.klip   true: kapsam seçili klip (ipucu klibi anlatır), false: sekans / In-Out
+   *   secenek.karar  toplu iş: bir kez sorulur, sonraki sessiz klipler aynı kararı alır
+   *   secenek.etiket günlük için klip adı
+   *   secenek.toplu  { sira, toplam }: toplu işte soru klibin adını ve sırasını söyler, durum satırı
+   *                  ("Klip i/N (ad): …") silinmez
+   */
+  async function sessizDenetim(sesYolu, secenek) {
+    secenek = secenek || {};
+    if (!SSES || !sesYolu || !K.nodeOK) return true;
+    var tepe = NaN;
+    try {
+      if (Object.prototype.hasOwnProperty.call(mp3Tepeleri, sesYolu)) {
+        tepe = mp3Tepeleri[sesYolu];
+        delete mp3Tepeleri[sesYolu];
+      } else if (/\.wav$/i.test(sesYolu)) {
+        var olcum = await SSES.dosyaTepesiAsync(K.fs, sesYolu, { esik: SSES.ESIK });
+        if (olcum) tepe = olcum.tepe;
+      }
+    } catch (e) {
+      K.log("[sessiz ses] tepe olculemedi: " + (e && e.message ? e.message : e));
+      return true;
+    }
+    var ad = secenek.etiket ? " [" + secenek.etiket + "]" : "";
+    var d = await SSES.denetle({
+      tepe: tepe, karar: secenek.karar,
+      onay: function (b) {
+        K.log("[sessiz ses]" + ad + " tepe " + b.tepe.toFixed(5) + " (" + (isFinite(b.dbfs) ? b.dbfs.toFixed(1) : "-inf") +
+          " dBFS) < " + b.esik + " - kullaniciya soruluyor");
+        var toplu = secenek.toplu;
+        if (!toplu) status("");
+        return sessizOnay(secenek.kutu || "cap-sessiz", toplu
+          ? sessizTopluMetni(toplu.sira, toplu.toplam, secenek.etiket || "?")
+          : (secenek.klip ? SESSIZ_KLIP : SESSIZ_SEKANS));
+      }
+    });
+    if (d.sessiz && d.soruldu) K.log("[sessiz ses]" + ad + " kullanici karari: " + (d.devam ? "devam" : "vazgec"));
+    else if (d.sessiz) K.log("[sessiz ses]" + ad + " toplu isin onceki karari: " + (d.devam ? "devam" : "vazgec"));
+    return d.devam;
+  }
+
   /* ---------------- Motorlar ---------------- */
+
+  /* ---------------- Yerel motor seçenekleri (3.2 adım 5, js/whisper-args.js) ---------------- */
+
+  // Motor derlemesi (DTW otomatik kapatma kaydı model + derleme başına): cuda | cpu | metal
+  function yerelDerleme() {
+    try { return KEngine.installedBuild() || "cpu"; } catch (e) { return "cpu"; }
+  }
+
+  // Bu model + derlemede DTW daha önce otomatik kapatıldı mı ({ "turbo@cuda": { neden, ts } })
+  function dtwOtomatikKapali(anahtar) {
+    try {
+      var k = K.settings().dtwKapali;
+      return !!(anahtar && k && typeof k === "object" && Object.prototype.hasOwnProperty.call(k, anahtar));
+    } catch (e) { return false; }
+  }
+
+  function dtwOtomatikKapat(anahtar, neden) {
+    if (!anahtar) return;
+    try {
+      var st = K.settings();
+      var k = st.dtwKapali && typeof st.dtwKapali === "object" ? st.dtwKapali : {};
+      k[anahtar] = { neden: String(neden || ""), ts: Date.now() };
+      st.dtwKapali = k;
+      K.saveSettings();
+    } catch (e) {}
+    try { motorSecenekDurumu(); } catch (eU) {}
+  }
+
+  /*
+   * DTW koşusunun sonucu (WW.segmentleriCoz bilgi.dtw): t_dtw ≥ 0 gelmediyse bu model + derleme
+   * için DTW kapatılır ve günlüğe yazılır (kelime zamanları zaten belirteç zamanından kuruldu).
+   * Belirteç yoksa (boş / sessiz transkript) karar verilmez.
+   */
+  function dtwSonucunuIsle(bilgi, anahtar) {
+    if (!WAR || !bilgi) return "yok";
+    var d = bilgi.dtw || { toplam: 0, olculen: 0 };
+    var sonuc = WAR.dtwSonucu(d);
+    if (sonuc === "calisti") {
+      K.log("yerel motor: DTW kelime zamanı " + d.olculen + "/" + d.toplam + " belirteçte ölçüldü (" + anahtar + ")");
+    } else if (sonuc === "kapali" || (sonuc === "yok" && bilgi.belirtecli)) {
+      dtwOtomatikKapat(anahtar, sonuc === "kapali" ? "t_dtw" : "alan-yok");
+      if (sonuc === "kapali") K.log("yerel motor: DTW istendi ama tüm t_dtw -1 (motor DTW'yi kapattı: flash attention ya da desteklenmeyen model) - " + anahtar + " için otomatik kapatıldı");
+      else K.log("yerel motor: DTW istendi ama JSON'da t_dtw yok (eski derleme) - " + anahtar + " için otomatik kapatıldı");
+    }
+    return sonuc;
+  }
+
+  var CEVIRI_YEREL_UYARISI = "Çevrimdışı İngilizce çeviri yerel motorla çalışır: Ayarlar'dan yerel çekirdeği kur ya da çeviriyi kapat.";
+  var CEVIRI_TURBO_UYARISI = "Turbo çeviri için eğitilmedi: çevrimdışı İngilizce çeviri Small ve Large modelinde çalışır.";
+  var CEVIRI_MODEL_UYARISI = "Çevrimdışı İngilizce çeviri Small ve Large modelinde çalışır (Tiny ve Base'in çevirisi zayıf).";
+
+  /*
+   * Ekrandaki belge çevrimdışı İngilizce çeviriyle (-tr) mi yazıldı? İşaret satırlarda (cikisDili:
+   * "en") durur: geri al, taslak ve Shorts kaydı satırlarla birlikte saklar; yeni transkript, SRT
+   * içe aktarma ve örnek transkript onu taşımaz. LLM çevirisi (ceviriDili + s.orig) her zaman önce gelir.
+   */
+  function cevrimdisiEn() {
+    for (var i = 0; i < segments.length; i++) if (segments[i] && segments[i].cikisDili === "en") return true;
+    return false;
+  }
+
+  // Altyazı › Dil satırındaki "İngilizceye çevir (çevrimdışı)" işaretli ve geçerli mi
+  function cevrimdisiCeviriSecili() {
+    var c = el("cap-cevir-en"), sar = el("cap-cevir-en-sar");
+    if (!c || !c.checked || (sar && sar.hidden)) return false;
+    var dil = el("cap-lang") ? el("cap-lang").value : "";
+    return dil !== "en" && localEngineReady();
+  }
+
+  // Çeviriyi engelleyen durum ("" = yok): yerel motor yok ya da model Small / Large değil
+  function cevrimdisiCeviriEngeli() {
+    if (!localEngineReady()) return CEVIRI_YEREL_UYARISI;
+    var m = null;
+    try { m = KEngine.activeModel(); } catch (e) { m = null; }
+    if (!m || !WAR || !WAR.cevirebilir(m.id)) return m && m.id === "turbo" ? CEVIRI_TURBO_UYARISI : CEVIRI_MODEL_UYARISI;
+    return "";
+  }
+
+  // Yerel koşunun durum satırı: Ayarlar › Çözme "Hızlı" iken "yüksek doğruluk" denmez
+  function yerelDurumMetni() {
+    var hizli = false;
+    try { hizli = !!WAR && WAR.cozmeModu(K.settings().cozme) === "hizli"; } catch (e) { hizli = false; }
+    return hizli ? "Suflo Motoru · yerel · hızlı çözme…" : "Suflo Motoru · yerel yüksek doğruluk…";
+  }
+
+  // Kurulu çeviri modeli (önce Large, sonra Small; yoksa null): ipucunun "… geç" düğmesi
+  function kuruluCeviriModeli() {
+    try {
+      var kurulu = KEngine.installedModels().map(function (m) { return m.id; });
+      if (kurulu.indexOf("large") !== -1) return KEngine.modelById("large");
+      if (kurulu.indexOf("small") !== -1) return KEngine.modelById("small");
+    } catch (e) {}
+    return null;
+  }
+
+  // DTW yalnız kelime zamanının görüntüyü belirlediği yerde: kelime kelime / birikimli / N kelime
+  // modları ya da kelime tabanlı Suflo Stili (stil motoru wordBased)
+  function dtwUygun() {
+    var len = el("cap-maxlen") ? el("cap-maxlen").value : "";
+    if (/^(k|w\d)/.test(len)) return true;
+    var SE = window.SufloStyleEngine;
+    return !secilenMogrt && !!secilenMotorStili && !!(SE && SE.wordBased && SE.wordBased(secilenMotorStili));
+  }
+
+  function dtwSecili() {
+    var c = el("cap-dtw"), sar = el("cap-dtw-sar");
+    return !!(c && c.checked && !(sar && sar.hidden) && dtwUygun() && localEngineReady());
+  }
+
+  function aktifDtwAnahtari() {
+    if (!WAR) return "";
+    var yol = null;
+    try { yol = KEngine.activeModelPath(); } catch (e) { yol = null; }
+    return yol ? WAR.dtwAnahtari(yol, yerelDerleme()) : "";
+  }
+
+  /*
+   * Altyazı kartındaki yerel motor seçenekleri: "Hassas kelime zamanlaması" (yerel motor + kelime
+   * tabanlı mod / stil) ve Dil satırındaki "İngilizceye çevir (çevrimdışı)" (yerel motor, dil
+   * İngilizce değil). Yalnız dosya sistemine bakar (Premiere çağrısı yok).
+   */
+  function motorSecenekDurumu() {
+    var yerel = false;
+    try { yerel = localEngineReady(); } catch (e) { yerel = false; }
+    var dSar = el("cap-dtw-sar"), dKut = el("cap-dtw"), dNot = el("cap-dtw-not");
+    if (dSar) dSar.hidden = !(yerel && dtwUygun());
+    if (dNot) dNot.hidden = !(yerel && dSar && !dSar.hidden && dKut && dKut.checked && dtwOtomatikKapali(aktifDtwAnahtari()));
+
+    var cSar = el("cap-cevir-en-sar"), cKut = el("cap-cevir-en"), cNot = el("cap-cevir-en-not");
+    var dil = el("cap-lang") ? el("cap-lang").value : "";
+    if (cSar) cSar.hidden = !yerel || dil === "en";
+    var engel = (yerel && cKut && cKut.checked && dil !== "en") ? cevrimdisiCeviriEngeli() : "";
+    if (cNot) {
+      cNot.hidden = !engel;
+      var metin = el("cap-cevir-en-not-metin");
+      if (metin) metin.textContent = engel;
+      var gec = el("cap-cevir-en-gec");
+      if (gec) {
+        var hedef = kuruluCeviriModeli();
+        gec.textContent = hedef ? (hedef.id === "large" ? "Large'a geç" : "Small'a geç") : "Ayarlar'da model indir";
+        gec.setAttribute("data-model", hedef ? hedef.id : "");
+      }
+    }
+  }
+
+  // İpucunun düğmesi: kurulu Large / Small'a geç; kurulu değilse Ayarlar'ı aç (model listesi orada)
+  function ceviriModelineGec() {
+    var gec = el("cap-cevir-en-gec");
+    var id = gec ? gec.getAttribute("data-model") : "";
+    if (!id) { if (typeof KApp !== "undefined" && KApp.goster) KApp.goster("settings"); return; }
+    var st = K.settings();
+    st.model = id;
+    K.saveSettings();
+    K.log("[altyazı] cevrimdisi ceviri icin model degisti: " + id);
+    refreshSetup();
+    ayarDegisti("model");
+    KApp.toast("Model: " + (id === "large" ? "Large v3" : "Small") + " · çevrimdışı İngilizce çeviri hazır", "good");
+  }
 
   // dilAyari: rehberin örnek klibi gibi çağrılar #cap-lang'i ve kayıtlı tercihi
   // değiştirmeden kendi dilini geçirir (undefined → panelde seçili dil)
-  async function transcribeLocal(audioPath, wordLevel, dilAyari) {
+  // motor (isteğe bağlı; Altyazı oluştur verir, diğer araçlar vermez):
+  //   cevir  true: -tr, çevrimdışı İngilizce (yalnız Small / Large; Pro kapısı go()'da)
+  //   dtw    true: hassas kelime zamanı (kelime zamanlı mod + Altyazı › Hassas kelime zamanlaması)
+  //   cevrildi (çıkış): motor -tr ile İngilizce yazdı
+  // Çözme modu (Ayarlar › Çözme) her yerel koşuda geçerli.
+  async function transcribeLocal(audioPath, wordLevel, dilAyari, motor) {
+    motor = motor || {};
     var lw = K.whisperLocal();
     if (!lw) throw new Error("Yerel motor kurulu değil — Ayarlar'dan kur.");
     // çıktı tabanı geçici klasörde: rehberin örnek WAV'ı ayar klasöründe duruyor,
@@ -381,105 +838,214 @@ window.KCaptions = (function () {
     var lang = (dilAyari !== undefined ? dilAyari : el("cap-lang").value) || "auto";
     var threads = 4;
     try { threads = Math.max(2, Math.min(8, K.os.cpus().length - 2)); } catch (e) {}
+    var ayar = {};
+    try { ayar = K.settings() || {}; } catch (eA) { ayar = {}; }
+    var cozme = WAR ? WAR.cozmeModu(ayar.cozme) : "dogru";
+    var dtwAnahtar = WAR ? WAR.dtwAnahtari(lw.model, yerelDerleme()) : "";
+    var dtwIste = !!motor.dtw && !dtwOtomatikKapali(dtwAnahtar);
+    if (motor.dtw && !dtwIste) K.log("yerel motor: DTW bu model ve derlemede daha önce otomatik kapatıldı (" + dtwAnahtar + ") - belirteç zamanı kullanılıyor");
+    var cevir = !!motor.cevir;
 
-    // motor katmanı: VAD (sessizlik atlama) + beam search + karaoke bayrakları
-    var built = KEngine.buildArgs({
-      model: lw.model,
-      audio: audioPath,
-      lang: lang,
-      outBase: outBase,
-      threads: threads,
-      wordLevel: wordLevel,
-      prompt: glossaryPrompt()
-    });
+    // motor katmanı: VAD (sessizlik atlama) + çözme modu + -ojf (belirteç zamanı, olasılığı, t_dtw) + DTW / -tr
+    function argOlustur(ek) {
+      var o = {
+        model: lw.model, audio: audioPath, lang: lang, outBase: outBase, threads: threads, wordLevel: wordLevel,
+        prompt: glossaryPrompt(cevir), cozme: cozme, dtw: dtwIste, cevir: cevir
+      };
+      for (var k in ek) if (Object.prototype.hasOwnProperty.call(ek, k)) o[k] = ek[k];
+      return KEngine.buildArgs(o);
+    }
+    var built = argOlustur({});
+    // kapı ve model denetimi go()'da; yine de Turbo'ya -tr verilmez, çevrilmemiş metin "çeviri" sayılmaz
+    if (cevir && !built.cevir) throw new Error(CEVIRI_MODEL_UYARISI);
     K.log("yerel motor: " + (KEngine.installedBuild() === "cuda" ? "GPU" : "CPU") +
       ", VAD " + (built.vad ? "acik" : "kapali") +
       ", model " + String(lw.model).replace(/^.*[\\\/]/, ""));
+    K.log("yerel motor: " + built.gunluk);
 
-    var segs = await yerelCalistir(lw.exe, built.args, outBase, "");
+    /*
+     * Canlı akış (yalnız Altyazı oluştur): whisper-cli'nin stdout segment satırları geçici satır
+     * olarak akar. Ofset ve hız eşlemesi nihai JSON'unkiyle aynı (go(): WW.zamanEsle(raw, seqOffset,
+     * speedFactor)); toplu klipte her klip kendi ofsetini canliIs'e yazar.
+     */
+    var sesSure = /\.wav$/i.test(audioPath) ? wavDuration(audioPath) : 0;
+    var akisTaban = canliIs ? { ofset: canliIs.ofset, carpan: canliIs.carpan, onEk: canliIs.onEk } : null;
+    function akis(kaymaSn, sure) {
+      if (!akisTaban) return null;
+      return { ofset: akisTaban.ofset + kaymaSn * akisTaban.carpan, carpan: akisTaban.carpan, toplamSn: sure, onEk: akisTaban.onEk };
+    }
+
+    var bilgi = {};
+    var basMs = Date.now();
+    var segs;
+    try {
+      segs = await yerelCalistir(lw.exe, built.args, outBase, "", akis(0, sesSure), bilgi);
+    } catch (eDtw) {
+      // Eski derleme -dtw / -nfa ya da ön ayarı tanımıyor (whisper-cli kod 0 ile çıkar, JSON yok):
+      // bu model + derleme için DTW kapatılır, aynı ses DTW'siz yeniden çözülür
+      var bayrak = (built.dtw && eDtw && !eDtw.iptal && WAR) ? (WAR.bilinmeyenBayrak(eDtw.stderr) || WAR.bilinmeyenOnAyar(eDtw.stderr)) : "";
+      if (!bayrak) throw eDtw;
+      dtwOtomatikKapat(dtwAnahtar, "bayrak:" + bayrak);
+      K.log("yerel motor: derleme '" + bayrak + "' tanımadı - DTW " + dtwAnahtar + " için kapatıldı, DTW'siz yeniden çözülüyor");
+      dtwIste = false;
+      built = argOlustur({});
+      bilgi = {};
+      basMs = Date.now();
+      segs = await yerelCalistir(lw.exe, built.args, outBase, "", akis(0, sesSure), bilgi);
+    }
+    var dtwKullanildi = !!built.dtw && dtwSonucunuIsle(bilgi, dtwAnahtar) === "calisti";
+    // -tr verildi: metin İngilizce (JSON'un params.translate'i yalnız doğrulama için günlüğe)
+    motor.cevrildi = !!built.cevir;
+    if (built.cevir && bilgi.ceviri !== true) K.log("yerel motor: -tr verildi ama JSON params.translate yok (eski derleme?) - cikti yine Ingilizce sayildi");
+    // ek yük ölçümü için: süre ve gerçek zaman çarpanı (DTW / çözme modu kıyası günlükten okunur)
+    var gecenSn = (Date.now() - basMs) / 1000;
+    var olcum = (sesSure ? sesSure.toFixed(1) + "s audio / " : "") + gecenSn.toFixed(1) + "s" + (sesSure && gecenSn > 0 ? " (" + (sesSure / gecenSn).toFixed(1) + "x realtime)" : "");
+    K.log("yerel motor bitti: " + olcum + ", cozme=" + built.cozme + ", dtw=" + (dtwKullanildi ? built.dtw : "off") + (built.cevir ? ", -tr" : ""));
+
+    /*
+     * Satır ve kelime modu aynı -ojf çıktısını kullanır: satırlar ölçülmüş kelimeleri
+     * taşır. Belirteç yazmayan eski derleme (or. eski Homebrew whisper-cli) kelime
+     * zamanı vermezse ve kelime zamanı gerekiyorsa eski "-ml 1 -sow" turuna düşülür.
+     */
+    var kelimeYedegi = false;
+    if (wordLevel && segs.length && !WW.kelimeVar(segs)) {
+      K.log("yerel motor belirtec zamani vermedi (eski derleme?) - kelime zamani icin -ml 1 -sow ile yeniden cozuluyor");
+      kelimeYedegi = true;
+      // -ml 1 (belirteç başına satır): akış kapalı; ilk turun geçici satırları ekranda kalır
+      segs = await yerelCalistir(lw.exe, argOlustur({ wordLevel: true, kelimeYedegi: true }).args, outBase, " · kelime zamanı", null);
+    }
 
     /*
      * Takilma kurtarma: whisper bir satira takilip sesin sonuna kadar onu
      * tekrarladiysa (cleanSegments sonra bunlari atar, altyazi orada biter),
      * sesi takilma noktasindan kes ve o parcayi onceki metne bakmadan (-mc 0)
-     * yeniden coz. Sozluk ipucu --carry-initial-prompt ile korunur.
+     * yeniden coz. Sozluk ipucu --carry-initial-prompt ile korunur. Kalan parça
+     * aynı çözme modu, DTW ve çeviri seçenekleriyle çözülür.
      */
-    var ti = CT.sondaTakilma(segs, wordLevel ? 6 : 3);
-    var sesSure = /\.wav$/i.test(audioPath) ? wavDuration(audioPath) : 0;
+    var ti = CT.sondaTakilma(segs, kelimeYedegi ? 6 : 3);
     if (ti >= 0 && sesSure - segs[ti].start > 5) {
       var kesBas = Math.max(0, segs[ti].start);
       K.log("yerel motor takildi: " + kesBas.toFixed(1) + " sn'den itibaren '" +
         String(segs[ti].text).slice(0, 40) + "' tekrarlaniyor (" + (segs.length - ti) +
         " satir) - kalan ses yeniden cozuluyor");
       var parca = outBase + "_kalan.wav";
+      // tekrarlanan geçici satırlar gider; kalan turu kendi ofsetiyle (takılma noktası) akar
+      if (akisTaban) canliKirp(akisTaban.ofset + kesBas * akisTaban.carpan);
+      var kalanAkis = kelimeYedegi ? null : akis(kesBas, Math.max(0, sesSure - kesBas));
       try {
+        iptalDenetle();
         var ff = await K.findFfmpeg();
         var rk = await K.run(ff, ["-y", "-ss", kesBas.toFixed(3), "-i", audioPath, "-c:a", "pcm_s16le", parca],
-          { timeout: 900000 });
+          { timeout: 900000, iptal: aktifIptal });
+        if (rk.iptal) throw iptalHatasiYap();
         if (rk.code !== 0 || !K.fs.existsSync(parca)) throw new Error("ses kesilemedi");
-        var ek = KEngine.buildArgs({
-          model: lw.model, audio: parca, lang: lang, outBase: outBase + "_kalan",
-          threads: threads, wordLevel: wordLevel, prompt: glossaryPrompt()
-        }).args.concat(["-mc", "0"]);
+        var ek = argOlustur({ audio: parca, outBase: outBase + "_kalan", kelimeYedegi: kelimeYedegi }).args.concat(["-mc", "0"]);
         var kalan;
         try {
           // eski whisper-cli (or. Homebrew) bu bayragi tanimayabilir: o zaman bayraksiz dene
           kalan = await yerelCalistir(lw.exe, ek.indexOf("--prompt") !== -1 ? ek.concat(["--carry-initial-prompt"]) : ek,
-            outBase + "_kalan", " · kalan kısım");
+            outBase + "_kalan", " · kalan kısım", kalanAkis);
         } catch (eCarry) {
-          kalan = await yerelCalistir(lw.exe, ek, outBase + "_kalan", " · kalan kısım");
+          if (eCarry && eCarry.iptal) throw eCarry;
+          if (akisTaban) canliKirp(akisTaban.ofset + kesBas * akisTaban.carpan);
+          kalan = await yerelCalistir(lw.exe, ek, outBase + "_kalan", " · kalan kısım", kalanAkis);
         }
-        kalan.forEach(function (sg) { sg.start += kesBas; sg.end += kesBas; });
-        var yeniden = CT.sondaTakilma(kalan, wordLevel ? 6 : 3);
+        // parça kesme noktasından başlar: satırlar VE ölçülmüş kelimeleri aynı ofsetle kayar
+        kalan = WW.zamanEsle(kalan, kesBas, 1);
+        var yeniden = CT.sondaTakilma(kalan, kelimeYedegi ? 6 : 3);
         K.log("takilma kurtarma: " + kalan.length + " satir eklendi" +
           (yeniden >= 0 ? " (kalan kisim da tekrarla bitiyor)" : ""));
         if (kalan.length) segs = segs.slice(0, ti).concat(kalan);
       } catch (eK) {
+        if (eK && eK.iptal) throw eK;       // İptal: kurtarma hatası sayılmaz, iş durur
         K.log("takilma kurtarma basarisiz: " + (eK && eK.message ? eK.message : eK));
       } finally {
-        try { K.fs.unlinkSync(parca); } catch (eP) {}
+        geciciSil(parca);
       }
     }
     if (wordLevel) {
-      K.log("yerel kelime modu: " + segs.length + " parça, ilk3=" +
-        segs.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
+      var duz = WW.duzlestir(segs);
+      K.log("yerel kelime modu: " + duz.length + " kelime (" + (kelimeYedegi ? "-ml 1 yedegi" : (dtwKullanildi ? "-ojf + DTW" : "-ojf olculmus")) + "), ilk3=" +
+        duz.slice(0, 3).map(function (x) { return x.start.toFixed(2); }).join(","));
     }
     return segs;
   }
 
-  // whisper-cli'yi calistir, JSON ciktisini segmentlere cevir
-  async function yerelCalistir(exe, args, outBase, etiket) {
-    var r = await K.run(exe, args, {
-      timeout: 7200000,
-      onStderr: function (s) {
-        var m = s.match(/progress\s*=\s*(\d+)%/);
-        if (m) status("Transkribe ediliyor… %" + m[1] + " (yerel" + etiket + ")");
-      }
-    });
+  /*
+   * whisper-cli'yi calistir, JSON ciktisini segmentlere cevir.
+   *   akis (isteğe bağlı; yalnız Altyazı oluştur, -ml 1 yedeğinde null): { ofset, carpan, toplamSn, onEk }
+   *     stdout'taki segment satırları geçici "canlı" satır olur; durum satırı yumuşatılmış yüzde,
+   *     kalan süre ve gerçek zaman çarpanı gösterir ('12 satır · %34 · ~1 dk 20 sn kaldı · 3,1× gerçek zaman').
+   *   aktifIptal (go()): süreç ağacı öldürülür, JSON silinir, iptal hatası atılır.
+   */
+  async function yerelCalistir(exe, args, outBase, etiket, akis, disBilgi) {
+    var iptal = aktifIptal;
+    var akar = !!(akis && WA && canliIs);
+    // DTW açıkken whisper.cpp v1.9.1 yeni segment bildirimini DTW hesabının sonrasına erteler ve o
+    // döngü ilk 30 sn'lik pencereden sonra hiç satır yazmaz, ilk pencerede satırları yineler: canlı
+    // satırlar kapalı, akıcı yüzde ve kalan süre sürer (nihai satırlar yine JSON'dan)
+    var satirli = !args || args.indexOf("-dtw") === -1;
+    var ayristir = akar && satirli ? WA.satirAyristirici({ offset: akis.ofset, carpan: akis.carpan }) : null;
+    var yumusat = akar ? WA.ilerlemeYumusat({ toplamSn: akis.toplamSn, basMs: Date.now() }) : null;
+    var turEtiketi = String(etiket || "").replace(/^\s*·\s*/, "");
+    var tik = null;
+    function durumYaz() {
+      if (iptal && iptal.iptalEdildi) return;
+      var t = yumusat.tahmin(Date.now());
+      status((akis.onEk || "") + WA.durumMetni({
+        satir: canliIs ? canliIs.satirlar.length : 0, pct: t.pct, kalanSn: t.kalanSn, hiz: t.hiz, etiket: turEtiketi
+      }));
+    }
+    if (yumusat) { durumYaz(); tik = setInterval(durumYaz, 500); }
+    var r;
+    try {
+      r = await K.run(exe, args, {
+        timeout: 7200000,
+        iptal: iptal,
+        onStdout: ayristir ? function (s) { canliEkle(ayristir.besle(s)); } : null,
+        onStderr: function (s) {
+          // bir parçada birden çok bildirim olabilir: sonuncusu geçerli
+          var re = /progress\s*=\s*(\d+)%/g, m, son = null;
+          while ((m = re.exec(s)) !== null) son = m[1];
+          if (son === null) return;
+          if (yumusat) { yumusat.kontrol(Number(son), Date.now()); durumYaz(); }
+          else status("Transkribe ediliyor… %" + son + " (yerel" + etiket + ")");
+        }
+      });
+    } finally {
+      if (tik) clearInterval(tik);
+    }
     var jsonPath = outBase + ".json";
+    if (r.iptal) {
+      // yarım çıktı kalmasın (whisper JSON'u yalnız sonda yazar; yine de denetlenir)
+      try { if (K.fs.existsSync(jsonPath)) K.fs.unlinkSync(jsonPath); } catch (eJ) {}
+      throw iptalHatasiYap();
+    }
+    if (ayristir) canliEkle(ayristir.bitir());
     if (!K.fs.existsSync(jsonPath)) {
       // çıkış kodu mesajda kalsın: hata rehberi eksik DLL / eski CPU kalıplarını kodla tanır
-      throw new Error("Yerel motor çıktı üretmedi (kod=" + r.code + "): " +
+      var eYok = new Error("Yerel motor çıktı üretmedi (kod=" + r.code + "): " +
         (r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 180));
+      // tanınmayan bayrak ("error: unknown argument: -nfa") stderr'in başında: DTW yedeği okur
+      eYok.stderr = String(r.stderr || "");
+      throw eYok;
     }
-    var parsed = JSON.parse(K.fs.readFileSync(jsonPath, "utf8").toString());
-    if (!etiket) { try { algilananDil = dilKodu(parsed.result && parsed.result.language); } catch (eDil) {} }
+    // Buffer olarak okunur: eski derlemenin bölünmüş UTF-8 belirteçleri kelimede birleştirilir.
+    // stderr: --vad açıkken whisper'ın VAD eşleme satırları (belirteç zamanlarını özgün sese taşır).
+    // vadAcik: VAD'siz koşuda (Silero modeli yok) belirteç zamanları segmentle aynı tabanda;
+    // doğrusal hizalama orada kelimeleri erkene çekerdi, olduğu gibi kullanılır.
+    var bilgi = {};
+    var vadAcik = args.indexOf("--vad") !== -1;
+    var segs = WW.segmentleriCoz(K.fs.readFileSync(jsonPath), bilgi, { stderr: r.stderr, vadAcik: vadAcik });
+    if (!etiket && bilgi.belirtecli) K.log("yerel motor kelime hizasi: " + bilgi.hiza);
+    // -tr koşusu: result.language kaynak dilde kalır ama metin İngilizce
+    if (!etiket) { try { algilananDil = bilgi.ceviri ? "en" : dilKodu(bilgi.dil); } catch (eDil) {} }
+    if (disBilgi && typeof disBilgi === "object") {
+      for (var bk in bilgi) if (Object.prototype.hasOwnProperty.call(bilgi, bk)) disBilgi[bk] = bilgi[bk];
+    }
     try { K.fs.unlinkSync(jsonPath); } catch (e2) {}
-    return (parsed.transcription || []).map(function (t) {
-      var s = t.offsets ? t.offsets.from / 1000 : NaN;
-      var e = t.offsets ? t.offsets.to / 1000 : NaN;
-      // offsets bozuksa timestamps dizgesinden coz ("00:00:01,380")
-      if ((!isFinite(s) || (s === 0 && e === 0)) && t.timestamps && t.timestamps.from) {
-        s = tcParse(t.timestamps.from);
-        e = tcParse(t.timestamps.to);
-      }
-      var probs = (t.tokens || []).map(function (token) { return Number(token && token.p); })
-        .filter(function (p) { return isFinite(p) && p >= 0 && p <= 1; });
-      var confidence = probs.length
-        ? probs.reduce(function (n, p) { return n + p; }, 0) / probs.length
-        : (isFinite(Number(t.avg_logprob)) ? Math.exp(Number(t.avg_logprob)) : undefined);
-      return { start: s || 0, end: e || 0, text: String(t.text || "").trim(), confidence: confidence };
-    });
+    // satır: { start, end, text, confidence (belirteç p ortalaması), words: [{ text, start, end, p }] }
+    return segs;
   }
 
   /*
@@ -548,8 +1114,10 @@ window.KCaptions = (function () {
 
     var json;
     if (K.nodeOK) {
+      // Bulut motoru akış vermez; İptal yalnız yüklemeyi keser (aktifIptal yalnız Altyazı oluştur'da)
       var r = await K.httpUpload(cfg.url, { "Authorization": "Bearer " + cfg.key },
-        fields, buf, "audio.mp3", "audio/mpeg");
+        fields, buf, "audio.mp3", "audio/mpeg", { iptal: aktifIptal });
+      if (r.iptal) throw iptalHatasiYap();
       if (r.status === 0) throw new Error("Bağlantı hatası: " + String(r.body).slice(0, 160));
       if (r.status < 200 || r.status >= 300) throw apiError(r.status, r.body);
       try { json = JSON.parse(r.body); }
@@ -610,40 +1178,121 @@ window.KCaptions = (function () {
    *            WAV'ı ffmpeg ile dönüştürmeye gerek kalmaz
    * Başarıda secenek.motor = sonucu GERÇEKTEN üreten rotanın kimliği (yerel hata
    * verip bulut yedeği yazdıysa "bulut:…"): önbellek anahtarı bundan kurulur.
+   *   cevir    true: çevrimdışı İngilizce (-tr; yalnız yerel, bulut yedeğine geçilmez).
+   *            Başarıda secenek.cevrildi = true.
+   *   dtw      true: hassas kelime zamanı (yalnız yerel; bulutta yok sayılır)
    */
   async function transcribeSuflo(audioPath, durHint, wordLevel, tempFiles, secenek) {
     secenek = secenek || {};
     var errors = [];
+    // Çevrimdışı İngilizce (secenek.cevir) yalnız yerel motorla: bulut yedeği çevirmez, kaynak dilde
+    // yazılan altyazı "çeviri" sayılmasın
+    if (secenek.cevir && !localEngineReady()) throw new Error(CEVIRI_YEREL_UYARISI);
     if (localEngineReady()) {
       try {
-        status("Suflo Motoru · yerel yüksek doğruluk…");
-        var yerelSonuc = await transcribeLocal(audioPath, wordLevel, secenek.dil);
+        status(secenek.cevir ? "Suflo Motoru · yerel · İngilizceye çevriliyor…" : yerelDurumMetni());
+        var motor = { cevir: !!secenek.cevir, dtw: !!secenek.dtw };
+        var yerelSonuc = await transcribeLocal(audioPath, wordLevel, secenek.dil, motor);
         secenek.motor = yerelKimlik();
+        secenek.cevrildi = !!motor.cevrildi;
         return yerelSonuc;
       } catch (eLocal) {
+        // İptal: bulut yedeğine geçme (ses yüklenmesin, kota harcanmasın)
+        if (eLocal && eLocal.iptal) throw eLocal;
+        // bulut yedeği akış vermez: yarıda kalan yerel turun geçici satırları ekranda beklemesin
+        if (canliIs) canliKirp(-Infinity);
+        if (secenek.cevir) throw eLocal;
         errors.push("yerel: " + (eLocal && eLocal.message ? eLocal.message : eLocal));
         K.log("Suflo motoru yerel rota basarisiz: " + errors[errors.length - 1]);
       }
     }
     if (cloudEngineReady()) {
+      iptalDenetle();
       var cloudAudio = secenek.bulutSes || audioPath;
       try {
         if (/\.wav$/i.test(cloudAudio)) {
           status("Suflo Motoru · güvenli yedek için ses hazırlanıyor…");
-          cloudAudio = await convertAudio(audioPath, { wav: false, durHint: durHint });
+          cloudAudio = await convertAudio(audioPath, { wav: false, durHint: durHint, iptal: aktifIptal });
           if (tempFiles) tempFiles.push(cloudAudio);
         }
         status("Suflo Motoru · güvenli bulut yedeği…");
         var bulutSonuc = await transcribeCloud(cloudAudio, durHint, wordLevel, secenek.dil);
+        iptalDenetle();
         secenek.motor = bulutKimlik();
         return bulutSonuc;
       } catch (eCloud) {
+        if (eCloud && eCloud.iptal) throw eCloud;
         errors.push("yedek: " + (eCloud && eCloud.message ? eCloud.message : eCloud));
       }
     }
     throw new Error(errors.length
       ? "Suflo Altyazı Motoru tamamlayamadı — " + errors.join(" · ")
       : "Suflo Altyazı Motoru hazır değil — yerel çekirdeği kur veya bulut yedeği ekle.");
+  }
+
+  // Ayarlar › Altyazı › Ses etiketlerini koru (varsayılan kapalı): açıkken [Müzik] gibi etiketler
+  // erişilebilirlik için altyazıda kalır (caption-text.js cleanSegments etiketKoru)
+  var YALNIZ_ETIKET = "Yalnız ses etiketi vardı ([Müzik], alkış…), konuşma yok. Etiketleri altyazıda tutmak için: Ayarlar › Altyazı › Ses etiketlerini koru.";
+  // Satırlar yalnız etiket filtresiyle mi boşaldı? (ayar kapalıyken; koru açık kursa satır çıkardı)
+  function yalnizEtiketMi(mapped, lenVal) {
+    if (sesEtiketKoru() || !mapped || !mapped.length) return false;
+    try { return CT.segmentleriKur(mapped, lenVal, { etiketKoru: true }).segments.length > 0; } catch (e) { return false; }
+  }
+
+  function sesEtiketKoru() {
+    try { return K.settings().sesEtiketKoru === true; } catch (e) { return false; }
+  }
+
+  /*
+   * Satır kurma seçenekleri (caption-text.js segmentleriKur): ses etiketleri, Satır uzunluğu ›
+   * Kelime sınırı (0 = kapalı) ve Ayarlar › Altyazı'daki en kısa / en uzun süre ile kısa parça
+   * birleştirme. Süre ve birleştirme yalnız satır modlarında (32/42 karakter, 2 satır × 42) işler.
+   * sonSinir: sesin sekanstaki sonu (klip sonu, Out noktası ya da sekans sonu; sn). En kısa süre
+   * uzatması bunu aşmaz: son satır sekansın ötesine uzayıp katmanı uzatmasın. 0 / yoksa motor
+   * satırlarının en geç bitişi kullanılır.
+   */
+  function kurSecenekleri(sonSinir) {
+    var s = {};
+    try { s = K.settings() || {}; } catch (e) { s = {}; }
+    return {
+      etiketKoru: sesEtiketKoru(),
+      maxWords: kelimeSiniri(),
+      birlestir: s.kisaBirlestir !== false,
+      minSure: s.altyaziMinSure,
+      maxSure: s.altyaziMaxSure,
+      sonSinir: Number(sonSinir) > 0 ? Number(sonSinir) : undefined
+    };
+  }
+
+  // Kelime sınırı yalnız satır modlarında (32 / 42 karakter, 2 satır × 42) anlamlı: diğerlerinde gizli
+  function kelimeSiniriDurumu() {
+    var alan = el("cap-kelime-siniri-alan");
+    if (alan) alan.hidden = !/^(l\d+|c\d+x\d)$/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
+  }
+
+  // Satır uzunluğu › Kelime sınırı: 0 kapalı, yoksa 2..12
+  function kelimeSiniri() {
+    var e = el("cap-kelime-siniri");
+    var n = e ? Math.floor(Number(e.value)) : 0;
+    if (!isFinite(n) || n <= 0) return 0;
+    return Math.max(2, Math.min(12, n));
+  }
+
+  /*
+   * Satır uzunluğu menüsü 3.2'de "32 / 42 karakter"i kelime zamanından kuruyor (l32 / l42);
+   * eski tercih, şablon ve stil kodlarındaki c32 / c42 aynı menü girdisine eşlenir. Menüde
+   * olmayan değer en yakın satır moduna (42 karakter) düşer: select boş kalmasın.
+   */
+  function uzunlukSecimi(v) {
+    v = String(v || "");
+    if (v === "c32") v = "l32";
+    else if (v === "c42") v = "l42";
+    var sel = el("cap-maxlen");
+    if (sel && sel.options) {
+      for (var i = 0; i < sel.options.length; i++) if (sel.options[i].value === v) return v;
+      return "l42";
+    }
+    return v;
   }
 
   /* ---------------- Terim sözlüğü ---------------- */
@@ -655,13 +1304,16 @@ window.KCaptions = (function () {
 
   // Dogru yazimlari motora daha sesi dinlerken ogret. Sonraki deterministik
   // sozluk gecisi yine kalir; prompt yalniz ilk tahmini guclendirir.
-  function glossaryPrompt() {
+  // ingilizce: çevrimdışı İngilizce çeviri (-tr) koşusu. Türkçe cümle ipucu çözücüyü Türkçe yazmaya
+  // çekebilir; yalnız doğru yazılan adlar İngilizce çerçeveyle verilir (dolgu ipucu o koşuda yok)
+  function glossaryPrompt(ingilizce) {
     var rules = K.settings().glossary || [];
     var correct = [];
     rules.forEach(function (r) {
       var t = String(r && r.to || "").trim();
       if (t && correct.indexOf(t) === -1) correct.push(t);
     });
+    if (ingilizce) return correct.length ? "Names and terms: " + correct.join(", ").slice(0, 700) + "." : "";
     var terim = correct.length
       ? "Doğru yazılması gereken özel adlar ve terimler: " + correct.join(", ").slice(0, 700) + "."
       : "";
@@ -689,9 +1341,12 @@ window.KCaptions = (function () {
     return _onbellek;
   }
 
-  // Hangi motor + model yazdı: farklı motorun transkripti önbellekten karışmasın
+  // Hangi motor + model yazdı: farklı motorun transkripti önbellekten karışmasın. Ayarlar › Çözme
+  // "Hızlı" (açgözlü) kimliğe ":hizli" ekler; "En doğru" eki yok (3.2 öncesi önbellek girdileri geçerli)
   function yerelKimlik() {
-    try { var m = KEngine.activeModel(); return "yerel:" + (m && m.id || "?"); } catch (e) { return "yerel:?"; }
+    var ek = "";
+    try { if (WAR && WAR.cozmeModu(K.settings().cozme) === "hizli") ek = ":hizli"; } catch (eC) {}
+    try { var m = KEngine.activeModel(); return "yerel:" + (m && m.id || "?") + ek; } catch (e) { return "yerel:?" + ek; }
   }
   function bulutKimlik() {
     try { var c = providerConfig(); return "bulut:" + c.model + "@" + String(c.url || "").replace(/^https?:\/\//, "").split("/")[0]; } catch (e) { return "bulut:?"; }
@@ -703,6 +1358,13 @@ window.KCaptions = (function () {
       if (cloudEngineReady()) return bulutKimlik();
     } catch (e) {}
     return "";
+  }
+
+  // transcribeWords'ün önbellek istemleri: { ara: [aranacak istem türleri], yaz: yazılacak tür }
+  function onbellekIstemi(ekIpucu) {
+    var TCM = window.SufloTranscriptCache;
+    if (TCM && TCM.istemler) return TCM.istemler(ekIpucu);
+    return /\S/.test(String(ekIpucu || "")) ? { ara: ["dolgu"], yaz: "dolgu" } : { ara: ["altyazi", "dolgu"], yaz: "altyazi" };
   }
 
   // Önbellek anahtarı için klip bilgisi; dosya okunamıyorsa null (önbellek atlanır)
@@ -732,8 +1394,8 @@ window.KCaptions = (function () {
         confidence: w.confidence
       };
     }).filter(function (w) {
-      // yalniz noktalamadan olusan belirtecler kelime degil
-      return w.text.replace(/[.,!?;:…"'«»]/g, "").trim() && isFinite(w.start) && isFinite(w.end);
+      // yalniz noktalamadan olusan belirtecler (bosluklu tire dahil) kelime degil
+      return w.text.replace(/[.,!?;:…"'«»\-–—]/g, "").trim() && isFinite(w.start) && isFinite(w.end);
     });
     words.sort(function (a, b) { return a.start - b.start; });
     return words;
@@ -759,14 +1421,17 @@ window.KCaptions = (function () {
   async function transcribeWords(opts) {
     opts = opts || {};
     var istenenDil = (el("cap-lang") && el("cap-lang").value) || "auto";
+    // Dolgu ipucuyla istenen transkript yalnız "dolgu" girdisinden gelir: altyazının ipucusuz
+    // transkripti ("altyazi") "ııı/eee"yi çoğu zaman yazmaz, dolgu önerilerini sessizce boşaltırdı
+    var istem = onbellekIstemi(opts.prompt);
     if (opts.cache !== false && transcriptCache()) {
       var onClip = opts.clip;
       if (!onClip) {
         var sc0 = await K.call("KS_getSelectedClips");
         if (sc0.ok && sc0.clips && sc0.clips.length) onClip = sc0.clips[0];
       }
-      var om = onClip ? onbellekMeta(onClip, istenenDil, "dolgu") : null;
-      var bulunan = om ? transcriptCache().get(om, { prompts: ["dolgu", "altyazi"] }) : null;
+      var om = onClip ? onbellekMeta(onClip, istenenDil, istem.yaz) : null;
+      var bulunan = om ? transcriptCache().get(om, { prompts: istem.ara }) : null;
       if (bulunan && bulunan.words.length) {
         K.log("transkript önbellekten: " + bulunan.words.length + " kelime (" + bulunan.prompt + (bulunan.covering ? ", kapsayan" : "") + ")");
         return {
@@ -800,14 +1465,17 @@ window.KCaptions = (function () {
         wav: localEngineReady(), ss: clip.inPoint, t: clip.dur, durHint: clip.dur
       });
       temp.push(audio);
-      var motorOnce = onbellekMeta(clip, istenenDil, "dolgu");   // ortam bilgisi yazıya dökmeden ÖNCE
+      // sessiz ses: motor (ve bulut yüklemesi) çalışmadan önce sor
+      if (!(await sessizDenetim(audio, { klip: true, kutu: opts.sessizKutu || "cap-sessiz" }))) throw vazgecHatasi();
+      var motorOnce = onbellekMeta(clip, istenenDil, istem.yaz);   // ortam bilgisi yazıya dökmeden ÖNCE
       var rota = {};
       var raw = await transcribeSuflo(audio, clip.dur, true, temp, rota);
-      var words = kelimeleriEsle(raw, clip);
+      // yerel: satırların ölçülmüş kelimeleri; bulut/eski derleme: öğeler zaten kelime
+      var words = kelimeleriEsle(WW.duzlestir(raw), clip);
       var dil = algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili();
       // anahtar, sonucu GERÇEKTEN yazan rotayla: yerel hata verip bulut yazdıysa "bulut:…"
       if (motorOnce && rota.motor) motorOnce.engine = rota.motor;
-      if (motorOnce && rota.motor && raw.length && transcriptCache()) transcriptCache().put(motorOnce, { words: raw, lang: dil });
+      if (motorOnce && rota.motor && raw.length && transcriptCache()) transcriptCache().put(motorOnce, { segments: raw, lang: dil });
       return { clip: clip, lang: dil, words: words, fromCache: false, motor: rota.motor || "" };
     } finally {
       temp.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
@@ -819,6 +1487,21 @@ window.KCaptions = (function () {
     }
   }
 
+  /*
+   * Ölçülmüş kelimeler (s.words) metinle birlikte yaşar: metin değişince (AI metin kontrolü, sözlük,
+   * bul & değiştir; elle düzenleme editörde aynısını yapar) kelimeler yeni metne yeniden hizalanır
+   * (caption-layout.js kelimeleriHizala, LCS). Aynı kalan kelime ölçülmüş zamanını korur, değiştirilen
+   * kelime eski kelimenin aralığını alır, eklenen kelime komşularının arasına yerleşir; stil motoru
+   * satırın tamamını ölçülmüş zamanla akıtmayı sürdürür (karakter oranına düşmez).
+   */
+  function kelimeleriYenidenHizala(s, eskiMetin) {
+    if (!s || !s.words || s.text === eskiMetin) return;
+    var hiza = CL.kelimeleriHizala(s.words, s.text, s.start, s.end, styleLocale() || algilananDil);
+    if (hiza.length) s.words = hiza; else delete s.words;
+  }
+  function kelimeleriMetinleDogrula(s, eskiMetin) { kelimeleriYenidenHizala(s, eskiMetin); }
+  function kelimeSayisiniKoru(s, eskiMetin) { kelimeleriYenidenHizala(s, eskiMetin); }
+
   // Terim sozlugu ucretsiz cekirdekte (Ayarlar'da kilitsiz gorunur; motor istemine de herkes icin gider)
   function applyGlossary(segs) {
     var rules = K.settings().glossary || [];
@@ -827,7 +1510,7 @@ window.KCaptions = (function () {
     segs.forEach(function (s) {
       var before = s.text;
       rules.forEach(function (r) { s.text = trReplace(s.text, r.from, r.to); });
-      if (s.text !== before) n++;
+      if (s.text !== before) { n++; kelimeSayisiniKoru(s, before); }
     });
     if (n) K.log("sozluk: " + n + " satirda duzeltme yapildi");
     return segs;
@@ -965,7 +1648,7 @@ window.KCaptions = (function () {
     // "user" (Şablonum) gibi anahtarlar motor stili tasiyabilir: stilin ailesine bak
     secilenMotorStili = motorStiliMi(key) ? key : (p.stil && motorStiliMi(p.stil.aile) ? p.stil.aile : "");
     bekleyenMogrtYolu = "";
-    el("cap-maxlen").value = p.maxlen;
+    el("cap-maxlen").value = uzunlukSecimi(p.maxlen);
     el("cap-case").value = p.kase;
     el("cap-punct").checked = p.punct;
     // Marka Kiti acikken hazir Suflo Stili kitin yazi tipi / renk / konumuyla gelir (Sablonum aynen kalir)
@@ -974,6 +1657,8 @@ window.KCaptions = (function () {
     stilKredisi("");
     inceAyarDurumu();
     vurguKutusuDurumu();
+    kelimeSiniriDurumu();
+    motorSecenekDurumu();
     onizlemeDurdur();
     onizlemeCiz();
     stilKartiIsaretle(key);
@@ -1512,6 +2197,8 @@ window.KCaptions = (function () {
       s.capPrefs = {
         lang: el("cap-lang").value,
         maxlen: el("cap-maxlen").value,
+        kelimeSiniri: kelimeSiniri(),
+        cevirEn: !!(el("cap-cevir-en") && el("cap-cevir-en").checked),
         kase: el("cap-case").value,
         punct: el("cap-punct").checked,
         preset: el("cap-preset").value,
@@ -1559,7 +2246,9 @@ window.KCaptions = (function () {
     if (!p) { if (arayuzDili() === "en" && el("cap-lang")) el("cap-lang").value = ""; return; }
     try {
       if (p.lang !== undefined) el("cap-lang").value = p.lang;
-      if (p.maxlen) el("cap-maxlen").value = p.maxlen;
+      if (p.maxlen) el("cap-maxlen").value = uzunlukSecimi(p.maxlen);
+      if (el("cap-kelime-siniri")) { el("cap-kelime-siniri").value = String(p.kelimeSiniri || 0); el("cap-kelime-siniri").value = String(kelimeSiniri()); }
+      if (el("cap-cevir-en")) el("cap-cevir-en").checked = p.cevirEn === true;
       if (p.kase) el("cap-case").value = p.kase;
       if (p.punct !== undefined) el("cap-punct").checked = p.punct;
       if (p.preset !== undefined) el("cap-preset").value = p.preset;
@@ -1631,6 +2320,8 @@ window.KCaptions = (function () {
     if (sar) sar.hidden = !(motorda && dikeySekans());
     var cip = el("cap-marka-kiti-cip");
     if (cip) cip.hidden = !markaKiti();
+    // MOGRT / Suflo Stili değişti: kelime tabanlı stilde "Hassas kelime zamanlaması" görünür
+    motorSecenekDurumu();
   }
 
   // Paylaşılan koddan gelen stilin yazarı: "Stil: @yazar" (textContent; HTML yok)
@@ -1663,7 +2354,8 @@ window.KCaptions = (function () {
     return {
       kod: SS.encode({
         styleId: secilenMotorStili, intensity: st.yogunluk, overrides: motorAyarlari(st),
-        text: { maxlen: el("cap-maxlen").value, kase: el("cap-case").value, punct: !!el("cap-punct").checked },
+        // l32 / l42 eski sürümlerde yok: aynı menü girdisi c32 / c42 olarak paylaşılır (içe alırken geri eşlenir)
+        text: { maxlen: el("cap-maxlen").value.replace(/^l(\d+)$/, "c$1"), kase: el("cap-case").value, punct: !!el("cap-punct").checked },
         author: yazar
       }),
       yazarGecersiz: !!yazar && !SS.validAuthor(yazar)
@@ -1705,11 +2397,13 @@ window.KCaptions = (function () {
     Object.keys(r.overrides).forEach(function (k) { if (k !== "fontFile") ov[k] = r.overrides[k]; });
     stiliYaz(ov);
     if (r.intensity && el("cap-yogunluk")) el("cap-yogunluk").value = r.intensity;
-    if (r.text.maxlen) el("cap-maxlen").value = r.text.maxlen;
+    if (r.text.maxlen) el("cap-maxlen").value = uzunlukSecimi(r.text.maxlen);
     if (r.text.kase) el("cap-case").value = r.text.kase;
     if (typeof r.text.punct === "boolean") el("cap-punct").checked = r.text.punct;
     stilKredisi(r.author || "");
     vurguKutusuDurumu();
+    kelimeSiniriDurumu();
+    motorSecenekDurumu();
     onizlemeDurdur();
     onizlemeCiz();
     stilKartiIsaretle(r.styleId);
@@ -1797,6 +2491,8 @@ window.KCaptions = (function () {
       var ornek = segments.slice(0, 40).map(function (s) { return s.text; }).join(" ");
       return /[ğışĞİŞ]/.test(ornek) ? "tr-TR" : undefined;
     }
+    // Çevrimdışı İngilizce belge (kaynak metni de İngilizce): dil-bağımsız kural ("THIS", "THİS" değil)
+    if (cevrimdisiEn()) return undefined;
     var l = el("cap-lang").value;
     if (l === "") l = algilananDil; // "Otomatik": motorun algiladigi dile guven
     if (l === "tr") return "tr-TR";
@@ -1889,12 +2585,31 @@ window.KCaptions = (function () {
    */
   async function go(opts) {
     if (busy) return false;
+    // tıkla gelen çağrı (opts = click olayı): İptal'e çift tıkın ikinci tıkı / düğme yeniden belirir belirmez
+    // gelen tık yeni iş açmasın (yeni iş ses dışa aktarımında İptal'i kilitler). Rehberin { ornek } çağrısı geçer.
+    if (K.baslatTikiGecerli && !K.baslatTikiGecerli(opts, baslatAcilis)) return false;
     var ornek = (opts && opts.ornek && opts.ornek.wav) ? opts.ornek : null;
     var ctx = KApp.ctx();
     var clip = ctx.sel;
     if (!ornek && scope === "clip" && !clip) { status("Önce timeline'da bir klip seç.", "warn"); return false; }
+    /*
+     * Çevrimdışı İngilizce (-tr; Pro, 3 deneme hakkı): yerel motor ve model (Small / Large) kapıdan
+     * ÖNCE denetlenir, deneme boşa kurulmasın; hak yalnız transkript başarıyla bitince düşer.
+     * Rehberin örnek klibi hiç çevrilmez. DTW (Hassas kelime zamanlaması) ücretsiz, kapısız.
+     */
+    var cevirEn = !ornek && cevrimdisiCeviriSecili();
+    if (cevirEn) {
+      var ceviriEngeli = cevrimdisiCeviriEngeli();
+      if (ceviriEngeli) { status(ceviriEngeli, "warn"); KApp.toast(ceviriEngeli, "warn", 8000); return false; }
+      if (typeof Pro !== "undefined" && !Pro.gate("offlineTranslate", { deneme: true, yeniden: function () { go(); } })) return false;
+    }
+    var dtwIste = !ornek && dtwSecili();
+    var cevrildi = false;
     var basarili = false;
     busy = true;
+    // İptal jetonu ve geçici satırlar bu işe ait; finally ikisini de bırakır
+    aktifIptal = K.iptalJetonu ? K.iptalJetonu() : null;
+    canliBaslat();
     setBusy(true);
     /*
      * Ekranda duzenlenmis is varken yeni transkript uretmek TEK korumasiz
@@ -1905,8 +2620,13 @@ window.KCaptions = (function () {
     var oncekiIs = segments.length
       ? durumAl("yeni transkript")
       : null;
+    // Ekrandaki belgenin dili: iş başarısız olur ya da "Vazgeç" seçilirse belge kalır, dili de kalsın
+    // (stil büyük harfi "BİR", Viral anlar/çeviri dili, SRT paketi adı ona bakar)
+    var belgeDili = algilananDil, yeniBelge = false;
     algilananDil = "";
     var tempFiles = [];
+    // İptal / Vazgeç / yalnız etiket uyarısı: iş bitince (setBusy → refreshButton) silinmesin
+    var sonUyari = "";
     try {
       /*
        * ffmpeg'i EN BASTA hazirla. Sekans kapsaminda ses disa aktarimi dakikalar
@@ -1918,9 +2638,11 @@ window.KCaptions = (function () {
       if (!ornek && !(await K.findFfmpeg())) {
         status("ffmpeg kuruluyor… (bir kerelik, ses dönüştürme için gerekli)");
         try {
-          await KEngine.installFfmpeg(function (m) { status(m); });
+          // İptal ffmpeg indirmesini keser (.part korunur; sonraki deneme kaldığı yerden devam eder)
+          await KEngine.installFfmpeg(function (m) { status(m); }, aktifIptal);
           await K.findFfmpeg(true);
         } catch (eFF) {
+          if (eFF && eFF.iptal) throw eFF;
           throw new Error("ffmpeg kurulamadı: " + (eFF && eFF.message ? eFF.message : eFF) +
             " — Ayarlar > ffmpeg bölümünden elle bir yol gösterebilirsin.");
         }
@@ -1934,15 +2656,19 @@ window.KCaptions = (function () {
       var motorSecenek = null;
 
       var speedFactor = 1;
+      var sesSonu = 0;       // sesin sekanstaki sonu: satır modunda son satır bunun ötesine uzamaz
       var batchClips = null; // coklu klip: [clip, ...] — tek klipte null kalir
       if (ornek) {
         // ornek dosyalari ayar klasorunde kalici: tempFiles'a EKLENMEZ (silinmesin)
         audioSrc = ornek.wav;
         seqOffset = Number(ornek.offset) || 0;
         durHint = Number(ornek.sure) || wavDuration(ornek.wav) || 15;
+        sesSonu = seqOffset + durHint;
         motorSecenek = { dil: ornek.lang || "tr", bulutSes: ornek.mp3 || "" };
       } else if (scope === "clip") {
+        iptalDenetle();
         var sc = await K.call("KS_getSelectedClips");
+        iptalDenetle();
         if (sc.ok && sc.clips && sc.clips.length > 1) {
           if (typeof Pro !== "undefined" && !Pro.isPro()) {                   // Pro: toplu klip
             Pro.gate("batch");
@@ -1956,15 +2682,17 @@ window.KCaptions = (function () {
         if (batchClips) {
           // coklu klip: her klip ayri islenir, asagida birlestirilir
           audioSrc = null;
+          batchClips.forEach(function (b) { if (Number(b.clipEnd) > sesSonu) sesSonu = Number(b.clipEnd); });
         } else {
           seqOffset = clip.clipStart;
           durHint = clip.dur;
+          sesSonu = Number(clip.clipEnd) || 0;
           // hiz degistirilmis klipte kaynak suresi != timeline suresi; damgalari olcekle
           var tlDur = clip.clipEnd - clip.clipStart;
           if (clip.dur > 0 && tlDur > 0) speedFactor = tlDur / clip.dur;
           status("Ses çıkarılıyor…");
           audioSrc = await convertAudio(clip.mediaPath, {
-            wav: useLocal, ss: clip.inPoint, t: clip.dur, durHint: durHint
+            wav: useLocal, ss: clip.inPoint, t: clip.dur, durHint: durHint, iptal: aktifIptal
           });
           tempFiles.push(audioSrc);
         }
@@ -1979,19 +2707,29 @@ window.KCaptions = (function () {
           if (enabled.length < at.length) trackArg = enabled;
         }
         status(scope === "inout" ? "In → Out sesi dışa aktarılıyor…" : "Sequence sesi dışa aktarılıyor…");
-        // Uzun sekanslarda dışa aktarım dakikalar sürebilir: varsayılan zaman aşımını uzat
-        var ex = await K.call("KS_exportAudio",
-          { scope: scope, epr: bundledEpr(), tracks: trackArg }, 3600000);
+        iptalDenetle();
+        // KS_exportAudio senkron ExtendScript: yarıda kesilemez, o sırada İptal kapalı (ipucu nedenini söyler)
+        iptalKilidi(true);
+        var ex;
+        try {
+          // Uzun sekanslarda dışa aktarım dakikalar sürebilir: varsayılan zaman aşımını uzat
+          ex = await K.call("KS_exportAudio",
+            { scope: scope, epr: bundledEpr(), tracks: trackArg }, 3600000);
+        } finally {
+          iptalKilidi(false);
+        }
+        if (ex && ex.ok && ex.wav) tempFiles.push(ex.wav);
+        iptalDenetle();
         if (!ex.ok) throw new Error(ex.error);
-        tempFiles.push(ex.wav);
         seqOffset = ex.offset;
         durHint = wavDuration(ex.wav);
+        if (durHint > 0) sesSonu = (Number(seqOffset) || 0) + durHint;
         status("Ses hazırlanıyor…");
-        audioSrc = await convertAudio(ex.wav, { wav: useLocal, durHint: durHint });
+        audioSrc = await convertAudio(ex.wav, { wav: useLocal, durHint: durHint, iptal: aktifIptal });
         tempFiles.push(audioSrc);
       }
 
-      var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime, "k1"/"kc" kelime-zamanli
+      var lenVal = el("cap-maxlen").value; // "l42" karakter, "c42x2" 2 satır, "w3" kelime, "k1"/"kc" kelime-zamanli
       // Kelime kelime / birikimli modlar UCRETSIZDIR (Samet karari, 20 Agu 2026)
       var karaoke = /^k/.test(lenVal);
       var mapped = [];
@@ -1999,30 +2737,43 @@ window.KCaptions = (function () {
       if (batchClips) {
         // toplu islem: klipler sirayla; biri patlarsa digerleri devam eder
         var failed = [];
+        // sessiz klip: bir kez sorulur; "Vazgeç" sessiz klipleri atlar, digerleri devam eder
+        var sessizKarar = {}, sessizAtlanan = [];
         for (var bi = 0; bi < batchClips.length; bi++) {
+          iptalDenetle();               // klipler arasında: İptal sonraki klibe geçmez
           var bc = batchClips[bi];
           var tag = "Klip " + (bi + 1) + "/" + batchClips.length + " (" + bc.name + "): ";
           var ba = null;
+          var bTl = bc.clipEnd - bc.clipStart;
+          var bf = (bc.dur > 0 && bTl > 0) ? bTl / bc.dur : 1;
           try {
             status(tag + "ses çıkarılıyor…");
             ba = await convertAudio(bc.mediaPath, {
-              wav: useLocal, ss: bc.inPoint, t: bc.dur, durHint: bc.dur
+              wav: useLocal, ss: bc.inPoint, t: bc.dur, durHint: bc.dur, iptal: aktifIptal
             });
             tempFiles.push(ba);
+            var bDevam = await sessizDenetim(ba, { klip: true, karar: sessizKarar, etiket: bc.name, toplu: { sira: bi + 1, toplam: batchClips.length } });
+            iptalDenetle();
+            if (!bDevam) {
+              sessizAtlanan.push(bc.name);
+              continue;
+            }
             status(tag + "transkribe ediliyor…");
-            var bRaw = await transcribeSuflo(ba, bc.dur, karaoke, tempFiles);
-            var bTl = bc.clipEnd - bc.clipStart;
-            var bf = (bc.dur > 0 && bTl > 0) ? bTl / bc.dur : 1;
-            bRaw.forEach(function (s) {
+            // canlı satırlar: bu klibin ofseti ve hızı (nihai eşlemeyle aynı), durum satırında klip etiketi
+            if (canliIs) { canliIs.parca = bi; canliIs.ofset = bc.clipStart; canliIs.carpan = bf; canliIs.onEk = tag; }
+            var bSecenek = { cevir: cevirEn, dtw: dtwIste };
+            var bRaw = await transcribeSuflo(ba, bc.dur, karaoke, tempFiles, bSecenek);
+            if (bSecenek.cevrildi) cevrildi = true;
+            iptalDenetle();
+            // satırlar ve ölçülmüş kelimeleri aynı eşlemeyle sekans zamanına
+            WW.zamanEsle(bRaw, bc.clipStart, bf).forEach(function (s) {
               if (!s.text) return;
-              mapped.push({
-                start: bc.clipStart + s.start * bf,
-                end: bc.clipStart + s.end * bf,
-                text: s.text,
-                confidence: s.confidence
-              });
+              var m = { start: s.start, end: s.end, text: s.text, confidence: s.confidence };
+              if (s.words && s.words.length) m.words = s.words;
+              mapped.push(m);
             });
           } catch (eB) {
+            if (eB && eB.iptal) throw eB;   // İptal: kalan klipler işlenmez, yarım sonuç uygulanmaz
             failed.push(bc.name);
             K.log("toplu islem atladi [" + bc.name + "]: " + eB.message);
           } finally {
@@ -2031,48 +2782,84 @@ window.KCaptions = (function () {
             if (ba) { try { K.fs.unlinkSync(ba); } catch (eT) {} }
           }
         }
+        // tüm klipler sessiz ve "Vazgeç": hata değil
+        if (mapped.length === 0 && sessizAtlanan.length === batchClips.length) throw vazgecHatasi();
+        if (sessizAtlanan.length) KApp.toast(sessizAtlanan.length + " sessiz klip atlandı: " + sessizAtlanan.join(", ").slice(0, 100), "warn");
         if (mapped.length === 0) throw new Error("Hiçbir klipten konuşma alınamadı.");
         if (failed.length) KApp.toast(failed.length + " klip atlandı: " + failed.join(", ").slice(0, 100), "bad");
         mapped.sort(function (a, b) { return a.start - b.start; });
       } else {
+        // sessiz ses: motor (ve bulut yüklemesi) çalışmadan önce sor; rehberin örnek klibi hariç
+        // (soru açıkken İptal: soru "Vazgeç" gibi kapanır; catch jetona bakıp "İptal edildi" der)
+        iptalDenetle();
+        if (!ornek && !(await sessizDenetim(audioSrc, { klip: scope === "clip" }))) throw vazgecHatasi();
+        iptalDenetle();
         status("Suflo Altyazı Motoru dinliyor…");
-        // Önbellek: yalnız tek klip + kelime zamanlı (k1/kc) transkript, "altyazi" etiketiyle
-        // (dolgu ipucu yok: Konuşmadan kes "dolgu" girdisini tercih eder, yoksa bunu kullanır)
-        var onbMeta = (!ornek && scope === "clip" && karaoke && clip) ? onbellekMeta(clip, el("cap-lang").value || "auto", "altyazi") : null;
+        // canlı satırlar: nihai eşlemeyle aynı ofset ve hız (WW.zamanEsle(raw, seqOffset, speedFactor))
+        if (canliIs) { canliIs.parca = 0; canliIs.ofset = Number(seqOffset) || 0; canliIs.carpan = speedFactor; canliIs.onEk = ""; }
+        /*
+         * Önbellek: tek klip, "altyazi" etiketiyle. Yerel motor satır modunda da ölçülmüş
+         * kelime yazdığı için satır ve kelime modu AYNI girdiyi paylaşır. Dolgu ipucu yok:
+         * Konuşmadan kes dolgu ipucuyla ister ve bu girdiyi KULLANMAZ (transcript-cache.js
+         * istemler: ipucusuz turda Whisper dolgu seslerini çoğu zaman yazmaz). Kelime zamanı
+         * olmayan sonuç (bulut satır modu) yazılmaz: kelime bekleyen araçları bozardı.
+         */
+        // Çevrimdışı İngilizce transkript önbelleğe yazılmaz: anahtar kaynak dili taşır, Konuşmadan kes
+        // İngilizce kelimeleri kaynak dil sanırdı
+        var onbMeta = (!ornek && !cevirEn && scope === "clip" && clip) ? onbellekMeta(clip, el("cap-lang").value || "auto", "altyazi") : null;
         var rotaSecenek = motorSecenek || {};
+        rotaSecenek.cevir = cevirEn;
+        rotaSecenek.dtw = dtwIste;
         var raw = await transcribeSuflo(audioSrc, durHint, karaoke, tempFiles, rotaSecenek);
+        if (rotaSecenek.cevrildi) cevrildi = true;
+        iptalDenetle();               // İptal'den sonra gelen sonuç önbelleğe de belgeye de yazılmaz
+        var kelimeZamanli = karaoke || WW.kelimeVar(raw);
         if (onbMeta && rotaSecenek.motor) onbMeta.engine = rotaSecenek.motor;   // gerçekten yazan rota
-        if (onbMeta && rotaSecenek.motor && raw.length && transcriptCache()) {
-          transcriptCache().put(onbMeta, { words: raw, lang: algilananDil || el("cap-lang").value || "" });
+        if (onbMeta && kelimeZamanli && rotaSecenek.motor && raw.length && transcriptCache()) {
+          transcriptCache().put(onbMeta, { segments: raw, lang: algilananDil || el("cap-lang").value || "" });
         }
 
-        mapped = raw.map(function (s) {
-          return {
-            start: seqOffset + s.start * speedFactor,
-            end: seqOffset + s.end * speedFactor,
-            text: s.text,
-            confidence: s.confidence
-          };
+        // satırlar ve ölçülmüş kelimeleri aynı eşlemeyle (klip başı + hız) sekans zamanına
+        mapped = WW.zamanEsle(raw, seqOffset, speedFactor).map(function (s) {
+          var m = { start: s.start, end: s.end, text: s.text, confidence: s.confidence };
+          if (s.words && s.words.length) m.words = s.words;
+          return m;
         }).filter(function (s) { return s.text; });
       }
 
+      iptalDenetle();
+      // nihai satırlar geldi: geçici satırlar gider (yerlerini düzenlenebilir satırlar alır)
+      canliBitir();
       // Satir kurma tek yerde (caption-text.js): rehberin hazir ornek transkripti de
       // ayni yolu kullanir, iki cikti hic ayrismaz
       var kurulan;
-      try { kurulan = CT.segmentleriKur(mapped, lenVal); }
+      try { kurulan = CT.segmentleriKur(mapped, lenVal, kurSecenekleri(sesSonu)); }
       catch (eKur) {
         if (eKur && eKur.ayrinti) K.log("karaoke HATA: " + eKur.ayrinti);
         throw eKur;
       }
       segments = kurulan.segments;
       segmentsMode = kurulan.mode;
+      // Çevrimdışı İngilizce: belge dili "en" (büyük harf kuralı, kalite, SRT paketi, .en.srt). İşaret
+      // satırlarda taşınır: geri al, taslak ve Shorts kaydı onu satırlarla birlikte saklar
+      if (cevrildi) {
+        segments.forEach(function (sg) { sg.cikisDili = "en"; });
+        algilananDil = "en";
+      }
       applyGlossary(segments);
       if (segments.length === 0) {
         // Eski dokumana geri don: ekrandaki satirlar ile bellek ayrismasin,
         // bos dizi bir sonraki taslak yazimiyla kayitli isi de silmesin.
         if (oncekiIs) durumYukle(oncekiIs); else segments = [];
+        // Yalnız ses etiketi vardı ([Müzik], alkış): filtre bilerek attı; hata değil, ayara yönlendiren uyarı
+        if (yalnizEtiketMi(mapped, lenVal)) {
+          var eEt = new Error(YALNIZ_ETIKET);
+          eEt.uyari = true;
+          throw eEt;
+        }
         throw new Error("Konuşma bulunamadı.");
       }
+      yeniBelge = true;          // ekranda artık yeni transkript: dili algılanan dil
       if (oncekiIs) {
         undoStack.push(oncekiIs);
         if (undoStack.length > UNDO_MAX) undoStack.shift();
@@ -2097,14 +2884,30 @@ window.KCaptions = (function () {
       render();
       // Uzun bir transkripsiyon bitti: kullanıcı hiçbir şeye dokunmasa da taslak diskte olsun
       saveDraftNow();
-      KApp.toast(segments.length + " altyazı satırı hazır", "good");
+      if (cevrildi) KApp.toast(segments.length + " altyazı satırı hazır · İngilizce (çevrimdışı)", "good");
+      else KApp.toast(segments.length + " altyazı satırı hazır", "good");
       basarili = true;
+      // deneme: yalnız başarıda (boş transkript, İptal ya da hata hak yemez)
+      if (cevirEn && typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("offlineTranslate", KApp.toast);
     } catch (e) {
-      status("✕ " + K.hataYardimi(e), "bad");
+      if (!yeniBelge) algilananDil = belgeDili;  // önceki belge ekranda kaldı: dili de onun
+      // İptal: hata değil. Ekrandaki belge, taslak ve geri al yığını olduğu gibi kalır; yarım satır uygulanmaz
+      if ((e && e.iptal) || (aktifIptal && aktifIptal.iptalEdildi)) {
+        sonUyari = "İptal edildi.";
+        status(sonUyari, "warn");
+        K.log("[altyazı] is iptal edildi, gecici dosyalar siliniyor");
+      }
+      else if (e && (e.vazgecildi || e.uyari)) status(e.message, "warn");
+      else status("✕ " + K.hataYardimi(e), "bad");
+      if (!sonUyari && e && (e.vazgecildi || e.uyari)) sonUyari = e.message;
     } finally {
-      tempFiles.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
+      tempFiles.forEach(function (f) { geciciSil(f); });
+      canliBitir();
+      aktifIptal = null;
       busy = false;
       setBusy(false);
+      // refreshButton yalnız kırmızı hatayı korur; uyarı seçim değişene kadar ekranda kalsın
+      if (sonUyari) status(sonUyari, "warn");
     }
     if (basarili) sonucBildir({ kaynak: ornek ? "ornek" : "go", satir: segments.length });
     return basarili;
@@ -2127,13 +2930,15 @@ window.KCaptions = (function () {
    * AYNI satır kurma yolu (CT.segmentleriKur) ve aynı anlık görüntü/geri al akışı.
    *   veri: SufloOnboarding.ornekKelimeleri() çıktısı { lang, words, segments }
    *   offset: klibin sekanstaki başlangıcı (sn)
+   *   sure (isteğe bağlı): örnek klibin süresi (sn); son satır klibin sonunu aşmaz
    */
-  function ornekYukle(veri, offset) {
+  function ornekYukle(veri, offset, sure) {
     if (busy || !veri || !window.SufloOnboarding) return false;
     var lenVal = el("cap-maxlen").value;
     var girdi = window.SufloOnboarding.ornekGirdisi(veri, lenVal, offset);
     if (!girdi.length) return false;
-    var kurulan = CT.segmentleriKur(girdi, lenVal);
+    var ornekSonu = Number(sure) > 0 ? (Number(offset) || 0) + Number(sure) : 0;
+    var kurulan = CT.segmentleriKur(girdi, lenVal, kurSecenekleri(ornekSonu));
     if (!kurulan.segments.length) return false;
     // Ekranda iş varsa üzerine yazmadan önce anlık görüntü: Ctrl+Z geri getirir
     // (anlık görüntü Shorts bayrağını taşır: sıfırlama ONDAN sonra)
@@ -2161,17 +2966,28 @@ window.KCaptions = (function () {
     el("cap-go").classList.toggle("busy", b);
     if (b) el("cap-go").disabled = true;
     el("cap-progress").hidden = !b;
+    // iş sürerken "Altyazı oluştur" yerine "İptal"
+    var iptal = el("cap-cancel");
+    if (iptal) {
+      el("cap-go").hidden = b;
+      iptal.hidden = !b;
+      iptal.disabled = false;
+      iptal.title = IPTAL_IPUCU;
+    }
+    iptalAcilis = b ? Date.now() : 0;
+    baslatAcilis = b ? 0 : Date.now();
     if (!b) refreshButton();
   }
 
   /* ---------------- Segment düzenleme ---------------- */
 
   function qualityOptions() {
-    var len = el("cap-maxlen") ? el("cap-maxlen").value : "c42";
-    var mc = /^c(\d+)$/.exec(len);
+    var len = el("cap-maxlen") ? el("cap-maxlen").value : "l42";
+    var mc = /^[cl](\d+)(?:x(\d))?$/.exec(len);
     return {
-      lang: (ceviriDili && ceviriVar() ? ceviriDili : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || arayuzDili(),
+      lang: (ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || arayuzDili(),
       maxChars: mc ? Number(mc[1]) : 42,
+      maxLines: mc && mc[2] ? Number(mc[2]) : 1,
       wordMode: /^k/.test(len) || segmentsMode === "k1" || segmentsMode === "kc"
     };
   }
@@ -2320,7 +3136,7 @@ window.KCaptions = (function () {
   // Anlamina gore satir sonlarina emoji: seyrek, tekrarsiz, Ctrl+Z ile geri alinir
   function otomatikEmoji() {
     if (!segments.length || !window.SufloAutoEmoji) return;
-    var dil = algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili();
+    var dil = (ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili();
     var oneriler = window.SufloAutoEmoji.suggest(segments, { lang: dil === "en" ? "en" : "tr" });
     if (!oneriler.length) {
       KApp.toast("Emojiye uygun satır bulunamadı", "warn");
@@ -2392,8 +3208,8 @@ window.KCaptions = (function () {
       var corrected = [];
       var BATCH = 50;
       for (var i = 0; i < originals.length; i += BATCH) {
-        // *vurgu* isaretleri modele gitmez (dusurur ya da markdown ekler); donuste geri konur
-        var chunk = originals.slice(i, i + BATCH).map(CT.stripEmphasis);
+        // *vurgu* isaretleri ve satir kirilimi modele gitmez (dusurur ya da markdown ekler); donuste geri konur
+        var chunk = originals.slice(i, i + BATCH).map(function (t) { return CL.duzMetin(CT.stripEmphasis(t)); });
         status("AI metin kontrolü… " + Math.min(i + BATCH, originals.length) + "/" + originals.length);
         var json = await chatCall(cfg, {
           model: cfg.model,
@@ -2401,7 +3217,7 @@ window.KCaptions = (function () {
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: "You proofread subtitle lines. Fix only clear spelling, Turkish punctuation, capitalization and obvious speech-recognition errors. Preserve meaning, tone, slang, names, line order and line count. Never merge, split, censor or rewrite. Reply ONLY as JSON {\"lines\":[...]}, with exactly " + chunk.length + " strings." },
-            { role: "user", content: "Language: " + ((el("cap-lang") && el("cap-lang").value) || algilananDil || "auto") + "\nKnown correct terms: " + glossaryPrompt() + "\nLines:\n" + JSON.stringify(chunk) }
+            { role: "user", content: "Language: " + ((ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || "auto") + "\nKnown correct terms: " + glossaryPrompt() + "\nLines:\n" + JSON.stringify(chunk) }
           ]
         });
         var content = json.choices && json.choices[0] && json.choices[0].message.content;
@@ -2413,13 +3229,20 @@ window.KCaptions = (function () {
         var t = String(text || "").trim();
         if (!t) return originals[i2];
         var geri = CT.reapplyEmphasis(originals[i2], t);
-        return geri === null ? originals[i2] : geri;   // kelime sayisi degistiyse vurgu kaybolmasin
+        if (geri === null) return originals[i2];   // kelime sayisi degistiyse vurgu kaybolmasin
+        // 2 satirlik altyazinin kirilimi (kelime sayisi ayniysa) ayni kelimenin arasina geri gelir
+        return CL.satirKiriklariniKoru(originals[i2], geri);
       });
       var changed = 0;
       corrected.forEach(function (text, i2) { if (text !== originals[i2]) changed++; });
       if (!changed) { status(""); KApp.toast("AI kontrolü tamamlandı; açık bir yazım hatası bulunmadı", "good"); return; }
       snapshot("AI metin kontrolü");
-      refs.forEach(function (s, i3) { s.text = String(corrected[i3] || s.text).trim() || s.text; s.proofread = true; });
+      refs.forEach(function (s, i3) {
+        var eskiMetin = s.text;
+        s.text = String(corrected[i3] || s.text).trim() || s.text;
+        kelimeleriMetinleDogrula(s, eskiMetin);
+        s.proofread = true;
+      });
       applyGlossary(segments);
       status(""); render(); saveDraftNow();
       KApp.toast(changed + " satır ikinci kontrolden geçirildi", "good");
@@ -2444,6 +3267,7 @@ window.KCaptions = (function () {
 
   function render() {
     ceviriDugmeleriniGuncelle();   // geri al/yinele/taslak sonrasi da satirlarla tutarli
+    vurguKutusuDurumu();           // satır modunda ölçülmüş kelime varsa karaoke dolgusu seçilebilir
     // Gerçek satırlar geldiğinde/değiştiğinde önizleme de onlardan beslensin
     onizlemeCiz();
     var box = el("cap-segments");
@@ -2488,9 +3312,22 @@ window.KCaptions = (function () {
       inp.value = s.text;
       inp.dataset.i = String(i);
       function fit() { inp.style.height = "auto"; inp.style.height = Math.min(90, Math.max(30, inp.scrollHeight)) + "px"; }
-      inp.onfocus = function () { inp.dataset.before = inp.value; selectedSegment = i; row.classList.add("selected"); };
+      // odaklanırken satırın ölçülmüş kelimeleri: her tuşta yeni metne bunlardan hizalanır (kayma birikmez)
+      var odakKelimeleri = s.words || null;
+      inp.onfocus = function () {
+        inp.dataset.before = inp.value;
+        odakKelimeleri = segments[i] && segments[i].words || null;
+        selectedSegment = i; row.classList.add("selected");
+      };
       inp.oninput = function () {
         segments[i].text = inp.value;
+        // Ölçülmüş kelimeler yeni metne hizalanır (caption-layout.js kelimeleriHizala, LCS): değişmeyen
+        // kelime kendi zamanını korur, eklenen / değiştirilen kelime komşularının arasına yerleşir,
+        // silinen düşer. Yalnız *vurgu* ya da satır kırılımı değiştiyse zamanlar aynen kalır.
+        if (odakKelimeleri) {
+          var hiza = CL.kelimeleriHizala(odakKelimeleri, inp.value, segments[i].start, segments[i].end, styleLocale() || algilananDil);
+          if (hiza.length) segments[i].words = hiza; else delete segments[i].words;
+        } else delete segments[i].words;
         fit();
         updateQualityUI(qualityReport());
         saveDraftSoon();
@@ -2501,17 +3338,21 @@ window.KCaptions = (function () {
           var correction = correctionFromEdit(inp.dataset.before, inp.value);
           var eski = JSON.parse(JSON.stringify(segments));
           eski[i].text = inp.dataset.before;
-          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, cevir: ceviriDili, shorts: shortsYuklenen, ts: Date.now() });
+          // geri al, düzenleme öncesi ölçülmüş kelimeleri de geri getirir
+          if (odakKelimeleri) eski[i].words = JSON.parse(JSON.stringify(odakKelimeleri));
+          else delete eski[i].words;
+          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, cevir: ceviriDili, dil: algilananDil, shorts: shortsYuklenen, ts: Date.now() });
           if (undoStack.length > UNDO_MAX) undoStack.shift();
           redoStack.length = 0;
           refreshUndoUI();
           renderHistory();
           if (correction) showLastCorrection(correction);
           inp.dataset.before = inp.value;
+          odakKelimeleri = segments[i] && segments[i].words || null;
         }
       };
-      // Enter: bol · Alt+Enter: alta satir ekle · Ctrl+Enter: sonraki satira gec
-      // Ctrl/Cmd+B: imlecteki kelimeyi (ya da secimi) *vurgula* / vurguyu kaldir
+      // Enter: bol · Shift+Enter: satir icinde alt satira gec (2 satirlik altyazi) · Alt+Enter: alta satir ekle
+      // Ctrl+Enter: sonraki satira gec · Ctrl/Cmd+B: imlecteki kelimeyi (ya da secimi) *vurgula* / vurguyu kaldir
       inp.onkeydown = function (e) {
         if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
           e.preventDefault();
@@ -2525,6 +3366,7 @@ window.KCaptions = (function () {
         }
         if (e.key !== "Enter") return;
         e.preventDefault();
+        if (e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) { satirKir(inp); return; }
         if (e.altKey) { insertAfter(i); return; }
         if (e.ctrlKey || e.metaKey) {
           var next = box.querySelector('textarea[data-i="' + String(i + 1) + '"]');
@@ -2553,6 +3395,11 @@ window.KCaptions = (function () {
         var nx = segments[i + 1];
         if (!nx) return;
         snapshot("birleştirme");
+        // ölçülmüş kelimeler zamanla birleşir (iki tarafta da varsa; boş metinli taraf kelimesiz)
+        var birlesik = WW.birlestirKelimeler(segments[i], nx);
+        if (birlesik) segments[i].words = birlesik; else delete segments[i].words;
+        var origBirlesik = (segments[i].origWords && nx.origWords) ? segments[i].origWords.concat(nx.origWords) : null;
+        if (origBirlesik) segments[i].origWords = origBirlesik; else delete segments[i].origWords;
         // çeviri öncesi metinleri de birleştir, yoksa "çeviriyi geri al" bu satırı atlar
         if (typeof segments[i].orig === "string" || typeof nx.orig === "string") {
           segments[i].orig = ((segments[i].orig || segments[i].text) + " " +
@@ -2609,6 +3456,22 @@ window.KCaptions = (function () {
     renderHistory();
   }
 
+  /*
+   * Shift+Enter: imleçte satır içi kırılım ("\n"); kırılım çevresindeki boşluklar atılır, seçim varsa
+   * yerine geçer. Kelimeler aynı kaldığı için ölçülmüş zamanlar değişmez (oninput hizalar).
+   * Metnin başında ya da sonunda kırılım eklenmez.
+   */
+  function satirKir(inp) {
+    var v = inp.value;
+    var a = v.slice(0, inp.selectionStart).replace(/[ \t]+$/, "");
+    var b = v.slice(inp.selectionEnd).replace(/^[ \t]+/, "");
+    if (!a.trim() || !b.trim()) return;
+    if (/\n$/.test(a) || /^\n/.test(b)) return;     // zaten satır başı: boş satır olmaz
+    inp.value = a + "\n" + b;
+    inp.setSelectionRange(a.length + 1, a.length + 1);
+    inp.oninput();
+  }
+
   // Boşluksuz yazı sistemleri (Japonca/Çince/Korece): kelime sınırı yok, her yerden bölünür
   var BOSLUKSUZ = new RegExp("[\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uAC00-\\uD7AF]");
 
@@ -2618,10 +3481,12 @@ window.KCaptions = (function () {
     if (!s) return;
     var text = s.text;
     if (pos === null || pos === undefined) pos = Math.floor(text.length / 2);
-    // kelime ortasında bölmeyi engelle: en yakın boşluğa kaydır
-    if (pos > 0 && pos < text.length && text[pos] !== " ") {
-      var sag = text.indexOf(" ", pos);
-      var sol = text.lastIndexOf(" ", pos);
+    // kelime ortasında bölmeyi engelle: en yakın boşluğa (satır kırılımı da boşluktur) kaydır
+    if (pos > 0 && pos < text.length && !/\s/.test(text[pos])) {
+      var sag = text.slice(pos).search(/\s/);
+      if (sag !== -1) sag += pos;
+      var sol = -1;
+      for (var si = pos; si >= 0; si--) if (/\s/.test(text[si])) { sol = si; break; }
       if (sag === -1 && sol === -1) {
         // Metinde hiç boşluk yok. Boşluksuz yazı sistemlerinde (CJK) her karakter sınırı
         // geçerlidir; Latin/Kiril tek kelimesini ortadan kesmek ise her zaman hatadır
@@ -2642,40 +3507,74 @@ window.KCaptions = (function () {
     var oran = a.length / Math.max(1, a.length + b.length);
     var kesme = s.start + Math.max(0.3, dur * oran);
     if (kesme >= s.end - 0.15) kesme = s.start + dur / 2;
-    segments.splice(i, 1,
-      { start: s.start, end: kesme, text: a, confidence: s.confidence },
-      { start: kesme, end: s.end, text: b, confidence: s.confidence });
+    // ölçülmüş kelimeler varsa kesme noktası b'nin ilk kelimesinin başı; kelimeler zamanla bölünür
+    var bolum = WW.bolmeNoktasi(s, a, b, kesme);
+    kesme = bolum.kesme;
+    var ilkParca = { start: s.start, end: kesme, text: a, confidence: s.confidence };
+    var ikinciParca = { start: kesme, end: s.end, text: b, confidence: s.confidence };
+    // çevrimdışı İngilizce işareti iki parçada da kalır (tek satırlık belge bölününce İngilizce sayılmaya devam etsin)
+    if (s.cikisDili) { ilkParca.cikisDili = s.cikisDili; ikinciParca.cikisDili = s.cikisDili; }
+    if (bolum.a) ilkParca.words = bolum.a;
+    if (bolum.b) ikinciParca.words = bolum.b;
+    segments.splice(i, 1, ilkParca, ikinciParca);
     render(); saveDraftSoon();
     KApp.toast("Satır bölündü", "good");
   }
 
-  /* zaman damgasını elle düzenle (çift tık) */
+  /*
+   * Zaman damgasını elle düzenle (çift tık). Alan "başlangıç – bitiş" gösterir:
+   *   - tek zaman yazılırsa satır o ana TAŞINIR (süre aynı, ölçülmüş kelimeler aynı miktarda kayar)
+   *   - iki zaman yazılırsa satırın başı ve sonu değişir, kelimeler yeni aralığa doğrusal ölçeklenir
+   */
   function editTime(i, btn) {
     var s = segments[i];
     if (!s) return;
     var inp = document.createElement("input");
     inp.type = "text";
     inp.className = "seg-time-edit mono";
-    inp.value = tc(s.start, false).slice(0, 12); // hh:mm:ss.mmm
+    inp.value = tc(s.start, false).slice(0, 12) + " – " + tc(s.end, false).slice(0, 12); // hh:mm:ss.mmm – hh:mm:ss.mmm
+    inp.title = "Tek zaman: satırı taşı · başlangıç – bitiş: satırın sınırlarını değiştir";
     btn.replaceWith(inp);
     inp.focus();
     inp.select();
+    function zamanOku(v) {
+      // biçimi ÖNCE doğrula — tcParse tanımadığı girdide 0 döner, o sessizce 00:00 yapar
+      v = String(v || "").trim();
+      var gecerli = /^\d{1,2}:\d{1,2}(:\d{1,2})?[.,]\d{1,3}$/.test(v) ||
+                    /^\d{1,2}:\d{1,2}(:\d{1,2})?$/.test(v);
+      return gecerli ? tcParse(v.indexOf(".") === -1 && v.indexOf(",") === -1 ? v + ".000" : v) : NaN;
+    }
     function bitir(kaydet) {
       if (kaydet) {
-        // biçimi ÖNCE doğrula — tcParse tanımadığı girdide 0 döner, o sessizce 00:00 yapar
-        var v = inp.value.trim();
-        var gecerli = /^\d{1,2}:\d{1,2}(:\d{1,2})?[.,]\d{1,3}$/.test(v) ||
-                      /^\d{1,2}:\d{1,2}(:\d{1,2})?$/.test(v);
-        var yeni = gecerli ? tcParse(v.indexOf(".") === -1 && v.indexOf(",") === -1 ? v + ".000" : v) : NaN;
-        if (gecerli && isFinite(yeni) && yeni >= 0) {
-          var dur = s.end - s.start;
+        var parcalar = inp.value.trim().split(/\s*[–—]\s*|\s+-\s+/);
+        var yeni = zamanOku(parcalar[0]);
+        var yeniSon = parcalar.length === 2 ? zamanOku(parcalar[1]) : null;
+        var gecerli = parcalar.length <= 2 && isFinite(yeni) && yeni >= 0 &&
+          (yeniSon === null || (isFinite(yeniSon) && yeniSon >= yeni + 0.05));
+        if (gecerli) {
+          var eskiBas = segments[i].start, eskiSon = segments[i].end;
+          var dur = eskiSon - eskiBas;
+          // tek zaman ya da iki uç aynı miktarda kaydıysa taşıma; değilse sınır değişikliği
+          var tasima = yeniSon === null || Math.abs((yeni - eskiBas) - (yeniSon - eskiSon)) < 0.0005;
+          if (yeniSon === null) yeniSon = yeni + Math.max(0.3, dur);
+          if (Math.abs(yeni - eskiBas) < 0.0005 && Math.abs(yeniSon - eskiSon) < 0.0005) { render(); return; }
           snapshot("zaman düzenleme");
           segments[i].start = yeni;
-          segments[i].end = yeni + Math.max(0.3, dur);
+          segments[i].end = yeniSon;
+          if (tasima) {
+            // satır taşınınca ölçülmüş kelimeleri de aynı miktarda kayar
+            var fark = yeni - eskiBas;
+            if (segments[i].words) segments[i].words = WW.kelimeleriKaydir(segments[i].words, fark);
+            if (segments[i].origWords) segments[i].origWords = WW.kelimeleriKaydir(segments[i].origWords, fark);
+          } else {
+            // başı / sonu değişti: kelimeler yeni aralığa doğrusal ölçeklenir
+            if (segments[i].words) segments[i].words = CL.kelimeleriOlcekle(segments[i].words, eskiBas, eskiSon, yeni, yeniSon);
+            if (segments[i].origWords) segments[i].origWords = CL.kelimeleriOlcekle(segments[i].origWords, eskiBas, eskiSon, yeni, yeniSon);
+          }
           sortSegments();          // sıra bozulmasın: SRT komşu kontrolü sıralı liste ister
           saveDraftSoon();
         } else {
-          KApp.toast("Zaman biçimi: dd:ss.mmm (örn. 01:23.500)", "warn");
+          KApp.toast("Zaman biçimi: dd:ss.mmm ya da dd:ss.mmm – dd:ss.mmm (örn. 01:23.500 – 01:25.000)", "warn");
         }
       }
       render();
@@ -2700,7 +3599,11 @@ window.KCaptions = (function () {
       return;                        // snapshot YOK: boş tıklama undo geçmişini yemesin
     }
     snapshot("toplu kaydırma");
-    segments.forEach(function (s) { s.start += uyg; s.end += uyg; });
+    segments.forEach(function (s) {
+      s.start += uyg; s.end += uyg;
+      if (s.words) s.words = WW.kelimeleriKaydir(s.words, uyg);
+      if (s.origWords) s.origWords = WW.kelimeleriKaydir(s.origWords, uyg);
+    });
     var msg = (uyg > 0 ? "+" : "") + uyg.toFixed(2) + " sn kaydırıldı";
     if (Math.abs(uyg - sec) > 0.001) msg += " (sequence başına dayandı)";
     render(); saveDraftSoon();
@@ -2865,7 +3768,12 @@ window.KCaptions = (function () {
       segsRef.forEach(function (s, i2) {
         if (!guncel.has(s)) return;
         if (s.text !== texts[i2]) { atlananDuzenleme++; return; }
-        if (typeof s.orig !== "string") s.orig = texts[i2];   // zincir çeviride ilk orijinali koru
+        if (typeof s.orig !== "string") {
+          s.orig = texts[i2];   // zincir çeviride ilk orijinali koru
+          // ölçülmüş kelimeler orijinal dile ait: çeviride saklanır, "orijinale dön" geri getirir
+          if (s.words) s.origWords = s.words;
+        }
+        delete s.words;
         s.text = CT.normalizeEmphasis(String(out[i2] || "").trim()) || s.text;
       });
       ceviriDili = target;
@@ -2919,7 +3827,7 @@ window.KCaptions = (function () {
       klasor = K.path.join(klasor, "Suflo altyazilar " + t0.getFullYear() + "-" + iki(t0.getMonth() + 1) + "-" + iki(t0.getDate()) +
         " " + iki(t0.getHours()) + "." + iki(t0.getMinutes()) + "." + iki(t0.getSeconds()));
       K.fs.mkdirSync(klasor, { recursive: true });
-      var kaynakDil = algilananDil || (el("cap-lang") && el("cap-lang").value) || "";
+      var kaynakDil = (cevrimdisiEn() ? "en" : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || "";
       if (!kaynakDil) kaynakDil = "kaynak";   // "Otomatik" ve taslaktan: dil bilinmiyor
       K.fs.writeFileSync(K.path.join(klasor, kaynakDil + ".srt"), "\uFEFF" + paketSrt(zaman, metinler, kaynakDil), "utf8");
       var yazilan = 1, hatalar = [];
@@ -2991,7 +3899,10 @@ window.KCaptions = (function () {
     var atlanan = 0;
     snapshot("çeviriyi geri al");
     segments.forEach(function (s) {
-      if (typeof s.orig === "string") { s.text = s.orig; delete s.orig; }
+      if (typeof s.orig === "string") {
+        s.text = s.orig; delete s.orig;
+        if (s.origWords) { s.words = s.origWords; delete s.origWords; }
+      }
       else atlanan++;                    // orijinali olmayan (sonradan eklenen) satıra dokunma
     });
     clearRevert();
@@ -3017,7 +3928,7 @@ window.KCaptions = (function () {
       } else if (s.text.indexOf(find) !== -1) {
         s.text = s.text.split(find).join(rep);
       }
-      if (s.text !== before) n++;
+      if (s.text !== before) { n++; kelimeSayisiniKoru(s, before); }
     });
     if (n) {
       undoStack.push({ segs: yedek, etiket: "bul & değiştir" });
@@ -3088,6 +3999,7 @@ window.KCaptions = (function () {
         ornekBelge = false;
         segments = segs;
         segmentsMode = "plain";    // ice aktarilan SRT'de kelime zamani verisi yok
+        algilananDil = "";         // dosyanin dili bilinmiyor: Altyazi › Dil secimine dusulur
         uygulaEtiketiniSifirla();  // yeni doküman: "yine de uygula" onayı geçersiz
         refreshUndoUI();
         clearRevert();
@@ -3136,6 +4048,12 @@ window.KCaptions = (function () {
 
   /* ---------------- SRT + uygulama ---------------- */
 
+  // Cue metninde satir kirilimi (2 satir × 42, Shift+Enter) kalir; bos satir SRT/VTT'de cue'yu bitirirdi
+  function satirlariTopla(t) {
+    return String(t == null ? "" : t).split(/\r?\n/).map(function (x) { return x.trim(); })
+      .filter(function (x) { return x.length > 0; }).join("\n");
+  }
+
   /*
    * Stil uygulanmış, çakışması giderilmiş cue listesi.
    * TÜM dışa aktarma biçimleri bunu kullanır — biçimler arası davranış ayrışmasın.
@@ -3144,32 +4062,42 @@ window.KCaptions = (function () {
   // (yalniz SRT/VTT ve normal caption izi; stilli yollar kelime gruplar, tek dil kalir)
   // opts.vurgu: *anahtar kelime* isaretleri korunur (yalniz Suflo Stilleri cizer);
   // diger tum ciktilarda isaret kaldirilir
+  /*
+   * opts.kelimeler: satırın ölçülmüş kelimeleri (yerel -ojf) cue.words olarak eklenir;
+   * Suflo Stil motoru kelime geçişlerini onlardan alır (sayı tutmazsa kendi yedeği).
+   */
   function cueler(opts) {
     var out = [];
     var cift = !!(opts && opts.ciftDil);
     var vurguKoru = !!(opts && opts.vurgu);
+    var kelimeli = !!(opts && opts.kelimeler);
     segments.forEach(function (s, i) {
-      var txt = styleText(vurguKoru ? s.text : CT.stripEmphasis(s.text));
+      var txt = satirlariTopla(styleText(vurguKoru ? s.text : CT.stripEmphasis(s.text)));
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
       if (cift && typeof s.orig === "string") {
-        var asil = styleText(CT.stripEmphasis(s.orig), true);
-        if (asil && asil !== txt) txt = asil + "\n" + txt;
+        // cift dilde her dil tek satir: ust satir orijinal, alt satir ceviri (4 satirlik cue olmasin)
+        var asil = CL.duzMetin(styleText(CT.stripEmphasis(s.orig), true));
+        var ceviri = CL.duzMetin(txt);
+        if (asil && asil !== ceviri) txt = asil + "\n" + ceviri;
       }
       // minimum 0.3 sn gorunum — ama bir sonraki cue ile CAKISMA (karaoke'de kritik)
       var end = Math.max(s.end, s.start + 0.3);
       var next = segments[i + 1];
       if (next && end > next.start) end = Math.max(next.start, s.start + 0.05);
-      out.push({ start: s.start, end: end, text: txt });
+      var cue = { start: s.start, end: end, text: txt };
+      if (kelimeli && !cift && s.words && s.words.length) cue.words = s.words;
+      out.push(cue);
     });
     return out;
   }
 
+  // SRT: cue icindeki satir kirilimi da CRLF (Premiere caption izi iki satiri boyle okur)
   function buildSrt(opts) {
     var out = [];
     cueler(opts).forEach(function (c, i) {
       out.push(String(i + 1));
       out.push(tc(c.start, true) + " --> " + tc(c.end, true));
-      out.push(c.text);
+      out.push(c.text.split("\n").join("\r\n"));
       out.push("");
     });
     return out.join("\r\n");
@@ -3226,6 +4154,31 @@ window.KCaptions = (function () {
     }
     bosalt();
     return satirlar;
+  }
+
+  /*
+   * Satır modunda karaoke (\k / \kf): satırın ölçülmüş kelimeleri stilli metnin kelimelerine
+   * caption-layout.js kelimeleriHizala ile eşlenir (BÜYÜK HARF ya da noktalamasız stilde de tutar);
+   * her kelimenin dolgusu GERÇEK konuşma anında başlar ve bir sonraki kelimenin başına kadar sürer.
+   * Kelimesi olmayan satırda süre karakter oranıyla paylaşılır. İlk kelimeden önceki sessizlik boş
+   * hecedir; satır kırılımı \N. Süreler satır başından birikimli yuvarlanır: toplam satır süresi tutar.
+   */
+  function assSatirKaraoke(c, kTag, loc) {
+    var hiza = CL.kelimeleriHizala(c.words || [], c.text, c.start, c.end, loc);
+    function cs(t) { return Math.round((Math.max(c.start, Math.min(c.end, t)) - c.start) * 100); }
+    var out = "", k = 0, harcanan = 0;
+    if (hiza.length && cs(hiza[0].start) > 0) { harcanan = cs(hiza[0].start); out += "{" + kTag + harcanan + "}"; }
+    String(c.text).split(/(\s+)/).forEach(function (p) {
+      if (!p) return;
+      if (!/\S/.test(p)) { out += /\n/.test(p) ? "\\N" : " "; return; }
+      if (!p.replace(/\*/g, "").length || k >= hiza.length) { out += assMetin(p); return; }
+      var sonraki = hiza[k + 1];
+      var d = Math.max(0, cs(sonraki ? sonraki.start : c.end) - harcanan);
+      out += "{" + kTag + d + "}" + assMetin(p);
+      harcanan += d;
+      k++;
+    });
+    return out;
   }
 
   /* ---------------- Canlı önizleme ---------------- */
@@ -3294,14 +4247,18 @@ window.KCaptions = (function () {
     if (kutu) kutu.classList.toggle("pasif",
       !(motorda || anim === "karaoke" || anim === "vurgu" || anim === "viral" || anim === "pop" || anim === "premium"));
 
+    // Satır modunda ölçülmüş kelimeler varsa karaoke / akıcı dolgu satır içinde gerçek zamanla çalışır
+    // (buildAss → assSatirKaraoke); diğer kelimeli animasyonlar kelime modu ister
+    var satirKelime = !kelimeVar && segments.some(function (s) { return s.words && s.words.length; });
+    function satirDolgusu(v) { return satirKelime && (v === "karaoke" || v === "akici"); }
     var secici = el("cap-animasyon");
     if (secici) {
       Array.prototype.forEach.call(secici.options, function (o) {
-        if (ANIMASYONLAR[o.value] && ANIMASYONLAR[o.value].kelimeli) o.disabled = !kelimeVar;
+        if (ANIMASYONLAR[o.value] && ANIMASYONLAR[o.value].kelimeli) o.disabled = !kelimeVar && !satirDolgusu(o.value);
       });
     }
     var ipucu = el("cap-animasyon-ipucu");
-    if (ipucu) ipucu.hidden = kelimeVar || !(ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli);
+    if (ipucu) ipucu.hidden = kelimeVar || satirDolgusu(anim) || !(ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli);
   }
 
   function onizlemeDurdur() {
@@ -3492,7 +4449,7 @@ window.KCaptions = (function () {
   }
 
   function motorOnizlemeCueleri(st) {
-    var cs = cueler({ vurgu: true });
+    var cs = cueler({ vurgu: true, kelimeler: true });
     if (!cs.length) {
       if (st.aile === "doc") return [{ start: 0.15, end: 2.7, text: "Hikâyenin başladığı yer." }];
       var ornekler = st.aile === "pop" ? ["POP!", "ŞAK!", "VAY!"] :
@@ -3513,6 +4470,8 @@ window.KCaptions = (function () {
     var MC = window.KMulticam && KMulticam.colorsEnabled && KMulticam.colorsEnabled() ? KMulticam : null;
     return secilen.map(function (c) {
       var o = { start: c.start - ilk + 0.15, end: c.end - ilk + 0.15, text: c.text };
+      // ölçülmüş kelimeler de aynı kaydırmayla: önizleme gerçek kelime geçişlerini gösterir
+      if (c.words) o.words = WW.kelimeleriKaydir(c.words, 0.15 - ilk);
       if (MC) o.speaker = MC.speakerFor(c.start, c.end);
       return o;
     });
@@ -3808,11 +4767,19 @@ window.KCaptions = (function () {
      */
     var anim = opts.animasyon || st.animasyon || (kelimeVerisi ? "karaoke" : "yok");
     if (!ANIMASYONLAR[anim]) anim = "yok";
-    if (ANIMASYONLAR[anim].kelimeli && !kelimeVerisi) anim = "fade";
+    // satır cue'ları ölçülmüş kelimelerini taşır (satır modunda karaoke dolgusu onlardan)
+    var cs = cueler({ kelimeler: true });
+    /*
+     * Satır modunda karaoke / akıcı dolgu: transkriptte ölçülmüş kelime zamanı varsa her satır kendi
+     * içinde \k ile dolar (assSatirKaraoke). Hiç kelime zamanı yoksa (bulut satır modu, içe alınan
+     * SRT) eskisi gibi fade'e düşülür; diğer kelimeli animasyonlar satır modunda fade kalır.
+     */
+    var satirKaraoke = !kelimeVerisi && (anim === "karaoke" || anim === "akici") &&
+      cs.some(function (c) { return c.words && c.words.length; });
+    if (ANIMASYONLAR[anim].kelimeli && !kelimeVerisi && !satirKaraoke) anim = "fade";
     // Pro: kelimeli animasyon (stilli katman denemesi kuruluyken de acik)
     if (ANIMASYONLAR[anim].kelimeli && typeof Pro !== "undefined" && !Pro.isPro() && !(Pro.denemeAcik && Pro.denemeAcik("overlay"))) anim = "fade";
-
-    var cs = cueler();
+    if (anim !== "karaoke" && anim !== "akici") satirKaraoke = false;
 
     /*
      * Renk yerleşimi animasyona göre değişir:
@@ -3883,7 +4850,12 @@ window.KCaptions = (function () {
 
     var vurguAss = assRenk(st.vurguRenk);
 
-    if (ANIMASYONLAR[anim].kelimeli) {
+    if (satirKaraoke) {
+      // satır modu: her satır tek olay, kelimeler gerçek konuşma anında dolar, satır kırılımı \N
+      var skTag = anim === "akici" ? "\\kf" : "\\k";
+      var skDil = styleLocale();
+      cs.forEach(function (c) { olay(c.start, c.end, assSatirKaraoke(c, skTag, skDil)); });
+    } else if (ANIMASYONLAR[anim].kelimeli) {
       assKaraokeSatirlari(cs, rec.maxWords).forEach(function (grup) {
         var sonBitis = grup[grup.length - 1].end;
 
@@ -4183,7 +5155,7 @@ window.KCaptions = (function () {
           styleId: st.aile,
           intensity: st.yogunluk,
           cueKind: motorCueTuru(),
-          cues: cueler({ vurgu: true }),
+          cues: cueler({ vurgu: true, kelimeler: true }),
           offset: baslangic,
           width: g,
           height: y,
@@ -4251,12 +5223,19 @@ window.KCaptions = (function () {
    */
   function buildAssKaydirilmis(offset, opts) {
     if (!offset) return buildAss(opts);
-    var yedek = segments.map(function (s) { return { start: s.start, end: s.end }; });
+    // ölçülmüş kelimeler de kayar: satır modu karaoke dolgusu (assSatirKaraoke) onları okur
+    var yedek = segments.map(function (s) { return { start: s.start, end: s.end, words: s.words }; });
     try {
-      segments.forEach(function (s) { s.start -= offset; s.end -= offset; });
+      segments.forEach(function (s) {
+        s.start -= offset; s.end -= offset;
+        if (s.words) s.words = WW.kelimeleriKaydir(s.words, -offset);
+      });
       return buildAss(opts);
     } finally {
-      segments.forEach(function (s, i) { s.start = yedek[i].start; s.end = yedek[i].end; });
+      segments.forEach(function (s, i) {
+        s.start = yedek[i].start; s.end = yedek[i].end;
+        if (yedek[i].words) s.words = yedek[i].words;
+      });
     }
   }
 
@@ -4407,6 +5386,29 @@ window.KCaptions = (function () {
     el("star-close").addEventListener("click", function () { bar.hidden = true; });
   }
 
+  /*
+   * Stilli ASS dışa aktarmada buildAss'in karaoke (segmentler kelime / parça cue'su) bilgisi: k1 ve wN
+   * (kc hariç: ASS'te metin katlanıyordu). wN ölçülmüş kelime taşırken karaoke / akıcı dolgu, katman
+   * yolundaki gibi (karaoke = k1) her cue'nun içinde gerçek kelime zamanıyla dolar (assSatirKaraoke);
+   * N kelimelik parçalar tek \k birimi olarak dolmaz. Kelimesiz wN ve diğer animasyonlar eski yolda kalır.
+   */
+  function assKelimeVerisi(mod, animasyon, segs) {
+    if (mod === "k1") return true;
+    if (mod !== "w") return false;
+    var satirDolgu = animasyon === "karaoke" || animasyon === "akici";
+    return !(satirDolgu && (segs || []).some(function (s) { return s && s.words && s.words.length; }));
+  }
+
+  /*
+   * Çeviri belgesinde dosya adına dil eki (suflo-altyazi.en.srt): çevrimdışı İngilizce (-tr) ya da
+   * LLM çevirisinin hedef dili. Çift dilli dışa aktarmada ek yok (dosyada iki dil var).
+   */
+  function dosyaDilEki() {
+    if (ciftDilAcik()) return "";
+    var d = (ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "");
+    return /^[a-z]{2,3}$/.test(d) ? "." + d : "";
+  }
+
   function saveToDesktop(name, content) {
     var dir = K.path.join(K.os.homedir(), "Desktop");
     if (!K.fs.existsSync(dir)) dir = K.os.homedir();
@@ -4424,30 +5426,31 @@ window.KCaptions = (function () {
       var fmt = (el("cap-export-fmt") && el("cap-export-fmt").value) || "srt";
       var kelimeModu = segmentsMode === "k1" || segmentsMode === "w"; // kc haric: ASS'te metin katlaniyordu
       var icerik, ad, bom = "﻿";
+      var ek = dosyaDilEki();
       if (fmt === "txt") {
-        var lines = segments.map(function (s) { return styleText(CT.stripEmphasis(s.text)); }).filter(Boolean);
+        var lines = segments.map(function (s) { return CL.duzMetin(styleText(CT.stripEmphasis(s.text))); }).filter(Boolean);
         if (!lines.length) { KApp.toast("Yazılacak metin yok.", "bad"); return; }
         icerik = lines.join("\r\n");
-        ad = "suflo-transkript.txt";
+        ad = "suflo-transkript" + ek + ".txt";
       } else if (fmt === "vtt") {
         icerik = buildVtt({ ciftDil: ciftDilAcik() });
-        ad = "suflo-altyazi.vtt";
+        ad = "suflo-altyazi" + ek + ".vtt";
       } else if (fmt === "ass") {
         if (typeof Pro !== "undefined" && !Pro.gate("assexport")) return;    // Pro: stilli ASS
         var assStil = stil();
         if (motorStiliMi(assStil.aile)) {
           icerik = window.SufloStyleEngine.compile(konusmaciRenkleri({
-            styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler({ vurgu: true }), cueKind: motorCueTuru(),
+            styleId: assStil.aile, intensity: assStil.yogunluk, cues: cueler({ vurgu: true, kelimeler: true }), cueKind: motorCueTuru(),
             overrides: motorAyarlari(assStil)
           })).ass;
         } else {
-          icerik = buildAss({ karaoke: kelimeModu, animasyon: assStil.animasyon });
+          icerik = buildAss({ karaoke: assKelimeVerisi(segmentsMode, assStil.animasyon, segments), animasyon: assStil.animasyon });
         }
-        ad = "suflo-altyazi.ass";
+        ad = "suflo-altyazi" + ek + ".ass";
         bom = "";
       } else {
         icerik = buildSrt({ ciftDil: ciftDilAcik() });
-        ad = "suflo-altyazi.srt";
+        ad = "suflo-altyazi" + ek + ".srt";
       }
       if (!icerik) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
       var yol = saveToDesktop(ad, bom + icerik);
@@ -4462,6 +5465,7 @@ window.KCaptions = (function () {
 
   function init() {
     el("cap-go").addEventListener("click", go);
+    if (el("cap-cancel")) el("cap-cancel").addEventListener("click", iptalEt);
     el("cap-apply").addEventListener("click", function () { apply(false); });
     el("cap-apply-style").addEventListener("click", function () { apply(true); });
     el("cap-save").addEventListener("click", saveAs);
@@ -4566,7 +5570,16 @@ window.KCaptions = (function () {
       el("cap-maxlen").addEventListener("change", function () {
         onizlemeDurdur();
         vurguKutusuDurumu();
+        kelimeSiniriDurumu();
+        motorSecenekDurumu();
         onizlemeCiz();
+      });
+    }
+    // Kelime sınırı: 0 kapalı, 2..12 (1 yazılırsa 2 olur); tercihlerle saklanır, yeni transkriptte geçerli
+    if (el("cap-kelime-siniri")) {
+      el("cap-kelime-siniri").addEventListener("change", function () {
+        this.value = String(kelimeSiniri());
+        savePrefs();
       });
     }
     vurguKutusuDurumu();
@@ -4624,7 +5637,9 @@ window.KCaptions = (function () {
       e.preventDefault();
       K.cs.openURLInDefaultBrowser("https://console.groq.com/keys");
     });
-    el("cap-local-install").addEventListener("click", function () {
+    el("cap-local-install").addEventListener("click", function (ev) {
+      // İptal'e çift tıkın ikinci tıkı kurulumu yeniden başlatmasın (app.js kurulumTikiGecerli)
+      if (KApp.kurulumTikiGecerli && !KApp.kurulumTikiGecerli(ev)) return;
       // Rehber açıksa hızlı başlangıç: dile uygun küçük model, ffmpeg arkada, GPU sonra
       var rehber = window.KOnboarding && KOnboarding.kurulumSecenekleri ? KOnboarding.kurulumSecenekleri() : null;
       KApp.installLocalWhisper(el("cap-local-install"), rehber);
@@ -4642,11 +5657,37 @@ window.KCaptions = (function () {
     ["cap-maxlen", "cap-case", "cap-punct", "cap-lang"].forEach(function (id) {
       el(id).addEventListener("change", function () {
         if (id !== "cap-lang") el("cap-preset").value = "";
-        if (id === "cap-lang") glifUyarisi();
+        if (id === "cap-lang") { glifUyarisi(); motorSecenekDurumu(); }
         savePrefs();
       });
     });
     loadPrefs();
+    // Yerel motor seçenekleri (3.2 adım 5): DTW ayarı Ayarlar'da saklanır (motor okur), çevrimdışı
+    // İngilizce altyazı tercihiyle; değişiklikte yalnız ayar yazılır, Premiere çağrısı yok
+    if (el("cap-dtw")) {
+      el("cap-dtw").checked = K.settings().dtw === true;
+      el("cap-dtw").addEventListener("change", function () {
+        K.settings().dtw = this.checked;
+        K.saveSettings();
+        motorSecenekDurumu();
+      });
+    }
+    if (el("cap-dtw-yeniden")) el("cap-dtw-yeniden").addEventListener("click", function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      var anahtar = aktifDtwAnahtari();
+      var st = K.settings();
+      if (anahtar && st.dtwKapali && typeof st.dtwKapali === "object") { delete st.dtwKapali[anahtar]; K.saveSettings(); }
+      K.log("[altyazı] DTW otomatik kapatma kaydi silindi: " + anahtar);
+      motorSecenekDurumu();
+      KApp.toast("DTW bir sonraki transkriptte yeniden denenecek", "good");
+    });
+    if (el("cap-cevir-en")) el("cap-cevir-en").addEventListener("change", function () { motorSecenekDurumu(); savePrefs(); });
+    if (el("cap-cevir-en-gec")) el("cap-cevir-en-gec").addEventListener("click", function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      ceviriModelineGec();
+    });
+    kelimeSiniriDurumu();
+    motorSecenekDurumu();
     inceAyarDurumu();
     glifUyarisi();
     // Arayüz dili değişince (Ayarlar ya da ilk açılış seçicisi): örnek sözcükler ve kayıtlı
@@ -4693,9 +5734,11 @@ window.KCaptions = (function () {
     var s = K.settings();
     var harita = s.shortsAltyazi || {};
     if (!harita[shortsYuklenen]) return;
-    harita[shortsYuklenen].segs = JSON.parse(JSON.stringify(segments));
+    // ölçülmüş kelimeler settings.json'a yazılmaz (her ayar kaydında dosya baştan yazılır)
+    harita[shortsYuklenen].segs = WW.kelimesizKopya(segments);
     harita[shortsYuklenen].mod = segmentsMode;
     harita[shortsYuklenen].ceviriDili = ceviriDili;
+    harita[shortsYuklenen].dil = algilananDil;
     harita[shortsYuklenen].ts = Date.now();
     K.saveSettings();
   }
@@ -4720,6 +5763,7 @@ window.KCaptions = (function () {
     ornekBelge = false;
     // ceviri bilgisi satirlarda (orig) kalir; hedef dil kayittan
     ceviriDili = k.kayit.ceviriDili || "";
+    algilananDil = kayitDili(k.kayit.dil, segments);   // kaydın dili (ekrandaki belgeninki değil)
     hideRestore();
     el("cap-result").hidden = false;
     el("cap-result-info").textContent = segments.length + " satır · Shorts (ana videodan)";
@@ -4801,7 +5845,7 @@ window.KCaptions = (function () {
     onizlemeDurdur();
     STIL_ALANLARI.forEach(function (id) {
       var e = el(id);
-      if (e && y.alan[id] !== undefined) e.value = y.alan[id];
+      if (e && y.alan[id] !== undefined) e.value = id === "cap-maxlen" ? uzunlukSecimi(y.alan[id]) : y.alan[id];
     });
     if (el("cap-punct")) el("cap-punct").checked = y.punct;
     if (el("cap-kutu")) el("cap-kutu").checked = y.kutu;
@@ -4820,6 +5864,8 @@ window.KCaptions = (function () {
     if (yeni) s.capPrefs = yeni; else delete s.capPrefs;
     K.saveSettings();
     vurguKutusuDurumu();
+    kelimeSiniriDurumu();
+    motorSecenekDurumu();
     onizlemeCiz();
     stilKartiIsaretle(secilenMogrt ? "" : (y.alan["cap-preset"] || secilenMotorStili));
     uygulamaIpucunuGuncelle();
@@ -4847,7 +5893,8 @@ window.KCaptions = (function () {
   // vurgu: kullanicinin *isaretledigi* ilk kelime ve tahmini ani (Zoom / Akilli SFX kullanir)
   function segmentsSnapshot() {
     return segments.map(function (s) {
-      var o = { start: Number(s.start) || 0, end: Number(s.end) || 0, text: CT.stripEmphasis(String(s.text || "")) };
+      // diğer araçlar (bölümler, viral anlar, zoom, SFX) satır başına tek metin bekler: 2 satırlık altyazı düzlenir
+      var o = { start: Number(s.start) || 0, end: Number(s.end) || 0, text: CT.stripEmphasis(String(s.text || "")).replace(/\s*\n\s*/g, " ") };
       var v = CT.emphasisInfo(s);
       if (v) o.vurgu = v;
       return o;
@@ -4857,6 +5904,7 @@ window.KCaptions = (function () {
   return {
     init: init,
     refreshSetup: refreshSetup,
+    motorSecenekDurumu: motorSecenekDurumu,
     // Rehber (js/onboarding.js): örnek klip, hazır transkript, anahtar, stil denemesi
     go: go,
     ornekYukle: ornekYukle,
@@ -4886,6 +5934,8 @@ window.KCaptions = (function () {
     parseGlossary: parseGlossary,
     getSegments: segmentsSnapshot,
     translationLang: function () { return ceviriDili; },
+    // ekrandaki belgenin kayıtlı dili (algılanan / çevrimdışı İngilizce; "" = bilinmiyor): Shorts kaydı onu saklar
+    documentLang: function () { return algilananDil; },
     // Shorts sekanslari icin ham satirlar (*vurgu* ve orig korunur) ve mod
     rawSegments: function () { return JSON.parse(JSON.stringify(segments)); },
     mode: function () { return segmentsMode; },
@@ -4898,7 +5948,7 @@ window.KCaptions = (function () {
     chatConfig: chatConfig,
     chatCall: chatCall,
     // Bolum/viral basliklari ekrandaki metnin dilinde: ceviri varsa hedef dil
-    language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili(); },
+    language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili(); },
     refreshMogrtStyles: refreshMogrtStyles,
     // Podcast Modu: mikrofonları ayrı ayrı dışa aktarırken aynı gömülü WAV presetleri
     bundledEpr: bundledEpr

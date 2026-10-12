@@ -28,7 +28,7 @@ function ok(ad, kosul, kanit) {
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
                 "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
                 "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js",
-                "js/marka-kiti-ui.js", "js/kanca.js"];
+                "js/marka-kiti-ui.js", "js/kanca.js", "js/hiz-rampasi.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -335,5 +335,323 @@ ok("Podcast: altyazının üç derleme noktası konuşmacı renklerinden geçer"
 ok("Podcast: sessiz mikrofon reddi normalizeSeries'in konuşma seviyesiyle (az konuşan mikrofon reddedilmez)", /M\.speechLevel\(seri\) < M\.SESSIZ_P95/.test(fnGovde(mcUi, "async function micEnerji(")));
 ok("Podcast: hazırlık açık Suflo kopyalarını bilir (kopyada yeniden uygulama)", /seqIds: Object\.keys\(onbellek\.seqIds\)/.test(uyg));
 ok("Podcast: eşleme denetimlerinin erişilebilir adında konuşmacı harfi var", /HARF\[i\][\s\S]{0,120}" · "/.test(mcUi) && /on \+ "Mikrofon ses katmanı"/.test(mcUi));
-console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
-process.exit(kaldi ? 1 : 0);
+/* ---------- Hız Rampası (v3.2) ---------- */
+var hizUi = fs.readFileSync(KOKYOL + "js/hiz-rampasi.js", "utf8");
+ok("Hız Rampası: kenar çubuğunda Geçişler'den sonra, Kanca Başlığı'ndan önce; YENİ ve PRO rozetli",
+  html.indexOf('data-tab="hiz"') > html.indexOf('data-tab="gecis"') && html.indexOf('data-tab="hiz"') < html.indexOf('data-tab="kanca"') &&
+  /data-tab="hiz">[\s\S]{0,300}<b>Hız Rampası <em class="ky-yeni">YENİ<\/em><\/b><i>ağır çekim · hızlanma<\/i>[\s\S]{0,80}data-kilit>PRO/.test(html));
+var yanCss = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
+// Ekran görüntüsü (3.1.0, 164 px menü): "Diğer Animasyonla / r" kelime ortasından bölünüyor, uzun ad ve açıklama
+// alttaki öğenin üstüne taşıyordu
+ok("Yan menü: adlar kelime ortasından bölünmez, en çok 2 satır; açıklama tek satır; öğeler büzülmez; dar menüde sayaç gizli",
+  !/\.yan-menu \.ky-metin b \{[^}]*overflow-wrap:\s*anywhere/.test(yanCss) && /\.yan-menu \.ky-metin b \{[^}]*-webkit-line-clamp:\s*2/.test(yanCss) &&
+  /\.yan-menu \.ky-metin i \{[^}]*text-overflow:\s*ellipsis/.test(yanCss) && /\.yan-menu \.ky-oge \{\s*flex-shrink:\s*0/.test(yanCss) &&
+  /@media \(min-width: 561px\) and \(max-width: 720px\) \{ \.yan-menu \.ky-adet \{ display: none; \} \}/.test(yanCss));
+ok("Hız Rampası: sayaç rozeti yok (elle tutulan bir sayı daha olmasın)", !/data-tab="hiz">[\s\S]{0,400}?ky-adet[\s\S]{0,40}<\/button>/.test(html.slice(html.indexOf('data-tab="hiz"'), html.indexOf('data-tab="kanca"'))));
+["tab-hiz", "hiz-tanitim", "hiz-hedef", "hiz-aralik", "hiz-grid", "hiz-onizleme", "hiz-ozet", "hiz-yogunluk", "hiz-gecis", "hiz-parca", "hiz-kaynak", "hiz-ses",
+  "hiz-akis", "hiz-bulanik", "hiz-vurus", "hiz-kopya", "hiz-uygula", "hiz-kaldir", "hiz-status", "hiz-ritim-yon", "hiz-ritim-yon-kutu"].forEach(function (id) {
+  ok("Hız Rampası: #" + id + " var", !!idler[id]);
+});
+ok("Hız Rampası: sekme Geçişler sekmesinden sonra", html.indexOf('id="tab-hiz"') > html.indexOf('id="tab-gecis"') && html.indexOf('id="tab-hiz"') < html.indexOf('id="tab-kanca"'));
+ok("Hız Rampası: betik sırası speedramp.js → hiz-rampasi.js → app.js", betikSira("speedramp.js") > 0 && betikSira("speedramp.js") < betikSira("hiz-rampasi.js") &&
+  betikSira("hiz-rampasi.js") < betikSira("app.js"));
+ok("Hız Rampası: app.js başlatır, kilitler ve tanıtım kartını Pro'da gizler", /KHizRampasi\.init\(\)/.test(appSrc) &&
+  /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="hiz"\]'\), !s\.pro\)/.test(appSrc) && /"hiz-tanitim"/.test(appSrc));
+ok("Hız Rampası: Pro etiketi ve tanıtım düğmesi speedramp", /speedramp: 'Hız rampası: tek tıkla ağır çekim ve hızlanma'/.test(proSrc) &&
+  /data-pro-feature="speedramp">Hız rampasını aç — 749 TL</.test(html));
+ok("Hız Rampası: Ayarlar Pro listesinde", /<li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası<\/li>/.test(html));
+ok("Hız Rampası: Premiere çağrıları yalnız tıklamada (init'te K.call yok)", !/K\.call\(/.test(fnGovde(hizUi, "function init(")) && !/K\.call\(/.test(fnGovde(hizUi, "function render(")) &&
+  !/K\.call\(/.test(fnGovde(hizUi, "function refresh(")) && !/K\.call\(/.test(fnGovde(hizUi, "function onizlemeCiz(")));
+ok("Hız Rampası: Ctrl+Z uyarısı ve kaldırma düğmesi arayüzde", /Ctrl\+Z rampayı tek adımda geri almaz/.test(html) && /id="hiz-kaldir"[^>]*>Rampayı kaldır</.test(html));
+/* ---------- Ses etiketi filtresi + sessiz ses uyarısı (3.2 adım 2) ---------- */
+["grp-altyazi", "set-ses-etiket", "cap-sessiz", "cap-sessiz-metin", "cap-sessiz-devam", "cap-sessiz-vazgec",
+  "tc-sessiz", "tc-sessiz-metin", "tc-sessiz-devam", "tc-sessiz-vazgec"].forEach(function (id) {
+  ok("Ses etiketi / sessiz ses: #" + id + " var", !!idler[id]);
+});
+var grpAltyazi = html.slice(html.indexOf('id="grp-altyazi"'), html.indexOf('id="grp-marka-kiti"'));
+ok("Ayarlar › Altyazı: 'Ses etiketlerini koru' anahtarı varsayılan kapalı, motor kartından sonra",
+  /<div class="set-title">Altyazı<\/div>/.test(grpAltyazi) && /<input id="set-ses-etiket" type="checkbox">/.test(grpAltyazi) && !/set-ses-etiket"[^>]*checked/.test(grpAltyazi) &&
+  />Ses etiketlerini koru</.test(grpAltyazi) && html.indexOf('id="grp-altyazi"') > html.indexOf('class="set-group caption-engine-settings"'));
+ok("Ayarlar › Altyazı: anahtar app.js'te bağlı (sesEtiketKoru yüklenir ve kaydedilir)",
+  /el\("set-ses-etiket"\)\.checked = s\.sesEtiketKoru === true;/.test(appSrc) &&
+  /el\("set-ses-etiket"\)\.addEventListener\("change", function \(\) \{\s*K\.settings\(\)\.sesEtiketKoru = this\.checked;\s*K\.saveSettings\(\);/.test(appSrc));
+// 3.2 adım 4: ses etiketi ayarı kelime sınırı, birleştirme ve sürelerle aynı seçenek nesnesinde (kurSecenekleri)
+ok("Ses etiketlerini koru: altyazı satır kurma yolları ayarı geçirir (go + rehber örneği)",
+  (capSrc.match(/CT\.segmentleriKur\([a-z]+, lenVal, kurSecenekleri\([a-zA-Z]*\)\)/g) || []).length === 2 &&
+  /function kurSecenekleri\(sonSinir\) \{[\s\S]*?etiketKoru: sesEtiketKoru\(\),/.test(capSrc) &&
+  /return K\.settings\(\)\.sesEtiketKoru === true;/.test(capSrc));
+ok("Sessiz ses: uyarı kutuları durum satırının hemen altında, gizli başlar, düğmeler 'Yine de devam et' / 'Vazgeç'",
+  html.indexOf('id="cap-sessiz"') > html.indexOf('id="cap-status"') && html.indexOf('id="tc-sessiz"') > html.indexOf('id="tc-status"') &&
+  /id="cap-sessiz" class="sessiz-uyari" role="alert" hidden/.test(html) && /id="tc-sessiz" class="sessiz-uyari" role="alert" hidden/.test(html) &&
+  /id="cap-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="cap-sessiz-vazgec"[^>]*>Vazgeç</.test(html) &&
+  /id="tc-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="tc-sessiz-vazgec"[^>]*>Vazgeç</.test(html));
+ok("Sessiz ses: betik sırası caption-text.js → sessiz-ses.js → captions.js", betikSira("sessiz-ses.js") > betikSira("caption-text.js") && betikSira("sessiz-ses.js") < betikSira("captions.js"));
+ok("Sessiz ses: panel açılışında ölçüm/Premiere çağrısı yok (yalnız Altyazı oluştur / Konuşmadan kes akışında)",
+  !/sessizDenetim\(/.test(fnGovde(capSrc, "function init(")) && /\.sessiz-uyari\[hidden\] \{ display: none !important; \}/.test(fs.readFileSync(KOKYOL + "css/style.css", "utf8")));
+
+/* ---------- Canlı transkripsiyon, İptal ve kalan süre (3.2 adım 3) ---------- */
+["cap-cancel", "cap-canli", "cap-canli-liste", "cut-cancel", "set-local-cancel", "cap-local-cancel"].forEach(function (id) {
+  ok("Canlı transkripsiyon / İptal: #" + id + " var", !!idler[id]);
+});
+ok("#cap-cancel: 'Altyazı oluştur'un hemen ardında, gizli başlar, 'İptal' yazar, ipucu ne olacağını söyler",
+  html.indexOf('id="cap-cancel"') > html.indexOf('id="cap-go"') && html.indexOf('id="cap-cancel"') < html.indexOf('id="cap-restore"') &&
+  /<button id="cap-cancel" class="btn outline big iptal-btn" type="button" hidden title="[^"]*ekrandaki altyazı olduğu gibi kalır\.">İptal<\/button>/.test(html));
+ok("#cap-canli: durum satırının altında, gizli başlar, 'canlı' rozetli; liste salt okunur ve çeviriden muaf (kullanıcı içeriği)",
+  html.indexOf('id="cap-canli"') > html.indexOf('id="cap-status"') && html.indexOf('id="cap-canli"') < html.indexOf('id="cap-result"') &&
+  /id="cap-canli" class="canli-kutu"[^>]* hidden>/.test(html) && /<span class="canli-rozet">canlı<\/span>/.test(html) &&
+  /id="cap-canli-liste" class="canli-liste" role="log" aria-readonly="true"/.test(html) &&
+  /"cap-canli-liste"/.test(fs.readFileSync(KOKYOL + "js/i18n.js", "utf8")));
+ok("betik sırası: caption-text.js → whisper-akis.js → captions.js", betikSira("whisper-akis.js") > betikSira("caption-text.js") && betikSira("whisper-akis.js") < betikSira("captions.js"));
+var setBusyG = fnGovde(capSrc, "function setBusy(");
+ok("setBusy: iş sürerken #cap-go gizlenir, #cap-cancel görünür (ve tersi)", /el\("cap-go"\)\.hidden = b;/.test(setBusyG) && /iptal\.hidden = !b;/.test(setBusyG) && /iptal\.disabled = false;/.test(setBusyG));
+ok("#cap-cancel tıklaması jetonu iptal eder (init'te bağlı, Premiere çağrısı yok)", /el\("cap-cancel"\)\.addEventListener\("click", iptalEt\)/.test(fnGovde(capSrc, "function init(")) &&
+  /aktifIptal\.iptal\(\);/.test(fnGovde(capSrc, "function iptalEt(")) && !/K\.call\(/.test(fnGovde(capSrc, "function iptalEt(")));
+// Çift tıklama (inceleme bulgusu): "Altyazı oluştur" / "Sessizlikleri bul" / "İndir & kur"un ikinci tıkı aynı
+// yerde beliren "İptal"e düşüp yeni başlayan işi iptal etmesin. Gerçek iptalEt + setBusy, sahte DOM ve saatle.
+var tikKod = "var IPTAL_ACILIS_MS = 500;\n" + fnGovde(fs.readFileSync(KOKYOL + "js/bridge.js", "utf8"), "function iptalTikiGecerli(") + "\n" +
+  fnGovde(fs.readFileSync(KOKYOL + "js/bridge.js", "utf8"), "function baslatTikiGecerli(");
+function tikDugme() { return { hidden: false, disabled: false, title: "", textContent: "", classList: { toggle: function () {} } }; }
+function ciftTikKabi(kod, kur, donus) {
+  var dom5 = {}, saat = { t: 50000 }, jet = { iptalEdildi: false, sayi: 0, iptal: function () { jet.sayi++; jet.iptalEdildi = true; } };
+  var api = new Function("el", "Date", "status", "refreshButton", "IPTAL_IPUCU", "jeton",
+    tikKod + "\nvar K = { iptalTikiGecerli: iptalTikiGecerli, baslatTikiGecerli: baslatTikiGecerli, log: function () {} };\n" + kur + "\n" + kod + "\nreturn " + donus + ";")(
+    function (id) { return dom5[id] || (dom5[id] = tikDugme()); }, { now: function () { return saat.t; } }, function () {}, function () {}, "ipucu", jet);
+  return { api: api, saat: saat, jet: jet, dom: dom5 };
+}
+function ciftTikSenaryo(ad, k, dugmeId) {
+  k.api.basla();
+  k.saat.t += 150;
+  k.api.iptalEt({ detail: 2 });             // çift tıkın ikinci tıkı (Chromium: detail 2)
+  k.api.iptalEt({ detail: 1 });             // aynı anda tek tık sayılan olay da
+  var erken = k.jet.sayi;
+  k.saat.t += 600;
+  k.api.iptalEt({ detail: 1 });             // gerçek İptal
+  ok(ad + ": düğme göründükten hemen sonraki / çift tıkın ikinci tıkı iptal etmez, sonraki tek tık eder",
+    erken === 0 && k.jet.sayi === 1 && k.dom[dugmeId].hidden === false && k.dom[dugmeId].disabled === true, "erken=" + erken + " sayi=" + k.jet.sayi);
+}
+ciftTikSenaryo("Altyazı oluştur → İptal", ciftTikKabi(fnGovde(capSrc, "function iptalEt(") + "\n" + setBusyG,
+  "var busy = false, aktifIptal = jeton, iptalAcilis = 0;", "{ basla: function () { busy = true; setBusy(true); }, iptalEt: iptalEt }"), "cap-cancel");
+ciftTikSenaryo("Sessizlikleri bul → İptal", ciftTikKabi(fnGovde(fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8"), "function iptalEt(") + "\n" +
+  fnGovde(fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8"), "function setBusy("),
+  "var busy = false, iptalJetonu = jeton, iptalAcilis = 0;", "{ basla: function () { busy = true; setBusy(true); }, iptalEt: iptalEt }"), "cut-cancel");
+ciftTikSenaryo("İndir & kur → İptal (Ayarlar)", ciftTikKabi(fnGovde(appSrc, "function kurulumuIptalEt(") + "\n" + fnGovde(appSrc, "function kurulumIptalDugmeleri("),
+  "var installingLocal = false, kurulumJetonu = jeton, kurulumIptalAcilis = 0;",
+  "{ basla: function () { installingLocal = true; kurulumIptalDugmeleri(true); }, iptalEt: kurulumuIptalEt }"), "set-local-cancel");
+ciftTikSenaryo("Ayarlar › ffmpeg İptal", ciftTikKabi(fnGovde(appSrc, "function ffmpegKurulumunuIptalEt(") + "\n" + fnGovde(appSrc, "function ffmpegIptalDugmesi("),
+  "var ffmpegKuruluyor = false, ffmpegJetonu = jeton, ffmpegIptalAcilis = 0;",
+  "{ basla: function () { ffmpegKuruluyor = true; ffmpegIptalDugmesi(true); }, iptalEt: ffmpegKurulumunuIptalEt }"), "set-ffmpeg-cancel");
+// Ters yön (inceleme bulgusu): İptal'e çift tık. İlk tık işi iptal eder, iş aynı olay döngüsünde biter ve başlatma
+// düğmesi İptal'in yerinde yeniden belirir; ikinci tık (detail 2) ya da hemen ardından gelen tık yeni iş açmamalı
+// (yeni altyazı işi ses dışa aktarımında İptal'i kilitler). Gerçek iptalEt + setBusy + başlatıcının ilk satırları.
+function tersTikSenaryo(ad, k, baslatId, iptalId, programla) {
+  k.api.baslat({ detail: 1 });
+  var ilk = k.api.sayi();
+  k.saat.t += 30000;
+  k.api.iptalEt({ detail: 1 });              // çift tıkın ilk tıkı: geçerli İptal
+  k.api.bitir();                            // jeton dinleyicisi işi bitirir → finally → başlatma düğmesi geri gelir
+  var yerinde = k.dom[baslatId].hidden === false && (!iptalId || k.dom[iptalId].hidden === true);
+  k.saat.t += 150;
+  k.api.baslat({ detail: 2 });              // aynı çift tıkın ikinci tıkı, artık başlatma düğmesinde
+  k.api.baslat({ detail: 1 });              // aynı anda tek tık sayılan olay da
+  var erken = k.api.sayi();
+  k.saat.t += 600;
+  k.api.baslat({ detail: 1 });              // bilerek yapılan yeni tık
+  var sonra = k.api.sayi();
+  k.api.bitir();
+  k.api.baslat(programla);                  // programla çağrı (rehber örneği / Pro "yeniden"): olay yok, hemen geçer
+  ok(ad + ": İptal'e çift tıkın ikinci tıkı / düğme geri gelir gelmez gelen tık yeni iş başlatmaz; sonraki tek tık ve programla çağrı başlatır",
+    ilk === 1 && k.jet.sayi === 1 && yerinde && erken === 1 && sonra === 2 && k.api.sayi() === 3,
+    "ilk=" + ilk + " iptal=" + k.jet.sayi + " yerinde=" + yerinde + " erken=" + erken + " sonra=" + sonra + " son=" + k.api.sayi());
+}
+var goBas = fnGovde(capSrc, "async function go(");
+goBas = goBas.slice(0, goBas.indexOf("var ornek")).replace("async function go(", "function go(");
+ok("go(): başlatma tıkı koruması busy denetiminden hemen sonra, jeton/setBusy'den önce",
+  /if \(K\.baslatTikiGecerli && !K\.baslatTikiGecerli\(opts, baslatAcilis\)\) return false;/.test(goBas) && /baslatAcilis = b \? 0 : Date\.now\(\);\s*if \(!b\) refreshButton\(\);/.test(setBusyG));
+tersTikSenaryo("İptal → Altyazı oluştur", ciftTikKabi(fnGovde(capSrc, "function iptalEt(") + "\n" + setBusyG + "\n" + goBas +
+  "  baslatilan++; busy = true; aktifIptal = jeton; setBusy(true); return true;\n  }",
+  "var busy = false, aktifIptal = null, iptalAcilis = 0, baslatAcilis = 0, baslatilan = 0;",
+  "{ baslat: go, iptalEt: iptalEt, bitir: function () { aktifIptal = null; busy = false; setBusy(false); }, sayi: function () { return baslatilan; } }"),
+  "cap-go", "cap-cancel", { ornek: { wav: "ornek.wav" } });
+var cutSrc2 = fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8");
+var anBas = fnGovde(cutSrc2, "async function analyze(");
+ok("analyze(): başlatma tıkı koruması Pro kapısından önce (başıboş tık deneme penceresi açmaz)",
+  anBas.indexOf("K.baslatTikiGecerli(ev, baslatAcilis)") > 0 && anBas.indexOf("K.baslatTikiGecerli(ev, baslatAcilis)") < anBas.indexOf("Pro.gate(") &&
+  /el\("cut-analyze"\)\.addEventListener\("click", analyze\)/.test(cutSrc2));
+anBas = anBas.slice(0, anBas.indexOf("// Pro:")).replace("async function analyze(", "function analyze(");
+tersTikSenaryo("İptal → Sessizlikleri bul", ciftTikKabi(fnGovde(cutSrc2, "function iptalEt(") + "\n" + fnGovde(cutSrc2, "function setBusy(") + "\n" + anBas +
+  "  baslatilan++; busy = true; iptalJetonu = jeton; setBusy(true); return true;\n  }",
+  "var busy = false, iptalJetonu = null, iptalAcilis = 0, baslatAcilis = 0, baslatilan = 0;",
+  "{ baslat: analyze, iptalEt: iptalEt, bitir: function () { iptalJetonu = null; busy = false; setBusy(false); }, sayi: function () { return baslatilan; } }"),
+  "cut-analyze", "cut-cancel");
+ok("İndir & kur (Ayarlar ve Altyazı kurulum kartı) ve ffmpeg düğmeleri başlatma tıkı korumasından geçer",
+  /el\("set-local-install"\)\.addEventListener\("click", function \(ev\) \{ if \(kurulumTikiGecerli\(ev\)\) installLocalWhisper\(\); \}\)/.test(appSrc) &&
+  /kurulumTikiGecerli: kurulumTikiGecerli/.test(appSrc) &&
+  /el\("cap-local-install"\)\.addEventListener\("click", function \(ev\) \{[\s\S]{0,160}if \(KApp\.kurulumTikiGecerli && !KApp\.kurulumTikiGecerli\(ev\)\) return;/.test(capSrc) &&
+  /el\("set-ffmpeg-install"\)\.addEventListener\("click", function \(ev\) \{ if \(ffmpegTikiGecerli\(ev\)\) installFfmpeg\(\); \}\)/.test(appSrc) &&
+  /el\("set-ffmpeg-recheck"\)\.addEventListener\("click", function \(ev\) \{ if \(ffmpegTikiGecerli\(ev\)\) checkFfmpeg\(true\); \}\)/.test(appSrc));
+tersTikSenaryo("İptal → İndir & kur (Ayarlar)", ciftTikKabi(fnGovde(appSrc, "function kurulumuIptalEt(") + "\n" + fnGovde(appSrc, "function kurulumIptalDugmeleri(") + "\n" +
+  fnGovde(appSrc, "function kurulumTikiGecerli(") + "\n" +
+  "function baslat(ev) { if (!kurulumTikiGecerli(ev) || installingLocal) return; baslatilan++; installingLocal = true; el('set-local-install').hidden = true; kurulumIptalDugmeleri(true); }",
+  "var installingLocal = false, kurulumJetonu = jeton, kurulumIptalAcilis = 0, kurulumBaslatAcilis = 0, baslatilan = 0;",
+  "{ baslat: baslat, iptalEt: kurulumuIptalEt, bitir: function () { installingLocal = false; kurulumIptalDugmeleri(false); el('set-local-install').hidden = false; }, sayi: function () { return baslatilan; } }"),
+  "set-local-install", "set-local-cancel");
+tersTikSenaryo("İptal → ffmpeg indir ve kur (Ayarlar)", ciftTikKabi(fnGovde(appSrc, "function ffmpegKurulumunuIptalEt(") + "\n" + fnGovde(appSrc, "function ffmpegIptalDugmesi(") + "\n" +
+  fnGovde(appSrc, "function ffmpegTikiGecerli(") + "\n" +
+  "function baslat(ev) { if (!ffmpegTikiGecerli(ev) || ffmpegKuruluyor) return; baslatilan++; ffmpegKuruluyor = true; el('set-ffmpeg-install').disabled = true; ffmpegIptalDugmesi(true); }",
+  "var ffmpegKuruluyor = false, ffmpegJetonu = jeton, ffmpegIptalAcilis = 0, ffmpegBaslatAcilis = 0, baslatilan = 0;",
+  "{ baslat: baslat, iptalEt: ffmpegKurulumunuIptalEt, bitir: function () { ffmpegKuruluyor = false; ffmpegIptalDugmesi(false); el('set-ffmpeg-install').disabled = false; }, sayi: function () { return baslatilan; } }"),
+  "set-ffmpeg-install", "set-ffmpeg-cancel");
+// README "ffmpeg indirmesi (Ayarlar …) iptal edilebilir" diyor: Ayarlar › ffmpeg satırının da İptal'i olmalı (inceleme bulgusu)
+var ffKur = fnGovde(appSrc, "async function installFfmpeg(");
+ok("Ayarlar › ffmpeg: #set-ffmpeg-cancel kur düğmesinin yanında, gizli başlar; jeton KEngine.installFfmpeg'e gider; iptal kırmızı hata değil uyarı",
+  !!idler["set-ffmpeg-cancel"] && html.indexOf('id="set-ffmpeg-cancel"') > html.indexOf('id="set-ffmpeg-install"') &&
+  html.indexOf('id="set-ffmpeg-cancel"') < html.indexOf('id="set-ffmpeg-recheck"') && /id="set-ffmpeg-cancel"[^>]* hidden/.test(html) &&
+  /KEngine\.installFfmpeg\(say, ffmpegJetonu\)/.test(ffKur) && /if \(e && e\.iptal\) \{[\s\S]{0,200}"inline-status warn"/.test(ffKur) &&
+  /ffmpegIptalDugmesi\(false\)/.test(ffKur) && /el\("set-ffmpeg-cancel"\)\.addEventListener\("click", ffmpegKurulumunuIptalEt\)/.test(appSrc));
+var goG2 = fnGovde(capSrc, "async function go(");
+ok("go(): jeton ve geçici satırlar işle başlar, finally'de bırakılır; İptal 'İptal edildi.' uyarısı (hata değil)",
+  /aktifIptal = K\.iptalJetonu \? K\.iptalJetonu\(\) : null;\s*canliBaslat\(\);/.test(goG2) &&
+  /finally \{[\s\S]*canliBitir\(\);\s*aktifIptal = null;/.test(goG2) && /sonUyari = "İptal edildi\.";\s*status\(sonUyari, "warn"\);/.test(goG2) &&
+  // setBusy(false) → refreshButton yalnız kırmızı hatayı korur: "İptal edildi." ondan sonra yeniden yazılır
+  /setBusy\(false\);\s*\/\/[^\n]*\n\s*if \(sonUyari\) status\(sonUyari, "warn"\);/.test(goG2));
+ok("go(): ses dışa aktarımı (senkron ExtendScript) sırasında İptal kapalı, sonra açılır",
+  goG2.indexOf("iptalKilidi(true)") > 0 && goG2.indexOf("iptalKilidi(true)") < goG2.indexOf('K.call("KS_exportAudio"') &&
+  goG2.indexOf('K.call("KS_exportAudio"') < goG2.indexOf("iptalKilidi(false)") && /Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez/.test(capSrc));
+ok("go(): jeton convertAudio'ya, toplu döngüye ve ffmpeg kurulumuna gider; toplu döngü klipler arasında denetler",
+  (goG2.match(/iptal: aktifIptal/g) || []).length >= 3 && /installFfmpeg\(function \(m\) \{ status\(m\); \}, aktifIptal\)/.test(goG2) &&
+  /for \(var bi = 0; bi < batchClips\.length; bi\+\+\) \{\s*iptalDenetle\(\);/.test(goG2) && /if \(eB && eB\.iptal\) throw eB;/.test(goG2));
+var tlG = fnGovde(capSrc, "async function transcribeLocal(");
+ok("yerelCalistir: jeton ve onStdout K.run'a gider; iptalde JSON silinir; -ml 1 yedeğinde akış kapalı; kalan turu kendi ofsetiyle",
+  /iptal: iptal,\s*onStdout: ayristir \?/.test(fnGovde(capSrc, "async function yerelCalistir(")) && /if \(r\.iptal\) \{[\s\S]{0,200}unlinkSync\(jsonPath\)/.test(fnGovde(capSrc, "async function yerelCalistir(")) &&
+  /" · kelime zamanı", null\)/.test(tlG) && /var kalanAkis = kelimeYedegi \? null : akis\(kesBas,/.test(tlG) && tlG.indexOf("canliKirp(") < tlG.indexOf('outBase + "_kalan", " · kalan kısım"') &&
+  /if \(eK && eK\.iptal\) throw eK;/.test(tlG));
+ok("transcribeSuflo: İptal bulut yedeğine geçmez", /if \(eLocal && eLocal\.iptal\) throw eLocal;/.test(fnGovde(capSrc, "async function transcribeSuflo(")));
+// Geçici satırlar belgeye girmez: işlevler gerçek DOM'suz bir kapta çalıştırılır
+var canliKod = ["function canliZaman(", "function canliBaslat(", "function canliSatirDom(", "function canliEkle(", "function canliKirp(", "function canliBitir(", "function durumAl("]
+  .map(function (imza) { return fnGovde(capSrc, imza); }).join("\n");
+ok("geçici satır işlevleri segments / geri al / taslak / önbelleğe dokunmaz (kaynakta)", ["function canliBaslat(", "function canliEkle(", "function canliKirp(", "function canliBitir("].every(function (imza) {
+  var g = fnGovde(capSrc, imza);
+  return g && !/\bsegments\b|undoStack|redoStack|saveDraft|snapshot\(|transcriptCache|K\.call\(/.test(g);
+}));
+function sahteDugum() {
+  var d = { childNodes: [], hidden: true, textContent: "", className: "", scrollTop: 0, scrollHeight: 0 };
+  d.appendChild = function (c) { d.childNodes.push(c); return c; };
+  d.removeChild = function (c) { d.childNodes.splice(d.childNodes.indexOf(c), 1); return c; };
+  Object.defineProperty(d, "firstChild", { get: function () { return d.childNodes[0]; } });
+  Object.defineProperty(d, "innerHTML", { set: function () { d.childNodes = []; }, get: function () { return ""; } });
+  return d;
+}
+var dom = { "cap-canli": sahteDugum(), "cap-canli-liste": sahteDugum() };
+var kap = new Function("el", "tc", "document", "CANLI_GOSTER",
+  "var canliIs = null, segments = [{ start: 1, end: 2, text: 'Önceki belge' }], segmentsMode = 'plain', ceviriDili = '', algilananDil = 'tr', shortsYuklenen = '', ornekBelge = false;\n" +
+  "var undoStack = [], redoStack = [];\n" + canliKod +
+  "\nreturn { canliBaslat: canliBaslat, canliEkle: canliEkle, canliKirp: canliKirp, canliBitir: canliBitir, durumAl: durumAl, " +
+  "segments: function () { return segments; }, undo: function () { return undoStack.length + redoStack.length; }, is: function () { return canliIs; } };")(
+  function (id) { return dom[id] || null; },
+  function (sn) { var t = Math.round(sn * 1000), h = Math.floor(t / 3600000), m = Math.floor(t % 3600000 / 60000), s2 = Math.floor(t % 60000 / 1000);
+    function p(n) { return (n < 10 ? "0" : "") + n; } return p(h) + ":" + p(m) + ":" + p(s2) + "." + ("00" + (t % 1000)).slice(-3); },
+  { createElement: function () { return sahteDugum(); } }, 3);
+kap.canliBaslat();
+kap.canliEkle([{ start: 5, end: 6, text: "canlı bir" }, { start: 6, end: 7, text: "canlı iki" }]);
+kap.canliEkle([{ start: 7, end: 8, text: "canlı üç" }, { start: 3725, end: 3726, text: "canlı dört" }]);
+var liste = dom["cap-canli-liste"];
+ok("canlı satırlar listede (en çok CANLI_GOSTER), kutu açılır, saat ≥ 1'de h:mm:ss",
+  dom["cap-canli"].hidden === false && liste.childNodes.length === 3 && liste.childNodes[0].childNodes[1].textContent === "canlı iki" &&
+  liste.childNodes[2].childNodes[0].textContent === "01:02:05" && liste.childNodes[1].childNodes[0].textContent === "00:07" && kap.is().satirlar.length === 4,
+  liste.childNodes.map(function (c) { return c.childNodes[0].textContent + " " + c.childNodes[1].textContent; }).join(" | "));
+var belge = JSON.parse(kap.durumAl("x").segs);
+ok("geçici satırlar belgeye, geri al girdisine ve geri al yığınına girmez",
+  kap.segments().length === 1 && belge.length === 1 && belge[0].text === "Önceki belge" && kap.undo() === 0 && JSON.stringify(kap.durumAl("x")).indexOf("canlı") === -1);
+kap.canliKirp(7);
+ok("takılma kurtarması: sınırdan sonraki geçici satırlar silinir, öncekiler kalır", kap.is().satirlar.length === 2 && liste.childNodes.length === 2 &&
+  liste.childNodes[1].childNodes[1].textContent === "canlı iki");
+kap.canliBitir();
+ok("iş bitince geçici satırlar gider, kutu kapanır", kap.is() === null && liste.childNodes.length === 0 && dom["cap-canli"].hidden === true && kap.segments().length === 1);
+// yerelCalistir gerçek kodu, sahte K.run ile: stdout satırları canlı satır olur (ofset + hız), durum satırı
+// '… satır · %… ' biçiminde; iptalde JSON silinir ve iptal hatası atılır, geçici satırlar belgeye girmez
+var osm = require("os"), pathm = require("path");
+var calismaDiz = fs.mkdtempSync(pathm.join(osm.tmpdir(), "suflo-canli-"));
+var fikstur = fs.readFileSync(KOKYOL + "tests/fixtures/whisper-ojf-tr.json");
+function yerelKap(senaryo) {
+  var durumlar = [], dom2 = { "cap-canli": sahteDugum(), "cap-canli-liste": sahteDugum() };
+  var K2 = {
+    fs: fs, log: function () {},
+    iptalHatasi: function (m) { var e = new Error(m || "İptal edildi"); e.iptal = true; return e; },
+    run: function (exe, args, o) { return senaryo(o, args); }
+  };
+  var kod = ["function iptalHatasiYap(", "function iptalDenetle(", "function canliZaman(", "function canliBaslat(", "function canliSatirDom(",
+    "function canliEkle(", "function canliKirp(", "function canliBitir(", "async function yerelCalistir("].map(function (imza) { return fnGovde(capSrc, imza); }).join("\n");
+  var api = new Function("K", "WA", "WW", "el", "tc", "document", "status", "CANLI_GOSTER", "jeton",
+    "var aktifIptal = jeton, canliIs = null, algilananDil = '';\nfunction dilKodu(x) { return x; }\n" + kod +
+    "\nreturn { yerelCalistir: yerelCalistir, canliBaslat: canliBaslat, is: function () { return canliIs; }, ayarla: function (o) { for (var k in o) canliIs[k] = o[k]; } };")(
+    K2, require(KOKYOL + "js/whisper-akis.js"), require(KOKYOL + "js/whisper-words.js"), function (id) { return dom2[id] || null; },
+    function (sn) { var t = Math.round(sn * 1000), m = Math.floor(t % 3600000 / 60000), s2 = Math.floor(t % 60000 / 1000); return "00:" + (m < 10 ? "0" : "") + m + ":" + (s2 < 10 ? "0" : "") + s2 + ".000"; },
+    { createElement: function () { return sahteDugum(); } }, function (m) { durumlar.push(m); }, 200, senaryo.jeton || null);
+  return { api: api, dom: dom2, durumlar: durumlar };
+}
+var outBaseC = pathm.join(calismaDiz, "cap_1_w");
+var y1 = yerelKap(function (o, args) {
+  o.onStderr("whisper_print_progress_callback: progress =  25%\n");
+  o.onStdout("[00:00:01.000 --> 00:00:02.500]  Merhaba ");
+  o.onStdout("dünya\n[00:00:02.500 --> 00:00:03.000]  [Müzik]\n[00:00:03.000 --> 00:00:04.000]  ikinci satır");
+  fs.writeFileSync(outBaseC + ".json", fikstur);
+  return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+});
+y1.api.canliBaslat();
+y1.api.ayarla({ ofset: 10, carpan: 0.5 });
+var bekleyenUI = y1.api.yerelCalistir("whisper-cli", ["-f", "a.wav"], outBaseC, "", { ofset: 10, carpan: 0.5, toplamSn: 120, onEk: "" }).then(function (segs) {
+  var satirlar = y1.api.is().satirlar;
+  ok("yerelCalistir: stdout satırları canlı satır (kapsam ofseti + hız eşlemesi), etiket satırı atlanır, son satır bitir() ile gelir",
+    satirlar.length === 2 && satirlar[0].start === 10.5 && satirlar[0].end === 11.25 && satirlar[0].text === "Merhaba dünya" && satirlar[1].text === "ikinci satır" &&
+    y1.dom["cap-canli"].hidden === false, JSON.stringify(satirlar));
+  ok("yerelCalistir: nihai satırlar JSON'dan (geçici satırlardan değil), JSON silinir", segs.length > 0 && !fs.existsSync(outBaseC + ".json") &&
+    segs.every(function (x) { return x.text !== "Merhaba dünya"; }), segs.length);
+  ok("yerelCalistir: durum satırı '… satır · %… · ~… kaldı · …× gerçek zaman'", y1.durumlar.some(function (d) { return /^\d+ satır · %\d+/.test(d) || /^Transkribe ediliyor… · %\d+/.test(d); }) &&
+    y1.durumlar.some(function (d) { return /%25/.test(d); }), y1.durumlar.join(" | "));
+  // İptal: süreç { code: -2, iptal: true } döner, yarım JSON silinir, iptal hatası atılır
+  var j = { iptalEdildi: false, dinle: function () { return function () {}; } };
+  var y2 = yerelKap(Object.assign(function (o) {
+    o.onStdout("[00:00:00.000 --> 00:00:01.000]  yarım\n");
+    fs.writeFileSync(outBaseC + "2.json", "{}");
+    j.iptalEdildi = true;
+    return Promise.resolve({ code: -2, iptal: true, stdout: "", stderr: "" });
+  }, { jeton: j }));
+  y2.api.canliBaslat();
+  return y2.api.yerelCalistir("whisper-cli", [], outBaseC + "2", "", { ofset: 0, carpan: 1, toplamSn: 60, onEk: "" }).then(function () {
+    ok("yerelCalistir iptali hata atmalıydı", false);
+  }, function (e) {
+    ok("yerelCalistir iptali: e.iptal, yarım JSON silinir, jeton K.run'a verilir", e && e.iptal === true && !fs.existsSync(outBaseC + "2.json"), e && e.message);
+  });
+}).then(function () {
+  // -ml 1 yedeği (akis null): akış yok, eski ilerleme metni
+  var y3 = yerelKap(function (o) {
+    ok("akış kapalıyken onStdout verilmez", o.onStdout === null);
+    o.onStderr("progress = 40%\n");
+    fs.writeFileSync(outBaseC + "3.json", fikstur);
+    return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+  });
+  y3.api.canliBaslat();
+  return y3.api.yerelCalistir("whisper-cli", [], outBaseC + "3", " · kelime zamanı", null).then(function () {
+    ok("akış kapalıyken (-ml 1) eski ilerleme metni ve geçici satır yok", y3.durumlar.indexOf("Transkribe ediliyor… %40 (yerel · kelime zamanı)") !== -1 && y3.api.is().satirlar.length === 0,
+      y3.durumlar.join(" | "));
+  });
+}).catch(function (e) { ok("yerelCalistir kabı çöktü: " + (e && e.stack || e), false); }).then(function () {
+  try { fs.readdirSync(calismaDiz).forEach(function (f) { fs.unlinkSync(pathm.join(calismaDiz, f)); }); fs.rmdirSync(calismaDiz); } catch (e) {}
+});
+var mcSrc = fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8");
+ok("Otomatik Kesim: ffmpeg analizi jetonla, iptal 'İptal edildi.' uyarısı, #cut-cancel 'Sessizlikleri bul'un yerini alır",
+  /iptal: jeton \}\);/.test(mcSrc) && /if \(res\.iptal\) \{ status\("İptal edildi\.", "warn"\); return; \}/.test(mcSrc) &&
+  /el\("cut-analyze"\)\.hidden = b;/.test(mcSrc) && /el\("cut-cancel"\)\.addEventListener\("click", iptalEt\)/.test(mcSrc) &&
+  html.indexOf('id="cut-cancel"') > html.indexOf('id="cut-analyze"') && /id="cut-cancel"[^>]* hidden/.test(html));
+var kur = fnGovde(appSrc, "async function installLocalWhisper(");
+ok("Kurulum İptal: jeton KEngine.install'a gider, iptal kırmızı hata değil uyarı; düğmeler yalnız kurulum sürerken görünür",
+  /iptal: kurulumJetonu/.test(kur) && /if \(e && e\.iptal\)/.test(kur) && /kurulumIptalDugmeleri\(true\)/.test(kur) && /kurulumIptalDugmeleri\(false\)/.test(kur) &&
+  /id="set-local-cancel"[^>]* hidden/.test(html) && /id="cap-local-cancel"[^>]* hidden/.test(html));
+var cssSrc = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
+ok("CSS: busy düğmesi (inline-flex) gizlenince görünmez; canlı satırlar soluk", /#cap-go\[hidden\], #cut-analyze\[hidden\] \{ display: none !important; \}/.test(cssSrc) &&
+  /\.canli-satir \{[^}]*opacity: \.78/.test(cssSrc) && /\.canli-kutu\[hidden\] \{ display: none !important; \}/.test(cssSrc));
+
+bekleyenUI.then(function () {
+  console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
+  process.exit(kaldi ? 1 : 0);
+});

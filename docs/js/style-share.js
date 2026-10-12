@@ -46,7 +46,8 @@
   var KONUMLAR = [1, 2, 5, 8];
   var YOGUNLUK = ["soft", "balanced", "hard"];
   var KASE = ["normal", "upper", "lower"];
-  var MAXLEN = /^(w[2-5]|c(32|42|60)|k1|kc)$/;
+  // l32 / l42: 3.2'nin kelime zamanından satır modu; c42x2: 2 satır × 42 (eski sürümler c32 / c42 alır)
+  var MAXLEN = /^(w[2-5]|c(32|42|60)|l(32|42)|c42x2|k1|kc)$/;
   var YAZAR = /^[A-Za-z0-9_.ÇĞİÖŞÜçğıöşü-]{1,32}$/;
   var STIL_KIMLIGI = /^[a-z0-9_-]{1,24}$/;
   var RENK = /^#[0-9a-f]{6}$/i;

@@ -97,6 +97,14 @@ ok("ortaklik sayfasi: baslik, canonical, affiliate kaydi, IBAN ve kod istegi", /
   /rel="canonical" href="https:\/\/suflo\.app\/ortaklik\.html"/.test(ort) && /lemonsqueezy\.com\/affiliates/.test(ort) && /IBAN/.test(ort) && /indirim kodu/.test(ort));
 ok("ortaklik sayfasi: e-posta adresi yazilana dek e-posta dugmesi gizli", /id="ortak-eposta" data-eposta="" href="#" hidden/.test(ort));
 ok("ortaklik sayfasinda kisisel e-posta yok", !/@gmail\.com/i.test(ort));
+// ASS dışa aktarma Pro (js/captions.js Pro.gate("assexport"), denemesiz): ücretsiz plan sütunu ve
+// ücretsiz Suflo JSON-LD featureList'i ASS'i bedava gibi sunmaz (İngilizce site de yalnız SRT/VTT/TXT der)
+var ucretsizPlan = (/<div class="plan">[\s\S]*?<\/ul>/.exec(html) || [""])[0];
+var ucretsizLd = (/"name":"Suflo","applicationCategory"[\s\S]*?"featureList":\[([^\]]*)\]/.exec(html) || ["", ""])[1];
+ok("ücretsiz plan ve ücretsiz featureList ASS dışa aktarma vaat etmez",
+  /0 ₺/.test(ucretsizPlan) && /SRT · VTT · TXT dışa aktarma/.test(ucretsizPlan) && !/\bASS\b/.test(ucretsizPlan) &&
+  /SRT, WebVTT ve TXT dışa aktarma/.test(ucretsizLd) && !/\bASS\b/.test(ucretsizLd), ucretsizLd);
+
 var sm = fs.readFileSync(path.join(ROOT, "docs", "sitemap.xml"), "utf8");
 ok("site haritasinda ortaklik sayfasi", /<loc>https:\/\/suflo\.app\/ortaklik\.html<\/loc>/.test(sm));
 

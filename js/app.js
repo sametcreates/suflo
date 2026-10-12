@@ -41,7 +41,9 @@ window.KApp = (function () {
     var box = el("toasts");
     var t = document.createElement("div");
     t.className = "toast" + (kind ? " " + kind : "");
-    t.textContent = msg;
+    // DOM düğümü de olabilir: kullanıcı adları (klip, sekans) data-i18n-skip içinde çevrilmeden kalır
+    if (msg && typeof msg === "object" && msg.nodeType) t.appendChild(msg);
+    else t.textContent = msg;
     if (eylem && eylem.metin && typeof eylem.fn === "function") {
       var b = document.createElement("button");
       b.type = "button";
@@ -61,6 +63,10 @@ window.KApp = (function () {
   /* ---------------- Bağlam ---------------- */
 
   function onContext(fn) { ctxListeners.push(fn); }
+  // Her başarılı yoklamada çağrılır (seçim anahtarı değişmese de): playhead, In/Out, seçili klibin yeri
+  // gibi sık değişen alanlara bakan dinleyici (Hız Rampası önizlemesi) kendi anahtarını karşılaştırır
+  var pollListeners = [];
+  function onPoll(fn) { pollListeners.push(fn); }
 
   var CLAP_IC = '<svg class="ctx-ic" viewBox="0 0 16 16"><path d="M1.8 6.2 h12.4 v6.4 a1.4 1.4 0 0 1 -1.4 1.4 h-9.6 a1.4 1.4 0 0 1 -1.4-1.4 z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M2.2 6.2 L3.4 3.3 L14.2 4.6 L13.4 6.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/><path d="M6.4 3.7 L5.4 6.2 M9.9 4.1 L8.9 6.2" stroke="currentColor" stroke-width="1.1"/></svg>';
 
@@ -132,6 +138,7 @@ window.KApp = (function () {
       var now = JSON.stringify({ s: ctx.sel && ctx.sel.mediaPath, n: ctx.selCount, q: ctx.sequence, qi: ctx.sequenceId, c: ctx.connected });
       renderContext();
       if (prev !== now) ctxListeners.forEach(function (fn) { fn(ctx); });
+      if (ctx.connected) pollListeners.forEach(function (fn) { try { fn(ctx); } catch (eP) {} });
     } finally {
       polling = false;
     }
@@ -241,6 +248,70 @@ window.KApp = (function () {
   /* ---------------- Yerel Whisper kurulumu ---------------- */
 
   var installingLocal = false;
+  // Süren kurulumun iptal jetonu (K.iptalJetonu): motor/model/ffmpeg indirmesi kesilir, .part korunur
+  var kurulumJetonu = null;
+  // İptal düğmelerinin göründüğü an: Ayarlar'da "İptal" "İndir & kur"un yerinde belirir,
+  // çift tıklamanın ikinci tıkı yeni başlayan kurulumu iptal etmesin (K.iptalTikiGecerli)
+  var kurulumIptalAcilis = 0;
+  // Ters yön: kurulum bitince (İptal ya da kendiliğinden) "İndir & kur" İptal'in yerinde yeniden belirir;
+  // İptal'e çift tıkın ikinci tıkı kurulumu yeniden başlatmasın (K.baslatTikiGecerli)
+  var kurulumBaslatAcilis = 0;
+
+  // Ayarlar'daki ve Altyazı kurulum kartındaki "İptal" düğmeleri yalnız kurulum sürerken görünür
+  function kurulumIptalDugmeleri(acik) {
+    ["set-local-cancel", "cap-local-cancel"].forEach(function (id) {
+      var b = el(id);
+      if (!b) return;
+      b.hidden = !acik;
+      b.disabled = false;
+    });
+    kurulumIptalAcilis = acik ? Date.now() : 0;
+    kurulumBaslatAcilis = acik ? 0 : Date.now();
+  }
+
+  // "İndir & kur" tıkı (Ayarlar ve Altyazı kurulum kartı): programla çağrı (olaysız) her zaman geçerli
+  /*
+   * Ayarlar › Altyazı: satır modlarında (32 / 42 karakter, 2 satır × 42) en kısa / en uzun ekran
+   * süresi ve kısa parça birleştirme (caption-text.js segmentleriKur). Geçersiz değer sınıra çekilir;
+   * en uzun süre en kısa sürenin altına inemez. Yeni transkriptlerde geçerli.
+   */
+  function altyaziSureAyarlari(s) {
+    var mn = el("set-min-sure"), mx = el("set-max-sure"), br = el("set-kisa-birlestir");
+    function sinirla(v, a, b, varsayilan) { var n = Number(v); return isFinite(n) && v !== "" ? Math.min(b, Math.max(a, n)) : varsayilan; }
+    if (mn) mn.value = String(sinirla(s.altyaziMinSure, 0.3, 3, 0.8));
+    if (mx) mx.value = String(sinirla(s.altyaziMaxSure, 2, 15, 6));
+    if (br) br.checked = s.kisaBirlestir !== false;
+    function kaydet() {
+      var st = K.settings();
+      var a = sinirla(mn ? mn.value : 0.8, 0.3, 3, 0.8);
+      var b = sinirla(mx ? mx.value : 6, 2, 15, 6);
+      if (b < a + 0.5) b = Math.min(15, a + 0.5);
+      a = Math.round(a * 10) / 10;
+      b = Math.round(b * 10) / 10;
+      if (mn) mn.value = String(a);
+      if (mx) mx.value = String(b);
+      st.altyaziMinSure = a;
+      st.altyaziMaxSure = b;
+      K.saveSettings();
+    }
+    if (mn) mn.addEventListener("change", kaydet);
+    if (mx) mx.addEventListener("change", kaydet);
+    if (br) br.addEventListener("change", function () {
+      K.settings().kisaBirlestir = this.checked;
+      K.saveSettings();
+    });
+  }
+
+  function kurulumTikiGecerli(ev) {
+    return !K.baslatTikiGecerli || K.baslatTikiGecerli(ev, kurulumBaslatAcilis);
+  }
+
+  function kurulumuIptalEt(ev) {
+    if (!installingLocal || !kurulumJetonu) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, kurulumIptalAcilis)) return;
+    ["set-local-cancel", "cap-local-cancel"].forEach(function (id) { if (el(id)) el(id).disabled = true; });
+    kurulumJetonu.iptal();
+  }
 
   function refreshEngineRoute() {
     var out = el("set-engine-route");
@@ -308,8 +379,10 @@ window.KApp = (function () {
     if (installingLocal) return null;
     if (!K.nodeOK) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return null; }
     installingLocal = true;
+    kurulumJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
+    kurulumIptalDugmeleri(true);
     var box = el("set-local-status");
-    var kurulumHatasi = null;
+    var kurulumHatasi = null, kurulumIptal = "";
     var sonuc = null;
     // ilerleme metnini yazdığımız öğenin kendi etiketi: iş bitince geri konur,
     // yoksa kurulum kartındaki düğme "Motor iniyor… %62" yazısında donup kalıyor
@@ -328,7 +401,7 @@ window.KApp = (function () {
       var modelId = opts.modelId || (el("set-model") && el("set-model").value) || K.settings().model || "turbo";
 
       var res = await KEngine.install({
-        modelId: modelId, useGpu: useGpu, onStatus: say, ffmpegArkada: !!opts.ffmpegArkada,
+        modelId: modelId, useGpu: useGpu, onStatus: say, ffmpegArkada: !!opts.ffmpegArkada, iptal: kurulumJetonu,
         onFfmpeg: function (m) {
           var fb = el("set-ffmpeg-status");
           if (fb) { fb.className = "inline-status"; fb.textContent = m; }
@@ -348,11 +421,19 @@ window.KApp = (function () {
       toast("Hazır: " + res.model.label.split(" —")[0] + donanim +
         (res.vad ? " · sessizlik atlama açık" : ""), "good");
     } catch (e) {
-      // kurulum hatası en kritik an: çözüm önerisiyle ve uzun süre göster
-      kurulumHatasi = K.hataYardimi(e);
-      toast(kurulumHatasi, "bad", 12000);
+      if (e && e.iptal) {
+        // kullanıcı iptal etti: hata değil; inen kısım korunur, yeniden kurunca kaldığı yerden devam eder
+        kurulumIptal = e.message || "İptal edildi";
+        toast(kurulumIptal, "warn", 8000);
+      } else {
+        // kurulum hatası en kritik an: çözüm önerisiyle ve uzun süre göster
+        kurulumHatasi = K.hataYardimi(e);
+        toast(kurulumHatasi, "bad", 12000);
+      }
     } finally {
       installingLocal = false;
+      kurulumJetonu = null;
+      kurulumIptalDugmeleri(false);
       if (progressEl && progressEski !== null) progressEl.textContent = progressEski;
       refreshLocalStatus();
       KCaptions.refreshSetup();
@@ -360,6 +441,9 @@ window.KApp = (function () {
       if (kurulumHatasi) {
         box.className = "inline-status bad";
         box.textContent = "✕ " + kurulumHatasi;
+      } else if (kurulumIptal) {
+        box.className = "inline-status warn";
+        box.textContent = kurulumIptal;
       }
     }
     return sonuc;
@@ -390,6 +474,7 @@ window.KApp = (function () {
     Pro.markLocked(document.querySelector('.tab[data-tab="cut"]'), !s.pro);
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
     Pro.markLocked(document.querySelector('.ky-oge[data-tab="podcast"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.ky-oge[data-tab="hiz"]'), !s.pro);
     // SFX satirinin kendi ky-kilit rozeti var; ikinci bir ::after rozeti ekleme.
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
     Pro.markLocked(el("cap-translate-go"), !s.pro);
@@ -425,7 +510,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "kanca-tanitim", "podcast-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "hiz-tanitim", "kanca-tanitim", "podcast-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -866,6 +951,16 @@ window.KApp = (function () {
     }
 
     var s = K.settings();
+    // Ayarlar › Altyazı › Ses etiketlerini koru (varsayılan kapalı; yeni transkriptlerde geçerli)
+    if (el("set-ses-etiket")) {
+      el("set-ses-etiket").checked = s.sesEtiketKoru === true;
+      el("set-ses-etiket").addEventListener("change", function () {
+        K.settings().sesEtiketKoru = this.checked;
+        K.saveSettings();
+      });
+    }
+    // Ayarlar › Altyazı › en kısa / en uzun süre ve kısa parçaları birleştir (satır modları, 3.2 adım 4)
+    altyaziSureAyarlari(s);
     el("set-provider").value = s.provider || "groq";
     el("set-apikey").value = s.apiKey || "";
     el("set-endpoint").value = s.endpoint || "";
@@ -876,7 +971,10 @@ window.KApp = (function () {
       refreshEngineRoute();
     });
 
-    el("set-local-install").addEventListener("click", function () { installLocalWhisper(); });
+    el("set-local-install").addEventListener("click", function (ev) { if (kurulumTikiGecerli(ev)) installLocalWhisper(); });
+    // İptal: Ayarlar'da ve Altyazı kurulum kartında (indirme kesilir, .part korunur)
+    if (el("set-local-cancel")) el("set-local-cancel").addEventListener("click", kurulumuIptalEt);
+    if (el("cap-local-cancel")) el("cap-local-cancel").addEventListener("click", kurulumuIptalEt);
     if (el("set-model")) {
       el("set-model").addEventListener("change", function () {
         var st2 = K.settings();
@@ -892,6 +990,17 @@ window.KApp = (function () {
           refreshLocalStatus();
           KCaptions.refreshSetup();
         }
+      });
+    }
+    // Ayarlar › Çözme (3.2 adım 5): yerel motor En doğru (-bs 5) ya da Hızlı (-bs 1 -bo 1); varsayılan
+    // Türkçe kıyas yapılana dek En doğru (js/whisper-args.js VARSAYILAN_COZME). Açılışta yazılmaz.
+    if (el("set-cozme")) {
+      var WAR = window.SufloWhisperArgs;
+      el("set-cozme").value = WAR ? WAR.cozmeModu(s.cozme) : "dogru";
+      el("set-cozme").addEventListener("change", function () {
+        K.settings().cozme = WAR ? WAR.cozmeModu(this.value) : this.value;
+        K.saveSettings();
+        K.log("[ayarlar] cozme modu: " + K.settings().cozme);
       });
     }
     // GPU tespiti arka planda: kutuyu ancak NVIDIA varsa göster
@@ -930,8 +1039,9 @@ window.KApp = (function () {
     });
 
 
-    el("set-ffmpeg-recheck").addEventListener("click", function () { checkFfmpeg(true); });
-    el("set-ffmpeg-install").addEventListener("click", installFfmpeg);
+    el("set-ffmpeg-recheck").addEventListener("click", function (ev) { if (ffmpegTikiGecerli(ev)) checkFfmpeg(true); });
+    el("set-ffmpeg-install").addEventListener("click", function (ev) { if (ffmpegTikiGecerli(ev)) installFfmpeg(); });
+    if (el("set-ffmpeg-cancel")) el("set-ffmpeg-cancel").addEventListener("click", ffmpegKurulumunuIptalEt);
     // macOS'ta winget yok — dugme ne yapiyorsa onu yazsin
     // mac'te Homebrew varsa onunla, yoksa dogrudan indirmeyle kurulur
     if (K.MAC && K.brewYolu()) el("set-ffmpeg-install").textContent = "Homebrew ile kur";
@@ -1083,6 +1193,32 @@ window.KApp = (function () {
    * macOS'ta Homebrew varsa once o denenir: kullanicinin sistemiyle uyumlu kalir.
    */
   var ffmpegKuruluyor = false;
+  // Doğrudan indirmenin iptal jetonu: istek kesilir, .part korunur (Homebrew kurulumu yarıda kesilmez)
+  var ffmpegJetonu = null, ffmpegIptalAcilis = 0;
+  // İptal gizlenince "Yeniden dene" onun yerine kayar: çift tıkın ikinci tıkı "İptal edildi"yi
+  // "bulunamadı" hatasıyla ezmesin, yeniden kurulum da başlatmasın
+  var ffmpegBaslatAcilis = 0;
+
+  function ffmpegIptalDugmesi(acik) {
+    var b = el("set-ffmpeg-cancel");
+    if (!b) return;
+    var gorunuyordu = !b.hidden;
+    b.hidden = !acik;
+    b.disabled = false;
+    ffmpegIptalAcilis = acik ? Date.now() : 0;
+    if (!acik && gorunuyordu) ffmpegBaslatAcilis = Date.now();
+  }
+
+  function ffmpegTikiGecerli(ev) {
+    return !K.baslatTikiGecerli || K.baslatTikiGecerli(ev, ffmpegBaslatAcilis);
+  }
+
+  function ffmpegKurulumunuIptalEt(ev) {
+    if (!ffmpegKuruluyor || !ffmpegJetonu || ffmpegJetonu.iptalEdildi) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, ffmpegIptalAcilis)) return;
+    if (el("set-ffmpeg-cancel")) el("set-ffmpeg-cancel").disabled = true;
+    ffmpegJetonu.iptal();
+  }
 
   async function installFfmpeg() {
     if (ffmpegKuruluyor) return;
@@ -1107,7 +1243,9 @@ window.KApp = (function () {
         say("Homebrew kuramadı, doğrudan indiriliyor…");
       }
 
-      await KEngine.installFfmpeg(say);
+      ffmpegJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
+      ffmpegIptalDugmesi(!!ffmpegJetonu);
+      await KEngine.installFfmpeg(say, ffmpegJetonu);
       var ff = await K.findFfmpeg(true);
       if (ff) {
         toast("ffmpeg hazır — altyazı alabilirsin", "good");
@@ -1117,13 +1255,24 @@ window.KApp = (function () {
         throw new Error("kurulum sonrası doğrulanamadı");
       }
     } catch (e) {
-      var m = K.hataYardimi(e);
-      box.className = "inline-status bad";
-      box.textContent = "✕ " + m;
-      toast(m, "bad", 12000);
-      K.log("ffmpeg kurulumu basarisiz: " + (e && e.message ? e.message : e));
+      if (e && e.iptal) {
+        // kullanıcı iptal etti: hata değil; inen kısım korunur, yeniden kurunca kaldığı yerden devam eder
+        var mi = e.message || "İptal edildi";
+        box.className = "inline-status warn";
+        box.textContent = mi;
+        toast(mi, "warn", 8000);
+        K.log("ffmpeg kurulumu iptal edildi");
+      } else {
+        var m = K.hataYardimi(e);
+        box.className = "inline-status bad";
+        box.textContent = "✕ " + m;
+        toast(m, "bad", 12000);
+        K.log("ffmpeg kurulumu basarisiz: " + (e && e.message ? e.message : e));
+      }
     } finally {
       ffmpegKuruluyor = false;
+      ffmpegJetonu = null;
+      ffmpegIptalDugmesi(false);
       if (btn) { btn.disabled = false; btn.textContent = eskiEtiket; }
     }
   }
@@ -1430,6 +1579,7 @@ window.KApp = (function () {
     guvenli("Konuşmadan kes", function () { if (window.KTextCut) KTextCut.init(); });
     guvenli("Bölümler", function () { if (window.KChapters) KChapters.init(); });
     guvenli("Geçişler", function () { if (window.KGecis) KGecis.init(); });
+    guvenli("Hız rampası", function () { if (window.KHizRampasi) KHizRampasi.init(); });
     guvenli("Sahne algılama", function () { if (window.KSahne) KSahne.init(); });
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
     guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });
@@ -1477,23 +1627,20 @@ window.KApp = (function () {
   }
 
   /*
-   * "Suflo 3.1'de yeni": surum basina bir kez. Yeni ozellikler sekmelerin
-   * derinliginde (Kesim sekmesinin altinda, Ayarlar'in kartlarinda);
+   * "Suflo 3.2'de yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (Hiz Rampasi sol menude, cozme modu Ayarlar'da);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
-   * 3.0'dan yukselten kullanicida yeniliklerGoruldu "3.0" oldugundan pencere bir kez acilir.
+   * 3.1'den yukselten kullanicida yeniliklerGoruldu "3.1" oldugundan pencere bir kez acilir.
    */
   var YENILIKLER = {
-    surum: "3.1",
-    alt: "Shorts, podcast ve marka",
+    surum: "3.2",
+    alt: "Hız rampası ve daha iyi altyazı",
     maddeler: [
-      { ikon: "▶", baslik: "Tek Tık Shorts Paketi", metin: "Viral andan altyazılı, kancalı, ilerleme çubuklu hazır Shorts sekansı.", sekme: "captions", acilir: "cap-vr-box" },
-      { ikon: "🎙", baslik: "Podcast Modu", metin: "Mikrofon başına sese göre konuşan kişiye kamera kesimi.", sekme: "podcast" },
-      { ikon: "✂", baslik: "Tek tık temizlik", metin: "Konuşmadan kes artık tekrar çekimleri ve yarım başlangıçları da bulur.", sekme: "cut", hedef: "tc-card" },
-      { ikon: "🔥", baslik: "Viral puan 0–100", metin: "Her ana açıklamalı puan ve üç kanca başlığı önerisi.", sekme: "captions", acilir: "cap-vr-box" },
-      { ikon: "Aa", baslik: "Marka Kiti", metin: "Yazı tipin, renklerin ve logon her altyazıda; stilini kodla paylaş.", sekme: "settings", hedef: "grp-marka-kiti" },
-      { ikon: "★", baslik: "Pro'yu dene", metin: "Her Pro aracına 3 ücretsiz deneme hakkı, süresi dolmaz.", sekme: "settings", hedef: "grp-pro" },
-      { ikon: "♥", baslik: "Davet et, kazan", metin: "Kodunu paylaş; arkadaşın indirim alır, sen ödül paketleri açarsın.", sekme: "settings", hedef: "grp-davet" },
-      { ikon: "EN", baslik: "English arayüz (beta)", metin: "Paneli Ayarlar'dan İngilizceye çevir.", sekme: "settings", hedef: "set-ui-lang" }
+      { ikon: "⏩", baslik: "Hız Rampası", metin: "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz (Pro).", sekme: "hiz", hedef: "hiz-grid" },
+      { ikon: "▶", baslik: "Canlı altyazı", metin: "Satırlar motor yazdıkça akar; kalan süre ve İptal düğmesi.", sekme: "captions", hedef: "cap-go" },
+      { ikon: "≡", baslik: "Okunaklı altyazı", metin: "2 satır × 42 düzen, kısa parçalar birleşir, kelime zamanları ölçülür.", sekme: "captions", hedef: "cap-maxlen" },
+      { ikon: "⚙", baslik: "Hızlı ya da En doğru", metin: "Yerel motorda hız ile doğruluk arasında seç.", sekme: "settings", hedef: "set-cozme" },
+      { ikon: "EN", baslik: "Çevrimdışı İngilizce", metin: "Konuşmayı internetsiz İngilizce altyazıya çevir (Pro).", sekme: "captions", hedef: "cap-lang" }
     ]
   };
 
@@ -1554,6 +1701,7 @@ window.KApp = (function () {
     toast: toast,
     goster: goster,
     onContext: onContext,
+    onPoll: onPoll,
     onTab: onTab,
     ctx: function () { return ctx; },
     refreshContext: contextPollingBaslat,
@@ -1562,6 +1710,7 @@ window.KApp = (function () {
     davetAni: davetAni,
     proCheckoutUrl: proCheckoutUrl,
     installLocalWhisper: installLocalWhisper,
+    kurulumTikiGecerli: kurulumTikiGecerli,
     checkUpdate: checkUpdate
   };
 })();

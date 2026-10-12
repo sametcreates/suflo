@@ -92,6 +92,8 @@
     multicam:  'Podcast Modu: mikrofona göre otomatik kamera geçişi',
     zoom:      'Otomatik Zoom (konusmaya gore punch-in)',
     beat:      'Ritim / beat senkronu',
+    speedramp: 'Hız rampası: tek tıkla ağır çekim ve hızlanma',
+    offlineTranslate: 'Çevrimdışı İngilizce çeviri: internetsiz, yerel motorla',
     batch:     'Toplu (coklu klip) transkripsiyon',
     translate: 'Altyazi cevirisi',
     assexport: 'Stilli ASS disa aktarma',

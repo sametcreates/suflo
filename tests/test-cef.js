@@ -101,6 +101,14 @@ var denemeCssSorun = denemeKurallari.filter(function (k) {
   return (/display:\s*(inline-)?flex/.test(k.govde) && /(^|[;\s])(row-|column-)?gap:/.test(k.govde)) || /overflow-wrap:\s*anywhere/.test(k.govde);
 }).map(function (k) { return k.secici; });
 ok("Pro'yu dene CSS: flex gap ve overflow-wrap:anywhere yok (CEF 74)", denemeKurallari.length >= 6 && denemeCssSorun.length === 0, denemeKurallari.length + " kural · " + denemeCssSorun.join(" | "));
+// Canlı transkripsiyon ve İptal düğmeleri (3.2 adım 3): aynı kural — CEF 74'te zaman damgası metne,
+// nabız noktası "CANLI" yazısına yapışıyordu (inceleme bulgusu)
+var canliKurallari = [], cre = /([^{}]*(?:canli-|iptal-btn|kurulum-iptal)[^{}]*)\{([^{}]*)\}/g, cm;
+while ((cm = cre.exec(css))) canliKurallari.push({ secici: cm[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), govde: cm[2] });
+var canliCssSorun = canliKurallari.filter(function (k) {
+  return /(^|[;\s])(row-|column-)?gap:/.test(k.govde) || /overflow-wrap:\s*anywhere/.test(k.govde);
+}).map(function (k) { return k.secici; });
+ok("Canlı satırlar / İptal CSS: flex gap ve overflow-wrap:anywhere yok (CEF 74)", canliKurallari.length >= 10 && canliCssSorun.length === 0, canliKurallari.length + " kural · " + canliCssSorun.join(" | "));
 
 var ornekRegex = ayikla("function f(x){ return /a'b/.test(x); }\nvar y = o?.p;");
 ok("denetleyici: return'den sonraki regex metin sanilmaz, arkasindaki kod gorunur", /o\?\.p/.test(ornekRegex.split("\n")[1]));

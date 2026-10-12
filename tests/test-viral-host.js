@@ -118,11 +118,11 @@ ok("Shorts yukleme: editor gorunur, bos ekranda geri al yigini sifir, ana taslak
 ok("yeni transkript / SRT / taslak kurtarma Shorts modunu kapatir", (cj.match(/shortsYuklenen = "";/g) || []).length >= 3);
 ok("viral: anlar baska sekansta bulunduysa Shorts olusturulmaz, bulundugu andaki transkript kullanilir",
   /bulSekans && simdiki !== bulSekans/.test(vj) && /var d = await sekansDenetle\(\);\s*if \(d\.uyari\) \{ durum\(d\.uyari, "warn"\); return; \}\s*var liste = gorunenler\(\);/.test(vj) &&
-  /else if \(bulSegs\) \{ kaynak = bulSegs; mod = bulMod; \}\s*else \{ kaynak = KCaptions\.rawSegments\(\);/.test(vj) && /sliceSegments\(kaynak, an\.start, an\.end\)/.test(vj));
+  /else if \(bulSegs\) \{ kaynak = bulSegs; mod = bulMod;(?: dil = bulDil;)? \}\s*else \{ kaynak = KCaptions\.rawSegments\(\);/.test(vj) && /sliceSegments\(kaynak, an\.start, an\.end\)/.test(vj));
 
 /* sekizinci inceleme */
 ok("geri al yigini Shorts durumunu tasir ve geri yukler", /shorts: shortsYuklenen, ts: Date\.now\(\)/.test(cj) && /if \(typeof st\.shorts === "string"\) \{\s*shortsYuklenen = st\.shorts;/.test(cj) &&
-  /cevir: ceviriDili, shorts: shortsYuklenen, ts: Date\.now\(\) \}\);/.test(cj));
+  /cevir: ceviriDili,(?: dil: algilananDil,)? shorts: shortsYuklenen, ts: Date\.now\(\) \}\);/.test(cj));
 var goKod = cj.slice(cj.indexOf("var oncekiIs = segments.length"), cj.indexOf('el("cap-result-info").textContent = segments.length + " satır · düzenleyip uygula"'));
 ok("yeni transkript: Shorts modu yalniz basarida kapanir", goKod.indexOf('shortsYuklenen = "";') > goKod.indexOf("clearRevert();"));
 ok("uygulama: Shorts (ya da rehberin ornegi) uygulaninca ana taslak silinmez", /if \(!shortsYuklenen(?: && !ornekBelge)?\) K\.clearDraft\(\);/.test(cj));

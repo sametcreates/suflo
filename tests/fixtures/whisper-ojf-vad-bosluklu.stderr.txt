@@ -1,0 +1,14 @@
+whisper_init_from_file_with_params_no_state: loading model from 'models/ggml-large-v3-turbo-q5_0.bin'
+whisper_vad: VAD is enabled, processing speech segments only
+whisper_vad_init_from_file_with_params: loading VAD model from 'models/ggml-silero-v5.1.2.bin'
+whisper_vad_segments_from_probs: Final speech segments after filtering: 2
+whisper_vad: detected 2 speech segments
+whisper_vad: Including segment 0: 10.00 - 12.10 (duration: 2.10)
+whisper_vad: Including segment 1: 14.00 - 16.40 (duration: 2.40)
+whisper_vad: total duration of speech segments: 4.50 seconds
+whisper_vad: vad_segment_info: orig_start: 10.00, orig_end: 12.00, vad_start: 0.00, vad_end: 2.00
+whisper_vad: vad_segment_info: orig_start: 14.00, orig_end: 16.40, vad_start: 2.20, vad_end: 4.60
+whisper_vad: Created time mapping table with 5 points
+whisper_vad: Reduced audio from 288000 to 73600 samples (74.4% reduction)
+
+main: processing 'ornek.wav' (288000 samples, 18.0 sec), 4 threads, 1 processors, 5 beams + best of 5, lang = tr, task = transcribe, timestamps = 1 ...

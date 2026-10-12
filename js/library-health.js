@@ -280,7 +280,12 @@ window.KLibraryHealth = (function () {
       { k: "markers", ad: "Marker API", etki: "Bölüm, viral ve B-roll marker'ları eklenemez" },
       { k: "qeAddTracks", ad: "QE kanal ekleme", etki: "Boş kanal yoksa Sesi iyileştir / katmanlar yeni kanal açamaz" },
       { k: "trackItemDisabled", ad: "Klip devre dışı bırakma", etki: "Sesi iyileştir orijinal sesi kapatamaz (elle kapat)" },
-      { k: "seqFromClips", ad: "Klipten sekans (createNewSequenceFromClips)", etki: "Rehberin örnek klibi sekansa kendiliğinden konmaz; klibi Yeni Öğe simgesine sürüklemen gerekir" }
+      { k: "seqFromClips", ad: "Klipten sekans (createNewSequenceFromClips)", etki: "Rehberin örnek klibi sekansa kendiliğinden konmaz; klibi Yeni Öğe simgesine sürüklemen gerekir" },
+      // Hız Rampası (KS_apiProbe yalnız typeof okur; setSpeed hiçbir zaman çağrılmaz)
+      { k: "qeSetSpeed", ad: "QE hız yazma (setSpeed)", etki: "Hız Rampası klibe hız yazamaz" },
+      { k: "unlinkSelection", ad: "Bağlantı koparma (unlinkSelection)", etki: "Sesle bağlı kliplerde Hız Rampası önce Ctrl+L ile bağlantıyı koparmanı ister" },
+      { k: "interp", ad: "Kare harmanlama (setTimeInterpolationType)", etki: "Hız Rampası parçalara kare harmanlamayı açamaz; Premiere'de elle aç" },
+      { k: "speedRead", ad: "Hız okuma (getSpeed)", etki: "Hızı değişmiş klipler süre karşılaştırmasıyla bulunur" }
     ];
     var eksik = [], bilinmeyen = [];
     gerek.forEach(function (g) {
@@ -296,6 +301,11 @@ window.KLibraryHealth = (function () {
       eksik.forEach(function (g) {
         out.push({ status: "warn", title: "Premiere'de yok: " + g.ad, detail: g.etki, group: "premiere" });
       });
+    }
+    // Bilgi: Premiere bir gün Zaman Yeniden Eşleme'yi betiklere açarsa (Hız Rampası Katman 3)
+    if (a.timeRemapApi === true) {
+      out.push({ status: "good", title: "Zaman Yeniden Eşleme API'si açık",
+        detail: "Bu Premiere sürümü Zaman Yeniden Eşleme'yi betiklere gösteriyor; Hız Rampası ileride gerçek eğri yazabilir", group: "premiere" });
     }
     return out;
   }
@@ -334,6 +344,22 @@ window.KLibraryHealth = (function () {
     }
   }
 
+  /*
+   * Yerel motor seçenekleri (js/whisper-args.js doctorSatirlari): Ayarlar › Çözme ve "Hassas kelime
+   * zamanlaması (DTW)" — derleme -dtw / -nfa tanıyor mu (whisper-cli -h), modelin ön ayarı var mı,
+   * bu model + derlemede otomatik kapatıldı mı. Yalnız okur; ayar yazmaz.
+   */
+  function motorSecenekSatirlari(probe, model, ready, build) {
+    var WAR = window.SufloWhisperArgs;
+    if (!WAR || !WAR.doctorSatirlari) return [];
+    var s = K.settings ? K.settings() : {};
+    var yardim = probe ? WAR.yardimDestegi(String(probe.stdout || "") + "\n" + String(probe.stderr || "")) : null;
+    return WAR.doctorSatirlari({
+      cozme: s.cozme, dtwAyar: s.dtw === true, model: model && model.id ? model.id : (ready && ready.model) || "",
+      derleme: build, dtwKapali: s.dtwKapali, yardim: yardim
+    }).map(function (c) { return { status: c.status, title: c.title, detail: c.detail, group: "engine" }; });
+  }
+
   async function engineChecks() {
     var checks = [];
     var settings = K.settings ? K.settings() : {};
@@ -352,6 +378,8 @@ window.KLibraryHealth = (function () {
         var model = window.KEngine && KEngine.activeModel ? KEngine.activeModel() : null;
         var build = window.KEngine && KEngine.installedBuild ? KEngine.installedBuild() : "cpu";
         checks.push({ status: "good", title: "Yerel altyazı motoru", detail: (model ? model.label.split(" —")[0] : basename(ready.model)) + " · " + String(build).toUpperCase(), group: "engine" });
+        // 3.2 adım 5: etkin çözme modu ve DTW desteği (yardım metni yukarıdaki "-h" yoklamasından)
+        motorSecenekSatirlari(probe, model, ready, build).forEach(function (c) { checks.push(c); });
       } catch (eP) {
         checks.push({ status: cloudReady ? "warn" : "bad", title: "Yerel motor açılmıyor", detail: K.hataYardimi ? K.hataYardimi(eP) : String(eP), action: "repair-engine", group: "engine" });
       }
@@ -528,7 +556,41 @@ window.KLibraryHealth = (function () {
     return out;
   }
 
+  // Karttaki dört çip (Premiere, Altyazı motoru, Pro Cloud, Presetler) taramanın gerçek sonucunu
+  // gösterir: o bölümdeki en kötü durum; denetim yoksa "" (nötr). Presetler, Pro grubundaki preset
+  // denetimleridir; Pro Cloud geri kalanı
+  var CIPLER = {
+    premiere: function (c) { return c.group === "premiere"; },
+    engine: function (c) { return c.group === "engine"; },
+    pro: function (c) { return c.group === "pro" && !/preset/i.test(c.title); },
+    preset: function (c) { return c.group === "pro" && /preset/i.test(c.title); }
+  };
+  var CIP_SIRA = { good: 1, warn: 2, bad: 3 };
+  function cipDurumlari(report) {
+    var out = {};
+    Object.keys(CIPLER).forEach(function (k) {
+      var en = "";
+      ((report && report.checks) || []).forEach(function (c) {
+        if (CIPLER[k](c) && (CIP_SIRA[c.status] || 0) > (CIP_SIRA[en] || 0)) en = c.status;
+      });
+      out[k] = en;
+    });
+    return out;
+  }
+  var CIP_METNI = { good: "sorun yok", warn: "uyarı var", bad: "düzeltilmesi gereken sorun var", "": "denetlenmedi" };
+  function cipleriCiz(report) {
+    var d = cipDurumlari(report);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-cip]"), function (s) {
+      var k = s.getAttribute("data-doctor-cip");
+      var durum = report ? (d[k] || "") : "";
+      s.className = durum;
+      if (report) s.setAttribute("title", uiMetni(s.textContent) + ": " + uiMetni(CIP_METNI[durum]));
+      else s.removeAttribute("title");
+    });
+  }
+
   function render(report) {
+    cipleriCiz(report);
     var box = el("set-library-health-result");
     var copy = el("set-library-health-copy");
     var fixAll = el("set-doctor-fix-all");
@@ -756,6 +818,7 @@ window.KLibraryHealth = (function () {
     repair: repair,
     repairAll: repairAll,
     apiKontrolleri: apiKontrolleri,
+    cipDurumlari: cipDurumlari,
     PANEL_REHBERI: PANEL_REHBERI,
     last: function () { return lastReport; }
   };

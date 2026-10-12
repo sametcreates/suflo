@@ -549,7 +549,15 @@
   /*
    * İşin kaynak transkripti: her Short'a kendi aralığındaki satırlar (zamanlar KAYDIRILMADAN,
    * orta noktası aralıkta olanlar) yazılır. "Devam et" o an yüklü transkripti değil bunu kullanır.
+   * İş settings.json'da (shortsPaketIs) durur: ölçülmüş kelimeler (words, origWords) kopyalanmaz,
+   * dosya her ayar kaydında baştan yazılır (Shorts altyazı kaydı da onları taşımaz).
    */
+  function kelimesizKopya(s) {
+    var x = kopya(s);
+    if (x && typeof x === "object") { delete x.words; delete x.origWords; }
+    return x;
+  }
+
   function kaynakDilimi(segs, start, end) {
     start = Number(start); end = Number(end);
     if (!(end > start)) return [];
@@ -558,7 +566,7 @@
       if (!isFinite(a) || !isFinite(b)) return false;
       var orta = (a + b) / 2;
       return orta >= start && orta <= end;
-    }).map(kopya);
+    }).map(kelimesizKopya);
   }
 
   var MODLAR = { k1: 1, kc: 1, w: 1, plain: 1 };

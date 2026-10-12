@@ -10,6 +10,12 @@ window.KCut = (function () {
   var ranges = [];      // { start, end, keep } — sequence zamanı
   var target = "clone"; // clone | here
   var busy = false;
+  // Süren ffmpeg analizinin iptal jetonu (K.iptalJetonu): "İptal" düğmesi süreç ağacını öldürür
+  var iptalJetonu = null;
+  // setBusy(true) anı: "İptal" "Sessizlikleri bul"un yerinde belirir; çift tıklamanın ikinci tıkı analizi iptal etmesin
+  var iptalAcilis = 0;
+  // setBusy(false) anı: "Sessizlikleri bul" "İptal"in yerinde yeniden belirir; İptal'e çift tıkın ikinci tıkı yeni analiz başlatmasın
+  var baslatAcilis = 0;
 
   function el(id) { return document.getElementById(id); }
 
@@ -59,7 +65,9 @@ window.KCut = (function () {
     return out;
   }
 
-  async function analyze() {
+  async function analyze(ev) {
+    // kapıdan ÖNCE: başıboş ikinci tık deneme penceresi de açmasın (Pro "yeniden" olay taşımaz, geçer)
+    if (K.baslatTikiGecerli && !K.baslatTikiGecerli(ev, baslatAcilis)) return;
     // Pro: otomatik kesim (ucretsizde 3 deneme hakki; hak yalniz kesim uygulaninca duser)
     if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: analyze })) return;
     if (busy) return;
@@ -67,10 +75,13 @@ window.KCut = (function () {
     clip = KApp.ctx().sel;
     if (!clip) { status("Önce bir klip seç.", "warn"); return; }
     busy = true;
+    iptalJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
+    var jeton = iptalJetonu;
     setBusy(true);
     try {
       var ff = await K.findFfmpeg();
       if (!ff) throw new Error("ffmpeg bulunamadı — Ayarlar sekmesinden kur.");
+      if (jeton && jeton.iptalEdildi) { status("İptal edildi.", "warn"); return; }
 
       var noise = el("cut-noise").value;
       var minSil = parseFloat(el("cut-minsil").value);
@@ -86,7 +97,9 @@ window.KCut = (function () {
         "-map", "0:a:0?",
         "-af", "silencedetect=noise=" + noise + "dB:d=" + minSil,
         "-f", "null", "-"
-      ], { timeout: Math.max(300000, dur * 2000) });
+      ], { timeout: Math.max(300000, dur * 2000), iptal: jeton });
+      // kullanıcı iptal etti: yarım sonucu öneri diye gösterme, önceki analiz ekranda kalır
+      if (res.iptal) { status("İptal edildi.", "warn"); return; }
       var sil = parseSilence(res.stderr || "");
       K.log("[kesim] ffmpeg kod=" + res.code + " ham aralik=" + sil.length +
         " sure=" + dur.toFixed(1) + " esik=" + noise + "dB");
@@ -138,6 +151,7 @@ window.KCut = (function () {
       status("✕ " + e.message, "bad");
     } finally {
       busy = false;
+      iptalJetonu = null;
       setBusy(false);
     }
   }
@@ -145,7 +159,23 @@ window.KCut = (function () {
   function setBusy(b) {
     el("cut-analyze").classList.toggle("busy", b);
     el("cut-progress").hidden = !b;
+    // analiz sürerken "Sessizlikleri bul" yerine "İptal"
+    var iptal = el("cut-cancel");
+    if (iptal) {
+      el("cut-analyze").hidden = b;
+      iptal.hidden = !b;
+      iptal.disabled = false;
+    }
+    iptalAcilis = b ? Date.now() : 0;
+    baslatAcilis = b ? 0 : Date.now();
     if (!b) refreshButton();
+  }
+
+  function iptalEt(ev) {
+    if (!busy || !iptalJetonu) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, iptalAcilis)) return;
+    el("cut-cancel").disabled = true;
+    iptalJetonu.iptal();
   }
 
   /* ---------------- Görselleştirme ---------------- */
@@ -316,6 +346,7 @@ window.KCut = (function () {
     });
 
     el("cut-analyze").addEventListener("click", analyze);
+    if (el("cut-cancel")) el("cut-cancel").addEventListener("click", iptalEt);
     el("cut-apply").addEventListener("click", apply);
     if (el("cut-dinle")) el("cut-dinle").addEventListener("click", dinle);
 

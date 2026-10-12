@@ -1,0 +1,199 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "large",
+		"multilingual": true,
+		"vocab": 51866,
+		"audio": {
+			"ctx": 1500,
+			"state": 1280,
+			"head": 20,
+			"layer": 32
+		},
+		"text": {
+			"ctx": 448,
+			"state": 1280,
+			"head": 20,
+			"layer": 4
+		},
+		"mels": 128,
+		"ftype": 8
+	},
+	"params": {
+		"model": "models/ggml-large-v3-turbo-q5_0.bin",
+		"language": "tr",
+		"translate": false
+	},
+	"result": {
+		"language": "tr"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:10,000",
+				"to": "00:00:16,400"
+			},
+			"offsets": {
+				"from": 10000,
+				"to": 16400
+			},
+			"text": " Kamera hazır, şimdi başlıyoruz.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50365,
+					"p": 0.94,
+					"t_dtw": -1
+				},
+				{
+					"text": " Kam",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,300"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 300
+					},
+					"id": 21765,
+					"p": 0.95,
+					"t_dtw": -1
+				},
+				{
+					"text": "era",
+					"timestamps": {
+						"from": "00:00:00,300",
+						"to": "00:00:00,600"
+					},
+					"offsets": {
+						"from": 300,
+						"to": 600
+					},
+					"id": 1663,
+					"p": 0.99,
+					"t_dtw": -1
+				},
+				{
+					"text": " haz",
+					"timestamps": {
+						"from": "00:00:00,600",
+						"to": "00:00:01,000"
+					},
+					"offsets": {
+						"from": 600,
+						"to": 1000
+					},
+					"id": 30134,
+					"p": 0.97,
+					"t_dtw": -1
+				},
+				{
+					"text": "ır",
+					"timestamps": {
+						"from": "00:00:01,000",
+						"to": "00:00:01,400"
+					},
+					"offsets": {
+						"from": 1000,
+						"to": 1400
+					},
+					"id": 7930,
+					"p": 0.99,
+					"t_dtw": -1
+				},
+				{
+					"text": ",",
+					"timestamps": {
+						"from": "00:00:01,400",
+						"to": "00:00:01,500"
+					},
+					"offsets": {
+						"from": 1400,
+						"to": 1500
+					},
+					"id": 11,
+					"p": 0.86,
+					"t_dtw": -1
+				},
+				{
+					"text": " şimdi",
+					"timestamps": {
+						"from": "00:00:02,300",
+						"to": "00:00:02,800"
+					},
+					"offsets": {
+						"from": 2300,
+						"to": 2800
+					},
+					"id": 22941,
+					"p": 0.96,
+					"t_dtw": -1
+				},
+				{
+					"text": " baş",
+					"timestamps": {
+						"from": "00:00:02,800",
+						"to": "00:00:03,300"
+					},
+					"offsets": {
+						"from": 2800,
+						"to": 3300
+					},
+					"id": 26239,
+					"p": 0.96,
+					"t_dtw": -1
+				},
+				{
+					"text": "lıyoruz",
+					"timestamps": {
+						"from": "00:00:03,300",
+						"to": "00:00:04,100"
+					},
+					"offsets": {
+						"from": 3300,
+						"to": 4100
+					},
+					"id": 41287,
+					"p": 0.98,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:04,100",
+						"to": "00:00:04,600"
+					},
+					"offsets": {
+						"from": 4100,
+						"to": 4600
+					},
+					"id": 13,
+					"p": 0.93,
+					"t_dtw": -1
+				},
+				{
+					"text": "[_TT_230]",
+					"timestamps": {
+						"from": "00:00:04,600",
+						"to": "00:00:04,600"
+					},
+					"offsets": {
+						"from": 4600,
+						"to": 4600
+					},
+					"id": 50595,
+					"p": 0.41,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

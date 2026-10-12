@@ -71,6 +71,11 @@
       <span class="ky-kilit" data-kilit>PRO</span>
       <span class="ky-adet" id="gecis-sayac">13</span>
     </button>
+    <button class="ky-oge" data-tab="hiz">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14a7 7 0 0 1 14 0"/><path d="M10 14l4-5"/></svg></span>
+      <span class="ky-metin"><b>Hız Rampası <em class="ky-yeni">YENİ</em></b><i>ağır çekim · hızlanma</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
     <button class="ky-oge" data-tab="kanca">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="5" rx="1.2"/><path d="M5 13h10M7 16h6"/></svg></span>
       <span class="ky-metin"><b>Kanca Başlığı <em class="ky-yeni">YENİ</em></b><i>Shorts açılış yazısı</i></span>
@@ -231,6 +236,7 @@
     <div id="cap-setup" class="setup-note" hidden>
       <p id="cap-setup-text"><strong>Suflo Altyazı Motoru kurulmalı.</strong> Tek motor; doğru modeli, GPU'yu ve güvenli yedeği kendisi yönetir. Yerel kullanımda hesap, anahtar veya internet gerekmez.</p>
       <button id="cap-local-install" class="btn primary" style="width:100%">Yerel motoru indir & kur</button>
+      <button id="cap-local-cancel" class="link-btn kurulum-iptal" type="button" hidden title="İnen kısım korunur; yeniden kurunca kaldığı yerden devam eder">İndirmeyi iptal et</button>
       <p class="hint" id="cap-ffmpeg-ipucu" hidden style="margin:8px 0 6px">
         Not: ses dönüştürme için <b>ffmpeg</b> de gerekiyor (her iki motorda da).
         Panel bunu ilk kurulumda kendisi indirir, senin bir şey yapmana gerek yok.
@@ -290,6 +296,12 @@
               <option value="">Otomatik</option>
             </select>
             <p class="hint" id="cap-lang-glif" hidden>Bu alfabe stilli altyazı katmanının yazı tiplerinde olmayabilir; altyazı izi ve SRT her zaman çalışır.</p>
+            <!-- Çevrimdışı İngilizce (3.2 adım 5, js/whisper-args.js "-tr"): yalnız yerel motor ve dil İngilizce değilken;
+                 Small ya da Large model; Pro (3 deneme hakkı). Diğer diller Caption Editor'daki bulut çevirisinde. -->
+            <label class="check-label cap-cevir-en" id="cap-cevir-en-sar" hidden title="Konuşmayı internetsiz İngilizce altyazıya çevirir: yerel motor, Small ya da Large model. Pro (3 ücretsiz deneme hakkı). Diğer diller için Caption Editor'daki Çeviri.">
+              <input id="cap-cevir-en" type="checkbox"> İngilizceye çevir (çevrimdışı) <span class="pro-inline">PRO</span>
+            </label>
+            <p class="hint cap-cevir-en-not" id="cap-cevir-en-not" hidden><span id="cap-cevir-en-not-metin"></span> <button type="button" id="cap-cevir-en-gec" class="link-btn">Large'a geç</button></p>
           </div>
           <div class="field">
             <label for="cap-maxlen">Satır uzunluğu</label>
@@ -299,8 +311,9 @@
                 <option value="w3">3 kelime</option>
                 <option value="w4">4 kelime</option>
                 <option value="w5">5 kelime</option>
-                <option value="c32">32 karakter</option>
-                <option value="c42" selected>42 karakter</option>
+                <option value="l32">32 karakter</option>
+                <option value="l42" selected>42 karakter</option>
+                <option value="c42x2">2 satır × 42 (YouTube/TV)</option>
                 <option value="c60">60 karakter</option>
               </optgroup>
               <optgroup label="Kelime zamanlı">
@@ -310,6 +323,24 @@
             </select>
           </div>
         </div>
+
+        <!-- Kelime sınırı (3.2 adım 4, js/caption-layout.js): satır modlarında satır en çok N kelime; 0 kapalı -->
+        <div class="field" id="cap-kelime-siniri-alan">
+          <label for="cap-kelime-siniri">Kelime sınırı</label>
+          <div class="field-row">
+            <input id="cap-kelime-siniri" type="number" min="0" max="12" step="1" value="0" class="kelime-siniri"
+              title="Satır modunda bir satıra en çok kaç kelime girer (0 = kapalı, 2–12). Kelime zamanı olan transkriptte geçerli.">
+            <span class="hint">0 = kapalı · satır modunda bir satırdaki en çok kelime</span>
+          </div>
+        </div>
+
+        <!-- Hassas kelime zamanlaması (3.2 adım 5): DTW; yalnız kelime tabanlı modlarda / Suflo Stillerinde, yerel motor -->
+        <label class="switch cap-dtw" id="cap-dtw-sar" hidden title="Yerel motor kelime başlarını ses ile metnin hizalamasından (DTW) ölçer: kelime kelime ve karaoke altyazıda vurgu sözcüğün söylendiği anda yanar. Transkripsiyon biraz uzar.">
+          <input id="cap-dtw" type="checkbox">
+          <i></i>
+          <span>Hassas kelime zamanlaması (DTW, biraz daha yavaş)</span>
+        </label>
+        <p class="hint" id="cap-dtw-not" hidden>Bu model ve motor derlemesinde DTW zamanı gelmedi, otomatik kapatıldı; kelime zamanı belirteç zamanından geliyor. <a href="#" id="cap-dtw-yeniden" class="link-btn">Yeniden dene</a></p>
 
         <div class="field">
           <label for="cap-case">Yazım biçimi</label>
@@ -501,6 +532,8 @@
       <button id="cap-go" class="btn primary big cta" disabled>
         <span class="btn-label">Altyazı oluştur<em id="cap-go-scope">Seçili klip</em></span>
       </button>
+      <!-- İş sürerken "Altyazı oluştur"un yerini alır (js/captions.js setBusy); ses dışa aktarımı sırasında kapalı -->
+      <button id="cap-cancel" class="btn outline big iptal-btn" type="button" hidden title="İşi durdurur: geçici ses ve çıktı dosyaları silinir (kurulu motor ve model kalır), ekrandaki altyazı olduğu gibi kalır.">İptal</button>
       <button id="cap-restore" class="btn outline big" hidden></button>
       <button id="cap-shorts-al" class="btn outline big" type="button" hidden title="Bu sekans Suflo'nun Shorts sekansı: ana videonun transkriptinden bu anın satırları yüklenir"></button>
       <button id="cap-import-srt" class="btn outline big">
@@ -509,6 +542,23 @@
       </button>
       <div id="cap-progress" class="progress-line" hidden><i></i></div>
       <div id="cap-status" class="inline-status"></div>
+      <!-- Canlı transkripsiyon (js/whisper-akis.js): motor çalışırken akan geçici satırlar; salt okunur,
+           taslağa / geri al yığınına girmez, nihai satırlar gelince silinir -->
+      <div id="cap-canli" class="canli-kutu" role="region" aria-label="Canlı transkripsiyon" hidden>
+        <div class="canli-ust">
+          <span class="canli-rozet">canlı</span>
+          <span class="canli-not">Geçici satırlar: motor bitince düzenlenebilir altyazıyla değişir.</span>
+        </div>
+        <div id="cap-canli-liste" class="canli-liste" role="log" aria-readonly="true"></div>
+      </div>
+      <!-- Sessiz ses uyarısı (js/sessiz-ses.js): motor çalışmadan önce, tepe 0,001 altındaysa -->
+      <div id="cap-sessiz" class="sessiz-uyari" role="alert" hidden>
+        <span id="cap-sessiz-metin" class="sessiz-uyari-metin"></span>
+        <div class="sessiz-uyari-btns">
+          <button id="cap-sessiz-devam" class="btn tiny" type="button">Yine de devam et</button>
+          <button id="cap-sessiz-vazgec" class="btn tiny ghost" type="button">Vazgeç</button>
+        </div>
+      </div>
 
       <div id="star-bar" class="star-bar" hidden>
         <span>Suflo işini görüyorsa GitHub'da bir yıldız bırakır mısın? Duyulmamıza yarıyor.</span>
@@ -598,6 +648,7 @@
         <div class="caption-editor-shortcuts">
           <span><i></i> Otomatik kaydedilir</span>
           <span><kbd>Enter</kbd> böl</span>
+          <span><kbd>Shift+Enter</kbd> alt satır</span>
           <span><kbd>Ctrl+Enter</kbd> sonraki satır</span>
           <span><kbd>Alt+Enter</kbd> satır ekle</span>
         </div>
@@ -901,6 +952,7 @@
       <button id="cut-analyze" class="btn primary big" disabled>
         <span class="btn-label">Sessizlikleri bul</span>
       </button>
+      <button id="cut-cancel" class="btn outline big iptal-btn" type="button" hidden title="ffmpeg analizini durdurur; önceki sonuç ekranda kalır">İptal</button>
     </div>
     <div id="cut-progress" class="progress-line" hidden><i></i></div>
     <div id="cut-status" class="inline-status"></div>
@@ -994,6 +1046,13 @@
       </div>
       <div id="tc-progress" class="progress-line" hidden><i></i></div>
       <div id="tc-status" class="inline-status"></div>
+      <div id="tc-sessiz" class="sessiz-uyari" role="alert" hidden>
+        <span id="tc-sessiz-metin" class="sessiz-uyari-metin"></span>
+        <div class="sessiz-uyari-btns">
+          <button id="tc-sessiz-devam" class="btn tiny" type="button">Yine de devam et</button>
+          <button id="tc-sessiz-vazgec" class="btn tiny ghost" type="button">Vazgeç</button>
+        </div>
+      </div>
       <div id="tc-result" hidden>
         <div id="tc-cache" class="tc-cache hint" hidden>önbellekten · <button id="tc-retranscribe" class="link-btn" type="button">Yeniden yazıya dök</button></div>
         <div class="result-head">
@@ -1355,6 +1414,103 @@
     <div id="gecis-grid" class="preset-grid gecis-grid"></div>
   </section>
 
+  <!-- ================= HIZ RAMPASI (v3.2) ================= -->
+  <!-- Eğri kartları ve önizleme ücretsiz; uygulamak Pro (3 deneme). js/speedramp.js + js/hiz-rampasi.js -->
+  <section id="tab-hiz" class="tabpane">
+    <div class="pro-tanitim" id="hiz-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Tek tıkla hız rampası</b>
+        <span>Klibi seç, eğriyi seç, uygula. Premiere'de düzenlenebilir hız parçaları; kurgun kaymaz.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>11</strong> eğri</i><i><strong>0</strong> eklenti</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="speedramp">Hız rampasını aç — 749 TL</button>
+    </div>
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 14a7 7 0 0 1 14 0"/><path d="M10 14l4-5"/></svg>
+        <b>Premiere'de düzenlenebilir hız rampası</b>
+      </div>
+      <p class="ci-p">Premiere, Zaman Yeniden Eşleme'yi eklentilere açmıyor. Suflo rampayı kısa parçalara böler ve her parçaya kendi hızını yazar; hızları Hız/Süre'den değiştirebilirsin. Klibin yeri ve süresi aynı kalır: altyazı, müzik ve sonraki klipler kaymaz.</p>
+    </div>
+    <div class="hiz-hedef-satir">
+      <div id="hiz-hedef" class="hiz-hedef">Timeline'da bir klip seç ya da Giriş/Çıkış (In/Out) koy.</div>
+      <label class="preset-control">Aralık
+        <select id="hiz-aralik">
+          <option value="clips" selected>Seçili klipler (tamamı)</option>
+          <option value="inout">Giriş–Çıkış arası (In/Out)</option>
+        </select>
+      </label>
+    </div>
+    <div id="hiz-grid" class="preset-grid hiz-grid"></div>
+    <div class="hiz-onizleme-kutu">
+      <!-- aria-label SVG'nin dışında: çeviri SVG'ye girmez, İngilizce ekran okuyucu da çevrilmiş adı duysun -->
+      <div class="hiz-onizleme-cerceve" role="img" aria-label="Hız eğrisi önizlemesi">
+        <svg id="hiz-onizleme" class="hiz-onizleme" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true"></svg>
+      </div>
+      <div id="hiz-ozet" class="hiz-ozet"></div>
+    </div>
+    <div class="preset-toolbar hiz-secenekler">
+      <label class="preset-control">Yoğunluk
+        <select id="hiz-yogunluk">
+          <option value="0.6">Hafif</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.4">Güçlü</option>
+        </select>
+      </label>
+      <label class="preset-control">Yumuşatma
+        <select id="hiz-gecis">
+          <option value="smooth" selected>Yumuşak</option>
+          <option value="linear">Doğrusal</option>
+          <option value="step">Basamaklı</option>
+        </select>
+      </label>
+      <label class="preset-control">Parça
+        <select id="hiz-parca">
+          <option value="few">Az</option>
+          <option value="normal" selected>Normal</option>
+          <option value="many">Çok</option>
+        </select>
+      </label>
+      <label class="preset-control">Kaynak
+        <select id="hiz-kaynak">
+          <option value="auto" selected>Otomatik</option>
+          <option value="balanced">Dengeli</option>
+        </select>
+      </label>
+      <label class="preset-control">Ses
+        <select id="hiz-ses">
+          <option value="mute" selected>Rampada sesi kapat</option>
+          <option value="keep">Sesi olduğu gibi bırak</option>
+        </select>
+      </label>
+      <label class="preset-control">Yavaş parçalarda
+        <select id="hiz-akis">
+          <option value="1" selected>Kare harmanlama</option>
+          <option value="2">Optik akış (yavaş render)</option>
+          <option value="0">Aradeğerleme yok</option>
+        </select>
+      </label>
+      <label class="preset-control" id="hiz-ritim-yon-kutu" hidden>Vuruş
+        <select id="hiz-ritim-yon">
+          <option value="slow" selected>Vuruşta yavaş</option>
+          <option value="fast">Vuruşta hızlı</option>
+        </select>
+      </label>
+    </div>
+    <label class="switch"><input id="hiz-bulanik" type="checkbox"><i></i><span>Hızlı bölümlerde bulanıklık</span></label>
+    <label class="switch"><input id="hiz-vurus" type="checkbox"><i></i><span>Darbe anını playhead'e hizala</span></label>
+    <label class="switch"><input id="hiz-kopya" type="checkbox" checked><i></i><span>Önce sekansı kopyala</span></label>
+    <div class="row hiz-eylem">
+      <button id="hiz-kaldir" class="btn" type="button">Rampayı kaldır</button>
+      <button id="hiz-uygula" class="btn primary grow" type="button">Rampayı uygula</button>
+    </div>
+    <div id="hiz-status" class="inline-status" role="status" aria-live="polite"></div>
+    <p class="hint">Ctrl+Z rampayı tek adımda geri almaz; geri almak için Rampayı kaldır'ı kullan. Yakınlaştırma ve geçişleri rampadan sonra ekle.</p>
+  </section>
+
   <!-- ================= KANCA BASLIGI ================= -->
   <section id="tab-kanca" class="tabpane">
     <div class="pro-tanitim" id="kanca-tanitim" hidden>
@@ -1673,11 +1829,21 @@
         <label>Yerel çekirdek</label>
         <span id="set-local-status" class="inline-status" style="margin:0;flex:1">kontrol ediliyor…</span>
         <button id="set-local-install" class="btn" hidden>İndir & kur</button>
+        <button id="set-local-cancel" class="btn" type="button" hidden title="İnen kısım korunur; yeniden kurunca kaldığı yerden devam eder">İptal</button>
       </div>
       <div class="row">
         <label>Doğruluk modeli</label>
         <select id="set-model" class="grow" title="Büyük model = daha doğru ama yavaş"></select>
       </div>
+      <!-- Çözme modu (3.2 adım 5, js/whisper-args.js): yalnız yerel motor; varsayılan Türkçe kıyasa dek En doğru -->
+      <div class="row">
+        <label for="set-cozme">Çözme</label>
+        <select id="set-cozme" class="grow" title="Yerel motorun metni nasıl çözdüğü">
+          <option value="dogru">En doğru — beam search (önerilen)</option>
+          <option value="hizli">Hızlı — tek aday</option>
+        </select>
+      </div>
+      <p class="hint" id="set-cozme-ipucu">En doğru her adımda 5 adayı karşılaştırır. Hızlı tek adayla çözer: uzun videoda belirgin hızlıdır, gürültülü ya da telefon kaydında daha çok hata yapabilir. Yalnız yerel motorda geçerli; yeni transkriptlerde.</p>
       <div class="row" id="set-gpu-row" hidden>
         <label>Hızlandırma</label>
         <label class="switch" style="flex:1" title="NVIDIA ekran kartıyla 5-15 kat hızlı">
@@ -1712,6 +1878,33 @@
         </div>
         <p class="hint">Suflo önce bilgisayarındaki motoru kullanır. Yalnız yerel motor açılamazsa ses, seçtiğin yedek sağlayıcıya gönderilir.</p>
       </details>
+    </div>
+
+    <div class="set-group" id="grp-altyazi">
+      <div class="set-title">Altyazı</div>
+      <label class="switch" title="Erişilebilirlik: işitme engelli izleyiciler müziği ve alkışı altyazıdan okur">
+        <input id="set-ses-etiket" type="checkbox">
+        <i></i>
+        <span>Ses etiketlerini koru</span>
+      </label>
+      <p class="hint">Kapalıyken motorun yazdığı [Müzik], (alkış), [BLANK_AUDIO] ve yalnız ♪ satırları atılır; konuşmalı satırda yalnız etiket silinir. Açıkken etiketler [Müzik] biçiminde kalır. Yeni transkriptlerde geçerli.</p>
+      <!-- Okunabilir satır düzeni (3.2 adım 4): satır modlarında ekran süresi ve kısa parça birleştirme -->
+      <div class="field-grid altyazi-sure" style="margin-top:8px">
+        <div class="field">
+          <label for="set-min-sure">En kısa süre (sn)</label>
+          <input id="set-min-sure" type="number" min="0.3" max="3" step="0.1" value="0.8">
+        </div>
+        <div class="field">
+          <label for="set-max-sure">En uzun süre (sn)</label>
+          <input id="set-max-sure" type="number" min="2" max="15" step="0.5" value="6">
+        </div>
+      </div>
+      <label class="switch" title="Arası 0,2 saniyeden kısa olan komşu parçalar birlikte sığıyorsa tek altyazı olur">
+        <input id="set-kisa-birlestir" type="checkbox" checked>
+        <i></i>
+        <span>Kısa parçaları birleştir</span>
+      </label>
+      <p class="hint">Satır modlarında (32 / 42 karakter, 2 satır × 42) yeni transkriptlerde geçerli: altyazı en kısa sürenin altında kalmaz (sonraki satıra kadar boşluk varsa), en uzun süreyi aşmaz (uzun satır bölünür). Kelime zamanı olmayan transkriptte (bulut yedeği) yalnız 2 satır × 42'de geçerli; 32 / 42 karakter eski bölmeyi izler. Birleştirme kelime zamanı olmayan kısa parçaları toplar (kelime zamanlı satırlar zaten en az parçayla kurulur), cümle sonunu aşmaz, satır uzunluğunu ve kelime sınırını korur.</p>
     </div>
 
     <div class="set-group marka-kiti-kart" id="grp-marka-kiti">
@@ -1795,6 +1988,7 @@
       </div>
       <div class="row">
         <button id="set-ffmpeg-install" class="btn">ffmpeg’i indir ve kur</button>
+        <button id="set-ffmpeg-cancel" class="btn" type="button" hidden title="İnen kısım korunur; yeniden kurunca kaldığı yerden devam eder">İptal</button>
         <button id="set-ffmpeg-recheck" class="btn ghost">Yeniden dene</button>
       </div>
       <div class="field" style="margin-top:8px">
@@ -1866,7 +2060,7 @@
           </button>
         </div>
         <div class="doctor-scope" aria-label="Kontrol edilen bölümler">
-          <span>Premiere</span><span>Altyazı motoru</span><span>Pro Cloud</span><span>Presetler</span>
+          <span data-doctor-cip="premiere">Premiere</span><span data-doctor-cip="engine">Altyazı motoru</span><span data-doctor-cip="pro">Pro Cloud</span><span data-doctor-cip="preset">Presetler</span>
         </div>
         <div class="library-health-actions doctor-actions">
           <button id="set-doctor-fix-all" class="btn" hidden>Güvenli sorunları düzelt</button>
@@ -1951,8 +2145,8 @@
               <li>Otomatik kesim · Konuşmadan kes (dolgu, tekrar, tekrar çekim)</li>
               <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
               <li>Suflo Stilleri timeline'da · Kanca başlığı</li>
-              <li>Sesi iyileştir · Otomatik zoom · Ritim</li>
-              <li>12 dile çeviri · Toplu klip · stilli ASS</li>
+              <li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası</li>
+              <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
               <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
               <li>MOGRT, SFX, preset ve Motion BG kütüphaneleri</li>
@@ -2118,9 +2312,14 @@
   <script src="js/deneme.js"></script>
   <script src="js/pro.js"></script>
   <script src="js/pro-sync.js"></script>
+  <script src="js/whisper-args.js"></script>
   <script src="js/engine.js"></script>
+  <script src="js/caption-layout.js"></script>
   <script src="js/caption-quality.js"></script>
+  <script src="js/whisper-words.js"></script>
   <script src="js/caption-text.js"></script>
+  <script src="js/whisper-akis.js"></script>
+  <script src="js/sessiz-ses.js"></script>
   <script src="js/diller.js"></script>
   <script src="js/auto-emoji.js"></script>
   <script src="js/style-share.js"></script>
@@ -2146,6 +2345,8 @@
   <script src="js/youtube-meta.js"></script>
   <script src="js/bolumler.js"></script>
   <script src="js/gecisler.js"></script>
+  <script src="js/speedramp.js"></script>
+  <script src="js/hiz-rampasi.js"></script>
   <script src="js/sahneler.js"></script>
   <script src="js/viral.js"></script>
   <script src="js/broll.js"></script>

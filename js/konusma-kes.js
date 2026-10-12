@@ -443,7 +443,8 @@ window.KTextCut = (function () {
         var istek = {
           prompt: TC.fillerPrompt(dilSecimi),
           cache: zorla ? false : undefined,
-          onStatus: function (m, c) { status(m, c); }
+          onStatus: function (m, c) { status(m, c); },
+          sessizKutu: "tc-sessiz"            // sessiz ses uyarısı bu sekmede görünür
         };
         if (secili) istek.clip = secili;
         sonuc = await KCaptions.transcribeWords(istek);
@@ -473,7 +474,9 @@ window.KTextCut = (function () {
       KApp.toast(words.length + " kelime · " + n + " kesim önerisi" + (g ? " · " + g + " tekrar çekim" : ""), "good");
       if (el("tc-ai") && el("tc-ai").checked) aiGrupla();
     } catch (e) {
-      status("✕ " + K.hataYardimi(e), "bad");
+      // sessiz ses uyarısında "Vazgeç": hata değil
+      if (e && e.vazgecildi) status(e.message, "warn");
+      else status("✕ " + K.hataYardimi(e), "bad");
     } finally {
       setBusy(false);
     }

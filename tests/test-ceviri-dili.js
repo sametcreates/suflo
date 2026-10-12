@@ -12,7 +12,7 @@ function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "F
 var M = new Function("DOM", "SEG", "CT_", [
   "var segments = SEG; var algilananDil = ''; var ceviriDili = '';",
   "function el(id) { return DOM[id]; }",
-  kes("function ceviriVar("), kes("function styleLocale("), kes("function styleText("),
+  kes("function ceviriVar("), kes("function cevrimdisiEn("), kes("function styleLocale("), kes("function styleText("),
   "var CT = CT_;",
   "return { styleText: styleText, set: function (d) { ceviriDili = d; } };"
 ].join("\n"));
@@ -29,6 +29,20 @@ ok("Ingilizceye cevrilmis metin BUYUK HARF'te 'THIS' (THİS degil)", m.styleText
 ok("orijinal (kaynakDili) metin hala Turkce kuralla", m.styleText("işte bu", true) === "İŞTE BU", m.styleText("işte bu", true));
 segs[0] = { text: "this is it" };   // ceviri geri alindi: orig yok
 ok("satirlarda orig kalmayinca kaynak kurala doner", m.styleText("bir") === "BİR");
+
+// 3.2 adım 5: çevrimdışı İngilizce (-tr) belge — #cap-lang "tr" kalır, metin İngilizce: dil-bağımsız kural
+m.set("");
+segs.length = 0;
+segs.push({ text: "this is it", cikisDili: "en" }, { text: "it is fine" });
+ok("cevrimdisi Ingilizce belge: cap-lang tr iken BUYUK HARF 'THIS IS IT' (THİS degil)", m.styleText("this is it") === "THIS IS IT", m.styleText("this is it"));
+ok("cevrimdisi Ingilizce belgenin orijinal metni de Ingilizce kuralla", m.styleText("it is", true) === "IT IS", m.styleText("it is", true));
+segs[0] = { text: "dies ist es", orig: "this is it", cikisDili: "en" };
+m.set("de");
+ok("cevrimdisi Ingilizce belge LLM ile Almancaya cevrilince hedef dil once gelir", m.styleText("dies ist") === "DIES IST");
+segs.length = 0;
+segs.push({ text: "bir şey" });
+m.set("");
+ok("isaret kalmayinca (yeni transkript / SRT) kaynak kurala doner", m.styleText("bir") === "BİR");
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

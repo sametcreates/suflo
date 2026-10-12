@@ -1,4 +1,4 @@
-// Suflo testi: Pro'yu dene bağlantıları — 9 araç deneme kapısından geçer, hak yalnız
+// Suflo testi: Pro'yu dene bağlantıları — 11 araç deneme kapısından geçer, hak yalnız
 // başarı dalında düşer; kütüphaneler/MOGRT/toplu/ASS deneme almaz; filigran yalnız
 // stilli katman ve kanca başlığında; temiz yeniden oluşturma KS_removeOverlay'e nodeId vermez.
 var fs = require("fs"), path = require("path"), vm = require("vm");
@@ -16,10 +16,10 @@ function govde(src, imza) {
   return src.slice(i, sonrakiler.length ? Math.min.apply(null, sonrakiler) : src.length);
 }
 
-/* ---------------- 1) 9 araç: deneme kapısı + başarıda harcama ---------------- */
+/* ---------------- 1) 10 araç: deneme kapısı + başarıda harcama ---------------- */
 // [dosya, işlev imzası, özellik, başarı denetimi (harcamadan ÖNCE gelmeli), harcama bekleniyor mu]
 var SITELER = [
-  ["js/magiccut.js", "async function analyze()", "cut", null, false],
+  ["js/magiccut.js", "async function analyze(ev)", "cut", null, false],
   ["js/magiccut.js", "async function apply()", "cut", "if (r.ok) {", true],
   ["js/konusma-kes.js", "async function analyze(zorla)", "textcut", null, false],
   ["js/konusma-kes.js", "async function apply()", "textcut", "if (res.ok) {", true],
@@ -33,7 +33,10 @@ var SITELER = [
   ["js/beat.js", "async function bol()", "beat", "if (!r.ok) throw", true],
   ["js/captions.js", "async function translateAll()", "translate", "var out = await metinleriCevir(", true],
   ["js/captions.js", "async function cokDilliPaket()", "translate", "yazilan > 1 &&", true],
-  ["js/captions.js", "async function overlayUygula()", "overlay", "if (!yer.ok) throw", true]
+  ["js/captions.js", "async function overlayUygula()", "overlay", "if (!yer.ok) throw", true],
+  ["js/hiz-rampasi.js", "async function uygula(ek)", "speedramp", "if (!basarili.length) throw", true],
+  // 3.2 adım 5: çevrimdışı İngilizce (-tr) Altyazı oluştur'da; hak yalnız transkript başarıyla bitince
+  ["js/captions.js", "async function go(opts)", "offlineTranslate", "basarili = true;", true]
 ];
 var kapiliOzellikler = {};
 SITELER.forEach(function (s) {
@@ -53,8 +56,8 @@ SITELER.forEach(function (s) {
   var hata = g.search(/\n    \} catch \(/);
   ok(ad + ": hak yalnız başarı denetiminden sonra düşer", basari > 0 && harca > basari && (hata === -1 || harca < hata), "basari " + basari + " harca " + harca + " catch " + hata);
 });
-var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat"];
-ok("9 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
+var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate"];
+ok("11 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
 ok("deneme listesi deneme.js ile aynı", JSON.stringify(require(path.join(KOK, "js", "deneme.js")).OZELLIKLER) === JSON.stringify(DOKUZ));
 
 /* ---------------- 2) deneme almayan kapılar ---------------- */
@@ -73,7 +76,7 @@ jsDosyalari.forEach(function (f) {
     }
   });
 });
-ok("tarama deneme kapılarını buluyor (15 kapı: 14 araç + rehberin stil adımı)", denemeli.length === 15, denemeli.join(" | "));
+ok("tarama deneme kapılarını buluyor (17 kapı: 16 araç + rehberin stil adımı)", denemeli.length === 17, denemeli.join(" | "));
 // Rehberin "Timeline'a koy"u Altyazı sekmesindeki "… ile ekle" ile aynı stilli katman denemesini sunar;
 // MOGRT stili seçiliyse denemesiz kütüphane penceresi (inceleme bulgusu: Suflo Stili için de captionStyles açılıyordu)
 var koy = govde(oku("js/onboarding.js"), "function stilKoyTikla()");
@@ -170,7 +173,7 @@ ok("tanıtımdan kurulan deneme aracın asıl düğmesini adıyla gösterir ('te
   /toast\(ip\.mesaj/.test(yonlendir) && /scrollIntoView/.test(yonlendir) && !/tekrar tıkla/.test(tanitimIsl + yonlendir));
 ok("etkinleştirmeden sonra deneme çıktısı varsa bir kez hatırlatılır", /if \(Pro\.denemeCiktilari && Pro\.denemeCiktilari\(\)\.length\) \{\s*toast\("Deneme çıktılarını temiz yeniden oluştur/.test(app));
 ok("Pro karşılaştırması: Sözlük yok, yeni araçlar var", !/Sözlük/.test(kilitli.split('class="pro-renk"')[1] || "") &&
-  ["Konuşmadan kes", "viral puan", "Geçişler", "Suflo Stilleri timeline'da", "Kanca başlığı", "Sesi iyileştir", "Otomatik zoom", "Ritim", "12 dile çeviri"].every(function (x) { return kilitli.indexOf(x) !== -1; }));
+  ["Konuşmadan kes", "viral puan", "Geçişler", "Suflo Stilleri timeline'da", "Kanca başlığı", "Sesi iyileştir", "Otomatik zoom", "Ritim", "Hız rampası", "12 dile çeviri"].every(function (x) { return kilitli.indexOf(x) !== -1; }));
 ok("ücretsiz sütunu: kelime kelime altyazı ve terim sözlüğü", /<li>Kelime kelime altyazı · terim sözlüğü<\/li>/.test(kilitli));
 ok("kanca başlığı tanıtımı 5 stil (seçicideki stil sayısı)", /<strong>5<\/strong> stil/.test(blok(html, "kanca-tanitim")) && html.match(/id="kanca-stil">[\s\S]*?<\/select>/)[0].match(/<option /g).length === 5);
 ok("eski 'v1.7' ve 'ücretsiz altyazı paneli' yedekleri yok", !/v1\.7</.test(html) && !/ücretsiz altyazı paneli/.test(html));

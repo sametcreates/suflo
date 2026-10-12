@@ -2,8 +2,9 @@
  * Suflo — transkript önbelleği
  *
  * Aynı klibi ikinci kez yazıya dökmek dakikalar sürüyordu: Konuşmadan kes'te
- * politika değiştirmek, kesimden sonra kalan alt klibi yeniden incelemek ya da
- * altyazıdan sonra kesime geçmek hep yeniden transkripsiyon demekti.
+ * politika değiştirmek ya da kesimden sonra kalan alt klibi yeniden incelemek hep
+ * yeniden transkripsiyon demekti. (Altyazıdan sonra Konuşmadan kes yine yazıya döker:
+ * dolgu ipucu ister, altyazının ipucusuz girdisini kullanmaz; bkz. istemler.)
  *
  *   - Kelimeler KAYNAK zamanında saklanır (klip başlangıcı/hız eşlemesinden önce),
  *     USER_DATA/Kesit/transcripts/ altında, girdi başına bir JSON.
@@ -13,6 +14,11 @@
  *     sonra kalan alt klipler de önbellekten gelir.
  *   - LRU: 50 girdi ya da 100 MB (index.json lastUsed).
  *   - Yazımlar atomik (tmp + rename). Bozuk/eksik dizin = ıska; asla fırlatmaz.
+ *   - Girdi gövdesi v2: satırlar + ölçülmüş kelimeleri (yerel -ojf) { v: 2, lang, segments:
+ *     [{ start, end, text, confidence, words: [{ text, start, end, p }] }] }. v1 gövdesi
+ *     ({ v: 1, words }) geçerli kalır: öğeleri kelimesiz satır sayılır. get() ikisinde de
+ *     düz kelime listesi (words) ve satırları (segments) döner; satır ve kelime kelime
+ *     altyazı aynı girdiyi ("altyazi") paylaşır.
  *
  * Saf çekirdek: fs, path, crypto dışarıdan verilir (panel K.fs ve require('crypto')
  * bağlar). Yalnız Node 12 API'leri (klasör silme yerine dosya dosya unlink).
@@ -24,10 +30,26 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var SURUM = 1;
+  var SURUM = 1;          // index.json biçimi (değişmedi: eski girdiler görünür kalır)
+  var GOVDE_SURUM = 2;    // girdi gövdesi: 2 = satır + ölçülmüş kelime, 1 = düz liste
   var EPS = 0.002;
 
   function num(x) { var n = Number(x); return isFinite(n) ? n : 0; }
+  function dizi(x) { return Object.prototype.toString.call(x) === "[object Array]"; }
+  function guven(x) {
+    if (x === null || x === undefined || x === "") return null;
+    var n = Number(x);
+    return isFinite(n) ? n : null;
+  }
+  // { text, start, end, p } — kaynak zamanına (+ofs) taşınmış, geçersiz zaman atılır
+  function kelimeYaz(w, ofs) {
+    if (!w || !isFinite(Number(w.start)) || !isFinite(Number(w.end))) return null;
+    // ms'ye yuvarlanır: kelime başına 17 haneli kayan nokta girdiyi şişirmesin
+    var x = { text: String(w.text || ""), start: Math.round((ofs + Number(w.start)) * 1000) / 1000, end: Math.round((ofs + Number(w.end)) * 1000) / 1000 };
+    var p = guven(w.p);
+    if (p !== null) x.p = p;
+    return x;
+  }
 
   function create(o) {
     o = o || {};
@@ -85,32 +107,71 @@
         String(e.engine) === String(m.engine || "");
     }
 
+    // v2: segments; v1: words (öğeleri kelimesiz satır olarak okunur)
     function girdiOku(e) {
       try {
         var d = JSON.parse(fs.readFileSync(path.join(dir, e.key + ".json"), "utf8"));
-        if (!d || !Array.isArray(d.words)) return null;
-        return d;
+        if (!d) return null;
+        if (dizi(d.segments)) return d;
+        if (dizi(d.words)) return { v: 1, lang: d.lang, segments: d.words };
+        return null;
       } catch (er) { return null; }
     }
 
-    // Kaynak-mutlak kelimeleri istenen [inPoint, inPoint+dur] aralığına kes, inPoint'e göre kaydır
+    /*
+     * Kaynak-mutlak satırları istenen [inPoint, inPoint+dur] aralığına kes, inPoint'e
+     * göre kaydır. Satır orta noktasıyla, kelimeler KENDİ orta noktalarıyla seçilir:
+     * kapsayan girdide aralığa taşan uzun satırın içerideki kelimeleri kaybolmaz.
+     * Döner: { segments, words } — words düz liste (satırın kelimesi yoksa satırın kendisi).
+     */
     function kes(d, inPoint, dur) {
       var a = num(inPoint), b = a + num(dur);
-      var out = [];
-      d.words.forEach(function (w) {
-        var s = num(w.start), e = num(w.end);
-        var orta = (s + e) / 2;
-        if (orta < a - EPS || orta > b + EPS) return;
-        var x = { start: Math.max(0, s - a), end: Math.max(0, Math.min(b, e) - a), text: String(w.text || "") };
-        if (w.confidence != null && isFinite(Number(w.confidence))) x.confidence = Number(w.confidence);
-        out.push(x);
+      function icinde(s, e) { var orta = (s + e) / 2; return orta >= a - EPS && orta <= b + EPS; }
+      function kaydir(s, e) { return { start: Math.max(0, s - a), end: Math.max(0, Math.min(b, e) - a) }; }
+      var segments = [], words = [];
+      d.segments.forEach(function (g) {
+        if (!g) return;
+        var s = num(g.start), e = num(g.end);
+        var kel = [];
+        if (dizi(g.words)) {
+          g.words.forEach(function (w) {
+            if (!w) return;
+            var ws = num(w.start), we = num(w.end);
+            if (!icinde(ws, we)) return;
+            var z = kaydir(ws, we);
+            var y = { text: String(w.text || ""), start: z.start, end: z.end };
+            var p = guven(w.p);
+            if (p !== null) y.p = p;
+            kel.push(y);
+            var duz = { start: z.start, end: z.end, text: y.text };
+            if (p !== null) duz.confidence = p;
+            words.push(duz);
+          });
+        }
+        var satirIcinde = icinde(s, e);
+        var kelimesiz = !dizi(g.words) || !g.words.length;
+        if (kelimesiz && satirIcinde) {
+          var z2 = kaydir(s, e);
+          var x = { start: z2.start, end: z2.end, text: String(g.text || "") };
+          if (guven(g.confidence) !== null) x.confidence = Number(g.confidence);
+          words.push(x);
+        }
+        if (satirIcinde || kel.length) {
+          var z3 = kaydir(Math.max(s, a), e);
+          var sg = { start: z3.start, end: z3.end, text: String(g.text || "") };
+          if (guven(g.confidence) !== null) sg.confidence = Number(g.confidence);
+          if (kel.length) sg.words = kel;
+          segments.push(sg);
+        }
       });
-      return out;
+      words.sort(function (x, y) { return x.start - y.start; });
+      return { segments: segments, words: words };
     }
 
     /*
      * get(meta, { prompts: ["dolgu", "altyazi"] })
-     * Doner: null | { words (meta.inPoint'e göreli), lang, prompt, covering }
+     * Doner: null | { words (düz kelime listesi, meta.inPoint'e göreli), segments (satırlar,
+     *        ölçülmüş kelimeleriyle), lang, prompt, covering }
      * prompts verilmezse yalnız meta.prompt aranır. Sıra: her istem için önce
      * birebir anahtar, sonra kapsayan girdi.
      */
@@ -141,30 +202,38 @@
           if (!d) continue;
           bulunan.lastUsed = now();
           dizinYaz(ix);
-          return { words: kes(d, m.inPoint, m.dur), lang: d.lang || "", prompt: m.prompt, covering: kapsayan };
+          var kesik = kes(d, m.inPoint, m.dur);
+          return { words: kesik.words, segments: kesik.segments, lang: d.lang || "", prompt: m.prompt, covering: kapsayan };
         }
       } catch (e) {}
       return null;
     }
 
     /*
-     * put(meta, { words (meta.inPoint'e göreli kaynak saniyesi), lang })
+     * put(meta, { segments | words (meta.inPoint'e göreli kaynak saniyesi), lang })
+     *   segments: satırlar, her biri isteğe bağlı words: [{ text, start, end, p }] (yerel -ojf)
+     *   words:    eski biçim — düz liste (kelimesiz satır olarak saklanır)
      * Doner: true / false (asla fırlatmaz)
      */
     function put(meta, data) {
-      if (!hazir || !meta || !meta.mediaPath || !data || !Array.isArray(data.words)) return false;
+      var kaynak = data && (dizi(data.segments) ? data.segments : (dizi(data.words) ? data.words : null));
+      if (!hazir || !meta || !meta.mediaPath || !kaynak) return false;
       try {
         if (!klasor()) return false;
         var ip = num(meta.inPoint);
-        var words = data.words.filter(function (w) {
+        var segments = kaynak.filter(function (w) {
           return w && isFinite(Number(w.start)) && isFinite(Number(w.end));
         }).map(function (w) {
           var x = { start: ip + Number(w.start), end: ip + Number(w.end), text: String(w.text || "") };
           if (w.confidence != null && isFinite(Number(w.confidence))) x.confidence = Number(w.confidence);
+          if (dizi(w.words) && w.words.length) {
+            var kel = w.words.map(function (k) { return kelimeYaz(k, ip); }).filter(Boolean);
+            if (kel.length) x.words = kel;
+          }
           return x;
         });
         var anahtar = key(meta);
-        var govde = JSON.stringify({ v: SURUM, lang: String(data.lang || ""), words: words });
+        var govde = JSON.stringify({ v: GOVDE_SURUM, lang: String(data.lang || ""), segments: segments });
         atomikYaz(path.join(dir, anahtar + ".json"), govde);
         var ix = dizinOku();
         ix.entries = ix.entries.filter(function (e) { return e.key !== anahtar; });
@@ -216,5 +285,19 @@
     return { key: key, get: get, put: put, clear: clear, stats: stats, dir: dir };
   }
 
-  return { create: create };
+  /*
+   * Kelime transkripti isteyen aracın (captions.js transcribeWords, Konuşmadan kes) istem türleri.
+   *   ekIpucu: motora giden ek ipucu (Konuşmadan kes: textcut.js fillerPrompt, "Iıı, eee, hmm…")
+   * Döner: { ara: [get() için istem sırası], yaz: put() istem türü }
+   * Dolgu ipucuyla istenen transkript YALNIZ dolgu ipucuyla yazılmış girdiden ("dolgu") gelir.
+   * Altyazının girdisi ("altyazi", satır ve kelime modu ortak) ipucusuz yazıya dökülür; Whisper
+   * o turda dolgu seslerini çoğu zaman yazmaz ve dolgu önerileri sessizce boşalırdı. İpucusuz
+   * istek önce "altyazi"yı, sonra "dolgu"yu kabul eder ve sonucunu "altyazi" olarak yazar.
+   */
+  function istemler(ekIpucu) {
+    if (/\S/.test(String(ekIpucu == null ? "" : ekIpucu))) return { ara: ["dolgu"], yaz: "dolgu" };
+    return { ara: ["altyazi", "dolgu"], yaz: "altyazi" };
+  }
+
+  return { create: create, istemler: istemler };
 });

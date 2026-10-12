@@ -306,9 +306,10 @@ videoları ve `Listeyi kopyala` çıktısını gönder; istemdeki kalibrasyon c�
 ## 4. Pro'yu dene: her araca 3 kalıcı hak (+ deneme filigranı)
 
 **Şu an durum:** Kod tamam ve gerçek dünya girdisi gerektirmiyor (Lemon Squeezy anahtarı, yeni ürün ya
-da sunucu değişikliği yok). Ücretsiz kullanıcı, kodla çalışan 9 Pro aracının her birini kendi videonda
+da sunucu değişikliği yok). Ücretsiz kullanıcı, kodla çalışan 10 Pro aracının her birini kendi videonda
 3 kez dener: otomatik kesim, konuşmadan kes, viral anlar, otomatik zoom, geçişler, sesi iyileştir,
-stilli altyazı katmanı ve kanca başlığı (ikisi ortak 3 hak), çeviri (çok dilli SRT paketi dahil), ritim.
+stilli altyazı katmanı ve kanca başlığı (ikisi ortak 3 hak), çeviri (çok dilli SRT paketi dahil), ritim,
+hız rampası (3.2 adayı, § 12; hak yalnız en az bir klip rampalanınca, çalıştırma başına bir kez).
 Haklar süresiz; hak yalnız işlem **başarıyla** bitince düşer. İçerik kütüphaneleri (MOGRT, SFX, Motion BG,
 preset, Pro paketi, altyazı MOGRT stilleri), toplu klip, stilli ASS dışa aktarma, sahne algılama ve
 B-roll önerileri denemeye açık değil.
@@ -950,3 +951,387 @@ erişim geri sayımı ve "75+ içerik üreticisi" satırı olduğu gibi kaldı.
    retake cleanup, Brand kit); JSON-LD'yi eşitle. (Bu dalda yapılmadı.)
 4. `node tools/test.js` (SEO denetimi dahil) yeşil kalmalı.
 5. Premiere'de elle deneme listesi: `marketing/v3.1-deneme-listesi.md`.
+
+## 12. Hız Rampası (tek tıkla ağır çekim ve hızlanma; 3.2 adayı)
+
+Kod tamam ve testli (`test-speedramp*.js`); **senden anahtar, hesap ya da sunucu değişikliği istemiyor**.
+Pro özelliği (`speedramp`), 3 deneme hakkı (deneme listesi 9 → 10 araç); eğri kartları, canlı önizleme ve
+"Rampayı kaldır" ücretsiz. Premiere'de **hiç denenmedi**.
+
+Neden böyle kuruldu (kısa): Premiere, Zaman Yeniden Eşleme'yi eklentilere açmıyor (bileşen
+`components`'ta yok, UXP'de yok, QE `addVideoEffect("Time Remapping")` bir şey eklemiyor). Suflo aralığı
+kareye oturan 3–28 parçaya bölüp her parçaya QE `setSpeed` ile kendi sabit hızını yazıyor; sonuç Hız/Süre
+ile düzenlenebilen sıradan klipler. Aralığın yeri ve süresi hiç değişmez (ripple yok; tek izde ripple
+senkronu bozardı). Ses aralıkta kapatılır ya da olduğu gibi bırakılır; sesi hızlandırma kapsam dışı.
+`setSpeed`'in imzası ve birimi belgesiz: host bir kalibrasyon merdiveniyle dener (5/3/2/1 argüman, oran ya
+da yüzde), her adımı geri okur, tutmazsa klibi tek %100 klibe geri getirir; bulunan biçim sürüm başına
+panelde saklanır. Ctrl+Z rampayı tek adımda geri almaz (Premiere'de undo gruplama yok); bu yüzden
+"Rampayı kaldır" ve bildirimdeki "Geri al" var, ilk denemede de "Önce sekansı kopyala" kendiliğinden işaretli.
+
+İnceleme düzeltmeleri (kısa): her parça TAM hızına yukarıdan yaklaşılarak yazılır (hızlanma süreyi tam
+kareye yuvarlar, yavaşlama tam yazar), uç yalnız o hızda ve yalnız gerektiği kadar uzatılır: Dengeli, klibin
+Out'u medyanın sonu olsa da (kırpılmamış kuyruk) medya istemez. "Rampayı kaldır" hiçbir parçayı silmeden önce
+ilk parçayı %100'e alır (QE yoksa ya da hız yazılamazsa hiçbir şey silinmez); birimi bilinmeyen sürümde birim
+silinecek son parçada yoklanır. In/Out rampadan sonra dış video parçaları kendi seslerine yeniden bağlanır.
+Arayüz adları: yoğunluk **Hafif / Normal / Güçlü** (tasarım notundaki Hafif / Orta / Sert değil: sözlükte "Orta"
+altyazı konumu olarak "Middle", "Sert" "Hard" çevriliyor; "Güçlü" Sesi iyileştir'deki yoğunlukla aynı dil).
+Vuruş anı seçeneği müzik vuruşuyla karışmasın diye "Darbe anını playhead'e hizala"; aradeğerleme seçicisi
+"Yavaş parçalarda: Kare harmanlama / Optik akış / Aradeğerleme yok".
+
+### 12.1 Premiere'de elle deneme (yaklaşık 45 dk; 26.x / 25.x, mümkünse 22.x–24.x ve 14.4 ayrı ayrı)
+
+Liste `marketing/v3.1-deneme-listesi.md` › 13'te. Sonucu bana yazarken özellikle şunları ekle:
+- Doctor'da hangi Hız Rampası satırının sarı çıktığı ve Premiere sürümü.
+- Günlükteki `cal` (units: ratio / percent, sig: 5 / 5d / 3 / 2 / 1) ve ilk rampanın kaç `setSpeed`
+  denemesi sürdüğü. 14.x'te imza ne çıktı?
+- Bir rampanın Ctrl+Z ile kaç adımda geri alındığı ve günlükteki `undoSteps`.
+- Yavaşlatılan bir parçada Premiere süreyi korudu mu, yoksa boş alana uzadı mı (QE `setSpeed` ikinci
+  argümanı ""). Hızlı parçalarda inPoint / outPoint okumaları ölçekli mi?
+- Bağlı seste "Rampada sesi kapat" sonrası aralık dışındaki sesin hâlâ bağlı olup olmadığı.
+- İç içe sekans öğesi ve kenarında cross dissolve olan klip ne yaptı.
+
+Eğer bir sürümde QE `setSpeed` hiç yoksa ya da kalibrasyon hep başarısız oluyorsa (Doctor'da "QE hız
+yazma (setSpeed)" sarı), söyle: o zaman ffmpeg ile render edilen sürekli eğri yolu (Katman 2) yapılır.
+Premiere bir gün Zaman Yeniden Eşleme'yi betiklere açarsa Doctor "Zaman Yeniden Eşleme API'si açık"
+der; o zaman gerçek anahtar kareler (Katman 3) yazılabilir.
+
+### 12.2 Sürüm (3.2.0) — bu dalda bilerek yapılmadı
+
+`CSXS/manifest.xml` 3.1.0'da kaldı ve `marketing/release-notes.md`'nin ilk satırına dokunulmadı:
+`yayinla.yml`, main'e her gönderimde manifest sürümünün GitHub'da yayını yoksa otomatik yayınlıyor.
+Elle denemeden sonra 3.2.0'a geçerken birlikte yap: manifest ve `js/bridge.js` sürümü, release-notes'un
+başına "Suflo 3.2.0" bölümü, `js/app.js` YENILIKLER (surum + Hız Rampası satırı), rehberin yedek metni ve
+`tests/test-yenilikler.js` beklentileri; README'de *(3.2)* etiketleri zaten var.
+
+### 12.3 Bilinen sınırlar (bilerek kapsam dışı)
+
+- Basamaklı: parçalar sabit hızda (Normal'de en çok 16, Çok'ta 28 parça); gerçek sürekli eğri yok.
+- Ses hızlandırılmaz; "Sesi olduğu gibi bırak"ta rampa içinde kayar, Dengeli'de aralık sonunda yine senkron.
+- Rampadan sonra eklenen zoom / geçiş anahtarları parça başına doğrusal eşlenir: önce rampa, sonra zoom.
+- Kaldırmadan sonra T0/T1'de ve seste görünmez kesikler (through-edit) kalır; iki yan %100, kaynak sürekli.
+- Kısa (12 kareden az) klip, fotoğraf, grafik/MOGRT, ayar katmanı, ters, hızı değişmiş, Zaman Yeniden
+  Eşlemeli, Warp Stabilizer'lı, multicam ve kilitli izdeki klipler reddedilir.
+
+### 12.4 Tanıtım (isteğe bağlı)
+
+- "Premiere'de hız rampası için keyframe sürüklemek yok: eğriyi seç, uygula, Hız/Süre'de düzenle." Ekran
+  kaydı: Darbe kartı → playhead'i vuruş anına koy → Uygula → oynat. Ritme Rampa için müzikli bir B-roll.
+- Önayar adları genel (Ağır Çekim Dalışı, Darbe…); rakip ya da kişi adıyla anılan önayar adı kullanma.
+
+
+---
+
+## 3.2
+
+Altı açık kaynak projeden (`marketing/alti-repo-plan.json`, `plan.build_order`) gelen 3.2 adımları.
+Her adım kendi alt bölümünü ekler. Elle Premiere denemeleri `marketing/v3.2-deneme-listesi.md`'de.
+
+### Adım 1: Ölçülmüş kelime zamanları (-ojf)
+
+Ne değişti: yerel motor artık `-oj` yerine `-ojf` ile çalışıyor; whisper.cpp JSON'a belirteç başına metin,
+zaman ve olasılık yazıyor. `js/whisper-words.js` bunları kelimelere çeviriyor (Raunen'den uyarlandı, MIT,
+`THIRD_PARTY_NOTICES.md`). Karaoke için ikinci "-ml 1 -sow" turu kalktı (yalnız belirteç yazmayan eski
+derlemede yedek olarak duruyor), yerel motorun güven değeri geri geldi, satır ve kelime modu aynı
+önbellek girdisini paylaşıyor. Ücretsiz; senin girdin olmadan da tam çalışır.
+
+İnceleme düzeltmeleri (bilmen gereken davranışlar):
+- **Konuşmadan kes altyazının transkriptini kullanmaz.** Dolgu ipucuyla ("Iıı, eee, hmm…") ister; altyazı
+  ipucusuz yazıya döküldüğü için o transkriptte dolgular çoğu zaman yok. Altyazıdan sonra Konuşmadan kes
+  yine bir kez yazıya döker (3.1'de karaoke sonrası kullanıyordu, artık hiç kullanmaz); ikinci açılış
+  kendi "dolgu" girdisinden anında gelir. Hız için geri almak istersen `js/transcript-cache.js` › `istemler`.
+- **Shorts kayıtları ölçülmüş kelime taşımaz.** `settings.json` her ayar kaydında baştan yazılıyor; kelimeler
+  dosyayı ~5 kat şişiriyordu. Shorts altyazısında kelime stilleri karakter oranıyla akar (3.1'deki gibi).
+- **VAD'siz koşu** (Silero modeli inmemiş): kelime zamanları whisper'ın belirteç zamanlarından aynen alınır.
+- **Boşluklu tire** (" - ", " — ") kendi kelimesidir; önceki kelimeye yapışmaz ("Evet-" olmaz).
+
+**1.1 Gerçek bir -ojf fikstürü ekle (önerilir, yaklaşık 20 dk).**
+Bu oturumda internet kısıtlıydı (Hugging Face'e erişim yoktu, model indirilemedi), bu yüzden
+`tests/fixtures/whisper-*.json` whisper.cpp v1.9.1'in `examples/cli/cli.cpp` `output_json(full=true)`
+biçimiyle birebir, elle kısaltılmış örnekler. Segment-belirteç düzeni `src/whisper.cpp` v1.9.1'den alındı
+(pencerenin ilk segmenti dışında başlangıç zaman belirteci yok, ilk metin belirtecinin zamanı segment
+başıyla tutmayabilir; VAD'siz örnek `whisper-ojf-vadsiz.json`). Yine de gerçek bir koşu, CI'ın göremediği
+biçim farklarını yakalar. Gerçek bir koşunun çıktısı eklenirse `tests/test-whisper-words.js` onu kendiliğinden bulur ve
+değişmezleri (her satırda kelime ve güven var, kelime metni satır metniyle tutuyor, kelimeler satırın içinde
+ve sıralı) onda da sınar; dosya yokken o bölüm "ATLA" der.
+
+1. "değil", "ışık", "şimdi", "güzel" gibi kelimeler geçen, arada 1–2 sn duraklama olan ~20 sn'lik Türkçe
+   bir konuşma kaydet (kendi sesin; telif yok). Örn. "Bu ışık hiç de kötü değil, değil mi? Şimdi kamerayı
+   biraz sola çevirelim. … Güzel. Peki, sonra tekrar deneyelim!"
+2. 16 kHz mono WAV'a çevir:
+   `ffmpeg -i kayit.m4a -ac 1 -ar 16000 -c:a pcm_s16le ornek-ojf.wav`
+3. Suflo'nun kurduğu motorla çalıştır (VAD açık: Suflo'nun varsayılanı):
+   - Windows (PowerShell):
+     `& "$env:APPDATA\Kesit\whisper\whisper-cli.exe" -m "$env:APPDATA\Kesit\whisper\models\ggml-large-v3-turbo-q5_0.bin" -f ornek-ojf.wav -l tr -ojf -pp -bs 5 --vad -vm "$env:APPDATA\Kesit\whisper\models\ggml-silero-v5.1.2.bin" -vsd 500 -vp 250 -of whisper-ojf-tr-gercek 2> whisper-ojf-tr-gercek.stderr.txt`
+     (`whisper-cli.exe` `whisper\Release\` altındaysa o yolu kullan; model adı Ayarlar'da seçili modele göre değişebilir.)
+   - macOS: `whisper-cli -m "$HOME/Library/Application Support/Suflo/whisper/models/ggml-large-v3-turbo-q5_0.bin" -f ornek-ojf.wav -l tr -ojf -pp -bs 5 --vad -vm "$HOME/Library/Application Support/Suflo/whisper/models/ggml-silero-v5.1.2.bin" -vsd 500 -vp 250 -of whisper-ojf-tr-gercek 2> whisper-ojf-tr-gercek.stderr.txt`
+   (`2>` stderr'i dosyaya yazar: içindeki `vad_segment_info` satırları whisper'ın VAD eşleme tablosu; panel
+   aynı satırlarla belirteç zamanlarını özgün sese taşır.)
+4. Çıkan `whisper-ojf-tr-gercek.json`'da `"params"` içindeki `"model"` satırı kendi kullanıcı adını içeriyorsa
+   yolu `models/ggml-large-v3-turbo-q5_0.bin` yap. Başka bir şeye dokunma (fikstür ham kalmalı).
+5. İki dosyayı `tests/fixtures/whisper-ojf-tr-gercek.json` ve `tests/fixtures/whisper-ojf-tr-gercek.stderr.txt` olarak koy
+   (stderr'de kendi kullanıcı adın geçen yolları `models/...` yap), `node tests/test-whisper-words.js` çalıştır:
+   "gerçek -ojf" ile başlayan üç satır PASS olmalı. Kaldıysa günlükle birlikte bana yaz (VAD zaman tabanı
+   ya da yeni bir belirteç biçimi olabilir). Sonra commit'le.
+6. Aynı WAV'ı **VAD olmadan** bir kez daha çalıştır: 3. adımdaki komuttan `--vad -vm "…" -vsd 500 -vp 250`
+   kısmını sil ve `-of whisper-ojf-tr-gercek-vadsiz` yap (stderr gerekmez). Çıkan JSON'u 4. adımdaki gibi
+   temizleyip `tests/fixtures/whisper-ojf-tr-gercek-vadsiz.json` olarak koy; "gerçek -ojf (VAD'siz)" satırı
+   PASS olmalı. İki fikstür de eklenince test o bölümü artık "ATLA" demez.
+
+**1.2 macOS Homebrew motorunu doğrula (yaklaşık 5 dk).** `whisper-cli --help | grep ojf` bir satır
+göstermeli. Göstermiyorsa ya da Ayarlar › Destek › Günlüğü kopyala'da kelime modunda
+"yerel motor belirtec zamani vermedi (eski derleme?)" satırı görünüyorsa `brew upgrade whisper-cpp` yap.
+Eski derlemede de çalışır (eski "-ml 1 -sow" turuna düşer), yalnız iki kat sürer ve satır modunda kelime
+zamanı / güven olmaz.
+
+**1.3 3.2.0 sürüm notu.** Sürüm 3.2.0'a geçerken (`## 12.2` ile birlikte) `marketing/release-notes.md`'nin
+3.2.0 bölümüne şu satırı ekle: "Yerel motor her transkriptte kelime zamanlarını ölçüyor: kelime kelime
+altyazı tek turda, kelime stilleri satır modunda da gerçek konuşma anında, yerel motorda da 'emin değil'
+uyarısı." `js/app.js` YENILIKLER listesine istersen aynı satırın kısası.
+
+**1.4 Paketi doğrula.** `tools/package.ps1` ve `tools/kurucu-yap.ps1` artık `THIRD_PARTY_NOTICES.md`'yi
+pakete koyuyor; `tools/verify-release.ps1` ZXP'de ya da kurulum ZIP'inde `LICENSE` veya
+`THIRD_PARTY_NOTICES.md` yoksa yayını durduruyor. Yayından önce `verify-release.ps1`'in yeşil bittiğini gör.
+
+### Adım 2: Ses etiketi filtresi ve sessiz ses uyarısı
+
+Ne değişti: `js/caption-text.js` Whisper'ın konuşma dışı etiketlerini (`[BLANK_AUDIO]`, `[Müzik]`, `(alkış)`,
+`*laughs*`, yalnız ♪ satırları; Türkçe ve İngilizce sözlük) yeni transkriptlerden atıyor; karışık satırda
+yalnız etiket siliniyor, `*vurgu*` gerçek kelimelerde kalıyor. Kalıplar Raunen'den uyarlandı (MIT,
+`THIRD_PARTY_NOTICES.md` Raunen girdisine `js/caption-text.js` eklendi). Ayarlar'da yeni **Altyazı** kartı:
+"Ses etiketlerini koru" (varsayılan kapalı) etiketleri `[Müzik]` biçiminde tutar. Yeni `js/sessiz-ses.js`
+motor çalışmadan önce sesin tepesini ölçüyor (WAV 1 MB parçalarla; bulut MP3'ünde aynı ffmpeg geçişinde
+`volumedetect`); tepe 0,001'in altındaysa Altyazı ya da Konuşmadan kes kartında "Yine de devam et" /
+"Vazgeç" soruluyor. Ücretsiz; senin girdin olmadan tam çalışır, harici şablon ya da hesap gerekmez.
+
+Bilmen gereken davranışlar:
+- whisper-cli'nin `-sns` (konuşma dışı belirteç bastırma) bayrağı **bilerek kullanılmadı**: noktalama
+  benzeri belirteçleri de bastırıyor. Filtre transkripsiyondan sonra metinde çalışır.
+- Filtre yalnız **yeni transkriptlerde** çalışır; taslaktan kurtarılan, SRT'den içe alınan ya da elle yazılan
+  satırlara dokunmaz.
+- **Konuşmadan kes'in kelime listesi filtrelenmez**: `[Müzik]` kelimesi orada konuşma gibi kalır, böylece müzikli
+  bölümler duraksama sayılıp kesilmez (3.1 davranışı).
+- Toplu klipte sessiz klip için **bir kez** sorulur; soru klibin adını ve sırasını ("klip 2/6 (ad)") söyler ve
+  kararın sonraki sessiz kliplere de uygulanacağını yazar. "Vazgeç" sessiz klipleri atlar, diğerleri işlenir.
+- Soru açıkken ilerleme çubuğu durur. Kullanıcı başka sekmedeyse ~20 sn'lik sarı bildirim ve "Uyarıyı göster"
+  düğmesi çıkar (iş cevap bekliyor; kullanıcı hâlâ yazıya döküldüğünü sanmasın).
+- Bulut rotasında tepe, yüklenen sesle aynı biçimde (mono, 16 kHz) ölçülür: ters fazlı stereo gibi mono'da
+  sıfırlanan ses de uyarı verir.
+- Etiket satırı (atılsa da tutulsa da) "3+ aynı satır = takılma" zincirini keser: alkışla ayrılmış aynı cümle
+  atılmaz; koru ayarı konuşma satırlarını değiştirmez. Koru açıkken art arda `[Müzik]` satırları takılma sayılmaz.
+- Transkriptte yalnız ses etiketi varsa (koru kapalı) kırmızı "Konuşma bulunamadı." yerine sarı uyarı
+  Ayarlar › Altyazı › Ses etiketlerini koru'yu gösterir. "Vazgeç" ya da hata, ekrandaki belgenin algılanan dilini
+  silmez.
+- Uyarı metni sekans kapsamında "Altyazı › Ses katmanları" der (panelde kartın adı bu; planda "Ses kanalları"
+  geçiyordu). Seçili klip kapsamında ayrı bir metin klibin kaynağını anlatır (orada katman seçimi yok).
+
+**2.1 Premiere'de dene (yaklaşık 15 dk).** `marketing/v3.2-deneme-listesi.md` › `## 2` maddeleri.
+
+**2.2 3.2.0 sürüm notu.** Sürüm 3.2.0'a geçerken `marketing/release-notes.md`'nin 3.2.0 bölümüne şu satırı ekle:
+"Altyazıda [Müzik], (alkış) ve ♪ gibi ses etiketleri artık çıkmıyor (erişilebilirlik için Ayarlar › Altyazı ›
+Ses etiketlerini koru). Ses neredeyse tamamen sessizse motor çalışmadan önce uyarı: sessize alınmış katmanlar
+için dakikalarca beklemek ya da API kotası harcamak yok." `js/app.js` YENILIKLER listesine istersen kısası.
+
+### Adım 3: Canlı transkripsiyon, İptal ve kalan süre
+
+Ne değişti: yerel motor çalışırken whisper-cli'nin her segmenti bitirince stdout'a yazdığı
+`[00:00:01.380 --> 00:00:04.000]  metin` satırları (Suflo `-np` vermez) Altyazı oluştur'un altında soluk, salt
+okunur, "canlı" rozetli geçici satırlar olarak akıyor (`js/whisper-akis.js`, yeni saf modül). Durum satırı
+`-pp` yüzdelerini yumuşatıp kalan süreyi ve gerçek zaman çarpanını söylüyor:
+`12 satır · %34 · ~1 dk 20 sn kaldı · 3,1× gerçek zaman`. İş sürerken **İptal** düğmesi "Altyazı oluştur"un yerine
+geçiyor; `K.run` iptalde Windows'ta `taskkill /pid N /T /F` (süreç ağacı), macOS'ta `SIGKILL` gönderiyor. Aynı
+iptal jetonu motor/model/ffmpeg indirmelerinde (Ayarlar'ın yerel çekirdek ve ffmpeg satırlarında ve kurulum
+kartında "İptal"; yarım `.part` korunur) ve
+Otomatik Kesim'in ffmpeg analizinde de var. Fikirler Premiere TR ve Raunen'den (MIT), kod Suflo'nun kendi:
+`THIRD_PARTY_NOTICES.md` değişmedi. Ücretsiz; senin girdin olmadan tam çalışır, harici şablon ya da hesap gerekmez.
+
+Bilmen gereken davranışlar:
+- **Geçici satırlar belge değildir.** Taslağa, geri al yığınına ve transkript önbelleğine girmez; motor bitince
+  yerini `-ojf` JSON'undan kurulan nihai satırlar alır. Bu yüzden canlı satırla nihai satırın bölünmesi farklı
+  olabilir (nihai satırlar satır uzunluğu ayarına göre yeniden kurulur, sözlük uygulanır).
+- **Bulut motoru (Groq/OpenAI) akış vermez**; canlı kutu açılmaz, İptal yalnız yüklemeyi keser. Kelime kelime
+  için eski `-ml 1` yedeğine düşen eski derlemelerde (belirteç zamanı yok) o tur akış göstermez.
+- **Takılma kurtarması**: takılma noktasından sonraki (tekrarlanan) geçici satırlar silinir, kalan kısım kendi
+  ofsetiyle akar. Planda "temizle" yazıyordu; takılmadan önceki doğru satırlar ekranda kalsın diye yalnız
+  takılmadan sonrası silinir.
+- **Ses dışa aktarımı** (sekans / In-Out) Premiere'de senkron ExtendScript: o sırada İptal kapalıdır, ipucu
+  nedenini söyler. Bitince açılır.
+- **İptal hiçbir şeyi yarım bırakmaz**: geçici WAV/MP3 ve whisper JSON'u silinir, ekrandaki altyazı ve taslak
+  olduğu gibi kalır, toplu klipte işlenmiş klipler de uygulanmaz, yerel iptal bulut yedeğine geçmez (ses
+  yüklenmez). Sessiz ses sorusu açıkken İptal soruyu kapatır.
+- **Kalan süre tahmindir**: whisper.cpp yüzdeyi ~30 sn'lik ses pencerelerinde ve %5 adımla bildirir; arada
+  gözlenen hızla ilerlenir, sonraki beklenen bildirim geçilmez. VAD sessizlikleri attığı için yüzde konuşma
+  süresine göredir; çok sessiz kayıtta tahmin ilk dakikada oynak olabilir.
+- **İndirme iptali**: rehber ffmpeg'i arka planda kuruyorken Altyazı oluştur'un İptal'i yalnız altyazı işini
+  durdurur; arka plandaki indirme sürer (işi başlatan iptal eder). İptal edilen altyazı işinin durum satırı o
+  indirmenin ilerlemesini artık almaz ("İptal edildi." ekranda kalır; yüzde Ayarlar › ffmpeg satırında akar).
+  Ayarlar'dan başka bir kurulumun indirmesini bekleyen İptal (ör. rehberin Turbo indirmesi sürerken Ayarlar'da
+  Turbo "İndir & kur") "Bekleme iptal edildi — başka bir kurulum indirmeye devam ediyor." der; "İndirme iptal
+  edildi" yalnız indirme gerçekten durduğunda görünür. GPU ısınması başarısız olunca inen CPU motoru da aynı
+  İptal'le kesilir (yarım dosya korunur, "Hazır" denmez).
+- **Çift tıklama koruması**: İptal, başlatma düğmesinin ("Altyazı oluştur", "Sessizlikleri bul", "İndir & kur")
+  yerinde belirir. Göründükten sonraki ~0,5 sn içindeki tık ve çift tıkın ikinci tıkı yok sayılır; yoksa çift tık
+  yeni başlayan işi anında iptal ediyordu. Klavyeyle (Enter/Boşluk) basış her zaman geçerli.
+- **macOS Homebrew ffmpeg**: Ayarlar › ffmpeg'de Homebrew kurulumu sürerken İptal görünmez (brew yarıda
+  kesilirse yarım paket kalabilir); Homebrew kuramazsa başlayan doğrudan indirmede İptal çıkar.
+
+**3.1 Premiere'de dene (yaklaşık 25 dk).** `marketing/v3.2-deneme-listesi.md` › `## 3` maddeleri. En önemlileri
+3.6 (iptalden sonra Görev Yöneticisi'nde `whisper-cli.exe` / `ffmpeg.exe` kalmıyor) ve 3.14 (iptal edilen model
+indirmesi kaldığı yerden devam ediyor).
+
+**3.2 macOS'ta satırlar akıyor mu? (yaklaşık 5 dk).** whisper.cpp segment satırını yazdıktan sonra `fflush(stdout)`
+yapıyor; Homebrew derlemesinde de öyle olmalı. Deneme listesi 3.19'da satırlar iş sonunda topluca geliyorsa
+Terminal'de şunu çalıştır ve satırların teker teker mi geldiğine bak:
+`whisper-cli -m "$HOME/Library/Application Support/Suflo/whisper/models/ggml-large-v3-turbo-q5_0.bin" -f ornek.wav -l tr -pp | cat`
+Teker teker geliyorsa panelde başka bir sorun var (günlüğü bana gönder); topluca geliyorsa `brew upgrade whisper-cpp`
+yap. Her iki durumda da altyazı ve İptal çalışır; yalnız canlı satırlar sonda görünür.
+
+**3.3 3.2.0 sürüm notu.** Sürüm 3.2.0'a geçerken `marketing/release-notes.md`'nin 3.2.0 bölümüne şu satırı ekle:
+"Altyazı çıkarırken satırlar canlı akıyor, kalan süre ve hız görünüyor; uzun bir işi İptal ile anında durdurabilirsin
+(geçici dosyalar silinir, ekrandaki altyazın bozulmaz). Motor ve model indirmeleri de iptal edilebilir ve kaldığı
+yerden devam eder." `js/app.js` YENILIKLER listesine istersen kısası.
+
+### Adım 4: Okunabilir altyazı düzeni (kelimeden satır, 2 × 42, kısa parça birleştirme, kelime hizalama)
+
+Ne değişti: yeni saf modül `js/caption-layout.js`. Satır modunda (Satır uzunluğu 32 / 42 karakter ve yeni
+**2 satır × 42 (YouTube/TV)**) altyazılar yerel motorun ölçülmüş kelime zamanlarından kuruluyor: karakter sınırı,
+isteğe bağlı **Kelime sınırı** (2–12), 0,6 sn'den uzun duraklama, cümle sonu ve en uzun süre satırı kırıyor; aynı
+satır sayısıyla dengeleniyor (iki satır 38/4 değil 21/21). **Ayarlar › Altyazı**'ya en kısa / en uzun süre (0,8 / 6 sn)
+ve "Kısa parçaları birleştir" (varsayılan açık) geldi. Caption Editor'da **Shift+Enter** satır içinde alt satıra geçer,
+metin düzeltmesi kelime zamanlarını LCS ile yeni metne hizalar (AI kontrolü, sözlük, bul & değiştir de), zaman
+alanı "başlangıç – bitiş" kabul eder ve kelimeleri ölçekler. SRT/VTT iki satırı tek cue'ya yazar, ASS `\N`; satır
+modunda ASS karaoke dolgusu gerçek kelime zamanlarından. Belgesel stilinin iki satır bölmesi aynı işlevi
+(`ikiyeBolNoktasi`) kullanıyor; stil çıktısı bayt bayt aynı (`tests/style-engine-snapshot.json`). Raunen'in `wrapText`
+ve `shapeSegments` birleştirme / bölme / süre geçişleri uyarlandı (MIT, `THIRD_PARTY_NOTICES.md` Raunen girdisine
+`js/caption-layout.js` eklendi); kelimeden satır kurma ve LCS hizalama Suflo'nun kendi kodu (Animated Captions /
+TranscriptAI'dan yalnız fikir, kod yok). Ücretsiz; senin girdin olmadan tam çalışır, harici şablon ya da hesap gerekmez.
+
+Bilmen gereken davranışlar:
+- **Menü değerleri değişti:** "32 / 42 karakter" artık `l32` / `l42` (kelimeden satır). 3.1 tercihleri, şablonlar
+  (`maxlen: "c42"`) ve stil kodları açılışta aynı menü girdisine eşlenir. Paylaşılan stil kodu 3.1 uyumlu kalsın diye
+  `l42` koda `c42` olarak yazılır; `c42x2` 3.1'de "geçersiz ayar atlandı" uyarısıyla satır uzunluğu olmadan açılır.
+  "60 karakter" (`c60`) eski yolla çalışır.
+- **Kelime zamanı yoksa** (bulut satır modu, eski önbellek, SRT içe alma) 32 / 42 karakter 3.1'deki gibi çalışır;
+  yalnız eski eşit kelime bölmesi yerine karakter bütçesiyle bölünür (bir parça artık satır uzunluğunu aşmaz).
+  2 satır × 42 aynı yolu iki satırlık bütçeyle izler. Kelime sınırı bu yolda etkisizdir.
+- **En kısa / en uzun süre ve birleştirme** yalnız satır modlarında (32 / 42, 2 × 42) ve yeni transkriptlerde geçerli;
+  kelime kelime, N kelime ve 60 karakter değişmedi. Kısa satır yalnız sonraki satıra kadar BOŞ zamana uzar (0,08 sn
+  boşluk bırakır), satırlar hiç üst üste binmez.
+- **Elle eklenen kırılım** (Shift+Enter) her satır modunda kabul edilir; kalite denetimi her satırı ayrı sayar
+  ("Satır çok uzun" satır başına). 2 satır × 42'de "Nizami düzelt" uzun satırı bölmek yerine iki satıra kırar.
+- **SRT içindeki satır sonu artık CRLF** (dosyanın geri kalanı gibi; çift dilli SRT dahil). Çift dilli altyazıda her dil
+  tek satıra indirilir (4 satırlık cue olmasın). TXT'de her altyazı tek satır. SRT/VTT **içe alırken** çok satırlı
+  cue'lar 3.1'deki gibi tek satıra birleşir (bilinen sınır).
+- **Diğer araçlar** (bölümler, viral anlar, zoom, SFX, kanca) altyazı metnini tek satır alır; çeviri satır kırılımını
+  modele gönderir, kırılımı korumayabilir (çeviride kelime zamanları zaten düşer, 3.1 gibi).
+- **Satır modunda karaoke**: Suflo Stili seçmeden ince ayardaki Animasyon'da "Karaoke dolgu" / "Akıcı dolgu" artık
+  yerel transkriptte satır modunda da seçilebilir; ASS'te her satır tek olay, `\k` süreleri satır başından birikimli
+  yuvarlanır. Kelime zamanı olmayan transkriptte bu seçenekler eskisi gibi soluk ve fade'e düşer.
+
+**4.1 Premiere'de dene (yaklaşık 25 dk).** `marketing/v3.2-deneme-listesi.md` › `## 4` maddeleri. En önemlisi **4.3**:
+2 satır × 42 altyazıyı "Normal altyazı izi ekle" ile uygula ve Premiere altyazı izinde cue'nun iki satır göründüğünü
+doğrula (`KS_importSrtAsCaptions` değişmedi; Premiere SRT'deki CRLF satır sonunu satır kırılımı sayıyor). Premiere iki
+satırı tek satıra yapıştırırsa ya da iki ayrı cue yaparsa: Premiere sürümünü ve dışa aktarılan SRT'yi (Dışa aktarma ›
+SRT › indir) bana gönder; o arada kullanıcılar 42 karakter modunu kullanabilir (iki satır yalnız seçilirse oluşur).
+
+**4.2 Varsayılan değerler (isteğe bağlı, 5 dk).** En kısa 0,8 sn / en uzun 6 sn / birleştirme açık / kelime sınırı 0
+Netflix-YouTube önerilerine yakın. Kendi kanalında farklı bir varsayılan istersen (ör. en uzun 7 sn) `index.html`'deki
+`set-min-sure` / `set-max-sure` `value`'sunu ve `js/app.js` `altyaziSureAyarlari` varsayılanını birlikte değiştir.
+
+**4.3 3.2.0 sürüm notu.** Sürüm 3.2.0'a geçerken `marketing/release-notes.md`'nin 3.2.0 bölümüne şu satırı ekle:
+"Satır modunda altyazılar artık kelime zamanlarından kuruluyor: cümle sonunda ve duraklamada kırılan, dengeli
+satırlar; yeni '2 satır × 42 (YouTube/TV)', kelime sınırı ve Ayarlar › Altyazı'da en kısa / en uzun süre. Metni
+düzelttiğinde kelime zamanları kaybolmuyor; Shift+Enter satır içinde alt satıra geçiyor." `js/app.js` YENILIKLER
+listesine istersen kısası.
+
+### Adım 5: Yerel motor seçenekleri (Hızlı / En doğru, DTW hassas kelime, çevrimdışı İngilizce)
+
+Ne değişti: argüman kurma yeni saf modülde (`js/whisper-args.js`; `KEngine.buildArgs` ona devreder, ASCII-güvenli
+yol eşlemesi aynı). **Ayarlar › Çözme**: En doğru (bugünkü `-bs 5`, varsayılan) ya da Hızlı (`-bs 1 -bo 1`; sıcaklık
+geri dönüşü açık), yerel motorun her koşusunda. Altyazı kartında **Hassas kelime zamanlaması (DTW, biraz daha
+yavaş)**: yalnız yerel motor + kelime tabanlı mod (kelime kelime, birikimli, N kelime) ya da kelime tabanlı Suflo
+Stilinde görünür; motor `-dtw <ön ayar> -nfa` ile çalışır (tiny, base, small, large.v3.turbo, large.v3) ve
+`js/whisper-words.js` kelime başını `t_dtw / 100` sn alır; sonu kelimenin kendi belirteç sonu (DTW kaymasıyla),
+sonraki kelimenin başıyla sınırlı — 0,3 sn'ye kadar boşluk kapanır, daha uzun duraklama (ve VAD'in attığı sessizlik)
+korunur, son kelime segment sonuna uzamaz. (İlk sürüm sonu sonraki kelimenin başı alıyordu: duraklamada kelime
+ekranda kalıyor, 3 kelime / iki satır modları duraklamada bölünmüyordu; inceleme düzeltmesi.) Dil satırında
+**İngilizceye çevir (çevrimdışı)**: `-tr`, yalnız Small ve Large. **Suflo Doctor** çözme modunu ve DTW desteğini
+gösterir. Çözme ve DTW **ücretsiz**; çevrimdışı İngilizce **Pro** — yeni özellik anahtarı `offlineTranslate`, 3 deneme
+hakkı (deneme listesi 10 → 11 araç, Ayarlar › Suflo Pro'daki tablo kendiliğinden gösterir). Raunen'den (MIT) yalnız
+fikir (bayrakları açmak); kod Suflo'nun kendi, clean-room (Raunen'in DTW yolu `-nfa` vermiyor, `t_dtw` okumuyordu).
+Kıyas aracı: `tools/motor-kiyas.js`.
+
+Benim doğruladıklarım (bu ortamda HuggingFace kapalıydı, gerçek modelleri indiremedim): whisper.cpp v1.9.1'i
+kaynaktan derledim. Yardım metni (`tests/fixtures/whisper-cli-v1.9.1-yardim.txt`) flash attention'ın varsayılan
+**açık** olduğunu gösteriyor. q5_1 olarak nicemlenmiş (rastgele ağırlıklı) bir tiny dosyasında: `-dtw tiny` tek başına
+"dtw_token_timestamps is not supported with flash_attn - disabling" yazıp bütün `t_dtw`'leri -1 bırakıyor; `-nfa` ile
+`t_dtw ≥ 0` geliyor (santisaniye), `--vad` ile de (VAD tablosuyla eşleniyor); `-tr` JSON'a `"translate": true` yazıyor.
+CPU'da 66 sn seste DTW'nin kendi ek yükü ~%3, `-nfa` dahil ~%6 çıktı ama bu rastgele ağırlıklı (anlamsız metin
+çözen) tiny dosyasındaydı: temsilî değil, README'de verilmiyor (hız tablosunun "+ DTW" satırı 5.1'deki ölçümünü
+bekliyor). Gerçek koşu çıktısı panelin ayrıştırıcısından geçti. Gerçek Turbo / Large / Small dosyalarında DTW'nin çalıştığını ve Türkçe hız / doğruluğu SEN ölçeceksin (5.1, 5.2).
+
+Bilmen gereken davranışlar:
+- **Varsayılan "En doğru" kalıyor**, kıyas (5.1) yapılana dek. Raunen'in ~13× / 1,4× iddiası Türkçe için doğrulanmadı.
+- **DTW otomatik kapanır:** motor `t_dtw` vermezse (hepsi -1) ya da derleme `-dtw` / `-nfa` tanımazsa (eski Homebrew;
+  o zaman aynı ses DTW'siz yeniden çözülür) o **model + derleme** için kapanır (`settings.json` › `dtwKapali`, ör.
+  `"turbo@cuda"`), günlüğe yazılır, anahtarın altında not ve "Yeniden dene" çıkar. CPU'ya ya da başka modele geçince
+  yeniden denenir.
+- **DTW açıkken canlı satırlar akmıyor** (yüzde, kalan süre ve hız akıyor): whisper.cpp v1.9.1'de DTW açıkken yeni
+  segment bildirimi DTW hesabından sonraya kalıyor ve o döngü (`src/whisper.cpp`, `seg < n_segments`) ilk 30 sn'lik
+  pencereden sonra hiç satır yazmıyor, ilkinde satırları yineliyor. Nihai altyazı JSON'dan, etkilenmiyor.
+- **Çevrimdışı çeviri bulut yedeğine geçmez** (yedek çevirmez; kaynak dilde altyazı "çeviri" sayılmasın), transkript
+  önbelleğine yazılmaz (Konuşmadan kes İngilizce kelime almasın), rehberin örnek klibinde kapalı. Sözlük ipucu
+  çeviride İngilizce çerçeveyle ("Names and terms: …") gider. Belge İngilizce sayılır (büyük harf "THIS", kalite,
+  çok dilli paket `en.srt`); işaret satırlarda (`cikisDili: "en"`) durur (satır bölünce iki parçaya da geçer), geri al /
+  taslak / Shorts kaydıyla taşınır. Belgenin dili de belgeyle taşınır (geri al girdisi, taslak ve Shorts kaydında `dil`;
+  SRT içe aktarmada sıfırlanır): çevrimdışı İngilizceden Ctrl+Z ile dönülen Türkçe belge Türkçe kalır (BİR, `tr.srt`,
+  Türkçe başlıklar). 3.2 öncesi taslak / Shorts kaydında `dil` yok: işaretli satırlardan "en", değilse Altyazı › Dil.
+- **Dosya adı eki:** çeviri belgesi `suflo-altyazi.en.srt` olarak iner. Bu ek bulut (LLM) çevirisinde de hedef dili
+  alır (`suflo-altyazi.de.srt`); çift dilli dışa aktarmada ek yok. 3.1'de çeviri sonrası dosya adı eksizdi.
+- **Hızlı moddaki transkript** önbellekte ayrı tutulur: motor kimliği `yerel:<model>:hizli` (En doğru eksiz
+  `yerel:<model>` kalır, eski önbellek girdileri geçerli). Hızlı'da yazıya dökülen klip En doğru'ya geçince yeniden
+  çözülür. Hızlı'da durum satırı "Suflo Motoru · yerel · hızlı çözme…" der ("yüksek doğruluk" değil).
+
+**5.1 Türkçe kıyas ve varsayılan kararı (yaklaşık 1,5 saat; Windows, NVIDIA kartlı makinede).**
+1. Üç örnek hazırla, her biri 1–3 dk Türkçe konuşma: `studyo` (iyi mikrofon), `telefon` (telefonla kayıt), `gurultulu`
+   (kafe / sokak). Bir klasöre (ör. `D:\kiyas`) 16 kHz mono WAV olarak koy:
+   `ffmpeg -i studyo.mp4 -ar 16000 -ac 1 -c:a pcm_s16le D:\kiyas\studyo.wav` (diğer ikisi aynı).
+2. Her biri için referans metni `D:\kiyas\studyo.txt` (UTF-8): Suflo'nun Large + En doğru çıktısını SRT/TXT olarak al,
+   sesi dinleyerek **elle düzelt** (kelime kelime doğru olsun; noktalama ve büyük harf önemli değil).
+3. Panelden Large v3 ve Turbo'yu indir (Ayarlar › Doğruluk modeli; dosyalar `%APPDATA%\Kesit\whisper\models`).
+   Kurulu motor GPU (cuBLAS) ise CPU karşılaştırması için
+   `https://github.com/ggerganov/whisper.cpp/releases/download/v1.9.1/whisper-blas-bin-x64.zip`'i ayrı bir klasöre
+   (ör. `D:\whisper-cpu`) aç.
+4. `%APPDATA%\Kesit\whisper` içinde `whisper-cli.exe`'yi bul (bir alt klasörde de olabilir; aşağıdaki `--cli`'ye o
+   yolu ver). Depo klasöründe (Node 12+):
+   `node tools/motor-kiyas.js --cli "%APPDATA%\Kesit\whisper\whisper-cli.exe" --modeller "%APPDATA%\Kesit\whisper\models" --ornekler D:\kiyas --model turbo,large --dtw --vad "%APPDATA%\Kesit\whisper\models\ggml-silero-v5.1.2.bin" --json D:\kiyas\gpu.json`
+   ve aynısını `--cli D:\whisper-cpu\whisper-cli.exe ... --json D:\kiyas\cpu.json` ile (exe alt klasördeyse yolunu ver).
+   Windows kullanıcı adında ya da klasör adında Türkçe harf olması sorun değil: araç panel gibi yolları 8.3 kısa adına,
+   o kapalıysa `C:\ProgramData\Suflo\ascii-onbellek`'e kopyaya çevirir (model ilk koşuda bir kez kopyalanabilir).
+   Bir satırda "ASCII olmayan yol whisper-cli'ye gitti" görürsen örnekleri ve modelleri `D:\kiyas` gibi yalnız ASCII
+   harfli bir klasöre koyup `--modeller`/`--ornekler`'i ona çevir.
+   Çıktı tablosu her model / mod / DTW için gerçek zaman çarpanını ve WER'i verir. İki JSON'u bana gönder.
+5. Karar kuralı: Turbo ve Large'da, CPU ve GPU'da, üç örneğin hepsinde Hızlı'nın WER'i En doğru'dan en çok
+   **1 puan** fazlaysa **ve** Hızlı en az **1,5×** hızlıysa varsayılanı Hızlı yap; değilse En doğru kalsın. Hızlı'ya
+   geçmek için: `js/whisper-args.js` › `VARSAYILAN_COZME = "hizli"`, `index.html` › `#set-cozme`'de Hızlı'yı ilk
+   seçenek yap ve "(önerilen)"i ona taşı, `tests/test-whisper-args.js` / `tests/test-caption-quality.js` /
+   `tests/test-motor-secenekleri.js`'teki varsayılan beklentilerini güncelle (ya da bana yaz, ben yaparım).
+6. README'deki hız tablosunun "Hızlı" ve "+ DTW" satırlarına ölçtüğün çarpanları ve WER'i yaz.
+
+**5.2 DTW'yi gerçek modellerde doğrula (5.1'in içinde, ek süre yok).** `--dtw` ile her model satırında araç
+"t_dtw N/M" yazar. Turbo, Large ve (kuruluysa) Small'da GPU ve CPU'da N > 0 olmalı. Bir satırda **0/M** görürsen o
+model + derlemede DTW çalışmıyor demektir: kullanıcıda otomatik kapanır (zarar yok) ama bana yaz. Ek yük: aynı model
+ve modda DTW açık / kapalı gerçek zaman çarpanlarının oranı.
+
+**5.3 Gerçek DTW fikstürü (isteğe bağlı, 10 dk).** 10–20 sn'lik Türkçe bir WAV'ı Large ya da Turbo ile
+`whisper-cli -m <model> -f ornek.wav -l tr -ojf -of whisper-ojf-dtw-gercek -dtw large.v3.turbo -nfa --vad -vm <silero> 2> whisper-ojf-dtw-gercek.stderr.txt`
+ile çöz (Large'da ön ayar `large.v3`), iki dosyayı `tests/fixtures/` altına koy. `tests/test-whisper-words.js` onları
+bulunca gerçek DTW çıktısını da sınar (şimdi "ATLA" yazıyor).
+
+**5.4 Pro sayfası ve sürüm notu.** suflo.app Pro listesine (ve istersen fiyat sayfasına) "Çevrimdışı İngilizce
+çeviri (internetsiz, yerel motor)" ekle. Sürüm 3.2.0'a geçerken `marketing/release-notes.md`'nin 3.2.0 bölümüne:
+"Ayarlar › Çözme ile yerel motoru Hızlı ya da En doğru çalıştır; kelime kelime ve karaoke altyazıda 'Hassas kelime
+zamanlaması (DTW)' vurguyu sözcüğün söylendiği ana oturtur. Yeni Pro aracı: konuşmayı internetsiz İngilizce altyazıya
+çevir (Small / Large model, 3 deneme hakkı)." `js/app.js` YENILIKLER listesine istersen kısası.
+
+**5.5 Premiere'de dene (yaklaşık 40 dk).** `marketing/v3.2-deneme-listesi.md` › `## 5` maddeleri; en önemlisi 5.6
+(her modelde ve derlemede DTW) ve 5.10–5.12 (deneme hakkı, büyük harf, `.en.srt`).

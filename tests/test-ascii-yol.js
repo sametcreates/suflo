@@ -67,11 +67,20 @@ ok("ASCII yol degismeden gecer", Y.guvenliYol(duz, "girdi") === duz);
 ok("bos deger patlamaz", Y.guvenliYol("", "girdi") === "" && Y.guvenliYol(null, "girdi") === null);
 
 /* ---- engine.js butun yol argumanlarini korumadan geciriyor ---- */
+// Argüman kurma js/whisper-args.js'te (3.2 adım 5); engine.js K.guvenliYol'u o.yol kancası olarak verir
 var motor = fs.readFileSync(KOK + "js" + path.sep + "engine.js", "utf8");
-ok("engine: model korumali", motor.indexOf('G(o.model, "girdi")') > -1);
-ok("engine: ses korumali", motor.indexOf('G(o.audio, "girdi")') > -1);
-ok("engine: cikti tabani korumali", motor.indexOf('G(o.outBase, "cikti")') > -1);
-ok("engine: VAD modeli korumali", motor.indexOf('G(vp, "girdi")') > -1);
+var argKaynak = fs.readFileSync(KOK + "js" + path.sep + "whisper-args.js", "utf8");
+ok("engine: K.guvenliYol kancasi whisper-args'a verilir", /var G = \(typeof K !== "undefined" && K\.guvenliYol\)/.test(motor) && motor.indexOf("girdi.yol = G;") > -1);
+ok("whisper-args: model korumali", argKaynak.indexOf('G(o.model, "girdi")') > -1);
+ok("whisper-args: ses korumali", argKaynak.indexOf('G(o.audio, "girdi")') > -1);
+ok("whisper-args: cikti tabani korumali", argKaynak.indexOf('G(o.outBase, "cikti")') > -1);
+ok("whisper-args: VAD modeli korumali", argKaynak.indexOf('G(o.vad, "girdi")') > -1);
+var WARG = require(KOK + "js" + path.sep + "whisper-args.js");
+var kancali = WARG.olustur({ model: "/Ş/m.bin", audio: "/Ş/a.wav", outBase: "/Ş/o", vad: "/Ş/v.bin",
+  yol: function (p, tur) { return "ASCII[" + tur + "]" + p; } });
+ok("whisper-args: dort yolun hepsi kancadan gecer (girdi/cikti turuyle)",
+  kancali[1] === "ASCII[girdi]/Ş/m.bin" && kancali[3] === "ASCII[girdi]/Ş/a.wav" &&
+  kancali[kancali.indexOf("-of") + 1] === "ASCII[cikti]/Ş/o" && kancali[kancali.indexOf("-vm") + 1] === "ASCII[girdi]/Ş/v.bin", kancali.join(" "));
 ok("bridge disa aktariyor", kaynak.indexOf("guvenliYol: guvenliYol") > -1);
 
 /* ---- temizlik ---- */

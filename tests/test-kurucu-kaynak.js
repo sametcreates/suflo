@@ -32,5 +32,19 @@ var vr = oku("tools/verify-release.ps1");
 ok("verify-release.ps1: i18n/en.js, js/i18n.js ve js/pricing.js zorunlu", vr.indexOf("'(^|/)i18n/en\\.js$'") !== -1 &&
   vr.indexOf("'(^|/)js/i18n\\.js$'") !== -1 && vr.indexOf("'(^|/)js/pricing\\.js$'") !== -1);
 
+/* ---------- 9) macOS kurucusu LF satır sonuyla paketlenir ----------
+ * Yayın Windows sunucusunda (core.autocrlf=true) paketlenir. 3.0.0 ve 3.1.0 kurulum zip'lerinde
+ * Suflo-Kur.command CRLF çıktı: macOS "bad interpreter: /bin/bash^M" dedi, kurulum hiç başlamadı. */
+var gitattr = fs.existsSync(KOKYOL + ".gitattributes") ? oku(".gitattributes") : "";
+ok(".gitattributes: *.command ve *.sh her checkout'ta LF", /^\*\.command\s+text\s+eol=lf\s*$/m.test(gitattr) &&
+  /^\*\.sh\s+text\s+eol=lf\s*$/m.test(gitattr), gitattr ? "var" : "YOK");
+ok("command: ilk baytlar #!/bin/bash (BOM yok)", cmdKaynak.indexOf("#!/bin/bash") === 0, JSON.stringify(cmdKaynak.slice(0, 14)));
+var ky = oku("tools/kurucu-yap.ps1");
+ok("kurucu-yap.ps1: .command'ı CRLF->LF ve BOM'suz yazar (düz kopya değil)",
+  !/Copy-Item[^\n]*Suflo-Kur\.command/.test(ky) && /Suflo-Kur\.command"\)\) -replace "`r`n", "`n"/.test(ky) &&
+  /WriteAllText\(\(Join-Path \$stage "Suflo-Kur\.command"\), \$cmdMetin, \(New-Object System\.Text\.UTF8Encoding\(\$false\)\)\)/.test(ky));
+ok("verify-release.ps1: kurucu betiğinde CR baytı ya da BOM varsa yayını durdurur",
+  /'\\\.\(command\|sh\)\$'/.test(vr) && /\$bytes -contains 13/.test(vr) && /-or \$crlf\.Count\)/.test(vr));
+
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

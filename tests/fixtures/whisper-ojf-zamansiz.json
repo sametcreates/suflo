@@ -1,0 +1,224 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "large",
+		"multilingual": true,
+		"vocab": 51866,
+		"audio": {
+			"ctx": 1500,
+			"state": 1280,
+			"head": 20,
+			"layer": 32
+		},
+		"text": {
+			"ctx": 448,
+			"state": 1280,
+			"head": 20,
+			"layer": 4
+		},
+		"mels": 128,
+		"ftype": 8
+	},
+	"params": {
+		"model": "models/ggml-large-v3-turbo-q5_0.bin",
+		"language": "tr",
+		"translate": false
+	},
+	"result": {
+		"language": "tr"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2000
+			},
+			"text": " Bu ışık hiç de kötü değil.",
+			"tokens": [
+				{
+					"text": "[_BEG_]",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,000"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 0
+					},
+					"id": 50365,
+					"p": 0.95,
+					"t_dtw": -1
+				},
+				{
+					"text": " Bu",
+					"timestamps": {
+						"from": "00:00:00,000",
+						"to": "00:00:00,220"
+					},
+					"offsets": {
+						"from": 0,
+						"to": 220
+					},
+					"id": 4078,
+					"p": 0.91,
+					"t_dtw": -1
+				},
+				{
+					"text": " ı",
+					"id": 3045,
+					"p": 0.87,
+					"t_dtw": -1
+				},
+				{
+					"text": "ş",
+					"id": 7464,
+					"p": 0.99,
+					"t_dtw": -1
+				},
+				{
+					"text": "ık",
+					"id": 9874,
+					"p": 0.98,
+					"t_dtw": -1
+				},
+				{
+					"text": " hiç",
+					"timestamps": {
+						"from": "00:00:00,640",
+						"to": "00:00:00,920"
+					},
+					"offsets": {
+						"from": 640,
+						"to": 920
+					},
+					"id": 17054,
+					"p": 0.96,
+					"t_dtw": -1
+				},
+				{
+					"text": " de",
+					"timestamps": {
+						"from": "00:00:00,920",
+						"to": "00:00:01,060"
+					},
+					"offsets": {
+						"from": 920,
+						"to": 1060
+					},
+					"id": 368,
+					"p": 0.94,
+					"t_dtw": -1
+				},
+				{
+					"text": " kö",
+					"id": 21307,
+					"p": 0.9,
+					"t_dtw": -1
+				},
+				{
+					"text": "tü",
+					"id": 15329,
+					"p": 0.99,
+					"t_dtw": -1
+				},
+				{
+					"text": " de",
+					"timestamps": {
+						"from": "00:00:01,440",
+						"to": "00:00:01,600"
+					},
+					"offsets": {
+						"from": 1440,
+						"to": 1600
+					},
+					"id": 368,
+					"p": 0.98,
+					"t_dtw": -1
+				},
+				{
+					"text": "ğ",
+					"timestamps": {
+						"from": "00:00:01,600",
+						"to": "00:00:01,680"
+					},
+					"offsets": {
+						"from": 1600,
+						"to": 1680
+					},
+					"id": 11545,
+					"p": 0.99,
+					"t_dtw": -1
+				},
+				{
+					"text": "il",
+					"timestamps": {
+						"from": "00:00:01,680",
+						"to": "00:00:01,900"
+					},
+					"offsets": {
+						"from": 1680,
+						"to": 1900
+					},
+					"id": 388,
+					"p": 0.99,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"timestamps": {
+						"from": "00:00:01,900",
+						"to": "00:00:02,000"
+					},
+					"offsets": {
+						"from": 1900,
+						"to": 2000
+					},
+					"id": 13,
+					"p": 0.9,
+					"t_dtw": -1
+				},
+				{
+					"text": "<|endoftext|>",
+					"id": 50256,
+					"p": 0.2,
+					"t_dtw": -1
+				}
+			]
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,000",
+				"to": "00:00:03,000"
+			},
+			"offsets": {
+				"from": 2000,
+				"to": 3000
+			},
+			"text": " Tamam.",
+			"tokens": [
+				{
+					"text": " Tam",
+					"id": 21279,
+					"p": 0.97,
+					"t_dtw": -1
+				},
+				{
+					"text": "am",
+					"id": 335,
+					"p": 0.99,
+					"t_dtw": -1
+				},
+				{
+					"text": ".",
+					"id": 13,
+					"p": 0.9,
+					"t_dtw": -1
+				}
+			]
+		}
+	]
+}

@@ -9,10 +9,13 @@
   // Paylasim kodu modulu (paket fontlari) style-engine'den ONCE yuklenir; yoksa motor yine calisir
   var SS = (root && root.SufloStyleShare) || null;
   if (!SS && typeof require === "function") { try { SS = require("./style-share.js"); } catch (e) { SS = null; } }
-  var api = factory(SS);
+  // Dengeli iki satir kirilimi altyazi iziyle ortak (js/caption-layout.js ikiyeBolNoktasi); ONCE yuklenir
+  var CL = (root && root.SufloCaptionLayout) || null;
+  if (!CL && typeof require === "function") { try { CL = require("./caption-layout.js"); } catch (e2) { CL = null; } }
+  var api = factory(SS, CL);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloStyleEngine = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS) {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS, CL) {
   "use strict";
 
   var STYLES = {
@@ -120,12 +123,46 @@
     return hedef;
   }
 
+  /*
+   * Ölçülmüş kelime zamanları (yerel motor -ojf, js/whisper-words.js): cue.words sayısı
+   * satırın *vurgu* işaretleri ayıklanmış kelime sayısına eşitse kelime geçişleri
+   * ölçülmüş başlangıçlardan alınır. İlk kelime cue başında, son kelime cue sonunda
+   * biter (satır ekranda boşluksuz kalır). Tutmuyorsa null: karakter ağırlıklı yedek.
+   */
+  function olculmusBaslangiclar(cue, words, start, end) {
+    var olcu = cue.words;
+    if (!olcu || typeof olcu.length !== "number" || !olcu.length) return null;
+    var icerik = words.filter(function (w) { return w.replace(/\*/g, "").length > 0; });
+    if (icerik.length !== olcu.length) return null;
+    var baslar = [], k = 0, onceki = start;
+    for (var i = 0; i < words.length; i++) {
+      var t = onceki;
+      if (words[i].replace(/\*/g, "").length > 0) {
+        var m = Number(olcu[k] && olcu[k].start);
+        k++;
+        if (!isFinite(m)) return null;
+        t = i === 0 ? start : Math.min(end, Math.max(onceki, m));
+      }
+      baslar.push(t);
+      onceki = t;
+    }
+    return baslar;
+  }
+
   function splitToWords(cues) {
     var out = [];
     (cues || []).forEach(function (cue) {
       var words = String(cue.text || "").trim().split(/\s+/).filter(Boolean);
       var start = Number(cue.start || 0), end = Number(cue.end || 0);
       if (words.length <= 1) { if (words.length) out.push(konusmaciTasi(cue, { start: start, end: end, text: words[0], lineEnd: true })); return; }
+      var baslar = olculmusBaslangiclar(cue, words, start, end);
+      if (baslar) {
+        words.forEach(function (w, i) {
+          var son = i === words.length - 1 ? end : baslar[i + 1];
+          out.push(konusmaciTasi(cue, { start: baslar[i], end: son, text: w, lineEnd: i === words.length - 1 }));
+        });
+        return;
+      }
       var weights = words.map(function (w) { return w.replace(/\*/g, "").length + 1; });
       var total = weights.reduce(function (a, b) { return a + b; }, 0);
       var t = start;
@@ -233,7 +270,15 @@
       if (!value || end <= 0) return;
       start = Math.max(0, start);
       end = Math.max(start + 0.08, end);
-      out.push(konusmaciTasi(cue, { start: start, end: end, text: value }));
+      var c = konusmaciTasi(cue, { start: start, end: end, text: value });
+      // Ölçülmüş kelimeler (varsa) aynı ofsetle taşınır; yoksa alan hiç eklenmez (çıktı aynı kalır)
+      if (cue.words && typeof cue.words.length === "number" && cue.words.length) {
+        var ofs = Number(offset || 0);
+        c.words = Array.prototype.map.call(cue.words, function (w) {
+          return { text: String(w && w.text || ""), start: Number(w && w.start) - ofs, end: Number(w && w.end) - ofs };
+        });
+      }
+      out.push(c);
     });
     return out;
   }
@@ -367,6 +412,23 @@
       assColor(color, alpha) + (extra || "") + "\\p1}" + path + "{\\p0}";
   }
 
+  /*
+   * Iki satirlik dengeli kirilim: altyazi iziyle (2 satir × 42) AYNI kural, tek kaynak
+   * js/caption-layout.js ikiyeBolNoktasi (sol/sag satir farki en kucuk ilk kelime siniri).
+   * Eski yerel dongunun "max'i asan satira +12" cezasi en dengeli kirilimi hic degistirmiyordu
+   * (fark kuculdukce en uzun satir da kisalir): stil goruntu cikisi bayt bayt aynidir.
+   */
+  function ikiyeBol(words) {
+    if (CL && CL.ikiyeBolNoktasi) return CL.ikiyeBolNoktasi(words);
+    // yedek: motor require'siz bir ortamda tek basina yuklendiyse (caption-layout.js yok) ayni kural
+    var enIyi = -1, enKucuk = Infinity;
+    for (var i = 1; i < words.length; i++) {
+      var fark = Math.abs(words.slice(0, i).join(" ").length - words.slice(i).join(" ").length);
+      if (fark < enKucuk) { enIyi = i; enKucuk = fark; }
+    }
+    return enIyi;
+  }
+
   // accent/normal verilirse *vurgulu* kelimeler o renkte yazilir
   function balancedText(value, max, accent, normal) {
     var tokens = emphasisTokens(value);
@@ -375,13 +437,8 @@
       return t.v && accent ? "{\\1c" + accent + "}" + esc(t.w) + "{\\1c" + normal + "}" : esc(t.w);
     });
     if (words.join(" ").length <= max || words.length < 3) return parts.join(" ");
-    var best = 1, bestScore = 9999;
-    for (var i = 1; i < words.length; i++) {
-      var left = words.slice(0, i).join(" ").length;
-      var right = words.slice(i).join(" ").length;
-      var score = Math.abs(left - right) + (Math.max(left, right) > max ? 12 : 0);
-      if (score < bestScore) { best = i; bestScore = score; }
-    }
+    var best = ikiyeBol(words);
+    if (best < 1) return parts.join(" ");
     return parts.slice(0, best).join(" ") + "\\N" + parts.slice(best).join(" ");
   }
 
@@ -588,18 +645,14 @@
     return events;
   }
 
-  // balancedText'in en uzun satirinin karakter sayisi (ayni bolme kurali)
+  // balancedText'in en uzun satirinin karakter sayisi (ayni bolme kurali: ikiyeBol)
   function dengeliUzunluk(value, max) {
     var words = String(value || "").split(/\s+/).filter(Boolean);
     var tum = words.join(" ").length;
     if (tum <= max || words.length < 3) return tum;
-    var best = tum, bestScore = 9999;
-    for (var i = 1; i < words.length; i++) {
-      var left = words.slice(0, i).join(" ").length, right = words.slice(i).join(" ").length;
-      var score = Math.abs(left - right) + (Math.max(left, right) > max ? 12 : 0);
-      if (score < bestScore) { best = Math.max(left, right); bestScore = score; }
-    }
-    return best;
+    var i = ikiyeBol(words);
+    if (i < 1) return tum;
+    return Math.max(words.slice(0, i).join(" ").length, words.slice(i).join(" ").length);
   }
 
   function renderDoc(cues, style, width, height, factor) {
@@ -699,17 +752,12 @@
     return Math.max(1, Math.round(Number(value || 1) * Math.min(width, height) / 1080));
   }
 
-  // Grup icin satir kirilma indeksi (ikinci satirin ilk kelimesi); 0 = tek satir
+  // Grup icin satir kirilma indeksi (ikinci satirin ilk kelimesi); 0 = tek satir.
+  // Kural altyazi iziyle ortak: caption-layout.js ikiyeBolNoktasi (sol/sag farki en kucuk ilk sinir)
   function breakIndex(group, minWords) {
     if (group.length < (minWords || 3)) return 0;
-    var best = 1, bestScore = 1e9;
-    for (var i = 1; i < group.length; i++) {
-      var left = group.slice(0, i).map(function (c) { return c.text; }).join(" ").length;
-      var right = group.slice(i).map(function (c) { return c.text; }).join(" ").length;
-      var score = Math.abs(left - right);
-      if (score < bestScore) { best = i; bestScore = score; }
-    }
-    return best;
+    var i = ikiyeBol(group.map(function (c) { return String(c.text); }));
+    return i > 0 ? i : 0;
   }
 
   function fitSize(fs, group, br, style, width, extra) {

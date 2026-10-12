@@ -24,6 +24,9 @@ window.KBeat = (function () {
   var clip = null;
   var vurusler = [];      // { t: timeline saniyesi, guc: 0..1, tip: "bass"|"tiz" }
   var bpm = 0;
+  // Son analizin sekansı ve müzik klibinin timeline aralığı: Hız Rampası (Ritme Rampa) vuruşları
+  // yalnız aynı sekansta kullanır ve "bu aralıkta vuruş yok" derken aralığı söyler
+  var analiz = null;
   var busy = false;
   // Pro'yu dene: ritim hakkı analiz başına BİR kez, o analizin ilk timeline çıktısında
   // (marker ya da bölme) düşer; aynı analizden sonraki çıktılar yeni hak istemez
@@ -248,11 +251,13 @@ window.KBeat = (function () {
      * cokerdi. Yerel kopya (k) uzerinden calis: analiz basladigi klibe kilitli.
      */
     var k = KApp.ctx().sel;
+    var analizSeq = String(KApp.ctx().sequenceId || "");   // analiz başladığı sekansa kilitli (uzun sürebilir)
     clip = k;
     if (!k) { status("Önce timeline'da bir klip seç.", "warn"); return; }
     busy = true;
     // Yeni analiz: eski sonuc (baska klibin vuruslari) bu analiz basarisiz olsa da kalmasin
     vurusler = [];
+    analiz = null;
     analizHakDustu = false;
     el("beat-result").hidden = true;
     el("beat-analyze").classList.add("busy");
@@ -313,6 +318,7 @@ window.KBeat = (function () {
         return;
       }
 
+      analiz = { seqId: analizSeq, start: k.clipStart, end: k.clipEnd };
       status("");
       el("beat-result").hidden = false;
       el("beat-result-info").textContent = vurusler.length + " vuruş" + (bpm ? " · ~" + bpm + " BPM" : "");
@@ -398,5 +404,10 @@ window.KBeat = (function () {
     refreshButton();
   }
 
-  return { init: init, _onsetBul: onsetBul, _bpmTahmin: bpmTahmin };
+  // Hız Rampası (Ritme Rampa) son analizin vuruşlarını okur: timeline saniyesi, kopya
+  function vuruslarKopya() { return vurusler.map(function (v) { return { t: v.t, guc: v.guc, tip: v.tip }; }); }
+
+  function analizKopya() { return analiz && vurusler.length ? { seqId: analiz.seqId, start: analiz.start, end: analiz.end } : null; }
+
+  return { init: init, vuruslar: vuruslarKopya, analiz: analizKopya, bpm: function () { return bpm; }, _onsetBul: onsetBul, _bpmTahmin: bpmTahmin };
 })();
