@@ -201,10 +201,79 @@ window.K = (function () {
   var aktifSurec = 0;
   function surecSayisi() { return aktifSurec; }
 
+  /*
+   * İptal jetonu: uzun işler (transkripsiyon, ffmpeg, indirme) aynı jetonu paylaşır.
+   *   iptalEdildi  true olduktan sonra geri dönmez
+   *   iptal()      dinleyicileri bir kez çağırır (ikinci çağrı etkisiz)
+   *   dinle(fn)    fn'i kaydeder, kaydı silen işlevi döner; jeton zaten iptalse fn hemen çağrılır
+   * CEF 74 / Node 12'de yerleşik iptal denetleyicisi yok (Node 15): kendi küçük jetonumuz.
+   */
+  function iptalJetonu() {
+    var dinleyiciler = [];
+    var j = {
+      iptalEdildi: false,
+      iptal: function () {
+        if (j.iptalEdildi) return;
+        j.iptalEdildi = true;
+        var liste = dinleyiciler.slice();
+        dinleyiciler.length = 0;
+        for (var i = 0; i < liste.length; i++) {
+          try { liste[i](); } catch (e) { log("iptal dinleyicisi: " + (e && e.message ? e.message : e)); }
+        }
+      },
+      dinle: function (fn) {
+        if (typeof fn !== "function") return function () {};
+        if (j.iptalEdildi) { try { fn(); } catch (e0) {} return function () {}; }
+        dinleyiciler.push(fn);
+        return function () {
+          var k = dinleyiciler.indexOf(fn);
+          if (k !== -1) dinleyiciler.splice(k, 1);
+        };
+      }
+    };
+    return j;
+  }
+
+  // Kullanıcı iptal etti: hata değil (çağıran "İptal edildi" uyarısı gösterir, hata rehberine gitmez)
+  function iptalHatasi(mesaj) {
+    var e = new Error(mesaj || "İptal edildi");
+    e.iptal = true;
+    return e;
+  }
+
+  /*
+   * Süreci ALT SÜREÇLERİYLE birlikte öldür. Windows'ta child.kill() yalnız ilk süreci kapatır;
+   * whisper-cli / ffmpeg'in açtığı alt süreçler (ve kilitlediği WAV) yaşamaya devam eder:
+   * taskkill /T (ağaç) /F (zorla). macOS'ta SIGKILL: whisper SIGTERM'de JSON yazmaya çalışmasın.
+   */
+  function surecAgaciniOldur(child) {
+    if (!child) return;
+    if (WIN && child.pid) {
+      try {
+        cp.execFile("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true }, function (e) {
+          // taskkill yoksa ya da başarısızsa en azından ana süreç kapansın (süreç zaten bittiyse zararsız)
+          if (e) { try { child.kill(); } catch (e2) {} }
+        });
+        return;
+      } catch (e3) {}
+    }
+    try { child.kill("SIGKILL"); } catch (e4) { try { child.kill(); } catch (e5) {} }
+  }
+
+  /*
+   * opts.timeout   ms (varsayılan 5 dk)
+   * opts.cwd       çalışma klasörü
+   * opts.onStderr  fn(parça) — stderr akarken (ilerleme yüzdesi)
+   * opts.onStdout  fn(parça) — stdout akarken (whisper-cli segment satırları); tam çıktı yine birikir
+   * opts.iptal     K.iptalJetonu(): iptalde süreç ağacı öldürülür, { code: -2, iptal: true } döner
+   */
   function run(cmd, args, opts) {
     opts = opts || {};
     return new Promise(function (resolve) {
       if (!nodeOK) { resolve({ code: -1, stdout: "", stderr: "Node erişimi yok" }); return; }
+      var jeton = opts.iptal && typeof opts.iptal.dinle === "function" ? opts.iptal : null;
+      // başlamadan iptal edilmiş iş: süreç hiç açılmaz
+      if (jeton && jeton.iptalEdildi) { resolve({ code: -2, iptal: true, stdout: "", stderr: "" }); return; }
       var child;
       try {
         var spawnOpts = { windowsHide: true };
@@ -229,35 +298,53 @@ window.K = (function () {
         resolve({ code: -1, stdout: "", stderr: String(e) });
         return;
       }
-      var out = "", err = "", done = false;
+      var out = "", err = "", done = false, birak = null;
       aktifSurec++;
+      function kapat() {
+        done = true;
+        aktifSurec = Math.max(0, aktifSurec - 1);
+        clearTimeout(timer);
+        if (birak) { birak(); birak = null; }
+      }
       var timer = setTimeout(function () {
         if (done) return;
         try { child.kill(); } catch (e) {}
-        done = true;
-        aktifSurec = Math.max(0, aktifSurec - 1);
+        kapat();
         resolve({ code: -1, stdout: out, stderr: err + "\n[zaman aşımı]" });
       }, opts.timeout || 300000);
 
       function finish(code) {
         if (done) return;
-        done = true;
-        aktifSurec = Math.max(0, aktifSurec - 1);
-        clearTimeout(timer);
+        kapat();
         if (code !== 0) {
           log("run HATA [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kod=" + code + " " +
             String(err).split("\n").slice(-2).join(" ").slice(0, 200));
         }
         resolve({ code: code, stdout: out, stderr: err });
       }
+      if (jeton) {
+        birak = jeton.dinle(function () {
+          if (done) return;
+          kapat();
+          surecAgaciniOldur(child);
+          log("run IPTAL [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kullanici iptal etti");
+          resolve({ code: -2, iptal: true, stdout: out, stderr: err });
+        });
+      }
       // setEncoding: cok baytli harfler parca sinirinda bolunup U+FFFD olmasin
       if (child.stdout && child.stdout.setEncoding) child.stdout.setEncoding("utf8");
       if (child.stderr && child.stderr.setEncoding) child.stderr.setEncoding("utf8");
-      child.stdout.on("data", function (d) { out += String(d); });
+      child.stdout.on("data", function (d) {
+        var s = String(d);
+        out += s;
+        if (opts.onStdout && !done) {
+          try { opts.onStdout(s); } catch (eO) { log("onStdout: " + (eO && eO.message ? eO.message : eO)); }
+        }
+      });
       child.stderr.on("data", function (d) {
         var s = String(d);
         err += s;
-        if (opts.onStderr) opts.onStderr(s);
+        if (opts.onStderr && !done) opts.onStderr(s);
       });
       child.on("error", function (e) { err += String(e); finish(-1); });
       child.on("close", finish);
@@ -272,9 +359,19 @@ window.K = (function () {
    * vermez). Node'un https modülü tarayıcı kısıtlarına tabi değildir; API
    * yüklemeleri bu yoldan yapılır.
    */
-  function httpUpload(urlStr, headers, fields, fileBuf, filename, mime) {
-    return new Promise(function (resolve) {
-      if (!nodeOK) { resolve({ status: 0, body: "Node erişimi yok" }); return; }
+  // secenek.iptal: K.iptalJetonu() — iptalde istek kesilir, { status: 0, iptal: true } döner
+  function httpUpload(urlStr, headers, fields, fileBuf, filename, mime, secenek) {
+    return new Promise(function (resolve0) {
+      if (!nodeOK) { resolve0({ status: 0, body: "Node erişimi yok" }); return; }
+      var jeton = secenek && secenek.iptal && typeof secenek.iptal.dinle === "function" ? secenek.iptal : null;
+      if (jeton && jeton.iptalEdildi) { resolve0({ status: 0, iptal: true, body: "İptal edildi" }); return; }
+      var birak = null, bitti = false;
+      function resolve(x) {
+        if (bitti) return;
+        bitti = true;
+        if (birak) { birak(); birak = null; }
+        resolve0(x);
+      }
       var proto, Buf, u;
       try {
         u = new URL(urlStr);
@@ -335,6 +432,12 @@ window.K = (function () {
       }
       req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
       req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+      if (jeton) {
+        birak = jeton.dinle(function () {
+          resolve({ status: 0, iptal: true, body: "İptal edildi" });
+          try { req.destroy(); } catch (eD) {}
+        });
+      }
       req.write(body);
       req.end();
     });
@@ -876,15 +979,25 @@ window.K = (function () {
    * Yonlendirme takip eden, kaldigi yerden devam eden dosya indirici.
    * .part dosyasina yazar, tamamlaninca atomik olarak nihai ada tasir.
    * resumeFrom: ic kullanim (byte offset).
-   * meta: { key, expectedMB } — key mantiksal kimliktir; yarim dosya yalnizca ayni
+   * meta: { key, expectedMB, iptal } — key mantiksal kimliktir; yarim dosya yalnizca ayni
    *   kimlige devam eder, boylece aynalar arasi devam korunur ama farkli dosyalar
    *   (ornegin CPU/GPU derlemeleri) birbirine eklenmez.
+   *   iptal: K.iptalJetonu() — iptalde istek kesilir, .part KORUNUR (sonraki deneme kaldigi
+   *   yerden devam eder) ve { ok: false, iptal: true, kept } doner.
    */
   function download(urlStr, destPath, onProgress, redirects, resumeFrom, meta) {
     redirects = redirects || 0;
     meta = meta || {};
-    return new Promise(function (resolve) {
-      if (!nodeOK) { resolve({ ok: false, error: "Node erişimi yok" }); return; }
+    return new Promise(function (resolve0) {
+      if (!nodeOK) { resolve0({ ok: false, error: "Node erişimi yok" }); return; }
+      var jeton = meta.iptal && typeof meta.iptal.dinle === "function" ? meta.iptal : null;
+      var birak = null, bitti = false, aktifReq = null, aktifRes = null, aktifOut = null;
+      function resolve(x) {
+        if (bitti) return;
+        bitti = true;
+        if (birak) { birak(); birak = null; }
+        resolve0(x);
+      }
       if (redirects > 6) { resolve({ ok: false, error: "Çok fazla yönlendirme" }); return; }
       var u, proto;
       try {
@@ -911,6 +1024,19 @@ window.K = (function () {
         try {
           fs.writeFileSync(sidePath, JSON.stringify({ key: meta.key, total: total || 0 }), "utf8");
         } catch (e) {}
+      }
+
+      // iptal: istegi ve yazmayi kes, yarim dosyayi koru
+      if (jeton) {
+        if (jeton.iptalEdildi) { resolve({ ok: false, iptal: true, error: "İptal edildi", kept: partSize() }); return; }
+        birak = jeton.dinle(function () {
+          try { if (aktifRes) aktifRes.destroy(); } catch (e1) {}
+          try { if (aktifReq) aktifReq.destroy(); } catch (e2) {}
+          try { if (aktifOut) aktifOut.destroy(); } catch (e3) {}
+          var kalanIptal = partSize();
+          log("indirme iptal edildi" + (kalanIptal ? ", yarim dosya korunuyor: " + kalanIptal + " bayt" : ""));
+          resolve({ ok: false, iptal: true, error: "İptal edildi", kept: kalanIptal });
+        });
       }
 
       // ilk cagrida yarim dosya varsa kaldigi yerden devam etmeyi dene
@@ -942,6 +1068,8 @@ window.K = (function () {
       };
 
       function onRes(res) {
+        if (bitti) { res.resume(); return; }
+        aktifRes = res;
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
           // Goreli Location'i tarayici kuraliyla coz: port ve yol korunur
@@ -1009,6 +1137,7 @@ window.K = (function () {
         var out;
         try { out = fs.createWriteStream(partPath, resuming ? { flags: "a" } : undefined); }
         catch (eO) { resolve({ ok: false, error: String(eO) }); return; }
+        aktifOut = out;
         function fail(msg, keepPart) {
           try { out.destroy(); } catch (e1) {}
           // ag hatasinda .part'i KORU — sonraki denemede kaldigi yerden devam eder
@@ -1036,8 +1165,14 @@ window.K = (function () {
       }
 
       function fire(extra) {
+        if (bitti) {
+          // proxy tuneli kurulurken iptal edildi: acik soketi birak
+          try { if (extra && extra.socket) extra.socket.destroy(); } catch (eS) {}
+          return;
+        }
         if (extra) for (var k in extra) reqOpts[k] = extra[k];
         var req = proto.get(reqOpts, onRes);
+        aktifReq = req;
         // ag hatasinda .part korunur ki sonraki deneme kaldigi yerden devam etsin
         req.on("error", function (eq) {
           resolve({ ok: false, error: String(eq), kept: partSize() });
@@ -1298,6 +1433,8 @@ window.K = (function () {
     call: call,
     hostMesgul: hostMesgul,
     run: run,
+    iptalJetonu: iptalJetonu,
+    iptalHatasi: iptalHatasi,
     settingsPath: settingsPath,
     extensionPath: extensionPath,
     httpUpload: httpUpload,
