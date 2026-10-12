@@ -121,10 +121,12 @@ function hizYaz(k, args) {
   if (ortam.hataBas && ortam.setSpeed === ortam.hataBas) ortam.kotuKlip = k;
   if (ortam.kotuKlip === k) throw new Error("General error (enjekte)");
   if (ortam.surum === "26" && args.length < 5) throw new Error("Not Enough Parameters");
-  ortam.undo++;
   var oran = Number(args[0]);
   var yeni = ortam.surum === "26" ? oran : oran / 100;
   yeni = Math.max(0.0001, Math.min(100, yeni));
+  // İsteğe bağlı: Premiere mevcut hıza çok yakın bir isteği yok sayıyormuş gibi (gerçek davranış bilinmiyor)
+  if (ortam.yoksayEps && Math.abs(yeni - k._v) / k._v < ortam.yoksayEps) return;
+  ortam.undo++;
   var span = (k._e - k._s) * ortam.fr * k._v;
   if (yeni > k._v + 1e-12) {
     var sure = Math.max(1, Math.ceil(span / (yeni * ortam.fr) - 1e-9));
@@ -563,6 +565,13 @@ S.list().forEach(function (pr) {
 ok("17) Dengeli + tutamak 0: 10 önayar × 7 seçenek × 4 uzunluk hepsi başarılı, kaynak Out'ta biter", den17.length === 0, den17.length + ": " + den17.slice(0, 6).join(" | "));
 ok("17) Dengeli + tutamak 0: her rampa kaldırılınca tek tam %100 klip, iz boşluksuz (Basamaklı, k 0.5 dahil)", kal17.length === 0, kal17.length + ": " + kal17.slice(0, 4).join(" | "));
 ok("17) Dengeli + tutamak 0: parça hızları plana yakın (tam kare yuvarlaması yok)", hiz17.length === 0, hiz17.slice(0, 6).join(" | "));
+// Premiere %100'e yavaşlatma isteğini (hız 1.00005, istek 1) yok sayarsa tam modda aynı setSpeed 8 turun
+// hepsinde yeniden gönderilip geri alma adımı biriktirmesin: hız değişmediyse hemen hizYazilamadi
+var z17y = sahne({ n: 24, tutamak: 0, fr: 1001 / 60000 });
+var r17y = uygula(z17y, S.hostPlan(S.plan("atilim", { ease: "linear", density: "many", mode: "balanced" }, { frames: 24, fps: 60000 / 1001 })));
+ortam.yoksayEps = 2e-4;
+var once17y = ortam.setSpeed, k17y = call("KS_removeSpeedRamp", { record: r17y.record }), cagri17y = ortam.setSpeed - once17y;
+ok("17) tam: yok sayılan %100 isteği turlarda tekrarlanmaz (en çok 2 setSpeed)", r17y.ok && cagri17y <= 2, cagri17y + " çağrı · " + js(k17y));
 z = sahne({ n: 25, tutamak: 0.04 });
 var r17 = uygula(z, S.hostPlan(S.plan("vites", { mode: "balanced" }, { frames: 25, fps: 25 })));
 ok("17) Vites Dengeli 25 kare, 1 kare tutamak: başarılı", r17.ok, js(r17));

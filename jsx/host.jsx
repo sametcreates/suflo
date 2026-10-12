@@ -3552,7 +3552,7 @@ function KS_rampHizKur(o) {
     if (Kf && Number(R.end.seconds) < hedefSon - yari) { KS_rampSetEnd(R, hedefSon); oku(); }
     return { ok: true, units: cal.units || "", sig: cal.sig || "", speed: u, calls: cagri };
   }
-  var yavaslatildi = false;
+  var yavaslatildi = false, yavasOnce = null;
   for (tur = 0; tur < 8; tur++) {
     if (!oku()) return { ok: false, kod: "qeYok", calls: cagri };
     // uc bu hizda uzatilacak: hedefin ustunde kalan hiz (yuvarlama payi bile) planin kaynagini asar,
@@ -3560,8 +3560,12 @@ function KS_rampHizKur(o) {
     // 1.00004 TAM icinde ama t1'e uzatma L'den fazla kaynak ister (tutamak 0'da uc bir kare kisa kalir)
     if ((Math.abs(u - v) <= v * (tam ? TAM : 1e-5) && (!tam || u <= v * (1 + 1e-9) || yavaslatildi)) ||
         (!tam && ((u < v && v - u <= v * 0.002) || (yavaslatildi && Math.abs(u - v) <= v * 0.002)))) return bitir();
+    // tam: Premiere yavaslatma istegini yok saydiysa (hiz hic degismedi) ayni setSpeed sonraki turlarda
+    // yeniden gonderilip geri alma adimi biriktirmesin
+    if (tam && yavasOnce !== null && Math.abs(u - yavasOnce) < 1e-9) return { ok: false, kod: "hizYazilamadi", calls: cagri, units: cal.units || "", sig: cal.sig || "" };
+    yavasOnce = null;
     var istek, Kt;
-    if (v < u) { istek = v; Kt = Math.max(kare, Kf, 1); yavaslatildi = true; }
+    if (v < u) { istek = v; Kt = Math.max(kare, Kf, 1); yavaslatildi = true; if (tam) yavasOnce = u; }
     else {
       if (Kf && Number(R.end.seconds) < hedefSon - yari) {
         KS_rampSetEnd(R, hedefSon);
