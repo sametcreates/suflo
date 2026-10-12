@@ -35,6 +35,8 @@ window.KCaptions = (function () {
   var CT = window.SufloCaptionText;
   // Ölçülmüş kelime zamanları (yerel motor -ojf): ayrıştırma, düzleştirme, editörde taşıma
   var WW = window.SufloWhisperWords;
+  // Okunabilir satır düzeni (2 satır × 42 kırılımı, düzenlemede kelime hizalama): saf modül js/caption-layout.js
+  var CL = window.SufloCaptionLayout;
   // Sessiz ses denetimi (motor çalışmadan önce tepe < 0,001): saf modül js/sessiz-ses.js
   var SSES = window.SufloSessizSes || null;
   // Canlı transkripsiyon (whisper-cli stdout satırları, ilerleme yumuşatma): saf modül js/whisper-akis.js
@@ -1010,6 +1012,54 @@ window.KCaptions = (function () {
     try { return K.settings().sesEtiketKoru === true; } catch (e) { return false; }
   }
 
+  /*
+   * Satır kurma seçenekleri (caption-text.js segmentleriKur): ses etiketleri, Satır uzunluğu ›
+   * Kelime sınırı (0 = kapalı) ve Ayarlar › Altyazı'daki en kısa / en uzun süre ile kısa parça
+   * birleştirme. Süre ve birleştirme yalnız satır modlarında (32/42 karakter, 2 satır × 42) işler.
+   */
+  function kurSecenekleri() {
+    var s = {};
+    try { s = K.settings() || {}; } catch (e) { s = {}; }
+    return {
+      etiketKoru: sesEtiketKoru(),
+      maxWords: kelimeSiniri(),
+      birlestir: s.kisaBirlestir !== false,
+      minSure: s.altyaziMinSure,
+      maxSure: s.altyaziMaxSure
+    };
+  }
+
+  // Kelime sınırı yalnız satır modlarında (32 / 42 karakter, 2 satır × 42) anlamlı: diğerlerinde gizli
+  function kelimeSiniriDurumu() {
+    var alan = el("cap-kelime-siniri-alan");
+    if (alan) alan.hidden = !/^(l\d+|c\d+x\d)$/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
+  }
+
+  // Satır uzunluğu › Kelime sınırı: 0 kapalı, yoksa 2..12
+  function kelimeSiniri() {
+    var e = el("cap-kelime-siniri");
+    var n = e ? Math.floor(Number(e.value)) : 0;
+    if (!isFinite(n) || n <= 0) return 0;
+    return Math.max(2, Math.min(12, n));
+  }
+
+  /*
+   * Satır uzunluğu menüsü 3.2'de "32 / 42 karakter"i kelime zamanından kuruyor (l32 / l42);
+   * eski tercih, şablon ve stil kodlarındaki c32 / c42 aynı menü girdisine eşlenir. Menüde
+   * olmayan değer en yakın satır moduna (42 karakter) düşer: select boş kalmasın.
+   */
+  function uzunlukSecimi(v) {
+    v = String(v || "");
+    if (v === "c32") v = "l32";
+    else if (v === "c42") v = "l42";
+    var sel = el("cap-maxlen");
+    if (sel && sel.options) {
+      for (var i = 0; i < sel.options.length; i++) if (sel.options[i].value === v) return v;
+      return "l42";
+    }
+    return v;
+  }
+
   /* ---------------- Terim sözlüğü ---------------- */
 
   function glossaryText() {
@@ -1197,19 +1247,19 @@ window.KCaptions = (function () {
   }
 
   /*
-   * Ölçülmüş kelimeler (s.words) metinle birlikte yaşar:
-   *  - elle / AI metin düzenlemesi: yalnız *vurgu* işaretleri değiştiyse kelimeler kalır,
-   *    yoksa düşer (yeniden hizalama sonraki adımda gelir; stil motoru o satırda
-   *    karakter ağırlıklı yedeğe döner)
-   *  - kelime değiştirme (sözlük, bul & değiştir): kelime sayısı aynı kaldıysa zamanlar
-   *    hâlâ doğru konumdadır, kelimeler kalır; sayı değiştiyse düşer
+   * Ölçülmüş kelimeler (s.words) metinle birlikte yaşar: metin değişince (AI metin kontrolü, sözlük,
+   * bul & değiştir; elle düzenleme editörde aynısını yapar) kelimeler yeni metne yeniden hizalanır
+   * (caption-layout.js kelimeleriHizala, LCS). Aynı kalan kelime ölçülmüş zamanını korur, değiştirilen
+   * kelime eski kelimenin aralığını alır, eklenen kelime komşularının arasına yerleşir; stil motoru
+   * satırın tamamını ölçülmüş zamanla akıtmayı sürdürür (karakter oranına düşmez).
    */
-  function kelimeleriMetinleDogrula(s, eskiMetin) {
-    if (s && s.words && !WW.yalnizVurgu(eskiMetin, s.text)) delete s.words;
+  function kelimeleriYenidenHizala(s, eskiMetin) {
+    if (!s || !s.words || s.text === eskiMetin) return;
+    var hiza = CL.kelimeleriHizala(s.words, s.text, s.start, s.end, styleLocale() || algilananDil);
+    if (hiza.length) s.words = hiza; else delete s.words;
   }
-  function kelimeSayisiniKoru(s, eskiMetin) {
-    if (s && s.words && WW.belirtecSayisi(s.text) !== WW.belirtecSayisi(eskiMetin)) delete s.words;
-  }
+  function kelimeleriMetinleDogrula(s, eskiMetin) { kelimeleriYenidenHizala(s, eskiMetin); }
+  function kelimeSayisiniKoru(s, eskiMetin) { kelimeleriYenidenHizala(s, eskiMetin); }
 
   // Terim sozlugu ucretsiz cekirdekte (Ayarlar'da kilitsiz gorunur; motor istemine de herkes icin gider)
   function applyGlossary(segs) {
@@ -1357,7 +1407,7 @@ window.KCaptions = (function () {
     // "user" (Şablonum) gibi anahtarlar motor stili tasiyabilir: stilin ailesine bak
     secilenMotorStili = motorStiliMi(key) ? key : (p.stil && motorStiliMi(p.stil.aile) ? p.stil.aile : "");
     bekleyenMogrtYolu = "";
-    el("cap-maxlen").value = p.maxlen;
+    el("cap-maxlen").value = uzunlukSecimi(p.maxlen);
     el("cap-case").value = p.kase;
     el("cap-punct").checked = p.punct;
     // Marka Kiti acikken hazir Suflo Stili kitin yazi tipi / renk / konumuyla gelir (Sablonum aynen kalir)
@@ -1366,6 +1416,7 @@ window.KCaptions = (function () {
     stilKredisi("");
     inceAyarDurumu();
     vurguKutusuDurumu();
+    kelimeSiniriDurumu();
     onizlemeDurdur();
     onizlemeCiz();
     stilKartiIsaretle(key);
@@ -1904,6 +1955,7 @@ window.KCaptions = (function () {
       s.capPrefs = {
         lang: el("cap-lang").value,
         maxlen: el("cap-maxlen").value,
+        kelimeSiniri: kelimeSiniri(),
         kase: el("cap-case").value,
         punct: el("cap-punct").checked,
         preset: el("cap-preset").value,
@@ -1951,7 +2003,8 @@ window.KCaptions = (function () {
     if (!p) { if (arayuzDili() === "en" && el("cap-lang")) el("cap-lang").value = ""; return; }
     try {
       if (p.lang !== undefined) el("cap-lang").value = p.lang;
-      if (p.maxlen) el("cap-maxlen").value = p.maxlen;
+      if (p.maxlen) el("cap-maxlen").value = uzunlukSecimi(p.maxlen);
+      if (el("cap-kelime-siniri")) { el("cap-kelime-siniri").value = String(p.kelimeSiniri || 0); el("cap-kelime-siniri").value = String(kelimeSiniri()); }
       if (p.kase) el("cap-case").value = p.kase;
       if (p.punct !== undefined) el("cap-punct").checked = p.punct;
       if (p.preset !== undefined) el("cap-preset").value = p.preset;
@@ -2055,7 +2108,8 @@ window.KCaptions = (function () {
     return {
       kod: SS.encode({
         styleId: secilenMotorStili, intensity: st.yogunluk, overrides: motorAyarlari(st),
-        text: { maxlen: el("cap-maxlen").value, kase: el("cap-case").value, punct: !!el("cap-punct").checked },
+        // l32 / l42 eski sürümlerde yok: aynı menü girdisi c32 / c42 olarak paylaşılır (içe alırken geri eşlenir)
+        text: { maxlen: el("cap-maxlen").value.replace(/^l(\d+)$/, "c$1"), kase: el("cap-case").value, punct: !!el("cap-punct").checked },
         author: yazar
       }),
       yazarGecersiz: !!yazar && !SS.validAuthor(yazar)
@@ -2097,11 +2151,12 @@ window.KCaptions = (function () {
     Object.keys(r.overrides).forEach(function (k) { if (k !== "fontFile") ov[k] = r.overrides[k]; });
     stiliYaz(ov);
     if (r.intensity && el("cap-yogunluk")) el("cap-yogunluk").value = r.intensity;
-    if (r.text.maxlen) el("cap-maxlen").value = r.text.maxlen;
+    if (r.text.maxlen) el("cap-maxlen").value = uzunlukSecimi(r.text.maxlen);
     if (r.text.kase) el("cap-case").value = r.text.kase;
     if (typeof r.text.punct === "boolean") el("cap-punct").checked = r.text.punct;
     stilKredisi(r.author || "");
     vurguKutusuDurumu();
+    kelimeSiniriDurumu();
     onizlemeDurdur();
     onizlemeCiz();
     stilKartiIsaretle(r.styleId);
@@ -2407,7 +2462,7 @@ window.KCaptions = (function () {
         tempFiles.push(audioSrc);
       }
 
-      var lenVal = el("cap-maxlen").value; // "c42" karakter, "w3" kelime, "k1"/"kc" kelime-zamanli
+      var lenVal = el("cap-maxlen").value; // "l42" karakter, "c42x2" 2 satır, "w3" kelime, "k1"/"kc" kelime-zamanli
       // Kelime kelime / birikimli modlar UCRETSIZDIR (Samet karari, 20 Agu 2026)
       var karaoke = /^k/.test(lenVal);
       var mapped = [];
@@ -2504,7 +2559,7 @@ window.KCaptions = (function () {
       // Satir kurma tek yerde (caption-text.js): rehberin hazir ornek transkripti de
       // ayni yolu kullanir, iki cikti hic ayrismaz
       var kurulan;
-      try { kurulan = CT.segmentleriKur(mapped, lenVal, { etiketKoru: sesEtiketKoru() }); }
+      try { kurulan = CT.segmentleriKur(mapped, lenVal, kurSecenekleri()); }
       catch (eKur) {
         if (eKur && eKur.ayrinti) K.log("karaoke HATA: " + eKur.ayrinti);
         throw eKur;
@@ -2598,7 +2653,7 @@ window.KCaptions = (function () {
     var lenVal = el("cap-maxlen").value;
     var girdi = window.SufloOnboarding.ornekGirdisi(veri, lenVal, offset);
     if (!girdi.length) return false;
-    var kurulan = CT.segmentleriKur(girdi, lenVal, { etiketKoru: sesEtiketKoru() });
+    var kurulan = CT.segmentleriKur(girdi, lenVal, kurSecenekleri());
     if (!kurulan.segments.length) return false;
     // Ekranda iş varsa üzerine yazmadan önce anlık görüntü: Ctrl+Z geri getirir
     // (anlık görüntü Shorts bayrağını taşır: sıfırlama ONDAN sonra)
@@ -2642,11 +2697,12 @@ window.KCaptions = (function () {
   /* ---------------- Segment düzenleme ---------------- */
 
   function qualityOptions() {
-    var len = el("cap-maxlen") ? el("cap-maxlen").value : "c42";
-    var mc = /^c(\d+)$/.exec(len);
+    var len = el("cap-maxlen") ? el("cap-maxlen").value : "l42";
+    var mc = /^[cl](\d+)(?:x(\d))?$/.exec(len);
     return {
       lang: (ceviriDili && ceviriVar() ? ceviriDili : "") || (el("cap-lang") && el("cap-lang").value) || algilananDil || arayuzDili(),
       maxChars: mc ? Number(mc[1]) : 42,
+      maxLines: mc && mc[2] ? Number(mc[2]) : 1,
       wordMode: /^k/.test(len) || segmentsMode === "k1" || segmentsMode === "kc"
     };
   }
@@ -2867,8 +2923,8 @@ window.KCaptions = (function () {
       var corrected = [];
       var BATCH = 50;
       for (var i = 0; i < originals.length; i += BATCH) {
-        // *vurgu* isaretleri modele gitmez (dusurur ya da markdown ekler); donuste geri konur
-        var chunk = originals.slice(i, i + BATCH).map(CT.stripEmphasis);
+        // *vurgu* isaretleri ve satir kirilimi modele gitmez (dusurur ya da markdown ekler); donuste geri konur
+        var chunk = originals.slice(i, i + BATCH).map(function (t) { return CL.duzMetin(CT.stripEmphasis(t)); });
         status("AI metin kontrolü… " + Math.min(i + BATCH, originals.length) + "/" + originals.length);
         var json = await chatCall(cfg, {
           model: cfg.model,
@@ -2888,7 +2944,9 @@ window.KCaptions = (function () {
         var t = String(text || "").trim();
         if (!t) return originals[i2];
         var geri = CT.reapplyEmphasis(originals[i2], t);
-        return geri === null ? originals[i2] : geri;   // kelime sayisi degistiyse vurgu kaybolmasin
+        if (geri === null) return originals[i2];   // kelime sayisi degistiyse vurgu kaybolmasin
+        // 2 satirlik altyazinin kirilimi (kelime sayisi ayniysa) ayni kelimenin arasina geri gelir
+        return CL.satirKiriklariniKoru(originals[i2], geri);
       });
       var changed = 0;
       corrected.forEach(function (text, i2) { if (text !== originals[i2]) changed++; });
@@ -2924,6 +2982,7 @@ window.KCaptions = (function () {
 
   function render() {
     ceviriDugmeleriniGuncelle();   // geri al/yinele/taslak sonrasi da satirlarla tutarli
+    vurguKutusuDurumu();           // satır modunda ölçülmüş kelime varsa karaoke dolgusu seçilebilir
     // Gerçek satırlar geldiğinde/değiştiğinde önizleme de onlardan beslensin
     onizlemeCiz();
     var box = el("cap-segments");
@@ -2968,7 +3027,7 @@ window.KCaptions = (function () {
       inp.value = s.text;
       inp.dataset.i = String(i);
       function fit() { inp.style.height = "auto"; inp.style.height = Math.min(90, Math.max(30, inp.scrollHeight)) + "px"; }
-      // odaklanırken satırın ölçülmüş kelimeleri: yalnız *vurgu* değişirse geri konur
+      // odaklanırken satırın ölçülmüş kelimeleri: her tuşta yeni metne bunlardan hizalanır (kayma birikmez)
       var odakKelimeleri = s.words || null;
       inp.onfocus = function () {
         inp.dataset.before = inp.value;
@@ -2977,8 +3036,13 @@ window.KCaptions = (function () {
       };
       inp.oninput = function () {
         segments[i].text = inp.value;
-        if (odakKelimeleri && WW.yalnizVurgu(inp.dataset.before, inp.value)) segments[i].words = odakKelimeleri;
-        else delete segments[i].words;
+        // Ölçülmüş kelimeler yeni metne hizalanır (caption-layout.js kelimeleriHizala, LCS): değişmeyen
+        // kelime kendi zamanını korur, eklenen / değiştirilen kelime komşularının arasına yerleşir,
+        // silinen düşer. Yalnız *vurgu* ya da satır kırılımı değiştiyse zamanlar aynen kalır.
+        if (odakKelimeleri) {
+          var hiza = CL.kelimeleriHizala(odakKelimeleri, inp.value, segments[i].start, segments[i].end, styleLocale() || algilananDil);
+          if (hiza.length) segments[i].words = hiza; else delete segments[i].words;
+        } else delete segments[i].words;
         fit();
         updateQualityUI(qualityReport());
         saveDraftSoon();
@@ -3002,8 +3066,8 @@ window.KCaptions = (function () {
           odakKelimeleri = segments[i] && segments[i].words || null;
         }
       };
-      // Enter: bol · Alt+Enter: alta satir ekle · Ctrl+Enter: sonraki satira gec
-      // Ctrl/Cmd+B: imlecteki kelimeyi (ya da secimi) *vurgula* / vurguyu kaldir
+      // Enter: bol · Shift+Enter: satir icinde alt satira gec (2 satirlik altyazi) · Alt+Enter: alta satir ekle
+      // Ctrl+Enter: sonraki satira gec · Ctrl/Cmd+B: imlecteki kelimeyi (ya da secimi) *vurgula* / vurguyu kaldir
       inp.onkeydown = function (e) {
         if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
           e.preventDefault();
@@ -3017,6 +3081,7 @@ window.KCaptions = (function () {
         }
         if (e.key !== "Enter") return;
         e.preventDefault();
+        if (e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) { satirKir(inp); return; }
         if (e.altKey) { insertAfter(i); return; }
         if (e.ctrlKey || e.metaKey) {
           var next = box.querySelector('textarea[data-i="' + String(i + 1) + '"]');
@@ -3106,6 +3171,22 @@ window.KCaptions = (function () {
     renderHistory();
   }
 
+  /*
+   * Shift+Enter: imleçte satır içi kırılım ("\n"); kırılım çevresindeki boşluklar atılır, seçim varsa
+   * yerine geçer. Kelimeler aynı kaldığı için ölçülmüş zamanlar değişmez (oninput hizalar).
+   * Metnin başında ya da sonunda kırılım eklenmez.
+   */
+  function satirKir(inp) {
+    var v = inp.value;
+    var a = v.slice(0, inp.selectionStart).replace(/[ \t]+$/, "");
+    var b = v.slice(inp.selectionEnd).replace(/^[ \t]+/, "");
+    if (!a.trim() || !b.trim()) return;
+    if (/\n$/.test(a) || /^\n/.test(b)) return;     // zaten satır başı: boş satır olmaz
+    inp.value = a + "\n" + b;
+    inp.setSelectionRange(a.length + 1, a.length + 1);
+    inp.oninput();
+  }
+
   // Boşluksuz yazı sistemleri (Japonca/Çince/Korece): kelime sınırı yok, her yerden bölünür
   var BOSLUKSUZ = new RegExp("[\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF\\uAC00-\\uD7AF]");
 
@@ -3115,10 +3196,12 @@ window.KCaptions = (function () {
     if (!s) return;
     var text = s.text;
     if (pos === null || pos === undefined) pos = Math.floor(text.length / 2);
-    // kelime ortasında bölmeyi engelle: en yakın boşluğa kaydır
-    if (pos > 0 && pos < text.length && text[pos] !== " ") {
-      var sag = text.indexOf(" ", pos);
-      var sol = text.lastIndexOf(" ", pos);
+    // kelime ortasında bölmeyi engelle: en yakın boşluğa (satır kırılımı da boşluktur) kaydır
+    if (pos > 0 && pos < text.length && !/\s/.test(text[pos])) {
+      var sag = text.slice(pos).search(/\s/);
+      if (sag !== -1) sag += pos;
+      var sol = -1;
+      for (var si = pos; si >= 0; si--) if (/\s/.test(text[si])) { sol = si; break; }
       if (sag === -1 && sol === -1) {
         // Metinde hiç boşluk yok. Boşluksuz yazı sistemlerinde (CJK) her karakter sınırı
         // geçerlidir; Latin/Kiril tek kelimesini ortadan kesmek ise her zaman hatadır
@@ -3151,37 +3234,60 @@ window.KCaptions = (function () {
     KApp.toast("Satır bölündü", "good");
   }
 
-  /* zaman damgasını elle düzenle (çift tık) */
+  /*
+   * Zaman damgasını elle düzenle (çift tık). Alan "başlangıç – bitiş" gösterir:
+   *   - tek zaman yazılırsa satır o ana TAŞINIR (süre aynı, ölçülmüş kelimeler aynı miktarda kayar)
+   *   - iki zaman yazılırsa satırın başı ve sonu değişir, kelimeler yeni aralığa doğrusal ölçeklenir
+   */
   function editTime(i, btn) {
     var s = segments[i];
     if (!s) return;
     var inp = document.createElement("input");
     inp.type = "text";
     inp.className = "seg-time-edit mono";
-    inp.value = tc(s.start, false).slice(0, 12); // hh:mm:ss.mmm
+    inp.value = tc(s.start, false).slice(0, 12) + " – " + tc(s.end, false).slice(0, 12); // hh:mm:ss.mmm – hh:mm:ss.mmm
+    inp.title = "Tek zaman: satırı taşı · başlangıç – bitiş: satırın sınırlarını değiştir";
     btn.replaceWith(inp);
     inp.focus();
     inp.select();
+    function zamanOku(v) {
+      // biçimi ÖNCE doğrula — tcParse tanımadığı girdide 0 döner, o sessizce 00:00 yapar
+      v = String(v || "").trim();
+      var gecerli = /^\d{1,2}:\d{1,2}(:\d{1,2})?[.,]\d{1,3}$/.test(v) ||
+                    /^\d{1,2}:\d{1,2}(:\d{1,2})?$/.test(v);
+      return gecerli ? tcParse(v.indexOf(".") === -1 && v.indexOf(",") === -1 ? v + ".000" : v) : NaN;
+    }
     function bitir(kaydet) {
       if (kaydet) {
-        // biçimi ÖNCE doğrula — tcParse tanımadığı girdide 0 döner, o sessizce 00:00 yapar
-        var v = inp.value.trim();
-        var gecerli = /^\d{1,2}:\d{1,2}(:\d{1,2})?[.,]\d{1,3}$/.test(v) ||
-                      /^\d{1,2}:\d{1,2}(:\d{1,2})?$/.test(v);
-        var yeni = gecerli ? tcParse(v.indexOf(".") === -1 && v.indexOf(",") === -1 ? v + ".000" : v) : NaN;
-        if (gecerli && isFinite(yeni) && yeni >= 0) {
-          var dur = s.end - s.start;
+        var parcalar = inp.value.trim().split(/\s*[–—]\s*|\s+-\s+/);
+        var yeni = zamanOku(parcalar[0]);
+        var yeniSon = parcalar.length === 2 ? zamanOku(parcalar[1]) : null;
+        var gecerli = parcalar.length <= 2 && isFinite(yeni) && yeni >= 0 &&
+          (yeniSon === null || (isFinite(yeniSon) && yeniSon >= yeni + 0.05));
+        if (gecerli) {
+          var eskiBas = segments[i].start, eskiSon = segments[i].end;
+          var dur = eskiSon - eskiBas;
+          // tek zaman ya da iki uç aynı miktarda kaydıysa taşıma; değilse sınır değişikliği
+          var tasima = yeniSon === null || Math.abs((yeni - eskiBas) - (yeniSon - eskiSon)) < 0.0005;
+          if (yeniSon === null) yeniSon = yeni + Math.max(0.3, dur);
+          if (Math.abs(yeni - eskiBas) < 0.0005 && Math.abs(yeniSon - eskiSon) < 0.0005) { render(); return; }
           snapshot("zaman düzenleme");
-          var fark = yeni - segments[i].start;
           segments[i].start = yeni;
-          segments[i].end = yeni + Math.max(0.3, dur);
-          // satır taşınınca ölçülmüş kelimeleri de aynı miktarda kayar
-          if (segments[i].words) segments[i].words = WW.kelimeleriKaydir(segments[i].words, fark);
-          if (segments[i].origWords) segments[i].origWords = WW.kelimeleriKaydir(segments[i].origWords, fark);
+          segments[i].end = yeniSon;
+          if (tasima) {
+            // satır taşınınca ölçülmüş kelimeleri de aynı miktarda kayar
+            var fark = yeni - eskiBas;
+            if (segments[i].words) segments[i].words = WW.kelimeleriKaydir(segments[i].words, fark);
+            if (segments[i].origWords) segments[i].origWords = WW.kelimeleriKaydir(segments[i].origWords, fark);
+          } else {
+            // başı / sonu değişti: kelimeler yeni aralığa doğrusal ölçeklenir
+            if (segments[i].words) segments[i].words = CL.kelimeleriOlcekle(segments[i].words, eskiBas, eskiSon, yeni, yeniSon);
+            if (segments[i].origWords) segments[i].origWords = CL.kelimeleriOlcekle(segments[i].origWords, eskiBas, eskiSon, yeni, yeniSon);
+          }
           sortSegments();          // sıra bozulmasın: SRT komşu kontrolü sıralı liste ister
           saveDraftSoon();
         } else {
-          KApp.toast("Zaman biçimi: dd:ss.mmm (örn. 01:23.500)", "warn");
+          KApp.toast("Zaman biçimi: dd:ss.mmm ya da dd:ss.mmm – dd:ss.mmm (örn. 01:23.500 – 01:25.000)", "warn");
         }
       }
       render();
@@ -3654,6 +3760,12 @@ window.KCaptions = (function () {
 
   /* ---------------- SRT + uygulama ---------------- */
 
+  // Cue metninde satir kirilimi (2 satir × 42, Shift+Enter) kalir; bos satir SRT/VTT'de cue'yu bitirirdi
+  function satirlariTopla(t) {
+    return String(t == null ? "" : t).split(/\r?\n/).map(function (x) { return x.trim(); })
+      .filter(function (x) { return x.length > 0; }).join("\n");
+  }
+
   /*
    * Stil uygulanmış, çakışması giderilmiş cue listesi.
    * TÜM dışa aktarma biçimleri bunu kullanır — biçimler arası davranış ayrışmasın.
@@ -3672,11 +3784,13 @@ window.KCaptions = (function () {
     var vurguKoru = !!(opts && opts.vurgu);
     var kelimeli = !!(opts && opts.kelimeler);
     segments.forEach(function (s, i) {
-      var txt = styleText(vurguKoru ? s.text : CT.stripEmphasis(s.text));
+      var txt = satirlariTopla(styleText(vurguKoru ? s.text : CT.stripEmphasis(s.text)));
       if (!txt) return; // stil sonrasi bos kalan cue yazilmaz
       if (cift && typeof s.orig === "string") {
-        var asil = styleText(CT.stripEmphasis(s.orig), true);
-        if (asil && asil !== txt) txt = asil + "\n" + txt;
+        // cift dilde her dil tek satir: ust satir orijinal, alt satir ceviri (4 satirlik cue olmasin)
+        var asil = CL.duzMetin(styleText(CT.stripEmphasis(s.orig), true));
+        var ceviri = CL.duzMetin(txt);
+        if (asil && asil !== ceviri) txt = asil + "\n" + ceviri;
       }
       // minimum 0.3 sn gorunum — ama bir sonraki cue ile CAKISMA (karaoke'de kritik)
       var end = Math.max(s.end, s.start + 0.3);
@@ -3689,12 +3803,13 @@ window.KCaptions = (function () {
     return out;
   }
 
+  // SRT: cue icindeki satir kirilimi da CRLF (Premiere caption izi iki satiri boyle okur)
   function buildSrt(opts) {
     var out = [];
     cueler(opts).forEach(function (c, i) {
       out.push(String(i + 1));
       out.push(tc(c.start, true) + " --> " + tc(c.end, true));
-      out.push(c.text);
+      out.push(c.text.split("\n").join("\r\n"));
       out.push("");
     });
     return out.join("\r\n");
@@ -3751,6 +3866,31 @@ window.KCaptions = (function () {
     }
     bosalt();
     return satirlar;
+  }
+
+  /*
+   * Satır modunda karaoke (\k / \kf): satırın ölçülmüş kelimeleri stilli metnin kelimelerine
+   * caption-layout.js kelimeleriHizala ile eşlenir (BÜYÜK HARF ya da noktalamasız stilde de tutar);
+   * her kelimenin dolgusu GERÇEK konuşma anında başlar ve bir sonraki kelimenin başına kadar sürer.
+   * Kelimesi olmayan satırda süre karakter oranıyla paylaşılır. İlk kelimeden önceki sessizlik boş
+   * hecedir; satır kırılımı \N. Süreler satır başından birikimli yuvarlanır: toplam satır süresi tutar.
+   */
+  function assSatirKaraoke(c, kTag, loc) {
+    var hiza = CL.kelimeleriHizala(c.words || [], c.text, c.start, c.end, loc);
+    function cs(t) { return Math.round((Math.max(c.start, Math.min(c.end, t)) - c.start) * 100); }
+    var out = "", k = 0, harcanan = 0;
+    if (hiza.length && cs(hiza[0].start) > 0) { harcanan = cs(hiza[0].start); out += "{" + kTag + harcanan + "}"; }
+    String(c.text).split(/(\s+)/).forEach(function (p) {
+      if (!p) return;
+      if (!/\S/.test(p)) { out += /\n/.test(p) ? "\\N" : " "; return; }
+      if (!p.replace(/\*/g, "").length || k >= hiza.length) { out += assMetin(p); return; }
+      var sonraki = hiza[k + 1];
+      var d = Math.max(0, cs(sonraki ? sonraki.start : c.end) - harcanan);
+      out += "{" + kTag + d + "}" + assMetin(p);
+      harcanan += d;
+      k++;
+    });
+    return out;
   }
 
   /* ---------------- Canlı önizleme ---------------- */
@@ -3819,14 +3959,18 @@ window.KCaptions = (function () {
     if (kutu) kutu.classList.toggle("pasif",
       !(motorda || anim === "karaoke" || anim === "vurgu" || anim === "viral" || anim === "pop" || anim === "premium"));
 
+    // Satır modunda ölçülmüş kelimeler varsa karaoke / akıcı dolgu satır içinde gerçek zamanla çalışır
+    // (buildAss → assSatirKaraoke); diğer kelimeli animasyonlar kelime modu ister
+    var satirKelime = !kelimeVar && segments.some(function (s) { return s.words && s.words.length; });
+    function satirDolgusu(v) { return satirKelime && (v === "karaoke" || v === "akici"); }
     var secici = el("cap-animasyon");
     if (secici) {
       Array.prototype.forEach.call(secici.options, function (o) {
-        if (ANIMASYONLAR[o.value] && ANIMASYONLAR[o.value].kelimeli) o.disabled = !kelimeVar;
+        if (ANIMASYONLAR[o.value] && ANIMASYONLAR[o.value].kelimeli) o.disabled = !kelimeVar && !satirDolgusu(o.value);
       });
     }
     var ipucu = el("cap-animasyon-ipucu");
-    if (ipucu) ipucu.hidden = kelimeVar || !(ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli);
+    if (ipucu) ipucu.hidden = kelimeVar || satirDolgusu(anim) || !(ANIMASYONLAR[anim] && ANIMASYONLAR[anim].kelimeli);
   }
 
   function onizlemeDurdur() {
@@ -4335,11 +4479,19 @@ window.KCaptions = (function () {
      */
     var anim = opts.animasyon || st.animasyon || (kelimeVerisi ? "karaoke" : "yok");
     if (!ANIMASYONLAR[anim]) anim = "yok";
-    if (ANIMASYONLAR[anim].kelimeli && !kelimeVerisi) anim = "fade";
+    // satır cue'ları ölçülmüş kelimelerini taşır (satır modunda karaoke dolgusu onlardan)
+    var cs = cueler({ kelimeler: true });
+    /*
+     * Satır modunda karaoke / akıcı dolgu: transkriptte ölçülmüş kelime zamanı varsa her satır kendi
+     * içinde \k ile dolar (assSatirKaraoke). Hiç kelime zamanı yoksa (bulut satır modu, içe alınan
+     * SRT) eskisi gibi fade'e düşülür; diğer kelimeli animasyonlar satır modunda fade kalır.
+     */
+    var satirKaraoke = !kelimeVerisi && (anim === "karaoke" || anim === "akici") &&
+      cs.some(function (c) { return c.words && c.words.length; });
+    if (ANIMASYONLAR[anim].kelimeli && !kelimeVerisi && !satirKaraoke) anim = "fade";
     // Pro: kelimeli animasyon (stilli katman denemesi kuruluyken de acik)
     if (ANIMASYONLAR[anim].kelimeli && typeof Pro !== "undefined" && !Pro.isPro() && !(Pro.denemeAcik && Pro.denemeAcik("overlay"))) anim = "fade";
-
-    var cs = cueler();
+    if (anim !== "karaoke" && anim !== "akici") satirKaraoke = false;
 
     /*
      * Renk yerleşimi animasyona göre değişir:
@@ -4410,7 +4562,12 @@ window.KCaptions = (function () {
 
     var vurguAss = assRenk(st.vurguRenk);
 
-    if (ANIMASYONLAR[anim].kelimeli) {
+    if (satirKaraoke) {
+      // satır modu: her satır tek olay, kelimeler gerçek konuşma anında dolar, satır kırılımı \N
+      var skTag = anim === "akici" ? "\\kf" : "\\k";
+      var skDil = styleLocale();
+      cs.forEach(function (c) { olay(c.start, c.end, assSatirKaraoke(c, skTag, skDil)); });
+    } else if (ANIMASYONLAR[anim].kelimeli) {
       assKaraokeSatirlari(cs, rec.maxWords).forEach(function (grup) {
         var sonBitis = grup[grup.length - 1].end;
 
@@ -4778,12 +4935,19 @@ window.KCaptions = (function () {
    */
   function buildAssKaydirilmis(offset, opts) {
     if (!offset) return buildAss(opts);
-    var yedek = segments.map(function (s) { return { start: s.start, end: s.end }; });
+    // ölçülmüş kelimeler de kayar: satır modu karaoke dolgusu (assSatirKaraoke) onları okur
+    var yedek = segments.map(function (s) { return { start: s.start, end: s.end, words: s.words }; });
     try {
-      segments.forEach(function (s) { s.start -= offset; s.end -= offset; });
+      segments.forEach(function (s) {
+        s.start -= offset; s.end -= offset;
+        if (s.words) s.words = WW.kelimeleriKaydir(s.words, -offset);
+      });
       return buildAss(opts);
     } finally {
-      segments.forEach(function (s, i) { s.start = yedek[i].start; s.end = yedek[i].end; });
+      segments.forEach(function (s, i) {
+        s.start = yedek[i].start; s.end = yedek[i].end;
+        if (yedek[i].words) s.words = yedek[i].words;
+      });
     }
   }
 
@@ -4952,7 +5116,7 @@ window.KCaptions = (function () {
       var kelimeModu = segmentsMode === "k1" || segmentsMode === "w"; // kc haric: ASS'te metin katlaniyordu
       var icerik, ad, bom = "﻿";
       if (fmt === "txt") {
-        var lines = segments.map(function (s) { return styleText(CT.stripEmphasis(s.text)); }).filter(Boolean);
+        var lines = segments.map(function (s) { return CL.duzMetin(styleText(CT.stripEmphasis(s.text))); }).filter(Boolean);
         if (!lines.length) { KApp.toast("Yazılacak metin yok.", "bad"); return; }
         icerik = lines.join("\r\n");
         ad = "suflo-transkript.txt";
@@ -5094,7 +5258,15 @@ window.KCaptions = (function () {
       el("cap-maxlen").addEventListener("change", function () {
         onizlemeDurdur();
         vurguKutusuDurumu();
+        kelimeSiniriDurumu();
         onizlemeCiz();
+      });
+    }
+    // Kelime sınırı: 0 kapalı, 2..12 (1 yazılırsa 2 olur); tercihlerle saklanır, yeni transkriptte geçerli
+    if (el("cap-kelime-siniri")) {
+      el("cap-kelime-siniri").addEventListener("change", function () {
+        this.value = String(kelimeSiniri());
+        savePrefs();
       });
     }
     vurguKutusuDurumu();
@@ -5177,6 +5349,7 @@ window.KCaptions = (function () {
       });
     });
     loadPrefs();
+    kelimeSiniriDurumu();
     inceAyarDurumu();
     glifUyarisi();
     // Arayüz dili değişince (Ayarlar ya da ilk açılış seçicisi): örnek sözcükler ve kayıtlı
@@ -5332,7 +5505,7 @@ window.KCaptions = (function () {
     onizlemeDurdur();
     STIL_ALANLARI.forEach(function (id) {
       var e = el(id);
-      if (e && y.alan[id] !== undefined) e.value = y.alan[id];
+      if (e && y.alan[id] !== undefined) e.value = id === "cap-maxlen" ? uzunlukSecimi(y.alan[id]) : y.alan[id];
     });
     if (el("cap-punct")) el("cap-punct").checked = y.punct;
     if (el("cap-kutu")) el("cap-kutu").checked = y.kutu;
@@ -5351,6 +5524,7 @@ window.KCaptions = (function () {
     if (yeni) s.capPrefs = yeni; else delete s.capPrefs;
     K.saveSettings();
     vurguKutusuDurumu();
+    kelimeSiniriDurumu();
     onizlemeCiz();
     stilKartiIsaretle(secilenMogrt ? "" : (y.alan["cap-preset"] || secilenMotorStili));
     uygulamaIpucunuGuncelle();
@@ -5378,7 +5552,8 @@ window.KCaptions = (function () {
   // vurgu: kullanicinin *isaretledigi* ilk kelime ve tahmini ani (Zoom / Akilli SFX kullanir)
   function segmentsSnapshot() {
     return segments.map(function (s) {
-      var o = { start: Number(s.start) || 0, end: Number(s.end) || 0, text: CT.stripEmphasis(String(s.text || "")) };
+      // diğer araçlar (bölümler, viral anlar, zoom, SFX) satır başına tek metin bekler: 2 satırlık altyazı düzlenir
+      var o = { start: Number(s.start) || 0, end: Number(s.end) || 0, text: CT.stripEmphasis(String(s.text || "")).replace(/\s*\n\s*/g, " ") };
       var v = CT.emphasisInfo(s);
       if (v) o.vurgu = v;
       return o;

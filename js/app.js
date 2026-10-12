@@ -270,6 +270,38 @@ window.KApp = (function () {
   }
 
   // "İndir & kur" tıkı (Ayarlar ve Altyazı kurulum kartı): programla çağrı (olaysız) her zaman geçerli
+  /*
+   * Ayarlar › Altyazı: satır modlarında (32 / 42 karakter, 2 satır × 42) en kısa / en uzun ekran
+   * süresi ve kısa parça birleştirme (caption-text.js segmentleriKur). Geçersiz değer sınıra çekilir;
+   * en uzun süre en kısa sürenin altına inemez. Yeni transkriptlerde geçerli.
+   */
+  function altyaziSureAyarlari(s) {
+    var mn = el("set-min-sure"), mx = el("set-max-sure"), br = el("set-kisa-birlestir");
+    function sinirla(v, a, b, varsayilan) { var n = Number(v); return isFinite(n) && v !== "" ? Math.min(b, Math.max(a, n)) : varsayilan; }
+    if (mn) mn.value = String(sinirla(s.altyaziMinSure, 0.3, 3, 0.8));
+    if (mx) mx.value = String(sinirla(s.altyaziMaxSure, 2, 15, 6));
+    if (br) br.checked = s.kisaBirlestir !== false;
+    function kaydet() {
+      var st = K.settings();
+      var a = sinirla(mn ? mn.value : 0.8, 0.3, 3, 0.8);
+      var b = sinirla(mx ? mx.value : 6, 2, 15, 6);
+      if (b < a + 0.5) b = Math.min(15, a + 0.5);
+      a = Math.round(a * 10) / 10;
+      b = Math.round(b * 10) / 10;
+      if (mn) mn.value = String(a);
+      if (mx) mx.value = String(b);
+      st.altyaziMinSure = a;
+      st.altyaziMaxSure = b;
+      K.saveSettings();
+    }
+    if (mn) mn.addEventListener("change", kaydet);
+    if (mx) mx.addEventListener("change", kaydet);
+    if (br) br.addEventListener("change", function () {
+      K.settings().kisaBirlestir = this.checked;
+      K.saveSettings();
+    });
+  }
+
   function kurulumTikiGecerli(ev) {
     return !K.baslatTikiGecerli || K.baslatTikiGecerli(ev, kurulumBaslatAcilis);
   }
@@ -927,6 +959,8 @@ window.KApp = (function () {
         K.saveSettings();
       });
     }
+    // Ayarlar › Altyazı › en kısa / en uzun süre ve kısa parçaları birleştir (satır modları, 3.2 adım 4)
+    altyaziSureAyarlari(s);
     el("set-provider").value = s.provider || "groq";
     el("set-apikey").value = s.apiKey || "";
     el("set-endpoint").value = s.endpoint || "";

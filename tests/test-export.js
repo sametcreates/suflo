@@ -29,12 +29,14 @@ var kod = [
   animBlok,
   kes("function assCapa("),
   kes("function tc(sec, comma)"),
+  kes("function satirlariTopla("),
   kes("function cueler("),
   kes("function buildSrt("),
   kes("function buildVtt("),
   kes("function assTc("),
   kes("function assMetin("),
   kes("function assKaraokeSatirlari("),
+  kes("function assSatirKaraoke("),
   kes("function assRenk("),
   kes("function stilRecetesi("),
   kes("function yogunlukCarpani("),
@@ -48,10 +50,13 @@ var kod = [
  * dogrulugunu olcuyor, gorunum dogrulugu tests/test-stil.js'in isi.
  */
 globalThis.__SufloCT = require(require("path").join(__dirname, "..", "js", "caption-text.js"));
+globalThis.__SufloCL = require(require("path").join(__dirname, "..", "js", "caption-layout.js"));
 var f = new Function("SEGMENTS", "STYLE", `
   var segments = SEGMENTS;
   var CT = globalThis.__SufloCT;
+  var CL = globalThis.__SufloCL;
   function styleText(t) { return STYLE(t); }
+  function styleLocale() { return "tr-TR"; }
   function stil() {
     return { font: "Arial", boyut: 72, renk: "#ffffff", konturRenk: "#000000",
              vurguRenk: "#8b7cf6", kontur: 4, konum: 2, kutu: false };
@@ -152,14 +157,52 @@ var cift = f([
   { start: 2, end: 3, text: "Not translated" }
 ], duz);
 var ciftSrt = cift.buildSrt({ ciftDil: true });
-chk("cift dilli SRT: ust satir orijinal, alt satir ceviri", ciftSrt.indexOf("Merhaba arkadaşlar\nHello friends") !== -1, JSON.stringify(ciftSrt.slice(0, 80)));
-chk("cift dilli: ayni metin iki kez yazilmaz", ciftSrt.indexOf("Same\nSame") === -1);
+// 3.2 adim 4: SRT'de cue icindeki satir kirilimi da CRLF (dosyanin geri kalaniyla ayni)
+chk("cift dilli SRT: ust satir orijinal, alt satir ceviri", ciftSrt.indexOf("Merhaba arkadaşlar\r\nHello friends") !== -1, JSON.stringify(ciftSrt.slice(0, 80)));
+chk("cift dilli: ayni metin iki kez yazilmaz", ciftSrt.indexOf("Same\r\nSame") === -1);
 chk("cift dilli: cevirisi olmayan satir tek satir", ciftSrt.indexOf("Not translated") !== -1 && ciftSrt.indexOf("\nNot translated\n") === -1 || /3\r\n[^\r]*\r\nNot translated\r\n/.test(ciftSrt));
 chk("varsayilan (secenek yok) tek dilli", cift.buildSrt().indexOf("Merhaba") === -1);
 chk("cift dilli VTT", cift.buildVtt({ ciftDil: true }).indexOf("Merhaba arkadaşlar\nHello friends") !== -1);
 var oass = ozel.buildAss({});
 chk("ASS: susly parantez kacirildi", /sus\\\{lu\\\}/.test(oass), (oass.match(/^Dialogue.*/m) || [""])[0]);
 chk("ASS: Turkce karakterler korundu", /\u00e7\u0131k\u0131\u015f/.test(oass));
+
+/* ---- 3.2 adim 4: iki satirlik cue (2 satir × 42, Shift+Enter) ---- */
+var ikiSatir = f([
+  { start: 0, end: 2.5, text: "Bugün size kamerayla ilgili\nbirkaç şey anlatacağım." },
+  { start: 2.6, end: 4, text: "Tek satır" },
+  { start: 4.1, end: 5, text: "Boş satırlı\n\n  \nmetin" }
+], duz);
+var isrt = ikiSatir.buildSrt(), ivtt = ikiSatir.buildVtt(), iass = ikiSatir.buildAss({});
+chk("SRT: iki satirlik cue icinde CRLF, bos satir yok (cue bolunmez)", isrt.indexOf("00:00:02,500\r\nBugün size kamerayla ilgili\r\nbirkaç şey anlatacağım.\r\n\r\n2\r\n") !== -1 &&
+  isrt.indexOf("Boş satırlı\r\nmetin\r\n") !== -1 && (isrt.match(/-->/g) || []).length === 3, JSON.stringify(isrt.slice(0, 140)));
+chk("VTT: iki satirlik cue LF ile, bos satir yok", ivtt.indexOf("Bugün size kamerayla ilgili\nbirkaç şey anlatacağım.\n\n2\n") !== -1 && ivtt.indexOf("Boş satırlı\nmetin\n") !== -1, JSON.stringify(ivtt.slice(0, 140)));
+chk("ASS: satir kirilimi \\N", /Bugün size kamerayla ilgili\\Nbirkaç şey anlatacağım\./.test(iass), (iass.match(/^Dialogue.*/m) || [""])[0]);
+var ciftIki = f([{ start: 0, end: 2, text: "Hello\nfriends", orig: "Merhaba\narkadaşlar" }], duz).buildSrt({ ciftDil: true });
+chk("cift dilli + iki satirli: her dil tek satir (4 satirlik cue olmaz)", ciftIki.indexOf("Merhaba arkadaşlar\r\nHello friends\r\n") !== -1, JSON.stringify(ciftIki));
+
+/* ---- 3.2 adim 4: satir modunda karaoke \k gercek kelime zamanlarindan ---- */
+var satirKelime = [
+  { start: 10, end: 12, text: "Bir iki üç", words: [{ text: "Bir", start: 10.2, end: 10.4 }, { text: "iki", start: 10.7, end: 11.0 }, { text: "üç", start: 11.4, end: 11.9 }] },
+  { start: 12.5, end: 14, text: "Kelimesiz satır burada" }
+];
+var SK = f(satirKelime, duz);
+var skass = SK.buildAss({ animasyon: "karaoke" });
+var skd = skass.match(/^Dialogue: .*/gm) || [];
+chk("satir modu karaoke: her satir tek olay, satir zamaninda", skd.length === 2 && skd[0].indexOf("0,0:00:10.00,0:00:12.00,") !== -1, skd.length + " | " + (skd[0] || "").slice(0, 50));
+chk("satir modu karaoke: \\k gercek kelime zamanlarindan (bas bosluk 20, Bir→iki 50, iki→üç 70, üç→son 60)",
+  /\{\\k20\}\{\\k50\}Bir \{\\k70\}iki \{\\k60\}üç$/.test(skd[0] || ""), (skd[0] || "").split(",,")[1]);
+chk("satir modu karaoke: \\k toplami satir suresi (200 cs)", ((skd[0] || "").match(/\\k(\d+)/g) || []).reduce(function (n, k) { return n + Number(k.slice(2)); }, 0) === 200);
+var kelimesizK = (skd[1] || "").match(/\\k(\d+)/g) || [];
+chk("satir modu karaoke: kelimesiz satirda sure karakter oraniyla (3 hece, toplam 150 cs)", kelimesizK.length === 3 &&
+  kelimesizK.reduce(function (n, k) { return n + Number(k.slice(2)); }, 0) === 150, kelimesizK.join(","));
+var buyukK = f([{ start: 0, end: 1, text: "bir iki", words: [{ text: "bir", start: 0, end: 0.3 }, { text: "iki", start: 0.6, end: 1 }] }],
+  function (t) { return String(t).toLocaleUpperCase("tr-TR"); }).buildAss({ animasyon: "akici" });
+chk("satir modu akici: BÜYÜK HARF stilde de kelimeler eslesir (\\kf60 BİR \\kf40 İKİ)", /\{\\kf60\}BİR \{\\kf40\}İKİ$/.test((buyukK.match(/^Dialogue: .*/m) || [""])[0]), (buyukK.match(/^Dialogue: .*/m) || [""])[0]);
+var ikiSatirK = f([{ start: 0, end: 2, text: "bir iki\nüç", words: [{ text: "bir", start: 0, end: 0.5 }, { text: "iki", start: 0.5, end: 1 }, { text: "üç", start: 1, end: 2 }] }], duz).buildAss({ animasyon: "karaoke" });
+chk("satir modu karaoke: iki satirlik cue \\N ile", /\{\\k50\}bir \{\\k50\}iki\\N\{\\k100\}üç$/.test((ikiSatirK.match(/^Dialogue: .*/m) || [""])[0]), (ikiSatirK.match(/^Dialogue: .*/m) || [""])[0]);
+var hicKelime = f([{ start: 0, end: 1, text: "Kelimesiz" }], duz).buildAss({ animasyon: "karaoke" });
+chk("satir modu karaoke: transkriptte hic kelime zamani yoksa eskisi gibi fade", /\{\\fad\(180,180\)\}Kelimesiz/.test(hicKelime) && !/\\k\d/.test(hicKelime));
 
 /* ---------------- 4) ffmpeg gercekten okuyabiliyor mu ---------------- */
 var ff = ffmpeg();
@@ -191,6 +234,10 @@ if (!ff) {
   chk("ASS karaoke: kelimeler tek satirda birlesti", /Bir iki uc dort\./.test(g3), g3.split("\n")[2]);
 
   ayristir("test.srt", "\ufeff" + srt, "SRT (regresyon)");
+  var g4 = ayristir("iki-satir.srt", "\ufeff" + isrt, "SRT (iki satirlik cue)");
+  chk("SRT iki satir: ffmpeg iki satiri tek cue olarak okur", /Bugün size kamerayla ilgili\r?\nbirkaç şey anlatacağım\./.test(g4) && (g4.match(/-->/g) || []).length === 3, g4.split("\n").slice(0, 5).join(" | "));
+  var g5 = ayristir("satir-karaoke.ass", skass, "ASS (satir modu karaoke)");
+  chk("ASS satir karaoke: metin korunur", /Bir iki üç/.test(g5), g5.split("\n").slice(0, 4).join(" | "));
 }
 
 console.log(sonuc.join("\n"));

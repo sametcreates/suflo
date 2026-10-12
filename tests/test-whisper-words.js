@@ -216,8 +216,9 @@ ok("stil motoru çağrıları ölçülmüş kelimeleri alır (önizleme dahil, k
 ok("editör: bölme / birleştirme / toplu kaydırma / zaman düzenleme kelimeleri taşır",
   /WW\.bolmeNoktasi\(s, a, b, kesme\)/.test(cap) && /WW\.birlestirKelimeler\(segments\[i\], nx\)/.test(cap) &&
   /s\.words = WW\.kelimeleriKaydir\(s\.words, uyg\)/.test(cap) && /WW\.kelimeleriKaydir\(segments\[i\]\.words, fark\)/.test(cap));
-ok("editör: metin düzenlemesi kelimeleri düşürür (yalnız *vurgu* hariç), geri al geri getirir",
-  /if \(odakKelimeleri && WW\.yalnizVurgu\(inp\.dataset\.before, inp\.value\)\) segments\[i\]\.words = odakKelimeleri;\s*else delete segments\[i\]\.words;/.test(cap) &&
+// 3.2 adım 4: metin düzenlemesi kelimeleri artık düşürmez, yeni metne LCS ile hizalar (tests/test-caption-layout.js)
+ok("editör: metin düzenlemesi kelimeleri yeni metne hizalar (odaktaki kelimelerden), geri al geri getirir",
+  /var hiza = CL\.kelimeleriHizala\(odakKelimeleri, inp\.value, segments\[i\]\.start, segments\[i\]\.end, styleLocale\(\) \|\| algilananDil\);\s*if \(hiza\.length\) segments\[i\]\.words = hiza; else delete segments\[i\]\.words;\s*\} else delete segments\[i\]\.words;/.test(cap) &&
   /if \(odakKelimeleri\) eski\[i\]\.words = JSON\.parse\(JSON\.stringify\(odakKelimeleri\)\)/.test(cap));
 ok("çeviri kelimeleri saklar, 'orijinale dön' geri getirir; AI kontrolü ve sözlük kuralları",
   /if \(s\.words\) s\.origWords = s\.words;/.test(cap) && /s\.words = s\.origWords; delete s\.origWords;/.test(cap) &&

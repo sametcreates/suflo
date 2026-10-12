@@ -723,6 +723,9 @@ details.adv > *:not(summary) { margin-top: 8px; }
 .field select { padding-right: 28px; }
 
 .field-row { display: flex; align-items: center; gap: 9px; }
+/* Satır uzunluğu › Kelime sınırı (3.2 adım 4) */
+.field-row .kelime-siniri { flex: 0 0 64px; width: 64px; }
+.field-row .kelime-siniri + .hint { margin: 0; min-width: 0; }
 .field-row .grow { flex: 1; }
 
 .field-grid {
@@ -1907,10 +1910,13 @@ button.seg-time.jump:hover { color: var(--accent-lite); background: rgba(139, 12
 .mc-cut-length { margin-left: auto; color: var(--warn); font-size: 10.5px; }
 .cut-seg.off { opacity: .38; }
 
-/* zaman damgası düzenleme kutusu (çift tıkta açılır) */
+/* zaman damgası düzenleme kutusu (çift tıkta açılır): "başlangıç – bitiş", metnin üstüne taşar */
 .seg-time-edit {
   flex: 0 0 auto;
-  width: 92px;
+  position: relative;
+  z-index: 3;
+  width: 178px;
+  max-width: calc(100vw - 48px);
   padding: 3px 6px !important;
   font-size: 10.5px !important;
   border-radius: 5px;

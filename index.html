@@ -305,8 +305,9 @@
                 <option value="w3">3 kelime</option>
                 <option value="w4">4 kelime</option>
                 <option value="w5">5 kelime</option>
-                <option value="c32">32 karakter</option>
-                <option value="c42" selected>42 karakter</option>
+                <option value="l32">32 karakter</option>
+                <option value="l42" selected>42 karakter</option>
+                <option value="c42x2">2 satır × 42 (YouTube/TV)</option>
                 <option value="c60">60 karakter</option>
               </optgroup>
               <optgroup label="Kelime zamanlı">
@@ -314,6 +315,16 @@
                 <option value="kc">Birikimli</option>
               </optgroup>
             </select>
+          </div>
+        </div>
+
+        <!-- Kelime sınırı (3.2 adım 4, js/caption-layout.js): satır modlarında satır en çok N kelime; 0 kapalı -->
+        <div class="field" id="cap-kelime-siniri-alan">
+          <label for="cap-kelime-siniri">Kelime sınırı</label>
+          <div class="field-row">
+            <input id="cap-kelime-siniri" type="number" min="0" max="12" step="1" value="0" class="kelime-siniri"
+              title="Satır modunda bir satıra en çok kaç kelime girer (0 = kapalı, 2–12). Kelime zamanı olan transkriptte geçerli.">
+            <span class="hint">0 = kapalı · satır modunda bir satırdaki en çok kelime</span>
           </div>
         </div>
 
@@ -623,6 +634,7 @@
         <div class="caption-editor-shortcuts">
           <span><i></i> Otomatik kaydedilir</span>
           <span><kbd>Enter</kbd> böl</span>
+          <span><kbd>Shift+Enter</kbd> alt satır</span>
           <span><kbd>Ctrl+Enter</kbd> sonraki satır</span>
           <span><kbd>Alt+Enter</kbd> satır ekle</span>
         </div>
@@ -1853,6 +1865,23 @@
         <span>Ses etiketlerini koru</span>
       </label>
       <p class="hint">Kapalıyken motorun yazdığı [Müzik], (alkış), [BLANK_AUDIO] ve yalnız ♪ satırları atılır; konuşmalı satırda yalnız etiket silinir. Açıkken etiketler [Müzik] biçiminde kalır. Yeni transkriptlerde geçerli.</p>
+      <!-- Okunabilir satır düzeni (3.2 adım 4): satır modlarında ekran süresi ve kısa parça birleştirme -->
+      <div class="field-grid altyazi-sure" style="margin-top:8px">
+        <div class="field">
+          <label for="set-min-sure">En kısa süre (sn)</label>
+          <input id="set-min-sure" type="number" min="0.3" max="3" step="0.1" value="0.8">
+        </div>
+        <div class="field">
+          <label for="set-max-sure">En uzun süre (sn)</label>
+          <input id="set-max-sure" type="number" min="2" max="15" step="0.5" value="6">
+        </div>
+      </div>
+      <label class="switch" title="Arası 0,2 saniyeden kısa olan komşu parçalar birlikte sığıyorsa tek altyazı olur">
+        <input id="set-kisa-birlestir" type="checkbox" checked>
+        <i></i>
+        <span>Kısa parçaları birleştir</span>
+      </label>
+      <p class="hint">Satır modlarında (32 / 42 karakter, 2 satır × 42) yeni transkriptlerde geçerli: altyazı en kısa sürenin altında kalmaz (sonraki satıra kadar boşluk varsa), en uzun süreyi aşmaz. Birleştirme cümle sonunu aşmaz, satır uzunluğunu ve kelime sınırını korur.</p>
     </div>
 
     <div class="set-group marka-kiti-kart" id="grp-marka-kiti">
@@ -2261,6 +2290,7 @@
   <script src="js/pro.js"></script>
   <script src="js/pro-sync.js"></script>
   <script src="js/engine.js"></script>
+  <script src="js/caption-layout.js"></script>
   <script src="js/caption-quality.js"></script>
   <script src="js/whisper-words.js"></script>
   <script src="js/caption-text.js"></script>

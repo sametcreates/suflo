@@ -2730,6 +2730,27 @@
     "Bekleme iptal edildi — başka bir kurulum indirmeye devam ediyor.": "Stopped waiting — another install is still downloading."
   });
 
+  /* ================= Okunabilir altyazı düzeni / Readable caption layout (3.2 step 4: js/caption-layout.js) ================= */
+  add({
+    // Line length menu, word limit (Captions › settings)
+    "2 satır × 42 (YouTube/TV)": "2 lines × 42 (YouTube/TV)",
+    "Kelime sınırı": "Word limit",
+    "Satır modunda bir satıra en çok kaç kelime girer (0 = kapalı, 2–12). Kelime zamanı olan transkriptte geçerli.":
+      "The most words one caption can hold in line mode (0 = off, 2–12). Applies to transcripts with word timings.",
+    "0 = kapalı · satır modunda bir satırdaki en çok kelime": "0 = off · most words per caption in line mode",
+    // Caption Editor: Shift+Enter inserts a line break inside the caption
+    "alt satır": "line break",
+    "Tek zaman: satırı taşı · başlangıç – bitiş: satırın sınırlarını değiştir": "One time: move the line · start – end: change the line's start and end",
+    "Zaman biçimi: dd:ss.mmm ya da dd:ss.mmm – dd:ss.mmm (örn. 01:23.500 – 01:25.000)": "Time format: mm:ss.mmm or mm:ss.mmm – mm:ss.mmm (e.g. 01:23.500 – 01:25.000)",
+    // Settings › Captions
+    "En kısa süre (sn)": "Minimum duration (s)",
+    "En uzun süre (sn)": "Maximum duration (s)",
+    "Kısa parçaları birleştir": "Merge short fragments",
+    "Arası 0,2 saniyeden kısa olan komşu parçalar birlikte sığıyorsa tek altyazı olur": "Neighboring fragments less than 0.2 s apart become one caption if they fit together",
+    "Satır modlarında (32 / 42 karakter, 2 satır × 42) yeni transkriptlerde geçerli: altyazı en kısa sürenin altında kalmaz (sonraki satıra kadar boşluk varsa), en uzun süreyi aşmaz. Birleştirme cümle sonunu aşmaz, satır uzunluğunu ve kelime sınırını korur.":
+      "Applies to new transcripts in line modes (32 / 42 characters, 2 lines × 42): a caption stays on screen at least the minimum duration (when there's room before the next one) and never longer than the maximum. Merging never crosses the end of a sentence and keeps the line length and word limit."
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
@@ -2889,7 +2910,7 @@
     "SaaS Glass", "Reels", "Pop", "Premium", "Karaoke", "YouTube", "Azərbaycanca", "Azərbaycan", "English", "Deutsch", "Español",
     "Français", "Português", "Italiano", "Anton", "Archivo Black", "Bebas Neue", "Bungee", "Lora", "Montserrat", "Arial", "Impact",
     "Verdana", "Tahoma", "Georgia", "Trebuchet MS", "Courier New", "Apple", "Twemoji", "SRT", "WebVTT", "ASS · stilli", "TXT", "Enter",
-    "Ctrl+Enter", "Alt+Enter", "Instagram Reels", "TikTok", "Jump Cut", "Snap-In", "BPM", "native", "Slide", "Zoom", "Fade", "MOGRT",
+    "Ctrl+Enter", "Alt+Enter", "Shift+Enter", "Instagram Reels", "TikTok", "Jump Cut", "Snap-In", "BPM", "native", "Slide", "Zoom", "Fade", "MOGRT",
     "Neon", "✦ Smart SFX 2.0", "Smart SFX 2.0", "loop", "GPU:", "OpenAI", "Endpoint", "Premiere", "Pro Cloud", "AUTO", "Emoji CDN",
     "SRT · VTT · TXT + caption track", "MIT · sametcreates", "Platform", "https://…/v1/audio/transcriptions", "gsk_… / sk-…",
     "suflo => Suflo sametkreyts => sametcreates rils => Reels", "https://assets.suflo.app/emoji/v1/catalog.json", "XXXX-XXXX-XXXX-XXXX",
