@@ -46,6 +46,13 @@ window.KMarkaKiti = (function () {
   function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }
   // Altyazı Efektleri'nden kite alınan görünüm alanları (3.3 adım 17)
   var GORUNUM_ALANLARI = ["golge", "kutu", "kutuRenk", "kutuOpak"];
+  /*
+   * Kitin son serbest konumu ({ konum, konumX, konumY }): hazır konum seçilip kaydedilince kitten çıkar, ama
+   * "Serbest konum" yeniden seçilirse buradan geri gelir (seçenek görünür kalır; seçili ama kitte boş kalmaz).
+   * "Şimdiki ayarlardan doldur" yenisini alır.
+   */
+  var sonSerbest = null;
+  function serbestMi(ov) { return !!ov && typeof ov.konumX === "number" && typeof ov.konumY === "number"; }
 
   // Kayıttaki kit → alanlar
   function doldur(kit) {
@@ -53,8 +60,9 @@ window.KMarkaKiti = (function () {
     el("mk-acik").checked = kit.on;
     el("mk-font").value = ov.font || "";
     // Serbest konum (Altyazı sekmesinde sürüklenmiş) kitte varsa "Serbest konum" seçeneği görünür ve seçili
-    var xy = typeof ov.konumX === "number" && typeof ov.konumY === "number";
-    if (el("mk-konum-xy")) el("mk-konum-xy").hidden = !xy;
+    var xy = serbestMi(ov);
+    if (xy) sonSerbest = { konum: ov.konum, konumX: ov.konumX, konumY: ov.konumY };
+    if (el("mk-konum-xy")) el("mk-konum-xy").hidden = !(xy || sonSerbest);
     el("mk-konum").value = xy ? "xy" : (ov.konum ? String(ov.konum) : "");
     if (el("mk-gorunum")) el("mk-gorunum").checked = GORUNUM_ALANLARI.some(function (k) { return own(ov, k); });
     var renkVar = !!(ov.renk || ov.konturRenk || ov.vurguRenk);
@@ -96,8 +104,12 @@ window.KMarkaKiti = (function () {
     var eskiOv = eski.stil.overrides;
     var ov = {};
     if (el("mk-font").value) ov.font = el("mk-font").value;
-    // "Serbest konum": kitteki konum olduğu gibi kalır (yalnız "Şimdiki ayarlardan doldur" değiştirir)
-    if (el("mk-konum").value === "xy") ["konum", "konumX", "konumY"].forEach(function (k) { if (own(eskiOv, k)) ov[k] = eskiOv[k]; });
+    // "Serbest konum": kitteki konum olduğu gibi kalır (yalnız "Şimdiki ayarlardan doldur" değiştirir); arada hazır
+    // konum kaydedildiyse kitin son serbest konumu geri gelir
+    if (el("mk-konum").value === "xy") {
+      var xyKaynak = serbestMi(eskiOv) ? eskiOv : (sonSerbest || eskiOv);
+      ["konum", "konumX", "konumY"].forEach(function (k) { if (own(xyKaynak, k) && xyKaynak[k] !== undefined) ov[k] = xyKaynak[k]; });
+    }
     else if (el("mk-konum").value) ov.konum = Number(el("mk-konum").value);
     // Gölge ve kutu: anahtar açıkken kitteki değerler kalır; kitte yoksa Altyazı sekmesinden alınır
     if (el("mk-gorunum") && el("mk-gorunum").checked) {
@@ -131,6 +143,8 @@ window.KMarkaKiti = (function () {
     alanlariKilitle();
     var kit = kaydet(topla());
     if (kit.logo.path) logoGoster(kit.logo.path);
+    // "Serbest konum" seçili ama kitte serbest konum yok (hiç olmadı): seçici kitin gerçek konumunu gösterir
+    if (el("mk-konum").value === "xy" && !serbestMi(kit.stil.overrides)) doldur(kit);
   }
 
   function logoSec() {
@@ -170,6 +184,8 @@ window.KMarkaKiti = (function () {
     if (!window.KCaptions || !window.KCaptions.stilAyarlari) return;
     var st = window.KCaptions.stilAyarlari();
     var kit = MK.fromCurrent(st, oku().kit, !!el("mk-konum").value, !!(el("mk-gorunum") && el("mk-gorunum").checked));
+    // konum da alındıysa eski serbest konum hatırlanmaz (Altyazı sekmesinde serbest konum yoksa seçenek gizlenir)
+    if (el("mk-konum").value) sonSerbest = null;
     doldur(kit);
     if (!(st && window.SufloStyleShare && window.SufloStyleShare.hasFont(st.font))) durum("Sistem yazı tipi kite alınmadı: yalnız Suflo ile gelen yazı tipleri her bilgisayarda aynı görünür.", "warn");
     else if (!MK.isOn(kit)) durum("Doldu. Kullanmak için \"Marka kitini her stile ve kanca başlığına uygula\"yı aç.", "warn");
@@ -180,6 +196,7 @@ window.KMarkaKiti = (function () {
   function init() {
     if (!MK || !el("grp-marka-kiti")) return;
     var n = oku();
+    sonSerbest = null;
     doldur(n.kit);
     ["mk-acik", "mk-font", "mk-konum", "mk-renk-acik", "mk-logo-kose"].forEach(function (id) {
       el(id).addEventListener("change", degisti);

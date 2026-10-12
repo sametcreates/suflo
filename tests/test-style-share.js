@@ -320,6 +320,26 @@ ok("styleFieldsChanged: gölge / kutu / serbest konum değişimi stil değişimi
   MK.styleFieldsChanged(kitG1, MK.normalize({ on: true, stil: { overrides: { golge: { opak: 40 }, konumX: 10, konumY: 10 } } }).kit));
 var rbG = MK.rebaseBrandKit(MK.mergeBrandKit(efTaban, kitG1), efTaban, kitG1, MK.normalize({ on: false }).kit);
 ok("rebaseBrandKit: kit kapanınca kitin gölgesi görünümün değerine (gölge yok) döner", rbG.changed && rbG.stil.golge === null, JSON.stringify(rbG.stil));
+/*
+ * Kitin açıkça "gölge yok" demesi (golge: null; "Gölge ve kutu" gölgesizken doldurulmuş kit) kitte olmayan alandan
+ * ayrı: gölgeli görünümde (Vurucu) kit açılınca gölge kalkar; mergeBrandKit (görünüm yeniden seçilince) ile aynı sonuç.
+ */
+(function () {
+  var vurucu = { font: "Anton", renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe600", konum: 5, golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 },
+    kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null };
+  var kitKapali = MK.normalize({ on: false }).kit;
+  var kitGolgesiz = MK.normalize({ on: true, stil: { overrides: { golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50 } } }).kit;
+  var rbN = MK.rebaseBrandKit(vurucu, vurucu, kitKapali, kitGolgesiz), mN = MK.mergeBrandKit(vurucu, kitGolgesiz);
+  ok("rebaseBrandKit: gölgesiz kit (golge null) açılınca görünümün gölgesi kalkar (mergeBrandKit ile aynı); kit kapanınca geri gelir",
+    MK.styleFieldsChanged(kitKapali, kitGolgesiz) && kitGolgesiz.stil.overrides.golge === null && rbN.changed && rbN.stil.golge === null && mN.golge === null &&
+    MK.rebaseBrandKit(rbN.stil, vurucu, kitGolgesiz, kitKapali).stil.golge.opak === 85, JSON.stringify([rbN.stil.golge, mN.golge]));
+  var elleGolge = Object.assign({}, vurucu, { golge: { renk: "#ff0000", opak: 50, mesafe: 3, yumusak: 2 } });
+  ok("rebaseBrandKit: elle ayarlanmış gölge gölgesiz kit açılınca da korunur", MK.rebaseBrandKit(elleGolge, vurucu, kitKapali, kitGolgesiz).stil.golge.renk === "#ff0000");
+  ok("styleFieldsChanged: kitte olmayan gölge ile kitin 'gölge yok'u farklı; iki 'gölge yok' aynı",
+    MK.normalize({ on: true, stil: { overrides: { golge: null } } }).kit.stil.overrides.golge === null &&
+    MK.styleFieldsChanged(MK.normalize({ on: true }).kit, MK.normalize({ on: true, stil: { overrides: { golge: null } } }).kit) &&
+    !MK.styleFieldsChanged(kitGolgesiz, MK.normalize(JSON.parse(JSON.stringify(kitGolgesiz))).kit));
+})();
 
 /* ---------------- deneme filigranı: logo filigranın üstüne binmez ---------------- */
 // js/filigran.js: \an9\pos(0.97w, 0.04h | 0.10h), boy = kısa kenar × 0.026; "suflo.app" ≤ 7 × boy genişlik, 1.4 × boy yükseklik (cömert kutu)

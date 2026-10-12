@@ -400,7 +400,7 @@ window.KShortsPaket = (function () {
         var hk = kit && MK ? MK.mergeHook({}, kit) : {};
         var cp = P.cercevePlani({ W: W, H: H, dur: dur, secim: job.secim, kit: kit, logoAcik: job.logoAcik,
           hookDur: k.adimlar.kanca === "tamam" || k.adimlar.kanca === "bekliyor" ? job.kancaSure : 0,
-          altyaziKonum: sa.konum, altyaziAcik: k.adimlar.altyazi === "tamam", lang: job.lang,
+          altyaziKonum: sa.konum, altyaziY: sa.konumY, altyaziAcik: k.adimlar.altyazi === "tamam", lang: job.lang,
           font: hk.font, renk: hk.renk, vurguRenk: hk.vurguRenk, ctaStil: kit && kit.kanca && kit.kanca.stil ? kit.kanca.stil : "serit" });
         if (cp.ctaNeden) k.notlar.cta = cp.ctaNeden;
         if (cp.ctaDilNot) k.notlar.ctaDil = cp.ctaDilNot;

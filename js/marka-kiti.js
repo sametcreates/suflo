@@ -178,11 +178,20 @@
     if (typeof a === "object" || typeof b === "object") return JSON.stringify(a).toLowerCase() === JSON.stringify(b).toLowerCase();
     return String(a).toLowerCase() === String(b).toLowerCase();
   }
+  /*
+   * İki kitin aynı alanı aynı mı? Kitte olmayan alan (undefined: stilin kendi değeri) ile kitin açıkça
+   * koyduğu "yok" (golge: null, "Gölge ve kutu" gölgesizken doldurulmuş kit) ayrıdır: gölgesiz kit açılınca
+   * görünümün gölgesi kalkar (mergeBrandKit de öyle yapar; yoksa sonuç işlem sırasına bağlı kalırdı).
+   */
+  function ayniKitDegeri(a, b) {
+    if (a === undefined || b === undefined) return a === b;
+    return ayniDeger(a, b);
+  }
   var STIL_ALANLARI = ["font", "renk", "konturRenk", "vurguRenk", "konum", "konumX", "konumY", "golge", "kutu", "kutuRenk", "kutuOpak"];
 
   // Kitin stile işleyen kısmı (açık/kapalı, yazı tipi, renkler, konum) değişti mi? Logo / kanca / köşe sayılmaz.
   function styleFieldsChanged(eski, yeni) {
-    return STIL_ALANLARI.some(function (key) { return !ayniDeger(kitDegeri(eski, key), kitDegeri(yeni, key)); });
+    return STIL_ALANLARI.some(function (key) { return !ayniKitDegeri(kitDegeri(eski, key), kitDegeri(yeni, key)); });
   }
 
   /*
@@ -197,7 +206,7 @@
     Object.keys(s).forEach(function (key) { out[key] = s[key]; });
     STIL_ALANLARI.forEach(function (key) {
       var e = kitDegeri(eski, key), y = kitDegeri(yeni, key);
-      if (ayniDeger(e, y)) return;
+      if (ayniKitDegeri(e, y)) return;
       var beklenen = e !== undefined ? e : b[key];
       var hedef = y !== undefined ? y : b[key];
       if (hedef === undefined || !ayniDeger(out[key], beklenen) || ayniDeger(out[key], hedef)) return;

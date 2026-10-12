@@ -3739,8 +3739,17 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
   position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%); padding: 2px 9px; border-radius: 20px;
   background: rgba(12, 13, 20, .82); color: #fff; font-size: 10px; white-space: nowrap;
 }
+/* Yazı alt yarıdayken etiket üstte (Oynat / Kare al düğmelerinin altında): sürüklenen yazının üstüne binmez */
+.efekt-arti-etiket.ust { top: 34px; bottom: auto; }
+/*
+ * Sürüklerken DOM önizlemesinin kelimeleri her adımda yeniden kurulur: işaretçi hep sahneye düşsün (basış kopan
+ * bir kelimeye düşerse Chromium çift tıkı hiç iletmez). Düğmeler tıklanabilir kalır.
+ */
+.efekt.etkin .onizleme-alt { pointer-events: none; }
 /* DOM yedek önizlemesinde serbest konum: kartın ortası noktada */
 .onizleme-alt.serbest { right: auto; bottom: auto; width: max-content; max-width: 92%; transform: translate(-50%, -50%); }
+/* Ölçülüp piksel olarak yerleşmiş kart (captions.js efektKartiSigdir): giriş animasyonu ortasından büyür, yerinden kaymaz */
+.onizleme-alt.serbest.olculu { transform: none; }
 /* DOM yedek önizlemesi (gerçek görünüm libass çıktısıdır) */
 .satir-efekt-pop   { animation: on-efekt-pop .3s cubic-bezier(.22,1,.36,1) both; }
 .satir-efekt-zipla { animation: on-efekt-zipla .3s ease-out both; }

@@ -107,11 +107,13 @@ function ortam(o) {
     govde("function stilKodu("), govde("function stilKoduUygula("), govde("function varsayilanaDon("),
     govde("function efektVarsayilan("), govde("function sablonumUygula("),
     govde("function efektSayi("), govde("function efektSayiAlani("), govde("function serbestKonumDegeri("), govde("function efektBagimliDurum("),
-    govde("function konumAktif("), govde("function sahneNoktasi("), govde("function artiGoster("), govde("function konumYaz("),
+    govde("function konumAktif("), govde("function konumOlcusu("), govde("function sahneNoktasi("), govde("function artiGoster("), govde("function konumYaz("),
     govde("function konumDegisti("), govde("function konumSuruklemeAdim("), govde("function konumSuruklemeBitir("), govde("function konumSifirla("),
-    govde("function konumSurukleBagla("), govde("function stilYedegi("), govde("function stilYedeginiYukle("),
-    // rehber yedeğinin alan listeleri (EFEKT_ISARETLERI, STIL_ALANLARI)
-    cap.slice(cap.indexOf("  var EFEKT_ISARETLERI = "), cap.indexOf("  function stilYedegi("))
+    govde("function konumSurukleBagla("), govde("function sahneErisimi("), govde("function stilYedegi("), govde("function stilYedeginiYukle("),
+    // oluşturucu kontrolleri ve rehber yedeğinin alan listeleri (EFEKT_KONTROLLERI + efektKontrolleriniBagla, EFEKT_ISARETLERI, STIL_ALANLARI)
+    cap.slice(cap.indexOf("  var EFEKT_KONTROLLERI = "), cap.indexOf("  function stilYedegi(")),
+    // DOM yedek önizlemesi (efektDomCiz, ölçeği ve kartın sahneye sığdırılması)
+    cap.slice(cap.indexOf("  var EFEKT_GIRIS_SINIFI = "), cap.indexOf("  function onizlemeMetni("))
   ].join("\n");
   var api = new Function("K", "window", "document", "el", "KApp", "Pro",
     "var SS = window.SufloStyleShare, AE = window.SufloAltyaziEfekt, EFEKT = 'efekt';\n" +
@@ -130,6 +132,7 @@ function ortam(o) {
     " durum: function () { return { motor: secilenMotorStili, gorunum: secilenGorunum, son: sonGorunum, mogrt: secilenMogrt, kredi: stilKrediAd }; }," +
     " efektAyari: efektAyari, konumSurukleBagla: konumSurukleBagla, surukluyor: function () { return !!surukleme; }," +
     " stilYedegi: stilYedegi, stilYedeginiYukle: stilYedeginiYukle, sablonumUygula: sablonumUygula," +
+    " efektKontrolleriniBagla: efektKontrolleriniBagla, stilKartiIsaretle: stilKartiIsaretle, efektDomCiz: efektDomCiz, efektKartiSigdir: efektKartiSigdir," +
     " mogrtSec: function (m) { secilenMogrt = m; secilenMotorStili = ''; } };")(
     K, window, { createElement: function (t) { return dugum(t); }, querySelectorAll: function () { return []; } },
     function (id) { return dom[id] || null; }, { toast: function (m, tur) { toastlar.push(m); } }, {});
@@ -173,8 +176,10 @@ ok("elle ayar: italik, glitch, 1 satır; en çok kelime 1-10'a kırpılır", ov2
 var r2 = ciz(ov2);
 ok("elle ayar çıktıda: Style italik, glitch alt katmanı, \\N yok", r2.ass.split("\n").filter(function (l) { return /^Style:/.test(l); })[0].split(",")[8] === "-1" &&
   r2.ass.indexOf("&H00552AFF") !== -1 && !/\\N/.test(r2.ass));
-var kontrolKodu = govde("function init(");
-ok("kontrol değişikliği efekti seçer ve hazır görünüm çipini kaldırır, canlı önizlemeyi tazeler (init)", /EFEKT_KONTROLLERI\.forEach/.test(kontrolKodu) &&
+// init kontrolleri efektKontrolleriniBagla ile bağlar (işleyici ayrı işlev: testte gerçek işleyici çalıştırılır)
+var kontrolKodu = govde("function efektKontrolleriniBagla(");
+ok("kontrol değişikliği efekti seçer ve hazır görünüm çipini kaldırır, canlı önizlemeyi tazeler (init → efektKontrolleriniBagla)",
+  /efektKontrolleriniBagla\(\);/.test(govde("function init(")) && /EFEKT_KONTROLLERI\.forEach/.test(kontrolKodu) &&
   /efekteGec\(\);\s*secilenGorunum = "";\s*efektSonrasi\(\);\s*savePrefs\(\);\s*efektOnizlemeTazele\(\);/.test(kontrolKodu));
 e.api.mogrtSec({ path: "/x.mogrt" });
 e.api.efekteGec();
@@ -341,25 +346,35 @@ vu.api.gorunumUygula("temiz");
 ok("Temiz'e dönünce gölge kapanır, noktalama açılır; alt kontroller soluk / kapalı", vu.dom["cap-efekt-golge"].checked === false && vu.dom["cap-punct"].checked === true &&
   vu.dom["cap-efekt-golge-ayar"].classList.contains("pasif") && vu.dom["cap-efekt-golge-opak"].disabled === true && vu.dom["cap-kutu-renk"].disabled === true);
 
-// sürükleme
+// sürükleme (3.3 adım 17 inceleme: kart tutulduğu yerden taşınır, 4 px'ten az kımıldayan basış tıktır)
 var sk = ortam();
 sk.api.gorunumleriCiz();
 sk.api.gorunumUygula("temiz");
 sk.api.konumSurukleBagla();
 var sahne = sk.dom["cap-sahne"];
 function olay(ad, e) { (sahne.dinle[ad] || []).forEach(function (f) { f(Object.assign({ pointerId: 7, button: 0, target: sahne, preventDefault: function () {} }, e || {})); }); }
-var kayit0 = sk.kayit(), tazele0 = sk.api.onizleme.tazele.length;
-olay("pointerdown", { clientX: 220, clientY: 140 });   // %30, %40
-ok("sürükle: basınca işaretçi yakalanır, artı işareti ve 'X %30 · Y %40' etiketi görünür, noktalar canlı", sk.yakalanan[0] === "al:7" &&
-  sahne.classList.contains("surukleniyor") && sk.dom["cap-efekt-arti"].hidden === false && sk.dom["cap-efekt-arti-etiket"].textContent === "X %30 · Y %40" &&
+// sahnenin %'si → sayfa pikseli (400 × 225 sahne (100, 50)'de)
+function px(x, y, ek) { return Object.assign({ clientX: 100 + x / 100 * 400, clientY: 50 + y / 100 * 225 }, ek || {}); }
+var alt0 = AE.konumNoktasi(sk.api.efektAyari());   // Temiz Alt'ın kart ortası (50 · 76,9)
+var kayit0 = sk.kayit(), tazele0 = sk.api.onizleme.tazele.length, ciz0 = sk.api.onizleme.ciz;
+olay("pointerdown", px(alt0.x, alt0.y));
+ok("sürükle: basınca işaretçi yakalanır, artı işareti kartın şimdiki ortasında ('Alt · hazır konum'); basmak yazıyı oynatmaz, çizmez",
+  sk.yakalanan[0] === "al:7" && sk.dom["cap-efekt-arti"].hidden === false && sk.dom["cap-efekt-arti-etiket"].textContent === "Alt · hazır konum" &&
+  sk.dom["cap-konum-x"].value === "" && sk.dom["cap-konum"].value === "2" && !sahne.classList.contains("surukleniyor") && sk.api.onizleme.ciz === ciz0 &&
+  sk.dom["cap-efekt-arti"].childNodes[1].style.top === alt0.y + "%", sk.dom["cap-efekt-arti-etiket"].textContent);
+olay("pointermove", px(alt0.x + 0.4, alt0.y + 0.6));   // 1,6 px · 1,35 px
+ok("sürükle: 4 px'ten az kımıldama sürükleme başlatmaz", sk.dom["cap-konum-x"].value === "" && !sahne.classList.contains("surukleniyor") && sk.api.onizleme.ciz === ciz0);
+olay("pointermove", px(30, 40));
+ok("sürükle: eşik aşılınca kart tutulduğu yerden taşınır (ortasından tutuldu → X %30 · Y %40); artı işareti ve etiket canlı",
+  sahne.classList.contains("surukleniyor") && sk.dom["cap-efekt-arti-etiket"].textContent === "X %30 · Y %40" &&
   sk.dom["cap-konum-x"].value === "30" && sk.dom["cap-konum-y"].value === "40" && sk.dom["cap-efekt-arti"].childNodes[0].style.left === "30%" &&
   sk.dom["cap-efekt-arti"].childNodes[1].style.top === "40%", sk.dom["cap-efekt-arti-etiket"].textContent);
-olay("pointermove", { clientX: 340, clientY: 95.5 });   // %60, %20.2
+olay("pointermove", px(60, 20.2));
 ok("sürükle: hareket noktayı izler; sürerken tercih yazılmaz, gerçek önizleme istenmez", sk.dom["cap-konum-x"].value === "60" && sk.dom["cap-konum-y"].value === "20" &&
   sk.kayit() === kayit0 && sk.api.onizleme.tazele.length === tazele0);
-olay("pointermove", { pointerId: 9, clientX: 100, clientY: 50 });
+olay("pointermove", px(0, 0, { pointerId: 9 }));
 ok("sürükle: başka işaretçinin hareketi yok sayılır", sk.dom["cap-konum-x"].value === "60");
-olay("pointerup", { clientX: 340, clientY: 95.5 });
+olay("pointerup", px(60, 20.2));
 var prefs7 = sk.ayar.capPrefs && sk.ayar.capPrefs.stil;
 ok("bırakınca: işaretçi bırakılır, konum tercihe yazılır, gerçek önizleme bir kez istenir, görünüm çipi kalkar",
   sk.yakalanan[1] === "bırak:7" && !sahne.classList.contains("surukleniyor") && prefs7 && prefs7.konumX === 60 && prefs7.konumY === 20 &&
@@ -367,14 +382,23 @@ ok("bırakınca: işaretçi bırakılır, konum tercihe yazılır, gerçek öniz
   sk.dom["cap-konum-serbest-deger"].textContent === "X %60 · Y %20", J(prefs7 && [prefs7.konumX, prefs7.konumY]));
 var ov8 = sk.api.motorAyarlari(sk.api.stil());
 ok("serbest konum motora gider ve çizilir (1920×1080'de %60 / %20 → 1152, 216)", ov8.konumX === 60 && ov8.konumY === 20 && /\\an5\\pos\(1152,216\)/.test(ciz(Object.assign({}, ov8, { giris: "yok" })).ass));
-// yapışma: Alt'ın noktası (50, 84) ±%3
-olay("pointerdown", { clientX: 100 + 0.51 * 400, clientY: 50 + 0.826 * 225 });
-ok("sürükle: hazır konuma (Alt, X 50 · Y 84) ±%3 yapışır; etiket hazır konumu söyler", sk.dom["cap-konum-x"].value === "" && sk.dom["cap-konum"].value === "2" &&
+// kartın kenarından tutmak: kart ortası basılan noktaya zıplamaz, fark korunur
+olay("pointerdown", px(64, 24));
+olay("pointermove", px(70, 30));
+ok("sürükle: kartın kenarından tutulunca kart işaretçi kadar kayar (ortası basılan noktaya zıplamaz: 60·20 → 66·26)",
+  sk.dom["cap-konum-x"].value === "66" && sk.dom["cap-konum-y"].value === "26", sk.dom["cap-konum-x"].value + "," + sk.dom["cap-konum-y"].value);
+olay("pointermove", px(64, 24));
+olay("pointerup", px(64, 24));
+// yapışma: Alt'ın kart ortası (50, 76,9) ±%3; kart (60, 20)'den tutulup (51, 75,5)'e taşınır
+olay("pointerdown", px(60, 20));
+olay("pointermove", px(51, 75.5));
+ok("sürükle: hazır konumun kart ortasına (Alt, X 50 · Y 76,9) ±%3 yapışır; etiket hazır konumu söyler", sk.dom["cap-konum-x"].value === "" && sk.dom["cap-konum"].value === "2" &&
   sk.dom["cap-efekt-arti-etiket"].textContent === "Alt · hazır konum");
 olay("pointerup");
 ok("yapışınca Temiz'in kendi konumu: hazır görünüm çipi yeniden seçili, serbest konum satırı gizli", sk.api.durum().gorunum === "temiz" &&
   sk.dom["cap-konum-serbest"].hidden === true && sk.ayar.capPrefs.stil.konumX === null && sk.ayar.capPrefs.stil.konum === 2);
-olay("pointerdown", { clientX: 100 + 0.5 * 400, clientY: 50 + 0.62 * 225 });
+olay("pointerdown", px(alt0.x, alt0.y));
+olay("pointermove", px(50, 61.5));
 olay("pointerup");
 ok("Orta'ya yapışmak hazır konumu Orta yapar (seçici 5)", sk.dom["cap-konum"].value === "5" && sk.dom["cap-konum-x"].value === "");
 // ok tuşları: odakta; Orta'dan (50, 62) sağa %1, Shift+yukarı %5
@@ -383,6 +407,12 @@ var e1 = tus("ArrowRight"), e2 = tus("ArrowUp", true);
 ok("ok tuşları: %1 sağa, Shift ile %5 yukarı (sayfa kaymaz); her biri kaydedilir", e1 === 1 && e2 === 1 && sk.dom["cap-konum-x"].value === "51" &&
   sk.dom["cap-konum-y"].value === "57" && sk.ayar.capPrefs.stil.konumX === 51 && sk.ayar.capPrefs.stil.konumY === 57);
 ok("ok tuşları dışındaki tuşlar engellenmez", tus("a") === 0 && tus("Tab") === 0);
+// Çift tık: iki basış da kımıldamadan → yazı yerinde kalır, kaydedilmez, çizilmez; dblclick hazır konuma döndürür
+var kayitC = sk.kayit(), cizC = sk.api.onizleme.ciz, tazeleC = sk.api.onizleme.tazele.length;
+[1, 2].forEach(function () { olay("pointerdown", px(20, 60)); olay("pointerup", px(20, 60)); });
+ok("çift tıkın basışları (kımıldamadan): yazı tıklanan noktaya zıplamaz, tercih yazılmaz, DOM / gerçek önizleme yeniden çizilmez",
+  sk.dom["cap-konum-x"].value === "51" && sk.dom["cap-konum-y"].value === "57" && sk.kayit() === kayitC && sk.api.onizleme.ciz === cizC &&
+  sk.api.onizleme.tazele.length === tazeleC && !sk.api.surukluyor());
 (sahne.dinle.dblclick || []).forEach(function (f) { f({ target: sahne }); });
 ok("çift tık hazır konuma döner (Orta), serbest konum silinir", sk.dom["cap-konum-x"].value === "" && sk.dom["cap-konum"].value === "5" && sk.ayar.capPrefs.stil.konumX === null);
 tus("ArrowLeft"); tus("Home");
@@ -391,22 +421,136 @@ ok("Home da sıfırlar", sk.dom["cap-konum-x"].value === "" && sk.ayar.capPrefs.
 tus("ArrowDown");
 var once = [sk.dom["cap-konum-x"].value, sk.dom["cap-konum-y"].value];
 var kayit1 = sk.kayit();
-olay("pointerdown", { clientX: 120, clientY: 60 });
+olay("pointerdown", px(50, 63));
+olay("pointermove", px(20, 30));
+var esnada = sk.dom["cap-konum-x"].value;
 tus("Escape");
-ok("Esc sürüklemeyi geri alır (başlangıç noktası), kaydetmez", sk.dom["cap-konum-x"].value === once[0] && sk.dom["cap-konum-y"].value === once[1] &&
+ok("Esc sürüklemeyi geri alır (başlangıç noktası), kaydetmez", esnada === "20" && sk.dom["cap-konum-x"].value === once[0] && sk.dom["cap-konum-y"].value === once[1] &&
   !sk.api.surukluyor() && sk.kayit() === kayit1 && !sahne.classList.contains("surukleniyor"));
-olay("pointerdown", { clientX: 120, clientY: 60 });
+olay("pointerdown", px(50, 63));
+olay("pointermove", px(20, 30));
 olay("pointercancel");
 ok("pointercancel da geri alır", sk.dom["cap-konum-x"].value === once[0] && !sk.api.surukluyor());
 // düğmelerde ve Premiere şablonunda sürükleme yok
 var dugme = dugum("button");
-olay("pointerdown", { clientX: 220, clientY: 140, target: { closest: function (s) { return s === "button" ? dugme : null; } } });
+olay("pointerdown", px(30, 40, { target: { closest: function (s) { return s === "button" ? dugme : null; } } }));
 ok("Oynat / Kare al düğmesine basmak sürükleme başlatmaz", !sk.api.surukluyor() && sk.dom["cap-konum-x"].value === once[0]);
-olay("pointerdown", { clientX: 220, clientY: 140, button: 2 });
+olay("pointerdown", px(30, 40, { button: 2 }));
 ok("sağ tık sürükleme başlatmaz", !sk.api.surukluyor());
 sk.api.mogrtSec({ path: "/x.mogrt" });
-olay("pointerdown", { clientX: 220, clientY: 140 });
+olay("pointerdown", px(30, 40));
+olay("pointermove", px(60, 60));
 ok("Premiere şablonu seçiliyken sürükleme yok (konum ve seçim değişmez)", !sk.api.surukluyor() && sk.api.durum().mogrt !== null && sk.dom["cap-konum-x"].value === once[0]);
+
+/* ---------------- 7b) adım 17 inceleme bulguları ---------------- */
+// Gölge / Arka plan kutusu anahtarı gerçek işleyiciyle (efektKontrolleriniBagla): alt kontrolleri açılır / kapanır
+var an = ortam();
+an.api.gorunumUygula("temiz");
+an.api.efektKontrolleriniBagla();
+function degistir(o, id) { (o.dom[id].dinle[o.dom[id].type === "color" ? "input" : "change"] || []).forEach(function (f) { f({ target: o.dom[id] }); }); }
+ok("Temiz: gölge ve kutu alt kontrolleri kapalı / soluk", an.dom["cap-efekt-golge-opak"].disabled === true && an.dom["cap-kutu-opak"].disabled === true &&
+  an.dom["cap-efekt-golge-ayar"].classList.contains("pasif") && an.dom["cap-efekt-kutu-ayar"].classList.contains("pasif"));
+an.dom["cap-efekt-golge"].checked = true; degistir(an, "cap-efekt-golge");
+an.dom["cap-kutu"].checked = true; degistir(an, "cap-kutu");
+ok("Gölge ve Arka plan kutusu anahtarı açılınca renk / opaklık / mesafe / yumuşaklık ve kutu rengi / opaklığı açılır (soluk değil)",
+  ["cap-efekt-golge-renk", "cap-efekt-golge-opak", "cap-efekt-golge-mesafe", "cap-efekt-golge-yumusak", "cap-kutu-renk", "cap-kutu-opak"].every(function (id) { return an.dom[id].disabled === false; }) &&
+  !an.dom["cap-efekt-golge-ayar"].classList.contains("pasif") && !an.dom["cap-efekt-kutu-ayar"].classList.contains("pasif") &&
+  an.api.motorAyarlari(an.api.stil()).golge !== null && an.api.motorAyarlari(an.api.stil()).kutu === true);
+an.dom["cap-efekt-golge-opak"].value = "40"; degistir(an, "cap-efekt-golge-opak");
+ok("açılan gölge opaklığı değiştirilir ve motora gider", an.api.motorAyarlari(an.api.stil()).golge.opak === 40);
+an.dom["cap-efekt-golge"].checked = false; degistir(an, "cap-efekt-golge");
+ok("Gölge kapanınca alt kontrolleri yeniden kapanır", an.dom["cap-efekt-golge-opak"].disabled === true && an.dom["cap-efekt-golge-ayar"].classList.contains("pasif") &&
+  an.dom["cap-kutu-opak"].disabled === false);
+// Rehber yedeği: serbest konum satırı ve alt kontrollerin durumu da geri gelir
+var ry = ortam();
+ry.api.gorunumUygula("temiz");
+ry.dom["cap-konum-x"].value = "30"; ry.dom["cap-konum-y"].value = "40";
+var ryYedek = ry.api.stilYedegi();
+ry.api.gorunumUygula("vurucu");   // rehberin stilDene'si gibi
+ry.api.stilYedeginiYukle(ryYedek);
+ok("stilYedeginiYukle: serbest konum satırı ('X %30 · Y %40' + Sıfırla) ve gölge kapalıyken alt kontrollerin kapalı hâli geri gelir",
+  ry.api.stil().konumX === 30 && ry.dom["cap-konum-serbest"].hidden === false && ry.dom["cap-konum-serbest-deger"].textContent === "X %30 · Y %40" &&
+  ry.dom["cap-efekt-golge"].checked === false && ry.dom["cap-efekt-golge-opak"].disabled === true && ry.dom["cap-efekt-golge-ayar"].classList.contains("pasif"));
+// Yapışma bölgesinden geçmek hazır konumu değiştirmez; bırakılan yer karar verir
+var gc = ortam();
+gc.api.gorunumUygula("temiz");
+gc.api.konumSurukleBagla();
+var gs = gc.dom["cap-sahne"];
+function gOlay(ad, e) { (gs.dinle[ad] || []).forEach(function (f) { f(Object.assign({ pointerId: 3, button: 0, target: gs, preventDefault: function () {} }, e || {})); }); }
+var gAlt = AE.konumNoktasi(gc.api.efektAyari());
+gOlay("pointerdown", px(gAlt.x, gAlt.y));
+gOlay("pointermove", px(50, 61));
+var gecisKonum = gc.dom["cap-konum"].value;
+gOlay("pointermove", px(30, 40));
+ok("sürüklerken Orta bölgesinden geçmek (anlık 5) bırakınca hazır konumu değiştirmez: serbest noktada konum sürükleme başındaki (Alt)",
+  gecisKonum === "5" && gc.dom["cap-konum"].value === "2" && gc.dom["cap-konum-x"].value === "30");
+gOlay("pointerup", px(30, 40));
+(gs.dinle.dblclick || []).forEach(function (f) { f({ target: gs }); });
+ok("…ve çift tık / Sıfırla Alt'a döner (Orta'ya değil)", gc.dom["cap-konum"].value === "2" && gc.dom["cap-konum-x"].value === "" && gc.ayar.capPrefs.stil.konum === 2);
+// 9:16 sekans: yapışma, ok tuşu ve etiket çizilen yerle aynı
+var dk = ortam({ ctx: { width: 1080, height: 1920 } });
+dk.api.gorunumUygula("temiz");
+dk.api.konumSurukleBagla();
+var ds = dk.dom["cap-sahne"];
+function dOlay(ad, e) { (ds.dinle[ad] || []).forEach(function (f) { f(Object.assign({ pointerId: 4, button: 0, target: ds, preventDefault: function () {} }, e || {})); }); }
+var dAlt = AE.konumNoktasi(dk.api.efektAyari(), { w: 1080, h: 1920 });
+dOlay("pointerdown", px(dAlt.x, dAlt.y));
+dOlay("pointermove", px(dAlt.x + 2, dAlt.y - 1.5));
+ok("9:16: Alt'ın çizildiği yerde (kart ortası %70,1) yapışır", dAlt.y === 70.1 && dk.dom["cap-konum"].value === "2" && dk.dom["cap-konum-x"].value === "" &&
+  dk.dom["cap-efekt-arti-etiket"].textContent === "Alt · hazır konum");
+dOlay("pointermove", px(50, 90));
+ok("9:16: alt arayüz bandına (Y %90) sürüklenen yazı çizildiği yere (%72) sığar; etiket onu söyler, üstte durur (yazının üstüne binmez)",
+  dk.dom["cap-konum-y"].value === "72" && dk.dom["cap-efekt-arti-etiket"].textContent === "X %50 · Y %72" && dk.dom["cap-efekt-arti-etiket"].classList.contains("ust"));
+dOlay("pointerup");
+(function () {
+  var dk2 = ortam({ ctx: { width: 1080, height: 1920 } });
+  dk2.api.gorunumUygula("temiz");
+  dk2.api.konumSurukleBagla();
+  var s2 = dk2.dom["cap-sahne"];
+  (s2.dinle.keydown || []).forEach(function (f) { f({ key: "ArrowUp", shiftKey: false, target: s2, preventDefault: function () {} }); });
+  ok("9:16: Alt'tan yukarı ok yazıyı yukarı taşır (%70,1 → 69; eskiden %83'e, aşağı iniyordu)", dk2.dom["cap-konum-y"].value === "69" && dk2.dom["cap-konum"].value === "2");
+})();
+ok("etiket yazı üst yarıdayken altta durur", (function () {
+  var o = ortam(); o.api.gorunumUygula("temiz"); o.api.konumSurukleBagla();
+  var s3 = o.dom["cap-sahne"];
+  (s3.dinle.pointerdown || []).forEach(function (f) { f(Object.assign({ pointerId: 1, button: 0, target: s3, preventDefault: function () {} }, px(50, 76.9))); });
+  (s3.dinle.pointermove || []).forEach(function (f) { f(Object.assign({ pointerId: 1, target: s3 }, px(40, 35))); });
+  return o.dom["cap-efekt-arti-etiket"].classList.contains("ust") === false && o.dom["cap-konum-y"].value === "35";
+})());
+// Önizleme sahnesinin odak durağı / adı / ipucu yalnız Altyazı Efektleri seçiliyken
+var er = ortam();
+er.api.gorunumUygula("temiz");
+var erS = er.dom["cap-sahne"];
+var erEfekt = [erS.getAttribute("tabindex"), erS.getAttribute("role"), erS.getAttribute("aria-label"), erS.getAttribute("title")];
+er.api.mogrtSec({ path: "/x.mogrt" });
+er.api.stilKartiIsaretle("");
+var erMogrt = [erS.getAttribute("tabindex"), erS.getAttribute("role"), erS.getAttribute("aria-label"), erS.getAttribute("title")];
+er.api.gorunumUygula("canli");
+ok("önizleme sahnesi: Altyazı Efektleri'nde odaklanır, 'sürükleyerek konumlandır' adı ve ipucu var; Premiere şablonunda yok; geri dönünce gelir",
+  erEfekt[0] === "0" && erEfekt[1] === "group" && /sürükleyerek konumlandır/.test(erEfekt[2]) && /çift tık/.test(erEfekt[3]) &&
+  erMogrt.every(function (v) { return v === null; }) && erS.getAttribute("tabindex") === "0" && /çift tık/.test(erS.getAttribute("title")), J([erEfekt, erMogrt]));
+ok("index.html'deki sahne ipucu ve adı captions.js'teki ile aynı (İngilizce karşılığı tek)", html.indexOf('aria-label="' + erEfekt[2] + '"') !== -1 && html.indexOf('title="' + erEfekt[3] + '"') !== -1);
+// DOM yedek önizlemesi: kart ortası motorun noktasında (hazır konumda da), sahneye sığdırılır
+(function () {
+  var dm = ortam();
+  dm.api.gorunumUygula("temiz");
+  var kutu = dugum("div"), sh = dm.dom["cap-sahne"];
+  sh.clientWidth = 400; sh.clientHeight = 225;
+  dm.api.efektDomCiz(kutu, dm.api.stil(), { kelimeler: ["Bunu", "gören", "herkes"] });
+  var hazir = [kutu.style.left, kutu.style.top, kutu.classList.contains("serbest")];
+  var k2 = dugum("div"); k2.className = "onizleme-alt serbest"; k2.style.left = "5%"; k2.style.top = "95%"; k2.offsetWidth = 200; k2.offsetHeight = 40;
+  dm.api.efektKartiSigdir(k2, sh);
+  // 400 × 225 sahne, 200 × 40 kart: pay %1 = 4 px → ortası (104, 201) → sol üst (4, 181) px, translate yok
+  ok("DOM yedeği: hazır konumda da kart ortası motorun noktasında (Alt 50 · 76,9); kenara taşan kart sahneye sığdırılır, piksel yerleşir",
+    hazir[0] === "50%" && hazir[1] === "76.9%" && hazir[2] === true && k2.style.left === "4.0px" && k2.style.top === "181.0px" && k2.classList.contains("olculu"),
+    J([hazir, k2.style.left, k2.style.top]));
+})();
+ok("CSS: oluşturucuda DOM yazısı işaretçiyi yakalamaz (çift tık sahneye ulaşır); etiket yazı alt yarıdayken üstte",
+  /\.efekt\.etkin \.onizleme-alt \{ pointer-events: none; \}/.test(fs.readFileSync(path.join(KOK, "css", "style.css"), "utf8")) &&
+  /\.efekt-arti-etiket\.ust \{ top: 34px; bottom: auto; \}/.test(fs.readFileSync(path.join(KOK, "css", "style.css"), "utf8")));
+ok("onizlemeDurdur: Altyazı Efektleri'nde sahne sekansın oranında kalır (konum değişince 16:9'a çökmez); CEF 74'te oranlı boy",
+  /if \(!secilenMogrt && secilenMotorStili === EFEKT\) sahneOraniniAyarla\(onizlemeBoyutu\(/.test(govde("function onizlemeDurdur(")) &&
+  /sahneYedekBoyut\(sahne, ob\);/.test(govde("function sahneOraniniAyarla(")) && /CSS\.supports\("aspect-ratio"/.test(govde("function aspectRatioVar(")));
 
 // kalıcılık: tercih, paylaşım kodu, Şablonum, Marka Kiti
 var ka = ortam();
@@ -437,7 +581,7 @@ var mk7 = ortam({ ayar: { markaKiti: { on: true, stil: { overrides: { konum: 2, 
 mk7.api.gorunumUygula("canli");
 ok("Marka Kiti'nin serbest konumu ve kutusu görünümle gelir", mk7.dom["cap-konum-x"].value === "20" && mk7.dom["cap-konum-y"].value === "30" &&
   mk7.dom["cap-kutu"].checked === true && mk7.dom["cap-kutu-renk"].value === "#00ff00" && mk7.dom["cap-efekt-aktif"].value === "zipla");
-var initKod = govde("function init(");
+var initKod = govde("function init(") + govde("function efektKontrolleriniBagla(");
 ok("init: gölge / kutu sayı kutuları aralığa (boşsa varsayılana) döner", /if \(EFEKT_SAYILARI\[id\]\) e\.value = String\(efektSayi\(id,/.test(initKod));
 ok("init: hazır konum seçilince serbest konum bırakılır; sürükleme bağlanır (açılışta Premiere / ffmpeg yok)",
   /id === "cap-konum"\) \{ if \(el\("cap-konum-x"\)\) el\("cap-konum-x"\)\.value = ""/.test(initKod) && /konumSurukleBagla\(\);/.test(initKod) &&

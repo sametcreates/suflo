@@ -116,6 +116,32 @@ ok("captionCues: oluşturucunun noktalaması (punct false) uygulanır; verilmezs
     P.captionCues(kayit, { styleId: "efekt", kase: "upper" }).cues[0].text === "BUNU KAÇIRMA, TAMAM MI?";
 })());
 
+/*
+ * 3.3 adım 17: serbest konumlu altyazıda CTA yeri hazır konumdan değil serbest Y'den: Vurucu (Orta, konum 5)
+ * Y %75'e sürüklenince CTA üstte (eskiden altta, %74'te kartın üstüne biniyordu); Temiz (Alt) Y %30'a
+ * sürüklenince CTA altta (eskiden üstte, kartın üstüne).
+ */
+var AEs = require(path.join(__dirname, "..", "js", "altyazi-efekt.js"));
+function ctaY(ass) { var m = /\\(?:pos|move)\(\d+,(\d+)/.exec(ass || ""); return m ? Number(m[1]) : -1; }
+ok("stilAyarlari: serbest konumun dikeyi (konumY) döner; hazır konumda / eski stilde null", (function () {
+  var v = Object.assign(AEs.gorunum("vurucu").ayar, { konumX: 50, konumY: 75 });
+  var s = P.stilAyarlari("efekt", null, true, v), h = P.stilAyarlari("efekt", null, true, AEs.gorunum("vurucu").ayar);
+  var kitXY = MK.normalize({ on: true, stil: { overrides: { konum: 2, konumX: 40, konumY: 20 } } }).kit;
+  return s.konum === 5 && s.konumY === 75 && h.konumY === null && P.stilAyarlari("hormozi", null, true).konumY === null &&
+    P.stilAyarlari("efekt", kitXY, true, AEs.gorunum("vurucu").ayar).konumY === 20;
+})());
+(function () {
+  var sV = P.stilAyarlari("efekt", null, true, Object.assign(AEs.gorunum("vurucu").ayar, { konumX: 50, konumY: 75 }));
+  var sT = P.stilAyarlari("efekt", null, true, Object.assign(AEs.gorunum("temiz").ayar, { konumX: 50, konumY: 30 }));
+  var o = { W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({}), hookDur: 3, altyaziAcik: true, lang: "tr" };
+  var cV = P.cercevePlani(Object.assign({}, o, { altyaziKonum: sV.konum, altyaziY: sV.konumY }));
+  var cT = P.cercevePlani(Object.assign({}, o, { altyaziKonum: sT.konum, altyaziY: sT.konumY }));
+  ok("cercevePlani: serbest konumlu altyazı Y %75 (Vurucu, hazır konum Orta) → CTA üstte; Y %30 (Temiz, hazır konum Alt) → CTA altta",
+    cV.cta && cT.cta && ctaY(cV.cta.ass) < 1920 * 0.4 && ctaY(cT.cta.ass) > 1920 * 0.5, ctaY(cV.cta && cV.cta.ass) + " / " + ctaY(cT.cta && cT.cta.ass));
+})();
+ok("shorts-paket.js çerçeve adımı serbest konumu CTA'ya verir (altyaziY: sa.konumY)",
+  /altyaziKonum: sa\.konum, altyaziY: sa\.konumY,/.test(require("fs").readFileSync(path.join(__dirname, "..", "js", "shorts-paket.js"), "utf8")));
+
 /* ---------------- çerçeve planı ---------------- */
 var cp1 = P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({}), hookDur: 3, altyaziKonum: 2, altyaziAcik: true, lang: "tr" });
 ok("cercevePlani: çubuk + CTA, altyazı altta → CTA üstte", cp1.progress && cp1.cta && !cp1.logo && !cp1.bos && cp1.cta.start === 27.5 &&

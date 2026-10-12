@@ -370,7 +370,34 @@ var golZ = olaylar(efekt({ giris: "yok", aktif: "zipla", golge: { renk: "#000000
 var golZust = golZ.filter(function (l) { return /^Dialogue: 4,/.test(l); }), golZgol = golZ.filter(function (l) { return /^Dialogue: 1,/.test(l); });
 ok("efekt gölge + zıpla: hareketli kelimenin gölgesi onunla zıplar; gölge kopyasında görünür işaret yalnız gölgeyi açar",
   golZust.length > 0 && golZgol.length === golZ.filter(function (l) { return /^Dialogue: [34],/.test(l); }).length &&
-  golZgol.every(function (l) { return l.indexOf("\\alpha&H00&") === -1; }) && golZgol.some(function (l) { return /\\move\(960,907,960,892/.test(l) && /\{\\4a&H40&\}/.test(l); }), golZgol.slice(0, 3).join(" | "));
+  golZgol.every(function (l) { return l.indexOf("\\alpha&H00&") === -1; }) && golZgol.some(function (l) { return /\\move\(960,907,960,892/.test(l) && /\{\\1a&HFE&\\3a&HFF&\\4a&H40&\}/.test(l); }), golZgol.slice(0, 3).join(" | "));
+/*
+ * Gölge kopyasında görünür her metin koşusu dolgu 1/255 (\1a FE) ile çizilmeli: \alpha&HFF& (zıpla / titrede
+ * etkin kelimenin çevresi) \1a'yı da FF yapar; yalnız \4a açılırsa libass gölgeyi içi boş halka çizer, kontur 0'da
+ * hiç çizmez. Her koşunun etkin \1a / \4a değeri etiket sırasıyla izlenir.
+ */
+function golgeKosulari(l) {
+  var m = /^Dialogue: [^,]*(?:,[^,]*){8},(.*)$/.exec(l), t = m ? m[1] : "", a1 = "00", a4 = "00", out = [], re = /\{([^}]*)\}|([^{]+)/g, x;
+  while ((x = re.exec(t))) {
+    if (x[1] !== undefined) {
+      var r2 = /\\(alpha|1a|4a)&H([0-9A-F]{2})&/g, y;
+      while ((y = r2.exec(x[1]))) { if (y[1] === "alpha") { a1 = y[2]; a4 = y[2]; } else if (y[1] === "1a") a1 = y[2]; else a4 = y[2]; }
+    } else if (x[2].replace(/\\N/g, "").trim()) out.push({ metin: x[2], a1: a1, a4: a4 });
+  }
+  return out;
+}
+["zipla", "titre"].forEach(function (akt) {
+  [4, 0].forEach(function (kon) {
+    var ol = olaylar(efekt({ giris: "yok", aktif: akt, kontur: kon, golge: { renk: "#ff0000", opak: 75, mesafe: 5, yumusak: 0 } }));
+    var kos = [];
+    ol.filter(function (l) { return /^Dialogue: 1,/.test(l); }).forEach(function (l) { kos = kos.concat(golgeKosulari(l)); });
+    var gorunur = kos.filter(function (k) { return k.a4 !== "FF"; });
+    ok("efekt gölge + " + akt + ", kontur " + kon + ": gölge kopyasında görünür her koşu dolu (\\1a FE; \\alpha&HFF& sonrası FF kalmaz)",
+      gorunur.length > 5 && gorunur.every(function (k) { return k.a1 === "FE" && k.a4 === "40"; }) &&
+      kos.every(function (k) { return k.a4 === "FF" || k.a4 === "40"; }),
+      gorunur.filter(function (k) { return k.a1 !== "FE"; }).map(function (k) { return k.metin + ":" + k.a1; }).slice(0, 4).join(" ") || gorunur.length + " koşu");
+  });
+});
 var golG = olaylar(efekt({ giris: "yok", aktif: "glitch", golge: { opak: 75 } }));
 ok("efekt gölge + glitch: glitch kopyaları (2) gölgesiz, metnin altında", golG.filter(function (l) { return /^Dialogue: 2,/.test(l); }).length === 10 &&
   golG.filter(function (l) { return /^Dialogue: 1,/.test(l); }).length === golG.filter(function (l) { return /^Dialogue: 3,/.test(l); }).length);
@@ -551,6 +578,39 @@ if (!ffmpeg) {
   var bK8 = rgbKare(gK8.ass, gK8.fontFiles, 640, 360), dolgu8 = say(rgbKare(gD8.ass, gD8.fontFiles, 640, 360), beyaz);
   ok("efekt gölge gerçek çizim, konturlu: gölge dolu glif (içi boş halka değil)", dolgu8 > 500 && say(bK8, kirmizi) > dolgu8 * 0.8,
     say(bK8, kirmizi) + " kırmızı / " + dolgu8 + " dolgu");
+  /*
+   * Zıpla + gölge, kontur 0: etkin kelime (zıplayan) ve sonrakilerin gölgesi de çizilir. Eskiden gölge kopyasında
+   * \alpha&HFF& sonrası \1a FF kalıyordu: 0,3 s'de (BUNU etkin) hiçbir kelimenin gölgesi yoktu. Aynı ayarın
+   * zıplasız (aktif yok) çiziminin kırmızı alanına yakın olmalı.
+   */
+  var zCues = [{ start: 0, end: 0.6, text: "BUNU" }, { start: 0.6, end: 1.2, text: "GOREN" }, { start: 1.2, end: 1.8, text: "HERKES" }];
+  function zGolge(akt) {
+    return engine.compile({ styleId: "efekt", cues: zCues, cueKind: "words", width: 640, height: 360,
+      overrides: { giris: "yok", aktif: akt, kontur: 0, satir: 1, kelime: 3, golge: { renk: "#ff0000", opak: 100, mesafe: 20, yumusak: 0 } } });
+  }
+  var zZ = zGolge("zipla"), zY = zGolge("yok");
+  var kZ = say(rgbKare(zZ.ass, zZ.fontFiles, 640, 360, 0.3), kirmizi), kY = say(rgbKare(zY.ass, zY.fontFiles, 640, 360, 0.3), kirmizi);
+  ok("efekt gölge + zıpla gerçek çizim, kontur 0: etkin kelime ve sonrakilerin gölgesi dolu (zıplasızla aynı alan)",
+    kY > 300 && kZ > kY * 0.85, kZ + " / " + kY + " kırmızı");
+  /*
+   * Önizlemede sürükleme (adım 17 inceleme): efektKonumlari'nın hazır konum noktası, çizilen kartın ORTASI (gerçek
+   * libass çizimi, beyaz piksellerin dikey orta noktası) ile ±%1,5 içinde (yapışma toleransı ±%3); 16:9 ve 9:16'da.
+   * Eskiden önizleme bağlantı noktasını (Alt %84 = kartın altı) kullanıyordu: 9:16'da Alt %69'da çizilirken %84'e yapışıyordu.
+   */
+  var ortaCues = ["Bunu", "gören", "herkes", "şaşırdı", "bugün"].map(function (w, i) { return { start: i * 0.5, end: i * 0.5 + 0.44, text: w }; });
+  [[640, 360], [360, 640]].forEach(function (b) {
+    [2, 5, 8].forEach(function (k) {
+      var ov = { giris: "yok", vurgu: false, konum: k };
+      var r = engine.compile({ styleId: "efekt", cues: ortaCues, cueKind: "words", width: b[0], height: b[1], overrides: ov });
+      var px = rgbKare(r.ass, r.fontFiles, b[0], b[1], 1.2), ust = -1, alt = -1;
+      for (var yk = 0; yk < b[1]; yk++) {
+        for (var xk = 0; xk < b[0]; xk++) { var q = (yk * b[0] + xk) * 3; if (px[q] > 235 && px[q + 1] > 235 && px[q + 2] > 235) { if (ust < 0) ust = yk; alt = yk; break; } }
+      }
+      var ciz = (ust + alt) / 2 / b[1] * 100, nokta = engine.efektKonumlari(ov, b[0], b[1]).noktalar[k].y;
+      ok("efektKonumlari gerçek çizim " + b[0] + "×" + b[1] + " konum " + k + ": hazır konum noktası kartın çizilen ortası (±%1,5)",
+        ust >= 0 && Math.abs(ciz - nokta) <= 1.5, "çizilen %" + ciz.toFixed(1) + " · nokta %" + nokta);
+    });
+  });
   var kutu2 = engine.compile({ styleId: "efekt", cues: [{ start: 0, end: 2.5, text: "Kutunun ilk satırı ve ikinci satırı" }], cueKind: "lines", width: 640, height: 360,
     overrides: { giris: "yok", vurgu: false, kontur: 0, satir: 2, kelime: 6, kutu: true, kutuRenk: "#00c000", kutuOpak: 60, konumX: 50, konumY: 50 } });
   var bK = rgbKare(kutu2.ass, kutu2.fontFiles, 640, 360);

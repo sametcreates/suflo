@@ -1194,8 +1194,12 @@
       golgeEk = "\\1a&HFE&\\3a&HFF&\\4c" + assColor(golge.renk) + "\\4a&H" + alfa(golge.opak) + "&\\shad" + (gm > 0 ? gm : 0.01) + (gy > 0 ? "\\blur" + gy : "");
     }
     var kutuPay = kutuAcik ? scaled(20, height) : 0;
-    // Metnin içindeki "görünür" işareti gölge kopyasında yalnız gölgeyi açar (dolgu ve kontur saydam kalır)
-    function golgeMetni(icerik) { return icerik.split("\\alpha&H00&").join("\\4a&H" + alfa(golge.opak) + "&"); }
+    /*
+     * Metnin içindeki "görünür" işareti gölge kopyasında yalnız gölgeyi açar: dolgu yine 1/255, kontur
+     * saydam. Zıpla / titrede etkin kelimenin çevresindeki \alpha&HFF& (gizli / yalnız) \1a'yı da FF
+     * yapar; yalnız \4a'yı açmak sonraki kelimelerin gölgesini içi boş halkaya çevirir, kontur 0'da siler.
+     */
+    function golgeMetni(icerik) { return icerik.split("\\alpha&H00&").join("\\1a&HFE&\\3a&HFF&\\4a&H" + alfa(golge.opak) + "&"); }
 
     groupWords(cues, kelime).forEach(function (group) {
       var kir = efektKirilimlari(group, satir);
@@ -1417,6 +1421,46 @@
     return st;
   }
 
+  /*
+   * 3.3 adım 17 (önizlemede sürükleme): Altyazı Efektleri'nde hazır konumların (1, 2, 5, 8) kart ORTASI ve serbest
+   * konumda kart ortasının dikey bandı, bu kadraj ve ayarla (kadrajın %'si, bir ondalık). Serbest konum kartın
+   * ortasıdır; hazır konumun bağlantı noktası ise kartın altı (2 / 1) ya da üstüdür (8): sürüklerken yapışma noktası,
+   * ok tuşunun başlangıcı, artı işareti ve etiket bununla çizilenle aynı yeri gösterir. Kart `satir` satırlı tam kart;
+   * libass'te satır kutusu bir punto yüksekliğinde (ASS Fontsize hücre yüksekliği; gerçek çizimle ±%1), Alt sol'da
+   * satır ~16 karakter. Dikey bant serbestKart'ın kendi (cömert: satır ≈ 1,3 punto + kontur) tahminiyle: motor kartı
+   * oraya sığdırır. 9:16'nın %64 / %74 sınırı, üst çubuk / alt arayüz bandı ve overrides.guvenli ("Platform
+   * arayüzünden kaçın") dahil. Çıktıya dokunmaz.
+   * Döner: { noktalar: { 1: { x, y }, 2: …, 5: …, 8: … }, ySinir: [en az, en çok] }
+   */
+  function efektKonumlari(overrides, width, height) {
+    var w = Math.max(320, Math.round(Number(width) || 1920)), h = Math.max(180, Math.round(Number(height) || 1080));
+    var style = guvenliStil(STYLES.efekt.style, overrides, "efekt");
+    var eskiRef = olcekRef, eskiW = guvenliW;
+    olcekRef = Math.min(w, h);
+    guvenliW = overrides && overrides.guvenli === true && h > w * 1.2 ? Math.round(w * 0.74) : 0;
+    try {
+      var fs = scaled(style.boyut, h);
+      var satir = tamSayi(style.satir, EFEKT_SATIR, 2), kelime = tamSayi(style.kelime, EFEKT_KELIME, 5);
+      var satirSay = satir >= 3 && kelime >= 5 ? 3 : (satir >= 2 && kelime >= 3 ? 2 : 1);
+      var outline = Number(style.kontur) > 0 ? scaled(style.kontur, h) : 0;
+      var yarimH = satirSay * fs / 2, bantYarimH = satirSay * fs * 1.3 / 2 + outline;
+      var yarimW = Math.min(alanW(w) * .88, 16 * fs * (KARAKTER_GENISLIK[style.font] || .62) * 1.08) / 2;
+      var yuzde = function (v, t) { return Math.round(v / t * 1000) / 10; };
+      var noktalar = {};
+      [1, 2, 5, 8].forEach(function (p) {
+        var a = anchor({ konum: p }, "efekt", w, h);
+        noktalar[p] = { x: yuzde(a.an === 1 ? a.x + yarimW : a.x, w),
+          y: yuzde(a.an === 2 || a.an === 1 ? a.y - yarimH : (a.an === 8 ? a.y + yarimH : a.y), h) };
+      });
+      // serbestKart'ın dikey bandı (kartın ortası bu aralıkta kalır)
+      var pay = scaled(12, h), ust = pay, alt = h - pay;
+      if (h > w * 1.2) { ust = Math.max(ust, Math.round(h * GUVENLI_ALAN[0].h)); alt = Math.min(alt, Math.round(h * GUVENLI_ALAN[2].y)); }
+      var y0 = ust + bantYarimH, y1 = alt - bantYarimH;
+      if (y0 > y1) { y0 = (ust + alt) / 2; y1 = y0; }
+      return { noktalar: noktalar, ySinir: [yuzde(y0, h), yuzde(y1, h)] };
+    } finally { olcekRef = eskiRef; guvenliW = eskiW; }
+  }
+
   function compile(options) {
     options = options || {};
     var id = STYLES[options.styleId] ? options.styleId : "viral";
@@ -1492,6 +1536,7 @@
     markEmphasis: markEmphasis,
     stripEmphasis: stripEmphasis,
     compile: compile,
+    efektKonumlari: efektKonumlari,
     GUVENLI_ALAN: GUVENLI_ALAN,
     // Altyazı Efektleri: animasyon kimlikleri (TranscriptAI şablonunun dizin sırası) ve ek alanlar
     GIRISLER: GIRISLER.slice(),

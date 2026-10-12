@@ -28,11 +28,15 @@
     if (!m && typeof require === "function") { try { m = require(yol); } catch (e) { m = null; } }
     return m;
   }
-  var api = factory(yukle("SufloStyleShare", "./style-share.js"));
+  var api = factory(yukle("SufloStyleShare", "./style-share.js"), function () { return yukle("SufloStyleEngine", "./style-engine.js"); });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloAltyaziEfekt = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS) {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (SS, motorBul) {
   "use strict";
+
+  // Stil motoru (hazır konumların kadraja göre noktası için); index.html'de önce yüklenir, Node'da require
+  var SE_ = null;
+  function motor() { if (!SE_ && motorBul) SE_ = motorBul(); return SE_; }
 
   var STIL = "efekt";
 
@@ -54,8 +58,10 @@
 
   var KONUMLAR = [1, 2, 5, 8];
   /*
-   * Hazır konumların önizlemedeki noktası (% kadraj; stil motorunun efekt bağlantı noktasıyla aynı:
-   * alt sol x %8,5 y %85,5, alt %84, orta %62, üst %22) ve adları. Sürüklerken ±%3 içinde yapışılır.
+   * Hazır konumların 16:9 bağlantı noktası (% kadraj; stil motorunun efekt bağlantı noktasıyla aynı: alt sol x %8,5
+   * y %85,5, alt %84, orta %62, üst %22) ve adları. Sürükleme / ok tuşu / artı işareti bunu değil kartın ORTASINI
+   * kullanır (olcu: stil motorunun efektKonumlari, kadraja ve ayara göre); tablo yalnız motor yokken yedektir.
+   * Sürüklerken ±%3 içinde yapışılır.
    */
   var KONUM_NOKTALARI = { 1: { x: 8.5, y: 85.5, ad: "Alt sol" }, 2: { x: 50, y: 84, ad: "Alt" }, 5: { x: 50, y: 62, ad: "Orta" }, 8: { x: 50, y: 22, ad: "Üst" } };
   var YAPISMA = 3;
@@ -102,12 +108,17 @@
       golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null } }
   ];
 
-  // Eski stil kimliği → en yakın görünüm
+  /*
+   * Eski stil kimliği → en yakın görünüm. 3.2'nin kutulu stilleri (Clean Pill, SaaS Glass ve Belgesel: metnin
+   * arkasında koyu panel) adım 17'den beri arka plan kutusu olan "Kutulu"ya taşınır; yazı tipi / renk / konum
+   * eskiStilden ile eski stilden gelir (Belgesel Lora'sıyla).
+   */
   var ESKI = {
     mrbeast: "vurucu", hormozi: "vurucu", viral: "vurucu",
     pop: "canli", ziplama: "canli",
-    capcut: "temiz", saas: "temiz", dolgu: "temiz", daktilo: "temiz",
-    doc: "zarif", premium: "zarif",
+    capcut: "kutulu", saas: "kutulu", doc: "kutulu",
+    dolgu: "temiz", daktilo: "temiz",
+    premium: "zarif",
     neon: "glitch"
   };
 
@@ -226,42 +237,80 @@
 
   /* ---------------- Serbest konum: önizlemede sürükleme (adım 17) ---------------- */
 
-  // Ayarın önizlemedeki noktası (%): serbest konum ya da hazır konumun noktası
-  function konumNoktasi(ayar) {
-    var n = normalize(ayar);
-    if (n.konumX !== null && n.konumY !== null) return { x: n.konumX, y: n.konumY, konum: n.konum, serbest: true };
-    var p = KONUM_NOKTALARI[n.konum];
+  /*
+   * Bu kadrajda hazır konumların noktası (kartın ortası, %) ve serbest konumun dikey sınırı. o: { w, h (sekans; yoksa
+   * 1920×1080), guvenli ("Platform arayüzünden kaçın") }. Stil motoru çizdiği yeri verir: 9:16'da Alt %74'e çekilir,
+   * kart %7-78 bandına sığdırılır; sürükleme, ok tuşu, artı işareti ve etiket bununla çizilenle aynı yerde.
+   * Motor yoksa 16:9 bağlantı noktaları ve %5-95.
+   */
+  function olcu(ayar, o) {
+    o = o || {};
+    var noktalar = {}, ySinir = KONUM_YUZDE.slice(), SE = motor();
+    var r = null;
+    if (SE && SE.efektKonumlari) {
+      var ov = overrides(ayar);
+      ov.guvenli = o.guvenli === true;
+      try { r = SE.efektKonumlari(ov, sayi(o.w) || 1920, sayi(o.h) || 1080); } catch (e) { r = null; }
+    }
+    KONUMLAR.forEach(function (k) {
+      var p = r && r.noktalar && r.noktalar[k], v = KONUM_NOKTALARI[k];
+      noktalar[k] = { x: p && sayi(p.x) !== null ? sayi(p.x) : v.x, y: p && sayi(p.y) !== null ? sayi(p.y) : v.y, ad: v.ad };
+    });
+    var s = r && r.ySinir, a = s ? sayi(s[0]) : null, b = s ? sayi(s[1]) : null;
+    if (a !== null && b !== null) {
+      var lo = Math.max(KONUM_YUZDE[0], Math.ceil(Math.min(a, b))), hi = Math.min(KONUM_YUZDE[1], Math.floor(Math.max(a, b)));
+      ySinir = lo <= hi ? [lo, hi] : [kirp((a + b) / 2, KONUM_YUZDE), kirp((a + b) / 2, KONUM_YUZDE)];
+    }
+    return { noktalar: noktalar, ySinir: ySinir };
+  }
+
+  /*
+   * Ayarın önizlemedeki noktası (%): serbest konum (dikeyde çizilen banda sığdırılmış: kaydedilen değer başka
+   * kadrajdan kalmış olabilir) ya da hazır konumun kart ortası. o: olcu() gibi.
+   */
+  function konumNoktasi(ayar, o) {
+    var n = normalize(ayar), t = olcu(n, o);
+    if (n.konumX !== null && n.konumY !== null) return { x: n.konumX, y: kirp(n.konumY, t.ySinir), konum: n.konum, serbest: true };
+    var p = t.noktalar[n.konum];
     return { x: p.x, y: p.y, konum: n.konum, serbest: false };
   }
 
   /*
-   * Sürükleme (x, y: kadrajın %'si) → ayarın konum alanları. Bir hazır konumun noktasına ±%3 içinde
-   * yapışır: o hazır konum seçilir, serbest konum silinir. Değilse %5-95'e kırpılmış tam sayılar; hazır
-   * konum (konum) olduğu gibi kalır (çift tık / sıfırla ona döner).
+   * Sürükleme (x, y: kadrajın %'si; kartın ortası) → ayarın konum alanları. En yakın hazır konumun noktasına ±%3
+   * içinde yapışır: o hazır konum seçilir, serbest konum silinir. Değilse tam sayılar: X %5-95, Y çizilen bant
+   * (9:16'da %7-78 içinde). o: olcu() alanları + taban: sürükleme başındaki hazır konum. Yapışmayan noktada hazır konum
+   * tabana döner (sürüklerken bir yapışma bölgesinden geçmek hazır konumu değiştirmez; çift tık / sıfırla ona döner).
    * Döner: { konum, konumX, konumY, x, y, yapisti: 0 | hazır konum }
    */
-  function surukle(ayar, x, y) {
-    var n = normalize(ayar);
+  function surukle(ayar, x, y, o) {
+    var n = normalize(ayar), t = olcu(n, o);
+    var taban = o && KONUMLAR.indexOf(sayi(o.taban)) !== -1 ? sayi(o.taban) : n.konum;
     var px = sayi(x), py = sayi(y);
-    if (px === null || py === null) return { konum: n.konum, konumX: n.konumX, konumY: n.konumY, x: konumNoktasi(n).x, y: konumNoktasi(n).y, yapisti: 0 };
-    for (var i = 0; i < KONUMLAR.length; i++) {
-      var p = KONUM_NOKTALARI[KONUMLAR[i]];
-      if (Math.abs(px - p.x) <= YAPISMA && Math.abs(py - p.y) <= YAPISMA) return { konum: KONUMLAR[i], konumX: null, konumY: null, x: p.x, y: p.y, yapisti: KONUMLAR[i] };
+    if (px === null || py === null) {
+      var p0 = konumNoktasi(n, o);
+      return { konum: n.konum, konumX: n.konumX, konumY: n.konumY, x: p0.x, y: p0.y, yapisti: 0 };
     }
-    var kx = kirp(px, KONUM_YUZDE), ky = kirp(py, KONUM_YUZDE);
-    return { konum: n.konum, konumX: kx, konumY: ky, x: kx, y: ky, yapisti: 0 };
+    var en = 0, enUzak = Infinity;
+    KONUMLAR.forEach(function (k) {
+      var p = t.noktalar[k], dx = Math.abs(px - p.x), dy = Math.abs(py - p.y);
+      // 9:16'da Alt sol ile Alt'ın kart ortaları yakın düşer: bölgeler örtüşürse en yakın kazanır
+      if (dx <= YAPISMA && dy <= YAPISMA && dx * dx + dy * dy < enUzak) { en = k; enUzak = dx * dx + dy * dy; }
+    });
+    if (en) return { konum: en, konumX: null, konumY: null, x: t.noktalar[en].x, y: t.noktalar[en].y, yapisti: en };
+    var kx = kirp(px, KONUM_YUZDE), ky = kirp(py, t.ySinir);
+    return { konum: taban, konumX: kx, konumY: ky, x: kx, y: ky, yapisti: 0 };
   }
 
-  // Ok tuşu: dx / dy % (Shift ile 5). Hazır konumdan başlanırsa onun noktasından; yapışmaz
-  function kaydir(ayar, dx, dy) {
-    var n = normalize(ayar), p = konumNoktasi(n);
-    var kx = kirp(p.x + (sayi(dx) || 0), KONUM_YUZDE), ky = kirp(p.y + (sayi(dy) || 0), KONUM_YUZDE);
+  // Ok tuşu: dx / dy % (Shift ile 5). Hazır konumdan başlanırsa onun kart ortasından; yapışmaz; çizilen banda sığar
+  function kaydir(ayar, dx, dy, o) {
+    var n = normalize(ayar), t = olcu(n, o), p = konumNoktasi(n, o);
+    var kx = kirp(p.x + (sayi(dx) || 0), KONUM_YUZDE), ky = kirp(p.y + (sayi(dy) || 0), t.ySinir);
     return { konum: n.konum, konumX: kx, konumY: ky, x: kx, y: ky, yapisti: 0 };
   }
 
   // Çift tık: serbest konum silinir, hazır konum (konum) geçerli olur
-  function sifirla(ayar) {
-    var n = normalize(ayar), p = KONUM_NOKTALARI[n.konum];
+  function sifirla(ayar, o) {
+    var n = normalize(ayar), p = olcu(n, o).noktalar[n.konum];
     return { konum: n.konum, konumX: null, konumY: null, x: p.x, y: p.y, yapisti: n.konum };
   }
 
@@ -279,8 +328,8 @@
    * Yerel MOGRT (3.3 sonraki adım): şablonun JSON sözleşmesinde konum yok; klibin Motion › Position'ı
    * için kartın ortasının kadraj oranı (0-1). Hazır konumda o konumun noktası.
    */
-  function sablonKonumu(ayar) {
-    var p = konumNoktasi(ayar);
+  function sablonKonumu(ayar, o) {
+    var p = konumNoktasi(ayar, o);
     return { x: Math.round(p.x * 10) / 1000, y: Math.round(p.y * 10) / 1000, serbest: p.serbest };
   }
 
@@ -351,6 +400,7 @@
     KONUM_NOKTALARI: kopya(KONUM_NOKTALARI),
     YAPISMA: YAPISMA,
     konumNoktasi: konumNoktasi,
+    konumOlcusu: olcu,
     surukle: surukle,
     kaydir: kaydir,
     sifirla: sifirla,

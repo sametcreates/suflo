@@ -1696,6 +1696,7 @@ window.KCaptions = (function () {
     });
     var bolum = el("cap-efekt");
     if (bolum) bolum.classList.toggle("etkin", efektte);
+    sahneErisimi(efektte);
     var grid = el("cap-stil-grid");
     if (!grid) return;
     Array.prototype.forEach.call(grid.querySelectorAll(".stil-sec"), function (b) {
@@ -1882,6 +1883,8 @@ window.KCaptions = (function () {
   // Seçim / değer değişikliğinin ardından bağımlı durumlar ve DOM önizlemesi
   function efektSonrasi() {
     inceAyarDurumu();
+    // Gölge / kutu anahtarı açılınca alt kontrolleri de açılır; serbest konum satırı tazelenir
+    efektBagimliDurum();
     vurguKutusuDurumu();
     kelimeSiniriDurumu();
     motorSecenekDurumu();
@@ -2013,11 +2016,21 @@ window.KCaptions = (function () {
    * "X %50 · Y %85" etiketi; hazır konumlara ±%3 yapışır (js/altyazi-efekt.js surukle). Odaktayken ok tuşları
    * %1 (Shift %5) kaydırır, çift tık / Home hazır konuma döner, Esc sürüklemeyi geri alır. Sürerken yalnız
    * DOM önizlemesi ve artı işareti güncellenir; gerçek önizleme (libass) bırakınca bir kez çizilir.
+   * Kart tutulduğu yerden taşınır (basılan nokta ile kartın ortası arasındaki fark korunur); 4 px'ten az kımıldayan
+   * basış sürükleme değildir: tıklamak (sahneyi ok tuşları için odaklamak) ya da çift tık yazıyı yerinden oynatmaz.
+   * Noktalar kartın ortası, sekansın kadrajına göre (AE.konumOlcusu: 9:16'da motorun %74 / %7-78 sınırları dahil).
    * Premiere çağrısı yok; Pro kapısı yalnız timeline'a eklerken (önizleme ücretsiz).
    */
-  var surukleme = null;   // { id: pointerId, bas: { konum, x, y } }
+  var surukleme = null;   // { id, bas: { konum, x, y }, ofset: { x, y } (%), px: { x, y } (basış), basladi }
   var artiSaat = null;
   function konumAktif() { return !!AE && !secilenMogrt && secilenMotorStili === EFEKT; }
+  // Sürükleme modelinin kadrajı: sekansın boyutu (yoksa 1920×1080) ve 9:16'da "Platform arayüzünden kaçın"
+  function konumOlcusu() {
+    var c = (window.KApp && window.KApp.ctx) ? window.KApp.ctx() : {};
+    var w = Number(c && c.width) || 0, h = Number(c && c.height) || 0;
+    if (!(w > 0 && h > 0)) { w = 1920; h = 1080; }
+    return { w: w, h: h, guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked) };
+  }
   function sahneNoktasi(e) {
     var sahne = el("cap-sahne");
     var r = sahne && sahne.getBoundingClientRect ? sahne.getBoundingClientRect() : null;
@@ -2035,7 +2048,11 @@ window.KCaptions = (function () {
     if (d) d.style.left = nokta.x + "%";
     if (y) y.style.top = nokta.y + "%";
     var et = el("cap-efekt-arti-etiket");
-    if (et) et.textContent = AE.konumEtiketi(nokta);
+    if (et) {
+      et.textContent = AE.konumEtiketi(nokta);
+      // etiket yazının üstüne binmesin: yazı alt yarıdaysa sahnenin üstünde, üst yarıdaysa altında
+      if (et.classList) et.classList.toggle("ust", nokta.y > 50);
+    }
     if (sure) artiSaat = setTimeout(function () { artiSaat = null; a.hidden = true; }, sure);
   }
   // AE.surukle / kaydir / sifirla sonucunu kontrollere yaz (hazır konum seçicisi + gizli X / Y)
@@ -2054,9 +2071,13 @@ window.KCaptions = (function () {
     savePrefs();
     efektOnizlemeTazele();
   }
+  // n: işaretçinin sahnedeki noktası (%); kartın ortası = n − tutma farkı. Yapışmayan noktada hazır konum sürükleme başındaki
   function konumSuruklemeAdim(n) {
     if (!n || !AE) return;
-    var r = AE.surukle(efektAyari(), n.x, n.y);
+    var o = konumOlcusu();
+    if (surukleme) o.taban = surukleme.bas.konum;
+    var f = surukleme && surukleme.ofset ? surukleme.ofset : { x: 0, y: 0 };
+    var r = AE.surukle(efektAyari(), n.x - f.x, n.y - f.y, o);
     konumYaz(r);
     artiGoster(r);
     // gerçek önizleme video olarak oynuyorsa (soluk) bırakınca yeniden çizilir; DOM önizlemesi noktayı hemen izler
@@ -2072,15 +2093,17 @@ window.KCaptions = (function () {
       sahne.classList.remove("surukleniyor");
       try { if (sahne.releasePointerCapture) sahne.releasePointerCapture(s0.id); } catch (e) {}
     }
+    // Kımıldamadan bırakılan basış (tık, çift tıkın basışları): hiçbir şey değişmez, kaydedilmez, çizilmez
+    if (!s0.basladi) { artiGoster(AE.konumNoktasi(efektAyari(), konumOlcusu()), 1400); return; }
     if (!kaydet) { konumYaz({ konum: s0.bas.konum, konumX: s0.bas.x, konumY: s0.bas.y }); artiGoster(null); onizlemeCiz(); return; }
     konumDegisti();
     // bırakılan nokta kısa süre görünür kalır (hazır konuma yapıştıysa adıyla)
-    var son = AE.konumNoktasi(efektAyari());
-    artiGoster(son.serbest ? son : AE.sifirla(efektAyari()), 1400);
+    var son = AE.konumNoktasi(efektAyari(), konumOlcusu());
+    artiGoster(son.serbest ? son : AE.sifirla(efektAyari(), konumOlcusu()), 1400);
   }
   function konumSifirla() {
     if (!konumAktif()) return;
-    var r = AE.sifirla(efektAyari());
+    var r = AE.sifirla(efektAyari(), konumOlcusu());
     konumYaz(r);
     konumDegisti();
     artiGoster(r, 1400);
@@ -2088,6 +2111,7 @@ window.KCaptions = (function () {
   function konumSurukleBagla() {
     var sahne = el("cap-sahne");
     if (!sahne || !sahne.addEventListener) return;
+    var ESIK = 4;   // px: bundan az kımıldayan basış tıktır
     sahne.addEventListener("pointerdown", function (e) {
       if (!konumAktif() || (e.button !== undefined && e.button !== 0)) return;
       // sahnedeki düğmeler (Oynat, Kare al) sürükleme başlatmaz
@@ -2095,15 +2119,23 @@ window.KCaptions = (function () {
       var n = sahneNoktasi(e);
       if (!n) return;
       var st = stil();
-      surukleme = { id: e.pointerId, bas: { konum: st.konum, x: typeof st.konumX === "number" ? st.konumX : null, y: typeof st.konumY === "number" ? st.konumY : null } };
+      // Kartın şimdiki ortası: sürükleme kartı tutulduğu yerden taşır (basmak onu işaretçiye zıplatmaz)
+      var p = AE.konumNoktasi(efektAyari(st), konumOlcusu());
+      surukleme = { id: e.pointerId, bas: { konum: st.konum, x: typeof st.konumX === "number" ? st.konumX : null, y: typeof st.konumY === "number" ? st.konumY : null },
+        ofset: { x: n.x - p.x, y: n.y - p.y }, px: { x: e.clientX, y: e.clientY }, basladi: false };
       try { if (sahne.setPointerCapture) sahne.setPointerCapture(e.pointerId); } catch (eC) {}
-      sahne.classList.add("surukleniyor");
       if (sahne.focus) { try { sahne.focus(); } catch (eF) {} }
       if (e.preventDefault) e.preventDefault();
-      konumSuruklemeAdim(n);
+      artiGoster(p.serbest ? p : AE.sifirla(efektAyari(st), konumOlcusu()));
     });
     sahne.addEventListener("pointermove", function (e) {
       if (!surukleme || e.pointerId !== surukleme.id) return;
+      if (!surukleme.basladi) {
+        var dx = e.clientX - surukleme.px.x, dy = e.clientY - surukleme.px.y;
+        if (!(dx * dx + dy * dy >= ESIK * ESIK)) return;
+        surukleme.basladi = true;
+        sahne.classList.add("surukleniyor");
+      }
       konumSuruklemeAdim(sahneNoktasi(e));
     });
     sahne.addEventListener("pointerup", function (e) {
@@ -2125,15 +2157,31 @@ window.KCaptions = (function () {
       var yon = { ArrowLeft: [-adim, 0], ArrowRight: [adim, 0], ArrowUp: [0, -adim], ArrowDown: [0, adim] }[e.key];
       if (!yon) return;
       e.preventDefault();
-      var r = AE.kaydir(efektAyari(), yon[0], yon[1]);
+      var r = AE.kaydir(efektAyari(), yon[0], yon[1], konumOlcusu());
       konumYaz(r);
       konumDegisti();
       artiGoster(r, 1400);
     });
     // Klavye odağında artı işareti şimdiki noktayı gösterir
-    sahne.addEventListener("focus", function () { if (konumAktif() && !surukleme) artiGoster(AE.konumNoktasi(efektAyari()), 1800); });
+    sahne.addEventListener("focus", function () { if (konumAktif() && !surukleme) artiGoster(AE.konumNoktasi(efektAyari(), konumOlcusu()), 1800); });
     sahne.addEventListener("blur", function () { if (!surukleme) artiGoster(null); });
     if (el("cap-konum-sifirla")) el("cap-konum-sifirla").addEventListener("click", konumSifirla);
+  }
+
+  /*
+   * Önizleme sahnesi yalnız Altyazı Efektleri seçiliyken sürüklenir: odak durağı, erişilebilir ad ve ipucu da o zaman
+   * (Premiere şablonu seçiliyken sürükleme, ok tuşları ve çift tık çalışmaz; boş bir odak durağı ve yanlış ipucu kalmaz).
+   * Öznitelik zaten varsa yeniden yazılmaz (İngilizce arayüzde çeviri gözlemcisi her yazışta yeniden çevirirdi).
+   */
+  function sahneErisimi(etkin) {
+    var s = el("cap-sahne");
+    if (!s || !s.setAttribute || !s.removeAttribute) return;
+    var ERISIM = { tabindex: "0", role: "group", "aria-label": "Önizleme: yazıyı sürükleyerek konumlandır",
+      title: "Yazıyı sürükleyerek konumlandır · ok tuşları %1 (Shift %5) · çift tık hazır konuma döner" };
+    Object.keys(ERISIM).forEach(function (a) {
+      if (etkin) { if (s.getAttribute(a) === null) s.setAttribute(a, ERISIM[a]); }
+      else s.removeAttribute(a);
+    });
   }
 
   function mogrtStilleriniCiz() {
@@ -2606,7 +2654,8 @@ window.KCaptions = (function () {
     var satir = el("cap-konum-serbest");
     if (satir) satir.hidden = x === null;
     var yazi = el("cap-konum-serbest-deger");
-    if (yazi) yazi.textContent = x === null || !AE ? "" : AE.konumEtiketi({ x: x, y: y });
+    // çizildiği yer (kaydedilen Y başka kadrajdan kalmışsa bu kadrajın bandına sığmış hâli)
+    if (yazi) yazi.textContent = x === null || !AE ? "" : AE.konumEtiketi(AE.konumNoktasi(efektAyari(), konumOlcusu()));
   }
 
   /* ---------------- İnce ayar, Marka Kiti, paylaşılabilir stil kodları ---------------- */
@@ -4625,9 +4674,15 @@ window.KCaptions = (function () {
       try { K.fs.unlinkSync(onizlemeRenderYol); } catch (e2) {}
       onizlemeRenderYol = null;
     }
-    // CSS onizlemesi 16:9 sahnede calisir
+    /*
+     * CSS onizlemesi 16:9 sahnede calisir. Altyazı Efektleri'nde sahne sekansın oranında kalır: serbest konum
+     * kadrajın %'si (sürüklerken / ok tuşunda 9:16 sahne 16:9'a çökmez), DOM yedeği de o kadrajda çizer.
+     */
     var sahne = el("cap-sahne");
-    if (sahne) { sahne.style.aspectRatio = ""; sahne.classList.remove("dikey"); }
+    if (sahne) {
+      if (!secilenMogrt && secilenMotorStili === EFEKT) sahneOraniniAyarla(onizlemeBoyutu((window.KApp && KApp.ctx) ? KApp.ctx() : {}));
+      else { sahne.style.aspectRatio = ""; sahne.classList.remove("dikey"); sahneYedekBoyut(sahne, null); }
+    }
     var mogrtImg = el("cap-mogrt-onizleme");
     if (mogrtImg) mogrtImg.hidden = true;
     var metin = el("cap-onizleme-metin");
@@ -4660,7 +4715,8 @@ window.KCaptions = (function () {
     var st = stil();
     var rec = stilRecetesi(st);
     var karaoke = kelimeModuAktif();
-    var olcek = sahne.clientWidth / 1920;
+    // Altyazı Efektleri motor gibi kısa kenara göre ölçekler (9:16 sahnede de); 16:9'da ikisi aynı
+    var olcek = st.aile === EFEKT ? efektDomOlcegi(sahne) : sahne.clientWidth / 1920;
 
     // Yerleşim: ASS Alignment 2/5/8 -> alt/orta/üst
     kutu.className = "onizleme-alt stil-" + rec.aile + " " +
@@ -4785,6 +4841,29 @@ window.KCaptions = (function () {
     return "rgba(" + (parseInt(h.slice(0, 2), 16) || 0) + "," + (parseInt(h.slice(2, 4), 16) || 0) + "," + (parseInt(h.slice(4, 6), 16) || 0) + "," +
       Math.max(0, Math.min(1, Number(opak) / 100)) + ")";
   }
+  // DOM yedeğinin ölçeği: sahnenin kısa kenarı / 1080 (stil motorunun olcekRef'i gibi)
+  function efektDomOlcegi(sahne) {
+    var w = sahne && sahne.clientWidth || 0, h = sahne && sahne.clientHeight || 0;
+    if (!(w > 0)) return 0.25;
+    return (h > 0 ? Math.min(w, h) : w * 9 / 16) / 1080;
+  }
+  /*
+   * Kart sahneye sığsın (serbestKart'ın DOM karşılığı): ortası noktada, kenarlardan %1 içeride; sığmayan yönde ortada.
+   * Sahne de kart da ölçülür (yerleşimden sonra) ve kartın sol üst köşesi piksel olarak yazılır ("olculu": translate yok;
+   * giriş animasyonunun ölçek / kayma transform'u kartı yerinden oynatmaz, ortasından büyür). Ölçü yoksa (gizli sahne)
+   * % + translate(-50%, -50%) yedeği kalır.
+   */
+  function efektKartiSigdir(kutu, sahne) {
+    if (!kutu || !sahne || !kutu.classList.contains("serbest")) return;
+    var sw = sahne.clientWidth, sh = sahne.clientHeight, w = kutu.offsetWidth, h = kutu.offsetHeight;
+    if (!(sw > 0 && sh > 0 && w > 0 && h > 0)) { kutu.classList.remove("olculu"); return; }
+    var pay = sw * 0.01;
+    function sigdir(v, yarim, boy) { return yarim * 2 >= boy - 2 * pay ? boy / 2 : Math.max(pay + yarim, Math.min(boy - pay - yarim, v)); }
+    var x = sigdir(parseFloat(kutu.style.left) / 100 * sw, w / 2, sw), y = sigdir(parseFloat(kutu.style.top) / 100 * sh, h / 2, sh);
+    kutu.style.left = (x - w / 2).toFixed(1) + "px";
+    kutu.style.top = (y - h / 2).toFixed(1) + "px";
+    kutu.classList.add("olculu");
+  }
   function efektDomCiz(kutu, st, ornek, vurguIndex) {
     // kalın kapalı: 400 (katmanın libass yüzü Montserrat-Regular; tek ağırlıklı fontlar zaten 400)
     kutu.style.fontWeight = st.kalin === false ? "400" : "800";
@@ -4793,15 +4872,17 @@ window.KCaptions = (function () {
     kutu.style.padding = "0";
     kutu.style.borderRadius = "0";
     /*
-     * 3.3 adım 17 (yaklaşık; gerçek görünüm libass çıktısı): serbest konumda kartın ortası noktada; gölge
+     * 3.3 adım 17 (yaklaşık; gerçek görünüm libass çıktısı): kartın ortası motorun çizdiği noktada (hazır konumda da
+     * kart ortası; serbest konum bu kadrajın bandına sığmış hâliyle), kart sahneye sığar (efektKartiSigdir); gölge
      * metin gölgesi (mesafe · cos 45°, yumuşaklık bulanıklık); kutu her kelimenin arkasında satır satır.
      */
     var sahne = el("cap-sahne");
-    var olcek = sahne && sahne.clientWidth ? sahne.clientWidth / 1920 : 0.25;
-    var serbest = typeof st.konumX === "number" && typeof st.konumY === "number";
-    kutu.classList.toggle("serbest", serbest);
-    kutu.style.left = serbest ? st.konumX + "%" : "";
-    kutu.style.top = serbest ? st.konumY + "%" : "";
+    var olcek = efektDomOlcegi(sahne);
+    var nokta = AE ? AE.konumNoktasi(efektAyari(st), konumOlcusu()) : null;
+    kutu.classList.toggle("serbest", !!nokta);
+    kutu.classList.remove("olculu");
+    kutu.style.left = nokta ? nokta.x + "%" : "";
+    kutu.style.top = nokta ? nokta.y + "%" : "";
     if (st.golge) {
       var gm = Math.max(0, st.golge.mesafe * 0.7071 * olcek), gy = Math.max(0, st.golge.yumusak * olcek);
       var dusen = gm.toFixed(1) + "px " + gm.toFixed(1) + "px " + gy.toFixed(1) + "px " + hexRgba(st.golge.renk, st.golge.opak);
@@ -4828,6 +4909,7 @@ window.KCaptions = (function () {
       }
       kutu.appendChild(s);
     });
+    efektKartiSigdir(kutu, sahne);
   }
 
   /*
@@ -4931,8 +5013,37 @@ window.KCaptions = (function () {
     if (!sahne) return;
     sahne.style.aspectRatio = ob.w + " / " + ob.h;
     sahne.classList.toggle("dikey", !!ob.dikey);
+    sahneYedekBoyut(sahne, ob);
     var sar = el("cap-guvenli-sar");
     if (sar) sar.hidden = !ob.dikey;
+  }
+
+  /*
+   * CEF 74 (Premiere 14.4-15.x) aspect-ratio'yu tanımaz: style.css'in @supports yedeği sahneyi sabit yükseklikte
+   * (168 px) ve panel genişliğinde bırakır (~2,2:1). Gerçek önizleme (object-fit: cover) üstten / alttan kırpılır,
+   * sürüklenen nokta kadrajla eşleşmezdi (Y %90'a bırakılan yazı kadrajın %90'ında, görünen sahnenin dışında çizilir).
+   * Bu motorda sahne genişliğinden kadraj oranında yükseklik verilir (en çok CSS max-height; aşarsa genişlik daralır).
+   * ob null: yedek boyut silinir. aspect-ratio olan motorda hiçbir şey yapılmaz.
+   */
+  var sahneYedekOb = null;
+  function aspectRatioVar() {
+    try { return !!(window.CSS && CSS.supports && CSS.supports("aspect-ratio", "1 / 1")); } catch (e) { return true; }
+  }
+  function sahneYedekBoyut(sahne, ob) {
+    if (!sahne || !sahne.style || aspectRatioVar()) return;
+    sahneYedekOb = ob || null;
+    sahne.style.width = "";
+    sahne.style.height = "";
+    if (!ob || !(ob.w > 0 && ob.h > 0)) return;
+    var cs = window.getComputedStyle ? window.getComputedStyle(sahne) : null;
+    var enCok = cs ? parseFloat(cs.maxHeight) : NaN;
+    if (!(enCok > 0)) enCok = ob.dikey ? 380 : 240;
+    var kap = sahne.parentNode && sahne.parentNode.clientWidth ? sahne.parentNode.clientWidth : sahne.clientWidth;
+    if (!(kap > 0)) return;
+    var w = kap, h = w * ob.h / ob.w;
+    if (h > enCok) { h = enCok; w = h * ob.w / ob.h; }
+    sahne.style.width = Math.round(w) + "px";
+    sahne.style.height = Math.round(h) + "px";
   }
 
   /*
@@ -5975,29 +6086,7 @@ window.KCaptions = (function () {
     // acilista secili sablonu kartlara yansit
     if (el("cap-preset") && el("cap-preset").value) stilKartiIsaretle(el("cap-preset").value);
 
-    /*
-     * Altyazı Efektleri kontrolleri: her değişiklik efekti seçer (Premiere şablonu seçiliyse bırakır),
-     * hazır görünüm çipini kaldırır, DOM önizlemesini anında, gerçek motor önizlemesini kısa
-     * sakinlikten sonra tazeler ve kaydeder.
-     */
-    EFEKT_KONTROLLERI.forEach(function (id) {
-      var e = el(id);
-      if (!e) return;
-      // renk seçicide "input" anlık, diğerlerinde "change" yeterli
-      var olay = e.type === "color" ? "input" : "change";
-      e.addEventListener(olay, function () {
-        if (id === "cap-efekt-kelime") e.value = String(efektKelimeSayisi());
-        // Gölge / kutu sayı kutuları aralığa (boşsa varsayılana) döner: kutuda görünen = çizilen
-        if (EFEKT_SAYILARI[id]) e.value = String(efektSayi(id, EFEKT_SAYILARI[id][0], EFEKT_SAYILARI[id][1], EFEKT_SAYILARI[id][2]));
-        // Hazır konum seçildi: serbest (sürüklenmiş) konum bırakılır
-        if (id === "cap-konum") { if (el("cap-konum-x")) el("cap-konum-x").value = ""; if (el("cap-konum-y")) el("cap-konum-y").value = ""; }
-        efekteGec();
-        secilenGorunum = "";
-        efektSonrasi();
-        savePrefs();
-        efektOnizlemeTazele();
-      });
-    });
+    efektKontrolleriniBagla();
     if (el("cap-onizleme-oynat")) el("cap-onizleme-oynat").addEventListener("click", onizlemeOynat);
     // 3.3 adım 17: önizlemede sürükleyerek konum (yalnız etkileşimde; açılışta çağrı yok)
     konumSurukleBagla();
@@ -6044,8 +6133,11 @@ window.KCaptions = (function () {
     }
     vurguKutusuDurumu();
     onizlemeCiz();
-    // panel genişleyince ölçek değişir; önizleme yeniden çizilmeli
-    window.addEventListener("resize", function () { onizlemeCiz(); });
+    // panel genişleyince ölçek değişir; önizleme yeniden çizilmeli (CEF 74'te sahnenin oranlı boyu da)
+    window.addEventListener("resize", function () {
+      if (sahneYedekOb) sahneYedekBoyut(el("cap-sahne"), sahneYedekOb);
+      onizlemeCiz();
+    });
 
     // Ctrl+Z / Ctrl+Y — metin alanında yazarken tarayıcının kendi geri alması çalışsın
     document.addEventListener("keydown", function (e) {
@@ -6295,6 +6387,32 @@ window.KCaptions = (function () {
     "cap-efekt-golge", "cap-efekt-golge-renk", "cap-efekt-golge-opak", "cap-efekt-golge-mesafe", "cap-efekt-golge-yumusak",
     "cap-kutu", "cap-kutu-renk", "cap-kutu-opak"];
   var EFEKT_ISARETLERI = ["cap-efekt-vurgu", "cap-efekt-kalin", "cap-efekt-italik", "cap-efekt-golge"];
+  /*
+   * Altyazı Efektleri kontrolleri: her değişiklik efekti seçer (Premiere şablonu seçiliyse bırakır),
+   * hazır görünüm çipini kaldırır, DOM önizlemesini anında, gerçek motor önizlemesini kısa
+   * sakinlikten sonra tazeler ve kaydeder. Gölge / Arka plan kutusu anahtarı alt kontrollerini açar
+   * (efektSonrasi → efektBagimliDurum).
+   */
+  function efektKontrolleriniBagla() {
+    EFEKT_KONTROLLERI.forEach(function (id) {
+      var e = el(id);
+      if (!e) return;
+      // renk seçicide "input" anlık, diğerlerinde "change" yeterli
+      var olay = e.type === "color" ? "input" : "change";
+      e.addEventListener(olay, function () {
+        if (id === "cap-efekt-kelime") e.value = String(efektKelimeSayisi());
+        // Gölge / kutu sayı kutuları aralığa (boşsa varsayılana) döner: kutuda görünen = çizilen
+        if (EFEKT_SAYILARI[id]) e.value = String(efektSayi(id, EFEKT_SAYILARI[id][0], EFEKT_SAYILARI[id][1], EFEKT_SAYILARI[id][2]));
+        // Hazır konum seçildi: serbest (sürüklenmiş) konum bırakılır
+        if (id === "cap-konum") { if (el("cap-konum-x")) el("cap-konum-x").value = ""; if (el("cap-konum-y")) el("cap-konum-y").value = ""; }
+        efekteGec();
+        secilenGorunum = "";
+        efektSonrasi();
+        savePrefs();
+        efektOnizlemeTazele();
+      });
+    });
+  }
   var STIL_ALANLARI = ["cap-preset", "cap-maxlen", "cap-case", "cap-style-family", "cap-yogunluk", "cap-font",
     "cap-boyut", "cap-renk", "cap-renk-kontur", "cap-renk-vurgu", "cap-kontur", "cap-konum", "cap-animasyon",
     "cap-efekt-giris", "cap-efekt-aktif", "cap-efekt-satir", "cap-efekt-kelime",
@@ -6354,6 +6472,8 @@ window.KCaptions = (function () {
     var yeni = window.SufloOnboarding ? window.SufloOnboarding.stilTercihiGeriYukle(s.capPrefs, eski) : eski;
     if (yeni) s.capPrefs = yeni; else delete s.capPrefs;
     K.saveSettings();
+    // geri konan gölge / kutu anahtarı ve serbest konum: alt kontrollerin açık / kapalı hâli ve Konum satırı
+    efektBagimliDurum();
     vurguKutusuDurumu();
     kelimeSiniriDurumu();
     motorSecenekDurumu();

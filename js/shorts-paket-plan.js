@@ -229,7 +229,8 @@
   /*
    * Stil motoruna giden ince ayar: stilin kendi değerleri + Altyazı Efektleri oluşturucu ayarı (efekt,
    * varsa) + Marka Kiti (açıksa: yazı tipi, renkler, konum) + 9:16'da "platform arayüzünden kaçın".
-   * Döner: { overrides, konum }
+   * Döner: { overrides, konum, konumY }: konumY serbest konumun dikeyi (%; Altyazı Efektleri'nde konumX / konumY
+   * ikisi de varsa, yoksa null). Serbest konum hazır konumun (konum) önüne geçer: CTA yerini ondan seçer.
    */
   function stilAyarlari(styleId, kit, dikey, efekt) {
     var p = SE ? SE.preset(styleId) : null;
@@ -241,14 +242,16 @@
       boyut: st.boyut, kontur: st.kontur, konum: st.konum, guvenli: !!dikey };
     // Altyazı Efektleri alanları (giriş / vurgu animasyonu, kelime vurgusu, kalın, italik, satır, kelime; gölge, kutu, serbest konum)
     if (SE && SE.EFEKT_ALANLARI && styleId === "efekt") SE.EFEKT_ALANLARI.forEach(function (k) { if (st[k] !== undefined) ov[k] = st[k]; });
-    return { overrides: ov, konum: Number(st.konum) || 5 };
+    var serbest = styleId === "efekt" && typeof ov.konumX === "number" && isFinite(ov.konumX) && typeof ov.konumY === "number" && isFinite(ov.konumY);
+    return { overrides: ov, konum: Number(st.konum) || 5, konumY: serbest ? ov.konumY : null };
   }
 
   /* ---------------- çerçeve ---------------- */
 
   /*
    * Çerçeve katmanında ne var? o: { W, H, dur (Short süresi), secim, kit, logoAcik, hookDur (kanca
-   * konacaksa süresi), altyaziKonum, altyaziAcik, lang, font, renk, vurguRenk, ctaStil }
+   * konacaksa süresi), altyaziKonum, altyaziY (serbest konumun dikeyi, % ya da null), altyaziAcik, lang, font, renk,
+   * vurguRenk, ctaStil }
    * Döner: { progress?, cta? ({ ass, start, fontFiles }), ctaNeden?, ctaDilNot?, logo: { path, kose, oran, guvenli }|null, bos }
    */
   function cercevePlani(o) {
@@ -263,7 +266,7 @@
     if (s.cta) {
       var metin = EK.ctaMetni(s.ctaSecim, s.ctaOzel, o.lang);
       var c = EK.ctaEvents({ W: o.W, H: o.H, dur: o.dur, metin: metin, sure: o.kit && o.kit.on ? o.kit.cta.sure : 2.5,
-        hookDur: o.hookDur, stil: o.ctaStil || "serit", konum: EK.ctaKonum(o.altyaziKonum, o.altyaziAcik),
+        hookDur: o.hookDur, stil: o.ctaStil || "serit", konum: EK.ctaKonum(o.altyaziKonum, o.altyaziAcik, o.altyaziY),
         font: o.font, renk: o.renk, vurguRenk: o.vurguRenk, lang: o.lang });
       if (c.ass) out.cta = c;
       else if (c.atla === "kisa") out.ctaNeden = "cta-kisa";

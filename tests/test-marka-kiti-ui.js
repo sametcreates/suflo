@@ -124,6 +124,32 @@ ok("şimdiki ayarlardan doldur (konum seçili): Altyazı sekmesindeki serbest ko
   ayarlar.markaKiti.stil.overrides.konumX === 44 && ayarlar.markaKiti.stil.overrides.konumY === 55 && ayarlar.markaKiti.stil.overrides.konum === 5 &&
   DOM["mk-konum"].value === "xy" && DOM["mk-konum-xy"].hidden === false && ayarlar.markaKiti.stil.overrides.golge.opak === 85, JSON.stringify(ayarlar.markaKiti.stil.overrides));
 
+/*
+ * 3.3 adım 17 inceleme: "Serbest konum" seçeneği seçili kalıp kitte serbest konum yokken kart onu söylememeli.
+ * Kit {Alt, X 30 · Y 70} → Üst kaydedilir → "Serbest konum" yeniden seçilir: kitin serbest konumu geri gelir
+ * (eskiden kit {konum: 8} kalıyordu, seçici "Serbest konum" diyordu).
+ */
+ayarlar.markaKiti = { on: true, stil: { overrides: { font: "Lora", konum: 2, konumX: 30, konumY: 70 } } };
+UI.init();
+DOM["mk-konum"].value = "8";
+tetikle("mk-konum", "change");
+var ustKit = JSON.parse(JSON.stringify(ayarlar.markaKiti.stil.overrides));
+ok("Üst seçilince kitte hazır konum; 'Serbest konum' seçeneği geri dönülebilsin diye görünür kalır",
+  ustKit.konum === 8 && ustKit.konumX === undefined && DOM["mk-konum-xy"].hidden === false, JSON.stringify(ustKit));
+DOM["mk-konum"].value = "xy";
+tetikle("mk-konum", "change");
+var xyKit = ayarlar.markaKiti.stil.overrides;
+ok("'Serbest konum' yeniden seçilince kitin son serbest konumu geri gelir (seçili ama boş kalmaz)",
+  xyKit.konumX === 30 && xyKit.konumY === 70 && xyKit.konum === 2 && DOM["mk-konum"].value === "xy", JSON.stringify(xyKit));
+// Serbest konumu hiç olmamış kitte "xy" seçili kalamaz: seçici kitin gerçek konumunu gösterir
+ayarlar.markaKiti = { on: true, stil: { overrides: { font: "Lora", konum: 8 } } };
+UI.init();
+DOM["mk-konum"].value = "xy";
+tetikle("mk-konum", "change");
+ok("serbest konumu olmayan kitte 'Serbest konum' seçili kalmaz: kitin hazır konumu (Üst) korunur ve seçicide görünür, seçenek gizli",
+  DOM["mk-konum"].value === "8" && DOM["mk-konum-xy"].hidden === true && ayarlar.markaKiti.stil.overrides.konum === 8 &&
+  ayarlar.markaKiti.stil.overrides.konumX === undefined, DOM["mk-konum"].value + " " + JSON.stringify(ayarlar.markaKiti.stil.overrides));
+
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

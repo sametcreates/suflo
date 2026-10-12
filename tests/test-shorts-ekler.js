@@ -37,6 +37,10 @@ ok("ctaMetni: hazır metin videonun dilinde, özel metin ≤40 ve emojisiz",
   E.ctaMetni("ozel", "Abone ol 🔥 ve bildirimleri aç lütfen çok önemli gerçekten", "tr").length <= 40 &&
   E.ctaMetni("ozel", "Abone ol 🔥", "tr") === "Abone ol" && E.ctaMetni("bilinmeyen", "", "tr") === "");
 ok("ctaKonum: altyazı altta ise CTA üstte", E.ctaKonum(2, true) === "ust" && E.ctaKonum(5, true) === "alt" && E.ctaKonum(2, false) === "alt");
+// 3.3 adım 17: serbest konumun dikeyi hazır konumun önüne geçer (sürüklenmiş altyazı CTA'nın altında kalmaz)
+ok("ctaKonum: serbest konum (Y %) hazır konumun önüne geçer: alt yarı → CTA üstte, üst yarı → altta",
+  E.ctaKonum(5, true, 75) === "ust" && E.ctaKonum(2, true, 30) === "alt" && E.ctaKonum(8, true, 50) === "ust" && E.ctaKonum(2, true, 49) === "alt" &&
+  E.ctaKonum(5, false, 75) === "alt" && E.ctaKonum(2, true, null) === "ust" && E.ctaKonum(5, true, undefined) === "alt" && E.ctaKonum(2, true, "") === "ust");
 
 var cta = E.ctaEvents({ W: W, H: H, dur: 20, metin: "Takip et", sure: 3, hookDur: 3, lang: "tr" });
 ok("CTA: son N saniye (20 sn'lik klipte 17. sn'den)", cta.ass && Math.abs(cta.start - 17) < 1e-6 && Math.abs(cta.end - 20) < 1e-6, JSON.stringify([cta.start, cta.end, cta.atla]));

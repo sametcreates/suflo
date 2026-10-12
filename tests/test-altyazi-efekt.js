@@ -67,9 +67,16 @@ ok("oluşturucu → motor: Pop girişi, titreme katmanı, tek satır, kartta en 
 var ESKI = ["mrbeast", "capcut", "saas", "viral", "pop", "doc", "premium", "hormozi", "neon", "daktilo", "ziplama", "dolgu"];
 ok("her eski stilin en yakın görünümü var", ESKI.every(function (id) { return ids.indexOf(AE.eskiGorunum(id)) !== -1; }) &&
   AE.eskiGorunum("efekt") === null && AE.eskiGorunum("__proto__") === null && AE.eskiGorunum(5) === null);
-ok("en yakınlar: Bold Box → Vurucu, Neon → Glitch, Belgesel → Zarif, Clean Pill → Temiz, Zıplayan → Canlı",
-  AE.eskiGorunum("hormozi") === "vurucu" && AE.eskiGorunum("neon") === "glitch" && AE.eskiGorunum("doc") === "zarif" &&
-  AE.eskiGorunum("capcut") === "temiz" && AE.eskiGorunum("ziplama") === "canli");
+ok("en yakınlar: Bold Box → Vurucu, Neon → Glitch, Premium → Zarif, Dolgu → Temiz, Zıplayan → Canlı",
+  AE.eskiGorunum("hormozi") === "vurucu" && AE.eskiGorunum("neon") === "glitch" && AE.eskiGorunum("premium") === "zarif" &&
+  AE.eskiGorunum("dolgu") === "temiz" && AE.eskiGorunum("ziplama") === "canli");
+// 3.3 adım 17 inceleme: 3.2'nin kutulu stilleri (metnin arkasında koyu panel) arka plan kutusunu kaybetmez
+ok("kutulu eski stiller (Clean Pill, SaaS Glass, Belgesel) → Kutulu: arka plan kutusu açık; yazı tipi / renk / konum eski stilden",
+  ["capcut", "saas", "doc"].every(function (id) {
+    var p = SE.preset(id).style, t = AE.eskiStilden(id, p);
+    return AE.eskiGorunum(id) === "kutulu" && t.kutu === true && t.kutuOpak === AE.gorunum("kutulu").ayar.kutuOpak && t.font === p.font &&
+      t.renk === p.renk.toLowerCase() && t.konum === p.konum && /SufloKutu/.test(SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", overrides: AE.overrides(t) }).ass);
+  }) && AE.eskiStilden("doc", SE.preset("doc").style).font === "Lora");
 var hz = SE.preset("hormozi").style;
 var tasinan = AE.eskiStilden("hormozi", hz);
 ok("eskiStilden: görünüm + eski stilin yazı tipi, renkleri ve konumu; punto / kontur görünümden", tasinan.font === hz.font && tasinan.renk === hz.renk &&
@@ -157,22 +164,59 @@ ok("adım 17: hazır konum noktaları motorun yerleşimiyle aynı (±0,5%)", [1,
   return m && Math.abs(Number(m[1]) / 19.2 - p.x) <= 0.5 && Math.abs(Number(m[2]) / 10.8 - p.y) <= 0.5;
 }));
 var tz = AE.gorunum("temiz").ayar;
-var s1 = AE.surukle(tz, 31.4, 40.6), s2 = AE.surukle(tz, 52.9, 81.2), s3 = AE.surukle(tz, 47, 60), s4 = AE.surukle(tz, -10, 130), s5 = AE.surukle(tz, "a", 3);
+/*
+ * 3.3 adım 17 inceleme: sürükleme modeli kartın ORTASIYLA çalışır (serbest konum \an5 kart ortası). Hazır konumun
+ * noktası da kart ortası: 1920×1080 Temiz'de Alt (bağlantı %84, kartın altı) → orta %76,9; Üst (%22, kartın üstü) →
+ * %29,1; Alt sol %30,4 · %78,4 (gerçek çizimle denetimi tests/test-style-engine.js'te). Serbest Y çizilen banda
+ * (kart kadraja sığar: %11-89) kırpılır.
+ */
+var olc = AE.konumOlcusu(tz);
+ok("konumOlcusu: hazır konumların kart ortası stil motorundan (1920×1080 Temiz: Alt 50 · 76,9, Orta 50 · 62, Üst 50 · 29,1, Alt sol 30,4 · 78,4), Y bandı 11-89",
+  [1, 2, 5, 8].every(function (k) { var m = SE.efektKonumlari(AE.overrides(tz), 1920, 1080).noktalar[k];
+    return olc.noktalar[k].x === m.x && olc.noktalar[k].y === m.y && olc.noktalar[k].ad === AE.KONUM_NOKTALARI[k].ad; }) && olc.noktalar[2].y === 76.9 && olc.noktalar[5].y === 62 && olc.noktalar[8].y === 29.1 &&
+  olc.noktalar[1].x === 30.4 && J(olc.ySinir) === "[11,89]", J(olc));
+var s1 = AE.surukle(tz, 31.4, 40.6), s2 = AE.surukle(tz, 52.9, 74.6), s3 = AE.surukle(tz, 47, 60), s4 = AE.surukle(tz, -10, 130), s5 = AE.surukle(tz, "a", 3);
 ok("surukle: serbest nokta tam sayıya yuvarlanır, hazır konum (konum) kalır", s1.konumX === 31 && s1.konumY === 41 && s1.konum === 2 && s1.yapisti === 0, J(s1));
-ok("surukle: hazır konumun ±%3 içinde yapışır (Alt: X 50 · Y 84; Orta: 50 · 62), serbest konum silinir",
-  s2.konum === 2 && s2.konumX === null && s2.konumY === null && s2.yapisti === 2 && s3.konum === 5 && s3.yapisti === 5 && s3.konumX === null, J([s2, s3]));
-ok("surukle: kadraj dışı %5-95'e kırpılır; sayı değilse ayar olduğu gibi", s4.konumX === 5 && s4.konumY === 95 && s5.konumX === null && s5.konum === 2, J([s4, s5]));
+ok("surukle: hazır konumun kart ortasına ±%3 içinde yapışır (Alt: X 50 · Y 76,9; Orta: 50 · 62), serbest konum silinir",
+  s2.konum === 2 && s2.konumX === null && s2.konumY === null && s2.yapisti === 2 && s2.y === 76.9 && s3.konum === 5 && s3.yapisti === 5 && s3.konumX === null, J([s2, s3]));
+ok("surukle: X %5-95'e, Y çizilen banda (kart kadrajda: %11-89) kırpılır; sayı değilse ayar olduğu gibi", s4.konumX === 5 && s4.konumY === 89 && s5.konumX === null && s5.konum === 2, J([s4, s5]));
+ok("surukle: eski bağlantı noktasına (Alt %84, kartın altı) bırakmak yapışmaz (orada kart Alt'tan aşağıda çizilir)", AE.surukle(tz, 50, 84).yapisti === 0);
 var serbest = Object.assign({}, tz, { konumX: 30, konumY: 40 });
-ok("kaydir: ok tuşu %1 (Shift %5); hazır konumdan noktasıyla başlar; yapışmaz; kırpılır",
-  J(AE.kaydir(tz, 1, 0).konumX) === "51" && AE.kaydir(tz, 1, 0).konumY === 84 && AE.kaydir(serbest, 0, -5).konumY === 35 &&
+ok("kaydir: ok tuşu %1 (Shift %5); hazır konumdan kart ortasıyla başlar (Alt'tan yukarı ok yazıyı yukarı taşır); yapışmaz; kırpılır",
+  J(AE.kaydir(tz, 1, 0).konumX) === "51" && AE.kaydir(tz, 1, 0).konumY === 77 && AE.kaydir(tz, 0, -1).konumY === 76 && AE.kaydir(tz, 0, -1).konumY < olc.noktalar[2].y &&
+  AE.kaydir(serbest, 0, -5).konumY === 35 &&
   AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 85 }), 0, -1).konumY === 84 && AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 85 }), 0, -1).konumX === 50 &&
-  AE.kaydir(Object.assign({}, tz, { konumX: 94, konumY: 50 }), 5, 0).konumX === 95);
-ok("sifirla: serbest konum silinir, hazır konum geçerli", J(AE.sifirla(serbest)) === '{"konum":2,"konumX":null,"konumY":null,"x":50,"y":84,"yapisti":2}');
+  AE.kaydir(Object.assign({}, tz, { konumX: 94, konumY: 50 }), 5, 0).konumX === 95 && AE.kaydir(Object.assign({}, tz, { konumX: 50, konumY: 89 }), 0, 5).konumY === 89);
+ok("sifirla: serbest konum silinir, hazır konum geçerli (noktası kart ortası)", J(AE.sifirla(serbest)) === '{"konum":2,"konumX":null,"konumY":null,"x":50,"y":76.9,"yapisti":2}');
 ok("konumEtiketi: 'X %31 · Y %41'; yapışınca 'Alt · hazır konum'", AE.konumEtiketi(s1) === "X %31 · Y %41" && AE.konumEtiketi(s2) === "Alt · hazır konum" &&
-  AE.konumEtiketi(AE.surukle(tz, 9, 86)) === "Alt sol · hazır konum" && AE.konumEtiketi(null) === "");
-ok("konumNoktasi / sablonKonumu: serbest nokta ya da hazır konumun noktası (oran 0-1, Motion › Position için)",
-  J(AE.konumNoktasi(serbest)) === '{"x":30,"y":40,"konum":2,"serbest":true}' && J(AE.sablonKonumu(tz)) === '{"x":0.5,"y":0.84,"serbest":false}' &&
+  AE.konumEtiketi(AE.surukle(tz, 31, 79)) === "Alt sol · hazır konum" && AE.konumEtiketi(null) === "");
+ok("konumNoktasi / sablonKonumu: serbest nokta ya da hazır konumun kart ortası (oran 0-1, Motion › Position için)",
+  J(AE.konumNoktasi(serbest)) === '{"x":30,"y":40,"konum":2,"serbest":true}' && J(AE.sablonKonumu(tz)) === '{"x":0.5,"y":0.769,"serbest":false}' &&
   J(AE.sablonKonumu(serbest)) === '{"x":0.3,"y":0.4,"serbest":true}');
+
+/* 9:16 (1080×1920): motor Alt'ı %74'e çeker, kart %7-78 bandına sığar; önizleme modeli çizilenle aynı yeri kullanır */
+var D = { w: 1080, h: 1920 }, olcD = AE.konumOlcusu(tz, D);
+ok("9:16 konumOlcusu: Alt'ın kart ortası %70,1 (bağlantı %74 − yarım kart), Orta %62, Üst %25,9; Y bandı 13-72",
+  olcD.noktalar[2].y === 70.1 && olcD.noktalar[5].y === 62 && olcD.noktalar[8].y === 25.9 && J(olcD.ySinir) === "[13,72]", J(olcD));
+ok("9:16 surukle: Alt'ın görünen yerine (≈%70) bırakmak Alt'a yapışır; %84'e (alt arayüz bandı) bırakmak yapışmaz, %72'ye sığar",
+  AE.surukle(tz, 50, 69, D).yapisti === 2 && AE.surukle(tz, 50, 84, D).yapisti === 0 && AE.surukle(tz, 50, 84, D).konumY === 72 &&
+  AE.konumEtiketi(AE.surukle(tz, 50, 90, D)) === "X %50 · Y %72");
+ok("9:16 kaydir: Alt'tan yukarı ok yazıyı yukarı taşır (%70,1 → 69), aşağı ok bandın altında kalır",
+  AE.kaydir(tz, 0, -1, D).konumY === 69 && AE.kaydir(tz, 0, 5, D).konumY === 72 && AE.kaydir(tz, 0, -1, D).konumY < olcD.noktalar[2].y);
+ok("9:16 konumNoktasi: başka kadrajdan kalan serbest Y (85) çizildiği yerde (bandın içinde) gösterilir",
+  AE.konumNoktasi(Object.assign({}, tz, { konumX: 50, konumY: 85 }), D).y === 72 && AE.konumNoktasi(Object.assign({}, tz, { konumX: 50, konumY: 85 })).y === 85);
+ok("9:16 Alt sol ile Alt'ın yapışma bölgesi örtüşünce en yakın kazanır", AE.surukle(tz, 50, 70.1, D).yapisti === 2 && AE.surukle(tz, olcD.noktalar[1].x - 0.5, 70.1, D).yapisti === 1);
+ok("guvenli (Platform arayüzünden kaçın) ölçüye geçer: Alt sol kartı ikon sütunundan uzak, daha solda",
+  AE.konumOlcusu(tz, { w: 1080, h: 1920, guvenli: true }).noktalar[1].x < olcD.noktalar[1].x);
+
+/* Sürüklerken yapışma bölgesinden geçmek hazır konumu değiştirmez (taban: sürükleme başındaki hazır konum) */
+var gecis = AE.surukle(tz, 50, 61, { taban: 2 });
+var sonra = AE.surukle(Object.assign({}, tz, { konum: gecis.konum, konumX: gecis.konumX, konumY: gecis.konumY }), 30, 40, { taban: 2 });
+ok("surukle: Orta bölgesinden geçip serbest noktaya varınca hazır konum sürükleme başındaki (Alt) kalır; sıfırla Alt'a döner",
+  gecis.yapisti === 5 && gecis.konum === 5 && sonra.konum === 2 && sonra.konumX === 30 && sonra.konumY === 40 &&
+  AE.sifirla(Object.assign({}, tz, sonra)).konum === 2 && AE.sifirla(Object.assign({}, tz, sonra)).y === 76.9, J([gecis, sonra]));
+ok("surukle: geçersiz taban yok sayılır (ayarın konumu)", AE.surukle(Object.assign({}, tz, { konum: 8 }), 30, 40, { taban: 3 }).konum === 8 &&
+  AE.surukle(Object.assign({}, tz, { konum: 8 }), 30, 40, { taban: "__proto__" }).konum === 8);
 var kutuluAss = SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: AE.overrides(AE.gorunum("kutulu").ayar) }).ass;
 ok("Kutulu görünümü motorda kutuyla, Vurucu / Zarif gölgeyle çizilir", /Style: SufloKutu,/.test(kutuluAss) && /\\3a&H59&/.test(kutuluAss) &&
   /\\4a&H26&\\shad4\.9\}/.test(SE.compile({ styleId: "efekt", cues: kelimeCue, cueKind: "words", width: 1920, height: 1080, overrides: AE.overrides(AE.gorunum("vurucu").ayar) }).ass) &&

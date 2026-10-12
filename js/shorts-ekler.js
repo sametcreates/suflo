@@ -147,8 +147,12 @@
   /*
    * CTA hangi yükseklikte? Altyazı altta duruyorsa (konum 1/2) CTA üste geçer, yoksa alta.
    * Kanca açılışta üstte olduğundan CTA (son saniyeler) onunla zaman olarak çakışmaz.
+   * altyaziY (3.3, Altyazı Efektleri serbest konumu; kartın ortası, kadrajın %'si) verilirse hazır konumun
+   * önüne geçer: altyazı alt yarıdaysa (Y >= %50) CTA üste (%20-33), üst yarıdaysa alta (%61-74).
    */
-  function ctaKonum(altyaziKonum, altyaziAcik) {
+  function ctaKonum(altyaziKonum, altyaziAcik, altyaziY) {
+    var y = altyaziY === null || altyaziY === undefined || altyaziY === "" ? NaN : Number(altyaziY);
+    if (isFinite(y)) return altyaziAcik && y >= 50 ? "ust" : "alt";
     var k = Number(altyaziKonum);
     return altyaziAcik && (k === 1 || k === 2) ? "ust" : "alt";
   }
