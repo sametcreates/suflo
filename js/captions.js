@@ -1869,13 +1869,14 @@ window.KCaptions = (function () {
       konumX: st.konumX === undefined ? null : st.konumX, konumY: st.konumY === undefined ? null : st.konumY };
   }
 
-  // Seçimi Altyazı Efektleri'ne al (kontrol değerlerine dokunmaz)
+  // Seçimi Altyazı Efektleri'ne al (görünen kontrol değerlerine dokunmaz; gizli hareket şiddeti Dengeli)
   function efekteGec() {
     secilenMogrt = null;
     bekleyenMogrtYolu = "";
     secilenMotorStili = EFEKT;
     if (el("cap-style-family")) el("cap-style-family").value = EFEKT;
     if (el("cap-preset")) el("cap-preset").value = EFEKT;
+    if (el("cap-yogunluk")) el("cap-yogunluk").value = "balanced";
   }
 
   // Seçim / değer değişikliğinin ardından bağımlı durumlar ve DOM önizlemesi
@@ -2344,9 +2345,12 @@ window.KCaptions = (function () {
       var e = el(id);
       return e ? e.value : varsayilan;
     }
+    var aile = d("cap-style-family", "custom");
     return {
-      aile: d("cap-style-family", "custom"),
-      yogunluk: d("cap-yogunluk", "balanced"),
+      aile: aile,
+      // Altyazı Efektleri'nde hareket şiddeti ayarı yok: hep Dengeli (eski kod / kayıt / Şablonum'un "Sert"i
+      // görünen ayarla aynı görünümü farklı hızda oynatmasın; Shorts paketi ve suflo.app/stil de Dengeli)
+      yogunluk: aile === EFEKT ? "balanced" : d("cap-yogunluk", "balanced"),
       font: d("cap-font", "Arial"),
       boyut: parseInt(d("cap-boyut", "72"), 10) || 72,
       renk: d("cap-renk", "#ffffff"),
@@ -2680,7 +2684,8 @@ window.KCaptions = (function () {
     var yazar = el("cap-stil-yazar") ? String(el("cap-stil-yazar").value || "").trim() : "";
     return {
       kod: SS.encode({
-        styleId: secilenMotorStili, intensity: st.yogunluk, overrides: motorAyarlari(st),
+        // Altyazı Efektleri kodunda hareket şiddeti yok (hep Dengeli); eski kimlikler kendi şiddetiyle
+        styleId: secilenMotorStili, intensity: secilenMotorStili === EFEKT ? undefined : st.yogunluk, overrides: motorAyarlari(st),
         // l32 / l42 eski sürümlerde yok: aynı menü girdisi c32 / c42 olarak paylaşılır (içe alırken geri eşlenir)
         text: { maxlen: el("cap-maxlen").value.replace(/^l(\d+)$/, "c$1"), kase: el("cap-case").value, punct: !!el("cap-punct").checked },
         author: yazar
@@ -2734,7 +2739,8 @@ window.KCaptions = (function () {
     }
     stiliYaz(ov);
     secilenGorunum = AE ? AE.gorunumuBul(efektAyari()) : "";
-    if (r.intensity && el("cap-yogunluk")) el("cap-yogunluk").value = r.intensity;
+    // Kodun hareket şiddeti (3.2 kodlarında stilin kendisi: Creator Punch "hard"…) uygulanmaz: Altyazı
+    // Efektleri hep Dengeli, aynı görünen ayar aynı hızda oynar
     if (r.text.maxlen) el("cap-maxlen").value = uzunlukSecimi(r.text.maxlen);
     if (r.text.kase) el("cap-case").value = r.text.kase;
     if (typeof r.text.punct === "boolean") el("cap-punct").checked = r.text.punct;
@@ -6323,6 +6329,18 @@ window.KCaptions = (function () {
     bekleyenMogrtYolu = y.bekleyen || "";
     secilenGorunum = y.gorunum || "";
     sonGorunum = y.gorunumTaban || "";
+    /*
+     * 3.2'de alınmış (rehberin stil adımında kalmış) yedek eski bir stil kimliği taşıyabilir: loadPrefs'teki
+     * gibi en yakın görünüme taşınır (yedekteki yazı tipi, renkler, konum korunur). Seçimsiz yedek de
+     * Altyazı Efektleri'ne düşer (stil düğmesi kapalı kalmaz).
+     */
+    if (!secilenMogrt && secilenMotorStili && secilenMotorStili !== EFEKT && AE && AE.eskiStilden(secilenMotorStili, stil())) {
+      sonGorunum = AE.eskiGorunum(secilenMotorStili);
+      stiliYaz(efektStili(AE.eskiStilden(secilenMotorStili, stil())));
+      efekteGec();
+      secilenGorunum = "";
+    }
+    efektVarsayilan(false);
     // denenen görünüm paylaşılan kodun yazar notunu silmişti: önceki yazar geri gelir
     stilKredisi(secilenMogrt ? "" : (y.kredi || ""));
     /*

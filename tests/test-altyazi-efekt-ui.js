@@ -109,7 +109,9 @@ function ortam(o) {
     govde("function efektSayi("), govde("function efektSayiAlani("), govde("function serbestKonumDegeri("), govde("function efektBagimliDurum("),
     govde("function konumAktif("), govde("function sahneNoktasi("), govde("function artiGoster("), govde("function konumYaz("),
     govde("function konumDegisti("), govde("function konumSuruklemeAdim("), govde("function konumSuruklemeBitir("), govde("function konumSifirla("),
-    govde("function konumSurukleBagla(")
+    govde("function konumSurukleBagla("), govde("function stilYedegi("), govde("function stilYedeginiYukle("),
+    // rehber yedeğinin alan listeleri (EFEKT_ISARETLERI, STIL_ALANLARI)
+    cap.slice(cap.indexOf("  var EFEKT_ISARETLERI = "), cap.indexOf("  function stilYedegi("))
   ].join("\n");
   var api = new Function("K", "window", "document", "el", "KApp", "Pro",
     "var SS = window.SufloStyleShare, AE = window.SufloAltyaziEfekt, EFEKT = 'efekt';\n" +
@@ -127,6 +129,7 @@ function ortam(o) {
     " stilKodu: stilKodu, stilKoduUygula: stilKoduUygula, applyPreset: applyPreset, efekteGec: efekteGec, varsayilanaDon: varsayilanaDon, onizleme: onizleme," +
     " durum: function () { return { motor: secilenMotorStili, gorunum: secilenGorunum, son: sonGorunum, mogrt: secilenMogrt, kredi: stilKrediAd }; }," +
     " efektAyari: efektAyari, konumSurukleBagla: konumSurukleBagla, surukluyor: function () { return !!surukleme; }," +
+    " stilYedegi: stilYedegi, stilYedeginiYukle: stilYedeginiYukle, sablonumUygula: sablonumUygula," +
     " mogrtSec: function (m) { secilenMogrt = m; secilenMotorStili = ''; } };")(
     K, window, { createElement: function (t) { return dugum(t); }, querySelectorAll: function () { return []; } },
     function (id) { return dom[id] || null; }, { toast: function (m, tur) { toastlar.push(m); } }, {});
@@ -443,6 +446,47 @@ ok("index.html: gölge / kutu kontrolleri oluşturucuda, sahne odaklanabilir, ar
   /id="cap-efekt-ayarlar"[\s\S]*id="cap-efekt-golge"[\s\S]*id="cap-kutu"[\s\S]*id="cap-konum-x"/.test(html) && /id="cap-sahne" tabindex="0"/.test(html) &&
   /id="cap-efekt-arti"/.test(html) && html.slice(html.indexOf('class="ia-eski"'), html.indexOf("</div>", html.indexOf('class="ia-eski"'))).indexOf("cap-kutu") === -1 &&
   /min="0" max="20"/.test(html) && /min="0" max="30"/.test(html));
+
+/* ---------------- 8) adım 16 ikinci inceleme: hareket şiddeti efektte hep Dengeli, rehber yedeği taşınır ---------------- */
+var hk = ortam();
+var kod32 = SS.encode({ styleId: "mrbeast", intensity: "hard", overrides: { font: "Anton", renk: "#ffffff", vurguRenk: "#ffe342", konum: 5 }, text: { kase: "upper", punct: false } });
+hk.api.stilKoduUygula(kod32);
+var stHk = hk.api.stil();
+var popHk = SE.compile({ styleId: "efekt", intensity: stHk.yogunluk, cues: kelimeCue, cueKind: "words", width: 1920, height: 1080,
+  overrides: Object.assign({}, hk.api.motorAyarlari(stHk), { giris: "pop" }) }).ass;
+ok("3.2 Creator Punch kodu (intensity hard) → Vurucu, hareket şiddeti Dengeli: pop girişi 300 ms (234 değil)", hk.api.durum().motor === "efekt" &&
+  stHk.yogunluk === "balanced" && hk.dom["cap-yogunluk"].value === "balanced" && /\\t\(0,300,\\fscx100/.test(popHk) && !/\\t\(0,234,/.test(popHk), stHk.yogunluk);
+var hkKod = SS.decode(hk.api.stilKodu().kod, function (id) { return SE.has(id); });
+ok("efekt kodu hareket şiddeti taşımaz (yeniden paylaşım 'hard' yaymaz)", hkKod.ok && hkKod.recipe.intensity === undefined, JSON.stringify(hkKod.recipe));
+var oz = ortam({ ayar: { capPrefs: { maxlen: "k1", kase: "upper", punct: false, preset: "", stil: { aile: "custom", yogunluk: "hard", font: "Anton", boyut: 120,
+  renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe600", kontur: 8, konum: 5 } } } });
+oz.api.loadPrefs();
+ok("eski 'Özel' kaydı (yogunluk hard) efekte geçince Dengeli", oz.api.durum().motor === "efekt" && oz.api.stil().yogunluk === "balanced");
+var sb = ortam({ ayar: { userPreset: { maxlen: "k1", kase: "normal", punct: true, stil: Object.assign({ aile: "efekt", yogunluk: "hard", animasyon: "efekt", kutu: false },
+  AE.overrides(AE.gorunum("canli").ayar)) } } });
+sb.api.gorunumleriCiz();
+sb.api.sablonumUygula();
+ok("Şablonum (yogunluk hard kaydedilmiş) uygulanınca Dengeli", sb.api.durum().motor === "efekt" && sb.api.stil().yogunluk === "balanced" &&
+  sb.dom["cap-efekt-aktif"].value === "zipla");
+// 3.2'de rehberin stil adımında kalmış yedek: Bold Box (eski kimlik), kendi yazı tipi / renkleri
+var yd = ortam();
+var yedek32 = { alan: { "cap-preset": "hormozi", "cap-maxlen": "k1", "cap-case": "upper", "cap-style-family": "hormozi", "cap-yogunluk": "hard",
+  "cap-font": "Lora", "cap-boyut": "124", "cap-renk": "#ff3366", "cap-renk-kontur": "#000000", "cap-renk-vurgu": "#22ccff", "cap-kontur": "8", "cap-konum": "8",
+  "cap-animasyon": "hormozi" }, punct: false, kutu: false, isaret: {}, motor: "hormozi", mogrt: null, bekleyen: "", gorunum: "", gorunumTaban: "", kredi: "", prefs: null };
+yd.api.stilYedeginiYukle(yedek32);
+var ovYd = yd.api.motorAyarlari(yd.api.stil());
+ok("3.2 yedeği (Bold Box) geri yüklenince Altyazı Efektleri › Vurucu'ya taşınır; yedeğin yazı tipi / renkleri / konumu korunur",
+  yd.api.durum().motor === "efekt" && yd.api.durum().son === "vurucu" && yd.dom["cap-style-family"].value === "efekt" && ovYd.font === "Lora" &&
+  ovYd.renk === "#ff3366" && ovYd.vurguRenk === "#22ccff" && ovYd.konum === 8 && ovYd.giris === "pop" && ovYd.aktif === "zipla" && yd.api.stil().yogunluk === "balanced",
+  JSON.stringify([yd.api.durum(), ovYd]));
+var yd2 = ortam();
+yd2.api.stilYedeginiYukle(Object.assign({}, yedek32, { motor: "", alan: Object.assign({}, yedek32.alan, { "cap-preset": "", "cap-style-family": "custom" }) }));
+ok("seçimsiz 3.2 yedeği de Altyazı Efektleri'ne düşer (stil düğmesi kapalı kalmaz)", yd2.api.durum().motor === "efekt" && yd2.api.durum().son === "temiz");
+var yd3 = ortam();
+var buYedek = (function () { var o = ortam(); o.api.gorunumUygula("glitch"); o.dom["cap-konum-x"].value = "40"; o.dom["cap-konum-y"].value = "30"; return o.api.stilYedegi(); })();
+yd3.api.stilYedeginiYukle(buYedek);
+ok("3.3 yedeği olduğu gibi döner (görünüm, serbest konum)", yd3.api.durum().motor === "efekt" && yd3.api.durum().gorunum === "glitch" &&
+  yd3.dom["cap-konum-x"].value === "40" && yd3.dom["cap-efekt-aktif"].value === "glitch");
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

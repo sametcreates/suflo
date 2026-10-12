@@ -3701,7 +3701,17 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .efekt-bi:hover { border-color: var(--line2); color: var(--text); }
 .efekt-bi.efekt-italik span { font-style: italic; font-weight: 600; }
 .efekt-bi input:checked + span { color: var(--accent-lite); }
+/*
+ * Gizli onay kutusunun odağı: :focus-visible Chromium 86'da geldi, Premiere 14.4-15.x'in CEF 74'ü kuralı
+ * tümden atar. Önce her sürümün anladığı :focus (ayrı kural; seçici listesinde birleşirse CEF 74 ikisini de
+ * atar), yeni motorlarda yalnız klavye odağı için :focus-visible ile fare tıklaması geri sessizleşir.
+ */
+.efekt-bi input:focus + span { text-decoration: underline; }
+.efekt-bi input:focus:not(:focus-visible) + span { text-decoration: none; }
 .efekt-bi input:focus-visible + span { text-decoration: underline; }
+/* Oluşturucunun anahtarları (Kelime vurgusu, Gölge, Arka plan kutusu) da CEF 74'te odak gösterir (aynı düzen) */
+.efekt-ayarlar .switch input:focus + i { outline: 2px solid var(--accent-lite); outline-offset: 2px; }
+.efekt-ayarlar .switch input:focus:not(:focus-visible) + i { outline: none; }
 /* 3.3 adım 17: gölge ve arka plan kutusu (flex gap'siz, CEF 74) */
 .efekt-katman { margin-bottom: 8px; }
 .efekt-katman > .switch { display: inline-flex; margin: 0 0 6px; }
