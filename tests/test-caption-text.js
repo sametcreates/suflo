@@ -377,5 +377,17 @@ chk("caption-text.js: whisper -sns kullanılmaz (noktalama belirteçlerini de ba
 var bildirim = require("fs").readFileSync(path.join(__dirname, "..", "THIRD_PARTY_NOTICES.md"), "utf8");
 chk("THIRD_PARTY_NOTICES: Raunen girdisinde js/caption-text.js (NOISE_PATTERNS)", /`js\/caption-text\.js` — `NOISE_PATTERNS`/.test(bildirim));
 
+// Altyazı düzenleyici araması: "tr" yereli "I"yı "ı" yapar, İngilizce metin "it" sorgusuyla eşleşmezdi
+chk("aramaKatla: İngilizce 'It ... I think' metni 'it' ve 'i think' sorgusuyla eşleşir",
+  T.aramaKatla("It works. I think").indexOf(T.aramaKatla("it")) !== -1 &&
+  T.aramaKatla("It works. I think").indexOf(T.aramaKatla("i think")) !== -1 &&
+  T.aramaKatla("Instagram").indexOf(T.aramaKatla("instagram")) === 0);
+chk("aramaKatla: Türkçe ı/İ de i'ye katlanır (İstanbul ~ istanbul, ılık ~ ilik)",
+  T.aramaKatla("İstanbul") === T.aramaKatla("istanbul") && T.aramaKatla("ILIK") === T.aramaKatla("ılık"));
+var capsKaynakArama = require("fs").readFileSync(path.join(__dirname, "..", "js", "captions.js"), "utf8");
+chk("captions.js: düzenleyici araması 'tr' yereline bağlı küçültme kullanmaz (aramaKatla)",
+  !/editorQuery[^;\n]*toLocaleLowerCase\("tr"\)/.test(capsKaynakArama) && !/\.text \|\| ""\)\.toLocaleLowerCase\("tr"\)\.indexOf\(q\)/.test(capsKaynakArama) &&
+  (capsKaynakArama.match(/CT\.aramaKatla\(/g) || []).length >= 4);
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

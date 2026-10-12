@@ -900,6 +900,13 @@
       .replace(/ *\n */g, "\n").trim();
   }
 
+  // Aramada büyük/küçük harf katlama: "tr" yereli "I" harfini "ı" yapar, İngilizce
+  // metinde "it" sorgusu "It" ile eşleşmezdi. İki taraf da yerelden bağımsız katlanır.
+  function aramaKatla(s) {
+    return String(s == null ? "" : s).toLowerCase()
+      .replace(/\u0069\u0307/g, "i").replace(/[\u0131\u0130]/g, "i");
+  }
+
   return {
     metinStili: metinStili,
     emojiVar: emojiVar,
@@ -931,6 +938,7 @@
     kelimeSegmentiBozuk: kelimeSegmentiBozuk,
     kelimelerHepsiYigili: kelimelerHepsiYigili,
     parseGlossary: parseGlossary,
-    trReplace: trReplace
+    trReplace: trReplace,
+    aramaKatla: aramaKatla
   };
 });

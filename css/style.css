@@ -1326,6 +1326,9 @@ details.adv > *:not(summary) { margin-top: 8px; }
   box-shadow: 0 2px 10px -3px rgba(120, 108, 255, .7);
 }
 .switch input:checked + i::after { transform: translateX(14px); background: #fff; }
+/* CEF 74 (Premiere 14.4-15.x) :focus-visible kuralını atar; gizli anahtarın odağı :focus ile görünür (ayrı kurallar) */
+.switch input:focus + i { outline: 2px solid var(--accent-lite); outline-offset: 2px; }
+.switch input:focus:not(:focus-visible) + i { outline: none; }
 .switch input:focus-visible + i { box-shadow: var(--glow-sm); }
 
 /* ---------- Ses katmanı chip'leri ---------- */

@@ -3454,11 +3454,11 @@ window.KCaptions = (function () {
     if (!box) return;
     var oldEmpty = box.querySelector(".editor-filter-empty");
     if (oldEmpty) oldEmpty.remove();
-    var q = String(editorQuery || "").toLocaleLowerCase("tr");
+    var q = CT.aramaKatla(editorQuery || "");
     var visible = 0;
     Array.prototype.forEach.call(box.querySelectorAll(".seg"), function (row) {
       var i = Number(row.dataset.i);
-      var textMatches = !q || String(segments[i] && segments[i].text || "").toLocaleLowerCase("tr").indexOf(q) !== -1;
+      var textMatches = !q || CT.aramaKatla(segments[i] && segments[i].text || "").indexOf(q) !== -1;
       var show = textMatches && (!editorOnlyIssues || row.classList.contains("flagged"));
       row.classList.toggle("filtered", !show);
       if (show) visible++;
@@ -3705,14 +3705,14 @@ window.KCaptions = (function () {
     var box = el("cap-segments");
     box.innerHTML = "";
     var report = qualityReport();
-    var q = String(editorQuery || "").toLocaleLowerCase("tr");
+    var q = CT.aramaKatla(editorQuery || "");
     var visible = 0;
     segments.forEach(function (s, i) {
       var rowQuality = report.rows[i] || { issues: [], cps: 0, duration: Math.max(0, s.end - s.start), flagged: false, bad: false, confidence: s.confidence };
       var row = document.createElement("div");
       row.className = "seg" + (rowQuality.flagged ? " flagged" : "") + (rowQuality.bad ? " bad" : "") + (selectedSegment === i ? " selected" : "");
       row.dataset.i = String(i);
-      var textMatches = !q || String(s.text || "").toLocaleLowerCase("tr").indexOf(q) !== -1;
+      var textMatches = !q || CT.aramaKatla(s.text || "").indexOf(q) !== -1;
       if (!textMatches || (editorOnlyIssues && !rowQuality.flagged)) row.classList.add("filtered");
       else visible++;
       row.onclick = function (ev) {

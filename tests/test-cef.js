@@ -132,6 +132,9 @@ efektKurallari.forEach(function (k) {
 ok("Altyazı Efektleri: gizli onay kutularının :focus-visible kuralı ayrı bir :focus yedeğiyle (CEF 74)", odakSorun.length === 0 &&
   tumSeciciler.indexOf(".efekt-bi input:focus + span") !== -1 && tumSeciciler.indexOf(".efekt-ayarlar .switch input:focus + i") !== -1, odakSorun.join(" | "));
 
+ok("Tüm .switch anahtarları CEF 74'te klavye odağı gösterir (:focus yedeği + :not(:focus-visible))",
+  tumSeciciler.indexOf(".switch input:focus + i") !== -1 && tumSeciciler.indexOf(".switch input:focus:not(:focus-visible) + i") !== -1);
+
 var ornekRegex = ayikla("function f(x){ return /a'b/.test(x); }\nvar y = o?.p;");
 ok("denetleyici: return'den sonraki regex metin sanilmaz, arkasindaki kod gorunur", /o\?\.p/.test(ornekRegex.split("\n")[1]));
 
