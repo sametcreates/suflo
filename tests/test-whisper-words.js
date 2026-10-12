@@ -191,7 +191,8 @@ ED.shiftAll(0.5);
 ok("shiftAll: satırlar ve kelimeler aynı miktarda kayar", Math.abs(ED.get()[1].start - 11.56) < 1e-9 && Math.abs(ED.get()[1].words[0].start - 11.56) < 1e-9 && Math.abs(ED.get()[0].words[0].start - 10.5) < 1e-9);
 
 /* ---------------- 10) kaynak: ES5, Raunen atfı ---------------- */
-var kaynak = fs.readFileSync(path.join(__dirname, "..", "js", "whisper-words.js"), "utf8");
+// Windows checkout (core.autocrlf) CRLF verir: satır sonu işaretleri \n ile aranır
+var kaynak = fs.readFileSync(path.join(__dirname, "..", "js", "whisper-words.js"), "utf8").replace(/\r\n/g, "\n");
 ok("Raunen dosya başlığı ve işaretleri", kaynak.indexOf("Portions adapted from Raunen (https://github.com/Zeyphers/raunen), MIT, Copyright (c) 2026 Jacob Szczepaniak. See THIRD_PARTY_NOTICES.md.") !== -1 &&
   /\/\/ Raunen: tokensToWords\n  function kelimelereAyir/.test(kaynak) && /\/\/ Raunen: splitByWords\n  function kelimeGrupla/.test(kaynak));
 ok("ES5: let/const/ok işlevi/for-of/padStart/Object.values yok", !/\b(let|const)\s|=>|\bfor\s*\([^)]*\bof\b|padStart|Object\.values|rmSync/.test(kaynak));
