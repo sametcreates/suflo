@@ -38,7 +38,8 @@ window.KYoutube = (function () {
   function el(id) { return document.getElementById(id); }
   function uiMetni(s) { return window.SufloI18n && SufloI18n.tr ? SufloI18n.tr(s) : s; }
   function toast(m, t, s) { if (window.KApp && KApp.toast) KApp.toast(m, t, s); }
-  function log(m) { try { if (K.log) K.log("[youtube] " + m); } catch (e) {} }
+  // Günlük destekle paylaşılır: yt-dlp'nin hata satırında geçebilecek vekil parolası (//kullanici:parola@) gizlenir
+  function log(m) { try { if (K.log) K.log("[youtube] " + String(m).replace(/\/\/[^\/\s:@]+:[^\/\s@]+@/g, "//***@")); } catch (e) {} }
 
   /* ---------------- metin parçaları ---------------- */
   // Dize = arayüz metni (çevrilir); { ad } = kullanıcı içeriği (dosya / kutu adı; çevrilmez)
@@ -252,6 +253,7 @@ window.KYoutube = (function () {
 
   // Çalıştırmadan önce: doğrulanmış ikili ya da (yoksa / doğrulanamadıysa) doğrulanmış yeni kurulum
   async function hazirla(say, iptal) {
+    if (!K.nodeOK || !K.fs || !K.path) throw new Error("Bu ortamda kurulamaz — Premiere içinde dene.");
     // Süren kurulum / güncelleme (ör. Doctor'un Güncelle'si) ikiliyi değiştirirken eski dosya çalıştırılmasın
     if (kurulumIsi) {
       say(Y.ASAMA_METNI.kur);
@@ -759,6 +761,7 @@ window.KYoutube = (function () {
 
   /* ---------------- Suflo Doctor ---------------- */
   async function doctorSatirlari() {
+    if (!K.nodeOK || !K.fs || !K.path) return [];
     var kurulu = varMi(exeYolu());
     var meta = metaOku();
     var v = kurulu ? await dogrulanmisIkili() : null;
