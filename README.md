@@ -27,6 +27,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Podcast Modu** *(3.1)* | Mikrofona göre otomatik kamera geçişi. **Her konuşmacının kendi mikrofonu olmalı** (ayrı ses katmanı); kameralar senkronlu, her biri kendi video katmanında. Sol menü › Podcast: **Sekansı tara** 2–4 konuşmacı için ad, mikrofon ve kamera eşlemesini katman sırasından önerir (isteğe bağlı geniş plan). **Analiz et** her mikrofonu Premiere'den ayrı dışa aktarır (birleşik klip, polyWAV, iç içe sekans ve klip kazancı dahil), kazanç farkını ve komşu mikrofona sızan sesi ayıklar; sessiz mikrofonu (kapalı / solo) reddeder. Ritim: en kısa plan, en uzun plan, hassasiyet, bekleme, çapraz konuşmada ve her N saniyede geniş plan; plan canlı yeniden hesaplanır, kamera başına renkli önizleme ve "84 kamera geçişi · A %46 · B %41 · Geniş %13" özeti. **Kopyada uygula** (varsayılan) ya da Bu sekansta: kamera katmanları yalnız kendi geçiş anlarında kesilir ve parçalar açılıp kapatılır, ses ve diğer katmanlara dokunulmaz; bağlı sesi koruma, iki yönlü bağda Ctrl+L uyarısı. **Konuşmacı renkleri**: Suflo Stilleri katmanında ve ASS'te her konuşmacı kendi renginde (Premiere'in SRT altyazı izi renk taşıyamaz). Multicam kaynak sekansı desteklenmez; tek mikrofona karışık kayıt sonraki sürümde. Analiz ücretsiz, uygulamak Pro (deneme hakkı yok) |
 | **Hız Rampası** *(3.2)* | Klibe tek tıkla hız rampası: ağır çekim ve hızlanma. Sol menü › Hız Rampası: 11 eğri (Ağır Çekim Dalışı, Darbe, Hızlı Giriş, Hızlı Çıkış, Doruk Anı, Atılım, Zaman Bükümü, Nabız, Vites, Süzülme ve Ritim analizindeki vuruşlarda yavaşlayan **Ritme Rampa**); kartlar ve canlı eğri önizlemesi ücretsiz. Premiere, Zaman Yeniden Eşleme'yi eklentilere açmadığı için Suflo aralığı kareye oturan 3–28 parçaya böler ve her parçaya kendi hızını yazar; sonuç Premiere'de Hız/Süre ile düzenlenebilen sıradan klipler. **Sabit ayak izi:** klibin yeri ve süresi değişmez, ripple yok; altyazı, müzik, marker ve sonraki klipler kaymaz. Kaynak: **Otomatik** (klibin sonrasında yeterli görüntü varsa önayar hızları aynen, ffmpeg ile ölçülür; yetmezse yoğunluk düşer ya da Dengeli) ya da **Dengeli** (hızlar ölçeklenir, aralığın iki kenarında kaynak aynı, ses aralık sonunda yine senkron). Bağlı ses rampa boyunca kapatılır (silinmez) ya da olduğu gibi bırakılır; yavaş parçalara kare harmanlama ya da optik akış. Seçili klipler (en çok 12) ya da In/Out aralığı; isteğe bağlı darbe anını playhead'e hizalama; ilk denemede önce sekans kopyalanır. Ctrl+Z rampayı tek adımda geri almaz: **Rampayı kaldır** klibi tek %100 klibe döndürür (panel kapanıp açılsa da). Uygulamak Pro (3 deneme hakkı) |
 | **Ölçülmüş kelime zamanları** *(3.2)* | Yerel motor her transkriptte whisper.cpp'nin belirteç zamanlarını ve olasılıklarını okur (`-ojf`). Kelime kelime, birikimli ve N kelimelik altyazılar **tek transkripsiyonla**, ölçülmüş kelime zamanlarından kurulur (karaoke için ikinci tur yok); N kelimelik satırlar duraklamada ve cümle sonunda kırılır. Satır modundaki kelime stilleri (Bold Box, Neon, Karaoke Dolgu…) aktif kelimeyi gerçek konuşma anında yakar. Yerel motorun **güven değeri** geri geldi: Caption Editor'da "Motor bu metinden emin değil" uyarısı artık yerel motorda da çalışır. Satır ve kelime modu aynı transkript önbelleği girdisini paylaşır (Konuşmadan kes onu kullanmaz: dolgu sesleri için kendi ipucuyla yazıya döker); bölme, birleştirme, toplu kaydırma, geri al ve taslak kelime zamanlarını korur, metni elle değiştirilen satır karakter oranına döner. Ücretsiz |
+| **Ses etiketi filtresi ve sessiz ses uyarısı** *(3.2)* | Motorun yazdığı konuşma dışı etiketler altyazıya girmez: `[BLANK_AUDIO]`, `[Müzik]`, `(alkış)`, `[gülüşmeler]`, `(Applause)`, `*laughs*` gibi Türkçe ve İngilizce ses etiketleri ve yalnız ♪/♫'dan oluşan satırlar atılır; konuşmalı satırda yalnız etiket silinir ("Merhaba [müzik]" → "Merhaba"), kelime kelime ve N kelimelik modlarda etiket kelimesi çıkmaz. `*vurgu*` işareti gerçek kelimelerde aynen kalır. Erişilebilirlik için **Ayarlar › Altyazı › Ses etiketlerini koru** (varsayılan kapalı) etiketleri `[Müzik]` biçiminde tutar. **Sessiz ses uyarısı:** motor (yerel ya da bulut yüklemesi) çalışmadan önce sesin tepesi ölçülür; neredeyse tamamen sessizse (tepe < 0,001, ~ -60 dBFS: kapalı / sessize alınmış ses katmanı, sesi ayrı klipte duran video) satır içi uyarı "Yine de devam et" / "Vazgeç" sorar; boşa transkripsiyon ve API kotası harcanmaz. Altyazı oluştur (toplu klip dahil), Konuşmadan kes ve onların transkriptini kullanan Viral anlar kapsanır. Ücretsiz |
 | **Transkripsiyon** | Yerel motorla (whisper.cpp) çevrimdışı, ya da ücretsiz Groq anahtarıyla bulutta |
 | **Düzenleme** | Satır bölme, birleştirme, zaman düzeltme, toplu kaydırma, geri al/yinele (Ctrl+Z/Y) |
 | **Karaoke** | Kelime kelime ve birikimli mod; yerel motorda ölçülmüş kelime zamanlarıyla |
@@ -235,7 +236,8 @@ Testler `js/*.js` dosyalarını **kaynaktan okuyup** çalıştırır; kopyalanm�
 | Dosya | Ne ölçer |
 |---|---|
 | `test-download.js` | Yarım kalan indirmenin devamı, hangi HTTP hatasında dosya korunur/silinir |
-| `test-caption-text.js` | Halüsinasyon temizliği, karaoke, satır bölme, Türkçe-duyarlı terim sözlüğü, ölçülmüş kelimelerden k1/kc/wN |
+| `test-caption-text.js` | Halüsinasyon temizliği, karaoke, satır bölme, Türkçe-duyarlı terim sözlüğü, ölçülmüş kelimelerden k1/kc/wN, ses etiketi filtresi (Türkçe/İngilizce etiketler, ♪ satırları, `*vurgu*` korunur, karışık satır, "Ses etiketlerini koru") |
+| `test-sessiz-ses.js` | Sessiz ses uyarısı: WAV başlığı (LIST/bext, EXTENSIBLE, kayan nokta), parça sınırına düşen örnekte tepe (gerçek 1 MB sınırı dahil), 0,001 eşik sınırı, erken durma, volumedetect, "Yine de devam et" / "Vazgeç" ve toplu işte tek soru, panelde motordan önce denetim |
 | `test-whisper-words.js` | whisper-cli `-ojf` çıktısı: alt-kelime ve çok baytlı harf birleşimi (değil, ışık), özel belirteçler, zamansız belirteç dağıtımı, VAD zaman tabanı (açık: whisper'ın tablosu, kapalı: belirteç zamanı aynen), boşluklu tire, satır güveni, duraklama/cümle sonunda gruplama, belirteçsiz eski derleme |
 | `test-textcut.js` | Konuşmadan kes: dolgu/tekrar algılama, kesim aralıkları, duraksama kısaltma, ek dolgular, cümle içi yeniden başlama, 300 kesim sınırı |
 | `test-retakes.js` | Tek Tık Temizlik: tekrar çekim / yarım başlangıç kuralları, politikalar, yanlış pozitifler (anafora, tarif adımları), senaryo hizalaması (300×600 < 1 sn), AI cevabı doğrulaması |
@@ -351,6 +353,12 @@ Shorts with an explained 0–100 score, animated caption styles, transitions and
   timings (`-ojf`), so word-by-word and N-word captions come from one transcription with real word
   times, word styles in line mode light the active word on the spoken beat, and the "the engine isn't
   sure about this text" flag works for local transcripts too.
+- **Coming in 3.2: sound-tag filter and silent-audio warning.** Non-speech tags the engine writes
+  (`[BLANK_AUDIO]`, `[Music]`, `(applause)`, `*laughs*`, ♪-only lines, plus their Turkish forms) no
+  longer end up in your captions; a mixed line keeps its speech and `*emphasis*` on real words is left
+  alone. Settings › Captions › Keep sound tags keeps them as `[Music]` for accessibility. If the audio
+  is almost completely silent (muted or disabled tracks), Suflo asks before the engine runs or anything
+  is uploaded.
 - **Coming in 3.2: Speed Ramp.** One-click slow-mo and speed-ups with 11 curves (including a Beat Ramp that slows
   down on your music's beats). Premiere doesn't expose Time Remapping to extensions, so Suflo splits the range into
   short frame-aligned pieces with their own speeds; they stay editable under Speed/Duration and your edit never
@@ -369,8 +377,8 @@ with a screenshot.
 
 MIT — [LICENSE](LICENSE). Dilediğin gibi kullan, değiştir, dağıt.
 
-Başka açık kaynak projelerden uyarlanan bölümler (ör. Raunen'den kelime zamanı ayrıştırma,
-MIT) ve çalışırken indirilen bileşenlerin (whisper.cpp, modeller, ffmpeg) lisansları:
+Başka açık kaynak projelerden uyarlanan bölümler (ör. Raunen'den kelime zamanı ayrıştırma ve
+ses etiketi kalıpları, MIT) ve çalışırken indirilen bileşenlerin (whisper.cpp, modeller, ffmpeg) lisansları:
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Portions adapted from other open-source
 projects and the licenses of runtime downloads are listed in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

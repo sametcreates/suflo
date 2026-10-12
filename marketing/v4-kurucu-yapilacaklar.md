@@ -1091,3 +1091,32 @@ uyarısı." `js/app.js` YENILIKLER listesine istersen aynı satırın kısası.
 **1.4 Paketi doğrula.** `tools/package.ps1` ve `tools/kurucu-yap.ps1` artık `THIRD_PARTY_NOTICES.md`'yi
 pakete koyuyor; `tools/verify-release.ps1` ZXP'de ya da kurulum ZIP'inde `LICENSE` veya
 `THIRD_PARTY_NOTICES.md` yoksa yayını durduruyor. Yayından önce `verify-release.ps1`'in yeşil bittiğini gör.
+
+### Adım 2: Ses etiketi filtresi ve sessiz ses uyarısı
+
+Ne değişti: `js/caption-text.js` Whisper'ın konuşma dışı etiketlerini (`[BLANK_AUDIO]`, `[Müzik]`, `(alkış)`,
+`*laughs*`, yalnız ♪ satırları; Türkçe ve İngilizce sözlük) yeni transkriptlerden atıyor; karışık satırda
+yalnız etiket siliniyor, `*vurgu*` gerçek kelimelerde kalıyor. Kalıplar Raunen'den uyarlandı (MIT,
+`THIRD_PARTY_NOTICES.md` Raunen girdisine `js/caption-text.js` eklendi). Ayarlar'da yeni **Altyazı** kartı:
+"Ses etiketlerini koru" (varsayılan kapalı) etiketleri `[Müzik]` biçiminde tutar. Yeni `js/sessiz-ses.js`
+motor çalışmadan önce sesin tepesini ölçüyor (WAV 1 MB parçalarla; bulut MP3'ünde aynı ffmpeg geçişinde
+`volumedetect`); tepe 0,001'in altındaysa Altyazı ya da Konuşmadan kes kartında "Yine de devam et" /
+"Vazgeç" soruluyor. Ücretsiz; senin girdin olmadan tam çalışır, harici şablon ya da hesap gerekmez.
+
+Bilmen gereken davranışlar:
+- whisper-cli'nin `-sns` (konuşma dışı belirteç bastırma) bayrağı **bilerek kullanılmadı**: noktalama
+  benzeri belirteçleri de bastırıyor. Filtre transkripsiyondan sonra metinde çalışır.
+- Filtre yalnız **yeni transkriptlerde** çalışır; taslaktan kurtarılan, SRT'den içe alınan ya da elle yazılan
+  satırlara dokunmaz.
+- **Konuşmadan kes'in kelime listesi filtrelenmez**: `[Müzik]` kelimesi orada konuşma gibi kalır, böylece müzikli
+  bölümler duraksama sayılıp kesilmez (3.1 davranışı).
+- Toplu klipte sessiz klip için **bir kez** sorulur; "Vazgeç" sessiz klipleri atlar, diğerleri işlenir.
+- Uyarı metni sekans kapsamında "Altyazı › Ses katmanları" der (panelde kartın adı bu; planda "Ses kanalları"
+  geçiyordu). Seçili klip kapsamında ayrı bir metin klibin kaynağını anlatır (orada katman seçimi yok).
+
+**2.1 Premiere'de dene (yaklaşık 15 dk).** `marketing/v3.2-deneme-listesi.md` › `## 2` maddeleri.
+
+**2.2 3.2.0 sürüm notu.** Sürüm 3.2.0'a geçerken `marketing/release-notes.md`'nin 3.2.0 bölümüne şu satırı ekle:
+"Altyazıda [Müzik], (alkış) ve ♪ gibi ses etiketleri artık çıkmıyor (erişilebilirlik için Ayarlar › Altyazı ›
+Ses etiketlerini koru). Ses neredeyse tamamen sessizse motor çalışmadan önce uyarı: sessize alınmış katmanlar
+için dakikalarca beklemek ya da API kotası harcamak yok." `js/app.js` YENILIKLER listesine istersen kısası.
