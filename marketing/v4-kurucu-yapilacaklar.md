@@ -1455,6 +1455,46 @@ Senin yapacakların:
 5. İstersen sonraki sürümde Roboto (Apache-2.0, `LICENSE` dosyasıyla) ya da Rajdhani / Jost eklenebilir; bütçede
    ≈ 1,1 MB yer kaldı.
 
+### Adım 21: Altyazı Efektleri › Premiere yerel çıktı (render yok, TranscriptAI şablonu)
+
+Ne değişti: Altyazı Efektleri oluşturucusunda yeni **Çıktı** seçimi: **Premiere yerel (render yok)** (varsayılan) ya da
+**Video katmanı** (önceki libass katmanı). Yerel çıktı TranscriptAI'ın altyazı şablonunu (`assets/mogrt/altyazi-efekt-v1.mogrt`,
+yazarın izniyle; TranscriptAI'ın `dist/source/dinamik_altyazi_motoru.mogrt`'u, sha256
+`32c2394de3f639fede180bc274e30166daa0375298af5c5f7ae3dfbf73989969`) aktif sekansta boş bir üst video izine doğrudan koyar;
+kartlar önizlemeyle aynı kurulur (`js/caption-mogrt-json.js`), en çok 45 sn / 8 KB'lık klip parçalarına bölünür ve
+`JSON_Input`'a yazılıp geri okunur (`jsx/host.jsx` › `KS_placeCaptionJsonMogrt`, TranscriptAI'ın `host/index.jsx`'inden
+uyarlandı; başlık + `THIRD_PARTY_NOTICES.md`). İç içe "CAPTIONS [V]" sekansı, QE, ses izi silme, razor YOK. Yalnız Pro
+(`Pro.gate("overlay")`); deneme hakkı filigranlı video katmanını koyar (düzenlenebilir şablonda filigran zorlanamaz).
+Premiere 2022 öncesi, şablon açılamazsa ya da importMGT yoksa katmana düşer. Premiere yalnız sisteme kurulu fontu çizer:
+yazı tipi kurulu değilse Arial'a düşülür ve uyarılır; isteğe bağlı **Suflo fontlarını kur** paketteki fontları kullanıcı
+font klasörüne kopyalar. `tools/verify-release.ps1` bu tek dosyaya (yol + sha256) dar bir istisna tanır; başka her `.mogrt`
+yine yayını durdurur. Doctor'a "Şablon içe aktarma (importMGT)" satırı.
+
+**21.1 İzni yazılı sakla (5 dk, yayından önce).** TranscriptAI yazarının (Aktuğ Antika) şablonu Suflo'da dağıtma iznini
+(e-posta / DM ekran görüntüsü) kendi arşivinde sakla. TranscriptAI'ın LICENSE'ı (bölüm 5) MOGRT varlıklarını MIT
+kapsamı dışında tutar; pakette olmasının dayanağı bu izin. İstersen yazara Suflo'daki kredi satırını
+(`THIRD_PARTY_NOTICES.md` › TranscriptAI) göster.
+
+**21.2 Premiere'de yokla ve dene (yaklaşık 60 dk; 26.x / 25.x, mümkünse 22.x ve 14.4 ayrı ayrı).**
+`marketing/v3.3-deneme-listesi.md` › `## 21`. En önemlisi plandaki dört yoklama: 21.4 (klip ucu kırpılınca şablon
+esnemiyor mu), 21.6 (uzun transkript: metin sınırı / akıcılık), 21.8 (yazı tipi), 21.5 (Highlight_Color yok sayılıyor;
+renk JSON'dan). 21.10 (9:16 ve 4K ölçek / konum) sonucu tutmazsa aşağıdaki 21.3'e bak.
+
+**21.3 Ölçek ve konum varsayımı (deneme sonrası, gerekirse 15 dk).** Suflo, Premiere'in AE şablonunu kendi 1920×1080
+kompozisyon boyutunda sekansın ortasına koyduğunu varsayar: 1920×1080 dışı sekanslarda klibin Motion › Scale'ini
+`max(w/1920, h/1080)` yapar ve `Caption_Position`'ı buna göre hesaplar (`js/caption-mogrt-json.js` › `yerlesim`). 21.10'da
+yazı iki kat büyük / kadraj dışı çıkarsa (Premiere şablonu zaten sığdırıyorsa) `yerlesim`'de ölçeği 1'e sabitle; testler
+(`tests/test-caption-mogrt-json.js` › Yerleşim) birlikte güncellenmeli. 9:16'da yazı bulanık görünürse aynı yer.
+
+**21.4 Parça sınırları (deneme sonrası, bilgi).** 21.6'da uzun bir videoda takılma / "geri okunan ayni degil" hatası
+görürsen `js/caption-mogrt-json.js` › `SINIR` (45 sn, 8000 bayt) ve `BAYT_KADEMELERI` (8 → 4 → 2 KB) küçültülebilir;
+panel doğrulama tutmazsa zaten küçültüp yeniden dener.
+
+**21.5 Sürüm notu (3.3.0'a geçerken).** `marketing/release-notes.md` 3.3.0 bölümüne: "Altyazı Efektleri artık
+Premiere'in kendi klibi olarak eklenir: render yok, yazı ve zamanlar Premiere'de düzenlenebilir (Pro). Video katmanı
+seçeneği duruyor. Şablon: TranscriptAI (Aktuğ Antika), izinle." README'deki "Altyazı Efektleri › Premiere yerel" satırı
+hazır.
+
 ### YouTube indirici (sol menü › YouTube İndir; bilgi ücretsiz, indirmek Pro `youtube`, 3 deneme)
 
 Ne değişti: yeni araç. Bağlantı (watch?v=, youtu.be, Shorts, m. / music.youtube.com; oynatma listesinden yalnız o video)
