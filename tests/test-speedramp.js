@@ -126,10 +126,14 @@ var segSorun = [];
           if (seg.length > 1 && seg.some(function (g) { return g.b - g.a < m; })) segSorun.push(ad + ": d < m (" + m + ")");
           if (seg.length > P.max) segSorun.push(ad + ": " + seg.length + " > " + P.max);
           if (ease === "step") {
-            // kesim yalnız hızın değiştiği yerde: tekrarlanan t ya da iki farklı anahtarın ortası
-            var izinli = {}, nk = p.beats ? keys : p.keys.map(function (k) { return { t: k[0], v: k[1] / 100 }; });
-            for (var q = 0; q + 1 < nk.length; q++) if (nk[q + 1].v !== nk[q].v) izinli[Math.round((nk[q].t + nk[q + 1].t) / 2 * F)] = 1;
-            seg.forEach(function (g) { if (g.a && !izinli[g.a]) segSorun.push(ad + ": basamak dışı kesim " + g.a); });
+            // kesim yalnız hızın değiştiği yerde (tekrarlanan t ya da iki farklı anahtarın ortası);
+            // m'den kısa basamak komşudan pay alıp genişlediği için sınır en çok m − 1 kare kayar
+            var izinli = [], nk = p.beats ? keys : p.keys.map(function (k) { return { t: k[0], v: k[1] / 100 }; });
+            for (var q = 0; q + 1 < nk.length; q++) if (nk[q + 1].v !== nk[q].v) izinli.push(Math.round((nk[q].t + nk[q + 1].t) / 2 * F));
+            seg.forEach(function (g) {
+              if (g.a && !izinli.some(function (c) { return Math.abs(c - g.a) < m; })) segSorun.push(ad + ": basamak dışı kesim " + g.a);
+            });
+            if (izinli.some(function (c) { return c > 0 && c < F; }) && F >= 2 * m && seg.length < 2) segSorun.push(ad + ": basamaklar tek parçaya düştü");
           }
           if (!nanYok(seg)) segSorun.push(ad + ": NaN");
         });
@@ -137,7 +141,7 @@ var segSorun = [];
     });
   });
 });
-ok("segment: Σd = F, bitişik, d ≥ m, sayı sınırda, step yalnız basamak karelerinde (4 fps × 4 süre × 3 yoğunluk × 3 geçiş × 11)", segSorun.length === 0, segSorun.slice(0, 6).join(" | "));
+ok("segment: Σd = F, bitişik, d ≥ m, sayı sınırda, step yalnız basamaklarda (≤ m − 1 kare kayar) ve tek parçaya düşmez (4 fps × 4 süre × 3 yoğunluk × 3 geçiş × 11)", segSorun.length === 0, segSorun.slice(0, 6).join(" | "));
 var vSeg = S.segment(vk, "smooth", 125, 25, "normal");
 ok("vites: sınırlar u = 0.40 ve 0.70'te", js(vSeg.map(function (g) { return g.a; })) === js([0, 50, 88]), js(vSeg));
 ok("segment: v parça ortalaması (Σ d·v = F·B)", yakin(vSeg.reduce(function (s, g) { return s + (g.b - g.a) * g.v; }, 0), 125 * 1.165, 1e-6));
@@ -177,6 +181,24 @@ L.forEach(function (p) {
   });
 });
 ok("plan: her önayar Basamaklı'da rampa (duz yok), uç parçalar ilk/son anahtarın hızında, uç hız oranı korunur", stepSorun.length === 0, stepSorun.slice(0, 5).join(" | "));
+// Uç basamak yarıya indiği için kısa klipte m'den kısa kalabilir: komşusuna katılmaz, m'ye genişler
+// (eskiden tek parçaya düşüp duz atardı; inceleme bulgusu)
+var kisaStep = [];
+[["giris", { frames: 60, fps: 29.97, handleSec: 1000, hitFrac: 0.3 }, {}], ["doruk", { frames: 30, fps: 59.94, handleSec: 1000, hitFrac: 0.5 }, {}],
+ ["ritim", { frames: 50, fps: 59.94, handleSec: 1000, beatsU: [0.5] }, { density: "few" }], ["giris", { frames: 19, fps: 29.97, handleSec: 60 }, {}],
+ ["giris", { frames: 60, fps: 29.97, hitFrac: 0.4 }, { density: "few", k: 1.4 }]].forEach(function (c) {
+  var o = { ease: "step" }; for (var a in c[2]) o[a] = c[2][a];
+  try { var pl = S.plan(c[0], o, c[1]); if (pl.segments.length < 2 || !(pl.maxV / pl.minV > 1.5)) kisaStep.push(c[0] + " F" + c[1].frames + " " + js(pl.segments)); } catch (e) { kisaStep.push(c[0] + " F" + c[1].frames + " " + (e.kod || e.message)); }
+});
+var stepDuz = [];
+L.forEach(function (p) {
+  [23.976, 29.97, 59.94].forEach(function (fps) { ["few", "normal"].forEach(function (den) { [null, 0.25, 0.5].forEach(function (hf) {
+    for (var F = 12; F <= 90; F += 3) {
+      try { S.plan(p.id, { ease: "step", density: den }, { frames: F, fps: fps, handleSec: 1000, hitFrac: hf, beatsU: [0.3, 0.7] }); } catch (e) { if (e.kod === "duz") stepDuz.push(p.id + " " + fps + " " + den + " F" + F); else throw e; }
+    }
+  }); }); });
+});
+ok("plan: Basamaklı kısa klipte de rampa (uç basamak m'ye genişler, duz yok; 11 önayar × 12–90 kare × 3 fps × 2 yoğunluk × 3 hizalama)", kisaStep.length === 0 && stepDuz.length === 0, kisaStep.concat(stepDuz).slice(0, 5).join(" | "));
 var ritStep = S.plan("ritim", { ease: "step", mode: "balanced" }, { frames: 250, fps: 25, beatsU: [0.2, 0.4, 0.6, 0.8] });
 ok("plan: Basamaklı Ritme Rampa vuruşlarda yavaş, aralarda hızlı", [0.2, 0.4, 0.6, 0.8].every(function (u) { return kaynakAn(ritStep, u * 250 + 0.5) - kaynakAn(ritStep, u * 250 - 0.5) < 1; }) &&
   [0.02, 0.3, 0.5, 0.7, 0.98].every(function (u) { return kaynakAn(ritStep, u * 250 + 0.5) - kaynakAn(ritStep, u * 250 - 0.5) > 1; }), js(ritStep.segments));
@@ -254,6 +276,21 @@ var hizStep = [];
   });
 });
 ok("alignHit step: basamaklar bükülen eğriyle kayar, vuruş anı yine 1 kare içinde", hizStep.length === 0, hizStep.join(" | "));
+// Vuruş anı yazılacak parçalarda ölçülür: 1 kareden fazla kayarsa hitKaydi ve err gerçek kayma (sn)
+var hitSessiz = [];
+L.forEach(function (p) {
+  if (p.hit === null) return;
+  ["smooth", "step"].forEach(function (e) { [59.94, 25].forEach(function (fps) { [0.25, 0.5, 0.75].forEach(function (f) { [30, 120, 150].forEach(function (F) {
+    var pl;
+    // kısa klipte Yumuşak Nabız gibi tek hız çıkanlar duz ile atar (ayrı denenir)
+    try { pl = S.plan(p.id, { ease: e, density: "few", mode: F === 150 ? "auto" : "balanced" }, { frames: F, fps: fps, hitFrac: f, handleSec: F === 150 ? 1000 : null }); } catch (eD) { if (eD.kod === "duz" && e !== "step") return; throw eD; }
+    var kay = Math.abs(kaynakAn(pl, pl.hit.u * F) - f * F);
+    if (kay > 1.05 && (pl.warnings.indexOf("hitKaydi") === -1 || pl.hit.err < (kay - 0.05) / fps)) hitSessiz.push(p.id + " " + e + " " + fps + " f" + f + " F" + F + " kayma " + kay.toFixed(2) + " " + js(pl.warnings));
+  }); }); }); });
+});
+var doruk2 = S.plan("doruk", { ease: "step" }, { frames: 120, fps: 59.94, hitFrac: 0.25 });
+ok("plan: vuruş anı parçalarda 1 kareden çok kayarsa hitKaydi + gerçek kayma (Doruk Basamaklı 59.94p 2 sn)", hitSessiz.length === 0 &&
+  (Math.abs(kaynakAn(doruk2, doruk2.hit.u * 120) - 30) <= 1 || doruk2.warnings.indexOf("hitKaydi") !== -1), hitSessiz.slice(0, 4).join(" | "));
 var disari = S.plan("darbe", { mode: "balanced" }, { frames: 200, fps: 25, hitFrac: 0.02 });
 ok("alignHit: aralık dışı hedef [0.1, 0.9]'a sınırlanır (hitKaydi)", disari.hit.u === 0.1 && disari.warnings.indexOf("hitKaydi") !== -1 && disari.hit.err > 0, js(disari.hit));
 var al = S.alignHit(S.get("dalis").keys, 0.5, 0.5, "balanced");

@@ -284,7 +284,7 @@
     var hc = clamp(h, 0.1, 0.9);
     var out = ks.map(function (k) {
       var t = k.t <= hitU ? k.t * hc / hitU : hc + (k.t - hitU) * (1 - hc) / (1 - hitU);
-      return { t: t, v: k.v };
+      return { t: clamp(t, 0, 1), v: k.v };
     });
     var got = mode === "exact" ? a * hc : a * hc / (a * hc + b * (1 - hc));
     return { keys: out, hitU2: hc, err: Math.abs(got - f) * (Number(Lsec) > 0 ? Number(Lsec) : 1), clamped: Math.abs(hc - h) > 1e-9 };
@@ -326,7 +326,8 @@
    * Eğriyi kareye oturan parçalara böler: [{a, b (kare), v}]. Her kare merkezinde 4 alt
    * örnekle okunur; log2(hız) aralığı tau'yu aşmadıkça parça büyür. Sert basamaklar
    * (tekrarlanan t) kareye yuvarlanıp zorunlu kesim olur; step'te YALNIZ basamaklarda (hızın
-   * değiştiği orta noktalarda) kesilir. Kısa parça komşusuna katılır; parça sayısı sınırı aşılırsa tau × 1.35.
+   * değiştiği orta noktalarda) kesilir. Kısa parça komşusuna katılır (step'te önce komşudan pay alıp
+   * m'ye genişler); parça sayısı sınırı aşılırsa tau × 1.35.
    * v = parçanın ortalaması (integral): Σ d·v tam olarak F·B olur.
    */
   function segment(keys, ease, F, fps, density) {
@@ -374,6 +375,37 @@
       return runs;
     }
 
+    // Basamaklı: her parça gerçek bir basamak. m'den kısa parça komşusuna KATILMAZ (yarıya inen uç
+    // basamağı, ör. Hızlı Giriş'in %500'ü, kısa klipte tek parçaya yani "duz"a düşerdi); sınırları
+    // m'nin üstünde kalan komşulardan pay alınarak (önce iki yandan eşit) m'ye genişletilir. v yine
+    // parça ortalaması, her sınırdaki kaynak tam. Komşular yetmezse en yakın hızlı komşuya katılır.
+    function kisaGenislet(runs) {
+      function uz(q) { return runs[q][1] - runs[q][0]; }
+      for (var tur = 0; tur < 4 * runs.length + 4 && runs.length > 1; tur++) {
+        var r = -1;
+        for (var q = 0; q < runs.length; q++) if (uz(q) < m && (r < 0 || uz(q) < uz(r))) r = q;
+        if (r < 0) break;
+        var eksik = m - uz(r);
+        var solPay = r > 0 ? Math.max(0, uz(r - 1) - m) : 0;
+        var sagPay = r < runs.length - 1 ? Math.max(0, uz(r + 1) - m) : 0;
+        if (solPay + sagPay < eksik) {
+          var hedef = r === 0 ? 1 : r === runs.length - 1 ? r - 1 : null;
+          if (hedef === null) {
+            var me = lg(ort(runs[r][0], runs[r][1]));
+            hedef = Math.abs(lg(ort(runs[r - 1][0], runs[r - 1][1])) - me) <= Math.abs(lg(ort(runs[r + 1][0], runs[r + 1][1])) - me) ? r - 1 : r + 1;
+          }
+          var x = Math.min(r, hedef);
+          runs.splice(x, 2, [runs[x][0], runs[x + 1][1]]);
+          continue;
+        }
+        var solAl = Math.min(solPay, Math.ceil(eksik / 2)), sagAl = Math.min(sagPay, eksik - solAl);
+        solAl = eksik - sagAl;
+        if (solAl) { runs[r - 1][1] -= solAl; runs[r][0] -= solAl; }
+        if (sagAl) { runs[r + 1][0] += sagAl; runs[r][1] += sagAl; }
+      }
+      return runs;
+    }
+
     var runs;
     if (ease === "step") {
       var kesim = Object.keys(zorunlu).map(Number).sort(function (a, b) { return a - b; });
@@ -381,7 +413,7 @@
       var s0 = 0;
       kesim.forEach(function (c) { runs.push([s0, c]); s0 = c; });
       runs.push([s0, F]);
-      runs = kisaBirlestir(runs);
+      runs = kisaGenislet(runs);
     } else {
       var fl = new Array(F);
       for (i = 0; i < F; i++) {
@@ -546,6 +578,17 @@
 
     var src = 0, mn = Infinity, mx = 0;
     for (i = 0; i < v.length; i++) { src += d[i] * v[i]; mn = Math.min(mn, v[i]); mx = Math.max(mx, v[i]); }
+    // Vuruş anı hatası yazılacak parçalarda ölçülür (sn): eğri üzerinde tam hizalanan an, kısa
+    // parçanın komşusuna katılması ya da sınırlama yüzünden kayabilir. Hedef kaynak: f·F
+    var hitErr = 0;
+    if (sh.hit) {
+      var hx = sh.hit.u * F, ht = 0, hs = 0;
+      for (i = 0; i < v.length; i++) {
+        if (ht + d[i] >= hx) { hs += (hx - ht) * v[i]; break; }
+        ht += d[i]; hs += d[i] * v[i];
+      }
+      hitErr = Math.max(sh.hit.err, Math.abs(hs - sh.hit.f * F) / fps);
+    }
     // Tek hız (tek parça ya da hepsi %1 içinde): rampa değil. Dengeli'de bu %100 demek; host yine de
     // sesi kapatıp "başarılı" derdi. Vuruşsuz Ritme Rampa kendi uyarısıyla (vurusYok) döner.
     if ((v.length < 2 || mx / mn < 1.01) && sh.warnings.indexOf("vurusYok") === -1) {
@@ -557,11 +600,11 @@
       id: id, mode: mode, k: yuvarla(k, 3), c: yuvarla(c, 4), ease: o.ease,
       segments: d.map(function (x, j) { return { d: x, v: v[j] }; }),
       F: F, fps: fps, srcFrames: yuvarla(src, 4), B: yuvarla(src / F, 4), minV: mn, maxV: mx,
-      hit: sh.hit ? { u: yuvarla(sh.hit.u, 4), f: sh.hit.f, err: yuvarla(sh.hit.err, 4) } : null,
+      hit: sh.hit ? { u: yuvarla(sh.hit.u, 4), f: sh.hit.f, err: yuvarla(hitErr, 4) } : null,
       warnings: [],
       keys: sh.keys.map(function (x) { return { t: x.t, v: clamp(x.v * c, MIN_V, MAX_V) }; })
     };
-    if (sh.hit && (sh.hit.clamped || sh.hit.err > 1 / fps)) uyarilar.push("hitKaydi");
+    if (sh.hit && (sh.hit.clamped || hitErr > 1 / fps + 1e-9)) uyarilar.push("hitKaydi");
     if (Number(clip.srcFps) > 0 && quality(sonuc, fps, Number(clip.srcFps)).warn) uyarilar.push("takilabilir");
     uyarilar.forEach(function (w) { if (sonuc.warnings.indexOf(w) === -1) sonuc.warnings.push(w); });
     return sonuc;
