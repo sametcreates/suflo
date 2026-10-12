@@ -285,8 +285,9 @@ function baglanti(o) {
   var kod = fnGovde(cap, "function vazgecHatasi(") + fnGovde(cap, "function sessizTopluMetni(") + fnGovde(cap, "function sessizSekmesi(") +
     fnGovde(cap, "function sessizOnay(") + fnGovde(cap, "async function sessizDenetim(") +
     "\nreturn { sessizDenetim: sessizDenetim, vazgecHatasi: vazgecHatasi, sessizTopluMetni: sessizTopluMetni };";
-  var api = new Function("SSES", "K", "KApp", "el", "status", "mp3Tepeleri", "SESSIZ_KLIP", "SESSIZ_SEKANS", kod)(
-    SS, K, KApp, function (id) { return dom[id] || null; }, function (m) { durumlar.push(m); }, mp3, "KLIP-METNI", "SEKANS-METNI");
+  // aktifIptal: Altyazı oluştur'un iptal jetonu (3.2 adım 3); soru açıkken İptal soruyu "Vazgeç" gibi kapatır
+  var api = new Function("SSES", "K", "KApp", "el", "status", "mp3Tepeleri", "SESSIZ_KLIP", "SESSIZ_SEKANS", "aktifIptal", kod)(
+    SS, K, KApp, function (id) { return dom[id] || null; }, function (m) { durumlar.push(m); }, mp3, "KLIP-METNI", "SEKANS-METNI", o.iptal || null);
   return { api: api, dom: dom, loglar: loglar, mp3: mp3, durumlar: durumlar, bildirimler: bildirimler, gidilen: gidilen };
 }
 var sessizYol = path.join(tmp, "cap_sessiz.wav"), sesliYol = path.join(tmp, "cap_sesli.wav");
@@ -311,6 +312,24 @@ okAsync("panel: 'Vazgeç' -> false; kutu verilen sekmede (tc-sessiz), sekans met
   b2.dom["tc-sessiz-vazgec"].onclick();
   return p2.then(function (devam) { return [acik, devam]; });
 }), function (r) { return r[0] && r[1] === false && b2.dom["tc-sessiz"].hidden === true ? true : JSON.stringify(r); });
+// 3.2 adım 3: soru açıkken Altyazı oluştur'un İptal'i soruyu kapatır (false); go() jetona bakıp "İptal edildi" der
+var jetonDinleyici = [], jeton = { iptalEdildi: false, dinle: function (f) { jetonDinleyici.push(f); return function () { jetonDinleyici = jetonDinleyici.filter(function (x) { return x !== f; }); }; },
+  iptal: function () { jeton.iptalEdildi = true; jetonDinleyici.slice().forEach(function (f) { f(); }); } };
+var bI = baglanti({ iptal: jeton });
+var pI = bI.api.sessizDenetim(sessizYol, { klip: true });
+okAsync("panel: soru açıkken İptal -> false, kutu kapanır, dinleyici bırakılır", sonraki().then(function () {
+  var acik = bI.dom["cap-sessiz"].hidden === false;
+  jeton.iptal();
+  return pI.then(function (d) { return [acik, d]; });
+}), function (r) {
+  return r[0] && r[1] === false && bI.dom["cap-sessiz"].hidden === true && bI.dom["cap-sessiz-devam"].onclick === null && jetonDinleyici.length === 0 ? true : JSON.stringify([r, jetonDinleyici.length]);
+});
+var bJ = baglanti({ iptal: { iptalEdildi: false, dinle: function () { return function () { bJ.birakildi = true; }; } } });
+var pJ = bJ.api.sessizDenetim(sessizYol, { klip: true });
+okAsync("panel: soru cevaplanınca iptal dinleyicisi bırakılır", sonraki().then(function () {
+  bJ.dom["cap-sessiz-devam"].onclick();
+  return pJ;
+}), function (d) { return d === true && bJ.birakildi === true ? true : JSON.stringify([d, bJ.birakildi]); });
 var b3 = baglanti();
 okAsync("panel: sesli WAV'da soru yok, kutu kapalı kalır", b3.api.sessizDenetim(sesliYol, {}), function (d) {
   return d === true && b3.dom["cap-sessiz"].hidden === true && !b3.loglar.length ? true : JSON.stringify([d, b3.loglar]);

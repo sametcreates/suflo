@@ -1034,7 +1034,7 @@ window.K = (function () {
           try { if (aktifReq) aktifReq.destroy(); } catch (e2) {}
           try { if (aktifOut) aktifOut.destroy(); } catch (e3) {}
           var kalanIptal = partSize();
-          log("indirme iptal edildi" + (kalanIptal ? ", yarim dosya korunuyor: " + kalanIptal + " bayt" : ""));
+          log("indirme iptal edildi, yarim dosya korunuyor: " + kalanIptal + " bayt");
           resolve({ ok: false, iptal: true, error: "İptal edildi", kept: kalanIptal });
         });
       }

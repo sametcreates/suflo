@@ -236,6 +236,7 @@
     <div id="cap-setup" class="setup-note" hidden>
       <p id="cap-setup-text"><strong>Suflo Altyazı Motoru kurulmalı.</strong> Tek motor; doğru modeli, GPU'yu ve güvenli yedeği kendisi yönetir. Yerel kullanımda hesap, anahtar veya internet gerekmez.</p>
       <button id="cap-local-install" class="btn primary" style="width:100%">Yerel motoru indir & kur</button>
+      <button id="cap-local-cancel" class="link-btn kurulum-iptal" type="button" hidden title="İnen kısım korunur; yeniden kurunca kaldığı yerden devam eder">İndirmeyi iptal et</button>
       <p class="hint" id="cap-ffmpeg-ipucu" hidden style="margin:8px 0 6px">
         Not: ses dönüştürme için <b>ffmpeg</b> de gerekiyor (her iki motorda da).
         Panel bunu ilk kurulumda kendisi indirir, senin bir şey yapmana gerek yok.
@@ -506,6 +507,8 @@
       <button id="cap-go" class="btn primary big cta" disabled>
         <span class="btn-label">Altyazı oluştur<em id="cap-go-scope">Seçili klip</em></span>
       </button>
+      <!-- İş sürerken "Altyazı oluştur"un yerini alır (js/captions.js setBusy); ses dışa aktarımı sırasında kapalı -->
+      <button id="cap-cancel" class="btn outline big iptal-btn" type="button" hidden title="İşi durdurur: geçici ses ve motor dosyaları silinir, ekrandaki altyazı olduğu gibi kalır.">İptal</button>
       <button id="cap-restore" class="btn outline big" hidden></button>
       <button id="cap-shorts-al" class="btn outline big" type="button" hidden title="Bu sekans Suflo'nun Shorts sekansı: ana videonun transkriptinden bu anın satırları yüklenir"></button>
       <button id="cap-import-srt" class="btn outline big">
@@ -514,6 +517,15 @@
       </button>
       <div id="cap-progress" class="progress-line" hidden><i></i></div>
       <div id="cap-status" class="inline-status"></div>
+      <!-- Canlı transkripsiyon (js/whisper-akis.js): motor çalışırken akan geçici satırlar; salt okunur,
+           taslağa / geri al yığınına girmez, nihai satırlar gelince silinir -->
+      <div id="cap-canli" class="canli-kutu" role="region" aria-label="Canlı transkripsiyon" hidden>
+        <div class="canli-ust">
+          <span class="canli-rozet">canlı</span>
+          <span class="canli-not">Geçici satırlar: motor bitince düzenlenebilir altyazıyla değişir.</span>
+        </div>
+        <div id="cap-canli-liste" class="canli-liste" role="log" aria-readonly="true"></div>
+      </div>
       <!-- Sessiz ses uyarısı (js/sessiz-ses.js): motor çalışmadan önce, tepe 0,001 altındaysa -->
       <div id="cap-sessiz" class="sessiz-uyari" role="alert" hidden>
         <span id="cap-sessiz-metin" class="sessiz-uyari-metin"></span>
@@ -914,6 +926,7 @@
       <button id="cut-analyze" class="btn primary big" disabled>
         <span class="btn-label">Sessizlikleri bul</span>
       </button>
+      <button id="cut-cancel" class="btn outline big iptal-btn" type="button" hidden title="ffmpeg analizini durdurur; önceki sonuç ekranda kalır">İptal</button>
     </div>
     <div id="cut-progress" class="progress-line" hidden><i></i></div>
     <div id="cut-status" class="inline-status"></div>
@@ -1790,6 +1803,7 @@
         <label>Yerel çekirdek</label>
         <span id="set-local-status" class="inline-status" style="margin:0;flex:1">kontrol ediliyor…</span>
         <button id="set-local-install" class="btn" hidden>İndir & kur</button>
+        <button id="set-local-cancel" class="btn" type="button" hidden title="İnen kısım korunur; yeniden kurunca kaldığı yerden devam eder">İptal</button>
       </div>
       <div class="row">
         <label>Doğruluk modeli</label>
@@ -2249,6 +2263,7 @@
   <script src="js/caption-quality.js"></script>
   <script src="js/whisper-words.js"></script>
   <script src="js/caption-text.js"></script>
+  <script src="js/whisper-akis.js"></script>
   <script src="js/sessiz-ses.js"></script>
   <script src="js/diller.js"></script>
   <script src="js/auto-emoji.js"></script>

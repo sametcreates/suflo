@@ -248,6 +248,24 @@ window.KApp = (function () {
   /* ---------------- Yerel Whisper kurulumu ---------------- */
 
   var installingLocal = false;
+  // Süren kurulumun iptal jetonu (K.iptalJetonu): motor/model/ffmpeg indirmesi kesilir, .part korunur
+  var kurulumJetonu = null;
+
+  // Ayarlar'daki ve Altyazı kurulum kartındaki "İptal" düğmeleri yalnız kurulum sürerken görünür
+  function kurulumIptalDugmeleri(acik) {
+    ["set-local-cancel", "cap-local-cancel"].forEach(function (id) {
+      var b = el(id);
+      if (!b) return;
+      b.hidden = !acik;
+      b.disabled = false;
+    });
+  }
+
+  function kurulumuIptalEt() {
+    if (!installingLocal || !kurulumJetonu) return;
+    ["set-local-cancel", "cap-local-cancel"].forEach(function (id) { if (el(id)) el(id).disabled = true; });
+    kurulumJetonu.iptal();
+  }
 
   function refreshEngineRoute() {
     var out = el("set-engine-route");
@@ -315,8 +333,10 @@ window.KApp = (function () {
     if (installingLocal) return null;
     if (!K.nodeOK) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return null; }
     installingLocal = true;
+    kurulumJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
+    kurulumIptalDugmeleri(true);
     var box = el("set-local-status");
-    var kurulumHatasi = null;
+    var kurulumHatasi = null, kurulumIptal = "";
     var sonuc = null;
     // ilerleme metnini yazdığımız öğenin kendi etiketi: iş bitince geri konur,
     // yoksa kurulum kartındaki düğme "Motor iniyor… %62" yazısında donup kalıyor
@@ -335,7 +355,7 @@ window.KApp = (function () {
       var modelId = opts.modelId || (el("set-model") && el("set-model").value) || K.settings().model || "turbo";
 
       var res = await KEngine.install({
-        modelId: modelId, useGpu: useGpu, onStatus: say, ffmpegArkada: !!opts.ffmpegArkada,
+        modelId: modelId, useGpu: useGpu, onStatus: say, ffmpegArkada: !!opts.ffmpegArkada, iptal: kurulumJetonu,
         onFfmpeg: function (m) {
           var fb = el("set-ffmpeg-status");
           if (fb) { fb.className = "inline-status"; fb.textContent = m; }
@@ -355,11 +375,19 @@ window.KApp = (function () {
       toast("Hazır: " + res.model.label.split(" —")[0] + donanim +
         (res.vad ? " · sessizlik atlama açık" : ""), "good");
     } catch (e) {
-      // kurulum hatası en kritik an: çözüm önerisiyle ve uzun süre göster
-      kurulumHatasi = K.hataYardimi(e);
-      toast(kurulumHatasi, "bad", 12000);
+      if (e && e.iptal) {
+        // kullanıcı iptal etti: hata değil; inen kısım korunur, yeniden kurunca kaldığı yerden devam eder
+        kurulumIptal = e.message || "İptal edildi";
+        toast(kurulumIptal, "warn", 8000);
+      } else {
+        // kurulum hatası en kritik an: çözüm önerisiyle ve uzun süre göster
+        kurulumHatasi = K.hataYardimi(e);
+        toast(kurulumHatasi, "bad", 12000);
+      }
     } finally {
       installingLocal = false;
+      kurulumJetonu = null;
+      kurulumIptalDugmeleri(false);
       if (progressEl && progressEski !== null) progressEl.textContent = progressEski;
       refreshLocalStatus();
       KCaptions.refreshSetup();
@@ -367,6 +395,9 @@ window.KApp = (function () {
       if (kurulumHatasi) {
         box.className = "inline-status bad";
         box.textContent = "✕ " + kurulumHatasi;
+      } else if (kurulumIptal) {
+        box.className = "inline-status warn";
+        box.textContent = kurulumIptal;
       }
     }
     return sonuc;
@@ -893,6 +924,9 @@ window.KApp = (function () {
     });
 
     el("set-local-install").addEventListener("click", function () { installLocalWhisper(); });
+    // İptal: Ayarlar'da ve Altyazı kurulum kartında (indirme kesilir, .part korunur)
+    if (el("set-local-cancel")) el("set-local-cancel").addEventListener("click", kurulumuIptalEt);
+    if (el("cap-local-cancel")) el("cap-local-cancel").addEventListener("click", kurulumuIptalEt);
     if (el("set-model")) {
       el("set-model").addEventListener("change", function () {
         var st2 = K.settings();

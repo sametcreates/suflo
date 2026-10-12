@@ -35,7 +35,9 @@
     // Konuşmadan kes: yapıştırılan senaryo ve inceleme listesindeki konuşma parçaları
     "tc-script", "tc-review",
     // Kullanıcının kütüphane dosya adları (bir SFX'in adı "Kapat" ise "Close" olmasın)
-    "sfx-list", "emoji-assets-grid"
+    "sfx-list", "emoji-assets-grid",
+    // Canlı transkripsiyon: motorun akan geçici satırları (3.2)
+    "cap-canli-liste"
   ];
   var UI_IN_USER_ZONE = { BUTTON: 1, LABEL: 1, OPTION: 1, SELECT: 1 };
   // Kullanıcı kabının İÇİNDE yine de arayüz olan adacıklar: boş durum / ipucu satırları
