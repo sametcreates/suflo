@@ -316,7 +316,7 @@ ok("sayfa: renksiz üçüncü kodda kutular gizli, eski renk ve font kalmaz", s5
 // İngilizce sayfa (docs/en/stil.html, <html lang="en">)
 var e1 = sayfa("#" + SS.encode({ styleId: "ziplama", overrides: { renk: "#FF0000", konum: 8 }, author: "ayse" }), "en");
 ok("EN sayfa: İngilizce stil adı, konum, başlık, video yolu", e1.D["stil-ad"].textContent === "Bouncy · @ayse" && e1.D["stil-konum"].textContent === "Top" &&
-  e1.doc.title === "Bouncy · Shared Suflo Style" && e1.D["stil-font"].textContent === "The style's own font" &&
+  e1.doc.title === "Bouncy · Shared Caption Effect" && e1.D["stil-font"].textContent === "The style's own font" &&
   e1.D["stil-video"].src === "../gorseller/suflo-stiller/ziplama.webm" && e1.D["renk-yazi"].title === "Text #ff0000", JSON.stringify([e1.D["stil-ad"].textContent, e1.doc.title, e1.D["renk-yazi"].title]));
 var e2 = sayfa("#SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzayli" })), "en");
 ok("EN sayfa: hata metni İngilizce", !e2.D["stil-hata"].hidden && e2.D["stil-hata-metin"].textContent === "This style is not available in this Suflo version.");

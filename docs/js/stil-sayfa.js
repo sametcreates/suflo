@@ -31,7 +31,7 @@
     surum: "This code was made with a newer Suflo version; update Suflo.",
     stilYok: "This style is not available in this Suflo version.",
     yazar: "The author name in this style code is invalid.",
-    baslik: " · Shared Suflo Style",
+    baslik: " · Shared Caption Effect",
     kendiFontu: "The style's own font",
     kendiKonumu: "The style's own position",
     renk: { "renk-yazi": "Text", "renk-kontur": "Outline", "renk-vurgu": "Highlight" },
@@ -39,7 +39,7 @@
     video: "../gorseller/suflo-stiller/"
   } : {
     yuklenemedi: "Sayfa tam yüklenemedi; yenile.",
-    baslik: " · Paylaşılan Suflo Stili",
+    baslik: " · Paylaşılan Altyazı Efekti",
     kendiFontu: "Stilin kendi yazı tipi",
     kendiKonumu: "Stilin kendi konumu",
     renk: { "renk-yazi": "Yazı", "renk-kontur": "Kontur", "renk-vurgu": "Vurgu" },

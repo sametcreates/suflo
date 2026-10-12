@@ -1335,3 +1335,45 @@ zamanlaması (DTW)' vurguyu sözcüğün söylendiği ana oturtur. Yeni Pro arac
 
 **5.5 Premiere'de dene (yaklaşık 40 dk).** `marketing/v3.2-deneme-listesi.md` › `## 5` maddeleri; en önemlisi 5.6
 (her modelde ve derlemede DTW) ve 5.10–5.12 (deneme hakkı, büyük harf, `.en.srt`).
+
+## 3.3
+
+3.3'ün kapsamı: `marketing/alti-repo-plan.json` › `plan.build_order` adım 16, 17, 18 ve 21 (Altyazı Efektleri
+oluşturucusu, bu sırayla) ve YouTube indirici. Her adım kendi alt bölümünü ekler. Elle Premiere denemeleri
+`marketing/v3.3-deneme-listesi.md`'de.
+
+### Adım 16: Altyazı Efektleri oluşturucusu (Suflo Stilleri galerisinin yerine)
+
+Ne değişti: Altyazı sekmesindeki 12 kartlık "Suflo Stilleri" galerisi kalktı; yerinde "Altyazı Efektleri": beş
+hazır görünüm çipi, büyük canlı önizleme (gerçek libass çıktısı) ve giriş / vurgu animasyonu, kelime vurgusu, renk,
+yazı tipi + kalın / italik, boyut, kontur, satır sayısı, en çok kelime, konum. Stil motorunda tek temel stil `efekt`
+(`js/style-engine.js`), model `js/altyazi-efekt.js`. Eski 12 stil motorda duruyor: eski kayıtlar, 3.2 SFL1 kodları
+ve Shorts Paketi seçimleri en yakın görünüme taşınıyor (yazı tipi, renk, konum korunuyor). "Suflo Stilleri" her
+yerde "Altyazı Efektleri" (İngilizce "Caption Effects"). Katman Pro.gate("overlay") ile, mevcut 3 deneme hakkıyla.
+Animated Captions / TranscriptAI'dan yalnız fikir alındı (temiz oda); bu adımda kod ya da MOGRT paketlenmedi.
+
+**16.1 Görünümleri onayla (5 dk).** Beş görünümün adı ve değeri `js/altyazi-efekt.js` › `GORUNUMLER`'de: Temiz,
+Vurucu, Canlı, Zarif, Glitch. Ad ya da renk değiştirmek istersen orada değiştir; "Temiz" stil motorundaki `efekt`
+varsayılanıyla birebir aynı kalmalı (`js/style-engine.js` › `STYLES.efekt.style`; test denetler). Yeni ad eklersen
+`i18n/en.js`'e İngilizcesini yaz (ör. "Vurucu": "Punchy").
+
+**16.2 Premiere'de dene (yaklaşık 40 dk).** `marketing/v3.3-deneme-listesi.md` › `## 16` maddeleri; en önemlisi 16.2–16.4
+(gerçek önizleme ve animasyonlar), 16.8–16.9 (eski kayıt ve eski kod taşıma), 16.11–16.12 (deneme hakkı ve timeline).
+
+**16.3 Site görselleri (isteğe bağlı, 20 dk).** Site metni güncellendi (`docs/index.html`, `docs/en/index.html`,
+`docs/en/pro.html`, iki blog yazısı, `docs/stil.html`). Eski galeriyi gösteren görseller kaldı: `docs/gorseller/v3/kelime-vurgusu.webp`
+(alt metni "12 animasyonlu altyazı stili") ve varsa Pro sayfasındaki stil kartı ekran görüntüleri. 3.3 panelinden
+Altyazı Efektleri bölümünün yeni ekran görüntüsünü al (Vurucu seçili, önizleme oynarken) ve değiştir; alt metni
+"Altyazı Efektleri: giriş ve vurgu animasyonlu kendi altyazın" yap. `docs/gorseller/suflo-stiller/efekt.webm` stil
+sayfasının yeni vitrini (`node tools/render-style-previews.js --site --id efekt` ile yeniden üretilebilir).
+
+**16.4 Sürüm notu ve tanıtım (3.3.0'a geçerken).** `marketing/release-notes.md`'nin 3.3.0 bölümüne: "Altyazı
+Efektleri: eski stil galerisinin yerinde kendi altyazı efektini kur: giriş (Pop, Belirme, Yukarı / Aşağı kay, Zıpla) ve
+vurgu animasyonu (Zıpla, Titre, Glitch), kelime vurgusu, renk, yazı tipi, kalın / italik, satır ve kelime sayısı; beş
+hazır görünümle başla. Eski stillerin ve stil kodların en yakın görünüme taşınır." `js/app.js` YENILIKLER listesine
+istersen kısası. Eski sürüm notlarındaki (3.0–3.2) "Suflo Stilleri" geçmiş kayıt olduğu için bilerek değişmedi.
+
+**16.5 Sonraki adımlar için not.** Yerel (render'sız) MOGRT çıktısı adım 21'de: TranscriptAI şablonu
+(`dist/source/dinamik_altyazi_motoru.mogrt`, izinli) o adımda pakete girer. `tools/verify-release.ps1` `.mogrt`
+dosyalarını ücretli içerik sayıp yayını durduruyor; adım 21 o dosyayı ayrıca izinli listeye almalı. Oluşturucu
+kontrolleri şablonun JSON sözleşmesine 1:1 eşleniyor (`js/altyazi-efekt.js` › `sablonStili`, `sablonIndeksleri`).
