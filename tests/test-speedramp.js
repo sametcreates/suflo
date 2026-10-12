@@ -208,6 +208,21 @@ var nabizKisa = [];
     if (!(pl.segments.length >= 2 && pl.maxV / pl.minV > 1.5)) nabizKisa.push(js(c) + " " + js(pl.segments));
   } catch (e) { nabizKisa.push(js(c) + " " + (e.kod || e.message)); }
 });
+var nabizHit = [];
+[[25, 15, "few", 0.4], [29.97, 22, "few", 0.5], [59.94, 26, "normal", 0.5], [25, 20, "few", 0.3], [59.94, 46, "few", 0.5]].forEach(function (c) {
+  var pl;
+  try { pl = S.plan("nabiz", { ease: "step", density: c[2], mode: "balanced" }, { frames: c[1], fps: c[0], hitFrac: c[3] }); } catch (e) { return; }
+  var x = pl.hit.u * c[1], t = 0, hv = null, digerleri = [];
+  pl.segments.forEach(function (g) { if (hv === null && t + g.d > x) hv = g.v; else digerleri.push(g.v); t += g.d; });
+  // Nabız vuruşu yavaş platoda: vuruşu içeren parça en az bir diğerinden yavaş olmalı (ters rampa yazılmaz)
+  if (!(digerleri.some(function (v) { return hv < v; }))) nabizHit.push(js(c) + " " + js(pl.segments) + " vuruş " + x.toFixed(1));
+});
+ok("son çare kesim vuruş anına uyar: Nabız'ın yavaş vuruşu yavaş parçada (ya da duz)", nabizHit.length === 0, nabizHit.join(" | "));
+var duzB = [], t0 = Date.now();
+for (var bi = 0; bi < 24; bi++) duzB.push((bi + 0.5) / 24);
+try { S.plan("ritim", { ease: "step", slowV: 0.996, fastV: 1.004 }, { frames: 18000, fps: 30, beatsU: duzB }); } catch (e) { /* duz beklenir */ }
+var sure = Date.now() - t0;
+ok("son çare tarama neredeyse düz eğride çalışmaz (18000 kare < 600 ms)", sure < 600, sure + " ms");
 ok("plan: Basamaklı Nabız çok kısa klipte hizalamayla da rampa (tek hıza erimez)", nabizKisa.length === 0, nabizKisa.join(" | "));
 // Ritme Rampa çok sık vuruşta: genişletme turu sınırı birleşmelerle küçülmez, her parça ≥ m
 var sikSorun = [];
@@ -290,11 +305,33 @@ var hizStep = [];
 [0.25, 0.4, 0.5, 0.62].forEach(function (f) {
   ["darbe", "cikis", "giris", "atilim"].forEach(function (id) {
     var pl = S.plan(id, { mode: "balanced", ease: "step" }, { frames: 200, fps: 25, hitFrac: f });
-    var src = kaynakAn(pl, pl.hit.u * pl.F);
-    if (Math.abs(src - f * pl.F) > 1) hizStep.push(id + " f" + f + ": " + src.toFixed(2) + " ≠ " + (f * pl.F));
+    // vuruş anı sert basamaktaysa (Giriş/Çıkış) kesim kareye yuvarlanır: kaynakta birkaç kare, timeline'da
+    // bir kareden az; görünür kayma (ikisi de > 1 kare) varsa hitKaydi şart
+    var es = Math.abs(kaynakAn(pl, pl.hit.u * pl.F) - f * pl.F), et = Math.abs(zamanAn(pl, f * pl.F) - pl.hit.u * pl.F);
+    if (Math.min(es, et) > 1.05 && pl.warnings.indexOf("hitKaydi") === -1) hizStep.push(id + " f" + f + ": es " + es.toFixed(2) + " et " + et.toFixed(2));
   });
 });
-ok("alignHit step: basamaklar bükülen eğriyle kayar, vuruş anı yine 1 kare içinde", hizStep.length === 0, hizStep.join(" | "));
+ok("alignHit step: basamaklar bükülen eğriyle kayar, vuruş anı görünür biçimde (kaynak ya da timeline) 1 kare içinde ya da hitKaydi", hizStep.length === 0, hizStep.join(" | "));
+// Basamaklı Giriş/Çıkış: vuruş anı görünen basamağa (hızın değiştiği yere) oturur, düz tutmanın ortasına değil
+// (3. tur inceleme: Hızlı Çıkış'ta sıçrama vuruştan 5 sn sonra geliyordu)
+var basamakVurus = [];
+[["cikis", 90, 29.97, 0.4], ["cikis", 300, 23.976, 0.3], ["giris", 150, 25, 0.6], ["giris", 300, 23.976, 0.7]].forEach(function (c) {
+  var pl = S.plan(c[0], { ease: "step" }, { frames: c[1], fps: c[2], hitFrac: c[3], handleSec: 1000 });
+  if (pl.warnings.indexOf("hitKaydi") !== -1) return;
+  var t = 0, enYakin = Infinity;
+  for (var i = 1; i < pl.segments.length; i++) {
+    t += pl.segments[i - 1].d;
+    var r = pl.segments[i].v / pl.segments[i - 1].v;
+    if (r >= 1.5 || r <= 1 / 1.5) enYakin = Math.min(enYakin, Math.abs(t - pl.hit.u * c[1]));
+  }
+  if (!(enYakin <= 1)) basamakVurus.push(c[0] + " F" + c[1] + " hf" + c[3] + " basamak vuruştan " + enYakin + " kare uzakta " + JSON.stringify(pl.segments));
+});
+var thC = S.thumb("cikis", 100, 50, { ease: "step" }), thG = S.thumb("giris", 100, 50, { ease: "step" }), thD = S.thumb("darbe", 100, 50, { ease: "step" });
+ok("Basamaklı Giriş/Çıkış: vuruş anı görünen basamakta (plan 1 kare içinde, kart noktası 0.8 / 0.175'te; Darbe yerinde)",
+  basamakVurus.length === 0 && thC.hit.x === 80 && thG.hit.x === 17.5 && thD.hit.x === 50, basamakVurus.join(" | ") + " " + js([thC.hit, thG.hit]));
+// Tam hız kaynağın sonunu kullanmıyorsa ve vuruş anı o sonda kalıyorsa exact seçilmez (uydurma "kaydı" yazmasın)
+var kirpik = S.plan("vites", {}, { frames: 60, fps: 23.976, hitFrac: 0.8, handleSec: 1000 });
+ok("auto: exact vuruş anını kırpacaksa Dengeli; vuruş anı gösterilir", kirpik.srcFrames >= 0.8 * 60 - 1e-6 && (kirpik.mode === "balanced" || kirpik.B >= 0.8), kirpik.mode + " " + kirpik.srcFrames + " " + js(kirpik.warnings));
 // Vuruş anı yazılacak parçalarda ölçülür: hem gösterilen kaynak karesi (es) hem hedef karenin timeline
 // yeri (et) 1 kareden fazla kayarsa hitKaydi; err timeline kayması (sn). Ağır çekimde et, hızlıda es
 // küçüktür: yalnız biri 1 kareyi aşıyorsa göze görünmez, uyarı yok
@@ -428,6 +465,8 @@ var cf = S.clipFor(hed, 1 / 25, { media: { duration: 26, fps: 50 }, playhead: 11
 ok("clipFor: kare, tutamak, vuruş anı, vuruş oranları", cf.frames === 100 && cf.fps === 25 && cf.handleSec === 6 && cf.hitFrac === 0.25 && cf.srcFps === 50 &&
   js(cf.beatsU) === js([{ u: 0.5, guc: 0.5 }, { u: 0.75, guc: 1 }]) && cf.partial === false, js(cf));
 var cf2 = S.clipFor(hed, 1 / 25, { playhead: 30, hizala: true });
+var cfBas = S.clipFor(hed, 1 / 25, { playhead: 10, hizala: true }), cfSon = S.clipFor(hed, 1 / 25, { playhead: 14, hizala: true }), cfIc = S.clipFor(hed, 1 / 25, { playhead: 10.04, hizala: true });
+ok("clipFor: kurgu noktasındaki playhead (aralık sonu, başın 1 kare içi) vuruş sayılmaz", cfBas.hitFrac === null && cfSon.hitFrac === null && Math.abs(cfIc.hitFrac - 0.01) < 1e-9, js([cfBas.hitFrac, cfSon.hitFrac, cfIc.hitFrac]));
 ok("clipFor: ffmpeg yok → tutamak null; playhead dışarıda → hizalama yok", cf2.handleSec === null && cf2.hitFrac === null && cf2.beatsU === null && cf2.srcFps === null);
 
 /* ---------------- hatalar ve NaN ---------------- */

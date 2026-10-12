@@ -134,6 +134,19 @@
     }
     return out;
   }
+  // Basamaklı'da vuruş anı görünen basamağa oturur: vuruş anahtarı bir yanda aynı hızı tutup öbür
+  // yanda değişiyorsa (Hızlı Giriş 0.35, Hızlı Çıkış 0.6) en yakın anahtar kuralıyla hız o anahtarda
+  // değil, komşusuyla ortasında değişir (0.175 / 0.8). Platonun ortasındaki (Darbe, Atılım, Nabız)
+  // ve zaten sert basamaktaki (Vites, tekrarlanan t) vuruşlar yerinde kalır. ks: basamaklanmamış
+  function basamakVurus(ks, hit) {
+    var j = -1, n = 0;
+    for (var i = 0; i < ks.length; i++) if (Math.abs(ks[i].t - hit) < 1e-9) { j = i; n++; }
+    if (n !== 1) return hit;
+    var sol = ks[j - 1], sag = ks[j + 1];
+    var sd = !!sol && sol.v !== ks[j].v, gd = !!sag && sag.v !== ks[j].v;
+    if (sd === gd) return hit;
+    return ((sd ? sol.t : sag.t) + ks[j].t) / 2;
+  }
   function easeOf(ease) { return EASES.indexOf(ease) !== -1 ? ease : "smooth"; }
   // normKeys + Basamaklı'da açık basamaklar
   function hazir(keys, ease) { var ks = normKeys(keys); return ease === "step" ? basamakla(ks) : ks; }
@@ -301,11 +314,15 @@
       if (!ks.length) { uyari.push("vurusYok"); ks = [{ t: 0, v: 1 }, { t: 1, v: 1 }]; }
     } else ks = normKeys(p.keys);
     ks = ks.map(function (x) { return { t: x.t, v: Math.pow(x.v, k) }; });
-    if (o.ease === "step") ks = basamakla(ks);
+    var hitU = p.hit;
+    if (o.ease === "step") {
+      if (hitU !== null && hitU !== undefined) hitU = basamakVurus(ks, hitU);
+      ks = basamakla(ks);
+    }
     var hit = null;
     var f = ctx.hitFrac;
-    if (p.hit !== null && p.hit !== undefined && f !== null && f !== undefined && isFinite(Number(f)) && Number(f) >= 0 && Number(f) <= 1) {
-      var al = alignHit(ks, p.hit, Number(f), ctx.mode === "exact" ? "exact" : "balanced", o.ease, ctx.Lsec);
+    if (hitU !== null && hitU !== undefined && f !== null && f !== undefined && isFinite(Number(f)) && Number(f) >= 0 && Number(f) <= 1) {
+      var al = alignHit(ks, hitU, Number(f), ctx.mode === "exact" ? "exact" : "balanced", o.ease, ctx.Lsec);
       ks = al.keys;
       hit = { u: al.hitU2, f: Number(f), err: al.err, clamped: al.clamped };
     }
@@ -330,7 +347,8 @@
    * m'ye genişler); parça sayısı sınırı aşılırsa tau × 1.35.
    * v = parçanın ortalaması (integral): Σ d·v tam olarak F·B olur.
    */
-  function segment(keys, ease, F, fps, density) {
+  // vurus (isteğe bağlı): { hx: vuruş anı (kare), yavas: vuruşta eğri ortalamadan yavaş mı }
+  function segment(keys, ease, F, fps, density, vurus) {
     ease = easeOf(ease);
     var ks = hazir(keys, ease);
     F = Math.max(1, Math.round(Number(F) || 0));
@@ -423,11 +441,23 @@
       runs.push([s0, F]);
       runs = kisaGenislet(runs);
       // Son çare: dönüşümlü kısa basamaklar birleşip tek hıza eridiyse (ör. Nabız + hizalama, 1 sn
-      // altı klip) en büyük karşıtlığı veren tek kesim: iki parça, ikisi de ≥ m
-      if (kesim.length && F >= 2 * m && tekHiz(runs)) {
+      // altı klip) en büyük karşıtlığı veren tek kesim: iki parça, ikisi de ≥ m. Vuruş anı varsa onu
+      // içeren parça önayarın vuruştaki karakterini korur (yavaş vuruş yavaş parçada); öyle bir kesim
+      // yoksa eğri tek hızda kalır (plan "duz"), ters rampa yazılmaz. Eğrinin kendisi %1'den az
+      // değişiyorsa hiç taranmaz; ortalamalar kare başı birikimli integralden (O(F))
+      var vmn = Infinity, vmx = 0;
+      ks.forEach(function (x) { vmn = Math.min(vmn, x.v); vmx = Math.max(vmx, x.v); });
+      if (kesim.length && F >= 2 * m && vmx / vmn >= 1.01 && tekHiz(runs)) {
+        var I = [0], q;
+        for (q = 0; q < F; q++) I.push(I[q] + integ(ks, ease, q / F, (q + 1) / F));
         var enIyi = -1, enFark = 0;
         for (var c2 = m; c2 <= F - m; c2++) {
-          var fk = Math.abs(lg(ort(0, c2)) - lg(ort(c2, F)));
+          var o1 = I[c2] * F / c2, o2 = (I[F] - I[c2]) * F / (F - c2);
+          if (vurus) {
+            var hp = vurus.hx < c2 ? o1 : o2, ob = vurus.hx < c2 ? o2 : o1;
+            if (vurus.yavas ? !(hp < ob) : !(hp > ob)) continue;
+          }
+          var fk = Math.abs(lg(o1) - lg(o2));
           if (fk > enFark + 1e-12) { enFark = fk; enIyi = c2; }
         }
         if (enIyi > 0 && enFark > lg(1.01)) runs = [[0, enIyi], [enIyi, F]];
@@ -529,7 +559,11 @@
     var mode = "balanced", k = o.k, sh = null;
     if (o.mode === "auto" && !clip.partial) {
       sh = bicim(k, "exact");
-      if (sigar(sh)) mode = "exact";
+      // Tam hız kaynağın sonunu kullanmıyorsa (B < 1) ve vuruş anı o kullanılmayan sonda kalıyorsa
+      // exact vuruşu hiç göstermez (ve uydurma bir "kaydı" süresi yazardı): Dengeli tüm kaynağı
+      // kullanır ve hizalar
+      if (hf !== null && sh.hit && integ(sh.keys, o.ease, 0, 1) < hf - 1e-9) { /* Dengeli */ }
+      else if (sigar(sh)) mode = "exact";
       // medya süresi bilinmiyor (ffmpeg yok, okunamadı ya da ffmpeg -i hâlâ sürüyor): yoğunluk düşürülmez;
       // "klibin sonrasında görüntü yok" denmez, çünkü bilinmiyor
       else if (tutamak === null) uyarilar.push("sureYok");
@@ -551,7 +585,12 @@
     if (mode === "balanced") { k = o.k; sh = bicim(k, "balanced"); }
     uyarilar = uyarilar.concat(sh.warnings);
 
-    var parca = segment(sh.keys, o.ease, F, fps, o.density);
+    var vurusBilgi = null;
+    if (sh.hit) {
+      var hks = hazir(sh.keys, o.ease);
+      vurusBilgi = { hx: sh.hit.u * F, yavas: at(hks, sh.hit.u, o.ease) < integ(hks, o.ease, 0, 1) };
+    }
+    var parca = segment(sh.keys, o.ease, F, fps, o.density, vurusBilgi);
     var d = parca.map(function (s) { return s.b - s.a; });
     var v = parca.map(function (s) { return s.v; });
     var sinirli = v.map(function () { return false; });
@@ -712,10 +751,14 @@
     w = Number(w) > 0 ? Number(w) : 120; h = Number(h) > 0 ? Number(h) : 56;
     var ks = p.beats ? beatKeys(ORNEK_VURUS, o, 400) : normKeys(p.keys);
     ks = ks.map(function (x) { return { t: x.t, v: Math.pow(x.v, o.k) }; });
-    if (o.ease === "step") ks = basamakla(ks);
+    var hu = p.hit;
+    if (o.ease === "step") {
+      if (hu !== null && hu !== undefined) hu = basamakVurus(ks, hu);
+      ks = basamakla(ks);
+    }
     var pad = Math.max(2, h * 0.06);
     var hit = null;
-    if (p.hit !== null && p.hit !== undefined) hit = { x: yuvarla(p.hit * w, 2), y: yEkseni(at(ks, p.hit, o.ease), h, pad) };
+    if (hu !== null && hu !== undefined) hit = { x: yuvarla(hu * w, 2), y: yEkseni(at(ks, hu, o.ease), h, pad) };
     return { path: path(ks, o.ease, w, h), base: yEkseni(1, h, pad), hit: hit, w: w, h: h };
   }
 
@@ -769,7 +812,9 @@
     var media = ek.media || null;
     var tutamak = media && Number(media.duration) > 0 && isFinite(Number(t.outPoint)) ? Math.max(0, Number(media.duration) - Number(t.outPoint)) : null;
     var hf = null, ph = Number(ek.playhead);
-    if (ek.hizala && isFinite(ph) && ph >= a && ph <= b && L > 0) hf = (ph - a) / L;
+    // Kurgu noktasındaki playhead (ok tuşlarıyla gelinen yer) iki klibin vuruşu sayılmaz: aralık sonu
+    // hariç, başından bir kareden yakın playhead hizalamaz
+    if (ek.hizala && isFinite(ph) && ph - a >= frame - 1e-9 && ph < b - 1e-9 && L > 0) hf = (ph - a) / L;
     var beats = null;
     if (ek.beats && ek.beats.length && L > 0) {
       beats = [];
