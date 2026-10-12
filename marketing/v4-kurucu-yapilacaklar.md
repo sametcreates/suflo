@@ -1250,7 +1250,10 @@ yol eşlemesi aynı). **Ayarlar › Çözme**: En doğru (bugünkü `-bs 5`, var
 geri dönüşü açık), yerel motorun her koşusunda. Altyazı kartında **Hassas kelime zamanlaması (DTW, biraz daha
 yavaş)**: yalnız yerel motor + kelime tabanlı mod (kelime kelime, birikimli, N kelime) ya da kelime tabanlı Suflo
 Stilinde görünür; motor `-dtw <ön ayar> -nfa` ile çalışır (tiny, base, small, large.v3.turbo, large.v3) ve
-`js/whisper-words.js` kelime başını `t_dtw / 100` sn, sonunu sonraki kelimenin başı alır. Dil satırında
+`js/whisper-words.js` kelime başını `t_dtw / 100` sn alır; sonu kelimenin kendi belirteç sonu (DTW kaymasıyla),
+sonraki kelimenin başıyla sınırlı — 0,3 sn'ye kadar boşluk kapanır, daha uzun duraklama (ve VAD'in attığı sessizlik)
+korunur, son kelime segment sonuna uzamaz. (İlk sürüm sonu sonraki kelimenin başı alıyordu: duraklamada kelime
+ekranda kalıyor, 3 kelime / iki satır modları duraklamada bölünmüyordu; inceleme düzeltmesi.) Dil satırında
 **İngilizceye çevir (çevrimdışı)**: `-tr`, yalnız Small ve Large. **Suflo Doctor** çözme modunu ve DTW desteğini
 gösterir. Çözme ve DTW **ücretsiz**; çevrimdışı İngilizce **Pro** — yeni özellik anahtarı `offlineTranslate`, 3 deneme
 hakkı (deneme listesi 10 → 11 araç, Ayarlar › Suflo Pro'daki tablo kendiliğinden gösterir). Raunen'den (MIT) yalnız
@@ -1262,8 +1265,9 @@ kaynaktan derledim. Yardım metni (`tests/fixtures/whisper-cli-v1.9.1-yardim.txt
 **açık** olduğunu gösteriyor. q5_1 olarak nicemlenmiş (rastgele ağırlıklı) bir tiny dosyasında: `-dtw tiny` tek başına
 "dtw_token_timestamps is not supported with flash_attn - disabling" yazıp bütün `t_dtw`'leri -1 bırakıyor; `-nfa` ile
 `t_dtw ≥ 0` geliyor (santisaniye), `--vad` ile de (VAD tablosuyla eşleniyor); `-tr` JSON'a `"translate": true` yazıyor.
-CPU'da 66 sn seste DTW'nin kendi ek yükü ~%3, `-nfa` dahil ~%6. Gerçek koşu çıktısı panelin ayrıştırıcısından
-geçti. Gerçek Turbo / Large / Small dosyalarında DTW'nin çalıştığını ve Türkçe hız / doğruluğu SEN ölçeceksin (5.1, 5.2).
+CPU'da 66 sn seste DTW'nin kendi ek yükü ~%3, `-nfa` dahil ~%6 çıktı ama bu rastgele ağırlıklı (anlamsız metin
+çözen) tiny dosyasındaydı: temsilî değil, README'de verilmiyor (hız tablosunun "+ DTW" satırı 5.1'deki ölçümünü
+bekliyor). Gerçek koşu çıktısı panelin ayrıştırıcısından geçti. Gerçek Turbo / Large / Small dosyalarında DTW'nin çalıştığını ve Türkçe hız / doğruluğu SEN ölçeceksin (5.1, 5.2).
 
 Bilmen gereken davranışlar:
 - **Varsayılan "En doğru" kalıyor**, kıyas (5.1) yapılana dek. Raunen'in ~13× / 1,4× iddiası Türkçe için doğrulanmadı.
@@ -1277,11 +1281,15 @@ Bilmen gereken davranışlar:
 - **Çevrimdışı çeviri bulut yedeğine geçmez** (yedek çevirmez; kaynak dilde altyazı "çeviri" sayılmasın), transkript
   önbelleğine yazılmaz (Konuşmadan kes İngilizce kelime almasın), rehberin örnek klibinde kapalı. Sözlük ipucu
   çeviride İngilizce çerçeveyle ("Names and terms: …") gider. Belge İngilizce sayılır (büyük harf "THIS", kalite,
-  çok dilli paket `en.srt`); işaret satırlarda (`cikisDili: "en"`) durur, geri al / taslak / Shorts kaydıyla taşınır.
+  çok dilli paket `en.srt`); işaret satırlarda (`cikisDili: "en"`) durur (satır bölünce iki parçaya da geçer), geri al /
+  taslak / Shorts kaydıyla taşınır. Belgenin dili de belgeyle taşınır (geri al girdisi, taslak ve Shorts kaydında `dil`;
+  SRT içe aktarmada sıfırlanır): çevrimdışı İngilizceden Ctrl+Z ile dönülen Türkçe belge Türkçe kalır (BİR, `tr.srt`,
+  Türkçe başlıklar). 3.2 öncesi taslak / Shorts kaydında `dil` yok: işaretli satırlardan "en", değilse Altyazı › Dil.
 - **Dosya adı eki:** çeviri belgesi `suflo-altyazi.en.srt` olarak iner. Bu ek bulut (LLM) çevirisinde de hedef dili
   alır (`suflo-altyazi.de.srt`); çift dilli dışa aktarmada ek yok. 3.1'de çeviri sonrası dosya adı eksizdi.
-- **Hızlı moddaki transkript** önbellekte En doğru'yla aynı anahtarı paylaşır (motor kimliği değişmedi): Hızlı'da
-  yazıya dökülen klip Konuşmadan kes'te önbellekten gelebilir; "Yeniden yazıya dök" yeniden çözer.
+- **Hızlı moddaki transkript** önbellekte ayrı tutulur: motor kimliği `yerel:<model>:hizli` (En doğru eksiz
+  `yerel:<model>` kalır, eski önbellek girdileri geçerli). Hızlı'da yazıya dökülen klip En doğru'ya geçince yeniden
+  çözülür. Hızlı'da durum satırı "Suflo Motoru · yerel · hızlı çözme…" der ("yüksek doğruluk" değil).
 
 **5.1 Türkçe kıyas ve varsayılan kararı (yaklaşık 1,5 saat; Windows, NVIDIA kartlı makinede).**
 1. Üç örnek hazırla, her biri 1–3 dk Türkçe konuşma: `studyo` (iyi mikrofon), `telefon` (telefonla kayıt), `gurultulu`
@@ -1297,6 +1305,10 @@ Bilmen gereken davranışlar:
    yolu ver). Depo klasöründe (Node 12+):
    `node tools/motor-kiyas.js --cli "%APPDATA%\Kesit\whisper\whisper-cli.exe" --modeller "%APPDATA%\Kesit\whisper\models" --ornekler D:\kiyas --model turbo,large --dtw --vad "%APPDATA%\Kesit\whisper\models\ggml-silero-v5.1.2.bin" --json D:\kiyas\gpu.json`
    ve aynısını `--cli D:\whisper-cpu\whisper-cli.exe ... --json D:\kiyas\cpu.json` ile (exe alt klasördeyse yolunu ver).
+   Windows kullanıcı adında ya da klasör adında Türkçe harf olması sorun değil: araç panel gibi yolları 8.3 kısa adına,
+   o kapalıysa `C:\ProgramData\Suflo\ascii-onbellek`'e kopyaya çevirir (model ilk koşuda bir kez kopyalanabilir).
+   Bir satırda "ASCII olmayan yol whisper-cli'ye gitti" görürsen örnekleri ve modelleri `D:\kiyas` gibi yalnız ASCII
+   harfli bir klasöre koyup `--modeller`/`--ornekler`'i ona çevir.
    Çıktı tablosu her model / mod / DTW için gerçek zaman çarpanını ve WER'i verir. İki JSON'u bana gönder.
 5. Karar kuralı: Turbo ve Large'da, CPU ve GPU'da, üç örneğin hepsinde Hızlı'nın WER'i En doğru'dan en çok
    **1 puan** fazlaysa **ve** Hızlı en az **1,5×** hızlıysa varsayılanı Hızlı yap; değilse En doğru kalsın. Hızlı'ya
