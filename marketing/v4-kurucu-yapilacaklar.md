@@ -1189,3 +1189,56 @@ yap. Her iki durumda da altyazı ve İptal çalışır; yalnız canlı satırlar
 "Altyazı çıkarırken satırlar canlı akıyor, kalan süre ve hız görünüyor; uzun bir işi İptal ile anında durdurabilirsin
 (geçici dosyalar silinir, ekrandaki altyazın bozulmaz). Motor ve model indirmeleri de iptal edilebilir ve kaldığı
 yerden devam eder." `js/app.js` YENILIKLER listesine istersen kısası.
+
+### Adım 4: Okunabilir altyazı düzeni (kelimeden satır, 2 × 42, kısa parça birleştirme, kelime hizalama)
+
+Ne değişti: yeni saf modül `js/caption-layout.js`. Satır modunda (Satır uzunluğu 32 / 42 karakter ve yeni
+**2 satır × 42 (YouTube/TV)**) altyazılar yerel motorun ölçülmüş kelime zamanlarından kuruluyor: karakter sınırı,
+isteğe bağlı **Kelime sınırı** (2–12), 0,6 sn'den uzun duraklama, cümle sonu ve en uzun süre satırı kırıyor; aynı
+satır sayısıyla dengeleniyor (iki satır 38/4 değil 21/21). **Ayarlar › Altyazı**'ya en kısa / en uzun süre (0,8 / 6 sn)
+ve "Kısa parçaları birleştir" (varsayılan açık) geldi. Caption Editor'da **Shift+Enter** satır içinde alt satıra geçer,
+metin düzeltmesi kelime zamanlarını LCS ile yeni metne hizalar (AI kontrolü, sözlük, bul & değiştir de), zaman
+alanı "başlangıç – bitiş" kabul eder ve kelimeleri ölçekler. SRT/VTT iki satırı tek cue'ya yazar, ASS `\N`; satır
+modunda ASS karaoke dolgusu gerçek kelime zamanlarından. Belgesel stilinin iki satır bölmesi aynı işlevi
+(`ikiyeBolNoktasi`) kullanıyor; stil çıktısı bayt bayt aynı (`tests/style-engine-snapshot.json`). Raunen'in `wrapText`
+ve `shapeSegments` birleştirme / bölme / süre geçişleri uyarlandı (MIT, `THIRD_PARTY_NOTICES.md` Raunen girdisine
+`js/caption-layout.js` eklendi); kelimeden satır kurma ve LCS hizalama Suflo'nun kendi kodu (Animated Captions /
+TranscriptAI'dan yalnız fikir, kod yok). Ücretsiz; senin girdin olmadan tam çalışır, harici şablon ya da hesap gerekmez.
+
+Bilmen gereken davranışlar:
+- **Menü değerleri değişti:** "32 / 42 karakter" artık `l32` / `l42` (kelimeden satır). 3.1 tercihleri, şablonlar
+  (`maxlen: "c42"`) ve stil kodları açılışta aynı menü girdisine eşlenir. Paylaşılan stil kodu 3.1 uyumlu kalsın diye
+  `l42` koda `c42` olarak yazılır; `c42x2` 3.1'de "geçersiz ayar atlandı" uyarısıyla satır uzunluğu olmadan açılır.
+  "60 karakter" (`c60`) eski yolla çalışır.
+- **Kelime zamanı yoksa** (bulut satır modu, eski önbellek, SRT içe alma) 32 / 42 karakter 3.1'deki gibi çalışır;
+  yalnız eski eşit kelime bölmesi yerine karakter bütçesiyle bölünür (bir parça artık satır uzunluğunu aşmaz).
+  2 satır × 42 aynı yolu iki satırlık bütçeyle izler. Kelime sınırı bu yolda etkisizdir.
+- **En kısa / en uzun süre ve birleştirme** yalnız satır modlarında (32 / 42, 2 × 42) ve yeni transkriptlerde geçerli;
+  kelime kelime, N kelime ve 60 karakter değişmedi. Kısa satır yalnız sonraki satıra kadar BOŞ zamana uzar (0,08 sn
+  boşluk bırakır), satırlar hiç üst üste binmez.
+- **Elle eklenen kırılım** (Shift+Enter) her satır modunda kabul edilir; kalite denetimi her satırı ayrı sayar
+  ("Satır çok uzun" satır başına). 2 satır × 42'de "Nizami düzelt" uzun satırı bölmek yerine iki satıra kırar.
+- **SRT içindeki satır sonu artık CRLF** (dosyanın geri kalanı gibi; çift dilli SRT dahil). Çift dilli altyazıda her dil
+  tek satıra indirilir (4 satırlık cue olmasın). TXT'de her altyazı tek satır. SRT/VTT **içe alırken** çok satırlı
+  cue'lar 3.1'deki gibi tek satıra birleşir (bilinen sınır).
+- **Diğer araçlar** (bölümler, viral anlar, zoom, SFX, kanca) altyazı metnini tek satır alır; çeviri satır kırılımını
+  modele gönderir, kırılımı korumayabilir (çeviride kelime zamanları zaten düşer, 3.1 gibi).
+- **Satır modunda karaoke**: Suflo Stili seçmeden ince ayardaki Animasyon'da "Karaoke dolgu" / "Akıcı dolgu" artık
+  yerel transkriptte satır modunda da seçilebilir; ASS'te her satır tek olay, `\k` süreleri satır başından birikimli
+  yuvarlanır. Kelime zamanı olmayan transkriptte bu seçenekler eskisi gibi soluk ve fade'e düşer.
+
+**4.1 Premiere'de dene (yaklaşık 25 dk).** `marketing/v3.2-deneme-listesi.md` › `## 4` maddeleri. En önemlisi **4.3**:
+2 satır × 42 altyazıyı "Normal altyazı izi ekle" ile uygula ve Premiere altyazı izinde cue'nun iki satır göründüğünü
+doğrula (`KS_importSrtAsCaptions` değişmedi; Premiere SRT'deki CRLF satır sonunu satır kırılımı sayıyor). Premiere iki
+satırı tek satıra yapıştırırsa ya da iki ayrı cue yaparsa: Premiere sürümünü ve dışa aktarılan SRT'yi (Dışa aktarma ›
+SRT › indir) bana gönder; o arada kullanıcılar 42 karakter modunu kullanabilir (iki satır yalnız seçilirse oluşur).
+
+**4.2 Varsayılan değerler (isteğe bağlı, 5 dk).** En kısa 0,8 sn / en uzun 6 sn / birleştirme açık / kelime sınırı 0
+Netflix-YouTube önerilerine yakın. Kendi kanalında farklı bir varsayılan istersen (ör. en uzun 7 sn) `index.html`'deki
+`set-min-sure` / `set-max-sure` `value`'sunu ve `js/app.js` `altyaziSureAyarlari` varsayılanını birlikte değiştir.
+
+**4.3 3.2.0 sürüm notu.** Sürüm 3.2.0'a geçerken `marketing/release-notes.md`'nin 3.2.0 bölümüne şu satırı ekle:
+"Satır modunda altyazılar artık kelime zamanlarından kuruluyor: cümle sonunda ve duraklamada kırılan, dengeli
+satırlar; yeni '2 satır × 42 (YouTube/TV)', kelime sınırı ve Ayarlar › Altyazı'da en kısa / en uzun süre. Metni
+düzelttiğinde kelime zamanları kaybolmuyor; Shift+Enter satır içinde alt satıra geçiyor." `js/app.js` YENILIKLER
+listesine istersen kısası.
