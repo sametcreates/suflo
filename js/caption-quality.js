@@ -7,10 +7,13 @@
  * calistirsin diye UMD olarak yazildi.
  */
 (function (root, factory) {
-  var api = factory();
+  // Okunabilir satir duzeni (2 satir × 42 kirilimi, karakter butcesiyle bolme): js/caption-layout.js ONCE yuklenir
+  var CL = (root && root.SufloCaptionLayout) || null;
+  if (!CL && typeof require === "function") { try { CL = require("./caption-layout.js"); } catch (e) { CL = null; } }
+  var api = factory(CL);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloCaptionQuality = api;
-})(typeof window !== "undefined" ? window : this, function () {
+})(typeof window !== "undefined" ? window : this, function (CL) {
   "use strict";
 
   var VERSION = 1;
@@ -47,9 +50,11 @@
   }
 
   function normalizeText(text, lang) {
+    // satir kirilimi (2 satir × 42, Shift+Enter) tek "\n" olarak kalir; bos satir ve kenar bosluklari gider
     var s = String(text || "")
-      .replace(/[\t\r\n]+/g, " ")
-      .replace(/\s+/g, " ")
+      .replace(/\r\n?/g, "\n")
+      .replace(/[ \t]*\n\s*/g, "\n")
+      .replace(/[ \t]+/g, " ")
       .replace(/\s+([,.;:!?])/g, "$1")
       .replace(/([!?;:])([^\s!?;:])/g, "$1 $2")
       .replace(/\(\s+/g, "(")
@@ -63,6 +68,21 @@
   function maxChars(options) {
     var m = parseInt(options && options.maxChars, 10);
     return m > 10 ? m : 42;
+  }
+
+  // Satir modunun satir sayisi (2 satir × 42 = 2); elle eklenen tek kirilim her modda kabul edilir
+  function maxLines(options) {
+    var m = parseInt(options && options.maxLines, 10);
+    return m >= 2 ? Math.min(3, m) : 1;
+  }
+
+  // Metin satir sinirlarina uyuyor mu: her satir maxChars'i asmaz, satir sayisi max(2, maxLines)'i asmaz
+  function satirlarUyar(text, options) {
+    var satirlar = String(text || "").split("\n");
+    if (satirlar.length > Math.max(2, maxLines(options))) return false;
+    var limit = maxChars(options);
+    for (var i = 0; i < satirlar.length; i++) if (satirlar[i].trim().length > limit) return false;
+    return true;
   }
 
   function issue(code, level, label) {
@@ -86,7 +106,7 @@
     if (next && end > num(next.start, end) + 0.015) issues.push(issue("overlap", "bad", "Sonraki satırla çakışıyor"));
     if (!wordMode && dur > 0 && dur < 0.55) issues.push(issue("short", "warn", "Ekranda çok kısa kalıyor"));
     if (!wordMode && dur > 7.0) issues.push(issue("long-time", "warn", "Ekranda gereğinden uzun kalıyor"));
-    if (!wordMode && text.length > maxChars(options)) issues.push(issue("long-text", "warn", "Satır çok uzun"));
+    if (!wordMode && !satirlarUyar(text, options)) issues.push(issue("long-text", "warn", "Satır çok uzun"));
     if (!wordMode && cps > 22) issues.push(issue("fast", "bad", "Okuma hızı çok yüksek"));
     else if (!wordMode && cps > 18) issues.push(issue("fast", "warn", "Hızlı okunuyor"));
     if (/\s{2,}|\s+[,.!?;:]/.test(String(s && s.text || ""))) issues.push(issue("spacing", "warn", "Boşluk düzeni bozuk"));
@@ -150,10 +170,21 @@
   function splitOverlong(segments, options) {
     var out = [];
     var limit = maxChars(options);
+    var ml = maxLines(options);
     (segments || []).forEach(function (source) {
       var s = copySegment(source);
-      var parts = splitText(s.text, limit);
-      if (parts.length <= 1) { out.push(s); return; }
+      if (satirlarUyar(s.text, options)) { out.push(s); return; }
+      var duz = s.text.replace(/\s+/g, " ").trim();
+      var parts;
+      if (ml > 1 && CL) {
+        // iki satir: butceye (ml × limit) sigan parcalar, her biri dengeli kirilimla
+        parts = CL.karakterleBol({ start: s.start, end: s.end, text: duz }, limit, { maxLines: ml }).map(function (p) {
+          return CL.dengeliSar(p.text, limit, ml);
+        });
+      } else {
+        parts = splitText(duz, limit);
+      }
+      if (parts.length <= 1) { if (parts.length) s.text = parts[0]; out.push(s); return; }
       var totalChars = parts.reduce(function (n, p) { return n + Math.max(1, p.length); }, 0);
       var cursor = s.start;
       parts.forEach(function (part, i) {

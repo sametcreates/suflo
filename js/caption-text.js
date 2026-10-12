@@ -12,10 +12,13 @@
   // Ölçülmüş kelime zamanları (js/whisper-words.js) bu modülden ÖNCE yüklenir; yoksa eski yol
   var WW = (root && root.SufloWhisperWords) || null;
   if (!WW && typeof require === "function") { try { WW = require("./whisper-words.js"); } catch (e) { WW = null; } }
-  var api = factory(WW);
+  // Okunabilir satır düzeni (js/caption-layout.js): kelimeden satır, 2 × 42, birleştirme, bölme, süre
+  var CL = (root && root.SufloCaptionLayout) || null;
+  if (!CL && typeof require === "function") { try { CL = require("./caption-layout.js"); } catch (e2) { CL = null; } }
+  var api = factory(WW, CL);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloCaptionText = api;
-})(typeof window !== "undefined" ? window : this, function (WW) {
+})(typeof window !== "undefined" ? window : this, function (WW, CL) {
   "use strict";
 
   function kelimeli(s) { return !!(s && s.words && s.words.length); }
@@ -388,48 +391,25 @@
     });
   }
 
-  function splitLong(segs, maxChars, maxDur) {
+  /*
+   * Satır uzunluğunu (maxLines satır × maxChars) ya da maxDur süresini aşan satırı kelime sınırında
+   * böler: parça sayısı açgözlü karakter doldurmayla bulunur, parçalar dengelenir (caption-layout.js
+   * karakterleBol). Eski eşit kelime bölmesi bütçeyi aşabiliyordu ("kötü değil, değil mi?" 20 karakterde
+   * 21 olurdu). Ölçülmüş kelimeler metinle bire bir tutuyorsa parçalar ÖLÇÜLMÜŞ zamanla bölünür (parça =
+   * ilk kelimesinin başı); tutmuyorsa süre karakter oranıyla paylaşılır, kelimeler orta noktalarıyla dağılır.
+   */
+  function splitLong(segs, maxChars, maxDur, maxLines) {
     var out = [];
+    maxLines = Math.max(1, Math.floor(Number(maxLines)) || 1);
     segs.forEach(function (s) {
       var text = String(s.text || "").trim();
       var dur = s.end - s.start;
       if (!text) return;
-      if (text.length <= maxChars && dur <= maxDur) { out.push(s); return; }
-      var pieces = Math.ceil(Math.max(text.length / maxChars, dur / maxDur));
-      var words = text.split(/\s+/);
-      var per = Math.ceil(words.length / pieces);
-      var acc = [];
-      for (var i = 0; i < pieces; i++) acc.push(words.slice(i * per, (i + 1) * per).join(" "));
-      acc = acc.filter(Boolean);
-      /*
-       * Ölçülmüş kelimeler metnin kelimeleriyle birebir tutuyorsa parçalar kelime
-       * sınırında, ÖLÇÜLMÜŞ zamanla bölünür (parça = ilk kelimesinin başı); tutmuyorsa
-       * süre eşit paylaşılır ve kelimeler orta noktalarına göre parçalara dağılır.
-       */
-      var olcu = kelimeli(s) && s.words.length === words.length ? s.words : null;
-      var sinirlar = [];
-      if (olcu) {
-        for (var j = 0; j <= acc.length; j++) {
-          var t = j === 0 ? s.start : (j === acc.length ? s.end : Number(olcu[j * per].start));
-          if (!isFinite(t) || t < (sinirlar[j - 1] || s.start) || t > s.end) { olcu = null; break; }
-          sinirlar.push(t);
-        }
-      }
-      var step = dur / acc.length;
-      acc.forEach(function (w, i) {
-        var a = olcu ? sinirlar[i] : s.start + step * i;
-        var b = olcu ? sinirlar[i + 1] : s.start + step * (i + 1);
-        var parca = { start: a, end: b, text: w, confidence: s.confidence };
-        if (olcu) parca.words = olcu.slice(i * per, (i + 1) * per);
-        else if (kelimeli(s)) {
-          var ic = s.words.filter(function (k) {
-            var orta = (Number(k.start) + Number(k.end)) / 2;
-            return orta >= a && (orta < b || i === acc.length - 1);
-          });
-          if (ic.length) parca.words = ic;
-        }
-        out.push(parca);
-      });
+      var sigar = maxLines > 1 && CL ? CL.sigarMi(text.split(/\s+/), maxChars, maxLines) : text.length <= maxChars;
+      if (sigar && dur <= maxDur) { out.push(s); return; }
+      if (!CL) { out.push(s); return; }      // düzen modülü yoksa (olmamalı) satır bölünmeden kalır
+      var enAz = dur > maxDur ? Math.ceil(dur / maxDur) : 1;
+      CL.karakterleBol(s, maxChars, { maxLines: maxLines, enAz: enAz }).forEach(function (p) { out.push(p); });
     });
     return out;
   }
@@ -438,8 +418,14 @@
    * Motor çıktısından (sekans zamanına taşınmış) ekrandaki altyazı satırları.
    * captions.js go() ve rehberin hazır örnek transkripti (ornekYukle) AYNI yolu
    * kullanır: iki yol ayrışırsa örnekte görülen satırlar gerçek çıktıyla tutmaz.
-   *   lenVal: "k1" kelime kelime · "kc" birikimli · "wN" N kelime · "cN" N karakter
+   *   lenVal: "k1" kelime kelime · "kc" birikimli · "wN" N kelime · "cN" N karakter (eski yol)
+   *           "l32" / "l42" kelime zamanından tek satır · "c42x2" iki satır × 42 (YouTube / TV)
    *   secenek.etiketKoru: ses etiketlerini "[Müzik]" biçiminde tut (varsayılan: at)
+   *   secenek.maxWords: satır modlarında kelime sınırı (0 = kapalı, 2..12)
+   *   secenek.birlestir: kısa parçaları birleştir (varsayılan açık; kelime modlarında hiç)
+   *   secenek.minSure / maxSure: satır modlarında en kısa / en uzun ekran süresi (0,8 / 6 sn)
+   * l32/l42/c42x2 satırları ölçülmüş kelimelerden kurulur (caption-layout.js kelimedenSatirlar);
+   * kelime yoksa l32/l42 bugünkü c32/c42 yolunun aynısıdır, c42x2 aynı yolu iki satırlık bütçeyle izler.
    * Döner: { segments, mode } — mode: "k1" | "kc" | "w" | "plain"
    */
   function segmentleriKur(mapped, lenVal, secenek) {
@@ -486,8 +472,41 @@
       }
       return { segments: splitWords(trimOverlongCues(temiz), n), mode: "w" };
     }
+    var ayar = CL ? CL.uzunlukAyari(lenVal) : null;
+    if (ayar && (ayar.tur === "l" || ayar.maxLines > 1)) return satirModu(liste, ayar, olculmus, secenek);
     liste = trimOverlongCues(cleanSegments(liste, secenek));
     return { segments: splitLong(liste, parseInt(lenVal.slice(1), 10) || 42, 4.5), mode: "plain" };
+  }
+
+  // Okunabilir satır modu (l32 / l42 / c42x2): ayar = CL.uzunlukAyari(lenVal)
+  function satirModu(liste, ayar, olculmus, secenek) {
+    var o = {
+      maxChars: ayar.maxChars, maxLines: ayar.maxLines, maxWords: secenek.maxWords, araKir: 0.6,
+      minSure: secenek.minSure, maxSure: secenek.maxSure, aralik: 0.2
+    };
+    function sure(x, v, enAz) { var n = Number(x); return x !== null && x !== undefined && x !== "" && isFinite(n) && n >= enAz ? n : v; }
+    o.minSure = sure(secenek.minSure, 0.8, 0);
+    o.maxSure = sure(secenek.maxSure, 6, 0.5);
+    if (o.maxSure < o.minSure) o.maxSure = o.minSure;
+    var birlestir = secenek.birlestir !== false;
+    var temiz = cleanSegments(liste, secenek);
+    var cues;
+    if (olculmus && temiz.length && temiz.every(kelimeli) && !temiz.some(function (x) { return BOSLUKSUZ_YAZI.test(x.text); })) {
+      // ölçülmüş kelimelerden: segment sınırını aşar; karakter, kelime, duraklama, cümle sonu ve sürede kırılır
+      cues = CL.kelimedenSatirlar(WW.duzlestir(temiz), o);
+      if (birlestir) cues = CL.kisaBirlestir(cues, o);
+      cues = CL.zamanHijyeni(cues, o);
+    } else if (ayar.maxLines > 1) {
+      // kelimesiz iki satır: bugünkü yol, iki satırlık bütçe ve ekran süresi kurallarıyla
+      cues = trimOverlongCues(temiz);
+      if (birlestir) cues = CL.kisaBirlestir(cues, o);
+      cues = CL.zamanHijyeni(splitLong(cues, ayar.maxChars, Math.max(4.5, o.maxSure), ayar.maxLines), o);
+    } else {
+      // kelimesiz l32 / l42: bugünkü c32 / c42 yolunun aynısı
+      return { segments: splitLong(trimOverlongCues(temiz), ayar.maxChars, 4.5), mode: "plain" };
+    }
+    if (ayar.maxLines > 1) cues.forEach(function (c) { c.text = CL.dengeliSar(c.text, ayar.maxChars, ayar.maxLines); });
+    return { segments: cues, mode: "plain" };
   }
 
   /*
@@ -746,7 +765,8 @@
   function metinStili(t, o) {
     o = o || {};
     var out = String(t == null ? "" : t);
-    if (!o.punct) out = out.replace(NOKTALAMA, " ").replace(/\s+/g, " ").trim();
+    // satır kırılımı (2 satır × 42, Shift+Enter) korunur; yalnız noktalamadan oluşan satır düşer
+    if (!o.punct) out = out.replace(NOKTALAMA, " ").replace(/[^\S\n]+/g, " ").replace(/ *\n[\s]*/g, "\n").trim();
     var loc = o.loc || undefined;
     if (o.kase === "upper") out = loc ? out.toLocaleUpperCase(loc) : out.toUpperCase();
     else if (o.kase === "lower") out = loc ? out.toLocaleLowerCase(loc) : out.toLowerCase();

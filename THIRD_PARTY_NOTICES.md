@@ -36,6 +36,17 @@ lisansı ve uyarlanan kodu içeren Suflo dosyalarıyla listelenmiştir.
     inline tag removal in mixed cues, word-list filtering and an optional "keep tags" mode.
     `tests/test-caption-text.js` covers it (test cases are Suflo's own). The silent-audio warning
     (`js/sessiz-ses.js`) takes only the idea of Raunen's peak-below-0.001 check; its code is Suflo's own.
+  - `js/caption-layout.js` — `wrapText()` (as `dengeliSar`: balanced wrap to at most N lines, a 21/21
+    split instead of 38/4, greedy fallback that never drops a word) and the merge, split and
+    min/max-duration passes of `shapeSegments()` (as `kisaBirlestir`, `karakterleBol` and
+    `zamanHijyeni`), ported from `com.raunen.premiere/js/lib/subtitles.js` to ES5 and extended for
+    Suflo: exact balanced partition shared with the styled overlay's two-line split, the split pass
+    keeps measured word timings and rebalances the greedy chunk count, merging never crosses a sentence
+    end or the word limit, the duration pass follows Suflo's caption-quality `fixTiming` rules (never
+    overlaps) and keeps words inside their caption. The word-to-line builder (`kelimedenSatirlar`,
+    character + word limits with measured word timings) and the LCS word re-alignment after edits
+    (`kelimeleriHizala`) are Suflo's own (ideas only from Animated Captions / TranscriptAI; no code).
+    `tests/test-caption-layout.js` covers it (test cases are Suflo's own).
 
 ```
 MIT License

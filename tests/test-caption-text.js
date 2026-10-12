@@ -130,11 +130,68 @@ var jp = [{ start: 0, end: 2, text: "今日はいい天気です。", words: [{ 
   { start: 2, end: 4, text: "散歩に行きましょう。", words: [{ text: "散歩に行きましょう。", start: 2, end: 4 }] }];
 chk("w3 boşluksuz yazı (Japonca): satırlar birleşmez, bugünkü bölme", T.segmentleriKur(jp, "w3").segments.length === 2);
 var c20 = T.segmentleriKur(esli, "c20");
-chk("c20: uzun satır ölçülmüş kelime sınırında bölünür, parçalar kelimelerini taşır",
-  c20.mode === "plain" && c20.segments.length === 6 && c20.segments[0].text === "Bu ışık hiç de" && Math.abs(c20.segments[1].start - 11.06) < 1e-9 &&
-  c20.segments.every(function (x) { return x.words && icinde(x); }) && sirali(c20.segments),
+// 3.2 adım 4: eşit kelime bölmesi ("Bu ışık hiç de" | "kötü değil, değil mi?" = 21 karakter) 20'yi aşıyordu;
+// karakterle bölme (caption-layout.js karakterleBol) bütçeyi hiç aşmaz ve parçaları dengeler
+chk("c20: uzun satır ölçülmüş kelime sınırında, bütçeyi aşmadan bölünür, parçalar kelimelerini taşır",
+  c20.mode === "plain" && c20.segments.length === 6 && c20.segments[0].text === "Bu ışık hiç de kötü" && Math.abs(c20.segments[1].start - 11.44) < 1e-9 &&
+  c20.segments.every(function (x) { return x.words && icinde(x) && x.text.length <= 20; }) && sirali(c20.segments),
   c20.segments.map(function (x) { return x.text + "@" + x.start.toFixed(2); }).join(" | "));
 chk("c42: kısa satırlar kelimeleriyle aynen kalır", T.segmentleriKur(esli, "c42").segments[0].words.length === 8);
+
+/* ---- 3.2 adım 4: okunabilir satır modları (l32 / l42 / c42x2, js/caption-layout.js) ---- */
+function metinler2(r) { return r.segments.map(function (x) { return x.text; }).join("|"); }
+var l42 = T.segmentleriKur(esli, "l42");
+chk("l42: satırlar ölçülmüş kelimelerden; cümle sonunda kırılır (\"Güzel.\" ayrı), satır sonu son kelimenin sonu",
+  l42.mode === "plain" && metinler2(l42) === "Bu ışık hiç de kötü değil, değil mi?|Şimdi kamerayı biraz sola çevirelim.|Güzel.|Peki, sonra tekrar deneyelim!" &&
+  Math.abs(l42.segments[0].end - 12.86) < 1e-9 && l42.segments.every(function (x) { return x.words && icinde(x); }), metinler2(l42));
+chk("l42: kısa \"Güzel.\" en kısa süreye (0,8 sn) sonraki satıra çarpmadan uzar", l42.segments[2].end > l42.segments[2].start + 0.4 &&
+  l42.segments[2].end <= l42.segments[3].start - 0.08 + 1e-9, l42.segments[2].start + "–" + l42.segments[2].end);
+var l32 = T.segmentleriKur(esli, "l32");
+chk("l32: 32 karakter aşılmaz, aynı satır sayısıyla dengeli (\"mi?\" tek başına kalmaz)",
+  metinler2(l32) === "Bu ışık hiç de kötü|değil, değil mi?|Şimdi kamerayı biraz|sola çevirelim.|Güzel.|Peki, sonra tekrar deneyelim!" &&
+  l32.segments.every(function (x) { return x.text.length <= 32; }), metinler2(l32));
+chk("l32/l42: satırlar sıralı, çakışmasız", [l32, l42].every(function (r) { return r.segments.every(function (x, i) { return i === 0 || x.start >= r.segments[i - 1].end - 1e-9; }); }));
+var x2 = T.segmentleriKur(esli, "c42x2");
+chk("c42x2: kısa satırlar tek satır kalır (kırılım yalnız 42'yi aşınca)", metinler2(x2) === metinler2(l42), metinler2(x2));
+var uzunKel = "Bugün size kamerayla ilgili birkaç şey anlatacağım ve sonra da ışığı nasıl kuracağımızı göstereceğim.".split(" ").map(function (t, i) {
+  return { text: t, start: +(i * 0.3).toFixed(2), end: +(i * 0.3 + 0.25).toFixed(2) };
+});
+var uzunSeg = [{ start: 0, end: 5, text: uzunKel.map(function (w) { return w.text; }).join(" "), words: uzunKel }];
+var x2u = T.segmentleriKur(uzunSeg, "c42x2");
+chk("c42x2: 42'yi aşan satır iki dengeli satıra kırılır ('\\n'), her satır ≤ 42, kelimeler tutar",
+  x2u.segments.length >= 1 && x2u.segments.every(function (x) { var sat = x.text.split("\n"); return sat.length <= 2 && sat.every(function (l) { return l.length <= 42; }) && x.words.length === x.text.split(/\s+/).length; }) &&
+  x2u.segments.some(function (x) { return x.text.indexOf("\n") !== -1; }), JSON.stringify(x2u.segments.map(function (x) { return x.text; })));
+var l42u = T.segmentleriKur(uzunSeg, "l42");
+chk("l42 aynı metin: tek satırlık parçalar (42'yi aşmaz), c42x2'den çok satır", l42u.segments.every(function (x) { return x.text.length <= 42 && x.text.indexOf("\n") === -1; }) &&
+  l42u.segments.length > x2u.segments.length, l42u.segments.length + " / " + x2u.segments.length);
+chk("kelime sınırı (maxWords 3): her satır ≤ 3 kelime; 0 kapalı", T.segmentleriKur(esli, "l42", { maxWords: 3 }).segments.every(function (x) { return x.words.length <= 3; }) &&
+  metinler2(T.segmentleriKur(esli, "l42", { maxWords: 0 })) === metinler2(l42));
+chk("en uzun süre (maxSure 1,5): satırlar 1,5 sn'yi aşmaz", T.segmentleriKur(esli, "l42", { maxSure: 1.5 }).segments.every(function (x) { return x.end - x.start <= 1.5 + 1e-9; }));
+chk("en kısa süre (minSure 0,3): \"Güzel.\" uzamaz", Math.abs(T.segmentleriKur(esli, "l42", { minSure: 0.3 }).segments[2].end - 17.7) < 1e-9);
+var kopuk = [{ start: 0, end: 1, text: "Bugün", words: [{ text: "Bugün", start: 0, end: 0.8 }] },
+  { start: 0.9, end: 2, text: "size anlatacağım", words: [{ text: "size", start: 0.9, end: 1.3 }, { text: "anlatacağım", start: 1.35, end: 2 }] }];
+chk("kısa parça birleştirme: segment sınırını aşan cümle tek satır; kapalıyken de kelimeden satır aynı",
+  metinler2(T.segmentleriKur(kopuk, "l42")) === "Bugün size anlatacağım" && metinler2(T.segmentleriKur(kopuk, "l42", { birlestir: false })) === "Bugün size anlatacağım");
+// kelimesiz (bulut satır modu, eski önbellek): l32/l42 bugünkü c32/c42 yolunun aynısı
+var kelimesiz = esli.map(function (s) { return { start: s.start, end: s.end, text: s.text, confidence: s.confidence }; });
+chk("kelimesiz l42 = c42 ve l32 = c32 (bugünkü yol)", JSON.stringify(T.segmentleriKur(kelimesiz, "l42")) === JSON.stringify(T.segmentleriKur(kelimesiz, "c42")) &&
+  JSON.stringify(T.segmentleriKur(kelimesiz, "l32")) === JSON.stringify(T.segmentleriKur(kelimesiz, "c32")));
+var kelimesizUzun = [{ start: 0, end: 9, text: "Bu çok uzun bir cümle ve iki satıra sığması gereken bir altyazı metni olarak yazıldı bakalım ne olacak" }];
+var kx2 = T.segmentleriKur(kelimesizUzun, "c42x2").segments;
+chk("kelimesiz c42x2: iki satırlık bütçeyle bölünür, her parça ≤ 2 × 42, kelime atılmaz, çakışma yok",
+  kx2.length === 2 && kx2.every(function (x) { var sat = x.text.split("\n"); return sat.length <= 2 && sat.every(function (l) { return l.length <= 42; }); }) &&
+  kx2.map(function (x) { return x.text.replace(/\n/g, " "); }).join(" ") === kelimesizUzun[0].text && kx2[0].end <= kx2[1].start, JSON.stringify(kx2));
+chk("kelimesiz c42x2: kısa parçalar birleşir (aralık ≤ 0,2 sn, sığıyor); 'Kısa parçaları birleştir' kapalıyken birleşmez",
+  T.segmentleriKur([seg(0, 1, "Bugün"), seg(1.1, 2, "size anlatacağım")], "c42x2").segments.map(function (x) { return x.text; }).join("|") === "Bugün size anlatacağım" &&
+  T.segmentleriKur([seg(0, 1, "Bugün"), seg(1.1, 2, "size anlatacağım")], "c42x2", { birlestir: false }).segments.length === 2 &&
+  T.segmentleriKur([seg(0, 1, "Tamam."), seg(1.1, 2, "Sonra")], "c42x2").segments.length === 2);
+chk("kelimesiz c42x2: ses etiketi filtresi ve halüsinasyon temizliği yine çalışır", T.segmentleriKur([seg(0, 2, "[Müzik]"), seg(2, 4, "Merhaba")], "c42x2").segments.map(function (x) { return x.text; }).join("|") === "Merhaba");
+chk("boşluksuz yazı (Japonca) l42: satırlar birleşmez, bugünkü yol", T.segmentleriKur(jp, "l42").segments.length === 2);
+/* metinStili: satır kırılımı korunur */
+chk("metinStili: noktalamasız stilde satır kırılımı kalır, yalnız noktalamalı satır düşer",
+  T.metinStili("Bu ışık, hiç\nde kötü değil.", { punct: false }) === "Bu ışık hiç\nde kötü değil" &&
+  T.metinStili("Merhaba\n...\nsonra", { punct: false }) === "Merhaba\nsonra" &&
+  T.metinStili("bir\niki", { punct: true, kase: "upper", loc: "tr-TR" }) === "BİR\nİKİ");
 // trimOverlongCues: ölçülmüş son kelimeden önce kırpmaz
 var uzun = { start: 0, end: 17, text: "Bu kısa cümle", words: [{ text: "Bu", start: 0, end: 0.3 }, { text: "kısa", start: 0.4, end: 0.8 }, { text: "cümle", start: 0.9, end: 4.0 }] };
 var kirp = T.trimOverlongCues([uzun])[0];

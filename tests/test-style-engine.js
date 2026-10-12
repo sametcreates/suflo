@@ -133,6 +133,31 @@ styles.forEach(function (s) {
 ok("guvenli olmadan cikti degisiklik oncesiyle bayt bayt ayni (" + sayilan + " durum) ve 16:9'da guvenli etkisiz", farkli.length === 0 && sayilan === Object.keys(snap).length,
   farkli.slice(0, 4).join(", "));
 
+/* ---- 3.2 adim 4: Belgesel bandinin dengeli \N bolmesi altyazi iziyle ortak (js/caption-layout.js) ---- */
+var seKaynak = fs.readFileSync(path.join(__dirname, "..", "js", "style-engine.js"), "utf8");
+ok("balancedText, dengeliUzunluk ve breakIndex iki satir kirilimini caption-layout.js ikiyeBolNoktasi'ndan alir (eski yerel donguler yok)",
+  /if \(CL && CL\.ikiyeBolNoktasi\) return CL\.ikiyeBolNoktasi\(words\);/.test(seKaynak) && /var best = ikiyeBol\(words\);/.test(seKaynak) &&
+  /var i = ikiyeBol\(words\);/.test(seKaynak) && /var i = ikiyeBol\(group\.map\(/.test(seKaynak) && !/bestScore/.test(seKaynak));
+// require'siz ortamda (caption-layout.js yok) yedek kural ayni kirilimi verir: Belgesel ve kelime gruplari bayt bayt ayni
+var kutuSe = { module: { exports: {} }, console: console };
+kutuSe.exports = kutuSe.module.exports;
+require("vm").runInNewContext(seKaynak, kutuSe);
+var yalinSe = kutuSe.module.exports;
+ok("caption-layout.js olmadan yuklenen motor ayni Belgesel ve kelime grubu kirilimini uretir", ["doc", "capcut", "premium", "neon"].every(function (id) {
+  return [[1920, 1080], [1080, 1920]].every(function (wh) {
+    var o1 = { styleId: id, cues: id === "doc" ? [{ start: 0, end: 3, text: "Bugün size kamerayla ilgili birkaç şey anlatacağım ve göstereceğim" }] : snapKelime,
+      cueKind: id === "doc" ? "lines" : "words", width: wh[0], height: wh[1] };
+    return yalinSe.compile(o1).ass === engine.compile(o1).ass;
+  });
+}));
+var CLm = require(path.join(__dirname, "..", "js", "caption-layout.js"));
+var docUzun = "Bugün size kamerayla ilgili birkaç şey anlatacağım ve göstereceğim";
+var docAss = engine.compile({ styleId: "doc", cues: [{ start: 0, end: 3, text: docUzun }], cueKind: "lines", width: 1920, height: 1080 }).ass;
+var docKelime = docUzun.split(" "), docKir = CLm.ikiyeBolNoktasi(docKelime);
+ok("Belgesel bandi uzun satiri altyazi iziyle (2 satir × 42) ayni kelimeden kirar",
+  docAss.indexOf(docKelime.slice(0, docKir).join(" ") + "\\N" + docKelime.slice(docKir).join(" ")) !== -1 &&
+  CLm.dengeliSar(docUzun, 42, 2) === docKelime.slice(0, docKir).join(" ") + "\n" + docKelime.slice(docKir).join(" "));
+
 /* ---- Ölçülmüş kelime zamanları (yerel -ojf): cue.words sayısı tutarsa ölçülmüş geçişler ---- */
 var olcuSatir = [{ start: 10, end: 13, text: "Bunu gören *herkes* şaşırdı", words: [
   { text: "Bunu", start: 10.2, end: 10.5 }, { text: "gören", start: 10.5, end: 11.4 }, { text: "herkes", start: 11.9, end: 12.3 }, { text: "şaşırdı", start: 12.35, end: 12.9 }] }];

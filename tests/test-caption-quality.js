@@ -67,5 +67,19 @@ ok("Caption Editor ikinci metin kontrolunu satir sayisini koruyarak yapar", /asy
 ok("duzeltme sonraki altyazilar icin ogrenilebilir", /function correctionFromEdit/.test(captions) && /function learnLastCorrection/.test(captions));
 ok("kritik sorunlar timeline oncesi ikinci onay ister", /kritik \+ " kritik sorunla yine de uygula"/.test(captions) && /qualityReport\(\)/.test(captions));
 
+/* ---- 3.2 adim 4: iki satirlik altyazi (2 satir × 42, Shift+Enter) ---- */
+ok("normalizeText satir kirilimini tek \\n olarak korur", Q.normalizeText("  bir  iki \r\n\n  üç ", "tr") === "Bir iki\nüç", JSON.stringify(Q.normalizeText("  bir  iki \r\n\n  üç ", "tr")));
+var ikiSatir = { start: 0, end: 3, text: "Bugün size kamerayla ilgili birkaç\nşey anlatacağım ve göstereceğim" };
+ok("uzunluk denetimi satir basina: iki satir × 42 'Satır çok uzun' degil",
+  !Q.inspectSegment(ikiSatir, 0, [ikiSatir], { maxChars: 42, maxLines: 2 }).issues.some(function (x) { return x.code === "long-text"; }));
+ok("tek satir modunda da elle eklenen tek kirilim kabul edilir", !Q.inspectSegment(ikiSatir, 0, [ikiSatir], { maxChars: 42 }).issues.some(function (x) { return x.code === "long-text"; }));
+var tekUzun = { start: 0, end: 3, text: "Bugün size kamerayla ilgili birkaç şey anlatacağım ve göstereceğim" };
+ok("kirilimsiz 42'yi asan satir yine uyarilir", Q.inspectSegment(tekUzun, 0, [tekUzun], { maxChars: 42, maxLines: 2 }).issues.some(function (x) { return x.code === "long-text"; }));
+var duzeltilen = Q.autoFix([tekUzun], { lang: "tr", maxChars: 42, maxLines: 2 });
+ok("autoFix iki satir modunda bolmez, dengeli iki satira kirar", duzeltilen.length === 1 && duzeltilen[0].text.split("\n").length === 2 &&
+  duzeltilen[0].text.split("\n").every(function (l) { return l.length <= 42; }), JSON.stringify(duzeltilen.map(function (x) { return x.text; })));
+ok("autoFix tek satir modunda bugunku gibi boler", Q.autoFix([tekUzun], { lang: "tr", maxChars: 42 }).length === 2);
+ok("autoFix ikiye sigan kirilimli satira dokunmaz", Q.autoFix([ikiSatir], { lang: "tr", maxChars: 42, maxLines: 2 })[0].text === ikiSatir.text);
+
 console.log("\nCaption quality: " + pass + "/" + (pass + fail) + " gecti");
 if (fail) process.exit(1);
