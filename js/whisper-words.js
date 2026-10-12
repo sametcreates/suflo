@@ -101,7 +101,10 @@
   /*
    * DTW zamanı (sn, işlenmiş ses tabanında) ya da null. whisper.cpp v1.9.1 t_dtw'yi santisaniye
    * yazar (whisper_exp_compute_token_level_timestamps_dtw: zaman dizini * 2 + seek) ve -1 "yok"
-   * demektir. --vad açıkken t_dtw de belirteç offsets'i gibi işlenmiş seste: aynı eşlemeden geçer.
+   * demektir. Değer belirtecin BAŞLANGICIDIR: DTW girdisinde metin belirteçlerinden önce
+   * "notimestamps" belirteci durur, hizalama yolu bir belirtece geçtiği an o belirtece yazılır
+   * (OpenAI timing.py'deki jump_times gibi). --vad açıkken t_dtw de belirteç offsets'i gibi işlenmiş
+   * seste: aynı eşlemeden geçer.
    */
   function dtwZamani(tok) {
     if (!tok || tok.t_dtw === null || tok.t_dtw === undefined || tok.t_dtw === "") return null;
