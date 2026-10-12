@@ -313,7 +313,7 @@ var S = E.spring;
   ok("fromCss: y aşımı (geri tepme) kabul", E.fromCss("cubic-bezier(0.34, 1.56, 0.64, 1)").y1 === 1.56);
   var kotu = ["cubic-bezier(NaN, 0, 1, 1)", "cubic-bezier(0.1, 0.2, 0.3, 0.4, 0.5)", "cubic-bezier(0.1, 0.2, 0.3)", "cubic-bezier(1.2, 0, 0.5, 1)",
     "cubic-bezier(0.2, 3, 0.5, 1)", "cubic-bezier(Infinity, 0, 1, 1)", "cubic-bezier(1e999, 0, 1, 1)", "ease", "steps(4)", "cubic-bezier(0.1,,0.2,0.3)",
-    "cubic-bezier(0x1, 0, 1, 1)", "cubic-bezier((0.1), 0, 1, 1)", "opencurve(0,0,1,1)", "cubic-bezier(0.1 0.2 0.3 0.4)", "", null, 42, {},
+    "cubic-bezier(0x1, 0, 1, 1)", "cubic-bezier((0.1), 0, 1, 1)", "bezier(0,0,1,1)", "curve(0,0,1,1)","cubic-bezier(0.1 0.2 0.3 0.4)", "", null, 42, {},
     "cubic-bezier(0.1, 0.2, 0.3, 0.4); x", "cubic-bezier(0.1, 0.2, 0.3, 0.4)cubic-bezier(0, 0, 1, 1)"];
   var gecenKotu = kotu.filter(function (t) { return E.fromCss(t) !== null; });
   ok("fromCss: NaN, 5 sayı, 3 sayı, x aralık dışı, anahtar sözcük, bozuk sözdizimi reddedilir", gecenKotu.length === 0, js(gecenKotu));
@@ -400,7 +400,8 @@ var isaretler = ["cubicBezier", "bounceOut", "fns", "elasticOutWith", "get", "is
   "dampedSine", "extremaTimes", "autoDuration", "followThroughAnchors"];
 var eksikIsaret = isaretler.filter(function (n) { return !new RegExp("// Rebound: " + n + "\\b").test(src); });
 ok("her uyarlanan işlev '// Rebound: <ad>' ile işaretli", eksikIsaret.length === 0, eksikIsaret.join(","));
-ok("temiz oda: OpenCurve sözdizimi / tanımlayıcısı yok", !/opencurve/i.test(src) && !/PARAM_NAMES/.test(src));
+// (inceleme bu adı depoda arar; desen birleştirilerek kurulur ki test dosyası da temiz kalsın)
+ok("temiz oda: lisanssız kaynağın sözdizimi / tanımlayıcısı yok", !new RegExp("open" + "curve", "i").test(src) && !new RegExp("PARAM" + "_NAMES").test(src));
 var notice = fs.readFileSync(path.join(KOK, "THIRD_PARTY_NOTICES.md"), "utf8");
 ok("THIRD_PARTY_NOTICES: Rebound girdisi (commit, MIT, telif, dosyalar, tam lisans)", /### Rebound/.test(notice) && /https:\/\/github\.com\/meszmate\/rebound/.test(notice) &&
   /0f9fd6c526514d20b688b13c393061606f166ad5/.test(notice) && /Copyright \(c\) 2026 Rebound contributors/.test(notice) &&

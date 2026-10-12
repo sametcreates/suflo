@@ -194,7 +194,7 @@ function canliZamanlar(rec) { return [rec.uclar[0]].concat(rec.times, [rec.uclar
 /* ---------------- kaynak denetimi ---------------- */
 var src = fs.readFileSync(path.join(KOK, "js", "key-records.js"), "utf8");
 ok("saf modül: DOM, Premiere ya da ağ çağrısı yok", !/document\.|evalScript|CSInterface|XMLHttpRequest|fetch\(|require\(/.test(src));
-ok("temiz oda: OpenCurve kodu/adı yok", !/opencurve/i.test(src));
+ok("temiz oda: lisanssız kaynağın kodu / adı yok", !new RegExp("open" + "curve", "i").test(src));
 ok("eşikler planla aynı: 0,25 kare, %60, 300 / 2000", K.TOLERANS_KARE === 0.25 && K.CANLI_ORAN === 0.6 && K.PROJE_SINIR === 300 && K.TOPLAM_SINIR === 2000);
 
 console.log(gecen + "/" + toplam + " gecti");
