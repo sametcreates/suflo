@@ -62,6 +62,52 @@ var t = M.tablo([
 ok("tablo: satır başına gerçek zaman çarpanı ve WER, hata satırı", /\| turbo \| dogru \| kapalı \| studyo \| 60\.0 \| 20\.0 \| 3\.00× \| 5\.0% \|/.test(t) && /\| hata \|/.test(t), t);
 ok("tablo: model + mod toplamı (ses / süre, kelime ağırlıklı WER)", /\| turbo · dogru \| 2\.00× \| 12\.5% \|/.test(t) && /\| turbo · hizli \| 12\.00× \| 6\.0% \|/.test(t) && !/turbo · hizli · DTW/.test(t), t);
 
+/* ---------------- ASCII-güvenli yol (issue #7; inceleme bulgusu) ---------------- */
+var TR_MODEL = "C:\\Users\\Şükrü\\AppData\\Roaming\\Kesit\\whisper\\models\\ggml-large-v3-turbo-q5_0.bin";
+var TR_WAV = "D:\\kıyas\\stüdyo.wav", TR_VAD = "C:\\Users\\Şükrü\\AppData\\Roaming\\Kesit\\whisper\\models\\ggml-silero-v5.1.2.bin";
+var TR_TMP = "C:\\Users\\Şükrü\\AppData\\Local\\Temp\\suflo-kiyas-ab12", TR_OUT = TR_TMP + "\\o0_st_dyo_turbo_dogru_0";
+var KISA = {};
+KISA[TR_MODEL] = "C:\\Users\\SKR~1\\AppData\\Roaming\\Kesit\\whisper\\models\\GGML-L~1.BIN";
+KISA[TR_VAD] = "C:\\Users\\SKR~1\\AppData\\Roaming\\Kesit\\whisper\\models\\GGML-S~1.BIN";
+KISA[TR_WAV] = "D:\\KIYAS~1\\STDYO~1.WAV";
+KISA[TR_TMP] = "C:\\Users\\SKR~1\\AppData\\Local\\Temp\\SUFLO-~1";
+var komutlar = [];
+function sahteFs(varolan) {
+  var kopyalar = [];
+  return {
+    kopyalar: kopyalar,
+    existsSync: function (p) { return varolan.indexOf(p) !== -1 || kopyalar.indexOf(p) !== -1; },
+    mkdirSync: function () {}, statSync: function () { return { size: 1234 }; },
+    copyFileSync: function (a, b) { kopyalar.push(b); }
+  };
+}
+var ex83 = function (komut) {
+  komutlar.push(komut);
+  var m = /^for %I in \("(.*)"\) do @echo %~sI$/.exec(komut);
+  if (m && KISA[m[1]]) return Buffer.from("\r\n" + KISA[m[1]] + "\r\n");
+  throw new Error("8.3 yok");
+};
+var var83 = Object.keys(KISA).map(function (k) { return KISA[k]; }).concat([TR_MODEL, TR_WAV, TR_VAD, TR_TMP]);
+var y83 = M.guvenliYolKancasi({ platform: "win32", execSync: ex83, fs: sahteFs(var83) });
+ok("Windows, Türkçe karakterli kullanıcı yolu: model / ses / VAD 8.3 kısa yoluna çevrilir",
+  y83(TR_MODEL, "girdi") === KISA[TR_MODEL] && y83(TR_WAV, "girdi") === KISA[TR_WAV] && y83(TR_VAD, "girdi") === KISA[TR_VAD], komutlar.join(" | "));
+ok("çıktı tabanı: yalnız klasör kısalır, ASCII ad korunur (JSON aynı fiziksel klasöre düşer)", y83(TR_OUT, "cikti") === KISA[TR_TMP] + "\\o0_st_dyo_turbo_dogru_0");
+ok("ASCII yol ve Windows dışı: dokunulmaz", y83("D:\\kiyas\\a.wav", "girdi") === "D:\\kiyas\\a.wav" &&
+  M.guvenliYolKancasi({ platform: "linux", execSync: function () { throw new Error("çağrılmamalı"); } })("/home/şükrü/a.wav", "girdi") === "/home/şükrü/a.wav");
+var fsKopya = sahteFs([TR_WAV]);
+var yKopya = M.guvenliYolKancasi({ platform: "win32", execSync: function () { throw new Error("8.3 kapalı"); }, fs: fsKopya, kopyaDir: "C:\\ProgramData\\Suflo\\ascii-onbellek" });
+ok("8.3 kısa ad kapalı: girdi ASCII önbellek klasörüne kopyalanır (panelle aynı klasör ve ad biçimi)",
+  yKopya(TR_WAV, "girdi") === "C:\\ProgramData\\Suflo\\ascii-onbellek\\1234-st_dyo.wav" && fsKopya.kopyalar.length === 1, fsKopya.kopyalar.join(","));
+var ka = M.kosuArgumanlari({ model: TR_MODEL, audio: TR_WAV, outBase: TR_OUT, dil: "tr", threads: 8, mod: "hizli", dtw: true, modelId: "turbo", vad: TR_VAD }, y83);
+function argOf(a, b) { var i = a.indexOf(b); return i < 0 ? undefined : a[i + 1]; }
+ok("kıyas argümanları: -m / -f / -of / -vm ASCII-güvenli, bayraklar panelle aynı", argOf(ka, "-m") === KISA[TR_MODEL] && argOf(ka, "-f") === KISA[TR_WAV] &&
+  argOf(ka, "-of") === KISA[TR_TMP] + "\\o0_st_dyo_turbo_dogru_0" && argOf(ka, "-vm") === KISA[TR_VAD] && argOf(ka, "-bs") === "1" && argOf(ka, "-dtw") === "large.v3.turbo" &&
+  ka.every(function (x) { return M.asciiMi(x); }), ka.join(" "));
+var kaynakK = fs.readFileSync(path.join(KOK, "tools", "motor-kiyas.js"), "utf8");
+ok("kos(): her koşu kancalı kosuArgumanlari ile; ASCII'ye çevrilemeyen yolda whisper-cli çalıştırılmaz, neden yazılır",
+  /var yol = guvenliYolKancasi\(\);/.test(kaynakK) && /kosuArgumanlari\(\{[^}]*\}, yol\)/.test(kaynakK) &&
+  /asciiDisi\.length \? \{ status: null, stderr: "" \} : cp\.spawnSync/.test(kaynakK) && /ASCII olmayan yol whisper-cli'ye gitti/.test(kaynakK));
+
 /* ---------------- tutarlılık ---------------- */
 var motor = fs.readFileSync(path.join(KOK, "js", "engine.js"), "utf8");
 ok("model dosya adları js/engine.js kataloğuyla aynı", Object.keys(M.MODEL_DOSYA).every(function (id) {

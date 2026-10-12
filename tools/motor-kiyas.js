@@ -13,7 +13,9 @@
  * Önerilen üç örnek: studyo, telefon, gurultulu (1–3 dk Türkçe konuşma).
  *
  * Argümanlar panelle aynı kaynaktan kurulur (js/whisper-args.js olustur): kıyas panelin gerçekte
- * çalıştırdığı bayrakları ölçer. Metin -ojf JSON'undan js/whisper-words.js ile okunur. WER Türkçe
+ * çalıştırdığı bayrakları ölçer. Yol argümanları da panel gibi ASCII-güvenlidir (guvenliYolKancasi):
+ * whisper-cli Windows'ta argv'yi ANSI kod sayfasında okur (issue #7), "C:\Users\Şükrü\…" ya da
+ * "D:\kıyas" gibi yollar 8.3 kısa adına, o yoksa ASCII önbellek klasörüne kopyaya çevrilir. Metin -ojf JSON'undan js/whisper-words.js ile okunur. WER Türkçe
  * normalizasyondan sonra kelime düzeyinde Levenshtein / referans kelime sayısı (noktalama, büyük-küçük
  * harf ve kesme işareti yok sayılır; "3" ile "üç" farklı sayılır). Gerçek zaman çarpanı = ses süresi /
  * geçen süre (büyük = hızlı); model yükleme süresi dahil (panelde de her iş modeli yeniden yükler).
@@ -35,6 +37,63 @@ var MODEL_DOSYA = {
   tiny: "ggml-tiny-q5_1.bin", base: "ggml-base-q5_1.bin", small: "ggml-small-q5_1.bin",
   turbo: "ggml-large-v3-turbo-q5_0.bin", large: "ggml-large-v3-q5_0.bin"
 };
+
+function asciiMi(s) { return /^[\x00-\x7F]*$/.test(String(s == null ? "" : s)); }
+
+/*
+ * Panelin K.guvenliYol'unun (js/bridge.js, issue #7) kıyas aracındaki karşılığı: whisper-cli Windows'ta
+ * argv'yi ANSI kod sayfasında okur, ASCII olmayan model / ses / VAD / çıktı yolunu açamaz.
+ *   tur "girdi": var olan dosya -> 8.3 kısa yolu; kısa ad kapalıysa ASCII önbellek klasörüne kopya
+ *                (panelle aynı klasör: %ProgramData%\Suflo\ascii-onbellek, aynı ad + boyut yeniden kopyalanmaz)
+ *   tur "cikti": yazılacak taban ad -> klasörü kısaltılır, ad korunur (çıktı aynı fiziksel klasöre düşer)
+ * Windows dışında ve ASCII yolda yol aynen döner.
+ *   ortam (testte sahte): { platform, execSync, fs, kopyaDir }
+ */
+function guvenliYolKancasi(ortam) {
+  ortam = ortam || {};
+  var platform = ortam.platform || process.platform;
+  var ex = ortam.execSync || cp.execSync;
+  var fsx = ortam.fs || fs;
+  var onbellek = {};
+  function kisaYol(yol) {
+    if (Object.prototype.hasOwnProperty.call(onbellek, yol)) return onbellek[yol];
+    try {
+      var cikti = String(ex('for %I in ("' + yol + '") do @echo %~sI', { windowsHide: true, timeout: 10000 }));
+      var son = (cikti.split(/\r?\n/).filter(function (x) { return x.trim(); }).pop() || "").trim();
+      if (son && asciiMi(son) && fsx.existsSync(son)) { onbellek[yol] = son; return son; }
+    } catch (e) {}
+    return yol;
+  }
+  function kopya(yol) {
+    try {
+      var dir = ortam.kopyaDir || path.win32.join(process.env.ProgramData || "C:\\ProgramData", "Suflo", "ascii-onbellek");
+      if (!asciiMi(dir)) return yol;
+      if (!fsx.existsSync(dir)) fsx.mkdirSync(dir, { recursive: true });
+      var st = fsx.statSync(yol);
+      var hedef = path.win32.join(dir, st.size + "-" + path.win32.basename(yol).replace(/[^\x20-\x7E]/g, "_"));
+      if (!fsx.existsSync(hedef) || fsx.statSync(hedef).size !== st.size) fsx.copyFileSync(yol, hedef);
+      return hedef;
+    } catch (e) { return yol; }
+  }
+  return function (yol, tur) {
+    if (platform !== "win32" || !yol || asciiMi(yol)) return yol;
+    if (tur === "cikti" && !fsx.existsSync(yol)) {
+      var dn = path.win32.dirname(yol), bn = path.win32.basename(yol);
+      if (dn === yol) return yol;
+      var kdn = kisaYol(dn);
+      return asciiMi(kdn) && asciiMi(bn) ? path.win32.join(kdn, bn) : yol;
+    }
+    var k = kisaYol(yol);
+    if (asciiMi(k)) return k;
+    return tur === "girdi" ? kopya(yol) : yol;
+  };
+}
+
+// Kıyas koşusunun whisper-cli argümanları: panelle aynı olustur, aynı ASCII-güvenli yol kancası
+function kosuArgumanlari(o, yol) {
+  return WAR.olustur({ model: o.model, audio: o.audio, outBase: o.outBase, lang: o.dil, threads: o.threads,
+    cozme: o.mod, dtw: o.dtw, modelId: o.modelId, vad: o.vad || null, yol: yol });
+}
 
 // Türkçe büyük-küçük harf (I → ı, İ → i), noktalama ve kesme işareti atılır, boşluk tekilleşir
 function normalize(metin) {
@@ -135,27 +194,33 @@ function kos(o) {
   if (!ornekler.length) throw new Error("örnek yok: " + o.ornekler + " (<ad>.wav + <ad>.txt)");
   var gecici = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-kiyas-"));
   var threads = o.threads || Math.max(2, Math.min(8, os.cpus().length - 2));
+  var yol = guvenliYolKancasi();
   var sonuclar = [];
   o.model.forEach(function (modelId) {
     var modelYolu = path.join(o.modeller, MODEL_DOSYA[modelId]);
     if (!fs.existsSync(modelYolu)) { console.error("model yok, atlandı: " + modelYolu); return; }
     o.mod.forEach(function (mod) {
       (o.dtw ? [false, true] : [false]).forEach(function (dtw) {
-        ornekler.forEach(function (wav) {
+        ornekler.forEach(function (wav, ornekNo) {
           var ad = wav.replace(/\.wav$/i, "");
           var refYol = path.join(o.ornekler, ad + ".txt");
           if (!fs.existsSync(refYol)) { console.error("referans yok, atlandı: " + refYol); return; }
           var ref = fs.readFileSync(refYol, "utf8");
           var sesSn = wavSure(fs.readFileSync(path.join(o.ornekler, wav)));
           for (var t = 0; t < o.tekrar; t++) {
-            var outBase = path.join(gecici, ad + "_" + modelId + "_" + mod + (dtw ? "_dtw" : "") + "_" + t);
-            var args = WAR.olustur({ model: modelYolu, audio: path.join(o.ornekler, wav), outBase: outBase, lang: o.dil, threads: threads,
-              cozme: mod, dtw: dtw, modelId: modelId, vad: o.vad || null });
+            // çıktı adı ASCII (örnek adı "gürültülü" olsa da): yalnız klasör kısaltılır
+            var outBase = path.join(gecici, "o" + ornekNo + "_" + ad.replace(/[^\x20-\x7E]/g, "_") + "_" + modelId + "_" + mod + (dtw ? "_dtw" : "") + "_" + t);
+            var args = kosuArgumanlari({ model: modelYolu, audio: path.join(o.ornekler, wav), outBase: outBase, dil: o.dil, threads: threads,
+              mod: mod, dtw: dtw, modelId: modelId, vad: o.vad }, yol);
+            var asciiDisi = process.platform === "win32" ? args.filter(function (x) { return !asciiMi(x); }) : [];
             var bas = Date.now();
-            var r = cp.spawnSync(o.cli, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+            // ASCII'ye çevrilemeyen yol kaldıysa whisper-cli hiç çalıştırılmaz (açamayacağı dosyayla "hata" satırı yerine neden yazılır)
+            var r = asciiDisi.length ? { status: null, stderr: "" } : cp.spawnSync(o.cli, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
             var sureSn = (Date.now() - bas) / 1000;
             var kayit = { model: modelId, mod: mod, dtw: dtw, ornek: ad, tekrar: t, sesSn: sesSn, sureSn: sureSn, refKelime: kelimeler(ref).length, args: args.join(" ") };
             try {
+              if (asciiDisi.length) throw new Error("ASCII olmayan yol whisper-cli'ye gitti (8.3 kısa ad ve ASCII kopya olmadı): " + asciiDisi.join(", ") +
+                " — örnekleri ve modelleri D:\\kiyas gibi yalnız ASCII harfli bir klasöre koy");
               var bilgi = {};
               var segs = WW.segmentleriCoz(fs.readFileSync(outBase + ".json"), bilgi, { stderr: r.stderr, vadAcik: !!o.vad });
               var hip = segs.map(function (s) { return s.text; }).join(" ");
@@ -188,4 +253,5 @@ if (require.main === module) {
   if (o.json) fs.writeFileSync(o.json, JSON.stringify({ tarih: new Date().toISOString(), secenek: o, sonuclar: sonuclar }, null, 2));
 }
 
-module.exports = { normalize: normalize, kelimeler: kelimeler, wer: wer, wavSure: wavSure, argumanlar: argumanlar, tablo: tablo, MODEL_DOSYA: MODEL_DOSYA };
+module.exports = { normalize: normalize, kelimeler: kelimeler, wer: wer, wavSure: wavSure, argumanlar: argumanlar, tablo: tablo, MODEL_DOSYA: MODEL_DOSYA,
+  asciiMi: asciiMi, guvenliYolKancasi: guvenliYolKancasi, kosuArgumanlari: kosuArgumanlari };
