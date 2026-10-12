@@ -1242,3 +1242,84 @@ Netflix-YouTube önerilerine yakın. Kendi kanalında farklı bir varsayılan is
 satırlar; yeni '2 satır × 42 (YouTube/TV)', kelime sınırı ve Ayarlar › Altyazı'da en kısa / en uzun süre. Metni
 düzelttiğinde kelime zamanları kaybolmuyor; Shift+Enter satır içinde alt satıra geçiyor." `js/app.js` YENILIKLER
 listesine istersen kısası.
+
+### Adım 5: Yerel motor seçenekleri (Hızlı / En doğru, DTW hassas kelime, çevrimdışı İngilizce)
+
+Ne değişti: argüman kurma yeni saf modülde (`js/whisper-args.js`; `KEngine.buildArgs` ona devreder, ASCII-güvenli
+yol eşlemesi aynı). **Ayarlar › Çözme**: En doğru (bugünkü `-bs 5`, varsayılan) ya da Hızlı (`-bs 1 -bo 1`; sıcaklık
+geri dönüşü açık), yerel motorun her koşusunda. Altyazı kartında **Hassas kelime zamanlaması (DTW, biraz daha
+yavaş)**: yalnız yerel motor + kelime tabanlı mod (kelime kelime, birikimli, N kelime) ya da kelime tabanlı Suflo
+Stilinde görünür; motor `-dtw <ön ayar> -nfa` ile çalışır (tiny, base, small, large.v3.turbo, large.v3) ve
+`js/whisper-words.js` kelime başını `t_dtw / 100` sn, sonunu sonraki kelimenin başı alır. Dil satırında
+**İngilizceye çevir (çevrimdışı)**: `-tr`, yalnız Small ve Large. **Suflo Doctor** çözme modunu ve DTW desteğini
+gösterir. Çözme ve DTW **ücretsiz**; çevrimdışı İngilizce **Pro** — yeni özellik anahtarı `offlineTranslate`, 3 deneme
+hakkı (deneme listesi 10 → 11 araç, Ayarlar › Suflo Pro'daki tablo kendiliğinden gösterir). Raunen'den (MIT) yalnız
+fikir (bayrakları açmak); kod Suflo'nun kendi, clean-room (Raunen'in DTW yolu `-nfa` vermiyor, `t_dtw` okumuyordu).
+Kıyas aracı: `tools/motor-kiyas.js`.
+
+Benim doğruladıklarım (bu ortamda HuggingFace kapalıydı, gerçek modelleri indiremedim): whisper.cpp v1.9.1'i
+kaynaktan derledim. Yardım metni (`tests/fixtures/whisper-cli-v1.9.1-yardim.txt`) flash attention'ın varsayılan
+**açık** olduğunu gösteriyor. q5_1 olarak nicemlenmiş (rastgele ağırlıklı) bir tiny dosyasında: `-dtw tiny` tek başına
+"dtw_token_timestamps is not supported with flash_attn - disabling" yazıp bütün `t_dtw`'leri -1 bırakıyor; `-nfa` ile
+`t_dtw ≥ 0` geliyor (santisaniye), `--vad` ile de (VAD tablosuyla eşleniyor); `-tr` JSON'a `"translate": true` yazıyor.
+CPU'da 66 sn seste DTW'nin kendi ek yükü ~%3, `-nfa` dahil ~%6. Gerçek koşu çıktısı panelin ayrıştırıcısından
+geçti. Gerçek Turbo / Large / Small dosyalarında DTW'nin çalıştığını ve Türkçe hız / doğruluğu SEN ölçeceksin (5.1, 5.2).
+
+Bilmen gereken davranışlar:
+- **Varsayılan "En doğru" kalıyor**, kıyas (5.1) yapılana dek. Raunen'in ~13× / 1,4× iddiası Türkçe için doğrulanmadı.
+- **DTW otomatik kapanır:** motor `t_dtw` vermezse (hepsi -1) ya da derleme `-dtw` / `-nfa` tanımazsa (eski Homebrew;
+  o zaman aynı ses DTW'siz yeniden çözülür) o **model + derleme** için kapanır (`settings.json` › `dtwKapali`, ör.
+  `"turbo@cuda"`), günlüğe yazılır, anahtarın altında not ve "Yeniden dene" çıkar. CPU'ya ya da başka modele geçince
+  yeniden denenir.
+- **DTW açıkken canlı satırlar akmıyor** (yüzde, kalan süre ve hız akıyor): whisper.cpp v1.9.1'de DTW açıkken yeni
+  segment bildirimi DTW hesabından sonraya kalıyor ve o döngü (`src/whisper.cpp`, `seg < n_segments`) ilk 30 sn'lik
+  pencereden sonra hiç satır yazmıyor, ilkinde satırları yineliyor. Nihai altyazı JSON'dan, etkilenmiyor.
+- **Çevrimdışı çeviri bulut yedeğine geçmez** (yedek çevirmez; kaynak dilde altyazı "çeviri" sayılmasın), transkript
+  önbelleğine yazılmaz (Konuşmadan kes İngilizce kelime almasın), rehberin örnek klibinde kapalı. Sözlük ipucu
+  çeviride İngilizce çerçeveyle ("Names and terms: …") gider. Belge İngilizce sayılır (büyük harf "THIS", kalite,
+  çok dilli paket `en.srt`); işaret satırlarda (`cikisDili: "en"`) durur, geri al / taslak / Shorts kaydıyla taşınır.
+- **Dosya adı eki:** çeviri belgesi `suflo-altyazi.en.srt` olarak iner. Bu ek bulut (LLM) çevirisinde de hedef dili
+  alır (`suflo-altyazi.de.srt`); çift dilli dışa aktarmada ek yok. 3.1'de çeviri sonrası dosya adı eksizdi.
+- **Hızlı moddaki transkript** önbellekte En doğru'yla aynı anahtarı paylaşır (motor kimliği değişmedi): Hızlı'da
+  yazıya dökülen klip Konuşmadan kes'te önbellekten gelebilir; "Yeniden yazıya dök" yeniden çözer.
+
+**5.1 Türkçe kıyas ve varsayılan kararı (yaklaşık 1,5 saat; Windows, NVIDIA kartlı makinede).**
+1. Üç örnek hazırla, her biri 1–3 dk Türkçe konuşma: `studyo` (iyi mikrofon), `telefon` (telefonla kayıt), `gurultulu`
+   (kafe / sokak). Bir klasöre (ör. `D:\kiyas`) 16 kHz mono WAV olarak koy:
+   `ffmpeg -i studyo.mp4 -ar 16000 -ac 1 -c:a pcm_s16le D:\kiyas\studyo.wav` (diğer ikisi aynı).
+2. Her biri için referans metni `D:\kiyas\studyo.txt` (UTF-8): Suflo'nun Large + En doğru çıktısını SRT/TXT olarak al,
+   sesi dinleyerek **elle düzelt** (kelime kelime doğru olsun; noktalama ve büyük harf önemli değil).
+3. Panelden Large v3 ve Turbo'yu indir (Ayarlar › Doğruluk modeli; dosyalar `%APPDATA%\Kesit\whisper\models`).
+   Kurulu motor GPU (cuBLAS) ise CPU karşılaştırması için
+   `https://github.com/ggerganov/whisper.cpp/releases/download/v1.9.1/whisper-blas-bin-x64.zip`'i ayrı bir klasöre
+   (ör. `D:\whisper-cpu`) aç.
+4. `%APPDATA%\Kesit\whisper` içinde `whisper-cli.exe`'yi bul (bir alt klasörde de olabilir; aşağıdaki `--cli`'ye o
+   yolu ver). Depo klasöründe (Node 12+):
+   `node tools/motor-kiyas.js --cli "%APPDATA%\Kesit\whisper\whisper-cli.exe" --modeller "%APPDATA%\Kesit\whisper\models" --ornekler D:\kiyas --model turbo,large --dtw --vad "%APPDATA%\Kesit\whisper\models\ggml-silero-v5.1.2.bin" --json D:\kiyas\gpu.json`
+   ve aynısını `--cli D:\whisper-cpu\whisper-cli.exe ... --json D:\kiyas\cpu.json` ile (exe alt klasördeyse yolunu ver).
+   Çıktı tablosu her model / mod / DTW için gerçek zaman çarpanını ve WER'i verir. İki JSON'u bana gönder.
+5. Karar kuralı: Turbo ve Large'da, CPU ve GPU'da, üç örneğin hepsinde Hızlı'nın WER'i En doğru'dan en çok
+   **1 puan** fazlaysa **ve** Hızlı en az **1,5×** hızlıysa varsayılanı Hızlı yap; değilse En doğru kalsın. Hızlı'ya
+   geçmek için: `js/whisper-args.js` › `VARSAYILAN_COZME = "hizli"`, `index.html` › `#set-cozme`'de Hızlı'yı ilk
+   seçenek yap ve "(önerilen)"i ona taşı, `tests/test-whisper-args.js` / `tests/test-caption-quality.js` /
+   `tests/test-motor-secenekleri.js`'teki varsayılan beklentilerini güncelle (ya da bana yaz, ben yaparım).
+6. README'deki hız tablosunun "Hızlı" ve "+ DTW" satırlarına ölçtüğün çarpanları ve WER'i yaz.
+
+**5.2 DTW'yi gerçek modellerde doğrula (5.1'in içinde, ek süre yok).** `--dtw` ile her model satırında araç
+"t_dtw N/M" yazar. Turbo, Large ve (kuruluysa) Small'da GPU ve CPU'da N > 0 olmalı. Bir satırda **0/M** görürsen o
+model + derlemede DTW çalışmıyor demektir: kullanıcıda otomatik kapanır (zarar yok) ama bana yaz. Ek yük: aynı model
+ve modda DTW açık / kapalı gerçek zaman çarpanlarının oranı.
+
+**5.3 Gerçek DTW fikstürü (isteğe bağlı, 10 dk).** 10–20 sn'lik Türkçe bir WAV'ı Large ya da Turbo ile
+`whisper-cli -m <model> -f ornek.wav -l tr -ojf -of whisper-ojf-dtw-gercek -dtw large.v3.turbo -nfa --vad -vm <silero> 2> whisper-ojf-dtw-gercek.stderr.txt`
+ile çöz (Large'da ön ayar `large.v3`), iki dosyayı `tests/fixtures/` altına koy. `tests/test-whisper-words.js` onları
+bulunca gerçek DTW çıktısını da sınar (şimdi "ATLA" yazıyor).
+
+**5.4 Pro sayfası ve sürüm notu.** suflo.app Pro listesine (ve istersen fiyat sayfasına) "Çevrimdışı İngilizce
+çeviri (internetsiz, yerel motor)" ekle. Sürüm 3.2.0'a geçerken `marketing/release-notes.md`'nin 3.2.0 bölümüne:
+"Ayarlar › Çözme ile yerel motoru Hızlı ya da En doğru çalıştır; kelime kelime ve karaoke altyazıda 'Hassas kelime
+zamanlaması (DTW)' vurguyu sözcüğün söylendiği ana oturtur. Yeni Pro aracı: konuşmayı internetsiz İngilizce altyazıya
+çevir (Small / Large model, 3 deneme hakkı)." `js/app.js` YENILIKLER listesine istersen kısası.
+
+**5.5 Premiere'de dene (yaklaşık 40 dk).** `marketing/v3.2-deneme-listesi.md` › `## 5` maddeleri; en önemlisi 5.6
+(her modelde ve derlemede DTW) ve 5.10–5.12 (deneme hakkı, büyük harf, `.en.srt`).

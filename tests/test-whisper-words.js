@@ -199,6 +199,20 @@ if (fs.existsSync(gercekVadsiz)) {
 } else {
   console.log("ATLA gerçek VAD'siz -ojf fikstürü yok (tests/fixtures/whisper-ojf-tr-gercek-vadsiz.json) — kurucu yapılacaklar ## 3.2");
 }
+// 3.2 adım 5: Suflo'nun gerçek modeliyle "-dtw <ön ayar> -nfa" koşusu (VAD açık, stderr yanında)
+var gercekDtw = path.join(FIX, "whisper-ojf-dtw-gercek.json");
+if (fs.existsSync(gercekDtw)) {
+  var gdStderr = path.join(FIX, "whisper-ojf-dtw-gercek.stderr.txt");
+  var gdBilgi = {};
+  var gd = WW.segmentleriCoz(fs.readFileSync(gercekDtw), gdBilgi, fs.existsSync(gdStderr) ? { stderr: fs.readFileSync(gdStderr, "utf8") } : null);
+  ok("gerçek DTW koşusu: belirteçlerin çoğu t_dtw ≥ 0 (nicemlenmiş modelde DTW çalışıyor)", gdBilgi.dtw && gdBilgi.dtw.toplam > 0 && gdBilgi.dtw.olculen >= gdBilgi.dtw.toplam * 0.5, JSON.stringify(gdBilgi.dtw));
+  ok("gerçek DTW koşusu: kelimeler satır içinde, sıralı, metin satırla tutar", gd.length > 0 && gd.every(function (s) {
+    return metinler(s.words).replace(/\s+/g, "") === s.text.replace(/\s+/g, "") &&
+      s.words.every(function (w, i) { return w.start >= s.start && w.end <= s.end && w.end >= w.start && (i === 0 || w.start >= s.words[i - 1].start); });
+  }));
+} else {
+  console.log("ATLA gerçek DTW -ojf fikstürü yok (tests/fixtures/whisper-ojf-dtw-gercek.json) — kurucu yapılacaklar ## 3.2 › Adım 5");
+}
 
 /* ---------------- 8b) DTW (3.2 adım 5): t_dtw ≥ 0 kelime başı, sonraki kelimeye kadar ---------------- */
 // Fikstür whisper-ojf-tr.json'un aynısı, metin belirteçlerine -dtw ile yazılan t_dtw (santisaniye)

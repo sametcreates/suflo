@@ -25,7 +25,10 @@ lisansı ve uyarlanan kodu içeren Suflo dosyalarıyla listelenmiştir.
     ported from `com.raunen.premiere/js/lib/subtitles.js` to ES5 (CEF 74 / Node 12.3) and
     extended for Suflo (character-weighted interpolation, VAD time-base alignment, byte-level
     UTF-8 merge for older whisper.cpp builds, sentence-end flush). Raunen's DTW path was not
-    ported.
+    ported: the DTW word timing in the same file (`dtwZamani`, `dtwUygula`: `t_dtw` word starts,
+    next-word ends) and the engine flags in `js/whisper-args.js` (fast / accurate decoding,
+    `-dtw <preset> -nfa`, offline `-tr`) are Suflo's own clean-room code (3.2 step 5; only the idea of
+    exposing decoding flags came from Raunen).
   - `tests/test-whisper-words.js` exercises the adapted functions (test cases are Suflo's own).
   - `js/caption-text.js` — `NOISE_PATTERNS` and `isNoise()` (as `SES_ETIKETLERI` / `gurultuMu`:
     whole-cue `[BLANK_AUDIO]`, bracketed and parenthesised non-speech tags such as `[music]` or
@@ -93,7 +96,8 @@ listed here for transparency.
   (commit `f049fff95a089aa9969deb009cdd4892b3e74916`), MIT (SPDX: `MIT`),
   Copyright (c) 2023-2026 The ggml authors. On macOS it is installed through Homebrew
   (`whisper-cpp`). Suflo only reads its JSON output (`-ojf`); no whisper.cpp source code is
-  included in Suflo.
+  included in Suflo. The test fixture `tests/fixtures/whisper-cli-v1.9.1-yardim.txt` is the
+  unmodified `whisper-cli -h` output of that release (used to test flag detection; not shipped).
 - Whisper models in ggml format (https://huggingface.co/ggerganov/whisper.cpp) — OpenAI
   Whisper weights, MIT (SPDX: `MIT`).
 - Silero VAD in ggml format (`ggml-silero-v5.1.2.bin`, https://huggingface.co/ggml-org/whisper-vad)
