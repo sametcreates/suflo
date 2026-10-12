@@ -44,7 +44,9 @@
     "noise", "anlaşılmıyor", "inaudible", "şarkı", "singing", "nefes", "öksürük", "cough"];
   // Türkçe-duyarlı katlama: "MÜZİK", "ALKIŞ", "INAUDIBLE" sözlükle eşleşsin (İ/I/ı -> i)
   function katla(s) { return String(s).replace(/[İIı]/g, "i").toLowerCase(); }
+  // Yalnız kendi anahtarları sayılır: "(constructor)", "[__proto__]" gibi Object.prototype adları etiket değildir
   var ETIKET_ADI = {};
+  var KENDI = Object.prototype.hasOwnProperty;
   for (var ei = 0; ei < SES_ETIKETLERI.length; ei++) {
     ETIKET_ADI[katla(SES_ETIKETLERI[ei])] = SES_ETIKETLERI[ei].charAt(0).toUpperCase() + SES_ETIKETLERI[ei].slice(1);
   }
@@ -63,8 +65,8 @@
     var t = String(ic || "").replace(NOTALAR, " ").replace(/[.,!?;:…]+/g, " ").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
     if (!t) return null;
     if (!yildiz && /^blank[_ ]audio$/i.test(t)) return { bos: true };
-    var ad = ETIKET_ADI[katla(t)];
-    return ad ? { ad: ad } : null;
+    var anahtar = katla(t);
+    return KENDI.call(ETIKET_ADI, anahtar) ? { ad: ETIKET_ADI[anahtar] } : null;
   }
   function etiketleriGez(text, fn) {
     function degis(tam, a, b, c) {
@@ -164,17 +166,20 @@
   }
 
   // Satırın etiketsiz kopyası: metin yeni; ölçülmüş kelimelerden etiketler atılır. Baştaki ya da
-  // sondaki etiket atıldıysa satır o kenarda kalan kelimeye daralır (müzik boyunca ekranda beklemesin)
+  // sondaki etiket atıldıysa satır o kenarda kalan kelimeye daralır (müzik boyunca ekranda beklemesin).
+  // Daralma "koru" ayarından bağımsızdır: [BLANK_AUDIO] koru açıkken de atılır. Tutulan etiket
+  // kopyası özgün kelimenin zamanını taşır, kenar kelimesi atılmadıkça satır daralmaz.
   function etiketsizSatir(s, metin, koru) {
     var y = kelimeKopya(s, metin);
     if (kelimeli(s)) {
       var ws = kelimeEtiketleri(s.words, koru);
       if (ws.length) {
         y.words = ws;
-        // dokunulmayan kelime aynı nesnedir: kenardaki kelime değiştiyse orada etiket atıldı
+        // kalan ilk kelime özgün ilk kelimeden geç başlıyorsa baştaki kelime(ler) atıldı; sonda tersi
         var a = Number(ws[0].start), b = Number(ws[ws.length - 1].end);
-        if (!koru && ws[0] !== s.words[0] && isFinite(a) && a > y.start && a < y.end) y.start = a;
-        if (!koru && ws[ws.length - 1] !== s.words[s.words.length - 1] && isFinite(b) && b < y.end && b > y.start) y.end = b;
+        var a0 = Number(s.words[0].start), b0 = Number(s.words[s.words.length - 1].end);
+        if (isFinite(a) && a > a0 && a > y.start && a < y.end) y.start = a;
+        if (isFinite(b) && b < b0 && b < y.end && b > y.start) y.end = b;
       } else delete y.words;
     }
     return y;
@@ -197,8 +202,18 @@
       var t = s.text;
       if (!t) continue;
       var et = sesEtiketleri(t, koru);
+      // Yalnız ses etiketinden oluşan satır ("(alkış)", "[Müzik]") takılma zincirini keser: iki
+      // konuşma arasındaki alkış onları "art arda aynı satır" yapmaz (filtre öncesi davranış).
+      // Böylece aynı ses, "Ses etiketlerini koru" açık da kapalı da aynı konuşmayı verir.
+      if (et !== t && !et) { lastText = ""; repeat = 0; continue; }   // atılan etiket satırı
+      if (koru && gurultuMu(t)) {
+        // koru: etiket satırı takılma sayılmaz (uzun müzikte motor her pencereye "[Müzik]" yazar)
+        if (et !== t) s = etiketsizSatir(s, et, koru);
+        lastText = ""; repeat = 0;
+        out.push(s);
+        continue;
+      }
       if (et !== t) {
-        if (!et) continue;                       // yalnız ses etiketi
         s = etiketsizSatir(s, et, koru);
         t = et;
       }

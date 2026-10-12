@@ -192,9 +192,20 @@ ok("go(): tek klip/sekans yolunda denetim transcribeSuflo'dan ÖNCE (yerel ve bu
   goG.indexOf("sessizDenetim(audioSrc") < goG.indexOf("transcribeSuflo(audioSrc") && tekYol.indexOf("sessizDenetim") === -1);
 ok("go(): rehberin örnek klibi denetlenmez (!ornek)", /!ornek && !\(await sessizDenetim/.test(goG));
 ok("go(): toplu klipte her klip ses hazırlanınca, transkripsiyondan önce; tek karar, sessiz klip atlanır",
-  goG.indexOf("sessizDenetim(ba, { klip: true, karar: sessizKarar, etiket: bc.name })") > goG.indexOf("convertAudio(bc.mediaPath") &&
+  goG.indexOf("sessizDenetim(ba, { klip: true, karar: sessizKarar, etiket: bc.name, toplu: { sira: bi + 1, toplam: batchClips.length } })") > goG.indexOf("convertAudio(bc.mediaPath") &&
   goG.indexOf("sessizDenetim(ba,") < goG.indexOf("transcribeSuflo(ba,") && /sessizAtlanan\.push\(bc\.name\);\s*continue;/.test(goG));
-ok("go(): Vazgeç hata değil uyarı", /if \(e && e\.vazgecildi\) status\(e\.message, "warn"\);/.test(goG));
+ok("go(): Vazgeç hata değil uyarı", /if \(e && \(e\.vazgecildi \|\| e\.uyari\)\) status\(e\.message, "warn"\);/.test(goG));
+// İnceleme: Vazgeç (ya da başka hata) ekrandaki belgeyi bırakır; algılanan dili de geri gelir
+var goCatch = goG.slice(goG.lastIndexOf("} catch (e) {"), goG.lastIndexOf("} finally {"));
+ok("go(): algılanan dil temizlenmeden önce saklanır, hata/Vazgeç'te geri yüklenir",
+  goG.indexOf("var belgeDili = algilananDil") !== -1 && goG.indexOf("var belgeDili = algilananDil") < goG.indexOf("algilananDil = \"\";") &&
+  goG.indexOf("algilananDil = \"\";") < goG.indexOf("sessizDenetim(") && /if \(!yeniBelge\) algilananDil = belgeDili;/.test(goCatch) &&
+  goG.indexOf("yeniBelge = true;") > goG.indexOf("throw new Error(\"Konuşma bulunamadı.\");"));
+// İnceleme: yalnız ses etiketinden oluşan transkript kırmızı hata değil, ayara yönlendiren uyarı
+var bosG = goG.slice(goG.indexOf("if (segments.length === 0) {"), goG.indexOf("throw new Error(\"Konuşma bulunamadı.\");"));
+ok("go(): satırlar yalnız etiket filtresiyle boşaldıysa uyarı (e.uyari) ve Ayarlar › Altyazı › Ses etiketlerini koru",
+  /if \(yalnizEtiketMi\(mapped, lenVal\)\)/.test(bosG) && /eEt\.uyari = true;/.test(bosG) && bosG.indexOf("durumYukle(oncekiIs)") < bosG.indexOf("yalnizEtiketMi") &&
+  cap.indexOf("Etiketleri altyazıda tutmak için: Ayarlar › Altyazı › Ses etiketlerini koru.") !== -1);
 var twG = cap.slice(cap.indexOf("async function transcribeWords"), cap.indexOf("function applyGlossary"));
 ok("transcribeWords (Konuşmadan kes): denetim transcribeSuflo'dan önce, uyarı kendi kutusunda",
   twG.indexOf("sessizDenetim(audio, { klip: true, kutu: opts.sessizKutu || \"cap-sessiz\" })") > 0 &&
@@ -202,26 +213,74 @@ ok("transcribeWords (Konuşmadan kes): denetim transcribeSuflo'dan önce, uyarı
 var kk = fs.readFileSync(path.join(KOK, "js", "konusma-kes.js"), "utf8");
 ok("Konuşmadan kes: uyarı #tc-sessiz'de, Vazgeç uyarı olarak", /sessizKutu: "tc-sessiz"/.test(kk) && /if \(e && e\.vazgecildi\) status\(e\.message, "warn"\);/.test(kk));
 var ca = fnGovde(cap, "async function convertAudio(");
-ok("convertAudio: bulut MP3'ünde tepe aynı geçişte volumedetect ile ölçülür", /"-af", "volumedetect", "-b:a", br/.test(ca) && /SSES\.volumedetectTepe\(r\.stderr\)/.test(ca) &&
-  !/"-af", "volumedetect"/.test(ca.slice(ca.indexOf("if (wav) {"), ca.indexOf("} else {", ca.indexOf("if (wav) {")))));
+ok("convertAudio: bulut MP3'ünde tepe aynı geçişte volumedetect ile ölçülür", /"-af", SESSIZ_OLCUM_ZINCIRI, "-b:a", br/.test(ca) && /SSES\.volumedetectTepe\(r\.stderr\)/.test(ca) &&
+  !/SESSIZ_OLCUM_ZINCIRI|volumedetect"/.test(ca.slice(ca.indexOf("if (wav) {"), ca.indexOf("} else {", ca.indexOf("if (wav) {")))) && /"-ac", "1", "-ar", "16000"/.test(ca));
+// İnceleme: ffmpeg -af zincirini -ac/-ar dönüşümünden ÖNCE çalıştırır; ölçüm yüklenen mono 16 kHz sesle aynı olmalı
+var zincirM = /var SESSIZ_OLCUM_ZINCIRI = "([^"]+)";/.exec(cap);
+var zincir = zincirM ? zincirM[1] : "";
+ok("volumedetect zinciri: önce mono + 16 kHz aformat, sonra volumedetect",
+  /^aformat=[^,]*sample_rates=16000/.test(zincir) && /^aformat=[^,]*channel_layouts=mono/.test(zincir) && /,volumedetect$/.test(zincir) &&
+  zincir.indexOf("aformat") < zincir.indexOf("volumedetect"), zincir);
+// Gerçek ffmpeg (varsa): convertAudio'nun bulut argümanlarıyla. Ters fazlı stereo (ters bağlanmış yaka
+// mikrofonu) mono'da birbirini siler: yüklenen MP3 gibi "sessiz" ölçülmeli. Her durumda ölçüm yüklenen
+// dosyayla aynı kararı vermeli (eski zincir kaynağın tepesini ölçüyordu)
+(function () {
+  var cp = require("child_process");
+  var var1 = cp.spawnSync("ffmpeg", ["-hide_banner", "-encoders"], { encoding: "utf8" });
+  if (var1.error || var1.status !== 0 || !/libmp3lame/.test(var1.stdout || "")) { console.log("ATLA gerçek ffmpeg volumedetect: libmp3lame'li ffmpeg yok"); return; }
+  function stereo(oran, frekans, ters) {
+    var n = oran * 1, o = [];
+    for (var i = 0; i < n; i++) { var v = Math.round(12000 * Math.sin(2 * Math.PI * frekans * i / oran)); o.push(v, ters ? -v : v); }
+    return wav(o, { kanal: 2, oran: oran });
+  }
+  function olc(buf, ad) {
+    var giris = path.join(tmp, ad + ".wav"), cikis = path.join(tmp, ad + ".mp3");
+    fs.writeFileSync(giris, buf);
+    var r = cp.spawnSync("ffmpeg", ["-y", "-i", giris, "-vn", "-ac", "1", "-ar", "16000", "-af", zincir, "-b:a", "64k", cikis], { encoding: "utf8" });
+    var sonra = cp.spawnSync("ffmpeg", ["-hide_banner", "-i", cikis, "-af", "volumedetect", "-f", "null", "-"], { encoding: "utf8" });
+    return { tepe: SS.volumedetectTepe(r.stderr), dosya: SS.volumedetectTepe(sonra.stderr) };
+  }
+  var ters = olc(stereo(48000, 440, true), "vd_ters"), tiz = olc(stereo(48000, 10000, false), "vd_tiz"), normal = olc(stereo(48000, 440, false), "vd_normal");
+  ok("gerçek ffmpeg: ters fazlı stereo (mono'da sessiz) sessiz ölçülür, yüklenen MP3 ile aynı karar",
+    SS.sessizMi(ters.tepe) && SS.sessizMi(ters.dosya), JSON.stringify(ters));
+  ok("gerçek ffmpeg: tiz (10 kHz) içerikte ölçüm yeniden örneklenmiş sesi izler (kaynağın tepesi değil)",
+    isFinite(tiz.tepe) && isFinite(tiz.dosya) && Math.abs(20 * Math.log(tiz.tepe / tiz.dosya) / Math.LN10) < 3 && SS.sessizMi(tiz.tepe) === SS.sessizMi(tiz.dosya), JSON.stringify(tiz));
+  ok("gerçek ffmpeg: normal stereo konuşma bandı sessiz sayılmaz", !SS.sessizMi(normal.tepe) && normal.tepe > 0.1, JSON.stringify(normal));
+})();
 ok("uyarı metni: spesifikasyondaki cümle", cap.indexOf("Ses neredeyse tamamen sessiz: ses kanalları kapalı ya da sessize alınmış olabilir") !== -1);
 
 // sessizDenetim + sessizOnay davranışı (sahte DOM ve K ile)
-function sahteEl() {
+function sahteSekme(id, acik) {
+  var sinif = { tabpane: true, active: !!acik };
+  return { id: id, parentNode: null, classList: { contains: function (c) { return !!sinif[c]; } }, ac: function () { sinif.active = true; } };
+}
+function sahteEl(o) {
+  o = o || {};
   var d = {};
-  ["cap-sessiz", "cap-sessiz-devam", "cap-sessiz-vazgec", "cap-sessiz-metin", "tc-sessiz", "tc-sessiz-devam", "tc-sessiz-vazgec", "tc-sessiz-metin"].forEach(function (id) {
-    d[id] = { id: id, hidden: /-sessiz$/.test(id), textContent: "", onclick: null, focus: function () {}, scrollIntoView: function () {} };
+  var sekmeler = { cap: sahteSekme("tab-captions", o.capAcik !== false), tc: sahteSekme("tab-cut", o.tcAcik !== false) };
+  ["cap-sessiz", "cap-sessiz-devam", "cap-sessiz-vazgec", "cap-sessiz-metin", "tc-sessiz", "tc-sessiz-devam", "tc-sessiz-vazgec", "tc-sessiz-metin",
+    "cap-progress", "tc-progress"].forEach(function (id) {
+    d[id] = { id: id, hidden: /-sessiz$/.test(id), textContent: "", onclick: null, focus: function () { d.odak = id; }, scrollIntoView: function () {},
+      parentNode: /-sessiz$/.test(id) ? sekmeler[id.split("-")[0]] : null };
   });
+  d.sekmeler = sekmeler;
   return d;
 }
-function baglanti() {
-  var dom = sahteEl(), loglar = [], durumlar = [], mp3 = {};
+function baglanti(o) {
+  o = o || {};
+  var dom = sahteEl(o), loglar = [], durumlar = [], mp3 = {}, bildirimler = [], gidilen = [];
+  if (o.ilerleme) { dom["cap-progress"].hidden = false; dom["tc-progress"].hidden = false; }
   var K = { nodeOK: true, fs: fs, log: function (m) { loglar.push(m); } };
-  var kod = fnGovde(cap, "function vazgecHatasi(") + fnGovde(cap, "function sessizOnay(") + fnGovde(cap, "async function sessizDenetim(") +
-    "\nreturn { sessizDenetim: sessizDenetim, vazgecHatasi: vazgecHatasi };";
-  var api = new Function("SSES", "K", "el", "status", "mp3Tepeleri", "SESSIZ_KLIP", "SESSIZ_SEKANS", kod)(
-    SS, K, function (id) { return dom[id] || null; }, function (m) { durumlar.push(m); }, mp3, "KLIP-METNI", "SEKANS-METNI");
-  return { api: api, dom: dom, loglar: loglar, mp3: mp3 };
+  var KApp = o.kappYok ? undefined : {
+    toast: function (m, tur, sure, eylem) { bildirimler.push({ m: m, tur: tur, sure: sure, eylem: eylem }); },
+    goster: function (ad) { gidilen.push(ad); var s = dom.sekmeler[ad === "captions" ? "cap" : "tc"]; if (s) s.ac(); }
+  };
+  var kod = fnGovde(cap, "function vazgecHatasi(") + fnGovde(cap, "function sessizTopluMetni(") + fnGovde(cap, "function sessizSekmesi(") +
+    fnGovde(cap, "function sessizOnay(") + fnGovde(cap, "async function sessizDenetim(") +
+    "\nreturn { sessizDenetim: sessizDenetim, vazgecHatasi: vazgecHatasi, sessizTopluMetni: sessizTopluMetni };";
+  var api = new Function("SSES", "K", "KApp", "el", "status", "mp3Tepeleri", "SESSIZ_KLIP", "SESSIZ_SEKANS", kod)(
+    SS, K, KApp, function (id) { return dom[id] || null; }, function (m) { durumlar.push(m); }, mp3, "KLIP-METNI", "SEKANS-METNI");
+  return { api: api, dom: dom, loglar: loglar, mp3: mp3, durumlar: durumlar, bildirimler: bildirimler, gidilen: gidilen };
 }
 var sessizYol = path.join(tmp, "cap_sessiz.wav"), sesliYol = path.join(tmp, "cap_sesli.wav");
 fs.writeFileSync(sessizYol, wav(sinyal(16000, 10, 5)));
@@ -261,6 +320,75 @@ var b5 = baglanti();
 okAsync("panel: ölçülemeyen ses (yok/okunamaz) engellemez", b5.api.sessizDenetim(path.join(tmp, "yok.wav"), {}), function (d) {
   return d === true && b5.loglar.some(function (l) { return /olculemedi/.test(l); }) ? true : JSON.stringify([d, b5.loglar]);
 });
+// İnceleme: toplu işte soru klibin adını ve sırasını söyler, durum satırı silinmez, karar sonrakilere de uygulanır
+var b6 = baglanti(), karar6 = {};
+var p6 = b6.api.sessizDenetim(sessizYol, { klip: true, karar: karar6, etiket: "B-roll 3", toplu: { sira: 2, toplam: 6 } });
+okAsync("toplu: soru klip adını ve i/N sırasını söyler, kararın sonraki sessiz kliplere uygulandığını belirtir; durum satırı silinmez", sonraki().then(function () {
+  var metin = b6.dom["cap-sessiz-metin"].textContent;
+  b6.dom["cap-sessiz-vazgec"].onclick();
+  return p6.then(function (d) { return [metin, d]; });
+}), function (r) {
+  return r[1] === false && r[0].indexOf("klip 2/6 (B-roll 3)") !== -1 && /sonraki sessiz kliplere de uygulanır/.test(r[0]) && r[0] !== "KLIP-METNI" &&
+    b6.durumlar.indexOf("") === -1 && karar6.devam === false ? true : JSON.stringify([r, b6.durumlar]);
+});
+var b6b = baglanti();
+var p6b = b6b.api.sessizDenetim(sessizYol, { klip: true });
+okAsync("tek klip: durum satırı temizlenir (eski davranış), metin tek klip metni", sonraki().then(function () {
+  var metin = b6b.dom["cap-sessiz-metin"].textContent;
+  b6b.dom["cap-sessiz-devam"].onclick();
+  return p6b.then(function () { return metin; });
+}), function (m) { return m === "KLIP-METNI" && b6b.durumlar.indexOf("") !== -1 ? true : JSON.stringify([m, b6b.durumlar]); });
+ok("sessizTopluMetni: en.js kalıbı klip adını çevirmeden İngilizceye taşır", (function () {
+  var I = require(path.join(KOK, "js", "i18n.js"));
+  I.setDictionary(require(path.join(KOK, "i18n", "en.js")));
+  var tr = baglanti().api.sessizTopluMetni(2, 6, "Altyazı");
+  var en = I.translate(tr);
+  return en !== tr && en.indexOf("clip 2/6 (Altyazı)") !== -1 && !/sessiz|klip/.test(en.replace("Altyazı", "")) ? true : en;
+})() === true);
+
+// İnceleme: cevap beklenirken ilerleme çubuğu durur; kutunun sekmesi kapalıysa uyarı bildirimi ve "Uyarıyı göster"
+var b7 = baglanti({ ilerleme: true, tcAcik: false });
+var p7 = b7.api.sessizDenetim(sessizYol, { klip: false, kutu: "tc-sessiz" });
+okAsync("gizli sekmede soru: ilerleme gizlenir, uzun uyarı bildirimi çıkar, 'Uyarıyı göster' sekmeye götürür; cevaptan sonra ilerleme geri gelir", sonraki().then(function () {
+  var bekler = { tcIlerleme: b7.dom["tc-progress"].hidden, capIlerleme: b7.dom["cap-progress"].hidden, bildirim: b7.bildirimler.slice() };
+  var eylem = b7.bildirimler[0] && b7.bildirimler[0].eylem;
+  if (eylem) eylem.fn();
+  bekler.gidilen = b7.gidilen.slice();
+  bekler.odak = b7.dom.odak;
+  b7.dom["tc-sessiz-devam"].onclick();
+  return p7.then(function (d) { bekler.d = d; bekler.sonra = b7.dom["tc-progress"].hidden; return bekler; });
+}), function (r) {
+  var bl = r.bildirim[0];
+  return r.tcIlerleme === true && r.capIlerleme === false && r.bildirim.length === 1 && bl.m === "SEKANS-METNI" && bl.tur === "warn" && bl.sure >= 15000 &&
+    bl.eylem && bl.eylem.metin === "Uyarıyı göster" && r.gidilen.join() === "cut" && r.odak === "tc-sessiz-vazgec" && r.d === true && r.sonra === false
+    ? true : JSON.stringify(r);
+});
+var b8 = baglanti({ ilerleme: true });
+var p8 = b8.api.sessizDenetim(sessizYol, { klip: true });
+okAsync("açık sekmede soru: bildirim yok (kutu zaten görünür); Vazgeç'ten sonra ilerleme yine görünür (iş setBusy ile kapanır)", sonraki().then(function () {
+  var gizli = b8.dom["cap-progress"].hidden;
+  b8.dom["cap-sessiz-vazgec"].onclick();
+  return p8.then(function (d) { return [gizli, d, b8.bildirimler.length, b8.dom["cap-progress"].hidden]; });
+}), function (r) { return r[0] === true && r[1] === false && r[2] === 0 && r[3] === false ? true : JSON.stringify(r); });
+var b9 = baglanti({ kappYok: true, capAcik: false });
+var p9 = b9.api.sessizDenetim(sessizYol, { klip: true });
+okAsync("KApp yoksa (test/eski yükleme sırası) soru yine çalışır", sonraki().then(function () {
+  b9.dom["cap-sessiz-devam"].onclick();
+  return p9;
+}), function (d) { return d === true ? true : JSON.stringify(d); });
+
+// İnceleme: satırlar yalnız etiket filtresiyle boşaldıysa (ayar kapalı) uyarı; konuşmasız gerçek boşlukta değil
+var CTm = require(path.join(KOK, "js", "caption-text.js"));
+function yalnizEtiket(koruAyari) {
+  return new Function("CT", "sesEtiketKoru", fnGovde(cap, "function yalnizEtiketMi(") + "\nreturn yalnizEtiketMi;")(CTm, function () { return koruAyari; });
+}
+var yalnizMuzik = [{ start: 0, end: 5, text: "[Müzik]" }, { start: 5, end: 9, text: "(alkış)" }];
+ok("yalnizEtiketMi: yalnız etiket + ayar kapalı -> true; ayar açık, boş ya da konuşmasız noktalama -> false",
+  yalnizEtiket(false)(yalnizMuzik, "c42") === true && yalnizEtiket(false)(yalnizMuzik, "k1") === true && yalnizEtiket(false)(yalnizMuzik, "w3") === true &&
+  yalnizEtiket(true)(yalnizMuzik, "c42") === false && yalnizEtiket(false)([], "c42") === false &&
+  yalnizEtiket(false)([{ start: 0, end: 1, text: "..." }, { start: 1, end: 2, text: "[BLANK_AUDIO]" }], "c42") === false &&
+  CTm.segmentleriKur(yalnizMuzik, "c42", {}).segments.length === 0);
+
 var vh = baglanti().api.vazgecHatasi();
 ok("vazgecHatasi: işaretli hata", vh.vazgecildi === true && /Vazgeçildi/.test(vh.message));
 

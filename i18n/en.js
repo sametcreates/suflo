@@ -2697,7 +2697,10 @@
     "Ses neredeyse tamamen sessiz: ses kanalları kapalı ya da sessize alınmış olabilir (Altyazı › Ses katmanları).": "The audio is almost completely silent: the audio tracks may be turned off or muted (Captions › Audio tracks).",
     "Ses neredeyse tamamen sessiz: seçili klibin bu aralığında duyulur ses yok. Ses ayrı bir klipteyse (harici mikrofon) o klibi seç.": "The audio is almost completely silent: there is no audible sound in this range of the selected clip. If the sound is on a separate clip (external microphone), select that clip.",
     "Vazgeçildi: ses neredeyse tamamen sessiz.": "Cancelled: the audio is almost completely silent.",
-    "{n} sessiz klip atlandı: {}": "{} silent clips skipped: {}"
+    "{n} sessiz klip atlandı: {}": "{} silent clips skipped: {}",
+    "Uyarıyı göster": "Show warning",
+    "Yalnız ses etiketi vardı ([Müzik], alkış…), konuşma yok. Etiketleri altyazıda tutmak için: Ayarlar › Altyazı › Ses etiketlerini koru.":
+      "There were only sound tags ([Music], applause…), no speech. To keep tags in the captions: Settings › Captions › Keep sound tags."
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */
@@ -2843,6 +2846,9 @@
     // Try Pro clean re-render: the Premiere project item name and file path stay verbatim ($ = raw, not translated)
     [/^Filigran kısmen kaldırıldı: (\d+) proje öğesi değiştirilemedi\. Proje panelinde ona sağ tıkla, Replace Footage ile temiz dosyayı seç: ([\s\S]*)$/,
       function (m) { return "Watermark partly removed: " + m[1] + " project item" + (m[1] === "1" ? "" : "s") + " couldn't be swapped. Right-click " + (m[1] === "1" ? "it" : "them") + " in the Project panel, choose Replace Footage and pick the clean file: " + m[2]; }],
+    // silent-audio guard, batch: the clip name stays verbatim ($3 = raw, not translated)
+    [/^Ses neredeyse tamamen sessiz: klip (\d+)\/(\d+) \(([\s\S]+)\) içinde duyulur ses yok\. Bu karar sonraki sessiz kliplere de uygulanır: Vazgeç onları atlar, sesli klipler yine yazıya dökülür\.$/,
+      "The audio is almost completely silent: clip $1/$2 ($3) has no audible sound. This choice also applies to later silent clips: Cancel skips them, clips with sound are still transcribed."],
     [/^Deneme klibi timeline'da düzenlenmiş \(taşınmış, kırpılmış, bölünmüş ya da kopyalanmış\); kurgun bozulmasın diye Suflo ona dokunmadı\. Proje panelinde "([\s\S]+?)" öğesine sağ tıkla, Replace Footage ile temiz dosyayı seç \(düzenlemelerin korunur\), sonra listeden çıkar\. Temiz dosya: ([\s\S]+)$/,
       "The trial clip was edited on the timeline (moved, trimmed, split or duplicated), so Suflo left it alone to keep your edit intact. In the Project panel, right-click \"$1\", choose Replace Footage and pick the clean file (your edits are kept), then remove it from the list. Clean file: $2"]
   ];

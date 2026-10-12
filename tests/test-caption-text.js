@@ -208,6 +208,41 @@ chk("bulut kelime öğeleri (ölçülmüş değil): etiket öğeleri atılır", 
 var c42e = T.segmentleriKur([seg(0, 2, "[Müzik]"), seg(2, 5, "Merhaba [müzik]")], "c42");
 chk("satır modu: etiket satırı yok, karışık satır konuşmasıyla", metinler(c42e.segments) === "Merhaba");
 chk("satır modu + koru: '[Müzik]' satırı kalır", metinler(T.segmentleriKur([seg(0, 2, "(müzik)"), seg(2, 5, "Merhaba")], "c42", { etiketKoru: true }).segments) === "[Müzik]|Merhaba");
+// İnceleme: atılan etiket satırı takılma zincirini keser (filtre öncesi gibi); koru ayarı konuşmayı değiştirmez
+var araEtiket = [["Teşekkürler.", 0], ["(alkış)", 2], ["Teşekkürler.", 4], ["(alkış)", 6], ["Teşekkürler.", 8], ["Gol!", 9],
+  ["[Müzik]", 10], ["Gol!", 12], ["[Müzik]", 13], ["Gol!", 15]].map(function (x) { return seg(x[1], x[1] + 1, x[0]); });
+function konusma(liste) { return liste.filter(function (x) { return !T.gurultuMu(x.text); }).map(function (x) { return x.start + ":" + x.text; }).join("|"); }
+var araVars = T.cleanSegments(araEtiket), araKoru = T.cleanSegments(araEtiket, { etiketKoru: true });
+chk("etiket satırı araya girince 3 aynı konuşma satırı takılma sayılmaz (alkış/müzik arası 'Teşekkürler.' ve 'Gol!' kalır)",
+  konusma(araVars) === "0:Teşekkürler.|4:Teşekkürler.|8:Teşekkürler.|9:Gol!|12:Gol!|15:Gol!", konusma(araVars));
+chk("aynı ses: 'Ses etiketlerini koru' açık ve kapalıyken aynı konuşma satırları", konusma(araVars) === konusma(araKoru), konusma(araKoru));
+chk("gerçek takılma (aralıksız 3+ aynı satır) yine atılır",
+  metinler(T.cleanSegments([seg(0, 1, "Tamam."), seg(1, 2, "Tamam."), seg(2, 3, "Tamam."), seg(3, 4, "Tamam.")])) === "Tamam.|Tamam.");
+// İnceleme: koru açıkken uzun müziğin her penceresi '[Müzik]' kalır (takılma filtresi etiket satırını yemez)
+var uzunMuzik = T.segmentleriKur([seg(0, 10, "[Müzik]"), seg(10, 20, "[Müzik]"), seg(20, 30, "(müzik)"), seg(30, 40, "[MÜZİK]"), seg(40, 41, "Merhaba")], "c42", { etiketKoru: true });
+chk("koru: art arda 4 müzik penceresinin hepsi '[Müzik]' satırı verir",
+  metinler(uzunMuzik.segments) === "[Müzik]|[Müzik]|[Müzik]|[Müzik]|Merhaba" &&
+  uzunMuzik.segments.map(function (x) { return x.start; }).join(",") === "0,10,20,30,40", metinler(uzunMuzik.segments));
+// İnceleme: [BLANK_AUDIO] koru açıkken de atılır; satır kalan konuşmaya daralır (sessizlikte ekranda beklemez)
+var bosBas = { start: 0, end: 10, text: "[BLANK_AUDIO] Merhaba", words: [{ text: "[BLANK_AUDIO]", start: 0, end: 9 }, { text: " Merhaba", start: 9.2, end: 10 }] };
+var bosSon = { start: 20, end: 30, text: "Görüşürüz [BLANK_AUDIO]", words: [{ text: "Görüşürüz", start: 20, end: 21 }, { text: " [BLANK_AUDIO]", start: 21, end: 30 }] };
+[false, true].forEach(function (k) {
+  var c = T.cleanSegments([bosBas, bosSon], { etiketKoru: k });
+  var s42 = T.segmentleriKur([bosBas, bosSon], "c42", { etiketKoru: k }).segments;
+  chk("[BLANK_AUDIO] baş/son: satır konuşmaya daralır (koru " + (k ? "açık" : "kapalı") + ")",
+    metinler(c) === "Merhaba|Görüşürüz" && c[0].start === 9.2 && c[0].end === 10 && c[1].start === 20 && c[1].end === 21 &&
+    s42[0].start === 9.2 && s42[1].end <= 21, JSON.stringify(c.map(function (x) { return [x.start, x.end]; })) + " " + JSON.stringify(s42.map(function (x) { return [x.start, x.end]; })));
+});
+var koruKenar = T.cleanSegments([{ start: 0, end: 6, text: "[müzik] Merhaba", words: [{ text: "[müzik]", start: 0.5, end: 5 }, { text: " Merhaba", start: 5.1, end: 6 }] }], { etiketKoru: true });
+chk("koru: tutulan kenar etiketi satırı daraltmaz ('[Müzik] Merhaba' 0-6 kalır)",
+  metinler(koruKenar) === "[Müzik] Merhaba" && koruKenar[0].start === 0 && koruKenar[0].end === 6, JSON.stringify(koruKenar));
+// İnceleme: Object.prototype adları ses etiketi değildir (yazılım dersinde "(constructor)")
+chk("'(constructor)', '[__proto__]', '*toString*' etiket değil: metin aynen kalır",
+  !T.gurultuMu("(constructor)") && !T.gurultuMu("[__proto__]") && !T.gurultuMu("*toString*") && !T.gurultuMu("(hasOwnProperty)") &&
+  T.sesEtiketleri("Sonra (constructor) yazıyoruz", false) === "Sonra (constructor) yazıyoruz" &&
+  T.sesEtiketleri("Sonra (constructor) yazıyoruz", true) === "Sonra (constructor) yazıyoruz" &&
+  metinler(T.cleanSegments([seg(0, 1, "(constructor)"), seg(1, 2, "[__proto__]")], { etiketKoru: true })) === "(constructor)|[__proto__]",
+  T.sesEtiketleri("Sonra (constructor) yazıyoruz", true));
 // Raunen atfı: dosya başlığı, işaretler ve THIRD_PARTY_NOTICES girdisi
 var ctKaynak = require("fs").readFileSync(path.join(__dirname, "..", "js", "caption-text.js"), "utf8").replace(/\r\n/g, "\n");
 chk("caption-text.js: Raunen başlığı ve '// Raunen: <ad>' işaretleri",

@@ -1110,7 +1110,17 @@ Bilmen gereken davranışlar:
   satırlara dokunmaz.
 - **Konuşmadan kes'in kelime listesi filtrelenmez**: `[Müzik]` kelimesi orada konuşma gibi kalır, böylece müzikli
   bölümler duraksama sayılıp kesilmez (3.1 davranışı).
-- Toplu klipte sessiz klip için **bir kez** sorulur; "Vazgeç" sessiz klipleri atlar, diğerleri işlenir.
+- Toplu klipte sessiz klip için **bir kez** sorulur; soru klibin adını ve sırasını ("klip 2/6 (ad)") söyler ve
+  kararın sonraki sessiz kliplere de uygulanacağını yazar. "Vazgeç" sessiz klipleri atlar, diğerleri işlenir.
+- Soru açıkken ilerleme çubuğu durur. Kullanıcı başka sekmedeyse ~20 sn'lik sarı bildirim ve "Uyarıyı göster"
+  düğmesi çıkar (iş cevap bekliyor; kullanıcı hâlâ yazıya döküldüğünü sanmasın).
+- Bulut rotasında tepe, yüklenen sesle aynı biçimde (mono, 16 kHz) ölçülür: ters fazlı stereo gibi mono'da
+  sıfırlanan ses de uyarı verir.
+- Etiket satırı (atılsa da tutulsa da) "3+ aynı satır = takılma" zincirini keser: alkışla ayrılmış aynı cümle
+  atılmaz; koru ayarı konuşma satırlarını değiştirmez. Koru açıkken art arda `[Müzik]` satırları takılma sayılmaz.
+- Transkriptte yalnız ses etiketi varsa (koru kapalı) kırmızı "Konuşma bulunamadı." yerine sarı uyarı
+  Ayarlar › Altyazı › Ses etiketlerini koru'yu gösterir. "Vazgeç" ya da hata, ekrandaki belgenin algılanan dilini
+  silmez.
 - Uyarı metni sekans kapsamında "Altyazı › Ses katmanları" der (panelde kartın adı bu; planda "Ses kanalları"
   geçiyordu). Seçili klip kapsamında ayrı bir metin klibin kaynağını anlatır (orada katman seçimi yok).
 
