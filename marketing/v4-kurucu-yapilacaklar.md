@@ -1409,9 +1409,10 @@ Dengeli, 3.2 rehber yedeğinin taşınması, Shorts Paketi'nde noktalama).
 `golgeEk` / `kutuPay`; testler (`tests/test-style-engine.js`) sayıları denetler, birlikte güncelle. Kutulu / Vurucu / Zarif
 görünümlerinin değerleri `js/altyazi-efekt.js` › `GORUNUMLER`.
 
-**17.2 Premiere'de dene (yaklaşık 40 dk).** `marketing/v3.3-deneme-listesi.md` › `## 17`; en önemlisi 17.2–17.3 (gerçek
+**17.2 Premiere'de dene (yaklaşık 50 dk).** `marketing/v3.3-deneme-listesi.md` › `## 17`; en önemlisi 17.2–17.3 (gerçek
 gölge / kutu), 17.5–17.9 (sürükle, yapış, klavye, kenarlar, 9:16), 17.11 (timeline'da önizlemeyle aynı, Suflo'nun
-Windows / macOS ffmpeg'iyle) ve eski Premiere için 17.18.
+Windows / macOS ffmpeg'iyle), eski Premiere için 17.18 ve 17.25, inceleme düzeltmeleri için 17.22–17.28 (Vurucu'da
+zıplayan kelimenin gölgesi, Shorts CTA'sının yeri, 3.2 Clean Pill → Kutulu).
 
 **17.3 Sürüm notu (3.3.0'a geçerken).** `marketing/release-notes.md` 3.3.0 bölümüne: "Altyazı Efektleri'ne gölge ve
 arka plan kutusu; yazıyı önizlemede sürükleyerek istediğin yere koy (hazır konumlara yapışır, ok tuşlarıyla ince ayar);
@@ -1427,6 +1428,10 @@ Motion › Position'ını `AE.sablonKonumu(ayar)` oranıyla (0-1, kartın ortas�
 (a) Drop Shadow'un Opacity ifadesi JSON'daki 0-100'ü yüzde mi, 0-255 mi okuyor (AE'de bu efektin opaklığı ifadede
 0-255 olabilir; öyleyse gölge önizlemeden çok soluk çıkar, değer 2,55 ile çarpılmalı); (b) şablonun kutusu tek dikdörtgen
 (`sourceRectAtTime` + 20 px), Suflo önizlemesi satır satır kutu çizer: farkı onayla ya da libass tarafını tek kutuya çevir.
+
+**17.6 Kutulu eşlemesini onayla (2 dk).** İncelemeden sonra 3.2'nin kutulu stilleri (Clean Pill, SaaS Glass, Belgesel)
+"Temiz" / "Zarif" yerine arka plan kutulu **Kutulu**'ya taşınıyor (eski stilin yazı tipi / renkleri / konumu korunur).
+Belgesel'i kutusuz Zarif'e döndürmek istersen `js/altyazi-efekt.js` › `ESKI` (testi `tests/test-altyazi-efekt.js`).
 
 ### YouTube indirici (sol menü › YouTube İndir; bilgi ücretsiz, indirmek Pro `youtube`, 3 deneme)
 
