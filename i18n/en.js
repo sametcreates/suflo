@@ -2703,6 +2703,14 @@
       "There were only sound tags ([Music], applause…), no speech. To keep tags in the captions: Settings › Captions › Keep sound tags."
   });
 
+  /* ================= Canlı transkripsiyon / Live transcription (3.2 step 3: js/whisper-akis.js) ================= */
+  add({
+    // status line parts: "12 satır · %34 · ~1 dk 20 sn kaldı · 3,1× gerçek zaman" (each part translated alone)
+    "%{n}": "{}%",
+    "~{} kaldı": "~{} left",
+    "{n} dk {n} sn": "{} min {} s"
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
@@ -2833,6 +2841,8 @@
     // "12,5 sn" decimals and durations
     [/^([−+-]?\d+(?:[.,]\d+)?) ?sn$/, function (m) { return m[1].replace(",", ".") + " s"; }],
     [/^([−+-]?\d+(?:[.,]\d+)?) ?dk$/, function (m) { return m[1].replace(",", ".") + " min"; }],
+    // live transcription realtime factor: "3,1× gerçek zaman" → "3.1× real time"
+    [/^(\d+(?:,\d+)?)× gerçek zaman$/, function (m) { return m[1].replace(",", ".") + "× real time"; }],
     // "3 klip", "1 satır", "5 kelime"…
     [/^(\d+) (klip|satır|kelime|bölüm|kesim|vuruş|sahne|parça|dosya|ses|efekt|içerik|stil|geçiş|zemin)$/, function (m) {
       var w = { "klip": "clips", "satır": "lines", "kelime": "words", "bölüm": "chapters", "kesim": "cuts", "vuruş": "beats",
