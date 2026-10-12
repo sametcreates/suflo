@@ -1388,3 +1388,42 @@ düşmeli; yoksa şablon yazı tipini düşürür (Arial).
 `Montserrat-Bold.ttf` gibi paketteki değişken `Montserrat.ttf`'ten fontTools ile üretildi (OFL, aynı lisans dosyası,
 `THIRD_PARTY_NOTICES.md`'de yazılı). `tools/verify-release.ps1` iki statik Montserrat'ı zorunlu tutar; ZXP / kurucu
 `fonts/` klasörünü bütün taşır, ek adım yok.
+
+### Adım 17: Gölge, arka plan kutusu ve serbest X / Y konum
+
+Ne değişti: Altyazı Efektleri oluşturucusuna **Gölge** (renk, opaklık 0-100, mesafe 0-20, yumuşaklık 0-30) ve
+**Arka plan kutusu** (renk, opaklık) anahtarları, önizlemede **sürükleyerek serbest konum** (artı işareti, "X %50 · Y %85"
+etiketi, hazır konumlara ±%3 yapışma, ok tuşları %1 / Shift %5, çift tık / Home sıfırlar) ve altıncı hazır görünüm
+**Kutulu** geldi; Vurucu sert, Zarif yumuşak gölgeli. Stil motoru (`js/style-engine.js`, yalnız `efekt`): gölge ayrı
+katmanda metnin görünmez kopyasıdır (`\4c \4a \shad \blur`, yazı keskin kalır), kutu ikinci stil satırı `SufloKutu`
+(BorderStyle 3, satır satır, `\xbord20 \ybord0`), serbest konum `\an5` + kadraja / 9:16 sınırlarına kart kart sığdırma.
+Varsayılanlar ve 12 eski stil bayt bayt aynı (anlık görüntü testi). SFL1 kodu, Şablonum, Marka Kiti (isteğe bağlı:
+serbest konum, gölge, kutu) ve Shorts Paketi aynı ayarı taşır. Katman yine Pro.gate("overlay"), 3 deneme hakkı; yeni
+deneme anahtarı yok. TranscriptAI'dan bu adımda yalnız aralıklar / sözleşme alanları izlendi (kod ya da varlık yok).
+16. adımın ikinci incelemesinden kalan dört küçük bulgu da düzeldi (CEF 74 odak çizgisi, efektte hareket şiddeti hep
+Dengeli, 3.2 rehber yedeğinin taşınması, Shorts Paketi'nde noktalama).
+
+**17.1 Görünüşü onayla (10 dk).** Gölge yumuşaklığı ve kutu payı yaklaşıktır: yumuşaklık `\blur` = yumuşaklık / 2
+(1080p'de), gölge mesafesi şablonun Drop Shadow yönüyle (135°) eksen başına mesafe · cos 45°, kutu yatay payı 20 px
+(şablondaki `pad = 20`), dikey pay satır yüksekliği. Değiştirmek istersen `js/style-engine.js` › `renderEfekt` başındaki
+`golgeEk` / `kutuPay`; testler (`tests/test-style-engine.js`) sayıları denetler, birlikte güncelle. Kutulu / Vurucu / Zarif
+görünümlerinin değerleri `js/altyazi-efekt.js` › `GORUNUMLER`.
+
+**17.2 Premiere'de dene (yaklaşık 40 dk).** `marketing/v3.3-deneme-listesi.md` › `## 17`; en önemlisi 17.2–17.3 (gerçek
+gölge / kutu), 17.5–17.9 (sürükle, yapış, klavye, kenarlar, 9:16), 17.11 (timeline'da önizlemeyle aynı, Suflo'nun
+Windows / macOS ffmpeg'iyle) ve eski Premiere için 17.18.
+
+**17.3 Sürüm notu (3.3.0'a geçerken).** `marketing/release-notes.md` 3.3.0 bölümüne: "Altyazı Efektleri'ne gölge ve
+arka plan kutusu; yazıyı önizlemede sürükleyerek istediğin yere koy (hazır konumlara yapışır, ok tuşlarıyla ince ayar);
+yeni Kutulu görünümü. Shorts Paketi altyazısı Altyazı sekmesinin noktalama ayarını izler."
+
+**17.4 Site görseli (isteğe bağlı, 10 dk).** Site metni güncellendi (`docs/index.html`, `docs/en/index.html`). 16.3'teki
+yeni ekran görüntüsünü alırken önizlemede sürükleme anını (artı işareti ve "X %… · Y %…" etiketi görünürken) ya da
+Kutulu görünümünü kullanabilirsin.
+
+**17.5 Adım 21 için not (yerel MOGRT).** Şablonun JSON sözleşmesi gölge ve kutuyu taşıyor (`sablonStili`: gölge
+`[1,r,g,b,opaklık,mesafe,yumuşaklık]`, kutu `[1,r,g,b,opaklık]`). **Konum sözleşmede yok**: yerleştirme klibin
+Motion › Position'ını `AE.sablonKonumu(ayar)` oranıyla (0-1, kartın ortası) ayarlamalı. Şablon denemesinde iki şeye bak:
+(a) Drop Shadow'un Opacity ifadesi JSON'daki 0-100'ü yüzde mi, 0-255 mi okuyor (AE'de bu efektin opaklığı ifadede
+0-255 olabilir; öyleyse gölge önizlemeden çok soluk çıkar, değer 2,55 ile çarpılmalı); (b) şablonun kutusu tek dikdörtgen
+(`sourceRectAtTime` + 20 px), Suflo önizlemesi satır satır kutu çizer: farkı onayla ya da libass tarafını tek kutuya çevir.
