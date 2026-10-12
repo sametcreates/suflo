@@ -29,9 +29,10 @@
   "use strict";
 
   var VARSAYILAN_COZME = "dogru";
+  // ozet: günlük satırı için (yalnız ASCII teknik terim; arayüzde gösterilmez)
   var COZME = {
-    dogru: { bayrak: ["-bs", "5"], ad: "En doğru", ozet: "beam search, -bs 5" },
-    hizli: { bayrak: ["-bs", "1", "-bo", "1"], ad: "Hızlı", ozet: "açgözlü, -bs 1 -bo 1" }
+    dogru: { bayrak: ["-bs", "5"], ozet: "beam search, -bs 5" },
+    hizli: { bayrak: ["-bs", "1", "-bo", "1"], ozet: "greedy, -bs 1 -bo 1" }
   };
   // Suflo model kimliği -> whisper.cpp -dtw ön ayarı (examples/cli/cli.cpp, WHISPER_AHEADS_*)
   var DTW_ON_AYAR = { tiny: "tiny", base: "base", small: "small", turbo: "large.v3.turbo", large: "large.v3" };
@@ -136,12 +137,14 @@
     return args;
   }
 
-  // Günlük satırının gövdesi: "cozme=hizli (açgözlü, -bs 1 -bo 1), dtw=large.v3.turbo, ceviri=en"
+  // Günlük satırının gövdesi: "cozme=hizli (greedy, -bs 1 -bo 1), dtw=large.v3.turbo, ceviri=en"
+  // (istenip uygulanmayan: "dtw=unsupported(medium)", "ceviri=refused(turbo)")
   function gunlukMetni(o) {
     var s = secenekler(o);
+    var id = s.modelId || "?";
     var parca = ["cozme=" + s.cozme + " (" + COZME[s.cozme].ozet + ")"];
-    parca.push("dtw=" + (s.dtw || (o && o.dtw === true ? "yok (" + (s.modelId || "bilinmeyen model") + ")" : "kapali")));
-    if (o && o.cevir === true) parca.push("ceviri=" + (s.cevir ? "en" : "reddedildi (" + (s.modelId || "bilinmeyen model") + ")"));
+    parca.push("dtw=" + (s.dtw || (o && o.dtw === true ? "unsupported(" + id + ")" : "off")));
+    if (o && o.cevir === true) parca.push("ceviri=" + (s.cevir ? "en" : "refused(" + id + ")"));
     return parca.join(", ");
   }
 
@@ -200,7 +203,8 @@
    * Doctor satırları (Altyazı motoru grubu). Girdi:
    *   { cozme, dtwAyar (bool), model (kimlik ya da dosya), derleme, dtwKapali ({ anahtar: neden }),
    *     yardim (yardimDestegi() sonucu ya da null) }
-   * Döner: [{ status, title, detail }]
+   * Döner: [{ status, title, detail }]. DTW'nin desteklenmemesi kendi başına sorun değildir: satır
+   * yalnız kullanıcı DTW'yi açmışken uyarı (warn) olur, kapalıyken bilgi (good).
    */
   function doctorSatirlari(d) {
     d = d || {};
@@ -214,14 +218,15 @@
     var kapali = d.dtwKapali && typeof d.dtwKapali === "object" ? d.dtwKapali : {};
     var anahtar = dtwAnahtari(d.model, d.derleme);
     var dtw;
+    var sorun = d.dtwAyar ? "warn" : "good";
     if (y && y.okundu && !(y.dtw && y.nfa)) {
-      dtw = { status: "warn", detail: "Bu motor derlemesi -dtw / -nfa tanımıyor · kelime zamanı belirteç zamanından gelir" };
+      dtw = { status: sorun, detail: "Bu motor derlemesi -dtw / -nfa tanımıyor · kelime zamanı belirteç zamanından gelir" };
     } else if (!onAyar) {
-      dtw = { status: "warn", detail: "Bu model için DTW ön ayarı yok · kelime zamanı belirteç zamanından gelir" };
+      dtw = { status: sorun, detail: "Bu model için DTW ön ayarı yok · kelime zamanı belirteç zamanından gelir" };
     } else if (sahip(kapali, anahtar)) {
-      dtw = { status: "warn", detail: "Bu model ve derlemede DTW zamanı gelmedi, otomatik kapatıldı (" + onAyar + ")" };
+      dtw = { status: sorun, detail: "Bu model ve derlemede DTW zamanı gelmedi, otomatik kapatıldı (" + onAyar + ")" };
     } else {
-      dtw = { status: "good", detail: (d.dtwAyar ? "Açık" : "Kapalı") + " · desteklenir (" + onAyar + ")" };
+      dtw = { status: "good", detail: d.dtwAyar ? "Açık · desteklenir (" + onAyar + ")" : "Kapalı · desteklenir (" + onAyar + ")" };
     }
     satirlar.push({ status: dtw.status, title: "Hassas kelime zamanlaması (DTW)", detail: dtw.detail });
     return satirlar;

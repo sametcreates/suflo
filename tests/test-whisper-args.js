@@ -141,9 +141,10 @@ var E2 = motorOrtami(false, null);
 var b2 = E2.buildArgs(TABAN);
 ok("buildArgs: VAD modeli yoksa vad false, --vad yok; kanca yoksa yollar aynen", b2.vad === false && b2.args.indexOf("--vad") === -1 && b2.args[1] === TABAN.model && js(b2.args) === js(bugun));
 ok("buildArgs: çağıranın nesnesi değişmez (yol/vad eklenmez)", (function () { var o = Object.assign({}, TABAN); E.buildArgs(o); return o.yol === undefined && o.vad === undefined; })());
-ok("buildArgs günlüğü: cozme ve dtw yazılır", /cozme=hizli \(.*-bs 1 -bo 1\)/.test(b1.gunluk) && /dtw=large\.v3\.turbo/.test(b1.gunluk) && /ceviri=reddedildi \(turbo\)/.test(b1.gunluk), b1.gunluk);
-ok("günlük: DTW kapalıyken dtw=kapali, istenip ön ayar yokken dtw=yok (model)", /dtw=kapali/.test(W.gunlukMetni(TABAN)) &&
-  /dtw=yok \(bilinmeyen model\)/.test(W.gunlukMetni({ model: "x.bin", dtw: true })) && W.gunlukMetni(TABAN).indexOf("ceviri") === -1);
+ok("buildArgs günlüğü: cozme ve dtw yazılır", /cozme=hizli \(greedy, -bs 1 -bo 1\)/.test(b1.gunluk) && /dtw=large\.v3\.turbo/.test(b1.gunluk) && /ceviri=refused\(turbo\)/.test(b1.gunluk), b1.gunluk);
+ok("günlük: DTW kapalıyken dtw=off, istenip ön ayar yokken dtw=unsupported(model)", /dtw=off/.test(W.gunlukMetni(TABAN)) &&
+  /dtw=unsupported\(\?\)/.test(W.gunlukMetni({ model: "x.bin", dtw: true })) && /dtw=unsupported\(turbo\)/.test(W.gunlukMetni({ modelId: "turbo", dtw: true, kelimeYedegi: true })) &&
+  W.gunlukMetni(TABAN).indexOf("ceviri") === -1 && /^cozme=dogru \(beam search, -bs 5\)/.test(W.gunlukMetni(TABAN)));
 
 /* ---------------- 8) whisper-cli yardım metni ve hatalar ---------------- */
 
@@ -172,7 +173,9 @@ var T = "Hassas kelime zamanlaması (DTW)";
 ok("Doctor: DTW destekleniyor + açık (ön ayar adıyla)", (function () { var s = satir({ model: "ggml-large-v3-turbo-q5_0.bin", dtwAyar: true, yardim: d }, T); return s.status === "good" && /Açık · desteklenir \(large\.v3\.turbo\)/.test(s.detail); })());
 ok("Doctor: DTW destekleniyor + kapalı", /Kapalı · desteklenir \(small\)/.test(satir({ model: "small", dtwAyar: false, yardim: d }, T).detail));
 ok("Doctor: eski derleme -dtw tanımıyor -> uyarı", (function () { var s = satir({ model: "turbo", dtwAyar: true, yardim: d2 }, T); return s.status === "warn" && /-dtw \/ -nfa tanımıyor/.test(s.detail); })());
-ok("Doctor: ön ayarı olmayan model -> uyarı", /DTW ön ayarı yok/.test(satir({ model: "ggml-medium.bin", yardim: d }, T).detail));
+ok("Doctor: ön ayarı olmayan model, DTW açık -> uyarı", (function () { var s = satir({ model: "ggml-medium.bin", dtwAyar: true, yardim: d }, T); return s.status === "warn" && /DTW ön ayarı yok/.test(s.detail); })());
+ok("Doctor: DTW kapalıyken desteklenmemesi sorun sayılmaz (bilgi)", satir({ model: "ggml-medium.bin", dtwAyar: false, yardim: d }, T).status === "good" &&
+  satir({ model: "turbo", dtwAyar: false, yardim: d2 }, T).status === "good");
 ok("Doctor: otomatik kapatılmış (model@derleme) -> uyarı", (function () {
   var s = satir({ model: "turbo", derleme: "cuda", dtwAyar: true, yardim: d, dtwKapali: { "turbo@cuda": "t_dtw" } }, T);
   var cpu = satir({ model: "turbo", derleme: "cpu", dtwAyar: true, yardim: d, dtwKapali: { "turbo@cuda": "t_dtw" } }, T);

@@ -344,6 +344,22 @@ window.KLibraryHealth = (function () {
     }
   }
 
+  /*
+   * Yerel motor seçenekleri (js/whisper-args.js doctorSatirlari): Ayarlar › Çözme ve "Hassas kelime
+   * zamanlaması (DTW)" — derleme -dtw / -nfa tanıyor mu (whisper-cli -h), modelin ön ayarı var mı,
+   * bu model + derlemede otomatik kapatıldı mı. Yalnız okur; ayar yazmaz.
+   */
+  function motorSecenekSatirlari(probe, model, ready, build) {
+    var WAR = window.SufloWhisperArgs;
+    if (!WAR || !WAR.doctorSatirlari) return [];
+    var s = K.settings ? K.settings() : {};
+    var yardim = probe ? WAR.yardimDestegi(String(probe.stdout || "") + "\n" + String(probe.stderr || "")) : null;
+    return WAR.doctorSatirlari({
+      cozme: s.cozme, dtwAyar: s.dtw === true, model: model && model.id ? model.id : (ready && ready.model) || "",
+      derleme: build, dtwKapali: s.dtwKapali, yardim: yardim
+    }).map(function (c) { return { status: c.status, title: c.title, detail: c.detail, group: "engine" }; });
+  }
+
   async function engineChecks() {
     var checks = [];
     var settings = K.settings ? K.settings() : {};
@@ -362,6 +378,8 @@ window.KLibraryHealth = (function () {
         var model = window.KEngine && KEngine.activeModel ? KEngine.activeModel() : null;
         var build = window.KEngine && KEngine.installedBuild ? KEngine.installedBuild() : "cpu";
         checks.push({ status: "good", title: "Yerel altyazı motoru", detail: (model ? model.label.split(" —")[0] : basename(ready.model)) + " · " + String(build).toUpperCase(), group: "engine" });
+        // 3.2 adım 5: etkin çözme modu ve DTW desteği (yardım metni yukarıdaki "-h" yoklamasından)
+        motorSecenekSatirlari(probe, model, ready, build).forEach(function (c) { checks.push(c); });
       } catch (eP) {
         checks.push({ status: cloudReady ? "warn" : "bad", title: "Yerel motor açılmıyor", detail: K.hataYardimi ? K.hataYardimi(eP) : String(eP), action: "repair-engine", group: "engine" });
       }
