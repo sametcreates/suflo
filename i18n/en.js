@@ -2647,6 +2647,24 @@
     "Dosya projeye alinamadi. Premiere bu bicimi acamiyor olabilir.": "Couldn't import the file into the project. Premiere may not open this format."
   });
 
+  /* ================= Yumuşatma motoru / Easing engine (js/ease-curve.js BUILTINS, 3.4) ================= */
+  // "Doğrusal" (Linear), "Yumuşak" (Smooth) and "Zıplama" (Bounce) already have entries above; the curve
+  // picker shows each built-in's own nameEn ("Ease", "Bounce out") through SufloEase.builtinName().
+  add({
+    "Yumuşak giriş": "Ease in",
+    "Yumuşak çıkış": "Ease out",
+    "Yumuşak giriş-çıkış": "Ease in-out",
+    "Sert giriş": "Expo in",
+    "Sert çıkış": "Expo out",
+    "Güçlü S": "Strong S",
+    "Geri çekil": "Back in",
+    "Taşma": "Back out",
+    "Esnek": "Elastic out",
+    "Yay yumuşak": "Spring gentle",
+    "Yay canlı": "Spring lively",
+    "Çift yumuşak": "Double ease"
+  });
+
   /* ================= Hız rampası / Speed ramp (js/speedramp.js, js/hiz-rampasi.js, #tab-hiz) ================= */
   add({
     // curve presets (js/speedramp.js LIST)

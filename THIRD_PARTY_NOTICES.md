@@ -75,6 +75,58 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### Rebound
+
+- Project: Rebound — https://github.com/meszmate/rebound
+- Pinned commit: `0f9fd6c526514d20b688b13c393061606f166ad5` (0f9fd6c, "Merge pull request #6 from
+  meszmate/fix/cep12-manifest-guardrails")
+- License: MIT (SPDX: `MIT`)
+- Copyright: `Copyright (c) 2026 Rebound contributors`
+- Adapted in Suflo (3.4):
+  - `js/ease-curve.js` (`window.SufloEase`) — the easing engine from `client/js/easing/`, ported into one
+    ES5 UMD module (CEF 74 / Node 12.3) with the namespace renamed from `Rebound.easing` to `SufloEase`:
+    `bezier.js` (`cubicBezier`: Newton with a bisection fallback; Suflo caps the bisection loop),
+    `penner.js` (the Penner set, `get`, `isMonotonic`, `elasticOutWith`), `spring.js` (`resolveParams`,
+    `spring`, `springNormalized`, `settleTime`), `sampler.js` (`toFunction`, `samplePoints`, `range`,
+    `bakeFactors`, `turningPoints`, `slopeAt`), `speedgraph.js` (`endpointSpeeds`, `withStartSpeed`,
+    `withEndSpeed`, `sampleSpeed`, `speedRange`) and `overshoot.js` (`dampedSine`, `extremaTimes`,
+    `autoDuration`, `followThroughAnchors`). Each ported function is marked `// Rebound: <name>`.
+    Rebound's After Effects temporal-ease conversion, sparse Hermite fitting and its ingest server were
+    not ported. Suflo's own clean-room additions in the same file: multi-point curves (a chain of cubic
+    segments, each solved with its own general-cubic Newton plus bisection), `normalize`, `split`
+    (de Casteljau), `flip`, `invert`, `toCss` / `fromCss` (a single `cubic-bezier()` only), the built-in
+    curve list and `bakePlan` (dense keyframes on timeline frame times), plus exact 0/1 endpoints and a
+    numeric speed graph for non-bezier curves.
+  - `tests/test-ease-curve.js` — Rebound's `bezier`, `penner`, `spring`, `sampler`, `speedgraph` and
+    `overshoot` unit-test cases (vitest) adapted to Suflo's test style, next to Suflo's own cases.
+  - `js/key-records.js` (keyframe records and liveness check) is Suflo's own code; no Rebound code.
+- Rebound also states: "After Effects, Adobe, and ExtendScript are trademarks of Adobe Inc." Rebound is
+  an independent project; Suflo is not affiliated with it.
+
+```
+MIT License
+
+Copyright (c) 2026 Rebound contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## Bundled assets / Pakete dahil varlıklar
 
 - Fonts in `fonts/` (Anton, Archivo Black, Bebas Neue, Bungee, Lora, Montserrat) are
