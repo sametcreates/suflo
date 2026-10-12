@@ -46,6 +46,29 @@ ok("3.3 'Kalın yazı' kapalı: statik Montserrat Regular / Bold pakette (fonts/
   /\$stageItems = @\([^)]*"fonts"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"fonts"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /fonts\/Montserrat-Regular\\\.ttf\$/.test(gerekli) && /fonts\/Montserrat-Bold\\\.ttf\$/.test(gerekli) &&
   fs.existsSync(path.join(__dirname, "..", "fonts", "Montserrat-Regular.ttf")) && /Montserrat-Regular\.ttf/.test(notice), gerekli.slice(0, 600));
+/* ---- 3.3 adım 18: seçilmiş yeni fontlar ---- */
+var SSp = require(path.join(__dirname, "..", "js", "style-share.js"));
+var lisansDosyasi = { "Archivo Black": "ArchivoBlack", "Bebas Neue": "BebasNeue", "Libre Caslon Display": "LibreCaslonDisplay", "Exo 2": "Exo2", "Chakra Petch": "ChakraPetch" };
+var lisansEksik = SSp.fontNames().filter(function (n) {
+  var yol = path.join(__dirname, "..", "fonts", "OFL-" + (lisansDosyasi[n] || n) + ".txt");
+  if (!fs.existsSync(yol)) return true;
+  var t = fs.readFileSync(yol, "utf8");
+  // OFL 1.1 tam metin; fontTools ile örneklenen (değiştirilmiş) ailelerin telif satırı ayrılmış ad (Reserved Font
+  // Name) taşımaz: statik örnekler aynı adla dağıtılabilir (Lora olduğu gibi gelir, onun ayrılmış adı sorun değil)
+  var ornekli = n === "Montserrat" || n === "Inter" || n === "Exo 2" || n === "Nunito";
+  return !/SIL OPEN FONT LICENSE Version 1\.1/.test(t) || (ornekli && /Reserved Font Name/i.test(t.split("\n")[0]));
+});
+ok("her paket fontunun kendi fonts/OFL-<Aile>.txt'i var (OFL 1.1; örneklenen ailelerde ayrılmış ad yok)", lisansEksik.length === 0, lisansEksik.join(","));
+var yeniFontlar = SSp.fontNames().filter(function (n) { return SSp.fontSurumu(n) === "3.3"; });
+var yeniDosyalar = [];
+yeniFontlar.forEach(function (n) { [SSp.fontFile(n), SSp.fontFile(n, true)].forEach(function (f) { if (yeniDosyalar.indexOf(f) === -1) yeniDosyalar.push(f); }); });
+var yeniBayt = yeniDosyalar.reduce(function (t, f) { return t + fs.statSync(path.join(__dirname, "..", "fonts", f)).size; }, 0);
+ok("yeni fontların paket büyümesi ≤ 3 MB (4-8 aile; kalın yüz yalnız iki ağırlıklılarda)", yeniFontlar.length >= 4 && yeniFontlar.length <= 8 &&
+  yeniBayt <= 3 * 1024 * 1024, yeniFontlar.length + " aile, " + (yeniBayt / 1048576).toFixed(2) + " MB");
+ok("yeni font dosyaları ve lisansları verify-release'te zorunlu, bildirimlerde adlı",
+  yeniDosyalar.every(function (f) { return gerekli.indexOf("fonts/" + f.replace(/\./g, "\\.") + "$") !== -1 && notice.indexOf("`" + f + "`") !== -1; }) &&
+  yeniFontlar.every(function (n) { var l = "OFL-" + (lisansDosyasi[n] || n) + ".txt"; return gerekli.indexOf("fonts/" + l.replace(/\./g, "\\.") + "$") !== -1 && notice.indexOf(l) !== -1; }),
+  yeniDosyalar.join(","));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
 
 console.log(gecen + "/" + toplam + " gecti");

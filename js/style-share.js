@@ -14,7 +14,8 @@
  * atlandı" uyarısıyla atar; "efekt" stilini hiç tanımadıkları için kodu reddeder.
  *
  * Güvenlik: kod yabancı kaynaktan gelir ve değerleri ASS Style satırına yazılır.
- *   - renkler yalnız #rrggbb, yazı tipi yalnız paketle gelen 6 OFL fontundan biri
+ *   - renkler yalnız #rrggbb, yazı tipi yalnız paketle gelen OFL fontlarından biri (FONTS; 3.3 adım 18'den beri
+ *     13 aile, Kalın / Modern / Zarif / Teknik kategorileriyle)
  *   - konum ∈ {1, 2, 5, 8}; punto 36-180, kontur 0-16 aralığına kırpılır
  *   - giris / aktif sabit kimlik listesinden; satır 1-3, kelime 1-10 aralığına kırpılır
  *   - gölge opaklığı 0-100, mesafe 0-20, yumuşaklık 0-30; kutu opaklığı 0-100; konum %5-95 (kırpılır)
@@ -39,17 +40,43 @@
   var PAYLASIM_ADRESI = "https://suflo.app/stil";
   var PAYLASIM_ADRESI_EN = "https://suflo.app/en/stil";
 
+  /*
+   * Yazı tipi seçicisinin kategorileri (3.3 adım 18): Altyazı Efektleri'nin ve Marka Kiti'nin yazı tipi listesi bu
+   * sırayla gruplanır (index.html optgroup'ları; test eşleşmeyi denetler). etiket: optgroup'un görünen adı
+   * (i18n/en.js'te İngilizcesi var; düz "Kalın" sözlükte çubuk kalınlığı "Thick" olarak çevrildiği için ayrı).
+   */
+  var KATEGORILER = [
+    { id: "kalin", ad: "Kalın", etiket: "Kalın · iddialı" },
+    { id: "modern", ad: "Modern", etiket: "Modern · sade" },
+    { id: "zarif", ad: "Zarif", etiket: "Zarif · serif" },
+    { id: "teknik", ad: "Teknik", etiket: "Teknik · fütüristik" }
+  ];
+
   // Panelle gelen fontlar (Google Fonts, OFL; Türkçe glifler tam). genislik: ortalama
-  // karakter genişliği / punto (satır sığdırma hesabı için kaba katsayı)
+  // karakter genişliği / punto (satır sığdırma hesabı için kaba katsayı; büyük harfli metnin
+  // ölçülen ortalamasından biraz geniş: satır taşmasın). kategori: seçicideki grup.
   var FONTS = {
-    "Anton": { file: "Anton.ttf", genislik: 0.47 },
-    "Archivo Black": { file: "ArchivoBlack.ttf", genislik: 0.72 },
-    "Bebas Neue": { file: "BebasNeue.ttf", genislik: 0.43 },
-    "Bungee": { file: "Bungee.ttf", genislik: 0.8 },
-    "Lora": { file: "Lora.ttf", genislik: 0.55 },
+    "Anton": { file: "Anton.ttf", genislik: 0.47, kategori: "kalin" },
+    "Archivo Black": { file: "ArchivoBlack.ttf", genislik: 0.72, kategori: "kalin" },
+    "Bebas Neue": { file: "BebasNeue.ttf", genislik: 0.43, kategori: "kalin" },
+    "Bungee": { file: "Bungee.ttf", genislik: 0.8, kategori: "kalin" },
+    "Lora": { file: "Lora.ttf", genislik: 0.55, kategori: "zarif" },
     // statik Bold: libass değişken fontu seçemiyor, DejaVu'ya düşüyordu. normal: "Kalın yazı" kapalıyken
     // (Altyazı Efektleri) statik Regular; tek ağırlıklı fontlarda libass kalını kendisi üretir
-    "Montserrat": { file: "Montserrat-Bold.ttf", normal: "Montserrat-Regular.ttf", genislik: 0.64 }
+    "Montserrat": { file: "Montserrat-Bold.ttf", normal: "Montserrat-Regular.ttf", genislik: 0.64, kategori: "modern" },
+    /*
+     * 3.3 adım 18: seçilmiş yeni fontlar (google/fonts, OFL; fonts/OFL-<Aile>.txt). Hepsi tools/font-kontrol.js --az
+     * denetiminden geçti: Türkçe + Azerbaycanca ə / Ə TAM. İki ağırlıklı ailelerde statik Bold + Regular ("Kalın yazı"
+     * kapalıyken Regular; dosyaların iç aile adı anahtarla aynı, libass onunla eşler). surum: fontun geldiği sürüm;
+     * bu fontu taşıyan stil kodunu 3.2 paneli "font" uyarısıyla stilin kendi yazı tipine düşürür (kod yine açılır).
+     */
+    "Bangers": { file: "Bangers.ttf", genislik: 0.42, kategori: "kalin", surum: "3.3" },
+    "Inter": { file: "Inter-Bold.ttf", normal: "Inter-Regular.ttf", genislik: 0.63, kategori: "modern", surum: "3.3" },
+    "Poppins": { file: "Poppins-Bold.ttf", normal: "Poppins-Regular.ttf", genislik: 0.62, kategori: "modern", surum: "3.3" },
+    "Nunito": { file: "Nunito-Bold.ttf", normal: "Nunito-Regular.ttf", genislik: 0.62, kategori: "modern", surum: "3.3" },
+    "Libre Caslon Display": { file: "LibreCaslonDisplay.ttf", genislik: 0.57, kategori: "zarif", surum: "3.3" },
+    "Exo 2": { file: "Exo2-Bold.ttf", normal: "Exo2-Regular.ttf", genislik: 0.58, kategori: "teknik", surum: "3.3" },
+    "Chakra Petch": { file: "ChakraPetch-Bold.ttf", normal: "ChakraPetch-Regular.ttf", genislik: 0.6, kategori: "teknik", surum: "3.3" }
   };
 
   var KONUMLAR = [1, 2, 5, 8];
@@ -94,6 +121,21 @@
     fontNames().forEach(function (n) { o[n] = FONTS[n].genislik; });
     return o;
   }
+  /*
+   * Kategorili seçici (3.3 adım 18): [{ id, ad, etiket, fontlar: [ad…] }] KATEGORILER sırasıyla, grup içinde
+   * alfabetik. Boş kategori listelenmez.
+   */
+  function fontGruplari() {
+    return KATEGORILER.map(function (k) {
+      return { id: k.id, ad: k.ad, etiket: k.etiket, fontlar: fontNames().filter(function (n) { return FONTS[n].kategori === k.id; }).sort() };
+    }).filter(function (g) { return g.fontlar.length > 0; });
+  }
+  function fontKategorisi(name) { return hasFont(name) ? FONTS[name].kategori : null; }
+  // Fontun geldiği Suflo sürümü ("3.3"); 3.2'den beri pakette olanlarda null
+  function fontSurumu(name) { return hasFont(name) && FONTS[name].surum ? FONTS[name].surum : null; }
+  // Önizleme / seçici için CSS font-family (paket fontu değilse ""): "Exo 2" gibi rakamla başlayan
+  // kelimeli adlar tırnaksız geçersizdir
+  function cssFontFamily(name) { return hasFont(name) ? "\"" + name + "\", sans-serif" : ""; }
   function isColor(v) { return typeof v === "string" && RENK.test(v); }
 
   function sayi(v) {
@@ -333,6 +375,7 @@
     MAX_INPUT: EN_UZUN_GIRDI,
     SHARE_BASE: PAYLASIM_ADRESI,
     FONTS: FONTS,
+    KATEGORILER: JSON.parse(JSON.stringify(KATEGORILER)),
     GIRISLER: GIRISLER.slice(),
     AKTIFLER: AKTIFLER.slice(),
     EFEKT_ALANLARI: EFEKT_ALANLARI.slice(),
@@ -344,6 +387,10 @@
     fontNames: fontNames,
     fontFiles: fontFiles,
     widths: widths,
+    fontGruplari: fontGruplari,
+    fontKategorisi: fontKategorisi,
+    fontSurumu: fontSurumu,
+    cssFontFamily: cssFontFamily,
     isColor: isColor,
     validAuthor: validAuthor,
     sanitizeOverrides: sanitizeOverrides,

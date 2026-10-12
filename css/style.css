@@ -55,6 +55,20 @@
 @font-face { font-family: "Bungee";        src: url("../fonts/Bungee.ttf");        font-display: block; }
 @font-face { font-family: "Lora";          src: url("../fonts/Lora.ttf");          font-weight: 400 700; font-display: block; }
 @font-face { font-family: "Montserrat";    src: url("../fonts/Montserrat.ttf");    font-weight: 400 800; font-display: block; }
+/* 3.3 adım 18: seçilmiş yeni fontlar (kategorili seçici; iki ağırlıklılarda statik Regular 400 + Bold 700,
+   önizlemenin "Kalın yazı" açık / kapalı yüzü katmanınkiyle aynı dosya) */
+@font-face { font-family: "Bangers";              src: url("../fonts/Bangers.ttf");              font-display: block; }
+@font-face { font-family: "Libre Caslon Display"; src: url("../fonts/LibreCaslonDisplay.ttf");   font-display: block; }
+@font-face { font-family: "Inter";        src: url("../fonts/Inter-Regular.ttf");       font-weight: 400; font-display: block; }
+@font-face { font-family: "Inter";        src: url("../fonts/Inter-Bold.ttf");          font-weight: 700; font-display: block; }
+@font-face { font-family: "Poppins";      src: url("../fonts/Poppins-Regular.ttf");     font-weight: 400; font-display: block; }
+@font-face { font-family: "Poppins";      src: url("../fonts/Poppins-Bold.ttf");        font-weight: 700; font-display: block; }
+@font-face { font-family: "Nunito";       src: url("../fonts/Nunito-Regular.ttf");      font-weight: 400; font-display: block; }
+@font-face { font-family: "Nunito";       src: url("../fonts/Nunito-Bold.ttf");         font-weight: 700; font-display: block; }
+@font-face { font-family: "Exo 2";        src: url("../fonts/Exo2-Regular.ttf");        font-weight: 400; font-display: block; }
+@font-face { font-family: "Exo 2";        src: url("../fonts/Exo2-Bold.ttf");           font-weight: 700; font-display: block; }
+@font-face { font-family: "Chakra Petch"; src: url("../fonts/ChakraPetch-Regular.ttf"); font-weight: 400; font-display: block; }
+@font-face { font-family: "Chakra Petch"; src: url("../fonts/ChakraPetch-Bold.ttf");    font-weight: 700; font-display: block; }
 
 html, body {
   margin: 0;

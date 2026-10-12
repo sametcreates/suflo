@@ -3066,6 +3066,12 @@
     "Satır stili": "Line style",
     "Sistem": "System",
     "Suflo ile gelir": "Included with Suflo",
+    // 3.3 adım 18: kategorili yazı tipi seçicisi (optgroup etiketleri js/style-share.js KATEGORILER)
+    "Kalın · iddialı": "Bold · punchy",
+    "Modern · sade": "Modern · clean",
+    "Zarif · serif": "Elegant · serif",
+    "Teknik · fütüristik": "Tech · futuristic",
+    "Yazı tipleri dört kategoride, her biri kendi görünümüyle. Önizleme herkese açık; katmanı yerleştirmek Pro (3 deneme hakkı).": "Fonts come in four categories, each shown in its own face. The preview is free for everyone; placing the layer is Pro (3 free trials).",
     "kalan kısım": "remaining part",
     "kelime zamanı": "word timing",
     // invite rewards sync errors (pro-sync.js)
@@ -3212,6 +3218,7 @@
     "PREMIERE READY", "SFX", "Emoji Assets", "PNG · WEBP · GIF", "Motion BG", "ffmpeg", "In → Out", "Creator Punch", "Clean Pill", "Bold Box",
     "SaaS Glass", "Reels", "Pop", "Premium", "Karaoke", "YouTube", "Azərbaycanca", "Azərbaycan", "English", "Deutsch", "Español",
     "Français", "Português", "Italiano", "Anton", "Archivo Black", "Bebas Neue", "Bungee", "Lora", "Montserrat", "Arial", "Impact",
+    "Bangers", "Inter", "Poppins", "Nunito", "Libre Caslon Display", "Exo 2", "Chakra Petch",
     "Verdana", "Tahoma", "Georgia", "Trebuchet MS", "Courier New", "Apple", "Twemoji", "SRT", "WebVTT", "ASS · stilli", "TXT", "Enter",
     "Ctrl+Enter", "Alt+Enter", "Shift+Enter", "Instagram Reels", "TikTok", "Jump Cut", "Snap-In", "BPM", "native", "Slide", "Zoom", "Fade", "MOGRT",
     "Neon", "✦ Smart SFX 2.0", "Smart SFX 2.0", "loop", "GPU:", "OpenAI", "Endpoint", "Premiere", "Pro Cloud", "AUTO", "Emoji CDN",

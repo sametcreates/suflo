@@ -112,7 +112,19 @@ ok("sablonFontu: PostScript adı, kalın paketteki yüzden (Montserrat-Bold / -R
 ok("sablonFontu: paketlenmemiş italik yüz istenmez (Montserrat-Italic kurulu değil → Regular / Bold)",
   AE.sablonFontu({ font: "Montserrat", kalin: true, italik: true }) === "Montserrat-Bold" && AE.sablonFontu({ font: "Lora", kalin: false, italik: true }) === "Lora-Regular");
 var psAdlari = { "Anton.ttf": "Anton-Regular", "ArchivoBlack.ttf": "ArchivoBlack-Regular", "BebasNeue.ttf": "BebasNeue-Regular", "Bungee.ttf": "Bungee-Regular",
-  "Lora.ttf": "Lora-Regular", "Montserrat-Bold.ttf": "Montserrat-Bold", "Montserrat-Regular.ttf": "Montserrat-Regular" };
+  "Lora.ttf": "Lora-Regular", "Montserrat-Bold.ttf": "Montserrat-Bold", "Montserrat-Regular.ttf": "Montserrat-Regular",
+  // 3.3 adım 18: yeni fontların statik yüzleri
+  "Bangers.ttf": "Bangers-Regular", "LibreCaslonDisplay.ttf": "LibreCaslonDisplay-Regular",
+  "Inter-Regular.ttf": "Inter-Regular", "Inter-Bold.ttf": "Inter-Bold", "Poppins-Regular.ttf": "Poppins-Regular", "Poppins-Bold.ttf": "Poppins-Bold",
+  "Nunito-Regular.ttf": "Nunito-Regular", "Nunito-Bold.ttf": "Nunito-Bold", "Exo2-Regular.ttf": "Exo2-Regular", "Exo2-Bold.ttf": "Exo2-Bold",
+  "ChakraPetch-Regular.ttf": "ChakraPetch-Regular", "ChakraPetch-Bold.ttf": "ChakraPetch-Bold" };
+ok("3.3 adım 18: yeni fontların şablon adı paketteki yüzden (kalın → -Bold, tek ağırlıklıda Regular); her paket fontunun şablon adı var",
+  AE.sablonFontu({ font: "Exo 2", kalin: true }) === "Exo2-Bold" && AE.sablonFontu({ font: "Exo 2", kalin: false }) === "Exo2-Regular" &&
+  AE.sablonFontu({ font: "Inter", kalin: true }) === "Inter-Bold" && AE.sablonFontu({ font: "Bangers", kalin: true }) === "Bangers-Regular" &&
+  AE.sablonFontu({ font: "Libre Caslon Display", kalin: true }) === "LibreCaslonDisplay-Regular" &&
+  SS.fontNames().every(function (n) { return AE.sablonFontu({ font: n, kalin: false }) !== n || n === "Bangers"; }) &&
+  SS.fontNames().every(function (n) { return psAdlari[SS.fontFile(n)] && psAdlari[SS.fontFile(n, true)]; }));
+ok("yeni fontlar oluşturucuda seçilebilir (normalize korur)", ["Bangers", "Exo 2", "Libre Caslon Display", "Chakra Petch"].every(function (n) { return AE.normalize({ font: n }).font === n; }));
 // name tablosundaki PostScript adı (nameID 6, Windows UTF-16BE kaydı) dosyadan okunur
 function psAdi(dosya) {
   var b = fs.readFileSync(path.join(__dirname, "..", "fonts", dosya)), n = b.readUInt16BE(4);

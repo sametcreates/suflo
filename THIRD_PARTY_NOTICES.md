@@ -77,11 +77,27 @@ SOFTWARE.
 
 ## Bundled assets / Pakete dahil varlıklar
 
-- Fonts in `fonts/` (Anton, Archivo Black, Bebas Neue, Bungee, Lora, Montserrat) are
+- Fonts in `fonts/` (Anton, Archivo Black, Bebas Neue, Bungee, Lora, Montserrat; 3.3 additions below) are
   licensed under the SIL Open Font License 1.1 (SPDX: `OFL-1.1`). Each font's license text
   ships next to it as `fonts/OFL-<Family>.txt`. `Montserrat-Bold.ttf` and
   `Montserrat-Regular.ttf` are static instances (wght 700 / 400) of the bundled variable
   `Montserrat.ttf`, made with fontTools so libass can select them; same license.
+- Suflo 3.3 adds seven curated caption families from google/fonts (https://github.com/google/fonts),
+  all under the SIL Open Font License 1.1 (SPDX: `OFL-1.1`), none with a Reserved Font Name;
+  each ships with its own `fonts/OFL-<Family>.txt`:
+  - Bangers (`Bangers.ttf`), Copyright 2010 The Bangers Project Authors (`fonts/OFL-Bangers.txt`)
+  - Chakra Petch (`ChakraPetch-Regular.ttf`, `ChakraPetch-Bold.ttf`), Copyright 2018 The Chakra Petch
+    Project Authors (`fonts/OFL-ChakraPetch.txt`)
+  - Exo 2 (`Exo2-Regular.ttf`, `Exo2-Bold.ttf`), Copyright 2013 The Exo 2 Project Authors (`fonts/OFL-Exo2.txt`)
+  - Inter (`Inter-Regular.ttf`, `Inter-Bold.ttf`), Copyright 2020 The Inter Project Authors (`fonts/OFL-Inter.txt`)
+  - Libre Caslon Display (`LibreCaslonDisplay.ttf`), Copyright 2012 The Libre Caslon Display Authors
+    (`fonts/OFL-LibreCaslonDisplay.txt`)
+  - Nunito (`Nunito-Regular.ttf`, `Nunito-Bold.ttf`), Copyright 2014 The Nunito Project Authors (`fonts/OFL-Nunito.txt`)
+  - Poppins (`Poppins-Regular.ttf`, `Poppins-Bold.ttf`), Copyright 2020 The Poppins Project Authors (`fonts/OFL-Poppins.txt`)
+
+  The Inter, Exo 2 and Nunito files are static instances (wght 400 / 700) of the upstream variable
+  fonts, made with fontTools so libass can select them; the others are the upstream static files.
+  Their internal family names are unchanged.
 - Emoji images in `emoji/` come from Twemoji (https://github.com/jdecked/twemoji),
   Copyright Twitter, Inc and other contributors, licensed under CC-BY 4.0
   (SPDX: `CC-BY-4.0`); see `emoji/LISANS.txt`.

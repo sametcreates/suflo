@@ -4762,7 +4762,8 @@ window.KCaptions = (function () {
     // serbest konum yalnız Altyazı Efektleri'nin DOM önizlemesinde (efektDomCiz); başka stilde silinir
     kutu.style.left = "";
     kutu.style.top = "";
-    kutu.style.fontFamily = st.font + ", sans-serif";
+    // tırnaklı: "Exo 2" gibi rakamla başlayan kelimeli ad tırnaksız geçersiz CSS'tir (önizleme varsayılan fonta düşerdi)
+    kutu.style.fontFamily = (SS && SS.cssFontFamily && SS.cssFontFamily(st.font)) || JSON.stringify(String(st.font || "Arial")) + ", sans-serif";
     kutu.style.fontSize = Math.max(7, st.boyut * olcek) + "px";
     kutu.style.fontWeight = rec.aile === "doc" ? "600" : "800";
     kutu.style.fontStyle = "normal";

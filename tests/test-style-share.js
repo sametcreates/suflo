@@ -10,12 +10,92 @@ function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "F
 var STILLER = ["mrbeast", "capcut", "saas", "viral", "pop", "doc", "premium", "hormozi", "neon", "daktilo", "ziplama", "dolgu"];
 
 /* ---------------- FONTS ---------------- */
-ok("6 paket fontu", SS.fontNames().join(",") === "Anton,Archivo Black,Bebas Neue,Bungee,Lora,Montserrat", SS.fontNames().join(","));
+var ESKI6 = ["Anton", "Archivo Black", "Bebas Neue", "Bungee", "Lora", "Montserrat"];
+var YENI7 = ["Bangers", "Inter", "Poppins", "Nunito", "Libre Caslon Display", "Exo 2", "Chakra Petch"];
+ok("paket fontları: 3.2'nin 6 fontu aynı sırada başta, 3.3 adım 18'in 7 yeni ailesi arkada",
+  SS.fontNames().join(",") === ESKI6.concat(YENI7).join(","), SS.fontNames().join(","));
 ok("font dosyaları gerçekten var", SS.fontNames().every(function (n) { return fs.existsSync(path.join(kok, "fonts", SS.FONTS[n].file)); }));
 ok("normal (kalın olmayan) yüz: Montserrat statik Regular, tek dosyalı fontta aynı dosya; dosyalar var", SS.fontFile("Montserrat", true) === "Montserrat-Regular.ttf" &&
   SS.fontFile("Montserrat") === "Montserrat-Bold.ttf" && SS.fontFile("Anton", true) === "Anton.ttf" && SS.fontFile("Arial", true) === null &&
   SS.fontNames().every(function (n) { return fs.existsSync(path.join(kok, "fonts", SS.fontFile(n, true))); }));
 ok("hasFont: proto / bilinmeyen değil", SS.hasFont("Lora") && !SS.hasFont("__proto__") && !SS.hasFont("toString") && !SS.hasFont("Arial"));
+
+/* ---------------- 3.3 adım 18: kategorili seçici ---------------- */
+var KAT = SS.KATEGORILER.map(function (k) { return k.id; });
+ok("kategoriler: Kalın / Modern / Zarif / Teknik sırasıyla, her birinin optgroup etiketi var",
+  KAT.join(",") === "kalin,modern,zarif,teknik" && SS.KATEGORILER.map(function (k) { return k.ad; }).join(",") === "Kalın,Modern,Zarif,Teknik" &&
+  SS.KATEGORILER.every(function (k) { return typeof k.etiket === "string" && k.etiket.indexOf(k.ad) === 0 && k.etiket !== k.ad; }), JSON.stringify(SS.KATEGORILER));
+ok("her font tam bir bilinen kategoride", SS.fontNames().every(function (n) { return KAT.indexOf(SS.fontKategorisi(n)) !== -1; }) &&
+  SS.fontKategorisi("Arial") === null && SS.fontKategorisi("__proto__") === null);
+var gr = SS.fontGruplari();
+var grDuz = [];
+gr.forEach(function (g) { grDuz = grDuz.concat(g.fontlar); });
+ok("fontGruplari: KATEGORILER sırası, grup içi alfabetik, her font tam bir kez", gr.map(function (g) { return g.id; }).join(",") === KAT.join(",") &&
+  gr.every(function (g) { return g.fontlar.join("|") === g.fontlar.slice().sort().join("|") && g.fontlar.length > 0; }) &&
+  grDuz.length === SS.fontNames().length && grDuz.slice().sort().join("|") === SS.fontNames().slice().sort().join("|"), JSON.stringify(gr));
+ok("fontGruplari: Teknik = Chakra Petch + Exo 2; Zarif = Libre Caslon Display + Lora",
+  gr[3].fontlar.join(",") === "Chakra Petch,Exo 2" && gr[2].fontlar.join(",") === "Libre Caslon Display,Lora", JSON.stringify(gr));
+gr[0].fontlar.push("Arial");
+ok("fontGruplari kopya döner (dışarıdan bozulmaz)", SS.fontGruplari()[0].fontlar.indexOf("Arial") === -1);
+SS.KATEGORILER[0].id = "bozuk";
+ok("KATEGORILER dışa kopya (modül içi değişmez)", SS.fontGruplari()[0].id === "kalin");
+SS.KATEGORILER[0].id = "kalin";
+ok("fontSurumu: yeni 7 font '3.3', eski 6 font null", YENI7.every(function (n) { return SS.fontSurumu(n) === "3.3"; }) &&
+  ESKI6.every(function (n) { return SS.fontSurumu(n) === null; }) && SS.fontSurumu("Arial") === null);
+ok("cssFontFamily: tırnaklı (\"Exo 2\" rakamla başlayan kelime), paket dışı \"\"",
+  SS.cssFontFamily("Exo 2") === "\"Exo 2\", sans-serif" && SS.cssFontFamily("Anton") === "\"Anton\", sans-serif" &&
+  SS.cssFontFamily("Arial") === "" && SS.cssFontFamily("x\"; color:red") === "");
+ok("yeni fontlar: genişlik katsayısı makul (0.3-0.9), iki ağırlıklılarda statik Regular + Bold ayrı dosya",
+  YENI7.every(function (n) { var f = SS.FONTS[n]; return f.genislik >= 0.3 && f.genislik <= 0.9 && fs.existsSync(path.join(kok, "fonts", f.file)); }) &&
+  ["Inter", "Poppins", "Nunito", "Exo 2", "Chakra Petch"].every(function (n) { return SS.fontFile(n, true) !== SS.fontFile(n) && /-Regular\.ttf$/.test(SS.fontFile(n, true)) && /-Bold\.ttf$/.test(SS.fontFile(n)); }) &&
+  SS.fontFile("Bangers", true) === "Bangers.ttf" && SS.fontFile("Libre Caslon Display", true) === "LibreCaslonDisplay.ttf");
+// Her paket fontu Türkçe glifleri gerçekten içerir; 3.3'te eklenenler Azerbaycanca ə / Ə da (tools/font-kontrol.js)
+var FK = require(path.join(kok, "tools", "font-kontrol.js"));
+var fkSorun = [];
+SS.fontNames().forEach(function (n) {
+  [SS.fontFile(n), SS.fontFile(n, true)].forEach(function (dosya) {
+    var r = FK.denetle(fs.readFileSync(path.join(kok, "fonts", dosya)));
+    if (r.hata || r.eksik.length || r.aile !== n) fkSorun.push(dosya + ":" + JSON.stringify(r));
+    else if (SS.fontSurumu(n) && r.azEksik.length) fkSorun.push(dosya + " az:" + r.azEksik.join(""));
+  });
+});
+ok("font-kontrol: her paket fontu Türkçe TAM, iç aile adı FONTS anahtarı; yeniler Azerbaycanca da TAM", fkSorun.length === 0, fkSorun.join(" | "));
+// Panelin iki yazı tipi seçicisi (Altyazı Efektleri, Marka Kiti) kategorili ve FONTS ile birebir
+var html = fs.readFileSync(path.join(kok, "index.html"), "utf8");
+function seciciGruplari(id) {
+  var bas = html.indexOf('<select id="' + id + '"');
+  var blok = html.slice(bas, html.indexOf("</select>", bas));
+  var out = [], re = /<optgroup label="([^"]+)"([^>]*)>([\s\S]*?)<\/optgroup>/g, m;
+  while ((m = re.exec(blok))) {
+    if (/disabled/.test(m[2])) continue;
+    var fl = [], r2 = /<option value="([^"]+)" style="font-family:([^"]+)"/g, o;
+    while ((o = r2.exec(m[3]))) fl.push({ ad: o[1], css: o[2].replace(/&quot;/g, "\"") });
+    out.push({ etiket: m[1], fontlar: fl });
+  }
+  return out;
+}
+["cap-font", "mk-font"].forEach(function (id) {
+  var sg = seciciGruplari(id);
+  ok(id + ": optgroup'lar fontGruplari ile aynı (etiket, sıra, fontlar), her seçenek kendi yüzüyle",
+    sg.length === SS.fontGruplari().length && SS.fontGruplari().every(function (g, i) {
+      return sg[i].etiket === g.etiket && sg[i].fontlar.map(function (f) { return f.ad; }).join("|") === g.fontlar.join("|") &&
+        sg[i].fontlar.every(function (f) { return f.css === SS.cssFontFamily(f.ad); });
+    }), JSON.stringify(sg).slice(0, 400));
+});
+["stil.html", "en/stil.html"].forEach(function (sayfa) {
+  var h = fs.readFileSync(path.join(kok, "docs", sayfa), "utf8");
+  var link = (/fonts\.googleapis\.com\/css2\?([^"]+)"/.exec(h) || ["", ""])[1];
+  ok("docs/" + sayfa + ": stil kodu sayfası her paket fontunu Google Fonts'tan yükler", SS.fontNames().every(function (n) {
+    return link.indexOf("family=" + n.replace(/ /g, "+") + "&") !== -1 || link.indexOf("family=" + n.replace(/ /g, "+") + ":") !== -1;
+  }), link);
+});
+var css = fs.readFileSync(path.join(kok, "css", "style.css"), "utf8");
+ok("css: her paket fontunun @font-face'i var, iki ağırlıklılarda Regular 400 + Bold 700",
+  SS.fontNames().every(function (n) { return css.indexOf('font-family: "' + n + '"') !== -1; }) &&
+  ["Inter", "Poppins", "Nunito", "Exo 2", "Chakra Petch"].every(function (n) {
+    return new RegExp('font-family: "' + n + '";\\s*src: url\\("\\.\\./fonts/' + SS.fontFile(n, true).replace(".", "\\.") + '"\\);\\s*font-weight: 400;').test(css) &&
+      new RegExp('font-family: "' + n + '";\\s*src: url\\("\\.\\./fonts/' + SS.fontFile(n).replace(".", "\\.") + '"\\);\\s*font-weight: 700;').test(css);
+  }));
 
 /* ---------------- round trip ---------------- */
 var tarif = {
@@ -470,6 +550,19 @@ ok("EN sayfa: her Suflo Stilinin İngilizce adı var, panelin İngilizce adıyla
 }), JSON.stringify(enAdlar));
 ok("shareUrl: İngilizce arayüz /en/stil, Türkçe (ya da dil yok) /stil", SS.shareUrl("SFL1.x", "en") === "https://suflo.app/en/stil#SFL1.x" &&
   SS.shareUrl("SFL1.x", "tr") === "https://suflo.app/stil#SFL1.x" && SS.shareUrl("SFL1.x") === "https://suflo.app/stil#SFL1.x");
+
+/* ---- 3.3 adım 18: yeni fontlu kodlar ve eski kodlar ---- */
+var yeniFontKod = SS.encode({ styleId: "neon", overrides: { font: "Exo 2", renk: "#00ff00" } });
+var yfC = SS.decode(yeniFontKod, YENI);
+ok("yeni font gidiş-dönüş: font + fontFile (Exo2-Bold.ttf), uyarısız", yfC.ok && yfC.recipe.overrides.font === "Exo 2" &&
+  yfC.recipe.overrides.fontFile === "Exo2-Bold.ttf" && yfC.warnings.length === 0, JSON.stringify(yfC));
+var yfEski = Eski32.decode(yeniFontKod, eskiIzin);
+ok("3.2 paneli yeni fontlu kodu yine açar: font 'font' uyarısıyla atlanır (stilin kendi yazı tipi), renk uygulanır",
+  yfEski.ok && yfEski.recipe.overrides.font === undefined && yfEski.recipe.overrides.renk === "#00ff00" && yfEski.warnings.indexOf("font") !== -1, JSON.stringify(yfEski));
+var eskiFontKod = { styleId: "neon", overrides: { font: "Lora", renk: "#00ff00", konum: 2, boyut: 90 }, text: { kase: "upper" } };
+ok("eski 6 fontlu kodlar değişmedi: 3.3 kodlayıcısı 3.2 ile birebir aynı kodu üretir",
+  ESKI6.every(function (n) { var t = JSON.parse(JSON.stringify(eskiFontKod)); t.overrides.font = n; return SS.encode(t) === Eski32.encode(t); }) &&
+  ESKI6.every(function (n) { var t = JSON.parse(JSON.stringify(eskiFontKod)); t.overrides.font = n; var d = SS.decode(Eski32.encode(t), YENI); return d.ok && d.recipe.overrides.font === n && d.recipe.overrides.fontFile === Eski32.FONTS[n].file; }));
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

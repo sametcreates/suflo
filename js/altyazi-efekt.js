@@ -71,7 +71,7 @@
   var KUTU_OPAK = [0, 100], KONUM_YUZDE = [5, 95];
   var KASE = ["normal", "upper", "lower"];
   var RENK = /^#[0-9a-f]{6}$/i;
-  // Panelle gelen yazı tipleri (style-share.js yoksa yedek liste)
+  // Panelle gelen yazı tipleri (style-share.js yoksa yedek liste: 3.2'nin 6 fontu; 3.3'ün yenileri yalnız FONTS'tan)
   var FONTLAR = SS && SS.fontNames ? SS.fontNames() : ["Anton", "Archivo Black", "Bebas Neue", "Bungee", "Lora", "Montserrat"];
 
   /*
@@ -376,7 +376,15 @@
     "Bebas Neue": { n: "BebasNeue-Regular" },
     "Bungee": { n: "Bungee-Regular" },
     "Lora": { n: "Lora-Regular", b: "Lora-Bold" },
-    "Montserrat": { n: "Montserrat-Regular", b: "Montserrat-Bold" }
+    "Montserrat": { n: "Montserrat-Regular", b: "Montserrat-Bold" },
+    // 3.3 adım 18: yeni fontların paketteki statik yüzleri (nameID 6; test dosyalardan okuyup denetler)
+    "Bangers": { n: "Bangers-Regular" },
+    "Inter": { n: "Inter-Regular", b: "Inter-Bold" },
+    "Poppins": { n: "Poppins-Regular", b: "Poppins-Bold" },
+    "Nunito": { n: "Nunito-Regular", b: "Nunito-Bold" },
+    "Libre Caslon Display": { n: "LibreCaslonDisplay-Regular" },
+    "Exo 2": { n: "Exo2-Regular", b: "Exo2-Bold" },
+    "Chakra Petch": { n: "ChakraPetch-Regular", b: "ChakraPetch-Bold" }
   };
   function sablonFontu(ayar) {
     var n = normalize(ayar);
