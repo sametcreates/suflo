@@ -1427,3 +1427,50 @@ Motion › Position'ını `AE.sablonKonumu(ayar)` oranıyla (0-1, kartın ortas�
 (a) Drop Shadow'un Opacity ifadesi JSON'daki 0-100'ü yüzde mi, 0-255 mi okuyor (AE'de bu efektin opaklığı ifadede
 0-255 olabilir; öyleyse gölge önizlemeden çok soluk çıkar, değer 2,55 ile çarpılmalı); (b) şablonun kutusu tek dikdörtgen
 (`sourceRectAtTime` + 20 px), Suflo önizlemesi satır satır kutu çizer: farkı onayla ya da libass tarafını tek kutuya çevir.
+
+### YouTube indirici (sol menü › YouTube İndir; bilgi ücretsiz, indirmek Pro `youtube`, 3 deneme)
+
+Ne değişti: yeni araç. Bağlantı (watch?v=, youtu.be, Shorts, m. / music.youtube.com; oynatma listesinden yalnız o video)
+→ Bilgi al (ücretsiz) → MP3 / 720p / 1080p / 4K → İndir. 720p / 1080p H.264 + AAC MP4 iner; 4K (YouTube'da VP9 / AV1) ve
+H.264'süz videolar Suflo'nun ffmpeg'iyle H.264 / AAC'ye çevrilir. Dosya proje klasörü › `Suflo İndirilenler`'e (değiştirilebilir)
+iner, projede `Suflo İndirilenler` kutusuna alınır (`KS_importDownloaded`, timeline'a dokunmaz). yt-dlp pakette yok: ilk
+kullanımda GitHub'dan son sürüm + aynı sürümün `SHA2-256SUMS`'ı iner, SHA-256 tutmadan çalışmaz; Güncelle ve Doctor satırı
+var. İlk indirmede bir kez "yalnız hakkın olan içerik" onayı (`settings.json` › `ytOnay`). Kod: `js/youtube-indir.js` (saf),
+`js/youtube-indir-ui.js`, `jsx/host.jsx` › `KS_importDownloaded`; testler `tests/test-youtube-indir*.js`, `tests/test-youtube-host.js`.
+
+**YT.1 Hukuk ve satış metni (yayından önce, 30 dk).** Lemon Squeezy'nin ve (varsa) Adobe Exchange'in kabul edilebilir
+kullanım şartlarını "YouTube indirici" özelliği için bir kez oku: bazı ödeme sağlayıcıları "telif ihlalini kolaylaştıran
+araç" satışını yasaklıyor. Satış ve site metninde aracı "kendi videolarını / izinli içeriği Premiere'e al" diye anlat;
+"YouTube'dan istediğin videoyu indir" gibi ifade kullanma. Onay metni `js/youtube-indir.js` › `ONAY_METNI`'de ve
+`index.html` › `#yt-onay`'da (değiştirirsen `ONAY_SURUMU`'nu 2 yap: herkese yeniden sorulur; `i18n/en.js`'e İngilizcesini yaz).
+
+**YT.2 Premiere'de dene (yaklaşık 60 dk, Windows ve macOS).** `marketing/v3.3-deneme-listesi.md` › `## YT` maddeleri;
+en önemlisi YT.3–YT.4 (doğrulanmış kurulum), YT.8 (4K dönüştürme hızı, Windows'ta hangi kodlayıcı), YT.11 (İptal sonrası
+arkada `yt-dlp` / `ffmpeg` süreci kalmıyor), YT.14 (Türkçe harfli kullanıcı / proje yolu).
+
+**YT.3 Deno kararı (YT.16'dan sonra, 15 dk).** YouTube 2025 sonundan beri bazı kaliteleri JavaScript çalıştırıcısı olmadan
+vermiyor; yt-dlp Deno'yu kendisi arar, Suflo `~/.deno/bin` ve Homebrew / Chocolatey / Scoop yollarını da dener ve yoksa
+uyarı gösterir. Suflo Deno İNDİRMEZ. YT.16'da Deno'suz makinede 1080p / 4K gelmiyorsa bir sonraki sürüm için karar ver:
+Deno'yu (MIT, ~40 MB) yt-dlp gibi ilk kullanımda indirip yayımlanan SHA-256 ile doğrulamak (yeni iş: `THIRD_PARTY_NOTICES.md`,
+`denoAdaylari`) ya da yalnız uyarıda bırakmak.
+
+**YT.4 Windows'ta 4K dönüştürme (YT.8'den sonra, bilgi).** Suflo'nun Windows ffmpeg'i (BtbN LGPL) libx264 taşımaz; dönüştürme
+sırayla Media Foundation (`h264_mf`), NVENC, Quick Sync, AMF, OpenH264, son çare MPEG-4 ile yapılır ve sonuç satırı hangisini
+kullandığını söyler. Kalite / hız kabul edilmezse seçenek: Windows'ta gyan.dev GPL derlemesini (libx264'lü, zaten yedek kaynak)
+birinci kaynak yapmak; GPL ikili de pakete girmez, çalışırken iner ve `THIRD_PARTY_NOTICES.md` zaten listeliyor.
+
+**YT.5 Destek cevapları (15 dk).** `marketing/dm-cevaplari.md`'ye ekle: (a) virüs koruması `yt-dlp.exe`'yi engelliyor
+(PyInstaller ikilisi; Suflo SHA-256 doğruladıktan sonra çalıştırır; `%APPDATA%\Kesit\yt-dlp` klasörünü dışlamalara ekle,
+sonra Güncelle); (b) "Sign in to confirm you're not a bot" (bekle, Güncelle; Suflo tarayıcı çerezi kullanmaz, bilerek);
+(c) yaş sınırlı / üyelere özel videolar indirilemez (bilerek).
+
+**YT.6 Sürüm notu ve yenilikler (3.3.0'a geçerken).** `marketing/release-notes.md`'nin 3.3.0 bölümüne: "YouTube indirici:
+kendi videolarını ya da izinli içeriği bağlantıyla MP3, 720p, 1080p ya da 4K olarak indir; Premiere'e uygun MP4'e çevrilip
+projendeki 'Suflo İndirilenler' kutusuna gelir (Pro, 3 deneme hakkı)." `js/app.js` › `YENILIKLER` 3.3'e geçerken
+`{ ikon: "▼", baslik: "YouTube indirici", metin: "…", sekme: "youtube", hedef: "yt-url" }` maddesini ekleyebilirsin
+(Türkçe metne İngilizce karşılık `i18n/en.js`).
+
+**YT.7 Bakım (bilgi).** yt-dlp varlık adlarını değiştirirse (`yt-dlp.exe`, `yt-dlp_arm64.exe`, `yt-dlp_macos`)
+`js/youtube-indir.js` › `varlikAdaylari` güncellenmeli; listede ad yoksa kurulum güvenle durur ("SHA2-256SUMS listesinde
+yt-dlp dosyası yok"). GitHub API'ye ulaşılamazsa (kimliksiz sınır saatte 60 istek) `latest/download` kullanılır; SUMS ve ikili
+yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız yt-dlp kuruluysa).
