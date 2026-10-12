@@ -363,5 +363,29 @@ ok("Hız Rampası: Ayarlar Pro listesinde", /<li>Sesi iyileştir · Otomatik zoo
 ok("Hız Rampası: Premiere çağrıları yalnız tıklamada (init'te K.call yok)", !/K\.call\(/.test(fnGovde(hizUi, "function init(")) && !/K\.call\(/.test(fnGovde(hizUi, "function render(")) &&
   !/K\.call\(/.test(fnGovde(hizUi, "function refresh(")) && !/K\.call\(/.test(fnGovde(hizUi, "function onizlemeCiz(")));
 ok("Hız Rampası: Ctrl+Z uyarısı ve kaldırma düğmesi arayüzde", /Ctrl\+Z rampayı tek adımda geri almaz/.test(html) && /id="hiz-kaldir"[^>]*>Rampayı kaldır</.test(html));
+/* ---------- Ses etiketi filtresi + sessiz ses uyarısı (3.2 adım 2) ---------- */
+["grp-altyazi", "set-ses-etiket", "cap-sessiz", "cap-sessiz-metin", "cap-sessiz-devam", "cap-sessiz-vazgec",
+  "tc-sessiz", "tc-sessiz-metin", "tc-sessiz-devam", "tc-sessiz-vazgec"].forEach(function (id) {
+  ok("Ses etiketi / sessiz ses: #" + id + " var", !!idler[id]);
+});
+var grpAltyazi = html.slice(html.indexOf('id="grp-altyazi"'), html.indexOf('id="grp-marka-kiti"'));
+ok("Ayarlar › Altyazı: 'Ses etiketlerini koru' anahtarı varsayılan kapalı, motor kartından sonra",
+  /<div class="set-title">Altyazı<\/div>/.test(grpAltyazi) && /<input id="set-ses-etiket" type="checkbox">/.test(grpAltyazi) && !/set-ses-etiket"[^>]*checked/.test(grpAltyazi) &&
+  />Ses etiketlerini koru</.test(grpAltyazi) && html.indexOf('id="grp-altyazi"') > html.indexOf('class="set-group caption-engine-settings"'));
+ok("Ayarlar › Altyazı: anahtar app.js'te bağlı (sesEtiketKoru yüklenir ve kaydedilir)",
+  /el\("set-ses-etiket"\)\.checked = s\.sesEtiketKoru === true;/.test(appSrc) &&
+  /el\("set-ses-etiket"\)\.addEventListener\("change", function \(\) \{\s*K\.settings\(\)\.sesEtiketKoru = this\.checked;\s*K\.saveSettings\(\);/.test(appSrc));
+ok("Ses etiketlerini koru: altyazı satır kurma yolları ayarı geçirir (go + rehber örneği)",
+  (capSrc.match(/CT\.segmentleriKur\([a-z]+, lenVal, \{ etiketKoru: sesEtiketKoru\(\) \}\)/g) || []).length === 2 &&
+  /return K\.settings\(\)\.sesEtiketKoru === true;/.test(capSrc));
+ok("Sessiz ses: uyarı kutuları durum satırının hemen altında, gizli başlar, düğmeler 'Yine de devam et' / 'Vazgeç'",
+  html.indexOf('id="cap-sessiz"') > html.indexOf('id="cap-status"') && html.indexOf('id="tc-sessiz"') > html.indexOf('id="tc-status"') &&
+  /id="cap-sessiz" class="sessiz-uyari" role="alert" hidden/.test(html) && /id="tc-sessiz" class="sessiz-uyari" role="alert" hidden/.test(html) &&
+  /id="cap-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="cap-sessiz-vazgec"[^>]*>Vazgeç</.test(html) &&
+  /id="tc-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="tc-sessiz-vazgec"[^>]*>Vazgeç</.test(html));
+ok("Sessiz ses: betik sırası caption-text.js → sessiz-ses.js → captions.js", betikSira("sessiz-ses.js") > betikSira("caption-text.js") && betikSira("sessiz-ses.js") < betikSira("captions.js"));
+ok("Sessiz ses: panel açılışında ölçüm/Premiere çağrısı yok (yalnız Altyazı oluştur / Konuşmadan kes akışında)",
+  !/sessizDenetim\(/.test(fnGovde(capSrc, "function init(")) && /\.sessiz-uyari\[hidden\] \{ display: none !important; \}/.test(fs.readFileSync(KOKYOL + "css/style.css", "utf8")));
+
 console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
 process.exit(kaldi ? 1 : 0);

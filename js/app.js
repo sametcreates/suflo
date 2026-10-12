@@ -874,6 +874,14 @@ window.KApp = (function () {
     }
 
     var s = K.settings();
+    // Ayarlar › Altyazı › Ses etiketlerini koru (varsayılan kapalı; yeni transkriptlerde geçerli)
+    if (el("set-ses-etiket")) {
+      el("set-ses-etiket").checked = s.sesEtiketKoru === true;
+      el("set-ses-etiket").addEventListener("change", function () {
+        K.settings().sesEtiketKoru = this.checked;
+        K.saveSettings();
+      });
+    }
     el("set-provider").value = s.provider || "groq";
     el("set-apikey").value = s.apiKey || "";
     el("set-endpoint").value = s.endpoint || "";

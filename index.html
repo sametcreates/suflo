@@ -514,6 +514,14 @@
       </button>
       <div id="cap-progress" class="progress-line" hidden><i></i></div>
       <div id="cap-status" class="inline-status"></div>
+      <!-- Sessiz ses uyarısı (js/sessiz-ses.js): motor çalışmadan önce, tepe 0,001 altındaysa -->
+      <div id="cap-sessiz" class="sessiz-uyari" role="alert" hidden>
+        <span id="cap-sessiz-metin" class="sessiz-uyari-metin"></span>
+        <div class="sessiz-uyari-btns">
+          <button id="cap-sessiz-devam" class="btn tiny" type="button">Yine de devam et</button>
+          <button id="cap-sessiz-vazgec" class="btn tiny ghost" type="button">Vazgeç</button>
+        </div>
+      </div>
 
       <div id="star-bar" class="star-bar" hidden>
         <span>Suflo işini görüyorsa GitHub'da bir yıldız bırakır mısın? Duyulmamıza yarıyor.</span>
@@ -999,6 +1007,13 @@
       </div>
       <div id="tc-progress" class="progress-line" hidden><i></i></div>
       <div id="tc-status" class="inline-status"></div>
+      <div id="tc-sessiz" class="sessiz-uyari" role="alert" hidden>
+        <span id="tc-sessiz-metin" class="sessiz-uyari-metin"></span>
+        <div class="sessiz-uyari-btns">
+          <button id="tc-sessiz-devam" class="btn tiny" type="button">Yine de devam et</button>
+          <button id="tc-sessiz-vazgec" class="btn tiny ghost" type="button">Vazgeç</button>
+        </div>
+      </div>
       <div id="tc-result" hidden>
         <div id="tc-cache" class="tc-cache hint" hidden>önbellekten · <button id="tc-retranscribe" class="link-btn" type="button">Yeniden yazıya dök</button></div>
         <div class="result-head">
@@ -1816,6 +1831,16 @@
       </details>
     </div>
 
+    <div class="set-group" id="grp-altyazi">
+      <div class="set-title">Altyazı</div>
+      <label class="switch" title="Erişilebilirlik: işitme engelli izleyiciler müziği ve alkışı altyazıdan okur">
+        <input id="set-ses-etiket" type="checkbox">
+        <i></i>
+        <span>Ses etiketlerini koru</span>
+      </label>
+      <p class="hint">Kapalıyken motorun yazdığı [Müzik], (alkış), [BLANK_AUDIO] ve yalnız ♪ satırları atılır; konuşmalı satırda yalnız etiket silinir. Açıkken etiketler [Müzik] biçiminde kalır. Yeni transkriptlerde geçerli.</p>
+    </div>
+
     <div class="set-group marka-kiti-kart" id="grp-marka-kiti">
       <div class="set-title">Marka Kiti <span class="dim" style="font-weight:400">yazı tipi · renkler · logo</span></div>
       <p class="hint" style="margin-bottom:8px">Yazı tipin, renklerin ve logon her Suflo Stiline ve kanca başlığına kendiliğinden uygulanır. Düzenlemek ve önizlemek ücretsiz; timeline'a eklemek Pro.</p>
@@ -2224,6 +2249,7 @@
   <script src="js/caption-quality.js"></script>
   <script src="js/whisper-words.js"></script>
   <script src="js/caption-text.js"></script>
+  <script src="js/sessiz-ses.js"></script>
   <script src="js/diller.js"></script>
   <script src="js/auto-emoji.js"></script>
   <script src="js/style-share.js"></script>

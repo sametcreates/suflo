@@ -35,6 +35,8 @@ window.KCaptions = (function () {
   var CT = window.SufloCaptionText;
   // Ölçülmüş kelime zamanları (yerel motor -ojf): ayrıştırma, düzleştirme, editörde taşıma
   var WW = window.SufloWhisperWords;
+  // Sessiz ses denetimi (motor çalışmadan önce tepe < 0,001): saf modül js/sessiz-ses.js
+  var SSES = window.SufloSessizSes || null;
   var cleanSegments = CT.cleanSegments;
   var karaokeWords = CT.karaokeWords;
   var karaokeCumulative = CT.karaokeCumulative;
@@ -353,12 +355,18 @@ window.KCaptions = (function () {
     } else {
       // 24 MB API sınırına sığması için uzun seslerde bitrate düşür
       var br = (opts.durHint && opts.durHint > 2700) ? "32k" : "64k";
-      args = args.concat(["-b:a", br]);
+      // volumedetect: bulut rotasında sessiz ses denetiminin tepesi aynı geçişte ölçülür (ek okuma yok)
+      args = args.concat(["-af", "volumedetect", "-b:a", br]);
     }
     args.push(out);
     var r = await K.run(ff, args, { timeout: 900000 });
     if (r.code !== 0 || !K.fs.existsSync(out)) {
       throw new Error("Ses hazırlanamadı: " + (r.stderr || "").split("\n").slice(-3).join(" ").slice(0, 180));
+    }
+    if (!wav && SSES) {
+      var tepeMp3 = SSES.volumedetectTepe(r.stderr);
+      if (Object.keys(mp3Tepeleri).length > 32) mp3Tepeleri = {};
+      if (isFinite(tepeMp3)) mp3Tepeleri[out] = tepeMp3;
     }
     if (!wav) {
       var mb = K.fs.statSync(out).size / 1048576;
@@ -368,6 +376,85 @@ window.KCaptions = (function () {
       }
     }
     return out;
+  }
+
+  /* ---------------- Sessiz ses denetimi ---------------- */
+
+  /*
+   * Motor (yerel ya da bulut yüklemesi) çalışmadan ÖNCE hazırlanan sesin tepesi:
+   * WAV dosyadan 1 MB parçalarla okunur, MP3'te convertAudio'nun ffmpeg volumedetect ölçümü
+   * kullanılır. Tepe 0,001'in (~ -60 dBFS) altındaysa satır içi uyarı: "Yine de devam et" /
+   * "Vazgeç". Kapsam: Altyazı oluştur (tek klip, toplu klip, In/Out, sekans; Viral anlar bu
+   * transkripti kullanır) ve Konuşmadan kes (transcribeWords). Ölçülemeyen ses engellemez.
+   */
+  var mp3Tepeleri = {};          // convertAudio MP3 çıktısı -> volumedetect tepesi
+  var SESSIZ_SEKANS = "Ses neredeyse tamamen sessiz: ses kanalları kapalı ya da sessize alınmış olabilir (Altyazı › Ses katmanları).";
+  var SESSIZ_KLIP = "Ses neredeyse tamamen sessiz: seçili klibin bu aralığında duyulur ses yok. Ses ayrı bir klipteyse (harici mikrofon) o klibi seç.";
+
+  // Kullanıcı vazgeçti: hata değil, uyarı olarak gösterilir
+  function vazgecHatasi() {
+    var e = new Error("Vazgeçildi: ses neredeyse tamamen sessiz.");
+    e.vazgecildi = true;
+    return e;
+  }
+
+  // Satır içi uyarı kutusu (modal değil): "<kutu>-devam" -> true, "<kutu>-vazgec" -> false
+  function sessizOnay(kutuId, metin) {
+    return new Promise(function (resolve) {
+      var kutu = el(kutuId), devam = el(kutuId + "-devam"), vazgec = el(kutuId + "-vazgec"), yazi = el(kutuId + "-metin");
+      if (!kutu || !devam || !vazgec) { resolve(true); return; }     // arayüz yoksa engelleme
+      if (yazi) yazi.textContent = metin;
+      kutu.hidden = false;
+      function bitir(cevap) {
+        kutu.hidden = true;
+        devam.onclick = null;
+        vazgec.onclick = null;
+        resolve(cevap);
+      }
+      devam.onclick = function () { bitir(true); };
+      vazgec.onclick = function () { bitir(false); };
+      try { kutu.scrollIntoView({ block: "nearest" }); } catch (eK) {}
+      // klavyede Enter güvenli seçeneği seçsin: boşa transkripsiyon / kota harcamamak
+      try { vazgec.focus(); } catch (eF) {}
+    });
+  }
+
+  /*
+   * Döner: true = motoru çalıştır, false = kullanıcı vazgeçti.
+   *   secenek.kutu   uyarı kutusu ("cap-sessiz" | "tc-sessiz")
+   *   secenek.klip   true: kapsam seçili klip (ipucu klibi anlatır), false: sekans / In-Out
+   *   secenek.karar  toplu iş: bir kez sorulur, sonraki sessiz klipler aynı kararı alır
+   *   secenek.etiket günlük için klip adı
+   */
+  async function sessizDenetim(sesYolu, secenek) {
+    secenek = secenek || {};
+    if (!SSES || !sesYolu || !K.nodeOK) return true;
+    var tepe = NaN;
+    try {
+      if (Object.prototype.hasOwnProperty.call(mp3Tepeleri, sesYolu)) {
+        tepe = mp3Tepeleri[sesYolu];
+        delete mp3Tepeleri[sesYolu];
+      } else if (/\.wav$/i.test(sesYolu)) {
+        var olcum = await SSES.dosyaTepesiAsync(K.fs, sesYolu, { esik: SSES.ESIK });
+        if (olcum) tepe = olcum.tepe;
+      }
+    } catch (e) {
+      K.log("[sessiz ses] tepe olculemedi: " + (e && e.message ? e.message : e));
+      return true;
+    }
+    var ad = secenek.etiket ? " [" + secenek.etiket + "]" : "";
+    var d = await SSES.denetle({
+      tepe: tepe, karar: secenek.karar,
+      onay: function (b) {
+        K.log("[sessiz ses]" + ad + " tepe " + b.tepe.toFixed(5) + " (" + (isFinite(b.dbfs) ? b.dbfs.toFixed(1) : "-inf") +
+          " dBFS) < " + b.esik + " - kullaniciya soruluyor");
+        status("");
+        return sessizOnay(secenek.kutu || "cap-sessiz", secenek.klip ? SESSIZ_KLIP : SESSIZ_SEKANS);
+      }
+    });
+    if (d.sessiz && d.soruldu) K.log("[sessiz ses]" + ad + " kullanici karari: " + (d.devam ? "devam" : "vazgec"));
+    else if (d.sessiz) K.log("[sessiz ses]" + ad + " toplu isin onceki karari: " + (d.devam ? "devam" : "vazgec"));
+    return d.devam;
   }
 
   /* ---------------- Motorlar ---------------- */
@@ -659,6 +746,12 @@ window.KCaptions = (function () {
       : "Suflo Altyazı Motoru hazır değil — yerel çekirdeği kur veya bulut yedeği ekle.");
   }
 
+  // Ayarlar › Altyazı › Ses etiketlerini koru (varsayılan kapalı): açıkken [Müzik] gibi etiketler
+  // erişilebilirlik için altyazıda kalır (caption-text.js cleanSegments etiketKoru)
+  function sesEtiketKoru() {
+    try { return K.settings().sesEtiketKoru === true; } catch (e) { return false; }
+  }
+
   /* ---------------- Terim sözlüğü ---------------- */
 
   function glossaryText() {
@@ -823,6 +916,8 @@ window.KCaptions = (function () {
         wav: localEngineReady(), ss: clip.inPoint, t: clip.dur, durHint: clip.dur
       });
       temp.push(audio);
+      // sessiz ses: motor (ve bulut yüklemesi) çalışmadan önce sor
+      if (!(await sessizDenetim(audio, { klip: true, kutu: opts.sessizKutu || "cap-sessiz" }))) throw vazgecHatasi();
       var motorOnce = onbellekMeta(clip, istenenDil, istem.yaz);   // ortam bilgisi yazıya dökmeden ÖNCE
       var rota = {};
       var raw = await transcribeSuflo(audio, clip.dur, true, temp, rota);
@@ -2038,6 +2133,8 @@ window.KCaptions = (function () {
       if (batchClips) {
         // toplu islem: klipler sirayla; biri patlarsa digerleri devam eder
         var failed = [];
+        // sessiz klip: bir kez sorulur; "Vazgeç" sessiz klipleri atlar, digerleri devam eder
+        var sessizKarar = {}, sessizAtlanan = [];
         for (var bi = 0; bi < batchClips.length; bi++) {
           var bc = batchClips[bi];
           var tag = "Klip " + (bi + 1) + "/" + batchClips.length + " (" + bc.name + "): ";
@@ -2048,6 +2145,10 @@ window.KCaptions = (function () {
               wav: useLocal, ss: bc.inPoint, t: bc.dur, durHint: bc.dur
             });
             tempFiles.push(ba);
+            if (!(await sessizDenetim(ba, { klip: true, karar: sessizKarar, etiket: bc.name }))) {
+              sessizAtlanan.push(bc.name);
+              continue;
+            }
             status(tag + "transkribe ediliyor…");
             var bRaw = await transcribeSuflo(ba, bc.dur, karaoke, tempFiles);
             var bTl = bc.clipEnd - bc.clipStart;
@@ -2068,10 +2169,15 @@ window.KCaptions = (function () {
             if (ba) { try { K.fs.unlinkSync(ba); } catch (eT) {} }
           }
         }
+        // tüm klipler sessiz ve "Vazgeç": hata değil
+        if (mapped.length === 0 && sessizAtlanan.length === batchClips.length) throw vazgecHatasi();
+        if (sessizAtlanan.length) KApp.toast(sessizAtlanan.length + " sessiz klip atlandı: " + sessizAtlanan.join(", ").slice(0, 100), "warn");
         if (mapped.length === 0) throw new Error("Hiçbir klipten konuşma alınamadı.");
         if (failed.length) KApp.toast(failed.length + " klip atlandı: " + failed.join(", ").slice(0, 100), "bad");
         mapped.sort(function (a, b) { return a.start - b.start; });
       } else {
+        // sessiz ses: motor (ve bulut yüklemesi) çalışmadan önce sor; rehberin örnek klibi hariç
+        if (!ornek && !(await sessizDenetim(audioSrc, { klip: scope === "clip" }))) throw vazgecHatasi();
         status("Suflo Altyazı Motoru dinliyor…");
         /*
          * Önbellek: tek klip, "altyazi" etiketiyle. Yerel motor satır modunda da ölçülmüş
@@ -2100,7 +2206,7 @@ window.KCaptions = (function () {
       // Satir kurma tek yerde (caption-text.js): rehberin hazir ornek transkripti de
       // ayni yolu kullanir, iki cikti hic ayrismaz
       var kurulan;
-      try { kurulan = CT.segmentleriKur(mapped, lenVal); }
+      try { kurulan = CT.segmentleriKur(mapped, lenVal, { etiketKoru: sesEtiketKoru() }); }
       catch (eKur) {
         if (eKur && eKur.ayrinti) K.log("karaoke HATA: " + eKur.ayrinti);
         throw eKur;
@@ -2141,7 +2247,8 @@ window.KCaptions = (function () {
       KApp.toast(segments.length + " altyazı satırı hazır", "good");
       basarili = true;
     } catch (e) {
-      status("✕ " + K.hataYardimi(e), "bad");
+      if (e && e.vazgecildi) status(e.message, "warn");
+      else status("✕ " + K.hataYardimi(e), "bad");
     } finally {
       tempFiles.forEach(function (f) { try { K.fs.unlinkSync(f); } catch (e2) {} });
       busy = false;
@@ -2174,7 +2281,7 @@ window.KCaptions = (function () {
     var lenVal = el("cap-maxlen").value;
     var girdi = window.SufloOnboarding.ornekGirdisi(veri, lenVal, offset);
     if (!girdi.length) return false;
-    var kurulan = CT.segmentleriKur(girdi, lenVal);
+    var kurulan = CT.segmentleriKur(girdi, lenVal, { etiketKoru: sesEtiketKoru() });
     if (!kurulan.segments.length) return false;
     // Ekranda iş varsa üzerine yazmadan önce anlık görüntü: Ctrl+Z geri getirir
     // (anlık görüntü Shorts bayrağını taşır: sıfırlama ONDAN sonra)

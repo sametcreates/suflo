@@ -2687,6 +2687,19 @@
     "Bu Premiere surumunde Suflo klibin sesle bagini okuyamiyor ve koparamiyor.": "In this Premiere version Suflo can't read or break the clip's link to its audio."
   });
 
+  /* ============ 3.2 step 2: sound tag filter + silent audio guard (caption-text.js, sessiz-ses.js, Settings › #grp-altyazi) ============ */
+  add({
+    "Ses etiketlerini koru": "Keep sound tags",
+    "Erişilebilirlik: işitme engelli izleyiciler müziği ve alkışı altyazıdan okur": "Accessibility: deaf and hard-of-hearing viewers read music and applause in the captions",
+    "Kapalıyken motorun yazdığı [Müzik], (alkış), [BLANK_AUDIO] ve yalnız ♪ satırları atılır; konuşmalı satırda yalnız etiket silinir. Açıkken etiketler [Müzik] biçiminde kalır. Yeni transkriptlerde geçerli.": "When off, the [Music], (applause), [BLANK_AUDIO] and ♪-only lines the engine writes are dropped; in a line with speech only the tag is removed. When on, tags are kept in [Music] form. Applies to new transcripts.",
+    "Yine de devam et": "Continue anyway",
+    "Vazgeç": "Cancel",
+    "Ses neredeyse tamamen sessiz: ses kanalları kapalı ya da sessize alınmış olabilir (Altyazı › Ses katmanları).": "The audio is almost completely silent: the audio tracks may be turned off or muted (Captions › Audio tracks).",
+    "Ses neredeyse tamamen sessiz: seçili klibin bu aralığında duyulur ses yok. Ses ayrı bir klipteyse (harici mikrofon) o klibi seç.": "The audio is almost completely silent: there is no audible sound in this range of the selected clip. If the sound is on a separate clip (external microphone), select that clip.",
+    "Vazgeçildi: ses neredeyse tamamen sessiz.": "Cancelled: the audio is almost completely silent.",
+    "{n} sessiz klip atlandı: {}": "{} silent clips skipped: {}"
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
