@@ -35,6 +35,7 @@
   var CUMLE_SONU = /[.!?…]["'”’»)\]]*$/;
   var BOSLUK = 0.08;      // zamanHijyeni: komşu cue'lar arası en az boşluk (fixTiming ile aynı)
   var TABAN = 0.25;       // zamanHijyeni: çakışma kırpmasında kalacak en kısa süre (fixTiming ile aynı)
+  var EN_AZ_KELIME = 0.1; // kelimeleriHizala: eklenen kelime başına en az süre (yoksa komşudan paylaşılır)
 
   function dizi(x) { return Object.prototype.toString.call(x) === "[object Array]"; }
   function sayi(x, v) { var n = Number(x); return (x !== null && x !== undefined && x !== "" && isFinite(n)) ? n : v; }
@@ -79,6 +80,7 @@
   /* ---------------- satır sarma ---------------- */
 
   // Açgözlü sarma: genişlik w ile satırlar (en az satır sayısını verir; tek kelime w'yi aşabilir)
+  // Raunen: wrapText (greedy fallback)
   function acgozluSatirlar(words, w) {
     var satirlar = [], cur = "";
     for (var i = 0; i < words.length; i++) {
@@ -577,18 +579,37 @@
       }
       var a0 = solSinir, a1 = sagSinir;
       if (x1 >= x0) { a0 = aralikta(x0, solSinir, sagSinir); a1 = aralikta(x1, a0, sagSinir); }
-      var agirlik = 0, ag = [];
-      for (var s = q; s < r; s++) { var g = tokens[s].replace(/\*/g, "").length + 1; ag.push(g); agirlik += g; }
-      var t = a0;
-      for (var s2 = q; s2 < r; s2++) {
-        var d = (a1 - a0) * ag[s2 - q] / agirlik;
-        var bitis = s2 === r - 1 ? a1 : t + d;
-        out[s2] = { text: tokens[s2].replace(/\*/g, ""), start: ms(t), end: ms(bitis) };
-        t = bitis;
+      for (var s = q; s < r; s++) out[s] = { text: tokens[s].replace(/\*/g, "") };
+      /*
+       * Yer yoksa (satır sonuna / başına ya da bitişik iki kelimenin arasına eklenen kelime: satır
+       * modunda cue son kelimenin sonunda biter) eklenenler sıfır süre alıp aynı anda yanıp sönerdi.
+       * Kelime başına EN_AZ_KELIME kalana kadar komşu kelimeler (önce öncekiler, sonra sonrakiler)
+       * aralığa katılır ve hepsi o aralığı karakter ağırlığıyla paylaşır.
+       */
+      var lo = q, hi = r;
+      while (a1 - a0 < EN_AZ_KELIME * (hi - lo) - 1e-9) {
+        if (lo > 0) { lo--; a0 = Math.min(a0, out[lo].start); }
+        else if (hi < m && out[hi]) { a1 = Math.max(a1, out[hi].end); hi++; }
+        else break;
       }
-      q = r;
+      paylastir(out, lo, hi, a0, a1);
+      q = hi;
     }
     return out;
+  }
+
+  // out[lo..hi) kelimeleri [a0, a1] aralığını karakter ağırlığıyla, sırayla paylaşır
+  function paylastir(out, lo, hi, a0, a1) {
+    if (a1 < a0) a1 = a0;
+    var agirlik = 0, ag = [];
+    for (var s = lo; s < hi; s++) { var g = out[s].text.length + 1; ag.push(g); agirlik += g; }
+    var t = a0;
+    for (var s2 = lo; s2 < hi; s2++) {
+      var bitis = s2 === hi - 1 ? a1 : t + (a1 - a0) * ag[s2 - lo] / agirlik;
+      out[s2].start = ms(t);
+      out[s2].end = ms(bitis);
+      t = bitis;
+    }
   }
 
   /*

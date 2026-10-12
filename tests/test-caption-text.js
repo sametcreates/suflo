@@ -185,6 +185,29 @@ chk("kelimesiz c42x2: kısa parçalar birleşir (aralık ≤ 0,2 sn, sığıyor)
   T.segmentleriKur([seg(0, 1, "Bugün"), seg(1.1, 2, "size anlatacağım")], "c42x2").segments.map(function (x) { return x.text; }).join("|") === "Bugün size anlatacağım" &&
   T.segmentleriKur([seg(0, 1, "Bugün"), seg(1.1, 2, "size anlatacağım")], "c42x2", { birlestir: false }).segments.length === 2 &&
   T.segmentleriKur([seg(0, 1, "Tamam."), seg(1.1, 2, "Sonra")], "c42x2").segments.length === 2);
+// En uzun süre 4,5 sn'nin altındayken uzun satır BÖLÜNÜR, kırpılmaz (konuşma sürerken altyazı kaybolmaz)
+var sureUzun = [seg(10, 14.4, "Bugün size kamerayla ilgili birkaç şey anlatacağım ve sonra da göstereceğim")];
+var kx3 = T.segmentleriKur(sureUzun, "c42x2", { maxSure: 3 }).segments;
+chk("kelimesiz c42x2 + en uzun süre 3: 4,4 sn'lik satır bölünür (kırpılmaz), parçalar ≤ 3 sn, konuşmanın sonuna kadar sürer",
+  kx3.length === 2 && kx3.every(function (x) { return x.end - x.start <= 3 + 1e-9; }) && Math.abs(kx3[kx3.length - 1].end - 14.4) < 1e-9 &&
+  kx3.map(function (x) { return x.text.replace(/\n/g, " "); }).join(" ") === sureUzun[0].text, JSON.stringify(kx3));
+chk("kelimesiz c42x2 + en uzun süre 6 (varsayılan): 4,4 sn'lik iki satıra sığan satır tek kalır",
+  T.segmentleriKur(sureUzun, "c42x2").segments.length === 1);
+// Bozuk kelime zamanı (motor kelimeleri segment başına yığmış): satır modu segment zamanına düşer
+function yigit(bas, metin) { return metin.split(" ").map(function (t) { return { text: t, start: bas, end: bas }; }); }
+var yM1 = "Bugün size yeni bir kamera tanıtacağım ve bunu çok seviyorum gerçekten yeni bir";
+var yM2 = "şey daha var onu da seviyorum";
+var bozukW = [{ start: 0, end: 5, text: yM1, words: yigit(0, yM1) }, { start: 5.5, end: 7, text: yM2, words: yigit(5.5, yM2) }];
+var bozuksuz = bozukW.map(function (x) { return { start: x.start, end: x.end, text: x.text }; });
+chk("kelimeZamaniBozuk: yığılmış kelimeler bozuk, gerçek fikstür ve kelimesiz liste değil",
+  T.kelimeZamaniBozuk(bozukW) === true && T.kelimeZamaniBozuk(esli) === false && T.kelimeZamaniBozuk(bozuksuz) === false &&
+  T.kelimeZamaniBozuk([{ start: 5, end: 6, text: "a b c d e f g h", words: yigit(5.1, "a b c d e f g h").map(function (w, i) { w.start = 5.1 + i * 0.1; return w; }) }]) === true);
+var bl42 = T.segmentleriKur(bozukW, "l42"), bx2 = T.segmentleriKur(bozukW, "c42x2");
+chk("bozuk kelime zamanı: l42 ve c42x2 segment zamanıyla kurulur (kelimesiz yolla aynı), sıfır süreli satır yok",
+  JSON.stringify(bl42) === JSON.stringify(T.segmentleriKur(bozuksuz, "l42")) && JSON.stringify(bx2) === JSON.stringify(T.segmentleriKur(bozuksuz, "c42x2")) &&
+  bl42.segments.concat(bx2.segments).every(function (x) { return x.end - x.start >= 0.5 && !x.words; }) && Math.abs(bl42.segments[1].end - 5) < 1e-9,
+  JSON.stringify(bl42.segments.map(function (x) { return [x.start, x.end]; })));
+chk("bozuk kelime zamanı: girdi değişmez (kelimeler yerinde)", bozukW[0].words.length === yM1.split(" ").length);
 chk("kelimesiz c42x2: ses etiketi filtresi ve halüsinasyon temizliği yine çalışır", T.segmentleriKur([seg(0, 2, "[Müzik]"), seg(2, 4, "Merhaba")], "c42x2").segments.map(function (x) { return x.text; }).join("|") === "Merhaba");
 chk("boşluksuz yazı (Japonca) l42: satırlar birleşmez, bugünkü yol", T.segmentleriKur(jp, "l42").segments.length === 2);
 /* metinStili: satır kırılımı korunur */

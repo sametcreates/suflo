@@ -116,6 +116,25 @@ var kb = CL.kisaBirlestir([c(0, 1, "bir iki", zamanla("bir iki", 0)), c(1.1, 2, 
 ok("kisaBirlestir: kelimeler birleşir, girdi değişmez", kb.length === 1 && hepsi(kb[0].words) === "bir iki üç" && parcalar[0].text === "Bugün");
 ok("kisaBirlestir: bir tarafın kelimesi metinle tutmuyorsa birleşik satır kelimesiz kalır", !CL.kisaBirlestir([c(0, 1, "bir iki", zamanla("bir", 0)), c(1.1, 2, "üç", [{ text: "üç", start: 1.1, end: 1.5 }])], {})[0].words);
 
+// kelimedenSatirlar her öbeği en az satırla kurar; öbekler cümle sonunda ya da 0,6 sn'den uzun duraklamada
+// ayrılır. kisaBirlestir (aralık ≤ 0,2 sn, cümle sonunu aşmaz) bu çıktıyı DEĞİŞTİREMEZ: satır modunda
+// "Kısa parçaları birleştir" yalnız kelimesiz (bulut) 2 satır × 42 yolunda iş görür (Ayarlar ipucu bunu söyler)
+ok("kisaBirlestir kelimedenSatirlar çıktısını değiştirmez (3000 rastgele akış, 1 / 2 satır, kelime sınırlı)", (function () {
+  var sozluk = ["ve", "bir", "çok", "güzel", "kamera", "bugün", "arkadaşlar", "değil,", "mi?", "Tamam.", "şimdi", "sonra", "ışık", "anlatacağım"];
+  for (var d = 0; d < 3000; d++) {
+    var ws = [], t = rastgele() * 5, nn = 2 + Math.floor(rastgele() * 30);
+    for (var z = 0; z < nn; z++) {
+      var sure = 0.05 + rastgele() * 0.6;
+      ws.push({ text: sozluk[Math.floor(rastgele() * sozluk.length)], start: +t.toFixed(3), end: +(t + sure).toFixed(3) });
+      t += sure + (rastgele() < 0.15 ? rastgele() * 1.2 : rastgele() * 0.15);
+    }
+    var o = { maxChars: [32, 42][d % 2], maxLines: 1 + (d % 3 === 0 ? 1 : 0), maxWords: d % 5 === 0 ? 2 + (d % 7) : 0, maxSure: 2 + (d % 6) };
+    var cs = CL.kelimedenSatirlar(ws, o);
+    if (J(CL.kisaBirlestir(cs, o)) !== J(cs)) return false;
+  }
+  return true;
+})());
+
 /* ---------------- 5) karakterleBol ---------------- */
 var uzun = c(10, 16, "Bu ışık hiç de kötü değil, değil mi? Şimdi kamerayı biraz sola çevirelim.");
 var b20 = CL.karakterleBol(uzun, 20);
@@ -180,6 +199,29 @@ ok("hizala: idempotent (aynı metinle yeniden hizalama sonucu değiştirmez)", [
 }));
 var bastaEk = CL.kelimeleriHizala(eskiW, "Evet bu ışık hiç de kötü değil.", 0.5, 3.2, "tr");
 ok("hizala: başa eklenen kelime satır başı ile ilk eşleşme arasına", bastaEk[0].text === "Evet" && bastaEk[0].start >= 0.5 && bastaEk[0].end <= 1 + 1e-9 && bastaEk[1].start === 1, J(bastaEk[0]));
+// Satır modunda cue son kelimenin sonunda biter: sona / başa eklenen kelimeye yer yok. Sıfır süreyle aynı anda
+// yanıp sönmez; komşu kelimenin aralığını karakter ağırlığıyla paylaşır (en az ~0,1 sn / kelime)
+var satirW = [{ text: "Bugün", start: 10, end: 10.4 }, { text: "hava", start: 10.45, end: 10.8 }, { text: "çok", start: 10.85, end: 11.1 }, { text: "güzel.", start: 11.15, end: 11.56, p: 0.9 }];
+function akar(h, bas, son) {
+  return h.every(function (w, i) { return w.end > w.start && w.start >= bas - 1e-9 && w.end <= son + 1e-9 && (i === 0 || w.start >= h[i - 1].end - 1e-9); });
+}
+var sonaEk = CL.kelimeleriHizala(satirW, "Bugün hava çok güzel, değil mi?", 10, 11.56, "tr");
+ok("hizala: satır sonuna eklenen kelimeler sıfır süre almaz, önceki kelimeyle paylaşır (satır içinde, sıralı)",
+  sonaEk.length === 6 && akar(sonaEk, 10, 11.56) && sonaEk[4].end - sonaEk[4].start >= 0.08 && sonaEk[5].end - sonaEk[5].start >= 0.08 &&
+  sonaEk[3].start === 11.15 && sonaEk[5].end === 11.56 && sonaEk[3].p === 0.9 && sonaEk[0].start === 10 && sonaEk[2].end === 11.1, J(sonaEk));
+var basaEk2 = CL.kelimeleriHizala(satirW, "Evet bugün hava çok güzel.", 10, 11.56, "tr");
+ok("hizala: satır başına (boşluk yokken) eklenen kelime sonraki kelimeyle paylaşır",
+  basaEk2.length === 5 && akar(basaEk2, 10, 11.56) && basaEk2[0].start === 10 && basaEk2[0].end - basaEk2[0].start >= 0.08 &&
+  basaEk2[1].end === 10.4 && basaEk2[2].start === 10.45, J(basaEk2));
+var bitisik = [{ text: "bir", start: 0, end: 0.5 }, { text: "üç", start: 0.54, end: 1 }];
+var araEk = CL.kelimeleriHizala(bitisik, "bir iki üç", 0, 1, "tr");
+ok("hizala: 40 ms aralığa eklenen kelime önceki kelimeyle paylaşır, sonraki ölçülmüş kalır",
+  akar(araEk, 0, 1) && araEk[1].text === "iki" && araEk[1].end - araEk[1].start >= 0.1 && araEk[2].start === 0.54 && araEk[2].end === 1, J(araEk));
+ok("hizala: paylaşımlı sonuç da idempotent", [[sonaEk, "Bugün hava çok güzel, değil mi?"], [basaEk2, "Evet bugün hava çok güzel."], [araEk, "bir iki üç"]].every(function (x) {
+  return J(CL.kelimeleriHizala(x[0], x[1], x[0][0].start, x[0][x[0].length - 1].end, "tr")) === J(x[0]);
+}));
+ok("hizala: satırda hiç yer yoksa (tek kelimelik sıfır süreli satır) fırlatmaz, sıralı kalır",
+  akar(CL.kelimeleriHizala([{ text: "a", start: 2, end: 2.3 }], "a b c d", 2, 2.3), 2, 2.3));
 var kelimesiz = CL.kelimeleriHizala([], "bir iki üçüncü", 0, 3);
 ok("hizala: eski kelime yoksa süre karakter ağırlığıyla paylaşılır", kelimesiz.length === 3 && kelimesiz[0].start === 0 && kelimesiz[2].end === 3 &&
   kelimesiz[2].end - kelimesiz[2].start > kelimesiz[0].end - kelimesiz[0].start, J(kelimesiz));
@@ -211,9 +253,9 @@ ok("c42x2 + kelime sınırı 4: her satır ≤ 4 kelime, 2 × 42'ye sığar, kel
 /* ---------------- 10) kaynak: ES5, Raunen atfı, NOTICE ---------------- */
 var kaynak = fs.readFileSync(path.join(KOK, "js", "caption-layout.js"), "utf8").replace(/\r\n/g, "\n");
 var ayikla = require("./_ayikla.js");
-ok("Raunen dosya başlığı ve işaretleri (wrapText, shapeSegments geçişleri)",
+ok("Raunen dosya başlığı ve işaretleri (wrapText ve açgözlü yedeği, shapeSegments geçişleri)",
   kaynak.indexOf("Portions adapted from Raunen (https://github.com/Zeyphers/raunen), MIT, Copyright (c) 2026 Jacob Szczepaniak. See THIRD_PARTY_NOTICES.md.") !== -1 &&
-  /\/\/ Raunen: wrapText\n  function dengeliSar/.test(kaynak) && /\/\/ Raunen: shapeSegments \(merge pass\)\n  function kisaBirlestir/.test(kaynak) &&
+  /\/\/ Raunen: wrapText\n  function dengeliSar/.test(kaynak) && /\/\/ Raunen: wrapText \(greedy fallback\)\n  function acgozluSatirlar/.test(kaynak) && /\/\/ Raunen: shapeSegments \(merge pass\)\n  function kisaBirlestir/.test(kaynak) &&
   /\/\/ Raunen: shapeSegments \(split pass\)\n  function karakterleBol/.test(kaynak) && /\/\/ Raunen: shapeSegments \(duration pass\)\n  function zamanHijyeni/.test(kaynak));
 ok("ES5: let/const/ok işlevi/for-of/şablon dizgesi/padStart yok", !/\b(let|const)\s|=>|\bfor\s*\([^)]*\bof\b|padStart|Object\.values|`/.test(ayikla(kaynak)));
 ok("DOM ve dosya sistemi yok (saf modül)", !/document\.|window\.[a-z]|require\("fs"\)|K\.fs/.test(ayikla(kaynak).replace(/typeof window !== "undefined" \? window/, "")));

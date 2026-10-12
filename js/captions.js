@@ -5098,6 +5098,19 @@ window.KCaptions = (function () {
     el("star-close").addEventListener("click", function () { bar.hidden = true; });
   }
 
+  /*
+   * Stilli ASS dışa aktarmada buildAss'in karaoke (segmentler kelime / parça cue'su) bilgisi: k1 ve wN
+   * (kc hariç: ASS'te metin katlanıyordu). wN ölçülmüş kelime taşırken karaoke / akıcı dolgu, katman
+   * yolundaki gibi (karaoke = k1) her cue'nun içinde gerçek kelime zamanıyla dolar (assSatirKaraoke);
+   * N kelimelik parçalar tek \k birimi olarak dolmaz. Kelimesiz wN ve diğer animasyonlar eski yolda kalır.
+   */
+  function assKelimeVerisi(mod, animasyon, segs) {
+    if (mod === "k1") return true;
+    if (mod !== "w") return false;
+    var satirDolgu = animasyon === "karaoke" || animasyon === "akici";
+    return !(satirDolgu && (segs || []).some(function (s) { return s && s.words && s.words.length; }));
+  }
+
   function saveToDesktop(name, content) {
     var dir = K.path.join(K.os.homedir(), "Desktop");
     if (!K.fs.existsSync(dir)) dir = K.os.homedir();
@@ -5132,7 +5145,7 @@ window.KCaptions = (function () {
             overrides: motorAyarlari(assStil)
           })).ass;
         } else {
-          icerik = buildAss({ karaoke: kelimeModu, animasyon: assStil.animasyon });
+          icerik = buildAss({ karaoke: assKelimeVerisi(segmentsMode, assStil.animasyon, segments), animasyon: assStil.animasyon });
         }
         ad = "suflo-altyazi.ass";
         bom = "";

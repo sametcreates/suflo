@@ -2747,8 +2747,8 @@
     "En uzun süre (sn)": "Maximum duration (s)",
     "Kısa parçaları birleştir": "Merge short fragments",
     "Arası 0,2 saniyeden kısa olan komşu parçalar birlikte sığıyorsa tek altyazı olur": "Neighboring fragments less than 0.2 s apart become one caption if they fit together",
-    "Satır modlarında (32 / 42 karakter, 2 satır × 42) yeni transkriptlerde geçerli: altyazı en kısa sürenin altında kalmaz (sonraki satıra kadar boşluk varsa), en uzun süreyi aşmaz. Birleştirme cümle sonunu aşmaz, satır uzunluğunu ve kelime sınırını korur.":
-      "Applies to new transcripts in line modes (32 / 42 characters, 2 lines × 42): a caption stays on screen at least the minimum duration (when there's room before the next one) and never longer than the maximum. Merging never crosses the end of a sentence and keeps the line length and word limit."
+    "Satır modlarında (32 / 42 karakter, 2 satır × 42) yeni transkriptlerde geçerli: altyazı en kısa sürenin altında kalmaz (sonraki satıra kadar boşluk varsa), en uzun süreyi aşmaz (uzun satır bölünür). Kelime zamanı olmayan transkriptte (bulut yedeği) yalnız 2 satır × 42'de geçerli; 32 / 42 karakter eski bölmeyi izler. Birleştirme kelime zamanı olmayan kısa parçaları toplar (kelime zamanlı satırlar zaten en az parçayla kurulur), cümle sonunu aşmaz, satır uzunluğunu ve kelime sınırını korur.":
+      "Applies to new transcripts in line modes (32 / 42 characters, 2 lines × 42): a caption stays on screen at least the minimum duration (when there's room before the next one) and never longer than the maximum (longer lines are split). Without word timings (cloud fallback) these apply only to 2 lines × 42; 32 / 42 characters keep the classic split. Merging joins short fragments that have no word timings (word-timed captions are already built from as few pieces as possible), never crosses the end of a sentence, and keeps the line length and word limit."
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

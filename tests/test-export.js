@@ -41,7 +41,8 @@ var kod = [
   kes("function stilRecetesi("),
   kes("function yogunlukCarpani("),
   kes("function vurguKelimesi("),
-  kes("function buildAss(")
+  kes("function buildAss("),
+  kes("function assKelimeVerisi(")
 ].join("\n");
 
 /*
@@ -63,7 +64,7 @@ var f = new Function("SEGMENTS", "STYLE", `
   }
   ${kod}
   return { buildSrt: buildSrt, buildVtt: buildVtt, buildAss: buildAss,
-           cueler: cueler, assTc: assTc, assMetin: assMetin };
+           cueler: cueler, assTc: assTc, assMetin: assMetin, assKelimeVerisi: assKelimeVerisi };
 `);
 
 var duz = function (t) { return String(t || "").trim(); };
@@ -203,6 +204,21 @@ var ikiSatirK = f([{ start: 0, end: 2, text: "bir iki\nüç", words: [{ text: "b
 chk("satir modu karaoke: iki satirlik cue \\N ile", /\{\\k50\}bir \{\\k50\}iki\\N\{\\k100\}üç$/.test((ikiSatirK.match(/^Dialogue: .*/m) || [""])[0]), (ikiSatirK.match(/^Dialogue: .*/m) || [""])[0]);
 var hicKelime = f([{ start: 0, end: 1, text: "Kelimesiz" }], duz).buildAss({ animasyon: "karaoke" });
 chk("satir modu karaoke: transkriptte hic kelime zamani yoksa eskisi gibi fade", /\{\\fad\(180,180\)\}Kelimesiz/.test(hicKelime) && !/\\k\d/.test(hicKelime));
+
+// wN olcülmüs kelimelerle: ASS disa aktarma katman yoluyla (karaoke = k1) ayni, cue icinde kelime kelime dolar
+var w3Segs = [
+  { start: 0, end: 1.2, text: "bir iki üç", words: [{ text: "bir", start: 0, end: 0.3 }, { text: "iki", start: 0.4, end: 0.7 }, { text: "üç", start: 0.8, end: 1.2 }] },
+  { start: 1.3, end: 2.5, text: "dört beş altı", words: [{ text: "dört", start: 1.3, end: 1.6 }, { text: "beş", start: 1.7, end: 2.0 }, { text: "altı", start: 2.1, end: 2.5 }] }
+];
+var W3 = f(w3Segs, duz);
+chk("assKelimeVerisi: k1 her zaman, wN + karaoke/akici + kelimeler satir dolgusu, kelimesiz wN ve diger animasyonlar eski yol, satir modu hayir",
+  W3.assKelimeVerisi("k1", "vurgu", []) === true && W3.assKelimeVerisi("w", "karaoke", w3Segs) === false && W3.assKelimeVerisi("w", "akici", w3Segs) === false &&
+  W3.assKelimeVerisi("w", "karaoke", [{ start: 0, end: 1, text: "bir iki üç" }]) === true && W3.assKelimeVerisi("w", "vurgu", w3Segs) === true &&
+  W3.assKelimeVerisi("plain", "karaoke", w3Segs) === false && W3.assKelimeVerisi("kc", "karaoke", w3Segs) === false);
+var w3ass = W3.buildAss({ karaoke: W3.assKelimeVerisi("w", "karaoke", w3Segs), animasyon: "karaoke" });
+var w3d = w3ass.match(/^Dialogue: .*/gm) || [];
+chk("w3 + karaoke ASS: her cue tek olay, kelimeler gercek zamanla dolar (parca tek \\k birimi degil)",
+  w3d.length === 2 && /\{\\k40\}bir \{\\k40\}iki \{\\k40\}üç$/.test(w3d[0]) && /\{\\k40\}dört \{\\k40\}beş \{\\k40\}altı$/.test(w3d[1]), w3d.join(" | "));
 
 /* ---------------- 4) ffmpeg gercekten okuyabiliyor mu ---------------- */
 var ff = ffmpeg();

@@ -478,6 +478,34 @@
     return { segments: splitLong(liste, parseInt(lenVal.slice(1), 10) || 42, 4.5), mode: "plain" };
   }
 
+  /*
+   * Bozuk kelime zamanı: motor kelimeleri bir ana yığmış (belirteç zamanı gelmemiş). Ölçüt:
+   *   - bir satırın 5+ kelimesi, kelime başına 0,06 sn'den az aralıkla başlıyor (saniyede ~16+ kelime:
+   *     konuşmada olmaz), ya da
+   *   - 8+ kelimenin hepsi 1 sn'den kısa bir aralıkta başlıyor (k1 / kc korumasıyla aynı ölçüt).
+   */
+  function kelimeZamaniBozuk(segs) {
+    var tMin = Infinity, tMax = -Infinity, say = 0;
+    for (var i = 0; i < (segs || []).length; i++) {
+      var s = segs[i];
+      if (!kelimeli(s)) continue;
+      var bas = Infinity, son = -Infinity, n = 0;
+      for (var j = 0; j < s.words.length; j++) {
+        var t = Number(s.words[j] && s.words[j].start);
+        if (!isFinite(t)) continue;
+        n++;
+        if (t < bas) bas = t;
+        if (t > son) son = t;
+      }
+      if (!n) continue;
+      if (n >= 5 && son - bas < 0.06 * (n - 1)) return true;
+      say += n;
+      if (bas < tMin) tMin = bas;
+      if (son > tMax) tMax = son;
+    }
+    return say >= 8 && tMax - tMin < 1;
+  }
+
   // Okunabilir satır modu (l32 / l42 / c42x2): ayar = CL.uzunlukAyari(lenVal)
   function satirModu(liste, ayar, olculmus, secenek) {
     var o = {
@@ -490,17 +518,24 @@
     if (o.maxSure < o.minSure) o.maxSure = o.minSure;
     var birlestir = secenek.birlestir !== false;
     var temiz = cleanSegments(liste, secenek);
+    // bozuk kelime zamanı (motor kelimeleri bir ana yığmış): ölçülmüş kelimeler bırakılır, satırlar
+    // segment zamanlarıyla kurulur (k1 korumasının "satır modunu kullan" önerisi burada çalışmalı)
+    if (olculmus && kelimeZamaniBozuk(temiz)) { temiz = WW.kelimesizKopya(temiz); olculmus = false; }
     var cues;
     if (olculmus && temiz.length && temiz.every(kelimeli) && !temiz.some(function (x) { return BOSLUKSUZ_YAZI.test(x.text); })) {
-      // ölçülmüş kelimelerden: segment sınırını aşar; karakter, kelime, duraklama, cümle sonu ve sürede kırılır
+      // ölçülmüş kelimelerden: segment sınırını aşar; karakter, kelime, duraklama, cümle sonu ve sürede kırılır.
+      // kelimedenSatirlar her öbeği zaten en az satırla kurar ve öbekler yalnız cümle sonunda ya da
+      // araKir'dan (0,6 sn) uzun duraklamada ayrılır: birleştirme burada bir şey değiştirmez (güvenlik ağı)
       cues = CL.kelimedenSatirlar(WW.duzlestir(temiz), o);
       if (birlestir) cues = CL.kisaBirlestir(cues, o);
       cues = CL.zamanHijyeni(cues, o);
     } else if (ayar.maxLines > 1) {
-      // kelimesiz iki satır: bugünkü yol, iki satırlık bütçe ve ekran süresi kurallarıyla
+      // kelimesiz iki satır: bugünkü yol, iki satırlık bütçe ve ekran süresi kurallarıyla. En uzun süreyi
+      // aşan satır önce bölünür (zamanHijyeni yalnız bölünemeyen tek kelimeyi kırpar; konuşma sürerken
+      // altyazı kaybolmaz)
       cues = trimOverlongCues(temiz);
       if (birlestir) cues = CL.kisaBirlestir(cues, o);
-      cues = CL.zamanHijyeni(splitLong(cues, ayar.maxChars, Math.max(4.5, o.maxSure), ayar.maxLines), o);
+      cues = CL.zamanHijyeni(splitLong(cues, ayar.maxChars, o.maxSure, ayar.maxLines), o);
     } else {
       // kelimesiz l32 / l42: bugünkü c32 / c42 yolunun aynısı
       return { segments: splitLong(trimOverlongCues(temiz), ayar.maxChars, 4.5), mode: "plain" };
@@ -813,6 +848,7 @@
     trimOverlongCues: trimOverlongCues,
     splitLong: splitLong,
     segmentleriKur: segmentleriKur,
+    kelimeZamaniBozuk: kelimeZamaniBozuk,
     parseGlossary: parseGlossary,
     trReplace: trReplace
   };
