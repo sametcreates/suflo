@@ -1627,23 +1627,20 @@ window.KApp = (function () {
   }
 
   /*
-   * "Suflo 3.1'de yeni": surum basina bir kez. Yeni ozellikler sekmelerin
-   * derinliginde (Kesim sekmesinin altinda, Ayarlar'in kartlarinda);
+   * "Suflo 3.2'de yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (Hiz Rampasi sol menude, cozme modu Ayarlar'da);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
-   * 3.0'dan yukselten kullanicida yeniliklerGoruldu "3.0" oldugundan pencere bir kez acilir.
+   * 3.1'den yukselten kullanicida yeniliklerGoruldu "3.1" oldugundan pencere bir kez acilir.
    */
   var YENILIKLER = {
-    surum: "3.1",
-    alt: "Shorts, podcast ve marka",
+    surum: "3.2",
+    alt: "Hız rampası ve daha iyi altyazı",
     maddeler: [
-      { ikon: "▶", baslik: "Tek Tık Shorts Paketi", metin: "Viral andan altyazılı, kancalı, ilerleme çubuklu hazır Shorts sekansı.", sekme: "captions", acilir: "cap-vr-box" },
-      { ikon: "🎙", baslik: "Podcast Modu", metin: "Mikrofon başına sese göre konuşan kişiye kamera kesimi.", sekme: "podcast" },
-      { ikon: "✂", baslik: "Tek tık temizlik", metin: "Konuşmadan kes artık tekrar çekimleri ve yarım başlangıçları da bulur.", sekme: "cut", hedef: "tc-card" },
-      { ikon: "🔥", baslik: "Viral puan 0–100", metin: "Her ana açıklamalı puan ve üç kanca başlığı önerisi.", sekme: "captions", acilir: "cap-vr-box" },
-      { ikon: "Aa", baslik: "Marka Kiti", metin: "Yazı tipin, renklerin ve logon her altyazıda; stilini kodla paylaş.", sekme: "settings", hedef: "grp-marka-kiti" },
-      { ikon: "★", baslik: "Pro'yu dene", metin: "Her Pro aracına 3 ücretsiz deneme hakkı, süresi dolmaz.", sekme: "settings", hedef: "grp-pro" },
-      { ikon: "♥", baslik: "Davet et, kazan", metin: "Kodunu paylaş; arkadaşın indirim alır, sen ödül paketleri açarsın.", sekme: "settings", hedef: "grp-davet" },
-      { ikon: "EN", baslik: "English arayüz (beta)", metin: "Paneli Ayarlar'dan İngilizceye çevir.", sekme: "settings", hedef: "set-ui-lang" }
+      { ikon: "⏩", baslik: "Hız Rampası", metin: "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz.", sekme: "hiz", hedef: "hiz-grid" },
+      { ikon: "▶", baslik: "Canlı altyazı", metin: "Satırlar motor yazdıkça akar; kalan süre ve İptal düğmesi.", sekme: "captions", hedef: "cap-go" },
+      { ikon: "≡", baslik: "Okunaklı altyazı", metin: "2 satır × 42 düzen, kısa parçalar birleşir, kelime zamanları ölçülür.", sekme: "captions", hedef: "cap-maxlen" },
+      { ikon: "⚙", baslik: "Hızlı ya da En doğru", metin: "Yerel motorda hız ile doğruluk arasında seç.", sekme: "settings", hedef: "set-cozme" },
+      { ikon: "EN", baslik: "Çevrimdışı İngilizce", metin: "Konuşmayı internetsiz İngilizce altyazıya çevir (Pro).", sekme: "captions", hedef: "cap-lang" }
     ]
   };
 

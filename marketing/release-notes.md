@@ -1,3 +1,31 @@
+## Suflo 3.2.0 — Hız rampası ve daha iyi altyazı
+
+### Yeni
+- **Hız Rampası (Pro):** Sol menüde yeni Hız Rampası. Klibi ya da In/Out aralığını seç, 11 eğriden birini seç (Ağır Çekim Dalışı, Darbe, Hızlı Giriş, Hızlı Çıkış, Doruk Anı, Atılım, Zaman Bükümü, Nabız, Vites, Süzülme ve müziğin vuruşlarında yavaşlayan Ritme Rampa) ve uygula. Premiere, Zaman Yeniden Eşleme'yi eklentilere açmadığı için Suflo aralığı kısa parçalara böler ve her parçaya kendi hızını yazar; hızları Hız/Süre'den değiştirebilirsin. Klibin yeri ve süresi değişmez: altyazı, müzik, marker ve sonraki klipler kaymaz. Yumuşak, Doğrusal ya da Basamaklı geçiş, yoğunluk ve parça sayısı, yavaş parçalarda kare harmanlama ya da optik akış, darbe anını playhead'e hizalama; ilk denemede sekans önce kopyalanır. Ctrl+Z yerine **Rampayı kaldır** klibi tam %100 hızlı tek klibe, boşluk bırakmadan döndürür (panel kapanıp açılsa da). Eğri kartları ve önizleme ücretsiz; uygulamak Pro (3 deneme hakkı).
+- **Canlı altyazı, İptal ve kalan süre:** Yerel motor çalışırken bulduğu satırlar Altyazı oluştur'un altında akarak görünür; durum satırı yüzdeyi ve kalan süreyi söyler. İş sürerken **İptal** her şeyi anında durdurur ve geçici dosyaları siler; ekrandaki altyazı olduğu gibi kalır. Motor, model ve ffmpeg indirmeleri ile Otomatik Kesim'in sessizlik analizi de iptal edilebilir; yarım indirme yeniden başlatınca kaldığı yerden sürer.
+- **Okunabilir altyazı düzeni:** Yeni **2 satır × 42 (YouTube/TV)** seçeneği. Satırlar duraklamada ve cümle sonunda kırılır, "mi?" gibi tek kelimelik artık satır kalmaz, iki satır dengeli bölünür. İsteğe bağlı kelime sınırı; Ayarlar › Altyazı'da en kısa / en uzun ekran süresi ve "Kısa parçaları birleştir". Caption Editor'da Shift+Enter satırın içinde alt satıra geçer; metni düzeltince kelime zamanları kaybolmaz.
+- **Ölçülmüş kelime zamanları:** Yerel motor artık her kelimenin gerçek zamanını ölçer. Kelime kelime ve karaoke altyazı tek transkripsiyonla gelir (ikinci tur yok); kelime stillerinde vurgu, sözcük söylendiği anda yanar. Yerel motorda "Motor bu metinden emin değil" uyarısı geri geldi.
+- **Hızlı ya da En doğru:** Ayarlar › Çözme ile yerel motorda hız ile doğruluk arasında seç (varsayılan En doğru). Kelime tabanlı altyazıda isteğe bağlı **Hassas kelime zamanlaması (DTW)**; model ya da motor derlemesi desteklemiyorsa kendiliğinden kapanır.
+- **Çevrimdışı İngilizce çeviri (Pro):** Dil satırında "İngilizceye çevir (çevrimdışı)": konuşma internetsiz İngilizce altyazıya döner (Small ve Large modeller). 3 deneme hakkı.
+- **Yenilikler penceresi:** 3.2'yi ilk açışta yeni özellikler tek ekranda; her biri tek tıkla ilgili bölümü açar.
+
+### İyileştirildi
+- **Ses etiketleri altyazıya girmez:** [Müzik], (alkış), ♪ ve [BLANK_AUDIO] gibi konuşma dışı etiketler atılır; konuşmalı satırda yalnız etiket silinir. Erişilebilirlik için Ayarlar › Altyazı › Ses etiketlerini koru.
+- **Sessiz ses uyarısı:** Ses neredeyse tamamen sessizse (kapalı ya da sessize alınmış ses katmanı) Suflo motor çalışmadan önce sorar; boşa transkripsiyon ve API kotası harcanmaz.
+- **Suflo Doctor:** Premiere, Altyazı motoru, Pro Cloud ve Presetler çipleri taramadan önce nötr, taramadan sonra gerçek sonucu gösterir (yeşil / sarı / kırmızı). Yeni satırlar: etkin çözme modu, DTW desteği ve Hız Rampası'nın kullandığı Premiere yetenekleri.
+- **Dışa aktarma:** SRT ve VTT iki satırlı altyazıyı tek altyazı bloğuna yazar; satır modunda ASS karaoke gerçek kelime zamanlarından.
+
+### Düzeltildi
+- Dar panelde sol menü adları kelime ortasından bölünmüyor ("Diğer Animasyonla / r"); uzun açıklama alttaki öğenin üstüne taşmıyor.
+- Suflo Doctor'da Premiere çipi her zaman yeşil, ötekiler gri görünüp "sorun var" gibi okunuyordu.
+- Uzun altyazı satırı bölünürken bir parça satır uzunluğunu aşabiliyordu; artık aşmıyor.
+
+### Geliştirici
+- Yeni saf modüller (testli): `speedramp`, `whisper-words`, `whisper-akis`, `whisper-args`, `caption-layout`, `sessiz-ses`; Hız Rampası host işlevleri sahte Premiere + QE ile test ediliyor.
+- `tools/motor-kiyas.js`: Hızlı / En doğru / DTW için gerçek zaman çarpanı ve kelime hata oranı kıyası.
+- Testler Windows CRLF checkout'ta ve ffmpeg 9'da da kararlı; paket `LICENSE` ve `THIRD_PARTY_NOTICES.md`'yi içeriyor, yayın doğrulaması ikisini de arıyor.
+- Kelime zamanı ayrıştırma, ses etiketi kalıpları ve dengeli satır sarma Raunen'den (MIT, © 2026 Jacob Szczepaniak) uyarlandı; ayrıntılar `THIRD_PARTY_NOTICES.md`'de.
+
 ## Suflo 3.1.0 — Shorts, podcast ve marka
 
 ### Yeni

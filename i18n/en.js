@@ -788,6 +788,16 @@
     "Kodunu paylaş; arkadaşın indirim alır, sen ödül paketleri açarsın.": "Share your code: your friend gets a discount, you unlock reward packs.",
     "English arayüz (beta)": "English interface (beta)",
     "Paneli Ayarlar'dan İngilizceye çevir.": "Switch the panel to English in Settings.",
+    "Hız rampası ve daha iyi altyazı": "Speed ramps and better captions",
+    "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz.": "One-click slow-mo and speed-ups with 11 curves; your edit never shifts.",
+    "Canlı altyazı": "Live captions",
+    "Satırlar motor yazdıkça akar; kalan süre ve İptal düğmesi.": "Lines stream in as the engine writes them, with time left and a Cancel button.",
+    "Okunaklı altyazı": "Readable captions",
+    "2 satır × 42 düzen, kısa parçalar birleşir, kelime zamanları ölçülür.": "2 × 42 layout, short pieces merged, measured word timings.",
+    "Hızlı ya da En doğru": "Fast or Most accurate",
+    "Yerel motorda hız ile doğruluk arasında seç.": "Choose between speed and accuracy for the local engine.",
+    "Çevrimdışı İngilizce": "Offline English",
+    "Konuşmayı internetsiz İngilizce altyazıya çevir (Pro).": "Turn speech into English captions without internet (Pro).",
     "Göster →": "Show →",
     "Başlayalım": "Let's go"
   });

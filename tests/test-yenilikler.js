@@ -24,8 +24,8 @@ html.replace(/data-tab="([^"]+)"/g, function (_, t) { sekmeler[t] = 1; });
   if (id) ok("madde '" + m.baslik + "': hedef öğe index.html'de", html.indexOf('id="' + id + '"') !== -1, id);
 });
 var hedefler = (Y ? Y.maddeler : []).map(function (m) { return m.sekme + ":" + (m.hedef || m.acilir || ""); }).join(" ");
-["podcast:", "settings:grp-marka-kiti", "settings:grp-davet", "settings:set-ui-lang", "cut:tc-card"].forEach(function (h) {
-  ok("v3.1 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
+["hiz:hiz-grid", "captions:cap-go", "captions:cap-maxlen", "settings:set-cozme"].forEach(function (h) {
+  ok("v3.2 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
 });
 
 // İngilizce karşılıklar

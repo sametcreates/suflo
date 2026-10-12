@@ -860,7 +860,7 @@ window.KOnboarding = (function () {
     }
     if (kararDegeri === "tam") {
       // Taze kurulumda "Suflo 3.1'de yeni" penceresi rehberin üstüne binmesin
-      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.1";
+      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.2";
       kayitYaz();
     }
     olaylariBagla();

@@ -6,6 +6,8 @@ Türkçe ve Azerice dahil 99 dil — abonelik yok, kredi yok, hesap yok.
 
 > Premiere'in yerleşik altyazısı Türkçe konuşmayı yazıya dökemiyor. Suflo döküyor, üstelik bilgisayarında çalışan yapay zekâyla.
 
+**Sürüm 3.2.0:** Hız Rampası (Pro), canlı transkripsiyon ve İptal, 2 satır × 42 okunabilir düzen, ölçülmüş kelime zamanları, Hızlı / En doğru çözme ve çevrimdışı İngilizce çeviri (Pro). Ayrıntılar: [sürüm notları](marketing/release-notes.md).
+
 ## Özellikler
 
 Suflo konuşmayı izlenebilir kurguya çevirir. Seçili klipten, In–Out aralığından ya da tüm sequence'tan
@@ -49,7 +51,7 @@ ve altyazıdan Smart SFX 2.0 önerileri bulunur.
 | **Çift dilli altyazı** *(3.0)* | Çeviri sonrası orijinal + çeviri alt alta (SRT/VTT/caption izi) |
 | **Geçişler** *(3.0)* | Kesime tek tıkla 13 geçiş (zoom, whip, itme…), eklentisiz keyframe |
 | **Sahne algılama** *(3.0)* | Sahne değişimlerinde marker ya da bölme; vuruşlarda bölme |
-| **Suflo Doctor** | Premiere bağlantısı, motor, Pro içerik ve 3.0 API uyumluluğu tek taramada |
+| **Suflo Doctor** | Premiere bağlantısı, motor, Pro içerik ve 3.0 API uyumluluğu tek taramada. 3.2: Premiere, Altyazı motoru, Pro Cloud ve Presetler çipleri taramadan önce nötr, sonra o bölümün gerçek sonucunu (yeşil / sarı / kırmızı) gösterir; çözme modu, DTW desteği ve Hız Rampası'nın kullandığı Premiere yetenekleri ayrı satırlarda |
 
 ### Altyazı motorları
 
@@ -112,7 +114,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | — | **Viral anlar:** uzun videodan 15–90 sn'lik Shorts/Reels anları, açıklamalı 0–100 puan (Viral Skor 2.0), cümle güvenli kenarlar, In/Out ve süreli marker |
 | — | **Tek Tık Shorts Paketi:** seçili anlardan 9:16 sekans, markalı altyazı, kanca, ilerleme çubuğu, CTA, logo ve paylaşım metinleri |
 | — | **Podcast Modu:** mikrofona göre otomatik kamera geçişi (2–4 konuşmacı, geniş plan) ve konuşmacı renkli altyazı |
-| — | **Hız Rampası:** 11 eğriyle tek tıkla ağır çekim ve hızlanma; Premiere'de düzenlenebilir hız parçaları, kurgu kaymaz |
+| Canlı transkripsiyon (kalan süre, İptal) · 2 satır × 42 düzen · ölçülmüş kelime zamanları · Hızlı / En doğru çözme | **Hız Rampası:** 11 eğriyle tek tıkla ağır çekim ve hızlanma; Premiere'de düzenlenebilir hız parçaları, kurgu kaymaz |
 | — | **Sahne algılama** ve **vuruşlarda bölme**; kesimleri uygulamadan **▶ Dinle** |
 | Emoji Assets (yerel arşiv veya Suflo Cloud, favori/son, timeline'a ekleme) | Panelden uygulanan 12 yerleşik Motion + 278 efekt preseti + Pro İçerik Bulutu: 262 MOGRT, 1.076 SFX ve 30 Motion BG |
 | — | Smart SFX 2.0: yoğunluk, güven puanı, alternatifler, toplu ekleme ve dalga önizlemesi |
@@ -364,34 +366,34 @@ Shorts with an explained 0–100 score, animated caption styles, transitions and
     title; share a style as a one-line code or a [suflo.app/en/stil](https://suflo.app/en/stil.html) link.
   - **Invite codes:** Pro owners get a personal code (a discount for friends) and reward packs at 1
     and 3 invites.
-- **Coming in 3.2: measured word timings.** The local engine now reads whisper.cpp's per-token
+- **New in 3.2: measured word timings.** The local engine now reads whisper.cpp's per-token
   timings (`-ojf`), so word-by-word and N-word captions come from one transcription with real word
   times, word styles in line mode light the active word on the spoken beat, and the "the engine isn't
   sure about this text" flag works for local transcripts too.
-- **Coming in 3.2: sound-tag filter and silent-audio warning.** Non-speech tags the engine writes
+- **New in 3.2: sound-tag filter and silent-audio warning.** Non-speech tags the engine writes
   (`[BLANK_AUDIO]`, `[Music]`, `(applause)`, `*laughs*`, ♪-only lines, plus their Turkish forms) no
   longer end up in your captions; a mixed line keeps its speech and `*emphasis*` on real words is left
   alone. Settings › Captions › Keep sound tags keeps them as `[Music]` for accessibility. If the audio
   is almost completely silent (muted or disabled tracks), Suflo asks before the engine runs or anything
   is uploaded.
-- **Coming in 3.2: live transcription with Cancel and time left.** While the local engine runs, the lines it
+- **New in 3.2: live transcription with Cancel and time left.** While the local engine runs, the lines it
   finds stream in under Create captions as dimmed, read-only "live" rows, and the status line shows a smoothed
   percentage, the time left and the speed (`12 lines · 34% · ~1 min 20 s left · 3.1× real time`). A Cancel button
   replaces Create captions: ffmpeg and whisper stop at once (the whole process tree on Windows), temporary files are
   deleted and the captions on screen stay untouched. Engine, model and ffmpeg downloads (Settings and the setup
   card) and Auto Cut's silence analysis can be canceled too; a canceled download resumes where it left off.
-- **Coming in 3.2: readable caption layout.** In line mode, captions are built from the measured word timings:
+- **New in 3.2: readable caption layout.** In line mode, captions are built from the measured word timings:
   32 / 42 characters or the new **2 lines × 42 (YouTube/TV)**, breaking at the character limit, on pauses, at the
   end of a sentence and at a maximum duration, balanced so no one-word leftover line remains (a two-line caption
   splits 21/21, not 38/4). Optional word limit; Settings › Captions sets the minimum and maximum on-screen time and
   merges short fragments. In the Caption Editor, Shift+Enter adds a line break inside a caption, and editing the
   text keeps the word timings (they're re-aligned to the new text). SRT/VTT write both lines into one cue, ASS
   writes `\N`, and line-mode ASS karaoke uses the real word times (styled ASS export is Pro).
-- **Coming in 3.2: Speed Ramp.** One-click slow-mo and speed-ups with 11 curves (including a Beat Ramp that slows
+- **New in 3.2: Speed Ramp.** One-click slow-mo and speed-ups with 11 curves (including a Beat Ramp that slows
   down on your music's beats). Premiere doesn't expose Time Remapping to extensions, so Suflo splits the range into
   short frame-aligned pieces with their own speeds; they stay editable under Speed/Duration and your edit never
   shifts. Use Remove ramp (not Ctrl+Z) to undo it.
-- **Coming in 3.2: local engine options.** Settings › Decoding: **Most accurate** (default, beam search) or **Fast**
+- **New in 3.2: local engine options.** Settings › Decoding: **Most accurate** (default, beam search) or **Fast**
   (single candidate). **Precise word timing (DTW, slightly slower)** appears for word-by-word, cumulative and N-word
   captions and word-based caption styles: whisper.cpp aligns audio and text so karaoke highlights land on the spoken
   word; if a model or engine build can't deliver it, it switches itself off for that pair. **Translate to English
