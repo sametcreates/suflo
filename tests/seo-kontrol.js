@@ -85,7 +85,7 @@ var TR_KARSILIGI_YOK = ["en/pro.html"];
 var proYonlendirme = fs.readFileSync(D + "pro.html", "utf8");
 chk("pro.html (noindex yönlendirme) hreflang taşımaz", !/hreflang=/.test(proYonlendirme) && /noindex/.test(proYonlendirme));
 var enSayfalar = ["en/index.html", "en/pro.html", "en/blog/index.html", "en/blog/free-local-auto-captions-premiere-whisper.html",
-  "en/blog/opusclip-alternative-premiere.html", "en/blog/autocut-firecut-alternative.html"];
+  "en/blog/opusclip-alternative-premiere.html", "en/blog/autocut-firecut-alternative.html", "en/blog/premiere-speed-ramp.html"];
 enSayfalar.forEach(function (f) {
   var yol = D + f;
   chk("EN sayfa var: " + f, fs.existsSync(yol));
