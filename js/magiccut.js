@@ -14,6 +14,8 @@ window.KCut = (function () {
   var iptalJetonu = null;
   // setBusy(true) anı: "İptal" "Sessizlikleri bul"un yerinde belirir; çift tıklamanın ikinci tıkı analizi iptal etmesin
   var iptalAcilis = 0;
+  // setBusy(false) anı: "Sessizlikleri bul" "İptal"in yerinde yeniden belirir; İptal'e çift tıkın ikinci tıkı yeni analiz başlatmasın
+  var baslatAcilis = 0;
 
   function el(id) { return document.getElementById(id); }
 
@@ -63,7 +65,9 @@ window.KCut = (function () {
     return out;
   }
 
-  async function analyze() {
+  async function analyze(ev) {
+    // kapıdan ÖNCE: başıboş ikinci tık deneme penceresi de açmasın (Pro "yeniden" olay taşımaz, geçer)
+    if (K.baslatTikiGecerli && !K.baslatTikiGecerli(ev, baslatAcilis)) return;
     // Pro: otomatik kesim (ucretsizde 3 deneme hakki; hak yalniz kesim uygulaninca duser)
     if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: analyze })) return;
     if (busy) return;
@@ -163,6 +167,7 @@ window.KCut = (function () {
       iptal.disabled = false;
     }
     iptalAcilis = b ? Date.now() : 0;
+    baslatAcilis = b ? 0 : Date.now();
     if (!b) refreshButton();
   }
 

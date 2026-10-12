@@ -249,6 +249,19 @@ window.K = (function () {
     return !(acilis > 0 && t >= acilis && t - acilis < IPTAL_ACILIS_MS);
   }
 
+  /*
+   * Ters yön: iş bitince (İptal ya da kendiliğinden) başlatma düğmesi "İptal"in yerinde yeniden
+   * belirir. İptal'e çift tıklamanın ikinci tıkı aynı noktada "Altyazı oluştur" / "Sessizlikleri
+   * bul" / "İndir & kur"a düşüp yeni iş başlatmasın (yeni iş ses dışa aktarımında İptal'i kilitler).
+   * Yalnız tık olayına uygulanır: programla çağrı (rehberin örnek klibi, Pro denemesinden sonra
+   * "yeniden") olay taşımaz, her zaman geçerli.
+   *   acilis  başlatma düğmesinin yeniden göründüğü an (Date.now()); 0 ise süre denetimi yok
+   */
+  function baslatTikiGecerli(ev, acilis, simdi) {
+    if (!ev || typeof ev.detail !== "number") return true;
+    return iptalTikiGecerli(ev, acilis, simdi);
+  }
+
   // Kullanıcı iptal etti: hata değil (çağıran "İptal edildi" uyarısı gösterir, hata rehberine gitmez)
   function iptalHatasi(mesaj) {
     var e = new Error(mesaj || "İptal edildi");
@@ -1451,6 +1464,7 @@ window.K = (function () {
     iptalJetonu: iptalJetonu,
     iptalHatasi: iptalHatasi,
     iptalTikiGecerli: iptalTikiGecerli,
+    baslatTikiGecerli: baslatTikiGecerli,
     IPTAL_ACILIS_MS: IPTAL_ACILIS_MS,
     settingsPath: settingsPath,
     extensionPath: extensionPath,

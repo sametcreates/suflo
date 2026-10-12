@@ -19,7 +19,7 @@ function govde(src, imza) {
 /* ---------------- 1) 10 araç: deneme kapısı + başarıda harcama ---------------- */
 // [dosya, işlev imzası, özellik, başarı denetimi (harcamadan ÖNCE gelmeli), harcama bekleniyor mu]
 var SITELER = [
-  ["js/magiccut.js", "async function analyze()", "cut", null, false],
+  ["js/magiccut.js", "async function analyze(ev)", "cut", null, false],
   ["js/magiccut.js", "async function apply()", "cut", "if (r.ok) {", true],
   ["js/konusma-kes.js", "async function analyze(zorla)", "textcut", null, false],
   ["js/konusma-kes.js", "async function apply()", "textcut", "if (res.ok) {", true],

@@ -253,6 +253,9 @@ window.KApp = (function () {
   // İptal düğmelerinin göründüğü an: Ayarlar'da "İptal" "İndir & kur"un yerinde belirir,
   // çift tıklamanın ikinci tıkı yeni başlayan kurulumu iptal etmesin (K.iptalTikiGecerli)
   var kurulumIptalAcilis = 0;
+  // Ters yön: kurulum bitince (İptal ya da kendiliğinden) "İndir & kur" İptal'in yerinde yeniden belirir;
+  // İptal'e çift tıkın ikinci tıkı kurulumu yeniden başlatmasın (K.baslatTikiGecerli)
+  var kurulumBaslatAcilis = 0;
 
   // Ayarlar'daki ve Altyazı kurulum kartındaki "İptal" düğmeleri yalnız kurulum sürerken görünür
   function kurulumIptalDugmeleri(acik) {
@@ -263,6 +266,12 @@ window.KApp = (function () {
       b.disabled = false;
     });
     kurulumIptalAcilis = acik ? Date.now() : 0;
+    kurulumBaslatAcilis = acik ? 0 : Date.now();
+  }
+
+  // "İndir & kur" tıkı (Ayarlar ve Altyazı kurulum kartı): programla çağrı (olaysız) her zaman geçerli
+  function kurulumTikiGecerli(ev) {
+    return !K.baslatTikiGecerli || K.baslatTikiGecerli(ev, kurulumBaslatAcilis);
   }
 
   function kurulumuIptalEt(ev) {
@@ -928,7 +937,7 @@ window.KApp = (function () {
       refreshEngineRoute();
     });
 
-    el("set-local-install").addEventListener("click", function () { installLocalWhisper(); });
+    el("set-local-install").addEventListener("click", function (ev) { if (kurulumTikiGecerli(ev)) installLocalWhisper(); });
     // İptal: Ayarlar'da ve Altyazı kurulum kartında (indirme kesilir, .part korunur)
     if (el("set-local-cancel")) el("set-local-cancel").addEventListener("click", kurulumuIptalEt);
     if (el("cap-local-cancel")) el("cap-local-cancel").addEventListener("click", kurulumuIptalEt);
@@ -985,8 +994,8 @@ window.KApp = (function () {
     });
 
 
-    el("set-ffmpeg-recheck").addEventListener("click", function () { checkFfmpeg(true); });
-    el("set-ffmpeg-install").addEventListener("click", installFfmpeg);
+    el("set-ffmpeg-recheck").addEventListener("click", function (ev) { if (ffmpegTikiGecerli(ev)) checkFfmpeg(true); });
+    el("set-ffmpeg-install").addEventListener("click", function (ev) { if (ffmpegTikiGecerli(ev)) installFfmpeg(); });
     if (el("set-ffmpeg-cancel")) el("set-ffmpeg-cancel").addEventListener("click", ffmpegKurulumunuIptalEt);
     // macOS'ta winget yok — dugme ne yapiyorsa onu yazsin
     // mac'te Homebrew varsa onunla, yoksa dogrudan indirmeyle kurulur
@@ -1141,13 +1150,22 @@ window.KApp = (function () {
   var ffmpegKuruluyor = false;
   // Doğrudan indirmenin iptal jetonu: istek kesilir, .part korunur (Homebrew kurulumu yarıda kesilmez)
   var ffmpegJetonu = null, ffmpegIptalAcilis = 0;
+  // İptal gizlenince "Yeniden dene" onun yerine kayar: çift tıkın ikinci tıkı "İptal edildi"yi
+  // "bulunamadı" hatasıyla ezmesin, yeniden kurulum da başlatmasın
+  var ffmpegBaslatAcilis = 0;
 
   function ffmpegIptalDugmesi(acik) {
     var b = el("set-ffmpeg-cancel");
     if (!b) return;
+    var gorunuyordu = !b.hidden;
     b.hidden = !acik;
     b.disabled = false;
     ffmpegIptalAcilis = acik ? Date.now() : 0;
+    if (!acik && gorunuyordu) ffmpegBaslatAcilis = Date.now();
+  }
+
+  function ffmpegTikiGecerli(ev) {
+    return !K.baslatTikiGecerli || K.baslatTikiGecerli(ev, ffmpegBaslatAcilis);
   }
 
   function ffmpegKurulumunuIptalEt(ev) {
@@ -1650,6 +1668,7 @@ window.KApp = (function () {
     davetAni: davetAni,
     proCheckoutUrl: proCheckoutUrl,
     installLocalWhisper: installLocalWhisper,
+    kurulumTikiGecerli: kurulumTikiGecerli,
     checkUpdate: checkUpdate
   };
 })();

@@ -406,12 +406,13 @@ ok("#cap-cancel tıklaması jetonu iptal eder (init'te bağlı, Premiere çağr�
   /aktifIptal\.iptal\(\);/.test(fnGovde(capSrc, "function iptalEt(")) && !/K\.call\(/.test(fnGovde(capSrc, "function iptalEt(")));
 // Çift tıklama (inceleme bulgusu): "Altyazı oluştur" / "Sessizlikleri bul" / "İndir & kur"un ikinci tıkı aynı
 // yerde beliren "İptal"e düşüp yeni başlayan işi iptal etmesin. Gerçek iptalEt + setBusy, sahte DOM ve saatle.
-var tikKod = "var IPTAL_ACILIS_MS = 500;\n" + fnGovde(fs.readFileSync(KOKYOL + "js/bridge.js", "utf8"), "function iptalTikiGecerli(");
+var tikKod = "var IPTAL_ACILIS_MS = 500;\n" + fnGovde(fs.readFileSync(KOKYOL + "js/bridge.js", "utf8"), "function iptalTikiGecerli(") + "\n" +
+  fnGovde(fs.readFileSync(KOKYOL + "js/bridge.js", "utf8"), "function baslatTikiGecerli(");
 function tikDugme() { return { hidden: false, disabled: false, title: "", textContent: "", classList: { toggle: function () {} } }; }
 function ciftTikKabi(kod, kur, donus) {
   var dom5 = {}, saat = { t: 50000 }, jet = { iptalEdildi: false, sayi: 0, iptal: function () { jet.sayi++; jet.iptalEdildi = true; } };
   var api = new Function("el", "Date", "status", "refreshButton", "IPTAL_IPUCU", "jeton",
-    tikKod + "\nvar K = { iptalTikiGecerli: iptalTikiGecerli, log: function () {} };\n" + kur + "\n" + kod + "\nreturn " + donus + ";")(
+    tikKod + "\nvar K = { iptalTikiGecerli: iptalTikiGecerli, baslatTikiGecerli: baslatTikiGecerli, log: function () {} };\n" + kur + "\n" + kod + "\nreturn " + donus + ";")(
     function (id) { return dom5[id] || (dom5[id] = tikDugme()); }, { now: function () { return saat.t; } }, function () {}, function () {}, "ipucu", jet);
   return { api: api, saat: saat, jet: jet, dom: dom5 };
 }
@@ -437,6 +438,67 @@ ciftTikSenaryo("İndir & kur → İptal (Ayarlar)", ciftTikKabi(fnGovde(appSrc, 
 ciftTikSenaryo("Ayarlar › ffmpeg İptal", ciftTikKabi(fnGovde(appSrc, "function ffmpegKurulumunuIptalEt(") + "\n" + fnGovde(appSrc, "function ffmpegIptalDugmesi("),
   "var ffmpegKuruluyor = false, ffmpegJetonu = jeton, ffmpegIptalAcilis = 0;",
   "{ basla: function () { ffmpegKuruluyor = true; ffmpegIptalDugmesi(true); }, iptalEt: ffmpegKurulumunuIptalEt }"), "set-ffmpeg-cancel");
+// Ters yön (inceleme bulgusu): İptal'e çift tık. İlk tık işi iptal eder, iş aynı olay döngüsünde biter ve başlatma
+// düğmesi İptal'in yerinde yeniden belirir; ikinci tık (detail 2) ya da hemen ardından gelen tık yeni iş açmamalı
+// (yeni altyazı işi ses dışa aktarımında İptal'i kilitler). Gerçek iptalEt + setBusy + başlatıcının ilk satırları.
+function tersTikSenaryo(ad, k, baslatId, iptalId, programla) {
+  k.api.baslat({ detail: 1 });
+  var ilk = k.api.sayi();
+  k.saat.t += 30000;
+  k.api.iptalEt({ detail: 1 });              // çift tıkın ilk tıkı: geçerli İptal
+  k.api.bitir();                            // jeton dinleyicisi işi bitirir → finally → başlatma düğmesi geri gelir
+  var yerinde = k.dom[baslatId].hidden === false && (!iptalId || k.dom[iptalId].hidden === true);
+  k.saat.t += 150;
+  k.api.baslat({ detail: 2 });              // aynı çift tıkın ikinci tıkı, artık başlatma düğmesinde
+  k.api.baslat({ detail: 1 });              // aynı anda tek tık sayılan olay da
+  var erken = k.api.sayi();
+  k.saat.t += 600;
+  k.api.baslat({ detail: 1 });              // bilerek yapılan yeni tık
+  var sonra = k.api.sayi();
+  k.api.bitir();
+  k.api.baslat(programla);                  // programla çağrı (rehber örneği / Pro "yeniden"): olay yok, hemen geçer
+  ok(ad + ": İptal'e çift tıkın ikinci tıkı / düğme geri gelir gelmez gelen tık yeni iş başlatmaz; sonraki tek tık ve programla çağrı başlatır",
+    ilk === 1 && k.jet.sayi === 1 && yerinde && erken === 1 && sonra === 2 && k.api.sayi() === 3,
+    "ilk=" + ilk + " iptal=" + k.jet.sayi + " yerinde=" + yerinde + " erken=" + erken + " sonra=" + sonra + " son=" + k.api.sayi());
+}
+var goBas = fnGovde(capSrc, "async function go(");
+goBas = goBas.slice(0, goBas.indexOf("var ornek")).replace("async function go(", "function go(");
+ok("go(): başlatma tıkı koruması busy denetiminden hemen sonra, jeton/setBusy'den önce",
+  /if \(K\.baslatTikiGecerli && !K\.baslatTikiGecerli\(opts, baslatAcilis\)\) return false;/.test(goBas) && /baslatAcilis = b \? 0 : Date\.now\(\);\s*if \(!b\) refreshButton\(\);/.test(setBusyG));
+tersTikSenaryo("İptal → Altyazı oluştur", ciftTikKabi(fnGovde(capSrc, "function iptalEt(") + "\n" + setBusyG + "\n" + goBas +
+  "  baslatilan++; busy = true; aktifIptal = jeton; setBusy(true); return true;\n  }",
+  "var busy = false, aktifIptal = null, iptalAcilis = 0, baslatAcilis = 0, baslatilan = 0;",
+  "{ baslat: go, iptalEt: iptalEt, bitir: function () { aktifIptal = null; busy = false; setBusy(false); }, sayi: function () { return baslatilan; } }"),
+  "cap-go", "cap-cancel", { ornek: { wav: "ornek.wav" } });
+var cutSrc2 = fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8");
+var anBas = fnGovde(cutSrc2, "async function analyze(");
+ok("analyze(): başlatma tıkı koruması Pro kapısından önce (başıboş tık deneme penceresi açmaz)",
+  anBas.indexOf("K.baslatTikiGecerli(ev, baslatAcilis)") > 0 && anBas.indexOf("K.baslatTikiGecerli(ev, baslatAcilis)") < anBas.indexOf("Pro.gate(") &&
+  /el\("cut-analyze"\)\.addEventListener\("click", analyze\)/.test(cutSrc2));
+anBas = anBas.slice(0, anBas.indexOf("// Pro:")).replace("async function analyze(", "function analyze(");
+tersTikSenaryo("İptal → Sessizlikleri bul", ciftTikKabi(fnGovde(cutSrc2, "function iptalEt(") + "\n" + fnGovde(cutSrc2, "function setBusy(") + "\n" + anBas +
+  "  baslatilan++; busy = true; iptalJetonu = jeton; setBusy(true); return true;\n  }",
+  "var busy = false, iptalJetonu = null, iptalAcilis = 0, baslatAcilis = 0, baslatilan = 0;",
+  "{ baslat: analyze, iptalEt: iptalEt, bitir: function () { iptalJetonu = null; busy = false; setBusy(false); }, sayi: function () { return baslatilan; } }"),
+  "cut-analyze", "cut-cancel");
+ok("İndir & kur (Ayarlar ve Altyazı kurulum kartı) ve ffmpeg düğmeleri başlatma tıkı korumasından geçer",
+  /el\("set-local-install"\)\.addEventListener\("click", function \(ev\) \{ if \(kurulumTikiGecerli\(ev\)\) installLocalWhisper\(\); \}\)/.test(appSrc) &&
+  /kurulumTikiGecerli: kurulumTikiGecerli/.test(appSrc) &&
+  /el\("cap-local-install"\)\.addEventListener\("click", function \(ev\) \{[\s\S]{0,160}if \(KApp\.kurulumTikiGecerli && !KApp\.kurulumTikiGecerli\(ev\)\) return;/.test(capSrc) &&
+  /el\("set-ffmpeg-install"\)\.addEventListener\("click", function \(ev\) \{ if \(ffmpegTikiGecerli\(ev\)\) installFfmpeg\(\); \}\)/.test(appSrc) &&
+  /el\("set-ffmpeg-recheck"\)\.addEventListener\("click", function \(ev\) \{ if \(ffmpegTikiGecerli\(ev\)\) checkFfmpeg\(true\); \}\)/.test(appSrc));
+tersTikSenaryo("İptal → İndir & kur (Ayarlar)", ciftTikKabi(fnGovde(appSrc, "function kurulumuIptalEt(") + "\n" + fnGovde(appSrc, "function kurulumIptalDugmeleri(") + "\n" +
+  fnGovde(appSrc, "function kurulumTikiGecerli(") + "\n" +
+  "function baslat(ev) { if (!kurulumTikiGecerli(ev) || installingLocal) return; baslatilan++; installingLocal = true; el('set-local-install').hidden = true; kurulumIptalDugmeleri(true); }",
+  "var installingLocal = false, kurulumJetonu = jeton, kurulumIptalAcilis = 0, kurulumBaslatAcilis = 0, baslatilan = 0;",
+  "{ baslat: baslat, iptalEt: kurulumuIptalEt, bitir: function () { installingLocal = false; kurulumIptalDugmeleri(false); el('set-local-install').hidden = false; }, sayi: function () { return baslatilan; } }"),
+  "set-local-install", "set-local-cancel");
+tersTikSenaryo("İptal → ffmpeg indir ve kur (Ayarlar)", ciftTikKabi(fnGovde(appSrc, "function ffmpegKurulumunuIptalEt(") + "\n" + fnGovde(appSrc, "function ffmpegIptalDugmesi(") + "\n" +
+  fnGovde(appSrc, "function ffmpegTikiGecerli(") + "\n" +
+  "function baslat(ev) { if (!ffmpegTikiGecerli(ev) || ffmpegKuruluyor) return; baslatilan++; ffmpegKuruluyor = true; el('set-ffmpeg-install').disabled = true; ffmpegIptalDugmesi(true); }",
+  "var ffmpegKuruluyor = false, ffmpegJetonu = jeton, ffmpegIptalAcilis = 0, ffmpegBaslatAcilis = 0, baslatilan = 0;",
+  "{ baslat: baslat, iptalEt: ffmpegKurulumunuIptalEt, bitir: function () { ffmpegKuruluyor = false; ffmpegIptalDugmesi(false); el('set-ffmpeg-install').disabled = false; }, sayi: function () { return baslatilan; } }"),
+  "set-ffmpeg-install", "set-ffmpeg-cancel");
 // README "ffmpeg indirmesi (Ayarlar …) iptal edilebilir" diyor: Ayarlar › ffmpeg satırının da İptal'i olmalı (inceleme bulgusu)
 var ffKur = fnGovde(appSrc, "async function installFfmpeg(");
 ok("Ayarlar › ffmpeg: #set-ffmpeg-cancel kur düğmesinin yanında, gizli başlar; jeton KEngine.installFfmpeg'e gider; iptal kırmızı hata değil uyarı",

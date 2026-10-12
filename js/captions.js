@@ -357,6 +357,8 @@ window.KCaptions = (function () {
 
   // setBusy(true) anı: "İptal" "Altyazı oluştur"un yerinde belirir; çift tıklamanın ikinci tıkı işi iptal etmesin
   var iptalAcilis = 0;
+  // setBusy(false) anı: "Altyazı oluştur" "İptal"in yerinde yeniden belirir; İptal'e çift tıkın ikinci tıkı yeni iş başlatmasın
+  var baslatAcilis = 0;
 
   function iptalEt(ev) {
     if (!busy || !aktifIptal || aktifIptal.iptalEdildi) return;
@@ -2279,6 +2281,9 @@ window.KCaptions = (function () {
    */
   async function go(opts) {
     if (busy) return false;
+    // tıkla gelen çağrı (opts = click olayı): İptal'e çift tıkın ikinci tıkı / düğme yeniden belirir belirmez
+    // gelen tık yeni iş açmasın (yeni iş ses dışa aktarımında İptal'i kilitler). Rehberin { ornek } çağrısı geçer.
+    if (K.baslatTikiGecerli && !K.baslatTikiGecerli(opts, baslatAcilis)) return false;
     var ornek = (opts && opts.ornek && opts.ornek.wav) ? opts.ornek : null;
     var ctx = KApp.ctx();
     var clip = ctx.sel;
@@ -2630,6 +2635,7 @@ window.KCaptions = (function () {
       iptal.title = IPTAL_IPUCU;
     }
     iptalAcilis = b ? Date.now() : 0;
+    baslatAcilis = b ? 0 : Date.now();
     if (!b) refreshButton();
   }
 
@@ -5146,7 +5152,9 @@ window.KCaptions = (function () {
       e.preventDefault();
       K.cs.openURLInDefaultBrowser("https://console.groq.com/keys");
     });
-    el("cap-local-install").addEventListener("click", function () {
+    el("cap-local-install").addEventListener("click", function (ev) {
+      // İptal'e çift tıkın ikinci tıkı kurulumu yeniden başlatmasın (app.js kurulumTikiGecerli)
+      if (KApp.kurulumTikiGecerli && !KApp.kurulumTikiGecerli(ev)) return;
       // Rehber açıksa hızlı başlangıç: dile uygun küçük model, ffmpeg arkada, GPU sonra
       var rehber = window.KOnboarding && KOnboarding.kurulumSecenekleri ? KOnboarding.kurulumSecenekleri() : null;
       KApp.installLocalWhisper(el("cap-local-install"), rehber);

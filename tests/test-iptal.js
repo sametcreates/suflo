@@ -176,6 +176,13 @@ async function surecTestleri() {
   ok("çift tık: çoklu tıkın devamı (event.detail > 1) iptal etmez, süre geçmiş olsa bile", G({ detail: 2 }, A, A + 5000) === false && G({ detail: 3 }, A, A + 5000) === false);
   ok("çift tık: süre dolunca tek tık ve klavye (detail 0) iptal eder; açılış anı yoksa süre denetimi yok",
     G({ detail: 1 }, A, A + MS) === true && G({ detail: 0 }, A, A + 2000) === true && G({ detail: 1 }, 0, A) === true && G(undefined, A, A + MS + 1) === true);
+  // ters yön: İptal'e çift tık → başlatma düğmesi aynı yerde geri gelir; ikinci tık yeni iş açmasın
+  var B = w5.K.baslatTikiGecerli;
+  ok("başlatma: düğme geri geldikten hemen sonraki tık ve çift tıkın devamı yeni iş başlatmaz",
+    B({ detail: 1 }, A, A + 150) === false && B({ detail: 0 }, A, A + 10) === false && B({ detail: 2 }, A, A + 5000) === false);
+  ok("başlatma: süre dolunca tek tık geçer; olaysız / { ornek } programla çağrı her zaman geçer",
+    B({ detail: 1 }, A, A + MS) === true && B({ detail: 1 }, 0, A) === true && B(undefined, A, A + 1) === true &&
+    B({ ornek: { wav: "x" } }, A, A + 1) === true);
 }
 
 /* ---------- indirme ve yükleme iptali (gerçek HTTP) ---------- */
