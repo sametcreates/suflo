@@ -2663,8 +2663,24 @@ function KS_importSample(encoded) {
 /* ---------- YouTube indirici (3.3): indirilen dosyayi projeye al ---------- */
 
 /*
+ * ExtendScript File yolu URI gibi cozer: "%50" -> "P", "%20" -> bosluk. Indirilen dosyanin adi YouTube
+ * basligindan gelir ("Fiyatlar %50 dustu [id] 1080p.mp4"); duz yolla File baska bir (olmayan) dosyayi
+ * gosterir. Once yol oldugu gibi, tutmazsa "%" kacirilarak ("%25") denenir. Panel dosyanin varligini
+ * Node ile zaten dogruladi; burasi yalniz yanlis yolla ice almamak icin.
+ */
+function KS_downloadedExists(yol) {
+  var y = String(yol || "");
+  if (!y) return false;
+  try { if ((new File(y)).exists) return true; } catch (e1) {}
+  if (y.indexOf("%") !== -1) {
+    try { if ((new File(y.replace(/%/g, "%25"))).exists) return true; } catch (e2) {}
+  }
+  return false;
+}
+
+/*
  * p: { path, bin } — bin: kokteki kutunun adi (panel verir; varsayilan "Suflo Indirilenler").
- *   1) acik proje ve var olan dosya sart
+ *   1) acik proje ve var olan dosya sart (adinda "%" olan dosya: KS_downloadedExists)
  *   2) ayni medya projede zaten varsa yeniden ALINMAZ (reused) — ikinci indirmede kopya oge olmaz
  *   3) yoksa kutuya importFiles; oge yoluyla bulunur, bulunamazsa (macOS'ta Unicode yol bicimi
  *      farki) kutuya yeni eklenen son oge alinir
@@ -2678,8 +2694,7 @@ function KS_importDownloaded(encoded) {
     if (!app.project || !app.project.rootItem) return KS_errKod("proje-yok", "Acik proje yok. Once bir proje ac ya da yeni proje olustur.");
     var yol = String(p.path || "");
     if (!yol) return KS_errKod("yol-yok", "Dosya yolu verilmedi.");
-    var dosya = new File(yol);
-    if (!dosya.exists) return KS_errKod("dosya-yok", "Indirilen dosya bulunamadi: " + yol);
+    if (!KS_downloadedExists(yol)) return KS_errKod("dosya-yok", "Indirilen dosya bulunamadi: " + yol);
     var kutuAdi = String(p.bin || "Suflo \u0130ndirilenler").replace(/[\r\n\t]+/g, " ").substring(0, 80);
 
     var oge = null;

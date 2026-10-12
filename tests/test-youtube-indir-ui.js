@@ -69,7 +69,9 @@ var ENCODERS = "Encoders:\n V..... = Video\n ------\n V....D h264_nvenc         
 
 /*
  * o: { platform, pro, kurulu (deneme kurulu), proje, sumsBozuk, apiEtiket, ikili, cevapJ, indirmeHata, indirmeIptal,
- *      akis, kodlayiciHata: [adlar], projeYok, ayar }
+ *      akis, kodlayiciHata: [adlar], projeYok, ayar,
+ *      donusumdeIptal (İptal ffmpeg dönüştürmesi başlayınca), yoklamadaIptal (İptal ffmpeg -i yoklamasında),
+ *      icedeIptalDene (KS_importDownloaded sırasında İptal'e basılır) }
  */
 function kur(o) {
   o = o || {};
@@ -98,6 +100,7 @@ function kur(o) {
   function argDeger(a, b) { var i = a.indexOf(b); return i === -1 ? undefined : a[i + 1]; }
   var K = {
     nodeOK: true, MAC: platform === "darwin", WIN: platform === "win32", fs: fs, path: path,
+    rmrf: function (p) { c.rmrf = (c.rmrf || []).concat([path.basename(p)]); fs.rmSync(p, { recursive: true, force: true }); },
     os: { arch: function () { return "arm64"; }, homedir: function () { return ev; } },
     whisperDir: function () { return path.join(ev, "Suflo", "whisper"); },
     settings: function () { return ayar; }, saveSettings: function () { c.kaydet++; return true; },
@@ -125,18 +128,24 @@ function kur(o) {
     call: function (fn, arg) {
       c.call.push({ fn: fn, arg: arg });
       if (fn === "KS_projectDir") return Promise.resolve(o.projeYok ? { ok: true, dir: "" } : { ok: true, dir: proje });
-      if (fn === "KS_importDownloaded") return Promise.resolve(o.iceAlma || { ok: true, imported: true, reused: false, selected: true, bin: arg.bin, name: path.basename(arg.path) });
+      if (fn === "KS_importDownloaded") {
+        // ekleme adımı yarıda kesilemez: İptal görünür ama kapalı, basılsa da iş iptal olmaz
+        c.iceIptal = { hidden: dom["yt-iptal"].hidden, disabled: dom["yt-iptal"].disabled };
+        if (o.icedeIptalDene) { dom["yt-iptal"]._o.click({ detail: 1 }); c.iceSonrasiIptal = !!(c.sonJeton && c.sonJeton.iptalEdildi); }
+        return Promise.resolve(o.iceAlma || { ok: true, imported: true, reused: false, selected: true, bin: arg.bin, name: path.basename(arg.path) });
+      }
       return Promise.resolve({ ok: false, error: "?" });
     },
     run: function (cmd, args, opts) {
       opts = opts || {};
-      var kayit = { cmd: cmd, args: args.slice(), opts: { surecGrubu: !!opts.surecGrubu, timeout: opts.timeout, iptal: !!opts.iptal } };
+      var kayit = { cmd: cmd, args: args.slice(), opts: { surecGrubu: !!opts.surecGrubu, timeout: opts.timeout, iptal: !!opts.iptal, env: opts.env } };
       c.run.push(kayit);
       if (cmd === exe) {
         // ikili çalıştırıldığı anda diskteki özet: yalnız doğrulanmış dosya çalışmalı
         c.calisanOzet.push(sha(fs.readFileSync(exe)));
         if (args[0] === "--version") return Promise.resolve({ code: o.surumHata ? 1 : 0, stdout: o.surumHata ? "" : (o.yeniSurum ? "2026.10.01\n" : "2026.08.19\n"), stderr: o.surumHata ? "[PYI-1:ERROR] Failed to execute script" : "" });
         if (args.indexOf("-J") !== -1) {
+          c.bilgiIptal = { hidden: dom["yt-iptal"].hidden, disabled: dom["yt-iptal"].disabled };
           if (o.bilgiHata) return Promise.resolve({ code: 1, stdout: "", stderr: o.bilgiHata });
           return Promise.resolve({ code: 0, stdout: jCikti(o.j), stderr: o.jsYok ? "WARNING: [youtube] No supported JavaScript runtime could be found." : "" });
         }
@@ -166,8 +175,18 @@ function kur(o) {
       }
       if (/ffmpeg$/.test(cmd)) {
         if (args.indexOf("-encoders") !== -1) return Promise.resolve({ code: 0, stdout: ENCODERS, stderr: "" });
-        if (args.length === 3 && args[1] === "-i") return Promise.resolve({ code: 1, stdout: "", stderr: o.akis || H264 });
+        if (args.length === 3 && args[1] === "-i") {
+          if (o.yoklamadaIptal && opts.iptal) { opts.iptal.iptal(); return Promise.resolve({ code: -2, iptal: true, stdout: "", stderr: "" }); }
+          return Promise.resolve({ code: 1, stdout: "", stderr: o.akis || H264 });
+        }
         var cikti = args[args.length - 1], enc = argDeger(args, "-c:v");
+        if (o.donusumdeIptal && opts.iptal) {
+          // kodlama başladı, geçici dosya yarım yazıldı; kullanıcı İptal'e basar (köprü süreci öldürüp iptal döner)
+          fs.writeFileSync(cikti, "yarim-h264");
+          c.donusumGecici = cikti;
+          opts.iptal.iptal();
+          return Promise.resolve({ code: -2, iptal: true, stdout: "", stderr: "" });
+        }
         if (opts.onStderr) { opts.onStderr("frame=1 time=00:00:02.50 bitrate=1\r"); opts.onStderr("frame=2 time=00:00:05.00 bitrate=1\r"); c.donusumDurum = dom["yt-durum"].textContent; c.donusumCubuk = dom["yt-ilerleme-cubuk"].style.width; }
         if ((o.kodlayiciHata || []).indexOf(enc) !== -1) return Promise.resolve({ code: 1, stdout: "", stderr: "Error while opening encoder " + enc });
         fs.writeFileSync(cikti, "h264");
@@ -320,6 +339,50 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
     js(kalan) === js([path.basename(baska), path.basename(eskiTam)].sort()), js(kalan));
   ok("İptal: hak düşmez, Premiere'e eklenmez, durum İptal", ip.c.harca.length === 0 && !ip.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) && /İptal edildi/.test(ip.durum()), ip.durum());
 
+  /* ---------- 7b) dönüştürme sırasında İptal: indirilen tam dosya KALIR, yalnız geçici ve yarımlar gider ---------- */
+  var dc = kur({ kurulu: true, ayar: { ytOnay: 1, ytKalite: "2160" }, akis: VP9, donusumdeIptal: true });
+  fs.mkdirSync(hedefKlasor(dc), { recursive: true });
+  var dcEskiYarim = path.join(hedefKlasor(dc), "Eski [" + ID + "] 4K.f313.webm.part");
+  fs.writeFileSync(dcEskiYarim, "y");
+  dc.dom["yt-url"].value = URL1;
+  await tikla(dc.dom, "yt-bilgi");
+  await tikla(dc.dom, "yt-indir");
+  var dcTam = path.join(hedefKlasor(dc), "Deneme ⧸ videosu： başlık？ [" + ID + "] 4K.mp4");
+  ok("dönüştürmede İptal: indirilen 4K dosya klasörde durur (silinmez), .suflo-tmp ve eski yarım silinir",
+    !!dc.c.donusumGecici && /\.suflo-tmp\.mp4$/.test(dc.c.donusumGecici) && fs.existsSync(dcTam) && fs.readFileSync(dcTam, "utf8") === "video" &&
+    js(fs.readdirSync(hedefKlasor(dc))) === js([path.basename(dcTam)]), js(fs.readdirSync(hedefKlasor(dc))));
+  ok("dönüştürmede İptal: durum doğru söyler (dosya duruyor, eklenmedi), Klasörde göster açık, hak düşmez, Premiere'e eklenmez",
+    /^Dönüştürme iptal edildi\. İndirilen dosya klasörde duruyor, Premiere'e eklenmedi: /.test(dc.durum()) && dc.durum().indexOf(path.basename(dcTam)) !== -1 &&
+    !/Yarım dosyalar silindi/.test(dc.durum()) && dc.dom["yt-sonuc"].hidden === false && dc.KY._durum().sonDosya === dcTam &&
+    dc.c.harca.length === 0 && !dc.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) &&
+    dc.dom["yt-indir"].hidden === false && dc.dom["yt-iptal"].hidden === true, dc.durum());
+  await tikla(dc.dom, "yt-klasorde-goster");
+  ok("dönüştürmede İptal: Klasörde göster korunan dosyayı seçer", dc.c.run.some(function (r) { return r.cmd === "/usr/bin/open" && js(r.args) === js(["-R", dcTam]); }));
+
+  /* ---------- 7c) indirme bitti, codec yoklamasında İptal: dosya kalır, eklenmez, hak düşmez ---------- */
+  var yk = kur({ kurulu: true, ayar: { ytOnay: 1 }, yoklamadaIptal: true });
+  yk.dom["yt-url"].value = URL1;
+  await tikla(yk.dom, "yt-bilgi");
+  await tikla(yk.dom, "yt-indir");
+  var ykTam = path.join(hedefKlasor(yk), "Deneme ⧸ videosu： başlık？ [" + ID + "] 1080p.mp4");
+  var ykYokla = yk.c.run.filter(function (r) { return /ffmpeg$/.test(r.cmd) && r.args.length === 3 && r.args[1] === "-i"; })[0];
+  ok("yoklamada İptal: ffmpeg -i iptal jetonuyla çalışır; tam dosya kalır; eklenmez; hak düşmez",
+    !!ykYokla && ykYokla.opts.iptal === true && fs.existsSync(ykTam) && js(fs.readdirSync(hedefKlasor(yk))) === js([path.basename(ykTam)]) &&
+    yk.c.harca.length === 0 && !yk.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) && !yk.c.donusum &&
+    /^İptal edildi\. İndirme bitmişti; dosya klasörde duruyor, Premiere'e eklenmedi: /.test(yk.durum()), yk.durum());
+
+  /* ---------- 7d) Premiere'e ekleme adımında İptal kapalı (KS_importDownloaded yarıda kesilemez) ---------- */
+  var ie = kur({ kurulu: true, ayar: { ytOnay: 1 }, icedeIptalDene: true });
+  ie.dom["yt-url"].value = URL1;
+  await tikla(ie.dom, "yt-bilgi");
+  await tikla(ie.dom, "yt-indir");
+  ok("ekleme adımı: İptal görünür ama kapalı, basılsa da iş iptal olmaz; hak bir kez, sonuç 'eklendi'",
+    !!ie.c.iceIptal && ie.c.iceIptal.hidden === false && ie.c.iceIptal.disabled === true && ie.c.iceSonrasiIptal === false &&
+    js(ie.c.harca) === js(["youtube"]) && /İndirildi ve Premiere'e eklendi/.test(ie.durum()) && ie.dom["yt-iptal"].hidden === true, js([ie.c.iceIptal, ie.durum()]));
+  ie.c.bilgiIptal = null;
+  await tikla(ie.dom, "yt-bilgi");
+  ok("sonraki iş İptal'i yeniden açar (ekleme adımından kalma kapalılık taşınmaz)", !!ie.c.bilgiIptal && ie.c.bilgiIptal.hidden === false && ie.c.bilgiIptal.disabled === false, js(ie.c.bilgiIptal));
+
   /* ---------- 8) hatalar ---------- */
   var h1 = kur({ kurulu: true, ayar: { ytOnay: 1 }, indirmeHata: "ERROR: [youtube] " + ID + ": Sign in to confirm your age. This video may be inappropriate for some users." });
   h1.dom["yt-url"].value = URL1;
@@ -344,6 +407,22 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
   h4.ayar.ytKlasor = path.join(engel, "alt");
   await tikla(h4.dom, "yt-indir");
   ok("klasör yazılamıyor: başka klasör seç mesajı, yt-dlp indirmesi başlamaz", /yazılamıyor/.test(h4.durum()) && h4.ytCalismalari().length === 2 && h4.c.harca.length === 0, h4.durum());
+  // imza hatasından sonra Güncelle, sürüm aynıysa indirmez ("zaten güncel")
+  var h2Indirme = h2.c.download.length;
+  await tikla(h2.dom, "yt-guncelle");
+  ok("eski sürüm hatası → Güncelle: GitHub'daki sürüm kurulu → indirme yok, 'zaten güncel'", h2.c.download.length === h2Indirme && /zaten güncel: 2026\.08\.19/.test(h2.durum()), h2.durum());
+  // "yt-dlp çalıştırılamadı" (virüs koruması / izin): dosya doğrulanıyor ama açılmıyor → Güncelle GERÇEKTEN yeniden indirir
+  var cz = kur({ ayar: {}, bilgiHata: "Error: spawn /Users/a/Library/Application Support/Suflo/yt-dlp/yt-dlp EACCES" });
+  cz.dom["yt-url"].value = URL1;
+  await tikla(cz.dom, "yt-bilgi");
+  ok("çalıştırılamadı: mesaj ve 'yeniden indirip doğrular' Güncelle kutusu", /çalıştırılamadı/.test(cz.durum()) && cz.dom["yt-guncelle-kutu"].hidden === false &&
+    /yeniden indirip doğrular/.test(cz.dom["yt-guncelle-metin"].textContent) && cz.c.download.length === 2, js([cz.durum(), cz.dom["yt-guncelle-metin"].textContent]));
+  await tikla(cz.dom, "yt-guncelle");
+  var czUrl = cz.c.download.slice(2).map(function (d) { return d.url; });
+  ok("çalıştırılamadı → Güncelle: aynı sürüm yine SHA2-256SUMS ile indirilip doğrulanır, 'zaten güncel' denmez", czUrl.length === 2 && /SHA2-256SUMS$/.test(czUrl[0]) && /yt-dlp_macos$/.test(czUrl[1]) &&
+    /yeniden indirildi ve doğrulandı: 2026\.08\.19/.test(cz.durum()) && cz.dom["yt-guncelle-kutu"].hidden === true && sha(fs.readFileSync(cz.exe)) === sha(IKILI), js([czUrl, cz.durum()]));
+  await tikla(cz.dom, "yt-guncelle");
+  ok("zorla yalnız o hata için: kutu kapandıktan sonraki Güncelle sürüm aynıysa indirmez", cz.c.download.length === 4 && /zaten güncel/.test(cz.durum()), cz.durum());
 
   /* ---------- 9) canlı yayın ---------- */
   var cy = kur({ kurulu: true, ayar: { ytOnay: 1 }, j: { canli: "is_live" } });
@@ -372,6 +451,26 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
   kc3.dom["yt-url"].value = URL1;
   await tikla(kc3.dom, "yt-bilgi");
   ok("sağlam kurulumda yeni oturum: indirme yok, yalnız -J (özet bir kez hesaplanır)", kc3.c.download.length === 0 && kc3.c.calisanOzet.length === 1, js(kc3.c.calisanOzet.length));
+
+  /* ---------- 11b) yt-dlp'nin geçici klasörü: PyInstaller _MEI… artıkları Suflo'nun klasöründe, sonraki çalıştırmada silinir ---------- */
+  var me = kur({ kurulu: true, ayar: { ytOnay: 1 } });
+  me.dom["yt-url"].value = URL1;
+  await tikla(me.dom, "yt-bilgi");
+  await tikla(me.dom, "yt-indir");
+  var meTmp = path.join(me.ytdir, "tmp");
+  var meYt = me.ytCalismalari();
+  ok("her yt-dlp çalıştırması (--version, -J, indirme) TMPDIR / TEMP / TMP = Suflo'nun yt-dlp/tmp klasörü", meYt.length === 3 && meYt.every(function (r) {
+    return r.opts.env && r.opts.env.TMPDIR === meTmp && r.opts.env.TEMP === meTmp && r.opts.env.TMP === meTmp;
+  }) && fs.statSync(meTmp).isDirectory(), js(meYt.map(function (r) { return r.opts.env; })));
+  ok("ffmpeg ve sistem araçlarına geçici ortam verilmez", me.c.run.filter(function (r) { return r.cmd !== me.exe; }).every(function (r) { return !r.opts.env; }));
+  fs.mkdirSync(path.join(meTmp, "_MEI48213"), { recursive: true });
+  fs.writeFileSync(path.join(meTmp, "_MEI48213", "python312.dll"), "x");
+  fs.mkdirSync(path.join(meTmp, "baska-klasor"), { recursive: true });
+  fs.writeFileSync(path.join(meTmp, "notlar.txt"), "x");
+  await tikla(me.dom, "yt-bilgi");
+  ok("öldürülmüş yt-dlp'nin _MEI artığı bir sonraki çalıştırmadan önce silinir; başka dosyalara dokunulmaz",
+    !fs.existsSync(path.join(meTmp, "_MEI48213")) && fs.existsSync(path.join(meTmp, "baska-klasor")) && fs.existsSync(path.join(meTmp, "notlar.txt")) &&
+    js(me.c.rmrf) === js(["_MEI48213"]), js([fs.readdirSync(meTmp), me.c.rmrf]));
 
   /* ---------- 12) Güncelle ve Doctor ---------- */
   var g = kur({ ayar: {} });
@@ -410,6 +509,15 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
   await tikla(u.dom, "yt-bilgi");
   ok("proje kaydedilmemiş: Videolar / Suflo İndirilenler + not", u.dom["yt-klasor-yol"].textContent === path.join(u.ev, "Movies", "Suflo İndirilenler") && u.dom["yt-klasor-not"].hidden === false,
     u.dom["yt-klasor-yol"].textContent);
+  ok("macOS: not Filmler (Movies) der (Videolar değil); yol yön yalıtımlı iç düğümde (dar panelde sondaki klasör görünür)",
+    u.dom["yt-klasor-not"].textContent === Y.klasorNotu("darwin") && /Filmler \(Movies\)/.test(u.dom["yt-klasor-not"].textContent) &&
+    u.dom["yt-klasor-yol"].children.length === 1 && u.dom["yt-klasor-yol"].children[0].className === "yt-klasor-ic" &&
+    u.dom["yt-klasor-yol"].getAttribute("title") === u.dom["yt-klasor-yol"].textContent, u.dom["yt-klasor-not"].textContent);
+  var uw = kur({ platform: "win32", projeYok: true });
+  uw.dinleyici.youtube();
+  await bekle(10);
+  ok("Windows: not Videolar der; açık proje yokken de görünür", uw.dom["yt-klasor-not"].hidden === false && uw.dom["yt-klasor-not"].textContent === Y.klasorNotu("win32") &&
+    /Videolar klasörüne/.test(uw.dom["yt-klasor-not"].textContent), uw.dom["yt-klasor-not"].textContent);
   u.dom["yt-url"].value = "https://youtu.be/AAAAAAAAAAA";
   u.dom["yt-url"]._o.input();
   ok("başka bağlantı: önizleme ve çipler temizlenir, İndir kapalı", u.dom["yt-onizleme"].hidden === true && u.dom["yt-indir"].disabled === true && u.dom["yt-k-1080"].disabled === true);
@@ -474,6 +582,13 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
     /SHA-256 mismatch/.test(cevir(sb.dom["yt-durum"])), cevir(w.dom["yt-durum"]));
   ok("İngilizce: ilerleme ve kurulum satırları", I18N.translate("yt-dlp iniyor… %45 (≈ 36 MB)") === "Downloading yt-dlp… 45% (≈ 36 MB)" &&
     I18N.translate(Y.ilerlemeMetni({ asama: "indir", oran: 0.5, hiz: 4404019, eta: 3900 })) === "Downloading… · 50% · 4,2 MB/s · ~1 h 5 min left", I18N.translate(Y.ilerlemeMetni({ asama: "indir", oran: 0.5, hiz: 4404019, eta: 3900 })));
+  ok("İngilizce: dönüştürmede / yoklamada İptal, zorla Güncelle ve klasör notları", /^Conversion canceled\. The downloaded file is still in the folder and wasn't added to Premiere: /.test(cevir(dc.dom["yt-durum"])) &&
+    cevir(dc.dom["yt-durum"]).indexOf(path.basename(dcTam)) !== -1 && /^Canceled\. The download had already finished; the file is in the folder and wasn't added to Premiere: /.test(cevir(yk.dom["yt-durum"])) &&
+    I18N.translate("yt-dlp yeniden indirildi ve doğrulandı: 2026.08.19") === "yt-dlp downloaded again and verified: 2026.08.19" &&
+    I18N.translate("Güncelle yt-dlp'yi yeniden indirip doğrular.") === "Update downloads yt-dlp again and verifies it." &&
+    /Movies folder/.test(I18N.translate(Y.klasorNotu("darwin"))) && /Videos folder/.test(I18N.translate(Y.klasorNotu("win32"))) &&
+    I18N.translate("İndirmeyi durdurur; yarım dosyalar silinir, bitmiş indirme klasörde kalır") !== "İndirmeyi durdurur; yarım dosyalar silinir, bitmiş indirme klasörde kalır",
+    js([cevir(dc.dom["yt-durum"]), cevir(yk.dom["yt-durum"])]));
   ok("İngilizce: deneme ipucu", I18N.translate(DM.tanitimIpucu("youtube").mesaj) === "Trial on: now press \"Get info\"", I18N.translate(DM.tanitimIpucu("youtube").mesaj));
 
   /* ---------- 18) köprü: süreç grubu ---------- */
@@ -486,7 +601,8 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
 
 async function kopruTesti() {
   var SRC = fs.readFileSync(path.join(KOK, "js", "bridge.js"), "utf8");
-  function yukle(platform) {
+  function yukle(platform, ek) {
+    ek = ek || {};
     var cagri = { spawn: [], execFile: [], kill: [], grup: [] };
     var sahteCp = {
       spawn: function (cmd, args, o) {
@@ -503,8 +619,8 @@ async function kopruTesti() {
     };
     var sb = {
       window: {}, console: console,
-      require: function (ad) { return ad === "child_process" ? sahteCp : require(ad); },
-      process: { platform: platform, env: { PATH: "/usr/bin" }, versions: process.versions, arch: process.arch, kill: function (pid, sig) { cagri.grup.push([pid, sig]); } },
+      require: function (ad) { return ad === "child_process" ? sahteCp : (ek.moduller && ek.moduller[ad]) || require(ad); },
+      process: { platform: platform, env: ek.env || { PATH: "/usr/bin" }, versions: process.versions, arch: process.arch, kill: function (pid, sig) { cagri.grup.push([pid, sig]); } },
       URL: URL, Promise: Promise, Buffer: Buffer, JSON: JSON, Math: Math, Date: Date, setTimeout: setTimeout, clearTimeout: clearTimeout, setImmediate: setImmediate,
       String: String, Number: Number, Object: Object, Array: Array, Error: Error, RegExp: RegExp, isFinite: isFinite,
       navigator: { platform: platform === "darwin" ? "MacIntel" : "Win32", userAgent: "" },
@@ -536,4 +652,71 @@ async function kopruTesti() {
   await isw;
   ok("köprü Windows: detached yok, taskkill /T /F ağacı", !w.cagri.spawn[0].o.detached && w.cagri.execFile.length === 1 && w.cagri.execFile[0].cmd === "taskkill" &&
     js(w.cagri.execFile[0].args) === js(["/pid", "4242", "/T", "/F"]) && w.cagri.grup.length === 0);
+
+  /* opts.env: yt-dlp'nin geçici klasörü; Windows'ta büyük/küçük harf duyarsız (eski "Temp" yazımı atılır) */
+  var we = yukle("win32", { env: { Path: "C:\\Windows", Temp: "C:\\Users\\a\\AppData\\Local\\Temp", tmp: "C:\\x", USERPROFILE: "C:\\Users\\a" } });
+  var jwe = we.K.iptalJetonu();
+  var iswe = we.K.run("C:\\x\\yt-dlp.exe", ["-J"], { iptal: jwe, surecGrubu: true, env: { TMPDIR: "C:\\S\\tmp", TEMP: "C:\\S\\tmp", TMP: "C:\\S\\tmp" } });
+  jwe.iptal(); await iswe;
+  var wenv = we.cagri.spawn[0].o.env || {};
+  ok("köprü Windows env: TEMP / TMP / TMPDIR Suflo klasörü, eski 'Temp' / 'tmp' yazımı yok, geri kalan ortam aynen", wenv.TEMP === "C:\\S\\tmp" && wenv.TMP === "C:\\S\\tmp" &&
+    wenv.TMPDIR === "C:\\S\\tmp" && !("Temp" in wenv) && !("tmp" in wenv) && wenv.Path === "C:\\Windows" && wenv.USERPROFILE === "C:\\Users\\a", js(wenv));
+  var wn = yukle("win32", { env: { Path: "C:\\Windows" } });
+  var jwn = wn.K.iptalJetonu();
+  var iswn = wn.K.run("C:\\x\\whisper-cli.exe", [], { iptal: jwn });
+  jwn.iptal(); await iswn;
+  ok("köprü Windows: env verilmezse süreç ortamı eskisi gibi (env seçeneği yok)", wn.cagri.spawn[0].o.env === undefined);
+  var me2 = yukle("darwin", { env: { PATH: "/usr/bin", HOME: "/Users/a", TMPDIR: "/var/folders/x/T/" } });
+  var jme = me2.K.iptalJetonu();
+  var isme = me2.K.run("/x/yt-dlp", ["-J"], { iptal: jme, surecGrubu: true, env: { TMPDIR: "/S/tmp", TEMP: "/S/tmp", TMP: "/S/tmp" } });
+  jme.iptal(); await isme;
+  var menv = me2.cagri.spawn[0].o.env || {};
+  ok("köprü macOS env: Homebrew PATH korunur, TMPDIR Suflo klasörü", menv.TMPDIR === "/S/tmp" && /^\/opt\/homebrew\/bin:/.test(menv.PATH) && menv.HOME === "/Users/a", js(menv));
+
+  /* httpGet vekil sunucuya uyar (sürüm denetimi: GitHub API); önce doğrudan gidiyordu */
+  function sahteAg() {
+    var kayit = { connect: [], get: [] };
+    var soket = { sahte: "soket", destroy: function () { kayit.soketKapandi = true; } };
+    function cevap(cb) {
+      var res = new EventEmitter();
+      res.statusCode = 200; res.headers = {}; res.setEncoding = function () {};
+      setImmediate(function () { cb(res); res.emit("data", "{\"tag_name\":\"2026.10.01\"}"); res.emit("end"); });
+    }
+    function istek() { var q = new EventEmitter(); q.setTimeout = function () {}; q.destroy = function () {}; q.end = function () {}; return q; }
+    var http = {
+      request: function (o) {
+        kayit.connect.push(o);
+        var q = istek();
+        q.end = function () { setImmediate(function () { q.emit("connect", { statusCode: kayit.ret ? 407 : 200 }, soket); }); };
+        return q;
+      },
+      get: function (o, cb) { kayit.get.push({ http: true, o: o }); cevap(cb); return istek(); }
+    };
+    var https = { get: function (o, cb) { kayit.get.push({ https: true, o: o }); cevap(cb); return istek(); } };
+    return { kayit: kayit, soket: soket, moduller: { http: http, https: https } };
+  }
+  var API = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
+  var ag1 = sahteAg();
+  var v1 = yukle("darwin", { moduller: ag1.moduller, env: { PATH: "/usr/bin", HTTPS_PROXY: "http://ali:gizli%40parola@vekil.sirket.local:3128" } });
+  var r1 = await v1.K.httpGet(API, { "Accept": "application/vnd.github+json" });
+  var c1 = ag1.kayit.connect[0] || {}, g1 = (ag1.kayit.get[0] || {}).o || {};
+  ok("httpGet + HTTPS_PROXY: CONNECT tüneli (vekil, port, hedef:443, Proxy-Authorization), TLS aynı soket üzerinden",
+    c1.method === "CONNECT" && c1.host === "vekil.sirket.local" && c1.port === 3128 && c1.path === "api.github.com:443" &&
+    c1.headers["Proxy-Authorization"] === "Basic " + Buffer.from("ali:gizli@parola").toString("base64") &&
+    ag1.kayit.get.length === 1 && ag1.kayit.get[0].https && g1.socket === ag1.soket && g1.servername === "api.github.com" && g1.host === "api.github.com" &&
+    g1.path === "/repos/yt-dlp/yt-dlp/releases/latest" && g1.headers.Accept === "application/vnd.github+json" && r1.status === 200 && /2026\.10\.01/.test(r1.body), js([c1, g1.path, r1]));
+  var ag2 = sahteAg();
+  var v2 = yukle("darwin", { moduller: ag2.moduller, env: { PATH: "/usr/bin", HTTPS_PROXY: "http://vekil.sirket.local:3128", NO_PROXY: ".github.com" } });
+  var r2 = await v2.K.httpGet(API, {});
+  ok("httpGet + NO_PROXY: doğrudan (tünel yok)", ag2.kayit.connect.length === 0 && ag2.kayit.get.length === 1 && ag2.kayit.get[0].o.hostname === "api.github.com" && !ag2.kayit.get[0].o.socket && r2.status === 200);
+  var ag3 = sahteAg();
+  var v3 = yukle("darwin", { moduller: ag3.moduller, env: { PATH: "/usr/bin" } });
+  var r3 = await v3.K.httpGet(API, {});
+  ok("httpGet vekilsiz: eskisi gibi doğrudan", ag3.kayit.connect.length === 0 && ag3.kayit.get.length === 1 && ag3.kayit.get[0].o.hostname === "api.github.com" && ag3.kayit.get[0].o.port === 443 && r3.status === 200);
+  var ag4 = sahteAg();
+  ag4.kayit.ret = true;
+  var v4 = yukle("darwin", { moduller: ag4.moduller, env: { PATH: "/usr/bin", HTTPS_PROXY: "vekil.sirket.local:8080" } });
+  var r4 = await v4.K.httpGet(API, {});
+  ok("httpGet: vekil tüneli reddederse (407) istek gitmez, status 0 ve neden", ag4.kayit.connect.length === 1 && ag4.kayit.connect[0].port === 8080 && ag4.kayit.get.length === 0 &&
+    r4.status === 0 && /407/.test(r4.body), js(r4));
 }

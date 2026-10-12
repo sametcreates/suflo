@@ -1,7 +1,8 @@
 // Suflo testi: KS_importDownloaded (YouTube indirici, 3.3) sahte Premiere modeliyle
 // "Suflo İndirilenler" kutusu (Unicode ad panelden), ikinci indirmede yeniden kullanım, yol bulucu,
-// macOS Unicode yol farkında kutuya eklenen son öğe, proje / dosya yok hataları, Proje panelinde seçim
-// (select yoksa ya da hata verirse sessiz) ve timeline'a hiç dokunulmaması.
+// macOS Unicode yol farkında kutuya eklenen son öğe, proje / dosya yok hataları, adında "%" olan dosya
+// (ExtendScript File yolu URI gibi çözer), Proje panelinde seçim (select yoksa ya da hata verirse sessiz)
+// ve timeline'a hiç dokunulmaması.
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var gecen = 0, toplam = 0;
 function ok(ad, kosul, ek) { toplam++; if (kosul) gecen++; console.log((kosul ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 240) + "]" : "")); }
@@ -28,7 +29,12 @@ function liste(dizi, sayac) {
  *   iceAlmaz    importFiles hiçbir şey eklemez
  *   select      "yok" | "atar" | (varsayılan) çalışır
  *   kutuVar     aynı adlı kutu kökte zaten var
+ *   dosya       diskteki dosyanın yolu (varsayılan DOSYA)
+ * File, ExtendScript gibi yolu URI olarak çözer ("%50" → "P", "%25" → "%"): "%" taşıyan YouTube başlıkları için.
  */
+function uriCoz(y) {
+  return String(y).replace(/(%[0-9A-Fa-f]{2})+/g, function (m) { try { return decodeURIComponent(m); } catch (e) { return m; } });
+}
 function premiere(opts) {
   opts = opts || {};
   var d = { binYapildi: 0, iceAlinan: [], secilen: 0, bulucu: 0, timeline: [] };
@@ -73,7 +79,7 @@ function premiere(opts) {
   }
   var ctx = {
     app: { version: "26.0.0", project: proje },
-    File: function (y) { this.exists = !opts.dosyaYok && y === DOSYA; },
+    File: function (y) { d.fileYollari = (d.fileYollari || []).concat([String(y)]); this.exists = !opts.dosyaYok && uriCoz(y) === (opts.dosya || DOSYA); },
     Time: function () {}, decodeURIComponent: decodeURIComponent, encodeURIComponent: encodeURIComponent,
     isFinite: isFinite, Math: Math, String: String, Number: Number, Error: Error, Folder: function () {}
   };
@@ -133,6 +139,19 @@ ok("yol verilmedi → yol-yok", r9.ok === false && r9.kod === "yol-yok");
 var pi = premiere({ iceAlmaz: true });
 var r10 = pi.cagir({ path: DOSYA, bin: KUTU });
 ok("Premiere içe alamadı → ice-alinamadi", r10.ok === false && r10.kod === "ice-alinamadi" && pi.d.timeline.length === 0, js(r10));
+
+/* 7b) Başlıkta "%" (Türkçede "%50 indirim", "%100 gerçek"): ExtendScript File "%50"yi "P" sanar */
+var YUZDE = "C:\\Users\\Ömer\\Belgeler\\Düğün Projesi\\Suflo İndirilenler\\Fiyatlar %50 düştü, %100 gerçek [dQw4w9WgXcQ] 1080p.mp4";
+ok("sahte File URI çözümü gerçekçi: düz yolla '%50' dosyası bulunmaz", uriCoz(YUZDE) !== YUZDE && uriCoz(YUZDE.replace(/%/g, "%25")) === YUZDE);
+var py = premiere({ dosya: YUZDE });
+var ry = py.cagir({ path: YUZDE, bin: KUTU });
+ok("'%' taşıyan başlık: dosya bulunur ve kutuya alınır (dosya-yok değil), importFiles'a yol aynen gider",
+  ry.ok === true && ry.imported === true && py.d.iceAlinan.length === 1 && py.d.iceAlinan[0].yollar[0] === YUZDE && py.kok[0].children[0].getMediaPath() === YUZDE, js(ry));
+var ry2 = premiere({ dosya: YUZDE, dosyaYok: true }).cagir({ path: YUZDE, bin: KUTU });
+ok("'%' taşıyan başlık ama dosya gerçekten yok → yine dosya-yok", ry2.ok === false && ry2.kod === "dosya-yok", js(ry2));
+var pd = premiere();
+pd.cagir({ path: DOSYA, bin: KUTU });
+ok("'%' yoksa tek File denemesi (eskisi gibi)", js(pd.d.fileYollari) === js([DOSYA]), js(pd.d.fileYollari));
 
 /* 8) Seçim isteğe bağlı */
 var rs1 = premiere({ select: "yok" }).cagir({ path: DOSYA, bin: KUTU });

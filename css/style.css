@@ -3867,6 +3867,11 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .yt-klasor { flex: 1; min-width: 0; font-size: 10.5px; }
 .yt-klasor > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .yt-klasor > span[hidden] { display: none; }
+/* Uzun yolda BAŞ kırpılır, sondaki klasör adı görünür ("…\Düğün Çekimi\Suflo İndirilenler"): dış kutu sağdan
+   sola (taşma ve üç nokta solda), içteki yol soldan sağa yalıtılmış (ters bölü / eğik çizgi yer değiştirmez).
+   Sığan yol sola yaslı kalır; tam yol title'da. */
+#yt-klasor-yol { direction: rtl; text-align: left; }
+#yt-klasor-yol > .yt-klasor-ic { direction: ltr; unicode-bidi: embed; unicode-bidi: isolate; }
 #yt-klasor-ipucu { color: var(--faint); }
 .yt-klasor-satir .btn { flex: none; margin-left: 6px; }
 .yt-ilerleme { height: 4px; margin: 0 0 9px; overflow: hidden; border-radius: 999px; background: var(--bg3); }

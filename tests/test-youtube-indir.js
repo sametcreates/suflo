@@ -23,6 +23,9 @@ var kabul = [
   ["https://youtu.be/" + ID + "?si=AbCdEf123&t=10", false, false],
   ["https://www.youtube.com/shorts/" + ID, false, true],
   ["https://m.youtube.com/shorts/" + ID + "?feature=share", false, true],
+  // canlı yayın / yayın kaydı: YouTube'un Paylaş › Kopyala bağlantısı (yayın sürüyorsa -J'deki live_status engeller)
+  ["https://www.youtube.com/live/" + ID + "?si=AbCdEf123", false, false],
+  ["https://m.youtube.com/live/" + ID + "/", false, false],
   ["youtube.com/watch?v=" + ID, false, false],
   ["youtu.be/" + ID, false, false],
   ["HTTPS://WWW.YOUTUBE.COM/watch?v=" + ID, false, false],
@@ -46,6 +49,7 @@ var red = [
   ["https://www.youtube.com/results?search_query=x", "videoDegil"], ["https://www.youtube.com/", "videoDegil"],
   ["https://www.youtube.com/embed/" + ID, "videoDegil"], ["https://www.youtube-nocookie.com/embed/" + ID, "videoDegil"],
   ["https://studio.youtube.com/video/" + ID + "/edit", "videoDegil"],
+  ["https://www.youtube.com/live/kisa", "gecersiz"], ["https://www.youtube.com/live/", "videoDegil"],
   ["https://www.youtube.com/watch?v=kisa", "gecersiz"], ["https://www.youtube.com/watch?v=" + ID + "x", "gecersiz"],
   ["https://www.youtube.com/watch", "gecersiz"], ["https://youtu.be/", "gecersiz"],
   ["javascript:alert(1)//youtu.be/" + ID, "gecersiz"], ["ftp://youtube.com/watch?v=" + ID, "gecersiz"],
@@ -278,6 +282,10 @@ var HATA_ORNEK = [
   ["ERROR: Postprocessing: ffprobe and ffmpeg not found. Please install or provide the path using --ffmpeg-location", "ffmpegYok", false],
   ["ERROR: [youtube] x: Incomplete YouTube ID x. URL https://www.youtube.com/watch?v=x looks truncated.", "gecersizUrl", false],
   ["ERROR: Unable to download webpage: HTTP Error 429: Too Many Requests", "cokIstek", false],
+  // yt-dlp 2026.08.19 (extractor/youtube/_video.py): oturum kısıtı "Video unavailable" ile başlar; video var
+  ["ERROR: [youtube] " + ID + ": Video unavailable. This content isn't available, try again later. The current session has been rate-limited by YouTube for up to an hour. " +
+    "It is recommended to use `-t sleep` to add a delay between video requests to avoid exceeding the rate limit. For more information, refer to " +
+    "https://github.com/yt-dlp/yt-dlp/wiki/Extractors#this-content-isnt-available-try-again-later", "cokIstek", false],
   ["Error: spawn C:\\Users\\a\\AppData\\Roaming\\Kesit\\yt-dlp\\yt-dlp.exe ENOENT", "calismadi", true],
   ["Error: spawn /Users/a/Library/Application Support/Suflo/yt-dlp/yt-dlp EACCES", "calismadi", true],
   ["[PYI-4242:ERROR] Failed to extract embedded archive", "calismadi", true]
@@ -290,6 +298,21 @@ var uyarili = Y.hataSinifla("WARNING: [youtube] Falling back to generic n functi
 ok("hata: WARNING satırları ERROR'u ezmez", uyarili.kod === "ozel", js(uyarili));
 var bilinmeyen = Y.hataSinifla("ERROR: tuhaf bir şey oldu\n", "");
 ok("hata: bilinmeyen → son ERROR satırı (ERROR: öneki atılır)", bilinmeyen.kod === "bilinmeyen" && bilinmeyen.satir === "tuhaf bir şey oldu" && bilinmeyen.guncelle === false);
+// ffmpeg (Premiere için dönüştürme) disk hatası: video adındaki "Disk Is Full" sayılmaz, yalnız işletim sisteminin hatası
+var FF_GIRDI = "C:\\Users\\Ömer\\Suflo İndirilenler\\When Your Disk Is Full [" + ID + "] 4K.mp4";
+var FF_GECICI = "C:\\Users\\Ömer\\Suflo İndirilenler\\When Your Disk Is Full [" + ID + "] 4K.suflo-tmp.mp4";
+var FF_MF_HATA = "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '" + FF_GIRDI + "':\n  Metadata:\n    major_brand     : isom\n    title           : Not Enough Space For Love\n" +
+  "  Duration: 00:00:10.00, start: 0.000000, bitrate: 9000 kb/s\n  Stream #0:0[0x1](und): Video: vp9 (Profile 0) (vp09 / 0x39307076), yuv420p(tv, bt709), 3840x2160, 25 fps\n" +
+  "Stream mapping:\n  Stream #0:0 -> #0:0 (vp9 (native) -> h264 (h264_mf))\n[h264_mf @ 000001] could not set output type (80004005)\n" +
+  "Error while opening encoder for output stream #0:0 - maybe incorrect parameters such as bit_rate, rate, width or height\nConversion failed!\n";
+ok("hataSinifla tüm ffmpeg metninde başlıktaki 'Disk Is Full'u disk sanar (bu yüzden ayrı denetim)", Y.hataSinifla(FF_MF_HATA, "").kod === "disk");
+ok("ffmpeg disk: kodlayıcı hatası + başlıkta / meta veride 'Disk Is Full', 'Not Enough Space' → disk değil",
+  Y.ffmpegDiskDolu(FF_MF_HATA, [FF_GIRDI, FF_GECICI]) === false && Y.ffmpegDiskDolu(FF_MF_HATA, []) === false &&
+  Y.ffmpegDiskDolu("Output #0, mp4, to 'C:\\k\\No space left on device [" + ID + "].suflo-tmp.mp4':\nError initializing output stream", []) === false);
+ok("ffmpeg disk: gerçek disk dolu hataları (Linux/macOS strerror, Windows, çıktı yolu satır içinde)",
+  Y.ffmpegDiskDolu("frame= 100 fps=20\nav_interleaved_write_frame(): No space left on device\nError writing trailer of " + FF_GECICI + ": No space left on device\nConversion failed!", [FF_GIRDI, FF_GECICI]) &&
+  Y.ffmpegDiskDolu("[mp4 @ 0x1] Error number -28 occurred", []) && Y.ffmpegDiskDolu("[out#0/mp4] Error writing trailer: There is not enough space on the disk.", []) &&
+  Y.ffmpegDiskDolu("Error writing trailer of /k/a.suflo-tmp.mp4: No space left on device", ["/k/a.mp4", "/k/a.suflo-tmp.mp4"]));
 ok("uyarı: JS çalıştırıcısı yok", Y.uyarilar("WARNING: [youtube] No supported JavaScript runtime could be found. YouTube extraction without a JS runtime has been deprecated").jsYok === true &&
   Y.uyarilar("WARNING: [youtube] x: nothing").jsYok === false && /Deno/.test(Y.JS_YOK_METNI));
 
@@ -298,6 +321,13 @@ ok("varsayılan klasör: proje yanında 'Suflo İndirilenler'", Y.varsayilanKlas
   Y.varsayilanKlasor({ projeKlasoru: "/Users/ayşe/Proje", platform: "darwin" }) === "/Users/ayşe/Proje/Suflo İndirilenler");
 ok("varsayılan klasör: proje kaydedilmemişse Videolar / Filmler", Y.varsayilanKlasor({ ev: "C:\\Users\\Ömer", platform: "win32" }) === "C:\\Users\\Ömer\\Videos\\Suflo İndirilenler" &&
   Y.varsayilanKlasor({ ev: "/Users/a", platform: "darwin" }) === "/Users/a/Movies/Suflo İndirilenler" && Y.varsayilanKlasor({}) === "" && Y.KLASOR_ADI === "Suflo İndirilenler");
+ok("klasör notu: macOS'ta Filmler (Movies), Windows'ta Videolar; açık proje yokken de doğru", /Filmler \(Movies\)/.test(Y.klasorNotu("darwin")) && /Videolar/.test(Y.klasorNotu("win32")) &&
+  !/Movies/.test(Y.klasorNotu("win32")) && /ya da açık değil/.test(Y.klasorNotu("darwin")));
+var GO = Y.geciciOrtam("C:\\Users\\Ömer\\AppData\\Roaming\\Suflo\\yt-dlp\\tmp");
+ok("yt-dlp geçici ortamı: TMPDIR / TEMP / TMP aynı Suflo klasörü; klasör yoksa ortam değişmez",
+  GO.TMPDIR === "C:\\Users\\Ömer\\AppData\\Roaming\\Suflo\\yt-dlp\\tmp" && GO.TEMP === GO.TMPDIR && GO.TMP === GO.TMPDIR && Object.keys(GO).length === 3 && Y.geciciOrtam("") === null);
+ok("PyInstaller artığı: yalnız _MEI… klasörleri", Y.meiArtigiMi("_MEI123456") && Y.meiArtigiMi("_MEIa1B2c3") && !Y.meiArtigiMi("_MEI") && !Y.meiArtigiMi("MEI123") &&
+  !Y.meiArtigiMi("x_MEI123") && !Y.meiArtigiMi("_MEI12/..") && !Y.meiArtigiMi("suflo-ytdlp.json") && !Y.meiArtigiMi(""));
 var ARTIK = ["a [" + ID + "] 1080p.mp4.part", "a [" + ID + "] 1080p.f137.mp4", "a [" + ID + "] 1080p.f140.m4a.part", "a [" + ID + "] 1080p.mp4.ytdl", "a [" + ID + "] 1080p.temp.mp4",
   "a [" + ID + "] 4K.suflo-tmp.mp4", "a [" + ID + "] 1080p.mp4.part-Frag12", "a [" + ID + "].webm.part-Frag3.part"];
 ok("artık dosyalar tanınır, tamamlanmış dosya tanınmaz", ARTIK.every(Y.artikMi) && !Y.artikMi("a [" + ID + "] 1080p.mp4") && !Y.artikMi("a [" + ID + "].mp3") && !Y.artikMi("film.final.mp4"));
@@ -378,6 +408,7 @@ topla(Y.URL_HATA); topla(Y.HATALAR); topla(Y.ASAMA_METNI);
 ["is_live", "is_upcoming", "post_live"].forEach(function (c) { metinler.push(Y.canliEngeli({ canli: c })); });
 ["ozetYok", "listedeYok", "apiCeliski", "uyusmadi"].forEach(function (k) { metinler.push(Y.dogrulamaMesaji(k)); });
 dr.forEach(function (d) { metinler.push(d.title, d.detail); });
+metinler.push(Y.klasorNotu("darwin"), Y.klasorNotu("win32"));
 metinler.push(Y.JS_YOK_METNI, Y.ONAY_METNI, Y.guncellemeIpucu(eskiMeta, SIMDI).metin, Y.donusumNotu("h264_mf", aR), Y.donusumNotu("mpeg4", aV),
   Y.ilerlemeMetni({ asama: "indir", oran: 0.45, hiz: 4404019, eta: 80 }), Y.ilerlemeMetni({ asama: "donustur", oran: 0.3, eta: 3900 }),
   Y.ilerlemeMetni({ asama: "kur", oran: 0.1, hiz: 2048, eta: 7 }), Y.ilerlemeMetni({ asama: "ice", oran: 1 }));

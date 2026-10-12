@@ -7,15 +7,16 @@
  * tarayıcıda aynı çalışır (UMD: window.SufloYoutubeIndir / module.exports),
  * tests/test-youtube-indir.js ile sınanır.
  *
- *   URL          urlCoz: yalnız tek video (watch?v=, youtu.be/, shorts/, m., music.) → kanonik adres
+ *   URL          urlCoz: yalnız tek video (watch?v=, youtu.be/, shorts/, live/, m., music.) → kanonik adres
  *   bilgi        bilgiOzeti: yt-dlp -J çıktısından başlık, kanal, süre, küçük resim, kaliteler
  *   kalite       kaliteDurumu / varsayilanKalite / dosyaEtiketi / canliEngeli
  *   argümanlar   bilgiArgs / indirmeArgs / formatSecici / ffmpegKonumu: args dizisi (kabuk yok)
  *   ilerleme     satirCoz + izleyici: --progress-template satırlarından tek yüzde, hız, kalan süre
  *   ikili        varlikAdaylari / varlikSec / indirmeAdresleri / surumCoz / sumsCoz / ozetDogrula
  *                surumKarsilastir / ytdlpSurumu / eskiMi / metaGecerliMi / guncellemeIpucu / doctorSatiri
- *   hatalar      hataSinifla: stderr → kod + Türkçe mesaj + "Güncelle önerilsin mi"; uyarilar
- *   çıktı        varsayilanKlasor, artikMi, iptalSilinecekler, sonDosyaBul
+ *   hatalar      hataSinifla: stderr → kod + Türkçe mesaj + "Güncelle önerilsin mi"; uyarilar; ffmpegDiskDolu
+ *   çıktı        varsayilanKlasor, klasorNotu, artikMi, iptalSilinecekler, hataSilinecekler, sonDosyaBul
+ *   geçici       geciciOrtam / meiArtigiMi: yt-dlp'nin (PyInstaller) _MEI… açılış klasörleri Suflo'nun klasöründe
  *   dönüştürme   akisBilgisi (ffmpeg -i), donusumKarari, kodlayicilar, kodlayiciSec, donusumArgs,
  *                ffmpegZaman, kalanTahmini, donusumNotu
  */
@@ -102,6 +103,10 @@
       if (!id) return sorgu.list ? hata("liste") : hata("gecersiz");
     } else if ((sm = /^\/shorts\/([^\/]+)\/?$/i.exec(yol))) {
       id = sm[1]; shorts = true;
+    } else if ((sm = /^\/live\/([^\/]+)\/?$/i.exec(yol))) {
+      // Canlı yayın / yayın kaydı için YouTube'un kendi Paylaş › Kopyala bağlantısı. Yayın sürüyor mu,
+      // başlamadı mı: Bilgi al'daki live_status (canliEngeli) söyler
+      id = sm[1];
     } else if (/^\/playlist\/?$/i.test(yol)) {
       return hata("liste");
     } else {
@@ -707,7 +712,9 @@
     ["yas", /confirm your age|age[- ]restricted|inappropriate for some users/i],
     ["bolge", /not available in your country|not made this video available in your country|geo[- ]?restrict|blocked it in your country|from your location/i],
     ["giris", /not a bot|requires? (login|authentication)|login required|use --cookies|cookies-from-browser|sign in to (view|confirm)|only available for registered users/i],
-    ["cokIstek", /http error 429|too many requests/i],
+    // "Video unavailable. This content isn't available, try again later. The current session has been
+    // rate-limited by YouTube…" (yt-dlp 2026.08.19): video var, oturum kısıtlı; `yok`tan önce denenir
+    ["cokIstek", /http error 429|too many requests|rate[- ]?limited|content isn'?t available,? try again later/i],
     ["disk", /no space left|errno 28\b|enospc|not enough space|winerror 112\b|disk (is )?full/i],
     ["yazilamaz", /permission denied|errno 13\b|access is denied|winerror 5\b|read-only file system|eacces|eperm|erofs|unable to open for writing|unable to create directory/i],
     ["ffmpegYok", /ffmpeg (is )?not (found|installed)|ffprobe and ffmpeg not found|ffmpeg-location .* does not exist/i],
@@ -742,6 +749,26 @@
     return { kod: "bilinmeyen", mesaj: HATALAR.bilinmeyen.mesaj, guncelle: false, satir: son.replace(/^ERROR:\s*/, "").slice(0, 300) };
   }
 
+  /*
+   * ffmpeg (Premiere için dönüştürme) diskte yer kalmadığı için mi düştü. ffmpeg "ERROR:" satırı yazmaz;
+   * hataSinifla tüm metne bakardı ve "Input #0 … from '…When Your Disk Is Full [id] 4K.mp4'" başlığındaki
+   * video adı disk hatası sayılırdı. Önce girdi / çıktı yolları, tırnaklı metinler, Input / Output
+   * başlıkları ve meta veri satırları ("    title           : …") atılır; kalan metinde yalnız işletim
+   * sisteminin disk hatası aranır.
+   */
+  var FFMPEG_DISK_RE = /no space left on device|\benospc\b|errno 28\b|winerror 112\b|not enough space on the disk|error number -28\b/i;
+  function ffmpegDiskDolu(stderr, yollar) {
+    var t = String(stderr || "");
+    (yollar || []).forEach(function (y) {
+      var s = String(y || "");
+      if (s) t = t.split(s).join(" ");
+    });
+    t = t.split(/\r?\n|\r/).filter(function (sat) {
+      return !/^\s*(Input|Output) #\d+/.test(sat) && !/^\s+[^\s:][^:]*?\s+:\s/.test(sat);
+    }).join("\n").replace(/'[^'\n]*'/g, "''");
+    return FFMPEG_DISK_RE.test(t);
+  }
+
   // Hata değil, uyarı: JS çalıştırıcısı (Deno) yoksa YouTube bazı kaliteleri vermeyebilir
   var JS_YOK_METNI = "YouTube bazı kaliteleri JavaScript çalıştırıcısı olmadan vermiyor. deno.com'dan Deno'yu kurarsan Suflo onu kendiliğinden kullanır.";
   function uyarilar(stderr) {
@@ -767,6 +794,25 @@
     if (!o.ev) return "";
     return birlestir(birlestir(o.ev, o.platform === "darwin" ? "Movies" : "Videos", sep), KLASOR_ADI, sep);
   }
+
+  // Proje kaydedilmemiş (ya da açık proje yok) notu: macOS'ta varsayılan klasör Filmler (Movies)
+  function klasorNotu(platform) {
+    return String(platform) === "darwin" ? "Proje kaydedilmemiş ya da açık değil: Filmler (Movies) klasörüne iner."
+      : "Proje kaydedilmemiş ya da açık değil: Videolar klasörüne iner.";
+  }
+
+  /*
+   * yt-dlp.exe / yt-dlp_macos tek dosyalık PyInstaller paketidir: her çalıştırmada Python'u geçici
+   * "_MEI…" klasörüne açar ve ancak düzgün kapanınca siler. İptal ve zaman aşımı süreç ağacını zorla
+   * öldürür, Premiere kapanırken de süreç ölür: klasör (onlarca MB) %TEMP% / $TMPDIR'de kalırdı.
+   * yt-dlp'ye Suflo'nun kendi geçici klasörü verilir (TMPDIR / TEMP / TMP) ve oradaki artıklar bir
+   * sonraki çalıştırmadan önce silinir; başka uygulamaların _MEI klasörlerine dokunulmaz.
+   */
+  function geciciOrtam(dir) {
+    var d = String(dir || "");
+    return d ? { TMPDIR: d, TEMP: d, TMP: d } : null;
+  }
+  function meiArtigiMi(ad) { return /^_MEI[0-9A-Za-z_]+$/.test(String(ad || "")); }
 
   function idDosyasiMi(ad, id) { return !!id && String(ad).indexOf("[" + id + "]") !== -1; }
 
@@ -988,9 +1034,10 @@
     surumKarsilastir: surumKarsilastir, ytdlpSurumu: ytdlpSurumu, eskiMi: eskiMi, metaGecerliMi: metaGecerliMi, ESKI_GUN: ESKI_GUN,
     guncellemeIpucu: guncellemeIpucu, doctorSatiri: doctorSatiri,
     // hatalar
-    hataSinifla: hataSinifla, uyarilar: uyarilar, HATALAR: HATALAR, JS_YOK_METNI: JS_YOK_METNI,
+    hataSinifla: hataSinifla, uyarilar: uyarilar, HATALAR: HATALAR, JS_YOK_METNI: JS_YOK_METNI, ffmpegDiskDolu: ffmpegDiskDolu,
     // çıktı
-    KLASOR_ADI: KLASOR_ADI, varsayilanKlasor: varsayilanKlasor, idDosyasiMi: idDosyasiMi, artikMi: artikMi,
+    KLASOR_ADI: KLASOR_ADI, varsayilanKlasor: varsayilanKlasor, klasorNotu: klasorNotu, idDosyasiMi: idDosyasiMi, artikMi: artikMi,
+    geciciOrtam: geciciOrtam, meiArtigiMi: meiArtigiMi,
     iptalSilinecekler: iptalSilinecekler, hataSilinecekler: hataSilinecekler, sonDosyaBul: sonDosyaBul, uzanti: uzanti,
     // dönüştürme
     akisBilgisi: akisBilgisi, donusumKarari: donusumKarari, donusumAdlari: donusumAdlari, kodlayicilar: kodlayicilar,

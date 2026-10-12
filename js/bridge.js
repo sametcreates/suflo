@@ -305,6 +305,9 @@ window.K = (function () {
    * opts.surecGrubu (3.3) macOS/Linux'ta süreç kendi grubunda açılır (detached); iptal ve zaman
    *                aşımı bütün grubu öldürür (yt-dlp'nin açtığı alt süreçler dahil). Windows'ta
    *                taskkill /T zaten ağacı kapsar.
+   * opts.env       (3.3) süreç ortamına eklenen / değiştirilen değişkenler (ör. yt-dlp'nin geçici
+   *                klasörü TMPDIR / TEMP / TMP); geri kalan ortam aynen geçer. Windows'ta ad büyük /
+   *                küçük harf duyarsız: aynı adın eski yazımı atılır, iki "Temp" kalmaz.
    */
   function run(cmd, args, opts) {
     opts = opts || {};
@@ -325,12 +328,25 @@ window.K = (function () {
          */
         if (opts.cwd) spawnOpts.cwd = opts.cwd;
         if (opts.surecGrubu && !WIN) spawnOpts.detached = true;
-        if (MAC) {
-          // CEP surecinin PATH'i cogu zaman /usr/bin ile sinirli; Homebrew'i goremiyor
+        if (MAC || opts.env) {
           var env = {};
           for (var ek in process.env) if (process.env.hasOwnProperty(ek)) env[ek] = process.env[ek];
-          env.PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" +
-            (process.env.PATH ? ":" + process.env.PATH : "");
+          // CEP surecinin PATH'i cogu zaman /usr/bin ile sinirli; Homebrew'i goremiyor
+          if (MAC) {
+            env.PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" +
+              (process.env.PATH ? ":" + process.env.PATH : "");
+          }
+          if (opts.env) {
+            for (var ad in opts.env) {
+              if (!opts.env.hasOwnProperty(ad) || opts.env[ad] === undefined || opts.env[ad] === null) continue;
+              if (WIN) {
+                for (var eski in env) {
+                  if (env.hasOwnProperty(eski) && eski !== ad && eski.toUpperCase() === ad.toUpperCase()) delete env[eski];
+                }
+              }
+              env[ad] = String(opts.env[ad]);
+            }
+          }
           spawnOpts.env = env;
         }
         child = cp.spawn(cmd, args, spawnOpts);
@@ -583,8 +599,15 @@ window.K = (function () {
 
   /* ---------------- HTTP GET (güncelleme kontrolü) ---------------- */
 
+  /*
+   * Vekil sunucu (3.3): download() gibi Ayarlar › vekil sunucu / HTTPS_PROXY / NO_PROXY'ye uyar
+   * (https hedefe CONNECT tüneli, http hedefe mutlak adresli istek). Yalnız doğrudan bağlantıya izin
+   * veren ağlarda sürüm denetimleri (GitHub API) hep başarısız olmasın.
+   */
   function httpGet(urlStr, headers) {
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve0) {
+      var bitti = false;
+      function resolve(x) { if (!bitti) { bitti = true; resolve0(x); } }
       if (!nodeOK) { resolve({ status: 0, body: "Node erişimi yok" }); return; }
       var proto, u;
       try {
@@ -593,20 +616,47 @@ window.K = (function () {
       } catch (e) { resolve({ status: 0, body: String(e) }); return; }
       var hdrs = { "User-Agent": "Suflo-Panel" };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
-      var req = proto.get({
+      var reqOpts = {
         hostname: u.hostname,
         port: u.port || (u.protocol === "http:" ? 80 : 443),
         path: u.pathname + (u.search || ""),
         headers: hdrs
-      }, function (res) {
-        var data = "";
-        res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
-        res.on("data", function (d) { data += d; });
-        res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
-        res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
-      });
-      req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
-      req.setTimeout(20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+      };
+      function fire(extra) {
+        if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) reqOpts[k] = extra[k];
+        var req = proto.get(reqOpts, function (res) {
+          var data = "";
+          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+          res.on("data", function (d) { data += d; });
+          res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
+          res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
+        });
+        req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
+        req.setTimeout(20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+      }
+      var pu = null;
+      try { pu = proxyFor(u); } catch (eP) { pu = null; }
+      if (pu && u.protocol === "http:") {
+        var h2 = Object.assign({ Host: u.hostname }, hdrs);
+        var au = proxyAuth(pu);
+        if (au) h2["Proxy-Authorization"] = au;
+        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, headers: h2 };
+        proto = require("http");
+        fire();
+      } else if (pu) {
+        connectTunnel(pu, u, function (err, socket) {
+          if (err) {
+            log("proxy tuneli kurulamadi (httpGet): " + err.message);
+            resolve({ status: 0, body: String(err.message || err) });
+            return;
+          }
+          if (bitti) { try { socket.destroy(); } catch (eS) {} return; }
+          // hazir socket uzerinden TLS: SNI ve Host icin host/servername sart
+          fire({ socket: socket, agent: false, host: u.hostname, servername: u.hostname });
+        });
+      } else {
+        fire();
+      }
     });
   }
 

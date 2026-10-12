@@ -28,6 +28,8 @@ window.KYoutube = (function () {
   var mesgul = false;
   var isTuru = "";
   var jeton = null;          // süren işin iptal jetonu (K.iptalJetonu)
+  var iptalKapali = false;   // Premiere'e ekleme adımı: KS_importDownloaded yarıda kesilemez, İptal kapalı
+  var zorlaGuncelle = false; // "yt-dlp çalıştırılamadı" sonrası Güncelle: sürüm aynı olsa da yeniden indirir
   var iptalAcilis = 0, baslatAcilis = 0;
   var sonDosya = "";
   var kurulumIsi = null;     // paylaşılan yt-dlp kurulum / güncelleme işi
@@ -102,6 +104,26 @@ window.KYoutube = (function () {
   }
   function sil(yol) { try { K.fs.unlinkSync(yol); return true; } catch (e) { return false; } }
   function varMi(yol) { try { return !!yol && K.fs.existsSync(yol); } catch (e) { return false; } }
+  function listele(yol) { try { return K.fs.readdirSync(yol); } catch (e) { return []; } }
+
+  /*
+   * yt-dlp'nin süreç ortamı: Suflo'nun kendi geçici klasörü (TMPDIR / TEMP / TMP). PyInstaller'ın her
+   * çalıştırmada açtığı _MEI… klasörü, süreç zorla öldürülünce (İptal, zaman aşımı, Premiere kapanması)
+   * burada kalır ve bir sonraki yt-dlp çalıştırmasından önce silinir. Paneldeki yt-dlp işleri tek tek
+   * sürer (mesgul / kurulumIsi): silme anında çalışan başka yt-dlp yok. Klasör kurulamazsa ortam
+   * değişmez (yt-dlp sistemin geçici klasörünü kullanır).
+   */
+  function ytOrtam() {
+    var d = K.path.join(ytDir(), "tmp");
+    try { K.fs.mkdirSync(d, { recursive: true }); } catch (e) { return undefined; }
+    var n = 0;
+    listele(d).forEach(function (ad) {
+      if (!Y.meiArtigiMi(ad)) return;
+      try { if (K.rmrf) { K.rmrf(K.path.join(d, ad)); n++; } } catch (eS) {}
+    });
+    if (n) log("yt-dlp geçici artığı silindi: " + n);
+    return Y.geciciOrtam(d) || undefined;
+  }
 
   function dosyaOzeti(yol) {
     return new Promise(function (resolve) {
@@ -224,7 +246,7 @@ window.KYoutube = (function () {
 
     // 5) İlk çalıştırma (doğrulanmış dosya): sürüm okunamazsa eski ikili geri gelir
     say("yt-dlp deneniyor…");
-    var t = await K.run(hedef, ["--version"], { timeout: 120000 });
+    var t = await K.run(hedef, ["--version"], { timeout: 120000, env: ytOrtam() });
     var surum = Y.ytdlpSurumu(t && t.stdout);
     if (!t || t.code !== 0 || !surum) {
       sil(hedef);
@@ -304,12 +326,13 @@ window.KYoutube = (function () {
       indir.disabled = !ac || !bilgi || !kalite || !durumlar || !durumlar[kalite] || !durumlar[kalite].acik || !!Y.canliEngeli(bilgi);
     }
     var iptal = el("yt-iptal");
-    if (iptal) { iptal.hidden = !mesgul; iptal.disabled = false; }
+    if (iptal) { iptal.hidden = !mesgul; iptal.disabled = mesgul && iptalKapali; }
     ciplerCiz();
   }
   function isBaslat(tur) {
     mesgul = true;
     isTuru = tur;
+    iptalKapali = false;
     jeton = K.iptalJetonu();
     iptalAcilis = Date.now();
     if (el("yt-sonuc")) el("yt-sonuc").hidden = true;
@@ -319,13 +342,14 @@ window.KYoutube = (function () {
   function isBitir() {
     mesgul = false;
     isTuru = "";
+    iptalKapali = false;
     jeton = null;
     baslatAcilis = Date.now();
     ilerleme(null);
     dugmeler();
   }
   function iptalEt(ev) {
-    if (!mesgul || !jeton) return;
+    if (!mesgul || !jeton || iptalKapali) return;
     if (ev && K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, iptalAcilis)) return;
     if (el("yt-iptal")) el("yt-iptal").disabled = true;
     durum("İptal ediliyor…", "warn");
@@ -333,7 +357,9 @@ window.KYoutube = (function () {
   }
   function baslatGecerli(ev) { return !ev || !K.baslatTikiGecerli || K.baslatTikiGecerli(ev, baslatAcilis); }
 
-  function guncelleKutusu(metin) {
+  // zorla: kutu "yt-dlp çalıştırılamadı" için açıldı; Güncelle sürüm aynı olsa da doğrulanmış ikiliyi yeniden indirir
+  function guncelleKutusu(metin, zorla) {
+    zorlaGuncelle = !!metin && !!zorla;
     var kutu = el("yt-guncelle-kutu");
     if (!kutu) return;
     kutu.hidden = !metin;
@@ -347,7 +373,8 @@ window.KYoutube = (function () {
     var h = e && e.ytHata ? e.ytHata : null;
     if (h) {
       durum(h.kod === "bilinmeyen" && h.satir ? h.mesaj + " " + h.satir : h.mesaj, "bad");
-      if (h.guncelle) guncelleKutusu("yt-dlp'yi güncellemek bu hatayı çözebilir.");
+      if (h.kod === "calismadi") guncelleKutusu("Güncelle yt-dlp'yi yeniden indirip doğrular.", true);
+      else if (h.guncelle) guncelleKutusu("yt-dlp'yi güncellemek bu hatayı çözebilir.");
       log("hata " + h.kod + ": " + String(h.satir || "").slice(0, 200));
       return;
     }
@@ -430,10 +457,24 @@ window.KYoutube = (function () {
     var ozel = String(ayar().ytKlasor || "");
     var yolEl = el("yt-klasor-yol"), ipucu = el("yt-klasor-ipucu");
     var yol = ozel || (projeKlasoru !== null ? varsayilanYol(projeKlasoru) : "");
-    // yol kullanıcı içeriği (data-i18n-skip); ipucu ("Proje klasörü › Suflo İndirilenler") yol bilinmezken
-    if (yolEl) { yolEl.textContent = yol; yolEl.hidden = !yol; yolEl.setAttribute("title", yol); }
+    // yol kullanıcı içeriği (data-i18n-skip); ipucu ("Proje klasörü › Suflo İndirilenler") yol bilinmezken.
+    // Dar panelde uzun yolun BAŞI kırpılır, sondaki klasör adı görünür (css: dış kutu sağdan sola, içteki
+    // yol soldan sağa yalıtılmış); tam yol title'da.
+    if (yolEl) {
+      yolEl.textContent = "";
+      var ic = document.createElement("span");
+      ic.className = "yt-klasor-ic";
+      ic.textContent = yol;
+      yolEl.appendChild(ic);
+      yolEl.hidden = !yol;
+      yolEl.setAttribute("title", yol);
+    }
     if (ipucu) ipucu.hidden = !!yol;
-    if (el("yt-klasor-not")) el("yt-klasor-not").hidden = !(!ozel && projeKlasoru === "");
+    var not = el("yt-klasor-not");
+    if (not) {
+      not.hidden = !(!ozel && projeKlasoru === "");
+      if (!not.hidden) not.textContent = Y.klasorNotu(platform());
+    }
     if (el("yt-klasor-varsayilan")) el("yt-klasor-varsayilan").hidden = !ozel;
   }
   async function hedefKlasor() {
@@ -456,7 +497,6 @@ window.KYoutube = (function () {
       throw ytHatasi(hazirHata(kod === "ENOSPC" ? "disk" : "yazilamaz"));
     }
   }
-  function listele(yol) { try { return K.fs.readdirSync(yol); } catch (e) { return []; } }
   // Kilitli dosya (Windows'ta süreç henüz tam kapanmadı): birkaç kez dener
   function temizle(klasor, adlar) {
     var kalan = (adlar || []).map(function (a) { return K.path.join(klasor, a); });
@@ -510,7 +550,7 @@ window.KYoutube = (function () {
       var ikili = await hazirla(say, j);
       iptalDenetle(j);
       durum(Y.ASAMA_METNI.bilgi);
-      var r = await K.run(ikili.yol, Y.bilgiArgs(u.url, ortakSecenek(ikili.meta)), { timeout: 180000, iptal: j, surecGrubu: true });
+      var r = await K.run(ikili.yol, Y.bilgiArgs(u.url, ortakSecenek(ikili.meta)), { timeout: 180000, iptal: j, surecGrubu: true, env: ytOrtam() });
       if (r.iptal) { durum("İptal edildi.", "warn"); return; }
       if (r.code !== 0) {
         if (/\[zaman aşımı\]/.test(String(r.stderr))) throw ytHatasi(hazirHata("ag"));
@@ -580,8 +620,13 @@ window.KYoutube = (function () {
     var sonuc = null;
     try {
       sonuc = await indirmeIsi(j);
-      if (sonuc && sonuc.iptal) { durum("İptal edildi. Yarım dosyalar silindi.", "warn"); return; }
+      // İndirme bitmişken gelen İptal (dönüştürme / codec yoklaması sırasında): tam dosya silinmez
+      if (sonuc && !sonuc.iptal && j.iptalEdildi) sonuc = { iptal: true, korunan: sonuc.dosya || "", donusumdu: false };
+      if (sonuc && sonuc.iptal) { iptalSonucu(sonuc); return; }
       if (!sonuc || !sonuc.dosya) throw new Error("İndirilen dosya bulunamadı.");
+      // Premiere'e ekleme yarıda kesilemez: İptal bu adımda kapalı (hak ve ekleme birlikte)
+      iptalKapali = true;
+      dugmeler();
       // Hak yalnız dosya Premiere'e hazır olunca düşer (ekleme adımı projeye bağlı, hakkı etkilemez)
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("youtube", KApp.toast);
       sonDosya = sonuc.dosya;
@@ -610,8 +655,26 @@ window.KYoutube = (function () {
   }
 
   /*
-   * yt-dlp ile indir, gerekirse Premiere için dönüştür. Döner: { dosya, not, jsYok } ya da { iptal: true }.
-   * İptalde bu indirmenin oluşturduğu her şey (ve videonun eski yarım dosyaları) silinir; hatada yalnız
+   * İptal sonucu. korunan yoksa indirme yarıda kaldı (yarım dosyalar silindi). korunan varsa indirme
+   * bitmişti: tam dosya klasörde durur (Klasörde göster), Premiere'e eklenmez, hak düşmez; yalnız
+   * dönüştürme geçicisi ve yarım dosyalar silindi. Yeniden İndir'de yt-dlp dosyayı "zaten indirildi"
+   * sayar, yalnız dönüştürme yeniden yapılır.
+   */
+  function iptalSonucu(s) {
+    if (!s.korunan) { durum("İptal edildi. Yarım dosyalar silindi.", "warn"); return; }
+    sonDosya = s.korunan;
+    var ad = { ad: K.path.basename(s.korunan) };
+    durum(s.donusumdu ? ["Dönüştürme iptal edildi. İndirilen dosya klasörde duruyor, Premiere'e eklenmedi: ", ad]
+      : ["İptal edildi. İndirme bitmişti; dosya klasörde duruyor, Premiere'e eklenmedi: ", ad], "warn");
+    if (el("yt-sonuc")) el("yt-sonuc").hidden = false;
+    log("iptal: indirilen dosya korundu" + (s.donusumdu ? " (donusturme)" : " (indirme bitmisti)"));
+  }
+
+  /*
+   * yt-dlp ile indir, gerekirse Premiere için dönüştür. Döner: { dosya, kaynak, not, jsYok } ya da
+   * { iptal: true, korunan?, donusumdu? }. İndirme sırasında İptal: bu indirmenin oluşturduğu her şey (ve
+   * videonun eski yarım dosyaları) silinir. İndirme bittikten sonra İptal (codec yoklaması, dönüştürme):
+   * tamamlanmış dosya KALIR, yalnız dönüştürme geçicisi ve yarım / ara dosyalar silinir. Hatada yalnız
    * yarım / ara dosyalar.
    */
   async function indirmeIsi(j) {
@@ -646,7 +709,7 @@ window.KYoutube = (function () {
     ilerlemeGoster({ asama: "indir", oran: 0 });
     log("indirme: " + id + " " + k + " → " + K.path.basename(hedef.yol));
     var r = await K.run(ikili.yol, args, {
-      timeout: 6 * 3600000, iptal: j, surecGrubu: true,
+      timeout: 6 * 3600000, iptal: j, surecGrubu: true, env: ytOrtam(),
       onStdout: function (p) { try { isle(tOut.besle(p)); } catch (e) {} },
       onStderr: function (p) { try { isle(tErr.besle(p)); } catch (e) {} }
     });
@@ -667,17 +730,19 @@ window.KYoutube = (function () {
     }
     if (!dosya || !varMi(dosya)) throw new Error("İndirilen dosya bulunamadı.");
     var jsYok = Y.uyarilar(r.stderr).jsYok;
+    // Buradan sonra İptal tamamlanmış indirmeyi silmez
+    if (j.iptalEdildi) return { iptal: true, korunan: dosya, donusumdu: false };
     var dn = await premiereIcin(dosya, ff, j);
     if (dn.iptal) {
-      await temizle(hedef.yol, Y.iptalSilinecekler(onceki, listele(hedef.yol), id));
-      return { iptal: true };
+      await temizle(hedef.yol, Y.hataSilinecekler(listele(hedef.yol), id));
+      return { iptal: true, korunan: varMi(dosya) ? dosya : "", donusumdu: !!dn.donusumdu };
     }
-    return { dosya: dn.dosya, not: dn.not, jsYok: jsYok, klasor: hedef.yol };
+    return { dosya: dn.dosya, kaynak: dosya, not: dn.not, jsYok: jsYok, klasor: hedef.yol };
   }
 
-  async function kodlayicilariAl(ff) {
+  async function kodlayicilariAl(ff, j) {
     if (kodlayiciOnbellek[ff]) return kodlayiciOnbellek[ff];
-    var r = await K.run(ff, ["-hide_banner", "-encoders"], { timeout: 30000 });
+    var r = await K.run(ff, ["-hide_banner", "-encoders"], { timeout: 30000, iptal: j || null });
     var l = Y.kodlayicilar(String(r.stdout || "") + "\n" + String(r.stderr || ""));
     if (l.length) kodlayiciOnbellek[ff] = l;
     return l;
@@ -686,14 +751,17 @@ window.KYoutube = (function () {
   /*
    * Premiere uyumu: ffmpeg -i ile codec'e bak; H.264/HEVC + AAC MP4 değilse dönüştür (kodlayıcılar
    * sırayla denenir: donanım kodlayıcı ekran kartı yoksa açılmayabilir). Geçici ad .suflo-tmp.mp4;
-   * başarıda özgün dosyanın yerini alır. Döner: { dosya, not } ya da { iptal: true }.
+   * başarıda özgün dosyanın yerini alır. Döner: { dosya, not } ya da { iptal: true, donusumdu }
+   * (donusumdu: İptal dönüştürme sürerken geldi).
    */
   async function premiereIcin(dosya, ff, j) {
-    var p = await K.run(ff, ["-hide_banner", "-i", dosya], { timeout: 60000 });
+    var p = await K.run(ff, ["-hide_banner", "-i", dosya], { timeout: 60000, iptal: j });
+    if (p.iptal || j.iptalEdildi) return { iptal: true, donusumdu: false };
     var akis = Y.akisBilgisi(p.stderr);
     var karar = Y.donusumKarari(akis, dosya);
     if (!karar.gerekli) return { dosya: dosya, not: "" };
-    var adaylar = karar.video === "encode" ? Y.kodlayiciSec(await kodlayicilariAl(ff), platform()) : [""];
+    var adaylar = karar.video === "encode" ? Y.kodlayiciSec(await kodlayicilariAl(ff, j), platform()) : [""];
+    if (j.iptalEdildi) return { iptal: true, donusumdu: false };
     if (!adaylar.length) throw new Error("Bu ffmpeg'de H.264 kodlayıcısı yok; video Premiere için dönüştürülemedi. Ayarlar › ffmpeg'den Suflo'nun ffmpeg'ini kur.");
     log("dönüştürme: " + akis.video + "/" + akis.ses + " " + akis.yukseklik + "p → H.264/AAC MP4");
     // 4K (kısa kenar 1440'tan büyük) kodlama uzun sürer: ilerleme satırı bunu söylemeye devam eder
@@ -721,14 +789,15 @@ window.KYoutube = (function () {
           ilerlemeGoster({ asama: "donustur", oran: oran, eta: Y.kalanTahmini(oran, (Date.now() - bas) / 1000) });
         }
       });
-      if (r.iptal) { sil(adlar.gecici); return { iptal: true }; }
+      if (r.iptal) { sil(adlar.gecici); return { iptal: true, donusumdu: true }; }
       var boyut = 0;
       try { boyut = K.fs.statSync(adlar.gecici).size; } catch (eS) {}
       if (r.code === 0 && boyut > 0) { kullanilan = adaylar[i]; break; }
       sil(adlar.gecici);
       sonHata = String(r.stderr || "");
       log("dönüştürme denemesi başarısız (" + (adaylar[i] || "kopya") + "): " + sonHata.trim().split(/\r?\n/).pop());
-      if (Y.hataSinifla(sonHata, "").kod === "disk") throw ytHatasi(Y.hataSinifla(sonHata, ""));
+      // Yalnız işletim sisteminin disk hatası; video adındaki "Disk Is Full" sayılmaz (yollar ayıklanır)
+      if (Y.ffmpegDiskDolu(sonHata, [dosya, adlar.gecici, adlar.son])) throw ytHatasi(hazirHata("disk"));
     }
     if (kullanilan === null) throw new Error("Video Premiere için dönüştürülemedi: " + (sonHata.trim().split(/\r?\n/).pop() || "ffmpeg hata verdi"));
     // rename hedefi değiştirir (Windows'ta da); özgün dosya ancak yenisi yerine oturunca silinir
@@ -739,19 +808,24 @@ window.KYoutube = (function () {
   }
 
   /* ---------------- Güncelle ---------------- */
-  // Doctor ve "Güncelle" düğmesi: aynı doğrulanmış indirme. Döner: { surum, guncel }
-  async function guncelle(say, iptal) {
+  /*
+   * Doctor ve "Güncelle" düğmesi: aynı doğrulanmış indirme. Döner: { surum, guncel }.
+   * zorla: GitHub'daki sürüm kurulu olanla aynı olsa da yeniden indirip doğrular ("yt-dlp çalıştırılamadı":
+   * dosya doğrulanıyor ama açılamıyor; "zaten güncel" deyip hiçbir şey yapmamak hatayı çözmezdi).
+   */
+  async function guncelle(say, iptal, zorla) {
     if (mesgul && isTuru !== "guncelle") throw new Error("YouTube indirici çalışıyor; bitince tekrar dene.");
-    var r = await kur(say || function () {}, iptal || null, false);
+    var r = await kur(say || function () {}, iptal || null, !!zorla);
     return { surum: r.meta ? r.meta.surum : "", guncel: !!r.guncel };
   }
   async function guncelleTikla(ev) {
     if (mesgul || !baslatGecerli(ev)) return;
+    var zorla = zorlaGuncelle;
     var j = isBaslat("guncelle");
     try {
-      var r = await guncelle(function (m) { durum(m); }, j);
+      var r = await guncelle(function (m) { durum(m); }, j, zorla);
       guncelleKutusu("");
-      durum(r.guncel ? "yt-dlp zaten güncel: " + r.surum : "yt-dlp güncellendi: " + r.surum, "good");
+      durum(r.guncel ? "yt-dlp zaten güncel: " + r.surum : zorla ? "yt-dlp yeniden indirildi ve doğrulandı: " + r.surum : "yt-dlp güncellendi: " + r.surum, "good");
     } catch (e) {
       hataGoster(e);
     } finally {
