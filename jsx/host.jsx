@@ -2660,6 +2660,60 @@ function KS_importSample(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+/* ---------- YouTube indirici (3.3): indirilen dosyayi projeye al ---------- */
+
+/*
+ * p: { path, bin } — bin: kokteki kutunun adi (panel verir; varsayilan "Suflo Indirilenler").
+ *   1) acik proje ve var olan dosya sart
+ *   2) ayni medya projede zaten varsa yeniden ALINMAZ (reused) — ikinci indirmede kopya oge olmaz
+ *   3) yoksa kutuya importFiles; oge yoluyla bulunur, bulunamazsa (macOS'ta Unicode yol bicimi
+ *      farki) kutuya yeni eklenen son oge alinir
+ *   4) Proje panelinde secmek ucuzsa denenir (select yoksa ya da hata verirse sessizce gecilir)
+ * Timeline'a, sekanslara ve playhead'e DOKUNULMAZ.
+ * Doner: { imported, reused, selected, bin, name }
+ */
+function KS_importDownloaded(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    if (!app.project || !app.project.rootItem) return KS_errKod("proje-yok", "Acik proje yok. Once bir proje ac ya da yeni proje olustur.");
+    var yol = String(p.path || "");
+    if (!yol) return KS_errKod("yol-yok", "Dosya yolu verilmedi.");
+    var dosya = new File(yol);
+    if (!dosya.exists) return KS_errKod("dosya-yok", "Indirilen dosya bulunamadi: " + yol);
+    var kutuAdi = String(p.bin || "Suflo \u0130ndirilenler").replace(/[\r\n\t]+/g, " ").substring(0, 80);
+
+    var oge = null;
+    try {
+      if (typeof app.project.rootItem.findItemsMatchingMediaPath === "function") {
+        var esler = app.project.rootItem.findItemsMatchingMediaPath(yol, 1);
+        if (esler && esler.length) oge = esler[0];
+      }
+    } catch (eF) {}
+    if (!oge) oge = KS_findItemByPath(app.project.rootItem, yol);
+    var yeniden = !!oge;
+
+    if (!oge) {
+      var kutu = KS_findBin(kutuAdi);
+      var once = 0;
+      try { once = kutu.children.numItems; } catch (eS) {}
+      app.project.importFiles([yol], true, kutu, false);
+      oge = KS_findItemByPath(kutu, yol) || KS_findItemByPath(app.project.rootItem, yol);
+      if (!oge) {
+        try { if (kutu.children.numItems > once) oge = kutu.children[kutu.children.numItems - 1]; } catch (eY) {}
+      }
+    }
+    if (!oge) return KS_errKod("ice-alinamadi", "Dosya projeye alinamadi. Premiere bu bicimi acamiyor olabilir.");
+
+    var secildi = false;
+    try {
+      if (typeof oge.select === "function") { oge.select(); secildi = true; }
+    } catch (eSec) {}
+    var ad = "";
+    try { ad = String(oge.name || ""); } catch (eAd) {}
+    return KS_ok({ imported: !yeniden, reused: yeniden, selected: secildi, bin: kutuAdi, name: ad });
+  } catch (e) { return KS_err(e); }
+}
+
 // Sekansin In/Out'unu verilen araliga ayarla ve playhead'i basa getir
 function KS_setInOut(encoded) {
   try {
