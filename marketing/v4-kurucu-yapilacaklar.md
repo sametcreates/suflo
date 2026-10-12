@@ -1479,3 +1479,38 @@ projendeki 'Suflo İndirilenler' kutusuna gelir (Pro, 3 deneme hakkı)." `js/app
 `js/youtube-indir.js` › `varlikAdaylari` güncellenmeli; listede ad yoksa kurulum güvenle durur ("SHA2-256SUMS listesinde
 yt-dlp dosyası yok"). GitHub API'ye ulaşılamazsa (kimliksiz sınır saatte 60 istek) `latest/download` kullanılır; SUMS ve ikili
 yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız yt-dlp kuruluysa).
+
+## 3.4
+
+3.4'ün kapsamı: `marketing/alti-repo-plan.json` › `plan.build_order` adımları (yerel dal `yerel-34-ag-palet`, henüz
+uzak depoya gönderilmedi). Her adım kendi alt bölümünü ekler. Elle Premiere denemeleri `marketing/v3.4-deneme-listesi.md`'de.
+
+### Adım 19: Kurumsal ağ dayanıklılığı ve çevrimdışı model içe aktarma (ücretsiz)
+
+Ne değişti: Ayarlar › Motor'da **Model dosyası içe aktar** (`js/model-ice-aktar.js` + `KEngine.modelIceAktar`), indirmede
+kurumsal HTTPS denetimine karşı tek seferlik sistem kökü yeniden denemesi ve Cisco Umbrella / 0.0.0.0 DNS teşhisi
+(`js/ag-dayanim.js` + `js/bridge.js`), Doctor'da **Model kaynaklarını sına**. Raunen'den (MIT) yalnız fikir; kod temiz oda,
+THIRD_PARTY_NOTICES.md değişmedi. Pro kapısı yok.
+
+**19.K1 Windows kök dışa aktarma betiği (bir kez, gerçek makinede).** `js/ag-dayanim.js` › `WIN_BETIK` PowerShell 5.1'de
+(Windows 10 / 11) `Cert:\CurrentUser\Root` ve `Cert:\LocalMachine\Root` köklerini PEM olarak basmalı. Komut istemcisinde
+`node -e "var a=require('./js/ag-dayanim.js'),c=a.sertifikaKomutu('win32');var r=require('child_process').spawnSync(c.cmd,c.args,{encoding:'utf8'});console.log(a.pemleriAyikla(r.stdout).length)"`
+çalıştır: 30-80 arası bir sayı beklenir (0 ise betik çalışmıyor demektir; günlükte `sistem kok sertifikalari: 0 adet`).
+Grup ilkesiyle PowerShell'i kısıtlı (Constrained Language Mode) bir makinede de bir kez dene; çalışmazsa Suflo yine
+eskisi gibi hata verir (yeniden deneme atlanır), kırılmaz.
+
+**19.K2 Kurumsal ağ denemesi (mümkünse).** HTTPS denetleyen bir ağda (Zscaler, Netskope, Fortinet, Sophos, kurum
+proxy'si) ya da Fiddler / mitmproxy'nin kökünü Windows deposuna ekleyip "HTTPS'i çöz" açıkken yerel motoru kur:
+eskiden `unable to get local issuer certificate` ile düşen indirme şimdi inmeli (günlükte `sertifika hatasi (...), sistem
+kokleriyle bir kez daha`). Fiddler / mitmproxy'yi deneme bitince kaldır ve kökü depodan sil.
+
+**19.K3 Destek metni.** Kurumsal kullanıcı "model inmiyor" yazarsa: önce Doctor › **Model kaynaklarını sına** sonucunu
+iste; "Kurumsal ağ filtresi" ya da "HTTPS bağlantılarını denetliyor" görünüyorsa iki yol: BT'den `huggingface.co`,
+`hf-mirror.com`, `github.com` ve `objects.githubusercontent.com` / `release-assets.githubusercontent.com` için izin, ya da
+modeli evde indirip **Model dosyası içe aktar**. İndirme bağlantıları: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin`
+(Turbo; diğerleri aynı klasörde: `ggml-tiny-q5_1.bin`, `ggml-base-q5_1.bin`, `ggml-small-q5_1.bin`, `ggml-large-v3-q5_0.bin`).
+Bu metni suflo.app SSS'ine / blog'a eklemek istersen "Şirket ağında Suflo modeli inmiyor" başlığı uygun.
+
+**19.K4 Bilinen sınır (bilgi).** Yerel motor arşivi (whisper.cpp zip) ve ffmpeg için içe aktarma yok; yalnız model.
+Sertifika yeniden denemesi indirme ve Doctor sınaması içindir; Groq / OpenAI bulut çağrıları (`httpUpload` / `httpJson`)
+değişmedi. Serbest "özel ayna" adresi bilerek eklenmedi (plan: özet doğrulamasını atlatır).
