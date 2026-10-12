@@ -2811,6 +2811,23 @@
     "Kapalı · desteklenir ({})": "Off · supported ({})"
   });
 
+  /* ================= Altyazı Efektleri / Caption Effects (3.3: js/altyazi-efekt.js, style-engine "efekt") ================= */
+  add({
+    "Altyazı Efektleri": "Caption Effects",
+    "Kendi efektin: giriş ve vurgu animasyonu, renk, yazı tipi, satır": "Your own effect: entrance and highlight animation, color, font, lines",
+    // Hazır görünümler
+    "Temiz": "Clean",
+    "Vurucu": "Punchy",
+    "Canlı": "Vivid",
+    "Zarif": "Elegant",
+    // Giriş / vurgu animasyonları
+    "Belirme": "Fade in",
+    "Yukarı kay": "Slide up",
+    "Aşağı kay": "Slide down",
+    "Zıpla": "Bounce",
+    "Titre": "Shake"
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({

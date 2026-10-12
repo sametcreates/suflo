@@ -105,6 +105,48 @@ ok("encode: geçersiz stil kimliği fırlatır", thrown);
 });
 ok("b64url Node Buffer ile aynı", SS.b64urlEncode("Merhaba dünya!?") === Buffer.from("Merhaba dünya!?", "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
 
+/* ---------------- 3.3: Altyazı Efektleri alanları (styleId "efekt") ---------------- */
+var E33 = require(path.join(kok, "js", "style-engine.js"));
+var YENI = STILLER.concat(["efekt"]);
+ok("giriş / vurgu kimlikleri stil motoruyla aynı", SS.GIRISLER.join(",") === E33.GIRISLER.join(",") && SS.AKTIFLER.join(",") === E33.AKTIFLER.join(","));
+var efTarif = { styleId: "efekt", intensity: "balanced",
+  overrides: { font: "Anton", renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe600", boyut: 110, kontur: 8, konum: 5, guvenli: true,
+    giris: "zipla", aktif: "glitch", vurgu: false, kalin: false, italik: true, satir: 3, kelime: 7 },
+  text: { maxlen: "l42", kase: "upper", punct: false } };
+var efKod = SS.encode(efTarif);
+var efC = SS.decode(efKod, YENI);
+ok("efekt: gidiş-dönüş tüm oluşturucu alanlarıyla, uyarısız", efC.ok && efC.warnings.length === 0 && efC.recipe.styleId === "efekt" &&
+  ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"].every(function (k) { return efC.recipe.overrides[k] === efTarif.overrides[k]; }),
+  JSON.stringify(efC.recipe.overrides) + " " + efC.warnings.join(","));
+ok("efekt kodu kısa kalır (≤ 600)", efKod.length <= 600, efKod.length);
+var efKotu = coz({ v: 1, styleId: "viral", overrides: { giris: "uzay", aktif: "<b>", vurgu: "evet", kalin: 1, italik: null, satir: 9, kelime: 0 } });
+var ok2 = efKotu.recipe.overrides;
+ok("efekt: geçersiz giriş / vurgu ve boolean olmayan bayraklar atılır, satır / kelime kırpılır",
+  ok2.giris === undefined && ok2.aktif === undefined && ok2.vurgu === undefined && ok2.kalin === undefined && ok2.italik === undefined &&
+  ok2.satir === 3 && ok2.kelime === 1 && ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"].every(function (w) { return efKotu.warnings.indexOf(w) !== -1; }),
+  JSON.stringify(ok2) + " " + efKotu.warnings.join(","));
+var bos = SS.sanitizeOverrides({ giris: "", aktif: "", satir: "2", kelime: "4" }, []);
+ok("efekt: \"\" (stilin kendi değeri) uyarısız atlanır, sayı metni kabul", bos.giris === undefined && bos.aktif === undefined && bos.satir === 2 && bos.kelime === 4, JSON.stringify(bos));
+ok("efekt: satır / kelime sayı değilse atılır", SS.sanitizeOverrides({ satir: "üç", kelime: {} }).satir === undefined);
+// Eski panel (3.2.0 sürümünün style-share.js'i): yeni alanları uyarıyla atar, efekt stilini reddeder
+var vmEski = require("vm");
+var kutuEski = { module: { exports: {} } };
+kutuEski.exports = kutuEski.module.exports;
+vmEski.runInNewContext(fs.readFileSync(path.join(__dirname, "fixtures", "style-share-3.2.0.js"), "utf8"), kutuEski);
+var Eski32 = kutuEski.module.exports;
+// izin listesi işlev olarak (vm bağlamında dizi instanceof Array tutmaz)
+function eskiIzin(id) { return STILLER.indexOf(id) !== -1; }
+var karisik = SS.encode({ styleId: "hormozi", overrides: { renk: "#ff0000", konum: 8, giris: "pop", aktif: "titre", satir: 1 } });
+var eskiC = Eski32.decode(karisik, eskiIzin);
+ok("eski panel (3.2.0): yeni alanları 'geçersiz ayar' uyarısıyla atar, gerisini uygular", eskiC.ok && eskiC.recipe.overrides.renk === "#ff0000" &&
+  eskiC.recipe.overrides.konum === 8 && eskiC.recipe.overrides.giris === undefined && ["giris", "aktif", "satir"].every(function (w) { return eskiC.warnings.indexOf(w) !== -1; }),
+  JSON.stringify(eskiC));
+var eskiEf = Eski32.decode(efKod, eskiIzin);
+ok("eski panel (3.2.0): efekt kodunu 'bu sürümde yok' diye reddeder (fırlatmaz)", !eskiEf.ok && /efekt/.test(eskiEf.error), eskiEf.error);
+var eskiKod = Eski32.encode({ styleId: "neon", overrides: { font: "Lora", renk: "#00ff00", konum: 2, boyut: 90 }, text: { kase: "upper" } });
+var yeniC = SS.decode(eskiKod, YENI);
+ok("yeni panel: 3.2 kodu (eski stil) uyarısız çözülür", yeniC.ok && yeniC.warnings.length === 0 && yeniC.recipe.styleId === "neon" && yeniC.recipe.overrides.font === "Lora", JSON.stringify(yeniC));
+
 /* ---------------- docs kopyası ---------------- */
 ok("docs/js/style-share.js bayt bayt aynı", fs.readFileSync(path.join(kok, "docs", "js", "style-share.js")).equals(fs.readFileSync(path.join(kok, "js", "style-share.js"))));
 

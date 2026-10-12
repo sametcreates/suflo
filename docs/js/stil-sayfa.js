@@ -10,18 +10,19 @@
   "use strict";
 
   var SS = window.SufloStyleShare;
-  // Panelin Suflo Stilleri (js/style-engine.js adları; test eşleşmeyi denetler)
+  // Stil motorundaki temel stiller (js/style-engine.js adları; test eşleşmeyi denetler). 3.3'ten beri panel
+  // yalnız Altyazı Efektleri'ni (efekt) üretir; eski kodlar açılmaya devam etsin diye öbürleri de burada
   var STILLER = {
     mrbeast: "Creator Punch", capcut: "Clean Pill", saas: "SaaS Glass", viral: "Viral Vurgu", pop: "Pop",
     doc: "Belgesel", premium: "Premium", hormozi: "Bold Box", neon: "Neon", daktilo: "Daktilo",
-    ziplama: "Zıplayan", dolgu: "Karaoke Dolgu"
+    ziplama: "Zıplayan", dolgu: "Karaoke Dolgu", efekt: "Altyazı Efektleri"
   };
   // Sayfanın dili <html lang>: "en" → İngilizce sayfa (suflo.app/en/stil); stil kimliği ve kod aynı
   var EN = !!(document.documentElement && document.documentElement.lang === "en");
   var STILLER_EN = {
     mrbeast: "Creator Punch", capcut: "Clean Pill", saas: "SaaS Glass", viral: "Viral Highlight", pop: "Pop",
     doc: "Documentary", premium: "Premium", hormozi: "Bold Box", neon: "Neon", daktilo: "Typewriter",
-    ziplama: "Bouncy", dolgu: "Karaoke Fill"
+    ziplama: "Bouncy", dolgu: "Karaoke Fill", efekt: "Caption Effects"
   };
   var KONUM = EN ? { 1: "Bottom left", 2: "Bottom", 5: "Center", 8: "Top" } : { 1: "Alt sol", 2: "Alt", 5: "Orta", 8: "Üst" };
   var M = EN ? {

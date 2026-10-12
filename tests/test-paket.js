@@ -39,6 +39,9 @@ ok("kurucu ve geliştirici kurulumları da taşır", /\$panelItems = @\([^)]*"TH
 var vr = okuK("tools/verify-release.ps1");
 var gerekli = (/\$required = @\(([\s\S]*?)\n\s*\)/.exec(vr) || ["", ""])[1];
 ok("verify-release.ps1: THIRD_PARTY_NOTICES.md ve LICENSE paketten eksikse yayın durur", /THIRD_PARTY_NOTICES\\\.md\$/.test(gerekli) && /LICENSE\$/.test(gerekli) && /missing=\{4\}/.test(vr) && /exit 1/.test(vr), gerekli.slice(-160));
+ok("3.3 Altyazı Efektleri: oluşturucu modeli ve stil motoru pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /altyazi-efekt\\\.js\$/.test(gerekli) && /style-engine\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "altyazi-efekt.js")), gerekli.slice(0, 400));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
 
 console.log(gecen + "/" + toplam + " gecti");

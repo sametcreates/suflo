@@ -13,9 +13,12 @@ function ok(name, condition, proof) {
 }
 
 var styles = engine.list();
+// 3.3: arayüzde tek temel stil "efekt" (Altyazı Efektleri); 12 eski stil kayıtlar ve SFL1 kodları için kalır
+var ESKI = ["mrbeast", "capcut", "saas", "viral", "pop", "doc", "premium", "hormozi", "neon", "daktilo", "ziplama", "dolgu"];
+var eskiStiller = styles.filter(function (s) { return ESKI.indexOf(s.id) !== -1; });
 ok("motor v3 etkin", engine.version === 3, engine.version);
-ok("12 bagimsiz stil var (7 klasik + 5 v3.0)", styles.map(function (s) { return s.id; }).join(",") ===
-  "mrbeast,capcut,saas,viral,pop,doc,premium,hormozi,neon,daktilo,ziplama,dolgu",
+ok("13 bagimsiz stil var (7 klasik + 5 v3.0 + Altyazı Efektleri)", styles.map(function (s) { return s.id; }).join(",") ===
+  ESKI.join(",") + ",efekt",
   styles.map(function (s) { return s.id; }).join(","));
 ok("has(): bilinen/bilinmeyen stil", engine.has("neon") && !engine.has("yok"));
 
@@ -31,7 +34,8 @@ var expectedFonts = {
   neon: ["BebasNeue.ttf", "OFL-BebasNeue.txt"],
   daktilo: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"],
   ziplama: ["ArchivoBlack.ttf", "OFL-ArchivoBlack.txt"],
-  dolgu: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"]
+  dolgu: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"],
+  efekt: ["Montserrat-Bold.ttf", "OFL-Montserrat.txt"]
 };
 Object.keys(expectedFonts).forEach(function (id) {
   expectedFonts[id].forEach(function (file) {
@@ -100,7 +104,8 @@ ok("kullanici metnindeki ters bolu ASS komutu olmaz", kac.indexOf("a\\Nb") === -
 var crypto = require("crypto");
 function ozet(r) { return crypto.createHash("sha256").update(r.ass).digest("hex").slice(0, 16); }
 // Degisiklik ONCESI motorla uretilen ozetler (tests/style-engine-snapshot.json): guvenli bayragi
-// olmadan cikti bayt bayt ayni kalmali (12 stil × 16:9 / 9:16 × kelime / satir × ince ayar yok / paket / sistem fontu)
+// olmadan cikti bayt bayt ayni kalmali (12 eski stil × 16:9 / 9:16 × kelime / satir × ince ayar yok / paket / sistem fontu).
+// 3.3: Altyazı Efektleri alanları ("" = stilin kendi değeri) eski stillerin çıktısını da değiştirmez.
 var snap = JSON.parse(fs.readFileSync(path.join(__dirname, "style-engine-snapshot.json"), "utf8"));
 var snapKelime = ["Bunu", "*gören*", "herkes", "şaşırdı", "İstanbul'da", "çok", "güzel", "bir", "gün", "vardı."].map(function (w, i) {
   return { start: i * 0.5, end: i * 0.5 + 0.44, text: w };
@@ -112,7 +117,7 @@ var snapAyar = {
   sistem: { font: "Arial", boyut: 72, renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#8b7cf6", kontur: 4, konum: 8 }
 };
 var farkli = [], sayilan = 0;
-styles.forEach(function (s) {
+eskiStiller.forEach(function (s) {
   [[1920, 1080], [1080, 1920]].forEach(function (d) {
     ["words", "lines"].forEach(function (k) {
       Object.keys(snapAyar).forEach(function (a) {
@@ -121,6 +126,9 @@ styles.forEach(function (s) {
         var anahtar = s.id + "@" + d[0] + "x" + d[1] + ":" + k + ":" + a;
         sayilan++;
         if (snap[anahtar] !== ozet(engine.compile(o))) farkli.push(anahtar);
+        // boş giriş / vurgu animasyonu ve eski stillerde anlamsız efekt alanları: çıktı aynı
+        var oe = Object.assign({}, o, { overrides: Object.assign({}, snapAyar[a] || {}, { giris: "", aktif: "", satir: 3, kelime: 2, vurgu: false }) });
+        if (snap[anahtar] !== ozet(engine.compile(oe))) farkli.push(anahtar + " +efekt");
         // guvenli bayragi 16:9'da hicbir seyi degistirmez
         if (d[0] > d[1]) {
           var og = Object.assign({}, o, { overrides: Object.assign({}, snapAyar[a] || {}, { guvenli: true }) });
@@ -198,6 +206,100 @@ ok("GUVENLI_ALAN disa aktarilir (ust %7, sag ikon sutunu %87, alt %78)", engine.
 var g916 = engine.compile({ styleId: "viral", cues: snapKelime, width: 1080, height: 1920, overrides: { guvenli: true } });
 ok("9:16 + guvenli cikti farkli (yazi daralir)", ozet(g916) !== snap["viral@1080x1920:words:yok"]);
 ok("guvenli sonrasi motor durumu sifirlanir", ozet(engine.compile({ styleId: "viral", cues: snapKelime, cueKind: "words", width: 1080, height: 1920 })) === snap["viral@1080x1920:words:yok"]);
+
+/* ---- 3.3: Altyazı Efektleri (efekt) — giriş ve vurgu animasyonları ---- */
+var efKelime = ["Bunu", "gören", "herkes", "şaşırdı", "bugün"].map(function (w, i) { return { start: i * 0.5, end: i * 0.5 + 0.44, text: w }; });
+function efekt(ov, o) {
+  o = o || {};
+  return engine.compile({ styleId: "efekt", cues: o.cues || efKelime, cueKind: "words", width: o.w || 1920, height: o.h || 1080,
+    intensity: o.intensity, overrides: ov }).ass;
+}
+function olaylar(ass) { return ass.split("\n").filter(function (l) { return /^Dialogue: /.test(l); }); }
+function katman(ass, n) { return olaylar(ass).filter(function (l) { return l.indexOf("Dialogue: " + n + ",") === 0; }); }
+var efP = engine.preset("efekt");
+ok("efekt: varsayılan görünüm (Temiz) ve kelime stili", efP.name === "Altyazı Efektleri" && efP.style.giris === "fade" && efP.style.aktif === "yok" &&
+  efP.style.vurgu === true && efP.style.satir === 2 && efP.style.kelime === 5 && engine.wordBased("efekt"), JSON.stringify(efP.style));
+ok("efekt: animasyon kimlikleri TranscriptAI şablonunun dizin sırasında", engine.GIRISLER.join(",") === "yok,pop,fade,yukari,asagi,zipla" &&
+  engine.AKTIFLER.join(",") === "yok,zipla,titre,glitch" && engine.EFEKT_ALANLARI.join(",") === "giris,aktif,vurgu,kalin,italik,satir,kelime");
+// 1920x1080, konum 2 (alt): \an2 \pos(960,907); kayma scaled(50) = 50
+var girisBekle = {
+  yok: function (l) { return /\{\\an2\\pos\(960,907\)\\fs\d+\\q2/.test(l) && !/\\fscx0|\\fad|\\move/.test(l); },
+  pop: function (l) { return /\\fscx0\\fscy0\\t\(0,300,\\fscx100\\fscy100\)/.test(l); },
+  fade: function (l) { return /\\fad\(300,0\)/.test(l); },
+  yukari: function (l) { return /\{\\an2\\move\(960,957,960,907,0,300\)/.test(l); },
+  asagi: function (l) { return /\{\\an2\\move\(960,857,960,907,0,300\)/.test(l); },
+  zipla: function (l) { return /\\fscx0\\fscy0\\t\(0,150,\\fscx112\\fscy112\)\\t\(150,231,\\fscx96\\fscy96\)\\t\(231,300,\\fscx100\\fscy100\)/.test(l); }
+};
+Object.keys(girisBekle).forEach(function (g) {
+  var ol = olaylar(efekt({ giris: g }));
+  var ilk = ol[0], sonrakiler = ol.slice(1).filter(function (l) { return !/^Dialogue: 1,0:00:00\.00,/.test(l); });
+  ok("efekt giriş " + g + ": kartın ilk olayında beklenen etiket, sonraki kelimelerde giriş yok", girisBekle[g](ilk) &&
+    sonrakiler.every(function (l) { return !/\\fscx0|\\fad\(|\\move\(/.test(l); }), ilk.slice(0, 160));
+});
+ok("efekt giriş: geçersiz değer ve \"\" stilin kendi girişine (Belirme) düşer", /\\fad\(300,0\)/.test(olaylar(efekt({ giris: "uzay" }))[0]) &&
+  /\\fad\(300,0\)/.test(olaylar(efekt({ giris: "" }))[0]) && /\\fad\(300,0\)/.test(olaylar(efekt({ giris: 3 }))[0]));
+ok("efekt giriş: süre hareket şiddetine bölünür (Sert: 300/1,28 = 234 ms)", /\\fscx0\\fscy0\\t\(0,234,/.test(olaylar(efekt({ giris: "pop" }, { intensity: "hard" }))[0]));
+
+// Vurgu animasyonu: zıpla — etkin kelime taban satırda saydam, üst katmanda 15 px yukarı ve geri (2 × 100 ms)
+var zp = efekt({ giris: "yok", aktif: "zipla" });
+var zk2 = katman(zp, 2);
+ok("efekt vurgu zıpla: taban satırda etkin kelime saydam, üst katman yalnız o kelime",
+  /^Dialogue: 1,0:00:00\.50,0:00:01\.00,.*\{\\alpha&HFF&\}\{\\1c[^}]*\}gören/.test(olaylar(zp).join("\n").split("\n").filter(function (l) { return /^Dialogue: 1,0:00:00\.50/.test(l); })[0] || "") &&
+  zk2.every(function (l) { return /\}\{\\alpha&HFF&\}/.test(l); }), zk2[0]);
+ok("efekt vurgu zıpla: \\move 907→892→907, 100 ms + 100 ms, sonra durağan", zk2.some(function (l) { return /^Dialogue: 2,0:00:00\.50,0:00:00\.60,.*\\move\(960,907,960,892,0,100\)/.test(l); }) &&
+  zk2.some(function (l) { return /^Dialogue: 2,0:00:00\.60,0:00:00\.70,.*\\move\(960,892,960,907,0,100\)/.test(l); }) &&
+  zk2.some(function (l) { return /^Dialogue: 2,0:00:00\.70,0:00:01\.00,.*\\pos\(960,907\)/.test(l); }), zk2.slice(3, 6).join(" | ").slice(0, 300));
+// titre: 4 kısa ±3 px sarsıntı (toplam 150 ms), sonra durağan
+var tt = katman(efekt({ giris: "yok", aktif: "titre" }), 2).filter(function (l) { return /^Dialogue: 2,0:00:00\.(5|6)/.test(l); });
+ok("efekt vurgu titre: 4 sarsıntı ±3 px (≈37 ms), sonra durağan", tt.length === 5 && /\\pos\(963,904\)/.test(tt[0]) && /\\pos\(957,910\)/.test(tt[1]) &&
+  /\\pos\(963,910\)/.test(tt[2]) && /\\pos\(957,904\)/.test(tt[3]) && /0:00:00\.65,0:00:01\.00,.*\\pos\(960,907\)/.test(tt[4]), tt.map(function (l) { return l.slice(10, 34); }).join(" | "));
+// glitch: altta kırmızı / camgöbeği iki kopya, konturun ötesinde ±6 px, 100 ms
+var gl = katman(efekt({ giris: "yok", aktif: "glitch" }), 0);
+var kontur5 = 5;
+ok("efekt vurgu glitch: kelime başına iki alt katman (kırmızı / camgöbeği), ±(6 + kontur) px, 100 ms",
+  gl.length === 10 && /^Dialogue: 0,0:00:00\.00,0:00:00\.10,.*\\pos\(949,907\).*\\bord0\}.*\\1c&H00552AFF/.test(gl[0]) &&
+  new RegExp("\\\\pos\\(" + (960 + 6 + kontur5) + ",907\\).*\\\\1c&H00FFF52A").test(gl[1]), gl.slice(0, 2).join(" | ").slice(0, 320));
+ok("efekt vurgu: geçersiz değer stilin kendine (yok) düşer, üst katman olmaz", katman(efekt({ aktif: "dans" }), 2).length === 0 && katman(efekt({ aktif: "dans" }), 0).length === 0);
+// Giriş + vurgu birlikte: ilk kelimenin hareketi giriş bitince başlar
+var gz = katman(efekt({ giris: "pop", aktif: "zipla" }), 2);
+ok("efekt giriş + zıpla: ilk kelimenin üst katmanı girişle gelir, zıplama 300 ms sonra", /^Dialogue: 2,0:00:00\.00,0:00:00\.30,.*\\fscx0\\fscy0\\t\(0,300/.test(gz[0]) &&
+  /^Dialogue: 2,0:00:00\.30,0:00:00\.40,.*\\move\(960,907,960,892,0,100\)/.test(gz[1]), gz.slice(0, 2).join(" | ").slice(0, 300));
+
+// Kelime vurgusu
+var vk = olaylar(efekt({ giris: "yok", vurgu: false }));
+ok("efekt: kelime vurgusu ve vurgu animasyonu kapalı → kart tek olay, vurgu rengi yok", vk.length === 1 && vk[0].indexOf("&H003FD2FF") === -1, vk.length + " olay");
+var va = olaylar(efekt({ giris: "yok", vurgu: true, vurguRenk: "#00ff00" }));
+ok("efekt: kelime vurgusu açık → her kelime kendi olayında vurgu renginde", va.length === 5 && /\{\\1c&H0000FF00\}herkes/.test(va[2]), va[2]);
+var vy = olaylar(engine.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir *önemli* söz" }], cueKind: "lines", width: 1920, height: 1080, overrides: { vurgu: false, giris: "yok" } }).ass);
+ok("efekt: *anahtar kelime* vurgu kapalıyken de vurgu renginde", vy.length === 1 && /\{\\1c&H003FD2FF\}önemli\{\\1c&H00FFFFFF\}/.test(vy[0]), vy[0]);
+
+// Satır sayısı ve en çok kelime
+var uzun = "Bugün size kamerayla ilgili birkaç şey anlatacağım".split(" ").map(function (w, i) { return { start: i * 0.4, end: i * 0.4 + 0.35, text: w }; });
+function nSay(ass) { return olaylar(ass).map(function (l) { return (l.match(/\\N/g) || []).length; }); }
+ok("efekt satır 1: hiç \\N yok", nSay(efekt({ satir: 1, kelime: 7, vurgu: false }, { cues: uzun })).every(function (n) { return n === 0; }));
+ok("efekt satır 2: 3+ kelimelik kart iki satır", nSay(efekt({ satir: 2, kelime: 7, vurgu: false }, { cues: uzun })).every(function (n) { return n === 1; }));
+ok("efekt satır 3: 5+ kelimelik kart üç satır", nSay(efekt({ satir: 3, kelime: 7, vurgu: false }, { cues: uzun })).every(function (n) { return n === 2; }));
+var u3 = olaylar(efekt({ satir: 3, kelime: 7, vurgu: false, giris: "yok" }, { cues: uzun }))[0];
+ok("efekt satır 3: en uzun satırı en kısa kırılım", /\}Bugün size\\Nkamerayla ilgili\\Nbirkaç şey anlatacağım$/.test(u3) ||
+  /\}Bugün size kamerayla\\Nilgili birkaç\\Nşey anlatacağım$/.test(u3), u3.slice(-80));
+ok("efekt en çok kelime: kart en çok N kelime (7 kelime, 3'er → 3 kart)", olaylar(efekt({ kelime: 3, vurgu: false, giris: "yok" }, { cues: uzun })).length === 3);
+ok("efekt satır / kelime: aralık dışı ya da kesirli değer stilin kendine (2 / 5) düşer",
+  efekt({ satir: 9, kelime: 0, vurgu: false }, { cues: uzun }) === efekt({ vurgu: false }, { cues: uzun }) &&
+  efekt({ satir: 2.5, kelime: "3", vurgu: false }, { cues: uzun }) === efekt({ vurgu: false }, { cues: uzun }));
+
+// Kalın / italik: yalnız Style satırında (eski stiller hep kalın, düz)
+var stK = styleAlanlari(efekt({ kalin: false, italik: true }));
+ok("efekt kalın kapalı + italik: Style satırı Bold 0, Italic -1", stK[7] === "0" && stK[8] === "-1", stK.slice(7, 9).join(","));
+ok("efekt varsayılan: kalın, düz", styleAlanlari(efekt({}))[7] === "-1" && styleAlanlari(efekt({}))[8] === "0");
+ok("eski stilde kalın / italik alanı çıktıyı değiştirmez", engine.compile({ styleId: "viral", cues: snapKelime, overrides: { kalin: false, italik: true } }).ass ===
+  engine.compile({ styleId: "viral", cues: snapKelime }).ass);
+ok("efekt: dize / sayı boolean alanları reddedilir", styleAlanlari(efekt({ kalin: "false", italik: 1 }))[7] === "-1" && styleAlanlari(efekt({ italik: "true" }))[8] === "0");
+ok("efekt: kontur 0 → \\bord0 (en az 1 px'e yuvarlanmaz)", /\\bord0\\shad0/.test(olaylar(efekt({ kontur: 0 }))[0]));
+ok("efekt 9:16 + alt konum: alt arayüzün üstüne (%74) çekilir; orta %62", /\{\\an2\\pos\(540,1421\)/.test(olaylar(efekt({ giris: "yok" }, { w: 1080, h: 1920 }))[0]) &&
+  /\{\\an5\\pos\(540,1190\)/.test(olaylar(efekt({ konum: 5, giris: "yok" }, { w: 1080, h: 1920 }))[0]));
+var konusmaci = engine.compile({ styleId: "efekt", cues: efKelime.map(function (c) { return Object.assign({ speaker: 0 }, c); }), cueKind: "words", width: 1920, height: 1080,
+  speakerColors: ["#ff0000"], overrides: { aktif: "zipla" } }).ass;
+ok("efekt + Podcast Modu: konuşmacı rengi satıra işler", /\{\\1c&H000000FF\}\{\\an2/.test(konusmaci));
 
 var ffmpeg = cp.spawnSync("ffmpeg", ["-version"], { encoding: "utf8" }).status === 0;
 if (!ffmpeg) {

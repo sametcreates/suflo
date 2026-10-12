@@ -95,6 +95,9 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)js/presets\.js$',
             '(^|/)js/pricing\.js$',
             '(^|/)js/i18n\.js$',
+            # 3.3 Altyazi Efektleri: olusturucu modeli ve tek temel stil (efekt) motoru
+            '(^|/)js/altyazi-efekt\.js$',
+            '(^|/)js/style-engine\.js$',
             '(^|/)i18n/en\.js$',
             '(^|/)jsx/host\.jsx$',
             '(^|/)assets/pro-mogrt-showcase/catalog\.json$',

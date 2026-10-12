@@ -7,9 +7,14 @@
  * ("Kod yapıştır") hem suflo.app/stil#KOD sayfasında çözülür; bu yüzden aynı dosyanın
  * bayt bayt kopyası docs/js/style-share.js'tedir (test denetler).
  *
+ * 3.3 Altyazı Efektleri (styleId "efekt"): giriş / vurgu animasyonu, kelime vurgusu, kalın, italik,
+ * satır sayısı ve en çok kelime de koda girer. Bu alanları tanımayan eski paneller (3.2 ve öncesi)
+ * onları "geçersiz ayar atlandı" uyarısıyla atar; "efekt" stilini hiç tanımadıkları için kodu reddeder.
+ *
  * Güvenlik: kod yabancı kaynaktan gelir ve değerleri ASS Style satırına yazılır.
  *   - renkler yalnız #rrggbb, yazı tipi yalnız paketle gelen 6 OFL fontundan biri
  *   - konum ∈ {1, 2, 5, 8}; punto 36-180, kontur 0-16 aralığına kırpılır
+ *   - giris / aktif sabit kimlik listesinden; satır 1-3, kelime 1-10 aralığına kırpılır
  *   - bilinmeyen anahtarlar ve __proto__ atılır; fontFile ASLA girdiden alınmaz,
  *     yazı tipinden yerelde türetilir (yol kaçışı olmasın)
  *   - yerel yollar (logo vb.) koda hiç yazılmaz
@@ -52,6 +57,12 @@
   var STIL_KIMLIGI = /^[a-z0-9_-]{1,24}$/;
   var RENK = /^#[0-9a-f]{6}$/i;
   var RENK_ANAHTARLARI = ["renk", "konturRenk", "vurguRenk"];
+  // Altyazı Efektleri: stil motorundaki (js/style-engine.js GIRISLER / AKTIFLER) listeyle aynı; test eşleşmeyi denetler
+  var GIRISLER = ["yok", "pop", "fade", "yukari", "asagi", "zipla"];
+  var AKTIFLER = ["yok", "zipla", "titre", "glitch"];
+  var BAYRAKLAR = ["vurgu", "kalin", "italik"];
+  var ALANLAR = ["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli",
+    "giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"];
 
   function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }
   function hasFont(name) { return typeof name === "string" && own(FONTS, name); }
@@ -80,6 +91,8 @@
    * İnce ayar değerlerini doğrula. Geçersiz değer atılır (stilin kendi değeri kalır),
    * aralık dışı sayı kırpılır. uyarilar (dizi) verilirse atılan / kırpılan alanlar yazılır.
    * Dönen nesnede yalnız: font + fontFile, renk, konturRenk, vurguRenk, boyut, kontur, konum, guvenli
+   * ve Altyazı Efektleri alanları (giris, aktif, vurgu, kalin, italik, satir, kelime). giris / aktif ""
+   * (stilin kendi değeri) uyarısız atlanır.
    */
   function sanitizeOverrides(o, uyarilar) {
     var out = {};
@@ -113,9 +126,26 @@
       if (typeof o.guvenli === "boolean") out.guvenli = o.guvenli;
       else uyar("guvenli");
     }
+    [["giris", GIRISLER], ["aktif", AKTIFLER]].forEach(function (g) {
+      if (!own(o, g[0]) || o[g[0]] === "") return;
+      if (g[1].indexOf(o[g[0]]) !== -1) out[g[0]] = o[g[0]];
+      else uyar(g[0]);
+    });
+    BAYRAKLAR.forEach(function (k) {
+      if (!own(o, k)) return;
+      if (typeof o[k] === "boolean") out[k] = o[k];
+      else uyar(k);
+    });
+    [["satir", 1, 3], ["kelime", 1, 10]].forEach(function (a) {
+      if (!own(o, a[0])) return;
+      var n = sayi(o[a[0]]);
+      if (n === null) { uyar(a[0]); return; }
+      out[a[0]] = kirp(n, a[1], a[2]);
+      if (out[a[0]] !== n) uyar(a[0]);
+    });
     Object.keys(o).forEach(function (key) {
       // fontFile de uyarı sayılır: girdiden ASLA alınmaz, yazı tipinden türetilir
-      if (["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli"].indexOf(key) === -1) uyar(key);
+      if (ALANLAR.indexOf(key) === -1) uyar(key);
     });
     return out;
   }
@@ -252,6 +282,8 @@
     MAX_INPUT: EN_UZUN_GIRDI,
     SHARE_BASE: PAYLASIM_ADRESI,
     FONTS: FONTS,
+    GIRISLER: GIRISLER.slice(),
+    AKTIFLER: AKTIFLER.slice(),
     hasFont: hasFont,
     fontFile: fontFile,
     fontNames: fontNames,

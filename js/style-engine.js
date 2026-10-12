@@ -1,6 +1,8 @@
 /*
  * Suflo Stil Motoru v3
  *
+ * 3.3: arayüzde tek temel stil "efekt" (Altyazı Efektleri, görünümü oluşturucunun ince ayarı);
+ * aşağıdaki diğer stiller eski kayıtlar, SFL1 kodları ve Shorts paketi işleri için kalır.
  * Yedi preset yalnız renk/font değiştirmez. Her biri kendi kelime kurgusunu,
  * kompozisyonunu, arka plan katmanlarını ve hareket ritmini üretir. Motor DOM'a
  * ve Premiere'e bağımlı değildir; zamanlı cue'lardan katmanlı ASS döndürür.
@@ -104,8 +106,34 @@
       style: { aile: "dolgu", yogunluk: "soft", font: "Montserrat", fontFile: "Montserrat-Bold.ttf",
         boyut: 78, renk: "#ffffff", konturRenk: "#0a0a0f", vurguRenk: "#8b7cf6",
         kontur: 4, konum: 2, kutu: false, animasyon: "dolgu" }
+    },
+    /*
+     * ---- 3.3: Altyazı Efektleri ----
+     * Panelde listelenen TEK temel stil. Görünümü tamamen oluşturucunun ince ayarından gelir
+     * (giriş / vurgu animasyonu, kelime vurgusu, renk, yazı tipi, kalın / italik, boyut, kontur,
+     * satır sayısı, en çok kelime). Yukarıdaki 12 stil eski kayıtlar ve SFL1 kodları için kalır;
+     * arayüz onları js/altyazi-efekt.js ile en yakın görünüme taşır. Varsayılanlar "Temiz" görünümü.
+     */
+    efekt: {
+      id: "efekt", name: "Altyazı Efektleri", description: "Kendi efektin: giriş ve vurgu animasyonu, renk, yazı tipi, satır",
+      text: { maxlen: "k1", kase: "normal", punct: true },
+      style: { aile: "efekt", yogunluk: "balanced", font: "Montserrat", fontFile: "Montserrat-Bold.ttf",
+        boyut: 76, renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffd23f",
+        kontur: 5, konum: 2, kutu: false, animasyon: "efekt",
+        giris: "fade", aktif: "yok", vurgu: true, kalin: true, italik: false, satir: 2, kelime: 5 }
     }
   };
+
+  /*
+   * Altyazı Efektleri animasyon kimlikleri. Sıra TranscriptAI şablonunun JSON sözleşmesiyle aynı
+   * (textAnim 0-5: None, Pop, Fade In, Slide Up, Slide Down, Bounce; hlAnim 0-3: None, Bounce,
+   * Shake, Glitch): yerel MOGRT çıktısı (3.3) aynı kimlikleri dizin olarak kullanır.
+   */
+  var GIRISLER = ["yok", "pop", "fade", "yukari", "asagi", "zipla"];
+  var AKTIFLER = ["yok", "zipla", "titre", "glitch"];
+  // Oluşturucunun stil motoruna giden ek alanları (ince ayar, SFL1, Shorts paketi aynı listeyi taşır)
+  var EFEKT_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"];
+  var EFEKT_SATIR = [1, 3], EFEKT_KELIME = [1, 10];
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function has(id) { return !!STYLES[id]; }
@@ -371,9 +399,12 @@
     var size = scaled(style.boyut, height);
     var outline = scaled(style.kontur || 0, height);
     var spacing = id === "premium" ? scaled(5, height) : id === "saas" ? scaled(.8, height) : id === "doc" ? scaled(0.6, height) : 0;
+    // Kalın / italik yalnız Altyazı Efektlerinde ayar; eski stiller hep kalın, düz (çıktıları bayt bayt aynı)
+    var kalin = id === "efekt" && style.kalin === false ? "0" : "-1";
+    var italik = id === "efekt" && style.italik === true ? "-1" : "0";
     return "Style: Suflo," + style.font + "," + size + "," + assColor(style.renk) + "," +
       assColor(style.renk) + "," + assColor(style.konturRenk) + "," + assColor("#000000", 0x80) +
-      ",-1,0,0,0,100,100," + spacing + ",0,1," + outline + ",0," + (style.konum || 5) + ",90,90,70,1";
+      "," + kalin + "," + italik + ",0,0,100,100," + spacing + ",0,1," + outline + ",0," + (style.konum || 5) + ",90,90,70,1";
   }
 
   function header(style, id, width, height) {
@@ -918,6 +949,184 @@
     return events;
   }
 
+  /* ---------------- Altyazı Efektleri (3.3) ---------------- */
+
+  function tamSayi(v, aralik, varsayilan) {
+    var n = Math.round(Number(v));
+    return isFinite(n) && n >= aralik[0] && n <= aralik[1] ? n : varsayilan;
+  }
+
+  // Satırın karakter uzunluğu (a..b-1 kelimeleri tek boşlukla)
+  function parcaUzunlugu(group, a, b) {
+    var n = 0;
+    for (var i = a; i < b; i++) n += String(group[i].text).length + (i > a ? 1 : 0);
+    return n;
+  }
+
+  /*
+   * Kart en çok `satir` satıra bölünür. 2 satır: altyazı iziyle aynı dengeli kırılım (3+ kelime).
+   * 3 satır (5+ kelime): en uzun satırı en kısa olan iki sınır (eşitlikte satırlar en dengeli).
+   * Döner: ikinci, üçüncü satırın ilk kelime indeksleri (boş = tek satır).
+   */
+  function efektKirilimlari(group, satir) {
+    var n = group.length;
+    if (satir >= 3 && n >= 5) {
+      var enIyi = null, enUzun = Infinity, enFark = Infinity;
+      for (var i = 1; i < n - 1; i++) {
+        for (var j = i + 1; j < n; j++) {
+          var u = [parcaUzunlugu(group, 0, i), parcaUzunlugu(group, i, j), parcaUzunlugu(group, j, n)];
+          var mx = Math.max(u[0], u[1], u[2]), fark = mx - Math.min(u[0], u[1], u[2]);
+          if (mx < enUzun || (mx === enUzun && fark < enFark)) { enIyi = [i, j]; enUzun = mx; enFark = fark; }
+        }
+      }
+      return enIyi || [];
+    }
+    if (satir >= 2 && n >= 3) {
+      var b = breakIndex(group, 3);
+      return b ? [b] : [];
+    }
+    return [];
+  }
+
+  // fitSize'ın çok satırlı hâli: en uzun satır kadrajın %88'ini (güvenli alanda daraltılmış) aşmasın
+  function efektSigdir(fs, group, kir, style, width) {
+    var sinir = [0].concat(kir, [group.length]), enUzun = 1;
+    for (var i = 0; i + 1 < sinir.length; i++) enUzun = Math.max(enUzun, parcaUzunlugu(group, sinir[i], sinir[i + 1]));
+    var k = KARAKTER_GENISLIK[style.font] || .62;
+    var maxW = alanW(width) * .88;
+    var need = enUzun * fs * k * 1.08;
+    return need > maxW ? Math.max(8, Math.floor(fs * maxW / need)) : fs;
+  }
+
+  function efektBirlestir(parts, kir) {
+    var out = "";
+    for (var i = 0; i < parts.length; i++) {
+      if (i > 0) out += kir.indexOf(i) !== -1 ? "\\N" : " ";
+      out += parts[i];
+    }
+    return out;
+  }
+
+  /*
+   * Giriş animasyonu (kartın ilk olay(lar)ı): konum etiketi ve ek etiketler.
+   *   pop    \fscx0\fscy0 → %100
+   *   fade   \fad(T,0)
+   *   yukari aşağıdan yukarı kayar, asagi yukarıdan aşağı (\move, d = scaled(50))
+   *   zipla  0 → %112 → %96 → %100 aşmalı büyüme
+   * T = 300 ms / hareket şiddeti (diğer stillerle aynı kural).
+   */
+  function efektGirisi(giris, a, d, T) {
+    var pos = "\\pos(" + a.x + "," + a.y + ")";
+    if (giris === "pop") return { pos: pos, ek: "\\fscx0\\fscy0\\t(0," + T + ",\\fscx100\\fscy100)" };
+    if (giris === "fade") return { pos: pos, ek: "\\fad(" + T + ",0)" };
+    if (giris === "yukari") return { pos: "\\move(" + a.x + "," + (a.y + d) + "," + a.x + "," + a.y + ",0," + T + ")", ek: "" };
+    if (giris === "asagi") return { pos: "\\move(" + a.x + "," + (a.y - d) + "," + a.x + "," + a.y + ",0," + T + ")", ek: "" };
+    if (giris === "zipla") {
+      var t1 = Math.round(T * 0.5), t2 = Math.round(T * 0.77);
+      return { pos: pos, ek: "\\fscx0\\fscy0\\t(0," + t1 + ",\\fscx112\\fscy112)\\t(" + t1 + "," + t2 + ",\\fscx96\\fscy96)\\t(" + t2 + "," + T + ",\\fscx100\\fscy100)" };
+    }
+    return { pos: pos, ek: "" };
+  }
+
+  /*
+   * Etkin kelimenin hareket parçaları (kelime başından ms cinsinden; konum etiketi tam metin):
+   *   zipla  scaled(15) yukarı ve geri, 2 × 100 ms (\move)
+   *   titre  4 kısa ±scaled(3) \pos sarsıntısı, toplam 150 ms
+   * Son parça (null bitiş) kelime sonuna dek durağan \pos. Süreler hareket şiddetine bölünür.
+   */
+  function efektAktifParcalari(aktif, a, height, factor) {
+    var x = a.x, y = a.y;
+    if (aktif === "zipla") {
+      var d = scaled(15, height), t = Math.max(1, Math.round(100 / factor));
+      return [
+        { bas: 0, son: t, pos: "\\move(" + x + "," + y + "," + x + "," + (y - d) + ",0," + t + ")" },
+        { bas: t, son: 2 * t, pos: "\\move(" + x + "," + (y - d) + "," + x + "," + y + ",0," + t + ")" },
+        { bas: 2 * t, son: null, pos: "\\pos(" + x + "," + y + ")" }
+      ];
+    }
+    if (aktif === "titre") {
+      var s = scaled(3, height), adim = Math.max(1, Math.round(150 / 4 / factor));
+      var sapma = [[s, -s], [-s, s], [s, s], [-s, -s]];
+      var out = sapma.map(function (o, i) { return { bas: i * adim, son: (i + 1) * adim, pos: "\\pos(" + (x + o[0]) + "," + (y + o[1]) + ")" }; });
+      out.push({ bas: 4 * adim, son: null, pos: "\\pos(" + x + "," + y + ")" });
+      return out;
+    }
+    return [];
+  }
+
+  function renderEfekt(cues, style, width, height, factor) {
+    var events = [], a = anchor(style, "efekt", width, height);
+    var giris = GIRISLER.indexOf(style.giris) !== -1 ? style.giris : "yok";
+    var aktif = AKTIFLER.indexOf(style.aktif) !== -1 ? style.aktif : "yok";
+    var vurguAcik = style.vurgu !== false;
+    var satir = tamSayi(style.satir, EFEKT_SATIR, 2), kelime = tamSayi(style.kelime, EFEKT_KELIME, 5);
+    var fs0 = scaled(style.boyut, height);
+    var outline = Number(style.kontur) > 0 ? scaled(style.kontur, height) : 0;
+    var normal = assColor(style.renk), vurgu = assColor(style.vurguRenk), kontur = assColor(style.konturRenk);
+    var T = Math.max(1, Math.round(300 / factor)), kayma = scaled(50, height);
+    var gir = efektGirisi(giris, a, kayma, T);
+    // Glitch kopyaları konturun dışına taşsın: görünen renkli saçak scaled(6) genişliğinde
+    var glitchMs = Math.max(1, Math.round(100 / factor)), glitchX = scaled(6, height) + outline;
+    var parcalar = efektAktifParcalari(aktif, a, height, factor);
+    function sn(ms) { return ms / 1000; }
+
+    groupWords(cues, kelime).forEach(function (group) {
+      var kir = efektKirilimlari(group, satir);
+      var fs = efektSigdir(fs0, group, kir, style, width);
+      var kartBas = group[0].start, kartSon = group[group.length - 1].end;
+      var govde = "\\fs" + fs + "\\q2\\1c" + normal + "\\3c" + kontur + "\\bord" + outline + "\\shad0";
+      // gorunur: "tum" bütün satır, "yalniz" yalnız etkin kelime, "gizli" etkin kelime saydam
+      function metin(etkin, gorunur, renk) {
+        var parts = group.map(function (c, i) {
+          var w = esc(c.text);
+          var r = i === etkin ? (renk || (vurguAcik || c.vurgu ? vurgu : null)) : (c.vurgu ? vurgu : null);
+          if (r) w = "{\\1c" + r + "}" + w + "{\\1c" + normal + "}";
+          if (gorunur === "yalniz" && i === etkin) w = "{\\alpha&H00&}" + w + "{\\alpha&HFF&}";
+          if (gorunur === "gizli" && i === etkin) w = "{\\alpha&HFF&}" + w + "{\\alpha&H00&}";
+          return w;
+        });
+        return (gorunur === "yalniz" ? "{\\alpha&HFF&}" : "") + efektBirlestir(parts, kir);
+      }
+      function olay(katman, bas, son, konum, ek, govdeEk, icerik) {
+        if (son - bas < 0.005) return;
+        events.push(dialogue(katman, bas, son, "{\\an" + a.an + konum + govde + (govdeEk || "") + ek + "}" + icerik));
+      }
+
+      // Kelime vurgusu ve vurgu animasyonu kapalıysa kart tek olaydır
+      if (!vurguAcik && aktif === "yok") {
+        olay(1, kartBas, kartSon, gir.pos, gir.ek, "", metin(-1, "tum"));
+        return;
+      }
+      group.forEach(function (cue, k) {
+        var adimSon = k + 1 < group.length ? group[k + 1].start : kartSon;
+        adimSon = Math.max(cue.start + .08, adimSon);
+        var ilk = k === 0;
+        // Kartın ilk kelimesi giriş animasyonuyla gelir; kelime hareketi giriş bitince başlar
+        var hareketBas = ilk && giris !== "yok" ? Math.min(adimSon, cue.start + sn(T)) : cue.start;
+        var tabanKonum = ilk ? gir.pos : "\\pos(" + a.x + "," + a.y + ")";
+        var tabanEk = ilk ? gir.ek : "";
+        // Zıpla / titre: etkin kelime taban satırda saydam, üst katmanda (aynı satır, yalnız o kelime) hareket eder
+        olay(1, cue.start, adimSon, tabanKonum, tabanEk, "", metin(k, parcalar.length ? "gizli" : "tum"));
+        if (parcalar.length) {
+          if (hareketBas > cue.start) olay(2, cue.start, hareketBas, tabanKonum, tabanEk, "", metin(k, "yalniz"));
+          parcalar.forEach(function (p) {
+            var bas = hareketBas + sn(p.bas), son = p.son === null ? adimSon : Math.min(adimSon, hareketBas + sn(p.son));
+            if (bas < adimSon) olay(2, bas, son, p.pos, "", "", metin(k, "yalniz"));
+          });
+        }
+        if (aktif === "glitch") {
+          // Kelimenin altında kırmızı / camgöbeği kopyalar, konturun ötesinde ±scaled(6) kayık, 100 ms
+          var gSon = Math.min(adimSon, hareketBas + sn(glitchMs));
+          [["#ff2a55", -glitchX], ["#2af5ff", glitchX]].forEach(function (g) {
+            olay(0, hareketBas, gSon, "\\pos(" + (a.x + g[1]) + "," + a.y + ")", "", "\\bord0",
+              metin(k, "yalniz", assColor(g[0])));
+          });
+        }
+      });
+    });
+    return events;
+  }
+
   /*
    * Ince ayar degerleri ASS Style satirina ve etiketlere yazilir: once yeniden dogrulanir.
    * Gecersiz deger stilin kendi degerine duser. Ornek: font "Arial,0,0}{\\pos(0,0)" virgulle
@@ -939,6 +1148,15 @@
       if (k === "konum") { if (v === 1 || v === 2 || v === 5 || v === 8) style.konum = v; return; }
       if (k === "kutu") { style.kutu = !!v; return; }
       if (k === "animasyon" || k === "aile" || k === "yogunluk") { if (typeof v === "string" && /^[a-z0-9_-]{1,24}$/.test(v)) style[k] = v; return; }
+      // Altyazı Efektleri: animasyon kimlikleri sabit listeden; "" (ya da geçersiz) stilin kendi değeri
+      if (k === "giris") { if (v !== "" && GIRISLER.indexOf(v) !== -1) style.giris = v; return; }
+      if (k === "aktif") { if (v !== "" && AKTIFLER.indexOf(v) !== -1) style.aktif = v; return; }
+      if (k === "vurgu" || k === "kalin" || k === "italik") { if (typeof v === "boolean") style[k] = v; return; }
+      if (k === "satir" || k === "kelime") {
+        var aralik = k === "satir" ? EFEKT_SATIR : EFEKT_KELIME;
+        if (sayiMi(v) && Math.round(v) === v && v >= aralik[0] && v <= aralik[1]) style[k] = v;
+        return;
+      }
     });
     // fontFile girdiden alinmaz: paket fontuysa dosyasi, stilin kendi fontuysa onunki, degilse yok
     if (SS && SS.hasFont(style.font)) style.fontFile = SS.fontFile(style.font);
@@ -1029,6 +1247,7 @@
       if (id === "daktilo") return renderDaktilo(liste, st, width, height, factor);
       if (id === "ziplama") return renderZiplama(liste, st, width, height, factor);
       if (id === "dolgu") return renderDolgu(liste, st, width, height, factor);
+      if (id === "efekt") return renderEfekt(liste, st, width, height, factor);
       return renderViral(liste, st, width, height, factor);
     }
     try {
@@ -1071,6 +1290,12 @@
     stripEmphasis: stripEmphasis,
     compile: compile,
     GUVENLI_ALAN: GUVENLI_ALAN,
+    // Altyazı Efektleri: animasyon kimlikleri (TranscriptAI şablonunun dizin sırası) ve ek alanlar
+    GIRISLER: GIRISLER.slice(),
+    AKTIFLER: AKTIFLER.slice(),
+    EFEKT_ALANLARI: EFEKT_ALANLARI.slice(),
+    EFEKT_SATIR: EFEKT_SATIR.slice(),
+    EFEKT_KELIME: EFEKT_KELIME.slice(),
     assColor: assColor,
     timecode: timecode
   };

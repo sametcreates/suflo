@@ -1,8 +1,9 @@
 /*
  * Stil kartlari icin, gercek Suflo Stil Motoru ile WebM onizlemeleri uretir.
  *   node tools/render-style-previews.js           panel kartlari (assets/style-previews) + site
- *   node tools/render-style-previews.js --site    yalniz site: suflo.app/stil sayfasinin tum Suflo
- *                                                 Stilleri vitrini (docs/gorseller/suflo-stiller/<id>.webm)
+ *   node tools/render-style-previews.js --site    yalniz site: suflo.app/stil sayfasinin tum temel
+ *                                                 stiller vitrini (docs/gorseller/suflo-stiller/<id>.webm)
+ *   node tools/render-style-previews.js --site --id efekt   yalniz verilen stil(ler) (virgulle)
  */
 var fs = require("fs");
 var path = require("path");
@@ -50,6 +51,10 @@ function wordCues(words) {
 }
 
 var yalnizSite = process.argv.indexOf("--site") !== -1;
+var idArg = process.argv.indexOf("--id");
+var yalnizIdler = idArg !== -1 && process.argv[idArg + 1] ? String(process.argv[idArg + 1]).split(",") : null;
+// Altyazı Efektleri'nin vitrini temel görünümün canlı hâli: kelime vurgusu + zıplama
+var siteAyar = { efekt: { giris: "pop", aktif: "zipla" } };
 
 (yalnizSite ? [] : ["viral", "pop", "doc", "premium"]).forEach(function (id) {
   var cues = id === "doc"
@@ -85,7 +90,7 @@ var siteCikti = path.join(root, "docs", "gorseller", "suflo-stiller");
 fs.mkdirSync(siteCikti, { recursive: true });
 var siteSahne = "gradients=s=1280x720:r=24:d=3.2:c0=#0d1220:c1=#24304a:c2=#101522:n=3:type=radial:x0=360:y0=200:x1=1100:y1=640:speed=.01";
 var siteKelimeler = { upper: ["BUNU", "*SAKIN*", "KAÇIRMA", "ARKADAŞLAR"], normal: ["Bunu", "*sakın*", "kaçırma", "arkadaşlar"] };
-engine.list().forEach(function (p) {
+engine.list().filter(function (p) { return !yalnizIdler || yalnizIdler.indexOf(p.id) !== -1; }).forEach(function (p) {
   var id = p.id;
   var kelimeler = p.text.kase === "upper" ? siteKelimeler.upper : siteKelimeler.normal;
   var cues = id === "doc"
@@ -93,7 +98,7 @@ engine.list().forEach(function (p) {
     : kelimeler.map(function (w, i) {
       return { start: 0.15 + i * 0.7, end: i === kelimeler.length - 1 ? 3.0 : 0.8 + i * 0.7, text: w };
     });
-  var built = engine.compile({ styleId: id, cues: cues, cueKind: "words", width: 1280, height: 720 });
+  var built = engine.compile({ styleId: id, cues: cues, cueKind: "words", width: 1280, height: 720, overrides: siteAyar[id] });
   var assName = "_site_" + id + ".ass";
   var assPath = path.join(siteCikti, assName);
   var webmPath = path.join(siteCikti, id + ".webm");
