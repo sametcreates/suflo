@@ -18,8 +18,9 @@
  *
  * Hassas kelime zamanı (DTW, 3.2 adım 5; Suflo'nun kendi kodu, Raunen'den taşınmadı): motor
  * "-dtw <ön ayar> -nfa" ile çalıştıysa belirteçler t_dtw yazar (santisaniye, -1 = yok). Kelimenin
- * başı ilk belirtecinin t_dtw / 100 sn'si, sonu sonraki kelimenin başıdır (segment sonuyla,
- * offsets.to, sınırlı); t_dtw -1 olan kelime eski yoldan (offsets) zamanlanır.
+ * başı ilk belirtecinin t_dtw / 100 sn'si; sonu kendi belirteç sonu (offsets.to), sonraki kelimenin
+ * başıyla sınırlı: küçük boşluk kapanır, duraklama korunur (dtwUygula). t_dtw -1 olan kelime eski
+ * yoldan (offsets) zamanlanır.
  *
  * Saf UMD modülü: DOM yok, dosya sistemi yok, ES5 (CEF 74 / Node 12.3).
  */
@@ -205,11 +206,24 @@
     }
   }
 
+  // DTW kelimesinin kendi sonu ile sonraki kelimenin başı arasındaki bu kadar (sn) boşluk kapatılır:
+  // DTW başı ile belirteç sonu arasındaki küçük uyuşmazlık kelime kelime modda titreme yapmasın.
+  // Daha uzun boşluk gerçek duraklamadır, korunur (satır / N kelime bölmesi 0,6 sn'nin üstünde kırar).
+  var DTW_BOSLUK_DOLDUR = 0.3;
+  // DTW kelimesinin en kısa süresi (belirteç süresi 0 olsa da görünür kalsın)
+  var DTW_EN_KISA = 0.1;
+
   /*
    * DTW başlangıçlarını kelimelere uygular (yerinde). Başlangıç: t_dtw (zaten eşlenmiş ve
-   * segmente sıkıştırılmış). Bitiş: sonraki kelimenin başı; son kelimede segment sonu. Sonraki
-   * kelimenin t_dtw'si yoksa onun offsets başlangıcı kullanılır. Bitiş hiçbir zaman başlangıçtan
-   * önce ve segment sonundan sonra olmaz.
+   * segmente sıkıştırılmış). DTW yalnız başlangıcı ölçer; bitiş kelimenin KENDİ belirteç sonundan
+   * (offsets.to, VAD tablosuyla eşlenmiş) gelir, böylece whisper'ın işaretlediği duraklamalar kalır:
+   *   kendi sonu = belirteç sonu, DTW başı belirteç başından sonraysa o kadar kaydırılmış
+   *                (en az DTW_EN_KISA sn)
+   *   sonraki kelime varsa: bitiş en çok onun başı; aradaki boşluk DTW_BOSLUK_DOLDUR sn ya da
+   *                daha azsa sonraki kelimenin başına uzatılır
+   *   son kelime: kendi sonu (segment sonuna uzatılmaz; konuşma bitince ekranda kalmasın)
+   * Sonraki kelimenin t_dtw'si yoksa onun offsets başlangıcı kullanılır. Bitiş hiçbir zaman
+   * başlangıçtan önce ve segment sonundan sonra olmaz.
    */
   function dtwUygula(kelimeler, sinir) {
     var n = kelimeler.length, i;
@@ -224,7 +238,13 @@
     for (i = 0; i < n; i++) {
       if (kelimeler[i].dtw === null || kelimeler[i].dtw === undefined) continue;
       var bas = baslar[i];
-      var son = i + 1 < n ? baslar[i + 1] : sinir.end;
+      var kendiBas = kelimeler[i].start, kendiSon = kelimeler[i].end;
+      var son = Math.max(kendiSon + Math.max(0, bas - kendiBas), bas + DTW_EN_KISA);
+      if (i + 1 < n) {
+        var sonraki = baslar[i + 1];
+        if (sonraki - son <= DTW_BOSLUK_DOLDUR) son = sonraki;
+        son = Math.min(son, sonraki);
+      }
       son = Math.min(son, sinir.end);
       if (son < bas) son = bas;
       kelimeler[i].start = bas;
@@ -245,8 +265,9 @@
    *   opts.vadAcik false: VAD kapalıydı, belirteç zamanları olduğu gibi (yalnız segmente
    *                sıkıştırılır). true / verilmezse tablo yoksa doğrusal hizalama (zamanHizasi).
    *   opts.dtw     false: t_dtw yok sayılır (yalnız offsets). Verilmezse t_dtw ≥ 0 olan kelime
-   *                DTW'yle zamanlanır: başı t_dtw / 100 sn, sonu sonraki kelimenin başı (son kelimede
-   *                segmentin offsets.to'su), segment sonuna sıkıştırılır.
+   *                DTW'yle zamanlanır: başı t_dtw / 100 sn, sonu kendi belirteç sonu (offsets.to),
+   *                sonraki kelimenin başıyla sınırlı (0,3 sn'ye kadar boşluk kapanır, duraklama
+   *                kalır), segment sonuna sıkıştırılır.
    *   opts.sayac   (isteğe bağlı) { toplam, olculen }: t_dtw alanı olan metin belirteçleri ve ≥ 0 olanlar
    * Yalnız noktalamadan oluşan kelime öncekine yapışır (açılış işareti sonrakine); boşlukla
    * ayrılmış tire / uzun tire (" - ", " – ", " — ") kendi kelimesidir: kelimeler satır metniyle tutar.
@@ -333,8 +354,8 @@
     }
     if (bekleyen && out.length) out[out.length - 1].text += bekleyen;
 
-    // DTW: t_dtw'si olan kelimenin başı DTW zamanı, sonu sonraki kelimenin başı (son kelimede
-    // segment sonu = offsets.to). t_dtw'si olmayan kelime offsets zamanını korur.
+    // DTW: t_dtw'si olan kelimenin başı DTW zamanı, sonu kendi belirteç sonu (sonraki kelimenin
+    // başıyla sınırlı; duraklama korunur). t_dtw'si olmayan kelime offsets zamanını korur.
     if (dtwAcik) dtwUygula(out, sinir);
 
     // sıra ve sınır: başlangıçlar azalmaz, bitiş başlangıçtan önce olmaz

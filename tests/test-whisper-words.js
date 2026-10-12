@@ -224,10 +224,10 @@ var d = WW.segmentleriCoz(oku("whisper-ojf-dtw.json"), dBilgi, VADSIZ);
 function zk(w) { return [w.text, w.start, w.end]; }
 ok("DTW: metin ve satır sınırları değişmez", d.length === 3 && d.every(function (s, i) { return s.text === segs[i].text && s.start === segs[i].start && s.end === segs[i].end && metinler(s.words) === s.text; }));
 ok("DTW: kelime başı t_dtw / 100 (ışık 0.26, offsets'te 0.22)", d[0].words[1].text === "ışık" && d[0].words[1].start === 0.26 && d[0].words[0].start === 0.04, JSON.stringify(d[0].words.map(zk)));
-ok("DTW: kelime sonu sonraki kelimenin başı (Bu 0.04–0.26, ışık 0.26–0.68, kötü 1.10–1.50)",
+ok("DTW: küçük boşluk sonraki kelimenin başına kapanır (Bu 0.04–0.26, ışık 0.26–0.68, kötü 1.10–1.50)",
   d[0].words[0].end === 0.26 && d[0].words[1].end === 0.68 && d[0].words[4].text === "kötü" && d[0].words[4].start === 1.1 && d[0].words[4].end === 1.5, JSON.stringify(d[0].words.map(zk)));
 ok("DTW: alt-kelimeli kelimede ilk belirtecin t_dtw'si ('de'+'ğ'+'il' -> 1.50)", d[0].words[5].text === "değil," && d[0].words[5].start === 1.5 && d[0].words[5].end === 2.14);
-ok("DTW: son kelime segment sonunda biter (offsets.to 3.48; 'mi?' 2.62–3.48)", d[0].words[7].text === "mi?" && d[0].words[7].start === 2.62 && d[0].words[7].end === 3.48, JSON.stringify(zk(d[0].words[7])));
+ok("DTW: son kelime kendi belirteç sonunda biter, DTW kaydırmasıyla (offsets 2.56–2.86 -> 2.62–2.92; segment sonu 3.48'e uzamaz)", d[0].words[7].text === "mi?" && d[0].words[7].start === 2.62 && d[0].words[7].end === 2.92, JSON.stringify(zk(d[0].words[7])));
 ok("DTW: t_dtw -1 olan kelime offsets'e düşer (biraz 4.30–4.70)", d[1].words[2].text === "biraz" && d[1].words[2].start === 4.3 && d[1].words[2].end === 4.7, JSON.stringify(d[1].words.map(zk)));
 ok("DTW: yedek kelimeden önceki DTW kelimesi onun offsets başında biter (kamerayı 3.86–4.30)", d[1].words[1].text === "kamerayı" && d[1].words[1].start === 3.86 && d[1].words[1].end === 4.3);
 ok("DTW: hepsi -1 olan satır offsets'le birebir (Güzel. 7.36–7.70)", JSON.stringify(d[2].words) === JSON.stringify(segs[2].words));
@@ -260,8 +260,34 @@ vbJson.transcription[0].tokens.forEach(function (t) { if (t.offsets && !/^\[_/.t
 var vbDtw = WW.segmentleriCoz(vbJson, {}, { stderr: vbStderr });
 ok("DTW + VAD tablosu: 'şimdi' t_dtw 2.35 -> özgün 14.15, sonu sonraki kelimenin başı", vbDtw[0].words[2].text === "şimdi" && yakin(vbDtw[0].words[2].start, 14.15) &&
   yakin(vbDtw[0].words[2].end, vbDtw[0].words[3].start) && yakin(vbDtw[0].words[0].start, 10.05), JSON.stringify(vbDtw[0].words.map(zk)));
-ok("DTW + VAD: son kelime satır sonunda (16.4), hepsi satır içinde", yakin(vbDtw[0].words[vbDtw[0].words.length - 1].end, 16.4) &&
-  vbDtw[0].words.every(function (w) { return w.start >= 10 && w.end <= 16.4; }));
+ok("DTW + VAD: son kelime kendi belirteç sonunda (15.9 + 0.05 kayma; satır sonu 16.4'e uzamaz), hepsi satır içinde", yakin(vbDtw[0].words[vbDtw[0].words.length - 1].end, 15.95) &&
+  vbDtw[0].words.every(function (w) { return w.start >= 10 && w.end <= 16.4; }), JSON.stringify(vbDtw[0].words.map(zk)));
+// inceleme bulgusu: DTW açıkken VAD'in attığı sessizlik kelimeyi ekranda tutmamalı (t_dtw = offsets başı:
+// DTW başları bugünkü başlarla aynı; bitişler de aynı kalmalı)
+var vbAyni = JSON.parse(vb.toString("utf8"));
+vbAyni.transcription[0].tokens.forEach(function (t) { if (t.offsets && !/^\[_/.test(t.text)) t.t_dtw = Math.round(t.offsets.from / 10); });
+var vbOff = WW.segmentleriCoz(vb, {}, { stderr: vbStderr }), vbDtw2 = WW.segmentleriCoz(vbAyni, {}, { stderr: vbStderr });
+ok("DTW + VAD: 2,7 sn sessizlikte 'hazır,' 11.4'te biter (14.1'e uzamaz), son kelime 15.9 — offsets'le birebir",
+  JSON.stringify(vbDtw2[0].words.map(zk)) === JSON.stringify(vbOff[0].words.map(zk)) && vbDtw2[0].words[1].text === "hazır," && yakin(vbDtw2[0].words[1].end, 11.4),
+  JSON.stringify(vbDtw2[0].words.map(zk)));
+// satır içi duraklama (VAD'siz): DTW açıkken de boşluk kalır, kelime kelime / N kelime / iki satır orada kırılır
+function duraklamaSegmenti(dtw) {
+  function tok(t, a, b, d) { var x = { text: t, offsets: { from: a, to: b }, p: 0.9 }; if (dtw) x.t_dtw = d; return x; }
+  return { transcription: [{ offsets: { from: 1000, to: 6500 }, text: " Bir dakika sonra geliyorum", tokens: [
+    tok(" Bir", 1000, 1400, 100), tok(" dakika", 1400, 2000, 140), tok(" sonra", 4500, 5000, 450), tok(" geliyorum", 5000, 6500, 500)] }] };
+}
+var drOff = WW.segmentleriCoz(duraklamaSegmenti(false), {}, VADSIZ), drDtw = WW.segmentleriCoz(duraklamaSegmenti(true), {}, VADSIZ);
+ok("DTW: 2,5 sn satır içi duraklama korunur (dakika 1.4–2.0, sonra 4.5'te), son kelime 6.5",
+  JSON.stringify(drDtw[0].words.map(zk)) === JSON.stringify([["Bir", 1, 1.4], ["dakika", 1.4, 2], ["sonra", 4.5, 5], ["geliyorum", 5, 6.5]]) &&
+  JSON.stringify(drDtw[0].words.map(zk)) === JSON.stringify(drOff[0].words.map(zk)), JSON.stringify(drDtw[0].words.map(zk)));
+var CTX = require(path.join(__dirname, "..", "js", "caption-text.js"));
+function duzen(segs, mod) { return CTX.segmentleriKur(segs, mod).segments.map(function (c) { return c.text + " " + c.start + "-" + c.end; }).join(" | "); }
+var k1Dtw = CTX.segmentleriKur(drDtw, "k1").segments;
+ok("DTW + kelime kelime: 'dakika' duraklamada ekranda kalmaz (2.0'da biter)", k1Dtw[1].text === "dakika" && k1Dtw[1].end <= 2.0 + 1e-9, duzen(drDtw, "k1"));
+ok("DTW + 3 kelime: duraklamada kırılır ('Bir dakika' | 'sonra geliyorum'), DTW kapalıyla aynı",
+  duzen(drDtw, "w3") === duzen(drOff, "w3") && CTX.segmentleriKur(drDtw, "w3").segments.length === 2 && CTX.segmentleriKur(drDtw, "w3").segments[0].text === "Bir dakika", duzen(drDtw, "w3"));
+ok("DTW + iki satır (c42x2): duraklamada iki cue, DTW kapalıyla aynı",
+  duzen(drDtw, "c42x2") === duzen(drOff, "c42x2") && CTX.segmentleriKur(drDtw, "c42x2").segments.length === 2, duzen(drDtw, "c42x2"));
 // -tr: params.translate true -> bilgi.ceviri (çıktı dili "en", result.language kaynakta kalır)
 var cv = JSON.parse(oku("whisper-ojf-tr.json").toString("utf8"));
 cv.params.translate = true;
