@@ -24,7 +24,7 @@
 
   var HAK = 3;
   var SURUM = 1;
-  var OZELLIKLER = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp"];
+  var OZELLIKLER = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate"];
   // Ayarlar'daki liste ve bildirimler için kısa adlar
   var AD = {
     cut: "Otomatik kesim",
@@ -36,7 +36,8 @@
     overlay: "Stilli altyazı ve kanca başlığı",
     translate: "Çeviri",
     beat: "Ritim",
-    speedramp: "Hız rampası"
+    speedramp: "Hız rampası",
+    offlineTranslate: "Çevrimdışı İngilizce çeviri"
   };
   var ANAHTAR = /^[A-Za-z]{1,32}$/;   // "__proto__" gibi anahtarlar geçersiz sayılır
   var UST_SINIR = 1000;               // makul olmayan sayılar (elle düzenleme) geçersiz
