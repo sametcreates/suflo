@@ -101,6 +101,9 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.3 YouTube indirici: saf karar modulu + panel (yt-dlp pakette YOK, ilk kullanimda iner)
             '(^|/)js/youtube-indir\.js$',
             '(^|/)js/youtube-indir-ui\.js$',
+            # 3.4 Yumusatma motoru (Rebound MIT uyarlamasi) ve anahtar kare kayitlari: Egri, Gecis, Zoom, Hareket bunlara dayanir
+            '(^|/)js/ease-curve\.js$',
+            '(^|/)js/key-records\.js$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

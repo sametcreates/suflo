@@ -397,6 +397,23 @@ ok("Sessiz ses: uyarı kutuları durum satırının hemen altında, gizli başla
   /id="cap-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="cap-sessiz-vazgec"[^>]*>Vazgeç</.test(html) &&
   /id="tc-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="tc-sessiz-vazgec"[^>]*>Vazgeç</.test(html));
 ok("Sessiz ses: betik sırası caption-text.js → sessiz-ses.js → captions.js", betikSira("sessiz-ses.js") > betikSira("caption-text.js") && betikSira("sessiz-ses.js") < betikSira("captions.js"));
+// 3.4 adım 9: yumuşatma motoru ve kayıtlar, onları kullanacak araçlardan (Geçiş, Zoom, Hareket, Hız Rampası) önce
+ok("Yumuşatma motoru: betik sırası ease-curve.js → key-records.js → transitions/speedramp/zoom/presets → app.js", betikSira("ease-curve.js") > 0 &&
+  betikSira("ease-curve.js") < betikSira("key-records.js") && betikSira("key-records.js") < betikSira("transitions.js") &&
+  betikSira("key-records.js") < betikSira("speedramp.js") && betikSira("key-records.js") < betikSira("zoom.js") &&
+  betikSira("key-records.js") < betikSira("presets.js") && betikSira("key-records.js") < betikSira("app.js"));
+(function () {
+  // saf modüller: yüklenince yalnız window.SufloEase / SufloKeyRecords tanımlar; Premiere, ağ, DOM, depo erişimi yok
+  var vm = require("vm"), erisim = [];
+  var pencere = {};
+  ["localStorage", "document", "CSInterface", "fetch", "XMLHttpRequest"].forEach(function (ad) {
+    Object.defineProperty(pencere, ad, { get: function () { erisim.push(ad); return undefined; } });
+  });
+  var ctx = vm.createContext({ window: pencere, JSON: JSON, Math: Math, Date: Date, Object: Object, Array: Array, String: String, Number: Number, isFinite: isFinite, isNaN: isNaN, Error: Error, RegExp: RegExp });
+  ["ease-curve.js", "key-records.js"].forEach(function (f) { vm.runInContext(fs.readFileSync(KOKYOL + "js/" + f, "utf8"), ctx); });
+  ok("Yumuşatma motoru: yüklenirken yalnız global tanımlar (localStorage/DOM/Premiere/ağ erişimi yok)", typeof pencere.SufloEase === "object" &&
+    typeof pencere.SufloKeyRecords === "object" && typeof pencere.SufloEase.bakePlan === "function" && erisim.length === 0, erisim.join(","));
+})();
 ok("Sessiz ses: panel açılışında ölçüm/Premiere çağrısı yok (yalnız Altyazı oluştur / Konuşmadan kes akışında)",
   !/sessizDenetim\(/.test(fnGovde(capSrc, "function init(")) && /\.sessiz-uyari\[hidden\] \{ display: none !important; \}/.test(fs.readFileSync(KOKYOL + "css/style.css", "utf8")));
 

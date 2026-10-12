@@ -46,6 +46,11 @@ ok("3.3 'Kalın yazı' kapalı: statik Montserrat Regular / Bold pakette (fonts/
   /\$stageItems = @\([^)]*"fonts"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"fonts"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /fonts\/Montserrat-Regular\\\.ttf\$/.test(gerekli) && /fonts\/Montserrat-Bold\\\.ttf\$/.test(gerekli) &&
   fs.existsSync(path.join(__dirname, "..", "fonts", "Montserrat-Regular.ttf")) && /Montserrat-Regular\.ttf/.test(notice), gerekli.slice(0, 600));
+ok("3.4 Yumuşatma motoru ve anahtar kare kayıtları pakette (js/ klasörü), verify-release'te zorunlu, Rebound bildirimi var",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /ease-curve\\\.js\$/.test(gerekli) && /key-records\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "ease-curve.js")) &&
+  fs.existsSync(path.join(__dirname, "..", "js", "key-records.js")) && /### Rebound/.test(notice) && /0f9fd6c526514d20b688b13c393061606f166ad5/.test(notice) &&
+  /"js"/.test(okuK("tools/install.ps1")), gerekli.slice(0, 600));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
 
 console.log(gecen + "/" + toplam + " gecti");

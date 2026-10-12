@@ -1479,3 +1479,46 @@ projendeki 'Suflo İndirilenler' kutusuna gelir (Pro, 3 deneme hakkı)." `js/app
 `js/youtube-indir.js` › `varlikAdaylari` güncellenmeli; listede ad yoksa kurulum güvenle durur ("SHA2-256SUMS listesinde
 yt-dlp dosyası yok"). GitHub API'ye ulaşılamazsa (kimliksiz sınır saatte 60 istek) `latest/download` kullanılır; SUMS ve ikili
 yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız yt-dlp kuruluysa).
+
+## 3.4
+
+3.4'ün Eğri hattı: `marketing/alti-repo-plan.json` › `plan.build_order` adım 9–15 (yumuşatma motoru, Eğri sekmesi,
+kayıt tabanlı kaldırma, Geçiş / Zoom / Hareket eğrisi, Hız Rampası özel eğrisi, varışta yaylanma, paylaşım kodları).
+Her adım kendi alt bölümünü ekler. Elle Premiere denemeleri `marketing/v3.4-deneme-listesi.md`'de. Bu iş yerel
+`yerel-34-egri` dalında; 3.3 bitip yayınlanana dek uzak depoya gönderilmez.
+
+### Adım 9: Yumuşatma motoru ve anahtar kare kayıtları (altyapı, ücretsiz; görünen araç yok)
+
+Ne değişti: iki saf modül geldi. `js/ease-curve.js` (`SufloEase`) Rebound'un (MIT, commit `0f9fd6c`) yumuşatma
+motorundan uyarlandı: CSS cubic-bezier çözücüsü, Penner kümesi (quad … bounce), yay (spring), örnekleyici, hız grafiği
+ve yaylanma (overshoot) matematiği. Suflo'nun kendi eklemeleri: çok noktalı eğri (en çok 8 nokta), şekli bozmadan nokta
+ekleme (de Casteljau), çevir (ease-in ↔ ease-out), ters çevir (yalnız tekdüze eğri), tek `cubic-bezier()` metni
+okuma / yazma, 15 hazır eğri ve `bakePlan` (eğriyi iki anahtar kare arasına timeline karelerinde sık anahtar kare
+olarak yazma planı). `js/key-records.js` (`SufloKeyRecords`) Suflo'nun yazdığı anahtar kareleri kayıt olarak tutar
+ve "hâlâ yerinde mi" denetler (iki uç + kayıtlı zamanların en az %60'ı, 0,25 kare tolerans); depo proje başına
+localStorage anahtarı, projede en çok 300, toplam 2000 kayıt. Panel açılışında Premiere'e ya da ağa çağrı yok.
+OpenCurve'den yalnız fikir alındı (lisansı yok); kodu, tabloları ve metin sözdizimi kullanılmadı.
+
+**9.1 Lisans ve atıf (5 dk, bilgi).** `THIRD_PARTY_NOTICES.md`'ye Rebound girdisi eklendi (commit, MIT, telif satırı,
+tam lisans metni, uyarlanan dosyalar); `js/ease-curve.js` başında atıf satırı, uyarlanan her işlevde
+`// Rebound: <ad>` işareti var. ZXP ve kurucu `THIRD_PARTY_NOTICES.md`'yi zaten taşıyor; `tools/verify-release.ps1`
+iki yeni dosyayı (`js/ease-curve.js`, `js/key-records.js`) zorunlu tutuyor. Yapacak bir şey yok; yalnız göz at.
+
+**9.2 İsteğe bağlı teşekkür satırı (2 dk, karar).** Plan README'ye "İlham: OpenCurve, Rebound" satırını isteğe
+bağlı bırakıyor (lisans iddiası değil, teşekkür). Eklenmedi; istersen `README.md` › `## Lisanslar / Licenses` altına
+ekle. OpenCurve'ün adı başka hiçbir yerde geçmemeli (inceleme `opencurve` arar; tek izinli yer adım 15'teki
+OpenCurve JSON içe aktarıcısı).
+
+**9.3 Hazır eğri adlarını onayla (5 dk).** `js/ease-curve.js` › `BUILTINS`: Doğrusal, Yumuşak, Yumuşak giriş,
+Yumuşak çıkış, Yumuşak giriş-çıkış, Sert giriş, Sert çıkış, Güçlü S, Geri çekil, Taşma, Esnek, Zıplama, Yay yumuşak,
+Yay canlı, Çift yumuşak (İngilizceleri `nameEn` alanında ve `i18n/en.js`'te). "Süzülme" Hız Rampası önayarı olduğu
+için kullanılmadı. Ad değiştirirsen `i18n/en.js`'teki karşılığını da değiştir; "Yumuşak" (Smooth) ve "Zıplama"
+(Bounce) sözlükte başka araçlarla ortak, eğri seçicisi İngilizce adı `SufloEase.builtinName()`'den alır.
+
+**9.4 Eğri fiyatlandırması (bilgi, adım 10'a not).** Senin kararınla adım 10'da Eğri editörü ve önizleme ücretsiz;
+eğriyi anahtar karelere uygulamak Pro (`Pro.gate('curves')`, 3 deneme hakkı, `js/deneme.js` listesine `curves` girer,
+Ayarlar'daki Pro / deneme tablosunda görünür). Adım 9'da kapı yok; sunucu tarafında yapılacak bir şey yok (deneme
+hakları panelde tutuluyor).
+
+**9.5 Premiere'de dene (10 dk).** `marketing/v3.4-deneme-listesi.md` › `## 9` (geliştirici kurulumu + Chrome'da
+`http://localhost:8092` konsolu). Özellikle 9.1'i eski Premiere'de (14.x / 2020, CEF 74) yap.
