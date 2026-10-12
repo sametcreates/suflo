@@ -17,6 +17,8 @@ window.KViral = (function () {
   var bulSegs = null, bulSekans = "";
   // bulSegs'in bolumleme modu (k1 / kc / w / plain): Shorts kaydi segs ile ayni andan gelsin
   var bulMod = "plain";
+  // bulSegs'in belge dili (KCaptions.documentLang: algılanan / çevrimdışı İngilizce; "" = bilinmiyor)
+  var bulDil = "";
   // aramanin gordugu temiz satirlar: from/to indeksleri buna gore (sonraki altyazi duzenlemeleri kaydirmasin)
   var bulSegsTemiz = null;
   var bulSure = { minDur: 20, maxDur: 60 };
@@ -481,6 +483,7 @@ window.KViral = (function () {
     // sekansta" sayardi. Sorgu simdi gonderilir, AI cagrisiyla paralel yurur (bekleme eklemez).
     var segsHam = KCaptions.rawSegments ? KCaptions.rawSegments() : null;
     var modHam = KCaptions.mode ? KCaptions.mode() : "plain";
+    var dilHam = KCaptions.documentLang ? String(KCaptions.documentLang() || "") : "";
     var sekansSorgu = sekansOku();
     var temiz = HL.clean(segs);
     try {
@@ -508,6 +511,7 @@ window.KViral = (function () {
       bulSure = s;
       bulSegs = segsHam;
       bulMod = modHam || "plain";
+      bulDil = dilHam;
       bulSekans = sekansHam;
       sonInOutId = null;
       durum("");
@@ -546,12 +550,14 @@ window.KViral = (function () {
     return (segs || []).map(function (x) { var y = JSON.parse(JSON.stringify(x)); delete y.words; delete y.origWords; return y; });
   }
 
-  function shortsKaydet(items, an, kaynakSegs, kaynakMod) {
+  // kaynakDil (isteğe bağlı): kaynakSegs'in belge dili; kayıtta "dil" olarak durur (Altyazı'ya yüklenince
+  // belgenin dili olur). Verilmezse kayıtta dil yok: yükleyen satırların işaretinden ya da Dil seçiminden alır
+  function shortsKaydet(items, an, kaynakSegs, kaynakMod, kaynakDil) {
     if (!window.KCaptions || !KCaptions.rawSegments || !HL.sliceSegments) return;
-    var kaynak, mod;
-    if (kaynakSegs) { kaynak = kaynakSegs; mod = kaynakMod || "plain"; }
-    else if (bulSegs) { kaynak = bulSegs; mod = bulMod; }
-    else { kaynak = KCaptions.rawSegments(); mod = KCaptions.mode ? KCaptions.mode() : "plain"; }
+    var kaynak, mod, dil;
+    if (kaynakSegs) { kaynak = kaynakSegs; mod = kaynakMod || "plain"; dil = typeof kaynakDil === "string" ? kaynakDil : undefined; }
+    else if (bulSegs) { kaynak = bulSegs; mod = bulMod; dil = bulDil; }
+    else { kaynak = KCaptions.rawSegments(); mod = KCaptions.mode ? KCaptions.mode() : "plain"; dil = KCaptions.documentLang ? String(KCaptions.documentLang() || "") : undefined; }
     var segs = HL.sliceSegments(kaynak, an.start, an.end);
     if (!segs.length) return;
     // ölçülmüş kelimeler (words, origWords) settings.json'a yazılmaz: 30 kayıt x yatay/dikey kopya
@@ -561,6 +567,7 @@ window.KViral = (function () {
     var harita = s.shortsAltyazi || {};
     var kayit = { ad: an.title, start: an.start, end: an.end, mod: mod || "plain",
       ceviriDili: KCaptions.translationLang ? KCaptions.translationLang() : "", segs: segs, ts: Date.now() };
+    if (typeof dil === "string") kayit.dil = dil;
     // her sekansin kendi kopyasi: yatay Shorts'ta duzenleme dikeyi degistirmesin
     items.forEach(function (it) {
       if (it.id) harita[it.id] = JSON.parse(JSON.stringify(kayit));
@@ -669,6 +676,7 @@ window.KViral = (function () {
     nesil: function () { return aramaNesli; },
     kaynakSegs: function () { return bulSegs ? JSON.parse(JSON.stringify(bulSegs)) : null; },
     kaynakMod: function () { return bulSegs ? bulMod : null; },
+    kaynakDil: function () { return bulSegs ? bulDil : null; },
     shortsKaydet: shortsKaydet,
     tur: function () { return secenekler().tur; },
     mesgul: function () { return busy; }

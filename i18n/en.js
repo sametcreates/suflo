@@ -2782,6 +2782,7 @@
     "Ayarlar'da model indir": "Download a model in Settings",
     "Model: {} · çevrimdışı İngilizce çeviri hazır": "Model: {} · offline English translation ready",
     "Suflo Motoru · yerel · İngilizceye çevriliyor…": "Suflo Engine · local · translating to English…",
+    "Suflo Motoru · yerel · hızlı çözme…": "Suflo Engine · local · fast decoding…",
     "{n} altyazı satırı hazır · İngilizce (çevrimdışı)": "{} caption lines ready · English (offline)",
     "js/whisper-args.js yüklenmedi": "js/whisper-args.js was not loaded",
     // Pro / trial (js/deneme.js, js/pro.js)

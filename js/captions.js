@@ -88,6 +88,16 @@ window.KCaptions = (function () {
     if (segments.length) return segmentsMode === "k1";
     return /^k/.test(el("cap-maxlen") ? el("cap-maxlen").value : "");
   }
+  /*
+   * Kayıtta (taslak, Shorts kaydı) belge dili yoksa (3.2 öncesi kayıt): çevrimdışı İngilizce işareti
+   * taşıyan satırlar "en", değilse "" (dil bilinmiyor: Altyazı › Dil seçimine düşülür). Ekrandaki
+   * önceki belgenin dili yeni belgeye geçmez.
+   */
+  function kayitDili(kayitDil, segs) {
+    if (typeof kayitDil === "string") return kayitDil;
+    for (var i = 0; segs && i < segs.length; i++) if (segs[i] && segs[i].cikisDili === "en") return "en";
+    return "";
+  }
   function dilKodu(x) {
     x = String(x || "").toLowerCase();
     if (x.length === 2) return x;
@@ -96,15 +106,17 @@ window.KCaptions = (function () {
   }
 
   // Geri al yigini girdisi: satirlar + mod + ceviri hedef dili (buyuk harf kurali buna bagli)
+  // + belgenin dili (algilananDil): cevrimdisi Ingilizce belgeden geri donulen Turkce belge "en" kalmasin
   function durumAl(etiket) {
     return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili,
-      shorts: shortsYuklenen, ornek: ornekBelge, ts: Date.now() };
+      dil: algilananDil, shorts: shortsYuklenen, ornek: ornekBelge, ts: Date.now() };
   }
   // shorts: ekrandaki belgenin Shorts kaydi mi (geri alinca taslak dogru yere yazilsin)
   function durumYukle(st) {
     segments = JSON.parse(st.segs);
     if (st.mode) segmentsMode = st.mode;
     if (typeof st.cevir === "string") ceviriDili = st.cevir;
+    if (typeof st.dil === "string") algilananDil = st.dil;
     if (typeof st.shorts === "string") {
       shortsYuklenen = st.shorts;
       try { shortsDugmesi(KApp.ctx()); } catch (eS) {}
@@ -163,6 +175,7 @@ window.KCaptions = (function () {
       segments: segments,
       mode: segmentsMode,
       ceviriDili: ceviriDili,
+      dil: algilananDil,
       sequence: ctx.sequence || "",
       scope: scope,
       ts: Date.now()
@@ -191,6 +204,7 @@ window.KCaptions = (function () {
     segmentsMode = d.mode || "plain";
     clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil
     ceviriDili = d.ceviriDili || "";                     // taslak çevrilmişse hedef dil (s.orig satırlarda)
+    algilananDil = kayitDili(d.dil, segments);           // taslağın dili (ekrandaki belgeninki değil)
     el("cap-result").hidden = false;
     render();                                            // önce render, sonra etiket (render eziyor)
     el("cap-result-info").textContent = segments.length + " satır · kurtarıldı";
@@ -726,6 +740,13 @@ window.KCaptions = (function () {
     return "";
   }
 
+  // Yerel koşunun durum satırı: Ayarlar › Çözme "Hızlı" iken "yüksek doğruluk" denmez
+  function yerelDurumMetni() {
+    var hizli = false;
+    try { hizli = !!WAR && WAR.cozmeModu(K.settings().cozme) === "hizli"; } catch (e) { hizli = false; }
+    return hizli ? "Suflo Motoru · yerel · hızlı çözme…" : "Suflo Motoru · yerel yüksek doğruluk…";
+  }
+
   // Kurulu çeviri modeli (önce Large, sonra Small; yoksa null): ipucunun "… geç" düğmesi
   function kuruluCeviriModeli() {
     try {
@@ -1169,7 +1190,7 @@ window.KCaptions = (function () {
     if (secenek.cevir && !localEngineReady()) throw new Error(CEVIRI_YEREL_UYARISI);
     if (localEngineReady()) {
       try {
-        status(secenek.cevir ? "Suflo Motoru · yerel · İngilizceye çevriliyor…" : "Suflo Motoru · yerel yüksek doğruluk…");
+        status(secenek.cevir ? "Suflo Motoru · yerel · İngilizceye çevriliyor…" : yerelDurumMetni());
         var motor = { cevir: !!secenek.cevir, dtw: !!secenek.dtw };
         var yerelSonuc = await transcribeLocal(audioPath, wordLevel, secenek.dil, motor);
         secenek.motor = yerelKimlik();
@@ -1320,9 +1341,12 @@ window.KCaptions = (function () {
     return _onbellek;
   }
 
-  // Hangi motor + model yazdı: farklı motorun transkripti önbellekten karışmasın
+  // Hangi motor + model yazdı: farklı motorun transkripti önbellekten karışmasın. Ayarlar › Çözme
+  // "Hızlı" (açgözlü) kimliğe ":hizli" ekler; "En doğru" eki yok (3.2 öncesi önbellek girdileri geçerli)
   function yerelKimlik() {
-    try { var m = KEngine.activeModel(); return "yerel:" + (m && m.id || "?"); } catch (e) { return "yerel:?"; }
+    var ek = "";
+    try { if (WAR && WAR.cozmeModu(K.settings().cozme) === "hizli") ek = ":hizli"; } catch (eC) {}
+    try { var m = KEngine.activeModel(); return "yerel:" + (m && m.id || "?") + ek; } catch (e) { return "yerel:?" + ek; }
   }
   function bulutKimlik() {
     try { var c = providerConfig(); return "bulut:" + c.model + "@" + String(c.url || "").replace(/^https?:\/\//, "").split("/")[0]; } catch (e) { return "bulut:?"; }
@@ -3317,7 +3341,7 @@ window.KCaptions = (function () {
           // geri al, düzenleme öncesi ölçülmüş kelimeleri de geri getirir
           if (odakKelimeleri) eski[i].words = JSON.parse(JSON.stringify(odakKelimeleri));
           else delete eski[i].words;
-          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, cevir: ceviriDili, shorts: shortsYuklenen, ts: Date.now() });
+          undoStack.push({ segs: JSON.stringify(eski), etiket: "metin düzenleme", mode: segmentsMode, cevir: ceviriDili, dil: algilananDil, shorts: shortsYuklenen, ts: Date.now() });
           if (undoStack.length > UNDO_MAX) undoStack.shift();
           redoStack.length = 0;
           refreshUndoUI();
@@ -3488,6 +3512,8 @@ window.KCaptions = (function () {
     kesme = bolum.kesme;
     var ilkParca = { start: s.start, end: kesme, text: a, confidence: s.confidence };
     var ikinciParca = { start: kesme, end: s.end, text: b, confidence: s.confidence };
+    // çevrimdışı İngilizce işareti iki parçada da kalır (tek satırlık belge bölününce İngilizce sayılmaya devam etsin)
+    if (s.cikisDili) { ilkParca.cikisDili = s.cikisDili; ikinciParca.cikisDili = s.cikisDili; }
     if (bolum.a) ilkParca.words = bolum.a;
     if (bolum.b) ikinciParca.words = bolum.b;
     segments.splice(i, 1, ilkParca, ikinciParca);
@@ -3973,6 +3999,7 @@ window.KCaptions = (function () {
         ornekBelge = false;
         segments = segs;
         segmentsMode = "plain";    // ice aktarilan SRT'de kelime zamani verisi yok
+        algilananDil = "";         // dosyanin dili bilinmiyor: Altyazi › Dil secimine dusulur
         uygulaEtiketiniSifirla();  // yeni doküman: "yine de uygula" onayı geçersiz
         refreshUndoUI();
         clearRevert();
@@ -5711,6 +5738,7 @@ window.KCaptions = (function () {
     harita[shortsYuklenen].segs = WW.kelimesizKopya(segments);
     harita[shortsYuklenen].mod = segmentsMode;
     harita[shortsYuklenen].ceviriDili = ceviriDili;
+    harita[shortsYuklenen].dil = algilananDil;
     harita[shortsYuklenen].ts = Date.now();
     K.saveSettings();
   }
@@ -5735,6 +5763,7 @@ window.KCaptions = (function () {
     ornekBelge = false;
     // ceviri bilgisi satirlarda (orig) kalir; hedef dil kayittan
     ceviriDili = k.kayit.ceviriDili || "";
+    algilananDil = kayitDili(k.kayit.dil, segments);   // kaydın dili (ekrandaki belgeninki değil)
     hideRestore();
     el("cap-result").hidden = false;
     el("cap-result-info").textContent = segments.length + " satır · Shorts (ana videodan)";
@@ -5905,6 +5934,8 @@ window.KCaptions = (function () {
     parseGlossary: parseGlossary,
     getSegments: segmentsSnapshot,
     translationLang: function () { return ceviriDili; },
+    // ekrandaki belgenin kayıtlı dili (algılanan / çevrimdışı İngilizce; "" = bilinmiyor): Shorts kaydı onu saklar
+    documentLang: function () { return algilananDil; },
     // Shorts sekanslari icin ham satirlar (*vurgu* ve orig korunur) ve mod
     rawSegments: function () { return JSON.parse(JSON.stringify(segments)); },
     mode: function () { return segmentsMode; },

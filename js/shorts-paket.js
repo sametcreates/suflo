@@ -319,7 +319,7 @@ window.KShortsPaket = (function () {
         // eski işte yoksa boş: kayıt yazılmaz, altyazı adımı nedenini söyler
         if (window.KViral && KViral.shortsKaydet) {
           KViral.shortsKaydet([it], { start: k.start, end: k.end, title: k.baslik }, k.kaynakSegs instanceof Array ? k.kaynakSegs : [],
-            P.kaynakModu(job));
+            P.kaynakModu(job), typeof job.kaynakDil === "string" ? job.kaynakDil : undefined);
         }
         if (bagNesli !== null && window.KViral && KViral.sekansiBagla) KViral.sekansiBagla(job.kaynakId, bagNesli);
         return { ok: true, id: it.id, dikeyId: it.dikeyId || "" };
@@ -546,11 +546,15 @@ window.KShortsPaket = (function () {
       // bölümleme modu da aynı yerden (kelime kelimeye geçilse bile satırlar satır kalır)
       var kaynakSegs = KViral.kaynakSegs ? KViral.kaynakSegs() : null;
       var kaynakMod = kaynakSegs && KViral.kaynakMod ? KViral.kaynakMod() : null;
+      var kaynakDil = kaynakSegs && KViral.kaynakDil ? KViral.kaynakDil() : null;
       if (!kaynakSegs && window.KCaptions && KCaptions.rawSegments) {
         kaynakSegs = KCaptions.rawSegments();
         kaynakMod = KCaptions.mode ? KCaptions.mode() : "plain";
+        kaynakDil = KCaptions.documentLang ? KCaptions.documentLang() : null;
       }
       P.kaynakEkle(job, kaynakSegs || [], kaynakMod);
+      // transkriptin belge dili: Shorts altyazı kaydına yazılır (Altyazı'ya yüklenince belgenin dili)
+      if (typeof kaynakDil === "string") job.kaynakDil = kaynakDil;
       if (durdu()) return;
       // atlanacak katmanlar ve uyarılar baştan söylenir (iş bitince değil)
       var onceden = P.atlamaOzeti(plan).map(function (g) {

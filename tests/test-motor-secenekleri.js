@@ -281,6 +281,95 @@ isler.push(function () {
   ok("normal belge: ek yok (suflo-altyazi.srt)", e.api.dosyaDilEki() === "");
 });
 
+/* ---------------- 4b) belge dili belgeyle taşınır (inceleme bulguları) ---------------- */
+// captions.js'in gerçek durumAl / durumYukle / kayitDili / splitAt / styleLocale / dosyaDilEki kaynağı ve
+// language() ile çok dilli paketin kaynakDil ifadesi; sahte DOM (cap-lang) ve ayarlar
+function belgeOrtami(o) {
+  o = o || {};
+  var dom = { "cap-lang": dugum({ value: o.dil === undefined ? "tr" : o.dil }), "cap-cift-dil": dugum({ checked: false }) };
+  var ayar = o.ayar || {};
+  var dilSatiri = /\n    language: function \(\) \{ (return [^\n]*?) \},\n/.exec(cap);
+  var paketSatiri = /\n      var kaynakDil = ([^\n]*);\n/.exec(cap);
+  if (!dilSatiri || !paketSatiri) throw new Error("language() / kaynakDil satırı bulunamadı");
+  var kod = [
+    sabit("BOSLUKSUZ"), govde("function durumAl("), govde("function durumYukle("), govde("function kayitDili("),
+    govde("function cevrimdisiEn("), govde("function ceviriVar("), govde("function ciftDilAcik("), govde("function styleLocale("),
+    govde("function dosyaDilEki("), govde("function splitAt("), govde("function yerelKimlik("), govde("function yerelDurumMetni(")
+  ].join("\n");
+  return new Function("K", "KEngine", "WAR", "WW", "el", "KApp",
+    "var segments = [], segmentsMode = 'plain', ceviriDili = '', algilananDil = '', shortsYuklenen = '', ornekBelge = false, anlik = 0;\n" +
+    "function shortsDugmesi() {} function snapshot() { anlik++; } function render() {} function saveDraftSoon() {}\n" +
+    "function arayuzDili() { return 'tr'; }\n" + kod +
+    "\nfunction dil() { " + dilSatiri[1] + " }\nfunction paketDili() { return " + paketSatiri[1] + "; }\n" +
+    "return { durumAl: durumAl, durumYukle: durumYukle, kayitDili: kayitDili, splitAt: splitAt, styleLocale: styleLocale, dosyaDilEki: dosyaDilEki," +
+    " dil: dil, paketDili: paketDili, yerelKimlik: yerelKimlik, yerelDurumMetni: yerelDurumMetni," +
+    " set: function (s, d) { segments = s; algilananDil = d; }, segs: function () { return segments; }, algilanan: function () { return algilananDil; } };")(
+    { settings: function () { return ayar; } }, { activeModel: function () { return { id: o.model || "turbo" }; } }, WAR, WW,
+    function (id) { return dom[id] || null; }, { toast: function () {} });
+}
+isler.push(function () {
+  // 1) Türkçe belge -> çevrimdışı İngilizce koşu -> Ctrl+Z: belge dili "tr"ye döner
+  var e = belgeOrtami({});
+  e.set([{ start: 0, end: 2, text: "bir dakika" }], "tr");
+  var turkce = e.durumAl("yeni transkript");
+  e.set([{ start: 0, end: 2, text: "one minute", cikisDili: "en" }], "en");
+  ok("çevrimdışı İngilizce belge: language() ve SRT paketi 'en'", e.dil() === "en" && e.paketDili() === "en");
+  var ingilizce = e.durumAl("");
+  e.durumYukle(turkce);
+  ok("geri al: Türkçe belgeye dönünce belge dili 'tr' (language() ve SRT paketi 'en' kalmaz)", e.algilanan() === "tr" && e.dil() === "tr" && e.paketDili() === "tr",
+    e.algilanan() + " / " + e.dil() + " / " + e.paketDili());
+  ok("geri al: büyük harf kuralı yine Türkçe (BİR)", e.styleLocale() === "tr-TR");
+  e.durumYukle(ingilizce);
+  ok("yinele: İngilizce belge dili geri gelir", e.algilanan() === "en" && e.dil() === "en");
+  var e2 = belgeOrtami({ dil: "" });
+  e2.set([{ start: 0, end: 1, text: "hallo" }], "de");
+  var alman = e2.durumAl("");
+  e2.set([{ start: 0, end: 1, text: "hello", cikisDili: "en" }], "en");
+  e2.durumYukle(alman);
+  ok("Otomatik dil: geri alınan belgenin algılanan dili (de) geri gelir", e2.dil() === "de");
+  e2.durumYukle({ segs: "[]", mode: "plain" });
+  ok("dil alanı olmayan eski geri al girdisi dili değiştirmez", e2.algilanan() === "de");
+  // 2) taslak / Shorts kaydı: kayıtlı dil, yoksa satır işaretinden, o da yoksa bilinmiyor
+  ok("kayitDili: kayıttaki dil öncelikli", e.kayitDili("de", [{ cikisDili: "en" }]) === "de" && e.kayitDili("", [{ cikisDili: "en" }]) === "");
+  ok("kayitDili: dilsiz eski kayıtta işaretli satır 'en', işaretsiz '' (ekrandaki belgenin dili geçmez)",
+    e.kayitDili(undefined, [{ text: "a" }, { text: "b", cikisDili: "en" }]) === "en" && e.kayitDili(undefined, [{ text: "bir" }]) === "" && e.kayitDili(null, null) === "");
+  var rd = govde("function restoreDraft("), sa = govde("function shortsAltyazisiAl("), wd = govde("function writeDraft("), sg = govde("function shortsKaydiGuncelle(");
+  ok("taslak ve Shorts kaydı belge dilini yazar ve geri yükler", /dil: algilananDil,/.test(wd) && /\.dil = algilananDil;/.test(sg) &&
+    /algilananDil = kayitDili\(d\.dil, segments\);/.test(rd) && /algilananDil = kayitDili\(k\.kayit\.dil, segments\);/.test(sa));
+  var srt = cap.slice(cap.indexOf("function importSrt("), cap.indexOf("function importSrt(") + 2500);
+  ok("SRT içe aktarma belge dilini sıfırlar (dosyanın dili bilinmiyor)", /segmentsMode = "plain";[^\n]*\n\s*algilananDil = "";/.test(srt));
+  var vir = fs.readFileSync(path.join(KOK, "js", "viral.js"), "utf8"), sp = fs.readFileSync(path.join(KOK, "js", "shorts-paket.js"), "utf8");
+  ok("Shorts kaydı (viral.js) transkriptin belge dilini yazar; paket işi onu taşır", /if \(typeof dil === "string"\) kayit\.dil = dil;/.test(vir) &&
+    /bulDil = dilHam;/.test(vir) && /job\.kaynakDil = kaynakDil;/.test(sp) && /P\.kaynakModu\(job\), typeof job\.kaynakDil === "string" \? job\.kaynakDil : undefined\)/.test(sp));
+});
+isler.push(function () {
+  // 3) satır bölme çevrimdışı İngilizce işaretini korur (tek satırlık belge İngilizce kalır)
+  var e = belgeOrtami({});
+  e.set([{ start: 0, end: 2, text: "this is it", confidence: 0.9, cikisDili: "en" }], "en");
+  ok("bölmeden önce: dil-bağımsız büyük harf, .en eki", e.styleLocale() === undefined && e.dosyaDilEki() === ".en");
+  e.splitAt(0, 4);
+  var p = e.segs();
+  ok("bölme: iki parça da cikisDili 'en' taşır", p.length === 2 && p[0].cikisDili === "en" && p[1].cikisDili === "en", JSON.stringify(p));
+  ok("bölmeden sonra: hâlâ İngilizce (THİS değil, suflo-altyazi.en.srt)", e.styleLocale() === undefined && e.dosyaDilEki() === ".en");
+  var t = belgeOrtami({});
+  t.set([{ start: 0, end: 2, text: "bir dakika", confidence: 0.9 }], "tr");
+  t.splitAt(0, 3);
+  ok("işaretsiz satır bölününce işaret eklenmez", t.segs().length === 2 && !("cikisDili" in t.segs()[0]) && !("cikisDili" in t.segs()[1]));
+});
+isler.push(function () {
+  // 4) önbellek motor kimliği çözme modunu ayırır; 5) durum satırı Hızlı'da "yüksek doğruluk" demez
+  var d = belgeOrtami({ model: "large", ayar: {} }), h = belgeOrtami({ model: "large", ayar: { cozme: "hizli" } });
+  ok("motor kimliği: En doğru 'yerel:large' (eski önbellek girdileri geçerli), Hızlı 'yerel:large:hizli'",
+    d.yerelKimlik() === "yerel:large" && h.yerelKimlik() === "yerel:large:hizli", d.yerelKimlik() + " / " + h.yerelKimlik());
+  ok("motor kimliği: bilinmeyen çözme değeri En doğru sayılır", belgeOrtami({ ayar: { cozme: "x" } }).yerelKimlik() === "yerel:turbo");
+  ok("durum satırı: En doğru 'yerel yüksek doğruluk', Hızlı 'hızlı çözme'", d.yerelDurumMetni() === "Suflo Motoru · yerel yüksek doğruluk…" &&
+    h.yerelDurumMetni() === "Suflo Motoru · yerel · hızlı çözme…");
+  ok("transcribeSuflo durum satırını çözme modundan alır", /status\(secenek\.cevir \? "Suflo Motoru · yerel · İngilizceye çevriliyor…" : yerelDurumMetni\(\)\);/.test(govde("async function transcribeSuflo(")));
+  var en = require(path.join(KOK, "i18n", "en.js"));
+  var sozluk = en.strings || (en.default && en.default.strings) || {};
+  ok("i18n: Hızlı durum satırı İngilizcede", !!sozluk["Suflo Motoru · yerel · hızlı çözme…"]);
+});
+
 /* ---------------- 5) go(), transcribeSuflo ve kaynak denetimleri ---------------- */
 isler.push(function () {
   var g = govde("async function go(opts)");
