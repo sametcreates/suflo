@@ -1139,7 +1139,8 @@ okunur, "canlı" rozetli geçici satırlar olarak akıyor (`js/whisper-akis.js`,
 `-pp` yüzdelerini yumuşatıp kalan süreyi ve gerçek zaman çarpanını söylüyor:
 `12 satır · %34 · ~1 dk 20 sn kaldı · 3,1× gerçek zaman`. İş sürerken **İptal** düğmesi "Altyazı oluştur"un yerine
 geçiyor; `K.run` iptalde Windows'ta `taskkill /pid N /T /F` (süreç ağacı), macOS'ta `SIGKILL` gönderiyor. Aynı
-iptal jetonu motor/model/ffmpeg indirmelerinde (Ayarlar ve kurulum kartında "İptal"; yarım `.part` korunur) ve
+iptal jetonu motor/model/ffmpeg indirmelerinde (Ayarlar'ın yerel çekirdek ve ffmpeg satırlarında ve kurulum
+kartında "İptal"; yarım `.part` korunur) ve
 Otomatik Kesim'in ffmpeg analizinde de var. Fikirler Premiere TR ve Raunen'den (MIT), kod Suflo'nun kendi:
 `THIRD_PARTY_NOTICES.md` değişmedi. Ücretsiz; senin girdin olmadan tam çalışır, harici şablon ya da hesap gerekmez.
 
@@ -1161,7 +1162,17 @@ Bilmen gereken davranışlar:
   gözlenen hızla ilerlenir, sonraki beklenen bildirim geçilmez. VAD sessizlikleri attığı için yüzde konuşma
   süresine göredir; çok sessiz kayıtta tahmin ilk dakikada oynak olabilir.
 - **İndirme iptali**: rehber ffmpeg'i arka planda kuruyorken Altyazı oluştur'un İptal'i yalnız altyazı işini
-  durdurur; arka plandaki indirme sürer (işi başlatan iptal eder).
+  durdurur; arka plandaki indirme sürer (işi başlatan iptal eder). İptal edilen altyazı işinin durum satırı o
+  indirmenin ilerlemesini artık almaz ("İptal edildi." ekranda kalır; yüzde Ayarlar › ffmpeg satırında akar).
+  Ayarlar'dan başka bir kurulumun indirmesini bekleyen İptal (ör. rehberin Turbo indirmesi sürerken Ayarlar'da
+  Turbo "İndir & kur") "Bekleme iptal edildi — başka bir kurulum indirmeye devam ediyor." der; "İndirme iptal
+  edildi" yalnız indirme gerçekten durduğunda görünür. GPU ısınması başarısız olunca inen CPU motoru da aynı
+  İptal'le kesilir (yarım dosya korunur, "Hazır" denmez).
+- **Çift tıklama koruması**: İptal, başlatma düğmesinin ("Altyazı oluştur", "Sessizlikleri bul", "İndir & kur")
+  yerinde belirir. Göründükten sonraki ~0,5 sn içindeki tık ve çift tıkın ikinci tıkı yok sayılır; yoksa çift tık
+  yeni başlayan işi anında iptal ediyordu. Klavyeyle (Enter/Boşluk) basış her zaman geçerli.
+- **macOS Homebrew ffmpeg**: Ayarlar › ffmpeg'de Homebrew kurulumu sürerken İptal görünmez (brew yarıda
+  kesilirse yarım paket kalabilir); Homebrew kuramazsa başlayan doğrudan indirmede İptal çıkar.
 
 **3.1 Premiere'de dene (yaklaşık 25 dk).** `marketing/v3.2-deneme-listesi.md` › `## 3` maddeleri. En önemlileri
 3.6 (iptalden sonra Görev Yöneticisi'nde `whisper-cli.exe` / `ffmpeg.exe` kalmıyor) ve 3.14 (iptal edilen model

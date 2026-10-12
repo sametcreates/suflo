@@ -341,7 +341,7 @@ window.KCaptions = (function () {
   var aktifIptal = null;
   var canliIs = null;
   var CANLI_GOSTER = 200;        // DOM'da en çok bu kadar geçici satır (sayaç hepsini sayar)
-  var IPTAL_IPUCU = "İşi durdurur: geçici ses ve motor dosyaları silinir, ekrandaki altyazı olduğu gibi kalır.";
+  var IPTAL_IPUCU = "İşi durdurur: geçici ses ve çıktı dosyaları silinir (kurulu motor ve model kalır), ekrandaki altyazı olduğu gibi kalır.";
   var IPTAL_KILITLI = "Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez. Bitince İptal açılır.";
 
   function iptalHatasiYap() {
@@ -355,8 +355,12 @@ window.KCaptions = (function () {
     if (aktifIptal && aktifIptal.iptalEdildi) throw iptalHatasiYap();
   }
 
-  function iptalEt() {
+  // setBusy(true) anı: "İptal" "Altyazı oluştur"un yerinde belirir; çift tıklamanın ikinci tıkı işi iptal etmesin
+  var iptalAcilis = 0;
+
+  function iptalEt(ev) {
     if (!busy || !aktifIptal || aktifIptal.iptalEdildi) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, iptalAcilis)) return;
     var b = el("cap-cancel");
     if (b) b.disabled = true;
     K.log("[altyazı] kullanici iptal etti");
@@ -2625,6 +2629,7 @@ window.KCaptions = (function () {
       iptal.disabled = false;
       iptal.title = IPTAL_IPUCU;
     }
+    iptalAcilis = b ? Date.now() : 0;
     if (!b) refreshButton();
   }
 

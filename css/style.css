@@ -493,12 +493,13 @@ a.link-btn { display: inline-block; }
   background: rgba(255, 255, 255, .02);
 }
 .canli-kutu[hidden] { display: none !important; }
-.canli-ust { display: flex; align-items: center; gap: 8px; padding: 6px 9px 4px; font-size: 10.5px; color: var(--faint); }
+/* CEF 74 (Premiere 2020-2021): flex gap (Chrome 84) yok — aralıklar margin ile */
+.canli-ust { display: flex; align-items: center; padding: 6px 9px 4px; font-size: 10.5px; color: var(--faint); }
 .canli-rozet {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  margin-right: 8px;
   padding: 1px 7px;
   border-radius: 999px;
   background: rgba(239, 83, 80, .14);
@@ -508,13 +509,12 @@ a.link-btn { display: inline-block; }
   letter-spacing: .4px;
   text-transform: uppercase;
 }
-.canli-rozet::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: canli-nabiz 1.4s ease-in-out infinite; }
+.canli-rozet::before { content: ""; flex: 0 0 auto; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor; animation: canli-nabiz 1.4s ease-in-out infinite; }
 @keyframes canli-nabiz { 50% { opacity: .25; } }
 .canli-not { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .canli-liste { max-height: 150px; overflow-y: auto; padding: 0 0 4px; }
 .canli-satir {
   display: flex;
-  gap: 8px;
   padding: 3px 9px;
   font-size: 11.5px;
   line-height: 1.4;
@@ -525,7 +525,7 @@ a.link-btn { display: inline-block; }
   user-select: text;
 }
 .canli-satir:last-child { opacity: 1; }
-.canli-zaman { flex: 0 0 auto; color: var(--faint); font-size: 10.5px; padding-top: 1px; }
+.canli-zaman { flex: 0 0 auto; margin-right: 8px; color: var(--faint); font-size: 10.5px; padding-top: 1px; }
 .canli-metin { min-width: 0; word-break: break-word; }
 @media (prefers-reduced-motion: reduce) { .canli-rozet::before { animation: none; } }
 

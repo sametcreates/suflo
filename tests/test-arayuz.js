@@ -404,6 +404,46 @@ var setBusyG = fnGovde(capSrc, "function setBusy(");
 ok("setBusy: iş sürerken #cap-go gizlenir, #cap-cancel görünür (ve tersi)", /el\("cap-go"\)\.hidden = b;/.test(setBusyG) && /iptal\.hidden = !b;/.test(setBusyG) && /iptal\.disabled = false;/.test(setBusyG));
 ok("#cap-cancel tıklaması jetonu iptal eder (init'te bağlı, Premiere çağrısı yok)", /el\("cap-cancel"\)\.addEventListener\("click", iptalEt\)/.test(fnGovde(capSrc, "function init(")) &&
   /aktifIptal\.iptal\(\);/.test(fnGovde(capSrc, "function iptalEt(")) && !/K\.call\(/.test(fnGovde(capSrc, "function iptalEt(")));
+// Çift tıklama (inceleme bulgusu): "Altyazı oluştur" / "Sessizlikleri bul" / "İndir & kur"un ikinci tıkı aynı
+// yerde beliren "İptal"e düşüp yeni başlayan işi iptal etmesin. Gerçek iptalEt + setBusy, sahte DOM ve saatle.
+var tikKod = "var IPTAL_ACILIS_MS = 500;\n" + fnGovde(fs.readFileSync(KOKYOL + "js/bridge.js", "utf8"), "function iptalTikiGecerli(");
+function tikDugme() { return { hidden: false, disabled: false, title: "", textContent: "", classList: { toggle: function () {} } }; }
+function ciftTikKabi(kod, kur, donus) {
+  var dom5 = {}, saat = { t: 50000 }, jet = { iptalEdildi: false, sayi: 0, iptal: function () { jet.sayi++; jet.iptalEdildi = true; } };
+  var api = new Function("el", "Date", "status", "refreshButton", "IPTAL_IPUCU", "jeton",
+    tikKod + "\nvar K = { iptalTikiGecerli: iptalTikiGecerli, log: function () {} };\n" + kur + "\n" + kod + "\nreturn " + donus + ";")(
+    function (id) { return dom5[id] || (dom5[id] = tikDugme()); }, { now: function () { return saat.t; } }, function () {}, function () {}, "ipucu", jet);
+  return { api: api, saat: saat, jet: jet, dom: dom5 };
+}
+function ciftTikSenaryo(ad, k, dugmeId) {
+  k.api.basla();
+  k.saat.t += 150;
+  k.api.iptalEt({ detail: 2 });             // çift tıkın ikinci tıkı (Chromium: detail 2)
+  k.api.iptalEt({ detail: 1 });             // aynı anda tek tık sayılan olay da
+  var erken = k.jet.sayi;
+  k.saat.t += 600;
+  k.api.iptalEt({ detail: 1 });             // gerçek İptal
+  ok(ad + ": düğme göründükten hemen sonraki / çift tıkın ikinci tıkı iptal etmez, sonraki tek tık eder",
+    erken === 0 && k.jet.sayi === 1 && k.dom[dugmeId].hidden === false && k.dom[dugmeId].disabled === true, "erken=" + erken + " sayi=" + k.jet.sayi);
+}
+ciftTikSenaryo("Altyazı oluştur → İptal", ciftTikKabi(fnGovde(capSrc, "function iptalEt(") + "\n" + setBusyG,
+  "var busy = false, aktifIptal = jeton, iptalAcilis = 0;", "{ basla: function () { busy = true; setBusy(true); }, iptalEt: iptalEt }"), "cap-cancel");
+ciftTikSenaryo("Sessizlikleri bul → İptal", ciftTikKabi(fnGovde(fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8"), "function iptalEt(") + "\n" +
+  fnGovde(fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8"), "function setBusy("),
+  "var busy = false, iptalJetonu = jeton, iptalAcilis = 0;", "{ basla: function () { busy = true; setBusy(true); }, iptalEt: iptalEt }"), "cut-cancel");
+ciftTikSenaryo("İndir & kur → İptal (Ayarlar)", ciftTikKabi(fnGovde(appSrc, "function kurulumuIptalEt(") + "\n" + fnGovde(appSrc, "function kurulumIptalDugmeleri("),
+  "var installingLocal = false, kurulumJetonu = jeton, kurulumIptalAcilis = 0;",
+  "{ basla: function () { installingLocal = true; kurulumIptalDugmeleri(true); }, iptalEt: kurulumuIptalEt }"), "set-local-cancel");
+ciftTikSenaryo("Ayarlar › ffmpeg İptal", ciftTikKabi(fnGovde(appSrc, "function ffmpegKurulumunuIptalEt(") + "\n" + fnGovde(appSrc, "function ffmpegIptalDugmesi("),
+  "var ffmpegKuruluyor = false, ffmpegJetonu = jeton, ffmpegIptalAcilis = 0;",
+  "{ basla: function () { ffmpegKuruluyor = true; ffmpegIptalDugmesi(true); }, iptalEt: ffmpegKurulumunuIptalEt }"), "set-ffmpeg-cancel");
+// README "ffmpeg indirmesi (Ayarlar …) iptal edilebilir" diyor: Ayarlar › ffmpeg satırının da İptal'i olmalı (inceleme bulgusu)
+var ffKur = fnGovde(appSrc, "async function installFfmpeg(");
+ok("Ayarlar › ffmpeg: #set-ffmpeg-cancel kur düğmesinin yanında, gizli başlar; jeton KEngine.installFfmpeg'e gider; iptal kırmızı hata değil uyarı",
+  !!idler["set-ffmpeg-cancel"] && html.indexOf('id="set-ffmpeg-cancel"') > html.indexOf('id="set-ffmpeg-install"') &&
+  html.indexOf('id="set-ffmpeg-cancel"') < html.indexOf('id="set-ffmpeg-recheck"') && /id="set-ffmpeg-cancel"[^>]* hidden/.test(html) &&
+  /KEngine\.installFfmpeg\(say, ffmpegJetonu\)/.test(ffKur) && /if \(e && e\.iptal\) \{[\s\S]{0,200}"inline-status warn"/.test(ffKur) &&
+  /ffmpegIptalDugmesi\(false\)/.test(ffKur) && /el\("set-ffmpeg-cancel"\)\.addEventListener\("click", ffmpegKurulumunuIptalEt\)/.test(appSrc));
 var goG2 = fnGovde(capSrc, "async function go(");
 ok("go(): jeton ve geçici satırlar işle başlar, finally'de bırakılır; İptal 'İptal edildi.' uyarısı (hata değil)",
   /aktifIptal = K\.iptalJetonu \? K\.iptalJetonu\(\) : null;\s*canliBaslat\(\);/.test(goG2) &&

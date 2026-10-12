@@ -258,15 +258,27 @@ window.KEngine = (function () {
   function iptalDenetle(iptal, mesaj) {
     if (iptal && iptal.iptalEdildi) throw iptalHatasi(mesaj || INDIRME_IPTAL);
   }
+  // Sonradan katılanın İptal'i: indirme DURMAZ (onu başka bir kurulum başlattı), yalnız bu bekleme biter.
+  // "İndirme iptal edildi" demek yanlış olurdu: indirme bant genişliği kullanmaya devam ediyor.
+  var BEKLEME_IPTAL = "Bekleme iptal edildi — başka bir kurulum indirmeye devam ediyor.";
   /*
    * Kilitli (paylaşılan) bir işi bekleyen ikinci çağıranın iptali yalnız KENDİ beklemesini
    * keser: işi başlatan (örn. rehberin arka plan ffmpeg kurulumu) sürer. İşi başlatanın
    * jetonu ise indirmenin kendisine gider.
+   *   sahip    işi başlatanın jetonu: katılan aynı jetonu taşıyorsa iptal indirmeyi zaten keser,
+   *            iş kendi "İndirme iptal edildi" hatasıyla biter (bekleme mesajı verilmez)
+   *   iptalde  (isteğe bağlı) katılanın beklemesi iptalle bitince bir kez çağrılır: örn. ilerleme
+   *            dinleyicisini sökmek (yoksa süren indirme iptal edilen işin durum satırına yazmaya devam eder)
    */
-  function iptalliBekle(is, iptal, mesaj) {
-    if (!iptal || typeof iptal.dinle !== "function") return is;
+  function iptalliBekle(is, iptal, sahip, iptalde) {
+    if (!iptal || iptal === sahip || typeof iptal.dinle !== "function") return is;
     return new Promise(function (resolve, reject) {
-      var birak = iptal.dinle(function () { reject(iptalHatasi(mesaj || INDIRME_IPTAL)); });
+      var birak = iptal.dinle(function () {
+        if (typeof iptalde === "function") {
+          try { iptalde(); } catch (eI) { K.log("iptal temizligi: " + (eI && eI.message ? eI.message : eI)); }
+        }
+        reject(iptalHatasi(BEKLEME_IPTAL));
+      });
       is.then(function (v) { birak(); resolve(v); }, function (e) { birak(); reject(e); });
     });
   }
@@ -367,12 +379,15 @@ window.KEngine = (function () {
    * yalniz kendi beklemesini keser.
    */
   var _kurulumIsi = null;
+  var _kurulumJetonu = null;   // işi başlatanın iptal jetonu (iptalliBekle: aynı jetonla katılan)
 
   function install(opts) {
-    if (_kurulumIsi) return iptalliBekle(_kurulumIsi, opts && opts.iptal);
+    if (_kurulumIsi) return iptalliBekle(_kurulumIsi, opts && opts.iptal, _kurulumJetonu);
     var is = kurulumYap(opts);
     _kurulumIsi = is;
-    is.then(function () { _kurulumIsi = null; }, function () { _kurulumIsi = null; });
+    _kurulumJetonu = (opts && opts.iptal) || null;
+    var birak = function () { if (_kurulumIsi === is) { _kurulumIsi = null; _kurulumJetonu = null; } };
+    is.then(birak, birak);
     return is;
   }
 
@@ -531,7 +546,10 @@ window.KEngine = (function () {
         var zp3 = K.path.join(dir, "engine-" + BUILDS.cpu.id + ".zip");
         var d5 = await fetchFile(BUILDS.cpu, zp3, function (f) {
           say("CPU motoru iniyor… %" + Math.round(f * 100));
-        }, "motor:cpu");
+        }, "motor:cpu", iptal);
+        // İptal: indirme kesilir, .part korunur (yeniden kurunca kaldığı yerden); CUDA DLL'leri
+        // silinmiş durum ağ hatasındakiyle aynı. Kullanıcıya "Hazır" değil iptal uyarısı gider.
+        if (d5.iptal) throw indirmeHatasi("CPU motoru", d5, BUILDS.cpu);
         var ok3 = d5.ok && await K.unzip(zp3, dir);
         try { K.fs.unlinkSync(zp3); } catch (e) {}
         if (ok3) {
@@ -584,16 +602,21 @@ window.KEngine = (function () {
    * yazici olmaz).
    */
   var _modelIsleri = {};
+  var _modelJetonlari = {};   // model başına işi başlatanın iptal jetonu
 
   // iptal (isteğe bağlı): K.iptalJetonu() — işi başlatanınki indirmeyi keser, sonradan katılanınki
   // yalnız kendi beklemesini
   function installModel(id, onStatus, iptal) {
     var model = modelById(id);
     if (!model) return Promise.reject(new Error("Bilinmeyen model: " + id));
-    if (_modelIsleri[model.id]) return iptalliBekle(_modelIsleri[model.id], iptal);
+    if (_modelIsleri[model.id]) return iptalliBekle(_modelIsleri[model.id], iptal, _modelJetonlari[model.id]);
     var is = modelKur(model, onStatus || function () {}, iptal);
     _modelIsleri[model.id] = is;
-    is.then(function () { delete _modelIsleri[model.id]; }, function () { delete _modelIsleri[model.id]; });
+    _modelJetonlari[model.id] = iptal || null;
+    var birak = function () {
+      if (_modelIsleri[model.id] === is) { delete _modelIsleri[model.id]; delete _modelJetonlari[model.id]; }
+    };
+    is.then(birak, birak);
     return is;
   }
 
@@ -779,6 +802,7 @@ window.KEngine = (function () {
    * AYNI hedefi olusturmaya calisirdi. Ikinci cagri birincinin sonucunu bekler.
    */
   var _ffmpegIsi = null;
+  var _ffmpegJetonu = null;    // isi baslatanin iptal jetonu
   var _ffmpegDinleyici = [];   // surmekte olan isin ilerlemesini bekleyen her cagiran
   var _ffmpegSon = "";         // son ilerleme metni: sonradan katilan bos ekranda beklemesin
 
@@ -802,18 +826,28 @@ window.KEngine = (function () {
         });
       }, iptal);
       _ffmpegIsi = is;
+      _ffmpegJetonu = iptal || null;
       // sonuc ne olursa olsun kilidi birak, ama sonucu cagirana aynen ilet
       var birak = function () {
-        if (_ffmpegIsi === is) { _ffmpegIsi = null; _ffmpegDinleyici = []; _ffmpegSon = ""; }
+        if (_ffmpegIsi === is) { _ffmpegIsi = null; _ffmpegJetonu = null; _ffmpegDinleyici = []; _ffmpegSon = ""; }
       };
       is.then(birak, birak);
       return is;
     }
-    if (typeof onStatus === "function" && _ffmpegDinleyici.indexOf(onStatus) === -1) {
-      _ffmpegDinleyici.push(onStatus);
+    var liste = _ffmpegDinleyici, eklendi = false;
+    var zatenIptal = !!(iptal && iptal.iptalEdildi);
+    if (!zatenIptal && typeof onStatus === "function" && liste.indexOf(onStatus) === -1) {
+      liste.push(onStatus);
+      eklendi = true;
       if (_ffmpegSon) { try { onStatus(_ffmpegSon); } catch (eS) {} }
     }
-    return iptalliBekle(_ffmpegIsi, iptal);
+    // Katılanın İptal'i: ilerleme dinleyicisi de sökülür. Yoksa arkada süren indirme, iptal edilmiş
+    // Altyazı oluştur'un durum satırına "ffmpeg iniyor… %31" yazmaya devam ederdi.
+    return iptalliBekle(_ffmpegIsi, iptal, _ffmpegJetonu, function () {
+      if (!eklendi) return;
+      var k = liste.indexOf(onStatus);
+      if (k !== -1) liste.splice(k, 1);
+    });
   }
 
   async function ffmpegKur(onStatus, iptal) {

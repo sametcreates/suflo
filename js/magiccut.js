@@ -12,6 +12,8 @@ window.KCut = (function () {
   var busy = false;
   // Süren ffmpeg analizinin iptal jetonu (K.iptalJetonu): "İptal" düğmesi süreç ağacını öldürür
   var iptalJetonu = null;
+  // setBusy(true) anı: "İptal" "Sessizlikleri bul"un yerinde belirir; çift tıklamanın ikinci tıkı analizi iptal etmesin
+  var iptalAcilis = 0;
 
   function el(id) { return document.getElementById(id); }
 
@@ -160,11 +162,13 @@ window.KCut = (function () {
       iptal.hidden = !b;
       iptal.disabled = false;
     }
+    iptalAcilis = b ? Date.now() : 0;
     if (!b) refreshButton();
   }
 
-  function iptalEt() {
+  function iptalEt(ev) {
     if (!busy || !iptalJetonu) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, iptalAcilis)) return;
     el("cut-cancel").disabled = true;
     iptalJetonu.iptal();
   }

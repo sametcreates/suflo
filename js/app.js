@@ -250,6 +250,9 @@ window.KApp = (function () {
   var installingLocal = false;
   // Süren kurulumun iptal jetonu (K.iptalJetonu): motor/model/ffmpeg indirmesi kesilir, .part korunur
   var kurulumJetonu = null;
+  // İptal düğmelerinin göründüğü an: Ayarlar'da "İptal" "İndir & kur"un yerinde belirir,
+  // çift tıklamanın ikinci tıkı yeni başlayan kurulumu iptal etmesin (K.iptalTikiGecerli)
+  var kurulumIptalAcilis = 0;
 
   // Ayarlar'daki ve Altyazı kurulum kartındaki "İptal" düğmeleri yalnız kurulum sürerken görünür
   function kurulumIptalDugmeleri(acik) {
@@ -259,10 +262,12 @@ window.KApp = (function () {
       b.hidden = !acik;
       b.disabled = false;
     });
+    kurulumIptalAcilis = acik ? Date.now() : 0;
   }
 
-  function kurulumuIptalEt() {
+  function kurulumuIptalEt(ev) {
     if (!installingLocal || !kurulumJetonu) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, kurulumIptalAcilis)) return;
     ["set-local-cancel", "cap-local-cancel"].forEach(function (id) { if (el(id)) el(id).disabled = true; });
     kurulumJetonu.iptal();
   }
@@ -982,6 +987,7 @@ window.KApp = (function () {
 
     el("set-ffmpeg-recheck").addEventListener("click", function () { checkFfmpeg(true); });
     el("set-ffmpeg-install").addEventListener("click", installFfmpeg);
+    if (el("set-ffmpeg-cancel")) el("set-ffmpeg-cancel").addEventListener("click", ffmpegKurulumunuIptalEt);
     // macOS'ta winget yok — dugme ne yapiyorsa onu yazsin
     // mac'te Homebrew varsa onunla, yoksa dogrudan indirmeyle kurulur
     if (K.MAC && K.brewYolu()) el("set-ffmpeg-install").textContent = "Homebrew ile kur";
@@ -1133,6 +1139,23 @@ window.KApp = (function () {
    * macOS'ta Homebrew varsa once o denenir: kullanicinin sistemiyle uyumlu kalir.
    */
   var ffmpegKuruluyor = false;
+  // Doğrudan indirmenin iptal jetonu: istek kesilir, .part korunur (Homebrew kurulumu yarıda kesilmez)
+  var ffmpegJetonu = null, ffmpegIptalAcilis = 0;
+
+  function ffmpegIptalDugmesi(acik) {
+    var b = el("set-ffmpeg-cancel");
+    if (!b) return;
+    b.hidden = !acik;
+    b.disabled = false;
+    ffmpegIptalAcilis = acik ? Date.now() : 0;
+  }
+
+  function ffmpegKurulumunuIptalEt(ev) {
+    if (!ffmpegKuruluyor || !ffmpegJetonu || ffmpegJetonu.iptalEdildi) return;
+    if (K.iptalTikiGecerli && !K.iptalTikiGecerli(ev, ffmpegIptalAcilis)) return;
+    if (el("set-ffmpeg-cancel")) el("set-ffmpeg-cancel").disabled = true;
+    ffmpegJetonu.iptal();
+  }
 
   async function installFfmpeg() {
     if (ffmpegKuruluyor) return;
@@ -1157,7 +1180,9 @@ window.KApp = (function () {
         say("Homebrew kuramadı, doğrudan indiriliyor…");
       }
 
-      await KEngine.installFfmpeg(say);
+      ffmpegJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
+      ffmpegIptalDugmesi(!!ffmpegJetonu);
+      await KEngine.installFfmpeg(say, ffmpegJetonu);
       var ff = await K.findFfmpeg(true);
       if (ff) {
         toast("ffmpeg hazır — altyazı alabilirsin", "good");
@@ -1167,13 +1192,24 @@ window.KApp = (function () {
         throw new Error("kurulum sonrası doğrulanamadı");
       }
     } catch (e) {
-      var m = K.hataYardimi(e);
-      box.className = "inline-status bad";
-      box.textContent = "✕ " + m;
-      toast(m, "bad", 12000);
-      K.log("ffmpeg kurulumu basarisiz: " + (e && e.message ? e.message : e));
+      if (e && e.iptal) {
+        // kullanıcı iptal etti: hata değil; inen kısım korunur, yeniden kurunca kaldığı yerden devam eder
+        var mi = e.message || "İptal edildi";
+        box.className = "inline-status warn";
+        box.textContent = mi;
+        toast(mi, "warn", 8000);
+        K.log("ffmpeg kurulumu iptal edildi");
+      } else {
+        var m = K.hataYardimi(e);
+        box.className = "inline-status bad";
+        box.textContent = "✕ " + m;
+        toast(m, "bad", 12000);
+        K.log("ffmpeg kurulumu basarisiz: " + (e && e.message ? e.message : e));
+      }
     } finally {
       ffmpegKuruluyor = false;
+      ffmpegJetonu = null;
+      ffmpegIptalDugmesi(false);
       if (btn) { btn.disabled = false; btn.textContent = eskiEtiket; }
     }
   }

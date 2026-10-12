@@ -234,6 +234,21 @@ window.K = (function () {
     return j;
   }
 
+  /*
+   * Çift tıklama koruması: iş başlayınca "İptal" başlatma düğmesinin YERİNE geçiyor
+   * (Altyazı oluştur, Sessizlikleri bul, İndir & kur). Çift tıklamanın ikinci tıkı aynı
+   * noktada "İptal"e düşüp yeni başlayan işi iptal etmesin: düğme göründükten sonraki
+   * IPTAL_ACILIS_MS içindeki tık ve çoklu tıkın (event.detail > 1) devamı yok sayılır.
+   *   ev      click olayı (klavyeyle basışta detail 0: geçerli)
+   *   acilis  düğmenin göründüğü an (Date.now()); 0/boş ise süre denetimi yok
+   */
+  var IPTAL_ACILIS_MS = 500;
+  function iptalTikiGecerli(ev, acilis, simdi) {
+    if (ev && typeof ev.detail === "number" && ev.detail > 1) return false;
+    var t = typeof simdi === "number" ? simdi : Date.now();
+    return !(acilis > 0 && t >= acilis && t - acilis < IPTAL_ACILIS_MS);
+  }
+
   // Kullanıcı iptal etti: hata değil (çağıran "İptal edildi" uyarısı gösterir, hata rehberine gitmez)
   function iptalHatasi(mesaj) {
     var e = new Error(mesaj || "İptal edildi");
@@ -1435,6 +1450,8 @@ window.K = (function () {
     run: run,
     iptalJetonu: iptalJetonu,
     iptalHatasi: iptalHatasi,
+    iptalTikiGecerli: iptalTikiGecerli,
+    IPTAL_ACILIS_MS: IPTAL_ACILIS_MS,
     settingsPath: settingsPath,
     extensionPath: extensionPath,
     httpUpload: httpUpload,

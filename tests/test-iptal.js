@@ -168,6 +168,14 @@ async function surecTestleri() {
   ok("jeton: bırakılan dinleyici çağrılmaz, iptal bir kez, sonradan dinleyen hemen çağrılır", say === 1 && hemen === 1 && j5.iptalEdildi === true, "say=" + say + " hemen=" + hemen);
   var hata = w5.K.iptalHatasi();
   ok("iptalHatasi: e.iptal ve 'İptal edildi', özel mesaj", hata.message === "İptal edildi" && hata.iptal === true && w5.K.iptalHatasi("x").message === "x");
+
+  /* ---------- çift tıklama koruması: İptal, başlatma düğmesinin yerinde belirir ---------- */
+  var G = w5.K.iptalTikiGecerli, A = 100000, MS = w5.K.IPTAL_ACILIS_MS;
+  ok("çift tık: düğme göründükten hemen sonraki (ikinci) tık iptal etmez", MS >= 400 && MS <= 600 &&
+    G({ detail: 1 }, A, A + 150) === false && G({ detail: 1 }, A, A + MS - 1) === false);
+  ok("çift tık: çoklu tıkın devamı (event.detail > 1) iptal etmez, süre geçmiş olsa bile", G({ detail: 2 }, A, A + 5000) === false && G({ detail: 3 }, A, A + 5000) === false);
+  ok("çift tık: süre dolunca tek tık ve klavye (detail 0) iptal eder; açılış anı yoksa süre denetimi yok",
+    G({ detail: 1 }, A, A + MS) === true && G({ detail: 0 }, A, A + 2000) === true && G({ detail: 1 }, 0, A) === true && G(undefined, A, A + MS + 1) === true);
 }
 
 /* ---------- indirme ve yükleme iptali (gerçek HTTP) ---------- */

@@ -7,6 +7,8 @@
 //   * rehber kurulumu kurulu cuBLAS motorunu CPU sürümüyle ezmez
 //   * installFfmpeg kilidi ilerlemeyi her bekleyene iletir
 //   * 3.2 İptal: işi başlatanın jetonu indirmeyi keser (.part korunur); sonradan katılanınki yalnız kendi beklemesini
+//     ("Bekleme iptal edildi" der, indirme sürer); iptal edilen katılan artık ffmpeg ilerlemesi almaz;
+//     GPU ısınması başarısız olunca inen CPU motoru da jetonla kesilir ("Hazır" denmez)
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var SO = require(path.join(__dirname, "..", "js", "onboarding-steps.js"));
 var gecen = 0, toplam = 0;
@@ -76,7 +78,8 @@ function motor(opts) {
     },
     unzip: function () { return Promise.resolve(false); },
     rmrf: function () {},
-    run: function () { return Promise.resolve({ code: 0, stdout: "", stderr: "" }); }
+    tmpDir: function () { return "/sanal/tmp"; },
+    run: opts.run || function () { return Promise.resolve({ code: 0, stdout: "", stderr: "" }); }
   };
   vfs["/sanal"] = -1; vfs[kok] = -1;
   var ctx = { window: {}, K: K, setTimeout: setTimeout, Promise: Promise, Math: Math, JSON: JSON, Error: Error,
@@ -208,6 +211,59 @@ Promise.all([a, b]).then(function (r) {
     setTimeout(function () { j10.iptal(); }, 20);
     return f10.then(function () { ok("iptal edilen ffmpeg kurulumu başarılı dönmemeli", false); }, function (e) {
       ok("installFfmpeg iptali: e.iptal, ikinci aynaya geçilmez", e && e.iptal === true && m10.indirmeler.length === 1, JSON.stringify(m10.indirmeler.map(function (x) { return x.anahtar; })));
+    });
+  });
+}).then(function () {
+  // İnceleme bulguları (3.2 adım 3): katılanın iptali, ffmpeg dinleyicisi, GPU ısınması sonrası CPU indirmesi
+  function jeton() {
+    var d = [], j = { iptalEdildi: false, iptal: function () { if (j.iptalEdildi) return; j.iptalEdildi = true; d.splice(0).forEach(function (f) { f(); }); },
+      dinle: function (f) { if (j.iptalEdildi) { f(); return function () {}; } d.push(f); return function () { var k = d.indexOf(f); if (k !== -1) d.splice(k, 1); }; } };
+    return j;
+  }
+  // (a) jetonsuz başlatılmış model indirmesine katılanın İptal'i "indirme iptal edildi" DEMEZ: indirme sürüyor
+  var m11 = motor({ yavas: true });
+  var sahip11 = jeton(), katilan11 = jeton();
+  var a11 = m11.E.installModel("small", function () {}, sahip11);
+  var b11 = m11.E.installModel("small", function () {}, katilan11);
+  ok("aynı jetonla katılan işin kendisini alır (bekleme sarmalı yok)", m11.E.installModel("small", function () {}, sahip11) === a11);
+  setTimeout(function () { katilan11.iptal(); }, 20);
+  return b11.then(function () { ok("katılanın beklemesi iptal edilmeliydi", false); }, function (e) {
+    ok("katılan iptali: 'Bekleme iptal edildi — başka bir kurulum…' (indirme durdu denmez)",
+      e && e.iptal === true && /^Bekleme iptal edildi/.test(e.message) && !/inen kısım korundu/.test(e.message), e && e.message);
+    return a11.then(function (r) { ok("katılan iptalinden sonra indirme sürer ve biter", !!(r && r.model) && m11.indirmeler.length === 1); });
+  }).then(function () {
+    // (b) Altyazı oluştur arkadaki ffmpeg kurulumuna katılıp İptal edince durum satırına ilerleme yazılmaz
+    var m12 = motor({ yavas: true });
+    var arka = jeton(), altyazi = jeton();
+    var a = [], b = [], iptalSonrasiB = -1;
+    var f1 = m12.E.installFfmpeg(function (x) { a.push(x); }, arka);
+    var f2 = m12.E.installFfmpeg(function (x) { b.push(x); }, altyazi);
+    var aIptalde = -1;
+    setTimeout(function () { aIptalde = a.length; iptalSonrasiB = b.length; altyazi.iptal(); }, 20);
+    return f2.then(function () { ok("katılan ffmpeg beklemesi iptal edilmeliydi", false); }, function (e) {
+      ok("ffmpeg katılan iptali: e.iptal, bekleme mesajı", e && e.iptal === true && /^Bekleme iptal edildi/.test(e.message), e && e.message);
+      return f1.then(function () { return null; }, function () { return null; });
+    }).then(function () {
+      ok("iptal edilen katılan artık ilerleme almaz; işi başlatan almaya devam eder",
+        iptalSonrasiB >= 1 && b.length === iptalSonrasiB && a.length > aIptalde, "a=" + JSON.stringify(a) + " b=" + JSON.stringify(b));
+    });
+  }).then(function () {
+    // (c) GPU ısınması "engine-run" ile başarısız → CPU motoru iner; İptal o indirmeyi de keser
+    var m13 = motor({
+      yavas: true, ffmpeg: true, ayarlar: { provider: "local", engineBuild: "cuda" },
+      run: function (exe) { return Promise.resolve(/whisper-cli/.test(exe) ? { code: 1, stdout: "", stderr: "CUDA error" } : { code: 0, stdout: "", stderr: "" }); }
+    });
+    var j13 = jeton();
+    var is13 = m13.E.install({ modelId: "small", useGpu: true, iptal: j13 });
+    var bekci = setInterval(function () {
+      if (m13.indirmeler.some(function (x) { return x.anahtar === "motor:cpu"; })) { clearInterval(bekci); j13.iptal(); }
+    }, 5);
+    return is13.then(function () { clearInterval(bekci); ok("GPU ısınması sonrası CPU indirmesi iptal edilince kurulum 'Hazır' dönmemeli", false); }, function (e) {
+      clearInterval(bekci);
+      var cpu = m13.indirmeler.filter(function (x) { return x.anahtar === "motor:cpu"; });
+      ok("ısınma sonrası CPU motoru indirmesi jetonu taşır ve iptal e.iptal ile biter",
+        cpu.length === 1 && cpu[0].iptal === j13 && e && e.iptal === true && /inen kısım korundu/.test(e.message), (e && e.message) + " " + JSON.stringify(m13.indirmeler.map(function (x) { return x.anahtar; })));
+      ok("kilit bırakılır, derleme 'cpu' diye kaydedilmez", m13.E.kurulumSuruyor() === false && m13.ayarlar.engineBuild === "cuda");
     });
   });
 }).then(function () {

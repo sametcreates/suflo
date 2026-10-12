@@ -2715,7 +2715,7 @@
     "canlı": "live",
     "Canlı transkripsiyon": "Live transcription",
     "Geçici satırlar: motor bitince düzenlenebilir altyazıyla değişir.": "Provisional lines: replaced by editable captions when the engine finishes.",
-    "İşi durdurur: geçici ses ve motor dosyaları silinir, ekrandaki altyazı olduğu gibi kalır.": "Stops the job: temporary audio and engine files are deleted, and the captions on screen stay as they are.",
+    "İşi durdurur: geçici ses ve çıktı dosyaları silinir (kurulu motor ve model kalır), ekrandaki altyazı olduğu gibi kalır.": "Stops the job: temporary audio and output files are deleted (the installed engine and model are kept), and the captions on screen stay as they are.",
     "Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez. Bitince İptal açılır.": "Premiere is exporting the audio; this step can't be interrupted. Cancel becomes available when it's done.",
     "İptal ediliyor…": "Canceling…",
     "İptal edildi.": "Canceled.",
@@ -2725,7 +2725,9 @@
     // engine / model / ffmpeg download cancel (Settings and the caption setup card)
     "İndirmeyi iptal et": "Cancel download",
     "İnen kısım korunur; yeniden kurunca kaldığı yerden devam eder": "The downloaded part is kept; installing again resumes where it left off",
-    "İndirme iptal edildi — inen kısım korundu, yeniden başlatınca kaldığı yerden devam eder.": "Download canceled — the downloaded part was kept; starting again resumes where it left off."
+    "İndirme iptal edildi — inen kısım korundu, yeniden başlatınca kaldığı yerden devam eder.": "Download canceled — the downloaded part was kept; starting again resumes where it left off.",
+    // Cancel while waiting on a download another install started (guide, Doctor, Create captions): that download keeps going
+    "Bekleme iptal edildi — başka bir kurulum indirmeye devam ediyor.": "Stopped waiting — another install is still downloading."
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

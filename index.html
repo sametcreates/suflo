@@ -508,7 +508,7 @@
         <span class="btn-label">Altyazı oluştur<em id="cap-go-scope">Seçili klip</em></span>
       </button>
       <!-- İş sürerken "Altyazı oluştur"un yerini alır (js/captions.js setBusy); ses dışa aktarımı sırasında kapalı -->
-      <button id="cap-cancel" class="btn outline big iptal-btn" type="button" hidden title="İşi durdurur: geçici ses ve motor dosyaları silinir, ekrandaki altyazı olduğu gibi kalır.">İptal</button>
+      <button id="cap-cancel" class="btn outline big iptal-btn" type="button" hidden title="İşi durdurur: geçici ses ve çıktı dosyaları silinir (kurulu motor ve model kalır), ekrandaki altyazı olduğu gibi kalır.">İptal</button>
       <button id="cap-restore" class="btn outline big" hidden></button>
       <button id="cap-shorts-al" class="btn outline big" type="button" hidden title="Bu sekans Suflo'nun Shorts sekansı: ana videonun transkriptinden bu anın satırları yüklenir"></button>
       <button id="cap-import-srt" class="btn outline big">
@@ -1936,6 +1936,7 @@
       </div>
       <div class="row">
         <button id="set-ffmpeg-install" class="btn">ffmpeg’i indir ve kur</button>
+        <button id="set-ffmpeg-cancel" class="btn" type="button" hidden title="İnen kısım korunur; yeniden kurunca kaldığı yerden devam eder">İptal</button>
         <button id="set-ffmpeg-recheck" class="btn ghost">Yeniden dene</button>
       </div>
       <div class="field" style="margin-top:8px">
