@@ -424,6 +424,8 @@
    *   secenek.maxWords: satır modlarında kelime sınırı (0 = kapalı, 2..12)
    *   secenek.birlestir: kısa parçaları birleştir (varsayılan açık; kelime modlarında hiç)
    *   secenek.minSure / maxSure: satır modlarında en kısa / en uzun ekran süresi (0,8 / 6 sn)
+   *   secenek.sonSinir: en kısa süre uzatmasının üst sınırı, sekans zamanı (klip / In-Out / ses sonu);
+   *           verilmezse motor satırlarının en geç bitişi: son satır sesin ötesine uzamaz
    * l32/l42/c42x2 satırları ölçülmüş kelimelerden kurulur (caption-layout.js kelimedenSatirlar);
    * kelime yoksa l32/l42 bugünkü c32/c42 yolunun aynısıdır, c42x2 aynı yolu iki satırlık bütçeyle izler.
    * Döner: { segments, mode } — mode: "k1" | "kc" | "w" | "plain"
@@ -481,36 +483,97 @@
   /*
    * Bozuk kelime zamanı: motor kelimeleri bir ana yığmış (belirteç zamanı gelmemiş). Ölçüt:
    *   - bir satırın 5+ kelimesi, kelime başına 0,06 sn'den az aralıkla başlıyor (saniyede ~16+ kelime:
-   *     konuşmada olmaz), ya da
-   *   - 8+ kelimenin hepsi 1 sn'den kısa bir aralıkta başlıyor (k1 / kc korumasıyla aynı ölçüt).
+   *     konuşmada olmaz): kelimeSegmentiBozuk, ya da
+   *   - 8+ kelimenin hepsi 1 sn'den kısa bir aralıkta başlıyor (k1 / kc korumasıyla aynı ölçüt):
+   *     kelimelerHepsiYigili.
+   * kelimeZamaniBozuk: ikisinden biri (tek bir bozuk satır yeter). Satır modu bütün transkripti yalnız
+   * ikinci ölçütte (ya da HER satır bozukken) kelimesiz kurar; tek tük bozuk satırın kelimeleri kendi
+   * satırına yayılır, sağlam satırlar ölçülmüş kelimelerini korur (satirModu).
    */
-  function kelimeZamaniBozuk(segs) {
-    var tMin = Infinity, tMax = -Infinity, say = 0;
-    for (var i = 0; i < (segs || []).length; i++) {
-      var s = segs[i];
-      if (!kelimeli(s)) continue;
-      var bas = Infinity, son = -Infinity, n = 0;
-      for (var j = 0; j < s.words.length; j++) {
-        var t = Number(s.words[j] && s.words[j].start);
-        if (!isFinite(t)) continue;
-        n++;
-        if (t < bas) bas = t;
-        if (t > son) son = t;
-      }
-      if (!n) continue;
-      if (n >= 5 && son - bas < 0.06 * (n - 1)) return true;
-      say += n;
-      if (bas < tMin) tMin = bas;
-      if (son > tMax) tMax = son;
+  // Satırın geçerli kelime başlangıçları: { n, bas, son } (kelimesizse n = 0)
+  function kelimeAraligi(s) {
+    var bas = Infinity, son = -Infinity, n = 0;
+    if (!kelimeli(s)) return { n: 0, bas: bas, son: son };
+    for (var j = 0; j < s.words.length; j++) {
+      var t = Number(s.words[j] && s.words[j].start);
+      if (!isFinite(t)) continue;
+      n++;
+      if (t < bas) bas = t;
+      if (t > son) son = t;
     }
+    return { n: n, bas: bas, son: son };
+  }
+  function kelimeSegmentiBozuk(s) {
+    var a = kelimeAraligi(s);
+    return a.n >= 5 && a.son - a.bas < 0.06 * (a.n - 1);
+  }
+  function kelimelerHepsiYigili(segs) {
+    var tMin = Infinity, tMax = -Infinity, say = 0;
+    (segs || []).forEach(function (s) {
+      var a = kelimeAraligi(s);
+      if (!a.n) return;
+      say += a.n;
+      if (a.bas < tMin) tMin = a.bas;
+      if (a.son > tMax) tMax = a.son;
+    });
     return say >= 8 && tMax - tMin < 1;
+  }
+  function kelimeZamaniBozuk(segs) {
+    var saglam = [];
+    for (var i = 0; i < (segs || []).length; i++) {
+      if (kelimeSegmentiBozuk(segs[i])) return true;
+      saglam.push(segs[i]);
+    }
+    return kelimelerHepsiYigili(saglam);
+  }
+
+  /*
+   * Bozuk satırın kelimeleri (bir ana yığılmış) satırın kendi süresine karakter ağırlığıyla yayılır:
+   * stil motorunun kelimesiz satırdaki yedeğiyle aynı tahmin. VAD'ın uzattığı satır sonu önce makul
+   * okuma süresine kırpılır (trimOverlongCues): yoksa kelimeler aralarındaki boşlukta tek tek kırılırdı.
+   * Kelime metinleri ve p korunur; girdi değişmez.
+   */
+  function kelimeleriYay(s) {
+    var kopya = {};
+    for (var k in s) if (Object.prototype.hasOwnProperty.call(s, k) && k !== "words") kopya[k] = s[k];
+    var bas = Number(s.start), son = Number(s.end);
+    if (!isFinite(bas)) bas = 0;
+    if (!isFinite(son) || son < bas) son = bas;
+    son = Math.max(bas, Number(trimOverlongCues([{ start: bas, end: son, text: String(s.text || "") }])[0].end) || bas);
+    var kelimeler = s.words.filter(function (w) { return w && String(w.text == null ? "" : w.text).trim(); });
+    var toplam = 0;
+    kelimeler.forEach(function (w) { toplam += Math.max(1, String(w.text).trim().length); });
+    var acc = 0;
+    kopya.words = kelimeler.map(function (w) {
+      var a = bas + (son - bas) * (acc / toplam);
+      acc += Math.max(1, String(w.text).trim().length);
+      var y = { text: w.text, start: Math.round(a * 1000) / 1000, end: Math.round((bas + (son - bas) * (acc / toplam)) * 1000) / 1000 };
+      if (w.p !== undefined) y.p = w.p;
+      return y;
+    });
+    if (!kopya.words.length) delete kopya.words;
+    return kopya;
+  }
+
+  // Satır modunda ekran süresi uzatmasının üst sınırı: verilen ses / klip sonu, yoksa motor satırlarının
+  // en geç bitişi (son satır sesin, klibin ya da sekansın sonundan öteye uzamasın)
+  function uzamaSiniri(liste, secenek) {
+    var verilen = Number(secenek && secenek.sonSinir);
+    if (secenek && secenek.sonSinir !== null && secenek.sonSinir !== undefined && secenek.sonSinir !== "" &&
+        isFinite(verilen) && verilen > 0) return verilen;
+    var enGec = -Infinity;
+    (liste || []).forEach(function (s) {
+      var e = Number(s && s.end);
+      if (isFinite(e) && e > enGec) enGec = e;
+    });
+    return isFinite(enGec) ? enGec : undefined;
   }
 
   // Okunabilir satır modu (l32 / l42 / c42x2): ayar = CL.uzunlukAyari(lenVal)
   function satirModu(liste, ayar, olculmus, secenek) {
     var o = {
       maxChars: ayar.maxChars, maxLines: ayar.maxLines, maxWords: secenek.maxWords, araKir: 0.6,
-      minSure: secenek.minSure, maxSure: secenek.maxSure, aralik: 0.2
+      minSure: secenek.minSure, maxSure: secenek.maxSure, aralik: 0.2, sonSinir: uzamaSiniri(liste, secenek)
     };
     function sure(x, v, enAz) { var n = Number(x); return x !== null && x !== undefined && x !== "" && isFinite(n) && n >= enAz ? n : v; }
     o.minSure = sure(secenek.minSure, 0.8, 0);
@@ -518,9 +581,25 @@
     if (o.maxSure < o.minSure) o.maxSure = o.minSure;
     var birlestir = secenek.birlestir !== false;
     var temiz = cleanSegments(liste, secenek);
-    // bozuk kelime zamanı (motor kelimeleri bir ana yığmış): ölçülmüş kelimeler bırakılır, satırlar
-    // segment zamanlarıyla kurulur (k1 korumasının "satır modunu kullan" önerisi burada çalışmalı)
-    if (olculmus && kelimeZamaniBozuk(temiz)) { temiz = WW.kelimesizKopya(temiz); olculmus = false; }
+    // bozuk kelime zamanı (motor kelimeleri bir ana yığmış): bütün kelimeler bir anda ya da HER kelimeli
+    // satır bozuksa ölçülmüş kelimeler bırakılır, satırlar segment zamanlarıyla kurulur (k1 korumasının
+    // "satır modunu kullan" önerisi burada çalışmalı). Yalnız bazı satırlar bozuksa (ör. sondaki yığılmış
+    // "İzlediğiniz için teşekkürler") yalnız onların kelimeleri kendi satırına yayılır: sağlam satırlar
+    // ölçülmüş kelimelerini (satır içi karaoke, kelime hizalama, ölçülmüş bölme) korur.
+    if (olculmus) {
+      var kelimeliSay = 0, bozukSay = 0;
+      temiz.forEach(function (s) {
+        if (!kelimeli(s)) return;
+        kelimeliSay++;
+        if (kelimeSegmentiBozuk(s)) bozukSay++;
+      });
+      if (kelimelerHepsiYigili(temiz) || (kelimeliSay && bozukSay === kelimeliSay)) {
+        temiz = WW.kelimesizKopya(temiz);
+        olculmus = false;
+      } else if (bozukSay) {
+        temiz = temiz.map(function (s) { return kelimeSegmentiBozuk(s) ? kelimeleriYay(s) : s; });
+      }
+    }
     var cues;
     if (olculmus && temiz.length && temiz.every(kelimeli) && !temiz.some(function (x) { return BOSLUKSUZ_YAZI.test(x.text); })) {
       // ölçülmüş kelimelerden: segment sınırını aşar; karakter, kelime, duraklama, cümle sonu ve sürede kırılır.
@@ -849,6 +928,8 @@
     splitLong: splitLong,
     segmentleriKur: segmentleriKur,
     kelimeZamaniBozuk: kelimeZamaniBozuk,
+    kelimeSegmentiBozuk: kelimeSegmentiBozuk,
+    kelimelerHepsiYigili: kelimelerHepsiYigili,
     parseGlossary: parseGlossary,
     trReplace: trReplace
   };

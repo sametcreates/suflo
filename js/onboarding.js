@@ -551,7 +551,7 @@ window.KOnboarding = (function () {
         durum("Örnek klibin altyazısı çıkarılıyor…");
         basarili = await KCaptions.go({ ornek: { wav: yerel.wav, mp3: yerel.mp3 || "", lang: o.m.lang, offset: offset, sure: o.m.sure } });
       } else {
-        basarili = KCaptions.ornekYukle(veri, offset);
+        basarili = KCaptions.ornekYukle(veri, offset, o.m.sure);
         if (basarili) KApp.toast("Örnek transkript yüklendi. Motoru kurunca kendi kliplerinden de böyle çıkar.", "good", 7000);
       }
       if (basarili) {

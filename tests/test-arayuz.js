@@ -377,8 +377,8 @@ ok("Ayarlar › Altyazı: anahtar app.js'te bağlı (sesEtiketKoru yüklenir ve 
   /el\("set-ses-etiket"\)\.addEventListener\("change", function \(\) \{\s*K\.settings\(\)\.sesEtiketKoru = this\.checked;\s*K\.saveSettings\(\);/.test(appSrc));
 // 3.2 adım 4: ses etiketi ayarı kelime sınırı, birleştirme ve sürelerle aynı seçenek nesnesinde (kurSecenekleri)
 ok("Ses etiketlerini koru: altyazı satır kurma yolları ayarı geçirir (go + rehber örneği)",
-  (capSrc.match(/CT\.segmentleriKur\([a-z]+, lenVal, kurSecenekleri\(\)\)/g) || []).length === 2 &&
-  /function kurSecenekleri\(\) \{[\s\S]*?etiketKoru: sesEtiketKoru\(\),/.test(capSrc) &&
+  (capSrc.match(/CT\.segmentleriKur\([a-z]+, lenVal, kurSecenekleri\([a-zA-Z]*\)\)/g) || []).length === 2 &&
+  /function kurSecenekleri\(sonSinir\) \{[\s\S]*?etiketKoru: sesEtiketKoru\(\),/.test(capSrc) &&
   /return K\.settings\(\)\.sesEtiketKoru === true;/.test(capSrc));
 ok("Sessiz ses: uyarı kutuları durum satırının hemen altında, gizli başlar, düğmeler 'Yine de devam et' / 'Vazgeç'",
   html.indexOf('id="cap-sessiz"') > html.indexOf('id="cap-status"') && html.indexOf('id="tc-sessiz"') > html.indexOf('id="tc-status"') &&

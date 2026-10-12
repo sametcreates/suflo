@@ -160,6 +160,13 @@ ok("zamanHijyeni: hiçbir satır sonrakiyle çakışmaz", zh.every(function (x, 
 ok("zamanHijyeni: sonraki satıra 0,08 sn boşluk bırakır (kırpma 0,25 sn'den kısa bırakmıyorsa)", Math.abs(zh[2].end - 12.52) < 1e-9, zh[2].end);
 var siki = CL.zamanHijyeni([c(5, 5.1, "a"), c(5.15, 6, "b")], {});
 ok("zamanHijyeni: sıkışık satırda sonrakinin başında biter (çakışma yok)", siki[0].end <= siki[1].start && siki[0].end > siki[0].start, J(siki));
+var tv = CL.zamanHijyeni([c(0, 0.3, "kısa"), c(9.5, 9.7, "son")], { minSure: 0.8, sonSinir: 10 });
+ok("zamanHijyeni sonSinir: son satır sınırda durur, ortadaki satır yine en kısa süreye uzar",
+  Math.abs(tv[1].end - 10) < 1e-9 && Math.abs(tv[0].end - 0.8) < 1e-9, J(tv.map(function (x) { return [x.start, x.end]; })));
+ok("zamanHijyeni sonSinir: satır kendi bitişinden kısalmaz; geçersiz sınır yok sayılır",
+  CL.zamanHijyeni([c(9.5, 9.9, "son")], { sonSinir: 9.6 })[0].end === 9.9 &&
+  Math.abs(CL.zamanHijyeni([c(9.5, 9.7, "son")], { sonSinir: 0 })[0].end - 10.3) < 1e-9 &&
+  Math.abs(CL.zamanHijyeni([c(9.5, 9.7, "son")], { sonSinir: "x" })[0].end - 10.3) < 1e-9);
 var zw = CL.zamanHijyeni([c(0, 10, "a b", [{ text: "a", start: 0, end: 1 }, { text: "b", start: 8, end: 9.5 }])], { maxSure: 7 });
 ok("zamanHijyeni: kırpılan satırın kelimeleri satıra sıkışır, sayı korunur", zw[0].words.length === 2 && zw[0].words[1].start === 7 && zw[0].words[1].end === 7, J(zw[0].words));
 ok("zamanHijyeni: sıralar, girdiyi değiştirmez", (function () {
@@ -284,7 +291,7 @@ ok("app.js: süre ayarları ve birleştirme kaydedilir (en uzun ≥ en kısa + 0
 var cap = fs.readFileSync(path.join(KOK, "js", "captions.js"), "utf8").replace(/\r\n/g, "\n");
 function govde(imza) { var i = cap.indexOf(imza); if (i < 0) throw new Error("yok: " + imza); return cap.slice(i, cap.indexOf("\n  }\n", i) + 4); }
 ok("captions.js: satır kurma seçenekleri (etiket, kelime sınırı, birleştirme, süreler) go() ve rehber örneğinde",
-  (cap.match(/CT\.segmentleriKur\([a-z]+, lenVal, kurSecenekleri\(\)\)/g) || []).length === 2 &&
+  (cap.match(/CT\.segmentleriKur\([a-z]+, lenVal, kurSecenekleri\([a-zA-Z]*\)\)/g) || []).length === 2 &&
   /etiketKoru: sesEtiketKoru\(\),\s*maxWords: kelimeSiniri\(\),\s*birlestir: s\.kisaBirlestir !== false,\s*minSure: s\.altyaziMinSure,\s*maxSure: s\.altyaziMaxSure/.test(govde("function kurSecenekleri(")));
 ok("captions.js: metin düzenlemesi kelimeleri LCS ile hizalar (odaktaki kelimelerden, kayma birikmez)",
   /var hiza = CL\.kelimeleriHizala\(odakKelimeleri, inp\.value, segments\[i\]\.start, segments\[i\]\.end, styleLocale\(\) \|\| algilananDil\);/.test(cap));

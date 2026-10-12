@@ -1016,8 +1016,11 @@ window.KCaptions = (function () {
    * Satır kurma seçenekleri (caption-text.js segmentleriKur): ses etiketleri, Satır uzunluğu ›
    * Kelime sınırı (0 = kapalı) ve Ayarlar › Altyazı'daki en kısa / en uzun süre ile kısa parça
    * birleştirme. Süre ve birleştirme yalnız satır modlarında (32/42 karakter, 2 satır × 42) işler.
+   * sonSinir: sesin sekanstaki sonu (klip sonu, Out noktası ya da sekans sonu; sn). En kısa süre
+   * uzatması bunu aşmaz: son satır sekansın ötesine uzayıp katmanı uzatmasın. 0 / yoksa motor
+   * satırlarının en geç bitişi kullanılır.
    */
-  function kurSecenekleri() {
+  function kurSecenekleri(sonSinir) {
     var s = {};
     try { s = K.settings() || {}; } catch (e) { s = {}; }
     return {
@@ -1025,7 +1028,8 @@ window.KCaptions = (function () {
       maxWords: kelimeSiniri(),
       birlestir: s.kisaBirlestir !== false,
       minSure: s.altyaziMinSure,
-      maxSure: s.altyaziMaxSure
+      maxSure: s.altyaziMaxSure,
+      sonSinir: Number(sonSinir) > 0 ? Number(sonSinir) : undefined
     };
   }
 
@@ -2394,12 +2398,14 @@ window.KCaptions = (function () {
       var motorSecenek = null;
 
       var speedFactor = 1;
+      var sesSonu = 0;       // sesin sekanstaki sonu: satır modunda son satır bunun ötesine uzamaz
       var batchClips = null; // coklu klip: [clip, ...] — tek klipte null kalir
       if (ornek) {
         // ornek dosyalari ayar klasorunde kalici: tempFiles'a EKLENMEZ (silinmesin)
         audioSrc = ornek.wav;
         seqOffset = Number(ornek.offset) || 0;
         durHint = Number(ornek.sure) || wavDuration(ornek.wav) || 15;
+        sesSonu = seqOffset + durHint;
         motorSecenek = { dil: ornek.lang || "tr", bulutSes: ornek.mp3 || "" };
       } else if (scope === "clip") {
         iptalDenetle();
@@ -2418,9 +2424,11 @@ window.KCaptions = (function () {
         if (batchClips) {
           // coklu klip: her klip ayri islenir, asagida birlestirilir
           audioSrc = null;
+          batchClips.forEach(function (b) { if (Number(b.clipEnd) > sesSonu) sesSonu = Number(b.clipEnd); });
         } else {
           seqOffset = clip.clipStart;
           durHint = clip.dur;
+          sesSonu = Number(clip.clipEnd) || 0;
           // hiz degistirilmis klipte kaynak suresi != timeline suresi; damgalari olcekle
           var tlDur = clip.clipEnd - clip.clipStart;
           if (clip.dur > 0 && tlDur > 0) speedFactor = tlDur / clip.dur;
@@ -2457,6 +2465,7 @@ window.KCaptions = (function () {
         if (!ex.ok) throw new Error(ex.error);
         seqOffset = ex.offset;
         durHint = wavDuration(ex.wav);
+        if (durHint > 0) sesSonu = (Number(seqOffset) || 0) + durHint;
         status("Ses hazırlanıyor…");
         audioSrc = await convertAudio(ex.wav, { wav: useLocal, durHint: durHint, iptal: aktifIptal });
         tempFiles.push(audioSrc);
@@ -2559,7 +2568,7 @@ window.KCaptions = (function () {
       // Satir kurma tek yerde (caption-text.js): rehberin hazir ornek transkripti de
       // ayni yolu kullanir, iki cikti hic ayrismaz
       var kurulan;
-      try { kurulan = CT.segmentleriKur(mapped, lenVal, kurSecenekleri()); }
+      try { kurulan = CT.segmentleriKur(mapped, lenVal, kurSecenekleri(sesSonu)); }
       catch (eKur) {
         if (eKur && eKur.ayrinti) K.log("karaoke HATA: " + eKur.ayrinti);
         throw eKur;
@@ -2647,13 +2656,15 @@ window.KCaptions = (function () {
    * AYNI satır kurma yolu (CT.segmentleriKur) ve aynı anlık görüntü/geri al akışı.
    *   veri: SufloOnboarding.ornekKelimeleri() çıktısı { lang, words, segments }
    *   offset: klibin sekanstaki başlangıcı (sn)
+   *   sure (isteğe bağlı): örnek klibin süresi (sn); son satır klibin sonunu aşmaz
    */
-  function ornekYukle(veri, offset) {
+  function ornekYukle(veri, offset, sure) {
     if (busy || !veri || !window.SufloOnboarding) return false;
     var lenVal = el("cap-maxlen").value;
     var girdi = window.SufloOnboarding.ornekGirdisi(veri, lenVal, offset);
     if (!girdi.length) return false;
-    var kurulan = CT.segmentleriKur(girdi, lenVal, kurSecenekleri());
+    var ornekSonu = Number(sure) > 0 ? (Number(offset) || 0) + Number(sure) : 0;
+    var kurulan = CT.segmentleriKur(girdi, lenVal, kurSecenekleri(ornekSonu));
     if (!kurulan.segments.length) return false;
     // Ekranda iş varsa üzerine yazmadan önce anlık görüntü: Ctrl+Z geri getirir
     // (anlık görüntü Shorts bayrağını taşır: sıfırlama ONDAN sonra)

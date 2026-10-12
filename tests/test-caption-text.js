@@ -208,6 +208,51 @@ chk("bozuk kelime zamanı: l42 ve c42x2 segment zamanıyla kurulur (kelimesiz yo
   bl42.segments.concat(bx2.segments).every(function (x) { return x.end - x.start >= 0.5 && !x.words; }) && Math.abs(bl42.segments[1].end - 5) < 1e-9,
   JSON.stringify(bl42.segments.map(function (x) { return [x.start, x.end]; })));
 chk("bozuk kelime zamanı: girdi değişmez (kelimeler yerinde)", bozukW[0].words.length === yM1.split(" ").length);
+// Tek bozuk satır (sondaki yığılmış "İzlediğiniz için…") sağlam satırların ölçülmüş kelimelerini düşürmez:
+// yalnız onun kelimeleri kendi satırına yayılır (3.2 adım 4 inceleme bulgusu)
+function akici(bas, metin, adim) { return metin.split(" ").map(function (t, i) { return { text: t, start: +(bas + i * adim).toFixed(3), end: +(bas + i * adim + adim * 0.9).toFixed(3) }; }); }
+function kseg(words) { return { start: words[0].start, end: words[words.length - 1].end, text: words.map(function (w) { return w.text; }).join(" "), words: words }; }
+var tekBozuk = [kseg(akici(0, "Bugün size kamerayla ilgili birkaç şey anlatacağım.", 0.3)), kseg(akici(3.1, "Peki bu neden önemli?", 0.3)),
+  kseg(akici(5.3, "Çünkü ışık her şeydir.", 0.3)), { start: 8.5, end: 11.5, text: "İzlediğiniz için çok teşekkür ederim", words: yigit(8.5, "İzlediğiniz için çok teşekkür ederim") }];
+chk("kelimeSegmentiBozuk / kelimelerHepsiYigili: yalnız yığılmış satır bozuk, transkriptin tümü yığılmış değil",
+  T.kelimeSegmentiBozuk(tekBozuk[3]) === true && !T.kelimeSegmentiBozuk(tekBozuk[0]) && T.kelimelerHepsiYigili(tekBozuk) === false &&
+  T.kelimeZamaniBozuk(tekBozuk) === true);
+["l42", "c42x2"].forEach(function (mod) {
+  var r = T.segmentleriKur(JSON.parse(JSON.stringify(tekBozuk)), mod).segments;
+  var olcu = {};
+  tekBozuk.slice(0, 3).forEach(function (sg) { sg.words.forEach(function (w) { olcu[w.text] = w.start; }); });
+  var saglamTutar = r.filter(function (x) { return x.start < 8; }).every(function (x) {
+    return x.words && x.words.length && x.words.every(function (w) { return olcu[w.text] === w.start; });
+  });
+  var son = r[r.length - 1], sw = son.words || [];
+  var yayildi = sw.length === 5 && sw.every(function (w, i) { return w.start >= 8.5 - 1e-9 && w.end <= son.end + 1e-9 && (i === 0 || w.start > sw[i - 1].start); }) &&
+    sw[4].start > 10;
+  chk("tek bozuk satır (" + mod + "): sağlam satırlar ölçülmüş kelimelerini korur, bozuk satırın kelimeleri kendi süresine yayılır",
+    saglamTutar && yayildi && r.every(function (x) { return x.words && x.words.length; }), JSON.stringify(r.map(function (x) { return [x.start, x.end, x.words ? x.words.length : 0]; })));
+});
+chk("tek bozuk satır: girdi değişmez (yığılmış kelimeler yerinde)", tekBozuk[3].words.every(function (w) { return w.start === 8.5 && w.end === 8.5; }));
+// VAD'ın uzattığı bozuk satır: kelimeler 17 sn'ye değil makul okuma süresine yayılır (tek tek kırılmaz)
+var uzunBozuk = tekBozuk.slice(0, 3).concat([{ start: 8.5, end: 25.5, text: "İzlediğiniz için çok teşekkür ederim", words: yigit(8.5, "İzlediğiniz için çok teşekkür ederim") }]);
+var ub = T.segmentleriKur(uzunBozuk, "l42").segments.filter(function (x) { return x.start >= 8.5; });
+chk("uzatılmış bozuk satır: kelimeler makul süreye yayılır, satır tek kalır", ub.length === 1 && ub[0].end < 13 && (ub[0].words || []).length === 5,
+  JSON.stringify(ub.map(function (x) { return [x.start, x.end]; })));
+// Bütün kelimeler bir anda (8+, 1 sn'den kısa aralık): yine bütün transkript kelimesiz kurulur
+var hepsiBirAnda = [{ start: 3, end: 5, text: "bir iki üç dört", words: yigit(3.1, "bir iki üç dört") }, { start: 5, end: 7, text: "beş altı yedi sekiz", words: yigit(3.2, "beş altı yedi sekiz") }];
+chk("bütün kelimeler aynı anda (satır başına 4): l42 kelimesiz yolla aynı", T.kelimelerHepsiYigili(hepsiBirAnda) === true &&
+  JSON.stringify(T.segmentleriKur(hepsiBirAnda, "l42")) === JSON.stringify(T.segmentleriKur(hepsiBirAnda.map(function (x) { return seg(x.start, x.end, x.text); }), "l42")));
+// Son satır sesin / sekansın ötesine uzamaz (en kısa süre uzatması sonSinir'de durur; 3.2 adım 4 inceleme bulgusu)
+var sonKisa = [kseg([{ text: "Bu", start: 57, end: 57.2 }, { text: "videoyu", start: 57.25, end: 57.7 }, { text: "beğenmeyi", start: 57.75, end: 58.3 }, { text: "unutmayın.", start: 58.35, end: 58.9 }]),
+  kseg([{ text: "Görüşürüz!", start: 59.5, end: 59.95 }])];
+["l42", "c42x2"].forEach(function (mod) {
+  var verilen = T.segmentleriKur(JSON.parse(JSON.stringify(sonKisa)), mod, { sonSinir: 60 }).segments;
+  var verilmez = T.segmentleriKur(JSON.parse(JSON.stringify(sonKisa)), mod).segments;
+  var genis = T.segmentleriKur(JSON.parse(JSON.stringify(sonKisa)), mod, { sonSinir: 120 }).segments;
+  var sV = verilen[verilen.length - 1].end, sY = verilmez[verilmez.length - 1].end, sG = genis[genis.length - 1].end;
+  chk("sonSinir (" + mod + "): son satır sekans sonunda (60) biter, sınır yoksa motorun son bitişini aşmaz, geniş sınırda en kısa süreye uzar",
+    Math.abs(sV - 60) < 1e-9 && Math.abs(sY - 59.95) < 1e-9 && Math.abs(sG - 60.3) < 1e-9 && T.katmanSuresi(sV, 60, 30, false) === 60, [sV, sY, sG].join(" "));
+});
+chk("sonSinir: satır kendi bitişinden kısalmaz (sınır yanlışsa yalnız uzatma durur)",
+  Math.abs(T.segmentleriKur(JSON.parse(JSON.stringify(sonKisa)), "l42", { sonSinir: 59.7 }).segments[1].end - 59.95) < 1e-9);
 chk("kelimesiz c42x2: ses etiketi filtresi ve halüsinasyon temizliği yine çalışır", T.segmentleriKur([seg(0, 2, "[Müzik]"), seg(2, 4, "Merhaba")], "c42x2").segments.map(function (x) { return x.text; }).join("|") === "Merhaba");
 chk("boşluksuz yazı (Japonca) l42: satırlar birleşmez, bugünkü yol", T.segmentleriKur(jp, "l42").segments.length === 2);
 /* metinStili: satır kırılımı korunur */

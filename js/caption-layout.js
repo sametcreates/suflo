@@ -461,7 +461,10 @@
    * uzunsa kırpılır, minSure'den kısaysa sonraki satıra kadar olan BOŞ zamana uzatılır; sonraki satırla
    * arasında en az 0,08 sn kalır, kırpma satırı 0,25 sn'den kısa bırakacaksa satır sonraki satırın başında
    * biter. Hiçbir satır sonrakiyle çakışmaz. Kelimeler satırın içine sıkıştırılır (sayı korunur).
-   * o: { minSure: 0.8, maxSure: 7 }
+   * o.sonSinir (isteğe bağlı): en kısa süre uzatması bu ana kadar (ses / klip / sekans sonu): son satır
+   *   sesin ötesine uzamaz (katman sekansı uzatır, dışa aktarımda siyah kuyruk kalırdı). Satır yine
+   *   kendi bitişinden kısalmaz; sınır yalnız uzatmayı keser.
+   * o: { minSure: 0.8, maxSure: 7, sonSinir: undefined }
    */
   // Raunen: shapeSegments (duration pass)
   function zamanHijyeni(cues, o) {
@@ -471,6 +474,8 @@
     var maxSure = sayi(o.maxSure, 7);
     if (!(maxSure > 0)) maxSure = 7;
     if (maxSure < minSure) maxSure = minSure;
+    var tavan = sayi(o.sonSinir, Infinity);
+    if (!(tavan > 0)) tavan = Infinity;
     var out = (dizi(cues) ? cues : []).filter(Boolean).map(function (c) {
       var y = kopya(c);
       y.start = sayi(c.start, 0);
@@ -484,7 +489,7 @@
       s.start = Math.max(0, s.start);
       if (s.end < s.start) s.end = s.start;
       if (s.end - s.start > maxSure) s.end = s.start + maxSure;
-      if (s.end - s.start < minSure) s.end = s.start + minSure;
+      if (s.end - s.start < minSure) s.end = Math.max(s.end, Math.min(s.start + minSure, tavan));
       var next = out[i + 1];
       if (next && s.end > next.start - BOSLUK) {
         var kirp = ms(next.start - BOSLUK);
