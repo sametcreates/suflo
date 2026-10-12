@@ -132,8 +132,18 @@ ok("args: dizi, her öğe metin (kabuk dizesi yok)", Array.isArray(a1080) && a10
 ok("args: spec bayrakları", ["--ignore-config", "--no-playlist", "--newline", "--no-mtime", "--windows-filenames", "--progress"].every(function (b) { return a1080.indexOf(b) !== -1; }), js(a1080));
 ok("args: ilerleme ve işlem şablonları, after_move yolu", sonraki(a1080, "--progress-template") === "download:" + Y.ILERLEME_SABLONU &&
   a1080.indexOf("postprocess:" + Y.ISLEM_SABLONU) !== -1 && sonraki(a1080, "--print") === "after_move:SUFLOF %(filepath)j" && sonraki(a1080, "--progress-delta") === "0.5");
-ok("args: klasör -P ile (adındaki % şablon sayılmaz), ad şablonu spec + kalite etiketi",
-  sonraki(a1080, "-P") === KLASOR && sonraki(a1080, "-o") === "%(title).150B [%(id)s] 1080p.%(ext)s" && Y.CIKTI_SABLONU === "%(title).150B [%(id)s].%(ext)s");
+ok("args: klasör argümanda yok (-P yok; süreç klasörde çalışır), ad şablonu göreli: spec + kalite etiketi",
+  a1080.indexOf("-P") === -1 && a1080.every(function (x) { return x.indexOf(KLASOR) === -1 && x.indexOf("Proje %1") === -1; }) &&
+  sonraki(a1080, "-o") === "%(title).150B [%(id)s] 1080p.%(ext)s" && Y.CIKTI_SABLONU === "%(title).150B [%(id)s].%(ext)s", js(a1080));
+// macOS: --windows-filenames yt-dlp'de çıktı yolunun HER parçasını temizler (":" "?" → "#"), -P'de $DEGISKEN açılır;
+// mutlak klasör verilseydi dosya "Vlog 12#10/Ne Yapsak#/…" klasörüne inerdi
+var MAC_KLASOR = "/Users/ali/Projeler/Vlog 12:10/Ne Yapsak?/$HOME proje./Suflo İndirilenler";
+["mp3", "720", "1080", "2160"].forEach(function (k) {
+  var am = Y.indirmeArgs({ url: "https://www.youtube.com/watch?v=" + ID, kalite: k, klasor: MAC_KLASOR, ffmpeg: "/opt/homebrew/bin/ffmpeg", etiket: k === "mp3" ? "" : (k === "2160" ? "4K" : k + "p") });
+  ok("args " + k + ": macOS klasörü (':' '?' '$' sondaki nokta) hiçbir argümanda yok, -P yok, -o göreli",
+    am.indexOf("-P") === -1 && am.indexOf("--paths") === -1 && am.every(function (x) { return x.indexOf("Vlog 12") === -1 && x.indexOf("Suflo İndirilenler") === -1; }) &&
+    !/^[\\\/]|^[A-Za-z]:/.test(sonraki(am, "-o")) && am.indexOf("--windows-filenames") !== -1, js(am));
+});
 ok("args: Suflo'nun ffmpeg'i --ffmpeg-location", sonraki(a1080, "--ffmpeg-location") === "C:\\Users\\Ömer\\AppData\\Roaming\\Kesit\\ffmpeg\\ffmpeg.exe");
 ok("args: video biçimi, sıralama (VP9 SDR, AV1/HDR değil) ve MP4 birleştirme", sonraki(a1080, "-f") === Y.formatSecici("1080") && sonraki(a1080, "-S") === "res,fps,vcodec:vp9" &&
   sonraki(a1080, "--merge-output-format") === "mp4" && a1080.indexOf("-x") === -1);

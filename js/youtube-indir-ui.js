@@ -621,8 +621,8 @@ window.KYoutube = (function () {
     try {
       sonuc = await indirmeIsi(j);
       // İndirme bitmişken gelen İptal (dönüştürme / codec yoklaması sırasında): tam dosya silinmez
-      if (sonuc && !sonuc.iptal && j.iptalEdildi) sonuc = { iptal: true, korunan: sonuc.dosya || "", donusumdu: false };
-      if (sonuc && sonuc.iptal) { iptalSonucu(sonuc); return; }
+      if (sonuc && !sonuc.iptal && j.iptalEdildi) sonuc = { iptal: true, korunan: sonuc.dosya || "", donusumdu: false, yeni: !!sonuc.yeni };
+      if (sonuc && sonuc.iptal) { await iptalSonucu(sonuc); return; }
       if (!sonuc || !sonuc.dosya) throw new Error("İndirilen dosya bulunamadı.");
       // Premiere'e ekleme yarıda kesilemez: İptal bu adımda kapalı (hak ve ekleme birlikte)
       iptalKapali = true;
@@ -654,14 +654,33 @@ window.KYoutube = (function () {
     }
   }
 
+  // Pro değil: kapı kurulu denemeyle geçti (İptal anında bakılır; iş sürerken Pro alındıysa Pro sayılır)
+  function denemeKipi() {
+    try { return typeof Pro !== "undefined" && !!Pro && typeof Pro.isPro === "function" && !Pro.isPro(); } catch (e) { return false; }
+  }
+
   /*
    * İptal sonucu. korunan yoksa indirme yarıda kaldı (yarım dosyalar silindi). korunan varsa indirme
-   * bitmişti: tam dosya klasörde durur (Klasörde göster), Premiere'e eklenmez, hak düşmez; yalnız
-   * dönüştürme geçicisi ve yarım dosyalar silindi. Yeniden İndir'de yt-dlp dosyayı "zaten indirildi"
-   * sayar, yalnız dönüştürme yeniden yapılır.
+   * bitmişti (codec yoklaması ya da dönüştürme sırasında İptal):
+   *  - Pro: tam dosya klasörde durur (Klasörde göster), Premiere'e eklenmez; yalnız dönüştürme geçicisi
+   *    ve yarım dosyalar silindi. Yeniden İndir'de yt-dlp dosyayı "zaten indirildi" sayar, yalnız
+   *    dönüştürme yeniden yapılır.
+   *  - Deneme: hak yalnız başarıda düşer, o yüzden tam dosya da verilmez: bu indirmenin oluşturduğu
+   *    dosya silinir (önceden klasörde olan dosyaya dokunulmaz). Silinemezse (kilitli) dosya verilmiş
+   *    sayılır ve hak düşer; yoksa her indirmede dönüştürmeyi iptal edip sınırsız tam dosya alınırdı.
    */
-  function iptalSonucu(s) {
+  async function iptalSonucu(s) {
     if (!s.korunan) { durum("İptal edildi. Yarım dosyalar silindi.", "warn"); return; }
+    if (denemeKipi() && s.yeni) {
+      var kalan = await temizle(K.path.dirname(s.korunan), [K.path.basename(s.korunan)]);
+      if (!kalan && !varMi(s.korunan)) {
+        durum("İptal edildi. Deneme hakkın düşmedi; indirilen dosya da silindi.", "warn");
+        log("iptal: deneme kipi, indirilen dosya silindi");
+        return;
+      }
+      log("iptal: deneme kipi, indirilen dosya silinemedi; hak düşüyor");
+      if (Pro.denemeHarca) Pro.denemeHarca("youtube", KApp.toast);
+    }
     sonDosya = s.korunan;
     var ad = { ad: K.path.basename(s.korunan) };
     durum(s.donusumdu ? ["Dönüştürme iptal edildi. İndirilen dosya klasörde duruyor, Premiere'e eklenmedi: ", ad]
@@ -701,15 +720,18 @@ window.KYoutube = (function () {
       satirlar.forEach(function (s) {
         var x = Y.satirCoz(s);
         if (!x) return;
-        if (x.tur === "dosya") { dosya = x.yol; return; }
+        // yt-dlp hedef klasörde çalışır (cwd): yol mutlak gelir; eski sürüm göreli verirse klasöre göre çözülür
+        if (x.tur === "dosya") { dosya = K.path.resolve(hedef.yol, x.yol); return; }
         var d = iz.besle(x);
         if (d) ilerlemeGoster(d);
       });
     }
     ilerlemeGoster({ asama: "indir", oran: 0 });
     log("indirme: " + id + " " + k + " → " + K.path.basename(hedef.yol));
+    // Klasör argümanda değil çalışma klasöründe: --windows-filenames yalnız göreli dosya adına dokunur
+    // (mutlak -P macOS'ta ":" "?" içeren klasör adlarını "#" yapıp dosyayı başka klasöre indirirdi)
     var r = await K.run(ikili.yol, args, {
-      timeout: 6 * 3600000, iptal: j, surecGrubu: true, env: ytOrtam(),
+      cwd: hedef.yol, timeout: 6 * 3600000, iptal: j, surecGrubu: true, env: ytOrtam(),
       onStdout: function (p) { try { isle(tOut.besle(p)); } catch (e) {} },
       onStderr: function (p) { try { isle(tErr.besle(p)); } catch (e) {} }
     });
@@ -730,14 +752,17 @@ window.KYoutube = (function () {
     }
     if (!dosya || !varMi(dosya)) throw new Error("İndirilen dosya bulunamadı.");
     var jsYok = Y.uyarilar(r.stderr).jsYok;
-    // Buradan sonra İptal tamamlanmış indirmeyi silmez
-    if (j.iptalEdildi) return { iptal: true, korunan: dosya, donusumdu: false };
+    // yeni: dosya bu indirmeyle oluştu (önceden klasörde yoktu). Deneme kipinde İptal yalnız bunu siler.
+    var yeni = onceki.indexOf(K.path.basename(dosya)) === -1;
+    // Buradan sonra İptal tamamlanmış indirmeyi kendiliğinden silmez (deneme kipi: indir → iptalSonucu)
+    if (j.iptalEdildi) return { iptal: true, korunan: dosya, donusumdu: false, yeni: yeni };
     var dn = await premiereIcin(dosya, ff, j);
     if (dn.iptal) {
       await temizle(hedef.yol, Y.hataSilinecekler(listele(hedef.yol), id));
-      return { iptal: true, korunan: varMi(dosya) ? dosya : "", donusumdu: !!dn.donusumdu };
+      return { iptal: true, korunan: varMi(dosya) ? dosya : "", donusumdu: !!dn.donusumdu, yeni: yeni };
     }
-    return { dosya: dn.dosya, kaynak: dosya, not: dn.not, jsYok: jsYok, klasor: hedef.yol };
+    return { dosya: dn.dosya, kaynak: dosya, not: dn.not, jsYok: jsYok, klasor: hedef.yol,
+      yeni: yeni || onceki.indexOf(K.path.basename(dn.dosya)) === -1 };
   }
 
   async function kodlayicilariAl(ff, j) {

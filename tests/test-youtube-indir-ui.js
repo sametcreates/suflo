@@ -99,7 +99,12 @@ function kur(o) {
   }
   function argDeger(a, b) { var i = a.indexOf(b); return i === -1 ? undefined : a[i + 1]; }
   var K = {
-    nodeOK: true, MAC: platform === "darwin", WIN: platform === "win32", fs: fs, path: path,
+    nodeOK: true, MAC: platform === "darwin", WIN: platform === "win32", path: path,
+    // o.silinemez: adı bu kalıba uyan dosya silinemez (Windows'ta kilitli dosya gibi)
+    fs: o.silinemez ? Object.assign(Object.create(fs), { unlinkSync: function (p) {
+      if (o.silinemez.test(String(p))) { var eB = new Error("EBUSY: resource busy or locked"); eB.code = "EBUSY"; throw eB; }
+      return fs.unlinkSync(p);
+    } }) : fs,
     rmrf: function (p) { c.rmrf = (c.rmrf || []).concat([path.basename(p)]); fs.rmSync(p, { recursive: true, force: true }); },
     os: { arch: function () { return "arm64"; }, homedir: function () { return ev; } },
     whisperDir: function () { return path.join(ev, "Suflo", "whisper"); },
@@ -138,7 +143,7 @@ function kur(o) {
     },
     run: function (cmd, args, opts) {
       opts = opts || {};
-      var kayit = { cmd: cmd, args: args.slice(), opts: { surecGrubu: !!opts.surecGrubu, timeout: opts.timeout, iptal: !!opts.iptal, env: opts.env } };
+      var kayit = { cmd: cmd, args: args.slice(), opts: { surecGrubu: !!opts.surecGrubu, timeout: opts.timeout, iptal: !!opts.iptal, env: opts.env, cwd: opts.cwd } };
       c.run.push(kayit);
       if (cmd === exe) {
         // ikili çalıştırıldığı anda diskteki özet: yalnız doğrulanmış dosya çalışmalı
@@ -149,8 +154,9 @@ function kur(o) {
           if (o.bilgiHata) return Promise.resolve({ code: 1, stdout: "", stderr: o.bilgiHata });
           return Promise.resolve({ code: 0, stdout: jCikti(o.j), stderr: o.jsYok ? "WARNING: [youtube] No supported JavaScript runtime could be found." : "" });
         }
-        // indirme: -P klasör, -o şablon
-        var klasor = argDeger(args, "-P"), sablon = argDeger(args, "-o");
+        // indirme: gerçek yt-dlp gibi göreli -o çalışma klasörüne (cwd) iner; -P verilmez
+        if (args.indexOf("-P") !== -1 || !opts.cwd) return Promise.resolve({ code: 1, stdout: "", stderr: "SAHTE: -P verildi ya da cwd yok" });
+        var klasor = opts.cwd, sablon = argDeger(args, "-o");
         var etiket = (/\] ([A-Za-z0-9]+)\.%\(ext\)s$/.exec(sablon) || [])[1];
         var ext = argDeger(args, "--audio-format") || "mp4";
         var ad = "Deneme ⧸ videosu： başlık？ [" + ID + "]" + (etiket ? " " + etiket : "") + "." + ext;
@@ -168,7 +174,7 @@ function kur(o) {
         fs.unlinkSync(parca);
         var son = path.join(klasor, ad);
         fs.writeFileSync(son, "video");
-        var yol = "SUFLOF " + JSON.stringify(son).replace(/[\u007f-\uffff]/g, function (ch) { return "\\u" + ("0000" + ch.charCodeAt(0).toString(16)).slice(-4); }) + "\n";
+        var yol = "SUFLOF " + JSON.stringify(o.goreliYol ? ad : son).replace(/[\u007f-\uffff]/g, function (ch) { return "\\u" + ("0000" + ch.charCodeAt(0).toString(16)).slice(-4); }) + "\n";
         if (opts.onStdout) opts.onStdout(yol);
         if (opts.onStderr) opts.onStderr("SUFLOPP finished Merger\n");
         return Promise.resolve({ code: 0, stdout: metin + yol, stderr: o.jsYok ? "WARNING: No supported JavaScript runtime could be found" : "" });
@@ -289,7 +295,9 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
   ok("indirme argümanları: dizi, süreç grubu, uzun zaman aşımı, kanonik adres en sonda", !!ind && ind.opts.surecGrubu && ind.opts.iptal && ind.opts.timeout >= 3600000 &&
     ind.args[ind.args.length - 1] === "https://www.youtube.com/watch?v=" + ID && ind.args[ind.args.length - 2] === "--", js(ind && ind.args));
   function deger(a, b2) { var i = a.indexOf(b2); return i === -1 ? undefined : a[i + 1]; }
-  ok("indirme: hedef klasör proje yanında, ffmpeg yolu, vekil, 1080p biçimi", deger(ind.args, "-P") === hedefKlasor(b) && deger(ind.args, "--ffmpeg-location") === "/opt/homebrew/bin/ffmpeg" &&
+  ok("indirme: yt-dlp hedef klasörde (proje yanında) çalışır, klasör argümanda yok (-P yok), ffmpeg yolu, vekil, 1080p biçimi",
+    ind.opts.cwd === hedefKlasor(b) && ind.args.indexOf("-P") === -1 && ind.args.every(function (x) { return x.indexOf(hedefKlasor(b)) === -1; }) &&
+    deger(ind.args, "--ffmpeg-location") === "/opt/homebrew/bin/ffmpeg" &&
     deger(ind.args, "--proxy") === "http://vekil.local:3128" && deger(ind.args, "-f") === Y.formatSecici("1080") && deger(ind.args, "-o") === "%(title).150B [%(id)s] 1080p.%(ext)s", js(ind.args));
   var dosya = path.join(hedefKlasor(b), "Deneme ⧸ videosu： başlık？ [" + ID + "] 1080p.mp4");
   ok("dosya indi (yol --print'ten, Unicode kaçışı çözüldü), yarım dosya kalmadı", fs.existsSync(dosya) && fs.readdirSync(hedefKlasor(b)).length === 1, js(fs.readdirSync(hedefKlasor(b))));
@@ -339,8 +347,8 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
     js(kalan) === js([path.basename(baska), path.basename(eskiTam)].sort()), js(kalan));
   ok("İptal: hak düşmez, Premiere'e eklenmez, durum İptal", ip.c.harca.length === 0 && !ip.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) && /İptal edildi/.test(ip.durum()), ip.durum());
 
-  /* ---------- 7b) dönüştürme sırasında İptal: indirilen tam dosya KALIR, yalnız geçici ve yarımlar gider ---------- */
-  var dc = kur({ kurulu: true, ayar: { ytOnay: 1, ytKalite: "2160" }, akis: VP9, donusumdeIptal: true });
+  /* ---------- 7b) Pro: dönüştürme sırasında İptal: indirilen tam dosya KALIR, yalnız geçici ve yarımlar gider ---------- */
+  var dc = kur({ pro: true, ayar: { ytOnay: 1, ytKalite: "2160" }, akis: VP9, donusumdeIptal: true });
   fs.mkdirSync(hedefKlasor(dc), { recursive: true });
   var dcEskiYarim = path.join(hedefKlasor(dc), "Eski [" + ID + "] 4K.f313.webm.part");
   fs.writeFileSync(dcEskiYarim, "y");
@@ -351,7 +359,7 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
   ok("dönüştürmede İptal: indirilen 4K dosya klasörde durur (silinmez), .suflo-tmp ve eski yarım silinir",
     !!dc.c.donusumGecici && /\.suflo-tmp\.mp4$/.test(dc.c.donusumGecici) && fs.existsSync(dcTam) && fs.readFileSync(dcTam, "utf8") === "video" &&
     js(fs.readdirSync(hedefKlasor(dc))) === js([path.basename(dcTam)]), js(fs.readdirSync(hedefKlasor(dc))));
-  ok("dönüştürmede İptal: durum doğru söyler (dosya duruyor, eklenmedi), Klasörde göster açık, hak düşmez, Premiere'e eklenmez",
+  ok("Pro, dönüştürmede İptal: durum doğru söyler (dosya duruyor, eklenmedi), Klasörde göster açık, hak düşmez, Premiere'e eklenmez",
     /^Dönüştürme iptal edildi\. İndirilen dosya klasörde duruyor, Premiere'e eklenmedi: /.test(dc.durum()) && dc.durum().indexOf(path.basename(dcTam)) !== -1 &&
     !/Yarım dosyalar silindi/.test(dc.durum()) && dc.dom["yt-sonuc"].hidden === false && dc.KY._durum().sonDosya === dcTam &&
     dc.c.harca.length === 0 && !dc.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) &&
@@ -359,8 +367,8 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
   await tikla(dc.dom, "yt-klasorde-goster");
   ok("dönüştürmede İptal: Klasörde göster korunan dosyayı seçer", dc.c.run.some(function (r) { return r.cmd === "/usr/bin/open" && js(r.args) === js(["-R", dcTam]); }));
 
-  /* ---------- 7c) indirme bitti, codec yoklamasında İptal: dosya kalır, eklenmez, hak düşmez ---------- */
-  var yk = kur({ kurulu: true, ayar: { ytOnay: 1 }, yoklamadaIptal: true });
+  /* ---------- 7c) Pro: indirme bitti, codec yoklamasında İptal: dosya kalır, eklenmez, hak düşmez ---------- */
+  var yk = kur({ pro: true, ayar: { ytOnay: 1 }, yoklamadaIptal: true });
   yk.dom["yt-url"].value = URL1;
   await tikla(yk.dom, "yt-bilgi");
   await tikla(yk.dom, "yt-indir");
@@ -370,6 +378,62 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
     !!ykYokla && ykYokla.opts.iptal === true && fs.existsSync(ykTam) && js(fs.readdirSync(hedefKlasor(yk))) === js([path.basename(ykTam)]) &&
     yk.c.harca.length === 0 && !yk.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) && !yk.c.donusum &&
     /^İptal edildi\. İndirme bitmişti; dosya klasörde duruyor, Premiere'e eklenmedi: /.test(yk.durum()), yk.durum());
+
+  /* ---------- 7c2) DENEME: indirme bittikten sonra İptal tam dosyayı vermez (hak düşmeden sınırsız indirme olmasın) ---------- */
+  var dd = kur({ kurulu: true, ayar: { ytOnay: 1, ytKalite: "2160" }, akis: VP9, donusumdeIptal: true });
+  fs.mkdirSync(hedefKlasor(dd), { recursive: true });
+  var ddBaska = path.join(hedefKlasor(dd), "Eski [" + ID + "] 720p.mp4");
+  fs.writeFileSync(ddBaska, "eski-tam");
+  dd.dom["yt-url"].value = URL1;
+  await tikla(dd.dom, "yt-bilgi");
+  await tikla(dd.dom, "yt-indir");
+  await bekle(20);
+  ok("deneme, dönüştürmede İptal: bu indirmenin 4K dosyası ve geçicisi silinir; önceki tam dosya kalır",
+    !!dd.c.donusumGecici && js(fs.readdirSync(hedefKlasor(dd))) === js([path.basename(ddBaska)]), js(fs.readdirSync(hedefKlasor(dd))));
+  ok("deneme, dönüştürmede İptal: hak düşmez, Premiere'e eklenmez, durum 'dosya da silindi', Klasörde göster gizli",
+    dd.c.harca.length === 0 && !dd.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) &&
+    dd.durum() === "İptal edildi. Deneme hakkın düşmedi; indirilen dosya da silindi." && dd.dom["yt-sonuc"].hidden === true &&
+    !dd.KY._durum().sonDosya && dd.dom["yt-indir"].hidden === false && dd.dom["yt-iptal"].hidden === true, dd.durum());
+
+  var dy = kur({ kurulu: true, ayar: { ytOnay: 1 }, yoklamadaIptal: true });
+  dy.dom["yt-url"].value = URL1;
+  await tikla(dy.dom, "yt-bilgi");
+  await tikla(dy.dom, "yt-indir");
+  await bekle(20);
+  ok("deneme, codec yoklamasında İptal: indirilen 1080p dosya silinir, hak düşmez, eklenmez",
+    js(fs.readdirSync(hedefKlasor(dy))) === js([]) && dy.c.harca.length === 0 && !dy.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) &&
+    /Deneme hakkın düşmedi/.test(dy.durum()), js([fs.readdirSync(hedefKlasor(dy)), dy.durum()]));
+
+  // önceden klasörde olan aynı dosya (yt-dlp "zaten indirildi"): deneme kipinde de dokunulmaz
+  var dv = kur({ kurulu: true, ayar: { ytOnay: 1 }, yoklamadaIptal: true });
+  fs.mkdirSync(hedefKlasor(dv), { recursive: true });
+  var dvTam = path.join(hedefKlasor(dv), "Deneme ⧸ videosu： başlık？ [" + ID + "] 1080p.mp4");
+  fs.writeFileSync(dvTam, "onceden");
+  dv.dom["yt-url"].value = URL1;
+  await tikla(dv.dom, "yt-bilgi");
+  await tikla(dv.dom, "yt-indir");
+  await bekle(20);
+  ok("deneme, önceden var olan dosya: İptal'de silinmez, hak düşmez", fs.existsSync(dvTam) && dv.c.harca.length === 0 &&
+    /^İptal edildi\. İndirme bitmişti; dosya klasörde duruyor/.test(dv.durum()), dv.durum());
+
+  // silinemeyen (kilitli) dosya: dosya verilmiş sayılır, hak bir kez düşer
+  var dk = kur({ kurulu: true, ayar: { ytOnay: 1 }, yoklamadaIptal: true, silinemez: /\] 1080p\.mp4$/ });
+  dk.dom["yt-url"].value = URL1;
+  await tikla(dk.dom, "yt-bilgi");
+  await tikla(dk.dom, "yt-indir");
+  var dkTam = path.join(hedefKlasor(dk), "Deneme ⧸ videosu： başlık？ [" + ID + "] 1080p.mp4");
+  ok("deneme, dosya silinemezse: dosya klasörde kalır ve hak bir kez düşer (bildirilir), eklenmez",
+    fs.existsSync(dkTam) && js(dk.c.harca) === js(["youtube"]) && dk.c.toast.some(function (t) { return /deneme hakkı kullanıldı/.test(t[0]); }) &&
+    !dk.c.call.some(function (x) { return x.fn === "KS_importDownloaded"; }) && /dosya klasörde duruyor/.test(dk.durum()) && dk.dom["yt-sonuc"].hidden === false, dk.durum());
+
+  /* ---------- 7c3) eski yt-dlp göreli yol yazarsa hedef klasöre göre çözülür ---------- */
+  var gy = kur({ kurulu: true, ayar: { ytOnay: 1 }, goreliYol: true });
+  gy.dom["yt-url"].value = URL1;
+  await tikla(gy.dom, "yt-bilgi");
+  await tikla(gy.dom, "yt-indir");
+  var gyIce = gy.c.call.filter(function (x) { return x.fn === "KS_importDownloaded"; })[0];
+  ok("göreli SUFLOF yolu: Premiere'e hedef klasördeki mutlak yol gider", !!gyIce &&
+    gyIce.arg.path === path.join(hedefKlasor(gy), "Deneme ⧸ videosu： başlık？ [" + ID + "] 1080p.mp4") && js(gy.c.harca) === js(["youtube"]), js(gyIce));
 
   /* ---------- 7d) Premiere'e ekleme adımında İptal kapalı (KS_importDownloaded yarıda kesilemez) ---------- */
   var ie = kur({ kurulu: true, ayar: { ytOnay: 1 }, icedeIptalDene: true });

@@ -2628,6 +2628,8 @@
     "Yarım dosyalar silindi.": "Partial files were deleted.",
     "Dönüştürme iptal edildi. İndirilen dosya klasörde duruyor, Premiere'e eklenmedi": "Conversion canceled. The downloaded file is still in the folder and wasn't added to Premiere",
     "İptal edildi. İndirme bitmişti; dosya klasörde duruyor, Premiere'e eklenmedi": "Canceled. The download had already finished; the file is in the folder and wasn't added to Premiere",
+    "İptal edildi. Deneme hakkın düşmedi; indirilen dosya da silindi.": "Canceled. No trial credit was used; the downloaded file was deleted too.",
+    "Deneme hakkın düşmedi; indirilen dosya da silindi.": "No trial credit was used; the downloaded file was deleted too.",
     "İndirilen dosya bulunamadı.": "The downloaded file wasn't found.",
     // conversion for Premiere
     "Bu ffmpeg'de H.264 kodlayıcısı yok; video Premiere için dönüştürülemedi. Ayarlar › ffmpeg'den Suflo'nun ffmpeg'ini kur.": "This ffmpeg has no H.264 encoder, so the video couldn't be converted for Premiere. Install Suflo's ffmpeg from Settings › ffmpeg.",

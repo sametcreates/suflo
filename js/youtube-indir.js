@@ -342,7 +342,14 @@
    * o: { url, kalite, klasor, ffmpeg (mutlak yol ya da ""), dikey, etiket, surum, jsRuntime, proxy }
    * --print dosya yolunu verir ama sessiz kipe geçirir: --progress ilerlemeyi yine yazdırır (sessiz
    * kipte stderr'e), --progress-delta satırları yarım saniyeye seyreltir (saatlik indirmede çıktı
-   * birikmesin). Klasör -P ile: -o içindeki "%" şablon sayılır, klasör adındaki "%" bozmasın.
+   * birikmesin).
+   * Klasör yt-dlp'ye VERİLMEZ (-P yok): çağıran süreci cwd: klasor ile açar, -o göreli kalır. yt-dlp
+   * --windows-filenames ile çıktı yolunun HER parçasını temizler (macOS'ta da: ":" "?" "|" ve sondaki
+   * boşluk / nokta "#" olur) ve -P değerinde $DEGISKEN açar; mutlak klasör verilseydi Finder'da
+   * "Çekim 12/10" (POSIX "Çekim 12:10") adlı proje klasörü "Çekim 12#10" olur, dosya başka bir
+   * klasöre iner, İptal temizliği yanlış klasöre bakardı. Klasör adındaki "%" de şablon sayılmaz.
+   * klasor yine zorunlu: göreli çıktının nereye ineceğini çağıran bilsin (cwd'siz çağrı Premiere'in
+   * çalışma klasörüne yazardı).
    */
   function indirmeArgs(o) {
     o = o || {};
@@ -356,7 +363,7 @@
       "--progress-template", "download:" + ILERLEME_SABLONU,
       "--progress-template", "postprocess:" + ISLEM_SABLONU,
       "--print", "after_move:" + DOSYA_SABLONU,
-      "-P", String(o.klasor), "-o", sablon
+      "-o", sablon
     ]);
     var ff = ffmpegKonumu(o.ffmpeg);
     if (ff) a.push("--ffmpeg-location", ff);
