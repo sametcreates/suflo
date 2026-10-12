@@ -149,7 +149,12 @@ var ZORUNLU = {
   "cap-vr-sira": "Viral siralama",
   "cap-vr-min": "Yalniz >=60 filtresi",
   "cap-vr-not": "Puan tahmin notu",
-  "cap-vr-liste": "Viral an kartlari"
+  "cap-vr-liste": "Viral an kartlari",
+  // 3.4: canli esikli sessizlik kesimi
+  "cut-minkeep": "Min. konusma kaydiricisi",
+  "cut-minkeep-val": "Min. konusma degeri",
+  "cut-noise-auto": "Otomatik esik dugmesi",
+  "cut-wave": "Ses zarfi tuvali"
 };
 var kayip = [];
 Object.keys(ZORUNLU).forEach(function (id) {
@@ -662,7 +667,62 @@ var cssSrc = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
 ok("CSS: busy düğmesi (inline-flex) gizlenince görünmez; canlı satırlar soluk", /#cap-go\[hidden\], #cut-analyze\[hidden\] \{ display: none !important; \}/.test(cssSrc) &&
   /\.canli-satir \{[^}]*opacity: \.78/.test(cssSrc) && /\.canli-kutu\[hidden\] \{ display: none !important; \}/.test(cssSrc));
 
-bekleyenUI.then(function () {
+/* ---------- 3.4 canlı eşikli sessizlik kesimi: yeni denetimler, deneme hakkı ---------- */
+var cutHtml = html.slice(html.indexOf('id="tab-cut"'), html.indexOf('id="tc-card"'));
+ok("3.4 Kesim: Min. konuşma 0–0.6 sn (varsayılan 0), Otomatik eşiğin yanında, dalga tuvali #cut-bar'ın altında",
+  /<input id="cut-minkeep" type="range" min="0" max="0\.6" step="0\.05" value="0">/.test(cutHtml) &&
+  cutHtml.indexOf('id="cut-noise-auto"') > cutHtml.indexOf('id="cut-noise-val"') && cutHtml.indexOf('id="cut-noise-auto"') < cutHtml.indexOf('id="cut-minsil"') &&
+  /<canvas id="cut-wave"[^>]* hidden/.test(cutHtml) && cutHtml.indexOf('id="cut-wave"') > cutHtml.indexOf('id="cut-bar"'));
+ok("3.4 Kesim: js/sessizlik.js magiccut.js'ten önce yüklenir",
+  betikler.indexOf("js/sessizlik.js") !== -1 && betikler.indexOf("js/sessizlik.js") < betikler.indexOf("js/magiccut.js"));
+ok("3.4 Kesim: CSS taralı ada + dalga tuvali",
+  /\.cut-bar \.cut\.ada \{[^}]*repeating-linear-gradient/.test(cssSrc) && /\.cut-wave \{/.test(cssSrc) && /\.cut-wave\[hidden\] \{ display: none; \}/.test(cssSrc));
+ok("3.4 Kesim: kaydırıcılar ~100 ms toplanır; Pro kapısı değişmedi (analiz ve Uygula 'cut', deneme: true)",
+  /var CANLI_MS = 100;/.test(mcSrc) && /\["cut-noise", "cut-minsil", "cut-pad", "cut-minkeep"\]\.forEach/.test(mcSrc) &&
+  /Pro\.gate\("cut", \{ deneme: true, yeniden: analyze \}\)/.test(mcSrc) && /Pro\.gate\("cut", \{ deneme: true, yeniden: apply \}\)/.test(mcSrc));
+
+// Analiz + kaydırıcı önizlemesi + Otomatik deneme hakkı harcamaz; yalnız Uygula harcar (sahte köprü, ffmpeg yok)
+var kabi = require("./_kesim-kabi.js");
+var bekleyenKesim = (function () {
+  // sahte köprü: runAkis 3 sn'lik mono PCM (1 sn ton, 1 sn sessiz, 1 sn ton) akıtır; run silencedetect çıktısı verir
+  function pcm(sn, genlik) {
+    var b = Buffer.alloc(Math.round(sn * 16000) * 2);
+    for (var i = 0; i < b.length / 2; i++) b.writeInt16LE(Math.round(genlik * Math.sin(i / 3)), 2 * i);
+    return b;
+  }
+  var sahteK = {
+    iptalJetonu: function () { return { iptalEdildi: false, iptal: function () {}, dinle: function () { return function () {}; } }; },
+    baslatTikiGecerli: function () { return true; }, iptalTikiGecerli: function () { return true; },
+    runAkis: function (cmd, args, o) {
+      o.onStderr("Output #0, s16le, to 'pipe:1':\n  Stream #0:0: Audio: pcm_s16le, 16000 Hz, mono, s16, 256 kb/s\n");
+      [pcm(1, 12000), pcm(1, 0), pcm(1, 12000)].forEach(function (b) { o.onData(b); });
+      return Promise.resolve({ code: 0, stderr: "", bayt: 96000 });
+    },
+    run: function () {
+      return Promise.resolve({ code: 0, stdout: "", stderr: "[silencedetect @ 0x1] silence_start: 1.0\n[silencedetect @ 0x1] silence_end: 2.0 | silence_duration: 1.0\n" });
+    }
+  };
+  var p = kabi.kesimPaneli({ K: sahteK, ffmpeg: "ffmpeg", clip: { mediaPath: "a.wav", inPoint: 0, outPoint: 3, clipStart: 0, clipEnd: 3 } });
+  return p.tikla("cut-analyze").then(function () {
+    ok("3.4 analiz: 1 kesim önerisi, dalga görünür, Kesimleri uygula açık, deneme hakkı düşmedi",
+      /^1 kesim/.test(p.el("cut-summary").textContent) && !p.el("cut-wave").hidden && p.el("cut-apply").disabled === false && p.kayit.harca.length === 0,
+      p.el("cut-summary").textContent);
+    p.kaydir("cut-minkeep", "0.3"); p.kaydir("cut-pad", "0.1");
+    p.tikla("cut-noise-auto");
+    return p.bekle(150);
+  }).then(function () {
+    ok("3.4 önizleme: kaydırıcılar + Otomatik (eşik -60'a kırpıldı) hak harcamaz, ffmpeg yeniden çalışmaz",
+      p.kayit.harca.length === 0 && p.kayit.runAkis.length === 1 &&p.kayit.run.length === 0 && p.el("cut-noise").value === "-60",
+      p.kayit.harca.join(",") + " esik " + p.el("cut-noise").value);
+    return p.tikla("cut-apply");
+  }).then(function () {
+    ok("3.4 Uygula: silencedetect doğrulaması koştu, KS_applyCuts çağrıldı, hak bir kez düştü",
+      p.kayit.run.length === 1 && p.kayit.call.length === 1 && p.kayit.call[0].fn === "KS_applyCuts" && p.kayit.harca.length === 1 && p.kayit.harca[0] === "cut",
+      p.kayit.run.length + " " + p.kayit.call.length + " " + p.kayit.harca.join(","));
+  }).catch(function (e) { ok("3.4 kesim kabı çöktü: " + (e && e.stack || e), false); });
+})();
+
+Promise.all([bekleyenUI, bekleyenKesim]).then(function () {
   console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
   process.exit(kaldi ? 1 : 0);
 });

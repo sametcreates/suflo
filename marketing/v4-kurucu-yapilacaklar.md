@@ -1479,3 +1479,29 @@ projendeki 'Suflo İndirilenler' kutusuna gelir (Pro, 3 deneme hakkı)." `js/app
 `js/youtube-indir.js` › `varlikAdaylari` güncellenmeli; listede ad yoksa kurulum güvenle durur ("SHA2-256SUMS listesinde
 yt-dlp dosyası yok"). GitHub API'ye ulaşılamazsa (kimliksiz sınır saatte 60 istek) `latest/download` kullanılır; SUMS ve ikili
 yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız yt-dlp kuruluysa).
+
+## 3.4
+
+3.4'ün kapsamı: `marketing/alti-repo-plan.json` › `plan.build_order` adım 6, 7 ve 8 (Otomatik Kesim). Bu iş yerel
+`yerel-34-kesim` dalında; 3.3 yayınlanana dek uzak depoya gönderilmez. Elle Premiere denemeleri
+`marketing/v3.4-deneme-listesi.md`'de. Her adım kendi alt bölümünü ekler.
+
+### Adım 6: Canlı eşikli sessizlik kesimi (tek çözümleme, anında önizleme, Min. konuşma, Otomatik eşik)
+
+Ne değişti: Otomatik Kesim sesi bir kez çözer (`K.runAkis` → ffmpeg 16 kHz s16le pipe:1, özgün kanal sayısı) ve
+bellekte 10 ms'lik tepe zarfı tutar (`js/sessizlik.js`, saniyede 100 sayı; geçici dosya ve süre sınırı yok).
+Kaydırıcılar haritayı ffmpeg'siz günceller; yeni "Min. konuşma" (0–0,6 sn, varsayılan 0 = 3.3 davranışı) ve
+"Otomatik" eşik düğmesi; `#cut-wave` tuvali. Uygula son ayarlarla silencedetect'i bir kez koşturup doğrular; PCM
+çözümleme olmazsa 3.3 akışı aynen çalışır. Pro kapısı değişmedi (`cut`, 3 deneme hakkı, hak yalnız başarılı Uygula'da).
+Lisans: clean-room (Premiere TR yalnız fikir); NOTICE girdisi gerekmez.
+
+**K6.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 6.1–6.16'yı yeni ve eski
+(CEF 74) Premiere'de dene. Özellikle 6.6 (tek kanallı yaka mikrofonu), 6.7 (önizleme = uygulanan kesimler) ve 6.11
+(30 dk+ klipte bellek ve hız).
+
+**K6.2 Varsayılanlar (karar).** Min. konuşma varsayılanı 0 (eski davranış). Denemelerde 0.2–0.3 daha iyi sonuç
+verirse varsayılanı `index.html` › `#cut-minkeep value` ile değiştir; `tests/test-arayuz.js` 3.4 satırı da
+güncellenmeli. Otomatik eşik formülü (arka plan p10 + 8 dB, −60…−20) `js/sessizlik.js` › `esikOner`'de.
+
+**K6.3 Tanıtım (isteğe bağlı).** Site / sosyal medya için 10 sn'lik ekran kaydı: Eşik kaydırıcısı sürüklenirken
+haritanın anında değişmesi ve Otomatik düğmesi. Sürüm notuna: "Sessizlik kesiminde kaydırıcılar artık anında".

@@ -1064,10 +1064,12 @@
 
     <details class="adv">
       <summary>Hassasiyet</summary>
+      <p class="hint cut-canli-ipucu">Analizden sonra kaydırıcılar kesim haritasını anında günceller; ffmpeg yeniden çalışmaz.</p>
       <div class="row">
         <label>Eşik</label>
         <input id="cut-noise" type="range" min="-60" max="-20" value="-38">
         <span id="cut-noise-val" class="mono">-38 dB</span>
+        <button id="cut-noise-auto" class="btn tiny" type="button" title="Eşiği klibin kendi sesinden öner: arka plan gürültüsünün 8 dB üstü">Otomatik</button>
       </div>
       <div class="row">
         <label>Min. sessizlik</label>
@@ -1079,6 +1081,11 @@
         <input id="cut-pad" type="range" min="0" max="0.5" step="0.05" value="0.15">
         <span id="cut-pad-val" class="mono">0.15 sn</span>
       </div>
+      <div class="row" title="İki kesim arasında bundan kısa konuşma kalırsa kesimler birleşir (0 = kapalı)">
+        <label>Min. konuşma</label>
+        <input id="cut-minkeep" type="range" min="0" max="0.6" step="0.05" value="0">
+        <span id="cut-minkeep-val" class="mono">0 sn</span>
+      </div>
     </details>
 
     <div id="cut-result" hidden>
@@ -1088,6 +1095,7 @@
       </div>
       <audio id="cut-audio" class="tc-audio" controls hidden></audio>
       <div id="cut-bar" class="cut-bar" title="Turuncu: kesilecek — tıklayıp kapatabilirsin"></div>
+      <canvas id="cut-wave" class="cut-wave" hidden aria-label="Ses zarfı ve eşik çizgisi"></canvas>
       <details class="adv">
         <summary>Kesim listesi</summary>
         <div id="cut-ranges" class="segments"></div>
@@ -2535,6 +2543,7 @@
   <script src="js/transitions.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/highlights.js"></script>
+  <script src="js/sessizlik.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
   <script src="js/referral-core.js"></script>

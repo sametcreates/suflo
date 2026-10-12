@@ -2156,6 +2156,34 @@ button.seg-time.jump:hover { color: var(--accent-lite); background: rgba(139, 12
 }
 .cut-bar .cut:hover { filter: brightness(1.2); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
 .cut-bar .cut.off { background: #3a3f56; }
+/* 3.4 canlı eşik: birleşik kesimin parçaları ve Min. konuşma adaları (taralı) */
+.cut-bar .cut.parca { min-width: 0; }
+.cut-bar .cut.ada {
+  background: repeating-linear-gradient(135deg, rgba(255,255,255,.6) 0, rgba(255,255,255,.6) 2px, transparent 2px, transparent 5px), var(--grad);
+}
+.cut-bar .cut.ada.off {
+  background: repeating-linear-gradient(135deg, rgba(255,255,255,.18) 0, rgba(255,255,255,.18) 2px, transparent 2px, transparent 5px), #3a3f56;
+}
+.cut-wave {
+  display: block;
+  width: 100%;
+  height: 56px;
+  margin: -4px 0 10px;
+  border-radius: var(--r-s);
+  background: var(--bg3);
+  border: 1px solid var(--line);
+}
+.cut-wave[hidden] { display: none; }
+#cut-noise-auto { flex: none; margin-left: 6px; }
+.cut-canli-ipucu { margin-top: 4px; }
+.mc-birlesik {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--warn);
+  border: 1px dashed rgba(234,200,119,.55);
+}
 
 /* ---------- Motion ---------- */
 

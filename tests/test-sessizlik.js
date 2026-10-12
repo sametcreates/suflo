@@ -1,0 +1,169 @@
+// Suflo testi: canlı eşikli sessizlik kesimi (3.4) — js/sessizlik.js saf modülü
+//  - tepe zarfı: parça sınırında yarım örnek/kare taşınır, pencere tüm kanalların tepesi, -120 tabanı
+//  - bul(): tampon, minKesim, Min. konuşma birleştirmesi (TAMPONDAN SONRA ölçülür), kenar kırpması
+//  - esikOner (düşük SNR dahil), kucult, kararEsle (%50 örtüşme kuralı), önbellek, kanal sayısı okuma
+var S = require("../js/sessizlik.js");
+var gecen = 0, toplam = 0;
+function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 300) + "]" : "")); }
+function yakin(a, b, t) { return Math.abs(a - b) <= (t || 1e-6); }
+function js(x) { return JSON.stringify(x); }
+
+// s16le iç içe Buffer: kanallar[k] = örnek dizisi (aynı uzunlukta)
+function pcm(kanallar) {
+  var n = kanallar[0].length, k = kanallar.length, b = Buffer.alloc(n * k * 2);
+  for (var i = 0; i < n; i++) for (var c = 0; c < k; c++) b.writeInt16LE(kanallar[c][i], 2 * (i * k + c));
+  return b;
+}
+function sabit(n, v) { var a = []; for (var i = 0; i < n; i++) a.push(v); return a; }
+function sinus(n, genlik, f, sr) { var a = []; for (var i = 0; i < n; i++) a.push(Math.round(genlik * Math.sin(2 * Math.PI * f * i / sr))); return a; }
+
+/* ---------------- dbfs ---------------- */
+ok("dbfs: tam ölçek 0 dB, yarım ölçek ≈ -6.02 dB, 0 → -120", yakin(S.dbfs(32768), 0) && yakin(S.dbfs(16384), -6.0206, 1e-3) && S.dbfs(0) === -120);
+ok("dbfs: çok küçük tepe de -120'nin altına inmez", S.dbfs(1e-9) === -120);
+
+/* ---------------- tepe zarfı ---------------- */
+var tek = pcm([sabit(160, 0).concat(sabit(160, 16384)).concat(sabit(160, -32768))]);
+var st = S.tepeZarfi();
+S.zarfBesle(st, tek, { kanal: 1, sr: 16000, win: 0.01 });
+var z = S.zarfBitir(st);
+ok("mono: 3 pencere (160 örnek = 10 ms), sessiz / -6 dB / 0 dB (-32768 tam ölçek)", z.length === 3 && z[0] === -120 && yakin(z[1], -6.0206, 1e-3) && yakin(z[2], 0), js(z));
+
+// Parça sınırları: bayt bayt ve tek sayılı parçalarla aynı sonuç
+var ses = sinus(16000, 12000, 440, 16000).concat(sabit(8000, 30)).concat(sinus(4000, 20000, 220, 16000));
+var butun = pcm([ses]);
+var stA = S.tepeZarfi(); S.zarfBesle(stA, butun, { kanal: 1 }); var zA = S.zarfBitir(stA);
+var stB = S.tepeZarfi();
+for (var i = 0; i < butun.length; ) { var boy = 1 + (i % 7) * 13; S.zarfBesle(stB, butun.slice(i, i + boy), { kanal: 1 }); i += boy; }
+var zB = S.zarfBitir(stB);
+ok("parça sınırı: tek baytlık / 7-13'lük parçalar bütünle aynı zarfı verir (yarım örnek taşınır)", zA.length === zB.length && zA.every(function (v, k) { return v === zB[k]; }), zA.length + " / " + zB.length);
+ok("zarf saniyede 100 değer (1.75 sn → 175 pencere)", zA.length === 175, zA.length);
+ok("sinüs penceresi ≈ tepe (12000 → -8.73 dB), sessiz bölüm 30 → ≈ -60.8 dB", yakin(zA[50], 20 * Math.log10(12000 / 32768), 0.05) && yakin(zA[120], 20 * Math.log10(30 / 32768), 0.01), zA[50] + " " + zA[120]);
+ok("bayt sayacı tutar", stB.bayt === butun.length);
+
+// Stereo: bir kanal sessiz → tepe diğer kanaldan (aşağı karışım gibi 6 dB düşmez)
+var sol = sinus(1600, 16384, 300, 16000), sag = sabit(1600, 0);
+var stS = S.tepeZarfi();
+var stereo = pcm([sol, sag]);
+for (var j = 0; j < stereo.length; j += 333) S.zarfBesle(stS, stereo.slice(j, j + 333), { kanal: 2 });
+var zS = S.zarfBitir(stS);
+var stM = S.tepeZarfi(); S.zarfBesle(stM, pcm([sol]), { kanal: 1 }); var zM = S.zarfBitir(stM);
+ok("stereo, bir kanal sessiz: zarf dolu kanalın mono zarfıyla aynı (kare sınırı parça ortasında)", zS.length === 10 && zS.every(function (v, k) { return yakin(v, zM[k]); }), js(zS.slice(0, 3)) + " vs " + js(zM.slice(0, 3)));
+var ters = S.tepeZarfi(); S.zarfBesle(ters, pcm([sag, sol]), { kanal: 2 });
+ok("stereo, kanallar yer değişse de aynı tepe", S.zarfBitir(ters).every(function (v, k) { return yakin(v, zM[k]); }));
+var hata = null;
+try { S.zarfBesle(ters, Buffer.alloc(8), { kanal: 1 }); } catch (e) { hata = e; }
+ok("akış ortasında kanal sayısı değişirse hata", !!hata);
+var yarim = S.tepeZarfi(); S.zarfBesle(yarim, pcm([sabit(80, 1000)]), { kanal: 1 });
+ok("yarım pencere zarfBitir'de eklenir", yarim.zarf.length === 0 && S.zarfBitir(yarim).length === 1);
+
+/* ---------------- ffmpeg argümanları ve kanal sayısı ---------------- */
+var ar = S.cozumlemeArgs("C:/a b/klip.mp4", 1.5, 30);
+ok("çözümleme: -ss/-t/-i, -map 0:a:0?, -vn, 16 kHz s16le pipe:1, -ac YOK", js(ar.slice(ar.indexOf("-ss"))) === js(["-ss", "1.5", "-t", "30", "-i", "C:/a b/klip.mp4", "-map", "0:a:0?", "-vn", "-ar", "16000", "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"]) && ar.indexOf("-ac") === -1, js(ar));
+var stderrOrnek = "Input #0, wav, from 'x.wav':\n  Stream #0:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 48000 Hz, 5.1, s16, 4608 kb/s\nOutput #0, s16le, to 'pipe:1':\n  Stream #0:0: Audio: pcm_s16le, 16000 Hz, stereo, s16, 512 kb/s\n";
+ok("kanal sayısı: Output #0 satırından (girdi 5.1, çıkış stereo → 2)", S.kanalSayisi(stderrOrnek) === 2);
+ok("kanal sayısı: mono 1, 5.1(side) 6, '3 channels' 3",
+  S.kanalSayisi("Output #0, s16le, to 'pipe:1':\n Stream #0:0: Audio: pcm_s16le, 16000 Hz, mono, s16, 256 kb/s") === 1 &&
+  S.kanalSayisi("Output #0\n Stream #0:0: Audio: pcm_s16le, 16000 Hz, 5.1(side), s16, 1536 kb/s") === 6 &&
+  S.kanalSayisi("Output #0\n Stream #0:0: Audio: pcm_s16le, 16000 Hz, 3 channels, s16, 768 kb/s") === 3);
+ok("kanal sayısı: bilinmeyen düzen adı → bit hızından (1024 kb/s @16 kHz = 4)", S.kanalSayisi("Output #0\n Stream #0:0: Audio: pcm_s16le, 16000 Hz, garip, s16, 1024 kb/s") === 4);
+ok("kanal sayısı: çıkış bölümü yoksa 0", S.kanalSayisi("Stream #0:0: Audio: pcm_s16le, 16000 Hz, stereo") === 0 && S.kanalSayisi("") === 0);
+
+/* ---------------- bul(): sentetik zarflar ---------------- */
+// zarf kurucu: [[sn, dB], …] parçaları 10 ms pencerelere
+function zarfYap(parcalar) { var z = []; parcalar.forEach(function (p) { for (var k = 0; k < Math.round(p[0] * 100); k++) z.push(p[1]); }); return z; }
+var Z1 = zarfYap([[2, -10], [1.5, -55], [2, -12], [0.3, -50], [2, -12]]);   // 7.8 sn
+var ayar = { esik: -38, minSessizlik: 0.8, pay: 0.15, minKonusma: 0, sure: 7.8 };
+var r1 = S.bul(Z1, ayar);
+ok("tek uzun sessizlik: [2+0.15, 3.5-0.15]; 0.3 sn'lik sessizlik min. sessizliğin altında", r1.kesimler.length === 1 && yakin(r1.kesimler[0].start, 2.15, 1e-6) && yakin(r1.kesimler[0].end, 3.35, 1e-6), js(r1));
+ok("ham aralıklar: eşiğin altı koşular, sn cinsinden", js(S.sessizAraliklar(Z1, { esik: -38, minSessizlik: 0.2 }).map(function (a) { return [+a.start.toFixed(2), +a.end.toFixed(2)]; })) === js([[2, 3.5], [5.5, 5.8]]));
+ok("eşik tam değer: zarf == eşik sessiz SAYILMAZ (silencedetect gibi < )", S.sessizAraliklar(zarfYap([[1, -38]]), { esik: -38, minSessizlik: 0.1 }).length === 0);
+
+// minKesim: tampondan sonra 0.25 sn'den kısa kalan kesim düşer
+var Z2 = zarfYap([[1, -10], [0.5, -60], [1, -10]]);
+ok("minKesim: 0.5 sn sessizlik − 2×0.15 = 0.2 < 0.25 → kesim yok", S.bul(Z2, { esik: -38, minSessizlik: 0.3, pay: 0.15, sure: 2.5 }).kesimler.length === 0);
+ok("minKesim: pay 0.1 ile 0.3 ≥ 0.25 → kesim var", S.bul(Z2, { esik: -38, minSessizlik: 0.3, pay: 0.1, sure: 2.5 }).kesimler.length === 1);
+ok("minKesim ayarlanabilir (0.1)", S.bul(Z2, { esik: -38, minSessizlik: 0.3, pay: 0.15, minKesim: 0.1, sure: 2.5 }).kesimler.length === 1);
+
+// Min. konuşma: ada TAMPONDAN SONRA ölçülür
+// sessizlik [1, 2], konuşma [2, 2.3] (0.3 sn), sessizlik [2.3, 3.3]; pay 0.15 → kesimler [1.15,1.85] [2.45,3.15]; ada 1.85→2.45 = 0.6
+var Z3 = zarfYap([[1, -10], [1, -60], [0.3, -10], [1, -60], [1, -10]]);
+var o3 = { esik: -38, minSessizlik: 0.5, pay: 0.15, sure: 4.3 };
+var b0 = S.bul(Z3, o3);
+ok("Min. konuşma 0: bugünkü davranış, iki ayrı kesim, ada yok", b0.kesimler.length === 2 && b0.adalar.length === 0 && !b0.kesimler[0].birlesik, js(b0));
+o3.minKonusma = 0.5;
+var b5 = S.bul(Z3, o3);
+ok("Min. konuşma 0.5: tampon öncesi konuşma 0.3 < 0.5 ama tampondan sonraki ada 0.6 ≥ 0.5 → birleşmez", b5.kesimler.length === 2, js(b5));
+o3.minKonusma = 0.6 + 1e-6;
+var b6 = S.bul(Z3, o3);
+ok("Min. konuşma > 0.6: birleşir, birlesik + ada kaydı", b6.kesimler.length === 1 && b6.kesimler[0].birlesik === true && b6.kesimler[0].adaSayisi === 1 &&
+  yakin(b6.kesimler[0].start, 1.15) && yakin(b6.kesimler[0].end, 3.15) && b6.adalar.length === 1 && yakin(b6.adalar[0].start, 1.85) && yakin(b6.adalar[0].end, 2.45), js(b6));
+var Z4 = zarfYap([[1, -10], [1, -60], [0.2, -10], [1, -60], [0.2, -10], [1, -60], [1, -10]]);
+var b7 = S.bul(Z4, { esik: -38, minSessizlik: 0.5, pay: 0.1, minKonusma: 0.45, sure: 5.4 });
+ok("zincir birleştirme: üç kesim tek kesim, iki ada", b7.kesimler.length === 1 && b7.adalar.length === 2 && b7.kesimler[0].adaSayisi === 2, js(b7));
+
+// Kenar kırpması
+var Z5 = zarfYap([[1, -60], [1, -10], [1, -60]]);
+var b8 = S.bul(Z5, { esik: -38, minSessizlik: 0.5, pay: 0, sure: 3 });
+ok("kenar: baştaki ve sondaki sessizlik [0.05, sure-0.05] içine kırpılır", b8.kesimler.length === 2 && yakin(b8.kesimler[0].start, 0.05) && yakin(b8.kesimler[1].end, 2.95), js(b8));
+ok("kenar ayarlanabilir", yakin(S.bul(Z5, { esik: -38, minSessizlik: 0.5, pay: 0, sure: 3, kenar: 0.2 }).kesimler[0].start, 0.2));
+ok("sure verilmezse zarf uzunluğundan", yakin(S.bul(Z5, { esik: -38, minSessizlik: 0.5, pay: 0 }).kesimler[1].end, 2.95));
+
+// kesimlereCevir: silencedetect ham aralıklarıyla eski magiccut akışı (minKonusma 0)
+function eskiAkis(sil, pad, dur) {
+  var out = [];
+  for (var i = 0; i < sil.length; i++) {
+    var s = sil[i].start + pad, e = sil[i].end - pad;
+    if (e - s < 0.25) continue;
+    if (s < 0.05) s = 0.05;
+    if (e > dur - 0.05) e = dur - 0.05;
+    if (e <= s) continue;
+    out.push({ start: s, end: e });
+  }
+  return out;
+}
+var hamlar = [{ start: 0, end: 0.9 }, { start: 3.1, end: 3.5 }, { start: 5, end: 6.2 }, { start: 9.4, end: 10 }];
+var yeni = S.kesimlereCevir(hamlar, { pay: 0.15, sure: 10 }).kesimler;
+ok("kesimlereCevir (minKonusma 0) = 3.3'teki magiccut akışı birebir", js(yeni) === js(eskiAkis(hamlar, 0.15, 10)), js(yeni));
+ok("kesimlereCevir: sırasız / bozuk girdi sıralanır, NaN atılır", S.kesimlereCevir([{ start: 5, end: 6.2 }, { start: NaN, end: 1 }, { start: 0, end: 0.9 }], { pay: 0.15, sure: 10 }).kesimler.length === 2);
+
+/* ---------------- esikOner ---------------- */
+var gurultuluDegil = zarfYap([[3, -55], [7, -14]]);   // p10 = -55, p95 = -14
+var e1 = S.esikOner(gurultuluDegil);
+ok("esikOner: p10 + 8 = -47, taban -55, konuşma -14, SNR iyi", e1.esik === -47 && e1.taban === -55 && e1.konusma === -14 && e1.dusukSnr === false, js(e1));
+var gurultulu = zarfYap([[3, -30], [7, -22]]);
+var e2 = S.esikOner(gurultulu);
+ok("esikOner: düşük SNR (p95 − p10 = 8 < 12) uyarısı; eşik -22", e2.dusukSnr === true && e2.esik === -22, js(e2));
+ok("esikOner: -60…-20'ye kırpılır", S.esikOner(zarfYap([[5, -120], [5, -10]])).esik === -60 && S.esikOner(zarfYap([[10, -5]])).esik === -20);
+ok("esikOner: boş zarf null", S.esikOner([]) === null && S.esikOner(null) === null);
+ok("esikOner: girdi zarfı sıralanıp bozulmaz", gurultuluDegil[0] === -55 && gurultuluDegil[gurultuluDegil.length - 1] === -14);
+
+/* ---------------- kucult ---------------- */
+var k1 = S.kucult([-10, -20, -30, -40, -50, -60, -70, -80], 4);
+ok("kucult: 8 → 4 sütun min/max", js(k1) === js([[-20, -10], [-40, -30], [-60, -50], [-80, -70]]), js(k1));
+ok("kucult: px zarftan büyükse zarf uzunluğu kadar sütun", S.kucult([-1, -2, -3], 100).length === 3);
+ok("kucult: boş zarf boş dizi, px 0 → 1 sütun", S.kucult([], 10).length === 0 && S.kucult([-5, -9], 0).length === 1);
+var kb = S.kucult(zarfYap([[7.77, -30]]), 300);
+ok("kucult: düzensiz bölüm, hiçbir sütun boş değil", kb.length === 300 && kb.every(function (p) { return isFinite(p[0]) && isFinite(p[1]); }));
+
+/* ---------------- kararEsle ---------------- */
+var eski = [{ start: 10, end: 11, keep: false }, { start: 20, end: 21, keep: true }];
+var e3 = S.kararEsle(eski, [{ start: 10.2, end: 11.3 }, { start: 20, end: 21 }, { start: 30, end: 31 }]);
+ok("kararEsle: kapalı aralıkla ≥%50 örtüşen yeni aralık kapalı, diğerleri açık", e3[0].keep === false && e3[1].keep === true && e3[2].keep === true, js(e3));
+var e4 = S.kararEsle(eski, [{ start: 10.6, end: 12 }]);
+ok("kararEsle: örtüşme kısa olanın %40'ı → açık", e4[0].keep === true, js(e4));
+var e5 = S.kararEsle(eski, [{ start: 10.5, end: 12 }]);
+ok("kararEsle: tam %50 sınırı kapalı", e5[0].keep === false, js(e5));
+var e6 = S.kararEsle(eski, [{ start: 9, end: 15, birlesik: true }]);
+ok("kararEsle: kapatılan aralığı yutan birleşik kesim kapalı kalır (kısa olana göre)", e6[0].keep === false && e6[0].birlesik === true);
+ok("kararEsle: yeni nesneler kopyalanır (girdi değişmez), boş girdiler", !("keep" in { start: 1, end: 2 }) && S.kararEsle(null, null).length === 0 && S.kararEsle([], [{ start: 1, end: 2 }])[0].keep === true);
+
+/* ---------------- önbellek ---------------- */
+ok("anahtar: mediaPath|in|dur (ms hassasiyet)", S.anahtar("a.mp4", 1.23456, 10) === "a.mp4|1.235|10.000");
+var ob = S.onbellekYap(2);
+ob.koy("a", [1]); ob.koy("b", [2]); ob.koy("c", [3]);
+ok("önbellek: en çok 2 kayıt, en eski düşer", ob.al("a") === null && ob.al("b")[0] === 2 && ob.al("c")[0] === 3 && ob.boyut() === 2);
+ob.temizle();
+ok("önbellek: temizle hepsini siler", ob.al("b") === null && ob.boyut() === 0);
+
+console.log("\n" + gecen + "/" + toplam + " gecti");
+process.exit(gecen === toplam ? 0 : 1);

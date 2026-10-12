@@ -42,6 +42,9 @@ ok("verify-release.ps1: THIRD_PARTY_NOTICES.md ve LICENSE paketten eksikse yayı
 ok("3.3 Altyazı Efektleri: oluşturucu modeli ve stil motoru pakette (js/ klasörü) ve verify-release'te zorunlu",
   /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /altyazi-efekt\\\.js\$/.test(gerekli) && /style-engine\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "altyazi-efekt.js")), gerekli.slice(0, 400));
+ok("3.4 canlı eşikli sessizlik kesimi: js/sessizlik.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /js\/sessizlik\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "sessizlik.js")), gerekli.slice(0, 600));
 ok("3.3 'Kalın yazı' kapalı: statik Montserrat Regular / Bold pakette (fonts/ klasörü) ve verify-release'te zorunlu",
   /\$stageItems = @\([^)]*"fonts"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"fonts"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /fonts\/Montserrat-Regular\\\.ttf\$/.test(gerekli) && /fonts\/Montserrat-Bold\\\.ttf\$/.test(gerekli) &&

@@ -101,6 +101,8 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.3 YouTube indirici: saf karar modulu + panel (yt-dlp pakette YOK, ilk kullanimda iner)
             '(^|/)js/youtube-indir\.js$',
             '(^|/)js/youtube-indir-ui\.js$',
+            # 3.4 Otomatik Kesim canli esik: tepe zarfi / kesim haritasi (magiccut.js bunsuz eski akisa duser)
+            '(^|/)js/sessizlik\.js$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',
