@@ -261,7 +261,7 @@ ok("go(ornek): örnek dosyaları geçici listeye girmez (silinmez)", !/tempFiles
   /ornek dosyalari ayar klasorunde kalici: tempFiles'a EKLENMEZ/.test(goGovde));
 var yukleGovde = capSrc.slice(capSrc.indexOf("function ornekYukle("), capSrc.indexOf("function setBusy("));
 ok("ornekYukle aynı kurucu + anlık görüntü/geri al yolu", /CT\.segmentleriKur\(girdi, lenVal(, \{ etiketKoru: sesEtiketKoru\(\) \}|, kurSecenekleri\([a-zA-Z]*\))?\)/.test(capSrc) && /snapshot\("örnek transkript"\)/.test(capSrc));
-ok("dil #cap-lang'i değiştirmeden motorlara geçer", /transcribeLocal\(audioPath, wordLevel, secenek\.dil\)/.test(capSrc) &&
+ok("dil #cap-lang'i değiştirmeden motorlara geçer", /transcribeLocal\(audioPath, wordLevel, secenek\.dil(, motor)?\)/.test(capSrc) &&
   /transcribeCloud\(cloudAudio, durHint, wordLevel, secenek\.dil\)/.test(capSrc) && !/el\("cap-lang"\)\.value\s*=/.test(goGovde) &&
   /motorSecenek = \{ dil: ornek\.lang \|\| "tr"/.test(goGovde));
 // Örnek transkript, henüz kurtarılmamış taslağı (tek draft.json) ezmez ve "Kurtar"ı gizlemez

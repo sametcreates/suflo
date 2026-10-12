@@ -1,4 +1,4 @@
-// Suflo testi: Pro'yu dene bağlantıları — 10 araç deneme kapısından geçer, hak yalnız
+// Suflo testi: Pro'yu dene bağlantıları — 11 araç deneme kapısından geçer, hak yalnız
 // başarı dalında düşer; kütüphaneler/MOGRT/toplu/ASS deneme almaz; filigran yalnız
 // stilli katman ve kanca başlığında; temiz yeniden oluşturma KS_removeOverlay'e nodeId vermez.
 var fs = require("fs"), path = require("path"), vm = require("vm");
@@ -34,7 +34,9 @@ var SITELER = [
   ["js/captions.js", "async function translateAll()", "translate", "var out = await metinleriCevir(", true],
   ["js/captions.js", "async function cokDilliPaket()", "translate", "yazilan > 1 &&", true],
   ["js/captions.js", "async function overlayUygula()", "overlay", "if (!yer.ok) throw", true],
-  ["js/hiz-rampasi.js", "async function uygula(ek)", "speedramp", "if (!basarili.length) throw", true]
+  ["js/hiz-rampasi.js", "async function uygula(ek)", "speedramp", "if (!basarili.length) throw", true],
+  // 3.2 adım 5: çevrimdışı İngilizce (-tr) Altyazı oluştur'da; hak yalnız transkript başarıyla bitince
+  ["js/captions.js", "async function go(opts)", "offlineTranslate", "basarili = true;", true]
 ];
 var kapiliOzellikler = {};
 SITELER.forEach(function (s) {
@@ -54,8 +56,8 @@ SITELER.forEach(function (s) {
   var hata = g.search(/\n    \} catch \(/);
   ok(ad + ": hak yalnız başarı denetiminden sonra düşer", basari > 0 && harca > basari && (hata === -1 || harca < hata), "basari " + basari + " harca " + harca + " catch " + hata);
 });
-var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp"];
-ok("10 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
+var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate"];
+ok("11 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
 ok("deneme listesi deneme.js ile aynı", JSON.stringify(require(path.join(KOK, "js", "deneme.js")).OZELLIKLER) === JSON.stringify(DOKUZ));
 
 /* ---------------- 2) deneme almayan kapılar ---------------- */
@@ -74,7 +76,7 @@ jsDosyalari.forEach(function (f) {
     }
   });
 });
-ok("tarama deneme kapılarını buluyor (16 kapı: 15 araç + rehberin stil adımı)", denemeli.length === 16, denemeli.join(" | "));
+ok("tarama deneme kapılarını buluyor (17 kapı: 16 araç + rehberin stil adımı)", denemeli.length === 17, denemeli.join(" | "));
 // Rehberin "Timeline'a koy"u Altyazı sekmesindeki "… ile ekle" ile aynı stilli katman denemesini sunar;
 // MOGRT stili seçiliyse denemesiz kütüphane penceresi (inceleme bulgusu: Suflo Stili için de captionStyles açılıyordu)
 var koy = govde(oku("js/onboarding.js"), "function stilKoyTikla()");

@@ -62,7 +62,7 @@ var engine = fs.readFileSync(path.join(ROOT, "js", "engine.js"), "utf8") + "\n" 
 ok("arayuz tek Suflo Altyazi Motoru sunar", /Suflo Altyazı Motoru/.test(html) && /Bulut yedeği/.test(html));
 ok("Caption Editor kalite puani ve filtreleri tasir", /SUFLO CAPTION EDITOR/.test(html) && /cap-quality-score/.test(html) && /cap-filter-issues/.test(html));
 ok("tek motor yerel rota ve yedegi orkestre eder", /function transcribeSuflo/.test(captions) && /localEngineReady/.test(captions) && /cloudEngineReady/.test(captions));
-ok("proje sozlugu decode promptuna girer", /prompt:\s*glossaryPrompt\(\)/.test(captions) && /"--prompt"/.test(engine));
+ok("proje sozlugu decode promptuna girer", /prompt:\s*glossaryPrompt\((cevir)?\)/.test(captions) && /"--prompt"/.test(engine));
 ok("yerel motor beam search kullanir (varsayilan 'En dogru')", /dogru: \{ bayrak: \["-bs", "5"\]/.test(engine) && /VARSAYILAN_COZME = "dogru"/.test(engine));
 ok("Caption Editor ikinci metin kontrolunu satir sayisini koruyarak yapar", /async function proofreadAll/.test(captions) && /Never merge, split/.test(captions));
 ok("duzeltme sonraki altyazilar icin ogrenilebilir", /function correctionFromEdit/.test(captions) && /function learnLastCorrection/.test(captions));

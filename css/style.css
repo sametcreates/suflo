@@ -726,6 +726,13 @@ details.adv > *:not(summary) { margin-top: 8px; }
 /* Satır uzunluğu › Kelime sınırı (3.2 adım 4) */
 .field-row .kelime-siniri { flex: 0 0 64px; width: 64px; }
 .field-row .kelime-siniri + .hint { margin: 0; min-width: 0; }
+/* Yerel motor seçenekleri (3.2 adım 5): Hassas kelime zamanlaması (DTW) ve çevrimdışı İngilizce */
+.cap-dtw { margin: 2px 0 8px; }
+.cap-cevir-en { margin-top: 6px; }
+.cap-cevir-en .pro-inline { margin-left: 2px; }
+.cap-cevir-en-not { margin: 4px 0 0; }
+.cap-cevir-en-not .link-btn { padding: 0; margin-left: 2px; }
+#cap-dtw-sar[hidden], #cap-dtw-not[hidden], #cap-cevir-en-sar[hidden], #cap-cevir-en-not[hidden] { display: none !important; }
 .field-row .grow { flex: 1; }
 
 .field-grid {

@@ -2751,6 +2751,55 @@
       "Applies to new transcripts in line modes (32 / 42 characters, 2 lines × 42): a caption stays on screen at least the minimum duration (when there's room before the next one) and never longer than the maximum (longer lines are split). Without word timings (cloud fallback) these apply only to 2 lines × 42; 32 / 42 characters keep the classic split. Merging joins short fragments that have no word timings (word-timed captions are already built from as few pieces as possible), never crosses the end of a sentence, and keeps the line length and word limit."
   });
 
+  /* ================= Yerel motor seçenekleri / Local engine options (3.2 step 5: js/whisper-args.js) ================= */
+  add({
+    // Settings › Suflo Caption Engine › Decoding
+    "Çözme": "Decoding",
+    "Yerel motorun metni nasıl çözdüğü": "How the local engine decodes the text",
+    "En doğru — beam search (önerilen)": "Most accurate — beam search (recommended)",
+    "Hızlı — tek aday": "Fast — single candidate",
+    "En doğru her adımda 5 adayı karşılaştırır. Hızlı tek adayla çözer: uzun videoda belirgin hızlıdır, gürültülü ya da telefon kaydında daha çok hata yapabilir. Yalnız yerel motorda geçerli; yeni transkriptlerde.":
+      "Most accurate compares 5 candidates at every step. Fast decodes with a single candidate: noticeably faster on long videos, but it can make more mistakes on noisy or phone recordings. Local engine only; applies to new transcripts.",
+    // Captions card: precise word timing (DTW)
+    "Hassas kelime zamanlaması (DTW, biraz daha yavaş)": "Precise word timing (DTW, slightly slower)",
+    "Yerel motor kelime başlarını ses ile metnin hizalamasından (DTW) ölçer: kelime kelime ve karaoke altyazıda vurgu sözcüğün söylendiği anda yanar. Transkripsiyon biraz uzar.":
+      "The local engine measures where each word starts by aligning the audio with the text (DTW): in word-by-word and karaoke captions the highlight lights up exactly when the word is spoken. Transcription takes a little longer.",
+    "Bu model ve motor derlemesinde DTW zamanı gelmedi, otomatik kapatıldı; kelime zamanı belirteç zamanından geliyor.":
+      "This model and engine build returned no DTW timings, so DTW was turned off automatically; word timing comes from token timestamps.",
+    "DTW bir sonraki transkriptte yeniden denenecek": "DTW will be tried again on the next transcript",
+    // Captions card › Language: offline English
+    "İngilizceye çevir (çevrimdışı)": "Translate to English (offline)",
+    "Konuşmayı internetsiz İngilizce altyazıya çevirir: yerel motor, Small ya da Large model. Pro (3 ücretsiz deneme hakkı). Diğer diller için Caption Editor'daki Çeviri.":
+      "Turns speech into English captions without internet: local engine, Small or Large model. Pro (3 free trial runs). For other languages, use Translate in the Caption Editor.",
+    "Çevrimdışı İngilizce çeviri yerel motorla çalışır: Ayarlar'dan yerel çekirdeği kur ya da çeviriyi kapat.":
+      "Offline English translation runs on the local engine: install the local core in Settings or turn translation off.",
+    "Turbo çeviri için eğitilmedi: çevrimdışı İngilizce çeviri Small ve Large modelinde çalışır.":
+      "Turbo wasn't trained for translation: offline English translation works with the Small and Large models.",
+    "Çevrimdışı İngilizce çeviri Small ve Large modelinde çalışır (Tiny ve Base'in çevirisi zayıf).":
+      "Offline English translation works with the Small and Large models (Tiny and Base translate poorly).",
+    "Large'a geç": "Switch to Large",
+    "Small'a geç": "Switch to Small",
+    "Ayarlar'da model indir": "Download a model in Settings",
+    "Model: {} · çevrimdışı İngilizce çeviri hazır": "Model: {} · offline English translation ready",
+    "Suflo Motoru · yerel · İngilizceye çevriliyor…": "Suflo Engine · local · translating to English…",
+    "{n} altyazı satırı hazır · İngilizce (çevrimdışı)": "{} caption lines ready · English (offline)",
+    "js/whisper-args.js yüklenmedi": "js/whisper-args.js was not loaded",
+    // Pro / trial (js/deneme.js, js/pro.js)
+    "Çevrimdışı İngilizce çeviri": "Offline English translation",
+    "Çevrimdışı İngilizce çeviri: internetsiz, yerel motorla": "Offline English translation: no internet, on the local engine",
+    "12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS": "Translation into 12 languages · offline English · Batch clips · styled ASS",
+    // Suflo Doctor › Caption engine
+    "Çözme modu": "Decoding mode",
+    "Hızlı · açgözlü çözme (-bs 1 -bo 1)": "Fast · greedy decoding (-bs 1 -bo 1)",
+    "En doğru · beam search (-bs 5)": "Most accurate · beam search (-bs 5)",
+    "Hassas kelime zamanlaması (DTW)": "Precise word timing (DTW)",
+    "Bu motor derlemesi -dtw / -nfa tanımıyor · kelime zamanı belirteç zamanından gelir": "This engine build doesn't support -dtw / -nfa · word timing comes from token timestamps",
+    "Bu model için DTW ön ayarı yok · kelime zamanı belirteç zamanından gelir": "No DTW preset for this model · word timing comes from token timestamps",
+    "Bu model ve derlemede DTW zamanı gelmedi, otomatik kapatıldı ({})": "This model and build returned no DTW timings, turned off automatically ({})",
+    "Açık · desteklenir ({})": "On · supported ({})",
+    "Kapalı · desteklenir ({})": "Off · supported ({})"
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({

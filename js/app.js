@@ -992,6 +992,17 @@ window.KApp = (function () {
         }
       });
     }
+    // Ayarlar › Çözme (3.2 adım 5): yerel motor En doğru (-bs 5) ya da Hızlı (-bs 1 -bo 1); varsayılan
+    // Türkçe kıyas yapılana dek En doğru (js/whisper-args.js VARSAYILAN_COZME). Açılışta yazılmaz.
+    if (el("set-cozme")) {
+      var WAR = window.SufloWhisperArgs;
+      el("set-cozme").value = WAR ? WAR.cozmeModu(s.cozme) : "dogru";
+      el("set-cozme").addEventListener("change", function () {
+        K.settings().cozme = WAR ? WAR.cozmeModu(this.value) : this.value;
+        K.saveSettings();
+        K.log("[ayarlar] cozme modu: " + K.settings().cozme);
+      });
+    }
     // GPU tespiti arka planda: kutuyu ancak NVIDIA varsa göster
     KEngine.detectGpu().then(function (g) {
       var row = el("set-gpu-row");

@@ -296,6 +296,12 @@
               <option value="">Otomatik</option>
             </select>
             <p class="hint" id="cap-lang-glif" hidden>Bu alfabe stilli altyazı katmanının yazı tiplerinde olmayabilir; altyazı izi ve SRT her zaman çalışır.</p>
+            <!-- Çevrimdışı İngilizce (3.2 adım 5, js/whisper-args.js "-tr"): yalnız yerel motor ve dil İngilizce değilken;
+                 Small ya da Large model; Pro (3 deneme hakkı). Diğer diller Caption Editor'daki bulut çevirisinde. -->
+            <label class="check-label cap-cevir-en" id="cap-cevir-en-sar" hidden title="Konuşmayı internetsiz İngilizce altyazıya çevirir: yerel motor, Small ya da Large model. Pro (3 ücretsiz deneme hakkı). Diğer diller için Caption Editor'daki Çeviri.">
+              <input id="cap-cevir-en" type="checkbox"> İngilizceye çevir (çevrimdışı) <span class="pro-inline">PRO</span>
+            </label>
+            <p class="hint cap-cevir-en-not" id="cap-cevir-en-not" hidden><span id="cap-cevir-en-not-metin"></span> <button type="button" id="cap-cevir-en-gec" class="link-btn">Large'a geç</button></p>
           </div>
           <div class="field">
             <label for="cap-maxlen">Satır uzunluğu</label>
@@ -327,6 +333,14 @@
             <span class="hint">0 = kapalı · satır modunda bir satırdaki en çok kelime</span>
           </div>
         </div>
+
+        <!-- Hassas kelime zamanlaması (3.2 adım 5): DTW; yalnız kelime tabanlı modlarda / Suflo Stillerinde, yerel motor -->
+        <label class="switch cap-dtw" id="cap-dtw-sar" hidden title="Yerel motor kelime başlarını ses ile metnin hizalamasından (DTW) ölçer: kelime kelime ve karaoke altyazıda vurgu sözcüğün söylendiği anda yanar. Transkripsiyon biraz uzar.">
+          <input id="cap-dtw" type="checkbox">
+          <i></i>
+          <span>Hassas kelime zamanlaması (DTW, biraz daha yavaş)</span>
+        </label>
+        <p class="hint" id="cap-dtw-not" hidden>Bu model ve motor derlemesinde DTW zamanı gelmedi, otomatik kapatıldı; kelime zamanı belirteç zamanından geliyor. <a href="#" id="cap-dtw-yeniden" class="link-btn">Yeniden dene</a></p>
 
         <div class="field">
           <label for="cap-case">Yazım biçimi</label>
@@ -1821,6 +1835,15 @@
         <label>Doğruluk modeli</label>
         <select id="set-model" class="grow" title="Büyük model = daha doğru ama yavaş"></select>
       </div>
+      <!-- Çözme modu (3.2 adım 5, js/whisper-args.js): yalnız yerel motor; varsayılan Türkçe kıyasa dek En doğru -->
+      <div class="row">
+        <label for="set-cozme">Çözme</label>
+        <select id="set-cozme" class="grow" title="Yerel motorun metni nasıl çözdüğü">
+          <option value="dogru">En doğru — beam search (önerilen)</option>
+          <option value="hizli">Hızlı — tek aday</option>
+        </select>
+      </div>
+      <p class="hint" id="set-cozme-ipucu">En doğru her adımda 5 adayı karşılaştırır. Hızlı tek adayla çözer: uzun videoda belirgin hızlıdır, gürültülü ya da telefon kaydında daha çok hata yapabilir. Yalnız yerel motorda geçerli; yeni transkriptlerde.</p>
       <div class="row" id="set-gpu-row" hidden>
         <label>Hızlandırma</label>
         <label class="switch" style="flex:1" title="NVIDIA ekran kartıyla 5-15 kat hızlı">
@@ -2123,7 +2146,7 @@
               <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
               <li>Suflo Stilleri timeline'da · Kanca başlığı</li>
               <li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası</li>
-              <li>12 dile çeviri · Toplu klip · stilli ASS</li>
+              <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
               <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
               <li>MOGRT, SFX, preset ve Motion BG kütüphaneleri</li>
