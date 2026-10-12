@@ -95,6 +95,26 @@ ok("stilAyarlari: efekt ayarı stil motoruna gider (giriş, vurgu, satır, kelim
 })());
 ok("stilAyarlari: eski stil kimliği (eski paket işi) efekt alanı almaz, eskisi gibi", JSON.stringify(Object.keys(P.stilAyarlari("hormozi", null, false).overrides)) ===
   JSON.stringify(["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli"]));
+ok("secimNormalize: noktalama (punct), gölge nesnesi (yalnız renk + sayılar), kutu ve serbest konum (null = hazır) işle saklanır", (function () {
+  var n = P.secimNormalize({ efekt: { punct: false, golge: { renk: "#112233", opak: 40, mesafe: 3, yumusak: 6, kotu: "x", __proto__: { y: 1 } }, kutu: true, kutuRenk: "#ffffff",
+    kutuOpak: 70, konumX: null, konumY: null } });
+  var n2 = P.secimNormalize({ efekt: { golge: null, konumX: 30, konumY: 70 } }), n3 = P.secimNormalize({ efekt: { golge: "var", renk: "#000000" } });
+  return n.efekt.punct === false && JSON.stringify(n.efekt.golge) === '{"renk":"#112233","opak":40,"mesafe":3,"yumusak":6}' && n.efekt.kutu === true &&
+    n.efekt.kutuOpak === 70 && n.efekt.konumX === null && n.efekt.konumY === null && n2.efekt.golge === null && n2.efekt.konumX === 30 &&
+    n3.efekt.golge === undefined && n3.efekt.renk === "#000000";
+})());
+ok("stilAyarlari: gölge / kutu / serbest konum stil motoruna gider; noktalama ve yazım biçimi (metin kuralı) gitmez", (function () {
+  var s = P.stilAyarlari("efekt", null, true, { golge: { renk: "#ff0000", opak: 50, mesafe: 4, yumusak: 2 }, kutu: true, kutuRenk: "#00ff00", kutuOpak: 40,
+    konumX: 30, konumY: 40, punct: false, kase: "upper" });
+  var r = SEm.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir iki üç" }], cueKind: "lines", width: 1080, height: 1920, overrides: s.overrides });
+  return s.overrides.golge.renk === "#ff0000" && s.overrides.kutu === true && s.overrides.kutuRenk === "#00ff00" && s.overrides.konumX === 30 &&
+    s.overrides.punct === undefined && s.overrides.kase === undefined && /SufloKutu/.test(r.ass) && /\\4c&H000000FF/.test(r.ass) && /\\an5\\pos\(324,/.test(r.ass);
+})());
+ok("captionCues: oluşturucunun noktalaması (punct false) uygulanır; verilmezse efektin kendi kuralı (noktalamalı)", (function () {
+  var kayit = { mod: "plain", segs: [{ start: 0, end: 2, text: "Bunu kaçırma, tamam mı?" }] };
+  return P.captionCues(kayit, { styleId: "efekt", kase: "upper", punct: false }).cues[0].text === "BUNU KAÇIRMA TAMAM MI" &&
+    P.captionCues(kayit, { styleId: "efekt", kase: "upper" }).cues[0].text === "BUNU KAÇIRMA, TAMAM MI?";
+})());
 
 /* ---------------- çerçeve planı ---------------- */
 var cp1 = P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({}), hookDur: 3, altyaziKonum: 2, altyaziAcik: true, lang: "tr" });

@@ -369,8 +369,11 @@ window.KShortsPaket = (function () {
       altyazi: async function (k, ctx) {
         var kayit = shortsKaydi(k);
         if (!kayit || !kayit.segs || !kayit.segs.length) return { ok: false, hata: T("Bu Short'un altyazı kaydı yok: Shorts sekansını Altyazı sekmesinde yazıya dökebilirsin.") };
-        // Altyazı Efektleri: yazım biçimi oluşturucu ayarından (yoksa stilin kendi kuralı)
-        var cc = P.captionCues(kayit, { styleId: job.secim.stilId, lang: job.lang, kase: job.secim.efekt && job.secim.efekt.kase });
+        // Altyazı Efektleri: yazım biçimi ve noktalama oluşturucu ayarından (Altyazı sekmesi ya da hazır görünüm;
+        // yoksa stilin kendi kuralı). Panelde "Noktalama" kapalıysa Short da noktalamasız (3.2'deki gibi).
+        var ef = job.secim.efekt || {};
+        var cc = P.captionCues(kayit, { styleId: job.secim.stilId, lang: job.lang, kase: ef.kase,
+          punct: typeof ef.punct === "boolean" ? ef.punct : undefined });
         if (!cc.cues.length) return { atla: "altyazi-bos" };
         var W = ciftBoyut(ctx.width, 1080), H = ciftBoyut(ctx.height, 1920), fps = Number(ctx.fps) > 0 ? Number(ctx.fps) : 30;
         var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt);

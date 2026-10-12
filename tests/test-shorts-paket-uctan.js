@@ -128,6 +128,12 @@ w.SufloStyleShare = mod("style-share.js"); w.SufloMarkaKiti = mod("marka-kiti.js
 w.SufloCaptionText = mod("caption-text.js"); w.SufloYouTubeMeta = mod("youtube-meta.js"); w.SufloHookTitle = mod("hook-title.js");
 w.SufloOverlayRender = mod("overlay-render.js"); w.SufloShortsEkler = mod("shorts-ekler.js"); w.SufloShortsPlan = mod("shorts-paket-plan.js");
 w.SufloReferral = mod("referral-core.js"); w.SufloAltyaziEfekt = mod("altyazi-efekt.js");
+// Short altyazısına giden cue metinleri (noktalama denetimi: 3.3 adım 16 inceleme bulgusu)
+var derlenenMetin = [];
+(function () { var asil = w.SufloStyleEngine.compile; w.SufloStyleEngine.compile = function (o) {
+  if (o && o.styleId === "efekt") (o.cues || []).forEach(function (c) { derlenenMetin.push(c.text); });
+  return asil.apply(this, arguments);
+}; })();
 w.KCaptions = {
   language: function () { return "tr"; }, chatConfig: function () { return { url: "https://api.groq.com/openai/v1/chat/completions", model: "m", key: "k" }; },
   stilAyarlari: function () { return { aile: "hormozi" }; }, mogrtSecili: function () { return false; }
@@ -207,6 +213,8 @@ dinleyici["cap-paket-olustur:click"]().then(function () {
   }), j && JSON.stringify(j.kisalar.map(function (k) { return k.adimlar; })));
   ok("paket altyazısı Altyazı Efektleri: seçilen hazır görünüm (Canlı) işle birlikte kaydedildi", j.secim.stilId === "efekt" && j.secim.gorunum === "canli" &&
     j.secim.efekt && j.secim.efekt.font === "Archivo Black" && j.secim.efekt.giris === "zipla" && ayarlar.shortsPaketSecim.gorunum === "canli", JSON.stringify(j.secim.efekt));
+  ok("paket altyazısı hazır görünümün noktalamasıyla (Canlı: noktalamasız, BÜYÜK HARF; panel / 3.2 ile aynı)", j.secim.efekt.punct === false &&
+    derlenenMetin.length > 0 && derlenenMetin.every(function (t) { return !/[.,!?]/.test(t) && t === t.toLocaleUpperCase("tr-TR"); }), derlenenMetin.join(" | "));
   ok("LLM: 429'da gövdedeki süre kadar beklenip yeniden denendi, çağrılar üst üste binmedi", llmCagri === 3 && !llmCakisti);
   ok("LLM: AI metni kullanıldı (YouTube 3 hashtag), hatalı ikinci Short yedeğe düştü", j.kisalar[0].paylasim.youtube.ai === true && j.kisalar[0].paylasim.youtube.baslik === "Para biriktirmenin sırrı" &&
     /#para #tasarruf #finans(\n|$)/.test(j.kisalar[0].paylasim.youtube.aciklama) && j.kisalar[1].paylasim.youtube.ai === false && j.kisalar[1].notlar.metinAi === "ai-hata",

@@ -75,15 +75,28 @@
   /*
    * Altyazı Efektleri (3.3) oluşturucu ayarı: pakete yalnız bilinen ve düz (metin / sayı / boolean)
    * alanlar girer; değerleri stil motoru (guvenliStil) yeniden doğrular. Yoksa null.
+   * kase / punct: altyazı metninin yazım biçimi ve noktalaması (Altyazı sekmesi ya da hazır görünüm).
+   * Adım 17: gölge nesnesi (yalnız renk + üç sayı) ya da null, kutu, serbest konum (null = hazır konum).
    */
   var EFEKT_SECIM_ALANLARI = ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime", "font", "renk", "konturRenk", "vurguRenk",
-    "boyut", "kontur", "konum", "kase"];
+    "boyut", "kontur", "konum", "kase", "punct", "golge", "kutu", "kutuRenk", "kutuOpak", "konumX", "konumY"];
+  // Stil motoruna gitmeyen metin kuralı alanları
+  var METIN_ALANLARI = ["kase", "punct"];
+  function golgeSecimi(g) {
+    if (!g || typeof g !== "object" || g instanceof Array) return undefined;
+    var out = {};
+    if (typeof g.renk === "string" && g.renk.length <= 9) out.renk = g.renk;
+    ["opak", "mesafe", "yumusak"].forEach(function (k) { if (typeof g[k] === "number" && isFinite(g[k])) out[k] = g[k]; });
+    return out;
+  }
   function efektSecimi(e) {
     if (!e || typeof e !== "object" || e instanceof Array) return null;
     var out = {}, var1 = false;
     EFEKT_SECIM_ALANLARI.forEach(function (k) {
       if (!Object.prototype.hasOwnProperty.call(e, k)) return;
       var v = e[k];
+      if (v === null && (k === "golge" || k === "konumX" || k === "konumY")) { out[k] = null; var1 = true; return; }
+      if (k === "golge") { var g = golgeSecimi(v); if (g) { out.golge = g; var1 = true; } return; }
       if ((typeof v === "string" && v.length <= 40) || (typeof v === "number" && isFinite(v)) || typeof v === "boolean") { out[k] = v; var1 = true; }
     });
     return var1 ? out : null;
@@ -222,11 +235,11 @@
     var p = SE ? SE.preset(styleId) : null;
     var st = p ? p.style : {};
     var ek = efektSecimi(efekt);
-    if (ek) { st = kopya(st); Object.keys(ek).forEach(function (k) { if (k !== "kase") st[k] = ek[k]; }); }
+    if (ek) { st = kopya(st); Object.keys(ek).forEach(function (k) { if (METIN_ALANLARI.indexOf(k) === -1) st[k] = ek[k]; }); }
     if (kit && kit.on && MK) st = MK.mergeBrandKit(st, kit);
     var ov = { font: st.font, renk: st.renk, konturRenk: st.konturRenk, vurguRenk: st.vurguRenk,
       boyut: st.boyut, kontur: st.kontur, konum: st.konum, guvenli: !!dikey };
-    // Altyazı Efektleri alanları (giriş / vurgu animasyonu, kelime vurgusu, kalın, italik, satır, kelime)
+    // Altyazı Efektleri alanları (giriş / vurgu animasyonu, kelime vurgusu, kalın, italik, satır, kelime; gölge, kutu, serbest konum)
     if (SE && SE.EFEKT_ALANLARI && styleId === "efekt") SE.EFEKT_ALANLARI.forEach(function (k) { if (st[k] !== undefined) ov[k] = st[k]; });
     return { overrides: ov, konum: Number(st.konum) || 5 };
   }
