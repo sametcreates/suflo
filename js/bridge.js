@@ -274,7 +274,12 @@ window.K = (function () {
    * whisper-cli / ffmpeg'in açtığı alt süreçler (ve kilitlediği WAV) yaşamaya devam eder:
    * taskkill /T (ağaç) /F (zorla). macOS'ta SIGKILL: whisper SIGTERM'de JSON yazmaya çalışmasın.
    */
-  function surecAgaciniOldur(child) {
+  /*
+   * grup (3.3, YouTube indirici): süreç kendi süreç grubunda açıldı (opts.surecGrubu, macOS/Linux'ta
+   * detached). Eksi pid TÜM grubu öldürür: yt-dlp_macos (PyInstaller) açılışta kendi Python sürecini
+   * ve indirirken ffmpeg'i açar; yalnız ana süreç ölürse onlar indirmeye devam ederdi.
+   */
+  function surecAgaciniOldur(child, grup) {
     if (!child) return;
     if (WIN && child.pid) {
       try {
@@ -285,6 +290,9 @@ window.K = (function () {
         return;
       } catch (e3) {}
     }
+    if (grup && child.pid && typeof process !== "undefined" && typeof process.kill === "function") {
+      try { process.kill(-child.pid, "SIGKILL"); return; } catch (eG) {}
+    }
     try { child.kill("SIGKILL"); } catch (e4) { try { child.kill(); } catch (e5) {} }
   }
 
@@ -294,6 +302,9 @@ window.K = (function () {
    * opts.onStderr  fn(parça) — stderr akarken (ilerleme yüzdesi)
    * opts.onStdout  fn(parça) — stdout akarken (whisper-cli segment satırları); tam çıktı yine birikir
    * opts.iptal     K.iptalJetonu(): iptalde süreç ağacı öldürülür, { code: -2, iptal: true } döner
+   * opts.surecGrubu (3.3) macOS/Linux'ta süreç kendi grubunda açılır (detached); iptal ve zaman
+   *                aşımı bütün grubu öldürür (yt-dlp'nin açtığı alt süreçler dahil). Windows'ta
+   *                taskkill /T zaten ağacı kapsar.
    */
   function run(cmd, args, opts) {
     opts = opts || {};
@@ -313,6 +324,7 @@ window.K = (function () {
          * dosyanın klasöründe çalıştırıp filtreye yalnız dosya adını vermek.
          */
         if (opts.cwd) spawnOpts.cwd = opts.cwd;
+        if (opts.surecGrubu && !WIN) spawnOpts.detached = true;
         if (MAC) {
           // CEP surecinin PATH'i cogu zaman /usr/bin ile sinirli; Homebrew'i goremiyor
           var env = {};
@@ -336,7 +348,8 @@ window.K = (function () {
       }
       var timer = setTimeout(function () {
         if (done) return;
-        try { child.kill(); } catch (e) {}
+        if (opts.surecGrubu) surecAgaciniOldur(child, true);
+        else { try { child.kill(); } catch (e) {} }
         kapat();
         resolve({ code: -1, stdout: out, stderr: err + "\n[zaman aşımı]" });
       }, opts.timeout || 300000);
@@ -354,7 +367,7 @@ window.K = (function () {
         birak = jeton.dinle(function () {
           if (done) return;
           kapat();
-          surecAgaciniOldur(child);
+          surecAgaciniOldur(child, !!opts.surecGrubu);
           log("run IPTAL [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kullanici iptal etti");
           resolve({ code: -2, iptal: true, stdout: out, stderr: err });
         });
