@@ -8,10 +8,31 @@
 <link rel="canonical" href="https://suflo.app/">
 <meta name="robots" content="noindex, follow">
 <meta name="theme-color" content="#0a0a0c">
-<style>body{background:#0a0a0c;color:#a0a3ad;font:15px/1.6 "Inter","Segoe UI",system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0}a{color:#c9beff}</style>
+<style>body{background:#0a0a0c;color:#a0a3ad;font:15px/1.6 "Inter","Segoe UI",system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0}a{color:#c9beff}main{width:min(1100px,100%);padding:24px;box-sizing:border-box}</style>
+<link rel="stylesheet" href="/css/speedramp.css?v=3.2.0">
+<script src="/js/speedramp-demo.js?v=3.2.0" defer></script>
 </head>
 <body>
-<p>Suflo Pro artık ana sayfada — <a href="/#pro">suflo.app/#pro</a> adresine yönlendiriliyorsun…</p>
+<main><p>Suflo Pro artık ana sayfada — <a href="/#pro">suflo.app/#pro</a> adresine yönlendiriliyorsun…</p>
+<div class="sr-feature" data-speedramp="tr">
+  <div class="sr-copy"><span class="sr-badge">Pro · 3 ücretsiz deneme · 3.2</span>
+    <h3>Hızı değiştir.<br>Kurgunun düzenini değil.</h3>
+    <p>Hız Rampası ile klibin hareketine vurgu kat. 11 eğriden birini seç; klibe veya In/Out aralığına uygula.</p>
+    <ul><li>Klibin yeri ve süresi değişmez.</li><li>Altyazı ve müzik kaymaz.</li><li>"Rampayı kaldır" ile tek tıkla geri dön.</li></ul>
+    <p class="sr-note">Hız parçaları Premiere'de düzenlenebilir. Premiere zaman yeniden eşlemeyi eklentilere açmadığı için Suflo rampayı kısa, sabit hızlı parçalarla kurar; yerel hız eğrisi anahtar kareleri yazmaz.</p>
+    <div class="sr-links"><a href="/#fiyat">Pro'yu incele →</a><a href="https://github.com/sametcreates/suflo/releases/latest">Kendi klibinde dene →</a><a href="/blog/premiere-hiz-rampasi-speed-ramp">Hız rampası rehberi</a></div>
+  </div>
+  <div class="sr-demo"><div class="sr-demo-head"><strong data-curve-label aria-live="polite">Ağır Çekim Dalışı</strong><button class="sr-pause" type="button" aria-pressed="false" data-play="Oynat" data-pause="Duraklat" disabled>Duraklat</button></div>
+    <svg class="sr-graph" viewBox="0 0 472 205" role="img" aria-labelledby="ramp-pro-tr-title ramp-pro-tr-desc"><title id="ramp-pro-tr-title">Zamana göre hız eğrisi</title><desc id="ramp-pro-tr-desc">Temsilî eğri. Eğri yükseldikçe hız artar; alçaldıkça yavaşlar.</desc>
+      <path class="sr-grid" d="M40 32H432 M40 68H432 M40 142H432 M40 178H432 M40 32V178 M138 32V178 M236 32V178 M334 32V178 M432 32V178"/><path class="sr-baseline" d="M40 105H432"/>
+      <text x="4" y="19">Hız</text><text x="10" y="109">1×</text><text x="392" y="200">Zaman</text>
+      <path class="sr-curve" d="M 40 62 C 110 62 122 158 218 158 S 314 62 432 62"/><path class="sr-cursor" d="M40 32V178"/>
+    </svg>
+    <div class="sr-tabs" role="group" aria-label="Eğri örnekleri"><button type="button" data-curve="0" aria-pressed="true" disabled>Ağır Çekim Dalışı</button><button type="button" data-curve="1" aria-pressed="false" disabled>Darbe</button><button type="button" data-curve="2" aria-pressed="false" disabled>Hızlı Giriş</button><button type="button" data-curve="3" aria-pressed="false" disabled>Hızlı Çıkış</button><button type="button" data-curve="4" aria-pressed="false" disabled>Doruk Anı</button><button type="button" data-curve="5" aria-pressed="false" disabled>Atılım</button><button type="button" data-curve="6" aria-pressed="false" disabled>Zaman Bükümü</button><button type="button" data-curve="7" aria-pressed="false" disabled>Nabız</button><button type="button" data-curve="8" aria-pressed="false" disabled>Vites</button><button type="button" data-curve="9" aria-pressed="false" disabled>Süzülme</button><button type="button" data-curve="10" aria-pressed="false" disabled>Ritme Rampa</button></div>
+    <p class="sr-caption">Temsilî eğriler · gerçek klip analizi değildir.</p>
+  </div>
+</div>
+</main>
 <script>location.replace("/#pro");</script>
 </body>
 </html>
