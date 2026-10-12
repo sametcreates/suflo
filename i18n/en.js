@@ -2707,6 +2707,8 @@
   add({
     // status line parts: "12 satır · %34 · ~1 dk 20 sn kaldı · 3,1× gerçek zaman" (each part translated alone)
     "%{n}": "{}%",
+    // "12 satır · %34" (no time left yet): more specific than the stats-line "{} %{n}" template
+    "{} · %{n}": "{} · {}%",
     "~{} kaldı": "~{} left",
     "{n} dk {n} sn": "{} min {} s",
     // live rows box (#cap-canli) and the Cancel button that replaces "Altyazı oluştur" while a job runs
