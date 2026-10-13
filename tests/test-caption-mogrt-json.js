@@ -101,13 +101,70 @@ ok("Boş transkript: parça yok", CMJ.build([], ayar, {}).parcalar.length === 0)
 var y1 = CMJ.yerlesim(1920, 1080, { x: 0.5, y: 0.84 });
 ok("1920×1080: ölçek %100, punto çarpanı 1, konum kadraj pikseli", y1.olcek === 100 && y1.punto === 1 && y1.konum[0] === 960 && y1.konum[1] === 907.2, JSON.stringify(y1));
 var y2 = CMJ.yerlesim(1080, 1920, { x: 0.5, y: 0.74 });
-ok("9:16: kompozisyon sekansı kaplar (%177,78), konum kompozisyon içinde", y2.olcek === 177.78 && y2.konum[1] > 0 && y2.konum[1] < 1080 && y2.konum[0] === 960, JSON.stringify(y2));
+ok("9:16: konum kompozisyon içinde, ölçek %100-%177,78 arası", y2.olcek >= 100 && y2.olcek <= 177.78 && y2.konum[1] > 0 && y2.konum[1] < 1080 && y2.konum[0] === 960, JSON.stringify(y2));
 ok("9:16: punto ölçekten arındırılır (görünen punto = boyut × kısa kenar / 1080)", Math.abs(y2.punto * y2.olcek / 100 - 1) < 0.01, JSON.stringify(y2));
 var y3 = CMJ.yerlesim(3840, 2160, { x: 0.25, y: 0.5 });
-ok("4K: ölçek %200, punto 1, x %25 → kompozisyonda 480", y3.olcek === 200 && y3.punto === 1 && y3.konum[0] === 480 && y3.konum[1] === 540, JSON.stringify(y3));
+ok("4K: ölçek %200 (kompozisyon kadrajı yatayda kaplamalı), punto 1, x %25 → kompozisyonda 480, büyütme işaretli",
+  y3.olcek === 200 && y3.punto === 1 && y3.konum[0] === 480 && y3.konum[1] === 540 && y3.buyutme === true, JSON.stringify(y3));
+/*
+ * 3.3 adım 21 incelemesi: AE şablonu kompozisyon çözünürlüğünde çizilir, Motion › Scale %100 üstü onu büyütür (yazı
+ * yumuşar). Kompozisyon kadrajdan genişse (9:16, 4:5) ölçek yalnız kartın bandını kaplayacak kadardır.
+ */
+var temizAyar = AE.normalize(AE.gorunum("temiz").ayar);
+var oranAlt916 = AE.sablonKonumu(temizAyar, { w: 1080, h: 1920 });
+var yAlt = CMJ.yerlesim(1080, 1920, oranAlt916, { ayar: temizAyar });
+ok("9:16 Alt (Temiz): ölçek %100 (büyütme yok, keskin), punto = kısa kenar / 1080 = 1", yAlt.olcek === 100 && yAlt.punto === 1 && yAlt.buyutme === false, JSON.stringify([oranAlt916, yAlt]));
+function kartIcinde(W, H, oran, y, pay) {
+  var s = y.olcek / 100, cy = y.konum[1], yarim = pay / s;
+  return cy - yarim >= -1e-6 && cy + yarim <= 1080 + 1e-6;
+}
+var payT = CMJ.kartPayi(temizAyar, 1080, 1920);
+ok("kartPayi: punto × satır payı + kontur, kısa kenara göre (Temiz 76 pt, 2 satır, kontur 5)", payT === Math.round(76 * (0.65 * 2 + 0.6) + 5), payT);
+var vurucu = AE.normalize(AE.gorunum("vurucu").ayar);
+var durumlar = [[1080, 1920, { x: 0.5, y: 0.259 }, temizAyar], [1080, 1920, { x: 0.5, y: 0.701 }, vurucu], [1080, 1350, { x: 0.5, y: 0.684 }, temizAyar],
+  [720, 1280, { x: 0.5, y: 0.7 }, vurucu]];
+ok("Dikey / 4:5 / 720p 9:16: kart (kadraj payıyla) kompozisyonun dikey bandında kalır; ölçek en çok kaplama oranı",
+  durumlar.every(function (d) {
+    var y = CMJ.yerlesim(d[0], d[1], d[2], { ayar: d[3] }), kapla = Math.max(d[0] / 1920, d[1] / 1080);
+    return kartIcinde(d[0], d[1], d[2], y, CMJ.kartPayi(d[3], d[0], d[1])) && y.olcek >= 100 && y.olcek <= Math.round(kapla * 10000) / 100 + 1e-9 &&
+      Math.abs(y.punto * y.olcek / 100 - Math.min(d[0], d[1]) / 1080) < 0.01;
+  }), JSON.stringify(durumlar.map(function (d) { return CMJ.yerlesim(d[0], d[1], d[2], { ayar: d[3] }); })));
+ok("Kart kadraj kenarına taşıyorsa ölçek kaplama oranında durur (%177,78; kompozisyon kadrajın tamamı)",
+  CMJ.yerlesim(1080, 1920, { x: 0.5, y: 0.95 }, { ayar: vurucu }).olcek === 177.78);
+var yUst = CMJ.yerlesim(1080, 1920, { x: 0.5, y: 0.259 }, { ayar: temizAyar });
+ok("9:16 Üst: büyütme yalnız gerektiği kadar (%100 < ölçek < %177,78)", yUst.olcek > 100 && yUst.olcek < 177.78 && yUst.buyutme, JSON.stringify(yUst));
+var y720 = CMJ.yerlesim(1280, 720, { x: 0.5, y: 0.84 });
+ok("1280×720: küçültme (kaplama %66,67), büyütme yok", y720.olcek === 66.67 && !y720.buyutme && y720.punto === 1, JSON.stringify(y720));
+ok("yerlesim: pay verilirse kullanılır (pay 0 → 9:16 Alt'ta %100)", CMJ.yerlesim(1080, 1920, { x: 0.5, y: 0.74 }, { pay: 0 }).olcek === 100);
 ok("Oran kontrolü için 0-1 konum da verilir", y1.konumOran[0] === 0.5 && y1.konumOran[1] === 0.84, JSON.stringify(y1.konumOran));
 var rP = CMJ.build(cues, AE.normalize({ boyut: 100 }), { cueKind: "lines", punto: y2.punto });
 ok("Punto çarpanı JSON'daki puntoya uygulanır", JSON.parse(rP.parcalar[0].json)[3] === Math.round(100 * y2.punto), JSON.parse(rP.parcalar[0].json)[3]);
+// 3.3 adım 21 incelemesi: kontur kalınlığı ve gölge mesafesi / yumuşaklığı da kompozisyon pikseli: Motion › Scale onları
+// da büyütür. Önizleme gibi ekranda kısa kenara göre olmalı (9:16'da kontur 5 → 5 px, 8,9 değil)
+var ayarKG = AE.normalize({ boyut: 76, kontur: 5, golge: { renk: "#000000", opak: 60, mesafe: 6, yumusak: 10 } });
+var yKapla = CMJ.yerlesim(1080, 1920, { x: 0.5, y: 0.5 }, { pay: 5000 });
+var stKG = JSON.parse(CMJ.build(cues, ayarKG, { cueKind: "lines", punto: yKapla.punto }).parcalar[0].json), sKG = yKapla.olcek / 100;
+ok("Ölçek %177,78'de ekrandaki kontur 5 px, gölge mesafesi 6, yumuşaklık 10 (= ayar × kısa kenar / 1080)",
+  yKapla.olcek === 177.78 && Math.abs(stKG[4][4] * sKG - 5) < 0.1 && Math.abs(stKG[5][5] * sKG - 6) < 0.1 && Math.abs(stKG[5][6] * sKG - 10) < 0.1 &&
+  Math.abs(stKG[3] * sKG - 76) < 1, JSON.stringify(stKG.slice(3, 6)));
+var y720p = CMJ.yerlesim(720, 1280, { x: 0.5, y: 0.7 }, { ayar: ayarKG });
+var st720 = JSON.parse(CMJ.build(cues, ayarKG, { cueKind: "lines", punto: y720p.punto }).parcalar[0].json);
+ok("720×1280 (%100): kontur ekranda 5 × 720 / 1080 ≈ 3,3 px (önizlemenin kısa kenar ölçüsü)",
+  Math.abs(st720[4][4] * y720p.olcek / 100 - 5 * 720 / 1080) < 0.1, JSON.stringify([y720p, st720[4]]));
+var st1 = JSON.parse(CMJ.build(cues, ayarKG, { cueKind: "lines" }).parcalar[0].json);
+ok("Punto çarpanı 1 iken kontur / gölge aynen; kontur 0 ve gölge kapalı [0] kalır",
+  st1[4][4] === 5 && st1[5][5] === 6 && st1[5][6] === 10 &&
+  JSON.stringify(JSON.parse(CMJ.build(cues, AE.normalize({ kontur: 0 }), { punto: 0.5 }).parcalar[0].json).slice(4, 6)) === "[[0],[0]]");
+
+/* ---------------- Ayak izi ve bildirim ekleri ---------------- */
+var iz = CMJ.izAraligi([{ start: 10, end: 40 }, { start: 40, end: 75.5 }]);
+ok("izAraligi: ilk parçanın başından son parçanın başı + şablon süresine (importMGT 1 saatlik overwrite)", iz.start === 10 && iz.end === 40 + CMJ.SABLON.sure && CMJ.SABLON.sure === 3600, JSON.stringify(iz));
+ok("izAraligi: boş plan", JSON.stringify(CMJ.izAraligi([])) === '{"start":0,"end":0}');
+var ekTam = CMJ.bildirimEkleri({ font: { yedek: true, neden: "kurulu-degil" }, vurguKaybi: 2, logo: true, konusmaci: true, konumYok: 1 });
+ok("bildirimEkleri: Arial, vurgu, Marka Kiti logosu, konuşmacı renkleri (+ Video katmanı yolu), konum",
+  ekTam.join(" · ") === "yazı tipi Arial · anahtar kelime vurgusu yerel çıktıda yok · Marka Kiti logosu yerel çıktıda yok · konuşmacı renkleri yerel çıktıda yok · bunlar için Çıktı: Video katmanı · konum / ölçek Premiere'de elle ayarlanmalı", ekTam.join(" · "));
+ok("bildirimEkleri: yeniden başlat ve italik", CMJ.bildirimEkleri({ font: { yedek: true, neden: "yeniden-baslat" } })[0] === "yazı tipi Arial (Premiere'i yeniden başlat)" &&
+  CMJ.bildirimEkleri({ font: { yedek: false, italikYok: true } }).join() === "italik yerel çıktıda yok" && CMJ.bildirimEkleri({}).length === 0);
 
 /* ---------------- Fontlar ---------------- */
 ok("fontKuruluMu: Montserrat-Bold.ttf Montserrat'ı karşılar (büyük / küçük harf fark etmez)", CMJ.fontKuruluMu("Montserrat", ["C:\\Windows\\Fonts\\MONTSERRAT-BOLD.TTF"]));
@@ -153,6 +210,53 @@ AE.sablonFontu = function (n) { return n.font; };
 var fBilinmez;
 try { fBilinmez = CMJ.fontSecimi({ font: "Inter" }, ["Inter-Regular.ttf"]); } finally { AE.normalize = eskiN; AE.sablonFontu = eskiS; }
 ok("Eşlemede olmayan aile (adım 18 fontu): Arial İtalik + 'bilinmiyor'", fBilinmez.ps === "Arial-ItalicMT" && fBilinmez.neden === "bilinmiyor", JSON.stringify(fBilinmez));
+// 3.3 adım 21 incelemesi: "Suflo fontlarını kur"dan sonra Premiere yeniden başlayana kadar yeni font görünmez
+var fBek = CMJ.fontSecimi(AE.normalize({ font: "Montserrat", kalin: true }), ["arial.ttf"], { bekleyen: ["Montserrat-Bold.ttf", "Montserrat-Regular.ttf"] });
+ok("fontSecimi: font yalnız bu oturumda kurulduysa Arial + 'yeniden-baslat' (PostScript adı gönderilmez)",
+  fBek.yedek && fBek.neden === "yeniden-baslat" && fBek.ps === "Arial-BoldMT", JSON.stringify(fBek));
+ok("fontSecimi: bekleyen listesi başka aileyi kapsıyorsa yine 'kurulu-degil'; önceden kuruluysa bekleyen etkisiz",
+  CMJ.fontSecimi(AE.normalize({ font: "Anton" }), ["arial.ttf"], { bekleyen: ["Montserrat-Bold.ttf"] }).neden === "kurulu-degil" &&
+  !CMJ.fontSecimi(AE.normalize({ font: "Montserrat", kalin: true }), ["Montserrat-Bold.ttf"], { bekleyen: ["Montserrat-Bold.ttf"] }).yedek);
+var fIt = CMJ.fontSecimi(AE.normalize({ font: "Montserrat", kalin: true, italik: true }), ["Montserrat-Bold.ttf"]);
+ok("fontSecimi: İtalik açık, ailenin italik yüzü yok → düz yüz gider ama italikYok (uyarı)", fIt.ps === "Montserrat-Bold" && !fIt.yedek && fIt.italikYok === true, JSON.stringify(fIt));
+ok("fontSecimi: Arial'a düşülünce italik Arial'da korunur (italikYok değil); italik kapalıyken italikYok değil",
+  CMJ.fontSecimi(AE.normalize({ font: "Anton", kalin: false, italik: true }), ["arial.ttf"]).ps === "Arial-ItalicMT" &&
+  !CMJ.fontSecimi(AE.normalize({ font: "Anton", kalin: false, italik: true }), ["arial.ttf"]).italikYok && !fKurulu.italikYok);
+
+// Adobe Fonts: sayısal adlı dosyaların name tablosundan PostScript adı (paketteki gerçek fontlarla ve uydurma dosyalarla)
+function okuyucu(buf) { return function (konum, uz) { return buf.slice(konum, konum + uz); }; }
+var gercek = ["Montserrat-Bold.ttf", "Anton.ttf", "Lora.ttf", "Inter-Regular.ttf"].map(function (f) {
+  return CMJ.fontPostScriptAdlari(okuyucu(fs.readFileSync(path.join(ROOT, "fonts", f))))[0];
+});
+ok("fontPostScriptAdlari: paketteki fontların nameID 6'sı (Montserrat-Bold, Anton-Regular, Lora-Regular, Inter-Regular)",
+  gercek.join(",") === "Montserrat-Bold,Anton-Regular,Lora-Regular,Inter-Regular", gercek.join(","));
+function sfnt(ps, mac) {
+  // Tek tablolu (name) en küçük sfnt: başlık 12 + dizin 16 + name (6 + 12 + metin)
+  var metin = mac ? Buffer.from(ps, "latin1") : Buffer.from(ps.split("").map(function (c) { return "\u0000" + c; }).join(""), "latin1");
+  var name = Buffer.alloc(18 + metin.length);
+  name.writeUInt16BE(0, 0); name.writeUInt16BE(1, 2); name.writeUInt16BE(18, 4);
+  name.writeUInt16BE(mac ? 1 : 3, 6); name.writeUInt16BE(mac ? 0 : 1, 8); name.writeUInt16BE(mac ? 0 : 0x409, 10);
+  name.writeUInt16BE(6, 12); name.writeUInt16BE(metin.length, 14); name.writeUInt16BE(0, 16);
+  metin.copy(name, 18);
+  var bas = Buffer.alloc(28);
+  bas.write("OTTO", 0, "latin1"); bas.writeUInt16BE(1, 4);
+  bas.write("name", 12, "latin1"); bas.writeUInt32BE(28, 20); bas.writeUInt32BE(name.length, 24);
+  return Buffer.concat([bas, name]);
+}
+ok("fontPostScriptAdlari: OpenType (CFF) Windows UTF-16 ve Mac Roman kaydı", CMJ.fontPostScriptAdlari(okuyucu(sfnt("Montserrat-Bold")))[0] === "Montserrat-Bold" &&
+  CMJ.fontPostScriptAdlari(okuyucu(sfnt("BebasNeue-Regular", true)))[0] === "BebasNeue-Regular");
+var tek = sfnt("Poppins-Bold"), ttcBas = Buffer.alloc(16);
+ttcBas.write("ttcf", 0, "latin1"); ttcBas.writeUInt32BE(0x00010000, 4); ttcBas.writeUInt32BE(1, 8); ttcBas.writeUInt32BE(16, 12);
+var ttcIc = Buffer.from(tek); ttcIc.writeUInt32BE(28 + 16, 20);   // koleksiyonda tablo konumu dosya başına göre
+ok("fontPostScriptAdlari: koleksiyon (ttcf)", CMJ.fontPostScriptAdlari(okuyucu(Buffer.concat([ttcBas, ttcIc])))[0] === "Poppins-Bold");
+ok("fontPostScriptAdlari: font olmayan / bozuk dosyada boş", CMJ.fontPostScriptAdlari(okuyucu(Buffer.from("PK\u0003\u0004 not a font"))).length === 0 &&
+  CMJ.fontPostScriptAdlari(okuyucu(Buffer.alloc(0))).length === 0 && CMJ.fontPostScriptAdlari(okuyucu(sfnt("x").slice(0, 30))).length === 0);
+ok("Adobe Fonts'tan gelen ad ('Montserrat-Bold.otf') fontSecimi'nde kurulu sayılır",
+  !CMJ.fontSecimi(AE.normalize({ font: "Montserrat", kalin: true }), ["arial.ttf", "Montserrat-Bold.otf"]).yedek);
+ok("adobeFontKlasorleri: Windows %APPDATA%, macOS Application Support (livetype .r / r); başka platformda yok",
+  CMJ.adobeFontKlasorleri("win32", { APPDATA: "C:\\U\\R" }).join("|") === "C:\\U\\R\\Adobe\\CoreSync\\plugins\\livetype\\.r|C:\\U\\R\\Adobe\\CoreSync\\plugins\\livetype\\r" &&
+  CMJ.adobeFontKlasorleri("darwin", { HOME: "/Users/a" })[0] === "/Users/a/Library/Application Support/Adobe/CoreSync/plugins/livetype/.r" &&
+  CMJ.adobeFontKlasorleri("linux", { HOME: "/h" }).length === 0 && CMJ.adobeFontKlasorleri("win32", {}).length === 0);
 var rF = CMJ.build(cues, ayar, { cueKind: "lines", font: "ArialMT" });
 ok("Seçilen font JSON'un 3. alanına yazılır", JSON.parse(rF.parcalar[0].json)[2] === "ArialMT");
 
@@ -225,23 +329,26 @@ function govde(ad) {
   var bas = cap.indexOf("  function " + ad + "(");
   return bas === -1 ? "" : cap.slice(bas, cap.indexOf("\n  }\n", bas) + 5);
 }
-function yerelUi(pro) {
+function yerelUi(pro, o) {
+  o = o || {};
   var dom = {};
   ["cap-efekt-cikti", "cap-efekt-cikti-sar", "cap-yerel-font-not", "cap-yerel-font-metin", "cap-yerel-font-kur", "cap-apply-hint", "cap-apply-style"].forEach(function (id) {
     dom[id] = { id: id, hidden: false, value: "", textContent: "", disabled: true };
   });
   dom["cap-efekt-cikti"].value = "yerel";
   dom["cap-yerel-font-not"].hidden = true;
-  var f = new Function("el", "CMJ", "AE", "Pro", "window",
+  var f = new Function("el", "CMJ", "AE", "Pro", "window", "AYAR", "KURULU", "BEKLEYEN",
     "var secilenMogrt = null, secilenMotorStili = 'efekt', EFEKT = 'efekt', kaliteOnayBekleyen = '';\n" +
-    "function efektAyari() { return AE.normalize({ font: 'Bangers', kalin: true }); }\n" +
-    "function sistemFontDosyalari() { return ['arial.ttf']; }\n" +
+    "var yerelBekleyenFontlar = BEKLEYEN;\n" +
+    "function efektAyari() { return AE.normalize(AYAR); }\n" +
+    "function sistemFontDosyalari() { return KURULU; }\n" +
     "function yerelPlatform() { return 'win32'; } function yerelEnv() { return { LOCALAPPDATA: 'C:\\\\U' }; }\n" +
     "function temizMogrtAdi(m) { return String(m); }\n" +
     govde("yerelCiktiSecili") + govde("yerelCiktiEtkin") + govde("yerelFontNotu") + govde("uygulamaIpucunuGuncelle") +
     "\nreturn { not: yerelFontNotu, ipucu: uygulamaIpucunuGuncelle };");
   var api = f(function (id) { return dom[id] || null; }, CMJ, AE, { isPro: function () { return pro; } },
-    { SufloStyleEngine: { preset: function () { return { name: "Altyazı Efektleri" }; } } });
+    { SufloStyleEngine: { preset: function () { return { name: "Altyazı Efektleri" }; } } },
+    o.ayar || { font: "Bangers", kalin: true }, o.kurulu || ["arial.ttf"], o.bekleyen || []);
   api.not();
   api.ipucu();
   return dom;
@@ -254,6 +361,57 @@ ok("Pro'suz (deneme) + Premiere yerel: font notu ve kur düğmesi GİZLİ, ipucu
   uiDeneme["cap-yerel-font-not"].hidden && !/kendi klibi/.test(uiDeneme["cap-apply-hint"].textContent) &&
   /Premiere yerel çıktı \(render yok\) Pro'da; deneme hakkı altyazıyı filigranlı şeffaf bir video katmanı/.test(uiDeneme["cap-apply-hint"].textContent),
   uiDeneme["cap-apply-hint"].textContent);
+// 3.3 adım 21 incelemesi: kurulumdan sonra (Premiere yeniden başlamadan) ve italik için dürüst not
+var uiBek = yerelUi(true, { ayar: { font: "Montserrat", kalin: true }, kurulu: ["arial.ttf"], bekleyen: ["Montserrat-Bold.ttf", "Montserrat-Regular.ttf"] });
+ok("'Suflo fontlarını kur'dan sonra Premiere yeniden başlamadan: not 'yeniden başlatılana kadar görmez … Arial', kur düğmesi gizli",
+  !uiBek["cap-yerel-font-not"].hidden && /^Montserrat kuruldu; Premiere yeniden başlatılana kadar görmez: o zamana kadar Arial çizilir\.$/.test(uiBek["cap-yerel-font-metin"].textContent) &&
+  uiBek["cap-yerel-font-kur"].hidden, uiBek["cap-yerel-font-metin"].textContent);
+var uiIt = yerelUi(true, { ayar: { font: "Montserrat", kalin: true, italik: true }, kurulu: ["Montserrat-Bold.ttf"] });
+ok("İtalik açık, aile kurulu: 'İtalik Premiere yerel çıktıda yok' notu, kur düğmesi gizli",
+  !uiIt["cap-yerel-font-not"].hidden && /^İtalik Premiere yerel çıktıda yok: Montserrat düz çizilir/.test(uiIt["cap-yerel-font-metin"].textContent) && uiIt["cap-yerel-font-kur"].hidden,
+  uiIt["cap-yerel-font-metin"].textContent);
+ok("Aile kurulu, italik kapalı: not gizli", yerelUi(true, { ayar: { font: "Montserrat", kalin: true }, kurulu: ["Montserrat-Bold.ttf"] })["cap-yerel-font-not"].hidden);
+
+// Adobe Fonts taraması (panel yapıştırıcısı, gerçek dosya sistemiyle): sayısal adlı, uzantısız dosyadan PostScript adı
+var os = require("os");
+var geciciEv = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-adobefont-"));
+try {
+  var lt = path.join(geciciEv, "Library", "Application Support", "Adobe", "CoreSync", "plugins", "livetype", ".r");
+  fs.mkdirSync(lt, { recursive: true });
+  fs.copyFileSync(path.join(ROOT, "fonts", "Montserrat-Bold.ttf"), path.join(lt, ".40123"));
+  fs.writeFileSync(path.join(lt, ".40124"), "font degil");
+  var tara = new Function("K", "CMJ", "require",
+    "function yerelPlatform() { return 'darwin'; } function yerelEnv() { return { HOME: " + JSON.stringify(geciciEv) + " }; }\n" +
+    govde("adobeFontAdlari") + "\nreturn adobeFontAdlari();")({ fs: fs, path: path }, CMJ, require);
+  ok("Adobe Fonts taraması: livetype/.r içindeki sayısal adlı font 'Montserrat-Bold.otf' olarak listelenir, font olmayan atlanır",
+    tara.join(",") === "Montserrat-Bold.otf", JSON.stringify(tara));
+} finally {
+  try { fs.rmSync(geciciEv, { recursive: true, force: true }); } catch (eRm) {}
+}
+
+// Premiere sürümü bağlam yoklamasıyla gelince (açılışta Premiere'e gidilmez) 2022 öncesinde seçenek gizlenir
+function baglaUi(surum) {
+  var dom = {}, dinleyiciler = [], ctx = { app: "" };
+  ["cap-efekt-cikti", "cap-efekt-cikti-sar", "cap-yerel-font-kur", "cap-yerel-kaldir"].forEach(function (id) {
+    dom[id] = { id: id, hidden: false, value: "yerel", addEventListener: function () {} };
+  });
+  var kapp = { ctx: function () { return ctx; }, onContext: function (fn) { dinleyiciler.push(fn); } };
+  var win = { KApp: kapp, ipucu: 0 };
+  var f = new Function("el", "CMJ", "AE", "KApp", "window", "Pro",
+    "var yerelDesteklenmiyor = '', YEREL_ANAHTAR = 'suflo.efektCikti';\n" +
+    "function yerelFontNotu() {} function yerelKayitNotu() {} function yerelFontlariKur() {} function yerelKaldir() {}\n" +
+    "function uygulamaIpucunuGuncelle() { window.ipucu++; }\n" +
+    govde("yerelSecenekDurumu") + govde("yerelCiktiBagla") + "\nreturn yerelCiktiBagla;");
+  f(function (id) { return dom[id] || null; }, CMJ, AE, kapp, win, undefined)();
+  var acilis = dom["cap-efekt-cikti-sar"].hidden;
+  ctx = { app: surum, connected: true };
+  dinleyiciler.forEach(function (fn) { fn(ctx); });
+  return { acilis: acilis, gizli: dom["cap-efekt-cikti-sar"].hidden, ipucu: win.ipucu, dinleyici: dinleyiciler.length };
+}
+var b21 = baglaUi("15.4.0"), b25 = baglaUi("25.2.0");
+ok("Premiere 2021 (15.x): açılışta görünür, bağlam gelince Çıktı seçeneği gizlenir ve ipucu tazelenir (ilk eklemeyi beklemez)",
+  b21.dinleyici === 1 && b21.acilis === false && b21.gizli === true && b21.ipucu === 1, JSON.stringify(b21));
+ok("Premiere 2025: seçenek görünür kalır, ipucu gereksiz tazelenmez", b25.gizli === false && b25.ipucu === 0, JSON.stringify(b25));
 ok("Pro durumu değişince font notu ve ipucu tazelenir (Pro.on, Premiere çağrısı yok)",
   /Pro\.on\(function \(\) \{ yerelFontNotu\(\); uygulamaIpucunuGuncelle\(\); \}\)/.test(cap.slice(cap.indexOf("function yerelCiktiBagla()"), cap.indexOf("function efektKontrolleriniBagla()"))));
 var bagla = cap.slice(cap.indexOf("function yerelCiktiBagla()"), cap.indexOf("function efektKontrolleriniBagla()"));
@@ -264,6 +422,24 @@ var uyg = cap.slice(cap.indexOf("async function yerelAltyaziUygula()"), cap.inde
 ok("Yerleştirme hatasında grup kaldırılır; şablon açılamazsa video katmanına düşülür",
   /KS_removeCaptionMogrtBatch/.test(uyg) && /\["ice-aktarma", "bilesen", "sozlesme", "dogrulama"\]/.test(uyg) && /return false;/.test(uyg));
 ok("Doğrulama tutmazsa parça boyu küçültülüp yeniden denenir", /hata\.kod === "dogrulama" && ki \+ 1 < kademeler\.length\) continue/.test(uyg));
+// 3.3 adım 21 incelemesi (kaynak denetimi): ayak izi, sekans sabitleme, Marka Kiti / konuşmacı renkleri bildirimi
+ok("Hazırlık izi grubun ayak izinde arar (izAraligi: son parça + 1 saat), her parça şablon süresini 'iz' olarak verir",
+  /var ayak = CMJ\.izAraligi\(plan\.parcalar\);/.test(uyg) && /KS_prepareCaptionMogrt", \{ path: sablon, start: ayak\.start, end: ayak\.end,/.test(uyg) &&
+  /iz: CMJ\.SABLON\.sure, expectSeqId: seqId/.test(uyg));
+ok("Parçalar ve hazırlık yoklanan sekansa sabit (expectSeqId), yarım grup o sekanstan kaldırılır, kayıt sekans kimliğini taşır",
+  /var seqId = String\(probe\.seqId/.test(uyg) && /expectSeqId: seqId \}, 30000\)/.test(uyg) &&
+  /KS_removeCaptionMogrtBatch", seqId \? \{ batch: batch, seqId: seqId \}/.test(uyg) && /sekansId: seqId/.test(uyg) &&
+  /if \(hata\.kod === "sekans"\) throw new Error/.test(uyg));
+ok("Yarım grup kaldırılamazsa 'Kaldır' için kayıt yazılır; Kaldır kayıttaki sekansı hedefler",
+  /if \(yerlesen && \(!rm \|\| !rm\.ok \|\| !\(rm\.removed >= yerlesen\)\)\)/.test(uyg) &&
+  /k\.sekansId \? \{ batch: k\.batch, seqId: k\.sekansId \}/.test(cap.slice(cap.indexOf("async function yerelKaldir()"), cap.indexOf("function yerelDus("))));
+ok("Bildirim: Marka Kiti logosu ve konuşmacı renkleri yerel çıktıda yoksa söylenir (bildirimEkleri)",
+  /var logoVar = !!\(kit && kit\.logo && kit\.logo\.path\);/.test(uyg) && /konusmaciRenkleri\(\{ cues: cs \}\)/.test(uyg) &&
+  /CMJ\.bildirimEkleri\(\{ font: fontSec, vurguKaybi: plan\.vurguKaybi, logo: logoVar, konusmaci: konusmaciVar/.test(uyg));
+ok("Yerleşim kartın payıyla (ayar) hesaplanır; font seçimi bu oturumda kurulanları bekleyen sayar",
+  /CMJ\.yerlesim\(w, h, oran, \{ ayar: ayar \}\)/.test(uyg) && /CMJ\.fontSecimi\(ayar, sistemFontDosyalari\(\), \{ bekleyen: yerelBekleyenFontlar \}\)/.test(uyg));
+ok("Font kurulumu önbelleği tazelemez (Premiere yeni fontu yeniden başlayınca görür); yeni kopyalananlar bekleyen listesine",
+  !/yerelFontOnbellek = null/.test(kur) && /if \(yeni\) yerelBekleyenFontlar\.push\(K\.path\.basename\(adim\.hedef\)\)/.test(kur));
 
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

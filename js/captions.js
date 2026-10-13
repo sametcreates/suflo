@@ -5701,6 +5701,8 @@ window.KCaptions = (function () {
   var YEREL_ANAHTAR = "suflo.efektCikti", YEREL_KAYIT = "suflo.yerelAltyaziKayit";
   var yerelDesteklenmiyor = "";   // oturumda destek yoksa ("surum" | "api") seçenek gizlenir
   var yerelFontOnbellek = null;
+  // Bu oturumda "Suflo fontlarını kur"un kopyaladığı dosyalar: Premiere onları ancak yeniden başlayınca görür
+  var yerelBekleyenFontlar = [];
 
   function yerelPlatform() { return K.MAC ? "darwin" : (K.WIN ? "win32" : (typeof process !== "undefined" ? process.platform : "")); }
   function yerelEnv() { return typeof process !== "undefined" && process.env ? process.env : {}; }
@@ -5727,7 +5729,40 @@ window.KCaptions = (function () {
     yerelKayitNotu();
   }
 
-  // İşletim sisteminin font klasörlerindeki dosya adları (ilk istekte bir kez taranır)
+  /*
+   * Adobe Fonts'un (Creative Cloud) etkin fontları: sayısal adlı dosyalar; Premiere onları PostScript adıyla görür.
+   * Her dosyadan yalnız başlık, tablo dizini ve name tablosu okunur; ad "Montserrat-Bold.otf" gibi listeye girer.
+   */
+  function adobeFontAdlari() {
+    var out = [];
+    if (!K.fs || !K.fs.openSync || !CMJ.adobeFontKlasorleri) return out;
+    var B = null;
+    try { B = require("buffer").Buffer; } catch (e) { B = null; }
+    if (!B) return out;
+    CMJ.adobeFontKlasorleri(yerelPlatform(), yerelEnv()).forEach(function (d) {
+      var dosyalar = [];
+      try { dosyalar = K.fs.readdirSync(d); } catch (e) { return; }
+      dosyalar.slice(0, 4000).forEach(function (f) {
+        var fd = null;
+        try {
+          fd = K.fs.openSync(K.path.join(d, f), "r");
+          CMJ.fontPostScriptAdlari(function (konum, uz) {
+            if (!(konum >= 0) || !(uz > 0)) return B.alloc(0);
+            var b = B.alloc(uz);
+            return b.slice(0, K.fs.readSync(fd, b, 0, uz, konum));
+          }).forEach(function (ps) { out.push(ps + ".otf"); });
+        } catch (e) {}
+        finally { if (fd !== null) { try { K.fs.closeSync(fd); } catch (eK) {} } }
+      });
+    });
+    return out;
+  }
+
+  /*
+   * Premiere'in görebildiği fontlar: işletim sisteminin font klasörlerindeki dosya adları + Adobe Fonts'un PostScript
+   * adları (ilk istekte bir kez taranır). "Suflo fontlarını kur" önbelleği tazelemez: yeni kopyalanan dosyaları
+   * Premiere yeniden başlayana kadar görmez (yerelBekleyenFontlar, fontSecimi "yeniden-baslat").
+   */
   function sistemFontDosyalari(tazele) {
     if (yerelFontOnbellek && !tazele) return yerelFontOnbellek;
     if (!CMJ || !K.nodeOK || !K.fs) return null;
@@ -5735,6 +5770,7 @@ window.KCaptions = (function () {
     CMJ.fontKlasorleri(yerelPlatform(), yerelEnv()).forEach(function (d) {
       try { K.fs.readdirSync(d).forEach(function (f) { out.push(f); }); } catch (e) {}
     });
+    try { out = out.concat(adobeFontAdlari()); } catch (eA) {}
     yerelFontOnbellek = out;
     return out;
   }
@@ -5743,13 +5779,17 @@ window.KCaptions = (function () {
     var not = el("cap-yerel-font-not");
     if (!not) return;
     if (!yerelCiktiEtkin() || secilenMogrt || secilenMotorStili !== EFEKT) { not.hidden = true; return; }
-    var sec = CMJ.fontSecimi(efektAyari(), sistemFontDosyalari());
-    not.hidden = !sec.yedek;
-    if (!sec.yedek) return;
+    var sec = CMJ.fontSecimi(efektAyari(), sistemFontDosyalari(), { bekleyen: yerelBekleyenFontlar });
+    not.hidden = !sec.yedek && !sec.italikYok;
+    if (not.hidden) return;
     var metin = el("cap-yerel-font-metin");
     if (metin) metin.textContent = sec.neden === "bilinmiyor"
       ? sec.aile + " Premiere yerel çıktıda yok: Arial kullanılır, önizleme ile sonuç farklı görünebilir."
-      : sec.aile + " bu bilgisayarda kurulu değil: Premiere Arial çizer, önizleme ile sonuç farklı görünebilir.";
+      : sec.neden === "kurulu-degil"
+        ? sec.aile + " bu bilgisayarda kurulu değil: Premiere Arial çizer, önizleme ile sonuç farklı görünebilir."
+        : sec.neden === "yeniden-baslat"
+          ? sec.aile + " kuruldu; Premiere yeniden başlatılana kadar görmez: o zamana kadar Arial çizilir."
+          : "İtalik Premiere yerel çıktıda yok: " + sec.aile + " düz çizilir, önizleme ile sonuç farklı görünebilir.";
     var kur = el("cap-yerel-font-kur");
     if (kur) kur.hidden = sec.neden !== "kurulu-degil" || !CMJ.fontKurulumPlani(yerelPlatform(), yerelEnv(), [{ dosya: "x.ttf", kaynak: "x" }]).length;
   }
@@ -5768,21 +5808,25 @@ window.KCaptions = (function () {
     var plan = CMJ.fontKurulumPlani(yerelPlatform(), yerelEnv(), dosyalar);
     if (!plan.length) { KApp.toast("Fontlar bu sistemde otomatik kurulamıyor; fonts klasöründeki dosyaları elle kur.", "warn", 9000); return; }
     var kurulan = 0, hata = "";
+    // Premiere'in şu an gördüğü fontlar (kurulumdan ÖNCE): yeni dosyalar oturum boyunca "bekleyen" sayılır
+    sistemFontDosyalari();
     status("Suflo fontları kuruluyor…");
     for (var i = 0; i < plan.length; i++) {
       var adim = plan[i];
       try {
         K.fs.mkdirSync(adim.dizin, { recursive: true });
-        if (!K.fs.existsSync(adim.hedef)) K.fs.copyFileSync(adim.kaynak, adim.hedef);
+        var yeni = !K.fs.existsSync(adim.hedef);
+        if (yeni) K.fs.copyFileSync(adim.kaynak, adim.hedef);
         if (adim.reg) {
           var r = await K.run("reg", adim.reg);
           if (!r || r.code !== 0) throw new Error((r && r.stderr) || "reg");
         }
+        if (yeni) yerelBekleyenFontlar.push(K.path.basename(adim.hedef));
         kurulan++;
       } catch (e) { hata = e && e.message ? e.message : String(e); }
     }
     status("");
-    yerelFontOnbellek = null;
+    // Önbellek tazelenmez: Premiere yeni fontları ancak yeniden başlayınca görür (o zamana kadar Arial + not)
     yerelFontNotu();
     if (kurulan) KApp.toast(kurulan + " Suflo fontu kuruldu. Premiere'i yeniden başlatın; yeni fontlar ancak o zaman görünür.", "good", 12000);
     if (hata) KApp.toast("Bazı fontlar kurulamadı: " + hata, "warn", 9000);
@@ -5803,11 +5847,12 @@ window.KCaptions = (function () {
     var m = el("cap-yerel-kayit-metin");
     if (k && m) m.textContent = "Son yerel altyazı: " + k.adet + " klip · " + k.iz + (k.sekans ? " · " + k.sekans : "");
   }
-  // Son yerel altyazı grubunu kaldır (klip adı "Suflo Caption · <grup>"; kullanıcının kendi klipleri etkilenmez)
+  // Son yerel altyazı grubunu kaldır (klip adı "Suflo Caption · <grup>"; kullanıcının kendi klipleri etkilenmez).
+  // Kayıt sekans kimliğini taşıyorsa grup O sekanstan kaldırılır (başka sekans açık olsa da)
   async function yerelKaldir() {
     var k = yerelKayitOku();
     if (!k) return;
-    var r = await K.call("KS_removeCaptionMogrtBatch", { batch: k.batch }, 30000);
+    var r = await K.call("KS_removeCaptionMogrtBatch", k.sekansId ? { batch: k.batch, seqId: k.sekansId } : { batch: k.batch }, 30000);
     if (!r || !r.ok) { KApp.toast("✕ " + (r && r.error ? r.error : "Kaldırılamadı."), "bad"); return; }
     if (r.removed) { yerelKayitYaz(null); yerelKayitNotu(); KApp.toast(r.removed + " yerel altyazı klibi kaldırıldı.", "good"); }
     else KApp.toast("Kaldırılacak klip bulunamadı: altyazıların eklendiği sekansı aç ya da klipler elle silinmiş.", "warn", 8000);
@@ -5840,44 +5885,59 @@ window.KCaptions = (function () {
     if (!cs.length) throw new Error("Yazılacak altyazı yok.");
     var ayar = efektAyari(), tur = motorCueTuru();
     var w = Number(probe.width) || 1920, h = Number(probe.height) || 1080;
-    var fontSec = CMJ.fontSecimi(ayar, sistemFontDosyalari());
+    var fontSec = CMJ.fontSecimi(ayar, sistemFontDosyalari(), { bekleyen: yerelBekleyenFontlar });
     var oran = AE.sablonKonumu(ayar, { w: w, h: h, guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked), ornek: { cues: cs, cueKind: tur } });
-    var yer = CMJ.yerlesim(w, h, oran);
+    var yer = CMJ.yerlesim(w, h, oran, { ayar: ayar });
+    // Video katmanının çizip yerel şablonun çizmediği: Marka Kiti logosu, Podcast Modu konuşmacı renkleri (bildirimde)
+    var kit = markaKiti();
+    var logoVar = !!(kit && kit.logo && kit.logo.path);
+    var kr = konusmaciRenkleri({ cues: cs });
+    var konusmaciVar = !!(kr && kr.speakerColors && (kr.cues || []).some(function (c) { return typeof c.speaker === "number" && c.speaker >= 0; }));
+    // Tüm parçalar yoklanan sekansa: kullanıcı arada başka sekansa geçerse host "sekans" ile durur, grup oradan kaldırılır
+    var seqId = String(probe.seqId || (KApp.ctx() || {}).sequenceId || "");
+    var seqAd = String(probe.seqName || (KApp.ctx() || {}).sequence || "");
     var kademeler = CMJ.BAYT_KADEMELERI;
     for (var ki = 0; ki < kademeler.length; ki++) {
       var plan = CMJ.build(cs, ayar, { cueKind: tur, fps: probe.fps, font: fontSec.ps, punto: yer.punto, bayt: kademeler[ki] });
       if (!plan.parcalar.length) throw new Error("Yazılacak altyazı yok.");
       var batch = "efk-" + Date.now().toString(36);
-      var ilk = plan.parcalar[0], son = plan.parcalar[plan.parcalar.length - 1];
-      var prep = await K.call("KS_prepareCaptionMogrt", { path: sablon, start: ilk.start, end: son.end, batch: batch }, 30000);
+      // Ayak izi: her parça önce 1 saatlik şablon olarak (overwrite) düşer; iz ilk parçadan son parça + 1 saate kadar boş
+      var ayak = CMJ.izAraligi(plan.parcalar);
+      var prep = await K.call("KS_prepareCaptionMogrt", { path: sablon, start: ayak.start, end: ayak.end, batch: batch, expectSeqId: seqId }, 30000);
       if (!prep || !prep.ok) throw new Error(prep && prep.error ? prep.error : "Altyazı katmanı hazırlanamadı.");
-      var hata = null, konumYok = 0, olcekYok = 0;
+      var hata = null, konumYok = 0, olcekYok = 0, yerlesen = 0;
       for (var i = 0; i < plan.parcalar.length; i++) {
         var pc = plan.parcalar[i];
         status("Premiere yerel altyazı yerleştiriliyor… " + (i + 1) + " / " + plan.parcalar.length);
         var r = await K.call("KS_placeCaptionJsonMogrt", {
           path: sablon, track: prep.track, batch: batch, start: pc.start, end: pc.end, json: pc.json,
-          konum: yer.konum, konumOran: yer.konumOran, olcek: yer.olcek
+          konum: yer.konum, konumOran: yer.konumOran, olcek: yer.olcek, iz: CMJ.SABLON.sure, expectSeqId: seqId
         }, 60000);
         if (!r || !r.ok) { hata = r || { kod: "hata", error: "Premiere yanıt vermedi." }; break; }
+        yerlesen++;
         if (!r.konum) konumYok++;
         if (!r.olcek) olcekYok++;
       }
+      var kayit = { batch: batch, adet: plan.parcalar.length, iz: prep.trackName, sekans: seqAd, sekansId: seqId, zaman: Date.now() };
       if (!hata) {
-        yerelKayitYaz({ batch: batch, adet: plan.parcalar.length, iz: prep.trackName, sekans: String((KApp.ctx() || {}).sequence || ""), zaman: Date.now() });
+        yerelKayitYaz(kayit);
         yerelKayitNotu();
         status("");
-        var ek = [];
-        if (fontSec.yedek) ek.push("yazı tipi Arial");
-        if (plan.vurguKaybi) ek.push("anahtar kelime vurgusu yerel çıktıda yok");
-        if (konumYok || olcekYok) ek.push("konum / ölçek Premiere'de elle ayarlanmalı");
+        var ek = CMJ.bildirimEkleri({ font: fontSec, vurguKaybi: plan.vurguKaybi, logo: logoVar, konusmaci: konusmaciVar, konumYok: konumYok || olcekYok });
         KApp.toast(plan.satirSayisi + " altyazı kartı · " + plan.parcalar.length + " Premiere klibi · " + prep.trackName + " · render yok" +
           (ek.length ? " · " + ek.join(" · ") : ""), ek.length ? "warn" : "good", 9000);
         yildizIste();
         return true;
       }
-      await K.call("KS_removeCaptionMogrtBatch", { batch: batch }, 30000);
+      // Yarım grup yoklanan sekanstan kaldırılır (etkin sekans değişmiş olsa da); kaldırılamazsa "Kaldır" için kayıt kalır
+      var rm = await K.call("KS_removeCaptionMogrtBatch", seqId ? { batch: batch, seqId: seqId } : { batch: batch }, 30000);
+      if (yerlesen && (!rm || !rm.ok || !(rm.removed >= yerlesen))) {
+        kayit.adet = yerlesen;
+        yerelKayitYaz(kayit);
+        yerelKayitNotu();
+      }
       if (hata.kod === "dogrulama" && ki + 1 < kademeler.length) continue;
+      if (hata.kod === "sekans") throw new Error("Etkin sekans değişti; yerel altyazı yerleştirilmedi. Altyazıların konacağı sekansı açıp yeniden ekle.");
       if (["ice-aktarma", "bilesen", "sozlesme", "dogrulama"].indexOf(hata.kod) !== -1) {
         yerelDus("Premiere yerel şablonu açılamadı (" + (hata.error || hata.kod) + "); video katmanı ekleniyor.");
         return false;
@@ -6659,6 +6719,19 @@ window.KCaptions = (function () {
     if (el("cap-yerel-kaldir")) el("cap-yerel-kaldir").addEventListener("click", function () { yerelKaldir(); });
     // Pro durumu değişince (lisans girildi / bitti) font notu ve ekleme ipucu yeni yola göre tazelenir
     if (typeof Pro !== "undefined" && Pro.on) { try { Pro.on(function () { yerelFontNotu(); uygulamaIpucunuGuncelle(); }); } catch (e) {} }
+    /*
+     * Premiere sürümü bağlam yoklamasıyla gelir (ilk kullanıcı etkileşiminden sonra; açılışta Premiere'e gidilmez):
+     * gelince Premiere 2022 öncesinde seçenek gizlenir, ipucu video katmanına döner (ilk eklemeyi beklemeden)
+     */
+    if (window.KApp && KApp.onContext) {
+      try {
+        KApp.onContext(function () {
+          var sar = el("cap-efekt-cikti-sar"), once = sar ? sar.hidden : null;
+          yerelSecenekDurumu();
+          if (sar && sar.hidden !== once) uygulamaIpucunuGuncelle();
+        });
+      } catch (eC) {}
+    }
     yerelSecenekDurumu();
   }
 

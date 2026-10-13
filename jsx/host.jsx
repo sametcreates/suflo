@@ -3175,11 +3175,17 @@ function KS_captionMogrtSetText(prop, text) {
   } catch (eVerify) { return true; }
 }
 
+/*
+ * p: { path, start, end, expectSeqId? }. [start, end] yerlestirmenin AYAK IZIDIR: importMGT sablonu kendi tam
+ * suresiyle (overwrite) birakir, ucu ancak sonra kirpilir. Altyazi Efektleri (1 saatlik sablon) end'i son parcanin
+ * basi + sablon suresi olarak verir: iz o araligin tamaminda bos olmali (sonraki kullanici klibi ezilmesin).
+ */
 function KS_prepareCaptionMogrt(encoded) {
   try {
     var p = KS_arg(encoded);
     var seq = KS_seq();
     if (!seq) return KS_err("Aktif sequence yok.");
+    if (!KS_captionSekansTutar(seq, p)) return KS_errKod("sekans", "Etkin sekans degisti; altyazi konmadi.");
     var f = new File(String(p.path || ""));
     if (!f.exists || !/\.mogrt$/i.test(f.name)) return KS_err("Altyazi MOGRT sablonu bulunamadi.");
     var start = Math.max(0, Number(p.start) || 0);
@@ -3246,11 +3252,21 @@ function KS_placeCaptionMogrt(encoded) {
   }
 }
 
+// Beklenen sekans: kimlik verilmisse etkin sekans o olmali (parcalar arasinda kullanici sekans degistirdiyse durur)
+function KS_captionSekansTutar(seq, p) {
+  if (!p || !p.expectSeqId) return true;
+  try { return !!seq && String(seq.sequenceID) === String(p.expectSeqId); } catch (e) { return false; }
+}
+
+/*
+ * p: { batch, seqId? }. seqId verilmisse grup O sekanstan kaldirilir (etkin olmasa da: yerlestirme yarida kalip
+ * kullanici baska sekansa gectiyse ya da "Kaldir" baska sekans acikken basildiysa). Yoksa etkin sekans.
+ */
 function KS_removeCaptionMogrtBatch(encoded) {
   try {
     var p = KS_arg(encoded);
-    var seq = KS_seq();
-    if (!seq) return KS_err("Aktif sequence yok.");
+    var seq = p.seqId ? KS_seqById(p.seqId) : KS_seq();
+    if (!seq) return p.seqId ? KS_errKod("sekans", "Altyazilarin eklendigi sekans projede yok.") : KS_err("Aktif sequence yok.");
     var batch = String(p.batch || "").replace(/[^a-z0-9_-]/ig, "").slice(0, 40);
     var prefix = "Suflo Caption · " + batch;
     var removed = 0;
@@ -3307,11 +3323,12 @@ function KS_captionJsonHata(kod, mesaj) {
 // Panelin "Premiere yerel" secenegi icin hafif yoklama: yalniz typeof / ayar okur, hicbir sey yazmaz
 function KS_captionJsonMogrtProbe() {
   try {
-    var out = { app: "", seq: false, importMGT: null, width: 0, height: 0, fps: 0 };
+    var out = { app: "", seq: false, seqId: "", importMGT: null, width: 0, height: 0, fps: 0 };
     try { out.app = String(app.version); } catch (eV) {}
     var seq = KS_seq();
     if (!seq) return KS_ok(out);
     out.seq = true;
+    try { out.seqId = String(seq.sequenceID); out.seqName = String(seq.name); } catch (eId) { out.seqId = ""; }
     try { out.importMGT = typeof seq.importMGT === "function"; } catch (eI) { out.importMGT = false; }
     try {
       var st = seq.getSettings();
@@ -3349,8 +3366,10 @@ function KS_captionJsonOlcekYaz(clip, olcek) {
 
 /*
  * p: { path, track, start, end (sn), json (JSON_Input dizgesi), batch, konum: [x, y] (kompozisyon px),
- *      konumOran: [x, y] (0-1), olcek (Motion > Scale, %) }
- * Hata kodlari (panel geri doner): dolu, ice-aktarma, bilesen, sozlesme, dogrulama, sure, girdi
+ *      konumOran: [x, y] (0-1), olcek (Motion > Scale, %), iz (sablon suresi, sn; yoksa 3600), expectSeqId }
+ * importMGT sablonu TAM suresiyle (1 saat) overwrite eder, ucu ancak sonra kirpilir ve kirpma ezilen klibi geri
+ * getirmez: izde [start, start + iz] bos degilse hic ice aktarilmaz ("dolu").
+ * Hata kodlari (panel geri doner): dolu, ice-aktarma, bilesen, sozlesme, dogrulama, sure, girdi, sekans
  */
 function KS_placeCaptionJsonMogrt(encoded) {
   var clip = null;
@@ -3358,6 +3377,7 @@ function KS_placeCaptionJsonMogrt(encoded) {
     var p = KS_arg(encoded);
     var seq = KS_seq();
     if (!seq) return KS_errKod("girdi", "Aktif sequence yok.");
+    if (!KS_captionSekansTutar(seq, p)) return KS_errKod("sekans", "Etkin sekans degisti; altyazi konmadi.");
     var f = new File(String(p.path || ""));
     if (!f.exists || !/\.mogrt$/i.test(f.name)) return KS_errKod("ice-aktarma", "Altyazi Efektleri sablonu bulunamadi.");
     var json = String(p.json || "");
@@ -3366,7 +3386,9 @@ function KS_placeCaptionJsonMogrt(encoded) {
     if (!isFinite(track) || track < 0 || track >= seq.videoTracks.numTracks) return KS_errKod("girdi", "Altyazi video katmani bulunamadi.");
     var start = Math.max(0, Number(p.start) || 0);
     var end = Math.max(start + .04, Number(p.end) || start + .04);
-    if (!KS_trackFreeIn(seq.videoTracks[track], start, end)) return KS_errKod("dolu", "Altyazi katmaninda bu zaman araligi dolu.");
+    // Ayak izi: sablonun tam suresi (importMGT overwrite eder; ucu ancak sonra kirpilir)
+    var iz = Number(p.iz) > 0 ? Number(p.iz) : 3600;
+    if (!KS_trackFreeIn(seq.videoTracks[track], start, Math.max(end, start + iz))) return KS_errKod("dolu", "Altyazi katmaninda bu zaman araligi dolu.");
 
     var at = new Time();
     at.seconds = start;

@@ -23,7 +23,7 @@ function FakeFile(p) { this.fsName = String(p || ""); this.name = path.basename(
 var durum;   // her senaryoda sıfırlanır
 function senaryo(o) {
   o = o || {};
-  durum = { importCount: 0, qe: 0, yeniSekans: 0, highlightYazildi: 0, removed: 0, sonKlip: null, konumYazilan: null, olcekYazilan: null };
+  durum = { importCount: 0, qe: 0, yeniSekans: 0, highlightYazildi: 0, removed: 0, sonKlip: null, konumYazilan: null, olcekYazilan: null, ezilen: [] };
   var jsonHam = JSON.stringify({ textEditValue: "", fontTextRunLength: [0], fontTextRunStart: [0] });
   var jsonProp = {
     displayName: "JSON_Input",
@@ -50,7 +50,6 @@ function senaryo(o) {
   var olcekProp = { matchName: "ADBE Scale", displayName: "Scale", getValue: function () { return olcekDeger; }, setValue: function (v) { olcekDeger = v; durum.olcekYazilan = v; } };
   var motion = { matchName: "AE.ADBE Motion", displayName: "Motion", properties: { numItems: 1, 0: olcekProp } };
 
-  var tracks = [];
   function track(onceki) {
     var items = (onceki || []).slice();
     var clips = { numItems: 0 };
@@ -62,43 +61,73 @@ function senaryo(o) {
     reindex();
     return { clips: clips, items: items, reindex: reindex, isLocked: function () { return false; } };
   }
-  tracks.push(track([{ name: "Video", start: { seconds: 0 }, end: { seconds: 100 }, remove: function () {} }]));
-  tracks.push(track(o.dolu ? [{ name: "Kullanıcı başlığı", start: { seconds: 11 }, end: { seconds: 13 }, remove: function () {} }] : []));
+  function kullaniciKlibi(ad, a, b) { return { name: ad, start: { seconds: a }, end: { seconds: b }, remove: function () {} }; }
 
-  var videoTracks = { numTracks: tracks.length };
-  tracks.forEach(function (t, i) { videoTracks[i] = t; });
-  var seq = {
-    name: "Ana", videoTracks: videoTracks,
-    getSettings: function () { return { videoFrameWidth: o.w || 1920, videoFrameHeight: o.h || 1080 }; },
-    timebase: String(TPS / 25),
-    importMGT: function (p, ticks, ti) {
-      durum.importCount++;
-      if (o.importNull) return null;
-      var t = tracks[ti];
-      var bas = Number(ticks) / TPS;
-      var endS = { seconds: bas + 3600 };
-      var clip = {
-        name: "dinamik_altyazi_motoru_yeni",
-        start: { seconds: bas },
-        components: { numItems: 1, 0: motion },
-        getMGTComponent: function () { return o.mgtYok ? null : mgt; },
-        remove: function () { durum.removed++; t.items.splice(t.items.indexOf(clip), 1); t.reindex(); }
-      };
-      Object.defineProperty(clip, "end", {
-        get: function () { return endS; },
-        set: function (v) { if (!o.sureSabit) endS = { seconds: v.seconds }; }
-      });
-      t.items.push(clip); t.reindex();
-      durum.sonKlip = clip;
-      return clip;
-    }
+  /*
+   * Sekans: Premiere'in importMGT'si gibi OVERWRITE eder: şablon tam süresiyle (3600 sn) düşer, [bas, bas + 3600]
+   * aralığındaki kullanıcı klipleri silinir / kırpılır (durum.ezilen); uç kırpılınca geri gelmezler.
+   */
+  function sekans(ad, kimlik, izler) {
+    var tracks = izler.map(function (liste) { return track(liste); });
+    var videoTracks = { numTracks: tracks.length };
+    function izleriDiz() { videoTracks.numTracks = tracks.length; tracks.forEach(function (t, i) { videoTracks[i] = t; }); }
+    izleriDiz();
+    var seq = {
+      name: ad, sequenceID: kimlik, videoTracks: videoTracks, tracks: tracks,
+      izEkle: function () { tracks.push(track([])); izleriDiz(); },
+      getSettings: function () { return { videoFrameWidth: o.w || 1920, videoFrameHeight: o.h || 1080 }; },
+      timebase: String(TPS / 25),
+      importMGT: function (p, ticks, ti) {
+        durum.importCount++;
+        if (o.importNull) return null;
+        var t = tracks[ti];
+        var bas = Number(ticks) / TPS, son = bas + 3600;
+        for (var k = t.items.length - 1; k >= 0; k--) {
+          var c = t.items[k];
+          if (c.end.seconds > bas + 1e-6 && c.start.seconds < son - 1e-6) {
+            durum.ezilen.push(c.name);
+            if (c.start.seconds < bas) c.end = { seconds: bas }; else t.items.splice(k, 1);
+          }
+        }
+        var endS = { seconds: son };
+        var clip = {
+          name: "dinamik_altyazi_motoru_yeni",
+          start: { seconds: bas },
+          components: { numItems: 1, 0: motion },
+          getMGTComponent: function () { return o.mgtYok ? null : mgt; },
+          remove: function () { durum.removed++; t.items.splice(t.items.indexOf(clip), 1); t.reindex(); }
+        };
+        Object.defineProperty(clip, "end", {
+          get: function () { return endS; },
+          set: function (v) { if (!o.sureSabit) endS = { seconds: v.seconds }; }
+        });
+        t.items.push(clip); t.reindex();
+        durum.sonKlip = clip;
+        return clip;
+      }
+    };
+    return seq;
+  }
+  var v2 = [];
+  if (o.dolu) v2.push(kullaniciKlibi("Kullanıcı başlığı", 11, 13));
+  // Altyazı aralığından SONRA kullanıcı klibi (alt üçlü / bitiş kartı): import ayak izinde
+  if (o.sonraki) v2.push(kullaniciKlibi("Kullanıcı alt üçlüsü", 60, 65));
+  var seq = sekans("Ana", "seq-A", [[kullaniciKlibi("Video", 0, 100)], v2]);
+  var seqB = sekans("İkinci", "seq-B", [[kullaniciKlibi("B videosu", 0, 50)], []]);
+  var tracks = seq.tracks;
+  var project = {
+    activeSequence: o.sekansYok ? null : seq,
+    sequences: { numSequences: 2, 0: seq, 1: seqB },
+    createNewSequence: function () { durum.yeniSekans++; }, createNewSequenceFromClips: function () { durum.yeniSekans++; }
   };
   var ctx = {
     app: {
       version: o.app || "25.2.0",
-      project: { activeSequence: o.sekansYok ? null : seq, createNewSequence: function () { durum.yeniSekans++; }, createNewSequenceFromClips: function () { durum.yeniSekans++; } },
+      project: project,
       enableQE: function () { durum.qe++; }
     },
+    // QE yalnız KS_prepareCaptionMogrt'un üst iz açması için (KS_addTopVideoTrack)
+    qe: { project: { getActiveSequence: function () { return { addTracks: function () { project.activeSequence.izEkle(); } }; } } },
     Time: FakeTime, File: FakeFile, Folder: function () {},
     Math: Math, Number: Number, String: String, Error: Error, isFinite: isFinite,
     decodeURIComponent: decodeURIComponent, encodeURIComponent: encodeURIComponent, JSON: JSON,
@@ -108,7 +137,8 @@ function senaryo(o) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, "jsx", "host.jsx"), "utf8"), ctx, { filename: "jsx/host.jsx" });
   return {
     call: function (name, value) { return JSON.parse(ctx[name](encodeURIComponent(JSON.stringify(value || {})))); },
-    track: tracks[1], jsonOku: function () { return JSON.parse(jsonHam).textEditValue; }
+    track: tracks[1], seq: seq, seqB: seqB, jsonOku: function () { return JSON.parse(jsonHam).textEditValue; },
+    etkin: function (s) { project.activeSequence = s; }
   };
 }
 
@@ -179,6 +209,50 @@ r = s.call("KS_placeCaptionJsonMogrt", girdi({ json: "" }));
 ok("Boş veri reddedilir", !r.ok && r.kod === "girdi" && durum.importCount === 0, JSON.stringify(r));
 r = s.call("KS_placeCaptionJsonMogrt", girdi({ track: 9 }));
 ok("Olmayan iz reddedilir", !r.ok && r.kod === "girdi", JSON.stringify(r));
+
+/* ---- 3.3 adım 21 incelemesi: importMGT'nin 1 saatlik ayak izi (overwrite) ---- */
+s = senaryo({ sonraki: true });
+r = s.call("KS_placeCaptionJsonMogrt", girdi({}));
+ok("Altyazı aralığından SONRA kullanıcı klibi (60-65 sn) varsa 'dolu': importMGT çağrılmaz, klip ezilmez",
+  !r.ok && r.kod === "dolu" && durum.importCount === 0 && durum.ezilen.length === 0 &&
+  s.track.items.length === 1 && s.track.items[0].name === "Kullanıcı alt üçlüsü" && s.track.items[0].end.seconds === 65, JSON.stringify(r) + " " + JSON.stringify(durum.ezilen));
+s = senaryo({ sonraki: true });
+r = s.call("KS_placeCaptionJsonMogrt", girdi({ start: 70, end: 74 }));
+ok("Kullanıcı klibinin SONRASINA yerleştirme serbest (ayak izi yalnız başlangıçtan ileri)", r.ok && durum.ezilen.length === 0 && s.track.items.length === 2, JSON.stringify(r));
+s = senaryo({});
+var r1 = s.call("KS_placeCaptionJsonMogrt", girdi({ start: 10, end: 14.2 }));
+var r2 = s.call("KS_placeCaptionJsonMogrt", girdi({ start: 14.2, end: 20 }));
+ok("Aynı gruptaki ardışık parça: önceki parça kırpıldığı için iz boş, ikisi de yerleşir, hiçbir şey ezilmez",
+  r1.ok && r2.ok && durum.ezilen.length === 0 && s.track.items.length === 2 && s.track.items[0].end.seconds === 14.2, JSON.stringify([r1, r2, durum.ezilen]));
+s = senaryo({ sonraki: true });
+r = s.call("KS_placeCaptionJsonMogrt", girdi({ iz: 0 }));
+ok("Geçersiz 'iz' ayak izini daraltmaz (varsayılan 3600 sn): yine 'dolu'", !r.ok && r.kod === "dolu" && durum.importCount === 0, JSON.stringify(r));
+
+// Hazırlık: iz ilk parçadan son parça + 1 saate kadar boş olmalı; değilse yeni üst iz açılır
+s = senaryo({ sonraki: true });
+var pr2 = s.call("KS_prepareCaptionMogrt", { path: SABLON, start: 10, end: 40 + 3600 });
+ok("Hazırlık: V2 altyazı aralığında boş ama sonrasında kullanıcı klibi var → V2 seçilmez, yeni üst iz (V3) açılır",
+  pr2.ok && pr2.track === 2 && pr2.trackName === "V3" && pr2.newTrack === true, JSON.stringify(pr2));
+s = senaryo({});
+pr2 = s.call("KS_prepareCaptionMogrt", { path: SABLON, start: 10, end: 40 + 3600 });
+ok("Hazırlık: V2 tamamen boşsa V2 (yeni iz açılmaz)", pr2.ok && pr2.track === 1 && !pr2.newTrack, JSON.stringify(pr2));
+
+/* ---- Sekans sabitleme: parçalar yoklanan sekansa; kaldırma o sekanstan ---- */
+s = senaryo({});
+pr = s.call("KS_captionJsonMogrtProbe");
+ok("Yoklama sekans kimliğini ve adını verir", pr.ok && pr.seqId === "seq-A" && pr.seqName === "Ana", JSON.stringify(pr));
+r = s.call("KS_placeCaptionJsonMogrt", girdi({ expectSeqId: "seq-A" }));
+ok("Beklenen sekans etkinse yerleşir", r.ok, JSON.stringify(r));
+s.etkin(s.seqB);
+var rB2 = s.call("KS_placeCaptionJsonMogrt", girdi({ start: 20, end: 24, expectSeqId: "seq-A" }));
+ok("Kullanıcı arada başka sekansa geçtiyse 'sekans': B'ye hiçbir şey konmaz", !rB2.ok && rB2.kod === "sekans" && durum.importCount === 1 &&
+  s.seqB.tracks[1].items.length === 0, JSON.stringify(rB2));
+var hazirB = s.call("KS_prepareCaptionMogrt", { path: SABLON, start: 0, end: 3600, expectSeqId: "seq-A" });
+ok("Hazırlık da beklenen sekansı denetler", !hazirB.ok && hazirB.kod === "sekans", JSON.stringify(hazirB));
+var rmB = s.call("KS_removeCaptionMogrtBatch", { batch: "efk-test", seqId: "seq-A" });
+ok("Kaldırma kimlikle o sekanstan (etkin sekans B olsa da): A'daki grup silinir", rmB.ok && rmB.removed === 1 && s.track.items.length === 0, JSON.stringify(rmB));
+var rmYok = s.call("KS_removeCaptionMogrtBatch", { batch: "efk-test", seqId: "seq-silinmis" });
+ok("Kayıttaki sekans projede yoksa 'sekans' hatası (etkin sekansa dokunulmaz)", !rmYok.ok && rmYok.kod === "sekans", JSON.stringify(rmYok));
 
 /* ---- Kaynak denetimi ---- */
 var host = fs.readFileSync(path.join(ROOT, "jsx", "host.jsx"), "utf8");

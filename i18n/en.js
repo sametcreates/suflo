@@ -3062,7 +3062,7 @@
     "Suflo fontlarını kur": "Install Suflo fonts",
     "Paketteki fontları kullanıcı font klasörüne kopyalar (yönetici izni gerekmez); sonra Premiere'i yeniden başlat":
       "Copies the bundled fonts to your user font folder (no admin rights needed); then restart Premiere",
-    "Suflo'nun son eklediği yerel altyazı kliplerini açık sekanstan kaldırır": "Removes the native caption clips Suflo added last from the open sequence",
+    "Suflo'nun son eklediği yerel altyazı kliplerini eklendikleri sekanstan kaldırır": "Removes the native caption clips Suflo added last from the sequence they were added to",
     "{} Premiere yerel çıktıda yok: Arial kullanılır, önizleme ile sonuç farklı görünebilir.":
       "{} isn't available in Premiere native output: Arial is used, so the result may look different from the preview.",
     "{} bu bilgisayarda kurulu değil: Premiere Arial çizer, önizleme ile sonuç farklı görünebilir.":
@@ -3108,7 +3108,21 @@
     "Sablonun Essential Graphics kontrolleri Premiere'e acilmadi.": "The template's Essential Graphics controls didn't open in Premiere.",
     "Sablonda 'JSON_Input' kontrolu bulunamadi.": "The template has no 'JSON_Input' control.",
     "Altyazi verisi sablona yazildi ama geri okunan ayni degil.": "The caption data was written to the template but didn't read back the same.",
-    "Sablon klibi altyazi suresine kirpilamadi.": "Couldn't trim the template clip to the caption duration."
+    "Sablon klibi altyazi suresine kirpilamadi.": "Couldn't trim the template clip to the caption duration.",
+    // 3.3 adım 21 incelemesi: sekans sabitleme, bekleyen font, italik, Marka Kiti logosu / konuşmacı renkleri
+    "Etkin sekans degisti; altyazi konmadi.": "The active sequence changed; captions weren't placed.",
+    "Altyazilarin eklendigi sekans projede yok.": "The sequence the captions were added to is no longer in the project.",
+    "Etkin sekans değişti; yerel altyazı yerleştirilmedi. Altyazıların konacağı sekansı açıp yeniden ekle.":
+      "The active sequence changed; native captions weren't placed. Open the sequence the captions belong to and add them again.",
+    "{} kuruldu; Premiere yeniden başlatılana kadar görmez: o zamana kadar Arial çizilir.":
+      "{} is installed; Premiere won't see it until it restarts, so Arial is drawn until then.",
+    "İtalik Premiere yerel çıktıda yok: {} düz çizilir, önizleme ile sonuç farklı görünebilir.":
+      "Italic isn't available in Premiere native output: {} is drawn upright, so the result may look different from the preview.",
+    "yazı tipi Arial (Premiere'i yeniden başlat)": "font Arial (restart Premiere)",
+    "italik yerel çıktıda yok": "italic isn't shown in native output",
+    "Marka Kiti logosu yerel çıktıda yok": "the Brand Kit logo isn't shown in native output",
+    "konuşmacı renkleri yerel çıktıda yok": "speaker colors aren't shown in native output",
+    "bunlar için Çıktı: Video katmanı": "for these use Output: Video layer"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

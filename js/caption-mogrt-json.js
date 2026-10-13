@@ -13,10 +13,15 @@
  *     en çok kelime, satır kırılımı) ve parçalara böler: her parça bir klip, en çok 45 sn ve 8 KB (şablonun metin
  *     sınırı ve her karedeki JSON.parse maliyeti; Premiere denemesi sonrası ayarlanır). Parça sınırları kareye oturur.
  *     *Vurgu* işaretleri ayıklanır (şablonda kelime başına vurgu bayrağı yok: sayısı vurguKaybi'nde).
- *   - yerlesim(w, h, oran): şablonun 1920×1080 kompozisyonunu sekansa sığdıran Motion › Scale ve Caption_Position.
- *   - fontSecimi / fontKuruluMu / fontKlasorleri / fontKurulumPlani: Premiere yalnız sisteme kurulu fontu çizer.
- *     Bilinen aile (PostScript eşlemesi olan) kurulu değilse ya da aile bilinmiyorsa Arial'a düşülür ve uyarılır;
- *     isteğe bağlı "Suflo fontlarını kur" kullanıcı font klasörüne kopyalar (Windows: HKCU kaydı, reg args dizisiyle).
+ *   - yerlesim(w, h, oran, o): şablonun 1920×1080 kompozisyonunu sekansa yerleştiren Motion › Scale (kartı kapsayan en
+ *     küçük ölçek: AE şablonu kompozisyon çözünürlüğünde çizilir, %100 üstü yumuşatır) ve Caption_Position.
+ *   - izAraligi(parcalar): grubun izdeki ayak izi (importMGT şablonu 1 saatlik overwrite eder, sonra kırpılır).
+ *   - bildirimEkleri(o): yerel çıktının önizlemeden farkları (Arial, italik, vurgu, Marka Kiti logosu, konuşmacı renkleri).
+ *   - fontSecimi / fontKuruluMu / fontKlasorleri / adobeFontKlasorleri / fontPostScriptAdlari / fontKurulumPlani:
+ *     Premiere yalnız sisteme kurulu (ya da Adobe Fonts'ta etkin) fontu çizer. Bilinen aile (PostScript eşlemesi olan)
+ *     kurulu değilse, aile bilinmiyorsa ya da font bu oturumda kurulduysa (Premiere yeniden başlayınca görür) Arial'a
+ *     düşülür ve uyarılır; isteğe bağlı "Suflo fontlarını kur" kullanıcı font klasörüne kopyalar (Windows: HKCU kaydı,
+ *     reg args dizisiyle).
  *   - yerelDestek(app, probe): Premiere 22 (2022) ve üstü, importMGT var.
  *
  * Bilinen şablon özelliği: EG'deki Highlight_Color kontrolü yok sayılır (ifadesi değeri okumaz); renk JSON'dan gelir,
@@ -152,6 +157,16 @@
     var st = ae.sablonStili(ayar, { olcek: carpan });
     if (o && typeof o.font === "string" && o.font) st[2] = o.font;
     st[3] = Math.max(8, st[3]);
+    /*
+     * Kontur kalınlığı ve gölge mesafesi / yumuşaklığı da kompozisyon pikselidir: klibin Motion › Scale'i onları da
+     * büyütür. Önizleme (stil motoru scaled / olcekRef) yazı gibi kısa kenara göre çizer; punto çarpanıyla arındırılır
+     * (9:16'da kontur 5 ekranda 5 px, 8,9 değil).
+     */
+    function olc(v) { return Math.round(Number(v) * carpan * 10) / 10; }
+    if (carpan !== 1) {
+      if (st[4] && st[4][0] === 1 && st[4].length >= 5) st[4][4] = olc(st[4][4]);
+      if (st[5] && st[5][0] === 1 && st[5].length >= 7) { st[5][5] = olc(st[5][5]); st[5][6] = olc(st[5][6]); }
+    }
     return st;
   }
 
@@ -200,17 +215,44 @@
   }
 
   /*
-   * Şablon 1920×1080. Premiere AE şablonunu kendi kompozisyon boyutunda, sekansın ortasına koyar (Responsive Design
-   * yok): klibin Motion › Scale'i kompozisyonu sekansın tamamını kaplayacak kadar büyütür / küçültür (s = en büyük
-   * oran), Caption_Position da kartın ortasının (oran: altyazi-efekt.js sablonKonumu, kadrajın 0-1'i) kompozisyondaki
-   * pikselidir. Punto, önizlemedeki gibi kısa kenara (min(w, h) / 1080) göre; ölçekten arındırılır.
-   * Döner: { olcek (%), konum: [x, y] (kompozisyon px), konumOran: [x / 1920, y / 1080], punto (çarpan) }
+   * Kartın dikey yarı yüksekliği (kadraj pikseli, cömert): ekrandaki punto (boyut × kısa kenar / 1080) × (satır başına
+   * ~0,65 + giriş / vurgu hareketi ve kutu payı 0,6) + kontur + gölge. yerlesim kartın kompozisyon içinde kaldığını
+   * bununla denetler (az tahmin yazıyı kompozisyon kenarında keser; fazlası yalnız biraz büyütür).
    */
-  function yerlesim(w, h, oran) {
+  function kartPayi(ayar, w, h) {
+    var ae = AE();
+    var n = ae ? ae.normalize(ayar) : (ayar || {});
+    var kisa = Math.min(sayi(w) > 0 ? Number(w) : SABLON.genislik, sayi(h) > 0 ? Number(h) : SABLON.yukseklik) / 1080;
+    var boyut = sayi(n.boyut) > 0 ? Number(n.boyut) : 76, satir = sayi(n.satir) > 0 ? Number(n.satir) : 2;
+    var ek = (sayi(n.kontur) > 0 ? Number(n.kontur) : 0) + (n.golge ? (Number(n.golge.mesafe) || 0) + (Number(n.golge.yumusak) || 0) : 0);
+    return Math.round((boyut * (0.65 * satir + 0.6) + ek) * kisa);
+  }
+
+  /*
+   * Şablon 1920×1080. Premiere AE şablonunu kendi kompozisyon boyutunda, sekansın ortasına koyar (Responsive Design
+   * yok) ve kompozisyon çözünürlüğünde çizer: klibin Motion › Scale'i %100'ün üstünde o resmi BÜYÜTÜR (yazı yumuşar).
+   * Ölçek bu yüzden en küçük yeterli değerdir:
+   *   - kadraj kompozisyondan genişse (4K, 2560×1080) kompozisyon yatayda kadrajı kaplamalı: s = max(w/1920, h/1080);
+   *   - değilse (9:16, 4:5, 720×1280) kompozisyon zaten yatayda kadrajı kaplar; dikeyde yalnız kartın bandını kaplaması
+   *     yeter: s = (|kart ortası − kadraj ortası| + pay) / 540, en az 1 (9:16 Alt'ta %100, keskin), en çok kaplama oranı.
+   * Küçük kadrajlarda (1280×720) küçültme: s = kaplama oranı (< 1, bulanıklık yok). Caption_Position kartın ortasının
+   * (oran: altyazi-efekt.js sablonKonumu, kadrajın 0-1'i) kompozisyondaki pikselidir. Punto, önizlemedeki gibi kısa kenara
+   * (min(w, h) / 1080) göre; ölçekten arındırılır (stilDizisi konturu ve gölgeyi de onunla çarpar).
+   * o: { pay (kartın yarı yüksekliği, kadraj px; kartPayi), ayar (pay verilmezse ondan) }
+   * Döner: { olcek (%), konum: [x, y] (kompozisyon px), konumOran: [x / 1920, y / 1080], punto (çarpan), buyutme (s > 1) }
+   */
+  function yerlesim(w, h, oran, o) {
     var W = sayi(w) > 0 ? Number(w) : SABLON.genislik, H = sayi(h) > 0 ? Number(h) : SABLON.yukseklik;
-    var s = Math.max(W / SABLON.genislik, H / SABLON.yukseklik);
+    var kapla = Math.max(W / SABLON.genislik, H / SABLON.yukseklik);
     var fx = oran && sayi(oran.x) !== null ? Math.max(0, Math.min(1, Number(oran.x))) : 0.5;
     var fy = oran && sayi(oran.y) !== null ? Math.max(0, Math.min(1, Number(oran.y))) : 0.84;
+    var s = kapla;
+    if (kapla > 1 && W <= SABLON.genislik) {
+      var pay = o && sayi(o.pay) !== null && o.pay >= 0 ? Number(o.pay) : kartPayi(o && o.ayar, W, H);
+      var gerek = (Math.abs(fy * H - H / 2) + pay) / (SABLON.yukseklik / 2);
+      // Yuvarlanmış ölçek (%, 2 ondalık) kartı kesmesin: yukarı yuvarla
+      s = Math.min(kapla, Math.max(1, Math.ceil(gerek * 10000) / 10000));
+    }
     var cx = SABLON.genislik / 2 + (fx * W - W / 2) / s;
     var cy = SABLON.yukseklik / 2 + (fy * H - H / 2) / s;
     function yuvarla(v, b) { var k = Math.pow(10, b); return Math.round(v * k) / k; }
@@ -218,7 +260,8 @@
       olcek: yuvarla(s * 100, 2),
       konum: [yuvarla(cx, 1), yuvarla(cy, 1)],
       konumOran: [yuvarla(cx / SABLON.genislik, 4), yuvarla(cy / SABLON.yukseklik, 4)],
-      punto: yuvarla(Math.min(W, H) / 1080 / s, 4)
+      punto: yuvarla(Math.min(W, H) / 1080 / s, 4),
+      buyutme: s > 1.0001
     };
   }
 
@@ -289,21 +332,118 @@
   }
 
   /*
-   * Şablona giden font. kurulu: işletim sisteminin font klasörlerindeki dosya adları (verilmezse denetlenmez).
+   * Şablona giden font. kurulu: Premiere'in gördüğü fontlar (işletim sisteminin font klasörlerindeki dosya adları ve
+   * Adobe Fonts'un etkin fontlarının PostScript adları; verilmezse denetlenmez). o.bekleyen: bu oturumda "Suflo
+   * fontlarını kur"un kopyaladığı dosyalar: Premiere onları ancak yeniden başlayınca görür, o zamana kadar Arial.
    * Aile Suflo'nun PostScript eşlemesinde (altyazi-efekt.js sablonFontu) değilse "bilinmiyor", kurulu değilse
-   * "kurulu-degil": ikisinde de Arial (kalın / italik korunur) ve önizlemeyle sonucun farklı olabileceği uyarısı.
-   * Döner: { ps, aile, yedek, neden: "" | "kurulu-degil" | "bilinmiyor" }
+   * "kurulu-degil", yalnız bu oturumda kurulduysa "yeniden-baslat": üçünde de Arial (kalın / italik korunur) ve
+   * önizlemeyle sonucun farklı olabileceği uyarısı. italikYok: İtalik açık ama ailenin italik yüzü pakette yok (şablona
+   * düz yüz gider; önizleme eğik çizer): uyarı gösterilir.
+   * Döner: { ps, aile, yedek, neden: "" | "kurulu-degil" | "yeniden-baslat" | "bilinmiyor", italikYok }
    */
-  function fontSecimi(ayar, kurulu) {
+  function fontSecimi(ayar, kurulu, o) {
     var ae = AE();
     var n = ae ? ae.normalize(ayar) : (ayar || {});
     var ps = ae ? ae.sablonFontu(n) : String(n.font || "");
     var bilinen = !!ps && ps !== n.font;
-    if (!bilinen) return { ps: arial(n.kalin, n.italik), aile: n.font, yedek: true, neden: "bilinmiyor" };
+    if (!bilinen) return { ps: arial(n.kalin, n.italik), aile: n.font, yedek: true, neden: "bilinmiyor", italikYok: false };
     // PostScript adının yüzü de kurulu olmalı (Montserrat-Bold → "Bold")
     var yuz = ps.lastIndexOf("-") > 0 ? ps.slice(ps.lastIndexOf("-") + 1) : "";
-    if (kurulu && !fontKuruluMu(n.font, kurulu, yuz)) return { ps: arial(n.kalin, n.italik), aile: n.font, yedek: true, neden: "kurulu-degil" };
-    return { ps: ps, aile: n.font, yedek: false, neden: "" };
+    if (kurulu && !fontKuruluMu(n.font, kurulu, yuz)) {
+      var bekleyen = o && o.bekleyen && o.bekleyen.length ? o.bekleyen : null;
+      return { ps: arial(n.kalin, n.italik), aile: n.font, yedek: true, italikYok: false,
+        neden: bekleyen && fontKuruluMu(n.font, bekleyen, yuz) ? "yeniden-baslat" : "kurulu-degil" };
+    }
+    return { ps: ps, aile: n.font, yedek: false, neden: "", italikYok: !!n.italik && !/italic|oblique/i.test(ps) };
+  }
+
+  /*
+   * Font dosyasının PostScript adları (name tablosu, nameID 6): Adobe Fonts etkin fontlarını sayısal adlı, uzantısız
+   * dosyalarda tutar; Premiere onları PostScript adıyla görür. oku(konum, uzunluk) → Buffer / Uint8Array (dosyadan
+   * yalnız başlık, tablo dizini ve name tablosu okunur). TrueType / OpenType (CFF) ve koleksiyon (ttcf). Bozuk ya da
+   * font olmayan dosyada boş dizi. Kayıt: Windows (3, UTF-16BE) önce, yoksa Mac (1, Roman / ASCII).
+   */
+  function fontPostScriptAdlari(oku) {
+    function u16(b, i) { return b && b.length >= i + 2 ? (b[i] << 8) | b[i + 1] : -1; }
+    function u32(b, i) { return b && b.length >= i + 4 ? ((b[i] << 24) >>> 0) + ((b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) : -1; }
+    function etiket(b, i) { return b && b.length >= i + 4 ? String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]) : ""; }
+    function yuzAdi(ofs) {
+      var bas = oku(ofs, 12);
+      var surum = etiket(bas, 0);
+      if (surum !== "\u0000\u0001\u0000\u0000" && surum !== "OTTO" && surum !== "true") return "";
+      var n = u16(bas, 4);
+      if (!(n > 0 && n < 200)) return "";
+      var dizin = oku(ofs + 12, n * 16);
+      for (var i = 0; i < n; i++) {
+        if (etiket(dizin, i * 16) !== "name") continue;
+        var tOfs = u32(dizin, i * 16 + 8), tUz = u32(dizin, i * 16 + 12);
+        if (!(tOfs > 0 && tUz > 6 && tUz < 1048576)) return "";
+        var t = oku(tOfs, tUz);
+        var sayi = u16(t, 2), depo = u16(t, 4), mac = "";
+        for (var j = 0; j < sayi; j++) {
+          var k = 6 + j * 12;
+          var plat = u16(t, k), kod = u16(t, k + 2), adNo = u16(t, k + 6), uz = u16(t, k + 8), yer = depo + u16(t, k + 10);
+          if (adNo !== 6 || uz <= 0 || yer + uz > t.length) continue;
+          var s = "", c;
+          if (plat === 3 || plat === 0) { for (c = 0; c + 1 < uz; c += 2) s += String.fromCharCode((t[yer + c] << 8) | t[yer + c + 1]); return s; }
+          if (plat === 1 && kod === 0 && !mac) { for (c = 0; c < uz; c++) mac += String.fromCharCode(t[yer + c]); }
+        }
+        return mac;
+      }
+      return "";
+    }
+    try {
+      var bas = oku(0, 12);
+      if (etiket(bas, 0) === "ttcf") {
+        var adet = u32(bas, 8);
+        if (!(adet > 0 && adet < 64)) return [];
+        var ofsler = oku(12, adet * 4), out = [];
+        for (var i = 0; i < adet; i++) { var a = yuzAdi(u32(ofsler, i * 4)); if (a) out.push(a); }
+        return out;
+      }
+      var tek = yuzAdi(0);
+      return tek ? [tek] : [];
+    } catch (e) { return []; }
+  }
+
+  // Adobe Fonts (Creative Cloud) etkin fontlarının klasörleri (dosyalar sayısal adlı; macOS'ta gizli). env: { APPDATA, HOME }
+  function adobeFontKlasorleri(platform, env) {
+    env = env || {};
+    var kok = "";
+    if (platform === "win32" && env.APPDATA) kok = birlestir(platform, env.APPDATA, "Adobe\\CoreSync\\plugins\\livetype");
+    else if (platform === "darwin" && env.HOME) kok = birlestir(platform, env.HOME, "Library/Application Support/Adobe/CoreSync/plugins/livetype");
+    if (!kok) return [];
+    return [birlestir(platform, kok, ".r"), birlestir(platform, kok, "r")];
+  }
+
+  /*
+   * Yerel ekleme bildiriminin ekleri (önizleme / video katmanından farkı). o: { font (fontSecimi), vurguKaybi (sayı),
+   * logo (Marka Kiti logosu açık), konusmaci (Podcast Modu konuşmacı renkleri açık), konumYok (Caption_Position /
+   * Motion › Scale yazılamadı) }. Logo ve konuşmacı renkleri yalnız video katmanında çizilir: yolu da söylenir.
+   */
+  function bildirimEkleri(o) {
+    o = o || {};
+    var ek = [], f = o.font || {};
+    if (f.yedek) ek.push(f.neden === "yeniden-baslat" ? "yazı tipi Arial (Premiere'i yeniden başlat)" : "yazı tipi Arial");
+    if (f.italikYok) ek.push("italik yerel çıktıda yok");
+    if (o.vurguKaybi) ek.push("anahtar kelime vurgusu yerel çıktıda yok");
+    if (o.logo) ek.push("Marka Kiti logosu yerel çıktıda yok");
+    if (o.konusmaci) ek.push("konuşmacı renkleri yerel çıktıda yok");
+    if (o.logo || o.konusmaci) ek.push("bunlar için Çıktı: Video katmanı");
+    if (o.konumYok) ek.push("konum / ölçek Premiere'de elle ayarlanmalı");
+    return ek;
+  }
+
+  /*
+   * Grubun izdeki ayak izi: importMGT her parçayı şablonun TAM süresiyle (1 saat) overwrite eder, ucu sonra kırpılır.
+   * İz ilk parçanın başından son parçanın başı + şablon süresine kadar boş olmalı (kırpma ezilen klibi geri getirmez).
+   * Döner: { start, end } (sn)
+   */
+  function izAraligi(parcalar) {
+    var p = parcalar || [];
+    if (!p.length) return { start: 0, end: 0 };
+    var ilk = p[0], son = p[p.length - 1];
+    return { start: Number(ilk.start) || 0, end: Math.max(Number(son.end) || 0, (Number(son.start) || 0) + SABLON.sure) };
   }
 
   function birlestir(platform, a, b) {
@@ -403,10 +543,15 @@
     satirlar: satirlar,
     stilDizisi: stilDizisi,
     build: build,
+    kartPayi: kartPayi,
     yerlesim: yerlesim,
+    izAraligi: izAraligi,
+    bildirimEkleri: bildirimEkleri,
     fontKuruluMu: fontKuruluMu,
     fontSecimi: fontSecimi,
+    fontPostScriptAdlari: fontPostScriptAdlari,
     fontKlasorleri: fontKlasorleri,
+    adobeFontKlasorleri: adobeFontKlasorleri,
     paketFontlari: paketFontlari,
     fontKurulumPlani: fontKurulumPlani,
     yerelDestek: yerelDestek

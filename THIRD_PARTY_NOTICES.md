@@ -85,9 +85,13 @@ SOFTWARE.
   `assets/mogrt/altyazi-efekt-v1.mogrt` is TranscriptAI's `dist/source/dinamik_altyazi_motoru.mogrt`,
   unchanged (sha256 `32c2394de3f639fede180bc274e30166daa0375298af5c5f7ae3dfbf73989969`). The Suflo owner
   (Samet Kaygısız) confirmed the author's permission to bundle it (2026-10-12). Its After Effects project uses
-  only Adobe built-ins (Drop Shadow, Slider Control) and references the system font Arial; no font, footage or
-  third-party plug-in is embedded. `tools/verify-release.ps1` allows exactly this path and hash; any other
-  `.mogrt` still stops a release.
+  only Adobe built-ins (Drop Shadow, Slider Control) and the Classic 3D renderer (`ADBE Escher`), and references
+  two fonts by name: the system font Arial (`ArialMT`, the visible caption text) and **DharmaGothicE-Heavy** (a
+  commercial font, only the default font of the hidden `JSON_Input` data layer; `definition.json` lists it in
+  `usedFontsLocalized`). Neither font is bundled with Suflo or embedded in the template; no footage or
+  third-party plug-in is embedded either. Whether Premiere flags DharmaGothicE-Heavy as missing on a machine
+  without it is a pre-release check (`marketing/v3.3-deneme-listesi.md` › 21.16).
+  `tools/verify-release.ps1` allows exactly this path and hash; any other `.mogrt` still stops a release.
 - Adapted in Suflo:
   - `jsx/host.jsx` — `KS_placeCaptionJsonMogrt` and `KS_captionJsonParam` adapt the placement steps of
     `addMOGRTCaption()` in `host/index.jsx` (`importMGT`, `getMGTComponent`, `getParamForDisplayName("JSON_Input")`

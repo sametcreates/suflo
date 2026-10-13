@@ -1485,10 +1485,14 @@ esnemiyor mu), 21.6 (uzun transkript: metin sınırı / akıcılık), 21.8 (yaz�
 renk JSON'dan). 21.10 (9:16 ve 4K ölçek / konum) sonucu tutmazsa aşağıdaki 21.3'e bak.
 
 **21.3 Ölçek ve konum varsayımı (deneme sonrası, gerekirse 15 dk).** Suflo, Premiere'in AE şablonunu kendi 1920×1080
-kompozisyon boyutunda sekansın ortasına koyduğunu varsayar: 1920×1080 dışı sekanslarda klibin Motion › Scale'ini
-`max(w/1920, h/1080)` yapar ve `Caption_Position`'ı buna göre hesaplar (`js/caption-mogrt-json.js` › `yerlesim`). 21.10'da
-yazı iki kat büyük / kadraj dışı çıkarsa (Premiere şablonu zaten sığdırıyorsa) `yerlesim`'de ölçeği 1'e sabitle; testler
-(`tests/test-caption-mogrt-json.js` › Yerleşim) birlikte güncellenmeli. 9:16'da yazı bulanık görünürse aynı yer.
+kompozisyon boyutunda sekansın ortasına koyduğunu ve kompozisyon çözünürlüğünde çizdiğini varsayar (Motion › Scale %100
+üstü resmi büyütür, yazı yumuşar). Bu yüzden ölçek en küçük yeterli değerdir (`js/caption-mogrt-json.js` › `yerlesim`):
+kompozisyon kadrajdan genişse (9:16, 4:5) yalnız kartın dikey bandını kaplayacak kadar (9:16 Alt'ta %100), kadraj
+kompozisyondan genişse (4K, 2560×1080) `max(w/1920, h/1080)` (4K'da %200; kaçınılmaz). Punto, kontur ve gölge ölçekten
+arındırılır, `Caption_Position` buna göre hesaplanır. 21.10'da yazı iki kat büyük / kadraj dışı / kompozisyon kenarında
+kesik çıkarsa (Premiere şablonu zaten sığdırıyorsa ya da kart payı `kartPayi` az geliyorsa) `yerlesim` / `kartPayi`
+düzeltilmeli; testler (`tests/test-caption-mogrt-json.js` › Yerleşim) birlikte. 4K'da yazı belirgin yumuşaksa karar:
+4K sekanslarda Video katmanına düşmek ya da şablonun bir 4K sürümünü (yazardan) istemek.
 
 **21.4 Parça sınırları (deneme sonrası, bilgi).** 21.6'da uzun bir videoda takılma / "geri okunan ayni degil" hatası
 görürsen `js/caption-mogrt-json.js` › `SINIR` (45 sn, 8000 bayt) ve `BAYT_KADEMELERI` (8 → 4 → 2 KB) küçültülebilir;
@@ -1498,6 +1502,23 @@ panel doğrulama tutmazsa zaten küçültüp yeniden dener.
 Premiere'in kendi klibi olarak eklenir: render yok, yazı ve zamanlar Premiere'de düzenlenebilir (Pro). Video katmanı
 seçeneği duruyor. Şablon: TranscriptAI (Aktuğ Antika), izinle." README'deki "Altyazı Efektleri › Premiere yerel" satırı
 hazır.
+
+**21.6 Şablonun ikinci fontu (21.16'dan sonra, gerekirse 15 dk).** Şablonun gizli `JSON_Input` veri katmanının varsayılan
+fontu ticari **DharmaGothicE-Heavy** (`definition.json` › `usedFontsLocalized`; Suflo'da yok, pakete girmez). Görünen
+yazı Arial / seçilen font. 21.16'da bu font olmayan bilgisayarda Premiere "eksik font" uyarısı veriyorsa seçenekler:
+yazardan (Aktuğ Antika) veri katmanı Arial olan bir sürüm istemek (yeni sha256 → `js/caption-mogrt-json.js` › `SABLON`,
+`tools/verify-release.ps1`, testler, `THIRD_PARTY_NOTICES.md`) ya da uyarıyı destek cevaplarına (`marketing/dm-cevaplari.md`:
+"pencereyi kapatmak yeterli, altyazı etkilenmez") yazmak. Uyarı yoksa bir şey yapma.
+
+**21.7 Yeni davranışlar (bilgi; 3.3 adım 21 incelemesi).** (a) Premiere `importMGT` şablonu önce TAM süresiyle (1 saat)
+koyup sonra kırptığı için Suflo, ilk parçadan son parça + 1 saate kadar boş bir iz arar; yoksa yeni üst iz açar (21.17).
+(b) Tüm parçalar eklemenin başladığı sekansa gider; kullanıcı arada sekans değiştirirse durur ve yarım grubu o sekanstan
+kaldırır (21.18); **Kaldır** da kayıttaki sekansı hedefler. (c) Marka Kiti logosu ve Podcast Modu konuşmacı renkleri
+yerel şablonda yok: bildirim söyler ve Video katmanını önerir (21.19). Bir sonraki sürüm için karar: logoyu ayrı bir
+görüntü klibi olarak eklemek. (d) "Suflo fontlarını kur"dan sonra Premiere yeniden başlayana kadar Arial gider (21.20).
+(e) Adobe Fonts'ta etkin fontlar `%APPDATA%\Adobe\CoreSync\plugins\livetype` / `~/Library/Application Support/Adobe/CoreSync/plugins/livetype`
+altındaki `.r` / `r` klasörlerinden okunur (dosyanın name tablosu); 21.21 tutmazsa klasör yolunu
+`js/caption-mogrt-json.js` › `adobeFontKlasorleri`'nde güncelle.
 
 ### YouTube indirici (sol menü › YouTube İndir; bilgi ücretsiz, indirmek Pro `youtube`, 3 deneme)
 
