@@ -474,6 +474,16 @@ ok("Gölge ve Arka plan kutusu anahtarı açılınca renk / opaklık / mesafe / 
   an.api.motorAyarlari(an.api.stil()).golge !== null && an.api.motorAyarlari(an.api.stil()).kutu === true);
 an.dom["cap-efekt-golge-opak"].value = "40"; degistir(an, "cap-efekt-golge-opak");
 ok("açılan gölge opaklığı değiştirilir ve motora gider", an.api.motorAyarlari(an.api.stil()).golge.opak === 40);
+// Boyut / Kontur kalınlığı yazılan değer de aralığa kırpılır (min/max yazılan değeri durdurmaz): önizleme / katman
+// 400 / 40 çiziyor, stil kodu ve Shorts Paketi sessizce 180 / 16 çiziyordu
+an.dom["cap-boyut"].value = "400"; an.dom["cap-kontur"].value = "40";
+var ovKir = an.api.motorAyarlari(an.api.stil());
+ok("yazılan Boyut 400 / Kontur 40: stil() 180 / 16 (kod ve Shorts Paketiyle aynı)", ovKir.boyut === 180 && ovKir.kontur === 16, J({ boyut: ovKir.boyut, kontur: ovKir.kontur }));
+degistir(an, "cap-boyut"); degistir(an, "cap-kontur");
+ok("değişiklikte kutu da kırpılan değeri gösterir (kutuda görünen = çizilen); boş kontur varsayılan 4", an.dom["cap-boyut"].value === "180" && an.dom["cap-kontur"].value === "16" &&
+  (function () { an.dom["cap-boyut"].value = "10"; an.dom["cap-kontur"].value = ""; var o = an.api.motorAyarlari(an.api.stil()); return o.boyut === 36 && o.kontur === 4; })(),
+  an.dom["cap-boyut"].value + " / " + an.dom["cap-kontur"].value);
+an.dom["cap-boyut"].value = "72"; an.dom["cap-kontur"].value = "4";
 an.dom["cap-efekt-golge"].checked = false; degistir(an, "cap-efekt-golge");
 ok("Gölge kapanınca alt kontrolleri yeniden kapanır", an.dom["cap-efekt-golge-opak"].disabled === true && an.dom["cap-efekt-golge-ayar"].classList.contains("pasif") &&
   an.dom["cap-kutu-opak"].disabled === false);

@@ -26,8 +26,10 @@ window.KCaptions = (function () {
   var EFEKT = "efekt";
   // Altyazı Efektleri gölge / kutu sayı kutuları (3.3 adım 17): [varsayılan, en az, en çok]; TranscriptAI şablonunun
   // aralıkları, stil motoru aynısını doğrular. Üstte: stil() modül yüklenirken de çağrılabilir.
+  // Boyut 36-180, kontur 0-16: stil kodu (SS.encode), Shorts Paketi (AE.normalize) ve suflo.app aynı aralığı
+  // sessizce uygular; panel de uygular ki önizleme / katman, kod ve Short aynı değeri çizsin
   var EFEKT_SAYILARI = { "cap-efekt-golge-opak": [75, 0, 100], "cap-efekt-golge-mesafe": [5, 0, 20], "cap-efekt-golge-yumusak": [5, 0, 30],
-    "cap-kutu-opak": [50, 0, 100] };
+    "cap-boyut": [72, 36, 180], "cap-kontur": [4, 0, 16], "cap-kutu-opak": [50, 0, 100] };
   var bekleyenMogrtYolu = "";
   var mogrtBaglam = { width: 0, height: 0 };
 
@@ -2453,11 +2455,11 @@ window.KCaptions = (function () {
       // görünen ayarla aynı görünümü farklı hızda oynatmasın; Shorts paketi ve suflo.app/stil de Dengeli)
       yogunluk: aile === EFEKT ? "balanced" : d("cap-yogunluk", "balanced"),
       font: d("cap-font", "Arial"),
-      boyut: parseInt(d("cap-boyut", "72"), 10) || 72,
+      boyut: efektSayiAlani("cap-boyut"),
       renk: d("cap-renk", "#ffffff"),
       konturRenk: d("cap-renk-kontur", "#000000"),
       vurguRenk: d("cap-renk-vurgu", "#8b7cf6"),
-      kontur: parseInt(d("cap-kontur", "4"), 10),
+      kontur: efektSayiAlani("cap-kontur"),
       konum: parseInt(d("cap-konum", "2"), 10),          // ASS Alignment: 2 alt, 5 orta, 8 üst
       kutu: !!(el("cap-kutu") && el("cap-kutu").checked),
       animasyon: d("cap-animasyon", "yok"),
