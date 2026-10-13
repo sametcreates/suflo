@@ -38,6 +38,7 @@ function Klip(o) {
   else c.projectItem = { getMediaPath: function () { return c._yol; } };
   if (o.mgt) c.isMGT = function () { return true; };
   if (o.multicam) c.projectItem.isMulticamClip = function () { return true; };
+  if (o.sekans) c.projectItem.isSequence = function () { return true; };
   var comps = o.comps || [{ matchName: "AE.ADBE Opacity", displayName: "Opacity" }, { matchName: "AE.ADBE Motion", displayName: "Motion" }];
   c.components = { numItems: comps.length };
   comps.forEach(function (x, i) { c.components[i] = x; });
@@ -237,7 +238,7 @@ function sahne(o) {
   var A = new Klip({ s: 0, e: 50, inp: 0, yol: "C:\\cekim\\A.mov", ad: "A" });
   var kYol = o.yol === undefined ? "C:\\cekim\\K.mov" : o.yol;
   var K = new Klip({ s: 50, e: 50 + n, inp: inp, yol: kYol, dur: kDur, ad: "Kahraman.mov", v: o.hiz || 1, rev: o.rev, mgt: o.mgt,
-    grafik: o.grafik, multicam: o.multicam, remap: o.remap, comps: o.comps });
+    grafik: o.grafik, multicam: o.multicam, sekans: o.sekans, remap: o.remap, comps: o.comps });
   var B = new Klip({ s: 50 + n, e: 90 + n, inp: 5, yol: "C:\\cekim\\B.mov", ad: "B" });
   var KS = new Klip({ s: 50, e: 50 + n, inp: inp, yol: kYol, dur: kDur, tur: "a", ad: "Kahraman.mov" });
   var AS = new Klip({ s: 0, e: 50, inp: 0, yol: "C:\\cekim\\A.mov", tur: "a" }), BS = new Klip({ s: 50 + n, e: 90 + n, inp: 5, yol: "C:\\cekim\\B.mov", tur: "a" });
@@ -354,7 +355,10 @@ var RET = [
   ["remap", { remap: 1 }],
   ["warp", { comps: [{ matchName: "AE.ADBE SubspaceStabilizer", displayName: "Warp Stabilizer" }] }],
   ["warp", { comps: [{ matchName: "x", displayName: "Sarsıntı Önleyici" }] }],
-  ["multicam", { multicam: true }]
+  ["multicam", { multicam: true }],
+  // iç içe sekans ve multicam kaynağının medya yolu boş: eskiden "grafik" sayılıyor, multicam mesajı hiç görünmüyordu
+  ["multicam", { multicam: true, yol: "" }],
+  ["icSekans", { sekans: true, yol: "" }]
 ];
 RET.forEach(function (x) {
   var zz = sahne(Object.assign({ n: 100 }, x[1]));

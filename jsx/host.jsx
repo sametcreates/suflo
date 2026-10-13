@@ -3531,6 +3531,7 @@ var KS_RAMP_MESAJ = {
   warp: "Warp Stabilizer hiz degisikligiyle calismaz.",
   kilitli: "Katman kilitli. Kilidi acip yeniden dene.",
   multicam: "Multicam ve birlestirilmis kliplerde hiz yazilamiyor.",
+  icSekans: "Ic ice sekansa hiz rampasi uygulanmaz. Sekansi acip icindeki klibe uygula.",
   kisa: "Rampa icin en az 12 kare gerekli.",
   qeYok: "Bu Premiere surumunde QE hiz yazma (setSpeed) yok.",
   linkedConflict: "Klip sesle bagli ve bag koparilamiyor. Ctrl+L ile bagi kopar, yeniden uygula.",
@@ -3925,8 +3926,10 @@ function KS_rampCheck(seq, clip, ti) {
   var tr = seq.videoTracks[ti];
   try { if (tr.isLocked && tr.isLocked()) return { kod: "kilitli" }; } catch (eL) {}
   var yol = KS_rampYol(clip);
-  if (KS_isGraphicClip(clip) || !yol || KS_RAMP_FOTO.test(yol)) return { kod: "grafik" };
+  // multicam kaynagi ve ic ice sekans ogesinin medya yolu bos: grafik testinden once ayrilir (dogru mesaj)
   if (KS_mcKlipBayrak(clip, "isMulticamClip") || KS_mcKlipBayrak(clip, "isMergedClip")) return { kod: "multicam" };
+  if (KS_mcKlipBayrak(clip, "isSequence")) return { kod: "icSekans" };
+  if (KS_isGraphicClip(clip) || !yol || KS_RAMP_FOTO.test(yol)) return { kod: "grafik" };
   try { if (typeof clip.isSpeedReversed === "function" && clip.isSpeedReversed()) return { kod: "ters" }; } catch (eR) {}
   var frame = KS_rampFrame(seq);
   var hiz = KS_rampSpeed(clip, null);
