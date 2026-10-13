@@ -242,6 +242,14 @@ var k = gidis.api.stilKodu();
 var cozum = SS.decode(k.kod, function (id) { return SE.has(id); });
 ok("stil kodu efekt alanlarıyla gider, aynı görünüm geri gelir", cozum.ok && cozum.warnings.length === 0 && cozum.recipe.styleId === "efekt" &&
   cozum.recipe.overrides.giris === "yukari" && cozum.recipe.overrides.kalin === false && cozum.recipe.overrides.font === "Lora", J(cozum.recipe));
+// Adım 18 incelemesi: eski kimlikli (3.2) koddan gelse de yeni fontla yeniden paylaşılan kod "efekt" kimliği taşır
+// (3.2 paneli efekt kodunu reddeder; deneme listesi 18.8 bunu bekler)
+var yf = ortam();
+yf.api.stilKoduUygula(eskiKod);
+yf.dom["cap-font"].value = "Nunito";
+var yfKod = SS.decode(yf.api.stilKodu().kod, function (id) { return SE.has(id); });
+ok("3.3 Stili paylaş: eski kimlikli koddan sonra da styleId 'efekt', yeni font kodda", yfKod.ok && yfKod.recipe.styleId === "efekt" &&
+  yfKod.recipe.overrides.font === "Nunito", J(yfKod.recipe));
 var geri = ortam();
 geri.api.stilKoduUygula(k.kod);
 ok("paylaşılan kod alıcıda aynı hazır görünüm olarak tanınır", geri.api.durum().gorunum === "zarif", geri.api.durum().gorunum);

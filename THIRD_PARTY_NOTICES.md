@@ -149,6 +149,12 @@ THE SOFTWARE.
   The Inter, Exo 2 and Nunito files are static instances (wght 400 / 700) of the upstream variable
   fonts, made with fontTools so libass can select them; the others are the upstream static files.
   Their internal family names are unchanged.
+  Provenance (3.3 step 18): only the idea of a categorized font dropdown comes from Animated Captions /
+  TranscriptAI (MIT); the picker (`js/style-share.js` `fontGruplari`, the `<optgroup>` lists in
+  `index.html`) is Suflo's own clean-room code. No font files or code were taken from TranscriptAI; all of
+  the files above come from google/fonts upstream (OFL-1.1).
+  Kaynak: Animated Captions / TranscriptAI (MIT) yalnız fikir (kategorili font listesi); font dosyaları
+  google/fonts upstream (OFL-1.1), TranscriptAI'dan dosya / kod alınmadı.
 - Emoji images in `emoji/` come from Twemoji (https://github.com/jdecked/twemoji),
   Copyright Twitter, Inc and other contributors, licensed under CC-BY 4.0
   (SPDX: `CC-BY-4.0`); see `emoji/LISANS.txt`.

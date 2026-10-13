@@ -3097,6 +3097,8 @@
       "A trial credit adds a watermarked video layer; Premiere native output (no render) is Pro.",
     "{} seçili: Suflo altyazıyı Premiere'in kendi klibi olarak (render yok, Premiere'de düzenlenebilir) timeline'ın üst kanalına koyar. Normal caption izi her zaman kullanılabilir.":
       "{} selected: Suflo places the captions as Premiere's own clip (no render, editable in Premiere) on the top track of the timeline. The normal caption track is always available.",
+    "{} seçili: Premiere yerel çıktı (render yok) Pro'da; deneme hakkı altyazıyı filigranlı şeffaf bir video katmanı olarak timeline'ın üst kanalına koyar (yazı tipi önizlemedeki gibi). Normal caption izi her zaman kullanılabilir.":
+      "{} selected: Premiere native output (no render) is a Pro feature; a trial use places the captions as a watermarked transparent video layer on the top track of the timeline (the font looks as in the preview). The normal caption track is always available.",
     "Şablon içe aktarma (importMGT)": "Template import (importMGT)",
     "Altyazı Efektleri Premiere yerel klip yerine video katmanı olarak eklenir": "Caption Effects are added as a video layer instead of a Premiere native clip",
     // jsx/host.jsx (ASCII Turkish)

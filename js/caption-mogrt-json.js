@@ -226,14 +226,58 @@
 
   function anahtar(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
 
-  // Aile bu dosya adlarından birinde var mı (Montserrat-Bold.ttf, ArchivoBlack.ttf, anton-regular.otf…)
-  function fontKuruluMu(aile, dosyalar) {
+  /*
+   * Dosya adında aile adından sonra kalan kısım yalnız yüz ve değişken eksen adlarından oluşabilir. Öbür türlüsü BAŞKA
+   * bir ailedir (PostScript adı farklı, Premiere eşlemez): InterTight-Bold, Inter_18pt-Bold (Google Fonts'un optik
+   * boy kesimi, ps "Inter18pt-Bold"), NunitoSans-Regular, MontserratAlternates-Bold, BungeeShade-Regular.
+   */
+  var YUZ_ADLARI = ["thin", "extralight", "ultralight", "light", "regular", "normal", "book", "medium", "semibold",
+    "demibold", "extrabold", "ultrabold", "bold", "black", "heavy", "italic", "oblique"];
+  var EKSEN_ADLARI = ["variablefont", "opsz", "wght", "wdth", "ital", "slnt"];
+  var DOSYA_PARCALARI = YUZ_ADLARI.concat(EKSEN_ADLARI);
+
+  // "bolditalic" → ["bold", "italic"]; listede olmayan bir parça varsa null (en uzun eşleşme önce)
+  function yuzParcalari(s) {
+    var out = [];
+    while (s) {
+      var bulunan = "";
+      for (var i = 0; i < DOSYA_PARCALARI.length; i++) {
+        var p = DOSYA_PARCALARI[i];
+        if (p.length > bulunan.length && s.indexOf(p) === 0) bulunan = p;
+      }
+      if (!bulunan) return null;
+      out.push(bulunan);
+      s = s.slice(bulunan.length);
+    }
+    return out;
+  }
+
+  /*
+   * Aile bu dosya adlarından birinde var mı (Montserrat-Bold.ttf, ArchivoBlack.ttf, anton-regular.otf, "Bebas Neue
+   * Regular.otf", Lora-VariableFont_wght.ttf…). yuz (isteğe bağlı): şablona gidecek PostScript adının yüzü ("Bold",
+   * "Regular"): verilirse o yüz de aranır (yalnız Montserrat-Black.ttf kuruluysa "Montserrat-Bold" yok). Değişken font
+   * ve yüz adı taşımayan tek dosya (Anton.ttf) her yüzü karşılar; italik dosya düz yüzü karşılamaz.
+   */
+  function fontKuruluMu(aile, dosyalar, yuz) {
     var k = anahtar(aile);
     if (!k) return false;
+    var istenen = anahtar(yuz);
     return (dosyalar || []).some(function (d) {
       var ad = String(d || "").replace(/^.*[\\\/]/, "");
       if (!/\.(ttf|otf|ttc)$/i.test(ad)) return false;
-      return anahtar(ad.replace(/\.[^.]+$/, "")).indexOf(k) === 0;
+      // Windows'un aynı adlı ikinci kurulumu: Montserrat-Bold_0.ttf, "Montserrat-Bold (1).ttf"
+      var taban = anahtar(ad.replace(/\.[^.]+$/, "").replace(/(?:_\d+|\s*\(\d+\))$/, ""));
+      if (taban.indexOf(k) !== 0) return false;
+      var parca = yuzParcalari(taban.slice(k.length));
+      if (!parca) return false;
+      if (!istenen || !parca.length) return true;
+      var italik = parca.indexOf("italic") !== -1 || parca.indexOf("oblique") !== -1;
+      if (italik !== /italic|oblique/.test(istenen)) return false;
+      if (parca.some(function (p) { return EKSEN_ADLARI.indexOf(p) !== -1; })) return true;
+      var yuzAdi = parca.filter(function (p) { return p !== "italic" && p !== "oblique"; }).join("") || "regular";
+      var istenenAd = istenen.replace(/italic|oblique/g, "") || "regular";
+      if (istenenAd === "regular") return yuzAdi === "regular" || yuzAdi === "normal" || yuzAdi === "book";
+      return yuzAdi === istenenAd;
     });
   }
 
@@ -256,7 +300,9 @@
     var ps = ae ? ae.sablonFontu(n) : String(n.font || "");
     var bilinen = !!ps && ps !== n.font;
     if (!bilinen) return { ps: arial(n.kalin, n.italik), aile: n.font, yedek: true, neden: "bilinmiyor" };
-    if (kurulu && !fontKuruluMu(n.font, kurulu)) return { ps: arial(n.kalin, n.italik), aile: n.font, yedek: true, neden: "kurulu-degil" };
+    // PostScript adının yüzü de kurulu olmalı (Montserrat-Bold → "Bold")
+    var yuz = ps.lastIndexOf("-") > 0 ? ps.slice(ps.lastIndexOf("-") + 1) : "";
+    if (kurulu && !fontKuruluMu(n.font, kurulu, yuz)) return { ps: arial(n.kalin, n.italik), aile: n.font, yedek: true, neden: "kurulu-degil" };
     return { ps: ps, aile: n.font, yedek: false, neden: "" };
   }
 

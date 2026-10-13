@@ -67,8 +67,9 @@
     /*
      * 3.3 adım 18: seçilmiş yeni fontlar (google/fonts, OFL; fonts/OFL-<Aile>.txt). Hepsi tools/font-kontrol.js --az
      * denetiminden geçti: Türkçe + Azerbaycanca ə / Ə TAM. İki ağırlıklı ailelerde statik Bold + Regular ("Kalın yazı"
-     * kapalıyken Regular; dosyaların iç aile adı anahtarla aynı, libass onunla eşler). surum: fontun geldiği sürüm;
-     * bu fontu taşıyan stil kodunu 3.2 paneli "font" uyarısıyla stilin kendi yazı tipine düşürür (kod yine açılır).
+     * kapalıyken Regular; dosyaların iç aile adı anahtarla aynı, libass onunla eşler). surum: fontun geldiği sürüm.
+     * 3.3'ün Stili paylaş'ı her zaman styleId "efekt" yazar; 3.2 paneli efekt kodunu fonttan bağımsız olarak "bu
+     * sürümde yok" diye reddeder. "font" uyarısıyla yalnız fontun düşürülmesi, 3.3 öncesi (eski kimlikli) kodlarda olur.
      */
     "Bangers": { file: "Bangers.ttf", genislik: 0.42, kategori: "kalin", surum: "3.3" },
     "Inter": { file: "Inter-Bold.ttf", normal: "Inter-Regular.ttf", genislik: 0.63, kategori: "modern", surum: "3.3" },

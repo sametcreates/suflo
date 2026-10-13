@@ -1807,9 +1807,12 @@ window.KCaptions = (function () {
     var styleBtn = el("cap-apply-style");
     if (!secilenMogrt && secilenMotorStili) {
       var mAd = (window.SufloStyleEngine.preset(secilenMotorStili) || {}).name || secilenMotorStili;
-      if (hint) hint.textContent = yerelCiktiSecili()
+      // Premiere yerel yalnız Pro'da: Pro'suz (deneme) ekleme filigranlı video katmanıdır (overlayUygula), ipucu onu söyler
+      if (hint) hint.textContent = yerelCiktiEtkin()
         ? mAd + " seçili: Suflo altyazıyı Premiere'in kendi klibi olarak (render yok, Premiere'de düzenlenebilir) timeline'ın üst kanalına koyar. Normal caption izi her zaman kullanılabilir."
-        : mAd + " seçili: Suflo altyazıyı şeffaf bir video katmanı olarak üretip timeline'ın üst kanalına koyar. Normal caption izi her zaman kullanılabilir.";
+        : (yerelCiktiSecili()
+          ? mAd + " seçili: Premiere yerel çıktı (render yok) Pro'da; deneme hakkı altyazıyı filigranlı şeffaf bir video katmanı olarak timeline'ın üst kanalına koyar (yazı tipi önizlemedeki gibi). Normal caption izi her zaman kullanılabilir."
+          : mAd + " seçili: Suflo altyazıyı şeffaf bir video katmanı olarak üretip timeline'ın üst kanalına koyar. Normal caption izi her zaman kullanılabilir.");
       if (styleBtn) {
         styleBtn.disabled = false;
         if (kaliteOnayBekleyen !== "style") styleBtn.textContent = mAd + " ile ekle";
@@ -5707,6 +5710,12 @@ window.KCaptions = (function () {
     return !!(CMJ && AE && s && s.value === "yerel" && sar && !sar.hidden);
   }
 
+  // Ekleme gerçekten Premiere yerel mi: seçili VE Pro. Pro'suz (deneme hakkı) ekleme paketteki fontla çizilen filigranlı
+  // video katmanıdır: "kurulu değil" notu ve "Suflo fontlarını kur" ona göre değil (overlayUygula'daki koşulla aynı)
+  function yerelCiktiEtkin() {
+    return yerelCiktiSecili() && (typeof Pro === "undefined" || Pro.isPro());
+  }
+
   function yerelSecenekDurumu() {
     var sar = el("cap-efekt-cikti-sar");
     if (!sar) return;
@@ -5733,7 +5742,7 @@ window.KCaptions = (function () {
   function yerelFontNotu() {
     var not = el("cap-yerel-font-not");
     if (!not) return;
-    if (!yerelCiktiSecili() || secilenMogrt || secilenMotorStili !== EFEKT) { not.hidden = true; return; }
+    if (!yerelCiktiEtkin() || secilenMogrt || secilenMotorStili !== EFEKT) { not.hidden = true; return; }
     var sec = CMJ.fontSecimi(efektAyari(), sistemFontDosyalari());
     not.hidden = !sec.yedek;
     if (!sec.yedek) return;
@@ -6648,6 +6657,8 @@ window.KCaptions = (function () {
     });
     if (el("cap-yerel-font-kur")) el("cap-yerel-font-kur").addEventListener("click", function () { yerelFontlariKur(); });
     if (el("cap-yerel-kaldir")) el("cap-yerel-kaldir").addEventListener("click", function () { yerelKaldir(); });
+    // Pro durumu değişince (lisans girildi / bitti) font notu ve ekleme ipucu yeni yola göre tazelenir
+    if (typeof Pro !== "undefined" && Pro.on) { try { Pro.on(function () { yerelFontNotu(); uygulamaIpucunuGuncelle(); }); } catch (e) {} }
     yerelSecenekDurumu();
   }
 

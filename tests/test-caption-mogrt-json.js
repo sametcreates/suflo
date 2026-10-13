@@ -113,6 +113,33 @@ ok("Punto çarpanı JSON'daki puntoya uygulanır", JSON.parse(rP.parcalar[0].jso
 ok("fontKuruluMu: Montserrat-Bold.ttf Montserrat'ı karşılar (büyük / küçük harf fark etmez)", CMJ.fontKuruluMu("Montserrat", ["C:\\Windows\\Fonts\\MONTSERRAT-BOLD.TTF"]));
 ok("fontKuruluMu: Archivo Black ↔ ArchivoBlack.ttf", CMJ.fontKuruluMu("Archivo Black", ["ArchivoBlack.ttf"]));
 ok("fontKuruluMu: başka font ya da lisans metni karşılamaz", !CMJ.fontKuruluMu("Anton", ["arial.ttf", "Anton.txt"]));
+// Adım 18 incelemesi: aile adıyla BAŞLAYAN başka aileler (kardeş aile, optik boy kesimi) kurulu sayılmaz
+ok("fontKuruluMu: InterTight / Inter_18pt (optik boy) / NunitoSans / MontserratAlternates / BungeeShade başka aile",
+  !CMJ.fontKuruluMu("Inter", ["InterTight-Bold.ttf", "Inter_18pt-Bold.ttf", "Inter_24pt-Regular.ttf"]) &&
+  !CMJ.fontKuruluMu("Nunito", ["NunitoSans-Regular.ttf", "NunitoSans-Bold.ttf"]) &&
+  !CMJ.fontKuruluMu("Montserrat", ["MontserratAlternates-Bold.ttf"]) && !CMJ.fontKuruluMu("Bungee", ["BungeeShade-Regular.ttf", "BungeeHairline-Regular.ttf"]));
+ok("fontKuruluMu: yüz adları, boşluklu adlar, değişken font ve Windows'un _0 / (1) kopyaları aynı aile",
+  CMJ.fontKuruluMu("Inter", ["Inter-SemiBoldItalic.ttf"]) && CMJ.fontKuruluMu("Bebas Neue", ["Bebas Neue Regular.otf"]) &&
+  CMJ.fontKuruluMu("Nunito", ["Nunito-VariableFont_wght.ttf"]) && CMJ.fontKuruluMu("Inter", ["Inter[opsz,wght].ttf"]) &&
+  CMJ.fontKuruluMu("Exo 2", ["Exo2-Bold_0.ttf"]) && CMJ.fontKuruluMu("Poppins", ["Poppins-Bold (1).ttf"]) && CMJ.fontKuruluMu("Anton", ["Anton.ttf"]));
+ok("fontKuruluMu(yuz): istenen yüz kurulu olmalı (yalnız Black / Italic yetmez); değişken ve tek dosya her yüzü karşılar",
+  CMJ.fontKuruluMu("Montserrat", ["Montserrat-Bold.ttf"], "Bold") && !CMJ.fontKuruluMu("Montserrat", ["Montserrat-Black.ttf"], "Bold") &&
+  !CMJ.fontKuruluMu("Montserrat", ["Montserrat-BoldItalic.ttf"], "Bold") && !CMJ.fontKuruluMu("Montserrat", ["Montserrat-Bold.ttf"], "Regular") &&
+  CMJ.fontKuruluMu("Montserrat", ["Montserrat-Regular.ttf"], "Regular") && CMJ.fontKuruluMu("Lora", ["Lora-VariableFont_wght.ttf"], "Bold") &&
+  !CMJ.fontKuruluMu("Lora", ["Lora-Italic-VariableFont_wght.ttf"], "Bold") && CMJ.fontKuruluMu("Anton", ["Anton.ttf"], "Regular") &&
+  CMJ.fontKuruluMu("Bangers", ["Bangers-Regular.ttf"], "Regular"));
+var fKardes = CMJ.fontSecimi(AE.normalize({ font: "Nunito", kalin: true }), ["NunitoSans-Regular.ttf"]);
+var fOptik = CMJ.fontSecimi(AE.normalize({ font: "Inter", kalin: true }), ["Inter_18pt-Bold.ttf", "InterTight-Bold.ttf"]);
+ok("fontSecimi: yalnız NunitoSans / Inter_18pt / InterTight kuruluysa Nunito-Bold / Inter-Bold GÖNDERİLMEZ (Arial + 'kurulu-degil')",
+  fKardes.yedek && fKardes.neden === "kurulu-degil" && fKardes.ps === "Arial-BoldMT" && fOptik.yedek && fOptik.neden === "kurulu-degil", JSON.stringify([fKardes, fOptik]));
+var fYuz = CMJ.fontSecimi(AE.normalize({ font: "Montserrat", kalin: false }), ["Montserrat-Bold.ttf"]);
+ok("fontSecimi: Kalın kapalıyken Montserrat-Regular gerekir; yalnız Bold kuruluysa uyarı", fYuz.yedek && fYuz.neden === "kurulu-degil", JSON.stringify(fYuz));
+var SS = require("../js/style-share.js");
+var fPaket = CMJ.paketFontlari(fs.readdirSync(path.join(ROOT, "fonts")));
+ok("fontSecimi: 'Suflo fontlarını kur'un kurduğu dosyalar her paket fontunu her iki yüzde karşılar",
+  SS.fontNames().every(function (n) {
+    return [true, false].every(function (kalin) { var r = CMJ.fontSecimi(AE.normalize({ font: n, kalin: kalin }), fPaket); return !r.yedek && r.ps !== n; });
+  }), JSON.stringify(fPaket));
 var fKurulu = CMJ.fontSecimi(AE.normalize({ font: "Montserrat", kalin: true }), ["Montserrat-Bold.ttf"]);
 ok("Kurulu bilinen aile: PostScript adı (Montserrat-Bold)", fKurulu.ps === "Montserrat-Bold" && !fKurulu.yedek, JSON.stringify(fKurulu));
 var fYok = CMJ.fontSecimi(AE.normalize({ font: "Anton", kalin: true }), ["arial.ttf"]);
@@ -190,6 +217,45 @@ var ov = cap.slice(cap.indexOf("async function overlayUygula()"), cap.indexOf("f
 ok("Yerel çıktı Pro.gate('overlay') kapısından SONRA ve yalnız Pro'da (deneme filigranlı katmana gider)",
   ov.indexOf('Pro.gate("overlay"') !== -1 && ov.indexOf("yerelAltyaziUygula()") > ov.indexOf('Pro.gate("overlay"') &&
   /if \(yerelCiktiSecili\(\) && \(typeof Pro === "undefined" \|\| Pro\.isPro\(\)\)\) \{\s*if \(await yerelAltyaziUygula\(\)\) return;/.test(ov));
+/*
+ * Adım 18 incelemesi: Pro'suz (deneme) ekleme her zaman paketteki fontla çizilen filigranlı video katmanıdır. Yeni bir
+ * font kurulu değilken "Premiere Arial çizer" notu, "Suflo fontlarını kur" ve "Premiere'in kendi klibi" ipucu yalnız Pro'da.
+ */
+function govde(ad) {
+  var bas = cap.indexOf("  function " + ad + "(");
+  return bas === -1 ? "" : cap.slice(bas, cap.indexOf("\n  }\n", bas) + 5);
+}
+function yerelUi(pro) {
+  var dom = {};
+  ["cap-efekt-cikti", "cap-efekt-cikti-sar", "cap-yerel-font-not", "cap-yerel-font-metin", "cap-yerel-font-kur", "cap-apply-hint", "cap-apply-style"].forEach(function (id) {
+    dom[id] = { id: id, hidden: false, value: "", textContent: "", disabled: true };
+  });
+  dom["cap-efekt-cikti"].value = "yerel";
+  dom["cap-yerel-font-not"].hidden = true;
+  var f = new Function("el", "CMJ", "AE", "Pro", "window",
+    "var secilenMogrt = null, secilenMotorStili = 'efekt', EFEKT = 'efekt', kaliteOnayBekleyen = '';\n" +
+    "function efektAyari() { return AE.normalize({ font: 'Bangers', kalin: true }); }\n" +
+    "function sistemFontDosyalari() { return ['arial.ttf']; }\n" +
+    "function yerelPlatform() { return 'win32'; } function yerelEnv() { return { LOCALAPPDATA: 'C:\\\\U' }; }\n" +
+    "function temizMogrtAdi(m) { return String(m); }\n" +
+    govde("yerelCiktiSecili") + govde("yerelCiktiEtkin") + govde("yerelFontNotu") + govde("uygulamaIpucunuGuncelle") +
+    "\nreturn { not: yerelFontNotu, ipucu: uygulamaIpucunuGuncelle };");
+  var api = f(function (id) { return dom[id] || null; }, CMJ, AE, { isPro: function () { return pro; } },
+    { SufloStyleEngine: { preset: function () { return { name: "Altyazı Efektleri" }; } } });
+  api.not();
+  api.ipucu();
+  return dom;
+}
+var uiPro = yerelUi(true), uiDeneme = yerelUi(false);
+ok("Pro + Premiere yerel + kurulu olmayan yeni font: 'kurulu değil' notu ve 'Suflo fontlarını kur' görünür, ipucu yerel klip",
+  !uiPro["cap-yerel-font-not"].hidden && /Bangers bu bilgisayarda kurulu değil/.test(uiPro["cap-yerel-font-metin"].textContent) &&
+  !uiPro["cap-yerel-font-kur"].hidden && /Premiere'in kendi klibi/.test(uiPro["cap-apply-hint"].textContent), JSON.stringify(uiPro["cap-apply-hint"]));
+ok("Pro'suz (deneme) + Premiere yerel: font notu ve kur düğmesi GİZLİ, ipucu filigranlı video katmanını söyler",
+  uiDeneme["cap-yerel-font-not"].hidden && !/kendi klibi/.test(uiDeneme["cap-apply-hint"].textContent) &&
+  /Premiere yerel çıktı \(render yok\) Pro'da; deneme hakkı altyazıyı filigranlı şeffaf bir video katmanı/.test(uiDeneme["cap-apply-hint"].textContent),
+  uiDeneme["cap-apply-hint"].textContent);
+ok("Pro durumu değişince font notu ve ipucu tazelenir (Pro.on, Premiere çağrısı yok)",
+  /Pro\.on\(function \(\) \{ yerelFontNotu\(\); uygulamaIpucunuGuncelle\(\); \}\)/.test(cap.slice(cap.indexOf("function yerelCiktiBagla()"), cap.indexOf("function efektKontrolleriniBagla()"))));
 var bagla = cap.slice(cap.indexOf("function yerelCiktiBagla()"), cap.indexOf("function efektKontrolleriniBagla()"));
 ok("Panel açılışında Premiere çağrısı yok (çıktı seçimi yalnız yerel depo)", bagla.length > 50 && bagla.indexOf("K.call") === -1 && bagla.indexOf("evalScript") === -1);
 var kur = cap.slice(cap.indexOf("async function yerelFontlariKur()"), cap.indexOf("function yerelKayitOku()"));

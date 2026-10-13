@@ -60,6 +60,25 @@ SS.fontNames().forEach(function (n) {
   });
 });
 ok("font-kontrol: her paket fontu Türkçe TAM, iç aile adı FONTS anahtarı; yeniler Azerbaycanca da TAM", fkSorun.length === 0, fkSorun.join(" | "));
+// Adım 18 incelemesi: belgelenen yayın öncesi komut (node tools/font-kontrol.js --az fonts/*.ttf) paket setinde 0 ile çıkar;
+// ə / Ə yalnız 3.2'den gelen ailelerde (Archivo Black, Bebas Neue) uyarı, yeni ya da aday ailede hata
+ok("font-kontrol --az: ə / Ə 3.2'den gelen ailelerde uyarı, 3.3 ailelerinde ve pakette olmayan adayda zorunlu",
+  FK.azZorunlu("Archivo Black") === false && FK.azZorunlu("Bebas Neue") === false && FK.azZorunlu("Montserrat") === false &&
+  FK.azZorunlu("Bangers") === true && FK.azZorunlu("Exo 2") === true && FK.azZorunlu("Roboto") === true);
+var fkSatirlar = [], fkLog = console.log, fkKod, fkKodBos, fkKodYok;
+var fkTtf = fs.readdirSync(path.join(kok, "fonts")).filter(function (f) { return /\.ttf$/.test(f); }).map(function (f) { return path.join(kok, "fonts", f); });
+console.log = function (m) { fkSatirlar.push(String(m)); };
+try {
+  fkKod = FK.calistir(["--az"].concat(fkTtf));
+  fkKodYok = FK.calistir(["--az", path.join(kok, "fonts", "yok-boyle-bir-font.ttf")]);
+} finally { console.log = fkLog; }
+var fkErr = console.error; console.error = function () {};
+try { fkKodBos = FK.calistir(["--az"]); } finally { console.error = fkErr; }
+ok("font-kontrol --az fonts/*.ttf: paket setinde çıkış 0; Archivo Black / Bebas Neue 'uyari' satırı; okunamayan dosya / boş liste 1",
+  fkKod === 0 && fkKodYok === 1 && fkKodBos === 1 && fkTtf.length >= 20 &&
+  fkSatirlar.filter(function (l) { return /Azerbaycanca EKSIK/.test(l); }).length === 2 &&
+  fkSatirlar.filter(function (l) { return /Azerbaycanca EKSIK/.test(l); }).every(function (l) { return /uyari/.test(l) && /(ArchivoBlack|BebasNeue)\.ttf/.test(l); }),
+  fkKod + " " + fkSatirlar.join(" | "));
 // Panelin iki yazı tipi seçicisi (Altyazı Efektleri, Marka Kiti) kategorili ve FONTS ile birebir
 var html = fs.readFileSync(path.join(kok, "index.html"), "utf8");
 function seciciGruplari(id) {
@@ -557,8 +576,19 @@ var yfC = SS.decode(yeniFontKod, YENI);
 ok("yeni font gidiş-dönüş: font + fontFile (Exo2-Bold.ttf), uyarısız", yfC.ok && yfC.recipe.overrides.font === "Exo 2" &&
   yfC.recipe.overrides.fontFile === "Exo2-Bold.ttf" && yfC.warnings.length === 0, JSON.stringify(yfC));
 var yfEski = Eski32.decode(yeniFontKod, eskiIzin);
-ok("3.2 paneli yeni fontlu kodu yine açar: font 'font' uyarısıyla atlanır (stilin kendi yazı tipi), renk uygulanır",
+// Yalnız 3.3 öncesi (eski kimlikli, elle / 3.2 sitesinde yapılmış) kodlarda: 3.3 paneli artık hep "efekt" kodu üretir
+ok("eski kimlikli kodda 3.2 paneli yeni fontu 'font' uyarısıyla atlar (stilin kendi yazı tipi), renk uygulanır",
   yfEski.ok && yfEski.recipe.overrides.font === undefined && yfEski.recipe.overrides.renk === "#00ff00" && yfEski.warnings.indexOf("font") !== -1, JSON.stringify(yfEski));
+// Adım 18 incelemesi: 3.3'ün Stili paylaş'ı her zaman styleId "efekt" yazar (stilKodu; eski kimlikler efekteGec ile taşınır).
+// 3.2.0 paneli bu kodu fonttan bağımsız olarak "bu sürümde yok" diye reddeder: yeni fontlu kod 3.2'de AÇILMAZ.
+var efYeniFont = SS.encode({ styleId: "efekt", overrides: { font: "Nunito", renk: "#00ff00", giris: "pop" }, text: { kase: "upper" } });
+var efYeniFont32 = Eski32.decode(efYeniFont, eskiIzin);
+var efEskiFont32 = Eski32.decode(SS.encode({ styleId: "efekt", overrides: { font: "Lora" } }), eskiIzin);
+ok("3.2.0 paneli 3.3'ün yeni fontlu Altyazı Efektleri kodunu reddeder ('Bu stil bu Suflo sürümünde yok: efekt.'); eski fontlusunu da",
+  !efYeniFont32.ok && efYeniFont32.error === "Bu stil bu Suflo sürümünde yok: efekt." && !efEskiFont32.ok && efEskiFont32.error === efYeniFont32.error,
+  JSON.stringify([efYeniFont32, efEskiFont32]));
+ok("3.3 paneli aynı kodu Nunito ile uyarısız açar", SS.decode(efYeniFont, YENI).ok && SS.decode(efYeniFont, YENI).recipe.overrides.font === "Nunito" &&
+  SS.decode(efYeniFont, YENI).warnings.length === 0);
 var eskiFontKod = { styleId: "neon", overrides: { font: "Lora", renk: "#00ff00", konum: 2, boyut: 90 }, text: { kase: "upper" } };
 ok("eski 6 fontlu kodlar değişmedi: 3.3 kodlayıcısı 3.2 ile birebir aynı kodu üretir",
   ESKI6.every(function (n) { var t = JSON.parse(JSON.stringify(eskiFontKod)); t.overrides.font = n; return SS.encode(t) === Eski32.encode(t); }) &&

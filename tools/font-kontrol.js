@@ -11,12 +11,16 @@
  * Bold 700) da raporlanır.
  *
  * 3.3 adım 18: Azerbaycanca ə / Ə (U+0259 / U+018F) da denetlenir. Türkçe glifler her
- * fontta ZORUNLU; ə / Ə yalnız --az ile zorunlu (3.3'te eklenen fontlar; 3.2'den gelen
- * Archivo Black ve Bebas Neue'de yok, onlar uyarıyla geçer).
+ * fontta ZORUNLU; ə / Ə yalnız --az ile zorunlu, o da 3.2'den beri pakette olmayan
+ * (js/style-share.js FONTS'ta surum alanı taşıyan ya da hiç olmayan, yani yeni aday) fontlarda.
+ * 3.2'den gelen Archivo Black ve Bebas Neue'de ə / Ə yok: "uyari" satırıyla geçerler, çıkış
+ * kodunu bozmazlar. Böylece `node tools/font-kontrol.js --az fonts/*.ttf` paketteki font
+ * setinde 0 ile çıkar (test: tests/test-style-share.js), zincire / CI'a bağlanabilir.
  *
  * Kullanım: node tools/font-kontrol.js [--az] fonts/*.ttf
  * Modül olarak (testler): require("./tools/font-kontrol.js").denetle(buf) →
  *   { aile, postscript, agirlik, eksik: [Türkçe], azEksik: [ə Ə] } | { hata }
+ *   azZorunlu(aile) → --az altında ə / Ə bu ailede zorunlu mu; calistir(argv) → çıkış kodu
  */
 var fs = require("fs");
 
@@ -116,6 +120,22 @@ function denetle(buf) {
   return { aile: aileAdi(buf), postscript: ad(buf, 6), agirlik: agirlik(buf), eksik: eksik, azEksik: azEksik };
 }
 
+/*
+ * --az altında ə / Ə zorunlu mu: 3.2'den beri pakette olan aileler (FONTS'ta, surum alanı yok) hariç hepsi.
+ * style-share.js okunamazsa her aile zorunlu (sıkı taraf).
+ */
+var ESKI_PAKET = null;
+function azZorunlu(aile) {
+  if (ESKI_PAKET === null) {
+    ESKI_PAKET = {};
+    try {
+      var SS = require(require("path").join(__dirname, "..", "js", "style-share.js"));
+      SS.fontNames().forEach(function (n) { if (!SS.fontSurumu(n)) ESKI_PAKET[n] = true; });
+    } catch (e) { ESKI_PAKET = {}; }
+  }
+  return !Object.prototype.hasOwnProperty.call(ESKI_PAKET, String(aile));
+}
+
 function calistir(argv) {
   var az = argv.indexOf("--az") !== -1;
   var dosyalar = argv.filter(function (a) { return a !== "--az"; });
@@ -131,8 +151,9 @@ function calistir(argv) {
       console.log(bas + "  EKSIK: " + r.eksik.join(" "));
       sorunlu++;
     } else if (r.azEksik.length) {
-      console.log(bas + "  Turkce TAM, Azerbaycanca EKSIK: " + r.azEksik.join(" "));
-      if (az) sorunlu++;
+      var zorunlu = az && azZorunlu(r.aile);
+      console.log(bas + "  Turkce TAM, Azerbaycanca EKSIK: " + r.azEksik.join(" ") + (az && !zorunlu ? "  (3.2'den gelen paket fontu: uyari)" : ""));
+      if (zorunlu) sorunlu++;
     } else {
       console.log(bas + "  Turkce + Azerbaycanca TAM");
     }
@@ -141,4 +162,4 @@ function calistir(argv) {
 }
 
 if (typeof module !== "undefined" && require.main === module) process.exit(calistir(process.argv.slice(2)));
-else module.exports = { TURKCE: TURKCE, AZERBAYCANCA: AZERBAYCANCA, denetle: denetle, aileAdi: aileAdi, ad: ad, agirlik: agirlik, calistir: calistir };
+else module.exports = { TURKCE: TURKCE, AZERBAYCANCA: AZERBAYCANCA, denetle: denetle, aileAdi: aileAdi, ad: ad, agirlik: agirlik, azZorunlu: azZorunlu, calistir: calistir };

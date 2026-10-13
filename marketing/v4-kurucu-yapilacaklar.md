@@ -1441,14 +1441,18 @@ Exo 2 ve Nunito upstream değişken fontlardan fontTools ile alınmış statik 4
 ayrılmış ad yok). Hepsi `node tools/font-kontrol.js --az` ile Türkçe + Azerbaycanca TAM; paket büyümesi 1,83 MB
 (bütçe 3 MB). `js/style-share.js` FONTS dört kategoriye ayrıldı (Kalın / Modern / Zarif / Teknik); Altyazı
 Efektleri ve Marka Kiti seçicileri bu gruplarla, her seçenek kendi yüzüyle. Önizleme ücretsiz; yerleştirme mevcut
-`overlay` kapısından (3 deneme), yeni Pro anahtarı yok. Eski 6 fontlu kodlar 3.2 ile birebir aynı; yeni fontlu kodu
-3.2 paneli "font" uyarısıyla açar.
+`overlay` kapısından (3 deneme), yeni Pro anahtarı yok. 3.2'de yapılmış eski 6 fontlu kodlar 3.3'te aynen açılır.
+3.3'ün Stili paylaş'ı her zaman Altyazı Efektleri kodu (`efekt`) üretir; 3.2 paneli bu kodu fonttan bağımsız olarak
+"Bu stil bu Suflo sürümünde yok: efekt." diye reddeder (yeni fontlu kod 3.2'de açılmaz; kullanıcıya "Suflo'yu güncelle"
+de). "font" uyarısıyla yalnız fontun atlanması sadece 3.3 öncesi (eski kimlikli) kodlarda olur.
 
 Senin yapacakların:
 
-1. `marketing/v3.3-deneme-listesi.md` § 18'i Windows'ta ve macOS'ta sırayla dene (18.1–18.10).
-2. Yayın öncesi `node tools/font-kontrol.js --az fonts/*.ttf` çalıştır; yalnız Archivo Black ve Bebas Neue
-   "Azerbaycanca EKSIK" demeli (3.2'den beri böyle), başka satır EKSIK olmamalı.
+1. `marketing/v3.3-deneme-listesi.md` § 18'i Windows'ta ve macOS'ta sırayla dene (18.1–18.12).
+2. Yayın öncesi `node tools/font-kontrol.js --az fonts/*.ttf` çalıştır: çıkış kodu 0 olmalı. Yalnız Archivo Black ve
+   Bebas Neue "Azerbaycanca EKSIK … (3.2'den gelen paket fontu: uyari)" der (3.2'den beri böyle, kodu bozmaz); başka
+   satır EKSIK olmamalı. Yeni bir aile eklersen ə / Ə'sı yoksa komut 1 ile çıkar. Aynı denetim `node tools/test.js`
+   içinde de koşar (`tests/test-style-share.js`).
 3. ZXP'yi kurduktan sonra `tools/verify-release.ps1`: yeni 12 `.ttf` ve 7 `OFL-*.txt` zorunlu listede.
 4. suflo.app/stil sayfası yeni aileleri Google Fonts'tan yükler (`docs/stil.html`, `docs/en/stil.html`); site
    yayınlandıktan sonra Nunito'lu bir kodu aç ve fontun yüklendiğini gör.
