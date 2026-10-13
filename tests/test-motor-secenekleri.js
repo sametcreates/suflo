@@ -52,7 +52,7 @@ function dugum(ek) {
 function ortam(o) {
   o = o || {};
   var ayar = o.ayar || {};
-  var gunluk = [], durumlar = [], kosular = [], toastlar = [], kayit = 0;
+  var gunluk = [], durumlar = [], kosular = [], toastlar = [], kayit = 0, sinirlar = [];
   var MODEL_DOSYA = { tiny: "ggml-tiny-q5_1.bin", base: "ggml-base-q5_1.bin", small: "ggml-small-q5_1.bin", turbo: "ggml-large-v3-turbo-q5_0.bin", large: "ggml-large-v3-q5_0.bin" };
   var model = o.model || "turbo";
   var kurulu = o.kurulu || [model];
@@ -74,7 +74,7 @@ function ortam(o) {
     iptalHatasi: function (m) { var e = new Error(m || "İptal edildi"); e.iptal = true; return e; },
     call: function () { throw new Error("Premiere çağrısı yapılmamalı"); },
     run: function (exe, args, op) {
-      kosular.push(args.slice());
+      kosular.push(args.slice()); sinirlar.push(op ? op.timeout : undefined);
       var sonuc = (o.senaryo || function () { return { json: TR_JSON }; })(args, kosular.length);
       var ob = args[args.indexOf("-of") + 1];
       if (sonuc.json) fs.writeFileSync(ob + ".json", sonuc.json);
@@ -112,7 +112,7 @@ function ortam(o) {
     "var segments = AYAR.segments || [], secilenMogrt = AYAR.mogrt || null, secilenMotorStili = AYAR.stil || '';\n" +
     "function localEngineReady() { return !!KEngine.activeModel() && !!K.whisperLocal(); }\n" +
     "function dilKodu(x) { return String(x || '').slice(0, 2); }\n" +
-    "function wavDuration() { return 10; }\n" +
+    "function wavDuration() { return AYAR.sesSn || 10; }\n" +
     "function geciciSil() {}\n" +
     "var refreshSetupSayisi = 0; function refreshSetup() { refreshSetupSayisi++; motorSecenekDurumu(); }\n" +
     "var ayarOlay = []; function ayarDegisti(n) { ayarOlay.push(n); }\n" + kod +
@@ -125,7 +125,7 @@ function ortam(o) {
     { toast: function (m) { toastlar.push(m); }, goster: function (ad) { toastlar.push("goster:" + ad); } },
     function (m) { durumlar.push(m); },
     function (sn) { return String(sn); }, o);
-  return { api: api, dom: dom, ayar: ayar, gunluk: gunluk, durumlar: durumlar, kosular: kosular, toastlar: toastlar, kayit: function () { return kayit; } };
+  return { api: api, dom: dom, ayar: ayar, gunluk: gunluk, sinirlar: sinirlar, durumlar: durumlar, kosular: kosular, toastlar: toastlar, kayit: function () { return kayit; } };
 }
 function arg(a, b) { var i = a.indexOf(b); return i < 0 ? undefined : a[i + 1]; }
 function gunlukte(e, re) { return e.gunluk.some(function (s) { return re.test(s); }); }
@@ -209,6 +209,23 @@ isler.push(function () {
     return e.api.yerelCalistir("whisper-cli", ["-of", ob2], ob2, "", { ofset: 0, carpan: 1, toplamSn: 60, onEk: "" });
   }).then(function () {
     ok("DTW'siz: canlı satır akar (değişmedi)", e.api.canli().satirlar.length === 1 && e.api.canli().satirlar[0].text === "canlı satır");
+  });
+});
+
+/* ---------------- 2b) yerelCalistir: süre sınırı sesin uzunluğuyla büyür ---------------- */
+// Sabit 2 saat: yavaş CPU'da (Large v3, -bs 5, DTW) 3 saatlik ses bitmeden süreç öldürülüyor, JSON yalnız
+// sonda yazıldığı için her şey kayboluyordu ("Yerel motor çıktı üretmedi (kod=-1)")
+isler.push(function () {
+  var uzun = ortam({ sesSn: 3 * 3600 }), kisa = ortam({});
+  var ob = path.join(DIZIN, "u_w"), ob2 = path.join(DIZIN, "k_w");
+  return uzun.api.transcribeLocal(path.join(DIZIN, "uzun.wav"), false, undefined, {}).then(function () {
+    return uzun.api.yerelCalistir("whisper-cli", ["-f", path.join(DIZIN, "uzun_kalan.wav"), "-of", ob], ob, " · kalan kısım", null);
+  }).then(function () {
+    return kisa.api.yerelCalistir("whisper-cli", ["-f", path.join(DIZIN, "kisa.wav"), "-of", ob2], ob2, "", null);
+  }).then(function () {
+    ok("3 saatlik ses: whisper-cli süre sınırı sesin 6 katı + 30 dk (2 saatte öldürülmez), kalan turu da",
+      uzun.sinirlar.length === 2 && uzun.sinirlar.every(function (t) { return t >= 3 * 3600 * 6000 + 1800000; }), js(uzun.sinirlar));
+    ok("kısa ses: en az 2 saat (eskisi gibi)", kisa.sinirlar.length === 1 && kisa.sinirlar[0] === 7200000, js(kisa.sinirlar));
   });
 });
 

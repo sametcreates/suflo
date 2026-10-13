@@ -1006,10 +1006,18 @@ window.KCaptions = (function () {
       }));
     }
     if (yumusat) { durumYaz(); tik = setInterval(durumYaz, 500); }
+    /*
+     * Süre sınırı sesin uzunluğuyla büyür (sesin 6 katı + 30 dk, en az 2 saat). Yavaş CPU'da (Large v3 +
+     * En doğru -bs 5, DTW'de -nfa) 2-3 saatlik ses 2 saatte bitmez; sabit 2 saatlik sınır iş sürerken süreci
+     * öldürüyor, JSON yalnız sonda yazıldığından bütün çözüm kayboluyordu. İptal her an keser.
+     */
+    var girdiSn = 0, fi = args ? args.indexOf("-f") : -1;
+    if (fi !== -1 && args[fi + 1]) { try { girdiSn = Number(wavDuration(args[fi + 1])) || 0; } catch (eSn) { girdiSn = 0; } }
+    var sinirMs = Math.max(7200000, Math.round(girdiSn * 6000) + 1800000);
     var r;
     try {
       r = await K.run(exe, args, {
-        timeout: 7200000,
+        timeout: sinirMs,
         iptal: iptal,
         onStdout: ayristir ? function (s) { canliEkle(ayristir.besle(s)); } : null,
         onStderr: function (s) {
