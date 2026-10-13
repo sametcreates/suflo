@@ -5925,7 +5925,8 @@ window.KCaptions = (function () {
     var ayar = efektAyari(), tur = motorCueTuru();
     var w = Number(probe.width) || 1920, h = Number(probe.height) || 1080;
     var fontSec = CMJ.fontSecimi(ayar, sistemFontDosyalari(), { bekleyen: yerelBekleyenFontlar });
-    var oran = AE.sablonKonumu(ayar, { w: w, h: h, guvenli: !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked), ornek: { cues: cs, cueKind: tur } });
+    var guvenliYer = !!(el("cap-guvenli-yerlesim") && el("cap-guvenli-yerlesim").checked);
+    var oran = AE.sablonKonumu(ayar, { w: w, h: h, guvenli: guvenliYer, ornek: { cues: cs, cueKind: tur } });
     var yer = CMJ.yerlesim(w, h, oran, { ayar: ayar });
     // Video katmanının çizip yerel şablonun çizmediği: Marka Kiti logosu, Podcast Modu konuşmacı renkleri (bildirimde)
     var kit = markaKiti();
@@ -5937,7 +5938,9 @@ window.KCaptions = (function () {
     var seqAd = String(probe.seqName || (KApp.ctx() || {}).sequence || "");
     var kademeler = CMJ.BAYT_KADEMELERI;
     for (var ki = 0; ki < kademeler.length; ki++) {
-      var plan = CMJ.build(cs, ayar, { cueKind: tur, fps: probe.fps, font: fontSec.ps, punto: yer.punto, bayt: kademeler[ki] });
+      // kadraj: şablon satırı sığdırmaz; kartlar önizlemedeki gibi kadraja sığdırılmış puntoyla (Arial'a düşülünce Arial'ın genişliğiyle)
+      var plan = CMJ.build(cs, ayar, { cueKind: tur, fps: probe.fps, font: fontSec.ps, punto: yer.punto, bayt: kademeler[ki],
+        kadraj: { w: w, h: h, guvenli: guvenliYer } });
       if (!plan.parcalar.length) throw new Error("Yazılacak altyazı yok.");
       var batch = "efk-" + Date.now().toString(36);
       // Ayak izi: her parça önce 1 saatlik şablon olarak (overwrite) düşer; iz ilk parçadan son parça + 1 saate kadar boş

@@ -156,6 +156,112 @@ ok("Punto çarpanı 1 iken kontur / gölge aynen; kontur 0 ve gölge kapalı [0]
   st1[4][4] === 5 && st1[5][5] === 6 && st1[5][6] === 10 &&
   JSON.stringify(JSON.parse(CMJ.build(cues, AE.normalize({ kontur: 0 }), { punto: 0.5 }).parcalar[0].json).slice(4, 6)) === "[[0],[0]]");
 
+/*
+ * ---------------- Satır sığdırma (3.3 adım 21 incelemesi) ----------------
+ * Şablon setFontSize(d[3]) dışında puntoya dokunmaz; önizleme / video katmanı her kartı efektSigdir'le en uzun satırı
+ * kadrajın %88'ine (9:16 + "Platform arayüzünden kaçın": %74'lük alanın %88'ine) sığana dek küçültür. 9:16'da ölçek %100
+ * iken 1920'lik kompozisyon 1080'lik kadrajdan görünür: sığdırılmayan satır kadraj kenarında kesilir.
+ */
+var SSg = require("../js/style-share.js");
+function previewFs(ayarX, metin, w, h, guvenli) {
+  var ov = AE.overrides(ayarX);
+  if (guvenli) ov.guvenli = true;
+  var m = SE.compile({ styleId: "efekt", overrides: ov, cues: [{ start: 0, end: 2, text: metin }], cueKind: "lines", width: w, height: h }).ass.match(/\\fs(\d+)/);
+  return m ? Number(m[1]) : 0;
+}
+function yerelPlan(ayarX, cuesX, w, h, o) {
+  o = o || {};
+  var oranX = AE.sablonKonumu(ayarX, { w: w, h: h, guvenli: !!o.guvenli, ornek: { cues: cuesX, cueKind: "lines" } });
+  var yerX = CMJ.yerlesim(w, h, oranX, { ayar: ayarX });
+  var plan = CMJ.build(cuesX, ayarX, { cueKind: "lines", fps: 30, font: o.font || AE.sablonFontu(ayarX), punto: yerX.punto,
+    kadraj: { w: w, h: h, guvenli: !!o.guvenli } });
+  return { plan: plan, s: yerX.olcek / 100, yer: yerX };
+}
+var glitch = AE.normalize(AE.gorunum("glitch").ayar);
+var kartG = "Abonelerimizden gelen sorulara";
+var pvG = previewFs(glitch, kartG, 1080, 1920);
+var ypG = yerelPlan(glitch, [{ start: 0, end: 2, text: kartG }], 1080, 1920);
+var dG = JSON.parse(ypG.plan.parcalar[0].json);
+ok("9:16 Glitch (Bebas Neue 118, 1 satır): '" + kartG + "' önizlemede \\fs" + pvG + "; yerel çıktıda da ekranda " + pvG + " (118 değil)",
+  pvG === 68 && ypG.s === 1 && Math.abs(dG[3] * ypG.s - pvG) < 0.11 && ypG.plan.parcalar[0].punto === dG[3], JSON.stringify([pvG, ypG.s, dG[3]]));
+ok("Bebas Neue ölçüsüyle satır 1080'lik kadrajın %88'ine sığar (30 karakter × punto × 0,43 × 1,08)",
+  kartG.length * dG[3] * ypG.s * 0.43 * 1.08 <= 0.88 * 1080 + 1e-6, kartG.length * dG[3] * 0.43 * 1.08);
+var ypA = yerelPlan(glitch, [{ start: 0, end: 2, text: kartG }], 1080, 1920, { font: "Arial-BoldMT" });
+var dA = JSON.parse(ypA.plan.parcalar[0].json);
+ok("Font Arial'a düşerse (kurulu değil) Arial'ın genişliğiyle sığdırılır (" + CMJ.ARIAL_GENISLIK + "; Bebas'tan küçük punto)",
+  dA[2] === "Arial-BoldMT" && dA[3] < dG[3] && kartG.length * dA[3] * ypA.s * CMJ.ARIAL_GENISLIK * 1.08 <= 0.88 * 1080 + 1e-6, JSON.stringify([dA[3], dG[3]]));
+var ypGv = yerelPlan(glitch, [{ start: 0, end: 2, text: kartG }], 1080, 1920, { guvenli: true });
+var dGv = JSON.parse(ypGv.plan.parcalar[0].json);
+ok("'Platform arayüzünden kaçın' (9:16): kadrajın %74'üne sığdırılır, önizlemenin puntosuyla aynı",
+  Math.abs(dGv[3] * ypGv.s - previewFs(glitch, kartG, 1080, 1920, true)) < 0.11 && dGv[3] < dG[3], JSON.stringify([dGv[3], previewFs(glitch, kartG, 1080, 1920, true)]));
+ok("Kadraj verilmezse punto eskisi gibi ayarınki (boyut × punto çarpanı)", JSON.parse(CMJ.build([{ start: 0, end: 2, text: kartG }], glitch, { cueKind: "lines" }).parcalar[0].json)[3] === 118);
+
+// Stil motorunun kart puntosu önizlemenin \fs'i ile aynı (tek kaynak: efektSigdir)
+var ornekMetinler = ["Abonelerimizden gelen sorulara cevap veriyorum", "ve bu", "Mükemmelleştirebileceklerimizden biri", "Premiere Pro'da altyazı nasıl eklenir?"];
+var tekKaynak = AE.GORUNUMLER.every(function (g) {
+  var a = AE.normalize(g.ayar);
+  return [[1080, 1920], [1920, 1080], [1080, 1350]].every(function (wh) {
+    return ornekMetinler.every(function (m) {
+      var k = SE.efektSatirlari({ cues: [{ start: 0, end: 2, text: m }], cueKind: "lines" }, AE.overrides(a), { width: wh[0], height: wh[1] });
+      return k.length >= 1 && (k.length > 1 || k[0].fs === previewFs(a, m, wh[0], wh[1]));
+    });
+  });
+});
+ok("efektSatirlari(kadraj).fs = önizlemenin \\fs'i (her görünüm, 9:16 / 16:9 / 4:5)", tekKaynak);
+
+// Her görünüm × kadraj × güvenli alan × font yedeği: her kartın en uzun satırı × ekrandaki punto × genişlik ≤ %88 alan
+var uzunMetin = "Merhaba arkadaşlar bugün sizlere abonelerimizden gelen sorulara cevap vereceğim. Öncelikle şunu söylemek istiyorum " +
+  "bu video gerçekten çok uzun zamandır planladığım bir içerik. Premiere Pro'da altyazı nasıl eklenir? Mükemmelleştirebileceklerimizden " +
+  "biri de renkler. Ve işte bu kadar! Teşekkürler izlediğiniz için.";
+var uzunKelime = uzunMetin.split(/\s+/), uzunCues = [];
+for (var u = 0; u * 6 < uzunKelime.length; u++) uzunCues.push({ start: u * 2.5, end: u * 2.5 + 2.4, text: uzunKelime.slice(u * 6, u * 6 + 6).join(" ") });
+var genislikler = SSg.widths(), tasan = [], kucuk = [];
+AE.GORUNUMLER.forEach(function (g) {
+  var a = AE.normalize(g.ayar);
+  [[1080, 1920], [1080, 1350], [1080, 1080], [1920, 1080], [720, 1280], [3840, 2160]].forEach(function (wh) {
+    [false, true].forEach(function (guv) {
+      [false, true].forEach(function (arial) {
+        var yp = yerelPlan(a, uzunCues, wh[0], wh[1], { guvenli: guv, font: arial ? "Arial-BoldMT" : "" });
+        var kartFs = SE.efektSatirlari({ cues: uzunCues, cueKind: "lines" }, guv ? Object.assign(AE.overrides(a), { guvenli: true }) : AE.overrides(a),
+          { width: wh[0], height: wh[1], genislik: arial ? CMJ.ARIAL_GENISLIK : 0 }).map(function (k) { return k.fs; });
+        var alan = guv && wh[1] > wh[0] * 1.2 ? Math.round(wh[0] * 0.74) : wh[0];
+        var k = arial ? CMJ.ARIAL_GENISLIK : genislikler[a.font], kartNo = 0;
+        yp.plan.parcalar.forEach(function (p) {
+          var d = JSON.parse(p.json), ekran = d[3] * yp.s;
+          d[9].forEach(function (s) {
+            var enUzun = Math.max.apply(null, s[2].split("\n").map(function (l) { return l.length; }));
+            if (enUzun * ekran * k * 1.08 > 0.88 * alan + 1e-6) tasan.push([g.id, wh.join("x"), guv, arial, s[2], d[3], yp.s]);
+            // Hiçbir kart önizlemedeki puntosunun %90'ından küçük, hiçbiri büyük değil (0,1 px yuvarlama payı)
+            var onizleme = kartFs[kartNo++];
+            if (ekran < onizleme * CMJ.PUNTO_ORANI - 0.1 * yp.s - 1e-6 || ekran > onizleme + 0.5 * yp.s + 1e-6) kucuk.push([g.id, wh.join("x"), guv, arial, s[2], ekran, onizleme]);
+          });
+        });
+      });
+    });
+  });
+});
+ok("Her görünüm, 9:16 / 4:5 / 1:1 / 16:9 / 720p / 4K, güvenli alan açık / kapalı, Arial yedeği: en uzun satır × ekrandaki punto × genişlik ≤ %88 × kadraj",
+  tasan.length === 0, JSON.stringify(tasan.slice(0, 3)));
+ok("Her kart önizlemedeki (sığdırılmış) puntosunun %90'ı ile %100'ü arasında çizilir", kucuk.length === 0, JSON.stringify(kucuk.slice(0, 3)));
+
+// Parçalama: puntosu %10'dan çok farklı kart yeni parça başlatır; aynı puntolu kartlar tek klipte
+var karisik = [{ start: 0, end: 1, text: "ve bu" }, { start: 1, end: 2, text: "da öyle" }, { start: 2, end: 3, text: kartG },
+  { start: 3, end: 4, text: "tamam mı" }, { start: 4, end: 5, text: "evet" }];
+var ypK = yerelPlan(glitch, karisik, 1080, 1920);
+var puntolar = ypK.plan.parcalar.map(function (p) { return JSON.parse(p.json)[3]; });
+ok("9:16 Glitch: kısa kartlar 118, uzun kart 68 ayrı klipte (3 parça: 118 · 68 · 118), kart kaybolmaz",
+  JSON.stringify(puntolar) === "[118,68,118]" && JSON.stringify(ypK.plan.parcalar.map(function (p) { return p.satir; })) === "[2,1,2]" &&
+  ypK.plan.parcalar.every(function (p, i) { return i === 0 || p.start >= ypK.plan.parcalar[i - 1].end - 1e-9; }), JSON.stringify(puntolar));
+var temiz169 = yerelPlan(temizAyar, uzunCues, 1920, 1080);
+ok("16:9 Temiz: sıradan satırlar sığar; tek parça, punto ayarınki (76)", temiz169.plan.parcalar.length === 1 && JSON.parse(temiz169.plan.parcalar[0].json)[3] === 76,
+  JSON.stringify(temiz169.plan.parcalar.map(function (p) { return [p.satir, JSON.parse(p.json)[3]]; })));
+var y4k = yerelPlan(glitch, [{ start: 0, end: 2, text: "Abonelerimizden gelen sorulara cevap veriyorum hemen şimdi" }], 3840, 2160);
+ok("4K (ölçek %200): punto kompozisyon pikseline çevrilir (ekranda = önizlemenin \\fs'i)",
+  y4k.s === 2 && Math.abs(JSON.parse(y4k.plan.parcalar[0].json)[3] * 2 - SE.efektSatirlari({ cues: [{ start: 0, end: 2, text: "Abonelerimizden gelen sorulara cevap veriyorum hemen şimdi" }], cueKind: "lines" },
+    AE.overrides(glitch), { width: 3840, height: 2160 })[0].fs) <= 0.2, JSON.parse(y4k.plan.parcalar[0].json)[3]);
+var ypKs = yerelPlan(glitch, karisik, 1080, 1920);
+ok("parca.punto JSON'daki puntoyla aynı", ypKs.plan.parcalar.every(function (p) { return p.punto === JSON.parse(p.json)[3]; }));
+
 /* ---------------- Ayak izi ve bildirim ekleri ---------------- */
 var iz = CMJ.izAraligi([{ start: 10, end: 40 }, { start: 40, end: 75.5 }]);
 ok("izAraligi: ilk parçanın başından son parçanın başı + şablon süresine (importMGT 1 saatlik overwrite)", iz.start === 10 && iz.end === 40 + CMJ.SABLON.sure && CMJ.SABLON.sure === 3600, JSON.stringify(iz));
@@ -438,6 +544,10 @@ ok("Bildirim: Marka Kiti logosu ve konuşmacı renkleri yerel çıktıda yoksa s
   /CMJ\.bildirimEkleri\(\{ font: fontSec, vurguKaybi: plan\.vurguKaybi, logo: logoVar, konusmaci: konusmaciVar/.test(uyg));
 ok("Yerleşim kartın payıyla (ayar) hesaplanır; font seçimi bu oturumda kurulanları bekleyen sayar",
   /CMJ\.yerlesim\(w, h, oran, \{ ayar: ayar \}\)/.test(uyg) && /CMJ\.fontSecimi\(ayar, sistemFontDosyalari\(\), \{ bekleyen: yerelBekleyenFontlar \}\)/.test(uyg));
+ok("Satır sığdırma: build sekansın kadrajını ve 'Platform arayüzünden kaçın'ı (konumla aynı seçim) alır, font yedeği o.font'tan",
+  /var guvenliYer = !!\(el\("cap-guvenli-yerlesim"\) && el\("cap-guvenli-yerlesim"\)\.checked\);/.test(uyg) &&
+  /AE\.sablonKonumu\(ayar, \{ w: w, h: h, guvenli: guvenliYer,/.test(uyg) &&
+  /CMJ\.build\(cs, ayar, \{ cueKind: tur, fps: probe\.fps, font: fontSec\.ps, punto: yer\.punto, bayt: kademeler\[ki\],\s*kadraj: \{ w: w, h: h, guvenli: guvenliYer \} \}\)/.test(uyg));
 ok("Font kurulumu önbelleği tazelemez (Premiere yeni fontu yeniden başlayınca görür); yeni kopyalananlar bekleyen listesine",
   !/yerelFontOnbellek = null/.test(kur) && /if \(yeni\) yerelBekleyenFontlar\.push\(K\.path\.basename\(adim\.hedef\)\)/.test(kur));
 

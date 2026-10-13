@@ -1046,11 +1046,12 @@
     return [];
   }
 
-  // fitSize'ın çok satırlı hâli: en uzun satır kadrajın %88'ini (güvenli alanda daraltılmış) aşmasın
-  function efektSigdir(fs, group, kir, style, width) {
+  // fitSize'ın çok satırlı hâli: en uzun satır kadrajın %88'ini (güvenli alanda daraltılmış) aşmasın.
+  // genislik (isteğe bağlı): fontun karakter genişliği katsayısı yerine (Premiere yerel çıktısı Arial'a düşünce)
+  function efektSigdir(fs, group, kir, style, width, genislik) {
     var sinir = [0].concat(kir, [group.length]), enUzun = 1;
     for (var i = 0; i + 1 < sinir.length; i++) enUzun = Math.max(enUzun, parcaUzunlugu(group, sinir[i], sinir[i + 1]));
-    var k = KARAKTER_GENISLIK[style.font] || .62;
+    var k = genislik > 0 ? genislik : (KARAKTER_GENISLIK[style.font] || .62);
     var maxW = alanW(width) * .88;
     var need = enUzun * fs * k * 1.08;
     return need > maxW ? Math.max(8, Math.floor(fs * maxW / need)) : fs;
@@ -1450,13 +1451,32 @@
    * AYNI kurulur (ornekKartlari: kelimeye bölme → *vurgu* → groupWords(kelime)) ve her kartın satır kırılımı
    * renderEfekt'inkiyle aynıdır (efektKirilimlari). Döner: [{ kelimeler: [{ start, end, text, vurgu }], kir: [satır başı
    * indeksleri] }]. Çıktıya dokunmaz.
+   * kadraj (isteğe bağlı) { width, height, genislik }: her karta renderEfekt'in puntosu da eklenir (kadraj pikseli):
+   * fs0 (boyut, kısa kenara göre) ve fs (efektSigdir: en uzun satır kadrajın %88'ine, overrides.guvenli ile 9:16'da
+   * %74'lük alanın %88'ine sığana dek küçültülmüş). genislik: fontun katsayısı yerine karakter genişliği (yerel çıktı
+   * Arial'a düştüğünde Arial'ınki). Premiere şablonu satırı kendisi sığdırmaz; punto buradan gider.
    */
-  function efektSatirlari(ornek, overrides) {
+  function efektSatirlari(ornek, overrides, kadraj) {
     var style = guvenliStil(STYLES.efekt.style, overrides, "efekt");
     var satir = tamSayi(style.satir, EFEKT_SATIR, 2), kelime = tamSayi(style.kelime, EFEKT_KELIME, 5);
-    return ornekKartlari(ornek, kelime).map(function (g) {
-      return { kelimeler: g.map(function (c) { return { start: c.start, end: c.end, text: String(c.text), vurgu: !!c.vurgu }; }), kir: efektKirilimlari(g, satir) };
-    });
+    var olc = kadraj && typeof kadraj === "object" && Number(kadraj.width) > 0 && Number(kadraj.height) > 0;
+    var w = olc ? Math.max(320, Math.round(Number(kadraj.width))) : 0, h = olc ? Math.max(180, Math.round(Number(kadraj.height))) : 0;
+    var genislik = olc && Number(kadraj.genislik) > 0 ? Number(kadraj.genislik) : 0;
+    var eskiRef = olcekRef, eskiW = guvenliW;
+    // compile'ın kadraj kuralları (punto kısa kenara göre, "Platform arayüzünden kaçın" 9:16'da %74)
+    if (olc) {
+      olcekRef = Math.min(w, h);
+      guvenliW = overrides && overrides.guvenli === true && h > w * 1.2 ? Math.round(w * 0.74) : 0;
+    }
+    try {
+      var fs0 = olc ? scaled(style.boyut, h) : 0;
+      return ornekKartlari(ornek, kelime).map(function (g) {
+        var kir = efektKirilimlari(g, satir);
+        var kart = { kelimeler: g.map(function (c) { return { start: c.start, end: c.end, text: String(c.text), vurgu: !!c.vurgu }; }), kir: kir };
+        if (olc) { kart.fs0 = fs0; kart.fs = efektSigdir(fs0, g, kir, style, w, genislik); }
+        return kart;
+      });
+    } finally { olcekRef = eskiRef; guvenliW = eskiW; }
   }
   function efektKonumlari(overrides, width, height, ornek) {
     var w = Math.max(320, Math.round(Number(width) || 1920)), h = Math.max(180, Math.round(Number(height) || 1080));

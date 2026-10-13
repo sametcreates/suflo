@@ -12,7 +12,9 @@
  *   - build(cues, ayar, o): kartları önizlemeyle AYNI kurar (stil motorunun efektSatirlari'ı: kelimeye bölme, *vurgu*,
  *     en çok kelime, satır kırılımı) ve parçalara böler: her parça bir klip, en çok 45 sn ve 8 KB (şablonun metin
  *     sınırı ve her karedeki JSON.parse maliyeti; Premiere denemesi sonrası ayarlanır). Parça sınırları kareye oturur.
- *     *Vurgu* işaretleri ayıklanır (şablonda kelime başına vurgu bayrağı yok: sayısı vurguKaybi'nde).
+ *     *Vurgu* işaretleri ayıklanır (şablonda kelime başına vurgu bayrağı yok: sayısı vurguKaybi'nde). Şablon satırı
+ *     kadraja sığdırmaz: o.kadraj ile her kartın önizlemedeki gibi sığdırılmış puntosu alınır, parçaya en küçüğü yazılır
+ *     (puntosu %10'dan çok farklı kart yeni parça başlatır; PUNTO_ORANI).
  *   - yerlesim(w, h, oran, o): şablonun 1920×1080 kompozisyonunu sekansa yerleştiren Motion › Scale (kartı kapsayan en
  *     küçük ölçek: AE şablonu kompozisyon çözünürlüğünde çizilir, %100 üstü yumuşatır) ve Caption_Position.
  *   - izAraligi(parcalar): grubun izdeki ayak izi (importMGT şablonu 1 saatlik overwrite eder, sonra kırpılır).
@@ -60,6 +62,17 @@
   // Doğrulama tutmazsa (şablonun metin sınırı) panel daha küçük parçalarla yeniden dener
   var BAYT_KADEMELERI = [8000, 4000, 2000];
   var EN_AZ_PREMIERE = 22;
+  /*
+   * Satır sığdırma (3.3 adım 21 incelemesi). Şablon puntoyu (setFontSize(d[3])) olduğu gibi çizer, satırı kadraja
+   * sığdırmaz; önizleme / video katmanı ise her kartı stil motorunun efektSigdir'iyle küçültür. build o.kadraj ile
+   * kartın sığdırılmış puntosunu stil motorundan alır. Şablonda klip başına TEK punto var: parçadaki kartların en
+   * küçüğü yazılır ve bir kart önizlemedeki puntosunun PUNTO_ORANI'ndan küçük çizilecekse yeni parça başlar (hiçbir kart
+   * önizlemedekinden büyük, hiçbiri %90'ından küçük değil; puntosu aynı kalan kartlar tek klipte).
+   * ARIAL_GENISLIK: Arial'a düşülünce (fontSecimi) genişlik katsayısı. Liberation Sans Bold (Arial'ın metrikleri) ile
+   * ölçüldü: büyük harfli Türkçe metinde 0,65 em / karakter, karışık harfte 0,51; efektSigdir'in × 1,08'iyle 0,67.
+   */
+  var PUNTO_ORANI = 0.9;
+  var ARIAL_GENISLIK = 0.62;
 
   function sayi(v) { var n = Number(v); return typeof v !== "boolean" && v !== null && v !== "" && isFinite(n) ? n : null; }
   function own(o, k) { return o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }
@@ -87,17 +100,32 @@
   }
 
   /*
+   * Kadraj: { w, h, guvenli ("Platform arayüzünden kaçın") }; geçersizse null (satır sığdırma yapılmaz).
+   * genislik: şablona giden font Arial'sa (o.font, fontSecimi'nin yedeği) Arial'ın katsayısı, değilse 0 (ailenin kendi).
+   */
+  function kadrajOku(o) {
+    var k = o && o.kadraj;
+    if (!k || typeof k !== "object" || !(sayi(k.w) > 0) || !(sayi(k.h) > 0)) return null;
+    return { w: Number(k.w), h: Number(k.h), guvenli: k.guvenli === true,
+      genislik: o && typeof o.font === "string" && /^arial/i.test(o.font) ? ARIAL_GENISLIK : 0 };
+  }
+
+  /*
    * Kartlar → satırlar: [{ start, end, text ("\n" satır kırılımı), kelimeler: [[bas, son], …], vurgu: [bool] }].
    * Kelime k, sonraki kelimenin başına kadar etkin (önizlemenin renderEfekt'iyle aynı); son kelime kart sonuna.
    * Kartlar üst üste binmez: kart sonu sonraki kartın başını geçemez. Metindeki kelime sayısı zaman çifti
    * sayısına HER ZAMAN eşittir (boş / yalnız kontrol karakterli kelime kart dışı kalır).
+   * o.kadraj verilirse her satırda fs0 (punto) ve fs (kadraja sığdırılmış punto), kadraj pikseli (stil motorundan).
    */
   function satirlar(cues, ayar, o) {
     var se = SE();
     if (!se || typeof se.efektSatirlari !== "function") throw new Error("Stil motoru yüklenemedi.");
     var ae = AE();
     var ov = ae ? ae.overrides(ayar) : (ayar || {});
-    var kartlar = se.efektSatirlari({ cues: cues || [], cueKind: o && o.cueKind ? o.cueKind : "lines" }, ov);
+    var kad = kadrajOku(o);
+    if (kad && kad.guvenli) ov.guvenli = true;
+    var kartlar = se.efektSatirlari({ cues: cues || [], cueKind: o && o.cueKind ? o.cueKind : "lines" }, ov,
+      kad ? { width: kad.w, height: kad.h, genislik: kad.genislik } : undefined);
     var out = [];
     kartlar.forEach(function (k) {
       var kel = [], kir = k.kir || [];
@@ -119,7 +147,9 @@
         vur.push(w.vurgu);
         onceki = kb;
       });
-      out.push({ start: bas, end: son, text: metin, kelimeler: zam, vurgu: vur });
+      var satir = { start: bas, end: son, text: metin, kelimeler: zam, vurgu: vur };
+      if (kad && k.fs > 0 && k.fs0 > 0) { satir.fs = k.fs; satir.fs0 = k.fs0; }
+      out.push(satir);
     });
     out.sort(function (a, b) { return a.start - b.start; });
     for (var i = 0; i + 1 < out.length; i++) {
@@ -171,10 +201,12 @@
   }
 
   /*
-   * build(cues, ayar, o) → { parcalar: [{ start, end, json, bayt, satir }], satirSayisi, vurguKaybi, asiri }
-   * o: { cueKind ("lines" | "words" | "cumulative"), fps, font, punto, sure (sn), bayt }
+   * build(cues, ayar, o) → { parcalar: [{ start, end, json, bayt, satir, punto }], satirSayisi, vurguKaybi, asiri }
+   * o: { cueKind ("lines" | "words" | "cumulative"), fps, font, punto, sure (sn), bayt, kadraj: { w, h, guvenli } }
    * Parça başı ve sonu kare sınırına oturur (Premiere klibi kareye yuvarlar; komşu parçalar aynı izde çakışmasın),
    * satır zamanları parçanın (kareye oturmuş) başına göredir. Tek satır sınırı aşarsa yine kendi parçasıdır (asiri).
+   * o.kadraj (sekansın boyu; yerlesim'inkiyle aynı) verilirse satır sığdırma (PUNTO_ORANI): parçanın puntosu (d[3],
+   * kompozisyon pikseli; parca.punto) kartlarının sığdırılmış puntolarının en küçüğü. Verilmezse punto ayarınki.
    */
   function build(cues, ayar, o) {
     o = o || {};
@@ -185,9 +217,30 @@
     var liste = satirlar(cues, ayar, o);
     var vurguKaybi = 0;
     liste.forEach(function (s) { s.vurgu.forEach(function (v) { if (v) vurguKaybi++; }); });
+    var kad = kadrajOku(o);
+    // Kadraj pikseli → kompozisyon pikseli: yerlesim'in punto çarpanı = kısa kenar / 1080 / ölçek
+    var kompBirim = kad ? (sayi(o.punto) > 0 ? Number(o.punto) : 1) * 1080 / Math.min(kad.w, kad.h) : 0;
 
+    // Parçanın puntosu: kartların sığdırılmış puntolarının en küçüğü (hiçbiri sığdırılmadıysa ayarınki, stilDizisi)
+    function punto(gruplar) {
+      if (!kad) return stil[3];
+      var enAz = Infinity, sigdi = false;
+      gruplar.forEach(function (s) { if (s.fs > 0 && s.fs < s.fs0) { sigdi = true; enAz = Math.min(enAz, s.fs); } });
+      if (!sigdi) return stil[3];
+      // Aşağı yuvarlanır (0,1 px): ekrandaki punto sığdırılmış puntoyu geçmez
+      return Math.min(stil[3], Math.max(1, Math.floor(enAz * kompBirim * 10 + 1e-6) / 10));
+    }
     function paket(gruplar, c0) {
-      return JSON.stringify(stil.concat([gruplar.map(function (s) { return msDizi(s, c0); })]));
+      var st = stil.slice();
+      st[3] = punto(gruplar);
+      return JSON.stringify(st.concat([gruplar.map(function (s) { return msDizi(s, c0); })]));
+    }
+    // Kart parçaya girerse parçadaki her kart önizlemedeki puntosunun en az PUNTO_ORANI'yla mı çizilir
+    function puntoUyar(gruplar, aday) {
+      if (!kad || !(aday.fs > 0)) return true;
+      var enAz = aday.fs, enCok = aday.fs;
+      gruplar.forEach(function (s) { if (s.fs > 0) { enAz = Math.min(enAz, s.fs); enCok = Math.max(enCok, s.fs); } });
+      return enAz >= enCok * PUNTO_ORANI - 1e-9;
     }
 
     var parcalar = [], asiri = 0, i = 0, oncekiSon = 0;
@@ -197,6 +250,7 @@
       var json = paket(grup, c0);
       var j = i + 1;
       while (j < liste.length) {
+        if (!puntoUyar(grup, liste[j])) break;
         var aday = grup.concat([liste[j]]);
         if (liste[j].end - c0 > sureSinir) break;
         var aJson = paket(aday, c0);
@@ -207,7 +261,7 @@
       var son = kare(grup[grup.length - 1].end, fps, true);
       if (j < liste.length) son = Math.min(son, Math.max(c0 + (fps > 0 ? 1 / fps : 0.04), kare(liste[j].start, fps, false)));
       son = Math.max(son, c0 + (fps > 0 ? 1 / fps : 0.04));
-      parcalar.push({ start: c0, end: son, json: json, bayt: baytSay(json), satir: grup.length });
+      parcalar.push({ start: c0, end: son, json: json, bayt: baytSay(json), satir: grup.length, punto: punto(grup) });
       oncekiSon = son;
       i = j;
     }
@@ -537,6 +591,8 @@
     SABLON: JSON.parse(JSON.stringify(SABLON)),
     SINIR: JSON.parse(JSON.stringify(SINIR)),
     BAYT_KADEMELERI: BAYT_KADEMELERI.slice(),
+    PUNTO_ORANI: PUNTO_ORANI,
+    ARIAL_GENISLIK: ARIAL_GENISLIK,
     EN_AZ_PREMIERE: EN_AZ_PREMIERE,
     temizMetin: temizMetin,
     baytSay: baytSay,
