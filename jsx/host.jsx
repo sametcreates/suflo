@@ -4635,6 +4635,8 @@ function KS_rampArdisik(a, b, frame) {
 }
 
 function KS_rampYuzde(c) { return Math.abs(KS_rampSpeed(c, null) - 1) <= 0.005; }
+// geri yuklemenin olcusu (KS_rampHizKur TAM): Hiz/Sure'de %100,00
+function KS_rampTam100(c) { return Math.abs(KS_rampSpeed(c, null) - 1) <= 5e-5; }
 
 // Bilesen listesi (matchName sirasi): ayni klibin razor parcalari ayni; Lumetri eklenmis komsu farkli
 function KS_rampBilesenler(c) {
@@ -4652,13 +4654,15 @@ function KS_rampBilesenler(c) {
  * Kayit yoksa secimden (sekans kopyalandi, proje baska makinede, depo silindi, 30'dan fazla rampa):
  * secili parcanin iki yanindaki ayni medya, bitisik, kaynagi devam eden parcalar. Uclardaki %100
  * parcalar rampa sayilmaz (ayni cekimin elle kesilmis devami, ustelik kendi efektleriyle); yalniz iki
- * %100-disi parcanin arasindaki %100 parca icte kalir. Secili parca kirpilan bir %100 uc ise rampa
+ * %100-disi parcanin arasindaki %100 parca icte kalir. Dis parca tam %100'dur ve ozgun kaynak dogrusunda
+ * baslar: %100'e yakin uc (1.0001) ya da kaynagi ileride baslayan %100 plato (Otomatik/exact) rampanindir.
+ * kayitlar: panelin kayitlari; t0/t1'leri bitisik iki rampayi ayirmakta ipucu. Secili parca kirpilan bir %100 uc ise rampa
  * yok. Parcalarin bilesen listesi secili parcayla ayni olmali; degilse (rampa sonradan degismis ya da
  * komsu baska bir klip) 'degisti': hicbir sey silinmez.
  * Ses tahmin edilmez: kapali ayni medya sesini kullanici da kapatmis olabilir. audio [] ve
  * unlinked false; sesKapali > 0 ise panel kullaniciya sesi elle acmasini soyler.
  */
-function KS_rampSecimdenKayit(seq, frame) {
+function KS_rampSecimdenKayit(seq, frame, kayitlar) {
   var sec = KS_packSelectedVideo(seq);
   if (!sec.length) return null;
   var ti = sec[0].track, tr = seq.videoTracks[ti], yari = frame / 2, liste = [], i, ix = -1;
@@ -4668,8 +4672,44 @@ function KS_rampSecimdenKayit(seq, frame) {
   var bas = ix, son = ix;
   while (bas > 0 && KS_rampArdisik(liste[bas - 1], liste[bas], frame)) bas--;
   while (son < liste.length - 1 && KS_rampArdisik(liste[son], liste[son + 1], frame)) son++;
+  var zBas = bas, zSon = son;
   while (bas < son && KS_rampYuzde(liste[bas])) bas++;
   while (son > bas && KS_rampYuzde(liste[son])) son--;
+  if (bas < son || !KS_rampYuzde(liste[bas])) {
+    // dis parca klibin ozgun hizinda (tam %100); %100'e yakin ama tam olmayan uc (1.0001, 1.0038) rampanindir
+    while (bas > zBas && !KS_rampTam100(liste[bas - 1])) bas--;
+    // kaynak surekliligi: geri yukleme ilk parcayi %100'de t1'e uzatir (srcIn + t1 - t0); zincirde kalan sonraki
+    // parca o kaynaktan baslamiyorsa (Otomatik/exact rampanin %100 platosu, Basamakli'da tam 1.0) o da rampanindir
+    var t0b = Number(liste[bas].start.seconds), inb = Number(liste[bas].inPoint.seconds);
+    var dogruda = function (c) { return Math.abs(Number(c.inPoint.seconds) - (inb + Number(c.start.seconds) - t0b)) <= yari; };
+    while (son < zSon) {
+      var snr = liste[son + 1];
+      if (KS_rampTam100(snr) && dogruda(snr)) break;
+      son++;
+    }
+    // Arka arkaya iki rampa (ikincinin In'i birincinin Out'unda) zincirde birlesir: kaynak sinirda kapanir.
+    // Panel kayitlarinin t0/t1'i (baska sekansinkiler dahil: kopyalanan sekans ayni geometriyi tasir) bir
+    // parca sinirina dusuyor ve kaynak orada kapaniyorsa (ozgun klibin dogrusu) rampa orada biter: yalniz secili
+    // olan kaldirilir. Hic kayit yoksa (depo silindi, baska makine) sinir bilinemez: ikisi birlikte kalkar
+    var yolK = KS_rampYol(liste[ix]).toLowerCase();
+    if (kayitlar instanceof Array) {
+      for (var ki = 0; ki < kayitlar.length; ki++) {
+        var kk = kayitlar[ki];
+        if (!kk || typeof kk !== "object" || Number(kk.track) !== ti || String(kk.mediaPath || "").toLowerCase() !== yolK) continue;
+        var sinirlar = [Number(kk.t0), Number(kk.t1)];
+        for (var sj = 0; sj < 2; sj++) {
+          for (i = bas + 1; i <= son; i++) {
+            if (Math.abs(Number(liste[i].start.seconds) - sinirlar[sj]) > yari || !dogruda(liste[i])) continue;
+            if (ix < i) son = i - 1; else bas = i;
+            break;
+          }
+        }
+      }
+      // bolunen yanda kalan (ozgun dogrusundaki) tam %100 ara parca rampa degil
+      while (bas < son && KS_rampTam100(liste[bas])) bas++;
+      while (son > bas && KS_rampTam100(liste[son]) && dogruda(liste[son])) son--;
+    }
+  }
   if (ix < bas || ix > son) return null;
   var degisik = false;
   for (i = bas; i <= son; i++) { if (!KS_rampYuzde(liste[i])) degisik = true; }
@@ -4735,7 +4775,7 @@ function KS_removeSpeedRamp(encoded) {
       rec = KS_rampKayitEsle(seq, p.records);
       panelKaydi = !!rec;
       if (!rec) {
-        rec = KS_rampSecimdenKayit(seq, frame);
+        rec = KS_rampSecimdenKayit(seq, frame, p.records);
         if (rec && rec.kod) return KS_rampHata(rec.kod);
       }
       if (!rec) return KS_rampHata("secimYok");
