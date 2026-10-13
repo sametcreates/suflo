@@ -29,9 +29,23 @@ window.K = (function () {
     else { MAC = /Mac|Darwin/i.test(navigator.platform + " " + navigator.userAgent); WIN = !MAC; }
   } catch (eP) {}
 
-  // Apple Silicon'da whisper.cpp Metal ile derlenir: GPU hızlandırma kendiliğinden açık
+  // Apple Silicon'da whisper.cpp Metal ile derlenir: GPU hızlandırma kendiliğinden açık.
+  // Premiere "Rosetta kullanarak aç" ile açıldıysa os.arch() x64 der; çeviri altında olmak da Apple Silicon demektir.
   function macMetal() {
-    try { return MAC && nodeOK && os.arch() === "arm64"; } catch (e) { return false; }
+    try { return MAC && nodeOK && (os.arch() === "arm64" || rosettaAltinda()); } catch (e) { return false; }
+  }
+
+  // Süreç Rosetta 2 ile mi çevriliyor (sysctl.proc_translated = 1)? Intel Mac'te anahtar yok: false
+  var _rosetta = null;
+  function rosettaAltinda() {
+    if (_rosetta !== null) return _rosetta;
+    _rosetta = false;
+    try {
+      if (MAC && nodeOK && cp && typeof cp.execFileSync === "function") {
+        _rosetta = String(cp.execFileSync("/usr/sbin/sysctl", ["-n", "sysctl.proc_translated"], { encoding: "utf8", timeout: 5000 })).trim() === "1";
+      }
+    } catch (e) { _rosetta = false; }
+    return _rosetta;
   }
 
   // Paketle gelen Suflo Originals gibi salt-okunur iceriklerin kok yolu.
@@ -936,6 +950,19 @@ window.K = (function () {
   }
 
   /*
+   * brew komutu: { exe, args } ya da brew yoksa null. Premiere Rosetta'da açıldıysa çocuk süreç x86_64
+   * başlar; /opt/homebrew'daki brew "Cannot install under Rosetta 2 in ARM default prefix" deyip durur.
+   * O durumda arch -arm64 ile yerel mimaride çağrılır.
+   */
+  function brewKomutu(args) {
+    var brew = brewYolu();
+    if (!brew) return null;
+    args = args || [];
+    if (brew.indexOf("/opt/homebrew/") === 0 && rosettaAltinda()) return { exe: "/usr/bin/arch", args: ["-arm64", brew].concat(args) };
+    return { exe: brew, args: args };
+  }
+
+  /*
    * Kurulu yerel motoru bul: { exe, model, dir } veya null.
    * opts.skipModel: yalnız çalıştırılabilir aranır (kurulum sırasında gerekir).
    * Model seçimi KEngine'e bırakılır; burada yalnız yedek tarama yapılır.
@@ -1568,6 +1595,8 @@ window.K = (function () {
     MAC: MAC,
     WIN: WIN,
     macMetal: macMetal,
-    brewYolu: brewYolu
+    brewYolu: brewYolu,
+    brewKomutu: brewKomutu,
+    rosettaAltinda: rosettaAltinda
   };
 })();

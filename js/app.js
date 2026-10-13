@@ -1169,12 +1169,23 @@ window.KApp = (function () {
 
   }
 
+  // mac: düğme ne yapacaksa onu yazar (son checkFfmpeg sonucundan); boşsa HTML'deki etiket kalır
+  var ffmpegDugmeEtiketi = "";
   async function checkFfmpeg() {
     var box = el("set-ffmpeg-status");
     box.className = "inline-status";
     box.textContent = "kontrol ediliyor…";
     var ff = await K.findFfmpeg(true);
-    if (ff) {
+    var libassYok = !!ff && K.ffmpegLibass && K.ffmpegLibass() === false;
+    // libass'siz ffmpeg (Homebrew'un sade ffmpeg'i): yazıya dökme çalışır ama Altyazı Efektleri / kanca /
+    // Shorts Paketi çizemez; yeşil ✓ yerine uyarı ve düğme Suflo'nun ffmpeg'ini kurar (brew değil)
+    ffmpegDugmeEtiketi = K.MAC ? (libassYok ? "Suflo'nun ffmpeg'ini kur" : (K.brewYolu() && !ff ? "Homebrew ile kur" : "ffmpeg’i indir ve kur")) : "";
+    var kurDugme = el("set-ffmpeg-install");
+    if (kurDugme && ffmpegDugmeEtiketi && !ffmpegKuruluyor) kurDugme.textContent = ffmpegDugmeEtiketi;
+    if (ff && libassYok) {
+      box.className = "inline-status warn";
+      box.textContent = "⚠ " + ff + " · " + K.libassUyarisi();
+    } else if (ff) {
       box.className = "inline-status good";
       box.textContent = "✓ " + ff;
     } else {
@@ -1233,15 +1244,20 @@ window.KApp = (function () {
     function say(m) { box.textContent = m; }
 
     try {
-      if (K.MAC && K.brewYolu()) {
+      // Homebrew'un sade ffmpeg'i libass'siz: Altyazı Efektleri, kanca, Shorts Paketi onunla çizilemez.
+      // Brew yalnız hiç ffmpeg yokken denenir ve sonucu ancak libass'liyse kabul edilir; libass'siz ffmpeg
+      // varken (libassUyarisi buraya yönlendirir) doğrudan Suflo'nun ffmpeg'i iner (KEngine.installFfmpeg)
+      var oncekiFf = K.MAC ? await K.findFfmpeg(true) : null;
+      var bk = K.MAC && !oncekiFf && K.brewKomutu ? K.brewKomutu(["install", "ffmpeg"]) : null;
+      if (bk) {
         say("brew install ffmpeg… (birkaç dakika sürebilir)");
-        await K.run(K.brewYolu(), ["install", "ffmpeg"], { timeout: 1800000 });
-        if (await K.findFfmpeg(true)) {
+        await K.run(bk.exe, bk.args, { timeout: 1800000 });
+        if (await K.findFfmpeg(true) && K.ffmpegLibass() === true) {
           toast("ffmpeg kuruldu", "good");
           await checkFfmpeg();
           return;
         }
-        say("Homebrew kuramadı, doğrudan indiriliyor…");
+        say("Homebrew'un ffmpeg'i altyazı çizemiyor ya da kurulamadı, Suflo'nun ffmpeg'i indiriliyor…");
       }
 
       ffmpegJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
@@ -1274,7 +1290,7 @@ window.KApp = (function () {
       ffmpegKuruluyor = false;
       ffmpegJetonu = null;
       ffmpegIptalDugmesi(false);
-      if (btn) { btn.disabled = false; btn.textContent = eskiEtiket; }
+      if (btn) { btn.disabled = false; btn.textContent = ffmpegDugmeEtiketi || eskiEtiket; }
     }
   }
 
