@@ -648,6 +648,41 @@ v20 = aktif._v[0]._k.filter(function (k) { return k._yol === z.K._yol; });
 a20 = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
 ok("20) kısmi rampa yarıda bozulursa da: geri yüklenir, üç video parçası kendi sesleriyle bağlı", !r20b.ok && r20b.restored === true && v20.length === 3 && a20.length === 3 &&
   v20.every(function (v, i) { return bagliMi(v, a20[i]) && v._v === 1; }) && a20.every(function (a) { return !a._d; }), js(r20b));
+// L-cut (ses videonun 10 kare ötesine uzar) ve J-cut (10 kare önce başlar): videonun kendi sınırını aşan ses
+// parçası da yeniden bağlanır (eskiden yalnız video parçasının tam içindeki ses bağlanıyordu)
+function lCut(o) {
+  var zz = sahne(o);
+  var BS = aktif._a[0]._k.filter(function (k) { return k._yol === zz.B._yol; })[0];
+  BS._s += 10; BS._in += 10 * zz.fr; zz.KS._e += 10;
+  return zz;
+}
+function jCut(o) {
+  var zz = sahne(o);
+  var AS = aktif._a[0]._k.filter(function (k) { return k._yol === zz.A._yol; })[0];
+  AS._e -= 10; zz.KS._s -= 10; zz.KS._in -= 10 * zz.fr;
+  return zz;
+}
+function sesVideo(zz, s) { var a = aktif._a[0]._k.filter(function (k) { return k._yol === zz.K._yol && k._s === s; })[0]; return a ? a._bag.filter(function (b) { return b._tur === "v"; }).map(function (b) { return b._s + "-" + b._e; }).join("|") : "yok"; }
+var lc20 = [];
+z = lCut({ n: 200, inF: 100, outF: 180, linkedApi: true });
+var r20l = call("KS_applySpeedRamp", { target: hedef(z), range: { start: 4, end: 7.2 }, plan: S.hostPlan(S.plan("darbe", { mode: "balanced" }, { frames: 80, fps: 25, partial: true })), audio: "mute", interp: {} });
+if (!r20l.ok || sesVideo(z, 180) !== "180-250") lc20.push("L-cut kısmi uygula: [180,260] sesi " + sesVideo(z, 180));
+var k20l = call("KS_removeSpeedRamp", { record: r20l.record });
+if (!k20l.ok || sesVideo(z, 180) !== "180-250" || sesVideo(z, 100) !== "100-180") lc20.push("L-cut kısmi kaldır: " + sesVideo(z, 180) + " / " + sesVideo(z, 100));
+z = jCut({ n: 200, inF: 100, outF: 180, linkedApi: true });
+var r20j = call("KS_applySpeedRamp", { target: hedef(z), range: { start: 4, end: 7.2 }, plan: S.hostPlan(S.plan("darbe", { mode: "balanced" }, { frames: 80, fps: 25, partial: true })), audio: "mute", interp: {} });
+if (!r20j.ok || sesVideo(z, 40) !== "50-100") lc20.push("J-cut kısmi uygula: [40,100] sesi " + sesVideo(z, 40));
+var k20j = call("KS_removeSpeedRamp", { record: r20j.record });
+if (!k20j.ok || sesVideo(z, 40) !== "50-100") lc20.push("J-cut kısmi kaldır: " + sesVideo(z, 40));
+z = lCut({ n: 100, linkedApi: true });
+var r20t = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+var k20t = call("KS_removeSpeedRamp", { record: r20t.record });
+if (!r20t.ok || !k20t.ok || sesVideo(z, 150) !== "50-150" || sesVideo(z, 50) !== "50-150") lc20.push("L-cut tüm klip kaldır: kuyruk [150,160] " + sesVideo(z, 150) + " gövde " + sesVideo(z, 50));
+z = jCut({ n: 100, linkedApi: true });
+var r20h = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+var k20h = call("KS_removeSpeedRamp", { record: r20h.record });
+if (!r20h.ok || !k20h.ok || sesVideo(z, 40) !== "50-150") lc20.push("J-cut tüm klip kaldır: baş [40,50] " + sesVideo(z, 40));
+ok("20) L-cut / J-cut: videonun sınırını aşan ses parçası uygulama ve kaldırma sonrası kendi video parçasına bağlı", lc20.length === 0, lc20.join(" | "));
 
 /* ---------- 21) kaldırınca geri gelen klip seçili; açık hedeflerle (items) yeniden uygulanır ---------- */
 z = sahne({ n: 100 });

@@ -4233,9 +4233,18 @@ function KS_rampDisBagla(seq, rec, frame) {
     var a = Number(dis[i][0]), b = Number(dis[i][1]);
     var vk = KS_rampClipAt(tr, a, frame);
     if (!vk || Math.abs(Number(vk.end.seconds) - b) > frame / 2 || KS_rampYol(vk).toLowerCase() !== yol) continue;
-    if (KS_rampBagla(seq, vk, a, b, frame, rec.ekSes)) n++;
+    var sa = a, sb = b;
+    if (Math.abs(b - Number(rec.t0)) <= frame / 2) sa = Math.min(a, KS_rampSesUc(rec, 0, a));
+    if (Math.abs(a - Number(rec.t1)) <= frame / 2) sb = Math.max(b, KS_rampSesUc(rec, 1, b));
+    if (KS_rampBagla(seq, vk, sa, sb, frame, rec.ekSes)) n++;
   }
   return n;
+}
+
+// rec.ses: [ilk, son] bagli sesin klibin disina tastigi uclar (L-cut / J-cut); yoksa varsayilan
+function KS_rampSesUc(rec, j, varsayilan) {
+  var s = rec && rec.ses instanceof Array ? Number(rec.ses[j]) : NaN;
+  return isNaN(s) ? varsayilan : s;
 }
 
 // Kapatilan ses parcalarini ac, kopan bagi (ilk video parcasi + hizali ses, kismi aralikta dis
@@ -4249,7 +4258,16 @@ function KS_rampSesGeri(seq, rec, ilk, frame) {
   }
   if (rec.unlinked) {
     if (ilk) {
-      KS_rampBagla(seq, ilk, Math.min(Number(rec.t0), Number(ilk.start.seconds)), Math.max(Number(rec.t1), Number(ilk.end.seconds)), frame, rec.ekSes);
+      var ba = Math.min(Number(rec.t0), Number(ilk.start.seconds)), bb = Math.max(Number(rec.t1), Number(ilk.end.seconds));
+      // o yanda dis video parcasi yoksa klibin disina tasan ses (L-cut kuyrugu, J-cut basi) geri gelen klibindir
+      var solDis = false, sagDis = false, dz = rec.dis || [];
+      for (i = 0; i < dz.length; i++) {
+        if (Math.abs(Number(dz[i][1]) - Number(rec.t0)) <= frame / 2) solDis = true;
+        if (Math.abs(Number(dz[i][0]) - Number(rec.t1)) <= frame / 2) sagDis = true;
+      }
+      if (!solDis) ba = Math.min(ba, KS_rampSesUc(rec, 0, ba));
+      if (!sagDis) bb = Math.max(bb, KS_rampSesUc(rec, 1, bb));
+      KS_rampBagla(seq, ilk, ba, bb, frame, rec.ekSes);
     }
     KS_rampDisBagla(seq, rec, frame);
   }
@@ -4468,6 +4486,15 @@ function KS_applySpeedRamp(encoded) {
     var undo0 = KS_rampUndoIndex();
     var rec = { v: 1, seqId: seqId, track: ti, t0: T0, t1: T1, srcIn: srcIn, mediaPath: mp, name: ad, audio: [], unlinked: false,
       mode: String(pl.mode || ""), dis: [], ekSes: [], ilkInterp: null };
+    // L-cut / J-cut: bagli ses videonun sinirini asabilir; T0/T1'de kesilince disarida kalan ses parcasi
+    // ([sesA, T0] ya da [T1, sesB]) da o yandaki video parcasina (yoksa geri gelen klibe) yeniden baglanir
+    var sesA = cs, sesB = ce;
+    for (k = 0; k < bag.length; k++) {
+      if (bag[k].bagli === false) continue;
+      if (bag[k].start < sesA) sesA = bag[k].start;
+      if (bag[k].end > sesB) sesB = bag[k].end;
+    }
+    if (sesA < cs - yari || sesB > ce + yari) rec.ses = [sesA, sesB];
     if (T0 > cs + yari) rec.dis.push([cs, T0]);
     if (T1 < ce - yari) rec.dis.push([T1, ce]);
     var uyarilar = [], cal = p.cal || {};
