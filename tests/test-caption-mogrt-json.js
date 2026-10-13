@@ -17,7 +17,7 @@ function ok(name, condition, evidence) {
   if (condition) { passed++; console.log("PASS " + name); }
   else { failed++; console.log("FAIL " + name + (evidence === undefined ? "" : "   [" + String(evidence).slice(0, 300) + "]")); }
 }
-function oku(rel) { return fs.readFileSync(path.join(ROOT, rel), "utf8"); }
+function oku(rel) { return fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n"); }
 function kelimeSay(t) { return String(t).split(/\s+/).filter(Boolean).length; }
 function satirlarOf(parca) { return JSON.parse(parca.json)[9]; }
 

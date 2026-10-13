@@ -106,7 +106,7 @@ Taslak transkript biter bitmez diske yazılır — panel kapanırsa kurtarılır
 | Ücretsiz (MIT, sonsuza dek) | Pro (bir kez 749 TL + KDV) |
 |---|---|
 | Yerel/bulut transkripsiyon (99 dil, çevrimdışı) | Bağımsız Stil Motoru ve şeffaf video katmanı |
-| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Creator Punch · Clean Pill · SaaS Glass dahil Stil Motoru v3 |
+| Altyazı editörü (bölme, birleştirme, zaman, geri al, taslak kurtarma) | Altyazı Efektleri'nde 6 hazır görünüm: Temiz · Vurucu · Canlı · Zarif · Glitch · Kutulu |
 | Düz stiller | Otomatik kesim (sessizlik temizleme) |
 | SRT · WebVTT · TXT dışa aktarım | Ritim/beat marker'ları |
 | SRT/VTT içe aktarım | Toplu çoklu klip transkripsiyonu |

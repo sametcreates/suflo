@@ -254,7 +254,7 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
   ok("ilk kullanım: SUMS ve ikili AYNI sürümden (API etiketi)", indirilenler[0] === "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/SHA2-256SUMS" &&
     indirilenler[1] === "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_macos" && indirilenler.length === 2, js(indirilenler));
   ok("ikili önce çalıştırılamayan geçici ada iner", /yt-dlp_macos\.dogrulanmadi$/.test(a.c.download[1].hedef) && !fs.existsSync(a.c.download[1].hedef));
-  ok("doğrulanmış ikili yerinde, 0755, kayıt yazıldı", fs.existsSync(a.exe) && (fs.statSync(a.exe).mode & 511) === 493 &&
+  ok("doğrulanmış ikili yerinde, 0755, kayıt yazıldı", fs.existsSync(a.exe) && (process.platform === "win32" || (fs.statSync(a.exe).mode & 511) === 493) &&
     JSON.parse(fs.readFileSync(path.join(a.ytdir, "suflo-ytdlp.json"), "utf8")).sha256 === sha(IKILI));
   var ytc = a.ytCalismalari();
   ok("ilk çalıştırma --version, sonra -J; her çalıştırmada dosya doğrulanmış özetle aynı", ytc[0].args[0] === "--version" && ytc[1].args.indexOf("-J") !== -1 &&
@@ -597,7 +597,7 @@ function hedefKlasor(t) { return path.join(t.proje, "Suflo İndirilenler"); }
   await tikla(d.dom, "yt-bilgi");
   var jarg = d.ytCalismalari().filter(function (r) { return r.args.indexOf("-J") !== -1; })[0].args;
   ok("JS çalıştırıcısı yok uyarısı gösterilir; ~/.deno/bin/deno varsa --js-runtimes", d.dom["yt-js-not"].hidden === false && /Deno/.test(d.dom["yt-js-not"].textContent) &&
-    deger(jarg, "--js-runtimes") === "deno:" + path.join(d.ev, ".deno", "bin", "deno"), js(jarg));
+    deger(jarg, "--js-runtimes") === "deno:" + d.ev.replace(/\/+$/, "") + "/.deno/bin/deno", js(jarg));   // darwin yolu: "/" ile (Windows CI'da da)
 
   /* ---------- 16) kaynak denetimleri ---------- */
   var SRC = fs.readFileSync(path.join(KOK, "js", "youtube-indir-ui.js"), "utf8").replace(/\r\n/g, "\n");
