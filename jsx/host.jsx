@@ -3716,7 +3716,9 @@ function KS_rampSetSpeed(o) {
   var once = KS_rampSpeed(clip, null);
   // tam (geri yukleme): cagiran KS_rampHizKur hizi 5e-5 ile olcer ve zaten yetersiz buldu; %0,1
   // icinde 'zaten orada' deyip cagrisiz donmek (ornek 1.00026 -> 1) her turu bos gecirir: hizYazilamadi
-  if (!o.tam && Math.abs(once - v) / v < 0.001) return { ok: true, units: cal.units || "", sig: cal.sig || "", speed: once, calls: 0 };
+  // yaklas: KS_rampHizKur yukaridan yaklasilan hizi v'ye yavaslatiyor; %0,1 alti asim da (3.166457 / 3.1662)
+  // uc bu hizda uzatildiginda plandan fazla kaynak acar: tutamak 0'da uc T1'den bir kare kisa kalir
+  if (!o.tam && !o.yaklas && Math.abs(once - v) / v < 0.001) return { ok: true, units: cal.units || "", sig: cal.sig || "", speed: once, calls: 0 };
   for (var si = 0; si < imzalar.length && cagri < 8; si++) {
     var imza = imzalar[si], birim = ilk, denendi = {}, gecersizTekrar = false, ayniTekrar = false;
     while (cagri < 8) {
@@ -3800,8 +3802,8 @@ function KS_rampHizKur(o) {
     // yeniden gonderilip geri alma adimi biriktirmesin
     if (tam && yavasOnce !== null && Math.abs(u - yavasOnce) < 1e-9) return { ok: false, kod: "hizYazilamadi", calls: cagri, units: cal.units || "", sig: cal.sig || "" };
     yavasOnce = null;
-    var istek, Kt;
-    if (v < u) { istek = v; Kt = Math.max(kare, Kf, 1); yavaslatildi = true; if (tam) yavasOnce = u; }
+    var istek, Kt, yaklas = false;
+    if (v < u) { istek = v; Kt = Math.max(kare, Kf, 1); yavaslatildi = true; yaklas = true; if (tam) yavasOnce = u; }
     else {
       if (Kf && Number(R.end.seconds) < hedefSon - yari) {
         KS_rampSetEnd(R, hedefSon);
@@ -3816,7 +3818,7 @@ function KS_rampHizKur(o) {
     }
     KS_rampDeselect(o.seq);
     var onceBirim = cal.units || "";
-    var ss = KS_rampSetSpeed({ seq: o.seq, qseq: o.qseq, ti: o.ti, t: o.t, frame: fr, v: istek, cal: cal, K: Kt, tam: tam });
+    var ss = KS_rampSetSpeed({ seq: o.seq, qseq: o.qseq, ti: o.ti, t: o.t, frame: fr, v: istek, cal: cal, K: Kt, tam: tam, yaklas: yaklas });
     cagri += ss.calls || 0;
     if (ss.units) cal = { units: ss.units, sig: ss.sig };
     // yanlis birimle kirpilan klip hedefe varamadiysa: birim artik belli, sonraki tur yeniden yaklasir

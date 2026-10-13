@@ -585,6 +585,20 @@ S.list().forEach(function (pr) {
   }); });
 });
 ok("17) varsayılan otomatik, tutamak 0 ya da bilinmiyor (ffmpeg yok): hepsi başarılı", oto17.length === 0, oto17.join(" | "));
+// Hızlanmada yukarıdan yaklaşma hızı %0,1'in altında aşarsa (3.166457 / 3.1662) KS_rampSetSpeed 'zaten
+// orada' deyip yavaşlatmayı atlıyordu: uç fazla hızla uzatılıp medya sonunda T1'den bir kare kısa kalıyordu (tutamak)
+var yak17 = [];
+[["cikis", 110, 25], ["bukum", 150, 25], ["bukum", 150, 24000 / 1001], ["cikis", 216, 30000 / 1001], ["nabiz", 361, 60000 / 1001]].forEach(function (d) {
+  var zz = sahne({ n: d[1], tutamak: 0, fr: 1 / d[2] });
+  [0, null].forEach(function (hs) {
+    if (hs === null) zz = sahne({ n: d[1], tutamak: 0, fr: 1 / d[2] });
+    var r = uygula(zz, S.hostPlan(S.plan(d[0], {}, { frames: d[1], fps: d[2], handleSec: hs })));
+    if (!r.ok) { yak17.push(d.join("/") + " " + hs + " " + r.kod); return; }
+    var ps = parcalar(zz, 50, 50 + d[1]);
+    if (ps[ps.length - 1]._e !== 50 + d[1]) yak17.push(d.join("/") + " uç " + ps[ps.length - 1]._e);
+  });
+});
+ok("17) varsayılan, tutamak 0: yukarıdan yaklaşmada %0,1 altı aşım da v'ye yavaşlatılır (Hızlı Çıkış 110, Zaman Bükümü 150, Nabız 361)", yak17.length === 0, yak17.join(" | "));
 
 /* ---------- 18) yüzde birimli sürüm, kayıtsız (seçimden) kaldır ---------- */
 z = sahne({ n: 100, surum: "eski" });
