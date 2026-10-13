@@ -76,6 +76,19 @@ chk("karaokeWords: cok kisa kelime en az 0.12 sn", Math.abs(kw[2].end - 3.12) < 
 var kc = T.karaokeCumulative(w, 4);
 chk("karaokeCumulative: satir birikir", kc[1].text === "bir iki", kc[1].text);
 chk("karaokeCumulative: uzun boslukta sifirlanir", kc[2].text === "üç", kc[2].text);
+// Ayni anda baslayan kelimeler (whisper -ojf'de segment sonunda t0 == t1'e coken belirtecler; bulutun sifir
+// sureli kelimesi): eskiden ilk kelime 50 ms'lik ve sonrakiyle ayni baslangicli, cakisan cue oluyordu
+function cakismasiz(c) { return c.every(function (x, i) { return x.end > x.start && (!c[i + 1] || (c[i + 1].start > x.start && x.end <= c[i + 1].start + 1e-9)); }); }
+var esit = [seg(11, 11.6, "Merhaba"), seg(13, 13, "arkadaşlar"), seg(13, 13, "nasılsınız")];
+var kwE = T.karaokeWords(esit), kcE = T.karaokeCumulative(esit, 4);
+chk("karaokeWords: ayni baslangicli kelimeler artan baslangic, cakisma yok, her biri okunur (>= 0,2 sn)", cakismasiz(kwE) && kwE[1].start === 13 &&
+  kwE[2].start > 13 && kwE[1].end - kwE[1].start >= 0.2 && kwE[2].end - kwE[2].start >= 0.2, JSON.stringify(kwE.map(function (c) { return [c.text, c.start, c.end]; })));
+chk("karaokeCumulative: ayni baslangicli kelimeler de cakismaz (1,2 sn bosluktan sonra satir sifirlanir)", cakismasiz(kcE) && kcE[2].text === "arkadaşlar nasılsınız", JSON.stringify(kcE.map(function (c) { return [c.text, c.start, c.end]; })));
+var bulut = [seg(5, 5.4, "Bugün"), seg(5.42, 5.42, "bir"), seg(5.42, 5.9, "video"), seg(6, 6.3, "çektim")];
+var kwB = T.karaokeWords(bulut);
+chk("karaokeWords: bulutun sifir sureli kelimesi sonrakiyle ayni anda: pay bolunur, sonraki baslangici asmaz",
+  cakismasiz(kwB) && kwB[1].start === 5.42 && kwB[2].start > 5.42 && kwB[2].end <= 6 + 1e-9 && kwB[3].start === 6, JSON.stringify(kwB.map(function (c) { return [c.text, c.start, c.end]; })));
+chk("esit baslangic yayma girdiyi degistirmez", esit[2].start === 13 && esit[2].end === 13 && bulut[1].end === 5.42);
 
 /* splitWords / splitLong */
 var sw = T.splitWords([seg(0, 6, "a b c d e f")], 2);

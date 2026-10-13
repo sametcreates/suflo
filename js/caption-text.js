@@ -307,8 +307,47 @@
     return kalan > 0 && kalan >= (Number(sonBitis) || 0) - 0.05 ? kalan : 0;
   }
 
+  /*
+   * Aynı anda başlayan ardışık kelimeler (whisper.cpp -ojf'de segment sonunda t0 == t1'e çöken belirteçler,
+   * bulutun sıfır süreli kelimesi): kelime cue'ları çakışmasın diye grubun payı harf sayısına göre bölünür.
+   * Pay: grubun son bitişi ya da kelime başına 0,4 sn (hangisi büyükse), bir sonraki farklı başlangıcı aşmadan.
+   * Yeni dizi döner; girdi değişmez.
+   */
+  function esitBaslangiclariYay(words) {
+    var out = [], i, k;
+    for (i = 0; i < words.length; i++) {
+      var kopya = {};
+      for (var a in words[i]) if (Object.prototype.hasOwnProperty.call(words[i], a)) kopya[a] = words[i][a];
+      out.push(kopya);
+    }
+    i = 0;
+    while (i < out.length) {
+      var bas = Number(out[i].start) || 0, j = i;
+      while (j + 1 < out.length && Number(out[j + 1].start) <= bas + 1e-6) j++;
+      if (j > i) {
+        var adet = j - i + 1, grupSon = bas, toplam = 0, agirlik = [];
+        for (k = i; k <= j; k++) {
+          grupSon = Math.max(grupSon, Number(out[k].end) || 0);
+          var h = Math.max(1, String(out[k].text || "").replace(/\s+/g, "").length);
+          agirlik.push(h); toplam += h;
+        }
+        var son = Math.max(grupSon, bas + 0.4 * adet);
+        if (j + 1 < out.length) son = Math.min(son, Number(out[j + 1].start));
+        var t = bas;
+        for (k = i; k <= j; k++) {
+          out[k].start = t;
+          t = k === j ? son : t + (son - bas) * agirlik[k - i] / toplam;
+          out[k].end = t;
+        }
+      }
+      i = j + 1;
+    }
+    return out;
+  }
+
   // kelime cue'ları: her kelime kendi zamanında, bir sonrakiyle çakışmadan
   function karaokeWords(words) {
+    words = esitBaslangiclariYay(words);
     var out = [];
     for (var i = 0; i < words.length; i++) {
       var w = words[i];
@@ -322,6 +361,7 @@
 
   // birikimli karaoke: satır kelime kelime dolar (n kelimede ya da uzun boşlukta sıfırlanır)
   function karaokeCumulative(words, n) {
+    words = esitBaslangiclariYay(words);
     var out = [];
     var line = [];
     for (var i = 0; i < words.length; i++) {
