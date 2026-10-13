@@ -138,17 +138,30 @@
   function denemeFile()  { var d = appDataDir(); return d ? path.join(d, 'pro-deneme.json') : null; }
   function ciktiFile()   { var d = appDataDir(); return d ? path.join(d, 'deneme-ciktilari.json') : null; }
 
-  // Atomik yazim: once .tmp, sonra yerine (yarim yazilmis dosya kalmasin), yalniz sahibi okur (0600)
+  // Atomik yazim: once .tmp, sonra yerine (yarim yazilmis dosya kalmasin), yalniz sahibi okur (0600).
+  // rename var olan hedefin yerine gecer (Windows'ta da: MoveFileEx REPLACE_EXISTING); once silmek
+  // atomikligi bozardi: rename duserse (antivirus .tmp'yi tararken EPERM/EBUSY) iki kopya da giderdi.
+  // Gecici kilitte birkac kez denenir; olmazsa eski dosya yerinde kalir, yalniz .tmp silinir.
   function atomikYaz(f, metin) {
     if (!f || !fs) return false;
     var tmp = f + '.tmp';
     try {
       fs.writeFileSync(tmp, metin, { encoding: 'utf8', mode: 384 }); // 0600
-      if (fs.existsSync(f)) fs.unlinkSync(f);
-      fs.renameSync(tmp, f);
-      try { fs.chmodSync(f, 384); } catch (eMode) {}
-      return true;
-    } catch (e) { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp) {} return false; }
+    } catch (eW) { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp0) {} return false; }
+    for (var deneme = 0; deneme < 4; deneme++) {
+      try {
+        fs.renameSync(tmp, f);
+        try { fs.chmodSync(f, 384); } catch (eMode) {}
+        return true;
+      } catch (e) {
+        var kod = e && e.code;
+        if (kod !== 'EPERM' && kod !== 'EBUSY' && kod !== 'EACCES') break;
+        var bitis = Date.now() + 25 * (deneme + 1);
+        while (Date.now() < bitis) { /* kisa bekleme: tarayici dosyayi birakir */ }
+      }
+    }
+    try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp) {}
+    return false;
   }
 
   // ================================================================
@@ -338,8 +351,11 @@
 
     apiPost('/v1/licenses/validate',
       { license_key: c.key, instance_id: c.instanceId },
-      function (err, data) {
+      function (err, data, code) {
         if (err || !data) { cb({ ok: false, offline: true }); return; } // cevrimdisi -> onbellege dokunma
+        // Gecici sunucu hatasi (429 / 5xx JSON govde) ya da karar tasimayan cevap ('valid' yok): lisans
+        // kaldirilmaz. Yalniz acik 'valid' cevabi karar verir (aksi halde cache + instanceId silinir, koltuk kaybolur)
+        if (code === 429 || Number(code) >= 500 || typeof data.valid !== 'boolean') { cb({ ok: false, offline: true }); return; }
         var lk = data.license_key || {};
         if (data.valid === true && lk.status === 'active' && checkOwnership(data.meta || {})) {
           c.status = 'active';
