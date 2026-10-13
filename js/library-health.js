@@ -703,9 +703,12 @@ window.KLibraryHealth = (function () {
     if (action === "repair-engine") {
       if (!window.KEngine || !KEngine.install) throw new Error("Yerel motor kurulum modülü yüklenmedi.");
       var gpu = await KEngine.detectGpu(true);
+      // Onarım kurulu derlemeyi korur: kullanıcının Hızlandırma'yı kapatması ya da CUDA bu sürücüde çalışmadığı
+      // için kaydedilen CPU dönüşü (engineBuild "cpu") cuBLAS'a çevrilmez; yoksa her onarım 646 MB indirirdi.
+      // Derleme değiştirmek Ayarlar › Hızlandırma › Değiştir'in işi.
       await KEngine.install({
         modelId: K.settings().model || "turbo",
-        useGpu: gpu && gpu.kind === "cuda",
+        useGpu: !!(gpu && gpu.kind === "cuda") && K.settings().engineBuild !== "cpu",
         onStatus: say
       });
       return;

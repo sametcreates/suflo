@@ -163,6 +163,19 @@ async function main() {
   var stagedCheck = check(staged, "Yarım kalan Pro güncellemesi var");
   ok("Yarim kalan Pro guncellemesi aktif paketi bozuk saymadan uyarir", stagedCheck && stagedCheck.status === "warn" && stagedCheck.action === "sync-pro");
 
+  // "Motoru onar" NVIDIA makinede kurulu CPU derlemesini (Hızlandırma kapalı ya da CUDA'dan CPU'ya dönüş) korur:
+  // eskiden her tıklama useGpu:true ile 646 MB cuBLAS indirtiyordu
+  var kurulumlar = [], eskiGpu = ctx.KEngine.detectGpu;
+  ctx.KEngine.detectGpu = async function () { return { kind: "cuda", name: "NVIDIA RTX" }; };
+  ctx.KEngine.install = async function (o) { kurulumlar.push(o); return { build: o.useGpu ? "cuda" : "cpu" }; };
+  settings.engineBuild = "cpu";
+  await ctx.KDoctor.repair("repair-engine");
+  settings.engineBuild = "cuda";
+  await ctx.KDoctor.repair("repair-engine");
+  ctx.KEngine.detectGpu = eskiGpu; delete ctx.KEngine.install; settings.engineBuild = "cpu";
+  ok("Motoru onar: kurulu CPU derlemesi NVIDIA'da da CPU kalır; cuBLAS kuruluysa cuBLAS", kurulumlar.length === 2 && kurulumlar[0].useGpu === false && kurulumlar[1].useGpu === true,
+    JSON.stringify(kurulumlar.map(function (o) { return o.useGpu; })));
+
   ffmpegReady = false;
   var missing = ctx.KDoctor.makeReport();
   await ctx.KDoctor.runAsyncChecks(missing);

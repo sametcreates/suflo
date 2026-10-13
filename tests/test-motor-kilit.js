@@ -76,7 +76,7 @@ function motor(opts) {
         }, 15);
       });
     },
-    unzip: function () { return Promise.resolve(false); },
+    unzip: opts.unzip || function () { return Promise.resolve(false); },
     rmrf: function () {},
     tmpDir: function () { return "/sanal/tmp"; },
     run: opts.run || function () { return Promise.resolve({ code: 0, stdout: "", stderr: "" }); }
@@ -251,7 +251,8 @@ Promise.all([a, b]).then(function (r) {
     // (c) GPU ısınması "engine-run" ile başarısız → CPU motoru iner; İptal o indirmeyi de keser
     var m13 = motor({
       yavas: true, ffmpeg: true, ayarlar: { provider: "local", engineBuild: "cuda" },
-      run: function (exe) { return Promise.resolve(/whisper-cli/.test(exe) ? { code: 1, stdout: "", stderr: "CUDA error" } : { code: 0, stdout: "", stderr: "" }); }
+      // motor açılır (-h 0 döner, kurulu motor yeniden inmez), ama CUDA'da çözümleme düşer
+      run: function (exe, args) { return Promise.resolve(/whisper-cli/.test(exe) && !(args && args[0] === "-h") ? { code: 1, stdout: "", stderr: "CUDA error" } : { code: 0, stdout: "", stderr: "" }); }
     });
     var j13 = jeton();
     var is13 = m13.E.install({ modelId: "small", useGpu: true, iptal: j13 });
@@ -264,6 +265,41 @@ Promise.all([a, b]).then(function (r) {
       ok("ısınma sonrası CPU motoru indirmesi jetonu taşır ve iptal e.iptal ile biter",
         cpu.length === 1 && cpu[0].iptal === j13 && e && e.iptal === true && /inen kısım korundu/.test(e.message), (e && e.message) + " " + JSON.stringify(m13.indirmeler.map(function (x) { return x.anahtar; })));
       ok("kilit bırakılır, derleme 'cpu' diye kaydedilmez", m13.E.kurulumSuruyor() === false && m13.ayarlar.engineBuild === "cuda");
+    });
+  });
+}).then(function () {
+  // Bozuk motor (exe var, whisper.dll yarıda kalan arşivde gelmedi / antivirüs karantinası): eskiden derleme aynı
+  // diye adım atlanıyor, Doctor'un "Motoru onar"ı hiçbir şey indirmeden "Hazır" diyordu
+  var acildi = false, hYoklama = 0;
+  var m14 = motor({
+    ffmpeg: true, ayarlar: { provider: "local" },
+    unzip: function () { acildi = true; return Promise.resolve(true); },
+    run: function (exe, args) {
+      if (/whisper-cli/.test(exe) && args && args[0] === "-h") { hYoklama++; return Promise.resolve(acildi ? { code: 0, stdout: "", stderr: "" } : { code: -1073741515, stdout: "", stderr: "" }); }
+      return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+    }
+  });
+  m14.vfs[path.join("/sanal/whisper", "models", "ggml-small-q5_1.bin")] = 200 * MB;
+  return m14.E.install({ modelId: "small", useGpu: false }).then(function (r) {
+    ok("açılmayan kurulu motor (0xC0000135) yeniden iner, açıldıktan sonra yoklanır, derleme kaydedilir",
+      m14.indirmeler.some(function (x) { return x.anahtar === "motor:cpu"; }) && acildi && hYoklama >= 2 && m14.ayarlar.engineBuild === "cpu" && r.build === "cpu",
+      JSON.stringify(m14.indirmeler.map(function (x) { return x.anahtar; })) + " h=" + hYoklama);
+    var m15 = motor({ ffmpeg: true, ayarlar: { provider: "local", engineBuild: "cpu" } });
+    return m15.E.install({ modelId: "small", useGpu: false }).then(function () { return null; }, function () { return null; }).then(function () {
+      ok("açılan kurulu motor yeniden inmez", !m15.indirmeler.some(function (x) { return /^motor:/.test(x.anahtar); }), JSON.stringify(m15.indirmeler.map(function (x) { return x.anahtar; })));
+    });
+  }).then(function () {
+    // cuBLAS'tan CPU'ya geçiş (Hızlandırma kapatıldı): CUDA DLL'leri silinir; kalırsa ggml_backend_load_all
+    // ggml-cuda.dll'i yükler ve "CPU" yazan kurulum yine CUDA'da koşar
+    var m16 = motor({ ffmpeg: true, ayarlar: { provider: "local", engineBuild: "cuda" }, unzip: function () { return Promise.resolve(true); } });
+    var rel = path.join("/sanal/whisper", "Release");
+    m16.vfs[rel] = -1;
+    ["ggml-cuda.dll", "cublas64_12.dll", "cublasLt64_12.dll", "cudart64_12.dll", "nvblas64_12.dll", "nvrtc64_120_0.dll", "nvrtc-builtins64_128.dll", "ggml-cpu-haswell.dll", "whisper.dll"].forEach(function (f) { m16.vfs[path.join(rel, f)] = MB; });
+    m16.vfs[path.join("/sanal/whisper", "models", "ggml-small-q5_1.bin")] = 200 * MB;
+    return m16.E.install({ modelId: "small", useGpu: false }).then(function (r) {
+      var kalan = Object.keys(m16.vfs).filter(function (p) { return path.dirname(p) === rel; }).map(function (p) { return path.basename(p); }).sort();
+      ok("cuBLAS → CPU: CUDA DLL'leri (nvblas, nvrtc-builtins dahil) silinir, CPU dosyaları kalır, derleme 'cpu'",
+        JSON.stringify(kalan) === JSON.stringify(["ggml-cpu-haswell.dll", "whisper.dll"]) && m16.ayarlar.engineBuild === "cpu" && r.build === "cpu", JSON.stringify(kalan));
     });
   });
 }).then(function () {
