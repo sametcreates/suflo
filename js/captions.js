@@ -4187,6 +4187,13 @@ window.KCaptions = (function () {
   }
 
   async function translateAll() {
+    // Kelime kelime / birikimli / N kelime modunda her kelime (ya da önek) ayrı satır olarak çevrilirdi:
+    // Türkçe sözdiziminde sözcük salatası, birikimli satırlar birbirini tutmaz, deneme hakkı boşa gider.
+    // Çok dilli paketteki kuralın aynısı; kapıdan ÖNCE (deneme kurulmaz)
+    if (segments.length && segmentsMode !== "plain") {
+      KApp.toast("Çeviri satır modunda çalışır: kelime/karaoke modunda her kelime ayrı çevrilirdi. Satır uzunluğunu \"Satır\" yapıp yeniden oluştur.", "warn", 8000);
+      return;
+    }
     // Pro: ceviri (ucretsizde 3 deneme hakki; hak yalniz ceviri yazilinca duser)
     if (typeof Pro !== "undefined" && !Pro.gate("translate", { deneme: true, yeniden: translateAll })) return;
     if (segments.length === 0) return;

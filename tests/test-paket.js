@@ -71,5 +71,47 @@ ok("yeni font dosyaları ve lisansları verify-release'te zorunlu, bildirimlerde
   yeniDosyalar.join(","));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
 
-console.log(gecen + "/" + toplam + " gecti");
-process.exit(gecen === toplam ? 0 : 1);
+/* ---- Caption Editor "Çevir": kelime kelime (k1) / birikimli (kc) / N kelime belgesi çevrilmez ---- */
+// Her kelime ayrı altyazı satırı olarak LLM'e gidiyor, sonuç kelime kelime yazılıyor ("Today|to you|with the
+// camera…"), deneme hakkı düşüyordu. Çok dilli paketteki kural; kapıdan önce (deneme kurulmaz).
+var CTp = require(path.join(__dirname, "..", "js", "caption-text.js"));
+function ceviriOrtami(mode, segs) {
+  var env = { segments: segs, mode: mode, CT: CTp, gonderilen: [], harcanan: [], kapi: 0, toast: "" };
+  var calis = new Function("ENV", [
+    "var segments = ENV.segments, segmentsMode = ENV.mode, ceviriDili = '', CT = ENV.CT;",
+    "var Pro = { gate: function () { ENV.kapi++; return true; }, denemeHarca: function (k) { ENV.harcanan.push(k); } };",
+    "var KApp = { toast: function (m) { ENV.toast = m; } }; var K = { hataYardimi: function (e) { return e.message; } };",
+    "var DOMc = { 'cap-translate': { value: 'en' }, 'cap-translate-go': {}, 'cap-revert': {}, 'cap-cift-dil-sar': {} };",
+    "function el(id) { return DOMc[id]; } function status() {} function render() {} function saveDraftNow() {} function snapshot() {}",
+    "function chatConfig() { return { url: 'x', model: 'm', key: 'k' }; }",
+    "async function chatCall(cfg, body) { var m = /\\[[\\s\\S]*\\]/.exec(body.messages[body.messages.length - 1].content); var lines = m ? JSON.parse(m[0]) : []; ENV.gonderilen.push(lines);",
+    "  return { choices: [{ message: { content: JSON.stringify({ lines: lines.map(function (w) { return 'EN ' + w; }) }) } }] }; }",
+    "var LANG_NAMES = { en: 'English' };",
+    kes("async function metinleriCevir("), kes("async function translateAll("),
+    "return translateAll;"
+  ].join("\n"))(env);
+  return { env: env, calis: calis };
+}
+var kelimeler = "Bugün size kamerayla ilgili birkaç şey anlatacağım".split(" ").map(function (t, i) { return { text: t, start: i * 0.4, end: i * 0.4 + 0.35, p: 0.9 }; });
+var kayitK = [{ start: 0, end: 3.2, text: kelimeler.map(function (w) { return w.text; }).join(" "), words: kelimeler }];
+var ceviriIsleri = ["k1", "kc", "w3"].map(function (mod) {
+  var kur = CTp.segmentleriKur(JSON.parse(JSON.stringify(kayitK)), mod, {});
+  var once = kur.segments.map(function (s) { return s.text; });
+  var o = ceviriOrtami(kur.mode, kur.segments);
+  return o.calis().then(function () {
+    ok("Çevir " + mod + " (" + kur.mode + "): reddedilir, LLM'e gitmez, metin değişmez, deneme kapısı/hakkı yok",
+      kur.mode !== "plain" && o.env.gonderilen.length === 0 && o.env.harcanan.length === 0 && o.env.kapi === 0 &&
+      JSON.stringify(kur.segments.map(function (s) { return s.text; })) === JSON.stringify(once) && /satır modunda/.test(o.env.toast), o.env.toast + " " + JSON.stringify(o.env.gonderilen));
+  });
+});
+var kurSatir = CTp.segmentleriKur(JSON.parse(JSON.stringify(kayitK)), "l42", {});
+var oSatir = ceviriOrtami(kurSatir.mode, kurSatir.segments);
+ceviriIsleri.push(oSatir.calis().then(function () {
+  ok("Çevir satır modu (plain): çevrilir, hak başarıda düşer (değişmedi)", kurSatir.mode === "plain" && oSatir.env.gonderilen.length === 1 &&
+    oSatir.env.harcanan.length === 1 && /^EN /.test(kurSatir.segments[0].text), JSON.stringify(kurSatir.segments.map(function (s) { return s.text; })));
+}));
+
+Promise.all(ceviriIsleri).then(function () {
+  console.log(gecen + "/" + toplam + " gecti");
+  process.exit(gecen === toplam ? 0 : 1);
+}, function (e) { console.log("FAIL beklenmeyen hata " + (e && e.stack || e)); process.exit(1); });
