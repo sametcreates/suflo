@@ -110,6 +110,31 @@ var canliCssSorun = canliKurallari.filter(function (k) {
 }).map(function (k) { return k.secici; });
 ok("Canlı satırlar / İptal CSS: flex gap ve overflow-wrap:anywhere yok (CEF 74)", canliKurallari.length >= 10 && canliCssSorun.length === 0, canliKurallari.length + " kural · " + canliCssSorun.join(" | "));
 
+// Altyazı Efektleri oluşturucusu (3.3): flex gap / overflow-wrap:anywhere yok; gizli onay kutularının odağı
+// CEF 74'te de görünür. :focus-visible Chromium 86'da geldi: CEF 74 kuralı tümden atar, gizli input'un
+// odağı hiç görünmüyordu (adım 16 inceleme bulgusu). Her "input:focus-visible" kuralının AYRI bir ":focus"
+// yedeği olmalı ve :focus-visible başka seçicilerle aynı listede olmamalı (liste tümden düşerdi).
+var efektKurallari = [], ere = /([^{}]*(?:efekt)[^{}]*)\{([^{}]*)\}/g, em;
+while ((em = ere.exec(css))) efektKurallari.push({ secici: em[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), govde: em[2] });
+var efektCssSorun = efektKurallari.filter(function (k) {
+  return /(^|[;\s])(row-|column-)?gap:/.test(k.govde) || /overflow-wrap:\s*anywhere/.test(k.govde);
+}).map(function (k) { return k.secici; });
+ok("Altyazı Efektleri CSS: flex gap ve overflow-wrap:anywhere yok (CEF 74)", efektKurallari.length >= 20 && efektCssSorun.length === 0, efektKurallari.length + " kural · " + efektCssSorun.join(" | "));
+var tumSeciciler = [], tre = /([^{}]+)\{[^{}]*\}/g, tm;
+while ((tm = tre.exec(css))) tumSeciciler.push(tm[1].replace(/\/\*[\s\S]*?\*\//g, "").trim());
+var odakSorun = [];
+efektKurallari.forEach(function (k) {
+  if (k.secici.indexOf(":focus-visible") === -1 || k.secici.indexOf("input") === -1 || k.secici.indexOf(":not(:focus-visible)") !== -1) return;
+  if (k.secici.indexOf(",") !== -1) { odakSorun.push("listede: " + k.secici); return; }
+  var yedek = k.secici.replace(":focus-visible", ":focus");
+  if (tumSeciciler.indexOf(yedek) === -1) odakSorun.push("yedeksiz: " + k.secici);
+});
+ok("Altyazı Efektleri: gizli onay kutularının :focus-visible kuralı ayrı bir :focus yedeğiyle (CEF 74)", odakSorun.length === 0 &&
+  tumSeciciler.indexOf(".efekt-bi input:focus + span") !== -1 && tumSeciciler.indexOf(".efekt-ayarlar .switch input:focus + i") !== -1, odakSorun.join(" | "));
+
+ok("Tüm .switch anahtarları CEF 74'te klavye odağı gösterir (:focus yedeği + :not(:focus-visible))",
+  tumSeciciler.indexOf(".switch input:focus + i") !== -1 && tumSeciciler.indexOf(".switch input:focus:not(:focus-visible) + i") !== -1);
+
 var ornekRegex = ayikla("function f(x){ return /a'b/.test(x); }\nvar y = o?.p;");
 ok("denetleyici: return'den sonraki regex metin sanilmaz, arkasindaki kod gorunur", /o\?\.p/.test(ornekRegex.split("\n")[1]));
 

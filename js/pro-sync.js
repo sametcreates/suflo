@@ -207,7 +207,7 @@ window.ProSync = (function () {
         };
         if (offset > 0) headers.Range = "bytes=" + offset + "-";
         var client = u.protocol === "http:" ? http : https;
-        var req = client.request({ method: "POST", hostname: u.hostname, port: u.port || (u.protocol === "http:" ? 80 : 443), path: u.path, headers: headers }, function (res) {
+        var yanit = function (res) {
           if (offset > 0 && res.statusCode === 200 && !retried) {
             res.resume(); try { K.fs.unlinkSync(part); } catch (e2) {}
             attempt(0, true); return;
@@ -253,9 +253,17 @@ window.ProSync = (function () {
               } catch (e6) { fail(e6); }
             });
           });
-        });
-        req.setTimeout(30 * 60 * 1000, function () { req.destroy(new Error("İndirme zaman aşımı.")); });
-        req.on("error", reject); req.write(body); req.end();
+        };
+        var gonder = function (req) {
+          req.setTimeout(30 * 60 * 1000, function () { req.destroy(new Error("İndirme zaman aşımı.")); });
+          req.on("error", reject); req.write(body); req.end();
+        };
+        // Ayarlar › vekil sunucu: Pro içerik indirmesi de vekilden geçer (K.vekilliIstek); yoksa doğrudan
+        if (K.vekilliIstek) {
+          K.vekilliIstek(endpoint, { method: "POST", headers: headers }, yanit, function (eV, req) { if (eV) { reject(eV); return; } gonder(req); });
+        } else {
+          gonder(client.request({ method: "POST", hostname: u.hostname, port: u.port || (u.protocol === "http:" ? 80 : 443), path: u.path, headers: headers }, yanit));
+        }
       }
       attempt(existing, false);
     });

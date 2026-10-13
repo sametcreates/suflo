@@ -10,9 +10,111 @@ function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "F
 var STILLER = ["mrbeast", "capcut", "saas", "viral", "pop", "doc", "premium", "hormozi", "neon", "daktilo", "ziplama", "dolgu"];
 
 /* ---------------- FONTS ---------------- */
-ok("6 paket fontu", SS.fontNames().join(",") === "Anton,Archivo Black,Bebas Neue,Bungee,Lora,Montserrat", SS.fontNames().join(","));
+var ESKI6 = ["Anton", "Archivo Black", "Bebas Neue", "Bungee", "Lora", "Montserrat"];
+var YENI7 = ["Bangers", "Inter", "Poppins", "Nunito", "Libre Caslon Display", "Exo 2", "Chakra Petch"];
+ok("paket fontları: 3.2'nin 6 fontu aynı sırada başta, 3.3 adım 18'in 7 yeni ailesi arkada",
+  SS.fontNames().join(",") === ESKI6.concat(YENI7).join(","), SS.fontNames().join(","));
 ok("font dosyaları gerçekten var", SS.fontNames().every(function (n) { return fs.existsSync(path.join(kok, "fonts", SS.FONTS[n].file)); }));
+ok("normal (kalın olmayan) yüz: Montserrat statik Regular, tek dosyalı fontta aynı dosya; dosyalar var", SS.fontFile("Montserrat", true) === "Montserrat-Regular.ttf" &&
+  SS.fontFile("Montserrat") === "Montserrat-Bold.ttf" && SS.fontFile("Anton", true) === "Anton.ttf" && SS.fontFile("Arial", true) === null &&
+  SS.fontNames().every(function (n) { return fs.existsSync(path.join(kok, "fonts", SS.fontFile(n, true))); }));
 ok("hasFont: proto / bilinmeyen değil", SS.hasFont("Lora") && !SS.hasFont("__proto__") && !SS.hasFont("toString") && !SS.hasFont("Arial"));
+
+/* ---------------- 3.3 adım 18: kategorili seçici ---------------- */
+var KAT = SS.KATEGORILER.map(function (k) { return k.id; });
+ok("kategoriler: Kalın / Modern / Zarif / Teknik sırasıyla, her birinin optgroup etiketi var",
+  KAT.join(",") === "kalin,modern,zarif,teknik" && SS.KATEGORILER.map(function (k) { return k.ad; }).join(",") === "Kalın,Modern,Zarif,Teknik" &&
+  SS.KATEGORILER.every(function (k) { return typeof k.etiket === "string" && k.etiket.indexOf(k.ad) === 0 && k.etiket !== k.ad; }), JSON.stringify(SS.KATEGORILER));
+ok("her font tam bir bilinen kategoride", SS.fontNames().every(function (n) { return KAT.indexOf(SS.fontKategorisi(n)) !== -1; }) &&
+  SS.fontKategorisi("Arial") === null && SS.fontKategorisi("__proto__") === null);
+var gr = SS.fontGruplari();
+var grDuz = [];
+gr.forEach(function (g) { grDuz = grDuz.concat(g.fontlar); });
+ok("fontGruplari: KATEGORILER sırası, grup içi alfabetik, her font tam bir kez", gr.map(function (g) { return g.id; }).join(",") === KAT.join(",") &&
+  gr.every(function (g) { return g.fontlar.join("|") === g.fontlar.slice().sort().join("|") && g.fontlar.length > 0; }) &&
+  grDuz.length === SS.fontNames().length && grDuz.slice().sort().join("|") === SS.fontNames().slice().sort().join("|"), JSON.stringify(gr));
+ok("fontGruplari: Teknik = Chakra Petch + Exo 2; Zarif = Libre Caslon Display + Lora",
+  gr[3].fontlar.join(",") === "Chakra Petch,Exo 2" && gr[2].fontlar.join(",") === "Libre Caslon Display,Lora", JSON.stringify(gr));
+gr[0].fontlar.push("Arial");
+ok("fontGruplari kopya döner (dışarıdan bozulmaz)", SS.fontGruplari()[0].fontlar.indexOf("Arial") === -1);
+SS.KATEGORILER[0].id = "bozuk";
+ok("KATEGORILER dışa kopya (modül içi değişmez)", SS.fontGruplari()[0].id === "kalin");
+SS.KATEGORILER[0].id = "kalin";
+ok("fontSurumu: yeni 7 font '3.3', eski 6 font null", YENI7.every(function (n) { return SS.fontSurumu(n) === "3.3"; }) &&
+  ESKI6.every(function (n) { return SS.fontSurumu(n) === null; }) && SS.fontSurumu("Arial") === null);
+ok("cssFontFamily: tırnaklı (\"Exo 2\" rakamla başlayan kelime), paket dışı \"\"",
+  SS.cssFontFamily("Exo 2") === "\"Exo 2\", sans-serif" && SS.cssFontFamily("Anton") === "\"Anton\", sans-serif" &&
+  SS.cssFontFamily("Arial") === "" && SS.cssFontFamily("x\"; color:red") === "");
+ok("yeni fontlar: genişlik katsayısı makul (0.3-0.9), iki ağırlıklılarda statik Regular + Bold ayrı dosya",
+  YENI7.every(function (n) { var f = SS.FONTS[n]; return f.genislik >= 0.3 && f.genislik <= 0.9 && fs.existsSync(path.join(kok, "fonts", f.file)); }) &&
+  ["Inter", "Poppins", "Nunito", "Exo 2", "Chakra Petch"].every(function (n) { return SS.fontFile(n, true) !== SS.fontFile(n) && /-Regular\.ttf$/.test(SS.fontFile(n, true)) && /-Bold\.ttf$/.test(SS.fontFile(n)); }) &&
+  SS.fontFile("Bangers", true) === "Bangers.ttf" && SS.fontFile("Libre Caslon Display", true) === "LibreCaslonDisplay.ttf");
+// Her paket fontu Türkçe glifleri gerçekten içerir; 3.3'te eklenenler Azerbaycanca ə / Ə da (tools/font-kontrol.js)
+var FK = require(path.join(kok, "tools", "font-kontrol.js"));
+var fkSorun = [];
+SS.fontNames().forEach(function (n) {
+  [SS.fontFile(n), SS.fontFile(n, true)].forEach(function (dosya) {
+    var r = FK.denetle(fs.readFileSync(path.join(kok, "fonts", dosya)));
+    if (r.hata || r.eksik.length || r.aile !== n) fkSorun.push(dosya + ":" + JSON.stringify(r));
+    else if (SS.fontSurumu(n) && r.azEksik.length) fkSorun.push(dosya + " az:" + r.azEksik.join(""));
+  });
+});
+ok("font-kontrol: her paket fontu Türkçe TAM, iç aile adı FONTS anahtarı; yeniler Azerbaycanca da TAM", fkSorun.length === 0, fkSorun.join(" | "));
+// Adım 18 incelemesi: belgelenen yayın öncesi komut (node tools/font-kontrol.js --az fonts/*.ttf) paket setinde 0 ile çıkar;
+// ə / Ə yalnız 3.2'den gelen ailelerde (Archivo Black, Bebas Neue) uyarı, yeni ya da aday ailede hata
+ok("font-kontrol --az: ə / Ə 3.2'den gelen ailelerde uyarı, 3.3 ailelerinde ve pakette olmayan adayda zorunlu",
+  FK.azZorunlu("Archivo Black") === false && FK.azZorunlu("Bebas Neue") === false && FK.azZorunlu("Montserrat") === false &&
+  FK.azZorunlu("Bangers") === true && FK.azZorunlu("Exo 2") === true && FK.azZorunlu("Roboto") === true);
+var fkSatirlar = [], fkLog = console.log, fkKod, fkKodBos, fkKodYok;
+var fkTtf = fs.readdirSync(path.join(kok, "fonts")).filter(function (f) { return /\.ttf$/.test(f); }).map(function (f) { return path.join(kok, "fonts", f); });
+console.log = function (m) { fkSatirlar.push(String(m)); };
+try {
+  fkKod = FK.calistir(["--az"].concat(fkTtf));
+  fkKodYok = FK.calistir(["--az", path.join(kok, "fonts", "yok-boyle-bir-font.ttf")]);
+} finally { console.log = fkLog; }
+var fkErr = console.error; console.error = function () {};
+try { fkKodBos = FK.calistir(["--az"]); } finally { console.error = fkErr; }
+ok("font-kontrol --az fonts/*.ttf: paket setinde çıkış 0; Archivo Black / Bebas Neue 'uyari' satırı; okunamayan dosya / boş liste 1",
+  fkKod === 0 && fkKodYok === 1 && fkKodBos === 1 && fkTtf.length >= 20 &&
+  fkSatirlar.filter(function (l) { return /Azerbaycanca EKSIK/.test(l); }).length === 2 &&
+  fkSatirlar.filter(function (l) { return /Azerbaycanca EKSIK/.test(l); }).every(function (l) { return /uyari/.test(l) && /(ArchivoBlack|BebasNeue)\.ttf/.test(l); }),
+  fkKod + " " + fkSatirlar.join(" | "));
+// Panelin iki yazı tipi seçicisi (Altyazı Efektleri, Marka Kiti) kategorili ve FONTS ile birebir
+var html = fs.readFileSync(path.join(kok, "index.html"), "utf8");
+function seciciGruplari(id) {
+  var bas = html.indexOf('<select id="' + id + '"');
+  var blok = html.slice(bas, html.indexOf("</select>", bas));
+  var out = [], re = /<optgroup label="([^"]+)"([^>]*)>([\s\S]*?)<\/optgroup>/g, m;
+  while ((m = re.exec(blok))) {
+    if (/disabled/.test(m[2])) continue;
+    var fl = [], r2 = /<option value="([^"]+)" style="font-family:([^"]+)"/g, o;
+    while ((o = r2.exec(m[3]))) fl.push({ ad: o[1], css: o[2].replace(/&quot;/g, "\"") });
+    out.push({ etiket: m[1], fontlar: fl });
+  }
+  return out;
+}
+["cap-font", "mk-font"].forEach(function (id) {
+  var sg = seciciGruplari(id);
+  ok(id + ": optgroup'lar fontGruplari ile aynı (etiket, sıra, fontlar), her seçenek kendi yüzüyle",
+    sg.length === SS.fontGruplari().length && SS.fontGruplari().every(function (g, i) {
+      return sg[i].etiket === g.etiket && sg[i].fontlar.map(function (f) { return f.ad; }).join("|") === g.fontlar.join("|") &&
+        sg[i].fontlar.every(function (f) { return f.css === SS.cssFontFamily(f.ad); });
+    }), JSON.stringify(sg).slice(0, 400));
+});
+["stil.html", "en/stil.html"].forEach(function (sayfa) {
+  var h = fs.readFileSync(path.join(kok, "docs", sayfa), "utf8");
+  var link = (/fonts\.googleapis\.com\/css2\?([^"]+)"/.exec(h) || ["", ""])[1];
+  ok("docs/" + sayfa + ": stil kodu sayfası her paket fontunu Google Fonts'tan yükler", SS.fontNames().every(function (n) {
+    return link.indexOf("family=" + n.replace(/ /g, "+") + "&") !== -1 || link.indexOf("family=" + n.replace(/ /g, "+") + ":") !== -1;
+  }), link);
+});
+var css = fs.readFileSync(path.join(kok, "css", "style.css"), "utf8");
+ok("css: her paket fontunun @font-face'i var, iki ağırlıklılarda Regular 400 + Bold 700",
+  SS.fontNames().every(function (n) { return css.indexOf('font-family: "' + n + '"') !== -1; }) &&
+  ["Inter", "Poppins", "Nunito", "Exo 2", "Chakra Petch"].every(function (n) {
+    return new RegExp('font-family: "' + n + '";\\s*src: url\\("\\.\\./fonts/' + SS.fontFile(n, true).replace(".", "\\.") + '"\\);\\s*font-weight: 400;').test(css) &&
+      new RegExp('font-family: "' + n + '";\\s*src: url\\("\\.\\./fonts/' + SS.fontFile(n).replace(".", "\\.") + '"\\);\\s*font-weight: 700;').test(css);
+  }));
 
 /* ---------------- round trip ---------------- */
 var tarif = {
@@ -105,6 +207,101 @@ ok("encode: geçersiz stil kimliği fırlatır", thrown);
 });
 ok("b64url Node Buffer ile aynı", SS.b64urlEncode("Merhaba dünya!?") === Buffer.from("Merhaba dünya!?", "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
 
+/* ---------------- 3.3: Altyazı Efektleri alanları (styleId "efekt") ---------------- */
+var E33 = require(path.join(kok, "js", "style-engine.js"));
+var YENI = STILLER.concat(["efekt"]);
+ok("giriş / vurgu kimlikleri stil motoruyla aynı", SS.GIRISLER.join(",") === E33.GIRISLER.join(",") && SS.AKTIFLER.join(",") === E33.AKTIFLER.join(","));
+var efTarif = { styleId: "efekt", intensity: "balanced",
+  overrides: { font: "Anton", renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe600", boyut: 110, kontur: 8, konum: 5, guvenli: true,
+    giris: "zipla", aktif: "glitch", vurgu: false, kalin: false, italik: true, satir: 3, kelime: 7 },
+  text: { maxlen: "l42", kase: "upper", punct: false } };
+var efKod = SS.encode(efTarif);
+var efC = SS.decode(efKod, YENI);
+ok("efekt: gidiş-dönüş tüm oluşturucu alanlarıyla, uyarısız", efC.ok && efC.warnings.length === 0 && efC.recipe.styleId === "efekt" &&
+  ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"].every(function (k) { return efC.recipe.overrides[k] === efTarif.overrides[k]; }),
+  JSON.stringify(efC.recipe.overrides) + " " + efC.warnings.join(","));
+ok("efekt kodu kısa kalır (≤ 600)", efKod.length <= 600, efKod.length);
+var efKotu = SS.decode("SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "efekt", overrides: { giris: "uzay", aktif: "<b>", vurgu: "evet", kalin: 1, italik: null, satir: 9, kelime: 0 } })), YENI);
+var ok2 = efKotu.recipe.overrides;
+ok("efekt: geçersiz giriş / vurgu ve boolean olmayan bayraklar atılır, satır / kelime kırpılır",
+  ok2.giris === undefined && ok2.aktif === undefined && ok2.vurgu === undefined && ok2.kalin === undefined && ok2.italik === undefined &&
+  ok2.satir === 3 && ok2.kelime === 1 && ["giris", "aktif", "vurgu", "kalin", "italik", "satir", "kelime"].every(function (w) { return efKotu.warnings.indexOf(w) !== -1; }),
+  JSON.stringify(ok2) + " " + efKotu.warnings.join(","));
+var bos = SS.sanitizeOverrides({ giris: "", aktif: "", satir: "2", kelime: "4" }, []);
+ok("efekt: \"\" (stilin kendi değeri) uyarısız atlanır, sayı metni kabul", bos.giris === undefined && bos.aktif === undefined && bos.satir === 2 && bos.kelime === 4, JSON.stringify(bos));
+ok("efekt: satır / kelime sayı değilse atılır", SS.sanitizeOverrides({ satir: "üç", kelime: {} }).satir === undefined);
+// Eski panel (3.2.0 sürümünün style-share.js'i): yeni alanları uyarıyla atar, efekt stilini reddeder
+var vmEski = require("vm");
+var kutuEski = { module: { exports: {} } };
+kutuEski.exports = kutuEski.module.exports;
+vmEski.runInNewContext(fs.readFileSync(path.join(__dirname, "fixtures", "style-share-3.2.0.js"), "utf8"), kutuEski);
+var Eski32 = kutuEski.module.exports;
+// izin listesi işlev olarak (vm bağlamında dizi instanceof Array tutmaz)
+function eskiIzin(id) { return STILLER.indexOf(id) !== -1; }
+// 3.3 kodlayıcısı efekt alanlarını eski stil kimliğine yazmaz: eski panelin davranışı elle kurulan kodla denenir
+var karisik = "SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "hormozi", overrides: { renk: "#ff0000", konum: 8, giris: "pop", aktif: "titre", satir: 1 } }));
+var eskiC = Eski32.decode(karisik, eskiIzin);
+ok("eski panel (3.2.0): yeni alanları 'geçersiz ayar' uyarısıyla atar, gerisini uygular", eskiC.ok && eskiC.recipe.overrides.renk === "#ff0000" &&
+  eskiC.recipe.overrides.konum === 8 && eskiC.recipe.overrides.giris === undefined && ["giris", "aktif", "satir"].every(function (w) { return eskiC.warnings.indexOf(w) !== -1; }),
+  JSON.stringify(eskiC));
+// Eski stil kimliği + efekt alanları (elle yazılmış kod / Shorts işi): uyarısız "geçerli" görünüp animasyonsuz çizilmez
+var eskiGiris = SS.decode(karisik, YENI);
+ok("3.3: eski stil kimliğindeki giriş / vurgu / satır alanları uyarıyla atılır (yalnız Altyazı Efektleri çizer)", eskiGiris.ok &&
+  eskiGiris.recipe.overrides.renk === "#ff0000" && eskiGiris.recipe.overrides.giris === undefined && eskiGiris.recipe.overrides.aktif === undefined &&
+  eskiGiris.recipe.overrides.satir === undefined && ["giris", "aktif", "satir"].every(function (w) { return eskiGiris.warnings.indexOf(w) !== -1; }), JSON.stringify(eskiGiris));
+var eskiKod = JSON.parse(SS.b64urlDecode(SS.encode({ styleId: "neon", overrides: { renk: "#ff0000", giris: "pop", kalin: false, kelime: 3 } }).slice(5)));
+ok("3.3 kodlayıcısı eski stil kimliğine efekt alanı yazmaz; efekt kodu yazar", JSON.stringify(eskiKod.overrides) === '{"renk":"#ff0000"}' &&
+  JSON.parse(SS.b64urlDecode(efKod.slice(5))).overrides.giris === "zipla", JSON.stringify(eskiKod));
+var gelecek = SS.decode("SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzay3d" })), YENI);
+ok("tanınmayan (daha yeni sürümün) stil kimliği: 'Suflo'yu güncelle' denir", !gelecek.ok && gelecek.error === "Bu stil bu Suflo sürümünde yok: uzay3d. Suflo'yu güncelle.", gelecek.error);
+var eskiEf = Eski32.decode(efKod, eskiIzin);
+ok("eski panel (3.2.0): efekt kodunu 'bu sürümde yok' diye reddeder (fırlatmaz)", !eskiEf.ok && /efekt/.test(eskiEf.error), eskiEf.error);
+var eskiKod = Eski32.encode({ styleId: "neon", overrides: { font: "Lora", renk: "#00ff00", konum: 2, boyut: 90 }, text: { kase: "upper" } });
+var yeniC = SS.decode(eskiKod, YENI);
+ok("yeni panel: 3.2 kodu (eski stil) uyarısız çözülür", yeniC.ok && yeniC.warnings.length === 0 && yeniC.recipe.styleId === "neon" && yeniC.recipe.overrides.font === "Lora", JSON.stringify(yeniC));
+
+/* ---------------- 3.3 adım 17: gölge, kutu, serbest konum (isteğe bağlı, yalnız efekt) ---------------- */
+ok("adım 17 alanları ve aralıkları stil motoruyla aynı", SS.EFEKT_ALANLARI.join(",") === E33.EFEKT_ALANLARI.join(",") &&
+  JSON.stringify(SS.ARALIKLAR) === JSON.stringify(E33.ARALIKLAR) && JSON.stringify(SS.GOLGE_VARSAYILAN) === JSON.stringify(E33.GOLGE_VARSAYILAN),
+  JSON.stringify([SS.ARALIKLAR, E33.ARALIKLAR]));
+var a17 = { styleId: "efekt", overrides: Object.assign({}, efTarif.overrides, { golge: { renk: "#112233", opak: 40, mesafe: 8, yumusak: 12 }, kutu: true,
+  kutuRenk: "#AABBCC", kutuOpak: 70, konumX: 30, konumY: 80 }), text: efTarif.text, author: "ayse" };
+var k17 = SS.encode(a17), c17 = SS.decode(k17, YENI), o17 = c17.recipe.overrides;
+ok("adım 17: gölge / kutu / konum gidiş-dönüş, uyarısız (renk küçük harfe)", c17.ok && c17.warnings.length === 0 &&
+  JSON.stringify(o17.golge) === '{"renk":"#112233","opak":40,"mesafe":8,"yumusak":12}' && o17.kutu === true && o17.kutuRenk === "#aabbcc" &&
+  o17.kutuOpak === 70 && o17.konumX === 30 && o17.konumY === 80 && o17.giris === "zipla", JSON.stringify(o17) + " " + c17.warnings.join(","));
+ok("adım 17: tüm alanlarla kod kısa kalır (≤ 700)", k17.length <= 700, k17.length);
+var n17 = SS.decode(SS.encode({ styleId: "efekt", overrides: { golge: null, konumX: null, konumY: null, kutu: false } }), YENI);
+ok("adım 17: null (gölge yok / hazır konum) ve kutu kapalı uyarısız gider gelir", n17.ok && n17.warnings.length === 0 &&
+  n17.recipe.overrides.golge === null && n17.recipe.overrides.konumX === null && n17.recipe.overrides.konumY === null && n17.recipe.overrides.kutu === false,
+  JSON.stringify(n17.recipe.overrides));
+var u17 = [];
+var t17 = SS.sanitizeOverrides({ golge: { renk: "red", opak: 300, mesafe: -2, yumusak: 99, ek: 1 }, kutuOpak: 120, kutuRenk: "#zzz", kutu: "evet",
+  konumX: 2, konumY: 99.6 }, u17);
+ok("adım 17: aralık dışı kırpılır, bozuk alan atılır ya da varsayılana döner; her biri uyarı",
+  JSON.stringify(t17.golge) === '{"renk":"#000000","opak":100,"mesafe":0,"yumusak":30}' && t17.kutuOpak === 100 && t17.kutuRenk === undefined &&
+  t17.kutu === undefined && t17.konumX === 5 && t17.konumY === 95 &&
+  ["golge.renk", "golge.opak", "golge.mesafe", "golge.yumusak", "golge.ek", "kutuOpak", "kutuRenk", "kutu", "konumX", "konumY"].every(function (w) { return u17.indexOf(w) !== -1; }),
+  JSON.stringify(t17) + " " + u17.join(","));
+var u17b = [];
+var t17b = SS.sanitizeOverrides({ golge: "var", konumX: "40", konumY: {} }, u17b);
+ok("adım 17: gölge nesne değilse atılır; konum sayı metni kabul, sayı değilse atılır", t17b.golge === undefined && t17b.konumX === 40 && t17b.konumY === undefined &&
+  u17b.indexOf("golge") !== -1 && u17b.indexOf("konumY") !== -1 && u17b.indexOf("konumX") === -1, JSON.stringify(t17b) + " " + u17b.join(","));
+ok("adım 17: eksik gölge alanı şablon varsayılanı (siyah, %75, 5, 5), uyarısız", JSON.stringify(SS.sanitizeOverrides({ golge: { opak: 30 } }).golge) ===
+  '{"renk":"#000000","opak":30,"mesafe":5,"yumusak":5}');
+var e17 = SS.decode("SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "capcut", overrides: { renk: "#ff0000", golge: { opak: 50 }, kutu: true, kutuRenk: "#ffffff", konumX: 20, konumY: 30 } })), YENI);
+ok("adım 17: eski stil kimliğindeki gölge / kutu / konum alanları uyarıyla atılır", e17.ok && e17.recipe.overrides.renk === "#ff0000" &&
+  ["golge", "kutu", "kutuRenk", "konumX", "konumY"].every(function (k) { return e17.recipe.overrides[k] === undefined && e17.warnings.indexOf(k) !== -1; }), JSON.stringify(e17));
+ok("adım 17: kodlayıcı eski stil kimliğine gölge / kutu / konum yazmaz", JSON.stringify(JSON.parse(SS.b64urlDecode(SS.encode({ styleId: "pop",
+  overrides: { renk: "#ff0000", golge: { opak: 50 }, kutu: true, konumX: 20, konumY: 30 } }).slice(5))).overrides) === '{"renk":"#ff0000"}');
+var eski17 = Eski32.decode("SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "neon", overrides: { renk: "#ff0000", golge: { opak: 50 }, konumX: 20 } })), eskiIzin);
+ok("eski panel (3.2.0): gölge / konum alanlarını uyarıyla atar, gerisini uygular", eski17.ok && eski17.recipe.overrides.renk === "#ff0000" &&
+  eski17.warnings.indexOf("golge") !== -1 && eski17.warnings.indexOf("konumX") !== -1 && eski17.recipe.overrides.golge === undefined, JSON.stringify(eski17));
+ok("adım 17 kodu motorda çizilir: gölge, kutu, serbest konum", (function () {
+  var r = E33.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir iki üç" }], cueKind: "lines", width: 1920, height: 1080, overrides: o17 });
+  return /SufloKutu/.test(r.ass) && /\\4c&H00332211/.test(r.ass) && /\\an5\\pos\(576,/.test(r.ass);
+})());
+
 /* ---------------- docs kopyası ---------------- */
 ok("docs/js/style-share.js bayt bayt aynı", fs.readFileSync(path.join(kok, "docs", "js", "style-share.js")).equals(fs.readFileSync(path.join(kok, "js", "style-share.js"))));
 
@@ -186,6 +383,63 @@ var elle = MK.rebaseBrandKit(Object.assign({}, tabanStil, { renk: "#abcdef" }), 
 ok("rebaseBrandKit: elle ince ayarlanmış renk kit açılınca da korunur", elle.stil.renk === "#abcdef" && elle.stil.font === "Anton");
 ok("rebaseBrandKit: değişiklik yoksa changed false", !MK.rebaseBrandKit(kodluStil, tabanStil, kitK, kitLogo).changed);
 
+/* ---------------- 3.3 adım 17: Marka Kiti'nde serbest konum, gölge, kutu (isteğe bağlı) ---------------- */
+var efTaban = { aile: "efekt", font: "Montserrat", renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffd23f", konum: 2, golge: null, kutu: false,
+  kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null };
+var kitXY = MK.normalize({ on: true, stil: { overrides: { konum: 2, konumX: 30, konumY: 120, golge: { opak: 40 }, kutu: true, kutuRenk: "#FFFFFF", kutuOpak: 80 } } });
+ok("kit: serbest konum / gölge / kutu doğrulanır ve saklanır (konum %95'e kırpılır, gölgenin eksik alanı varsayılan)",
+  kitXY.kit.stil.overrides.konumX === 30 && kitXY.kit.stil.overrides.konumY === 95 && JSON.stringify(kitXY.kit.stil.overrides.golge) === '{"renk":"#000000","opak":40,"mesafe":5,"yumusak":5}' &&
+  kitXY.kit.stil.overrides.kutu === true && kitXY.kit.stil.overrides.kutuRenk === "#ffffff" && kitXY.kit.stil.overrides.kutuOpak === 80 &&
+  kitXY.warnings.indexOf("stil.overrides.konumY") !== -1, JSON.stringify(kitXY));
+ok("kit: tek eksenli serbest konum saklanmaz", MK.normalize({ on: true, stil: { overrides: { konumX: 30 } } }).kit.stil.overrides.konumX === undefined);
+var mXY = MK.mergeBrandKit(efTaban, kitXY.kit);
+ok("mergeBrandKit: kitin serbest konumu, gölgesi ve kutusu efekte gelir", mXY.konumX === 30 && mXY.konumY === 95 && mXY.golge.opak === 40 &&
+  mXY.kutu === true && mXY.kutuRenk === "#ffffff" && mXY.kutuOpak === 80, JSON.stringify(mXY));
+var surukStil = Object.assign({}, efTaban, { konumX: 70, konumY: 20 });
+ok("mergeBrandKit: kitte hazır konum varsa stilin serbest konumu silinir (konum bir bütün); kitte konum yoksa kalır",
+  MK.mergeBrandKit(surukStil, MK.normalize({ on: true, stil: { overrides: { konum: 8 } } }).kit).konumX === null &&
+  MK.mergeBrandKit(surukStil, MK.normalize({ on: true, stil: { overrides: { konum: 8 } } }).kit).konum === 8 &&
+  MK.mergeBrandKit(surukStil, MK.normalize({ on: true, stil: { overrides: { renk: "#ff0000" } } }).kit).konumX === 70);
+ok("mergeBrandKit: gölge nesnesi kopyalanır (kit değişmez)", (function () { var x = MK.mergeBrandKit(efTaban, kitXY.kit); x.golge.opak = 1; return kitXY.kit.stil.overrides.golge.opak === 40; })());
+var fcXY = MK.fromCurrent(Object.assign({}, efTaban, { konumX: 44, konumY: 66, golge: { renk: "#112233", opak: 70, mesafe: 4, yumusak: 6 }, kutu: true, kutuOpak: 30 }),
+  { on: true }, true, true);
+ok("fromCurrent: konum istenirse serbest konum da, görünüm istenirse gölge ve kutu da", fcXY.stil.overrides.konum === 2 && fcXY.stil.overrides.konumX === 44 &&
+  fcXY.stil.overrides.konumY === 66 && fcXY.stil.overrides.golge.renk === "#112233" && fcXY.stil.overrides.kutu === true && fcXY.stil.overrides.kutuOpak === 30,
+  JSON.stringify(fcXY.stil.overrides));
+var fcYok = MK.fromCurrent(Object.assign({}, efTaban, { konumX: 44, konumY: 66, golge: { opak: 70 }, kutu: true }), { on: true });
+ok("fromCurrent: istenmezse konum / gölge / kutu kite girmez", ["konum", "konumX", "golge", "kutu", "kutuRenk", "kutuOpak"].every(function (k) {
+  return fcYok.stil.overrides[k] === undefined; }), JSON.stringify(fcYok.stil.overrides));
+ok("fromCurrent: gölgesiz efekt → kitte gölge yok (null), kutu kapalı", (function () {
+  var f = MK.fromCurrent(efTaban, { on: true }, false, true).stil.overrides;
+  return f.golge === null && f.kutu === false;
+})());
+var kitG1 = MK.normalize({ on: true, stil: { overrides: { golge: { opak: 40 } } } }).kit, kitG2 = MK.normalize({ on: true, stil: { overrides: { golge: { opak: 41 } } } }).kit;
+ok("styleFieldsChanged: gölge / kutu / serbest konum değişimi stil değişimi (nesne alan alan karşılaştırılır)", MK.styleFieldsChanged(kitG1, kitG2) &&
+  !MK.styleFieldsChanged(kitG1, MK.normalize({ on: true, stil: { overrides: { golge: { opak: 40 } } } }).kit) &&
+  MK.styleFieldsChanged(kitG1, MK.normalize({ on: true, stil: { overrides: { golge: { opak: 40 }, konumX: 10, konumY: 10 } } }).kit));
+var rbG = MK.rebaseBrandKit(MK.mergeBrandKit(efTaban, kitG1), efTaban, kitG1, MK.normalize({ on: false }).kit);
+ok("rebaseBrandKit: kit kapanınca kitin gölgesi görünümün değerine (gölge yok) döner", rbG.changed && rbG.stil.golge === null, JSON.stringify(rbG.stil));
+/*
+ * Kitin açıkça "gölge yok" demesi (golge: null; "Gölge ve kutu" gölgesizken doldurulmuş kit) kitte olmayan alandan
+ * ayrı: gölgeli görünümde (Vurucu) kit açılınca gölge kalkar; mergeBrandKit (görünüm yeniden seçilince) ile aynı sonuç.
+ */
+(function () {
+  var vurucu = { font: "Anton", renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe600", konum: 5, golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 },
+    kutu: false, kutuRenk: "#000000", kutuOpak: 50, konumX: null, konumY: null };
+  var kitKapali = MK.normalize({ on: false }).kit;
+  var kitGolgesiz = MK.normalize({ on: true, stil: { overrides: { golge: null, kutu: false, kutuRenk: "#000000", kutuOpak: 50 } } }).kit;
+  var rbN = MK.rebaseBrandKit(vurucu, vurucu, kitKapali, kitGolgesiz), mN = MK.mergeBrandKit(vurucu, kitGolgesiz);
+  ok("rebaseBrandKit: gölgesiz kit (golge null) açılınca görünümün gölgesi kalkar (mergeBrandKit ile aynı); kit kapanınca geri gelir",
+    MK.styleFieldsChanged(kitKapali, kitGolgesiz) && kitGolgesiz.stil.overrides.golge === null && rbN.changed && rbN.stil.golge === null && mN.golge === null &&
+    MK.rebaseBrandKit(rbN.stil, vurucu, kitGolgesiz, kitKapali).stil.golge.opak === 85, JSON.stringify([rbN.stil.golge, mN.golge]));
+  var elleGolge = Object.assign({}, vurucu, { golge: { renk: "#ff0000", opak: 50, mesafe: 3, yumusak: 2 } });
+  ok("rebaseBrandKit: elle ayarlanmış gölge gölgesiz kit açılınca da korunur", MK.rebaseBrandKit(elleGolge, vurucu, kitKapali, kitGolgesiz).stil.golge.renk === "#ff0000");
+  ok("styleFieldsChanged: kitte olmayan gölge ile kitin 'gölge yok'u farklı; iki 'gölge yok' aynı",
+    MK.normalize({ on: true, stil: { overrides: { golge: null } } }).kit.stil.overrides.golge === null &&
+    MK.styleFieldsChanged(MK.normalize({ on: true }).kit, MK.normalize({ on: true, stil: { overrides: { golge: null } } }).kit) &&
+    !MK.styleFieldsChanged(kitGolgesiz, MK.normalize(JSON.parse(JSON.stringify(kitGolgesiz))).kit));
+})();
+
 /* ---------------- deneme filigranı: logo filigranın üstüne binmez ---------------- */
 // js/filigran.js: \an9\pos(0.97w, 0.04h | 0.10h), boy = kısa kenar × 0.026; "suflo.app" ≤ 7 × boy genişlik, 1.4 × boy yükseklik (cömert kutu)
 function filigranKutusu(W, H) {
@@ -257,6 +511,31 @@ var s2 = sayfa("#" + "SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "
 ok("sayfa: kötü yazar → hata kartı, içerik gizli", !s2.D["stil-hata"].hidden && s2.D["stil-icerik"].hidden && /yazar/.test(s2.D["stil-hata-metin"].textContent));
 var s3 = sayfa("#SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzayli" })));
 ok("sayfa: bilinmeyen stil → hata, video yok", !s3.D["stil-hata"].hidden && s3.D["stil-icerik"].hidden && (!s3.D["stil-video"] || s3.D["stil-video"].src === ""));
+// Altyazı Efektleri kodu: kodun giriş + vurgu animasyonu yazılır ve o çiftin videosu oynar; 3.3+ notu
+var s6 = sayfa("#" + SS.encode({ styleId: "efekt", overrides: { font: "Bebas Neue", giris: "asagi", aktif: "glitch", vurguRenk: "#2af5ff" } }));
+ok("sayfa: efekt kodu → kendi animasyon çiftinin videosu, giriş / vurgu adları, 3.3 notu", s6.D["stil-video"].src === "gorseller/suflo-stiller/efekt-asagi-glitch.webm" &&
+  s6.D["stil-giris"].textContent === "Aşağı kay" && s6.D["stil-aktif"].textContent === "Glitch" && s6.D["stil-giris-sar"].hidden === false &&
+  s6.D["stil-surum"].hidden === false && /animasyonunu gösterir/.test(s6.D["stil-not"].textContent), s6.D["stil-video"].src);
+s6.hashDegis("#" + SS.encode({ styleId: "efekt", overrides: { renk: "#ffffff" } }));
+ok("sayfa: animasyonsuz efekt kodu → efektin kendi değerleri (Belirme / Yok)", s6.D["stil-video"].src === "gorseller/suflo-stiller/efekt-fade-yok.webm" &&
+  s6.D["stil-giris"].textContent === "Belirme" && s6.D["stil-aktif"].textContent === "Yok");
+s6.hashDegis("#" + SS.encode({ styleId: "neon", overrides: { renk: "#ffffff" } }));
+ok("sayfa: eski stil kodunda animasyon satırları ve 3.3 notu gizli, video stilin kendisi", s6.D["stil-giris-sar"].hidden && s6.D["stil-aktif-sar"].hidden &&
+  s6.D["stil-surum"].hidden && s6.D["stil-video"].src === "gorseller/suflo-stiller/neon.webm" && /temel stili gösterir/.test(s6.D["stil-not"].textContent));
+var s7 = sayfa("#" + SS.encode({ styleId: "efekt", overrides: { konum: 2, konumX: 30, konumY: 70, golge: { opak: 50 }, kutu: true } }));
+ok("sayfa: serbest konumlu efekt kodu konumu 'Serbest · X %30 · Y %70' gösterir (adım 17)", s7.D["stil-konum"].textContent === "Serbest · X %30 · Y %70" &&
+  sayfa("#" + SS.encode({ styleId: "efekt", overrides: { konumX: 30, konumY: 70 } }), "en").D["stil-konum"].textContent === "Free · X 30% · Y 70%", s7.D["stil-konum"].textContent);
+var e6 = sayfa("#" + SS.encode({ styleId: "efekt", overrides: { giris: "zipla", aktif: "titre" } }), "en");
+ok("EN sayfa: efekt animasyon adları İngilizce, video yolu", e6.D["stil-giris"].textContent === "Bounce" && e6.D["stil-aktif"].textContent === "Shake" &&
+  e6.D["stil-video"].src === "../gorseller/suflo-stiller/efekt-zipla-titre.webm");
+var efP = E.preset("efekt").style;
+var sayfaVars = new Function(sayfaSrc.slice(sayfaSrc.indexOf("var EFEKT_VARSAYILAN = {"), sayfaSrc.indexOf("};", sayfaSrc.indexOf("var EFEKT_VARSAYILAN = {")) + 2) + " return EFEKT_VARSAYILAN;")();
+ok("sayfa: efektin varsayılan animasyonu motorla aynı; her giriş × vurgu çiftinin videosu var", sayfaVars.giris === efP.giris && sayfaVars.aktif === efP.aktif &&
+  E.GIRISLER.every(function (g) { return E.AKTIFLER.every(function (a) { return fs.existsSync(path.join(kok, "docs", "gorseller", "suflo-stiller", "efekt-" + g + "-" + a + ".webm")); }); }));
+ok("sayfa (TR / EN): animasyon satırları ve sürüm notu HTML'de", ["stil.html", "en/stil.html"].every(function (f) {
+  var h = fs.readFileSync(path.join(kok, "docs", f), "utf8");
+  return ["stil-giris-sar", "stil-giris", "stil-aktif-sar", "stil-aktif", "stil-not", "stil-surum"].every(function (id) { return h.indexOf('id="' + id + '"') !== -1; });
+}));
 var s4 = sayfa("");
 ok("sayfa: kodsuz ziyaret → yalnız nasıl kullanılır", s4.D["stil-hata"].hidden && s4.D["stil-icerik"].hidden);
 
@@ -274,7 +553,7 @@ ok("sayfa: renksiz üçüncü kodda kutular gizli, eski renk ve font kalmaz", s5
 // İngilizce sayfa (docs/en/stil.html, <html lang="en">)
 var e1 = sayfa("#" + SS.encode({ styleId: "ziplama", overrides: { renk: "#FF0000", konum: 8 }, author: "ayse" }), "en");
 ok("EN sayfa: İngilizce stil adı, konum, başlık, video yolu", e1.D["stil-ad"].textContent === "Bouncy · @ayse" && e1.D["stil-konum"].textContent === "Top" &&
-  e1.doc.title === "Bouncy · Shared Suflo Style" && e1.D["stil-font"].textContent === "The style's own font" &&
+  e1.doc.title === "Bouncy · Shared Caption Effect" && e1.D["stil-font"].textContent === "The style's own font" &&
   e1.D["stil-video"].src === "../gorseller/suflo-stiller/ziplama.webm" && e1.D["renk-yazi"].title === "Text #ff0000", JSON.stringify([e1.D["stil-ad"].textContent, e1.doc.title, e1.D["renk-yazi"].title]));
 var e2 = sayfa("#SFL1." + SS.b64urlEncode(JSON.stringify({ v: 1, styleId: "uzayli" })), "en");
 ok("EN sayfa: hata metni İngilizce", !e2.D["stil-hata"].hidden && e2.D["stil-hata-metin"].textContent === "This style is not available in this Suflo version.");
@@ -290,6 +569,30 @@ ok("EN sayfa: her Suflo Stilinin İngilizce adı var, panelin İngilizce adıyla
 }), JSON.stringify(enAdlar));
 ok("shareUrl: İngilizce arayüz /en/stil, Türkçe (ya da dil yok) /stil", SS.shareUrl("SFL1.x", "en") === "https://suflo.app/en/stil#SFL1.x" &&
   SS.shareUrl("SFL1.x", "tr") === "https://suflo.app/stil#SFL1.x" && SS.shareUrl("SFL1.x") === "https://suflo.app/stil#SFL1.x");
+
+/* ---- 3.3 adım 18: yeni fontlu kodlar ve eski kodlar ---- */
+var yeniFontKod = SS.encode({ styleId: "neon", overrides: { font: "Exo 2", renk: "#00ff00" } });
+var yfC = SS.decode(yeniFontKod, YENI);
+ok("yeni font gidiş-dönüş: font + fontFile (Exo2-Bold.ttf), uyarısız", yfC.ok && yfC.recipe.overrides.font === "Exo 2" &&
+  yfC.recipe.overrides.fontFile === "Exo2-Bold.ttf" && yfC.warnings.length === 0, JSON.stringify(yfC));
+var yfEski = Eski32.decode(yeniFontKod, eskiIzin);
+// Yalnız 3.3 öncesi (eski kimlikli, elle / 3.2 sitesinde yapılmış) kodlarda: 3.3 paneli artık hep "efekt" kodu üretir
+ok("eski kimlikli kodda 3.2 paneli yeni fontu 'font' uyarısıyla atlar (stilin kendi yazı tipi), renk uygulanır",
+  yfEski.ok && yfEski.recipe.overrides.font === undefined && yfEski.recipe.overrides.renk === "#00ff00" && yfEski.warnings.indexOf("font") !== -1, JSON.stringify(yfEski));
+// Adım 18 incelemesi: 3.3'ün Stili paylaş'ı her zaman styleId "efekt" yazar (stilKodu; eski kimlikler efekteGec ile taşınır).
+// 3.2.0 paneli bu kodu fonttan bağımsız olarak "bu sürümde yok" diye reddeder: yeni fontlu kod 3.2'de AÇILMAZ.
+var efYeniFont = SS.encode({ styleId: "efekt", overrides: { font: "Nunito", renk: "#00ff00", giris: "pop" }, text: { kase: "upper" } });
+var efYeniFont32 = Eski32.decode(efYeniFont, eskiIzin);
+var efEskiFont32 = Eski32.decode(SS.encode({ styleId: "efekt", overrides: { font: "Lora" } }), eskiIzin);
+ok("3.2.0 paneli 3.3'ün yeni fontlu Altyazı Efektleri kodunu reddeder ('Bu stil bu Suflo sürümünde yok: efekt.'); eski fontlusunu da",
+  !efYeniFont32.ok && efYeniFont32.error === "Bu stil bu Suflo sürümünde yok: efekt." && !efEskiFont32.ok && efEskiFont32.error === efYeniFont32.error,
+  JSON.stringify([efYeniFont32, efEskiFont32]));
+ok("3.3 paneli aynı kodu Nunito ile uyarısız açar", SS.decode(efYeniFont, YENI).ok && SS.decode(efYeniFont, YENI).recipe.overrides.font === "Nunito" &&
+  SS.decode(efYeniFont, YENI).warnings.length === 0);
+var eskiFontKod = { styleId: "neon", overrides: { font: "Lora", renk: "#00ff00", konum: 2, boyut: 90 }, text: { kase: "upper" } };
+ok("eski 6 fontlu kodlar değişmedi: 3.3 kodlayıcısı 3.2 ile birebir aynı kodu üretir",
+  ESKI6.every(function (n) { var t = JSON.parse(JSON.stringify(eskiFontKod)); t.overrides.font = n; return SS.encode(t) === Eski32.encode(t); }) &&
+  ESKI6.every(function (n) { var t = JSON.parse(JSON.stringify(eskiFontKod)); t.overrides.font = n; var d = SS.decode(Eski32.encode(t), YENI); return d.ok && d.recipe.overrides.font === n && d.recipe.overrides.fontFile === Eski32.FONTS[n].file; }));
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

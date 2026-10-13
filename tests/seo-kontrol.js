@@ -141,7 +141,7 @@ if (fs.existsSync(stilYol)) {
   var st = fs.readFileSync(stilYol, "utf8");
   var stBaslik = (st.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
   var stAcik = (st.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
-  chk("stil.html: title ≤ 60 ve Suflo Stili geçiyor", stBaslik.length > 10 && stBaslik.length <= 60 && /Suflo Stili/.test(stBaslik), stBaslik);
+  chk("stil.html: title ≤ 60, Altyazı Efekti ve Suflo geçiyor", stBaslik.length > 10 && stBaslik.length <= 60 && /Altyazı Efekti/.test(stBaslik) && /Suflo/.test(stBaslik), stBaslik);
   chk("stil.html: description 120-160", stAcik.length >= 120 && stAcik.length <= 160, stAcik.length + " karakter");
   chk("stil.html: canonical, og:title/description/url/image, twitter:card, og:locale",
     /rel="canonical" href="https:\/\/suflo\.app\/stil"/.test(st) && /property="og:title"/.test(st) && /property="og:description"/.test(st) &&
@@ -169,7 +169,7 @@ if (fs.existsSync(stilEnYol)) {
   var seAcik = (se.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
   chk("en/stil.html: lang=en, canonical, og:locale en_US", /<html lang="en">/.test(se) && /rel="canonical" href="https:\/\/suflo\.app\/en\/stil"/.test(se) &&
     /property="og:url" content="https:\/\/suflo\.app\/en\/stil"/.test(se) && /og:locale" content="en_US"/.test(se));
-  chk("en/stil.html: title ≤ 60, description 120-160", seBaslik.length > 10 && seBaslik.length <= 60 && /Suflo Style/.test(seBaslik) &&
+  chk("en/stil.html: title ≤ 60, description 120-160", seBaslik.length > 10 && seBaslik.length <= 60 && /Caption Effect/.test(seBaslik) && /Suflo/.test(seBaslik) &&
     seAcik.length >= 120 && seAcik.length <= 160, seBaslik + " / " + seAcik.length);
   chk("en/stil.html: hreflang TR sayfasıyla karşılıklı", /hreflang="tr" href="https:\/\/suflo\.app\/stil"/.test(se) &&
     /hreflang="en" href="https:\/\/suflo\.app\/en\/stil"/.test(se) && /hreflang="x-default" href="https:\/\/suflo\.app\/en\/stil"/.test(se));

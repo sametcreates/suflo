@@ -125,7 +125,8 @@
     ].concat(cozmeBayraklari(s.cozme));
 
     // Proje sözlüğündeki doğru marka/kişi adları ilk çözme geçişine yön verir
-    if (o.prompt) args.push("--prompt", String(o.prompt).slice(0, ISTEM_SINIRI));
+    // satır sonu yanıt dosyasında argümanı böler (Windows, yanitDosyasiMetni): boşluğa çevrilir
+    if (o.prompt) args.push("--prompt", String(o.prompt).replace(/[\r\n]+/g, " ").slice(0, ISTEM_SINIRI));
 
     // VAD: sessizlikleri atla. -vp ve -vsd MİLİSANİYE (whisper-cli varsayılanları 30 / 100):
     // 500 ms altındaki sessizlikte segment bölme, konuşma sınırlarına 250 ms tampon
@@ -232,8 +233,27 @@
     return satirlar;
   }
 
+  /*
+   * Windows'ta whisper-cli argv'yi sistem kod sayfasında (ANSI: 1254 / 1252…) okur (cli.cpp main(argc, argv)):
+   * Türkçe / Kiril / Arapça --prompt (sözlük ipucu, dolgu ipucu) bozuk baytlarla ya da '?' ile gelir. Yollar
+   * zaten ASCII-güvenli (K.guvenliYol). ASCII dışı argüman varsa argümanlar UTF-8 yanıt dosyasına yazılır ve
+   * whisper-cli tek "@dosya" argümanıyla çağrılır: cli.cpp argc == 2 ve argv[1] '@' ile başlıyorsa dosyayı
+   * satır satır (std::getline) okur, baytlar UTF-8 kalır. macOS argv'si zaten UTF-8: gerekmez.
+   */
+  function yanitDosyasiGerekli(args, platform) {
+    if (platform !== "win32" || !args) return false;
+    for (var i = 0; i < args.length; i++) if (/[^\x00-\x7F]/.test(String(args[i]))) return true;
+    return false;
+  }
+  // Satır başına bir argüman, '\n' ile (argümandaki satır sonu boşluk olur; boş satır üretilmez)
+  function yanitDosyasiMetni(args) {
+    return (args || []).map(function (a) { return String(a).replace(/[\r\n]+/g, " "); }).join("\n") + "\n";
+  }
+
   return {
     VARSAYILAN_COZME: VARSAYILAN_COZME,
+    yanitDosyasiGerekli: yanitDosyasiGerekli,
+    yanitDosyasiMetni: yanitDosyasiMetni,
     COZME_MODLARI: ["dogru", "hizli"],
     DTW_ON_AYAR: (function () { var o = {}; for (var k in DTW_ON_AYAR) if (sahip(DTW_ON_AYAR, k)) o[k] = DTW_ON_AYAR[k]; return o; })(),
     CEVIRI_MODELLERI: CEVIRI_MODELLERI.slice(),

@@ -86,6 +86,11 @@
       <span class="ky-metin"><b>Podcast <em class="ky-yeni">YENİ</em></b><i>mikrofona göre kamera geçişi</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
+    <button class="ky-oge" data-tab="youtube">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4" width="15" height="10" rx="3"/><path d="m8.6 6.6 3.6 2.4-3.6 2.4z"/><path d="M6 17h8"/></svg></span>
+      <span class="ky-metin"><b>YouTube İndir <em class="ky-yeni">YENİ</em></b><i>MP3 · 720p · 1080p · 4K</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
 
     <div class="ky-baslik" style="margin-top:12px">Kütüphane</div>
     <button class="ky-oge" data-tab="text" data-kat="mogrt">
@@ -211,7 +216,7 @@
         <li id="ia-stil" class="ia-adim" data-adim="stil">
           <button type="button" class="ia-adim-bas" id="ia-stil-bas" aria-expanded="false" aria-controls="ia-stil-govde"><span class="ia-no">3</span><b>Stilini seç</b><span class="ia-rozet" id="ia-stil-rozet"></span></button>
           <div class="ia-govde" id="ia-stil-govde">
-            <p class="ia-metin" id="ia-stil-metin">Creator Punch'ı kendi altyazınla önizle.</p>
+            <p class="ia-metin" id="ia-stil-metin">Altyazı Efektleri'ni kendi altyazınla önizle.</p>
             <div class="row-btns" id="ia-stil-dugmeler">
               <button type="button" id="ia-stil-goster" class="btn primary">Stilleri gör</button>
               <button type="button" id="ia-stil-koy" class="btn">Timeline'a koy <span class="pro-inline">PRO</span></button>
@@ -260,7 +265,7 @@
         <div class="card-title">Altyazı ayarları</div>
 
         <!--
-          Stil seçimi görsel kartlarla yapılır (aşağıda, Görünüm kartında).
+          Stil seçimi aşağıdaki Stil kartında (Altyazı Efektleri ya da Premiere şablonu) yapılır.
           Bu gizli select yalnızca eski kodun okuduğu değer taşıyıcısıdır.
         -->
         <select id="cap-preset" hidden aria-hidden="true">
@@ -276,6 +281,7 @@
           <option value="enerjik">Enerjik</option>
           <option value="yt">YouTube</option>
           <option value="doc">Belgesel</option>
+          <option value="efekt">Altyazı Efektleri</option>
         </select>
         <input id="cap-style-family" type="hidden" value="custom">
 
@@ -334,7 +340,7 @@
           </div>
         </div>
 
-        <!-- Hassas kelime zamanlaması (3.2 adım 5): DTW; yalnız kelime tabanlı modlarda / Suflo Stillerinde, yerel motor -->
+        <!-- Hassas kelime zamanlaması (3.2 adım 5): DTW; yalnız kelime tabanlı modlarda / Altyazı Efektlerinde, yerel motor -->
         <label class="switch cap-dtw" id="cap-dtw-sar" hidden title="Yerel motor kelime başlarını ses ile metnin hizalamasından (DTW) ölçer: kelime kelime ve karaoke altyazıda vurgu sözcüğün söylendiği anda yanar. Transkripsiyon biraz uzar.">
           <input id="cap-dtw" type="checkbox">
           <i></i>
@@ -360,38 +366,241 @@
       </div>
 
       <div class="card stil-katmani-card">
-        <div class="card-title">Stil <span class="card-title-meta">PREMIERE ŞABLONLARI</span> <span class="pro-inline">PRO</span></div>
-        <p class="stil-aciklama">17 gerçek altyazı şablonundan birini seç. Suflo, sekansına uygun 9:16, 16:9 veya 1:1 dosyasını arka planda otomatik kullanır.</p>
+        <div class="card-title">Stil <span class="card-title-meta">ALTYAZI EFEKTLERİ · PREMIERE ŞABLONLARI</span> <span class="pro-inline">PRO</span></div>
+        <p class="stil-aciklama">Altyazı efektini kendin kur ya da aşağıdaki 17 gerçek altyazı şablonundan birini seç. Önizleme ücretsiz; timeline'a eklemek Pro (3 deneme hakkı).</p>
 
         <div class="stil-ust-satir">
-          <span class="marka-kiti-cip" id="cap-marka-kiti-cip" hidden title="Ayarlar › Marka Kiti: yazı tipin, renklerin ve logon her Suflo Stiline uygulanır">Marka kiti açık</span>
+          <span class="marka-kiti-cip" id="cap-marka-kiti-cip" hidden title="Ayarlar › Marka Kiti: yazı tipin, renklerin ve logon Altyazı Efektlerine uygulanır">Marka kiti açık</span>
           <span class="stil-kredi" id="cap-stil-kredi" hidden title="Bu stil paylaşılan bir koddan geldi"><span>Stil:</span> <b id="cap-stil-kredi-ad" data-i18n-skip></b></span>
         </div>
-        <div class="stil-grid" id="cap-stil-grid"></div>
 
-        <div class="field stil-yogunluk" hidden aria-hidden="true">
-          <label for="cap-yogunluk">Hareket şiddeti</label>
-          <select id="cap-yogunluk">
-            <option value="soft">Sakin</option>
-            <option value="balanced" selected>Dengeli</option>
-            <option value="hard">Sert</option>
-          </select>
-        </div>
+        <!--
+          Altyazı Efektleri (3.3): tek temel stil "efekt" (js/style-engine.js), model js/altyazi-efekt.js.
+          Hazır görünümler kontrolleri doldurur; her kontrol değişikliği efekti seçer ve canlı önizlemeyi
+          (gerçek libass çıktısı) tazeler. Timeline'a eklemek Pro.gate("overlay") (3 deneme hakkı).
+        -->
+        <section class="efekt" id="cap-efekt" aria-labelledby="cap-efekt-baslik">
+          <div class="efekt-head"><b id="cap-efekt-baslik">Altyazı Efektleri</b><span>önizleme ücretsiz · After Effects gerekmez</span></div>
+          <div class="efekt-gorunumler" id="cap-efekt-gorunumler" role="group" aria-label="Hazır görünümler"></div>
 
-        <!-- Canlı önizleme: seçilen stil gerçek zamanlamalarla burada oynar -->
-        <div class="onizleme" id="cap-onizleme">
-          <div class="onizleme-sahne" id="cap-sahne">
-            <div class="onizleme-alt" id="cap-onizleme-metin"></div>
-            <img id="cap-mogrt-onizleme" class="cap-mogrt-onizleme" alt="Seçili Premiere altyazı şablonu" hidden>
-            <video id="cap-render-onizleme" class="render-onizleme" muted playsinline hidden></video>
-            <button type="button" id="cap-onizleme-kare" class="onizleme-oynat" style="right:auto; left:7px" title="Timeline'daki kareyi arka plan olarak al">⛶ Kare al</button>
-            <button type="button" id="cap-onizleme-oynat" class="onizleme-oynat" title="Önizlemeyi oynat">▶ Oynat</button>
+          <!-- Canlı önizleme: Altyazı Efektleri gerçek motor çıktısıyla, Premiere şablonu kendi animasyonuyla oynar.
+               3.3 adım 17: Altyazı Efektleri seçiliyken yazı sahnede sürüklenerek konumlanır (captions.js konumSurukle) -->
+          <div class="onizleme" id="cap-onizleme">
+            <div class="onizleme-sahne" id="cap-sahne" tabindex="0" role="group" aria-label="Önizleme: yazıyı sürükleyerek konumlandır"
+                 title="Yazıyı sürükleyerek konumlandır · ok tuşları %1 (Shift %5) · çift tık hazır konuma döner">
+              <div class="onizleme-alt" id="cap-onizleme-metin"></div>
+              <div class="efekt-arti" id="cap-efekt-arti" hidden aria-hidden="true">
+                <i class="efekt-arti-dikey"></i><i class="efekt-arti-yatay"></i>
+                <span class="efekt-arti-etiket" id="cap-efekt-arti-etiket"></span>
+              </div>
+              <img id="cap-mogrt-onizleme" class="cap-mogrt-onizleme" alt="Seçili Premiere altyazı şablonu" hidden>
+              <video id="cap-render-onizleme" class="render-onizleme" muted playsinline hidden></video>
+              <button type="button" id="cap-onizleme-kare" class="onizleme-oynat" style="right:auto; left:7px" title="Timeline'daki kareyi arka plan olarak al">⛶ Kare al</button>
+              <button type="button" id="cap-onizleme-oynat" class="onizleme-oynat" title="Önizlemeyi oynat">▶ Oynat</button>
+            </div>
+            <p class="onizleme-not" id="cap-onizleme-not">Bir görünüm seç ya da ayarı değiştir; kendi karende görmek için "Kare al"</p>
+            <label class="check-label" id="cap-guvenli-sar" hidden title="TikTok, Reels ve Shorts arayüzünün (ikonlar, açıklama, üst çubuk) kapattığı bölgeleri kırmızıyla gösterir">
+              <input id="cap-guvenli-alan" type="checkbox" checked> Shorts güvenli alanını göster
+            </label>
           </div>
-          <p class="onizleme-not" id="cap-onizleme-not">Bir stile dokun; kendi karende görmek için "Kare al"</p>
-          <label class="check-label" id="cap-guvenli-sar" hidden title="TikTok, Reels ve Shorts arayüzünün (ikonlar, açıklama, üst çubuk) kapattığı bölgeleri kırmızıyla gösterir">
-            <input id="cap-guvenli-alan" type="checkbox" checked> Shorts güvenli alanını göster
-          </label>
-        </div>
+
+          <div class="efekt-ayarlar" id="cap-efekt-ayarlar">
+            <div class="field-grid">
+              <div class="field">
+                <label for="cap-efekt-giris">Giriş animasyonu</label>
+                <select id="cap-efekt-giris">
+                  <option value="yok">Yok</option>
+                  <option value="pop">Pop</option>
+                  <option value="fade" selected>Belirme</option>
+                  <option value="yukari">Yukarı kay</option>
+                  <option value="asagi">Aşağı kay</option>
+                  <option value="zipla">Zıpla</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="cap-efekt-aktif">Vurgu animasyonu</label>
+                <select id="cap-efekt-aktif">
+                  <option value="yok" selected>Yok</option>
+                  <option value="zipla">Zıpla</option>
+                  <option value="titre">Titre</option>
+                  <option value="glitch">Glitch</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field efekt-renkler">
+              <label class="switch" title="Konuşulan kelime vurgu renginde yanar">
+                <input id="cap-efekt-vurgu" type="checkbox" checked>
+                <i></i>
+                <span>Kelime vurgusu</span>
+              </label>
+              <div class="renk-satir">
+                <!-- Adlar oluşturucuya özgü ("… rengi"): genel "Vurgu" / "Kontur" girdileri başka yerde Emphasis / Stroke -->
+                <label class="renk-kutu" id="cap-renk-vurgu-kutu" title="Konuşulan kelimenin ve *anahtar kelimenin* rengi">
+                  <input type="color" id="cap-renk-vurgu" value="#ffd23f">
+                  <span>Vurgu rengi</span>
+                </label>
+                <label class="renk-kutu" title="Yazı rengi">
+                  <input type="color" id="cap-renk" value="#ffffff">
+                  <span>Yazı rengi</span>
+                </label>
+                <label class="renk-kutu" title="Kontur (çevre çizgisi) rengi">
+                  <input type="color" id="cap-renk-kontur" value="#000000">
+                  <span>Kontur rengi</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="cap-font">Yazı tipi</label>
+              <div class="field-row efekt-font">
+                <select id="cap-font" class="grow" title="Yazı tipleri dört kategoride, her biri kendi görünümüyle. Önizleme herkese açık; katmanı yerleştirmek Pro (3 deneme hakkı).">
+                  <optgroup label="Kalın · iddialı">
+                    <option value="Anton" style="font-family:&quot;Anton&quot;, sans-serif">Anton</option>
+                    <option value="Archivo Black" style="font-family:&quot;Archivo Black&quot;, sans-serif">Archivo Black</option>
+                    <option value="Bangers" style="font-family:&quot;Bangers&quot;, sans-serif">Bangers</option>
+                    <option value="Bebas Neue" style="font-family:&quot;Bebas Neue&quot;, sans-serif">Bebas Neue</option>
+                    <option value="Bungee" style="font-family:&quot;Bungee&quot;, sans-serif">Bungee</option>
+                  </optgroup>
+                  <optgroup label="Modern · sade">
+                    <option value="Inter" style="font-family:&quot;Inter&quot;, sans-serif">Inter</option>
+                    <option value="Montserrat" style="font-family:&quot;Montserrat&quot;, sans-serif" selected>Montserrat</option>
+                    <option value="Nunito" style="font-family:&quot;Nunito&quot;, sans-serif">Nunito</option>
+                    <option value="Poppins" style="font-family:&quot;Poppins&quot;, sans-serif">Poppins</option>
+                  </optgroup>
+                  <optgroup label="Zarif · serif">
+                    <option value="Libre Caslon Display" style="font-family:&quot;Libre Caslon Display&quot;, sans-serif">Libre Caslon Display</option>
+                    <option value="Lora" style="font-family:&quot;Lora&quot;, sans-serif">Lora</option>
+                  </optgroup>
+                  <optgroup label="Teknik · fütüristik">
+                    <option value="Chakra Petch" style="font-family:&quot;Chakra Petch&quot;, sans-serif">Chakra Petch</option>
+                    <option value="Exo 2" style="font-family:&quot;Exo 2&quot;, sans-serif">Exo 2</option>
+                  </optgroup>
+                  <!-- Sistem yazı tipleri: Altyazı Efektleri yalnız paketle gelen fontları çizer (libass sistem
+                       fontunu sessizce başka fonta çevirir); grup yalnız eski "Özel" kayıtlarını göstermek için, hep kapalı -->
+                  <optgroup label="Sistem" id="cap-font-sistem" disabled hidden>
+                    <option value="Arial">Arial</option>
+                    <option value="Impact">Impact</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Tahoma">Tahoma</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Trebuchet MS">Trebuchet MS</option>
+                    <option value="Courier New">Courier New</option>
+                  </optgroup>
+                </select>
+                <span class="efekt-bi-sar">
+                  <label class="efekt-bi" title="Kalın yazı"><input id="cap-efekt-kalin" type="checkbox" checked><span>Kalın yazı</span></label>
+                  <label class="efekt-bi efekt-italik" title="İtalik"><input id="cap-efekt-italik" type="checkbox"><span>İtalik</span></label>
+                </span>
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="cap-boyut">Boyut</label>
+                <input id="cap-boyut" type="number" min="36" max="180" step="2" value="76">
+              </div>
+              <div class="field">
+                <label for="cap-kontur">Kontur kalınlığı</label>
+                <input id="cap-kontur" type="number" min="0" max="16" step="1" value="5" title="0 = kontur yok">
+              </div>
+            </div>
+
+            <!-- 3.3 adım 17: gölge ve arka plan kutusu (TranscriptAI şablonunun gölge / kutu kontrolleriyle aynı aralıklar) -->
+            <div class="field efekt-katman">
+              <label class="switch" title="Yazının arkasına gölge (gerçek önizlemede ve katmanda aynı)">
+                <input id="cap-efekt-golge" type="checkbox">
+                <i></i>
+                <span>Gölge</span>
+              </label>
+              <div class="efekt-alt" id="cap-efekt-golge-ayar">
+                <label class="renk-kutu" title="Gölge rengi">
+                  <input type="color" id="cap-efekt-golge-renk" value="#000000">
+                  <span>Gölge rengi</span>
+                </label>
+                <div class="efekt-sayilar">
+                  <label class="efekt-sayi" title="Gölge opaklığı (0-100)"><span>Opaklık</span><input id="cap-efekt-golge-opak" type="number" min="0" max="100" step="5" value="75"></label>
+                  <label class="efekt-sayi" title="Gölgenin yazıdan uzaklığı (0-20)"><span>Mesafe</span><input id="cap-efekt-golge-mesafe" type="number" min="0" max="20" step="1" value="5"></label>
+                  <label class="efekt-sayi" title="Gölgenin yumuşaklığı (0-30)"><span>Yumuşaklık</span><input id="cap-efekt-golge-yumusak" type="number" min="0" max="30" step="1" value="5"></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="field efekt-katman">
+              <label class="switch" title="Yazının arkasına satır satır kutu">
+                <input id="cap-kutu" type="checkbox">
+                <i></i>
+                <span>Arka plan kutusu</span>
+              </label>
+              <div class="efekt-alt" id="cap-efekt-kutu-ayar">
+                <label class="renk-kutu" title="Kutu rengi">
+                  <input type="color" id="cap-kutu-renk" value="#000000">
+                  <span>Kutu rengi</span>
+                </label>
+                <div class="efekt-sayilar">
+                  <label class="efekt-sayi" title="Kutu opaklığı (0-100)"><span>Opaklık</span><input id="cap-kutu-opak" type="number" min="0" max="100" step="5" value="50"></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="cap-efekt-satir">Satır sayısı</label>
+                <select id="cap-efekt-satir">
+                  <option value="1">1 satır</option>
+                  <option value="2" selected>2 satır</option>
+                  <option value="3">3 satır</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="cap-efekt-kelime">En çok kelime</label>
+                <input id="cap-efekt-kelime" type="number" min="1" max="10" step="1" value="5" title="Ekranda aynı anda en çok kaç kelime görünür (1-10)">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="cap-konum">Konum</label>
+              <select id="cap-konum">
+                <option value="1">Alt sol</option>
+                <option value="2" selected>Alt</option>
+                <option value="5">Orta</option>
+                <option value="8">Üst</option>
+              </select>
+              <!-- Serbest konum (önizlemede sürükle): gizli alanlar %5-95, boşsa hazır konum -->
+              <input id="cap-konum-x" type="hidden" value="">
+              <input id="cap-konum-y" type="hidden" value="">
+              <div class="efekt-konum-serbest" id="cap-konum-serbest" hidden>
+                <span>Serbest konum:</span> <b id="cap-konum-serbest-deger"></b>
+                <button type="button" id="cap-konum-sifirla" class="link-btn" title="Hazır konuma dön (önizlemede çift tık da olur)">Sıfırla</button>
+              </div>
+              <p class="efekt-ipucu">İpucu: önizlemede yazıyı sürükleyerek istediğin yere koy.</p>
+            </div>
+
+            <label class="check-label" id="cap-guvenli-yerlesim-sar" hidden title="9:16'da yazıyı TikTok, Reels ve Shorts'un sağdaki ikon sütunundan uzak tutar">
+              <input id="cap-guvenli-yerlesim" type="checkbox"> Platform arayüzünden kaçın
+            </label>
+
+            <!-- 3.3 adım 21: çıktı biçimi (captions.js yerelCiktiBagla). Varsayılan Video katmanı: Suflo motoru (libass),
+                 denenmiş yol. Premiere yerel (Beta): pakette gelen şablon (assets/mogrt/altyazi-efekt-v1.mogrt), render yok;
+                 gerçek Premiere'de henüz denenmedi. Kullanıcının açıkça seçtiği değer (suflo.efektCikti) korunur.
+                 Premiere 2022 öncesinde ya da şablon açılamazsa gizlenir / katmana düşülür. -->
+            <div class="field efekt-cikti" id="cap-efekt-cikti-sar">
+              <label for="cap-efekt-cikti">Çıktı</label>
+              <select id="cap-efekt-cikti" title="Video katmanı: Suflo motoruyla şeffaf video · Premiere yerel (Beta): render yok, yazı ve zamanlar Premiere'de düzenlenebilir">
+                <option value="katman" selected>Video katmanı</option>
+                <option value="yerel">Premiere yerel (render yok) · Beta</option>
+              </select>
+              <div class="efekt-yerel-not" id="cap-yerel-font-not" hidden>
+                <span id="cap-yerel-font-metin"></span>
+                <button type="button" id="cap-yerel-font-kur" class="link-btn" title="Paketteki fontları kullanıcı font klasörüne kopyalar (yönetici izni gerekmez); sonra Premiere'i yeniden başlat">Suflo fontlarını kur</button>
+              </div>
+              <div class="efekt-yerel-not" id="cap-yerel-kayit" hidden>
+                <span id="cap-yerel-kayit-metin"></span>
+                <button type="button" id="cap-yerel-kaldir" class="link-btn" title="Suflo'nun son eklediği yerel altyazı kliplerini eklendikleri sekanstan kaldırır">Kaldır</button>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <!-- Paylaşılan stil kodu: herkes yapıştırıp önizleyebilir (timeline'a eklemek Pro) -->
         <div class="stil-kod-satir" id="cap-stil-kod-sar">
@@ -400,128 +609,57 @@
           <button type="button" id="cap-stil-ice" class="btn tiny ghost" title=".suflo-stil dosyasından stil al">.suflo-stil içe aktar</button>
         </div>
 
-        <!-- Yalnız Suflo Stili seçiliyken görünür (captions.js inceAyarDurumu); MOGRT stillerinde gizli -->
+        <!-- Yalnız Altyazı Efektleri seçiliyken görünür (captions.js inceAyarDurumu); Premiere şablonunda gizli -->
         <details class="ince-ayar" id="cap-ince-ayar">
-          <summary>İnce ayar <span class="ia-not">yazı tipi · renk · konum · paylaş</span></summary>
+          <summary>Paylaş ve kaydet <span class="ia-not">stil kodu · .suflo-stil · şablonum</span></summary>
 
-        <div class="field ia-eski" style="margin-top:10px">
-          <label for="cap-animasyon">Animasyon</label>
-          <select id="cap-animasyon">
-            <optgroup label="Her modda">
-              <option value="yok" selected>Yok</option>
-              <option value="fade">Yumuşak geçiş</option>
-              <option value="slide">Alttan kayma</option>
-            </optgroup>
-            <optgroup label="Kelime zamanlı (Satır uzunluğu → Karaoke)">
-              <option value="mrbeast" data-pro="1">Creator Punch</option>
-              <option value="capcut" data-pro="1">Clean Pill</option>
-              <option value="saas" data-pro="1">SaaS Glass</option>
-              <option value="viral" data-pro="1">Viral aktif kelime</option>
-              <option value="vurgu" data-pro="1">Aktif kelime vurgusu</option>
-              <option value="karaoke" data-pro="1">Karaoke dolgu</option>
-              <option value="akici" data-pro="1">Akıcı dolgu (pürüzsüz)</option>
-              <option value="yazim" data-pro="1">Daktilo (harf harf)</option>
-              <option value="pop" data-pro="1">Pop (kelimeler büyüyerek gelir)</option>
-              <option value="bounce" data-pro="1">Zıplama</option>
-              <option value="premium" data-pro="1">Premium sinematik</option>
-            </optgroup>
-            <optgroup label="Satır stili">
-              <option value="doc" data-pro="1">Belgesel bandı</option>
-            </optgroup>
-          </select>
-          <p class="hint" id="cap-animasyon-ipucu" hidden style="margin:5px 0 0">
-            Kelime zamanlı animasyonlar için yukarıda <b>Satır uzunluğu → Karaoke</b> seç.
-          </p>
-        </div>
-
-        <div class="field-grid">
-          <div class="field">
-            <label for="cap-font">Yazı tipi</label>
-            <select id="cap-font">
-              <optgroup label="Suflo ile gelir">
-                <option value="Anton">Anton</option>
-                <option value="Archivo Black">Archivo Black</option>
-                <option value="Bebas Neue">Bebas Neue</option>
-                <option value="Bungee">Bungee</option>
-                <option value="Lora">Lora</option>
-                <option value="Montserrat">Montserrat</option>
-              </optgroup>
-              <optgroup label="Sistem" id="cap-font-sistem">
-                <option value="Arial" selected>Arial</option>
-                <option value="Impact">Impact</option>
-                <option value="Verdana">Verdana</option>
-                <option value="Tahoma">Tahoma</option>
-                <option value="Georgia">Georgia</option>
-                <option value="Trebuchet MS">Trebuchet MS</option>
-                <option value="Courier New">Courier New</option>
-              </optgroup>
-            </select>
+          <div class="field field-row" style="align-items:center; justify-content:space-between; margin-top:8px">
+            <button type="button" id="cap-ia-varsayilan" class="link-btn" title="Seçili görünüme dön (Marka Kiti açıksa kitle birlikte)">Görünüme dön</button>
+            <button type="button" id="cap-preset-save" class="link-btn" title="Bu ayarları şablonum olarak kaydet">★ Şablonum yap</button>
           </div>
-          <div class="field">
-            <label for="cap-boyut">Punto</label>
-            <input id="cap-boyut" type="number" min="36" max="180" step="2" value="72">
+
+          <div class="ia-paylas">
+            <input id="cap-stil-yazar" type="text" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Adın (isteğe bağlı, kodda görünür)" aria-label="Paylaşımda görünecek adın">
+            <div class="row-btns">
+              <button type="button" id="cap-stil-paylas" class="btn tiny" title="Stil kodunu ve suflo.app/stil bağlantısını panoya kopyalar">Stili paylaş</button>
+              <button type="button" id="cap-stil-disa" class="btn tiny ghost" title="Stili masaüstüne .suflo-stil dosyası olarak kaydeder">.suflo-stil dışa aktar</button>
+            </div>
           </div>
-        </div>
-
-        <div class="field-grid">
-          <div class="field">
-            <label for="cap-konum">Konum</label>
-            <select id="cap-konum">
-              <option value="1">Alt sol</option>
-              <option value="2" selected>Alt</option>
-              <option value="5">Orta</option>
-              <option value="8">Üst</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="cap-kontur">Kontur</label>
-            <input id="cap-kontur" type="number" min="0" max="16" step="1" value="4">
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Renkler</label>
-          <div class="renk-satir">
-            <label class="renk-kutu" title="Yazı rengi">
-              <input type="color" id="cap-renk" value="#ffffff">
-              <span>Yazı</span>
-            </label>
-            <label class="renk-kutu" title="Kontur (çevre çizgisi) rengi">
-              <input type="color" id="cap-renk-kontur" value="#000000">
-              <span>Kontur</span>
-            </label>
-            <label class="renk-kutu" id="cap-renk-vurgu-kutu" title="Karaoke modunda okunan kelimenin rengi">
-              <input type="color" id="cap-renk-vurgu" value="#8b7cf6">
-              <span>Vurgu</span>
-            </label>
-          </div>
-        </div>
-
-        <label class="check-label" id="cap-guvenli-yerlesim-sar" hidden title="9:16'da yazıyı TikTok, Reels ve Shorts'un sağdaki ikon sütunundan uzak tutar">
-          <input id="cap-guvenli-yerlesim" type="checkbox"> Platform arayüzünden kaçın
-        </label>
-
-        <div class="field field-row" style="align-items:center; justify-content:space-between">
-          <span class="ia-eski">
-            <label class="switch" title="Yazının arkasına yarı saydam kutu koy">
-              <input id="cap-kutu" type="checkbox">
-              <i></i>
-              <span>Arka plan kutusu</span>
-            </label>
-          </span>
-          <button type="button" id="cap-ia-varsayilan" class="link-btn" title="Stilin kendi ayarlarına dön (Marka Kiti açıksa kitle birlikte)">Varsayılana dön</button>
-          <button type="button" id="cap-preset-save" class="link-btn" title="Bu ayarları şablonum olarak kaydet">★ Şablonum yap</button>
-        </div>
-
-        <div class="ia-paylas">
-          <input id="cap-stil-yazar" type="text" maxlength="32" spellcheck="false" autocomplete="off" placeholder="Adın (isteğe bağlı, kodda görünür)" aria-label="Paylaşımda görünecek adın">
-          <div class="row-btns">
-            <button type="button" id="cap-stil-paylas" class="btn tiny" title="Stil kodunu ve suflo.app/stil bağlantısını panoya kopyalar">Stili paylaş</button>
-            <button type="button" id="cap-stil-disa" class="btn tiny ghost" title="Stili masaüstüne .suflo-stil dosyası olarak kaydeder">.suflo-stil dışa aktar</button>
-          </div>
-        </div>
-
         </details>
+
+        <!-- Premiere Şablonları (MOGRT): kartlar captions.js mogrtStilleriniCiz ile çizilir -->
+        <div class="stil-grid" id="cap-stil-grid"></div>
+
+        <!--
+          Eski (3.0 öncesi "Özel") kayıtların değer taşıyıcıları: arayüzde gösterilmez. Hareket şiddeti
+          Altyazı Efektleri'nde hep Dengeli (captions.js efekteGec); animasyon yalnız eski özel şablonların ASS yolunda.
+          Arka plan kutusu (cap-kutu) 3.3 adım 17'den beri oluşturucuda.
+        -->
+        <div class="ia-eski" hidden aria-hidden="true">
+          <select id="cap-yogunluk">
+            <option value="soft">Sakin</option>
+            <option value="balanced" selected>Dengeli</option>
+            <option value="hard">Sert</option>
+          </select>
+          <select id="cap-animasyon">
+            <option value="yok" selected>Yok</option>
+            <option value="fade">Yumuşak geçiş</option>
+            <option value="slide">Alttan kayma</option>
+            <option value="mrbeast" data-pro="1">Creator Punch</option>
+            <option value="capcut" data-pro="1">Clean Pill</option>
+            <option value="saas" data-pro="1">SaaS Glass</option>
+            <option value="viral" data-pro="1">Viral aktif kelime</option>
+            <option value="vurgu" data-pro="1">Aktif kelime vurgusu</option>
+            <option value="karaoke" data-pro="1">Karaoke dolgu</option>
+            <option value="akici" data-pro="1">Akıcı dolgu (pürüzsüz)</option>
+            <option value="yazim" data-pro="1">Daktilo (harf harf)</option>
+            <option value="pop" data-pro="1">Pop (kelimeler büyüyerek gelir)</option>
+            <option value="bounce" data-pro="1">Zıplama</option>
+            <option value="premium" data-pro="1">Premium sinematik</option>
+            <option value="doc" data-pro="1">Belgesel bandı</option>
+          </select>
+          <p id="cap-animasyon-ipucu" hidden></p>
+        </div>
       </div>
 
       <div class="card" id="cap-tracks-card" hidden>
@@ -599,7 +737,7 @@
           <button type="button" id="cap-filter-issues" class="btn tiny caption-tool-toggle" title="Yalnız kontrol gerektiren satırları göster">Kontrol gerekenler</button>
           <button type="button" id="cap-auto-fix" class="btn tiny caption-tool-primary" title="Boşluk, satır uzunluğu, okuma hızı ve zamanlamayı otomatik düzelt">Nizami düzelt</button>
           <button type="button" id="cap-auto-emoji" class="btn tiny" title="Satırların anlamına göre seyrek emoji ekler (Ctrl+Z ile geri alınır)">Otomatik emoji</button>
-          <button type="button" id="cap-auto-vurgu" class="btn tiny" title="Sayıları ve önemli kelimeleri *yıldızla* işaretler; Suflo Stilleri bunları vurgu renginde çizer. Elle: satırda kelimeye gel, Ctrl+B (Mac: ⌘B) ya da *kelime* yaz">Otomatik vurgu</button>
+          <button type="button" id="cap-auto-vurgu" class="btn tiny" title="Sayıları ve önemli kelimeleri *yıldızla* işaretler; Altyazı Efektleri bunları vurgu renginde çizer. Elle: satırda kelimeye gel, Ctrl+B (Mac: ⌘B) ya da *kelime* yaz">Otomatik vurgu</button>
           <button type="button" id="cap-proofread" class="btn tiny" title="Altyazı metnini bulut yedeğiyle ikinci kez kontrol eder; ses gönderilmez">AI metin kontrolü</button>
           <span class="caption-history-wrap">
             <button type="button" id="cap-history" class="btn tiny" title="Düzenleme geçmişi">Geçmiş</button>
@@ -804,9 +942,9 @@
             <summary>Shorts Paketi <span class="tc-yeni">PRO</span></summary>
             <p class="hint" style="margin:6px 0 8px">"Pakete al" işaretli anlardan tek tıkla bitmiş Shorts: 9:16 sekans, markalı altyazı, kanca başlığı, ilerleme çubuğu, kapanış çağrısı, logo ve paylaşım metinleri. Her parça ayrı katmandır; istediğini silip değiştirebilirsin.</p>
             <label class="vr-alan paket-stil-alan">Altyazı stili
-              <select id="cap-paket-stil" title="Paketteki altyazıların Suflo Stili (MOGRT stilleri pakette kullanılamaz)"></select>
+              <select id="cap-paket-stil" title="Paketteki altyazıların görünümü: Altyazı sekmesindeki efekt ya da bir hazır görünüm (MOGRT stilleri pakette kullanılamaz)"></select>
             </label>
-            <p class="hint paket-not" id="cap-paket-mogrt-not" hidden>Seçili MOGRT stili pakette kullanılamaz: her altyazı satırı ayrı Premiere çağrısı ister. Pakette buradaki Suflo Stili kullanılır.</p>
+            <p class="hint paket-not" id="cap-paket-mogrt-not" hidden>Seçili MOGRT stili pakette kullanılamaz: her altyazı satırı ayrı Premiere çağrısı ister. Pakette buradaki Altyazı Efektleri görünümü kullanılır.</p>
             <div class="paket-secenekler">
               <label class="check-label" title="Shorts transkriptinden, seçili stilde şeffaf altyazı katmanı (emojiler çizilemediği için atılır)"><input id="cap-paket-altyazi" type="checkbox" checked> Altyazı</label>
               <label class="check-label" title="Kartta seçtiğin kanca başlığı ilk saniyelerde (stil ve süre Kanca Başlığı sekmesinden ya da Marka Kiti'nden)"><input id="cap-paket-kanca" type="checkbox" checked> Kanca</label>
@@ -878,7 +1016,7 @@
 
         <div class="caption-apply-actions" aria-label="Altyazıyı sekansa ekleme biçimi">
           <button id="cap-apply" class="btn outline big">Normal altyazı izi ekle</button>
-          <button id="cap-apply-style" class="btn primary big" disabled>Stil seçerek ekle</button>
+          <button id="cap-apply-style" class="btn primary big" disabled>Görünüm seçerek ekle</button>
         </div>
         <p class="hint" id="cap-apply-hint" style="margin:-4px 0 8px">
           Normal ekleme Premiere'in düzenlenebilir caption izini oluşturur. Bir stil seçersen animasyonlu MOGRT olarak da ekleyebilirsin.
@@ -1657,10 +1795,90 @@
 
       <div class="pc-adim"><b>5</b> Konuşmacı renkleri</div>
       <label class="switch"><input id="pc-renk" type="checkbox"><i></i><span>Altyazıda her konuşmacı kendi renginde</span></label>
-      <p class="hint">Renkler yukarıdaki tablodan. Suflo Stilleri katmanında ve ASS dışa aktarımında geçerli; Premiere'in kendi altyazı katmanı (SRT) renk taşıyamaz.</p>
+      <p class="hint">Renkler yukarıdaki tablodan. Altyazı Efektleri katmanında ve ASS dışa aktarımında geçerli; Premiere'in kendi altyazı katmanı (SRT) renk taşıyamaz.</p>
     </div>
     <div id="pc-progress" class="progress-line" hidden><i></i></div>
     <div id="pc-durum" class="inline-status" role="status" aria-live="polite"></div>
+  </section>
+
+  <!-- ================= YOUTUBE INDIRICI (v3.3) ================= -->
+  <!-- Bilgi almak ücretsiz; indirmek Pro (3 deneme). yt-dlp ilk kullanımda iner, SHA-256 ile doğrulanır.
+       js/youtube-indir.js (saf) + js/youtube-indir-ui.js; dosya projede "Suflo İndirilenler" kutusuna girer -->
+  <section id="tab-youtube" class="tabpane">
+    <div class="pro-tanitim" id="yt-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>YouTube'dan Premiere'e tek adımda</b>
+        <span>Bağlantıyı yapıştır, kaliteyi seç; dosya projendeki <b data-i18n-skip>Suflo İndirilenler</b> kutusuna gelir.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>4</strong> kalite</i><i><strong>MP3</strong> yalnız ses</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="youtube">YouTube indiriciyi aç — 749 TL</button>
+    </div>
+    <div class="yt-kart">
+      <label class="yt-etiket" for="yt-url">Video bağlantısı</label>
+      <div class="yt-url-satir">
+        <input id="yt-url" type="text" placeholder="https://www.youtube.com/watch?v=… ya da youtu.be/…" autocomplete="off" spellcheck="false">
+        <button id="yt-yapistir" class="btn" type="button" title="Panodaki bağlantıyı yapıştır">Yapıştır</button>
+      </div>
+      <button id="yt-bilgi" class="btn yt-bilgi-btn" type="button">Bilgi al</button>
+      <div id="yt-onizleme" class="yt-onizleme" hidden>
+        <img id="yt-kucuk" class="yt-kucuk" alt="" hidden>
+        <div class="yt-meta">
+          <b id="yt-baslik" data-i18n-skip></b>
+          <span id="yt-kanal" data-i18n-skip></span>
+          <span id="yt-sure" class="mono"></span>
+        </div>
+      </div>
+      <div class="yt-etiket">Kalite</div>
+      <div class="yt-kaliteler" role="radiogroup" aria-label="Kalite">
+        <button id="yt-k-mp3" class="yt-cip" type="button" role="radio" aria-checked="false" disabled>MP3</button>
+        <button id="yt-k-720" class="yt-cip" type="button" role="radio" aria-checked="false" disabled>720p</button>
+        <button id="yt-k-1080" class="yt-cip" type="button" role="radio" aria-checked="false" disabled>1080p</button>
+        <button id="yt-k-2160" class="yt-cip" type="button" role="radio" aria-checked="false" disabled>4K</button>
+      </div>
+      <p id="yt-kalite-not" class="hint yt-kalite-not"></p>
+      <div class="yt-etiket">Hedef klasör</div>
+      <div class="yt-klasor-satir">
+        <span class="yt-klasor">
+          <span id="yt-klasor-yol" data-i18n-skip hidden></span>
+          <span id="yt-klasor-ipucu"><span>Proje klasörü ›</span> <span data-i18n-skip>Suflo İndirilenler</span></span>
+        </span>
+        <button id="yt-klasor-degistir" class="btn tiny" type="button">Değiştir</button>
+        <button id="yt-klasor-varsayilan" class="btn tiny" type="button" hidden title="Proje klasöründeki varsayılan klasöre dön">Varsayılan</button>
+      </div>
+      <p id="yt-klasor-not" class="hint yt-klasor-not" hidden>Proje kaydedilmemiş ya da açık değil: Videolar klasörüne iner.</p>
+      <div class="action-bar yt-eylem">
+        <button id="yt-indir" class="btn primary big" type="button" disabled>İndir</button>
+        <button id="yt-iptal" class="btn outline big iptal-btn" type="button" hidden title="İndirmeyi durdurur; yarım dosyalar silinir, bitmiş indirme klasörde kalır">İptal</button>
+      </div>
+      <div id="yt-ilerleme" class="yt-ilerleme" hidden><i id="yt-ilerleme-cubuk"></i></div>
+      <div id="yt-durum" class="inline-status" role="status" aria-live="polite"></div>
+      <p id="yt-js-not" class="hint yt-uyari" hidden></p>
+      <div id="yt-guncelle-kutu" class="yt-guncelle" hidden>
+        <span id="yt-guncelle-metin"></span>
+        <button id="yt-guncelle" class="btn tiny" type="button">Güncelle</button>
+      </div>
+      <div id="yt-sonuc" class="yt-sonuc" hidden>
+        <button id="yt-klasorde-goster" class="btn" type="button">Klasörde göster</button>
+      </div>
+    </div>
+    <p class="hint yt-hatirlatma">Yalnızca indirme hakkın olan içeriği indir: kendi videoların, izin aldığın ya da lisanslı içerik.</p>
+    <p class="hint">yt-dlp (açık kaynak) ilk kullanımda GitHub'dan iner ve SHA-256 ile doğrulanmadan çalıştırılmaz. Oynatma listesinden yalnız bağlantıdaki video iner.</p>
+
+    <!-- İlk indirmede bir kez: onay ayarlarda hatırlanır (ytOnay) -->
+    <div id="yt-onay" class="yt-onay" role="dialog" aria-modal="true" aria-labelledby="yt-onay-baslik" hidden>
+      <div class="yt-onay-kutu">
+        <b id="yt-onay-baslik">İndirmeden önce</b>
+        <p>Yalnızca indirme hakkın olan içeriği indir: kendi videoların, izin aldığın ya da lisanslı içerik. YouTube Kullanım Şartları'na uymak senin sorumluluğunda.</p>
+        <label class="yt-onay-satir"><input id="yt-onay-cb" type="checkbox"><span>Anladım; yalnız indirme hakkım olan içeriği indireceğim.</span></label>
+        <div class="yt-onay-dugmeler">
+          <button id="yt-onay-vazgec" class="btn" type="button">Vazgeç</button>
+          <button id="yt-onay-tamam" class="btn primary" type="button" disabled>Devam et</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ================= SFX ================= -->
@@ -1909,7 +2127,7 @@
 
     <div class="set-group marka-kiti-kart" id="grp-marka-kiti">
       <div class="set-title">Marka Kiti <span class="dim" style="font-weight:400">yazı tipi · renkler · logo</span></div>
-      <p class="hint" style="margin-bottom:8px">Yazı tipin, renklerin ve logon her Suflo Stiline ve kanca başlığına kendiliğinden uygulanır. Düzenlemek ve önizlemek ücretsiz; timeline'a eklemek Pro.</p>
+      <p class="hint" style="margin-bottom:8px">Yazı tipin, renklerin ve logon Altyazı Efektlerine ve kanca başlığına kendiliğinden uygulanır. Düzenlemek ve önizlemek ücretsiz; timeline'a eklemek Pro.</p>
       <label class="switch">
         <input id="mk-acik" type="checkbox">
         <i></i>
@@ -1920,22 +2138,39 @@
           <label for="mk-font">Yazı tipi</label>
           <select id="mk-font">
             <option value="">Stilin kendi yazı tipi</option>
-            <option value="Anton">Anton</option>
-            <option value="Archivo Black">Archivo Black</option>
-            <option value="Bebas Neue">Bebas Neue</option>
-            <option value="Bungee">Bungee</option>
-            <option value="Lora">Lora</option>
-            <option value="Montserrat">Montserrat</option>
+            <optgroup label="Kalın · iddialı">
+              <option value="Anton" style="font-family:&quot;Anton&quot;, sans-serif">Anton</option>
+              <option value="Archivo Black" style="font-family:&quot;Archivo Black&quot;, sans-serif">Archivo Black</option>
+              <option value="Bangers" style="font-family:&quot;Bangers&quot;, sans-serif">Bangers</option>
+              <option value="Bebas Neue" style="font-family:&quot;Bebas Neue&quot;, sans-serif">Bebas Neue</option>
+              <option value="Bungee" style="font-family:&quot;Bungee&quot;, sans-serif">Bungee</option>
+            </optgroup>
+            <optgroup label="Modern · sade">
+              <option value="Inter" style="font-family:&quot;Inter&quot;, sans-serif">Inter</option>
+              <option value="Montserrat" style="font-family:&quot;Montserrat&quot;, sans-serif">Montserrat</option>
+              <option value="Nunito" style="font-family:&quot;Nunito&quot;, sans-serif">Nunito</option>
+              <option value="Poppins" style="font-family:&quot;Poppins&quot;, sans-serif">Poppins</option>
+            </optgroup>
+            <optgroup label="Zarif · serif">
+              <option value="Libre Caslon Display" style="font-family:&quot;Libre Caslon Display&quot;, sans-serif">Libre Caslon Display</option>
+              <option value="Lora" style="font-family:&quot;Lora&quot;, sans-serif">Lora</option>
+            </optgroup>
+            <optgroup label="Teknik · fütüristik">
+              <option value="Chakra Petch" style="font-family:&quot;Chakra Petch&quot;, sans-serif">Chakra Petch</option>
+              <option value="Exo 2" style="font-family:&quot;Exo 2&quot;, sans-serif">Exo 2</option>
+            </optgroup>
           </select>
         </div>
         <div class="field">
           <label for="mk-konum">Konum</label>
-          <select id="mk-konum">
+          <select id="mk-konum" title="Altyazı sekmesinde sürüklediğin serbest konum için bir konum seç ve &quot;Şimdiki ayarlardan doldur&quot;a bas">
             <option value="">Stilin kendi konumu</option>
             <option value="2">Alt</option>
             <option value="5">Orta</option>
             <option value="8">Üst</option>
             <option value="1">Alt sol</option>
+            <!-- 3.3 adım 17: kitte serbest konum (konumX / konumY) varsa görünür -->
+            <option value="xy" id="mk-konum-xy" hidden>Serbest konum (Altyazı sekmesinden)</option>
           </select>
         </div>
       </div>
@@ -1950,6 +2185,13 @@
           <label class="renk-kutu" title="Kontur (çevre çizgisi) rengi"><input type="color" id="mk-renk-kontur" value="#000000"><span>Kontur</span></label>
           <label class="renk-kutu" title="Vurgulanan kelimenin rengi"><input type="color" id="mk-renk-vurgu" value="#8b7cf6"><span>Vurgu</span></label>
         </div>
+      </div>
+      <div class="field">
+        <label class="switch" title="Altyazı Efektleri'ndeki gölge ve arka plan kutusu kite alınır; kit açıkken her görünüme uygulanır">
+          <input id="mk-gorunum" type="checkbox">
+          <i></i>
+          <span>Gölge ve arka plan kutusunu da kite al</span>
+        </label>
       </div>
       <div class="field">
         <label>Logo</label>
@@ -2023,7 +2265,7 @@
 
     <div class="set-group">
       <div class="set-title">Vekil sunucu (proxy)</div>
-      <p class="hint" style="margin-bottom:8px">Kurumsal ağdaysan model indirmeleri buradan geçer. Boş bırakırsan sistem ayarı (HTTPS_PROXY) kullanılır.</p>
+      <p class="hint" style="margin-bottom:8px">Kurumsal ağdaysan indirmeler, bulut altyazı, çeviri ve Pro lisansı buradan geçer. Boş bırakırsan sistem ayarı (HTTPS_PROXY) kullanılır.</p>
       <div class="field">
         <label class="field-label" for="set-proxy">Adres</label>
         <input id="set-proxy" type="text" placeholder="http://kullanici:sifre@proxy.sirket.com:8080">
@@ -2144,8 +2386,9 @@
             <ul>
               <li>Otomatik kesim · Konuşmadan kes (dolgu, tekrar, tekrar çekim)</li>
               <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
-              <li>Suflo Stilleri timeline'da · Kanca başlığı</li>
+              <li>Altyazı Efektleri timeline'da · Kanca başlığı</li>
               <li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası</li>
+              <li>YouTube indirici: MP3 · 720p · 1080p · 4K, projeye otomatik</li>
               <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
               <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
@@ -2325,6 +2568,8 @@
   <script src="js/style-share.js"></script>
   <script src="js/marka-kiti.js"></script>
   <script src="js/style-engine.js"></script>
+  <script src="js/altyazi-efekt.js"></script>
+  <script src="js/caption-mogrt-json.js"></script>
   <script src="js/filigran.js"></script>
   <script src="js/overlay-render.js"></script>
   <script src="js/captions.js"></script>
@@ -2359,6 +2604,8 @@
   <script src="js/multicam.js"></script>
   <script src="js/multicam-ui.js"></script>
   <script src="js/marka-kiti-ui.js"></script>
+  <script src="js/youtube-indir.js"></script>
+  <script src="js/youtube-indir-ui.js"></script>
   <script src="js/zoom.js"></script>
   <script src="js/beat.js"></script>
   <script src="js/library.js"></script>

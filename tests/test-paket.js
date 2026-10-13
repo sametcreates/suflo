@@ -39,7 +39,79 @@ ok("kurucu ve geliştirici kurulumları da taşır", /\$panelItems = @\([^)]*"TH
 var vr = okuK("tools/verify-release.ps1");
 var gerekli = (/\$required = @\(([\s\S]*?)\n\s*\)/.exec(vr) || ["", ""])[1];
 ok("verify-release.ps1: THIRD_PARTY_NOTICES.md ve LICENSE paketten eksikse yayın durur", /THIRD_PARTY_NOTICES\\\.md\$/.test(gerekli) && /LICENSE\$/.test(gerekli) && /missing=\{4\}/.test(vr) && /exit 1/.test(vr), gerekli.slice(-160));
+ok("3.3 Altyazı Efektleri: oluşturucu modeli ve stil motoru pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /altyazi-efekt\\\.js\$/.test(gerekli) && /style-engine\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "altyazi-efekt.js")), gerekli.slice(0, 400));
+ok("3.3 'Kalın yazı' kapalı: statik Montserrat Regular / Bold pakette (fonts/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"fonts"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"fonts"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /fonts\/Montserrat-Regular\\\.ttf\$/.test(gerekli) && /fonts\/Montserrat-Bold\\\.ttf\$/.test(gerekli) &&
+  fs.existsSync(path.join(__dirname, "..", "fonts", "Montserrat-Regular.ttf")) && /Montserrat-Regular\.ttf/.test(notice), gerekli.slice(0, 600));
+/* ---- 3.3 adım 18: seçilmiş yeni fontlar ---- */
+var SSp = require(path.join(__dirname, "..", "js", "style-share.js"));
+var lisansDosyasi = { "Archivo Black": "ArchivoBlack", "Bebas Neue": "BebasNeue", "Libre Caslon Display": "LibreCaslonDisplay", "Exo 2": "Exo2", "Chakra Petch": "ChakraPetch" };
+var lisansEksik = SSp.fontNames().filter(function (n) {
+  var yol = path.join(__dirname, "..", "fonts", "OFL-" + (lisansDosyasi[n] || n) + ".txt");
+  if (!fs.existsSync(yol)) return true;
+  var t = fs.readFileSync(yol, "utf8");
+  // OFL 1.1 tam metin; fontTools ile örneklenen (değiştirilmiş) ailelerin telif satırı ayrılmış ad (Reserved Font
+  // Name) taşımaz: statik örnekler aynı adla dağıtılabilir (Lora olduğu gibi gelir, onun ayrılmış adı sorun değil)
+  var ornekli = n === "Montserrat" || n === "Inter" || n === "Exo 2" || n === "Nunito";
+  return !/SIL OPEN FONT LICENSE Version 1\.1/.test(t) || (ornekli && /Reserved Font Name/i.test(t.split("\n")[0]));
+});
+ok("her paket fontunun kendi fonts/OFL-<Aile>.txt'i var (OFL 1.1; örneklenen ailelerde ayrılmış ad yok)", lisansEksik.length === 0, lisansEksik.join(","));
+var yeniFontlar = SSp.fontNames().filter(function (n) { return SSp.fontSurumu(n) === "3.3"; });
+var yeniDosyalar = [];
+yeniFontlar.forEach(function (n) { [SSp.fontFile(n), SSp.fontFile(n, true)].forEach(function (f) { if (yeniDosyalar.indexOf(f) === -1) yeniDosyalar.push(f); }); });
+var yeniBayt = yeniDosyalar.reduce(function (t, f) { return t + fs.statSync(path.join(__dirname, "..", "fonts", f)).size; }, 0);
+ok("yeni fontların paket büyümesi ≤ 3 MB (4-8 aile; kalın yüz yalnız iki ağırlıklılarda)", yeniFontlar.length >= 4 && yeniFontlar.length <= 8 &&
+  yeniBayt <= 3 * 1024 * 1024, yeniFontlar.length + " aile, " + (yeniBayt / 1048576).toFixed(2) + " MB");
+ok("yeni font dosyaları ve lisansları verify-release'te zorunlu, bildirimlerde adlı",
+  yeniDosyalar.every(function (f) { return gerekli.indexOf("fonts/" + f.replace(/\./g, "\\.") + "$") !== -1 && notice.indexOf("`" + f + "`") !== -1; }) &&
+  yeniFontlar.every(function (n) { var l = "OFL-" + (lisansDosyasi[n] || n) + ".txt"; return gerekli.indexOf("fonts/" + l.replace(/\./g, "\\.") + "$") !== -1 && notice.indexOf(l) !== -1; }),
+  yeniDosyalar.join(","));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
 
-console.log(gecen + "/" + toplam + " gecti");
-process.exit(gecen === toplam ? 0 : 1);
+/* ---- Caption Editor "Çevir": kelime kelime (k1) / birikimli (kc) / N kelime belgesi çevrilmez ---- */
+// Her kelime ayrı altyazı satırı olarak LLM'e gidiyor, sonuç kelime kelime yazılıyor ("Today|to you|with the
+// camera…"), deneme hakkı düşüyordu. Çok dilli paketteki kural; kapıdan önce (deneme kurulmaz).
+var CTp = require(path.join(__dirname, "..", "js", "caption-text.js"));
+function ceviriOrtami(mode, segs) {
+  var env = { segments: segs, mode: mode, CT: CTp, gonderilen: [], harcanan: [], kapi: 0, toast: "" };
+  var calis = new Function("ENV", [
+    "var segments = ENV.segments, segmentsMode = ENV.mode, ceviriDili = '', CT = ENV.CT;",
+    "var Pro = { gate: function () { ENV.kapi++; return true; }, denemeHarca: function (k) { ENV.harcanan.push(k); } };",
+    "var KApp = { toast: function (m) { ENV.toast = m; } }; var K = { hataYardimi: function (e) { return e.message; } };",
+    "var DOMc = { 'cap-translate': { value: 'en' }, 'cap-translate-go': {}, 'cap-revert': {}, 'cap-cift-dil-sar': {} };",
+    "function el(id) { return DOMc[id]; } function status() {} function render() {} function saveDraftNow() {} function snapshot() {}",
+    "function chatConfig() { return { url: 'x', model: 'm', key: 'k' }; }",
+    "async function chatCall(cfg, body) { var m = /\\[[\\s\\S]*\\]/.exec(body.messages[body.messages.length - 1].content); var lines = m ? JSON.parse(m[0]) : []; ENV.gonderilen.push(lines);",
+    "  return { choices: [{ message: { content: JSON.stringify({ lines: lines.map(function (w) { return 'EN ' + w; }) }) } }] }; }",
+    "var LANG_NAMES = { en: 'English' };",
+    kes("async function metinleriCevir("), kes("async function translateAll("),
+    "return translateAll;"
+  ].join("\n"))(env);
+  return { env: env, calis: calis };
+}
+var kelimeler = "Bugün size kamerayla ilgili birkaç şey anlatacağım".split(" ").map(function (t, i) { return { text: t, start: i * 0.4, end: i * 0.4 + 0.35, p: 0.9 }; });
+var kayitK = [{ start: 0, end: 3.2, text: kelimeler.map(function (w) { return w.text; }).join(" "), words: kelimeler }];
+var ceviriIsleri = ["k1", "kc", "w3"].map(function (mod) {
+  var kur = CTp.segmentleriKur(JSON.parse(JSON.stringify(kayitK)), mod, {});
+  var once = kur.segments.map(function (s) { return s.text; });
+  var o = ceviriOrtami(kur.mode, kur.segments);
+  return o.calis().then(function () {
+    ok("Çevir " + mod + " (" + kur.mode + "): reddedilir, LLM'e gitmez, metin değişmez, deneme kapısı/hakkı yok",
+      kur.mode !== "plain" && o.env.gonderilen.length === 0 && o.env.harcanan.length === 0 && o.env.kapi === 0 &&
+      JSON.stringify(kur.segments.map(function (s) { return s.text; })) === JSON.stringify(once) && /satır modunda/.test(o.env.toast), o.env.toast + " " + JSON.stringify(o.env.gonderilen));
+  });
+});
+var kurSatir = CTp.segmentleriKur(JSON.parse(JSON.stringify(kayitK)), "l42", {});
+var oSatir = ceviriOrtami(kurSatir.mode, kurSatir.segments);
+ceviriIsleri.push(oSatir.calis().then(function () {
+  ok("Çevir satır modu (plain): çevrilir, hak başarıda düşer (değişmedi)", kurSatir.mode === "plain" && oSatir.env.gonderilen.length === 1 &&
+    oSatir.env.harcanan.length === 1 && /^EN /.test(kurSatir.segments[0].text), JSON.stringify(kurSatir.segments.map(function (s) { return s.text; })));
+}));
+
+Promise.all(ceviriIsleri).then(function () {
+  console.log(gecen + "/" + toplam + " gecti");
+  process.exit(gecen === toplam ? 0 : 1);
+}, function (e) { console.log("FAIL beklenmeyen hata " + (e && e.stack || e)); process.exit(1); });

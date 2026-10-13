@@ -18,8 +18,8 @@ ok("kalıp: kanca başlığı katmanı", T("Kanca başlığı V3 katmanına ekle
   T("Kanca başlığı V4 katmanına eklendi (yeni katman)") === "Hook title added to track V4 (new track)", T("Kanca başlığı V4 katmanına eklendi (yeni katman)"));
 ok("kalıp: sayı + yüzde + MB", T("Motor iniyor… %45 (120 MB)") === "Downloading engine… 45% (120 MB)", T("Motor iniyor… %45 (120 MB)"));
 ok("kalıp: Türkçe binlik ayırıcı", T("1.076 SFX") === "1,076 SFX", T("1.076 SFX"));
-ok("kalıp: iç içe çeviri (yakalanan metin de çevrilir)", T("12 kelime vurgulandı · Suflo Stillerinde vurgu renginde görünür · Ctrl+Z ile geri al") ===
-  "12 words emphasized · shown in the highlight color in Suflo Styles · Ctrl+Z to undo", T("12 kelime vurgulandı · Suflo Stillerinde vurgu renginde görünür · Ctrl+Z ile geri al"));
+ok("kalıp: iç içe çeviri (yakalanan metin de çevrilir)", T("12 kelime vurgulandı · Altyazı Efektlerinde vurgu renginde görünür · Ctrl+Z ile geri al") ===
+  "12 words emphasized · shown in the highlight color in Caption Effects · Ctrl+Z to undo", T("12 kelime vurgulandı · Altyazı Efektlerinde vurgu renginde görünür · Ctrl+Z ile geri al"));
 ok("{n} yalnız sayı yakalar: 'Satır boş' kalıba düşmez", T("12 GB boş") === "12 GB free" && T("Satır boş") === "Satır boş", T("Satır boş"));
 ok("· ile birleşik durum satırı parça parça", T("Hazır: Turbo · GPU hızlandırmalı · sessizlik atlama açık") === "Ready: Turbo · GPU accelerated · silence skipping on", T("Hazır: Turbo · GPU hızlandırmalı · sessizlik atlama açık"));
 ok("ön ek simge korunur", T("✨ AI ile öner") === "✨ Suggest with AI", T("✨ AI ile öner"));

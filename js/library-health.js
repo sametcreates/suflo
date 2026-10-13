@@ -22,7 +22,8 @@ window.KLibraryHealth = (function () {
     "repair-engine": "Motoru onar",
     "sync-pro": "Eşitle",
     "clear-folders": "Bağlantıyı temizle",
-    "check-update": "Güncelle"
+    "check-update": "Güncelle",
+    "update-ytdlp": "yt-dlp'yi güncelle"
   };
   var GROUP_LABELS = {
     system: "Sistem",
@@ -280,6 +281,7 @@ window.KLibraryHealth = (function () {
       { k: "markers", ad: "Marker API", etki: "Bölüm, viral ve B-roll marker'ları eklenemez" },
       { k: "qeAddTracks", ad: "QE kanal ekleme", etki: "Boş kanal yoksa Sesi iyileştir / katmanlar yeni kanal açamaz" },
       { k: "trackItemDisabled", ad: "Klip devre dışı bırakma", etki: "Sesi iyileştir orijinal sesi kapatamaz (elle kapat)" },
+      { k: "importMGT", ad: "Şablon içe aktarma (importMGT)", etki: "Altyazı Efektleri Premiere yerel klip yerine video katmanı olarak eklenir" },
       { k: "seqFromClips", ad: "Klipten sekans (createNewSequenceFromClips)", etki: "Rehberin örnek klibi sekansa kendiliğinden konmaz; klibi Yeni Öğe simgesine sürüklemen gerekir" },
       // Hız Rampası (KS_apiProbe yalnız typeof okur; setSpeed hiçbir zaman çağrılmaz)
       { k: "qeSetSpeed", ad: "QE hız yazma (setSpeed)", etki: "Hız Rampası klibe hız yazamaz" },
@@ -336,7 +338,7 @@ window.KLibraryHealth = (function () {
       var ff = await K.findFfmpeg(true);
       if (!ff) return [{ status: "bad", title: "FFmpeg bulunamadı", detail: "Altyazı, kesim, zoom ve ritim analizi çalışmaz.", action: "repair-ffmpeg", group: "engine" }];
       if (K.ffmpegLibass && K.ffmpegLibass() === false) {
-        return [{ status: "warn", title: "FFmpeg altyazı çizemiyor (libass yok)", detail: ff + " · Suflo Stilleri ve kanca başlığı çalışmaz; Suflo'nun ffmpeg'ini kur.", action: "repair-ffmpeg", group: "engine" }];
+        return [{ status: "warn", title: "FFmpeg altyazı çizemiyor (libass yok)", detail: ff + " · Altyazı Efektleri ve kanca başlığı çalışmaz; Suflo'nun ffmpeg'ini kur.", action: "repair-ffmpeg", group: "engine" }];
       }
       return [{ status: "good", title: "FFmpeg", detail: ff, group: "engine" }];
     } catch (e) {
@@ -503,9 +505,20 @@ window.KLibraryHealth = (function () {
     }
   }
 
+  /*
+   * YouTube indirici (3.3): yt-dlp kurulu mu, kurulum kaydıyla aynı dosya mı (SHA-256), güncelleme var mı.
+   * Kurulu değilse uyarı değil (ilk kullanımda iner). Satırlar js/youtube-indir.js doctorSatiri'ndan.
+   */
+  async function ytdlpChecks() {
+    if (!window.KYoutube || !KYoutube.doctorSatirlari) return [];
+    try { return await KYoutube.doctorSatirlari(); } catch (e) {
+      return [{ status: "warn", title: "yt-dlp denetlenemedi", detail: String(e && e.message ? e.message : e), group: "system" }];
+    }
+  }
+
   async function runAsyncChecks(report) {
     localSystemChecks(report);
-    var batches = await Promise.all([premiereChecks(), ffmpegChecks(), engineChecks(), networkChecks()]);
+    var batches = await Promise.all([premiereChecks(), ffmpegChecks(), engineChecks(), networkChecks(), ytdlpChecks()]);
     batches.forEach(function (checks) {
       (checks || []).forEach(function (c) { addCheck(report, c.status, c.title, c.detail, c.action, c.group); });
     });
@@ -690,9 +703,12 @@ window.KLibraryHealth = (function () {
     if (action === "repair-engine") {
       if (!window.KEngine || !KEngine.install) throw new Error("Yerel motor kurulum modülü yüklenmedi.");
       var gpu = await KEngine.detectGpu(true);
+      // Onarım kurulu derlemeyi korur: kullanıcının Hızlandırma'yı kapatması ya da CUDA bu sürücüde çalışmadığı
+      // için kaydedilen CPU dönüşü (engineBuild "cpu") cuBLAS'a çevrilmez; yoksa her onarım 646 MB indirirdi.
+      // Derleme değiştirmek Ayarlar › Hızlandırma › Değiştir'in işi.
       await KEngine.install({
         modelId: K.settings().model || "turbo",
-        useGpu: gpu && gpu.kind === "cuda",
+        useGpu: !!(gpu && gpu.kind === "cuda") && K.settings().engineBuild !== "cpu",
         onStatus: say
       });
       return;
@@ -716,6 +732,11 @@ window.KLibraryHealth = (function () {
       }
       K.saveSettings();
       await refreshLibraries();
+      return;
+    }
+    if (action === "update-ytdlp") {
+      if (!window.KYoutube || !KYoutube.guncelle) throw new Error("YouTube indirici yüklenmedi.");
+      await KYoutube.guncelle(say);
       return;
     }
     if (action === "check-update") {

@@ -2,13 +2,15 @@
  * Suflo — Marka Kiti (saf modül)
  *
  * Kullanıcının marka görünümü: yazı tipi, yazı / kontur / vurgu rengi, isteğe bağlı konum
- * (yoksa her stilin kendi konumu) ve köşe logosu. Açıkken her Suflo Stiline ve kanca
- * başlığına uygulanır. ilerleme (ilerleme çubuğu) ve cta (kapanış çağrısı) alanları
+ * (yoksa her stilin kendi konumu; 3.3 adım 17'den beri serbest X / Y de olabilir), isteğe bağlı
+ * gölge ve arka plan kutusu (Altyazı Efektleri'nden alınır) ve köşe logosu. Açıkken Altyazı
+ * Efektlerine ve kanca başlığına uygulanır. ilerleme (ilerleme çubuğu) ve cta (kapanış çağrısı) alanları
  * burada tanımlıdır; tek tık paket (yol haritası 8. adım) onları kullanır.
  *
  * Şema (normalize sonrası her alan VAR):
  *   on: bool
- *   stil:     { id: "" | motor stili, overrides: { font?, fontFile?, renk?, konturRenk?, vurguRenk?, konum? } }
+ *   stil:     { id: "" | motor stili, overrides: { font?, fontFile?, renk?, konturRenk?, vurguRenk?, konum?,
+ *               konumX?, konumY? (%5-95), golge? ({ renk, opak, mesafe, yumusak } | null), kutu?, kutuRenk?, kutuOpak? } }
  *   kanca:    { stil: "" | kanca stili, renk: "" | #rrggbb, sure: 1-5 sn }
  *   ilerleme: { konum: "ust" | "alt" | "yok", renk: #rrggbb, kalinlik: 2-24 (1080p'de px) }
  *   cta:      { acik: bool, metin: ≤40 karakter, sure: 1.5-4 sn }
@@ -30,7 +32,12 @@
 
   var KOSELER = ["su", "ss", "as", "au"];
   var ILERLEME = ["ust", "alt", "yok"];
-  var KIT_ALANLARI = ["font", "fontFile", "renk", "konturRenk", "vurguRenk", "konum"];
+  var KIT_ALANLARI = ["font", "fontFile", "renk", "konturRenk", "vurguRenk", "konum",
+    "konumX", "konumY", "golge", "kutu", "kutuRenk", "kutuOpak"];
+  // Birlikte uygulanan alan grupları: kitin konumu (hazır ya da serbest) ve kutusu bir bütün
+  var KONUM_ALANLARI = ["konum", "konumX", "konumY"], KUTU_ALANLARI = ["kutu", "kutuRenk", "kutuOpak"];
+  // Altyazı Efektleri'nden alınan görünüm alanları ("Gölge ve kutu da kitte")
+  var GORUNUM_ALANLARI = ["golge", "kutu", "kutuRenk", "kutuOpak"];
 
   // TikTok / Reels / Shorts arayüzünün kapattığı bölgeler (stil motorundaki GUVENLI_ALAN ile aynı)
   var UST_PAY = 0.07, IKON_X = 0.87, ALT_SINIR = 0.78;
@@ -73,11 +80,13 @@
       !/[\u0000-\u001f]/.test(p) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(p) && /\.(png|jpe?g)$/i.test(p);
   }
 
-  // Kitte tutulan stil alanları: yazı tipi, üç renk, konum (punto / kontur stilin kendi değeri kalır)
+  // Kitte tutulan stil alanları: yazı tipi, üç renk, konum, gölge, kutu (punto / kontur stilin kendi değeri kalır)
   function kitOverrides(o, uyarilar) {
     var temiz = SS ? SS.sanitizeOverrides(nesne(o), uyarilar) : {};
     var out = {};
     KIT_ALANLARI.forEach(function (k) { if (own(temiz, k)) out[k] = temiz[k]; });
+    // serbest konum ikisi birlikte: tek eksen kitte anlamsız
+    if (!(typeof out.konumX === "number" && typeof out.konumY === "number")) { delete out.konumX; delete out.konumY; }
     return out;
   }
 
@@ -139,7 +148,8 @@
   /*
    * Stil (captions.js stil() biçimi ya da motor preset.style) + kit → yeni stil.
    * Öncelik: kit > stil. Kitte konum yoksa stilin kendi konumu kalır. Kit kapalıysa kopya döner.
-   * fontFile her zaman yazı tipinden türetilir.
+   * fontFile her zaman yazı tipinden türetilir. Konum bir bütün: kitte hazır konum varsa stilin serbest
+   * konumu (konumX / konumY) silinir, kitin serbest konumu varsa o gelir. Kutu da bir bütün.
    */
   function mergeBrandKit(stil, kit) {
     var out = {};
@@ -147,9 +157,10 @@
     Object.keys(s).forEach(function (key) { out[key] = s[key]; });
     if (!acik(kit)) return out;
     var ov = kitOverrides(kit.stil && kit.stil.overrides);
+    if (KONUM_ALANLARI.some(function (k) { return own(ov, k); })) { out.konumX = null; out.konumY = null; }
     Object.keys(ov).forEach(function (key) {
       if (key === "fontFile") return;
-      out[key] = ov[key];
+      out[key] = ov[key] !== null && typeof ov[key] === "object" ? JSON.parse(JSON.stringify(ov[key])) : ov[key];
     });
     if (ov.font) out.fontFile = ov.fontFile;
     return out;
@@ -163,13 +174,24 @@
   }
   function ayniDeger(a, b) {
     if (a === undefined || a === null || b === undefined || b === null) return a == null && b == null;
+    // gölge nesnesi: alan alan (renk küçük harf)
+    if (typeof a === "object" || typeof b === "object") return JSON.stringify(a).toLowerCase() === JSON.stringify(b).toLowerCase();
     return String(a).toLowerCase() === String(b).toLowerCase();
   }
-  var STIL_ALANLARI = ["font", "renk", "konturRenk", "vurguRenk", "konum"];
+  /*
+   * İki kitin aynı alanı aynı mı? Kitte olmayan alan (undefined: stilin kendi değeri) ile kitin açıkça
+   * koyduğu "yok" (golge: null, "Gölge ve kutu" gölgesizken doldurulmuş kit) ayrıdır: gölgesiz kit açılınca
+   * görünümün gölgesi kalkar (mergeBrandKit de öyle yapar; yoksa sonuç işlem sırasına bağlı kalırdı).
+   */
+  function ayniKitDegeri(a, b) {
+    if (a === undefined || b === undefined) return a === b;
+    return ayniDeger(a, b);
+  }
+  var STIL_ALANLARI = ["font", "renk", "konturRenk", "vurguRenk", "konum", "konumX", "konumY", "golge", "kutu", "kutuRenk", "kutuOpak"];
 
   // Kitin stile işleyen kısmı (açık/kapalı, yazı tipi, renkler, konum) değişti mi? Logo / kanca / köşe sayılmaz.
   function styleFieldsChanged(eski, yeni) {
-    return STIL_ALANLARI.some(function (key) { return !ayniDeger(kitDegeri(eski, key), kitDegeri(yeni, key)); });
+    return STIL_ALANLARI.some(function (key) { return !ayniKitDegeri(kitDegeri(eski, key), kitDegeri(yeni, key)); });
   }
 
   /*
@@ -184,7 +206,7 @@
     Object.keys(s).forEach(function (key) { out[key] = s[key]; });
     STIL_ALANLARI.forEach(function (key) {
       var e = kitDegeri(eski, key), y = kitDegeri(yeni, key);
-      if (ayniDeger(e, y)) return;
+      if (ayniKitDegeri(e, y)) return;
       var beklenen = e !== undefined ? e : b[key];
       var hedef = y !== undefined ? y : b[key];
       if (hedef === undefined || !ayniDeger(out[key], beklenen) || ayniDeger(out[key], hedef)) return;
@@ -225,10 +247,11 @@
 
   /*
    * "Şimdiki ayarlardan doldur": paneldeki stil → kitin stil alanları.
-   * konumDahil false ise konum boş kalır ("stilin kendi konumu").
+   * konumDahil false ise konum boş kalır ("stilin kendi konumu"); doğruysa serbest konum (konumX / konumY)
+   * da alınır. gorunumDahil doğruysa Altyazı Efektleri'nin gölgesi ve arka plan kutusu da kite girer.
    * Paketle gelmeyen (sistem) yazı tipi kite alınmaz.
    */
-  function fromCurrent(stil, kit, konumDahil) {
+  function fromCurrent(stil, kit, konumDahil, gorunumDahil) {
     var s = nesne(stil);
     var temel = normalize(kit || {}).kit;
     var ov = {};
@@ -237,6 +260,12 @@
     if (konumDahil) {
       var p = sayi(s.konum);
       if (p === 1 || p === 2 || p === 5 || p === 8) ov.konum = p;
+      var xy = kitOverrides({ konumX: s.konumX, konumY: s.konumY });
+      if (own(xy, "konumX")) { ov.konumX = xy.konumX; ov.konumY = xy.konumY; }
+    }
+    if (gorunumDahil) {
+      var g = kitOverrides({ golge: own(s, "golge") ? s.golge : null, kutu: s.kutu === true, kutuRenk: s.kutuRenk, kutuOpak: s.kutuOpak });
+      GORUNUM_ALANLARI.forEach(function (key) { if (own(g, key)) ov[key] = g[key]; });
     }
     temel.stil.overrides = ov;
     if (typeof s.aile === "string" && s.aile && s.aile !== "custom") temel.stil.id = s.aile;

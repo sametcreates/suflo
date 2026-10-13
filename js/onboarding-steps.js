@@ -179,13 +179,14 @@
 
   /*
    * Stil ızgarasındaki bir tıklamanın hedefi: hedeften ızgaraya (kap) doğru çıkıp
-   * .stil-sec kartını bulur. DOM'suz test edilebilsin diye yalnız parentNode/sınıf okur.
+   * .stil-sec kartını ya da Altyazı Efektleri görünüm çipini (.efekt-cip, 3.3; hiç kilitli değil)
+   * bulur. DOM'suz test edilebilsin diye yalnız parentNode/sınıf okur.
    * Döner: { kart, kilitli, secili } (stilDokunusuSecimMi'ye verilir).
    */
   function stilTiklamasi(hedef, kap) {
     var n = hedef, kart = null;
     for (var i = 0; n && n !== kap && i < 20; i++) {
-      if (sinifVar(n, "stil-sec")) { kart = n; break; }
+      if (sinifVar(n, "stil-sec") || sinifVar(n, "efekt-cip")) { kart = n; break; }
       n = n.parentNode;
     }
     return {
@@ -195,7 +196,8 @@
     };
   }
 
-  var STIL_TERCIHLERI = ["maxlen", "kase", "punct", "preset", "mogrtPath", "motorStili", "stil"];
+  // 3.3: Altyazı Efektleri görünümü (seçili / taban çip) ve paylaşılan kodun yazarı da görünümün parçası
+  var STIL_TERCIHLERI = ["maxlen", "kase", "punct", "preset", "mogrtPath", "motorStili", "stil", "gorunum", "gorunumTaban", "kredi"];
   function stilTercihiGeriYukle(simdi, eski) {
     var kaynak = eski && typeof eski === "object" ? eski : null;
     if (!simdi || typeof simdi !== "object") return kaynak ? JSON.parse(JSON.stringify(kaynak)) : null;

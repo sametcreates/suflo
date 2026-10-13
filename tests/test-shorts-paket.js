@@ -78,6 +78,85 @@ ok("stilAyarlari: Marka Kiti yazı tipi / renk, 9:16'da güvenli yerleşim", (fu
   return s.overrides.font === "Anton" && s.overrides.renk === "#ff0000" && s.overrides.guvenli === true && s.konum === 5;
 })());
 
+/* ---------------- 3.3: Altyazı Efektleri ---------------- */
+var SEm = require(path.join(__dirname, "..", "js", "style-engine.js"));
+ok("secimNormalize: varsayılan stil Altyazı Efektleri; efekt ayarında yalnız bilinen düz alanlar", (function () {
+  var n = P.secimNormalize({ gorunum: "canli", efekt: { giris: "pop", aktif: "glitch", font: "Anton", __proto__: { x: 1 }, kotu: { a: 1 }, boyut: Infinity, kase: "upper" } });
+  return P.secimNormalize({}).stilId === "efekt" && n.gorunum === "canli" && n.efekt.giris === "pop" && n.efekt.aktif === "glitch" && n.efekt.kase === "upper" &&
+    n.efekt.kotu === undefined && n.efekt.boyut === undefined && n.efekt.x === undefined && P.secimNormalize({ gorunum: "../x", efekt: [1] }).gorunum === "" &&
+    P.secimNormalize({ efekt: [1] }).efekt === null;
+})());
+ok("stilAyarlari: efekt ayarı stil motoruna gider (giriş, vurgu, satır, kelime), Marka Kiti üstte, kase girmez", (function () {
+  var k2 = MK.normalize({ on: true, stil: { overrides: { font: "Lora" } } }).kit;
+  var s = P.stilAyarlari("efekt", k2, true, { giris: "zipla", aktif: "titre", satir: 1, kelime: 3, font: "Anton", renk: "#00ff00", kase: "upper" });
+  var r = SEm.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir iki üç" }], cueKind: "lines", width: 1080, height: 1920, overrides: s.overrides });
+  return s.overrides.giris === "zipla" && s.overrides.aktif === "titre" && s.overrides.satir === 1 && s.overrides.kelime === 3 && s.overrides.font === "Lora" &&
+    s.overrides.renk === "#00ff00" && s.overrides.kase === undefined && s.overrides.guvenli === true && r.eventCount > 0 && /\\fscx112/.test(r.ass);
+})());
+// "Altyazı sekmesindeki efekt": kit panelde görünüm seçilirken uygulandı; sonraki elle ayar (Anton, X 30 / Y 40)
+// paneldeki önizleme ve katman gibi çizilir. Eskiden kit yeniden uygulanıp Lora + alt konuma dönüyordu (CTA da yanlış Y'de)
+ok("stilAyarlari: panel efekti Marka Kiti'yle yeniden birleştirilmez (elle yazı tipi ve serbest konum korunur)", (function () {
+  var kit = MK.normalize({ on: true, stil: { overrides: { font: "Lora", konum: 2 } } }).kit;
+  var ef = { giris: "pop", font: "Anton", renk: "#ffffff", konum: 2, konumX: 30, konumY: 40 };
+  var s = P.stilAyarlari("efekt", kit, true, ef, true), h = P.stilAyarlari("efekt", kit, true, ef);
+  var r = SEm.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir iki üç" }], cueKind: "lines", width: 1080, height: 1920, overrides: s.overrides });
+  return s.overrides.font === "Anton" && s.overrides.konumX === 30 && s.konumY === 40 && /Style: Suflo,Anton/.test(r.ass) && /\\an5\\pos\(324,768\)/.test(r.ass) &&
+    h.overrides.font === "Lora" && h.konumY === null;
+})());
+ok("shorts-paket: altyazı ve çerçeve adımları panel görünümünü stilAyarlari'na bildirir", (function () {
+  var src = require("fs").readFileSync(path.join(__dirname, "..", "js", "shorts-paket.js"), "utf8");
+  var cagri = src.match(/P\.stilAyarlari\([^\n]*\)/g) || [];
+  return cagri.length === 2 && cagri.every(function (c) { return /job\.secim\.gorunum === "panel"\)$/.test(c); });
+})());
+ok("stilAyarlari: eski stil kimliği (eski paket işi) efekt alanı almaz, eskisi gibi", JSON.stringify(Object.keys(P.stilAyarlari("hormozi", null, false).overrides)) ===
+  JSON.stringify(["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli"]));
+ok("secimNormalize: noktalama (punct), gölge nesnesi (yalnız renk + sayılar), kutu ve serbest konum (null = hazır) işle saklanır", (function () {
+  var n = P.secimNormalize({ efekt: { punct: false, golge: { renk: "#112233", opak: 40, mesafe: 3, yumusak: 6, kotu: "x", __proto__: { y: 1 } }, kutu: true, kutuRenk: "#ffffff",
+    kutuOpak: 70, konumX: null, konumY: null } });
+  var n2 = P.secimNormalize({ efekt: { golge: null, konumX: 30, konumY: 70 } }), n3 = P.secimNormalize({ efekt: { golge: "var", renk: "#000000" } });
+  return n.efekt.punct === false && JSON.stringify(n.efekt.golge) === '{"renk":"#112233","opak":40,"mesafe":3,"yumusak":6}' && n.efekt.kutu === true &&
+    n.efekt.kutuOpak === 70 && n.efekt.konumX === null && n.efekt.konumY === null && n2.efekt.golge === null && n2.efekt.konumX === 30 &&
+    n3.efekt.golge === undefined && n3.efekt.renk === "#000000";
+})());
+ok("stilAyarlari: gölge / kutu / serbest konum stil motoruna gider; noktalama ve yazım biçimi (metin kuralı) gitmez", (function () {
+  var s = P.stilAyarlari("efekt", null, true, { golge: { renk: "#ff0000", opak: 50, mesafe: 4, yumusak: 2 }, kutu: true, kutuRenk: "#00ff00", kutuOpak: 40,
+    konumX: 30, konumY: 40, punct: false, kase: "upper" });
+  var r = SEm.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir iki üç" }], cueKind: "lines", width: 1080, height: 1920, overrides: s.overrides });
+  return s.overrides.golge.renk === "#ff0000" && s.overrides.kutu === true && s.overrides.kutuRenk === "#00ff00" && s.overrides.konumX === 30 &&
+    s.overrides.punct === undefined && s.overrides.kase === undefined && /SufloKutu/.test(r.ass) && /\\4c&H000000FF/.test(r.ass) && /\\an5\\pos\(324,/.test(r.ass);
+})());
+ok("captionCues: oluşturucunun noktalaması (punct false) uygulanır; verilmezse efektin kendi kuralı (noktalamalı)", (function () {
+  var kayit = { mod: "plain", segs: [{ start: 0, end: 2, text: "Bunu kaçırma, tamam mı?" }] };
+  return P.captionCues(kayit, { styleId: "efekt", kase: "upper", punct: false }).cues[0].text === "BUNU KAÇIRMA TAMAM MI" &&
+    P.captionCues(kayit, { styleId: "efekt", kase: "upper" }).cues[0].text === "BUNU KAÇIRMA, TAMAM MI?";
+})());
+
+/*
+ * 3.3 adım 17: serbest konumlu altyazıda CTA yeri hazır konumdan değil serbest Y'den: Vurucu (Orta, konum 5)
+ * Y %75'e sürüklenince CTA üstte (eskiden altta, %74'te kartın üstüne biniyordu); Temiz (Alt) Y %30'a
+ * sürüklenince CTA altta (eskiden üstte, kartın üstüne).
+ */
+var AEs = require(path.join(__dirname, "..", "js", "altyazi-efekt.js"));
+function ctaY(ass) { var m = /\\(?:pos|move)\(\d+,(\d+)/.exec(ass || ""); return m ? Number(m[1]) : -1; }
+ok("stilAyarlari: serbest konumun dikeyi (konumY) döner; hazır konumda / eski stilde null", (function () {
+  var v = Object.assign(AEs.gorunum("vurucu").ayar, { konumX: 50, konumY: 75 });
+  var s = P.stilAyarlari("efekt", null, true, v), h = P.stilAyarlari("efekt", null, true, AEs.gorunum("vurucu").ayar);
+  var kitXY = MK.normalize({ on: true, stil: { overrides: { konum: 2, konumX: 40, konumY: 20 } } }).kit;
+  return s.konum === 5 && s.konumY === 75 && h.konumY === null && P.stilAyarlari("hormozi", null, true).konumY === null &&
+    P.stilAyarlari("efekt", kitXY, true, AEs.gorunum("vurucu").ayar).konumY === 20;
+})());
+(function () {
+  var sV = P.stilAyarlari("efekt", null, true, Object.assign(AEs.gorunum("vurucu").ayar, { konumX: 50, konumY: 75 }));
+  var sT = P.stilAyarlari("efekt", null, true, Object.assign(AEs.gorunum("temiz").ayar, { konumX: 50, konumY: 30 }));
+  var o = { W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({}), hookDur: 3, altyaziAcik: true, lang: "tr" };
+  var cV = P.cercevePlani(Object.assign({}, o, { altyaziKonum: sV.konum, altyaziY: sV.konumY }));
+  var cT = P.cercevePlani(Object.assign({}, o, { altyaziKonum: sT.konum, altyaziY: sT.konumY }));
+  ok("cercevePlani: serbest konumlu altyazı Y %75 (Vurucu, hazır konum Orta) → CTA üstte; Y %30 (Temiz, hazır konum Alt) → CTA altta",
+    cV.cta && cT.cta && ctaY(cV.cta.ass) < 1920 * 0.4 && ctaY(cT.cta.ass) > 1920 * 0.5, ctaY(cV.cta && cV.cta.ass) + " / " + ctaY(cT.cta && cT.cta.ass));
+})();
+ok("shorts-paket.js çerçeve adımı serbest konumu CTA'ya verir (altyaziY: sa.konumY)",
+  /altyaziKonum: sa\.konum, altyaziY: sa\.konumY,/.test(require("fs").readFileSync(path.join(__dirname, "..", "js", "shorts-paket.js"), "utf8")));
+
 /* ---------------- çerçeve planı ---------------- */
 var cp1 = P.cercevePlani({ W: 1080, H: 1920, dur: 30, secim: P.secimNormalize({}), hookDur: 3, altyaziKonum: 2, altyaziAcik: true, lang: "tr" });
 ok("cercevePlani: çubuk + CTA, altyazı altta → CTA üstte", cp1.progress && cp1.cta && !cp1.logo && !cp1.bos && cp1.cta.start === 27.5 &&

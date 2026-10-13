@@ -14,6 +14,15 @@ var cmdKaynak = fs.readFileSync(KOKYOL + "tools/kurucu/Suflo-Kur.command", "utf8
 ok("bat: onayda E/e ve Y/y kabul edilir (Y artık iptal etmez)", /if \/I "!ILK!"=="E" set "ONAY=1"/.test(batKaynak) &&
   /if \/I "!ILK!"=="Y" set "ONAY=1"/.test(batKaynak) && /set "ILK=!DEVAM:~0,1!"/.test(batKaynak) && !/if \/I not "!DEVAM!"=="E"/.test(batKaynak));
 ok("command: onayda E/e ve Y/y kabul edilir", /\[EeYy\]\*\) ;;/.test(cmdKaynak));
+// macOS'ta Premiere'in yürütülebilir adı yılı taşır ("Adobe Premiere Pro 2025") ve pgrep -x kısaltılmış
+// p_comm'a tam eşleşme ister: "Premiere açık" uyarısı hiç çıkmıyordu. Tam yol (-f) bir desenle aranır.
+var pgrepM = /pgrep -f "([^"]+)"/.exec(cmdKaynak);
+var pgrepDesen = pgrepM ? new RegExp(pgrepM[1]) : null;
+ok("command: Premiere açık denetimi tam yolla (pgrep -f), -x ile değil", !/pgrep -x/.test(cmdKaynak) && !!pgrepDesen &&
+  ["/Applications/Adobe Premiere Pro 2025/Adobe Premiere Pro 2025.app/Contents/MacOS/Adobe Premiere Pro 2025",
+    "/Applications/Adobe Premiere Pro 2020/Adobe Premiere Pro 2020.app/Contents/MacOS/Adobe Premiere Pro 2020",
+    "/Applications/Adobe Premiere Pro (Beta)/Adobe Premiere Pro (Beta).app/Contents/MacOS/Adobe Premiere Pro (Beta)"].every(function (s) { return pgrepDesen.test(s); }) &&
+  !pgrepDesen.test("/bin/bash /Users/x/Downloads/Suflo/Suflo-Kur.command"), pgrepM ? pgrepM[1] : "pgrep -f yok");
 ok("bat ve command iki dilli (İngilizce satırlar)", [batKaynak, cmdKaynak].every(function (k) {
   return /Setup cancelled/.test(k) && /SETUP COMPLETE/.test(k) && /Configuring Premiere/.test(k) && /Copying the panel/.test(k) &&
     /Verifying/.test(k) && /English \(beta\)/.test(k) && /Continue anyway\?/.test(k);

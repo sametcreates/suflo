@@ -483,8 +483,10 @@ window.KHizRampasi = (function () {
     grafik: "Grafik, MOGRT, ayar katmanı ya da fotoğrafa hız rampası uygulanmaz.",
     ters: "Ters oynatılan klipte rampa yapılamaz.",
     remap: "Bu klipte Zaman Yeniden Eşleme var gibi görünüyor; önce kapat.",
-    warp: "Warp Stabilizer hız değişikliğiyle çalışmaz. Klibi iç içe sekans yapıp yeniden dene.",
+    // iç içe sekansa rampa uygulanmaz (icSekans): Warp için önce rampa, sonra rampalı parçalar iç içe
+    warp: "Warp Stabilizer hız değişikliğiyle çalışmaz. Efekti kaldırıp rampayı uygula; sabitleme gerekirse rampalı parçaları iç içe sekans yapıp Warp'ı ona ekle.",
     multicam: "Multicam ve birleştirilmiş kliplerde hız yazılamıyor.",
+    icSekans: "İç içe sekansa hız rampası uygulanmaz. Sekansı açıp içindeki klibe uygula.",
     kisa: "Rampa için en az 12 kare gerekli.",
     qeYok: "Bu Premiere sürümünde Suflo hız yazamıyor. Premiere'i güncelle; Doctor'da ayrıntı var.",
     linkedConflict: "Klip sesle bağlı ve bu sürümde bağ koparılamıyor. Klibi seç, Ctrl+L ile bağlantıyı kopar, yeniden uygula.",
@@ -515,7 +517,7 @@ window.KHizRampasi = (function () {
     if (r.kod && Object.prototype.hasOwnProperty.call(HATA, r.kod)) return HATA[r.kod];
     return r.error || "Premiere işlemi tamamlanamadı.";
   }
-  var KISA = { grafik: "grafik", ters: "ters", remap: "zaman eşleme", warp: "Warp", kilitli: "kilitli", multicam: "multicam", kisa: "kısa",
+  var KISA = { grafik: "grafik", ters: "ters", remap: "zaman eşleme", warp: "Warp", kilitli: "kilitli", multicam: "multicam", icSekans: "iç içe sekans", kisa: "kısa",
     qeYok: "hız yazılamadı", linkedConflict: "bağlı ses", tutamak: "medya yetmedi", hizYazilamadi: "hız yazılamadı", yerlesim: "yerleşmedi",
     geriAlinamadi: "geri alınamadı", degisti: "değişmiş", sekans: "sekans değişti", plan: "plan", vurusYok: "vuruş yok", fazla: "12 klip sınırı",
     duz: "tek hız", linkedBilinmiyor: "bağlı ses" };

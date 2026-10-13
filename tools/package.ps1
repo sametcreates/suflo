@@ -38,6 +38,8 @@ if ($env:SUFLO_BUNDLE_CONTENT) { throw "SUFLO_BUNDLE_CONTENT desteklenmiyor: Pro
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 # THIRD_PARTY_NOTICES.md: uyarlanan MIT kodun (Raunen -> js/whisper-words.js) lisans metni pakette olmali
+# assets/: 3.3 adim 21 Altyazi Efektleri sablonu assets/mogrt/altyazi-efekt-v1.mogrt (TranscriptAI, izinle) dahil;
+# verify-release.ps1 yalniz bu yol + sha256 icin .mogrt istisnasi tanir
 $stageItems = @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md")
 foreach ($item in $stageItems) {
     $p = Join-Path $root $item

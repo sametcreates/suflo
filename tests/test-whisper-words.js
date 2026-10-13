@@ -306,7 +306,8 @@ var tl = cap.slice(cap.indexOf("async function transcribeLocal"), cap.indexOf("a
 ok("transcribeLocal: -ml 1 -sow yalnız belirteçsiz derlemede kelime gerekince", /if \(wordLevel && segs\.length && !WW\.kelimeVar\(segs\)\)/.test(tl) && /kelimeYedegi: true/.test(tl));
 ok("takılma kurtarma: 'kalan' satırları ve kelimeleri aynı ofsetle kayar", /kalan = WW\.zamanEsle\(kalan, kesBas, 1\)/.test(tl) && !/sg\.start \+= kesBas/.test(tl));
 ok("go(): tek klip ve toplu klip eşlemesi kelimeleri taşır", /WW\.zamanEsle\(raw, seqOffset, speedFactor\)/.test(cap) && /WW\.zamanEsle\(bRaw, bc\.clipStart, bf\)/.test(cap));
-ok("stil motoru çağrıları ölçülmüş kelimeleri alır (önizleme dahil, kaydırılarak)", (cap.match(/cueler\(\{ vurgu: true, kelimeler: true \}\)/g) || []).length === 3 &&
+// 3.3 adım 21: dördüncüsü Altyazı Efektleri'nin Premiere yerel çıktısı (yerelAltyaziUygula)
+ok("stil motoru çağrıları ölçülmüş kelimeleri alır (önizleme ve Premiere yerel dahil, kaydırılarak)", (cap.match(/cueler\(\{ vurgu: true, kelimeler: true \}\)/g) || []).length === 4 &&
   /o\.words = WW\.kelimeleriKaydir\(c\.words, 0\.15 - ilk\)/.test(cap));
 ok("editör: bölme / birleştirme / toplu kaydırma / zaman düzenleme kelimeleri taşır",
   /WW\.bolmeNoktasi\(s, a, b, kesme\)/.test(cap) && /WW\.birlestirKelimeler\(segments\[i\], nx\)/.test(cap) &&

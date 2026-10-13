@@ -55,6 +55,20 @@
 @font-face { font-family: "Bungee";        src: url("../fonts/Bungee.ttf");        font-display: block; }
 @font-face { font-family: "Lora";          src: url("../fonts/Lora.ttf");          font-weight: 400 700; font-display: block; }
 @font-face { font-family: "Montserrat";    src: url("../fonts/Montserrat.ttf");    font-weight: 400 800; font-display: block; }
+/* 3.3 adım 18: seçilmiş yeni fontlar (kategorili seçici; iki ağırlıklılarda statik Regular 400 + Bold 700,
+   önizlemenin "Kalın yazı" açık / kapalı yüzü katmanınkiyle aynı dosya) */
+@font-face { font-family: "Bangers";              src: url("../fonts/Bangers.ttf");              font-display: block; }
+@font-face { font-family: "Libre Caslon Display"; src: url("../fonts/LibreCaslonDisplay.ttf");   font-display: block; }
+@font-face { font-family: "Inter";        src: url("../fonts/Inter-Regular.ttf");       font-weight: 400; font-display: block; }
+@font-face { font-family: "Inter";        src: url("../fonts/Inter-Bold.ttf");          font-weight: 700; font-display: block; }
+@font-face { font-family: "Poppins";      src: url("../fonts/Poppins-Regular.ttf");     font-weight: 400; font-display: block; }
+@font-face { font-family: "Poppins";      src: url("../fonts/Poppins-Bold.ttf");        font-weight: 700; font-display: block; }
+@font-face { font-family: "Nunito";       src: url("../fonts/Nunito-Regular.ttf");      font-weight: 400; font-display: block; }
+@font-face { font-family: "Nunito";       src: url("../fonts/Nunito-Bold.ttf");         font-weight: 700; font-display: block; }
+@font-face { font-family: "Exo 2";        src: url("../fonts/Exo2-Regular.ttf");        font-weight: 400; font-display: block; }
+@font-face { font-family: "Exo 2";        src: url("../fonts/Exo2-Bold.ttf");           font-weight: 700; font-display: block; }
+@font-face { font-family: "Chakra Petch"; src: url("../fonts/ChakraPetch-Regular.ttf"); font-weight: 400; font-display: block; }
+@font-face { font-family: "Chakra Petch"; src: url("../fonts/ChakraPetch-Bold.ttf");    font-weight: 700; font-display: block; }
 
 html, body {
   margin: 0;
@@ -1312,6 +1326,9 @@ details.adv > *:not(summary) { margin-top: 8px; }
   box-shadow: 0 2px 10px -3px rgba(120, 108, 255, .7);
 }
 .switch input:checked + i::after { transform: translateX(14px); background: #fff; }
+/* CEF 74 (Premiere 14.4-15.x) :focus-visible kuralını atar; gizli anahtarın odağı :focus ile görünür (ayrı kurallar) */
+.switch input:focus + i { outline: 2px solid var(--accent-lite); outline-offset: 2px; }
+.switch input:focus:not(:focus-visible) + i { outline: none; }
 .switch input:focus-visible + i { box-shadow: var(--glow-sm); }
 
 /* ---------- Ses katmanı chip'leri ---------- */
@@ -3654,28 +3671,119 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .ch-row input.ch-title { flex: 1; min-width: 0; }
 .ch-row .ch-del { flex: none; }
 
-/* ---------- Suflo Stilleri: kendi motorumuzun kartlari (v3.0) ---------- */
-.stil-motor .ss-sahne { display: grid; place-items: center; padding: 8px; }
-.sm-ornek { font-size: 19px; line-height: 1.15; text-align: center; letter-spacing: .02em;
-  -webkit-text-stroke: 0; text-shadow: 0 0 0 transparent, 0 2px 0 var(--sm-kontur), 0 3px 8px rgba(0,0,0,.6); }
-.sm-ornek .sm-k { font-style: normal; display: inline-block; }
-.sm-ornek .sm-aktif { color: var(--sm-vurgu); }
-.stil-motor-hormozi .sm-ornek, .stil-motor-mrbeast .sm-ornek, .stil-motor-viral .sm-ornek, .stil-motor-ziplama .sm-ornek { font-size: 21px; }
-.stil-motor-hormozi .sm-aktif, .stil-motor-ziplama .sm-aktif, .stil-motor-mrbeast .sm-aktif { transform: scale(1.14); }
-.stil-motor-neon .sm-ornek { color: #f4fbff !important; text-shadow: 0 0 6px var(--sm-vurgu), 0 0 14px var(--sm-vurgu); }
-.stil-motor-neon .sm-ornek .sm-k:not(.sm-aktif) { opacity: .62; }
-.stil-motor-dolgu .sm-ornek .sm-k:first-child, .stil-motor-dolgu .sm-aktif { color: var(--sm-vurgu); }
-.stil-motor-dolgu .sm-ornek .sm-k:last-child { color: #fff; }
-.stil-motor-daktilo .sm-ornek .sm-k:last-child { opacity: 0; }
-.stil-motor-daktilo .sm-ornek .sm-aktif::after { content: "_"; color: var(--sm-vurgu); }
-.stil-motor-daktilo .sm-aktif { color: inherit; }
-.stil-motor-capcut .sm-ornek, .stil-motor-saas .sm-ornek { background: rgba(9,11,16,.78); padding: 5px 9px; border-radius: 9px; }
-.stil-motor-pop .sm-ornek .sm-k { background: #ff4fc8; color: #fff; padding: 1px 4px; border-radius: 4px; transform: rotate(-3deg); }
-.stil-motor-pop .sm-ornek .sm-aktif { background: #42ddff; color: #10131d; transform: rotate(3deg); }
-.stil-motor-doc .sm-ornek { font-size: 15px; border-left: 3px solid var(--sm-vurgu); padding: 4px 8px; background: rgba(7,16,22,.8); }
-.stil-motor-premium .sm-ornek { letter-spacing: .18em; font-size: 15px; }
-.stil-motor:hover .sm-aktif { animation: sm-vurus .5s var(--ease, ease) infinite alternate; }
-@keyframes sm-vurus { from { transform: scale(1); } to { transform: scale(1.16); } }
+/* ---------- Altyazı Efektleri (3.3): eski Suflo Stilleri galerisinin yerinde tek oluşturucu ---------- */
+.efekt { margin: 2px 0 10px; }
+.efekt-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; margin: 2px 0 8px; }
+.efekt-head b { color: var(--text); font-size: 12px; font-weight: 680; letter-spacing: -.01em; margin-right: 8px; }
+.efekt-head span { color: var(--faint); font-size: 8.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+/* Hazır görünümler: küçük çipler, rozet yok */
+.efekt-gorunumler { display: flex; flex-wrap: wrap; margin: 0 -3px 8px; }
+.efekt-cip {
+  display: inline-flex; align-items: center; margin: 0 3px 6px; padding: 4px 10px 4px 5px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--bg3); color: var(--dim);
+  font: inherit; font-size: 10.5px; cursor: pointer;
+  transition: border-color .16s var(--ease), color .16s var(--ease), box-shadow .2s var(--ease);
+}
+.efekt-cip:hover { border-color: var(--line2); color: var(--text); }
+.efekt-cip.secili { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 2px rgba(139, 124, 246, .22); }
+.efekt-cip:focus-visible { outline: none; box-shadow: var(--glow-sm); border-color: var(--accent); }
+.efekt-cip b { font-weight: 600; }
+.efekt-cip-ornek {
+  display: inline-block; min-width: 26px; margin-right: 6px; padding: 2px 5px; border-radius: 999px;
+  background: #11131b; font-size: 12px; line-height: 1.15; text-align: center; letter-spacing: .01em;
+  text-shadow: 1px 0 0 var(--efekt-kontur, #000), -1px 0 0 var(--efekt-kontur, #000), 0 1px 0 var(--efekt-kontur, #000), 0 -1px 0 var(--efekt-kontur, #000);
+}
+/* Büyük canlı önizleme */
+.efekt .onizleme-sahne { max-height: 240px; }
+.efekt .onizleme-sahne.dikey { max-height: 380px; }
+/* Ayarlar */
+.efekt-ayarlar .field { margin-bottom: 8px; }
+.efekt-renkler { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.efekt-renkler > .switch { display: inline-flex; margin: 0 10px 6px 0; }
+.efekt-ayarlar input[type="number"] { width: 100%; padding: 8px 10px; font: inherit; font-size: 12.5px; color: var(--text); border: 1px solid var(--line); border-radius: 9px; }
+/* Renk kutuları kendi satırında, eşit genişlikte; "… rengi" adları dar panelde ortalı iki satıra iner, taşmaz */
+.efekt-renkler .renk-satir { margin-bottom: 6px; flex: 1 1 100%; }
+.efekt-renkler .renk-kutu { min-width: 0; }
+.efekt-renkler .renk-kutu span { text-align: center; line-height: 1.2; }
+/* Dar panelde (320 px) yazı tipi adı kesilmesin: kalın / italik düğmeleri birlikte alt satıra iner (flex gap'siz, CEF 74) */
+.efekt-font { flex-wrap: wrap; }
+.efekt-font select { flex: 1 1 150px; min-width: 150px; }
+.efekt-bi-sar { display: inline-flex; flex: none; margin: 3px 0; }
+.efekt-bi {
+  display: inline-flex; align-items: center; flex: none; margin-left: 6px; padding: 0 8px; min-height: 26px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--bg3); color: var(--dim);
+  font-size: 10.5px; font-weight: 700; cursor: pointer; user-select: none;
+}
+.efekt-bi input { position: absolute; opacity: 0; pointer-events: none; }
+.efekt-bi:hover { border-color: var(--line2); color: var(--text); }
+.efekt-bi.efekt-italik span { font-style: italic; font-weight: 600; }
+.efekt-bi input:checked + span { color: var(--accent-lite); }
+/*
+ * Gizli onay kutusunun odağı: :focus-visible Chromium 86'da geldi, Premiere 14.4-15.x'in CEF 74'ü kuralı
+ * tümden atar. Önce her sürümün anladığı :focus (ayrı kural; seçici listesinde birleşirse CEF 74 ikisini de
+ * atar), yeni motorlarda yalnız klavye odağı için :focus-visible ile fare tıklaması geri sessizleşir.
+ */
+.efekt-bi input:focus + span { text-decoration: underline; }
+.efekt-bi input:focus:not(:focus-visible) + span { text-decoration: none; }
+.efekt-bi input:focus-visible + span { text-decoration: underline; }
+/* Oluşturucunun anahtarları (Kelime vurgusu, Gölge, Arka plan kutusu) da CEF 74'te odak gösterir (aynı düzen) */
+.efekt-ayarlar .switch input:focus + i { outline: 2px solid var(--accent-lite); outline-offset: 2px; }
+.efekt-ayarlar .switch input:focus:not(:focus-visible) + i { outline: none; }
+/* 3.3 adım 17: gölge ve arka plan kutusu (flex gap'siz, CEF 74) */
+.efekt-katman { margin-bottom: 8px; }
+.efekt-katman > .switch { display: inline-flex; margin: 0 0 6px; }
+.efekt-alt { display: flex; align-items: flex-end; flex-wrap: wrap; margin: 0 -3px; transition: opacity .16s var(--ease); }
+.efekt-alt.pasif { opacity: .45; }
+.efekt-alt .renk-kutu { flex: 0 0 auto; min-width: 64px; margin: 0 3px 4px; }
+.efekt-alt .renk-kutu span { text-align: center; line-height: 1.2; }
+.efekt-sayilar { display: flex; flex: 1 1 150px; flex-wrap: wrap; min-width: 0; }
+.efekt-sayi { display: flex; flex-direction: column; flex: 1 1 58px; min-width: 58px; margin: 0 3px 4px; font-size: 10px; color: var(--dim); }
+.efekt-sayi span { margin-bottom: 3px; white-space: nowrap; }
+.efekt-ayarlar .efekt-sayi input[type="number"] { padding: 6px 8px; }
+.efekt-konum-serbest { margin-top: 5px; font-size: 10.5px; color: var(--dim); }
+.efekt-konum-serbest b { color: var(--text); font-weight: 600; margin-right: 6px; }
+.efekt-ipucu { margin: 4px 0 0; font-size: 10px; line-height: 1.4; color: var(--faint); }
+/* 3.3 adım 21: Altyazı Efektleri çıktı seçimi (Premiere yerel / video katmanı) ve notları */
+.efekt-cikti select { width: 100%; }
+.efekt-yerel-not { margin-top: 5px; font-size: 10.5px; line-height: 1.45; color: var(--dim); }
+.efekt-yerel-not .link-btn { margin-left: 6px; }
+/* Önizlemede sürükleyerek konum: artı işareti + "X %50 · Y %85" etiketi (yalnız Altyazı Efektleri seçiliyken) */
+.efekt.etkin .onizleme-sahne { cursor: grab; touch-action: none; }
+.efekt.etkin .onizleme-sahne.surukleniyor { cursor: grabbing; }
+.onizleme-sahne.surukleniyor .render-onizleme { opacity: .45; }
+.onizleme-sahne:focus { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.efekt-arti { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 2; pointer-events: none; }
+.efekt-arti-dikey, .efekt-arti-yatay { position: absolute; background: rgba(255, 255, 255, .8); box-shadow: 0 0 0 1px rgba(0, 0, 0, .35); }
+.efekt-arti-dikey { top: 0; bottom: 0; width: 1px; }
+.efekt-arti-yatay { left: 0; right: 0; height: 1px; }
+.efekt-arti-etiket {
+  position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%); padding: 2px 9px; border-radius: 20px;
+  background: rgba(12, 13, 20, .82); color: #fff; font-size: 10px; white-space: nowrap;
+}
+/* Yazı alt yarıdayken etiket üstte (Oynat / Kare al düğmelerinin altında): sürüklenen yazının üstüne binmez */
+.efekt-arti-etiket.ust { top: 34px; bottom: auto; }
+/*
+ * Sürüklerken DOM önizlemesinin kelimeleri her adımda yeniden kurulur: işaretçi hep sahneye düşsün (basış kopan
+ * bir kelimeye düşerse Chromium çift tıkı hiç iletmez). Düğmeler tıklanabilir kalır.
+ */
+.efekt.etkin .onizleme-alt { pointer-events: none; }
+/* DOM yedek önizlemesinde serbest konum: kartın ortası noktada */
+.onizleme-alt.serbest { right: auto; bottom: auto; width: max-content; max-width: 92%; transform: translate(-50%, -50%); }
+/* Ölçülüp piksel olarak yerleşmiş kart (captions.js efektKartiSigdir): giriş animasyonu ortasından büyür, yerinden kaymaz */
+.onizleme-alt.serbest.olculu { transform: none; }
+/* DOM yedek önizlemesi (gerçek görünüm libass çıktısıdır) */
+.satir-efekt-pop   { animation: on-efekt-pop .3s cubic-bezier(.22,1,.36,1) both; }
+.satir-efekt-zipla { animation: on-efekt-zipla .3s ease-out both; }
+.satir-efekt-asagi { animation: on-efekt-asagi .3s ease-out both; }
+.kelime-efekt-zipla  { animation: on-efekt-kz .2s ease-out both; }
+.kelime-efekt-titre  { animation: on-efekt-kt .15s steps(4) both; }
+.kelime-efekt-glitch { animation: on-efekt-kg .1s steps(1); }
+@keyframes on-efekt-pop   { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes on-efekt-zipla { 0% { transform: scale(0); } 50% { transform: scale(1.12); } 77% { transform: scale(.96); } 100% { transform: scale(1); } }
+@keyframes on-efekt-asagi { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes on-efekt-kz { 0% { transform: translateY(0); } 50% { transform: translateY(-15%); } 100% { transform: translateY(0); } }
+@keyframes on-efekt-kt { 0% { transform: translate(2px, -2px); } 25% { transform: translate(-2px, 2px); } 50% { transform: translate(2px, 2px); } 75% { transform: translate(-2px, -2px); } 100% { transform: none; } }
+@keyframes on-efekt-kg { from { text-shadow: -3px 0 0 #ff2a55, 3px 0 0 #2af5ff; } to { text-shadow: -3px 0 0 #ff2a55, 3px 0 0 #2af5ff; } }
 
 /* ---------- Gecisler (v3.0) ---------- */
 .gecis-card { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
@@ -3753,6 +3861,55 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .hiz-secenekler .preset-control { margin: 0 6px 6px 0; }
 .hiz-eylem { margin-top: 10px; }
 .hiz-eylem .btn.grow { flex: 1; }
+
+/* ---------- YouTube indirici (3.3, #tab-youtube) ----------
+   CEF 74: flex gap ve inset yok — aralıklar margin ile, kaplama top/right/bottom/left ile */
+.yt-kart { margin-bottom: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.yt-etiket { display: block; margin: 0 0 5px; color: var(--dim); font-size: 10.5px; font-weight: 600; letter-spacing: .02em; }
+.yt-url-satir { display: flex; align-items: center; margin-bottom: 8px; }
+.yt-url-satir input { flex: 1; min-width: 0; }
+.yt-url-satir .btn { flex: none; margin-left: 6px; }
+.yt-bilgi-btn { display: block; width: 100%; margin-bottom: 10px; }
+.yt-onizleme { display: flex; align-items: flex-start; margin: 0 0 10px; padding: 8px; border: 1px solid #263242; border-radius: 9px; background: linear-gradient(180deg, #131b26, #0e151e); }
+.yt-onizleme[hidden], .yt-kucuk[hidden], .yt-ilerleme[hidden], .yt-guncelle[hidden], .yt-sonuc[hidden], .yt-onay[hidden] { display: none; }
+.yt-kucuk { flex: none; width: 112px; height: 63px; margin-right: 9px; border-radius: 6px; background: #0b0e15; object-fit: cover; }
+.yt-meta { flex: 1; min-width: 0; }
+.yt-meta b { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 11.5px; line-height: 1.35; word-break: break-word; }
+.yt-meta span { display: block; margin-top: 3px; overflow: hidden; color: var(--dim); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.yt-kaliteler { display: flex; flex-wrap: wrap; margin: 0 0 2px; }
+.yt-cip { min-width: 58px; margin: 0 6px 6px 0; padding: 6px 12px; border: 1px solid var(--line2); border-radius: 999px; background: var(--bg3); color: var(--text); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+.yt-cip:hover:not(:disabled) { border-color: var(--accent); }
+.yt-cip.on { border-color: transparent; background: var(--grad); color: #fff; box-shadow: var(--glow); }
+.yt-cip:disabled { opacity: .38; cursor: not-allowed; }
+.yt-cip:focus-visible { outline: 2px solid var(--accent-lite); outline-offset: 2px; }
+.yt-kalite-not { margin: 0 0 9px; }
+.yt-kalite-not:empty { display: none; }
+.yt-klasor-satir { display: flex; align-items: center; margin-bottom: 10px; }
+.yt-klasor { flex: 1; min-width: 0; font-size: 10.5px; }
+.yt-klasor > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yt-klasor > span[hidden] { display: none; }
+/* Uzun yolda BAŞ kırpılır, sondaki klasör adı görünür ("…\Düğün Çekimi\Suflo İndirilenler"): dış kutu sağdan
+   sola (taşma ve üç nokta solda), içteki yol soldan sağa yalıtılmış (ters bölü / eğik çizgi yer değiştirmez).
+   Sığan yol sola yaslı kalır; tam yol title'da. */
+#yt-klasor-yol { direction: rtl; text-align: left; }
+#yt-klasor-yol > .yt-klasor-ic { direction: ltr; unicode-bidi: embed; unicode-bidi: isolate; }
+#yt-klasor-ipucu { color: var(--faint); }
+.yt-klasor-satir .btn { flex: none; margin-left: 6px; }
+.yt-ilerleme { height: 4px; margin: 0 0 9px; overflow: hidden; border-radius: 999px; background: var(--bg3); }
+.yt-ilerleme i { display: block; width: 1%; height: 100%; border-radius: inherit; background: var(--grad); box-shadow: 0 0 12px rgba(83, 128, 255, .72); transition: width .2s ease; }
+.yt-guncelle { display: flex; align-items: center; margin: 0 0 9px; padding: 7px 9px; border: 1px solid rgba(234, 200, 119, .45); border-radius: var(--r-s); background: rgba(234, 200, 119, .08); color: var(--warn); font-size: 10.5px; }
+.yt-guncelle span { flex: 1; min-width: 0; margin-right: 8px; }
+.yt-uyari { color: var(--warn); }
+.yt-sonuc { margin: 0 0 4px; }
+.yt-hatirlatma { color: var(--dim); }
+.yt-onay { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(4, 6, 10, .72); }
+.yt-onay-kutu { width: 100%; max-width: 340px; padding: 14px; border: 1px solid var(--line2); border-radius: 12px; background: var(--bg2); box-shadow: var(--shadow); }
+.yt-onay-kutu b { display: block; margin-bottom: 6px; font-size: 13px; }
+.yt-onay-kutu p { margin: 0 0 10px; color: var(--dim); font-size: 11.5px; line-height: 1.5; }
+.yt-onay-satir { display: flex; align-items: flex-start; margin: 0 0 12px; font-size: 11px; line-height: 1.45; cursor: pointer; }
+.yt-onay-satir input { flex: none; margin: 2px 7px 0 0; }
+.yt-onay-dugmeler { display: flex; justify-content: flex-end; }
+.yt-onay-dugmeler .btn { margin-left: 8px; }
 
 /* ---------- v3.0 cilalama: yan menu ---------- */
 /* PRO etiketi ikonun kosesine rozet olarak: basliklar artik "Yazı …" diye kesilmez */

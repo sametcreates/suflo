@@ -24,6 +24,17 @@ if (-not $InstallerPath) { $InstallerPath = Join-Path $root ("dist\Suflo-{0}-Kur
 # mp4/wav/mp3 ucretli icerik sayilmaz. Depoda ornek.json varsa pakette de olmali.
 $onboardingMedia = '(^|/)assets/onboarding/[^/]+\.(mp4|wav|mp3)$'
 $ornekVar = Test-Path -LiteralPath (Join-Path $root "assets\onboarding\ornek.json") -PathType Leaf
+# 3.3 adim 21: Altyazi Efektleri'nin Premiere yerel sablonu (TranscriptAI, MIT kaynak; sablon yazarin izniyle,
+# THIRD_PARTY_NOTICES.md) ucretli icerik sayilmaz. Dar istisna: YALNIZ bu yol VE bu sha256. Baska her .mogrt ya da
+# icerigi degismis bu dosya yayini durdurur; dosya pakette zorunludur.
+$sufloSablon = '(^|/)assets/mogrt/altyazi-efekt-v1\.mogrt$'
+$sufloSablonSha = '32c2394de3f639fede180bc274e30166daa0375298af5c5f7ae3dfbf73989969'
+function Test-SufloSablon($entry) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $st = $entry.Open()
+    try { $hash = -join ($sha.ComputeHash($st) | ForEach-Object { $_.ToString('x2') }) } finally { $st.Dispose(); $sha.Dispose() }
+    return ($hash -eq $sufloSablonSha)
+}
 
 # Davet et, kazan: Lemon Squeezy API anahtari TUM MAGAZAYA yetkilidir ve yalniz sunucudaki private
 # config.php'de durur. Paketteki metin dosyalarinda gomulu bir Bearer tokeni, dolu bir ls_api_key
@@ -85,7 +96,9 @@ function Test-Archive([string]$path, [string]$kind) {
     $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $path))
     try {
         $names = @($zip.Entries | ForEach-Object FullName)
-        $paid = @($names | Where-Object { $_ -match '\.(mogrt|prfpset|mov|mp4|m4v|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' -and $_ -notmatch $onboardingMedia })
+        $sablonBozuk = @($zip.Entries | Where-Object { $_.FullName -match $sufloSablon -and -not (Test-SufloSablon $_) } | ForEach-Object { $_.FullName })
+        $paid = @($names | Where-Object { $_ -match '\.(mogrt|prfpset|mov|mp4|m4v|wav|mp3|aif|aiff|m4a|flac|ogg|wma)$' -and $_ -notmatch $onboardingMedia -and $_ -notmatch $sufloSablon }) + $sablonBozuk
+        if ($sablonBozuk.Count) { Write-Host ("Altyazi Efektleri sablonunun sha256'si beklenen degil: {0}" -f ($sablonBozuk -join ', ')) -ForegroundColor Red }
         $sample = @($names | Where-Object { $_ -match $onboardingMedia })
         $private = @($names | Where-Object { $_ -match '(^|/)(private|server)(/|$)|(^|/)config\.php$' })
         $badSeparators = @($names | Where-Object { $_ -match '\\' })
@@ -95,6 +108,38 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)js/presets\.js$',
             '(^|/)js/pricing\.js$',
             '(^|/)js/i18n\.js$',
+            # 3.3 Altyazi Efektleri: olusturucu modeli ve tek temel stil (efekt) motoru
+            '(^|/)js/altyazi-efekt\.js$',
+            '(^|/)js/style-engine\.js$',
+            # 3.3 YouTube indirici: saf karar modulu + panel (yt-dlp pakette YOK, ilk kullanimda iner)
+            '(^|/)js/youtube-indir\.js$',
+            '(^|/)js/youtube-indir-ui\.js$',
+            # 3.3 adim 21: Altyazi Efektleri > Premiere yerel (saf model + pakette gelen sablon; sha256 yukarida)
+            '(^|/)js/caption-mogrt-json\.js$',
+            '(^|/)assets/mogrt/altyazi-efekt-v1\.mogrt$',
+            # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
+            '(^|/)fonts/Montserrat-Regular\.ttf$',
+            '(^|/)fonts/Montserrat-Bold\.ttf$',
+            # 3.3 adim 18: kategorili seciciye eklenen yeni fontlar (style-share.js FONTS) ve lisanslari
+            '(^|/)fonts/Bangers\.ttf$',
+            '(^|/)fonts/ChakraPetch-Regular\.ttf$',
+            '(^|/)fonts/ChakraPetch-Bold\.ttf$',
+            '(^|/)fonts/Exo2-Regular\.ttf$',
+            '(^|/)fonts/Exo2-Bold\.ttf$',
+            '(^|/)fonts/Inter-Regular\.ttf$',
+            '(^|/)fonts/Inter-Bold\.ttf$',
+            '(^|/)fonts/LibreCaslonDisplay\.ttf$',
+            '(^|/)fonts/Nunito-Regular\.ttf$',
+            '(^|/)fonts/Nunito-Bold\.ttf$',
+            '(^|/)fonts/Poppins-Regular\.ttf$',
+            '(^|/)fonts/Poppins-Bold\.ttf$',
+            '(^|/)fonts/OFL-Bangers\.txt$',
+            '(^|/)fonts/OFL-ChakraPetch\.txt$',
+            '(^|/)fonts/OFL-Exo2\.txt$',
+            '(^|/)fonts/OFL-Inter\.txt$',
+            '(^|/)fonts/OFL-LibreCaslonDisplay\.txt$',
+            '(^|/)fonts/OFL-Nunito\.txt$',
+            '(^|/)fonts/OFL-Poppins\.txt$',
             '(^|/)i18n/en\.js$',
             '(^|/)jsx/host\.jsx$',
             '(^|/)assets/pro-mogrt-showcase/catalog\.json$',

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
-<title>Paylaşılan Suflo Stili | Premiere altyazı stili kodu</title>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Bungee&family=Lora:wght@600&family=Montserrat:wght@700&display=swap" rel="stylesheet">
+<title>Paylaşılan Altyazı Efekti | Suflo altyazı stili kodu</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Bungee&family=Lora:wght@600&family=Montserrat:wght@700&family=Bangers&family=Inter:wght@700&family=Poppins:wght@700&family=Nunito:wght@700&family=Libre+Caslon+Display&family=Exo+2:wght@700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
 <meta name="description" content="Bir içerik üreticisi Suflo altyazı stilini seninle paylaştı. Kodu kopyala, Premiere'deki Suflo panelinde Stil kodu kutusuna yapıştır; aynı görünüm hazır.">
 <link rel="canonical" href="https://suflo.app/stil">
 <link rel="alternate" hreflang="tr" href="https://suflo.app/stil">
@@ -15,7 +15,7 @@
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#0f1017">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Paylaşılan Suflo Stili">
+<meta property="og:title" content="Paylaşılan Altyazı Efekti">
 <meta property="og:description" content="Premiere için hazır animasyonlu altyazı stili. Kodu Suflo paneline yapıştır, aynı görünümü tek tıkla kullan.">
 <meta property="og:url" content="https://suflo.app/stil">
 <meta property="og:image" content="https://suflo.app/og.png">
@@ -86,8 +86,8 @@ footer{border-top:1px solid var(--line);padding:24px 16px;font-size:12.5px;color
 
 <main>
   <div class="wrap">
-    <div class="ust">SUFLO STİLİ</div>
-    <h1 id="stil-ad">Paylaşılan Suflo Stili</h1>
+    <div class="ust">ALTYAZI EFEKTİ</div>
+    <h1 id="stil-ad">Paylaşılan Altyazı Efekti</h1>
     <p class="yazar" id="stil-yazar-sar" hidden>Paylaşan: <b id="stil-yazar"></b></p>
 
     <div class="kart hata" id="stil-hata" hidden>
@@ -110,8 +110,11 @@ footer{border-top:1px solid var(--line);padding:24px 16px;font-size:12.5px;color
             </span>
           </div>
           <div><small>Konum</small><b id="stil-konum"></b></div>
+          <div id="stil-giris-sar" hidden><small>Giriş animasyonu</small><b id="stil-giris"></b></div>
+          <div id="stil-aktif-sar" hidden><small>Vurgu animasyonu</small><b id="stil-aktif"></b></div>
         </div>
-        <p class="not">Video temel stili gösterir; kodun yazı tipi, renk ve konum ayarı panelde uygulanır.</p>
+        <p class="not" id="stil-not">Video temel stili gösterir; kodun yazı tipi, renk ve konum ayarı panelde uygulanır.</p>
+        <p class="not" id="stil-surum" hidden>Altyazı Efektleri kodu Suflo 3.3 ya da üstünü ister; eski sürüm kodu açmaz, önce Suflo'yu güncelle.</p>
         <div class="kod"><code id="stil-kod"></code></div>
         <div class="dugmeler">
           <button class="btn" id="kodu-kopyala" type="button">Kodu kopyala</button>
@@ -127,7 +130,7 @@ footer{border-top:1px solid var(--line);padding:24px 16px;font-size:12.5px;color
         <li>Altyazı sekmesinde Stil kartındaki <b>Stil kodu yapıştır</b> kutusuna kodu yapıştır, <b>Uygula</b>'ya bas.</li>
         <li>Önizleme hemen oynar. Timeline'a stilli katman olarak eklemek Suflo Pro ile (ücretsiz deneme hakkıyla da) olur.</li>
       </ol>
-      <p class="not">Kendi stilini paylaşmak için panelde İnce ayar › <b>Stili paylaş</b>. Kod yalnız stil ayarlarını taşır; dosya yolu, logo ya da kişisel bilgi içermez.</p>
+      <p class="not">Kendi efektini paylaşmak için panelde Altyazı Efektleri › Paylaş ve kaydet › <b>Stili paylaş</b>. Kod yalnız stil ayarlarını taşır; dosya yolu, logo ya da kişisel bilgi içermez.</p>
     </div>
   </div>
 </main>

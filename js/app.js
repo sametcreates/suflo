@@ -475,6 +475,7 @@ window.KApp = (function () {
     Pro.markLocked(document.querySelector('.tab[data-tab="beat"]'), !s.pro);
     Pro.markLocked(document.querySelector('.ky-oge[data-tab="podcast"]'), !s.pro);
     Pro.markLocked(document.querySelector('.ky-oge[data-tab="hiz"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.ky-oge[data-tab="youtube"]'), !s.pro);
     // SFX satirinin kendi ky-kilit rozeti var; ikinci bir ::after rozeti ekleme.
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.
     Pro.markLocked(el("cap-translate-go"), !s.pro);
@@ -510,7 +511,7 @@ window.KApp = (function () {
 
     // Kilitli sekme tanitim kartlari: Pro'da gizli
     // (emoji tanitimi yok: Emoji Assets ucretsiz, karti HTML'den kaldirildi)
-    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "hiz-tanitim", "kanca-tanitim", "podcast-tanitim"].forEach(function (id) {
+    ["yazi-tanitim", "preset-tanitim", "sfx-tanitim", "motionbg-tanitim", "cut-tanitim", "beat-tanitim", "zoom-tanitim", "gecis-tanitim", "hiz-tanitim", "kanca-tanitim", "podcast-tanitim", "yt-tanitim"].forEach(function (id) {
       var t = el(id);
       if (t) t.hidden = !!s.pro;
     });
@@ -1168,12 +1169,23 @@ window.KApp = (function () {
 
   }
 
+  // mac: düğme ne yapacaksa onu yazar (son checkFfmpeg sonucundan); boşsa HTML'deki etiket kalır
+  var ffmpegDugmeEtiketi = "";
   async function checkFfmpeg() {
     var box = el("set-ffmpeg-status");
     box.className = "inline-status";
     box.textContent = "kontrol ediliyor…";
     var ff = await K.findFfmpeg(true);
-    if (ff) {
+    var libassYok = !!ff && K.ffmpegLibass && K.ffmpegLibass() === false;
+    // libass'siz ffmpeg (Homebrew'un sade ffmpeg'i): yazıya dökme çalışır ama Altyazı Efektleri / kanca /
+    // Shorts Paketi çizemez; yeşil ✓ yerine uyarı ve düğme Suflo'nun ffmpeg'ini kurar (brew değil)
+    ffmpegDugmeEtiketi = K.MAC ? (libassYok ? "Suflo'nun ffmpeg'ini kur" : (K.brewYolu() && !ff ? "Homebrew ile kur" : "ffmpeg’i indir ve kur")) : "";
+    var kurDugme = el("set-ffmpeg-install");
+    if (kurDugme && ffmpegDugmeEtiketi && !ffmpegKuruluyor) kurDugme.textContent = ffmpegDugmeEtiketi;
+    if (ff && libassYok) {
+      box.className = "inline-status warn";
+      box.textContent = "⚠ " + ff + " · " + K.libassUyarisi();
+    } else if (ff) {
       box.className = "inline-status good";
       box.textContent = "✓ " + ff;
     } else {
@@ -1232,15 +1244,20 @@ window.KApp = (function () {
     function say(m) { box.textContent = m; }
 
     try {
-      if (K.MAC && K.brewYolu()) {
+      // Homebrew'un sade ffmpeg'i libass'siz: Altyazı Efektleri, kanca, Shorts Paketi onunla çizilemez.
+      // Brew yalnız hiç ffmpeg yokken denenir ve sonucu ancak libass'liyse kabul edilir; libass'siz ffmpeg
+      // varken (libassUyarisi buraya yönlendirir) doğrudan Suflo'nun ffmpeg'i iner (KEngine.installFfmpeg)
+      var oncekiFf = K.MAC ? await K.findFfmpeg(true) : null;
+      var bk = K.MAC && !oncekiFf && K.brewKomutu ? K.brewKomutu(["install", "ffmpeg"]) : null;
+      if (bk) {
         say("brew install ffmpeg… (birkaç dakika sürebilir)");
-        await K.run(K.brewYolu(), ["install", "ffmpeg"], { timeout: 1800000 });
-        if (await K.findFfmpeg(true)) {
+        await K.run(bk.exe, bk.args, { timeout: 1800000 });
+        if (await K.findFfmpeg(true) && K.ffmpegLibass() === true) {
           toast("ffmpeg kuruldu", "good");
           await checkFfmpeg();
           return;
         }
-        say("Homebrew kuramadı, doğrudan indiriliyor…");
+        say("Homebrew'un ffmpeg'i altyazı çizemiyor ya da kurulamadı, Suflo'nun ffmpeg'i indiriliyor…");
       }
 
       ffmpegJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
@@ -1273,7 +1290,7 @@ window.KApp = (function () {
       ffmpegKuruluyor = false;
       ffmpegJetonu = null;
       ffmpegIptalDugmesi(false);
-      if (btn) { btn.disabled = false; btn.textContent = eskiEtiket; }
+      if (btn) { btn.disabled = false; btn.textContent = ffmpegDugmeEtiketi || eskiEtiket; }
     }
   }
 
@@ -1580,6 +1597,8 @@ window.KApp = (function () {
     guvenli("Bölümler", function () { if (window.KChapters) KChapters.init(); });
     guvenli("Geçişler", function () { if (window.KGecis) KGecis.init(); });
     guvenli("Hız rampası", function () { if (window.KHizRampasi) KHizRampasi.init(); });
+    // Panel açılışında Premiere'e / ağa gitmez: proje klasörü sekme açılınca, yt-dlp yalnız düğmelerde
+    guvenli("YouTube indirici", function () { if (window.KYoutube) KYoutube.init(); });
     guvenli("Sahne algılama", function () { if (window.KSahne) KSahne.init(); });
     guvenli("Viral anlar", function () { if (window.KViral) KViral.init(); });
     guvenli("B-roll", function () { if (window.KBroll) KBroll.init(); });
@@ -1627,20 +1646,19 @@ window.KApp = (function () {
   }
 
   /*
-   * "Suflo 3.2'de yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * "Suflo 3.3'te yeni": surum basina bir kez. Yeni ozellikler sekmelerin
    * derinliginde (Hiz Rampasi sol menude, cozme modu Ayarlar'da);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
    * 3.1'den yukselten kullanicida yeniliklerGoruldu "3.1" oldugundan pencere bir kez acilir.
    */
   var YENILIKLER = {
-    surum: "3.2",
-    alt: "Hız rampası ve daha iyi altyazı",
+    surum: "3.3",
+    alt: "Altyazı Efektleri ve YouTube indirici",
     maddeler: [
-      { ikon: "⏩", baslik: "Hız Rampası", metin: "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz (Pro).", sekme: "hiz", hedef: "hiz-grid" },
-      { ikon: "▶", baslik: "Canlı altyazı", metin: "Satırlar motor yazdıkça akar; kalan süre ve İptal düğmesi.", sekme: "captions", hedef: "cap-go" },
-      { ikon: "≡", baslik: "Okunaklı altyazı", metin: "2 satır × 42 düzen, kısa parçalar birleşir, kelime zamanları ölçülür.", sekme: "captions", hedef: "cap-maxlen" },
-      { ikon: "⚙", baslik: "Hızlı ya da En doğru", metin: "Yerel motorda hız ile doğruluk arasında seç.", sekme: "settings", hedef: "set-cozme" },
-      { ikon: "EN", baslik: "Çevrimdışı İngilizce", metin: "Konuşmayı internetsiz İngilizce altyazıya çevir (Pro).", sekme: "captions", hedef: "cap-lang" }
+      { ikon: "✦", baslik: "Altyazı Efektleri", metin: "Altı hazır görünüm, giriş ve vurgu animasyonu; önizlemek ücretsiz, eklemek Pro.", sekme: "captions", hedef: "cap-efekt" },
+      { ikon: "◎", baslik: "Gölge, kutu ve konum", metin: "Gölge, arka plan kutusu; yazıyı önizlemede sürükleyerek yerleştir.", sekme: "captions", hedef: "cap-sahne" },
+      { ikon: "Aa", baslik: "Yeni yazı tipleri", metin: "7 yeni font: 13 yazı tipi dört kategoride.", sekme: "captions", hedef: "cap-font" },
+      { ikon: "▼", baslik: "YouTube İndir", metin: "MP3, 720p, 1080p ya da 4K; dosya projene gelir (Pro).", sekme: "youtube", hedef: "yt-url" }
     ]
   };
 

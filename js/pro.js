@@ -81,7 +81,7 @@
   var _onUpgrade = null;  // "Yukselt" tiklama davranisi (app.js verir)
 
   var FEATURE_LABELS = {
-    overlay:   'Animasyonlu altyazi katmani (Suflo Stilleri)',
+    overlay:   'Animasyonlu altyazı katmanı (Altyazı Efektleri)',
     karaoke:   'Karaoke / kelime-kelime animasyon',
     cut:       'Otomatik kesim (sessizlik temizleme)',
     audioclean: 'Sesi iyilestir (gurultu azaltma + ses seviyesi)',
@@ -94,6 +94,7 @@
     beat:      'Ritim / beat senkronu',
     speedramp: 'Hız rampası: tek tıkla ağır çekim ve hızlanma',
     offlineTranslate: 'Çevrimdışı İngilizce çeviri: internetsiz, yerel motorla',
+    youtube:   'YouTube indirici: MP3 ve 720p / 1080p / 4K, projeye otomatik',
     batch:     'Toplu (coklu klip) transkripsiyon',
     translate: 'Altyazi cevirisi',
     assexport: 'Stilli ASS disa aktarma',
@@ -137,17 +138,30 @@
   function denemeFile()  { var d = appDataDir(); return d ? path.join(d, 'pro-deneme.json') : null; }
   function ciktiFile()   { var d = appDataDir(); return d ? path.join(d, 'deneme-ciktilari.json') : null; }
 
-  // Atomik yazim: once .tmp, sonra yerine (yarim yazilmis dosya kalmasin), yalniz sahibi okur (0600)
+  // Atomik yazim: once .tmp, sonra yerine (yarim yazilmis dosya kalmasin), yalniz sahibi okur (0600).
+  // rename var olan hedefin yerine gecer (Windows'ta da: MoveFileEx REPLACE_EXISTING); once silmek
+  // atomikligi bozardi: rename duserse (antivirus .tmp'yi tararken EPERM/EBUSY) iki kopya da giderdi.
+  // Gecici kilitte birkac kez denenir; olmazsa eski dosya yerinde kalir, yalniz .tmp silinir.
   function atomikYaz(f, metin) {
     if (!f || !fs) return false;
     var tmp = f + '.tmp';
     try {
       fs.writeFileSync(tmp, metin, { encoding: 'utf8', mode: 384 }); // 0600
-      if (fs.existsSync(f)) fs.unlinkSync(f);
-      fs.renameSync(tmp, f);
-      try { fs.chmodSync(f, 384); } catch (eMode) {}
-      return true;
-    } catch (e) { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp) {} return false; }
+    } catch (eW) { try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp0) {} return false; }
+    for (var deneme = 0; deneme < 4; deneme++) {
+      try {
+        fs.renameSync(tmp, f);
+        try { fs.chmodSync(f, 384); } catch (eMode) {}
+        return true;
+      } catch (e) {
+        var kod = e && e.code;
+        if (kod !== 'EPERM' && kod !== 'EBUSY' && kod !== 'EACCES') break;
+        var bitis = Date.now() + 25 * (deneme + 1);
+        while (Date.now() < bitis) { /* kisa bekleme: tarayici dosyayi birakir */ }
+      }
+    }
+    try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (eTmp) {}
+    return false;
   }
 
   // ================================================================
@@ -234,7 +248,7 @@
     var done = false;
     function finish(err, data, code) { if (!done) { done = true; cb(err, data, code); } }
 
-    var req = https.request(opts, function (res) {
+    function yanit(res) {
       var buf = '';
       res.setEncoding('utf8');
       res.on('data', function (d) { buf += d; });
@@ -243,11 +257,23 @@
         try { json = JSON.parse(buf); } catch (e) {}
         finish(null, json, res.statusCode);
       });
-    });
-    req.setTimeout(HTTP_TIMEOUT, function () { req.destroy(new Error('zaman-asimi')); });
-    req.on('error', function (err) { finish(err, null); });
-    req.write(body);
-    req.end();
+    }
+    function gonder(req) {
+      req.setTimeout(HTTP_TIMEOUT, function () { req.destroy(new Error('zaman-asimi')); });
+      req.on('error', function (err) { finish(err, null); });
+      req.write(body);
+      req.end();
+    }
+    // Ayarlar › vekil sunucu: lisans etkinleştirme / doğrulama da vekilden geçer (yalnız vekille çıkan ağ)
+    var Kb = typeof window !== 'undefined' && window.K && typeof window.K.vekilliIstek === 'function' ? window.K : null;
+    if (Kb) {
+      Kb.vekilliIstek(LS.API + endpoint, { method: 'POST', headers: opts.headers }, yanit, function (eV, req) {
+        if (eV) { finish(eV, null); return; }
+        gonder(req);
+      });
+      return;
+    }
+    gonder(https.request(opts, yanit));
   }
 
   // ================================================================
@@ -337,8 +363,11 @@
 
     apiPost('/v1/licenses/validate',
       { license_key: c.key, instance_id: c.instanceId },
-      function (err, data) {
+      function (err, data, code) {
         if (err || !data) { cb({ ok: false, offline: true }); return; } // cevrimdisi -> onbellege dokunma
+        // Gecici sunucu hatasi (429 / 5xx JSON govde) ya da karar tasimayan cevap ('valid' yok): lisans
+        // kaldirilmaz. Yalniz acik 'valid' cevabi karar verir (aksi halde cache + instanceId silinir, koltuk kaybolur)
+        if (code === 429 || Number(code) >= 500 || typeof data.valid !== 'boolean') { cb({ ok: false, offline: true }); return; }
         var lk = data.license_key || {};
         if (data.valid === true && lk.status === 'active' && checkOwnership(data.meta || {})) {
           c.status = 'active';

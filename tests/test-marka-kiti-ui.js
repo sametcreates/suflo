@@ -16,18 +16,19 @@ function elem(id, ek) {
   DOM[id] = e;
 }
 ["grp-marka-kiti", "mk-acik", "mk-font", "mk-konum", "mk-renk-acik", "mk-renk", "mk-renk-kontur", "mk-renk-vurgu", "mk-logo-ad", "mk-logo-sec",
-  "mk-logo-kaldir", "mk-logo-kose", "mk-logo-oran", "mk-logo-oran-deger", "mk-doldur", "mk-durum"].forEach(function (id) { elem(id); });
+  "mk-logo-kaldir", "mk-logo-kose", "mk-logo-oran", "mk-logo-oran-deger", "mk-doldur", "mk-durum", "mk-konum-xy", "mk-gorunum"].forEach(function (id) { elem(id); });
 function tetikle(id, olay) { (dinleyici[id + ":" + olay] || []).forEach(function (f) { f(); }); }
 
 var ayarlar = { markaKiti: { on: true, stil: { overrides: { font: "Lora", renk: "#FF0000", konum: 8 } }, logo: { kose: "as", oran: 0.2 }, cta: { metin: "Abone ol" } } };
 var kayit = 0, olaylar = [], kancaYenile = 0, dialogSonuc = null;
+var altyaziStili = { aile: "neon", font: "Bebas Neue", renk: "#F4FBFF", konturRenk: "#0b1020", vurguRenk: "#2af5ff", konum: 5 };
 var window_ = {
   SufloStyleShare: require(path.join(kok, "js", "style-share.js")),
   SufloMarkaKiti: require(path.join(kok, "js", "marka-kiti.js")),
   SufloStyleEngine: require(path.join(kok, "js", "style-engine.js")),
   SufloHookTitle: require(path.join(kok, "js", "hook-title.js")),
   KKanca: { kitDegisti: function () { kancaYenile++; } },
-  KCaptions: { stilAyarlari: function () { return { aile: "neon", font: "Bebas Neue", renk: "#F4FBFF", konturRenk: "#0b1020", vurguRenk: "#2af5ff", konum: 5 }; } },
+  KCaptions: { stilAyarlari: function () { return altyaziStili; } },
   cep: { fs: { showOpenDialogEx: function () { return dialogSonuc; } } }
 };
 var ctx = {
@@ -94,6 +95,60 @@ ok("kapatılınca on:false ve olayda bildirilir", ayarlar.markaKiti.on === false
 ayarlar.markaKiti.logo.path = path.join(tmp, "silinmis.png");
 UI.init();
 ok("kayıtlı logo silinmişse uyarı", /bulunamadı/.test(DOM["mk-durum"].textContent), DOM["mk-durum"].textContent);
+
+// 3.3 adım 17: kitte serbest konum, gölge ve arka plan kutusu
+ayarlar.markaKiti = { on: true, stil: { overrides: { font: "Lora", konum: 2, konumX: 30, konumY: 70, golge: { renk: "#112233", opak: 60, mesafe: 4, yumusak: 8 },
+  kutu: true, kutuRenk: "#000000", kutuOpak: 55 } } };
+UI.init();
+ok("kitteki serbest konum 'Serbest konum' seçeneğiyle görünür, gölge / kutu anahtarı açık", DOM["mk-konum"].value === "xy" && DOM["mk-konum-xy"].hidden === false &&
+  DOM["mk-gorunum"].checked === true, DOM["mk-konum"].value);
+DOM["mk-renk-acik"].checked = true;
+tetikle("mk-renk-acik", "change");
+var k17 = ayarlar.markaKiti.stil.overrides;
+ok("başka alan değişince serbest konum, gölge ve kutu kitte kalır (kaydedilir)", k17.konumX === 30 && k17.konumY === 70 && k17.konum === 2 &&
+  k17.golge && k17.golge.opak === 60 && k17.kutu === true && k17.kutuOpak === 55 && k17.renk === DOM["mk-renk"].value.toLowerCase(), JSON.stringify(k17));
+DOM["mk-konum"].value = "8";
+tetikle("mk-konum", "change");
+ok("hazır konum seçilince kitin serbest konumu bırakılır", ayarlar.markaKiti.stil.overrides.konum === 8 && ayarlar.markaKiti.stil.overrides.konumX === undefined);
+DOM["mk-gorunum"].checked = false;
+tetikle("mk-gorunum", "change");
+ok("anahtar kapanınca gölge ve kutu kitten çıkar", ["golge", "kutu", "kutuRenk", "kutuOpak"].every(function (k) { return ayarlar.markaKiti.stil.overrides[k] === undefined; }));
+altyaziStili = { aile: "efekt", font: "Anton", renk: "#ffffff", konturRenk: "#000000", vurguRenk: "#ffe600", konum: 5, konumX: 44, konumY: 55,
+  golge: { renk: "#000000", opak: 85, mesafe: 7, yumusak: 0 }, kutu: false, kutuRenk: "#000000", kutuOpak: 50 };
+DOM["mk-gorunum"].checked = true;
+tetikle("mk-gorunum", "change");
+ok("anahtar açılınca gölge ve kutu Altyazı sekmesinden alınır", JSON.stringify(ayarlar.markaKiti.stil.overrides.golge) === '{"renk":"#000000","opak":85,"mesafe":7,"yumusak":0}' &&
+  ayarlar.markaKiti.stil.overrides.kutu === false, JSON.stringify(ayarlar.markaKiti.stil.overrides));
+tetikle("mk-doldur", "click");
+ok("şimdiki ayarlardan doldur (konum seçili): Altyazı sekmesindeki serbest konum kite girer, 'Serbest konum' seçilir",
+  ayarlar.markaKiti.stil.overrides.konumX === 44 && ayarlar.markaKiti.stil.overrides.konumY === 55 && ayarlar.markaKiti.stil.overrides.konum === 5 &&
+  DOM["mk-konum"].value === "xy" && DOM["mk-konum-xy"].hidden === false && ayarlar.markaKiti.stil.overrides.golge.opak === 85, JSON.stringify(ayarlar.markaKiti.stil.overrides));
+
+/*
+ * 3.3 adım 17 inceleme: "Serbest konum" seçeneği seçili kalıp kitte serbest konum yokken kart onu söylememeli.
+ * Kit {Alt, X 30 · Y 70} → Üst kaydedilir → "Serbest konum" yeniden seçilir: kitin serbest konumu geri gelir
+ * (eskiden kit {konum: 8} kalıyordu, seçici "Serbest konum" diyordu).
+ */
+ayarlar.markaKiti = { on: true, stil: { overrides: { font: "Lora", konum: 2, konumX: 30, konumY: 70 } } };
+UI.init();
+DOM["mk-konum"].value = "8";
+tetikle("mk-konum", "change");
+var ustKit = JSON.parse(JSON.stringify(ayarlar.markaKiti.stil.overrides));
+ok("Üst seçilince kitte hazır konum; 'Serbest konum' seçeneği geri dönülebilsin diye görünür kalır",
+  ustKit.konum === 8 && ustKit.konumX === undefined && DOM["mk-konum-xy"].hidden === false, JSON.stringify(ustKit));
+DOM["mk-konum"].value = "xy";
+tetikle("mk-konum", "change");
+var xyKit = ayarlar.markaKiti.stil.overrides;
+ok("'Serbest konum' yeniden seçilince kitin son serbest konumu geri gelir (seçili ama boş kalmaz)",
+  xyKit.konumX === 30 && xyKit.konumY === 70 && xyKit.konum === 2 && DOM["mk-konum"].value === "xy", JSON.stringify(xyKit));
+// Serbest konumu hiç olmamış kitte "xy" seçili kalamaz: seçici kitin gerçek konumunu gösterir
+ayarlar.markaKiti = { on: true, stil: { overrides: { font: "Lora", konum: 8 } } };
+UI.init();
+DOM["mk-konum"].value = "xy";
+tetikle("mk-konum", "change");
+ok("serbest konumu olmayan kitte 'Serbest konum' seçili kalmaz: kitin hazır konumu (Üst) korunur ve seçicide görünür, seçenek gizli",
+  DOM["mk-konum"].value === "8" && DOM["mk-konum-xy"].hidden === true && ayarlar.markaKiti.stil.overrides.konum === 8 &&
+  ayarlar.markaKiti.stil.overrides.konumX === undefined, DOM["mk-konum"].value + " " + JSON.stringify(ayarlar.markaKiti.stil.overrides));
 
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
 console.log("\n" + gecen + "/" + toplam + " geçti");

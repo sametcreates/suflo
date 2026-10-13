@@ -38,6 +38,7 @@ function Klip(o) {
   else c.projectItem = { getMediaPath: function () { return c._yol; } };
   if (o.mgt) c.isMGT = function () { return true; };
   if (o.multicam) c.projectItem.isMulticamClip = function () { return true; };
+  if (o.sekans) c.projectItem.isSequence = function () { return true; };
   var comps = o.comps || [{ matchName: "AE.ADBE Opacity", displayName: "Opacity" }, { matchName: "AE.ADBE Motion", displayName: "Motion" }];
   c.components = { numItems: comps.length };
   comps.forEach(function (x, i) { c.components[i] = x; });
@@ -237,7 +238,7 @@ function sahne(o) {
   var A = new Klip({ s: 0, e: 50, inp: 0, yol: "C:\\cekim\\A.mov", ad: "A" });
   var kYol = o.yol === undefined ? "C:\\cekim\\K.mov" : o.yol;
   var K = new Klip({ s: 50, e: 50 + n, inp: inp, yol: kYol, dur: kDur, ad: "Kahraman.mov", v: o.hiz || 1, rev: o.rev, mgt: o.mgt,
-    grafik: o.grafik, multicam: o.multicam, remap: o.remap, comps: o.comps });
+    grafik: o.grafik, multicam: o.multicam, sekans: o.sekans, remap: o.remap, comps: o.comps });
   var B = new Klip({ s: 50 + n, e: 90 + n, inp: 5, yol: "C:\\cekim\\B.mov", ad: "B" });
   var KS = new Klip({ s: 50, e: 50 + n, inp: inp, yol: kYol, dur: kDur, tur: "a", ad: "Kahraman.mov" });
   var AS = new Klip({ s: 0, e: 50, inp: 0, yol: "C:\\cekim\\A.mov", tur: "a" }), BS = new Klip({ s: 50 + n, e: 90 + n, inp: 5, yol: "C:\\cekim\\B.mov", tur: "a" });
@@ -354,7 +355,10 @@ var RET = [
   ["remap", { remap: 1 }],
   ["warp", { comps: [{ matchName: "AE.ADBE SubspaceStabilizer", displayName: "Warp Stabilizer" }] }],
   ["warp", { comps: [{ matchName: "x", displayName: "Sarsıntı Önleyici" }] }],
-  ["multicam", { multicam: true }]
+  ["multicam", { multicam: true }],
+  // iç içe sekans ve multicam kaynağının medya yolu boş: eskiden "grafik" sayılıyor, multicam mesajı hiç görünmüyordu
+  ["multicam", { multicam: true, yol: "" }],
+  ["icSekans", { sekans: true, yol: "" }]
 ];
 RET.forEach(function (x) {
   var zz = sahne(Object.assign({ n: 100 }, x[1]));
@@ -585,6 +589,20 @@ S.list().forEach(function (pr) {
   }); });
 });
 ok("17) varsayılan otomatik, tutamak 0 ya da bilinmiyor (ffmpeg yok): hepsi başarılı", oto17.length === 0, oto17.join(" | "));
+// Hızlanmada yukarıdan yaklaşma hızı %0,1'in altında aşarsa (3.166457 / 3.1662) KS_rampSetSpeed 'zaten
+// orada' deyip yavaşlatmayı atlıyordu: uç fazla hızla uzatılıp medya sonunda T1'den bir kare kısa kalıyordu (tutamak)
+var yak17 = [];
+[["cikis", 110, 25], ["bukum", 150, 25], ["bukum", 150, 24000 / 1001], ["cikis", 216, 30000 / 1001], ["nabiz", 361, 60000 / 1001]].forEach(function (d) {
+  var zz = sahne({ n: d[1], tutamak: 0, fr: 1 / d[2] });
+  [0, null].forEach(function (hs) {
+    if (hs === null) zz = sahne({ n: d[1], tutamak: 0, fr: 1 / d[2] });
+    var r = uygula(zz, S.hostPlan(S.plan(d[0], {}, { frames: d[1], fps: d[2], handleSec: hs })));
+    if (!r.ok) { yak17.push(d.join("/") + " " + hs + " " + r.kod); return; }
+    var ps = parcalar(zz, 50, 50 + d[1]);
+    if (ps[ps.length - 1]._e !== 50 + d[1]) yak17.push(d.join("/") + " uç " + ps[ps.length - 1]._e);
+  });
+});
+ok("17) varsayılan, tutamak 0: yukarıdan yaklaşmada %0,1 altı aşım da v'ye yavaşlatılır (Hızlı Çıkış 110, Zaman Bükümü 150, Nabız 361)", yak17.length === 0, yak17.join(" | "));
 
 /* ---------- 18) yüzde birimli sürüm, kayıtsız (seçimden) kaldır ---------- */
 z = sahne({ n: 100, surum: "eski" });
@@ -634,6 +652,41 @@ v20 = aktif._v[0]._k.filter(function (k) { return k._yol === z.K._yol; });
 a20 = aktif._a[0]._k.filter(function (k) { return k._yol === z.K._yol; });
 ok("20) kısmi rampa yarıda bozulursa da: geri yüklenir, üç video parçası kendi sesleriyle bağlı", !r20b.ok && r20b.restored === true && v20.length === 3 && a20.length === 3 &&
   v20.every(function (v, i) { return bagliMi(v, a20[i]) && v._v === 1; }) && a20.every(function (a) { return !a._d; }), js(r20b));
+// L-cut (ses videonun 10 kare ötesine uzar) ve J-cut (10 kare önce başlar): videonun kendi sınırını aşan ses
+// parçası da yeniden bağlanır (eskiden yalnız video parçasının tam içindeki ses bağlanıyordu)
+function lCut(o) {
+  var zz = sahne(o);
+  var BS = aktif._a[0]._k.filter(function (k) { return k._yol === zz.B._yol; })[0];
+  BS._s += 10; BS._in += 10 * zz.fr; zz.KS._e += 10;
+  return zz;
+}
+function jCut(o) {
+  var zz = sahne(o);
+  var AS = aktif._a[0]._k.filter(function (k) { return k._yol === zz.A._yol; })[0];
+  AS._e -= 10; zz.KS._s -= 10; zz.KS._in -= 10 * zz.fr;
+  return zz;
+}
+function sesVideo(zz, s) { var a = aktif._a[0]._k.filter(function (k) { return k._yol === zz.K._yol && k._s === s; })[0]; return a ? a._bag.filter(function (b) { return b._tur === "v"; }).map(function (b) { return b._s + "-" + b._e; }).join("|") : "yok"; }
+var lc20 = [];
+z = lCut({ n: 200, inF: 100, outF: 180, linkedApi: true });
+var r20l = call("KS_applySpeedRamp", { target: hedef(z), range: { start: 4, end: 7.2 }, plan: S.hostPlan(S.plan("darbe", { mode: "balanced" }, { frames: 80, fps: 25, partial: true })), audio: "mute", interp: {} });
+if (!r20l.ok || sesVideo(z, 180) !== "180-250") lc20.push("L-cut kısmi uygula: [180,260] sesi " + sesVideo(z, 180));
+var k20l = call("KS_removeSpeedRamp", { record: r20l.record });
+if (!k20l.ok || sesVideo(z, 180) !== "180-250" || sesVideo(z, 100) !== "100-180") lc20.push("L-cut kısmi kaldır: " + sesVideo(z, 180) + " / " + sesVideo(z, 100));
+z = jCut({ n: 200, inF: 100, outF: 180, linkedApi: true });
+var r20j = call("KS_applySpeedRamp", { target: hedef(z), range: { start: 4, end: 7.2 }, plan: S.hostPlan(S.plan("darbe", { mode: "balanced" }, { frames: 80, fps: 25, partial: true })), audio: "mute", interp: {} });
+if (!r20j.ok || sesVideo(z, 40) !== "50-100") lc20.push("J-cut kısmi uygula: [40,100] sesi " + sesVideo(z, 40));
+var k20j = call("KS_removeSpeedRamp", { record: r20j.record });
+if (!k20j.ok || sesVideo(z, 40) !== "50-100") lc20.push("J-cut kısmi kaldır: " + sesVideo(z, 40));
+z = lCut({ n: 100, linkedApi: true });
+var r20t = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+var k20t = call("KS_removeSpeedRamp", { record: r20t.record });
+if (!r20t.ok || !k20t.ok || sesVideo(z, 150) !== "50-150" || sesVideo(z, 50) !== "50-150") lc20.push("L-cut tüm klip kaldır: kuyruk [150,160] " + sesVideo(z, 150) + " gövde " + sesVideo(z, 50));
+z = jCut({ n: 100, linkedApi: true });
+var r20h = uygula(z, S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 100, fps: 25 })));
+var k20h = call("KS_removeSpeedRamp", { record: r20h.record });
+if (!r20h.ok || !k20h.ok || sesVideo(z, 40) !== "50-150") lc20.push("J-cut tüm klip kaldır: baş [40,50] " + sesVideo(z, 40));
+ok("20) L-cut / J-cut: videonun sınırını aşan ses parçası uygulama ve kaldırma sonrası kendi video parçasına bağlı", lc20.length === 0, lc20.join(" | "));
 
 /* ---------- 21) kaldırınca geri gelen klip seçili; açık hedeflerle (items) yeniden uygulanır ---------- */
 z = sahne({ n: 100 });
@@ -691,6 +744,47 @@ p22c[0]._sel = true;
 var k22d = call("KS_removeSpeedRamp", { fromSelection: true, records: [{ v: 1, seqId: "baska", track: 0, t0: 2, t1: 6 }, r22c.record] });
 ok("22) panel kaydı eşleşirse kayıt kullanılır (efektli parça da rampanın parçası olarak kaldırılır), kayit döner", k22d.ok && k22d.kayit && k22d.kayit.t0 === 2 &&
   parcalar(z, 50, 150).length === 1 && parcalar(z, 50, 150)[0]._v === 1, js(k22d));
+// Otomatik (exact) rampa %100 platoyla biter (Hızlı Giriş 106: [71, 1.0001]; Basamaklı tam 1.0): kayıtsız kaldırma
+// platoyu dış parça sayıp dışarıda bırakırsa ilk parça kısa t1'e uzar, plato eski (ileri) kaynağıyla kalır: atlama + Out'u aşan klip
+function kayitsizKaldir(z, n, sec) {
+  aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+  parcalar(z, 50, 50 + n)[sec]._sel = true;
+  return call("KS_removeSpeedRamp", { fromSelection: true, records: [] });
+}
+function surekli100(z, n) {
+  var ps = parcalar(z, 50, 50 + n), hata = "";
+  if (!bitisikMi(ps, 50, 50 + n)) return "bitişik değil";
+  ps.forEach(function (k) {
+    if (!tam100(k)) hata += " hız " + k._v;
+    if (Math.abs(k._in - (10 + (k._s - 50) * ortam.fr)) > ortam.fr / 2) hata += " kaynak atlaması @" + k._s + " " + k._in;
+  });
+  if (Math.abs(kaynakSonu(ps[ps.length - 1]) - (10 + n * ortam.fr)) > ortam.fr / 2) hata += " son kaynak " + kaynakSonu(ps[ps.length - 1]);
+  return hata;
+}
+z = sahne({ n: 106, tutamak: 30 });
+var pl22e = S.plan("giris", {}, { frames: 106, fps: 25, handleSec: 30 });
+var r22e = uygula(z, S.hostPlan(pl22e));
+var k22e = kayitsizKaldir(z, 106, 1);
+ok("22) kayıtsız kaldırma: exact Hızlı Giriş 106 (son parça %100,01 plato) tek sürekli %100 klip, özgün Out'ta biter", pl22e.mode === "exact" && r22e.ok && k22e.ok &&
+  k22e.t0 === 2 && Math.abs(k22e.t1 - 6.24) < 1e-6 && parcalar(z, 50, 156).length === 1 && surekli100(z, 106) === "",
+  js(k22e) + " " + js(parcalar(z, 50, 156).map(function (k) { return [k._s, k._e, k._v, +k._in.toFixed(3)]; })));
+var sec22 = [];
+S.list().forEach(function (pr) {
+  if (pr.beats) return;
+  [{}, { mode: "balanced" }, { ease: "linear" }, { ease: "step" }].forEach(function (o) {
+    [60, 106, 125, 200].forEach(function (n) {
+      var zz = sahne({ n: n, tutamak: 30 });
+      var r = uygula(zz, S.hostPlan(S.plan(pr.id, o, { frames: n, fps: 25, handleSec: 30 })));
+      if (!r.ok) return;
+      var ps = parcalar(zz, 50, 50 + n), sec = Math.min(1, ps.length - 1);
+      if (ps.length < 2) return;
+      var kd = kayitsizKaldir(zz, n, sec);
+      var h = kd.ok ? surekli100(zz, n) : "kod " + kd.kod;
+      if (h) sec22.push(pr.id + " " + js(o) + " " + n + ":" + h);
+    });
+  });
+});
+ok("22) kayıtsız kaldırma her önayar/seçenek/uzunlukta: kaynak atlaması yok, her parça tam %100, Out özgün yerde", sec22.length === 0, sec22.length + ": " + sec22.slice(0, 5).join(" | "));
 
 /* ---------- 23) kaldır: canlı seçim + panel kayıtları (eski önbellekli seçim değil) ---------- */
 z = sahne({ n: 400 });
@@ -703,6 +797,28 @@ parcalar(z, 350, 450)[2]._sel = true;   // B rampasının parçası
 var k23 = call("KS_removeSpeedRamp", { fromSelection: true, records: [r23a.record, r23b.record] });
 ok("23) iki rampa aynı medyada: canlı seçim B'deyse B kaldırılır, A yerinde", r23a.ok && r23b.ok && k23.ok && k23.t0 === 14 && k23.kayit && k23.kayit.t0 === 14 &&
   parcalar(z, 50, 150).length === r23a.pieces && parcalar(z, 350, 450).length === 1, js(k23) + " " + Kb);
+// Arka arkaya iki rampa (ikincinin In'i birincinin Out'unda): kaynak sınırda kapanır, zincir ikisini birleştirir.
+// Kopyalanan sekansta kayıtlar başka seqId taşır: sınırları ipucu olur, yalnız seçili rampa kaldırılır
+function bitisikIkiRampa() {
+  var zz = sahne({ n: 250 });
+  var a = call("KS_applySpeedRamp", { target: hedef(zz), range: { start: 4, end: 6 }, plan: S.hostPlan(S.plan("dalis", { mode: "balanced" }, { frames: 50, fps: 25, partial: true })), audio: "mute", interp: {} });
+  var b = call("KS_applySpeedRamp", { target: { track: 0, start: 6, end: 12, mediaPath: zz.K._yol }, range: { start: 6, end: 8 },
+    plan: S.hostPlan(S.plan("darbe", { mode: "balanced" }, { frames: 50, fps: 25, partial: true })), audio: "mute", interp: {} });
+  return { z: zz, a: a, b: b };
+}
+function kopyaKaydi(r) { var k = JSON.parse(JSON.stringify(r.record)); k.seqId = "kopyalanan-sekansin-eslesi"; return k; }
+var y23 = bitisikIkiRampa();
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+parcalar(y23.z, 100, 150)[2]._sel = true;
+var k23y = call("KS_removeSpeedRamp", { fromSelection: true, records: [kopyaKaydi(y23.a), kopyaKaydi(y23.b)] });
+ok("23) bitişik iki rampa, kopyalanan sekans (kayıtlar başka seqId): yalnız seçili rampa kaldırılır, ikincisi yerinde", y23.a.ok && y23.b.ok && k23y.ok &&
+  k23y.t0 === 4 && k23y.t1 === 6 && parcalar(y23.z, 100, 150).length === 1 && parcalar(y23.z, 150, 200).length === y23.b.pieces, js(k23y));
+y23 = bitisikIkiRampa();
+aktif._v[0]._k.forEach(function (k) { k._sel = false; });
+parcalar(y23.z, 150, 200)[1]._sel = true;
+var k23z = call("KS_removeSpeedRamp", { fromSelection: true, records: [y23.a.record] });
+ok("23) bitişik iki rampa, yalnız birincinin kaydı var, ikincisi seçili: ikincisi kaldırılır, birincisi (kaydıyla) yerinde", k23z.ok && k23z.t0 === 6 && k23z.t1 === 8 &&
+  parcalar(y23.z, 100, 150).length === y23.a.pieces && parcalar(y23.z, 150, 200).length === 1, js(k23z));
 
 /* ---------- 24) geri yükleme tam %100 (yuvarlama payı yok) ---------- */
 var tam24 = [];

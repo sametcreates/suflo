@@ -333,11 +333,17 @@ window.KEngine = (function () {
 
   // cuBLAS'a dönmeden önce CUDA DLL'lerini sil: hem ~600 MB yer açar hem de
   // ggml_backend_load_all() exe klasörünü taradığı için bozuk backend tekrar denenmesin.
+  // cuBLAS derlemesinin CUDA'ya özgü DLL'leri (ggml-cuda, cuBLAS, cudart, nvrtc*, nvblas). v1.9.1 Windows
+  // derlemeleri GGML_BACKEND_DL: exe klasöründe kalan ggml-cuda.dll CPU kurulumunda da yüklenir, whisper-cli
+  // (-ng verilmeden) CUDA'da koşar. CPU derlemesine geçerken hepsi silinir.
+  var CUDA_DLL = /^(ggml-cuda[^\\/]*|cublas[^\\/]*|cudart[^\\/]*|nvrtc[^\\/]*|nvblas[^\\/]*)\.dll$/i;
   function stripCudaDlls(dir) {
     var files = ["ggml-cuda.dll", "cublasLt64_12.dll", "cublas64_12.dll",
-      "cudart64_12.dll", "nvrtc64_120_0.dll", "nvrtc-builtins64_124.dll"];
+      "cudart64_12.dll", "nvrtc64_120_0.dll", "nvrtc-builtins64_124.dll", "nvblas64_12.dll"];
     [K.path.join(dir, "Release"), dir].forEach(function (d) {
-      files.forEach(function (f) {
+      var adlar = files.slice();
+      try { K.fs.readdirSync(d).forEach(function (f) { if (CUDA_DLL.test(f) && adlar.indexOf(f) === -1) adlar.push(f); }); } catch (eD) {}
+      adlar.forEach(function (f) {
         try { K.fs.unlinkSync(K.path.join(d, f)); } catch (e) {}
       });
     });
@@ -348,6 +354,18 @@ window.KEngine = (function () {
    * -h dalında koşulsuz exit(0) yapar ve hatayı yalnızca stderr'e yazar. Bu yüzden GPU için
    * POZİTİF kanıt aranır — eşleşme yoksa emniyetli tarafa (CPU) düşülür.
    */
+  /*
+   * Kurulu motor (dosyası var, derleme istenenle aynı) gerçekten açılıyor mu? Dosyanın varlığı yetmez:
+   * arşiv yarıda kaldıysa (whisper-cli.exe çıktı, whisper.dll en sonda gelmedi) ya da antivirüs bir DLL'i
+   * karantinaya aldıysa exe 0xC0000135 ile düşer. Açılmıyorsa derleme yeniden iner: Doctor'un "Motoru
+   * onar"ı ve Ayarlar'ın yeniden kurulumu artık boşa "Hazır" demez.
+   */
+  async function kuruluMotorAcilir() {
+    var pr = await probeBuild(false);
+    if (!pr.ok) K.log("kurulu motor acilmiyor, yeniden kuruluyor: " + pr.why);
+    return pr.ok;
+  }
+
   async function probeBuild(wantCuda) {
     var lw = K.whisperLocal({ skipModel: true });
     if (!lw) return { ok: false, why: "motor dosyasi bulunamadi" };
@@ -458,7 +476,9 @@ window.KEngine = (function () {
             "— ya da Homebrew kurmadan, Ayarlar'dan ücretsiz Groq anahtarıyla bulut motorunu kullan.");
         }
         say("Motor kuruluyor: brew install whisper-cpp (birkaç dakika sürebilir)…");
-        var bi = await K.run(brew, ["install", "whisper-cpp"], { timeout: 1800000 });
+        // Rosetta'da açılan Premiere: /opt/homebrew'daki brew arch -arm64 ile çağrılır (K.brewKomutu)
+        var bk = K.brewKomutu ? K.brewKomutu(["install", "whisper-cpp"]) : null;
+        var bi = await K.run(bk ? bk.exe : brew, bk ? bk.args : ["install", "whisper-cpp"], { timeout: 1800000 });
         if (!K.whisperLocal({ skipModel: true })) {
           throw new Error("Homebrew motoru kuramadı (kod=" + bi.code + "): " +
             String(bi.stderr || bi.stdout).split("\n").slice(-3).join(" ").slice(0, 220));
@@ -470,7 +490,7 @@ window.KEngine = (function () {
       var sM = K.settings();
       sM.engineBuild = K.macMetal() ? "metal" : "cpu";
       K.saveSettings();
-    } else if (!haveExe || installedBuild() !== wantBuild) {
+    } else if (!haveExe || installedBuild() !== wantBuild || !(await kuruluMotorAcilir())) {
       var build = BUILDS[wantBuild];
       say("Motor iniyor… (" + fmtMB(build.sizeMB) + ")");
       // Derleme başına ayrı ad: yarım kalan cuBLAS .part'ı CPU zip'ine eklenmesin
@@ -481,6 +501,8 @@ window.KEngine = (function () {
       if (!d1.ok) throw indirmeHatasi("Motor", d1, build);
 
       say("Motor açılıyor…");
+      // CPU'ya geçiş (Hızlandırma kapatıldı) ya da onarım: arşiv yalnız üstüne yazar, eski CUDA DLL'lerini silmez
+      if (wantBuild === "cpu") stripCudaDlls(dir);
       var ok = await K.unzip(zipPath, dir);
       try { K.fs.unlinkSync(zipPath); } catch (e) {}
       if (!ok) throw new Error("Motor arşivi açılamadı.");

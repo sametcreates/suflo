@@ -79,6 +79,11 @@ function macOrtam(opts) {
       }
       if (m === "child_process") {
         return {
+          // sysctl.proc_translated: Rosetta'da "1"; Intel Mac'te anahtar yok (hata)
+          execFileSync: function (cmd) {
+            if (cmd === "/usr/sbin/sysctl" && opts.rosetta) return "1\n";
+            throw new Error("sysctl: unknown oid");
+          },
           spawn: function (cmd, args, o) {
             kosulanKomutlar.push({ cmd: cmd, args: args, env: o && o.env ? o.env.PATH : null });
             var cb = {};
@@ -255,6 +260,34 @@ isler.push((function () {
         komutlar.join(" | ").slice(0, 120));
     })
     .catch(function (err) { chk("brew varsa install gecmeli", false, err.message.slice(0, 120)); });
+})());
+
+/* ================= 8) Rosetta'da açılan Premiere: brew arch -arm64 ile, derleme yine Metal ================= */
+isler.push((function () {
+  var e = macOrtam({
+    arch: "x64", rosetta: true,
+    dosyalar: ["/opt/homebrew/bin/brew", "/opt/homebrew/bin/ffmpeg"],
+    komutCikti: function (cmd, args) {
+      if (cmd === "/opt/homebrew/bin/brew") return { code: 1, out: "", err: "Error: Cannot install under Rosetta 2 in ARM default prefix (/opt/homebrew)!" };
+      if (cmd === "/usr/bin/arch" && args[0] === "-arm64" && args[1] === "/opt/homebrew/bin/brew" && args[2] === "install") {
+        e.fs._kume["/opt/homebrew/bin/whisper-cli"] = true;
+        return { code: 0, out: "installed", err: "" };
+      }
+      if (/ffmpeg$/.test(String(cmd)) && args && args[0] === "-version") return { code: 0, out: "ffmpeg version 7.1", err: "" };
+      return { code: 0, out: "", err: "" };
+    }
+  });
+  e.K.download = function () { return Promise.resolve({ ok: true }); };
+  e.fs._kume["/Users/samet/Library/Application Support/Suflo/whisper/models/ggml-large-v3-turbo-q5_0.bin"] = true;
+  e.fs._kume["/Users/samet/Library/Application Support/Suflo/whisper/models/ggml-silero-v5.1.2.bin"] = true;
+  return e.KEngine.install({ modelId: "turbo", useGpu: true, onStatus: function () {} })
+    .then(function (res) {
+      var komutlar = e.komutlar.map(function (k) { return k.cmd + " " + (k.args || []).join(" "); });
+      chk("Rosetta: brew install whisper-cpp arch -arm64 ile koştu", komutlar.indexOf("/usr/bin/arch -arm64 /opt/homebrew/bin/brew install whisper-cpp") !== -1 &&
+        !komutlar.some(function (c) { return /^\/opt\/homebrew\/bin\/brew /.test(c); }), komutlar.slice(0, 4).join(" | "));
+      chk("Rosetta: os.arch x64 olsa da Apple Silicon -> 'metal'", res.build === "metal" && e.K.macMetal() === true, res.build);
+    })
+    .catch(function (err) { chk("Rosetta'da brew kurulumu geçmeli", false, err.message.slice(0, 160)); });
 })());
 
 Promise.all(isler).then(function () {

@@ -1335,3 +1335,235 @@ zamanlaması (DTW)' vurguyu sözcüğün söylendiği ana oturtur. Yeni Pro arac
 
 **5.5 Premiere'de dene (yaklaşık 40 dk).** `marketing/v3.2-deneme-listesi.md` › `## 5` maddeleri; en önemlisi 5.6
 (her modelde ve derlemede DTW) ve 5.10–5.12 (deneme hakkı, büyük harf, `.en.srt`).
+
+## 3.3
+
+3.3'ün kapsamı: `marketing/alti-repo-plan.json` › `plan.build_order` adım 16, 17, 18 ve 21 (Altyazı Efektleri
+oluşturucusu, bu sırayla) ve YouTube indirici. Her adım kendi alt bölümünü ekler. Elle Premiere denemeleri
+`marketing/v3.3-deneme-listesi.md`'de.
+
+### Adım 16: Altyazı Efektleri oluşturucusu (Suflo Stilleri galerisinin yerine)
+
+Ne değişti: Altyazı sekmesindeki 12 kartlık "Suflo Stilleri" galerisi kalktı; yerinde "Altyazı Efektleri": beş
+hazır görünüm çipi, büyük canlı önizleme (gerçek libass çıktısı) ve giriş / vurgu animasyonu, kelime vurgusu, renk,
+yazı tipi + kalın / italik, boyut, kontur, satır sayısı, en çok kelime, konum. Stil motorunda tek temel stil `efekt`
+(`js/style-engine.js`), model `js/altyazi-efekt.js`. Eski 12 stil motorda duruyor: eski kayıtlar, 3.2 SFL1 kodları
+ve Shorts Paketi seçimleri en yakın görünüme taşınıyor (yazı tipi, renk, konum korunuyor). "Suflo Stilleri" her
+yerde "Altyazı Efektleri" (İngilizce "Caption Effects"). Katman Pro.gate("overlay") ile, mevcut 3 deneme hakkıyla.
+Animated Captions / TranscriptAI'dan yalnız fikir alındı (temiz oda); bu adımda kod ya da MOGRT paketlenmedi.
+
+**16.1 Görünümleri onayla (5 dk).** Beş görünümün adı ve değeri `js/altyazi-efekt.js` › `GORUNUMLER`'de: Temiz,
+Vurucu, Canlı, Zarif, Glitch. Ad ya da renk değiştirmek istersen orada değiştir; "Temiz" stil motorundaki `efekt`
+varsayılanıyla birebir aynı kalmalı (`js/style-engine.js` › `STYLES.efekt.style`; test denetler). Yeni ad eklersen
+`i18n/en.js`'e İngilizcesini yaz (ör. "Vurucu": "Punchy").
+
+**16.2 Premiere'de dene (yaklaşık 40 dk).** `marketing/v3.3-deneme-listesi.md` › `## 16` maddeleri; en önemlisi 16.2–16.4
+(gerçek önizleme ve animasyonlar), 16.8–16.9 (eski kayıt ve eski kod taşıma), 16.11–16.12 (deneme hakkı ve timeline).
+
+**16.3 Site görselleri (isteğe bağlı, 20 dk).** Site metni güncellendi (`docs/index.html`, `docs/en/index.html`,
+`docs/en/pro.html`, iki blog yazısı, `docs/stil.html`). Eski galeriyi gösteren görseller kaldı: `docs/gorseller/v3/kelime-vurgusu.webp`
+(alt metni "12 animasyonlu altyazı stili") ve varsa Pro sayfasındaki stil kartı ekran görüntüleri. 3.3 panelinden
+Altyazı Efektleri bölümünün yeni ekran görüntüsünü al (Vurucu seçili, önizleme oynarken) ve değiştir; alt metni
+"Altyazı Efektleri: giriş ve vurgu animasyonlu kendi altyazın" yap. `docs/gorseller/suflo-stiller/efekt.webm` stil
+sayfasının yeni vitrini (`node tools/render-style-previews.js --site --id efekt` ile yeniden üretilebilir). Paylaşılan
+efekt kodunun sayfası kodun giriş × vurgu animasyon çiftini oynatır: `docs/gorseller/suflo-stiller/efekt-<giris>-<aktif>.webm`
+(24 dosya, ~280 KB; `node tools/render-style-previews.js --site --efekt` ile yeniden üretilir, stil motoru değişince yenile).
+
+**16.4 Sürüm notu ve tanıtım (3.3.0'a geçerken).** `marketing/release-notes.md`'nin 3.3.0 bölümüne: "Altyazı
+Efektleri: eski stil galerisinin yerinde kendi altyazı efektini kur: giriş (Pop, Belirme, Yukarı / Aşağı kay, Zıpla) ve
+vurgu animasyonu (Zıpla, Titre, Glitch), kelime vurgusu, renk, yazı tipi, kalın / italik, satır ve kelime sayısı; beş
+hazır görünümle başla. Eski stillerin ve stil kodların en yakın görünüme taşınır." `js/app.js` YENILIKLER listesine
+istersen kısası. Eski sürüm notlarındaki (3.0–3.2) "Suflo Stilleri" geçmiş kayıt olduğu için bilerek değişmedi.
+
+**16.5 Sonraki adımlar için not.** Yerel (render'sız) MOGRT çıktısı adım 21'de: TranscriptAI şablonu
+(`dist/source/dinamik_altyazi_motoru.mogrt`, izinli) o adımda pakete girer. `tools/verify-release.ps1` `.mogrt`
+dosyalarını ücretli içerik sayıp yayını durduruyor; adım 21 o dosyayı ayrıca izinli listeye almalı. Oluşturucu
+kontrolleri şablonun JSON sözleşmesine 1:1 eşleniyor (`js/altyazi-efekt.js` › `sablonStili`, `sablonIndeksleri`).
+Yazı tipi alanı PostScript adıdır (`sablonFontu`: Montserrat-Bold, Anton-Regular…; kalın bu adla gider, italik yüz
+pakette yok). Premiere yalnız sisteme **kurulu** fontu çizer: adım 21 paket fontlarını kullanıcıya kurmalı (Windows
+`%LOCALAPPDATA%\Microsoft\Windows\Fonts` + HKCU kaydı, macOS `~/Library/Fonts`) ya da kurulu değilse libass katmanına
+düşmeli; yoksa şablon yazı tipini düşürür (Arial).
+
+**16.6 Yeni statik font: `fonts/Montserrat-Regular.ttf` (bilgi).** "Kalın yazı" kapalıyken libass'in seçtiği Regular yüz;
+`Montserrat-Bold.ttf` gibi paketteki değişken `Montserrat.ttf`'ten fontTools ile üretildi (OFL, aynı lisans dosyası,
+`THIRD_PARTY_NOTICES.md`'de yazılı). `tools/verify-release.ps1` iki statik Montserrat'ı zorunlu tutar; ZXP / kurucu
+`fonts/` klasörünü bütün taşır, ek adım yok.
+
+### Adım 17: Gölge, arka plan kutusu ve serbest X / Y konum
+
+Ne değişti: Altyazı Efektleri oluşturucusuna **Gölge** (renk, opaklık 0-100, mesafe 0-20, yumuşaklık 0-30) ve
+**Arka plan kutusu** (renk, opaklık) anahtarları, önizlemede **sürükleyerek serbest konum** (artı işareti, "X %50 · Y %85"
+etiketi, hazır konumlara ±%3 yapışma, ok tuşları %1 / Shift %5, çift tık / Home sıfırlar) ve altıncı hazır görünüm
+**Kutulu** geldi; Vurucu sert, Zarif yumuşak gölgeli. Stil motoru (`js/style-engine.js`, yalnız `efekt`): gölge ayrı
+katmanda metnin görünmez kopyasıdır (`\4c \4a \shad \blur`, yazı keskin kalır), kutu ikinci stil satırı `SufloKutu`
+(BorderStyle 3, satır satır, `\xbord20 \ybord0`), serbest konum `\an5` + kadraja / 9:16 sınırlarına kart kart sığdırma.
+Varsayılanlar ve 12 eski stil bayt bayt aynı (anlık görüntü testi). SFL1 kodu, Şablonum, Marka Kiti (isteğe bağlı:
+serbest konum, gölge, kutu) ve Shorts Paketi aynı ayarı taşır. Katman yine Pro.gate("overlay"), 3 deneme hakkı; yeni
+deneme anahtarı yok. TranscriptAI'dan bu adımda yalnız aralıklar / sözleşme alanları izlendi (kod ya da varlık yok).
+16. adımın ikinci incelemesinden kalan dört küçük bulgu da düzeldi (CEF 74 odak çizgisi, efektte hareket şiddeti hep
+Dengeli, 3.2 rehber yedeğinin taşınması, Shorts Paketi'nde noktalama).
+
+**17.1 Görünüşü onayla (10 dk).** Gölge yumuşaklığı ve kutu payı yaklaşıktır: yumuşaklık `\blur` = yumuşaklık / 2
+(1080p'de), gölge mesafesi şablonun Drop Shadow yönüyle (135°) eksen başına mesafe · cos 45°, kutu yatay payı 20 px
+(şablondaki `pad = 20`), dikey pay satır yüksekliği. Değiştirmek istersen `js/style-engine.js` › `renderEfekt` başındaki
+`golgeEk` / `kutuPay`; testler (`tests/test-style-engine.js`) sayıları denetler, birlikte güncelle. Kutulu / Vurucu / Zarif
+görünümlerinin değerleri `js/altyazi-efekt.js` › `GORUNUMLER`.
+
+**17.2 Premiere'de dene (yaklaşık 50 dk).** `marketing/v3.3-deneme-listesi.md` › `## 17`; en önemlisi 17.2–17.3 (gerçek
+gölge / kutu), 17.5–17.9 (sürükle, yapış, klavye, kenarlar, 9:16), 17.11 (timeline'da önizlemeyle aynı, Suflo'nun
+Windows / macOS ffmpeg'iyle), eski Premiere için 17.18 ve 17.25, inceleme düzeltmeleri için 17.22–17.28 (Vurucu'da
+zıplayan kelimenin gölgesi, Shorts CTA'sının yeri, 3.2 Clean Pill → Kutulu).
+
+**17.3 Sürüm notu (3.3.0'a geçerken).** `marketing/release-notes.md` 3.3.0 bölümüne: "Altyazı Efektleri'ne gölge ve
+arka plan kutusu; yazıyı önizlemede sürükleyerek istediğin yere koy (hazır konumlara yapışır, ok tuşlarıyla ince ayar);
+yeni Kutulu görünümü. Shorts Paketi altyazısı Altyazı sekmesinin noktalama ayarını izler."
+
+**17.4 Site görseli (isteğe bağlı, 10 dk).** Site metni güncellendi (`docs/index.html`, `docs/en/index.html`). 16.3'teki
+yeni ekran görüntüsünü alırken önizlemede sürükleme anını (artı işareti ve "X %… · Y %…" etiketi görünürken) ya da
+Kutulu görünümünü kullanabilirsin.
+
+**17.5 Adım 21 için not (yerel MOGRT).** Şablonun JSON sözleşmesi gölge ve kutuyu taşıyor (`sablonStili`: gölge
+`[1,r,g,b,opaklık,mesafe,yumuşaklık]`, kutu `[1,r,g,b,opaklık]`). **Konum sözleşmede yok**: yerleştirme klibin
+Motion › Position'ını `AE.sablonKonumu(ayar)` oranıyla (0-1, kartın ortası) ayarlamalı. Şablon denemesinde iki şeye bak:
+(a) Drop Shadow'un Opacity ifadesi JSON'daki 0-100'ü yüzde mi, 0-255 mi okuyor (AE'de bu efektin opaklığı ifadede
+0-255 olabilir; öyleyse gölge önizlemeden çok soluk çıkar, değer 2,55 ile çarpılmalı); (b) şablonun kutusu tek dikdörtgen
+(`sourceRectAtTime` + 20 px), Suflo önizlemesi satır satır kutu çizer: farkı onayla ya da libass tarafını tek kutuya çevir.
+
+**17.6 Kutulu eşlemesini onayla (2 dk).** İncelemeden sonra 3.2'nin kutulu stilleri (Clean Pill, SaaS Glass, Belgesel)
+"Temiz" / "Zarif" yerine arka plan kutulu **Kutulu**'ya taşınıyor (eski stilin yazı tipi / renkleri / konumu korunur).
+Belgesel'i kutusuz Zarif'e döndürmek istersen `js/altyazi-efekt.js` › `ESKI` (testi `tests/test-altyazi-efekt.js`).
+
+### Adım 18: Seçilmiş yeni fontlar ve kategorili yazı tipi seçicisi
+
+Ne değişti: `fonts/`'a yedi OFL ailesi (google/fonts): Bangers, Chakra Petch (Regular + Bold), Exo 2 (R + B), Inter
+(R + B), Libre Caslon Display, Nunito (R + B), Poppins (R + B); her biri kendi `fonts/OFL-<Aile>.txt`'iyle. Inter,
+Exo 2 ve Nunito upstream değişken fontlardan fontTools ile alınmış statik 400 / 700 örnekleri (iç aile adı aynı;
+ayrılmış ad yok). Hepsi `node tools/font-kontrol.js --az` ile Türkçe + Azerbaycanca TAM; paket büyümesi 1,83 MB
+(bütçe 3 MB). `js/style-share.js` FONTS dört kategoriye ayrıldı (Kalın / Modern / Zarif / Teknik); Altyazı
+Efektleri ve Marka Kiti seçicileri bu gruplarla, her seçenek kendi yüzüyle. Önizleme ücretsiz; yerleştirme mevcut
+`overlay` kapısından (3 deneme), yeni Pro anahtarı yok. 3.2'de yapılmış eski 6 fontlu kodlar 3.3'te aynen açılır.
+3.3'ün Stili paylaş'ı her zaman Altyazı Efektleri kodu (`efekt`) üretir; 3.2 paneli bu kodu fonttan bağımsız olarak
+"Bu stil bu Suflo sürümünde yok: efekt." diye reddeder (yeni fontlu kod 3.2'de açılmaz; kullanıcıya "Suflo'yu güncelle"
+de). "font" uyarısıyla yalnız fontun atlanması sadece 3.3 öncesi (eski kimlikli) kodlarda olur.
+
+Senin yapacakların:
+
+1. `marketing/v3.3-deneme-listesi.md` § 18'i Windows'ta ve macOS'ta sırayla dene (18.1–18.12).
+2. Yayın öncesi `node tools/font-kontrol.js --az fonts/*.ttf` çalıştır: çıkış kodu 0 olmalı. Yalnız Archivo Black ve
+   Bebas Neue "Azerbaycanca EKSIK … (3.2'den gelen paket fontu: uyari)" der (3.2'den beri böyle, kodu bozmaz); başka
+   satır EKSIK olmamalı. Yeni bir aile eklersen ə / Ə'sı yoksa komut 1 ile çıkar. Aynı denetim `node tools/test.js`
+   içinde de koşar (`tests/test-style-share.js`).
+3. ZXP'yi kurduktan sonra `tools/verify-release.ps1`: yeni 12 `.ttf` ve 7 `OFL-*.txt` zorunlu listede.
+4. suflo.app/stil sayfası yeni aileleri Google Fonts'tan yükler (`docs/stil.html`, `docs/en/stil.html`); site
+   yayınlandıktan sonra Nunito'lu bir kodu aç ve fontun yüklendiğini gör.
+5. İstersen sonraki sürümde Roboto (Apache-2.0, `LICENSE` dosyasıyla) ya da Rajdhani / Jost eklenebilir; bütçede
+   ≈ 1,1 MB yer kaldı.
+
+### Adım 21: Altyazı Efektleri › Premiere yerel çıktı (render yok, TranscriptAI şablonu)
+
+Ne değişti: Altyazı Efektleri oluşturucusunda yeni **Çıktı** seçimi: **Video katmanı** (önceki libass katmanı; 3.3.0'da
+varsayılan, çünkü yerel yol gerçek Premiere'de henüz denenmedi) ya da **Premiere yerel (render yok) · Beta** (kullanıcı seçerse,
+seçim hatırlanır). Yerel çıktı TranscriptAI'ın altyazı şablonunu (`assets/mogrt/altyazi-efekt-v1.mogrt`,
+yazarın izniyle; TranscriptAI'ın `dist/source/dinamik_altyazi_motoru.mogrt`'u, sha256
+`32c2394de3f639fede180bc274e30166daa0375298af5c5f7ae3dfbf73989969`) aktif sekansta boş bir üst video izine doğrudan koyar;
+kartlar önizlemeyle aynı kurulur (`js/caption-mogrt-json.js`), en çok 45 sn / 8 KB'lık klip parçalarına bölünür ve
+`JSON_Input`'a yazılıp geri okunur (`jsx/host.jsx` › `KS_placeCaptionJsonMogrt`, TranscriptAI'ın `host/index.jsx`'inden
+uyarlandı; başlık + `THIRD_PARTY_NOTICES.md`). İç içe "CAPTIONS [V]" sekansı, QE, ses izi silme, razor YOK. Yalnız Pro
+(`Pro.gate("overlay")`); deneme hakkı filigranlı video katmanını koyar (düzenlenebilir şablonda filigran zorlanamaz).
+Premiere 2022 öncesi, şablon açılamazsa ya da importMGT yoksa katmana düşer. Premiere yalnız sisteme kurulu fontu çizer:
+yazı tipi kurulu değilse Arial'a düşülür ve uyarılır; isteğe bağlı **Suflo fontlarını kur** paketteki fontları kullanıcı
+font klasörüne kopyalar. `tools/verify-release.ps1` bu tek dosyaya (yol + sha256) dar bir istisna tanır; başka her `.mogrt`
+yine yayını durdurur. Doctor'a "Şablon içe aktarma (importMGT)" satırı.
+
+**21.1 İzni yazılı sakla (5 dk, yayından önce).** TranscriptAI yazarının (Aktuğ Antika) şablonu Suflo'da dağıtma iznini
+(e-posta / DM ekran görüntüsü) kendi arşivinde sakla. TranscriptAI'ın LICENSE'ı (bölüm 5) MOGRT varlıklarını MIT
+kapsamı dışında tutar; pakette olmasının dayanağı bu izin. İstersen yazara Suflo'daki kredi satırını
+(`THIRD_PARTY_NOTICES.md` › TranscriptAI) göster.
+
+**21.2 Premiere'de yokla ve dene (yaklaşık 60 dk; 26.x / 25.x, mümkünse 22.x ve 14.4 ayrı ayrı).**
+`marketing/v3.3-deneme-listesi.md` › `## 21`. En önemlisi plandaki dört yoklama: 21.4 (klip ucu kırpılınca şablon
+esnemiyor mu), 21.6 (uzun transkript: metin sınırı / akıcılık), 21.8 (yazı tipi), 21.5 (Highlight_Color yok sayılıyor;
+renk JSON'dan). 21.10 (9:16 ve 4K ölçek / konum) sonucu tutmazsa aşağıdaki 21.3'e bak.
+
+**21.3 Ölçek ve konum varsayımı (deneme sonrası, gerekirse 15 dk).** Suflo, Premiere'in AE şablonunu kendi 1920×1080
+kompozisyon boyutunda sekansın ortasına koyduğunu ve kompozisyon çözünürlüğünde çizdiğini varsayar (Motion › Scale %100
+üstü resmi büyütür, yazı yumuşar). Bu yüzden ölçek en küçük yeterli değerdir (`js/caption-mogrt-json.js` › `yerlesim`):
+kompozisyon kadrajdan genişse (9:16, 4:5) yalnız kartın dikey bandını kaplayacak kadar (9:16 Alt'ta %100), kadraj
+kompozisyondan genişse (4K, 2560×1080) `max(w/1920, h/1080)` (4K'da %200; kaçınılmaz). Punto, kontur ve gölge ölçekten
+arındırılır, `Caption_Position` buna göre hesaplanır. 21.10'da yazı iki kat büyük / kadraj dışı / kompozisyon kenarında
+kesik çıkarsa (Premiere şablonu zaten sığdırıyorsa ya da kart payı `kartPayi` az geliyorsa) `yerlesim` / `kartPayi`
+düzeltilmeli; testler (`tests/test-caption-mogrt-json.js` › Yerleşim) birlikte. 4K'da yazı belirgin yumuşaksa karar:
+4K sekanslarda Video katmanına düşmek ya da şablonun bir 4K sürümünü (yazardan) istemek.
+
+**21.4 Parça sınırları (deneme sonrası, bilgi).** 21.6'da uzun bir videoda takılma / "geri okunan ayni degil" hatası
+görürsen `js/caption-mogrt-json.js` › `SINIR` (45 sn, 8000 bayt) ve `BAYT_KADEMELERI` (8 → 4 → 2 KB) küçültülebilir;
+panel doğrulama tutmazsa zaten küçültüp yeniden dener.
+
+**21.5 Sürüm notu (3.3.0'a geçerken).** `marketing/release-notes.md` 3.3.0 bölümüne: "Altyazı Efektleri artık
+Premiere'in kendi klibi olarak eklenir: render yok, yazı ve zamanlar Premiere'de düzenlenebilir (Pro). Video katmanı
+seçeneği duruyor. Şablon: TranscriptAI (Aktuğ Antika), izinle." README'deki "Altyazı Efektleri › Premiere yerel" satırı
+hazır.
+
+**21.6 Şablonun ikinci fontu (21.16'dan sonra, gerekirse 15 dk).** Şablonun gizli `JSON_Input` veri katmanının varsayılan
+fontu ticari **DharmaGothicE-Heavy** (`definition.json` › `usedFontsLocalized`; Suflo'da yok, pakete girmez). Görünen
+yazı Arial / seçilen font. 21.16'da bu font olmayan bilgisayarda Premiere "eksik font" uyarısı veriyorsa seçenekler:
+yazardan (Aktuğ Antika) veri katmanı Arial olan bir sürüm istemek (yeni sha256 → `js/caption-mogrt-json.js` › `SABLON`,
+`tools/verify-release.ps1`, testler, `THIRD_PARTY_NOTICES.md`) ya da uyarıyı destek cevaplarına (`marketing/dm-cevaplari.md`:
+"pencereyi kapatmak yeterli, altyazı etkilenmez") yazmak. Uyarı yoksa bir şey yapma.
+
+**21.7 Yeni davranışlar (bilgi; 3.3 adım 21 incelemesi).** (a) Premiere `importMGT` şablonu önce TAM süresiyle (1 saat)
+koyup sonra kırptığı için Suflo, ilk parçadan son parça + 1 saate kadar boş bir iz arar; yoksa yeni üst iz açar (21.17).
+(b) Tüm parçalar eklemenin başladığı sekansa gider; kullanıcı arada sekans değiştirirse durur ve yarım grubu o sekanstan
+kaldırır (21.18); **Kaldır** da kayıttaki sekansı hedefler. (c) Marka Kiti logosu ve Podcast Modu konuşmacı renkleri
+yerel şablonda yok: bildirim söyler ve Video katmanını önerir (21.19). Bir sonraki sürüm için karar: logoyu ayrı bir
+görüntü klibi olarak eklemek. (d) "Suflo fontlarını kur"dan sonra Premiere yeniden başlayana kadar Arial gider (21.20).
+(e) Adobe Fonts'ta etkin fontlar `%APPDATA%\Adobe\CoreSync\plugins\livetype` / `~/Library/Application Support/Adobe/CoreSync/plugins/livetype`
+altındaki `.r` / `r` klasörlerinden okunur (dosyanın name tablosu); 21.21 tutmazsa klasör yolunu
+`js/caption-mogrt-json.js` › `adobeFontKlasorleri`'nde güncelle.
+
+### YouTube indirici (sol menü › YouTube İndir; bilgi ücretsiz, indirmek Pro `youtube`, 3 deneme)
+
+Ne değişti: yeni araç. Bağlantı (watch?v=, youtu.be, Shorts, m. / music.youtube.com; oynatma listesinden yalnız o video)
+→ Bilgi al (ücretsiz) → MP3 / 720p / 1080p / 4K → İndir. 720p / 1080p H.264 + AAC MP4 iner; 4K (YouTube'da VP9 / AV1) ve
+H.264'süz videolar Suflo'nun ffmpeg'iyle H.264 / AAC'ye çevrilir. Dosya proje klasörü › `Suflo İndirilenler`'e (değiştirilebilir)
+iner, projede `Suflo İndirilenler` kutusuna alınır (`KS_importDownloaded`, timeline'a dokunmaz). yt-dlp pakette yok: ilk
+kullanımda GitHub'dan son sürüm + aynı sürümün `SHA2-256SUMS`'ı iner, SHA-256 tutmadan çalışmaz; Güncelle ve Doctor satırı
+var. İlk indirmede bir kez "yalnız hakkın olan içerik" onayı (`settings.json` › `ytOnay`). Kod: `js/youtube-indir.js` (saf),
+`js/youtube-indir-ui.js`, `jsx/host.jsx` › `KS_importDownloaded`; testler `tests/test-youtube-indir*.js`, `tests/test-youtube-host.js`.
+
+**YT.1 Hukuk ve satış metni (yayından önce, 30 dk).** Lemon Squeezy'nin ve (varsa) Adobe Exchange'in kabul edilebilir
+kullanım şartlarını "YouTube indirici" özelliği için bir kez oku: bazı ödeme sağlayıcıları "telif ihlalini kolaylaştıran
+araç" satışını yasaklıyor. Satış ve site metninde aracı "kendi videolarını / izinli içeriği Premiere'e al" diye anlat;
+"YouTube'dan istediğin videoyu indir" gibi ifade kullanma. Onay metni `js/youtube-indir.js` › `ONAY_METNI`'de ve
+`index.html` › `#yt-onay`'da (değiştirirsen `ONAY_SURUMU`'nu 2 yap: herkese yeniden sorulur; `i18n/en.js`'e İngilizcesini yaz).
+
+**YT.2 Premiere'de dene (yaklaşık 60 dk, Windows ve macOS).** `marketing/v3.3-deneme-listesi.md` › `## YT` maddeleri;
+en önemlisi YT.3–YT.4 (doğrulanmış kurulum), YT.8 (4K dönüştürme hızı, Windows'ta hangi kodlayıcı), YT.11 (İptal sonrası
+arkada `yt-dlp` / `ffmpeg` süreci kalmıyor), YT.14 (Türkçe harfli kullanıcı / proje yolu).
+
+**YT.3 Deno kararı (YT.16'dan sonra, 15 dk).** YouTube 2025 sonundan beri bazı kaliteleri JavaScript çalıştırıcısı olmadan
+vermiyor; yt-dlp Deno'yu kendisi arar, Suflo `~/.deno/bin` ve Homebrew / Chocolatey / Scoop yollarını da dener ve yoksa
+uyarı gösterir. Suflo Deno İNDİRMEZ. YT.16'da Deno'suz makinede 1080p / 4K gelmiyorsa bir sonraki sürüm için karar ver:
+Deno'yu (MIT, ~40 MB) yt-dlp gibi ilk kullanımda indirip yayımlanan SHA-256 ile doğrulamak (yeni iş: `THIRD_PARTY_NOTICES.md`,
+`denoAdaylari`) ya da yalnız uyarıda bırakmak.
+
+**YT.4 Windows'ta 4K dönüştürme (YT.8'den sonra, bilgi).** Suflo'nun Windows ffmpeg'i (BtbN LGPL) libx264 taşımaz; dönüştürme
+sırayla Media Foundation (`h264_mf`), NVENC, Quick Sync, AMF, OpenH264, son çare MPEG-4 ile yapılır ve sonuç satırı hangisini
+kullandığını söyler. Kalite / hız kabul edilmezse seçenek: Windows'ta gyan.dev GPL derlemesini (libx264'lü, zaten yedek kaynak)
+birinci kaynak yapmak; GPL ikili de pakete girmez, çalışırken iner ve `THIRD_PARTY_NOTICES.md` zaten listeliyor.
+
+**YT.5 Destek cevapları (15 dk).** `marketing/dm-cevaplari.md`'ye ekle: (a) virüs koruması `yt-dlp.exe`'yi engelliyor
+(PyInstaller ikilisi; Suflo SHA-256 doğruladıktan sonra çalıştırır; `%APPDATA%\Kesit\yt-dlp` klasörünü dışlamalara ekle,
+sonra Güncelle); (b) "Sign in to confirm you're not a bot" (bekle, Güncelle; Suflo tarayıcı çerezi kullanmaz, bilerek);
+(c) yaş sınırlı / üyelere özel videolar indirilemez (bilerek).
+
+**YT.6 Sürüm notu ve yenilikler (3.3.0'a geçerken).** `marketing/release-notes.md`'nin 3.3.0 bölümüne: "YouTube indirici:
+kendi videolarını ya da izinli içeriği bağlantıyla MP3, 720p, 1080p ya da 4K olarak indir; Premiere'e uygun MP4'e çevrilip
+projendeki 'Suflo İndirilenler' kutusuna gelir (Pro, 3 deneme hakkı)." `js/app.js` › `YENILIKLER` 3.3'e geçerken
+`{ ikon: "▼", baslik: "YouTube indirici", metin: "…", sekme: "youtube", hedef: "yt-url" }` maddesini ekleyebilirsin
+(Türkçe metne İngilizce karşılık `i18n/en.js`).
+
+**YT.7 Bakım (bilgi).** yt-dlp varlık adlarını değiştirirse (`yt-dlp.exe`, `yt-dlp_arm64.exe`, `yt-dlp_macos`)
+`js/youtube-indir.js` › `varlikAdaylari` güncellenmeli; listede ad yoksa kurulum güvenle durur ("SHA2-256SUMS listesinde
+yt-dlp dosyası yok"). GitHub API'ye ulaşılamazsa (kimliksiz sınır saatte 60 istek) `latest/download` kullanılır; SUMS ve ikili
+yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız yt-dlp kuruluysa).

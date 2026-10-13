@@ -29,9 +29,23 @@ window.K = (function () {
     else { MAC = /Mac|Darwin/i.test(navigator.platform + " " + navigator.userAgent); WIN = !MAC; }
   } catch (eP) {}
 
-  // Apple Silicon'da whisper.cpp Metal ile derlenir: GPU hızlandırma kendiliğinden açık
+  // Apple Silicon'da whisper.cpp Metal ile derlenir: GPU hızlandırma kendiliğinden açık.
+  // Premiere "Rosetta kullanarak aç" ile açıldıysa os.arch() x64 der; çeviri altında olmak da Apple Silicon demektir.
   function macMetal() {
-    try { return MAC && nodeOK && os.arch() === "arm64"; } catch (e) { return false; }
+    try { return MAC && nodeOK && (os.arch() === "arm64" || rosettaAltinda()); } catch (e) { return false; }
+  }
+
+  // Süreç Rosetta 2 ile mi çevriliyor (sysctl.proc_translated = 1)? Intel Mac'te anahtar yok: false
+  var _rosetta = null;
+  function rosettaAltinda() {
+    if (_rosetta !== null) return _rosetta;
+    _rosetta = false;
+    try {
+      if (MAC && nodeOK && cp && typeof cp.execFileSync === "function") {
+        _rosetta = String(cp.execFileSync("/usr/sbin/sysctl", ["-n", "sysctl.proc_translated"], { encoding: "utf8", timeout: 5000 })).trim() === "1";
+      }
+    } catch (e) { _rosetta = false; }
+    return _rosetta;
   }
 
   // Paketle gelen Suflo Originals gibi salt-okunur iceriklerin kok yolu.
@@ -274,7 +288,12 @@ window.K = (function () {
    * whisper-cli / ffmpeg'in açtığı alt süreçler (ve kilitlediği WAV) yaşamaya devam eder:
    * taskkill /T (ağaç) /F (zorla). macOS'ta SIGKILL: whisper SIGTERM'de JSON yazmaya çalışmasın.
    */
-  function surecAgaciniOldur(child) {
+  /*
+   * grup (3.3, YouTube indirici): süreç kendi süreç grubunda açıldı (opts.surecGrubu, macOS/Linux'ta
+   * detached). Eksi pid TÜM grubu öldürür: yt-dlp_macos (PyInstaller) açılışta kendi Python sürecini
+   * ve indirirken ffmpeg'i açar; yalnız ana süreç ölürse onlar indirmeye devam ederdi.
+   */
+  function surecAgaciniOldur(child, grup) {
     if (!child) return;
     if (WIN && child.pid) {
       try {
@@ -285,6 +304,9 @@ window.K = (function () {
         return;
       } catch (e3) {}
     }
+    if (grup && child.pid && typeof process !== "undefined" && typeof process.kill === "function") {
+      try { process.kill(-child.pid, "SIGKILL"); return; } catch (eG) {}
+    }
     try { child.kill("SIGKILL"); } catch (e4) { try { child.kill(); } catch (e5) {} }
   }
 
@@ -294,6 +316,12 @@ window.K = (function () {
    * opts.onStderr  fn(parça) — stderr akarken (ilerleme yüzdesi)
    * opts.onStdout  fn(parça) — stdout akarken (whisper-cli segment satırları); tam çıktı yine birikir
    * opts.iptal     K.iptalJetonu(): iptalde süreç ağacı öldürülür, { code: -2, iptal: true } döner
+   * opts.surecGrubu (3.3) macOS/Linux'ta süreç kendi grubunda açılır (detached); iptal ve zaman
+   *                aşımı bütün grubu öldürür (yt-dlp'nin açtığı alt süreçler dahil). Windows'ta
+   *                taskkill /T zaten ağacı kapsar.
+   * opts.env       (3.3) süreç ortamına eklenen / değiştirilen değişkenler (ör. yt-dlp'nin geçici
+   *                klasörü TMPDIR / TEMP / TMP); geri kalan ortam aynen geçer. Windows'ta ad büyük /
+   *                küçük harf duyarsız: aynı adın eski yazımı atılır, iki "Temp" kalmaz.
    */
   function run(cmd, args, opts) {
     opts = opts || {};
@@ -313,12 +341,26 @@ window.K = (function () {
          * dosyanın klasöründe çalıştırıp filtreye yalnız dosya adını vermek.
          */
         if (opts.cwd) spawnOpts.cwd = opts.cwd;
-        if (MAC) {
-          // CEP surecinin PATH'i cogu zaman /usr/bin ile sinirli; Homebrew'i goremiyor
+        if (opts.surecGrubu && !WIN) spawnOpts.detached = true;
+        if (MAC || opts.env) {
           var env = {};
           for (var ek in process.env) if (process.env.hasOwnProperty(ek)) env[ek] = process.env[ek];
-          env.PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" +
-            (process.env.PATH ? ":" + process.env.PATH : "");
+          // CEP surecinin PATH'i cogu zaman /usr/bin ile sinirli; Homebrew'i goremiyor
+          if (MAC) {
+            env.PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" +
+              (process.env.PATH ? ":" + process.env.PATH : "");
+          }
+          if (opts.env) {
+            for (var ad in opts.env) {
+              if (!opts.env.hasOwnProperty(ad) || opts.env[ad] === undefined || opts.env[ad] === null) continue;
+              if (WIN) {
+                for (var eski in env) {
+                  if (env.hasOwnProperty(eski) && eski !== ad && eski.toUpperCase() === ad.toUpperCase()) delete env[eski];
+                }
+              }
+              env[ad] = String(opts.env[ad]);
+            }
+          }
           spawnOpts.env = env;
         }
         child = cp.spawn(cmd, args, spawnOpts);
@@ -336,7 +378,8 @@ window.K = (function () {
       }
       var timer = setTimeout(function () {
         if (done) return;
-        try { child.kill(); } catch (e) {}
+        if (opts.surecGrubu) surecAgaciniOldur(child, true);
+        else { try { child.kill(); } catch (e) {} }
         kapat();
         resolve({ code: -1, stdout: out, stderr: err + "\n[zaman aşımı]" });
       }, opts.timeout || 300000);
@@ -354,7 +397,7 @@ window.K = (function () {
         birak = jeton.dinle(function () {
           if (done) return;
           kapat();
-          surecAgaciniOldur(child);
+          surecAgaciniOldur(child, !!opts.surecGrubu);
           log("run IPTAL [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kullanici iptal etti");
           resolve({ code: -2, iptal: true, stdout: out, stderr: err });
         });
@@ -439,35 +482,29 @@ window.K = (function () {
       var hdrs = { "Content-Type": "multipart/form-data; boundary=" + boundary, "Content-Length": body.length };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
 
-      var req;
-      try {
-        req = proto.request({
-          hostname: u.hostname,
-          port: u.port || (u.protocol === "http:" ? 80 : 443),
-          path: u.pathname + (u.search || ""),
-          method: "POST",
-          headers: hdrs
-        }, function (res) {
-          var data = "";
-          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
-          res.on("data", function (d) { data += d; });
-          res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
-          res.on("error", function (eRs) { resolve({ status: 0, body: String(eRs) }); });
-        });
-      } catch (e2) {
-        resolve({ status: 0, body: String(e2) });
-        return;
-      }
-      req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
-      req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+      var req = null;
       if (jeton) {
         birak = jeton.dinle(function () {
           resolve({ status: 0, iptal: true, body: "İptal edildi" });
-          try { req.destroy(); } catch (eD) {}
+          try { if (req) req.destroy(); } catch (eD) {}
         });
       }
-      req.write(body);
-      req.end();
+      // vekil sunucuya uyar (Ayarlar › vekil): bulut transkripsiyonu da httpGet / download gibi vekilden geçer
+      vekilliIstek(urlStr, { method: "POST", headers: hdrs }, function (res) {
+        var data = "";
+        res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+        res.on("data", function (d) { data += d; });
+        res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
+        res.on("error", function (eRs) { resolve({ status: 0, body: String(eRs) }); });
+      }, function (e2, r) {
+        if (e2) { resolve({ status: 0, body: String(e2 && e2.message ? e2.message : e2) }); return; }
+        req = r;
+        if (bitti) { try { req.destroy(); } catch (eB) {} return; }   // tünel kurulurken iptal edildi
+        req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
+        req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+        req.write(body);
+        req.end();
+      });
     });
   }
 
@@ -570,8 +607,15 @@ window.K = (function () {
 
   /* ---------------- HTTP GET (güncelleme kontrolü) ---------------- */
 
+  /*
+   * Vekil sunucu (3.3): download() gibi Ayarlar › vekil sunucu / HTTPS_PROXY / NO_PROXY'ye uyar
+   * (https hedefe CONNECT tüneli, http hedefe mutlak adresli istek). Yalnız doğrudan bağlantıya izin
+   * veren ağlarda sürüm denetimleri (GitHub API) hep başarısız olmasın.
+   */
   function httpGet(urlStr, headers) {
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve0) {
+      var bitti = false;
+      function resolve(x) { if (!bitti) { bitti = true; resolve0(x); } }
       if (!nodeOK) { resolve({ status: 0, body: "Node erişimi yok" }); return; }
       var proto, u;
       try {
@@ -580,26 +624,53 @@ window.K = (function () {
       } catch (e) { resolve({ status: 0, body: String(e) }); return; }
       var hdrs = { "User-Agent": "Suflo-Panel" };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
-      var req = proto.get({
+      var reqOpts = {
         hostname: u.hostname,
         port: u.port || (u.protocol === "http:" ? 80 : 443),
         path: u.pathname + (u.search || ""),
         headers: hdrs
-      }, function (res) {
-        var data = "";
-        res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
-        res.on("data", function (d) { data += d; });
-        res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
-        res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
-      });
-      req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
-      req.setTimeout(20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+      };
+      function fire(extra) {
+        if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) reqOpts[k] = extra[k];
+        var req = proto.get(reqOpts, function (res) {
+          var data = "";
+          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+          res.on("data", function (d) { data += d; });
+          res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
+          res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
+        });
+        req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
+        req.setTimeout(20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+      }
+      var pu = null;
+      try { pu = proxyFor(u); } catch (eP) { pu = null; }
+      if (pu && u.protocol === "http:") {
+        var h2 = Object.assign({ Host: u.hostname }, hdrs);
+        var au = proxyAuth(pu);
+        if (au) h2["Proxy-Authorization"] = au;
+        reqOpts = { hostname: pu.hostname, port: proxyPort(pu), path: urlStr, headers: h2 };
+        proto = require("http");
+        fire();
+      } else if (pu) {
+        connectTunnel(pu, u, function (err, socket) {
+          if (err) {
+            log("proxy tuneli kurulamadi (httpGet): " + err.message);
+            resolve({ status: 0, body: String(err.message || err) });
+            return;
+          }
+          if (bitti) { try { socket.destroy(); } catch (eS) {} return; }
+          // hazir socket uzerinden TLS: SNI ve Host icin host/servername sart
+          fire({ socket: socket, agent: false, host: u.hostname, servername: u.hostname });
+        });
+      } else {
+        fire();
+      }
     });
   }
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "3.2.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
+  var VERSION = "3.3.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -718,26 +789,20 @@ window.K = (function () {
       var body = Buf.from(JSON.stringify(bodyObj), "utf8");
       var hdrs = { "Content-Type": "application/json", "Content-Length": body.length };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
-      var req;
-      try {
-        req = proto.request({
-          hostname: u.hostname,
-          port: u.port || (u.protocol === "http:" ? 80 : 443),
-          path: u.pathname + (u.search || ""),
-          method: "POST",
-          headers: hdrs
-        }, function (res) {
-          var data = "";
-          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
-          res.on("data", function (d) { data += d; });
-          res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
-          res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
-        });
-      } catch (e3) { resolve({ status: 0, body: String(e3) }); return; }
-      req.on("error", function (e4) { resolve({ status: 0, body: String(e4) }); });
-      req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
-      req.write(body);
-      req.end();
+      // vekil sunucuya uyar: çeviri, Shorts LLM, davet ve Pro içerik manifesti de vekilden geçer
+      vekilliIstek(urlStr, { method: "POST", headers: hdrs }, function (res) {
+        var data = "";
+        res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+        res.on("data", function (d) { data += d; });
+        res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
+        res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
+      }, function (e3, req) {
+        if (e3) { resolve({ status: 0, body: String(e3 && e3.message ? e3.message : e3) }); return; }
+        req.on("error", function (e4) { resolve({ status: 0, body: String(e4) }); });
+        req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+        req.write(body);
+        req.end();
+      });
     });
   }
 
@@ -873,6 +938,19 @@ window.K = (function () {
   }
 
   /*
+   * brew komutu: { exe, args } ya da brew yoksa null. Premiere Rosetta'da açıldıysa çocuk süreç x86_64
+   * başlar; /opt/homebrew'daki brew "Cannot install under Rosetta 2 in ARM default prefix" deyip durur.
+   * O durumda arch -arm64 ile yerel mimaride çağrılır.
+   */
+  function brewKomutu(args) {
+    var brew = brewYolu();
+    if (!brew) return null;
+    args = args || [];
+    if (brew.indexOf("/opt/homebrew/") === 0 && rosettaAltinda()) return { exe: "/usr/bin/arch", args: ["-arm64", brew].concat(args) };
+    return { exe: brew, args: args };
+  }
+
+  /*
    * Kurulu yerel motoru bul: { exe, model, dir } veya null.
    * opts.skipModel: yalnız çalıştırılabilir aranır (kurulum sırasında gerekir).
    * Model seçimi KEngine'e bırakılır; burada yalnız yedek tarama yapılır.
@@ -957,6 +1035,10 @@ window.K = (function () {
     try {
       var pu = new URL(raw);
       if (!pu.hostname) throw new Error("adreste host yok");
+      // URL şemanın varsayılan portunu siler (new URL("http://g:80").port === ""): açıkça yazılan port
+      // ham metinden okunur. Port yazılmadıysa eskisi gibi 8080.
+      var acik = /^[a-z][a-z0-9+.\-]*:\/\/(?:[^@\/?#]*@)?(?:\[[^\]]*\]|[^:\/?#]*):(\d+)/i.exec(raw);
+      pu.vekilPort = pu.port ? Number(pu.port) : (acik ? Number(acik[1]) : 8080);
       return pu;
     } catch (e) {
       // Ham adresi YAZMA: kullanici:sifre iceriyor olabilir ve gunluk destege gonderiliyor
@@ -977,6 +1059,46 @@ window.K = (function () {
    * katalogdaki tum adresler https oldugu icin tunel olmadan Squid/kurumsal proxy'ler
    * 400/403/501 doner ve HTTPS_PROXY tanimli makinelerde kurulum sessizce bozulur.
    */
+  // Vekilin portu: açık port (":80" dahil, proxyFor ham metinden okur), yoksa 8080
+  function proxyPort(pu) { return Number(pu && pu.vekilPort) || Number(pu && pu.port) || 8080; }
+
+  /*
+   * Vekil sunucuya uyan istek (httpUpload, httpJson, Pro lisans ve içerik istekleri): Ayarlar › vekil
+   * sunucu / HTTPS_PROXY / NO_PROXY. https hedefe CONNECT tüneli, http hedefe mutlak adresli istek, vekil
+   * yoksa doğrudan. secenek: { method, headers }; yanit(res) http.request geri çağrısı; hazir(err, req):
+   * istek yazılıp end edilmeye hazır (tünel kurulurken iptal edilen çağıran req'i yok edebilir).
+   */
+  function vekilliIstek(urlStr, secenek, yanit, hazir) {
+    var u;
+    try { u = new URL(urlStr); } catch (e) { hazir(e); return; }
+    secenek = secenek || {};
+    var guvenli = u.protocol !== "http:";
+    var proto = require(guvenli ? "https" : "http");
+    var opts = { hostname: u.hostname, port: u.port || (guvenli ? 443 : 80), path: u.pathname + (u.search || ""),
+      method: secenek.method || "GET", headers: secenek.headers || {} };
+    var pu = null;
+    try { pu = proxyFor(u); } catch (eP) { pu = null; }
+    if (pu && !guvenli) {
+      var h2 = Object.assign({ Host: u.host }, opts.headers);
+      var au = proxyAuth(pu);
+      if (au) h2["Proxy-Authorization"] = au;
+      try { hazir(null, require("http").request({ hostname: pu.hostname, port: proxyPort(pu), path: urlStr, method: opts.method, headers: h2 }, yanit)); }
+      catch (e2) { hazir(e2); }
+      return;
+    }
+    if (pu) {
+      connectTunnel(pu, u, function (err, socket) {
+        if (err) { log("proxy tuneli kurulamadi: " + err.message); hazir(err); return; }
+        // hazir socket uzerinden TLS: SNI ve Host icin servername sart
+        opts.socket = socket; opts.agent = false; opts.servername = u.hostname;
+        try { hazir(null, proto.request(opts, yanit)); }
+        catch (e3) { try { socket.destroy(); } catch (eS) {} hazir(e3); }
+      });
+      return;
+    }
+    try { hazir(null, proto.request(opts, yanit)); } catch (e4) { hazir(e4); }
+  }
+
   function connectTunnel(pu, u, cb) {
     var hdrs = {};
     var au = proxyAuth(pu);
@@ -985,7 +1107,7 @@ window.K = (function () {
     function done(e, s) { if (!settled) { settled = true; cb(e, s); } }
     var cr = require("http").request({
       host: pu.hostname,
-      port: Number(pu.port) || 8080,
+      port: proxyPort(pu),
       method: "CONNECT",
       path: u.hostname + ":" + (u.port || 443),
       headers: hdrs
@@ -1217,12 +1339,12 @@ window.K = (function () {
         var h2 = Object.assign({ Host: u.hostname }, hdrs);
         var au2 = proxyAuth(pu);
         if (au2) h2["Proxy-Authorization"] = au2;
-        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, headers: h2 };
+        reqOpts = { hostname: pu.hostname, port: proxyPort(pu), path: urlStr, headers: h2 };
         proto = require("http");
-        log("proxy (http hedef): " + pu.hostname + ":" + (pu.port || 8080));
+        log("proxy (http hedef): " + pu.hostname + ":" + proxyPort(pu));
         fire();
       } else if (pu) {
-        log("proxy CONNECT tuneli: " + pu.hostname + ":" + (pu.port || 8080) + " -> " + u.hostname);
+        log("proxy CONNECT tuneli: " + pu.hostname + ":" + proxyPort(pu) + " -> " + u.hostname);
         connectTunnel(pu, u, function (err, socket) {
           if (err) {
             log("proxy tuneli kurulamadi: " + err.message);
@@ -1320,7 +1442,7 @@ window.K = (function () {
   }
 
   /*
-   * libass (subtitles/ass filtresi) olan ffmpeg tercih edilir: Suflo Stilleri, kanca
+   * libass (subtitles/ass filtresi) olan ffmpeg tercih edilir: Altyazi Efektleri, kanca
    * basligi ve stil onizlemesi onsuz calismaz. Homebrew'un sade "ffmpeg"i gibi
    * libass'siz bir derleme yalniz baska aday yoksa secilir; _libass=false olur.
    */
@@ -1470,6 +1592,7 @@ window.K = (function () {
     extensionPath: extensionPath,
     httpUpload: httpUpload,
     httpJson: httpJson,
+    vekilliIstek: vekilliIstek,
     httpGet: httpGet,
     log: log,
     logText: logText,
@@ -1505,6 +1628,8 @@ window.K = (function () {
     MAC: MAC,
     WIN: WIN,
     macMetal: macMetal,
-    brewYolu: brewYolu
+    brewYolu: brewYolu,
+    brewKomutu: brewKomutu,
+    rosettaAltinda: rosettaAltinda
   };
 })();

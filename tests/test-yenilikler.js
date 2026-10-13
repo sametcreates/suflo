@@ -24,15 +24,20 @@ html.replace(/data-tab="([^"]+)"/g, function (_, t) { sekmeler[t] = 1; });
   if (id) ok("madde '" + m.baslik + "': hedef öğe index.html'de", html.indexOf('id="' + id + '"') !== -1, id);
 });
 var hedefler = (Y ? Y.maddeler : []).map(function (m) { return m.sekme + ":" + (m.hedef || m.acilir || ""); }).join(" ");
-["hiz:hiz-grid", "captions:cap-go", "captions:cap-maxlen", "settings:set-cozme"].forEach(function (h) {
-  ok("v3.2 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
+["captions:cap-efekt", "captions:cap-font", "youtube:yt-url"].forEach(function (h) {
+  ok("v3.3 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
 });
+// Premiere yerel çıktı Beta (gerçek Premiere'de denenmedi): Yenilikler penceresinde öne çıkarılmaz
+ok("Beta Premiere yerel çıktı Yenilikler'de duyurulmuyor", !/yerel|render/i.test(JSON.stringify(Y ? Y.maddeler : [])) && hedefler.indexOf("cap-efekt-cikti") === -1);
 
 // Pro kapılı araçlar pencerede (Pro) işaretli: işaretsiz madde ücretsiz gibi okunur, Uygula'da upsell çıkar
-["Hız Rampası", "Çevrimdışı İngilizce"].forEach(function (b) {
+["YouTube İndir"].forEach(function (b) {
   var m = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === b; })[0];
   ok("madde '" + b + "' (Pro) işaretli", !!m && /\(Pro\)\.?$/.test(m.metin), m && m.metin);
 });
+// Altyazı Efektleri: önizleme ücretsiz, timeline'a eklemek Pro (3 deneme) — madde bunu söyler
+var mAE = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Altyazı Efektleri"; })[0];
+ok("madde 'Altyazı Efektleri' eklemenin Pro olduğunu söyler", !!mAE && /eklemek Pro/.test(mAE.metin), mAE && mAE.metin);
 
 // İngilizce karşılıklar
 var EN = require(path.join(KOK, "i18n", "en.js"));

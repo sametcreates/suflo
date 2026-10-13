@@ -6,7 +6,7 @@
  *            kurulu cuBLAS motoru korunur. Adım atlanınca #cap-setup sekmedeki yerine döner
  *   2 Örnek  15 sn'lik Türkçe örnek klip projeye alınır, altyazısı çıkar
  *            (örnek dosyalar yoksa: "kendi klibinle ilk altyazı")
- *   3 Stil   Creator Punch kendi altyazınla önizlenir (önceki görünüm geri gelir;
+ *   3 Stil   Altyazı Efektleri (Vurucu görünüm) kendi altyazınla önizlenir (önceki görünüm geri gelir;
  *            kullanıcı bir karta ya da görünüm ayarına kendisi dokunursa onun seçimi kalır)
  *   4 AI     ücretsiz Groq anahtarı sihirbazı (doğrulama + panodan alma)
  * Ayrıca: bağlam şeridinin kardeşi #onb-chip ("Kurulum 2/4"), AI düğmelerinin
@@ -28,7 +28,7 @@ window.KOnboarding = (function () {
 
   var GROQ_ANAHTAR_SAYFASI = "https://console.groq.com/keys";
   var GROQ_DOGRULAMA = "https://api.groq.com/openai/v1/models";
-  var STIL_ORNEGI = "mrbeast";   // Creator Punch
+  var STIL_ORNEGI = "vurucu";   // Altyazı Efektleri › Vurucu (js/altyazi-efekt.js hazır görünümü)
 
   var basladi = false;
   var kararDegeri = "yok";
@@ -342,7 +342,7 @@ window.KOnboarding = (function () {
     var pro = proMu();
     yaz("ia-stil-metin", h.adimlar.stil === "tamam"
       ? "Stil adımı tamam. Stilleri her zaman aşağıdaki Stil kartından önizleyebilirsin."
-      : "Creator Punch'ı kendi altyazınla önizle. Normal altyazı izi ücretsiz; animasyonlu stil katmanı " +
+      : "Altyazı Efektleri'ni kendi altyazınla önizle. Normal altyazı izi ücretsiz; animasyonlu efekt katmanı " +
         (pro ? "Pro'da açık." : "Pro'dadır."));
     gorunur("ia-stil-dugmeler", h.adimlar.stil !== "tamam");
   }
@@ -598,9 +598,9 @@ window.KOnboarding = (function () {
     KApp.goster("captions");
     stilDeneniyor = true;
     try { KCaptions.stilDene(STIL_ORNEGI); } finally { stilDeneniyor = false; }
-    if (!KCaptions.hasSegments()) durum("Creator Punch önizleniyor. Altyazın çıkınca kendi satırlarınla oynar.");
-    else if (proMu()) durum("Creator Punch kendi altyazınla oynuyor. Beğendiğin karta dokun; seçtiğin stil kalır.");
-    else durum("Creator Punch kendi altyazınla oynuyor. Diğer kartlara dokunarak da önizleyebilirsin; \"Tamam\" deyince önceki görünümün geri gelir.");
+    if (!KCaptions.hasSegments()) durum("Altyazı Efektleri önizleniyor (Vurucu). Altyazın çıkınca kendi satırlarınla oynar.");
+    else if (proMu()) durum("Altyazı Efektleri kendi altyazınla oynuyor. Beğendiğin görünüme dokun ya da ayarla; seçtiğin efekt kalır.");
+    else durum("Altyazı Efektleri kendi altyazınla oynuyor. Diğer görünümlere dokunarak da önizleyebilirsin; \"Tamam\" deyince önceki görünümün geri gelir.");
   }
 
   // Adım kapanınca önceki görünüm geri gelir (kullanıcı kendisi bir seçim yaptıysa o kalır)
@@ -611,11 +611,11 @@ window.KOnboarding = (function () {
     try { KCaptions.stilYedeginiYukle(y); } catch (e) { K.log("[rehber] stil geri yuklenemedi: " + (e && e.message)); }
   }
 
-  // Stil ızgarasında tıklama: kartın kendi işleyicisinden SONRA (kabarcık evresi) bakılır,
-  // böylece seçimin gerçekten o karta geçip geçmediği (.secili) bilinir
+  // Stil ızgarasında / görünüm çiplerinde tıklama: kartın kendi işleyicisinden SONRA (kabarcık evresi)
+  // bakılır, böylece seçimin gerçekten o karta geçip geçmediği (.secili) bilinir
   function stilIzgarasiTiklandi(e) {
     if (!stilYedek || stilDeneniyor) return;
-    var t = SO.stilTiklamasi(e && e.target, el("cap-stil-grid"));
+    var t = SO.stilTiklamasi(e && e.target, (e && e.currentTarget) || el("cap-stil-grid"));
     t.tur = "kart";
     t.pro = proMu();
     if (SO.stilDokunusuSecimMi(t)) stilYedekAyarla(null);   // bilinçli seçim: geri yükleme yok
@@ -634,9 +634,9 @@ window.KOnboarding = (function () {
 
   /*
    * TIKLAMA: stilli katmanı timeline'a koy (Pro overlay).
-   * Seçili bir stil varsa (önizlenen Creator Punch, kullanıcının sonradan dokunduğu kart
-   * ya da daha önce kaydettiği stil) O uygulanır; hiç stil yoksa Creator Punch önizlenip konur.
-   * Ücretsizde Suflo Stili, Altyazı sekmesindeki "… ile ekle" gibi stilli katman deneme hakkıyla
+   * Seçili bir stil varsa (önizlenen Altyazı Efektleri, kullanıcının sonradan dokunduğu görünüm
+   * ya da daha önce kaydettiği stil) O uygulanır; hiç stil yoksa Vurucu görünüm önizlenip konur.
+   * Ücretsizde Altyazı Efektleri, Altyazı sekmesindeki "… ile ekle" gibi stilli katman deneme hakkıyla
    * (filigranlı) konur: pencere "Ücretsiz dene" sunar, kurulunca bu tıklama yeniden çalışır.
    * Seçili stil bir MOGRT ise kütüphane penceresi (deneme yok).
    */
@@ -824,6 +824,8 @@ window.KOnboarding = (function () {
     // kartın kendi işleyicisi seçimi yaptıktan sonra çalışır.
     var grid = el("cap-stil-grid");
     if (grid) grid.addEventListener("click", stilIzgarasiTiklandi);
+    var cipler = el("cap-efekt-gorunumler");   // Altyazı Efektleri › Hazır görünümler (3.3)
+    if (cipler) cipler.addEventListener("click", stilIzgarasiTiklandi);
     var kontroller = window.KCaptions && KCaptions.stilKontrolleri ? KCaptions.stilKontrolleri() : [];
     kontroller.forEach(function (id) {
       var k = el(id);
@@ -860,7 +862,7 @@ window.KOnboarding = (function () {
     }
     if (kararDegeri === "tam") {
       // Taze kurulumda "Suflo 3.1'de yeni" penceresi rehberin üstüne binmesin
-      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.2";
+      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.3";
       kayitYaz();
     }
     olaylariBagla();

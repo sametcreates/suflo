@@ -110,7 +110,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   var ls = sahteLs();
   var d1 = baglam(DT, { ls: ls });
   var P = d1.Pro;
-  ok("deneme: dosya yokken her araca 3 hak", P.denemeKalan("cut") === 3 && P.status().deneme.ozellikler.length === 11 && P.status().deneme.toplamKalan === 33, JSON.stringify(P.status().deneme && P.status().deneme.toplamKalan));
+  ok("deneme: dosya yokken her araca 3 hak", P.denemeKalan("cut") === 3 && P.status().deneme.ozellikler.length === 12 && P.status().deneme.toplamKalan === 36, JSON.stringify(P.status().deneme && P.status().deneme.toplamKalan));
   ok("deneme: kurulmadan deneme+silent kapi false", P.gate("cut", { deneme: true, silent: true }) === false && P.gate("cut", { silent: true }) === false);
   ok("deneme: kurulmadan harcama yok (-1), dosya yazilmaz", P.denemeHarca("cut") === -1 && !fs.existsSync(DF));
   ok("deneme: denemeBaslat('mogrt') ve diger kutuphaneler false", ["mogrt", "sfx", "motionbg", "presets", "propack", "captionStyles", "batch", "assexport"].every(function (f) { return P.denemeBaslat(f) === false; }));
@@ -129,7 +129,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   ok("deneme: dosya gecerli _sig ile yazildi", yazilan.v === 1 && yazilan.kullanilan.cut === 1 && yazilan._sig === beklenenSig, JSON.stringify(yazilan));
   ok("deneme: dosya 0600 ve .tmp kalmadi", (process.platform === "win32" || (fs.statSync(DF).mode & 511) === 384) && !fs.existsSync(DF + ".tmp"));
   ok("deneme: localStorage aynasi ayni imzali durumu tutar", ls.d["suflo.deneme"] === fs.readFileSync(DF, "utf8"));
-  ok("deneme: status().deneme cut 2/3", P.status().deneme.ozellikler[0].kalan === 2 && P.status().deneme.toplamKalan === 32);
+  ok("deneme: status().deneme cut 2/3", P.status().deneme.ozellikler[0].kalan === 2 && P.status().deneme.toplamKalan === 35);
 
   var d2 = baglam(DT, { ls: sahteLs() });
   ok("deneme: yeni oturum dosyadan 2 okur (hak suresiz kalir)", d2.Pro.denemeKalan("cut") === 2 && d2.Pro.denemeKalan("zoom") === 3);
@@ -169,7 +169,7 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   kilit.kalan = 1;
   var zoomKalan = e1.Pro.denemeHarca("zoom");
   ok("okuma hatası (EBUSY): harcama bellekteki duruma yapılır, öteki haklar silinmez", zoomKalan === 2 && e1.Pro.denemeKalan("cut") === 2 &&
-    e1.Pro.denemeKalan("overlay") === 3 && e1.Pro.status().deneme.toplamKalan === 31, zoomKalan + " / " + JSON.stringify(e1.Pro.status().deneme));
+    e1.Pro.denemeKalan("overlay") === 3 && e1.Pro.status().deneme.toplamKalan === 34, zoomKalan + " / " + JSON.stringify(e1.Pro.status().deneme));
   var e2 = baglam(EF, { ls: els1 });
   ok("okuma hatası: yeni oturumda cut 2, zoom 2, overlay 3 (tükenmiş durum diske yazılmadı)",
     e2.Pro.denemeKalan("cut") === 2 && e2.Pro.denemeKalan("zoom") === 2 && e2.Pro.denemeKalan("overlay") === 3, [e2.Pro.denemeKalan("cut"), e2.Pro.denemeKalan("zoom"), e2.Pro.denemeKalan("overlay")].join(","));
@@ -241,6 +241,39 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
   ok("Pro: denemeBaslat false, denemeHarca -1, filigran yok, status().deneme null",
     ctx.Pro.denemeBaslat("cut") === false && ctx.Pro.denemeHarca("cut") === -1 && ctx.Pro.filigranGerekli() === false && ctx.Pro.status().deneme === null);
   ok("Pro: deneme dosyasi hic yazilmaz", !fs.existsSync(PF));
+
+  // Lemon Squeezy'nin gecici hatasi (429 / 5xx, JSON govdeli ama 'valid' alani yok) lisansi kaldirmaz:
+  // eskiden cache (instanceId dahil) siliniyor, odeyen kullanici Pro'dan dusuyor, koltuk bosa gidiyordu
+  var LF = path.join(TMP, "Suflo", "pro-license.json");
+  reply({ message: "Too Many Attempts." }, 429);
+  var r429 = await validate();
+  ok("Dogrulama HTTP 429: cevrimdisi gibi, Pro acik, cache yerinde", r429.ok === false && r429.offline === true && !r429.revoked && ctx.Pro.isPro() && fs.existsSync(LF), JSON.stringify(r429));
+  reply({ error: "Server Error" }, 500);
+  var r500 = await validate();
+  ok("Dogrulama HTTP 500 (JSON govde): Pro acik, cache yerinde", r500.offline === true && !r500.revoked && ctx.Pro.isPro() && fs.existsSync(LF), JSON.stringify(r500));
+  reply({ license_key: { status: "active" } }, 200);
+  var rBos = await validate();
+  ok("Dogrulama cevabinda 'valid' yok: karar verilmez, Pro acik", rBos.offline === true && ctx.Pro.isPro() && fs.existsSync(LF), JSON.stringify(rBos));
+  ok("Gecici hatadan sonra yeni oturum da Pro (cache okunur)", baglam(TMP).Pro.init() === true);
+
+  // Windows: antivirus .tmp'yi tararken rename EPERM atarsa eski lisans dosyasi kaybolmamali
+  var renameHata = 1;
+  var fsKirik = Object.create(fs);
+  fsKirik.renameSync = function (a, b) {
+    if (renameHata > 0 && /pro-license\.json$/.test(String(b))) { renameHata--; var e = new Error("EPERM: operation not permitted, rename"); e.code = "EPERM"; throw e; }
+    return fs.renameSync(a, b);
+  };
+  var ctxR = baglam(TMP, { fs: fsKirik });
+  reply(owned());
+  var rR = await new Promise(function (resolve) { ctxR.Pro.validate(resolve); });
+  ok("atomikYaz: rename bir kez EPERM atsa da lisans dosyasi yerinde, .tmp kalmadi", rR.ok === true && fs.existsSync(LF) && !fs.existsSync(LF + ".tmp") && renameHata === 0, JSON.stringify(rR) + " " + fs.existsSync(LF));
+  ok("atomikYaz: sonraki acilista Pro", baglam(TMP).Pro.init() === true);
+  renameHata = 99;
+  var ctxR2 = baglam(TMP, { fs: fsKirik });
+  reply(owned());
+  await new Promise(function (resolve) { ctxR2.Pro.validate(resolve); });
+  renameHata = 0;
+  ok("atomikYaz: rename hep dusse de eski dosya silinmez, .tmp temizlenir", fs.existsSync(LF) && !fs.existsSync(LF + ".tmp") && baglam(TMP).Pro.init() === true);
 
   var validationWrong = owned(); validationWrong.meta.product_id = 777;
   reply(validationWrong);
