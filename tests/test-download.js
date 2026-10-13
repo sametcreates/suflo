@@ -184,6 +184,33 @@ async function main() {
   pxy2.close();
   delete process.env.HTTPS_PROXY;
 
+  // 7d) bulut transkripsiyonu (httpUpload), çeviri/LLM (httpJson) da vekilden geçer: eskiden doğrudan
+  // bağlanıyor, yalnız vekille çıkan ağda "vekil tanımla" ipucu kullanıcıyı döngüye sokuyordu
+  var tuneller = [], mutlak = null;
+  var pxy3 = http.createServer(function (rq, rs) {
+    var govde = "";
+    rq.on("data", function (d) { govde += d; });
+    rq.on("end", function () { mutlak = rq.method + " " + rq.url + " " + govde; rs.writeHead(200, { "content-type": "application/json" }); rs.end('{"ok":true}'); });
+  });
+  pxy3.on("connect", function (rq, socket) { tuneller.push(rq.url); socket.write("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n"); socket.end(); });
+  await new Promise(function (r) { pxy3.listen(0, r); });
+  process.env.HTTPS_PROXY = "http://127.0.0.1:" + pxy3.address().port;
+  var up = await K.httpUpload("https://api.groq.invalid/openai/v1/audio/transcriptions", { Authorization: "Bearer x" }, { model: "m" }, Buffer.from("ses"), "a.mp3", "audio/mpeg");
+  chk("httpUpload vekilden CONNECT ile gider (doğrudan DNS değil)", tuneller.indexOf("api.groq.invalid:443") !== -1 && up.status === 0 && /407/.test(up.body), JSON.stringify(tuneller) + " " + up.body);
+  var js1 = await K.httpJson("https://api.openai.invalid/v1/chat/completions", { Authorization: "Bearer x" }, { a: 1 });
+  chk("httpJson vekilden CONNECT ile gider", tuneller.indexOf("api.openai.invalid:443") !== -1 && js1.status === 0 && /407/.test(js1.body), JSON.stringify(tuneller) + " " + js1.body);
+  var js2 = await K.httpJson("http://ornek.gecersiz/json", {}, { b: 2 });
+  chk("httpJson http hedef: vekile mutlak adresli POST, gövdesiyle", js2.status === 200 && mutlak === 'POST http://ornek.gecersiz/json {"b":2}', String(mutlak));
+  pxy3.close();
+  // 7e) açık :80 portlu vekil 8080'e gitmez (new URL portu siler); port yazılmadıysa eskisi gibi 8080
+  process.env.HTTPS_PROXY = "http://127.0.0.1:80";
+  await K.download("https://huggingface.co/y.bin", pathm.join(TMP, "port80.bin"), null, 0, undefined, { key: "model:y" });
+  process.env.HTTPS_PROXY = "127.0.0.1:080";
+  await K.download("https://huggingface.co/y.bin", pathm.join(TMP, "port80b.bin"), null, 0, undefined, { key: "model:y" });
+  var tunelLog = K.logText().split("\n").filter(function (s) { return /proxy CONNECT tuneli: 127\.0\.0\.1:/.test(s); }).slice(-2);
+  chk("vekil http://host:80 ve host:080 → port 80 (8080 değil)", tunelLog.length === 2 && tunelLog.every(function (s) { return /127\.0\.0\.1:80 ->/.test(s); }), tunelLog.join(" | "));
+  delete process.env.HTTPS_PROXY;
+
   // 8) sweepTemp: .srt korunur, ses artiklari silinir
   var sw = pathm.join(os.tmpdir(), "kesit");
   fs.mkdirSync(sw, { recursive: true });

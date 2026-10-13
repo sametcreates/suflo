@@ -248,7 +248,7 @@
     var done = false;
     function finish(err, data, code) { if (!done) { done = true; cb(err, data, code); } }
 
-    var req = https.request(opts, function (res) {
+    function yanit(res) {
       var buf = '';
       res.setEncoding('utf8');
       res.on('data', function (d) { buf += d; });
@@ -257,11 +257,23 @@
         try { json = JSON.parse(buf); } catch (e) {}
         finish(null, json, res.statusCode);
       });
-    });
-    req.setTimeout(HTTP_TIMEOUT, function () { req.destroy(new Error('zaman-asimi')); });
-    req.on('error', function (err) { finish(err, null); });
-    req.write(body);
-    req.end();
+    }
+    function gonder(req) {
+      req.setTimeout(HTTP_TIMEOUT, function () { req.destroy(new Error('zaman-asimi')); });
+      req.on('error', function (err) { finish(err, null); });
+      req.write(body);
+      req.end();
+    }
+    // Ayarlar › vekil sunucu: lisans etkinleştirme / doğrulama da vekilden geçer (yalnız vekille çıkan ağ)
+    var Kb = typeof window !== 'undefined' && window.K && typeof window.K.vekilliIstek === 'function' ? window.K : null;
+    if (Kb) {
+      Kb.vekilliIstek(LS.API + endpoint, { method: 'POST', headers: opts.headers }, yanit, function (eV, req) {
+        if (eV) { finish(eV, null); return; }
+        gonder(req);
+      });
+      return;
+    }
+    gonder(https.request(opts, yanit));
   }
 
   // ================================================================

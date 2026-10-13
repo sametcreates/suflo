@@ -591,7 +591,7 @@
     "yanlış => doğru": "wrong => right",
     "Sözlüğü kaydet": "Save glossary",
     "Vekil sunucu": "Proxy server",
-    "Kurumsal ağdaysan model indirmeleri buradan geçer. Boş bırakırsan sistem ayarı (HTTPS_PROXY) kullanılır.": "On a corporate network, model downloads go through this. Leave empty to use the system setting (HTTPS_PROXY).",
+    "Kurumsal ağdaysan indirmeler, bulut altyazı, çeviri ve Pro lisansı buradan geçer. Boş bırakırsan sistem ayarı (HTTPS_PROXY) kullanılır.": "On a corporate network, downloads, cloud captions, translation and the Pro license go through this. Leave empty to use the system setting (HTTPS_PROXY).",
     "Suflo'nun durumunu tek taramada gör.": "See Suflo's health in a single scan.",
     "sorun yok": "no issues",
     "uyarı var": "has warnings",

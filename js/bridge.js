@@ -482,35 +482,29 @@ window.K = (function () {
       var hdrs = { "Content-Type": "multipart/form-data; boundary=" + boundary, "Content-Length": body.length };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
 
-      var req;
-      try {
-        req = proto.request({
-          hostname: u.hostname,
-          port: u.port || (u.protocol === "http:" ? 80 : 443),
-          path: u.pathname + (u.search || ""),
-          method: "POST",
-          headers: hdrs
-        }, function (res) {
-          var data = "";
-          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
-          res.on("data", function (d) { data += d; });
-          res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
-          res.on("error", function (eRs) { resolve({ status: 0, body: String(eRs) }); });
-        });
-      } catch (e2) {
-        resolve({ status: 0, body: String(e2) });
-        return;
-      }
-      req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
-      req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+      var req = null;
       if (jeton) {
         birak = jeton.dinle(function () {
           resolve({ status: 0, iptal: true, body: "İptal edildi" });
-          try { req.destroy(); } catch (eD) {}
+          try { if (req) req.destroy(); } catch (eD) {}
         });
       }
-      req.write(body);
-      req.end();
+      // vekil sunucuya uyar (Ayarlar › vekil): bulut transkripsiyonu da httpGet / download gibi vekilden geçer
+      vekilliIstek(urlStr, { method: "POST", headers: hdrs }, function (res) {
+        var data = "";
+        res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+        res.on("data", function (d) { data += d; });
+        res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
+        res.on("error", function (eRs) { resolve({ status: 0, body: String(eRs) }); });
+      }, function (e2, r) {
+        if (e2) { resolve({ status: 0, body: String(e2 && e2.message ? e2.message : e2) }); return; }
+        req = r;
+        if (bitti) { try { req.destroy(); } catch (eB) {} return; }   // tünel kurulurken iptal edildi
+        req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
+        req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+        req.write(body);
+        req.end();
+      });
     });
   }
 
@@ -654,7 +648,7 @@ window.K = (function () {
         var h2 = Object.assign({ Host: u.hostname }, hdrs);
         var au = proxyAuth(pu);
         if (au) h2["Proxy-Authorization"] = au;
-        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, headers: h2 };
+        reqOpts = { hostname: pu.hostname, port: proxyPort(pu), path: urlStr, headers: h2 };
         proto = require("http");
         fire();
       } else if (pu) {
@@ -795,26 +789,20 @@ window.K = (function () {
       var body = Buf.from(JSON.stringify(bodyObj), "utf8");
       var hdrs = { "Content-Type": "application/json", "Content-Length": body.length };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
-      var req;
-      try {
-        req = proto.request({
-          hostname: u.hostname,
-          port: u.port || (u.protocol === "http:" ? 80 : 443),
-          path: u.pathname + (u.search || ""),
-          method: "POST",
-          headers: hdrs
-        }, function (res) {
-          var data = "";
-          res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
-          res.on("data", function (d) { data += d; });
-          res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
-          res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
-        });
-      } catch (e3) { resolve({ status: 0, body: String(e3) }); return; }
-      req.on("error", function (e4) { resolve({ status: 0, body: String(e4) }); });
-      req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
-      req.write(body);
-      req.end();
+      // vekil sunucuya uyar: çeviri, Shorts LLM, davet ve Pro içerik manifesti de vekilden geçer
+      vekilliIstek(urlStr, { method: "POST", headers: hdrs }, function (res) {
+        var data = "";
+        res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
+        res.on("data", function (d) { data += d; });
+        res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
+        res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
+      }, function (e3, req) {
+        if (e3) { resolve({ status: 0, body: String(e3 && e3.message ? e3.message : e3) }); return; }
+        req.on("error", function (e4) { resolve({ status: 0, body: String(e4) }); });
+        req.setTimeout(300000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+        req.write(body);
+        req.end();
+      });
     });
   }
 
@@ -1047,6 +1035,10 @@ window.K = (function () {
     try {
       var pu = new URL(raw);
       if (!pu.hostname) throw new Error("adreste host yok");
+      // URL şemanın varsayılan portunu siler (new URL("http://g:80").port === ""): açıkça yazılan port
+      // ham metinden okunur. Port yazılmadıysa eskisi gibi 8080.
+      var acik = /^[a-z][a-z0-9+.\-]*:\/\/(?:[^@\/?#]*@)?(?:\[[^\]]*\]|[^:\/?#]*):(\d+)/i.exec(raw);
+      pu.vekilPort = pu.port ? Number(pu.port) : (acik ? Number(acik[1]) : 8080);
       return pu;
     } catch (e) {
       // Ham adresi YAZMA: kullanici:sifre iceriyor olabilir ve gunluk destege gonderiliyor
@@ -1067,6 +1059,46 @@ window.K = (function () {
    * katalogdaki tum adresler https oldugu icin tunel olmadan Squid/kurumsal proxy'ler
    * 400/403/501 doner ve HTTPS_PROXY tanimli makinelerde kurulum sessizce bozulur.
    */
+  // Vekilin portu: açık port (":80" dahil, proxyFor ham metinden okur), yoksa 8080
+  function proxyPort(pu) { return Number(pu && pu.vekilPort) || Number(pu && pu.port) || 8080; }
+
+  /*
+   * Vekil sunucuya uyan istek (httpUpload, httpJson, Pro lisans ve içerik istekleri): Ayarlar › vekil
+   * sunucu / HTTPS_PROXY / NO_PROXY. https hedefe CONNECT tüneli, http hedefe mutlak adresli istek, vekil
+   * yoksa doğrudan. secenek: { method, headers }; yanit(res) http.request geri çağrısı; hazir(err, req):
+   * istek yazılıp end edilmeye hazır (tünel kurulurken iptal edilen çağıran req'i yok edebilir).
+   */
+  function vekilliIstek(urlStr, secenek, yanit, hazir) {
+    var u;
+    try { u = new URL(urlStr); } catch (e) { hazir(e); return; }
+    secenek = secenek || {};
+    var guvenli = u.protocol !== "http:";
+    var proto = require(guvenli ? "https" : "http");
+    var opts = { hostname: u.hostname, port: u.port || (guvenli ? 443 : 80), path: u.pathname + (u.search || ""),
+      method: secenek.method || "GET", headers: secenek.headers || {} };
+    var pu = null;
+    try { pu = proxyFor(u); } catch (eP) { pu = null; }
+    if (pu && !guvenli) {
+      var h2 = Object.assign({ Host: u.host }, opts.headers);
+      var au = proxyAuth(pu);
+      if (au) h2["Proxy-Authorization"] = au;
+      try { hazir(null, require("http").request({ hostname: pu.hostname, port: proxyPort(pu), path: urlStr, method: opts.method, headers: h2 }, yanit)); }
+      catch (e2) { hazir(e2); }
+      return;
+    }
+    if (pu) {
+      connectTunnel(pu, u, function (err, socket) {
+        if (err) { log("proxy tuneli kurulamadi: " + err.message); hazir(err); return; }
+        // hazir socket uzerinden TLS: SNI ve Host icin servername sart
+        opts.socket = socket; opts.agent = false; opts.servername = u.hostname;
+        try { hazir(null, proto.request(opts, yanit)); }
+        catch (e3) { try { socket.destroy(); } catch (eS) {} hazir(e3); }
+      });
+      return;
+    }
+    try { hazir(null, proto.request(opts, yanit)); } catch (e4) { hazir(e4); }
+  }
+
   function connectTunnel(pu, u, cb) {
     var hdrs = {};
     var au = proxyAuth(pu);
@@ -1075,7 +1107,7 @@ window.K = (function () {
     function done(e, s) { if (!settled) { settled = true; cb(e, s); } }
     var cr = require("http").request({
       host: pu.hostname,
-      port: Number(pu.port) || 8080,
+      port: proxyPort(pu),
       method: "CONNECT",
       path: u.hostname + ":" + (u.port || 443),
       headers: hdrs
@@ -1307,12 +1339,12 @@ window.K = (function () {
         var h2 = Object.assign({ Host: u.hostname }, hdrs);
         var au2 = proxyAuth(pu);
         if (au2) h2["Proxy-Authorization"] = au2;
-        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, headers: h2 };
+        reqOpts = { hostname: pu.hostname, port: proxyPort(pu), path: urlStr, headers: h2 };
         proto = require("http");
-        log("proxy (http hedef): " + pu.hostname + ":" + (pu.port || 8080));
+        log("proxy (http hedef): " + pu.hostname + ":" + proxyPort(pu));
         fire();
       } else if (pu) {
-        log("proxy CONNECT tuneli: " + pu.hostname + ":" + (pu.port || 8080) + " -> " + u.hostname);
+        log("proxy CONNECT tuneli: " + pu.hostname + ":" + proxyPort(pu) + " -> " + u.hostname);
         connectTunnel(pu, u, function (err, socket) {
           if (err) {
             log("proxy tuneli kurulamadi: " + err.message);
@@ -1560,6 +1592,7 @@ window.K = (function () {
     extensionPath: extensionPath,
     httpUpload: httpUpload,
     httpJson: httpJson,
+    vekilliIstek: vekilliIstek,
     httpGet: httpGet,
     log: log,
     logText: logText,
