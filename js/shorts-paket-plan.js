@@ -232,12 +232,15 @@
    * Döner: { overrides, konum, konumY }: konumY serbest konumun dikeyi (%; Altyazı Efektleri'nde konumX / konumY
    * ikisi de varsa, yoksa null). Serbest konum hazır konumun (konum) önüne geçer: CTA yerini ondan seçer.
    */
-  function stilAyarlari(styleId, kit, dikey, efekt) {
+  // panel: efekt Altyazı sekmesindeki ayar ("Altyazı sekmesindeki efekt"); Marka Kiti orada görünüm
+  // seçilirken zaten uygulandı, sonraki elle ayarlar (yazı tipi, renk, sürüklenen X/Y, gölge) önizlemede ve
+  // panelin kendi katmanında böyle çizilir: kit yeniden uygulanmaz. Hazır görünümde kit üstte kalır.
+  function stilAyarlari(styleId, kit, dikey, efekt, panel) {
     var p = SE ? SE.preset(styleId) : null;
     var st = p ? p.style : {};
     var ek = efektSecimi(efekt);
     if (ek) { st = kopya(st); Object.keys(ek).forEach(function (k) { if (METIN_ALANLARI.indexOf(k) === -1) st[k] = ek[k]; }); }
-    if (kit && kit.on && MK) st = MK.mergeBrandKit(st, kit);
+    if (kit && kit.on && MK && !(panel === true && ek)) st = MK.mergeBrandKit(st, kit);
     var ov = { font: st.font, renk: st.renk, konturRenk: st.konturRenk, vurguRenk: st.vurguRenk,
       boyut: st.boyut, kontur: st.kontur, konum: st.konum, guvenli: !!dikey };
     // Altyazı Efektleri alanları (giriş / vurgu animasyonu, kelime vurgusu, kalın, italik, satır, kelime; gölge, kutu, serbest konum)

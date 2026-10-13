@@ -376,7 +376,7 @@ window.KShortsPaket = (function () {
           punct: typeof ef.punct === "boolean" ? ef.punct : undefined });
         if (!cc.cues.length) return { atla: "altyazi-bos" };
         var W = ciftBoyut(ctx.width, 1080), H = ciftBoyut(ctx.height, 1920), fps = Number(ctx.fps) > 0 ? Number(ctx.fps) : 30;
-        var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt);
+        var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt, job.secim.gorunum === "panel");
         var der = SE.compile({ styleId: job.secim.stilId, cueKind: cc.cueKind, cues: cc.cues, offset: 0, width: W, height: H, overrides: sa.overrides });
         var sure = CT.katmanSuresi(cc.cues[cc.cues.length - 1].end, Number(ctx.end) || 0, fps, false);
         var yol = cikti("altyazi", k);
@@ -396,7 +396,7 @@ window.KShortsPaket = (function () {
       cerceve: async function (k, ctx) {
         var W = ciftBoyut(ctx.width, 1080), H = ciftBoyut(ctx.height, 1920), fps = Number(ctx.fps) > 0 ? Number(ctx.fps) : 30;
         var dur = Number(ctx.end) > 0 ? Number(ctx.end) : Math.max(1, k.end - k.start);
-        var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt);
+        var sa = P.stilAyarlari(job.secim.stilId, kit, H > W * 1.2, job.secim.efekt, job.secim.gorunum === "panel");
         var hk = kit && MK ? MK.mergeHook({}, kit) : {};
         var cp = P.cercevePlani({ W: W, H: H, dur: dur, secim: job.secim, kit: kit, logoAcik: job.logoAcik,
           hookDur: k.adimlar.kanca === "tamam" || k.adimlar.kanca === "bekliyor" ? job.kancaSure : 0,

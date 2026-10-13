@@ -93,6 +93,21 @@ ok("stilAyarlari: efekt ayarı stil motoruna gider (giriş, vurgu, satır, kelim
   return s.overrides.giris === "zipla" && s.overrides.aktif === "titre" && s.overrides.satir === 1 && s.overrides.kelime === 3 && s.overrides.font === "Lora" &&
     s.overrides.renk === "#00ff00" && s.overrides.kase === undefined && s.overrides.guvenli === true && r.eventCount > 0 && /\\fscx112/.test(r.ass);
 })());
+// "Altyazı sekmesindeki efekt": kit panelde görünüm seçilirken uygulandı; sonraki elle ayar (Anton, X 30 / Y 40)
+// paneldeki önizleme ve katman gibi çizilir. Eskiden kit yeniden uygulanıp Lora + alt konuma dönüyordu (CTA da yanlış Y'de)
+ok("stilAyarlari: panel efekti Marka Kiti'yle yeniden birleştirilmez (elle yazı tipi ve serbest konum korunur)", (function () {
+  var kit = MK.normalize({ on: true, stil: { overrides: { font: "Lora", konum: 2 } } }).kit;
+  var ef = { giris: "pop", font: "Anton", renk: "#ffffff", konum: 2, konumX: 30, konumY: 40 };
+  var s = P.stilAyarlari("efekt", kit, true, ef, true), h = P.stilAyarlari("efekt", kit, true, ef);
+  var r = SEm.compile({ styleId: "efekt", cues: [{ start: 0, end: 1, text: "bir iki üç" }], cueKind: "lines", width: 1080, height: 1920, overrides: s.overrides });
+  return s.overrides.font === "Anton" && s.overrides.konumX === 30 && s.konumY === 40 && /Style: Suflo,Anton/.test(r.ass) && /\\an5\\pos\(324,768\)/.test(r.ass) &&
+    h.overrides.font === "Lora" && h.konumY === null;
+})());
+ok("shorts-paket: altyazı ve çerçeve adımları panel görünümünü stilAyarlari'na bildirir", (function () {
+  var src = require("fs").readFileSync(path.join(__dirname, "..", "js", "shorts-paket.js"), "utf8");
+  var cagri = src.match(/P\.stilAyarlari\([^\n]*\)/g) || [];
+  return cagri.length === 2 && cagri.every(function (c) { return /job\.secim\.gorunum === "panel"\)$/.test(c); });
+})());
 ok("stilAyarlari: eski stil kimliği (eski paket işi) efekt alanı almaz, eskisi gibi", JSON.stringify(Object.keys(P.stilAyarlari("hormozi", null, false).overrides)) ===
   JSON.stringify(["font", "renk", "konturRenk", "vurguRenk", "boyut", "kontur", "konum", "guvenli"]));
 ok("secimNormalize: noktalama (punct), gölge nesnesi (yalnız renk + sayılar), kutu ve serbest konum (null = hazır) işle saklanır", (function () {
