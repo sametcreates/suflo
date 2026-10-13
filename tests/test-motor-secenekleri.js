@@ -52,7 +52,7 @@ function dugum(ek) {
 function ortam(o) {
   o = o || {};
   var ayar = o.ayar || {};
-  var gunluk = [], durumlar = [], kosular = [], toastlar = [], kayit = 0, sinirlar = [];
+  var gunluk = [], durumlar = [], kosular = [], toastlar = [], kayit = 0, sinirlar = [], hamArgs = [], yanitlar = [];
   var MODEL_DOSYA = { tiny: "ggml-tiny-q5_1.bin", base: "ggml-base-q5_1.bin", small: "ggml-small-q5_1.bin", turbo: "ggml-large-v3-turbo-q5_0.bin", large: "ggml-large-v3-q5_0.bin" };
   var model = o.model || "turbo";
   var kurulu = o.kurulu || [model];
@@ -65,7 +65,7 @@ function ortam(o) {
     "cap-export-fmt": dugum({ value: "srt" }), "cap-cift-dil": dugum({ checked: false })
   };
   var K = {
-    nodeOK: true, MAC: false, fs: fs, path: path, os: { cpus: function () { return [1, 2, 3, 4, 5, 6]; } },
+    nodeOK: true, MAC: false, WIN: !!o.win, fs: fs, path: path, os: { cpus: function () { return [1, 2, 3, 4, 5, 6]; } },
     settings: function () { return ayar; }, saveSettings: function () { kayit++; },
     log: function (m) { gunluk.push(String(m)); },
     tmpDir: function () { return DIZIN; },
@@ -74,6 +74,13 @@ function ortam(o) {
     iptalHatasi: function (m) { var e = new Error(m || "İptal edildi"); e.iptal = true; return e; },
     call: function () { throw new Error("Premiere çağrısı yapılmamalı"); },
     run: function (exe, args, op) {
+      // whisper-cli yanıt dosyası (Windows, ASCII dışı argüman): tek "@dosya" argümanı, satır başına bir argüman
+      hamArgs.push(args.slice());
+      if (args.length === 1 && /^@/.test(args[0])) {
+        var metin = fs.readFileSync(args[0].slice(1), "utf8");
+        yanitlar.push(metin);
+        args = metin.split("\n").filter(function (x) { return x !== ""; });
+      }
       kosular.push(args.slice()); sinirlar.push(op ? op.timeout : undefined);
       var sonuc = (o.senaryo || function () { return { json: TR_JSON }; })(args, kosular.length);
       var ob = args[args.indexOf("-of") + 1];
@@ -125,7 +132,7 @@ function ortam(o) {
     { toast: function (m) { toastlar.push(m); }, goster: function (ad) { toastlar.push("goster:" + ad); } },
     function (m) { durumlar.push(m); },
     function (sn) { return String(sn); }, o);
-  return { api: api, dom: dom, ayar: ayar, gunluk: gunluk, sinirlar: sinirlar, durumlar: durumlar, kosular: kosular, toastlar: toastlar, kayit: function () { return kayit; } };
+  return { api: api, dom: dom, ayar: ayar, gunluk: gunluk, sinirlar: sinirlar, hamArgs: hamArgs, yanitlar: yanitlar, durumlar: durumlar, kosular: kosular, toastlar: toastlar, kayit: function () { return kayit; } };
 }
 function arg(a, b) { var i = a.indexOf(b); return i < 0 ? undefined : a[i + 1]; }
 function gunlukte(e, re) { return e.gunluk.some(function (s) { return re.test(s); }); }
@@ -226,6 +233,25 @@ isler.push(function () {
     ok("3 saatlik ses: whisper-cli süre sınırı sesin 6 katı + 30 dk (2 saatte öldürülmez), kalan turu da",
       uzun.sinirlar.length === 2 && uzun.sinirlar.every(function (t) { return t >= 3 * 3600 * 6000 + 1800000; }), js(uzun.sinirlar));
     ok("kısa ses: en az 2 saat (eskisi gibi)", kisa.sinirlar.length === 1 && kisa.sinirlar[0] === 7200000, js(kisa.sinirlar));
+  });
+});
+
+/* ---------------- 2c) Windows: Türkçe --prompt UTF-8 yanıt dosyasıyla ---------------- */
+// whisper-cli argv'yi ANSI kod sayfasında okur: "Doğru yazılması … Kaygısız" bozuk baytlarla gidiyordu
+isler.push(function () {
+  var w = ortam({ win: true }), m = ortam({});
+  var ob = path.join(DIZIN, "p_w"), ob2 = path.join(DIZIN, "q_w"), ob3 = path.join(DIZIN, "r_w");
+  var istem = ["-f", path.join(DIZIN, "p.wav"), "-of", ob, "--prompt", "Doğru yazılması gereken özel adlar ve terimler: Kaygısız, Şişli"];
+  return w.api.yerelCalistir("whisper-cli", istem, ob, "", null).then(function (segs) {
+    ok("Windows + ASCII dışı ipucu: whisper-cli tek '@dosya' argümanıyla, dosyada UTF-8 argümanlar aynen, iş bitince silinir",
+      w.hamArgs.length === 1 && w.hamArgs[0].length === 1 && w.hamArgs[0][0] === "@" + ob + ".args.txt" && w.yanitlar[0] === istem.join("\n") + "\n" &&
+      !fs.existsSync(ob + ".args.txt") && segs.length > 0, js(w.hamArgs));
+    return w.api.yerelCalistir("whisper-cli", ["-f", path.join(DIZIN, "q.wav"), "-of", ob2, "--prompt", "Suflo, Premiere"], ob2, "", null);
+  }).then(function () {
+    ok("Windows + ASCII ipucu: argümanlar doğrudan (yanıt dosyası yok)", w.hamArgs[1].length === 6 && w.hamArgs[1][4] === "--prompt" && w.yanitlar.length === 1, js(w.hamArgs[1]));
+    return m.api.yerelCalistir("whisper-cli", ["-f", path.join(DIZIN, "r.wav"), "-of", ob3, "--prompt", "Kaygısız"], ob3, "", null);
+  }).then(function () {
+    ok("macOS (argv UTF-8): Türkçe ipucu doğrudan argüman", m.hamArgs[0].length === 6 && m.hamArgs[0][5] === "Kaygısız" && m.yanitlar.length === 0, js(m.hamArgs[0]));
   });
 });
 

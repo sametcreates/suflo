@@ -193,5 +193,15 @@ var motorKaynak = fs.readFileSync(path.join(KOK, "js", "engine.js"), "utf8");
 ok("engine.js: buildArgs SufloWhisperArgs.olustur'a devreder (bayrakları kendisi yazmaz)", /WAR\.olustur\(girdi\)/.test(motorKaynak) &&
   !/"-bs", "5"/.test(motorKaynak.slice(motorKaynak.indexOf("function buildArgs"), motorKaynak.indexOf("ffmpeg kurulumu"))));
 
+/* ---- Windows: ASCII dışı --prompt UTF-8 yanıt dosyasıyla (whisper-cli argv'yi ANSI kod sayfasında okur) ---- */
+var trIpucu = arg({ prompt: "Doğru yazılması gereken özel adlar ve terimler: Kaygısız, Şişli\nBelediyesi" });
+ok("--prompt'taki satır sonu boşluk olur (yanıt dosyasında argümanı bölmesin)", sonra(trIpucu, "--prompt") === "Doğru yazılması gereken özel adlar ve terimler: Kaygısız, Şişli Belediyesi");
+ok("yanıt dosyası yalnız Windows'ta ve ASCII dışı argüman varken gerekli", W.yanitDosyasiGerekli(trIpucu, "win32") === true &&
+  W.yanitDosyasiGerekli(trIpucu, "darwin") === false && W.yanitDosyasiGerekli(arg({ prompt: "Suflo, Premiere" }), "win32") === false && W.yanitDosyasiGerekli(null, "win32") === false);
+var yanit = W.yanitDosyasiMetni(trIpucu);
+ok("yanıt dosyası: satır başına bir argüman, UTF-8 metin aynen, boş satır yok, argüman sayısı korunur",
+  yanit.split("\n").length === trIpucu.length + 1 && yanit.split("\n").slice(0, -1).every(function (s, i) { return s === trIpucu[i]; }) &&
+  /Kaygısız, Şişli Belediyesi/.test(yanit) && yanit.slice(-1) === "\n" && yanit.indexOf("\n\n") === -1);
+
 console.log("\n" + gecen + "/" + toplam + " gecti");
 if (gecen !== toplam) process.exit(1);

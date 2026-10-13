@@ -1016,9 +1016,25 @@ window.KCaptions = (function () {
     var girdiSn = 0, fi = args ? args.indexOf("-f") : -1;
     if (fi !== -1 && args[fi + 1]) { try { girdiSn = Number(wavDuration(args[fi + 1])) || 0; } catch (eSn) { girdiSn = 0; } }
     var sinirMs = Math.max(7200000, Math.round(girdiSn * 6000) + 1800000);
+    /*
+     * Windows: whisper-cli argv'yi ANSI kod sayfasında okur; Türkçe sözlük / dolgu ipucu (--prompt) bozulurdu.
+     * ASCII dışı argüman varsa argümanlar UTF-8 yanıt dosyasına yazılır, whisper-cli "@dosya" ile çağrılır
+     * (WAR.yanitDosyasiGerekli). Dosya ASCII-güvenli -of tabanının yanında; iş bitince silinir.
+     */
+    var calisArgs = args, yanitYolu = null;
+    if (K.WIN && WAR && WAR.yanitDosyasiGerekli && WAR.yanitDosyasiGerekli(args, "win32")) {
+      var ofi = args.indexOf("-of"), taban = ofi !== -1 ? String(args[ofi + 1] || "") : "";
+      if (taban && !/[^\x00-\x7F]/.test(taban)) {
+        try {
+          K.fs.writeFileSync(taban + ".args.txt", WAR.yanitDosyasiMetni(args), "utf8");
+          yanitYolu = taban + ".args.txt";
+          calisArgs = ["@" + yanitYolu];
+        } catch (eY) { K.log("whisper yanit dosyasi yazilamadi: " + (eY && eY.message ? eY.message : eY)); }
+      }
+    }
     var r;
     try {
-      r = await K.run(exe, args, {
+      r = await K.run(exe, calisArgs, {
         timeout: sinirMs,
         iptal: iptal,
         onStdout: ayristir ? function (s) { canliEkle(ayristir.besle(s)); } : null,
@@ -1033,6 +1049,7 @@ window.KCaptions = (function () {
       });
     } finally {
       if (tik) clearInterval(tik);
+      if (yanitYolu) { try { K.fs.unlinkSync(yanitYolu); } catch (eYs) {} }
     }
     var jsonPath = outBase + ".json";
     if (r.iptal) {
