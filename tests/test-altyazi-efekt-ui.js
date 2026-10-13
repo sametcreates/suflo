@@ -86,7 +86,8 @@ function ortam(o) {
     "cap-efekt-kutu-ayar": dugum("div"), "cap-konum-x": dugum("input", { type: "hidden", value: "" }), "cap-konum-y": dugum("input", { type: "hidden", value: "" }),
     "cap-konum-serbest": dugum("div"), "cap-konum-serbest-deger": dugum("b"), "cap-konum-sifirla": dugum("button"),
     "cap-sahne": dugum("div"), "cap-efekt-arti": dugum("div", { hidden: true }), "cap-efekt-arti-etiket": dugum("span"),
-    "cap-render-onizleme": dugum("video", { hidden: true })
+    "cap-render-onizleme": dugum("video", { hidden: true }),
+    "cap-apply-style": dugum("button"), "cap-apply-hint": dugum("p")
   };
   dom["cap-efekt-arti"].appendChild(dugum("i", { className: "efekt-arti-dikey" }));
   dom["cap-efekt-arti"].appendChild(dugum("i", { className: "efekt-arti-yatay" }));
@@ -117,7 +118,12 @@ function ortam(o) {
     cap.slice(cap.indexOf("  var EFEKT_KONTROLLERI = "), cap.indexOf("  function stilYedegi(")),
     // DOM yedek önizlemesi (efektDomCiz, ölçeği ve kartın sahneye sığdırılması)
     cap.slice(cap.indexOf("  var EFEKT_GIRIS_SINIFI = "), cap.indexOf("  function onizlemeMetni("))
-  ].join("\n");
+  ].concat(o.mogrt ? [
+    // Premiere Şablonları listesi (yalnız istenince): kayıtlı şablon seçiminin geri yüklenmesi ve uygulama düğmesi
+    govde("function mogrtOrani("), govde("function sekansOrani("), govde("function oranEtiketi("), govde("function temizMogrtAdi("),
+    govde("function mogrtStilAnahtari("), govde("function mogrtStilleriniBirlestir("), govde("function mogrtStilleriniCiz("),
+    govde("function refreshMogrtStyles("), govde("function uygulamaIpucunuGuncelle(")
+  ] : []).join("\n");
   var api = new Function("K", "window", "document", "el", "KApp", "Pro",
     "var SS = window.SufloStyleShare, AE = window.SufloAltyaziEfekt, EFEKT = 'efekt';\n" +
     cap.slice(cap.indexOf("  var EFEKT_SAYILARI = "), cap.indexOf("\n", cap.indexOf("\"cap-kutu-opak\": [50, 0, 100] };")) + 1) +
@@ -132,7 +138,10 @@ function ortam(o) {
     "function cueler() { return segments.map(function (s) { return { start: s.start, end: s.end, text: s.text }; }); }\n" +
     "function onizlemeDurdur() { onizleme.durdur++; } function onizlemeCiz() { onizleme.ciz++; } function onizlemeOynat() { onizleme.oynat++; }\n" +
     "function efektOnizlemeTazele(h) { onizleme.tazele.push(!!h); }\n" +
-    "function vurguKutusuDurumu() {} function kelimeSiniriDurumu() {} function motorSecenekDurumu() {} function uygulamaIpucunuGuncelle() {}\n" +
+    "function vurguKutusuDurumu() {} function kelimeSiniriDurumu() {} function motorSecenekDurumu() {}\n" +
+    (o.mogrt ? "var mogrtStilleri = [], gercekMogrtStilleri = [], mogrtVitrini = [], mogrtVitriniIsi = null, kaliteOnayBekleyen = '', aktifMogrtOnizlemeDurdur = null, mogrtBaglam = { width: 1080, height: 1920 };\n" +
+      "function yerelCiktiEtkin() { return false; } function yerelCiktiSecili() { return false; } function mogrtVitrininiYukle() { return Promise.resolve([]); } function mogrtStiliniSec() {}\n"
+      : "function uygulamaIpucunuGuncelle() {}\n") +
     "function arayuzDili() { return 'tr'; } function kelimeSiniri() { return 0; }\n" + kod +
     "\nreturn { gorunumleriCiz: gorunumleriCiz, gorunumUygula: gorunumUygula, stil: stil, motorAyarlari: motorAyarlari, loadPrefs: loadPrefs, savePrefs: savePrefs," +
     " stilKodu: stilKodu, stilKoduUygula: stilKoduUygula, applyPreset: applyPreset, efekteGec: efekteGec, varsayilanaDon: varsayilanaDon, onizleme: onizleme," +
@@ -140,10 +149,11 @@ function ortam(o) {
     " efektAyari: efektAyari, konumSurukleBagla: konumSurukleBagla, surukluyor: function () { return !!surukleme; }," +
     " stilYedegi: stilYedegi, stilYedeginiYukle: stilYedeginiYukle, sablonumUygula: sablonumUygula," +
     " efektKontrolleriniBagla: efektKontrolleriniBagla, stilKartiIsaretle: stilKartiIsaretle, efektDomCiz: efektDomCiz, efektKartiSigdir: efektKartiSigdir," +
-    " konumOrnegi: konumOrnegi," +
+    " konumOrnegi: konumOrnegi, konumAktif: konumAktif, bekleyenMogrt: function () { return bekleyenMogrtYolu; }," +
+    (o.mogrt ? " refreshMogrtStyles: refreshMogrtStyles," : "") +
     " mogrtSec: function (m) { secilenMogrt = m; secilenMotorStili = ''; } };")(
     K, window, { createElement: function (t) { return dugum(t); }, querySelectorAll: function () { return []; } },
-    function (id) { return dom[id] || null; }, { toast: function (m, tur) { toastlar.push(m); } }, {});
+    function (id) { return dom[id] || null; }, { toast: function (m, tur) { toastlar.push(m); } }, o.mogrt ? { isPro: function () { return true; }, gate: function () { return true; } } : {});
   return { api: api, dom: dom, ayar: ayar, toastlar: toastlar, kayit: function () { return kayit; }, yakalanan: yakalanan };
 }
 var kelimeCue = ["Bunu", "*gören*", "herkes", "şaşırdı", "bugün"].map(function (w, i) { return { start: i * 0.5, end: i * 0.5 + 0.44, text: w }; });
@@ -745,6 +755,28 @@ var buYedek = (function () { var o = ortam(); o.api.gorunumUygula("glitch"); o.d
 yd3.api.stilYedeginiYukle(buYedek);
 ok("3.3 yedeği olduğu gibi döner (görünüm, serbest konum)", yd3.api.durum().motor === "efekt" && yd3.api.durum().gorunum === "glitch" &&
   yd3.dom["cap-konum-x"].value === "40" && yd3.dom["cap-efekt-aktif"].value === "glitch");
+
+/* ---------------- kayıtlı Premiere şablonu bulunamazsa Altyazı Efektleri'ne düşülür ---------------- */
+// Kütüphane silinmiş / taşınmış / bu oranda şablon yok: eskiden hiçbir şey seçili kalmıyor, düğme
+// "Görünüm seçerek ekle" diye devre dışı, sürükleme ölü (3.3 kuralı: boş seçim Altyazı Efektleri'ne düşer)
+function kayitliMogrt(liste) {
+  var m = ortam({ mogrt: true, ayar: { capPrefs: { preset: "", mogrtPath: "C:/gone/Suflo Pop.mogrt", motorStili: "",
+    stil: { aile: "efekt", font: "Anton", boyut: 90, renk: "#ff0000", konum: 2, giris: "pop", aktif: "zipla" } } } });
+  m.api.gorunumleriCiz();
+  m.api.loadPrefs();
+  m.api.refreshMogrtStyles(liste);
+  return m;
+}
+[["boş liste", []], ["kayıtlı yol listede yok", [{ path: "D:/lib/Other 9x16 Subtitles.mogrt", display: "9x16 Other Subtitles", group: "caption" }]]].forEach(function (s) {
+  var m = kayitliMogrt(s[1]);
+  ok("kayıtlı MOGRT bulunamadı (" + s[0] + "): Altyazı Efektleri seçili, düğme etkin, bölüm etkin, sürükleme açık, değerler korunur",
+    m.api.durum().motor === "efekt" && m.api.durum().mogrt === null && m.api.bekleyenMogrt() === "" && m.dom["cap-apply-style"].disabled === false &&
+    m.dom["cap-efekt"].classList.contains("etkin") && m.api.konumAktif() && m.dom["cap-font"].value === "Anton" && m.dom["cap-efekt-giris"].value === "pop",
+    J(m.api.durum()) + " düğme=" + m.dom["cap-apply-style"].disabled + " '" + m.dom["cap-apply-style"].textContent + "'");
+});
+var mVar = kayitliMogrt([{ path: "C:/gone/Suflo Pop.mogrt", display: "9x16 Suflo Pop", group: "caption" }]);
+ok("kayıtlı MOGRT listede: o seçilir (değişmedi)", mVar.api.durum().mogrt && mVar.api.durum().mogrt.path === "C:/gone/Suflo Pop.mogrt" && mVar.api.durum().motor === "" &&
+  !mVar.dom["cap-efekt"].classList.contains("etkin"), J(mVar.api.durum()));
 
 console.log("\n" + gecen + "/" + toplam + " geçti");
 process.exit(gecen === toplam ? 0 : 1);

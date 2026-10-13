@@ -2245,6 +2245,9 @@ window.KCaptions = (function () {
     Array.prototype.forEach.call(grid.querySelectorAll(".stil-mogrt-head,.stil-mogrt,.stil-mogrt-empty"), function (n) { n.remove(); });
     var oran = sekansOrani();
     var istenenAnahtar = secilenMogrt ? mogrtStilAnahtari(secilenMogrt) : "";
+    // Kayıtlı Premiere şablonu seçimi geri yükleniyor: bulunamazsa (silinmiş / taşınmış / bu oranda yok / liste
+    // boş) seçim boş kalmaz, Altyazı Efektleri'ne düşülür (ilk açılıştaki kural; stil düğmesi devre dışı kalmasın)
+    var geriYuklenecek = !!bekleyenMogrtYolu;
     if (bekleyenMogrtYolu) {
       for (var bi = 0; bi < mogrtStilleri.length; bi++) {
         if (mogrtStilleri[bi].path === bekleyenMogrtYolu) {
@@ -2274,6 +2277,7 @@ window.KCaptions = (function () {
         : "<b>Altyazı şablonu bulunamadı</b><span>Pro lisansını etkinleştirip Ayarlar → Pro İçerikleri bölümünden eşitlemeyi çalıştır.</span>";
       grid.appendChild(empty);
       secilenMogrt = null;
+      if (geriYuklenecek) efektVarsayilan(false);
       uygulamaIpucunuGuncelle();
       return;
     }
@@ -2392,6 +2396,7 @@ window.KCaptions = (function () {
       }
       grid.appendChild(card);
     });
+    if (geriYuklenecek && !secilenMogrt) efektVarsayilan(false);
     if (secilenMogrt && el("cap-style-family")) el("cap-style-family").value = "mogrt";
     stilKartiIsaretle(el("cap-preset") ? el("cap-preset").value : "");
     uygulamaIpucunuGuncelle();
