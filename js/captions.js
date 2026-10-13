@@ -5728,8 +5728,9 @@ window.KCaptions = (function () {
   }
 
   /*
-   * ---------------- Altyazı Efektleri › Premiere yerel (3.3 adım 21) ----------------
-   * Oluşturucunun ana çıktısı: TranscriptAI'ın altyazı şablonu (assets/mogrt/altyazi-efekt-v1.mogrt, yazarın izniyle
+   * ---------------- Altyazı Efektleri › Premiere yerel (3.3 adım 21, Beta) ----------------
+   * Oluşturucunun isteğe bağlı çıktısı (varsayılan Video katmanı; yerel yol gerçek Premiere'de henüz denenmedi, Beta):
+   * TranscriptAI'ın altyazı şablonu (assets/mogrt/altyazi-efekt-v1.mogrt, yazarın izniyle
    * pakette; THIRD_PARTY_NOTICES.md) aktif sekansta boş bir video izine doğrudan konur. Render yok, kelimeler ve
    * zamanlar Premiere'de düzenlenebilir. Veri js/caption-mogrt-json.js (kartlar önizlemeyle aynı, ≤45 sn / ≤8 KB
    * parçalar), yerleştirme jsx/host.jsx KS_placeCaptionJsonMogrt (JSON_Input geri okunur). Yalnız Pro: deneme hakkı
@@ -6027,7 +6028,7 @@ window.KCaptions = (function () {
         await mogrtStiliniUygula();
         return;
       }
-      // 3.3 adım 21: Altyazı Efektleri'nin ana çıktısı Premiere yerel (yalnız Pro; deneme hakkı filigranlı katmanı koyar)
+      // 3.3 adım 21: Çıktı = Premiere yerel (Beta) seçiliyse (yalnız Pro; deneme hakkı filigranlı katmanı koyar)
       if (yerelCiktiSecili() && (typeof Pro === "undefined" || Pro.isPro())) {
         if (await yerelAltyaziUygula()) return;
       } else if (yerelCiktiSecili()) {
@@ -6747,7 +6748,8 @@ window.KCaptions = (function () {
    * sakinlikten sonra tazeler ve kaydeder. Gölge / Arka plan kutusu anahtarı alt kontrollerini açar
    * (efektSonrasi → efektBagimliDurum).
    */
-  // 3.3 adım 21: çıktı seçimi (Premiere yerel / video katmanı) tarayıcı deposunda; Premiere'e açılışta gidilmez
+  // 3.3 adım 21: çıktı seçimi (Video katmanı varsayılan / Premiere yerel Beta) tarayıcı deposunda; yalnız kullanıcının
+  // açıkça seçtiği değer kaydedilir ve korunur. Premiere'e açılışta gidilmez
   function yerelCiktiBagla() {
     var s = el("cap-efekt-cikti");
     if (!s) return;

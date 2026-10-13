@@ -1,7 +1,7 @@
 /*
  * Suflo — Altyazı Efektleri › Premiere yerel çıktı (render yok) için saf model (3.3 adım 21)
  *
- * Altyazı Efektleri oluşturucusunun ana çıktısı Premiere'in kendi klibidir: TranscriptAI'ın (Animated Captions,
+ * Altyazı Efektleri oluşturucusunun isteğe bağlı (Beta; varsayılan Video katmanı) çıktısı Premiere'in kendi klibidir: TranscriptAI'ın (Animated Captions,
  * MIT, Copyright (c) 2026 Aktuğ Antika) altyazı şablonu assets/mogrt/altyazi-efekt-v1.mogrt yazarın izniyle pakette
  * gelir (THIRD_PARTY_NOTICES.md). Şablonun "JSON_Input" metin kontrolü tek bir dizi okur:
  *   [vurguRGB, yaziRGB, font (PostScript adı), punto, kontur [1,r,g,b,kalınlık]|[0], gölge [1,r,g,b,opak,mesafe,yumuşak]|[0],

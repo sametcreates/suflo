@@ -1461,8 +1461,9 @@ Senin yapacakların:
 
 ### Adım 21: Altyazı Efektleri › Premiere yerel çıktı (render yok, TranscriptAI şablonu)
 
-Ne değişti: Altyazı Efektleri oluşturucusunda yeni **Çıktı** seçimi: **Premiere yerel (render yok)** (varsayılan) ya da
-**Video katmanı** (önceki libass katmanı). Yerel çıktı TranscriptAI'ın altyazı şablonunu (`assets/mogrt/altyazi-efekt-v1.mogrt`,
+Ne değişti: Altyazı Efektleri oluşturucusunda yeni **Çıktı** seçimi: **Video katmanı** (önceki libass katmanı; 3.3.0'da
+varsayılan, çünkü yerel yol gerçek Premiere'de henüz denenmedi) ya da **Premiere yerel (render yok) · Beta** (kullanıcı seçerse,
+seçim hatırlanır). Yerel çıktı TranscriptAI'ın altyazı şablonunu (`assets/mogrt/altyazi-efekt-v1.mogrt`,
 yazarın izniyle; TranscriptAI'ın `dist/source/dinamik_altyazi_motoru.mogrt`'u, sha256
 `32c2394de3f639fede180bc274e30166daa0375298af5c5f7ae3dfbf73989969`) aktif sekansta boş bir üst video izine doğrudan koyar;
 kartlar önizlemeyle aynı kurulur (`js/caption-mogrt-json.js`), en çok 45 sn / 8 KB'lık klip parçalarına bölünür ve

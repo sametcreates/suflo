@@ -419,9 +419,10 @@ ok("THIRD_PARTY_NOTICES: TranscriptAI (MIT, Aktuğ Antika, f1881ea), izinle kull
 var html = oku("index.html");
 var iAE = html.indexOf('<script src="js/altyazi-efekt.js">'), iCMJ = html.indexOf('<script src="js/caption-mogrt-json.js">'), iCap = html.indexOf('<script src="js/captions.js">');
 ok("index.html: caption-mogrt-json.js altyazi-efekt.js'ten sonra, captions.js'ten önce", iAE !== -1 && iCMJ > iAE && iCap > iCMJ, [iAE, iCMJ, iCap].join(","));
-ok("index.html: çıktı seçimi (Premiere yerel / Video katmanı), font notu ve kaldır düğmesi",
-  /id="cap-efekt-cikti"/.test(html) && /<option value="yerel" selected>Premiere yerel \(render yok\)<\/option>/.test(html) &&
-  /<option value="katman">Video katmanı<\/option>/.test(html) && /id="cap-yerel-font-kur"[^>]*>Suflo fontlarını kur</.test(html) && /id="cap-yerel-kaldir"/.test(html));
+ok("index.html: çıktı seçimi (Video katmanı varsayılan, Premiere yerel Beta), font notu ve kaldır düğmesi",
+  /id="cap-efekt-cikti"/.test(html) && /<option value="katman" selected>Video katmanı<\/option>/.test(html) &&
+  /<option value="yerel">Premiere yerel \(render yok\) · Beta<\/option>/.test(html) && !/<option value="yerel" selected/.test(html) &&
+  /id="cap-yerel-font-kur"[^>]*>Suflo fontlarını kur</.test(html) && /id="cap-yerel-kaldir"/.test(html));
 var cap = oku("js/captions.js");
 var ov = cap.slice(cap.indexOf("async function overlayUygula()"), cap.indexOf("function buildAssKaydirilmis("));
 ok("Yerel çıktı Pro.gate('overlay') kapısından SONRA ve yalnız Pro'da (deneme filigranlı katmana gider)",
@@ -514,6 +515,41 @@ function baglaUi(surum) {
   dinleyiciler.forEach(function (fn) { fn(ctx); });
   return { acilis: acilis, gizli: dom["cap-efekt-cikti-sar"].hidden, ipucu: win.ipucu, dinleyici: dinleyiciler.length };
 }
+/*
+ * 3.3 yayın güvenliği: Premiere yerel çıktı gerçek Premiere'de henüz denenmedi (Beta). Açılış değeri index.html'in
+ * varsayılanı (Video katmanı); yalnız kullanıcının açıkça seçip kaydettiği değer (suflo.efektCikti) onu ezer.
+ */
+var ciktiSelect = (html.match(/<select id="cap-efekt-cikti"[\s\S]*?<\/select>/) || [""])[0];
+var ciktiVarsayilan = (ciktiSelect.match(/<option value="(\w+)" selected>/) || [])[1] || "";
+function ciktiAcilis(kayit) {
+  var dom = {}, depo = {}, yazilan = 0;
+  ["cap-efekt-cikti", "cap-efekt-cikti-sar", "cap-yerel-font-kur", "cap-yerel-kaldir"].forEach(function (id) {
+    dom[id] = { id: id, hidden: false, value: "", addEventListener: function (tur, fn) { this.dinle = fn; } };
+  });
+  dom["cap-efekt-cikti"].value = ciktiVarsayilan;
+  if (kayit !== null) depo["suflo.efektCikti"] = kayit;
+  var ls = {
+    getItem: function (k) { return Object.prototype.hasOwnProperty.call(depo, k) ? depo[k] : null; },
+    setItem: function (k, v) { yazilan++; depo[k] = String(v); }
+  };
+  var f = new Function("el", "CMJ", "AE", "KApp", "window", "Pro", "localStorage",
+    "var yerelDesteklenmiyor = '', YEREL_ANAHTAR = 'suflo.efektCikti';\n" +
+    "function yerelFontNotu() {} function yerelKayitNotu() {} function yerelFontlariKur() {} function yerelKaldir() {}\n" +
+    "function uygulamaIpucunuGuncelle() {}\n" +
+    govde("yerelSecenekDurumu") + govde("yerelCiktiBagla") + "\nreturn yerelCiktiBagla;");
+  f(function (id) { return dom[id] || null; }, CMJ, AE, { ctx: function () { return { app: "" }; }, onContext: function () {} }, {}, undefined, ls)();
+  var acilis = dom["cap-efekt-cikti"].value, acilisYazilan = yazilan;
+  return { acilis: acilis, acilisYazilan: acilisYazilan, sec: function (v) { dom["cap-efekt-cikti"].value = v; dom["cap-efekt-cikti"].dinle(); return depo["suflo.efektCikti"]; } };
+}
+ok("index.html: Çıktı varsayılanı Video katmanı (Premiere yerel Beta, gerçek Premiere'de denenmedi)", ciktiVarsayilan === "katman", ciktiVarsayilan);
+var cYeni = ciktiAcilis(null);
+ok("Kaydı olmayan kullanıcı: Çıktı Video katmanı açılır, açılışta depoya bir şey yazılmaz",
+  cYeni.acilis === "katman" && cYeni.acilisYazilan === 0, JSON.stringify(cYeni));
+ok("Açıkça Premiere yerel seçip kaydetmiş kullanıcı: seçimi korunur", ciktiAcilis("yerel").acilis === "yerel");
+ok("Açıkça Video katmanı seçmiş kullanıcı: Video katmanı", ciktiAcilis("katman").acilis === "katman");
+ok("Bozuk kayıt: varsayılana (Video katmanı) döner", ciktiAcilis("baska").acilis === "katman");
+ok("Kullanıcı Premiere yerel (Beta) seçince seçim kaydedilir", ciktiAcilis(null).sec("yerel") === "yerel");
+
 var b21 = baglaUi("15.4.0"), b25 = baglaUi("25.2.0");
 ok("Premiere 2021 (15.x): açılışta görünür, bağlam gelince Çıktı seçeneği gizlenir ve ipucu tazelenir (ilk eklemeyi beklemez)",
   b21.dinleyici === 1 && b21.acilis === false && b21.gizli === true && b21.ipucu === 1, JSON.stringify(b21));

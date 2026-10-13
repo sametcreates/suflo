@@ -580,14 +580,15 @@
               <input id="cap-guvenli-yerlesim" type="checkbox"> Platform arayüzünden kaçın
             </label>
 
-            <!-- 3.3 adım 21: çıktı biçimi (captions.js yerelCiktiBagla). Premiere yerel: pakette gelen şablon
-                 (assets/mogrt/altyazi-efekt-v1.mogrt), render yok; Video katmanı: Suflo motoru (libass). Premiere 2022
-                 öncesinde ya da şablon açılamazsa gizlenir / katmana düşülür. -->
+            <!-- 3.3 adım 21: çıktı biçimi (captions.js yerelCiktiBagla). Varsayılan Video katmanı: Suflo motoru (libass),
+                 denenmiş yol. Premiere yerel (Beta): pakette gelen şablon (assets/mogrt/altyazi-efekt-v1.mogrt), render yok;
+                 gerçek Premiere'de henüz denenmedi. Kullanıcının açıkça seçtiği değer (suflo.efektCikti) korunur.
+                 Premiere 2022 öncesinde ya da şablon açılamazsa gizlenir / katmana düşülür. -->
             <div class="field efekt-cikti" id="cap-efekt-cikti-sar">
               <label for="cap-efekt-cikti">Çıktı</label>
-              <select id="cap-efekt-cikti" title="Premiere yerel: render yok, yazı ve zamanlar Premiere'de düzenlenebilir · Video katmanı: Suflo motoruyla şeffaf video">
-                <option value="yerel" selected>Premiere yerel (render yok)</option>
-                <option value="katman">Video katmanı</option>
+              <select id="cap-efekt-cikti" title="Video katmanı: Suflo motoruyla şeffaf video · Premiere yerel (Beta): render yok, yazı ve zamanlar Premiere'de düzenlenebilir">
+                <option value="katman" selected>Video katmanı</option>
+                <option value="yerel">Premiere yerel (render yok) · Beta</option>
               </select>
               <div class="efekt-yerel-not" id="cap-yerel-font-not" hidden>
                 <span id="cap-yerel-font-metin"></span>

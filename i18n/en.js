@@ -801,6 +801,13 @@
     "Yerel motorda hız ile doğruluk arasında seç.": "Choose between speed and accuracy for the local engine.",
     "Çevrimdışı İngilizce": "Offline English",
     "Konuşmayı internetsiz İngilizce altyazıya çevir (Pro).": "Turn speech into English captions without internet (Pro).",
+    "Altyazı Efektleri ve YouTube indirici": "Caption Effects and YouTube downloader",
+    "Altı hazır görünüm, giriş ve vurgu animasyonu; önizlemek ücretsiz, eklemek Pro.": "Six preset looks, entrance and highlight animations; previewing is free, adding is Pro.",
+    "Gölge, kutu ve konum": "Shadow, box and position",
+    "Gölge, arka plan kutusu; yazıyı önizlemede sürükleyerek yerleştir.": "Shadow and background box; drag the text into place on the preview.",
+    "Yeni yazı tipleri": "New fonts",
+    "7 yeni font: 13 yazı tipi dört kategoride.": "7 new fonts: 13 typefaces in four categories.",
+    "MP3, 720p, 1080p ya da 4K; dosya projene gelir (Pro).": "MP3, 720p, 1080p or 4K; the file lands in your project (Pro).",
     "Göster →": "Show →",
     "Başlayalım": "Let's go"
   });
@@ -3062,10 +3069,10 @@
   /* ============ 3.3 step 21: Caption Effects › Premiere native output (bundled TranscriptAI template) ============ */
   add({
     "Çıktı": "Output",
-    "Premiere yerel (render yok)": "Premiere native (no render)",
+    "Premiere yerel (render yok) · Beta": "Native Premiere (no render) · Beta",
     "Video katmanı": "Video layer",
-    "Premiere yerel: render yok, yazı ve zamanlar Premiere'de düzenlenebilir · Video katmanı: Suflo motoruyla şeffaf video":
-      "Premiere native: no render, text and timing stay editable in Premiere · Video layer: transparent video from Suflo's engine",
+    "Video katmanı: Suflo motoruyla şeffaf video · Premiere yerel (Beta): render yok, yazı ve zamanlar Premiere'de düzenlenebilir":
+      "Video layer: transparent video from Suflo's engine · Native Premiere (Beta): no render, text and timing stay editable in Premiere",
     "Suflo fontlarını kur": "Install Suflo fonts",
     "Paketteki fontları kullanıcı font klasörüne kopyalar (yönetici izni gerekmez); sonra Premiere'i yeniden başlat":
       "Copies the bundled fonts to your user font folder (no admin rights needed); then restart Premiere",

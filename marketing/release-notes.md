@@ -1,3 +1,34 @@
+## Suflo 3.3.0 — Altyazı Efektleri ve YouTube indirici
+
+### Yeni
+- **Altyazı Efektleri:** Altyazı sekmesindeki 12 kartlık Suflo Stilleri galerisinin yerine kendi altyazı görünümünü kurduğun bir oluşturucu geldi. Altı hazır görünümden (Temiz, Vurucu, Canlı, Zarif, Glitch, Kutulu) biriyle başla, sonra istediğini değiştir: giriş animasyonu (Pop, Belirme, Yukarı kay, Aşağı kay, Zıpla), konuşulan kelimenin animasyonu (Zıpla, Titre, Glitch), kelime vurgusu ve rengi, yazı ve kontur rengi, kalın / italik, boyut, satır sayısı ve ekranda en çok kaç kelime görüneceği. Büyük önizleme Suflo'nun gerçek stil motorunun çıktısıdır, her ayarda tazelenir. Stil kodu, Marka Kiti, Şablonum ve Shorts Paketi aynı ayarı taşır. Eski kayıtlı stiller ve 3.2 stil kodları en yakın görünüme taşınır (yazı tipi, renk ve konum korunur). Premiere Şablonları (17 MOGRT) olduğu gibi duruyor. Düzenlemek ve önizlemek ücretsiz; timeline'a eklemek Pro (3 deneme hakkı, denemede küçük filigran).
+- **Gölge, arka plan kutusu ve serbest konum:** Altyazı Efektleri'nde gölge (renk, opaklık, mesafe, yumuşaklık) ve her satırın arkasında arka plan kutusu. Yazıyı önizlemede sürükleyerek istediğin yere koy; hazır konumlara (Alt, Alt sol, Orta, Üst) kendiliğinden yapışır, ok tuşlarıyla ince ayar, çift tıkla hazır konuma dön.
+- **7 yeni yazı tipi:** Bangers, Inter, Nunito, Poppins, Libre Caslon Display, Chakra Petch ve Exo 2. Yazı tipi listesi artık 13 font ve dört kategori (Kalın · iddialı, Modern · sade, Zarif · serif, Teknik · fütüristik); her seçenek kendi yüzüyle görünür. Yedi yeni fontun hepsi Türkçe ve Azerbaycanca harflerin tamamını içerir.
+- **YouTube indirici (Pro):** Sol menüde yeni YouTube İndir. Bağlantıyı yapıştır, Bilgi al ile başlığı, kanalı ve süreyi gör (ücretsiz), sonra MP3, 720p, 1080p ya da 4K seç. Video Premiere'in doğrudan açtığı H.264 MP4 olarak gelir (4K gerekirse dönüştürülür) ve dosya projende **Suflo İndirilenler** kutusuna girer; timeline'a dokunulmaz. İlerleme, kalan süre ve İptal var. yt-dlp ilk kullanımda iner ve SHA-256 ile doğrulanmadan çalıştırılmaz. Yalnızca indirme hakkın olan içerik için: kendi videoların, izin aldığın ya da lisanslı içerik (ilk indirmede bir kez onay istenir). 3 deneme hakkı.
+- **Premiere yerel çıktı (Pro) · Beta:** Altyazı Efektleri › Çıktı'da "Premiere yerel (render yok) · Beta" seçersen altyazı render beklemeden Premiere'in kendi klibi olarak eklenir; yazı ve zamanlar Premiere'de düzenlenebilir. Bu yol henüz gerçek Premiere'de geniş denenmedi, bu yüzden varsayılan çıktı denenmiş **Video katmanı**. Premiere 2022 ve üstü; deneme hakkı her zaman filigranlı video katmanını ekler.
+- **Yenilikler penceresi:** 3.3'ü ilk açışta yeni özellikler tek ekranda; her biri tek tıkla ilgili bölümü açar.
+
+### İyileştirildi
+- **Shorts Paketi altyazısı:** Short'lar Altyazı sekmesindeki efekti ya da bir hazır görünümü kullanır; noktalama, gölge, kutu ve serbest konum da gelir. Kapanış çağrısı sürüklenen altyazının karşı tarafına geçer.
+- **Altyazı Efektleri sınırları:** Boyut 36–180, kontur 0–16 aralığına kırpılır; önizleme, stil kodu ve Shorts Paketi aynı değeri çizer. Kayıtlı Premiere şablonu bulunamazsa seçim boş kalmaz, Altyazı Efektleri'ne dönülür.
+- **Uzun yerel transkripsiyon:** Yerel motorun süre sınırı sesin uzunluğuyla büyür; yavaş bilgisayarda 2–3 saatlik ses artık 2 saatte kesilmez.
+- **Vekil sunucu:** Bulut altyazı, çeviri, yapay zekâ istekleri ve Pro lisansı da ayarlardaki vekilden geçer; açıkça yazılan :80 portu 8080'e çevrilmez.
+- **Motor kurulumu:** Açılmayan motor yeniden indirilip onarılır; Hızlandırma kapatılınca CUDA dosyaları silinir (yaklaşık 600 MB boşalır). Doctor'un "Motoru onar"ı CPU derlemesini değiştirmez.
+
+### Düzeltildi
+- Hız Rampası: Dengeli kaynakta bazı klip uzunluklarında çıkan "Medya yetmedi" hatası; kayıtsız (seçimden) rampa kaldırmada %100 platonun ve bitişik rampanın yanlış ayrılması; L-cut / J-cut sesin uygulama ve kaldırmadan sonra kendi video parçasına yeniden bağlanmaması; iç içe sekans ve multicam kliplerin "grafik" diye reddedilmesi.
+- Pro lisansı: Lemon Squeezy'nin geçici hatası (429 / 5xx) lisansı kaldırmıyor, çevrimdışı gibi sayılıyor. Lisans ve deneme hakkı kayıtları yazılırken eski dosya önce silinmiyor; yazma başarısız olursa eski kayıt yerinde kalıyor.
+- Shorts Paketi: "Altyazı sekmesindeki efekt" Marka Kiti'yle yeniden birleştirilip elle yaptığın ayarları ezmiyor.
+- macOS: libass'siz Homebrew ffmpeg'i varken Ayarlar Suflo'nun ffmpeg'ini kuruyor; Premiere Rosetta'da açıksa Homebrew doğru mimariyle çağrılıyor. Mac kurucusu, adında yıl olan açık Premiere'i (ör. Adobe Premiere Pro 2025) de fark edip uyarıyor.
+- Windows yerel motor: Türkçe (ASCII dışı) sözlük ve dolgu ipucu bozuk karakterle gitmiyor.
+- Karaoke ve kelime kelime altyazı: aynı anda başlayan kelimeler üst üste binmiyor.
+- Caption Editor araması İngilizce "I" harfini de buluyor (I / ı / İ); kelime kelime belgede Çevir, kelime salatası üretmek yerine uyarıyor.
+- Premiere 2020–2021'de anahtarlarda klavye odağı görünüyor.
+
+### Geliştirici
+- Yeni saf modüller (testli): `altyazi-efekt`, `caption-mogrt-json`, `youtube-indir`; YouTube indirici ve Premiere yerel yerleştirme sahte Premiere ile test ediliyor. Köprüde `K.run` süreç grubu: İptal ve zaman aşımı tüm süreç ağacını durdurur.
+- Teşekkürler: Premiere yerel çıktının şablonu TranscriptAI'ın (Aktuğ Antika) altyazı şablonudur, yazarın izniyle pakette. yt-dlp (açık kaynak) pakette yok, ilk kullanımda GitHub'dan iner. Yeni fontlar Google Fonts'tan, SIL Open Font License 1.1 ile; lisans metinleri `fonts/` klasöründe. Ayrıntılar `THIRD_PARTY_NOTICES.md`'de.
+
 ## Suflo 3.2.0 — Hız rampası ve daha iyi altyazı
 
 ### Yeni

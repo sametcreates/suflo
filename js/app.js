@@ -1646,20 +1646,19 @@ window.KApp = (function () {
   }
 
   /*
-   * "Suflo 3.2'de yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * "Suflo 3.3'te yeni": surum basina bir kez. Yeni ozellikler sekmelerin
    * derinliginde (Hiz Rampasi sol menude, cozme modu Ayarlar'da);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
    * 3.1'den yukselten kullanicida yeniliklerGoruldu "3.1" oldugundan pencere bir kez acilir.
    */
   var YENILIKLER = {
-    surum: "3.2",
-    alt: "Hız rampası ve daha iyi altyazı",
+    surum: "3.3",
+    alt: "Altyazı Efektleri ve YouTube indirici",
     maddeler: [
-      { ikon: "⏩", baslik: "Hız Rampası", metin: "11 eğriyle tek tıkla ağır çekim ve hızlanma; kurgun kaymaz (Pro).", sekme: "hiz", hedef: "hiz-grid" },
-      { ikon: "▶", baslik: "Canlı altyazı", metin: "Satırlar motor yazdıkça akar; kalan süre ve İptal düğmesi.", sekme: "captions", hedef: "cap-go" },
-      { ikon: "≡", baslik: "Okunaklı altyazı", metin: "2 satır × 42 düzen, kısa parçalar birleşir, kelime zamanları ölçülür.", sekme: "captions", hedef: "cap-maxlen" },
-      { ikon: "⚙", baslik: "Hızlı ya da En doğru", metin: "Yerel motorda hız ile doğruluk arasında seç.", sekme: "settings", hedef: "set-cozme" },
-      { ikon: "EN", baslik: "Çevrimdışı İngilizce", metin: "Konuşmayı internetsiz İngilizce altyazıya çevir (Pro).", sekme: "captions", hedef: "cap-lang" }
+      { ikon: "✦", baslik: "Altyazı Efektleri", metin: "Altı hazır görünüm, giriş ve vurgu animasyonu; önizlemek ücretsiz, eklemek Pro.", sekme: "captions", hedef: "cap-efekt" },
+      { ikon: "◎", baslik: "Gölge, kutu ve konum", metin: "Gölge, arka plan kutusu; yazıyı önizlemede sürükleyerek yerleştir.", sekme: "captions", hedef: "cap-sahne" },
+      { ikon: "Aa", baslik: "Yeni yazı tipleri", metin: "7 yeni font: 13 yazı tipi dört kategoride.", sekme: "captions", hedef: "cap-font" },
+      { ikon: "▼", baslik: "YouTube İndir", metin: "MP3, 720p, 1080p ya da 4K; dosya projene gelir (Pro).", sekme: "youtube", hedef: "yt-url" }
     ]
   };
 
