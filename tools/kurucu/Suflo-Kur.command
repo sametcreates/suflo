@@ -25,8 +25,9 @@ if [ ! -f "$KAYNAK/index.html" ]; then
   exit 1
 fi
 
-# Premiere açıkken kurulum yapılırsa panel bozuk yüklenir
-if pgrep -x "Adobe Premiere Pro" >/dev/null 2>&1; then
+# Premiere açıkken kurulum yapılırsa panel bozuk yüklenir. Yürütülebilir ad yılı taşır
+# ("Adobe Premiere Pro 2025"); pgrep'in tam ad eşleşmesi (-x) kısaltılmış ada bakar: tam yol (-f) aranır.
+if pgrep -f "Adobe Premiere Pro[^/]*\.app/Contents/MacOS/" >/dev/null 2>&1; then
   echo "  UYARI: Premiere Pro şu anda açık."
   echo "  Kurulumun düzgün olması için önce Premiere'i kapat."
   echo "  WARNING: Premiere Pro is running. Close it first for a clean install."
