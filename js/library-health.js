@@ -286,7 +286,9 @@ window.KLibraryHealth = (function () {
       { k: "qeSetSpeed", ad: "QE hız yazma (setSpeed)", etki: "Hız Rampası klibe hız yazamaz" },
       { k: "unlinkSelection", ad: "Bağlantı koparma (unlinkSelection)", etki: "Sesle bağlı kliplerde Hız Rampası önce Ctrl+L ile bağlantıyı koparmanı ister" },
       { k: "interp", ad: "Kare harmanlama (setTimeInterpolationType)", etki: "Hız Rampası parçalara kare harmanlamayı açamaz; Premiere'de elle aç" },
-      { k: "speedRead", ad: "Hız okuma (getSpeed)", etki: "Hızı değişmiş klipler süre karşılaştırmasıyla bulunur" }
+      { k: "speedRead", ad: "Hız okuma (getSpeed)", etki: "Hızı değişmiş klipler süre karşılaştırmasıyla bulunur" },
+      // Eğri (3.4): yazılan sık anahtar kareler doğrusal yapılır (yalnız typeof; yoklamada hiç çağrılmaz)
+      { k: "kfInterp", ad: "Anahtar kare ara değerlemesi (setInterpolationTypeAtKey)", etki: "Eğri, yazdığı sık anahtar kareleri doğrusal yapamaz; Premiere'in varsayılan ara değerlemesi kalır (eğri yine uygulanır, kareler arasında hafif sapma olabilir)" }
     ];
     var eksik = [], bilinmeyen = [];
     gerek.forEach(function (g) {

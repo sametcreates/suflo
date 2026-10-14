@@ -29,7 +29,10 @@ var qeOge = { type: "Clip", setSpeed: patla("setSpeed"), setTimeInterpolationTyp
   setReverse: patla("setReverse") };
 Object.defineProperty(qeOge, "reverse", { get: function () { cagrilan.push(".reverse"); throw new Error(".reverse okunmamali"); } });
 var qeIz = { numItems: 2, getItemAt: function (j) { return j === 0 ? { type: "Empty" } : qeOge; } };
-var vKlip = { getSpeed: patla("getSpeed"), components: { numItems: 2, 0: { matchName: "AE.ADBE Opacity", displayName: "Opacity" }, 1: { matchName: "AE.ADBE Motion", displayName: "Motion" } } };
+// Eğri (3.4): kfInterp = Hareket bileşenindeki özelliğin setInterpolationTypeAtKey'i var mı (yalnız typeof, ASLA çağrılmaz)
+var konumOzelligi = { displayName: "Position", setInterpolationTypeAtKey: patla("setInterpolationTypeAtKey") };
+var vKlip = { getSpeed: patla("getSpeed"), components: { numItems: 2, 0: { matchName: "AE.ADBE Opacity", displayName: "Opacity" },
+  1: { matchName: "AE.ADBE Motion", displayName: "Motion", properties: { numItems: 1, 0: konumOzelligi } } } };
 var tamSeq = { createSubsequence: function () { throw new Error("cagrilmamali"); }, autoReframeSequence: function () { throw new Error("cagrilmamali"); },
   markers: { createMarker: function () { throw new Error("cagrilmamali"); } },
   unlinkSelection: patla("unlinkSelection"), linkSelection: patla("linkSelection"),
@@ -48,10 +51,19 @@ var eski = host({ markers: { createMarker: function () {} }, audioTracks: { numT
 ok("eski Premiere: alt sekans/Auto Reframe/QE yok", eski.r.subsequence === false && eski.r.autoReframe === false && eski.r.qe === false && eski.r.markers === true, JSON.stringify(eski.r));
 ok("eski Premiere: klipten sekans yok (seqFromClips false)", eski.r.seqFromClips === false, JSON.stringify(eski.r));
 ok("eski Premiere: QE yok → qeSetSpeed false, unlinkSelection false", eski.r.qeSetSpeed === false && eski.r.unlinkSelection === false && eski.r.interp === false, JSON.stringify(eski.r));
+ok("egri: kfInterp true (setInterpolationTypeAtKey var), hicbiri cagrilmadi", t.r.kfInterp === true && cagrilan.length === 0, JSON.stringify(t.r));
 var yok = host(null, true, modernProje());
 ok("sekans yok: sekans API'leri bilinmiyor (null)", yok.r.seq === false && yok.r.subsequence === null && yok.r.qeAddTracks === null && yok.r.qe === true, JSON.stringify(yok.r));
 ok("sekans yok: seqFromClips proje duzeyinde yine raporlanir, cagrilmaz", yok.r.seqFromClips === true && sekansYapildi === 0, JSON.stringify(yok.r));
 ok("sekans yok: hiz rampasi alanlari bilinmiyor (null)", yok.r.qeSetSpeed === null && yok.r.unlinkSelection === null && yok.r.speedRead === null && yok.r.timeRemapApi === null, JSON.stringify(yok.r));
+ok("sekans yok: kfInterp bilinmiyor (null)", yok.r.kfInterp === null, JSON.stringify(yok.r));
+ok("eski Premiere: klip yoksa kfInterp bilinmiyor (null)", eski.r.kfInterp === null, JSON.stringify(eski.r));
+// Seçili klip önce: seçili video klibinin Hareket özelliğinde setInterpolationTypeAtKey yoksa false (ses öğesi atlanır)
+var eskiKlip = { components: { numItems: 1, 0: { matchName: "AE.ADBE Motion", displayName: "Motion", properties: { numItems: 1, 0: { displayName: "Position" } } } } };
+var secimSeq = { markers: { createMarker: function () {} }, audioTracks: { numTracks: 0 }, getSelection: function () { return [{ mediaType: "Audio" }, eskiKlip]; },
+  videoTracks: { numTracks: 1, 0: { clips: { numItems: 1, 0: vKlip } } } };
+var secimli = host(secimSeq, true, modernProje());
+ok("egri: secili video klibine bakilir (ses atlanir); yoksa kfInterp false", secimli.r.kfInterp === false && cagrilan.length === 0, JSON.stringify(secimli.r));
 var remapKlip = { getSpeed: patla("getSpeed"), components: { numItems: 1, 0: { matchName: "AE.ADBE Time Remap", displayName: "Time Remapping" } } };
 var remapSeq = { markers: { createMarker: function () {} }, audioTracks: { numTracks: 0 }, videoTracks: { numTracks: 1, 0: { clips: { numItems: 1, 0: remapKlip } } } };
 var remap = host(remapSeq, true, modernProje());
@@ -74,6 +86,11 @@ ok("doctor: hiz rampasi satirlari gerek listesinde", /k: "qeSetSpeed", ad: "QE h
 ok("doctor: klipten sekans yoksa 'Yeni Oge simgesine surukle' satiri", kotu.some(function (c) {
   return c.status === "warn" && /createNewSequenceFromClips/.test(c.title) && /Yeni Öğe simgesine/.test(c.detail);
 }), JSON.stringify(kotu.map(function (c) { return c.title; })));
+var kfSatir = AK(secimli.r);
+ok("doctor: kfInterp false ise Eğri'nin ara değerleme satırı sarı", kfSatir.some(function (c) {
+  return c.status === "warn" && c.title === "Premiere'de yok: Anahtar kare ara değerlemesi (setInterpolationTypeAtKey)" && /Eğri/.test(c.detail);
+}), JSON.stringify(kfSatir.map(function (c) { return c.title; })));
+ok("doctor: kfInterp gerek listesinde", /k: "kfInterp", ad: "Anahtar kare ara değerlemesi \(setInterpolationTypeAtKey\)"/.test(src));
 var bilinmez = AK(yok.r);
 ok("doctor: sekans yoksa 'sekans acip tekrar tara' notu", bilinmez.length === 1 && bilinmez[0].status === "good" && /sekans açıp tekrar tara/.test(bilinmez[0].detail), JSON.stringify(bilinmez));
 console.log(gecen + "/" + toplam + " gecti");
