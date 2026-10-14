@@ -229,6 +229,10 @@ ok("ret: uçların dışındaki plan anahtarı → gecersiz, yazılmaz", cagir("
 D.olcek.keys.push({ s: 3, v: 130 });
 var bi = cagir("KS_easeBake", { target: hedef(od), items: [pd] });
 ok("ret: arada kullanıcının anahtarı var → icAnahtar (sayısıyla), dokunulmaz", bi.sonuclar[0].kod === "icAnahtar" && bi.sonuclar[0].ic === 1 && D.olcek.keys.length === 3 && D.olcek.bul(3).v === 130, js(bi.sonuclar));
+var ogeli = JSON.parse(JSON.stringify(pd)); ogeli.degistir = true;
+var bi1 = cagir("KS_easeBake", { target: hedef(od), items: [pd, ogeli] });
+ok("degistir öğe başına: yalnız degistir'li öğe iç anahtarı siler (diğeri reddedilir)", bi1.sonuclar[0].kod === "icAnahtar" && bi1.sonuclar[1].ok && bi1.sonuclar[1].silinen === 1, js(bi1.sonuclar));
+D.olcek.keys = [{ s: 2, v: 100 }, { s: 3, v: 130 }, { s: 4, v: 150 }];
 var bi2 = cagir("KS_easeBake", { target: hedef(od), items: [pd], degistir: true });
 ok("degistir: iç anahtar silinir, eğri yazılır", bi2.basarili === 1 && bi2.sonuclar[0].silinen === 1 && D.olcek.keys.length === 2 + pd.keys.length &&
   !D.olcek.bul(3) === (pd.keys.every(function (k) { return Math.abs(k.t - 3) > 1e-9; })), js(bi2.sonuclar));

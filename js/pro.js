@@ -95,6 +95,7 @@
     speedramp: 'Hız rampası: tek tıkla ağır çekim ve hızlanma',
     offlineTranslate: 'Çevrimdışı İngilizce çeviri: internetsiz, yerel motorla',
     youtube:   'YouTube indirici: MP3 ve 720p / 1080p / 4K, projeye otomatik',
+    curves:    'Eğri: kendi anahtar karelerine özel yumuşatma',
     batch:     'Toplu (coklu klip) transkripsiyon',
     translate: 'Altyazi cevirisi',
     assexport: 'Stilli ASS disa aktarma',

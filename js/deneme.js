@@ -24,7 +24,7 @@
 
   var HAK = 3;
   var SURUM = 1;
-  var OZELLIKLER = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube"];
+  var OZELLIKLER = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube", "curves"];
   // Ayarlar'daki liste ve bildirimler için kısa adlar
   var AD = {
     cut: "Otomatik kesim",
@@ -38,7 +38,8 @@
     beat: "Ritim",
     speedramp: "Hız rampası",
     offlineTranslate: "Çevrimdışı İngilizce çeviri",
-    youtube: "YouTube indirici"
+    youtube: "YouTube indirici",
+    curves: "Eğri (anahtar kare yumuşatma)"
   };
   var ANAHTAR = /^[A-Za-z]{1,32}$/;   // "__proto__" gibi anahtarlar geçersiz sayılır
   var UST_SINIR = 1000;               // makul olmayan sayılar (elle düzenleme) geçersiz
@@ -131,7 +132,8 @@
     transitions: { hedef: "gecis-grid", eylem: "" },
     overlay: { hedef: "kanca-ekle", eylem: "Playhead'e ekle" },
     speedramp: { hedef: "hiz-uygula", eylem: "Rampayı uygula" },
-    youtube: { hedef: "yt-bilgi", eylem: "Bilgi al" }   // önce bilgi, sonra İndir (kurulu deneme kapıdan geçer)
+    youtube: { hedef: "yt-bilgi", eylem: "Bilgi al" },   // önce bilgi, sonra İndir (kurulu deneme kapıdan geçer)
+    curves: { hedef: "egri-uygula", eylem: "Uygula" }     // 3.4 Eğri: düzenleyici ücretsiz, uygulamak denemeli
   };
 
   function tanitimIpucu(f) {

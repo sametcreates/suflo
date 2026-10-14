@@ -2665,6 +2665,137 @@
     "Çift yumuşak": "Double ease"
   });
 
+  /* ================= Eğri / Easing tab (3.4 step 10: js/egri.js, js/egri-model.js, #tab-egri) ================= */
+  // "Çevir" is the captions Translate button and "Yoğunluk" the speed-ramp Intensity: the curve tab uses
+  // "Yönü çevir" (Flip) and "Anahtar sıklığı" (Key density) so neither shared entry is overridden.
+  add({
+    // sidebar, promo card, intro
+    "Eğri": "Easing",
+    "anahtar kare yumuşatma": "keyframe easing",
+    "Anahtar karelerine özel eğri": "Custom curves for your keyframes",
+    "Eğriyi düzenlemek, önizlemek ve geri almak ücretsiz; anahtar karelerine uygulamak Pro.": "Editing, previewing and undoing curves is free; applying them to your keyframes is Pro.",
+    "hazır eğri": "built-in curves",
+    "nokta": "points",
+    "Eğriyi aç": "Unlock curves",
+    "Kendi anahtar karelerine özel yumuşatma": "Custom easing for your own keyframes",
+    "Effect Controls'te bir özelliğe iki anahtar kare koy, playhead'i aralarına getir, eğriyi seç ve uygula. Premiere'in betikleri Bezier tutamaçlarını yazamadığı için Suflo eğriyi her kareye (ya da 2 / 4 karede bir) anahtar kare olarak yazar; uçlardaki iki anahtar karen değişmez.":
+      "Put two keyframes on a property in Effect Controls, move the playhead between them, pick a curve and apply. Premiere's scripting can't set Bezier handles, so Suflo writes the curve as a keyframe on every frame (or every 2 / 4 frames); your two keyframes at the ends stay as they are.",
+    // editor
+    "Görünüm": "View",
+    "Değer eğrisi (V)": "Value curve (V)",
+    "Hız eğrisi (V)": "Speed curve (V)",
+    "Eğri düzenleyici": "Curve editor",
+    "Tutamaçları sürükle · Shift 0,05'e yapışır · çift tık nokta ekler · Alt tutamaçları ayırır · Delete seçili noktayı siler":
+      "Drag the handles · Shift snaps to 0.05 · double-click adds a point · Alt breaks the handles · Delete removes the selected point",
+    "Canlı önizleme": "Live preview",
+    "Yumuşak giriş ↔ yumuşak çıkış (F)": "Ease in ↔ ease out (F)",
+    "Yönü çevir": "Flip",
+    "Eksenleri değiştir; yalnız taşmayan eğrilerde (I)": "Swap the axes; only for curves that don't overshoot (I)",
+    "Ters çevir": "Invert",
+    "Bu eğriyi önayarlarına ekle (bu bilgisayarda saklanır)": "Add this curve to your presets (saved on this computer)",
+    "Önayar olarak kaydet": "Save as preset",
+    "Hazır eğriler": "Built-in curves",
+    "Bu hazır eğrinin tutamacı yok; nokta eklemek için Yumuşak gibi bir bezier eğriyle başla.": "This built-in curve has no handles; to add points, start from a bezier curve such as Ease.",
+    "Buraya nokta eklenemedi (en çok 8 nokta; komşu noktaya çok yakın).": "Couldn't add a point here (8 points at most; too close to a neighbor).",
+    "Önayarı sil": "Delete preset",
+    "En çok {n} önayar saklanır; birini sil.": "Up to {} presets can be saved; delete one.",
+    "Bu eğri saklanamadı.": "Couldn't save this curve.",
+    "Önayar bu bilgisayarda saklanamadı.": "Couldn't save the preset on this computer.",
+    "Önayar kaydedildi.": "Preset saved.",
+    "Benim eğrim {n}": "My curve {}",
+    "çok noktalı eğri": "multi-point curve",
+    "hazır eğri (cubic-bezier değil)": "built-in curve (not a cubic-bezier)",
+    "Geçersiz: cubic-bezier(x1, y1, x2, y2) yaz; x değerleri 0–1, y değerleri -1–2 arası.": "Invalid: type cubic-bezier(x1, y1, x2, y2); x values 0–1, y values -1 to 2.",
+    "Ters çevirme yalnız taşmayan, geri dönmeyen (tekdüze) eğrilerde olur.": "Invert only works on curves that don't overshoot or turn back (monotonic).",
+    // property list
+    "Özellikler": "Properties",
+    "Klibi ve anahtar kareleri yeniden oku": "Read the clip and keyframes again",
+    "Yenile": "Refresh",
+    "Playhead'i sonraki anahtar kare çiftine götür": "Move the playhead to the next keyframe pair",
+    "Sonraki çift": "Next pair",
+    "Eğri sekmesi açıkken seçimi ve playhead'i izler.": "While the Easing tab is open it follows your selection and the playhead.",
+    "Timeline'da bir video klibi seç ya da playhead'i anahtar kareli bir klibin üstüne getir.": "Select a video clip on the timeline or move the playhead over a clip with keyframes.",
+    "playhead'in altındaki klip": "clip under the playhead",
+    "seçili klip": "selected clip",
+    "Hedef: {n} seçili klip": "Target: {} selected clips",
+    "Bu klipte iki ya da daha çok anahtar kareli bir özellik yok. Effect Controls'te bir özelliğe iki anahtar kare koy.": "This clip has no property with two or more keyframes. Add two keyframes to a property in Effect Controls.",
+    "Çiftin iki anahtar karesi arası 1 kare: yumuşatılacak ara yok.": "The pair's two keyframes are 1 frame apart: nothing to ease.",
+    "Playhead hiçbir anahtar kare çiftinin arasında değil. Sonraki çift ile atla.": "The playhead isn't between any keyframe pair. Jump with Next pair.",
+    "Suflo eğrisi": "Suflo curve",
+    "Ölçek": "Scale",
+    "Ölçek genişliği": "Scale Width",
+    "Döndürme": "Rotation",
+    "Bağlantı noktası": "Anchor Point",
+    "Titreme önleme": "Anti-flicker Filter",
+    // row reasons (js/egri-model.js NEDEN)
+    "playhead çiftin dışında": "playhead is outside the pair",
+    "1 kare: yumuşatılacak ara yok": "1 frame: nothing to ease",
+    "uç değerleri okunamadı": "couldn't read the end values",
+    "efekt sırası değişmiş": "the effect order changed",
+    "uçtaki anahtar kare yok": "the end keyframe is gone",
+    "uç anahtar karenin değeri değişmiş": "the end keyframe's value changed",
+    "arada başka anahtar kare var": "there's another keyframe in between",
+    "geçersiz plan": "invalid plan",
+    "çok fazla anahtar kare": "too many keyframes",
+    "Premiere anahtar kareleri yazmadı": "Premiere didn't write the keyframes",
+    "bazı anahtar kareler yazılamadı": "some keyframes couldn't be written",
+    "uygulanamadı": "couldn't apply",
+    // host codes (js/egri-model.js HATA)
+    "Aktif sekans yok. Bir sekans aç.": "No active sequence. Open a sequence.",
+    "Eğri başka bir sekans için hazırlanmıştı. Liste yenilendi; yeniden dene.": "The curve was prepared for another sequence. The list was refreshed; try again.",
+    "Klip bulunamadı (silinmiş ya da değişmiş olabilir). Liste yenilendi.": "Clip not found (it may have been deleted or changed). The list was refreshed.",
+    "Klip taşınmış. Liste yenilendi; yeniden dene.": "The clip was moved. The list was refreshed; try again.",
+    "Eğri planı geçersiz.": "The curve plan is invalid.",
+    "Çok fazla anahtar kare. Anahtar sıklığını 2 ya da 4 karede bire çıkar.": "Too many keyframes. Set Key density to every 2 or 4 frames.",
+    // options and actions
+    "Suflo'nun yazacağı anahtar karelerin sıklığı: her kare en pürüzsüzü, 2 / 4 karede bir daha az anahtar": "How often Suflo writes keyframes: every frame is smoothest, every 2 / 4 frames writes fewer keys",
+    "Anahtar sıklığı": "Key density",
+    "Her kare": "Every frame",
+    "2 karede bir": "Every 2 frames",
+    "4 karede bir": "Every 4 frames",
+    "Kaba önizleme: playhead çiftin başından sonuna saniyede en çok 12 adımla gider, sonra geri döner": "Rough preview: the playhead steps from the start to the end of the pair at up to 12 steps per second, then returns",
+    "Premiere'de önizle": "Preview in Premiere",
+    "Önizlemeyi durdur": "Stop preview",
+    "Bu sekansta Suflo'nun yazdığı tüm eğri anahtar karelerini kaldır": "Remove all curve keyframes Suflo wrote in this sequence",
+    "Tümünü geri al": "Undo all",
+    "Kısayollar (bir yazı alanında değilken): Enter uygula · U son uygulamayı geri al · F yönü çevir · I ters çevir · V görünüm · 1–9 önayar. Ctrl+Z eğriyi tek adımda geri almaz; Geri al'ı kullan, yalnız Suflo'nun yazdığı anahtar kareler kalkar. Şimdilik yalnız video katmanları; ses düzeyi sonraki sürümde.":
+      "Shortcuts (when you're not typing in a field): Enter apply · U undo the last apply · F flip · I invert · V view · 1–9 presets. Ctrl+Z doesn't undo a curve in one step; use Undo, which removes only the keyframes Suflo wrote. Video tracks only for now; audio level comes in a later version.",
+    // status lines and toasts
+    "Anahtar kareler okunamadı. Yenile ile tekrar dene.": "Couldn't read the keyframes. Try again with Refresh.",
+    "Anahtar kareler okunuyor…": "Reading keyframes…",
+    "Anahtar kareler okunamadı.": "Couldn't read the keyframes.",
+    "Uygulanacak çift yok: playhead'i iki anahtar karenin arasına getir ve özelliği işaretle.": "No pair to apply to: move the playhead between two keyframes and tick the property.",
+    "Yazılıyor… {n}/{n}": "Writing… {}/{}",
+    "Yazılıyor…": "Writing…",
+    "Uygulanamadı": "Couldn't apply",
+    "Eğri uygulandı: {n} özellik · {n} anahtar kare": "Curve applied: {} properties · {} keyframes",
+    "atlanan": "skipped",
+    "Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.": "The undo record couldn't be saved on this computer; Undo only works while the panel stays open.",
+    "Bu sekansta geri alınacak Suflo eğrisi yok.": "No Suflo curve to undo in this sequence.",
+    "Geri alınacak Suflo eğrisi yok.": "No Suflo curve to undo.",
+    "Geri alınıyor…": "Undoing…",
+    "Geri alınamadı.": "Couldn't undo.",
+    "Geri alındı: {n} anahtar kare silindi · {n} kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene.": "Undone: {} keyframes removed · {} records are in another sequence; they were kept, open that sequence and try again.",
+    "Geri alındı: {n} anahtar kare silindi · {n} kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.": "Undone: {} keyframes removed · the clip or property of {} records wasn't found; the records were kept.",
+    "Geri alındı: {n} anahtar kare silindi.": "Undone: {} keyframes removed.",
+    "Önce anahtar kareli bir klip seç.": "Select a clip with keyframes first.",
+    "Anahtar kare çifti yok.": "No keyframe pair.",
+    "Önce playhead'i bir anahtar kare çiftinin arasına getir.": "First move the playhead between a keyframe pair.",
+    // Pro, trial list, Suflo Doctor
+    "Eğri: kendi anahtar karelerine özel yumuşatma": "Easing: custom curves for your own keyframes",
+    "Eğri (anahtar kare yumuşatma)": "Easing (keyframe curves)",
+    "Eğri: anahtar karelerine özel yumuşatma (düzenlemek ücretsiz)": "Easing: custom curves on your keyframes (editing is free)",
+    "Anahtar kare ara değerlemesi (setInterpolationTypeAtKey)": "Keyframe interpolation (setInterpolationTypeAtKey)",
+    "Eğri, yazdığı sık anahtar kareleri doğrusal yapamaz; Premiere'in varsayılan ara değerlemesi kalır (eğri yine uygulanır, kareler arasında hafif sapma olabilir)":
+      "Easing can't make the dense keyframes it writes linear; Premiere's default interpolation stays (the curve is still applied, with possible slight wobble between frames)",
+    // jsx/host.jsx KS_easeBake (ASCII Turkish; the panel shows its own text from the code)
+    "Egri baska bir sekans icin hazirlandi.": "The curve was prepared for another sequence.",
+    "Gecersiz egri plani.": "Invalid curve plan.",
+    "Cok fazla anahtar kare.": "Too many keyframes.",
+    "Klip bulunamadi.": "Clip not found.",
+    "Klip tasinmis.": "The clip was moved."
+  });
+
   /* ================= Hız rampası / Speed ramp (js/speedramp.js, js/hiz-rampasi.js, #tab-hiz) ================= */
   add({
     // curve presets (js/speedramp.js LIST)
@@ -3187,6 +3318,10 @@
   function enWas() { var Pr = pricing(); return Pr ? Pr.wasLabel("en") : "1,249 TRY"; }
   function enTax() { var Pr = pricing(); return Pr ? Pr.taxLabel("en") : "+ tax"; }
   var P = [
+    // Eğri › aralık çipi "1,20 sn → 2,00 sn · 24 kare" → "1.20 s → 2.00 s · 24 frames"
+    [/^(-?\d+),(\d+) sn → (-?\d+),(\d+) sn · (\d+) kare$/, function (m) {
+      return m[1] + "." + m[2] + " s → " + m[3] + "." + m[4] + " s · " + m[5] + (m[5] === "1" ? " frame" : " frames");
+    }],
     // Altyazı Efektleri › önizlemede serbest konum etiketi (3.3 adım 17): Türkçe "%50" → İngilizce "50%"
     [/^X %(\d+) · Y %(\d+)$/, "X $1% · Y $2%"],
     [/^749 TL$/, function () { return enPrice(); }],
@@ -3240,7 +3375,8 @@
     "Podcast",        // Viral Score genre (same word in English)
     "English (beta)", "Türkmençe",
     ".suflo-stil,.txt", "Logo",
-    "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US"];   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US",
+    "cubic-bezier", "cubic-bezier(0.25, 0.1, 0.25, 1)", "P1 x", "P1 y", "P2 x", "P2 y"];   // Eğri: CSS syntax and handle names   // file picker filter (not shown as text)   // language pickers show each language in its own name
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

@@ -1,0 +1,832 @@
+/*
+ * Suflo — Eğri sekmesi (3.4, plan adım 10): kullanıcının KENDİ anahtar karelerine özel yumuşatma
+ *
+ * Effect Controls'te iki anahtar kare koy, playhead'i aralarına getir, eğriyi seç, Uygula. Premiere'in
+ * betikleri Bezier tutamaçlarını yazamaz: Suflo eğriyi her kareye (ya da 2 / 4 karede bir) sık anahtar
+ * kare olarak yazar (js/ease-curve.js bakePlan); uçlardaki iki anahtar kullanıcınındır, değişmez.
+ * Düzenleyici, önayarlar, canlı önizleme sahnesi ve geri alma ücretsiz; anahtar karelere UYGULAMAK Pro
+ * (Pro.gate('curves'), 3 deneme hakkı; hak yalnız en az bir özellik gerçekten yazılınca düşer). Geri al
+ * (satır, Tümünü geri al, U) kapısız: Suflo'nun yazdığını kaldırmak hiçbir zaman ücretli değil.
+ *
+ * Premiere'e çağrılar yalnız sekme açıkken ve kullanıcı eyleminde: init ve render K.call yapmaz.
+ * Yoklama: sekme görünür + panel odakta + host boştayken 1,2 sn'de bir KS_easePeek (ucuz); KS_easeScan
+ * yalnız sekans / seçim imzası değişince ya da playhead taranan kapsamdan çıkınca; playhead oynayınca
+ * çiftler önbellekteki anahtarlardan yeniden hesaplanır (js/egri-model.js). Uygula her zaman önce taze
+ * tarama yapar (uç değerleri o anki hâlinden), host yazmadan önce her şeyi yeniden doğrular.
+ * Kayıtlar: SufloKeyRecords (proje başına yerel depo); depo yazılamazsa bu oturumun belleğinde kalır.
+ *
+ * SufloEgriEditor: SVG eğri düzenleyicisi (Değer / Hız görünümü, tutamaç sürükleme, Shift 0,05'e yapışma,
+ * çift tık nokta, Alt tutamaç ayırma, Delete nokta silme, önceki eğrinin hayaleti). Hız Rampası'nın özel
+ * eğrisi (adım 13) aynı düzenleyiciyi kullanır.
+ * Klip adları ve Premiere'in kendi özellik adları data-i18n-skip içinde (İngilizce arayüz çevirmez).
+ * Suflo'nun kendi kodu (temiz oda); canlı önizleme sahnesi fikri Rebound'dan (MIT), küçük ve yeniden yazıldı.
+ */
+
+/* ======================================================================
+ * SufloEgriEditor.olustur(kap, { egri, gorunum: 'deger'|'hiz', degisti(egri, { bitti }), uyari(metin) })
+ * ====================================================================== */
+window.SufloEgriEditor = (function () {
+  "use strict";
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function svgEl(ad, oz, ust) {
+    var e = document.createElementNS(SVG_NS, ad);
+    for (var k in oz) if (Object.prototype.hasOwnProperty.call(oz, k)) e.setAttribute(k, String(oz[k]));
+    if (ust) ust.appendChild(e);
+    return e;
+  }
+  function bosalt(e) { while (e && e.firstChild) e.removeChild(e.firstChild); }
+
+  function olustur(kap, opts) {
+    opts = opts || {};
+    var E = window.SufloEase, M = window.SufloEgriModel, ED = M.ED;
+    var d = {
+      egri: E.normalize(opts.egri) || E.builtin("yumusak").curve, hayalet: null,
+      gorunum: opts.gorunum === "hiz" ? "hiz" : "deger", secili: -1, surukleme: null
+    };
+    bosalt(kap);
+    var kok = svgEl("svg", { viewBox: "0 0 " + ED.W + " " + ED.H, "class": "egri-svg deger", "aria-hidden": "true", focusable: "false" }, kap);
+    var izgara = svgEl("g", { "class": "egri-izgara" }, kok);
+    [[0, 0, 1, 0], [0, 1, 1, 1], [0, ED.YMIN, 0, ED.YMAX], [1, ED.YMIN, 1, ED.YMAX]].forEach(function (l, i) {
+      svgEl("line", { x1: M.ekranX(l[0]), y1: M.ekranY(l[1]), x2: M.ekranX(l[2]), y2: M.ekranY(l[3]), "class": i < 2 ? "egri-cizgi ana" : "egri-cizgi" }, izgara);
+    });
+    svgEl("line", { x1: M.ekranX(0), y1: M.ekranY(0.5), x2: M.ekranX(1), y2: M.ekranY(0.5), "class": "egri-cizgi yarim" }, izgara);
+    var hayaletYol = svgEl("path", { "class": "egri-hayalet", d: "" }, kok);
+    var yol = svgEl("path", { "class": "egri-yol", d: "" }, kok);
+    var katman = svgEl("g", { "class": "egri-tutamaclar" }, kok);
+
+    function uyar(m) { if (typeof opts.uyari === "function") { try { opts.uyari(m); } catch (e) {} } }
+    function bildir(bitti) { if (typeof opts.degisti === "function") { try { opts.degisti(E.kopya(d.egri), { bitti: !!bitti }); } catch (e) {} } }
+    function yolu(c) { return d.gorunum === "deger" ? M.degerYolu(c) : M.hizYolu(c); }
+
+    function ciz() {
+      var deger = d.gorunum === "deger";
+      yol.setAttribute("d", yolu(d.egri));
+      hayaletYol.setAttribute("d", d.hayalet ? yolu(d.hayalet) : "");
+      bosalt(katman);
+      if (deger) {
+        M.tutamaclar(d.egri).forEach(function (t) {
+          if (t.tur === "tutamac") {
+            svgEl("line", { x1: t.cx, y1: t.cy, x2: t.x, y2: t.y, "class": "egri-kol" }, katman);
+            svgEl("circle", { cx: t.x, cy: t.y, r: 5, "class": "egri-tutamac" }, katman);
+          } else {
+            svgEl("rect", { x: t.x - 4.5, y: t.y - 4.5, width: 9, height: 9, rx: 1.5,
+              "class": "egri-nokta" + (t.hedef.i === d.secili ? " secili" : "") + (t.smooth ? "" : " kirik") }, katman);
+          }
+        });
+      }
+      kok.setAttribute("class", "egri-svg " + (deger ? "deger" : "hiz") + (M.duzenlenebilir(d.egri) ? "" : " salt"));
+    }
+
+    function noktaOku(e) {
+      var r = kok.getBoundingClientRect ? kok.getBoundingClientRect() : null;
+      if (!r || !(r.width > 0 && r.height > 0)) return null;
+      return { px: (e.clientX - r.left) / r.width * ED.W, py: (e.clientY - r.top) / r.height * ED.H };
+    }
+    kok.addEventListener("pointerdown", function (e) {
+      if (d.gorunum !== "deger") return;
+      var n = noktaOku(e);
+      if (!n) return;
+      var t = M.enYakin(d.egri, n.px, n.py, 10);
+      if (!t) { if (d.secili !== -1) { d.secili = -1; ciz(); } return; }
+      if (e.preventDefault) e.preventDefault();
+      d.secili = t.tur === "nokta" ? t.hedef.i : -1;
+      d.surukleme = { hedef: t.hedef, id: e.pointerId, oynadi: false };
+      d.hayalet = E.kopya(d.egri);
+      try { if (kok.setPointerCapture) kok.setPointerCapture(e.pointerId); } catch (eC) {}
+      try { if (kap.focus) kap.focus(); } catch (eF) {}
+      ciz();
+    });
+    kok.addEventListener("pointermove", function (e) {
+      var s = d.surukleme;
+      if (!s) return;
+      var n = noktaOku(e);
+      if (!n) return;
+      var yeni = M.surukle(d.egri, s.hedef, M.egriX(n.px), M.egriY(n.py), { shift: !!e.shiftKey, alt: !!e.altKey });
+      if (!yeni) return;
+      s.oynadi = true;
+      d.egri = yeni;
+      ciz();
+      bildir(false);
+    });
+    function birak() {
+      var s = d.surukleme;
+      if (!s) return;
+      d.surukleme = null;
+      try { if (kok.releasePointerCapture) kok.releasePointerCapture(s.id); } catch (eR) {}
+      if (s.oynadi) bildir(true);
+    }
+    kok.addEventListener("pointerup", birak);
+    kok.addEventListener("pointercancel", birak);
+    kok.addEventListener("dblclick", function (e) {
+      if (d.gorunum !== "deger") return;
+      var n = noktaOku(e);
+      if (!n) return;
+      if (!M.duzenlenebilir(d.egri)) { uyar("Bu hazır eğrinin tutamacı yok; nokta eklemek için Yumuşak gibi bir bezier eğriyle başla."); return; }
+      var yeni = M.noktaEkle(d.egri, M.egriX(n.px));
+      if (!yeni) { uyar("Buraya nokta eklenemedi (en çok 8 nokta; komşu noktaya çok yakın)."); return; }
+      d.hayalet = E.kopya(d.egri);
+      d.egri = yeni;
+      d.secili = -1;
+      yeni.pts.forEach(function (p, i) { if (i > 0 && i < yeni.pts.length - 1 && Math.abs(p.x - M.egriX(n.px)) < 0.002) d.secili = i; });
+      ciz();
+      bildir(true);
+    });
+
+    function degistir(c, hayalet) {
+      var n = E.normalize(c);
+      if (!n) return false;
+      d.hayalet = hayalet === false ? null : E.kopya(d.egri);
+      d.egri = n;
+      d.secili = -1;
+      ciz();
+      return true;
+    }
+
+    ciz();
+    return {
+      egri: function () { return E.kopya(d.egri); },
+      // Dışarıdan atama (önayar, metin alanı): önceki eğri hayalet olur; hayalet:false ile hayaletsiz
+      egriAta: function (c, o) { return degistir(c, o && o.hayalet); },
+      gorunum: function (g) { if (g === "deger" || g === "hiz") { d.gorunum = g; d.surukleme = null; ciz(); } return d.gorunum; },
+      gorunumDegistir: function () { d.gorunum = d.gorunum === "deger" ? "hiz" : "deger"; d.surukleme = null; ciz(); return d.gorunum; },
+      cevir: function () { var y = E.flip(d.egri); if (!y || !degistir(y)) return false; bildir(true); return true; },
+      tersCevir: function () { var y = E.invert(d.egri); if (!y || !degistir(y)) return false; bildir(true); return true; },
+      seciliVar: function () { return d.secili > 0; },
+      seciliSil: function () {
+        if (!(d.secili > 0)) return false;
+        var y = M.noktaSil(d.egri, d.secili);
+        if (!y || !degistir(y)) return false;
+        bildir(true);
+        return true;
+      },
+      ciz: ciz,
+      yokEt: function () { d.surukleme = null; bosalt(kap); },
+      _d: d
+    };
+  }
+  return { olustur: olustur, svgEl: svgEl, bosalt: bosalt };
+})();
+
+/* ======================================================================
+ * KEgri: sekme denetleyicisi
+ * ====================================================================== */
+window.KEgri = (function () {
+  "use strict";
+
+  var svgEl = window.SufloEgriEditor.svgEl, bosalt = window.SufloEgriEditor.bosalt;
+  var E = window.SufloEase, M = window.SufloEgriModel, KR = window.SufloKeyRecords;
+  var AYAR_ANAHTAR = "suflo.egri.ayar";
+  var ONAYAR_ANAHTAR = "suflo.egri.onayarlar";
+
+  var editor = null;
+  var egri = null, seciliOnayar = "yumusak";
+  var gorunum = "deger";
+  var onbellek = null;          // son KS_easeScan (+ selSig)
+  var sonPeek = null;
+  var ph = 0;
+  var kapali = {};              // satirAnahtari → true: kullanıcı işareti kaldırdı
+  var mesgul = false, yoklaniyor = false, zamanlayici = null;
+  var sonUygulanan = [];        // son uygulamanın kayıt id'leri (U)
+  var bellek = [];              // depoya yazılamayan kayıtlar (bu oturum)
+  var onizleme = null;          // Premiere'de önizle jetonu
+  var tusTutuluyor = false;
+  var depoNesnesi = null;
+  var sahneRaf = null, sahneBas = 0;
+
+  function el(id) { return document.getElementById(id); }
+  function dil() { return window.SufloI18n && SufloI18n.getLang ? SufloI18n.getLang() : "tr"; }
+  function tr(s) { return window.SufloI18n && SufloI18n.tr ? SufloI18n.tr(s) : s; }
+  function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /* ---------------- metin parçaları (kullanıcı adları çevrilmez) ---------------- */
+  function dugum(parcalar) {
+    var kap = document.createElement("span");
+    (parcalar || []).forEach(function (p) {
+      if (p && typeof p === "object") {
+        var b = document.createElement("b");
+        b.setAttribute("data-i18n-skip", "");
+        b.textContent = String(p.ad);
+        kap.appendChild(b);
+      } else if (p !== null && p !== undefined && p !== "") kap.appendChild(document.createTextNode(String(p)));
+    });
+    return kap;
+  }
+  function durum(msg, cls) {
+    var e = el("egri-status");
+    if (!e) return;
+    e.className = "inline-status" + (cls ? " " + cls : "");
+    if (Array.isArray(msg)) { e.textContent = ""; e.appendChild(dugum(msg)); }
+    else e.textContent = msg || "";
+  }
+  function toast(msg, tur, sure, eylem) { if (window.KApp && KApp.toast) KApp.toast(msg, tur, sure, eylem); }
+
+  /* ---------------- yerel depo (bu görüntüleyicinin kolaylığı; her erişim korumalı) ---------------- */
+  function depoOku(anahtar, varsayilan) {
+    try {
+      var ls = window.localStorage, ham = ls ? ls.getItem(anahtar) : null;
+      if (!ham) return varsayilan;
+      var v = JSON.parse(ham);
+      return v === null || v === undefined ? varsayilan : v;
+    } catch (e) { return varsayilan; }
+  }
+  function depoYaz(anahtar, deger) {
+    try { if (window.localStorage) window.localStorage.setItem(anahtar, JSON.stringify(deger)); return true; } catch (e) { return false; }
+  }
+  function ayarKaydet() {
+    depoYaz(AYAR_ANAHTAR, { egri: egri, secili: seciliOnayar, gorunum: gorunum, yogunluk: yogunluk() });
+  }
+  function ayarYukle() {
+    var a = depoOku(AYAR_ANAHTAR, null);
+    egri = E.builtin("yumusak").curve;
+    if (!a || typeof a !== "object") return;
+    var c = E.normalize(a.egri);
+    if (c) egri = c;
+    if (typeof a.secili === "string") seciliOnayar = a.secili.slice(0, 24);
+    if (a.gorunum === "hiz") gorunum = "hiz";
+    var y = Number(a.yogunluk);
+    if (M.YOGUNLUKLAR.indexOf(y) !== -1 && el("egri-yogunluk")) el("egri-yogunluk").value = String(y);
+  }
+  function yogunluk() {
+    var y = Number(el("egri-yogunluk") ? el("egri-yogunluk").value : 1);
+    return M.YOGUNLUKLAR.indexOf(y) !== -1 ? y : 1;
+  }
+  function kullaniciOnayarlari() { return M.onayarlar(depoOku(ONAYAR_ANAHTAR, [])); }
+
+  /* ---------------- anahtar kare kayıtları ---------------- */
+  function depo() { if (!depoNesnesi && KR) depoNesnesi = KR.depo(); return depoNesnesi; }
+  function proje() { return (onbellek && onbellek.proje) || (sonPeek && sonPeek.proje) || ""; }
+  function seqId() { return (onbellek && onbellek.seqId) || (sonPeek && sonPeek.seqId) || ""; }
+  function kayitlar() {
+    var d = depo(), liste = [];
+    try { liste = d ? d.oku(proje()) : []; } catch (e) { liste = []; }
+    var idler = {};
+    liste.forEach(function (r) { idler[r.id] = 1; });
+    bellek.forEach(function (r) { if (!idler[r.id]) liste.push(r); });
+    return liste.filter(function (r) { return r && r.tur === "egri"; });
+  }
+  function kayitlariSakla(yeni) {
+    var d = depo(), pr = proje(), eski = kayitlar(), at = {};
+    yeni.forEach(function (r) {
+      r.id = KR.yeniId(Date.now());
+      M.cakisanlar(eski, r).forEach(function (x) { at[x.id] = 1; });
+    });
+    var atilacak = Object.keys(at);
+    bellek = bellek.filter(function (r) { return !at[r.id]; });
+    var ok = false;
+    try {
+      if (d && atilacak.length) d.kaldir(pr, atilacak);
+      ok = !!(d && d.ekle(pr, yeni).ok);
+    } catch (e) { ok = false; }
+    if (!ok) yeni.forEach(function (r) { bellek.push(r); });
+    sonUygulanan = yeni.map(function (r) { return r.id; });
+    return ok;
+  }
+  function kayitlariSil(idler) {
+    if (!idler.length) return;
+    var set = {};
+    idler.forEach(function (id) { set[id] = 1; });
+    bellek = bellek.filter(function (r) { return !set[r.id]; });
+    sonUygulanan = sonUygulanan.filter(function (id) { return !set[id]; });
+    try { var d = depo(); if (d) d.kaldir(proje(), idler); } catch (e) {}
+  }
+
+  /* ---------------- önayarlar ---------------- */
+  function tumOnayarlar() {
+    var out = E.builtins().map(function (b) { return { id: b.id, ad: E.builtinName(b, dil()), curve: b.curve, kullanici: false }; });
+    kullaniciOnayarlari().forEach(function (o) { out.push({ id: o.id, ad: o.ad, curve: o.curve, kullanici: true }); });
+    return out;
+  }
+  function onayarKartlari() {
+    var kap = el("egri-onayarlar");
+    if (!kap) return;
+    bosalt(kap);
+    tumOnayarlar().forEach(function (o, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "egri-onayar" + (o.id === seciliOnayar ? " on" : "") + (o.kullanici ? " kullanici" : "");
+      // Adı ve ipucunu panel kendisi dile göre yazar (yerleşik adlar SufloEase'ten; "Yumuşak" başka araçta "Smooth")
+      b.setAttribute("data-i18n-skip", "");
+      b.setAttribute("data-id", o.id);
+      b.setAttribute("aria-pressed", o.id === seciliOnayar ? "true" : "false");
+      b.setAttribute("title", (i < 9 ? (i + 1) + " · " : "") + o.ad);
+      var s = svgEl("svg", { viewBox: "0 0 48 30", "class": "egri-kucuk", "aria-hidden": "true", focusable: "false" }, b);
+      svgEl("path", { d: M.kucukYol(o.curve, 48, 30) }, s);
+      var ad = document.createElement("span");
+      ad.textContent = o.ad;
+      b.appendChild(ad);
+      if (o.kullanici) {
+        var x = document.createElement("i");
+        x.className = "egri-onayar-sil";
+        x.setAttribute("role", "button");
+        x.setAttribute("title", tr("Önayarı sil"));
+        x.textContent = "×";
+        x.addEventListener("click", function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); onayarSil(o.id); });
+        b.appendChild(x);
+      }
+      b.addEventListener("click", function () { onayarSec(o.id); });
+      kap.appendChild(b);
+    });
+  }
+  function onayarSec(id) {
+    var o = tumOnayarlar().filter(function (x) { return x.id === id; })[0];
+    if (!o) return;
+    seciliOnayar = id;
+    egri = E.normalize(o.curve);
+    if (editor) editor.egriAta(egri);
+    egriDegisti(false);
+    onayarKartlari();
+  }
+  function onayarKaydet() {
+    var r = M.onayarEkle(kullaniciOnayarlari(), M.onayarAdi(kullaniciOnayarlari()), egri, Date.now());
+    if (!r.ok) { durum(r.kod === "dolu" ? "En çok " + M.EN_COK_ONAYAR + " önayar saklanır; birini sil." : "Bu eğri saklanamadı.", "warn"); return; }
+    if (!depoYaz(ONAYAR_ANAHTAR, r.liste)) { durum("Önayar bu bilgisayarda saklanamadı.", "warn"); return; }
+    seciliOnayar = r.id;
+    onayarKartlari();
+    durum("Önayar kaydedildi.", "good");
+  }
+  function onayarSil(id) {
+    depoYaz(ONAYAR_ANAHTAR, M.onayarSil(kullaniciOnayarlari(), id));
+    if (seciliOnayar === id) seciliOnayar = "";
+    onayarKartlari();
+  }
+
+  /* ---------------- eğri alanları ---------------- */
+  function alanlariCiz() {
+    var c = E.normalize(egri);
+    var bez = !!c && c.type === "bezier";
+    var css = el("egri-css");
+    if (css && document.activeElement !== css) css.value = bez ? E.toCss(c) : "";
+    if (css) css.setAttribute("placeholder", bez ? "cubic-bezier(0.25, 0.1, 0.25, 1)" : (c && c.type === "multi" ? "çok noktalı eğri" : "hazır eğri (cubic-bezier değil)"));
+    [["egri-p1x", "x1"], ["egri-p1y", "y1"], ["egri-p2x", "x2"], ["egri-p2y", "y2"]].forEach(function (a) {
+      var e = el(a[0]);
+      if (!e) return;
+      e.disabled = !bez;
+      if (document.activeElement !== e) e.value = bez ? String(Math.round(c[a[1]] * 1000) / 1000) : "";
+    });
+  }
+  // Düzenleyiciden, alanlardan ya da önayardan gelen her değişiklik
+  function egriDegisti(elle) {
+    if (elle) { seciliOnayar = ""; onayarKartlari(); }
+    alanlariCiz();
+    ayarKaydet();
+  }
+  function cssUygula() {
+    var e = el("egri-css");
+    if (!e || !String(e.value || "").replace(/\s/g, "")) { alanlariCiz(); return; }
+    var c = E.fromCss(e.value);
+    if (!c) { durum("Geçersiz: cubic-bezier(x1, y1, x2, y2) yaz; x değerleri 0–1, y değerleri -1–2 arası.", "warn"); return; }
+    egri = c;
+    if (editor) editor.egriAta(c);
+    durum("");
+    egriDegisti(true);
+  }
+  function sayilarUygula() {
+    var v = ["egri-p1x", "egri-p1y", "egri-p2x", "egri-p2y"].map(function (id) { return Number(el(id) ? el(id).value : NaN); });
+    if (!v.every(function (x) { return isFinite(x); })) return;
+    var c = E.normalize({ type: "bezier", x1: v[0], y1: v[1], x2: v[2], y2: v[3] });
+    if (!c) return;
+    egri = c;
+    if (editor) editor.egriAta(c);
+    egriDegisti(true);
+  }
+  function cevir() {
+    if (!editor || !editor.cevir()) return;
+    egri = editor.egri();
+    egriDegisti(true);
+  }
+  function tersCevir() {
+    if (!editor) return;
+    if (!editor.tersCevir()) { durum("Ters çevirme yalnız taşmayan, geri dönmeyen (tekdüze) eğrilerde olur.", "warn"); return; }
+    egri = editor.egri();
+    egriDegisti(true);
+  }
+  function gorunumAta(g, kaydetme) {
+    if (editor) gorunum = editor.gorunum(g);
+    else gorunum = g === "hiz" ? "hiz" : "deger";
+    ["deger", "hiz"].forEach(function (k) {
+      var b = el("egri-gorunum-" + k);
+      if (!b) return;
+      b.classList.toggle("on", gorunum === k);
+      b.setAttribute("aria-pressed", gorunum === k ? "true" : "false");
+    });
+    if (kaydetme !== false) ayarKaydet();
+  }
+
+  /* ---------------- canlı önizleme sahnesi (Premiere'e gitmez) ---------------- */
+  function sekmeAcik() { var t = el("tab-egri"); return !!(t && t.classList && t.classList.contains("active")); }
+  function gizli() { return !!document.hidden; }
+  function sahneKare(ts) {
+    sahneRaf = null;
+    if (!sekmeAcik() || gizli()) return;   // sekme gizliyken / panel arka plandayken durur
+    var kare = el("egri-kare");
+    if (kare && egri) {
+      if (!sahneBas) sahneBas = ts;
+      var k = M.sahneKaresi(egri, ts - sahneBas);
+      var x = Math.max(-0.25, Math.min(1.25, k.x));
+      kare.style.left = (x * 82) + "%";
+      kare.style.transform = "scale(" + Math.max(0.2, Math.min(1.6, k.olcek)).toFixed(3) + ")";
+    }
+    sahneRaf = window.requestAnimationFrame(sahneKare);
+  }
+  function sahneBaslat() {
+    if (sahneRaf || typeof window.requestAnimationFrame !== "function" || !sekmeAcik() || gizli()) return;
+    sahneRaf = window.requestAnimationFrame(sahneKare);
+  }
+
+  /* ---------------- CEP tuş ilgisi: kısayollar Premiere'e gitmesin ---------------- */
+  function tuslariTut(tut) {
+    tut = !!tut;
+    if (tut === tusTutuluyor) return;
+    var cep = window.__adobe_cep__;
+    if (!cep || typeof cep.registerKeyEventsInterest !== "function") return;
+    try {
+      cep.registerKeyEventsInterest(tut ? M.tusIlgisi(!!(window.K && K.MAC)) : "");
+      tusTutuluyor = tut;
+    } catch (e) {}
+  }
+
+  /* ---------------- satır listesi (önbellekten; Premiere'e gitmez) ---------------- */
+  function satirlar() {
+    if (!onbellek || !onbellek.props) return [];
+    var kl = kayitlar();
+    return onbellek.props.map(function (p) {
+      var canli = M.canliKayitlar(kl, p);
+      var dd = M.satirDurumu(p, ph, M.uclarDan(canli));
+      return { prop: p, cift: dd.cift, durum: dd.durum, degerVar: dd.degerVar, kayit: M.satirKaydi(kl, p, dd.cift), anahtar: M.satirAnahtari(p) };
+    });
+  }
+  function uygulanabilir(s) { return s.durum === "tamam" || s.durum === "kayitli"; }
+  function isaretli(s) { return uygulanabilir(s) && !kapali[s.anahtar]; }
+
+  function hedefCiz(liste) {
+    var h = el("egri-hedef");
+    if (!h) return;
+    h.textContent = "";
+    if (!onbellek) { h.appendChild(dugum(["Eğri sekmesi açıkken seçimi ve playhead'i izler."])); return; }
+    if (onbellek.hata) { h.appendChild(dugum([onbellek.hata])); return; }
+    var kl = onbellek.klipler || [];
+    if (!kl.length) { h.appendChild(dugum(["Timeline'da bir video klibi seç ya da playhead'i anahtar kareli bir klibin üstüne getir."])); return; }
+    if (kl.length === 1) {
+      h.appendChild(dugum(["Hedef: ", { ad: kl[0].clipName }, kl[0].track >= 0 ? " · V" + (kl[0].track + 1) : "",
+        onbellek.kaynak === "playhead" ? " · playhead'in altındaki klip" : " · seçili klip"]));
+    } else h.appendChild(dugum(["Hedef: " + kl.length + " seçili klip"]));
+    if (!liste.length) {
+      h.appendChild(document.createElement("br"));
+      h.appendChild(dugum(["Bu klipte iki ya da daha çok anahtar kareli bir özellik yok. Effect Controls'te bir özelliğe iki anahtar kare koy."]));
+    } else if (!liste.some(uygulanabilir)) {
+      h.appendChild(document.createElement("br"));
+      h.appendChild(dugum([liste.some(function (s) { return s.durum === "tekKare"; }) && !liste.some(function (s) { return s.durum === "disinda"; })
+        ? "Çiftin iki anahtar karesi arası 1 kare: yumuşatılacak ara yok."
+        : "Playhead hiçbir anahtar kare çiftinin arasında değil. Sonraki çift ile atla."]));
+    }
+  }
+
+  function listeCiz() {
+    var kap = el("egri-ozellikler");
+    if (!kap) return;
+    var liste = satirlar();
+    hedefCiz(liste);
+    bosalt(kap);
+    var cokKlip = onbellek && onbellek.klipler && onbellek.klipler.length > 1, sonKlip = null;
+    liste.forEach(function (s) {
+      var p = s.prop;
+      if (cokKlip && p.nodeId !== sonKlip) {
+        sonKlip = p.nodeId;
+        var bas = document.createElement("div");
+        bas.className = "egri-klip";
+        bas.appendChild(dugum([{ ad: p.clipName }, p.track >= 0 ? " · V" + (p.track + 1) : ""]));
+        kap.appendChild(bas);
+      }
+      var satir = document.createElement("div");
+      satir.className = "egri-satir" + (uygulanabilir(s) ? "" : " pasif");
+      satir.setAttribute("role", "listitem");
+      var lab = document.createElement("label");
+      lab.className = "egri-satir-ad";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = isaretli(s);
+      cb.disabled = !uygulanabilir(s) || mesgul;
+      cb.addEventListener("change", function () { if (cb.checked) delete kapali[s.anahtar]; else kapali[s.anahtar] = true; dugmeCiz(); });
+      lab.appendChild(cb);
+      var ad = document.createElement("span");
+      // Suflo tablosundaki adlar çevrilir ("Konum" → "Position"); Premiere'in kendi adları kullanıcının dilinde kalır
+      if (!p.labelTablo) ad.setAttribute("data-i18n-skip", "");
+      ad.textContent = p.label;
+      lab.appendChild(ad);
+      satir.appendChild(lab);
+      var cip = document.createElement("span");
+      cip.className = "egri-cip" + (uygulanabilir(s) ? "" : " uyari");
+      cip.textContent = s.cift && s.durum !== "tekKare" ? M.aralikMetni(s.cift.t0, s.cift.t1, p.fps) : M.nedenMetni(s.durum);
+      satir.appendChild(cip);
+      if (s.kayit) {
+        var roz = document.createElement("span");
+        roz.className = "egri-rozet";
+        roz.textContent = "Suflo eğrisi";
+        satir.appendChild(roz);
+        var g = document.createElement("button");
+        g.type = "button";
+        g.className = "btn tiny egri-satir-geri";
+        g.textContent = "Geri al";
+        g.disabled = mesgul;
+        g.addEventListener("click", function () { geriAl([s.kayit], "satir"); });
+        satir.appendChild(g);
+      }
+      kap.appendChild(satir);
+    });
+    dugmeCiz();
+  }
+
+  // Kilitliyken de düğmenin adı "Uygula": tanıtım kartındaki deneme bildirimi bu adı söyler
+  function dugmeCiz() {
+    var b = el("egri-uygula");
+    if (b) {
+      var kilitli = typeof Pro !== "undefined" && Pro.isPro && !Pro.isPro() && !(Pro.denemeAcik && Pro.denemeAcik("curves"));
+      b.textContent = kilitli ? "🔒 Uygula" : "Uygula";
+      if (b.classList) b.classList.toggle("is-locked", !!kilitli);
+      b.disabled = mesgul;
+    }
+    ["egri-geri-tumu", "egri-sonraki", "egri-yenile"].forEach(function (id) { var e = el(id); if (e) e.disabled = mesgul; });
+    var pr = el("egri-pr-onizle");
+    if (pr) { pr.disabled = mesgul && !onizleme; pr.textContent = onizleme ? "Önizlemeyi durdur" : "Premiere'de önizle"; }
+  }
+
+  function render() {
+    onayarKartlari();
+    alanlariCiz();
+    listeCiz();
+  }
+
+  /* ---------------- yoklama ve tarama ---------------- */
+  function onbellekYaz(tar, pk) {
+    onbellek = tar;
+    onbellek.selSig = pk ? String(pk.selSig || "") : (sonPeek ? String(sonPeek.selSig || "") : "");
+    ph = Number(tar.ph) || 0;
+    onbellek.ph = ph;
+  }
+  async function tara(pk) {
+    var ipucu = M.ipuclari(kayitlar(), onbellek ? onbellek.props : []);
+    var tar = await K.call("KS_easeScan", { maxProps: 40, ipuclari: ipucu }, 30000);
+    // Canlılık önbellekteki anahtarlarla ölçülür: ilk taramada (önbellek boş) ya da anahtarlar değiştiyse
+    // ipuçları yeni anahtarlarla bir kez yeniden hesaplanır (kaydın aralığı çift olsun, uç değerleri o aralığın)
+    if (tar && tar.ok) {
+      var yeniIpucu = M.ipuclari(kayitlar(), tar.props);
+      if (JSON.stringify(yeniIpucu) !== JSON.stringify(ipucu)) {
+        var tar2 = await K.call("KS_easeScan", { maxProps: 40, ipuclari: yeniIpucu }, 30000);
+        if (tar2 && tar2.ok) tar = tar2;
+      }
+    }
+    if (!tar || !tar.ok) {
+      onbellek = { seqId: pk ? pk.seqId : "", selSig: pk ? pk.selSig : "", kapsam: [-1e9, 1e9], ph: pk ? pk.ph : 0, props: [], klipler: [],
+        hata: tar && tar.kod === "sekansYok" ? "Aktif sekans yok. Bir sekans aç." : "Anahtar kareler okunamadı. Yenile ile tekrar dene." };
+      listeCiz();
+      return null;
+    }
+    onbellekYaz(tar, pk);
+    listeCiz();
+    return tar;
+  }
+  // 1,2 sn'de bir (ve sekme açılınca): yalnız sekme görünür, panel odakta, Premiere boştayken
+  function yokla() {
+    if (!sekmeAcik()) { tuslariTut(false); return Promise.resolve(); }
+    var hostMesgul = !!(window.K && K.hostMesgul && K.hostMesgul());
+    if (!M.yoklamaUygun({ gorunur: !gizli(), odak: document.hasFocus ? document.hasFocus() : true, mesgul: mesgul || yoklaniyor || hostMesgul })) return Promise.resolve();
+    yoklaniyor = true;
+    return K.call("KS_easePeek", undefined, 8000).then(function (pk) {
+      if (!pk || !pk.ok) return null;
+      sonPeek = pk;
+      if (!pk.seqId) {
+        if (!onbellek || onbellek.seqId) { onbellek = { seqId: "", selSig: "", kapsam: [-1e9, 1e9], ph: 0, props: [], klipler: [], hata: "Aktif sekans yok. Bir sekans aç." }; listeCiz(); }
+        return null;
+      }
+      var karar = M.yoklamaKarari(onbellek, pk);
+      if (karar === "tara") return tara(pk);
+      if (karar === "ciftler") { ph = Number(pk.ph) || 0; onbellek.ph = ph; listeCiz(); }
+      return null;
+    }).catch(function () { return null; }).then(function () { yoklaniyor = false; });
+  }
+  function sekmeAcildi() {
+    tuslariTut(true);
+    render();
+    sahneBas = 0;
+    sahneBaslat();
+    if (!zamanlayici) zamanlayici = setInterval(yokla, M.YOKLAMA_MS);
+    yokla();
+  }
+
+  /* ---------------- uygula (Pro, 3 deneme hakkı) ---------------- */
+  function kilitle(b) { mesgul = !!b; dugmeCiz(); }
+  // Parçalı hata: kullanıcı adları (klip, Premiere özellik adı) durum satırında çevrilmeden kalır
+  function hataAt(parcalar) {
+    var e = new Error(parcalar.map(function (p) { return p && typeof p === "object" ? String(p.ad) : String(p); }).join(""));
+    e.parcalar = parcalar;
+    throw e;
+  }
+  function adParcasi(p) { return p.labelTablo ? p.label : { ad: p.label }; }
+  function atlamaParcalari(atlanan) {
+    var out = [];
+    atlanan.slice(0, 4).forEach(function (a, i) {
+      if (i) out.push(" · ");
+      out.push(adParcasi(a.prop));
+      out.push(": " + M.nedenMetni(a.kod));
+    });
+    if (atlanan.length > 4) out.push(" · +" + (atlanan.length - 4));
+    return out;
+  }
+
+  async function uygula() {
+    if (typeof Pro !== "undefined" && !Pro.gate("curves", { deneme: true, yeniden: function () { uygula(); } })) return;
+    if (mesgul || !E.normalize(egri)) return;
+    kilitle(true);
+    durum("Anahtar kareler okunuyor…");
+    try {
+      // Uç değerleri o anki hâlinden: her uygulama taze taramayla başlar
+      var tar = await tara(sonPeek);
+      if (!tar) throw new Error(onbellek && onbellek.hata ? onbellek.hata : "Anahtar kareler okunamadı.");
+      var secilen = satirlar().filter(isaretli).filter(function (s) { return s.degerVar; });
+      if (!secilen.length) throw new Error("Uygulanacak çift yok: playhead'i iki anahtar karenin arasına getir ve özelliği işaretle.");
+      var plan = M.bakeGruplari(secilen, egri, yogunluk(), tar.seqId);
+      var atlanan = plan.atlanan.slice(), yeniKayitlar = [], yazilan = 0, basarili = 0, ozellik = 0;
+      for (var g = 0; g < plan.gruplar.length; g++) {
+        var grup = plan.gruplar[g];
+        if (plan.gruplar.length > 1) durum("Yazılıyor… " + (g + 1) + "/" + plan.gruplar.length);
+        else durum("Yazılıyor…");
+        var r = await K.call("KS_easeBake", { target: grup.target, items: grup.items, dogrusal: true }, 120000);
+        if (!r || !r.ok) {
+          grup.satirlar.forEach(function (s) { atlanan.push({ prop: s.prop, kod: r && r.kod ? r.kod : "yazilamadi" }); });
+          continue;
+        }
+        (r.sonuclar || []).forEach(function (s) {
+          if (!s.ok) atlanan.push({ prop: grup.satirlar[s.i].prop, kod: s.kod || "yazilamadi" });
+          else ozellik++;
+        });
+        yeniKayitlar = yeniKayitlar.concat(r.records || []);
+        yazilan += Number(r.yazilan) || 0;
+        basarili += Number(r.basarili) || 0;
+      }
+      if (!basarili) hataAt(atlanan.length ? ["Uygulanamadı: "].concat(atlamaParcalari(atlanan)) : ["Uygulanamadı."]);
+      var saklandi = kayitlariSakla(yeniKayitlar);
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("curves", toast);   // deneme: yalnız başarıda, bir kez
+      var mesaj = ["Eğri uygulandı: " + ozellik + " özellik · " + yazilan + " anahtar kare"];
+      if (atlanan.length) mesaj = mesaj.concat([" · atlanan: "]).concat(atlamaParcalari(atlanan));
+      durum(mesaj, atlanan.length ? "warn" : "good");
+      toast(dugum(mesaj), atlanan.length ? "warn" : "good", 9000, { metin: "Geri al", fn: function () { geriAlSon(); } });
+      if (!saklandi) toast("Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.", "warn", 9000);
+    } catch (e) {
+      durum(e && e.parcalar ? ["✕ "].concat(e.parcalar) : "✕ " + (e && e.message ? e.message : String(e)), "bad");
+    } finally {
+      kilitle(false);
+      try { await tara(sonPeek); } catch (eT) { listeCiz(); }
+    }
+  }
+
+  /* ---------------- geri al (kapısız) ---------------- */
+  async function geriAl(liste, kaynak) {
+    liste = (liste || []).filter(function (r) { return r && r.id; });
+    if (mesgul) return;
+    if (!liste.length) { durum(kaynak === "tumu" ? "Bu sekansta geri alınacak Suflo eğrisi yok." : "Geri alınacak Suflo eğrisi yok.", "warn"); return; }
+    kilitle(true);
+    durum("Geri alınıyor…");
+    try {
+      var r = await K.call("KS_easeUndo", { records: liste }, 120000);
+      if (!r || !r.ok) throw new Error(r && r.kod ? (M.hataMetni(r.kod) || "Geri alınamadı.") : "Geri alınamadı.");
+      var silinen = 0, biten = [];
+      (r.sonuclar || []).forEach(function (s) { silinen += Number(s.silinen) || 0; biten.push(s.id); });
+      kayitlariSil(biten);
+      var kalan = (r.atlanan || []).length;
+      if (kalan) {
+        var ilk = r.atlanan[0].kod;
+        durum(ilk === "sekans"
+          ? "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene."
+          : "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.", "warn");
+      } else durum("Geri alındı: " + silinen + " anahtar kare silindi.", "good");
+    } catch (e) {
+      durum("✕ " + (e && e.message ? e.message : String(e)), "bad");
+    } finally {
+      kilitle(false);
+      try { await tara(sonPeek); } catch (eT) { listeCiz(); }
+    }
+  }
+  function buSekansinKayitlari() {
+    var s = seqId();
+    return kayitlar().filter(function (r) { return !s || r.seqId === s; });
+  }
+  function geriAlTumu() { return geriAl(buSekansinKayitlari(), "tumu"); }
+  // U / bildirimdeki Geri al: son uygulama; yoksa bu sekanstaki en yeni kayıt
+  function geriAlSon() {
+    var kl = kayitlar();
+    var son = kl.filter(function (r) { return sonUygulanan.indexOf(r.id) !== -1; });
+    if (!son.length) {
+      var bu = buSekansinKayitlari().slice().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      son = bu.length ? [bu[0]] : [];
+    }
+    return geriAl(son, "son");
+  }
+
+  /* ---------------- gezinme ---------------- */
+  async function sonrakiCift() {
+    if (mesgul || !onbellek || !onbellek.props || !onbellek.props.length) { durum("Önce anahtar kareli bir klip seç.", "warn"); return; }
+    var secili = satirlar().filter(function (s) { return !kapali[s.anahtar]; }).map(function (s) { return s.prop; });
+    var fps = onbellek.fps || (secili[0] && secili[0].fps) || 30;
+    var t = M.sonrakiCift(secili.length ? secili : onbellek.props, ph, fps);
+    if (t === null) { durum("Anahtar kare çifti yok.", "warn"); return; }
+    kilitle(true);
+    try {
+      await K.call("KS_setPlayerPosition", { sec: t }, 8000);
+      ph = t;
+      onbellek.ph = t;
+    } catch (e) {} finally { kilitle(false); }
+    var k = onbellek.kapsam;
+    if (k && (t < k[0] || t >= k[1])) { try { await tara(sonPeek); } catch (eT) {} }
+    else listeCiz();
+  }
+
+  // Premiere'de kaba önizleme: playhead çiftin başından sonuna (saniyede en çok 12 adım), sonra geri döner
+  async function premiereOnizle() {
+    if (onizleme) { onizleme.iptal = true; return; }
+    if (mesgul) return;
+    var s = satirlar().filter(isaretli)[0] || satirlar().filter(uygulanabilir)[0];
+    if (!s) { durum("Önce playhead'i bir anahtar kare çiftinin arasına getir.", "warn"); return; }
+    var adimlar = M.onizlemeAdimlari(s.cift.t0, s.cift.t1, s.prop.fps, M.ONIZLEME_HZ);
+    var donus = ph, jeton = { iptal: false };
+    onizleme = jeton;
+    kilitle(true);
+    try {
+      for (var i = 0; i < adimlar.length && !jeton.iptal; i++) {
+        await K.call("KS_setPlayerPosition", { sec: adimlar[i] }, 4000);
+        await bekle(Math.ceil(1000 / M.ONIZLEME_HZ));
+      }
+    } catch (e) {} finally {
+      try { await K.call("KS_setPlayerPosition", { sec: donus }, 4000); } catch (e2) {}
+      onizleme = null;
+      kilitle(false);
+    }
+  }
+
+  /* ---------------- kısayollar ---------------- */
+  function tusBasildi(e) {
+    if (!sekmeAcik()) return;
+    var k = M.kisayol(e);
+    if (!k) return;
+    if (k.eylem === "sil") {
+      if (editor && editor.seciliVar() && editor.seciliSil()) { egri = editor.egri(); egriDegisti(true); if (e.preventDefault) e.preventDefault(); }
+      return;
+    }
+    if (e.preventDefault) e.preventDefault();
+    if (k.eylem === "uygula") uygula();
+    else if (k.eylem === "geriAl") geriAlSon();
+    else if (k.eylem === "cevir") cevir();
+    else if (k.eylem === "tersCevir") tersCevir();
+    else if (k.eylem === "gorunum") gorunumAta(gorunum === "deger" ? "hiz" : "deger");
+    else if (k.eylem === "onayar") { var o = tumOnayarlar()[k.n - 1]; if (o) onayarSec(o.id); }
+  }
+
+  function init() {
+    if (!E || !M || !el("tab-egri") || !el("egri-editor")) return;
+    ayarYukle();
+    editor = window.SufloEgriEditor.olustur(el("egri-editor"), {
+      egri: egri, gorunum: gorunum,
+      degisti: function (c, o) { egri = c; if (o.bitti) egriDegisti(true); else alanlariCiz(); },
+      uyari: function (m) { durum(m, "warn"); }
+    });
+    gorunumAta(gorunum, false);   // açılışta yalnız okunur, depoya yazılmaz
+    render();
+    el("egri-gorunum-deger").addEventListener("click", function () { gorunumAta("deger"); });
+    el("egri-gorunum-hiz").addEventListener("click", function () { gorunumAta("hiz"); });
+    el("egri-css").addEventListener("change", cssUygula);
+    ["egri-p1x", "egri-p1y", "egri-p2x", "egri-p2y"].forEach(function (id) { el(id).addEventListener("change", sayilarUygula); });
+    el("egri-cevir").addEventListener("click", cevir);
+    el("egri-ters").addEventListener("click", tersCevir);
+    el("egri-kaydet").addEventListener("click", onayarKaydet);
+    el("egri-yogunluk").addEventListener("change", ayarKaydet);
+    el("egri-uygula").addEventListener("click", function () { uygula(); });
+    // Tanıtım kartından kurulan deneme Pro olayı yaymaz; app.js düğmeye odaklanır: kilit hemen kalkar
+    el("egri-uygula").addEventListener("focus", dugmeCiz);
+    el("egri-uygula").addEventListener("mouseenter", dugmeCiz);
+    el("egri-geri-tumu").addEventListener("click", function () { geriAlTumu(); });
+    el("egri-sonraki").addEventListener("click", function () { sonrakiCift(); });
+    el("egri-yenile").addEventListener("click", function () { if (!mesgul) tara(sonPeek); });
+    el("egri-pr-onizle").addEventListener("click", function () { premiereOnizle(); });
+    document.addEventListener("keydown", tusBasildi);
+    // Başka sekmeye geçilince kısayol tuşları Premiere'e geri verilir (tıklamanın sekme geçişinden SONRA bakılır)
+    document.addEventListener("click", function () { setTimeout(function () { if (!sekmeAcik()) tuslariTut(false); }, 0); });
+    document.addEventListener("visibilitychange", function () { if (!gizli()) sahneBaslat(); });
+    if (window.KApp && KApp.onTab) KApp.onTab("egri", sekmeAcildi);
+    if (typeof Pro !== "undefined" && Pro.on) { try { Pro.on(dugmeCiz); } catch (e) {} }
+    if (window.SufloI18n && SufloI18n.onChange) { try { SufloI18n.onChange(function () { onayarKartlari(); }); } catch (e2) {} }
+  }
+
+  return {
+    init: init,
+    uygula: uygula,
+    geriAl: geriAl,
+    geriAlTumu: geriAlTumu,
+    // testler / tanılama
+    _yokla: yokla,
+    _sekmeAcildi: sekmeAcildi,
+    _tus: tusBasildi,
+    _render: render,
+    _durum: function () { return { onbellek: onbellek, ph: ph, egri: egri, mesgul: mesgul, sonUygulanan: sonUygulanan.slice(), bellek: bellek.slice(), seciliOnayar: seciliOnayar, gorunum: gorunum }; },
+    _editor: function () { return editor; }
+  };
+})();

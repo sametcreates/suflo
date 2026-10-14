@@ -3841,6 +3841,73 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .hiz-eylem { margin-top: 10px; }
 .hiz-eylem .btn.grow { flex: 1; }
 
+/* ---------- Eğri (3.4 adım 10, #tab-egri): SVG düzenleyici, canlı önizleme sahnesi, önayarlar, özellik listesi ----------
+   CEF 74: flex gap, inset ve :focus-visible yok — aralıklar margin ile, odak :focus ile */
+.egri-ust { display: flex; flex-wrap: wrap; align-items: flex-start; margin: 0 -5px 8px; }
+.egri-editor-kutu, .egri-sahne-kutu { flex: 1 1 220px; min-width: 0; margin: 0 5px 8px; }
+.egri-gorunum { display: flex; margin-bottom: 6px; }
+.egri-gorunum .btn { margin-right: 5px; }
+.egri-gorunum .btn.on { border-color: var(--accent); color: var(--accent-lite); background: var(--accent-soft); }
+.egri-editor { position: relative; border: 1px solid #263242; border-radius: 10px; background: linear-gradient(180deg, #131b26, #0e151e); outline: none; touch-action: none; }
+.egri-editor:focus { border-color: var(--accent); }
+.egri-svg { display: block; width: 100%; height: auto; cursor: crosshair; user-select: none; }
+.egri-svg.hiz, .egri-svg.salt { cursor: default; }
+.egri-cizgi { stroke: #223041; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.egri-cizgi.ana { stroke: var(--line2); }
+.egri-cizgi.yarim { stroke-dasharray: 2 4; }
+.egri-yol { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.egri-hayalet { fill: none; stroke: var(--faint); stroke-opacity: .55; stroke-width: 1.4; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.egri-kol { stroke: var(--accent-lite); stroke-opacity: .5; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.egri-tutamac { fill: #0b0e15; stroke: var(--accent-lite); stroke-width: 1.6; cursor: grab; }
+.egri-tutamac:hover { fill: var(--accent); }
+.egri-nokta { fill: var(--accent2); stroke: #0b0e15; stroke-width: 1.4; cursor: move; }
+.egri-nokta.kirik { fill: var(--warn); }
+.egri-nokta.secili { stroke: #fff; stroke-width: 2; }
+.egri-ipucu { margin: 5px 0 0; font-size: 10px; }
+.egri-sahne { position: relative; height: 54px; margin: 0 0 8px; overflow: hidden; border: 1px solid #263242; border-radius: 10px; background: linear-gradient(180deg, #131b26, #0e151e); }
+.egri-kare { position: absolute; top: 13px; left: 0; width: 28px; height: 28px; margin-left: 3%; border-radius: 6px; background: var(--grad); box-shadow: 0 8px 18px -10px rgba(58,167,255,.9); }
+.egri-css-kutu { display: flex; width: 100%; margin: 0 0 6px; }
+.egri-css-kutu input { flex: 1; min-width: 0; margin-left: 6px; font-family: Consolas, Menlo, monospace; font-size: 10px; }
+.egri-sayilar { display: flex; flex-wrap: wrap; margin: 0 -3px 6px; }
+.egri-sayilar label { flex: 1 1 60px; margin: 0 3px 4px; font-size: 10px; color: var(--dim); }
+.egri-sayilar input { display: block; width: 100%; margin-top: 2px; }
+.egri-sayilar input:disabled { opacity: .45; }
+.egri-donustur { flex-wrap: wrap; }
+.egri-donustur .btn { margin: 0 5px 5px 0; }
+.egri-onayarlar { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); grid-gap: 6px; margin: 2px 0 12px; }
+.egri-onayar { position: relative; display: flex; flex-direction: column; align-items: stretch; padding: 5px 5px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+.egri-onayar:hover { border-color: var(--line2); }
+.egri-onayar:focus { outline: 2px solid var(--accent-lite); outline-offset: 1px; }
+.egri-onayar.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.egri-onayar span { display: block; margin-top: 3px; overflow: hidden; font-size: 9.5px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.egri-kucuk { display: block; width: 100%; height: 30px; border-radius: 5px; background: #0b0e15; }
+.egri-kucuk path { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.egri-onayar-sil { position: absolute; top: 1px; right: 3px; padding: 0 3px; color: var(--faint); font-style: normal; font-size: 12px; line-height: 1.2; }
+.egri-onayar-sil:hover { color: var(--bad); }
+.egri-liste-bas { display: flex; align-items: center; margin: 0 0 6px; }
+.egri-liste-bas b { flex: 1; font-size: 11px; }
+.egri-liste-bas .btn { margin-left: 5px; }
+.egri-hedef { margin: 0 0 6px; font-size: 10.5px; line-height: 1.45; color: var(--dim); }
+.egri-hedef b { color: var(--text); }
+.egri-ozellikler { margin: 0 0 10px; }
+.egri-klip { margin: 8px 0 4px; font-size: 10.5px; color: var(--dim); }
+.egri-klip b { color: var(--text); }
+.egri-satir { display: flex; flex-wrap: wrap; align-items: center; margin: 0 0 4px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); }
+.egri-satir.pasif { opacity: .7; }
+.egri-satir-ad { display: flex; flex: 1 1 120px; align-items: center; min-width: 0; margin-right: 6px; font-size: 11px; }
+.egri-satir-ad input { margin: 0 6px 0 0; }
+.egri-satir-ad span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.egri-cip { margin: 2px 6px 2px 0; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-lite); font-size: 10px; white-space: nowrap; }
+.egri-cip.uyari { background: rgba(234,200,119,.1); color: var(--warn); white-space: normal; }
+.egri-rozet { margin: 2px 6px 2px 0; color: var(--good); font-size: 9.5px; }
+.egri-satir-geri { margin-left: auto; }
+.egri-secenekler { flex-wrap: wrap; align-items: center; }
+.egri-secenekler .preset-control { margin: 0 6px 6px 0; }
+.egri-secenekler .btn { margin: 0 0 6px; }
+.egri-eylem { margin-top: 6px; }
+.egri-eylem .btn { margin-right: 6px; }
+.egri-eylem .btn.grow { flex: 1; margin-right: 0; }
+
 /* ---------- YouTube indirici (3.3, #tab-youtube) ----------
    CEF 74: flex gap ve inset yok — aralıklar margin ile, kaplama top/right/bottom/left ile */
 .yt-kart { margin-bottom: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }

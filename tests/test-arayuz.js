@@ -28,7 +28,7 @@ function ok(ad, kosul, kanit) {
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
                 "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
                 "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js",
-                "js/marka-kiti-ui.js", "js/kanca.js", "js/hiz-rampasi.js"];
+                "js/marka-kiti-ui.js", "js/kanca.js", "js/hiz-rampasi.js", "js/egri.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -374,6 +374,32 @@ ok("Hız Rampası: Ayarlar Pro listesinde", /<li>Sesi iyileştir · Otomatik zoo
 ok("Hız Rampası: Premiere çağrıları yalnız tıklamada (init'te K.call yok)", !/K\.call\(/.test(fnGovde(hizUi, "function init(")) && !/K\.call\(/.test(fnGovde(hizUi, "function render(")) &&
   !/K\.call\(/.test(fnGovde(hizUi, "function refresh(")) && !/K\.call\(/.test(fnGovde(hizUi, "function onizlemeCiz(")));
 ok("Hız Rampası: Ctrl+Z uyarısı ve kaldırma düğmesi arayüzde", /Ctrl\+Z rampayı tek adımda geri almaz/.test(html) && /id="hiz-kaldir"[^>]*>Rampayı kaldır</.test(html));
+/* ---------- Eğri (3.4 adım 10) ---------- */
+var egriUi = fs.readFileSync(KOKYOL + "js/egri.js", "utf8").replace(/\r\n/g, "\n");
+ok("Eğri: kenar çubuğunda Hız Rampası'ndan sonra, Kanca Başlığı'ndan önce; YENİ ve PRO rozetli, sayaçsız",
+  html.indexOf('data-tab="egri"') > html.indexOf('data-tab="hiz"') && html.indexOf('data-tab="egri"') < html.indexOf('data-tab="kanca"') &&
+  /data-tab="egri">[\s\S]{0,400}<b>Eğri <em class="ky-yeni">YENİ<\/em><\/b><i>anahtar kare yumuşatma<\/i>[\s\S]{0,80}data-kilit>PRO/.test(html) &&
+  !/ky-adet/.test(html.slice(html.indexOf('data-tab="egri"'), html.indexOf('data-tab="kanca"'))));
+["tab-egri", "egri-tanitim", "egri-gorunum-deger", "egri-gorunum-hiz", "egri-editor", "egri-sahne", "egri-kare", "egri-css", "egri-p1x", "egri-p1y", "egri-p2x",
+  "egri-p2y", "egri-cevir", "egri-ters", "egri-kaydet", "egri-onayarlar", "egri-yenile", "egri-sonraki", "egri-hedef", "egri-ozellikler", "egri-yogunluk",
+  "egri-pr-onizle", "egri-geri-tumu", "egri-uygula", "egri-status"].forEach(function (id) {
+  ok("Eğri: #" + id + " var", !!idler[id]);
+});
+ok("Eğri: sekme Hız Rampası'ndan sonra, Kanca'dan önce", html.indexOf('id="tab-egri"') > html.indexOf('id="tab-hiz"') && html.indexOf('id="tab-egri"') < html.indexOf('id="tab-kanca"'));
+ok("Eğri: betik sırası ease-curve.js → key-records.js → egri-model.js → egri.js → app.js", betikSira("ease-curve.js") > 0 &&
+  betikSira("ease-curve.js") < betikSira("key-records.js") && betikSira("key-records.js") < betikSira("egri-model.js") &&
+  betikSira("egri-model.js") < betikSira("egri.js") && betikSira("egri.js") < betikSira("app.js"));
+ok("Eğri: yoğunluk 1 / 2 / 4 kare (varsayılan her kare)", /<select id="egri-yogunluk">\s*<option value="1" selected>Her kare<\/option>\s*<option value="2">2 karede bir<\/option>\s*<option value="4">4 karede bir<\/option>/.test(html));
+ok("Eğri: app.js başlatır, yan menüyü kilitler, tanıtımı Pro'da gizler; Pro etiketi ve tanıtım düğmesi 'curves'", /KEgri\.init\(\)/.test(appSrc) &&
+  /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="egri"\]'\), !s\.pro\)/.test(appSrc) && /"egri-tanitim"/.test(appSrc) &&
+  /curves:\s+'Eğri: kendi anahtar karelerine özel yumuşatma'/.test(proSrc) && /data-pro-feature="curves">Eğriyi aç — 749 TL</.test(html));
+ok("Eğri: Ayarlar Pro listesinde", /<li>Eğri: anahtar karelerine özel yumuşatma \(düzenlemek ücretsiz\)<\/li>/.test(html));
+ok("Eğri: init / render / listeCiz Premiere'e gitmez", ["function init(", "function render(", "function listeCiz(", "function onayarKartlari("].every(function (f) {
+  var g = fnGovde(egriUi, f); return g.length > 20 && !/K\.call\(/.test(g);
+}));
+ok("Eğri: Ctrl+Z uyarısı, yalnız video katmanları notu ve 'Bezier tutamacı yazamaz' açıklaması arayüzde", /Ctrl\+Z eğriyi tek adımda geri almaz/.test(html) &&
+  /Şimdilik yalnız video katmanları/.test(html) && /Bezier tutamaçlarını yazamadığı için/.test(html));
+ok("Eğri: SufloEgriEditor dışa açık (Hız Rampası özel eğrisi yeniden kullanır)", /^window\.SufloEgriEditor = \(function \(\) \{/m.test(egriUi) && /return \{ olustur: olustur/.test(egriUi));
 /* ---------- Ses etiketi filtresi + sessiz ses uyarısı (3.2 adım 2) ---------- */
 ["grp-altyazi", "set-ses-etiket", "cap-sessiz", "cap-sessiz-metin", "cap-sessiz-devam", "cap-sessiz-vazgec",
   "tc-sessiz", "tc-sessiz-metin", "tc-sessiz-devam", "tc-sessiz-vazgec"].forEach(function (id) {

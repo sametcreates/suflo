@@ -5003,7 +5003,7 @@ function KS_easeScan(encoded) {
 
 /*
  * p: { target: { nodeId, clipName, clipStart, seqId }, items: [{ compIdx, propIdx, matchName, t0, t1, v0, v1,
- *      keys: [{ t, v }] (yalniz IC anahtarlar, timeline sn) }], degistir: bool, dogrusal: bool }
+ *      keys: [{ t, v }] (yalniz IC anahtarlar, timeline sn), degistir? }], degistir: bool, dogrusal: bool }
  * Her oge yazilmadan once dogrulanir: ozellik ayni (kimlik), t0 ve t1'de anahtar var ve degerleri ~ v0/v1,
  * arada anahtar yok (degistir ise once silinir). Bir ogenin reddi digerini durdurmaz. Doner:
  * { basarili, sonuclar: [{ i, ok, kod, yazilan, silinen }], records: [...], yazilan, dogrusal }.
@@ -5049,7 +5049,8 @@ function KS_easeBake(encoded) {
       if (d0 === null || d1 === null || !KS_easeAyni(d0, it.v0) || !KS_easeAyni(d1, it.v1)) { r.kod = "degisti"; continue; }
       var ic = [];
       for (var a = 0; a < an.length; a++) if (an[a].t > t0 + tol && an[a].t < t1 - tol) ic.push(an[a]);
-      if (ic.length && !p.degistir) { r.kod = "icAnahtar"; r.ic = ic.length; continue; }
+      // degistir: cagri geneli ya da oge basina (panel yalniz kendi canli kaydinin araligini degistirir)
+      if (ic.length && !(p.degistir === true || it.degistir === true)) { r.kod = "icAnahtar"; r.ic = ic.length; continue; }
       // plan dogrulamasi: her anahtar uclarin arasinda, deger ozelligin turunde
       var temiz = [], bozuk = false;
       for (var q = 0; q < plan.length; q++) {

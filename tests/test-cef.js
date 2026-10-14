@@ -132,6 +132,14 @@ efektKurallari.forEach(function (k) {
 ok("Altyazı Efektleri: gizli onay kutularının :focus-visible kuralı ayrı bir :focus yedeğiyle (CEF 74)", odakSorun.length === 0 &&
   tumSeciciler.indexOf(".efekt-bi input:focus + span") !== -1 && tumSeciciler.indexOf(".efekt-ayarlar .switch input:focus + i") !== -1, odakSorun.join(" | "));
 
+// Eğri sekmesi (3.4 adım 10): flex gap, overflow-wrap:anywhere ve :focus-visible yok (CEF 74 kuralı tümden atar)
+var egriKurallari = [], gre = /([^{}]*(?:\.egri-)[^{}]*)\{([^{}]*)\}/g, gm;
+while ((gm = gre.exec(css))) egriKurallari.push({ secici: gm[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), govde: gm[2] });
+var egriCssSorun = egriKurallari.filter(function (k) {
+  return (/display:\s*(inline-)?flex/.test(k.govde) && /(^|[;\s])(row-|column-)?gap:/.test(k.govde)) || /overflow-wrap:\s*anywhere/.test(k.govde) || /:focus-visible/.test(k.secici);
+}).map(function (k) { return k.secici; });
+ok("Eğri CSS: flex gap, overflow-wrap:anywhere ve :focus-visible yok (CEF 74)", egriKurallari.length >= 40 && egriCssSorun.length === 0, egriKurallari.length + " kural · " + egriCssSorun.join(" | "));
+
 var ornekRegex = ayikla("function f(x){ return /a'b/.test(x); }\nvar y = o?.p;");
 ok("denetleyici: return'den sonraki regex metin sanilmaz, arkasindaki kod gorunur", /o\?\.p/.test(ornekRegex.split("\n")[1]));
 

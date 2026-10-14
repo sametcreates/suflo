@@ -76,6 +76,11 @@
       <span class="ky-metin"><b>Hız Rampası <em class="ky-yeni">YENİ</em></b><i>ağır çekim · hızlanma</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
+    <button class="ky-oge" data-tab="egri">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16C9 16 9 4 17 4"/><circle cx="3" cy="16" r="1.3"/><circle cx="17" cy="4" r="1.3"/></svg></span>
+      <span class="ky-metin"><b>Eğri <em class="ky-yeni">YENİ</em></b><i>anahtar kare yumuşatma</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
     <button class="ky-oge" data-tab="kanca">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="5" rx="1.2"/><path d="M5 13h10M7 16h6"/></svg></span>
       <span class="ky-metin"><b>Kanca Başlığı <em class="ky-yeni">YENİ</em></b><i>Shorts açılış yazısı</i></span>
@@ -1616,6 +1621,80 @@
     <p class="hint">Ctrl+Z rampayı tek adımda geri almaz; geri almak için Rampayı kaldır'ı kullan. Yakınlaştırma ve geçişleri rampadan sonra ekle.</p>
   </section>
 
+  <!-- ================= EGRI (3.4 adım 10): kullanıcının kendi anahtar karelerine özel yumuşatma ================= -->
+  <section id="tab-egri" class="tabpane">
+    <div class="pro-tanitim" id="egri-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Anahtar karelerine özel eğri</b>
+        <span>Eğriyi düzenlemek, önizlemek ve geri almak ücretsiz; anahtar karelerine uygulamak Pro.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>15</strong> hazır eğri</i><i><strong>8</strong> nokta</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="curves">Eğriyi aç — 749 TL</button>
+    </div>
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 16C9 16 9 4 17 4"/><circle cx="3" cy="16" r="1.3"/><circle cx="17" cy="4" r="1.3"/></svg>
+        <b>Kendi anahtar karelerine özel yumuşatma</b>
+      </div>
+      <p class="ci-p">Effect Controls'te bir özelliğe iki anahtar kare koy, playhead'i aralarına getir, eğriyi seç ve uygula. Premiere'in betikleri Bezier tutamaçlarını yazamadığı için Suflo eğriyi her kareye (ya da 2 / 4 karede bir) anahtar kare olarak yazar; uçlardaki iki anahtar karen değişmez.</p>
+    </div>
+    <div class="egri-ust">
+      <div class="egri-editor-kutu">
+        <div class="egri-gorunum" role="group" aria-label="Görünüm">
+          <button id="egri-gorunum-deger" class="btn tiny on" type="button" aria-pressed="true" title="Değer eğrisi (V)">Değer</button>
+          <button id="egri-gorunum-hiz" class="btn tiny" type="button" aria-pressed="false" title="Hız eğrisi (V)">Hız</button>
+        </div>
+        <!-- aria-label kutuda: SVG çevrilmez, ekran okuyucu çevrilmiş adı duyar -->
+        <div id="egri-editor" class="egri-editor" tabindex="0" role="img" aria-label="Eğri düzenleyici"></div>
+        <p class="hint egri-ipucu">Tutamaçları sürükle · Shift 0,05'e yapışır · çift tık nokta ekler · Alt tutamaçları ayırır · Delete seçili noktayı siler</p>
+      </div>
+      <div class="egri-sahne-kutu">
+        <div id="egri-sahne" class="egri-sahne" role="img" aria-label="Canlı önizleme"><i id="egri-kare" class="egri-kare"></i></div>
+        <label class="preset-control egri-css-kutu">cubic-bezier
+          <input id="egri-css" type="text" maxlength="200" spellcheck="false" autocomplete="off" placeholder="cubic-bezier(0.25, 0.1, 0.25, 1)">
+        </label>
+        <div class="egri-sayilar">
+          <label>P1 x <input id="egri-p1x" type="number" step="0.01" min="0" max="1"></label>
+          <label>P1 y <input id="egri-p1y" type="number" step="0.01" min="-1" max="2"></label>
+          <label>P2 x <input id="egri-p2x" type="number" step="0.01" min="0" max="1"></label>
+          <label>P2 y <input id="egri-p2y" type="number" step="0.01" min="-1" max="2"></label>
+        </div>
+        <div class="row egri-donustur">
+          <button id="egri-cevir" class="btn tiny" type="button" title="Yumuşak giriş ↔ yumuşak çıkış (F)">Yönü çevir</button>
+          <button id="egri-ters" class="btn tiny" type="button" title="Eksenleri değiştir; yalnız taşmayan eğrilerde (I)">Ters çevir</button>
+          <button id="egri-kaydet" class="btn tiny" type="button" title="Bu eğriyi önayarlarına ekle (bu bilgisayarda saklanır)">Önayar olarak kaydet</button>
+        </div>
+      </div>
+    </div>
+    <div id="egri-onayarlar" class="egri-onayarlar" role="group" aria-label="Hazır eğriler"></div>
+    <div class="egri-liste-bas">
+      <b>Özellikler</b>
+      <button id="egri-yenile" class="btn tiny" type="button" title="Klibi ve anahtar kareleri yeniden oku">↻ Yenile</button>
+      <button id="egri-sonraki" class="btn tiny" type="button" title="Playhead'i sonraki anahtar kare çiftine götür">Sonraki çift</button>
+    </div>
+    <div id="egri-hedef" class="egri-hedef">Eğri sekmesi açıkken seçimi ve playhead'i izler.</div>
+    <div id="egri-ozellikler" class="egri-ozellikler" role="list"></div>
+    <div class="preset-toolbar egri-secenekler">
+      <label class="preset-control" title="Suflo'nun yazacağı anahtar karelerin sıklığı: her kare en pürüzsüzü, 2 / 4 karede bir daha az anahtar">Anahtar sıklığı
+        <select id="egri-yogunluk">
+          <option value="1" selected>Her kare</option>
+          <option value="2">2 karede bir</option>
+          <option value="4">4 karede bir</option>
+        </select>
+      </label>
+      <button id="egri-pr-onizle" class="btn" type="button" title="Kaba önizleme: playhead çiftin başından sonuna saniyede en çok 12 adımla gider, sonra geri döner">Premiere'de önizle</button>
+    </div>
+    <div class="row egri-eylem">
+      <button id="egri-geri-tumu" class="btn" type="button" title="Bu sekansta Suflo'nun yazdığı tüm eğri anahtar karelerini kaldır">Tümünü geri al</button>
+      <button id="egri-uygula" class="btn primary grow" type="button">Uygula</button>
+    </div>
+    <div id="egri-status" class="inline-status" role="status" aria-live="polite"></div>
+    <p class="hint">Kısayollar (bir yazı alanında değilken): Enter uygula · U son uygulamayı geri al · F yönü çevir · I ters çevir · V görünüm · 1–9 önayar. Ctrl+Z eğriyi tek adımda geri almaz; Geri al'ı kullan, yalnız Suflo'nun yazdığı anahtar kareler kalkar. Şimdilik yalnız video katmanları; ses düzeyi sonraki sürümde.</p>
+  </section>
+
   <!-- ================= KANCA BASLIGI ================= -->
   <section id="tab-kanca" class="tabpane">
     <div class="pro-tanitim" id="kanca-tanitim" hidden>
@@ -2340,6 +2419,7 @@
               <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
               <li>Altyazı Efektleri timeline'da · Kanca başlığı</li>
               <li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası</li>
+              <li>Eğri: anahtar karelerine özel yumuşatma (düzenlemek ücretsiz)</li>
               <li>YouTube indirici: MP3 · 720p · 1080p · 4K, projeye otomatik</li>
               <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
@@ -2547,6 +2627,9 @@
   <script src="js/gecisler.js"></script>
   <script src="js/speedramp.js"></script>
   <script src="js/hiz-rampasi.js"></script>
+  <!-- 3.4 Eğri sekmesi: saf model (yumuşatma motoru + kayıtlardan sonra) ve panel + SufloEgriEditor -->
+  <script src="js/egri-model.js"></script>
+  <script src="js/egri.js"></script>
   <script src="js/sahneler.js"></script>
   <script src="js/viral.js"></script>
   <script src="js/broll.js"></script>
