@@ -1511,3 +1511,30 @@ güncellenmeli. Otomatik eşik formülü (arka plan p10 + 8 dB, −60…−20) `
 
 **K6.3 Tanıtım (isteğe bağlı).** Site / sosyal medya için 10 sn'lik ekran kaydı: Eşik kaydırıcısı sürüklenirken
 haritanın anında değişmesi ve Otomatik düğmesi. Sürüm notuna: "Sessizlik kesiminde kaydırıcılar artık anında".
+
+### Adım 7: Sekans ve In/Out kapsamlı kesim, korunan katmanlar
+
+Ne değişti: Otomatik Kesim'e kapsam (`#cut-scope`: Seçili klip | In → Out | Sekans) ve **Katmanlar** bölümü geldi:
+"Dinlenecek ses" (sekans kapsamlarında `KS_exportAudio` bu katmanları tek WAV'a karıştırır, adım 6'nın zarfı ve
+`bul()` bu WAV'da koşar, aralıklar ofsetle sekans zamanına çevrilir) ve "Kesilmeyecek katmanlar" (her kapsamda;
+`KS_applyCuts` `protect` ile bu katmanları razor, ripple kaplama denetimi ve silmede atlar). Öneri ve uyarılar saf
+`SufloSessizlik.korumaOner`'de (müzik adı kuralı, %80 kaplama önerisi, korunan video + ripple engeli, bağlı çift
+listesi). `KS_applyCuts` artık `expectSeqId`'yi kopyadan önce denetler; korunan katman kilitlenmez, kilidi açılmaz.
+`protect` gönderilmeyen çağrıların (Konuşmadan kes, eski akış) çıktısı 3.3 ile birebir aynı (testle karşılaştırıldı).
+Pro kapısı değişmedi (`cut`, 3 deneme hakkı; analiz, önizleme, kapsam ve çipler hak yemez). Lisans: clean-room
+(Premiere TR yalnız fikir; onun `Track.locked` ile kilit açıp kapama yöntemi çalışmadığı için kullanılmadı); NOTICE
+girdisi gerekmez. Yeni çalışma zamanı dosyası yok (paketleme değişmedi).
+
+**K7.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 7.1–7.15'i yeni ve eski
+(CEF 74) Premiere'de dene. En önemlisi **7.8**: Premiere'in `TrackItem.remove` çağrısının bağlı (link) öğeyi de silip
+silmediği otomatik testte bilinemiyor. Siliyorsa korunan katman değişir; Suflo bunu fark edip "⚠ Korunan bir katman
+değişti…" der (Ctrl+Z ile geri alınır), ama o durumda bağlı çiftlerde koruma işe yaramaz. Sonucu bildir: silmiyorsa bir
+şey yapma; siliyorsa bir sonraki adımda bağlı çiftlerde korumayı engelleyen bir uyarıya çevireceğiz.
+
+**K7.2 Müzik adı listesi (karar).** Önceden korunan ad kuralı `js/sessizlik.js` › `MUZIK_RE`
+(`müzik|muzik|music|bgm|şarkı|sarki|song|ambiyans|ambience`). Kullanıcıların katmanlarına başka adlar verdiğini görürsen
+(ör. "Fon", "Background") listeye ekle; `tests/test-sessizlik.js` › `muzikAdi` satırı da güncellenmeli.
+
+**K7.3 Tanıtım (isteğe bağlı).** 15 sn'lik ekran kaydı: Sekans kapsamında müzikli bir vlogda Sessizlikleri bul →
+Kesimleri uygula, kopya sekansta müziğin tek parça kaldığını göster. Sürüm notuna: "Otomatik Kesim artık tüm sekansı ya
+da In/Out aralığını kesebilir; müzik katmanın bölünmez".
