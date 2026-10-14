@@ -15,7 +15,8 @@
  * bakılan örnek sayısını) düşürüyordu: gürültülü kayıtta zarf tabanı silencedetect'in gördüğünden ~6 dB alçak
  * kalıyor, önizlemenin gösterdiği kesimleri doğrulama atıyor, Otomatik eşik sessizlik bulunmayan yere düşüyordu.
  *
- * 3.4 adım 7 (kapsam ve korunan katmanlar): kapsamAraligi (Seçili klip | In → Out | Sekans), korumaOner
+ * 3.4 adım 7 (kapsam ve korunan katmanlar): kapsamAraligi (Seçili klip | In → Out | Sekans), hostKapsamAraligi
+ * (aynı aralık, Premiere'in katman okuması anındaki In / Out'undan) ve disaAktarimTutar (karışım o aralığın mı), korumaOner
  * (KS_getTrackLayout düzeninden dinlenecek ses + korunan katman önerisi ve uyarılar: korunan video + ripple,
  * bağlı video–ses çiftinin ayrılması), korumaYuku (KS_applyCuts protect).
  *
@@ -414,6 +415,33 @@
   }
 
   /*
+   * In → Out / Sekans aralığı, katmanların okunduğu ANDA Premiere'in kendi değerlerinden (KS_getTrackLayout({ scope })
+   * → kapsam: { scope, seqIn, seqOut, seqDur, frame }). Panelin bağlamı (KS_getContext) yalnız panel odaktayken
+   * yoklanır: Premiere'de I / O'ya basıp hemen Sessizlikleri bul'a tıklayınca bayattır ("In / Out yok" der ya da eski
+   * aralığın katmanlarından yanlış "Dinlenecek ses" önerir). kap yoksa { hata: "sekans" }.
+   */
+  function hostKapsamAraligi(kap) {
+    if (!kap || (kap.scope !== "inout" && kap.scope !== "entire")) return { hata: "sekans" };
+    return kapsamAraligi(kap.scope, { hasSeq: true, seqIn: kap.seqIn, seqOut: kap.seqOut, seqDur: kap.seqDur, frame: kap.frame });
+  }
+
+  /*
+   * KS_exportAudio'nun döndürdüğü ofset ve süre, katmanların okunduğu kapsamla (hostKapsamAraligi'nin kap'ı) aynı mı?
+   * Arada In / Out taşındıysa ya da sekans sonu değiştiyse karışım okunan katmanların (ve önerilen "Dinlenecek ses"in)
+   * aralığına ait değildir. Tolerans yarım kare (en az 1 ms). Süre okunamadıysa (0) yalnız ofset karşılaştırılır.
+   */
+  function disaAktarimTutar(kap, ex) {
+    if (!kap || !ex) return false;
+    var kare = num(kap.frame, 0) > 0 ? num(kap.frame, 0) : 1 / 30;
+    var tol = Math.max(0.001, kare / 2);
+    var ofset = 0, sure = num(kap.seqDur, 0);
+    if (kap.scope === "inout") { ofset = num(kap.seqIn, 0); sure = num(kap.seqOut, 0) - ofset; }
+    if (Math.abs(num(ex.offset, 0) - ofset) > tol) return false;
+    var exSure = num(ex.duration, 0);
+    return !(exSure > 0) || Math.abs(exSure - sure) <= tol;
+  }
+
+  /*
    * Arka plan sesi adı: bu adı taşıyan SES katmanı varsayılan olarak korunur (kesilmez, kaymaz).
    * Ad Türkçe büyük / küçük harf farkı ve şapkasız yazım gözetilerek karşılaştırılır ("MÜZİK", "Sarki").
    * Yalnız SÖZCÜK BAŞINDA aranır (camelCase sözcük sayılır: "BackgroundMusic"): "Songül", "Kemal Sarkis" gibi kişi
@@ -664,6 +692,8 @@
     anahtar: anahtar,
     onbellekYap: onbellekYap,
     kapsamAraligi: kapsamAraligi,
+    hostKapsamAraligi: hostKapsamAraligi,
+    disaAktarimTutar: disaAktarimTutar,
     muzikAdi: muzikAdi,
     izEtiketi: izEtiketi,
     bagliCiftler: bagliCiftler,

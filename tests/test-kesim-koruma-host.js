@@ -314,5 +314,28 @@ var r10c = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", clon
   expectTracks: { video: ["Video 1"], audio: ["Audio 1", "Müzik"] } });
 ok("expectTracks tutuyor: uygulanır, Müzik korunur", r10c.ok && r10c.removed === 4 && js(ozet(s10).A2) === js([[0, 60]]) && js(r10c.protectedSkipped) === js({ video: 0, audio: 1 }), js(r10c));
 
+/* ---------- 11) KS_getTrackLayout scope: aralık panel bağlamından değil sekansın kendi In / Out'undan ---------- */
+// sahte sekans: In 10, Out 40, sonu 60, kare 0.04; V2'de In / Out dışında (45–50) bir klip
+var s11 = vlog("s11", { v2: [klip(45, 50, { name: "Son" })] });
+var l11 = call("KS_getTrackLayout", { klipler: true, scope: "inout", start: 0, end: 60 });
+ok("getTrackLayout scope inout: kapsam okuma anındaki In / Out (10–40, kare 0.04); klipler panelin start / end'i değil In / Out'tan",
+  l11.ok && js(l11.kapsam) === js({ scope: "inout", seqIn: 10, seqOut: 40, seqDur: 60, frame: 0.04 }) &&
+  l11.video[1].klipler.length === 0 && l11.video[0].klipler.length === 1 && js(S.hostKapsamAraligi(l11.kapsam)) === js({ start: 10, end: 40 }), js(l11.kapsam));
+var l11b = call("KS_getTrackLayout", { klipler: true, scope: "entire" });
+ok("getTrackLayout scope entire: kapsam + tüm sekansın klipleri (V2 45–50 dahil)",
+  l11b.ok && l11b.kapsam.scope === "entire" && l11b.kapsam.seqDur === 60 && l11b.video[1].klipler.length === 1 && js(S.hostKapsamAraligi(l11b.kapsam)) === js({ start: 0, end: 60 }), js(l11b.kapsam));
+ok("getTrackLayout scope'suz: kapsam alanı yok (Podcast Modu / seçili klip çıktısı aynı)",
+  call("KS_getTrackLayout", { klipler: true, start: 0, end: 60 }).kapsam === undefined && call("KS_getTrackLayout").kapsam === undefined);
+var e11 = call("KS_exportAudio", { scope: "inout", epr: ["C:\\ext\\wav16k.epr"], tracks: [0] });
+var e11b = call("KS_exportAudio", { scope: "entire", epr: ["C:\\ext\\wav16k.epr"] });
+ok("KS_exportAudio ofset / süresi aynı okumanın kapsamıyla tutar (In / Out ve Sekans)",
+  S.disaAktarimTutar(l11.kapsam, e11) && S.disaAktarimTutar(l11b.kapsam, e11b) && !S.disaAktarimTutar(l11.kapsam, e11b), js(e11) + " " + js(e11b));
+// In / Out işaretsiz (Premiere 0 ve sekans sonu döndürür): klipler tüm sekanstan, panel "In / Out yok" der
+s11.getInPointAsTime = function () { var t = new FakeTime(); t.seconds = 0; return t; };
+s11.getOutPointAsTime = function () { var t = new FakeTime(); t.seconds = 60; return t; };
+var l11c = call("KS_getTrackLayout", { klipler: true, scope: "inout" });
+ok("getTrackLayout scope inout, In / Out işaretsiz: klipler tüm sekanstan, hostKapsamAraligi 'inout'",
+  l11c.ok && l11c.video[1].klipler.length === 1 && S.hostKapsamAraligi(l11c.kapsam).hata === "inout", js(l11c.kapsam));
+
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

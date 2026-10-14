@@ -274,6 +274,23 @@ ok("kapsamAraligi: Out sekans sonunu aşmaz; Sekans 0 → seqDur, süresiz sekan
   S.kapsamAraligi("inout", { hasSeq: true, seqIn: 5, seqOut: 900, seqDur: 60 }).end === 60 &&
   js(S.kapsamAraligi("entire", { hasSeq: true, seqDur: 75.5 })) === js({ start: 0, end: 75.5 }) && S.kapsamAraligi("entire", { hasSeq: true, seqDur: 0 }).hata === "sekans");
 
+/* 3.4 adım 7 incelemesi: aralık Premiere'in okuma anındaki In / Out'undan (bağlam bayat olabilir) */
+var kapIO = { scope: "inout", seqIn: 10, seqOut: 15.1, seqDur: 60, frame: 0.04 };
+ok("hostKapsamAraligi: host kapsamından In → Out / Sekans; işaretsiz In / Out (0 – son) 'inout'; kapsam yoksa 'sekans'",
+  js(S.hostKapsamAraligi(kapIO)) === js({ start: 10, end: 15.1 }) &&
+  js(S.hostKapsamAraligi({ scope: "entire", seqIn: 10, seqOut: 15.1, seqDur: 60, frame: 0.04 })) === js({ start: 0, end: 60 }) &&
+  S.hostKapsamAraligi({ scope: "inout", seqIn: 0, seqOut: 60, seqDur: 60, frame: 0.04 }).hata === "inout" &&
+  S.hostKapsamAraligi(null).hata === "sekans" && S.hostKapsamAraligi({ scope: "clip" }).hata === "sekans");
+ok("disaAktarimTutar: KS_exportAudio ofset / süresi okunan In / Out ile aynı (yarım kare tolerans); süre 0 ise yalnız ofset",
+  S.disaAktarimTutar(kapIO, { offset: 10, duration: 5.1 }) && S.disaAktarimTutar(kapIO, { offset: 10.01, duration: 5.09 }) &&
+  S.disaAktarimTutar(kapIO, { offset: 10, duration: 0 }) &&
+  !S.disaAktarimTutar(kapIO, { offset: 12, duration: 3.1 }) && !S.disaAktarimTutar(kapIO, { offset: 10, duration: 7 }) &&
+  !S.disaAktarimTutar(kapIO, { offset: 10.04, duration: 5.06 }) && !S.disaAktarimTutar(null, { offset: 10 }) && !S.disaAktarimTutar(kapIO, null));
+ok("disaAktarimTutar: Sekans kapsamı ofset 0, süre sekans sonu (sekans arada uzadıysa tutmaz)",
+  S.disaAktarimTutar({ scope: "entire", seqIn: 10, seqOut: 15.1, seqDur: 60, frame: 0.04 }, { offset: 0, duration: 60 }) &&
+  !S.disaAktarimTutar({ scope: "entire", seqIn: 10, seqOut: 15.1, seqDur: 60, frame: 0.04 }, { offset: 0, duration: 64 }) &&
+  !S.disaAktarimTutar({ scope: "entire", seqDur: 60 }, { offset: 10, duration: 60 }));
+
 /* ---------------- 3.4 adım 7: korunan katman önerisi (korumaOner) ---------------- */
 ok("muzikAdi: müzik / music / bgm / şarkı / song / ambiyans / ambience; Türkçe büyük harf ve şapkasız yazım",
   ["Müzik", "MÜZİK", "muzik", "Music Bed", "BGM", "Şarkı", "SARKI", "song", "Ambiyans", "Room ambience"].every(S.muzikAdi) &&

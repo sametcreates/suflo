@@ -2223,6 +2223,8 @@ function KS_mcIzBilgi(tr, i, video) {
  * her katmana [p.start, p.end] araligina degen kliplerin listesi eklenir (en cok KS_IZ_KLIP_MAX):
  * { s, e, ad, yol, hiza (inPoint - start), bag }. bag yalniz ses kliplerinde: getLinkedItems varsa bagli VIDEO
  * ogelerinin [{ s, e, yol, tur }] listesi (bos olabilir), API yoksa null (panel ayni medya + hiza sezgisine duser).
+ * p.scope ("inout" | "entire") verilirse aralik p.start / p.end'den degil sekansin kendi In / Out'undan ya da sonundan
+ * alinir ve kapsam: { scope, seqIn, seqOut, seqDur, frame } doner (okuma anindaki ham degerler).
  */
 var KS_IZ_KLIP_MAX = 400;
 
@@ -2267,14 +2269,37 @@ function KS_getTrackLayout(encoded) {
     for (i = 0; i < seq.audioTracks.numTracks; i++) a.push(KS_mcIzBilgi(seq.audioTracks[i], i, false));
     var sure = 0;
     try { sure = Number(seq.end) / KS_TPS; } catch (eS) {}
+    /*
+     * p.scope ("inout" | "entire", 3.4 Otomatik Kesim): aralik paneldeki baglamdan (KS_getContext yalniz panel odaktayken
+     * yoklanir; Premiere'de I / O'ya basip hemen Sessizlikleri bul'a tiklayinca bayattir) DEGIL, burada sekansin kendi
+     * In / Out'undan ve sonundan alinir. Ham degerler kapsam olarak doner: panel In / Out gecerli mi buna bakar ve
+     * KS_exportAudio'nun ofset / suresini bununla karsilastirir. In / Out isaretsizse (0 ve sekans sonu) klipler tum sekanstan.
+     */
+    var kap = null;
+    if (p.scope === "inout" || p.scope === "entire") {
+      kap = { scope: String(p.scope), seqIn: 0, seqOut: 0, seqDur: sure, frame: 0 };
+      try { kap.seqIn = Number(seq.getInPointAsTime().seconds); } catch (eKi) {}
+      try { kap.seqOut = Number(seq.getOutPointAsTime().seconds); } catch (eKo) {}
+      try { var tbK = Number(seq.timebase); if (tbK > 0) kap.frame = tbK / KS_TPS; } catch (eKf) {}
+    }
     if (p.klipler) {
       var bas = Number(p.start), son = Number(p.end);
+      if (kap) {
+        bas = 0;
+        son = sure;
+        if (kap.scope === "inout" && kap.seqOut > kap.seqIn) {
+          bas = kap.seqIn;
+          son = (sure > 0 && kap.seqOut > sure) ? sure : kap.seqOut;
+        }
+      }
       if (!isFinite(bas)) bas = 0;
       if (!isFinite(son) || son <= bas) son = sure > bas ? sure : bas + 1e9;
       for (i = 0; i < v.length; i++) v[i].klipler = KS_izKlipleri(seq.videoTracks[i], bas, son, true);
       for (i = 0; i < a.length; i++) a[i].klipler = KS_izKlipleri(seq.audioTracks[i], bas, son, false);
     }
-    return KS_ok({ seqId: String(seq.sequenceID), name: String(seq.name), duration: sure, video: v, audio: a });
+    var lay = { seqId: String(seq.sequenceID), name: String(seq.name), duration: sure, video: v, audio: a };
+    if (kap) lay.kapsam = kap;
+    return KS_ok(lay);
   } catch (e) { return KS_err(e); }
 }
 

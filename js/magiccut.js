@@ -16,7 +16,9 @@
  * clipStart = ofset). WAV Uygula'dan sonra, kapsam / sekans / dinlenen ses değişince ve panel kapanırken silinir.
  * "Kesilmeyecek katmanlar" (her kapsamda; KS_getTrackLayout'tan, SufloSessizlik.korumaOner önerisiyle) Uygula'da
  * KS_applyCuts'a protect olarak gider; analiz edilen sekans expectSeqId ile denetlenir. Katmanlar panel açılırken
- * OKUNMAZ: kapsam düğmesi, Katmanlar bölümünü açmak, Yenile ya da Sessizlikleri bul okur.
+ * OKUNMAZ: kapsam düğmesi, Katmanlar bölümünü açmak, Yenile ya da Sessizlikleri bul okur (düzen düşmüşse Uygula da).
+ * In → Out / Sekans aralığı panel bağlamından değil, katman okumasıyla aynı anda Premiere'den alınır (scope); seçimler
+ * katman imzasına bağlıdır, sekans değişince (Kopya sekansta'nın kopyası dahil) düşmez.
  */
 window.KCut = (function () {
   "use strict";
@@ -65,6 +67,15 @@ window.KCut = (function () {
   var katmanOkunuyor = false;
   var secDinle = null;      // kullanıcının "Dinlenecek ses" seçimi ([i]); null: öneri
   var secKoru = null;       // kullanıcının "Kesilmeyecek katmanlar" seçimi ({ video, audio }); null: öneri
+  /*
+   * Seçimlerin bağlı olduğu katman imzası (katmanImzasi: katman sayısı + adlar). Başka sekansa geçince düzen (katman)
+   * düşer ama seçimler ve imza KALIR: yeni sekansın düzeni aynı imzayı taşıyorsa (Kopya sekansta'nın açtığı kopya hep
+   * taşır) seçimler sürer, taşımıyorsa öneriye döner. null: bu oturumda düzen hiç okunmadı.
+   */
+  var secImza = null;
+  var sonKoruSayisi = 0;    // son okunan düzende korunan katman sayısı (düzen okunamazsa Uygula korumasız gitmesin)
+  // Son okumanın kapsamı: { scope: "inout" | "entire" | "", aralik: hostKapsamAraligi sonucu | null, kap: host değerleri | null }
+  var katmanKapsam = null;
   var geciciWav = "";       // sekans kapsamında KS_exportAudio'nun karışımı
   var analizSeqId = "";     // analizin yapıldığı sekans: KS_applyCuts expectSeqId
   var zorlaBosluk = false;  // "Boşluk bırakarak uygula" (korunan video katmanı ripple'da kaymasın)
@@ -241,11 +252,13 @@ window.KCut = (function () {
     sesiKapat();
     var ctx = KApp.ctx();
     var sekansMi = kapsam !== "clip";
-    var aralik = null;
     if (sekansMi) {
-      // In → Out / Sekans: sesi Premiere dışa aktarır (her analizde taze; timeline arada değişmiş olabilir)
-      aralik = S.kapsamAraligi(kapsam, ctx);
-      if (aralik.hata) { status(kapsamHataMetni(aralik.hata), "warn"); return; }
+      /*
+       * In → Out / Sekans: sesi Premiere dışa aktarır (her analizde taze; timeline arada değişmiş olabilir). Aralık
+       * burada bağlamdan (KApp.ctx) ALINMAZ: bağlam yalnız panel odaktayken yoklanır, Premiere'de I / O'ya basıp hemen
+       * tıklayınca bayattır. In / Out'u sekansSesiHazirla katmanlarla aynı okumada Premiere'den alır.
+       */
+      if (!ctx.hasSeq) { status(kapsamHataMetni("sekans"), "warn"); return; }
       sonucuBirak();
       onbellekleriBosalt();
     } else {
@@ -278,17 +291,19 @@ window.KCut = (function () {
       if (jeton && jeton.iptalEdildi) { status("İptal edildi.", "warn"); return; }
 
       if (sekansMi) {
-        var hazir = await sekansSesiHazirla(aralik, ctx, jeton);
+        var hazir = await sekansSesiHazirla(ctx, jeton);
         if (!hazir) return;           // iptal / uyarı (durum yazıldı)
         clip = benimKlip = hazir;
         // analiz edilen sekans: Premiere'in döndürdüğü kimlik (tıklama anındaki bağlam bayat olabilir)
         if (hazir.seqId) analizSeqId = hazir.seqId;
         sonAnahtar = S.anahtar(clip.mediaPath, clip.inPoint, clip.outPoint - clip.inPoint);
-      } else if (katman || katmanBolumuAcik()) {
+      } else if (katman || katmanBolumuAcik() || secImza !== null) {
         /*
          * Katmanlar bölümü açıldıysa koruma önerisi bu klibin aralığıyla tazelenir (okunamazsa analiz sürer).
          * Bölüm açık ama düzen yoksa da (sekans değişti / bölüm sekanssız açıldı) okunur: ipucu bunu söylüyor,
-         * okunmazsa Uygula korumasız giderdi.
+         * okunmazsa Uygula korumasız giderdi. Bölüm kapalı ama bu oturumda düzen okunduysa da (secImza) okunur:
+         * başka sekansa geçince (Kopya sekansta'nın açtığı kopya dahil) düzen düşer; okunmazsa ikinci geçişte
+         * korunan müzik kesilirdi.
          */
         await katmanlariOku({ start: clip.clipStart, end: clip.clipEnd });
         if (clip !== benimKlip) return;
@@ -470,14 +485,22 @@ window.KCut = (function () {
 
   /*
    * Katman düzenini oku (KS_getTrackLayout, aralığa değen kliplerle). Yalnız kullanıcı eyleminden: kapsam düğmesi,
-   * Katmanlar bölümünü açmak, Yenile, Sessizlikleri bul. Başka sekansa geçilmişse seçimler öneriye döner.
-   * Süren bir okuma varsa (kapsam tıkının hemen ardından Sessizlikleri bul) yenisi açılmaz, o beklenir.
+   * Katmanlar bölümünü açmak, Yenile, Sessizlikleri bul, Uygula (düzen düşmüşse). Katman imzası değiştiyse seçimler
+   * öneriye döner. Aynı kapsam / aralık için süren bir okuma varsa (kapsam tıkının hemen ardından Sessizlikleri bul)
+   * yenisi açılmaz, o beklenir; süren okuma başka kapsamın / aralığınsa bitince bu kapsam için yeniden okunur (yoksa
+   * In → Out'tan Sekans'a hızlı geçişte Sekans analizi In / Out aralığının düzeniyle yapılırdı).
+   * aralik verilmezse In → Out / Sekans'ta aralığı Premiere okuma anında kendi In / Out'undan verir (scope).
    * Döner: düzen | null (durum ipucuna yazıldı).
    */
-  var katmanSozu = null;
+  var katmanSozu = null, katmanSozAnahtari = "";
   function katmanlariOku(aralik) {
-    if (katmanSozu) return katmanSozu;
+    var anahtar = aralik ? "a:" + aralik.start + "-" + aralik.end : "k:" + kapsam;
+    if (katmanSozu) {
+      if (katmanSozAnahtari === anahtar) return katmanSozu;
+      return katmanSozu.then(function () { return katmanlariOku(aralik); });
+    }
     katmanOkunuyor = true;
+    katmanSozAnahtari = anahtar;
     katmanSozu = katmanOkuIc(aralik).then(function (r) {
       katmanOkunuyor = false; katmanSozu = null; return r;
     }, function (e) {
@@ -490,12 +513,22 @@ window.KCut = (function () {
   async function katmanOkuIc(aralik) {
     var ctx = KApp.ctx();
     if (!ctx.hasSeq) { katmanIpucu("Katmanları görmek için bir sekans aç."); return null; }
-    var ar = aralik || S.kapsamAraligi(kapsam, ctx);
-    if (ar.hata) ar = S.kapsamAraligi("entire", ctx);
-    if (ar.hata) ar = { start: 0, end: 0 };
+    var yuk = { klipler: true };
+    var ar = aralik || null;
+    if (!ar && kapsam === "clip") {
+      ar = S.kapsamAraligi("clip", ctx);
+      if (ar.hata) ar = null;
+    }
+    /*
+     * In → Out / Sekans (ya da seçili klip yok): aralığı Premiere okuma anında kendi In / Out'undan / sonundan verir
+     * (kapsam). Bağlamın seqIn / seqOut'u bayat olabilir: Dinlenecek ses önerisi, bağlı çift uyarısı ve "In / Out yok"
+     * denetimi eski aralığa göre yapılırdı.
+     */
+    if (ar) { yuk.start = ar.start; yuk.end = ar.end; }
+    else yuk.scope = kapsam === "clip" ? "entire" : kapsam;
     var r = null;
     try {
-      r = await K.call("KS_getTrackLayout", { klipler: true, start: ar.start, end: ar.end }, 60000);
+      r = await K.call("KS_getTrackLayout", yuk, 60000);
     } catch (e) {
       r = { ok: false, error: e && e.message };
     }
@@ -506,11 +539,26 @@ window.KCut = (function () {
     // okuma sürerken başka sekansa geçildiyse bu düzen artık etkin sekansın değil
     var simdi = KApp.ctx();
     if (simdi.sequenceId && r.seqId && String(simdi.sequenceId) !== String(r.seqId)) return null;
+    var kapAr = null;
+    if (yuk.scope) {
+      // host kapsam döndürmediyse (eski host.jsx) bağlamın değerleri
+      var kap = r.kapsam || { scope: yuk.scope, seqIn: ctx.seqIn, seqOut: ctx.seqOut, seqDur: ctx.seqDur, frame: ctx.frame };
+      kapAr = S.hostKapsamAraligi(kap);
+      ar = kapAr.hata ? S.hostKapsamAraligi({ scope: "entire", seqDur: kap.seqDur, frame: kap.frame }) : kapAr;
+      if (ar.hata) ar = { start: 0, end: 0 };
+      katmanKapsam = { scope: yuk.scope, aralik: kapAr, kap: r.kapsam || null };
+    } else {
+      katmanKapsam = { scope: "", aralik: null, kap: null };
+    }
     /*
-     * Seçimler katman DİZİNİDİR: başka sekansta ya da aynı sekansta katman eklenip silinince / yeniden adlandırılınca
-     * aynı dizin başka katmanı gösterir (müzik A2'den A3'e kayar, "korunan A2" boş katman olur). Öneriye dön.
+     * Seçimler katman DİZİNİDİR: katman eklenip silinince / yeniden adlandırılınca aynı dizin başka katmanı gösterir
+     * (müzik A2'den A3'e kayar, "korunan A2" boş katman olur): imza değiştiyse öneriye dön. Yalnız sekans kimliği
+     * değiştiyse (Kopya sekansta'nın açtığı kopya, aynı düzende başka sekans) seçimler sürer: düşürülürse elle korunan
+     * müzik ikinci geçişte kesilirdi.
      */
-    if (!katman || String(katman.seqId) !== String(r.seqId) || katmanImzasi(katman) !== katmanImzasi(r)) { secDinle = null; secKoru = null; }
+    var imza = katmanImzasi(r);
+    if (secImza !== imza) { secDinle = null; secKoru = null; }
+    secImza = imza;
     katman = r;
     katmanAralik = ar.end > ar.start ? ar : { start: 0, end: Number(r.duration) || 0 };
     katmanCiftleri = S.bagliCiftler(katman);
@@ -631,6 +679,7 @@ window.KCut = (function () {
       return;
     }
     katmanIpucu("");
+    sonKoruSayisi = o.koru.video.length + o.koru.audio.length;
     var ar = oneriAraligi();
     dinSatir.hidden = kapsam === "clip";
     korSatir.hidden = false;
@@ -727,15 +776,19 @@ window.KCut = (function () {
   }
 
   /*
-   * In → Out / Sekans: dinlenecek ses katmanları KS_exportAudio ile tek WAV'a (ofsetiyle). Döner: sahte klip
-   * { mediaPath: wav, inPoint: 0, outPoint: süre, clipStart: ofset, clipEnd, kapsam, seqId, dinle } | null (iptal /
-   * uyarı; durum yazıldı). Hata fırlatır (analyze yakalar).
+   * In → Out / Sekans: dinlenecek ses katmanları KS_exportAudio ile tek WAV'a (ofsetiyle). Aralık katmanlarla aynı
+   * okumada Premiere'in kendi In / Out'undan (katmanKapsam); dışa aktarılan karışımın ofset / süresi o aralıkla
+   * karşılaştırılır. Döner: sahte klip { mediaPath: wav, inPoint: 0, outPoint: süre, clipStart: ofset, clipEnd, kapsam,
+   * seqId, dinle } | null (iptal / uyarı; durum yazıldı). Hata fırlatır (analyze yakalar).
    */
-  async function sekansSesiHazirla(aralik, ctx, jeton) {
+  async function sekansSesiHazirla(ctx, jeton) {
     status("Katmanlar okunuyor…");
-    var lay = await katmanlariOku(aralik);
-    if (!lay) throw new Error("katmanlar okunamadı — Premiere meşgul olabilir, yeniden dene.");
+    var lay = await katmanlariOku();
+    if (!lay || !katmanKapsam || katmanKapsam.scope !== kapsam) throw new Error("katmanlar okunamadı — Premiere meşgul olabilir, yeniden dene.");
     if (jeton && jeton.iptalEdildi) { status("İptal edildi.", "warn"); return null; }
+    var okunan = katmanKapsam;
+    var aralik = okunan.aralik;
+    if (aralik.hata) { status(kapsamHataMetni(aralik.hata), "warn"); return null; }
     var o = korumaHesapla();
     if (!o || !o.dinle.length) {
       var det = el("cut-katman");
@@ -763,6 +816,17 @@ window.KCut = (function () {
     var seqId = String(ex.seqId || lay.seqId || ctx.sequenceId || "");
     if (ex.seqId && lay.seqId && String(ex.seqId) !== String(lay.seqId)) {
       throw new Error("etkin sekans analiz sırasında değişti — Sessizlikleri yeniden bul.");
+    }
+    /*
+     * Karışım, katmanların (ve önerilen Dinlenecek ses'in) okunduğu aralığın mı? Arada In / Out taşındıysa ya da sekans
+     * sonu değiştiyse dinlenen katmanlar başka aralığa göre seçildi: o aralıkta sessiz olan karışım tümüyle "sessizlik"
+     * görünür ve harita konuşmayı kesmeyi önerirdi.
+     */
+    if (okunan.kap && !S.disaAktarimTutar(okunan.kap, ex)) {
+      K.log("[kesim] disa aktarim araligi okunan kapsamla tutmuyor: ofset=" + ex.offset + " sure=" + ex.duration +
+        " okunan=" + JSON.stringify(okunan.kap));
+      throw new Error(kapsam === "inout" ? "In / Out analiz sırasında değişti — Sessizlikleri yeniden bul." :
+        "sekansın süresi analiz sırasında değişti — Sessizlikleri yeniden bul.");
     }
     var dur = Number(ex.duration) > 0 ? Number(ex.duration) : aralik.end - aralik.start;
     var ofset = Number(ex.offset) || 0;
@@ -1157,6 +1221,21 @@ window.KCut = (function () {
         farkUyarisi = true;
         return;
       }
+      /*
+       * Bu oturumda düzen okunmuştu ama şimdi yok (başka sekansa geçildi, analizdeki okuma başarısız oldu): korunan
+       * katmanlar bilinmeden KS_applyCuts korumasız giderdi. Önce yeniden okunur; okunamazsa ve son düzende korunan
+       * katman varsa uygulanmaz.
+       */
+      if (!katman && secImza !== null) {
+        var korKlip = clip;
+        status("Katmanlar okunuyor…");
+        await katmanlariOku({ start: clip.clipStart, end: clip.clipEnd });
+        if (!clip || clip !== korKlip) return;
+        if (!katman && sonKoruSayisi > 0) {
+          status("Katmanlar okunamadı: korunan katmanlar bilinmeden kesim uygulanmaz. Katmanlar › Yenile'ye bas, sonra yeniden Kesimleri uygula.", "warn");
+          return;
+        }
+      }
       status("Uygulanıyor…");
       var mode = etkinMod();
       if (bosluk && mode === "ripple") mode = "gap";
@@ -1363,9 +1442,13 @@ window.KCut = (function () {
 
     KApp.onContext(function (ctx) {
       refreshButton();
-      // başka sekansa geçildi: okunan katman düzeni ve seçimler o sekansın değil
+      /*
+       * Başka sekansa geçildi: okunan katman düzeni o sekansın değil, düşer (bir sonraki okuma yeni sekanstan). Seçimler
+       * (secDinle / secKoru) DÜŞMEZ: katman imzasına (secImza) bağlıdır, yeni düzen aynı imzayı taşıyorsa sürer
+       * (katmanOkuIc). Kopya sekansta Uygula kopyayı etkin yapar: burada silinirse ikinci geçiş korumasız giderdi.
+       */
       if (katman && ctx.sequenceId && String(ctx.sequenceId) !== String(katman.seqId)) {
-        katman = null; katmanCiftleri = []; secDinle = null; secKoru = null;
+        katman = null; katmanCiftleri = []; katmanKapsam = null;
         renderKatmanlar();
         renderUyarilar();
       } else if (!katman && !katmanOkunuyor && katmanBolumuAcik()) {

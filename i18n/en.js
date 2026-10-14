@@ -2970,6 +2970,12 @@
     "✕ Katman düzeni değişti (katman eklendi, silindi ya da yeniden adlandırıldı): kesimler uygulanmadı. Katmanlar yeniden okunuyor: korunanları kontrol et, sonra yeniden Kesimleri uygula.":
       "✕ The track layout changed (a track was added, deleted or renamed): the cuts weren't applied. Reading the tracks again: check the protected tracks, then click Apply cuts again.",
     "etkin sekans analiz sırasında değişti — Sessizlikleri yeniden bul.": "the active sequence changed during the analysis — run Find silences again.",
+    // the export's In / Out (or sequence end) no longer matches the range the tracks were read for
+    "In / Out analiz sırasında değişti — Sessizlikleri yeniden bul.": "In / Out changed during the analysis — run Find silences again.",
+    "sekansın süresi analiz sırasında değişti — Sessizlikleri yeniden bul.": "the sequence length changed during the analysis — run Find silences again.",
+    // Apply re-reads the track layout after a sequence switch; if it can't, it won't send cuts without the protected tracks
+    "Katmanlar okunamadı: korunan katmanlar bilinmeden kesim uygulanmaz. Katmanlar › Yenile'ye bas, sonra yeniden Kesimleri uygula.":
+      "Couldn't read the tracks: cuts aren't applied without knowing the protected tracks. Click Tracks › Refresh, then click Apply cuts again.",
     "⚠ Korunan video katmanı kaymasın diye kesimler boşluk bırakılarak silindi.": "⚠ Cuts were removed leaving gaps so the protected video track wouldn't drift.",
     "✕ Etkin sekans değişti: kesimler uygulanmadı. Analiz edilen sekansı aç ya da Sessizlikleri yeniden bul.": "✕ The active sequence changed: the cuts weren't applied. Open the analyzed sequence or run Find silences again.",
     // host.jsx (KS_applyCuts expectSeqId)
