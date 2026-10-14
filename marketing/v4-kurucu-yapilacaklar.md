@@ -1560,3 +1560,38 @@ değişmedi; 3.4 yayınında Eğri'yi anlatırken de "Bezier tutamacı" deme, "h
 
 **10.5 Ses düzeyi sonra (bilgi).** v1 yalnız video katmanlarındaki özellikleri tarar (arayüzde yazıyor). Ses Volume
 anahtarları için ayrı bir adım gerekir; şimdilik bir şey yapma.
+
+### Adım 11: Kayıt tabanlı güvenli kaldırma: Geçiş, Zoom, Hareket önayarı (ücretsiz)
+
+Ne değişti: `KS_applyCutTransition`, `KS_autoZoom` ve `KS_applyMotionPreset` artık yazdıkları her özellik için bir kayıt
+döndürür (klip nodeId, sekans, özellik kimliği, yazılan anahtar zamanları, yazmadan önceki kenar değerleri, kaynak çapası);
+panel bunları `js/kayit-kaldir.js` ile proje başına saklar (adım 9'un `SufloKeyRecords` deposu, Eğri ile ortak). Yeni host
+işlevi `KS_removeSufloKeys` yalnız canlı kaydın (iki uç yerinde ve zamanların en az %60'ı) Suflo'nun yazdığı ve hâlâ duran
+anahtarlarını siler, kenar değerlerini geri koyar, updateUI ile tazeler; taşınan klibi nodeId ile bulur, bulunamayan klibin
+kaydını saklar, Premiere'de geri alınmış uygulamanın kaydını bitirir. Geçişler'e **Geçişi kaldır**, Hareket önayarlarına
+**Önayarı kaldır** geldi; **Zoom'u kaldır** artık kullanıcının Ölçek anahtarlarını silmiyor. Uygulama bildirimlerinde kapısız
+**Geri al**. Kaydı olmayan zoom ve geçişte eski yöntem yalnız onayla çalışır. Kaldırmak her tierde ücretsiz (Pro kapısı ve
+deneme hakkı yok). OpenCurve'den yalnız "canlılık parmak izli kayıt" fikri alındı; kod yok.
+
+**11.1 Fiyat (bilgi).** Senin kuralın uygulandı: Suflo'nun yazdığını kaldırmak hiçbir zaman ücretli değil. Geçişler ve Zoom
+uygulamak Pro (3 deneme hakkı) olarak kaldı; kaldırma düğmeleri ücretsizde de kilitsiz. Sunucu tarafında yapılacak bir şey yok.
+
+**11.2 Eski önayarlar için karar (5 dk).** 3.3 ve öncesinde uygulanan Hareket önayarlarının kaydı yok; plan "kayıt yoksa
+bugünkü davranış onayla" diyor, ama önayarlarda bugün hiçbir kaldırma yolu yoktu ve bir önayarın penceresi (giriş / çıkış /
+playhead çevresi) sonradan bilinemiyor. Bu yüzden Önayarı kaldır kaydı olmayan önayarı tahminle silmez; kullanıcıya Ctrl+Z ya
+da Effect Controls'ü önerir. Geçişte eski yöntem, uygulamanın kendisinin de temizlediği kesim penceresidir (onaylı). Önayar
+için de onaylı bir "giriş / çıkış penceresini temizle" istersen söyle.
+
+**11.3 Zoom'un eski yöntemi (bilgi, sonra düzeltilebilir).** Onaylı eski yol 3.3'teki `kaldir()`'ın aynısı: klibin tüm Ölçek
+anahtarlarını silip iki düz anahtar yazar ve Konum'u sıfırlar. Düz değer klibin başındaki değerden okunur; zoom klibin başında
+yakınlaşmış başlıyorsa düz değer de yakın kalır (3.3'ten beri var olan sınır; kayıtlı yol bunu yaşamaz). Düzeltmek ayrı bir iş.
+
+**11.4 Yerel depo (bilgi).** Kayıtlar bu bilgisayarın panel deposunda (proje yolu karma anahtarla; projede en çok 300, toplam
+2000 kayıt, en eskiler tek tek atılır). Proje başka bilgisayarda açılırsa kayıt yok: eski yöntem (onaylı) ya da Ctrl+Z.
+Projenin içine yazmak (marker / proje meta verisi) sonraki bir karar.
+
+**11.5 Premiere'de dene (25–30 dk).** `marketing/v3.4-deneme-listesi.md` › `## 11`. Özellikle **11.2** (kendi anahtarın kalır,
+kenarlar eski değerde), **11.6** (eski geçiş: onay, Karartma'dan sonra klip siyah kalmaz), **11.7** (zoom kaldırma senin Ölçek
+anahtarını silmez), **11.9** (önayar kaldırınca Opaklık 80'e döner) ve **11.10** (hakları bitmiş ücretsiz kullanıcı kaldırabilir).
+Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de. `setTimeVarying(false)` + `setValue` ile sabit değere
+dönüşün Premiere'de anahtar bırakmadığını (Effect Controls'te kronometre kapalı) doğrula.
