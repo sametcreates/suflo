@@ -1053,6 +1053,27 @@
         <li><span>3</span> Turuncu bölümleri kontrol et → <b>Kesimleri uygula</b></li>
       </ol>
     </div>
+    <!-- 3.4 adım 7: kesim kapsamı ve korunan katmanlar (js/magiccut.js kapsamSec / renderKatmanlar) -->
+    <div class="seg-ctl full" id="cut-scope" role="group" aria-label="Kesim kapsamı">
+      <button class="on" data-s="clip" type="button">Seçili klip</button>
+      <button data-s="inout" type="button" title="Sekansın In ve Out noktaları arası: seçili ses katmanlarının karışımı dinlenir">In → Out</button>
+      <button data-s="entire" type="button" title="Tüm sekans: seçili ses katmanlarının karışımı dinlenir">Sekans</button>
+    </div>
+    <details class="adv cut-katman" id="cut-katman">
+      <summary>Katmanlar <span id="cut-katman-ozet" class="dim"></span></summary>
+      <p id="cut-katman-ipucu" class="hint"></p>
+      <div id="cut-dinle-satir" class="cut-iz-satir" hidden>
+        <div class="cut-iz-baslik">Dinlenecek ses</div>
+        <div id="cut-dinle-izler" class="tracks"></div>
+        <p class="hint">Sessizlik bu katmanların karışımında aranır. Müziği dinlemeye katma: sessizlikleri doldurur.</p>
+      </div>
+      <div id="cut-koru-satir" class="cut-iz-satir" hidden>
+        <div class="cut-iz-baslik">Kesilmeyecek katmanlar</div>
+        <div id="cut-koru-izler" class="tracks"></div>
+        <p class="hint">Korunan katman kesilmez ve kaymaz (arka plan müziği gibi). Kesikli çerçeve: öneri.</p>
+      </div>
+      <button id="cut-katman-yenile" class="btn tiny" type="button" title="Sekansın katmanlarını Premiere'den yeniden oku">Yenile</button>
+    </details>
     <div class="action-bar">
       <button id="cut-analyze" class="btn primary big" disabled>
         <span class="btn-label">Sessizlikleri bul</span>
@@ -1100,6 +1121,8 @@
         <summary>Kesim listesi</summary>
         <div id="cut-ranges" class="segments"></div>
       </details>
+      <!-- korunan katman uyarıları: video + ripple (Boşluk bırakarak uygula), bağlı çiftin ayrılması -->
+      <div id="cut-koru-uyari" class="cut-koru-uyari" hidden></div>
       <div class="seg-ctl full" id="cut-target">
         <button class="on" data-m="clone">Kopya sekansta<em>önerilen</em></button>
         <button data-m="here">Bu sekansta</button>

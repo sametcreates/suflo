@@ -154,7 +154,14 @@ var ZORUNLU = {
   "cut-minkeep": "Min. konusma kaydiricisi",
   "cut-minkeep-val": "Min. konusma degeri",
   "cut-noise-auto": "Otomatik esik dugmesi",
-  "cut-wave": "Ses zarfi tuvali"
+  "cut-wave": "Ses zarfi tuvali",
+  // 3.4 adim 7: kesim kapsami ve korunan katmanlar
+  "cut-scope": "Kesim kapsami (Secili klip / In-Out / Sekans)",
+  "cut-katman": "Katmanlar bolumu",
+  "cut-dinle-izler": "Dinlenecek ses cipleri",
+  "cut-koru-izler": "Kesilmeyecek katman cipleri",
+  "cut-koru-uyari": "Korunan katman uyarilari",
+  "cut-katman-yenile": "Katmanlari yenile"
 };
 var kayip = [];
 Object.keys(ZORUNLU).forEach(function (id) {
@@ -679,7 +686,36 @@ ok("3.4 Kesim: CSS taralı ada + dalga tuvali",
   /\.cut-bar \.cut\.ada \{[^}]*repeating-linear-gradient/.test(cssSrc) && /\.cut-wave \{/.test(cssSrc) && /\.cut-wave\[hidden\] \{ display: none; \}/.test(cssSrc));
 ok("3.4 Kesim: kaydırıcılar ~100 ms toplanır; Pro kapısı değişmedi (analiz ve Uygula 'cut', deneme: true)",
   /var CANLI_MS = 100;/.test(mcSrc) && /\["cut-noise", "cut-minsil", "cut-pad", "cut-minkeep"\]\.forEach/.test(mcSrc) &&
-  /Pro\.gate\("cut", \{ deneme: true, yeniden: analyze \}\)/.test(mcSrc) && /Pro\.gate\("cut", \{ deneme: true, yeniden: apply \}\)/.test(mcSrc));
+  /Pro\.gate\("cut", \{ deneme: true, yeniden: analyze \}\)/.test(mcSrc) && /Pro\.gate\("cut", \{ deneme: true, yeniden: bosluk \? boslukluUygula : apply \}\)/.test(mcSrc));
+
+/* ---------- 3.4 adım 7: kesim kapsamı ve korunan katmanlar ---------- */
+var kapsamHtml = cutHtml.slice(cutHtml.indexOf('id="cut-scope"'), cutHtml.indexOf("</div>", cutHtml.indexOf('id="cut-scope"')));
+ok("3.4 kapsam: #cut-scope üç düğme (Seçili klip açık | In → Out | Sekans), Sessizlikleri bul'dan önce",
+  /<button class="on" data-s="clip" type="button">Seçili klip<\/button>/.test(kapsamHtml) && /data-s="inout"[^>]*>In → Out</.test(kapsamHtml) &&
+  /data-s="entire"[^>]*>Sekans</.test(kapsamHtml) && cutHtml.indexOf('id="cut-scope"') < cutHtml.indexOf('id="cut-analyze"') &&
+  /class="seg-ctl full" id="cut-scope"/.test(cutHtml), kapsamHtml.slice(0, 200));
+var katmanHtml = cutHtml.slice(cutHtml.indexOf('id="cut-katman"'), cutHtml.indexOf("</details>", cutHtml.indexOf('id="cut-katman"')));
+ok("3.4 katmanlar: <details> içinde 'Dinlenecek ses' ve 'Kesilmeyecek katmanlar' çip satırları (gizli başlar), Yenile",
+  /<details class="adv cut-katman" id="cut-katman">/.test(cutHtml) && /id="cut-dinle-satir"[^>]* hidden/.test(katmanHtml) && /id="cut-koru-satir"[^>]* hidden/.test(katmanHtml) &&
+  katmanHtml.indexOf("Dinlenecek ses") !== -1 && katmanHtml.indexOf("Kesilmeyecek katmanlar") !== -1 &&
+  /id="cut-dinle-izler" class="tracks"/.test(katmanHtml) && /id="cut-koru-izler" class="tracks"/.test(katmanHtml) && katmanHtml.indexOf('id="cut-katman-yenile"') !== -1 &&
+  cutHtml.indexOf('id="cut-katman"') > cutHtml.indexOf('id="cut-scope"') && cutHtml.indexOf('id="cut-katman"') < cutHtml.indexOf('id="cut-analyze"'));
+var sonucHtml = cutHtml.slice(cutHtml.indexOf('id="cut-result"'));
+ok("3.4 uyarı kutusu #cut-koru-uyari sonuçta, Kesimleri uygula'dan (ve yöntemden) önce, gizli başlar",
+  /<div id="cut-koru-uyari" class="cut-koru-uyari" hidden><\/div>/.test(sonucHtml) && sonucHtml.indexOf('id="cut-koru-uyari"') < sonucHtml.indexOf('id="cut-target"') &&
+  sonucHtml.indexOf('id="cut-koru-uyari"') < sonucHtml.indexOf('id="cut-apply"'));
+ok("3.4 CSS: öneri çipi kesikli, kilitli çip soluk, uyarı kutusu; yeni kurallarda flex gap yok (CEF 74)",
+  /\.track-chip\.oneri \{[^}]*dashed/.test(cssSrc) && /\.track-chip\.kilitli \{/.test(cssSrc) && /\.cut-koru-uyari\[hidden\] \{ display: none; \}/.test(cssSrc) &&
+  !/gap:/.test(cssSrc.slice(cssSrc.indexOf(".cut-katman {"), cssSrc.indexOf(".mc-birlesik {"))));
+ok("3.4 katmanlar: KS_getTrackLayout yalnız katmanlariOku (katmanOkuIc) içinde; init doğrudan okumaz (bölüm açılınca / kapsamda / Yenile'de)",
+  (mcSrc.match(/K\.call\("KS_getTrackLayout"/g) || []).length === 1 && fnGovde(mcSrc, "async function katmanOkuIc(").indexOf('K.call("KS_getTrackLayout"') !== -1 &&
+  /det\.addEventListener\("toggle", function \(\) \{ if \(det\.open && !katman && !katmanOkunuyor\) katmanlariOku\(\); \}\)/.test(mcSrc));
+ok("3.4 sekans kapsamı: KS_exportAudio dinlenecek katmanlarla, İptal dışa aktarımda kilitli; WAV kapanışta silinir",
+  /K\.call\("KS_exportAudio", \{ scope: kapsam, tracks: o\.dinle, epr: eprListesi\(\), unmuteWanted: true \}/.test(mcSrc) &&
+  fnGovde(mcSrc, "async function sekansSesiHazirla(").indexOf("iptalKilit(true)") < fnGovde(mcSrc, "async function sekansSesiHazirla(").indexOf('K.call("KS_exportAudio"') &&
+  /window\.addEventListener\("unload", wavSil\)/.test(mcSrc));
+ok("3.4 Uygula: protect yalnız korunan katman varsa (korumaYuku), expectSeqId analiz edilen sekans",
+  /if \(korYuk\) yuk\.protect = korYuk;/.test(mcSrc) && /if \(analizSeqId\) yuk\.expectSeqId = analizSeqId;/.test(mcSrc));
 
 // Analiz + kaydırıcı önizlemesi + Otomatik deneme hakkı harcamaz; yalnız Uygula harcar (sahte köprü, ffmpeg yok)
 var kabi = require("./_kesim-kabi.js");
@@ -722,7 +758,31 @@ var bekleyenKesim = (function () {
   }).catch(function (e) { ok("3.4 kesim kabı çöktü: " + (e && e.stack || e), false); });
 })();
 
-Promise.all([bekleyenUI, bekleyenKesim]).then(function () {
+// 3.4 adım 7: panel açılışında Premiere'e katman sorulmaz; kapsam düğmesi okur, çipler deneme hakkı harcamaz
+var bekleyenKapsam = (function () {
+  var duzen = { ok: true, seqId: "s1", duration: 30,
+    video: [{ name: "Video 1", clipCount: 1, first: 0, last: 30, klipler: [{ s: 0, e: 30, yol: "a.mp4", hiza: 0 }] }],
+    audio: [{ name: "Audio 1", clipCount: 1, first: 0, last: 30, klipler: [{ s: 0, e: 30, yol: "a.mp4", hiza: 0, bag: [{ s: 0, e: 30, tur: "Video" }] }] },
+      { name: "BGM", clipCount: 1, first: 0, last: 30, klipler: [{ s: 0, e: 30, yol: "m.mp3", hiza: 0, bag: [] }] }] };
+  var p = kabi.kesimPaneli({ K: { iptalJetonu: function () { return { iptal: function () {} }; } }, ffmpeg: "ffmpeg", clip: null,
+    ctx: { hasSeq: true, sequenceId: "s1", seqIn: 0, seqOut: 30, seqDur: 30, frame: 0.04 },
+    call: function (fn) { return fn === "KS_getTrackLayout" ? duzen : { ok: false, error: fn }; } });
+  ok("3.4 kapsam: panel açılışında Premiere'e hiçbir şey sorulmaz (katman okunmaz)", p.kayit.call.length === 0, p.kayit.call.length);
+  p.kapsam("entire");
+  return p.bekle(10).then(function () {
+    var cagri = p.kayit.call.filter(function (c) { return c.fn === "KS_getTrackLayout"; });
+    var kor = p.el("cut-koru-izler").children;
+    ok("3.4 kapsam Sekans: katmanlar bir kez okundu; 'BGM' adlı ses katmanı korunuyor (önceden işaretli), video işaretsiz",
+      cagri.length === 1 && kor.length === 3 && / on/.test(kor[2].className) && !/ on/.test(kor[0].className) && p.el("cut-katman").open === true,
+      kor.map(function (b) { return b.className; }).join(" | "));
+    kor[0].onclick(); kor = p.el("cut-koru-izler").children;
+    p.el("cut-dinle-izler").children[1].onclick();
+    ok("3.4 çipler: koruma / dinleme değişimi deneme hakkı harcamaz, Premiere'e gitmez",
+      p.kayit.harca.length === 0 && p.kayit.gate.length === 0 && p.kayit.call.length === 1 && / on/.test(kor[0].className) && / on/.test(p.el("cut-dinle-izler").children[1].className));
+  });
+})().catch(function (e) { ok("3.4 kapsam kabı çöktü: " + (e && e.stack || e), false); });
+
+Promise.all([bekleyenUI, bekleyenKesim, bekleyenKapsam]).then(function () {
   console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
   process.exit(kaldi ? 1 : 0);
 });

@@ -273,6 +273,191 @@ async function canliTestler() {
   await kararTestleri(K, klip);
   await iptalTestleri(K, stereo, klip);
   await sahteTestler(K);
+  await kapsamTestleri(K, stereo);
+}
+
+/*
+ * ---- 3.4 adım 7: In → Out / Sekans kapsamı ve korunan katmanlar (gerçek ffmpeg, sahte Premiere) ----
+ * KS_exportAudio sahtesi stereo.wav'ın kopyasını "sekans karışımı" diye verir (ofset 10 sn = In noktası).
+ * Zarf ve silencedetect bu WAV'da koşar; kesimler ofsetle sekans zamanına çevrilir. Uygula'ya protect ve
+ * expectSeqId gider; WAV Uygula'dan, kapsam / sekans / dinlenen ses değişiminden sonra silinir.
+ */
+function duzenYap(o) {
+  o = o || {};
+  function iz(i, ad, klipler, ek) {
+    var x = { index: i, name: ad, locked: false, muted: false, clipCount: klipler.length, first: 0, last: 60, hasMulticam: false, hasMerged: false, klipler: klipler };
+    for (var k in (ek || {})) x[k] = ek[k];
+    return x;
+  }
+  return { ok: true, seqId: o.seqId || "seq-1", name: "Vlog", duration: 60,
+    video: [iz(0, "Video 1", [{ s: 0, e: 60, ad: "Kamera", yol: "cam.mp4", hiza: 0 }]), iz(1, "Video 2", [{ s: 5, e: 50, ad: "Başlık", yol: "baslik.mogrt", hiza: -5 }], { first: 5, last: 50 })],
+    audio: o.yalnizMuzik ? [iz(0, "Müzik", [{ s: 0, e: 60, ad: "sarki.mp3", yol: "sarki.mp3", hiza: 0, bag: [] }])] :
+      [iz(0, "Audio 1", [{ s: 0, e: 60, ad: "Kamera", yol: "cam.mp4", hiza: 0, bag: [{ s: 0, e: 60, yol: "cam.mp4", tur: "Video" }] }]),
+        iz(1, "Müzik", [{ s: 0, e: 60, ad: "sarki.mp3", yol: "sarki.mp3", hiza: 0, bag: [] }])] };
+}
+function kapsamPaneli(K, stereo, o) {
+  o = o || {};
+  var wavlar = [], sayac = 0;
+  var p = kabi.kesimPaneli({ K: K, ffmpeg: FF, clip: o.clip || null,
+    ctx: { hasSeq: true, sequenceId: "seq-1", seqIn: o.seqIn !== undefined ? o.seqIn : 10, seqOut: o.seqOut !== undefined ? o.seqOut : 15.1, seqDur: 60, frame: 0.04 },
+    call: function (fn, yuk) {
+      if (fn === "KS_getTrackLayout") return duzenYap(o.duzen);
+      if (fn === "KS_exportAudio") {
+        if (o.disaAktarmaHata) return { ok: false, error: "Ses disari alinamadi." };
+        var hedef = pathm.join(TMP, "seq_karisim_" + (++kapsamWavSayac) + ".wav");
+        fs.copyFileSync(stereo, hedef);
+        wavlar.push(hedef);
+        return { ok: true, wav: hedef, offset: yuk.scope === "inout" ? 10 : 0, duration: 5.1 };
+      }
+      if (fn === "KS_applyCuts") return o.uygula ? o.uygula(yuk) : { ok: true, newSeq: "Vlog - kopya", removed: 4, selected: 0, rippleFallback: false, protectedSkipped: { video: 0, audio: 1 } };
+      return { ok: false, error: "beklenmeyen " + fn };
+    } });
+  p.wavlar = wavlar;
+  p.cagrilar = function (fn) { return p.kayit.call.filter(function (x) { return x.fn === fn; }); };
+  return p;
+}
+var kapsamWavSayac = 0;
+function cipler(p, id) {
+  return p.el(id).children.map(function (b) {
+    var sp = b.children.filter(function (c) { return c.tagName === "SPAN"; })[0];
+    return (sp ? sp.textContent : "?") + (/\bon\b/.test(b.className) ? "+" : "") + (/oneri/.test(b.className) ? "~" : "");
+  });
+}
+
+async function kapsamTestleri(K, stereo) {
+  var beklenen = S.kesimlereCevir(silencedetect(stereo, -38, 0.8, 0, 5.1), { pay: 0.15, sure: 5.1 }).kesimler;
+
+  /* a) In → Out: katmanlar, dışa aktarım, ofset, Uygula'da protect + expectSeqId, WAV silinir */
+  var p = kapsamPaneli(K, stereo);
+  ok("kapsam: seçili klip yokken Sessizlikleri bul kapalı", p.el("cut-analyze").disabled === true, p.el("cut-status").textContent);
+  p.kapsam("inout");
+  await p.bekle(20);
+  var lc = p.cagrilar("KS_getTrackLayout");
+  ok("kapsam In → Out: katmanlar okundu (klipler, In–Out aralığı), Sessizlikleri bul açık",
+    lc.length === 1 && lc[0].payload.klipler === true && lc[0].payload.start === 10 && Math.abs(lc[0].payload.end - 15.1) < 1e-9 && p.el("cut-analyze").disabled === false,
+    JSON.stringify(lc.map(function (x) { return x.payload; })));
+  ok("çip satırları: Dinlenecek ses A1 (kamera sesi), Müzik dinlenmez",
+    p.el("cut-dinle-satir").hidden === false && JSON.stringify(cipler(p, "cut-dinle-izler")) === JSON.stringify(["A1+", "A2 · Müzik"]), JSON.stringify(cipler(p, "cut-dinle-izler")));
+  ok("çip satırları: Kesilmeyecek katmanlar V1 V2 A1 A2 — yalnız 'Müzik' işaretli (video hiç)",
+    p.el("cut-koru-satir").hidden === false && JSON.stringify(cipler(p, "cut-koru-izler")) === JSON.stringify(["V1", "V2", "A1", "A2 · Müzik+"]), JSON.stringify(cipler(p, "cut-koru-izler")));
+  ok("katman özeti: '1 dinlenen · 1 korunan'", p.el("cut-katman-ozet").textContent === "1 dinlenen · 1 korunan", p.el("cut-katman-ozet").textContent);
+
+  await p.tikla("cut-analyze");
+  var ex = p.cagrilar("KS_exportAudio");
+  ok("analiz: KS_exportAudio In/Out, yalnız dinlenecek A1, susturulmuşsa açılır",
+    ex.length === 1 && ex[0].payload.scope === "inout" && JSON.stringify(ex[0].payload.tracks) === "[0]" && ex[0].payload.unmuteWanted === true,
+    JSON.stringify(ex.length && ex[0].payload));
+  ok("analiz: zarf karışım WAV'ından (tek runAkis), silencedetect yok, hak düşmedi",
+    p.kayit.runAkis.length === 1 && p.kayit.runAkis[0].indexOf(p.wavlar[0]) !== -1 && p.kayit.run.length === 0 && p.kayit.harca.length === 0 && /^2 kesim/.test(p.el("cut-summary").textContent),
+    p.el("cut-summary").textContent + " / " + p.el("cut-status").textContent);
+  var satir0 = p.el("cut-ranges").children[0].children[1].textContent;
+  // liste önizlemeyi (zarf) gösterir: silencedetect'le ±50 ms, ekranda onda bire yuvarlı
+  ok("kesim listesi sekans zamanında (In 10 sn + karışımdaki konum)", /^0:1\d\.\d$/.test(satir0) && Math.abs(parseFloat(satir0.slice(2)) - (10 + beklenen[0].start)) <= 0.11,
+    satir0 + " beklenen ~" + (10 + beklenen[0].start).toFixed(2));
+  await p.tikla("cut-apply");
+  var ac = p.cagrilar("KS_applyCuts");
+  ok("Uygula: kesimler sekans zamanında (ofset 10), protect A2, expectSeqId seq-1, kopya + ripple",
+    ac.length === 1 && Math.abs(ac[0].payload.ranges[0].start - (10 + beklenen[0].start)) < 1e-6 && Math.abs(ac[0].payload.ranges[1].end - (10 + beklenen[1].end)) < 1e-6 &&
+    JSON.stringify(ac[0].payload.protect) === JSON.stringify({ video: [], audio: [1] }) && ac[0].payload.expectSeqId === "seq-1" &&
+    ac[0].payload.cloneFirst === true && ac[0].payload.removeMode === "ripple" && p.kayit.run.length === 1 && p.kayit.run[0].indexOf(p.wavlar[0]) !== -1,
+    JSON.stringify(ac.length && ac[0].payload));
+  ok("Uygula: hak bir kez düştü, toast korunan katmanı söyler, karışım WAV'ı silindi",
+    p.kayit.harca.length === 1 && p.kayit.toast.some(function (t) { return /korunan: A2/.test(t[0]); }) && !fs.existsSync(p.wavlar[0]),
+    JSON.stringify(p.kayit.toast));
+
+  /* b) Korunan video + ripple: Uygula kapalı, "Boşluk bırakarak uygula" gap gönderir */
+  var q = kapsamPaneli(K, stereo);
+  q.kapsam("entire");
+  await q.bekle(20);
+  await q.tikla("cut-analyze");
+  ok("Sekans kapsamı: KS_exportAudio entire", q.cagrilar("KS_exportAudio")[0].payload.scope === "entire" && /^2 kesim/.test(q.el("cut-summary").textContent), q.el("cut-summary").textContent);
+  q.el("cut-koru-izler").children[1].onclick();   // V2'yi koru
+  var uyari = q.el("cut-koru-uyari");
+  var bosluk = uyari.children.filter(function (c) { return c.id === "cut-bosluk-uygula"; })[0];
+  ok("korunan V2 + ripple (Kopya sekansta): uyarı görünür, Kesimleri uygula kapalı, Boşluk bırakarak uygula açık",
+    uyari.hidden === false && /Korunan video katmanı \(V2\) Ripple'da kaymaz/.test(uyari.children[0].textContent) && q.el("cut-apply").disabled === true && bosluk && bosluk.disabled === false,
+    uyari.children.map(function (c) { return c.textContent; }).join(" | "));
+  await q.tikla("cut-apply");
+  ok("korunan V2 + ripple: düz Uygula hiçbir şey göndermez", q.cagrilar("KS_applyCuts").length === 0 && q.kayit.run.length === 0);
+  await bosluk.onclick();
+  var qa = q.cagrilar("KS_applyCuts");
+  ok("Boşluk bırakarak uygula: removeMode gap, protect V2 + A2, kopya sekansta",
+    qa.length === 1 && qa[0].payload.removeMode === "gap" && JSON.stringify(qa[0].payload.protect) === JSON.stringify({ video: [1], audio: [1] }) && qa[0].payload.cloneFirst === true,
+    JSON.stringify(qa.length && qa[0].payload));
+
+  /* c) Bağlı çift uyarısı: kamera sesi A1 korunurken görüntüsü V1 kesiliyor */
+  var r = kapsamPaneli(K, stereo);
+  r.kapsam("inout");
+  await r.bekle(20);
+  await r.tikla("cut-analyze");
+  r.el("cut-koru-izler").children[2].onclick();   // A1'i koru
+  var ru = r.el("cut-koru-uyari");
+  ok("bağlı çift uyarısı: 'Bağlı klipler ayrılacak' + 'A1 korunuyor, V1 kesiliyor' (Uygula açık kalır)",
+    ru.hidden === false && ru.children.some(function (c) { return /Bağlı klipler ayrılacak/.test(c.textContent); }) &&
+    ru.children.some(function (c) { return c.tagName === "UL" && c.children.some(function (li) { return /A1 korunuyor, V1 kesiliyor/.test(li.textContent); }); }) && r.el("cut-apply").disabled === false,
+    ru.children.map(function (c) { return c.textContent; }).join(" | "));
+
+  /* d) Dinlenecek ses değişince analiz bayat: sonuç kapanır, WAV silinir */
+  var wav1 = r.wavlar[0];
+  r.el("cut-dinle-izler").children[1].onclick();   // Müzik'i de dinle
+  ok("dinlenen ses değişti: sonuç kapandı, WAV silindi, 'Sessizlikleri yeniden bul' uyarısı",
+    r.el("cut-result").hidden === true && !fs.existsSync(wav1) && /Dinlenecek ses değişti/.test(r.el("cut-status").textContent) && JSON.stringify(cipler(r, "cut-dinle-izler")) === JSON.stringify(["A1+", "A2 · Müzik+"]),
+    r.el("cut-status").textContent + " " + JSON.stringify(cipler(r, "cut-dinle-izler")));
+  await r.bekle(560);
+  await r.tikla("cut-analyze");
+  ok("yeni analiz iki dinlenen katmanla dışa aktarır", r.cagrilar("KS_exportAudio").length === 2 && JSON.stringify(r.cagrilar("KS_exportAudio")[1].payload.tracks) === "[0,1]" && r.wavlar.length === 2,
+    JSON.stringify(r.cagrilar("KS_exportAudio").map(function (x) { return x.payload.tracks; })));
+
+  /* e) Kapsam / sekans değişimi WAV'ı siler */
+  var wav2 = r.wavlar[1];
+  r.kapsam("clip");
+  ok("kapsam Seçili klip'e döndü: sonuç kapandı, WAV silindi, Dinlenecek ses gizli", r.el("cut-result").hidden === true && !fs.existsSync(wav2) && r.el("cut-dinle-satir").hidden === true);
+  r.kapsam("entire");
+  await r.bekle(580);
+  await r.tikla("cut-analyze");
+  var wav3 = r.wavlar[2];
+  r.ctx(null, { sequenceId: "seq-2" });
+  ok("başka sekansa geçildi: analiz geçersiz, WAV silindi, katmanlar boşaldı",
+    wav3 && r.el("cut-result").hidden === true && !fs.existsSync(wav3) && r.el("cut-koru-satir").hidden === true, wav3);
+
+  /* f) In / Out yok, dinlenecek ses yok, dışa aktarım hatası */
+  var s = kapsamPaneli(K, stereo, { seqIn: 0, seqOut: 0 });
+  s.kapsam("inout");
+  await s.bekle(20);
+  await s.tikla("cut-analyze");
+  ok("In / Out yok: uyarı, dışa aktarım yok", /Sekansta In \/ Out yok/.test(s.el("cut-status").textContent) && s.cagrilar("KS_exportAudio").length === 0, s.el("cut-status").textContent);
+  var t = kapsamPaneli(K, stereo, { duzen: { yalnizMuzik: true } });
+  t.kapsam("entire");
+  await t.bekle(20);
+  await t.tikla("cut-analyze");
+  ok("dinlenecek ses yok (yalnız Müzik): uyarı, dışa aktarım yok", /Dinlenecek bir ses katmanı seç/.test(t.el("cut-status").textContent) && t.cagrilar("KS_exportAudio").length === 0, t.el("cut-status").textContent);
+  var u = kapsamPaneli(K, stereo, { disaAktarmaHata: true });
+  u.kapsam("entire");
+  await u.bekle(20);
+  await u.tikla("cut-analyze");
+  ok("dışa aktarım hatası: '✕' durum, sonuç yok, ffmpeg çalışmadı", /^✕ Ses disari alinamadi/.test(u.el("cut-status").textContent) && u.el("cut-result").hidden === true && u.kayit.runAkis.length === 0, u.el("cut-status").textContent);
+
+  /* g) Seçili klip kapsamı: Katmanlar açılmadıysa Premiere'e katman sorulmaz, protect gönderilmez */
+  var klipK = { mediaPath: stereo, inPoint: 0, outPoint: 5.1, clipStart: 20, clipEnd: 25.1 };
+  var v = kapsamPaneli(K, stereo, { clip: klipK });
+  await v.tikla("cut-analyze");
+  await v.tikla("cut-apply");
+  var va = v.cagrilar("KS_applyCuts");
+  ok("Seçili klip: katman okunmadı, protect yok, expectSeqId analiz edilen sekans",
+    v.cagrilar("KS_getTrackLayout").length === 0 && va.length === 1 && va[0].payload.protect === undefined && va[0].payload.expectSeqId === "seq-1" && Math.abs(va[0].payload.ranges[0].start - (20 + beklenen[0].start)) < 1e-6,
+    JSON.stringify(va.length && va[0].payload));
+
+  /* h) Host expectSeqId'yi tutmadı: Türkçe açıklama, hak düşmez, WAV kalır (yeniden denenebilir) */
+  var w = kapsamPaneli(K, stereo, { uygula: function () { return { ok: false, kod: "sekans", error: "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul." }; } });
+  w.kapsam("entire");
+  await w.bekle(20);
+  await w.tikla("cut-analyze");
+  await w.tikla("cut-apply");
+  ok("expectSeqId tutmadı: '✕ Etkin sekans değişti: kesimler uygulanmadı…', hak düşmedi, sonuç ve WAV duruyor",
+    /^✕ Etkin sekans değişti: kesimler uygulanmadı/.test(w.el("cut-status").textContent) && w.kayit.harca.length === 0 && w.el("cut-result").hidden === false && fs.existsSync(w.wavlar[0]),
+    w.el("cut-status").textContent);
+  w.kapsam("clip");
+  ok("kapsam değişimi bu WAV'ı da siler", !fs.existsSync(w.wavlar[0]));
 }
 
 /*
