@@ -232,6 +232,113 @@ async function main() {
   ok("meşguliyet bitince yazma eylemi yürütülür", r.kod === 200 && r.govde.ok === true);
   ms.durdur();
 
+  /* ---- kapatma anahtarı: kabul edilmiş ama yürütülmemiş istek köprü kapanınca yürütülmez ---- */
+  // (inceleme bulgusu: meşgul beklemesindeki marker isteği köprü kapatıldıktan sonra yine yürütülüyordu)
+  var kYurut = [], kIzin = { duzenleme: true, onay: true }, kMesgul = true;
+  var ks = S.olustur({ dosya: dosya, mesgulBekleme: 5000, izinler: function () { return kIzin; },
+    mesgulMu: function () { return kMesgul; }, yurut: function (ad) { kYurut.push(ad); return { ok: true }; } });
+  var kp = (await ks.baslat()).port, kt = ks._token();
+  bas = Date.now();
+  var kSoz = istek(kp, { token: kt, govde: JSON.stringify({ ad: "suflo_marker_ekle", args: { markerlar: [{ saniye: 1 }] } }) });
+  await bekle(250);
+  ks.durdur("kapat");
+  setTimeout(function () { kMesgul = false; }, 300);
+  r = await kSoz;
+  await bekle(400);
+  ok("meşgul beklemesindeyken köprü kapatılırsa eylem yürütülmez, hemen 503 kopru_kapali", r.kod === 503 && r.govde.hata === "kopru_kapali" && kYurut.length === 0 && Date.now() - bas < 2000,
+    r.kod + " " + js(r.govde) + " " + js(kYurut));
+  // kapatılıp HEMEN yeniden açılsa da eski oturumun isteği yürütülmez (kuşak değişti)
+  kMesgul = true;
+  kp = (await ks.baslat()).port; kt = ks._token();
+  kSoz = istek(kp, { token: kt, govde: JSON.stringify({ ad: "suflo_oynatma_kafasi", args: { saniye: 2 } }) });
+  await bekle(250);
+  ks.durdur("kapat");
+  await ks.baslat();
+  kMesgul = false;
+  r = await kSoz;
+  ok("kapat + yeniden aç: önceki oturumun bekleyen isteği yürütülmez", r.kod === 503 && r.govde.hata === "kopru_kapali" && kYurut.length === 0, js(r.govde) + " " + js(kYurut));
+  // "Düzenlemeye izin ver" bekleme sırasında kapatılırsa: 403 izin_yok, yürütülmez
+  kMesgul = true;
+  kp = ks.port(); kt = ks._token();
+  kSoz = istek(kp, { token: kt, govde: JSON.stringify({ ad: "suflo_marker_ekle", args: { markerlar: [{ saniye: 1 }] } }) });
+  await bekle(250);
+  kIzin.duzenleme = false;
+  kMesgul = false;
+  r = await kSoz;
+  ok("bekleme sırasında düzenleme izni kapatılırsa 403 izin_yok, yürütülmez", r.kod === 403 && r.govde.hata === "izin_yok" && kYurut.length === 0, js(r.govde));
+  ks.durdur();
+
+  /* ---- kapanışta kuyruktaki istekler yanıtsız kalmaz ---- */
+  var qYurut = [];
+  var qs = S.olustur({ dosya: dosya, yurut: function (ad) {
+    qYurut.push(ad);
+    return new Promise(function (res2) { setTimeout(function () { res2({ ok: true }); }, 600); });
+  } });
+  var qp = (await qs.baslat()).port, qt = qs._token();
+  var q1 = istek(qp, { token: qt, govde: JSON.stringify({ ad: "suflo_doktor", args: {} }) });
+  await bekle(100);
+  var q2 = istek(qp, { token: qt, govde: JSON.stringify({ ad: "suflo_baglam", args: {} }) });
+  await bekle(150);
+  bas = Date.now();
+  qs.durdur("kapat");
+  var r2b = await q2;
+  var r1b = await q1;
+  ok("kuyruktaki istek kapanışta hemen 503 kopru_kapali alır (soket açık kalmaz)", r2b.kod === 503 && r2b.govde.hata === "kopru_kapali" && Date.now() - bas < 1000 && qYurut.join(",") === "suflo_doktor",
+    r2b.kod + " " + js(r2b.govde) + " " + js(qYurut));
+  ok("süren eylem yarıda kesilmez, kendi yanıtını alır", r1b.kod === 200 && r1b.govde.ok === true, js(r1b.govde));
+
+  /* ---- hata yolunda da mutlak yol sızmaz ---- */
+  var hs = S.olustur({ dosya: dosya, izinler: function () { return { duzenleme: true, onay: true }; }, yurut: function () {
+    return Promise.reject(new Error("EACCES: permission denied, open '/Users/samet/Projeler/Gizli Musteri/suflo-altyazi.srt'"));
+  } });
+  var hp = (await hs.baslat()).port;
+  r = await istek(hp, { token: hs._token(), govde: JSON.stringify({ ad: "suflo_altyazi_disari", args: { bicim: "srt" } }) });
+  ok("eylem istisnası: yanıtta klasör yolu yok, dosya adı kalır", r.kod === 500 && /suflo-altyazi\.srt/.test(r.govde.mesaj) && !/Gizli|Projeler|Users|samet/.test(r.govde.mesaj), js(r.govde));
+  hs.durdur();
+  var hs2 = S.olustur({ dosya: dosya, yurut: function () { return { ok: false, hata: "x", mesaj: "Dosya okunamadı: C:\\Users\\Samet Kaygısız\\Videos\\ham.mp4" }; } });
+  hp = (await hs2.baslat()).port;
+  r = await istek(hp, { token: hs2._token(), govde: JSON.stringify({ ad: "suflo_baglam", args: {} }) });
+  ok("eylemin ok:false mesajında boşluklu klasör adları da düşer", r.govde.ok === false && r.govde.mesaj === "Dosya okunamadı: ham.mp4", js(r.govde));
+  hs2.durdur();
+
+  /* ---- hız sınırı jetondan sonra: jetonsuz istekler gerçek istemciyi kilitleyemez ---- */
+  var rk = [];
+  var rs = S.olustur({ dosya: dosya, dakikaSiniri: 5, yurut: function () { return { ok: true }; }, kayit: function (k) { rk.push(k); } });
+  var rp = (await rs.baslat()).port, rt = rs._token();
+  var jetonsuz = [];
+  for (var u = 0; u < 15; u++) jetonsuz.push((await istek(rp, { token: "0" })).kod);
+  r = await istek(rp, { token: rt });
+  ok("15 jetonsuz istek 401; ardından gerçek istemci 200 (429 değil)", jetonsuz.every(function (x) { return x === 401; }) && r.kod === 200, js(jetonsuz) + " " + r.kod);
+
+  /* ---- reddedilen istekler de etkinlik listesine yazılır (dakikada en çok 10 satır) ---- */
+  var redler = rk.filter(function (k) { return k.ad === "_istek"; });
+  ok("reddedilen istek etkinlikte (jeton), sel sınırlı: 15 retten 10 satır", redler.length === 10 && redler[0].kod === "jeton" && redler[0].sonuc === "hata", js(redler.slice(0, 2)) + " n=" + redler.length);
+  await istek(rp, { token: rt, basliklar: { Host: "kotu.example" } });
+  ok("tam sınırdan sonra yeni ret satırı eklenmez (gerçek çağrılar listeden itilmez)", rk.filter(function (k) { return k.ad === "_istek"; }).length === 10 && rk.some(function (k) { return k.ad === "suflo_baglam" && k.sonuc === "ok"; }));
+  rs.durdur();
+
+  /* ---- aynı anda tek onay kartı: ikinci yıkıcı istek 409, ilk kart değişmez ---- */
+  var oKartlar = [], oCoz = null, oYurut = [];
+  var os2 = S.olustur({ dosya: dosya, izinler: function () { return { duzenleme: true, onay: true }; },
+    proIzin: function () { return { ok: true, deneme: false }; },
+    onayIste: function (ad, args, ozet) { oKartlar.push(ad); return new Promise(function (res3) { oCoz = res3; }); },
+    yurut: function (ad) { oYurut.push(ad); return { ok: true }; } });
+  var op = (await os2.baslat()).port, ot = os2._token();
+  var o1 = istek(op, { token: ot, govde: JSON.stringify({ ad: "suflo_sessizlik_kes", args: {} }) });
+  await bekle(150);
+  r = await istek(op, { token: ot, govde: JSON.stringify({ ad: "suflo_hiz_rampasi", args: {} }) });
+  ok("onay beklerken ikinci yıkıcı istek 409 onay_bekliyor; kart değişmez, ilk istek reddedilmez", r.kod === 409 && r.govde.hata === "onay_bekliyor" && js(oKartlar) === '["suflo_sessizlik_kes"]', js(r.govde) + " " + js(oKartlar));
+  oCoz(true);
+  r = await o1;
+  ok("kullanıcı ilk kartı onaylayınca ilk eylem yürütülür", r.kod === 200 && r.govde.ok === true && js(oYurut) === '["suflo_sessizlik_kes"]', js(r.govde) + " " + js(oYurut));
+  var o3 = istek(op, { token: ot, govde: JSON.stringify({ ad: "suflo_hiz_rampasi", args: {} }) });
+  await bekle(150);
+  ok("kart yanıtlanınca yeni yıkıcı istek yeniden kart açar", js(oKartlar) === '["suflo_sessizlik_kes","suflo_hiz_rampasi"]', js(oKartlar));
+  oCoz(false);
+  r = await o3;
+  ok("ikinci kart reddedilince 403 reddedildi, yürütülmez", r.kod === 403 && r.govde.hata === "reddedildi" && oYurut.length === 1, js(r.govde));
+  os2.durdur();
+
   try { fs.rmdirSync(path.join(dizin, "Kesit")); fs.rmdirSync(dizin); } catch (e) {}
   console.log("\n" + gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);

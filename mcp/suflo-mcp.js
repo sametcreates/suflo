@@ -101,7 +101,9 @@ async function aracCagir(params) {
   if (g.ok === true) return metinSonuc(g.sonuc === undefined ? null : g.sonuc, false);
   var h = String(g.hata || "");
   if (r.kod === 401) return metinSonuc(MESAJLAR.kopru_kapali + " (token changed: try again)", true);
-  if (Object.prototype.hasOwnProperty.call(MESAJLAR, h)) return metinSonuc(MESAJLAR[h] + (h === "pro_gerekli" && g.mesaj ? " " + String(g.mesaj).slice(0, 300) : ""), true);
+  // pro_gerekli: hangi araç; kopru_kapali (503): kullanıcı köprüyü kapattı, kabul edilmiş eylem yürütülmedi
+  var ekMesaj = (h === "pro_gerekli" || h === "kopru_kapali") && g.mesaj ? " " + String(g.mesaj).slice(0, 300) : "";
+  if (Object.prototype.hasOwnProperty.call(MESAJLAR, h)) return metinSonuc(MESAJLAR[h] + ekMesaj, true);
   return metinSonuc("Suflo error (" + (h || r.kod) + "): " + String(g.mesaj || "").slice(0, 500), true);
 }
 

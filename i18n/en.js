@@ -3272,7 +3272,10 @@
     "Otomatik zoom": "Auto zoom",
     "Sessizlikleri kes (kopyada)": "Cut silences (on a copy)",
     "Konuşmadan kes (kopyada)": "Text-based cut (on a copy)",
-    "Hız rampası uygula": "Apply speed ramp"
+    "Hız rampası uygula": "Apply speed ramp",
+    "Reddedilen istek": "Rejected request",
+    "Onay kartını göster": "Show the approval card",
+    "Yapay zekâ köprüsü (MCP, deneysel): Claude gibi bir asistan Suflo işlerini senin yerine yapar": "AI bridge (MCP, experimental): an assistant such as Claude runs Suflo tasks for you"
   });
 
   var KEEP = ["Suflo", "Suflo Pro", "Suflo Doctor", "SUFLO PRO", "SUFLO CAPTION EDITOR", "PREMIERE CREATOR STUDIO", "PRO", "PREMIERE",
@@ -3295,8 +3298,12 @@
     // AI bridge (MCP): English tool descriptions and error texts for the AI assistant (never shown in the panel)
     "List the clips currently selected on the timeline (name, track, start/end in seconds).",
     "Add up to 200 markers to the active sequence. With bolum=true they are added as chapter markers (YouTube chapters).",
-    "Spoken language code, e.g. tr, en or auto.", "satir = sentence lines, kelime = word-by-word captions.",
-    "Editing is not allowed: turn on 'Düzenlemeye izin ver' (Allow editing) in Suflo > Settings > AI bridge."];   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "Spoken language code, e.g. tr or en; auto = detect automatically. Default: the panel's choice.",
+    "satir = sentence lines (the user's line layout is kept), kelime = word-by-word captions. Default: the panel's choice.",
+    "Editing is not allowed: turn on 'Düzenlemeye izin ver' (Allow editing) in Suflo > Settings > AI bridge.",
+    "These are the onboarding sample captions: they only go on the 'Suflo Deneme' sequence. Open that sequence first.",
+    "The SRT was imported into the Premiere project, but Premiere did not create a caption track: drag it from the Project panel onto the timeline. Do not apply again.",
+    "Select a clip on the timeline first."];   // file picker filter (not shown as text)   // language pickers show each language in its own name
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

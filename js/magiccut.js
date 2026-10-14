@@ -65,15 +65,20 @@ window.KCut = (function () {
     return out;
   }
 
+  /*
+   * Sonuç (Yapay zekâ köprüsü / MCP kullanır; düğme yok sayar): { sonuc: 'bulundu'|'yok'|'iptal'|
+   * 'klip_yok'|'hata'|'mesgul', kismi? }. Analiz sonuç dalına ulaşmadıysa (iptal, hata, klip yok)
+   * önceki aralıklar ve liste olduğu gibi kalır.
+   */
   async function analyze(ev) {
     // kapıdan ÖNCE: başıboş ikinci tık deneme penceresi de açmasın (Pro "yeniden" olay taşımaz, geçer)
-    if (K.baslatTikiGecerli && !K.baslatTikiGecerli(ev, baslatAcilis)) return;
+    if (K.baslatTikiGecerli && !K.baslatTikiGecerli(ev, baslatAcilis)) return { sonuc: "mesgul" };
     // Pro: otomatik kesim (ucretsizde 3 deneme hakki; hak yalniz kesim uygulaninca duser)
-    if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: analyze })) return;
-    if (busy) return;
+    if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: analyze })) return { sonuc: "pro" };
+    if (busy) return { sonuc: "mesgul" };
     sesiKapat();
     clip = KApp.ctx().sel;
-    if (!clip) { status("Önce bir klip seç.", "warn"); return; }
+    if (!clip) { status("Önce bir klip seç.", "warn"); return { sonuc: "klip_yok" }; }
     busy = true;
     iptalJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
     var jeton = iptalJetonu;
@@ -81,7 +86,7 @@ window.KCut = (function () {
     try {
       var ff = await K.findFfmpeg();
       if (!ff) throw new Error("ffmpeg bulunamadı — Ayarlar sekmesinden kur.");
-      if (jeton && jeton.iptalEdildi) { status("İptal edildi.", "warn"); return; }
+      if (jeton && jeton.iptalEdildi) { status("İptal edildi.", "warn"); return { sonuc: "iptal" }; }
 
       var noise = el("cut-noise").value;
       var minSil = parseFloat(el("cut-minsil").value);
@@ -99,7 +104,7 @@ window.KCut = (function () {
         "-f", "null", "-"
       ], { timeout: Math.max(300000, dur * 2000), iptal: jeton });
       // kullanıcı iptal etti: yarım sonucu öneri diye gösterme, önceki analiz ekranda kalır
-      if (res.iptal) { status("İptal edildi.", "warn"); return; }
+      if (res.iptal) { status("İptal edildi.", "warn"); return { sonuc: "iptal" }; }
       var sil = parseSilence(res.stderr || "");
       K.log("[kesim] ffmpeg kod=" + res.code + " ham aralik=" + sil.length +
         " sure=" + dur.toFixed(1) + " esik=" + noise + "dB");
@@ -129,7 +134,7 @@ window.KCut = (function () {
       if (ranges.length === 0) {
         el("cut-result").hidden = true;
         status("Bu eşikte duraksama yok — eşiği yükselt (-30 dB) ya da min. süreyi düşür.", "warn");
-        return;
+        return { sonuc: "yok" };
       }
 
       /*
@@ -147,8 +152,10 @@ window.KCut = (function () {
       el("cut-result").hidden = false;
       render();
       KApp.toast(ranges.length + " kesim önerisi bulundu", kismi ? "warn" : "good");
+      return { sonuc: "bulundu", kismi: kismi };
     } catch (e) {
       status("✕ " + e.message, "bad");
+      return { sonuc: "hata", mesaj: String(e && e.message ? e.message : e) };
     } finally {
       busy = false;
       iptalJetonu = null;
@@ -297,21 +304,33 @@ window.KCut = (function () {
   /* ---------------- Yapay zekâ köprüsü (MCP, 3.4) ---------------- */
   // Düğmelerin aynı işlevleri (aynı kapı, aynı deneme hakkı); kesim HER ZAMAN kopya sekansta
   function durumMetni() { var e = el("cut-status"); return e ? { metin: e.textContent || "", kotu: /\bbad\b/.test(e.className) } : { metin: "", kotu: false }; }
+  // Kaydırıcı düğmeyle aynı yoldan: değer + "input" olayı (yanındaki "-38 dB" etiketi de güncellenir)
   function kaydir(id, v, alt, ust) {
     var e = el(id);
-    if (e && typeof v === "number" && isFinite(v)) e.value = String(Math.max(alt, Math.min(ust, v)));
+    if (!e || typeof v !== "number" || !isFinite(v)) return;
+    e.value = String(Math.max(alt, Math.min(ust, v)));
+    try { e.dispatchEvent(new Event("input", { bubbles: true })); } catch (er) {}
   }
   async function mcpAnaliz(o) {
     o = o || {};
+    // meşgul / klip yokken kaydırıcılara dokunulmaz, önceki analiz ve liste olduğu gibi kalır
+    if (busy) return { ok: false, hata: "mesgul", mesaj: "Auto Cut is already running." };
+    if (!KApp.ctx().sel) return { ok: false, hata: "klip_yok", mesaj: "Select a clip on the timeline first." };
     kaydir("cut-noise", o.esik_db, -60, -20);
     kaydir("cut-minsil", o.min_sessizlik, 0.3, 2.5);
     kaydir("cut-pad", o.pay, 0, 0.5);
-    if (busy) return { ok: false, hata: "mesgul", mesaj: "Auto Cut is already running." };
-    ranges = [];
-    await analyze();
+    var r = await analyze();
     var d = durumMetni();
-    if (d.kotu) return { ok: false, hata: "analiz_hatasi", mesaj: d.metin };
-    return { ok: true, klip: clip ? clip.name : "", araliklar: ranges.map(function (r) { return { baslangic: r.start, bitis: r.end }; }), durum: d.metin };
+    var sonuc = r && r.sonuc;
+    if (sonuc === "bulundu" || sonuc === "yok") {
+      return { ok: true, klip: clip ? clip.name : "", araliklar: ranges.map(function (x) { return { baslangic: x.start, bitis: x.end }; }),
+        kismi: !!(r && r.kismi), durum: d.metin };
+    }
+    if (sonuc === "klip_yok") return { ok: false, hata: "klip_yok", mesaj: "Select a clip on the timeline first." };
+    if (sonuc === "iptal") return { ok: false, hata: "iptal", mesaj: "The analysis was cancelled in Suflo." };
+    if (sonuc === "mesgul") return { ok: false, hata: "mesgul", mesaj: "Auto Cut is already running." };
+    if (sonuc === "pro") return { ok: false, hata: "pro_gerekli", mesaj: "Auto Cut needs Suflo Pro." };
+    return { ok: false, hata: "analiz_hatasi", mesaj: (r && r.mesaj) || d.metin || "Not analysed." };
   }
   async function mcpKes() {
     if (!activeRanges().length) return { ok: false, hata: "analiz_yok", mesaj: "Run suflo_sessizlik_analiz first: there are no cut ranges." };

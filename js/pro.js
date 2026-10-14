@@ -96,6 +96,7 @@
     speedramp: 'Hız rampası: tek tıkla ağır çekim ve hızlanma',
     offlineTranslate: 'Çevrimdışı İngilizce çeviri: internetsiz, yerel motorla',
     youtube:   'YouTube indirici: MP3 ve 720p / 1080p / 4K, projeye otomatik',
+    mcp:       'Yapay zekâ köprüsü (MCP, deneysel): Claude gibi bir asistan Suflo işlerini senin yerine yapar',
     batch:     'Toplu (coklu klip) transkripsiyon',
     translate: 'Altyazi cevirisi',
     assexport: 'Stilli ASS disa aktarma',

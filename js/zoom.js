@@ -235,12 +235,17 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     return out;
   }
 
+  /*
+   * Sonuç açıkça döner (Yapay zekâ köprüsü / MCP bunu kullanır; düğme yok sayar):
+   * { ok:true, hareket } ya da { ok:false, hata:'mesgul'|'pro_gerekli'|'klip_yok'|'zoom_yok'|'uygulanamadi', mesaj }.
+   * Meşgulken (ffmpeg konuşma analizi sürerken) dönen çağrı başarı sayılmasın.
+   */
   async function calistir() {
-    if (busy) return;
+    if (busy) return { ok: false, hata: "mesgul", mesaj: "Auto Zoom is already running." };
     // Pro: otomatik zoom (ucretsizde 3 deneme hakki; hak yalniz anahtar kareler yazilinca duser)
-    if (typeof Pro !== "undefined" && !Pro.gate("zoom", { deneme: true, yeniden: calistir })) return;
+    if (typeof Pro !== "undefined" && !Pro.gate("zoom", { deneme: true, yeniden: calistir })) return { ok: false, hata: "pro_gerekli", mesaj: "Auto Zoom needs Suflo Pro." };
     var clip = KApp.ctx().sel;
-    if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
+    if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return { ok: false, hata: "klip_yok", mesaj: "Select a clip on the timeline first." }; }
     setBusy(true);
     try {
       var sourceDur = Math.max(.2, clip.outPoint - clip.inPoint);
@@ -289,7 +294,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
         interval: interval,
         style: stil && stil.s ? stil.s : "smooth"
       });
-      if (plan.toggles < 1) { status("Zoom noktası bulunamadı — Ritmik modu dene.", "warn"); return; }
+      if (plan.toggles < 1) { status("Zoom noktası bulunamadı — Ritmik modu dene.", "warn"); return { ok: false, hata: "zoom_yok", mesaj: "No zoom points found: try the rhythmic mode in the Zoom tab." }; }
 
       status("Anahtar kareler yazılıyor…");
       var keys = plan.keys.map(function (k) {
@@ -306,8 +311,10 @@ if (typeof window !== "undefined") window.KZoom = (function () {
       status("");
       KApp.toast(plan.toggles + " zoom hareketi eklendi (" +
         (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")", "good");
+      return { ok: true, hareket: plan.toggles, mod: plan.mode };
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
+      return { ok: false, hata: "uygulanamadi", mesaj: String(e && e.message ? e.message : e) };
     } finally {
       setBusy(false);
     }

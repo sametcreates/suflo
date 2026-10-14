@@ -543,9 +543,13 @@ window.KHizRampasi = (function () {
 
   // ek: { hedefler: [{track, start}] } — seçim yerine bu klipler ('kaldırıp yeniden uygula': kaldırma seçimi
   // değiştirir, aynı klipler açıkça istenir)
+  // Sonuç açıkça döner (Yapay zekâ köprüsü / MCP; düğme yok sayar): meşgulken dönen çağrı başarı sayılmaz.
+  //   { ok:true, uygulanan, atlanan, kopyaSekans } | { ok:false, hata:'mesgul'|'uygulanamadi', mesaj }
+  //   (kapı geçilmezse undefined: köprü bunu da başarısız sayar)
   async function uygula(ek) {
     if (typeof Pro !== "undefined" && !Pro.gate("speedramp", { deneme: true, yeniden: function () { uygula(); } })) return;
-    if (mesgul) return;
+    if (mesgul) return { ok: false, hata: "mesgul", mesaj: "Speed Ramp is already running." };
+    var sonuc = null;
     mesgul = true;
     kilitle(true);
     // Eğri ve seçenekler iş başında sabitlenir: uygulama sürerken kart, kutu ya da bağlam (kopya sekansa
@@ -642,8 +646,10 @@ window.KHizRampasi = (function () {
       kayitlariSakla(basarili, hd.appVersion, kal);
       bildir(basarili, hatalar, atlanan, kopyaAdi);
       bildirildi = true;
+      sonuc = { ok: true, uygulanan: basarili.length, atlanan: hatalar.length + atlanan.length, kopyaSekans: kopyaAdi || "" };
     } catch (e) {
       var parcalar = ["✕ "].concat(e && e.parcalar ? e.parcalar : [String(e && e.message ? e.message : e)]);
+      sonuc = { ok: false, hata: "uygulanamadi", mesaj: duz((e && e.parcalar ? e.parcalar : [String(e && e.message ? e.message : e)]).concat(kopyaAdi && !bildirildi ? kopyaAcikParcalari(kopyaAdi) : [])) };
       // Kopya oluşturulup iş başarısız olduysa: Premiere artık kopya sekansı gösteriyor, söyle; yeniden
       // denemede kopyanın kopyası alınmasın (kutu kendiliğinden kalkar, kopya sekansta kalınır)
       if (kopyaAdi && !bildirildi) {
@@ -660,6 +666,7 @@ window.KHizRampasi = (function () {
       vurusUzlas();
       onizlemeCiz();
     }
+    return sonuc;
   }
 
   function bildir(basarili, hatalar, atlanan, kopyaAdi) {

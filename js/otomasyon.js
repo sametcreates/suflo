@@ -75,8 +75,8 @@
       aciklama: "Start caption generation exactly like the Captions tab button. Returns a job id; poll suflo_is_durumu. Scope: clip (selected clip), inout, entire.",
       sema: {
         kapsam: { tur: "metin", enum: ["clip", "inout", "entire"], aciklama: "What to transcribe (default clip)." },
-        dil: { tur: "metin", maxLen: 8, desen: "^(auto|[a-z]{2,3})$", aciklama: "Spoken language code, e.g. tr, en or auto." },
-        mod: { tur: "metin", enum: ["satir", "kelime"], aciklama: "satir = sentence lines, kelime = word-by-word captions." }
+        dil: { tur: "metin", maxLen: 8, desen: "^(auto|[a-z]{2,3})$", aciklama: "Spoken language code, e.g. tr or en; auto = detect automatically. Default: the panel's choice." },
+        mod: { tur: "metin", enum: ["satir", "kelime"], aciklama: "satir = sentence lines (the user's line layout is kept), kelime = word-by-word captions. Default: the panel's choice." }
       } },
     { ad: "suflo_altyazi_kanala", sinif: "yaz", pro: null,
       aciklama: "Put the captions from the Suflo editor on a Premiere caption track (the existing Apply button).",
@@ -199,8 +199,19 @@
 
   /* ---------------- Çıktı temizliği ---------------- */
 
-  var YOL_TAM = /^(?:[A-Za-z]:[\\\/]|\\\\|\/(?:Users|home|Volumes|private|var|tmp|mnt|opt|Applications|Library)\b|~[\\\/])/;
-  var YOL_ICINDE = /(?:[A-Za-z]:[\\\/]|\\\\[^\\\/\s"']+[\\\/]|\/(?:Users|home|Volumes|private|var|tmp|mnt|opt|Applications|Library)\/)[^\s"'<>|*?]*/g;
+  /*
+   * Mutlak yol kökü: sürücü (C:\ C:/), UNC (\\sunucu\pay\), ~/ ya da bilinen POSIX kökleri.
+   * Kök yalnız metin başında ya da harf/rakam/nokta/tire OLMAYAN bir karakterden sonra sayılır:
+   * "https://suflo.app/indir" içindeki "s:/" ve ".../home/x" adresleri yol değildir; "/home sayfası"
+   * (kökten sonra ayraç yok) de değildir.
+   * Kökten sonra klasör adları boşluk içerebilir ("C:\Users\Ad Soyad\…", "/Volumes/Extreme SSD/…"):
+   * aynı satırda son ayraca kadar her şey silinir, dosya adı ve arkasındaki metin kalır. Klasör adında
+   * satır sonu, tırnak, < > | * ? ve ":" olamaz ("x.mp4: No such file" ayraçta durur).
+   */
+  var YOL_KOKU = /(?:[A-Za-z]:[\\\/]|\\\\|~[\\\/]|\/(?:Users|home|Volumes|private|var|tmp|mnt|opt|Applications|Library)[\\\/])/.source;
+  var YOL_ICINDE = new RegExp("(^|[^A-Za-z0-9_.\\-])(" + YOL_KOKU + "(?:[^\\\\/\\n\\r\"'<>|*?:]*[\\\\/])*)", "g");
+  // Aynı eşleşmenin içinde boşluktan sonra başlayan ikinci yol ("/Users/a/b.mov ve /Users/c/d.mov")
+  var IC_KOK = new RegExp("(?=\\s" + YOL_KOKU + ")");
 
   function tabanAd(p) {
     var s = String(p).replace(/[\\\/]+$/, "");
@@ -208,9 +219,19 @@
     return i >= 0 ? s.slice(i + 1) : s;
   }
 
+  // Eşleşen klasör öneki: her yol parçasından son ayraca kadarki kısım düşer
+  function onekSil(yol) {
+    return yol.split(IC_KOK).map(function (parca) {
+      var bas = /^\s*/.exec(parca)[0], govde = parca.slice(bas.length);
+      var j = Math.max(govde.lastIndexOf("/"), govde.lastIndexOf("\\"));
+      return bas + govde.slice(j + 1);
+    }).join("");
+  }
+
   function metinTemizle(s) {
-    var t = YOL_TAM.test(s) && !/\s{2}/.test(s) && s.indexOf("\n") === -1 && !/[\\\/]\s/.test(s) ? tabanAd(s)
-      : s.replace(YOL_ICINDE, function (m) { return tabanAd(m); });
+    var t = s.replace(YOL_ICINDE, function (m, on, yol) { return on + onekSil(yol); });
+    // yalnız klasör yolu ("C:\Proje\"): klasörün adı kalsın
+    if (!t && s) t = tabanAd(s);
     if (t.length > METIN_SINIRI) t = t.slice(0, METIN_SINIRI) + "…";
     return t;
   }
@@ -323,7 +344,9 @@
     suflo_altyazi_olustur: "Altyazı oluştur", suflo_altyazi_kanala: "Altyazıyı kanala koy",
     suflo_altyazi_disari: "Altyazıyı dışa aktar", suflo_sessizlik_analiz: "Sessizlikleri bul",
     suflo_zoom: "Otomatik zoom", suflo_sessizlik_kes: "Sessizlikleri kes (kopyada)",
-    suflo_metinden_kes: "Konuşmadan kes (kopyada)", suflo_hiz_rampasi: "Hız rampası uygula"
+    suflo_metinden_kes: "Konuşmadan kes (kopyada)", suflo_hiz_rampasi: "Hız rampası uygula",
+    // eyleme ulaşmadan reddedilen istek (Host, tarayıcı, jeton, hız sınırı, boyut, JSON)
+    _istek: "Reddedilen istek"
   };
 
   function trAd(ad) { return sahip(TR_AD, ad) ? TR_AD[ad] : String(ad).slice(0, 40); }
@@ -381,6 +404,28 @@
     return { ekle: ekle, bitir: bitir, oku: oku };
   }
 
+  /* ---------------- suflo_altyazi_olustur: panel seçimlerine eşleme ---------------- */
+
+  // Şemadaki dil kodu → #cap-lang değeri: "auto" paneldeki "Otomatik" seçeneğidir (değeri "")
+  function dilDegeri(dil) {
+    if (dil === undefined || dil === null) return null;
+    return dil === "auto" ? "" : String(dil);
+  }
+
+  /*
+   * mod → #cap-maxlen değeri. Kullanıcının seçtiği düzen aynı ailedeyse KORUNUR:
+   * "satir" = "Satır" grubundaki her seçenek (2–5 kelime, 32/42/60 karakter, 2 satır × 42),
+   * "kelime" = kelime zamanlı seçenekler (k1 Kelime kelime, kc Birikimli). Yalnız aile
+   * değişiyorsa varsayılan (l42 / k1) seçilir. mod yoksa mevcut değer kalır.
+   */
+  function satirDegeri(mod, mevcut) {
+    var m = String(mevcut || "");
+    var kelimeZamanli = /^k/.test(m);
+    if (mod === "kelime") return kelimeZamanli ? m : "k1";
+    if (mod === "satir") return m && !kelimeZamanli ? m : "l42";
+    return m;
+  }
+
   /* ---------------- Bağlantı dosyası ---------------- */
 
   // otomasyon.json: { v:1, port, token, pid, baslangic }
@@ -402,6 +447,7 @@
     MARKER_SINIRI: MARKER_SINIRI, ETKINLIK_SINIRI: ETKINLIK_SINIRI, SINIFLAR: SINIFLAR.slice(), HARIC: HARIC.slice(),
     EYLEMLER: EYLEMLER, eylem: eylem, adlar: adlar, dogrula: dogrula, temizle: temizle, tabanAd: tabanAd,
     araclar: araclar, ozet: ozet, trAd: trAd, etkinlikEkle: etkinlikEkle, isTablosu: isTablosu,
+    dilDegeri: dilDegeri, satirDegeri: satirDegeri,
     baglantiGecerli: baglantiGecerli, claudeDesktopJson: claudeDesktopJson, claudeCodeKomutu: claudeCodeKomutu
   };
 });

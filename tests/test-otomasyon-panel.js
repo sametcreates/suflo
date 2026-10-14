@@ -8,13 +8,14 @@ function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "F
 function js(x) { return JSON.stringify(x); }
 function oku(f) { return fs.readFileSync(path.join(KOK, f), "utf8"); }
 
-function kur() {
-  var c = { call: [], baslat: [], harca: [], olustur: 0, dinle: [] };
+function kur(dom) {
+  dom = dom || {};
+  var c = { call: [], baslat: [], harca: [], olustur: 0, dinle: [], goster: [], toast: [] };
   var win = {};
   var sb = {
     window: win, console: console, setTimeout: setTimeout, clearTimeout: clearTimeout, setInterval: setInterval, clearInterval: clearInterval,
     Promise: Promise, JSON: JSON, Date: Date, Math: Math, Object: Object, Array: Array, String: String, Number: Number, RegExp: RegExp, Buffer: Buffer,
-    document: { getElementById: function () { return null; }, createElement: function () { return {}; }, body: {} },
+    document: { getElementById: function (id) { return dom[id] || null; }, createElement: function () { return {}; }, body: {} },
     K: {
       nodeOK: true, VERSION: "3.4.0",
       call: function (fn, arg) { c.call.push([fn, arg]); return Promise.resolve({ ok: true, added: arg && arg.times ? arg.times.length : 0 }); },
@@ -29,9 +30,16 @@ function kur() {
       izinVar: function () { return { ok: true, deneme: true }; },
       gate: function () { return true; }
     },
-    KApp: { toast: function () {} }
+    KApp: {
+      toast: function (m, t, sure, eylem) {
+        c.toast.push({ m: m, t: t, sure: sure, eylem: eylem });
+        if (dom.toasts) dom.toasts.ekle({ m: m, kaldirildi: false, remove: function () { this.kaldirildi = true; } });
+      },
+      goster: function (ad) { c.goster.push(ad); if (dom["tab-settings"]) dom["tab-settings"].aktif = ad === "settings"; }
+    }
   };
   sb.window.addEventListener = function (ad) { c.dinle.push(ad); };
+  sb.window.KApp = sb.KApp;   // panelde window === global: window.KApp ile KApp aynı nesne
   vm.createContext(sb);
   vm.runInContext(oku("js/otomasyon.js"), sb, { filename: "otomasyon.js" });
   vm.runInContext(oku("js/otomasyon-sunucu.js"), sb, { filename: "otomasyon-sunucu.js" });
@@ -47,6 +55,8 @@ function kur() {
   vm.runInContext(oku("js/otomasyon-panel.js"), sb, { filename: "otomasyon-panel.js" });
   return { sb: sb, c: c, P: sb.window.KOtomasyon, O: sb.window.SufloOtomasyon };
 }
+
+function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
 async function main() {
   var t = kur();
@@ -79,6 +89,64 @@ async function main() {
   r = await t.P._yurut("execute_extendscript", {}, {});
   ok("listede olmayan ad yürütülmez", r.ok === false && r.hata === "bilinmeyen_eylem");
 
+  /* ---- Zoom / Hız Rampası: modülün açık sonucu (meşgulken dönen çağrı başarı sayılmaz) ---- */
+  // inceleme bulgusu: KZoom.calistir / KHizRampasi.uygula meşgulken hiçbir şey yapmadan dönüyordu ve
+  // köprü durum satırındaki eski "analiz ediliyor…" metnine bakıp ok:true diyordu
+  t.sb.window.KZoom = { calistir: function () { return Promise.resolve({ ok: false, hata: "mesgul", mesaj: "Auto Zoom is already running." }); } };
+  r = await t.P._yurut("suflo_zoom", {}, {});
+  ok("zoom meşgulken ok:false mesgul", r.ok === false && r.hata === "mesgul", js(r));
+  t.sb.window.KZoom = { calistir: function () { return Promise.resolve(undefined); } };
+  r = await t.P._yurut("suflo_zoom", {}, {});
+  ok("zoom sonuç döndürmeden biterse başarı sayılmaz", r.ok === false && r.hata === "uygulanamadi", js(r));
+  t.sb.window.KZoom = { calistir: function () { return Promise.resolve({ ok: true, hareket: 4 }); } };
+  r = await t.P._yurut("suflo_zoom", {}, {});
+  ok("zoom başarısı modülün sonucundan", r.ok === true && r.hareket === 4, js(r));
+  t.sb.window.KHizRampasi = { uygula: function () { return Promise.resolve({ ok: false, hata: "mesgul", mesaj: "Speed Ramp is already running." }); } };
+  r = await t.P._yurut("suflo_hiz_rampasi", {}, {});
+  ok("hız rampası meşgulken ok:false mesgul", r.ok === false && r.hata === "mesgul", js(r));
+  t.sb.window.KHizRampasi = { uygula: function () { return Promise.resolve(undefined); } };
+  r = await t.P._yurut("suflo_hiz_rampasi", {}, {});
+  ok("hız rampası kapıdan dönerse (undefined) başarı sayılmaz", r.ok === false, js(r));
+  var zs = oku("js/zoom.js"), hs = oku("js/hiz-rampasi.js");
+  ok("zoom.js calistir / hiz-rampasi.js uygula meşgul dalı açık sonuç döner", /if \(busy\) return \{ ok: false, hata: "mesgul"/.test(zs) && /if \(mesgul\) return \{ ok: false, hata: "mesgul"/.test(hs) &&
+    /return \{ ok: true, hareket: plan\.toggles/.test(zs) && /return sonuc;\n  \}/.test(hs.replace(/\r\n/g, "\n")));
+
+  /* ---- onay kartı: Ayarlar sekmesine geçer, bekleyen kart değiştirilmez ---- */
+  function eleman(id) {
+    var e = { id: id, hidden: false, disabled: false, textContent: "", dinle: {}, kaydirildi: 0,
+      addEventListener: function (ad, fn) { e.dinle[ad] = fn; }, scrollIntoView: function () { e.kaydirildi++; } };
+    return e;
+  }
+  var dom = {};
+  ["mcp-ac", "mcp-onay-kart", "mcp-onay-ozet", "mcp-onay-sure", "mcp-onayla", "mcp-reddet", "tab-settings"].forEach(function (id) { dom[id] = eleman(id); });
+  dom["mcp-ac"].classList = { toggle: function () {} };
+  dom["mcp-onay-kart"].hidden = true;
+  dom.toasts = { liste: [], ekle: function (x) { this.liste.push(x); this.lastElementChild = x; }, lastElementChild: null };
+  var u = kur(dom);
+  u.P.init();
+  ok("init: Onayla / Reddet düğmeleri bağlanır, sunucu açılmaz", typeof dom["mcp-onayla"].dinle.click === "function" && typeof dom["mcp-reddet"].dinle.click === "function" && u.c.olustur === 0 && !u.P.acikMi());
+  var p1 = u.P._onayIste("suflo_sessizlik_kes", {}, "Sessizlikleri kes (kopyada)", 1500);
+  ok("onay kartı açılınca Ayarlar sekmesine geçilir ve kart görünür kaydırılır (başka sekmedeyken gizli kalmasın)",
+    js(u.c.goster) === '["settings"]' && dom["tab-settings"].aktif === true && dom["mcp-onay-kart"].hidden === false && dom["mcp-onay-kart"].kaydirildi === 1, js(u.c.goster));
+  var bildirim = u.c.toast[u.c.toast.length - 1];
+  ok("bildirim süre boyunca kalır ve karta götüren düğmesi var", bildirim.sure === 1500 && bildirim.eylem && bildirim.eylem.metin === "Onay kartını göster" && typeof bildirim.eylem.fn === "function", js(bildirim));
+  ok("Onayla kart belirdiği an kısa süre kapalı (yanlış tık onay sayılmasın)", dom["mcp-onayla"].disabled === true);
+  var p2sonuc = "bekliyor";
+  u.P._onayIste("suflo_hiz_rampasi", {}, "Hız rampası uygula", 1500).then(function (v) { p2sonuc = v; });
+  await bekle(20);
+  ok("bekleyen kart varken ikinci istek kartı DEĞİŞTİRMEZ, hemen reddedilir; ilki beklemede kalır",
+    p2sonuc === false && dom["mcp-onay-ozet"].textContent === "Sessizlikleri kes (kopyada)" && dom["mcp-onay-kart"].hidden === false);
+  await bekle(900);
+  ok("kısa kilitten sonra Onayla açılır", dom["mcp-onayla"].disabled === false);
+  var p1sonuc = "bekliyor";
+  p1.then(function (v) { p1sonuc = v; });
+  dom["mcp-onayla"].dinle.click();
+  await bekle(20);
+  ok("Onayla: ilk istek onaylanır, kart kapanır, bildirimi kaldırılır", p1sonuc === true && dom["mcp-onay-kart"].hidden === true && dom.toasts.liste[0].kaldirildi === true, String(p1sonuc));
+  var p3 = u.P._onayIste("suflo_metinden_kes", {}, "Konuşmadan kes (kopyada)", 600);
+  var p3sonuc = await p3;
+  ok("yanıt gelmezse süre dolunca reddedilir", p3sonuc === false && dom["mcp-onay-kart"].hidden === true);
+
   /* ---- kaynak denetimleri ---- */
   var src = oku("js/otomasyon-panel.js");
   var init = src.slice(src.indexOf("function init()"), src.indexOf("return {", src.indexOf("function init()")));
@@ -87,6 +155,11 @@ async function main() {
   ok("evalScript ya da rastgele betik yok", !/evalScript|new Function|eval\(/.test(src));
   ok("köprüyü açmak Pro kapısından geçer, hak yalnız açılınca düşer", /Pro\.gate\("mcp", \{ deneme: true, yeniden: ac \}\)/.test(src) && src.indexOf('Pro.denemeHarca("mcp"') > src.indexOf("if (sonuc.ok) {"));
   ok("izinler bellekte, varsayılan: düzenleme kapalı, onay açık", /var izin = \{ duzenleme: false, onay: true \}/.test(src) && !/saveSettings/.test(src));
+  // inceleme bulgusu: köprünün Pro penceresi başlığı "Bu ozellik" diyordu (FEATURE_LABELS'ta 'mcp' yoktu)
+  var proSrc = oku("js/pro.js"), etiket = /\n\s+mcp:\s+'([^']+)'/.exec(proSrc);
+  var enS = require(path.join(KOK, "i18n", "en.js"));
+  var enSozluk = enS.strings || (enS.default && enS.default.strings) || {};
+  ok("Pro penceresi köprüyü adıyla anar (FEATURE_LABELS.mcp + İngilizcesi)", !!etiket && /Yapay zekâ köprüsü/.test(etiket[1]) && !!enSozluk[etiket[1]], etiket && etiket[1]);
   ok("Pro.izinVar ile etkileşimsiz kapı", /Pro\.izinVar\(f\)/.test(src) && /function izinVar\(feature\)/.test(oku("js/pro.js")) && /izinVar: izinVar/.test(oku("js/pro.js")));
   var html = oku("index.html");
   var idler = (src.match(/el\("([a-z0-9-]+)"\)/g) || []).map(function (x) { return x.slice(4, -2); }).filter(function (v, i, a) { return a.indexOf(v) === i; });

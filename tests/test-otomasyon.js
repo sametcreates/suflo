@@ -65,6 +65,50 @@ var t = O.temizle({ ok: true, mediaPath: "C:\\Users\\Ayşe\\Videolar\\röportaj.
 ok("mutlak yollar dosya adına iner", t.mediaPath === "röportaj.mp4" && t.mac === "klip.mov" && t.unc === "a.wav" && t.linux === "y.srt", js(t));
 ok("metin içindeki yol da kısalır; sıradan metin ve oran bozulmaz", /x\.prproj/.test(t.metin) && !/Proje/.test(t.metin) && t.ad === "Sequence 01" && t.oran === "16/9", t.metin);
 ok("işlevler düşer, __proto__ kopyalanmaz", t.fn === null && O.temizle(JSON.parse('{"__proto__":{"x":1},"a":1}')).x === undefined);
+// İnceleme bulguları: boşluklu klasör adı sızıyordu; altyazı metnindeki URL ve "/home …" bozuluyordu
+var yollar = [
+  ["Dosya okunamadı: C:\\Users\\Samet Kaygısız\\Videos\\ham.mp4", "Dosya okunamadı: ham.mp4"],
+  ["Error: /Volumes/Extreme SSD/Projeler/Acme Corp/klip.mp4 not found", "Error: klip.mp4 not found"],
+  ["ses analizi başarısız: C:\\Users\\Ad Soyad\\Videos\\x.mp4: No such file", "ses analizi başarısız: x.mp4: No such file"],
+  ["EACCES: permission denied, open '/Users/samet/Projeler/Gizli Musteri/suflo-altyazi.srt'", "EACCES: permission denied, open 'suflo-altyazi.srt'"],
+  ["/Users/a/b.mov ve /Users/c/d.mov", "b.mov ve d.mov"],
+  ["~/Masaüstü/x.srt", "x.srt"],
+  ["C:\\Proje\\", "Proje"],
+  ["(C:/Users/x/y.mp4)", "(y.mp4)"]
+];
+yollar.forEach(function (y) { ok("yol temizliği: " + y[0].slice(0, 40), O.temizle(y[0]) === y[1], O.temizle(y[0])); });
+var dokunma = ["Daha fazlası için https://suflo.app/indir adresine gidin", "/home sayfasına dön", "https://example.com/home/x/y", "ve/veya", "16/9 kare",
+  "Saat 10:30/11:00 arası", "http://site.com/Users/a/b.html"];
+dokunma.forEach(function (m) { ok("altyazı metni bozulmaz: " + m.slice(0, 40), O.temizle(m) === m, O.temizle(m)); });
+var cue = O.temizle({ ok: true, satirlar: [{ metin: "Linke tıkla: https://suflo.app/indir" }, { metin: "/home sayfasına dön" }] }, { diziSiniri: O.ALTYAZI_SINIRI });
+ok("suflo_altyazi_oku satırları URL ve '/home' metniyle aynen döner", cue.satirlar[0].metin === "Linke tıkla: https://suflo.app/indir" && cue.satirlar[1].metin === "/home sayfasına dön", js(cue));
+
+/* ---------------- Şemanın vaat ettiği değerler panelde karşılıklı mı ---------------- */
+// İnceleme bulgusu: şema dil:'auto' diyordu, #cap-lang'de 'auto' yok ("Otomatik" değeri "")
+var fs = require("fs");
+var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+function secenekler(id) {
+  var i = html.indexOf('<select id="' + id + '"'), j = html.indexOf("</select>", i);
+  return (html.slice(i, j).match(/<option value="([^"]*)"/g) || []).map(function (x) { return /value="([^"]*)"/.exec(x)[1]; });
+}
+var diller = secenekler("cap-lang");
+var DL = require(path.join(__dirname, "..", "js", "diller.js"));
+var tumDiller = diller.concat((DL.moreLanguages ? DL.moreLanguages() : []).map(function (d) { return d[0]; }));
+var olustur = O.eylem("suflo_altyazi_olustur").sema;
+ok("dil 'auto' şemadan geçer ve paneldeki 'Otomatik' seçeneğine ('') eşlenir", O.dogrula("suflo_altyazi_olustur", { dil: "auto" }).ok && O.dilDegeri("auto") === "" && diller.indexOf("") !== -1);
+ok("dil kodu aynen geçer, verilmezse null (panel seçimi kalır)", O.dilDegeri("en") === "en" && O.dilDegeri(undefined) === null);
+ok("panelin sunduğu her dil kodu şemadan geçer", tumDiller.filter(function (d) { return d; }).every(function (d) { return O.dogrula("suflo_altyazi_olustur", { dil: d }).ok && O.dilDegeri(d) === d; }),
+  tumDiller.filter(function (d) { return d && !O.dogrula("suflo_altyazi_olustur", { dil: d }).ok; }).join(","));
+var kapsamlar = (html.slice(html.indexOf('id="cap-scope"'), html.indexOf("</div>", html.indexOf('id="cap-scope"'))).match(/data-s="([a-z]+)"/g) || []).map(function (x) { return x.slice(8, -1); });
+ok("şemadaki her kapsam paneldeki bir kapsam düğmesi", olustur.kapsam.enum.every(function (k) { return kapsamlar.indexOf(k) !== -1; }), js(kapsamlar));
+var uzunluklar = secenekler("cap-maxlen");
+ok("mod her mevcut seçimde paneldeki bir seçeneğe eşlenir", olustur.mod.enum.every(function (m) {
+  return uzunluklar.every(function (mevcut) { return uzunluklar.indexOf(O.satirDegeri(m, mevcut)) !== -1; });
+}));
+// İnceleme bulgusu: mod:'satir' kullanıcının "2 satır × 42" düzenini sessizce l42 yapıyordu
+ok("mod 'satir' kullanıcının satır düzenini korur (2 satır × 42, N kelime, 60 karakter)", O.satirDegeri("satir", "c42x2") === "c42x2" && O.satirDegeri("satir", "w3") === "w3" && O.satirDegeri("satir", "c60") === "c60");
+ok("mod 'kelime' kelime zamanlı seçimi korur (Birikimli), aile değişirse varsayılan", O.satirDegeri("kelime", "kc") === "kc" && O.satirDegeri("kelime", "c42x2") === "k1" && O.satirDegeri("satir", "k1") === "l42");
+ok("mod verilmezse seçim değişmez", O.satirDegeri(undefined, "c42x2") === "c42x2");
 var buyuk = [];
 for (var j = 0; j < 5000; j++) buyuk.push({ metin: "satır " + j });
 var tb = O.temizle({ ok: true, liste: buyuk });

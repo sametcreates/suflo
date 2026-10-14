@@ -27,7 +27,7 @@ window.KOtomasyon = (function () {
   var mesgul = false;
 
   function el(id) { return document.getElementById(id); }
-  function toast(m, t) { try { if (window.KApp && KApp.toast) KApp.toast(m, t); } catch (e) {} }
+  function toast(m, t, sure, eylem) { try { if (window.KApp && KApp.toast) KApp.toast(m, t, sure, eylem); } catch (e) {} }
   function durum(msg, cls) {
     var e = el("mcp-durum");
     if (!e) return;
@@ -46,11 +46,13 @@ window.KOtomasyon = (function () {
 
   /* ---------------- Yürütücüler: düğmelerin aynı işlevleri ---------------- */
 
-  function durumla(id) {
-    var e = el(id);
+  // Modül işlevinin açık sonucu ({ ok, hata, mesaj, … }); sonuç nesnesi yoksa (beklenmeyen erken dönüş)
+  // başarı SAYILMAZ, durum satırının metni yalnız açıklama olarak eklenir
+  function sonucla(r, durumId) {
+    if (r && typeof r === "object" && typeof r.ok === "boolean") return r;
+    var e = el(durumId);
     var metin = e ? (e.textContent || "") : "";
-    var kotu = e ? /\b(bad|warn)\b/.test(e.className) : false;
-    return kotu ? { ok: false, hata: "uygulanamadi", mesaj: metin || "Not applied." } : { ok: true, durum: metin };
+    return { ok: false, hata: "uygulanamadi", mesaj: metin || "Not applied." };
   }
 
   function markerGrubu(markerlar) {
@@ -115,17 +117,17 @@ window.KOtomasyon = (function () {
     suflo_altyazi_kanala: function () { return window.KCaptions.mcpKanala(); },
     suflo_altyazi_disari: function (a) { return window.KCaptions.mcpDisari(a.bicim); },
     suflo_sessizlik_analiz: function (a) { return window.KCut.mcpAnaliz(a); },
+    // Zoom ve Hız Rampası işlevleri sonucu açıkça döner: modül meşgulken (ffmpeg analizi, rampa
+    // sürüyor) hiçbir şey yapmadan dönen çağrı "başarılı" sayılmasın (durum satırı o an eski işi gösterir)
     suflo_zoom: async function () {
       if (!window.KZoom || !window.KZoom.calistir) return { ok: false, hata: "yok", mesaj: "Auto Zoom unavailable." };
-      await window.KZoom.calistir();
-      return durumla("zoom-status");
+      return sonucla(await window.KZoom.calistir(), "zoom-status");
     },
     suflo_sessizlik_kes: function () { return window.KCut.mcpKes(); },
     suflo_metinden_kes: function () { return window.KTextCut.mcpKes(); },
     suflo_hiz_rampasi: async function () {
       if (!window.KHizRampasi || !window.KHizRampasi.uygula) return { ok: false, hata: "yok", mesaj: "Speed Ramp unavailable." };
-      await window.KHizRampasi.uygula();
-      return durumla("hiz-status");
+      return sonucla(await window.KHizRampasi.uygula(), "hiz-status");
     }
   };
 
@@ -142,31 +144,58 @@ window.KOtomasyon = (function () {
 
   /* ---------------- Onay kartı ---------------- */
 
+  // Onay kartı Ayarlar sekmesinde (#tab-settings): kullanıcı başka sekmedeyken .tabpane gizli olduğundan
+  // kart da görünmezdi. Ayarlar'a geçilir ve kart ortalanır.
+  function kartiGoster() {
+    try { if (window.KApp && KApp.goster) KApp.goster("settings"); } catch (e) {}
+    var kart = el("mcp-onay-kart");
+    try { if (kart) kart.scrollIntoView({ block: "center" }); } catch (e2) {}
+  }
+
+  var ONAY_KILIDI = 800;   // kart belirdiği anda o noktaya düşen tık "Onayla" sayılmasın
+
   function onayIste(ad, args, ozet, sure) {
     return new Promise(function (resolve) {
       var kart = el("mcp-onay-kart");
       if (!kart) { resolve(false); return; }
-      if (bekleyenOnay) bekleyenOnay.coz(false);
-      var bitis = Date.now() + (sure || 60000);
+      // Bekleyen kart başka bir eylemle DEĞİŞTİRİLMEZ (sunucu ikinci yıkıcı isteğe zaten 409 döner):
+      // kullanıcının A için bastığı Onayla B'yi onaylamasın, A da kullanıcı yerine reddedilmesin
+      if (bekleyenOnay) { resolve(false); return; }
+      sure = sure || 60000;
+      var bitis = Date.now() + sure;
       el("mcp-onay-ozet").textContent = ozet;
       kart.hidden = false;
+      var onayla = el("mcp-onayla");
+      if (onayla) {
+        onayla.disabled = true;
+        setTimeout(function () { if (bekleyenOnay && bekleyenOnay.coz === coz) onayla.disabled = false; }, ONAY_KILIDI);
+      }
       function sayac() {
         var k = Math.max(0, Math.ceil((bitis - Date.now()) / 1000));
         el("mcp-onay-sure").textContent = k + " sn";
         if (k <= 0) coz(false);
       }
       var saat = setInterval(sayac, 500);
-      sayac();
+      var bildirim = null;
       function coz(v) {
         if (!bekleyenOnay || bekleyenOnay.coz !== coz) return;
         clearInterval(saat);
         bekleyenOnay = null;
         kart.hidden = true;
+        if (onayla) onayla.disabled = false;
+        // yanıtlanan onayın bildirimi ekranda kalmasın
+        if (bildirim) { try { bildirim.remove(); } catch (e3) {} bildirim = null; }
         resolve(v === true);
       }
       bekleyenOnay = { coz: coz };
-      try { kart.scrollIntoView({ block: "nearest" }); } catch (e) {}
-      toast("Yapay zekâ köprüsü onay bekliyor: " + ozet, "warn");
+      sayac();
+      kartiGoster();
+      // Kullanıcı kartı görmeden başka sekmeye geçerse: bildirim süre boyunca kalır, düğmesi karta götürür
+      toast("Yapay zekâ köprüsü onay bekliyor: " + ozet, "warn", sure, { metin: "Onay kartını göster", fn: kartiGoster });
+      try {
+        var kutu = el("toasts");
+        bildirim = kutu && kutu.lastElementChild ? kutu.lastElementChild : null;
+      } catch (e4) { bildirim = null; }
     });
   }
 
@@ -339,6 +368,7 @@ window.KOtomasyon = (function () {
     // testler
     _yurut: yurut,
     _YURUT: YURUT,
+    _onayIste: onayIste,
     _izin: izin,
     _etkinlik: function () { return etkinlik.slice(); }
   };

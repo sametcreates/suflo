@@ -112,7 +112,7 @@ ok("captions.js: filigran yalnız overlayUygula içinde, filigranGerekli'ye bağ
 var kancaEkle = govde(oku("js/kanca.js"), "async function ekle(ek)");
 ok("kanca.js: filigran yalnız ekle'de (önizleme temiz)", /SufloFiligran\.ekle\(/.test(kancaEkle) && /Pro\.filigranGerekli\(\)/.test(kancaEkle) && !/SufloFiligran/.test(govde(oku("js/kanca.js"), "async function onizle()")));
 ok("deneme çıktısı kaydı: temiz ASS saklanır (stilli katman + kanca)", /assTemiz: assTemiz/.test(ou) && /denemeKaydet\(K, Pro,/.test(ou) && /assTemiz: built\.ass/.test(kancaEkle) && /denemeKaydet\(K, Pro,/.test(kancaEkle));
-["exportFile", "async function apply(stilIle)"].forEach(function (imza) {
+["exportFile", "async function apply(stilIle, secenek)"].forEach(function (imza) {
   var g = govde(cap, imza);
   ok("filigran " + imza + " yolunda yok (SRT/VTT/caption izi temiz)", !g || !/SufloFiligran/.test(g));
 });
