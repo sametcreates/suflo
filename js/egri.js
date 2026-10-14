@@ -643,10 +643,13 @@ window.KEgri = (function () {
       // Uç değerleri o anki hâlinden: her uygulama taze taramayla başlar
       var tar = await tara(sonPeek);
       if (!tar) throw new Error(onbellek && onbellek.hata ? onbellek.hata : "Anahtar kareler okunamadı.");
-      var secilen = satirlar().filter(isaretli).filter(function (s) { return s.degerVar; });
-      if (!secilen.length) throw new Error("Uygulanacak çift yok: playhead'i iki anahtar karenin arasına getir ve özelliği işaretle.");
+      var isaretliler = satirlar().filter(isaretli);
+      if (!isaretliler.length) throw new Error("Uygulanacak çift yok: playhead'i iki anahtar karenin arasına getir ve özelliği işaretle.");
+      // Uç değerleri yalnız taramanın okuduğu çift için bilinir; okunamayan satır sessizce atlanmaz, nedeniyle bildirilir
+      var secilen = isaretliler.filter(function (s) { return s.degerVar; });
       var plan = M.bakeGruplari(secilen, egri, yogunluk(), tar.seqId);
-      var atlanan = plan.atlanan.slice(), yeniKayitlar = [], yazilan = 0, basarili = 0, ozellik = 0;
+      var atlanan = isaretliler.filter(function (s) { return !s.degerVar; }).map(function (s) { return { prop: s.prop, kod: "degerYok" }; }).concat(plan.atlanan);
+      var yeniKayitlar = [], yazilan = 0, basarili = 0, ozellik = 0;
       for (var g = 0; g < plan.gruplar.length; g++) {
         var grup = plan.gruplar[g];
         if (plan.gruplar.length > 1) durum("Yazılıyor… " + (g + 1) + "/" + plan.gruplar.length);
