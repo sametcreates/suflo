@@ -1525,14 +1525,15 @@ Pro kapısı değişmedi (`cut`, 3 deneme hakkı; analiz, önizleme, kapsam ve �
 (Premiere TR yalnız fikir; onun `Track.locked` ile kilit açıp kapama yöntemi çalışmadığı için kullanılmadı); NOTICE
 girdisi gerekmez. Yeni çalışma zamanı dosyası yok (paketleme değişmedi).
 
-**K7.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 7.1–7.15'i yeni ve eski
+**K7.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 7.1–7.19'u yeni ve eski
 (CEF 74) Premiere'de dene. En önemlisi **7.8**: Premiere'in `TrackItem.remove` çağrısının bağlı (link) öğeyi de silip
 silmediği otomatik testte bilinemiyor. Siliyorsa korunan katman değişir; Suflo bunu fark edip "⚠ Korunan bir katman
-değişti…" der (Ctrl+Z ile geri alınır), ama o durumda bağlı çiftlerde koruma işe yaramaz. Sonucu bildir: silmiyorsa bir
+değişti…" der (Kopya sekansta özgün sekans sağlam; Bu sekansta geri alma çok adımlı, Geçmiş paneli), ama o durumda bağlı çiftlerde koruma işe yaramaz. Sonucu bildir: silmiyorsa bir
 şey yapma; siliyorsa bir sonraki adımda bağlı çiftlerde korumayı engelleyen bir uyarıya çevireceğiz.
 
 **K7.2 Müzik adı listesi (karar).** Önceden korunan ad kuralı `js/sessizlik.js` › `MUZIK_RE`
-(`müzik|muzik|music|bgm|şarkı|sarki|song|ambiyans|ambience`). Kullanıcıların katmanlarına başka adlar verdiğini görürsen
+(`müzik|muzik|music|bgm|şarkı|sarki|song|ambiyans|ambience`, yalnız sözcük başında: "Songül", "Sarkis" gibi kişi adları
+müzik sayılmaz). Kullanıcıların katmanlarına başka adlar verdiğini görürsen
 (ör. "Fon", "Background") listeye ekle; `tests/test-sessizlik.js` › `muzikAdi` satırı da güncellenmeli.
 
 **K7.3 Tanıtım (isteğe bağlı).** 15 sn'lik ekran kaydı: Sekans kapsamında müzikli bir vlogda Sessizlikleri bul →

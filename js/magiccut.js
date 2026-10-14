@@ -70,6 +70,17 @@ window.KCut = (function () {
   var zorlaBosluk = false;  // "Boşluk bırakarak uygula" (korunan video katmanı ripple'da kaymasın)
   var IPTAL_IPUCU = "ffmpeg analizini durdurur; önceki sonuç ekranda kalır";
   var IPTAL_KILITLI = "Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez. Bitince İptal açılır.";
+  // Uygula sonrası korunan katman uyarısı: kopyada özgün sekans sağlam; "Bu sekansta" geri alma tek adım değil
+  var KORUNAN_UYARI = {
+    degisti: {
+      kopya: "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et, gerekirse kopyayı silip korumayı değiştirerek yeniden uygula.",
+      burada: "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Kontrol et: tek Ctrl+Z (Mac: Cmd+Z) geri getirmez, her kesim ve silme ayrı adımdır; Geçmiş (History) panelinde kesimlerden önceki adıma dön."
+    },
+    eksik: {
+      kopya: "⚠ Korunan katmanlardan bazıları sekansta bulunamadı, kesilmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et.",
+      burada: "⚠ Korunan katmanlardan bazıları sekansta bulunamadı, kesilmiş olabilir. Kontrol et: tek Ctrl+Z (Mac: Cmd+Z) geri getirmez, her kesim ve silme ayrı adımdır; Geçmiş (History) panelinde kesimlerden önceki adıma dön."
+    }
+  };
 
   function el(id) { return document.getElementById(id); }
 
@@ -270,9 +281,15 @@ window.KCut = (function () {
         var hazir = await sekansSesiHazirla(aralik, ctx, jeton);
         if (!hazir) return;           // iptal / uyarı (durum yazıldı)
         clip = benimKlip = hazir;
+        // analiz edilen sekans: Premiere'in döndürdüğü kimlik (tıklama anındaki bağlam bayat olabilir)
+        if (hazir.seqId) analizSeqId = hazir.seqId;
         sonAnahtar = S.anahtar(clip.mediaPath, clip.inPoint, clip.outPoint - clip.inPoint);
-      } else if (katman) {
-        // Katmanlar bölümü açıldıysa koruma önerisi bu klibin aralığıyla tazelenir (okunamazsa analiz sürer)
+      } else if (katman || katmanBolumuAcik()) {
+        /*
+         * Katmanlar bölümü açıldıysa koruma önerisi bu klibin aralığıyla tazelenir (okunamazsa analiz sürer).
+         * Bölüm açık ama düzen yoksa da (sekans değişti / bölüm sekanssız açıldı) okunur: ipucu bunu söylüyor,
+         * okunmazsa Uygula korumasız giderdi.
+         */
         await katmanlariOku({ start: clip.clipStart, end: clip.clipEnd });
         if (clip !== benimKlip) return;
       }
@@ -398,12 +415,44 @@ window.KCut = (function () {
     try { return window.KCaptions && KCaptions.bundledEpr ? KCaptions.bundledEpr() : []; } catch (e) { return []; }
   }
 
-  // Sekans kapsamında dışa aktarılan karışımı sil (Uygula, kapsam / sekans / dinlenen ses değişimi, panel kapanışı)
+  /*
+   * Sekans kapsamında dışa aktarılan karışımı sil (Uygula, kapsam / sekans / dinlenen ses değişimi, panel kapanışı).
+   * Windows'ta açık dosya silinemez: İptal'de ffmpeg (taskkill eşzamansız), ▶ Dinle ya da Uygula doğrulaması WAV'ı
+   * hâlâ tutuyor olabilir. Silinemeyen yol unutulmaz: artan aralıklarla yeniden denenir, sonraki wavSil ve panel
+   * kapanışı da dener (yoksa her iptal sekans uzunluğunda bir WAV bırakırdı).
+   */
+  var silinecekler = [];
+  var silZaman = null, silDeneme = 0;
+  var SIL_MS = 500, SIL_DENEME = 8;
+  function dosyaSil(yol) {
+    try {
+      if (K.fs && K.fs.existsSync(yol)) K.fs.unlinkSync(yol);
+      return true;
+    } catch (e) {
+      K.log("[kesim] gecici wav silinemedi (" + (e && e.code || "") + "): " + (e && e.message));
+      return false;
+    }
+  }
+  function bekleyenleriSil() {
+    silinecekler = silinecekler.filter(function (y) { return !dosyaSil(y); });
+    return silinecekler.length === 0;
+  }
+  function silmeyiYinele() {
+    if (silZaman || !silinecekler.length || silDeneme >= SIL_DENEME) return;
+    silZaman = setTimeout(function () {
+      silZaman = null;
+      silDeneme++;
+      if (!bekleyenleriSil()) silmeyiYinele();
+    }, SIL_MS * Math.pow(2, silDeneme));
+  }
   function wavSil() {
-    if (!geciciWav) return;
-    var yol = geciciWav;
-    geciciWav = "";
-    try { if (K.fs && K.fs.existsSync(yol)) K.fs.unlinkSync(yol); } catch (e) { K.log("[kesim] gecici wav silinemedi: " + (e && e.message)); }
+    if (geciciWav) {
+      if (silinecekler.indexOf(geciciWav) === -1) silinecekler.push(geciciWav);
+      geciciWav = "";
+      silDeneme = 0;
+    }
+    if (!silinecekler.length) return;
+    if (!bekleyenleriSil()) silmeyiYinele();
   }
 
   // Ekrandaki analizi bırak (kapsam değişti, sekans kapsamında yeni analiz başlıyor)
@@ -457,7 +506,11 @@ window.KCut = (function () {
     // okuma sürerken başka sekansa geçildiyse bu düzen artık etkin sekansın değil
     var simdi = KApp.ctx();
     if (simdi.sequenceId && r.seqId && String(simdi.sequenceId) !== String(r.seqId)) return null;
-    if (!katman || String(katman.seqId) !== String(r.seqId)) { secDinle = null; secKoru = null; }
+    /*
+     * Seçimler katman DİZİNİDİR: başka sekansta ya da aynı sekansta katman eklenip silinince / yeniden adlandırılınca
+     * aynı dizin başka katmanı gösterir (müzik A2'den A3'e kayar, "korunan A2" boş katman olur). Öneriye dön.
+     */
+    if (!katman || String(katman.seqId) !== String(r.seqId) || katmanImzasi(katman) !== katmanImzasi(r)) { secDinle = null; secKoru = null; }
     katman = r;
     katmanAralik = ar.end > ar.start ? ar : { start: 0, end: Number(r.duration) || 0 };
     katmanCiftleri = S.bagliCiftler(katman);
@@ -470,6 +523,15 @@ window.KCut = (function () {
     var e = el("cut-katman-ipucu");
     if (e) e.textContent = m || "";
   }
+
+  function katmanBolumuAcik() { var d = el("cut-katman"); return !!(d && d.open); }
+
+  // Katman adları (KS_applyCuts expectTracks: protect dizinleri bu düzene göre)
+  function katmanAdlari(lay) {
+    function adlar(l) { return (l || []).map(function (iz) { return String((iz && iz.name) || ""); }); }
+    return { video: adlar(lay && lay.video), audio: adlar(lay && lay.audio) };
+  }
+  function katmanImzasi(lay) { return JSON.stringify(katmanAdlari(lay)); }
 
   // Önerinin aralığı: analiz edilmiş kapsam (klip / In-Out / sekans), yoksa katmanın okunduğu aralık
   function oneriAraligi() {
@@ -693,12 +755,21 @@ window.KCut = (function () {
     if (ex && ex.ok && ex.wav) geciciWav = String(ex.wav);
     if (jeton && jeton.iptalEdildi) { status("İptal edildi.", "warn"); return null; }
     if (!ex || !ex.ok) throw new Error((ex && ex.error) || "Premiere sesi dışa aktaramadı.");
+    /*
+     * Analiz edilen sekans Premiere'in söylediği: katmanların okunduğu ve sesin dışa aktarıldığı sekans. Tıklama anındaki
+     * bağlam (KApp.ctx) panel odakta değilken yoklanmaz, bayat olabilir; ikisi arasında sekans değiştiyse karışım
+     * okunan katmanlara ait değil (WAV analyze'ın finally'sinde silinir).
+     */
+    var seqId = String(ex.seqId || lay.seqId || ctx.sequenceId || "");
+    if (ex.seqId && lay.seqId && String(ex.seqId) !== String(lay.seqId)) {
+      throw new Error("etkin sekans analiz sırasında değişti — Sessizlikleri yeniden bul.");
+    }
     var dur = Number(ex.duration) > 0 ? Number(ex.duration) : aralik.end - aralik.start;
     var ofset = Number(ex.offset) || 0;
     K.log("[kesim] " + kapsam + " karisimi: " + o.dinle.map(function (i) { return "A" + (i + 1); }).join(",") +
       " ofset=" + ofset.toFixed(3) + " sure=" + dur.toFixed(3));
     return { mediaPath: geciciWav, inPoint: 0, outPoint: dur, clipStart: ofset, clipEnd: ofset + dur,
-      name: kapsam === "inout" ? "In → Out" : "Sekans", kapsam: kapsam, seqId: ctx.sequenceId ? String(ctx.sequenceId) : "",
+      name: kapsam === "inout" ? "In → Out" : "Sekans", kapsam: kapsam, seqId: seqId,
       dinle: o.dinle.slice() };
   }
 
@@ -1095,6 +1166,8 @@ window.KCut = (function () {
       var kor = korumaHesapla(mode);
       var korYuk = kor ? S.korumaYuku(kor.koru) : null;
       if (korYuk) yuk.protect = korYuk;
+      // protect dizinleri bu düzene göre: host katman sayısı / adları tutmazsa (arada katman eklendi, silindi) uygulamaz
+      if (korYuk) yuk.expectTracks = katmanAdlari(katman);
       if (korYuk) K.log("[kesim] korunan katmanlar: " + korYuk.video.map(function (i) { return "V" + (i + 1); })
         .concat(korYuk.audio.map(function (i) { return "A" + (i + 1); })).join(",") + " mod=" + mode);
       // Yuzlerce kesim uygulamak uzun surebilir: zaman asimini genis tut
@@ -1114,13 +1187,20 @@ window.KCut = (function () {
           ? "✂ Kopya sekansta uygulandı: " + r.newSeq
           : "✂ " + r.removed + " parça silindi" + (r.selected ? ", " + r.selected + " parça seçildi" : "");
         if (mode === "select") msg = "✂ Kesildi ve seçildi — silmek istersen Shift+Delete";
-        if (korYuk && r.protectedSkipped) {
+        // host'un gerçekten koruduğu katman sayısı (geçersiz dizin atılır): istenenden azsa "korunan" denmez, uyarılır
+        var korEksik = !!(korYuk && r.protectedSkipped &&
+          (Number(r.protectedSkipped.video) < korYuk.video.length || Number(r.protectedSkipped.audio) < korYuk.audio.length));
+        if (korYuk && r.protectedSkipped && !korEksik) {
           msg += " · korunan: " + korYuk.video.map(function (i) { return "V" + (i + 1); })
             .concat(korYuk.audio.map(function (i) { return "A" + (i + 1); })).join(", ");
         }
-        if (r.protectedChanged) {
-          // Premiere bağlı klibi birlikte kesmiş / silmiş olabilir: kullanıcı görsün, geri alabilsin
-          status("⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Kontrol et; geri almak için Ctrl+Z (Mac: Cmd+Z).", "warn");
+        if (r.protectedChanged || korEksik) {
+          /*
+           * Premiere bağlı klibi birlikte kesmiş / silmiş olabilir ya da korunan katman bulunamadı. ExtendScript'te
+           * geri alma gruplanmaz (her razor / silme ayrı adım): tek Ctrl+Z demek yanıltır. Kopyada özgün sekans sağlam.
+           */
+          var tur = korEksik ? "eksik" : "degisti";
+          status(KORUNAN_UYARI[tur][r.newSeq ? "kopya" : "burada"], "warn");
           KApp.toast(msg, "warn");
         } else if (r.protectedVideoGap) {
           status("⚠ Korunan video katmanı kaymasın diye kesimler boşluk bırakılarak silindi.", "warn");
@@ -1142,7 +1222,16 @@ window.KCut = (function () {
     if (r && !r.ok) {
       // expectSeqId tutmadı (arada başka sekansa geçildi): hiçbir şey yapılmadı, kopya da açılmadı
       if (r.kod === "sekans") status("✕ Etkin sekans değişti: kesimler uygulanmadı. Analiz edilen sekansı aç ya da Sessizlikleri yeniden bul.", "bad");
-      else status("✕ " + r.error, "bad");
+      else if (r.kod === "katman") {
+        /*
+         * expectTracks tutmadı: analizden sonra katman eklendi / silindi / yeniden adlandırıldı, korunan dizinler başka
+         * katmanı gösterirdi. Hiçbir şey yapılmadı. Düzen yeniden okunur (seçimler öneriye döner), kullanıcı kontrol eder.
+         */
+        status("✕ Katman düzeni değişti (katman eklendi, silindi ya da yeniden adlandırıldı): kesimler uygulanmadı. Katmanlar yeniden okunuyor: korunanları kontrol et, sonra yeniden Kesimleri uygula.", "bad");
+        var det = el("cut-katman");
+        if (det) det.open = true;
+        katmanlariOku(clip ? { start: clip.clipStart, end: clip.clipEnd } : null);
+      } else status("✕ " + r.error, "bad");
     }
   }
 
@@ -1279,6 +1368,9 @@ window.KCut = (function () {
         katman = null; katmanCiftleri = []; secDinle = null; secKoru = null;
         renderKatmanlar();
         renderUyarilar();
+      } else if (!katman && !katmanOkunuyor && katmanBolumuAcik()) {
+        // bölüm açık, düzen yok: sekans açılınca / kapanınca ipucu tazelensin (Premiere'e gidilmez; Sessizlikleri bul okur)
+        renderKatmanlar();
       }
       // seçim değiştiyse eski analiz geçersiz (sekans kapsamında: sekans değiştiyse / kapandıysa)
       var gecersiz = clip && (clip.kapsam

@@ -52,8 +52,9 @@ function eleman(id) {
 /*
  * Paneli yükle. o: { K (köprü), ffmpeg (yol), clip, applyCuts(payload) → sonuç,
  *   ctx?: { hasSeq, sequenceId, seqIn, seqOut, seqDur, frame } (3.4 adım 7: sekans kapsamı),
- *   call?(fn, payload) → sonuç (verilirse her K.call buna gider; KS_exportAudio / KS_getTrackLayout sahtesi) }
- * Döner: { el, KCut, kayit: { gate, harca, toast, call, run, runAkis }, ctx(sel, ek), bekle(ms), kapsam(s) }
+ *   call?(fn, payload) → sonuç (verilirse her K.call buna gider; KS_exportAudio / KS_getTrackLayout sahtesi),
+ *   fs? (K.fs yerine) }
+ * Döner: { el, KCut, kayit: { gate, harca, toast, call, run, runAkis }, ctx(sel, ek), bekle(ms), kapsam(s), hedef(m) }
  */
 function kesimPaneli(o) {
   var els = {};
@@ -66,6 +67,9 @@ function kesimPaneli(o) {
   // #cut-scope: üç kapsam düğmesi (data-s), tıklanabilir
   var kapsamDugmeleri = ["clip", "inout", "entire"].map(function (k) { var b = eleman(""); b.tagName = "BUTTON"; b.dataset.s = k; return b; });
   el("cut-scope").querySelectorAll = function () { return kapsamDugmeleri; };
+  // #cut-target: Kopya sekansta (açık) | Bu sekansta (data-m), tıklanabilir
+  var hedefDugmeleri = ["clone", "here"].map(function (m) { var b = eleman(""); b.tagName = "BUTTON"; b.dataset.m = m; return b; });
+  el("cut-target").querySelectorAll = function () { return hedefDugmeleri; };
   var kayit = { gate: [], harca: [], toast: [], call: [], run: [], runAkis: [] };
   var sel = o.clip || null, dinleyiciler = [], ekCtx = o.ctx || {};
   function ctxNesnesi() {
@@ -76,6 +80,8 @@ function kesimPaneli(o) {
   var gercekK = o.K;
   var K = {};
   for (var k in gercekK) K[k] = gercekK[k];
+  // o.fs: K.fs sahtesi (ör. Windows'taki gibi açık dosyayı silemeyen unlinkSync)
+  if (o.fs) K.fs = o.fs;
   K.findFfmpeg = function () { return Promise.resolve(o.ffmpeg); };
   K.log = function () {};
   K.hataYardimi = function (e) { return String(e && e.message || e); };
@@ -118,6 +124,7 @@ function kesimPaneli(o) {
       dinleyiciler.forEach(function (f) { f(ctxNesnesi()); });
     },
     kapsam: function (s) { kapsamDugmeleri.forEach(function (b) { if (b.dataset.s === s) b.fire("click"); }); },
+    hedef: function (m) { hedefDugmeleri.forEach(function (b) { if (b.dataset.m === m) b.fire("click"); }); },
     tikla: function (id) { return Promise.resolve(el(id).fire("click", { detail: 0 })); },
     kaydir: function (id, deger) { el(id).value = String(deger); el(id).fire("input"); },
     bekle: function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); }

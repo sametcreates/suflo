@@ -2959,12 +2959,22 @@
     "ve {n} çift daha": "and {} more pairs",
     "Korunan video katmanı Ripple'da kaymaz: Boşluk bırakarak uygula ya da korumayı kaldır.": "A protected video track doesn't shift in Ripple: apply leaving gaps, or remove the protection.",
     "korunan: {}": "protected: {}",
-    "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Kontrol et; geri almak için Ctrl+Z (Mac: Cmd+Z).":
-      "⚠ A protected track changed: Premiere may have cut its linked clip too. Check it; to undo, press Ctrl+Z (Mac: Cmd+Z).",
+    "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et, gerekirse kopyayı silip korumayı değiştirerek yeniden uygula.":
+      "⚠ A protected track changed: Premiere may have cut its linked clip too. The original sequence is unchanged; check the copy, and if needed delete it and apply again with different protection.",
+    "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Kontrol et: tek Ctrl+Z (Mac: Cmd+Z) geri getirmez, her kesim ve silme ayrı adımdır; Geçmiş (History) panelinde kesimlerden önceki adıma dön.":
+      "⚠ A protected track changed: Premiere may have cut its linked clip too. Check it: a single Ctrl+Z (Mac: Cmd+Z) won't restore it, since every cut and removal is its own step; in the History panel, go back to the step before the cuts.",
+    "⚠ Korunan katmanlardan bazıları sekansta bulunamadı, kesilmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et.":
+      "⚠ Some protected tracks weren't found in the sequence and may have been cut. The original sequence is unchanged; check the copy.",
+    "⚠ Korunan katmanlardan bazıları sekansta bulunamadı, kesilmiş olabilir. Kontrol et: tek Ctrl+Z (Mac: Cmd+Z) geri getirmez, her kesim ve silme ayrı adımdır; Geçmiş (History) panelinde kesimlerden önceki adıma dön.":
+      "⚠ Some protected tracks weren't found in the sequence and may have been cut. Check it: a single Ctrl+Z (Mac: Cmd+Z) won't restore it, since every cut and removal is its own step; in the History panel, go back to the step before the cuts.",
+    "✕ Katman düzeni değişti (katman eklendi, silindi ya da yeniden adlandırıldı): kesimler uygulanmadı. Katmanlar yeniden okunuyor: korunanları kontrol et, sonra yeniden Kesimleri uygula.":
+      "✕ The track layout changed (a track was added, deleted or renamed): the cuts weren't applied. Reading the tracks again: check the protected tracks, then click Apply cuts again.",
+    "etkin sekans analiz sırasında değişti — Sessizlikleri yeniden bul.": "the active sequence changed during the analysis — run Find silences again.",
     "⚠ Korunan video katmanı kaymasın diye kesimler boşluk bırakılarak silindi.": "⚠ Cuts were removed leaving gaps so the protected video track wouldn't drift.",
     "✕ Etkin sekans değişti: kesimler uygulanmadı. Analiz edilen sekansı aç ya da Sessizlikleri yeniden bul.": "✕ The active sequence changed: the cuts weren't applied. Open the analyzed sequence or run Find silences again.",
     // host.jsx (KS_applyCuts expectSeqId)
     "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.": "The active sequence changed; the cuts weren't applied. Run Find silences again.",
+    "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.": "The track layout changed; the cuts weren't applied. Read the tracks again.",
     // Auto Cut: Cancel replaces "Sessizlikleri bul" while ffmpeg analyzes
     "ffmpeg analizini durdurur; önceki sonuç ekranda kalır": "Stops the ffmpeg analysis; the previous result stays on screen",
     // engine / model / ffmpeg download cancel (Settings and the caption setup card)

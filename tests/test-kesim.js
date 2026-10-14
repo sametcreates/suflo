@@ -458,6 +458,183 @@ async function kapsamTestleri(K, stereo) {
     w.el("cut-status").textContent);
   w.kapsam("clip");
   ok("kapsam değişimi bu WAV'ı da siler", !fs.existsSync(w.wavlar[0]));
+
+  await kapsamInceleme(K, stereo, klipK);
+}
+
+/*
+ * ---- 3.4 adım 7 incelemesi: korunan katman kimliği, host'un sekans kimliği, açık Katmanlar bölümü, uyarı metinleri,
+ * Windows'ta silinemeyen karışım WAV'ı ----
+ */
+function sahtePanel(K, stereo, o) {
+  var wavlar = [];
+  var p = kabi.kesimPaneli({ K: K, ffmpeg: FF, clip: o.clip || null, fs: o.fs,
+    ctx: o.ctx || { hasSeq: true, sequenceId: "seq-1", seqIn: 10, seqOut: 15.1, seqDur: 60, frame: 0.04 },
+    call: function (fn, yuk) {
+      if (fn === "KS_getTrackLayout") return o.duzen(yuk);
+      if (fn === "KS_exportAudio") {
+        var hedef = pathm.join(TMP, "seq_inceleme_" + (++kapsamWavSayac) + ".wav");
+        fs.copyFileSync(stereo, hedef);
+        wavlar.push(hedef);
+        if (o.disaAktarildi) o.disaAktarildi(hedef);
+        return { ok: true, wav: hedef, offset: yuk.scope === "inout" ? 10 : 0, duration: 5.1, seqId: o.disaSeqId ? o.disaSeqId() : "seq-1" };
+      }
+      if (fn === "KS_applyCuts") return o.uygula ? o.uygula(yuk) : { ok: true, newSeq: "Vlog - kopya", removed: 4, selected: 0, rippleFallback: false, protectedSkipped: { video: 0, audio: 1 } };
+      return { ok: false, error: "beklenmeyen " + fn };
+    } });
+  p.wavlar = wavlar;
+  p.cagrilar = function (fn) { return p.kayit.call.filter(function (x) { return x.fn === fn; }); };
+  return p;
+}
+// A2'ye yeni boş katman eklenmiş düzen: müzik A3'e kaydı
+function muzikKaydi(seqId) {
+  var d = duzenYap({ seqId: seqId });
+  d.audio.splice(1, 0, { index: 1, name: "Audio 2", locked: false, muted: false, clipCount: 0, first: 0, last: 0, klipler: [] });
+  d.audio.forEach(function (iz, i) { iz.index = i; });
+  return d;
+}
+
+async function kapsamInceleme(K, stereo, klipK) {
+  var IPUCU = "Katmanlar sekanstan okunur: bu bölümü açınca ya da Sessizlikleri bul'da.";
+
+  /* a) Seçili klip: Katmanlar açık, sekans değişti (düzen düştü): Sessizlikleri bul yeniden okur, protect gider */
+  var seqNow = "seq-1";
+  var a = sahtePanel(K, stereo, { clip: klipK, duzen: function () { return duzenYap({ seqId: seqNow }); } });
+  a.el("cut-katman").open = true;
+  a.el("cut-katman").fire("toggle");
+  await a.bekle(20);
+  ok("klip kapsamı: Katmanlar açılınca düzen okundu, Müzik korunuyor", a.cagrilar("KS_getTrackLayout").length === 1 &&
+    JSON.stringify(cipler(a, "cut-koru-izler")) === JSON.stringify(["V1", "V2", "A1", "A2 · Müzik+"]), JSON.stringify(cipler(a, "cut-koru-izler")));
+  seqNow = "seq-2";
+  var klip2 = { mediaPath: stereo, inPoint: 0, outPoint: 5.1, clipStart: 30, clipEnd: 35.1 };
+  a.ctx(klip2, { sequenceId: "seq-2" });
+  ok("sekans değişti, bölüm açık: düzen düştü, ipucu Sessizlikleri bul'un okuyacağını söylüyor", a.el("cut-katman-ipucu").textContent === IPUCU && a.el("cut-koru-satir").hidden === true,
+    a.el("cut-katman-ipucu").textContent);
+  await a.tikla("cut-analyze");
+  var al = a.cagrilar("KS_getTrackLayout");
+  ok("Sessizlikleri bul: açık bölüm düzensizken katmanlar bu klibin aralığıyla yeniden okundu",
+    al.length === 2 && al[1].payload.start === 30 && Math.abs(al[1].payload.end - 35.1) < 1e-9, JSON.stringify(al.map(function (x) { return x.payload; })));
+  await a.tikla("cut-apply");
+  var aa = a.cagrilar("KS_applyCuts");
+  ok("Uygula: seq-2'de de Müzik korunur (protect + expectTracks), expectSeqId seq-2",
+    aa.length === 1 && JSON.stringify(aa[0].payload.protect) === JSON.stringify({ video: [], audio: [1] }) && aa[0].payload.expectSeqId === "seq-2" &&
+    JSON.stringify(aa[0].payload.expectTracks) === JSON.stringify({ video: ["Video 1", "Video 2"], audio: ["Audio 1", "Müzik"] }),
+    JSON.stringify(aa.length && aa[0].payload));
+
+  /* a2) Bölüm sekanssızken açıldı, sonra sekans açıldı: ipucu tazelenir (Premiere'e gidilmez), Sessizlikleri bul okur */
+  var b = sahtePanel(K, stereo, { ctx: { hasSeq: false }, duzen: function () { return duzenYap(); } });
+  b.el("cut-katman").open = true;
+  b.el("cut-katman").fire("toggle");
+  await b.bekle(20);
+  var bIlk = b.el("cut-katman-ipucu").textContent;
+  b.ctx(klipK, { hasSeq: true, sequenceId: "seq-1", seqIn: 10, seqOut: 15.1, seqDur: 60, frame: 0.04 });
+  ok("bölüm sekanssız açıldı → sekans açıldı: ipucu güncellendi, katman sorulmadı",
+    bIlk === "Katmanları görmek için bir sekans aç." && b.el("cut-katman-ipucu").textContent === IPUCU && b.cagrilar("KS_getTrackLayout").length === 0,
+    bIlk + " / " + b.el("cut-katman-ipucu").textContent);
+  await b.tikla("cut-analyze");
+  await b.tikla("cut-apply");
+  var ba = b.cagrilar("KS_applyCuts");
+  ok("…Sessizlikleri bul katmanları okudu, Uygula Müzik'i korur", b.cagrilar("KS_getTrackLayout").length === 1 && ba.length === 1 &&
+    JSON.stringify(ba[0].payload.protect) === JSON.stringify({ video: [], audio: [1] }), JSON.stringify(ba.length && ba[0].payload));
+
+  /* b) Host katman düzeni değişti (kod katman): Türkçe açıklama, hak düşmez, düzen yeniden okunur, seçimler öneriye döner */
+  var duzenNo = 0;
+  var c = sahtePanel(K, stereo, {
+    duzen: function () { return ++duzenNo <= 2 ? duzenYap() : muzikKaydi("seq-1"); },
+    uygula: function () { return { ok: false, kod: "katman", error: "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku." }; } });
+  c.kapsam("entire");
+  await c.bekle(20);
+  await c.tikla("cut-analyze");
+  c.el("cut-koru-izler").children[2].onclick();   // A1'i de koru (kullanıcı seçimi: dizin listesi)
+  await c.tikla("cut-apply");
+  await c.bekle(20);
+  var ca = c.cagrilar("KS_applyCuts");
+  ok("katman düzeni değişti: '✕ Katman düzeni değişti…', hak düşmedi, sonuç duruyor",
+    ca.length === 1 && JSON.stringify(ca[0].payload.expectTracks) === JSON.stringify({ video: ["Video 1", "Video 2"], audio: ["Audio 1", "Müzik"] }) &&
+    /^✕ Katman düzeni değişti/.test(c.el("cut-status").textContent) && c.kayit.harca.length === 0 && c.el("cut-result").hidden === false,
+    c.el("cut-status").textContent);
+  ok("…katmanlar yeniden okundu; dizin seçimleri yeni düzene taşınmadı (öneri: Müzik artık A3)",
+    c.cagrilar("KS_getTrackLayout").length === 3 && JSON.stringify(cipler(c, "cut-koru-izler")) === JSON.stringify(["V1", "V2", "A1", "A2", "A3 · Müzik+"]),
+    JSON.stringify(cipler(c, "cut-koru-izler")));
+
+  /* c) Uyarılar: korunan katman değişti (kopya / bu sekans), korunan katman bulunamadı */
+  var d = sahtePanel(K, stereo, { duzen: function () { return duzenYap(); },
+    uygula: function () { return { ok: true, newSeq: "Vlog - kopya", removed: 4, selected: 0, rippleFallback: false, protectedSkipped: { video: 0, audio: 1 }, protectedChanged: true }; } });
+  d.kapsam("entire");
+  await d.bekle(20);
+  await d.tikla("cut-analyze");
+  await d.tikla("cut-apply");
+  ok("protectedChanged + kopya: özgün sekans sağlam denir, tek Ctrl+Z vaadi yok",
+    /Özgün sekans değişmedi/.test(d.el("cut-status").textContent) && !/Ctrl\+Z/.test(d.el("cut-status").textContent), d.el("cut-status").textContent);
+  var e = sahtePanel(K, stereo, { duzen: function () { return duzenYap(); },
+    uygula: function () { return { ok: true, newSeq: "", removed: 4, selected: 0, rippleFallback: false, protectedSkipped: { video: 0, audio: 1 }, protectedChanged: true }; } });
+  e.hedef("here");
+  e.el("cut-mode").value = "ripple";
+  e.kapsam("entire");
+  await e.bekle(20);
+  await e.tikla("cut-analyze");
+  await e.tikla("cut-apply");
+  ok("protectedChanged + Bu sekansta: geri almanın tek adım olmadığı ve Geçmiş paneli söylenir",
+    e.cagrilar("KS_applyCuts").length === 1 && e.cagrilar("KS_applyCuts")[0].payload.cloneFirst === false &&
+    /tek Ctrl\+Z \(Mac: Cmd\+Z\) geri getirmez/.test(e.el("cut-status").textContent) && /Geçmiş \(History\)/.test(e.el("cut-status").textContent), e.el("cut-status").textContent);
+  var f = sahtePanel(K, stereo, { duzen: function () { return duzenYap(); },
+    uygula: function () { return { ok: true, newSeq: "Vlog - kopya", removed: 4, selected: 0, rippleFallback: false, protectedSkipped: { video: 0, audio: 0 } }; } });
+  f.kapsam("entire");
+  await f.bekle(20);
+  await f.tikla("cut-analyze");
+  await f.tikla("cut-apply");
+  ok("host korunan katmanı saymadı (protectedSkipped 0): toast 'korunan: A2' demez, uyarı",
+    !f.kayit.toast.some(function (t) { return /korunan:/.test(t[0]); }) && /Korunan katmanlardan bazıları sekansta bulunamadı/.test(f.el("cut-status").textContent),
+    JSON.stringify(f.kayit.toast) + " " + f.el("cut-status").textContent);
+
+  /* d) Sekans kimliği Premiere'den: tıklama anındaki bağlam bayat (seq-X), Premiere seq-Y'de */
+  var g;
+  var gNo = 0;
+  g = sahtePanel(K, stereo, { ctx: { hasSeq: true, sequenceId: "seq-X", seqIn: 10, seqOut: 15.1, seqDur: 60, frame: 0.04 },
+    duzen: function () {
+      // ikinci okumadan (analiz) hemen önce bekleyen bağlam yoklaması seq-Y'yi getirdi
+      if (++gNo === 2) g.ctx(null, { sequenceId: "seq-Y" });
+      return duzenYap({ seqId: "seq-Y" });
+    },
+    disaSeqId: function () { return "seq-Y"; } });
+  g.kapsam("entire");
+  await g.bekle(20);
+  await g.tikla("cut-analyze");
+  await g.tikla("cut-apply");
+  var ga = g.cagrilar("KS_applyCuts");
+  ok("analiz edilen sekans Premiere'in söylediği (seq-Y), tıklama anındaki bayat bağlam (seq-X) değil",
+    ga.length === 1 && ga[0].payload.expectSeqId === "seq-Y", JSON.stringify(ga.length && ga[0].payload.expectSeqId) + " " + g.el("cut-status").textContent);
+  var h = sahtePanel(K, stereo, { duzen: function () { return duzenYap({ seqId: "seq-1" }); }, disaSeqId: function () { return "seq-2"; } });
+  h.kapsam("entire");
+  await h.bekle(20);
+  await h.tikla("cut-analyze");
+  ok("katmanlar seq-1'den, ses seq-2'den: analiz durur, sonuç yok, WAV silindi",
+    /^✕ etkin sekans analiz sırasında değişti/.test(h.el("cut-status").textContent) && h.el("cut-result").hidden === true && h.wavlar.length === 1 && !fs.existsSync(h.wavlar[0]) &&
+    h.kayit.runAkis.length === 0, h.el("cut-status").textContent);
+
+  /* e) Windows: karışım WAV'ı hâlâ açık (EBUSY): yol unutulmaz, yeniden denenir */
+  var kilitli = {};
+  var sahteFs = {};
+  for (var k in fs) sahteFs[k] = fs[k];
+  sahteFs.unlinkSync = function (yol) {
+    if (kilitli[yol] > 0) {
+      kilitli[yol]--;
+      var hata = new Error("EBUSY: resource busy or locked, unlink '" + yol + "'");
+      hata.code = "EBUSY";
+      throw hata;
+    }
+    return fs.unlinkSync(yol);
+  };
+  var w = sahtePanel(K, stereo, { fs: sahteFs, duzen: function () { return duzenYap(); }, disaAktarildi: function (yol) { kilitli[yol] = 2; } });
+  w.kapsam("entire");
+  await w.bekle(20);
+  await w.tikla("cut-analyze");
+  w.kapsam("clip");   // sonuç bırakılır, WAV silinmeye çalışılır (ffmpeg / Dinle hâlâ tutuyor)
+  await w.bekle(200);
+  var hemen = fs.existsSync(w.wavlar[0]);
+  await w.bekle(1900);
+  ok("silinemeyen karışım WAV'ı (EBUSY ×2) artan aralıklarla yeniden denendi ve silindi",
+    hemen === true && !fs.existsSync(w.wavlar[0]) && kilitli[w.wavlar[0]] === 0, "hemen=" + hemen + " sonra=" + fs.existsSync(w.wavlar[0]));
 }
 
 /*
