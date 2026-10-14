@@ -23,7 +23,8 @@ window.KLibraryHealth = (function () {
     "sync-pro": "Eşitle",
     "clear-folders": "Bağlantıyı temizle",
     "check-update": "Güncelle",
-    "update-ytdlp": "yt-dlp'yi güncelle"
+    "update-ytdlp": "yt-dlp'yi güncelle",
+    "verify-model": "Doğrula"
   };
   var GROUP_LABELS = {
     system: "Sistem",
@@ -378,7 +379,12 @@ window.KLibraryHealth = (function () {
         if (!probe || probe.code !== 0) throw new Error("motor kod=" + (probe ? probe.code : "?"));
         var model = window.KEngine && KEngine.activeModel ? KEngine.activeModel() : null;
         var build = window.KEngine && KEngine.installedBuild ? KEngine.installedBuild() : "cpu";
-        checks.push({ status: "good", title: "Yerel altyazı motoru", detail: (model ? model.label.split(" —")[0] : basename(ready.model)) + " · " + String(build).toUpperCase(), group: "engine" });
+        var modelAdi = model ? (KEngine.modelKisaAdi ? KEngine.modelKisaAdi(model) : model.label.split(" —")[0]) : basename(ready.model);
+        checks.push({ status: "good", title: "Yerel altyazı motoru", detail: modelAdi + " · " + String(build).toUpperCase(), group: "engine" });
+        // 3.4 adım 19: çevrimdışı içe aktarılıp SHA-256'sı denetlenmemiş model ("doğrulanmadı")
+        if (model && KEngine.dogrulanmadiMi && KEngine.dogrulanmadiMi(model)) {
+          checks.push({ status: "warn", title: "Model doğrulanmadı", detail: modelAdi + " çevrimdışı içe aktarıldı; SHA-256 henüz denetlenmedi. İnternet varken Doğrula'ya bas.", action: "verify-model", group: "engine" });
+        }
         // 3.2 adım 5: etkin çözme modu ve DTW desteği (yardım metni yukarıdaki "-h" yoklamasından)
         motorSecenekSatirlari(probe, model, ready, build).forEach(function (c) { checks.push(c); });
       } catch (eP) {
@@ -424,8 +430,9 @@ window.KLibraryHealth = (function () {
 
   /*
    * 3.4 adım 19 — "Model kaynaklarını sına": huggingface.co, hf-mirror.com ve motor sürüm
-   * sunucusuna 5 sn zaman aşımlı HEAD isteği (paralel). Yanıt gelmezse ya da 403 dönerse ad
-   * çözülür: 146.112.0.0/16 (Cisco Umbrella) / 0.0.0.0 kurumsal filtre olarak anlatılır.
+   * sunucusuna 5 sn zaman aşımlı (duvar saati: DNS, bağlantı, vekil tüneli dahil) HEAD isteği
+   * (paralel). Her kaynağın adı HEAD ile aynı anda çözülür: 146.112.0.0/16 (Cisco Umbrella) /
+   * 0.0.0.0 kurumsal filtre olarak anlatılır (HEAD yanıt verse bile: engel sunucusu 200/302 döner).
    * Satırlar js/ag-dayanim.js kaynakSatirlari ile kurulur (group "engine", kaynak: true).
    * Yalnız düğmeyle çalışır: panel açılışında ve normal taramada ağ isteği yapılmaz.
    */
@@ -436,7 +443,11 @@ window.KLibraryHealth = (function () {
     var adresler = ag.kaynakAdresleri(motorUrl);
     var sonuclar = await Promise.all(adresler.map(async function (a) {
       var t0 = Date.now(), r = null;
-      try { r = await K.httpGet(a.url, {}, { method: "HEAD", timeout: ag.SINAMA_ZAMAN_ASIMI }); }
+      // DNS her kaynak için ve HEAD ile AYNI ANDA sorulur (en çok 3 sn, toplam süre 5 sn'yi aşmaz):
+      // Cisco Umbrella kök sertifikası kurulu ağda engel sunucusu TLS'i geçip 200 / 302 döner,
+      // yalnız HEAD'e bakmak engellenen kaynağı "ulaşılıyor" gösterirdi
+      var dnsIsi = K.dnsEngeli ? Promise.resolve().then(function () { return K.dnsEngeli(a.host); }).then(null, function () { return ""; }) : Promise.resolve("");
+      try { r = await K.httpGet(a.url, {}, { method: "HEAD", timeout: ag.SINAMA_ZAMAN_ASIMI, sistemKokleri: true }); }
       catch (e) { r = { status: 0, body: String(e && e.message ? e.message : e) }; }
       r = r || { status: 0, body: "" };
       var s = {
@@ -444,9 +455,7 @@ window.KLibraryHealth = (function () {
         hata: r.status ? "" : String(r.body || r.kod || "bağlantı kurulamadı"),
         sure: Date.now() - t0, caDenendi: !!r.caDenendi, dnsEngelAdresi: ""
       };
-      if ((!s.status || s.status === 403) && K.dnsEngeli) {
-        try { s.dnsEngelAdresi = await K.dnsEngeli(a.host); } catch (eD) { s.dnsEngelAdresi = ""; }
-      }
+      s.dnsEngelAdresi = String((await dnsIsi) || "");
       return s;
     }));
     return ag.kaynakSatirlari(sonuclar);
@@ -471,8 +480,16 @@ window.KLibraryHealth = (function () {
     busy = true;
     setWorking("Model kaynakları sınanıyor…");
     try {
-      var satirlar = await kaynakSina();
-      lastReport = kaynakSatirlariniEkle(lastReport || makeReport(), satirlar);
+      // Tam tarama hiç yapılmadıysa önce o (sınamayla aynı anda): yalnız dosya erişimi ve
+      // kütüphane satırlarından kurulan rapor, üç kaynak satırı iyi diye "Suflo hazır" yazıp
+      // "Yerel motor kurulu değil"i hiç sınamadan Altyazı motoru çipini yeşile boyardı
+      var temel = lastReport;
+      var isler = [kaynakSina()];
+      if (!temel) { temel = makeReport(); isler.push(runAsyncChecks(temel)); }
+      var sonuclar = await Promise.all(isler);
+      var satirlar = sonuclar[0];
+      if (isler.length > 1 && window.KApp && KApp.refreshContext) KApp.refreshContext();
+      lastReport = kaynakSatirlariniEkle(temel, satirlar);
       var kotu = satirlar.filter(function (c) { return c.status !== "good"; }).length;
       if (window.KApp) {
         KApp.toast(kotu ? "Bazı model kaynaklarına ulaşılamıyor: ayrıntı Doctor raporunda" : "Tüm model kaynaklarına ulaşılıyor", kotu ? "warn" : "good", kotu ? 9000 : 4500);
@@ -795,6 +812,18 @@ window.KLibraryHealth = (function () {
       }
       K.saveSettings();
       await refreshLibraries();
+      return;
+    }
+    if (action === "verify-model") {
+      // 3.4 adım 19: çevrimdışı içe aktarılan katalog modelini internet varken SHA-256 ile denetle
+      if (!window.KEngine || !KEngine.modelYenidenDogrula || !KEngine.dogrulanmamisModeller) throw new Error("Yerel motor kurulum modülü yüklenmedi.");
+      var bekleyen = KEngine.dogrulanmamisModeller();
+      for (var vi = 0; vi < bekleyen.length; vi++) {
+        var dv = await KEngine.modelYenidenDogrula(bekleyen[vi].id, say);
+        var vAd = KEngine.modelKisaAdi ? KEngine.modelKisaAdi(dv.model) : bekleyen[vi].id;
+        if (dv.durum === "uyusmadi") throw new Error(vAd + " doğrulanamadı: SHA-256 uyuşmadı, dosya silindi. Modeli yeniden indir ya da içe aktar.");
+        if (dv.durum !== "dogrulandi") throw new Error(vAd + " doğrulanamadı: huggingface.co'ya ulaşılamadı. İnternet varken yeniden dene.");
+      }
       return;
     }
     if (action === "update-ytdlp") {

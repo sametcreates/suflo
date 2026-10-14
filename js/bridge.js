@@ -601,10 +601,16 @@ window.K = (function () {
 
   function AG() { return (typeof window !== "undefined" && window.SufloAgDayanim) || null; }
 
+  // İndirme hatasına yalnız sistem kökleriyle ikinci deneme GERÇEKTEN yapıldıysa eklenir
+  var SERTIFIKA_YENIDEN_DENENDI = "Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi, olmadı.";
+
   /*
    * İşletim sisteminin güvendiği ek kök sertifikalar (PEM). Oturum boyunca bellekte saklanır;
    * diske yazılmaz. Windows: sabit PowerShell betiği (argüman dizisi, girdi eklenmez);
-   * macOS: security find-certificate. Linux / hata: boş liste.
+   * macOS: security find-certificate. Linux: boş liste.
+   * Yalnız BAŞARILI dışa aktarma önbelleğe girer: soğuk PowerShell'in antivirüs altında zaman
+   * aşımına uğraması ya da komut hatası oturumu "ek kök yok"a kilitlemesin; sonraki
+   * (kullanıcının başlattığı) deneme yeniden sorar.
    */
   var _ekPem = null, _ekPemIsi = null;
   function ekSertifikalar() {
@@ -614,11 +620,15 @@ window.K = (function () {
     var komut = ag && nodeOK ? ag.sertifikaKomutu(process.platform) : null;
     if (!komut) { _ekPem = []; return Promise.resolve(_ekPem); }
     _ekPemIsi = run(komut.cmd, komut.args, { timeout: 20000 }).then(function (r) {
-      _ekPem = r && r.code === 0 ? ag.pemleriAyikla(r.stdout) : [];
       _ekPemIsi = null;
+      if (!r || r.code !== 0) {
+        log("sistem kok sertifikalari alinamadi (kod " + (r ? r.code : "?") + "), onbellege alinmadi");
+        return [];
+      }
+      _ekPem = ag.pemleriAyikla(r.stdout);
       log("sistem kok sertifikalari: " + _ekPem.length + " adet");
       return _ekPem;
-    }, function () { _ekPem = []; _ekPemIsi = null; return _ekPem; });
+    }, function () { _ekPemIsi = null; return []; });
     return _ekPemIsi;
   }
 
@@ -660,18 +670,31 @@ window.K = (function () {
    * veren ağlarda sürüm denetimleri (GitHub API) hep başarısız olmasın.
    */
   /*
-   * secenek (3.4 adım 19, isteğe bağlı): { method: "HEAD", timeout: ms } — Doctor "Model kaynaklarını
-   * sına" 5 sn'lik HEAD ister. Sertifika hatasında (kurumsal HTTPS denetimi) istek BİR KEZ
-   * ca = tls.rootCertificates + sistem kökleri ile yeniden denenir (bkz. ekCaListesi); dönüşte
-   * caDenendi: true. Hata dönüşünde kod: Node hata kodu (ör. ENOTFOUND).
+   * secenek (3.4 adım 19, isteğe bağlı):
+   *   method: "HEAD"   Doctor "Model kaynaklarını sına" HEAD ister (varsayılan GET).
+   *   timeout: ms      İSTEĞİN TAMAMI için duvar saati sınırı: DNS, TCP bağlantısı, vekil CONNECT
+   *                    tüneli, TLS, sertifika yeniden denemesi ve yanıt gövdesi. Node'un
+   *                    req.setTimeout'u soket 'connect' olmadan saymaya başlamaz (güvenlik duvarı
+   *                    SYN'i düşürünce Windows'ta ~21 sn, macOS'ta ~75 sn askıda kalırdı); sınır
+   *                    dolunca istek / tünel yıkılır ve { status: 0, kod: "ETIMEDOUT" } döner.
+   *                    Verilmezse 20 sn'lik soket hareketsizlik sınırı (bağlantı kurulurken de sayar).
+   *   sistemKokleri: true  Sertifika hatasında (kurumsal HTTPS denetimi) istek BİR KEZ
+   *                    ca = tls.rootCertificates + sistem kökleri ile yeniden denenir (bkz. ekCaListesi);
+   *                    dönüşte caDenendi: true. YALNIZ kullanıcının başlattığı isteklerde açılır
+   *                    (Doctor sınaması, model özeti): panel açılışındaki sessiz güncelleme denetimi
+   *                    Premiere'den gizli PowerShell başlatmasın.
+   * Hata dönüşünde kod: Node hata kodu (ör. ENOTFOUND).
    */
+  var HTTP_HAREKETSIZ_MS = 20000;
   function httpGet(urlStr, headers, secenek) {
     secenek = secenek || {};
     return new Promise(function (resolve0) {
       var bitti = false;
+      var aktifReq = null, sayac = null;
       function resolve(x) {
         if (bitti) return;
         bitti = true;
+        if (sayac) { clearTimeout(sayac); sayac = null; }
         if (secenek.caDenendi && x) x.caDenendi = true;
         resolve0(x);
       }
@@ -681,6 +704,16 @@ window.K = (function () {
         u = new URL(urlStr);
         proto = require(u.protocol === "http:" ? "http" : "https");
       } catch (e) { resolve({ status: 0, body: String(e) }); return; }
+      // duvar saati sınırı (yeniden denemede aynı son an devralınır: toplam süre uzamaz)
+      var sonAn = secenek._sonAn > 0 ? secenek._sonAn : (secenek.timeout > 0 ? Date.now() + Number(secenek.timeout) : 0);
+      if (sonAn) {
+        sayac = setTimeout(function () {
+          sayac = null;
+          try { if (aktifReq) aktifReq.destroy(); } catch (eD) {}
+          resolve({ status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" });
+        }, Math.max(1, sonAn - Date.now()));
+      }
+      var hareketsiz = secenek.timeout > 0 ? Math.min(Number(secenek.timeout), HTTP_HAREKETSIZ_MS) : HTTP_HAREKETSIZ_MS;
       var hdrs = { "User-Agent": "Suflo-Panel" };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
       var yontem = secenek.method === "HEAD" ? "HEAD" : "GET";
@@ -689,12 +722,15 @@ window.K = (function () {
         port: u.port || (u.protocol === "http:" ? 80 : 443),
         path: u.pathname + (u.search || ""),
         method: yontem,
-        headers: hdrs
+        headers: hdrs,
+        // soket oluşturulurken kurulur: DNS ve TCP bağlantısı da sayılır (setTimeout yalnız 'connect' sonrası)
+        timeout: hareketsiz
       };
       if (secenek.ca && u.protocol === "https:") reqOpts.ca = secenek.ca;
       function hataDonus(e3) {
+        if (bitti) return;
         // kurumsal HTTPS denetimi: sistemin güvendiği köklerle bir kez daha (doğrulama hep açık)
-        if (!secenek.caDenendi && u.protocol === "https:" && AG() && AG().sertifikaHatasiMi(e3)) {
+        if (secenek.sistemKokleri && !secenek.caDenendi && u.protocol === "https:" && AG() && AG().sertifikaHatasiMi(e3)) {
           log("sertifika hatasi (" + (e3 && e3.code ? e3.code : "?") + "), sistem kokleriyle bir kez daha: " + u.hostname);
           ekCaListesi().then(function (ca) {
             if (bitti) return;
@@ -702,6 +738,7 @@ window.K = (function () {
             var s2 = {};
             for (var k2 in secenek) if (secenek.hasOwnProperty(k2)) s2[k2] = secenek[k2];
             s2.ca = ca; s2.caDenendi = true;
+            if (sonAn) s2._sonAn = sonAn;
             httpGet(urlStr, headers, s2).then(resolve);
           });
           return;
@@ -719,8 +756,9 @@ window.K = (function () {
           res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
           res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
         });
+        aktifReq = req;
         req.on("error", hataDonus);
-        req.setTimeout(secenek.timeout > 0 ? secenek.timeout : 20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" }); });
+        req.setTimeout(hareketsiz, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" }); });
         if (yontem === "HEAD") req.end();
       }
       var pu = null;
@@ -729,11 +767,12 @@ window.K = (function () {
         var h2 = Object.assign({ Host: u.hostname }, hdrs);
         var au = proxyAuth(pu);
         if (au) h2["Proxy-Authorization"] = au;
-        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, method: yontem, headers: h2 };
+        reqOpts = { hostname: pu.hostname, port: Number(pu.port) || 8080, path: urlStr, method: yontem, headers: h2, timeout: hareketsiz };
         proto = require("http");
         fire();
       } else if (pu) {
-        connectTunnel(pu, u, function (err, socket) {
+        // tünelin kendi 30 sn'si duvar saati sınırını aşmasın: sınır dolunca CONNECT isteği yıkılır
+        aktifReq = connectTunnel(pu, u, function (err, socket) {
           if (err) {
             log("proxy tuneli kurulamadi (httpGet): " + err.message);
             resolve({ status: 0, body: String(err.message || err), kod: err && err.code ? String(err.code) : "" });
@@ -742,7 +781,7 @@ window.K = (function () {
           if (bitti) { try { socket.destroy(); } catch (eS) {} return; }
           // hazir socket uzerinden TLS: SNI ve Host icin host/servername sart
           fire({ socket: socket, agent: false, host: u.hostname, servername: u.hostname });
-        });
+        }, sonAn ? Math.max(1, sonAn - Date.now()) : 0);
       } else {
         fire();
       }
@@ -815,11 +854,12 @@ window.K = (function () {
       tip: "BT ekibinden huggingface.co, hf-mirror.com ve github.com için izin iste ya da modeli başka bir " +
         "bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur."
     },
-    { // 3.4 adım 19: kurumsal HTTPS denetimi; Suflo sistemin güvendiği köklerle bir kez yeniden dener
+    { // 3.4 adım 19: kurumsal HTTPS denetimi. Tarafsız: yeniden deneme yalnız indirme/HEAD'de ve
+      // yalnız ek kök varsa yapılır, o zaman hatanın kendisi söyler (SERTIFIKA_YENIDEN_DENENDI);
+      // içe aktarma önerisi yalnız model indirme hatasına eklenir (hataYardimi, modelIceAktarOner)
       re: /UNABLE_TO_GET_ISSUER_CERT_LOCALLY|SELF_SIGNED_CERT_IN_CHAIN|CERT_UNTRUSTED|UNABLE_TO_VERIFY_LEAF_SIGNATURE|local issuer certificate|self.signed certificate in certificate chain|unable to verify the first certificate|certificate not trusted/i,
-      tip: "Ağın HTTPS bağlantılarını denetliyor (kurumsal güvenlik yazılımı). Suflo bilgisayarın güvendiği " +
-        "sertifikalarla bir kez daha denedi. BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip " +
-        "Ayarlar › Motor › Model dosyası içe aktar ile kur."
+      tip: "Ağ HTTPS bağlantılarını denetliyor olabilir (kurumsal güvenlik yazılımı). BT ekibinden bu adres " +
+        "için izin iste; şirket ağındaysan Ayarlar'dan vekil sunucu tanımla."
     },
     { // ağ: DNS, kopma, güvenlik duvarı, sertifika, indirme/istek zaman aşımı
       re: /ENOTFOUND|EAI_AGAIN|getaddrinfo|ETIMEDOUT|ECONNRESET|ECONNREFUSED|socket hang up|SELF_SIGNED|CERT_|indirme zaman aşımı|timed? ?out/i,
@@ -861,9 +901,19 @@ window.K = (function () {
 
   function hataYardimi(e) {
     var m = String(e && e.message ? e.message : (e || ""));
+    // 3.4 adım 19: model indirilemediyse (ağ) çevrimdışı içe aktarma yolu da söylenir; başka
+    // hatalarda (bulut API, motor arşivi) söylenmez. İleti/ipucu zaten içeriyorsa tekrarlanmaz.
+    // İşaret: engine.js modelKur, hata.modelIceAktarOner
+    var iceAktar = e && typeof e === "object" && e.modelIceAktarOner
+      ? "Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin." : "";
     for (var i = 0; i < HATA_REHBERI.length; i++) {
-      if (HATA_REHBERI[i].re.test(m)) return m + "\nÇözüm: " + HATA_REHBERI[i].tip;
+      if (HATA_REHBERI[i].re.test(m)) {
+        var tip = HATA_REHBERI[i].tip;
+        if (iceAktar && (m + tip).indexOf("Model dosyası içe aktar") === -1) tip += " " + iceAktar;
+        return m + "\nÇözüm: " + tip;
+      }
     }
+    if (iceAktar && m.indexOf("Model dosyası içe aktar") === -1) return m + "\nÇözüm: " + iceAktar;
     return m;
   }
 
@@ -1140,7 +1190,9 @@ window.K = (function () {
    * katalogdaki tum adresler https oldugu icin tunel olmadan Squid/kurumsal proxy'ler
    * 400/403/501 doner ve HTTPS_PROXY tanimli makinelerde kurulum sessizce bozulur.
    */
-  function connectTunnel(pu, u, cb) {
+  // sinirMs (isteğe bağlı): CONNECT için zaman aşımı (varsayılan 30 sn). Döner: CONNECT isteği
+  // (çağıran kendi duvar saati sınırında yıkabilsin; yıkılınca cb hata ile çağrılır)
+  function connectTunnel(pu, u, cb, sinirMs) {
     var hdrs = {};
     var au = proxyAuth(pu);
     if (au) hdrs["Proxy-Authorization"] = au;
@@ -1162,8 +1214,9 @@ window.K = (function () {
       done(null, socket);
     });
     cr.on("error", function (e) { done(e); });
-    cr.setTimeout(30000, function () { cr.destroy(); done(new Error("Proxy CONNECT zaman asimi")); });
+    cr.setTimeout(sinirMs > 0 ? Math.min(sinirMs, 30000) : 30000, function () { cr.destroy(); done(new Error("Proxy CONNECT zaman asimi")); });
     cr.end();
+    return cr;
   }
 
   /*
@@ -1188,6 +1241,8 @@ window.K = (function () {
     m2._izle = izle;
     return download(urlStr, destPath, onProgress, redirects, resumeFrom, m2).then(function (r) {
       if (!r || r.ok || r.iptal) return r;
+      // yeniden deneme YALNIZ gerçekten yapıldıysa söylenir (HATA_REHBERI'nin genel ipucu bunu iddia etmez)
+      if (r.caDenendi && r.sertifika) r.error = String(r.error || "") + " — " + SERTIFIKA_YENIDEN_DENENDI;
       var host = izle.host;
       if (!host) { try { host = new URL(urlStr).hostname; } catch (e) { host = ""; } }
       return dnsEngeli(host).then(function (adres) {

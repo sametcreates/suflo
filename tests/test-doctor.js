@@ -186,7 +186,12 @@ async function main() {
   ok("adım 19: ulaşılan kaynak iyi (kurumsal sertifikayla ulaşıldığı yazılır)", kHf && kHf.status === "good" && kHf.group === "engine" && /HTTP 200/.test(kHf.detail) && /kurumsal sertifikayla/.test(kHf.detail), kHf && kHf.detail);
   ok("adım 19: sertifika hatası 'HTTPS denetimi' olarak anlatılır, içe aktarma önerilir", kAyna && kAyna.status === "bad" && /HTTPS bağlantılarını denetliyor/.test(kAyna.detail) && /bir kez daha denedi/.test(kAyna.detail) && /Model dosyası içe aktar/.test(kAyna.detail), kAyna && kAyna.detail);
   ok("adım 19: Umbrella aralığına çözülen ad kurumsal filtre olarak anlatılır", kMotor && kMotor.status === "bad" && /Kurumsal ağ filtresi github\.com adresini engelliyor \(Cisco Umbrella, 146\.112\.61\.106\)/.test(kMotor.detail), kMotor && kMotor.detail);
-  ok("adım 19: DNS yalnız ulaşılamayan kaynaklar için sorulur", dnsSorgu.length === 2 && dnsSorgu.indexOf("huggingface.co") === -1, dnsSorgu.join(","));
+  // DNS her kaynak için sorulur (eskiden yalnız ulaşılamayanlar için: Umbrella kökü kurulu ağda engel
+  // sunucusu 200/302 dönünce filtre görünmüyordu, bkz. aşağıdaki 302 sınaması)
+  ok("adım 19: DNS her kaynak için sorulur", dnsSorgu.length === 3 &&
+    ["huggingface.co", "hf-mirror.com", "github.com"].every(function (h) { return dnsSorgu.indexOf(h) !== -1; }), dnsSorgu.join(","));
+  ok("adım 19: sınama HEAD'i kurumsal HTTPS denetiminde sistem köklerine izin verir (kullanıcının başlattığı iş)",
+    headCagri.every(function (c) { return c.s.sistemKokleri === true; }));
   var ekli = ctx.KDoctor.kaynakSatirlariniEkle(normal, kaynaklar);
   ekli = ctx.KDoctor.kaynakSatirlariniEkle(ekli, kaynaklar);
   ok("adım 19: tekrar sınama satırları çoğaltmaz, rapor durumu yeniden hesaplanır",
@@ -196,7 +201,63 @@ async function main() {
     temiz.checks.filter(function (c) { return c.kaynak; })[0].status === "warn" && /HTTP 403/.test(temiz.checks.filter(function (c) { return c.kaynak; })[0].detail));
   var htmlD = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
   ok("adım 19: Doctor kartında 'Model kaynaklarını sına' düğmesi", /id="set-doctor-kaynak"[^>]*>Model kaynaklarını sına</.test(htmlD));
+
+  // Engel sunucusu HEAD'e 302 dönse (Umbrella kökü kurulu, TLS geçer) de ad 146.112.x.x'e çözülüyorsa filtre
+  var sira = [];
+  ctx.K.httpGet = async function (u, h, s) {
+    if (s && s.method === "HEAD") {
+      await new Promise(function (r) { setTimeout(r, 20); });
+      sira.push("head:" + /^https:\/\/([^\/]+)/.exec(u)[1]);
+      return { status: 302, body: "" };
+    }
+    return eskiGet(u, h, s);
+  };
+  ctx.K.dnsEngeli = async function (host) { sira.push("dns:" + host); return host === "huggingface.co" ? "146.112.61.106" : ""; };
+  var umb = await ctx.KDoctor.kaynakSina();
+  var uHf = umb.filter(function (c) { return c.title === "Model kaynağı: huggingface.co"; })[0];
+  var uAyna = umb.filter(function (c) { return c.title === "Model kaynağı: hf-mirror.com"; })[0];
+  ok("adım 19: HEAD 302 dönse de Umbrella aralığına çözülen ad kurumsal filtre olarak anlatılır",
+    uHf && uHf.status === "bad" && /Cisco Umbrella, 146\.112\.61\.106/.test(uHf.detail) && uAyna && uAyna.status === "good", uHf && uHf.detail);
+  ok("adım 19: DNS HEAD bitmeden (aynı anda) sorulur: toplam süre 5 sn sınırını aşmaz",
+    ["huggingface.co", "hf-mirror.com", "github.com"].every(function (h) { return sira.indexOf("dns:" + h) !== -1 && sira.indexOf("dns:" + h) < sira.indexOf("head:" + h); }), sira.join(","));
+
+  // Tam tarama yapılmadan sınama: rapor yalnız üç kaynak satırından "Suflo hazır" olmamalı;
+  // motor kurulu değilse Altyazı motoru çipi yeşil yanmamalı
+  ctx.K.httpGet = async function (u, h, s) { return s && s.method === "HEAD" ? { status: 200, body: "" } : eskiGet(u, h, s); };
+  ctx.K.dnsEngeli = async function () { return ""; };
+  var eskiWl = ctx.K.whisperLocal;
+  ctx.K.whisperLocal = function () { return null; };
+  ok("adım 19: sınamadan önce Doctor raporu yok", ctx.KDoctor.last() === null);
+  var ilkSinama = await ctx.KDoctor.kaynaklariSina();
+  ctx.K.whisperLocal = eskiWl;
+  ok("adım 19: tam tarama yokken 'Model kaynaklarını sına' motoru da denetler (yeşil 'Suflo hazır' yok)",
+    ilkSinama && !!check(ilkSinama, "Yerel motor kurulu değil") && ilkSinama.status === "bad" &&
+    ctx.KDoctor.cipDurumlari(ilkSinama).engine === "bad" && ilkSinama.checks.filter(function (c) { return c.kaynak; }).length === 3,
+    ilkSinama && ilkSinama.status + " " + JSON.stringify(ctx.KDoctor.cipDurumlari(ilkSinama)));
   ctx.K.httpGet = eskiGet;
+
+  // Çevrimdışı içe aktarılıp doğrulanmamış model: uyarı satırı ve "Doğrula" onarımı
+  var eskiAktif = ctx.KEngine.activeModel;
+  ctx.KEngine.activeModel = function () { return { id: "turbo", file: "ggml-large-v3-turbo-q5_0.bin", label: "Turbo — önerilen" }; };
+  ctx.KEngine.dogrulanmadiMi = function (m) { return !!m && m.id === "turbo"; };
+  var dr = ctx.KDoctor.makeReport();
+  await ctx.KDoctor.runAsyncChecks(dr);
+  var dSatir = check(dr, "Model doğrulanmadı");
+  ok("adım 19: 'doğrulanmadı' model Doctor'da uyarı + Doğrula onarımı",
+    dSatir && dSatir.status === "warn" && dSatir.action === "verify-model" && dSatir.group === "engine" && /Turbo çevrimdışı içe aktarıldı/.test(dSatir.detail), dSatir && JSON.stringify(dSatir));
+  var dogrulanan = [];
+  ctx.KEngine.dogrulanmamisModeller = function () { return [{ id: "turbo", file: "ggml-large-v3-turbo-q5_0.bin", label: "Turbo — önerilen" }]; };
+  ctx.KEngine.modelYenidenDogrula = async function (id) { dogrulanan.push(id); return { durum: "dogrulandi", model: { label: "Turbo — önerilen" } }; };
+  await ctx.KDoctor.repair("verify-model");
+  ok("adım 19: Doğrula, doğrulanmamış modeli SHA-256 ile yeniden denetletir", dogrulanan.join(",") === "turbo", dogrulanan.join(","));
+  // Özel model Doctor'da dosya adıyla görünür ("Özel model" tek başına hangisi olduğunu söylemez)
+  ctx.KEngine.activeModel = function () { return { id: "ozel:ozel-ggml-x-q8_0.bin", file: "ozel-ggml-x-q8_0.bin", label: "Özel model — ggml-x-q8_0", ozel: true }; };
+  ctx.KEngine.modelKisaAdi = function (m) { return m.ozel ? m.label.slice(m.label.indexOf(" — ") + 3) : m.label.split(" —")[0]; };
+  var oR = ctx.KDoctor.makeReport();
+  await ctx.KDoctor.runAsyncChecks(oR);
+  ok("adım 19: Doctor motor satırı Özel modeli dosya adıyla yazar", /^ggml-x-q8_0 · CPU$/.test(check(oR, "Yerel altyazı motoru").detail), check(oR, "Yerel altyazı motoru").detail);
+  ctx.KEngine.activeModel = eskiAktif;
+  delete ctx.KEngine.dogrulanmadiMi; delete ctx.KEngine.dogrulanmamisModeller; delete ctx.KEngine.modelYenidenDogrula; delete ctx.KEngine.modelKisaAdi;
 
   fs.mkdirSync(path.join(RELEASES, "2026.08.25.1.staging"), { recursive: true });
   var staged = ctx.KDoctor.makeReport();

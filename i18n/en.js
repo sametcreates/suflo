@@ -3141,8 +3141,21 @@
     // error guide (js/bridge.js HATA_REHBERI)
     "BT ekibinden huggingface.co, hf-mirror.com ve github.com için izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
       "Ask your IT team to allow huggingface.co, hf-mirror.com and github.com, or download the model on another computer and install it with Settings › Engine › Import model file.",
-    "Ağın HTTPS bağlantılarını denetliyor (kurumsal güvenlik yazılımı). Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi. BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
-      "Your network inspects HTTPS connections (corporate security software). Suflo retried once with the certificates this computer trusts. Ask your IT team for access, or download the model on another computer and install it with Settings › Engine › Import model file."
+    "Ağ HTTPS bağlantılarını denetliyor olabilir (kurumsal güvenlik yazılımı). BT ekibinden bu adres için izin iste; şirket ağındaysan Ayarlar'dan vekil sunucu tanımla.":
+      "Your network may be inspecting HTTPS connections (corporate security software). Ask your IT team to allow this address; on a company network, set up a proxy in Settings.",
+    // review fixes: engine status, unverified import, Doctor › Verify
+    "doğrulanmadı": "not verified",
+    "motor kurulu değil": "engine not installed",
+    "{} hazır · motor kurulu değil": "{} ready · engine not installed",
+    "Bu model katalogda yok: doğrulanamaz.": "This model isn't in the catalog: it can't be verified.",
+    "Doğrula": "Verify",
+    "Model doğrulanmadı": "Model not verified",
+    "{} çevrimdışı içe aktarıldı; SHA-256 henüz denetlenmedi. İnternet varken Doğrula'ya bas.":
+      "{} was imported offline; its SHA-256 hasn't been checked yet. Press Verify when you're online.",
+    "{} doğrulanamadı: SHA-256 uyuşmadı, dosya silindi. Modeli yeniden indir ya da içe aktar.":
+      "{} couldn't be verified: SHA-256 mismatch, so the file was deleted. Download or import the model again.",
+    "{} doğrulanamadı: huggingface.co'ya ulaşılamadı. İnternet varken yeniden dene.":
+      "{} couldn't be verified: huggingface.co couldn't be reached. Try again when you're online."
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

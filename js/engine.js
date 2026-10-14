@@ -94,6 +94,7 @@ window.KEngine = (function () {
    * boyut denetimiyle devam edilir — kurulum engellenmez.
    */
   var HF_AGAC = {};
+  var HF_OZET_ZAMAN_ASIMI = 15000;
 
   function hfDepo(item) {
     var u = (item.urls || [])[0] || "";
@@ -118,7 +119,10 @@ window.KEngine = (function () {
       // Yalniz huggingface.co: dosya aynadan indiyse ozeti de aynadan almak, degistirilmis
       // bir aynanin kendi dosyasini onaylamasi olurdu. Ulasilamazsa "bilinmiyor".
       try {
-        var r = await K.httpGet("https://huggingface.co/api/models/" + depo + "/tree/main", { "Accept": "application/json" });
+        // 3.4 adım 19: duvar saati sınırı (çevrimdışı içe aktarmada bağlantı aşaması 21-75 sn askıda
+        // kalmasın) ve kullanıcının başlattığı iş olduğu için kurumsal HTTPS denetiminde sistem kökleri
+        var r = await K.httpGet("https://huggingface.co/api/models/" + depo + "/tree/main", { "Accept": "application/json" },
+          { timeout: HF_OZET_ZAMAN_ASIMI, sistemKokleri: true });
         if (r.status === 200) HF_AGAC[depo] = JSON.parse(r.body);
       } catch (e) {}
     }
@@ -172,6 +176,59 @@ window.KEngine = (function () {
       for (var j = 0; j < oz.length; j++) if (oz[j].id === id) return oz[j];
     }
     return null;
+  }
+
+  /*
+   * Kurulumun (Ayarlar "İndir & kur", Doctor "Motoru onar") kuracağı model. Özel model yalnız
+   * dosyası diskteyse seçilebilir: dosyası silinmiş / karantinaya alınmış Özel model indirilemez,
+   * settings.model ona takılı kalırsa her onarım motoru kurup modelde düşerdi. O zaman katalogdaki
+   * varsayılana (Turbo) dönülür; kurulum bitince settings.model da ona geçer.
+   */
+  function kurulumModeli(id) {
+    var m = modelById(id);
+    if (m && m.ozel && !installedModels().some(function (x) { return x.id === m.id; })) {
+      K.log("[model] ozel model dosyasi yok, varsayilan modele donuluyor: " + m.file);
+      m = null;
+    }
+    return m || modelById("turbo");
+  }
+
+  // Arayüzde kısa ad: katalog "Turbo"; Özel model dosya adıyla ("Özel model" tek başına hangisi olduğunu söylemez)
+  function modelKisaAdi(m) {
+    if (!m) return "";
+    var label = String(m.label || m.file || "");
+    if (m.ozel) return label.indexOf(" — ") !== -1 ? label.slice(label.indexOf(" — ") + 3) : label;
+    return label.split(" —")[0];
+  }
+
+  /*
+   * Çevrimdışı içe aktarma işareti (settings.modelIceAktarma[dosya]): "dogrulanmadi" katalog
+   * modeli SHA-256'sız kuruldu demektir. Ayarlar listesi, motor durumu ve Doctor bunu gösterir;
+   * Doctor "Doğrula" internet varken modelYenidenDogrula ile denetler.
+   */
+  function iceAktarmaIsaretiYaz(file, durum) {
+    var s = K.settings();
+    var kayitlar = s.modelIceAktarma && typeof s.modelIceAktarma === "object" ? s.modelIceAktarma : null;
+    if (!durum) {
+      if (!kayitlar || !Object.prototype.hasOwnProperty.call(kayitlar, file)) return;
+      delete kayitlar[file];
+    } else {
+      kayitlar = kayitlar || {};
+      kayitlar[file] = durum;
+    }
+    s.modelIceAktarma = kayitlar;
+    K.saveSettings();
+  }
+
+  function dogrulanmadiMi(m) {
+    if (!m || m.ozel) return false;
+    var s = K.settings();
+    return !!(s.modelIceAktarma && typeof s.modelIceAktarma === "object" && s.modelIceAktarma[m.file] === "dogrulanmadi");
+  }
+
+  // Kurulu, çevrimdışı içe aktarılıp henüz doğrulanmamış katalog modelleri
+  function dogrulanmamisModeller() {
+    return installedModels().filter(dogrulanmadiMi);
   }
 
   // Diskte kurulu modelleri döndür
@@ -311,10 +368,17 @@ window.KEngine = (function () {
   // label aynı zamanda mantıksal kimlik: yarım dosya (.part) yalnızca aynı kimliğe devam eder,
   // böylece aynalar arası devam korunur ama farklı dosyalar birbirine eklenmez.
   // iptal: K.iptalJetonu() — iptalde sonraki aynaya geçilmez, { ok: false, iptal: true } döner
+  /*
+   * Döner: { ok } ya da { ok: false, error, kept, sertifika, dnsEngeli }. Birden çok kaynakta
+   * hata SON aynanınki olurdu: huggingface.co için konan "Kurumsal ağ filtresi … (Cisco Umbrella)"
+   * teşhisi (3.4 adım 19, K.download) aynanın başka nedenli hatasıyla ezilip yalnız günlükte
+   * kalıyordu. DNS filtresi teşhisli ilk hata korunur ve döndürülen hatanın başına konur.
+   */
   async function fetchFile(item, destPath, onPct, label, iptal) {
     var urls = item.urls || [item.url];
     var lastErr = "";
     var kept = 0;
+    var dnsHata = "", dnsEngeli = "", sertifika = false;
     for (var i = 0; i < urls.length; i++) {
       if (iptal && iptal.iptalEdildi) return { ok: false, iptal: true, error: "İptal edildi", kept: kept };
       if (i > 0) K.log("indirme aynasi deneniyor (" + (i + 1) + "/" + urls.length + "): " + label);
@@ -325,9 +389,13 @@ window.KEngine = (function () {
       if (r.iptal) return { ok: false, iptal: true, error: "İptal edildi", kept: r.kept || kept };
       lastErr = r.error || "bilinmeyen hata";
       if (r.kept) kept = r.kept;
+      if (r.sertifika) sertifika = true;
+      if (r.dnsEngeli && !dnsHata) { dnsHata = lastErr; dnsEngeli = String(r.dnsEngeli); }
       K.log("indirme basarisiz [" + label + "] kaynak " + (i + 1) + ": " + lastErr);
     }
-    return { ok: false, error: lastErr, kept: kept };
+    var hata = lastErr;
+    if (dnsHata && dnsHata !== lastErr) hata = dnsHata + " · " + lastErr;
+    return { ok: false, error: hata, kept: kept, sertifika: sertifika, dnsEngeli: dnsEngeli };
   }
 
   /*
@@ -426,7 +494,7 @@ window.KEngine = (function () {
     var dir = K.whisperDir();
     K.fs.mkdirSync(K.path.join(dir, "models"), { recursive: true });
 
-    var model = modelById(opts.modelId) || modelById("turbo");
+    var model = kurulumModeli(opts.modelId);
 
     /*
      * 0) ON KOSULLAR — tek bir bayt indirmeden once. Karsilanamayacak bir kurulum
@@ -656,10 +724,17 @@ window.KEngine = (function () {
     var d3 = await fetchFile(model, mPath, function (f) {
       say(model.label + " iniyor… %" + Math.round(f * 100) + " (" + fmtMB(model.sizeMB) + ")");
     }, "model:" + model.id, iptal);
-    if (!d3.ok) throw indirmeHatasi(model.label.split(" —")[0], d3, model);
+    if (!d3.ok) {
+      var eI = indirmeHatasi(model.label.split(" —")[0], d3, model);
+      // 3.4 adım 19: ağ yüzünden inmeyen MODEL için K.hataYardimi çevrimdışı içe aktarmayı da söyler
+      if (!d3.iptal) eI.modelIceAktarOner = true;
+      throw eI;
+    }
     if (!(await modelDogrula(model, mPath, say))) {
       throw new Error(model.label.split(" —")[0] + " indirildi ama doğrulanamadı (bozuk dosya). Tekrar dene.");
     }
+    // yeni inen dosya içe aktarılanın yerini aldı: "doğrulanmadı" işareti artık bu dosyayı anlatmaz
+    iceAktarmaIsaretiYaz(model.file, null);
     return { model: model, already: false };
   }
 
@@ -703,6 +778,22 @@ window.KEngine = (function () {
       });
       oku.pipe(yaz);
     });
+  }
+
+  // .part -> hedef (üzerine, atomik). Windows'ta antivirüs / dizinleyici yeni yazılan dosyayı kısa
+  // süre tutar: EPERM / EBUSY / EACCES'te birkaç kez kısa beklemeyle yeniden denenir.
+  function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  async function yerineKoy(kaynak, hedef) {
+    var son = null;
+    for (var i = 0; i < 4; i++) {
+      try { K.fs.renameSync(kaynak, hedef); return; }
+      catch (e) {
+        son = e;
+        if (!e || !/^(EPERM|EBUSY|EACCES)$/.test(String(e.code || ""))) throw e;
+        if (i < 3) await bekle(250 * (i + 1));
+      }
+    }
+    throw son;
   }
 
   function ayniYol(a, b) {
@@ -769,9 +860,11 @@ window.KEngine = (function () {
             durum = "dogrulanmadi";
           }
         }
-        // onay alındı (ya da hedef boştu): eskiyi kaldır, .part'ı yerine koy
-        try { if (K.fs.existsSync(hedef)) K.fs.unlinkSync(hedef); } catch (eD) {}
-        K.fs.renameSync(part, hedef);
+        // onay alındı (ya da hedef boştu): .part'ı yerine koy. Hedef ÖNCEDEN SİLİNMEZ: rename
+        // eskisini tek adımda değiştirir (Windows'ta MoveFileExW REPLACE_EXISTING, POSIX rename(2)).
+        // Silip sonra taşımak, taşıma düşerse (antivirüs / dizinleyici yeni dosyayı tutuyor: EPERM)
+        // kullanıcıyı ne eski ne yeni modelle bırakırdı.
+        await yerineKoy(part, hedef);
       } catch (e) {
         try { K.fs.unlinkSync(part); } catch (eP) {}
         throw e;
@@ -792,8 +885,30 @@ window.KEngine = (function () {
     }
   }
 
-  // Doctor "Model kaynaklarını sına": motor sürüm arşivinin adresi (ana makinesi sınanır)
-  function motorKaynakAdresi() { return BUILDS.cpu.urls[0]; }
+  /*
+   * Doctor'da "Doğrula": çevrimdışı içe aktarılıp "doğrulanmadı" kalan katalog modelini internet
+   * varken SHA-256 ile denetler. Döner: { durum: "dogrulandi" | "bilinmiyor" | "uyusmadi", model }
+   *   dogrulandi  işaret kalkar
+   *   bilinmiyor  huggingface.co'ya yine ulaşılamadı: işaret kalır
+   *   uyusmadi    modelDogrula dosyayı siler (bozuk ya da değiştirilmiş dosya kullanılmaz), işaret kalkar
+   */
+  async function modelYenidenDogrula(id, say) {
+    var m = modelById(id);
+    if (!m || m.ozel) throw new Error("Bu model katalogda yok: doğrulanamaz.");
+    var yol = K.path.join(K.whisperDir(), "models", m.file);
+    if (!K.fs.existsSync(yol)) throw new Error(m.label.split(" —")[0] + " kurulu değil.");
+    var sonuc = {};
+    await modelDogrula(m, yol, say, sonuc);
+    if (sonuc.durum === "dogrulandi" || sonuc.durum === "uyusmadi") iceAktarmaIsaretiYaz(m.file, null);
+    return { durum: sonuc.durum || "bilinmiyor", model: m };
+  }
+
+  /*
+   * Doctor "Model kaynaklarını sına": motorun indirildiği yer (ana makinesi sınanır). Windows:
+   * GitHub sürüm arşivi. macOS: motoru Homebrew kurar (brew install whisper-cpp), paketler
+   * (bottle) ghcr.io'dan iner; github.com'a ulaşmak orada bir şey söylemez.
+   */
+  function motorKaynakAdresi() { return K.MAC ? "https://ghcr.io/" : BUILDS.cpu.urls[0]; }
 
   /*
    * Kısa sessiz sesle bir tur çalıştırıp CUDA çekirdek önbelleğini doldur.
@@ -1130,6 +1245,11 @@ window.KEngine = (function () {
     modelIceAktar: modelIceAktar,
     ozelModeller: ozelModeller,
     motorKaynakAdresi: motorKaynakAdresi,
+    kurulumModeli: kurulumModeli,
+    modelKisaAdi: modelKisaAdi,
+    dogrulanmadiMi: dogrulanmadiMi,
+    dogrulanmamisModeller: dogrulanmamisModeller,
+    modelYenidenDogrula: modelYenidenDogrula,
     _hfBeklenenOzet: hfBeklenenOzet,
     _hfDepo: hfDepo,
     _modelDogrula: modelDogrula

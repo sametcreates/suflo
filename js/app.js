@@ -335,17 +335,22 @@ window.KApp = (function () {
     var hw = derleme === "cuda"
       ? "GPU" + (gpu && gpu.name ? " (" + gpu.name.replace(/NVIDIA\s*/i, "") + ")" : "")
       : (derleme === "metal" ? "Metal (Apple GPU)" : "CPU");
-    if (m) {
-      box.className = "inline-status good";
-      box.textContent = "✓ " + m.label.split(" —")[0] + " · " + hw + (KEngine.vadPath() ? " · VAD" : "");
-      btn.textContent = "Değiştir";
-      btn.hidden = false;
-    } else {
-      box.className = "inline-status";
-      box.textContent = installingLocal ? box.textContent : "kurulu değil";
-      btn.textContent = "İndir & kur";
-      btn.hidden = installingLocal;
-    }
+    // 3.4 adım 19: içe aktarılan model motor kurulmadan da diskte olabilir (kurumsal ağ): ✓ yalnız
+    // motor (whisper-cli) da varken; yalnız model varsa motorun eksik olduğu söylenir, düğme kurar
+    var motorVar = false;
+    try { motorVar = !!(K.whisperLocal && K.whisperLocal({ skipModel: true })); } catch (eW) { motorVar = false; }
+    var ad = m ? (KEngine.modelKisaAdi ? KEngine.modelKisaAdi(m) : m.label.split(" —")[0]) : "";
+    var d = window.SufloModelIceAktar && SufloModelIceAktar.yerelDurum ? SufloModelIceAktar.yerelDurum({
+      ad: ad, motorVar: motorVar, donanim: hw, vad: !!KEngine.vadPath(),
+      dogrulanmadi: !!(m && KEngine.dogrulanmadiMi && KEngine.dogrulanmadiMi(m))
+    }) : (m ? { sinif: "good", metin: "✓ " + ad + " · " + hw, dugme: "Değiştir" } : { sinif: "", metin: "kurulu değil", dugme: "İndir & kur" });
+    var hazir = d.dugme === "Değiştir";
+    // kurulum sürerken ilerleme satırı ezilmez (hazır durum dışında)
+    var ilerleme = installingLocal && !hazir;
+    box.className = "inline-status" + (d.sinif && !ilerleme ? " " + d.sinif : "");
+    box.textContent = ilerleme ? box.textContent : d.metin;
+    btn.textContent = d.dugme;
+    btn.hidden = hazir ? false : installingLocal;
     refreshModelPicker();
     refreshEngineRoute();
   }
@@ -357,12 +362,16 @@ window.KApp = (function () {
     var inst = KEngine.installedModels().map(function (m) { return m.id; });
     var active = KEngine.activeModel();
     sel.innerHTML = "";
+    var degerler = [];
     KEngine.MODELS.forEach(function (m) {
       var o = document.createElement("option");
       o.value = m.id;
       var kurulu = inst.indexOf(m.id) !== -1;
-      o.textContent = (kurulu ? "✓ " : "") + m.label + " — " + KEngine.fmtMB(m.sizeMB);
+      // 3.4 adım 19: çevrimdışı içe aktarılıp SHA-256'sı denetlenmemiş model listede ayrışır
+      var dogrulanmadi = kurulu && KEngine.dogrulanmadiMi && KEngine.dogrulanmadiMi(m);
+      o.textContent = (kurulu ? "✓ " : "") + m.label + " — " + KEngine.fmtMB(m.sizeMB) + (dogrulanmadi ? " · doğrulanmadı" : "");
       sel.appendChild(o);
+      degerler.push(m.id);
     });
     // 3.4 adım 19: içe aktarılmış özel modeller (yalnız diskte duranlar)
     KEngine.installedModels().forEach(function (m) {
@@ -371,8 +380,11 @@ window.KApp = (function () {
       o2.value = m.id;
       o2.textContent = "✓ " + m.label + " — " + KEngine.fmtMB(m.sizeMB);
       sel.appendChild(o2);
+      degerler.push(m.id);
     });
-    sel.value = active ? active.id : (K.settings().model || "turbo");
+    // seçim listede yoksa (dosyası silinmiş Özel model) liste boş görünmesin: varsayılana düş
+    var secim = active ? active.id : (K.settings().model || "turbo");
+    sel.value = degerler.indexOf(secim) !== -1 ? secim : "turbo";
   }
 
   /*
@@ -426,7 +438,7 @@ window.KApp = (function () {
 
       var donanim = res.build === "cuda" ? " · GPU hızlandırmalı"
         : (res.build === "metal" ? " · Metal hızlandırmalı" : " · CPU");
-      toast("Hazır: " + res.model.label.split(" —")[0] + donanim +
+      toast("Hazır: " + (KEngine.modelKisaAdi ? KEngine.modelKisaAdi(res.model) : res.model.label.split(" —")[0]) + donanim +
         (res.vad ? " · sessizlik atlama açık" : ""), "good");
     } catch (e) {
       if (e && e.iptal) {
@@ -484,7 +496,8 @@ window.KApp = (function () {
         onayla: function (tur, metin) { return Promise.resolve(!!(window.confirm && window.confirm(uiMetni(metin)))); }
       });
       if (sonuc && sonuc.ok) {
-        var ad = sonuc.model && sonuc.model.label ? sonuc.model.label.split(" —")[0] : sonuc.file;
+        // Özel modelin etiketi "Özel model — <dosya>": kısa ad dosya adıdır (hangisi olduğu belli olsun)
+        var ad = (sonuc.model && KEngine.modelKisaAdi ? KEngine.modelKisaAdi(sonuc.model) : "") || sonuc.file;
         if (sonuc.durum === "dogrulandi") toast("Model içe aktarıldı ve doğrulandı: " + ad, "good");
         else if (sonuc.durum === "dogrulanmadi") toast("Model içe aktarıldı (doğrulanmadı): " + ad, "warn", 8000);
         else toast("Özel model eklendi: " + ad, "warn", 8000);

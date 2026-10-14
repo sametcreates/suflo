@@ -1512,5 +1512,6 @@ modeli evde indirip **Model dosyası içe aktar**. İndirme bağlantıları: `ht
 Bu metni suflo.app SSS'ine / blog'a eklemek istersen "Şirket ağında Suflo modeli inmiyor" başlığı uygun.
 
 **19.K4 Bilinen sınır (bilgi).** Yerel motor arşivi (whisper.cpp zip) ve ffmpeg için içe aktarma yok; yalnız model.
-Sertifika yeniden denemesi indirme ve Doctor sınaması içindir; Groq / OpenAI bulut çağrıları (`httpUpload` / `httpJson`)
-değişmedi. Serbest "özel ayna" adresi bilerek eklenmedi (plan: özet doğrulamasını atlatır).
+Sertifika yeniden denemesi indirme, Doctor sınaması ve model özeti (SHA-256) içindir; panel açılışındaki sessiz
+güncelleme denetimi PowerShell başlatmaz. Groq / OpenAI bulut çağrıları (`httpUpload` / `httpJson`) değişmedi ve
+hata ipucu onlara yeniden deneme ya da model içe aktarma iddia etmez. Serbest "özel ayna" adresi bilerek eklenmedi (plan: özet doğrulamasını atlatır).

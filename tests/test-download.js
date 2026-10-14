@@ -60,13 +60,19 @@ var srv = http.createServer(function (req, res) {
   }
 });
 
-// opts (3.4 adım 19): { ag: true } js/ag-dayanim.js de yüklenir; { dns } "dns" modülünün sahtesi
+// opts (3.4 adım 19): { ag: true } js/ag-dayanim.js de yüklenir; { dns } "dns" modülünün sahtesi;
+// { http } "http" modülünün sahtesi; { cp } "child_process" sahtesi; { process } sahte süreç (platform)
 function loadBridge(opts) {
   opts = opts || {};
   var code = fs.readFileSync(SRC, "utf8");
-  var sahteRequire = function (m) { return m === "dns" && opts.dns ? opts.dns : require(m); };
+  var sahteRequire = function (m) {
+    if (m === "dns" && opts.dns) return opts.dns;
+    if (m === "http" && opts.http) return opts.http;
+    if (m === "child_process" && opts.cp) return opts.cp;
+    return require(m);
+  };
   var sandbox = {
-    window: {}, console: console, require: sahteRequire, process: process,
+    window: {}, console: console, require: sahteRequire, process: opts.process || process,
     URL: URL, Promise: Promise, Buffer: Buffer, JSON: JSON, Math: Math, Date: Date,
     setTimeout: setTimeout, clearTimeout: clearTimeout, String: String, Number: Number,
     Object: Object, Array: Array, Error: Error, RegExp: RegExp, isFinite: isFinite,
@@ -266,13 +272,23 @@ async function kurumsalAg(base) {
   chk("adım 19: tls.rootCertificates + kurumsal kökle ikinci deneme iner, dosya birebir",
     r10c.ok && baglanti === 2 && Buffer.compare(fs.readFileSync(dC), REF) === 0, "bag=" + baglanti + " err=" + (r10c.error || ""));
 
-  // 10d) httpGet (HEAD, Doctor sınaması) aynı tek yeniden denemeyi yapar
+  // 10a/10b) yeniden deneme iddiası YALNIZ gerçekten yapıldığında hataya yazılır
+  chk("adım 19: ikinci deneme yapıldıysa hata bunu söyler, yapılmadıysa söylemez",
+    /bir kez daha denedi/.test(r10b.error) && !/bir kez daha denedi/.test(r10a.error), r10a.error + " || " + r10b.error);
+
+  // 10d) httpGet (HEAD, Doctor sınaması) aynı tek yeniden denemeyi yapar (sistemKokleri: true ile)
+  K2._ekSertifikaOnbellek([caPem]);
   baglanti = 0;
-  var h10 = await K2.httpGet(tbase, {}, { method: "HEAD", timeout: 5000 });
+  var h10 = await K2.httpGet(tbase, {}, { method: "HEAD", timeout: 5000, sistemKokleri: true });
   chk("adım 19: httpGet HEAD sertifika hatasında ek köklerle bir kez daha → 200, caDenendi",
     h10.status === 200 && h10.caDenendi === true, JSON.stringify(h10));
+  // 10d2) istenmeden (panel açılışındaki sessiz güncelleme denetimi gibi) sistem kökleri sorulmaz
+  baglanti = 0;
+  var h10s = await K2.httpGet(tbase, {});
+  chk("adım 19: sistemKokleri istenmeyen httpGet yeniden denemez (tek bağlantı, işletim sistemi komutu yok)",
+    h10s.status === 0 && /certificate/i.test(h10s.body) && !h10s.caDenendi && baglanti === 1, JSON.stringify(h10s) + " bag=" + baglanti);
   K2._ekSertifikaOnbellek([]);
-  var h10b = await K2.httpGet(tbase, {}, { method: "HEAD", timeout: 5000 });
+  var h10b = await K2.httpGet(tbase, {}, { method: "HEAD", timeout: 5000, sistemKokleri: true });
   chk("adım 19: httpGet ek kök yokken sertifika hatası iletisiyle döner",
     h10b.status === 0 && /certificate/i.test(h10b.body) && !h10b.caDenendi, JSON.stringify(h10b));
 
@@ -283,6 +299,73 @@ async function kurumsalAg(base) {
   var h10e = await K2.httpGet("http://127.0.0.1:" + sessiz.address().port + "/", {}, { method: "HEAD", timeout: 300 });
   chk("adım 19: HEAD zaman aşımı seçeneğe uyar (status 0, ETIMEDOUT)", h10e.status === 0 && h10e.kod === "ETIMEDOUT" && Date.now() - t0 < 3000, JSON.stringify(h10e));
   sessiz.close();
+
+  // 10e2) bağlantı HİÇ kurulamıyor (güvenlik duvarı SYN'i düşürüyor): Node'un req.setTimeout'u soket
+  // 'connect' olmadan saymaz (Node 12'nin globalAgent'ında zaman aşımı da yok). Sahte http modülü
+  // bağlanmayan istek döndürür; sınır duvar saatiyle tutulmalı, istek yıkılmalı
+  var asili = [];
+  var asiliHttp = {
+    request: function () {
+      var EE = require("events");
+      var rq = new EE();
+      rq.setTimeout = function () { return rq; };   // bağlantı yokken hiç tetiklenmez (Node gibi)
+      rq.end = function () {};
+      rq.destroy = function () { rq.yikildi = true; };
+      asili.push(rq);
+      return rq;
+    }
+  };
+  asiliHttp.get = asiliHttp.request;
+  var K5 = loadBridge({ ag: true, http: asiliHttp });
+  K5.settings().noProxy = "*";   // ortamdaki HTTPS_PROXY karışmasın: doğrudan bağlantı
+  var t2 = Date.now();
+  var h10f = await Promise.race([
+    K5.httpGet("http://10.255.255.1/", {}, { method: "HEAD", timeout: 300 }),
+    new Promise(function (r) { setTimeout(function () { r({ askida: true }); }, 4000); })
+  ]);
+  chk("adım 19: bağlantı kurulamazken zaman aşımı duvar saatiyle tutar (ETIMEDOUT, istek yıkılır)",
+    h10f.status === 0 && h10f.kod === "ETIMEDOUT" && Date.now() - t2 < 2000 && asili.length === 1 && asili[0].yikildi === true,
+    JSON.stringify(h10f) + " " + (Date.now() - t2) + " ms");
+
+  // 10e3) vekil sunucu CONNECT'e hiç yanıt vermiyor: tünelin kendi 30 sn'si sınırı aşmaz
+  var sessizVekil = require("net").createServer(function () {});
+  await new Promise(function (r) { sessizVekil.listen(0, "127.0.0.1", r); });
+  var K6 = loadBridge({ ag: true });
+  K6.settings().proxyUrl = "http://127.0.0.1:" + sessizVekil.address().port;
+  K6.settings().noProxy = "baska.invalid";
+  var t3 = Date.now();
+  var h10g = await Promise.race([
+    K6.httpGet("https://huggingface.invalid/", {}, { method: "HEAD", timeout: 400 }),
+    new Promise(function (r) { setTimeout(function () { r({ askida: true }); }, 6000); })
+  ]);
+  chk("adım 19: yanıtsız vekilde CONNECT de sınıra uyar (30 sn değil)",
+    h10g.status === 0 && h10g.kod === "ETIMEDOUT" && Date.now() - t3 < 2500, JSON.stringify(h10g) + " " + (Date.now() - t3) + " ms");
+  sessizVekil.close();
+
+  // 10e4) sistem kökü dışa aktarması başarısızsa önbelleğe alınmaz: sonraki deneme yeniden sorar
+  var cagri = 0;
+  var sahteCp = {
+    spawn: function () {
+      cagri++;
+      var EE = require("events");
+      var c = new EE();
+      c.stdout = new EE(); c.stderr = new EE();
+      var n = cagri;
+      setTimeout(function () {
+        if (n === 1) { c.stderr.emit("data", "zaman asimi"); c.emit("close", 1); }
+        else { c.stdout.emit("data", caPem); c.emit("close", 0); }
+      }, 5);
+      return c;
+    }
+  };
+  var sahteSurec = Object.create(process);
+  Object.defineProperty(sahteSurec, "platform", { value: "win32" });
+  var K7 = loadBridge({ ag: true, cp: sahteCp, process: sahteSurec });
+  var p1 = await K7.ekSertifikalar();
+  var p2 = await K7.ekSertifikalar();
+  var p3 = await K7.ekSertifikalar();
+  chk("adım 19: başarısız sertifika dışa aktarması oturumu 'ek kök yok'a kilitlemez; başarılı olan önbelleğe girer",
+    p1.length === 0 && p2.length === 1 && p3.length === 1 && cagri === 2, "cagri=" + cagri + " " + [p1.length, p2.length, p3.length].join(","));
 
   // 10f) sertifika doğrulaması hiçbir yerde kapatılmaz
   var jsDir = pathm.join(KOKYOL, "js");

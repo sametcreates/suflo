@@ -63,7 +63,7 @@ var K = {
   log: function () {}, whisperDir: function () { return WDIR; },
   httpGet: async function () { return agac ? { status: 200, body: JSON.stringify(agac) } : { status: 0, body: "Error: getaddrinfo ENOTFOUND huggingface.co" }; }
 };
-var ctx = { require: require, console: console, K: K, Promise: Promise, JSON: JSON, Buffer: Buffer };
+var ctx = { require: require, console: console, K: K, Promise: Promise, JSON: JSON, Buffer: Buffer, setTimeout: setTimeout, clearTimeout: clearTimeout };
 ctx.window = ctx;
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "model-ice-aktar.js"), "utf8"), ctx, { filename: "model-ice-aktar.js" });
@@ -176,6 +176,109 @@ async function hata(fn) { try { await fn(); return null; } catch (e) { return e;
   // 8) model klasöründeki dosyanın kendisi seçilirse hiçbir şey silinmez
   var e8 = await hata(function () { return E.modelIceAktar(hedef1, { onayla: function () { return Promise.resolve(true); } }); });
   ok("model klasöründeki dosyanın kendisi seçilince silinmez", e8 && /zaten/.test(e8.message) && fs.existsSync(hedef1) && Buffer.compare(fs.readFileSync(hedef1), tinyVeri) === 0, e8 && e8.message);
+
+  // 8b) üzerine yazmada .part yerine konamazsa (Windows: antivirüs yeni dosyayı tutuyor, EPERM)
+  // doğrulanmış eski model SİLİNMİŞ olmamalı: hedef önceden silinmez, rename tek adımda değiştirir
+  var gercekFs = K.fs;
+  var renameDene = 0;
+  K.fs = Object.create(gercekFs);
+  K.fs.renameSync = function () { renameDene++; var e = new Error("EPERM: operation not permitted, rename"); e.code = "EPERM"; throw e; };
+  agac = [{ type: "file", path: "ggml-tiny-q5_1.bin", lfs: { oid: ozet(tinyVeri) } }];
+  var tinyYeniden = yaz("ggml-tiny-q5_1-yeniden.bin", tinyVeri);
+  fs.renameSync(tinyYeniden, path.join(KAYNAK, "ggml-tiny-q5_1 (2).bin"));
+  cevaplar = { "ustune-yaz": true }; sorular = [];
+  var e8b = await hata(function () { return E.modelIceAktar(path.join(KAYNAK, "ggml-tiny-q5_1 (2).bin"), { onayla: onayla }); });
+  K.fs = gercekFs;
+  ok("üzerine yazmada taşıma düşerse eski doğrulanmış model yerinde kalır, .part temizlenir (kısa yeniden denemeyle)",
+    e8b && /EPERM/.test(e8b.message) && fs.existsSync(hedef1) && Buffer.compare(fs.readFileSync(hedef1), tinyVeri) === 0 &&
+    parcalar().length === 0 && renameDene === 4, (e8b && e8b.message) + " dene=" + renameDene);
+  // geçici kilit (ilk deneme EPERM) kısa beklemeyle aşılır
+  renameDene = 0;
+  K.fs = Object.create(gercekFs);
+  K.fs.renameSync = function (a, b) {
+    renameDene++;
+    if (renameDene === 1) { var e = new Error("EBUSY: resource busy or locked"); e.code = "EBUSY"; throw e; }
+    return gercekFs.renameSync(a, b);
+  };
+  var r8c = await E.modelIceAktar(path.join(KAYNAK, "ggml-tiny-q5_1 (2).bin"), { onayla: onayla });
+  K.fs = gercekFs;
+  ok("geçici EBUSY'de taşıma yeniden denenir ve içe aktarma tamamlanır", r8c.ok && renameDene === 2 && parcalar().length === 0 &&
+    Buffer.compare(fs.readFileSync(hedef1), tinyVeri) === 0, renameDene);
+
+  // 8d) dosyası silinmiş Özel model kurulumda seçilmez (her onarım motoru kurup modelde düşmesin)
+  ok("kurulum modeli: dosyası olmayan Özel model yerine katalog varsayılanı (Turbo)",
+    E.kurulumModeli("ozel:ozel-ggml-large-v3-turbo-q8_0.bin").id === "turbo" && E.kurulumModeli("tiny").id === "tiny" && E.kurulumModeli("yok").id === "turbo");
+  ok("kısa ad: Özel model dosya adıyla, katalog modeli etiketin başıyla",
+    E.modelKisaAdi(MI.ozelModelKaydi("ozel-ggml-large-v3-turbo-q8_0.bin", 900 * MB)) === "ggml-large-v3-turbo-q8_0" &&
+    E.modelKisaAdi(E.modelById("tiny")) === "Tiny");
+
+  // 8e) "doğrulanmadı" işareti okunur; Doctor "Doğrula" internet varken SHA-256'yı denetler.
+  // Yeni motor bağlamı: HF ağaç önbelleği ilk adımın ağacıyla dolu, burada her senaryo kendi ağacını ister
+  var httpArgs = [];
+  var K2 = Object.create(K);
+  K2.httpGet = function (u, h, s) { httpArgs.push(s || null); return K.httpGet(u, h, s); };
+  function yeniMotor() {
+    var c = { require: require, console: console, K: K2, Promise: Promise, JSON: JSON, Buffer: Buffer, setTimeout: setTimeout, clearTimeout: clearTimeout };
+    c.window = c;
+    vm.createContext(c);
+    vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "model-ice-aktar.js"), "utf8"), c, { filename: "model-ice-aktar.js" });
+    vm.runInContext(fs.readFileSync(path.join(ROOT, "js", "engine.js"), "utf8"), c, { filename: "engine.js" });
+    c.KEngine.MODELS.forEach(function (m) { if (/^(tiny|base|small)$/.test(m.id)) m.sizeMB = 1; });
+    return c.KEngine;
+  }
+  var E2 = yeniMotor();
+  ok("'doğrulanmadı' işareti okunur: Base listede doğrulanmamış, Tiny değil",
+    E2.dogrulanmadiMi(E2.modelById("base")) === true && E2.dogrulanmadiMi(E2.modelById("tiny")) === false &&
+    E2.dogrulanmamisModeller().map(function (m) { return m.id; }).indexOf("base") !== -1, JSON.stringify(ayarlar.modelIceAktarma));
+  agac = null;
+  var dv1 = await E2.modelYenidenDogrula("base");
+  ok("Doğrula: huggingface.co'ya yine ulaşılamazsa 'bilinmiyor', işaret kalır, dosya kalır",
+    dv1.durum === "bilinmiyor" && E2.dogrulanmadiMi(E2.modelById("base")) && fs.existsSync(hedef4));
+  ok("model özeti isteği duvar saati sınırlı ve sistem köklerine izinli (çevrimdışı içe aktarma 21-75 sn askıda kalmasın)",
+    httpArgs.length > 0 && httpArgs.every(function (s) { return s && s.timeout > 0 && s.timeout <= 20000 && s.sistemKokleri === true; }), JSON.stringify(httpArgs));
+  var E3 = yeniMotor();
+  agac = [{ type: "file", path: "ggml-base-q5_1.bin", lfs: { oid: ozet(baseVeri) } }, { type: "file", path: "ggml-small-q5_1.bin", lfs: { oid: ozet(Buffer.from("baska")) } }];
+  var dv2 = await E3.modelYenidenDogrula("base");
+  ok("Doğrula: SHA-256 tutunca işaret kalkar, dosya yerinde", dv2.durum === "dogrulandi" && !E3.dogrulanmadiMi(E3.modelById("base")) &&
+    fs.existsSync(hedef4) && !Object.prototype.hasOwnProperty.call(ayarlar.modelIceAktarma, "ggml-base-q5_1.bin"), JSON.stringify(ayarlar.modelIceAktarma));
+  var dv3 = await E3.modelYenidenDogrula("small");
+  ok("Doğrula: SHA-256 uyuşmazsa dosya silinir (bozuk / değiştirilmiş model kullanılmaz), işaret kalkar",
+    dv3.durum === "uyusmadi" && !fs.existsSync(path.join(MDIR, "ggml-small-q5_1.bin")) && !E3.dogrulanmadiMi(E3.modelById("small")));
+
+  // 8f) iki aynada farklı hatalar: huggingface.co'nun DNS filtresi teşhisi sonraki aynanın hatasıyla ezilmez;
+  // model indirme hatası çevrimdışı içe aktarmayı önermek için işaretlenir
+  var indirilen = [];
+  K2.download = async function (u) {
+    indirilen.push(u);
+    if (/huggingface\.co/.test(u)) return { ok: false, error: "HTTP 503 — Kurumsal ağ filtresi huggingface.co adresini engelliyor (Cisco Umbrella, 146.112.61.106).", dnsEngeli: "146.112.61.106" };
+    return { ok: false, error: "Error: connect ETIMEDOUT 104.21.0.1:443" };
+  };
+  var E4 = yeniMotor();
+  var e8f = await hata(function () { return E4.installModel("large"); });
+  delete K2.download;
+  ok("iki ayna: DNS filtresi teşhisi korunur, sonraki aynanın hatası da yazılır, içe aktarma işareti",
+    e8f && /Kurumsal ağ filtresi huggingface\.co adresini engelliyor \(Cisco Umbrella/.test(e8f.message) && /ETIMEDOUT/.test(e8f.message) &&
+    e8f.modelIceAktarOner === true && indirilen.length === 2, e8f && e8f.message);
+
+  // 8g) Doctor sınaması motor kaynağı: macOS'ta motor Homebrew'dan (ghcr.io), Windows'ta GitHub arşivinden
+  K.MAC = true;
+  var macAdres = E.motorKaynakAdresi();
+  K.MAC = false;
+  ok("motor kaynağı: macOS ghcr.io (Homebrew paketleri), Windows github.com",
+    macAdres === "https://ghcr.io/" && /^https:\/\/github\.com\//.test(E.motorKaynakAdresi()), macAdres);
+
+  // 8h) Ayarlar › Motor satırı: içe aktarılan model motor yokken "hazır" sayılmaz
+  var dYok = MI.yerelDurum({ ad: "Turbo", motorVar: false, donanim: "CPU" });
+  var dVar = MI.yerelDurum({ ad: "Turbo", motorVar: true, donanim: "CPU", vad: true });
+  var dDog = MI.yerelDurum({ ad: "Base", motorVar: true, donanim: "CPU", dogrulanmadi: true });
+  ok("motor durumu: model var motor yok -> '✓' yok, uyarı, düğme kurar",
+    dYok.sinif === "warn" && dYok.metin.indexOf("✓") === -1 && /motor kurulu değil/.test(dYok.metin) && dYok.dugme === "İndir & kur", JSON.stringify(dYok));
+  ok("motor durumu: ikisi de var -> ✓, Değiştir; doğrulanmamış model uyarı rengiyle 'doğrulanmadı'",
+    dVar.sinif === "good" && dVar.metin === "✓ Turbo · CPU · VAD" && dVar.dugme === "Değiştir" &&
+    dDog.sinif === "warn" && /· doğrulanmadı$/.test(dDog.metin) && MI.yerelDurum({}).metin === "kurulu değil", dVar.metin + " | " + dDog.metin);
+  ok("app.js: motor satırı yerelDurum'a ve whisperLocal({ skipModel: true })'a bakar",
+    /SufloModelIceAktar\.yerelDurum\(/.test(fs.readFileSync(path.join(ROOT, "js", "app.js"), "utf8")) &&
+    /K\.whisperLocal\(\{ skipModel: true \}\)/.test(fs.readFileSync(path.join(ROOT, "js", "app.js"), "utf8")));
 
   // 9) panel bağlantısı: betik sırası, düğme, dosya seçici süzgeci, i18n
   var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");

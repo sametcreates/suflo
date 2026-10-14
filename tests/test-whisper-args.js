@@ -184,6 +184,22 @@ ok("Doctor: otomatik kapatılmış (model@derleme) -> uyarı", (function () {
 ok("Doctor: yardım okunamadıysa model ön ayarına göre karar verilir", satir({ model: "base", yardim: null }, T).status === "good");
 ok("Doctor: her zaman iki satır", W.doctorSatirlari({}).length === 2 && W.doctorSatirlari().length === 2);
 
+/* ---------------- 9b) 3.4 adım 19: içe aktarılmış Özel model ---------------- */
+
+// İçe aktarma uyarısı "DTW ön ayarı uygulanmaz" der: adı tanıdık görünen özel dosya (distil-large-v3:
+// 2 çözücü katmanı, large.v3 hizalama başlıkları katman 7-31'de) ne DTW ne çeviri almaz
+var ozelDistil = W.secenekler({ model: "/x/models/ozel-ggml-distil-large-v3.bin", dtw: true, cevir: true });
+ok("Özel model: ozel-ggml-distil-large-v3.bin kimlik almaz, DTW ve -tr reddedilir",
+  W.modelKimligi("/x/models/ozel-ggml-distil-large-v3.bin") === "" && ozelDistil.dtw === "" && ozelDistil.dtwReddi === true &&
+  ozelDistil.cevir === false && ozelDistil.ceviriReddi === true, js(ozelDistil));
+var ozelArgs = W.olustur({ model: "C:\\S\\models\\ozel-ggml-large-v3-turbo-q8_0.bin", audio: "/t/a.wav", outBase: "/t/a", dtw: true, cevir: true });
+ok("Özel model: argümanlarda -dtw / -nfa / -tr yok (Windows yolu da)", ozelArgs.indexOf("-dtw") === -1 && ozelArgs.indexOf("-nfa") === -1 && ozelArgs.indexOf("-tr") === -1, js(ozelArgs));
+ok("Özel model: 'ozel:' kimliği çevrilemez sayılır, DTW anahtarı katalog Large ile paylaşılmaz",
+  W.cevirebilir("ozel:ozel-ggml-distil-large-v3.bin") === false && W.modelKimligi("ozel:ozel-ggml-large-v3-q5_0.bin") === "" &&
+  W.dtwAnahtari("/x/ozel-ggml-distil-large-v3.bin", "cpu") !== W.dtwAnahtari("/x/ggml-large-v3-q5_0.bin", "cpu"),
+  W.dtwAnahtari("/x/ozel-ggml-distil-large-v3.bin", "cpu"));
+ok("Özel model: katalog dosyaları etkilenmez", W.modelKimligi("/x/ggml-large-v3-q5_0.bin") === "large" && W.modelKimligi("/x/ggml-large-v3-turbo-q5_0.bin") === "turbo");
+
 /* ---------------- 10) panel bağlantısı ---------------- */
 
 var html = fs.readFileSync(path.join(KOK, "index.html"), "utf8");

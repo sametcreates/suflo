@@ -175,6 +175,25 @@
     return out;
   }
 
+  /*
+   * Ayarlar › Motor durum satırı (app.js refreshLocalStatus). İçe aktarılan model motor (whisper-cli)
+   * kurulmadan da diskte olabilir (kurumsal ağda motor arşivi de inmemiş olabilir): "✓" yalnız ikisi
+   * birlikteyken. o: { ad (etkin modelin kısa adı; "" = model yok), motorVar, donanim, vad, dogrulanmadi }
+   * Döner: { sinif: "good" | "warn" | "", metin, dugme }
+   */
+  function yerelDurum(o) {
+    o = o || {};
+    if (o.ad && o.motorVar) {
+      return {
+        sinif: o.dogrulanmadi ? "warn" : "good",
+        metin: "✓ " + o.ad + " · " + (o.donanim || "CPU") + (o.vad ? " · VAD" : "") + (o.dogrulanmadi ? " · doğrulanmadı" : ""),
+        dugme: "Değiştir"
+      };
+    }
+    if (o.ad) return { sinif: "warn", metin: o.ad + " hazır · motor kurulu değil", dugme: "İndir & kur" };
+    return { sinif: "", metin: "kurulu değil", dugme: "İndir & kur" };
+  }
+
   /* ---------------- Onay metinleri (engine.js sorar, app.js gösterir) ---------------- */
 
   function ozelUyari(ad, aile) {
@@ -204,6 +223,7 @@
     ozelDosyaAdi: ozelDosyaAdi,
     ozelModelKaydi: ozelModelKaydi,
     ozelListeyeEkle: ozelListeyeEkle,
+    yerelDurum: yerelDurum,
     ozelUyari: ozelUyari,
     dogrulanmadiSorusu: dogrulanmadiSorusu,
     ustuneYazSorusu: ustuneYazSorusu
