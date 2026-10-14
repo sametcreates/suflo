@@ -15,13 +15,17 @@
  *                             sorgu: puana göre sıralı (favori ve son kullanılan küçük bir ek puan alır).
  *   durumOku / durumYaz       favoriler ve son 8 kullanılan localStorage'da ("suflo.aracAra"); okuma / yazma
  *                             try/catch içinde, bozuk ya da yabancı kayıt yok sayılır.
- *   kisayolMu(e, mac)         Ctrl+K (Windows) / ⌘K (macOS); Shift / Alt / AltGr'li hâli değil.
+ *   kisayolMu(e, mac)         Ctrl+K (Windows) / ⌘K (macOS); Shift / Alt / AltGr'li hâli değil. Latin olmayan
+ *                             düzende (Rusça…) tuşun yerine bakılır (CEP'in panelde tuttuğu tuş da odur).
+ *   tusDuzeniUyumsuz(e, mac)  macOS: ⌘ + fiziksel K başka bir harf yazıyor (Türkçe F: M) → ⌘K ilgisi bırakılmalı.
  *   yaziAlaniMi(hedef)        metin kutusu, açılır liste, contenteditable ya da altyazı düzenleyicisi
  *                             (#cap-segments, #tc-words, [data-kisayol-yok]): kısayol orada hiç bağlanmaz.
  *   tusIlgisiAyarla(sahip, l) CEP registerKeyEventsInterest tek bir listeyi kabul eder (her çağrı öncekini
  *                             siler): araç arama kısayolu ve Altyazı Efektleri önizleme sahnesinin konum tuşları
  *                             burada birleştirilip tek kayıt olarak verilir. Ctrl+K panelde tutulmazsa Premiere'e de
- *                             gider (Premiere'de Ctrl+K = Kes / Add Edit).
+ *                             gider (Premiere'de Ctrl+K = Kes / Add Edit). Panelin BÜTÜN tuş ilgileri buradan geçmeli:
+ *                             doğrudan registerKeyEventsInterest çağrısı Ctrl+K ilgisini siler (test-arac-ara yakalar).
+ *   hedefTusIlgisi(mac)       seçimden sonra odaktaki düğmede Enter / Boşluk (Premiere'e gitmesin diye).
  *
  * Fikir: Rebound'un klavyeyle kullanılan, favorili ve son kullanılanlı Home başlatıcısı. Kod Suflo'nun kendi
  * (temiz oda, kod alınmadı). Çalışma ortamı: CEF 74 / Node 12.3 (ES5).
@@ -80,7 +84,8 @@
   var EYLEMLER = [
     { id: "altyazi-olustur", ad: "Altyazı oluştur", tab: "captions", hedef: ["cap-go"], anahtar: "transkript yaziya dok whisper subtitle caption generate" },
     { id: "srt-ice-aktar", ad: "SRT içe aktar", tab: "captions", hedef: ["cap-import-srt"], anahtar: "srt vtt altyazi dosyasi import subtitle file" },
-    { id: "altyazi-cevir", ad: "Altyazıyı çevir", tab: "captions", hedef: ["cap-translate"], pro: "translate",
+    // hedef: Pro kapılı "Çevir" düğmesi (dil seçilmemişse düğme "Önce hedef dili seç" der); yanındaki dil listesi yedek
+    { id: "altyazi-cevir", ad: "Altyazıyı çevir", tab: "captions", hedef: ["cap-translate-go", "cap-translate"], pro: "translate",
       gerekli: "Önce altyazı oluştur ya da SRT içe aktar.", anahtar: "ceviri dil ingilizce translate language" },
     { id: "bolum-oner", ad: "Bölüm öner", tab: "captions", hedef: ["cap-ch-suggest"],
       gerekli: "Önce altyazı oluştur ya da SRT içe aktar.", anahtar: "bolumler youtube chapters" },
@@ -349,13 +354,32 @@
 
   /* ---------------- Klavye ---------------- */
 
-  // Ctrl+K (Windows) / ⌘K (macOS). Shift (Premiere: tüm izlerde kes), Alt ve AltGr (= Ctrl+Alt) hâlleri değil.
+  /*
+   * Ctrl+K (Windows) / ⌘K (macOS). Shift (Premiere: tüm izlerde kes), Alt ve AltGr (= Ctrl+Alt) hâlleri değil.
+   * Tuş adı yoksa ya da Latin olmayan bir düzenin harfiyse (Rusça 'л', Yunanca 'κ'…) CEP'in panelde tuttuğu tuşa
+   * bakılır (tusIlgisi): Windows'ta VK_K (keyCode 75; Kiril / Yunan düzenlerinde de K'nın yerindeki tuş), macOS'ta
+   * fiziksel ANSI K (code "KeyK"). Yoksa Ctrl+K panelde tutulur (Premiere'in Kes'i çalışmaz) ama palet de açılmazdı.
+   */
   function kisayolMu(e, mac) {
     if (!e || e.altKey || e.shiftKey || e.repeat) return false;
     if (mac ? !(e.metaKey && !e.ctrlKey) : !(e.ctrlKey && !e.metaKey)) return false;
     var k = e.key == null ? "" : String(e.key);
-    if (k && k !== "Unidentified") return k === "k" || k === "K";
-    return e.keyCode === 75;
+    if (k === "k" || k === "K") return true;
+    if (k && k !== "Unidentified" && !(k.length === 1 && k.charCodeAt(0) > 127)) return false;
+    var kod = e.code == null ? "" : String(e.code);
+    if (mac) return kod ? kod === "KeyK" : e.keyCode === 75;
+    return e.keyCode ? e.keyCode === 75 : kod === "KeyK";
+  }
+
+  /*
+   * macOS: CEP ilgisi (tusIlgisi) fiziksel ANSI K tuşunu tutar. Bu tuş etkin düzende başka bir Latin harfiyse (Türkçe F'de
+   * M, Dvorak'ta T) ⌘ + o harf (Türkçe F: ⌘M = Premiere'in Export Media'sı) panelde yutulur ama palet açılmaz. Böyle
+   * bir ⌘ basışı görülünce app.js ilgiyi bırakır: ilk basış yutulmuş olur, sonrakiler Premiere'e gider (kurucu 20.K3).
+   */
+  function tusDuzeniUyumsuz(e, mac) {
+    if (!mac || !e || !e.metaKey || e.ctrlKey || e.altKey || e.code !== "KeyK") return false;
+    var k = e.key == null ? "" : String(e.key);
+    return k.length === 1 && /[a-z]/i.test(k) && k !== "k" && k !== "K";
   }
 
   function kisayolMetni(mac) { return mac ? "⌘K" : "Ctrl+K"; }
@@ -388,6 +412,17 @@
    * macOS kVK_ANSI_K = 40 + metaKey (⌘).
    */
   function tusIlgisi(mac) { return mac ? [{ keyCode: 40, metaKey: true }] : [{ keyCode: 75, ctrlKey: true }]; }
+
+  /*
+   * Seçimden sonra odak aracın düğmesinde (eylem) ya da sol menü girdisinde (araç). Odak metin kutusunda değilken CEP
+   * tuşları Premiere'e de gönderir: düğmeyi çalıştırmak için basılan Enter Premiere'de Render Effects In to Out'u,
+   * Boşluk oynatmayı başlatırdı. Odak orada kaldıkça Enter ve Boşluk panelde tutulur (app.js odak gidince bırakır).
+   * Windows VK_RETURN 13 (sayısal tuş takımının Enter'ı dahil), VK_SPACE 32; macOS kVK_Return 36,
+   * kVK_ANSI_KeypadEnter 76, kVK_Space 49.
+   */
+  function hedefTusIlgisi(mac) {
+    return mac ? [{ keyCode: 36 }, { keyCode: 76 }, { keyCode: 49 }] : [{ keyCode: 13 }, { keyCode: 32 }];
+  }
 
   function ilgiListesi(x) {
     if (typeof x === "string") {
@@ -457,9 +492,11 @@
     favoriDegistir: favoriDegistir,
     sonEkle: sonEkle,
     kisayolMu: kisayolMu,
+    tusDuzeniUyumsuz: tusDuzeniUyumsuz,
     kisayolMetni: kisayolMetni,
     yaziAlaniMi: yaziAlaniMi,
     tusIlgisi: tusIlgisi,
+    hedefTusIlgisi: hedefTusIlgisi,
     ilgiBirlestir: ilgiBirlestir,
     tusIlgisiYoneticisi: tusIlgisiYoneticisi,
     tusIlgisiAyarla: function (sahip, liste) { return panelYoneticisi.ayarla(sahip, liste); }

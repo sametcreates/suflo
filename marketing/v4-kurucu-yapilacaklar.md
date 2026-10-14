@@ -1538,9 +1538,22 @@ eyleme saniyede ulaş; favorilerin başta."; madde tıklanınca paleti açmak i�
 VK_K (75, klavye düzenine göre K harfi), macOS'ta kVK_ANSI_K (40, ANSI düzeninde K'nın **fiziksel** yeri). Türkçe Q'da sorun
 yok. macOS'ta Türkçe F düzeninde K başka bir tuşta olduğu için ⌘K paleti açar ama Premiere'e de gidebilir (timeline'da Add
 Edit). Deneme listesi 20.13'te görülürse: `js/arac-ara.js` › `tusIlgisi(mac)` listesine o tuşun kodu eklenebilir (ör. düzen
-algılanarak); şimdilik bilerek dokunulmadı.
+algılanarak); şimdilik bilerek dokunulmadı. İkinci etki (inceleme): Türkçe F'de fiziksel ANSI K tuşu **M** yazar, yani tutulan
+tuş aslında ⌘M'dir (Premiere: Export Media). Panel ⌘ + o tuşta K olmayan bir harf görünce (`tusDuzeniUyumsuz`) ilgiyi
+oturum boyunca bırakır: ilk ⌘M yutulmuş olabilir, sonrakiler Premiere'e gider. Latin olmayan düzenlerde (Windows Rusça /
+Yunanca) e.key 'л' / 'κ' olsa da tutulan VK_K tuşu Ctrl+K sayılır, palet açılır (tuş ölü kalmaz).
 
 **20.K4 Eğri sekmesi gelince (adım 10).** "Eğri uygula" eylemi `#tab-egri` varsa kendiliğinden listeye girer, yoksa
 görünmez. Eğri sekmesinin Uygula düğmesinin kimliği `egri-uygula` değilse `js/arac-ara.js` › `EYLEMLER` › `egri-uygula`
 satırındaki `hedef`i güncelle (`tests/test-arac-ara.js` sekme varken eksik hedefi yakalar). Yeni bir sekme / sık eylem
 eklendiğinde de aynı listeye bir satır eklemek yeter (sol menü girdileri kendiliğinden gelir).
+
+**Birleştirirken zorunlu (inceleme):** `yerel-34-egri` dalındaki `js/egri.js` › `tuslariTut` CEP tuş ilgisini doğrudan
+`window.__adobe_cep__.registerKeyEventsInterest(...)` ile veriyor. Bu çağrı panelin **bütün** listesini değiştirir: Eğri
+sekmesi açılınca Ctrl+K (⌘K) ilgisi silinir ve geri gelmez (app.js onu bir kez kurar); sonra panelde her Ctrl+K hem paleti
+açar hem timeline'daki klibi keser (20.2'nin tam tersi). Birleştirmede `tuslariTut`'u `captions.js` › `konumTuslariniTut`
+gibi yaz: `var AA = window.SufloAracAra; if (AA && typeof AA.tusIlgisiAyarla === "function") { if (AA.tusIlgisiAyarla("egri",
+tut ? M.tusIlgisi(mac) : "")) tusTutuluyor = tut; return; }` ve doğrudan çağrı yalnız bu dalın altında yedek olarak kalsın
+(`js/arac-ara.js`, `js/egri.js`'ten önce yüklenir). `tests/test-arac-ara.js` "panelin tuş ilgileri ortak yöneticiden
+geçer" maddesi bunu yapmadan birleştirilen dalda **kalır** (egri.js satırını adıyla gösterir). Deneme: Eğri sekmesini aç,
+panelde boş bir yere tıkla, Ctrl+K: palet açılır, timeline kesilmez; sekmeden çık, yine aynı.

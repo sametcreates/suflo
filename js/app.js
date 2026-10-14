@@ -251,27 +251,76 @@ window.KApp = (function () {
    * favoriler ve son kullanılanlar yalnız bu bilgisayarın localStorage'ında. Ücretsiz.
    */
   var AA = window.SufloAracAra || null;
-  var arama = { acik: false, kayit: [], sonuclar: [], aktif: 0, durum: null, onceki: null, vurgu: null, vurguSaat: null };
-  var aramaIlgisi = false;
+  var arama = { acik: false, kayit: [], sonuclar: [], aktif: 0, durum: null, onceki: null, vurgu: null, vurguSaat: null,
+    tutulan: null, tutulanBirak: null };
+  var aramaIlgisi = false, aramaIlgisiBirakildi = false;
 
   function aramaDepo() { try { return window.localStorage || null; } catch (e) { return null; } }
   function aramaAcik() { return arama.acik; }
   // Pro rozeti yalnız bilgi: pro.js yapılandırılmadıysa (isPro true) rozet yok, markLocked ile aynı
   function proAcik() { var P = window.Pro; try { return !P || typeof P.isPro !== "function" || P.isPro(); } catch (e) { return true; } }
 
-  // Pro penceresi, AI anahtar sihirbazı, yenilikler, YouTube onayı açıkken palet üstlerine açılmaz
+  /*
+   * Pro penceresi, AI anahtar sihirbazı, yenilikler, YouTube onayı, preset paketi rehberi (#preset-pack-guide) ya da
+   * görünen başka bir aria-modal pencere açıkken palet üstlerine açılmaz (çoğunun z-index'i paletinkinden yüksek: palet
+   * arkada görünmeden açılır, odağı ve yazılanları alırdı)
+   */
   function baskaPencereAcik() {
     var anahtar = el("onb-anahtar"), yt = el("yt-onay");
-    return !!(document.querySelector(".pro-upsell-backdrop") || document.querySelector(".yenilik-arka") ||
-      (anahtar && !anahtar.hidden) || (yt && !yt.hidden));
+    if (document.querySelector(".pro-upsell-backdrop") || document.querySelector(".yenilik-arka") || document.querySelector("#preset-pack-guide") ||
+      (anahtar && !anahtar.hidden) || (yt && !yt.hidden)) return true;
+    var palet = el("arac-ara"), modallar = document.querySelectorAll('[aria-modal="true"]');
+    for (var i = 0; i < modallar.length; i++) {
+      var m = modallar[i];
+      if ((palet && palet.contains(m)) || (m.closest && m.closest("[hidden]"))) continue;
+      if (gorunur(m)) return true;
+    }
+    return false;
   }
 
-  // CEP: Ctrl+K / ⌘K panelde tutulur (yoksa Premiere'e de gider: Kes / Add Edit). Panel açılışında değil, panel
-  // ilk kez odak / tıklama / tuş alınca bir kez; önizleme sahnesinin konum tuşlarıyla birleşik tek kayıt
-  function aramaTusIlgisi() {
-    if (aramaIlgisi || !AA) return;
+  /*
+   * CEP: Ctrl+K / ⌘K panelde tutulur (yoksa Premiere'e de gider: Kes / Add Edit). Panel açılışında değil, panel
+   * ilk kez odak / tıklama / tuş alınca bir kez; önizleme sahnesinin konum tuşlarıyla birleşik tek kayıt.
+   * macOS'ta ⌘ + fiziksel K başka bir harf yazıyorsa (Türkçe F: ⌘M = Export Media) ilgi bu düzende yanlış tuşu
+   * tutuyor demektir: bırakılır, bir daha kurulmaz (AA.tusDuzeniUyumsuz, kurucu 20.K3).
+   */
+  function aramaTusIlgisi(e) {
+    if (!AA || aramaIlgisiBirakildi) return;
+    if (e && e.type === "keydown" && AA.tusDuzeniUyumsuz(e, !!K.MAC)) {
+      aramaIlgisiBirakildi = true;
+      aramaIlgisi = true;
+      try { AA.tusIlgisiAyarla("arac-ara", ""); } catch (x) {}
+      K.log("arac ara: Cmd+K tus ilgisi birakildi (fiziksel K tusu bu duzende '" + e.key + "')");
+      return;
+    }
+    if (aramaIlgisi) return;
     aramaIlgisi = true;
-    try { AA.tusIlgisiAyarla("arac-ara", AA.tusIlgisi(!!K.MAC)); } catch (e) {}
+    try { AA.tusIlgisiAyarla("arac-ara", AA.tusIlgisi(!!K.MAC)); } catch (x) {}
+  }
+
+  /*
+   * Seçimden sonra odak aracın düğmesinde (eylem) ya da sol menü girdisinde (araç) ve kullanıcıya "Enter'a bir kez daha
+   * bas" deniyor. Odak metin kutusunda değilken CEP tuşları Premiere'e de gönderir (Enter = Render Effects In to Out,
+   * Boşluk = oynat / durdur): odak o öğede kaldıkça Enter ve Boşluk panelde tutulur (AA.hedefTusIlgisi), odak gidince
+   * bırakılır. Metin kutusu ve açılır liste zaten Premiere'e tuş göndermez: orada tutulmaz.
+   */
+  function hedefTuslariniTut(x) {
+    hedefTuslariniBirak();
+    if (!AA || !x || !x.addEventListener || document.activeElement !== x || AA.yaziAlaniMi(x)) return;
+    var birak = function () { if (arama.tutulan === x) hedefTuslariniBirak(); };
+    arama.tutulan = x;
+    arama.tutulanBirak = birak;
+    x.addEventListener("blur", birak);
+    try { AA.tusIlgisiAyarla("arac-ara-hedef", AA.hedefTusIlgisi(!!K.MAC)); } catch (e) {}
+  }
+
+  function hedefTuslariniBirak() {
+    var x = arama.tutulan;
+    if (!x) return;
+    if (x.removeEventListener && arama.tutulanBirak) x.removeEventListener("blur", arama.tutulanBirak);
+    arama.tutulan = null;
+    arama.tutulanBirak = null;
+    try { AA.tusIlgisiAyarla("arac-ara-hedef", ""); } catch (e) {}
   }
 
   // Sol menü girdisinin özgün (Türkçe) adı; "YENİ" rozeti (em.ky-yeni) ada katılmaz
@@ -417,6 +466,7 @@ window.KApp = (function () {
     var kutu = el("arac-ara"), girdi = el("arac-ara-girdi");
     if (!kutu || !girdi) return;
     aramaTusIlgisi();
+    hedefTuslariniBirak();
     arama.onceki = document.activeElement;
     arama.durum = AA.durumOku(aramaDepo());
     arama.kayit = aramaKaydi();
@@ -426,6 +476,9 @@ window.KApp = (function () {
     arama.acik = true;
     var ac = el("arac-ara-ac");
     if (ac) ac.setAttribute("aria-expanded", "true");
+    // liste data-i18n-skip (satırlar zaten arayüz dilinde çizilir): kendi aria-label'ı çevirmene girmez, burada verilir
+    var liste = el("arac-ara-liste");
+    if (liste) liste.setAttribute("aria-label", uiMetni("Araçlar ve eylemler"));
     aramaCiz();
     try { girdi.focus(); } catch (e) {}
   }
@@ -462,7 +515,7 @@ window.KApp = (function () {
 
   function aracaGit(o) {
     var b = navDugmesi(o.tab, o.kat);
-    if (b) { b.click(); try { b.focus(); } catch (e) {} }
+    if (b) { b.click(); try { b.focus(); } catch (e) {} hedefTuslariniTut(b); }
     else goster(o.tab);
   }
 
@@ -488,7 +541,11 @@ window.KApp = (function () {
     }
     aramaKaydir(hedef);
     aramaVurgula(hedef);
-    if (!hedef.disabled && hedef.focus) { try { hedef.focus({ preventScroll: true }); } catch (e) { try { hedef.focus(); } catch (e2) {} } }
+    if (!hedef.disabled && hedef.focus) {
+      try { hedef.focus({ preventScroll: true }); } catch (e) { try { hedef.focus(); } catch (e2) {} }
+      // "Enter'a bir kez daha bas": o Enter (ve Boşluk) Premiere'e gitmesin
+      hedefTuslariniTut(hedef);
+    }
   }
 
   function aramaSec(i) {
@@ -514,6 +571,20 @@ window.KApp = (function () {
   }
 
   /*
+   * Palet açıkken tuş arama kutusundan başka bir yerden geldiyse (odak bir yolla kutudan çıktı): odak kutuya döner ve tuş
+   * paletin olur (Esc kapatır, ↑↓ / Enter / Ctrl+D çalışır). Yakalama evresinde durdurulur: belgenin diğer kısayolları
+   * (Ayarlar açıkken Esc ile çıkış…) paletin arkasındaki sekmede çalışmaz. Yazılan harf de odağı alan kutuya gider.
+   */
+  function aramaDisTusu(e) {
+    if (!arama.acik) return;
+    var girdi = el("arac-ara-girdi");
+    if (!girdi || e.target === girdi) return;
+    e.stopPropagation();
+    try { girdi.focus(); } catch (x) {}
+    aramaGirdiTusu(e);
+  }
+
+  /*
    * Belge kısayolu: Ctrl+K (⌘K) paleti açar ya da açıksa kapatır. Metin kutusunda, açılır listede, contenteditable'da
    * ve altyazı düzenleyicisinde (#cap-segments, #tc-words) hiç bağlanmaz (AA.yaziAlaniMi): orada tuş yazının
    * kendisine kalır. Başka bir pencere (Pro, AI anahtarı, yenilikler) açıkken de açılmaz.
@@ -530,7 +601,7 @@ window.KApp = (function () {
 
   function aracAramaBaslat() {
     if (!AA) return;
-    var ac = el("arac-ara-ac"), kutu = el("arac-ara"), girdi = el("arac-ara-girdi"), liste = el("arac-ara-liste");
+    var ac = el("arac-ara-ac"), kutu = el("arac-ara"), girdi = el("arac-ara-girdi");
     var kisayol = AA.kisayolMetni(!!K.MAC);
     if (ac) {
       ac.title = "Araç ara (" + kisayol + ")";
@@ -545,14 +616,24 @@ window.KApp = (function () {
       girdi.addEventListener("keydown", aramaGirdiTusu);
       girdi.addEventListener("input", function () { arama.aktif = 0; aramaCiz(); });
     }
-    // liste tıklaması arama kutusundan odağı almasın (satır / yıldız tıklanınca da yazmaya devam edilir)
-    if (liste) liste.addEventListener("mousedown", function (e) { e.preventDefault(); });
-    if (kutu) kutu.addEventListener("mousedown", function (e) { if (e.target === kutu) { e.preventDefault(); aramaKapat(true); } });
+    /*
+     * Pencerede odağı yalnız arama kutusu alır: liste satırı / yıldız, başlıktaki büyüteç, Esc rozeti, alt bilgi ya da
+     * "Eşleşen araç yok" satırı tıklanınca odak kutuda kalır. Yoksa odak gövdeye düşer: tuşlar paletin olmaz ve CEP
+     * onları (metin kutusunda değil diye) Premiere'e de gönderir (oklar oynatma kafasını, Ctrl+D geçişi, Enter render).
+     * Karartılmış alana basış paleti kapatır.
+     */
+    if (kutu) kutu.addEventListener("mousedown", function (e) {
+      if (e.target === kutu) { e.preventDefault(); aramaKapat(true); }
+      else if (e.target !== girdi) e.preventDefault();
+    });
+    document.addEventListener("keydown", aramaDisTusu, true);
     document.addEventListener("keydown", aracAraTusu);
     // CEP tuş ilgisi: panel ilk kez odak / tıklama / tuş alınca (açılışta değil)
     window.addEventListener("focus", aramaTusIlgisi);
     document.addEventListener("pointerdown", aramaTusIlgisi, true);
     document.addEventListener("keydown", aramaTusIlgisi, true);
+    // seçimden sonra tutulan Enter / Boşluk: odak başka bir öğeye geçince bırakılır (öğe DOM'dan kalkıp blur gelmese de)
+    document.addEventListener("focusin", function (e) { if (arama.tutulan && e.target !== arama.tutulan) hedefTuslariniBirak(); }, true);
   }
 
   /* ---------------- Ayarlar ---------------- */

@@ -168,6 +168,22 @@ ok("kısayol macOS: ⌘K; Ctrl+K değil (metin kutusunda satır sonunu siler)", 
 ok("kısayol: tuş adı yoksa keyCode 75; basılı tutma (repeat) tekrar açmaz", AA.kisayolMu(tus({ ctrlKey: true, key: "Unidentified", keyCode: 75 }), false) &&
   !AA.kisayolMu(tus({ ctrlKey: true, repeat: true }), false) && !AA.kisayolMu(null, false));
 ok("kısayol metni: Ctrl+K / ⌘K", AA.kisayolMetni(false) === "Ctrl+K" && AA.kisayolMetni(true) === "⌘K");
+// İnceleme: Latin olmayan düzende (Rusça / Yunanca) e.key düzenin harfidir ('л', 'κ') ama CEP'in tuttuğu tuş (Windows VK_K 75,
+// macOS fiziksel ANSI K) aynı tuştur: kısayol tanınmazsa Ctrl+K hem Premiere'e gitmez hem paleti açmaz (ölü tuş)
+ok("kısayol: Latin olmayan düzen (Windows Rusça 'л' / Yunanca 'κ', keyCode 75) Ctrl+K sayılır; başka tuş sayılmaz",
+  AA.kisayolMu(tus({ ctrlKey: true, key: "л", keyCode: 75, code: "KeyK" }), false) && AA.kisayolMu(tus({ ctrlKey: true, key: "κ", keyCode: 75 }), false) &&
+  !AA.kisayolMu(tus({ ctrlKey: true, key: "д", keyCode: 76, code: "KeyL" }), false) && !AA.kisayolMu(tus({ ctrlKey: true, key: "л", keyCode: 75, shiftKey: true }), false) &&
+  !AA.kisayolMu(tus({ ctrlKey: true, key: "j", keyCode: 75 }), false));
+ok("kısayol macOS: Latin olmayan harf fiziksel K'daysa (code KeyK) ⌘K; Türkçe F'de fiziksel K = 'm' ⌘K değil",
+  AA.kisayolMu(tus({ metaKey: true, key: "л", code: "KeyK", keyCode: 75 }), true) && !AA.kisayolMu(tus({ metaKey: true, key: "л", code: "KeyL", keyCode: 75 }), true) &&
+  !AA.kisayolMu(tus({ metaKey: true, key: "m", code: "KeyK" }), true) && AA.kisayolMu(tus({ metaKey: true, key: "k", code: "KeyJ" }), true));
+ok("tusDuzeniUyumsuz: yalnız macOS'ta ⌘ + fiziksel K başka bir Latin harf yazınca (Türkçe F ⌘M, Dvorak ⌘T)",
+  AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "m", code: "KeyK" }), true) && AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "t", code: "KeyK" }), true) &&
+  !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "k", code: "KeyK" }), true) && !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "л", code: "KeyK" }), true) &&
+  !AA.tusDuzeniUyumsuz(tus({ key: "m", code: "KeyK" }), true) && !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "m", code: "KeyM" }), true) &&
+  !AA.tusDuzeniUyumsuz(tus({ ctrlKey: true, key: "m", code: "KeyK" }), false) && !AA.tusDuzeniUyumsuz(null, true));
+ok("hedefTusIlgisi: Windows Enter 13 + Boşluk 32; macOS Return 36, tuş takımı Enter 76, Boşluk 49 (değiştiricisiz)",
+  J(AA.hedefTusIlgisi(false)) === J([{ keyCode: 13 }, { keyCode: 32 }]) && J(AA.hedefTusIlgisi(true)) === J([{ keyCode: 36 }, { keyCode: 76 }, { keyCode: 49 }]));
 
 function ogeY(etiket, o, ebeveyn) {
   var d = { nodeType: 1, tagName: etiket.toUpperCase(), parentNode: ebeveyn || null, attrs: {}, id: "" };
@@ -237,6 +253,28 @@ ok("ilgiBirlestir: bozuk JSON ve keyCode'suz öğe atlanır, yalnız bilinen de�
   ok("captions.js: arac-ara.js yüklenmemişse eski doğrudan çağrı (tut / \"\")", J(cc2) === J([J([{ keyCode: 37 }]), ""]), J(cc2));
 })();
 
+/*
+ * İnceleme: registerKeyEventsInterest her çağrıda panelin bütün listesini değiştirir. Bir modül (ör. adım 10'un Eğri
+ * sekmesi) doğrudan çağırırsa Ctrl+K (⌘K) ilgisi silinir ve geri gelmez (app.js onu bir kez kurar): Ctrl+K paleti açar
+ * ama Premiere'de klibi de keser. Panelin her tuş ilgisi SufloAracAra.tusIlgisiAyarla'dan geçmeli; doğrudan çağrı
+ * yalnız arac-ara.js'te ve modül yüklenmemişken çalışan yedek dalda (aynı işlevde önce tusIlgisiAyarla denenir) olabilir.
+ */
+(function () {
+  var jsKok = path.join(KOK, "js"), ihlal = [], yedek = 0;
+  fs.readdirSync(jsKok).filter(function (f) { return /\.js$/.test(f) && f !== "arac-ara.js"; }).forEach(function (f) {
+    var src = fs.readFileSync(path.join(jsKok, f), "utf8").replace(/\r\n/g, "\n")
+      .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'\\])\/\/[^\n]*/g, "$1");
+    var re = /\.registerKeyEventsInterest\s*\(/g, m;
+    while ((m = re.exec(src))) {
+      var fnBas = src.lastIndexOf("function ", m.index), govdeOnu = fnBas === -1 ? "" : src.slice(fnBas, m.index);
+      if (/tusIlgisiAyarla\s*\(/.test(govdeOnu)) yedek++;
+      else ihlal.push(f + ":" + (src.slice(0, m.index).split("\n").length));
+    }
+  });
+  ok("panelin tuş ilgileri ortak yöneticiden geçer: arac-ara.js dışında doğrudan registerKeyEventsInterest yok (yalnız tusIlgisiAyarla'lı yedek dal)",
+    ihlal.length === 0 && yedek >= 1, ihlal.join(", ") || yedek + " yedek dal");
+})();
+
 /* ---------------- app.js arayüz katmanı (gerçek kod, sahte DOM) ---------------- */
 
 function M(t) { return { nodeType: 3, nodeValue: t, textContent: t, parentNode: null }; }
@@ -261,9 +299,25 @@ function sahne(o) {
     d.removeChild = function (c) { var i = d.childNodes.indexOf(c); if (i !== -1) d.childNodes.splice(i, 1); c.parentNode = null; return c; };
     Object.defineProperty(d, "firstChild", { get: function () { return d.childNodes[0] || null; } });
     d.addEventListener = function (ad, f) { (d.dinle[ad] = d.dinle[ad] || []).push(f); };
+    d.removeEventListener = function (ad, f) { var l = d.dinle[ad] || [], i = l.indexOf(f); if (i !== -1) l.splice(i, 1); };
+    // yalnız "#kimlik" ve "[hidden]" (app.js baskaPencereAcik'in kullandığı)
+    d.closest = function (sec) {
+      for (var n = d; n && n.nodeType === 1; n = n.parentNode) {
+        if (sec === "[hidden]" ? n.hidden : sec.charAt(0) === "#" && n.id === sec.slice(1)) return n;
+      }
+      return null;
+    };
     d.olay = function (ad, e) { e = e || {}; e.target = e.target || d; (d.dinle[ad] || []).forEach(function (f) { f(e); }); return e; };
     d.click = function () { d.tiklandi = (d.tiklandi || 0) + 1; d.olay("click"); };
-    d.focus = function () { d.odak++; belge.activeElement = d; };
+    // odak değişince öncekine blur, belgeye focusin (tarayıcıdaki sıra)
+    d.focus = function () {
+      d.odak++;
+      var onceki = belge.activeElement;
+      if (onceki === d) return;
+      belge.activeElement = d;
+      if (onceki && onceki.olay) onceki.olay("blur", {});
+      (belge.yakala.focusin || []).concat(belge.dinle.focusin || []).forEach(function (f) { f({ target: d }); });
+    };
     d.scrollIntoView = function () { d.kaydir++; };
     d.cloneNode = function () { return D(d.tagName); };
     d.contains = function (x) { for (var n = x; n; n = n.parentNode) if (n === d) return true; return false; };
@@ -282,13 +336,15 @@ function sahne(o) {
   }
   govdeD = D("body");
   belge = {
-    body: govdeD, activeElement: govdeD, dinle: {},
+    body: govdeD, activeElement: govdeD, dinle: {}, yakala: {},
     createElement: function (t) { return D(t); },
     createTextNode: function (t) { return M(t); },
-    addEventListener: function (ad, f) { (belge.dinle[ad] = belge.dinle[ad] || []).push(f); },
-    querySelector: function () { return null; },
+    // üçüncü bağımsız değişken true: yakalama evresi (belgeTusu önce bunları çağırır)
+    addEventListener: function (ad, f, yakalama) { var h = yakalama === true ? belge.yakala : belge.dinle; (h[ad] = h[ad] || []).push(f); },
+    querySelector: function (sec) { return /^#[a-z0-9-]+$/i.test(sec) ? el(sec.slice(1)) : null; },
     querySelectorAll: function (sec) {
       if (sec === ".yan-menu .ky-oge[data-tab]") return bul(menu, function (c) { return c.classList && c.classList.contains("ky-oge"); });
+      if (sec === '[aria-modal="true"]') return bul(govdeD, function (c) { return c.getAttribute && c.getAttribute("aria-modal") === "true"; });
       return [];
     }
   };
@@ -328,6 +384,7 @@ function sahne(o) {
   cap.appendChild(D("button", { id: "cap-import-srt" }));
   var sonuc = cap.appendChild(D("div", { id: "cap-result", hidden: true }));
   sonuc.appendChild(D("select", { id: "cap-translate" }));
+  sonuc.appendChild(D("button", { id: "cap-translate-go" }));
   var vrBox = sonuc.appendChild(D("details", { id: "cap-vr-box" }));
   vrBox.appendChild(D("button", { id: "cap-vr-bul" }));
   var ch = cap.appendChild(D("details", { id: "cap-ch-box" }));
@@ -347,7 +404,7 @@ function sahne(o) {
   var bosK = kutu.appendChild(D("div", { id: "arac-ara-bos", hidden: true }));
   var favTus = kutu.appendChild(D("kbd", { id: "arac-ara-fav-tus", textContent: "Ctrl+D" }));
   var dep = o.depo || depo();
-  var win = { SufloAracAra: AA, localStorage: dep, Pro: { isPro: function () { return !!o.pro; } }, dinle: {},
+  var win = { SufloAracAra: o.aa || AA, localStorage: dep, Pro: { isPro: function () { return !!o.pro; } }, dinle: {},
     addEventListener: function (ad, f) { (win.dinle[ad] = win.dinle[ad] || []).push(f); } };
   function el(id) { return bul(govdeD, function (c) { return c.id === id; })[0] || null; }
   var K = { MAC: !!o.mac, log: function () {} };
@@ -358,7 +415,12 @@ function sahne(o) {
     win, belge, el, K, function (s) { return o.en && o.en[s] ? o.en[s] : s; }, function (n) { return n.nodeType === 3 ? n.nodeValue : n.textContent; },
     function (m, tur) { toastlar.push([m, tur]); }, goster, function () { return 0; }, function () {});
   api.baslat();
-  function belgeTusu(e) { (belge.dinle.keydown || []).forEach(function (f) { f(e); }); return e; }
+  // belgeye gelen tuş (odak arama kutusunda değil): önce yakalama evresi; stopPropagation sonrakileri durdurur
+  function belgeTusu(e) {
+    (belge.yakala.keydown || []).forEach(function (f) { f(e); });
+    if (!e.durdu) (belge.dinle.keydown || []).forEach(function (f) { if (!e.durdu) f(e); });
+    return e;
+  }
   function olay(o2) {
     var e = { key: "", ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, engel: 0, durdu: 0, target: girdi };
     e.preventDefault = function () { e.engel++; }; e.stopPropagation = function () { e.durdu++; };
@@ -371,7 +433,7 @@ function sahne(o) {
     return b.childNodes.length ? b.childNodes.map(function (n) { return n.nodeType === 3 ? n.nodeValue : n.textContent; }).join("") : b.textContent;
   }
   function yaz(q) { girdi.value = q; girdi.olay("input"); }
-  return { api: api, kutu: kutu, girdi: girdi, liste: liste, bos: bosK, ac: ac, favTus: favTus, el: el, win: win, belge: belge, depo: dep, gidilen: gidilen,
+  return { api: api, D: D, govde: govdeD, kutu: kutu, girdi: girdi, liste: liste, bos: bosK, ac: ac, favTus: favTus, el: el, win: win, belge: belge, depo: dep, gidilen: gidilen,
     toastlar: toastlar, aktifSekme: function () { return aktifSekme; }, belgeTusu: belgeTusu, olay: olay, satirlar: satirlar, satirAdi: satirAdi, yaz: yaz,
     girdiTusu: function (o2) { return girdi.olay("keydown", olay(o2)); } };
 }
@@ -495,6 +557,122 @@ function sahne(o) {
   dz.yaz("hiz");
   dz.girdiTusu({ key: "Enter" });
   ok("localStorage hata atsa da palet açılır ve seçim çalışır", dz.aktifSekme() === "hiz");
+})();
+
+/* ---------------- inceleme bulguları (gerçek app.js kodu, sahte DOM) ---------------- */
+
+// tusIlgisiAyarla çağrılarını kaydeden SufloAracAra (geri kalanı gerçek modül)
+function ilgiCasusu() {
+  var aa = Object.create(AA);
+  aa.cagri = [];
+  aa.tusIlgisiAyarla = function (sahip, liste) { aa.cagri.push([sahip, liste === "" ? "" : J(liste)]); return true; };
+  return aa;
+}
+function sahipCagrilari(aa, sahip) { return aa.cagri.filter(function (c) { return c[0] === sahip; }).map(function (c) { return c[1]; }); }
+function ac(s, o) { return s.belgeTusu(s.olay(o || { key: "k", ctrlKey: true, target: s.belge.body })); }
+
+(function () {
+  var ENTER_BOSLUK = J([{ keyCode: 13 }, { keyCode: 32 }]);
+  // 1) Seçimden sonra odaktaki düğmede Enter / Boşluk Premiere'e gitmesin (Render Effects In to Out / oynat)
+  var aa = ilgiCasusu(), s = sahne({ aa: aa });
+  ac(s); s.yaz("rampa"); s.girdiTusu({ key: "Enter" });
+  var hu = s.el("hiz-uygula"), tutuldu = J(sahipCagrilari(aa, "arac-ara-hedef"));
+  s.el("cap-go").focus();
+  ok("eylem seçilince odaktaki düğmede Enter ve Boşluk panelde tutulur; odak gidince bırakılır (dinleyici de kalkar)",
+    tutuldu === J([ENTER_BOSLUK]) && J(sahipCagrilari(aa, "arac-ara-hedef")) === J([ENTER_BOSLUK, ""]) && !(hu.dinle.blur || []).length, J(aa.cagri));
+  ac(s); s.yaz("yazi animasyon"); s.girdiTusu({ key: "Enter" });
+  var navOdak = s.belge.activeElement, n1 = sahipCagrilari(aa, "arac-ara-hedef").length;
+  ac(s, { key: "k", ctrlKey: true, target: navOdak });
+  var h = sahipCagrilari(aa, "arac-ara-hedef");
+  ok("araç satırı: odaktaki sol menü girdisinde de tutulur; palet yeniden açılınca bırakılır",
+    navOdak.getAttribute("data-kat") === "mogrt" && n1 === 3 && h[2] === ENTER_BOSLUK && h.length === 4 && h[3] === "" && s.kutu.hidden === false, J(h));
+  s.girdiTusu({ key: "Escape" });
+  // odaktaki öğe DOM'dan kalkıp blur gelmese de bir sonraki odakta bırakılır
+  ac(s); s.yaz("rampa"); s.girdiTusu({ key: "Enter" });
+  s.belge.activeElement = s.belge.body;
+  s.el("cap-go").focus();
+  h = sahipCagrilari(aa, "arac-ara-hedef");
+  ok("odaklı düğme blur'suz kaybolsa da (yeniden çizim) başka öğe odak alınca bırakılır", h[h.length - 2] === ENTER_BOSLUK && h[h.length - 1] === "", J(h));
+  var aa2 = ilgiCasusu(), k2 = sahne({ aa: aa2, analizKapali: true });
+  ac(k2); k2.yaz("sessizlik"); k2.girdiTusu({ key: "Enter" });
+  ac(k2); k2.yaz("pro lisans"); k2.girdiTusu({ key: "Enter" });
+  ok("kapalı düğme (odaklanmaz) ve metin kutusu (#pro-key: CEP oradan Premiere'e tuş göndermez) için tutulmaz",
+    sahipCagrilari(aa2, "arac-ara-hedef").length === 0 && k2.belge.activeElement === k2.el("pro-key"), J(aa2.cagri));
+  var aa3 = ilgiCasusu(), m = sahne({ aa: aa3, mac: true });
+  ac(m, { key: "k", metaKey: true, target: m.belge.body }); m.yaz("rampa"); m.girdiTusu({ key: "Enter" });
+  ok("macOS: Return 36, tuş takımı Enter 76 ve Boşluk 49 tutulur", J(sahipCagrilari(aa3, "arac-ara-hedef")) === J([J([{ keyCode: 36 }, { keyCode: 76 }, { keyCode: 49 }])]));
+
+  // 2) Pencerenin içine basış odağı arama kutusundan almaz (tuşlar paletin kalır, Premiere'e gitmez)
+  var s2 = sahne();
+  ac(s2);
+  function bas(t) { var e = s2.olay({ target: t }); s2.kutu.olay("mousedown", e); return e; }
+  var b1 = bas(s2.favTus), b2 = bas(s2.liste), b3 = bas(s2.bos), b4 = bas(s2.girdi);
+  ok("pencerede Esc rozeti / alt bilgi / liste / boş durum satırına basış odağı kutudan almaz (varsayılan engellenir); kutunun kendisine basış alır",
+    b1.engel === 1 && b2.engel === 1 && b3.engel === 1 && b4.engel === 0 && s2.kutu.hidden === false);
+  var b5 = bas(s2.kutu);
+  ok("karartılmış alana basış paleti kapatır", b5.engel === 1 && s2.kutu.hidden === true);
+
+  // 3) Odak bir yolla kutudan çıksa da palet tuşları paletin; arkadaki sekmenin Esc'i çalışmaz
+  var s3 = sahne(), arkada = [];
+  s3.belge.addEventListener("keydown", function (e) { if (e.key === "Escape") arkada.push(1); });   // initTabs: Ayarlar'dan Esc ile çıkış
+  ac(s3);
+  s3.belge.activeElement = s3.belge.body;
+  var asagi = s3.belgeTusu(s3.olay({ key: "ArrowDown", target: s3.belge.body }));
+  ok("odak kutudan çıktıysa ↓ yine paletin: seçim ilerler, odak kutuya döner, olay belgeye yayılmaz",
+    s3.api.durum().aktif === 1 && s3.belge.activeElement === s3.girdi && asagi.durdu >= 1 && asagi.engel === 1);
+  s3.belge.activeElement = s3.belge.body;
+  var e3 = s3.belgeTusu(s3.olay({ key: "Escape", target: s3.belge.body }));
+  ok("odak kutudan çıktıysa Esc paleti kapatır; belgenin Esc'i (Ayarlar'dan çıkış) paletin arkasında çalışmaz",
+    s3.kutu.hidden === true && arkada.length === 0 && e3.durdu >= 1);
+  s3.belgeTusu(s3.olay({ key: "Escape", target: s3.belge.body }));
+  ok("palet kapalıyken belgenin Esc'i etkilenmez", arkada.length === 1);
+
+  // 4) Başka pencere: preset paketi rehberi ve görünen her aria-modal
+  var s4 = sahne();
+  var rehber = s4.govde.appendChild(s4.D("div", { id: "preset-pack-guide" }));
+  var e4 = ac(s4);
+  ok("preset paketi rehberi (#preset-pack-guide, z-index paletinkinden yüksek) açıkken Ctrl+K paleti arkasında açmaz",
+    s4.kutu.hidden === true && e4.engel === 0);
+  s4.govde.removeChild(rehber);
+  s4.govde.appendChild(s4.D("div", { hidden: true })).setAttribute("aria-modal", "true");
+  ac(s4);
+  var gizliEngellemez = s4.kutu.hidden === false;
+  s4.girdiTusu({ key: "Escape" });
+  s4.govde.appendChild(s4.D("div")).appendChild(s4.D("div")).setAttribute("aria-modal", "true");
+  ac(s4);
+  ok("görünen başka bir aria-modal pencere açıkken açılmaz; gizli (hidden) olanı engellemez", gizliEngellemez && s4.kutu.hidden === true);
+
+  // 5) Liste data-i18n-skip: aria-label'ı açılışta arayüz dilinde verilir
+  var en = sahne({ en: { "Araçlar ve eylemler": "Tools and actions" } }), tr = sahne();
+  ac(en); ac(tr);
+  ok("listenin aria-label'ı (çevirmene kapalı) açılışta arayüz dilinde: 'Tools and actions' / 'Araçlar ve eylemler'",
+    en.liste.getAttribute("aria-label") === "Tools and actions" && tr.liste.getAttribute("aria-label") === "Araçlar ve eylemler");
+
+  // 6) Altyazıyı çevir: Pro kapılı "Çevir" düğmesi (dil listesinde Enter hiçbir şey yapmaz)
+  var s6 = sahne();
+  s6.el("cap-result").hidden = false;
+  ac(s6); s6.yaz("altyazıyı çevir"); s6.girdiTusu({ key: "Enter" });
+  ok("'Altyazıyı çevir' (transkript varken): Pro kapılı #cap-translate-go odakta ve vurgulu, dil listesi değil",
+    s6.belge.activeElement === s6.el("cap-translate-go") && s6.el("cap-translate-go").classList.contains("arac-ara-vurgu") &&
+    AA.EYLEMLER.filter(function (e) { return e.id === "altyazi-cevir"; })[0].hedef[0] === "cap-translate-go");
+
+  // 7) Klavye düzeni
+  var r = sahne();
+  ac(r, { key: "л", ctrlKey: true, keyCode: 75, code: "KeyK", target: r.belge.body });
+  ok("Windows Rusça düzen: Ctrl+K ('л', VK_K 75) paleti açar (CEP'in tuttuğu tuş ölü kalmaz)", r.kutu.hidden === false);
+  var aa7 = ilgiCasusu(), m7 = sahne({ mac: true, aa: aa7 });
+  function tikla() { (m7.belge.yakala.pointerdown || []).forEach(function (f) { f({ type: "pointerdown" }); }); }
+  tikla();
+  var kuruldu = J(sahipCagrilari(aa7, "arac-ara"));
+  m7.belgeTusu(m7.olay({ type: "keydown", key: "m", code: "KeyK", metaKey: true, target: m7.belge.body }));
+  tikla();
+  m7.belgeTusu(m7.olay({ type: "keydown", key: "k", code: "KeyJ", metaKey: true, target: m7.belge.body }));
+  ok("macOS Türkçe F: ⌘ + fiziksel K 'm' yazınca (⌘M = Export Media yutulur) ⌘K ilgisi bırakılır ve yeniden kurulmaz; ⌘K paleti yine açar",
+    kuruldu === J([J([{ keyCode: 40, metaKey: true }])]) && J(sahipCagrilari(aa7, "arac-ara")) === J([J([{ keyCode: 40, metaKey: true }]), ""]) &&
+    m7.kutu.hidden === false, J(aa7.cagri));
+  var aa8 = ilgiCasusu(), m8 = sahne({ mac: true, aa: aa8 });
+  m8.belgeTusu(m8.olay({ type: "keydown", key: "k", code: "KeyK", metaKey: true, target: m8.belge.body }));
+  ok("macOS ABD / Türkçe Q: ⌘K ilgisi kurulur ve kalır, palet açılır", J(sahipCagrilari(aa8, "arac-ara")) === J([J([{ keyCode: 40, metaKey: true }])]) && m8.kutu.hidden === false);
 })();
 
 /* ---------------- İngilizce arayüz ---------------- */
