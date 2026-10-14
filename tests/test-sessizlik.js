@@ -358,5 +358,50 @@ ok("korumaYuku: yalnız korunan katman varsa { video, audio }, yoksa null (prote
   S.korumaYuku({ video: [], audio: [] }) === null && S.korumaYuku(null) === null && js(S.korumaYuku({ video: [2], audio: [1, 0] })) === js({ video: [2], audio: [0, 1] }));
 ok("korumaOner: düzen yoksa boş öneri, hata yok", js(S.korumaOner(null, {}).dinle) === "[]" && S.korumaOner(null, {}).uyarilar.length === 0);
 
+/* ---------------- 3.4 adım 7 incelemesi ---------------- */
+// Kişi adları müzik değil: ad kuralı sözcük başında, "şarkı" / "song" yalnız kendi biçimleriyle
+ok("muzikAdi: kişi adları (Songül, Sarkis) müzik sayılmaz",
+  !["Songül", "SONGÜL", "Songul Ahmet", "Kemal Sarkis", "Sarkis", "Ahmet"].some(S.muzikAdi),
+  ["Songül", "SONGÜL", "Songul Ahmet", "Kemal Sarkis", "Sarkis", "Ahmet"].filter(S.muzikAdi).join(","));
+ok("muzikAdi: ekli ve bitişik biçimler yine müzik (Müziği, Arka plan müziği, şarkılar, Şarkısı, BackgroundMusic, Song 2, songs, music_01)",
+  ["Müziği", "Arka plan müziği", "şarkılar", "Şarkısı", "BackgroundMusic", "Song 2", "songs", "music_01", "Fon Müzik", "BGM1"].every(S.muzikAdi),
+  ["Müziği", "Arka plan müziği", "şarkılar", "Şarkısı", "BackgroundMusic", "Song 2", "songs", "music_01", "Fon Müzik", "BGM1"].filter(function (a) { return !S.muzikAdi(a); }).join(","));
+var podcastSongul = { video: [], audio: [izYap("Ahmet", [k(0, 600, { yol: "ahmet.wav", bag: [] })]), izYap("Songül", [k(0, 600, { yol: "songul.wav", bag: [] })])] };
+var oSongul = S.korumaOner(podcastSongul, { start: 0, end: 600, mod: "ripple" });
+ok("korumaOner: 'Songül' adlı konuşma katmanı korunmaz, dinlenir; iki tek parça konuşma kaydı müzik diye önerilmez",
+  js(oSongul.koru.audio) === "[]" && js(oSongul.dinle) === js([0, 1]) && js(oSongul.oner.audio) === "[]", js(oSongul));
+
+// İşaretsiz sekans: Premiere In 0, Out sekans sonu okur → In / Out yok (Hız Rampası inOutVar ile aynı)
+ok("kapsamAraligi: In 0 + Out sekans sonu (işaretsiz sekans) → 'inout'; yalnız biri işaretliyse geçerli",
+  S.kapsamAraligi("inout", { hasSeq: true, seqIn: 0, seqOut: 60, seqDur: 60, frame: 0.04 }).hata === "inout" &&
+  S.kapsamAraligi("inout", { hasSeq: true, seqIn: 0, seqOut: 900, seqDur: 60 }).hata === "inout" &&
+  js(S.kapsamAraligi("inout", { hasSeq: true, seqIn: 0, seqOut: 40, seqDur: 60 })) === js({ start: 0, end: 40 }) &&
+  js(S.kapsamAraligi("inout", { hasSeq: true, seqIn: 5, seqOut: 60, seqDur: 60 })) === js({ start: 5, end: 60 }));
+
+// Videoya bağlı ses yok (yalnız ses podcast'i): adsız müzik yatağı önerilir (dinlenen olsa da), işaretlenmez
+var podcast = { video: [izYap("Video 1", [k(0, 600, { yol: "kapak.png" })])],
+  audio: [izYap("Audio 1", [k(0, 600, { yol: "ses.wav", bag: [] })]), izYap("Audio 2", [k(0, 600, { yol: "yatak.mp3", bag: [] })])] };
+var oP = S.korumaOner(podcast, { start: 0, end: 600, mod: "ripple", dinleGerekli: true });
+ok("korumaOner (bağsız, tek parça ses.wav + tek parça yatak.mp3): ikisi de dinlenir, yatak ÖNERİLİR (işaretlenmez), konuşma önerilmez",
+  js(oP.dinle) === js([0, 1]) && js(oP.oner.audio) === js([1]) && js(oP.koru.audio) === "[]", js(oP));
+var podcastWav = { video: [], audio: [izYap("Audio 1", [k(0, 600, { yol: "ses.wav", bag: [] })]), izYap("Audio 2", [k(0, 600, { yol: "C:\\ses\\Background Music.wav", bag: [] })])] };
+ok("korumaOner (bağsız): dosya adı müzik diyen tek parça WAV da önerilir",
+  js(S.korumaOner(podcastWav, { start: 0, end: 600 }).oner.audio) === js([1]), js(S.korumaOner(podcastWav, { start: 0, end: 600 }).oner));
+var duzenliSes = { video: [], audio: [izYap("Audio 1", [k(0, 200, { bag: [] }), k(210, 400, { bag: [] }), k(420, 600, { bag: [] })]),
+  izYap("Audio 2", [k(0, 600, { yol: "yatak.mp3", bag: [] })])] };
+var oD = S.korumaOner(duzenliSes, { start: 0, end: 600, mod: "ripple" });
+ok("korumaOner (bağsız, kesilmiş konuşma + tek parça yatak): yatak önerilir, konuşma önerilmez",
+  js(oD.dinle) === js([0, 1]) && js(oD.oner.audio) === js([1]), js(oD));
+ok("korumaOner: kullanıcının açık dinle seçimi varsa dinlenen katman önerilmez (eski kural)",
+  js(S.korumaOner(podcast, { start: 0, end: 600, dinle: [0, 1] }).oner.audio) === "[]");
+ok("korumaOner: tek aday tek uzun klipse (tek konuşmacı) önerilmez",
+  js(S.korumaOner({ video: [], audio: [izYap("Audio 1", [k(0, 600, { bag: [] })])] }, { start: 0, end: 600 }).oner.audio) === "[]");
+
+// Bağlı çift uyarısında zaman kapsam içinde kalır (klip kapsamında eksi zaman gösterilmesin)
+var oKir = S.korumaOner(duzen, { start: 20, end: 25.1, mod: "ripple", koru: { video: [0], audio: [] } });
+var uKir = oKir.uyarilar.filter(function (u) { return u.kod === "bagli"; })[0];
+ok("bağlı çift uyarısı: aralığın önünden başlayan çiftin zamanı kapsamın başına kırpılır (20, 0 değil)",
+  uKir && uKir.ciftler[0].start === 20 && uKir.ciftler[0].end === 25.1, js(oKir.uyarilar));
+
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

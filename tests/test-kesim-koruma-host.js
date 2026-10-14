@@ -269,6 +269,50 @@ ok("exportAudio In/Out: ofset In noktası, süre Out − In; katman susturmalar�
   e1.ok && e1.offset === 10 && e1.duration === 30 && !s8.audioTracks[0]._mute && !s8.audioTracks[1]._mute, js(e1));
 var e2 = call("KS_exportAudio", { scope: "entire", epr: ["C:\\ext\\wav16k.epr"] });
 ok("exportAudio Sekans: ofset 0, süre sekans sonu", e2.ok && e2.offset === 0 && e2.duration === 60, js(e2));
+ok("exportAudio: sesi dışa aktarılan sekansın kimliği (seqId; panel analizi buna bağlar)", e1.seqId === "s8" && e2.seqId === "s8", js(e1));
+
+/* ---------- 9) Sekans kapsamı: kliplerin arasındaki / baştaki boş bölge ripple'ı boşluk moduna düşürmez ---------- */
+// V1 + A1 bağlı klipler [ilk, 20] ve [22, 60] (arada 2 sn boşluk), A2 "Müzik" 0–60 tek klip (korunur)
+function bosluklu(id, ilk) {
+  var g1 = "g" + (++grupNo), g2 = "g" + (++grupNo);
+  var v = [iz("Video 1", [klip(ilk, 20, { grup: g1 }), klip(22, 60, { grup: g2, inPoint: 30 })])];
+  var a = [iz("Audio 1", [klip(ilk, 20, { tur: "a", grup: g1 }), klip(22, 60, { tur: "a", grup: g2, inPoint: 30 })]),
+    iz("Müzik", [klip(0, 60, { tur: "a", yol: "C:\\muzik\\sarki.mp3", name: "sarki.mp3" })])];
+  var s = sekansYap(id, v, a);
+  sekanslar.push(s); proje.sequences = koleksiyon();
+  aktif = s;
+  return s;
+}
+var s9 = bosluklu("s9", 0);
+var r9 = call("KS_applyCuts", { ranges: [{ start: 10, end: 12 }, { start: 20.15, end: 21.85 }, { start: 30, end: 31.5 }], removeMode: "ripple", cloneFirst: false,
+  protect: { video: [], audio: [1] } });
+ok("kliplerin arasındaki boşluk (20–22) kesim aralığında: ripple kalır, V1 ve A1 birlikte kayar, boşluk yerinde, Müzik bütün",
+  r9.ok && r9.rippleFallback === false && js(ozet(s9).V1) === js([[0, 10], [10, 18], [20, 28], [28, 56.5]]) && js(ozet(s9).A1) === js(ozet(s9).V1) &&
+  js(ozet(s9).A2) === js([[0, 60]]), js(r9) + " " + js(ozet(s9)));
+var s9b = bosluklu("s9b", 3);
+var r9b = call("KS_applyCuts", { ranges: [{ start: 0.15, end: 2.85 }, { start: 10, end: 12 }], removeMode: "ripple", cloneFirst: false, protect: { video: [], audio: [1] } });
+ok("ilk klipten önceki boşluk (0–3) kesim aralığında: ripple kalır, V1 ve A1 birlikte kayar",
+  r9b.ok && r9b.rippleFallback === false && js(ozet(s9b).V1) === js([[3, 10], [10, 18], [20, 58]]) && js(ozet(s9b).A1) === js(ozet(s9b).V1), js(r9b) + " " + js(ozet(s9b)));
+var s9c = vlog("s9c", { a3: [klip(10.5, 11, { tur: "a", yol: "C:\\sfx\\tik.wav" }), klip(40, 45, { tur: "a", yol: "C:\\sfx\\vurus.wav" })] });
+var r9c = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: false, protect: { audio: [1] } });
+ok("eşit olmayan kaplama (A3'te aralığın içinde kısa SFX, sonrasında içerik): yine boşluk moduna düşer",
+  r9c.ok && r9c.rippleFallback === true && js(ozet(s9c).A3) === js([[40, 45]]), js(r9c) + " " + js(ozet(s9c)));
+
+/* ---------- 10) expectTracks: protect dizinleri panelin okuduğu katman düzenine göre ---------- */
+var s10 = vlog("s10");
+var klonOnce10 = klonSayisi;
+razorlar = [];
+var r10 = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: true, protect: { audio: [2] }, expectSeqId: "s10",
+  expectTracks: { video: ["Video 1"], audio: ["Audio 1", "Audio 2", "Müzik"] } });
+ok("expectTracks: katman sayısı tutmuyor (analizden sonra katman silindi) → kod katman, kopya yok, razor yok, timeline aynı",
+  !r10.ok && r10.kod === "katman" && klonSayisi === klonOnce10 && razorlar.length === 0 && aktif === s10 &&
+  js(ozet(s10)) === js({ V1: [[0, 60]], A1: [[0, 60]], A2: [[0, 60]] }), js(r10));
+var r10b = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: false, protect: { audio: [1] },
+  expectTracks: { video: ["Video 1"], audio: ["Audio 1", "Ses"] } });
+ok("expectTracks: katman adı tutmuyor → kod katman, hiçbir şey kesilmedi", !r10b.ok && r10b.kod === "katman" && razorlar.length === 0, js(r10b));
+var r10c = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: false, protect: { audio: [1] },
+  expectTracks: { video: ["Video 1"], audio: ["Audio 1", "Müzik"] } });
+ok("expectTracks tutuyor: uygulanır, Müzik korunur", r10c.ok && r10c.removed === 4 && js(ozet(s10).A2) === js([[0, 60]]) && js(r10c.protectedSkipped) === js({ video: 0, audio: 1 }), js(r10c));
 
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

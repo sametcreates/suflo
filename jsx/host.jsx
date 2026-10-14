@@ -1356,8 +1356,11 @@ function KS_exportAudio(encoded) {
     } else {
       try { sure = Number(seq.end) / KS_TPS; } catch (eE) {}
     }
-    // duration (3.4): disa aktarilan araligin suresi; Otomatik Kesim sekans kapsami kullanir, digerleri yok sayar
-    return KS_ok({ wav: out, offset: offset, duration: sure > 0 ? sure : 0 });
+    // duration (3.4): disa aktarilan araligin suresi; Otomatik Kesim sekans kapsami kullanir, digerleri yok sayar.
+    // seqId (3.4): sesi disa aktarilan sekans (panel analizi bu kimlige baglar: tiklama anindaki baglam bayat olabilir)
+    var sid = "";
+    try { sid = String(seq.sequenceID); } catch (eId) {}
+    return KS_ok({ wav: out, offset: offset, duration: sure > 0 ? sure : 0, seqId: sid });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1950,7 +1953,9 @@ function KS_cloneActiveSeq() {
 /*
  * Kesimleri uygula. p: { ranges:[{start,end}] (sekans zamani), removeMode:"ripple"|"gap"|"select", cloneFirst:bool,
  *   cloneName?, expectSeqId? (3.4: analiz edilen sekans; kopyadan ONCE denetlenir), protect?: { video:[i], audio:[i] }
- *   (3.4: korunan katmanlar; razor, ripple kaplama denetimi ve silme / secme bu katmanlari atlar) }.
+ *   (3.4: korunan katmanlar; razor, ripple kaplama denetimi ve silme / secme bu katmanlari atlar),
+ *   expectTracks?: { video:[ad], audio:[ad] } (3.4: protect dizinlerinin okundugu duzen; sayi ya da ad tutmazsa
+ *   kod "katman" ile hata, kopyadan ONCE) }.
  * Korunan katman KILITLENMEZ, kilidi de acilmaz: hata olsa da geri yuklenecek bir sey yok. Kopya sekansin katman
  * dizinleri ozgununkiyle ayni. protect yoksa cikti 3.3 ile birebir ayni (protectedSkipped alani da yok).
  */
@@ -1964,6 +1969,14 @@ function KS_applyCuts(encoded) {
     // Analiz baska sekansta yapildiysa (kullanici arada sekans degistirdi) hicbir sey yapma, kopya da olusturma
     if (p.expectSeqId && String(seq.sequenceID) !== String(p.expectSeqId)) {
       return KS_errKod("sekans", "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.");
+    }
+    /*
+     * Korunan katmanlar DIZINLE gelir: panel duzeni okuduktan sonra katman eklendiyse / silindiyse / yeniden
+     * adlandirildiysa ayni dizin baska katmani gosterir (muzik kesilir, bos katman "korunur"). expectTracks
+     * ({ video:[ad], audio:[ad] }: panelin okudugu duzen) tutmazsa hicbir sey yapma, kopya da olusturma.
+     */
+    if (p.expectTracks && !KS_katmanlarAyni(seq, p.expectTracks)) {
+      return KS_errKod("katman", "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.");
     }
 
     // Korunan katmanlar: ES3'te Array.indexOf yok, nesne haritasi
@@ -2026,15 +2039,19 @@ function KS_applyCuts(encoded) {
 
     /*
      * Ripple guvenligi: clip.remove(ripple=true) YALNIZ kendi track'ini
-     * kaydirir. Bir track araligi kliplerle tam kaplamiyorsa o track
+     * kaydirir; track, araligin icindeki kliplerin toplam suresi kadar kayar.
+     * Sonrasinda icerigi olan track'lerin bu toplamlari esit degilse biri
      * digerlerinden az kayar ve timeline KALICI senkron kaybeder.
      * Boyle bir aralik varsa ripple'i bosluk (gap) moduna dusur ve bildir.
+     * Esitse (tam kaplama; ya da sekans kapsaminda kliplerin arasindaki bos
+     * bolge gibi hicbir track'te klip olmayan aralik: hepsi 0) senkron korunur.
      * Korunan katman bilerek kaymaz (arka plan muzigi): kaplama denetimine girmez. Korunan VIDEO katmaninda
      * ilk kesimden sonra icerik varsa ripple onu geride birakir: bosluk moduna dusulur (panel bunu zaten engeller).
      */
     var rippleDustu = false, korunanVideoBosluk = false;
     if (p.removeMode === "ripple") {
-      var kapliMi = function (tracks, rr, kor) {
+      // kayma: { video: ilk kayan track'in toplami | null } — ses ve video ayni miktarda kaymali (tek nesne paylasilir)
+      var kapliMi = function (tracks, rr, kor, kayma) {
         for (var ti2 = 0; ti2 < tracks.numTracks; ti2++) {
           if (kor[ti2]) continue;
           var tr2 = tracks[ti2];
@@ -2048,7 +2065,8 @@ function KS_applyCuts(encoded) {
             if (c2.end.seconds > rr.start + eps) sonrasiVar = true;
           }
           if (!sonrasiVar) continue; // bu track'te kayacak icerik yok
-          if (toplam < (rr.end - rr.start) - 2 * eps) return false;
+          if (kayma.miktar === null) kayma.miktar = toplam;
+          else if (Math.abs(toplam - kayma.miktar) > 2 * eps) return false;
         }
         return true;
       };
@@ -2066,7 +2084,8 @@ function KS_applyCuts(encoded) {
         if (korunanVideoBosluk) { rippleDustu = true; p.removeMode = "gap"; }
       }
       for (i = 0; i < ranges.length && !rippleDustu; i++) {
-        if (!kapliMi(seq.audioTracks, ranges[i], korA) || !kapliMi(seq.videoTracks, ranges[i], korV)) {
+        var kayma = { miktar: null };
+        if (!kapliMi(seq.audioTracks, ranges[i], korA, kayma) || !kapliMi(seq.videoTracks, ranges[i], korV, kayma)) {
           rippleDustu = true;
           p.removeMode = "gap";
           break;
@@ -2113,6 +2132,21 @@ function KS_applyCuts(encoded) {
     }
     return KS_ok(sonuc);
   } catch (e) { return KS_err(e); }
+}
+
+// Sekansin katman sayisi ve adlari panelin okudugu duzenle (beklenen: { video:[ad], audio:[ad] }) ayni mi
+function KS_katmanlarAyni(seq, beklenen) {
+  function ayni(tracks, adlar) {
+    if (!adlar || typeof adlar.length !== "number") return true;   // bu tur gonderilmedi: denetlenmez
+    if (tracks.numTracks !== adlar.length) return false;
+    for (var t4 = 0; t4 < tracks.numTracks; t4++) {
+      var ad4 = "";
+      try { ad4 = String(tracks[t4].name || ""); } catch (eA4) {}
+      if (ad4 !== String(adlar[t4] === undefined || adlar[t4] === null ? "" : adlar[t4])) return false;
+    }
+    return true;
+  }
+  return ayni(seq.videoTracks, beklenen.video) && ayni(seq.audioTracks, beklenen.audio);
 }
 
 // Korunan katmanlarin parmak izi (klip sayisi + toplam sure, ms): uygulamadan once ve sonra karsilastirilir

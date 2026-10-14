@@ -398,9 +398,14 @@
     if (!ctx.hasSeq) return { hata: "sekans" };
     var kare = num(ctx.frame, 0) > 0 ? num(ctx.frame, 0) : 1 / 30;
     if (kapsam === "inout") {
-      var a = num(ctx.seqIn, 0), b = num(ctx.seqOut, 0);
-      if (num(ctx.seqDur, 0) > 0 && b > num(ctx.seqDur, 0)) b = num(ctx.seqDur, 0);
+      var a = num(ctx.seqIn, 0), b = num(ctx.seqOut, 0), sd = num(ctx.seqDur, 0);
+      if (sd > 0 && b > sd) b = sd;
       if (!(b - a > kare)) return { hata: "inout" };
+      /*
+       * İşaretsiz sekansı Premiere In = 0, Out = sekans sonu diye okur: bu "In / Out yok" demektir (Hız Rampası
+       * inOutVar ile aynı kural). Yoksa In → Out kapsamı sessizce tüm sekansı keserdi.
+       */
+      if (!(a > kare || (sd > 0 && b < sd - kare))) return { hata: "inout" };
       return { start: Math.max(0, a), end: b };
     }
     var d = num(ctx.seqDur, 0);
@@ -411,10 +416,14 @@
   /*
    * Arka plan sesi adı: bu adı taşıyan SES katmanı varsayılan olarak korunur (kesilmez, kaymaz).
    * Ad Türkçe büyük / küçük harf farkı ve şapkasız yazım gözetilerek karşılaştırılır ("MÜZİK", "Sarki").
+   * Yalnız SÖZCÜK BAŞINDA aranır (camelCase sözcük sayılır: "BackgroundMusic"): "Songül", "Kemal Sarkis" gibi kişi
+   * adları müzik sayılmaz. müzik / music / bgm / ambiyans / ambience ekli de olur ("Müziği", "Musical"); "şarkı" yalnız
+   * Türkçe ekleriyle ("şarkılar", "şarkısı"), "song" yalnız "song" / "songs" olarak.
    */
-  var MUZIK_RE = /m[uü]zik|music|bgm|[sş]ark[iı]|song|ambiyans|ambience/;
+  var MUZIK_RE = /(^|[^a-zçğıöşüâîû])(m[uü]zi[kğg]|music|bgm|ambiyans|ambience|[sş]ark[iı](lar|ler|s[iı]|n[iı]n|m|n)?(?![a-zçğıöşüâîû])|songs?(?![a-zçğıöşüâîû]))/;
   function adNormal(ad) {
-    return String(ad || "").replace(/İ/g, "i").replace(/I/g, "i").replace(/ı/g, "i").toLowerCase();
+    return String(ad || "").replace(/([a-zçğıöşü])([A-ZÇĞİÖŞÜ])/g, "$1 $2")
+      .replace(/İ/g, "i").replace(/I/g, "i").replace(/ı/g, "i").toLowerCase();
   }
   function muzikAdi(ad) { return MUZIK_RE.test(adNormal(ad)); }
 
@@ -456,13 +465,21 @@
   }
 
   // Aralığın en az `oran`ını TEK bir klip kaplıyor mu (sürekli müzik / ambiyans izi)
-  function tekKlipKaplar(iz, bas, son, oran) {
+  function uzunKlip(iz, bas, son, oran) {
     var k = izKlipleri(iz), boy = son - bas;
-    if (!(boy > 0)) return false;
+    if (!(boy > 0)) return null;
     for (var i = 0; i < k.length; i++) {
-      if (ortSn(num(k[i].s, 0), num(k[i].e, 0), bas, son) >= oran * boy - 1e-6) return true;
+      if (ortSn(num(k[i].s, 0), num(k[i].e, 0), bas, son) >= oran * boy - 1e-6) return k[i];
     }
-    return false;
+    return null;
+  }
+  function tekKlipKaplar(iz, bas, son, oran) { return !!uzunKlip(iz, bas, son, oran); }
+
+  // Klibin kendisi müziğe benziyor mu: klip / dosya adında müzik sözcüğü ya da sıkıştırılmış müzik dosyası uzantısı
+  function muzikKlibi(kl) {
+    if (!kl) return false;
+    var dosya = String(kl.yol || "").replace(/^.*[\\\/]/, "");
+    return muzikAdi(kl.ad) || muzikAdi(dosya.replace(/\.[^.]*$/, "")) || /\.(mp3|m4a|aac|ogg|oga|opus|flac|wma)$/i.test(dosya);
   }
 
   /*
@@ -517,7 +534,8 @@
    * Kurallar:
    *  - Adı müzik / music / bgm / şarkı / song / ambiyans / ambience olan SES katmanı korunur (önceden işaretli).
    *  - Bir klibi aralığın %80'ini ya da fazlasını kaplayan, dinlenmeyen ve korunmayan ses katmanı yalnız ÖNERİLİR
-   *    (oner.audio: vurgulanır, işaretlenmez): tek uzun klip konuşma da olabilir.
+   *    (oner.audio: vurgulanır, işaretlenmez): tek uzun klip konuşma da olabilir. Videoya bağlı ses yokken birden
+   *    çok varsayılan dinlenen katman varsa (hangisi konuşma bilinemez) dinlenen böyle bir katman da önerilir.
    *  - Video katmanı hiçbir zaman önceden işaretlenmez.
    *  - Dinlenecek ses (varsayılan): aralıkta klibi olan, adı müzik olmayan ses katmanları; susturulmamış olanlar
    *    varsa yalnız onlar; videoya bağlı (kamera sesi) olanlar varsa yalnız onlar.
@@ -546,7 +564,7 @@
       ? { video: dizinler(o.koru.video, V.length), audio: dizinler(o.koru.audio, A.length) }
       : { video: [], audio: adla.slice() };
 
-    var dinle;
+    var dinle, belirsiz = false;
     if (o.dinle) dinle = dizinler(o.dinle, A.length);
     else {
       var aday = [];
@@ -557,12 +575,25 @@
         return ciftler.some(function (c) { return c.audio === i && ortSn(num(c.a.s, 0), num(c.a.e, 0), bas, son) > 1e-3; });
       });
       dinle = bagli.length ? bagli : aday;
+      // videoya bağlı ses yok ve birden çok aday: hangisinin konuşma, hangisinin adsız müzik olduğu bilinemez
+      belirsiz = !bagli.length && aday.length > 1;
     }
 
+    /*
+     * Kaplama önerisi. Belirsiz varsayılanda (bağlı ses yok, birden çok aday) tek uzun klipli DİNLENEN katman da
+     * önerilir, adsız müzik yatağı sessizce karışıma katılmış olabilir: başka bir aday parça parça (kurgulanmış konuşma)
+     * ise ya da klibin adı / dosyası müziğe benziyorsa (mp3, "music"…). Tek parça konuşma kayıtları (iki konuşmacılı
+     * podcast) birbirinden ayrılamaz: önerilmez. Önerilen yalnız vurgulanır, dinlemeden çıkarılmaz (yanlış çıkarılan
+     * konuşma katmanı sessiz sanılıp kesilirdi).
+     */
+    var karsit = belirsiz && dinle.some(function (i) { return !tekKlipKaplar(A[i], bas, son, 0.8); });
     var oner = [];
     A.forEach(function (iz, i) {
-      if (iceriyor(dinle, i) || iceriyor(koru.audio, i) || (iz && iz.locked)) return;
-      if (tekKlipKaplar(iz, bas, son, 0.8)) oner.push(i);
+      if (iceriyor(koru.audio, i) || (iz && iz.locked)) return;
+      var uzun = uzunKlip(iz, bas, son, 0.8);
+      if (!uzun) return;
+      if (iceriyor(dinle, i) && !(belirsiz && (karsit || muzikKlibi(uzun)))) return;
+      oner.push(i);
     });
 
     var uyarilar = [];
@@ -592,8 +623,9 @@
       var anahtar = c.audio + "|" + c.video + "|" + num(c.v.s, 0).toFixed(3);
       if (gor[anahtar]) return;
       gor[anahtar] = 1;
-      kopan.push({ audio: c.audio, video: c.video, start: Math.max(num(c.a.s, 0), num(c.v.s, 0)),
-        end: Math.min(num(c.a.e, 0), num(c.v.e, 0)), ad: String(c.v.ad || c.a.ad || ""), koruTaraf: aK ? "audio" : "video" });
+      // çiftin kapsam içindeki kısmı: klip kapsamında aralığın önünden başlayan çift eksi zaman göstermesin
+      kopan.push({ audio: c.audio, video: c.video, start: Math.max(bas, num(c.a.s, 0), num(c.v.s, 0)),
+        end: Math.max(bas, Math.min(son, num(c.a.e, 0), num(c.v.e, 0))), ad: String(c.v.ad || c.a.ad || ""), koruTaraf: aK ? "audio" : "video" });
     });
     if (kopan.length) {
       kopan.sort(function (x, y) { return x.start - y.start; });
