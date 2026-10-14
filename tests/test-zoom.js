@@ -227,6 +227,17 @@ function selOf(c) { return { name: c.name, clipStart: c.start.seconds, clipEnd: 
   chk("bildirimdeki Geri al: seçim başka klipteyken bile yalnız o uygulamayı kaldırır, onay sormaz (yeniden uygulama klibi temizlemişti: anahtarsız, 100)", P.sorular.length === 3 &&
     Zk.olcek.keys.length === 0 && Zk.olcek.value === 100 && Yk.olcek.keys.length === 2, Zk.olcek.keys);
 
+  // Yeniden uygulama: ikinci zoom birincinin (ilk anahtarı yakınlaşmış) anahtarlarını temizleyip üstüne yazar; kaldırınca
+  // ölçek zoom'dan önceki değere (100) döner — ikinci kaydın okuduğu "önceki değer" eski zoom'un izini taşısa da
+  PM.durum.secim = [Zk]; P.secili.clip = selOf(Zk);
+  await P.dinleyici["zoom-run:click"]();
+  await P.dinleyici["zoom-run:click"]();
+  var sakli = P.ctx.SufloKeyRecords.depo(P.ctx.localStorage).oku("C:\\proje\\kayit.prproj").filter(function (r) { return r.tur === "zoom"; });
+  chk("yeniden uygulama: yalnız son uygulamanın kayıtları kalır (Ölçek + Konum)", sakli.length === 2, sakli.length);
+  await P.dinleyici["zoom-remove:click"]();
+  chk("yeniden uygulamadan sonra kaldır: Ölçek anahtarsız ve 100 (yakınlaşmış 112'de kalmaz)", Zk.olcek.keys.length === 0 && Math.abs(Zk.olcek.value - 100) < 1e-9 &&
+    Zk.olcek.tv === false, Zk.olcek);
+
   // Seçim yokken
   P.secili.clip = null;
   await P.dinleyici["zoom-remove:click"]();

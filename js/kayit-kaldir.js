@@ -77,6 +77,28 @@
   }
 
   /*
+   * Yeniden uygulama (aynı araç, aynı klip ve özellik, pencerenin aynı ucu): araç yazmadan önce pencereyi temizler,
+   * yeni kaydın o uçtaki "önceki değeri" eski Suflo anahtarlarının izini taşıyabilir (ör. ilk anahtarı yakınlaşmış
+   * zoom). Yerine geçtiği en yeni eski kaydın o uçtaki kenar değeri (temiz hâlden okunmuş ya da o da devralmış)
+   * devralınır; kaldırma özelliği Suflo'dan önceki değerine döndürür. r yerinde değişir.
+   */
+  function kenarMiras(r, eskiler) {
+    var k = r && r.kenarDegerleri;
+    if (!Array.isArray(k) || !k.length) return;
+    var aday = (eskiler || []).filter(function (x) {
+      return x && x.tur === r.tur && Array.isArray(x.kenarDegerleri) && x.kenarDegerleri.length;
+    }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    if (!aday.length) return;
+    var o = aday[0], ok = o.kenarDegerleri, ra = aralik(r), oa = aralik(o), pay = 1e-3;
+    if (!ra || !oa) return;
+    function ayniTur(a, b) { return (typeof a === "number") === (typeof b === "number"); }
+    function kopya(v) { return Array.isArray(v) ? v.slice() : v; }
+    if (Math.abs(ra[0] - oa[0]) <= pay && ayniTur(k[0].v, ok[0].v)) k[0] = { t: k[0].t, v: kopya(ok[0].v) };
+    var s = k.length - 1, os = ok.length - 1;
+    if (Math.abs(ra[1] - oa[1]) <= pay && ayniTur(k[s].v, ok[os].v)) k[s] = { t: k[s].t, v: kopya(ok[os].v) };
+  }
+
+  /*
    * KS_removeSufloKeys cevabının özeti: { eslesen, silinen, eklenen, biten (host'un bitirdiği kayıt id'leri:
    * silindi ya da Suflo'nun anahtarları zaten yoktu), yok (zaten kaldırılmış sayısı), kalan: { kod: sayı },
    * kalanSayi, degistiSayi }
@@ -186,7 +208,11 @@
       }).filter(function (r) { return r && aracMi(r.tur); });
       if (!yeni.length) return { ok: true, idler: [] };
       var eski = kayitlar(proje), at = {};
-      yeni.forEach(function (r) { cakisanlar(eski, r).forEach(function (x) { at[x.id] = 1; }); });
+      yeni.forEach(function (r) {
+        var yerineGectigi = cakisanlar(eski, r);
+        yerineGectigi.forEach(function (x) { at[x.id] = 1; });
+        kenarMiras(r, yerineGectigi);
+      });
       var atilacak = Object.keys(at);
       bellek = bellek.filter(function (b) { return !at[b.r.id]; });
       var ok = false, d = depo();
@@ -287,7 +313,7 @@
 
   return {
     TURLER: TURLER.slice(), BASARI: BASARI, KALAN: KALAN, HATALAR: HATALAR, kenarMetni: kenarMetni,
-    cakisanlar: cakisanlar, ozet: ozet, yedekGerekli: yedekGerekli, mesajParcalari: mesajParcalari,
+    cakisanlar: cakisanlar, kenarMiras: kenarMiras, ozet: ozet, yedekGerekli: yedekGerekli, mesajParcalari: mesajParcalari,
     hataMetni: hataMetni, olustur: olustur, panel: panel, dugum: dugum
   };
 });

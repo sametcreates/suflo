@@ -1584,7 +1584,10 @@ için de onaylı bir "giriş / çıkış penceresini temizle" istersen söyle.
 
 **11.3 Zoom'un eski yöntemi (bilgi, sonra düzeltilebilir).** Onaylı eski yol 3.3'teki `kaldir()`'ın aynısı: klibin tüm Ölçek
 anahtarlarını silip iki düz anahtar yazar ve Konum'u sıfırlar. Düz değer klibin başındaki değerden okunur; zoom klibin başında
-yakınlaşmış başlıyorsa düz değer de yakın kalır (3.3'ten beri var olan sınır; kayıtlı yol bunu yaşamaz). Düzeltmek ayrı bir iş.
+yakınlaşmış başlıyorsa düz değer de yakın kalır (3.3'ten beri var olan sınır; kayıtlı yol bunu yaşamaz). Aynı sebeple zoom'u
+aynı klibe ikinci kez uygulamak hâlâ birincinin üstüne biner (taban yakınlaşmış ilk anahtardan okunur; 3.3'ten beri). Kayıtlı
+kaldırma bunu telafi eder: yeniden uygulamada yeni kayıt ilk uygulamanın "önceki değer"ini devralır, Zoom'u kaldır ölçeği
+zoom'dan önceki değere döndürür. Zoom'un tabanını düzeltmek (yeniden uygulamada üst üste binmesin) ayrı bir iş; istersen söyle.
 
 **11.4 Yerel depo (bilgi).** Kayıtlar bu bilgisayarın panel deposunda (proje yolu karma anahtarla; projede en çok 300, toplam
 2000 kayıt, en eskiler tek tek atılır). Proje başka bilgisayarda açılırsa kayıt yok: eski yöntem (onaylı) ya da Ctrl+Z.

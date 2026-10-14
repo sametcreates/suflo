@@ -27,6 +27,20 @@ var yeni = rec({ id: "y", tur: "hareket", times: [1.2, 1.8] });
 ok("cakisanlar: aynı klip + özellik, kesişen aralık (araçlar arası da); Eğri kaydı, başka klip / özellik, kesişmeyen aralık kalır",
   SK.cakisanlar(eski, yeni).map(function (r) { return r.id; }).sort().join(",") === "a,f", SK.cakisanlar(eski, yeni).map(function (r) { return r.id; }));
 ok("cakisanlar: geçersiz girdi boş", SK.cakisanlar(null, yeni).length === 0 && SK.cakisanlar(eski, null).length === 0);
+(function () {
+  function kz(o) { var r = rec(o); r.kenarDegerleri = o.kenar; r.createdAt = o.c || 1; return r; }
+  var ilk = kz({ id: "z1", tur: "zoom", times: [0, 5.45], kenar: [{ t: 0, v: 100 }, { t: 5.45, v: 100 }], c: 1 });
+  var ikinci = kz({ id: "z2", tur: "zoom", times: [0, 9.1], kenar: [{ t: 0, v: 112 }, { t: 9.1, v: 112 }], c: 2 });
+  SK.kenarMiras(ikinci, [ilk]);
+  ok("kenarMiras: yeniden uygulanan zoom (aynı başlangıç) ilk uygulamanın önceki değerini (100) devralır; öbür uç kendi değerinde",
+    ikinci.kenarDegerleri[0].v === 100 && ikinci.kenarDegerleri[0].t === 0 && ikinci.kenarDegerleri[1].v === 112, ikinci.kenarDegerleri);
+  var onayar = kz({ id: "h1", tur: "hareket", times: [0, 0.45], kenar: [{ t: 0, v: 112 }, { t: 0.45, v: 112 }], c: 3 });
+  SK.kenarMiras(onayar, [ilk]);
+  ok("kenarMiras: başka aracın kaydından devralınmaz (o pencerede önceki değer gerçekten oydu)", onayar.kenarDegerleri[0].v === 112);
+  var xy = kz({ id: "p2", tur: "zoom", times: [0, 3], kenar: [{ t: 0, v: [0.4, 0.6] }], c: 4 });
+  SK.kenarMiras(xy, [ilk]);
+  ok("kenarMiras: değer türü uyuşmazsa ([x,y] ↔ sayı) devralınmaz", Array.isArray(xy.kenarDegerleri[0].v));
+})();
 
 var o1 = SK.ozet({ eslesen: 3, sonuclar: [{ id: "a", silinen: 3, eklenen: 1 }, { id: "b", silinen: 0, kod: "yok" }], atlanan: [{ id: "c", kod: "degisti" }, { id: "d", kod: "bilinmez" }] });
 ok("ozet: biten (silinen + zaten yok), sayılar, kalan kodları (bilinmeyen kod klipYok sayılır)", JSON.stringify(o1.biten) === '["a","b"]' && o1.silinen === 3 &&
