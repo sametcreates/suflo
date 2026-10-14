@@ -2913,6 +2913,7 @@
     "Min. konuşma: araya giren kısa konuşma da bu kesime katıldı": "Min. speech: the short speech in between joined this cut too",
     "Kesimler doğrulanıyor… ({} sn)": "Verifying cuts… ({} s)",
     "Doğrulamadan sonra uygulanacak kesim kalmadı — eşiği ya da min. sessizliği değiştir.": "No cuts left to apply after verification — change the threshold or min. silence.",
+    "Doğrulama kesimleri değiştirdi (önizleme {n} kesim, doğrulama {n} kesim): haritayı kontrol et, sonra yeniden Kesimleri uygula.": "Verification changed the cuts ({} in the preview, {} verified): check the map, then click Apply cuts again.",
     // Auto Cut: Cancel replaces "Sessizlikleri bul" while ffmpeg analyzes
     "ffmpeg analizini durdurur; önceki sonuç ekranda kalır": "Stops the ffmpeg analysis; the previous result stays on screen",
     // engine / model / ffmpeg download cancel (Settings and the caption setup card)

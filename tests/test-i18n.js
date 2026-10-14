@@ -286,6 +286,23 @@ ok("origAttr(): çevrilmiş özniteliğin özgünü", ipuclu.attrs.title === "Sa
   ok("gözlemci: kullanıcı kabına eklenen boş durum çevrilir", bos2.childNodes[0].nodeValue === "No matching sounds.");
 })();
 
+// Otomatik Kesim listesi (#cut-ranges kullanıcı kabı): "birleşik" rozeti data-i18n-ui adacığı → metni ve ipucu çevrilir
+(function () {
+  I.setDictionary(EN);
+  var IPUCU = "Min. konuşma: araya giren kısa konuşma da bu kesime katıldı";
+  var rozet = new El("span", { "class": "mc-birlesik", "data-i18n-ui": "", title: IPUCU }, ["birleşik"]);
+  var isaretsiz = new El("span", { "class": "mc-birlesik", title: IPUCU }, ["birleşik"]);
+  var satir = new El("div", { "class": "seg cut-seg" }, [new El("span", { "class": "seg-time mono" }, ["0:01.4"]), rozet, isaretsiz]);
+  I.apply(new El("body", {}, [new El("div", { id: "cut-ranges" }, [satir])]));
+  ok("kesim listesi: 'birleşik' rozeti ve ipucu İngilizce (data-i18n-ui)", rozet.childNodes[0].nodeValue === "merged" &&
+    rozet.attrs.title === "Min. speech: the short speech in between joined this cut too", JSON.stringify([rozet.childNodes[0].nodeValue, rozet.attrs.title]));
+  ok("kesim listesi: işaretsiz düğüm kullanıcı kabında çevrilmez (adacık işareti gerekli)", isaretsiz.childNodes[0].nodeValue === "birleşik" && isaretsiz.attrs.title === IPUCU);
+})();
+ok("Otomatik Kesim: doğrulama farkı uyarısı sayılarıyla çevrilir",
+  I.translate("Doğrulama kesimleri değiştirdi (önizleme 1 kesim, doğrulama 2 kesim): haritayı kontrol et, sonra yeniden Kesimleri uygula.") ===
+  "Verification changed the cuts (1 in the preview, 2 verified): check the map, then click Apply cuts again.");
+ok("magiccut.js: 'birleşik' rozeti data-i18n-ui adacığı",/b\.setAttribute\("data-i18n-ui", ""\)/.test(fs.readFileSync(path.join(__dirname, "..", "js", "magiccut.js"), "utf8")));
+
 // İlk açılış dil sorusu: seçim yapılmadan settings.json yazılsa da sonraki açılışta yine sorulur
 (function () {
   var a = {};

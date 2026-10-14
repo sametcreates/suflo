@@ -1495,9 +1495,12 @@ Kaydırıcılar haritayı ffmpeg'siz günceller; yeni "Min. konuşma" (0–0,6 s
 çözümleme olmazsa 3.3 akışı aynen çalışır. Pro kapısı değişmedi (`cut`, 3 deneme hakkı, hak yalnız başarılı Uygula'da).
 Lisans: clean-room (Premiere TR yalnız fikir); NOTICE girdisi gerekmez.
 
-**K6.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 6.1–6.16'yı yeni ve eski
-(CEF 74) Premiere'de dene. Özellikle 6.6 (tek kanallı yaka mikrofonu), 6.7 (önizleme = uygulanan kesimler) ve 6.11
-(30 dk+ klipte bellek ve hız).
+**K6.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 6.1–6.20'yi yeni ve eski
+(CEF 74) Premiere'de dene. Özellikle 6.6 (tek kanallı yaka mikrofonu), 6.7 (önizleme = uygulanan kesimler), 6.11
+(30 dk+ klipte bellek ve hız) ve 6.18 (OBS / MTS gibi sesi geç başlayan kayıtlar: zarf ve silencedetect ffmpeg
+`aresample=async=1:min_hard_comp=0.01:first_pts=0` süzgeciyle aynı PTS ekseninde; Premiere'in bu dosyalarda sesi
+nereye yerleştirdiğini gözle doğrula). 6.17'deki "Doğrulama kesimleri değiştirdi" uyarısı sık çıkıyorsa günlükteki
+`[kesim] dogrulama onizlemeden farkli` satırlarıyla bildir.
 
 **K6.2 Varsayılanlar (karar).** Min. konuşma varsayılanı 0 (eski davranış). Denemelerde 0.2–0.3 daha iyi sonuç
 verirse varsayılanı `index.html` › `#cut-minkeep value` ile değiştir; `tests/test-arayuz.js` 3.4 satırı da

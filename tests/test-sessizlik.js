@@ -58,7 +58,12 @@ ok("yarım pencere zarfBitir'de eklenir", yarim.zarf.length === 0 && S.zarfBitir
 
 /* ---------------- ffmpeg argümanları ve kanal sayısı ---------------- */
 var ar = S.cozumlemeArgs("C:/a b/klip.mp4", 1.5, 30);
-ok("çözümleme: -ss/-t/-i, -map 0:a:0?, -vn, 16 kHz s16le pipe:1, -ac YOK", js(ar.slice(ar.indexOf("-ss"))) === js(["-ss", "1.5", "-t", "30", "-i", "C:/a b/klip.mp4", "-map", "0:a:0?", "-vn", "-ar", "16000", "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"]) && ar.indexOf("-ac") === -1, js(ar));
+ok("çözümleme: -ss/-t/-i, -map 0:a:0?, -vn, PTS süzgeci, 16 kHz s16le pipe:1, -ac YOK", js(ar.slice(ar.indexOf("-ss"))) === js(["-ss", "1.5", "-t", "30", "-i", "C:/a b/klip.mp4", "-map", "0:a:0?", "-vn", "-af", S.ZAMAN_SUZGECI, "-ar", "16000", "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"]) && ar.indexOf("-ac") === -1, js(ar));
+// ham PCM zaman damgası taşımaz: ses akışının başlangıç kayması ve PTS boşlukları sessizlikle doldurulmalı
+// (silencedetect kare PTS'ini raporlar; gerçek ffmpeg karşılaştırması test-kesim.js'te)
+ok("çözümleme: zaman süzgeci aresample, async (boşluk doldurur), first_pts=0 (baş kayması), 10 ms eşik",
+  /^aresample=/.test(S.ZAMAN_SUZGECI) && /(^|[=:])async=1(:|$)/.test(S.ZAMAN_SUZGECI) && /(^|:)first_pts=0(:|$)/.test(S.ZAMAN_SUZGECI) &&
+  /(^|:)min_hard_comp=0\.01(:|$)/.test(S.ZAMAN_SUZGECI), S.ZAMAN_SUZGECI);
 var stderrOrnek = "Input #0, wav, from 'x.wav':\n  Stream #0:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 48000 Hz, 5.1, s16, 4608 kb/s\nOutput #0, s16le, to 'pipe:1':\n  Stream #0:0: Audio: pcm_s16le, 16000 Hz, stereo, s16, 512 kb/s\n";
 ok("kanal sayısı: Output #0 satırından (girdi 5.1, çıkış stereo → 2)", S.kanalSayisi(stderrOrnek) === 2);
 ok("kanal sayısı: mono 1, 5.1(side) 6, '3 channels' 3",
@@ -156,6 +161,70 @@ ok("kararEsle: tam %50 sınırı kapalı", e5[0].keep === false, js(e5));
 var e6 = S.kararEsle(eski, [{ start: 9, end: 15, birlesik: true }]);
 ok("kararEsle: kapatılan aralığı yutan birleşik kesim kapalı kalır (kısa olana göre)", e6[0].keep === false && e6[0].birlesik === true);
 ok("kararEsle: yeni nesneler kopyalanır (girdi değişmez), boş girdiler", !("keep" in { start: 1, end: 2 }) && S.kararEsle(null, null).length === 0 && S.kararEsle([], [{ start: 1, end: 2 }])[0].keep === true);
+
+/* ---------------- kararYaz: kararlar türetilmiş kümeden ayrı ---------------- */
+function durum(l) { return l.map(function (r) { return r.keep ? "a" : "k"; }).join(""); }
+(function () {
+  // Kullanıcı ikinci kesimi kapatır; ara bir kaydırıcı konumunda onunla örtüşen kesim yok; geri dönülür.
+  var A = { start: 11.35, end: 12.45 }, B = { start: 13.35, end: 13.95 };
+  var kararlar = S.kararYaz([], B, false, [A, B]);
+  ok("kararYaz: kapatma kaydı eklenir", kararlar.length === 1 && kararlar[0].keep === false && kararlar[0].start === 13.35, js(kararlar));
+  var ara = S.kararEsle(kararlar, [A]);
+  var geri = S.kararEsle(kararlar, [A, { start: 13.36, end: 13.94 }]);
+  ok("karar listesi: aradaki konumda örtüşen kesim kalmasa da geri dönünce kapalı kalır", durum(ara) === "a" && durum(geri) === "ak", durum(ara) + " " + durum(geri));
+  // Eski zincir (her küme bir öncekiyle eşlenir) kararı kaybediyordu: bulgunun kendisi
+  var zincir = S.kararEsle(S.kararEsle([{ start: A.start, end: A.end, keep: true }, { start: B.start, end: B.end, keep: false }], [A]), [A, B]);
+  ok("(karşılaştırma) zincirleme eşleme ara konumda kararı kaybeder", durum(zincir) === "aa");
+  var bos = S.kararEsle(kararlar, []);
+  ok("karar listesi: hiç kesim kalmayan konumdan dönüşte de kapalı", bos.length === 0 && durum(S.kararEsle(kararlar, [A, B])) === "ak");
+})();
+(function () {
+  // Kapatılan kesim eşik yükselince komşusuyla birleşir, düşünce ayrılır: "kapalı" komşuya yayılmaz
+  var K1 = { start: 8.15, end: 9.35 }, K2 = { start: 9.95, end: 10.85 };
+  var kararlar = S.kararYaz([], K1, false, [K1, K2]);
+  var birlesik = S.kararEsle(kararlar, [{ start: 8.15, end: 10.85, birlesik: true }]);
+  ok("birleşme: kapatılanı yutan birleşik kesim kapalı", durum(birlesik) === "k");
+  var ayrik = S.kararEsle(kararlar, [K1, K2]);
+  ok("ayrılma: yalnız kullanıcının kapattığı parça kapalı, komşu açık (yayılmaz)", durum(ayrik) === "ka", durum(ayrik));
+  var zincir = S.kararEsle(birlesik, [K1, K2]);
+  ok("(karşılaştırma) zincirleme eşleme kapalıyı komşuya yayıyordu", durum(zincir) === "kk");
+})();
+(function () {
+  // Açma: aynı kesim, kenarları tampon değişince kaymış → kayıt tümden silinir (artık şerit kalmaz)
+  var kararlar = S.kararYaz([], { start: 2.8, end: 3.8 }, false);
+  var gorunen = { start: 3.0, end: 3.6 };
+  ok("açma öncesi: kaymış kesim kapalı görünür", durum(S.kararEsle(kararlar, [gorunen])) === "k");
+  kararlar = S.kararYaz(kararlar, gorunen, true, [gorunen]);
+  ok("açma: aynı kesimin kaydı silinir", kararlar.length === 0, js(kararlar));
+  ok("açma: tampon geri dönünce kesim açık kalır (kenar artığı kapatmaz)", durum(S.kararEsle(kararlar, [{ start: 2.8, end: 3.8 }])) === "a");
+  ok("aç / kapat / aç: liste boşalır", S.kararYaz(S.kararYaz([], gorunen, false), gorunen, true).length === 0);
+})();
+(function () {
+  // Açma: birleşik kesim kapatılmış, ayrılınca parçalardan biri açılır → yalnız o parça açılır
+  var M = { start: 1, end: 5 };
+  var p1 = { start: 1, end: 2 }, p2 = { start: 2.6, end: 3.4 }, p3 = { start: 4, end: 5 };
+  var kararlar = S.kararYaz([], M, false, [M]);
+  ok("birleşik kapalı → ayrılınca tüm parçalar kapalı", durum(S.kararEsle(kararlar, [p1, p2, p3])) === "kkk");
+  kararlar = S.kararYaz(kararlar, p1, true, [p1, p2, p3]);
+  ok("parça açılınca: yalnız o parça açık, kalan bölge kapalı", durum(S.kararEsle(kararlar, [p1, p2, p3])) === "akk" && kararlar.length === 1 &&
+    kararlar[0].start === 2 && kararlar[0].end === 5, js(kararlar));
+  ok("yeniden birleşince kapalı kalır (kullanıcının kesme dediği bölgeyi içerir)", durum(S.kararEsle(kararlar, [M])) === "k");
+  // ekranda başka parça yokken bile büyük bölge korunur (ilerideki konumlarda parçalar geri gelir)
+  var k2 = S.kararYaz(S.kararYaz([], M, false), p1, true, [p1]);
+  ok("diğer parçalar o an görünmese de geniş bölge korunur", durum(S.kararEsle(k2, [p2, p3])) === "kk", js(k2));
+  // kaydın çoğu açılan parçadaysa ama başka bir görünen parçayı da kapalı tutuyorsa silinmez, kırpılır
+  var x = { start: 1, end: 3 }, r = { start: 1, end: 2.2 }, r2 = { start: 2.5, end: 3.0 };
+  var k3 = S.kararYaz(S.kararYaz([], x, false), r, true, [r, r2]);
+  ok("açılan parça kaydın çoğu olsa da komşu parça kapalı kalır", durum(S.kararEsle(k3, [r, r2])) === "ak", js(k3));
+  ok("kararYaz: girdi listesi değişmez, geçersiz aralık listeyi aynen döndürür", kararlar !== null && S.kararYaz(kararlar, { start: 3, end: 3 }, false).length === kararlar.length);
+})();
+
+/* ---------------- kesimlerAyni: önizleme ↔ doğrulama ---------------- */
+var on1 = [{ start: 1, end: 2 }, { start: 3, end: 4 }];
+ok("kesimlerAyni: kenarlar 50 ms içinde → aynı", S.kesimlerAyni(on1, [{ start: 1.04, end: 1.96 }, { start: 3.05, end: 4 }]));
+ok("kesimlerAyni: sayı farklı → farklı", !S.kesimlerAyni(on1, [{ start: 1, end: 2 }]) && !S.kesimlerAyni(on1, on1.concat([{ start: 5, end: 6 }])));
+ok("kesimlerAyni: bir kenar 60 ms kaymış → farklı", !S.kesimlerAyni(on1, [{ start: 1, end: 2.06 }, { start: 3, end: 4 }]));
+ok("kesimlerAyni: boş ↔ boş aynı, tol parametresi", S.kesimlerAyni([], []) && S.kesimlerAyni(null, []) && S.kesimlerAyni(on1, [{ start: 1.2, end: 2 }, { start: 3, end: 4 }], 0.25));
 
 /* ---------------- önbellek ---------------- */
 ok("anahtar: mediaPath|in|dur (ms hassasiyet)", S.anahtar("a.mp4", 1.23456, 10) === "a.mp4|1.235|10.000");

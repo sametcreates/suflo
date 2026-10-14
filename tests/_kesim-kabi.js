@@ -25,8 +25,10 @@ function kopruYukle() {
 function eleman(id) {
   var e = {
     id: id, tagName: "DIV", value: "", textContent: "", className: "", hidden: false, disabled: false, checked: false,
-    title: "", type: "", style: {}, dataset: {}, children: [], _h: {}, onclick: null, onchange: null,
+    title: "", type: "", style: {}, dataset: {}, children: [], attrs: {}, _h: {}, onclick: null, onchange: null,
     clientWidth: 320, clientHeight: 56, width: 0, height: 0,
+    setAttribute: function (a, v) { e.attrs[a] = String(v); },
+    getAttribute: function (a) { return Object.prototype.hasOwnProperty.call(e.attrs, a) ? e.attrs[a] : null; },
     addEventListener: function (t, f) { (e._h[t] = e._h[t] || []).push(f); },
     fire: function (t, ev) { var r; (e._h[t] || []).forEach(function (f) { r = f.call(e, ev || { detail: 0 }); }); return r; },
     appendChild: function (c) { e.children.push(c); return c; },

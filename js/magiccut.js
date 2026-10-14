@@ -5,8 +5,10 @@
  *
  * 3.4 canlı eşik: ses BİR KEZ çözülür (K.runAkis → SufloSessizlik tepe zarfı, bellekte); Eşik /
  * Min. sessizlik / Tampon / Min. konuşma kaydırıcıları haritayı ~100 ms içinde yeniden çizer, ffmpeg
- * yeniden çalışmaz. Uygula'da silencedetect son ayarlarla bir kez koşar (eski akışla birebir), kapatılan
- * aralıklar kararEsle ile taşınır. Çözümleme olmazsa eski silencedetect akışı aynen çalışır.
+ * yeniden çalışmaz. Uygula'da silencedetect son ayarlarla bir kez koşar (eski akışla birebir); kesimler
+ * önizlemeden farklı çıkarsa Uygula önce farkı gösterir, ikinci tık uygular. Kullanıcının kapattığı
+ * bölgeler ayrı bir karar listesinde (kapatilanlar) tutulur. Çözümleme olmazsa eski silencedetect akışı
+ * aynen çalışır.
  */
 window.KCut = (function () {
   "use strict";
@@ -14,6 +16,12 @@ window.KCut = (function () {
   var clip = null;
   var ranges = [];      // { start, end, keep, birlesik? } — sequence zamanı
   var adalar = [];      // Min. konuşma ile kesime katılan kısa konuşma adaları (sequence zamanı)
+  /*
+   * Kullanıcının kapattığı bölgeler (sequence zamanı, { start, end, keep:false }): türetilmiş `ranges`ten
+   * AYRI. Yalnız çubuk / liste tıklaması yazar (S.kararYaz); her yeniden hesaplanan küme (kaydırıcı,
+   * önbellek, Uygula doğrulaması) bununla eşlenir. Klip değişince ve Uygula'dan sonra boşalır.
+   */
+  var kapatilanlar = [];
   var target = "clone"; // clone | here
   var busy = false;
   // 3.4: tek çözümleme + canlı eşik
@@ -23,6 +31,7 @@ window.KCut = (function () {
   var hamSessizlik = null;  // eski akış: { liste, noise, minSil } silencedetect ham aralıkları
   var sdOnbellek = {};      // silencedetect sonucu: anahtar|eşik|min. sessizlik → ham aralıklar
   var sonAnahtar = "";
+  var farkUyarisi = false;  // durum satırında "doğrulama kesimleri değiştirdi" uyarısı var (kaydırıcı silsin)
   var canliZaman = null;
   var CANLI_MS = 100;
   // Süren ffmpeg analizinin iptal jetonu (K.iptalJetonu): "İptal" düğmesi süreç ağacını öldürür
@@ -110,7 +119,11 @@ window.KCut = (function () {
     });
   }
 
-  // ffmpeg silencedetect (eski akış ve Uygula'daki doğrulama aynı çağrıyı kullanır)
+  /*
+   * ffmpeg silencedetect (eski akış ve Uygula'daki doğrulama aynı çağrıyı kullanır). Önce zarfla aynı
+   * zaman süzgeci (S.ZAMAN_SUZGECI): ses akışı geç başlıyorsa (baştaki boşluk) ya da PTS boşluğu varsa
+   * ikisi de onu sessizlik sayar, aynı eksende ölçer. Kaymasız dosyada sonuç 3.3'le aynıdır.
+   */
   function sessizlikBul(ff, a, jeton) {
     return K.run(ff, [
       "-hide_banner",
@@ -118,7 +131,7 @@ window.KCut = (function () {
       "-t", String(a.dur),
       "-i", clip.mediaPath,
       "-map", "0:a:0?",
-      "-af", "silencedetect=noise=" + a.noise + "dB:d=" + a.minSil,
+      "-af", S.ZAMAN_SUZGECI + ",silencedetect=noise=" + a.noise + "dB:d=" + a.minSil,
       "-f", "null", "-"
     ], { timeout: Math.max(300000, a.dur * 2000), iptal: jeton });
   }
@@ -179,6 +192,20 @@ window.KCut = (function () {
     clip = KApp.ctx().sel;
     if (!clip) { status("Önce bir klip seç.", "warn"); return; }
     var benimKlip = clip;
+    /*
+     * Başka klip (ya da aynı klibin in/out'u kaydı): önceki analizin HİÇBİR parçası taşınmaz — kararlar,
+     * zarf, ham silencedetect aralıkları ve ekrandaki sonuç. İlk await'ten ÖNCE: İptal / hata eski klibin
+     * sesini yeni klibin in/out'uyla eşleştirilmiş halde bırakmasın. Aynı klipte iptal edilen yeniden
+     * analizde önceki sonuç ekranda kalır.
+     */
+    var anahtar = S.anahtar(clip.mediaPath, clip.inPoint, clip.outPoint - clip.inPoint);
+    if (anahtar !== sonAnahtar) {
+      ranges = []; adalar = []; kapatilanlar = [];
+      zarf = null; hamSessizlik = null; farkUyarisi = false;
+      el("cut-result").hidden = true;
+      render();   // çubuk / liste / özet boşalır, "Kesimleri uygula" kapanır
+    }
+    sonAnahtar = anahtar;
     busy = true;
     iptalJetonu = K.iptalJetonu ? K.iptalJetonu() : null;
     var jeton = iptalJetonu;
@@ -190,10 +217,6 @@ window.KCut = (function () {
 
       var a = ayarlar();
       var dur = a.dur, noise = a.noise;
-      var anahtar = S.anahtar(clip.mediaPath, clip.inPoint, dur);
-      // başka klip: önceki kararlar (kapatılan aralıklar) taşınmaz
-      if (anahtar !== sonAnahtar) { ranges = []; adalar = []; }
-      sonAnahtar = anahtar;
 
       // 3.4: tek çözümleme → canlı eşik. Önbellekte varsa ffmpeg hiç çalışmaz.
       var z = zarfOnbellek.al(anahtar);
@@ -236,7 +259,7 @@ window.KCut = (function () {
       // tampon, 0.25 sn alt sınırı, Min. konuşma birleştirmesi ve kenar kırpması: SufloSessizlik (zarfla aynı kurallar)
       hamSessizlik = { liste: sil, noise: noise, minSil: a.minSil };
       if (res.code === 0) sdOnbellek[sdAnahtar(a)] = sil;
-      ranges = S.kararEsle(ranges, sekansaCevir(S.kesimlereCevir(sil, kesimAyari(a))));
+      ranges = S.kararEsle(kapatilanlar, sekansaCevir(S.kesimlereCevir(sil, kesimAyari(a))));
 
       if (ranges.length === 0) {
         el("cut-result").hidden = true;
@@ -297,8 +320,8 @@ window.KCut = (function () {
 
   /*
    * Kaydırıcı değişti: zarf varsa bul() ile harita yeniden kurulur (ffmpeg yok); eski akışta yalnız
-   * Tampon ve Min. konuşma canlıdır (ham silencedetect aralıkları üzerinden). Kapatılan aralıklar
-   * kararEsle ile yeni aralıklara taşınır.
+   * Tampon ve Min. konuşma canlıdır (ham silencedetect aralıkları üzerinden). Yeni aralıklar bir önceki
+   * kümeyle değil, kullanıcının karar listesiyle (kapatilanlar) eşlenir: aradaki konumlarda karar kaybolmaz.
    */
   function yenidenHesapla() {
     if (!clip || !S) return;
@@ -306,11 +329,14 @@ window.KCut = (function () {
     if (zarf) sonuc = S.bul(zarf, kesimAyari(a));
     else if (hamSessizlik) sonuc = S.kesimlereCevir(hamSessizlik.liste, kesimAyari(a));
     else return;
-    ranges = S.kararEsle(ranges, sekansaCevir(sonuc));
+    ranges = S.kararEsle(kapatilanlar, sekansaCevir(sonuc));
     var e = el("cut-status");
+    // "doğrulama kesimleri değiştirdi" uyarısı doğrulanmış haritayı anlatıyordu; harita artık önizleme
+    var farkVardi = farkUyarisi;
+    farkUyarisi = false;
     if (zarf && ranges.length === 0) status(BOS_UYARI, "warn");
     else if (!zarf && (String(a.noise) !== String(hamSessizlik.noise) || a.minSil !== hamSessizlik.minSil)) status(ESKI_UYARI, "warn");
-    else if (e.textContent === BOS_UYARI || e.textContent === ESKI_UYARI ||
+    else if (farkVardi || e.textContent === BOS_UYARI || e.textContent === ESKI_UYARI ||
       (window.SufloI18n && SufloI18n.orig && (SufloI18n.orig(e) === BOS_UYARI || SufloI18n.orig(e) === ESKI_UYARI))) status("");
     // eski akışta "duraksama yok" sonucu gizlemişti; Tampon / Min. konuşma kesim çıkarınca geri gelsin
     if (ranges.length) el("cut-result").hidden = false;
@@ -361,6 +387,17 @@ window.KCut = (function () {
     updateSummary();
   }
 
+  /*
+   * Kullanıcı bir kesimi açtı / kapattı (çubuk ya da liste): karar listesine yazılır, ekrandaki küme de
+   * listeyle yeniden eşlenir (sonraki kaydırıcı hareketinin göstereceğiyle aynı görünsün).
+   */
+  function kararVer(r, keep) {
+    kapatilanlar = S.kararYaz(kapatilanlar, r, keep, ranges);
+    r.keep = keep;
+    ranges = S.kararEsle(kapatilanlar, ranges);
+    render();
+  }
+
   // Bir kesimin içine düşen Min. konuşma adaları (taralı gösterilir)
   function kesimAdalari(r) {
     return adalar.filter(function (a) { return a.start >= r.start - 1e-6 && a.end <= r.end + 1e-6; });
@@ -389,7 +426,7 @@ window.KCut = (function () {
         cut.className = "cut" + (r.keep ? "" : " off");
         cut.style.width = ((r.end - r.start) / total * 100) + "%";
         cut.title = baslik;
-        cut.onclick = function () { r.keep = !r.keep; render(); };
+        cut.onclick = function () { kararVer(r, !r.keep); };
         bar.appendChild(cut);
       } else {
         // birleşik kesim: sessiz parçalar düz, araya giren kısa konuşma adaları taralı (hepsi aynı aralığı açıp kapatır)
@@ -406,7 +443,7 @@ window.KCut = (function () {
           sp.style.width = ((pc.e - pc.s) / total * 100) + "%";
           var adaSn = (pc.e - pc.s).toFixed(2);
           sp.title = pc.ada ? "Kısa konuşma (" + adaSn + " sn) — Min. konuşma nedeniyle kesime katıldı" + (r.keep ? "" : " (kapalı)") : baslik;
-          sp.onclick = function () { r.keep = !r.keep; render(); };
+          sp.onclick = function () { kararVer(r, !r.keep); };
           bar.appendChild(sp);
         });
       }
@@ -487,7 +524,7 @@ window.KCut = (function () {
       var cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = r.keep;
-      cb.onchange = function () { ranges[i].keep = cb.checked; render(); };
+      cb.onchange = function () { kararVer(r, cb.checked); };
 
       var t = document.createElement("span");
       t.className = "seg-time mono";
@@ -501,6 +538,8 @@ window.KCut = (function () {
       if (r.birlesik) {
         var b = document.createElement("span");
         b.className = "mc-birlesik";
+        // #cut-ranges kullanıcı içeriği kabı (i18n): rozet arayüz metni, adacık olarak işaretle
+        b.setAttribute("data-i18n-ui", "");
         b.textContent = "birleşik";
         b.title = "Min. konuşma: araya giren kısa konuşma da bu kesime katıldı";
         row.appendChild(b);
@@ -520,15 +559,23 @@ window.KCut = (function () {
     el("cut-apply").disabled = act.length === 0 || busy;
   }
 
+  // Eski akışın ham silencedetect aralıkları ekrandaki ayarla (eşik + min. sessizlik) koşmuşsa onlar
+  // (ffmpeg hatayla bitip yarım sonuç verdiyse de: kısmi uyarısıyla gösterilen buydu, 3.3 de bunu uygulardı)
+  function hamGecerli(a) {
+    if (!hamSessizlik) return null;
+    return String(hamSessizlik.noise) === String(a.noise) && hamSessizlik.minSil === a.minSil ? hamSessizlik.liste : null;
+  }
+
   /*
    * Uygula öncesi doğrulama (3.4): ffmpeg silencedetect son ayarlarla BİR KEZ koşar (eski akışla
-   * birebir aynı kesimler); kullanıcının kapattığı aralıklar kararEsle ile taşınır. Aynı ayarla
-   * zaten koştuysa (eski akış) yeniden koşmaz. Döner: aralıklar | null (iptal / hata, durum yazıldı).
-   * Doğrulama ffmpeg hatasıyla biterse önizlemedeki (zarf) aralıklar kullanılır ve günlüğe yazılır.
+   * birebir aynı kesimler); kullanıcının kararları (kapatilanlar) kararEsle ile eşlenir. Aynı ayarla
+   * zaten koştuysa (önbellek ya da eski akışın ham aralıkları) yeniden koşmaz. Döner: aralıklar | null
+   * (iptal / hata, durum yazıldı). Doğrulama ffmpeg hatasıyla biterse önizlemedeki (zarf) aralıklar
+   * kullanılır ve günlüğe yazılır.
    */
   async function kesimleriDogrula() {
     var a = ayarlar(), benimKlip = clip;
-    var ham = sdOnbellek[sdAnahtar(a)] || null;
+    var ham = sdOnbellek[sdAnahtar(a)] || hamGecerli(a);
     if (!ham) {
       var ff = await K.findFfmpeg();
       if (!ff) { status("✕ ffmpeg bulunamadı — Ayarlar sekmesinden kur.", "bad"); return null; }
@@ -563,7 +610,7 @@ window.KCut = (function () {
       }
     }
     if (!clip || clip !== benimKlip) return null;
-    var eslenmis = S.kararEsle(ranges, sekansaCevir(S.kesimlereCevir(ham, kesimAyari(a))));
+    var eslenmis = S.kararEsle(kapatilanlar, sekansaCevir(S.kesimlereCevir(ham, kesimAyari(a))));
     K.log("[kesim] dogrulama: onizleme=" + ranges.length + " silencedetect=" + eslenmis.length);
     ranges = eslenmis;
     render();
@@ -576,13 +623,29 @@ window.KCut = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: apply })) return; // Pro: otomatik kesim
     if (busy || !clip || activeRanges().length === 0) return;
     sesiKapat();
+    farkUyarisi = false;
     el("cut-apply").disabled = true;
+    function sade(r) { return { start: r.start, end: r.end }; }
     // 3.4: önizleme zarftan; uygulanan kesimler silencedetect doğrulamasından
+    var onizleme = activeRanges().map(sade);
     var dogru = await kesimleriDogrula();
     if (!dogru) { updateSummary(); return; }
-    var act = dogru.filter(function (r) { return r.keep; }).map(function (r) { return { start: r.start, end: r.end }; });
+    var act = dogru.filter(function (r) { return r.keep; }).map(sade);
     if (act.length === 0) {
       status("Doğrulamadan sonra uygulanacak kesim kalmadı — eşiği ya da min. sessizliği değiştir.", "warn");
+      updateSummary();
+      return;
+    }
+    /*
+     * Doğrulama önizlemeden (dinlenen / haritada görülen) farklı kesim verdiyse sormadan uygulama:
+     * doğrulanmış küme haritada (kesimleriDogrula çizdi), kullanıcı kontrol edip yeniden Uygula'ya basar;
+     * ikinci tık doğrulama önbelleğinden gelir, ffmpeg yeniden koşmaz. (Sayı farkı ya da > 50 ms kenar kayması.)
+     */
+    if (!S.kesimlerAyni(onizleme, act)) {
+      K.log("[kesim] dogrulama onizlemeden farkli: onizleme=" + onizleme.length + " dogrulama=" + act.length + " — uygulanmadi");
+      status("Doğrulama kesimleri değiştirdi (önizleme " + onizleme.length + " kesim, doğrulama " + act.length +
+        " kesim): haritayı kontrol et, sonra yeniden Kesimleri uygula.", "warn");
+      farkUyarisi = true;
       updateSummary();
       return;
     }
@@ -595,11 +658,16 @@ window.KCut = (function () {
       removeMode: mode,
       cloneFirst: target === "clone"
     }, 900000);
-    el("cut-apply").disabled = false;
     if (r.ok) {
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("cut", KApp.toast);   // deneme: yalniz basarida
-      // timeline değişti: önbellekteki çözümleme ve doğrulama artık bayat (sonraki analiz yeniden çözer)
+      /*
+       * Timeline değişti: önbellekler VE canlı analiz bayat. Zarf / ham aralıklar / harita bırakılır,
+       * sonuç gizlenir, "Kesimleri uygula" yeni analize dek kapalı kalır: kaydırıcılar ve Otomatik
+       * Uygula'dan önceki çözümlemeden taze görünümlü bir harita kurup eski konumlara ikinci kez
+       * kesim uygulatamaz (ripple'dan sonra konuşma silerdi).
+       */
       onbellekleriBosalt();
+      analiziBirak();
       status("");
       var msg = r.newSeq
         ? "✂ Kopya sekansta uygulandı: " + r.newSeq
@@ -615,8 +683,23 @@ window.KCut = (function () {
       // ilk uygulanan kesim: davet seridinin anlarindan biri (mesgulken/yildiz seridi acikken cikmaz)
       if (KApp.davetAni) KApp.davetAni("cut");
     } else {
+      el("cut-apply").disabled = false;
       status("✕ " + r.error, "bad");
     }
+  }
+
+  // Canlı analizi bırak (Uygula'dan sonra): bir sonraki "Sessizlikleri bul" baştan çözümler
+  function analiziBirak() {
+    if (canliZaman) { clearTimeout(canliZaman); canliZaman = null; }
+    zarf = null;
+    hamSessizlik = null;
+    ranges = [];
+    adalar = [];
+    kapatilanlar = [];
+    farkUyarisi = false;
+    clip = null;
+    el("cut-result").hidden = true;
+    render();   // çubuk / liste / dalga boşalır, "Kesimleri uygula" kapanır
   }
 
   /* ---------------- Dinle (önizleme) ---------------- */
@@ -692,6 +775,8 @@ window.KCut = (function () {
         sesiKapat();
         ranges = [];
         adalar = [];
+        kapatilanlar = [];
+        farkUyarisi = false;
         clip = null;
         // 3.4: klip değişti → zarf ve doğrulama önbelleği geçersiz
         zarf = null;

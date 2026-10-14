@@ -5,7 +5,9 @@
  * pencerelerden bir TEPE zarfı (dBFS) çıkarılır. Eşik / Min. sessizlik / Tampon / Min. konuşma
  * kaydırıcıları bu zarf üzerinde bul() ile anında yeniden hesaplanır: ffmpeg her değişimde
  * yeniden çalışmaz. Uygula'da ffmpeg silencedetect son ayarlarla bir kez daha koşar (eski
- * akışla birebir aynı sonuç), kullanıcının kapattığı aralıklar kararEsle ile taşınır.
+ * akışla birebir aynı sonuç); kullanıcının kapattığı bölgeler ayrı bir karar listesinde (kararYaz)
+ * tutulur, her yeni küme o listeyle eşlenir (kararEsle). Önizleme ile doğrulama farklıysa Uygula
+ * önce farkı gösterir (kesimlerAyni).
  *
  * Zarf TEPE (en büyük |örnek|) değeridir, RMS DEĞİL: silencedetect de örnek genliğine bakar.
  * multicam.energyFromPcm RMS'tir; burada kullanılmaz.
@@ -39,12 +41,21 @@
   /*
    * Tek çözümleme: özgün kanal sayısı korunur (-ac 1 YOK: tek taraflı bir mikrofon aşağı
    * karışımda 3–6 dB düşer ve eşiğin altına kayardı). -map 0:a:0? : silencedetect'le aynı akış.
+   *
+   * ZAMAN EKSENİ: ham s16le zaman damgası taşımaz; zarf ilk çözülen örnekten başlardı. silencedetect
+   * ise kare PTS'ini raporlar: ses akışının başlangıç kayması (video 0'da, ses 0.45 sn'de: OBS, ekran
+   * kaydı, AVCHD/MTS) ve PTS boşlukları dahil. ZAMAN_SUZGECI baştaki kaymayı ve boşlukları sessizlikle
+   * doldurur (first_pts=0; async: 10 ms'den büyük farkta örnek ekler / atar, esnetmez), zarf
+   * silencedetect'le aynı eksende kalır. Panel Uygula'daki silencedetect'i de aynı süzgeçten geçirir
+   * (magiccut sessizlikBul): baştaki doldurulmuş boşluğu ikisi de sessizlik sayar. Kaymasız dosyada
+   * çıktı birebir aynıdır.
    */
+  var ZAMAN_SUZGECI = "aresample=async=1:min_hard_comp=0.01:first_pts=0";
   function cozumlemeArgs(media, inPoint, dur) {
     return ["-hide_banner", "-nostdin", "-nostats",
       "-ss", String(num(inPoint, 0)), "-t", String(num(dur, 0)),
       "-i", String(media),
-      "-map", "0:a:0?", "-vn", "-ar", String(SR), "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"];
+      "-map", "0:a:0?", "-vn", "-af", ZAMAN_SUZGECI, "-ar", String(SR), "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"];
   }
 
   // Çıkış akışının kanal sayısı ffmpeg'in stderr'indeki "Output #0" bölümünden okunur (bilinmiyorsa 0)
@@ -245,11 +256,21 @@
 
   /* ---------------- Kullanıcı kararları ---------------- */
 
+  function ortusme(a, b) { return Math.min(a.end, b.end) - Math.max(a.start, b.start); }
+  // a ile b "aynı yer" mi: örtüşme iki aralıktan kısa olanın en az %50'si
+  function eslesir(a, b) {
+    var ort = ortusme(a, b);
+    if (ort <= 0) return false;
+    var olcu = Math.min(a.end - a.start, b.end - b.start);
+    return olcu > 0 && ort >= 0.5 * olcu - 1e-9;
+  }
+
   /*
    * Ayar değişince yeni aralıklar gelir; kullanıcının KAPATTIĞI (keep:false) bir aralıkla örtüşmesi
    * iki aralıktan kısa olanın %50'si ya da fazlası olan yeni aralık da kapalı başlar. Gerisi açık.
    * (Kısa olana göre ölçmek: kapatılan aralığı yutan birleşik bir kesim de kapalı kalır, kullanıcının
    * "bunu kesme" dediği yer sessizce kesilmez.)
+   * Panel `eski` olarak bir önceki türetilmiş kümeyi DEĞİL, kararYaz'ın tuttuğu karar listesini verir.
    */
   function kararEsle(eski, yeni) {
     var kapali = (eski || []).filter(function (r) { return r && r.keep === false; });
@@ -258,15 +279,56 @@
       for (var k in r) if (Object.prototype.hasOwnProperty.call(r, k)) o[k] = r[k];
       var keep = true;
       for (var i = 0; i < kapali.length; i++) {
-        var x = kapali[i];
-        var ort = Math.min(r.end, x.end) - Math.max(r.start, x.start);
-        if (ort <= 0) continue;
-        var olcu = Math.min(r.end - r.start, x.end - x.start);
-        if (olcu > 0 && ort >= 0.5 * olcu - 1e-9) { keep = false; break; }
+        if (eslesir(r, kapali[i])) { keep = false; break; }
       }
       o.keep = keep;
       return o;
     });
+  }
+
+  /*
+   * Kullanıcının kararları türetilmiş kesim kümesinden AYRI tutulur: yalnız çubuk / liste tıklaması
+   * yazar, her yeniden hesaplanan küme bu listeyle eşlenir. Küme bir öncekiyle eşlenince, aradaki bir
+   * kaydırıcı konumunda kapatılan kesimle örtüşen aralık kalmadığında karar kayboluyor; kapatılan
+   * kesim komşularıyla birleşip yeniden ayrılınca "kapalı" komşulara yayılıyordu.
+   * kararYaz(liste, aralik, keep, guncel) → yeni liste ({ start, end, keep:false } bölgeleri):
+   *  - keep false: aralık listeye eklenir.
+   *  - keep true: aralığı kapalı gösteren (eslesir) her kayıt için: kayıt büyük ölçüde (≥ %50) bu
+   *    aralıksa ve ekranda başka bir kesimi kapalı tutmuyorsa silinir (aynı kesim, kenarları tampon /
+   *    eşikle kaymış). Değilse (ör. birleşik bir kesimden kalan daha geniş bölge) yalnız aralık kadarı
+   *    açılır; minParca'dan (0.25 sn, en kısa kesim) kısa artıklar atılır.
+   * guncel: ekrandaki kesimler (isteğe bağlı; aralığın kendisi sayılmaz).
+   */
+  function kararYaz(liste, aralik, keep, guncel, minParca) {
+    var r = aralik || {};
+    var MIN = num(minParca, 0.25), out = [];
+    if (!(r.end > r.start)) return (liste || []).slice();
+    (liste || []).forEach(function (x) {
+      if (!x || !(x.end > x.start) || x.keep !== false) return;
+      if (keep === false || !eslesir(r, x)) { out.push({ start: x.start, end: x.end, keep: false }); return; }
+      var baskasi = (guncel || []).some(function (g) {
+        return g && g !== r && !(g.start === r.start && g.end === r.end) && eslesir(g, x);
+      });
+      if (!baskasi && ortusme(r, x) >= 0.5 * (x.end - x.start) - 1e-9) return;
+      if (r.start - x.start >= MIN - 1e-9) out.push({ start: x.start, end: Math.min(x.end, r.start), keep: false });
+      if (x.end - r.end >= MIN - 1e-9) out.push({ start: Math.max(x.start, r.end), end: x.end, keep: false });
+    });
+    if (keep === false) out.push({ start: r.start, end: r.end, keep: false });
+    return out;
+  }
+
+  /*
+   * Önizlenen ve uygulanacak kesimler aynı mı: sayı aynı ve her kenar tol içinde (varsayılan 0.05 sn:
+   * zarf ile silencedetect arasındaki belirtilen eşleşme sınırı). Panel farkı göstermeden uygulamaz.
+   */
+  function kesimlerAyni(a, b, tol) {
+    tol = num(tol, 0.05);
+    a = a || []; b = b || [];
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (Math.abs(a[i].start - b[i].start) > tol + 1e-9 || Math.abs(a[i].end - b[i].end) > tol + 1e-9) return false;
+    }
+    return true;
   }
 
   /* ---------------- Bellek önbelleği ---------------- */
@@ -291,7 +353,7 @@
   }
 
   return {
-    TABAN: TABAN, SR: SR, PENCERE: PENCERE,
+    TABAN: TABAN, SR: SR, PENCERE: PENCERE, ZAMAN_SUZGECI: ZAMAN_SUZGECI,
     dbfs: dbfs,
     cozumlemeArgs: cozumlemeArgs,
     kanalSayisi: kanalSayisi,
@@ -304,6 +366,8 @@
     esikOner: esikOner,
     kucult: kucult,
     kararEsle: kararEsle,
+    kararYaz: kararYaz,
+    kesimlerAyni: kesimlerAyni,
     anahtar: anahtar,
     onbellekYap: onbellekYap
   };
