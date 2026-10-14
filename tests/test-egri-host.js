@@ -364,6 +364,86 @@ SP.outPoint.seconds = 20;   // %50 hız
 var usp = cagir("KS_easeUndo", { records: [kayitSP] });
 ok("geri al, klibin hızı değişti: kayıt eşleşmez → atlanan 'degisti', hiçbir anahtar silinmez", usp.ok && usp.sonuclar.length === 0 && js(usp.atlanan) === js([{ id: "krsp", kod: "degisti" }]) &&
   SP.olcek.keys.length === spOnce, js(usp));
+// baştan ripple kırpma ve slip: klibin başı yerinde, giriş noktası kayar → anahtarlar timeline'da -Δgiriş kadar kayar.
+// Kayıt klibin kaynak çapasını (giriş / çıkış / bitiş / yön) taşır; geri al Suflo'nun anahtarlarını yine bulur.
+var KRh = require(path.join(ROOT, "js", "key-records.js"));
+var Mh = require(path.join(ROOT, "js", "egri-model.js"));
+function capaKlibi(o) {
+  var c = klip({ nodeId: o.nodeId, ad: o.ad, start: 10, end: 20, inP: o.inP === undefined ? 5 : o.inP, outP: o.outP === undefined ? 15 : o.outP, ters: o.ters,
+    olcek: o.olcek || [[6, 100], [8, 200], [12, 50]] });
+  izKur([[c]]);
+  playhead = o.ph === undefined ? 11.5 : o.ph;
+  var rr = cagir("KS_easeScan", {});
+  var pp = rr.props[0];
+  var bb = cagir("KS_easeBake", { target: hedef(pp), items: [plan(pp)] });
+  var kk = bb.records[0]; kk.id = "kr" + o.nodeId;
+  return { c: c, prop: pp, b: bb, kayit: kk, toplam: c.olcek.keys.length };
+}
+var SL = capaKlibi({ nodeId: "nSL", ad: "Slip.mp4" });
+ok("tarama ve kayıt klibin kaynak çapasını taşır (giriş / çıkış / bitiş / yön)", SL.prop.clipIn === 5 && SL.prop.clipOut === 15 && SL.prop.clipEnd === 20 && SL.prop.ters === false &&
+  SL.kayit.clipIn === 5 && SL.kayit.clipOut === 15 && SL.kayit.clipEnd === 20 && SL.kayit.ters === false && SL.b.basarili === 1 && SL.kayit.times.length === 49,
+  js([SL.prop.clipIn, SL.prop.clipOut, SL.prop.ters, SL.kayit.clipIn, SL.kayit.clipOut, SL.kayit.ters]));
+var slKayit = KRh.kayit(SL.kayit);
+ok("anahtar kayıt deposu kaynak çapasını saklar (eski kayıtta yok)", slKayit.clipIn === 5 && slKayit.clipOut === 15 && slKayit.clipEnd === 20 && slKayit.ters === false &&
+  KRh.kayit({ tur: "egri", times: [1], clipStart: 0 }).clipIn === undefined, js(slKayit).slice(0, 200));
+SL.c.inPoint.seconds = 5.5; SL.c.outPoint.seconds = 15.5;   // slip: 0,5 sn
+var slTar = cagir("KS_easeScan", {});
+var slProp = slTar.props[0];
+var slCanli = Mh.canliKayitlar([slKayit], slProp);
+ok("slip sonrası panel: kayıt çapayla kaydırılıp canlı (uçlar 10,5 → 12,5), satır kayıtlı çift, Geri al bulunur", slCanli.length === 1 && slCanli[0].id === slKayit.id &&
+  js(slCanli[0].uclar) === js([10.5, 12.5]) && Mh.satirDurumu(slProp, 11.5, Mh.uclarDan(slCanli)).durum === "kayitli" &&
+  Mh.satirKaydi([slKayit], slProp, Mh.satirDurumu(slProp, 11.5, Mh.uclarDan(slCanli)).cift).id === slKayit.id, js([slCanli.map(function (r) { return r.uclar; }), slProp.keys.slice(0, 3)]));
+var slU = cagir("KS_easeUndo", { records: [slKayit] });
+ok("geri al, slip sonrası: 49 Suflo anahtarı silinir, kullanıcının 3 anahtarı kalır", slU.ok && slU.atlanan.length === 0 && slU.sonuclar.length === 1 && slU.sonuclar[0].silinen === 49 &&
+  SL.c.olcek.keys.length === 3 && SL.c.olcek.bul(6).v === 100 && SL.c.olcek.bul(8).v === 200 && SL.c.olcek.bul(12).v === 50, js([slU, SL.c.olcek.keys.length]));
+// panelin kaydırılmış kopyası (çapası bugünkü klip) da aynı anahtarları siler
+var SL2 = capaKlibi({ nodeId: "nSL2", ad: "Slip2.mp4" });
+SL2.c.inPoint.seconds = 4; SL2.c.outPoint.seconds = 14;   // slip: -1 sn
+var sl2Prop = cagir("KS_easeScan", {}).props[0];
+var sl2Kopya = Mh.canliKayitlar([KRh.kayit(SL2.kayit)], sl2Prop)[0];
+var sl2U = sl2Kopya ? cagir("KS_easeUndo", { records: [sl2Kopya] }) : null;
+ok("geri al, slip sonrası panelin kaydırılmış kopyasıyla: 49 anahtar silinir", sl2Kopya && js(sl2Kopya.uclar) === js([12, 14]) && sl2Kopya.clipIn === 4 &&
+  sl2U.sonuclar.length === 1 && sl2U.sonuclar[0].silinen === 49 && SL2.c.olcek.keys.length === 3, js([sl2Kopya && sl2Kopya.uclar, sl2U]));
+// Q tarzı baştan ripple kırpma: giriş +0,5, bitiş -0,5, başlangıç yerinde
+var RT = capaKlibi({ nodeId: "nRT", ad: "Ripple.mp4" });
+RT.c.inPoint.seconds = 5.5; RT.c.end.seconds = 19.5;
+var rtU = cagir("KS_easeUndo", { records: [KRh.kayit(RT.kayit)] });
+ok("geri al, baştan ripple kırpma sonrası: 49 Suflo anahtarı silinir", rtU.atlanan.length === 0 && rtU.sonuclar[0].silinen === 49 && RT.c.olcek.keys.length === 3, js([rtU, RT.c.olcek.keys.length]));
+// düz baştan kırpma (başlangıç ve giriş birlikte) + taşıma: anahtarlar timeline'da taşıma kadar kayar
+var NT = capaKlibi({ nodeId: "nNT", ad: "Kirp.mp4" });
+NT.c.inPoint.seconds = 5.2; NT.c.start.seconds = 10.2;   // baştan 0,2 sn kırpıldı
+NT.c.start.seconds += 3; NT.c.end.seconds += 3;           // sonra 3 sn sağa taşındı
+var ntU = cagir("KS_easeUndo", { records: [KRh.kayit(NT.kayit)] });
+ok("geri al, baştan kırpma + taşıma sonrası: 49 Suflo anahtarı silinir", ntU.atlanan.length === 0 && ntU.sonuclar[0].silinen === 49 && NT.c.olcek.keys.length === 3, js([ntU, NT.c.olcek.keys.length]));
+// ters klipte baştan ripple kırpma: görünen baş kaynağın çıkışıdır (çıkış -0,5, bitiş -0,5)
+var TR = capaKlibi({ nodeId: "nTR", ad: "Ters.mp4", ters: true, olcek: [[14, 100], [12, 200], [8, 50]] });
+TR.c.outPoint.seconds = 14.5; TR.c.end.seconds = 19.5;
+var trU = cagir("KS_easeUndo", { records: [KRh.kayit(TR.kayit)] });
+ok("geri al, ters klipte baştan ripple kırpma sonrası: 49 Suflo anahtarı silinir", TR.kayit.ters === true && trU.atlanan.length === 0 && trU.sonuclar[0].silinen === 49 &&
+  TR.c.olcek.keys.length === 3, js([trU, TR.c.olcek.keys.length]));
+// %50 hızlı klipte slip: kaynak 0,5 sn → timeline 1 sn
+var YS = capaKlibi({ nodeId: "nYS", ad: "Yavas.mp4", inP: 5, outP: 10, olcek: [[6, 100], [7, 200], [9, 50]], ph: 13 });
+YS.c.inPoint.seconds = 5.5; YS.c.outPoint.seconds = 10.5;
+var ysU = cagir("KS_easeUndo", { records: [KRh.kayit(YS.kayit)] });
+ok("geri al, %50 hızlı klipte slip sonrası: Suflo anahtarlarının hepsi silinir", ysU.atlanan.length === 0 && ysU.sonuclar[0].silinen === YS.kayit.times.length &&
+  YS.c.olcek.keys.length === 3, js([ysU, YS.kayit.times.length, YS.c.olcek.keys.length]));
+// yeniden uygulama, slip sonrası: panel kopyasının uçları ipucu olur, degistir + eski yalnız Suflo'nun eski anahtarlarını siler
+var RA = capaKlibi({ nodeId: "nRA", ad: "Yeniden.mp4" });
+RA.c.inPoint.seconds = 5.5; RA.c.outPoint.seconds = 15.5;
+var raKayit = KRh.kayit(RA.kayit);
+var raProp0 = cagir("KS_easeScan", {}).props[0];
+var raIpucu = Mh.ipuclari([raKayit], [raProp0]);
+playhead = 11.5;
+var raProp = cagir("KS_easeScan", { ipuclari: raIpucu }).props[0];
+var raKopya = Mh.canliKayitlar([raKayit], raProp)[0];
+var raSatir = Mh.satirDurumu(raProp, playhead, Mh.uclarDan([raKopya]));
+var raPlan = Mh.bakeGruplari([{ prop: raProp, cift: raSatir.cift, kayit: raKopya }], E.builtin("dogrusal").curve, 1, "seq-1");
+var raB = cagir("KS_easeBake", raPlan.gruplar[0]);
+ok("yeniden uygulama, slip sonrası: kayıtlı çift 10,5 → 12,5, eski 49 anahtar silinir, yeni eğri yazılır, kullanıcının anahtarları kalır",
+  js(raIpucu) === js([{ nodeId: "nRA", compIdx: 0, propIdx: 1, t0: 10.5, t1: 12.5 }]) && raProp.pair.kayitli === true && raSatir.durum === "kayitli" &&
+  raB.basarili === 1 && raB.sonuclar[0].silinen === 49 && RA.c.olcek.keys.length === 3 + raB.records[0].times.length && RA.c.olcek.bul(12).v === 50 &&
+  js(Mh.cakisanlar([raKayit], KRh.kayit(raB.records[0])).map(function (r) { return r.id; })) === js([raKayit.id]), js([raIpucu, raSatir.durum, raB.sonuclar]));
+
 // Suflo'nun anahtarları Ctrl+Z ile gitti, kullanıcı aralığa (kayıtlı bir kare zamanına) kendi anahtarını koydu
 var CZ = klip({ nodeId: "nCZ", ad: "CtrlZ.mp4", start: 0, end: 10, inP: 0, outP: 10, olcek: [[1, 100], [2, 200]] });
 izKur([[CZ]]);

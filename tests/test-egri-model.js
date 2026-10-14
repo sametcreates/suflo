@@ -158,6 +158,49 @@ ok("taşınan klip: satır kayıtlı çift 13 → 15, satır kaydı (Geri al) bu
 var baskaYer = KR.kayit({ id: "krb", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", clipStart: 10, uclar: [13, 15], times: [14] });
 ok("çakışanlar klibe göre: taşındıktan sonra yeniden uygulanan eğri eski kaydın yerine geçer, taşınmış başka eğrininkini atmaz",
   js(M.cakisanlar([kayitT, baskaYer], { id: "kryeni", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, clipStart: 12, uclar: [13, 15] }).map(function (r) { return r.id; })) === js(["krt"]));
+// slip / baştan ripple kırpma: klibin başı yerinde, giriş noktası kayar → anahtarlar timeline'da kayar; kayıt kaynak çapasıyla bulunur
+var capaR = KR.kayit({ id: "krc", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", clipStart: 10, clipEnd: 20, clipIn: 5, clipOut: 15,
+  ters: false, uclar: [11, 13], times: yogun.map(function (t) { return Math.round((t + 10) * 10000) / 10000; }) });
+function satir(o, kayma) {
+  var p = { nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", fps: 25, clipStart: 10, clipEnd: 20, clipIn: 5, clipOut: 15, ters: false };
+  Object.keys(o).forEach(function (k) { p[k] = o[k]; });
+  p.keys = [11 + kayma].concat(yogun.map(function (t) { return Math.round((t + 10 + kayma) * 10000) / 10000; })).concat([13 + kayma, 17 + kayma]);
+  return p;
+}
+var slip = satir({ clipIn: 6.5, clipOut: 16.5 }, -1.5), ripple = satir({ clipIn: 5.5, clipEnd: 19.5 }, -0.5);
+var kirpTasi = satir({ clipStart: 13.2, clipEnd: 23, clipIn: 5.2 }, 3);
+ok("çapa kayması: slip -1,5, baştan ripple kırpma -0,5, düz kırpma + taşıma +3 (klip başlangıcı kayması 3,2 değil)", yakin(M.capaKaymasi(capaR, slip, 0.01), -1.5) &&
+  yakin(M.capaKaymasi(capaR, ripple, 0.01), -0.5) && yakin(M.capaKaymasi(capaR, kirpTasi, 0.01), 3), js([M.capaKaymasi(capaR, slip, 0.01), M.capaKaymasi(capaR, kirpTasi, 0.01)]));
+ok("çapa kayması: hız ya da yön değişti, ya da çapasız eski kayıt → NaN (eski adaylar)", isNaN(M.capaKaymasi(capaR, satir({ clipOut: 25 }, 0), 0.01)) &&
+  isNaN(M.capaKaymasi(capaR, satir({ ters: true }, 0), 0.01)) && isNaN(M.capaKaymasi(kayitT, slip, 0.01)) && M.capaKaymasi(capaR, satir({}, 0), 0.01) === 0);
+var csl = M.canliKayitlar([capaR], slip), crp = M.canliKayitlar([capaR], ripple), ckt = M.canliKayitlar([capaR], kirpTasi);
+ok("slip / ripple kırpma / kırpma + taşıma sonrası kayıt canlı; kopya bugünkü klibin çapasını alır, özgün kayıt değişmez", csl.length === 1 && js(csl[0].uclar) === js([9.5, 11.5]) &&
+  csl[0].clipIn === 6.5 && csl[0].clipOut === 16.5 && csl[0].clipStart === 10 && crp.length === 1 && js(crp[0].uclar) === js([10.5, 12.5]) && crp[0].clipEnd === 19.5 &&
+  ckt.length === 1 && js(ckt[0].uclar) === js([14, 16]) && capaR.clipIn === 5 && js(capaR.uclar) === js([11, 13]) && yakin(M.capaKaymasi(csl[0], slip, 0.01), 0),
+  js([csl.map(function (r) { return r.uclar; }), crp.map(function (r) { return r.uclar; }), ckt.map(function (r) { return r.uclar; })]));
+var sdS = M.satirDurumu(slip, 10.5, M.uclarDan(csl));
+ok("slip sonrası satır kayıtlı çift 9,5 → 11,5 (1 karelik Suflo çifti değil); Geri al kaydı bulunur; ipucu kaymış uçlarla", sdS.durum === "kayitli" && sdS.cift.t0 === 9.5 &&
+  sdS.cift.t1 === 11.5 && M.satirKaydi([capaR], slip, sdS.cift).id === "krc" && js(M.ipuclari([capaR], [slip])) === js([{ nodeId: "n1", compIdx: 0, propIdx: 1, t0: 9.5, t1: 11.5 }]), js(sdS));
+ok("hızı değişen klipte kayıt canlı sayılmaz (Geri al dokunmaz)", M.canliKayitlar([capaR], satir({ clipOut: 25 }, -1.5)).length === 0);
+// kesik pencere (400'den çok anahtar) de çapa kaymasıyla ölçülür
+var uzunC = KR.kayit({ id: "kruc", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", clipStart: 0, clipEnd: 40, clipIn: 0, clipOut: 40,
+  uclar: [2, 26], times: uzunTimesC() });
+function uzunTimesC() { var z = []; for (var q = 1; q < 600; q++) z.push(Math.round((2 + q * 0.04) * 10000) / 10000); return z; }
+var pencereC = { nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", fps: 25, kesik: true, clipStart: 0, clipEnd: 40, clipIn: 1, clipOut: 41,
+  keys: uzunTimesC().slice(200, 600).map(function (t) { return Math.round((t - 1) * 10000) / 10000; }) };
+ok("kesik pencere, slip sonrası: ipucu çapa kaymasıyla (uçlar 1 → 25)", js(M.ipuclari([uzunC], [pencereC])) === js([{ nodeId: "n1", compIdx: 0, propIdx: 1, t0: 1, t1: 25 }]),
+  js(M.ipuclari([uzunC], [pencereC])));
+// büyük slip sonrası yeniden uygulanan eğri eski kaydın yerine geçer (klip başı aynı olsa da)
+var yeniSlip = { id: "krys", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, clipStart: 10, clipEnd: 20, clipIn: 8, clipOut: 18, ters: false, uclar: [8, 10] };
+var baskaSlip = KR.kayit({ id: "krbs", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", clipStart: 10, clipEnd: 20, clipIn: 5, clipOut: 15,
+  uclar: [8, 10], times: [9] });
+ok("çakışanlar çapaya göre: slip'ten sonra yeniden uygulanan eğri eskinin yerine geçer, eskiden aynı timeline aralığındaki başka eğriyi atmaz",
+  js(M.cakisanlar([capaR, baskaSlip], yeniSlip).map(function (r) { return r.id; })) === js(["krc"]), js(M.cakisanlar([capaR, baskaSlip], yeniSlip).map(function (r) { return r.id; })));
+var gcap = M.bakeGruplari([{ prop: { nodeId: "nA", clipName: "A.mp4", clipStart: 0, clipEnd: 10, clipIn: 2, clipOut: 12, ters: true, compIdx: 1, propIdx: 0,
+  matchName: "AE.ADBE Opacity/Opacity", opak: true, fps: 25, v0: 0, v1: 100 }, cift: { t0: 1, t1: 2, kayitli: false } }], E.builtin("yumusak").curve, 1, "s1");
+var gecC = KR.kayit(M.geciciKayitlar(gcap.gruplar[0], "s1")[0]);
+ok("zaman aşımı geçici kaydı da kaynak çapasını taşır (hedef host'a eskisi gibi gider)", gecC.clipIn === 2 && gecC.clipOut === 12 && gecC.clipEnd === 10 && gecC.ters === true &&
+  js(Object.keys(gcap.gruplar[0].target).sort()) === js(["clipName", "clipStart", "nodeId", "seqId"]), js(gecC).slice(0, 200));
 // kayıtlı çiftte bake öğesi eski zamanları taşır (host yalnız onları siler)
 var gk = M.bakeGruplari([{ prop: pB, cift: { t0: 1, t1: 2, kayitli: true }, kayit: { id: "kx", times: [1.5, 1.6] } }, { prop: pA, cift: { t0: 1, t1: 2, kayitli: false } }], E.builtin("yumusak").curve, 1, "s1");
 ok("bake öğesi: kayıtlı çiftte degistir + eski (kaydın zamanları), kayıtsızda eski yok", js(gk.gruplar[0].items[0].eski) === js([1.5, 1.6]) && gk.gruplar[0].items[0].degistir === true &&

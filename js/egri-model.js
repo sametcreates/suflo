@@ -131,32 +131,81 @@
         String(r.matchName || "") === String(prop.matchName || "");
     });
   }
+  // Klibin kaynak çapası (tarama satırından ya da kayıttan): { clipStart, clipEnd, clipIn, clipOut, ters } | null
+  function capa(o) {
+    if (!o || !sonlu(o.clipStart) || !sonlu(o.clipEnd) || !sonlu(o.clipIn) || !sonlu(o.clipOut)) return null;
+    return { clipStart: o.clipStart, clipEnd: o.clipEnd, clipIn: o.clipIn, clipOut: o.clipOut, ters: o.ters === true };
+  }
+  /*
+   * Kaydın kaynak çapasından bugünkü klibe (k: tarama satırı ya da yeni kayıt) sabit kayma; host
+   * KS_easeCapaKaymasi ile aynı hesap. Kayıt zamanı → o günkü eşlemeyle kaynak saniyesi → bugünkü klibin
+   * timeline saniyesi. Hız ve yön aynıyken (taşıma, slip, baştan / sondan düz ya da ripple kırpma) tüm
+   * anahtarlar aynı kadar kayar; iki uçtaki kayma tol / 2'den çok ayrışırsa ya da çapa yoksa NaN.
+   */
+  function capaKaymasi(r, k, tol) {
+    var a = capa(r), b = capa(k);
+    if (!a || !b || a.ters !== b.ters) return NaN;
+    var rDur = a.clipEnd - a.clipStart, rKay = a.clipOut - a.clipIn, dur = b.clipEnd - b.clipStart, kKay = b.clipOut - b.clipIn;
+    if (!(rDur > 1e-6) || !(Math.abs(rKay) > 1e-6) || !(dur > 1e-6) || !(Math.abs(kKay) > 1e-6)) return NaN;
+    var u = Array.isArray(r.uclar) && r.uclar.length === 2 ? r.uclar : (Array.isArray(r.times) && r.times.length ? [r.times[0], r.times[r.times.length - 1]] : null);
+    if (!u || !sonlu(u[0]) || !sonlu(u[1])) return NaN;
+    function yeni(t) {
+      var oran = (t - a.clipStart) / rDur;
+      var s = a.ters ? a.clipOut - rKay * oran : a.clipIn + rKay * oran;
+      var o2 = b.ters ? (b.clipOut - s) / kKay : (s - b.clipIn) / kKay;
+      return b.clipStart + o2 * dur;
+    }
+    var d0 = yeni(u[0]) - u[0], d1 = yeni(u[1]) - u[1];
+    if (!sonlu(d0) || !sonlu(d1) || Math.abs(d1 - d0) > tol / 2) return NaN;
+    return (d0 + d1) / 2;
+  }
   /*
    * Kaydın d saniye kaydırılmış kopyası (id aynı). Anahtarlar klibin KAYNAK zamanında durur: klip timeline'da
-   * taşınınca hepsi klip kadar kayar, kayıt (timeline saniyesi) kaymaz. clipStart da kayar: host'a giden
-   * kopya kendi içinde tutarlıdır.
+   * taşınınca / slip ya da ripple kırpılınca hepsi kayar, kayıt (timeline saniyesi) kaymaz. Kopya kendi içinde
+   * tutarlıdır: yeniCapa verildiyse (çapa kayması) bugünkü klibin çapasını alır, yoksa clipStart / clipEnd de d
+   * kadar kayar. Host'a giden kopya böylece kaymasız eşleşir.
    */
-  function kaydir(r, d) {
+  function kaydir(r, d, yeniCapa) {
     var k = {};
     for (var a in r) if (Object.prototype.hasOwnProperty.call(r, a)) k[a] = r[a];
     k.times = (r.times || []).map(function (t) { return r4(t + d); });
     if (r.uclar) k.uclar = [r4(r.uclar[0] + d), r4(r.uclar[1] + d)];
     if (Array.isArray(r.kenarDegerleri)) k.kenarDegerleri = r.kenarDegerleri.map(function (x) { return { t: r4(x.t + d), v: x.v }; });
-    if (sonlu(r.clipStart)) k.clipStart = r4(r.clipStart + d);
+    var c = capa(yeniCapa);
+    if (c) {
+      k.clipStart = r4(c.clipStart); k.clipEnd = r4(c.clipEnd); k.clipIn = r4(c.clipIn); k.clipOut = r4(c.clipOut); k.ters = c.ters;
+    } else {
+      if (sonlu(r.clipStart)) k.clipStart = r4(r.clipStart + d);
+      if (sonlu(r.clipEnd)) k.clipEnd = r4(r.clipEnd + d);
+    }
     return k;
   }
   /*
+   * Kaydın bugünkü klibe göre aday kaymaları (host KS_easeKayitEsle ile aynı sıra): çapa kayması (taşıma, slip,
+   * ripple kırpma; hız ve yön aynıyken), kaymasız (düz baştan kırpma anahtarları yerinde bırakır) ve klip
+   * başlangıcının kayması (çapasız eski kayıt). Döner: [{ d, capa }] (capa: kopyanın alacağı bugünkü çapa).
+   */
+  function adayKaymalar(r, prop) {
+    var tol = tolerans(prop.fps), out = [];
+    var dc = capaKaymasi(r, prop, tol);
+    if (sonlu(dc) && Math.abs(dc) > 1e-6) out.push({ d: dc, capa: prop });
+    out.push({ d: 0, capa: null });
+    var dm = Number(prop.clipStart) - Number(r.clipStart);
+    if (sonlu(r.clipStart) && sonlu(dm) && Math.abs(dm) > tol && (!sonlu(dc) || Math.abs(dm - dc) > 1e-6)) out.push({ d: dm, capa: null });
+    return out;
+  }
+  /*
    * Kaydın bugünkü anahtarlarla canlı hâli (SufloKeyRecords.canli: iki uç + zamanların en az %60'ı) ya da null.
-   * Önce kaydın kendi zamanları (baştan kırpma anahtarları yerinde bırakır), tutmazsa klibin kayması kadar
-   * (kayıt.clipStart → prop.clipStart) kaydırılmış kopyası denenir (host KS_easeKayitEsle ile aynı adaylar).
+   * Aday kaymalar sırayla denenir (adayKaymalar); kaymasız aday kaydın kendisini döndürür.
    */
   function canliHali(r, prop) {
     if (!KR) return null;
-    if (KR.canli(r, prop.keys, prop.fps)) return r;
-    var d = Number(prop.clipStart) - Number(r.clipStart);
-    if (!sonlu(r.clipStart) || !sonlu(d) || Math.abs(d) <= tolerans(prop.fps)) return null;
-    var k = kaydir(r, d);
-    return KR.canli(k, prop.keys, prop.fps) ? k : null;
+    var ad = adayKaymalar(r, prop);
+    for (var i = 0; i < ad.length; i++) {
+      var k = ad[i].d === 0 ? r : kaydir(r, ad[i].d, ad[i].capa);
+      if (KR.canli(k, prop.keys, prop.fps)) return k;
+    }
+    return null;
   }
   // Canlı kayıtlar (taşınan klipte kaydırılmış kopyalarıyla)
   function canliKayitlar(kayitlar, prop) {
@@ -183,11 +232,12 @@
       var ucTamam = rec.uclar.every(function (u) { return u < lo || u > hi || indis(k, u, tol) >= 0; });
       return ucTamam && KR.canli({ tur: rec.tur, times: gorunen }, k, prop.fps);
     }
-    if (dene(r)) return r;
-    var d = Number(prop.clipStart) - Number(r.clipStart);
-    if (!sonlu(r.clipStart) || !sonlu(d) || Math.abs(d) <= tol) return null;
-    var kk = kaydir(r, d);
-    return dene(kk) ? kk : null;
+    var ad = adayKaymalar(r, prop);
+    for (var i = 0; i < ad.length; i++) {
+      var kk = ad[i].d === 0 ? r : kaydir(r, ad[i].d, ad[i].capa);
+      if (dene(kk)) return kk;
+    }
+    return null;
   }
   // KS_easeScan'e giden ipuçları: canlı kayıtların uçları (kesik özellikte pencerede canlı görünenler de)
   function ipuclari(kayitlar, props) {
@@ -211,15 +261,17 @@
     return null;
   }
   // Yeni kayıtla çakışan eskiler (aynı satır, uç aralıkları kesişir): yeni eğri onların yerine geçer. İkisinin
-  // de klip başlangıcı biliniyorsa aralıklar klibe göre ölçülür (klip taşındıktan sonra yeniden uygulanan eğri
-  // eski kaydın yerine geçer; taşınmış başka bir eğrinin kaydını yanlışlıkla atmaz)
+  // de kaynak çapası biliniyorsa aralıklar kaynak zamanına göre (klip taşınmış, slip ya da ripple kırpılmış),
+  // yalnız klip başlangıcı biliniyorsa klibe göre ölçülür: düzenlemeden sonra yeniden uygulanan eğri eski kaydın
+  // yerine geçer; kaymış başka bir eğrinin kaydını yanlışlıkla atmaz
   function cakisanlar(kayitlar, yeni) {
     return (Array.isArray(kayitlar) ? kayitlar : []).filter(function (r) {
       if (!r || !yeni || r.id === yeni.id || r.tur !== "egri") return false;
       if (String(r.nodeId) !== String(yeni.nodeId) || r.compIdx !== yeni.compIdx || r.propIdx !== yeni.propIdx) return false;
       var a = r.uclar, b = yeni.uclar;
       if (!a || !b) return true;
-      var d = sonlu(r.clipStart) && sonlu(yeni.clipStart) ? yeni.clipStart - r.clipStart : 0;
+      var d = capaKaymasi(r, yeni, tolerans(yeni.fps));
+      if (!sonlu(d)) d = sonlu(r.clipStart) && sonlu(yeni.clipStart) ? yeni.clipStart - r.clipStart : 0;
       return a[0] + d < b[1] && b[0] < a[1] + d;
     });
   }
@@ -244,7 +296,8 @@
       var a = String(p.nodeId);
       if (!Object.prototype.hasOwnProperty.call(dizin, a)) {
         dizin[a] = gruplar.length;
-        gruplar.push({ target: { nodeId: p.nodeId, clipName: p.clipName, clipStart: p.clipStart, seqId: seqId || "" }, items: [], satirlar: [] });
+        gruplar.push({ target: { nodeId: p.nodeId, clipName: p.clipName, clipStart: p.clipStart, seqId: seqId || "" }, items: [], satirlar: [],
+          klip: capa(p) });
       }
       var g = gruplar[dizin[a]];
       var oge = { compIdx: p.compIdx, propIdx: p.propIdx, matchName: p.matchName, t0: c.t0, t1: c.t1, v0: p.v0, v1: p.v1,
@@ -261,11 +314,14 @@
    * canlı değildir, dokunulmaz.
    */
   function geciciKayitlar(grup, seqId) {
-    var h = (grup && grup.target) || {};
+    var h = (grup && grup.target) || {}, c = capa(grup && grup.klip);
     return ((grup && grup.items) || []).map(function (it) {
-      return { tur: "egri", seqId: String(seqId || h.seqId || ""), nodeId: h.nodeId, clipName: h.clipName, clipStart: h.clipStart,
+      var r = { tur: "egri", seqId: String(seqId || h.seqId || ""), nodeId: h.nodeId, clipName: h.clipName, clipStart: h.clipStart,
         matchName: it.matchName, compIdx: it.compIdx, propIdx: it.propIdx, uclar: [it.t0, it.t1],
         times: (it.keys || []).map(function (k) { return k.t; }), kenarDegerleri: [{ t: it.t0, v: it.v0 }, { t: it.t1, v: it.v1 }] };
+      // kaynak çapası (taramadan): zaman aşımındaki geçici kayıt da slip / ripple kırpmadan sonra bulunur
+      if (c) { r.clipEnd = c.clipEnd; r.clipIn = c.clipIn; r.clipOut = c.clipOut; r.ters = c.ters; }
+      return r;
     }).filter(function (r) { return r.times.length > 0; });
   }
   // KS_easeBake zaman aşımı: toplam anahtar başına 50 ms, en az 120 sn, en çok 10 dk
@@ -558,7 +614,7 @@
     yoklamaUygun: yoklamaUygun, yoklamaKarari: yoklamaKarari,
     ciftBul: ciftBul, kareSayisi: kareSayisi, sayi: sayi, aralikMetni: aralikMetni, satirDurumu: satirDurumu, satirAnahtari: satirAnahtari,
     satirKayitlari: satirKayitlari, canliKayitlar: canliKayitlar, canliHali: canliHali, kaydir: kaydir, uclarDan: uclarDan, ipuclari: ipuclari,
-    satirKaydi: satirKaydi, cakisanlar: cakisanlar,
+    satirKaydi: satirKaydi, cakisanlar: cakisanlar, capaKaymasi: capaKaymasi,
     bakeGruplari: bakeGruplari, geciciKayitlar: geciciKayitlar, bakeSuresi: bakeSuresi, sonrakiCift: sonrakiCift, onizlemeAdimlari: onizlemeAdimlari,
     kisayol: kisayol, metinAlani: metinAlani, tusIlgisi: tusIlgisi,
     onayarlar: onayarlar, onayarEkle: onayarEkle, onayarSil: onayarSil, onayarAdi: onayarAdi,

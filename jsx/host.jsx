@@ -4655,8 +4655,10 @@ function KS_easeFps(seq) {
   return f > 0 && f <= 1000 ? f : 30;
 }
 
-// Kaynak saniyesi -> timeline saniyesi (KS_presetSourceTime'in tersi, kirpmasiz)
-function KS_easeTimeline(clip, srcSec, start, end) {
+// Klibin kaynak capasi: { clipIn, clipOut, ters } (KS_presetSourceTime ile ayni yedekler). Kayit bunu da
+// saklar: slip / bastan ripple kirpma klibin baslangicini degil giris noktasini kaydirir; anahtarlar
+// (kaynak zamaninda) timeline'da kayar, Geri al onlari bu capayla bulur (KS_easeCapaKaymasi).
+function KS_easeKaynak(clip, start, end) {
   var dur = Math.max(0.000001, end - start);
   var sIn = 0, sOut = dur;
   try { sIn = Number(clip.inPoint.seconds); } catch (eIn) {}
@@ -4665,8 +4667,18 @@ function KS_easeTimeline(clip, srcSec, start, end) {
   if (!isFinite(sOut) || Math.abs(sOut - sIn) < 0.000001) sOut = sIn + dur;
   var ters = false;
   try { if (clip.isSpeedReversed) ters = !!clip.isSpeedReversed(); } catch (eR) {}
-  var oran = ters ? (sOut - Number(srcSec)) / (sOut - sIn) : (Number(srcSec) - sIn) / (sOut - sIn);
+  return { clipIn: sIn, clipOut: sOut, ters: ters };
+}
+
+// Kaynak saniyesi -> timeline saniyesi (KS_presetSourceTime'in tersi, kirpmasiz); kay: KS_easeKaynak
+function KS_easeKaynaktan(kay, srcSec, start, end) {
+  var dur = Math.max(0.000001, end - start);
+  var oran = kay.ters ? (kay.clipOut - Number(srcSec)) / (kay.clipOut - kay.clipIn) : (Number(srcSec) - kay.clipIn) / (kay.clipOut - kay.clipIn);
   return start + oran * dur;
+}
+
+function KS_easeTimeline(clip, srcSec, start, end) {
+  return KS_easeKaynaktan(KS_easeKaynak(clip, start, end), srcSec, start, end);
 }
 
 function KS_easeSaniye(t) {
@@ -4975,7 +4987,8 @@ function KS_easePeek() {
  * Hedef: secili video klipleri (en cok 20), yoksa playhead'in altindaki en ustteki video klibi.
  * Doner: { seqId, ph, fps, proje, kaynak: 'secim'|'playhead'|'yok', kapsam: [a, b) (bu sonucun gecerli
  *   oldugu playhead araligi: secimde sinirsiz; playhead'de klibin ust katmanlarla kirpilmis araligi; klip
- *   yoksa playhead'i saran bosluk; 400'den cok anahtarda pencere), klipler: [...], props: [{ nodeId, clipName, clipStart, clipEnd, compIdx,
+ *   yoksa playhead'i saran bosluk; 400'den cok anahtarda pencere), klipler: [...], props: [{ nodeId, clipName, clipStart, clipEnd,
+ *   clipIn, clipOut, ters (kaynak capasi: panel kaydin canliligini slip / ripple kirpmadan sonra da bununla olcer), compIdx,
  *   propIdx, matchName, label, labelTablo, opak, tur: 'sayi'|'xy', keys (timeline sn), kesik,
  *   pair: { t0, t1, i0, i1, ic, kayitli } | null, v0, v1, fps }], atlanan (sinir disi ozellik) }
  */
@@ -5009,6 +5022,7 @@ function KS_easeScan(encoded) {
       var oz = KS_easeKlipOzeti(clip);
       oz.track = KS_easeKatman(seq, clip);
       klipler.push(oz);
+      var kay = KS_easeKaynak(clip, oz.clipStart, oz.clipEnd);
       var comps = null;
       try { comps = clip.components; } catch (eC) { comps = null; }
       if (!comps) continue;
@@ -5063,7 +5077,7 @@ function KS_easeScan(encoded) {
           var etiket = KS_easeEtiket(comp, prop);
           var oge = {
             nodeId: oz.nodeId, clipName: oz.clipName, clipStart: oz.clipStart, clipEnd: oz.clipEnd, track: oz.track,
-            compIdx: ci, propIdx: pi, matchName: KS_easeKimlik(comp, prop), label: etiket.label, labelTablo: etiket.tablo,
+            clipIn: kay.clipIn, clipOut: kay.clipOut, ters: kay.ters, compIdx: ci, propIdx: pi, matchName: KS_easeKimlik(comp, prop), label: etiket.label, labelTablo: etiket.tablo,
             opak: KS_easeOpakMi(comp, prop), tur: typeof ilk === "number" ? "sayi" : "xy",
             keys: keys, kesik: kesik, toplam: an.length, pair: null, v0: null, v1: null, fps: fps
           };
@@ -5105,6 +5119,7 @@ function KS_easeBake(encoded) {
     if (h.clipStart !== undefined && h.clipStart !== null && Math.abs(oz.clipStart - Number(h.clipStart)) > tol) {
       return KS_errKod("klipTasindi", "Klip tasinmis.");
     }
+    var kay = KS_easeKaynak(clip, oz.clipStart, oz.clipEnd);
     var toplamYaz = 0;
     for (var s = 0; s < items.length; s++) toplamYaz += items[s] && items[s].keys && items[s].keys.length ? items[s].keys.length : 0;
     if (toplamYaz > KS_EASE_MAX_WRITE) return KS_errKod("cokFazla", "Cok fazla anahtar kare.");
@@ -5185,7 +5200,7 @@ function KS_easeBake(encoded) {
       r.ok = true;
       if (dogru.length < temiz.length) r.kod = "eksik";
       records.push({ tur: "egri", seqId: String(seq.sequenceID), nodeId: oz.nodeId, clipName: oz.clipName, clipStart: oz.clipStart,
-        matchName: String(it.matchName), compIdx: Number(it.compIdx), propIdx: Number(it.propIdx), uclar: [t0, t1], times: dogru,
+        clipEnd: oz.clipEnd, clipIn: kay.clipIn, clipOut: kay.clipOut, ters: kay.ters, matchName: String(it.matchName), compIdx: Number(it.compIdx), propIdx: Number(it.propIdx), uclar: [t0, t1], times: dogru,
         kenarDegerleri: [{ t: t0, v: d0 }, { t: t1, v: d1 }] });
     }
     // Effect Controls / Program bir kez tazelensin: yalniz en son yazimda updateUI (her anahtarda true
@@ -5206,15 +5221,43 @@ function KS_easeKaydir(dizi, d) {
   return out;
 }
 
+function KS_easeSayi(v) { return typeof v === "number" && isFinite(v); }
+
+/*
+ * Kaydin kaynak capasindan (kayittaki clipStart / clipEnd / clipIn / clipOut / ters) bugunku klibe kayma: kayit
+ * zamani -> o gunku eslemeyle kaynak saniyesi -> bugunku klibin timeline saniyesi. Klibin hizi ve yonu ayniyken
+ * (tasima, slip, bastan / sondan duz ya da ripple kirpma ve bunlarin bilesimi) tum anahtarlar ayni kadar kayar.
+ * a, b: kaydin uclari; iki uctaki kayma tol / 2'den cok ayrisirsa (hiz ya da yon degisti) ya da kayitta capa
+ * yoksa (eski kayit) NaN. oz: { clipStart, clipEnd }, kay: KS_easeKaynak. (Panelde egri-model.js capaKaymasi.)
+ */
+function KS_easeCapaKaymasi(rec, oz, kay, a, b, tol) {
+  if (!KS_easeSayi(rec.clipStart) || !KS_easeSayi(rec.clipEnd) || !KS_easeSayi(rec.clipIn) || !KS_easeSayi(rec.clipOut)) return NaN;
+  if (!kay || (rec.ters === true) !== (kay.ters === true)) return NaN;
+  var bas = Number(oz.clipStart), son = Number(oz.clipEnd);
+  var rDur = rec.clipEnd - rec.clipStart, rKay = rec.clipOut - rec.clipIn;
+  var kKay = kay.clipOut - kay.clipIn;
+  if (!(rDur > 0.000001) || !(Math.abs(rKay) > 0.000001) || !(son - bas > 0.000001) || !(Math.abs(kKay) > 0.000001)) return NaN;
+  function yeni(t) {
+    var oran = (t - rec.clipStart) / rDur;
+    var src = rec.ters === true ? rec.clipOut - rKay * oran : rec.clipIn + rKay * oran;
+    return KS_easeKaynaktan(kay, src, bas, son);
+  }
+  var d0 = yeni(a) - a, d1 = yeni(b) - b;
+  if (!isFinite(d0) || !isFinite(d1) || Math.abs(d1 - d0) > tol / 2) return NaN;
+  return (d0 + d1) / 2;
+}
+
 /*
  * Kaydin bugunku anahtarlarla eslesmesi (SufloKeyRecords.canliAyrinti'nin host esi). Kaydin anahtarlari
- * klibin KAYNAK zamaninda durur: klip timeline'da tasininca hepsi klip kadar kayar, kayit (timeline
- * saniyesi) kaymaz. Adaylar: kaymasiz (bas kirpma da anahtari yerinde birakir) ve klibin kaymasi kadar
- * (kayit.clipStart -> bugunku baslangic). Canli aday: iki uc yerinde ve zamanlarin en az %60'i eslesir.
+ * klibin KAYNAK zamaninda durur: klip duzenlenince (tasima, slip, ripple kirpma) anahtarlar timeline'da
+ * kayar, kayit (timeline saniyesi) kaymaz. Adaylar sirasiyla: kaydin kaynak capasindan kayma
+ * (KS_easeCapaKaymasi; hiz ve yon ayniyken), kaymasiz (duz bas kirpma anahtari yerinde birakir) ve klibin
+ * baslangic kaymasi kadar (capasiz eski kayit: kayit.clipStart -> bugunku baslangic). Canli aday: iki uc
+ * yerinde ve zamanlarin en az %60'i eslesir. oz: { clipStart, clipEnd }, kay: KS_easeKaynak.
  * Doner: { canli, d, es (eslesen anahtar indisleri), koru (kullanicinin uclari, kaydirilmis) } ya da
  * { canli: false, ciftVar (bir adayda iki uc yerinde) }.
  */
-function KS_easeKayitEsle(an, rec, klipBas, tol) {
+function KS_easeKayitEsle(an, rec, oz, kay, tol) {
   var times = KS_easeKaydir(rec.times && typeof rec.times.length === "number" ? rec.times : [], 0);
   var koru = null;
   if (rec.uclar && rec.uclar.length === 2) {
@@ -5223,14 +5266,21 @@ function KS_easeKayitEsle(an, rec, klipBas, tol) {
   }
   // uc yoksa (baska araclarin kaydi) ilk ve son zaman uc sayilir (SufloKeyRecords gibi); onlar korunmaz
   var gerekli = koru || (times.length ? [times[0], times[times.length - 1]] : null);
-  var adaylar = [0];
-  var rs = typeof rec.clipStart === "number" ? rec.clipStart : NaN;
-  if (isFinite(rs) && isFinite(klipBas) && Math.abs(klipBas - rs) > tol) adaylar.push(klipBas - rs);
+  if (!gerekli) return { canli: false, ciftVar: false };
+  var adaylar = [];
+  var dc = KS_easeCapaKaymasi(rec, oz, kay, gerekli[0], gerekli[1], tol);
+  if (isFinite(dc) && Math.abs(dc) > 0.000001) adaylar.push(dc);
+  adaylar.push(0);
+  var klipBas = Number(oz.clipStart);
+  if (KS_easeSayi(rec.clipStart) && isFinite(klipBas) && Math.abs(klipBas - rec.clipStart) > tol) {
+    var dm = klipBas - rec.clipStart;
+    if (!isFinite(dc) || Math.abs(dm - dc) > 0.000001) adaylar.push(dm);
+  }
   var ciftVar = false;
   for (var a = 0; a < adaylar.length; a++) {
     var d = adaylar[a];
     var tz = KS_easeKaydir(times, d);
-    var ucVar = !!gerekli && KS_easeBulIndis(an, gerekli[0] + d, tol) >= 0 && KS_easeBulIndis(an, gerekli[1] + d, tol) >= 0;
+    var ucVar = KS_easeBulIndis(an, gerekli[0] + d, tol) >= 0 && KS_easeBulIndis(an, gerekli[1] + d, tol) >= 0;
     if (!ucVar) continue;
     ciftVar = true;
     var es = KS_easeEslestir(an, tz, tol);
@@ -5243,7 +5293,7 @@ function KS_easeKayitEsle(an, rec, klipBas, tol) {
 
 /*
  * p: { records: [SufloKeyRecords kaydi] }. Yalniz CANLI kayitta (KS_easeKayitEsle: iki uc yerinde, zamanlarin
- * en az %60'i; klip tasindiysa kaymasiyla) kaydedilen ve HALA duran zamanlar (0,25 kare tolerans) silinir;
+ * en az %60'i; klip tasindi, slip ya da ripple kirpildiysa kaymasiyla) kaydedilen ve HALA duran zamanlar (0,25 kare tolerans) silinir;
  * kayit uclari (kullanicinin anahtarlari) ve kullanicinin sonradan ekledigi anahtarlar kalir. Sonra t0'daki
  * deger updateUI ile yeniden yazilir (Program monitoru tazelensin). Canli degilse hicbir sey silinmez:
  * cift yerinde ama Suflo'nun anahtarlari gitmis (Ctrl+Z, elle silme) -> sonuclar'da kod 'yok' (kayit biter);
@@ -5271,7 +5321,7 @@ function KS_easeUndo(encoded) {
       if (!prop || KS_easeKimlik(comp, prop) !== String(rec.matchName || "")) { atlanan.push({ id: id, kod: "ozellik" }); continue; }
       var oz = KS_easeKlipOzeti(clip);
       var an = KS_easeAnahtarlar(clip, prop, oz.clipStart, oz.clipEnd);
-      var esle = KS_easeKayitEsle(an, rec, oz.clipStart, tol);
+      var esle = KS_easeKayitEsle(an, rec, oz, KS_easeKaynak(clip, oz.clipStart, oz.clipEnd), tol);
       if (!esle.canli) {
         if (esle.ciftVar) sonuclar.push({ id: id, ok: true, silinen: 0, kod: "yok" });
         else atlanan.push({ id: id, kod: "degisti" });

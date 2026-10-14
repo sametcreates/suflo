@@ -13,6 +13,9 @@
  *   uclar: Eğri'de çiftin kullanıcıya ait iki ucu; null ise times'ın ilk ve son elemanı.
  *   kenarDegerleri: yazmadan önceki kenar değerleri [{ t, v }] (v sayı ya da [x,y]); kaldırmada
  *   geri konur.
+ *   İsteğe bağlı kaynak çapası { clipEnd, clipIn, clipOut, ters }: yazıldığı andaki klip bitişi, kaynak
+ *   giriş / çıkış noktası ve ters oynatma. Anahtarlar klibin kaynak zamanında durur; slip ya da baştan
+ *   ripple kırpma onları timeline'da kaydırır, kaldırırken bu çapayla bulunur (Eğri; 3.4 adım 10).
  *
  * canli(kayit, canliZamanlar, fps): iki uç hâlâ var VE kaydedilen zamanların en az %60'ı yerinde
  * (sıralı iki dizide birleştirme yürüyüşü, tolerans 0,25 kare). Bu eşikler Suflo'nundur.
@@ -146,7 +149,7 @@
     }
     var id = typeof o.id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(o.id) ? o.id : yeniId(simdi);
     function tamsayi(v) { return sonlu(v) && v >= 0 && Math.floor(v) === v ? v : -1; }
-    return {
+    var out = {
       id: id,
       tur: o.tur,
       seqId: metin(o.seqId, 128),
@@ -161,6 +164,15 @@
       kenarDegerleri: kenar,
       createdAt: sonlu(o.createdAt) && o.createdAt > 0 ? o.createdAt : (sonlu(simdi) ? simdi : Date.now())
     };
+    // İsteğe bağlı kaynak çapası (yalnız dördü de geçerliyse; diğer araçların kaydında yer tutmaz)
+    if (sonlu(o.clipStart) && sonlu(o.clipEnd) && o.clipEnd > o.clipStart && sonlu(o.clipIn) && sonlu(o.clipOut) && o.clipOut !== o.clipIn &&
+      Math.abs(o.clipEnd) <= ZAMAN_UST && Math.abs(o.clipIn) <= ZAMAN_UST && Math.abs(o.clipOut) <= ZAMAN_UST) {
+      out.clipEnd = r4(o.clipEnd);
+      out.clipIn = r4(o.clipIn);
+      out.clipOut = r4(o.clipOut);
+      out.ters = o.ters === true;
+    }
+    return out;
   }
 
   function tolerans(fps) {
