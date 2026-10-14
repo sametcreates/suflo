@@ -1539,3 +1539,38 @@ müzik sayılmaz). Kullanıcıların katmanlarına başka adlar verdiğini gör�
 **K7.3 Tanıtım (isteğe bağlı).** 15 sn'lik ekran kaydı: Sekans kapsamında müzikli bir vlogda Sessizlikleri bul →
 Kesimleri uygula, kopya sekansta müziğin tek parça kaldığını göster. Sürüm notuna: "Otomatik Kesim artık tüm sekansı ya
 da In/Out aralığını kesebilir; müzik katmanın bölünmez".
+
+### Adım 8: Kesimden sonra altyazıyı yeni kurguya uyarla
+
+Ne değişti: Otomatik Kesim ve Konuşmadan kes başarılı **Kesimleri uygula**'dan sonra kesimi oturumluk bir kayda yazar
+(`KCaptions.kesimKaydet`). Altyazı sekmesindeki belge artık ait olduğu sekansı ve kayıttaki yerini bilir; kesimden önceki
+kurguya aitse kartta **Altyazıyı yeni kurguya uyarla** çıkar (art arda birden çok kesim, kopya dalları dahil, sırayla tek
+geri alma adımında). Konuşmadan kes'te ayrıca **Altyazıya aktar** (kesilmeyen kelimeler satır kurucuyla belge olur).
+Hesap saf modülde: `js/kesim-esle.js` (kelimeEsle: ortası kesimde kalan kelime düşer; satirEsle: kalan kelimelerden
+yeniden kurma; kareyeOturt; yolBul). Kart satırı `js/kesim-altyazi.js`. `KS_applyCuts` `esleme: true` isteyene ek bir
+rapor döner (kesimden önceki sekans, kesilen sekans/kopya, kare, her aralıkta ripple'ın gerçek kayması); istemeyenin çıktısı
+aynı. Uyarlanan / aktarılan belge yalnız o sekansa uygulanır. Kapı yok: ücretsiz (owner kararı: adım 8 free; kesim araçları
+Pro kalır, deneme hakkı yalnız Kesimleri uygula'da düşer). Lisans: clean-room (Premiere TR'nin `remapTime`'ı yalnız fikir;
+onun kesime kırpma davranışı alınmadı), NOTICE girdisi gerekmez. Yeni çalışma zamanı dosyaları `js/kesim-esle.js` ve
+`js/kesim-altyazi.js`: `js/` klasörüyle pakette, `tools/verify-release.ps1` ikisini de zorunlu tutar.
+
+**K8.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 8.1–8.13'ü yeni ve eski (CEF 74)
+Premiere'de dene. En önemlisi **8.4**: kesim kenarları Premiere'in `Time.getFormatted` zaman kodunun **aşağı yuvarladığı**
+varsayımıyla kareye oturtuluyor (`js/kesim-esle.js` › `kareyeOturt`). Altyazılar kesimlerden sonra hep aynı yönde tam
+1 kare kayıyorsa bildir; o zaman `Math.floor` yerine en yakın kareye yuvarlamaya geçilir (`tests/test-kesim-esle.js` kare
+satırları da). **8.6**: host'un "gerçek kayma" raporu (`KS_applyCuts` › `esleme.kesimler[].kayma`) Premiere'in boşlukta
+hiçbir şey silmediği varsayımına dayanıyor; boşluktan sonraki altyazılar kayıksa günlükle bildir.
+
+**K8.2 Karar: kelimesiz satır eşiği.** Kelime zamanı olmayan satır (bulut satır modu, SRT içe aktarma, kelime kelime /
+birikimli modlar, çevrilmiş satır) kesimle 0,2 sn'nin altına inerse düşer (`MIN_KALAN`). Plandan küçük sapma: yarısından
+fazlası kalan kısa satır (kelime kelime modundaki tek kelime, 0,15 sn) kesime değdi diye düşmez. Denemelerde kelime kelime
+modunda kesim kenarında kelime kaybolursa ya da kesilen kısa satır kalıyorsa bildir.
+
+**K8.3 Bilinen sınır (metinler için).** Premiere'e daha önce eklenmiş altyazı izi (ya da Altyazı Efektleri katmanı)
+güncellenmez: Suflo yalnız paneldeki belgeyi uyarlar. Kopya sekansta eski iz (özgün sekanstan kopyalanan) duruyorsa sil,
+sonra uyarlanan belgeyi Uygula. Kesim kayıtları oturumluk: panel kapanıp açılınca eski kesime uyarlama önerilmez. Sürüm notu
+ve site metninde böyle söyle; "altyazı izi kendiliğinden kayar" deme.
+
+**K8.4 Tanıtım (isteğe bağlı).** 15 sn'lik ekran kaydı: altyazılı bir vlogda Otomatik Kesim → Kesimleri uygula →
+"Altyazıyı yeni kurguya uyarla" → kopyada senkron altyazı. Sürüm notuna: "Kesimden sonra altyazıyı yeniden yazıya dökmeye
+gerek yok: tek tıkla yeni kurguya uyar".
