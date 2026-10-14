@@ -4853,6 +4853,25 @@ function KS_easeKlipBul(seq, h, fps) {
   return adli;
 }
 
+/*
+ * Birlestirme yuruyusu: artan anahtarlar [{ t }] ile zamanlar (siralanir) arasinda tol icinde eslesen
+ * ANAHTAR indisleri (her anahtar en cok bir kez). O(n + m): ExtendScript yavas, 2000 x 2000 ic ice
+ * dongu saniyeler surer.
+ */
+function KS_easeEslestir(anahtarlar, zamanlar, tol) {
+  var z = [];
+  for (var q = 0; q < zamanlar.length; q++) { var v = Number(zamanlar[q]); if (isFinite(v)) z.push(v); }
+  z.sort(function (x, y) { return x - y; });
+  var out = [], i = 0, j = 0;
+  while (i < z.length && j < anahtarlar.length) {
+    var d = anahtarlar[j].t - z[i];
+    if (Math.abs(d) <= tol) { out.push(j); i++; j++; }
+    else if (d < 0) j++;
+    else i++;
+  }
+  return out;
+}
+
 // Sirali anahtarlarda t'ye tol icinde bir anahtarin indisi (yoksa -1)
 function KS_easeBulIndis(liste, t, tol) {
   for (var i = 0; i < liste.length; i++) if (Math.abs(liste[i].t - t) <= tol) return i;
@@ -5079,7 +5098,8 @@ function KS_easeBake(encoded) {
       }
       // dogrulama: yazilan zamanlar gercekten anahtar mi (Premiere cagriyi hatasiz kabul edip yazmayabilir)
       var sonra = KS_easeAnahtarlar(clip, prop, oz.clipStart, oz.clipEnd), dogru = [];
-      for (var y = 0; y < yazilan.length; y++) if (KS_easeBulIndis(sonra, yazilan[y], tol) >= 0) dogru.push(yazilan[y]);
+      var bulunan = KS_easeEslestir(sonra, yazilan, tol);
+      for (var y = 0; y < bulunan.length; y++) dogru.push(Math.round(sonra[bulunan[y]].t * 1000000) / 1000000);
       r.yazilan = dogru.length;
       yazilanToplam += dogru.length;
       if (!dogru.length) { r.kod = temiz.length ? "yazilamadi" : "bos"; continue; }
@@ -5129,18 +5149,12 @@ function KS_easeUndo(encoded) {
       var an = KS_easeAnahtarlar(clip, prop, oz.clipStart, oz.clipEnd);
       var uc = rec.uclar && rec.uclar.length === 2 ? [Number(rec.uclar[0]), Number(rec.uclar[1])] : null;
       var times = rec.times && typeof rec.times.length === "number" ? rec.times : [];
-      var sil = [], kullanildi = {};
-      for (var k = 0; k < times.length; k++) {
-        var t = Number(times[k]);
-        if (!isFinite(t)) continue;
-        for (var a = 0; a < an.length; a++) {
-          if (kullanildi[a] || Math.abs(an[a].t - t) > tol) continue;
-          // uclar kullanicinin: kayitta gecse bile silinmez
-          if (uc && (Math.abs(an[a].t - uc[0]) <= tol || Math.abs(an[a].t - uc[1]) <= tol)) break;
-          kullanildi[a] = 1;
-          sil.push(an[a]);
-          break;
-        }
+      var sil = [], es = KS_easeEslestir(an, times, tol);
+      for (var k = 0; k < es.length; k++) {
+        var a = an[es[k]];
+        // uclar kullanicinin: kayitta gecse bile silinmez
+        if (uc && (Math.abs(a.t - uc[0]) <= tol || Math.abs(a.t - uc[1]) <= tol)) continue;
+        sil.push(a);
       }
       var silinen = 0;
       for (var s = sil.length - 1; s >= 0; s--) {

@@ -283,6 +283,19 @@ ok("geri al: bulunamayan klip, başka sekans, değişen özellik → atlanan (pa
 var adli = JSON.parse(JSON.stringify(kayitG)); adli.nodeId = "eski-node"; adli.times = [];
 ok("klip nodeId'siz kayıtta ad + başlangıçla bulunur", cagir("KS_easeUndo", { records: [adli] }).sonuclar.length === 1);
 
+// uzun aralık: 2000 iç anahtar yazılır ve tamamı geri alınır (eşleştirme birleştirme yürüyüşüyle, iç içe döngü yok)
+var U = klip({ nodeId: "nU", ad: "Uzun.mp4", start: 0, end: 100, inP: 0, outP: 100, olcek: [[0, 100], [80.04, 300]] });
+izKur([[U]]);
+playhead = 40;
+var ru = cagir("KS_easeScan", {});
+var pu = plan(ru.props[0], E.builtin("dogrusal").curve, 1);
+var basU = Date.now();
+var bu = cagir("KS_easeBake", { target: hedef(ru.props[0]), items: [pu] });
+var kayitU = bu.records[0];
+var uu = cagir("KS_easeUndo", { records: [kayitU] });
+ok("uzun aralık: 2000 anahtar yazılır, kayıt 2000 zaman, geri al hepsini siler, uçlar kalır", pu.keys.length === 2000 && bu.basarili === 1 && kayitU.times.length === 2000 &&
+  uu.sonuclar[0].silinen === 2000 && U.olcek.keys.length === 2 && U.olcek.bul(0) && U.olcek.bul(80.04), js([pu.keys.length, kayitU.times.length, uu.sonuclar[0].silinen, Date.now() - basU + " ms"]));
+
 /* ---------- 7) ipucu: canlı kayıt aralığı çift olur; 400 / 40 sınırları ---------- */
 var H = klip({ nodeId: "nH", start: 0, end: 10, inP: 0, outP: 10, olcek: [[2, 100], [4, 200]] });
 izKur([[H]]);
