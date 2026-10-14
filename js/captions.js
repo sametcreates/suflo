@@ -91,6 +91,21 @@ window.KCaptions = (function () {
   // harf donusumunun TR/AZ/RU kurallarini uygulayabilmesi icin saklanir.
   var algilananDil = "";
 
+  /*
+   * 3.4 adım 8 — kesimden sonra altyazıyı yeni kurguya uyarla. Ekrandaki belgenin ait olduğu sekans (kimlik) ve
+   * oturumun kesim kayıtlarındaki yeri: belge yalnız kendi sekansının (ya da o sekanstan açılan "— Suflo Temiz"
+   * kopyasının) kesimlerine uyarlanır; belge oluşmadan önce uygulanmış kesimler ona bir daha uygulanmaz (belgeSira).
+   * Otomatik Kesim ve Konuşmadan kes her başarılı KS_applyCuts'ı kesimKaydet ile bildirir (js/kesim-altyazi.js).
+   * Hesap saf modülde: js/kesim-esle.js. Ücretsiz (Pro kesim araçlarından tetiklenir).
+   */
+  var belgeSekansId = "";       // "" = bilinmiyor (eski taslak, sekanssız): uyarlama önerilmez
+  var belgeSira = 0;            // belge bu kesim kaydına kadar (dahil) güncel
+  var belgeKesimAdi = null;     // null: kesime bağlı değil; metin: belge bir kesimden sonra uyarlandı / aktarıldı, o
+                                // sekansın adı ("" = adı bilinmiyor): Uygula başka sekansta açılmaz (altyazı kayık çıkardı)
+  var kesimKayitlari = [];      // oturumdaki uygulanmış kesimler: { sira, kaynak, hedef, hedefAd, mod, cuts, kare, imza }
+  var kesimSayac = 0;
+  var KESIM_KAYIT_SINIRI = 40;
+
   // Onizleme/ipucu icin: ekranda veri varsa GERCEK bicimine, henuz uretim
   // yapilmadiysa UI secimine bak (bir sonraki uretimin bicimini gosterir).
   function kelimeModuAktif() {
@@ -118,7 +133,8 @@ window.KCaptions = (function () {
   // + belgenin dili (algilananDil): cevrimdisi Ingilizce belgeden geri donulen Turkce belge "en" kalmasin
   function durumAl(etiket) {
     return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili,
-      dil: algilananDil, shorts: shortsYuklenen, ornek: ornekBelge, ts: Date.now() };
+      dil: algilananDil, shorts: shortsYuklenen, ornek: ornekBelge, ts: Date.now(),
+      sekansId: belgeSekansId, sira: belgeSira, kesimAdi: belgeKesimAdi };
   }
   // shorts: ekrandaki belgenin Shorts kaydi mi (geri alinca taslak dogru yere yazilsin)
   function durumYukle(st) {
@@ -133,6 +149,13 @@ window.KCaptions = (function () {
     // geri alınan belge örnek değilse taslak yazımı yeniden açılır (aynı belgedeki
     // metin düzenleme anlık görüntüsü bayrak taşımaz: o zaman bayrak değişmez)
     if (typeof st.ornek === "boolean") ornekBelge = st.ornek;
+    // 3.4 adım 8: geri alınan belgenin sekansı ve kesim kayıtlarındaki yeri (uyarlamayı geri alınca yeniden önerilir)
+    if (typeof st.sekansId === "string") {
+      belgeSekansId = st.sekansId;
+      belgeSira = Number(st.sira) || 0;
+      belgeKesimAdi = typeof st.kesimAdi === "string" ? st.kesimAdi : null;
+      belgeDegisti();
+    }
   }
 
   function snapshot(etiket) {
@@ -186,6 +209,9 @@ window.KCaptions = (function () {
       ceviriDili: ceviriDili,
       dil: algilananDil,
       sequence: ctx.sequence || "",
+      // 3.4 adım 8: belgenin ait olduğu sekans (kesimden sonra uyarlama ve yanlış sekansa uygulama denetimi)
+      sekansId: belgeSekansId,
+      kesimAdi: belgeKesimAdi,
       scope: scope,
       ts: Date.now()
     });
@@ -214,6 +240,8 @@ window.KCaptions = (function () {
     clearRevert();                                       // eski dokümanın metinleri bu satırlara ait değil
     ceviriDili = d.ceviriDili || "";                     // taslak çevrilmişse hedef dil (s.orig satırlarda)
     algilananDil = kayitDili(d.dil, segments);           // taslağın dili (ekrandaki belgeninki değil)
+    // taslağın sekansı (3.4 öncesi taslakta yok: uyarlama önerilmez); bu oturumun önceki kesimleri ona uygulanmaz
+    belgeBagla(typeof d.sekansId === "string" ? d.sekansId : "", kesimSayac, typeof d.kesimAdi === "string" ? d.kesimAdi : null);
     el("cap-result").hidden = false;
     render();                                            // önce render, sonra etiket (render eziyor)
     el("cap-result-info").textContent = segments.length + " satır · kurtarıldı";
@@ -1493,6 +1521,7 @@ window.KCaptions = (function () {
       durumYonlendir = null;
       busy = false;
       refreshButton();
+      belgeDegisti();
     }
   }
 
@@ -3038,6 +3067,10 @@ window.KCaptions = (function () {
     var dtwIste = !ornek && dtwSecili();
     var cevrildi = false;
     var basarili = false;
+    // 3.4 adım 8: yeni belgenin sekansı (sekans kapsamında dışa aktarımın sekansı) ve o anki kesim kaydı: bu işten
+    // önce uygulanmış kesimler sesin içinde zaten var, belgeye bir daha uygulanmaz
+    var isSekansId = ornek ? (ornekSekansId || String(ctx.sequenceId || "")) : String(ctx.sequenceId || "");
+    var isSira = kesimSayac;
     busy = true;
     // İptal jetonu ve geçici satırlar bu işe ait; finally ikisini de bırakır
     aktifIptal = K.iptalJetonu ? K.iptalJetonu() : null;
@@ -3153,6 +3186,7 @@ window.KCaptions = (function () {
         if (ex && ex.ok && ex.wav) tempFiles.push(ex.wav);
         iptalDenetle();
         if (!ex.ok) throw new Error(ex.error);
+        if (ex.seqId) isSekansId = String(ex.seqId);   // sesi gerçekten dışa aktarılan sekans (bağlam bayat olabilir)
         seqOffset = ex.offset;
         durHint = wavDuration(ex.wav);
         if (durHint > 0) sesSonu = (Number(seqOffset) || 0) + durHint;
@@ -3292,6 +3326,7 @@ window.KCaptions = (function () {
         throw new Error("Konuşma bulunamadı.");
       }
       yeniBelge = true;          // ekranda artık yeni transkript: dili algılanan dil
+      belgeBagla(isSekansId, isSira, null);
       if (oncekiIs) {
         undoStack.push(oncekiIs);
         if (undoStack.length > UNDO_MAX) undoStack.shift();
@@ -3340,9 +3375,140 @@ window.KCaptions = (function () {
       setBusy(false);
       // refreshButton yalnız kırmızı hatayı korur; uyarı seçim değişene kadar ekranda kalsın
       if (sonUyari) status(sonUyari, "warn");
+      belgeDegisti();   // 3.4 adım 8: iş sürerken gizlenen "Altyazıyı yeni kurguya uyarla" yeniden değerlendirilsin
     }
     if (basarili) sonucBildir({ kaynak: ornek ? "ornek" : "go", satir: segments.length });
     return basarili;
+  }
+
+  /* ---------------- 3.4 adım 8: kesimden sonra altyazıyı yeni kurguya uyarla ---------------- */
+
+  function kesimEsleModulu() { return window.SufloKesimEsle || null; }
+
+  // Ekrandaki belgeyi bir sekansa bağla. sira: belge bu kesim kaydına kadar güncel. kesimAdi: null ya da (kesimden sonra
+  // uyarlanan / aktarılan belgede) o sekansın adı
+  function belgeBagla(sekansId, sira, kesimAdi) {
+    belgeSekansId = sekansId ? String(sekansId) : "";
+    belgeSira = Number(sira) || 0;
+    belgeKesimAdi = typeof kesimAdi === "string" ? kesimAdi : null;
+    belgeDegisti();
+  }
+  // Kesim kartlarındaki "Altyazıyı yeni kurguya uyarla" satırı (js/kesim-altyazi.js) belge değişince tazelenir
+  function belgeDegisti() {
+    try { document.dispatchEvent(new CustomEvent("suflo:altyazi-belge")); } catch (e) {}
+  }
+
+  /*
+   * Otomatik Kesim / Konuşmadan kes: başarılı KS_applyCuts'ın kaydı (SufloKesimEsle.uyarlamaPlani çıktısı). Döner:
+   * kaydın sırası (0: kaydedilmedi). Kayıtlar oturumluk (panel yeniden açılınca boşalır; en çok 40).
+   */
+  function kesimKaydet(k) {
+    if (!k || !k.kaynak || !k.hedef || !k.cuts || !k.cuts.length || (k.mod !== "ripple" && k.mod !== "gap")) return 0;
+    var kayit = { sira: ++kesimSayac, kaynak: String(k.kaynak), hedef: String(k.hedef), hedefAd: String(k.hedefAd || ""),
+      mod: k.mod, cuts: k.cuts, kare: Number(k.kare) || 0, imza: String(k.imza || "") };
+    kesimKayitlari.push(kayit);
+    if (kesimKayitlari.length > KESIM_KAYIT_SINIRI) kesimKayitlari.shift();
+    return kayit.sira;
+  }
+
+  /*
+   * Ekrandaki belge hedef sekansın bugünkü kurgusuna uyarlanabilir mi? { ok, adim, satir } ya da { ok: false, neden }:
+   * "yok" (modül / hedef yok), "mesgul" (transkripsiyon sürüyor), "bos", "sekans" (belge başka sekansın ya da sekansı
+   * bilinmiyor), "guncel" (belge zaten bu kurguda).
+   */
+  function kurguYolu(hedef) {
+    hedef = String(hedef || "");
+    var M = kesimEsleModulu();
+    if (!M || !hedef) return { ok: false, neden: "yok" };
+    if (busy) return { ok: false, neden: "mesgul" };
+    if (!segments.length) return { ok: false, neden: "bos" };
+    if (!belgeSekansId) return { ok: false, neden: "sekans" };
+    var yol = M.yolBul(kesimKayitlari, { sekansId: belgeSekansId, sira: belgeSira }, hedef);
+    if (!yol) return { ok: false, neden: "sekans" };
+    if (!yol.length) return { ok: false, neden: "guncel" };
+    return { ok: true, adim: yol.length, satir: segments.length, yol: yol };
+  }
+  function kurguDurumu(hedef) {
+    var d = kurguYolu(hedef);
+    return d.ok ? { ok: true, adim: d.adim, satir: d.satir } : d;
+  }
+
+  /*
+   * Belgeyi hedef sekansın kurgusuna uyarla: yoldaki kesimler sırayla (SufloKesimEsle.zincirEsle), TEK geri alma adımı,
+   * taslak güncellenir. Belge hedefe bağlanır; Shorts / rehber örneğinin belgesi kopyaya geçince onların kaydından çıkar.
+   */
+  function kurguyaUyarla(hedef) {
+    var d = kurguYolu(hedef);
+    if (!d.ok) return d;
+    var ayar = CL.uzunlukAyari(el("cap-maxlen") ? el("cap-maxlen").value : "");
+    var r = kesimEsleModulu().zincirEsle(segments, d.yol, { maxChars: ayar.maxChars || 42 });
+    cancelDraft();
+    snapshot("kesimden sonra uyarlama");
+    var son = d.yol[d.yol.length - 1];
+    segments = r.cues;
+    belgeBagla(son.hedef, son.sira, son.hedefAd || "");
+    if (shortsYuklenen && shortsYuklenen !== belgeSekansId) shortsYuklenen = "";
+    if (ornekBelge) ornekSekansId = belgeSekansId;
+    el("cap-result").hidden = false;
+    render();
+    el("cap-result-info").textContent = segments.length + " satır · yeni kurguya uyarlandı";
+    saveDraftNow();
+    return { ok: true, satir: segments.length, dusen: r.dusen, kirpilan: r.kirpilan, adim: d.yol.length };
+  }
+
+  /*
+   * Doğrudan uyarlama: bu kesimler seqId sekansına uygulandı (o.hedef: açılan kopya; o.kare, o.hedefAd). Belge o
+   * sekansınsa yeni kurguya taşınır; aynı kesim (aynı imza) ikinci kez uygulanmaz.
+   */
+  function esleKesim(cuts, mod, seqId, o) {
+    o = o || {};
+    var M = kesimEsleModulu();
+    if (!M) return { ok: false, neden: "yok" };
+    if (mod !== "ripple" && mod !== "gap") return { ok: false, neden: "mod" };
+    var kaynak = String(seqId || "");
+    var hedef = String(o.hedef || kaynak);
+    if (!kaynak) return { ok: false, neden: "sekans" };
+    var im = M.imza(cuts, mod, o.kare);
+    var kayitli = kesimKayitlari.some(function (k) { return k.kaynak === kaynak && k.hedef === hedef && k.imza === im; });
+    if (!kayitli) kesimKaydet({ kaynak: kaynak, hedef: hedef, hedefAd: o.hedefAd, mod: mod, cuts: M.kesimleriDuzenle(cuts), kare: o.kare, imza: im });
+    return kurguyaUyarla(hedef);
+  }
+
+  /*
+   * Kelime listesinden yeni belge (Konuşmadan kes › Altyazıya aktar): satırlar mevcut satır kurucuyla (Satır uzunluğu
+   * seçimi, CT.segmentleriKur). o: { sekansId, sira (kelimelerin eşlendiği kesim kaydı), sekansAd, dil, sonSinir }.
+   * Ekranda iş varsa anlık görüntü: Ctrl+Z geri getirir.
+   */
+  function yukleKelimeler(words, o) {
+    o = o || {};
+    if (busy) return { ok: false, neden: "mesgul" };
+    var M = kesimEsleModulu();
+    var liste = (words || []).filter(function (w) { return w && isFinite(Number(w.start)) && String(w.text == null ? "" : w.text).trim(); });
+    if (!liste.length || !M) return { ok: false, neden: "bos" };
+    var kurulan;
+    try { kurulan = CT.segmentleriKur(M.kelimelerdenSegment(liste), el("cap-maxlen").value, kurSecenekleri(o.sonSinir)); }
+    catch (eKur) { return { ok: false, neden: "kur", hata: eKur && eKur.message ? eKur.message : String(eKur) }; }
+    if (!kurulan.segments.length) return { ok: false, neden: "bos" };
+    cancelDraft();
+    if (segments.length) snapshot("Konuşmadan kes aktarımı");
+    else { undoStack.length = 0; redoStack.length = 0; }
+    shortsYuklenen = "";
+    ornekBelge = false;
+    segments = kurulan.segments;
+    segmentsMode = kurulan.mode;
+    applyGlossary(segments);
+    algilananDil = dilKodu(o.dil);
+    belgeBagla(o.sekansId, Number(o.sira) || kesimSayac, typeof o.sekansAd === "string" ? o.sekansAd : "");
+    clearRevert();
+    hideRestore();
+    uygulaEtiketiniSifirla();
+    el("cap-result").hidden = false;
+    render();
+    el("cap-result-info").textContent = segments.length + " satır · Konuşmadan kes'ten";
+    refreshUndoUI();
+    renderHistory();
+    saveDraftNow();
+    return { ok: true, satir: segments.length };
   }
 
   /*
@@ -3381,6 +3547,7 @@ window.KCaptions = (function () {
     segmentsMode = kurulan.mode;
     applyGlossary(segments);
     algilananDil = veri.lang || "tr";
+    belgeBagla(ornekSekansId || String(KApp.ctx().sequenceId || ""), kesimSayac, null);
     ornekBelge = true;         // taslak yazılmaz, "Kurtar" teklifi gizlenmez
     clearRevert();
     uygulaEtiketiniSifirla();
@@ -4432,6 +4599,7 @@ window.KCaptions = (function () {
         segments = segs;
         segmentsMode = "plain";    // ice aktarilan SRT'de kelime zamani verisi yok
         algilananDil = "";         // dosyanin dili bilinmiyor: Altyazi › Dil secimine dusulur
+        belgeBagla(String(KApp.ctx().sequenceId || ""), kesimSayac, null);   // acik sekansin altyazisi sayilir
         uygulaEtiketiniSifirla();  // yeni doküman: "yine de uygula" onayı geçersiz
         refreshUndoUI();
         clearRevert();
@@ -5846,6 +6014,13 @@ window.KCaptions = (function () {
       KApp.toast("Bu örnek altyazı Suflo Deneme sekansı için. Önce o sekansı aç, sonra uygula.", "warn", 8000);
       return;
     }
+    // 3.4 adım 8: kesimden sonra uyarlanan / aktarılan belge yalnız o kurgunun sekansına (başka sekansta kayık çıkar)
+    if (belgeKesimAdi !== null && belgeSekansId && KApp.ctx().sequenceId && String(KApp.ctx().sequenceId) !== belgeSekansId) {
+      KApp.toast(belgeKesimAdi
+        ? "Bu altyazı \"" + belgeKesimAdi + "\" sekansının kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula."
+        : "Bu altyazı kesilmiş başka bir sekansın kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.", "warn", 8000);
+      return;
+    }
     if (stilIle && !secilenMogrt && !secilenMotorStili) {
       KApp.toast("Önce Altyazı Efektleri'nden bir görünüm seç ya da bir Premiere şablonu seç.", "warn");
       return;
@@ -6350,6 +6525,7 @@ window.KCaptions = (function () {
     segments = JSON.parse(JSON.stringify(k.kayit.segs));
     segmentsMode = k.kayit.mod || "plain";
     shortsYuklenen = k.id;
+    belgeBagla(k.id, kesimSayac, null);   // Shorts sekansının belgesi
     ornekBelge = false;
     // ceviri bilgisi satirlarda (orig) kalir; hedef dil kayittan
     ceviriDili = k.kayit.ceviriDili || "";
@@ -6581,6 +6757,13 @@ window.KCaptions = (function () {
     stilKoduUygula: stilKoduUygula,
     // Rehberin örnek klibi: altyazı yalnız bu sekansa uygulanır ("" = bilinmiyor)
     ornekHedefi: function (seqId) { ornekSekansId = seqId ? String(seqId) : ""; },
+    // 3.4 adım 8: kesimden sonra altyazıyı yeni kurguya uyarla (js/kesim-altyazi.js, js/kesim-esle.js)
+    kesimKaydet: kesimKaydet,
+    kurguDurumu: kurguDurumu,
+    kurguyaUyarla: kurguyaUyarla,
+    esleKesim: esleKesim,
+    yukleKelimeler: yukleKelimeler,
+    belgeBilgisi: function () { return { sekansId: belgeSekansId, sira: belgeSira, kesimAdi: belgeKesimAdi, satir: segments.length }; },
     anahtarSesiBulutaGonderir: anahtarSesiBulutaGonderir,
     applyStyled: function () { return apply(true); },
     hasSegments: function () { return segments.length > 0; },

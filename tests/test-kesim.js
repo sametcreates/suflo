@@ -1111,6 +1111,93 @@ async function sahteTestler(K) {
     /^1 kesim/.test(p3.el("cut-summary").textContent), rozet ? JSON.stringify(rozet.attrs) : "rozet yok: " + p3.el("cut-summary").textContent);
 
   await kilitTestleri(K1);
+  await altyaziTestleri(K1);
+}
+
+/*
+ * ---- 3.4 adım 8: Uygula'dan sonra "Altyazıyı yeni kurguya uyarla" (js/kesim-altyazi.js, sahte KCaptions) ----
+ * Kopya sekansta: kesim host'un esleme raporuyla kaydedilir (kaynak, kopyanın kimliği, kare, gerçek kayma), satır
+ * yalnız kopya açıkken görünür, tık KCaptions.kurguyaUyarla(kopya). Bu sekansta + Sadece kes + seç: kayıt / satır yok;
+ * Ripple boşluk moduna düştüyse (rippleFallback) kayıt boşluk modunda.
+ */
+async function altyaziTestleri(K1) {
+  var pcm5 = pcmMono([[1.0, 1], [1.5, 0], [1.0, 1], [1.5, 0], [1.0, 1]]);   // 6 sn; sessizlik 1.0–2.5 ve 3.5–5.0
+  var K5 = {};
+  for (var k in K1) K5[k] = K1[k];
+  K5.runAkis = function (cmd, args, opts) {
+    opts.onStderr(CIKIS);
+    opts.onData(pcm5);
+    return Promise.resolve({ code: 0, stderr: CIKIS, bayt: pcm5.length });
+  };
+  K5.run = function () { return Promise.resolve({ code: 0, stderr: sdCiktisi([[1.0, 2.5], [3.5, 5.0]]) }); };
+  var klip5 = { mediaPath: "/sahte/altyazi.mp4", inPoint: 0, outPoint: 6, clipStart: 30, clipEnd: 36 };
+  function panel(o) {
+    var w = { kayit: [], uyarla: [], belge: o.belge || "seq-1" };
+    w.C = {
+      kesimKaydet: function (kk) { w.kayit.push(kk); return w.kayit.length; },
+      kurguDurumu: function (h) {
+        var son = w.kayit[w.kayit.length - 1];
+        return son && son.kaynak === w.belge && son.hedef === h && !w.uyarla.length ? { ok: true, adim: 1, satir: 4 } : { ok: false, neden: "guncel" };
+      },
+      kurguyaUyarla: function (h) { w.uyarla.push(h); return { ok: true, satir: 4, dusen: 1, kirpilan: 0, adim: 1 }; }
+    };
+    w.p = kabi.kesimPaneli({ K: K5, ffmpeg: "ffmpeg", clip: klip5, altyazi: w.C, ctx: { sequenceId: "seq-1", sequence: "Vlog", frame: 0.04 },
+      applyCuts: function (yuk) {
+        var hedef = yuk.cloneFirst ? "seq-1-kopya" : "seq-1";
+        return { ok: true, newSeq: yuk.cloneFirst ? "Vlog — Suflo Temiz" : "", removed: 4, selected: yuk.removeMode === "select" ? 4 : 0, rippleFallback: !!o.fallback,
+          esleme: { kaynak: "seq-1", seqId: hedef, kare: 0.04, kesimler: yuk.ranges.map(function (r) {
+            var y = { start: r.start, end: r.end };
+            if (yuk.removeMode === "ripple" && !o.fallback) y.kayma = r.end - r.start;
+            return y;
+          }) } };
+      } });
+    return w;
+  }
+  /* a) Kopya sekansta */
+  var w = panel({}), p = w.p;
+  await p.tikla("cut-analyze");
+  ok("adım 8: Uygula'dan önce satır gizli", p.el("cut-altyazi").hidden === true);
+  await p.tikla("cut-apply");
+  var ac = p.kayit.call.filter(function (x) { return x.fn === "KS_applyCuts"; });
+  ok("adım 8: KS_applyCuts esleme raporunu ister", ac.length === 1 && ac[0].payload.esleme === true, JSON.stringify(ac.length && ac[0].payload).slice(0, 160));
+  var kay = w.kayit[0];
+  ok("adım 8: kesim kaydı — kaynak analiz edilen sekans, hedef kopya (host), ripple, kare, gerçek kayma",
+    w.kayit.length === 1 && kay.kaynak === "seq-1" && kay.hedef === "seq-1-kopya" && kay.hedefAd === "Vlog — Suflo Temiz" && kay.mod === "ripple" && kay.kare === 0.04 &&
+    kay.cuts.length === 2 && Math.abs(kay.cuts[0].start - 31.15) < 1e-6 && Math.abs(kay.cuts[0].kayma - 1.2) < 1e-6, JSON.stringify(kay));
+  ok("adım 8: satır ve 'Altyazıyı yeni kurguya uyarla' görünür (belge özgün sekansın)",
+    p.el("cut-altyazi").hidden === false && p.el("cut-altyazi-uyarla").hidden === false && /4 satır/.test(p.el("cut-altyazi-metin").textContent), p.el("cut-altyazi-metin").textContent);
+  p.ctx(null, { sequenceId: "seq-1", sequence: "Vlog" });
+  ok("adım 8: özgün sekans açılınca satır gizli (sekans tutmuyor)", p.el("cut-altyazi").hidden === true);
+  p.ctx(null, { sequenceId: "seq-1-kopya", sequence: "Vlog — Suflo Temiz" });
+  ok("adım 8: kopya açılınca yine görünür", p.el("cut-altyazi").hidden === false);
+  p.el("cut-altyazi-uyarla").fire("click");
+  ok("adım 8: tık kopyanın kimliğiyle uyarlar, bildirim, satır kapanır", w.uyarla.length === 1 && w.uyarla[0] === "seq-1-kopya" && p.el("cut-altyazi").hidden === true &&
+    p.kayit.toast.some(function (t) { return /Altyazı yeni kurguya uyarlandı: 4 satır · kesilen 1 satır çıkarıldı/.test(t[0]); }), JSON.stringify(p.kayit.toast));
+  ok("adım 8: eylem deneme hakkı harcamaz (hak yalnız Uygula'da bir kez)", p.kayit.harca.length === 1 && p.kayit.gate.every(function (g) { return g[0] === "cut"; }));
+
+  /* b) Bu sekansta + Sadece kes + seç: hiçbir şey silinmedi */
+  var w2 = panel({}), p2 = w2.p;
+  p2.hedef("here");
+  await p2.tikla("cut-analyze");
+  await p2.tikla("cut-apply");
+  ok("adım 8: Sadece kes + seç → kayıt yok, satır yok", p2.kayit.call.filter(function (x) { return x.fn === "KS_applyCuts"; }).length === 1 && w2.kayit.length === 0 &&
+    p2.el("cut-altyazi").hidden === true);
+
+  /* c) Bu sekansta + Ripple, host boşluk moduna düştü */
+  var w3 = panel({ fallback: true }), p3 = w3.p;
+  p3.hedef("here");
+  p3.el("cut-mode").value = "ripple";
+  await p3.tikla("cut-analyze");
+  await p3.tikla("cut-apply");
+  ok("adım 8: rippleFallback → kayıt boşluk modunda, hedef aynı sekans, kayma yok; satır görünür",
+    w3.kayit.length === 1 && w3.kayit[0].mod === "gap" && w3.kayit[0].hedef === "seq-1" && w3.kayit[0].cuts.every(function (c) { return c.kayma === undefined; }) &&
+    p3.el("cut-altyazi").hidden === false, JSON.stringify(w3.kayit[0]));
+
+  /* d) belge başka sekansın: satır yok */
+  var w4 = panel({ belge: "baska" }), p4 = w4.p;
+  await p4.tikla("cut-analyze");
+  await p4.tikla("cut-apply");
+  ok("adım 8: Altyazı sekmesindeki belge başka sekansın → kayıt var, satır gizli", w4.kayit.length === 1 && p4.el("cut-altyazi").hidden === true);
 }
 
 /*

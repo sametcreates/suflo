@@ -31,6 +31,8 @@ window.KTextCut = (function () {
   var bellek = [];     // bellek içi önbellek: son birkaç klibin transkripti [{ anahtar, sonuc }]
   var target = "clone";
   var busy = false;
+  // 3.4 adım 8: Uygula'dan sonra "Altyazıya aktar" / "Altyazıyı yeni kurguya uyarla" satırı (js/kesim-altyazi.js; ücretsiz)
+  var altyaziEylemi = null;
 
   var NEDEN = {
     "dolgu": "dolgu", "tekrar": "tekrar", "tekrar-cekim": "tekrar çekim", "yarim": "yarım başlangıç",
@@ -533,6 +535,12 @@ window.KTextCut = (function () {
       KApp.toast("300+ kesim birleştirildi" + (sinirli.dropped ? " — en kısa " + sinirli.dropped + " kesim atlandı" : ""), "warn");
     }
     sesiKapat();
+    /*
+     * 3.4 adım 8 "Altyazıya aktar": kesilmeyecek kelimeler (Uygula'dan sonra transkript sıfırlanır). 300 sınırında
+     * atlanan kesim varsa bütün kelimeler gider: ortası gerçekten uygulanan bir kesimde kalan kelime düşer.
+     */
+    var aktarKelimeler = sinirli.dropped ? words.slice() : tutulan.slice();
+    var aktarDil = lang, aktarSon = clip ? Number(clip.clipEnd) : 0;
     // Bayat olabilecek yoklama yerine Premiere'e taze sor
     var tazeCtx = await K.call("KS_getContext");
     var aktif = tazeCtx.ok ? (tazeCtx.sequenceId || tazeCtx.sequence || "") : "";
@@ -543,7 +551,8 @@ window.KTextCut = (function () {
     el("tc-apply").disabled = true;
     status("Uygulanıyor…");
     try {
-      var arg = { ranges: r, removeMode: "ripple", cloneFirst: target === "clone" };
+      // esleme: host kesilen sekansı, kareyi ve gerçek ripple kaymasını bildirir (altyazıyı yeni kurguya taşımak için)
+      var arg = { ranges: r, removeMode: "ripple", cloneFirst: target === "clone", esleme: true };
       // kopya sekansın adı: "<sekans> — Suflo Temiz"; dokunulmamış özgün sekans yedektir
       // (ad Premiere'e veri olarak gider, çevirmen görmez: arayüz diliyle burada kurulur)
       if (target === "clone" && tazeCtx.ok && tazeCtx.sequence) {
@@ -560,6 +569,12 @@ window.KTextCut = (function () {
           KApp.toast(msg + " (boşluk modunda)", "warn");
         } else {
           KApp.toast(msg, "good");
+        }
+        // 3.4 adım 8: kesim kaydı + "Altyazıya aktar" (kalan kelimeler yeni kurgunun zamanlarıyla) ve belge bu kurgunun
+        // öncesine aitse "Altyazıyı yeni kurguya uyarla" (rippleFallback → boşluk modu)
+        if (altyaziEylemi) {
+          altyaziEylemi.kesimSonrasi(res, { removeMode: "ripple", kaynak: aktif || sekans, kaynakAd: tazeCtx.ok ? String(tazeCtx.sequence || "") : "",
+            ranges: r, kare: tazeCtx.ok ? tazeCtx.frame : 0, kelimeler: aktarKelimeler, dil: aktarDil, sonSinir: aktarSon });
         }
         // Timeline degisti: eski zamanlar artik gecersiz
         el("tc-result").hidden = true; sesiKapat();
@@ -633,6 +648,9 @@ window.KTextCut = (function () {
     el("tc-analyze").addEventListener("click", function () { analyze(false); });
     el("tc-retranscribe").addEventListener("click", function () { analyze(true); });
     el("tc-apply").addEventListener("click", apply);
+    if (window.KKesimAltyazi && el("tc-altyazi")) {
+      altyaziEylemi = window.KKesimAltyazi({ kutu: "tc-altyazi", metin: "tc-altyazi-metin", uyarla: "tc-altyazi-uyarla", aktar: "tc-altyazi-aktar" });
+    }
     el("tc-reset").addEventListener("click", function () {
       elle = {}; grupSecim = {}; korunanDuraksama = {}; kaldirilan = [];
       if (words.length) yenidenSinifla();

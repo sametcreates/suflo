@@ -1082,6 +1082,11 @@
     </div>
     <div id="cut-progress" class="progress-line" hidden><i></i></div>
     <div id="cut-status" class="inline-status"></div>
+    <!-- 3.4 adım 8: kesimden sonra altyazı (js/kesim-altyazi.js; ücretsiz) -->
+    <div id="cut-altyazi" class="kesim-altyazi" hidden>
+      <span id="cut-altyazi-metin" class="kesim-altyazi-metin"></span>
+      <button id="cut-altyazi-uyarla" class="btn tiny" type="button" title="Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)">Altyazıyı yeni kurguya uyarla</button>
+    </div>
 
     <details class="adv">
       <summary>Hassasiyet</summary>
@@ -1182,6 +1187,12 @@
       </div>
       <div id="tc-progress" class="progress-line" hidden><i></i></div>
       <div id="tc-status" class="inline-status"></div>
+      <!-- 3.4 adım 8: kesimden sonra altyazı (js/kesim-altyazi.js; ücretsiz) -->
+      <div id="tc-altyazi" class="kesim-altyazi" hidden>
+        <span id="tc-altyazi-metin" class="kesim-altyazi-metin"></span>
+        <button id="tc-altyazi-aktar" class="btn tiny" type="button" title="Kesilmeyen kelimelerden yeni kurgunun zamanlarıyla altyazı kurar (yeniden yazıya dökmeden)">Altyazıya aktar</button>
+        <button id="tc-altyazi-uyarla" class="btn tiny" type="button" title="Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)">Altyazıyı yeni kurguya uyarla</button>
+      </div>
       <div id="tc-sessiz" class="sessiz-uyari" role="alert" hidden>
         <span id="tc-sessiz-metin" class="sessiz-uyari-metin"></span>
         <div class="sessiz-uyari-btns">
@@ -2554,6 +2565,7 @@
   <script src="js/altyazi-efekt.js"></script>
   <script src="js/filigran.js"></script>
   <script src="js/overlay-render.js"></script>
+  <script src="js/kesim-esle.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/emoji-picker.js"></script>
   <script src="js/textcut.js"></script>
@@ -2567,6 +2579,7 @@
   <script src="js/scenes.js"></script>
   <script src="js/highlights.js"></script>
   <script src="js/sessizlik.js"></script>
+  <script src="js/kesim-altyazi.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
   <script src="js/referral-core.js"></script>

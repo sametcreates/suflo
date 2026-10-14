@@ -2208,6 +2208,20 @@ button.seg-time.jump:hover { color: var(--accent-lite); background: rgba(139, 12
   color: var(--warn);
   border: 1px dashed rgba(234,200,119,.55);
 }
+/* 3.4 adım 8: kesimden sonra altyazı satırı (flex gap yok: CEF 74) */
+.kesim-altyazi {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 2px 0 12px;
+  padding: 7px 10px 3px;
+  border-radius: var(--r-s);
+  border: 1px solid var(--line2);
+  background: var(--accent-soft);
+}
+.kesim-altyazi[hidden], .kesim-altyazi .btn[hidden] { display: none; }
+.kesim-altyazi-metin { flex: 1 1 160px; min-width: 0; margin: 0 8px 4px 0; font-size: 12px; color: var(--text); line-height: 1.45; }
+.kesim-altyazi .btn.tiny { flex: none; margin: 0 6px 4px 0; }
 
 /* ---------- Motion ---------- */
 

@@ -103,6 +103,9 @@ function Test-Archive([string]$path, [string]$kind) {
             '(^|/)js/youtube-indir-ui\.js$',
             # 3.4 Otomatik Kesim canli esik: tepe zarfi / kesim haritasi (magiccut.js bunsuz eski akisa duser)
             '(^|/)js/sessizlik\.js$',
+            # 3.4 adim 8: kesimden sonra altyazi (saf esleme modulu + kesim kartlarindaki eylem satiri)
+            '(^|/)js/kesim-esle\.js$',
+            '(^|/)js/kesim-altyazi\.js$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

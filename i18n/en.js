@@ -2981,6 +2981,38 @@
     // host.jsx (KS_applyCuts expectSeqId)
     "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.": "The active sequence changed; the cuts weren't applied. Run Find silences again.",
     "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.": "The track layout changed; the cuts weren't applied. Read the tracks again.",
+    // Auto Cut / Text-based cut 3.4 step 8: keep captions in sync after cuts (js/kesim-altyazi.js, js/captions.js)
+    "Altyazıyı yeni kurguya uyarla": "Adapt captions to the new edit",
+    "Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)":
+      "Moves the lines in the Captions tab to the timing of the cut edit; lines for speech that was cut are removed (Ctrl+Z undoes it)",
+    "Altyazıya aktar": "Send to captions",
+    "Kesilmeyen kelimelerden yeni kurgunun zamanlarıyla altyazı kurar (yeniden yazıya dökmeden)":
+      "Builds captions from the words that weren't cut, timed to the new edit (no new transcription)",
+    "Altyazı sekmesindeki {n} satır kesimden önceki kurguya göre.": "The {} lines in the Captions tab still follow the edit from before the cut.",
+    "Kesilmeyen {n} kelime yeni kurgunun zamanlarıyla altyazıya hazır.": "{} words that weren't cut are ready for captions, timed to the new edit.",
+    "Altyazı yeni kurguya uyarlandı: {n} satır": "Captions adapted to the new edit: {} lines",
+    "kesilen {n} satır çıkarıldı": "{} cut lines removed",
+    "{n} satır kısaldı": "{} lines shortened",
+    "Altyazı oluşturulurken uyarlanamaz; iş bitince yeniden dene.": "Captions can't be adapted while they're being created; try again when the job finishes.",
+    "Altyazı sekmesinde uyarlanacak belge yok.": "There are no captions to adapt in the Captions tab.",
+    "Altyazı sekmesindeki belge bu kurgunun sekansına ait değil.": "The captions in the Captions tab don't belong to this edit's sequence.",
+    "Altyazı zaten yeni kurguya göre.": "The captions already follow the new edit.",
+    "Altyazı uyarlanamadı.": "Couldn't adapt the captions.",
+    "{n} altyazı satırı yeni kurguya göre Altyazı sekmesinde": "{} caption lines in the Captions tab, timed to the new edit",
+    "Altyazı oluşturulurken aktarılamaz; iş bitince yeniden dene.": "Can't send to captions while captions are being created; try again when the job finishes.",
+    "Altyazıya aktarılacak kelime kalmadı.": "No words left to send to captions.",
+    "yeni kurguya uyarlandı": "adapted to the new edit",
+    "{n} satır · yeni kurguya uyarlandı": "{} lines · adapted to the new edit",
+    "Konuşmadan kes'ten": "from Text-based cut",
+    "{n} satır · Konuşmadan kes'ten": "{} lines · from Text-based cut",
+    // undo history labels
+    "Konuşmadan kes aktarımı": "Text-based cut handoff",
+    "kesimden sonra uyarlama": "adapt after cut",
+    // Apply: captions adapted to a cut edit only go to that sequence
+    "Bu altyazı \"{}\" sekansının kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.":
+      "These captions were adapted to the edit of the \"{}\" sequence. Open that sequence first, then apply.",
+    "Bu altyazı kesilmiş başka bir sekansın kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.":
+      "These captions were adapted to the edit of another, cut sequence. Open that sequence first, then apply.",
     // Auto Cut: Cancel replaces "Sessizlikleri bul" while ffmpeg analyzes
     "ffmpeg analizini durdurur; önceki sonuç ekranda kalır": "Stops the ffmpeg analysis; the previous result stays on screen",
     // engine / model / ffmpeg download cancel (Settings and the caption setup card)

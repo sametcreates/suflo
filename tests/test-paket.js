@@ -45,6 +45,10 @@ ok("3.3 Altyazı Efektleri: oluşturucu modeli ve stil motoru pakette (js/ klas�
 ok("3.4 canlı eşikli sessizlik kesimi: js/sessizlik.js pakette (js/ klasörü) ve verify-release'te zorunlu",
   /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /js\/sessizlik\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "sessizlik.js")), gerekli.slice(0, 600));
+ok("3.4 kesimden sonra altyazı: js/kesim-esle.js ve js/kesim-altyazi.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /js\/kesim-esle\\\.js\$/.test(gerekli) && /js\/kesim-altyazi\\\.js\$/.test(gerekli) &&
+  fs.existsSync(path.join(__dirname, "..", "js", "kesim-esle.js")) && fs.existsSync(path.join(__dirname, "..", "js", "kesim-altyazi.js")), gerekli.slice(0, 700));
 ok("3.3 'Kalın yazı' kapalı: statik Montserrat Regular / Bold pakette (fonts/ klasörü) ve verify-release'te zorunlu",
   /\$stageItems = @\([^)]*"fonts"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"fonts"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /fonts\/Montserrat-Regular\\\.ttf\$/.test(gerekli) && /fonts\/Montserrat-Bold\\\.ttf\$/.test(gerekli) &&

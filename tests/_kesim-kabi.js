@@ -51,6 +51,7 @@ function eleman(id) {
 
 /*
  * Paneli yükle. o: { K (köprü), ffmpeg (yol), clip, applyCuts(payload) → sonuç,
+ *   altyazi?: sahte KCaptions (3.4 adım 8: verilirse js/kesim-esle.js ve js/kesim-altyazi.js da yüklenir),
  *   ctx?: { hasSeq, sequenceId, seqIn, seqOut, seqDur, frame } (3.4 adım 7: sekans kapsamı),
  *   call?(fn, payload) → sonuç (verilirse her K.call buna gider; KS_exportAudio / KS_getTrackLayout sahtesi),
  *   fs? (K.fs yerine) }
@@ -114,6 +115,13 @@ function kesimPaneli(o) {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
+  if (o.altyazi) {
+    // 3.4 adım 8: Uygula'dan sonraki "Altyazıyı yeni kurguya uyarla" satırı (gerçek modüller, sahte KCaptions)
+    sandbox.SufloKesimEsle = require(path.join(KOK, "js", "kesim-esle.js"));
+    sandbox.KCaptions = o.altyazi;
+    sandbox.document.addEventListener = function () {};
+    vm.runInContext(fs.readFileSync(path.join(KOK, "js", "kesim-altyazi.js"), "utf8"), sandbox, { filename: "kesim-altyazi.js" });
+  }
   vm.runInContext(fs.readFileSync(path.join(KOK, "js", "magiccut.js"), "utf8"), sandbox, { filename: "magiccut.js" });
   sandbox.KCut.init();
   return {

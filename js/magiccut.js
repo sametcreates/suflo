@@ -79,6 +79,8 @@ window.KCut = (function () {
   var geciciWav = "";       // sekans kapsamında KS_exportAudio'nun karışımı
   var analizSeqId = "";     // analizin yapıldığı sekans: KS_applyCuts expectSeqId
   var zorlaBosluk = false;  // "Boşluk bırakarak uygula" (korunan video katmanı ripple'da kaymasın)
+  // 3.4 adım 8: Uygula'dan sonra "Altyazıyı yeni kurguya uyarla" satırı (js/kesim-altyazi.js; ücretsiz)
+  var altyaziEylemi = null;
   var IPTAL_IPUCU = "ffmpeg analizini durdurur; önceki sonuç ekranda kalır";
   var IPTAL_KILITLI = "Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez. Bitince İptal açılır.";
   // Uygula sonrası korunan katman uyarısı: kopyada özgün sekans sağlam; "Bu sekansta" geri alma tek adım değil
@@ -1239,7 +1241,8 @@ window.KCut = (function () {
       status("Uygulanıyor…");
       var mode = etkinMod();
       if (bosluk && mode === "ripple") mode = "gap";
-      var yuk = { ranges: act, removeMode: mode, cloneFirst: target === "clone" };
+      // esleme: host kesilen sekansı, kareyi ve gerçek ripple kaymasını bildirir (altyazıyı yeni kurguya uyarlamak için)
+      var yuk = { ranges: act, removeMode: mode, cloneFirst: target === "clone", esleme: true };
       // 3.4 adım 7: analiz edilen sekans (kopyadan önce denetlenir) ve korunan katmanlar (yalnız varsa)
       if (analizSeqId) yuk.expectSeqId = analizSeqId;
       var kor = korumaHesapla(mode);
@@ -1290,6 +1293,13 @@ window.KCut = (function () {
           KApp.toast(msg + " (boşluk modunda)", "warn");
         } else {
           KApp.toast(msg, "good");
+        }
+        // 3.4 adım 8: kesim kaydı; Altyazı sekmesindeki belge bu kurgunun öncesine aitse "Altyazıyı yeni kurguya uyarla"
+        // (mod: rippleFallback → boşluk, yoksa uygulanan; Sadece kes + seç'te hiçbir şey silinmedi: eylem yok)
+        if (altyaziEylemi) {
+          var bag = KApp.ctx() || {};
+          altyaziEylemi.kesimSonrasi(r, { removeMode: mode, kaynak: analizSeqId || String(bag.sequenceId || ""), kaynakAd: String(bag.sequence || ""),
+            ranges: act, kare: bag.frame });
         }
         // ilk uygulanan kesim: davet seridinin anlarindan biri (mesgulken/yildiz seridi acikken cikmaz)
         if (KApp.davetAni) KApp.davetAni("cut");
@@ -1437,6 +1447,9 @@ window.KCut = (function () {
 
     el("cut-analyze").addEventListener("click", analyze);
     if (el("cut-cancel")) el("cut-cancel").addEventListener("click", iptalEt);
+    if (window.KKesimAltyazi && el("cut-altyazi")) {
+      altyaziEylemi = window.KKesimAltyazi({ kutu: "cut-altyazi", metin: "cut-altyazi-metin", uyarla: "cut-altyazi-uyarla" });
+    }
     el("cut-apply").addEventListener("click", apply);
     if (el("cut-dinle")) el("cut-dinle").addEventListener("click", dinle);
 
