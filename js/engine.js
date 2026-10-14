@@ -256,6 +256,13 @@ window.KEngine = (function () {
     return out;
   }
 
+  // Katalog modelinin kurulu sayıldığı en küçük boyut (installedModels: beklenenin %85'inden BÜYÜK).
+  // fetchFile bundan küçük yanıtı indi saymaz. Katalog dışı (VAD, motor arşivi, Özel model): 0
+  function modelEnAzBayt(m) {
+    if (!m || MODELS.indexOf(m) === -1 || !(Number(m.sizeMB) > 0)) return 0;
+    return Math.floor(Number(m.sizeMB) * 1048576 * 0.85) + 1;
+  }
+
   function vadPath() {
     if (!K.nodeOK) return null;
     try {
@@ -379,12 +386,18 @@ window.KEngine = (function () {
     var lastErr = "";
     var kept = 0;
     var dnsHata = "", dnsEngeli = "", sertifika = false;
+    var meta = { key: label, expectedMB: item.sizeMB, iptal: iptal || null };
+    // 3.4 adım 19 inceleme: katalog modelinde installedModels'in %85 kuralının altındaki yanıt
+    // (ağ filtresinin engel sayfası) indi sayılmaz: K.download onu hedefe taşımaz, başarısız döner
+    // (DNS teşhisi + sıradaki ayna). VAD / motor arşivinde katalog boyutu kaba, sınır konmaz.
+    var enAz = modelEnAzBayt(item);
+    if (enAz) meta.enAzBayt = enAz;
     for (var i = 0; i < urls.length; i++) {
       if (iptal && iptal.iptalEdildi) return { ok: false, iptal: true, error: "İptal edildi", kept: kept };
       if (i > 0) K.log("indirme aynasi deneniyor (" + (i + 1) + "/" + urls.length + "): " + label);
       var r = await K.download(urls[i], destPath, function (f) {
         if (onPct) onPct(f);
-      }, 0, undefined, { key: label, expectedMB: item.sizeMB, iptal: iptal || null });
+      }, 0, undefined, meta);
       if (r.ok) return { ok: true };
       if (r.iptal) return { ok: false, iptal: true, error: "İptal edildi", kept: r.kept || kept };
       lastErr = r.error || "bilinmeyen hata";
@@ -730,7 +743,19 @@ window.KEngine = (function () {
       if (!d3.iptal) eI.modelIceAktarOner = true;
       throw eI;
     }
-    if (!(await modelDogrula(model, mPath, say))) {
+    var dogrulama = {};
+    if (!(await modelDogrula(model, mPath, say, dogrulama))) {
+      throw new Error(model.label.split(" —")[0] + " indirildi ama doğrulanamadı (bozuk dosya). Tekrar dene.");
+    }
+    /*
+     * 3.4 adım 19 inceleme: çözülen installModel "model kurulu" demektir (rehber "Turbo hazır" der,
+     * settings.model'i ona geçirir). SHA-256 bilinmezken (huggingface.co da engelli) kurulu
+     * sayılmayacak dosya kabul edilmez; doğrulanmamış dosya silinir ki sonraki içe aktarma onu
+     * "var olan model" sanıp üzerine yazmayı sormasın. K.download küçük yanıtı zaten reddeder.
+     */
+    if (!installedModels().some(function (m) { return m.id === model.id; })) {
+      K.log("[model] inen dosya kurulu sayilmadi (boyut, SHA " + (dogrulama.durum || "?") + "): " + model.file);
+      if (dogrulama.durum !== "dogrulandi") { try { K.fs.unlinkSync(mPath); } catch (eS) {} }
       throw new Error(model.label.split(" —")[0] + " indirildi ama doğrulanamadı (bozuk dosya). Tekrar dene.");
     }
     // yeni inen dosya içe aktarılanın yerini aldı: "doğrulanmadı" işareti artık bu dosyayı anlatmaz

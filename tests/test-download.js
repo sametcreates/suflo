@@ -238,16 +238,26 @@ async function kurumsalAg(base) {
     cert: fs.readFileSync(pathm.join(TLSD, "sunucu.pem"))
   }, function (rq, rs) {
     if (rq.method === "HEAD") { rs.writeHead(200); rs.end(); return; }
+    // engel sunucusu taklidi (Umbrella kökü sistem deposunda: TLS geçer, sayfa 200 döner)
+    if (rq.url === "/engel") { rs.writeHead(200, { "content-type": "text/html; charset=utf-8" }); rs.end(ENGEL_SAYFASI); return; }
+    if (rq.url === "/kucuk") { rs.writeHead(200, { "content-type": "application/octet-stream", "content-length": "84" }); rs.end(Buffer.alloc(84, 7)); return; }
+    if (rq.url === "/kucuk-parcali") { rs.writeHead(200, { "content-type": "application/octet-stream" }); rs.write(Buffer.alloc(40, 7)); rs.end(Buffer.alloc(44, 7)); return; }
     rs.writeHead(200, { "content-length": String(TOTAL) });
     rs.end(REF);
   });
+  var ENGEL_SAYFASI = "<!doctype html><html><body>This site is blocked.</body></html>";
   tsrv.on("connection", function () { baglanti++; });
   await new Promise(function (r) { tsrv.listen(0, "127.0.0.1", r); });
   var tbase = "https://127.0.0.1:" + tsrv.address().port + "/";
   var caPem = fs.readFileSync(pathm.join(TLSD, "ca.pem"), "utf8");
   var baskaPem = fs.readFileSync(pathm.join(TLSD, "baska-ca.pem"), "utf8");
   var aramalar = [];
-  var sahteDns = { adres: "127.0.0.1", lookup: function (h, o, cb) { aramalar.push(h); cb(null, [{ address: sahteDns.adres, family: 4 }]); } };
+  // harita: ada özel adres (yoksa adres)
+  var sahteDns = { adres: "127.0.0.1", harita: {}, lookup: function (h, o, cb) {
+    aramalar.push(h);
+    var a = Object.prototype.hasOwnProperty.call(sahteDns.harita, h) ? sahteDns.harita[h] : sahteDns.adres;
+    cb(null, [{ address: a, family: 4 }]);
+  } };
   var K2 = loadBridge({ ag: true, dns: sahteDns });
 
   // 10a) ek kök yok (Linux ya da dışa aktarma boş): yeniden deneme YOK, tek bağlantı
@@ -390,7 +400,109 @@ async function kurumsalAg(base) {
   sahteDns.adres = "146.112.61.106";
   var rOk = await K2.download(base + "ok", pathm.join(TMP, "dnsok.bin"), null, 0, undefined, { key: "model:x" });
   chk("adım 19: başarılı indirmede DNS sorgusu yapılmaz", rOk.ok && aramalar.length === 0, "aramalar=" + aramalar.length);
+
+  await engelSayfasi(K2, tbase, sahteDns, function () { return aramalar; }, caPem);
   tsrv.close();
+}
+
+/*
+ * 3.4 adım 19 inceleme: Cisco Umbrella kökü Windows deposundaysa sertifika yeniden denemesi engel
+ * sunucusunda TLS'i geçer ve engel sayfası HTTP 200 döner. Bu "indi" sayılırsa sayfa model adıyla
+ * kaydedilir, DNS ipucu hiç çıkmaz. İkili dosya beklenirken (expectedMB) gelen text/html ve
+ * meta.enAzBayt'tan küçük yanıt başarısızdır, hedefe dokunulmaz; o zaman DNS teşhisi çalışır.
+ */
+async function engelSayfasi(K2, tbase, sahteDns, aramalar, caPem) {
+  var MB = 1048576;
+  // (a) bulgu senaryosu: TLS denetimi + kurumsal kök + DNS 146.112.x + 200 HTML. Hedefte içe aktarılmış
+  // model var: engel sayfası onun yerine geçmemeli
+  K2._ekSertifikaOnbellek([caPem]);
+  sahteDns.adres = "146.112.61.106";
+  var hedefA = pathm.join(TMP, "engel-model.bin");
+  fs.writeFileSync(hedefA, "ICE AKTARILMIS MODEL");
+  var rA = await K2.download(tbase + "engel", hedefA, null, 0, undefined, { key: "model:turbo", expectedMB: 574 });
+  chk("adım 19 inceleme: kurumsal kökle TLS geçip 200 HTML engel sayfası gelince indirme BAŞARISIZ, DNS ipucu eklenir",
+    !rA.ok && rA.sayfa === true && rA.dnsEngeli === "146.112.61.106" && !rA.sertifika &&
+    /web sayfası gönderdi/.test(rA.error) && /Kurumsal ağ filtresi 127\.0\.0\.1 adresini engelliyor \(Cisco Umbrella, 146\.112\.61\.106\)/.test(rA.error),
+    JSON.stringify(rA));
+  chk("adım 19 inceleme: engel sayfası hedefteki dosyanın yerine geçmez, .part bırakmaz",
+    fs.readFileSync(hedefA, "utf8") === "ICE AKTARILMIS MODEL" && !fs.existsSync(hedefA + ".part") && !fs.existsSync(hedefA + ".part.json"));
+  chk("adım 19 inceleme: engel sayfası hatası hataYardimi'nda kurumsal filtre çözümünü (içe aktarma) getirir",
+    /Model dosyası içe aktar/.test(K2.hataYardimi(new Error(rA.error))), K2.hataYardimi(new Error(rA.error)));
+
+  // (b) DNS filtresi yok (başka bir filtre, ör. Zscaler sayfası): yine başarısız, tarafsız ipucu
+  sahteDns.adres = "127.0.0.1";
+  var hedefB = pathm.join(TMP, "engel-b.bin");
+  var rB = await K2.download(tbase + "engel", hedefB, null, 0, undefined, { key: "model:turbo", expectedMB: 574 });
+  chk("adım 19 inceleme: DNS engeli yokken de HTML dosya sayılmaz, dosya oluşmaz, ağ filtresi ipucu",
+    !rB.ok && rB.sayfa === true && !rB.dnsEngeli && !fs.existsSync(hedefB) &&
+    /Ağ filtresi bu indirmeyi engelliyor olabilir/.test(K2.hataYardimi(new Error(rB.error))), JSON.stringify(rB));
+
+  // (c) expectedMB yoksa (ör. sürüm notu / güncelleme sayfası) HTML eskisi gibi iner
+  var hedefC = pathm.join(TMP, "engel-c.html");
+  var rC = await K2.download(tbase + "engel", hedefC, null, 0, undefined, { key: "sayfa" });
+  chk("adım 19 inceleme: expectedMB verilmeyen indirmede HTML yine kabul edilir", rC.ok && fs.existsSync(hedefC), JSON.stringify(rC));
+
+  // (d) meta.enAzBayt: bildirilen boyut (84 B) sınırın altında: hiçbir şey yazılmaz, DNS teşhisi çalışır
+  sahteDns.adres = "146.112.61.106";
+  var hedefD = pathm.join(TMP, "kucuk.bin");
+  fs.writeFileSync(hedefD, "ICE AKTARILMIS MODEL");
+  var rD = await K2.download(tbase + "kucuk", hedefD, null, 0, undefined, { key: "model:turbo", expectedMB: 574, enAzBayt: Math.floor(574 * MB * 0.85) + 1 });
+  chk("adım 19 inceleme: enAzBayt altındaki yanıt başarısız (boyut iletisi + DNS ipucu), hedef değişmez",
+    !rD.ok && rD.kucuk === true && rD.dnsEngeli === "146.112.61.106" &&
+    /çok küçük bir yanıt gönderdi \(1 KB, beklenen ~574 MB\)/.test(rD.error) &&
+    fs.readFileSync(hedefD, "utf8") === "ICE AKTARILMIS MODEL" && !fs.existsSync(hedefD + ".part"), JSON.stringify(rD));
+
+  // (e) boyut bildirmeyen (chunked) küçük yanıt: indikten sonra yakalanır, .part atılır, hedef değişmez
+  sahteDns.adres = "127.0.0.1";
+  var hedefE = pathm.join(TMP, "kucuk-parcali.bin");
+  fs.writeFileSync(hedefE, "ICE AKTARILMIS MODEL");
+  var rE = await K2.download(tbase + "kucuk-parcali", hedefE, null, 0, undefined, { key: "model:turbo", expectedMB: 574, enAzBayt: 1000 });
+  chk("adım 19 inceleme: chunked küçük yanıt da başarısız, .part silinir, hedef değişmez",
+    !rE.ok && rE.kucuk === true && !fs.existsSync(hedefE + ".part") && !fs.existsSync(hedefE + ".part.json") &&
+    fs.readFileSync(hedefE, "utf8") === "ICE AKTARILMIS MODEL", JSON.stringify(rE));
+
+  // (f) gerçek dosya (sınırın üstünde, ikili) eskisi gibi iner; DNS'e bakılmaz (Umbrella seçici vekili)
+  sahteDns.adres = "146.112.61.106";
+  var oncekiArama = aramalar().length;
+  var hedefF = pathm.join(TMP, "gercek.bin");
+  var rF = await K2.download(tbase + "ok", hedefF, null, 0, undefined, { key: "model:x", expectedMB: 1, enAzBayt: 900000 });
+  chk("adım 19 inceleme: sınırın üstündeki ikili dosya iner, DNS sorgusu yok",
+    rF.ok && Buffer.compare(fs.readFileSync(hedefF), REF) === 0 && aramalar().length === oncekiArama, JSON.stringify(rF));
+
+  // (g) yönlendirmede iki ad: ikisi de engelliyse istenen ad söylenir (engel sunucusu block.opendns.com'a
+  // yönlendirse de kullanıcıya huggingface.co anlatılır); yalnız son ad engelliyse o söylenir
+  var sahteHttp = {
+    get: function (o, cb) {
+      var EE = require("events");
+      var rq = new EE();
+      rq.setTimeout = function () { return rq; };
+      rq.destroy = function () {};
+      rq.end = function () {};
+      setTimeout(function () {
+        var rs = new EE();
+        rs.resume = function () {};
+        rs.headers = {};
+        if (o.hostname === "huggingface.invalid") { rs.statusCode = 302; rs.headers.location = "http://block.opendns.invalid/?url=x"; }
+        else rs.statusCode = 503;
+        cb(rs);
+      }, 1);
+      return rq;
+    }
+  };
+  sahteHttp.request = sahteHttp.get;
+  var yAramalar = [];
+  var yDns = { harita: {}, lookup: function (h, o, cb) { yAramalar.push(h); cb(null, [{ address: yDns.harita[h] || "1.2.3.4", family: 4 }]); } };
+  var K9 = loadBridge({ ag: true, http: sahteHttp, dns: yDns });
+  K9.settings().noProxy = "*";   // ortamdaki HTTP(S)_PROXY karışmasın
+  yDns.harita = { "huggingface.invalid": "146.112.61.106", "block.opendns.invalid": "146.112.61.104" };
+  var rG = await K9.download("http://huggingface.invalid/m.bin", pathm.join(TMP, "yon-g.bin"), null, 0, undefined, { key: "model:x" });
+  chk("adım 19 inceleme: yönlendirmede ikisi de engelliyse istenen ad (huggingface) söylenir, iki ad da sorulur",
+    !rG.ok && rG.dnsEngeli === "146.112.61.106" && /Kurumsal ağ filtresi huggingface\.invalid adresini engelliyor/.test(rG.error) &&
+    yAramalar.indexOf("huggingface.invalid") !== -1 && yAramalar.indexOf("block.opendns.invalid") !== -1, JSON.stringify(rG) + " " + yAramalar.join(","));
+  yDns.harita = { "block.opendns.invalid": "146.112.61.104" };
+  var rH = await K9.download("http://huggingface.invalid/m.bin", pathm.join(TMP, "yon-h.bin"), null, 0, undefined, { key: "model:x" });
+  chk("adım 19 inceleme: yalnız son (yönlendirilen) ad engelliyse o söylenir",
+    !rH.ok && rH.dnsEngeli === "146.112.61.104" && /Kurumsal ağ filtresi block\.opendns\.invalid adresini engelliyor/.test(rH.error), JSON.stringify(rH));
 }
 
 main().catch(function (e) { console.error("HARNESS HATA: " + e.stack); process.exit(2); });

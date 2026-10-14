@@ -204,8 +204,15 @@ var ornekler = [
   "Error: spawn ffmpeg ENOENT",
   // 3.4 adım 19: DNS filtresi teşhisi ve kurumsal HTTPS denetimi
   "Error: getaddrinfo ENOTFOUND — Kurumsal ağ filtresi huggingface.co adresini engelliyor (Cisco Umbrella, 146.112.61.106).",
-  "Error: unable to get local issuer certificate"
+  "Error: unable to get local issuer certificate",
+  // 3.4 adım 19 inceleme: dosya yerine engel sayfası (DNS teşhisi yokken)
+  "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir."
 ];
+ok("3.4 adım 19 inceleme: engel sayfası + DNS teşhisi kurumsal filtre çözümünü (içe aktarma) alır, tek başına tarafsız ipucunu",
+  iceriyor("Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir. — Kurumsal ağ filtresi huggingface.co adresini engelliyor (Cisco Umbrella, 146.112.61.106).", "Model dosyası içe aktar") &&
+  iceriyor("Sunucu beklenenden çok küçük bir yanıt gönderdi (1 KB, beklenen ~574 MB): ağ filtresinin engel sayfası olabilir.", "Ağ filtresi bu indirmeyi engelliyor olabilir") &&
+  /Model dosyası içe aktar/.test(modelHatasi("Turbo indirilemedi: Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.")),
+  coz("Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir."));
 ok("3.4 adım 19: sertifika hatası genel ağ ipucunu değil HTTPS denetimi çözümünü alır",
   iceriyor("Error: self signed certificate in certificate chain", "HTTPS bağlantılarını denetliyor") &&
   iceriyor("UNABLE_TO_VERIFY_LEAF_SIGNATURE", "HTTPS bağlantılarını denetliyor"), coz("Error: self signed certificate in certificate chain"));

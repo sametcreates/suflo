@@ -3155,7 +3155,14 @@
     "{} doğrulanamadı: SHA-256 uyuşmadı, dosya silindi. Modeli yeniden indir ya da içe aktar.":
       "{} couldn't be verified: SHA-256 mismatch, so the file was deleted. Download or import the model again.",
     "{} doğrulanamadı: huggingface.co'ya ulaşılamadı. İnternet varken yeniden dene.":
-      "{} couldn't be verified: huggingface.co couldn't be reached. Try again when you're online."
+      "{} couldn't be verified: huggingface.co couldn't be reached. Try again when you're online.",
+    // review fixes: block page instead of the file (js/bridge.js download)
+    "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.":
+      "The server sent a web page instead of the file: it may be a network filter's block page.",
+    "Sunucu beklenenden çok küçük bir yanıt gönderdi ({}, beklenen ~{} MB): ağ filtresinin engel sayfası olabilir.":
+      "The server sent a much smaller response than expected ({}, expected ~{} MB): it may be a network filter's block page.",
+    "Ağ filtresi bu indirmeyi engelliyor olabilir. BT ekibinden bu adres için izin iste; şirket ağındaysan Ayarlar'dan vekil sunucu tanımla.":
+      "A network filter may be blocking this download. Ask your IT team to allow this address; on a company network, set up a proxy in Settings."
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

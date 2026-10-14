@@ -605,6 +605,19 @@ window.K = (function () {
   var SERTIFIKA_YENIDEN_DENENDI = "Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi, olmadı.";
 
   /*
+   * İkili dosya yerine gelen yanıt (download(), 3.4 adım 19 inceleme). Cisco Umbrella kökü Windows
+   * deposundaysa sertifika yeniden denemesi engel sunucusunda TLS'i geçer, engel sayfası HTTP 200
+   * döner: bu "indi" sayılsaydı sayfa model adıyla kaydedilir, DNS ipucu hiç çıkmazdı.
+   */
+  var SAYFA_GELDI = "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.";
+  function kucukGeldi(bayt, beklenenMB) {
+    var b = Number(bayt) || 0;
+    var boyut = b >= 1048576 ? Math.round(b / 1048576) + " MB" : Math.max(1, Math.ceil(b / 1024)) + " KB";
+    return "Sunucu beklenenden çok küçük bir yanıt gönderdi (" + boyut + ", beklenen ~" + beklenenMB +
+      " MB): ağ filtresinin engel sayfası olabilir.";
+  }
+
+  /*
    * İşletim sisteminin güvendiği ek kök sertifikalar (PEM). Oturum boyunca bellekte saklanır;
    * diske yazılmaz. Windows: sabit PowerShell betiği (argüman dizisi, girdi eklenmez);
    * macOS: security find-certificate. Linux: boş liste.
@@ -853,6 +866,11 @@ window.K = (function () {
       re: /Kurumsal ağ filtresi/,
       tip: "BT ekibinden huggingface.co, hf-mirror.com ve github.com için izin iste ya da modeli başka bir " +
         "bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur."
+    },
+    { // 3.4 adım 19 inceleme: dosya yerine web sayfası / çok küçük yanıt (DNS teşhisi yoksa: Zscaler vb.)
+      re: /engel sayfası olabilir/,
+      tip: "Ağ filtresi bu indirmeyi engelliyor olabilir. BT ekibinden bu adres için izin iste; " +
+        "şirket ağındaysan Ayarlar'dan vekil sunucu tanımla."
     },
     { // 3.4 adım 19: kurumsal HTTPS denetimi. Tarafsız: yeniden deneme yalnız indirme/HEAD'de ve
       // yalnız ek kök varsa yapılır, o zaman hatanın kendisi söyler (SERTIFIKA_YENIDEN_DENENDI);
@@ -1228,11 +1246,23 @@ window.K = (function () {
    *   (ornegin CPU/GPU derlemeleri) birbirine eklenmez.
    *   iptal: K.iptalJetonu() — iptalde istek kesilir, .part KORUNUR (sonraki deneme kaldigi
    *   yerden devam eder) ve { ok: false, iptal: true, kept } doner.
+   *   expectedMB: ikili dosya bekleniyor demektir; text/html yanit (agin engel sayfasi) dosya
+   *   sayilmaz: { ok: false, sayfa: true }, hedefe ve .part'a dokunulmaz (3.4 adim 19 inceleme).
+   *   enAzBayt (istege bagli): bundan kucuk yanit dosya sayilmaz: { ok: false, kucuk: true };
+   *   hedef dosya degistirilmez (katalog modelleri: KEngine.installedModels'in %85 kurali).
    */
   /*
    * Dışa açılan indirici (3.4 adım 19): download() + DNS filtresi teşhisi. İndirme başarısızsa
-   * (iptal değilse) son denenen ana makinenin adı çözülür; 146.112.0.0/16 (Cisco Umbrella) ya da
-   * 0.0.0.0 ise hataya "Kurumsal ağ filtresi … engelliyor" eklenir ve dnsEngeli alanı dolar.
+   * (iptal değilse) istenen ana makinenin ve (yönlendirildiyse) son denenen ana makinenin adı
+   * çözülür; 146.112.0.0/16 (Cisco Umbrella) ya da 0.0.0.0 ise hataya "Kurumsal ağ filtresi …
+   * engelliyor" eklenir ve dnsEngeli alanı dolar. İkisi de engelliyse istenen ad söylenir: engel
+   * sunucusu block.opendns.com'a yönlendirdiğinde kullanıcıya o adı değil huggingface.co'yu anlatmalı.
+   *
+   * Başarı demek dosya demektir: ikili dosya beklenirken gelen web sayfası (engel sayfası; Umbrella
+   * kökü Windows deposunda kuruluysa sertifika yeniden denemesi TLS'i geçer ve sayfa 200 döner) ya da
+   * meta.enAzBayt'tan küçük yanıt download() içinde BAŞARISIZ sayılır, hedef dosyaya hiç taşınmaz;
+   * bu teşhis de o zaman çalışır. Gerçek dosya inince DNS'e bakılmaz: Umbrella'nın seçici vekili
+   * (intelligent proxy) izin verilen içeriği de 146.112.x adresinden geçirir.
    */
   function downloadTeshisli(urlStr, destPath, onProgress, redirects, resumeFrom, meta) {
     var izle = {};
@@ -1243,14 +1273,19 @@ window.K = (function () {
       if (!r || r.ok || r.iptal) return r;
       // yeniden deneme YALNIZ gerçekten yapıldıysa söylenir (HATA_REHBERI'nin genel ipucu bunu iddia etmez)
       if (r.caDenendi && r.sertifika) r.error = String(r.error || "") + " — " + SERTIFIKA_YENIDEN_DENENDI;
-      var host = izle.host;
-      if (!host) { try { host = new URL(urlStr).hostname; } catch (e) { host = ""; } }
-      return dnsEngeli(host).then(function (adres) {
+      var ilk = "";
+      try { ilk = new URL(urlStr).hostname; } catch (e) { ilk = ""; }
+      var adaylar = [];
+      if (ilk) adaylar.push(ilk);
+      if (izle.host && izle.host !== ilk) adaylar.push(izle.host);
+      return Promise.all(adaylar.map(dnsEngeli)).then(function (adresler) {
         var ag = AG();
-        if (adres && ag) {
-          r.dnsEngeli = adres;
-          r.error = String(r.error || "") + " — " + ag.dnsEngelTeshis(host, adres);
-          log("DNS filtresi: " + host + " -> " + adres);
+        for (var i = 0; i < adaylar.length; i++) {
+          if (!adresler[i] || !ag) continue;
+          r.dnsEngeli = adresler[i];
+          r.error = String(r.error || "") + " — " + ag.dnsEngelTeshis(adaylar[i], adresler[i]);
+          log("DNS filtresi: " + adaylar[i] + " -> " + adresler[i]);
+          break;
         }
         return r;
       });
@@ -1395,6 +1430,24 @@ window.K = (function () {
         var partial = Number(res.headers["content-length"] || 0);
         var base = resuming ? resumeFrom : 0;
         var total = partial ? base + partial : 0;
+        // 3.4 adım 19 inceleme: ikili dosya beklenirken gelen web sayfası (engel sayfası) ya da en az
+        // boyutun altındaki yanıt dosya değildir. Hiçbir şey yazılmaz: .part ve hedef olduğu gibi kalır
+        // (hedefte içe aktarılmış model olabilir). Başarısız döner ki downloadTeshisli DNS'e baksın,
+        // fetchFile sıradaki aynayı denesin.
+        var tur = String(res.headers["content-type"] || "");
+        var beklenenMB = meta.expectedMB ? Math.max(1, Math.round(meta.expectedMB)) : Math.ceil((meta.enAzBayt || 0) / 1048576);
+        if (meta.expectedMB && /^\s*(text\/html|application\/xhtml\+xml)/i.test(tur)) {
+          res.resume();
+          log("indirme: dosya yerine web sayfasi geldi (HTTP " + res.statusCode + ", " + tur + "): " + u.hostname);
+          resolve({ ok: false, error: SAYFA_GELDI, kept: partSize(), sayfa: true });
+          return;
+        }
+        if (meta.enAzBayt > 0 && total && total < meta.enAzBayt) {
+          res.resume();
+          log("indirme: yanit beklenenden kucuk (" + total + " bayt < " + meta.enAzBayt + "): " + u.hostname);
+          resolve({ ok: false, error: kucukGeldi(total, beklenenMB), kept: partSize(), kucuk: true });
+          return;
+        }
         if (!resuming) writeSide(total);
         // Katalog boyutuyla kaba denetim (checksum yok): sapma varsa uyar, engelleme.
         if (total && meta.expectedMB) {
@@ -1412,11 +1465,13 @@ window.K = (function () {
         try { out = fs.createWriteStream(partPath, resuming ? { flags: "a" } : undefined); }
         catch (eO) { resolve({ ok: false, error: String(eO) }); return; }
         aktifOut = out;
-        function fail(msg, keepPart) {
+        function fail(msg, keepPart, ek) {
           try { out.destroy(); } catch (e1) {}
           // ag hatasinda .part'i KORU — sonraki denemede kaldigi yerden devam eder
           if (!keepPart) dropPart();
-          resolve({ ok: false, error: msg, kept: keepPart ? partSize() : 0 });
+          var sonucF = { ok: false, error: msg, kept: keepPart ? partSize() : 0 };
+          if (ek) for (var ekA in ek) if (ek.hasOwnProperty(ekA)) sonucF[ekA] = ek[ekA];
+          resolve(sonucF);
         }
         res.on("data", function (d) {
           got += d.length;
@@ -1426,6 +1481,12 @@ window.K = (function () {
         out.on("finish", function () {
           out.close(function () {
             if (total > 0 && got !== total) { fail("Eksik indirme: " + got + "/" + total, true); return; }
+            // boyut bildirmeyen (chunked) küçük yanıt: hedefe taşınmaz, .part atılır (dosya değil)
+            if (meta.enAzBayt > 0 && got < meta.enAzBayt) {
+              log("indirme: inen dosya beklenenden kucuk (" + got + " bayt < " + meta.enAzBayt + ")");
+              fail(kucukGeldi(got, beklenenMB), false, { kucuk: true });
+              return;
+            }
             try {
               if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
               fs.renameSync(partPath, destPath);
