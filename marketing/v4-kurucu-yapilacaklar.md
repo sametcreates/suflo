@@ -1524,3 +1524,39 @@ hakları panelde tutuluyor).
 
 **9.5 Premiere'de dene (10 dk).** `marketing/v3.4-deneme-listesi.md` › `## 9` (geliştirici kurulumu + Chrome'da
 `http://localhost:8092` konsolu). Özellikle 9.1'i eski Premiere'de (14.x / 2020, CEF 74) yap.
+
+### Adım 10: Eğri sekmesi: kendi anahtar karelerine özel yumuşatma (Pro: düzenlemek ücretsiz, uygulamak 3 deneme hakkı)
+
+Ne değişti: sol menüde **Eğri** sekmesi (Hız Rampası'nın altında). Kullanıcı Effect Controls'te bir özelliğe iki anahtar
+kare koyar, playhead'i aralarına getirir, eğriyi seçer, Uygula der; Suflo eğriyi aralarına her kareye (ya da 2 / 4 karede
+bir) sık anahtar kare olarak yazar (Premiere'in betikleri Bezier tutamacı yazamaz), uçtaki iki anahtar değişmez. Seçili
+klipler (en çok 20) toplu, yoksa playhead'in altındaki klip. SVG düzenleyici (Değer / Hız, tutamaç, çok nokta, Shift / Alt /
+Delete), 15 hazır eğri + kendi önayarların, canlı önizleme sahnesi (Premiere'e gitmez), kaba "Premiere'de önizle",
+cubic-bezier alanı, kısayollar (Enter, U, F, I, V, 1–9). Geri al yalnız Suflo'nun yazdığı ve hâlâ duran anahtarları siler;
+kayıtlar `SufloKeyRecords` deposunda (adım 9), panel kapanıp açılsa da çalışır. Host: `KS_easePeek` / `KS_easeScan` /
+`KS_easeBake` / `KS_easeUndo` ve Doctor'da `kfInterp` satırı. Panel açılışında Premiere'e çağrı yok; yoklama yalnız sekme
+görünür, panel odakta ve Premiere boştayken 1,2 sn'de bir ve ucuz. OpenCurve'den yalnız fikir alındı (lisansı yok; kod,
+tablo, metin sözdizimi yok); motor Rebound (MIT, adım 9).
+
+**10.1 Fiyat kararın uygulandı (bilgi).** Senin kararınla düzenleyici, önayarlar, önizleme ve geri alma ücretsiz; eğriyi
+anahtar karelere uygulamak (tek klip ya da toplu) `Pro.gate('curves')`, 3 deneme hakkı. `js/deneme.js` listesine 13. araç
+olarak `curves` ("Eğri (anahtar kare yumuşatma)") girdi, Ayarlar › Suflo Pro'daki deneme tablosunda görünür; Pro listesine
+"Eğri: anahtar karelerine özel yumuşatma (düzenlemek ücretsiz)" satırı eklendi. Hak yalnız en az bir özellik gerçekten
+yazılınca, bir kez düşer. Sunucu tarafında yapılacak bir şey yok (haklar panelde). Planın ayrı "egri-toplu" kapısı yok:
+toplu uygulama da aynı `curves` kapısından geçer. Farklı istersen (ör. tek klip ücretsiz) söyle.
+
+**10.2 Premiere'de dene (30–40 dk).** `marketing/v3.4-deneme-listesi.md` › `## 10`. Özellikle: **10.3** (Delete, F, I, V
+Premiere'e gitmemeli; Delete seçili klibi silmemeli), **10.5** (deneme penceresi ve hak bir kez), **10.6** (%50 hız ve ters
+klip), **10.7** (yazılan anahtarlar Doğrusal mı: `setInterpolationTypeAtKey` sabiti 0 = doğrusal varsayımı Premiere'de
+doğrulanmadı) ve **10.9** (Geri al senin elle eklediğin anahtarı korumalı). Hem yeni (2025 / 2026) hem eski (14.x / 2020,
+CEF 74) Premiere'de.
+
+**10.3 Adlar (5 dk, karar).** Sol menü adı "Eğri" (açıklama "anahtar kare yumuşatma"), İngilizcesi "Easing". Panelde "Bezier
+tutamaçları" iddiası yok: arayüz ve README "tutamaç yazamaz, sık anahtar kare" der. Site, blog ve sürüm notu bu adımda
+değişmedi; 3.4 yayınında Eğri'yi anlatırken de "Bezier tutamacı" deme, "her kareye anahtar kare" de.
+
+**10.4 Yenilikler penceresi (3.4 yayınında).** `js/app.js` › `YENILIKLER` hâlâ 3.2'nin listesi. 3.4'ü yayınlarken sürümü
+"3.4" yapıp Eğri maddesini (`sekme: "egri"`, `hedef: "egri-editor"`) ekle; bu adımda bilerek dokunulmadı (yayın kararı).
+
+**10.5 Ses düzeyi sonra (bilgi).** v1 yalnız video katmanlarındaki özellikleri tarar (arayüzde yazıyor). Ses Volume
+anahtarları için ayrı bir adım gerekir; şimdilik bir şey yapma.
