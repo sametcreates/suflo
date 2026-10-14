@@ -1955,9 +1955,14 @@ function KS_cloneActiveSeq() {
  *   cloneName?, expectSeqId? (3.4: analiz edilen sekans; kopyadan ONCE denetlenir), protect?: { video:[i], audio:[i] }
  *   (3.4: korunan katmanlar; razor, ripple kaplama denetimi ve silme / secme bu katmanlari atlar),
  *   expectTracks?: { video:[ad], audio:[ad] } (3.4: protect dizinlerinin okundugu duzen; sayi ya da ad tutmazsa
- *   kod "katman" ile hata, kopyadan ONCE) }.
+ *   kod "katman" ile hata, kopyadan ONCE), esleme?: true (3.4 adim 8: sonuca esleme raporu eklenir) }.
  * Korunan katman KILITLENMEZ, kilidi de acilmaz: hata olsa da geri yuklenecek bir sey yok. Kopya sekansin katman
  * dizinleri ozgununkiyle ayni. protect yoksa cikti 3.3 ile birebir ayni (protectedSkipped alani da yok).
+ * esleme raporu (yalniz istenince; panel altyaziyi yeni kurguya uyarlar, js/kesim-esle.js):
+ *   { kaynak: kesimden onceki sekansin kimligi, seqId: kesilen sekans (kopya ya da ayni), kare: sekans karesi (sn),
+ *     kesimler: [{ start, end, kayma? }] (gelen sirayla) }. kayma yalniz ripple gercekten uygulandiysa: aralikta silinen
+ *   kliplerin toplam suresi = sonraki icerigin kaydigi miktar (sekans kapsaminda hicbir katmanda klip olmayan bosluk
+ *   araliga girerse araligin uzunlugundan kisadir; sonrasinda icerik yoksa alan yok).
  */
 function KS_applyCuts(encoded) {
   try {
@@ -1977,6 +1982,12 @@ function KS_applyCuts(encoded) {
      */
     if (p.expectTracks && !KS_katmanlarAyni(seq, p.expectTracks)) {
       return KS_errKod("katman", "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.");
+    }
+
+    // 3.4 adim 8: esleme raporu icin kesimden onceki sekans ve gelen sirayla araliklar (asagida ranges yerinde siralanir)
+    var eslemeKaynak = String(seq.sequenceID), eslemeGiris = [], eslemeKayma = [], ei;
+    if (p.esleme) {
+      for (ei = 0; ei < ranges.length; ei++) eslemeGiris.push({ start: Number(ranges[ei].start), end: Number(ranges[ei].end) });
     }
 
     // Korunan katmanlar: ES3'te Array.indexOf yok, nesne haritasi
@@ -2090,6 +2101,7 @@ function KS_applyCuts(encoded) {
           p.removeMode = "gap";
           break;
         }
+        eslemeKayma[i] = kayma.miktar;   // null: sonrasinda kayacak icerik yok
       }
     }
     ranges.sort(function (a, b) { return b.start - a.start; });
@@ -2129,6 +2141,15 @@ function KS_applyCuts(encoded) {
       if (korunanVideoBosluk) sonuc.protectedVideoGap = true;
       // Premiere bagli klibi birlikte sildiyse / kirptiysa korunan katman degismistir: panel uyarir (Ctrl+Z)
       if (KS_korunanIz(seq, korV, korA) !== korunanOnce) sonuc.protectedChanged = true;
+    }
+    if (p.esleme) {
+      var eslemeKesim = [];
+      for (ei = 0; ei < eslemeGiris.length; ei++) {
+        var ek = { start: eslemeGiris[ei].start, end: eslemeGiris[ei].end };
+        if (p.removeMode === "ripple" && !rippleDustu && typeof eslemeKayma[ei] === "number") ek.kayma = eslemeKayma[ei];
+        eslemeKesim.push(ek);
+      }
+      sonuc.esleme = { kaynak: eslemeKaynak, seqId: String(seq.sequenceID), kare: tb > 0 ? tb / KS_TPS : 0, kesimler: eslemeKesim };
     }
     return KS_ok(sonuc);
   } catch (e) { return KS_err(e); }

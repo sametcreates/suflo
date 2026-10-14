@@ -337,5 +337,33 @@ var l11c = call("KS_getTrackLayout", { klipler: true, scope: "inout" });
 ok("getTrackLayout scope inout, In / Out işaretsiz: klipler tüm sekanstan, hostKapsamAraligi 'inout'",
   l11c.ok && l11c.video[1].klipler.length === 1 && S.hostKapsamAraligi(l11c.kapsam).hata === "inout", js(l11c.kapsam));
 
+/* ---------- 12) 3.4 adım 8: esleme raporu (altyazıyı yeni kurguya uyarlamak için) ---------- */
+var E8 = require(path.join(__dirname, "..", "js", "kesim-esle.js"));
+var s12 = vlog("s12");
+var r12 = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: true, protect: { video: [], audio: [1] }, esleme: true });
+ok("esleme (Kopya sekansta, ripple): kaynak özgün sekans, seqId kopya, kare 0.04, gelen sırayla kesimler + gerçek kayma",
+  r12.ok && js(r12.esleme) === js({ kaynak: "s12", seqId: "s12-kopya", kare: 0.04, kesimler: [{ start: 10, end: 12, kayma: 2 }, { start: 30, end: 31.5, kayma: 1.5 }] }) &&
+  aktif.sequenceID === "s12-kopya", js(r12.esleme));
+ok("esleme yalnız istenince (protect'li çağrıda da alan yok)", r1.esleme === undefined && r2.esleme === undefined && r9.esleme === undefined);
+var s12b = bosluklu("s12b", 0);
+var r12b = call("KS_applyCuts", { ranges: [{ start: 30, end: 31.5 }, { start: 10, end: 12 }, { start: 20.15, end: 21.85 }], removeMode: "ripple", cloneFirst: false,
+  protect: { video: [], audio: [1] }, esleme: true });
+ok("esleme: klipsiz boşluktaki kesim (20,15–21,85) kayma 0 — sonrası yalnız gerçekten silinen kadar kaydı; Bu sekansta seqId = kaynak",
+  r12b.ok && r12b.rippleFallback === false && r12b.esleme.kaynak === "s12b" && r12b.esleme.seqId === "s12b" &&
+  js(r12b.esleme.kesimler) === js([{ start: 30, end: 31.5, kayma: 1.5 }, { start: 10, end: 12, kayma: 2 }, { start: 20.15, end: 21.85, kayma: 0 }]), js(r12b.esleme));
+// panel modülü bu raporla eşler: boşluk kesiminin ardındaki klip (22 → 20) ile aynı yere
+var p12b = E8.uyarlamaPlani(r12b, { removeMode: "ripple" });
+ok("esleme → uyarlamaPlani → zamanEsle: klipsiz boşluktan sonraki an Premiere'deki yerine eşlenir (22 → 20, 40 → 36,5)",
+  E8.zamanEsle(22, p12b.cuts, "ripple") === 20 && E8.zamanEsle(40, p12b.cuts, "ripple") === 36.5 && js(ozet(s12b).V1) === js([[0, 10], [10, 18], [20, 28], [28, 56.5]]),
+  E8.zamanEsle(22, p12b.cuts, "ripple") + " " + js(ozet(s12b).V1));
+var s12c = vlog("s12c");
+var r12c = call("KS_applyCuts", { ranges: kesimler(), removeMode: "gap", cloneFirst: false, esleme: true });
+ok("esleme gap: kayma yok (hiçbir şey kaymadı)", r12c.ok && js(r12c.esleme.kesimler) === js(kesimler()) && r12c.esleme.seqId === "s12c", js(r12c.esleme));
+var s12d = vlog("s12d", { a3: [klip(10.5, 11, { tur: "a", yol: "C:\\sfx\\tik.wav" }), klip(40, 45, { tur: "a", yol: "C:\\sfx\\vurus.wav" })] });
+var r12d = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: false, protect: { audio: [1] }, esleme: true });
+ok("esleme: ripple boşluk moduna düştüyse (rippleFallback) kayma yok", r12d.ok && r12d.rippleFallback === true && js(r12d.esleme.kesimler) === js(kesimler()), js(r12d.esleme));
+var r12e = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: true, expectSeqId: "baska", esleme: true });
+ok("esleme: expectSeqId tutmazsa hata, rapor yok", !r12e.ok && r12e.kod === "sekans" && r12e.esleme === undefined, js(r12e));
+
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
