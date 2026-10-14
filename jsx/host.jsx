@@ -3177,8 +3177,9 @@ function KS_captionMogrtSetText(prop, text) {
 
 /*
  * p: { path, start, end, expectSeqId? }. [start, end] yerlestirmenin AYAK IZIDIR: importMGT sablonu kendi tam
- * suresiyle (overwrite) birakir, ucu ancak sonra kirpilir. Altyazi Efektleri (1 saatlik sablon) end'i son parcanin
- * basi + sablon suresi olarak verir: iz o araligin tamaminda bos olmali (sonraki kullanici klibi ezilmesin).
+ * suresiyle (overwrite) birakir, ucu ancak sonra kirpilir. Panel end'i son parcanin basi + sablon suresi olarak verir
+ * (Altyazi Efektleri: 1 saatlik sablon; kullanici MOGRT'u: definition.json'daki sure, js/mogrt-sure.js): iz o araligin
+ * tamaminda bos olmali (sonraki kullanici klibi ezilmesin).
  */
 function KS_prepareCaptionMogrt(encoded) {
   try {
@@ -3202,6 +3203,14 @@ function KS_prepareCaptionMogrt(encoded) {
   } catch (e) { return KS_err(e); }
 }
 
+// Kullanici sablonunun suresi bilinmiyorsa ayak izi, sn (js/mogrt-sure.js VARSAYILAN_SURE ile ayni)
+var KS_CAPTION_MOGRT_IZ = 60;
+
+/*
+ * p: { path, track, start, end, text, batch, iz (sablon suresi, sn; yoksa KS_CAPTION_MOGRT_IZ) }
+ * importMGT sablonu TAM suresiyle overwrite eder, ucu ancak sonra kirpilir ve kirpma ezilen klibi geri getirmez:
+ * izde [start, max(end, start + iz)] bos degilse hic ice aktarilmaz ("dolu"). dogal: kirpmadan onceki sure (sn).
+ */
 function KS_placeCaptionMogrt(encoded) {
   var clip = null;
   try {
@@ -3214,12 +3223,15 @@ function KS_placeCaptionMogrt(encoded) {
     if (!isFinite(track) || track < 0 || track >= seq.videoTracks.numTracks) return KS_err("Altyazi video katmani bulunamadi.");
     var start = Math.max(0, Number(p.start) || 0);
     var end = Math.max(start + .05, Number(p.end) || start + .05);
-    if (!KS_trackFreeIn(seq.videoTracks[track], start, end)) return KS_err("Altyazi katmaninda bu zaman araligi dolu.");
+    var iz = Number(p.iz) > 0 ? Number(p.iz) : KS_CAPTION_MOGRT_IZ;
+    if (!KS_trackFreeIn(seq.videoTracks[track], start, Math.max(end, start + iz))) return KS_errKod("dolu", "Altyazi katmaninda bu zaman araligi dolu.");
 
     var at = new Time();
     at.seconds = start;
     try { clip = seq.importMGT(f.fsName, at.ticks, track, 0); } catch (eImport) {}
     if (!clip) return KS_err("MOGRT timeline'a yerlestirilemedi.");
+    var dogal = 0;
+    try { dogal = Number(clip.end.seconds) - Number(clip.start.seconds); } catch (eDogal) {}
 
     var batch = String(p.batch || "").replace(/[^a-z0-9_-]/ig, "").slice(0, 40);
     try { clip.name = "Suflo Caption · " + batch; } catch (eName) {}
@@ -3245,7 +3257,8 @@ function KS_placeCaptionMogrt(encoded) {
     }
     if (Math.abs(actualEnd - end) > .08) throw new Error("MOGRT suresi altyazi zamanina kirpilamadi.");
 
-    return KS_ok({ track: track, trackName: "V" + (track + 1), start: start, end: actualEnd, text: String(p.text || "") });
+    return KS_ok({ track: track, trackName: "V" + (track + 1), start: start, end: actualEnd, text: String(p.text || ""),
+      iz: iz, dogal: dogal > 0 ? dogal : 0 });
   } catch (e) {
     try { if (clip) clip.remove(0, 0); } catch (eRemove) {}
     return KS_err(e);

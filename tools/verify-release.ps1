@@ -117,6 +117,8 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.3 adim 21: Altyazi Efektleri > Premiere yerel (saf model + pakette gelen sablon; sha256 yukarida)
             '(^|/)js/caption-mogrt-json\.js$',
             '(^|/)assets/mogrt/altyazi-efekt-v1\.mogrt$',
+            # Altyazi > Stil > Premiere sablonu: kullanici MOGRT'unun suresi (importMGT ayak izi)
+            '(^|/)js/mogrt-sure\.js$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

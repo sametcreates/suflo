@@ -54,6 +54,8 @@ window.KCaptions = (function () {
   var WA = window.SufloWhisperAkis || null;
   // Yerel motor seçenekleri (Hızlı / En doğru, DTW, çevrimdışı İngilizce): saf modül js/whisper-args.js
   var WAR = window.SufloWhisperArgs || null;
+  // Kullanıcı MOGRT şablonunun süresi (definition.json) ve importMGT ayak izi: saf modül js/mogrt-sure.js
+  var MSURE = window.SufloMogrtSure;
   var cleanSegments = CT.cleanSegments;
   var karaokeWords = CT.karaokeWords;
   var karaokeCumulative = CT.karaokeCumulative;
@@ -5688,16 +5690,40 @@ window.KCaptions = (function () {
     });
   }
 
+  /*
+   * Seçili şablonun importMGT ayak izi süresi (sn): definition.json'daki süre (yalnız zip'in merkez dizini ve
+   * definition.json okunur); okunamazsa temkinli MSURE.VARSAYILAN_SURE.
+   */
+  function mogrtIzSuresi(yol) {
+    var sure = 0, fd = null;
+    try {
+      var B = require("buffer").Buffer, zlib = require("zlib");
+      fd = K.fs.openSync(yol, "r");
+      sure = MSURE.sablonSuresi(function (konum, uz) {
+        if (!(konum >= 0) || !(uz > 0)) return B.alloc(0);
+        var b = B.alloc(uz);
+        return b.slice(0, K.fs.readSync(fd, b, 0, uz, konum));
+      }, K.fs.fstatSync(fd).size, function (veri) { return zlib.inflateRawSync(veri); });
+    } catch (e) { sure = 0; }
+    finally { if (fd !== null) { try { K.fs.closeSync(fd); } catch (eK) {} } }
+    if (!(sure > 0)) K.log("[altyazı] MOGRT süresi okunamadı, ayak izi " + MSURE.VARSAYILAN_SURE + " sn: " + String(yol).replace(/^.*[\\\/]/, ""));
+    return MSURE.izSuresi(sure);
+  }
+
   async function mogrtStiliniUygula() {
     if (!secilenMogrt || !secilenMogrt.path) throw new Error("Önce bir Premiere altyazı şablonu seç.");
     if (!K.nodeOK || !K.fs || !K.fs.existsSync(secilenMogrt.path)) throw new Error("Seçili MOGRT dosyası artık bulunamıyor.");
     var cs = mogrtCueleri();
     if (!cs.length) throw new Error("Yazılacak altyazı yok.");
     var batch = "cap-" + Date.now().toString(36);
+    // Ayak izi: importMGT her altyazıyı önce şablonun tam süresiyle (overwrite) bırakır, ucu sonra kırpılır; iz ilk
+    // altyazıdan son altyazının başı + şablon süresine kadar boş olmalı (sonraki kullanıcı klibi ezilmesin)
+    var iz = mogrtIzSuresi(secilenMogrt.path);
+    var ayak = MSURE.ayakIzi(cs, iz);
     var prep = await K.call("KS_prepareCaptionMogrt", {
       path: secilenMogrt.path,
-      start: cs[0].start,
-      end: cs[cs.length - 1].end,
+      start: ayak.start,
+      end: ayak.end,
       batch: batch
     }, 30000);
     if (!prep || !prep.ok) throw new Error(prep && prep.error ? prep.error : "Altyazı katmanı hazırlanamadı.");
@@ -5712,9 +5738,12 @@ window.KCaptions = (function () {
           batch: batch,
           start: cs[i].start,
           end: cs[i].end,
-          text: cs[i].text
+          text: cs[i].text,
+          iz: iz
         }, 60000);
         if (!r || !r.ok) throw new Error((r && r.error ? r.error : "MOGRT altyazı yerleştirilemedi.") + " (satır " + (i + 1) + ")");
+        // Premiere'in bıraktığı süre okunandan uzunsa günlüğe (Premiere denemesi: definition.json süresi doğru mu)
+        if (i === 0 && r.dogal > iz + 0.1) K.log("[altyazı] MOGRT ayak izi eksik: Premiere " + r.dogal.toFixed(2) + " sn, okunan " + iz.toFixed(2) + " sn");
         placed++;
       }
     } catch (e) {
