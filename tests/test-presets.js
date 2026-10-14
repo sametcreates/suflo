@@ -235,5 +235,62 @@ ok("Preset paketi standart kartlarda dogrudan motoru, ozel veride gercek import 
 ok("Uzun Premiere islemi boyunca kart UYGULANIYOR durumunu ve aria-busy bilgisini gosterir",
   /UYGULANIYOR…/.test(src) && /aria-busy/.test(src) && /button\.disabled = !!active/.test(src));
 
+/* ---------- 3.4 adım 11: Hareket önayarı kayıtları ve güvenli kaldırma ---------- */
+var KR = require(path.join(ROOT, "js", "key-records.js"));
+var PM = require("./_kayit-premiere.js").olustur();
+function js(x) { return JSON.stringify(x); }
+function onayar(id) { return PM.cagir("KS_applyMotionPreset", { id: id, duration: .45, strength: 1 }); }
+function sakla(r) { return (r.records || []).map(function (x) { return KR.kayit(x); }); }
+var P1 = PM.klip({ ad: "Sahne.mp4", nodeId: "P1", start: 0, end: 5, inP: 0, opak: 80 });
+var P2 = PM.klip({ ad: "Diger.mp4", nodeId: "P2", start: 5, end: 10, inP: 0 });
+PM.izKur([[P1, P2]]);
+PM.durum.secim = [P1];
+
+var f = onayar("fade-in");
+var sf = sakla(f);
+ok("kayıt: Clean Fade In Opaklık için 'hareket' kaydı döner (kenar = önceki değer 80)", f.ok && sf.length === 1 && sf[0].tur === "hareket" &&
+  sf[0].matchName === "AE.ADBE Opacity/Opacity" && sf[0].times.length === 2 && sf[0].kenarDegerleri.length === 2 &&
+  sf[0].kenarDegerleri[0].v === 80 && sf[0].kenarDegerleri[1].v === 80 && /kayit\.prproj$/.test(f.proje), js(f));
+var kf = PM.cagir("KS_removeSufloKeys", { records: sf, secili: true });
+ok("önayar kaldırma kenar değerini geri koyar: Opaklık anahtarsız ve 80 (Premiere ilk anahtarın 0'ında bırakırdı)", kf.ok && kf.eslesen === 1 &&
+  kf.sonuclar[0].silinen === 2 && P1.opak.keys.length === 0 && P1.opak.value === 80 && P1.opak.tv === false, js([kf, P1.opak]));
+ok("önayar kaldırma ekranı updateUI ile tazeler", PM.ui.some(function (u) { return u.ad === "Opacity" && u.tur === "deger" && u.ui; }), js(PM.ui.slice(-3)));
+
+var pop = onayar("pop-in");
+var sp = sakla(pop);
+ok("Pop In: Ölçek ve Opaklık için iki kayıt", pop.ok && sp.length === 2 && sp.map(function (r) { return r.matchName; }).sort().join(",") === "AE.ADBE Motion/Scale,AE.ADBE Opacity/Opacity", js(pop));
+PM.durum.secim = [P2];
+var kp0 = PM.cagir("KS_removeSufloKeys", { records: sp, secili: true });
+ok("seçili kapsam: başka klip seçiliyken hiçbir kayıt eşleşmez, anahtarlara dokunulmaz", kp0.ok && kp0.eslesen === 0 && P1.olcek.keys.length === 3 && P1.opak.keys.length === 2, js(kp0));
+PM.durum.secim = [P1];
+var kp = PM.cagir("KS_removeSufloKeys", { records: sp, secili: true });
+ok("seçili kapsam: Pop In'in iki kaydı kaldırıldı, Ölçek 100 ve Opaklık 80'e döndü", kp.ok && kp.eslesen === 2 && P1.olcek.keys.length === 0 &&
+  P1.olcek.value === 100 && P1.opak.keys.length === 0 && P1.opak.value === 80, js([kp, P1.olcek, P1.opak]));
+
+// Kullanıcının pencere dışındaki animasyonu: önayar onu bozmaz, kaldırma da (kenar eklemeden) olduğu gibi bırakır
+P1.olcek.elle(P1, 3, 100);
+P1.olcek.elle(P1, 4, 150);
+var z = onayar("simple-zoom-in");
+var sz = sakla(z);
+var kz = PM.cagir("KS_removeSufloKeys", { records: sz, secili: true });
+ok("kullanıcının Ölçek animasyonu (3 sn → 4 sn) kaldırmadan sonra aynen duruyor, kenar anahtarı eklenmedi", kz.ok && kz.sonuclar[0].silinen === 3 && kz.sonuclar[0].eklenen === 0 &&
+  js(P1.olcek.tl(P1)) === js([3, 4]) && js(P1.olcek.keys.map(function (k) { return k.v; })) === js([100, 150]), js([kz, P1.olcek.keys]));
+
+// Konum [x,y]: Slide In Left kaldırılınca Konum eski [x,y] değerine döner
+P1.konum.value = [0.4, 0.6];
+var sl = onayar("slide-in-left");
+var ssl = sakla(sl);
+var kk = PM.cagir("KS_removeSufloKeys", { records: ssl, secili: true });
+ok("Slide In Left kaldırılınca Konum [0.4, 0.6] ve Opaklık 80", kk.ok && kk.eslesen === 2 && P1.konum.keys.length === 0 && js(P1.konum.value) === js([0.4, 0.6]) &&
+  P1.opak.value === 80, js([kk, P1.konum]));
+
+// Klip Hareket bileşeni olmadan da (bileşen yoksa kayıt yok) önayar eskisi gibi hata verir
+var bos = PM.klip({ nodeId: "P3", start: 20, end: 25 });
+bos.components = { numItems: 0 };
+PM.izKur([[P1, P2, bos]]);
+PM.durum.secim = [bos];
+var hb = onayar("fade-in");
+ok("Motion/Opaklık yoksa önayar hata verir ve kayıt dönmez", !hb.ok && !hb.records, js(hb));
+
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

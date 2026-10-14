@@ -315,5 +315,28 @@ ok("saf modül: DOM, Premiere ya da ağ çağrısı yok", !/document\.|evalScrip
 ok("temiz oda: lisanssız kaynağın kodu / adı yok", !new RegExp("open" + "curve", "i").test(src));
 ok("eşikler planla aynı: 0,25 kare, %60, 300 / 2000", K.TOLERANS_KARE === 0.25 && K.CANLI_ORAN === 0.6 && K.PROJE_SINIR === 300 && K.TOPLAM_SINIR === 2000);
 
+/* ---------- 3.4 adım 11: Geçiş / Zoom / Hareket önayarı kayıtları (uç yok: ilk ve son zaman uçtur) ---------- */
+var arac = K.kayit({ tur: "hareket", seqId: "s1", nodeId: "n7", clipName: "Klip.mp4", clipStart: 12, clipEnd: 17, clipIn: 37, clipOut: 42, ters: false,
+  matchName: "AE.ADBE Motion/Position", compIdx: 0, propIdx: 0, uclar: null, times: [12.351, 12, 12.45],
+  kenarDegerleri: [{ t: 12, v: [0.5, 0.5] }, { t: 12.45, v: [0.5, 0.5] }, { t: 13, v: "metin" }] }, 1000);
+ok("araç kaydı: tur 'hareket' geçerli, zamanlar sıralı, uç yok, çapa ve [x,y] kenar değerleri korunur (geçersiz kenar atılır)", arac && arac.tur === "hareket" &&
+  js(arac.times) === js([12, 12.351, 12.45]) && arac.uclar === null && arac.clipIn === 37 && arac.clipOut === 42 && arac.ters === false &&
+  js(arac.kenarDegerleri) === js([{ t: 12, v: [0.5, 0.5] }, { t: 12.45, v: [0.5, 0.5] }]), js(arac));
+ok("araç kaydı: 'gecis' ve 'zoom' türleri de geçerli", K.kayit({ tur: "gecis", times: [1, 2] }) !== null && K.kayit({ tur: "zoom", times: [0, 10] }) !== null);
+var fps25 = 25;
+ok("araç kaydı canlı: kullanıcı aralığa kendi anahtarını ekleyince de (uçlar ilk ve son zaman)", K.canli(arac, [12, 12.2, 12.351, 12.45], fps25));
+ok("araç kaydı ölü: Premiere'de geri alınınca (Suflo'nun anahtarlarından hiçbiri yok)", (function () {
+  var a = K.canliAyrinti(arac, [3, 20], fps25);
+  return !a.canli && a.eslesen === 0 && !a.uclar;
+})());
+ok("araç kaydı ölü: son anahtar (uç) silinince, %66 yerinde olsa da", !K.canli(arac, [12, 12.351], fps25));
+var depoA = K.depo(sahteDepo());
+depoA.ekle("C:/p.prproj", [arac, K.kayit({ tur: "egri", seqId: "s1", nodeId: "n7", times: [1, 2], uclar: [1, 2] })]);
+ok("depo: araç ve Eğri kayıtları aynı proje kovasında, türe göre süzülür", K.filtrele(depoA.oku("C:/p.prproj"), { tur: "hareket" }).length === 1 &&
+  K.filtrele(depoA.oku("C:/p.prproj"), { tur: "egri" }).length === 1, depoA.oku("C:/p.prproj").length);
+var geri = depoA.oku("C:/p.prproj").filter(function (r) { return r.tur === "hareket"; })[0];
+ok("depo: araç kaydı diskten aynen döner (sıkıştırılmış zamanlar, çapa, [x,y] kenar)", geri && js(geri.times) === js(arac.times) && geri.clipIn === 37 &&
+  js(geri.kenarDegerleri) === js(arac.kenarDegerleri), js(geri));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
