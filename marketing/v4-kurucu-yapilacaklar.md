@@ -1515,3 +1515,32 @@ Bu metni suflo.app SSS'ine / blog'a eklemek istersen "Şirket ağında Suflo mod
 Sertifika yeniden denemesi indirme, Doctor sınaması ve model özeti (SHA-256) içindir; panel açılışındaki sessiz
 güncelleme denetimi PowerShell başlatmaz. Groq / OpenAI bulut çağrıları (`httpUpload` / `httpJson`) değişmedi ve
 hata ipucu onlara yeniden deneme ya da model içe aktarma iddia etmez. Serbest "özel ayna" adresi bilerek eklenmedi (plan: özet doğrulamasını atlatır).
+
+### Adım 20: Araç ara (Ctrl+K / ⌘K komut paleti; ücretsiz)
+
+Ne değişti: üst çubukta büyüteç düğmesi ve **Ctrl+K** (macOS ⌘K) ile açılan arama penceresi. Sol menüdeki her araç ve 26
+sık kullanılan eylem ("Altyazı oluştur", "Sessizlikleri bul", "Rampayı uygula", "Ayarlar › Motor"…) Türkçe karakter
+duyarsız aranır; favoriler (☆, Ctrl+D) ve son kullanılan 8 araç `localStorage`'da (`suflo.aracAra`, yalnız o bilgisayarda).
+Eylem seçmek yalnız gezinir: sekme açılır, düğme odaklanıp çerçevelenir, **çalıştırılmaz** (Pro kapısı ve deneme hakları
+aracın kendi düğmesinde kaldı; paletin kendisinde kapı yok). Saf mantık `js/arac-ara.js`, arayüz `js/app.js`. Rebound'un
+Home başlatıcısından yalnız fikir; kod temiz oda, THIRD_PARTY_NOTICES.md değişmedi.
+
+**20.K1 Destek / SSS notu.** Suflo paneli odaktayken Ctrl+K artık Premiere'in **Kes (Add Edit)** kısayoluna gitmez, araç
+aramayı açar (CEP `registerKeyEventsInterest` ile panelde tutulur). Timeline'a tıklayınca Premiere'in Ctrl+K'sı eskisi gibi
+çalışır. "Ctrl+K klibi kesmiyor" diye yazan olursa: önce timeline'a tıklasın. Bunu 3.4 yenilikler / sürüm notuna eklemek
+istersen tek cümle yeter: "Ctrl+K ile her araca ve eyleme saniyede ulaş."
+
+**20.K2 3.4 yayın hazırlığı (bilgi).** "Suflo 3.x'te yeni" penceresi (`js/app.js` › `YENILIKLER`) bu adımda değişmedi; 3.4
+yayınında sürüm ve maddeler birlikte güncellenir. Önerilen madde: ikon "⌘", başlık "Araç ara", metin "Ctrl+K ile her araca ve
+eyleme saniyede ulaş; favorilerin başta."; madde tıklanınca paleti açmak için `KApp.aracAra()` hazır.
+
+**20.K3 Bilinen sınır: macOS ve Türkçe F klavye.** CEP tuş ilgisi işletim sisteminin sanal tuş koduyla çalışır: Windows'ta
+VK_K (75, klavye düzenine göre K harfi), macOS'ta kVK_ANSI_K (40, ANSI düzeninde K'nın **fiziksel** yeri). Türkçe Q'da sorun
+yok. macOS'ta Türkçe F düzeninde K başka bir tuşta olduğu için ⌘K paleti açar ama Premiere'e de gidebilir (timeline'da Add
+Edit). Deneme listesi 20.13'te görülürse: `js/arac-ara.js` › `tusIlgisi(mac)` listesine o tuşun kodu eklenebilir (ör. düzen
+algılanarak); şimdilik bilerek dokunulmadı.
+
+**20.K4 Eğri sekmesi gelince (adım 10).** "Eğri uygula" eylemi `#tab-egri` varsa kendiliğinden listeye girer, yoksa
+görünmez. Eğri sekmesinin Uygula düğmesinin kimliği `egri-uygula` değilse `js/arac-ara.js` › `EYLEMLER` › `egri-uygula`
+satırındaki `hedef`i güncelle (`tests/test-arac-ara.js` sekme varken eksik hedefi yakalar). Yeni bir sekme / sık eylem
+eklendiğinde de aynı listeye bir satır eklemek yeter (sol menü girdileri kendiliğinden gelir).
