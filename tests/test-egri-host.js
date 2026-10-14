@@ -329,6 +329,153 @@ ok("sınırlar: en çok 20 klip, en çok 40 özellik; fazlası 'atlanan'", rm.kl
   cagir("KS_easeScan", { maxProps: 7 }).atlanan === 33, js([rm.klipler.length, rm.props.length]));
 secim = [];
 
+/* ---------- 7b) inceleme: taşınan klipte geri al, canlılık, yarı açık kayıt aralığı, kapsam, uzun kayıt ---------- */
+function anahtarlar(p) { return p.keys.slice().sort(function (x, y) { return x.s - y.s; }); }
+// klip taşındı: anahtarlar kaynak zamanında klip ile kayar, kayıt (timeline) kaymaz → kayma kadar kaydırılıp silinir
+var MV = klip({ nodeId: "nMV", ad: "Tasinan.mp4", start: 10, end: 20, inP: 0, outP: 10, olcek: [[1, 100], [3, 200]] });
+izKur([[MV]]);
+playhead = 12;
+var rmv = cagir("KS_easeScan", {});
+var bmv = cagir("KS_easeBake", { target: hedef(rmv.props[0]), items: [plan(rmv.props[0])] });
+var kayitMV = bmv.records[0]; kayitMV.id = "krmv";
+MV.start.seconds = 12; MV.end.seconds = 22;   // 2 sn sağa sürüklendi (giriş / çıkış aynı)
+var umv = cagir("KS_easeUndo", { records: [kayitMV] });
+ok("geri al, klip 2 sn taşındıktan sonra: 49 Suflo anahtarı kayma kadar kaydırılıp silinir, uçlar kalır", umv.ok && umv.sonuclar.length === 1 && umv.sonuclar[0].silinen === 49 &&
+  umv.atlanan.length === 0 && MV.olcek.keys.length === 2 && MV.olcek.bul(1).v === 100 && MV.olcek.bul(3).v === 200, js([umv, MV.olcek.keys.length]));
+// 10 kare (0,4 sn) taşındı: kullanıcının baş anahtarı (kaynak 1 → timeline 11,4) kayıtlı bir iç zamana denk gelir; silinmez
+var MV2 = klip({ nodeId: "nMV2", ad: "Az.mp4", start: 10, end: 20, inP: 0, outP: 10, konum: [[1, [0.1, 0.1]], [2, [0.9, 0.9]]] });
+izKur([[MV2]]);
+playhead = 11.5;
+var rmv2 = cagir("KS_easeScan", {});
+var kmv2 = bul(rmv2, "Konum");
+var kayitMV2 = cagir("KS_easeBake", { target: hedef(kmv2), items: [plan(kmv2)] }).records[0]; kayitMV2.id = "krmv2";
+MV2.start.seconds = 10.4; MV2.end.seconds = 20.4;
+var umv2 = cagir("KS_easeUndo", { records: [kayitMV2] });
+ok("geri al, klip 10 kare taşındı: kullanıcının uç anahtarları değeriyle kalır, Suflo'nunkilerin hepsi gider", umv2.sonuclar[0].silinen === 24 && MV2.konum.keys.length === 2 &&
+  js(MV2.konum.bul(1).v) === js([0.1, 0.1]) && js(MV2.konum.bul(2).v) === js([0.9, 0.9]), js([umv2.sonuclar, anahtarlar(MV2.konum).map(function (k) { return k.s; }).slice(0, 4)]));
+// klibin hızı değişti (eşleme başka): ne kaymasız ne kaymalı aday tutar → hiçbir şey silinmez, kayıt saklanır
+var SP = klip({ nodeId: "nSP", ad: "Hiz.mp4", start: 10, end: 20, inP: 0, outP: 10, olcek: [[1, 100], [3, 200]] });
+izKur([[SP]]);
+playhead = 12;
+var rsp = cagir("KS_easeScan", {});
+var kayitSP = cagir("KS_easeBake", { target: hedef(rsp.props[0]), items: [plan(rsp.props[0])] }).records[0]; kayitSP.id = "krsp";
+var spOnce = SP.olcek.keys.length;
+SP.outPoint.seconds = 20;   // %50 hız
+var usp = cagir("KS_easeUndo", { records: [kayitSP] });
+ok("geri al, klibin hızı değişti: kayıt eşleşmez → atlanan 'degisti', hiçbir anahtar silinmez", usp.ok && usp.sonuclar.length === 0 && js(usp.atlanan) === js([{ id: "krsp", kod: "degisti" }]) &&
+  SP.olcek.keys.length === spOnce, js(usp));
+// Suflo'nun anahtarları Ctrl+Z ile gitti, kullanıcı aralığa (kayıtlı bir kare zamanına) kendi anahtarını koydu
+var CZ = klip({ nodeId: "nCZ", ad: "CtrlZ.mp4", start: 0, end: 10, inP: 0, outP: 10, olcek: [[1, 100], [2, 200]] });
+izKur([[CZ]]);
+playhead = 1.5;
+var rcz = cagir("KS_easeScan", {});
+var kayitCZ = cagir("KS_easeBake", { target: hedef(rcz.props[0]), items: [plan(rcz.props[0])] }).records[0]; kayitCZ.id = "krcz";
+CZ.olcek.keys = [{ s: 1, v: 100 }, { s: 2, v: 200 }, { s: 1.52, v: 777 }];   // 1,52 sn kayıtta geçen bir kare
+var ucz = cagir("KS_easeUndo", { records: [kayitCZ] });
+ok("geri al, canlı olmayan kayıt (Suflo anahtarları gitmiş): kullanıcının anahtarı silinmez, kayıt 'yok' ile biter", ucz.sonuclar.length === 1 && ucz.sonuclar[0].silinen === 0 &&
+  ucz.sonuclar[0].kod === "yok" && CZ.olcek.bul(1.52) && CZ.olcek.bul(1.52).v === 777 && CZ.olcek.keys.length === 3, js([ucz, CZ.olcek.keys.length]));
+
+// kayıt aralığı sonda yarı açık: playhead B'de (ya da Sonraki çift'in B + 0,25 karesinde) çift B → C; B son anahtarsa kayıt çifti
+var YA = klip({ nodeId: "nYA", start: 0, end: 10, inP: 0, outP: 10, olcek: [[1, 100], [3, 200], [5, 50]] });
+izKur([[YA]]);
+playhead = 2;
+var rya = cagir("KS_easeScan", {});
+cagir("KS_easeBake", { target: hedef(rya.props[0]), items: [plan(rya.props[0])] });
+var ipYA = [{ nodeId: "nYA", compIdx: 0, propIdx: 1, t0: 1, t1: 3 }];
+function ciftYA(ph) { playhead = ph; return cagir("KS_easeScan", { ipuclari: ipYA }).props[0].pair; }
+var yaB = ciftYA(3), yaB2 = ciftYA(3.01), yaIc = ciftYA(2.98);
+ok("ipucu yarı açık: playhead B'de ve B + 0,25 karede çift B → C (kayıtlı değil); içeride kayıt çifti", yaB.t0 === 3 && yaB.t1 === 5 && !yaB.kayitli && yaB2.t0 === 3 && yaB2.t1 === 5 &&
+  yaIc.t0 === 1 && yaIc.t1 === 3 && yaIc.kayitli === true, js([yaB, yaB2, yaIc]));
+YA.olcek.keys = YA.olcek.keys.filter(function (k) { return k.s !== 5; });
+var yaSon = ciftYA(3);
+ok("ipucu: B son anahtarsa playhead B'deyken kayıt çifti kalır (son anahtarda bir önceki çift)", yaSon.t0 === 1 && yaSon.t1 === 3 && yaSon.kayitli === true, js(yaSon));
+
+// kapsam: playhead altında klip yoksa saran boşluk; playhead modunda üst katman klipleriyle kırpılır
+var BASE = klip({ nodeId: "nBase", ad: "Base.mp4", start: 0, end: 20, inP: 0, outP: 20, olcek: [[2, 100], [18, 150]] });
+var OVR = klip({ nodeId: "nOvr", ad: "Overlay.png", start: 5, end: 8, inP: 0, outP: 3, opak: [[0.5, 0], [2.5, 100]] });
+var SON = klip({ nodeId: "nSon", ad: "Son.mp4", start: 30, end: 40, inP: 0, outP: 10 });
+izKur([[BASE, SON], [OVR]]);
+secim = [];
+playhead = 2;
+var kp1 = cagir("KS_easeScan", {});
+playhead = 10;
+var kp2 = cagir("KS_easeScan", {});
+playhead = 25;
+var kp3 = cagir("KS_easeScan", {});
+playhead = 45;
+var kp4 = cagir("KS_easeScan", {});
+ok("kapsam, playhead modu: alt katmandaki klip üst katman klibinin başında / sonunda kırpılır", kp1.kaynak === "playhead" && kp1.klipler[0].nodeId === "nBase" && js(kp1.kapsam) === js([0, 5]) &&
+  kp2.klipler[0].nodeId === "nBase" && js(kp2.kapsam) === js([8, 20]), js([kp1.kapsam, kp2.kapsam]));
+ok("kapsam, klip yok: playhead'i saran boşluk (bir klibe girince yeniden taranır); sekans sonunda açık uç", kp3.kaynak === "yok" && js(kp3.kapsam) === js([20, 30]) &&
+  kp4.kaynak === "yok" && kp4.kapsam[0] === 40 && kp4.kapsam[1] > 1e8, js([kp3.kapsam, kp4.kapsam]));
+
+// 400'den uzun canlı kayıt: ipucuyla çift ve kaydın tüm anahtarları gider (pencere kaydı kapsar)
+var UZ = klip({ nodeId: "nUZ", ad: "Uzun2.mp4", start: 0, end: 40, inP: 0, outP: 40, olcek: [[2, 100], [26, 300]] });
+izKur([[UZ]]);
+playhead = 14;
+var ruz = cagir("KS_easeScan", {});
+var buz = cagir("KS_easeBake", { target: hedef(ruz.props[0]), items: [plan(ruz.props[0])] });
+var ruz2 = cagir("KS_easeScan", { ipuclari: [{ nodeId: "nUZ", compIdx: 0, propIdx: 1, t0: 2, t1: 26 }] });
+var puz = ruz2.props[0];
+ok("400'den uzun kayıt (599 iç anahtar): ipucuyla çift kaydın uçları, anahtarlar iki ucu ve tüm iç anahtarları içerir", buz.records[0].times.length === 599 && puz.kesik === true &&
+  puz.pair && puz.pair.t0 === 2 && puz.pair.t1 === 26 && puz.pair.kayitli === true && puz.keys.indexOf(2) !== -1 && puz.keys.indexOf(26) !== -1 &&
+  puz.v0 === 100 && puz.v1 === 300 && ruz2.kapsam[0] <= 2 && ruz2.kapsam[1] >= 26, js([puz.keys.length, puz.pair, ruz2.kapsam]));
+var KRm = require(path.join(ROOT, "js", "key-records.js"));
+ok("400'den uzun kayıt: dönen anahtarlarla kayıt canlı (panel 'Suflo eğrisi' ve satır Geri al'ı gösterir)", KRm.canli(buz.records[0], puz.keys, 25), puz.keys.length);
+UZ.olcek.keys.push({ s: 30, v: 50 });   // B artık son anahtar değil
+playhead = 26;
+var ruz3 = cagir("KS_easeScan", { ipuclari: [{ nodeId: "nUZ", compIdx: 0, propIdx: 1, t0: 2, t1: 26 }] });
+ok("400'den uzun kayıt, playhead B'de: çift B → sonraki; kapsam B'de başlar (geri, kaydın içine girince tam kayıtla yeniden taranır)",
+  ruz3.props[0].pair && ruz3.props[0].pair.t0 === 26 && ruz3.props[0].pair.t1 === 30 && ruz3.kapsam[0] === 26, js([ruz3.props[0].pair, ruz3.kapsam]));
+
+// degistir + eski: kullanıcının kayıtlı aralığa eklediği anahtar sessizce silinmez
+var DG = klip({ nodeId: "nDG", start: 0, end: 10, inP: 0, outP: 10, olcek: [[1, 100], [3, 200]] });
+izKur([[DG]]);
+playhead = 2;
+var rdg = cagir("KS_easeScan", {});
+var kayitDG = cagir("KS_easeBake", { target: hedef(rdg.props[0]), items: [plan(rdg.props[0], E.builtin("yumusak").curve, 4)] }).records[0];
+DG.olcek.keys.push({ s: 2.02, v: 42 });
+var rdg2 = cagir("KS_easeScan", { ipuclari: [{ nodeId: "nDG", compIdx: 0, propIdx: 1, t0: 1, t1: 3 }] });
+var yeniDG = plan(rdg2.props[0], E.builtin("dogrusal").curve, 1); yeniDG.degistir = true; yeniDG.eski = kayitDG.times;
+var dgOnce = DG.olcek.keys.length;
+var bdg = cagir("KS_easeBake", { target: hedef(rdg2.props[0]), items: [yeniDG] });
+ok("yeniden uygulama (degistir + eski): kullanıcının araya eklediği anahtar varsa reddedilir, hiçbir şey silinmez", bdg.sonuclar[0].kod === "icAnahtar" && bdg.sonuclar[0].ic === 1 &&
+  DG.olcek.keys.length === dgOnce && DG.olcek.bul(2.02).v === 42, js(bdg.sonuclar));
+DG.olcek.keys = DG.olcek.keys.filter(function (k) { return k.s !== 2.02; });
+var bdg2 = cagir("KS_easeBake", { target: hedef(rdg2.props[0]), items: [yeniDG] });
+ok("yeniden uygulama (degistir + eski): yalnız Suflo'nun eski anahtarları silinir, yeni eğri yazılır", bdg2.sonuclar[0].ok && bdg2.sonuclar[0].silinen === kayitDG.times.length &&
+  DG.olcek.keys.length === 2 + yeniDG.keys.length, js(bdg2.sonuclar));
+
+// setValueAtKey reddederse eklenen anahtar kaldırılır (kayıtsız Suflo anahtarı kalmaz)
+var RJ = klip({ nodeId: "nRJ", start: 0, end: 10, inP: 0, outP: 10, olcek: [[1, 0], [2, 100]] });
+var asilYaz = RJ.olcek.setValueAtKey;
+RJ.olcek.setValueAtKey = function (t, v, ui) { if (typeof v === "number" && v < 0) throw new Error("negatif"); return asilYaz.call(this, t, v, ui); };
+izKur([[RJ]]);
+playhead = 1.5;
+var rrj = cagir("KS_easeScan", {});
+var prj = plan(rrj.props[0], E.builtin("geri-cekil").curve, 1);
+var negatif = prj.keys.filter(function (k) { return k.v < 0; }).length;
+var brj = cagir("KS_easeBake", { target: hedef(rrj.props[0]), items: [prj] });
+ok("setValueAtKey reddedince eklenen anahtar silinir: özellikte yalnız uçlar + kayıttakiler, kod 'eksik'", negatif > 0 && brj.sonuclar[0].ok && brj.sonuclar[0].kod === "eksik" &&
+  brj.records[0].times.length === prj.keys.length - negatif && RJ.olcek.keys.length === 2 + brj.records[0].times.length && RJ.olcek.keys.every(function (k) { return k.v >= 0; }),
+  js([negatif, prj.keys.length, brj.records[0].times.length, RJ.olcek.keys.length]));
+
+// Opaklık Premiere'in dilinden bağımsız tanınır (bileşen matchName + bileşenle aynı adlı parametre); host da 0..100 kırpar
+var DE = klip({ nodeId: "nDE", start: 0, end: 10, inP: 0, outP: 10, opak: [[1, 0], [3, 100]], bulanik: [[1, 0], [3, 50]] });
+DE.opak.displayName = "Deckkraft";
+DE.components[1].displayName = "Deckkraft";
+izKur([[DE]]);
+playhead = 2;
+var rde = cagir("KS_easeScan", {});
+var ode = rde.props.filter(function (p) { return p.compIdx === 1; })[0], bde = rde.props.filter(function (p) { return p.compIdx === 2; })[0];
+ok("Almanca Premiere: 'Deckkraft' Opaklık sayılır (opak), başka efektin parametresi sayılmaz", ode && ode.opak === true && bde && bde.opak === false, js([ode && ode.label, ode && ode.opak, bde && bde.opak]));
+var tasan = plan(ode, E.builtin("tasma").curve); tasan.keys = tasan.keys.map(function (k) { return { t: k.t, v: k.v * 1.2 }; });   // panel kırpmasa da
+cagir("KS_easeBake", { target: hedef(ode), items: [tasan] });
+ok("host Opaklık değerlerini 0..100'e kırpar", DE.opak.keys.length === 2 + tasan.keys.length && DE.opak.keys.every(function (k) { return k.v >= 0 && k.v <= 100; }), js(DE.opak.keys.map(function (k) { return k.v; })).slice(0, 120));
+DE.opak.displayName = "Maskenausweitung";
+ok("Opaklık bileşeninde başka adlı parametre (maske) opak sayılmaz", cagir("KS_easeScan", {}).props.filter(function (p) { return p.compIdx === 1; })[0].opak === false);
+secim = [];
+
 /* ---------- 8) yoklama: kfInterp ---------- */
 izKur([[A]]);
 var pr = cagir("KS_apiProbe");
@@ -338,6 +485,10 @@ ok("probe: kfInterp var (setInterpolationTypeAtKey), çağrılmadı", pr.ok && p
 var host = fs.readFileSync(path.join(ROOT, "jsx", "host.jsx"), "utf8");
 var bolum = host.slice(host.indexOf("Egri (3.4 adim 10)"));
 ok("temiz oda: lisanssız kaynağın adı / tablosu yok", bolum.length > 1000 && !new RegExp("open" + "curve", "i").test(host) && !new RegExp("PARAM" + "_NAMES").test(host));
+// BOM'suz host.jsx sistem kod sayfasıyla okunabilir: Eğri bölümünde ASCII dışı bayt yok (\u kaçışı; KS_presetProps gibi)
+var asciiDisi = bolum.match(/[^\x00-\x7F]/g) || [];
+ok("Eğri bölümü yalnız ASCII (etiketler \\u kaçışıyla), tablo yine Türkçe etiket döner", asciiDisi.length === 0 && ctx.KS_EASE_ADLAR["scale"] === "Ölçek" &&
+  ctx.KS_EASE_ADLAR["bağlantı noktası"] === "Bağlantı noktası" && ctx.KS_easeEtiket({ matchName: "AE.ADBE Opacity", displayName: "Opacity" }, { displayName: "Opaklık" }).label === "Opaklık", js(asciiDisi.slice(0, 5)));
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
