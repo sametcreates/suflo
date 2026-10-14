@@ -1587,14 +1587,24 @@ anahtarlarını silip iki düz anahtar yazar ve Konum'u sıfırlar. Düz değer 
 yakınlaşmış başlıyorsa düz değer de yakın kalır (3.3'ten beri var olan sınır; kayıtlı yol bunu yaşamaz). Aynı sebeple zoom'u
 aynı klibe ikinci kez uygulamak hâlâ birincinin üstüne biner (taban yakınlaşmış ilk anahtardan okunur; 3.3'ten beri). Kayıtlı
 kaldırma bunu telafi eder: yeniden uygulamada yeni kayıt ilk uygulamanın "önceki değer"ini devralır, Zoom'u kaldır ölçeği
-zoom'dan önceki değere döndürür. Zoom'un tabanını düzeltmek (yeniden uygulamada üst üste binmesin) ayrı bir iş; istersen söyle.
+zoom'dan önceki değere döndürür (yalnız yerine geçilen kayıt uygulamadan hemen önce hâlâ canlıysa; Premiere'de geri
+alınmış eski kaydın bayat değeri devralınmaz, klip taşınmış olsa da eşlenir). Zoom'un tabanını düzeltmek (yeniden
+uygulamada üst üste binmesin) ayrı bir iş; istersen söyle.
 
-**11.4 Yerel depo (bilgi).** Kayıtlar bu bilgisayarın panel deposunda (proje yolu karma anahtarla; projede en çok 300, toplam
-2000 kayıt, en eskiler tek tek atılır). Proje başka bilgisayarda açılırsa kayıt yok: eski yöntem (onaylı) ya da Ctrl+Z.
+**11.4 Yerel depo (bilgi).** Kayıtlar bu bilgisayarın panel deposunda (proje yolu karma anahtarla; projede Eğri ve araç
+kayıtları için ayrı ayrı en çok 300, toplam 2000 kayıt, en eskiler tek tek atılır; çok klipli bir araç uygulaması Eğri'nin
+Geri al kayıtlarını atmaz). Proje başka bilgisayarda açılırsa kayıt yok: eski yöntem (onaylı) ya da Ctrl+Z.
 Projenin içine yazmak (marker / proje meta verisi) sonraki bir karar.
 
 **11.5 Premiere'de dene (25–30 dk).** `marketing/v3.4-deneme-listesi.md` › `## 11`. Özellikle **11.2** (kendi anahtarın kalır,
 kenarlar eski değerde), **11.6** (eski geçiş: onay, Karartma'dan sonra klip siyah kalmaz), **11.7** (zoom kaldırma senin Ölçek
 anahtarını silmez), **11.9** (önayar kaldırınca Opaklık 80'e döner) ve **11.10** (hakları bitmiş ücretsiz kullanıcı kaldırabilir).
 Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de. `setTimeVarying(false)` + `setValue` ile sabit değere
-dönüşün Premiere'de anahtar bırakmadığını (Effect Controls'te kronometre kapalı) doğrula.
+dönüşün Premiere'de anahtar bırakmadığını (Effect Controls'te kronometre kapalı) doğrula. İnceleme düzeltmeleri için
+**11.13 (d)** ve **11.14** (araçlar arası: Zoom + Punch, Zoom + geçiş, Karartma → Zoom İçeri, Ctrl+Z sonra yeniden uygulama,
+çoklu seçim uyarısı) da dene.
+
+**11.6 Kaynak satırı (PR / birleştirme, 1 dk).** Adım 11'in ilk dört commit'inde (675cddd, 13b08f1, 63c3fe7, 74dfccb) kaynak
+satırı yok; inceleme düzeltmesi commit'inde var. 3.4 PR açıklamasına ve squash-merge commit'ine şu satırı ekle:
+`Kaynak: temiz oda (OpenCurve'den yalnız "canlılık parmak izli kayıt" fikri); kod alınmadı, bildirim gerekmez.`
+(plan › attribution_notes: her adımın commit / PR metni kaynağı ve kodun alınıp alınmadığını söyler).

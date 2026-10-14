@@ -256,5 +256,33 @@ ok("eski yol: kesim bulunur, pencere temizlenir", t7.ok && t7.temizlendi === tru
 ok("eski yol: anahtarı kalmayan A Opaklığı pencere dışındaki değere (100) sabitlenir", K1.opak.keys.length === 0 && K1.opak.value === 100 && K1.opak.tv === false, js(K1.opak));
 ok("eski yol: B'de pencere dışındaki kullanıcı anahtarı kalır", js(K2.opak.tl(K2)) === js([7.5]), js(K2.opak.tl(K2)));
 
+/* ---- inceleme: aynı kesimde geçiş türü değişince (Karartma → Zoom İçeri) klip artık değerde kalmaz ---- */
+var PM2 = require("./_kayit-premiere.js").olustur();
+var D1 = PM2.klip({ ad: "A.mp4", nodeId: "D1", start: 0, end: 5 }), D2 = PM2.klip({ ad: "B.mp4", nodeId: "D2", start: 5, end: 10 });
+PM2.izKur([[D1, D2]]);
+PM2.durum.playhead = 5;
+var dip = PM2.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.6 }), tolerance: 1 });
+var zi = PM2.cagir("KS_applyCutTransition", { plan: T.hostPlan("zoom-in", { duration: 0.6 }), tolerance: 1 });
+ok("Karartma → Zoom İçeri: önceki geçişin Opaklık anahtarları silinir, anahtarsız kalan Opaklık pencere dışındaki değere (100) sabitlenir (0'da, görünmez kalmaz)",
+  dip.ok && zi.ok && D2.opak.keys.length === 0 && D2.opak.value === 100 && D2.opak.tv === false && D1.opak.keys.length === 0 && D1.opak.value === 100, js([D1.opak, D2.opak]));
+var tzB = (zi.temizlenen || []).filter(function (e) { return e.nodeId === "D2" && e.matchName === "AE.ADBE Opacity/Opacity"; })[0];
+ok("temizlenen: host silinen anahtarları (Karartma'nın B'deki 5 ve 5,3) ve pencereyi bildirir, özellik boşaldı; tolerans 0,25 kare",
+  tzB && js(tzB.times) === js([5, 5.3]) && tzB.bosaldi === true && tzB.seqId === "seq-1" && tzB.pencereler.length >= 1 &&
+  tzB.pencereler[0][0] === 5 && yak(zi.tol, 0.25 / 25), js([tzB, zi.tol]));
+var zi2 = PM2.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.6 }), tolerance: 1 });
+ok("Zoom İçeri → Karartma: Ölçek de 145'te kalmaz (anahtarsız, 100)", zi2.ok && D2.olcek.keys.length === 0 && D2.olcek.value === 100 &&
+  D1.olcek.keys.length === 0 && D1.olcek.value === 100, js([D1.olcek, D2.olcek]));
+ok("Zoom İçeri → Karartma: yeni Karartma kaydının önceki değeri 100 (artık değil)", zi2.records.every(function (r) {
+  return r.kenarDegerleri.every(function (k) { return k.v === 100; });
+}), js(zi2.records.map(function (r) { return r.kenarDegerleri; })));
+
+/* ---- inceleme: Premiere anahtarları silmezse kayıt 'yok' (zaten kaldırılmış) sayılmaz ---- */
+var s8 = sakla(zi2);
+D2.opak.removeKey = function () { throw new Error("Premiere reddetti"); };
+var c8 = PM2.cagir("KS_removeSufloKeys", { records: s8 });
+ok("removeKey hata verirse: o kayıt atlanan 'silinemedi' (kayıt saklanır), öbürü kaldırılır", c8.ok && c8.atlanan.length === 1 && c8.atlanan[0].kod === "silinemedi" &&
+  c8.sonuclar.length === 1 && c8.sonuclar[0].silinen === 2 && D2.opak.keys.length === 2, js([c8, D2.opak.keys]));
+delete D2.opak.removeKey;
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

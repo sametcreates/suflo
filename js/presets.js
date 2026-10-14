@@ -244,7 +244,7 @@ window.KPresets = (function () {
       if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Preset uygulanamadi.");
       if (card) card.classList.add("ok");
       // Kaldırma kaydı (3.4 adım 11): bildirimdeki Geri al yalnız bu uygulamanın anahtarlarını kaldırır
-      var saklama = kd() ? kd().sakla(result.proje || "", result.records) : { ok: true, idler: [] };
+      var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
       var proje = result.proje || "";
       KApp.toast(result.applied + " klibe uygulandi · " + preset.name, "good",
         saklama.idler.length ? 9000 : undefined,
@@ -282,7 +282,7 @@ window.KPresets = (function () {
         kapsam: kapsam || { secili: true },
         kayitYokMetni: tekUygulama
           ? "Bu önayarın kaydı bulunamadı; hiçbir şey silinmedi."
-          : "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önceki sürümde uygulanan önayarı Premiere'de Ctrl+Z ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin."
+          : "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önceki sürümde uygulanan önayarı Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin."
       });
       KApp.toast(SufloKaldir.dugum(s.parcalar), s.tur, s.tur === "good" ? 6000 : 9000);
     } catch (e) {

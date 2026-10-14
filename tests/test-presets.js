@@ -292,5 +292,28 @@ PM.durum.secim = [bos];
 var hb = onayar("fade-in");
 ok("Motion/Opaklık yoksa önayar hata verir ve kayıt dönmez", !hb.ok && !hb.records, js(hb));
 
+/* ---- inceleme: pencere temizliği özelliği boşaltınca önceki değer artıktan (silinen ilk anahtar) okunmaz ---- */
+var PMb = require("./_kayit-premiere.js").olustur();
+var E1 = PMb.klip({ ad: "Eski.mp4", nodeId: "E1", start: 0, end: 5, inP: 0, opak: 90 });
+PMb.izKur([[E1]]);
+PMb.durum.secim = [E1];
+PMb.cagir("KS_applyMotionPreset", { id: "fade-in", duration: .45, strength: 1 });   // 3.3'te uygulanmış gibi (kayıt yok)
+var f2 = PMb.cagir("KS_applyMotionPreset", { id: "fade-in", duration: .45, strength: 1 });
+ok("eski Fade In yeniden uygulanınca önceki değer 90 (eski fade'in 0'ı değil: pencere dışındaki değer, silmeden önce okunur)",
+  f2.ok && f2.records[0].kenarDegerleri.length === 2 && f2.records[0].kenarDegerleri[0].v === 90 && f2.records[0].kenarDegerleri[1].v === 90, js(f2.records));
+var tzF = (f2.temizlenen || [])[0];
+ok("temizlenen: eski fade'in iki anahtarı silindi ve Opaklık boşaldı (panel buna göre eski kaydın yerine geçer)",
+  tzF && tzF.nodeId === "E1" && tzF.matchName === "AE.ADBE Opacity/Opacity" && js(tzF.times) === js([0, 0.45]) && tzF.bosaldi === true, js(f2.temizlenen));
+var kf2 = PMb.cagir("KS_removeSufloKeys", { records: sakla(f2), secili: true });
+ok("eski Fade In yeniden uygulanıp kaldırılınca Opaklık 90'a döner (0'da, görünmez kalmaz)", kf2.ok && E1.opak.keys.length === 0 && E1.opak.value === 90, js([kf2, E1.opak]));
+var E2 = PMb.klip({ ad: "Ozel.mp4", nodeId: "E2", start: 10, end: 15, inP: 0 });
+PMb.izKur([[E1, E2]]);
+PMb.durum.secim = [E2];
+E2.opak.elle(E2, 14, 40);
+var f3 = PMb.cagir("KS_applyMotionPreset", { id: "fade-in", duration: .45, strength: 1 });
+ok("pencere dışında anahtar kalırsa (özellik boşalmadı) önceki değer kalan eğriden okunur (kullanıcının 40'ı)",
+  f3.ok && f3.records[0].kenarDegerleri[0].v === 40 && f3.temizlenen[0].bosaldi === false && f3.temizlenen[0].times.length === 0, js([f3.records[0].kenarDegerleri, f3.temizlenen]));
+ok("kaydı olmayan önayar metni macOS'un Cmd+Z'sini de söyler", /Ctrl\+Z \(macOS'ta Cmd\+Z\)/.test(src), "presets.js");
+
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

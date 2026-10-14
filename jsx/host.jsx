@@ -550,7 +550,7 @@ function KS_applyMotionPreset(encoded) {
     }
     if (!applied) return KS_err("Secili klipte uygulanabilir Motion/Opacity ozelligi bulunamadi.");
     return KS_ok({ applied: applied, skipped: skipped, preset: id, removedKeys: KS_presetRemovedCount,
-      records: kt.kayitlar, proje: KS_projeYolu() });
+      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() });
   } catch (e) { return KS_err(e); }
 }
 
@@ -633,22 +633,24 @@ function KS_gecisSeciliMi(secili, c) {
 }
 
 /*
- * Eski yol (3.4 adim 11; kaydi olmayan, onceki surumlerde uygulanmis gecis; panel once onay ister): kesimin bu
- * yanindaki gecis penceresinde [t0, t1] Olcek / Konum / Opaklik anahtarlari silinir. Ozellikte hic anahtar kalmadiysa
- * pencerenin DISINDAKI (dinlenme) degere sabitlenir: deger temizlemeden once okunur, gecis onu etkilemez.
+ * Kesimin bu yanindaki gecis penceresinde [t0, t1] Olcek / Konum / Opaklik anahtarlari silinir. Ozellikte hic anahtar
+ * kalmadiysa pencerenin DISINDAKI (dinlenme) degere sabitlenir: deger temizlemeden once okunur, gecis onu etkilemez
+ * (Premiere son anahtar silinince ozelligi o anahtarin degerinde birakir: Karartma'nin 0'inda kalan klip gorunmez olurdu).
+ * Iki yol kullanir: gecis uygulanmadan once (onceki gecisin izi; hangi tur olursa olsun) ve eski yol (3.4 adim 11; kaydi
+ * olmayan, onceki surumlerde uygulanmis gecis; panel once onay ister). kt verilirse silinenler kayit toplayicisina
+ * bildirilir (KS_kayitTemizle). Doner: silinen anahtar sayisi.
  */
-function KS_gecisPencereTemizle(clip, cStart, cEnd, t0, t1, tabanAn) {
+function KS_gecisPencereTemizle(clip, cStart, cEnd, t0, t1, tabanAn, kt) {
   var props = KS_presetProps(clip);
-  var a = KS_presetSourceTime(clip, t0, cStart, cEnd), b = KS_presetSourceTime(clip, t1, cStart, cEnd);
   var kaynakAn = KS_presetSourceTime(clip, tabanAn, cStart, cEnd);
   var adlar = ["scale", "position", "opacity"], n = 0;
   for (var i = 0; i < adlar.length; i++) {
     var prop = props[adlar[i]];
     if (!prop) continue;
     var taban = KS_kayitDegerAt(prop, kaynakAn);
-    var sil = KS_presetClearKeys(prop, a, b);
-    n += sil;
-    if (sil && taban !== null && !KS_easeAnahtarlar(clip, prop, cStart, cEnd).length) KS_kayitSabitle(prop, taban);
+    var tm = KS_kayitTemizle(kt, clip, cStart, cEnd, prop, props.yer ? props.yer[adlar[i]] : null, t0, t1);
+    n += tm.n;
+    if (tm.bosaldi && taban !== null) KS_kayitSabitle(prop, taban);
   }
   return n;
 }
@@ -684,9 +686,12 @@ function KS_applyCutTransition(encoded) {
     var tabanA = Math.max(aStart, cut - wA - 0.02), tabanB = Math.min(bEnd, cut + wB + 0.02);
 
     if (temizleModu) {
-      var silinen = KS_gecisPencereTemizle(best.a, aStart, aEnd2, cut - wA, aEnd2, tabanA) +
-        KS_gecisPencereTemizle(best.b, bStart2, bEnd, bStart2, cut + wB, tabanB);
-      return KS_ok({ cut: cut, track: best.track + 1, temizlendi: true, removedKeys: silinen });
+      // temizlenen: panel, penceresi temizlenen (artik olu) arac kayitlarini dusurur
+      var ktT = KS_kayitToplayici(seq, "gecis");
+      var silinen = KS_gecisPencereTemizle(best.a, aStart, aEnd2, cut - wA, aEnd2, tabanA, ktT) +
+        KS_gecisPencereTemizle(best.b, bStart2, bEnd, bStart2, cut + wB, tabanB, ktT);
+      return KS_ok({ cut: cut, track: best.track + 1, temizlendi: true, removedKeys: silinen, temizlenen: ktT.temizlenen, tol: KS_kayitTol(ktT),
+        proje: KS_projeYolu() });
     }
 
     var half = Math.min(Number(plan.half), (aEnd2 - aStart) * 0.5, (bEnd - bStart2) * 0.5);
@@ -695,18 +700,14 @@ function KS_applyCutTransition(encoded) {
     var frameW = Number(seq.frameSizeHorizontal) || 1920;
     var frameH = Number(seq.frameSizeVertical) || 1080;
 
-    function temizle(clip, cStart, cEnd, t0, t1) {
-      var props = KS_presetProps(clip);
-      var a = KS_presetSourceTime(clip, t0, cStart, cEnd), b = KS_presetSourceTime(clip, t1, cStart, cEnd);
-      KS_presetClearKeys(props.scale, a, b);
-      KS_presetClearKeys(props.position, a, b);
-      KS_presetClearKeys(props.opacity, a, b);
-    }
-    temizle(best.a, aStart, aEnd2, cut - wA, aEnd2);
-    temizle(best.b, bStart2, bEnd, bStart2, cut + wB);
-
-    // Kaldirma kayitlari (3.4 adim 11): her yazilan ozellik icin bir kayit
+    // Kaldirma kayitlari (3.4 adim 11): her yazilan ozellik icin bir kayit; temizlenen anahtarlar da bildirilir
     var kt = KS_kayitToplayici(seq, "gecis");
+
+    // Onceki gecisin izi: en genis pencere temizlenir; anahtari kalmayan ozellik pencere disindaki (dinlenme)
+    // degerine sabitlenir. Aksi halde Premiere ozelligi silinen ilk anahtarin degerinde birakir (Karartma'dan sonra
+    // Zoom Ici: B Opaklik 0'da, gorunmez) ve yeni gecis tabanini o artiktan okurdu.
+    KS_gecisPencereTemizle(best.a, aStart, aEnd2, cut - wA, aEnd2, tabanA, kt);
+    KS_gecisPencereTemizle(best.b, bStart2, bEnd, bStart2, cut + wB, tabanB, kt);
 
     // tabanAn: klibin "dinlenme" degerini okuyacagimiz timeline ani (gecis bolgesinin disi).
     // ValueAt KAYNAK zamani ister: timeline anini klibin kaynak zamanina cevir.
@@ -748,7 +749,7 @@ function KS_applyCutTransition(encoded) {
     var inOk = uygula(best.b, plan["in"], bStart2, bEnd, bStart2, cut + half, tabanB);
     if (!outOk && !inOk) return KS_err("Kesimdeki kliplerde Motion/Opaklik ozelligi bulunamadi.");
     return KS_ok({ cut: cut, track: best.track + 1, half: half, out: outOk, "in": inOk, removedKeys: KS_presetRemovedCount,
-      records: kt.kayitlar, proje: KS_projeYolu() });
+      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1257,7 +1258,7 @@ function KS_autoZoom(encoded) {
     }
     if (!applied) return KS_err("Secili klipte Motion > Scale ozelligi bulunamadi.");
     return KS_ok({ applied: applied, skipped: skipped, keyCount: keys.length, removedKeys: KS_presetRemovedCount, engine: "Motion > Scale",
-      records: kt.kayitlar, proje: KS_projeYolu() });
+      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() });
   } catch (e) { return KS_err(e); }
 }
 
@@ -5456,8 +5457,65 @@ function KS_projeYolu() {
   try { return String(app.project.path || ""); } catch (e) { return ""; }
 }
 
-// Kayit toplayici: KS_kayitliYaz yazilan her ozelligin kaydini kayitlar'a ekler
-function KS_kayitToplayici(seq, tur) { return { seq: seq, tur: tur, kayitlar: [] }; }
+// Kayit toplayici: KS_kayitliYaz yazilan her ozelligin kaydini kayitlar'a, KS_kayitTemizle yazmadan once temizlenen
+// pencereleri temizlenen'e ekler (panel eski kayitlarin yerine gecilip gecilmedigine bununla karar verir)
+function KS_kayitToplayici(seq, tur) { return { seq: seq, tur: tur, kayitlar: [], temizlenen: [] }; }
+
+// Eslesme toleransi (0,25 kare, saniye): panel temizlenen zamanlari eski kayitlarla bununla karsilastirir
+function KS_kayitTol(kt) {
+  var fps = 30;
+  try { fps = KS_easeFps(kt.seq); } catch (e) {}
+  return KS_EASE_TOL_KARE / fps;
+}
+
+/*
+ * Pencereyi [ta, tb] (timeline saniyesi) temizler (KS_presetClearKeys) ve ne oldugunu soyler. kt ve yer
+ * (KS_presetProps().yer[ad]) verilirse kt.temizlenen'e bir girdi eklenir (ayni klip + ozellik birlesir):
+ *   { seqId, nodeId, clipName, clipStart, clipEnd, clipIn, clipOut, ters, matchName, pencereler: [[a, b]],
+ *     times (silinmeden once duran ve silinen anahtarlarin timeline saniyesi), bosaldi (ozellikte anahtar kalmadi) }
+ * Doner: { n (silinen), bosaldi, ilk, son }: ilk / son, temizlik ozelligi bosaltacaksa (tum anahtarlar pencerede)
+ * silinmeden once okunan ilk ve son anahtarin degeri (pencerenin hemen oncesi / sonrasi; yoksa null).
+ */
+function KS_kayitTemizle(kt, clip, start, end, prop, yer, ta, tb) {
+  var r = { n: 0, bosaldi: false, ilk: null, son: null };
+  if (!prop) return r;
+  var lo = Math.min(ta, tb), hi = Math.max(ta, tb);
+  var once = KS_easeAnahtarlar(clip, prop, start, end);
+  if (once.length && once[0].t >= lo - 0.003 && once[once.length - 1].t <= hi + 0.003) {
+    r.ilk = KS_easeDegerAt(prop, once[0].k);
+    r.son = KS_easeDegerAt(prop, once[once.length - 1].k);
+  }
+  r.n = KS_presetClearKeys(prop, KS_presetSourceTime(clip, ta, start, end), KS_presetSourceTime(clip, tb, start, end));
+  var sonra = r.n ? KS_easeAnahtarlar(clip, prop, start, end) : once;
+  r.bosaldi = once.length > 0 && sonra.length === 0;
+  // silinenler: once'de olup sonra'da olmayanlar (iki sirali dizide birlestirme yuruyusu)
+  var silinen = [];
+  if (r.n) {
+    var j = 0;
+    for (var i = 0; i < once.length; i++) {
+      while (j < sonra.length && sonra[j].t < once[i].t - 0.000001) j++;
+      if (j < sonra.length && Math.abs(sonra[j].t - once[i].t) <= 0.000001) { j++; continue; }
+      silinen.push(Math.round(once[i].t * 1000000) / 1000000);
+    }
+  }
+  if (!kt || !kt.temizlenen || !yer) return r;
+  var oz = KS_easeKlipOzeti(clip), kimlik = KS_easeKimlik(yer.comp, prop);
+  for (var q = 0; q < kt.temizlenen.length; q++) {
+    var g = kt.temizlenen[q];
+    if (g.nodeId === oz.nodeId && g.clipStart === start && g.matchName === kimlik) {
+      g.pencereler.push([lo, hi]);
+      for (var s = 0; s < silinen.length; s++) g.times.push(silinen[s]);
+      g.times.sort(function (x, y) { return x - y; });
+      if (r.bosaldi) g.bosaldi = true;
+      return r;
+    }
+  }
+  var kay = KS_easeKaynak(clip, start, end), seqId = "";
+  try { seqId = String(kt.seq.sequenceID); } catch (eS) {}
+  kt.temizlenen.push({ seqId: seqId, nodeId: oz.nodeId, clipName: oz.clipName, clipStart: start, clipEnd: end, clipIn: kay.clipIn,
+    clipOut: kay.clipOut, ters: kay.ters, matchName: kimlik, pencereler: [[lo, hi]], times: silinen, bosaldi: r.bosaldi });
+  return r;
+}
 
 // Ozelligin degeri (kaynak saniyesinde): sayi ya da [x,y]; okunamazsa null
 function KS_kayitDegerAt(prop, src) {
@@ -5473,8 +5531,13 @@ function KS_kayitDegerAt(prop, src) {
 
 /*
  * KS_presetClipKeys'in kayit ureten esi (ayni imza; props: KS_presetProps, ad: 'scale' | 'position' | 'opacity'):
- *   1) KS_presetKeys'in silecegi aralik once temizlenir (yazim da onu temizlerdi; sonuc ayni),
- *   2) yazilacak araligin iki ucundaki deger okunur: Suflo yazmadan onceki hal, kaldirma bunu geri koyar,
+ *   1) KS_presetKeys'in silecegi aralik once temizlenir (yazim da onu temizlerdi; sonuc ayni; KS_kayitTemizle
+ *      silinenleri kt.temizlenen'e bildirir),
+ *   2) yazilacak araligin iki ucundaki deger okunur: Suflo yazmadan onceki hal, kaldirma bunu geri koyar. Temizlik
+ *      ozelligin TUM anahtarlarini sildiyse Premiere ozelligi silinen ilk anahtarin degerinde birakir (ornegin
+ *      Karartma'nin 0'i, eski Fade In'in 0'i): o artik okunmaz, pencerenin disindaki (dinlenme) deger alinir: pencere
+ *      klibin sonuna varmiyorsa son anahtarin, varip basina varmiyorsa ilk anahtarin degeri (silinmeden once okunur).
+ *      Pencere tum klibi kapliyorsa (Zoom) baska bilgi yok; panel, yerine gectigi canli kaydin degerini devralir.
  *   3) yazilir (KS_presetClipKeys: kaynak zamani eslemesi, son anahtarda updateUI, ilk/son anahtar dogrulamasi),
  *   4) planli zamanlardan gercekten anahtar olanlar (0,25 kare tolerans) kt.kayitlar'a bir kayit olarak girer.
  * Doner: KS_presetClipKeys'in sonucu (yazildi mi).
@@ -5485,7 +5548,13 @@ function KS_kayitliYaz(kt, clip, start, end, props, ad, keys, clearA, clearB) {
   var kay = KS_easeKaynak(clip, start, end);
   var ca = clearA === undefined ? Number(keys[0].time) : Number(clearA);
   var cb = clearB === undefined ? Number(keys[keys.length - 1].time) : Number(clearB);
-  KS_presetClearKeys(prop, KS_presetSourceTime(clip, ca, start, end), KS_presetSourceTime(clip, cb, start, end));
+  var yer = props.yer ? props.yer[ad] : null;
+  var tm = KS_kayitTemizle(kt, clip, start, end, prop, yer, ca, cb);
+  var dinlenme = null;
+  if (tm.bosaldi) {
+    if (Math.max(ca, cb) < end - 0.001) dinlenme = tm.son;
+    else if (Math.min(ca, cb) > start + 0.001) dinlenme = tm.ilk;
+  }
   var tl = [], tA = 1e15, tB = -1e15, srcA = 0, srcB = 0;
   for (var i = 0; i < keys.length; i++) {
     var src = KS_presetSourceTime(clip, keys[i].time, start, end);
@@ -5497,16 +5566,15 @@ function KS_kayitliYaz(kt, clip, start, end, props, ad, keys, clearA, clearB) {
   }
   var kenar = [];
   if (tl.length) {
-    var vA = KS_kayitDegerAt(prop, srcA);
+    var vA = dinlenme !== null ? dinlenme : KS_kayitDegerAt(prop, srcA);
     if (vA !== null) kenar.push({ t: tA, v: vA });
     if (tB > tA) {
-      var vB = KS_kayitDegerAt(prop, srcB);
+      var vB = dinlenme !== null ? dinlenme : KS_kayitDegerAt(prop, srcB);
       if (vB !== null) kenar.push({ t: tB, v: vB });
     }
   }
   var ok = KS_presetClipKeys(clip, start, end, prop, keys, clearA, clearB);
   if (!ok || !kt || !tl.length) return ok;
-  var yer = props.yer ? props.yer[ad] : null;
   if (!yer) return ok;
   var fps = KS_easeFps(kt.seq), tol = KS_EASE_TOL_KARE / fps;
   var an = KS_easeAnahtarlar(clip, prop, start, end);
@@ -5559,9 +5627,10 @@ function KS_kayitKapsamAday(ozetler, rec, yari) {
   return false;
 }
 
-function KS_kayitSecili(secim, clip) {
-  for (var q = 0; q < secim.length; q++) if (KS_easeAyniKlip(secim[q], clip)) return true;
-  return false;
+// Klibin secimdeki yeri (yoksa -1)
+function KS_kayitSeciliIndis(secim, clip) {
+  for (var q = 0; q < secim.length; q++) if (KS_easeAyniKlip(secim[q], clip)) return q;
+  return -1;
 }
 
 // Kaydin kenar degerleri d kadar kaydirilmis, zamana gore sirali: [{ t, v }]
@@ -5652,9 +5721,11 @@ function KS_kayitKesimde(rec, d, kesim, yanA, tol) {
  * Effect Controls / Program updateUI ile tazelenir.
  *   Suflo'nun anahtarlarindan hicbiri yerinde degil (Premiere'de geri alindi / silindi): sonuclar kod 'yok' (kayit biter).
  *   Bir kismi yerinde ama kayit canli degil (uc anahtar silinmis, %60'in alti): dokunulmaz, atlanan 'degisti'.
+ *   Canli ama Premiere anahtarlarin hicbirini silmedi (removeKey hata verdi): atlanan 'silinemedi' (kayit saklanir).
  *   Klip bulunamadi: atlanan 'klipYok' (kayit saklanir, sonra yeniden denenir). Ozellik yok: 'ozellik'. Baska sekans: 'sekans'.
  * Doner: { eslesen (kapsamdaki kayit), sonuclar: [{ id, ok, kod, silinen, eklenen }], atlanan: [{ id, kod }], kesim?,
- *   secim? (secili kapsamda secili klip sayisi) }
+ *   secim? (secili kapsamda secili klip sayisi), kayitsiz? (secili kapsamda bu kayitlarin hicbirinin eslesmedigi secili
+ *   video klipleri: [{ nodeId, clipName, clipStart, clipEnd }]; onlara dokunulmadi, panel soyler) }
  */
 function KS_removeSufloKeys(encoded) {
   try {
@@ -5686,7 +5757,7 @@ function KS_removeSufloKeys(encoded) {
       kapsamOzet = [];
       for (var c0 = 0; c0 < adaylar.length; c0++) kapsamOzet.push(KS_easeKlipOzeti(adaylar[c0]));
     }
-    var sonuclar = [], atlanan = [], eslesen = 0;
+    var sonuclar = [], atlanan = [], eslesen = 0, kayitli = [];
     for (var i = 0; i < recs.length && i < KS_KALDIR_MAX_KAYIT; i++) {
       var rec = recs[i] || {};
       var id = String(rec.id || "");
@@ -5700,7 +5771,11 @@ function KS_removeSufloKeys(encoded) {
         if (!kapsamli) atlanan.push({ id: id, kod: "klipYok" });
         continue;
       }
-      if (seciliMod && !KS_kayitSecili(secim, clip)) continue;
+      if (seciliMod) {
+        var si = KS_kayitSeciliIndis(secim, clip);
+        if (si < 0) continue;
+        kayitli[si] = true;
+      }
       var yanA = false;
       if (kesim) {
         yanA = KS_easeAyniKlip(clip, kesim.a);
@@ -5735,6 +5810,8 @@ function KS_removeSufloKeys(encoded) {
       for (var s = sil.length - 1; s >= 0; s--) {
         try { prop.removeKey(sil[s].k); silinen++; } catch (eR) {}
       }
+      // Anahtarlar yerinde ama Premiere hicbirini silmedi: 'yok' (zaten kaldirilmis) DEGIL; kayit saklanir, panel uyarir
+      if (sil.length && !silinen) { atlanan.push({ id: id, kod: "silinemedi" }); continue; }
       var g = silinen ? KS_kayitKenarGeri(clip, prop, oz, KS_kayitKenarlar(rec, esle.d), tol) : { eklenen: 0, ui: false, son: null };
       if (silinen && !g.ui) {
         // Program monitoru / Effect Controls tazelensin: son eklenen kenar anahtari ya da kalan en yakin anahtar
@@ -5758,7 +5835,17 @@ function KS_removeSufloKeys(encoded) {
     }
     var out = { eslesen: eslesen, sonuclar: sonuclar, atlanan: atlanan };
     if (kesim) out.kesim = { cut: kesim.cut, track: kesim.track + 1 };
-    if (seciliMod) out.secim = secim.length;   // 0: hic klip secili degil (panel "once klip sec" der)
+    if (seciliMod) {
+      out.secim = secim.length;   // 0: hic klip secili degil (panel "once klip sec" der)
+      var kayitsiz = [];
+      for (var sk = 0; sk < secim.length; sk++) {
+        if (kayitli[sk] || !KS_easeVideoMu(seq, secim[sk])) continue;
+        var ko = KS_easeKlipOzeti(secim[sk]), tekrar = false;
+        for (var sq = 0; sq < kayitsiz.length; sq++) if (kayitsiz[sq].nodeId && kayitsiz[sq].nodeId === ko.nodeId) tekrar = true;
+        if (!tekrar) kayitsiz.push(ko);
+      }
+      out.kayitsiz = kayitsiz;
+    }
     return KS_ok(out);
   } catch (e) { return KS_err(e); }
 }

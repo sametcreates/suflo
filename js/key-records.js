@@ -20,7 +20,9 @@
  * canli(kayit, canliZamanlar, fps): iki uç hâlâ var VE kaydedilen zamanların en az %60'ı yerinde
  * (sıralı iki dizide birleştirme yürüyüşü, tolerans 0,25 kare). Bu eşikler Suflo'nundur.
  *
- * Depo: proje başına bir localStorage anahtarı; projede en çok 300, toplam en çok 2000 kayıt.
+ * Depo: proje başına bir localStorage anahtarı; projede sınıf başına en çok 300 (Eğri kayıtları ve araç kayıtları
+ * — Geçiş, Zoom, Hareket önayarı… — ayrı sayılır: çok kliple tek bir araç uygulaması Eğri'nin Geri al kayıtlarını
+ * atmaz; 3.4 adım 11), toplam en çok 2000 kayıt.
  * Kayıt sayısının yanında BOYUT da sınırlı: proje kovası en çok 400 000, tüm kovalar en çok
  * 1 000 000 karakter (diskteki JSON uzunluğu). localStorage kotası (~5 M karakter) panelin geri
  * kalanıyla (deneme sayacı aynası, Hız Rampası kayıtları…) ortak; bu pay ona yer bırakır.
@@ -241,6 +243,25 @@
     });
   }
 
+  // Kayıt sınıfı: Eğri'nin Geri al kayıtları ('egri') ya da araç kayıtları (diğer türler). Proje kovasında her sınıfın
+  // kendi sınırı var ve yer açmak için bir sınıfın kayıtları yalnız kendi sınıfının eskilerini atar.
+  function sinif(r) { return r && r.tur === "egri" ? "egri" : "arac"; }
+
+  // Sınıf başına en yeni `sinir` kaydı tutar (enYeniler her sınıfa ayrı; listedeki sıra korunur)
+  function sinifEnYeniler(liste, sinir) {
+    var gruplar = { egri: [], arac: [] }, tut = {};
+    liste.forEach(function (r, i) { gruplar[sinif(r)].push({ r: r, i: i }); });
+    Object.keys(gruplar).forEach(function (s) {
+      var g = gruplar[s];
+      if (g.length > sinir) {
+        g.sort(function (a, b) { return (b.r.createdAt - a.r.createdAt) || (b.i - a.i); });
+        g = g.slice(0, sinir);
+      }
+      g.forEach(function (x) { tut[x.i] = 1; });
+    });
+    return liste.filter(function (r, i) { return tut[i] === 1; });
+  }
+
   // En yeni `sinir` kaydı tutar (createdAt'e göre; eşitlikte listedeki sıra)
   function enYeniler(liste, sinir) {
     if (liste.length <= sinir) return liste.slice();
@@ -305,8 +326,14 @@
   }
   // Paketten en eski kayıtları TEK TEK atar (önce korunmayanlar, sonra korunanlar; createdAt
   // artan) — hedefKarakter karakterlik yer açılana ve hedefSayi kayıt atılana dek. { sayi, serbest }
+  // Korunanlar (bu çağrıda eklenenler) varsa başka sınıfın kayıtları en sona kalır: araç kayıtları için Eğri'ninkiler
+  // (ve tersi) atılmaz, yer yetmezse yeni eklenenler saklanamaz (ekle ok: false).
   function paketten(p, hedefKarakter, hedefSayi, korunan) {
-    var sira = p.liste.map(function (r, i) { return { i: i, k: korunan[r.id] ? 1 : 0, c: r.createdAt }; });
+    var siniflar = {}, korunanVar = false;
+    p.liste.forEach(function (r) { if (korunan[r.id]) { siniflar[sinif(r)] = 1; korunanVar = true; } });
+    var sira = p.liste.map(function (r, i) {
+      return { i: i, k: korunan[r.id] ? 1 : (korunanVar && !siniflar[sinif(r)] ? 2 : 0), c: r.createdAt };
+    });
     sira.sort(function (a, b) { return a.k - b.k || a.c - b.c || a.i - b.i; });
     var at = {}, serbest = 0, sayi = 0;
     for (var j = 0; j < sira.length && (serbest < hedefKarakter || sayi < hedefSayi); j++) {
@@ -399,7 +426,7 @@
       var anahtar = depoAnahtari(proje);
       var d = dizinOku();
       var eskiKova = al(anahtar);
-      var p = paketle(enYeniler(liste, PROJE_SINIR));
+      var p = paketle(sinifEnYeniler(liste, PROJE_SINIR));
       var atilanKendi = liste.length - p.liste.length, atilanDiger = 0;
 
       // diğer projelerin kovaları yalnız gerektiğinde okunur; atmalar önce bellekte yapılır
@@ -548,6 +575,6 @@
     PROJE_SINIR: PROJE_SINIR, TOPLAM_SINIR: TOPLAM_SINIR, PROJE_KARAKTER: PROJE_KARAKTER, TOPLAM_KARAKTER: TOPLAM_KARAKTER,
     ONEK: ONEK, DIZIN: DIZIN, zamanKodla: zamanKodla, zamanCoz: zamanCoz,
     kayit: kayit, canli: canli, canliAyrinti: canliAyrinti, eslestir: eslestir, tolerans: tolerans,
-    filtrele: filtrele, enYeniler: enYeniler, depoAnahtari: depoAnahtari, depo: depo, yeniId: yeniId
+    filtrele: filtrele, enYeniler: enYeniler, sinifEnYeniler: sinifEnYeniler, sinif: sinif, depoAnahtari: depoAnahtari, depo: depo, yeniId: yeniId
   };
 });

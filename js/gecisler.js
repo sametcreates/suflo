@@ -14,7 +14,7 @@ window.KGecis = (function () {
 
   // Kaydı olmayan (önceki sürümde ya da başka bilgisayarda uygulanmış) geçiş: eski yöntem onay sorusu
   var YEDEK_SORU = {
-    yok: "Bu kesimde Suflo'nun geçiş kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış olabilir). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.",
+    yok: "Bu kesimde Suflo'nun geçiş kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.",
     degisti: "Suflo'nun geçiş kaydı bu kesimin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir."
   };
 
@@ -48,7 +48,7 @@ window.KGecis = (function () {
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("transitions", KApp.toast);   // deneme: yalniz basarida
       status("");
       // Kaldırma kaydı (kapısız Geri al: yalnız bu uygulamanın anahtarları)
-      var saklama = kd() ? kd().sakla(r.proje || "", r.records) : { ok: true, idler: [] };
+      var saklama = kd() ? kd().sakla(r.proje || "", r.records, r) : { ok: true, idler: [] };
       var proje = r.proje || "";
       KApp.toast("↔ " + t.name + " · V" + r.track + " kesimine eklendi" +
         (r.half < secenek().duration / 2 - 0.01 ? " (kısa klip: süre kısaltıldı)" : ""), "good",
@@ -86,6 +86,7 @@ window.KGecis = (function () {
         yedek: async function () {
           var r = await K.call("KS_applyCutTransition", { temizle: true, tolerance: 1.0 }, 60000);
           if (!r || !r.ok) throw new Error(r && r.error ? r.error : "Temizlenemedi.");
+          k.sakla(r.proje || "", [], r);   // penceresi temizlenen (artık ölü) kayıtlar düşer; eski yöntem kayıt yazmaz
           return { parcalar: ["Geçiş penceresi eski yöntemle temizlendi: " + (Number(r.removedKeys) || 0) + " anahtar kare silindi."], tur: "good" };
         }
       });

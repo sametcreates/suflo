@@ -2823,6 +2823,9 @@
     "{n} kaydın klibi bulunamadı; kayıt saklandı, klip yerindeyken yeniden dene.": "The clip of {} records wasn't found; the records were kept, try again while the clip is on the timeline.",
     "{n} kaydın özelliği bulunamadı; kayıt saklandı.": "The property of {} records wasn't found; the records were kept.",
     "{n} kaydın anahtar kareleri sonradan değiştirilmiş; dokunulmadı.": "The keyframes of {} records were changed afterwards; nothing was touched.",
+    "{n} kaydın anahtar karelerini Premiere silmedi; kayıt saklandı, yeniden dene.": "Premiere didn't delete the keyframes of {} records; the records were kept, try again.",
+    "{n} seçili klipte Suflo'nun kaydı yok; onlara dokunulmadı (önceki sürümde uygulandıysa yalnız o klibi seçip yeniden dene).":
+      "{} selected clips have no Suflo record; they were left untouched (if it was applied in an earlier version, select only that clip and try again).",
     "Playhead'in yakınında kesim yok. Playhead'i iki klibin birleştiği yere getir.": "There's no cut near the playhead. Move the playhead to where two clips meet.",
     "Premiere'e ulaşılamadı; biraz sonra yeniden dene.": "Couldn't reach Premiere; try again in a moment.",
     "Suflo'nun anahtar kareleri zaten kaldırılmış (Premiere'de geri alınmış ya da silinmiş); kayıt temizlendi.":
@@ -2837,16 +2840,16 @@
     "Bu zoom'un kaydı bulunamadı; hiçbir şey silinmedi.": "This zoom's record wasn't found; nothing was deleted.",
     "Bu önayarın kaydı bulunamadı; hiçbir şey silinmedi.": "This preset's record wasn't found; nothing was deleted.",
     "Geçiş penceresi eski yöntemle temizlendi: {n} anahtar kare silindi.": "Transition window cleared the old way: {} keyframes deleted.",
-    "Bu kesimde Suflo'nun geçiş kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış olabilir). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.":
-      "There's no Suflo transition record at this cut (it may have been applied in an earlier version or on another computer). Delete the Scale, Position and Opacity keyframes in the transition window on both sides of the cut (up to 0.8 s) the old way? Your own keyframes in that range are deleted too.",
+    "Bu kesimde Suflo'nun geçiş kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.":
+      "There's no Suflo transition record at this cut (it may have been applied in an earlier version or on another computer, or its record was dropped because it was very old). Delete the Scale, Position and Opacity keyframes in the transition window on both sides of the cut (up to 0.8 s) the old way? Your own keyframes in that range are deleted too.",
     "Suflo'nun geçiş kaydı bu kesimin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.":
       "Suflo's transition record no longer matches this cut's keyframes (they were changed afterwards). Delete the Scale, Position and Opacity keyframes in the transition window on both sides of the cut (up to 0.8 s) the old way? Your own keyframes in that range are deleted too.",
-    "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir.":
-      "There's no Suflo zoom record on this clip (it may have been applied in an earlier version or on another computer). Delete ALL of the clip's Scale keyframes and reset Position the old way? Scale keyframes you added yourself are deleted too.",
+    "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir.":
+      "There's no Suflo zoom record on this clip (it may have been applied in an earlier version or on another computer, or its record was dropped because it was very old). Delete ALL of the clip's Scale keyframes and reset Position the old way? Scale keyframes you added yourself are deleted too.",
     "Suflo'nun zoom kaydı bu klibin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir.":
       "Suflo's zoom record no longer matches this clip's keyframes (they were changed afterwards). Delete ALL of the clip's Scale keyframes and reset Position the old way? Scale keyframes you added yourself are deleted too.",
-    "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önceki sürümde uygulanan önayarı Premiere'de Ctrl+Z ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin.":
-      "There's no Suflo preset record on the selected clip; nothing was deleted. To remove a preset applied in an earlier version, use Ctrl+Z in Premiere or delete its keyframes in Effect Controls.",
+    "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önceki sürümde uygulanan önayarı Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin.":
+      "There's no Suflo preset record on the selected clip; nothing was deleted. To remove a preset applied in an earlier version, use Ctrl+Z in Premiere (Cmd+Z on macOS) or delete its keyframes in Effect Controls.",
     // jsx/host.jsx KS_removeSufloKeys (ASCII Turkish; the panel shows its own text from the code)
     "Playhead'in yakininda kesim yok.": "No cut near the playhead."
   });

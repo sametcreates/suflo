@@ -338,5 +338,27 @@ var geri = depoA.oku("C:/p.prproj").filter(function (r) { return r.tur === "hare
 ok("depo: araç kaydı diskten aynen döner (sıkıştırılmış zamanlar, çapa, [x,y] kenar)", geri && js(geri.times) === js(arac.times) && geri.clipIn === 37 &&
   js(geri.kenarDegerleri) === js(arac.kenarDegerleri), js(geri));
 
+/* ---------- inceleme: araç kayıtları Eğri'nin Geri al kayıtlarını atmaz (sınıf başına sınır) ---------- */
+(function () {
+  var dp = K.depo(sahteDepo());
+  var egriK = K.kayit({ tur: "egri", seqId: "s1", nodeId: "e1", matchName: "AE.ADBE Motion/Scale", compIdx: 0, propIdx: 1, times: [1, 1.04, 2], uclar: [1, 2] }, 500);
+  dp.ekle("C:/p.prproj", [egriK]);
+  var cok = [];
+  for (var i = 0; i < 320; i++) cok.push(K.kayit({ tur: "hareket", seqId: "s1", nodeId: "n" + i, matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0, times: [i, i + 0.45] }, 1000 + i));
+  var s = dp.ekle("C:/p.prproj", cok);
+  var hepsi = dp.oku("C:/p.prproj");
+  ok("tek seferde 320 araç kaydı: Eğri kaydı kalır, araçların en yeni 300'ü saklanır (sınır sınıf başına)",
+    hepsi.filter(function (r) { return r.tur === "egri"; }).length === 1 && hepsi.filter(function (r) { return r.tur === "hareket"; }).length === 300 &&
+    s.eklenen === 300 && !s.ok && hepsi.filter(function (r) { return r.tur === "hareket" && r.createdAt < 1020; }).length === 0, js([s.eklenen, s.ok, hepsi.length]));
+  var egriler = [];
+  for (var j = 0; j < 300; j++) egriler.push(K.kayit({ tur: "egri", seqId: "s1", nodeId: "g" + j, matchName: "AE.ADBE Motion/Scale", compIdx: 0, propIdx: 1, times: [j, j + 1], uclar: [j, j + 1] }, 5000 + j));
+  dp.ekle("C:/p.prproj", egriler);
+  var son = dp.oku("C:/p.prproj");
+  ok("Eğri kovası dolunca da araç kayıtları atılmaz (Eğri yalnız kendi eskisini atar)", son.filter(function (r) { return r.tur === "hareket"; }).length === 300 &&
+    son.filter(function (r) { return r.tur === "egri"; }).length === 300 && !son.some(function (r) { return r.id === egriK.id; }), son.length);
+  ok("sinifEnYeniler: sınıf başına en yeniler, sıra korunur", js(K.sinifEnYeniler([{ tur: "egri", createdAt: 1 }, { tur: "zoom", createdAt: 2 }, { tur: "gecis", createdAt: 3 }], 1)
+    .map(function (r) { return r.tur; })) === js(["egri", "gecis"]));
+})();
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

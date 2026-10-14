@@ -10,8 +10,9 @@
  * Kaldırmak hiçbir zaman ücretli değil (Pro kapısı yok). Kayıt bulunamazsa (eski proje, başka bilgisayar,
  * silinmiş yerel depo) araç eski yöntemi YALNIZ onayla çalıştırır (yedekGerekli).
  *
- * Saf kısım (DOM'suz, node ile test edilir): cakisanlar, ozet, mesajParcalari, yedekGerekli, hataMetni.
- * olustur({ call, depo, simdi }) → { sakla, kayitlar, kaldir }: call = K.call (Promise), depo = SufloKeyRecords.depo().
+ * Saf kısım (DOM'suz, node ile test edilir): yerineGecis, kenarMiras, cakisanlar, ozet, mesajParcalari, yedekGerekli,
+ * hataMetni. olustur({ call, depo, simdi }) → { sakla, kayitlar, kaldir, akis }: call = K.call (Promise),
+ * depo = SufloKeyRecords.depo().
  * Depo yazılamazsa kayıtlar bu oturumun belleğinde kalır (panel açıkken kaldırma yine çalışır).
  * Premiere'e yalnız kullanıcı eyleminde gidilir (kaldir): panel açılışında çağrı yok.
  */
@@ -41,8 +42,11 @@
     sekans: function (n) { return n + " kayıt başka bir sekansta; saklandı, o sekansı açıp yeniden dene."; },
     klipYok: function (n) { return n + " kaydın klibi bulunamadı; kayıt saklandı, klip yerindeyken yeniden dene."; },
     ozellik: function (n) { return n + " kaydın özelliği bulunamadı; kayıt saklandı."; },
-    degisti: function (n) { return n + " kaydın anahtar kareleri sonradan değiştirilmiş; dokunulmadı."; }
+    degisti: function (n) { return n + " kaydın anahtar kareleri sonradan değiştirilmiş; dokunulmadı."; },
+    silinemedi: function (n) { return n + " kaydın anahtar karelerini Premiere silmedi; kayıt saklandı, yeniden dene."; }
   };
+  // Seçili kapsamda Suflo kaydı eşleşmeyen video klipleri (önceki sürümde uygulanmış olabilir): dokunulmaz, söylenir
+  function kayitsizMetni(n) { return n + " seçili klipte Suflo'nun kaydı yok; onlara dokunulmadı (önceki sürümde uygulandıysa yalnız o klibi seçip yeniden dene)."; }
   function kenarMetni(n) { return "Kendi anahtar karelerin korundu; kenarlara " + n + " anahtar kare eski değerle eklendi."; }
   var HATALAR = {
     sekansYok: "Aktif sekans yok.",
@@ -60,9 +64,9 @@
   }
 
   /*
-   * Yeni kaydın yerini aldığı eski araç kayıtları: aynı sekans, klip ve özellik, zaman aralıkları kesişiyor.
-   * Araç yazmadan önce o pencereyi temizler: eski kaydın anahtarları gitti; kalsaydı yenisinin anahtarlarını
-   * kendininmiş gibi eşleyip kaldırmayı bölebilirdi. Eğri kayıtlarına dokunulmaz.
+   * Eski araç kayıtlarından yeni kaydın aralığıyla kesişenler (aynı sekans, klip ve özellik; Eğri kayıtları hariç).
+   * Yalnız aralığa bakar; bir kaydın yerine geçilip geçilmediğine bununla karar verilmez (yerineGecis, host'un
+   * bildirdiği silinen anahtarlarla karar verir: başka aracın küçük penceresi tüm klibe yayılan zoom'u atmasın).
    */
   function cakisanlar(liste, yeni) {
     var ya = aralik(yeni);
@@ -76,37 +80,174 @@
     });
   }
 
+  function sonlu(v) { return typeof v === "number" && isFinite(v); }
+  function kopya(v) { return Array.isArray(v) ? v.slice() : v; }
+  function ayniTur(a, b) {
+    if (typeof a === "number" || typeof b === "number") return typeof a === "number" && typeof b === "number";
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length;
+  }
+
   /*
-   * Yeniden uygulama (aynı araç, aynı klip ve özellik, pencerenin aynı ucu): araç yazmadan önce pencereyi temizler,
-   * yeni kaydın o uçtaki "önceki değeri" eski Suflo anahtarlarının izini taşıyabilir (ör. ilk anahtarı yakınlaşmış
-   * zoom). Yerine geçtiği en yeni eski kaydın o uçtaki kenar değeri (temiz hâlden okunmuş ya da o da devralmış)
-   * devralınır; kaldırma özelliği Suflo'dan önceki değerine döndürür. r yerinde değişir.
+   * Host'un bildirdiği temizlik (KS_kayitTemizle; cevaptaki temizlenen): araç yazmadan önce bir klibin bir özelliğinde
+   * hangi pencereleri temizledi, o an duran hangi anahtarlar silindi (timeline saniyesi), özellik boşaldı mı.
+   * Bozuk girdi atılır.
    */
-  function kenarMiras(r, eskiler) {
+  function temizlenenler(ek) {
+    var liste = ek && Array.isArray(ek.temizlenen) ? ek.temizlenen : [];
+    var out = [];
+    liste.slice(0, 2000).forEach(function (e) {
+      if (!e || typeof e.matchName !== "string" || !sonlu(Number(e.clipStart))) return;
+      var pencereler = (Array.isArray(e.pencereler) ? e.pencereler : []).filter(function (w) {
+        return Array.isArray(w) && sonlu(w[0]) && sonlu(w[1]);
+      }).slice(0, 16).map(function (w) { return [Math.min(w[0], w[1]), Math.max(w[0], w[1])]; });
+      var times = (Array.isArray(e.times) ? e.times : []).filter(sonlu).slice(0, 20000).sort(function (a, b) { return a - b; });
+      out.push({ seqId: String(e.seqId || ""), nodeId: String(e.nodeId || ""), clipName: String(e.clipName || ""),
+        clipStart: Number(e.clipStart), clipEnd: Number(e.clipEnd), clipIn: Number(e.clipIn), clipOut: Number(e.clipOut), ters: e.ters === true,
+        matchName: e.matchName, pencereler: pencereler, times: times, bosaldi: e.bosaldi === true });
+    });
+    return out;
+  }
+
+  // Kayıt ile temizlik girdisi aynı klibin aynı özelliği mi: sekans + özellik kimliği + klip (nodeId; yoksa ad + başlangıç)
+  function ayniYer(r, e, tol) {
+    if (!r || !e || String(r.seqId || "") !== String(e.seqId || "") || r.matchName !== e.matchName) return false;
+    if (r.nodeId && e.nodeId) return String(r.nodeId) === String(e.nodeId);
+    return String(r.clipName || "") === String(e.clipName || "") && sonlu(r.clipStart) && Math.abs(r.clipStart - e.clipStart) <= Math.max(tol, 1e-3);
+  }
+
+  // sıralı dizide t'ye tol içinde bir eleman var mı (ikili arama)
+  function icinde(sirali, t, tol) {
+    var lo = 0, hi = sirali.length - 1;
+    while (lo <= hi) {
+      var m = (lo + hi) >> 1;
+      if (Math.abs(sirali[m] - t) <= tol) return true;
+      if (sirali[m] < t) lo = m + 1; else hi = m - 1;
+    }
+    return false;
+  }
+
+  /*
+   * Eski kaydın (x) bugünkü klibe (e: temizlik girdisinin kaynak çapası) kayması: x'in zamanı → o günkü eşlemeyle
+   * kaynak saniyesi → bugünkü klibin timeline saniyesi (host KS_easeCapaKaymasi ile aynı hesap). Hız ya da yön
+   * değiştiyse ya da çapa yoksa NaN.
+   */
+  function capaKaymasi(x, e, tol) {
+    if (!sonlu(x.clipStart) || !sonlu(x.clipEnd) || !sonlu(x.clipIn) || !sonlu(x.clipOut)) return NaN;
+    if (!sonlu(e.clipStart) || !sonlu(e.clipEnd) || !sonlu(e.clipIn) || !sonlu(e.clipOut) || (x.ters === true) !== (e.ters === true)) return NaN;
+    var rDur = x.clipEnd - x.clipStart, rKay = x.clipOut - x.clipIn, dur = e.clipEnd - e.clipStart, kKay = e.clipOut - e.clipIn;
+    if (!(rDur > 1e-6) || !(Math.abs(rKay) > 1e-6) || !(dur > 1e-6) || !(Math.abs(kKay) > 1e-6)) return NaN;
+    function yeni(t) {
+      var oran = (t - x.clipStart) / rDur;
+      var src = x.ters === true ? x.clipOut - rKay * oran : x.clipIn + rKay * oran;
+      var o2 = e.ters === true ? (e.clipOut - src) / kKay : (src - e.clipIn) / kKay;
+      return e.clipStart + o2 * dur;
+    }
+    var t = x.times, d0 = yeni(t[0]) - t[0], d1 = yeni(t[t.length - 1]) - t[t.length - 1];
+    if (!sonlu(d0) || !sonlu(d1) || Math.abs(d1 - d0) > tol / 2) return NaN;
+    return (d0 + d1) / 2;
+  }
+
+  // Aday kaymalar (host KS_easeKayitEsle sırası): kaynak çapasından, kaymasız, klip başlangıcının kayması
+  function kaymalar(x, e, tol) {
+    var out = [], dc = capaKaymasi(x, e, tol);
+    if (sonlu(dc) && Math.abs(dc) > 1e-6) out.push(dc);
+    out.push(0);
+    var dm = sonlu(x.clipStart) ? e.clipStart - x.clipStart : NaN;
+    if (sonlu(dm) && Math.abs(dm) > tol && (!sonlu(dc) || Math.abs(dm - dc) > 1e-6)) out.push(dm);
+    return out;
+  }
+
+  /*
+   * Eski kaydın bu temizlikten sonraki hâli: { silindi (kayıt temizlikten hemen önce CANLIYDI — iki uç ve zamanların en
+   * az %60'ı o an duruyordu — ve o anahtarlar şimdi silindi: yeni yazım onun yerine geçti), d (kayma), kalan (kaydın
+   * kendi zamanlarından silinmeyen ve temizlenen pencerelerin dışında kalanlar; pencerenin içindekiler artık yok) }.
+   */
+  function olcum(x, e, tol) {
+    var T = e.times, n = x.times.length, oran = KR ? KR.CANLI_ORAN : 0.6, enIyi = null;
+    kaymalar(x, e, tol).forEach(function (d) {
+      var m = 0;
+      x.times.forEach(function (t) { if (icinde(T, t + d, tol)) m++; });
+      var silindi = n > 0 && icinde(T, x.times[0] + d, tol) && icinde(T, x.times[n - 1] + d, tol) && m >= oran * n - 1e-9;
+      if (!enIyi || (silindi && !enIyi.silindi) || (!enIyi.silindi && !silindi && m > enIyi.m)) enIyi = { d: d, m: m, silindi: silindi };
+    });
+    var pay = 1e-3;
+    enIyi.kalan = x.times.filter(function (t) {
+      var u = t + enIyi.d;
+      if (icinde(T, u, tol)) return false;
+      return !e.pencereler.some(function (w) { return u >= w[0] - pay && u <= w[1] + pay; });
+    });
+    return enIyi;
+  }
+
+  /*
+   * Yeniden uygulama: araç yazmadan önce pencereyi temizledi ve özellikte hiç anahtar kalmadıysa (Premiere özelliği
+   * silinen ilk anahtarın değerinde bırakır) yeni kaydın "önceki değeri" eski Suflo anahtarlarının izini taşıyabilir
+   * (ör. ilk anahtarı yakınlaşmış zoom: 112; tüm klibi kaplayan pencerenin dışı yok). adaylar: bu yazımın yerine geçtiği,
+   * temizlikten hemen önce CANLI olan kayıtlar (yerineGecis doğrular; Premiere'de geri alınmış eski kayıt aday olmaz).
+   * En eskisinin kenar değerleri (Suflo'dan önceki hâl; o da devralmış olabilir) yeni kaydın iki ucuna geçer; değer
+   * türü uyuşmayan uç (sayı ↔ [x,y]) kendi değerinde kalır. r yerinde değişir. Doner: devralındı mı.
+   */
+  function kenarMiras(r, adaylar) {
     var k = r && r.kenarDegerleri;
-    if (!Array.isArray(k) || !k.length) return;
-    var aday = (eskiler || []).filter(function (x) {
-      return x && x.tur === r.tur && Array.isArray(x.kenarDegerleri) && x.kenarDegerleri.length;
-    }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-    if (!aday.length) return;
-    var o = aday[0], ok = o.kenarDegerleri, ra = aralik(r), oa = aralik(o), pay = 1e-3;
-    if (!ra || !oa) return;
-    function ayniTur(a, b) { return (typeof a === "number") === (typeof b === "number"); }
-    function kopya(v) { return Array.isArray(v) ? v.slice() : v; }
-    if (Math.abs(ra[0] - oa[0]) <= pay && ayniTur(k[0].v, ok[0].v)) k[0] = { t: k[0].t, v: kopya(ok[0].v) };
-    var s = k.length - 1, os = ok.length - 1;
-    if (Math.abs(ra[1] - oa[1]) <= pay && ayniTur(k[s].v, ok[os].v)) k[s] = { t: k[s].t, v: kopya(ok[os].v) };
+    if (!Array.isArray(k) || !k.length) return false;
+    var aday = (adaylar || []).filter(function (x) {
+      return x && Array.isArray(x.kenarDegerleri) && x.kenarDegerleri.length;
+    }).sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+    if (!aday.length) return false;
+    var ok = aday[0].kenarDegerleri, s = k.length - 1, os = ok.length - 1, oldu = false;
+    if (ayniTur(k[0].v, ok[0].v)) { k[0] = { t: k[0].t, v: kopya(ok[0].v) }; oldu = true; }
+    if (s > 0 && ayniTur(k[s].v, ok[os].v)) { k[s] = { t: k[s].t, v: kopya(ok[os].v) }; oldu = true; }
+    return oldu;
+  }
+
+  /*
+   * Yeni yazımın eski araç kayıtlarına etkisi (host'un bildirdiği temizliğe göre; araçtan bağımsız):
+   *  - temizlikten hemen önce canlı olup anahtarları silinen kayıt, bu yazımın yerine geçtiği kayıttır: atılır; özellik
+   *    boşaldıysa önceki değeri yeni kayda geçer (kenarMiras);
+   *  - kısmen temizlenen kayıt (ör. tüm klibe yayılan zoom'un kesimdeki ilk anahtarı) kırpılır: pencerenin içindeki
+   *    zamanları düşer, gerisi kalır (sonra kaldırılırken yeni yazımın anahtarını kendininmiş gibi silmez);
+   *  - zamanlarının hepsi pencerenin içinde ama hiçbiri durmayan kayıt (Premiere'de geri alınmış) atılır, devralınmaz;
+   *  - temizlenen pencereye değmeyen kayda (ör. ortadaki Punch'ın penceresi zoom anahtarlarına değmez) dokunulmaz.
+   * eski / yeni: kayıtlar (yeni yerinde değişir), temiz: temizlenenler(...), tol: eşleşme toleransı (sn).
+   * Doner: { at: { id: 1 }, kirpilan: [kayıt kopyası (aynı id, kalan zamanlarla)], miras: devralan yeni kayıt sayısı }
+   */
+  function yerineGecis(eski, yeni, temiz, tol) {
+    var at = {}, kirpilan = [], gecilen = [], miras = 0;
+    tol = sonlu(tol) && tol > 0 ? tol : (KR ? KR.tolerans(30) : 1 / 120);
+    (temiz || []).forEach(function (e, ei) {
+      gecilen[ei] = [];
+      (Array.isArray(eski) ? eski : []).forEach(function (x) {
+        if (!x || at[x.id] || !aracMi(x.tur) || !Array.isArray(x.times) || !x.times.length || !ayniYer(x, e, tol)) return;
+        var o = olcum(x, e, tol);
+        if (o.silindi) { at[x.id] = 1; gecilen[ei].push(x); return; }
+        if (o.kalan.length === x.times.length) return;
+        if (!o.kalan.length) { at[x.id] = 1; return; }
+        var k = {};
+        Object.keys(x).forEach(function (a) { k[a] = x[a]; });
+        k.times = o.kalan;
+        kirpilan.push(k);
+      });
+    });
+    (yeni || []).forEach(function (r) {
+      (temiz || []).forEach(function (e, ei) {
+        if (e.bosaldi && gecilen[ei].length && ayniYer(r, e, tol) && kenarMiras(r, gecilen[ei])) miras++;
+      });
+    });
+    var gorulen = {};
+    kirpilan = kirpilan.filter(function (k) { if (at[k.id] || gorulen[k.id]) return false; gorulen[k.id] = 1; return true; });
+    return { at: at, kirpilan: kirpilan, miras: miras };
   }
 
   /*
    * KS_removeSufloKeys cevabının özeti: { eslesen, silinen, eklenen, biten (host'un bitirdiği kayıt id'leri:
    * silindi ya da Suflo'nun anahtarları zaten yoktu), yok (zaten kaldırılmış sayısı), kalan: { kod: sayı },
-   * kalanSayi, degistiSayi }
+   * kalanSayi, degistiSayi, kayitsiz (seçili kapsamda kaydı eşleşmeyen seçili video klibi sayısı) }
    */
   function ozet(r) {
-    var o = { eslesen: 0, silinen: 0, eklenen: 0, biten: [], yok: 0, kalan: {}, kalanSayi: 0, degistiSayi: 0 };
+    var o = { eslesen: 0, silinen: 0, eklenen: 0, biten: [], yok: 0, kalan: {}, kalanSayi: 0, degistiSayi: 0, kayitsiz: 0 };
     if (!r || typeof r !== "object") return o;
     o.eslesen = Math.max(0, Number(r.eslesen) || 0);
+    o.kayitsiz = Array.isArray(r.kayitsiz) ? r.kayitsiz.length : 0;
     (Array.isArray(r.sonuclar) ? r.sonuclar : []).forEach(function (s) {
       if (!s || typeof s.id !== "string") return;
       o.biten.push(s.id);
@@ -141,7 +282,8 @@
     else if (!o.kalanSayi) p.push("Kaldırılacak Suflo anahtar karesi yok.");
     if (o.eklenen) p.push(doldur(kenarMetni, o.eklenen));
     Object.keys(KALAN).forEach(function (kod) { if (o.kalan[kod]) p.push(doldur(KALAN[kod], o.kalan[kod])); });
-    var iyi = o.silinen > 0 && !o.kalanSayi;
+    if (o.kayitsiz) p.push(doldur(kayitsizMetni, o.kayitsiz));
+    var iyi = o.silinen > 0 && !o.kalanSayi && !o.kayitsiz;
     return { parcalar: p, tur: iyi ? "good" : "warn" };
   }
 
@@ -196,29 +338,33 @@
     }
 
     /*
-     * Host'un döndürdüğü kayıtları saklar; aynı pencerenin eski araç kayıtları atılır (cakisanlar).
-     * Doner: { ok (depoya yazıldı), idler (bu uygulamanın kayıtları: bildirimdeki Geri al) }
+     * Host'un döndürdüğü kayıtları saklar. ek: host cevabı ({ temizlenen, tol }): yazmadan önce temizlenen anahtarlara
+     * göre eski araç kayıtları atılır ya da kırpılır; özellik boşaldıysa yerine geçilen canlı kaydın önceki değeri
+     * devralınır (yerineGecis). Doner: { ok (depoya yazıldı), idler (bu uygulamanın kayıtları: bildirimdeki Geri al) }
      */
-    function sakla(proje, records) {
+    function sakla(proje, records, ek) {
       if (!KR) return { ok: false, idler: [] };
       var yeni = (Array.isArray(records) ? records : []).map(function (r) {
         var k = KR.kayit(r, simdi());
         if (k) k.id = KR.yeniId(simdi());
         return k;
       }).filter(function (r) { return r && aracMi(r.tur); });
-      if (!yeni.length) return { ok: true, idler: [] };
-      var eski = kayitlar(proje), at = {};
-      yeni.forEach(function (r) {
-        var yerineGectigi = cakisanlar(eski, r);
-        yerineGectigi.forEach(function (x) { at[x.id] = 1; });
-        kenarMiras(r, yerineGectigi);
+      var temiz = temizlenenler(ek);
+      if (!yeni.length && !temiz.length) return { ok: true, idler: [] };
+      var d = depo(), depodaki = {};
+      try { (d ? d.oku(proje) : []).forEach(function (r) { depodaki[r.id] = 1; }); } catch (e0) { depodaki = {}; }
+      var y = yerineGecis(kayitlar(proje), yeni, temiz, Number(ek && ek.tol));
+      var kirp = {};
+      y.kirpilan.forEach(function (k) { kirp[k.id] = k; });
+      bellek = bellek.filter(function (b) { return !y.at[b.r.id]; }).map(function (b) {
+        return kirp[b.r.id] && !depodaki[b.r.id] ? { proje: b.proje, r: kirp[b.r.id] } : b;
       });
-      var atilacak = Object.keys(at);
-      bellek = bellek.filter(function (b) { return !at[b.r.id]; });
-      var ok = false, d = depo();
+      var atilacak = Object.keys(y.at);
+      var depoya = yeni.concat(y.kirpilan.filter(function (k) { return depodaki[k.id]; }));
+      var ok = false;
       try {
         if (d && atilacak.length) d.kaldir(proje, atilacak);
-        ok = !!(d && d.ekle(proje, yeni).ok);
+        ok = !!(d && (depoya.length ? d.ekle(proje, depoya).ok : true));
       } catch (e) { ok = false; }
       if (!ok) { var k = anahtar(proje); yeni.forEach(function (r) { bellek.push({ proje: k, r: r }); }); }
       return { ok: ok, idler: yeni.map(function (r) { return r.id; }) };
@@ -253,6 +399,7 @@
       var oz = ozet(r);
       sil(proje, oz.biten);
       oz.kayitYok = oz.eslesen === 0;
+      if (!opts.secili) oz.kayitsiz = 0;
       oz.proje = proje;
       oz.seqId = pk.seqId;
       if (r.kesim) oz.kesim = r.kesim;
@@ -312,8 +459,8 @@
   }
 
   return {
-    TURLER: TURLER.slice(), BASARI: BASARI, KALAN: KALAN, HATALAR: HATALAR, kenarMetni: kenarMetni,
-    cakisanlar: cakisanlar, kenarMiras: kenarMiras, ozet: ozet, yedekGerekli: yedekGerekli, mesajParcalari: mesajParcalari,
+    TURLER: TURLER.slice(), BASARI: BASARI, KALAN: KALAN, HATALAR: HATALAR, kenarMetni: kenarMetni, kayitsizMetni: kayitsizMetni,
+    cakisanlar: cakisanlar, kenarMiras: kenarMiras, yerineGecis: yerineGecis, temizlenenler: temizlenenler, ozet: ozet, yedekGerekli: yedekGerekli, mesajParcalari: mesajParcalari,
     hataMetni: hataMetni, olustur: olustur, panel: panel, dugum: dugum
   };
 });

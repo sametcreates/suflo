@@ -238,6 +238,19 @@ function selOf(c) { return { name: c.name, clipStart: c.start.seconds, clipEnd: 
   chk("yeniden uygulamadan sonra kaldır: Ölçek anahtarsız ve 100 (yakınlaşmış 112'de kalmaz)", Zk.olcek.keys.length === 0 && Math.abs(Zk.olcek.value - 100) < 1e-9 &&
     Zk.olcek.tv === false, Zk.olcek);
 
+  // Çok klip seçili: biri kayıtlı (Z), biri kaydı olmayan eski zoom (Y): Z kaldırılır, Y sessizce atlanmaz (uyarı), onay sorulmaz
+  PM.durum.secim = [Zk]; P.secili.clip = selOf(Zk);
+  await P.dinleyici["zoom-run:click"]();
+  PM.durum.secim = [Yk];
+  PM.cagir("KS_autoZoom", { keys: [{ time: 10, value: 1.1 }, { time: 12, value: 1 }, { time: 15, value: 1.1 }], clearStart: 10, clearEnd: 20 });
+  var yAnahtar = Yk.olcek.keys.length, soruSayisi = P.sorular.length;
+  PM.durum.secim = [Zk, Yk]; P.secili.clip = selOf(Zk);
+  await P.dinleyici["zoom-remove:click"]();
+  var karisik = P.toastlar[P.toastlar.length - 1];
+  chk("karışık seçim: kayıtlı klibin zoom'u kalktı, kaydı olmayan klip için uyarı (warn), onay sorulmadı, Y'ye dokunulmadı",
+    Zk.olcek.keys.length === 0 && Yk.olcek.keys.length === yAnahtar && P.sorular.length === soruSayisi && karisik.tur === "warn" &&
+    /1 seçili klipte Suflo'nun kaydı yok; onlara dokunulmadı/.test(karisik.m), karisik);
+
   // Seçim yokken
   P.secili.clip = null;
   await P.dinleyici["zoom-remove:click"]();

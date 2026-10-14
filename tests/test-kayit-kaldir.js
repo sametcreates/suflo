@@ -31,15 +31,69 @@ ok("cakisanlar: geçersiz girdi boş", SK.cakisanlar(null, yeni).length === 0 &&
   function kz(o) { var r = rec(o); r.kenarDegerleri = o.kenar; r.createdAt = o.c || 1; return r; }
   var ilk = kz({ id: "z1", tur: "zoom", times: [0, 5.45], kenar: [{ t: 0, v: 100 }, { t: 5.45, v: 100 }], c: 1 });
   var ikinci = kz({ id: "z2", tur: "zoom", times: [0, 9.1], kenar: [{ t: 0, v: 112 }, { t: 9.1, v: 112 }], c: 2 });
-  SK.kenarMiras(ikinci, [ilk]);
-  ok("kenarMiras: yeniden uygulanan zoom (aynı başlangıç) ilk uygulamanın önceki değerini (100) devralır; öbür uç kendi değerinde",
-    ikinci.kenarDegerleri[0].v === 100 && ikinci.kenarDegerleri[0].t === 0 && ikinci.kenarDegerleri[1].v === 112, ikinci.kenarDegerleri);
-  var onayar = kz({ id: "h1", tur: "hareket", times: [0, 0.45], kenar: [{ t: 0, v: 112 }, { t: 0.45, v: 112 }], c: 3 });
-  SK.kenarMiras(onayar, [ilk]);
-  ok("kenarMiras: başka aracın kaydından devralınmaz (o pencerede önceki değer gerçekten oydu)", onayar.kenarDegerleri[0].v === 112);
+  // kenarMiras yalnız yerineGecis'in doğruladığı adaylarla çağrılır (temizlikten hemen önce canlıydı, anahtarları silindi,
+  // özellik boşaldı): Suflo'dan önceki sabit değer iki uca da geçer (sağ uç 112'de kalsaydı, kullanıcının sol taraftaki
+  // anahtarı dururken kaldırma sağ kenara 112'lik anahtar eklerdi)
+  ok("kenarMiras: yeniden uygulanan zoom ilk uygulamanın önceki değerini (100) iki ucuna da devralır, zamanlar kendisinin",
+    SK.kenarMiras(ikinci, [ilk]) === true && ikinci.kenarDegerleri[0].v === 100 && ikinci.kenarDegerleri[0].t === 0 &&
+    ikinci.kenarDegerleri[1].v === 100 && ikinci.kenarDegerleri[1].t === 9.1, ikinci.kenarDegerleri);
+  var ucuncu = kz({ id: "z3", tur: "zoom", times: [0, 9.1], kenar: [{ t: 0, v: 125 }, { t: 9.1, v: 125 }], c: 5 });
+  var arada = kz({ id: "p1", tur: "hareket", times: [4, 5], kenar: [{ t: 4, v: 106 }, { t: 5, v: 106 }], c: 3 });
+  SK.kenarMiras(ucuncu, [arada, ilk]);
+  ok("kenarMiras: birden çok aday varsa en eskisinin (Suflo'dan önceki hâlin) değeri alınır", ucuncu.kenarDegerleri[0].v === 100 && ucuncu.kenarDegerleri[1].v === 100, ucuncu.kenarDegerleri);
   var xy = kz({ id: "p2", tur: "zoom", times: [0, 3], kenar: [{ t: 0, v: [0.4, 0.6] }], c: 4 });
   SK.kenarMiras(xy, [ilk]);
   ok("kenarMiras: değer türü uyuşmazsa ([x,y] ↔ sayı) devralınmaz", Array.isArray(xy.kenarDegerleri[0].v));
+  ok("kenarMiras: aday yoksa ya da kenar değeri yoksa dokunulmaz", SK.kenarMiras(xy, []) === false && SK.kenarMiras(xy, [rec({ times: [0, 1] })]) === false);
+
+  /* yerineGecis: host'un bildirdiği temizlik (silinen anahtar zamanları + pencereler) eski kayıtları belirler */
+  function tz(o) {   // host KS_kayitTemizle girdisi
+    return { seqId: "s1", nodeId: o.nodeId || "n1", clipName: "", clipStart: o.cs || 0, clipEnd: o.ce || 10, clipIn: o.ci || 0, clipOut: o.co || 10,
+      matchName: o.matchName || "AE.ADBE Motion/Scale", pencereler: o.p, times: o.times || [], bosaldi: !!o.bosaldi };
+  }
+  function capali(o) { var r = kz(o); r.clipStart = o.cs || 0; r.clipEnd = o.ce || 10; r.clipIn = o.ci || 0; r.clipOut = o.co || 10; r.ters = false; return r; }
+  var tol = 0.25 / 25;
+  // (a) Zoom'dan sonra ortada Punch: Punch penceresi zoom anahtarlarına değmez → zoom kaydı yerinde
+  var zoomK = capali({ id: "zk", tur: "zoom", times: [0, 2, 4, 6, 8, 10], kenar: [{ t: 0, v: 100 }, { t: 10, v: 100 }], c: 1 });
+  var punch = capali({ id: "pk", tur: "hareket", times: [4.775, 5, 5.225], kenar: [{ t: 4.775, v: 100 }, { t: 5.225, v: 100 }], c: 2 });
+  var g1 = SK.yerineGecis([zoomK], [punch], SK.temizlenenler({ temizlenen: [tz({ p: [[4.25, 5.75]] })] }), tol);
+  ok("yerineGecis: başka aracın küçük penceresi zoom anahtarlarına değmezse zoom kaydı kalır (aralık kesişse de)",
+    !g1.at.zk && g1.kirpilan.length === 0 && g1.miras === 0, g1);
+  // (b) Kesimdeki geçiş zoom'un ilk anahtarını temizledi: zoom kaydı kırpılır (yeni geçişin anahtarını kendininmiş gibi silmesin)
+  var g2 = SK.yerineGecis([zoomK], [], SK.temizlenenler({ temizlenen: [tz({ p: [[0, 0.8]], times: [0] })] }), tol);
+  ok("yerineGecis: kısmen temizlenen kayıt kırpılır (pencerenin içindeki zaman düşer), atılmaz",
+    !g2.at.zk && g2.kirpilan.length === 1 && g2.kirpilan[0].id === "zk" && JSON.stringify(g2.kirpilan[0].times) === "[2,4,6,8,10]" &&
+    JSON.stringify(zoomK.times) === "[0,2,4,6,8,10]", g2);
+  // (c) Yeniden uygulama: eski kayıt canlıydı, anahtarları silindi, özellik boşaldı → atılır, önceki değeri devralınır
+  var yeniZ = capali({ id: "zy", tur: "zoom", times: [0, 2, 4, 6, 8, 10], kenar: [{ t: 0, v: 112 }, { t: 10, v: 112 }], c: 3 });
+  var g3 = SK.yerineGecis([zoomK], [yeniZ], SK.temizlenenler({ temizlenen: [tz({ p: [[0, 10]], times: [0, 2, 4, 6, 8, 10], bosaldi: true })] }), tol);
+  ok("yerineGecis: canlı kaydın anahtarları silindi ve özellik boşaldı → kayıt atılır, yeni kayıt önceki değeri (100) devralır",
+    g3.at.zk === 1 && g3.miras === 1 && yeniZ.kenarDegerleri[0].v === 100 && yeniZ.kenarDegerleri[1].v === 100, g3);
+  // (d) Premiere'de geri alınmış (anahtarları yok) eski kayıt: pencerenin içinde → atılır, ama devralınmaz (bayat değer)
+  var bayat = capali({ id: "fb", tur: "hareket", matchName: "AE.ADBE Opacity/Opacity", times: [0, 0.45], kenar: [{ t: 0, v: 100 }, { t: 0.45, v: 100 }], c: 1 });
+  var yeniF = capali({ id: "fy", tur: "hareket", matchName: "AE.ADBE Opacity/Opacity", times: [0, 0.45], kenar: [{ t: 0, v: 60 }, { t: 0.45, v: 60 }], c: 2 });
+  var g4 = SK.yerineGecis([bayat], [yeniF], SK.temizlenenler({ temizlenen: [tz({ matchName: "AE.ADBE Opacity/Opacity", p: [[0, 1.5]], times: [] })] }), tol);
+  ok("yerineGecis: dışarıdan geri alınmış kayıt atılır, değeri devralınmaz (kullanıcının sonradan verdiği 60 kalır)",
+    g4.at.fb === 1 && g4.miras === 0 && yeniF.kenarDegerleri[0].v === 60 && yeniF.kenarDegerleri[1].v === 60, g4);
+  // (e) Taşınmış klipte yeniden uygulama: eski kaydın zamanları kaynak çapasıyla kaydırılıp eşlenir
+  var tasinan = capali({ id: "zt", tur: "zoom", times: [0, 2, 4, 6, 8, 10], kenar: [{ t: 0, v: 100 }, { t: 10, v: 100 }], c: 1 });
+  var yeniT = capali({ id: "zn", tur: "zoom", cs: 3, ce: 13, times: [3, 5, 7, 9, 11, 13], kenar: [{ t: 3, v: 112 }, { t: 13, v: 112 }], c: 2 });
+  var g5 = SK.yerineGecis([tasinan], [yeniT], SK.temizlenenler({ temizlenen: [tz({ cs: 3, ce: 13, p: [[3, 13]], times: [3, 5, 7, 9, 11, 13], bosaldi: true })] }), tol);
+  ok("yerineGecis: taşınan klipte de (kaynak çapası) eski kayıt yerine geçilir, önceki değer (100) devralınır",
+    g5.at.zt === 1 && yeniT.kenarDegerleri[0].v === 100 && yeniT.kenarDegerleri[1].v === 100, g5);
+  // (f) Özellik boşalmadıysa (pencere dışında anahtar kaldı) host'un okuduğu değer doğrudur: devralınmaz
+  var onayar = capali({ id: "h1", tur: "hareket", times: [0, 0.45], kenar: [{ t: 0, v: 112 }, { t: 0.45, v: 112 }], c: 3 });
+  var ilkC = capali({ id: "z1c", tur: "zoom", times: [0, 5.45], kenar: [{ t: 0, v: 100 }, { t: 5.45, v: 100 }], c: 1 });
+  var g6 = SK.yerineGecis([ilkC], [onayar], SK.temizlenenler({ temizlenen: [tz({ p: [[0, 1.5]], times: [0] })] }), tol);
+  ok("yerineGecis: başka aracın kaydından devralınmaz (zoom'un yalnız ilk anahtarı silindi, özellik boşalmadı; o pencerede önceki değer gerçekten oydu)",
+    onayar.kenarDegerleri[0].v === 112 && !g6.at.z1c && g6.kirpilan.length === 1 && JSON.stringify(g6.kirpilan[0].times) === "[5.45]", g6);
+  // (g) Başka klip / özellik / sekans ve Eğri kayıtları hiç etkilenmez
+  var g7 = SK.yerineGecis([rec({ id: "o1", nodeId: "n2", times: [0, 1] }), rec({ id: "o2", matchName: "AE.ADBE Opacity/Opacity", times: [0, 1] }),
+    rec({ id: "o3", seqId: "s2", times: [0, 1] }), rec({ id: "o4", tur: "egri", times: [0, 1] })], [],
+    SK.temizlenenler({ temizlenen: [tz({ p: [[0, 10]], times: [0, 1], bosaldi: true })] }), tol);
+  ok("yerineGecis: başka klip, özellik, sekans ve Eğri kayıtlarına dokunulmaz", Object.keys(g7.at).length === 0 && g7.kirpilan.length === 0, g7);
+  ok("temizlenenler: bozuk girdi atılır", SK.temizlenenler({ temizlenen: [null, { matchName: 5 }, { matchName: "m", clipStart: "x" }] }).length === 0 &&
+    SK.temizlenenler(null).length === 0);
 })();
 
 var o1 = SK.ozet({ eslesen: 3, sonuclar: [{ id: "a", silinen: 3, eklenen: 1 }, { id: "b", silinen: 0, kod: "yok" }], atlanan: [{ id: "c", kod: "degisti" }, { id: "d", kod: "bilinmez" }] });
@@ -66,7 +120,7 @@ ok("i18n: her metin (sayılı kalıplar dahil) i18n/en.js ile İngilizceye çevr
   var I = require(path.join(ROOT, "js", "i18n.js"));
   I.setDictionary(require(path.join(ROOT, "i18n", "en.js")));
   var hepsi = [].concat(Object.keys(SK.BASARI).map(function (k) { return SK.BASARI[k]("7"); }), Object.keys(SK.KALAN).map(function (k) { return SK.KALAN[k]("2"); }),
-    Object.keys(SK.HATALAR).map(function (k) { return SK.HATALAR[k]; }), [SK.kenarMetni("2")]);
+    Object.keys(SK.HATALAR).map(function (k) { return SK.HATALAR[k]; }), [SK.kenarMetni("2"), SK.kayitsizMetni("2")]);
   var eksik = hepsi.filter(function (s) { var t = I.translate(s); return t === s || /[çğıöşüÇĞİÖŞÜ]/.test(t); });
   return eksik.length === 0 || console.log(eksik);
 })());
@@ -91,9 +145,15 @@ function bellekDepo() {
   var s = o.sakla("C:\\p\\a.prproj", [{ tur: "gecis", seqId: "s1", nodeId: "n1", matchName: "AE.ADBE Motion/Scale", compIdx: 0, propIdx: 1, times: [1, 2] },
     { tur: "egri", seqId: "s1", nodeId: "n1", matchName: "x", times: [1, 2] }, { tur: "bozuk" }]);
   ok("sakla: yalnız araç kayıtları (gecis/zoom/hareket) depoya; id'ler döner", s.ok && s.idler.length === 1 && depo.oku("C:\\p\\a.prproj").length === 1, s);
-  var s2 = o.sakla("C:\\p\\a.prproj", [{ tur: "gecis", seqId: "s1", nodeId: "n1", matchName: "AE.ADBE Motion/Scale", compIdx: 0, propIdx: 1, times: [1.5, 2.5] }]);
+  // Host cevabı gibi: araç yazmadan önce pencereyi temizledi ve eski kaydın anahtarlarını (1, 2) sildi
+  var s2 = o.sakla("C:\\p\\a.prproj", [{ tur: "gecis", seqId: "s1", nodeId: "n1", matchName: "AE.ADBE Motion/Scale", compIdx: 0, propIdx: 1, times: [1.5, 2.5] }],
+    { tol: 0.01, temizlenen: [{ seqId: "s1", nodeId: "n1", clipName: "", clipStart: 0, clipEnd: 5, matchName: "AE.ADBE Motion/Scale", pencereler: [[1, 2.5]], times: [1, 2], bosaldi: true }] });
   var kl = o.kayitlar("C:\\p\\a.prproj");
   ok("sakla: aynı pencerenin eski kaydı (araç temizledi) atılır, yenisi kalır", kl.length === 1 && kl[0].id === s2.idler[0], kl);
+  var s3 = o.sakla("C:\\p\\a.prproj", [{ tur: "hareket", seqId: "s1", nodeId: "n1", matchName: "AE.ADBE Motion/Scale", compIdx: 0, propIdx: 1, times: [3, 3.5] }],
+    { tol: 0.01, temizlenen: [{ seqId: "s1", nodeId: "n1", clipName: "", clipStart: 0, clipEnd: 5, matchName: "AE.ADBE Motion/Scale", pencereler: [[2.8, 3.7]], times: [], bosaldi: false }] });
+  ok("sakla: temizlik eski kayda değmediyse (başka pencere) iki kayıt da kalır", o.kayitlar("C:\\p\\a.prproj").length === 2 && s3.idler.length === 1);
+  o.sil("C:\\p\\a.prproj", s3.idler);
   cevaplar.KS_removeSufloKeys = function (arg) {
     return { ok: true, eslesen: arg.records.length, sonuclar: arg.records.map(function (r) { return { id: r.id, ok: true, silinen: 2, eklenen: 0, kod: "" }; }), atlanan: [] };
   };
@@ -149,6 +209,7 @@ function bellekDepo() {
   ok("akis: seçili kapsamda hiç klip seçili değilse 'Önce klip seç' (onay sorulmaz)", /Önce timeline'da bir klip seç/.test(a4.parcalar[0]), a4);
 
   await uctanUca();
+  await araclarArasi();
   console.log(gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);
 })().catch(function (e) { console.error(e); process.exit(1); });
@@ -243,4 +304,165 @@ async function uctanUca() {
   await dinleyici["preset-kaldir:click"]();
   ok("kaydı olmayan önayar: onay sorulmaz, hiçbir şey silinmez, nasıl kaldırılacağı söylenir", sorular.length === soruOnce && A.opak.keys.length === 2 &&
     /önayar kaydı yok; hiçbir şey silinmedi/.test(toastlar[toastlar.length - 1].m), toastlar[toastlar.length - 1]);
+}
+
+/* ---------------- araçlar arası ve yeniden uygulama (3.4 adım 11 inceleme bulguları; panel modülü + host sahte Premiere) ---------------- */
+async function araclarArasi() {
+  function ortam() {
+    var PM = require("./_kayit-premiere.js").olustur();
+    var t = 1000;
+    var o = SK.olustur({ call: PM.kcall, depo: KR.depo(bellekDepo()), simdi: function () { return t++; } });
+    return { PM: PM, o: o, sakla: function (r) { return o.sakla(r.proje, r.records, r); } };
+  }
+  // s..e sn: 2 sn arayla zoom; ilk anahtar yakınlaşmış (1,12), sonra 1 / 1,12 dönüşümlü (ritmik mod gibi)
+  function zoomPlani(s, e) { var k = []; for (var t = s, i = 0; t <= e + 1e-9; t += 2, i++) k.push({ time: t, value: i % 2 ? 1 : 1.12 }); return k; }
+  function yedekli(o, tur, kapsam, sorular) {
+    return o.akis({ tur: tur, kapsam: kapsam, onay: function (q) { sorular.push(q); return false; }, yedekMetni: { yok: "YOK?", degisti: "DEGISTI?" },
+      yedek: function () { return Promise.resolve({ parcalar: ["eski"], tur: "good" }); } });
+  }
+  var PROJE = "C:\\proje\\kayit.prproj";
+
+  // 1a) Zoom'dan sonra ortada Punch: zoom kaydı atılmaz; Zoom'u kaldır zoom anahtarlarını siler, Punch'ınkiler kalır
+  var e = ortam(), PM = e.PM;
+  var Z = PM.klip({ ad: "Z.mp4", nodeId: "Z", start: 0, end: 10 });
+  PM.izKur([[Z]]); PM.durum.secim = [Z];
+  e.sakla(PM.cagir("KS_autoZoom", { keys: zoomPlani(0, 10), clearStart: 0, clearEnd: 10, anchor: [0.3, 0.3] }));
+  PM.durum.playhead = 5;
+  e.sakla(PM.cagir("KS_applyMotionPreset", { id: "punch", duration: 0.45, strength: 1 }));
+  ok("Zoom + Punch: zoom'un Ölçek ve Konum kayıtları depoda kalır", e.o.kayitlar(PROJE, { tur: "zoom" }).length === 2, e.o.kayitlar(PROJE).map(function (r) { return r.tur + ":" + r.matchName; }));
+  var s = await e.o.akis({ tur: "zoom", kapsam: { secili: true } });
+  ok("Zoom + Punch → Zoom'u kaldır: 6 Ölçek + 6 Konum zoom anahtarı silinir, yalnız Punch'ın 3 anahtarı kalır",
+    /Zoom kaldırıldı: 12 anahtar kare silindi\./.test(s.parcalar[0]) && JSON.stringify(Z.olcek.tl(Z)) === "[4.775,5,5.225]" && Z.konum.keys.length === 0, [s, Z.olcek.tl(Z)]);
+
+  // 1b) B'de zoom, sonra A | B kesimine Zoom İçeri: zoom kaydı kalır (kesimdeki ilk anahtarı silindiyse kırpılır), onay sorulmaz
+  e = ortam(); PM = e.PM;
+  var A = PM.klip({ ad: "A.mp4", nodeId: "A", start: 0, end: 10 }), B = PM.klip({ ad: "B.mp4", nodeId: "B", start: 10, end: 20 });
+  PM.izKur([[A, B]]); PM.durum.secim = [B];
+  e.sakla(PM.cagir("KS_autoZoom", { keys: zoomPlani(10, 20), clearStart: 10, clearEnd: 20 }));
+  PM.durum.secim = []; PM.durum.playhead = 10;
+  e.sakla(PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("zoom-in", { duration: 0.5 }), tolerance: 1 }));
+  var gecisB = B.olcek.tl(B).filter(function (t) { return t < 11; });
+  PM.durum.secim = [B];
+  var sorular = [];
+  s = await yedekli(e.o, "zoom", { secili: true }, sorular);
+  ok("Zoom + geçiş → Zoom'u kaldır: onay sorulmaz, zoom'un kalan Ölçek anahtarları (12–20 sn) silinir, geçişin B anahtarları yerinde",
+    sorular.length === 0 && !s.yedek && JSON.stringify(B.olcek.tl(B).filter(function (t) { return t < 11; })) === JSON.stringify(gecisB) &&
+    !B.olcek.tl(B).some(function (t) { return t > 11 && t < 19.9; }) && gecisB.length === 3, [s, B.olcek.tl(B), gecisB]);
+  PM.durum.secim = [];
+  s = await e.o.akis({ tur: "gecis", kapsam: { kesim: { tolerance: 1 } } });
+  ok("ardından Geçişi kaldır: geçiş de kayıtla kalkar (zoom kaydı geçişin kesimdeki anahtarını kendininmiş gibi silmemişti)",
+    /^Geçiş kaldırıldı: \d+ anahtar kare silindi\./.test(s.parcalar[0]) && !B.olcek.tl(B).some(function (t) { return t < 11; }), [s, B.olcek.tl(B)]);
+
+  // 2) Uygula → Premiere'de Ctrl+Z → kullanıcı değeri değiştirir → yeniden uygula → kaldır: kullanıcının değeri kalır
+  e = ortam(); PM = e.PM;
+  var C = PM.klip({ ad: "C.mp4", nodeId: "C", start: 0, end: 5, opak: 100 });
+  PM.izKur([[C]]); PM.durum.secim = [C];
+  e.sakla(PM.cagir("KS_applyMotionPreset", { id: "fade-in", duration: 0.45, strength: 1 }));
+  C.opak.keys = []; C.opak.tv = false; C.opak.value = 60;   // Ctrl+Z, sonra kullanıcı Opaklık 60
+  e.sakla(PM.cagir("KS_applyMotionPreset", { id: "fade-in", duration: 0.45, strength: 1 }));
+  s = await e.o.akis({ tur: "hareket", kapsam: { secili: true } });
+  ok("dışarıdan geri alınan önayar yeniden uygulanıp kaldırılınca Opaklık kullanıcının 60'ında kalır (bayat 100 devralınmaz)",
+    C.opak.keys.length === 0 && C.opak.value === 60 && s.tur === "good" && e.o.kayitlar(PROJE).length === 0, [s, C.opak]);
+  e = ortam(); PM = e.PM;
+  var Z2 = PM.klip({ ad: "Z.mp4", nodeId: "Z2", start: 0, end: 10 });
+  PM.izKur([[Z2]]); PM.durum.secim = [Z2];
+  e.sakla(PM.cagir("KS_autoZoom", { keys: zoomPlani(0, 10), clearStart: 0, clearEnd: 10 }));
+  Z2.olcek.keys = []; Z2.olcek.tv = false; Z2.olcek.value = 120; Z2.konum.keys = []; Z2.konum.tv = false;   // Ctrl+Z, sonra kadraj 120
+  e.sakla(PM.cagir("KS_autoZoom", { keys: zoomPlani(0, 10), clearStart: 0, clearEnd: 10 }));
+  await e.o.akis({ tur: "zoom", kapsam: { secili: true } });
+  ok("dışarıdan geri alınan zoom yeniden uygulanıp kaldırılınca Ölçek kullanıcının 120'sinde kalır", Z2.olcek.keys.length === 0 && Z2.olcek.value === 120, Z2.olcek);
+
+  // 3a) Karartma (B Opaklık 0 → 100), sonra B'ye Clean Fade In, Önayarı kaldır: B görünür (100), 0'da kalmaz
+  e = ortam(); PM = e.PM;
+  A = PM.klip({ ad: "A.mp4", nodeId: "A", start: 0, end: 5 }); B = PM.klip({ ad: "B.mp4", nodeId: "B", start: 5, end: 10 });
+  PM.izKur([[A, B]]); PM.durum.playhead = 5;
+  e.sakla(PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.6 }), tolerance: 1 }));
+  PM.durum.secim = [B];
+  var fr = PM.cagir("KS_applyMotionPreset", { id: "fade-in", duration: 0.45, strength: 1 });
+  ok("Karartma + Fade In: önayar kaydının önceki değeri Karartma'nın artığı (0) değil, pencere dışındaki 100",
+    fr.records.length === 1 && fr.records[0].kenarDegerleri[0].v === 100 && fr.records[0].kenarDegerleri[1].v === 100, fr.records[0] && fr.records[0].kenarDegerleri);
+  e.sakla(fr);
+  ok("Karartma + Fade In: Karartma'nın B kaydı (anahtarları silindi) yerine geçildi, A'nınki kaldı",
+    e.o.kayitlar(PROJE, { tur: "gecis" }).length === 1 && e.o.kayitlar(PROJE, { tur: "gecis" })[0].nodeId === "A", e.o.kayitlar(PROJE).map(function (r) { return r.tur + ":" + r.nodeId; }));
+  await e.o.akis({ tur: "hareket", kapsam: { secili: true } });
+  ok("Karartma + Fade In → Önayarı kaldır: B Opaklık anahtarsız ve 100", B.opak.keys.length === 0 && B.opak.value === 100, B.opak);
+  // 3b) Kaydı olmayan (eski) Fade In yeniden uygulanıp kaldırılınca Opaklık 100; eski Karartma yeniden uygulanınca da
+  e = ortam(); PM = e.PM;
+  C = PM.klip({ ad: "C.mp4", nodeId: "C", start: 0, end: 5, opak: 100 });
+  PM.izKur([[C]]); PM.durum.secim = [C];
+  PM.cagir("KS_applyMotionPreset", { id: "fade-in", duration: 0.45, strength: 1 });
+  e.sakla(PM.cagir("KS_applyMotionPreset", { id: "fade-in", duration: 0.45, strength: 1 }));
+  await e.o.akis({ tur: "hareket", kapsam: { secili: true } });
+  ok("eski Fade In yeniden uygulanıp kaldırılınca Opaklık 100 (0'da kalmaz)", C.opak.keys.length === 0 && C.opak.value === 100, C.opak);
+  e = ortam(); PM = e.PM;
+  A = PM.klip({ ad: "A.mp4", nodeId: "A", start: 0, end: 5 }); B = PM.klip({ ad: "B.mp4", nodeId: "B", start: 5, end: 10 });
+  PM.izKur([[A, B]]); PM.durum.playhead = 5;
+  PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.6 }), tolerance: 1 });
+  e.sakla(PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.6 }), tolerance: 1 }));
+  await e.o.akis({ tur: "gecis", kapsam: { kesim: { tolerance: 1 } } });
+  ok("eski Karartma yeniden uygulanıp Geçişi kaldır: A ve B Opaklığı anahtarsız ve 100", A.opak.keys.length === 0 && A.opak.value === 100 &&
+    B.opak.keys.length === 0 && B.opak.value === 100, [A.opak, B.opak]);
+  // 3c) Ritmik zoom, klip taşındı, yeniden uygulandı, kaldırıldı: Ölçek 100 (112'de kalmaz)
+  e = ortam(); PM = e.PM;
+  var Z3 = PM.klip({ ad: "Z.mp4", nodeId: "Z3", start: 0, end: 10 });
+  PM.izKur([[Z3]]); PM.durum.secim = [Z3];
+  e.sakla(PM.cagir("KS_autoZoom", { keys: zoomPlani(0, 10), clearStart: 0, clearEnd: 10 }));
+  Z3.tasi(3);
+  e.sakla(PM.cagir("KS_autoZoom", { keys: zoomPlani(3, 13), clearStart: 3, clearEnd: 13 }));
+  ok("taşınan klipte yeniden uygulama: yalnız son uygulamanın iki kaydı kalır", e.o.kayitlar(PROJE).length === 2, e.o.kayitlar(PROJE).length);
+  await e.o.akis({ tur: "zoom", kapsam: { secili: true } });
+  ok("taşınan klipte yeniden uygulanan zoom kaldırılınca Ölçek 100", Z3.olcek.keys.length === 0 && Math.abs(Z3.olcek.value - 100) < 1e-9, Z3.olcek);
+
+  // 4) Premiere anahtarları silmezse kayıt 'zaten kaldırılmış' sayılıp atılmaz
+  e = ortam(); PM = e.PM;
+  var Z4 = PM.klip({ ad: "Z.mp4", nodeId: "Z4", start: 0, end: 10 });
+  PM.izKur([[Z4]]); PM.durum.secim = [Z4];
+  e.sakla(PM.cagir("KS_autoZoom", { keys: [{ time: 0, value: 1.1 }, { time: 3, value: 1 }, { time: 6, value: 1.1 }], clearStart: 0, clearEnd: 10 }));
+  function reddet() { throw new Error("Premiere reddetti"); }
+  Z4.olcek.removeKey = reddet; Z4.konum.removeKey = reddet;
+  s = await e.o.akis({ tur: "zoom", kapsam: { secili: true } });
+  ok("removeKey hata verince: uyarı (silinemedi), 'zaten kaldırılmış' denmez, kayıtlar saklı, anahtarlar yerinde",
+    s.tur === "warn" && /Premiere silmedi; kayıt saklandı/.test(s.parcalar.join(" ")) && !/zaten kaldırılmış/.test(s.parcalar.join(" ")) &&
+    e.o.kayitlar(PROJE).length === 2 && Z4.olcek.keys.length === 3, s);
+  delete Z4.olcek.removeKey; delete Z4.konum.removeKey;   // prototipteki (çalışan) removeKey'e dön
+  s = await e.o.akis({ tur: "zoom", kapsam: { secili: true } });
+  ok("Premiere yeniden silebildiğinde ikinci deneme kayıtla kaldırır", s.tur === "good" && Z4.olcek.keys.length === 0 && e.o.kayitlar(PROJE).length === 0, s);
+
+  // 5) Çok klip seçili: biri kayıtlı, biri eski (kayıtsız) zoom → kayıtlı kaldırılır, kayıtsız söylenir
+  e = ortam(); PM = e.PM;
+  var Zy = PM.klip({ ad: "Yeni.mp4", nodeId: "Z1", start: 0, end: 10 }), Ye = PM.klip({ ad: "Eski.mp4", nodeId: "Y1", start: 10, end: 20 });
+  PM.izKur([[Zy, Ye]]); PM.durum.secim = [Ye];
+  PM.cagir("KS_autoZoom", { keys: [{ time: 10, value: 1.1 }, { time: 12, value: 1 }, { time: 15, value: 1.1 }], clearStart: 10, clearEnd: 20 });
+  PM.durum.secim = [Zy];
+  e.sakla(PM.cagir("KS_autoZoom", { keys: [{ time: 0, value: 1.1 }, { time: 3, value: 1 }, { time: 6, value: 1.1 }], clearStart: 0, clearEnd: 10 }));
+  PM.durum.secim = [Zy, Ye];
+  sorular = [];
+  s = await yedekli(e.o, "zoom", { secili: true }, sorular);
+  ok("karışık seçim: kayıtlı klip temizlenir, kaydı olmayan klip için uyarı (sessiz atlanmaz), sınıf warn",
+    Zy.olcek.keys.length === 0 && Ye.olcek.keys.length === 3 && s.tur === "warn" && sorular.length === 0 &&
+    s.parcalar.some(function (p) { return /^1 seçili klipte Suflo'nun kaydı yok; onlara dokunulmadı/.test(p); }), s);
+  PM.durum.secim = [Ye];
+  s = await yedekli(e.o, "zoom", { secili: true }, sorular);
+  ok("ardından yalnız kayıtsız klip seçilince eski yöntemin onayı sorulur", sorular.length === 1 && sorular[0] === "YOK?" && s.iptal, s);
+
+  // 6) Karartma, sonra aynı kesime Zoom İçeri: B görünmez kalmaz; Geçişi kaldır sonrası iki klip de 100
+  e = ortam(); PM = e.PM;
+  A = PM.klip({ ad: "A.mp4", nodeId: "A", start: 0, end: 5 }); B = PM.klip({ ad: "B.mp4", nodeId: "B", start: 5, end: 10 });
+  PM.izKur([[A, B]]); PM.durum.playhead = 5;
+  e.sakla(PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.6 }), tolerance: 1 }));
+  e.sakla(PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("zoom-in", { duration: 0.6 }), tolerance: 1 }));
+  ok("Karartma → Zoom İçeri: B Opaklığı anahtarsız ve 100 (Karartma'nın 0'ında kalmaz); Karartma kayıtları yerine geçildi",
+    B.opak.keys.length === 0 && B.opak.value === 100 && A.opak.value === 100 && e.o.kayitlar(PROJE).every(function (r) { return r.matchName !== "AE.ADBE Opacity/Opacity"; }),
+    [B.opak, e.o.kayitlar(PROJE).map(function (r) { return r.matchName; })]);
+  s = await e.o.akis({ tur: "gecis", kapsam: { kesim: { tolerance: 1 } } });
+  ok("Karartma → Zoom İçeri → Geçişi kaldır: B Opaklık 100, iki klibin Ölçeği anahtarsız ve 100", s.tur === "good" && B.opak.value === 100 &&
+    B.olcek.keys.length === 0 && B.olcek.value === 100 && A.olcek.keys.length === 0 && A.olcek.value === 100, [s, B.olcek, A.olcek]);
+  e = ortam(); PM = e.PM;
+  A = PM.klip({ ad: "A.mp4", nodeId: "A", start: 0, end: 5 }); B = PM.klip({ ad: "B.mp4", nodeId: "B", start: 5, end: 10 });
+  PM.izKur([[A, B]]); PM.durum.playhead = 5;
+  e.sakla(PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("zoom-in", { duration: 0.6 }), tolerance: 1 }));
+  e.sakla(PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.6 }), tolerance: 1 }));
+  await e.o.akis({ tur: "gecis", kapsam: { kesim: { tolerance: 1 } } });
+  ok("Zoom İçeri → Karartma → Geçişi kaldır: B Ölçeği 145'te kalmaz (100), Opaklık 100", B.olcek.keys.length === 0 && B.olcek.value === 100 &&
+    A.olcek.value === 100 && B.opak.value === 100 && A.opak.value === 100, [A.olcek, B.olcek]);
 }

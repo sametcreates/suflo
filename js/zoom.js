@@ -305,7 +305,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);   // deneme: yalniz basarida
       status("");
       // Kaldırma kaydı (3.4 adım 11): bildirimdeki Geri al yalnız bu uygulamanın anahtarlarını kaldırır
-      var saklama = kd() ? kd().sakla(result.proje || "", result.records) : { ok: true, idler: [] };
+      var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
       var proje = result.proje || "";
       KApp.toast(plan.toggles + " zoom hareketi eklendi (" +
         (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")", "good",
@@ -322,7 +322,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
   function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }
   function uiMetni(s) { return window.SufloI18n && SufloI18n.tr ? SufloI18n.tr(s) : s; }
   var YEDEK_SORU = {
-    yok: "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir.",
+    yok: "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir.",
     degisti: "Suflo'nun zoom kaydı bu klibin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir."
   };
 
@@ -358,6 +358,8 @@ if (typeof window !== "undefined") window.KZoom = (function () {
             clearEnd: clip.clipStart + dur
           }, 30000);
           if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Temizlenemedi.");
+          // Düz anahtarların kaydı saklanmaz; klibin temizlenen (artık ölü) zoom kayıtları düşer (yeniden 'değişti' sorulmasın)
+          k.sakla(result.proje || "", [], result);
           return { parcalar: ["Zoom anahtarları temizlendi"], tur: "good" };
         }
       });
