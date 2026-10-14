@@ -1,7 +1,7 @@
 /*
  * Suflo — Canlı eşikli sessizlik kesimi (3.4, Otomatik Kesim)
  *
- * Klibin sesi BİR KEZ çözülür (ffmpeg → 16 kHz s16le, özgün kanal sayısı, pipe:1) ve 10 ms'lik
+ * Klibin sesi BİR KEZ çözülür (ffmpeg → s16le, özgün örnekleme hızı ve kanal sayısı, pipe:1) ve 10 ms'lik
  * pencerelerden bir TEPE zarfı (dBFS) çıkarılır. Eşik / Min. sessizlik / Tampon / Min. konuşma
  * kaydırıcıları bu zarf üzerinde bul() ile anında yeniden hesaplanır: ffmpeg her değişimde
  * yeniden çalışmaz. Uygula'da ffmpeg silencedetect son ayarlarla bir kez daha koşar (eski
@@ -10,7 +10,10 @@
  * önce farkı gösterir (kesimlerAyni).
  *
  * Zarf TEPE (en büyük |örnek|) değeridir, RMS DEĞİL: silencedetect de örnek genliğine bakar.
- * multicam.energyFromPcm RMS'tir; burada kullanılmaz.
+ * multicam.energyFromPcm RMS'tir; burada kullanılmaz. Örnekleme hızı DEĞİŞTİRİLMEZ: silencedetect de
+ * dosyanın kendi hızındaki örneklere bakar. 16 kHz'e indirmek 8 kHz üstünü süzüp tıslama tabanını (ve 10 ms'de
+ * bakılan örnek sayısını) düşürüyordu: gürültülü kayıtta zarf tabanı silencedetect'in gördüğünden ~6 dB alçak
+ * kalıyor, önizlemenin gösterdiği kesimleri doğrulama atıyor, Otomatik eşik sessizlik bulunmayan yere düşüyordu.
  *
  * Saf (ES5, UMD): DOM'a, Premiere'e ve ffmpeg'e dokunmaz; Node'da test edilir (tests/test-sessizlik.js).
  * Clean-room: "canlı yeniden analiz + kısa konuşma birleştirme" fikri Premiere TR'den (MIT) esinlenir;
@@ -24,7 +27,9 @@
   "use strict";
 
   var TABAN = -120;     // dBFS: tam sessizlik (0 örnek) buraya kırpılır
-  var SR = 16000;       // çözümleme örnekleme hızı: ıslıklı ses sonları (s, ş) kaybolmasın
+  // zarfBesle'nin sr verilmezse varsaydığı hız. Panel gerçek hızı ffmpeg'in "Output #0" satırından okur
+  // (cikisBilgisi); çözümleme özgün hızda yapılır, bu sabit ffmpeg'e GİTMEZ.
+  var SR = 16000;
   var PENCERE = 0.01;   // sn: zarf penceresi (saniyede 100 değer)
   var TAM = 32768;      // s16 tam ölçek
 
@@ -40,7 +45,9 @@
 
   /*
    * Tek çözümleme: özgün kanal sayısı korunur (-ac 1 YOK: tek taraflı bir mikrofon aşağı
-   * karışımda 3–6 dB düşer ve eşiğin altına kayardı). -map 0:a:0? : silencedetect'le aynı akış.
+   * karışımda 3–6 dB düşer ve eşiğin altına kayardı). Özgün örnekleme hızı korunur (-ar YOK:
+   * silencedetect dosyanın kendi hızında ölçer; 16 kHz'e indirmek tıslamayı ~6 dB alçak gösteriyordu).
+   * -map 0:a:0? : silencedetect'le aynı akış.
    *
    * ZAMAN EKSENİ: ham s16le zaman damgası taşımaz; zarf ilk çözülen örnekten başlardı. silencedetect
    * ise kare PTS'ini raporlar: ses akışının başlangıç kayması (video 0'da, ses 0.45 sn'de: OBS, ekran
@@ -55,56 +62,73 @@
     return ["-hide_banner", "-nostdin", "-nostats",
       "-ss", String(num(inPoint, 0)), "-t", String(num(dur, 0)),
       "-i", String(media),
-      "-map", "0:a:0?", "-vn", "-af", ZAMAN_SUZGECI, "-ar", String(SR), "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"];
+      "-map", "0:a:0?", "-vn", "-af", ZAMAN_SUZGECI, "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"];
   }
 
-  // Çıkış akışının kanal sayısı ffmpeg'in stderr'indeki "Output #0" bölümünden okunur (bilinmiyorsa 0)
+  // Çıkış akışının kanal sayısı ve örnekleme hızı ffmpeg'in stderr'indeki "Output #0" bölümünden okunur (bilinmiyorsa 0)
   var DUZEN = {
     "mono": 1, "stereo": 2, "downmix": 2, "2.1": 3, "3.0": 3, "3.0(back)": 3, "4.0": 4, "quad": 4, "quad(side)": 4,
     "3.1": 4, "5.0": 5, "5.0(side)": 5, "4.1": 5, "5.1": 6, "5.1(side)": 6, "6.0": 6, "6.0(front)": 6,
     "hexagonal": 6, "6.1": 7, "6.1(back)": 7, "6.1(front)": 7, "7.0": 7, "7.0(front)": 7, "7.1": 8,
     "7.1(wide)": 8, "7.1(wide-side)": 8, "7.1(top)": 8, "octagonal": 8, "hexadecagonal": 16, "22.2": 24
   };
-  function kanalSayisi(stderr) {
-    var s = String(stderr || "");
-    var o = s.indexOf("Output #0");
-    if (o === -1) return 0;
-    var parca = s.slice(o);
-    var m = parca.match(/Audio:\s*pcm_s16le[^,\n]*,\s*(\d+)\s*Hz,\s*([^,\n]+)/);
-    if (!m) return 0;
-    var d = m[2].replace(/^\s+|\s+$/g, "").toLowerCase();
+  function kanalBul(parca, d, hz) {
     if (Object.prototype.hasOwnProperty.call(DUZEN, d)) return DUZEN[d];
     var n = d.match(/^(\d+)\s*channels?/);
     if (n) return parseInt(n[1], 10);
     // bilinmeyen düzen adı: s16 bit hızından (kanal başına sr × 16 bit)
     var b = parca.match(/Audio:\s*pcm_s16le[^\n]*?(\d+)\s*kb\/s/);
-    var hz = parseInt(m[1], 10);
     if (b && hz > 0) {
       var k = Math.round(parseInt(b[1], 10) * 1000 / (hz * 16));
       if (k >= 1 && k <= 64) return k;
     }
     return 0;
   }
+  /*
+   * Döner: { kanal, sr }; okunamazsa ikisi de 0. Kanal ve hız aynı satırdan gelir: kanal okunduysa hız da
+   * okunmuştur. Panel zarfı bu hızla besler (pencere = sr × 10 ms örnek): çözümleme özgün hızda yapılır.
+   */
+  function cikisBilgisi(stderr) {
+    var s = String(stderr || "");
+    var o = s.indexOf("Output #0");
+    if (o === -1) return { kanal: 0, sr: 0 };
+    var parca = s.slice(o);
+    var m = parca.match(/Audio:\s*pcm_s16le[^,\n]*,\s*(\d+)\s*Hz,\s*([^,\n]+)/);
+    if (!m) return { kanal: 0, sr: 0 };
+    var hz = parseInt(m[1], 10);
+    if (!(hz > 0)) return { kanal: 0, sr: 0 };
+    var kanal = kanalBul(parca, m[2].replace(/^\s+|\s+$/g, "").toLowerCase(), hz);
+    return kanal ? { kanal: kanal, sr: hz } : { kanal: 0, sr: 0 };
+  }
+  function kanalSayisi(stderr) { return cikisBilgisi(stderr).kanal; }
 
   /* ---------------- Tepe zarfı (artımlı) ---------------- */
 
   function tepeZarfi() {
-    return { zarf: [], tepe: 0, n: 0, kalan: [], kanal: 0, boy: 0, bayt: 0 };
+    return { zarf: [], tepe: 0, n: 0, kalan: [], kanal: 0, adim: 0, boy: 0, bayt: 0 };
   }
+
+  /*
+   * k. pencerenin örnek sayısı. Sınırlar birikimli: k. pencere round((k + 1) × sr × win). örnekte biter (k 0'dan).
+   * sr × win tam sayı değilse (22050 Hz → 220,5) pencereler 220 / 221 örnek olur ve zarf ekseni kaymaz
+   * (sabit 221 örnekle 1 saatte ~8 sn kayardı).
+   */
+  function pencereBoyu(adim, k) { return Math.max(1, Math.round((k + 1) * adim) - Math.round(k * adim)); }
 
   /*
    * buf: s16le, kanallar iç içe (L R L R …) Buffer / Uint8Array parçası. Parça sınırında kalan
    * yarım örnek / yarım kare st.kalan'da bir sonraki parçaya taşınır. Her pencere TÜM kanallardaki
-   * en büyük |örnek|; dBFS, -120'de kırpılır.
+   * en büyük |örnek|; dBFS, -120'de kırpılır. o.sr akışın GERÇEK örnekleme hızı olmalı (cikisBilgisi).
    */
   function zarfBesle(st, buf, o) {
     o = o || {};
     var kanal = Math.max(1, Math.floor(num(o.kanal, 1)));
-    var boy = Math.max(1, Math.round(num(o.sr, SR) * num(o.win, PENCERE)));
-    if (!st.boy) { st.boy = boy; st.kanal = kanal; }
-    else if (st.boy !== boy || st.kanal !== kanal) throw new Error("zarfBesle: channel count / window cannot change mid-stream");
+    var adim = Math.max(1, num(o.sr, SR) * num(o.win, PENCERE));
+    if (!st.adim) { st.adim = adim; st.kanal = kanal; st.boy = pencereBoyu(adim, st.zarf.length); }
+    else if (st.adim !== adim || st.kanal !== kanal) throw new Error("zarfBesle: channel count / window cannot change mid-stream");
     if (!buf || !buf.length) return st;
     var kb = 2 * kanal, L = buf.length, i = 0, c, v, m;
+    var zarf = st.zarf;
     st.bayt += L;
     if (st.kalan.length) {
       while (st.kalan.length < kb && i < L) st.kalan.push(buf[i++]);
@@ -117,9 +141,10 @@
       }
       st.tepe = m;
       st.kalan = [];
-      if (++st.n >= st.boy) { st.zarf.push(dbfs(st.tepe)); st.tepe = 0; st.n = 0; }
+      if (++st.n >= st.boy) { zarf.push(dbfs(st.tepe)); st.tepe = 0; st.n = 0; st.boy = pencereBoyu(adim, zarf.length); }
     }
     var son = L - ((L - i) % kb);
+    var n = st.n, boy = st.boy;
     m = st.tepe;
     for (; i < son; i += kb) {
       for (c = 0; c < kb; c += 2) {
@@ -127,9 +152,9 @@
         if (v >= 32768) v = 65536 - v;   // |negatif örnek|; -32768 → 32768 (0 dBFS)
         if (v > m) m = v;
       }
-      if (++st.n >= st.boy) { st.zarf.push(dbfs(m)); m = 0; st.n = 0; }
+      if (++n >= boy) { zarf.push(dbfs(m)); m = 0; n = 0; boy = pencereBoyu(adim, zarf.length); }
     }
-    st.tepe = m;
+    st.tepe = m; st.n = n; st.boy = boy;
     for (; i < L; i++) st.kalan.push(buf[i]);
     return st;
   }
@@ -357,6 +382,7 @@
     dbfs: dbfs,
     cozumlemeArgs: cozumlemeArgs,
     kanalSayisi: kanalSayisi,
+    cikisBilgisi: cikisBilgisi,
     tepeZarfi: tepeZarfi,
     zarfBesle: zarfBesle,
     zarfBitir: zarfBitir,

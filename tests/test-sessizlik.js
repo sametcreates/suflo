@@ -56,9 +56,28 @@ ok("akış ortasında kanal sayısı değişirse hata", !!hata);
 var yarim = S.tepeZarfi(); S.zarfBesle(yarim, pcm([sabit(80, 1000)]), { kanal: 1 });
 ok("yarım pencere zarfBitir'de eklenir", yarim.zarf.length === 0 && S.zarfBitir(yarim).length === 1);
 
-/* ---------------- ffmpeg argümanları ve kanal sayısı ---------------- */
+// Özgün hız 48 kHz: pencere 480 örnek, saniyede yine 100 değer
+var st48 = S.tepeZarfi(); S.zarfBesle(st48, pcm([sabit(48000, 100)]), { kanal: 1, sr: 48000 });
+ok("48 kHz: 1 sn → 100 pencere (480 örnek)", S.zarfBitir(st48).length === 100 && st48.n === 0);
+
+// 22.05 kHz: 10 ms = 220,5 örnek. Pencere sınırları birikimli → zarf ekseni kaymaz (sabit 221 örnek 9 sn'de 1,6 pencere kayardı)
+var n22 = 22050 * 10, s22 = sabit(n22, 0);
+s22[Math.floor(22050 * 9.005)] = 20000;   // 9.005 sn'de tek tepe → 900. pencere (9.00–9.01 sn)
+var b22 = pcm([s22]);
+var st22 = S.tepeZarfi(); S.zarfBesle(st22, b22, { kanal: 1, sr: 22050 }); var z22 = S.zarfBitir(st22);
+var st22b = S.tepeZarfi();
+for (var q = 0; q < b22.length; q += 4097) S.zarfBesle(st22b, b22.slice(q, q + 4097), { kanal: 1, sr: 22050 });
+var z22b = S.zarfBitir(st22b);
+var tepe22 = z22.reduce(function (a, v, k) { return v > z22[a] ? k : a; }, 0);
+ok("22.05 kHz (220,5 örnek / pencere): 10 sn → tam 1000 pencere, 9.005 sn'deki tepe 900. pencerede (eksen kaymaz)",
+  z22.length === 1000 && tepe22 === 900 && z22[899] === -120 && z22[901] === -120, z22.length + " pencere, tepe " + tepe22);
+ok("22.05 kHz: tek sayılı parçalarla aynı zarf", z22b.length === z22.length && z22b.every(function (v, k) { return v === z22[k]; }), z22b.length);
+
+/* ---------------- ffmpeg argümanları, kanal sayısı ve örnekleme hızı ---------------- */
 var ar = S.cozumlemeArgs("C:/a b/klip.mp4", 1.5, 30);
-ok("çözümleme: -ss/-t/-i, -map 0:a:0?, -vn, PTS süzgeci, 16 kHz s16le pipe:1, -ac YOK", js(ar.slice(ar.indexOf("-ss"))) === js(["-ss", "1.5", "-t", "30", "-i", "C:/a b/klip.mp4", "-map", "0:a:0?", "-vn", "-af", S.ZAMAN_SUZGECI, "-ar", "16000", "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"]) && ar.indexOf("-ac") === -1, js(ar));
+// -ar YOK: silencedetect (Uygula'daki doğrulama) dosyanın kendi hızında ölçer; 16 kHz'e indirmek 8 kHz üstünü
+// süzüp tıslama tabanını ~6 dB alçak gösteriyordu (önizleme kesimlerini doğrulama atıyordu)
+ok("çözümleme: -ss/-t/-i, -map 0:a:0?, -vn, PTS süzgeci, s16le pipe:1, -ac YOK, -ar YOK (özgün hız)", js(ar.slice(ar.indexOf("-ss"))) === js(["-ss", "1.5", "-t", "30", "-i", "C:/a b/klip.mp4", "-map", "0:a:0?", "-vn", "-af", S.ZAMAN_SUZGECI, "-acodec", "pcm_s16le", "-f", "s16le", "pipe:1"]) && ar.indexOf("-ac") === -1 && ar.indexOf("-ar") === -1 && !/sample_rate|aformat|resample=\d|osr=/.test(ar.join(" ")), js(ar));
 // ham PCM zaman damgası taşımaz: ses akışının başlangıç kayması ve PTS boşlukları sessizlikle doldurulmalı
 // (silencedetect kare PTS'ini raporlar; gerçek ffmpeg karşılaştırması test-kesim.js'te)
 ok("çözümleme: zaman süzgeci aresample, async (boşluk doldurur), first_pts=0 (baş kayması), 10 ms eşik",
@@ -72,6 +91,15 @@ ok("kanal sayısı: mono 1, 5.1(side) 6, '3 channels' 3",
   S.kanalSayisi("Output #0\n Stream #0:0: Audio: pcm_s16le, 16000 Hz, 3 channels, s16, 768 kb/s") === 3);
 ok("kanal sayısı: bilinmeyen düzen adı → bit hızından (1024 kb/s @16 kHz = 4)", S.kanalSayisi("Output #0\n Stream #0:0: Audio: pcm_s16le, 16000 Hz, garip, s16, 1024 kb/s") === 4);
 ok("kanal sayısı: çıkış bölümü yoksa 0", S.kanalSayisi("Stream #0:0: Audio: pcm_s16le, 16000 Hz, stereo") === 0 && S.kanalSayisi("") === 0);
+// zarf bu hızla beslenir: girdi bölümündeki hız değil, Output #0'daki (çözümlenen akış) hız
+ok("çıkış bilgisi: kanal + hız Output #0 satırından (girdi 48 kHz 5.1 değil, çıkış 16 kHz stereo)", js(S.cikisBilgisi(stderrOrnek)) === js({ kanal: 2, sr: 16000 }), js(S.cikisBilgisi(stderrOrnek)));
+ok("çıkış bilgisi: 48000 mono, 44100 stereo, 22050 '3 channels'",
+  js(S.cikisBilgisi("Output #0, s16le, to 'pipe:1':\n  Stream #0:0: Audio: pcm_s16le, 48000 Hz, mono, s16, 768 kb/s")) === js({ kanal: 1, sr: 48000 }) &&
+  js(S.cikisBilgisi("Output #0\n Stream #0:0: Audio: pcm_s16le, 44100 Hz, stereo, s16, 1411 kb/s")) === js({ kanal: 2, sr: 44100 }) &&
+  js(S.cikisBilgisi("Output #0\n Stream #0:0: Audio: pcm_s16le, 22050 Hz, 3 channels, s16, 1058 kb/s")) === js({ kanal: 3, sr: 22050 }));
+ok("çıkış bilgisi: okunamazsa { 0, 0 } (kanal varken hız yok olmaz)",
+  js(S.cikisBilgisi("")) === js({ kanal: 0, sr: 0 }) && js(S.cikisBilgisi("Output #0\n Stream #0:0: Audio: pcm_s16le, 48000 Hz, garip")) === js({ kanal: 0, sr: 0 }) &&
+  js(S.cikisBilgisi("Stream #0:0: Audio: pcm_s16le, 48000 Hz, mono")) === js({ kanal: 0, sr: 0 }));
 
 /* ---------------- bul(): sentetik zarflar ---------------- */
 // zarf kurucu: [[sn, dB], …] parçaları 10 ms pencerelere

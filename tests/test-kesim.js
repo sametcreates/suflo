@@ -15,9 +15,8 @@ var cp = require("child_process");
 
 var KOK = pathm.join(__dirname, "..");
 var FF = process.argv[2] || "ffmpeg";
-var TMP = pathm.join(os.tmpdir(), "suflo-kesim-test");
-try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
-fs.mkdirSync(TMP, { recursive: true });
+// koşuya özel klasör: aynı makinede eşzamanlı iki koşu (iki çalışma ağacı, CI matrisi) birbirinin wav'ını silmesin
+var TMP = fs.mkdtempSync(pathm.join(os.tmpdir(), "suflo-kesim-test-"));
 
 var gecti = 0, kaldi = 0;
 function ok(ad, kosul, kanit) {
@@ -99,19 +98,21 @@ if (uret.status !== 0 || !fs.existsSync(wav)) {
 var S = require(pathm.join(KOK, "js", "sessizlik.js"));
 var kabi = require("./_kesim-kabi.js");
 
+// Panelin zarfCikar'ıyla aynı: kanal sayısı VE örnekleme hızı ffmpeg'in "Output #0" satırından
 function cozumle(K, dosya, inPoint, dur) {
-  var st = S.tepeZarfi(), kanal = 0, stderr = "", bekleyen = [];
+  var st = S.tepeZarfi(), bilgi = { kanal: 0, sr: 0 }, stderr = "", bekleyen = [];
+  function besle(b) { S.zarfBesle(st, b, { kanal: bilgi.kanal, sr: bilgi.sr }); }
   return K.runAkis(FF, S.cozumlemeArgs(dosya, inPoint, dur), {
     timeout: 60000,
     onStderr: function (s) {
-      if (kanal) return;
-      stderr += s; kanal = S.kanalSayisi(stderr);
-      if (kanal) { bekleyen.forEach(function (b) { S.zarfBesle(st, b, { kanal: kanal }); }); bekleyen = []; }
+      if (bilgi.kanal) return;
+      stderr += s; bilgi = S.cikisBilgisi(stderr);
+      if (bilgi.kanal) { bekleyen.forEach(besle); bekleyen = []; }
     },
-    onData: function (b) { if (kanal) S.zarfBesle(st, b, { kanal: kanal }); else bekleyen.push(b); }
+    onData: function (b) { if (bilgi.kanal) besle(b); else bekleyen.push(b); }
   }).then(function (res) {
-    if (!kanal) { kanal = S.kanalSayisi(res.stderr); bekleyen.forEach(function (b) { S.zarfBesle(st, b, { kanal: kanal }); }); }
-    return { res: res, kanal: kanal, zarf: S.zarfBitir(st) };
+    if (!bilgi.kanal) { bilgi = S.cikisBilgisi(res.stderr); bekleyen.forEach(besle); }
+    return { res: res, kanal: bilgi.kanal, sr: bilgi.sr, zarf: S.zarfBitir(st) };
   });
 }
 function silencedetect(dosya, esik, d, inPoint, dur) {
@@ -158,7 +159,7 @@ async function canliTestler() {
   if (u2.status !== 0) { ok("stereo wav uretildi", false, String(u2.stderr).slice(-200)); return; }
 
   var c = await cozumle(K, stereo, 0, 5.1);
-  ok("tek çözümleme: kod 0, 2 kanal okundu, ~510 pencere (16 kHz, 10 ms)", c.res.code === 0 && c.kanal === 2 && Math.abs(c.zarf.length - 510) <= 2, c.kanal + " kanal, " + c.zarf.length);
+  ok("tek çözümleme: kod 0, 2 kanal, özgün 44.1 kHz okundu (16 kHz'e inmez), ~510 pencere (10 ms)", c.res.code === 0 && c.kanal === 2 && c.sr === 44100 && Math.abs(c.zarf.length - 510) <= 2, c.kanal + " kanal, " + c.sr + " Hz, " + c.zarf.length);
   ok("tek çözümleme: sağ kanal sessizken konuşma tepesi ≈ -18 dBFS (aşağı karışımla -24'e düşmezdi)", c.zarf[50] > -19 && c.zarf[50] < -17, c.zarf[50]);
 
   [[-30, 0.5], [-45, 0.8], [-25, 0.3]].forEach(function (p) {
@@ -268,9 +269,61 @@ async function canliTestler() {
   ok("yedek akış: aynı ayarla Uygula silencedetect'i yeniden koşmaz", p2.kayit.run.length === 1 && p2.kayit.call.length === 1 && p2.kayit.harca.length === 1, p2.kayit.run.length);
 
   await zamanEkseniTestleri(K, stereo);
+  await ornekHiziTestleri(K);
   await kararTestleri(K, klip);
   await iptalTestleri(K, stereo, klip);
   await sahteTestler(K);
+}
+
+/*
+ * ---- Örnekleme hızı: zarf silencedetect'le AYNI hızda ölçer ----
+ * Tıslamalı kayıt (48 kHz mono, -12 dBFS ton patlamaları arasında 1.5 sn duraksama + Gauss beyaz gürültü).
+ * Zarf 16 kHz'e indirilince gürültü tabanı silencedetect'in gördüğünden ~6 dB alçak ölçülüyordu: Otomatik
+ * eşiği sessizlik bulunmayan yere koyuyor, önizleme 2 kesim gösterip doğrulama 0 buluyor, Uygula hiçbir şey
+ * kesmiyordu ("Doğrulamadan sonra uygulanacak kesim kalmadı"). σ 0.003'te varsayılan -38 dB'de de önizleme
+ * 2 kesim gösterirken silencedetect (3.3) hiç bulmuyordu.
+ */
+function sdSuzgecli(dosya, esik, d, inPoint, dur) {
+  return parseSilence(cp.spawnSync(FF, ["-hide_banner", "-ss", String(inPoint), "-t", String(dur), "-i", dosya, "-map", "0:a:0?",
+    "-af", S.ZAMAN_SUZGECI + ",silencedetect=noise=" + esik + "dB:d=" + d, "-f", "null", "-"], { encoding: "utf8", timeout: 60000 }).stderr || "");
+}
+async function ornekHiziTestleri(K) {
+  var seviyeler = [[0.0003, "sessiz oda"], [0.001, "hafif tıslama"], [0.003, "belirgin tıslama"]];
+  for (var i = 0; i < seviyeler.length; i++) {
+    var sigma = seviyeler[i][0], ad = "tıslama σ " + sigma + " (" + seviyeler[i][1] + ")";
+    var wav = pathm.join(TMP, "tislama-" + i + ".wav");
+    // ton 0–1, 2.5–3.5, 5–6 sn; aralar yalnız gürültü. Gauss: Box-Muller (ffmpeg random() tohumlu → her koşuda aynı)
+    var ifade = "0.25*sin(2*PI*300*t)*between(t\\,0\\,1)+0.25*sin(2*PI*500*t)*between(t\\,2.5\\,3.5)+0.25*sin(2*PI*700*t)*between(t\\,5\\,6)+" +
+      sigma + "*sqrt(-2*log(random(0)+1e-12))*cos(2*PI*random(1))";
+    var u = cp.spawnSync(FF, ["-hide_banner", "-y", "-f", "lavfi", "-i", "aevalsrc=" + ifade + ":s=48000:d=6", "-c:a", "pcm_s16le", wav], { encoding: "utf8", timeout: 60000 });
+    if (u.status !== 0) { ok(ad + ": wav üretildi", false, String(u.stderr).slice(-200)); return; }
+    var p = kabi.kesimPaneli({ K: K, ffmpeg: FF, clip: { mediaPath: wav, inPoint: 0, outPoint: 6, clipStart: 0, clipEnd: 6 } });
+    await p.tikla("cut-analyze");
+    var varsayilan = (p.el("cut-summary").textContent.match(/^(\d+) kesim/) || [])[1];
+    var sd38 = S.kesimlereCevir(sdSuzgecli(wav, -38, 0.8, 0, 6), { pay: 0.15, minKesim: 0.25, kenar: 0.05, sure: 6 }).kesimler.length;
+    ok(ad + ": varsayılan -38 dB'de önizleme = silencedetect (" + sd38 + " kesim)", varsayilan === String(sd38), p.el("cut-summary").textContent + " vs silencedetect " + sd38);
+    p.tikla("cut-noise-auto");
+    var esik = p.el("cut-noise").value, onizleme = (p.el("cut-summary").textContent.match(/^(\d+) kesim/) || [])[1];
+    var sdOto = sdSuzgecli(wav, esik, 0.8, 0, 6).length;
+    ok(ad + ": Otomatik eşik (" + esik + " dB) duraksamaları bulur ve silencedetect aynı eşikte aynısını bulur",
+      onizleme === "2" && sdOto === 2, "önizleme " + onizleme + " / silencedetect " + sdOto + " · " + p.el("cut-status").textContent);
+    await p.tikla("cut-apply");
+    var cagri = p.kayit.call.filter(function (x) { return x.fn === "KS_applyCuts"; });
+    ok(ad + ": Otomatik sonrası Uygula önizlenen 2 kesimi tek tıkla uygular (doğrulama atmaz, fark uyarısı yok)",
+      cagri.length === 1 && cagri[0].payload.ranges.length === 2 && !/kalmadı|Doğrulama kesimleri değiştirdi/.test(p.el("cut-status").textContent),
+      cagri.length + " çağrı · " + p.el("cut-status").textContent);
+  }
+
+  // 22.05 kHz: pencere 220,5 örnek. Zarf ekseni 60 sn sonra da silencedetect'le ±50 ms (sabit 221 örnekle ~136 ms kayardı)
+  var w22 = pathm.join(TMP, "oran22050.wav");
+  var u22 = cp.spawnSync(FF, ["-hide_banner", "-y", "-f", "lavfi", "-i", "aevalsrc=0.25*sin(2*PI*400*t)*(1-between(t\\,60\\,61.5)):s=22050:d=63",
+    "-c:a", "pcm_s16le", w22], { encoding: "utf8", timeout: 60000 });
+  if (u22.status !== 0) { ok("22.05 kHz wav üretildi", false, String(u22.stderr).slice(-200)); return; }
+  var c = await cozumle(K, w22, 0, 63);
+  var z = S.sessizAraliklar(c.zarf, { esik: -30, minSessizlik: 0.8, sure: 63 });
+  var sd = sdSuzgecli(w22, -30, 0.8, 0, 63);
+  ok("22.05 kHz: hız okundu, 63 sn → ~6300 pencere, 60 sn'deki duraksama silencedetect ile ±50 ms (eksen kaymaz)",
+    c.sr === 22050 && Math.abs(c.zarf.length - 6300) <= 2 && sd.length === 1 && yakinListe(z, sd, 0.05), c.sr + " Hz, " + c.zarf.length + " · " + yaz(z) + " vs " + yaz(sd));
 }
 
 /* ---- PTS: ses akışı geç başlıyor / boşluklu → zarf silencedetect'le aynı eksende (±50 ms) ---- */
@@ -481,9 +534,117 @@ async function sahteTestler(K) {
   p3.el("cut-ranges").children.forEach(function (row) { row.children.forEach(function (c) { if (/mc-birlesik/.test(c.className)) rozet = c; }); });
   ok("birleşik rozeti data-i18n-ui adacığı (kullanıcı kabında çevrilsin)", rozet && rozet.getAttribute("data-i18n-ui") === "" && rozet.textContent === "birleşik" &&
     /^1 kesim/.test(p3.el("cut-summary").textContent), rozet ? JSON.stringify(rozet.attrs) : "rozet yok: " + p3.el("cut-summary").textContent);
+
+  await kilitTestleri(K1);
 }
 
+/*
+ * ---- Uygula sürerken panel kilitli ----
+ * KS_applyCuts 900 sn'ye dek beklenir; busy yalnız ffmpeg'i kapsıyordu. Bu arada kaydırıcı / Otomatik / kesim
+ * tıklaması updateSummary'yle "Kesimleri uygula"yı yeniden açıyor, ikinci tık aynı sekans zamanlarıyla ikinci
+ * KS_applyCuts gönderiyordu (cloneFirst'te az önce kesilen kopya yeniden kesilir; "Bu sekansta" + Ripple'da
+ * kullanıcının sekansı iki kez kesilir, konuşma silinir).
+ */
+async function kilitTestleri(K1) {
+  var pcm4 = pcmMono([[1.0, 1], [1.5, 0], [1.0, 1], [1.5, 0], [1.0, 1]]);   // 6 sn; sessizlik 1.0–2.5 ve 3.5–5.0
+  var K4 = {};
+  for (var k in K1) K4[k] = K1[k];
+  K4.runAkis = function (cmd, args, opts) {
+    opts.onStderr(CIKIS);
+    opts.onData(pcm4);
+    return Promise.resolve({ code: 0, stderr: CIKIS, bayt: pcm4.length });
+  };
+  K4.run = function () { return Promise.resolve({ code: 0, stderr: sdCiktisi([[1.0, 2.5], [3.5, 5.0]]) }); };
+  var klip4 = { mediaPath: "/sahte/kilit.mp4", inPoint: 0, outPoint: 6, clipStart: 0, clipEnd: 6 };
+  function panel() {
+    var askida = [];
+    // KS_applyCuts askıda kalır; test w.bitir(sonuç) ile bitirir (kilit bozulup ikinci çağrı giderse o da biter, test asılı kalmaz)
+    var w = { bitir: function (r) { var l = askida; askida = []; l.forEach(function (coz) { coz(r); }); } };
+    w.p = kabi.kesimPaneli({ K: K4, ffmpeg: "ffmpeg", clip: klip4, applyCuts: function () { return new Promise(function (coz) { askida.push(coz); }); } });
+    return w;
+  }
+  function uygulamalar(p) { return p.kayit.call.filter(function (x) { return x.fn === "KS_applyCuts"; }).length; }
+
+  /* a) KS_applyCuts beklerken her yol denenir, sonra başarı */
+  var w = panel(), p = w.p;
+  await p.tikla("cut-analyze");
+  var ozet = p.el("cut-summary").textContent;
+  ok("kilit: analiz 2 kesim, Uygula açık", /^2 kesim · −2\.4 sn/.test(ozet) && p.el("cut-apply").disabled === false, ozet);
+  var ilk = p.tikla("cut-apply");
+  await p.bekle(20);
+  ok("kilit: KS_applyCuts askıda — 'Uygulanıyor…', Uygula ve Sessizlikleri bul kapalı",
+    uygulamalar(p) === 1 && p.el("cut-status").textContent === "Uygulanıyor…" && p.el("cut-apply").disabled === true && p.el("cut-analyze").disabled === true,
+    uygulamalar(p) + " · " + p.el("cut-status").textContent);
+  p.kaydir("cut-pad", "0.1");
+  await p.bekle(160);
+  ok("kilit: Tampon kaydırıcısı haritayı değiştirmez, Kesimleri uygula'yı yeniden açmaz",
+    p.el("cut-apply").disabled === true && p.el("cut-summary").textContent === ozet, p.el("cut-summary").textContent + " disabled=" + p.el("cut-apply").disabled);
+  // beklenmez: kilit bozulursa ikinci uygulama da askıda kalır (w.bitir hepsini bitirir)
+  var tiklar = [ilk, p.tikla("cut-apply")];
+  await p.bekle(20);
+  ok("kilit: kaydırıcıdan sonra ikinci Kesimleri uygula tıkı ikinci KS_applyCuts göndermez", uygulamalar(p) === 1, uygulamalar(p));
+  p.tikla("cut-noise-auto");
+  ok("kilit: Otomatik eşiği ve haritayı değiştirmez, Uygula kapalı",
+    p.el("cut-noise").value === "-38" && p.el("cut-summary").textContent === ozet && p.el("cut-apply").disabled === true, p.el("cut-noise").value);
+  var kesimSpan = p.el("cut-bar").children.filter(function (s) { return /\bcut\b/.test(s.className); });
+  kesimSpan[0].onclick();
+  ok("kilit: kesim çubuğu tıklaması kesimi kapatmaz, Uygula kapalı",
+    p.el("cut-summary").textContent === ozet && p.el("cut-apply").disabled === true && !/ off/.test(p.el("cut-bar").children.filter(function (s) { return /\bcut\b/.test(s.className); })[0].className),
+    p.el("cut-summary").textContent);
+  var satir = p.el("cut-ranges").children[1];
+  satir.children[0].checked = false;
+  satir.children[0].onchange();
+  ok("kilit: liste onay kutusu kesimi kapatmaz (kutu eski haline çizilir), Uygula kapalı",
+    p.el("cut-summary").textContent === ozet && p.el("cut-apply").disabled === true && p.el("cut-ranges").children[1].children[0].checked === true,
+    p.el("cut-summary").textContent);
+  p.ctx(klip4);   // bağlam yoklaması: refreshButton
+  ok("kilit: bağlam değişimi Uygula'yı açmaz, 'Uygulanıyor…' silinmez",
+    p.el("cut-apply").disabled === true && p.el("cut-analyze").disabled === true && p.el("cut-status").textContent === "Uygulanıyor…", p.el("cut-status").textContent);
+  tiklar.push(p.tikla("cut-apply"));
+  await p.bekle(20);
+  ok("kilit: üçüncü tık da KS_applyCuts / ffmpeg çağırmaz", uygulamalar(p) === 1 && p.kayit.run.length === 1, uygulamalar(p));
+  w.bitir({ ok: true, newSeq: "Kopya" });
+  await Promise.all(tiklar);
+  w.bitir({ ok: true, newSeq: "Kopya" });   // (kilit bozuksa sonradan gönderilen uygulamalar da bitsin)
+  ok("kilit: KS_applyCuts bitince tek uygulama, hak bir kez, harita kapandı, Uygula kapalı, Sessizlikleri bul açık",
+    uygulamalar(p) === 1 && p.kayit.harca.length === 1 && p.el("cut-result").hidden === true && p.el("cut-apply").disabled === true && p.el("cut-analyze").disabled === false,
+    uygulamalar(p) + " / " + p.kayit.harca.length);
+  p.kaydir("cut-pad", "0.15");
+  await p.bekle(160);
+  ok("kilit: başarıdan sonra kilitteki kaydırıcı değişimi eski zarftan harita kurmaz", p.el("cut-result").hidden === true && p.el("cut-apply").disabled === true && p.el("cut-bar").children.length === 0);
+
+  /* b) KS_applyCuts başarısız: kilit açılır, hata kalır, kilitte bekleyen Tampon haritaya işlenir, yeniden denenebilir */
+  var v = panel(), q = v.p;
+  await q.tikla("cut-analyze");
+  var ilk2 = q.tikla("cut-apply");
+  await q.bekle(20);
+  q.kaydir("cut-pad", "0.3");
+  await q.bekle(160);
+  ok("başarısız öncesi: kilitte harita eski Tampon'la (0.15) kalır", /^2 kesim · −2\.4 sn/.test(q.el("cut-summary").textContent) && q.el("cut-apply").disabled === true, q.el("cut-summary").textContent);
+  v.bitir({ ok: false, error: "Sekans kilitli" });
+  await ilk2;
+  ok("başarısız: hata durum satırında, harita bekleyen Tampon 0.3 ile kuruldu, Uygula ve Sessizlikleri bul açık, hak düşmedi",
+    q.el("cut-status").textContent === "✕ Sekans kilitli" && /bad/.test(q.el("cut-status").className) && /^2 kesim · −1\.8 sn/.test(q.el("cut-summary").textContent) &&
+    q.el("cut-apply").disabled === false && q.el("cut-analyze").disabled === false && q.kayit.harca.length === 0,
+    q.el("cut-status").textContent + " · " + q.el("cut-summary").textContent);
+  var ilk3 = q.tikla("cut-apply");
+  await q.bekle(20);
+  var son = q.kayit.call.filter(function (x) { return x.fn === "KS_applyCuts"; });
+  ok("başarısız sonrası yeniden Uygula: ikinci KS_applyCuts yeni Tampon'la (1.3–2.2, 3.8–4.7)",
+    son.length === 2 && son[1].payload.ranges.length === 2 && Math.abs(son[1].payload.ranges[0].start - 1.3) < 1e-6 && Math.abs(son[1].payload.ranges[1].end - 4.7) < 1e-6,
+    JSON.stringify(son.length && son[son.length - 1].payload.ranges));
+  v.bitir({ ok: true, newSeq: "Kopya" });
+  await ilk3;
+}
+
+// Bir söz hiç çözülmezse (ör. askıda kalan sahte KS_applyCuts) Node olay döngüsü boşalınca 0 koduyla sessizce
+// çıkardı ve tools/test.js bunu GECTI sayardı: özet yazılmadan çıkış başarısızlıktır.
+var tamamlandi = false;
+process.on("exit", function () {
+  if (!tamamlandi) { console.log("FAIL test-kesim yarıda kaldı: bekleyen bir söz hiç çözülmedi (" + gecti + " gecti, " + kaldi + " kaldi)"); process.exitCode = 1; }
+});
 canliTestler().catch(function (e) { ok("canli esik testleri coktu: " + (e && e.stack || e), false); }).then(function () {
+  tamamlandi = true;
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
   console.log("\n" + gecti + " gecti, " + kaldi + " kaldi");
   process.exit(kaldi ? 1 : 0);

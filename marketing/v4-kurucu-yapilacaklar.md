@@ -1488,16 +1488,19 @@ yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız
 
 ### Adım 6: Canlı eşikli sessizlik kesimi (tek çözümleme, anında önizleme, Min. konuşma, Otomatik eşik)
 
-Ne değişti: Otomatik Kesim sesi bir kez çözer (`K.runAkis` → ffmpeg 16 kHz s16le pipe:1, özgün kanal sayısı) ve
-bellekte 10 ms'lik tepe zarfı tutar (`js/sessizlik.js`, saniyede 100 sayı; geçici dosya ve süre sınırı yok).
+Ne değişti: Otomatik Kesim sesi bir kez çözer (`K.runAkis` → ffmpeg s16le pipe:1, dosyanın kendi örnekleme hızı ve
+kanal sayısı: Uygula'daki silencedetect ile aynı örnekler; 16 kHz'e indirmek tıslamalı kayıtta zarfı ~6 dB alçak
+gösteriyordu. Plan `-ar 16000` diyordu ("ıslıklı ses sonları kalsın" gerekçesiyle); 16 kHz 8 kHz üstünü, yani tam o
+sesleri süzdüğü ve 3.3 silencedetect eşleşmesini bozduğu için özgün hıza geçildi) ve bellekte 10 ms'lik tepe zarfı tutar (`js/sessizlik.js`, saniyede 100 sayı; geçici dosya ve süre sınırı yok).
 Kaydırıcılar haritayı ffmpeg'siz günceller; yeni "Min. konuşma" (0–0,6 sn, varsayılan 0 = 3.3 davranışı) ve
 "Otomatik" eşik düğmesi; `#cut-wave` tuvali. Uygula son ayarlarla silencedetect'i bir kez koşturup doğrular; PCM
 çözümleme olmazsa 3.3 akışı aynen çalışır. Pro kapısı değişmedi (`cut`, 3 deneme hakkı, hak yalnız başarılı Uygula'da).
 Lisans: clean-room (Premiere TR yalnız fikir); NOTICE girdisi gerekmez.
 
-**K6.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 6.1–6.20'yi yeni ve eski
+**K6.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 6.1–6.22'yi yeni ve eski
 (CEF 74) Premiere'de dene. Özellikle 6.6 (tek kanallı yaka mikrofonu), 6.7 (önizleme = uygulanan kesimler), 6.11
-(30 dk+ klipte bellek ve hız) ve 6.18 (OBS / MTS gibi sesi geç başlayan kayıtlar: zarf ve silencedetect ffmpeg
+(30 dk+ klipte bellek ve hız; çözümleme artık 48 kHz'te, 16 kHz'ten ~3 kat fazla bayt akar), 6.21 (tıslamalı kayıtta
+Otomatik), 6.22 (uygulanırken kilit: ikinci tık ikinci kez kesmez) ve 6.18 (OBS / MTS gibi sesi geç başlayan kayıtlar: zarf ve silencedetect ffmpeg
 `aresample=async=1:min_hard_comp=0.01:first_pts=0` süzgeciyle aynı PTS ekseninde; Premiere'in bu dosyalarda sesi
 nereye yerleştirdiğini gözle doğrula). 6.17'deki "Doğrulama kesimleri değiştirdi" uyarısı sık çıkıyorsa günlükteki
 `[kesim] dogrulama onizlemeden farkli` satırlarıyla bildir.

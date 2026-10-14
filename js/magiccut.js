@@ -24,6 +24,15 @@ window.KCut = (function () {
   var kapatilanlar = [];
   var target = "clone"; // clone | here
   var busy = false;
+  /*
+   * apply() sürerken (doğrulama + KS_applyCuts, 900 sn'ye dek): harita ve Uygula KİLİTLİ. busy yalnız ffmpeg
+   * analizini / doğrulamasını kapsar; KS_applyCuts beklenirken kaydırıcı / Otomatik / kesim tıklaması
+   * updateSummary'yle "Kesimleri uygula"yı yeniden açıyor, ikinci tık aynı sekans zamanlarını ikinci kez
+   * kestiriyordu (ripple'dan sonra konuşma silerdi). Kilitliyken gelen kaydırıcı değişimi bekletilir (canliBekliyor),
+   * kilit açılınca (Uygula başarısızsa) harita yeni ayarla kurulur.
+   */
+  var uygulaniyor = false;
+  var canliBekliyor = false;
   // 3.4: tek çözümleme + canlı eşik
   var S = window.SufloSessizlik || null;
   var zarfOnbellek = S ? S.onbellekYap(4) : null;   // mediaPath|in|dur → tepe zarfı
@@ -58,9 +67,11 @@ window.KCut = (function () {
 
   function refreshButton() {
     var ctx = KApp.ctx();
-    el("cut-analyze").disabled = busy || !ctx.sel;
-    if (ctx.connected && !ctx.sel && !busy) status("Timeline'da bir klip seç.");
-    else if (!busy) {
+    // Uygula sürerken de meşgul: "Sessizlikleri bul" kapalı, "Uygulanıyor…" silinmez, Uygula yeniden açılmaz
+    var mesgul = busy || uygulaniyor;
+    el("cut-analyze").disabled = mesgul || !ctx.sel;
+    if (ctx.connected && !ctx.sel && !mesgul) status("Timeline'da bir klip seç.");
+    else if (!mesgul) {
       /*
        * Uyarı/hata mesajına DOKUNMA: analyze'ın finally'si setBusy(false) →
        * buraya geliyor ve eski kod status("") ile hatayı daha kullanıcı
@@ -70,7 +81,7 @@ window.KCut = (function () {
       if (!/warn|bad/.test(e.className)) status("");
     }
     // iş bitti: "Kesimleri uygula" meşgulken kapalıydı (updateSummary busy'ye bakar), yeniden aç
-    if (!busy && clip && !el("cut-result").hidden) updateSummary();
+    if (!mesgul && clip && !el("cut-result").hidden) updateSummary();
   }
 
   /* ---------------- Analiz ---------------- */
@@ -139,16 +150,19 @@ window.KCut = (function () {
   function sdAnahtar(a) { return sonAnahtar + "|" + a.noise + "|" + a.minSil; }
 
   /*
-   * Tek çözümleme: 16 kHz s16le, özgün kanal sayısı, pipe:1 → tepe zarfı (saniyede 100 değer,
-   * geçici dosya yok, süre sınırı yok). Kanal sayısı stderr'deki "Output #0" satırından okunur;
-   * okunana dek gelen parçalar bekletilir (en çok 16 MB, sonra vazgeçilir → eski akış).
+   * Tek çözümleme: s16le, özgün örnekleme hızı ve kanal sayısı, pipe:1 → tepe zarfı (saniyede 100
+   * değer, geçici dosya yok, süre sınırı yok). Hız silencedetect'inkiyle aynı kalır (16 kHz'e inmez:
+   * tıslamalı kayıtta önizleme doğrulamadan ~6 dB alçak ölçüyordu). Kanal sayısı ve hız stderr'deki
+   * "Output #0" satırından okunur; okunana dek gelen parçalar bekletilir (en çok 16 MB, sonra
+   * vazgeçilir → eski akış).
    * Döner: { zarf } | { iptal: true } | { neden }
    */
   async function zarfCikar(ff, a, jeton) {
-    var st = S.tepeZarfi(), kanal = 0, stderr = "", bekleyen = [], bekleyenBayt = 0, vazgec = false;
+    var st = S.tepeZarfi(), kanal = 0, sr = 0, stderr = "", bekleyen = [], bekleyenBayt = 0, vazgec = false;
     var yerel = K.iptalJetonu();
     var birak = jeton && jeton.dinle ? jeton.dinle(function () { yerel.iptal(); }) : null;
-    function besle(b) { S.zarfBesle(st, b, { kanal: kanal, sr: S.SR, win: S.PENCERE }); }
+    function besle(b) { S.zarfBesle(st, b, { kanal: kanal, sr: sr, win: S.PENCERE }); }
+    function bilgiOku(s) { var b = S.cikisBilgisi(s); kanal = b.kanal; sr = b.sr; }
     var res;
     try {
       res = await K.runAkis(ff, S.cozumlemeArgs(clip.mediaPath, clip.inPoint, a.dur), {
@@ -156,7 +170,7 @@ window.KCut = (function () {
         onStderr: function (s) {
           if (kanal) return;
           stderr += s;
-          kanal = S.kanalSayisi(stderr);
+          bilgiOku(stderr);
           if (kanal) { bekleyen.forEach(besle); bekleyen = []; bekleyenBayt = 0; }
         },
         onData: function (b) {
@@ -172,13 +186,13 @@ window.KCut = (function () {
     if (vazgec) return { neden: "no channel count" };
     if (!res || res.code !== 0) return { neden: "kod " + (res ? res.code : "?") + (res && res.hata ? " " + res.hata : "") };
     if (!kanal) {
-      kanal = S.kanalSayisi(res.stderr || "");
+      bilgiOku(res.stderr || "");
       if (!kanal) return { neden: "no channel count" };
       bekleyen.forEach(besle);
     }
     var z = S.zarfBitir(st);
     if (!z.length) return { neden: "no audio stream" };
-    K.log("[kesim] zarf: " + z.length + " pencere, " + kanal + " kanal, " + res.bayt + " bayt");
+    K.log("[kesim] zarf: " + z.length + " pencere, " + kanal + " kanal, " + sr + " Hz, " + res.bayt + " bayt");
     return { zarf: z };
   }
 
@@ -187,7 +201,7 @@ window.KCut = (function () {
     if (K.baslatTikiGecerli && !K.baslatTikiGecerli(ev, baslatAcilis)) return;
     // Pro: otomatik kesim (ucretsizde 3 deneme hakki; hak yalniz kesim uygulaninca duser)
     if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: analyze })) return;
-    if (busy) return;
+    if (busy || uygulaniyor) return;
     sesiKapat();
     clip = KApp.ctx().sel;
     if (!clip) { status("Önce bir klip seç.", "warn"); return; }
@@ -325,6 +339,8 @@ window.KCut = (function () {
    */
   function yenidenHesapla() {
     if (!clip || !S) return;
+    // Uygula sürerken harita değişmez (uygulanan küme ekranda kalır); kilit açılınca yeni ayarla kurulur
+    if (uygulaniyor) { canliBekliyor = true; return; }
     var a = ayarlar(), sonuc;
     if (zarf) sonuc = S.bul(zarf, kesimAyari(a));
     else if (hamSessizlik) sonuc = S.kesimlereCevir(hamSessizlik.liste, kesimAyari(a));
@@ -348,6 +364,7 @@ window.KCut = (function () {
     if (canliZaman) clearTimeout(canliZaman);
     canliZaman = setTimeout(function () {
       canliZaman = null;
+      if (uygulaniyor) { canliBekliyor = true; return; }
       if (busy) return;
       yenidenHesapla();
     }, CANLI_MS);
@@ -355,6 +372,7 @@ window.KCut = (function () {
 
   // "Otomatik": eşiği klibin kendi zarfından öner (arka plan p10 + 8 dB); düşük SNR'de uyar
   function otomatikEsik() {
+    if (uygulaniyor) return;   // Uygula sürerken eşik ve harita değişmez
     if (!zarf) {
       status("Önce Sessizlikleri bul: otomatik eşik klibin kendi sesinden ölçülür.", "warn");
       return;
@@ -392,6 +410,8 @@ window.KCut = (function () {
    * listeyle yeniden eşlenir (sonraki kaydırıcı hareketinin göstereceğiyle aynı görünsün).
    */
   function kararVer(r, keep) {
+    // Uygula sürerken karar değişmez; liste onay kutusu tıklamayla değişmişse eski haline çizilir
+    if (uygulaniyor) { render(); return; }
     kapatilanlar = S.kararYaz(kapatilanlar, r, keep, ranges);
     r.keep = keep;
     ranges = S.kararEsle(kapatilanlar, ranges);
@@ -556,7 +576,7 @@ window.KCut = (function () {
     el("cut-summary").textContent = act.length + " kesim · −" + saved.toFixed(1) + " sn" +
       (dur > 0 ? " (%" + (saved / dur * 100).toFixed(0) + ")" : "") +
       (birlesik ? " · " + birlesik + " birleşik" : "");
-    el("cut-apply").disabled = act.length === 0 || busy;
+    el("cut-apply").disabled = act.length === 0 || busy || uygulaniyor;
   }
 
   // Eski akışın ham silencedetect aralıkları ekrandaki ayarla (eşik + min. sessizlik) koşmuşsa onlar
@@ -621,76 +641,100 @@ window.KCut = (function () {
 
   async function apply() {
     if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: apply })) return; // Pro: otomatik kesim
-    if (busy || !clip || activeRanges().length === 0) return;
-    sesiKapat();
-    farkUyarisi = false;
-    el("cut-apply").disabled = true;
-    function sade(r) { return { start: r.start, end: r.end }; }
-    // 3.4: önizleme zarftan; uygulanan kesimler silencedetect doğrulamasından
-    var onizleme = activeRanges().map(sade);
-    var dogru = await kesimleriDogrula();
-    if (!dogru) { updateSummary(); return; }
-    var act = dogru.filter(function (r) { return r.keep; }).map(sade);
-    if (act.length === 0) {
-      status("Doğrulamadan sonra uygulanacak kesim kalmadı — eşiği ya da min. sessizliği değiştir.", "warn");
-      updateSummary();
-      return;
-    }
+    if (busy || uygulaniyor || !clip || activeRanges().length === 0) return;
     /*
-     * Doğrulama önizlemeden (dinlenen / haritada görülen) farklı kesim verdiyse sormadan uygulama:
-     * doğrulanmış küme haritada (kesimleriDogrula çizdi), kullanıcı kontrol edip yeniden Uygula'ya basar;
-     * ikinci tık doğrulama önbelleğinden gelir, ffmpeg yeniden koşmaz. (Sayı farkı ya da > 50 ms kenar kayması.)
+     * Doğrulamadan KS_applyCuts dönene dek kilitli (uygulaniyor): kaydırıcı, Otomatik, kesim tıklaması ve
+     * bağlam değişimi haritayı değiştirip "Kesimleri uygula"yı yeniden açamaz; ikinci tık geri döner.
      */
-    if (!S.kesimlerAyni(onizleme, act)) {
-      K.log("[kesim] dogrulama onizlemeden farkli: onizleme=" + onizleme.length + " dogrulama=" + act.length + " — uygulanmadi");
-      status("Doğrulama kesimleri değiştirdi (önizleme " + onizleme.length + " kesim, doğrulama " + act.length +
-        " kesim): haritayı kontrol et, sonra yeniden Kesimleri uygula.", "warn");
-      farkUyarisi = true;
-      updateSummary();
-      return;
-    }
+    uygulaniyor = true;
     el("cut-apply").disabled = true;
-    status("Uygulanıyor…");
-    var mode = target === "clone" ? "ripple" : el("cut-mode").value;
-    // Yuzlerce kesim uygulamak uzun surebilir: zaman asimini genis tut
-    var r = await K.call("KS_applyCuts", {
-      ranges: act,
-      removeMode: mode,
-      cloneFirst: target === "clone"
-    }, 900000);
-    if (r.ok) {
-      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("cut", KApp.toast);   // deneme: yalniz basarida
-      /*
-       * Timeline değişti: önbellekler VE canlı analiz bayat. Zarf / ham aralıklar / harita bırakılır,
-       * sonuç gizlenir, "Kesimleri uygula" yeni analize dek kapalı kalır: kaydırıcılar ve Otomatik
-       * Uygula'dan önceki çözümlemeden taze görünümlü bir harita kurup eski konumlara ikinci kez
-       * kesim uygulatamaz (ripple'dan sonra konuşma silerdi).
-       */
-      onbellekleriBosalt();
-      analiziBirak();
-      status("");
-      var msg = r.newSeq
-        ? "✂ Kopya sekansta uygulandı: " + r.newSeq
-        : "✂ " + r.removed + " parça silindi" + (r.selected ? ", " + r.selected + " parça seçildi" : "");
-      if (mode === "select") msg = "✂ Kesildi ve seçildi — silmek istersen Shift+Delete";
-      if (r.rippleFallback) {
-        // host, senkron kaybini onlemek icin ripple'i bosluk moduna dusurdu
-        status("⚠ Bazı track'ler aralığı tam kaplamıyor — senkron bozulmasın diye kesimler boşluk bırakılarak silindi.", "warn");
-        KApp.toast(msg + " (boşluk modunda)", "warn");
-      } else {
-        KApp.toast(msg, "good");
+    var r = null;
+    try {
+      sesiKapat();
+      farkUyarisi = false;
+      var sade = function (k) { return { start: k.start, end: k.end }; };
+      // 3.4: önizleme zarftan; uygulanan kesimler silencedetect doğrulamasından
+      var onizleme = activeRanges().map(sade);
+      var dogru = await kesimleriDogrula();
+      if (!dogru) return;
+      var act = dogru.filter(function (k) { return k.keep; }).map(sade);
+      if (act.length === 0) {
+        status("Doğrulamadan sonra uygulanacak kesim kalmadı — eşiği ya da min. sessizliği değiştir.", "warn");
+        return;
       }
-      // ilk uygulanan kesim: davet seridinin anlarindan biri (mesgulken/yildiz seridi acikken cikmaz)
-      if (KApp.davetAni) KApp.davetAni("cut");
-    } else {
-      el("cut-apply").disabled = false;
-      status("✕ " + r.error, "bad");
+      /*
+       * Doğrulama önizlemeden (dinlenen / haritada görülen) farklı kesim verdiyse sormadan uygulama:
+       * doğrulanmış küme haritada (kesimleriDogrula çizdi), kullanıcı kontrol edip yeniden Uygula'ya basar;
+       * ikinci tık doğrulama önbelleğinden gelir, ffmpeg yeniden koşmaz. (Sayı farkı ya da > 50 ms kenar kayması.)
+       */
+      if (!S.kesimlerAyni(onizleme, act)) {
+        K.log("[kesim] dogrulama onizlemeden farkli: onizleme=" + onizleme.length + " dogrulama=" + act.length + " — uygulanmadi");
+        status("Doğrulama kesimleri değiştirdi (önizleme " + onizleme.length + " kesim, doğrulama " + act.length +
+          " kesim): haritayı kontrol et, sonra yeniden Kesimleri uygula.", "warn");
+        farkUyarisi = true;
+        return;
+      }
+      status("Uygulanıyor…");
+      var mode = target === "clone" ? "ripple" : el("cut-mode").value;
+      // Yuzlerce kesim uygulamak uzun surebilir: zaman asimini genis tut
+      r = await K.call("KS_applyCuts", {
+        ranges: act,
+        removeMode: mode,
+        cloneFirst: target === "clone"
+      }, 900000);
+      if (r.ok) {
+        if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("cut", KApp.toast);   // deneme: yalniz basarida
+        /*
+         * Timeline değişti: önbellekler VE canlı analiz bayat. Zarf / ham aralıklar / harita bırakılır,
+         * sonuç gizlenir, "Kesimleri uygula" yeni analize dek kapalı kalır: kaydırıcılar ve Otomatik
+         * Uygula'dan önceki çözümlemeden taze görünümlü bir harita kurup eski konumlara ikinci kez
+         * kesim uygulatamaz (ripple'dan sonra konuşma silerdi).
+         */
+        onbellekleriBosalt();
+        analiziBirak();
+        status("");
+        var msg = r.newSeq
+          ? "✂ Kopya sekansta uygulandı: " + r.newSeq
+          : "✂ " + r.removed + " parça silindi" + (r.selected ? ", " + r.selected + " parça seçildi" : "");
+        if (mode === "select") msg = "✂ Kesildi ve seçildi — silmek istersen Shift+Delete";
+        if (r.rippleFallback) {
+          // host, senkron kaybini onlemek icin ripple'i bosluk moduna dusurdu
+          status("⚠ Bazı track'ler aralığı tam kaplamıyor — senkron bozulmasın diye kesimler boşluk bırakılarak silindi.", "warn");
+          KApp.toast(msg + " (boşluk modunda)", "warn");
+        } else {
+          KApp.toast(msg, "good");
+        }
+        // ilk uygulanan kesim: davet seridinin anlarindan biri (mesgulken/yildiz seridi acikken cikmaz)
+        if (KApp.davetAni) KApp.davetAni("cut");
+      }
+    } finally {
+      kilidiAc();
     }
+    // hata kilit açıldıktan sonra yazılır (bekleyen kaydırıcı haritayı yeniden kursa da silinmesin)
+    if (r && !r.ok) status("✕ " + r.error, "bad");
+  }
+
+  /*
+   * Kilit açılır: bekleyen kaydırıcı değişimi varsa harita yeni ayarla kurulur (Uygula başarısız / fark /
+   * iptal); "Sessizlikleri bul" ve (sonuç görünürse) "Kesimleri uygula" yeniden açılır. Süreç satırı
+   * ("Kesimler doğrulanıyor…", "Uygulanıyor…") kalmaz; uyarı ve hata (ör. boşluk modu) silinmez.
+   */
+  function kilidiAc() {
+    if (!uygulaniyor) return;
+    uygulaniyor = false;
+    var bekleyen = canliBekliyor;
+    canliBekliyor = false;
+    if (bekleyen && clip && (zarf || hamSessizlik)) yenidenHesapla();
+    var ctx = KApp.ctx(), e = el("cut-status");
+    el("cut-analyze").disabled = busy || !ctx.sel;
+    if (!/warn|bad/.test(e.className)) status(ctx.connected && !ctx.sel ? "Timeline'da bir klip seç." : "");
+    if (clip && !el("cut-result").hidden) updateSummary();
   }
 
   // Canlı analizi bırak (Uygula'dan sonra): bir sonraki "Sessizlikleri bul" baştan çözümler
   function analiziBirak() {
     if (canliZaman) { clearTimeout(canliZaman); canliZaman = null; }
+    canliBekliyor = false;
     zarf = null;
     hamSessizlik = null;
     ranges = [];
