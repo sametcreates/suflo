@@ -380,6 +380,150 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
     I18N.translate("Anahtar sıklığı") === "Key density" && I18N.translate("Çevir") === "Translate" && I18N.translate("Yoğunluk") === "Intensity");
   ok("İngilizce: deneme ipucu 'Uygula'", I18N.translate(require(path.join(KOK, "js", "deneme.js")).tanitimIpucu("curves").mesaj) === "Trial on: now press \"Apply\"");
 
+  /* ---------- 9b) inceleme: odak dönüşü, taze playhead, bildirimdeki Geri al, ret nedenleri, zaman aşımı, önayar adı ---------- */
+  function taramaSayisi(x) { return x.cagri.filter(function (c) { return c.fn === "KS_easeScan"; }).length; }
+  // odak Premiere'deyken kullanıcı Effect Controls'te anahtar ekler (seçim imzası aynı): odak dönünce bir kez taranır
+  var od = { peek: peek(12.5), tar: tarama(12.5, []) };
+  var f1 = kur({ cevap: function (fn) { return fn === "KS_easePeek" ? od.peek : fn === "KS_easeScan" ? od.tar : { ok: false }; } });
+  f1.ctx._tab.egri();
+  await bekle(10);
+  await f1.G._yokla();
+  ok("odak: ilk tarama + aynı imzada yalnız peek", taramaSayisi(f1) === 1 && /iki ya da daha çok anahtar kareli/.test(f1.dom["egri-hedef"].textContent), js(f1.cagriAdlari()));
+  f1.durumlar.odak = false;
+  await f1.G._yokla();
+  var onceOdak = f1.cagri.length;
+  od.tar = tarama(12.5, ikiProp(12.5));   // kullanıcı iki özelliğe anahtar koydu
+  f1.durumlar.odak = true;
+  await f1.G._yokla();
+  ok("odak dönünce: imza ve playhead aynıyken de bir kez yeniden tarama, yeni anahtarlar listede", onceOdak === 3 && taramaSayisi(f1) === 2 &&
+    hepsi(f1.dom["egri-ozellikler"], function (c) { return /egri-satir( |$)/.test(c.className); }).length === 2, js(f1.cagriAdlari()));
+  await f1.G._yokla();
+  ok("odak dönüşünden sonra yine yalnız peek (sürekli tarama yok)", taramaSayisi(f1) === 2);
+  f1.dom["tab-egri"].classList.remove("active");
+  f1.dom["tab-egri"].classList.add("active");
+  f1.ctx._tab.egri();
+  await bekle(10);
+  ok("sekme yeniden açılınca bir kez yeniden tarama", taramaSayisi(f1) === 3, js(f1.cagriAdlari()));
+
+  // panel odakta değilken playhead Premiere'de oynadı: 'Premiere'de önizle' önce peek eder, yeni çifti oynatır ve oraya döner
+  var pz = { peek: peek(12.5) };
+  var p1 = kur({ cevap: function (fn) {
+    if (fn === "KS_easePeek") return pz.peek;
+    if (fn === "KS_easeScan") return tarama(12.5, ikiProp(12.5));
+    if (fn === "KS_setPlayerPosition") return { ok: true };
+    return { ok: false };
+  } });
+  p1.ctx._tab.egri();
+  await bekle(10);
+  pz.peek = peek(13.6);   // Konum 11–13 dışında, Opaklık 12–14 içinde
+  var onceP = p1.cagri.length;
+  p1.dom["egri-pr-onizle"].tetikle("click");
+  for (var bk = 0; bk < 60 && p1.G._durum().mesgul; bk++) await bekle(5);
+  var sonra = p1.cagri.slice(onceP), konumlar = sonra.filter(function (c) { return c.fn === "KS_setPlayerPosition"; }).map(function (c) { return c.arg.sec; });
+  ok("Premiere'de önizle: önce peek; taze playhead'in çifti (12 → 14) oynatılır, sonda taze yere (13,6) döner", sonra[0].fn === "KS_easePeek" && konumlar[0] === 12 &&
+    konumlar[konumlar.length - 2] === 14 && konumlar[konumlar.length - 1] === 13.6, js([sonra[0].fn, konumlar[0], konumlar.slice(-2)]));
+
+  // Sonraki çift: canlı Suflo kaydının iç anahtarları atlanır (A içinden B'ye)
+  var dpS = {};
+  KR.depo({ getItem: function (k) { return dpS[k] === undefined ? null : dpS[k]; }, setItem: function (k, v) { dpS[k] = v; }, removeItem: function (k) { delete dpS[k]; } }).ekle("C:/p/deneme.prproj", eskiKayit);
+  var abcKeys = [11].concat(times).concat([13, 15]);
+  var sc = kur({ depo: dpS, cevap: function (fn) {
+    if (fn === "KS_easePeek") return peek(12.02);
+    if (fn === "KS_easeScan") return tarama(12.02, [prop("nA", "Röportaj.mp4", 0, 0, abcKeys, { t0: 11, t1: 13, i0: 0, i1: 50, ic: 49, kayitli: true }, [0.5, 0.5], [0.8, 0.3])]);
+    if (fn === "KS_setPlayerPosition") return { ok: true };
+    return { ok: false };
+  } });
+  sc.ctx._tab.egri();
+  await bekle(10);
+  sc.dom["egri-sonraki"].tetikle("click");
+  await bekle(20);
+  var git = sc.cagri.filter(function (c) { return c.fn === "KS_setPlayerPosition"; }).map(function (c) { return c.arg.sec; });
+  var cipS = hepsi(sc.dom["egri-ozellikler"], function (c) { return /^egri-cip/.test(c.className); }).map(function (c) { return c.textContent; });
+  ok("Sonraki çift: kayıtlı aralığın içinden B + 0,25 kareye (13,01), çip B → C; Suflo'nun anahtarları kare kare gezilmez", js(git) === js([13.01]) &&
+    cipS[0] === "13,00 sn → 15,00 sn · 50 kare", js([git, cipS]));
+
+  // bildirimdeki Geri al yalnız KENDİ uygulamasının kayıtlarını kaldırır (arada ikinci uygulama yapılsa da)
+  var ikinci = 0;
+  var gb = kur({ kurulu: true, cevap: function (fn, arg) {
+    if (fn === "KS_easeScan") return tarama(12.5, ikiProp(12.5));
+    if (fn === "KS_easeBake") { ikinci++; return { ok: true, basarili: 1, yazilan: 2, sonuclar: [{ i: 0, ok: true }], records: [{ tur: "egri", seqId: "s1", nodeId: "nA", clipName: "Röportaj.mp4", clipStart: 10,
+      matchName: "AE.ADBE Motion/Position", compIdx: 0, propIdx: ikinci, uclar: [11, 13], times: [11.04 + ikinci * 0.001, 11.08] }] }; }
+    if (fn === "KS_easeUndo") return { ok: true, sonuclar: arg.records.map(function (r) { return { id: r.id, ok: true, silinen: 2 }; }), atlanan: [] };
+    return { ok: false };
+  } });
+  await gb.G.uygula();
+  var t1 = gb.toastlar.filter(function (t) { return t.e && t.e.metin === "Geri al"; })[0];
+  var ilkId = gb.G._durum().sonUygulanan.slice();
+  await gb.G.uygula();
+  var ikinciId = gb.G._durum().sonUygulanan.slice();
+  t1.e.fn();
+  await bekle(20);
+  var geriGb = gb.cagri.filter(function (c) { return c.fn === "KS_easeUndo"; });
+  ok("ilk bildirimin Geri al'ı ilk uygulamanın kaydını gönderir (ikincinin değil)", geriGb.length === 1 && ilkId.length === 1 && ikinciId[0] !== ilkId[0] &&
+    js(geriGb[0].arg.records.map(function (r) { return r.id; })) === js(ilkId), js([ilkId, ikinciId, geriGb.map(function (g) { return g.arg.records.map(function (r) { return r.id; }); })]));
+
+  // klip başına ret (klip taşındı) ve kısmi yazım nedeniyle görünür
+  var kt = kur({ kurulu: true, cevap: function (fn) {
+    if (fn === "KS_easeScan") return tarama(12.5, ikiProp(12.5));
+    if (fn === "KS_easeBake") return { ok: false, kod: "klipTasindi" };
+    return { ok: false };
+  } });
+  await kt.G.uygula();
+  ok("klip taşındı: satırda 'klip taşınmış…' nedeni (genel 'uygulanamadı' değil)", /Konum: klip taşınmış; liste yenilendi, yeniden dene/.test(kt.dom["egri-status"].textContent), kt.dom["egri-status"].textContent);
+  var ek = kur({ kurulu: true, cevap: function (fn) {
+    if (fn === "KS_easeScan") return tarama(12.5, ikiProp(12.5));
+    if (fn === "KS_easeBake") return { ok: true, basarili: 2, yazilan: 60, sonuclar: [{ i: 0, ok: true, kod: "eksik" }, { i: 1, ok: true }], records: [] };
+    return { ok: false };
+  } });
+  await ek.G.uygula();
+  ok("kısmi yazım ('eksik'): durum ve bildirim uyarı, neden 'bazı anahtar kareler yazılamadı'", /warn/.test(ek.dom["egri-status"].className) &&
+    /kısmen yazıldı: Konum: bazı anahtar kareler yazılamadı/.test(ek.dom["egri-status"].textContent), ek.dom["egri-status"].textContent);
+
+  // zaman aşımı: hak düşmez, planlanan zamanlar geçici kayıt olarak saklanır (Geri al canlıysa kaldırır)
+  var za = kur({ kurulu: true, cevap: function (fn) {
+    if (fn === "KS_easeScan") return tarama(12.5, ikiProp(12.5));
+    if (fn === "KS_easeBake") return { ok: false, error: "Premiere yanıt vermedi (KS_easeBake) — işlem zaman aşımına uğradı." };
+    return { ok: false };
+  } });
+  await za.G.uygula();
+  var zaKayit = KR.depo(za.ctx.localStorage).oku("C:/p/deneme.prproj");
+  ok("bake zaman aşımı: hak düşmez, neden söylenir, iki özelliğin planlanan zamanları kayıtta (U ile geri alınabilir)", za.harcanan.length === 0 &&
+    /Premiere yanıt vermedi; yazılmış olabilecek/.test(za.dom["egri-status"].textContent) && zaKayit.length === 2 && zaKayit[0].times.length === 49 &&
+    js(za.G._durum().sonUygulanan.slice().sort()) === js(zaKayit.map(function (r) { return r.id; }).sort()), js([za.harcanan, zaKayit.length, za.dom["egri-status"].textContent]));
+
+  // geri al: host kaydı 'degisti' ile atladı → saklanır, neden söylenir; 'yok' → kayıt temizlenir, uyarı
+  var dpG = {};
+  KR.depo({ getItem: function (k) { return dpG[k] === undefined ? null : dpG[k]; }, setItem: function (k, v) { dpG[k] = v; }, removeItem: function (k) { delete dpG[k]; } }).ekle("C:/p/deneme.prproj", eskiKayit);
+  var gd = { cevap: { ok: true, sonuclar: [], atlanan: [{ id: "kreski1", kod: "degisti" }] } };
+  var gg = kur({ depo: dpG, cevap: function (fn) {
+    if (fn === "KS_easePeek") return peek(12.5);
+    if (fn === "KS_easeScan") return tarama(12.5, ikiProp(12.5));
+    if (fn === "KS_easeUndo") return gd.cevap;
+    return { ok: false };
+  } });
+  gg.ctx._tab.egri();
+  await bekle(10);
+  await gg.G.geriAlTumu();
+  ok("geri al 'degisti': kayıt saklanır, 'dokunulmadı' uyarısı", KR.depo(gg.ctx.localStorage).oku("C:/p/deneme.prproj").length === 1 &&
+    /kaydın anahtar kareleri değişmiş .*dokunulmadı, kayıtlar saklandı/.test(gg.dom["egri-status"].textContent) && /warn/.test(gg.dom["egri-status"].className), gg.dom["egri-status"].textContent);
+  gd.cevap = { ok: true, sonuclar: [{ id: "kreski1", ok: true, silinen: 0, kod: "yok" }], atlanan: [] };
+  await gg.G.geriAlTumu();
+  ok("geri al 'yok': Suflo'nun anahtarları zaten gitmiş → kayıt temizlenir, yeşil 'Geri alındı: 0' değil uyarı", KR.depo(gg.ctx.localStorage).oku("C:/p/deneme.prproj").length === 0 &&
+    /zaten kaldırılmış; kayıt temizlendi/.test(gg.dom["egri-status"].textContent) && /warn/.test(gg.dom["egri-status"].className), gg.dom["egri-status"].textContent);
+
+  // İngilizce arayüzde kullanıcı önayarının varsayılan adı İngilizce kaydedilir (kart çeviriden muaf)
+  var on = kur({ dil: "en", cevap: function () { return { ok: false }; } });
+  on.dom["egri-kaydet"].tetikle("click");
+  on.dom["egri-kaydet"].tetikle("click");
+  var onayarEn = JSON.parse(on.depo["suflo.egri.onayarlar"] || "[]").map(function (o) { return o.ad; });
+  ok("İngilizce: kullanıcı önayarı 'My curve 1', 'My curve 2' adıyla", js(onayarEn) === js(["My curve 1", "My curve 2"]), js(onayarEn));
+  var onTr = kur({ cevap: function () { return { ok: false }; } });
+  onTr.dom["egri-kaydet"].tetikle("click");
+  ok("Türkçe: kullanıcı önayarı 'Benim eğrim 1'", JSON.parse(onTr.depo["suflo.egri.onayarlar"])[0].ad === "Benim eğrim 1");
+  ok("İngilizce: yeni ret nedenleri ve geri al iletileri çevrilir", I18N.translate(": klip taşınmış; liste yenilendi, yeniden dene") === ": the clip was moved; the list was refreshed, try again" &&
+    I18N.translate(" · kısmen yazıldı: ") === " · partly written: " && I18N.translate("Suflo'nun anahtar kareleri zaten kaldırılmış; kayıt temizlendi.") === "Suflo's keyframes were already removed; the record was cleared." &&
+    /^Undone: 0 keyframes removed · the keyframes of 1 records changed/.test(I18N.translate("Geri alındı: 0 anahtar kare silindi · 1 kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı.")));
+
   /* ---------- 10) önizleme sahnesi ve düzenleyici ---------- */
   var p10 = kur({ cevap: function (fn) { return fn === "KS_easePeek" ? peek(12.5) : tarama(12.5, ikiProp(12.5)); } });
   p10.durumlar.gizli = true;

@@ -44,13 +44,15 @@
     return !!d.gorunur && d.odak !== false && !d.mesgul;
   }
   /*
-   * onbellek: son tarama { seqId, selSig, kapsam: [a, b], ph } (yoksa null); pk: KS_easePeek sonucu.
-   * Döner: 'tara' (sekans ya da seçim değişti, playhead taranan kapsamın dışında), 'ciftler' (yalnız
+   * onbellek: son tarama { seqId, selSig, kapsam: [a, b], ph } (yoksa null); pk: KS_easePeek sonucu;
+   * o.tazele: panel odağı yeni geri aldı ya da sekme yeniden açıldı (kullanıcı Effect Controls'te anahtar
+   * eklemiş / değiştirmiş olabilir; seçim imzası bunu göstermez).
+   * Döner: 'tara' (sekans ya da seçim değişti, playhead taranan kapsamın dışında, tazele), 'ciftler' (yalnız
    * playhead oynadı: çiftler önbellekteki anahtarlardan yeniden hesaplanır) ya da 'bekle'.
    */
-  function yoklamaKarari(onbellek, pk) {
+  function yoklamaKarari(onbellek, pk, o) {
     if (!pk || !pk.ok) return "bekle";
-    if (!onbellek) return "tara";
+    if (!onbellek || (o && o.tazele)) return "tara";
     if (String(pk.seqId || "") !== String(onbellek.seqId || "")) return "tara";
     if (String(pk.selSig || "") !== String(onbellek.selSig || "")) return "tara";
     var ph = Number(pk.ph), k = onbellek.kapsam;
@@ -69,6 +71,8 @@
    * keys: artan timeline saniyeleri; uclar: o özelliğin canlı Suflo kayıtlarının [t0, t1] aralıkları.
    * Playhead canlı bir kaydın içindeyse çift o kaydın uçlarıdır (Suflo'nun iç anahtarları çifti bölmez);
    * değilse playhead'i saran iki komşu anahtar (anahtarın üstündeyse o ve sonraki, sonuncudaysa bir önceki).
+   * Kayıt aralığı sonda yarı açık (host KS_easeIpucu ile aynı): playhead B'nin üstündeyse düz kural (B ve
+   * sonraki çift); B son anahtarsa kaydın çifti kalır.
    * Döner: { i0, i1, t0, t1, ic, kayitli } | null (playhead anahtarların dışında ya da < 2 anahtar).
    */
   function ciftBul(keys, ph, fps, uclar) {
@@ -80,7 +84,9 @@
       var a = Number(uclar[u] && uclar[u][0]), b = Number(uclar[u] && uclar[u][1]);
       if (!(sonlu(a) && sonlu(b) && b > a) || ph < a - tol || ph > b + tol) continue;
       var j0 = indis(keys, a, tol), j1 = indis(keys, b, tol);
-      if (j0 >= 0 && j1 > j0) return { i0: j0, i1: j1, t0: keys[j0], t1: keys[j1], ic: j1 - j0 - 1, kayitli: true };
+      if (!(j0 >= 0 && j1 > j0)) continue;
+      if (ph >= b - tol && j1 < n - 1) continue;
+      return { i0: j0, i1: j1, t0: keys[j0], t1: keys[j1], ic: j1 - j0 - 1, kayitli: true };
     }
     if (ph < keys[0] - tol || ph > keys[n - 1] + tol) return null;
     var i = 0;
@@ -125,20 +131,71 @@
         String(r.matchName || "") === String(prop.matchName || "");
     });
   }
-  // Canlı kayıtlar (iki uç + zamanların en az %60'ı önbellekteki anahtarlarda); SufloKeyRecords.canli
+  /*
+   * Kaydın d saniye kaydırılmış kopyası (id aynı). Anahtarlar klibin KAYNAK zamanında durur: klip timeline'da
+   * taşınınca hepsi klip kadar kayar, kayıt (timeline saniyesi) kaymaz. clipStart da kayar: host'a giden
+   * kopya kendi içinde tutarlıdır.
+   */
+  function kaydir(r, d) {
+    var k = {};
+    for (var a in r) if (Object.prototype.hasOwnProperty.call(r, a)) k[a] = r[a];
+    k.times = (r.times || []).map(function (t) { return r4(t + d); });
+    if (r.uclar) k.uclar = [r4(r.uclar[0] + d), r4(r.uclar[1] + d)];
+    if (Array.isArray(r.kenarDegerleri)) k.kenarDegerleri = r.kenarDegerleri.map(function (x) { return { t: r4(x.t + d), v: x.v }; });
+    if (sonlu(r.clipStart)) k.clipStart = r4(r.clipStart + d);
+    return k;
+  }
+  /*
+   * Kaydın bugünkü anahtarlarla canlı hâli (SufloKeyRecords.canli: iki uç + zamanların en az %60'ı) ya da null.
+   * Önce kaydın kendi zamanları (baştan kırpma anahtarları yerinde bırakır), tutmazsa klibin kayması kadar
+   * (kayıt.clipStart → prop.clipStart) kaydırılmış kopyası denenir (host KS_easeKayitEsle ile aynı adaylar).
+   */
+  function canliHali(r, prop) {
+    if (!KR) return null;
+    if (KR.canli(r, prop.keys, prop.fps)) return r;
+    var d = Number(prop.clipStart) - Number(r.clipStart);
+    if (!sonlu(r.clipStart) || !sonlu(d) || Math.abs(d) <= tolerans(prop.fps)) return null;
+    var k = kaydir(r, d);
+    return KR.canli(k, prop.keys, prop.fps) ? k : null;
+  }
+  // Canlı kayıtlar (taşınan klipte kaydırılmış kopyalarıyla)
   function canliKayitlar(kayitlar, prop) {
-    if (!KR) return [];
-    return satirKayitlari(kayitlar, prop).filter(function (r) { return KR.canli(r, prop.keys, prop.fps); });
+    var out = [];
+    satirKayitlari(kayitlar, prop).forEach(function (r) { var c = canliHali(r, prop); if (c) out.push(c); });
+    return out;
   }
   function uclarDan(kayitlar) {
     return kayitlar.filter(function (r) { return r.uclar; }).map(function (r) { return [r.uclar[0], r.uclar[1]]; });
   }
-  // KS_easeScan'e giden ipuçları: canlı kayıtların uçları
+  /*
+   * 400'den çok anahtarlı özellikte (kesik) tarama yalnız playhead çevresindeki pencereyi verir: uzun bir kaydın
+   * uçları ve zamanlarının çoğu pencerenin dışında kalabilir. İpucu için kayıt pencerede görünen kısmıyla
+   * ölçülür (görünen zamanların %60'ı ve görünen uçlar yerinde); host ipucunu tüm anahtarlarla doğrular ve
+   * kaydın tüm aralığını döndürür, sonraki ölçüm yine tam kuralla yapılır.
+   */
+  function pencerede(r, prop) {
+    var k = prop.keys || [], tol = tolerans(prop.fps);
+    if (!KR || !prop.kesik || k.length < 2 || !r.uclar) return null;
+    var lo = k[0] - tol, hi = k[k.length - 1] + tol;
+    function dene(rec) {
+      var gorunen = (rec.times || []).filter(function (t) { return t >= lo && t <= hi; });
+      if (!gorunen.length) return false;
+      var ucTamam = rec.uclar.every(function (u) { return u < lo || u > hi || indis(k, u, tol) >= 0; });
+      return ucTamam && KR.canli({ tur: rec.tur, times: gorunen }, k, prop.fps);
+    }
+    if (dene(r)) return r;
+    var d = Number(prop.clipStart) - Number(r.clipStart);
+    if (!sonlu(r.clipStart) || !sonlu(d) || Math.abs(d) <= tol) return null;
+    var kk = kaydir(r, d);
+    return dene(kk) ? kk : null;
+  }
+  // KS_easeScan'e giden ipuçları: canlı kayıtların uçları (kesik özellikte pencerede canlı görünenler de)
   function ipuclari(kayitlar, props) {
     var out = [];
     (props || []).forEach(function (p) {
-      canliKayitlar(kayitlar, p).forEach(function (r) {
-        if (r.uclar) out.push({ nodeId: p.nodeId, compIdx: p.compIdx, propIdx: p.propIdx, t0: r.uclar[0], t1: r.uclar[1] });
+      satirKayitlari(kayitlar, p).forEach(function (r0) {
+        var r = canliHali(r0, p) || pencerede(r0, p);
+        if (r && r.uclar) out.push({ nodeId: p.nodeId, compIdx: p.compIdx, propIdx: p.propIdx, t0: r.uclar[0], t1: r.uclar[1] });
       });
     });
     return out.slice(0, 400);
@@ -153,21 +210,26 @@
     }
     return null;
   }
-  // Yeni kayıtla çakışan eskiler (aynı satır, uç aralıkları kesişir): yeni eğri onların yerine geçer
+  // Yeni kayıtla çakışan eskiler (aynı satır, uç aralıkları kesişir): yeni eğri onların yerine geçer. İkisinin
+  // de klip başlangıcı biliniyorsa aralıklar klibe göre ölçülür (klip taşındıktan sonra yeniden uygulanan eğri
+  // eski kaydın yerine geçer; taşınmış başka bir eğrinin kaydını yanlışlıkla atmaz)
   function cakisanlar(kayitlar, yeni) {
     return (Array.isArray(kayitlar) ? kayitlar : []).filter(function (r) {
       if (!r || !yeni || r.id === yeni.id || r.tur !== "egri") return false;
       if (String(r.nodeId) !== String(yeni.nodeId) || r.compIdx !== yeni.compIdx || r.propIdx !== yeni.propIdx) return false;
       var a = r.uclar, b = yeni.uclar;
-      return !a || !b || (a[0] < b[1] && b[0] < a[1]);
+      if (!a || !b) return true;
+      var d = sonlu(r.clipStart) && sonlu(yeni.clipStart) ? yeni.clipStart - r.clipStart : 0;
+      return a[0] + d < b[1] && b[0] < a[1] + d;
     });
   }
 
   /* ================= bake ================= */
   /*
-   * Seçili satırlardan KS_easeBake çağrıları (klip başına bir). satirlar: [{ prop, cift, kayitli }]
-   * (cift prop.pair ile aynı olmalı: uç değerleri taramadan gelir). Döner:
-   * { gruplar: [{ target, items }], atlanan: [{ prop, kod }] }.
+   * Seçili satırlardan KS_easeBake çağrıları (klip başına bir). satirlar: [{ prop, cift, kayit }]
+   * (cift prop.pair ile aynı olmalı: uç değerleri taramadan gelir; kayit: çifti kapsayan canlı Suflo kaydı).
+   * Kayıtlı çiftte öğe degistir + eski (kaydın zamanları) taşır: host yalnız Suflo'nun eski anahtarlarını siler,
+   * kullanıcının araya eklediği anahtar varsa yazmaz. Döner: { gruplar: [{ target, items }], atlanan: [{ prop, kod }] }.
    */
   function bakeGruplari(satirlar, egri, adim, seqId) {
     var gruplar = [], dizin = {}, atlanan = [];
@@ -185,20 +247,47 @@
         gruplar.push({ target: { nodeId: p.nodeId, clipName: p.clipName, clipStart: p.clipStart, seqId: seqId || "" }, items: [], satirlar: [] });
       }
       var g = gruplar[dizin[a]];
-      g.items.push({ compIdx: p.compIdx, propIdx: p.propIdx, matchName: p.matchName, t0: c.t0, t1: c.t1, v0: p.v0, v1: p.v1,
-        keys: plan.keys, degistir: !!c.kayitli });
+      var oge = { compIdx: p.compIdx, propIdx: p.propIdx, matchName: p.matchName, t0: c.t0, t1: c.t1, v0: p.v0, v1: p.v1,
+        keys: plan.keys, degistir: !!c.kayitli };
+      if (c.kayitli) oge.eski = s.kayit && Array.isArray(s.kayit.times) ? s.kayit.times.slice() : [];
+      g.items.push(oge);
       g.satirlar.push(s);
     });
     return { gruplar: gruplar, atlanan: atlanan };
   }
+  /*
+   * KS_easeBake zaman aşımına uğrarsa ExtendScript yazmayı sürdürebilir (iptal edilemez): grubun planlanan
+   * zamanları geçici kayıt olur. Geri al yalnız canlı (gerçekten yazılmış) kaydı siler; yazılmadıysa kayıt
+   * canlı değildir, dokunulmaz.
+   */
+  function geciciKayitlar(grup, seqId) {
+    var h = (grup && grup.target) || {};
+    return ((grup && grup.items) || []).map(function (it) {
+      return { tur: "egri", seqId: String(seqId || h.seqId || ""), nodeId: h.nodeId, clipName: h.clipName, clipStart: h.clipStart,
+        matchName: it.matchName, compIdx: it.compIdx, propIdx: it.propIdx, uclar: [it.t0, it.t1],
+        times: (it.keys || []).map(function (k) { return k.t; }), kenarDegerleri: [{ t: it.t0, v: it.v0 }, { t: it.t1, v: it.v1 }] };
+    }).filter(function (r) { return r.times.length > 0; });
+  }
+  // KS_easeBake zaman aşımı: toplam anahtar başına 50 ms, en az 120 sn, en çok 10 dk
+  function bakeSuresi(grup) {
+    var n = 0;
+    ((grup && grup.items) || []).forEach(function (it) { n += it.keys ? it.keys.length : 0; });
+    return Math.max(120000, Math.min(600000, n * 50));
+  }
 
   /* ================= gezinme ================= */
-  // Sonraki çift: playhead'den sonra başlayan en yakın çiftin başı + 0,25 kare (seçili satırlarda); yoksa ilk çift
+  /*
+   * Sonraki çift: playhead'den sonra başlayan en yakın çiftin başı + 0,25 kare (seçili satırlarda); yoksa ilk çift.
+   * props: [{ keys, uclar? }] — uclar o satırın canlı Suflo kayıtlarının [t0, t1] aralıkları: kaydın iç
+   * anahtarları çift başı sayılmaz (Suflo'nun sık anahtarları kare kare gezilmez; kayıt tek çifttir).
+   */
   function sonrakiCift(props, ph, fps) {
     var tol = tolerans(fps), en = null, ilk = null;
     (props || []).forEach(function (p) {
-      var k = p.keys || [];
+      var k = p.keys || [], u = Array.isArray(p.uclar) ? p.uclar : [];
+      function icte(t) { return u.some(function (x) { return x && t > Number(x[0]) + tol && t < Number(x[1]) - tol; }); }
       for (var i = 0; i < k.length - 1; i++) {
+        if (icte(k[i])) continue;
         if (ilk === null || k[i] < ilk) ilk = k[i];
         if (k[i] > ph + tol && (en === null || k[i] < en)) { en = k[i]; break; }
       }
@@ -445,7 +534,13 @@
     gecersiz: "geçersiz plan",
     cokFazla: "çok fazla anahtar kare",
     yazilamadi: "Premiere anahtar kareleri yazmadı",
-    eksik: "bazı anahtar kareler yazılamadı"
+    eksik: "bazı anahtar kareler yazılamadı",
+    // KS_easeBake'in klip başına (grup) reddi: satırda nedeniyle
+    klipYok: "klip bulunamadı (silinmiş ya da değişmiş olabilir)",
+    klipTasindi: "klip taşınmış; liste yenilendi, yeniden dene",
+    sekans: "eğri başka bir sekans için hazırlanmıştı; liste yenilendi, yeniden dene",
+    sekansYok: "aktif sekans yok",
+    zamanAsimi: "Premiere yanıt vermedi; yazılmış olabilecek anahtar kareler kayda alındı, Geri al ile kaldırılabilir"
   };
   var HATA = {
     sekansYok: "Aktif sekans yok. Bir sekans aç.",
@@ -462,8 +557,9 @@
     YOKLAMA_MS: YOKLAMA_MS, ONIZLEME_HZ: ONIZLEME_HZ, YOGUNLUKLAR: YOGUNLUKLAR.slice(), EN_COK_ONAYAR: EN_COK_ONAYAR, ED: ED, SAHNE: SAHNE,
     yoklamaUygun: yoklamaUygun, yoklamaKarari: yoklamaKarari,
     ciftBul: ciftBul, kareSayisi: kareSayisi, sayi: sayi, aralikMetni: aralikMetni, satirDurumu: satirDurumu, satirAnahtari: satirAnahtari,
-    satirKayitlari: satirKayitlari, canliKayitlar: canliKayitlar, uclarDan: uclarDan, ipuclari: ipuclari, satirKaydi: satirKaydi, cakisanlar: cakisanlar,
-    bakeGruplari: bakeGruplari, sonrakiCift: sonrakiCift, onizlemeAdimlari: onizlemeAdimlari,
+    satirKayitlari: satirKayitlari, canliKayitlar: canliKayitlar, canliHali: canliHali, kaydir: kaydir, uclarDan: uclarDan, ipuclari: ipuclari,
+    satirKaydi: satirKaydi, cakisanlar: cakisanlar,
+    bakeGruplari: bakeGruplari, geciciKayitlar: geciciKayitlar, bakeSuresi: bakeSuresi, sonrakiCift: sonrakiCift, onizlemeAdimlari: onizlemeAdimlari,
     kisayol: kisayol, metinAlani: metinAlani, tusIlgisi: tusIlgisi,
     onayarlar: onayarlar, onayarEkle: onayarEkle, onayarSil: onayarSil, onayarAdi: onayarAdi,
     ekranX: ekranX, ekranY: ekranY, egriX: egriX, egriY: egriY, yapis: yapis,

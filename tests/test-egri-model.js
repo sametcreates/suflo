@@ -134,6 +134,55 @@ ok("yollar: değer ve hız SVG yolları sayısal, NaN yok", /^M[\d. L-]+$/.test(
 var s0 = M.sahneKaresi(bz, 0), s1 = M.sahneKaresi(bz, 1100), s2 = M.sahneKaresi(bz, 1400), s3 = M.sahneKaresi(bz, 1550);
 ok("önizleme sahnesi: 0 → 1 gider, sonda bekler, döngü başa döner; büyür", s0.x === 0 && s1.x === 1 && s2.x === 1 && s3.x === 0 && s1.olcek > s0.olcek && M.sahneKaresi(E.builtin("tasma").curve, 700).x > 1);
 
+/* ---------------- inceleme: yarı açık kayıt aralığı, sonraki çift, taşınan klip, uzun kayıt, zaman aşımı ---------------- */
+var yogun = []; for (var yi = 1; yi < 50; yi++) yogun.push(Math.round((1 + yi * 0.04) * 10000) / 10000);
+var abc = [1].concat(yogun).concat([3, 5]);   // A=1, B=3, C=5; [A,B] canlı Suflo kaydı (her kare)
+ok("çift: playhead B'de ve B + 0,25 karede B → C (düz kural); içeride kayıt çifti", M.ciftBul(abc, 3, 25, [[1, 3]]).t0 === 3 && M.ciftBul(abc, 3, 25, [[1, 3]]).t1 === 5 &&
+  M.ciftBul(abc, 3.01, 25, [[1, 3]]).t0 === 3 && M.ciftBul(abc, 3.01, 25, [[1, 3]]).kayitli === false && M.ciftBul(abc, 2.98, 25, [[1, 3]]).kayitli === true,
+  js([M.ciftBul(abc, 3, 25, [[1, 3]]), M.ciftBul(abc, 3.01, 25, [[1, 3]])]));
+ok("çift: B son anahtarsa playhead B'deyken kayıt çifti kalır", js(M.ciftBul([1].concat(yogun).concat([3]), 3, 25, [[1, 3]])) === js({ i0: 0, i1: 50, t0: 1, t1: 3, ic: 49, kayitli: true }));
+ok("sonraki çift: canlı kaydın iç anahtarları atlanır (A içinden ve A'dan B'ye), C son anahtar → başa döner", M.sonrakiCift([{ keys: abc, uclar: [[1, 3]] }], 2, 25) === 3.01 &&
+  M.sonrakiCift([{ keys: abc, uclar: [[1, 3]] }], 1.01, 25) === 3.01 && M.sonrakiCift([{ keys: abc, uclar: [[1, 3]] }], 3.01, 25) === 1.01 &&
+  M.sonrakiCift([{ keys: abc }], 2, 25) === 2.05, js([M.sonrakiCift([{ keys: abc, uclar: [[1, 3]] }], 2, 25), M.sonrakiCift([{ keys: abc }], 2, 25)]));
+// taşınan klip: anahtarlar kaynak zamanında klip ile kayar, kayıt kaymaz → canlılık kaymayla ölçülür
+var kayitT = KR.kayit({ id: "krt", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", clipStart: 10, uclar: [11, 13],
+  times: yogun.map(function (t) { return Math.round((t + 10) * 10000) / 10000; }) });
+var tasinan = { nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", fps: 25, clipStart: 12,
+  keys: [13].concat(yogun.map(function (t) { return Math.round((t + 12) * 10000) / 10000; })).concat([15]) };
+var ct = M.canliKayitlar([kayitT], tasinan);
+ok("taşınan klip: kayıt kayma kadar kaydırılıp canlı sayılır (aynı id, uçlar ve clipStart kaymış)", ct.length === 1 && ct[0].id === "krt" && js(ct[0].uclar) === js([13, 15]) &&
+  ct[0].clipStart === 12 && yakin(ct[0].times[0], 13.04) && kayitT.uclar[0] === 11, js(ct.map(function (r) { return [r.id, r.uclar, r.clipStart]; })));
+var sdT = M.satirDurumu(tasinan, 14, M.uclarDan(ct));
+ok("taşınan klip: satır kayıtlı çift 13 → 15, satır kaydı (Geri al) bulunur", sdT.durum === "kayitli" && sdT.cift.t0 === 13 && sdT.cift.t1 === 15 &&
+  M.satirKaydi([kayitT], tasinan, sdT.cift).id === "krt", js(sdT));
+var baskaYer = KR.kayit({ id: "krb", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", clipStart: 10, uclar: [13, 15], times: [14] });
+ok("çakışanlar klibe göre: taşındıktan sonra yeniden uygulanan eğri eski kaydın yerine geçer, taşınmış başka eğrininkini atmaz",
+  js(M.cakisanlar([kayitT, baskaYer], { id: "kryeni", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, clipStart: 12, uclar: [13, 15] }).map(function (r) { return r.id; })) === js(["krt"]));
+// kayıtlı çiftte bake öğesi eski zamanları taşır (host yalnız onları siler)
+var gk = M.bakeGruplari([{ prop: pB, cift: { t0: 1, t1: 2, kayitli: true }, kayit: { id: "kx", times: [1.5, 1.6] } }, { prop: pA, cift: { t0: 1, t1: 2, kayitli: false } }], E.builtin("yumusak").curve, 1, "s1");
+ok("bake öğesi: kayıtlı çiftte degistir + eski (kaydın zamanları), kayıtsızda eski yok", js(gk.gruplar[0].items[0].eski) === js([1.5, 1.6]) && gk.gruplar[0].items[0].degistir === true &&
+  gk.gruplar[0].items[1].eski === undefined, js(gk.gruplar[0].items.map(function (i) { return [i.degistir, i.eski]; })));
+// uzun kayıt (kesik pencere): ipucu pencerede görünen kısmıyla
+var uzunTimes = []; for (var ui = 1; ui < 600; ui++) uzunTimes.push(Math.round((2 + ui * 0.04) * 10000) / 10000);
+var kayitU = KR.kayit({ id: "kru", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", uclar: [2, 26], times: uzunTimes });
+var pencere = { nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", fps: 25, kesik: true, keys: uzunTimes.slice(200, 600) };
+ok("uzun kayıt, kesik pencere (uçlar dışarıda): ipucu yine gider; kesik değilse tam kural", js(M.ipuclari([kayitU], [pencere])) === js([{ nodeId: "n1", compIdx: 0, propIdx: 1, t0: 2, t1: 26 }]) &&
+  M.ipuclari([kayitU], [{ nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", fps: 25, keys: pencere.keys }]).length === 0, js(M.ipuclari([kayitU], [pencere])));
+var pencereBos = { nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", fps: 25, kesik: true, keys: uzunTimes.slice(200, 600).filter(function (t, i) { return i % 2; }) };
+ok("uzun kayıt, kesik pencere: görünen zamanların çoğu yoksa ipucu yok", M.ipuclari([kayitU], [pencereBos]).length === 0);
+// zaman aşımı: geçici kayıtlar planlanan zamanlarla; süre anahtar sayısıyla büyür
+var gz = { target: { nodeId: "nA", clipName: "A.mp4", clipStart: 0, seqId: "s1" }, items: [{ compIdx: 1, propIdx: 0, matchName: "AE.ADBE Opacity/Opacity", t0: 1, t1: 2, v0: 0, v1: 100, keys: [{ t: 1.5, v: 50 }] }] };
+var gec = M.geciciKayitlar(gz, "s1");
+ok("zaman aşımı: geçici kayıt planlanan zamanlarla (uçlar, kimlik, kenar değerleri)", gec.length === 1 && js(gec[0].times) === js([1.5]) && js(gec[0].uclar) === js([1, 2]) &&
+  gec[0].nodeId === "nA" && gec[0].seqId === "s1" && gec[0].tur === "egri" && KR.kayit(gec[0]) !== null, js(gec));
+var buyuk = { items: [{ keys: new Array(2000) }, { keys: new Array(2000) }, { keys: new Array(2000) }] };
+ok("bake zaman aşımı: en az 120 sn, 6000 anahtarda 300 sn, en çok 10 dk", M.bakeSuresi(gz) === 120000 && M.bakeSuresi(buyuk) === 300000 &&
+  M.bakeSuresi({ items: [{ keys: new Array(20000) }] }) === 600000);
+ok("yoklama: odak geri gelince / sekme yeniden açılınca (tazele) aynı imzada da tara", M.yoklamaKarari(ob, { ok: true, seqId: "s1", selSig: "a|1|2", ph: 5 }, { tazele: true }) === "tara" &&
+  M.yoklamaKarari(ob, { ok: false }, { tazele: true }) === "bekle");
+ok("klip başına ret kodları satırda nedeniyle (genel 'uygulanamadı' değil)", ["klipYok", "klipTasindi", "sekans", "sekansYok", "zamanAsimi"].every(function (k) {
+  return M.nedenMetni(k) !== "uygulanamadı"; }) && /taşınmış/.test(M.nedenMetni("klipTasindi")));
+
 /* ---------------- metinler ---------------- */
 ok("neden ve hata metinleri", M.nedenMetni("degisti") === "uç anahtar karenin değeri değişmiş" && M.nedenMetni("??") === "uygulanamadı" && /Liste yenilendi/.test(M.hataMetni("klipTasindi")) && M.hataMetni("yok") === "");
 var src = require("fs").readFileSync(path.join(KOK, "js", "egri-model.js"), "utf8");

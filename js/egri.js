@@ -187,6 +187,7 @@ window.KEgri = (function () {
   var ph = 0;
   var kapali = {};              // satirAnahtari → true: kullanıcı işareti kaldırdı
   var mesgul = false, yoklaniyor = false, zamanlayici = null;
+  var tazeleGerek = false;      // odak Premiere'e gitti / sekme yeniden açıldı: sonraki yoklama bir kez tarar
   var sonUygulanan = [];        // son uygulamanın kayıt id'leri (U)
   var bellek = [];              // depoya yazılamayan kayıtlar (bu oturum)
   var onizleme = null;          // Premiere'de önizle jetonu
@@ -265,21 +266,23 @@ window.KEgri = (function () {
     bellek.forEach(function (r) { if (!idler[r.id]) liste.push(r); });
     return liste.filter(function (r) { return r && r.tur === "egri"; });
   }
-  function kayitlariSakla(yeni) {
+  // yeni: host'un doğruladığı kayıtlar (çakışan eskilerin yerine geçer); gecici: zaman aşımında planlanan
+  // zamanlar (yazıldığı bilinmez: eskiler atılmaz, Geri al yalnız canlıysa siler)
+  function kayitlariSakla(yeni, gecici) {
+    gecici = gecici || [];
     var d = depo(), pr = proje(), eski = kayitlar(), at = {};
-    yeni.forEach(function (r) {
-      r.id = KR.yeniId(Date.now());
-      M.cakisanlar(eski, r).forEach(function (x) { at[x.id] = 1; });
-    });
+    var hepsi = yeni.concat(gecici);
+    hepsi.forEach(function (r) { r.id = KR.yeniId(Date.now()); });
+    yeni.forEach(function (r) { M.cakisanlar(eski, r).forEach(function (x) { at[x.id] = 1; }); });
     var atilacak = Object.keys(at);
     bellek = bellek.filter(function (r) { return !at[r.id]; });
     var ok = false;
     try {
       if (d && atilacak.length) d.kaldir(pr, atilacak);
-      ok = !!(d && d.ekle(pr, yeni).ok);
+      ok = !!(d && d.ekle(pr, hepsi).ok);
     } catch (e) { ok = false; }
-    if (!ok) yeni.forEach(function (r) { bellek.push(r); });
-    sonUygulanan = yeni.map(function (r) { return r.id; });
+    if (!ok) hepsi.forEach(function (r) { bellek.push(r); });
+    sonUygulanan = hepsi.map(function (r) { return r.id; });
     return ok;
   }
   function kayitlariSil(idler) {
@@ -338,7 +341,8 @@ window.KEgri = (function () {
     onayarKartlari();
   }
   function onayarKaydet() {
-    var r = M.onayarEkle(kullaniciOnayarlari(), M.onayarAdi(kullaniciOnayarlari()), egri, Date.now());
+    // Varsayılan ad arayüzün dilinde kaydedilir ("My curve 2"); kart data-i18n-skip, sonradan çevrilmez
+    var r = M.onayarEkle(kullaniciOnayarlari(), tr(M.onayarAdi(kullaniciOnayarlari())), egri, Date.now());
     if (!r.ok) { durum(r.kod === "dolu" ? "En çok " + M.EN_COK_ONAYAR + " önayar saklanır; birini sil." : "Bu eğri saklanamadı.", "warn"); return; }
     if (!depoYaz(ONAYAR_ANAHTAR, r.liste)) { durum("Önayar bu bilgisayarda saklanamadı.", "warn"); return; }
     seciliOnayar = r.id;
@@ -565,16 +569,19 @@ window.KEgri = (function () {
     onbellek.ph = ph;
   }
   async function tara(pk) {
+    tazeleGerek = false;
     var ipucu = M.ipuclari(kayitlar(), onbellek ? onbellek.props : []);
     var tar = await K.call("KS_easeScan", { maxProps: 40, ipuclari: ipucu }, 30000);
     // Canlılık önbellekteki anahtarlarla ölçülür: ilk taramada (önbellek boş) ya da anahtarlar değiştiyse
-    // ipuçları yeni anahtarlarla bir kez yeniden hesaplanır (kaydın aralığı çift olsun, uç değerleri o aralığın)
-    if (tar && tar.ok) {
+    // ipuçları yeni anahtarlarla yeniden hesaplanır (kaydın aralığı çift olsun, uç değerleri o aralığın). En çok
+    // iki kez: uzun kayıtta (kesik pencere) ilk ölçüm pencereyle, ikincisi host'un döndürdüğü tüm aralıkla
+    for (var n = 0; n < 2 && tar && tar.ok; n++) {
       var yeniIpucu = M.ipuclari(kayitlar(), tar.props);
-      if (JSON.stringify(yeniIpucu) !== JSON.stringify(ipucu)) {
-        var tar2 = await K.call("KS_easeScan", { maxProps: 40, ipuclari: yeniIpucu }, 30000);
-        if (tar2 && tar2.ok) tar = tar2;
-      }
+      if (JSON.stringify(yeniIpucu) === JSON.stringify(ipucu)) break;
+      var tar2 = await K.call("KS_easeScan", { maxProps: 40, ipuclari: yeniIpucu }, 30000);
+      if (!tar2 || !tar2.ok) break;
+      tar = tar2;
+      ipucu = yeniIpucu;
     }
     if (!tar || !tar.ok) {
       onbellek = { seqId: pk ? pk.seqId : "", selSig: pk ? pk.selSig : "", kapsam: [-1e9, 1e9], ph: pk ? pk.ph : 0, props: [], klipler: [],
@@ -586,27 +593,42 @@ window.KEgri = (function () {
     listeCiz();
     return tar;
   }
-  // 1,2 sn'de bir (ve sekme açılınca): yalnız sekme görünür, panel odakta, Premiere boştayken
+  // KS_easePeek sonucu: gerekirse tarar (sekans / seçim / kapsam / tazele), yoksa playhead'i günceller
+  function peekIsle(pk) {
+    if (!pk || !pk.ok) return Promise.resolve(null);
+    sonPeek = pk;
+    if (!pk.seqId) {
+      if (!onbellek || onbellek.seqId) { onbellek = { seqId: "", selSig: "", kapsam: [-1e9, 1e9], ph: 0, props: [], klipler: [], hata: "Aktif sekans yok. Bir sekans aç." }; listeCiz(); }
+      return Promise.resolve(null);
+    }
+    var karar = M.yoklamaKarari(onbellek, pk, { tazele: tazeleGerek });
+    if (karar === "tara") return tara(pk);
+    if (karar === "ciftler") { ph = Number(pk.ph) || 0; onbellek.ph = ph; listeCiz(); }
+    return Promise.resolve(null);
+  }
+  // 1,2 sn'de bir (ve sekme açılınca): yalnız sekme görünür, panel odakta, Premiere boştayken. Odak Premiere'deyken
+  // kullanıcı Effect Controls'te anahtar ekleyip değiştirebilir (seçim imzası değişmez): odak dönünce bir kez taranır
   function yokla() {
     if (!sekmeAcik()) { tuslariTut(false); return Promise.resolve(); }
+    var odak = document.hasFocus ? document.hasFocus() : true;
+    if (!odak && onbellek) tazeleGerek = true;
     var hostMesgul = !!(window.K && K.hostMesgul && K.hostMesgul());
-    if (!M.yoklamaUygun({ gorunur: !gizli(), odak: document.hasFocus ? document.hasFocus() : true, mesgul: mesgul || yoklaniyor || hostMesgul })) return Promise.resolve();
+    if (!M.yoklamaUygun({ gorunur: !gizli(), odak: odak, mesgul: mesgul || yoklaniyor || hostMesgul })) return Promise.resolve();
     yoklaniyor = true;
-    return K.call("KS_easePeek", undefined, 8000).then(function (pk) {
-      if (!pk || !pk.ok) return null;
-      sonPeek = pk;
-      if (!pk.seqId) {
-        if (!onbellek || onbellek.seqId) { onbellek = { seqId: "", selSig: "", kapsam: [-1e9, 1e9], ph: 0, props: [], klipler: [], hata: "Aktif sekans yok. Bir sekans aç." }; listeCiz(); }
-        return null;
-      }
-      var karar = M.yoklamaKarari(onbellek, pk);
-      if (karar === "tara") return tara(pk);
-      if (karar === "ciftler") { ph = Number(pk.ph) || 0; onbellek.ph = ph; listeCiz(); }
-      return null;
-    }).catch(function () { return null; }).then(function () { yoklaniyor = false; });
+    return K.call("KS_easePeek", undefined, 8000).then(peekIsle).catch(function () { return null; }).then(function () { yoklaniyor = false; });
+  }
+  // Kullanıcı eyleminden önce (Sonraki çift, Premiere'de önizle): panel odakta değilken yoklama durur; playhead
+  // ve anahtarlar taze okunur (ilk tıklama panele dönüş tıklaması olabilir)
+  async function guncelle() {
+    var pk = null;
+    try { pk = await K.call("KS_easePeek", undefined, 8000); } catch (e) { pk = null; }
+    if (!pk || !pk.ok) return false;
+    await peekIsle(pk);
+    return true;
   }
   function sekmeAcildi() {
     tuslariTut(true);
+    if (onbellek) tazeleGerek = true;   // sekme yeniden açıldı: başka sekmedeyken anahtarlar değişmiş olabilir
     render();
     sahneBas = 0;
     sahneBaslat();
@@ -649,31 +671,46 @@ window.KEgri = (function () {
       var secilen = isaretliler.filter(function (s) { return s.degerVar; });
       var plan = M.bakeGruplari(secilen, egri, yogunluk(), tar.seqId);
       var atlanan = isaretliler.filter(function (s) { return !s.degerVar; }).map(function (s) { return { prop: s.prop, kod: "degerYok" }; }).concat(plan.atlanan);
-      var yeniKayitlar = [], yazilan = 0, basarili = 0, ozellik = 0;
+      var yeniKayitlar = [], gecici = [], eksik = [], yazilan = 0, basarili = 0, ozellik = 0;
       for (var g = 0; g < plan.gruplar.length; g++) {
         var grup = plan.gruplar[g];
         if (plan.gruplar.length > 1) durum("Yazılıyor… " + (g + 1) + "/" + plan.gruplar.length);
         else durum("Yazılıyor…");
-        var r = await K.call("KS_easeBake", { target: grup.target, items: grup.items, dogrusal: true }, 120000);
+        var r = await K.call("KS_easeBake", { target: grup.target, items: grup.items, dogrusal: true }, M.bakeSuresi(grup));
         if (!r || !r.ok) {
-          grup.satirlar.forEach(function (s) { atlanan.push({ prop: s.prop, kod: r && r.kod ? r.kod : "yazilamadi" }); });
+          // Zaman aşımı: ExtendScript yazmayı sürdürebilir; planlanan zamanlar geçici kayıt olur (Geri al yalnız
+          // gerçekten yazılmış, canlı olanı siler). Hak düşmez: sonucu bilinmiyor
+          var asim = !!(r && !r.kod && /zaman aşımı|yanıt vermedi/i.test(String(r.error || "")));
+          if (asim) gecici = gecici.concat(M.geciciKayitlar(grup, tar.seqId));
+          grup.satirlar.forEach(function (s) { atlanan.push({ prop: s.prop, kod: asim ? "zamanAsimi" : r && r.kod ? r.kod : "yazilamadi" }); });
           continue;
         }
         (r.sonuclar || []).forEach(function (s) {
-          if (!s.ok) atlanan.push({ prop: grup.satirlar[s.i].prop, kod: s.kod || "yazilamadi" });
-          else ozellik++;
+          var sat = grup.satirlar[s.i];
+          if (!sat) return;
+          if (!s.ok) atlanan.push({ prop: sat.prop, kod: s.kod || "yazilamadi" });
+          else {
+            ozellik++;
+            if (s.kod === "eksik") eksik.push({ prop: sat.prop, kod: "eksik" });
+          }
         });
         yeniKayitlar = yeniKayitlar.concat(r.records || []);
         yazilan += Number(r.yazilan) || 0;
         basarili += Number(r.basarili) || 0;
       }
+      var saklandi = yeniKayitlar.length || gecici.length ? kayitlariSakla(yeniKayitlar, gecici) : true;
       if (!basarili) hataAt(atlanan.length ? ["Uygulanamadı: "].concat(atlamaParcalari(atlanan)) : ["Uygulanamadı."]);
-      var saklandi = kayitlariSakla(yeniKayitlar);
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("curves", toast);   // deneme: yalnız başarıda, bir kez
       var mesaj = ["Eğri uygulandı: " + ozellik + " özellik · " + yazilan + " anahtar kare"];
       if (atlanan.length) mesaj = mesaj.concat([" · atlanan: "]).concat(atlamaParcalari(atlanan));
-      durum(mesaj, atlanan.length ? "warn" : "good");
-      toast(dugum(mesaj), atlanan.length ? "warn" : "good", 9000, { metin: "Geri al", fn: function () { geriAlSon(); } });
+      if (eksik.length) mesaj = mesaj.concat([" · kısmen yazıldı: "]).concat(atlamaParcalari(eksik));
+      var uyari = atlanan.length || eksik.length;
+      durum(mesaj, uyari ? "warn" : "good");
+      // Bildirimdeki Geri al YALNIZ bu uygulamanın kayıtlarını kaldırır (9 sn içinde başka bir uygulama yapılsa da)
+      var buIdler = sonUygulanan.slice();
+      toast(dugum(mesaj), uyari ? "warn" : "good", 9000, { metin: "Geri al", fn: function () {
+        geriAl(kayitlar().filter(function (k) { return buIdler.indexOf(k.id) !== -1; }), "son");
+      } });
       if (!saklandi) toast("Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.", "warn", 9000);
     } catch (e) {
       durum(e && e.parcalar ? ["✕ "].concat(e.parcalar) : "✕ " + (e && e.message ? e.message : String(e)), "bad");
@@ -693,16 +730,24 @@ window.KEgri = (function () {
     try {
       var r = await K.call("KS_easeUndo", { records: liste }, 120000);
       if (!r || !r.ok) throw new Error(r && r.kod ? (M.hataMetni(r.kod) || "Geri alınamadı.") : "Geri alınamadı.");
-      var silinen = 0, biten = [];
-      (r.sonuclar || []).forEach(function (s) { silinen += Number(s.silinen) || 0; biten.push(s.id); });
+      // sonuclar: host'un bitirdiği kayıtlar (silindi ya da Suflo'nun anahtarları zaten yoktu: 'yok'); atlanan saklanır
+      var silinen = 0, biten = [], yok = 0;
+      (r.sonuclar || []).forEach(function (s) {
+        silinen += Number(s.silinen) || 0;
+        biten.push(s.id);
+        if (s.kod === "yok" && !Number(s.silinen)) yok++;
+      });
       kayitlariSil(biten);
       var kalan = (r.atlanan || []).length;
       if (kalan) {
         var ilk = r.atlanan[0].kod;
         durum(ilk === "sekans"
           ? "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene."
-          : "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.", "warn");
-      } else durum("Geri alındı: " + silinen + " anahtar kare silindi.", "good");
+          : ilk === "degisti"
+            ? "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı."
+            : "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.", "warn");
+      } else if (!silinen && yok) durum("Suflo'nun anahtar kareleri zaten kaldırılmış; kayıt temizlendi.", "warn");
+      else durum("Geri alındı: " + silinen + " anahtar kare silindi.", "good");
     } catch (e) {
       durum("✕ " + (e && e.message ? e.message : String(e)), "bad");
     } finally {
@@ -727,42 +772,61 @@ window.KEgri = (function () {
   }
 
   /* ---------------- gezinme ---------------- */
+  // Önce taze playhead (guncelle); canlı Suflo kaydının iç anahtarları çift başı sayılmaz (kayıt tek çift)
   async function sonrakiCift() {
-    if (mesgul || !onbellek || !onbellek.props || !onbellek.props.length) { durum("Önce anahtar kareli bir klip seç.", "warn"); return; }
-    var secili = satirlar().filter(function (s) { return !kapali[s.anahtar]; }).map(function (s) { return s.prop; });
-    var fps = onbellek.fps || (secili[0] && secili[0].fps) || 30;
-    var t = M.sonrakiCift(secili.length ? secili : onbellek.props, ph, fps);
-    if (t === null) { durum("Anahtar kare çifti yok.", "warn"); return; }
+    if (mesgul) return;
     kilitle(true);
+    var t = null, kapsamDisi = false;
     try {
-      await K.call("KS_setPlayerPosition", { sec: t }, 8000);
-      ph = t;
-      onbellek.ph = t;
+      await guncelle();
+      if (!onbellek || !onbellek.props || !onbellek.props.length) durum("Önce anahtar kareli bir klip seç.", "warn");
+      else {
+        var kl = kayitlar();
+        var ogesi = function (p) { return { keys: p.keys, uclar: M.uclarDan(M.canliKayitlar(kl, p)) }; };
+        var secili = satirlar().filter(function (s) { return !kapali[s.anahtar]; }).map(function (s) { return ogesi(s.prop); });
+        var fps = onbellek.fps || (onbellek.props[0] && onbellek.props[0].fps) || 30;
+        t = M.sonrakiCift(secili.length ? secili : onbellek.props.map(ogesi), ph, fps);
+        if (t === null) durum("Anahtar kare çifti yok.", "warn");
+        else {
+          await K.call("KS_setPlayerPosition", { sec: t }, 8000);
+          ph = t;
+          onbellek.ph = t;
+          var k = onbellek.kapsam;
+          kapsamDisi = !!(k && (t < k[0] || t >= k[1]));
+        }
+      }
     } catch (e) {} finally { kilitle(false); }
-    var k = onbellek.kapsam;
-    if (k && (t < k[0] || t >= k[1])) { try { await tara(sonPeek); } catch (eT) {} }
+    if (kapsamDisi) { try { await tara(sonPeek); } catch (eT) { listeCiz(); } }
     else listeCiz();
   }
 
-  // Premiere'de kaba önizleme: playhead çiftin başından sonuna (saniyede en çok 12 adım), sonra geri döner
+  // Premiere'de kaba önizleme: playhead çiftin başından sonuna (saniyede en çok 12 adım), sonra başladığı yere
+  // döner. Önce taze playhead: panel odakta değilken yoklama durur, eski ph'ye dönülmesin
   async function premiereOnizle() {
     if (onizleme) { onizleme.iptal = true; return; }
     if (mesgul) return;
-    var s = satirlar().filter(isaretli)[0] || satirlar().filter(uygulanabilir)[0];
-    if (!s) { durum("Önce playhead'i bir anahtar kare çiftinin arasına getir.", "warn"); return; }
-    var adimlar = M.onizlemeAdimlari(s.cift.t0, s.cift.t1, s.prop.fps, M.ONIZLEME_HZ);
-    var donus = ph, jeton = { iptal: false };
-    onizleme = jeton;
     kilitle(true);
+    var donus = null;
     try {
-      for (var i = 0; i < adimlar.length && !jeton.iptal; i++) {
-        await K.call("KS_setPlayerPosition", { sec: adimlar[i] }, 4000);
-        await bekle(Math.ceil(1000 / M.ONIZLEME_HZ));
+      await guncelle();
+      var s = satirlar().filter(isaretli)[0] || satirlar().filter(uygulanabilir)[0];
+      if (!s) durum("Önce playhead'i bir anahtar kare çiftinin arasına getir.", "warn");
+      else {
+        var adimlar = M.onizlemeAdimlari(s.cift.t0, s.cift.t1, s.prop.fps, M.ONIZLEME_HZ);
+        var jeton = { iptal: false };
+        donus = ph;
+        onizleme = jeton;
+        dugmeCiz();   // "Önizlemeyi durdur" tıklanabilir
+        for (var i = 0; i < adimlar.length && !jeton.iptal; i++) {
+          await K.call("KS_setPlayerPosition", { sec: adimlar[i] }, 4000);
+          await bekle(Math.ceil(1000 / M.ONIZLEME_HZ));
+        }
       }
     } catch (e) {} finally {
-      try { await K.call("KS_setPlayerPosition", { sec: donus }, 4000); } catch (e2) {}
+      if (donus !== null) { try { await K.call("KS_setPlayerPosition", { sec: donus }, 4000); } catch (e2) {} }
       onizleme = null;
       kilitle(false);
+      listeCiz();
     }
   }
 
@@ -814,6 +878,8 @@ window.KEgri = (function () {
     // Başka sekmeye geçilince kısayol tuşları Premiere'e geri verilir (tıklamanın sekme geçişinden SONRA bakılır)
     document.addEventListener("click", function () { setTimeout(function () { if (!sekmeAcik()) tuslariTut(false); }, 0); });
     document.addEventListener("visibilitychange", function () { if (!gizli()) sahneBaslat(); });
+    // Odak Premiere'e gidince (Effect Controls'te anahtar eklenebilir) sonraki yoklama bir kez yeniden tarar
+    if (typeof window.addEventListener === "function") window.addEventListener("blur", function () { if (onbellek) tazeleGerek = true; });
     if (window.KApp && KApp.onTab) KApp.onTab("egri", sekmeAcildi);
     if (typeof Pro !== "undefined" && Pro.on) { try { Pro.on(dugmeCiz); } catch (e) {} }
     if (window.SufloI18n && SufloI18n.onChange) { try { SufloI18n.onChange(function () { onayarKartlari(); }); } catch (e2) {} }
