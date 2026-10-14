@@ -1349,11 +1349,15 @@ function KS_exportAudio(encoded) {
     if (!done) {
       return KS_err("Ses disari alinamadi" + (res ? ": " + res : ".") + " 'Secili klip' kapsamini dene.");
     }
-    var offset = 0;
+    var offset = 0, sure = 0;
     if (p.scope === "inout") {
       try { offset = seq.getInPointAsTime().seconds; } catch (eI) {}
+      try { sure = seq.getOutPointAsTime().seconds - offset; } catch (eO) {}
+    } else {
+      try { sure = Number(seq.end) / KS_TPS; } catch (eE) {}
     }
-    return KS_ok({ wav: out, offset: offset });
+    // duration (3.4): disa aktarilan araligin suresi; Otomatik Kesim sekans kapsami kullanir, digerleri yok sayar
+    return KS_ok({ wav: out, offset: offset, duration: sure > 0 ? sure : 0 });
   } catch (e) { return KS_err(e); }
 }
 
@@ -1943,13 +1947,40 @@ function KS_cloneActiveSeq() {
 }
 
 
+/*
+ * Kesimleri uygula. p: { ranges:[{start,end}] (sekans zamani), removeMode:"ripple"|"gap"|"select", cloneFirst:bool,
+ *   cloneName?, expectSeqId? (3.4: analiz edilen sekans; kopyadan ONCE denetlenir), protect?: { video:[i], audio:[i] }
+ *   (3.4: korunan katmanlar; razor, ripple kaplama denetimi ve silme / secme bu katmanlari atlar) }.
+ * Korunan katman KILITLENMEZ, kilidi de acilmaz: hata olsa da geri yuklenecek bir sey yok. Kopya sekansin katman
+ * dizinleri ozgununkiyle ayni. protect yoksa cikti 3.3 ile birebir ayni (protectedSkipped alani da yok).
+ */
 function KS_applyCuts(encoded) {
   try {
-    var p = KS_arg(encoded); // { ranges:[{start,end}], removeMode:"ripple"|"gap"|"select", cloneFirst:bool, cloneName? }
+    var p = KS_arg(encoded);
     var seq = KS_seq();
     if (!seq) return KS_err("Aktif sequence yok.");
     var ranges = p.ranges || [];
     if (ranges.length === 0) return KS_err("Kesilecek aralik yok.");
+    // Analiz baska sekansta yapildiysa (kullanici arada sekans degistirdi) hicbir sey yapma, kopya da olusturma
+    if (p.expectSeqId && String(seq.sequenceID) !== String(p.expectSeqId)) {
+      return KS_errKod("sekans", "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.");
+    }
+
+    // Korunan katmanlar: ES3'te Array.indexOf yok, nesne haritasi
+    var korV = {}, korA = {}, korVSay = 0, korASay = 0, korumaVar = false, pk, ki, kn;
+    if (p.protect) {
+      korumaVar = true;
+      pk = p.protect.video || [];
+      for (ki = 0; ki < pk.length; ki++) {
+        kn = Number(pk[ki]);
+        if (kn >= 0 && kn < seq.videoTracks.numTracks && !korV[kn]) { korV[kn] = 1; korVSay++; }
+      }
+      pk = p.protect.audio || [];
+      for (ki = 0; ki < pk.length; ki++) {
+        kn = Number(pk[ki]);
+        if (kn >= 0 && kn < seq.audioTracks.numTracks && !korA[kn]) { korA[kn] = 1; korASay++; }
+      }
+    }
 
     var newSeqName = "";
     if (p.cloneFirst) {
@@ -1964,19 +1995,23 @@ function KS_applyCuts(encoded) {
       newSeqName = String(seq.name);
     }
 
+    var korunanOnce = korumaVar ? KS_korunanIz(seq, korV, korA) : "";
+
     app.enableQE();
     var qseq = qe.project.getActiveSequence();
 
-    // 1) Tum sinirlarda razor
+    // 1) Tum sinirlarda razor (korunan katmanlar haric)
     var boundaries = [];
     var r, i, t;
     for (i = 0; i < ranges.length; i++) { boundaries.push(ranges[i].start); boundaries.push(ranges[i].end); }
     for (i = 0; i < boundaries.length; i++) {
       var tc = KS_timecode(boundaries[i]);
       for (t = 0; t < qseq.numVideoTracks; t++) {
+        if (korV[t]) continue;
         try { qseq.getVideoTrackAt(t).razor(tc); } catch (eV) {}
       }
       for (t = 0; t < qseq.numAudioTracks; t++) {
+        if (korA[t]) continue;
         try { qseq.getAudioTrackAt(t).razor(tc); } catch (eA) {}
       }
     }
@@ -1994,11 +2029,14 @@ function KS_applyCuts(encoded) {
      * kaydirir. Bir track araligi kliplerle tam kaplamiyorsa o track
      * digerlerinden az kayar ve timeline KALICI senkron kaybeder.
      * Boyle bir aralik varsa ripple'i bosluk (gap) moduna dusur ve bildir.
+     * Korunan katman bilerek kaymaz (arka plan muzigi): kaplama denetimine girmez. Korunan VIDEO katmaninda
+     * ilk kesimden sonra icerik varsa ripple onu geride birakir: bosluk moduna dusulur (panel bunu zaten engeller).
      */
-    var rippleDustu = false;
+    var rippleDustu = false, korunanVideoBosluk = false;
     if (p.removeMode === "ripple") {
-      var kapliMi = function (tracks, rr) {
+      var kapliMi = function (tracks, rr, kor) {
         for (var ti2 = 0; ti2 < tracks.numTracks; ti2++) {
+          if (kor[ti2]) continue;
           var tr2 = tracks[ti2];
           try { if (tr2.isLocked && tr2.isLocked()) continue; } catch (eL2) {}
           var toplam = 0, sonrasiVar = false, n2 = tr2.clips.numItems;
@@ -2014,8 +2052,21 @@ function KS_applyCuts(encoded) {
         }
         return true;
       };
-      for (i = 0; i < ranges.length; i++) {
-        if (!kapliMi(seq.audioTracks, ranges[i]) || !kapliMi(seq.videoTracks, ranges[i])) {
+      if (korVSay > 0) {
+        var ilkKesim = ranges[0].start;
+        for (i = 1; i < ranges.length; i++) { if (ranges[i].start < ilkKesim) ilkKesim = ranges[i].start; }
+        for (t = 0; t < seq.videoTracks.numTracks && !korunanVideoBosluk; t++) {
+          if (!korV[t]) continue;
+          var trV = seq.videoTracks[t];
+          try { if (trV.isLocked && trV.isLocked()) continue; } catch (eLV) {}
+          for (var cv = 0; cv < trV.clips.numItems; cv++) {
+            if (trV.clips[cv].end.seconds > ilkKesim + eps) { korunanVideoBosluk = true; break; }
+          }
+        }
+        if (korunanVideoBosluk) { rippleDustu = true; p.removeMode = "gap"; }
+      }
+      for (i = 0; i < ranges.length && !rippleDustu; i++) {
+        if (!kapliMi(seq.audioTracks, ranges[i], korA) || !kapliMi(seq.videoTracks, ranges[i], korV)) {
           rippleDustu = true;
           p.removeMode = "gap";
           break;
@@ -2024,8 +2075,9 @@ function KS_applyCuts(encoded) {
     }
     ranges.sort(function (a, b) { return b.start - a.start; });
 
-    function handleTracks(tracks) {
+    function handleTracks(tracks, kor) {
       for (var ti = 0; ti < tracks.numTracks; ti++) {
+        if (kor[ti]) continue;
         var tr = tracks[ti];
         if (tr.isLocked && tr.isLocked()) continue;
         for (var ci = tr.clips.numItems - 1; ci >= 0; ci--) {
@@ -2048,12 +2100,38 @@ function KS_applyCuts(encoded) {
 
     for (i = 0; i < ranges.length; i++) {
       r = ranges[i];
-      handleTracks(seq.audioTracks);
-      handleTracks(seq.videoTracks);
+      handleTracks(seq.audioTracks, korA);
+      handleTracks(seq.videoTracks, korV);
     }
 
-    return KS_ok({ cuts: boundaries.length, removed: removed, selected: selected, newSeq: newSeqName, rippleFallback: rippleDustu });
+    var sonuc = { cuts: boundaries.length, removed: removed, selected: selected, newSeq: newSeqName, rippleFallback: rippleDustu };
+    if (korumaVar) {
+      sonuc.protectedSkipped = { video: korVSay, audio: korASay };
+      if (korunanVideoBosluk) sonuc.protectedVideoGap = true;
+      // Premiere bagli klibi birlikte sildiyse / kirptiysa korunan katman degismistir: panel uyarir (Ctrl+Z)
+      if (KS_korunanIz(seq, korV, korA) !== korunanOnce) sonuc.protectedChanged = true;
+    }
+    return KS_ok(sonuc);
   } catch (e) { return KS_err(e); }
+}
+
+// Korunan katmanlarin parmak izi (klip sayisi + toplam sure, ms): uygulamadan once ve sonra karsilastirilir
+function KS_korunanIz(seq, korV, korA) {
+  var iz = "";
+  function tara(tracks, kor, onek) {
+    for (var t2 = 0; t2 < tracks.numTracks; t2++) {
+      if (!kor[t2]) continue;
+      var tr3 = tracks[t2], n3 = 0, top3 = 0;
+      try { n3 = tr3.clips.numItems; } catch (eK1) {}
+      for (var c3 = 0; c3 < n3; c3++) {
+        try { top3 += tr3.clips[c3].end.seconds - tr3.clips[c3].start.seconds; } catch (eK2) {}
+      }
+      iz += onek + t2 + ":" + n3 + ":" + Math.round(top3 * 1000) + ";";
+    }
+  }
+  tara(seq.videoTracks, korV, "V");
+  tara(seq.audioTracks, korA, "A");
+  return iz;
 }
 
 
@@ -2106,8 +2184,48 @@ function KS_mcIzBilgi(tr, i, video) {
   return o;
 }
 
-function KS_getTrackLayout() {
+/*
+ * Katman duzeni. Arguman yoksa (Podcast Modu) cikti eskisiyle ayni. p.klipler (3.4 Otomatik Kesim, korunan katmanlar):
+ * her katmana [p.start, p.end] araligina degen kliplerin listesi eklenir (en cok KS_IZ_KLIP_MAX):
+ * { s, e, ad, yol, hiza (inPoint - start), bag }. bag yalniz ses kliplerinde: getLinkedItems varsa bagli VIDEO
+ * ogelerinin [{ s, e, yol, tur }] listesi (bos olabilir), API yoksa null (panel ayni medya + hiza sezgisine duser).
+ */
+var KS_IZ_KLIP_MAX = 400;
+
+function KS_izKlipleri(tr, bas, son, video) {
+  var out = [], n = 0;
+  try { n = tr.clips.numItems; } catch (eN) {}
+  for (var ci = 0; ci < n && out.length < KS_IZ_KLIP_MAX; ci++) {
+    var c = tr.clips[ci], s = 0, e = 0;
+    try { s = Number(c.start.seconds); e = Number(c.end.seconds); } catch (eT) { continue; }
+    if (e <= bas || s >= son) continue;
+    var o = { s: s, e: e, ad: "", yol: KS_rampYol(c), hiza: 0 };
+    try { o.ad = String(c.name || ""); } catch (eA) {}
+    try { o.hiza = Number(c.inPoint.seconds) - s; } catch (eH) {}
+    if (!video) {
+      o.bag = null;
+      try {
+        if (typeof c.getLinkedItems === "function") {
+          var bagli = KS_rampKoleksiyon(c.getLinkedItems());
+          o.bag = [];
+          for (var bi = 0; bi < bagli.length; bi++) {
+            var b = bagli[bi], tur = "";
+            if (KS_rampAyni(b, c)) continue;
+            try { tur = String(b.mediaType || ""); } catch (eM) {}
+            if (tur && !/video/i.test(tur)) continue;
+            try { o.bag.push({ s: Number(b.start.seconds), e: Number(b.end.seconds), yol: KS_rampYol(b), tur: tur }); } catch (eB) {}
+          }
+        }
+      } catch (eL) { o.bag = null; }
+    }
+    out.push(o);
+  }
+  return out;
+}
+
+function KS_getTrackLayout(encoded) {
   try {
+    var p = KS_arg(encoded);
     var seq = KS_seq();
     if (!seq) return KS_err("Aktif sequence yok.");
     var v = [], a = [], i;
@@ -2115,6 +2233,13 @@ function KS_getTrackLayout() {
     for (i = 0; i < seq.audioTracks.numTracks; i++) a.push(KS_mcIzBilgi(seq.audioTracks[i], i, false));
     var sure = 0;
     try { sure = Number(seq.end) / KS_TPS; } catch (eS) {}
+    if (p.klipler) {
+      var bas = Number(p.start), son = Number(p.end);
+      if (!isFinite(bas)) bas = 0;
+      if (!isFinite(son) || son <= bas) son = sure > bas ? sure : bas + 1e9;
+      for (i = 0; i < v.length; i++) v[i].klipler = KS_izKlipleri(seq.videoTracks[i], bas, son, true);
+      for (i = 0; i < a.length; i++) a[i].klipler = KS_izKlipleri(seq.audioTracks[i], bas, son, false);
+    }
     return KS_ok({ seqId: String(seq.sequenceID), name: String(seq.name), duration: sure, video: v, audio: a });
   } catch (e) { return KS_err(e); }
 }

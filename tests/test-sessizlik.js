@@ -262,5 +262,101 @@ ok("önbellek: en çok 2 kayıt, en eski düşer", ob.al("a") === null && ob.al(
 ob.temizle();
 ok("önbellek: temizle hepsini siler", ob.al("b") === null && ob.boyut() === 0);
 
+/* ---------------- 3.4 adım 7: kapsam aralığı ---------------- */
+ok("kapsamAraligi: seçili klip → klibin sekans aralığı; klip yoksa 'klip'",
+  js(S.kapsamAraligi("clip", { sel: { clipStart: 4, clipEnd: 9 } })) === js({ start: 4, end: 9 }) && S.kapsamAraligi("clip", {}).hata === "klip");
+ok("kapsamAraligi: In → Out; Out ≤ In ya da bir kareden kısa → 'inout'; sekans yok → 'sekans'",
+  js(S.kapsamAraligi("inout", { hasSeq: true, seqIn: 10, seqOut: 40, seqDur: 60 })) === js({ start: 10, end: 40 }) &&
+  S.kapsamAraligi("inout", { hasSeq: true, seqIn: 10, seqOut: 10, seqDur: 60 }).hata === "inout" &&
+  S.kapsamAraligi("inout", { hasSeq: true, seqIn: 10, seqOut: 10.01, seqDur: 60, frame: 0.04 }).hata === "inout" &&
+  S.kapsamAraligi("inout", { hasSeq: false }).hata === "sekans");
+ok("kapsamAraligi: Out sekans sonunu aşmaz; Sekans 0 → seqDur, süresiz sekans 'sekans'",
+  S.kapsamAraligi("inout", { hasSeq: true, seqIn: 5, seqOut: 900, seqDur: 60 }).end === 60 &&
+  js(S.kapsamAraligi("entire", { hasSeq: true, seqDur: 75.5 })) === js({ start: 0, end: 75.5 }) && S.kapsamAraligi("entire", { hasSeq: true, seqDur: 0 }).hata === "sekans");
+
+/* ---------------- 3.4 adım 7: korunan katman önerisi (korumaOner) ---------------- */
+ok("muzikAdi: müzik / music / bgm / şarkı / song / ambiyans / ambience; Türkçe büyük harf ve şapkasız yazım",
+  ["Müzik", "MÜZİK", "muzik", "Music Bed", "BGM", "Şarkı", "SARKI", "song", "Ambiyans", "Room ambience"].every(S.muzikAdi) &&
+  !["Audio 1", "Ses", "Mikrofon", "Kamera", "Diyalog", ""].some(S.muzikAdi));
+ok("izEtiketi: varsayılan adlar kısa (A2 / V1), özel ad eklenir",
+  S.izEtiketi("audio", 1, "Audio 2") === "A2" && S.izEtiketi("video", 0, "Video 1") === "V1" && S.izEtiketi("audio", 0, "Ses 1") === "A1" &&
+  S.izEtiketi("audio", 2, "Müzik") === "A3 · Müzik" && S.izEtiketi("video", 1, "") === "V2");
+
+function izYap(ad, klipler, o) {
+  o = o || {};
+  var bas = klipler.length ? Math.min.apply(null, klipler.map(function (k) { return k.s; })) : 0;
+  var son = klipler.length ? Math.max.apply(null, klipler.map(function (k) { return k.e; })) : 0;
+  return { name: ad, locked: !!o.locked, muted: !!o.muted, clipCount: klipler.length, first: bas, last: son, klipler: klipler };
+}
+function k(s, e, o) { o = o || {}; var x = { s: s, e: e, ad: o.ad || "", yol: o.yol || "", hiza: o.hiza || 0 }; if (o.bag !== undefined) x.bag = o.bag; return x; }
+// V1 kamera (bağlı A1), A2 müzik (adıyla), A3 tek uzun ses (adsız), A4 boş
+var duzen = {
+  video: [izYap("Video 1", [k(0, 30, { yol: "cam.mp4", ad: "Kamera" }), k(30, 60, { yol: "cam2.mp4", ad: "Kamera 2", hiza: -20 })]), izYap("Video 2", [k(5, 50, { ad: "Başlık" })])],
+  audio: [
+    izYap("Audio 1", [k(0, 30, { yol: "cam.mp4", bag: [{ s: 0, e: 30, tur: "Video" }] }), k(30, 60, { yol: "cam2.mp4", hiza: -20, bag: [{ s: 30, e: 60, tur: "Video" }] })]),
+    izYap("Müzik", [k(0, 60, { yol: "sarki.mp3", bag: [] })]),
+    izYap("Audio 3", [k(2, 58, { yol: "yaka.wav", bag: [] })]),
+    izYap("Audio 4", [])
+  ]
+};
+var o1 = S.korumaOner(duzen, { start: 0, end: 60, mod: "ripple" });
+ok("korumaOner ad kuralı: 'Müzik' adlı ses katmanı önceden korunur; video hiç işaretlenmez",
+  js(o1.koru) === js({ video: [], audio: [1] }) && js(o1.adla.audio) === js([1]), js(o1.koru));
+ok("korumaOner dinle: videoya bağlı kamera sesi (A1) varsa yalnız o; müzik dinlenmez", js(o1.dinle) === js([0]), js(o1.dinle));
+ok("korumaOner kaplama kuralı: tek klibi aralığın %80+'ini kaplayan A3 önerilir ama İŞARETLENMEZ (boş A4 önerilmez)",
+  js(o1.oner.audio) === js([2]) && o1.koru.audio.indexOf(2) === -1, js(o1.oner));
+var o1b = S.korumaOner(duzen, { start: 0, end: 60, mod: "ripple", dinle: [0, 2] });
+ok("korumaOner: dinlenen katman önerilmez (kullanıcı A3'ü dinlemeye kattı)", js(o1b.dinle) === js([0, 2]) && js(o1b.oner.audio) === "[]", js(o1b.oner));
+var o1c = S.korumaOner(duzen, { start: 0, end: 100, mod: "ripple" });
+ok("korumaOner kaplama: 56 sn'lik klip 100 sn'lik aralığın %80'ini kaplamaz → önerilmez", js(o1c.oner.audio) === "[]", js(o1c.oner));
+ok("korumaOner: kullanıcı seçimi aynen (geçersiz / yinelenen dizin atılır, sıralı)",
+  js(S.korumaOner(duzen, { start: 0, end: 60, koru: { video: [1, 1, 9], audio: [3, -1, 0] }, dinle: [2, "x", 2] }).koru) === js({ video: [1], audio: [0, 3] }) &&
+  js(S.korumaOner(duzen, { start: 0, end: 60, dinle: [2, "x", 2] }).dinle) === js([2]));
+
+// bağlı olmayan düzen: dinle = adı müzik olmayan, aralıkta klibi olan, susturulmamış katmanlar
+var duz2 = { video: [izYap("Video 1", [k(0, 60, { yol: "ekran.mp4" })])],
+  audio: [izYap("Mik", [k(0, 60, { yol: "mik.wav", bag: [] })]), izYap("Sistem", [k(0, 60, { yol: "sis.wav", bag: [] })], { muted: true }),
+    izYap("BGM", [k(0, 60, { yol: "bgm.mp3", bag: [] })]), izYap("Audio 4", [k(70, 80, { bag: [] })])] };
+var o2 = S.korumaOner(duz2, { start: 0, end: 60, mod: "gap" });
+ok("korumaOner dinle (bağsız): susturulmuş ve müzik adlı katman hariç, aralık dışı klip sayılmaz", js(o2.dinle) === js([0]) && js(o2.koru.audio) === js([2]), js(o2));
+var duz3 = { video: [], audio: [izYap("Müzik", [k(0, 60)]), izYap("Audio 2", [k(0, 60)], { muted: true })] };
+var o3 = S.korumaOner(duz3, { start: 0, end: 60, dinleGerekli: true });
+ok("korumaOner: hepsi susturulmuşsa susturulmuşlar dinlenir; aday hiç yoksa 'dinle-yok' uyarısı",
+  js(o3.dinle) === js([1]) && js(S.korumaOner({ video: [], audio: [izYap("Müzik", [k(0, 60)])] }, { start: 0, end: 60, dinleGerekli: true }).uyarilar) === js([{ kod: "dinle-yok" }]));
+
+// uyarılar: korunan video + ripple
+var oV = S.korumaOner(duzen, { start: 0, end: 60, mod: "ripple", koru: { video: [1], audio: [1] } });
+ok("uyarı: korunan V2 ripple'da kaymaz → video-ripple", oV.uyarilar.some(function (u) { return u.kod === "video-ripple" && js(u.izler) === js([1]); }), js(oV.uyarilar));
+ok("uyarı: gap / select modunda video-ripple yok",
+  !S.korumaOner(duzen, { start: 0, end: 60, mod: "gap", koru: { video: [1], audio: [] } }).uyarilar.length &&
+  !S.korumaOner(duzen, { start: 0, end: 60, mod: "select", koru: { video: [1], audio: [] } }).uyarilar.length);
+ok("uyarı: korunan video katmanı ilk kesimden önce bitiyorsa kaymaz → uyarı yok",
+  !S.korumaOner(duzen, { start: 0, end: 60, mod: "ripple", koru: { video: [1], audio: [] }, kesimler: [{ start: 52, end: 53 }] }).uyarilar.length);
+ok("uyarı: kilitli video katmanı korunsa da uyarmaz (zaten kesilmez)",
+  !S.korumaOner({ video: [izYap("V", [k(0, 60)], { locked: true })], audio: [] }, { start: 0, end: 60, mod: "ripple", koru: { video: [0], audio: [] } }).uyarilar.length);
+
+// uyarılar: bağlı çift ayrılıyor
+var oB = S.korumaOner(duzen, { start: 0, end: 60, mod: "ripple", koru: { video: [], audio: [0] }, kesimler: [{ start: 40, end: 41 }] });
+var uB = oB.uyarilar.filter(function (u) { return u.kod === "bagli"; })[0];
+ok("uyarı: A1 korunurken bağlı görüntüsü kesiliyor → yalnız kesilen çift listelenir (30–60)",
+  uB && uB.toplam === 1 && uB.ciftler[0].audio === 0 && uB.ciftler[0].video === 0 && uB.ciftler[0].start === 30 && uB.ciftler[0].ad === "Kamera 2" && uB.ciftler[0].koruTaraf === "audio", js(oB.uyarilar));
+var oB2 = S.korumaOner(duzen, { start: 0, end: 60, mod: "ripple", koru: { video: [], audio: [0] } });
+ok("uyarı: kesimler yokken aralıktaki her bağlı çift (2)", oB2.uyarilar.filter(function (u) { return u.kod === "bagli"; })[0].toplam === 2);
+var oB3 = S.korumaOner(duzen, { start: 0, end: 60, mod: "gap", koru: { video: [0], audio: [] }, kesimler: [{ start: 10, end: 11 }] });
+ok("uyarı: video korunurken bağlı ses kesiliyor (ters yön, koruTaraf video)",
+  oB3.uyarilar.some(function (u) { return u.kod === "bagli" && u.ciftler[0].koruTaraf === "video" && u.ciftler[0].start === 0; }), js(oB3.uyarilar));
+ok("uyarı: iki taraf da korunuyorsa ayrılma yok", !S.korumaOner(duzen, { start: 0, end: 60, mod: "gap", koru: { video: [0], audio: [0] } }).uyarilar.length);
+// bag listesi yok (eski Premiere): aynı medya + hiza sezgisi; farklı hiza eşleşmez
+var bagsiz = { video: [izYap("V", [k(0, 30, { yol: "C:\\A.mp4", hiza: 5 })])], audio: [izYap("A", [k(0, 30, { yol: "c:\\a.MP4", hiza: 5 }), k(30, 40, { yol: "c:\\a.mp4", hiza: 9 })])] };
+var cf = S.bagliCiftler(bagsiz);
+ok("bagliCiftler sezgi: aynı medya (büyük/küçük harf duyarsız) + aynı hiza eşleşir, farklı hiza eşleşmez", cf.length === 1 && cf[0].a.s === 0, js(cf.map(function (c) { return [c.audio, c.video, c.a.s]; })));
+ok("bagliCiftler: bag listesi varsa sezgi kullanılmaz (boş bag = bağsız)", S.bagliCiftler({ video: bagsiz.video, audio: [izYap("A", [k(0, 30, { yol: "c:\\a.mp4", hiza: 5, bag: [] })])] }).length === 0);
+ok("korumaOner: ciftler parametresi (önbellek) aynı sonucu verir",
+  js(S.korumaOner(duzen, { start: 0, end: 60, mod: "ripple", koru: { video: [], audio: [0] }, ciftler: S.bagliCiftler(duzen) })) === js(oB2));
+
+ok("korumaYuku: yalnız korunan katman varsa { video, audio }, yoksa null (protect gönderilmez)",
+  S.korumaYuku({ video: [], audio: [] }) === null && S.korumaYuku(null) === null && js(S.korumaYuku({ video: [2], audio: [1, 0] })) === js({ video: [2], audio: [0, 1] }));
+ok("korumaOner: düzen yoksa boş öneri, hata yok", js(S.korumaOner(null, {}).dinle) === "[]" && S.korumaOner(null, {}).uyarilar.length === 0);
+
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

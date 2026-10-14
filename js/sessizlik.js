@@ -15,9 +15,13 @@
  * bakılan örnek sayısını) düşürüyordu: gürültülü kayıtta zarf tabanı silencedetect'in gördüğünden ~6 dB alçak
  * kalıyor, önizlemenin gösterdiği kesimleri doğrulama atıyor, Otomatik eşik sessizlik bulunmayan yere düşüyordu.
  *
+ * 3.4 adım 7 (kapsam ve korunan katmanlar): kapsamAraligi (Seçili klip | In → Out | Sekans), korumaOner
+ * (KS_getTrackLayout düzeninden dinlenecek ses + korunan katman önerisi ve uyarılar: korunan video + ripple,
+ * bağlı video–ses çiftinin ayrılması), korumaYuku (KS_applyCuts protect).
+ *
  * Saf (ES5, UMD): DOM'a, Premiere'e ve ffmpeg'e dokunmaz; Node'da test edilir (tests/test-sessizlik.js).
- * Clean-room: "canlı yeniden analiz + kısa konuşma birleştirme" fikri Premiere TR'den (MIT) esinlenir;
- * kod kopyalanmadı.
+ * Clean-room: "canlı yeniden analiz + kısa konuşma birleştirme" ve "zaman çizelgesi kapsamı + korunan katman"
+ * fikirleri Premiere TR'den (MIT) esinlenir; kod kopyalanmadı (onun kilit açıp kapama yöntemi de kullanılmadı).
  */
 (function (root, factory) {
   var api = factory();
@@ -377,6 +381,237 @@
     };
   }
 
+  /* ---------------- Kapsam ve korunan katmanlar (3.4 adım 7) ---------------- */
+
+  /*
+   * Kesim kapsamının sekans aralığı (sn). ctx: KS_getContext özeti ({ hasSeq, sel, seqIn, seqOut, seqDur, frame }).
+   * kapsam: "clip" (seçili klip) | "inout" (sekansın In → Out'u) | "entire" (tüm sekans).
+   * Döner { start, end } ya da { hata: "klip" | "sekans" | "inout" } (panel metni koda göre kurar).
+   */
+  function kapsamAraligi(kapsam, ctx) {
+    ctx = ctx || {};
+    if (kapsam !== "inout" && kapsam !== "entire") {
+      var s = ctx.sel;
+      if (!s || !(num(s.clipEnd, 0) > num(s.clipStart, 0))) return { hata: "klip" };
+      return { start: num(s.clipStart, 0), end: num(s.clipEnd, 0) };
+    }
+    if (!ctx.hasSeq) return { hata: "sekans" };
+    var kare = num(ctx.frame, 0) > 0 ? num(ctx.frame, 0) : 1 / 30;
+    if (kapsam === "inout") {
+      var a = num(ctx.seqIn, 0), b = num(ctx.seqOut, 0);
+      if (num(ctx.seqDur, 0) > 0 && b > num(ctx.seqDur, 0)) b = num(ctx.seqDur, 0);
+      if (!(b - a > kare)) return { hata: "inout" };
+      return { start: Math.max(0, a), end: b };
+    }
+    var d = num(ctx.seqDur, 0);
+    if (!(d > kare)) return { hata: "sekans" };
+    return { start: 0, end: d };
+  }
+
+  /*
+   * Arka plan sesi adı: bu adı taşıyan SES katmanı varsayılan olarak korunur (kesilmez, kaymaz).
+   * Ad Türkçe büyük / küçük harf farkı ve şapkasız yazım gözetilerek karşılaştırılır ("MÜZİK", "Sarki").
+   */
+  var MUZIK_RE = /m[uü]zik|music|bgm|[sş]ark[iı]|song|ambiyans|ambience/;
+  function adNormal(ad) {
+    return String(ad || "").replace(/İ/g, "i").replace(/I/g, "i").replace(/ı/g, "i").toLowerCase();
+  }
+  function muzikAdi(ad) { return MUZIK_RE.test(adNormal(ad)); }
+
+  // Çip etiketi: "A2", özel adlı katmanda "A2 · Müzik" (Premiere'in varsayılan "Audio 2" / "Ses 2" adı yazılmaz)
+  function izEtiketi(tur, i, ad) {
+    var kisa = (tur === "video" ? "V" : "A") + (Math.floor(num(i, 0)) + 1);
+    var a = String(ad || "").replace(/^\s+|\s+$/g, "");
+    if (!a || /^(audio|video|ses|görüntü|goruntu|a|v)(\s*track)?\s*\d+$/i.test(a)) return kisa;
+    return kisa + " · " + a;
+  }
+
+  function iceriyor(liste, x) {
+    for (var i = 0; i < liste.length; i++) if (liste[i] === x) return true;
+    return false;
+  }
+  // Geçerli, tekil, sıralı dizin listesi (0 ≤ i < n)
+  function dizinler(liste, n) {
+    var out = [];
+    (liste || []).forEach(function (v) {
+      var i = Number(v);
+      if (i === Math.floor(i) && i >= 0 && i < n && !iceriyor(out, i)) out.push(i);
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+  function ortSn(s, e, a, b) { return Math.min(e, b) - Math.max(s, a); }
+  function izKlipleri(iz) { return iz && iz.klipler && iz.klipler.length ? iz.klipler : []; }
+
+  // Katmanda aralığa değen klip var mı (klipler yoksa katman özetinden: clipCount, first, last)
+  function izDolu(iz, bas, son) {
+    if (!iz) return false;
+    var k = izKlipleri(iz);
+    if (k.length) {
+      for (var i = 0; i < k.length; i++) if (ortSn(num(k[i].s, 0), num(k[i].e, 0), bas, son) > 1e-3) return true;
+      return false;
+    }
+    if (!(num(iz.clipCount, 0) > 0)) return false;
+    if (iz.last === undefined || iz.first === undefined) return true;
+    return num(iz.last, 0) > bas + 1e-3 && num(iz.first, 0) < son - 1e-3;
+  }
+
+  // Aralığın en az `oran`ını TEK bir klip kaplıyor mu (sürekli müzik / ambiyans izi)
+  function tekKlipKaplar(iz, bas, son, oran) {
+    var k = izKlipleri(iz), boy = son - bas;
+    if (!(boy > 0)) return false;
+    for (var i = 0; i < k.length; i++) {
+      if (ortSn(num(k[i].s, 0), num(k[i].e, 0), bas, son) >= oran * boy - 1e-6) return true;
+    }
+    return false;
+  }
+
+  /*
+   * Bağlı video–ses klip çiftleri. Ses klibinin `bag` listesi (Premiere getLinkedItems: [{ s, e, yol, tur }])
+   * varsa o esas alınır (bağlı video öğesi aynı başlangıç / bitişli video klibiyle eşlenir). bag yoksa (eski
+   * Premiere: API yok) sezgi: aynı medya + aynı kaynak hizası (inPoint − start, ±50 ms) + zamanda örtüşme.
+   * Döner: [{ audio, video, a: sesKlibi, v: videoKlibi }]
+   */
+  function bagliCiftler(layout) {
+    var V = (layout && layout.video) || [], A = (layout && layout.audio) || [], out = [];
+    A.forEach(function (aiz, ai) {
+      izKlipleri(aiz).forEach(function (ak) {
+        V.forEach(function (viz, vi) {
+          izKlipleri(viz).forEach(function (vk) {
+            var bag = false;
+            if (ak.bag && ak.bag.length !== undefined) {
+              for (var b = 0; b < ak.bag.length && !bag; b++) {
+                var x = ak.bag[b] || {};
+                if (x.tur && !/video/i.test(String(x.tur))) continue;
+                bag = Math.abs(num(x.s, NaN) - num(vk.s, 0)) < 0.01 && Math.abs(num(x.e, NaN) - num(vk.e, 0)) < 0.01;
+              }
+            } else if (ak.yol && vk.yol) {
+              bag = String(ak.yol).toLowerCase() === String(vk.yol).toLowerCase() &&
+                Math.abs(num(ak.hiza, 0) - num(vk.hiza, 0)) <= 0.05 && ortSn(num(ak.s, 0), num(ak.e, 0), num(vk.s, 0), num(vk.e, 0)) > 1e-3;
+            }
+            if (bag) out.push({ audio: ai, video: vi, a: ak, v: vk });
+          });
+        });
+      });
+    });
+    return out;
+  }
+
+  // Klip [s, e] kesimlerden birine değiyor mu (kesimler yoksa aralığa)
+  function kesilir(k, kesimler, bas, son) {
+    var s = num(k.s, 0), e = num(k.e, 0);
+    if (!kesimler) return ortSn(s, e, bas, son) > 1e-3;
+    for (var i = 0; i < kesimler.length; i++) {
+      if (ortSn(s, e, num(kesimler[i].start, 0), num(kesimler[i].end, 0)) > 1e-3) return true;
+    }
+    return false;
+  }
+
+  /*
+   * Kapsamın katman önerisi ve uyarıları. Saf: Premiere'e dokunmaz.
+   * layout: KS_getTrackLayout({ klipler: true, start, end }) çıktısı:
+   *   { video: [{ index, name, locked, muted, clipCount, first, last, klipler: [{ s, e, ad, yol, hiza, bag }] }], audio: [...] }
+   * o: { start, end (sekans aralığı), dinle?: [i] (kullanıcının seçimi; yoksa varsayılan), koru?: { video, audio }
+   *      (kullanıcının seçimi; yoksa varsayılan), mod: "ripple" | "gap" | "select", kesimler?: [{ start, end }] (etkin
+   *      kesimler, sekans zamanı; varsa bağlı çift uyarısı yalnız gerçekten kesilen klipler için), dinleGerekli?: bool,
+   *      ciftler?: bagliCiftler(layout) (panel önbelleği; yoksa hesaplanır) }
+   * Kurallar:
+   *  - Adı müzik / music / bgm / şarkı / song / ambiyans / ambience olan SES katmanı korunur (önceden işaretli).
+   *  - Bir klibi aralığın %80'ini ya da fazlasını kaplayan, dinlenmeyen ve korunmayan ses katmanı yalnız ÖNERİLİR
+   *    (oner.audio: vurgulanır, işaretlenmez): tek uzun klip konuşma da olabilir.
+   *  - Video katmanı hiçbir zaman önceden işaretlenmez.
+   *  - Dinlenecek ses (varsayılan): aralıkta klibi olan, adı müzik olmayan ses katmanları; susturulmamış olanlar
+   *    varsa yalnız onlar; videoya bağlı (kamera sesi) olanlar varsa yalnız onlar.
+   * Uyarılar:
+   *  - { kod: "video-ripple", izler }: ripple'da korunan video katmanı kaymaz, kurgunun geri kalanıyla senkronu bozulur
+   *    (panel boşluk modunu önerir ya da uygulamaz).
+   *  - { kod: "bagli", ciftler: [{ audio, video, start, end, ad, koruTaraf }], toplam }: bağlı çiftin bir tarafı korunurken
+   *    öbür tarafı kesiliyor (kamera sesi ile görüntüsü ayrılır).
+   *  - { kod: "dinle-yok" }: dinleGerekli iken dinlenecek ses katmanı yok.
+   * Döner: { dinle, koru: { video, audio }, oner: { audio }, adla: { audio }, kilitli: { video, audio }, uyarilar }
+   */
+  function korumaOner(layout, o) {
+    o = o || {};
+    var V = (layout && layout.video) || [], A = (layout && layout.audio) || [];
+    var bas = num(o.start, 0), son = num(o.end, num(layout && layout.duration, 0));
+    if (!(son > bas)) son = bas;
+    var ciftler = o.ciftler || bagliCiftler(layout);
+    var adla = [], kilitV = [], kilitA = [];
+    A.forEach(function (iz, i) {
+      if (iz && muzikAdi(iz.name)) adla.push(i);
+      if (iz && iz.locked) kilitA.push(i);
+    });
+    V.forEach(function (iz, i) { if (iz && iz.locked) kilitV.push(i); });
+
+    var koru = o.koru
+      ? { video: dizinler(o.koru.video, V.length), audio: dizinler(o.koru.audio, A.length) }
+      : { video: [], audio: adla.slice() };
+
+    var dinle;
+    if (o.dinle) dinle = dizinler(o.dinle, A.length);
+    else {
+      var aday = [];
+      A.forEach(function (iz, i) { if (izDolu(iz, bas, son) && !iceriyor(adla, i) && !iz.locked) aday.push(i); });
+      var sesli = aday.filter(function (i) { return !A[i].muted; });
+      if (sesli.length) aday = sesli;
+      var bagli = aday.filter(function (i) {
+        return ciftler.some(function (c) { return c.audio === i && ortSn(num(c.a.s, 0), num(c.a.e, 0), bas, son) > 1e-3; });
+      });
+      dinle = bagli.length ? bagli : aday;
+    }
+
+    var oner = [];
+    A.forEach(function (iz, i) {
+      if (iceriyor(dinle, i) || iceriyor(koru.audio, i) || (iz && iz.locked)) return;
+      if (tekKlipKaplar(iz, bas, son, 0.8)) oner.push(i);
+    });
+
+    var uyarilar = [];
+    if (o.dinleGerekli && !dinle.length) uyarilar.push({ kod: "dinle-yok" });
+    var kesimler = o.kesimler && o.kesimler.length ? o.kesimler : null;
+    if (o.mod === "ripple" && koru.video.length) {
+      // ilk kesimden sonra içeriği olan korunan video katmanı ripple'da geride kalır
+      var ilk = bas;
+      if (kesimler) { ilk = Infinity; kesimler.forEach(function (k) { if (num(k.start, Infinity) < ilk) ilk = num(k.start, Infinity); }); }
+      var kayan = koru.video.filter(function (i) {
+        var iz = V[i] || {};
+        if (iz.locked) return false;
+        if (!(num(iz.clipCount, 0) > 0) && !izKlipleri(iz).length) return false;
+        if (iz.last !== undefined) return num(iz.last, 0) > ilk + 1e-3;
+        return izKlipleri(iz).some(function (k) { return num(k.e, 0) > ilk + 1e-3; });
+      });
+      if (kayan.length) uyarilar.push({ kod: "video-ripple", izler: kayan });
+    }
+    var kopan = [], gor = {};
+    ciftler.forEach(function (c) {
+      var aK = iceriyor(koru.audio, c.audio), vK = iceriyor(koru.video, c.video);
+      if (aK === vK) return;
+      // kesilen taraf: korunmayan (kilitli katman zaten kesilmez)
+      var kesilen = aK ? c.v : c.a;
+      if (aK ? (V[c.video] && V[c.video].locked) : (A[c.audio] && A[c.audio].locked)) return;
+      if (!kesilir(kesilen, kesimler, bas, son)) return;
+      var anahtar = c.audio + "|" + c.video + "|" + num(c.v.s, 0).toFixed(3);
+      if (gor[anahtar]) return;
+      gor[anahtar] = 1;
+      kopan.push({ audio: c.audio, video: c.video, start: Math.max(num(c.a.s, 0), num(c.v.s, 0)),
+        end: Math.min(num(c.a.e, 0), num(c.v.e, 0)), ad: String(c.v.ad || c.a.ad || ""), koruTaraf: aK ? "audio" : "video" });
+    });
+    if (kopan.length) {
+      kopan.sort(function (x, y) { return x.start - y.start; });
+      uyarilar.push({ kod: "bagli", ciftler: kopan.slice(0, 20), toplam: kopan.length });
+    }
+    return { dinle: dinle, koru: koru, oner: { audio: oner }, adla: { audio: adla }, kilitli: { video: kilitV, audio: kilitA }, uyarilar: uyarilar };
+  }
+
+  /*
+   * KS_applyCuts'a gidecek koruma: yalnız gerçekten korunan katman varsa { video, audio }, yoksa null
+   * (protect gönderilmez: host çıktısı 3.3 ile birebir aynı kalır).
+   */
+  function korumaYuku(koru) {
+    if (!koru) return null;
+    var v = dizinler(koru.video, Infinity), a = dizinler(koru.audio, Infinity);
+    return v.length || a.length ? { video: v, audio: a } : null;
+  }
+
   return {
     TABAN: TABAN, SR: SR, PENCERE: PENCERE, ZAMAN_SUZGECI: ZAMAN_SUZGECI,
     dbfs: dbfs,
@@ -395,6 +630,12 @@
     kararYaz: kararYaz,
     kesimlerAyni: kesimlerAyni,
     anahtar: anahtar,
-    onbellekYap: onbellekYap
+    onbellekYap: onbellekYap,
+    kapsamAraligi: kapsamAraligi,
+    muzikAdi: muzikAdi,
+    izEtiketi: izEtiketi,
+    bagliCiftler: bagliCiftler,
+    korumaOner: korumaOner,
+    korumaYuku: korumaYuku
   };
 });
