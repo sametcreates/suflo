@@ -241,6 +241,320 @@ window.KApp = (function () {
     });
   }
 
+  /* ---------------- Araç ara (Ctrl+K / ⌘K) — 3.4 adım 20 ---------------- */
+
+  /*
+   * Saf mantık js/arac-ara.js'te (SufloAracAra): Türkçe katlama, puanlama, kayıt, favori / son kullanılan,
+   * kısayol ve CEP tuş ilgisi. Burada yalnız ince DOM katmanı: #arac-ara penceresi ve üst çubuktaki #arac-ara-ac.
+   * Seçim yalnız gezinir: araç satırı sol menüdeki girdiye tıklar; eylem satırı sekmeyi açar, düğmeyi bulur, odaklar
+   * ve vurgular, ÇALIŞTIRMAZ (Pro kapısı, onay ve seçim denetimi aracın kendi düğmesinde). Premiere'e çağrı yok;
+   * favoriler ve son kullanılanlar yalnız bu bilgisayarın localStorage'ında. Ücretsiz.
+   */
+  var AA = window.SufloAracAra || null;
+  var arama = { acik: false, kayit: [], sonuclar: [], aktif: 0, durum: null, onceki: null, vurgu: null, vurguSaat: null };
+  var aramaIlgisi = false;
+
+  function aramaDepo() { try { return window.localStorage || null; } catch (e) { return null; } }
+  function aramaAcik() { return arama.acik; }
+  // Pro rozeti yalnız bilgi: pro.js yapılandırılmadıysa (isPro true) rozet yok, markLocked ile aynı
+  function proAcik() { var P = window.Pro; try { return !P || typeof P.isPro !== "function" || P.isPro(); } catch (e) { return true; } }
+
+  // Pro penceresi, AI anahtar sihirbazı, yenilikler, YouTube onayı açıkken palet üstlerine açılmaz
+  function baskaPencereAcik() {
+    var anahtar = el("onb-anahtar"), yt = el("yt-onay");
+    return !!(document.querySelector(".pro-upsell-backdrop") || document.querySelector(".yenilik-arka") ||
+      (anahtar && !anahtar.hidden) || (yt && !yt.hidden));
+  }
+
+  // CEP: Ctrl+K / ⌘K panelde tutulur (yoksa Premiere'e de gider: Kes / Add Edit). Panel açılışında değil, panel
+  // ilk kez odak / tıklama / tuş alınca bir kez; önizleme sahnesinin konum tuşlarıyla birleşik tek kayıt
+  function aramaTusIlgisi() {
+    if (aramaIlgisi || !AA) return;
+    aramaIlgisi = true;
+    try { AA.tusIlgisiAyarla("arac-ara", AA.tusIlgisi(!!K.MAC)); } catch (e) {}
+  }
+
+  // Sol menü girdisinin özgün (Türkçe) adı; "YENİ" rozeti (em.ky-yeni) ada katılmaz
+  function navAdi(b) {
+    if (!b) return "";
+    var s = "";
+    Array.prototype.forEach.call(b.childNodes, function (n) {
+      if (n.nodeType === 1 && n.classList && n.classList.contains("ky-yeni")) return;
+      s += uiOzgun(n);
+    });
+    return s.replace(/\s+/g, " ").trim();
+  }
+
+  function navDugmesi(tab, kat) {
+    var adaylar = document.querySelectorAll(".yan-menu .ky-oge[data-tab]");
+    for (var i = 0; i < adaylar.length; i++) {
+      if (adaylar[i].getAttribute("data-tab") === tab && (adaylar[i].getAttribute("data-kat") || "") === (kat || "")) return adaylar[i];
+    }
+    return null;
+  }
+
+  function aramaKaydi() {
+    var navlar = [];
+    Array.prototype.forEach.call(document.querySelectorAll(".yan-menu .ky-oge[data-tab]"), function (b) {
+      var ad = b.querySelector(".ky-metin b"), alt = b.querySelector(".ky-metin i");
+      navlar.push({ tab: b.getAttribute("data-tab"), kat: b.getAttribute("data-kat") || "", ad: navAdi(ad),
+        alt: alt ? uiOzgun(alt).replace(/\s+/g, " ").trim() : "", pro: !!b.querySelector("[data-kilit]") });
+    });
+    // sekmesi bu sürümde olmayan eylem (ör. Eğri) listelenmez
+    var kayit = AA.kayitKur(navlar, { mevcut: function (e) { return !!el("tab-" + e.tab); } });
+    kayit.forEach(function (o) {
+      o.adGoster = uiMetni(o.ad);
+      o.altGoster = o.alt ? uiMetni(o.alt) : "";
+    });
+    return kayit;
+  }
+
+  function aramaIkonu(o) {
+    var b = navDugmesi(o.tab, o.kat) || navDugmesi(o.tab, "");
+    var svg = b ? b.querySelector(".ky-ikon svg") : null;
+    var s = document.createElement("span");
+    s.className = "arac-ara-ikon" + (o.tur === "eylem" ? " eylem" : "");
+    s.setAttribute("aria-hidden", "true");
+    if (svg) s.appendChild(svg.cloneNode(true));
+    return s;
+  }
+
+  // Ad, eşleşen parçası <mark> içinde (metin düğümleriyle; innerHTML yok)
+  function aramaAdi(o, sorgu) {
+    var b = document.createElement("b"), ad = o.adGoster || o.ad, m = AA.eslesme(ad, sorgu);
+    if (!m) { b.textContent = ad; return b; }
+    if (m.bas > 0) b.appendChild(document.createTextNode(ad.slice(0, m.bas)));
+    var isaret = document.createElement("mark");
+    isaret.textContent = ad.slice(m.bas, m.son);
+    b.appendChild(isaret);
+    if (m.son < ad.length) b.appendChild(document.createTextNode(ad.slice(m.son)));
+    return b;
+  }
+
+  function aramaCiz() {
+    var liste = el("arac-ara-liste"), girdi = el("arac-ara-girdi");
+    var sorgu = girdi ? girdi.value : "";
+    arama.sonuclar = AA.ara(arama.kayit, sorgu, arama.durum);
+    if (arama.aktif >= arama.sonuclar.length) arama.aktif = 0;
+    while (liste.firstChild) liste.removeChild(liste.firstChild);
+    var pro = proAcik(), sonBolum = "";
+    arama.sonuclar.forEach(function (r, i) {
+      if (r.bolum && r.bolum !== sonBolum) {
+        var bas = document.createElement("div");
+        bas.className = "arac-ara-bolum";
+        bas.setAttribute("role", "presentation");
+        bas.textContent = uiMetni(AA.BOLUMLER[r.bolum] || "");
+        liste.appendChild(bas);
+      }
+      sonBolum = r.bolum;
+      var o = r.oge, satir = document.createElement("div");
+      satir.className = "arac-ara-satir";
+      satir.id = "arac-ara-s" + i;
+      satir.setAttribute("role", "option");
+      satir.setAttribute("aria-selected", "false");
+      satir.appendChild(aramaIkonu(o));
+      var metin = document.createElement("span");
+      metin.className = "arac-ara-metin";
+      metin.appendChild(aramaAdi(o, sorgu));
+      if (o.altGoster) { var alt = document.createElement("i"); alt.textContent = o.altGoster; metin.appendChild(alt); }
+      satir.appendChild(metin);
+      if (o.pro && !pro) {
+        var kilit = document.createElement("span");
+        kilit.className = "arac-ara-kilit";
+        kilit.textContent = "PRO";
+        kilit.title = uiMetni("Pro: uygulamak için lisans ya da deneme hakkı gerekir");
+        satir.appendChild(kilit);
+      }
+      var yildiz = document.createElement("button");
+      yildiz.type = "button";
+      yildiz.className = "arac-ara-yildiz" + (r.fav ? " on" : "");
+      yildiz.tabIndex = -1;
+      yildiz.textContent = r.fav ? "★" : "☆";
+      yildiz.setAttribute("aria-pressed", r.fav ? "true" : "false");
+      yildiz.title = uiMetni(r.fav ? "Favorilerden çıkar" : "Favorilere ekle");
+      yildiz.setAttribute("aria-label", yildiz.title);
+      yildiz.addEventListener("click", function (e) { e.stopPropagation(); aramaFavori(i); });
+      satir.appendChild(yildiz);
+      satir.addEventListener("mousemove", function () { if (arama.aktif !== i) aramaAktif(i, false); });
+      satir.addEventListener("click", function () { aramaSec(i); });
+      liste.appendChild(satir);
+    });
+    var bos = el("arac-ara-bos");
+    if (bos) bos.hidden = arama.sonuclar.length > 0;
+    aramaAktif(arama.aktif, true);
+  }
+
+  function aramaAktif(i, kaydir) {
+    var n = arama.sonuclar.length, girdi = el("arac-ara-girdi");
+    if (!n) { if (girdi) girdi.removeAttribute("aria-activedescendant"); return; }
+    i = ((i % n) + n) % n;
+    var eski = el("arac-ara-s" + arama.aktif);
+    if (eski) { eski.classList.remove("aktif"); eski.setAttribute("aria-selected", "false"); }
+    arama.aktif = i;
+    var s = el("arac-ara-s" + i);
+    if (!s) return;
+    s.classList.add("aktif");
+    s.setAttribute("aria-selected", "true");
+    if (girdi) girdi.setAttribute("aria-activedescendant", s.id);
+    if (kaydir && s.scrollIntoView) { try { s.scrollIntoView({ block: "nearest" }); } catch (e) { s.scrollIntoView(false); } }
+  }
+
+  function aramaFavori(i) {
+    var r = arama.sonuclar[i];
+    if (!r) return;
+    arama.durum = AA.favoriDegistir(arama.durum, r.oge.id);
+    AA.durumYaz(aramaDepo(), arama.durum);
+    var id = r.oge.id;
+    aramaCiz();
+    // boş sorguda satır Favoriler bölümüne taşınır: imleç aynı öğede kalsın
+    for (var k = 0; k < arama.sonuclar.length; k++) if (arama.sonuclar[k].oge.id === id) { aramaAktif(k, true); break; }
+    var girdi = el("arac-ara-girdi");
+    if (girdi) girdi.focus();
+  }
+
+  function aramaAc() {
+    if (!AA || arama.acik) return;
+    var kutu = el("arac-ara"), girdi = el("arac-ara-girdi");
+    if (!kutu || !girdi) return;
+    aramaTusIlgisi();
+    arama.onceki = document.activeElement;
+    arama.durum = AA.durumOku(aramaDepo());
+    arama.kayit = aramaKaydi();
+    arama.aktif = 0;
+    girdi.value = "";
+    kutu.hidden = false;
+    arama.acik = true;
+    var ac = el("arac-ara-ac");
+    if (ac) ac.setAttribute("aria-expanded", "true");
+    aramaCiz();
+    try { girdi.focus(); } catch (e) {}
+  }
+
+  // geriOdak: Esc / dışarı tıklama → odak paletten önceki öğeye döner; seçimde odak hedefe gider
+  function aramaKapat(geriOdak) {
+    if (!arama.acik) return;
+    arama.acik = false;
+    var kutu = el("arac-ara");
+    if (kutu) kutu.hidden = true;
+    var ac = el("arac-ara-ac");
+    if (ac) ac.setAttribute("aria-expanded", "false");
+    var onceki = arama.onceki;
+    arama.onceki = null;
+    if (geriOdak && onceki && onceki.focus && document.body.contains(onceki)) { try { onceki.focus(); } catch (e) {} }
+  }
+
+  function gorunur(x) { return !!(x && (x.offsetParent !== null || (x.getClientRects && x.getClientRects().length))); }
+
+  function aramaVurgula(x) {
+    if (arama.vurgu) arama.vurgu.classList.remove("arac-ara-vurgu");
+    if (arama.vurguSaat) clearTimeout(arama.vurguSaat);
+    arama.vurgu = x;
+    // aynı öğe ikinci kez seçilirse animasyon yeniden başlasın
+    void x.offsetWidth;
+    x.classList.add("arac-ara-vurgu");
+    arama.vurguSaat = setTimeout(function () { x.classList.remove("arac-ara-vurgu"); arama.vurgu = null; arama.vurguSaat = null; }, 2600);
+  }
+
+  function aramaKaydir(x) {
+    if (!x.scrollIntoView) return;
+    try { x.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) { x.scrollIntoView(); }
+  }
+
+  function aracaGit(o) {
+    var b = navDugmesi(o.tab, o.kat);
+    if (b) { b.click(); try { b.focus(); } catch (e) {} }
+    else goster(o.tab);
+  }
+
+  function eylemeGit(o) {
+    var b = navDugmesi(o.tab, "");
+    if (b) b.click(); else goster(o.tab);
+    var hedef = null, ilk = null, i;
+    for (i = 0; i < o.hedef.length; i++) {
+      var x = el(o.hedef[i]);
+      if (!x) continue;
+      if (!ilk) ilk = x;
+      // kapalı <details> içindeyse aç (Bölümler, Viral anlar…)
+      for (var p = x.parentNode; p && p.tagName; p = p.parentNode) if (p.tagName === "DETAILS" && !p.open) p.open = true;
+      if (gorunur(x)) { hedef = x; break; }
+    }
+    if (!hedef) {
+      // düğme henüz görünmüyor (ör. transkript yok): ipucu + görünen en yakın kap vurgulanır
+      if (o.gerekli) toast(o.gerekli, "warn");
+      var kap = ilk;
+      while (kap && kap.parentNode && !gorunur(kap)) kap = kap.parentNode;
+      if (kap && kap.classList && kap !== document.body && !kap.classList.contains("tabpane")) { aramaKaydir(kap); aramaVurgula(kap); }
+      return;
+    }
+    aramaKaydir(hedef);
+    aramaVurgula(hedef);
+    if (!hedef.disabled && hedef.focus) { try { hedef.focus({ preventScroll: true }); } catch (e) { try { hedef.focus(); } catch (e2) {} } }
+  }
+
+  function aramaSec(i) {
+    var r = arama.sonuclar[i];
+    if (!r) return;
+    arama.durum = AA.sonEkle(arama.durum, r.oge.id);
+    AA.durumYaz(aramaDepo(), arama.durum);
+    aramaKapat(false);
+    try { if (r.oge.tur === "eylem") eylemeGit(r.oge); else aracaGit(r.oge); }
+    catch (e) { K.log("arac ara: " + (e && e.message ? e.message : e)); }
+  }
+
+  // Paletin arama kutusu: ↑↓ / Tab seç, Enter aç, Esc kapat, Ctrl+D (⌘D) favori, Ctrl+K (⌘K) kapat
+  function aramaGirdiTusu(e) {
+    var n = arama.sonuclar.length;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); aramaKapat(true); return; }
+    if (AA.kisayolMu(e, !!K.MAC)) { e.preventDefault(); e.stopPropagation(); aramaKapat(true); return; }
+    if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) { e.preventDefault(); if (n) aramaAktif(arama.aktif + 1, true); return; }
+    if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)) { e.preventDefault(); if (n) aramaAktif(arama.aktif - 1, true); return; }
+    if (e.key === "Enter") { e.preventDefault(); if (n) aramaSec(arama.aktif); return; }
+    var mod = K.MAC ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);
+    if (mod && !e.altKey && !e.shiftKey && (e.key === "d" || e.key === "D")) { e.preventDefault(); if (n) aramaFavori(arama.aktif); }
+  }
+
+  /*
+   * Belge kısayolu: Ctrl+K (⌘K) paleti açar ya da açıksa kapatır. Metin kutusunda, açılır listede, contenteditable'da
+   * ve altyazı düzenleyicisinde (#cap-segments, #tc-words) hiç bağlanmaz (AA.yaziAlaniMi): orada tuş yazının
+   * kendisine kalır. Başka bir pencere (Pro, AI anahtarı, yenilikler) açıkken de açılmaz.
+   */
+  function aracAraTusu(e) {
+    if (!AA || !AA.kisayolMu(e, !!K.MAC)) return false;
+    if (aramaAcik()) { e.preventDefault(); aramaKapat(true); return true; }
+    if (AA.yaziAlaniMi(e.target)) return false;
+    if (baskaPencereAcik()) return false;
+    e.preventDefault();
+    aramaAc();
+    return true;
+  }
+
+  function aracAramaBaslat() {
+    if (!AA) return;
+    var ac = el("arac-ara-ac"), kutu = el("arac-ara"), girdi = el("arac-ara-girdi"), liste = el("arac-ara-liste");
+    var kisayol = AA.kisayolMetni(!!K.MAC);
+    if (ac) {
+      ac.title = "Araç ara (" + kisayol + ")";
+      ac.setAttribute("aria-keyshortcuts", K.MAC ? "Meta+K" : "Control+K");
+      var kt = ac.querySelector(".arac-ara-kisayol");
+      if (kt) kt.textContent = kisayol;
+      ac.addEventListener("click", function () { if (arama.acik) aramaKapat(true); else aramaAc(); });
+    }
+    var favTus = el("arac-ara-fav-tus");
+    if (favTus) favTus.textContent = K.MAC ? "⌘D" : "Ctrl+D";
+    if (girdi) {
+      girdi.addEventListener("keydown", aramaGirdiTusu);
+      girdi.addEventListener("input", function () { arama.aktif = 0; aramaCiz(); });
+    }
+    // liste tıklaması arama kutusundan odağı almasın (satır / yıldız tıklanınca da yazmaya devam edilir)
+    if (liste) liste.addEventListener("mousedown", function (e) { e.preventDefault(); });
+    if (kutu) kutu.addEventListener("mousedown", function (e) { if (e.target === kutu) { e.preventDefault(); aramaKapat(true); } });
+    document.addEventListener("keydown", aracAraTusu);
+    // CEP tuş ilgisi: panel ilk kez odak / tıklama / tuş alınca (açılışta değil)
+    window.addEventListener("focus", aramaTusIlgisi);
+    document.addEventListener("pointerdown", aramaTusIlgisi, true);
+    document.addEventListener("keydown", aramaTusIlgisi, true);
+  }
+
   /* ---------------- Ayarlar ---------------- */
 
 
@@ -1640,6 +1954,8 @@ window.KApp = (function () {
     });
 
     guvenli("sekmeler", initTabs);
+    // Araç ara (Ctrl+K): yalnız DOM ve kısayol; Premiere'e / ağa gitmez
+    guvenli("Araç ara", aracAramaBaslat);
     guvenli("ayarlar", initSettings);
     guvenli("Altyazı", function () { KCaptions.init(); });
     guvenli("Kesim", function () { KCut.init(); });
@@ -1780,6 +2096,8 @@ window.KApp = (function () {
     proCheckoutUrl: proCheckoutUrl,
     installLocalWhisper: installLocalWhisper,
     kurulumTikiGecerli: kurulumTikiGecerli,
-    checkUpdate: checkUpdate
+    checkUpdate: checkUpdate,
+    // 3.4 adım 20: Araç ara penceresini açar (ör. yenilikler maddesinden)
+    aracAra: aramaAc
   };
 })();

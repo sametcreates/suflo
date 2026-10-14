@@ -3165,6 +3165,33 @@
       "A network filter may be blocking this download. Ask your IT team to allow this address; on a company network, set up a proxy in Settings."
   });
 
+  /* ============ 3.4 step 20: tool search / command palette (Ctrl+K / ⌘K; js/arac-ara.js, js/app.js #arac-ara) ============ */
+  add({
+    "Araç ara": "Search tools",
+    "Araç ara ({})": "Search tools ({})",
+    "Araç ya da eylem ara… (ör. sessizlik, rampa)": "Search tools or actions… (e.g. silence, ramp)",
+    "Araçlar ve eylemler": "Tools and actions",
+    "Eşleşen araç yok. Başka bir kelime dene.": "No matching tool. Try another word.",
+    "seç": "select",
+    "aç": "open",
+    "favori": "favorite",
+    "kapat": "close",
+    "Son kullanılanlar": "Recent",
+    "Eylemler": "Actions",
+    "Favorilere ekle": "Add to favorites",
+    "Favorilerden çıkar": "Remove from favorites",
+    "Pro: uygulamak için lisans ya da deneme hakkı gerekir": "Pro: applying it needs a license or a trial credit",
+    // static actions (js/arac-ara.js EYLEMLER); the others reuse existing button labels
+    "Altyazıyı çevir": "Translate captions",
+    "Eğri uygula": "Apply curve",
+    "Kanca başlığı ekle": "Add hook title",
+    "YouTube'dan indir": "Download from YouTube",
+    "Ayarlar › Motor": "Settings › Engine",
+    "Ayarlar › Arayüz dili": "Settings › Interface language",
+    "Ayarlar › Marka Kiti": "Settings › Brand kit",
+    "Önce sessizlikleri bul.": "Find silences first."
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
@@ -3337,7 +3364,8 @@
     "Podcast",        // Viral Score genre (same word in English)
     "English (beta)", "Türkmençe",
     ".suflo-stil,.txt", "Logo",
-    "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US"];   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US",
+    "Ctrl+K", "⌘K", "Ctrl+D", "⌘D", "Esc"];   // tool search (3.4 step 20): keyboard keys   // file picker filter (not shown as text)   // language pickers show each language in its own name
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

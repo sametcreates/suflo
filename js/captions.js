@@ -2053,6 +2053,13 @@ window.KCaptions = (function () {
   function konumTuslariniTut(tut) {
     tut = !!tut && konumAktif();
     if (tut === konumTusTutuluyor) return;
+    // 3.4 adım 20: registerKeyEventsInterest her çağrıda tüm listeyi değiştirir; araç aramanın Ctrl+K (⌘K) ilgisi
+    // silinmesin diye ikisi js/arac-ara.js'te birleştirilip tek kayıt olarak verilir
+    var AA = window.SufloAracAra;
+    if (AA && typeof AA.tusIlgisiAyarla === "function") {
+      if (AA.tusIlgisiAyarla("konum", tut ? AE.konumTusIlgisi(!!(K && K.MAC)) : "")) konumTusTutuluyor = tut;
+      return;
+    }
     var cep = window.__adobe_cep__;
     if (!cep || typeof cep.registerKeyEventsInterest !== "function") return;
     try {

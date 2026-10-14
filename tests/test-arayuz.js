@@ -662,6 +662,75 @@ var cssSrc = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
 ok("CSS: busy düğmesi (inline-flex) gizlenince görünmez; canlı satırlar soluk", /#cap-go\[hidden\], #cut-analyze\[hidden\] \{ display: none !important; \}/.test(cssSrc) &&
   /\.canli-satir \{[^}]*opacity: \.78/.test(cssSrc) && /\.canli-kutu\[hidden\] \{ display: none !important; \}/.test(cssSrc));
 
+/* ---------- Araç ara (Ctrl+K / ⌘K komut paleti, 3.4 adım 20) ---------- */
+["arac-ara", "arac-ara-ac", "arac-ara-girdi", "arac-ara-liste", "arac-ara-bos", "arac-ara-ipucu", "arac-ara-fav-tus", "grp-motor"].forEach(function (id) {
+  ok("Araç ara: #" + id + " var", !!idler[id]);
+});
+ok("Araç ara: pencere gizli başlar, modal iletişim kutusu; liste listbox ve çevirmene kapalı (satırlar arayüz dilinde çizilir)",
+  /<div id="arac-ara" class="arac-ara-arka" hidden>/.test(html) && /class="arac-ara-kutu" role="dialog" aria-modal="true" aria-label="Araç ara"/.test(html) &&
+  /<div id="arac-ara-liste" class="arac-ara-liste" role="listbox"[^>]* data-i18n-skip><\/div>/.test(html) && /id="arac-ara-bos" class="arac-ara-bos" hidden/.test(html));
+ok("Araç ara: arama kutusu combobox, listeyi denetler; düğme üst çubukta, kısayolu başlıkta",
+  /<input id="arac-ara-girdi" type="text"[^>]*role="combobox"[^>]*aria-controls="arac-ara-liste"/.test(html) &&
+  html.indexOf('id="arac-ara-ac"') > html.indexOf('<div class="top-right">') && html.indexOf('id="arac-ara-ac"') < html.indexOf('id="pro-chip"') &&
+  /id="arac-ara-ac"[^>]*title="Araç ara \(Ctrl\+K\)"[^>]*aria-controls="arac-ara"/.test(html));
+ok("Araç ara: betik sırası arac-ara.js → captions.js → app.js", betikSira("arac-ara.js") > 0 && betikSira("arac-ara.js") < betikSira("captions.js") &&
+  betikSira("arac-ara.js") < betikSira("app.js"));
+var aaAppSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8").replace(/\r\n/g, "\n");
+var aaBolum = aaAppSrc.slice(aaAppSrc.indexOf("/* ---------------- Araç ara (Ctrl+K"), aaAppSrc.indexOf("/* ---------------- Ayarlar ---------------- */"));
+ok("Araç ara: init sekmelerden sonra başlatır; Premiere / host çağrısı yok (K.call, evalScript), CEP tuş ilgisi yalnız ilk etkileşimde",
+  /guvenli\("sekmeler", initTabs\);\s*\/\/[^\n]*\n\s*guvenli\("Araç ara", aracAramaBaslat\);/.test(aaAppSrc) && aaBolum.length > 2000 &&
+  !/K\.call\(|evalScript|K\.run\(/.test(aaBolum) && !/tusIlgisiAyarla/.test(fnGovde(aaAppSrc, "function aracAramaBaslat(")) &&
+  /window\.addEventListener\("focus", aramaTusIlgisi\)/.test(aaBolum));
+ok("Araç ara: seçim eylemi çalıştırmaz (düğmeye click() yok, yalnız odak + vurgu); araç satırı menü girdisine tıklar",
+  !/hedef\.click\(\)/.test(fnGovde(aaAppSrc, "function eylemeGit(")) && /hedef\.focus/.test(fnGovde(aaAppSrc, "function eylemeGit(")) &&
+  /b\.click\(\)/.test(fnGovde(aaAppSrc, "function aracaGit(")));
+// Kısayol yazı alanlarında ve altyazı düzenleyicisinde hiç bağlanmaz: gerçek aracAraTusu + gerçek js/arac-ara.js
+(function () {
+  var AAmod = require(KOKYOL + "js/arac-ara.js");
+  function kur(mac, acik, pencere) {
+    var s = { acildi: 0, kapandi: 0 };
+    var fn = new Function("AA", "K", "aramaAcik", "aramaKapat", "aramaAc", "baskaPencereAcik", fnGovde(aaAppSrc, "function aracAraTusu(") + "\nreturn aracAraTusu;")(
+      AAmod, { MAC: mac }, function () { return !!acik; }, function () { s.kapandi++; }, function () { s.acildi++; }, function () { return !!pencere; });
+    s.bas = function (hedef, o) {
+      var e = { key: "k", ctrlKey: !mac, metaKey: !!mac, altKey: false, shiftKey: false, target: hedef, engel: 0 };
+      e.preventDefault = function () { e.engel++; };
+      for (var k in o || {}) e[k] = o[k];
+      fn(e);
+      return e;
+    };
+    return s;
+  }
+  function oge(etiket, o, ebeveyn) {
+    var d = { nodeType: 1, tagName: etiket.toUpperCase(), parentNode: ebeveyn || null, attrs: {}, id: "" };
+    for (var k in o || {}) d[k] = o[k];
+    d.getAttribute = function (a) { return Object.prototype.hasOwnProperty.call(d.attrs, a) ? d.attrs[a] : null; };
+    d.hasAttribute = function (a) { return Object.prototype.hasOwnProperty.call(d.attrs, a); };
+    return d;
+  }
+  var govde = oge("body"), segs = oge("div", { id: "cap-segments" }, govde);
+  var yazilar = [oge("input", { type: "text" }, govde), oge("input", { type: "search" }, govde), oge("textarea", {}, govde), oge("select", {}, govde),
+    oge("div", { isContentEditable: true }, govde), oge("input", { type: "text" }, oge("div", {}, segs)), oge("button", {}, segs),
+    oge("span", {}, oge("div", { id: "tc-words" }, govde))];
+  var w = kur(false);
+  var engeller = yazilar.map(function (h) { return w.bas(h).engel; });
+  ok("Ctrl+K metin kutusu / arama / textarea / açılır liste / contenteditable / altyazı düzenleyicisinde (#cap-segments, #tc-words) bağlanmaz: palet açılmaz, tuş engellenmez",
+    w.acildi === 0 && engeller.every(function (x) { return x === 0; }), JSON.stringify(engeller));
+  var dugme = w.bas(oge("button", {}, govde)), onay = w.bas(oge("input", { type: "checkbox" }, govde)), bos = w.bas(govde);
+  ok("Ctrl+K düğmede, onay kutusunda ve boş alanda paleti açar (varsayılan engellenir)", w.acildi === 3 && dugme.engel === 1 && onay.engel === 1 && bos.engel === 1);
+  var w2 = kur(false);
+  w2.bas(govde, { shiftKey: true }); w2.bas(govde, { altKey: true }); w2.bas(govde, { ctrlKey: false, metaKey: true }); w2.bas(govde, { key: "j" });
+  ok("Ctrl+Shift+K (Premiere: tüm izlerde kes), AltGr, Windows'ta ⌘K ve başka harf açmaz", w2.acildi === 0);
+  var m = kur(true);
+  m.bas(govde); m.bas(govde, { metaKey: false, ctrlKey: true });
+  ok("macOS: ⌘K açar, Ctrl+K açmaz", m.acildi === 1);
+  var a = kur(false, true);
+  var ak = a.bas(yazilar[0]);
+  ok("palet açıkken Ctrl+K kapatır (aç / kapa)", a.kapandi === 1 && a.acildi === 0 && ak.engel === 1);
+  var p = kur(false, false, true);
+  ok("başka bir pencere (Pro, AI anahtarı, yenilikler) açıkken palet açılmaz", (p.bas(govde), p.acildi === 0));
+})();
+ok("Araç ara: verify-release js/arac-ara.js'i paket için zorunlu tutar", /js\/arac-ara\\\.js\$/.test(fs.readFileSync(KOKYOL + "tools/verify-release.ps1", "utf8")));
+
 bekleyenUI.then(function () {
   console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
   process.exit(kaldi ? 1 : 0);

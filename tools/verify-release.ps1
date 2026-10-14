@@ -104,6 +104,8 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.4 adim 19: kurumsal ag dayanikliligi + cevrimdisi model ice aktarma (bridge/engine'den once yuklenir)
             '(^|/)js/ag-dayanim\.js$',
             '(^|/)js/model-ice-aktar\.js$',
+            # 3.4 adim 20: Arac ara (Ctrl+K) saf modulu; app.js paleti ve captions.js onizleme tus ilgisi kullanir
+            '(^|/)js/arac-ara\.js$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

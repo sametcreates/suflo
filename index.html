@@ -25,6 +25,11 @@
       </span>
     </div>
     <div class="top-right">
+      <!-- 3.4 adım 20: Araç ara (Ctrl+K / ⌘K). Başlık ve kısayol metni macOS'ta app.js'te ⌘K olur -->
+      <button type="button" id="arac-ara-ac" class="arac-ara-ac" title="Araç ara (Ctrl+K)" aria-label="Araç ara" aria-haspopup="dialog" aria-expanded="false" aria-controls="arac-ara">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3.6 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <kbd class="arac-ara-kisayol">Ctrl+K</kbd>
+      </button>
       <button id="pro-chip" class="pro-chip" title="Suflo Pro">
         <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l1.4 3.1L11 4.5 8.5 6.8l.7 3.4L6 8.6 2.8 10.2l.7-3.4L1 4.5l3.6-.4z" fill="currentColor"/></svg>
         <span>PRO</span>
@@ -2000,7 +2005,7 @@
       <span class="set-back-title">Ayarlar</span>
     </div>
 
-    <div class="set-group caption-engine-settings">
+    <div class="set-group caption-engine-settings" id="grp-motor">
       <div class="set-title">Suflo Altyazı Motoru</div>
       <div class="suflo-engine-card">
         <span class="suflo-engine-mark" aria-hidden="true">S</span>
@@ -2506,6 +2511,27 @@
     </div>
   </div>
 
+  <!-- 3.4 adım 20: Araç ara (Ctrl+K / ⌘K). Puanlama js/arac-ara.js, pencere js/app.js; seçim yalnız gezinir.
+       Liste satırları app.js'te zaten arayüz dilinde çizilir (vurgulu parça bölünmesin diye çevirmen girmez) -->
+  <div id="arac-ara" class="arac-ara-arka" hidden>
+    <div class="arac-ara-kutu" role="dialog" aria-modal="true" aria-label="Araç ara">
+      <div class="arac-ara-ust">
+        <svg class="arac-ara-buyutec" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3.6 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="arac-ara-girdi" type="text" placeholder="Araç ya da eylem ara… (ör. sessizlik, rampa)" aria-label="Araç ara" autocomplete="off" spellcheck="false"
+          role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="arac-ara-liste">
+        <kbd class="arac-ara-esc">Esc</kbd>
+      </div>
+      <div id="arac-ara-liste" class="arac-ara-liste" role="listbox" aria-label="Araçlar ve eylemler" data-i18n-skip></div>
+      <div id="arac-ara-bos" class="arac-ara-bos" hidden>Eşleşen araç yok. Başka bir kelime dene.</div>
+      <div class="arac-ara-alt" id="arac-ara-ipucu">
+        <span><kbd>↑</kbd><kbd>↓</kbd> seç</span>
+        <span><kbd>Enter</kbd> aç</span>
+        <span><kbd id="arac-ara-fav-tus">Ctrl+D</kbd> favori</span>
+        <span><kbd>Esc</kbd> kapat</span>
+      </div>
+    </div>
+  </div>
+
   <script src="js/CSInterface.js"></script>
   <script src="js/pricing.js"></script>
   <script src="i18n/en.js"></script>
@@ -2515,6 +2541,8 @@
   <script src="js/deneme.js"></script>
   <script src="js/pro.js"></script>
   <script src="js/pro-sync.js"></script>
+  <!-- 3.4 adım 20: Araç ara saf modülü (captions.js'in önizleme tuş ilgisi ve app.js paleti kullanır) -->
+  <script src="js/arac-ara.js"></script>
   <script src="js/whisper-args.js"></script>
   <script src="js/model-ice-aktar.js"></script>
   <script src="js/engine.js"></script>

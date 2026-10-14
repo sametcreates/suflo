@@ -4243,3 +4243,105 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .pc-bar .pc-on { min-width: 1px; }
 .pc-ozet { font-size: 11px; margin-bottom: 6px; }
 #pc-periyot { width: 64px; margin-left: 8px; }
+
+/* ---------- Araç ara (Ctrl+K / ⌘K) — 3.4 adım 20 ----------
+   CEF 74 (Premiere 14.4): flex gap, overflow-wrap:anywhere, min()/max() ve yedeksiz inset yok; aralıklar margin ile.
+   #arac-ara-ac üst çubukta; #arac-ara pencere, satırlar js/app.js'te çizilir. */
+.arac-ara-ac {
+  display: inline-flex; align-items: center; flex: 0 0 auto;
+  height: 26px; padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, .09); border-radius: 6px;
+  background: rgba(255, 255, 255, .035); color: #8792a2;
+  font: inherit; cursor: pointer;
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+.arac-ara-ac svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.arac-ara-ac:hover, .arac-ara-ac[aria-expanded="true"] { color: var(--accent-lite); border-color: rgba(114, 124, 255, .55); background: var(--accent-soft); }
+.arac-ara-ac:focus { outline: none; border-color: var(--accent); box-shadow: var(--glow-sm); }
+.arac-ara-ac .arac-ara-kisayol { margin: 0 0 0 6px; }
+@media (max-width: 720px) { .arac-ara-ac .arac-ara-kisayol { display: none; } }
+
+.arac-ara-kisayol, .arac-ara-esc, .arac-ara-alt kbd {
+  display: inline-block; min-width: 16px; padding: 0 4px; margin-right: 3px;
+  border: 1px solid rgba(255, 255, 255, .1); border-radius: 4px; background: rgba(255, 255, 255, .04);
+  color: #9aa3b5; font-family: inherit; font-size: 9.5px; font-weight: 600; line-height: 15px; text-align: center;
+}
+
+.arac-ara-arka {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; inset: 0; z-index: 9050;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 56px 16px 16px; background: rgba(5, 7, 12, .66);
+}
+.arac-ara-arka[hidden] { display: none; }
+.arac-ara-kutu {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 520px; max-height: calc(100vh - 72px);
+  background: var(--bg2); border: 1px solid rgba(139, 124, 246, .38); border-radius: 12px;
+  box-shadow: 0 30px 70px -30px #000; overflow: hidden;
+}
+.arac-ara-ust { display: flex; align-items: center; flex: 0 0 auto; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.arac-ara-buyutec { width: 15px; height: 15px; flex: 0 0 auto; margin-right: 9px; color: var(--faint); }
+#arac-ara-girdi {
+  flex: 1 1 auto; min-width: 0; height: 32px; padding: 0;
+  border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  color: var(--text); font-size: 13.5px;
+}
+#arac-ara-girdi:focus { outline: none; border: 0; background: transparent; box-shadow: none; }
+.arac-ara-esc { margin: 0 0 0 8px; }
+
+.arac-ara-liste { flex: 1 1 auto; min-height: 0; max-height: 380px; overflow-y: auto; padding: 4px 6px 6px; }
+.arac-ara-bolum {
+  padding: 9px 8px 4px; color: var(--faint);
+  font-size: 8.5px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
+}
+.arac-ara-satir {
+  display: flex; align-items: center; padding: 5px 6px 5px 7px; margin-top: 1px;
+  border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+}
+.arac-ara-satir.aktif { background: var(--accent-soft); border-color: rgba(114, 124, 255, .42); }
+.arac-ara-ikon {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 26px; height: 26px; margin-right: 10px;
+  border: 1px solid #243040; border-radius: 6px; background: #17202b; color: #8997aa;
+}
+.arac-ara-ikon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+/* eylem satırı: aracın simgesi, vurgu renginde (sekmeye değil düğmeye götürür) */
+.arac-ara-ikon.eylem { color: var(--accent-lite); border-color: rgba(114, 124, 255, .32); background: rgba(88, 103, 226, .12); }
+.arac-ara-satir.aktif .arac-ara-ikon { color: #dfe4ff; border-color: rgba(150, 173, 255, .42); }
+.arac-ara-metin { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.arac-ara-metin b, .arac-ara-metin i { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.arac-ara-metin b { color: #dce2ec; font-size: 12px; font-weight: 600; }
+.arac-ara-metin i { margin-top: 1px; color: #657184; font-size: 10px; font-style: normal; }
+.arac-ara-metin mark { background: none; color: #9fa9ff; font-weight: 800; border-bottom: 1px solid rgba(159, 169, 255, .55); }
+.arac-ara-kilit {
+  flex: 0 0 auto; margin-left: 8px; padding: 1px 5px;
+  border: 1px solid rgba(111, 127, 255, .32); border-radius: 4px; background: rgba(88, 103, 226, .12);
+  color: #cbd1ff; font-size: 8px; font-weight: 800; letter-spacing: .08em;
+}
+.arac-ara-yildiz {
+  flex: 0 0 auto; width: 26px; height: 24px; margin-left: 4px; padding: 0;
+  border: 0; border-radius: 6px; background: none; color: var(--faint);
+  font-size: 14px; line-height: 24px; cursor: pointer; opacity: .45;
+}
+.arac-ara-satir:hover .arac-ara-yildiz, .arac-ara-satir.aktif .arac-ara-yildiz { opacity: 1; }
+.arac-ara-yildiz:hover { background: rgba(255, 255, 255, .06); color: #ffd23f; }
+.arac-ara-yildiz.on { color: #ffd23f; opacity: 1; }
+.arac-ara-bos { padding: 18px 14px; color: var(--dim); font-size: 12px; text-align: center; }
+.arac-ara-bos[hidden] { display: none; }
+.arac-ara-alt {
+  display: flex; flex-wrap: wrap; align-items: center; flex: 0 0 auto;
+  padding: 6px 12px 7px; border-top: 1px solid var(--line); color: var(--faint); font-size: 10.5px;
+}
+.arac-ara-alt span { margin: 1px 12px 1px 0; white-space: nowrap; }
+
+/* Seçilen eylemin düğmesi: kısa nabız + çerçeve (odak da orada; Enter çalıştırır) */
+.arac-ara-vurgu { outline: 2px solid var(--accent); outline-offset: 2px; animation: arac-ara-nabiz 1.2s ease-in-out 2; }
+@keyframes arac-ara-nabiz {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(114, 124, 255, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(114, 124, 255, .35); }
+}
+@media (prefers-reduced-motion: reduce) { .arac-ara-vurgu { animation: none; } }
+@media (max-width: 470px) {
+  .arac-ara-arka { padding: 20px 8px 8px; }
+  .arac-ara-kutu { max-height: calc(100vh - 28px); }
+}
