@@ -573,8 +573,10 @@ window.KTextCut = (function () {
         // 3.4 adım 8: kesim kaydı + "Altyazıya aktar" (kalan kelimeler yeni kurgunun zamanlarıyla) ve belge bu kurgunun
         // öncesine aitse "Altyazıyı yeni kurguya uyarla" (rippleFallback → boşluk modu)
         if (altyaziEylemi) {
-          altyaziEylemi.kesimSonrasi(res, { removeMode: "ripple", kaynak: aktif || sekans, kaynakAd: tazeCtx.ok ? String(tazeCtx.sequence || "") : "",
-            ranges: r, kare: tazeCtx.ok ? tazeCtx.frame : 0, kelimeler: aktarKelimeler, dil: aktarDil, sonSinir: aktarSon });
+          try {
+            altyaziEylemi.kesimSonrasi(res, { removeMode: "ripple", kaynak: aktif || sekans, kaynakAd: tazeCtx.ok ? String(tazeCtx.sequence || "") : "",
+              ranges: r, kare: tazeCtx.ok ? tazeCtx.frame : 0, kelimeler: aktarKelimeler, dil: aktarDil, sonSinir: aktarSon });
+          } catch (eA) { K.log("[konusmadan kes] altyazi eylemi: " + (eA && eA.message ? eA.message : eA)); }   // kesim zaten uygulandı
         }
         // Timeline degisti: eski zamanlar artik gecersiz
         el("tc-result").hidden = true; sesiKapat();

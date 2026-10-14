@@ -1298,8 +1298,10 @@ window.KCut = (function () {
         // (mod: rippleFallback → boşluk, yoksa uygulanan; Sadece kes + seç'te hiçbir şey silinmedi: eylem yok)
         if (altyaziEylemi) {
           var bag = KApp.ctx() || {};
-          altyaziEylemi.kesimSonrasi(r, { removeMode: mode, kaynak: analizSeqId || String(bag.sequenceId || ""), kaynakAd: String(bag.sequence || ""),
-            ranges: act, kare: bag.frame });
+          try {
+            altyaziEylemi.kesimSonrasi(r, { removeMode: mode, kaynak: analizSeqId || String(bag.sequenceId || ""), kaynakAd: String(bag.sequence || ""),
+              ranges: act, kare: bag.frame });
+          } catch (eA) { K.log("[kesim] altyazi eylemi: " + (eA && eA.message ? eA.message : eA)); }   // kesim zaten uygulandı
         }
         // ilk uygulanan kesim: davet seridinin anlarindan biri (mesgulken/yildiz seridi acikken cikmaz)
         if (KApp.davetAni) KApp.davetAni("cut");
