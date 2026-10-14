@@ -218,6 +218,37 @@ async function main() {
   await bekle(450);
   ok("çağrı gelmezse kendiliğinden kapanır, dosya silinir", bosta[0] === "bosta" && !bs.acikMi() && !fs.existsSync(dosya));
 
+  /* ---- deneme oturumu: mutlak süre sınırı, çağrılar uzatmaz ---- */
+  // İnceleme bulgusu: her doğrulanmış çağrı boşta sayacını sıfırladığından tek deneme hakkı, istemci
+  // birkaç dakikada bir yokladıkça süresiz açık kalıyordu
+  var sureKapanma = [];
+  var ss = S.olustur({ dosya: dosya, bostaKapanma: 250, yurut: function () { return { ok: true }; }, onKapandi: function (n) { sureKapanma.push(n); } });
+  var sp = (await ss.baslat({ sure: 600 })).port, st = ss._token();
+  var sBas = Date.now(), sKodlar = [];
+  while (ss.acikMi() && Date.now() - sBas < 2000) { sKodlar.push((await istek(sp, { token: st })).kod); await bekle(100); }
+  var sGecen = Date.now() - sBas;
+  ok("deneme oturumu: 100 ms'de bir çağrı boşta sayacını canlı tutsa da süre dolunca kapanır ('sure'), dosya silinir",
+    sureKapanma[0] === "sure" && !ss.acikMi() && !fs.existsSync(dosya) && sGecen >= 550 && sGecen < 1500 && sKodlar.length >= 4 && sKodlar.every(function (k) { return k === 200; }), sureKapanma.join(",") + " " + sGecen + "ms " + js(sKodlar));
+  r = await istek(sp, { token: st });
+  ok("süre dolduktan sonra istek bağlanamaz", r.kod === 0, r.kod);
+  // süre sınırı kaldırılınca (oturumda Pro alındı) yalnız boşta kapanma kalır
+  sureKapanma = [];
+  sp = (await ss.baslat({ sure: 300 })).port; st = ss._token();
+  ss.sureSiniri(0);
+  for (var sq = 0; sq < 5; sq++) { await istek(sp, { token: st }); await bekle(100); }
+  ok("sureSiniri(0): sınır kalkar, çağrı geldikçe açık kalır", ss.acikMi() && sureKapanma.length === 0, sureKapanma.join(","));
+  await bekle(400);
+  ok("sınır kalkınca boşta kapanma yine çalışır", !ss.acikMi() && sureKapanma[0] === "bosta", sureKapanma.join(","));
+  // sınırsız açılış (Pro): süre sınırı kurulmaz; yeniden açılışta eski sınır taşınmaz
+  sureKapanma = [];
+  var sz = S.olustur({ dosya: dosya, bostaKapanma: 0, yurut: function () { return { ok: true }; }, onKapandi: function (n) { sureKapanma.push(n); } });
+  await sz.baslat({ sure: 200 });
+  sz.durdur("kapat");
+  await sz.baslat();
+  await bekle(350);
+  ok("deneme oturumu kapatılıp Pro oturumu açılınca eski süre sınırı işlemez", sz.acikMi() && js(sureKapanma) === '["kapat"]', js(sureKapanma));
+  sz.durdur();
+
   /* ---- Premiere meşgul: yazma eylemi bekler, zaman aşımında 503 ---- */
   var mesgul = true;
   var ms = S.olustur({ dosya: dosya, mesgulBekleme: 300, izinler: function () { return { duzenleme: true, onay: true }; },

@@ -264,19 +264,25 @@ window.KCut = (function () {
 
   /* ---------------- Uygulama ---------------- */
 
-  async function apply() {
-    if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: apply })) return; // Pro: otomatik kesim
+  // ek.cloneFirst === true (Yapay zekâ köprüsü): kopya sekans zorunlu, açık seçenekle. Köprü paylaşılan
+  // "target"a yazmaz: kesim sürerken kullanıcının hedef düğmesiyle seçtiği değer ezilmez.
+  // Düğmenin tık olayı (Event) cloneFirst taşımaz: o an seçili hedef geçerli.
+  async function apply(ek) {
+    var kopyaZorunlu = !!(ek && ek.cloneFirst === true);
+    var hedef = kopyaZorunlu ? "clone" : target;
+    var yeniden = kopyaZorunlu ? function () { return apply({ cloneFirst: true }); } : apply;
+    if (typeof Pro !== "undefined" && !Pro.gate("cut", { deneme: true, yeniden: yeniden })) return; // Pro: otomatik kesim
     var act = activeRanges().map(function (r) { return { start: r.start, end: r.end }; });
     if (act.length === 0) return;
     sesiKapat();
     el("cut-apply").disabled = true;
     status("Uygulanıyor…");
-    var mode = target === "clone" ? "ripple" : el("cut-mode").value;
+    var mode = hedef === "clone" ? "ripple" : el("cut-mode").value;
     // Yuzlerce kesim uygulamak uzun surebilir: zaman asimini genis tut
     var r = await K.call("KS_applyCuts", {
       ranges: act,
       removeMode: mode,
-      cloneFirst: target === "clone"
+      cloneFirst: hedef === "clone"
     }, 900000);
     el("cut-apply").disabled = false;
     if (r.ok) {
@@ -334,10 +340,7 @@ window.KCut = (function () {
   }
   async function mcpKes() {
     if (!activeRanges().length) return { ok: false, hata: "analiz_yok", mesaj: "Run suflo_sessizlik_analiz first: there are no cut ranges." };
-    var eski = target;
-    target = "clone";   // kopya sekans zorunlu: özgün sekans hiç bozulmaz
-    var r;
-    try { r = await apply(); } finally { target = eski; }
+    var r = await apply({ cloneFirst: true });   // kopya sekans zorunlu: özgün sekans hiç bozulmaz
     if (!r) return { ok: false, hata: "uygulanamadi", mesaj: durumMetni().metin || "Not applied." };
     if (!r.ok) return { ok: false, hata: "uygulanamadi", mesaj: r.error || "Not applied." };
     return { ok: true, kopyaSekans: r.newSeq || "", bosluklu: !!r.rippleFallback };

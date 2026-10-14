@@ -26,10 +26,14 @@ var i18n = require(path.join(KOK, "js", "i18n.js"));
 ok("i18n: senaryo ve inceleme listesi kullanıcı içeriği", i18n.USER_CONTENT_IDS.indexOf("tc-script") !== -1 && i18n.USER_CONTENT_IDS.indexOf("tc-review") !== -1 && i18n.USER_CONTENT_IDS.indexOf("tc-words") !== -1);
 
 var kk = oku("js/konusma-kes.js");
-var uygula = kk.slice(kk.indexOf("async function apply()"), kk.indexOf("// \"Dinle\""));
+var uygulaBas = kk.indexOf("async function apply(ek)");
+var uygula = uygulaBas === -1 ? "" : kk.slice(uygulaBas, kk.indexOf("// \"Dinle\""));
 ok("uygula: önce capCuts (300, tutulan kelimeler yutulmaz), sonra KS_applyCuts", uygula.indexOf("TC.capCuts(kesimler(), { max: 300, mergeGap: 0.25, keep: tutulan })") !== -1 && uygula.indexOf("capCuts") < uygula.indexOf("KS_applyCuts"));
 ok("uygula: '300+ kesim birleştirildi' uyarısı", /"300\+ kesim birleştirildi"/.test(uygula));
-ok("uygula: ripple + kopya sekans + '— Suflo Temiz' adı", /removeMode: "ripple", cloneFirst: target === "clone"/.test(uygula) && /" — Suflo Temiz"/.test(uygula));
+ok("uygula: ripple + kopya sekans + '— Suflo Temiz' adı", /removeMode: "ripple", cloneFirst: hedef === "clone"/.test(uygula) && /" — Suflo Temiz"/.test(uygula));
+// hedef ilk await'ten ÖNCE bir kez okunur (Premiere'e sorulurken hedef düğmesine basılması kesimin yerini değiştirmez)
+ok("uygula: hedef ilk await'ten önce yakalanır, sonra 'target' okunmaz", /var hedef = kopyaZorunlu \? "clone" : target;/.test(uygula) &&
+  uygula.indexOf("var hedef =") < uygula.indexOf("await ") && uygula.slice(uygula.indexOf("await ")).indexOf("target") === -1);
 ok("Yalnız kesilecekleri dinle: only:true", /only: true/.test(kk) && /oynatici\.MAX_SN \+ " kesim dinletiliyor/.test(kk));
 ok("özet satırı ' · N tekrar çekim'", /" · " \+ n \+ " tekrar çekim"/.test(kk));
 ok("AI: sıralı chatCall + bayat cevap koruması + hata uyarısı", /await KCaptions\.chatCall\(cfg, RT\.llmRequest\(/.test(kk) && /benim !== aiSurum \|\| clip !== benimKlip/.test(kk) && /AI gruplama yapılamadı — sezgisel sonuç geçerli/.test(kk));

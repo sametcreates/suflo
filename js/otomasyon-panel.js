@@ -3,7 +3,9 @@
  *
  * İnce yapıştırıcı: kurallar js/otomasyon.js (eylem listesi, doğrulama, temizlik) ve
  * js/otomasyon-sunucu.js'te (127.0.0.1 sunucusu). Burada yalnız:
- *  - Ayarlar kartı: Aç/Kapat (Pro: kapı + 3 deneme hakkı), Düzenlemeye izin ver,
+ *  - Ayarlar kartı: Aç/Kapat (Pro: kapı + 3 deneme hakkı; deneme hakkıyla açılan köprü en çok
+ *    30 dakika açık kalır, çağrılar bu süreyi uzatmaz; Pro ile açılan köprü lisans gidince kapanır),
+ *    Düzenlemeye izin ver,
  *    Yıkıcı eylemlerde onay iste, Yeni jeton, etkinlik listesi, Claude kopyala düğmeleri,
  *    Node denetimi
  *  - her eylem panel düğmelerinin çağırdığı AYNI işlevi çağırır (aynı doğrulama, kapı,
@@ -25,6 +27,10 @@ window.KOtomasyon = (function () {
   var izin = { duzenleme: false, onay: true };   // bellekte: her açılışta güvenli varsayılan
   var bekleyenOnay = null;                         // { coz, saat }
   var mesgul = false;
+  // Deneme hakkıyla açılan oturum: mutlak süre sınırı (boşta sayacı gibi çağrılarla uzamaz). Diğer
+  // araçların denemesi tek işlemdir; köprünün denemesi bu yüzden süreyle sınırlı tek oturumdur.
+  var DENEME_OTURUMU = 30 * 60000;
+  var oturum = "";                                 // açıkken "pro" | "deneme"
 
   function el(id) { return document.getElementById(id); }
   function toast(m, t, sure, eylem) { try { if (window.KApp && KApp.toast) KApp.toast(m, t, sure, eylem); } catch (e) {} }
@@ -260,8 +266,11 @@ window.KOtomasyon = (function () {
       kayit: kaydet,
       gunluk: function (m) { try { K.log(m); } catch (e) {} },
       onKapandi: function (neden) {
+        oturum = "";
         if (bekleyenOnay) bekleyenOnay.coz(false);
         if (neden === "bosta") { durum("30 dakika çağrı gelmedi: köprü kapandı.", "warn"); toast("Yapay zekâ köprüsü kapandı (30 dakika boşta)", "warn"); }
+        if (neden === "sure") { durum("30 dakikalık deneme oturumu doldu: köprü kapandı.", "warn"); toast("Yapay zekâ köprüsü kapandı: deneme oturumu doldu", "warn"); }
+        if (neden === "pro") { durum("Pro lisansı artık etkin değil: köprü kapandı.", "warn"); toast("Yapay zekâ köprüsü kapandı: Pro lisansı etkin değil", "warn"); }
         arayuz();
       }
     });
@@ -287,21 +296,43 @@ window.KOtomasyon = (function () {
     if (!O || !S || !K.nodeOK) { durum("Bu ortamda köprü açılamaz (Node yok).", "bad"); return; }
     // Pro: köprüyü açmak (ücretsizde 3 deneme hakkı; hak yalnız köprü açılınca düşer). Her eylem ayrıca kendi kapısında.
     if (typeof Pro !== "undefined" && !Pro.gate("mcp", { deneme: true, yeniden: ac })) return;
+    // Pro değilken kapı yalnız kurulu deneme hakkıyla geçer: bu açılış süre sınırlı bir deneme oturumu
+    // (kapıyla aynı anda, await'ten önce okunur)
+    var deneme = typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro();
     mesgul = true;
     arayuz();
     durum("Köprü açılıyor…");
     if (!sunucu) sunucu = sunucuKur();
-    var sonuc = await sunucu.baslat().then(function (r) { return { ok: true, port: r.port }; },
+    oturum = deneme ? "deneme" : "pro";
+    var sonuc = await sunucu.baslat(deneme ? { sure: DENEME_OTURUMU } : undefined).then(function (r) { return { ok: true, port: r.port }; },
       function (e) { return { ok: false, hata: e && e.message ? e.message : String(e) }; });
     mesgul = false;
     if (sonuc.ok) {
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("mcp", KApp.toast);   // deneme: yalniz basarida
-      durum("Köprü açık: yalnız bu bilgisayardan (127.0.0.1), 30 dakika boşta kalırsa kapanır.", "good");
+      acikDurum();
       nodeDenetle();
+      proDegisti();   // açılış beklenirken Pro durumu değiştiyse (lisans gitti / alındı) hemen uygulanır
     } else {
+      oturum = "";
       durum("✕ Köprü açılamadı: " + sonuc.hata, "bad");
     }
     arayuz();
+  }
+
+  function acikDurum() {
+    if (oturum === "deneme") durum("Köprü açık (deneme): yalnız bu bilgisayardan (127.0.0.1), en çok 30 dakika; boşta kalırsa daha önce kapanır.", "good");
+    else durum("Köprü açık: yalnız bu bilgisayardan (127.0.0.1), 30 dakika boşta kalırsa kapanır.", "good");
+  }
+
+  // Pro durumu köprü açıkken de izlenir (Pro.on): Pro ile açılmış köprü lisans gidince (iade, koltuk
+  // taşıma / Pro.deactivate) hemen kapanır; deneme oturumunda Pro alınırsa süre sınırı kalkar.
+  function proDegisti() {
+    if (!sunucu || !sunucu.acikMi() || typeof Pro === "undefined" || typeof Pro.isPro !== "function") return;
+    if (Pro.isPro()) {
+      if (oturum === "deneme") { oturum = "pro"; sunucu.sureSiniri(0); acikDurum(); }
+      return;
+    }
+    if (oturum !== "deneme") sunucu.durdur("pro");
   }
 
   function kapat() {
@@ -358,6 +389,8 @@ window.KOtomasyon = (function () {
     // Panel yeniden yüklenir / Premiere kapanırken köprü kapanır, bağlantı dosyası silinir
     window.addEventListener("beforeunload", function () { if (sunucu) sunucu.durdur("panel"); });
     window.addEventListener("unload", function () { if (sunucu) sunucu.durdur("panel"); });
+    // yalnız dinleyici kaydı (ağ / Premiere yok): köprü kapalıyken hiçbir şey yapmaz
+    if (typeof Pro !== "undefined" && typeof Pro.on === "function") Pro.on(proDegisti);
     etkinlikCiz();
     arayuz();
   }
@@ -370,6 +403,10 @@ window.KOtomasyon = (function () {
     _YURUT: YURUT,
     _onayIste: onayIste,
     _izin: izin,
+    _ac: ac,
+    _oturum: function () { return oturum; },
+    _sunucu: function () { return sunucu; },
+    DENEME_OTURUMU: DENEME_OTURUMU,
     _etkinlik: function () { return etkinlik.slice(); }
   };
 })();

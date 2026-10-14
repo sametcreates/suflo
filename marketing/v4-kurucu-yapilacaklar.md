@@ -1511,3 +1511,12 @@ adım 22 kararıyla geçersiz: köprü 3.4'te Deneysel olarak geliyor. O satır�
 
 **MCP.8 Destek cevabı (10 dk).** `marketing/dm-cevaplari.md`'ye: "Claude Suflo'yu göremiyor" → (a) Ayarlar'da köprü açık mı,
 (b) Node 18+ kurulu mu ("Node'u denetle"), (c) Claude Desktop'u yeniden başlattın mı, (d) yazma için "Düzenlemeye izin ver" açık mı.
+
+**MCP.9 Karar: köprünün deneme hakları (5 dk).** Kademe "pro" olduğundan köprüyü açmak, diğer Pro araçları gibi 3 deneme
+hakkıyla geldi. Diğer araçlarda bir hak tek işlemdir; köprüde bir hak **bir oturumdur**. İnceleme sonrası bu oturum, asistan
+çağrı yapmaya devam etse de açıldıktan **en çok 30 dakika** sonra kapanır (`js/otomasyon-panel.js` › `DENEME_OTURUMU`); oturumda
+Pro alınırsa sınır kalkar. Pro ile açılan köprü lisans devre dışı kalınca (Ayarlar › Devre dışı bırak, iade) hemen kapanır.
+Karar ver: (a) böyle kalsın; (b) süre farklı olsun (`DENEME_OTURUMU`'nu değiştir, kart / README / `docs/mcp-guvenlik.html` /
+deneme listesi 22.2a metinlerindeki "30 dakika"yı güncelle); (c) köprüde deneme hiç olmasın: `js/deneme.js` › OZELLIKLER ve AD'den
+`mcp`'yi çıkar (`pro.js` › FEATURE_LABELS.mcp kalsın), `js/otomasyon-panel.js` › `ac()`'de `Pro.gate("mcp")` (deneme'siz) yap ve
+`denemeHarca("mcp")`'yi sil, `tests/test-deneme-baglanti.js` listelerini ve README "Pro'yu dene" satırını güncelle.

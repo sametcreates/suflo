@@ -8,18 +8,21 @@ function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "F
 function js(x) { return JSON.stringify(x); }
 function oku(f) { return fs.readFileSync(path.join(KOK, f), "utf8"); }
 
-function kur(dom) {
+function kur(dom, o) {
   dom = dom || {};
-  var c = { call: [], baslat: [], harca: [], olustur: 0, dinle: [], goster: [], toast: [] };
+  o = o || {};
+  var c = { call: [], baslat: [], harca: [], olustur: 0, dinle: [], goster: [], toast: [], sunucuBaslat: [], sureSiniri: [], proDinleyici: [] };
   var win = {};
   var sb = {
     window: win, console: console, setTimeout: setTimeout, clearTimeout: clearTimeout, setInterval: setInterval, clearInterval: clearInterval,
     Promise: Promise, JSON: JSON, Date: Date, Math: Math, Object: Object, Array: Array, String: String, Number: Number, RegExp: RegExp, Buffer: Buffer,
+    // CEP'te olduğu gibi Node: köprü sunucusu gerçek loopback'te açılır (yalnız _ac ile)
+    require: require, process: process,
     document: { getElementById: function (id) { return dom[id] || null; }, createElement: function () { return {}; }, body: {} },
     K: {
       nodeOK: true, VERSION: "3.4.0",
       call: function (fn, arg) { c.call.push([fn, arg]); return Promise.resolve({ ok: true, added: arg && arg.times ? arg.times.length : 0 }); },
-      settingsPath: function () { return "/tmp/Kesit/settings.json"; }, extensionPath: function () { return "/ext"; },
+      settingsPath: function () { return o.ayarYolu || "/tmp/Kesit/settings.json"; }, extensionPath: function () { return "/ext"; },
       path: require("path"), fs: { existsSync: function () { return false; }, unlinkSync: function () {} },
       hostMesgul: function () { return false; }, log: function () {}, ffmpegKurulu: function () { return "/x/ffmpeg"; },
       run: function () { return Promise.resolve({ code: 0, stdout: "v20.1.0\n" }); }
@@ -28,7 +31,12 @@ function kur(dom) {
       denemeBaslat: function (f) { c.baslat.push(f); return true; },
       denemeHarca: function (f) { c.harca.push(f); return 2; },
       izinVar: function () { return { ok: true, deneme: true }; },
-      gate: function () { return true; }
+      gate: function () { return true; },
+      // Pro durumu (pro.js'teki gibi): isPro + on(dinleyici); _degis lisans değişimini (emit) taklit eder
+      _pro: o.pro !== undefined ? o.pro : true,
+      isPro: function () { return sb.Pro._pro; },
+      on: function (fn) { c.proDinleyici.push(fn); },
+      _degis: function (v) { sb.Pro._pro = v; c.proDinleyici.forEach(function (fn) { fn({ pro: v }); }); }
     },
     KApp: {
       toast: function (m, t, sure, eylem) {
@@ -45,7 +53,15 @@ function kur(dom) {
   vm.runInContext(oku("js/otomasyon-sunucu.js"), sb, { filename: "otomasyon-sunucu.js" });
   // sunucu kurulumu sayılır (açılışta HİÇ kurulmamalı)
   var gercek = sb.window.SufloOtomasyonSunucu.olustur;
-  sb.window.SufloOtomasyonSunucu.olustur = function (s) { c.olustur++; return gercek(s); };
+  sb.window.SufloOtomasyonSunucu.olustur = function (s) {
+    c.olustur++;
+    var x = gercek(s);
+    // açılış seçenekleri (deneme süre sınırı) ve süre sınırı değişimleri kaydedilir
+    var b = x.baslat, ss = x.sureSiniri;
+    x.baslat = function (a) { c.sunucuBaslat.push(a === undefined ? "yok" : a); return b(a); };
+    x.sureSiniri = function (ms) { c.sureSiniri.push(ms); return ss(ms); };
+    return x;
+  };
   sb.window.KCaptions = {
     getSegments: function () { return [{ start: 0, end: 1.5, text: "Merhaba" }, { start: 1.5, end: 3, text: "dünya" }]; },
     mcpOlustur: function (a) { c.olustur_a = a; return new Promise(function (r) { setTimeout(function () { r({ ok: true, satir: 2 }); }, 30); }); },
@@ -146,6 +162,64 @@ async function main() {
   var p3 = u.P._onayIste("suflo_metinden_kes", {}, "Konuşmadan kes (kopyada)", 600);
   var p3sonuc = await p3;
   ok("yanıt gelmezse süre dolunca reddedilir", p3sonuc === false && dom["mcp-onay-kart"].hidden === true);
+
+  /* ---- Pro / deneme oturumu (inceleme bulgusu) ---- */
+  // Deneme hakkıyla açılan köprü, çağrılar boşta sayacını sıfırladıkça süresiz açık kalıyordu; Pro yalnız
+  // açılışta denetleniyordu (Pro.deactivate / iade sonrası köprü panel yeniden yüklenene kadar açık kalıyordu)
+  var os = require("os");
+  var tmp = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-mcp-panel-"));
+  function kartDom() {
+    var d = {};
+    ["mcp-ac", "mcp-jeton", "mcp-acik-rozet", "mcp-durum", "mcp-node", "mcp-onay-kart"].forEach(function (id) { d[id] = eleman(id); d[id].className = ""; });
+    d["mcp-ac"].classList = { toggle: function () {} };
+    return d;
+  }
+  var bagFile = path.join(tmp, "otomasyon.json");
+  var dd = kartDom();
+  var dn = kur(dd, { pro: false, ayarYolu: path.join(tmp, "settings.json") });
+  dn.P.init();
+  ok("init: Pro durumu dinlenir (yalnız dinleyici kaydı, sunucu yok)", dn.c.proDinleyici.length === 1 && dn.c.olustur === 0);
+  await dn.P._ac();
+  ok("ücretsiz + deneme hakkı: köprü açılır, 'deneme' oturumu, hak açılınca düşer",
+    dn.P.acikMi() && dn.P._oturum() === "deneme" && js(dn.c.harca) === '["mcp"]' && fs.existsSync(bagFile), dn.P._oturum() + " " + js(dn.c.harca));
+  ok("deneme oturumu 30 dakikalık MUTLAK süre sınırıyla açılır (çağrılar uzatmaz)",
+    dn.P.DENEME_OTURUMU === 30 * 60000 && dn.c.sunucuBaslat.length === 1 && dn.c.sunucuBaslat[0] && dn.c.sunucuBaslat[0].sure === 30 * 60000, js(dn.c.sunucuBaslat));
+  ok("durum satırı deneme oturumunu ve süresini söyler", /deneme/.test(dd["mcp-durum"].textContent) && /30 dakika/.test(dd["mcp-durum"].textContent), dd["mcp-durum"].textContent);
+  dn.sb.Pro._degis(false);   // başka bir Pro olayı (ör. hak sayısı değişti): deneme oturumu sürer
+  ok("deneme oturumunda Pro olayı (hâlâ ücretsiz) köprüyü kapatmaz", dn.P.acikMi() && dn.P._oturum() === "deneme");
+  // süre dolunca kapanır (sınır testte kısaltılır)
+  dn.P._sunucu().sureSiniri(40);
+  await bekle(150);
+  ok("deneme süresi dolunca köprü kapanır, dosya silinir, kullanıcıya söylenir",
+    !dn.P.acikMi() && dn.P._oturum() === "" && !fs.existsSync(bagFile) && /deneme oturumu doldu/.test(dd["mcp-durum"].textContent) &&
+    dn.c.toast.some(function (x) { return /deneme oturumu doldu/.test(x.m); }), dd["mcp-durum"].textContent);
+
+  // deneme oturumunda Pro alınırsa süre sınırı kalkar
+  dn.c.sureSiniri = [];
+  await dn.P._ac();
+  ok("ikinci deneme açılışı da süre sınırlı", dn.P._oturum() === "deneme" && dn.c.sunucuBaslat[dn.c.sunucuBaslat.length - 1].sure === 30 * 60000);
+  dn.sb.Pro._degis(true);
+  ok("deneme oturumunda Pro alınınca: oturum Pro'ya döner, süre sınırı kaldırılır (sureSiniri(0))",
+    dn.P.acikMi() && dn.P._oturum() === "pro" && js(dn.c.sureSiniri) === "[0]" && !/deneme/.test(dd["mcp-durum"].textContent), js(dn.c.sureSiniri));
+  // ... ve sonra lisans giderse köprü kapanır
+  dn.sb.Pro._degis(false);
+  ok("Pro'ya dönen oturumda lisans gidince köprü kapanır", !dn.P.acikMi() && dn.P._oturum() === "");
+
+  // Pro ile açılan köprü: lisans gidince (Pro.deactivate / iade) hemen kapanır
+  var dp = kartDom();
+  var pp = kur(dp, { pro: true, ayarYolu: path.join(tmp, "settings.json") });
+  pp.P.init();
+  await pp.P._ac();
+  ok("Pro kullanıcı: köprü süre sınırı OLMADAN açılır, deneme hakkı harcanmaz", pp.P.acikMi() && pp.P._oturum() === "pro" && pp.c.sunucuBaslat[0] === "yok", js(pp.c.sunucuBaslat));
+  pp.sb.Pro._degis(true);
+  ok("Pro olayı (hâlâ Pro): köprü açık kalır", pp.P.acikMi());
+  pp.sb.Pro._degis(false);
+  ok("Pro.deactivate / iade: köprü hemen kapanır, dosya silinir, kullanıcıya söylenir",
+    !pp.P.acikMi() && !fs.existsSync(bagFile) && /Pro lisansı artık etkin değil/.test(dp["mcp-durum"].textContent) &&
+    pp.c.toast.some(function (x) { return /Pro lisansı etkin değil/.test(x.m); }), dp["mcp-durum"].textContent);
+  pp.sb.Pro._degis(false);
+  ok("kapalı köprüde Pro olayı bir şey yapmaz", !pp.P.acikMi() && pp.c.sunucuBaslat.length === 1);
+  try { fs.rmdirSync(tmp); } catch (e) {}
 
   /* ---- kaynak denetimleri ---- */
   var src = oku("js/otomasyon-panel.js");

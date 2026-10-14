@@ -20,9 +20,9 @@ function govde(src, imza) {
 // [dosya, işlev imzası, özellik, başarı denetimi (harcamadan ÖNCE gelmeli), harcama bekleniyor mu]
 var SITELER = [
   ["js/magiccut.js", "async function analyze(ev)", "cut", null, false],
-  ["js/magiccut.js", "async function apply()", "cut", "if (r.ok) {", true],
+  ["js/magiccut.js", "async function apply(ek)", "cut", "if (r.ok) {", true],
   ["js/konusma-kes.js", "async function analyze(zorla)", "textcut", null, false],
-  ["js/konusma-kes.js", "async function apply()", "textcut", "if (res.ok) {", true],
+  ["js/konusma-kes.js", "async function apply(ek)", "textcut", "if (res.ok) {", true],
   ["js/viral.js", "async function bul()", "highlights", "if (!bulunan.length) throw", true],
   ["js/ses.js", "async function iyilestir()", "audioclean", "if (!sonuclar.length) throw", true],
   ["js/kanca.js", "async function ekle(ek)", "overlay", "if (!yer.ok) throw", true],

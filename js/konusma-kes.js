@@ -521,8 +521,15 @@ window.KTextCut = (function () {
     }
   }
 
-  async function apply() {
-    if (typeof Pro !== "undefined" && !Pro.gate("textcut", { deneme: true, yeniden: apply })) return;
+  // ek.cloneFirst === true (Yapay zekâ köprüsü): kopya sekans zorunlu. Hedef İLK await'ten ÖNCE bir kez
+  // okunur: Premiere'e sorulurken "Bu sekansta"ya basılması bu kesimin yerini değiştirmez; köprü de
+  // paylaşılan "target"a hiç yazmaz (kesim sürerken kullanıcının seçtiği hedef ezilmez).
+  // Düğmenin tık olayı (Event) cloneFirst taşımaz: o an seçili hedef geçerli.
+  async function apply(ek) {
+    var kopyaZorunlu = !!(ek && ek.cloneFirst === true);
+    var hedef = kopyaZorunlu ? "clone" : target;
+    var yeniden = kopyaZorunlu ? function () { return apply({ cloneFirst: true }); } : apply;
+    if (typeof Pro !== "undefined" && !Pro.gate("textcut", { deneme: true, yeniden: yeniden })) return;
     // Premiere yüzlerce kesimde yavaşlar: en fazla 300 (yakın kesimler birleşir, en kısalar kalır)
     // birleşme yalnız arasında tutulan kelime olmayan boşluklarda (konuşma yutulmaz)
     var tutulan = words.filter(function (w, i) { return !kesilsinMi(i); });
@@ -543,12 +550,12 @@ window.KTextCut = (function () {
     el("tc-apply").disabled = true;
     status("Uygulanıyor…");
     try {
-      var arg = { ranges: r, removeMode: "ripple", cloneFirst: target === "clone" };
+      var arg = { ranges: r, removeMode: "ripple", cloneFirst: hedef === "clone" };
       // kopya sekansın adı: "<sekans> — Suflo Temiz"; dokunulmamış özgün sekans yedektir
       // (ad Premiere'e veri olarak gider, çevirmen görmez: arayüz diliyle burada kurulur)
-      if (target === "clone" && tazeCtx.ok && tazeCtx.sequence) {
-        var ek = window.SufloI18n && SufloI18n.getLang && SufloI18n.getLang() === "en" ? " — Suflo Clean" : " — Suflo Temiz";
-        arg.cloneName = String(tazeCtx.sequence) + ek;
+      if (hedef === "clone" && tazeCtx.ok && tazeCtx.sequence) {
+        var adEki = window.SufloI18n && SufloI18n.getLang && SufloI18n.getLang() === "en" ? " — Suflo Clean" : " — Suflo Temiz";
+        arg.cloneName = String(tazeCtx.sequence) + adEki;
       }
       var res = await K.call("KS_applyCuts", arg, 900000);
       if (res.ok) {
@@ -575,12 +582,10 @@ window.KTextCut = (function () {
   }
 
   // Yapay zekâ köprüsü (MCP, 3.4): "Uygula" düğmesinin aynı işlevi, HER ZAMAN kopya sekansta
+  // (açık seçenekle; panelin hedef düğmeleri bu kesimi etkilemez, köprü de onları değiştirmez)
   async function mcpKes() {
     if (!words.length) return { ok: false, hata: "analiz_yok", mesaj: "Prepare the Text-based cut in the Suflo panel first (no analysed transcript)." };
-    var eski = target;
-    target = "clone";
-    var res;
-    try { res = await apply(); } finally { target = eski; }
+    var res = await apply({ cloneFirst: true });
     var st = el("tc-status");
     if (!res) return { ok: false, hata: "uygulanamadi", mesaj: (st && st.textContent) || "Nothing to cut." };
     if (!res.ok) return { ok: false, hata: "uygulanamadi", mesaj: res.error || "Not applied." };

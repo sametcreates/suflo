@@ -18,7 +18,8 @@
  *  - kapatma anahtarı: köprü kapanınca kuyruktaki, meşgul beklemesindeki ve onay bekleyen hiçbir
  *    istek yürütülmez (503 kopru_kapali); izin / Pro yürütmeden hemen önce yeniden denetlenir
  *  - hata metinleri de temizlenir (mutlak yol → dosya adı); reddedilen istekler de günlüğe yazılır
- *  - 30 dakika çağrı gelmezse kendiliğinden kapanır
+ *  - 30 dakika çağrı gelmezse kendiliğinden kapanır; deneme oturumu ayrıca mutlak süre sınırıyla
+ *    (baslat({ sure })) kapanır, çağrılar bu sınırı uzatmaz
  *
  * Saf Node (http/crypto/fs/path enjekte edilebilir): DOM'a dokunmaz, testte gerçek loopback
  * sunucusuyla çalışır. CEF 74 / Node 12.3 uyumlu.
@@ -78,6 +79,7 @@
     var calisan = false;        // aynı anda tek eylem
     var kuyruk = [];            // bekleyen eylemler: { calistir: function(), reddet: function(hata) }
     var bostaSaat = null;
+    var sureSaat = null;        // oturumun mutlak süre sınırı (deneme oturumu): çağrılar uzatmaz
     var acik = false;
     // Oturum kuşağı: her açılış ve kapanışta artar. Kabul edilmiş bir istek kuyrukta, meşgul
     // beklemesinde ya da onay kartında beklerken köprü kapatılırsa (ya da kapatılıp yeniden
@@ -177,6 +179,15 @@
       if (!acik || !(bostaKapanma > 0)) return;
       bostaSaat = setTimeout(function () { durdur("bosta"); }, bostaKapanma);
       if (bostaSaat && bostaSaat.unref) bostaSaat.unref();
+    }
+
+    // Mutlak süre sınırı: boşta sayacından farklı olarak çağrılar onu UZATMAZ (deneme oturumu en çok
+    // bu kadar açık kalır). ms <= 0 ya da sayı değilse sınır kaldırılır (ör. oturum sırasında Pro alındı).
+    function sureSiniri(ms) {
+      if (sureSaat) { clearTimeout(sureSaat); sureSaat = null; }
+      if (!acik || typeof ms !== "number" || !(ms > 0)) return;
+      sureSaat = setTimeout(function () { durdur("sure"); }, ms);
+      if (sureSaat && sureSaat.unref) sureSaat.unref();
     }
 
     function hizAsildi() {
@@ -400,7 +411,9 @@
 
     /* ---------------- Aç / kapat ---------------- */
 
-    function baslat() {
+    // o.sure (ms): oturumun mutlak süre sınırı (deneme oturumu); verilmezse yalnız boşta kapanma
+    function baslat(o) {
+      o = o || {};
       return new Promise(function (resolve, reject) {
         if (acik) { resolve({ port: port }); return; }
         yeniToken();
@@ -419,7 +432,8 @@
           try { dosyaYaz(); }
           catch (e3) { durdur("dosya"); reject(e3); return; }
           bostaKur();
-          log("[mcp] kopru acildi (127.0.0.1)");
+          sureSiniri(o.sure);
+          log("[mcp] kopru acildi (127.0.0.1)" + (o.sure > 0 ? " sure siniri " + Math.round(o.sure / 60000) + " dk" : ""));
           resolve({ port: port });
         });
       });
@@ -429,6 +443,7 @@
       var oncedenAcik = acik;
       acik = false;
       if (bostaSaat) { clearTimeout(bostaSaat); bostaSaat = null; }
+      if (sureSaat) { clearTimeout(sureSaat); sureSaat = null; }
       dosyaSil();
       token = ""; tokenBuf = null;
       if (sunucu) { try { sunucu.close(); } catch (e) {} sunucu = null; }
@@ -458,6 +473,7 @@
       baslat: baslat,
       durdur: durdur,
       jetonYenile: jetonYenile,
+      sureSiniri: sureSiniri,
       acikMi: function () { return acik; },
       port: function () { return port; },
       _token: function () { return token; }

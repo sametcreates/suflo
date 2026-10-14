@@ -137,6 +137,44 @@ function kesimKur(o) {
   return { api: f(E), c: c, dom: dom };
 }
 
+// suflo_sessizlik_kes: apply + mcpKes GERÇEK kaynağı; hedef düğmesi (Kopya / Bu sekansta) target'a yazar
+var mcUygulaKod = [
+  kes(mc, "function activeRanges()"),
+  kes(mc, "async function apply(ek)"),
+  kes(mc, "function durumMetni()"),
+  kes(mc, "async function mcpKes()")
+].join("\n");
+function kesimUygulaKur(o) {
+  o = o || {};
+  var c = { call: [], bekleyen: [], toast: [] };
+  function eleman(id, deger) { return { id: id, value: deger, textContent: "", className: "inline-status", hidden: false, disabled: false }; }
+  var dom = { "cut-status": eleman("cut-status"), "cut-apply": eleman("cut-apply"), "cut-mode": eleman("cut-mode", o.mod || "ripple") };
+  var E = {
+    dom: dom,
+    ranges: [{ start: 12, end: 13, keep: true }, { start: 15, end: 16, keep: true }],
+    KApp: { toast: function (m, t) { c.toast.push([m, t]); } },
+    K: {
+      // KS_applyCuts uzun sürer: test bitirene kadar bekler (kesim sürerken hedef düğmesine basılabilir)
+      call: function (fn, arg) {
+        c.call.push([fn, arg]);
+        return new Promise(function (r) { c.bekleyen.push(function () { r({ ok: true, newSeq: arg.cloneFirst ? "Vlog — kopya" : "", removed: arg.ranges.length }); }); });
+      }
+    }
+  };
+  var f = new Function("E", [
+    "var target = " + JSON.stringify(o.hedef || "clone") + ", ranges = E.ranges, Pro;",
+    "var KApp = E.KApp, K = E.K;",
+    "function el(id) { return E.dom[id] || null; }",
+    "function status(m, cls) { var e = el('cut-status'); e.className = 'inline-status' + (cls ? ' ' + cls : ''); e.textContent = m || ''; }",
+    "function sesiKapat() {}",
+    mcUygulaKod,
+    // init'teki hedef düğmesi işleyicisinin yaptığı: target = b.dataset.m
+    "return { mcpKes: mcpKes, apply: apply, hedefSec: function (m) { target = m; } };"
+  ].join("\n"));
+  return { api: f(E), c: c, dom: dom };
+}
+function birTur() { return new Promise(function (r) { setTimeout(r, 0); }); }
+
 async function main() {
   /* ---- suflo_altyazi_kanala ---- */
   var a = altyaziKur({ uygulananSekans: { s1: 1 } });
@@ -231,6 +269,35 @@ async function main() {
   var my = kesimKur({ run: function () { return { code: 0, stderr: "" }; } });
   r = await my.api.mcpAnaliz({});
   ok("bu eşikte duraksama yok: ok:true, boş aralık (analiz gerçekten yapıldı)", r.ok === true && r.araliklar.length === 0, js(r));
+
+  /* ---- suflo_sessizlik_kes: kopya sekans açık seçenekle, kullanıcının hedef seçimi ezilmez ---- */
+  // İnceleme bulgusu: mcpKes paylaşılan target'ı "clone" yapıp finally'de geri yüklüyordu; kesim (15 dk'ya
+  // kadar) sürerken kullanıcının bastığı hedef düğmesi kesim bitince eski değere dönüyor, arayüz başka şey gösteriyordu
+  var u = kesimUygulaKur({ hedef: "here", mod: "ripple" });
+  var kp = u.api.mcpKes();
+  await birTur();
+  ok("köprü kesimi: kullanıcı 'Bu sekansta' seçmiş olsa da kopyada (cloneFirst, ripple)", u.c.call.length === 1 && u.c.call[0][1].cloneFirst === true && u.c.call[0][1].removeMode === "ripple", js(u.c.call[0] && u.c.call[0][1]));
+  u.api.hedefSec("clone");   // kesim sürerken kullanıcı "Kopya sekansta"ya bastı
+  u.c.bekleyen.shift()();
+  r = await kp;
+  ok("köprü kesimi başarı: kopya sekans adı döner", r.ok === true && r.kopyaSekans === "Vlog — kopya", js(r));
+  var ep = u.api.apply({ type: "click" });   // ardından elle "Uygula" (tık olayı cloneFirst taşımaz)
+  await birTur();
+  ok("kesim sürerken seçilen 'Kopya sekansta' ezilmez: elle 'Uygula' kopyada", u.c.call.length === 2 && u.c.call[1][1].cloneFirst === true, js(u.c.call[1] && u.c.call[1][1]));
+  u.c.bekleyen.shift()(); await ep;
+
+  var v = kesimUygulaKur({ hedef: "clone", mod: "gap" });
+  kp = v.api.mcpKes();
+  await birTur();
+  v.api.hedefSec("here");    // kesim sürerken "Bu sekansta"
+  v.c.bekleyen.shift()();
+  r = await kp;
+  ep = v.api.apply({ type: "click" });
+  await birTur();
+  ok("kesim sürerken seçilen 'Bu sekansta' geri alınmaz: elle 'Uygula' özgün sekansta, seçili yöntemle",
+    r.ok === true && v.c.call.length === 2 && v.c.call[1][1].cloneFirst === false && v.c.call[1][1].removeMode === "gap", js(v.c.call[1] && v.c.call[1][1]));
+  v.c.bekleyen.shift()(); await ep;
+  ok("magiccut: mcpKes paylaşılan target'a yazmaz", !/target\s*=/.test(kes(mc, "async function mcpKes()")));
 
   console.log("\n" + gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);

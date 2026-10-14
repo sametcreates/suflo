@@ -3246,6 +3246,14 @@
     "Bu ortamda köprü açılamaz (Node yok).": "The bridge cannot run here (no Node).",
     "Köprü açılıyor…": "Turning the bridge on…",
     "Köprü açık: yalnız bu bilgisayardan (127.0.0.1), 30 dakika boşta kalırsa kapanır.": "Bridge on: this computer only (127.0.0.1); it turns off after 30 idle minutes.",
+    "Köprü açık (deneme): yalnız bu bilgisayardan (127.0.0.1), en çok 30 dakika; boşta kalırsa daha önce kapanır.":
+      "Bridge on (trial): this computer only (127.0.0.1), for at most 30 minutes; it turns off sooner if idle.",
+    "30 dakikalık deneme oturumu doldu: köprü kapandı.": "The 30-minute trial session ended: the bridge turned off.",
+    "Yapay zekâ köprüsü kapandı: deneme oturumu doldu": "AI bridge turned off: the trial session ended",
+    "Pro lisansı artık etkin değil: köprü kapandı.": "Your Pro license is no longer active: the bridge turned off.",
+    "Yapay zekâ köprüsü kapandı: Pro lisansı etkin değil": "AI bridge turned off: Pro license not active",
+    "Açmak Pro gerektirir. Ücretsiz hesapta 3 deneme oturumu var; her biri en çok 30 dakika sürer.":
+      "Turning it on needs Pro. Free accounts get 3 trial sessions of up to 30 minutes each.",
     "✕ Köprü açılamadı: {}": "✕ Could not turn the bridge on: {}",
     "Köprü kapalı.": "Bridge off.",
     "Yeni jeton oluşturuldu: eski jeton artık geçmez": "New token created: the old token no longer works",
