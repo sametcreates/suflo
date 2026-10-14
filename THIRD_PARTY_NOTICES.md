@@ -91,6 +91,10 @@ SOFTWARE.
     `bakeFactors`, `turningPoints`, `slopeAt`), `speedgraph.js` (`endpointSpeeds`, `withStartSpeed`,
     `withEndSpeed`, `sampleSpeed`, `speedRange`) and `overshoot.js` (`dampedSine`, `extremaTimes`,
     `autoDuration`, `followThroughAnchors`). Each ported function is marked `// Rebound: <name>`.
+    Suflo modification: `spring` computes its settle time per damping regime, including the initial
+    amplitude and, for overdamped springs, the slow root (Rebound's envelope formula left critically and
+    overdamped springs well short of the target at the end of `springNormalized`); Rebound's own
+    `settleTime(w0, zeta)` stays exported unchanged.
     Rebound's After Effects temporal-ease conversion, sparse Hermite fitting and its ingest server were
     not ported. Suflo's own clean-room additions in the same file: multi-point curves (a chain of cubic
     segments, each solved with its own general-cubic Newton plus bisection), `normalize`, `split`

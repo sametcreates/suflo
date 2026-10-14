@@ -1,4 +1,5 @@
 // Suflo testi: js/ease-curve.js — Yumuşatma motoru (3.4 adım 9)
+// Portions adapted from Rebound (https://github.com/meszmate/rebound), MIT License, Copyright (c) 2026 Rebound contributors. See THIRD_PARTY_NOTICES.md.
 // Rebound'un (MIT, commit 0f9fd6c) bezier/penner/spring/sampler/speedgraph/overshoot vitest
 // durumları Suflo'nun ok() biçimine uyarlandı (THIRD_PARTY_NOTICES.md › Rebound); geri kalanı Suflo'nun.
 var fs = require("fs"), path = require("path");
@@ -123,6 +124,31 @@ var S = E.spring;
   for (t = 0; t < lively.settleTime * 0.5; t += lively.settleTime / 200) if (Math.abs(lively.fn(t) - 1) > 0.01) once = true;
   ok("yay settleTime içinde oturur (sonrasında hep %1 bandında, öncesinde değil)", icinde && once && isFinite(lively.settleTime), lively.settleTime);
   ok("resolveParams fiziksel varsayılanlar", js(E.resolveParams({})) === js({ mass: 1, stiffness: 100, damping: 10, velocity: 0 }));
+
+  // Suflo: settleTime her rejimde gerçekten oturur (kritik ve aşırı sönümlüde yavaş kök, az
+  // sönümlüde başlangıç genliği). Eskiden bounce ≤ 0 yay hedefin çok gerisinde kalıyor ve
+  // pişirilen eğri son karede 1'e sıçrıyordu.
+  var rejimler = [{ response: 0.5, bounce: 0.4 }, { response: 0.5, bounce: 0.05 }, { response: 0.5, bounce: 0.01 }, { response: 0.5, bounce: 0 },
+    { response: 0.5, bounce: -0.3 }, { response: 0.5, bounce: -0.5 }, { response: 2, bounce: -0.95 }, { response: 0.5, dampingFraction: 2 },
+    { response: 0.5, dampingFraction: 5 }, { stiffness: 100, damping: 20 }, { stiffness: 100, damping: 40 }, { mass: 1, stiffness: 100, damping: 80 },
+    { mass: 0.01, stiffness: 0.1, damping: 10000 }, { stiffness: 100, damping: 20, velocity: -1000 }, { stiffness: 100, damping: 60, velocity: 1000 }];
+  var oturmayan = rejimler.filter(function (o) {
+    var y = S.spring(o), son = 0;
+    for (t = y.settleTime; t <= y.settleTime * 4; t += y.settleTime / 400) son = Math.max(son, Math.abs(y.fn(t) - 1));
+    return !(isFinite(y.settleTime) && son <= 0.005 + 1e-9);
+  });
+  ok("yay: settleTime'dan sonra her rejimde hedefin %0,5'i içinde (kritik, aşırı sönümlü, kritiğe yakın, ilk hızlı)", oturmayan.length === 0, js(oturmayan));
+  var sicrayan = rejimler.filter(function (o) {
+    var c = { type: "spring" };
+    Object.keys(o).forEach(function (k) { c[k] = o[k]; });
+    return Math.abs(E.toFunction(c)(0.999) - 1) >= 0.01 || Math.abs(E.toFunction(c)(0.99) - 1) >= 0.01;
+  });
+  ok("yay: normalize eğri 1'e varmadan hedefin %1'i içinde (son karede sıçrama yok)", sicrayan.length === 0, js(sicrayan));
+  var sonAnahtar = [0, -0.3, -0.95].map(function (b) {
+    var pl = E.bakePlan({ t0: 0, t1: 1, v0: 0, v1: 1000, fps: 30, curve: { type: "spring", response: 0.5, bounce: b } });
+    return pl.keys[pl.keys.length - 1].v;
+  });
+  ok("bakePlan: bounce 0 / −0,3 / −0,95 yayında son iç anahtar hedefin %1'i içinde", sonAnahtar.every(function (v) { return Math.abs(v - 1000) < 10; }), js(sonAnahtar));
 })();
 
 /* ================= Rebound: sampler.test.mjs (samplePoints, range, bakeFactors) ================= */
@@ -236,6 +262,17 @@ var S = E.spring;
   for (var z = 0; z < 100000; z++) kotuGirdi.pts.push({ x: Math.random(), y: Math.random() });
   var bas = Date.now(), kn = E.normalize(kotuGirdi);
   ok("normalize multi: dev nokta listesi hızlı ve sınırlı (ilk 64 incelenir)", kn.pts.length <= 8 && Date.now() - bas < 200);
+  // tam 0,01 aralık yasal: kayan nokta artığı (0,05 + 0,01 = 0,060000000000000005) noktayı atmamalı
+  var dusen = [];
+  for (var g = 1; g <= 98; g++) {
+    var a1 = g / 100, a2 = (g + 1) / 100;
+    var n1 = E.normalize({ type: "multi", pts: [{ x: 0, y: 0 }, { x: a1, y: 0.3 }, { x: a2, y: 0.6 }, { x: 1, y: 1 }] });
+    if (n1.pts.length !== 4 || js(E.normalize(n1)) !== js(n1)) dusen.push(a1 + "/" + a2);
+  }
+  ok("normalize multi: tam 0,01 aralıklı noktalar korunur, normalize∘normalize = normalize", dusen.length === 0 &&
+    E.normalize({ type: "multi", pts: [{ x: 0, y: 0 }, { x: 0.14, y: 0.1 }, { x: 0.15, y: 0.8 }, { x: 1, y: 1 }] }).pts.length === 4 &&
+    E.normalize({ type: "multi", pts: [{ x: 0, y: 0 }, { x: 0.05, y: 0.3 }, { x: 0.06, y: 0.6 }, { x: 1, y: 1 }] }).pts.length === 4 &&
+    E.normalize({ type: "multi", pts: [{ x: 0, y: 0 }, { x: 0.01, y: 0.3 }, { x: 0.99, y: 0.6 }, { x: 1, y: 1 }] }).pts.length === 4, dusen.join(" "));
 })();
 
 /* ================= Suflo: split (de Casteljau) ================= */
@@ -256,6 +293,24 @@ var S = E.spring;
   var dolu = E.builtin("yumusak").curve;
   [0.1, 0.2, 0.3, 0.4, 0.5, 0.6].forEach(function (x) { dolu = E.split(dolu, x) || dolu; });
   ok("split: 8 noktada durur", dolu.pts.length === 8 && E.split(dolu, 0.8) === null && enBuyukFark(E.builtin("yumusak").curve, dolu) < 1e-5);
+  // sınırda bölme (komşu + 0,01 ve 1 − 0,01): nokta eklenir ve şekil aynı kalır; asla şekli değişmiş eğri dönmez
+  var sinirda = [[E.builtin("yumusak-giris-cikis").curve, 0.01], [E.builtin("yumusak-giris-cikis").curve, 0.99], [E.builtin("guclu-s").curve, 0.01],
+    [E.builtin("guclu-s").curve, 0.99], [E.builtin("yumusak").curve, 0.01], [E.builtin("yumusak").curve, 0.99], [E.builtin("cift-yumusak").curve, 0.51],
+    [E.builtin("cift-yumusak").curve, 0.49], [E.split(E.builtin("yumusak").curve, 0.3), 0.31], [E.split(E.builtin("yumusak").curve, 0.3), 0.29]];
+  var bozulan = sinirda.filter(function (s) {
+    var sp = E.split(s[0], s[1]);
+    return !sp || sp.pts.length !== E.toMulti(s[0]).pts.length + 1 || enBuyukFark(s[0], sp) > 1e-5;
+  }).map(function (s) { return s[1]; });
+  ok("split: komşudan tam 0,01 uzakta ve 0,99'da nokta eklenir, şekil değişmez", bozulan.length === 0, js(bozulan));
+  var sekilBozuk = [];
+  [E.builtin("yumusak").curve, E.builtin("guclu-s").curve, E.builtin("cift-yumusak").curve, { type: "bezier", x1: 1, y1: 0, x2: 0, y2: 1 },
+    { type: "bezier", x1: 0.9, y1: -0.5, x2: 0.1, y2: 1.6 }].forEach(function (c0, ci) {
+    for (var q = 0; q <= 100; q++) {
+      var sp = E.split(c0, q / 100);
+      if (sp && (sp.pts.length !== E.toMulti(c0).pts.length + 1 || enBuyukFark(c0, sp, 400) > 1e-4)) sekilBozuk.push(ci + "@" + q / 100);
+    }
+  });
+  ok("split: 0,01 ızgarasının her yerinde ya null ya da aynı şekil (+1 nokta)", sekilBozuk.length === 0, sekilBozuk.join(" "));
 })();
 
 /* ================= Suflo: flip / invert ================= */
@@ -279,6 +334,20 @@ var S = E.spring;
   var af = E.toFunction(E.flip(asim)), ag = E.toFunction(asim);
   ok("flip: asimetrik çok noktalı eğri döner, flip∘flip özdeş", [0.15, 0.4, 0.69, 0.9].every(function (x) { return yakin(af(x), 1 - ag(1 - x), 1e-5); }) &&
     js(E.flip(E.flip(asim))) === js(asim));
+  // noktaları tam 0,01 aralıklı eğrilerde flip nokta kaybetmez, flip∘flip özdeş
+  var flipKayip = [];
+  for (var fx = 1; fx <= 97; fx++) {
+    var b1 = fx / 100, b2 = (fx + 1) / 100;
+    var c01 = E.normalize({ type: "multi", pts: [{ x: 0, y: 0 }, { x: b1, y: 0.3, ox: b1 + 0.005, oy: 0.5 }, { x: b2, y: 0.6, ix: b2 - 0.004, iy: 0.4 }, { x: 1, y: 1 }] });
+    var fl = E.flip(c01), ff = E.flip(fl);
+    if (c01.pts.length !== 4 || fl.pts.length !== 4 || js(ff) !== js(c01) ||
+      [0.2, 0.5, 0.8].some(function (x) { return !yakin(E.toFunction(fl)(x), 1 - E.toFunction(c01)(1 - x), 1e-5); })) flipKayip.push(b1 + "/" + b2);
+  }
+  ok("flip∘flip: noktaları tam 0,01 aralıklı eğrilerde özdeşlik, flip nokta kaybetmez", flipKayip.length === 0, flipKayip.join(" "));
+  var yAdim = E.normalize({ type: "multi", pts: [{ x: 0, y: 0 }, { x: 0.3, y: 0.05 }, { x: 0.6, y: 0.06 }, { x: 0.8, y: 0.07 }, { x: 1, y: 1 }] });
+  var yAdimTers = E.invert(yAdim);
+  ok("invert∘invert: y değerleri tam 0,01 aralıklı tekdüze eğride özdeşlik", yAdimTers && yAdimTers.pts.length === 5 && js(E.invert(yAdimTers)) === js(yAdim),
+    yAdimTers ? yAdimTers.pts.length : "null");
 
   var tekduze = ["dogrusal", "yumusak", "yumusak-giris", "yumusak-cikis", "yumusak-giris-cikis", "sert-giris", "sert-cikis", "guclu-s", "cift-yumusak"];
   var invOzdes = tekduze.every(function (id) {
@@ -394,7 +463,11 @@ var S = E.spring;
 
 /* ================= Atıf ve paket ================= */
 var src = fs.readFileSync(path.join(KOK, "js", "ease-curve.js"), "utf8");
-ok("başlık: Rebound MIT atfı (plandaki metin)", src.indexOf("Portions adapted from Rebound (https://github.com/meszmate/rebound), MIT License, Copyright (c) 2026 Rebound contributors. See THIRD_PARTY_NOTICES.md.") !== -1);
+var REBOUND_BASLIK = "Portions adapted from Rebound (https://github.com/meszmate/rebound), MIT License, Copyright (c) 2026 Rebound contributors. See THIRD_PARTY_NOTICES.md.";
+ok("başlık: Rebound MIT atfı (plandaki metin)", src.indexOf(REBOUND_BASLIK) !== -1);
+// Rebound'un vitest durumlarından uyarlanan bu test dosyası da aynı başlığı taşır (ilk yorum bloğunda)
+var testBasi = fs.readFileSync(__filename, "utf8").split("\n").slice(0, 5).join("\n");
+ok("başlık: tests/test-ease-curve.js de Rebound MIT atfını (telif satırıyla) taşır", testBasi.indexOf("// " + REBOUND_BASLIK) !== -1);
 var isaretler = ["cubicBezier", "bounceOut", "fns", "elasticOutWith", "get", "isMonotonic", "resolveParams", "spring", "settleTime", "springNormalized",
   "toFunction", "samplePoints", "range", "bakeFactors", "turningPoints", "slopeAt", "endpointSpeeds", "withStartSpeed", "withEndSpeed", "sampleSpeed", "speedRange",
   "dampedSine", "extremaTimes", "autoDuration", "followThroughAnchors"];

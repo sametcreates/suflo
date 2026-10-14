@@ -9,6 +9,7 @@
  *   bezier.js     cubicBezier (Newton 8 adım + ikiye bölme yedeği)
  *   penner.js     Penner kümesi (quad … bounce, In/Out/InOut), get, isMonotonic, elasticOutWith
  *   spring.js     resolveParams, spring, springNormalized, settleTime
+ *                 (Suflo değişikliği: spring() oturma süresini rejime göre hesaplar — oturmaSuresi)
  *   sampler.js    toFunction, samplePoints, range, bakeFactors, turningPoints, slopeAt
  *   speedgraph.js endpointSpeeds, withStartSpeed, withEndSpeed, sampleSpeed, speedRange
  *   overshoot.js  dampedSine, extremaTimes, autoDuration, followThroughAnchors
@@ -226,12 +227,15 @@
   }
 
   // Rebound: spring — sönümlü harmonik salınıcı, 0 → 1; { fn(t sn), settleTime, omega0, zeta, regime, params }
+  // Suflo değişikliği: settleTime rejime göre ve başlangıç genliğiyle hesaplanır (oturmaSuresi);
+  // Rebound'un zarf formülü kritik / aşırı sönümlü yayda ve kritiğe yakın az sönümlüde yayı
+  // hedefin çok gerisinde bırakıyor, springNormalized de son karede 1'e sıçrıyordu.
   function spring(opts) {
     var p = resolveParams(opts);
     var m = p.mass, k = p.stiffness, c = p.damping, v0 = p.velocity;
     var w0 = Math.sqrt(k / m);
     var zeta = c / (2 * Math.sqrt(k * m));
-    var fn, regime;
+    var fn, regime, kalan;
     if (zeta < 1) {
       regime = "underdamped";
       var wd = w0 * Math.sqrt(1 - zeta * zeta);
@@ -241,11 +245,13 @@
         var env = Math.exp(-zeta * w0 * t);
         return 1 + env * (A * Math.cos(wd * t) + B * Math.sin(wd * t));
       };
+      kalan = { tur: "az", genlik: Math.sqrt(A * A + B * B), hiz: zeta * w0 };
     } else if (zeta === 1 || Math.abs(zeta - 1) < 1e-6) {
       regime = "critical";
       var A2 = -1;
       var B2 = v0 + w0 * A2;
       fn = function (t) { return 1 + Math.exp(-w0 * t) * (A2 + B2 * t); };
+      kalan = { tur: "kritik", a: Math.abs(A2), b: Math.abs(B2), hiz: w0 };
     } else {
       regime = "overdamped";
       var s = w0 * Math.sqrt(zeta * zeta - 1);
@@ -254,11 +260,39 @@
       var C1 = (v0 + r2) / (r1 - r2);
       var C2 = -1 - C1;
       fn = function (t) { return 1 + C1 * Math.exp(r1 * t) + C2 * Math.exp(r2 * t); };
+      // yavaş kök, sayısal olarak kararlı biçimde: r1 · r2 = w0²
+      kalan = { tur: "asiri", c1: Math.abs(C1), h1: w0 * w0 / (zeta * w0 + s), c2: Math.abs(C2), h2: zeta * w0 + s };
     }
-    return { fn: fn, omega0: w0, zeta: zeta, regime: regime, settleTime: settleTime(w0, zeta), params: p };
+    return { fn: fn, omega0: w0, zeta: zeta, regime: regime, settleTime: oturmaSuresi(kalan), params: p };
   }
 
-  // Rebound: settleTime — zarf e^(-zeta*w0*t) epsilon altına inene dek (varsayılan %0,5)
+  // Suflo: oturmaSuresi — |fn(t) − 1| ≤ epsilon olduğu, sonrasında da öyle kalan süre (üst sınır).
+  //   az sönümlü: |fn − 1| ≤ √(A² + B²) · e^(−ζ·w0·t)
+  //   kritik:     |fn − 1| ≤ (|A| + |B|·t) · e^(−w0·t)            (sabit nokta yinelemesi)
+  //   aşırı:      |fn − 1| ≤ |C1|·e^(r1·t) + |C2|·e^(r2·t)         (her terim ≤ epsilon/2; YAVAŞ kök r1)
+  function oturmaSuresi(kalan, epsilon) {
+    epsilon = epsilon || 0.005;
+    if (!kalan || !(kalan.hiz > 0 || kalan.tur === "asiri")) return Infinity;
+    function terim(c, h, e) { return c > e ? Math.log(c / e) / h : 0; }
+    var T;
+    if (kalan.tur === "az") T = terim(Math.max(1, kalan.genlik), kalan.hiz, epsilon);
+    else if (kalan.tur === "kritik") {
+      T = Math.log(Math.max(1, kalan.a) / epsilon) / kalan.hiz;
+      for (var i = 0; i < 60; i++) {
+        var yeni = Math.log((kalan.a + kalan.b * T) / epsilon) / kalan.hiz;
+        if (Math.abs(yeni - T) < 1e-9 * T) { T = yeni; break; }
+        T = yeni;
+      }
+    } else {
+      if (!(kalan.h1 > 0) || !(kalan.h2 > 0)) return Infinity;
+      T = Math.max(terim(kalan.c1, kalan.h1, epsilon / 2), terim(kalan.c2, kalan.h2, epsilon / 2));
+    }
+    return isFinite(T) && T > 0 ? T : Infinity;
+  }
+
+  // Rebound: settleTime — zarf e^(-zeta*w0*t) epsilon altına inene dek (varsayılan %0,5).
+  // (Rebound'un özgün API'si olarak dışa açık; Suflo'nun spring() / springNormalized() işlevleri
+  // yerine oturmaSuresi kullanır.)
   function settleTime(w0, zeta, epsilon) {
     epsilon = epsilon || 0.005;
     var decay = zeta * w0;
@@ -335,12 +369,18 @@
     stiffness: [0.1, 100000], damping: [0.01, 10000], velocity: [-1000, 1000]
   };
 
+  // Aralık karşılaştırmalarında kayan nokta payı: tam 0,01 aralıklı iki nokta (0,05 + 0,01 =
+  // 0,060000000000000005 > 0,06) atılmasın; normalize(normalize(c)) ve flip∘flip özdeş kalsın.
+  var GAP_EPS = 1e-9;
+
   function normMulti(c) {
     if (!c || !Array.isArray(c.pts) || c.pts.length < 2) return null;
     var ham = [];
     for (var i = 0; i < c.pts.length && i < 64; i++) {
       var p = c.pts[i];
-      if (p && sonlu(p.x) && sonlu(p.y)) ham.push({ p: p, x: sinirla(p.x, 0, 1), y: sinirla(p.y, Y_MIN, Y_MAX), s: i });
+      // x önce 1e-6'ya yuvarlanır: aralık kararı yazılan (yuvarlı) değerle verilir, ikinci
+      // normalize aynı kararı verir
+      if (p && sonlu(p.x) && sonlu(p.y)) ham.push({ p: p, x: r6(sinirla(p.x, 0, 1)), y: sinirla(p.y, Y_MIN, Y_MAX), s: i });
     }
     if (ham.length < 2) return null;
     ham.sort(function (a, b) { return a.x - b.x || a.s - b.s; });
@@ -349,7 +389,7 @@
     var son = ham.length && ham[ham.length - 1].x >= 1 - MIN_GAP / 2 ? ham.pop() : null;
     var ic = [], onceki = 0;
     ham.forEach(function (h) {
-      if (h.x >= onceki + MIN_GAP && h.x <= 1 - MIN_GAP) { ic.push(h); onceki = h.x; }
+      if (h.x >= onceki + MIN_GAP - GAP_EPS && h.x <= 1 - MIN_GAP + GAP_EPS) { ic.push(h); onceki = h.x; }
     });
     if (ic.length > MAX_PTS - 2) {
       var sec = [], n = ic.length, m = MAX_PTS - 2;
@@ -663,7 +703,7 @@
       var p = c.pts, i;
       for (i = 0; i < p.length; i++) {
         if (p[i].y < 0 || p[i].y > 1 || p[i].iy < 0 || p[i].iy > 1 || p[i].oy < 0 || p[i].oy > 1) return null;
-        if (i > 0 && p[i].y < p[i - 1].y + MIN_GAP) return null;
+        if (i > 0 && p[i].y < p[i - 1].y + MIN_GAP - GAP_EPS) return null;
         if (i > 0 && (p[i].iy < p[i - 1].y || p[i].iy > p[i].y)) return null;
         if (i < p.length - 1 && (p[i].oy < p[i].y || p[i].oy > p[i + 1].y)) return null;
       }
@@ -710,11 +750,17 @@
     var tol = 1e-6;
     function icinde(v, lo, hi) { return v >= lo - tol && v <= hi + tol; }
     if (!icinde(P01[0], a.x, P[0]) || !icinde(P012[0], a.x, P[0]) || !icinde(P123[0], P[0], b.x) || !icinde(P23[0], P[0], b.x)) return null;
+    // Eklenecek nokta istenen x değil, çözülen P[0] (en çok 1e-7 sapar): aralığı onunla da denetle
+    var px = r6(P[0]);
+    if (px < a.x + MIN_GAP - GAP_EPS || px > b.x - MIN_GAP + GAP_EPS) return null;
     var yeni = p.map(function (q) { return { x: q.x, y: q.y, ix: q.ix, iy: q.iy, ox: q.ox, oy: q.oy, smooth: q.smooth }; });
     yeni[i].ox = P01[0]; yeni[i].oy = P01[1];
     yeni[i + 1].ix = P23[0]; yeni[i + 1].iy = P23[1];
     yeni.splice(i + 1, 0, { x: P[0], y: P[1], ix: P012[0], iy: P012[1], ox: P123[0], oy: P123[1], smooth: true });
-    return normalize({ type: "multi", pts: yeni });
+    var out = normalize({ type: "multi", pts: yeni });
+    // normalize yeni noktayı yine de atarsa komşuların alt eğri tutamaçları kalır ve şekil bozulur:
+    // şekli değişmiş bir eğri döndürmektense hiç nokta ekleme
+    return out && out.pts.length === p.length + 1 ? out : null;
   }
 
   /* ================= Suflo: CSS cubic-bezier metni ================= */
