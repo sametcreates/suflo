@@ -114,5 +114,124 @@ chk("tum stillerde deger araligi korunur", [yum, jc, sn].every(function (pl) {
   return pl.keys.every(function (k) { return k.value >= 0.99 && k.value <= 1.31; });
 }));
 
-console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
-if (kaldi) process.exit(1);
+/* ---- 3.4 adım 11: Zoom'u kaldır kayıt tabanlı (uçtan uca: js/zoom.js + js/kayit-kaldir.js + host.jsx sahte Premiere) ---- */
+var fs = require("fs");
+var path = require("path");
+var vm = require("vm");
+var ROOT = path.join(__dirname, "..");
+var PM = require("./_kayit-premiere.js").olustur();
+var Zk = PM.klip({ ad: "Konusma.mp4", nodeId: "Z1", start: 0, end: 10, inP: 0 });
+var Yk = PM.klip({ ad: "Eski.mp4", nodeId: "Y1", start: 10, end: 20, inP: 0 });
+PM.izKur([[Zk, Yk]]);
+
+function panelKur() {
+  var dinleyici = {}, toastlar = [], sorular = [], cevap = { onay: false };
+  function oge(id, deger) {
+    return { id: id, value: deger, hidden: false, disabled: false, className: "", textContent: "",
+      classList: { toggle: function () {}, add: function () {}, remove: function () {} },
+      addEventListener: function (tur, fn) { dinleyici[id + ":" + tur] = fn; } };
+  }
+  var ogeler = { "tab-zoom": oge("tab-zoom"), "zoom-run": oge("zoom-run"), "zoom-remove": oge("zoom-remove"), "zoom-status": oge("zoom-status"),
+    "zoom-progress": oge("zoom-progress"), "zoom-aralik": oge("zoom-aralik", "5"), "zoom-yogunluk": oge("zoom-yogunluk", "12"), "zoom-hiz": oge("zoom-hiz", "0.45") };
+  function metinDugumu(s) { return { textContent: String(s) }; }
+  var depoVeri = {};
+  var ls = { getItem: function (k) { return Object.prototype.hasOwnProperty.call(depoVeri, k) ? depoVeri[k] : null; },
+    setItem: function (k, v) { depoVeri[k] = String(v); }, removeItem: function (k) { delete depoVeri[k]; },
+    key: function (i) { return Object.keys(depoVeri)[i]; } };
+  Object.defineProperty(ls, "length", { get: function () { return Object.keys(depoVeri).length; } });
+  var secili = { clip: null };
+  var ctx = {
+    document: {
+      getElementById: function (id) { return ogeler[id] || null; },
+      querySelector: function (s) {
+        if (s === "#zoom-mode .on") return { dataset: { m: "rhythm" } };
+        if (s === "#zoom-stil .on") return { dataset: { s: "smooth" } };
+        if (s === "#zoom-nokta .on") return { dataset: { a: "0.5,0.5" } };
+        return null;
+      },
+      querySelectorAll: function () { return []; },
+      createElement: function () {
+        return { cocuk: [], appendChild: function (c) { this.cocuk.push(c); return c; },
+          get textContent() { return this.cocuk.map(function (c) { return c.textContent; }).join(""); } };
+      },
+      createTextNode: metinDugumu
+    },
+    localStorage: ls,
+    confirm: function (s) { sorular.push(s); return cevap.onay; },
+    K: { call: function (fn, arg) { return PM.kcall(fn, arg); }, log: function () {} },
+    KApp: { ctx: function () { return { sel: secili.clip }; }, toast: function (m, tur, sure, eylem) { toastlar.push({ m: m && m.textContent !== undefined ? m.textContent : m, tur: tur, eylem: eylem }); } },
+    console: console, Promise: Promise, setTimeout: setTimeout, Date: Date, Math: Math, JSON: JSON, Object: Object, Array: Array,
+    String: String, Number: Number, isFinite: isFinite, isNaN: isNaN, Error: Error, RegExp: RegExp
+  };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  ["key-records.js", "kayit-kaldir.js", "zoom.js"].forEach(function (f) {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, "js", f), "utf8"), ctx, { filename: "js/" + f });
+  });
+  ctx.KZoom.init();
+  return { ctx: ctx, dinleyici: dinleyici, toastlar: toastlar, sorular: sorular, cevap: cevap, secili: secili, depoVeri: depoVeri };
+}
+function selOf(c) { return { name: c.name, clipStart: c.start.seconds, clipEnd: c.end.seconds, inPoint: c.inPoint.seconds, outPoint: c.outPoint.seconds, mediaPath: "x" }; }
+
+(async function () {
+  var P = panelKur();
+  chk("panel açılışında Premiere çağrısı yok (yalnız tıklamada)", PM.ui.length === 0 && P.toastlar.length === 0);
+
+  // Zoom uygula (ritmik mod): kayıtlar saklanır, bildirimde kapısız Geri al
+  PM.durum.secim = [Zk]; P.secili.clip = selOf(Zk);
+  await P.dinleyici["zoom-run:click"]();
+  var uyg = P.toastlar[P.toastlar.length - 1];
+  var depo = P.ctx.SufloKeyRecords.depo(P.ctx.localStorage);
+  var kayitlar = depo.oku("C:\\proje\\kayit.prproj");
+  chk("uygula: zoom anahtarları yazıldı, kayıtlar (Ölçek + Konum) proje deposunda", Zk.olcek.keys.length === 4 && kayitlar.length === 2 &&
+    kayitlar.every(function (r) { return r.tur === "zoom" && r.nodeId === "Z1"; }), { keys: Zk.olcek.tl(Zk), kayitlar: kayitlar.length });
+  chk("uygula: bildirimde Geri al eylemi", uyg && uyg.eylem && uyg.eylem.metin === "Geri al" && typeof uyg.eylem.fn === "function", uyg);
+
+  // Kullanıcı kendi Ölçek anahtarını ekler; Zoom'u kaldır onu korur (eski kaldir() klibin tüm Ölçek anahtarlarını silerdi)
+  Zk.olcek.elle(Zk, 8, 130);
+  await P.dinleyici["zoom-remove:click"]();
+  var son = P.toastlar[P.toastlar.length - 1];
+  chk("kaldır: kullanıcının Ölçek anahtarı (8 sn · 130) duruyor; Suflo'nun 4 anahtarı gitti", Zk.olcek.keys.some(function (k) { return k.v === 130; }) &&
+    JSON.stringify(Zk.olcek.tl(Zk)) === JSON.stringify([0, 8]) && Zk.olcek.keys[0].v === 100, Zk.olcek.keys);
+  chk("kaldır: Konum anahtarsız ve eski değerinde", Zk.konum.keys.length === 0 && JSON.stringify(Zk.konum.value) === "[0.5,0.5]", Zk.konum);
+  chk("kaldır: kayıt varken onay sorulmadı; bildirim sonucu söyler; kayıtlar depodan düştü", P.sorular.length === 0 && /Zoom kaldırıldı: 6 anahtar kare silindi\./.test(son.m) &&
+    depo.oku("C:\\proje\\kayit.prproj").length === 0, son);
+
+  // Kaydı olmayan (eski sürümde uygulanmış) zoom: eski yöntem yalnız onayla
+  PM.durum.secim = [Yk]; P.secili.clip = selOf(Yk);
+  PM.cagir("KS_autoZoom", { keys: [{ time: 10, value: 1.1 }, { time: 12, value: 1 }, { time: 15, value: 1.1 }], clearStart: 10, clearEnd: 20 });
+  Yk.olcek.elle(Yk, 18, 125);
+  var yOnce = Yk.olcek.keys.length;
+  P.cevap.onay = false;
+  await P.dinleyici["zoom-remove:click"]();
+  chk("kayıt yoksa onay sorulur (eski yöntem uyarısıyla); vazgeçince hiçbir şey silinmez", P.sorular.length === 1 && /zoom kaydı yok/.test(P.sorular[0]) &&
+    /TÜM Ölçek anahtar kareleri/.test(P.sorular[0]) && Yk.olcek.keys.length === yOnce && /Hiçbir şey silinmedi/.test(P.toastlar[P.toastlar.length - 1].m), P.sorular);
+  P.cevap.onay = true;
+  await P.dinleyici["zoom-remove:click"]();
+  chk("onaylanınca bugünkü davranış: klibin tüm Ölçek anahtarları (kullanıcınınki dahil) temizlenir, iki düz anahtar kalır", P.sorular.length === 2 &&
+    Yk.olcek.keys.length === 2 && Yk.olcek.keys[0].v === Yk.olcek.keys[1].v && !Yk.olcek.keys.some(function (k) { return k.v === 125; }) && /Zoom anahtarları temizlendi/.test(P.toastlar[P.toastlar.length - 1].m), Yk.olcek.keys);
+
+  // Başka klibin kaydı varken seçili klibin kaydı yok: yine onay (Z'nin zoom'una dokunulmaz)
+  PM.durum.secim = [Zk]; P.secili.clip = selOf(Zk);
+  await P.dinleyici["zoom-run:click"]();
+  var zAnahtar = Zk.olcek.keys.length;
+  PM.durum.secim = [Yk]; P.secili.clip = selOf(Yk);
+  P.cevap.onay = false;
+  await P.dinleyici["zoom-remove:click"]();
+  chk("seçili klibin kaydı yoksa (başka klibin var) onay sorulur, öbür klibin zoom'u yerinde", P.sorular.length === 3 && Zk.olcek.keys.length === zAnahtar, P.sorular.length);
+
+  // Bildirimdeki Geri al: yalnız o uygulamanın anahtarları, seçimden bağımsız
+  var uyg2 = P.toastlar.filter(function (t) { return t.eylem; }).pop();
+  await uyg2.eylem.fn();
+  await new Promise(function (r) { setTimeout(r, 5); });
+  chk("bildirimdeki Geri al: seçim başka klipteyken bile yalnız o uygulamayı kaldırır, onay sormaz (yeniden uygulama klibi temizlemişti: anahtarsız, 100)", P.sorular.length === 3 &&
+    Zk.olcek.keys.length === 0 && Zk.olcek.value === 100 && Yk.olcek.keys.length === 2, Zk.olcek.keys);
+
+  // Seçim yokken
+  P.secili.clip = null;
+  await P.dinleyici["zoom-remove:click"]();
+  chk("seçim yokken uyarı, Premiere'e gidilmez", /Önce timeline'da bir klip seç/.test(P.ctx.document.getElementById("zoom-status").textContent));
+
+  console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
+  if (kaldi) process.exit(1);
+})().catch(function (e) { console.error(e); process.exit(1); });

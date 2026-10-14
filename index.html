@@ -1327,6 +1327,7 @@
     <div id="zoom-progress" class="progress-line" hidden><i></i></div>
     <div id="zoom-status" class="inline-status"></div>
     <button id="zoom-remove" class="btn outline" style="width:100%">Zoom'u kaldır</button>
+    <p class="kaldir-not">Yalnız Suflo'nun yazdığı zoom anahtar karelerini kaldırır; kendi anahtar karelerine dokunmaz. Ücretsiz.</p>
   </section>
 
   <!-- ================= RITIM ================= -->
@@ -1477,6 +1478,11 @@
       <span id="preset-count" class="dim">290 panel preseti</span>
     </div>
     <div class="preset-note"><span>1</span> Timeline’da klibi seç <i>·</i><span>2</span> Preset kartında Uygula’ya bas <i>→</i><b>Doğrudan timeline</b></div>
+    <!-- 3.4 adım 11: kayıt tabanlı kaldırma (kapısız) -->
+    <div class="kaldir-satir">
+      <button id="preset-kaldir" class="btn outline" type="button">Önayarı kaldır</button>
+      <span class="kaldir-not">Seçili klipte yalnız Suflo'nun yazdığı önayar anahtar karelerini kaldırır; kendi anahtar karelerine dokunmaz.</span>
+    </div>
     <div id="preset-grid" class="preset-grid"></div>
     <div id="preset-empty" class="empty-state" hidden>
       <b>Eşleşen preset yok</b>
@@ -1519,6 +1525,11 @@
           <option value="1.35">Güçlü</option>
         </select>
       </label>
+    </div>
+    <!-- 3.4 adım 11: kayıt tabanlı kaldırma (kapısız: ücretsizde de çalışır) -->
+    <div class="kaldir-satir">
+      <button id="gecis-kaldir" class="btn outline" type="button">Geçişi kaldır</button>
+      <span class="kaldir-not">Playhead'e en yakın kesimdeki Suflo geçişini kaldırır; kendi anahtar karelerine dokunmaz.</span>
     </div>
     <div id="gecis-status" class="inline-status"></div>
     <div id="gecis-grid" class="preset-grid gecis-grid"></div>
@@ -2616,6 +2627,7 @@
        Geçiş, Zoom, Hareket, Hız Rampası ve Eğri bunları kullanır -->
   <script src="js/ease-curve.js"></script>
   <script src="js/key-records.js"></script>
+  <script src="js/kayit-kaldir.js"></script>
   <script src="js/transitions.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/highlights.js"></script>

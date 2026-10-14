@@ -2,6 +2,9 @@
  * Suflo — Geçişler (v3.0)
  * Playhead'e en yakın kesime iki tarafa eşleşik keyframe yazar.
  * Plan: js/transitions.js (saf, testli) · Uygulama: host KS_applyCutTransition.
+ * Kaldırma (3.4, plan adım 11): uygulama her yazdığı özellik için bir kayıt döndürür; js/kayit-kaldir.js saklar.
+ * "Geçişi kaldır" playhead'e en yakın kesimdeki Suflo geçişini kayıtla kaldırır (kullanıcının anahtar karelerine
+ * dokunmaz). Kaldırmak ücretsiz (Pro kapısı yok). Kayıt yoksa eski yöntem (geçiş penceresini temizlemek) yalnız onayla.
  */
 window.KGecis = (function () {
   "use strict";
@@ -9,7 +12,15 @@ window.KGecis = (function () {
   var TR = window.SufloTransitions;
   var busy = false;
 
+  // Kaydı olmayan (önceki sürümde ya da başka bilgisayarda uygulanmış) geçiş: eski yöntem onay sorusu
+  var YEDEK_SORU = {
+    yok: "Bu kesimde Suflo'nun geçiş kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış olabilir). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.",
+    degisti: "Suflo'nun geçiş kaydı bu kesimin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir."
+  };
+
   function el(id) { return document.getElementById(id); }
+  function uiMetni(s) { return window.SufloI18n && SufloI18n.tr ? SufloI18n.tr(s) : s; }
+  function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }
 
   function status(msg, cls) {
     var e = el("gecis-status");
@@ -36,8 +47,50 @@ window.KGecis = (function () {
       if (!r.ok) throw new Error(r.error);
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("transitions", KApp.toast);   // deneme: yalniz basarida
       status("");
+      // Kaldırma kaydı (kapısız Geri al: yalnız bu uygulamanın anahtarları)
+      var saklama = kd() ? kd().sakla(r.proje || "", r.records) : { ok: true, idler: [] };
+      var proje = r.proje || "";
       KApp.toast("↔ " + t.name + " · V" + r.track + " kesimine eklendi" +
-        (r.half < secenek().duration / 2 - 0.01 ? " (kısa klip: süre kısaltıldı)" : ""), "good");
+        (r.half < secenek().duration / 2 - 0.01 ? " (kısa klip: süre kısaltıldı)" : ""), "good",
+        saklama.idler.length ? 9000 : undefined,
+        saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
+      if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
+    } catch (e) {
+      status("✕ " + (e && e.message ? e.message : e), "bad");
+    } finally {
+      busy = false;
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  /*
+   * Kapısız kaldırma. kapsam: varsayılan playhead'e en yakın kesim ({ kesim }); bildirimdeki Geri al
+   * { idler, proje } ile yalnız o uygulamanın kayıtlarını kaldırır (eski yönteme düşmez).
+   */
+  async function kaldir(kapsam) {
+    if (busy) return;
+    var k = kd();
+    if (!k) return;
+    var tekUygulama = !!(kapsam && kapsam.idler);
+    busy = true;
+    var btn = el("gecis-kaldir");
+    if (btn) btn.disabled = true;
+    status("Geçiş kaldırılıyor…");
+    try {
+      var s = await k.akis({
+        tur: "gecis",
+        kapsam: kapsam || { kesim: { tolerance: 1.0 } },
+        onay: function (soru) { return window.confirm ? window.confirm(uiMetni(soru)) : false; },
+        yedekMetni: tekUygulama ? null : YEDEK_SORU,
+        kayitYokMetni: tekUygulama ? "Bu geçişin kaydı bulunamadı; hiçbir şey silinmedi." : "",
+        yedek: async function () {
+          var r = await K.call("KS_applyCutTransition", { temizle: true, tolerance: 1.0 }, 60000);
+          if (!r || !r.ok) throw new Error(r && r.error ? r.error : "Temizlenemedi.");
+          return { parcalar: ["Geçiş penceresi eski yöntemle temizlendi: " + (Number(r.removedKeys) || 0) + " anahtar kare silindi."], tur: "good" };
+        }
+      });
+      status("");
+      KApp.toast(SufloKaldir.dugum(s.parcalar), s.tur, 7000);
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
@@ -65,7 +118,7 @@ window.KGecis = (function () {
       btn.type = "button";
       btn.className = "btn preset-apply" + (kilitli ? " is-locked" : "");
       btn.textContent = kilitli ? "🔒 Pro" : "Uygula";
-      btn.addEventListener("click", function () { uygula(t, btn); });
+      btn.addEventListener("click", function () { return uygula(t, btn); });
       card.appendChild(sahne); card.appendChild(bilgi); card.appendChild(btn);
       grid.appendChild(card);
     });
@@ -75,8 +128,10 @@ window.KGecis = (function () {
   function init() {
     if (!TR || !el("gecis-grid")) return;
     render();
+    var kb = el("gecis-kaldir");
+    if (kb) kb.addEventListener("click", function () { return kaldir(); });
     if (typeof Pro !== "undefined" && Pro.on) { try { Pro.on(render); } catch (e) {} }
   }
 
-  return { init: init };
+  return { init: init, kaldir: kaldir };
 })();

@@ -107,6 +107,8 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.4 Egri sekmesi: saf model + panel (SufloEgriEditor); host tarafi jsx/host.jsx icinde
             '(^|/)js/egri-model\.js$',
             '(^|/)js/egri\.js$',
+            # 3.4 kayit tabanli guvenli kaldirma (Gecis, Zoom, Hareket onayari); host tarafi KS_removeSufloKeys
+            '(^|/)js/kayit-kaldir\.js$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

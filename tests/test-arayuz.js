@@ -440,6 +440,27 @@ ok("Yumuşatma motoru: betik sırası ease-curve.js → key-records.js → trans
   ok("Yumuşatma motoru: yüklenirken yalnız global tanımlar (localStorage/DOM/Premiere/ağ erişimi yok)", typeof pencere.SufloEase === "object" &&
     typeof pencere.SufloKeyRecords === "object" && typeof pencere.SufloEase.bakePlan === "function" && erisim.length === 0, erisim.join(","));
 })();
+/* ---------- 3.4 adım 11: kayıt tabanlı güvenli kaldırma ---------- */
+ok("Kaldırma: betik sırası key-records.js → kayit-kaldir.js → gecisler/zoom/presets → app.js", betikSira("kayit-kaldir.js") > betikSira("key-records.js") &&
+  betikSira("kayit-kaldir.js") < betikSira("gecisler.js") && betikSira("kayit-kaldir.js") < betikSira("zoom.js") &&
+  betikSira("kayit-kaldir.js") < betikSira("presets.js") && betikSira("kayit-kaldir.js") < betikSira("app.js"));
+["gecis-kaldir", "preset-kaldir", "zoom-remove"].forEach(function (id) { ok("Kaldırma: #" + id + " var", !!idler[id]); });
+ok("Kaldırma: 'Geçişi kaldır' Geçişler sekmesinde, 'Önayarı kaldır' Hareket önayarlarında; ikisi de kilitsiz düğme",
+  html.indexOf('id="gecis-kaldir"') > html.indexOf('id="tab-gecis"') && html.indexOf('id="gecis-kaldir"') < html.indexOf('id="gecis-grid"') &&
+  html.indexOf('id="preset-kaldir"') > html.indexOf('id="tab-presets"') && html.indexOf('id="preset-kaldir"') < html.indexOf('id="preset-grid"') &&
+  /<button id="gecis-kaldir" class="btn outline" type="button">Geçişi kaldır<\/button>/.test(html) &&
+  /<button id="preset-kaldir" class="btn outline" type="button">Önayarı kaldır<\/button>/.test(html));
+(function () {
+  // Kaldırmak hiçbir zaman ücretli değil: kaldir() gövdelerinde Pro kapısı yok
+  var gs = fs.readFileSync(KOKYOL + "js/gecisler.js", "utf8"), zs = fs.readFileSync(KOKYOL + "js/zoom.js", "utf8"), ps = fs.readFileSync(KOKYOL + "js/presets.js", "utf8");
+  var govdeler = [fnGovde(gs, "async function kaldir("), fnGovde(zs, "async function kaldir("), fnGovde(ps, "async function kaldir(")];
+  ok("Kaldırma kapısız: üç aracın kaldir() gövdesinde Pro.gate / deneme hakkı yok, KS_removeSufloKeys modül üzerinden",
+    govdeler.every(function (g) { return g.length > 200 && !/Pro\.gate|denemeHarca/.test(g) && /\.akis\(/.test(g); }), govdeler.map(function (g) { return g.length; }).join(","));
+  ok("Kaldırma: eski yöntem (zoom ve geçiş) yalnız onayla — confirm arayüz dilinde",
+    /window\.confirm\(uiMetni\(soru\)\)/.test(govdeler[0]) && /window\.confirm\(uiMetni\(soru\)\)/.test(govdeler[1]) && !/KS_autoZoom/.test(govdeler[1].split("yedek:")[0]));
+  ok("Kaldırma: init / render Premiere'e gitmez (yalnız tıklamada)", !/K\.call\(/.test(fnGovde(gs, "function init(")) && !/K\.call\(/.test(fnGovde(gs, "function render(")) &&
+    !/K\.call\(/.test(fnGovde(zs, "function init(")) && !/K\.call\(/.test(fnGovde(ps, "function init(")));
+})();
 ok("Sessiz ses: panel açılışında ölçüm/Premiere çağrısı yok (yalnız Altyazı oluştur / Konuşmadan kes akışında)",
   !/sessizDenetim\(/.test(fnGovde(capSrc, "function init(")) && /\.sessiz-uyari\[hidden\] \{ display: none !important; \}/.test(fs.readFileSync(KOKYOL + "css/style.css", "utf8")));
 

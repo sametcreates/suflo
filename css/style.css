@@ -4310,3 +4310,10 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .pc-bar .pc-on { min-width: 1px; }
 .pc-ozet { font-size: 11px; margin-bottom: 6px; }
 #pc-periyot { width: 64px; margin-left: 8px; }
+
+/* 3.4 adım 11: kayıt tabanlı güvenli kaldırma (Geçişi kaldır, Önayarı kaldır, Zoom notu).
+   CEF 74: flex gap ve overflow-wrap:anywhere yok; aralık kenar boşluğuyla. */
+.kaldir-satir { display: flex; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
+.kaldir-satir .btn { flex: none; margin: 0 10px 4px 0; }
+.kaldir-not { flex: 1 1 160px; min-width: 0; margin: 0 0 4px; color: var(--faint); font-size: 10.5px; line-height: 1.4; word-wrap: break-word; }
+#tab-zoom .kaldir-not { display: block; margin: 6px 0 0; }

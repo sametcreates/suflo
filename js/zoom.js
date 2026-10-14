@@ -304,8 +304,14 @@ if (typeof window !== "undefined") window.KZoom = (function () {
       if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Zoom uygulanamadı.");
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);   // deneme: yalniz basarida
       status("");
+      // Kaldırma kaydı (3.4 adım 11): bildirimdeki Geri al yalnız bu uygulamanın anahtarlarını kaldırır
+      var saklama = kd() ? kd().sakla(result.proje || "", result.records) : { ok: true, idler: [] };
+      var proje = result.proje || "";
       KApp.toast(plan.toggles + " zoom hareketi eklendi (" +
-        (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")", "good");
+        (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")", "good",
+        saklama.idler.length ? 9000 : undefined,
+        saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
+      if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
@@ -313,23 +319,50 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     }
   }
 
-  // Kapisiz: deneme hakkiyla eklenen zoom'u herkes her zaman geri alabilmeli
-  async function kaldir() {
+  function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }
+  function uiMetni(s) { return window.SufloI18n && SufloI18n.tr ? SufloI18n.tr(s) : s; }
+  var YEDEK_SORU = {
+    yok: "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir.",
+    degisti: "Suflo'nun zoom kaydı bu klibin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir."
+  };
+
+  /*
+   * Kapisiz: deneme hakkiyla eklenen zoom'u herkes her zaman geri alabilmeli (3.4 adim 11: kayit tabanli).
+   * Secili klip(ler)in Suflo zoom kayitlari KS_removeSufloKeys'e gider: yalniz Suflo'nun yazdigi ve hala duran
+   * Olcek / Konum anahtarlari silinir, kullanicinin kendi anahtarlari kalir, olcek eski degerine doner.
+   * Kayit yoksa (eski proje) bugunku davranis (tum Olcek anahtarlarini silip Konum'u sifirlamak) YALNIZ onayla.
+   * kapsam { idler, proje }: bildirimdeki Geri al (yalniz o uygulama; eski yonteme dusmez).
+   */
+  async function kaldir(kapsam) {
     if (busy) return;
+    var tekUygulama = !!(kapsam && kapsam.idler);
     var clip = KApp.ctx().sel;
-    if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
+    if (!tekUygulama && !clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
+    var k = kd();
+    if (!k) return;
     setBusy(true);
     try {
-      var dur = Math.max(.2, clip.clipEnd - clip.clipStart);
-      var result = await K.call("KS_autoZoom", {
-        keys: [{ time: clip.clipStart, value: 1 }, { time: clip.clipStart + dur, value: 1 }],
-        anchor: sabitNokta(), // merkez-disi uygulandiysa pozisyon da baza doner
-        clearStart: clip.clipStart,
-        clearEnd: clip.clipStart + dur
-      }, 30000);
-      if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Temizlenemedi.");
+      var s = await k.akis({
+        tur: "zoom",
+        kapsam: kapsam || { secili: true },
+        onay: function (soru) { return window.confirm ? window.confirm(uiMetni(soru)) : false; },
+        yedekMetni: tekUygulama ? null : YEDEK_SORU,
+        kayitYokMetni: tekUygulama ? "Bu zoom'un kaydı bulunamadı; hiçbir şey silinmedi." : "",
+        yedek: async function () {
+          // Eski yontem (bugunku davranis): klibin tum araligi temizlenir, olcek ve konum baza doner
+          var dur = Math.max(.2, clip.clipEnd - clip.clipStart);
+          var result = await K.call("KS_autoZoom", {
+            keys: [{ time: clip.clipStart, value: 1 }, { time: clip.clipStart + dur, value: 1 }],
+            anchor: sabitNokta(), // merkez-disi uygulandiysa pozisyon da baza doner
+            clearStart: clip.clipStart,
+            clearEnd: clip.clipStart + dur
+          }, 30000);
+          if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Temizlenemedi.");
+          return { parcalar: ["Zoom anahtarları temizlendi"], tur: "good" };
+        }
+      });
       status("");
-      KApp.toast("Zoom anahtarları temizlendi", "good");
+      KApp.toast(SufloKaldir.dugum(s.parcalar), s.tur, 7000);
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
@@ -340,7 +373,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
   function init() {
     if (!el("tab-zoom")) return;
     el("zoom-run").addEventListener("click", calistir);
-    el("zoom-remove").addEventListener("click", kaldir);
+    el("zoom-remove").addEventListener("click", function () { return kaldir(); });
     // mod secici (seg-ctl kalibi)
     Array.prototype.forEach.call(document.querySelectorAll("#zoom-mode button"), function (b) {
       b.addEventListener("click", function () {
@@ -368,5 +401,5 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     });
   }
 
-  return { init: init };
+  return { init: init, kaldir: kaldir };
 })();

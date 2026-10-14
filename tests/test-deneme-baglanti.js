@@ -97,7 +97,8 @@ ok("captions.js: MOGRT, toplu klip ve stilli ASS kapıları denemesiz", /Pro\.ga
 
 /* ---------------- 3) zoom kaldır kapısız, MOGRT sızıntısı kapalı ---------------- */
 var zoom = oku("js/zoom.js");
-ok("zoom.js kaldir(): kapı yok (deneme zoom'u her zaman geri alınır)", !/Pro\./.test(govde(zoom, "async function kaldir()")) && govde(zoom, "async function kaldir()").length > 50);
+ok("zoom.js kaldir(): kapı yok (deneme zoom'u her zaman geri alınır; 3.4: kayıt tabanlı)", !/Pro\./.test(govde(zoom, "async function kaldir(")) && govde(zoom, "async function kaldir(").length > 50 &&
+  /KS_removeSufloKeys|\.akis\(/.test(govde(zoom, "async function kaldir(")));
 var ou = govde(cap, "async function overlayUygula()");
 ok("overlayUygula: ücretsizde seçili MOGRT stilini reddeder", /if \(typeof Pro !== "undefined" && !Pro\.isPro\(\) && secilenMogrt\) \{[\s\S]{0,200}Deneme yalnız Altyazı Efektleri için[\s\S]{0,200}return;/.test(ou) &&
   ou.indexOf("!Pro.isPro() && secilenMogrt") < ou.indexOf("mogrtStiliniUygula"));

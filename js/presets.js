@@ -243,13 +243,53 @@ window.KPresets = (function () {
       }, 30000);
       if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Preset uygulanamadi.");
       if (card) card.classList.add("ok");
-      KApp.toast(result.applied + " klibe uygulandi · " + preset.name, "good");
+      // Kaldırma kaydı (3.4 adım 11): bildirimdeki Geri al yalnız bu uygulamanın anahtarlarını kaldırır
+      var saklama = kd() ? kd().sakla(result.proje || "", result.records) : { ok: true, idler: [] };
+      var proje = result.proje || "";
+      KApp.toast(result.applied + " klibe uygulandi · " + preset.name, "good",
+        saklama.idler.length ? 9000 : undefined,
+        saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
+      if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
       setTimeout(function () { if (card) card.classList.remove("ok"); }, 900);
     } catch (e) {
       KApp.toast("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
       busy = "";
       setApplyBusy(card, false);
+    }
+  }
+
+  function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }
+
+  /*
+   * Önayarı kaldır (3.4 adım 11; kapısız): seçili klip(ler)deki Suflo önayar kayıtları KS_removeSufloKeys'e
+   * gider; yalnız Suflo'nun yazdığı ve hâlâ duran anahtarlar silinir, özellikler önceki değerine döner,
+   * kullanıcının anahtarlarına dokunulmaz. Önceki sürümde uygulanmış (kaydı olmayan) önayarın bugün bir
+   * kaldırma yolu yoktu: Suflo tahminle silmez, nasıl kaldırılacağını söyler. Paket presetleri (.prfpset)
+   * kayıt tutmaz. kapsam { idler, proje }: bildirimdeki Geri al.
+   */
+  async function kaldir(kapsam) {
+    if (busy) return;
+    var k = kd();
+    if (!k) return;
+    var tekUygulama = !!(kapsam && kapsam.idler);
+    busy = "kaldir";
+    var btn = el("preset-kaldir");
+    if (btn) btn.disabled = true;
+    try {
+      var s = await k.akis({
+        tur: "hareket",
+        kapsam: kapsam || { secili: true },
+        kayitYokMetni: tekUygulama
+          ? "Bu önayarın kaydı bulunamadı; hiçbir şey silinmedi."
+          : "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önceki sürümde uygulanan önayarı Premiere'de Ctrl+Z ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin."
+      });
+      KApp.toast(SufloKaldir.dugum(s.parcalar), s.tur, s.tur === "good" ? 6000 : 9000);
+    } catch (e) {
+      KApp.toast("✕ " + (e && e.message ? e.message : e), "bad");
+    } finally {
+      busy = "";
+      if (btn) btn.disabled = false;
     }
   }
 
@@ -376,6 +416,8 @@ window.KPresets = (function () {
     });
     var cta = el("preset-proya-gec");
     if (cta) cta.addEventListener("click", function () { if (typeof Pro !== "undefined") Pro.gate("presets"); });
+    var kb = el("preset-kaldir");
+    if (kb) kb.addEventListener("click", function () { return kaldir(); });
     if (typeof Pro !== "undefined") Pro.on(function () { render(); loadPackCatalog(false); });
     if (typeof ProSync !== "undefined" && ProSync.on) ProSync.on(function (state) {
       if (state && state.phase === "ready") loadPackCatalog(false);
@@ -388,6 +430,7 @@ window.KPresets = (function () {
   return {
     init: init,
     render: render,
+    kaldir: kaldir,
     list: function () { return PRESETS.slice(); },
     packs: function () { return PACKS.slice(); },
     catalog: function () { return packCatalog.slice(); },
