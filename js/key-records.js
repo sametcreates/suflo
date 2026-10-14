@@ -17,8 +17,17 @@
  * canli(kayit, canliZamanlar, fps): iki uç hâlâ var VE kaydedilen zamanların en az %60'ı yerinde
  * (sıralı iki dizide birleştirme yürüyüşü, tolerans 0,25 kare). Bu eşikler Suflo'nundur.
  *
- * Depo: proje başına bir localStorage anahtarı; projede en çok 300, toplam en çok 2000 kayıt
- * (fazlası en eskiden atılır). Her okuma/yazma try/catch içinde; bozuk veri yok sayılır.
+ * Depo: proje başına bir localStorage anahtarı; projede en çok 300, toplam en çok 2000 kayıt.
+ * Kayıt sayısının yanında BOYUT da sınırlı: proje kovası en çok 400 000, tüm kovalar en çok
+ * 1 000 000 karakter (diskteki JSON uzunluğu). localStorage kotası (~5 M karakter) panelin geri
+ * kalanıyla (deneme sayacı aynası, Hız Rampası kayıtları…) ortak; bu pay ona yer bırakır.
+ * Zamanlar diskte sıkıştırılır ('z': 0,1 ms birimli ilk değer + artışlar, 36 tabanında; aynı artış
+ * yinelenirse 'artış*adet'), anahtar başına ~3 karakter.
+ * Sınır aşılınca kayıtlar TEK TEK, en eskiden atılır: önce diğer projelerinkiler, sonra bu projenin
+ * eski kayıtları, en son (yalnız başka yol kalmadıysa) yeni eklenenler. Yazma kota hatası verirse
+ * (yalnız kota hatasında; başka hatada hiçbir şey silinmez) birkaç kayıtlık yer açılıp yeniden
+ * denenir. ekle() kaç kaydın gerçekten saklandığını (eklenen) ve kaç eski kaydın atıldığını (atilan)
+ * bildirir. Her okuma/yazma try/catch içinde; bozuk veri yok sayılır.
  * Depo yalnız bu bilgisayardaki panelin kolaylığıdır: silinirse eski davranış (onaylı) çalışır.
  */
 (function (root, factory) {
@@ -34,7 +43,14 @@
   var PROJE_SINIR = 300;        // proje başına kayıt
   var TOPLAM_SINIR = 2000;      // tüm projelerde kayıt
   var ZAMAN_SINIR = 4096;       // kayıt başına zaman
+  var ZAMAN_UST = 1e8;          // |zaman| üst sınırı (sn); ötesi anlamsız, sıkıştırma tamsayıda kalsın
   var KENAR_SINIR = 8;
+  var PROJE_KARAKTER = 400000;  // proje kovası en çok (diskteki JSON karakteri)
+  var TOPLAM_KARAKTER = 1000000; // tüm kovalar en çok
+  var KOTA_ADIM = 2048;         // kota hatasında bir denemede açılacak en az yer (karakter; birkaç kayıt)
+  var KOTA_DENEME = 24;
+  var KOTA_PAY = 256;           // kota hatasında: önceden sığan boyutun bu kadar altına inince durulur
+  var KOTA = "kota";
   var ONEK = "suflo.anahtarKayit.v1:";
   var DIZIN = "suflo.anahtarKayit.v1.dizin";
   var VARSAYILAN_FPS = 30;
@@ -42,6 +58,39 @@
   function sonlu(v) { return typeof v === "number" && isFinite(v); }
   function metin(v, en) { return typeof v === "string" ? v.slice(0, en) : (sonlu(v) ? String(v).slice(0, en) : ""); }
   function r4(v) { var r = Math.round(v * 10000) / 10000; return r === 0 ? 0 : r; }   // 0,1 ms; 0,25 karenin çok altında
+
+  /* ---------------- zamanların sıkıştırılması ---------------- */
+  var BIRIM = 10000;            // 0,1 ms
+  // sıralı, tekrarsız, r4'lü zamanlar → "ilk,artış,artış*adet,…" (36 tabanı)
+  function zamanKodla(times) {
+    var u = [], i;
+    for (i = 0; i < times.length; i++) u.push(Math.round(times[i] * BIRIM));
+    if (!u.length) return "";
+    var out = [u[0].toString(36)];
+    i = 1;
+    while (i < u.length) {
+      var d = u[i] - u[i - 1], k = 1;
+      while (i + k < u.length && u[i + k] - u[i + k - 1] === d) k++;
+      if (k >= 3) { out.push(d.toString(36) + "*" + k.toString(36)); i += k; }
+      else { out.push(d.toString(36)); i++; }
+    }
+    return out.join(",");
+  }
+  // Tüm kodun biçimi tek geçişte denetlenir (parçalar ',' ile ayrık; geri izleme patlaması yok)
+  var KOD_BICIM = /^-?[0-9a-z]{1,9}(?:,[0-9a-z]{1,9}(?:\*[0-9a-z]{1,3})?)*$/;
+  // zamanKodla'nın tersi; bozuk kodda boş dizi (kayıt geçersiz sayılır)
+  function zamanCoz(s) {
+    if (typeof s !== "string" || !s || s.length > ZAMAN_SINIR * 12 || !KOD_BICIM.test(s)) return [];
+    var parca = s.split(","), u = parseInt(parca[0], 36), out = [u / BIRIM];
+    for (var i = 1; i < parca.length && out.length < ZAMAN_SINIR; i++) {
+      var p = parca[i], yildiz = p.indexOf("*");
+      var v = parseInt(p, 36);   // '*'da durur
+      var k = yildiz < 0 ? 1 : parseInt(p.slice(yildiz + 1), 36);
+      if (!(v > 0) || !(k >= 1)) return [];
+      for (var j = 0; j < k && out.length < ZAMAN_SINIR; j++) { u += v; out.push(u / BIRIM); }
+    }
+    return out;
+  }
 
   var sayac = 0;
   function yeniId(simdi) {
@@ -59,8 +108,15 @@
   function siraliZamanlar(dizi, sinir, yuvarla) {
     if (!Array.isArray(dizi)) return [];
     var z = [];
-    for (var i = 0; i < dizi.length && z.length < sinir * 2; i++) { if (sonlu(dizi[i])) z.push(yuvarla ? yuvarla(dizi[i]) : dizi[i]); }
-    z.sort(function (a, b) { return a - b; });
+    var sirali = true;
+    for (var i = 0; i < dizi.length && z.length < sinir * 2; i++) {
+      if (sonlu(dizi[i]) && Math.abs(dizi[i]) <= ZAMAN_UST) {
+        var v = yuvarla ? yuvarla(dizi[i]) : dizi[i];
+        if (z.length && v < z[z.length - 1]) sirali = false;
+        z.push(v);
+      }
+    }
+    if (!sirali) z.sort(function (a, b) { return a - b; });   // depodan gelen zamanlar zaten sıralı
     var out = [];
     for (var j = 0; j < z.length && out.length < sinir; j++) {
       if (!out.length || z[j] - out[out.length - 1] > 1e-9) out.push(z[j]);
@@ -203,6 +259,54 @@
     return ONEK + fnv(s, 0x811c9dc5) + fnv(s, 0x01000193);
   }
 
+  /* ---------------- disk biçimi ve boyut ---------------- */
+  // Diskteki kayıt: 'times' yerine sıkıştırılmış 'z'
+  function diske(r) {
+    var o = {};
+    Object.keys(r).forEach(function (k) { if (k !== "times") o[k] = r[k]; });
+    o.z = zamanKodla(r.times);
+    return o;
+  }
+  // Diskten okunan ham kayıt: 'z' varsa 'times'a açılır (eski biçimdeki 'times' dizisi de okunur)
+  function diskten(h) {
+    if (!h || typeof h !== "object" || Array.isArray(h.times) || typeof h.z !== "string") return h;
+    var o = {};
+    Object.keys(h).forEach(function (k) { if (k !== "z") o[k] = h[k]; });
+    o.times = zamanCoz(h.z);
+    return o;
+  }
+  function kotaHatasi(e) {
+    if (!e) return false;
+    var ad = String(e.name || "");
+    return ad === "QuotaExceededError" || ad === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22 || e.code === 1014;
+  }
+  // Kova paketi: kayıtlar + her birinin diskteki JSON metni (boyut bir kez hesaplanır)
+  function paketle(liste) {
+    return { liste: liste.slice(), parca: liste.map(function (r) { return JSON.stringify(diske(r)); }) };
+  }
+  function paketMetni(p) { return "{\"v\":2,\"k\":[" + p.parca.join(",") + "]}"; }
+  function paketBoyutu(p) {   // = paketMetni(p).length; boş kova diskte yer tutmaz (silinir)
+    if (!p.liste.length) return 0;
+    var b = 14 + p.parca.length - 1;
+    for (var i = 0; i < p.parca.length; i++) b += p.parca[i].length;
+    return b;
+  }
+  // Paketten en eski kayıtları TEK TEK atar (önce korunmayanlar, sonra korunanlar; createdAt
+  // artan) — hedefKarakter karakterlik yer açılana ve hedefSayi kayıt atılana dek. { sayi, serbest }
+  function paketten(p, hedefKarakter, hedefSayi, korunan) {
+    var sira = p.liste.map(function (r, i) { return { i: i, k: korunan[r.id] ? 1 : 0, c: r.createdAt }; });
+    sira.sort(function (a, b) { return a.k - b.k || a.c - b.c || a.i - b.i; });
+    var at = {}, serbest = 0, sayi = 0;
+    for (var j = 0; j < sira.length && (serbest < hedefKarakter || sayi < hedefSayi); j++) {
+      at[sira[j].i] = 1; serbest += p.parca[sira[j].i].length + 1; sayi++;
+    }
+    if (sayi) {
+      p.liste = p.liste.filter(function (r, i) { return !at[i]; });
+      p.parca = p.parca.filter(function (s, i) { return !at[i]; });
+    }
+    return { sayi: sayi, serbest: serbest };
+  }
+
   /* ---------------- depo ---------------- */
   function varsayilanDepo() {
     try { return typeof window !== "undefined" && window.localStorage ? window.localStorage : null; } catch (e) { return null; }
@@ -219,7 +323,10 @@
     function simdi() { return typeof ayar.simdi === "function" ? ayar.simdi() : Date.now(); }
 
     function al(k) { try { return ls ? ls.getItem(k) : null; } catch (e) { return null; } }
-    function koy(k, v) { try { if (!ls) return false; ls.setItem(k, v); return true; } catch (e) { return false; } }
+    // true: yazıldı · KOTA: depo dolu (QuotaExceededError) · false: başka hata (erişim yok vb.)
+    function koy(k, v) {
+      try { if (!ls) return false; ls.setItem(k, v); return true; } catch (e) { return kotaHatasi(e) ? KOTA : false; }
+    }
     function sil(k) { try { if (!ls) return false; ls.removeItem(k); return true; } catch (e) { return false; } }
     function json(ham) { if (!ham) return null; try { return JSON.parse(ham); } catch (e) { return null; } }
 
@@ -227,18 +334,21 @@
       var o = json(al(anahtar));
       var ham = o && typeof o === "object" && !Array.isArray(o) && Array.isArray(o.k) ? o.k : [];
       var out = [];
-      for (var i = 0; i < ham.length && i < PROJE_SINIR * 2; i++) { var r = kayit(ham[i]); if (r) out.push(r); }
+      for (var i = 0; i < ham.length && i < PROJE_SINIR * 2; i++) { var r = kayit(diskten(ham[i])); if (r) out.push(r); }
       return out;
     }
 
-    // dizin: { anahtar: { n: kayıt sayısı, t: son yazma } }. Bozuksa depodaki kovalar taranır.
+    // dizin: { anahtar: { n: kayıt sayısı, t: son yazma, b: kovanın karakter boyutu } }.
+    // Bozuksa depodaki kovalar taranır; boyutu bilinmeyen kovanın boyutu gerektiğinde okunur.
     function dizinOku() {
       var d = json(al(DIZIN));
       if (d && typeof d === "object" && !Array.isArray(d)) {
         var temiz = {};
         Object.keys(d).forEach(function (k) {
           var e = d[k];
-          if (k.indexOf(ONEK) === 0 && e && sonlu(e.n) && e.n >= 0 && sonlu(e.t)) temiz[k] = { n: Math.floor(e.n), t: e.t };
+          if (k.indexOf(ONEK) === 0 && e && sonlu(e.n) && e.n >= 0 && sonlu(e.t)) {
+            temiz[k] = { n: Math.floor(e.n), t: e.t, b: sonlu(e.b) && e.b >= 0 ? Math.floor(e.b) : -1 };
+          }
         });
         return temiz;
       }
@@ -249,7 +359,7 @@
             var k = ls.key(i);
             if (typeof k === "string" && k.indexOf(ONEK) === 0) {
               var n = kovaOku(k).length;
-              if (n) yeni[k] = { n: n, t: 0 };
+              if (n) yeni[k] = { n: n, t: 0, b: -1 };
             }
           }
         }
@@ -257,67 +367,149 @@
       return yeni;
     }
     function dizinYaz(d) { return koy(DIZIN, JSON.stringify(d)); }
-
-    function kovaYaz(anahtar, liste) {
-      if (!liste.length) return sil(anahtar);
-      return koy(anahtar, JSON.stringify({ v: 1, k: liste }));
+    function boyutu(d, k) {
+      if (d[k].b < 0) { var ham = al(k); d[k].b = typeof ham === "string" ? ham.length : 0; }
+      return d[k].b;
+    }
+    function kovaKoy(anahtar, p) {
+      if (!p.liste.length) return sil(anahtar);
+      return koy(anahtar, paketMetni(p));
     }
 
-    // toplam sınırı ve kota: başka projelerin en eski kayıtları atılır (en eski yazılan proje önce)
-    function toplamiSinirla(d, korunan) {
-      var toplamN = 0;
-      Object.keys(d).forEach(function (k) { toplamN += d[k].n; });
-      if (toplamN <= TOPLAM_SINIR) return;
-      var digerleri = Object.keys(d).filter(function (k) { return k !== korunan; })
-        .sort(function (a, b) { return d[a].t - d[b].t; });
-      for (var i = 0; i < digerleri.length && toplamN > TOPLAM_SINIR; i++) {
-        var k = digerleri[i], liste = kovaOku(k);
-        var fazla = toplamN - TOPLAM_SINIR;
-        var kalan = liste.length > fazla ? enYeniler(liste, liste.length - fazla) : [];
-        toplamN -= (d[k].n - kalan.length);
-        kovaYaz(k, kalan);
-        if (kalan.length) d[k].n = kalan.length; else delete d[k];
-      }
-      if (toplamN > TOPLAM_SINIR && d[korunan]) {
-        var kendi = kovaOku(korunan), tut = Math.max(0, kendi.length - (toplamN - TOPLAM_SINIR));
-        kendi = enYeniler(kendi, tut);
-        kovaYaz(korunan, kendi);
-        if (kendi.length) d[korunan].n = kendi.length; else delete d[korunan];
-      }
-    }
-
-    function kaydet(proje, liste) {
+    /*
+     * Projenin listesini yazar; sayı ve boyut sınırlarını uygular. korunan: { id: 1 } — bu çağrıda
+     * eklenen kayıtlar, en son atılır. Atma sırası (hep en eskiden, tek tek): diğer projelerin
+     * kayıtları (tüm projelerde createdAt sırasıyla), bu projenin eski kayıtları, korunanlar.
+     * Döner: { ok, liste, atilan }.
+     */
+    function kaydet(proje, liste, korunan) {
+      korunan = korunan || {};
       var anahtar = depoAnahtari(proje);
-      liste = enYeniler(liste, PROJE_SINIR);
       var d = dizinOku();
-      var ok = kovaYaz(anahtar, liste);
-      // kota dolduysa: diğer projeleri en eskiden boşalt, sonra kendi listesinin yarısıyla dene
-      if (!ok) {
-        var digerleri = Object.keys(d).filter(function (k) { return k !== anahtar; }).sort(function (a, b) { return d[a].t - d[b].t; });
-        for (var i = 0; i < digerleri.length && !ok; i++) { sil(digerleri[i]); delete d[digerleri[i]]; ok = kovaYaz(anahtar, liste); }
-        while (!ok && liste.length > 1) { liste = enYeniler(liste, Math.floor(liste.length / 2)); ok = kovaYaz(anahtar, liste); }
+      var eskiKova = al(anahtar);
+      var p = paketle(enYeniler(liste, PROJE_SINIR));
+      var atilanKendi = liste.length - p.liste.length, atilanDiger = 0;
+
+      // diğer projelerin kovaları yalnız gerektiğinde okunur; atmalar önce bellekte yapılır
+      var digerleri = null;
+      function digerleriAl() {
+        if (!digerleri) {
+          digerleri = Object.keys(d).filter(function (k) { return k !== anahtar; })
+            .map(function (k) { return { anahtar: k, p: paketle(kovaOku(k)), bekleyen: 0 }; });
+        }
+        return digerleri;
       }
-      if (!ok) return { ok: false, liste: kovaOku(anahtar) };
-      if (liste.length) d[anahtar] = { n: liste.length, t: simdi() }; else delete d[anahtar];
-      toplamiSinirla(d, anahtar);
+      function digerOzet() {
+        var o = { n: 0, b: 0 };
+        if (digerleri) digerleri.forEach(function (x) { o.n += x.p.liste.length; o.b += paketBoyutu(x.p); });
+        else Object.keys(d).forEach(function (k) { if (k !== anahtar) { o.n += d[k].n; o.b += boyutu(d, k); } });
+        return o;
+      }
+      function digerlerinden(hedefKarakter, hedefSayi) {
+        var kv = digerleriAl(), aday = [];
+        kv.forEach(function (x, xi) {
+          var t = d[x.anahtar] ? d[x.anahtar].t : 0;
+          x.p.liste.forEach(function (r, i) { aday.push({ x: xi, i: i, c: r.createdAt, t: t }); });
+        });
+        aday.sort(function (a, b) { return a.c - b.c || a.t - b.t || a.x - b.x || a.i - b.i; });
+        var at = {}, serbest = 0, sayi = 0;
+        for (var j = 0; j < aday.length && (serbest < hedefKarakter || sayi < hedefSayi); j++) {
+          var a = aday[j];
+          (at[a.x] = at[a.x] || {})[a.i] = 1;
+          serbest += kv[a.x].p.parca[a.i].length + 1; sayi++;
+        }
+        kv.forEach(function (x, xi) {
+          var m = at[xi];
+          if (!m) return;
+          var n0 = x.p.liste.length;
+          x.p.liste = x.p.liste.filter(function (r, i) { return !m[i]; });
+          x.p.parca = x.p.parca.filter(function (s, i) { return !m[i]; });
+          x.bekleyen += n0 - x.p.liste.length;
+        });
+        return { sayi: sayi, serbest: serbest };
+      }
+      // bellekte kısalan diğer kovaları diske yazar (küçülen yazım yer açar); diske geçen atma sayısı
+      function digerleriYaz() {
+        var yazilan = 0;
+        (digerleri || []).forEach(function (x) {
+          if (!x.bekleyen) return;
+          if (kovaKoy(x.anahtar, x.p) === true) {
+            atilanDiger += x.bekleyen; yazilan += x.bekleyen;
+            if (x.p.liste.length) d[x.anahtar] = { n: x.p.liste.length, t: d[x.anahtar] ? d[x.anahtar].t : 0, b: paketBoyutu(x.p) };
+            else delete d[x.anahtar];
+          } else {
+            x.p = paketle(kovaOku(x.anahtar));   // yazılamadı: bellek diskle yeniden eşlenir
+          }
+          x.bekleyen = 0;
+        });
+        return yazilan;
+      }
+      function kendinden(hedefKarakter, hedefSayi) {
+        var r = paketten(p, hedefKarakter, hedefSayi, korunan);
+        atilanKendi += r.sayi;
+        return r;
+      }
+      // bu çağrıdan önce depoda duran Suflo kayıtlarının boyutu (o hâliyle sığıyordu)
+      var once = (typeof eskiKova === "string" ? eskiKova.length : 0) + digerOzet().b;
+
+      // 1) proje boyut payı
+      var fazla = paketBoyutu(p) - PROJE_KARAKTER;
+      if (fazla > 0) kendinden(fazla, 0);
+      // 2) toplam boyut ve toplam kayıt sınırı: önce diğer projelerin en eskileri, sonra bu projeninkiler
+      fazla = digerOzet().b + paketBoyutu(p) - TOPLAM_KARAKTER;
+      if (fazla > 0) { fazla -= digerlerinden(fazla, 0).serbest; if (fazla > 0) kendinden(fazla, 0); }
+      var fazlaN = digerOzet().n + p.liste.length - TOPLAM_SINIR;
+      if (fazlaN > 0) { fazlaN -= digerlerinden(0, fazlaN).sayi; if (fazlaN > 0) kendinden(0, fazlaN); }
+
+      // 3) yaz. YALNIZ kota hatasında küçük adımlarla (birkaç kayıt) yer açılır — önce diğer
+      // projelerin en eskileri — ve yeniden denenir. Başka hatada hiçbir kayıt silinmez.
+      // Üst sınır: Suflo verisi bu çağrıdan önce depoda duran boyutun (once) KOTA_PAY altına inince
+      // durulur; o boyut zaten sığıyordu, hata sürüyorsa sebep yer değildir, silmek işe yaramaz.
+      var sonuc = kovaKoy(anahtar, p);
+      if (sonuc === KOTA) {
+        var ust = once - KOTA_PAY;
+        var adim = Math.max(KOTA_ADIM, Math.ceil((paketBoyutu(p) + digerOzet().b - ust) / 16));
+        for (var deneme = 0; sonuc === KOTA && deneme < KOTA_DENEME; deneme++) {
+          var gerek = paketBoyutu(p) + digerOzet().b - ust;
+          if (gerek <= 0) break;
+          var hedef = Math.min(adim, gerek);
+          var digerden = digerlerinden(hedef, 0);
+          var yazilan = digerleriYaz();
+          var kendiden = digerden.serbest < hedef ? kendinden(hedef - digerden.serbest, 0) : { sayi: 0 };
+          // ilerleme yoksa (küçülen kova bile yazılamıyor: depo yer yüzünden reddetmiyor) dur
+          if (!yazilan && !kendiden.sayi) break;
+          sonuc = kovaKoy(anahtar, p);
+        }
+      }
+      if (sonuc !== true) {
+        if (atilanDiger) dizinYaz(d);
+        return { ok: false, liste: kovaOku(anahtar), atilan: atilanDiger };
+      }
+      digerleriYaz();
+      if (p.liste.length) d[anahtar] = { n: p.liste.length, t: simdi(), b: paketBoyutu(p) }; else delete d[anahtar];
       dizinYaz(d);
-      return { ok: true, liste: d[anahtar] ? kovaOku(anahtar) : [] };
+      return { ok: true, liste: p.liste.slice(), atilan: atilanKendi + atilanDiger };
     }
 
     return {
       anahtar: depoAnahtari,
       // Projenin geçerli kayıtları (bozuk girdiler atlanır)
       oku: function (proje) { return kovaOku(depoAnahtari(proje)); },
-      // Kayıt(lar) ekler; aynı id varsa yenisi yerine geçer. { ok, eklenen, liste }
+      // Kayıt(lar) ekler; aynı id varsa yenisi yerine geçer. { ok, eklenen, atilan, liste }
+      // eklenen: gerçekten saklanan yeni kayıt sayısı; ok yalnız hepsi saklandıysa true.
+      // atilan: yer açmak için atılan eski kayıt sayısı (bu ve diğer projelerden).
       ekle: function (proje, kayitlar) {
         var gelen = (Array.isArray(kayitlar) ? kayitlar : [kayitlar]).map(function (r) { return kayit(r, simdi()); })
           .filter(function (r) { return r; });
-        if (!gelen.length) return { ok: false, eklenen: 0, liste: kovaOku(depoAnahtari(proje)) };
+        if (!gelen.length) return { ok: false, eklenen: 0, atilan: 0, liste: kovaOku(depoAnahtari(proje)) };
         var idler = {};
         gelen.forEach(function (r) { idler[r.id] = 1; });
         var liste = kovaOku(depoAnahtari(proje)).filter(function (r) { return !idler[r.id]; }).concat(gelen);
-        var s = kaydet(proje, liste);
-        return { ok: s.ok, eklenen: s.ok ? gelen.length : 0, liste: s.liste };
+        var s = kaydet(proje, liste, idler);
+        var eklenen = 0;
+        if (s.ok) s.liste.forEach(function (r) { if (idler[r.id]) eklenen++; });
+        var atilan = s.ok ? s.atilan - (gelen.length - eklenen) : s.atilan;   // atılan yeniler "eski" sayılmaz
+        return { ok: s.ok && eklenen === gelen.length, eklenen: eklenen, atilan: atilan > 0 ? atilan : 0, liste: s.liste };
       },
       // id(ler)i siler. { ok, silinen, liste }
       kaldir: function (proje, idler) {
@@ -341,7 +533,8 @@
 
   return {
     TURLER: TURLER.slice(), TOLERANS_KARE: TOLERANS_KARE, CANLI_ORAN: CANLI_ORAN,
-    PROJE_SINIR: PROJE_SINIR, TOPLAM_SINIR: TOPLAM_SINIR, ONEK: ONEK, DIZIN: DIZIN,
+    PROJE_SINIR: PROJE_SINIR, TOPLAM_SINIR: TOPLAM_SINIR, PROJE_KARAKTER: PROJE_KARAKTER, TOPLAM_KARAKTER: TOPLAM_KARAKTER,
+    ONEK: ONEK, DIZIN: DIZIN, zamanKodla: zamanKodla, zamanCoz: zamanCoz,
     kayit: kayit, canli: canli, canliAyrinti: canliAyrinti, eslestir: eslestir, tolerans: tolerans,
     filtrele: filtrele, enYeniler: enYeniler, depoAnahtari: depoAnahtari, depo: depo, yeniId: yeniId
   };

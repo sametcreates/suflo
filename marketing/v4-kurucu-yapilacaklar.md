@@ -1496,7 +1496,9 @@ ekleme (de Casteljau), çevir (ease-in ↔ ease-out), ters çevir (yalnız tekd�
 okuma / yazma, 15 hazır eğri ve `bakePlan` (eğriyi iki anahtar kare arasına timeline karelerinde sık anahtar kare
 olarak yazma planı). `js/key-records.js` (`SufloKeyRecords`) Suflo'nun yazdığı anahtar kareleri kayıt olarak tutar
 ve "hâlâ yerinde mi" denetler (iki uç + kayıtlı zamanların en az %60'ı, 0,25 kare tolerans); depo proje başına
-localStorage anahtarı, projede en çok 300, toplam 2000 kayıt. Panel açılışında Premiere'e ya da ağa çağrı yok.
+localStorage anahtarı, projede en çok 300, toplam 2000 kayıt; boyut da sınırlı (proje 400 000, toplam 1 000 000 karakter,
+zamanlar sıkıştırılmış), kota ya da sınır dolunca en eski kayıtlar tek tek atılır. Panel açılışında Premiere'e ya da ağa
+çağrı yok.
 OpenCurve'den yalnız fikir alındı (lisansı yok); kodu, tabloları ve metin sözdizimi kullanılmadı.
 
 **9.1 Lisans ve atıf (5 dk, bilgi).** `THIRD_PARTY_NOTICES.md`'ye Rebound girdisi eklendi (commit, MIT, telif satırı,

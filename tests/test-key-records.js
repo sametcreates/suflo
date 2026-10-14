@@ -175,20 +175,138 @@ function canliZamanlar(rec) { return [rec.uclar[0]].concat(rec.times, [rec.uclar
   var D5 = K.depo(null);
   ok("depo yok (null): işlemler sessizce başarısız", D5.ekle(P1, egriKaydi()).ok === false && D5.oku(P1).length === 0);
 
-  // kota: diğer projeler en eskiden boşaltılır, yine sığmazsa kendi listesi yarıya iner
-  var ls6 = sahteDepo(20000), saat6 = 0;   // ~1 KB/kayıt: 10 eski sığar, 30 yeni tek başına sığmaz, 15'i sığar
+  // kota: yalnız gereken kadar en eski kayıt atılır (önce diğer proje); hiçbir liste yarıya inmez
+  var ls6 = sahteDepo(20000), saat6 = 0;   // 10 eski + 30 yeni birlikte sığmaz; birkaç eski atılınca sığar
   var D6 = K.depo(ls6, { simdi: function () { return ++saat6; } });
-  function buyukKayitlar(on, n) {
+  function buyukKayitlar(on, n, t0) {
     var l = [], t = [];
     for (var x = 0; x < 120; x++) t.push(x / 24);
-    for (var y = 0; y < n; y++) l.push(egriKaydi({ id: on + y, createdAt: y + 1, times: t }));
+    for (var y = 0; y < n; y++) l.push(egriKaydi({ id: on + y, createdAt: (t0 || 0) + y + 1, times: t }));
     return l;
   }
   D6.ekle("eski", buyukKayitlar("e", 10));
   var once = D6.oku("eski").length;
-  var r6 = D6.ekle("yeni", buyukKayitlar("n", 30));
-  ok("kota dolunca: önce en eski proje boşaltılır, gerekirse yeni liste kısalır; hata yok", once === 10 && r6.ok && D6.oku("eski").length === 0 &&
-    D6.oku("yeni").length > 0 && D6.oku("yeni").length < 30, once + " → " + D6.oku("eski").length + " / " + D6.oku("yeni").length);
+  var r6 = D6.ekle("yeni", buyukKayitlar("n", 30, 100));
+  var eskiKalan = D6.oku("eski");
+  ok("kota dolunca: diğer projenin yalnız en eski birkaç kaydı atılır, yeni liste tam saklanır, sayılar doğru", once === 10 && r6.ok && r6.eklenen === 30 &&
+    D6.oku("yeni").length === 30 && eskiKalan.length > 0 && eskiKalan.length < 10 && r6.atilan === 10 - eskiKalan.length &&
+    eskiKalan.every(function (r) { return +r.id.slice(1) >= 10 - eskiKalan.length; }), once + " → " + eskiKalan.length + " / " + D6.oku("yeni").length + " atilan " + r6.atilan);
+  // yeni kayıtlar tek başına sığmıyorsa: diğer proje boşalır, yenilerin en yenileri saklanır; ok/eklenen bunu söyler
+  var ls7 = sahteDepo(6000), saat7 = 0;
+  var D7 = K.depo(ls7, { simdi: function () { return ++saat7; } });
+  D7.ekle("eski", buyukKayitlar("e", 2));
+  var r7 = D7.ekle("yeni", buyukKayitlar("n", 30, 100)), yeniKalan = D7.oku("yeni");
+  ok("kota: sığmayan toplu eklemede ok false, eklenen = gerçekten saklanan (en yeniler), hata yok", r7.ok === false && r7.eklenen === yeniKalan.length &&
+    r7.eklenen > 0 && r7.eklenen < 30 && D7.oku("eski").length === 0 && yeniKalan.every(function (r) { return +r.id.slice(1) >= 30 - yeniKalan.length; }),
+    r7.eklenen + " / " + yeniKalan.length);
+  // kota dışı hata (erişim reddi) yalnız bu projede: başka projeye dokunulmaz, eviction yok
+  var ls8 = sahteDepo(), D8 = K.depo(ls8, { simdi: function () { return 7; } });
+  D8.ekle("x", egriKaydi({ id: "x1" }));
+  D8.ekle("y", [egriKaydi({ id: "y1" }), egriKaydi({ id: "y2" })]);
+  var asil8 = ls8.setItem;
+  ls8.setItem = function (k, v) { if (k === K.depoAnahtari("x")) { throw new Error("SecurityError"); } return asil8.call(ls8, k, v); };
+  var yOnce = ls8.getItem(K.depoAnahtari("y")), r8 = D8.ekle("x", egriKaydi({ id: "x2" }));
+  ok("kota dışı yazma hatası: hiçbir kayıt atılmaz (başka projeler aynen), ok false, eklenen 0", r8.ok === false && r8.eklenen === 0 && r8.atilan === 0 &&
+    ls8.getItem(K.depoAnahtari("y")) === yOnce && D8.oku("x").length === 1 && D8.oku("y").length === 2);
+  // her yazımı kota hatasıyla reddeden depo: küçülen kova bile yazılamıyor → ilerleme yok, hemen
+  // durulur; döngü yok, hata fırlatmaz, hiçbir kayıt silinmez
+  var y40 = [];
+  for (var y9 = 0; y9 < 40; y9++) y40.push(egriKaydi({ id: "y" + y9, createdAt: 100 + y9 }));
+  var ls9 = sahteDepo(), D9 = K.depo(ls9, { simdi: function () { return 8; } });
+  D9.ekle("y", y40);
+  var yazim9 = 0, yOnce9 = ls9.getItem(K.depoAnahtari("y"));
+  ls9.setItem = function () { yazim9++; var e = new Error("dolu"); e.name = "QuotaExceededError"; e.code = 22; throw e; };
+  var r9, hata9 = false;
+  try { r9 = D9.ekle("x", egriKaydi({ id: "x1", createdAt: 999 })); } catch (e) { hata9 = true; }
+  ok("hep kota hatası veren depo: birkaç denemede durur, ok false, hiçbir kayıt silinmez", !hata9 && r9.ok === false && r9.eklenen === 0 && r9.atilan === 0 &&
+    yazim9 <= 4 && ls9.getItem(K.depoAnahtari("y")) === yOnce9, yazim9 + " yazım");
+  // gerçek dolu depo (panelin başka verisi kotayı doldurmuş): yalnız yeni kaydın gerektirdiği kadar,
+  // diğer projenin en eski bir iki kaydı atılır
+  var ls10 = sahteDepo(), D10 = K.depo(ls10, { simdi: function () { return 9; } });
+  D10.ekle("y", y40);
+  var dolu = 0;
+  Object.keys(ls10.veri).forEach(function (k) { dolu += ls10.veri[k].length; });
+  ls10.setItem("panel.baska", new Array(2001).join("x"));
+  var ls10b = sahteDepo(dolu + 2000 + 150);
+  Object.keys(ls10.veri).forEach(function (k) { ls10b.setItem(k, ls10.veri[k]); });
+  var D10b = K.depo(ls10b, { simdi: function () { return 10; } });
+  var r10 = D10b.ekle("x", egriKaydi({ id: "x1", createdAt: 999 })), yKalan = D10b.oku("y");
+  ok("dolu depo: yeni kayıt saklanır, diğer projeden yalnız gereken kadar (1–3) en eski kayıt atılır", r10.ok && r10.eklenen === 1 &&
+    yKalan.length >= 37 && yKalan.length < 40 && r10.atilan === 40 - yKalan.length && yKalan[0].id === "y" + (40 - yKalan.length) &&
+    ls10b.getItem("panel.baska").length === 2000, yKalan.length + " / atilan " + r10.atilan);
+})();
+
+/* ---------------- sıkıştırılmış zamanlar ve boyut payı ---------------- */
+(function () {
+  function zamanlar(n, fps, bas) { var t = []; for (var k = 1; k <= n; k++) t.push(((bas || 0) * fps + k) / fps); return t; }
+  var donen = [24, 25, 30, 30000 / 1001, 60000 / 1001, 50].every(function (fps) {
+    var r = K.kayit({ tur: "egri", times: zamanlar(1797, fps, 3725.3) });
+    return js(K.zamanCoz(K.zamanKodla(r.times))) === js(r.times);
+  });
+  var tuhaf = K.kayit({ tur: "egri", times: [-5.25, -1, 0, 0.0001, 3, 3.5, 4, 4.5, 5, 99999.9999] }).times;
+  ok("zamanKodla ↔ zamanCoz: 24/25/29,97/30/50/59,94 kare zamanları, negatif ve tek zaman birebir", donen &&
+    js(K.zamanCoz(K.zamanKodla(tuhaf))) === js(tuhaf) && js(K.zamanCoz(K.zamanKodla([1.5]))) === "[1.5]");
+  var r5994 = K.kayit({ tur: "zoom", times: zamanlar(1797, 60000 / 1001) });
+  ok("sıkıştırma: 30 sn @59,94 (1797 anahtar) anahtar başına 4 karakterden az", K.zamanKodla(r5994.times).length < 1797 * 4, K.zamanKodla(r5994.times).length);
+  var bozuk = ["", "a,,b", "1*2", "1,-2", "1,0", "1,zzzzzzzzzz", "1,2*0", "1,2*", "1;2", " 1,2", "1,2,", null, 5];
+  ok("zamanCoz: bozuk kod boş dizi", bozuk.every(function (s) { return K.zamanCoz(s).length === 0; }), js(bozuk.filter(function (s) { return K.zamanCoz(s).length; })));
+  ok("zamanCoz: en çok 4096 zaman (dev yineleme sayısı sınırlı)", K.zamanCoz("0,1*zzz,1*zzz,1*zzz,1*zzz").length === 4096);
+  ok("kayit: anlamsız büyük zaman (|t| > 1e8 sn) atılır", js(K.kayit({ tur: "egri", times: [1, 1e9, -1e12, 2] }).times) === "[1,2]");
+
+  var ls = sahteDepo(), D = K.depo(ls, { simdi: function () { return 1; } });
+  D.ekle("p", { tur: "egri", id: "z1", times: zamanlar(300, 30) });
+  var ham = JSON.parse(ls.getItem(K.depoAnahtari("p"))).k[0];
+  ok("disk biçimi: zamanlar 'z' kodunda, 'times' dizisi yazılmaz; okuyunca aynı zamanlar", typeof ham.z === "string" && !("times" in ham) &&
+    js(D.oku("p")[0].times) === js(K.kayit({ tur: "egri", times: zamanlar(300, 30) }).times));
+  ls.setItem(K.depoAnahtari("q"), JSON.stringify({ v: 1, k: [egriKaydi({ id: "eskiBicim" }), { tur: "egri", id: "kotuZ", z: "1,0" }] }));
+  ok("disk biçimi: eski 'times' dizili kayıt okunur, bozuk 'z' kodlu kayıt atlanır", D.oku("q").length === 1 && D.oku("q")[0].id === "eskiBicim" && D.oku("q")[0].times.length === 23);
+
+  // bulgu senaryosu: tarayıcı kotası (5 242 880 karakter); 6 proje × 50 küçük kayıt; geçerli
+  // projeye tek tek 1049 anahtarlı (70 sn @30) Eğri kaydı. Eskiden kota dolunca tek ekle()
+  // diğer projeleri siler, geçerli projeyi yarıya indirirdi.
+  var lsB = sahteDepo(5242880), saatB = 0;
+  var DB = K.depo(lsB, { simdi: function () { return ++saatB; } });
+  for (var p = 0; p < 6; p++) {
+    var kucuk = [];
+    for (var j = 0; j < 50; j++) kucuk.push({ tur: "egri", id: "o" + p + "_" + j, times: [1, 1.5, 2], createdAt: p * 100 + j + 1 });
+    DB.ekle("proje" + p, kucuk);
+  }
+  var agir = zamanlar(1049, 30), hepOk = true, dustu = false, onceN = 0, atilanToplam = 0, enBuyukKova = 0;
+  for (var i = 0; i < 130; i++) {
+    var r = DB.ekle("akim", { tur: "egri", id: "a" + i, times: agir, createdAt: 10000 + i });
+    if (!r.ok || r.eklenen !== 1) hepOk = false;
+    if (r.liste.length < onceN) dustu = true;
+    onceN = r.liste.length; atilanToplam += r.atilan;
+    enBuyukKova = Math.max(enBuyukKova, lsB.getItem(K.depoAnahtari("akim")).length);
+  }
+  var digerSayi = [0, 1, 2, 3, 4, 5].map(function (q) { return DB.oku("proje" + q).length; });
+  ok("boyut payı: ağır kayıtlar tek tek eklenir, proje kovası ≤ 400 000 karakter, liste hiç kısalmaz (en eski tek tek atılır), diğer projeler yerinde",
+    hepOk && !dustu && enBuyukKova <= K.PROJE_KARAKTER && onceN > 100 && atilanToplam === 130 - onceN && digerSayi.join(",") === "50,50,50,50,50,50" &&
+    DB.oku("akim")[0].id === "a" + (130 - onceN), onceN + " kayıt, en büyük kova " + enBuyukKova + ", diğer " + digerSayi.join(","));
+  var kalanYer = true;
+  try { lsB.setItem("suflo.deneme", new Array(100001).join("x")); } catch (e) { kalanYer = false; }
+  ok("boyut payı: panelin diğer anahtarlarına (deneme aynası vb.) yer kalır", kalanYer && K.TOPLAM_KARAKTER <= 1000000 && K.PROJE_KARAKTER < K.TOPLAM_KARAKTER);
+
+  // toplam pay (1 000 000): üç ağır proje; sınır aşılınca tüm projelerdeki en eski kayıtlar tek tek atılır
+  var dev = [], u = 0;
+  for (var z = 0; z < 4096; z++) { u += 400 + ((z * 7919) % 97); dev.push(u / 10000); }
+  var lsT = sahteDepo(5242880), saatT = 0, DT = K.depo(lsT, { simdi: function () { return ++saatT; } });
+  DT.ekle("kucuk", [{ tur: "egri", id: "k0", times: [1], createdAt: 1 }, { tur: "egri", id: "k1", times: [1], createdAt: 2 }]);
+  var toplamTasti = false, sonDustu = false, sonN = 0, hepOkT = true;
+  ["A", "B", "C"].forEach(function (pr, pi) {
+    for (var q = 0; q < 34; q++) {
+      var rr = DT.ekle(pr, { tur: "egri", id: pr + q, times: dev, createdAt: 100 + pi * 100 + q });
+      if (!rr.ok || rr.eklenen !== 1) hepOkT = false;
+      if (pr === "C") { if (rr.liste.length < sonN) sonDustu = true; sonN = rr.liste.length; }
+      var kovalar = 0;
+      Object.keys(lsT.veri).forEach(function (k) { if (k.indexOf(K.ONEK) === 0 && k !== K.DIZIN) kovalar += lsT.veri[k].length; });
+      if (kovalar > K.TOPLAM_KARAKTER) toplamTasti = true;
+    }
+  });
+  var a = DT.oku("A"), b = DT.oku("B"), c = DT.oku("C");
+  ok("toplam pay: tüm kovalar ≤ 1 000 000 karakter; en eski kayıtlar (önce en eski proje) tek tek atılır, yeni proje kısalmaz",
+    hepOkT && !toplamTasti && !sonDustu && DT.oku("kucuk").length === 0 && a.length < b.length && c.length === sonN && c.length > 0 &&
+    a.every(function (r) { return +r.id.slice(1) >= 34 - a.length; }), [DT.oku("kucuk").length, a.length, b.length, c.length].join("/"));
 })();
 
 /* ---------------- kaynak denetimi ---------------- */
