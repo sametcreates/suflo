@@ -150,6 +150,18 @@ ok("kesimYeri: V katmanı + dakika:saniye.salise; saat varsa başa; geçersizse 
   var me = SK.mesajParcalari("zoom", oe);
   ok("mesaj: kaldırılan Eğri ayrıca söylenir, temiz başarı 'good'", me.tur === "good" && me.parcalar[0] === "Zoom kaldırıldı: 7 anahtar kare silindi." &&
     me.parcalar[1] === "Uçları bu anahtar karelerde olan 1 Suflo eğrisi de kaldırıldı.", me);
+  // 3.4 adım 14 inceleme: inişi silinen yaylanma "eğri" diye anılmaz, ayrı cümleyle söylenir (türü host'a giden adaylardan)
+  var oy = SK.ozet({ eslesen: 1, sonuclar: [{ id: "z", silinen: 9 }], atlanan: [], egriBiten: ["y1", "e1"] }, [yay, egriler[0]]);
+  var my = SK.mesajParcalari("gecis", oy);
+  var oyY = SK.ozet({ eslesen: 1, sonuclar: [{ id: "z", silinen: 5 }], atlanan: [], egriBiten: ["y1"] }, [yay]);
+  ok("ozet / mesaj: biten yaylanma ayrı sayılır ve 'Suflo yaylanması' diye söylenir; yalnız yaylanma bittiyse eğri cümlesi yok",
+    oy.egri === 1 && oy.yaylan === 1 && my.parcalar[1] === "Uçları bu anahtar karelerde olan 1 Suflo eğrisi de kaldırıldı." &&
+    my.parcalar[2] === "Bu anahtar karelere inen 1 Suflo yaylanması da kaldırıldı." && oyY.egri === 0 && oyY.yaylan === 1 &&
+    SK.mesajParcalari("gecis", oyY).parcalar.join("|") === "Geçiş kaldırıldı: 5 anahtar kare silindi.|Bu anahtar karelere inen 1 Suflo yaylanması da kaldırıldı." &&
+    SK.ozet({ egriBiten: ["y1"] }).egri === 1, JSON.stringify([my.parcalar, SK.mesajParcalari("gecis", oyY).parcalar]));
+  var I2 = require(path.join(ROOT, "js", "i18n.js"));
+  I2.setDictionary(require(path.join(ROOT, "i18n", "en.js")));
+  ok("i18n: yaylanma cümlesi İngilizce", I2.translate(SK.yaylanMetni("2")) === "2 Suflo follow-throughs landing on these keyframes were removed too.", I2.translate(SK.yaylanMetni("2")));
 })();
 
 /* ---------------- depo + akış (sahte call) ---------------- */

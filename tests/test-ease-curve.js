@@ -478,7 +478,13 @@ var S = E.spring;
   ok("yaylanPlan: her iç anahtar bir tepe / çukurun en yakın karesinde", ic.length === ext.length && ic.every(function (k, i) {
     return Math.abs((k.t - 2) - ext[i]) <= 0.5 / fps + 1e-9;
   }), js([ic.length, ext.length]));
-  ok("yaylanPlan: değer = iniş + hız · genlik · s(t − iniş)", p.keys.every(function (k) { return yakin(k.v, 500 + 1000 * 0.1 * s(k.t - 2), 1e-5); }));
+  // 3.4 adım 14 inceleme: son anahtar (pencere sonu) tam tabanda — sönümlü sinüsün kalıntısı (s(süre) ≠ 0) yazılmaz
+  ok("yaylanPlan: değer = iniş + hız · genlik · s(t − iniş); son anahtar tam inişte (s = 0)", p.keys.slice(0, -1).every(function (k) {
+    return yakin(k.v, 500 + 1000 * 0.1 * s(k.t - 2), 1e-5);
+  }) && p.keys[p.keys.length - 1].v === 500 && p.oran === 1);
+  var donus = E.yaylanPlan({ tL: 2, vL: 360, hiz: 720, genlik: 0.5, frekans: 3, sonum: 6, sinir: 10, fps: fps });
+  ok("yaylanPlan: iniş son anahtarsa (sonraki yok) özellik kullanıcının değerinde oturur (Döndürme 0 → 360, genlik 0,5: kalıntı yok)",
+    donus.keys[donus.keys.length - 1].v === 360 && Math.abs(360 + 720 * 0.5 * s(donus.sure) - 360) > 1, js(donus.keys[donus.keys.length - 1]));
   var sap = ic.map(function (k) { return k.v - 500; }), azalir = true, isaret = true;
   for (var i = 1; i < sap.length; i++) {
     if (!(Math.abs(sap[i]) < Math.abs(sap[i - 1]))) azalir = false;
@@ -512,17 +518,38 @@ var S = E.spring;
     op.keys.some(function (k) { return k.v === 100; }) && op.keys.some(function (k) { return k.v < 100; }));
   // sonraki anahtar başka değerdeyse taban oraya doğru doğrusal gider (kullanıcının sonraki hareketi kaymaz)
   var dog = E.yaylanPlan({ tL: 2, vL: 0, hiz: 100, genlik: 0.1, frekans: 3, sonum: 6, sinir: 4, tN: 4, vN: 200, fps: 25 });
-  ok("yaylanPlan: sonraki anahtar farklıysa taban doğrusal (iniş → sonraki)", dog.keys.every(function (k) {
-    return yakin(k.v, 0 + 200 * (k.t - 2) / 2 + 100 * 0.1 * s(k.t - 2), 1e-5);
+  // son anahtar tam tabanda (doğrusal yolun üstünde: s = 0)
+  ok("yaylanPlan: sonraki anahtar farklıysa taban doğrusal (iniş → sonraki)", dog.keys.every(function (k, i) {
+    return yakin(k.v, 0 + 200 * (k.t - 2) / 2 + (i === dog.keys.length - 1 ? 0 : 100 * 0.1 * s(k.t - 2)), 1e-5);
   }));
   var tnOte = E.yaylanPlan({ tL: 2, vL: 0, hiz: 100, sinir: 3, tN: 6, vN: 400, fps: 25 });
+  var tnSon = tnOte.keys[tnOte.keys.length - 1], tnOnce = tnOte.keys[tnOte.keys.length - 2];
   ok("yaylanPlan: sonraki anahtar klibin ötesindeyse taban yine o anahtara göre (sınır klip sonu)", tnOte.keys.every(function (k) { return k.t < 3; }) &&
-    yakin(tnOte.keys[tnOte.keys.length - 1].v - 400 * (tnOte.keys[tnOte.keys.length - 1].t - 2) / 4, 100 * 0.1 * E.dampedSine(3, 6)(tnOte.keys[tnOte.keys.length - 1].t - 2), 1e-5));
+    yakin(tnOnce.v - 400 * (tnOnce.t - 2) / 4, 100 * 0.1 * E.dampedSine(3, 6)(tnOnce.t - 2), 1e-5) && yakin(tnSon.v, 400 * (tnSon.t - 2) / 4, 1e-6));
   var yog = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: 0.1, frekans: 3, sonum: 6, sinir: 5, fps: fps, yogun: true });
   var kareler = yog.keys.map(function (k) { return Math.round(k.t * fps) - 50; });
-  ok("yaylanPlan yoğun: 2 karede bir, son anahtar pencere sonu (Bezier yazılamazsa yedek)", yog.yogun === true && kareler[0] === 1 &&
+  ok("yaylanPlan yoğun: 2 karede bir, son anahtar pencere sonu ve tam inişte (Bezier yazılamazsa yedek)", yog.yogun === true && kareler[0] === 1 &&
     kareler.slice(1, -1).every(function (k, i) { return k - kareler[i] === 2; }) && yakin(yog.keys[yog.keys.length - 1].t, 2 + p.sure, 1e-9) &&
-    yog.keys.every(function (k) { return yakin(k.v, 500 + 100 * s(k.t - 2), 1e-5); }), js(kareler));
+    yog.keys.slice(0, -1).every(function (k) { return yakin(k.v, 500 + 100 * s(k.t - 2), 1e-5); }) && yog.keys[yog.keys.length - 1].v === 500, js(kareler));
+  // 3.4 adım 14 inceleme: sinirSigdir — aşım Opaklık / Ölçek sınırına sığdırılır, kırpılmaz (kırpılan ilk tepe silinip
+  // içeri dönen salınım kalırdı: sönen klip yeniden görünür, 0'a küçülen Ölçek eksiye gider)
+  var sonen = E.yaylanPlan({ tL: 2, vL: 0, hiz: -200, sinir: 10, fps: 25, clampMin: 0, clampMax: 100, sinirSigdir: true });
+  var dolan = E.yaylanPlan({ tL: 2, vL: 100, hiz: 200, sinir: 10, fps: 25, clampMin: 0, clampMax: 100, sinirSigdir: true });
+  var kucul = E.yaylanPlan({ tL: 2, vL: 0, hiz: -333, sinir: 10, fps: 25, clampMin: 0, sinirSigdir: true });
+  var eski0 = E.yaylanPlan({ tL: 2, vL: 0, hiz: -200, sinir: 10, fps: 25, clampMin: 0, clampMax: 100 });
+  ok("yaylanPlan sinirSigdir: iniş sınırda ve aşım o yöndeyse 'sinir' (sönen Opaklık, 100'e dolan Opaklık, 0'a küçülen Ölçek); eski kırpmada hayalet vardı",
+    sonen.hata === "sinir" && sonen.keys.length === 0 && dolan.hata === "sinir" && kucul.hata === "sinir" &&
+    eski0.keys.some(function (k) { return k.v > 1; }), js([sonen.hata, dolan.hata, kucul.hata, eski0.keys.map(function (k) { return k.v; })]));
+  var yakin0 = E.yaylanPlan({ tL: 2, vL: 5, hiz: -200, sinir: 10, fps: 25, clampMin: 0, clampMax: 100, sinirSigdir: true });
+  var yakin0Y = E.yaylanPlan({ tL: 2, vL: 5, hiz: -200, sinir: 10, fps: 25, clampMin: 0, clampMax: 100, sinirSigdir: true, yogun: true });
+  var en0 = Math.min.apply(null, yakin0Y.keys.map(function (k) { return k.v; }));
+  ok("yaylanPlan sinirSigdir: sınıra yakın iniş — aşım küçültülür (oran < 1, seyrek ve sık aynı), hiçbir anahtar sınırı geçmez, tepe sınıra değer",
+    !yakin0.hata && yakin0.oran > 0.1 && yakin0.oran < 1 && yakin0Y.oran === yakin0.oran && yakin0.keys.concat(yakin0Y.keys).every(function (k) { return k.v >= 0 && k.v <= 100; }) &&
+    en0 >= 0 && yakin(yakin0.keys[0].v, 0, 1e-6) && yakin0.keys[yakin0.keys.length - 1].v === 5 &&
+    yakin0.keys.slice(0, -1).every(function (k) { return yakin(k.v, 5 - 200 * 0.1 * yakin0.oran * s(k.t - 2), 1e-5); }), js([yakin0.oran, en0, yakin0.keys]));
+  ok("yaylanPlan sinirSigdir: sınıra uzak (ya da sınırsız) değerde aşım değişmez (oran 1)",
+    E.yaylanPlan({ tL: 2, vL: 50, hiz: 100, sinir: 10, fps: 25, clampMin: 0, clampMax: 100, sinirSigdir: true }).oran === 1 &&
+    E.yaylanPlan({ tL: 2, vL: 0, hiz: -200, sinir: 10, fps: 25, sinirSigdir: true }).oran === 1);
   var kirp = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: 9, frekans: 99, sonum: -3, sinir: 5, fps: fps });
   ok("yaylanPlan: ayarlar sınırlara kırpılır, sayı olmayan varsayılan olur", kirp.genlik === 0.5 && kirp.frekans === 6 && kirp.sonum === 2 &&
     E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: "x", sinir: 5, fps: fps }).genlik === 0.1);

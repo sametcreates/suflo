@@ -661,13 +661,26 @@ ok("yaylan yoğun yedek: kfInterp yok → 2 karede bir yazılır, Bezier çağr�
   yyYeni.slice(1).every(function (k, i) { return Math.round((k.s - yyYeni[i].s) * 25) <= 2; }), js([yyB.sonuclar, yyYeni.length]));
 ok("yaylan: iniş son anahtarsa sınır klibin sonu (t1 null), yazılanlar klibin içinde", yyPlan.gruplar[0].items[0].t1 === null && yyPlan.gruplar[0].items[0].v1 === null &&
   yyYeni.every(function (k) { return k.s < 10; }));
-// Opaklık: host da 0..100 kırpar (panel kırpmasa bile)
-var YO = yaylanKlibi({ nodeId: "nYO", opak: [[1, 0], [2, 100]] });
+// Opaklık: host da 0..100 kırpar (panel kırpmasa bile). 3.4 adım 14 inceleme: panel 100'e inen opaklığa aşım yazmaz
+// ('sinir'); iniş 80, plan iki yönde de taşacak biçimde bozulur (üst ve alt sınır birlikte denenir)
+var YO = yaylanKlibi({ nodeId: "nYO", opak: [[1, 0], [2, 80]] });
 var tyo = yaylanTara(YO, [1, 0]);
 var yoPlan = yaylanPlani(tyo.p, { genlik: 0.4 });
-yoPlan.gruplar[0].items[0].keys = yoPlan.gruplar[0].items[0].keys.map(function (k) { return { t: k.t, v: 100 + (k.v - 100) * -3 + 5 }; });
+yoPlan.gruplar[0].items[0].keys = yoPlan.gruplar[0].items[0].keys.map(function (k) { return { t: k.t, v: (k.v - 80) * 30 + 50 }; });
+var yoTasan = yoPlan.gruplar[0].items[0].keys;
 cagir("KS_easeBake", yoPlan.gruplar[0]);
-ok("yaylan Opaklık: değerler 0..100'e kırpılır", YO.opak.keys.length > 2 && YO.opak.keys.every(function (k) { return k.v >= 0 && k.v <= 100; }), js(YO.opak.keys.map(function (k) { return k.v; })));
+ok("yaylan Opaklık: değerler 0..100'e kırpılır (iki yönde)", YO.opak.keys.length > 2 && YO.opak.keys.every(function (k) { return k.v >= 0 && k.v <= 100; }) &&
+  yoTasan.some(function (k) { return k.v > 100; }) && yoTasan.some(function (k) { return k.v < 0; }), js(YO.opak.keys.map(function (k) { return k.v; })));
+var YO2 = yaylanKlibi({ nodeId: "nYO2", opak: [[1, 0], [2, 100]] });
+var yo2Plan = yaylanPlani(yaylanTara(YO2, [1, 0]).p, { genlik: 0.4 });
+ok("yaylan Opaklık: 100'e inen opaklıkta aşım sığmaz → host'a öğe gitmez ('sinir')", yo2Plan.gruplar.length === 0 && yo2Plan.atlanan[0].kod === "sinir", js(yo2Plan.atlanan));
+// Ölçek: host da 0'ın altına yazmaz (panel sığdırsa bile son güvence)
+var YS = yaylanKlibi({ nodeId: "nYS", olcek: [[1, 100], [2, 20]] });
+var ysPlan = yaylanPlani(yaylanTara(YS, [0, 1]).p, {});
+ysPlan.gruplar[0].items[0].keys = ysPlan.gruplar[0].items[0].keys.map(function (k) { return { t: k.t, v: (k.v - 20) * 10 }; });
+var ysB = cagir("KS_easeBake", ysPlan.gruplar[0]);
+ok("yaylan Ölçek: host eksi değeri 0'a kırpar", ysB.sonuclar[0].ok && ysPlan.gruplar[0].items[0].keys.some(function (k) { return k.v < 0; }) &&
+  YS.olcek.keys.every(function (k) { return k.v >= 0; }), js(YS.olcek.keys.map(function (k) { return k.v; })));
 // tüm varışlar: zincirdeki her hareketin inişi, tek çağrıda
 var YT = yaylanKlibi({ nodeId: "nYT", olcek: [[1, 100], [2, 150], [4, 150], [5, 120], [8, 120]] });
 var tyt = yaylanTara(YT, [0, 1]);
@@ -716,6 +729,60 @@ var yeU = cagir("KS_easeUndo", { records: [yeKayit], egriler: [yeEgriKayit] });
 ok("yaylan geri al: ucu yaylanma anahtarında olan Eğri'nin iç anahtarları da silinir (egriBiten); kullanıcının anahtarları kalır",
   yeEgri.basarili === 1 && js(yeEgriKayit.uclar) === js([yeT[0], yeT[1]]) && js(yeU.egriBiten) === js(["krye-egri"]) &&
   yeU.sonuclar[0].silinen === yeT.length + yeEgriKayit.times.length && YE.olcek.keys.length === 3 && YE.olcek.bul(2).v === 160, js([yeU, YE.olcek.keys.length]));
+
+/* 3.4 adım 14 inceleme */
+// (a) Tüm varışlar, 45 iniş (100 / 120 arasında 0,5 sn'de bir): KS_easeBake 40'tan çok öğeyi reddeder → panel aynı klibi 40'lık çağrılara böler
+var ZK = [];
+for (var zi = 0; zi < 46; zi++) ZK.push([0.5 + zi * 0.5, zi % 2 ? 120 : 100]);
+var Y45 = yaylanKlibi({ nodeId: "nY45", end: 30, olcek: ZK });
+var y45Plan = yaylanPlani(yaylanTara(Y45, [0, 1]).p, {}, [], { tum: true });
+var y45Once = Y45.olcek.keys.length, y45B = y45Plan.gruplar.map(function (g) { return cagir("KS_easeBake", { target: g.target, items: g.items }); });
+ok("tüm varışlar: 45 iniş iki çağrıya bölünür (40 + 5), ikisi de yazar, 45 kayıt", y45Plan.gruplar.length === 2 && y45Plan.gruplar[0].items.length === 40 &&
+  y45B.every(function (b) { return b.ok && b.basarili === b.sonuclar.length; }) && y45B[0].records.length + y45B[1].records.length === 45 &&
+  Y45.olcek.keys.length > y45Once + 45 && cagir("KS_easeBake", { target: y45Plan.gruplar[0].target, items: y45Plan.gruplar[0].items.concat(y45Plan.gruplar[1].items) }).kod === "gecersiz",
+  js(y45Plan.gruplar.map(function (g) { return g.items.length; })));
+// (b) Tümünü geri al, depo sırası [yaylanma, ucu yaylanma anahtarında Eğri]: Eğri önce geri alınır, iç anahtarları kalmaz
+var YU = yaylanKlibi({ nodeId: "nYU", olcek: [[1, 100], [2, 160], [6, 160]] });
+var yuB = cagir("KS_easeBake", yaylanPlani(yaylanTara(YU, [0, 1]).p, { frekans: 1, sonum: 2 }).gruplar[0]);
+var yuK = KRh.kayit(yuB.records[0]); yuK.id = "kryu";
+playhead = 2.01;
+var yuP = cagir("KS_easeScan", {}).props.filter(function (x) { return x.propIdx === 1; })[0];
+var yuE = cagir("KS_easeBake", { target: hedef(yuP), items: [plan(yuP, E.builtin("yumusak").curve, 1)], dogrusal: true });
+var yuEK = KRh.kayit(yuE.records[0]); yuEK.id = "kryu-egri";
+var yuU = cagir("KS_easeUndo", { records: [yuK, yuEK] });
+ok("Tümünü geri al [yaylanma, Eğri]: Eğri önce (uçları yerindeyken), sonra yaylanma; sahipsiz anahtar kalmaz, atlanan yok", yuE.basarili === 1 &&
+  js([yuP.pair.t0, yuP.pair.t1]) === js([2, yuK.times[0]]) && yuU.atlanan.length === 0 && yuU.sonuclar.length === 2 &&
+  js(anahtarlar(YU.olcek).map(function (k) { return k.s; })) === js([1, 2, 6]), js([yuU, anahtarlar(YU.olcek).map(function (k) { return k.s; })]));
+// (c) yaylanma penceresinde (iki yaylanma anahtarı arasında) Eğri varken aynı inişe yeniden uygulama: Eğri'yi sahipsiz bırakmaz → 'egriVar'
+var YV = yaylanKlibi({ nodeId: "nYV", olcek: [[1, 100], [2, 160], [6, 160]] });
+var yvB = cagir("KS_easeBake", yaylanPlani(yaylanTara(YV, [0, 1]).p, { frekans: 1, sonum: 2 }).gruplar[0]);
+var yvK = KRh.kayit(yvB.records[0]); yvK.id = "kryv";
+playhead = (yvK.times[0] + yvK.times[1]) / 2;
+var yvP = cagir("KS_easeScan", {}).props.filter(function (x) { return x.propIdx === 1; })[0];
+var yvE = cagir("KS_easeBake", { target: hedef(yvP), items: [plan(yvP, E.builtin("yumusak").curve, 1)] });
+var yvEK = KRh.kayit(yvE.records[0]); yvEK.id = "kryv-egri";
+var yvOnce = YV.olcek.keys.length;
+var yvPlan = yaylanPlani(yaylanTara(YV, [0, 1]).p, { frekans: 3, sonum: 6 }, [yvK, yvEK]);
+var yvPlanT = yaylanPlani(yaylanTara(YV, [0, 1]).p, {}, [yvK, yvEK], { tum: true });
+ok("yeniden uygulama: yaylanmanın içinde Eğri varsa 'egriVar' (tek ve tüm varışlar), host'a öğe gitmez, Eğri'nin Geri al'ı çalışır",
+  yvE.basarili === 1 && yvPlan.gruplar.length === 0 && yvPlan.atlanan[0].kod === "egriVar" && yvPlanT.gruplar.length === 0 && yvPlanT.atlanan[0].kod === "egriVar" &&
+  YV.olcek.keys.length === yvOnce && cagir("KS_easeUndo", { records: [yvEK] }).sonuclar[0].silinen === yvEK.times.length, js([yvPlan.atlanan, yvPlanT.atlanan]));
+// (d) setInterpolationTypeAtKey var ama hata veriyor: seyrek tepeler bırakılmaz, sık plan yazılır (interp 'yogun')
+var YB = yaylanKlibi({ nodeId: "nYB", konum: [[1, [0, 0]], [2, [1, 0]], [5, [1, 0]]] });
+YB.konum.setInterpolationTypeAtKey = function () { throw new Error("desteklenmiyor"); };
+var ybPlan = yaylanPlani(yaylanTara(YB, [0, 0]).p, {});
+var ybB = cagir("KS_easeBake", ybPlan.gruplar[0]);
+var ybYeni = anahtarlar(YB.konum).filter(function (k) { return k.s > 2 + 1e-6 && k.s < 5 - 1e-6; });
+ok("yaylan: Bezier çağrısı hata verirse seyrek anahtarlar silinip 2 karede bir yazılır; sonuç 'yogun', kayıt sık planın zamanları",
+  ybB.sonuclar[0].ok && ybB.sonuclar[0].interp === "yogun" && ybB.yogun === 1 && ybB.bezier === 0 &&
+  ybYeni.length === ybPlan.gruplar[0].items[0].yogunKeys.length && js(ybB.records[0].times) === js(ybYeni.map(function (k) { return k.s; })) &&
+  ybYeni.every(function (k, i) { return yakin(k.v[0], ybPlan.gruplar[0].items[0].yogunKeys[i].v[0], 1e-9); }), js([ybB.sonuclar, ybYeni.length]));
+// (e) iniş son anahtarsa yaylanma kullanıcının değerinde biter (kalıntı yok)
+var YR = yaylanKlibi({ nodeId: "nYR", olcek: [[1.5, 0], [2, 360]] });
+cagir("KS_easeBake", yaylanPlani(yaylanTara(YR, [0, 1]).p, { genlik: 0.5 }).gruplar[0]);
+var yrSon = anahtarlar(YR.olcek);
+ok("yaylan: iniş son anahtarsa son yaylanma anahtarı tam iniş değerinde (özellik kayık kalmaz)", yrSon.length > 3 && yrSon[yrSon.length - 1].v === 360 && yrSon[yrSon.length - 1].s > 2,
+  js(yrSon.slice(-2)));
 secim = [];
 
 /* ---------- 8) yoklama: kfInterp ---------- */

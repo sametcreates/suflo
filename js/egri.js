@@ -1266,7 +1266,7 @@ window.KEgri = (function () {
       }
       if (!tar) throw new Error(onbellek && onbellek.hata ? onbellek.hata : "Anahtar kareler okunamadı.");
       var secilen = satirlar().filter(yaylanIsaretli);
-      if (!secilen.length) throw new Error("Yaylanacak varış yok: playhead'i bir hareketin iki anahtar karesi arasına getir (ya da Tüm varışlar'ı aç) ve özelliği işaretle.");
+      if (!secilen.length) throw new Error("Yaylanacak varış yok: playhead'i bir hareketin iki anahtar karesi arasına getir (ya da Tüm varışlar'ı aç) ve Konum, Ölçek, Döndürme ya da Opaklık satırını işaretle.");
       var kl = kayitlar();
       var plan = M.yaylanGruplari(secilen.map(function (s) {
         return { prop: s.prop, varis: M.varislar(s.prop, kl, { ph: ph, tum: ayar.tum }) };
@@ -1452,6 +1452,7 @@ window.KEgri = (function () {
     }
     if (e.preventDefault) e.preventDefault();
     if (k.eylem === "uygula") uygula();
+    else if (k.eylem === "yaylan") yaylanUygula();
     else if (k.eylem === "geriAl") geriAlSon();
     else if (k.eylem === "cevir") cevir();
     else if (k.eylem === "tersCevir") tersCevir();

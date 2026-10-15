@@ -2752,6 +2752,11 @@
     "sonraki anahtar kareye ya da klibin sonuna 2 kareden az yer var": "there's less than 2 frames of room before the next keyframe or the clip end",
     "sonraki anahtar kare yerinde değil": "the next keyframe is gone",
     "iniş anahtar karesi silinmiş; önce yaylanmayı Geri al ile kaldır": "the landing keyframe was deleted; remove the follow-through with Undo first",
+    "yalnız Konum, Ölçek, Döndürme ve Opaklık yaylanır": "follow-through only works on Position, Scale, Rotation and Opacity",
+    "hareket bu anahtar karede durmuyor, sürüyor": "the move doesn't stop at this keyframe; it carries on",
+    "bu yaylanmanın anahtar karelerine Suflo eğrisi uygulanmış; önce o eğriyi Geri al ile kaldır":
+      "a Suflo curve was applied on this follow-through's keyframes; remove that curve with Undo first",
+    "iniş değeri sınırda (Opaklık 0 ya da 100, Ölçek 0); aşım sığmıyor": "the landing value is at its limit (Opacity 0 or 100, Scale 0); there's no room to overshoot",
     // host codes (js/egri-model.js HATA)
     "Aktif sekans yok. Bir sekans aç.": "No active sequence. Open a sequence.",
     "Eğri başka bir sekans için hazırlanmıştı. Liste yenilendi; yeniden dene.": "The curve was prepared for another sequence. The list was refreshed; try again.",
@@ -2814,8 +2819,8 @@
     "İşaretli özelliklerin varışına yaylanma yaz (Pro; düzenlemek ve önizlemek ücretsiz)": "Write follow-through at the landing of the ticked properties (Pro; editing and previewing are free)",
     "Suflo yaylanması": "Suflo follow-through",
     "Bu varıştaki yaylanmayı kaldır": "Remove the follow-through at this landing",
-    "Yaylanacak varış yok: playhead'i bir hareketin iki anahtar karesi arasına getir (ya da Tüm varışlar'ı aç) ve özelliği işaretle.":
-      "No landing to add follow-through to: move the playhead between the two keyframes of a move (or turn on Every landing) and tick the property.",
+    "Yaylanacak varış yok: playhead'i bir hareketin iki anahtar karesi arasına getir (ya da Tüm varışlar'ı aç) ve Konum, Ölçek, Döndürme ya da Opaklık satırını işaretle.":
+      "No landing to add follow-through to: move the playhead between the two keyframes of a move (or turn on Every landing) and tick a Position, Scale, Rotation or Opacity row.",
     "Yaylanma uygulanamadı": "Couldn't apply follow-through",
     "Varışta yaylanma uygulandı: {n} varış · {n} anahtar kare": "Follow-through applied: {} landings · {} keyframes",
     "Premiere Bezier yazamadı; 2 karede bir yazıldı": "Premiere couldn't write Bezier keys; written every 2 frames instead",
@@ -2839,6 +2844,7 @@
       "Removes the Suflo transition nearest the playhead (up to 1 s away; the playhead decides, not the selected clip); your own keyframes stay untouched.",
     "Kesim: V{n}, {}": "Cut: V{}, {}",
     "Uçları bu anahtar karelerde olan {n} Suflo eğrisi de kaldırıldı.": "{} Suflo curves whose ends were on these keyframes were removed too.",
+    "Bu anahtar karelere inen {n} Suflo yaylanması da kaldırıldı.": "{} Suflo follow-throughs landing on these keyframes were removed too.",
     "Seçili klipte yalnız Suflo'nun yazdığı önayar anahtar karelerini kaldırır; kendi anahtar karelerine dokunmaz.":
       "Removes only the preset keyframes Suflo wrote on the selected clip; your own keyframes stay untouched.",
     "Yalnız Suflo'nun yazdığı zoom anahtar karelerini kaldırır; kendi anahtar karelerine dokunmaz. Ücretsiz.":

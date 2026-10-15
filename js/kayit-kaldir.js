@@ -57,6 +57,8 @@
   // Kalan anahtarlar kullanıcının ya da başka bir Suflo aracının olabilir (ör. zoom'un ortasındaki Punch): "senin" denmez
   function kenarMetni(n) { return "Klipteki diğer anahtar kareler korundu; kenarlara " + n + " anahtar kare eski değerle eklendi."; }
   function egriMetni(n) { return "Uçları bu anahtar karelerde olan " + n + " Suflo eğrisi de kaldırıldı."; }
+  // Varışta yaylanma (3.4 adım 14) eğri değil, ucu da yok: inişi silinen yaylanma ayrı cümleyle söylenir
+  function yaylanMetni(n) { return "Bu anahtar karelere inen " + n + " Suflo yaylanması da kaldırıldı."; }
   // Geçişi kaldır'ın kesimi: { cut (sn), track (1'den) } → "Kesim: V1, 00:09.04" (onay sorusu ve sonuç bildirimi)
   function kesimYeri(k) {
     if (!k || !sonlu(Number(k.cut))) return "";
@@ -283,20 +285,23 @@
    * KS_removeSufloKeys cevabının özeti: { eslesen, silinen, eklenen, biten (host'un bitirdiği kayıt id'leri:
    * silindi ya da Suflo'nun anahtarları zaten yoktu), yok (zaten kaldırılmış sayısı), kalan: { kod: sayı },
    * kalanSayi, degistiSayi, kayitsiz (seçili kapsamda kaydı eşleşmeyen seçili video klibi sayısı),
-   * egriBiten (uçları silindiği için host'un kaldırdığı Eğri kayıtlarının id'leri), egri (sayısı) }
+   * egriBiten (uçları / inişi silindiği için host'un kaldırdığı Eğri sekmesi kayıtlarının id'leri), egri (Eğri sayısı),
+   * yaylan (varışta yaylanma sayısı; adaylar: host'a giden Eğri sekmesi kayıtları, türleri buradan) }
    */
-  function ozet(r) {
-    var o = { eslesen: 0, silinen: 0, eklenen: 0, biten: [], yok: 0, kalan: {}, kalanSayi: 0, degistiSayi: 0, kayitsiz: 0, egriBiten: [], egri: 0 };
+  function ozet(r, adaylar) {
+    var o = { eslesen: 0, silinen: 0, eklenen: 0, biten: [], yok: 0, kalan: {}, kalanSayi: 0, degistiSayi: 0, kayitsiz: 0, egriBiten: [], egri: 0, yaylan: 0 };
     if (!r || typeof r !== "object") return o;
     o.eslesen = Math.max(0, Number(r.eslesen) || 0);
     o.kayitsiz = Array.isArray(r.kayitsiz) ? r.kayitsiz.length : 0;
-    var gorulen = {};
+    var gorulen = {}, yaylanMi = {};
+    (Array.isArray(adaylar) ? adaylar : []).forEach(function (e) { if (e && e.tur === "yaylan" && typeof e.id === "string") yaylanMi[e.id] = 1; });
     o.egriBiten = (Array.isArray(r.egriBiten) ? r.egriBiten : []).filter(function (id) {
       if (typeof id !== "string" || !id || gorulen[id]) return false;
       gorulen[id] = 1;
       return true;
     });
-    o.egri = o.egriBiten.length;
+    o.yaylan = o.egriBiten.filter(function (id) { return yaylanMi[id] === 1; }).length;
+    o.egri = o.egriBiten.length - o.yaylan;
     (Array.isArray(r.sonuclar) ? r.sonuclar : []).forEach(function (s) {
       if (!s || typeof s.id !== "string") return;
       o.biten.push(s.id);
@@ -330,6 +335,7 @@
     else if (o.yok && !o.kalanSayi) p.push("Suflo'nun anahtar kareleri zaten kaldırılmış (Premiere'de geri alınmış ya da silinmiş); kayıt temizlendi.");
     else if (!o.kalanSayi) p.push("Kaldırılacak Suflo anahtar karesi yok.");
     if (o.egri) p.push(doldur(egriMetni, o.egri));
+    if (o.yaylan) p.push(doldur(yaylanMetni, o.yaylan));
     if (o.eklenen) p.push(doldur(kenarMetni, o.eklenen));
     Object.keys(KALAN).forEach(function (kod) { if (o.kalan[kod]) p.push(doldur(KALAN[kod], o.kalan[kod])); });
     if (o.kayitsiz) p.push(doldur(kayitsizMetni, o.kayitsiz));
@@ -455,7 +461,7 @@
       if (opts.kesim) arg.kesim = { tolerance: Number(opts.kesim.tolerance) || 1 };
       var r = await call("KS_removeSufloKeys", arg, 120000);
       if (!r || !r.ok) throw hata(r && r.kod, r && r.error);
-      var oz = ozet(r);
+      var oz = ozet(r, egriler);
       sil(proje, oz.biten.concat(oz.egriBiten));
       oz.kayitYok = oz.eslesen === 0;
       if (!opts.secili) oz.kayitsiz = 0;
@@ -522,7 +528,7 @@
 
   return {
     TURLER: TURLER.slice(), BASARI: BASARI, KALAN: KALAN, HATALAR: HATALAR, kenarMetni: kenarMetni, kayitsizMetni: kayitsizMetni,
-    egriMetni: egriMetni, kesimYeri: kesimYeri, egriAdaylari: egriAdaylari,
+    egriMetni: egriMetni, yaylanMetni: yaylanMetni, kesimYeri: kesimYeri, egriAdaylari: egriAdaylari,
     cakisanlar: cakisanlar, kenarMiras: kenarMiras, yerineGecis: yerineGecis, temizlenenler: temizlenenler, ozet: ozet, yedekGerekli: yedekGerekli, mesajParcalari: mesajParcalari,
     hataMetni: hataMetni, olustur: olustur, panel: panel, dugum: dugum
   };

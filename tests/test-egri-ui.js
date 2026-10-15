@@ -558,7 +558,7 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   ok("Delete: seçili nokta silinir, eğri yine bezier", ed.egri().type === "bezier" && p10.dom["egri-css"].value !== "", p10.dom["egri-css"].value);
 
   /* ---------- 10b) Varışta yaylan (3.4 adım 14): ayarlar, önizleme, kapı, değerli tarama, öğeler, kayıt, rozet, geri al ---------- */
-  var DEGERLER = { 0: [[0.5, 0.5], [0.8, 0.3]], 1: [0, 100] };
+  var DEGERLER = { 0: [[0.5, 0.5], [0.8, 0.3]], 1: [0, 80] };   // 3.4 adım 14 inceleme: 100'e inen opaklık aşım yazmaz ('sinir'), 80'e iniş yazılır
   function degerli(props, arg) {
     var iste = (arg && arg.degerIste) || [];
     return props.map(function (p) {
@@ -596,6 +596,17 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   await y0.G.yaylanUygula();
   ok("yaylan: kurulmamışken Premiere'e gidilmez; kapı 'curves' + deneme:true + yeniden (Eğri ile ortak 3 hak)", y0.cagri.length === 0 && y0.kapi.length === 1 &&
     y0.kapi[0][0] === "curves" && y0.kapi[0][1].deneme === true && typeof y0.kapi[0][1].yeniden === "function" && y0.harcanan.length === 0);
+  // 3.4 adım 14 inceleme: kartın kaydırıcısında / Tüm varışlar kutusunda Enter Eğri'yi değil yaylanmayı uygular
+  var yEnter = kur({ kurulu: false, cevap: function () { throw new Error("çağrılmamalı"); } });
+  yEnter.ctx._tab.egri();
+  var kartHedef = function (tip) { return { tagName: "INPUT", type: tip, closest: function (s) { return s === "#egri-yaylan" ? yEnter.dom["egri-yaylan"] : null; } }; };
+  var engelE = 0;
+  yEnter.G._tus({ key: "Enter", target: kartHedef("range"), preventDefault: function () { engelE++; } });
+  yEnter.G._tus({ key: "Enter", target: kartHedef("checkbox"), preventDefault: function () { engelE++; } });
+  await bekle(5);
+  ok("kısayol Enter Varışta yaylan kartında: yaylanmanın kapısı (yeniden: yaylanUygula), Eğri uygulanmaz, Premiere'e gidilmez",
+    yEnter.kapi.length === 2 && yEnter.kapi.every(function (k) { return k[0] === "curves" && /yaylanUygula\(\)/.test(String(k[1].yeniden)); }) && engelE === 2 &&
+    yEnter.cagri.filter(function (c) { return c.fn === "KS_easeBake"; }).length === 0, js(yEnter.kapi.map(function (k) { return String(k[1].yeniden); })));
   ok("kaynakta: yaylanUygula'nın ilk satırı 'curves' kapısı", /async function yaylanUygula\(\) \{\n    if \(typeof Pro !== "undefined" && !Pro\.gate\("curves", \{ deneme: true, yeniden: function \(\) \{ yaylanUygula\(\); \} \}\)\) return;/.test(KAYNAK));
   // uygulama: önbellekteki işaretli satırlar için değerli taze tarama → klip başına KS_easeBake (tur 'yaylan') → hak bir kez
   var yu = kur({ kurulu: true, cevap: function (fn, arg) {
@@ -616,7 +627,7 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   ok("yaylan öğeleri: tur 'yaylan', iniş = çiftin ikinci ucu, sonraki anahtar yok → t1 null, anahtarlar inişten sonra; seyrek + 2 karede bir", yuBake.length === 1 &&
     yo0.tur === "yaylan" && yo0.t0 === 13 && yo0.t1 === null && js(yo0.v0) === js([0.8, 0.3]) && yo0.sinir === 20 && yo0.keys.length >= 3 &&
     yo0.keys.every(function (q) { return q.t > 13 && q.t < 20 && Array.isArray(q.v); }) && yo0.yogunKeys.length > yo0.keys.length && yo0.degistir === false &&
-    yo1.t0 === 14 && yo1.v0 === 100 && yo1.keys.every(function (q) { return q.v >= 0 && q.v <= 100; }) && yuBake[0].arg.target.seqId === "s1" && yuBake[0].arg.dogrusal === undefined,
+    yo1.t0 === 14 && yo1.v0 === 80 && yo1.keys.every(function (q) { return q.v >= 0 && q.v <= 100; }) && yuBake[0].arg.target.seqId === "s1" && yuBake[0].arg.dogrusal === undefined,
     js(yo0).slice(0, 240));
   ok("yaylan: başarıda hak bir kez düşer ('curves')", js(yu.harcanan) === js(["curves"]));
   var yuSak = KR.depo(yu.ctx.localStorage).oku("C:/p/deneme.prproj");
@@ -647,7 +658,7 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   ok("yaylan: varış yoksa bake çağrılmaz, hak düşmez, açıklama", yn.cagri.filter(function (c) { return c.fn === "KS_easeBake"; }).length === 0 && yn.harcanan.length === 0 &&
     /Yaylanacak varış yok/.test(yn.dom["egri-status"].textContent), yn.dom["egri-status"].textContent);
   // Tüm varışlar açılınca playhead dışarıdaki satır da seçilebilir; bekleme anahtarları geçilir
-  var bekleyen = prop("nA", "Röportaj.mp4", 1, 0, [11, 12, 15], null, null, null, { degerlerHazir: [0, 100, 100] });
+  var bekleyen = prop("nA", "Röportaj.mp4", 1, 0, [11, 12, 15], null, null, null, { degerlerHazir: [0, 80, 80] });
   var yt = kur({ kurulu: true, cevap: function (fn, arg) {
     if (fn === "KS_easePeek") return peek(10.2);
     if (fn === "KS_easeScan") return tarama(10.2, degerli([bekleyen], arg));
@@ -665,6 +676,30 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   var ytBake = yt.cagri.filter(function (c) { return c.fn === "KS_easeBake"; })[0];
   ok("Tüm varışlar: tek iniş (12; 15 bekleme), sonraki anahtara (15) kadar", ytBake && ytBake.arg.items.length === 1 && ytBake.arg.items[0].t0 === 12 && ytBake.arg.items[0].t1 === 15 &&
     ytBake.arg.items[0].keys.every(function (q) { return q.t > 12 && q.t < 15; }), ytBake && js(ytBake.arg.items.map(function (x) { return [x.t0, x.t1]; })));
+  // 3.4 adım 14 inceleme: 40'tan çok iniş aynı klibin birkaç KS_easeBake çağrısına bölünür (host 40'tan çok öğeyi reddeder);
+  // Bulanıklık gibi desteklenmeyen özellik Tüm varışlarda da seçilmez
+  var cokKeys = [], cokVals = [];
+  for (var ci2 = 0; ci2 < 46; ci2++) { cokKeys.push(Math.round((10.2 + ci2 * 0.2) * 1e4) / 1e4); cokVals.push(ci2 % 2 ? 120 : 100); }
+  var olcCok = prop("nA", "Röportaj.mp4", 0, 1, cokKeys, null, null, null, { matchName: "AE.ADBE Motion/Scale", label: "Ölçek", tur: "sayi", degerlerHazir: cokVals });
+  var bulan = prop("nA", "Röportaj.mp4", 2, 0, [11, 12], null, null, null, { matchName: "AE.ADBE Gaussian Blur 2/Blurriness", label: "Gaussian Blur › Blurriness",
+    labelTablo: false, opak: false, tur: "sayi", degerlerHazir: [50, 0] });
+  var yc = kur({ kurulu: true, depo: { "suflo.egri.yaylan": JSON.stringify({ tum: true, sonum: 10 }) }, cevap: function (fn, arg) {
+    if (fn === "KS_easePeek") return peek(10.1);
+    if (fn === "KS_easeScan") return tarama(10.1, degerli([olcCok, bulan], arg));
+    if (fn === "KS_easeBake") return arg.items.length > 40 ? { ok: false, kod: "gecersiz", error: "Gecersiz egri plani." } : yaylanBake(arg);
+    return { ok: false };
+  } });
+  yc.ctx._tab.egri(); await bekle(10);
+  var ycKutular = hepsi(yc.dom["egri-ozellikler"], function (c) { return c.type === "checkbox"; });
+  await yc.G.yaylanUygula();
+  var ycBake = yc.cagri.filter(function (c) { return c.fn === "KS_easeBake"; });
+  var ycTar = yc.cagri.filter(function (c) { return c.fn === "KS_easeScan" && c.arg && c.arg.degerIste; });
+  var ycBil = yc.toastlar.filter(function (t) { return t.e && t.e.metin === "Geri al"; })[0];
+  ok("Tüm varışlar: 45 iniş iki çağrıda (40 + 5), hepsi yazılır, hak bir kez; Bulanıklık satırı seçilemez ve değeri istenmez",
+    ycBake.length === 2 && ycBake[0].arg.items.length === 40 && ycBake[1].arg.items.length === 5 && js(yc.harcanan) === js(["curves"]) &&
+    !!ycBil && /^Varışta yaylanma uygulandı: 45 varış · \d+ anahtar kare$/.test(ycBil.m.textContent) && ycKutular.length === 2 && ycKutular[1].disabled === true &&
+    ycTar.length >= 1 && ycTar.every(function (c) { return js(c.arg.degerIste) === js([{ nodeId: "nA", compIdx: 0, propIdx: 1 }]); }),
+    js([ycBake.map(function (c) { return c.arg.items.length; }), ycBil && ycBil.m.textContent, ycKutular.map(function (c) { return c.disabled; })]));
   // satır rozeti + satırın Geri al'ı (kapısız); geri alırken aynı sekansın Eğri kayıtları da host'a gider (ucu yaylanmada olan kalkar)
   var yKay = { id: "kryay1", tur: "yaylan", seqId: "s1", nodeId: "nA", clipName: "Röportaj.mp4", clipStart: 10, matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0,
     uclar: null, times: [14.08, 14.24, 14.4], kenarDegerleri: [{ t: 14, v: 100 }], createdAt: 5000 };

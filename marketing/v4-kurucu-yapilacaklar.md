@@ -1766,8 +1766,9 @@ yeniden uygulama öncekinin yerine geçer; kullanıcı pencerenin ortasına anah
 ötesindeki anahtarları da silinir (onun anahtarı kalır).
 (e) **Değerler yalnız Uygula'da okunur:** yoklama taraması değer okumaz (40 özellik × 400 anahtar yavaş olurdu); Uygula işaretli
 satırların değerlerini taze taramayla ister.
-(f) **Kısayol yok:** Eğri'nin kısayolları (Enter, U, F, I, V, 1–9) aynı; Varışta yaylan için ayrı tuş eklenmedi (CEP tuş ilgisi
-listesi değişmedi). U ve Tümünü geri al yaylanmayı da kaldırır.
+(f) **Kısayol:** Eğri'nin kısayolları (Enter, U, F, I, V, 1–9) aynı; Varışta yaylan için ayrı tuş eklenmedi (CEP tuş ilgisi
+listesi değişmedi). Odak Varışta yaylan kartındayken (kaydırıcı, Tüm varışlar kutusu) Enter yaylanmayı uygular, Eğri'yi değil.
+U ve Tümünü geri al yaylanmayı da kaldırır.
 Farklı istersen söyle.
 
 **14.4 Premiere'de dene (25–35 dk).** `marketing/v3.4-deneme-listesi.md` › `## 14`. Özellikle **14.3** (Bezier türü), **14.4**
@@ -1782,3 +1783,24 @@ bilerek dokunulmadı.
 **14.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
 `Kaynak: Rebound (MIT) overshoot.js — adım 9'da js/ease-curve.js'e atıflı uyarlandı (dampedSine, extremaTimes, autoDuration,
 followThroughAnchors); varışlar, plan, host yazımı ve arayüz Suflo'nun (temiz oda), yeni bildirim gerekmez.`
+İnceleme düzeltme commit'i bu satırı zaten taşıyor (adım 14'ün ilk beş commit'inde yoktu; geçmiş yeniden yazılmadı). Squash-merge
+yapmazsan da PR açıklamasına ekle.
+
+**14.7 İnceleme kararlarını onayla (5 dk, karar).** Adım 14 incelemesinden sonra davranış:
+(a) **Kapsam:** yalnız Hareket › Konum, Ölçek (ve Ölçek genişliği), Döndürme ve Opaklık yaylanır (plan adımı 14 (4)). Efekt
+parametreleri (Bulanıklık, Kırpma %…), Bağlantı noktası ve Titreme önleme satırı Varışta yaylan için seçilmez (Eğri için seçilir).
+İngilizce / Türkçe olmayan Premiere'de Hareket parametreleri Premiere'in sabit sırasıyla tanınır (Konum 0, Ölçek 1, Ölçek genişliği 2,
+Döndürme 4); bu sıra bir sürümde değişirse `js/egri-model.js` › `YAYLAN_HAREKET_SIRA`.
+(b) **Sınırlar:** Opaklık (0–100) ve Ölçek (≥ 0) aşımı kırpılmaz, sınıra sığacak kadar küçültülür (ilk tepe sınıra değer). Aşım
+ayarın %10'undan küçülecekse (iniş sınırda: 0'a sönen / 100'e dolan Opaklık, 0'a küçülen Ölçek) yazılmaz: "iniş değeri sınırda".
+Önceden 100'e dolan opaklık kırpılıp "yalnız aşağı salınım" yazılıyordu; 0'a sönen klip yeniden görünüyordu. Eşik
+`js/ease-curve.js` › `YAYLAN.EN_AZ_ORAN`.
+(c) **Tüm varışlar ve süren hareket:** hareketin aynı yönde, varış hızının en az dörtte biriyle sürdüğü ara anahtarda o boyut
+yaylanmaz (köşede yalnız duran boyut); hiçbir boyut kalmazsa anahtar sessizce geçilir. Tek varışta (playhead'in çifti) kullanıcı
+seçtiği için yine yazılır. Oran `js/egri-model.js` › `DEVAM_ORAN` (0,25).
+(d) **Son anahtar tam iniş değerinde:** sönümlü sinüsün pencere sonundaki kalıntısı (%0,5 civarı) yazılmaz; iniş son anahtarsa
+özellik senin değerinde oturur.
+(e) **Eğri yaylanmanın içindeyse** (iki yaylanma anahtarı arasına Eğri) yaylanma yeniden uygulanmaz; önce o Eğri geri alınır.
+Tümünü geri al Eğri kayıtlarını yaylanmalardan önce geri alır.
+(f) **40'tan çok varış** (Tüm varışlar) aynı klibin birkaç KS_easeBake çağrısına bölünür (çağrı başına en çok 40 öğe).
+Farklı istersen söyle.

@@ -1000,7 +1000,8 @@
     FREKANS: { min: 1, max: 6, varsayilan: 3 },
     SONUM: { min: 2, max: 10, varsayilan: 6 },
     YOGUN_ADIM: 2,      // Bezier ara değerlemesi yazılamazsa 2 karede bir sık yazım
-    EN_AZ_KARE: 2       // inişten sonra en az 2 kare yer yoksa reddedilir
+    EN_AZ_KARE: 2,      // inişten sonra en az 2 kare yer yoksa reddedilir
+    EN_AZ_ORAN: 0.1     // sinirSigdir: aşım sınıra sığmak için ayarın %10'undan küçülecekse (iniş sınırda) reddedilir
   };
   function ayarSayi(v, s) { var n = Number(v); return isFinite(n) ? sinirla(n, s.min, s.max) : s.varsayilan; }
 
@@ -1012,12 +1013,16 @@
    *      sinir (timeline sn: sonraki anahtar kare ya da klibin sonu; o kareye ve ötesine yazılmaz), fps,
    *      tN, vN (sonraki anahtar karenin zamanı ve değeri: taban oraya doğru doğrusal gider, kullanıcının sonraki
    *      hareketi kaymaz; tN verilmezse sinir; vN yoksa taban vL), clampMin, clampMax (Opaklık 0..100),
+   *      sinirSigdir (true: aşım clampMin / clampMax'a sığacak kadar küçültülür, kırpılmaz: kırpılan tepe silinip geri
+   *      dönen salınım kalırdı, ör. sönen Opaklık yeniden görünür; iniş sınırdaysa ve aşım o yöndeyse 'sinir'),
    *      yogun (true: 2 karede bir sık yazım) }
    * Süre autoDuration(sönüm); sonraki anahtar karenin bir kare öncesine (ya da klibin son karesine) kırpılır.
    * Anahtarlar timeline kare zamanlarında. Seyrek planda (Bezier ile yazılır) her tepe / çukur en yakın kareye
-   * oturur, son anahtar pencere sonu; değer o karedeki gerçek eğri değeri.
-   * Döner: { keys: [{ t, v }], sure (sn), oda (inişten sonra yazılabilen kare), yogun } ya da hata:
-   *   'aralik' (tL / sinir geçersiz) | 'fps' | 'deger' | 'hiz' (varış hızı yok) | 'yer' (2 kareden az yer)
+   * oturur; değer o karedeki gerçek eğri değeri. Son anahtar (pencere sonu) tam tabanda (s = 0): sönümlü sinüsün
+   * kalıntısı yazılmaz, iniş son anahtarsa özellik kullanıcının değerinde oturur.
+   * Döner: { keys: [{ t, v }], sure (sn), oda (inişten sonra yazılabilen kare), yogun, oran (aşım çarpanı, 1 = ayar) }
+   *   ya da hata: 'aralik' (tL / sinir geçersiz) | 'fps' | 'deger' | 'hiz' (varış hızı yok) | 'yer' (2 kareden az yer) |
+   *   'sinir' (sinirSigdir: iniş değeri sınırda, aşım sığmıyor)
    */
   function yaylanPlan(o) {
     o = o || {};
@@ -1062,15 +1067,28 @@
     var tN = Number(o.tN);
     if (!(isFinite(tN) && tN >= sinir - 1e-9)) tN = sinir;
     var vLd = dizi ? vL : [vL], vNd = vN === null ? null : (dizi ? vN : [vN]);
+    function tabanDeger(a, d, u) { return vNd ? a + (vNd[d] - a) * (u / (tN - tL)) : a; }
+    // Sınıra sığdırma: pencerenin her karesinde (seyrek ve sık plan aynı çarpanı alır) aşım sınırı geçmesin
+    var oran = 1;
+    if (o.sinirSigdir && (lo > -Infinity || hi < Infinity)) {
+      for (var jk = jmin; jk < jSon; jk++) {
+        var uk = (taban + jk) / fps - tL, sk = s(uk);
+        for (var d0 = 0; d0 < vLd.length; d0++) {
+          var b0 = tabanDeger(vLd[d0], d0, uk), a0 = hizlar[d0] * genlik * sk;
+          if (a0 < 0 && b0 + a0 < lo) oran = Math.min(oran, Math.max(0, (b0 - lo) / -a0));
+          if (a0 > 0 && b0 + a0 > hi) oran = Math.min(oran, Math.max(0, (hi - b0) / a0));
+        }
+      }
+      if (oran < YAYLAN.EN_AZ_ORAN) return bos("sinir", { oda: oda, oran: oran });
+    }
     var keys = js.map(function (jj) {
-      var t = (taban + jj) / fps, u = t - tL, sv = s(u);
+      var t = (taban + jj) / fps, u = t - tL, sv = jj === jSon ? 0 : s(u);
       var v = vLd.map(function (a, d) {
-        var base = vNd ? a + (vNd[d] - a) * (u / (tN - tL)) : a;
-        return r6(sinirla(base + hizlar[d] * genlik * sv, lo, hi));
+        return r6(sinirla(tabanDeger(a, d, u) + hizlar[d] * genlik * oran * sv, lo, hi));
       });
       return { t: t, v: dizi ? v : v[0] };
     });
-    return { keys: keys, sure: sure, oda: oda, yogun: !!o.yogun, genlik: genlik, frekans: frekans, sonum: sonum };
+    return { keys: keys, sure: sure, oda: oda, yogun: !!o.yogun, genlik: genlik, frekans: frekans, sonum: sonum, oran: oran };
   }
 
   var bezier = { cubicBezier: cubicBezier };
