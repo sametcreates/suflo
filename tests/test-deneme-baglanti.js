@@ -40,7 +40,9 @@ var SITELER = [
   // 3.3 YouTube indirici: Bilgi al ücretsiz (kapı yok); hak yalnız dosya Premiere'e hazır olunca
   ["js/youtube-indir-ui.js", "async function indir(ev)", "youtube", "if (!sonuc || !sonuc.dosya) throw", true],
   // 3.4 Eğri: düzenleyici, önizleme ve geri al ücretsiz; hak yalnız en az bir özellik yazılınca, bir kez
-  ["js/egri.js", "async function uygula()", "curves", "if (!basarili) hataAt(", true]
+  ["js/egri.js", "async function uygula()", "curves", "if (!basarili) hataAt(", true],
+  // 3.4 adım 14 Varışta yaylan: aynı 'curves' kapısı ve hakları; hak yalnız en az bir varış yazılınca, bir kez
+  ["js/egri.js", "async function yaylanUygula()", "curves", "if (!varisSayi) hataAt(", true]
 ];
 var kapiliOzellikler = {};
 SITELER.forEach(function (s) {
@@ -80,7 +82,7 @@ jsDosyalari.forEach(function (f) {
     }
   });
 });
-ok("tarama deneme kapılarını buluyor (19 kapı: 18 araç + rehberin stil adımı)", denemeli.length === 19, denemeli.join(" | "));
+ok("tarama deneme kapılarını buluyor (20 kapı: 19 araç + rehberin stil adımı)", denemeli.length === 20, denemeli.join(" | "));
 // Rehberin "Timeline'a koy"u Altyazı sekmesindeki "… ile ekle" ile aynı stilli katman denemesini sunar;
 // MOGRT stili seçiliyse denemesiz kütüphane penceresi (inceleme bulgusu: Suflo Stili için de captionStyles açılıyordu)
 var koy = govde(oku("js/onboarding.js"), "function stilKoyTikla()");

@@ -414,14 +414,32 @@ ok("Eğri: betik sırası ease-curve.js → key-records.js → egri-model.js →
 ok("Eğri: yoğunluk 1 / 2 / 4 kare (varsayılan her kare)", /<select id="egri-yogunluk">\s*<option value="1" selected>Her kare<\/option>\s*<option value="2">2 karede bir<\/option>\s*<option value="4">4 karede bir<\/option>/.test(html));
 ok("Eğri: app.js başlatır, yan menüyü kilitler, tanıtımı Pro'da gizler; Pro etiketi ve tanıtım düğmesi 'curves'", /KEgri\.init\(\)/.test(appSrc) &&
   /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="egri"\]'\), !s\.pro\)/.test(appSrc) && /"egri-tanitim"/.test(appSrc) &&
-  /curves:\s+'Eğri: kendi anahtar karelerine özel yumuşatma'/.test(proSrc) && /data-pro-feature="curves">Eğriyi aç — 749 TL</.test(html));
-ok("Eğri: Ayarlar Pro listesinde", /<li>Eğri: anahtar karelerine özel yumuşatma \(düzenlemek ücretsiz\)<\/li>/.test(html));
+  /curves:\s+'Eğri: kendi anahtar karelerine özel yumuşatma ve varışta yaylanma'/.test(proSrc) && /data-pro-feature="curves">Eğriyi aç — 749 TL</.test(html));
+ok("Eğri: Ayarlar Pro listesinde (varışta yaylanma dahil)", /<li>Eğri: anahtar karelerine özel yumuşatma ve varışta yaylanma \(düzenlemek ücretsiz\)<\/li>/.test(html));
 ok("Eğri: init / render / listeCiz Premiere'e gitmez", ["function init(", "function render(", "function listeCiz(", "function onayarKartlari("].every(function (f) {
   var g = fnGovde(egriUi, f); return g.length > 20 && !/K\.call\(/.test(g);
 }));
 ok("Eğri: Ctrl+Z uyarısı, yalnız video katmanları notu ve 'Bezier tutamacı yazamaz' açıklaması arayüzde", /Ctrl\+Z eğriyi tek adımda geri almaz/.test(html) &&
   /Şimdilik yalnız video katmanları/.test(html) && /Bezier tutamaçlarını yazamadığı için/.test(html));
 ok("Eğri: SufloEgriEditor dışa açık (Hız Rampası özel eğrisi yeniden kullanır)", /^window\.SufloEgriEditor = \(function \(\) \{/m.test(egriUi) && /return \{ olustur: olustur/.test(egriUi));
+/* ---------- Varışta yaylan (3.4 adım 14): Eğri sekmesinde kart ---------- */
+["egri-yaylan", "egri-yaylan-grafik", "egri-yaylan-hedef", "egri-yaylan-varis", "egri-yaylan-yol", "egri-yaylan-genlik", "egri-yaylan-genlik-deger", "egri-yaylan-frekans",
+  "egri-yaylan-frekans-deger", "egri-yaylan-sonum", "egri-yaylan-sonum-deger", "egri-yaylan-tum", "egri-yaylan-sure", "egri-yaylan-uygula"].forEach(function (id) {
+  ok("Varışta yaylan: #" + id + " var", !!idler[id]);
+});
+var yaylanBolum = html.slice(html.indexOf('id="egri-yaylan"'), html.indexOf('id="egri-status"'));
+ok("Varışta yaylan: kart Eğri sekmesinde, Uygula satırından sonra ve durum satırından önce", html.indexOf('id="egri-yaylan"') > html.indexOf('id="egri-uygula"') &&
+  html.indexOf('id="egri-yaylan"') < html.indexOf('id="egri-status"') && html.indexOf('id="egri-yaylan"') > html.indexOf('id="tab-egri"') && html.indexOf('id="egri-yaylan"') < html.indexOf('id="tab-kanca"'));
+ok("Varışta yaylan: kaydırıcı sınırları plandaki gibi (genlik 0,02–0,5 sn, frekans 1–6 Hz, sönüm 2–10), Tüm varışlar kutusu",
+  /<input id="egri-yaylan-genlik" type="range" min="0\.02" max="0\.5" step="0\.01" value="0\.1">/.test(yaylanBolum) &&
+  /<input id="egri-yaylan-frekans" type="range" min="1" max="6" step="0\.5" value="3">/.test(yaylanBolum) &&
+  /<input id="egri-yaylan-sonum" type="range" min="2" max="10" step="1" value="6">/.test(yaylanBolum) && /<input id="egri-yaylan-tum" type="checkbox"> Tüm varışlar/.test(yaylanBolum));
+ok("Varışta yaylan: önizleme SVG'si ekran okuyucuya gizli; düğmenin ipucu Pro olduğunu söyler", /<svg id="egri-yaylan-grafik"[^>]*aria-hidden="true"/.test(yaylanBolum) &&
+  /id="egri-yaylan-uygula"[^>]*title="[^"]*Pro;/.test(yaylanBolum));
+ok("Varışta yaylan: yaylanUygula 'curves' kapısından; init / yaylanCiz Premiere'e gitmez", /function yaylanUygula\(\) \{\n    if \(typeof Pro !== "undefined" && !Pro\.gate\("curves"/.test(egriUi) &&
+  ["function yaylanCiz(", "function yaylanDegisti(", "function yaylanYukle("].every(function (f) { var g = fnGovde(egriUi, f); return g.length > 20 && !/K\.call\(/.test(g); }));
+ok("Varışta yaylan: CSS kartı (CEF 74: flex gap yok)", /\.egri-yaylan \{/.test(cssOzel) && /\.egri-yaylan-yol \{/.test(cssOzel) &&
+  !/\.egri-yaylan[^{]*\{[^}]*\bgap\s*:/.test(cssOzel));
 /* ---------- Ses etiketi filtresi + sessiz ses uyarısı (3.2 adım 2) ---------- */
 ["grp-altyazi", "set-ses-etiket", "cap-sessiz", "cap-sessiz-metin", "cap-sessiz-devam", "cap-sessiz-vazgec",
   "tc-sessiz", "tc-sessiz-metin", "tc-sessiz-devam", "tc-sessiz-vazgec"].forEach(function (id) {

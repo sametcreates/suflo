@@ -639,8 +639,10 @@ window.KEgri = (function () {
   var E = window.SufloEase, M = window.SufloEgriModel, KR = window.SufloKeyRecords;
   var AYAR_ANAHTAR = "suflo.egri.ayar";
   var ONAYAR_ANAHTAR = "suflo.egri.onayarlar";
+  var YAYLAN_ANAHTAR = "suflo.egri.yaylan";   // Varışta yaylan ayarları (3.4 adım 14; bu görüntüleyicinin kolaylığı)
 
   var editor = null;
+  var yaylan = { genlik: 0.1, frekans: 3, sonum: 6, tum: false };   // Varışta yaylan ayarı (init yaylanYukle ile M.yaylanAyar)
   var egri = null, seciliOnayar = "yumusak";
   var gorunum = "deger";
   var onbellek = null;          // son KS_easeScan (+ selSig)
@@ -725,16 +727,19 @@ window.KEgri = (function () {
     var idler = {};
     liste.forEach(function (r) { idler[r.id] = 1; });
     bellek.forEach(function (r) { if (!idler[r.id]) liste.push(r); });
-    return liste.filter(function (r) { return r && r.tur === "egri"; });
+    // Eğri sekmesinin kayıtları: Eğri ('egri') ve varışta yaylanma ('yaylan', 3.4 adım 14)
+    return liste.filter(function (r) { return r && (r.tur === "egri" || r.tur === "yaylan"); });
   }
-  // yeni: host'un doğruladığı kayıtlar (çakışan eskilerin yerine geçer); gecici: zaman aşımında planlanan
-  // zamanlar (yazıldığı bilinmez: eskiler atılmaz, Geri al yalnız canlıysa siler)
+  // yeni: host'un doğruladığı kayıtlar (çakışan eskilerin yerine geçer: Eğri aynı aralıkta, yaylanma aynı inişte);
+  // gecici: zaman aşımında planlanan zamanlar (yazıldığı bilinmez: eskiler atılmaz, Geri al yalnız canlıysa siler)
   function kayitlariSakla(yeni, gecici) {
     gecici = gecici || [];
     var d = depo(), pr = proje(), eski = kayitlar(), at = {};
     var hepsi = yeni.concat(gecici);
     hepsi.forEach(function (r) { r.id = KR.yeniId(Date.now()); });
-    yeni.forEach(function (r) { M.cakisanlar(eski, r).forEach(function (x) { at[x.id] = 1; }); });
+    yeni.forEach(function (r) {
+      (r.tur === "yaylan" ? M.yaylanCakisanlar(eski, r) : M.cakisanlar(eski, r)).forEach(function (x) { at[x.id] = 1; });
+    });
     var atilacak = Object.keys(at);
     bellek = bellek.filter(function (r) { return !at[r.id]; });
     var ok = false;
@@ -896,11 +901,15 @@ window.KEgri = (function () {
     return onbellek.props.map(function (p) {
       var canli = M.canliKayitlar(kl, p);
       var dd = M.satirDurumu(p, ph, M.uclarDan(canli));
-      return { prop: p, cift: dd.cift, durum: dd.durum, degerVar: dd.degerVar, kayit: M.satirKaydi(kl, p, dd.cift), anahtar: M.satirAnahtari(p) };
+      return { prop: p, cift: dd.cift, durum: dd.durum, degerVar: dd.degerVar, kayit: M.satirKaydi(kl, p, dd.cift), anahtar: M.satirAnahtari(p),
+        yaylanKaydi: M.yaylanSatirKaydi(kl, p, ph), yaylanUygun: M.yaylanUygun(p, ph, kl, yaylan.tum) };
     });
   }
   function uygulanabilir(s) { return s.durum === "tamam" || s.durum === "kayitli"; }
   function isaretli(s) { return uygulanabilir(s) && !kapali[s.anahtar]; }
+  // Varışta yaylan (3.4 adım 14): 1 karelik çift ya da tüm varışlarda playhead dışarıdaki satır da uygun olabilir
+  function secilebilir(s) { return uygulanabilir(s) || s.yaylanUygun; }
+  function yaylanIsaretli(s) { return s.yaylanUygun && !kapali[s.anahtar]; }
 
   function hedefCiz(liste) {
     var h = el("egri-hedef");
@@ -942,14 +951,14 @@ window.KEgri = (function () {
         kap.appendChild(bas);
       }
       var satir = document.createElement("div");
-      satir.className = "egri-satir" + (uygulanabilir(s) ? "" : " pasif");
+      satir.className = "egri-satir" + (secilebilir(s) ? "" : " pasif");
       satir.setAttribute("role", "listitem");
       var lab = document.createElement("label");
       lab.className = "egri-satir-ad";
       var cb = document.createElement("input");
       cb.type = "checkbox";
-      cb.checked = isaretli(s);
-      cb.disabled = !uygulanabilir(s) || mesgul;
+      cb.checked = secilebilir(s) && !kapali[s.anahtar];
+      cb.disabled = !secilebilir(s) || mesgul;
       cb.addEventListener("change", function () { if (cb.checked) delete kapali[s.anahtar]; else kapali[s.anahtar] = true; dugmeCiz(); });
       lab.appendChild(cb);
       var ad = document.createElement("span");
@@ -975,6 +984,20 @@ window.KEgri = (function () {
         g.addEventListener("click", function () { geriAl([s.kayit], "satir"); });
         satir.appendChild(g);
       }
+      if (s.yaylanKaydi) {
+        var rozY = document.createElement("span");
+        rozY.className = "egri-rozet yaylan";
+        rozY.textContent = "Suflo yaylanması";
+        satir.appendChild(rozY);
+        var gy = document.createElement("button");
+        gy.type = "button";
+        gy.className = "btn tiny egri-satir-geri egri-yaylan-geri";
+        gy.textContent = "Geri al";
+        gy.title = "Bu varıştaki yaylanmayı kaldır";
+        gy.disabled = mesgul;
+        gy.addEventListener("click", function () { geriAl([s.yaylanKaydi], "satir"); });
+        satir.appendChild(gy);
+      }
       kap.appendChild(satir);
     });
     dugmeCiz();
@@ -983,11 +1006,18 @@ window.KEgri = (function () {
   // Kilitliyken de düğmenin adı "Uygula": tanıtım kartındaki deneme bildirimi bu adı söyler
   function dugmeCiz() {
     var b = el("egri-uygula");
+    var kilitli = typeof Pro !== "undefined" && Pro.isPro && !Pro.isPro() && !(Pro.denemeAcik && Pro.denemeAcik("curves"));
     if (b) {
-      var kilitli = typeof Pro !== "undefined" && Pro.isPro && !Pro.isPro() && !(Pro.denemeAcik && Pro.denemeAcik("curves"));
       b.textContent = kilitli ? "🔒 Uygula" : "Uygula";
       if (b.classList) b.classList.toggle("is-locked", !!kilitli);
       b.disabled = mesgul;
+    }
+    // Varışta yaylan aynı 'curves' kapısından geçer (3 deneme hakkı Eğri ile ortak)
+    var y = el("egri-yaylan-uygula");
+    if (y) {
+      y.textContent = kilitli ? "🔒 Varışta yaylan" : "Varışta yaylan";
+      if (y.classList) y.classList.toggle("is-locked", !!kilitli);
+      y.disabled = mesgul;
     }
     ["egri-geri-tumu", "egri-sonraki", "egri-yenile"].forEach(function (id) { var e = el(id); if (e) e.disabled = mesgul; });
     var pr = el("egri-pr-onizle");
@@ -997,6 +1027,7 @@ window.KEgri = (function () {
   function render() {
     onayarKartlari();
     alanlariCiz();
+    yaylanCiz();
     listeCiz();
   }
 
@@ -1007,17 +1038,23 @@ window.KEgri = (function () {
     ph = Number(tar.ph) || 0;
     onbellek.ph = ph;
   }
-  async function tara(pk) {
+  // degerIste (Varışta yaylan, 3.4 adım 14): bu satırların tüm anahtar değerleri de okunur (yalnız uygulamada; yoklamada yok)
+  async function tara(pk, degerIste) {
     tazeleGerek = false;
+    function arg(ip) {
+      var a = { maxProps: 40, ipuclari: ip };
+      if (degerIste && degerIste.length) a.degerIste = degerIste;
+      return a;
+    }
     var ipucu = M.ipuclari(kayitlar(), onbellek ? onbellek.props : []);
-    var tar = await K.call("KS_easeScan", { maxProps: 40, ipuclari: ipucu }, 30000);
+    var tar = await K.call("KS_easeScan", arg(ipucu), 30000);
     // Canlılık önbellekteki anahtarlarla ölçülür: ilk taramada (önbellek boş) ya da anahtarlar değiştiyse
     // ipuçları yeni anahtarlarla yeniden hesaplanır (kaydın aralığı çift olsun, uç değerleri o aralığın). En çok
     // iki kez: uzun kayıtta (kesik pencere) ilk ölçüm pencereyle, ikincisi host'un döndürdüğü tüm aralıkla
     for (var n = 0; n < 2 && tar && tar.ok; n++) {
       var yeniIpucu = M.ipuclari(kayitlar(), tar.props);
       if (JSON.stringify(yeniIpucu) === JSON.stringify(ipucu)) break;
-      var tar2 = await K.call("KS_easeScan", { maxProps: 40, ipuclari: yeniIpucu }, 30000);
+      var tar2 = await K.call("KS_easeScan", arg(yeniIpucu), 30000);
       if (!tar2 || !tar2.ok) break;
       tar = tar2;
       ipucu = yeniIpucu;
@@ -1159,6 +1196,128 @@ window.KEgri = (function () {
     }
   }
 
+  /* ---------------- varışta yaylan (3.4 adım 14; Pro 'curves', 3 deneme hakkı Eğri ile ortak) ---------------- */
+  // Ayarlar ve önizleme Premiere'e gitmez; uygulama taze, değerli taramayla başlar (yalnız işaretli satırların değerleri)
+  function yaylanYukle() {
+    yaylan = M.yaylanAyar(depoOku(YAYLAN_ANAHTAR, null));
+  }
+  function yaylanKaydet() { depoYaz(YAYLAN_ANAHTAR, yaylan); }
+  // "3,5 Hz" (İngilizce arayüzde sözlük "3.5 Hz" yapar)
+  function hzMetni(v) { return (Math.round(v) === v ? String(v) : M.sayi(v, 1)) + " Hz"; }
+  function yaylanCiz() {
+    var a = yaylan, gir = function (id, v) { var e = el(id); if (e && document.activeElement !== e) e.value = String(v); };
+    gir("egri-yaylan-genlik", a.genlik);
+    gir("egri-yaylan-frekans", a.frekans);
+    gir("egri-yaylan-sonum", a.sonum);
+    var t = el("egri-yaylan-tum");
+    if (t) t.checked = !!a.tum;
+    var yaz = function (id, s) { var e = el(id); if (e) e.textContent = s; };
+    yaz("egri-yaylan-genlik-deger", M.sayi(a.genlik) + " sn");
+    yaz("egri-yaylan-frekans-deger", hzMetni(a.frekans));
+    yaz("egri-yaylan-sonum-deger", String(a.sonum));
+    var on = M.yaylanOnizleme(a, 240, 80);
+    yaz("egri-yaylan-sure", "Oturma ≈ " + M.sayi(on.sure) + " sn");
+    var yol = el("egri-yaylan-yol");
+    if (yol) yol.setAttribute("d", on.yol);
+    var h = el("egri-yaylan-hedef");
+    if (h) { h.setAttribute("y1", String(on.hedefY)); h.setAttribute("y2", String(on.hedefY)); }
+    var v = el("egri-yaylan-varis");
+    if (v) { v.setAttribute("x1", String(on.varisX)); v.setAttribute("x2", String(on.varisX)); }
+  }
+  // Kaydırıcılar / onay kutusu: ayar, önizleme, depo (Premiere'e gitmez). Tüm varışlar satır uygunluğunu değiştirir
+  function yaylanDegisti() {
+    var oku = function (id) { var e = el(id); return e ? e.value : undefined; };
+    var t = el("egri-yaylan-tum");
+    var onceTum = yaylan.tum;
+    yaylan = M.yaylanAyar({ genlik: oku("egri-yaylan-genlik"), frekans: oku("egri-yaylan-frekans"), sonum: oku("egri-yaylan-sonum"), tum: !!(t && t.checked) });
+    yaylanKaydet();
+    yaylanCiz();
+    if (onceTum !== yaylan.tum) listeCiz();
+  }
+  // Aynı özellik + nedeni bir kez (tüm varışlarda bir satır birkaç kez atlanabilir)
+  function tekil(atlanan) {
+    var gor = {};
+    return atlanan.filter(function (a) {
+      var k = M.satirAnahtari(a.prop) + "|" + a.kod;
+      if (gor[k]) return false;
+      gor[k] = 1;
+      return true;
+    });
+  }
+
+  async function yaylanUygula() {
+    if (typeof Pro !== "undefined" && !Pro.gate("curves", { deneme: true, yeniden: function () { yaylanUygula(); } })) return;
+    if (mesgul) return;
+    kilitle(true);
+    durum("Anahtar kareler okunuyor…");
+    try {
+      var ayar = M.yaylanAyar(yaylan);
+      // Değerler yalnız işaretli satırlar için okunur (her anahtarın değeri: varış hızı ve sonraki anahtar)
+      var iste = satirlar().filter(yaylanIsaretli).slice(0, 40).map(function (s) {
+        return { nodeId: s.prop.nodeId, compIdx: s.prop.compIdx, propIdx: s.prop.propIdx };
+      });
+      var tar = await tara(sonPeek, iste);
+      // Önbellek boştu ya da tarama yeni bir satır getirdi: değeri okunmamış işaretli satırlar için bir kez daha
+      var degersiz = satirlar().filter(function (s) { return yaylanIsaretli(s) && !Array.isArray(s.prop.degerler); });
+      if (tar && degersiz.length) {
+        tar = await tara(sonPeek, satirlar().filter(yaylanIsaretli).slice(0, 40).map(function (s) {
+          return { nodeId: s.prop.nodeId, compIdx: s.prop.compIdx, propIdx: s.prop.propIdx };
+        }));
+      }
+      if (!tar) throw new Error(onbellek && onbellek.hata ? onbellek.hata : "Anahtar kareler okunamadı.");
+      var secilen = satirlar().filter(yaylanIsaretli);
+      if (!secilen.length) throw new Error("Yaylanacak varış yok: playhead'i bir hareketin iki anahtar karesi arasına getir (ya da Tüm varışlar'ı aç) ve özelliği işaretle.");
+      var kl = kayitlar();
+      var plan = M.yaylanGruplari(secilen.map(function (s) {
+        return { prop: s.prop, varis: M.varislar(s.prop, kl, { ph: ph, tum: ayar.tum }) };
+      }), ayar, tar.seqId);
+      var atlanan = plan.atlanan.slice();
+      var yeniKayitlar = [], gecici = [], eksik = [], yazilan = 0, varisSayi = 0, yogun = 0;
+      for (var g = 0; g < plan.gruplar.length; g++) {
+        var grup = plan.gruplar[g];
+        durum(plan.gruplar.length > 1 ? "Yazılıyor… " + (g + 1) + "/" + plan.gruplar.length : "Yazılıyor…");
+        var r = await K.call("KS_easeBake", { target: grup.target, items: grup.items }, M.bakeSuresi(grup));
+        if (!r || !r.ok) {
+          var asim = !!(r && !r.kod && /zaman aşımı|yanıt vermedi/i.test(String(r.error || "")));
+          if (asim) gecici = gecici.concat(M.yaylanGeciciKayitlar(grup, tar.seqId));
+          grup.satirlar.forEach(function (s) { atlanan.push({ prop: s.prop, kod: asim ? "zamanAsimi" : r && r.kod ? r.kod : "yazilamadi" }); });
+          continue;
+        }
+        (r.sonuclar || []).forEach(function (s) {
+          var sat = grup.satirlar[s.i];
+          if (!sat) return;
+          if (!s.ok) { atlanan.push({ prop: sat.prop, kod: s.kod || "yazilamadi" }); return; }
+          varisSayi++;
+          if (s.interp === "yogun") yogun++;
+          if (s.kod === "eksik") eksik.push({ prop: sat.prop, kod: "eksik" });
+        });
+        yeniKayitlar = yeniKayitlar.concat(r.records || []);
+        yazilan += Number(r.yazilan) || 0;
+      }
+      atlanan = tekil(atlanan);
+      eksik = tekil(eksik);
+      var saklandi = yeniKayitlar.length || gecici.length ? kayitlariSakla(yeniKayitlar, gecici) : true;
+      if (!varisSayi) hataAt(atlanan.length ? ["Yaylanma uygulanamadı: "].concat(atlamaParcalari(atlanan)) : ["Yaylanma uygulanamadı."]);
+      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("curves", toast);   // deneme: yalnız başarıda, bir kez
+      var mesaj = ["Varışta yaylanma uygulandı: " + varisSayi + " varış · " + yazilan + " anahtar kare"];
+      if (yogun) mesaj.push(" · Premiere Bezier yazamadı; 2 karede bir yazıldı");
+      if (atlanan.length) mesaj = mesaj.concat([" · atlanan: "]).concat(atlamaParcalari(atlanan));
+      if (eksik.length) mesaj = mesaj.concat([" · kısmen yazıldı: "]).concat(atlamaParcalari(eksik));
+      var uyari = atlanan.length || eksik.length;
+      durum(mesaj, uyari ? "warn" : "good");
+      var buIdler = sonUygulanan.slice();
+      toast(dugum(mesaj), uyari ? "warn" : "good", 9000, { metin: "Geri al", fn: function () {
+        geriAl(kayitlar().filter(function (k) { return buIdler.indexOf(k.id) !== -1; }), "son");
+      } });
+      if (!saklandi) toast("Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.", "warn", 9000);
+    } catch (e) {
+      durum(e && e.parcalar ? ["✕ "].concat(e.parcalar) : "✕ " + (e && e.message ? e.message : String(e)), "bad");
+    } finally {
+      kilitle(false);
+      try { await tara(sonPeek); } catch (eT) { listeCiz(); }
+    }
+  }
+
   /* ---------------- geri al (kapısız) ---------------- */
   async function geriAl(liste, kaynak) {
     liste = (liste || []).filter(function (r) { return r && r.id; });
@@ -1167,7 +1326,14 @@ window.KEgri = (function () {
     kilitle(true);
     durum("Geri alınıyor…");
     try {
-      var r = await K.call("KS_easeUndo", { records: liste }, 120000);
+      var arg = { records: liste }, gelen = {};
+      liste.forEach(function (x) { gelen[x.id] = 1; });
+      // Yaylanma geri alınırken ucu yaylanma anahtarında duran Eğri de sahipsiz kalmasın (host karar verir; 3.4 adım 14)
+      if (liste.some(function (x) { return x.tur === "yaylan"; })) {
+        var egriler = buSekansinKayitlari().filter(function (x) { return x.tur === "egri" && !gelen[x.id]; }).slice(0, 300);
+        if (egriler.length) arg.egriler = egriler;
+      }
+      var r = await K.call("KS_easeUndo", arg, 120000);
       if (!r || !r.ok) throw new Error(r && r.kod ? (M.hataMetni(r.kod) || "Geri alınamadı.") : "Geri alınamadı.");
       // sonuclar: host'un bitirdiği kayıtlar (silindi ya da Suflo'nun anahtarları zaten yoktu: 'yok'); atlanan saklanır
       var silinen = 0, biten = [], yok = 0;
@@ -1176,17 +1342,20 @@ window.KEgri = (function () {
         biten.push(s.id);
         if (s.kod === "yok" && !Number(s.silinen)) yok++;
       });
-      kayitlariSil(biten);
+      var egriBiten = (Array.isArray(r.egriBiten) ? r.egriBiten : []).filter(function (id) { return typeof id === "string" && id && !gelen[id]; });
+      kayitlariSil(biten.concat(egriBiten));
+      // ayrı metin parçası: İngilizce arayüz her cümleyi kendi kalıbıyla çevirir
+      var egriNotu = egriBiten.length ? [" · ", "Uçları bu anahtar karelerde olan " + egriBiten.length + " Suflo eğrisi de kaldırıldı."] : [];
       var kalan = (r.atlanan || []).length;
       if (kalan) {
         var ilk = r.atlanan[0].kod;
-        durum(ilk === "sekans"
+        durum([ilk === "sekans"
           ? "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene."
           : ilk === "degisti"
             ? "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı."
-            : "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.", "warn");
+            : "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı."].concat(egriNotu), "warn");
       } else if (!silinen && yok) durum("Suflo'nun anahtar kareleri zaten kaldırılmış; kayıt temizlendi.", "warn");
-      else durum("Geri alındı: " + silinen + " anahtar kare silindi.", "good");
+      else durum(["Geri alındı: " + silinen + " anahtar kare silindi."].concat(egriNotu), "good");
     } catch (e) {
       durum("✕ " + (e && e.message ? e.message : String(e)), "bad");
     } finally {
@@ -1290,6 +1459,7 @@ window.KEgri = (function () {
   function init() {
     if (!E || !M || !el("tab-egri") || !el("egri-editor")) return;
     ayarYukle();
+    yaylanYukle();
     editor = window.SufloEgriEditor.olustur(el("egri-editor"), {
       egri: egri, gorunum: gorunum,
       degisti: function (c, o) { egri = c; if (o.bitti) egriDegisti(true); else alanlariCiz(); },
@@ -1313,6 +1483,17 @@ window.KEgri = (function () {
     el("egri-sonraki").addEventListener("click", function () { sonrakiCift(); });
     el("egri-yenile").addEventListener("click", function () { if (!mesgul) tara(sonPeek); });
     el("egri-pr-onizle").addEventListener("click", function () { premiereOnizle(); });
+    // Varışta yaylan (3.4 adım 14): kaydırıcılar canlı önizler (input), Uygula 'curves' kapısından geçer
+    ["egri-yaylan-genlik", "egri-yaylan-frekans", "egri-yaylan-sonum"].forEach(function (id) {
+      var e = el(id);
+      if (e) { e.addEventListener("input", yaylanDegisti); e.addEventListener("change", yaylanDegisti); }
+    });
+    if (el("egri-yaylan-tum")) el("egri-yaylan-tum").addEventListener("change", yaylanDegisti);
+    if (el("egri-yaylan-uygula")) {
+      el("egri-yaylan-uygula").addEventListener("click", function () { yaylanUygula(); });
+      el("egri-yaylan-uygula").addEventListener("focus", dugmeCiz);
+      el("egri-yaylan-uygula").addEventListener("mouseenter", dugmeCiz);
+    }
     document.addEventListener("keydown", tusBasildi);
     // Başka sekmeye geçilince kısayol tuşları Premiere'e geri verilir (tıklamanın sekme geçişinden SONRA bakılır)
     document.addEventListener("click", function () { setTimeout(function () { if (!sekmeAcik()) tuslariTut(false); }, 0); });
@@ -1327,6 +1508,7 @@ window.KEgri = (function () {
   return {
     init: init,
     uygula: uygula,
+    yaylanUygula: yaylanUygula,
     geriAl: geriAl,
     geriAlTumu: geriAlTumu,
     // testler / tanılama
@@ -1334,7 +1516,8 @@ window.KEgri = (function () {
     _sekmeAcildi: sekmeAcildi,
     _tus: tusBasildi,
     _render: render,
-    _durum: function () { return { onbellek: onbellek, ph: ph, egri: egri, mesgul: mesgul, sonUygulanan: sonUygulanan.slice(), bellek: bellek.slice(), seciliOnayar: seciliOnayar, gorunum: gorunum }; },
+    _durum: function () { return { onbellek: onbellek, ph: ph, egri: egri, mesgul: mesgul, sonUygulanan: sonUygulanan.slice(), bellek: bellek.slice(), seciliOnayar: seciliOnayar, gorunum: gorunum,
+      yaylan: M.yaylanAyar(yaylan) }; },
     _editor: function () { return editor; }
   };
 })();

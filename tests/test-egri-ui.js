@@ -42,7 +42,10 @@ function hepsi(kok, kosul, out) {
 
 var IDLER = ["tab-egri", "egri-tanitim", "egri-gorunum-deger", "egri-gorunum-hiz", "egri-editor", "egri-sahne", "egri-kare", "egri-css", "egri-p1x", "egri-p1y",
   "egri-p2x", "egri-p2y", "egri-cevir", "egri-ters", "egri-kaydet", "egri-onayarlar", "egri-yenile", "egri-sonraki", "egri-hedef", "egri-ozellikler",
-  "egri-yogunluk", "egri-pr-onizle", "egri-geri-tumu", "egri-uygula", "egri-status"];
+  "egri-yogunluk", "egri-pr-onizle", "egri-geri-tumu", "egri-uygula", "egri-status",
+  // Varışta yaylan (3.4 adım 14)
+  "egri-yaylan", "egri-yaylan-grafik", "egri-yaylan-hedef", "egri-yaylan-varis", "egri-yaylan-yol", "egri-yaylan-genlik", "egri-yaylan-genlik-deger",
+  "egri-yaylan-frekans", "egri-yaylan-frekans-deger", "egri-yaylan-sonum", "egri-yaylan-sonum-deger", "egri-yaylan-tum", "egri-yaylan-sure", "egri-yaylan-uygula"];
 
 /*
  * o: { cevap(fn, arg, n) → yanıt, pro, kurulu (deneme kurulu), hostMesgul, odak, gizli, aktif (sekme), depo (localStorage içeriği), dil }
@@ -554,14 +557,157 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   p10.G._tus({ key: "Delete", target: { tagName: "DIV" }, preventDefault: function () {} });
   ok("Delete: seçili nokta silinir, eğri yine bezier", ed.egri().type === "bezier" && p10.dom["egri-css"].value !== "", p10.dom["egri-css"].value);
 
+  /* ---------- 10b) Varışta yaylan (3.4 adım 14): ayarlar, önizleme, kapı, değerli tarama, öğeler, kayıt, rozet, geri al ---------- */
+  var DEGERLER = { 0: [[0.5, 0.5], [0.8, 0.3]], 1: [0, 100] };
+  function degerli(props, arg) {
+    var iste = (arg && arg.degerIste) || [];
+    return props.map(function (p) {
+      var q = JSON.parse(JSON.stringify(p));
+      if (iste.some(function (u) { return u.nodeId === p.nodeId && u.compIdx === p.compIdx && u.propIdx === p.propIdx; })) q.degerler = q.degerlerHazir || DEGERLER[p.compIdx];
+      delete q.degerlerHazir;
+      return q;
+    });
+  }
+  function yaylanBake(arg, ek) {
+    return { ok: true, basarili: arg.items.length, yazilan: arg.items.reduce(function (n, it) { return n + it.keys.length; }, 0),
+      sonuclar: arg.items.map(function (it, i) { return { i: i, ok: true, interp: ek && ek.yogun ? "yogun" : "bezier" }; }),
+      records: arg.items.map(function (it) {
+        return { tur: "yaylan", seqId: "s1", nodeId: arg.target.nodeId, clipName: "Röportaj.mp4", clipStart: 10, clipEnd: 20, clipIn: 0, clipOut: 10, matchName: it.matchName,
+          compIdx: it.compIdx, propIdx: it.propIdx, uclar: null, times: (ek && ek.yogun ? it.yogunKeys : it.keys).map(function (q) { return q.t; }), kenarDegerleri: [{ t: it.t0, v: it.v0 }] };
+      }) };
+  }
+  var ya = kur({ cevap: function () { throw new Error("çağrılmamalı"); } });
+  ok("yaylan: init/render Premiere'e gitmez; kart varsayılanlarla çizilir (0,10 sn · 3 Hz · 6 · Oturma ≈ 0,80 sn), önizleme yolu", ya.cagri.length === 0 &&
+    ya.dom["egri-yaylan-genlik-deger"].textContent === "0,10 sn" && ya.dom["egri-yaylan-frekans-deger"].textContent === "3 Hz" && ya.dom["egri-yaylan-sonum-deger"].textContent === "6" &&
+    ya.dom["egri-yaylan-sure"].textContent === "Oturma ≈ 0,80 sn" && /^M[\d.]+ [\d.]+ L/.test(ya.dom["egri-yaylan-yol"].getAttribute("d") || "") && !ya.dom["egri-yaylan-tum"].checked &&
+    ya.dom["egri-yaylan-uygula"].textContent === "🔒 Varışta yaylan", js([ya.dom["egri-yaylan-sure"].textContent, ya.dom["egri-yaylan-uygula"].textContent]));
+  ok("yaylan: init'te ayar deposuna yazılmaz", !Object.prototype.hasOwnProperty.call(ya.depo, "suflo.egri.yaylan"));
+  ya.dom["egri-yaylan-genlik"].value = "0.3"; ya.dom["egri-yaylan-genlik"].tetikle("input");
+  ya.dom["egri-yaylan-frekans"].value = "4.5"; ya.dom["egri-yaylan-frekans"].tetikle("input");
+  ya.dom["egri-yaylan-sonum"].value = "99"; ya.dom["egri-yaylan-sonum"].tetikle("change");
+  var yd0 = JSON.parse(ya.depo["suflo.egri.yaylan"] || "null");
+  ok("yaylan: kaydırıcılar canlı önizler ve ayarı saklar (sönüm 10'a kırpılır); Premiere'e gidilmez", ya.cagri.length === 0 && yd0 && yd0.genlik === 0.3 && yd0.frekans === 4.5 &&
+    yd0.sonum === 10 && ya.dom["egri-yaylan-genlik-deger"].textContent === "0,30 sn" && ya.dom["egri-yaylan-frekans-deger"].textContent === "4,5 Hz" &&
+    ya.dom["egri-yaylan-sure"].textContent === "Oturma ≈ 0,48 sn", js([yd0, ya.dom["egri-yaylan-sure"].textContent]));
+  var yb = kur({ depo: { "suflo.egri.yaylan": JSON.stringify({ genlik: 0.2, frekans: 2, sonum: 4, tum: true }) }, cevap: function () { throw new Error("çağrılmamalı"); } });
+  ok("yaylan: saklanan ayar açılışta okunur (Tüm varışlar dahil); bozuk depo varsayılana döner", yb.G._durum().yaylan.genlik === 0.2 && yb.G._durum().yaylan.tum === true &&
+    yb.dom["egri-yaylan-tum"].checked === true && kur({ depo: { "suflo.egri.yaylan": "{bozuk" } }).G._durum().yaylan.genlik === 0.1);
+  var y0 = kur({ kurulu: false, cevap: function () { throw new Error("çağrılmamalı"); } });
+  await y0.G.yaylanUygula();
+  ok("yaylan: kurulmamışken Premiere'e gidilmez; kapı 'curves' + deneme:true + yeniden (Eğri ile ortak 3 hak)", y0.cagri.length === 0 && y0.kapi.length === 1 &&
+    y0.kapi[0][0] === "curves" && y0.kapi[0][1].deneme === true && typeof y0.kapi[0][1].yeniden === "function" && y0.harcanan.length === 0);
+  ok("kaynakta: yaylanUygula'nın ilk satırı 'curves' kapısı", /async function yaylanUygula\(\) \{\n    if \(typeof Pro !== "undefined" && !Pro\.gate\("curves", \{ deneme: true, yeniden: function \(\) \{ yaylanUygula\(\); \} \}\)\) return;/.test(KAYNAK));
+  // uygulama: önbellekteki işaretli satırlar için değerli taze tarama → klip başına KS_easeBake (tur 'yaylan') → hak bir kez
+  var yu = kur({ kurulu: true, cevap: function (fn, arg) {
+    if (fn === "KS_easePeek") return peek(12.5);
+    if (fn === "KS_easeScan") return tarama(12.5, degerli(ikiProp(12.5), arg));
+    if (fn === "KS_easeBake") return yaylanBake(arg);
+    return { ok: false };
+  } });
+  yu.ctx._tab.egri();
+  await bekle(10);
+  var yuOnce = yu.cagri.length;
+  await yu.G.yaylanUygula();
+  var yuTar = yu.cagri.slice(yuOnce).filter(function (c) { return c.fn === "KS_easeScan"; });
+  var yuBake = yu.cagri.filter(function (c) { return c.fn === "KS_easeBake"; });
+  ok("yaylan: değerler yalnız işaretli satırlar için istenir (yoklama taramasında istenmez)", yu.cagri.slice(0, yuOnce).every(function (c) { return !c.arg || !c.arg.degerIste; }) &&
+    yuTar.length >= 1 && js(yuTar[0].arg.degerIste) === js([{ nodeId: "nA", compIdx: 0, propIdx: 0 }, { nodeId: "nA", compIdx: 1, propIdx: 0 }]), js(yuTar.map(function (c) { return c.arg; })));
+  var yo0 = yuBake[0] && yuBake[0].arg.items[0], yo1 = yuBake[0] && yuBake[0].arg.items[1];
+  ok("yaylan öğeleri: tur 'yaylan', iniş = çiftin ikinci ucu, sonraki anahtar yok → t1 null, anahtarlar inişten sonra; seyrek + 2 karede bir", yuBake.length === 1 &&
+    yo0.tur === "yaylan" && yo0.t0 === 13 && yo0.t1 === null && js(yo0.v0) === js([0.8, 0.3]) && yo0.sinir === 20 && yo0.keys.length >= 3 &&
+    yo0.keys.every(function (q) { return q.t > 13 && q.t < 20 && Array.isArray(q.v); }) && yo0.yogunKeys.length > yo0.keys.length && yo0.degistir === false &&
+    yo1.t0 === 14 && yo1.v0 === 100 && yo1.keys.every(function (q) { return q.v >= 0 && q.v <= 100; }) && yuBake[0].arg.target.seqId === "s1" && yuBake[0].arg.dogrusal === undefined,
+    js(yo0).slice(0, 240));
+  ok("yaylan: başarıda hak bir kez düşer ('curves')", js(yu.harcanan) === js(["curves"]));
+  var yuSak = KR.depo(yu.ctx.localStorage).oku("C:/p/deneme.prproj");
+  ok("yaylan: kayıtlar depoda tur 'yaylan', iniş kenarDegerleri'nde", yuSak.length === 2 && yuSak.every(function (r) { return r.tur === "yaylan" && r.uclar === null && r.kenarDegerleri.length === 1; }),
+    js(yuSak.map(function (r) { return [r.tur, r.kenarDegerleri]; })));
+  var yuBil = yu.toastlar.filter(function (t) { return t.e && t.e.metin === "Geri al"; })[0];
+  ok("yaylan bildirimi: 'Varışta yaylanma uygulandı: 2 varış · N anahtar kare' + Geri al", !!yuBil && /^Varışta yaylanma uygulandı: 2 varış · \d+ anahtar kare$/.test(yuBil.m.textContent) &&
+    /good/.test(yu.dom["egri-status"].className), yuBil && yuBil.m.textContent);
+  // yeniden uygulama aynı inişte: eski kayıt yerine geçer (depoda yine 2 kayıt)
+  await yu.G.yaylanUygula();
+  ok("yaylan yeniden uygulama: aynı inişin eski kaydı yerine geçer", KR.depo(yu.ctx.localStorage).oku("C:/p/deneme.prproj").length === 2 && js(yu.harcanan) === js(["curves", "curves"]));
+  // Bezier yazılamadıysa (yoğun) bildirim söyler
+  var yy = kur({ kurulu: true, cevap: function (fn, arg) {
+    if (fn === "KS_easeScan") return tarama(12.5, degerli(ikiProp(12.5), arg));
+    if (fn === "KS_easeBake") return yaylanBake(arg, { yogun: true });
+    return { ok: false };
+  } });
+  yy.ctx._tab.egri(); await bekle(10);
+  await yy.G.yaylanUygula();
+  ok("yaylan: Premiere Bezier yazamadıysa '2 karede bir yazıldı' notu", /Premiere Bezier yazamadı; 2 karede bir yazıldı/.test(yy.dom["egri-status"].textContent), yy.dom["egri-status"].textContent);
+  var yyTar = yy.cagri.filter(function (c) { return c.fn === "KS_easeScan"; });
+  ok("yaylan: önbellek boşken (yoklama olmadan) ilk taramadan sonra işaretli satırların değerleri ikinci taramayla istenir", yyTar.length >= 2 && !yyTar[0].arg.degerIste &&
+    yyTar[1].arg.degerIste && yyTar[1].arg.degerIste.length === 2, js(yyTar.map(function (c) { return c.arg.degerIste || null; })));
+  // varış yok: playhead çiftlerin dışında, Tüm varışlar kapalı → bake yok, hak düşmez
+  var yn = kur({ kurulu: true, cevap: function (fn, arg) { return fn === "KS_easeScan" ? tarama(10.2, degerli(ikiProp(10.2), arg)) : { ok: false }; } });
+  yn.ctx._tab.egri(); await bekle(10);
+  await yn.G.yaylanUygula();
+  ok("yaylan: varış yoksa bake çağrılmaz, hak düşmez, açıklama", yn.cagri.filter(function (c) { return c.fn === "KS_easeBake"; }).length === 0 && yn.harcanan.length === 0 &&
+    /Yaylanacak varış yok/.test(yn.dom["egri-status"].textContent), yn.dom["egri-status"].textContent);
+  // Tüm varışlar açılınca playhead dışarıdaki satır da seçilebilir; bekleme anahtarları geçilir
+  var bekleyen = prop("nA", "Röportaj.mp4", 1, 0, [11, 12, 15], null, null, null, { degerlerHazir: [0, 100, 100] });
+  var yt = kur({ kurulu: true, cevap: function (fn, arg) {
+    if (fn === "KS_easePeek") return peek(10.2);
+    if (fn === "KS_easeScan") return tarama(10.2, degerli([bekleyen], arg));
+    if (fn === "KS_easeBake") return yaylanBake(arg);
+    return { ok: false };
+  } });
+  yt.ctx._tab.egri(); await bekle(10);
+  var cbOnce = hepsi(yt.dom["egri-ozellikler"], function (c) { return c.type === "checkbox"; })[0];
+  ok("Tüm varışlar kapalıyken playhead dışarıdaki satırın kutusu kapalı", cbOnce && cbOnce.disabled === true && cbOnce.checked === false);
+  yt.dom["egri-yaylan-tum"].checked = true; yt.dom["egri-yaylan-tum"].tetikle("change");
+  var cbSonra = hepsi(yt.dom["egri-ozellikler"], function (c) { return c.type === "checkbox"; })[0];
+  ok("Tüm varışlar açılınca satır seçilebilir ve işaretli (Premiere'e gidilmeden)", cbSonra && cbSonra.disabled === false && cbSonra.checked === true &&
+    yt.cagri.filter(function (c) { return c.fn !== "KS_easePeek" && c.fn !== "KS_easeScan"; }).length === 0);
+  await yt.G.yaylanUygula();
+  var ytBake = yt.cagri.filter(function (c) { return c.fn === "KS_easeBake"; })[0];
+  ok("Tüm varışlar: tek iniş (12; 15 bekleme), sonraki anahtara (15) kadar", ytBake && ytBake.arg.items.length === 1 && ytBake.arg.items[0].t0 === 12 && ytBake.arg.items[0].t1 === 15 &&
+    ytBake.arg.items[0].keys.every(function (q) { return q.t > 12 && q.t < 15; }), ytBake && js(ytBake.arg.items.map(function (x) { return [x.t0, x.t1]; })));
+  // satır rozeti + satırın Geri al'ı (kapısız); geri alırken aynı sekansın Eğri kayıtları da host'a gider (ucu yaylanmada olan kalkar)
+  var yKay = { id: "kryay1", tur: "yaylan", seqId: "s1", nodeId: "nA", clipName: "Röportaj.mp4", clipStart: 10, matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0,
+    uclar: null, times: [14.08, 14.24, 14.4], kenarDegerleri: [{ t: 14, v: 100 }], createdAt: 5000 };
+  var eKay = { id: "kregri9", tur: "egri", seqId: "s1", nodeId: "nA", clipName: "Röportaj.mp4", clipStart: 10, matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0,
+    uclar: [14.08, 14.24], times: [14.12, 14.16, 14.2], createdAt: 6000 };
+  var dpY = {};
+  KR.depo({ getItem: function (k) { return dpY[k] === undefined ? null : dpY[k]; }, setItem: function (k, v) { dpY[k] = v; }, removeItem: function (k) { delete dpY[k]; } }).ekle("C:/p/deneme.prproj", [yKay, eKay]);
+  var opakY = prop("nA", "Röportaj.mp4", 1, 0, [12, 14, 14.08, 14.12, 14.16, 14.2, 14.24, 14.4], { t0: 14.08, t1: 14.24, i0: 2, i1: 6, ic: 3, kayitli: true }, 100, 100);
+  var yr = kur({ kurulu: false, depo: dpY, cevap: function (fn, arg) {
+    if (fn === "KS_easePeek") return peek(14.1);
+    if (fn === "KS_easeScan") return tarama(14.1, [opakY]);
+    if (fn === "KS_easeUndo") return { ok: true, sonuclar: arg.records.map(function (r) { return { id: r.id, ok: true, silinen: r.times.length }; }), atlanan: [], egriBiten: ["kregri9"] };
+    return { ok: false };
+  } });
+  yr.ctx._tab.egri(); await bekle(10);
+  var satirY = hepsi(yr.dom["egri-ozellikler"], function (c) { return /egri-satir( |$)/.test(c.className); })[0];
+  var gyDugme = satirY && hepsi(satirY, function (c) { return /egri-yaylan-geri/.test(c.className); })[0];
+  ok("satır: canlı yaylanmanın penceresinde 'Suflo yaylanması' rozeti + Geri al", !!gyDugme && hepsi(satirY, function (c) { return c.className === "egri-rozet yaylan"; })[0].textContent === "Suflo yaylanması",
+    satirY && satirY.textContent);
+  gyDugme.tetikle("click");
+  await bekle(20);
+  var yrGeri = yr.cagri.filter(function (c) { return c.fn === "KS_easeUndo"; })[0];
+  ok("yaylan Geri al: kapısız; kayıt + aynı sekansın Eğri kayıtları (egriler) host'a; biten Eğri de depodan düşer, durum satırı söyler", yrGeri && yr.kapi.length === 0 &&
+    yrGeri.arg.records.length === 1 && yrGeri.arg.records[0].id === "kryay1" && yrGeri.arg.egriler.length === 1 && yrGeri.arg.egriler[0].id === "kregri9" &&
+    KR.depo(yr.ctx.localStorage).oku("C:/p/deneme.prproj").length === 0 &&
+    yr.dom["egri-status"].textContent === "Geri alındı: 3 anahtar kare silindi. · Uçları bu anahtar karelerde olan 1 Suflo eğrisi de kaldırıldı.", js([yrGeri && yrGeri.arg, yr.dom["egri-status"].textContent]));
+  // İngilizce: kart ve bildirim metinleri çevrilir
+  var I18Nyy = require(path.join(KOK, "js", "i18n.js"));
+  I18Nyy.setDictionary(require(path.join(KOK, "i18n", "en.js")));
+  ok("İngilizce: Varışta yaylan kartı ve göstergeler", I18Nyy.translate("Varışta yaylan") === "Follow-through" && I18Nyy.translate("Tüm varışlar") === "Every landing" &&
+    I18Nyy.translate("0,30 sn") === "0.30 s" && I18Nyy.translate("4,5 Hz") === "4.5 Hz" && I18Nyy.translate("Oturma ≈ 0,48 sn") === "Settles in ≈ 0.48 s" &&
+    I18Nyy.translate("Varışta yaylanma uygulandı: 2 varış · 17 anahtar kare") === "Follow-through applied: 2 landings · 17 keyframes" &&
+    I18Nyy.translate("🔒 Varışta yaylan") === "🔒 Follow-through" && I18Nyy.translate(": sonraki anahtar kareye ya da klibin sonuna 2 kareden az yer var") ===
+    ": there's less than 2 frames of room before the next keyframe or the clip end");
+
   /* ---------- 11) bağlantılar ---------- */
   var HTML = oku("index.html"), APP = oku("js/app.js");
   ok("Eğri tanıtım kartı 'curves' ve Pro'da gizli; app.js başlatır ve yan menüyü kilitler", /data-pro-feature="curves">Eğriyi aç — 749 TL</.test(HTML) && /"egri-tanitim"/.test(APP) &&
     /KEgri\.init\(\)/.test(APP) && /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="egri"\]'\), !s\.pro\)/.test(APP));
   var DM = require(path.join(KOK, "js", "deneme.js"));
-  ok("deneme.js: curves 3 haklı, adı, tanıtım ipucu Uygula düğmesine", DM.listede("curves") && DM.kalan(DM.bos(), "curves") === 3 && DM.AD.curves === "Eğri (anahtar kare yumuşatma)" &&
+  ok("deneme.js: curves 3 haklı, adı, tanıtım ipucu Uygula düğmesine", DM.listede("curves") && DM.kalan(DM.bos(), "curves") === 3 && DM.AD.curves === "Eğri (yumuşatma ve varışta yaylanma)" &&
     DM.tanitimIpucu("curves").hedef === "egri-uygula" && DM.tanitimIpucu("curves").eylem === "Uygula");
-  ok("pro.js: curves etiketi", /curves:\s+'Eğri: kendi anahtar karelerine özel yumuşatma'/.test(oku("js/pro.js")));
+  ok("pro.js: curves etiketi", /curves:\s+'Eğri: kendi anahtar karelerine özel yumuşatma ve varışta yaylanma'/.test(oku("js/pro.js")));
   ok("Bezier tutamacı iddiası yok: arayüz 'tutamaç yazamaz, sık anahtar kare' der", /Bezier tutamaçlarını yazamadığı için Suflo eğriyi her kareye/.test(HTML));
   ok("temiz oda: lisanssız kaynağın adı / sözdizimi yok", ["js/egri.js", "js/egri-model.js", "index.html", "css/style.css"].every(function (f) { return !new RegExp("open" + "curve", "i").test(oku(f)); }));
 

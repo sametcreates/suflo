@@ -39,7 +39,7 @@
     speedramp: "Hız rampası",
     offlineTranslate: "Çevrimdışı İngilizce çeviri",
     youtube: "YouTube indirici",
-    curves: "Eğri (anahtar kare yumuşatma)"
+    curves: "Eğri (yumuşatma ve varışta yaylanma)"
   };
   var ANAHTAR = /^[A-Za-z]{1,32}$/;   // "__proto__" gibi anahtarlar geçersiz sayılır
   var UST_SINIR = 1000;               // makul olmayan sayılar (elle düzenleme) geçersiz

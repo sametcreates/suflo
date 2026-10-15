@@ -2673,7 +2673,7 @@
     "Eğri": "Easing",
     "anahtar kare yumuşatma": "keyframe easing",
     "Anahtar karelerine özel eğri": "Custom curves for your keyframes",
-    "Eğriyi düzenlemek, önizlemek ve geri almak ücretsiz; anahtar karelerine uygulamak Pro.": "Editing, previewing and undoing curves is free; applying them to your keyframes is Pro.",
+    "Eğriyi ve yaylanmayı düzenlemek, önizlemek ve geri almak ücretsiz; anahtar karelerine uygulamak Pro.": "Editing, previewing and undoing curves and follow-through is free; applying them to your keyframes is Pro.",
     "hazır eğri": "built-in curves",
     "nokta": "points",
     "Eğriyi aç": "Unlock curves",
@@ -2746,6 +2746,11 @@
     "Premiere yanıt vermedi; yazılmış olabilecek anahtar kareler kayda alındı, Geri al ile kaldırılabilir": "Premiere didn't respond; any keyframes it may have written were recorded and can be removed with Undo",
     "kısmen yazıldı": "partly written",
     "uygulanamadı": "couldn't apply",
+    // Varışta yaylan (3.4 adım 14) row reasons
+    "iniş anahtar karesine hareket gelmiyor": "no motion arrives at the landing keyframe",
+    "iniş anahtar karesi klibin görünen kısmının dışında": "the landing keyframe is outside the visible part of the clip",
+    "sonraki anahtar kareye ya da klibin sonuna 2 kareden az yer var": "there's less than 2 frames of room before the next keyframe or the clip end",
+    "sonraki anahtar kare yerinde değil": "the next keyframe is gone",
     // host codes (js/egri-model.js HATA)
     "Aktif sekans yok. Bir sekans aç.": "No active sequence. Open a sequence.",
     "Eğri başka bir sekans için hazırlanmıştı. Liste yenilendi; yeniden dene.": "The curve was prepared for another sequence. The list was refreshed; try again.",
@@ -2762,7 +2767,7 @@
     "Kaba önizleme: playhead çiftin başından sonuna saniyede en çok 12 adımla gider, sonra geri döner": "Rough preview: the playhead steps from the start to the end of the pair at up to 12 steps per second, then returns",
     "Premiere'de önizle": "Preview in Premiere",
     "Önizlemeyi durdur": "Stop preview",
-    "Bu sekansta Suflo'nun yazdığı tüm eğri anahtar karelerini kaldır": "Remove all curve keyframes Suflo wrote in this sequence",
+    "Bu sekansta Suflo'nun yazdığı tüm eğri ve yaylanma anahtar karelerini kaldır": "Remove all curve and follow-through keyframes Suflo wrote in this sequence",
     "Tümünü geri al": "Undo all",
     "Kısayollar (bir yazı alanında değilken): Enter uygula · U son uygulamayı geri al · F yönü çevir · I ters çevir · V görünüm · 1–9 önayar. Ctrl+Z eğriyi tek adımda geri almaz; Geri al'ı kullan, yalnız Suflo'nun yazdığı anahtar kareler kalkar. Şimdilik yalnız video katmanları; ses düzeyi sonraki sürümde.":
       "Shortcuts (when you're not typing in a field): Enter apply · U undo the last apply · F flip · I invert · V view · 1–9 presets. Ctrl+Z doesn't undo a curve in one step; use Undo, which removes only the keyframes Suflo wrote. Video tracks only for now; audio level comes in a later version.",
@@ -2790,12 +2795,32 @@
     "Anahtar kare çifti yok.": "No keyframe pair.",
     "Önce playhead'i bir anahtar kare çiftinin arasına getir.": "First move the playhead between a keyframe pair.",
     // Pro, trial list, Suflo Doctor
-    "Eğri: kendi anahtar karelerine özel yumuşatma": "Easing: custom curves for your own keyframes",
-    "Eğri (anahtar kare yumuşatma)": "Easing (keyframe curves)",
-    "Eğri: anahtar karelerine özel yumuşatma (düzenlemek ücretsiz)": "Easing: custom curves on your keyframes (editing is free)",
+    "Eğri: kendi anahtar karelerine özel yumuşatma ve varışta yaylanma": "Easing: custom curves and follow-through for your own keyframes",
+    "Eğri (yumuşatma ve varışta yaylanma)": "Easing (curves and follow-through)",
+    "Eğri: anahtar karelerine özel yumuşatma ve varışta yaylanma (düzenlemek ücretsiz)": "Easing: custom curves and follow-through on your keyframes (editing is free)",
+    // Varışta yaylan (3.4 adım 14): card, sliders, apply, row badge
+    "Varışta yaylan": "Follow-through",
+    "İniş anahtar karesinden sonra hareket hedefi biraz aşar, salınıp oturur (follow-through). İşaretli özelliklerde playhead'i saran çiftin ikinci anahtar karesine ya da tüm varışlara yazılır; sonraki anahtar kareyi geçmez.":
+      "After the landing keyframe the motion overshoots its target a little, wobbles and settles (follow-through). It's written on the ticked properties at the second keyframe of the pair around the playhead, or at every landing; it never runs past the next keyframe.",
+    "Aşımın büyüklüğü: varış hızıyla kaç saniyelik yol (0,02–0,5 sn)": "How big the overshoot is: how many seconds of travel at the arrival speed (0.02–0.5 s)",
+    "Genlik": "Amplitude",
+    "Saniyedeki salınım (1–6 Hz)": "Wobbles per second (1–6 Hz)",
+    "Frekans": "Frequency",
+    "Ne kadar çabuk oturur (2–10); yüksek sönüm kısa yaylanma": "How fast it settles (2–10); higher damping means a shorter follow-through",
+    "Sönüm": "Damping",
+    "İşaretli özelliklerde klibin her varışına (hareketin durduğu her anahtar kareye) uygula": "Apply at every landing in the clip (every keyframe where a move ends) on the ticked properties",
+    "Tüm varışlar": "Every landing",
+    "İşaretli özelliklerin varışına yaylanma yaz (Pro; düzenlemek ve önizlemek ücretsiz)": "Write follow-through at the landing of the ticked properties (Pro; editing and previewing are free)",
+    "Suflo yaylanması": "Suflo follow-through",
+    "Bu varıştaki yaylanmayı kaldır": "Remove the follow-through at this landing",
+    "Yaylanacak varış yok: playhead'i bir hareketin iki anahtar karesi arasına getir (ya da Tüm varışlar'ı aç) ve özelliği işaretle.":
+      "No landing to add follow-through to: move the playhead between the two keyframes of a move (or turn on Every landing) and tick the property.",
+    "Yaylanma uygulanamadı": "Couldn't apply follow-through",
+    "Varışta yaylanma uygulandı: {n} varış · {n} anahtar kare": "Follow-through applied: {} landings · {} keyframes",
+    "Premiere Bezier yazamadı; 2 karede bir yazıldı": "Premiere couldn't write Bezier keys; written every 2 frames instead",
     "Anahtar kare ara değerlemesi (setInterpolationTypeAtKey)": "Keyframe interpolation (setInterpolationTypeAtKey)",
-    "Eğri ve Geçiş / Zoom / Hareket önayarlarının özel eğrisi, yazdığı sık anahtar kareleri doğrusal yapamaz; Premiere'in varsayılan ara değerlemesi kalır (eğri yine uygulanır, kareler arasında hafif sapma olabilir)":
-      "Easing and the custom curve in Transitions / Zoom / Motion presets can't make the dense keyframes they write linear; Premiere's default interpolation stays (the curve is still applied, with possible slight wobble between frames)",
+    "Eğri ve Geçiş / Zoom / Hareket önayarlarının özel eğrisi, yazdığı sık anahtar kareleri doğrusal yapamaz; Premiere'in varsayılan ara değerlemesi kalır (eğri yine uygulanır, kareler arasında hafif sapma olabilir). Varışta yaylan, tepe noktalarını Bezier yapamadığı için 2 karede bir sık yazar":
+      "Easing and the custom curve in Transitions / Zoom / Motion presets can't make the dense keyframes they write linear; Premiere's default interpolation stays (the curve is still applied, with possible slight wobble between frames). Follow-through can't make its peaks Bezier, so it writes keys every 2 frames instead",
     // jsx/host.jsx KS_easeBake (ASCII Turkish; the panel shows its own text from the code)
     "Egri baska bir sekans icin hazirlandi.": "The curve was prepared for another sequence.",
     "Gecersiz egri plani.": "Invalid curve plan.",
@@ -3454,6 +3479,9 @@
     [/^(-?\d+),(\d+) sn → (-?\d+),(\d+) sn · (\d+) kare$/, function (m) {
       return m[1] + "." + m[2] + " s → " + m[3] + "." + m[4] + " s · " + m[5] + (m[5] === "1" ? " frame" : " frames");
     }],
+    // Eğri › Varışta yaylan (3.4 adım 14): "3,5 Hz" → "3.5 Hz", "Oturma ≈ 0,80 sn" → "Settles in ≈ 0.80 s"
+    [/^(\d+)(?:,(\d+))? Hz$/, function (m) { return m[1] + (m[2] ? "." + m[2] : "") + " Hz"; }],
+    [/^Oturma ≈ (\d+),(\d+) sn$/, "Settles in ≈ $1.$2 s"],
     // Altyazı Efektleri › önizlemede serbest konum etiketi (3.3 adım 17): Türkçe "%50" → İngilizce "50%"
     [/^X %(\d+) · Y %(\d+)$/, "X $1% · Y $2%"],
     [/^749 TL$/, function () { return enPrice(); }],
@@ -3508,7 +3536,8 @@
     "English (beta)", "Türkmençe",
     ".suflo-stil,.txt", "Logo",
     "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US",
-    "cubic-bezier", "cubic-bezier(0.25, 0.1, 0.25, 1)", "P1 x", "P1 y", "P2 x", "P2 y"];   // Eğri: CSS syntax and handle names   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "cubic-bezier", "cubic-bezier(0.25, 0.1, 0.25, 1)", "P1 x", "P1 y", "P2 x", "P2 y",   // Eğri: CSS syntax and handle names   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "3 Hz"];   // Eğri › Varışta yaylan frequency readout (Hz is the same; decimals go through a pattern)
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

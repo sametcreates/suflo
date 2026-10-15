@@ -3933,6 +3933,25 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .egri-eylem { margin-top: 6px; }
 .egri-eylem .btn { margin-right: 6px; }
 .egri-eylem .btn.grow { flex: 1; margin-right: 0; }
+/* Varışta yaylan (3.4 adım 14): ayar kartı, sönümlü salınım önizlemesi (Premiere'e gitmez). CEF 74: flex gap yok */
+.egri-yaylan { margin: 12px 0 8px; padding: 9px 10px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.egri-yaylan-bas b { display: block; margin-bottom: 2px; font-size: 11.5px; }
+.egri-yaylan-bas .hint { display: block; margin: 0 0 8px; font-size: 10px; line-height: 1.45; }
+.egri-yaylan-govde { display: flex; flex-wrap: wrap; align-items: center; margin: 0 -5px; }
+.egri-yaylan-grafik { display: block; flex: 1 1 180px; min-width: 0; height: auto; margin: 0 5px 8px; border: 1px solid #263242; border-radius: 8px; background: linear-gradient(180deg, #131b26, #0e151e); }
+.egri-yaylan-yol { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.egri-yaylan-hedef { stroke: var(--line2); stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+.egri-yaylan-varis { stroke: #223041; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.egri-yaylan-ayarlar { flex: 1 1 180px; min-width: 0; margin: 0 5px 8px; }
+.egri-yaylan-ayar { display: flex; flex-wrap: wrap; align-items: center; margin: 0 0 5px; font-size: 10.5px; color: var(--dim); }
+.egri-yaylan-ayar input { flex: 1 1 80px; min-width: 0; margin: 0 6px; accent-color: var(--accent); }
+.egri-yaylan-ayar output { flex: none; min-width: 46px; color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+.egri-yaylan-tum { display: flex; align-items: center; font-size: 10.5px; cursor: pointer; }
+.egri-yaylan-tum input { margin: 0 6px 0 0; accent-color: var(--accent); }
+.egri-yaylan-eylem { align-items: center; }
+.egri-yaylan-sure { flex: none; margin-right: 8px; color: var(--dim); font-size: 10px; white-space: nowrap; }
+.egri-yaylan-eylem .btn.grow { flex: 1; }
+.egri-rozet.yaylan { color: var(--accent-lite); }
 
 /* ---------- Eğri seçicisi (3.4 adım 12): Geçiş, Zoom, Hareket önayarı — #gecis-egri, #zoom-egri, #preset-egri ----------
    Aynı kart ızgarası (.egri-onayarlar / .egri-onayar) Eğri sekmesinden. CEF 74: flex gap ve :focus-visible yok */

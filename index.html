@@ -1670,7 +1670,7 @@
       <div class="pt-copy">
         <span class="pt-rozet">SUFLO PRO</span>
         <b>Anahtar karelerine özel eğri</b>
-        <span>Eğriyi düzenlemek, önizlemek ve geri almak ücretsiz; anahtar karelerine uygulamak Pro.</span>
+        <span>Eğriyi ve yaylanmayı düzenlemek, önizlemek ve geri almak ücretsiz; anahtar karelerine uygulamak Pro.</span>
       </div>
       <div class="pt-proof" aria-label="Pro özeti">
         <i><strong>15</strong> hazır eğri</i><i><strong>8</strong> nokta</i><i><strong>1×</strong> lisans</i>
@@ -1731,8 +1731,40 @@
       <button id="egri-pr-onizle" class="btn" type="button" title="Kaba önizleme: playhead çiftin başından sonuna saniyede en çok 12 adımla gider, sonra geri döner">Premiere'de önizle</button>
     </div>
     <div class="row egri-eylem">
-      <button id="egri-geri-tumu" class="btn" type="button" title="Bu sekansta Suflo'nun yazdığı tüm eğri anahtar karelerini kaldır">Tümünü geri al</button>
+      <button id="egri-geri-tumu" class="btn" type="button" title="Bu sekansta Suflo'nun yazdığı tüm eğri ve yaylanma anahtar karelerini kaldır">Tümünü geri al</button>
       <button id="egri-uygula" class="btn primary grow" type="button">Uygula</button>
+    </div>
+    <div id="egri-yaylan" class="egri-yaylan" role="group" aria-label="Varışta yaylan">
+      <div class="egri-yaylan-bas">
+        <b>Varışta yaylan</b>
+        <span class="hint">İniş anahtar karesinden sonra hareket hedefi biraz aşar, salınıp oturur (follow-through). İşaretli özelliklerde playhead'i saran çiftin ikinci anahtar karesine ya da tüm varışlara yazılır; sonraki anahtar kareyi geçmez.</span>
+      </div>
+      <div class="egri-yaylan-govde">
+        <svg id="egri-yaylan-grafik" class="egri-yaylan-grafik" viewBox="0 0 240 80" aria-hidden="true" focusable="false">
+          <line id="egri-yaylan-hedef" class="egri-yaylan-hedef" x1="0" y1="20" x2="240" y2="20"></line>
+          <line id="egri-yaylan-varis" class="egri-yaylan-varis" x1="60" y1="0" x2="60" y2="80"></line>
+          <path id="egri-yaylan-yol" class="egri-yaylan-yol" d=""></path>
+        </svg>
+        <div class="egri-yaylan-ayarlar">
+          <label class="egri-yaylan-ayar" title="Aşımın büyüklüğü: varış hızıyla kaç saniyelik yol (0,02–0,5 sn)">Genlik
+            <input id="egri-yaylan-genlik" type="range" min="0.02" max="0.5" step="0.01" value="0.1">
+            <output id="egri-yaylan-genlik-deger" for="egri-yaylan-genlik">0,10 sn</output>
+          </label>
+          <label class="egri-yaylan-ayar" title="Saniyedeki salınım (1–6 Hz)">Frekans
+            <input id="egri-yaylan-frekans" type="range" min="1" max="6" step="0.5" value="3">
+            <output id="egri-yaylan-frekans-deger" for="egri-yaylan-frekans">3 Hz</output>
+          </label>
+          <label class="egri-yaylan-ayar" title="Ne kadar çabuk oturur (2–10); yüksek sönüm kısa yaylanma">Sönüm
+            <input id="egri-yaylan-sonum" type="range" min="2" max="10" step="1" value="6">
+            <output id="egri-yaylan-sonum-deger" for="egri-yaylan-sonum">6</output>
+          </label>
+          <label class="egri-yaylan-tum" title="İşaretli özelliklerde klibin her varışına (hareketin durduğu her anahtar kareye) uygula"><input id="egri-yaylan-tum" type="checkbox"> Tüm varışlar</label>
+        </div>
+      </div>
+      <div class="row egri-yaylan-eylem">
+        <span id="egri-yaylan-sure" class="egri-yaylan-sure">Oturma ≈ 0,80 sn</span>
+        <button id="egri-yaylan-uygula" class="btn grow" type="button" title="İşaretli özelliklerin varışına yaylanma yaz (Pro; düzenlemek ve önizlemek ücretsiz)">Varışta yaylan</button>
+      </div>
     </div>
     <div id="egri-status" class="inline-status" role="status" aria-live="polite"></div>
     <p class="hint">Kısayollar (bir yazı alanında değilken): Enter uygula · U son uygulamayı geri al · F yönü çevir · I ters çevir · V görünüm · 1–9 önayar. Ctrl+Z eğriyi tek adımda geri almaz; Geri al'ı kullan, yalnız Suflo'nun yazdığı anahtar kareler kalkar. Şimdilik yalnız video katmanları; ses düzeyi sonraki sürümde.</p>
@@ -2462,7 +2494,7 @@
               <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
               <li>Altyazı Efektleri timeline'da · Kanca başlığı</li>
               <li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası</li>
-              <li>Eğri: anahtar karelerine özel yumuşatma (düzenlemek ücretsiz)</li>
+              <li>Eğri: anahtar karelerine özel yumuşatma ve varışta yaylanma (düzenlemek ücretsiz)</li>
               <li>YouTube indirici: MP3 · 720p · 1080p · 4K, projeye otomatik</li>
               <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
