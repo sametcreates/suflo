@@ -27,10 +27,13 @@ window.KTextCut = (function () {
   var kaldirilan = [];         // incelemede işareti kaldırılan kelime parçaları: [{ words, reason, start, end }]
   var aiGruplari = null;       // doğrulanmış AI grupları (bu klip için)
   var aiSurum = 0, aiMesgul = 0;   // aiMesgul: süren AI geçişinin sürümü (0 = yok)
+  var uygulaniyor = false;   // Uygula sürüyor (Premiere soruları + KS_applyCuts)
   var onbellektenMi = false;
   var bellek = [];     // bellek içi önbellek: son birkaç klibin transkripti [{ anahtar, sonuc }]
   var target = "clone";
   var busy = false;
+  // 3.4 adım 8: Uygula'dan sonra "Altyazıya aktar" / "Altyazıyı yeni kurguya uyarla" satırı (js/kesim-altyazi.js; ücretsiz)
+  var altyaziEylemi = null;
 
   var NEDEN = {
     "dolgu": "dolgu", "tekrar": "tekrar", "tekrar-cekim": "tekrar çekim", "yarim": "yarım başlangıç",
@@ -521,8 +524,16 @@ window.KTextCut = (function () {
     }
   }
 
-  async function apply() {
-    if (typeof Pro !== "undefined" && !Pro.gate("textcut", { deneme: true, yeniden: apply })) return;
+  // ek.cloneFirst === true (Yapay zekâ köprüsü): kopya sekans zorunlu. Hedef İLK await'ten ÖNCE bir kez
+  // okunur: Premiere'e sorulurken "Bu sekansta"ya basılması bu kesimin yerini değiştirmez; köprü de
+  // paylaşılan "target"a hiç yazmaz (kesim sürerken kullanıcının seçtiği hedef ezilmez).
+  // Düğmenin tık olayı (Event) cloneFirst taşımaz: o an seçili hedef geçerli.
+  async function apply(ek) {
+    if (uygulaniyor) return;   // süren Uygula bitmeden ikinci tık / köprü çağrısı yok sayılır
+    var kopyaZorunlu = !!(ek && ek.cloneFirst === true);
+    var hedef = kopyaZorunlu ? "clone" : target;
+    var yeniden = kopyaZorunlu ? function () { return apply({ cloneFirst: true }); } : apply;
+    if (typeof Pro !== "undefined" && !Pro.gate("textcut", { deneme: true, yeniden: yeniden })) return;
     // Premiere yüzlerce kesimde yavaşlar: en fazla 300 (yakın kesimler birleşir, en kısalar kalır)
     // birleşme yalnız arasında tutulan kelime olmayan boşluklarda (konuşma yutulmaz)
     var tutulan = words.filter(function (w, i) { return !kesilsinMi(i); });
@@ -533,22 +544,48 @@ window.KTextCut = (function () {
       KApp.toast("300+ kesim birleştirildi" + (sinirli.dropped ? " — en kısa " + sinirli.dropped + " kesim atlandı" : ""), "warn");
     }
     sesiKapat();
-    // Bayat olabilecek yoklama yerine Premiere'e taze sor
-    var tazeCtx = await K.call("KS_getContext");
-    var aktif = tazeCtx.ok ? (tazeCtx.sequenceId || tazeCtx.sequence || "") : "";
-    if (sekans && aktif && aktif !== sekans) {
-      status("Bu kesimler başka bir sekans için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
-      return;
-    }
+    /*
+     * 3.4 adım 8 "Altyazıya aktar": kesilmeyecek kelimeler (Uygula'dan sonra transkript sıfırlanır). 300 sınırında
+     * atlanan kesim varsa bütün kelimeler gider: ortası gerçekten uygulanan bir kesimde kalan kelime düşer.
+     */
+    var aktarKelimeler = sinirli.dropped ? words.slice() : tutulan.slice();
+    var aktarDil = lang, aktarSon = clip ? Number(clip.clipEnd) : 0;
+    /*
+     * 3.4 inceleme: tekrar girme kilidi İLK await'ten önce. Yer ve sekans soruları iki Premiere gidiş dönüşü sürer; o arada
+     * gelen ikinci tık (çift tık) aynı sekans zamanlarıyla ikinci bir KS_applyCuts gönderir, kaymış kurguda konuşma silinir
+     * ve deneme hakkı iki kez düşerdi (Otomatik Kesim'deki uygulaniyor gibi).
+     */
+    uygulaniyor = true;
     el("tc-apply").disabled = true;
-    status("Uygulanıyor…");
     try {
-      var arg = { ranges: r, removeMode: "ripple", cloneFirst: target === "clone" };
+      // Bayat olabilecek yoklama yerine Premiere'e taze sor
+      var tazeCtx = await K.call("KS_getContext");
+      var aktif = tazeCtx.ok ? (tazeCtx.sequenceId || tazeCtx.sequence || "") : "";
+      if (sekans && aktif && aktif !== sekans) {
+        status("Bu kesimler başka bir sekans için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
+        return;
+      }
+      /*
+       * 3.4 son inceleme: kesimler sekans zamanında (yazıya dökülen klibin clipStart'ı + kelime zamanı). Klip yazıya
+       * döküldükten sonra Premiere'de taşındı ya da kırpıldıysa (bağlam yoklaması aynı medyanın taşınmasını bildirmez, panel
+       * odakta değilken hiç yoklanmaz; kesim seçim istemez) kesimler eski konuma düşerdi: klibin aynı yerde durduğu sorulur.
+       */
+      var yerKlip = clip, yer = await klipYerinde(yerKlip);
+      if (clip !== yerKlip) return;
+      if (yer !== "tamam") {
+        K.log("[konusmadan kes] yaziya dokulen klip " + (yer === "okunamadi" ? "okunamadi" : "tasindi/kirpildi") + " (clipStart " + yerKlip.clipStart + "): KS_applyCuts gonderilmedi");
+        status(yer === "okunamadi" ? "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden dene." :
+          "✕ Yazıya döktüğün klip taşındı ya da kırpıldı: kesimler eski konuma düşerdi, uygulanmadı. Klibi yeniden yazıya dök.", "bad");
+        return;
+      }
+      status("Uygulanıyor…");
+      // esleme: host kesilen sekansı, kareyi ve gerçek ripple kaymasını bildirir (altyazıyı yeni kurguya taşımak için)
+      var arg = { ranges: r, removeMode: "ripple", cloneFirst: hedef === "clone", esleme: true };
       // kopya sekansın adı: "<sekans> — Suflo Temiz"; dokunulmamış özgün sekans yedektir
       // (ad Premiere'e veri olarak gider, çevirmen görmez: arayüz diliyle burada kurulur)
-      if (target === "clone" && tazeCtx.ok && tazeCtx.sequence) {
-        var ek = window.SufloI18n && SufloI18n.getLang && SufloI18n.getLang() === "en" ? " — Suflo Clean" : " — Suflo Temiz";
-        arg.cloneName = String(tazeCtx.sequence) + ek;
+      if (hedef === "clone" && tazeCtx.ok && tazeCtx.sequence) {
+        var adEki = window.SufloI18n && SufloI18n.getLang && SufloI18n.getLang() === "en" ? " — Suflo Clean" : " — Suflo Temiz";
+        arg.cloneName = String(tazeCtx.sequence) + adEki;
       }
       var res = await K.call("KS_applyCuts", arg, 900000);
       if (res.ok) {
@@ -561,6 +598,14 @@ window.KTextCut = (function () {
         } else {
           KApp.toast(msg, "good");
         }
+        // 3.4 adım 8: kesim kaydı + "Altyazıya aktar" (kalan kelimeler yeni kurgunun zamanlarıyla) ve belge bu kurgunun
+        // öncesine aitse "Altyazıyı yeni kurguya uyarla" (rippleFallback → boşluk modu)
+        if (altyaziEylemi) {
+          try {
+            altyaziEylemi.kesimSonrasi(res, { removeMode: "ripple", kaynak: aktif || sekans, kaynakAd: tazeCtx.ok ? String(tazeCtx.sequence || "") : "",
+              ranges: r, kare: tazeCtx.ok ? tazeCtx.frame : 0, kelimeler: aktarKelimeler, dil: aktarDil, sonSinir: aktarSon });
+          } catch (eA) { K.log("[konusmadan kes] altyazi eylemi: " + (eA && eA.message ? eA.message : eA)); }   // kesim zaten uygulandı
+        }
         // Timeline degisti: eski zamanlar artik gecersiz
         el("tc-result").hidden = true; sesiKapat();
         sifirla();
@@ -568,9 +613,45 @@ window.KTextCut = (function () {
       } else {
         status("✕ " + res.error, "bad");
       }
+      return res;
     } finally {
+      uygulaniyor = false;
       el("tc-apply").disabled = false;
     }
+  }
+
+  // Yapay zekâ köprüsü (MCP, 3.4): "Uygula" düğmesinin aynı işlevi, HER ZAMAN kopya sekansta
+  // (açık seçenekle; panelin hedef düğmeleri bu kesimi etkilemez, köprü de onları değiştirmez)
+  /*
+   * Yazıya dökülen klip hâlâ yerinde mi: [clipStart, clipEnd] aralığına değen kliplerden biri aynı medya, aynı başlangıç /
+   * bitiş ve aynı kaynak hizası (inPoint - start) mı (KS_getTrackLayout klipler). Döner: "tamam" | "degisti" | "okunamadi".
+   */
+  async function klipYerinde(c) {
+    if (!c || !isFinite(Number(c.clipStart)) || !isFinite(Number(c.clipEnd))) return "tamam";
+    var r = null;
+    try { r = await K.call("KS_getTrackLayout", { klipler: true, start: Number(c.clipStart), end: Number(c.clipEnd) }, 20000); } catch (e) { r = null; }
+    if (!r || !r.ok) return "okunamadi";
+    var hiza = Number(c.inPoint || 0) - Number(c.clipStart);
+    function yakin(a, b) { return Math.abs(Number(a) - Number(b)) < 0.0005; }
+    var izler = [].concat(r.video || [], r.audio || []);
+    for (var i = 0; i < izler.length; i++) {
+      var kl = (izler[i] && izler[i].klipler) || [];
+      for (var j = 0; j < kl.length; j++) {
+        var k = kl[j];
+        if (k && String(k.yol || "") === String(c.mediaPath || "") && yakin(k.s, c.clipStart) && yakin(k.e, c.clipEnd) && yakin(k.hiza, hiza)) return "tamam";
+      }
+    }
+    return "degisti";
+  }
+
+  async function mcpKes() {
+    if (!words.length) return { ok: false, hata: "analiz_yok", mesaj: "Prepare the Text-based cut in the Suflo panel first (no analysed transcript)." };
+    if (uygulaniyor) return { ok: false, hata: "mesgul", mesaj: "Suflo is already applying cuts in the Text-based cut panel; try again when it finishes." };
+    var res = await apply({ cloneFirst: true });
+    var st = el("tc-status");
+    if (!res) return { ok: false, hata: "uygulanamadi", mesaj: (st && st.textContent) || "Nothing to cut." };
+    if (!res.ok) return { ok: false, hata: "uygulanamadi", mesaj: res.error || "Not applied." };
+    return { ok: true, kopyaSekans: res.newSeq || "", bosluklu: !!res.rippleFallback };
   }
 
   // "Dinle": kesimler uygulanmis gibi sesi panelde cal (timeline'a dokunmaz)
@@ -633,6 +714,9 @@ window.KTextCut = (function () {
     el("tc-analyze").addEventListener("click", function () { analyze(false); });
     el("tc-retranscribe").addEventListener("click", function () { analyze(true); });
     el("tc-apply").addEventListener("click", apply);
+    if (window.KKesimAltyazi && el("tc-altyazi")) {
+      altyaziEylemi = window.KKesimAltyazi({ kutu: "tc-altyazi", metin: "tc-altyazi-metin", uyarla: "tc-altyazi-uyarla", aktar: "tc-altyazi-aktar" });
+    }
     el("tc-reset").addEventListener("click", function () {
       elle = {}; grupSecim = {}; korunanDuraksama = {}; kaldirilan = [];
       if (words.length) yenidenSinifla();
@@ -681,5 +765,5 @@ window.KTextCut = (function () {
     refreshButton();
   }
 
-  return { init: init };
+  return { init: init, mcpKes: mcpKes };
 })();

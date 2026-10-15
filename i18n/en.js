@@ -808,6 +808,14 @@
     "Yeni yazı tipleri": "New fonts",
     "7 yeni font: 13 yazı tipi dört kategoride.": "7 new fonts: 13 typefaces in four categories.",
     "MP3, 720p, 1080p ya da 4K; dosya projene gelir (Pro).": "MP3, 720p, 1080p or 4K; the file lands in your project (Pro).",
+    // 3.4 "What's new" (titles "Eğri", "Varışta yaylan", "Özel hız eğrisi", "Araç ara" are translated with their tools)
+    "Eğri, canlı sessizlik kesimi ve Araç ara": "Easing, live silence cut and Search tools",
+    "Kendi anahtar karelerine hazır ya da çizdiğin eğri; düzenlemek ücretsiz, uygulamak Pro.": "A preset or hand-drawn curve on your own keyframes; editing is free, applying is Pro.",
+    "Hareket inişte hedefi biraz aşar, salınıp oturur (Pro).": "Motion overshoots its landing a little, then settles (Pro).",
+    "Canlı eşikli kesim": "Live-threshold cut",
+    "Kaydırıcılar kesimleri anında günceller; sekans ya da In → Out, müzik bölünmez (Pro).": "Sliders update the cuts instantly; cut a sequence or In → Out without splitting the music (Pro).",
+    "Hız Rampası'nda kendi hız eğrini çiz (Pro).": "Draw your own speed curve in Speed Ramp (Pro).",
+    "Ctrl+K (⌘K) ile her araca ve eyleme saniyede ulaş.": "Reach any tool or action in seconds with Ctrl+K (⌘K).",
     "Göster →": "Show →",
     "Başlayalım": "Let's go"
   });
@@ -1224,6 +1232,8 @@
     "{} uygulanıyor…": "Applying {}…",
     "(kısa klip: süre kısaltıldı)": "(short clip: duration reduced)",
     "{} (kısa klip: süre kısaltıldı)": "{} (short clip: duration reduced)",
+    // Geçiş eklendi bildirimi (js/gecisler.js; geç cevapta "Premiere geç yanıt verdi: {}" içinde de)
+    "↔ {} · V{n} kesimine eklendi": "↔ {} · added to the V{} cut",
     "Klip {}": "Clip {}",
     "Başlık metni boş.": "Title text is empty.",
     "Önce bir başlık yaz.": "Write a title first.",
@@ -2660,6 +2670,390 @@
     "Dosya projeye alinamadi. Premiere bu bicimi acamiyor olabilir.": "Couldn't import the file into the project. Premiere may not open this format."
   });
 
+  /* ================= Yumuşatma motoru / Easing engine (js/ease-curve.js BUILTINS, 3.4) ================= */
+  // "Doğrusal" (Linear), "Yumuşak" (Smooth) and "Zıplama" (Bounce) already have entries above; the curve
+  // picker shows each built-in's own nameEn ("Ease", "Bounce out") through SufloEase.builtinName().
+  add({
+    "Yumuşak giriş": "Ease in",
+    "Yumuşak çıkış": "Ease out",
+    "Yumuşak giriş-çıkış": "Ease in-out",
+    "Sert giriş": "Expo in",
+    "Sert çıkış": "Expo out",
+    "Güçlü S": "Strong S",
+    "Geri çekil": "Back in",
+    "Taşma": "Back out",
+    "Esnek": "Elastic out",
+    "Yay yumuşak": "Spring gentle",
+    "Yay canlı": "Spring lively",
+    "Çift yumuşak": "Double ease"
+  });
+
+  /* ================= Eğri / Easing tab (3.4 step 10: js/egri.js, js/egri-model.js, #tab-egri) ================= */
+  // "Çevir" is the captions Translate button and "Yoğunluk" the speed-ramp Intensity: the curve tab uses
+  // "Yönü çevir" (Flip) and "Anahtar sıklığı" (Key density) so neither shared entry is overridden.
+  add({
+    // sidebar, promo card, intro
+    "Eğri": "Easing",
+    "anahtar kare yumuşatma": "keyframe easing",
+    "Anahtar karelerine özel eğri": "Custom curves for your keyframes",
+    "Eğriyi ve yaylanmayı düzenlemek, önizlemek ve geri almak ücretsiz; anahtar karelerine uygulamak Pro.": "Editing, previewing and undoing curves and follow-through is free; applying them to your keyframes is Pro.",
+    "hazır eğri": "built-in curves",
+    "nokta": "points",
+    "Eğriyi aç": "Unlock curves",
+    "Kendi anahtar karelerine özel yumuşatma": "Custom easing for your own keyframes",
+    "Effect Controls'te bir özelliğe iki anahtar kare koy, playhead'i aralarına getir, eğriyi seç ve uygula. Premiere'in betikleri Bezier tutamaçlarını yazamadığı için Suflo eğriyi her kareye (ya da 2 / 4 karede bir) anahtar kare olarak yazar; uçlardaki iki anahtar karen değişmez.":
+      "Put two keyframes on a property in Effect Controls, move the playhead between them, pick a curve and apply. Premiere's scripting can't set Bezier handles, so Suflo writes the curve as a keyframe on every frame (or every 2 / 4 frames); your two keyframes at the ends stay as they are.",
+    // editor
+    "Görünüm": "View",
+    "Değer eğrisi (V)": "Value curve (V)",
+    "Hız eğrisi (V)": "Speed curve (V)",
+    "Eğri düzenleyici": "Curve editor",
+    "Tutamaçları sürükle · Shift 0,05'e yapışır · çift tık nokta ekler · Alt tutamaçları ayırır · Delete seçili noktayı siler":
+      "Drag the handles · Shift snaps to 0.05 · double-click adds a point · Alt breaks the handles · Delete removes the selected point",
+    "Canlı önizleme": "Live preview",
+    "Yumuşak giriş ↔ yumuşak çıkış (F)": "Ease in ↔ ease out (F)",
+    "Yönü çevir": "Flip",
+    "Eksenleri değiştir; yalnız taşmayan eğrilerde (I)": "Swap the axes; only for curves that don't overshoot (I)",
+    "Ters çevir": "Invert",
+    "Bu eğriyi önayarlarına ekle (bu bilgisayarda saklanır)": "Add this curve to your presets (saved on this computer)",
+    "Önayar olarak kaydet": "Save as preset",
+    "Hazır eğriler": "Built-in curves",
+    "Bu hazır eğrinin tutamacı yok; nokta eklemek için Yumuşak gibi bir bezier eğriyle başla.": "This built-in curve has no handles; to add points, start from a bezier curve such as Ease.",
+    "Buraya nokta eklenemedi (en çok 8 nokta; komşu noktaya çok yakın).": "Couldn't add a point here (8 points at most; too close to a neighbor).",
+    "Önayarı sil": "Delete preset",
+    "En çok {n} önayar saklanır; birini sil.": "Up to {} presets can be saved; delete one.",
+    "Bu eğri saklanamadı.": "Couldn't save this curve.",
+    "Önayar bu bilgisayarda saklanamadı.": "Couldn't save the preset on this computer.",
+    "Önayar kaydedildi.": "Preset saved.",
+    "Benim eğrim {n}": "My curve {}",
+    "çok noktalı eğri": "multi-point curve",
+    "hazır eğri (cubic-bezier değil)": "built-in curve (not a cubic-bezier)",
+    "Geçersiz: cubic-bezier(x1, y1, x2, y2) yaz; x değerleri 0–1, y değerleri -1–2 arası.": "Invalid: type cubic-bezier(x1, y1, x2, y2); x values 0–1, y values -1 to 2.",
+    "Ters çevirme yalnız taşmayan, geri dönmeyen (tekdüze) eğrilerde olur.": "Invert only works on curves that don't overshoot or turn back (monotonic).",
+    // property list
+    "Özellikler": "Properties",
+    "Klibi ve anahtar kareleri yeniden oku": "Read the clip and keyframes again",
+    "Yenile": "Refresh",
+    "Playhead'i sonraki anahtar kare çiftine götür": "Move the playhead to the next keyframe pair",
+    "Sonraki çift": "Next pair",
+    "Eğri sekmesi açıkken seçimi ve playhead'i izler.": "While the Easing tab is open it follows your selection and the playhead.",
+    "Timeline'da bir video klibi seç ya da playhead'i anahtar kareli bir klibin üstüne getir.": "Select a video clip on the timeline or move the playhead over a clip with keyframes.",
+    "playhead'in altındaki klip": "clip under the playhead",
+    "seçili klip": "selected clip",
+    "Hedef: {n} seçili klip": "Target: {} selected clips",
+    "Bu klipte iki ya da daha çok anahtar kareli bir özellik yok. Effect Controls'te bir özelliğe iki anahtar kare koy.": "This clip has no property with two or more keyframes. Add two keyframes to a property in Effect Controls.",
+    "Çiftin iki anahtar karesi arası 1 kare: yumuşatılacak ara yok.": "The pair's two keyframes are 1 frame apart: nothing to ease.",
+    "Playhead hiçbir anahtar kare çiftinin arasında değil. Sonraki çift ile atla.": "The playhead isn't between any keyframe pair. Jump with Next pair.",
+    "Suflo eğrisi": "Suflo curve",
+    "Ölçek": "Scale",
+    "Ölçek genişliği": "Scale Width",
+    "Döndürme": "Rotation",
+    "Bağlantı noktası": "Anchor Point",
+    "Titreme önleme": "Anti-flicker Filter",
+    // row reasons (js/egri-model.js NEDEN)
+    "playhead çiftin dışında": "playhead is outside the pair",
+    "1 kare: yumuşatılacak ara yok": "1 frame: nothing to ease",
+    "uç değerleri okunamadı": "couldn't read the end values",
+    "efekt sırası değişmiş": "the effect order changed",
+    "uçtaki anahtar kare yok": "the end keyframe is gone",
+    "uç anahtar karenin değeri değişmiş": "the end keyframe's value changed",
+    "arada başka anahtar kare var": "there's another keyframe in between",
+    "geçersiz plan": "invalid plan",
+    "çok fazla anahtar kare": "too many keyframes",
+    "Premiere anahtar kareleri yazmadı": "Premiere didn't write the keyframes",
+    "bazı anahtar kareler yazılamadı": "some keyframes couldn't be written",
+    "klip bulunamadı (silinmiş ya da değişmiş olabilir)": "clip not found (it may have been deleted or changed)",
+    "klip taşınmış; liste yenilendi, yeniden dene": "the clip was moved; the list was refreshed, try again",
+    "katman kilitli; kilidi açıp yeniden dene": "the track is locked; unlock it and try again",
+    "eğri başka bir sekans için hazırlanmıştı; liste yenilendi, yeniden dene": "the curve was prepared for another sequence; the list was refreshed, try again",
+    "aktif sekans yok": "no active sequence",
+    "Premiere yanıt vermedi; yazılmış olabilecek anahtar kareler kayda alındı, Geri al ile kaldırılabilir": "Premiere didn't respond; any keyframes it may have written were recorded and can be removed with Undo",
+    "kısmen yazıldı": "partly written",
+    "uygulanamadı": "couldn't apply",
+    // Varışta yaylan (3.4 adım 14) row reasons
+    "iniş anahtar karesine hareket gelmiyor": "no motion arrives at the landing keyframe",
+    "iniş anahtar karesi klibin görünen kısmının dışında": "the landing keyframe is outside the visible part of the clip",
+    "sonraki anahtar kareye ya da klibin sonuna 2 kareden az yer var": "there's less than 2 frames of room before the next keyframe or the clip end",
+    "sonraki anahtar kare yerinde değil": "the next keyframe is gone",
+    "iniş anahtar karesi silinmiş; önce yaylanmayı Geri al ile kaldır": "the landing keyframe was deleted; remove the follow-through with Undo first",
+    "yalnız Konum, Ölçek, Döndürme ve Opaklık yaylanır": "follow-through only works on Position, Scale, Rotation and Opacity",
+    "hareket bu anahtar karede durmuyor, sürüyor": "the move doesn't stop at this keyframe; it carries on",
+    "bu yaylanmanın anahtar karelerine Suflo eğrisi uygulanmış; önce o eğriyi Geri al ile kaldır":
+      "a Suflo curve was applied on this follow-through's keyframes; remove that curve with Undo first",
+    "bu inişten sonra Suflo eğrisi başlıyor; yaylanma eğrinin içine yazılmaz": "a Suflo curve starts right after this landing; the follow-through isn't written inside the curve",
+    "iniş değeri sınırda (Opaklık 0 ya da 100, Ölçek 0); aşım sığmıyor": "the landing value is at its limit (Opacity 0 or 100, Scale 0); there's no room to overshoot",
+    "400'den çok anahtar kare var; Tüm varışlar'ı kapatıp varışlara tek tek uygula": "there are more than 400 keyframes; turn off Every landing and apply to the landings one at a time",
+    // host codes (js/egri-model.js HATA)
+    "Aktif sekans yok. Bir sekans aç.": "No active sequence. Open a sequence.",
+    "Eğri başka bir sekans için hazırlanmıştı. Liste yenilendi; yeniden dene.": "The curve was prepared for another sequence. The list was refreshed; try again.",
+    "Klip bulunamadı (silinmiş ya da değişmiş olabilir). Liste yenilendi.": "Clip not found (it may have been deleted or changed). The list was refreshed.",
+    "Klip taşınmış. Liste yenilendi; yeniden dene.": "The clip was moved. The list was refreshed; try again.",
+    "Eğri planı geçersiz.": "The curve plan is invalid.",
+    "Çok fazla anahtar kare. Anahtar sıklığını 2 ya da 4 karede bire çıkar.": "Too many keyframes. Set Key density to every 2 or 4 frames.",
+    // options and actions
+    "Suflo'nun yazacağı anahtar karelerin sıklığı: her kare en pürüzsüzü, 2 / 4 karede bir daha az anahtar": "How often Suflo writes keyframes: every frame is smoothest, every 2 / 4 frames writes fewer keys",
+    "Anahtar sıklığı": "Key density",
+    "Her kare": "Every frame",
+    "2 karede bir": "Every 2 frames",
+    "4 karede bir": "Every 4 frames",
+    "Kaba önizleme: playhead çiftin başından sonuna saniyede en çok 12 adımla gider, sonra geri döner": "Rough preview: the playhead steps from the start to the end of the pair at up to 12 steps per second, then returns",
+    "Premiere'de önizle": "Preview in Premiere",
+    "Önizlemeyi durdur": "Stop preview",
+    "Bu sekansta Suflo'nun yazdığı tüm eğri ve yaylanma anahtar karelerini kaldır": "Remove all curve and follow-through keyframes Suflo wrote in this sequence",
+    "Tümünü geri al": "Undo all",
+    "Kısayollar (bir yazı alanında değilken): Enter uygula · U son uygulamayı geri al · F yönü çevir · I ters çevir · V görünüm · 1–9 önayar. Ctrl+Z eğriyi tek adımda geri almaz; Geri al'ı kullan, yalnız Suflo'nun yazdığı anahtar kareler kalkar. Şimdilik yalnız video katmanları.":
+      "Shortcuts (when you're not typing in a field): Enter apply · U undo the last apply · F flip · I invert · V view · 1–9 presets. Ctrl+Z doesn't undo a curve in one step; use Undo, which removes only the keyframes Suflo wrote. Video tracks only for now.",
+    // status lines and toasts
+    "Anahtar kareler okunamadı. Yenile ile tekrar dene.": "Couldn't read the keyframes. Try again with Refresh.",
+    "Anahtar kareler okunuyor…": "Reading keyframes…",
+    "Anahtar kareler okunamadı.": "Couldn't read the keyframes.",
+    "Uygulanacak çift yok: playhead'i iki anahtar karenin arasına getir ve özelliği işaretle.": "No pair to apply to: move the playhead between two keyframes and tick the property.",
+    "Yazılıyor… {n}/{n}": "Writing… {}/{}",
+    "Yazılıyor…": "Writing…",
+    "Uygulanamadı": "Couldn't apply",
+    "Eğri uygulandı: {n} özellik · {n} anahtar kare": "Curve applied: {} properties · {} keyframes",
+    "atlanan": "skipped",
+    "Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.": "The undo record couldn't be saved on this computer; Undo only works while the panel stays open.",
+    "Yer açmak için en eski {n} Suflo Geri al kaydı silindi; o anahtar kareler Premiere'de kalır ama Suflo onları artık geri alamaz.":
+      "To make room, the {} oldest Suflo undo records were deleted; those keyframes stay in Premiere, but Suflo can no longer undo them.",
+    "Bu uygulama {n} yaylanma kaydı yazacak; projede Geri al için {n} kayıtlık yer kaldı (Eğri ve yaylanma kayıtları proje başına en çok {n}). Sürdürürsen en eski {n} Eğri / yaylanma kaydı silinir: o anahtar kareler Premiere'de kalır ama Suflo onları artık geri alamaz. Sürdürülsün mü?":
+      "This will write {} follow-through records, but the project only has room for {} more undo records (curves and follow-through keep at most {} per project). If you go on, the {} oldest curve / follow-through records are deleted: those keyframes stay in Premiere, but Suflo can no longer undo them. Go on?",
+    "Hiçbir şey yazılmadı: Geri al kayıtlarına yer yok. Daha az satır işaretle ya da varışlara tek tek uygula.":
+      "Nothing was written: there's no room for the undo records. Tick fewer rows or apply to the landings one at a time.",
+    "Bu sekansta geri alınacak Suflo eğrisi yok.": "No Suflo curve to undo in this sequence.",
+    "Geri alınacak Suflo eğrisi yok.": "No Suflo curve to undo.",
+    "Geri alınıyor…": "Undoing…",
+    "Geri alınamadı.": "Couldn't undo.",
+    // Geri al özeti: atlanan kayıtlar nedenlerine göre ayrı cümlelerde (" · " ile)
+    "Geri alındı: {n} anahtar kare silindi": "Undone: {} keyframes removed",
+    "{n} kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene.": "{} records are in another sequence; they were kept, open that sequence and try again.",
+    "{n} kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.": "the clip or property of {} records wasn't found; the records were kept.",
+    "{n} kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı.": "the keyframes of {} records changed (clip speed or end keyframes); nothing was touched and the records were kept.",
+    "{n} kaydın Suflo anahtar karelerinin bir kısmı silinmiş; kalanlara dokunulmadı, kayıtlar saklandı (kalanları Effect Controls'ten silebilirsin).":
+      "some of the Suflo keyframes of {} records were deleted; the rest were left untouched and the records were kept (you can delete the rest in Effect Controls).",
+    "{n} kaydın katmanı kilitli; dokunulmadı, kayıtlar saklandı. Kilidi açıp yeniden dene.": "the track of {} records is locked; nothing was touched and the records were kept. Unlock it and try again.",
+    "Geri alındı: {n} anahtar kare silindi.": "Undone: {} keyframes removed.",
+    "Suflo'nun anahtar kareleri zaten kaldırılmış; kayıt temizlendi.": "Suflo's keyframes were already removed; the record was cleared.",
+    "Önce anahtar kareli bir klip seç.": "Select a clip with keyframes first.",
+    "Anahtar kare çifti yok.": "No keyframe pair.",
+    "Önce playhead'i bir anahtar kare çiftinin arasına getir.": "First move the playhead between a keyframe pair.",
+    // Pro, trial list, Suflo Doctor
+    "Eğri: kendi anahtar karelerine özel yumuşatma ve varışta yaylanma": "Easing: custom curves and follow-through for your own keyframes",
+    "Eğri (yumuşatma ve varışta yaylanma)": "Easing (curves and follow-through)",
+    "Eğri: anahtar karelerine özel yumuşatma ve varışta yaylanma (düzenlemek ücretsiz)": "Easing: custom curves and follow-through on your keyframes (editing is free)",
+    // Varışta yaylan (3.4 adım 14): card, sliders, apply, row badge
+    "Varışta yaylan": "Follow-through",
+    "İniş anahtar karesinden sonra hareket hedefi biraz aşar, salınıp oturur (follow-through). İşaretli özelliklerde playhead'i saran çiftin ikinci anahtar karesine ya da tüm varışlara yazılır; sonraki anahtar kareyi geçmez.":
+      "After the landing keyframe the motion overshoots its target a little, wobbles and settles (follow-through). It's written on the ticked properties at the second keyframe of the pair around the playhead, or at every landing; it never runs past the next keyframe.",
+    "Aşımın büyüklüğü: varış hızıyla kaç saniyelik yol (0,02–0,5 sn)": "How big the overshoot is: how many seconds of travel at the arrival speed (0.02–0.5 s)",
+    "Genlik": "Amplitude",
+    "Saniyedeki salınım (1–6 Hz)": "Wobbles per second (1–6 Hz)",
+    "Frekans": "Frequency",
+    "Ne kadar çabuk oturur (2–10); yüksek sönüm kısa yaylanma": "How fast it settles (2–10); higher damping means a shorter follow-through",
+    "Sönüm": "Damping",
+    "İşaretli özelliklerde klibin her varışına (hareketin durduğu her anahtar kareye) uygula": "Apply at every landing in the clip (every keyframe where a move ends) on the ticked properties",
+    "Tüm varışlar": "Every landing",
+    "İşaretli özelliklerin varışına yaylanma yaz (Pro; düzenlemek ve önizlemek ücretsiz)": "Write follow-through at the landing of the ticked properties (Pro; editing and previewing are free)",
+    "Suflo yaylanması": "Suflo follow-through",
+    "Bu varıştaki yaylanmayı kaldır": "Remove the follow-through at this landing",
+    "Yaylanacak varış yok: playhead'i bir hareketin iki anahtar karesi arasına getir (ya da Tüm varışlar'ı aç) ve Konum, Ölçek, Döndürme ya da Opaklık satırını işaretle.":
+      "No landing to add follow-through to: move the playhead between the two keyframes of a move (or turn on Every landing) and tick a Position, Scale, Rotation or Opacity row.",
+    "Yaylanma uygulanamadı": "Couldn't apply follow-through",
+    "Varışta yaylanma uygulandı: {n} varış · {n} anahtar kare": "Follow-through applied: {} landings · {} keyframes",
+    "Premiere Bezier yazamadı; 2 karede bir yazıldı": "Premiere couldn't write Bezier keys; written every 2 frames instead",
+    "Anahtar kare ara değerlemesi (setInterpolationTypeAtKey)": "Keyframe interpolation (setInterpolationTypeAtKey)",
+    "Eğri ve Geçiş / Zoom / Hareket önayarlarının özel eğrisi, yazdığı sık anahtar kareleri doğrusal yapamaz; Premiere'in varsayılan ara değerlemesi kalır (eğri yine uygulanır, kareler arasında hafif sapma olabilir). Varışta yaylan, tepe noktalarını Bezier yapamadığı için 2 karede bir sık yazar":
+      "Easing and the custom curve in Transitions / Zoom / Motion presets can't make the dense keyframes they write linear; Premiere's default interpolation stays (the curve is still applied, with possible slight wobble between frames). Follow-through can't make its peaks Bezier, so it writes keys every 2 frames instead",
+    // jsx/host.jsx KS_easeBake (ASCII Turkish; the panel shows its own text from the code)
+    "Egri baska bir sekans icin hazirlandi.": "The curve was prepared for another sequence.",
+    "Gecersiz egri plani.": "Invalid curve plan.",
+    "Cok fazla anahtar kare.": "Too many keyframes.",
+    "Klip bulunamadi.": "Clip not found.",
+    "Klip tasinmis.": "The clip was moved.",
+    "Katman kilitli.": "The track is locked."
+  });
+
+  /* ================= Eğri paylaşımı / Curve sharing (3.4 step 15: SFC1 codes, .suflo-egri files, cubic-bezier paste,
+     import / export; Easing tab, curve picker, Speed Ramp custom curve) ================= */
+  add({
+    // Easing tab: preset row and Share & import card
+    "Önayar adı": "Preset name",
+    "Seçili önayarın adını değiştir": "Rename the selected preset",
+    "Adı değiştir": "Rename",
+    "Önayarı bir sola taşı (kartları sürükleyerek de sıralayabilirsin)": "Move the preset one place left (you can also drag the cards to reorder)",
+    "Önayarı bir sağa taşı (kartları sürükleyerek de sıralayabilirsin)": "Move the preset one place right (you can also drag the cards to reorder)",
+    "Önayarı sola taşı": "Move preset left",
+    "Önayarı sağa taşı": "Move preset right",
+    "Paylaş ve içe aktar": "Share and import",
+    "Ücretsiz. Kod tek satırdır (suflo.app/egri bağlantısıyla); dosya kendi önayarlarının hepsini taşır.": "Free. A code is one line (with a suflo.app/egri link); a file carries all your own presets.",
+    "SFC1 kodu, bağlantı ya da cubic-bezier(…) yapıştır": "Paste an SFC1 code, a link or cubic-bezier(…)",
+    "Eğri kodu yapıştır": "Paste a curve code",
+    "Tek eğri düzenleyiciye gelir; birden çok kod önayarlarına eklenir": "A single curve opens in the editor; several codes are added to your presets",
+    "Yükle": "Load",
+    "Düzenleyicideki eğrinin SFC1 kodunu ve suflo.app/egri bağlantısını kopyala": "Copy the SFC1 code and suflo.app/egri link of the curve in the editor",
+    "Kodu kopyala": "Copy code",
+    ".suflo-egri dosyasını ya da bir eğri aracının JSON dışa aktarmasını oku (en çok 64 KB, 32 önayar)": "Read a .suflo-egri file or a curve tool's JSON export (up to 64 KB, 32 presets)",
+    "İçe aktar…": "Import…",
+    "Kaydettiğin eğri önayarlarını .suflo-egri dosyasına yaz": "Write your saved curve presets to a .suflo-egri file",
+    "Dışa aktar…": "Export…",
+    // Curve picker (Transitions / Zoom / Motion)
+    "SFC1 kodu ya da cubic-bezier(…) yapıştır": "Paste an SFC1 code or cubic-bezier(…)",
+    "Kullan": "Use",
+    "Geçersiz kod.": "Invalid code.",
+    "cubic-bezier'in y değerleri -1–2 aralığına kırpıldı.": "The cubic-bezier's y values were clamped to -1–2.",
+    // Speed Ramp custom curve
+    "Seçili kayıtlı rampanın adını kutudaki adla değiştir": "Rename the selected saved ramp to the name in the box",
+    "Hız Rampası kodu (SFC1) yapıştır": "Paste a Speed Ramp code (SFC1)",
+    "Hız Rampası kodu yapıştır": "Paste a Speed Ramp code",
+    "Tek kod düzenleyiciye gelir; birden çok kod kayıtlı rampalara eklenir": "A single code opens in the editor; several codes are added to your saved ramps",
+    "Bu özel eğrinin SFC1 kodunu ve suflo.app/egri bağlantısını kopyala": "Copy the SFC1 code and suflo.app/egri link of this custom curve",
+    ".suflo-egri dosyasını oku (özel rampalar buraya, eğriler Eğri sekmesine)": "Read a .suflo-egri file (custom ramps go here, curves to the Easing tab)",
+    "Kayıtlı özel rampaları .suflo-egri dosyasına yaz": "Write your saved custom ramps to a .suflo-egri file",
+    "Paylaşmak ücretsiz; kayıtlı rampaları sürükleyerek sıralayabilirsin. Uygulamak yine Rampayı uygula'dan geçer.":
+      "Sharing is free; drag the saved ramps to reorder them. Applying still goes through Apply ramp.",
+    // errors (js/egri-model.js PAYLASIM_HATA)
+    "Yapıştırılacak bir kod yok.": "There's no code to paste.",
+    "Kod çok uzun (en çok 4096 karakter).": "The code is too long (up to 4096 characters).",
+    "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır.": "Not recognized: paste an SFC1 code, a suflo.app/egri link or cubic-bezier(…).",
+    "Kod eksik ya da bozuk; baştan sona yeniden kopyala.": "The code is incomplete or damaged; copy it again from start to end.",
+    "Birden çok farklı kod var; burada tek kod kullanılır. Birkaçını önayarlara eklemek için Eğri sekmesindeki kod kutusuna yapıştır.":
+      "There are several different codes; only one code works here. To add several to your presets, paste them into the code box in the Easing tab.",
+    "Bu kod ya da dosya Suflo'nun daha yeni bir sürümünden; önce Suflo'yu güncelle.": "This code or file is from a newer version of Suflo; update Suflo first.",
+    "Bu kod bir eğri ya da hız rampası değil.": "This code isn't a curve or a speed ramp.",
+    "Koddaki eğri geçersiz.": "The curve in the code is invalid.",
+    "Koddaki hız eğrisi geçersiz.": "The speed curve in the code is invalid.",
+    "Eğride 8'den çok nokta var; Suflo en çok 8 nokta okur.": "The curve has more than 8 points; Suflo reads at most 8.",
+    "Geçersiz cubic-bezier: dört sayı yaz; x değerleri 0–1 arası olmalı.": "Invalid cubic-bezier: write four numbers; the x values must be between 0 and 1.",
+    "Bu bir Hız Rampası kodu: Hız Rampası › Özel eğri'deki kod kutusuna yapıştır.": "This is a Speed Ramp code: paste it into the code box under Speed Ramp › Custom curve.",
+    "Bu bir eğri kodu: Eğri sekmesinde ya da Geçiş / Zoom / Hareket'in Eğri seçicisinde kullan.": "This is a curve code: use it in the Easing tab or in the Curve picker of Transitions / Zoom / Motion.",
+    "Dosya çok büyük (en çok 64 KB).": "The file is too large (up to 64 KB).",
+    "Dosya okunamadı: JSON değil.": "Couldn't read the file: it isn't JSON.",
+    "Tanınmayan dosya: .suflo-egri dosyası ya da bir eğri aracının JSON dışa aktarmasını seç.": "Unrecognized file: choose a .suflo-egri file or a curve tool's JSON export.",
+    "Dosya penceresi açılamadı; kodu kopyalayıp yapıştırarak paylaş.": "The file dialog couldn't open; share by copying and pasting the code.",
+    "Dosya yazılamadı.": "Couldn't write the file.",
+    "Bu adla bir dosya zaten var: {}. Üzerine yazılsın mı?": "A file with this name already exists: {}. Overwrite it?",
+    // import summary (js/egri-model.js iceAktarOzeti)
+    "Eğri önayarlarına eklendi: {n}": "Added to curve presets: {}",
+    "Hız Rampası özel rampalarına eklendi: {n}": "Added to Speed Ramp custom ramps: {}",
+    "Yeni önayar eklenmedi": "No new presets were added",
+    "{n} yineleme atlandı": "{} duplicates skipped",
+    "{n} eğri sığmadı (en çok {n} önayar)": "{} curves didn't fit (up to {} presets)",
+    "{n} özel rampa sığmadı (en çok 12)": "{} custom ramps didn't fit (up to 12)",
+    "{n} önayar saklanamadı": "{} presets couldn't be saved",
+    "{n} geçersiz önayar atlandı": "{} invalid presets skipped",
+    "{n} tanınmayan eğri atlandı (yalnız tek kübik ve çok noktalı eğriler okunur)": "{} unrecognized curves skipped (only single cubic and multi-point curves are read)",
+    "dosyadaki ilk 32 önayar okundu, {n} atlandı": "the first 32 presets in the file were read, {} skipped",
+    "dosya sürümü tanınmadı; okunabilenler alındı": "the file version wasn't recognized; whatever could be read was imported",
+    // status lines and toasts (js/egri.js, js/hiz-rampasi.js)
+    "Eğri dosyası seç": "Choose a curve file",
+    "Eğri dosyası seç (.suflo-egri ya da JSON)": "Choose a curve file (.suflo-egri or JSON)",
+    "Eğri önayarlarını kaydet": "Save curve presets",
+    "Özel rampaları kaydet": "Save custom ramps",
+    "Önayara bir ad yaz.": "Give the preset a name.",
+    "Önce kendi önayarlarından birini seç.": "First select one of your own presets.",
+    "Adı değişti:": "Renamed:",
+    "Bu eğri paylaşılamadı.": "This curve couldn't be shared.",
+    "Bu özel eğri paylaşılamadı.": "This custom curve couldn't be shared.",
+    "Eğri kodu ve suflo.app/egri bağlantısı kopyalandı": "Curve code and suflo.app/egri link copied",
+    "Hız Rampası kodu ve suflo.app/egri bağlantısı kopyalandı": "Speed Ramp code and suflo.app/egri link copied",
+    "Kopyalanamadı; kod aşağıdaki kutuda, Ctrl+C ile kopyala.": "Couldn't copy; the code is in the box below, copy it with Ctrl+C.",
+    ". Saklamak için Önayar olarak kaydet.": ". Use Save as preset to keep it.",
+    ". Saklamak için Kaydet'e bas.": ". Press Save to keep it.",
+    "cubic-bezier yüklendi; y değerleri -1–2 aralığına kırpıldı.": "cubic-bezier loaded; the y values were clamped to -1–2.",
+    "cubic-bezier yüklendi.": "cubic-bezier loaded.",
+    "Eğri yüklendi. Saklamak için Önayar olarak kaydet.": "Curve loaded. Use Save as preset to keep it.",
+    "Özel eğri yüklendi. Saklamak için Kaydet'e bas.": "Custom curve loaded. Press Save to keep it.",
+    "Dışa aktarılacak önayar yok: önce bir eğriyi Önayar olarak kaydet.": "No presets to export: first save a curve with Save as preset.",
+    "Dışa aktarılacak özel rampa yok: önce bir eğriyi adıyla Kaydet.": "No custom ramps to export: first save a curve under a name.",
+    "Dışa aktarıldı: {n} önayar →": "Exported: {} presets →",
+    "Dışa aktarıldı: {n} özel rampa →": "Exported: {} custom ramps →",
+    "Bu adla başka bir özel rampa var; başka bir ad yaz.": "Another custom ramp already has this name; pick a different one.",
+    "Önce kayıtlı bir rampa seç.": "First select a saved ramp."
+  });
+
+  /* ================= Kayıt tabanlı güvenli kaldırma / Record-based safe removal (3.4 step 11: js/kayit-kaldir.js,
+     Transitions, Auto Zoom, Motion presets) ================= */
+  add({
+    "Geçişi kaldır": "Remove transition",
+    "Önayarı kaldır": "Remove preset",
+    "Playhead'e en yakın Suflo geçişini kaldırır (en çok 1 sn uzakta; seçili klip değil playhead belirler); kendi anahtar karelerine dokunmaz.":
+      "Removes the Suflo transition nearest the playhead (up to 1 s away; the playhead decides, not the selected clip); your own keyframes stay untouched.",
+    "Kesim: V{n}, {}": "Cut: V{}, {}",
+    "Uçları bu anahtar karelerde olan {n} Suflo eğrisi de kaldırıldı.": "{} Suflo curves whose ends were on these keyframes were removed too.",
+    "Bu anahtar karelere inen {n} Suflo yaylanması da kaldırıldı.": "{} Suflo follow-throughs landing on these keyframes were removed too.",
+    "Seçili klipte yalnız Suflo'nun yerleşik hareket önayarlarının yazdığı anahtar kareleri kaldırır (Suflo Smooth paket presetleri kayıt tutmaz); kendi anahtar karelerine dokunmaz.":
+      "Removes only the keyframes Suflo's built-in motion presets wrote on the selected clip (Suflo Smooth pack presets keep no record); your own keyframes stay untouched.",
+    "Yalnız Suflo'nun yazdığı zoom anahtar karelerini kaldırır; kendi anahtar karelerine dokunmaz. Ücretsiz.":
+      "Removes only the zoom keyframes Suflo wrote; your own keyframes stay untouched. Free.",
+    "Geçiş kaldırılıyor…": "Removing transition…",
+    "Geçiş kaldırıldı: {n} anahtar kare silindi.": "Transition removed: {} keyframes deleted.",
+    "Zoom kaldırıldı: {n} anahtar kare silindi.": "Zoom removed: {} keyframes deleted.",
+    "Önayar kaldırıldı: {n} anahtar kare silindi.": "Preset removed: {} keyframes deleted.",
+    "{n} kayıt başka bir sekansta; saklandı, o sekansı açıp yeniden dene.": "{} records are in another sequence; they were kept, open that sequence and try again.",
+    "{n} kaydın klibi bulunamadı; kayıt saklandı, klip yerindeyken yeniden dene.": "The clip of {} records wasn't found; the records were kept, try again while the clip is on the timeline.",
+    "{n} kaydın özelliği bulunamadı; kayıt saklandı.": "The property of {} records wasn't found; the records were kept.",
+    "{n} kaydın anahtar kareleri sonradan değiştirilmiş; dokunulmadı.": "The keyframes of {} records were changed afterwards; nothing was touched.",
+    "{n} kaydın anahtar karelerini Premiere silmedi; kayıt saklandı, yeniden dene.": "Premiere didn't delete the keyframes of {} records; the records were kept, try again.",
+    "{n} seçili klipte Suflo'nun kaydı yok; onlara dokunulmadı (önceki sürümde uygulandıysa yalnız o klibi seçip yeniden dene).":
+      "{} selected clips have no Suflo record; they were left untouched (if it was applied in an earlier version, select only that clip and try again).",
+    "Playhead'in yakınında kesim yok. Playhead'i iki klibin birleştiği yere getir.": "There's no cut near the playhead. Move the playhead to where two clips meet.",
+    "Premiere'e ulaşılamadı; biraz sonra yeniden dene.": "Couldn't reach Premiere; try again in a moment.",
+    "Suflo'nun anahtar kareleri zaten kaldırılmış (Premiere'de geri alınmış ya da silinmiş); kayıt temizlendi.":
+      "Suflo's keyframes were already removed (undone or deleted in Premiere); the record was cleared.",
+    "Kaldırılacak Suflo anahtar karesi yok.": "There are no Suflo keyframes to remove.",
+    "Klipteki diğer anahtar kareler korundu; kenarlara {n} anahtar kare eski değerle eklendi.": "The clip's other keyframes were kept; {} keyframes with the earlier value were added at the edges.",
+    "Kaldırılamadı.": "Couldn't remove.",
+    "Hiçbir şey silinmedi.": "Nothing was deleted.",
+    "Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.":
+      "The removal record couldn't be saved on this computer; it only works while the panel stays open.",
+    "Bu geçişin kaydı bulunamadı; hiçbir şey silinmedi.": "This transition's record wasn't found; nothing was deleted.",
+    "Bu zoom'un kaydı bulunamadı; hiçbir şey silinmedi.": "This zoom's record wasn't found; nothing was deleted.",
+    "Bu önayarın kaydı bulunamadı; hiçbir şey silinmedi.": "This preset's record wasn't found; nothing was deleted.",
+    "Geçiş penceresi eski yöntemle temizlendi: {n} anahtar kare silindi.": "Transition window cleared the old way: {} keyframes deleted.",
+    "Bu kesimde Suflo'nun geçiş kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.":
+      "There's no Suflo transition record at this cut (it may have been applied in an earlier version or on another computer, or its record was dropped because it was very old). Delete the Scale, Position and Opacity keyframes in the transition window on both sides of the cut (up to 0.8 s) the old way? Your own keyframes in that range are deleted too.",
+    "Suflo'nun geçiş kaydı bu kesimin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.":
+      "Suflo's transition record no longer matches this cut's keyframes (they were changed afterwards). Delete the Scale, Position and Opacity keyframes in the transition window on both sides of the cut (up to 0.8 s) the old way? Your own keyframes in that range are deleted too.",
+    "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek ve Konum anahtar kareleri de silinir.":
+      "There's no Suflo zoom record on this clip (it may have been applied in an earlier version or on another computer, or its record was dropped because it was very old). Delete ALL of the clip's Scale keyframes and reset Position the old way? Scale and Position keyframes you added yourself are deleted too.",
+    "Suflo'nun zoom kaydı bu klibin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek ve Konum anahtar kareleri de silinir.":
+      "Suflo's zoom record no longer matches this clip's keyframes (they were changed afterwards). Delete ALL of the clip's Scale keyframes and reset Position the old way? Scale and Position keyframes you added yourself are deleted too.",
+    "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önayar önceki sürümde uygulanmış ya da bir Suflo Smooth paket preseti olabilir (paket presetleri kayıt tutmaz): Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin.":
+      "There's no Suflo preset record on the selected clip; nothing was deleted. The preset may have been applied in an earlier version or be a Suflo Smooth pack preset (pack presets keep no record): use Ctrl+Z in Premiere (Cmd+Z on macOS) or delete its keyframes in Effect Controls.",
+    "{n} önayar kaydının anahtar kareleri sonradan değiştirilmiş (ya da klibin hızı değişmiş); dokunulmadı. Kalanları Effect Controls'ten silebilir ya da Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile geri alabilirsin.":
+      "The keyframes of {} preset records were changed afterwards (or the clip speed changed); nothing was touched. You can delete the rest in Effect Controls or undo with Ctrl+Z in Premiere (Cmd+Z on macOS).",
+    // jsx/host.jsx KS_removeSufloKeys (ASCII Turkish; the panel shows its own text from the code)
+    "Playhead'in yakininda kesim yok.": "No cut near the playhead.",
+    "Kesim artik orada degil (timeline degismis); yeniden dene.": "The cut is no longer there (the timeline changed); try again."
+  });
+
+  /* ================= Özel eğri / Custom curve in Transitions, Auto Zoom and Motion presets (3.4 step 12: js/egri-secim.js,
+     SufloEgriSecici in js/egri.js, #gecis-egri, #zoom-egri, #preset-egri) ================= */
+  // "Eğri" (the picker label) stays "Easing" like the tab; built-in curve names come from SufloEase.builtinName.
+  add({
+    "Hareketin nasıl hızlanıp yavaşlayacağı": "How the motion speeds up and slows down",
+    "Eğri seç": "Choose a curve",
+    "Kendi eğrini Eğri sekmesinde çiz": "Draw your own curve in the Easing tab",
+    "Eğri sekmesindeki eğri": "Curve from the Easing tab",
+    "Özel eğri": "Custom curve",
+    "Gelen klip (B) eğriyi izler; giden klip (A) eğrinin aynasıyla kesime gelir, iki yarı kesimde buluşur. Özel eğri Premiere'e her kareye (1 sn'den uzun harekette 2 karede bir) anahtar kare olarak yazılır; Geçişi kaldır yine yalnız Suflo'nun anahtarlarını siler.":
+      "The incoming clip (B) follows the curve; the outgoing clip (A) reaches the cut with its mirror image, so the two halves meet at the cut. A custom curve is written to Premiere as a keyframe on every frame (every 2 frames for moves longer than 1 s); Remove transition still deletes only Suflo's keyframes.",
+    "Yumuşak ve Snap-In stillerinde her zoom hareketinin hızlanıp yavaşlamasını eğri belirler (Yumuşak'ın küçük taşmasının yerini alır); Jump Cut sert kesmedir, eğri kullanmaz. Özel eğri her kareye anahtar kare yazar; uzun kliplerde uygulama biraz daha sürer.":
+      "In the Smooth and Snap-In styles the curve sets how each zoom move speeds up and slows down (it replaces Smooth's small overshoot); Jump Cut is a hard cut and uses no curve. A custom curve writes a keyframe on every frame, so applying takes a little longer on long clips.",
+    "Panelin 12 Suflo önayarında her hareketin hızlanıp yavaşlamasını eğri belirler; Suflo Smooth paketindeki presetler kendi eğrisini korur. Özel eğri her kareye anahtar kare yazar; Önayarı kaldır yine yalnız Suflo'nun anahtarlarını siler.":
+      "In the panel's 12 Suflo presets the curve sets how each move speeds up and slows down; presets from the Suflo Smooth pack keep their own curve. A custom curve writes a keyframe on every frame; Remove preset still deletes only Suflo's keyframes.",
+    "Geçersiz eğri: {}": "Invalid curve: {}",
+    // dense writes: timeout hint, late reply from Premiere, total keyframe cap (js/egri-secim.js, gecisler.js, zoom.js, presets.js)
+    "Premiere anahtar kareleri yazmayı sürdürüyor olabilir; bitince kaldırma kaydı saklanır ve Geri al çıkar. O zamana dek yeniden uygulama.":
+      "Premiere may still be writing the keyframes; when it finishes, the removal record is saved and Undo appears. Don't apply again until then.",
+    "Premiere geç yanıt verdi: {}": "Premiere answered late: {}",
+    "Özel eğriyle bu seçim {n} anahtar kare ister; tek seferde en çok {n}. Daha az klip seç ya da Eğri'yi Otomatik yap.":
+      "With a custom curve this selection needs {1} keyframes; at most {2} per apply. Select fewer clips or set Easing to Auto.",
+    // jsx/host.jsx KS_applyMotionPreset (ASCII Turkish)
+    "Egri tablosu gecersiz.": "The curve table is invalid.",
+    "Ozel egriyle cok fazla anahtar kare.": "Too many keyframes for a custom curve."
+  });
+
   /* ================= Hız rampası / Speed ramp (js/speedramp.js, js/hiz-rampasi.js, #tab-hiz) ================= */
   add({
     // curve presets (js/speedramp.js LIST)
@@ -2875,6 +3269,53 @@
     "Bu Premiere surumunde Suflo klibin sesle bagini okuyamiyor ve koparamiyor.": "In this Premiere version Suflo can't read or break the clip's link to its audio."
   });
 
+  /* ================= Hız Rampası özel eğri / Speed Ramp custom curve (3.4 step 13: js/speedramp.js ozel*, js/egri.js mod 'hiz',
+     js/hiz-rampasi.js, #hiz-ozel) ================= */
+  add({
+    "Kendi hız eğrini çiz: nokta ekle, sürükle, sert basamak yap": "Draw your own speed curve: add points, drag them, make hard steps",
+    "Özel rampa {n}": "Custom ramp {}",
+    // preset cards
+    "Düzenle": "Edit",
+    "Bu eğriyi Özel eğri düzenleyicisine kopyala": "Copy this curve into the custom curve editor",
+    "{} özel eğriye kopyalandı; noktaları sürükleyerek değiştir.": "{} copied to the custom curve; drag the points to change it.",
+    // editor box (index.html #hiz-ozel)
+    "Ağır çekim anı": "Slow-mo moment",
+    "Darbe anını playhead'e hizala açıkken playhead'e oturan an; çizgiyi üstteki noktasından sürükle": "With “Line up the hit with the playhead” on, this moment lands on the playhead; drag the line by its top dot",
+    "Özel hız eğrisi düzenleyicisi": "Custom speed curve editor",
+    "Tıkla: nokta ekle · sürükle: taşı · çift tık: sil · Shift: ızgaraya yapış · Alt+tık: sert basamak. Yoğunluk ve Yumuşatma özel eğriye de uygulanır.":
+      "Click: add a point · drag: move it · double-click: delete · Shift: snap to the grid · Alt+click: hard step. Intensity and Easing apply to the custom curve too.",
+    "Sert basamak": "Hard step",
+    "Basamağı kaldır": "Remove step",
+    "Seçili noktada hız bir anda değişsin (Alt+tık)": "Make the speed change instantly at the selected point (Alt+click)",
+    "Noktayı sil": "Delete point",
+    "Seçili noktayı sil (Delete ya da çift tık)": "Delete the selected point (Delete key or double-click)",
+    "Başlangıç eğrisine dön": "Go back to the starting curve",
+    "Özel rampa adı": "Custom ramp name",
+    "Bu eğriyi adıyla sakla (bu bilgisayarda, en çok 12)": "Save this curve under a name (on this computer, up to 12)",
+    "Kayıtlı özel rampalar": "Saved custom ramps",
+    "Özel rampayı sil": "Delete custom ramp",
+    // status lines
+    "Yüklendi:": "Loaded:",
+    "Kaydedildi:": "Saved:",
+    "Güncellendi:": "Updated:",
+    "En çok 12 özel rampa saklanır; birini sil.": "Up to 12 custom ramps are kept; delete one first.",
+    "Özel rampaya bir ad yaz.": "Give the custom ramp a name.",
+    "Özel rampa bu bilgisayarda saklanamadı.": "Couldn't save the custom ramp on this computer.",
+    "Özel rampa silindi.": "Custom ramp deleted.",
+    "Kayıtlı özel rampanın eğrisi yenisiyle değişti.": "The saved custom ramp's curve was replaced with the new one.",
+    "Geri geldi:": "Restored:",
+    // editor warnings (js/egri.js mod 'hiz')
+    "En çok 8 nokta. Yeni nokta için birini çift tıklayıp sil.": "8 points at most. Double-click one to delete it before adding another.",
+    "Başka bir noktaya çok yakın; biraz yana tıkla.": "Too close to another point; click a little to the side.",
+    "Uç noktada sert basamak olmaz; aradaki bir noktayı seç.": "The end points can't be hard steps; pick a point in between.",
+    "Uç noktalar silinmez; hızını yukarı / aşağı sürükleyerek değiştir.": "The end points can't be deleted; drag them up or down to change their speed.",
+    "Önce eğride bir nokta seç.": "Select a point on the curve first.",
+    // review fixes: flat custom curve, undo after Edit / saved ramp / Reset replaced an unsaved hand-drawn curve
+    "Özel eğrinin noktaları aynı hızda: bir noktayı yukarı ya da aşağı sürükle.": "The custom curve's points are all at the same speed: drag a point up or down.",
+    "Kaydedilmemiş özel eğrinin yerine yenisi geldi.": "Your unsaved custom curve was replaced.",
+    "Önceki özel eğri geri geldi.": "Previous custom curve restored."
+  });
+
   /* ============ 3.2 step 2: sound tag filter + silent audio guard (caption-text.js, sessiz-ses.js, Settings › #grp-altyazi) ============ */
   add({
     "Ses etiketlerini koru": "Keep sound tags",
@@ -2908,6 +3349,163 @@
     "İptal ediliyor…": "Canceling…",
     "İptal edildi.": "Canceled.",
     "İptal edildi": "Canceled",
+    // Auto Cut 3.4: live threshold (decode once, instant preview, min. speech, auto threshold)
+    "Analizden sonra kaydırıcılar kesim haritasını anında günceller; ffmpeg yeniden çalışmaz.": "After the analysis, the sliders update the cut map instantly; ffmpeg doesn't run again.",
+    "Eşiği klibin kendi sesinden öner: arka plan gürültüsünün 8 dB üstü": "Suggest a threshold from the clip's own audio: 8 dB above the background noise",
+    "İki kesim arasında bundan kısa konuşma kalırsa kesimler birleşir (0 = kapalı)": "If less speech than this is left between two cuts, the cuts are merged (0 = off)",
+    "Min. konuşma": "Min. speech",
+    "Ses zarfı ve eşik çizgisi": "Audio envelope and threshold line",
+    "Ses çözümleniyor… ({} sn)": "Decoding audio… ({} s)",
+    "Eşik ve min. sessizlik bu klipte canlı güncellenemiyor: Sessizlikleri bul ile yenile.": "Threshold and min. silence can't update live for this clip: refresh with Find silences.",
+    "Önce Sessizlikleri bul: otomatik eşik klibin kendi sesinden ölçülür.": "Run Find silences first: the auto threshold is measured from the clip's own audio.",
+    // fallback flow (the audio couldn't be decoded, silencedetect map): Find silences again can't help
+    "Otomatik eşik bu klipte kullanılamıyor: ses çözümlenemedi. Eşiği elle ayarla, sonra Sessizlikleri bul.":
+      "Auto threshold isn't available for this clip: its audio couldn't be decoded. Set the threshold by hand, then run Find silences.",
+    "⚠ Konuşma ile arka plan gürültüsü arasındaki fark az ({} dB): kesimler kelime kırpabilir ya da sessizlik kaçırabilir. Önce Sesi iyileştir'i dene ya da eşiği elle ayarla.": "⚠ There's little difference between speech and background noise ({} dB): cuts may clip words or miss silences. Try Enhance audio first or set the threshold by hand.",
+    "Otomatik eşik: {} dB (arka plan {} dB, konuşma {} dB)": "Auto threshold: {} dB (background {} dB, speech {} dB)",
+    "kısa konuşma birleştirildi": "short speech merged",
+    "Kısa konuşma ({} sn)": "Short speech ({} s)",
+    "Kısa konuşma ({} sn) — Min. konuşma nedeniyle kesime katıldı{}": "Short speech ({} s) — joined the cut because of Min. speech{}",
+    "Min. konuşma nedeniyle kesime katıldı": "joined the cut because of Min. speech",
+    "birleşik": "merged",
+    "{n} birleşik": "{} merged",
+    "−{} sn (%{})": "−{} s ({}%)",
+    "Min. konuşma: araya giren kısa konuşma da bu kesime katıldı": "Min. speech: the short speech in between joined this cut too",
+    "Kesimler doğrulanıyor… ({} sn)": "Verifying cuts… ({} s)",
+    "Doğrulamadan sonra uygulanacak kesim kalmadı — eşiği ya da min. sessizliği değiştir.": "No cuts left to apply after verification — change the threshold or min. silence.",
+    "Doğrulama kesimleri değiştirdi (önizleme {n} kesim, doğrulama {n} kesim): haritayı kontrol et, sonra yeniden Kesimleri uygula.": "Verification changed the cuts ({} in the preview, {} verified): check the map, then click Apply cuts again.",
+    // Auto Cut 3.4 step 7: cut scope (Selected clip | In → Out | Sequence), audio to analyze, protected tracks
+    "Kesim kapsamı": "Cut scope",
+    "Sekansın In ve Out noktaları arası: seçili ses katmanlarının karışımı dinlenir": "Between the sequence's In and Out points: the mix of the chosen audio tracks is analyzed",
+    "Tüm sekans: seçili ses katmanlarının karışımı dinlenir": "Whole sequence: the mix of the chosen audio tracks is analyzed",
+    "Katmanlar": "Tracks",
+    "Dinlenecek ses": "Audio to analyze",
+    "Sessizlik bu katmanların karışımında aranır. Müziği dinlemeye katma: sessizlikleri doldurur.": "Silences are detected in the mix of these tracks. Leave music out: it fills the silences.",
+    "Kesilmeyecek katmanlar": "Protected tracks",
+    "Korunan katman kesilmez ve kaymaz (arka plan müziği gibi). Kesikli çerçeve: öneri.": "A protected track isn't cut and doesn't shift (like background music). Dashed outline: suggestion.",
+    "Sekansın katmanlarını Premiere'den yeniden oku": "Read the sequence's tracks from Premiere again",
+    "Yenile": "Refresh",
+    "Bir sekans aç.": "Open a sequence.",
+    "Önce bir sekans aç.": "Open a sequence first.",
+    "Sekans boş: önce klip ekle.": "The sequence is empty: add clips first.",
+    "Bu aralıkta ses klibi yok: sessizlik aranacak ses bulunamadı.": "There are no audio clips in this range: there's no audio to search for silences.",
+    "Sekansta In / Out yok: Premiere'de I ve O ile işaretle ya da Sekans kapsamını seç.": "The sequence has no In / Out: mark them in Premiere with I and O, or choose the Sequence scope.",
+    "Katmanları görmek için bir sekans aç.": "Open a sequence to see its tracks.",
+    "Katmanlar okunamadı.": "Couldn't read the tracks.",
+    "Katmanlar okunamadı: {}": "Couldn't read the tracks: {}",
+    "Katmanlar sekanstan okunur: bu bölümü açınca ya da Sessizlikleri bul'da.": "Tracks are read from the sequence when you open this section or run Find silences.",
+    "Katmanlar okunuyor…": "Reading tracks…",
+    "katmanlar okunamadı — Premiere meşgul olabilir, yeniden dene.": "couldn't read the tracks — Premiere may be busy, try again.",
+    "Dinlenecek ses değişti: Sessizlikleri yeniden bul.": "The audio to analyze changed: run Find silences again.",
+    "Dinlenecek bir ses katmanı seç (Katmanlar › Dinlenecek ses).": "Choose an audio track to analyze (Tracks › Audio to analyze).",
+    "Sekans sesi dışa aktarılıyor…": "Exporting sequence audio…",
+    "Premiere sesi dışa aktaramadı.": "Premiere couldn't export the audio.",
+    "Premiere'de susturulmuş: dinlenirse dışa aktarımda geçici olarak açılır": "Muted in Premiere: if analyzed, it's unmuted temporarily for the export",
+    "Sessizlik bu katmanların karışımında aranır": "Silences are detected in the mix of these tracks",
+    "Bu aralıkta klip yok": "No clips in this range",
+    "Premiere'de kilitli": "Locked in Premiere",
+    "Premiere'de kilitli: zaten kesilmez": "Locked in Premiere: it isn't cut anyway",
+    "Öneri: tek bir klip aralığın çoğunu kaplıyor (müzik ya da ambiyans olabilir)": "Suggestion: a single clip covers most of the range (could be music or ambience)",
+    "Adı müzik / ambiyans: varsayılan olarak korunur": "Named music / ambience: protected by default",
+    "Korunan video katmanı Ripple'da kaymaz: yalnız boşluk modunda güvenli": "A protected video track doesn't shift in Ripple: only safe in gap mode",
+    "Korunan katman kesilmez ve kaymaz": "A protected track isn't cut and doesn't shift",
+    "{n} dinlenen": "{} analyzed",
+    "{n} korunan": "{} protected",
+    "⚠ Korunan video katmanı ({}) Ripple'da kaymaz: kurgunun geri kalanıyla senkronu bozulur. Boşluk bırakarak uygula ya da korumayı kaldır.":
+      "⚠ The protected video track ({}) doesn't shift in Ripple: it goes out of sync with the rest of the edit. Apply leaving gaps, or remove the protection.",
+    "Boşluk bırakarak uygula": "Apply leaving gaps",
+    "Kesimler silinir, yerlerinde boşluk kalır: hiçbir katman kaymaz": "Cuts are removed and leave gaps: no track shifts",
+    "⚠ Bağlı klipler ayrılacak: bir tarafı korunuyor, öbür tarafı kesiliyor ({n} çift).": "⚠ Linked clips will be split: one side is protected, the other is cut ({} pairs).",
+    "A{n} korunuyor, V{n} kesiliyor": "A{} protected, V{} cut",
+    "V{n} korunuyor, A{n} kesiliyor": "V{} protected, A{} cut",
+    "ve {n} çift daha": "and {} more pairs",
+    "Korunan video katmanı Ripple'da kaymaz: Boşluk bırakarak uygula ya da korumayı kaldır.": "A protected video track doesn't shift in Ripple: apply leaving gaps, or remove the protection.",
+    // KS_applyCuts removed / selected nothing (every cut fell into empty parts of the timeline): no trial is used
+    "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, timeline değişmedi.":
+      "⚠ No clips were cut: the cuts only fell on empty parts of the timeline (or locked tracks), so the timeline didn't change.",
+    "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, açılan kopya sekans özgünüyle aynı.":
+      "⚠ No clips were cut: the cuts only fell on empty parts of the timeline (or locked tracks), so the duplicate sequence is the same as the original.",
+    "korunan: {}": "protected: {}",
+    "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et, gerekirse kopyayı silip korumayı değiştirerek yeniden uygula.":
+      "⚠ A protected track changed: Premiere may have cut its linked clip too. The original sequence is unchanged; check the copy, and if needed delete it and apply again with different protection.",
+    "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Kontrol et: tek Ctrl+Z (Mac: Cmd+Z) geri getirmez, her kesim ve silme ayrı adımdır; Geçmiş (History) panelinde kesimlerden önceki adıma dön.":
+      "⚠ A protected track changed: Premiere may have cut its linked clip too. Check it: a single Ctrl+Z (Mac: Cmd+Z) won't restore it, since every cut and removal is its own step; in the History panel, go back to the step before the cuts.",
+    "⚠ Korunan katmanlardan bazıları sekansta bulunamadı, kesilmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et.":
+      "⚠ Some protected tracks weren't found in the sequence and may have been cut. The original sequence is unchanged; check the copy.",
+    "⚠ Korunan katmanlardan bazıları sekansta bulunamadı, kesilmiş olabilir. Kontrol et: tek Ctrl+Z (Mac: Cmd+Z) geri getirmez, her kesim ve silme ayrı adımdır; Geçmiş (History) panelinde kesimlerden önceki adıma dön.":
+      "⚠ Some protected tracks weren't found in the sequence and may have been cut. Check it: a single Ctrl+Z (Mac: Cmd+Z) won't restore it, since every cut and removal is its own step; in the History panel, go back to the step before the cuts.",
+    "✕ Katman düzeni değişti (katman eklendi, silindi ya da yeniden adlandırıldı): kesimler uygulanmadı. Katmanlar yeniden okunuyor: korunanları kontrol et, sonra yeniden Kesimleri uygula.":
+      "✕ The track layout changed (a track was added, deleted or renamed): the cuts weren't applied. Reading the tracks again: check the protected tracks, then click Apply cuts again.",
+    "etkin sekans analiz sırasında değişti — Sessizlikleri yeniden bul.": "the active sequence changed during the analysis — run Find silences again.",
+    // the export's In / Out (or sequence end) no longer matches the range the tracks were read for
+    "In / Out analiz sırasında değişti — Sessizlikleri yeniden bul.": "In / Out changed during the analysis — run Find silences again.",
+    "sekansın süresi analiz sırasında değişti — Sessizlikleri yeniden bul.": "the sequence length changed during the analysis — run Find silences again.",
+    // Apply re-reads the track layout after a sequence switch; if it can't, it won't send cuts without the protected tracks
+    "Katmanlar okunamadı: korunan katmanlar bilinmeden kesim uygulanmaz. Katmanlar › Yenile'ye bas, sonra yeniden Kesimleri uygula.":
+      "Couldn't read the tracks: cuts aren't applied without knowing the protected tracks. Click Tracks › Refresh, then click Apply cuts again.",
+    "⚠ Korunan video katmanı kaymasın diye kesimler boşluk bırakılarak silindi.": "⚠ Cuts were removed leaving gaps so the protected video track wouldn't drift.",
+    "✕ Etkin sekans değişti: kesimler uygulanmadı. Analiz edilen sekansı aç ya da Sessizlikleri yeniden bul.": "✕ The active sequence changed: the cuts weren't applied. Open the analyzed sequence or run Find silences again.",
+    // Selected clip scope: the analyzed clip was moved / trimmed in Premiere after the analysis (cuts are in sequence time)
+    "Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da aynı dosyanın başka klibi seçildi): öneriler eski konumdaydı. Sessizlikleri yeniden bul.":
+      "The selected clip changed after the analysis (moved, trimmed, or another clip of the same file was selected): the suggestions were at its old position. Run Find silences again.",
+    "✕ Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da başka klip seçildi): kesimler eski konuma düşerdi, uygulanmadı. Sessizlikleri yeniden bul.":
+      "✕ The selected clip changed after the analysis (moved, trimmed, or another clip selected): the cuts would have landed at its old position, so they weren't applied. Run Find silences again.",
+    "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden Kesimleri uygula.":
+      "✕ Couldn't read the clip's position from Premiere: the cuts weren't applied. Click Apply cuts again.",
+    // Text-based cut: the transcribed clip was moved / trimmed in Premiere after transcription (3.4 final review)
+    "✕ Yazıya döktüğün klip taşındı ya da kırpıldı: kesimler eski konuma düşerdi, uygulanmadı. Klibi yeniden yazıya dök.":
+      "✕ The transcribed clip was moved or trimmed: the cuts would have landed at its old position, so they weren't applied. Transcribe the clip again.",
+    "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden dene.": "✕ Couldn't read the clip's position from Premiere: the cuts weren't applied. Try again.",
+    // host.jsx (KS_applyCuts expectSeqId)
+    "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.": "The active sequence changed; the cuts weren't applied. Run Find silences again.",
+    "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.": "The track layout changed; the cuts weren't applied. Read the tracks again.",
+    "Sekans analizden sonra degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.": "The sequence changed after the analysis; the cuts weren't applied. Run Find silences again.",
+    "✕ Sekans analizden sonra değişti (klipler taşındı, kırpıldı ya da silindi): kesimler eski yerlere düşerdi, uygulanmadı. Sessizlikleri yeniden bul.":
+      "✕ The sequence changed after the analysis (clips were moved, trimmed or deleted): the cuts would have landed in the old places, so they weren't applied. Run Find silences again.",
+    // Auto Cut / Text-based cut 3.4 step 8: keep captions in sync after cuts (js/kesim-altyazi.js, js/captions.js)
+    "Altyazıyı yeni kurguya uyarla": "Adapt captions to the new edit",
+    "Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)":
+      "Moves the lines in the Captions tab to the timing of the cut edit; lines for speech that was cut are removed (Ctrl+Z undoes it)",
+    "Altyazıya aktar": "Send to captions",
+    "Kesilmeyen kelimelerden yeni kurgunun zamanlarıyla altyazı kurar (yeniden yazıya dökmeden)":
+      "Builds captions from the words that weren't cut, timed to the new edit (no new transcription)",
+    "Altyazı sekmesindeki {n} satır kesimden önceki kurguya göre.": "The {} lines in the Captions tab still follow the edit from before the cut.",
+    "Kesilmeyen {n} kelime yeni kurgunun zamanlarıyla altyazıya hazır.": "{} words that weren't cut are ready for captions, timed to the new edit.",
+    "Altyazı yeni kurguya uyarlandı: {n} satır": "Captions adapted to the new edit: {} lines",
+    "kesilen {n} satır çıkarıldı": "{} cut lines removed",
+    "{n} satır kısaldı": "{} lines shortened",
+    "Altyazı oluşturulurken uyarlanamaz; iş bitince yeniden dene.": "Captions can't be adapted while they're being created; try again when the job finishes.",
+    "Altyazı sekmesinde uyarlanacak belge yok.": "There are no captions to adapt in the Captions tab.",
+    "Altyazı sekmesindeki belge bu kurgunun sekansına ait değil.": "The captions in the Captions tab don't belong to this edit's sequence.",
+    "Altyazı zaten yeni kurguya göre.": "The captions already follow the new edit.",
+    "Altyazı uyarlanamadı.": "Couldn't adapt the captions.",
+    "{n} altyazı satırı yeni kurguya göre Altyazı sekmesinde": "{} caption lines in the Captions tab, timed to the new edit",
+    "Altyazı oluşturulurken aktarılamaz; iş bitince yeniden dene.": "Can't send to captions while captions are being created; try again when the job finishes.",
+    "Altyazıya aktarılacak kelime kalmadı.": "No words left to send to captions.",
+    "Altyazı satırları kurulamadı.": "Couldn't build the caption lines.",
+    // js/kesim-esle.js: the word grouper (js/whisper-words.js) didn't load; reaches the Send to captions warning
+    "SufloWhisperWords yüklenmedi (js/whisper-words.js)": "SufloWhisperWords isn't loaded (js/whisper-words.js)",
+    "yeni kurguya uyarlandı": "adapted to the new edit",
+    "{n} satır · yeni kurguya uyarlandı": "{} lines · adapted to the new edit",
+    "Konuşmadan kes'ten": "from Text-based cut",
+    "{n} satır · Konuşmadan kes'ten": "{} lines · from Text-based cut",
+    // undo history labels
+    "Konuşmadan kes aktarımı": "Text-based cut handoff",
+    "kesimden sonra uyarlama": "adapt after cut",
+    // Apply: captions adapted to a cut edit only go to that sequence (the named form is a raw pattern below: the
+    // Premiere sequence name stays verbatim)
+    "Bu altyazı kesilmiş başka bir sekansın kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.":
+      "These captions were adapted to the edit of another, cut sequence. Open that sequence first, then apply.",
+    // the edit changed in Premiere after the cut (undo or another edit): checked against a fresh timeline fingerprint
+    "Arada tam uygulanamamış ya da artık hatırlanmayan bir kesim var; altyazıyı bu kurgu için yeniden oluştur.":
+      "A cut in between wasn't fully applied or is no longer remembered; create the captions again for this edit.",
+    "Kesim Premiere'de geri alınmış; altyazı zaten bu kurguya göre.": "The cut was undone in Premiere; the captions already follow this edit.",
+    "Kurgu kesimden sonra Premiere'de değişti (geri alma ya da başka bir düzenleme); altyazı bu kurguya uymayabilir.":
+      "The edit changed in Premiere after the cut (an undo or another edit); the captions may not match it.",
+    "Kurgu Premiere'den okunamadı; altyazı bu kurguya uymayabilir.": "Couldn't read the edit from Premiere; the captions may not match it.",
+    "Yine de uyarla": "Adapt anyway",
+    // Send to captions replaces the Captions tab document with a new one built from the words (it doesn't adapt it)
+    "Yine de aktar": "Send anyway",
     // Auto Cut: Cancel replaces "Sessizlikleri bul" while ffmpeg analyzes
     "ffmpeg analizini durdurur; önceki sonuç ekranda kalır": "Stops the ffmpeg analysis; the previous result stays on screen",
     // engine / model / ffmpeg download cancel (Settings and the caption setup card)
@@ -3139,6 +3737,158 @@
     "bunlar için Çıktı: Video katmanı": "for these use Output: Video layer"
   });
 
+  /* ============ 3.4 step 19: corporate-network resilience + offline model import (js/ag-dayanim.js, js/model-ice-aktar.js) ============ */
+  add({
+    // Settings › Engine
+    "Model dosyası içe aktar": "Import model file",
+    "Modeli başka bir bilgisayarda indirdiysen buradan kur (.bin)": "If you downloaded the model on another computer, install it from here (.bin)",
+    "İnternet yoksa ya da şirket ağı model indirmeyi engelliyorsa: modeli (ör. ggml-large-v3-turbo-q5_0.bin) başka bir bilgisayarda indir, buradan seç. Katalogdaki modeller SHA-256 ile doğrulanır; tanınmayan dosya yalnız Özel model olarak eklenir.":
+      "No internet, or your company network blocks the model download? Download the model (e.g. ggml-large-v3-turbo-q5_0.bin) on another computer and pick it here. Catalog models are verified with SHA-256; an unrecognised file can only be added as a Custom model.",
+    "Whisper model dosyasını seç (.bin)": "Choose the Whisper model file (.bin)",
+    "Motor kurulumu sürüyor; bitince içe aktar.": "The engine is still installing; import when it's done.",
+    "Model içe aktarıldı ve doğrulandı: {}": "Model imported and verified: {}",
+    "Model içe aktarıldı (doğrulanmadı): {}": "Model imported (not verified): {}",
+    "Özel model eklendi: {}": "Custom model added: {}",
+    "Özel model — {}": "Custom model — {}",
+    "içe aktarıldı, doğrulanmadı": "imported, not verified",
+    "Model kopyalanıyor…": "Copying the model…",
+    "Model kopyalanıyor… %{n}": "Copying the model… {}%",
+    "Model içe aktarma modülü yüklenmedi.": "The model import module didn't load.",
+    "Başka bir model içe aktarılıyor; bitmesini bekle.": "Another model is being imported; wait for it to finish.",
+    "Dosya okunamadı: {}": "Couldn't read the file: {}",
+    "Bir model dosyası (.bin) seç.": "Choose a model file (.bin).",
+    "Bu dosya zaten Suflo'nun model klasöründe: yeniden içe aktarmaya gerek yok.": "This file is already in Suflo's model folder: no need to import it again.",
+    "{} doğrulanamadı: SHA-256 uyuşmadı (bozuk ya da farklı bir dosya). Kurulmadı.": "{} couldn't be verified: SHA-256 mismatch (damaged or a different file). Not installed.",
+    "Özel model dosyası bulunamadı: Ayarlar › Motor › Model dosyası içe aktar ile yeniden ekle.": "Custom model file not found: add it again with Settings › Engine › Import model file.",
+    "Kopya eksik: {}/{} bayt": "Incomplete copy: {}/{} bytes",
+    // file checks (js/model-ice-aktar.js)
+    "Bu dosya model değil, Git LFS işaretçisi (yalnız birkaç yüz bayt). Modeli Hugging Face'teki indirme (resolve) bağlantısından indir.":
+      "This file isn't a model but a Git LFS pointer (only a few hundred bytes). Download the model from the Hugging Face download (resolve) link.",
+    "Dosya model olamayacak kadar küçük (1 MB ya da daha az). İndirme yarım kalmış olabilir.": "The file is too small to be a model (1 MB or less). The download may be incomplete.",
+    "Dosya 4 GB'tan büyük: whisper.cpp modeli olamaz.": "The file is larger than 4 GB: it can't be a whisper.cpp model.",
+    "Dosyanın başı okunamadı.": "Couldn't read the start of the file.",
+    "Dosya {} için beklenenden küçük ({} MB, beklenen ~{} MB): indirme yarım kalmış olabilir.": "The file is smaller than expected for {} ({} MB, expected ~{} MB): the download may be incomplete.",
+    "Bu bir GGUF dosyası; Suflo'nun motoru (whisper.cpp) ggml biçiminde .bin model ister.": "This is a GGUF file; Suflo's engine (whisper.cpp) needs a ggml .bin model.",
+    "Bu dosya whisper.cpp modeli değil (ggml imzası yok).": "This file isn't a whisper.cpp model (no ggml signature).",
+    // confirmations
+    "Bu dosya Suflo'nun model kataloğunda yok. Doğruluğu denetlenemez ve DTW ön ayarı uygulanmaz. Yalnız güvendiğin bir kaynaktan aldıysan devam et. Özel model olarak eklensin mi?":
+      "This file isn't in Suflo's model catalog. It can't be verified and no DTW preset applies. Only continue if you got it from a source you trust. Add it as a Custom model?",
+    "Bu dosya Suflo'nun model kataloğunda yok ({}: katalogdaki sürümden farklı). Doğruluğu denetlenemez ve DTW ön ayarı uygulanmaz. Yalnız güvendiğin bir kaynaktan aldıysan devam et. Özel model olarak eklensin mi?":
+      "This file isn't in Suflo's model catalog ({}: differs from the catalog version). It can't be verified and no DTW preset applies. Only continue if you got it from a source you trust. Add it as a Custom model?",
+    "İnternete ulaşılamadığı için {} SHA-256 ile doğrulanamadı (doğrulanmadı). Dosyayı güvendiğin bir kaynaktan aldıysan kurulsun mu?":
+      "The internet couldn't be reached, so {} couldn't be checked with SHA-256 (not verified). Install it if you got the file from a source you trust?",
+    "Model klasöründe zaten {} var. Mevcut model silinip içe aktarılan dosya yerine konsun mu?":
+      "{} is already in the model folder. Delete the current model and put the imported file in its place?",
+    // Doctor › Test model sources
+    "Model kaynaklarını sına": "Test model sources",
+    "huggingface.co, hf-mirror.com ve motor sürüm sunucusuna 5 saniyelik deneme isteği": "A 5-second test request to huggingface.co, hf-mirror.com and the engine release server",
+    "Model kaynakları sınanıyor…": "Testing model sources…",
+    "Bazı model kaynaklarına ulaşılamıyor: ayrıntı Doctor raporunda": "Some model sources can't be reached: details in the Doctor report",
+    "Tüm model kaynaklarına ulaşılıyor": "All model sources are reachable",
+    "Model kaynağı: {}": "Model source: {}",
+    "Hugging Face (modeller)": "Hugging Face (models)",
+    "Model aynası": "Model mirror",
+    "Motor sürümleri": "Engine releases",
+    "ulaşılıyor (HTTP {})": "reachable (HTTP {})",
+    "kurumsal sertifikayla": "via the corporate certificate",
+    // network explanations (js/ag-dayanim.js agHatasiAcikla)
+    "Kurumsal ağ filtresi {} adresini engelliyor (Cisco Umbrella, {}).": "A corporate network filter is blocking {} (Cisco Umbrella, {}).",
+    "Kurumsal ağ filtresi {} adresini engelliyor (ad {} adresine yönlendiriliyor).": "A corporate network filter is blocking {} (the name resolves to {}).",
+    "Kurumsal ağ filtresi {} adresini engelliyor (Cisco Umbrella, {}). BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
+      "A corporate network filter is blocking {} (Cisco Umbrella, {}). Ask your IT team for access, or download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Kurumsal ağ filtresi {} adresini engelliyor (ad {} adresine yönlendiriliyor). BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
+      "A corporate network filter is blocking {} (the name resolves to {}). Ask your IT team for access, or download the model on another computer and install it with Settings › Engine › Import model file.",
+    "BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
+      "Ask your IT team for access, or download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Ağ HTTPS bağlantılarını denetliyor (kurumsal güvenlik yazılımı, sertifika: {}). Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi, olmadı. BT ekibinden {} için izin iste. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "The network inspects HTTPS connections (corporate security software, certificate: {}). Suflo retried once with the certificates this computer trusts, without success. Ask your IT team to allow {}. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Ağ HTTPS bağlantılarını denetliyor (kurumsal güvenlik yazılımı, sertifika: {}). BT ekibinden {} için izin iste. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "The network inspects HTTPS connections (corporate security software, certificate: {}). Ask your IT team to allow {}. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Vekil sunucu kimlik doğrulaması istiyor (HTTP 407). Ayarlar'daki vekil adresine kullanıcı:parola ekle.": "The proxy requires authentication (HTTP 407). Add user:password to the proxy address in Settings.",
+    "Vekil sunucu bağlantıyı kurmadı ({}). Ayarlar'daki vekil adresini kontrol et.": "The proxy didn't open the connection ({}). Check the proxy address in Settings.",
+    "{} adı çözülemedi: internet yok ya da ağ bu adı engelliyor. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "{} couldn't be resolved: no internet, or the network blocks this name. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "{} yanıt vermedi (zaman aşımı): güvenlik duvarı bağlantıyı düşürüyor olabilir. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "{} didn't respond (timeout): a firewall may be dropping the connection. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "{} bağlantıyı reddetti ya da kesti: ağ filtresi engelliyor olabilir. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "{} refused or dropped the connection: a network filter may be blocking it. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "{} erişimi reddetti (HTTP {}): kurumsal filtre engelliyor olabilir. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "{} denied access (HTTP {}): a corporate filter may be blocking it. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "{} HTTP {} döndü.": "{} returned HTTP {}.",
+    // single sentences (sentence-by-sentence fallback when a host name splits a composed message)
+    "Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi, olmadı.": "Suflo retried once with the certificates this computer trusts, without success.",
+    "Bilgisayarın güvendiği sertifikalarla yeniden deneme süreye sığmadı: birkaç saniye sonra yeniden sına.":
+      "The retry with the certificates this computer trusts ran out of time: test again in a few seconds.",
+    "Doğruluğu denetlenemez ve DTW ön ayarı uygulanmaz.": "It can't be verified and no DTW preset applies.",
+    "Yalnız güvendiğin bir kaynaktan aldıysan devam et.": "Only continue if you got it from a source you trust.",
+    "Özel model olarak eklensin mi?": "Add it as a Custom model?",
+    "({}: katalogdaki sürümden farklı)": "({}: differs from the catalog version)",
+    "{} · ulaşılıyor (HTTP {})": "{} · reachable (HTTP {})",
+    "bağlantı kurulamadı": "couldn't connect",
+    // error guide (js/bridge.js HATA_REHBERI)
+    "BT ekibinden huggingface.co, hf-mirror.com ve github.com için izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
+      "Ask your IT team to allow huggingface.co, hf-mirror.com and github.com, or download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Ağ HTTPS bağlantılarını denetliyor olabilir (kurumsal güvenlik yazılımı). BT ekibinden bu adres için izin iste; şirket ağındaysan Ayarlar'dan vekil sunucu tanımla.":
+      "Your network may be inspecting HTTPS connections (corporate security software). Ask your IT team to allow this address; on a company network, set up a proxy in Settings.",
+    // review fixes: engine status, unverified import, Doctor › Verify
+    "doğrulanmadı": "not verified",
+    "motor kurulu değil": "engine not installed",
+    "{} hazır · motor kurulu değil": "{} ready · engine not installed",
+    "Bu model katalogda yok: doğrulanamaz.": "This model isn't in the catalog: it can't be verified.",
+    "Doğrula": "Verify",
+    "Model doğrulanmadı": "Model not verified",
+    "{} çevrimdışı içe aktarıldı; SHA-256 henüz denetlenmedi. İnternet varken Doğrula'ya bas.":
+      "{} was imported offline; its SHA-256 hasn't been checked yet. Press Verify when you're online.",
+    "{} doğrulanamadı: SHA-256 uyuşmadı, dosya silindi. Modeli yeniden indir ya da içe aktar.":
+      "{} couldn't be verified: SHA-256 mismatch, so the file was deleted. Download or import the model again.",
+    "{} doğrulanamadı: huggingface.co'ya ulaşılamadı. İnternet varken yeniden dene.":
+      "{} couldn't be verified: huggingface.co couldn't be reached. Try again when you're online.",
+    // review fixes: block page instead of the file (js/bridge.js download)
+    "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.":
+      "The server sent a web page instead of the file: it may be a network filter's block page.",
+    "Sunucu beklenenden çok küçük bir yanıt gönderdi ({}, beklenen ~{} MB): ağ filtresinin engel sayfası olabilir.":
+      "The server sent a much smaller response than expected ({}, expected ~{} MB): it may be a network filter's block page.",
+    "Ağ filtresi bu indirmeyi engelliyor olabilir. BT ekibinden bu adres için izin iste; şirket ağındaysan Ayarlar'dan vekil sunucu tanımla.":
+      "A network filter may be blocking this download. Ask your IT team to allow this address; on a company network, set up a proxy in Settings."
+  });
+
+  /* ============ 3.4 step 20: tool search / command palette (Ctrl+K / ⌘K; js/arac-ara.js, js/app.js #arac-ara) ============ */
+  add({
+    "Araç ara": "Search tools",
+    "Araç ara ({})": "Search tools ({})",
+    "Araç ya da eylem ara… (ör. sessizlik, rampa)": "Search tools or actions… (e.g. silence, ramp)",
+    "Araçlar ve eylemler": "Tools and actions",
+    "Eşleşen araç yok. Başka bir kelime dene.": "No matching tool. Try another word.",
+    "seç": "select",
+    "aç": "open",
+    "favori": "favorite",
+    "kapat": "close",
+    "Son kullanılanlar": "Recent",
+    "Eylemler": "Actions",
+    "Favorilere ekle": "Add to favorites",
+    "Favorilerden çıkar": "Remove from favorites",
+    "Suflo Pro özelliği": "Suflo Pro feature",
+    // static actions (js/arac-ara.js EYLEMLER); the others reuse existing button labels
+    "Altyazıyı çevir": "Translate captions",
+    "Eğri uygula": "Apply curve",
+    "Kanca başlığı ekle": "Add hook title",
+    "YouTube'dan indir": "Download from YouTube",
+    "Ayarlar › Motor": "Settings › Engine",
+    "Ayarlar › Arayüz dili": "Settings › Interface language",
+    "Ayarlar › Marka Kiti": "Settings › Brand kit",
+    "Önce sessizlikleri bul.": "Find silences first.",
+    // 3.4 actions (Curves tab, cut options, safe removal, Doctor, AI bridge)
+    "Önce kesimleri uygula.": "Apply the cuts first.",
+    "Özel hız eğrisi": "Custom speed curve",
+    "Eğri kodunu kopyala": "Copy curve code",
+    "Eğri önayarlarını içe aktar": "Import curve presets",
+    "Eğri önayarlarını dışa aktar": "Export curve presets",
+    "Suflo eğrilerini geri al": "Undo Suflo curves",
+    "Ayarlar › Yapay zekâ köprüsü (MCP)": "Settings › AI bridge (MCP)"
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
@@ -3264,6 +4014,13 @@
   function enWas() { var Pr = pricing(); return Pr ? Pr.wasLabel("en") : "1,249 TRY"; }
   function enTax() { var Pr = pricing(); return Pr ? Pr.taxLabel("en") : "+ tax"; }
   var P = [
+    // Eğri › aralık çipi "1,20 sn → 2,00 sn · 24 kare" → "1.20 s → 2.00 s · 24 frames"
+    [/^(-?\d+),(\d+) sn → (-?\d+),(\d+) sn · (\d+) kare$/, function (m) {
+      return m[1] + "." + m[2] + " s → " + m[3] + "." + m[4] + " s · " + m[5] + (m[5] === "1" ? " frame" : " frames");
+    }],
+    // Eğri › Varışta yaylan (3.4 adım 14): "3,5 Hz" → "3.5 Hz", "Oturma ≈ 0,80 sn" → "Settles in ≈ 0.80 s"
+    [/^(\d+)(?:,(\d+))? Hz$/, function (m) { return m[1] + (m[2] ? "." + m[2] : "") + " Hz"; }],
+    [/^Oturma ≈ (\d+),(\d+) sn$/, "Settles in ≈ $1.$2 s"],
     // Altyazı Efektleri › önizlemede serbest konum etiketi (3.3 adım 17): Türkçe "%50" → İngilizce "50%"
     [/^X %(\d+) · Y %(\d+)$/, "X $1% · Y $2%"],
     [/^749 TL$/, function () { return enPrice(); }],
@@ -3289,6 +4046,9 @@
     }],
     // "Bu Shorts'un…" style possessives are handled by exact keys; "Premiere'e geç" etc. too.
     [/^V(\d+) katmanına eklendi$/, "Added to track V$1"],
+    // captions adapted to a cut edit: the Premiere sequence name stays verbatim ($1 = raw, not translated)
+    [/^Bu altyazı "([\s\S]+)" sekansının kurgusuna göre uyarlandı\. Önce o sekansı aç, sonra uygula\.$/,
+      "These captions were adapted to the edit of the \"$1\" sequence. Open that sequence first, then apply."],
     // Try Pro clean re-render: the Premiere project item name and file path stay verbatim ($ = raw, not translated)
     [/^Filigran kısmen kaldırıldı: (\d+) proje öğesi değiştirilemedi\. Proje panelinde ona sağ tıkla, Replace Footage ile temiz dosyayı seç: ([\s\S]*)$/,
       function (m) { return "Watermark partly removed: " + m[1] + " project item" + (m[1] === "1" ? "" : "s") + " couldn't be swapped. Right-click " + (m[1] === "1" ? "it" : "them") + " in the Project panel, choose Replace Footage and pick the clean file: " + m[2]; }],
@@ -3301,6 +4061,84 @@
 
   // Intentionally identical in English (brands, product/feature names, fonts, formats, keys).
   // Only used by tools/i18n-coverage.js so these don't count as missing.
+  /* ================= Yapay zekâ köprüsü (MCP, 3.4, Deneysel) ================= */
+  add({
+    "Yapay zekâ köprüsü (MCP)": "AI bridge (MCP)",
+    "Yapay zekâ köprüsü": "AI bridge",
+    "Deneysel": "Experimental",
+    "AÇIK": "ON",
+    "Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.":
+      "An AI assistant such as Claude can run Suflo's own tasks for you: generating captions, adding markers, cutting silences on a sequence copy. It is not a general Premiere remote control; only this computer can connect, and it turns off after 30 idle minutes.",
+    "Köprüyü aç": "Turn bridge on",
+    "Köprüyü kapat": "Turn bridge off",
+    "Yeni jeton": "New token",
+    "Eski jeton anında geçersiz olur": "The old token stops working immediately",
+    "Düzenlemeye izin ver": "Allow editing",
+    "Kapalıyken asistan yalnız okur (bağlam, izler, altyazı). Açıkken marker, altyazı ve kesim gibi değişiklikler yapabilir.":
+      "When off, the assistant can only read (context, tracks, captions). When on, it can make changes such as markers, captions and cuts.",
+    "Yıkıcı eylemlerde onay iste": "Ask before destructive actions",
+    "Yapay zekâ asistanı bunu yapmak istiyor": "The AI assistant wants to do this",
+    "Onayla": "Approve",
+    "Reddet": "Deny",
+    "Claude'a bağla": "Connect to Claude",
+    "Claude Desktop: Ayarlar → Geliştirici → Yapılandırmayı düzenle, kopyalanan satırları ekle. Claude Code: komutu terminale yapıştır.":
+      "Claude Desktop: Settings → Developer → Edit config, add the copied lines. Claude Code: paste the command into a terminal.",
+    "Claude Desktop ayarını kopyala": "Copy Claude Desktop config",
+    "Claude Code komutunu kopyala": "Copy Claude Code command",
+    "Node'u denetle": "Check Node",
+    "Etkinlik (son 50 çağrı)": "Activity (last 50 calls)",
+    "Güvenlik modeli →": "Security model →",
+    "Yapay zekâ köprüsü (MCP, deneysel; deneme hakkı yok)": "AI bridge (MCP, experimental; no trial credits)",
+    "Yapay zekâ köprüsü onay bekliyor: {}": "AI bridge is waiting for approval: {}",
+    "Henüz çağrı yok.": "No calls yet.",
+    "30 dakika çağrı gelmedi: köprü kapandı.": "No calls for 30 minutes: the bridge turned off.",
+    "Yapay zekâ köprüsü kapandı (30 dakika boşta)": "AI bridge turned off (30 minutes idle)",
+    "Node aranıyor…": "Looking for Node…",
+    "Node bulunamadı: Claude Desktop ya da Claude Code köprüyü \"node\" ile başlatır. nodejs.org'dan Node 18 ya da üstünü kur.":
+      "Node not found: Claude Desktop or Claude Code starts the bridge with \"node\". Install Node 18 or later from nodejs.org.",
+    "Node {} eski: köprü için Node 18 ya da üstü gerekir.": "Node {} is too old: the bridge needs Node 18 or later.",
+    "Node {} hazır.": "Node {} is ready.",
+    "Bu ortamda köprü açılamaz (Node yok).": "The bridge cannot run here (no Node).",
+    "Köprü açılıyor…": "Turning the bridge on…",
+    "Köprü açık: yalnız bu bilgisayardan (127.0.0.1), 30 dakika boşta kalırsa kapanır.": "Bridge on: this computer only (127.0.0.1); it turns off after 30 idle minutes.",
+    "Pro lisansı artık etkin değil: köprü kapandı.": "Your Pro license is no longer active: the bridge turned off.",
+    "Yapay zekâ köprüsü kapandı: Pro lisansı etkin değil": "AI bridge turned off: Pro license not active",
+    "Açmak Pro gerektirir; köprü için deneme hakkı yok. Pro araçlarını çağıran eylemler ayrıca o aracın kendi kapısından geçer.":
+      "Turning it on needs Pro; the bridge has no trial credits. Actions that use a Pro tool also pass that tool's own gate.",
+    "✕ Köprü açılamadı: {}": "✕ Could not turn the bridge on: {}",
+    "Köprü kapalı.": "Bridge off.",
+    "Yeni jeton oluşturuldu: eski jeton artık geçmez": "New token created: the old token no longer works",
+    "✕ Jeton yenilenemedi ({}): köprü kapandı. Yeniden açmayı dene.": "✕ Could not renew the token ({}): the bridge turned off. Try turning it on again.",
+    "Jeton yenilenemedi: köprü kapandı": "Could not renew the token: the bridge turned off",
+    "Claude Desktop ayarı kopyalandı": "Claude Desktop config copied",
+    "Claude Code komutu kopyalandı": "Claude Code command copied",
+    "Bölüm": "Chapter",
+    "Bağlamı oku": "Read context",
+    "İzleri oku": "Read tracks",
+    "Seçimi oku": "Read selection",
+    "Altyazıyı oku": "Read captions",
+    "İş durumu": "Job status",
+    "Doktor": "Doctor",
+    "Oynatma kafasını taşı": "Move playhead",
+    "Oynatma kafasını taşı: {} sn": "Move playhead: {} s",
+    "Marker ekle": "Add markers",
+    "Marker ekle: {} marker": "Add markers: {} markers",
+    "Marker ekle: {} bölüm": "Add markers: {} chapters",
+    "Altyazı oluştur": "Generate captions",
+    "Altyazı oluştur: {}": "Generate captions: {}",
+    "Altyazıyı kanala koy": "Put captions on a caption track",
+    "Altyazıyı dışa aktar": "Export captions",
+    "Altyazıyı dışa aktar: {}": "Export captions: {}",
+    "Sessizlikleri bul": "Find silences",
+    "Otomatik zoom": "Auto zoom",
+    "Sessizlikleri kes (kopyada)": "Cut silences (on a copy)",
+    "Konuşmadan kes (kopyada)": "Text-based cut (on a copy)",
+    "Hız rampası uygula": "Apply speed ramp",
+    "Reddedilen istek": "Rejected request",
+    "Onay kartını göster": "Show the approval card",
+    "Yapay zekâ köprüsü (MCP, deneysel): Claude gibi bir asistan Suflo işlerini senin yerine yapar": "AI bridge (MCP, experimental): an assistant such as Claude runs Suflo tasks for you"
+  });
+
   var KEEP = ["Suflo", "Suflo Pro", "Suflo Doctor", "SUFLO PRO", "SUFLO CAPTION EDITOR", "PREMIERE CREATOR STUDIO", "PRO", "PREMIERE",
     "PREMIERE READY", "SFX", "Emoji Assets", "PNG · WEBP · GIF", "Motion BG", "ffmpeg", "In → Out", "Creator Punch", "Clean Pill", "Bold Box",
     "SaaS Glass", "Reels", "Pop", "Premium", "Karaoke", "YouTube", "Azərbaycanca", "Azərbaycan", "English", "Deutsch", "Español",
@@ -3318,7 +4156,19 @@
     "Podcast",        // Viral Score genre (same word in English)
     "English (beta)", "Türkmençe",
     ".suflo-stil,.txt", "Logo",
-    "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US"];   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "Suflo Paket · Altyazı", "Suflo Paket · Kanca", "Suflo Paket · Çerçeve", "Suflo Altyazı Efekti", "Glitch", "en-US",
+    // AI bridge (MCP): English tool descriptions and error texts for the AI assistant (never shown in the panel)
+    "List the clips currently selected on the timeline (name, track, start/end in seconds).",
+    "Add up to 200 markers to the active sequence. With bolum=true they are added as chapter markers (YouTube chapters).",
+    "Spoken language code, e.g. tr or en; auto = detect automatically. Default: the panel's choice.",
+    "satir = sentence lines (the user's line layout is kept), kelime = word-by-word captions. Default: the panel's choice.",
+    "Editing is not allowed: turn on 'Düzenlemeye izin ver' (Allow editing) in Suflo > Settings > AI bridge.",
+    "These are the onboarding sample captions: they only go on the 'Suflo Deneme' sequence. Open that sequence first.",
+    "The SRT was imported into the Premiere project, but Premiere did not create a caption track: drag it from the Project panel onto the timeline. Do not apply again.",
+    "Select a clip on the timeline first.",
+    "Ctrl+K", "⌘K", "Ctrl+D", "⌘D", "Esc",   // tool search (3.4 step 20): keyboard keys
+    "cubic-bezier", "cubic-bezier(0.25, 0.1, 0.25, 1)", "P1 x", "P1 y", "P2 x", "P2 y",   // Eğri: CSS syntax and handle names   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "3 Hz"];   // Eğri › Varışta yaylan frequency readout (Hz is the same; decimals go through a pattern)
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

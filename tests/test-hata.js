@@ -201,8 +201,40 @@ var ornekler = [
   "rate_limit exceeded",
   "Premiere yanıt vermedi (KS_getContext)",
   "Motor çalıştırılamadı: kod=1",
-  "Error: spawn ffmpeg ENOENT"
+  "Error: spawn ffmpeg ENOENT",
+  // 3.4 adım 19: DNS filtresi teşhisi ve kurumsal HTTPS denetimi
+  "Error: getaddrinfo ENOTFOUND — Kurumsal ağ filtresi huggingface.co adresini engelliyor (Cisco Umbrella, 146.112.61.106).",
+  "Error: unable to get local issuer certificate",
+  // 3.4 adım 19 inceleme: dosya yerine engel sayfası (DNS teşhisi yokken)
+  "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir."
 ];
+ok("3.4 adım 19 inceleme: engel sayfası + DNS teşhisi kurumsal filtre çözümünü (içe aktarma) alır, tek başına tarafsız ipucunu",
+  iceriyor("Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir. — Kurumsal ağ filtresi huggingface.co adresini engelliyor (Cisco Umbrella, 146.112.61.106).", "Model dosyası içe aktar") &&
+  iceriyor("Sunucu beklenenden çok küçük bir yanıt gönderdi (1 KB, beklenen ~574 MB): ağ filtresinin engel sayfası olabilir.", "Ağ filtresi bu indirmeyi engelliyor olabilir") &&
+  /Model dosyası içe aktar/.test(modelHatasi("Turbo indirilemedi: Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.")),
+  coz("Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir."));
+ok("3.4 adım 19: sertifika hatası genel ağ ipucunu değil HTTPS denetimi çözümünü alır",
+  iceriyor("Error: self signed certificate in certificate chain", "HTTPS bağlantılarını denetliyor") &&
+  iceriyor("UNABLE_TO_VERIFY_LEAF_SIGNATURE", "HTTPS bağlantılarını denetliyor"), coz("Error: self signed certificate in certificate chain"));
+// Genel ipucu yapılmamış bir yeniden denemeyi iddia etmez ve bulut API hatasına model içe aktarmayı önermez
+// (httpUpload / httpJson hiç yeniden denemez; Linux'ta ya da ek kök yokken indirme de denemez)
+ok("3.4 adım 19: bulut API sertifika hatası: 'bir kez daha denedi' yok, model içe aktarma önerisi yok",
+  iceriyor("Groq API hatası: Error: unable to get local issuer certificate", "HTTPS bağlantılarını denetliyor") &&
+  !iceriyor("Groq API hatası: Error: unable to get local issuer certificate", "bir kez daha denedi") &&
+  !iceriyor("Groq API hatası: Error: unable to get local issuer certificate", "içe aktar"),
+  coz("Groq API hatası: Error: unable to get local issuer certificate"));
+function modelHatasi(m) { var e = new Error(m); e.modelIceAktarOner = true; return win.hataYardimi(e); }
+ok("3.4 adım 19: MODEL indirme hatası (işaretli) HTTPS ipucuna içe aktarmayı ekler",
+  /HTTPS bağlantılarını denetliyor/.test(modelHatasi("Turbo indirilemedi: Error: unable to get local issuer certificate")) &&
+  /Model dosyası içe aktar/.test(modelHatasi("Turbo indirilemedi: Error: unable to get local issuer certificate")),
+  modelHatasi("Turbo indirilemedi: Error: unable to get local issuer certificate"));
+ok("3.4 adım 19: işaretli model hatası kural eşleşmese de içe aktarmayı söyler; ileti zaten içeriyorsa tekrarlamaz",
+  /Çözüm: Olmazsa modeli başka bir bilgisayarda/.test(modelHatasi("Turbo indirilemedi: HTTP 451")) &&
+  modelHatasi("Turbo indirilemedi: HTTP 503 — Kurumsal ağ filtresi huggingface.co adresini engelliyor (Cisco Umbrella, 146.112.61.106).").split("Model dosyası içe aktar").length === 2,
+  modelHatasi("Turbo indirilemedi: HTTP 451"));
+ok("3.4 adım 19: DNS filtresi teşhisi ENOTFOUND'a rağmen kurumsal filtre çözümünü alır",
+  iceriyor("Error: getaddrinfo ENOTFOUND huggingface.co — Kurumsal ağ filtresi huggingface.co adresini engelliyor (ad 0.0.0.0 adresine yönlendiriliyor).", "BT ekibinden"),
+  coz("Error: getaddrinfo ENOTFOUND huggingface.co — Kurumsal ağ filtresi"));
 var kapsanan = {};
 ornekler.forEach(function (m) {
   var c = win.hataYardimi(m);

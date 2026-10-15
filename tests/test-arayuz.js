@@ -28,7 +28,7 @@ function ok(ad, kosul, kanit) {
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
                 "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
                 "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js",
-                "js/marka-kiti-ui.js", "js/kanca.js", "js/hiz-rampasi.js"];
+                "js/marka-kiti-ui.js", "js/kanca.js", "js/hiz-rampasi.js", "js/egri.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -149,7 +149,19 @@ var ZORUNLU = {
   "cap-vr-sira": "Viral siralama",
   "cap-vr-min": "Yalniz >=60 filtresi",
   "cap-vr-not": "Puan tahmin notu",
-  "cap-vr-liste": "Viral an kartlari"
+  "cap-vr-liste": "Viral an kartlari",
+  // 3.4: canli esikli sessizlik kesimi
+  "cut-minkeep": "Min. konusma kaydiricisi",
+  "cut-minkeep-val": "Min. konusma degeri",
+  "cut-noise-auto": "Otomatik esik dugmesi",
+  "cut-wave": "Ses zarfi tuvali",
+  // 3.4 adim 7: kesim kapsami ve korunan katmanlar
+  "cut-scope": "Kesim kapsami (Secili klip / In-Out / Sekans)",
+  "cut-katman": "Katmanlar bolumu",
+  "cut-dinle-izler": "Dinlenecek ses cipleri",
+  "cut-koru-izler": "Kesilmeyecek katman cipleri",
+  "cut-koru-uyari": "Korunan katman uyarilari",
+  "cut-katman-yenile": "Katmanlari yenile"
 };
 var kayip = [];
 Object.keys(ZORUNLU).forEach(function (id) {
@@ -374,6 +386,72 @@ ok("Hız Rampası: Ayarlar Pro listesinde", /<li>Sesi iyileştir · Otomatik zoo
 ok("Hız Rampası: Premiere çağrıları yalnız tıklamada (init'te K.call yok)", !/K\.call\(/.test(fnGovde(hizUi, "function init(")) && !/K\.call\(/.test(fnGovde(hizUi, "function render(")) &&
   !/K\.call\(/.test(fnGovde(hizUi, "function refresh(")) && !/K\.call\(/.test(fnGovde(hizUi, "function onizlemeCiz(")));
 ok("Hız Rampası: Ctrl+Z uyarısı ve kaldırma düğmesi arayüzde", /Ctrl\+Z rampayı tek adımda geri almaz/.test(html) && /id="hiz-kaldir"[^>]*>Rampayı kaldır</.test(html));
+/* ---------- 3.4 adım 13: Hız Rampası için Özel eğri editörü ---------- */
+["hiz-ozel", "hiz-ozel-editor", "hiz-ozel-hit", "hiz-ozel-basamak", "hiz-ozel-sil", "hiz-ozel-sifirla", "hiz-ozel-ad", "hiz-ozel-kaydet", "hiz-ozel-kayitlar"].forEach(function (id) {
+  ok("Özel eğri: #" + id + " var", !!idler[id]);
+});
+var hizBolum = html.slice(html.indexOf('id="tab-hiz"'), html.indexOf("</section>", html.indexOf('id="tab-hiz"')));
+var egriOzelSrc = fs.readFileSync(KOKYOL + "js/egri.js", "utf8").replace(/\r\n/g, "\n"), cssOzel = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
+ok("Özel eğri: kutu Hız Rampası sekmesinde, kart ızgarasından sonra ve önizlemeden önce, gizli başlar", hizBolum.indexOf('id="hiz-ozel"') > hizBolum.indexOf('id="hiz-grid"') &&
+  hizBolum.indexOf('id="hiz-ozel"') < hizBolum.indexOf('id="hiz-onizleme"') && /<div id="hiz-ozel" class="hiz-ozel" hidden>/.test(hizBolum));
+ok("Özel eğri: düzenleyicinin aria-label'ı SVG'nin dışında (kutuda), odaklanabilir; Sert basamak / Noktayı sil seçimsiz kapalı",
+  /<div id="hiz-ozel-editor" class="egri-editor hiz-ozel-editor" tabindex="0" role="img" aria-label="Özel hız eğrisi düzenleyicisi"><\/div>/.test(hizBolum) &&
+  /id="hiz-ozel-basamak"[^>]*disabled>Sert basamak</.test(hizBolum) && /id="hiz-ozel-sil"[^>]*disabled>Noktayı sil</.test(hizBolum) &&
+  /<input id="hiz-ozel-ad" type="text" maxlength="40"/.test(hizBolum));
+ok("Özel eğri: ipucu tıkla / sürükle / çift tık / Shift / Alt'ı anlatır", /Tıkla: nokta ekle · sürükle: taşı · çift tık: sil · Shift: ızgaraya yapış · Alt\+tık: sert basamak\./.test(hizBolum));
+ok("Özel eğri: hiz-rampasi.js düzenleyiciyi SufloEgriEditor 'hiz' moduyla kurar; egri.js 'hiz' modunu SufloSpeedRamp.ozel ile çizer",
+  /ED\.olustur\(kap, \{ mod: "hiz",/.test(hizUi) && /if \(opts\.mod === "hiz"\) return hizOlustur\(kap, opts\);/.test(egriOzelSrc) && /Z = SR\.ozel/.test(egriOzelSrc));
+ok("Özel eğri: kapı ve deneme değişmedi (yalnız 'speedramp')", (hizUi.match(/Pro\.gate\(/g) || []).length === 1 && /Pro\.gate\("speedramp"/.test(hizUi) &&
+  (hizUi.match(/Pro\.denemeHarca\(/g) || []).length === 1 && /Pro\.denemeHarca\("speedramp"/.test(hizUi));
+ok("Özel eğri: düzenleme, Düzenle ve kayıtlar Premiere'e gitmez", ["function ozelKur(", "function ozelDegisti(", "function ozelAta(", "function duzenle(", "function ozelKayitKaydet(", "function kartlar("].every(function (f) {
+  var g = fnGovde(hizUi, f); return g.length > 20 && !/K\.call\(/.test(g);
+}));
+ok("Özel eğri: CSS (kart Düzenle, kutu, çipler) ve CEF 74'te olmayan flex gap / :focus-visible yok", /\.hiz-duzenle \{/.test(cssOzel) && /\.hiz-ozel \{/.test(cssOzel) && /\.hiz-ozel-kayit \{/.test(cssOzel) &&
+  !/\.hiz-(ozel|duzenle)[^{]*\{[^}]*\bgap:/.test(cssOzel) && !/\.hiz-(ozel|duzenle)[^{]*:focus-visible/.test(cssOzel));
+/* ---------- Eğri (3.4 adım 10) ---------- */
+var egriUi = fs.readFileSync(KOKYOL + "js/egri.js", "utf8").replace(/\r\n/g, "\n");
+ok("Eğri: kenar çubuğunda Hız Rampası'ndan sonra, Kanca Başlığı'ndan önce; YENİ ve PRO rozetli, sayaçsız",
+  html.indexOf('data-tab="egri"') > html.indexOf('data-tab="hiz"') && html.indexOf('data-tab="egri"') < html.indexOf('data-tab="kanca"') &&
+  /data-tab="egri">[\s\S]{0,400}<b>Eğri <em class="ky-yeni">YENİ<\/em><\/b><i>anahtar kare yumuşatma<\/i>[\s\S]{0,80}data-kilit>PRO/.test(html) &&
+  !/ky-adet/.test(html.slice(html.indexOf('data-tab="egri"'), html.indexOf('data-tab="kanca"'))));
+["tab-egri", "egri-tanitim", "egri-gorunum-deger", "egri-gorunum-hiz", "egri-editor", "egri-sahne", "egri-kare", "egri-css", "egri-p1x", "egri-p1y", "egri-p2x",
+  "egri-p2y", "egri-cevir", "egri-ters", "egri-kaydet", "egri-onayarlar", "egri-yenile", "egri-sonraki", "egri-hedef", "egri-ozellikler", "egri-yogunluk",
+  "egri-pr-onizle", "egri-geri-tumu", "egri-uygula", "egri-status"].forEach(function (id) {
+  ok("Eğri: #" + id + " var", !!idler[id]);
+});
+ok("Eğri: sekme Hız Rampası'ndan sonra, Kanca'dan önce", html.indexOf('id="tab-egri"') > html.indexOf('id="tab-hiz"') && html.indexOf('id="tab-egri"') < html.indexOf('id="tab-kanca"'));
+ok("Eğri: betik sırası ease-curve.js → key-records.js → egri-model.js → egri.js → app.js", betikSira("ease-curve.js") > 0 &&
+  betikSira("ease-curve.js") < betikSira("key-records.js") && betikSira("key-records.js") < betikSira("egri-model.js") &&
+  betikSira("egri-model.js") < betikSira("egri.js") && betikSira("egri.js") < betikSira("app.js"));
+ok("Eğri: yoğunluk 1 / 2 / 4 kare (varsayılan her kare)", /<select id="egri-yogunluk">\s*<option value="1" selected>Her kare<\/option>\s*<option value="2">2 karede bir<\/option>\s*<option value="4">4 karede bir<\/option>/.test(html));
+ok("Eğri: app.js başlatır, yan menüyü kilitler, tanıtımı Pro'da gizler; Pro etiketi ve tanıtım düğmesi 'curves'", /KEgri\.init\(\)/.test(appSrc) &&
+  /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="egri"\]'\), !s\.pro\)/.test(appSrc) && /"egri-tanitim"/.test(appSrc) &&
+  /curves:\s+'Eğri: kendi anahtar karelerine özel yumuşatma ve varışta yaylanma'/.test(proSrc) && /data-pro-feature="curves">Eğriyi aç — 749 TL</.test(html));
+ok("Eğri: Ayarlar Pro listesinde (varışta yaylanma dahil)", /<li>Eğri: anahtar karelerine özel yumuşatma ve varışta yaylanma \(düzenlemek ücretsiz\)<\/li>/.test(html));
+ok("Eğri: init / render / listeCiz Premiere'e gitmez", ["function init(", "function render(", "function listeCiz(", "function onayarKartlari("].every(function (f) {
+  var g = fnGovde(egriUi, f); return g.length > 20 && !/K\.call\(/.test(g);
+}));
+ok("Eğri: Ctrl+Z uyarısı, yalnız video katmanları notu ve 'Bezier tutamacı yazamaz' açıklaması arayüzde", /Ctrl\+Z eğriyi tek adımda geri almaz/.test(html) &&
+  /Şimdilik yalnız video katmanları/.test(html) && /Bezier tutamaçlarını yazamadığı için/.test(html));
+ok("Eğri: SufloEgriEditor dışa açık (Hız Rampası özel eğrisi yeniden kullanır)", /^window\.SufloEgriEditor = \(function \(\) \{/m.test(egriUi) && /return \{ olustur: olustur/.test(egriUi));
+/* ---------- Varışta yaylan (3.4 adım 14): Eğri sekmesinde kart ---------- */
+["egri-yaylan", "egri-yaylan-grafik", "egri-yaylan-hedef", "egri-yaylan-varis", "egri-yaylan-yol", "egri-yaylan-genlik", "egri-yaylan-genlik-deger", "egri-yaylan-frekans",
+  "egri-yaylan-frekans-deger", "egri-yaylan-sonum", "egri-yaylan-sonum-deger", "egri-yaylan-tum", "egri-yaylan-sure", "egri-yaylan-uygula"].forEach(function (id) {
+  ok("Varışta yaylan: #" + id + " var", !!idler[id]);
+});
+var yaylanBolum = html.slice(html.indexOf('id="egri-yaylan"'), html.indexOf('id="egri-status"'));
+ok("Varışta yaylan: kart Eğri sekmesinde, Uygula satırından sonra ve durum satırından önce", html.indexOf('id="egri-yaylan"') > html.indexOf('id="egri-uygula"') &&
+  html.indexOf('id="egri-yaylan"') < html.indexOf('id="egri-status"') && html.indexOf('id="egri-yaylan"') > html.indexOf('id="tab-egri"') && html.indexOf('id="egri-yaylan"') < html.indexOf('id="tab-kanca"'));
+ok("Varışta yaylan: kaydırıcı sınırları plandaki gibi (genlik 0,02–0,5 sn, frekans 1–6 Hz, sönüm 2–10), Tüm varışlar kutusu",
+  /<input id="egri-yaylan-genlik" type="range" min="0\.02" max="0\.5" step="0\.01" value="0\.1">/.test(yaylanBolum) &&
+  /<input id="egri-yaylan-frekans" type="range" min="1" max="6" step="0\.5" value="3">/.test(yaylanBolum) &&
+  /<input id="egri-yaylan-sonum" type="range" min="2" max="10" step="1" value="6">/.test(yaylanBolum) && /<input id="egri-yaylan-tum" type="checkbox"> Tüm varışlar/.test(yaylanBolum));
+ok("Varışta yaylan: önizleme SVG'si ekran okuyucuya gizli; düğmenin ipucu Pro olduğunu söyler", /<svg id="egri-yaylan-grafik"[^>]*aria-hidden="true"/.test(yaylanBolum) &&
+  /id="egri-yaylan-uygula"[^>]*title="[^"]*Pro;/.test(yaylanBolum));
+ok("Varışta yaylan: yaylanUygula 'curves' kapısından; init / yaylanCiz Premiere'e gitmez", /function yaylanUygula\(\) \{\n    if \(typeof Pro !== "undefined" && !Pro\.gate\("curves"/.test(egriUi) &&
+  ["function yaylanCiz(", "function yaylanDegisti(", "function yaylanYukle("].every(function (f) { var g = fnGovde(egriUi, f); return g.length > 20 && !/K\.call\(/.test(g); }));
+ok("Varışta yaylan: CSS kartı (CEF 74: flex gap yok)", /\.egri-yaylan \{/.test(cssOzel) && /\.egri-yaylan-yol \{/.test(cssOzel) &&
+  !/\.egri-yaylan[^{]*\{[^}]*\bgap\s*:/.test(cssOzel));
 /* ---------- Ses etiketi filtresi + sessiz ses uyarısı (3.2 adım 2) ---------- */
 ["grp-altyazi", "set-ses-etiket", "cap-sessiz", "cap-sessiz-metin", "cap-sessiz-devam", "cap-sessiz-vazgec",
   "tc-sessiz", "tc-sessiz-metin", "tc-sessiz-devam", "tc-sessiz-vazgec"].forEach(function (id) {
@@ -397,6 +475,68 @@ ok("Sessiz ses: uyarı kutuları durum satırının hemen altında, gizli başla
   /id="cap-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="cap-sessiz-vazgec"[^>]*>Vazgeç</.test(html) &&
   /id="tc-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="tc-sessiz-vazgec"[^>]*>Vazgeç</.test(html));
 ok("Sessiz ses: betik sırası caption-text.js → sessiz-ses.js → captions.js", betikSira("sessiz-ses.js") > betikSira("caption-text.js") && betikSira("sessiz-ses.js") < betikSira("captions.js"));
+// 3.4 adım 9: yumuşatma motoru ve kayıtlar, onları kullanacak araçlardan (Geçiş, Zoom, Hareket, Hız Rampası) önce
+ok("Yumuşatma motoru: betik sırası ease-curve.js → key-records.js → transitions/speedramp/zoom/presets → app.js", betikSira("ease-curve.js") > 0 &&
+  betikSira("ease-curve.js") < betikSira("key-records.js") && betikSira("key-records.js") < betikSira("transitions.js") &&
+  betikSira("key-records.js") < betikSira("speedramp.js") && betikSira("key-records.js") < betikSira("zoom.js") &&
+  betikSira("key-records.js") < betikSira("presets.js") && betikSira("key-records.js") < betikSira("app.js"));
+(function () {
+  // saf modüller: yüklenince yalnız window.SufloEase / SufloKeyRecords tanımlar; Premiere, ağ, DOM, depo erişimi yok
+  var vm = require("vm"), erisim = [];
+  var pencere = {};
+  ["localStorage", "document", "CSInterface", "fetch", "XMLHttpRequest"].forEach(function (ad) {
+    Object.defineProperty(pencere, ad, { get: function () { erisim.push(ad); return undefined; } });
+  });
+  var ctx = vm.createContext({ window: pencere, JSON: JSON, Math: Math, Date: Date, Object: Object, Array: Array, String: String, Number: Number, isFinite: isFinite, isNaN: isNaN, Error: Error, RegExp: RegExp });
+  ["ease-curve.js", "key-records.js"].forEach(function (f) { vm.runInContext(fs.readFileSync(KOKYOL + "js/" + f, "utf8"), ctx); });
+  ok("Yumuşatma motoru: yüklenirken yalnız global tanımlar (localStorage/DOM/Premiere/ağ erişimi yok)", typeof pencere.SufloEase === "object" &&
+    typeof pencere.SufloKeyRecords === "object" && typeof pencere.SufloEase.bakePlan === "function" && erisim.length === 0, erisim.join(","));
+})();
+/* ---------- 3.4 adım 12: Geçiş, Zoom ve Hareket önayarlarında özel eğri ---------- */
+ok("Özel eğri: betik sırası ease-curve.js → egri-secim.js → transitions/zoom/presets → egri.js → app.js", betikSira("egri-secim.js") > betikSira("ease-curve.js") &&
+  betikSira("egri-secim.js") < betikSira("transitions.js") && betikSira("egri-secim.js") < betikSira("zoom.js") && betikSira("egri-secim.js") < betikSira("presets.js") &&
+  betikSira("egri-secim.js") < betikSira("egri.js") && betikSira("egri.js") < betikSira("app.js"));
+[["gecis-egri", "tab-gecis", "gecis-grid"], ["zoom-egri", "tab-zoom", "zoom-run"], ["preset-egri", "tab-presets", "preset-grid"]].forEach(function (x) {
+  var i = html.indexOf('id="' + x[0] + '"');
+  ok("Özel eğri: #" + x[0] + " " + x[1] + " içinde, uygulama düğmelerinden önce, açıklamasıyla", !!idler[x[0]] && i > html.indexOf('id="' + x[1] + '"') &&
+    i < html.indexOf('id="' + x[2] + '"') && new RegExp('<div class="egri-secici" id="' + x[0] + '">\\s*<p class="hint egri-secici-not">[^<]{40,}</p>\\s*</div>').test(html));
+});
+(function () {
+  // saf modül: yüklenince yalnız window.SufloEgriSecim tanımlar (localStorage / DOM / Premiere / ağ yok)
+  var vm = require("vm"), erisim = [];
+  var pencere = {};
+  ["localStorage", "document", "CSInterface", "fetch", "XMLHttpRequest"].forEach(function (ad) {
+    Object.defineProperty(pencere, ad, { get: function () { erisim.push(ad); return undefined; } });
+  });
+  var ctx = vm.createContext({ window: pencere, JSON: JSON, Math: Math, Date: Date, Object: Object, Array: Array, String: String, Number: Number, isFinite: isFinite, isNaN: isNaN, Error: Error, RegExp: RegExp,
+    unescape: unescape, escape: escape, encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent });
+  ["ease-curve.js", "egri-secim.js"].forEach(function (f) { vm.runInContext(fs.readFileSync(KOKYOL + "js/" + f, "utf8"), ctx); });
+  ok("Özel eğri: egri-secim.js yüklenirken yalnız global tanımlar (localStorage/DOM/Premiere/ağ erişimi yok)", typeof pencere.SufloEgriSecim === "object" &&
+    typeof pencere.SufloEgriSecim.yogunlastir === "function" && pencere.SufloEgriSecim.coz("yumusak").ok && erisim.length === 0, erisim.join(","));
+})();
+ok("Özel eğri: kart ızgarası ve seçici egri.js'ten dışa açık (SufloEgriIzgara, SufloEgriSecici)", /^window\.SufloEgriIzgara = \(function \(\) \{/m.test(egriUi) &&
+  /^window\.SufloEgriSecici = \(function \(\) \{/m.test(egriUi));
+/* ---------- 3.4 adım 11: kayıt tabanlı güvenli kaldırma ---------- */
+ok("Kaldırma: betik sırası key-records.js → kayit-kaldir.js → gecisler/zoom/presets → app.js", betikSira("kayit-kaldir.js") > betikSira("key-records.js") &&
+  betikSira("kayit-kaldir.js") < betikSira("gecisler.js") && betikSira("kayit-kaldir.js") < betikSira("zoom.js") &&
+  betikSira("kayit-kaldir.js") < betikSira("presets.js") && betikSira("kayit-kaldir.js") < betikSira("app.js"));
+["gecis-kaldir", "preset-kaldir", "zoom-remove"].forEach(function (id) { ok("Kaldırma: #" + id + " var", !!idler[id]); });
+ok("Kaldırma: 'Geçişi kaldır' Geçişler sekmesinde, 'Önayarı kaldır' Hareket önayarlarında; ikisi de kilitsiz düğme",
+  html.indexOf('id="gecis-kaldir"') > html.indexOf('id="tab-gecis"') && html.indexOf('id="gecis-kaldir"') < html.indexOf('id="gecis-grid"') &&
+  html.indexOf('id="preset-kaldir"') > html.indexOf('id="tab-presets"') && html.indexOf('id="preset-kaldir"') < html.indexOf('id="preset-grid"') &&
+  /<button id="gecis-kaldir" class="btn outline" type="button">Geçişi kaldır<\/button>/.test(html) &&
+  /<button id="preset-kaldir" class="btn outline" type="button">Önayarı kaldır<\/button>/.test(html));
+(function () {
+  // Kaldırmak hiçbir zaman ücretli değil: kaldir() gövdelerinde Pro kapısı yok
+  var gs = fs.readFileSync(KOKYOL + "js/gecisler.js", "utf8"), zs = fs.readFileSync(KOKYOL + "js/zoom.js", "utf8"), ps = fs.readFileSync(KOKYOL + "js/presets.js", "utf8");
+  var govdeler = [fnGovde(gs, "async function kaldir("), fnGovde(zs, "async function kaldir("), fnGovde(ps, "async function kaldir(")];
+  ok("Kaldırma kapısız: üç aracın kaldir() gövdesinde Pro.gate / deneme hakkı yok, KS_removeSufloKeys modül üzerinden",
+    govdeler.every(function (g) { return g.length > 200 && !/Pro\.gate|denemeHarca/.test(g) && /\.akis\(/.test(g); }), govdeler.map(function (g) { return g.length; }).join(","));
+  ok("Kaldırma: eski yöntem (zoom ve geçiş) yalnız onayla — confirm arayüz dilinde",
+    /window\.confirm\(uiMetni\(soru\)\)/.test(govdeler[0]) && /window\.confirm\(uiMetni\(soru\)\)/.test(govdeler[1]) && !/KS_autoZoom/.test(govdeler[1].split("yedek:")[0]));
+  ok("Kaldırma: init / render Premiere'e gitmez (yalnız tıklamada)", !/K\.call\(/.test(fnGovde(gs, "function init(")) && !/K\.call\(/.test(fnGovde(gs, "function render(")) &&
+    !/K\.call\(/.test(fnGovde(zs, "function init(")) && !/K\.call\(/.test(fnGovde(ps, "function init(")));
+})();
 ok("Sessiz ses: panel açılışında ölçüm/Premiere çağrısı yok (yalnız Altyazı oluştur / Konuşmadan kes akışında)",
   !/sessizDenetim\(/.test(fnGovde(capSrc, "function init(")) && /\.sessiz-uyari\[hidden\] \{ display: none !important; \}/.test(fs.readFileSync(KOKYOL + "css/style.css", "utf8")));
 
@@ -554,7 +694,8 @@ function sahteDugum() {
 }
 var dom = { "cap-canli": sahteDugum(), "cap-canli-liste": sahteDugum() };
 var kap = new Function("el", "tc", "document", "CANLI_GOSTER",
-  "var canliIs = null, segments = [{ start: 1, end: 2, text: 'Önceki belge' }], segmentsMode = 'plain', ceviriDili = '', algilananDil = 'tr', shortsYuklenen = '', ornekBelge = false;\n" +
+  "var canliIs = null, segments = [{ start: 1, end: 2, text: 'Önceki belge' }], segmentsMode = 'plain', ceviriDili = '', algilananDil = 'tr', shortsYuklenen = '', ornekBelge = false, ornekSekansId = '';\n" +
+  "var belgeSekansId = 'S1', belgeSira = 0, belgeKesimAdi = null;\n" +
   "var undoStack = [], redoStack = [];\n" + canliKod +
   "\nreturn { canliBaslat: canliBaslat, canliEkle: canliEkle, canliKirp: canliKirp, canliBitir: canliBitir, durumAl: durumAl, " +
   "segments: function () { return segments; }, undo: function () { return undoStack.length + redoStack.length; }, is: function () { return canliIs; } };")(
@@ -651,7 +792,7 @@ var bekleyenUI = y1.api.yerelCalistir("whisper-cli", ["-f", "a.wav"], outBaseC, 
 });
 var mcSrc = fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8");
 ok("Otomatik Kesim: ffmpeg analizi jetonla, iptal 'İptal edildi.' uyarısı, #cut-cancel 'Sessizlikleri bul'un yerini alır",
-  /iptal: jeton \}\);/.test(mcSrc) && /if \(res\.iptal\) \{ status\("İptal edildi\.", "warn"\); return; \}/.test(mcSrc) &&
+  /iptal: jeton \}\);/.test(mcSrc) && /if \(res\.iptal\) \{ status\("İptal edildi\.", "warn"\); return \{ sonuc: "iptal" \}; \}/.test(mcSrc) &&
   /el\("cut-analyze"\)\.hidden = b;/.test(mcSrc) && /el\("cut-cancel"\)\.addEventListener\("click", iptalEt\)/.test(mcSrc) &&
   html.indexOf('id="cut-cancel"') > html.indexOf('id="cut-analyze"') && /id="cut-cancel"[^>]* hidden/.test(html));
 var kur = fnGovde(appSrc, "async function installLocalWhisper(");
@@ -662,7 +803,187 @@ var cssSrc = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
 ok("CSS: busy düğmesi (inline-flex) gizlenince görünmez; canlı satırlar soluk", /#cap-go\[hidden\], #cut-analyze\[hidden\] \{ display: none !important; \}/.test(cssSrc) &&
   /\.canli-satir \{[^}]*opacity: \.78/.test(cssSrc) && /\.canli-kutu\[hidden\] \{ display: none !important; \}/.test(cssSrc));
 
-bekleyenUI.then(function () {
+/* ---------- Araç ara (Ctrl+K / ⌘K komut paleti, 3.4 adım 20) ---------- */
+["arac-ara", "arac-ara-ac", "arac-ara-girdi", "arac-ara-liste", "arac-ara-bos", "arac-ara-ipucu", "arac-ara-fav-tus", "grp-motor"].forEach(function (id) {
+  ok("Araç ara: #" + id + " var", !!idler[id]);
+});
+ok("Araç ara: pencere gizli başlar, modal iletişim kutusu; liste listbox ve çevirmene kapalı (satırlar arayüz dilinde çizilir)",
+  /<div id="arac-ara" class="arac-ara-arka" hidden>/.test(html) && /class="arac-ara-kutu" role="dialog" aria-modal="true" aria-label="Araç ara"/.test(html) &&
+  /<div id="arac-ara-liste" class="arac-ara-liste" role="listbox"[^>]* data-i18n-skip><\/div>/.test(html) && /id="arac-ara-bos" class="arac-ara-bos" hidden/.test(html));
+ok("Araç ara: arama kutusu combobox, listeyi denetler; düğme üst çubukta, kısayolu başlıkta",
+  /<input id="arac-ara-girdi" type="text"[^>]*role="combobox"[^>]*aria-controls="arac-ara-liste"/.test(html) &&
+  html.indexOf('id="arac-ara-ac"') > html.indexOf('<div class="top-right">') && html.indexOf('id="arac-ara-ac"') < html.indexOf('id="pro-chip"') &&
+  /id="arac-ara-ac"[^>]*title="Araç ara \(Ctrl\+K\)"[^>]*aria-controls="arac-ara"/.test(html));
+ok("Araç ara: betik sırası arac-ara.js → captions.js → app.js", betikSira("arac-ara.js") > 0 && betikSira("arac-ara.js") < betikSira("captions.js") &&
+  betikSira("arac-ara.js") < betikSira("app.js"));
+var aaAppSrc = fs.readFileSync(KOKYOL + "js/app.js", "utf8").replace(/\r\n/g, "\n");
+var aaBolum = aaAppSrc.slice(aaAppSrc.indexOf("/* ---------------- Araç ara (Ctrl+K"), aaAppSrc.indexOf("/* ---------------- Ayarlar ---------------- */"));
+ok("Araç ara: init sekmelerden sonra başlatır; Premiere / host çağrısı yok (K.call, evalScript), CEP tuş ilgisi yalnız ilk etkileşimde",
+  /guvenli\("sekmeler", initTabs\);\s*\/\/[^\n]*\n\s*guvenli\("Araç ara", aracAramaBaslat\);/.test(aaAppSrc) && aaBolum.length > 2000 &&
+  !/K\.call\(|evalScript|K\.run\(/.test(aaBolum) && !/tusIlgisiAyarla/.test(fnGovde(aaAppSrc, "function aracAramaBaslat(")) &&
+  /window\.addEventListener\("focus", aramaTusIlgisi\)/.test(aaBolum));
+ok("Araç ara: seçim eylemi çalıştırmaz (düğmeye click() yok, yalnız odak + vurgu); araç satırı menü girdisine tıklar",
+  !/hedef\.click\(\)/.test(fnGovde(aaAppSrc, "function eylemeGit(")) && /hedef\.focus/.test(fnGovde(aaAppSrc, "function eylemeGit(")) &&
+  /b\.click\(\)/.test(fnGovde(aaAppSrc, "function aracaGit(")));
+// Kısayol yazı alanlarında ve altyazı düzenleyicisinde hiç bağlanmaz: gerçek aracAraTusu + gerçek js/arac-ara.js
+(function () {
+  var AAmod = require(KOKYOL + "js/arac-ara.js");
+  function kur(mac, acik, pencere) {
+    var s = { acildi: 0, kapandi: 0 };
+    var fn = new Function("AA", "K", "aramaAcik", "aramaKapat", "aramaAc", "baskaPencereAcik", fnGovde(aaAppSrc, "function aracAraTusu(") + "\nreturn aracAraTusu;")(
+      AAmod, { MAC: mac }, function () { return !!acik; }, function () { s.kapandi++; }, function () { s.acildi++; }, function () { return !!pencere; });
+    s.bas = function (hedef, o) {
+      var e = { key: "k", ctrlKey: !mac, metaKey: !!mac, altKey: false, shiftKey: false, target: hedef, engel: 0 };
+      e.preventDefault = function () { e.engel++; };
+      for (var k in o || {}) e[k] = o[k];
+      fn(e);
+      return e;
+    };
+    return s;
+  }
+  function oge(etiket, o, ebeveyn) {
+    var d = { nodeType: 1, tagName: etiket.toUpperCase(), parentNode: ebeveyn || null, attrs: {}, id: "" };
+    for (var k in o || {}) d[k] = o[k];
+    d.getAttribute = function (a) { return Object.prototype.hasOwnProperty.call(d.attrs, a) ? d.attrs[a] : null; };
+    d.hasAttribute = function (a) { return Object.prototype.hasOwnProperty.call(d.attrs, a); };
+    return d;
+  }
+  var govde = oge("body"), segs = oge("div", { id: "cap-segments" }, govde);
+  var yazilar = [oge("input", { type: "text" }, govde), oge("input", { type: "search" }, govde), oge("textarea", {}, govde), oge("select", {}, govde),
+    oge("div", { isContentEditable: true }, govde), oge("input", { type: "text" }, oge("div", {}, segs)), oge("button", {}, segs),
+    oge("span", {}, oge("div", { id: "tc-words" }, govde))];
+  var w = kur(false);
+  var engeller = yazilar.map(function (h) { return w.bas(h).engel; });
+  ok("Ctrl+K metin kutusu / arama / textarea / açılır liste / contenteditable / altyazı düzenleyicisinde (#cap-segments, #tc-words) bağlanmaz: palet açılmaz, tuş engellenmez",
+    w.acildi === 0 && engeller.every(function (x) { return x === 0; }), JSON.stringify(engeller));
+  var dugme = w.bas(oge("button", {}, govde)), onay = w.bas(oge("input", { type: "checkbox" }, govde)), bos = w.bas(govde);
+  ok("Ctrl+K düğmede, onay kutusunda ve boş alanda paleti açar (varsayılan engellenir)", w.acildi === 3 && dugme.engel === 1 && onay.engel === 1 && bos.engel === 1);
+  var w2 = kur(false);
+  w2.bas(govde, { shiftKey: true }); w2.bas(govde, { altKey: true }); w2.bas(govde, { ctrlKey: false, metaKey: true }); w2.bas(govde, { key: "j" });
+  ok("Ctrl+Shift+K (Premiere: tüm izlerde kes), AltGr, Windows'ta ⌘K ve başka harf açmaz", w2.acildi === 0);
+  var m = kur(true);
+  m.bas(govde); m.bas(govde, { metaKey: false, ctrlKey: true });
+  ok("macOS: ⌘K açar, Ctrl+K açmaz", m.acildi === 1);
+  var a = kur(false, true);
+  var ak = a.bas(yazilar[0]);
+  ok("palet açıkken Ctrl+K kapatır (aç / kapa)", a.kapandi === 1 && a.acildi === 0 && ak.engel === 1);
+  var p = kur(false, false, true);
+  ok("başka bir pencere (Pro, AI anahtarı, yenilikler) açıkken palet açılmaz", (p.bas(govde), p.acildi === 0));
+})();
+ok("Araç ara: verify-release js/arac-ara.js'i paket için zorunlu tutar", /js\/arac-ara\\\.js\$/.test(fs.readFileSync(KOKYOL + "tools/verify-release.ps1", "utf8")));
+
+/* ---------- 3.4 canlı eşikli sessizlik kesimi: yeni denetimler, deneme hakkı ---------- */
+var cutHtml = html.slice(html.indexOf('id="tab-cut"'), html.indexOf('id="tc-card"'));
+ok("3.4 Kesim: Min. konuşma 0–0.6 sn (varsayılan 0), Otomatik eşiğin yanında, dalga tuvali #cut-bar'ın altında",
+  /<input id="cut-minkeep" type="range" min="0" max="0\.6" step="0\.05" value="0">/.test(cutHtml) &&
+  cutHtml.indexOf('id="cut-noise-auto"') > cutHtml.indexOf('id="cut-noise-val"') && cutHtml.indexOf('id="cut-noise-auto"') < cutHtml.indexOf('id="cut-minsil"') &&
+  /<canvas id="cut-wave"[^>]* hidden/.test(cutHtml) && cutHtml.indexOf('id="cut-wave"') > cutHtml.indexOf('id="cut-bar"'));
+ok("3.4 Kesim: js/sessizlik.js magiccut.js'ten önce yüklenir",
+  betikler.indexOf("js/sessizlik.js") !== -1 && betikler.indexOf("js/sessizlik.js") < betikler.indexOf("js/magiccut.js"));
+ok("3.4 Kesim: CSS taralı ada + dalga tuvali",
+  /\.cut-bar \.cut\.ada \{[^}]*repeating-linear-gradient/.test(cssSrc) && /\.cut-wave \{/.test(cssSrc) && /\.cut-wave\[hidden\] \{ display: none; \}/.test(cssSrc));
+ok("3.4 Kesim: kaydırıcılar ~100 ms toplanır; Pro kapısı değişmedi (analiz ve Uygula 'cut', deneme: true)",
+  /var CANLI_MS = 100;/.test(mcSrc) && /\["cut-noise", "cut-minsil", "cut-pad", "cut-minkeep"\]\.forEach/.test(mcSrc) &&
+  /Pro\.gate\("cut", \{ deneme: true, yeniden: analyze \}\)/.test(mcSrc) && /var yeniden = kopyaZorunlu \? function \(\) \{ return apply\(\{ cloneFirst: true \}\); \} : \(bosluk \? boslukluUygula : apply\);/.test(mcSrc) &&
+  /Pro\.gate\("cut", \{ deneme: true, yeniden: yeniden \}\)/.test(mcSrc));
+
+/* ---------- 3.4 adım 7: kesim kapsamı ve korunan katmanlar ---------- */
+var kapsamHtml = cutHtml.slice(cutHtml.indexOf('id="cut-scope"'), cutHtml.indexOf("</div>", cutHtml.indexOf('id="cut-scope"')));
+ok("3.4 kapsam: #cut-scope üç düğme (Seçili klip açık | In → Out | Sekans), Sessizlikleri bul'dan önce",
+  /<button class="on" data-s="clip" type="button">Seçili klip<\/button>/.test(kapsamHtml) && /data-s="inout"[^>]*>In → Out</.test(kapsamHtml) &&
+  /data-s="entire"[^>]*>Sekans</.test(kapsamHtml) && cutHtml.indexOf('id="cut-scope"') < cutHtml.indexOf('id="cut-analyze"') &&
+  /class="seg-ctl full" id="cut-scope"/.test(cutHtml), kapsamHtml.slice(0, 200));
+var katmanHtml = cutHtml.slice(cutHtml.indexOf('id="cut-katman"'), cutHtml.indexOf("</details>", cutHtml.indexOf('id="cut-katman"')));
+ok("3.4 katmanlar: <details> içinde 'Dinlenecek ses' ve 'Kesilmeyecek katmanlar' çip satırları (gizli başlar), Yenile",
+  /<details class="adv cut-katman" id="cut-katman">/.test(cutHtml) && /id="cut-dinle-satir"[^>]* hidden/.test(katmanHtml) && /id="cut-koru-satir"[^>]* hidden/.test(katmanHtml) &&
+  katmanHtml.indexOf("Dinlenecek ses") !== -1 && katmanHtml.indexOf("Kesilmeyecek katmanlar") !== -1 &&
+  /id="cut-dinle-izler" class="tracks"/.test(katmanHtml) && /id="cut-koru-izler" class="tracks"/.test(katmanHtml) && katmanHtml.indexOf('id="cut-katman-yenile"') !== -1 &&
+  cutHtml.indexOf('id="cut-katman"') > cutHtml.indexOf('id="cut-scope"') && cutHtml.indexOf('id="cut-katman"') < cutHtml.indexOf('id="cut-analyze"'));
+var sonucHtml = cutHtml.slice(cutHtml.indexOf('id="cut-result"'));
+ok("3.4 uyarı kutusu #cut-koru-uyari sonuçta, Kesimleri uygula'dan (ve yöntemden) önce, gizli başlar",
+  /<div id="cut-koru-uyari" class="cut-koru-uyari" hidden><\/div>/.test(sonucHtml) && sonucHtml.indexOf('id="cut-koru-uyari"') < sonucHtml.indexOf('id="cut-target"') &&
+  sonucHtml.indexOf('id="cut-koru-uyari"') < sonucHtml.indexOf('id="cut-apply"'));
+ok("3.4 CSS: öneri çipi kesikli, kilitli çip soluk, uyarı kutusu; yeni kurallarda flex gap yok (CEF 74)",
+  /\.track-chip\.oneri \{[^}]*dashed/.test(cssSrc) && /\.track-chip\.kilitli \{/.test(cssSrc) && /\.cut-koru-uyari\[hidden\] \{ display: none; \}/.test(cssSrc) &&
+  !/gap:/.test(cssSrc.slice(cssSrc.indexOf(".cut-katman {"), cssSrc.indexOf(".mc-birlesik {"))));
+ok("3.4 katmanlar: KS_getTrackLayout yalnız katmanlariOku (katmanOkuIc) içinde; init doğrudan okumaz (bölüm açılınca / kapsamda / Yenile'de)",
+  (mcSrc.match(/K\.call\("KS_getTrackLayout"/g) || []).length === 1 && fnGovde(mcSrc, "async function katmanOkuIc(").indexOf('K.call("KS_getTrackLayout"') !== -1 &&
+  /det\.addEventListener\("toggle", function \(\) \{ if \(det\.open && !katman && !katmanOkunuyor\) katmanlariOku\(\); \}\)/.test(mcSrc));
+ok("3.4 sekans kapsamı: KS_exportAudio dinlenecek katmanlarla, İptal dışa aktarımda kilitli; WAV kapanışta silinir",
+  /K\.call\("KS_exportAudio", \{ scope: kapsam, tracks: o\.dinle, epr: eprListesi\(\), unmuteWanted: true \}/.test(mcSrc) &&
+  fnGovde(mcSrc, "async function sekansSesiHazirla(").indexOf("iptalKilit(true)") < fnGovde(mcSrc, "async function sekansSesiHazirla(").indexOf('K.call("KS_exportAudio"') &&
+  /window\.addEventListener\("unload", wavSil\)/.test(mcSrc));
+ok("3.4 Uygula: protect yalnız korunan katman varsa (korumaYuku), expectSeqId analiz edilen sekans",
+  /if \(korYuk\) yuk\.protect = korYuk;/.test(mcSrc) && /if \(analizSeqId\) yuk\.expectSeqId = analizSeqId;/.test(mcSrc));
+
+// Analiz + kaydırıcı önizlemesi + Otomatik deneme hakkı harcamaz; yalnız Uygula harcar (sahte köprü, ffmpeg yok)
+var kabi = require("./_kesim-kabi.js");
+var bekleyenKesim = (function () {
+  // sahte köprü: runAkis 3 sn'lik mono PCM (1 sn ton, 1 sn sessiz, 1 sn ton) akıtır; run silencedetect çıktısı verir
+  function pcm(sn, genlik) {
+    var b = Buffer.alloc(Math.round(sn * 16000) * 2);
+    for (var i = 0; i < b.length / 2; i++) b.writeInt16LE(Math.round(genlik * Math.sin(i / 3)), 2 * i);
+    return b;
+  }
+  var sahteK = {
+    iptalJetonu: function () { return { iptalEdildi: false, iptal: function () {}, dinle: function () { return function () {}; } }; },
+    baslatTikiGecerli: function () { return true; }, iptalTikiGecerli: function () { return true; },
+    runAkis: function (cmd, args, o) {
+      o.onStderr("Output #0, s16le, to 'pipe:1':\n  Stream #0:0: Audio: pcm_s16le, 16000 Hz, mono, s16, 256 kb/s\n");
+      [pcm(1, 12000), pcm(1, 0), pcm(1, 12000)].forEach(function (b) { o.onData(b); });
+      return Promise.resolve({ code: 0, stderr: "", bayt: 96000 });
+    },
+    run: function () {
+      return Promise.resolve({ code: 0, stdout: "", stderr: "[silencedetect @ 0x1] silence_start: 1.0\n[silencedetect @ 0x1] silence_end: 2.0 | silence_duration: 1.0\n" });
+    }
+  };
+  var p = kabi.kesimPaneli({ K: sahteK, ffmpeg: "ffmpeg", clip: { mediaPath: "a.wav", inPoint: 0, outPoint: 3, clipStart: 0, clipEnd: 3 } });
+  return p.tikla("cut-analyze").then(function () {
+    ok("3.4 analiz: 1 kesim önerisi, dalga görünür, Kesimleri uygula açık, deneme hakkı düşmedi",
+      /^1 kesim/.test(p.el("cut-summary").textContent) && !p.el("cut-wave").hidden && p.el("cut-apply").disabled === false && p.kayit.harca.length === 0,
+      p.el("cut-summary").textContent);
+    p.kaydir("cut-minkeep", "0.3"); p.kaydir("cut-pad", "0.1");
+    p.tikla("cut-noise-auto");
+    return p.bekle(150);
+  }).then(function () {
+    ok("3.4 önizleme: kaydırıcılar + Otomatik (eşik -60'a kırpıldı) hak harcamaz, ffmpeg yeniden çalışmaz",
+      p.kayit.harca.length === 0 && p.kayit.runAkis.length === 1 &&p.kayit.run.length === 0 && p.el("cut-noise").value === "-60",
+      p.kayit.harca.join(",") + " esik " + p.el("cut-noise").value);
+    return p.tikla("cut-apply");
+  }).then(function () {
+    // Premiere'e iki çağrı: klibin yerinin taze denetimi (KS_getContext), sonra KS_applyCuts
+    var cagrilar = p.kayit.call.map(function (c) { return c.fn; }).join(",");
+    ok("3.4 Uygula: silencedetect doğrulaması koştu, klibin yeri denetlendi, KS_applyCuts çağrıldı, hak bir kez düştü",
+      p.kayit.run.length === 1 && cagrilar === "KS_getContext,KS_applyCuts" && p.kayit.harca.length === 1 && p.kayit.harca[0] === "cut",
+      p.kayit.run.length + " " + cagrilar + " " + p.kayit.harca.join(","));
+  }).catch(function (e) { ok("3.4 kesim kabı çöktü: " + (e && e.stack || e), false); });
+})();
+
+// 3.4 adım 7: panel açılışında Premiere'e katman sorulmaz; kapsam düğmesi okur, çipler deneme hakkı harcamaz
+var bekleyenKapsam = (function () {
+  var duzen = { ok: true, seqId: "s1", duration: 30,
+    video: [{ name: "Video 1", clipCount: 1, first: 0, last: 30, klipler: [{ s: 0, e: 30, yol: "a.mp4", hiza: 0 }] }],
+    audio: [{ name: "Audio 1", clipCount: 1, first: 0, last: 30, klipler: [{ s: 0, e: 30, yol: "a.mp4", hiza: 0, bag: [{ s: 0, e: 30, tur: "Video" }] }] },
+      { name: "BGM", clipCount: 1, first: 0, last: 30, klipler: [{ s: 0, e: 30, yol: "m.mp3", hiza: 0, bag: [] }] }] };
+  var p = kabi.kesimPaneli({ K: { iptalJetonu: function () { return { iptal: function () {} }; } }, ffmpeg: "ffmpeg", clip: null,
+    ctx: { hasSeq: true, sequenceId: "s1", seqIn: 0, seqOut: 30, seqDur: 30, frame: 0.04 },
+    call: function (fn) { return fn === "KS_getTrackLayout" ? duzen : { ok: false, error: fn }; } });
+  ok("3.4 kapsam: panel açılışında Premiere'e hiçbir şey sorulmaz (katman okunmaz)", p.kayit.call.length === 0, p.kayit.call.length);
+  p.kapsam("entire");
+  return p.bekle(10).then(function () {
+    var cagri = p.kayit.call.filter(function (c) { return c.fn === "KS_getTrackLayout"; });
+    var kor = p.el("cut-koru-izler").children;
+    ok("3.4 kapsam Sekans: katmanlar bir kez okundu; 'BGM' adlı ses katmanı korunuyor (önceden işaretli), video işaretsiz",
+      cagri.length === 1 && kor.length === 3 && / on/.test(kor[2].className) && !/ on/.test(kor[0].className) && p.el("cut-katman").open === true,
+      kor.map(function (b) { return b.className; }).join(" | "));
+    kor[0].onclick(); kor = p.el("cut-koru-izler").children;
+    p.el("cut-dinle-izler").children[1].onclick();
+    ok("3.4 çipler: koruma / dinleme değişimi deneme hakkı harcamaz, Premiere'e gitmez",
+      p.kayit.harca.length === 0 && p.kayit.gate.length === 0 && p.kayit.call.length === 1 && / on/.test(kor[0].className) && / on/.test(p.el("cut-dinle-izler").children[1].className));
+  });
+})().catch(function (e) { ok("3.4 kapsam kabı çöktü: " + (e && e.stack || e), false); });
+
+Promise.all([bekleyenUI, bekleyenKesim, bekleyenKapsam]).then(function () {
   console.log("\n" + gecti + "/" + (gecti + kaldi) + " gecti");
   process.exit(kaldi ? 1 : 0);
 });

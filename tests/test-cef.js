@@ -28,6 +28,13 @@ fs.readdirSync(dizin).filter(function (f) { return /\.js$/.test(f) && f !== "CSI
   });
   ok("js/" + f + ": Chromium 74 / Node 12 uyumlu", bulgular.length === 0, bulgular.slice(0, 4).join(" | "));
 });
+// 3.4 Yapay zekâ köprüsü: panel sunucusu ve kaydı (js/otomasyon*.js) yukarıdaki taramada; stdio shim'i
+// (mcp/suflo-mcp.js) Premiere'de değil, kullanıcının Node 18+'inde çalışır: CEF taramasından bilerek hariç
+ok("MCP panel kodu taranan js/ içinde, shim js/ dışında", ["otomasyon.js", "otomasyon-sunucu.js", "otomasyon-panel.js"].every(function (f) { return fs.existsSync(path.join(dizin, f)); }) &&
+  !fs.existsSync(path.join(dizin, "suflo-mcp.js")) && fs.existsSync(path.join(__dirname, "..", "mcp", "suflo-mcp.js")));
+var sunucuSrc = ayikla(fs.readFileSync(path.join(dizin, "otomasyon-sunucu.js"), "utf8"));
+ok("MCP sunucusu Node 12.3'te olan API'lerle: timingSafeEqual, randomBytes, Buffer.from; async/await yok", /timingSafeEqual/.test(sunucuSrc) && /randomBytes\(32\)/.test(sunucuSrc) &&
+  !/\basync\b|\bawait\b|\bclass\b|=>/.test(sunucuSrc) && !/\b(let|const)\s/.test(sunucuSrc));
 // Node 14+ fs API'leri yalniz yedekli kullanilir (ornegin fs.rmSync -> rmrf yedegi)
 var yedeksiz = [];
 fs.readdirSync(dizin).filter(function (f) { return /\.js$/.test(f); }).forEach(function (f) {
@@ -134,6 +141,20 @@ ok("Altyazı Efektleri: gizli onay kutularının :focus-visible kuralı ayrı bi
 
 ok("Tüm .switch anahtarları CEF 74'te klavye odağı gösterir (:focus yedeği + :not(:focus-visible))",
   tumSeciciler.indexOf(".switch input:focus + i") !== -1 && tumSeciciler.indexOf(".switch input:focus:not(:focus-visible) + i") !== -1);
+// Eğri sekmesi (3.4 adım 10): flex gap, overflow-wrap:anywhere ve :focus-visible yok (CEF 74 kuralı tümden atar)
+var egriKurallari = [], gre = /([^{}]*(?:\.egri-)[^{}]*)\{([^{}]*)\}/g, gm;
+while ((gm = gre.exec(css))) egriKurallari.push({ secici: gm[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), govde: gm[2] });
+var egriCssSorun = egriKurallari.filter(function (k) {
+  return (/display:\s*(inline-)?flex/.test(k.govde) && /(^|[;\s])(row-|column-)?gap:/.test(k.govde)) || /overflow-wrap:\s*anywhere/.test(k.govde) || /:focus-visible/.test(k.secici);
+}).map(function (k) { return k.secici; });
+ok("Eğri CSS: flex gap, overflow-wrap:anywhere ve :focus-visible yok (CEF 74)", egriKurallari.length >= 40 && egriCssSorun.length === 0, egriKurallari.length + " kural · " + egriCssSorun.join(" | "));
+// 3.4 adım 11: kaldırma satırı (Geçişi kaldır / Önayarı kaldır) — aynı kural
+var kaldirKurallari = [], kkre = /([^{}]*(?:\.kaldir-)[^{}]*)\{([^{}]*)\}/g, kkm;
+while ((kkm = kkre.exec(css))) kaldirKurallari.push({ secici: kkm[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), govde: kkm[2] });
+var kaldirCssSorun = kaldirKurallari.filter(function (k) {
+  return /(^|[;\s])(row-|column-)?gap:/.test(k.govde) || /overflow-wrap:\s*anywhere/.test(k.govde) || /:focus-visible/.test(k.secici);
+}).map(function (k) { return k.secici; });
+ok("Kaldırma satırı CSS: flex gap, overflow-wrap:anywhere ve :focus-visible yok (CEF 74)", kaldirKurallari.length >= 4 && kaldirCssSorun.length === 0, kaldirKurallari.length + " kural · " + kaldirCssSorun.join(" | "));
 
 var ornekRegex = ayikla("function f(x){ return /a'b/.test(x); }\nvar y = o?.p;");
 ok("denetleyici: return'den sonraki regex metin sanilmaz, arkasindaki kod gorunur", /o\?\.p/.test(ornekRegex.split("\n")[1]));

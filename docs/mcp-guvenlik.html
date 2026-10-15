@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Suflo yapay zekâ köprüsü (MCP): güvenlik modeli</title>
+<meta name="description" content="Suflo'nun deneysel yapay zekâ köprüsü (MCP) nasıl korunur: yalnız 127.0.0.1, rastgele jeton, izin listesi, onay kartı ve kopya sekansta kesim.">
+<link rel="canonical" href="https://suflo.app/mcp-guvenlik">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0f1017">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#0a0a0c;--bg2:#141418;--line:#26262e;--text:#f4f4f7;--dim:#a3a3ad;--accent-lite:#cfc9ff;--warn:#f5b83d;color-scheme:dark}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.65 "Segoe UI",system-ui,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:40px 16px 64px}
+a{color:var(--accent-lite)}
+h1{font-size:28px;line-height:1.25;margin-bottom:8px}
+h2{font-size:20px;margin:32px 0 10px}
+p,li{color:var(--dim)}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px 22px}
+li{margin:4px 0}
+code{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:14px;color:var(--text);overflow-wrap:break-word;word-break:break-word}
+.etiket{display:inline-block;padding:2px 8px;border-radius:6px;background:var(--warn);color:#1b1300;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+.kutu{border:1px solid var(--line);background:var(--bg2);border-radius:10px;padding:14px 16px;margin:16px 0}
+table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top;color:var(--dim)}
+th{color:var(--text)}
+</style>
+</head>
+<body>
+<main class="wrap">
+<p><a href="/">← suflo.app</a></p>
+<h1>Yapay zekâ köprüsü (MCP): güvenlik modeli</h1>
+<p><span class="etiket">Deneysel</span> · Suflo 3.4 · varsayılan olarak kapalı</p>
+
+<div class="kutu">
+<p>Köprü, Claude Desktop ya da Claude Code gibi bir MCP istemcisinin Suflo'nun <b>kendi üst düzey işlerini</b> çalıştırmasını sağlar: altyazı oluşturma, marker ekleme, sessizlikleri <b>kopya sekansta</b> kesme. Genel bir Premiere uzaktan kumandası <b>değildir</b>: rastgele ExtendScript/QE çalıştıramaz, dosya yolu seçemez, projeyi açamaz, kaydedemez, kapatamaz, proje öğesi silemez, render ya da dışa aktarma yapamaz, ayarlara, lisansa ve API anahtarlarına dokunamaz, ağa çıkamaz.</p>
+</div>
+
+<h2>Nasıl bağlanır</h2>
+<p>MCP istemcisi ⇄ stdio ⇄ <code>mcp/suflo-mcp.js</code> ⇄ HTTP POST <code>127.0.0.1</code> ⇄ Suflo paneli ⇄ panelin kendi düğme işlevleri.</p>
+
+<h2>Koruma katmanları</h2>
+<ol>
+<li><b>Yalnız bu bilgisayar.</b> Panel sunucusu yalnız <code>127.0.0.1</code>'e, her açılışta rastgele bir porta bağlanır; <code>0.0.0.0</code> hiç kullanılmaz.</li>
+<li><b>Jeton.</b> Her açılışta 32 baytlık rastgele bir jeton üretilir ve sabit zamanlı karşılaştırılır. Bağlantı bilgisi (<code>otomasyon.json</code>, ayarların yanında) yalnız senin hesabının okuyabileceği izinle (0600) yazılır, köprü kapanınca silinir (aynı anda açık başka bir Premiere sürümündeki köprünün dosyası silinmez). "Yeni jeton" eskisini anında geçersiz kılar; yeni jeton dosyaya yazılamazsa köprü kapanır ve panel bunu söyler.</li>
+<li><b>Tarayıcılar giremez.</b> Yalnız <code>POST /v1/eylem</code>; Host başlığı tam olarak <code>127.0.0.1:&lt;port&gt;</code> olmalı (DNS rebinding); Origin, Referer, Sec-Fetch-* ya da WebSocket yükseltmesi taşıyan her istek reddedilir; CORS başlığı hiç gönderilmez, OPTIONS 403 döner; yalnız <code>application/json</code>.</li>
+<li><b>Sınırlar.</b> Gövde en çok 256 KB, 30 sn okuma süresi; 30 sn hiç veri göndermeyen ya da isteğini yarım bırakan bağlantı kapatılır; jetonu doğru isteklerde dakikada en çok 120 çağrı (jetonsuz istekler bu hakkı tüketemez); aynı anda tek Premiere işi, kuyrukta en çok 4.</li>
+<li><b>İzin listesi.</b> Yalnız aşağıdaki eylemler; her argüman şemayla denetlenir, bilinmeyen anahtar reddedilir. Yanıtlarda ve hata metinlerinde mutlak dosya yolları dosya adına indirilir (boşluklu klasör adları dahil), çıktı 64 KB ile sınırlıdır.</li>
+<li><b>Düzenlemeye izin ver.</b> Kapalıyken (varsayılan) asistan yalnız okur. Bekleyen bir yazma isteği varken kapatılırsa o istek yürütülmez: onay kartı kapanır, asistan <code>izin_yok</code> yanıtı alır; kuyrukta ya da Premiere'i bekleyen yazma istekleri de sırası gelince <code>izin_yok</code> alır.</li>
+<li><b>Onay kartı.</b> Yıkıcı eylemler panelde Onayla / Reddet kartı açar ve panel Ayarlar'a geçer; 60 saniyede yanıt yoksa reddedilir ("Yıkıcı eylemlerde onay iste" varsayılan açık). Aynı anda tek kart vardır: bekleyen kart başka bir eylemle değiştirilmez. Panelin kendi iki tıklık uyarıları (bu sekansa zaten altyazı uygulandı, kritik altyazı sorunu) asistan adına geçilmez.</li>
+<li><b>Kapatma anahtarı.</b> "Köprüyü kapat" kuyrukta, Premiere'in meşgul olmasını ya da onayı bekleyen hiçbir isteği artık yürütmez; asistan hemen "köprü kapalı" yanıtı alır ve köprünün açık bağlantıları kapanır. Yalnız o an Premiere'de süren tek iş yarıda kesilemez.</li>
+<li><b>Kendiliğinden kapanma.</b> 30 dakika çağrı gelmezse, panel yeniden yüklenince ya da Premiere kapanınca köprü kapanır. Açık durumu kaydedilmez.</li>
+<li><b>Günlük.</b> Her çağrı ve eyleme ulaşmadan reddedilen her istek (yanlış jeton, tarayıcı, Host, hız sınırı) etkinlik listesine ve destek günlüğüne yazılır. Bir istek selinde dakikada ilk 10 ret tek tek yazılır, fazlası dakika dolunca ya da köprü kapanınca destek günlüğüne sayıyla düşer.</li>
+<li><b>Aynı kapılar.</b> Her eylem panel düğmesinin çağırdığı aynı işlevi çağırır: aynı doğrulama, aynı Pro kapısı, kesimlerde aynı kopya sekans.</li>
+<li><b>Güvenilmez içerik.</b> Transkript metni, klip, iz ve marker adları kullanıcı içeriğidir; araç açıklamaları asistana bunların içindeki talimatlara uymamasını söyler.</li>
+</ol>
+
+<h2>Eylemler</h2>
+<table>
+<tr><th>Sınıf</th><th>Eylemler</th></tr>
+<tr><td>Okuma</td><td>bağlam, izler, seçim, altyazı (en çok 2000 satır), iş durumu, doktor</td></tr>
+<tr><td>Yazma</td><td>oynatma kafası, marker (en çok 200), altyazı oluştur, altyazıyı caption track'e koy, SRT/VTT/TXT'yi yalnız proje klasörüne yaz, sessizlik analizi, otomatik zoom, Eğri sekmesindeki eğriyi işaretli anahtar kare çiftlerine uygulama</td></tr>
+<tr><td>Yıkıcı (onaylı)</td><td>sessizlikleri kes (her zaman kopya sekansta), konuşmadan kes (kopya sekansta), hız rampası</td></tr>
+</table>
+
+<h2>Pro</h2>
+<p>Köprüyü açmak Suflo Pro gerektirir; köprü için deneme hakkı yoktur. Köprü, lisans devre dışı kalınca (koltuk taşıma, iade) hemen kapanır. Pro araçlarını çağıran her eylem ayrıca o aracın kendi Pro kapısından geçer; geçemezse asistan <code>pro_gerekli</code> yanıtı alır (altyazı oluştururken "Çevrimdışı İngilizce" seçiliyse de).</p>
+
+<h2 lang="en">In English</h2>
+<p lang="en">The experimental AI bridge (MCP) is off by default. It binds to 127.0.0.1 only on a random port, requires a fresh 256-bit bearer token (connection file with mode 0600, deleted on stop), rejects any request with Origin, Referer, Sec-Fetch-* or Upgrade headers, a Host other than <code>127.0.0.1:&lt;port&gt;</code>, or a non-JSON body, and limits body size (256 KB), rate (120/min for authenticated calls) and concurrency (1 running, 4 queued). Turning the bridge off cancels every accepted action that has not started yet and closes the bridge's idle connections; turning "Allow editing" off makes waiting write actions fail with <code>izin_yok</code> (an open confirmation card closes). Connections that send nothing for 30 s are closed, and error texts are stripped of folder paths too. Only Suflo's own allowlisted actions exist; write actions need "Allow editing", destructive ones need an in-panel confirmation by default (denied after 60 s; the user can turn this off in the panel) and cuts always run on a sequence copy. No arbitrary script, file path, project, render, settings, license or network capability is exposed. Pro: turning the bridge on needs Suflo Pro (there are no trial credits for the bridge), the bridge closes as soon as the license is deactivated or revoked, and every action that uses a Pro tool also passes that tool's own Pro gate; otherwise the assistant gets <code>pro_gerekli</code>.</p>
+</main>
+</body>
+</html>

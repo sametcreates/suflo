@@ -25,6 +25,11 @@
       </span>
     </div>
     <div class="top-right">
+      <!-- 3.4 adım 20: Araç ara (Ctrl+K / ⌘K). Başlık ve kısayol metni macOS'ta app.js'te ⌘K olur -->
+      <button type="button" id="arac-ara-ac" class="arac-ara-ac" title="Araç ara (Ctrl+K)" aria-label="Araç ara" aria-haspopup="dialog" aria-expanded="false" aria-controls="arac-ara">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3.6 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <kbd class="arac-ara-kisayol">Ctrl+K</kbd>
+      </button>
       <button id="pro-chip" class="pro-chip" title="Suflo Pro">
         <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l1.4 3.1L11 4.5 8.5 6.8l.7 3.4L6 8.6 2.8 10.2l.7-3.4L1 4.5l3.6-.4z" fill="currentColor"/></svg>
         <span>PRO</span>
@@ -74,6 +79,11 @@
     <button class="ky-oge" data-tab="hiz">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14a7 7 0 0 1 14 0"/><path d="M10 14l4-5"/></svg></span>
       <span class="ky-metin"><b>Hız Rampası <em class="ky-yeni">YENİ</em></b><i>ağır çekim · hızlanma</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
+    <button class="ky-oge" data-tab="egri">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16C9 16 9 4 17 4"/><circle cx="3" cy="16" r="1.3"/><circle cx="17" cy="4" r="1.3"/></svg></span>
+      <span class="ky-metin"><b>Eğri <em class="ky-yeni">YENİ</em></b><i>anahtar kare yumuşatma</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
     <button class="ky-oge" data-tab="kanca">
@@ -1086,6 +1096,27 @@
         <li><span>3</span> Turuncu bölümleri kontrol et → <b>Kesimleri uygula</b></li>
       </ol>
     </div>
+    <!-- 3.4 adım 7: kesim kapsamı ve korunan katmanlar (js/magiccut.js kapsamSec / renderKatmanlar) -->
+    <div class="seg-ctl full" id="cut-scope" role="group" aria-label="Kesim kapsamı">
+      <button class="on" data-s="clip" type="button">Seçili klip</button>
+      <button data-s="inout" type="button" title="Sekansın In ve Out noktaları arası: seçili ses katmanlarının karışımı dinlenir">In → Out</button>
+      <button data-s="entire" type="button" title="Tüm sekans: seçili ses katmanlarının karışımı dinlenir">Sekans</button>
+    </div>
+    <details class="adv cut-katman" id="cut-katman">
+      <summary>Katmanlar <span id="cut-katman-ozet" class="dim"></span></summary>
+      <p id="cut-katman-ipucu" class="hint"></p>
+      <div id="cut-dinle-satir" class="cut-iz-satir" hidden>
+        <div class="cut-iz-baslik">Dinlenecek ses</div>
+        <div id="cut-dinle-izler" class="tracks"></div>
+        <p class="hint">Sessizlik bu katmanların karışımında aranır. Müziği dinlemeye katma: sessizlikleri doldurur.</p>
+      </div>
+      <div id="cut-koru-satir" class="cut-iz-satir" hidden>
+        <div class="cut-iz-baslik">Kesilmeyecek katmanlar</div>
+        <div id="cut-koru-izler" class="tracks"></div>
+        <p class="hint">Korunan katman kesilmez ve kaymaz (arka plan müziği gibi). Kesikli çerçeve: öneri.</p>
+      </div>
+      <button id="cut-katman-yenile" class="btn tiny" type="button" title="Sekansın katmanlarını Premiere'den yeniden oku">Yenile</button>
+    </details>
     <div class="action-bar">
       <button id="cut-analyze" class="btn primary big" disabled>
         <span class="btn-label">Sessizlikleri bul</span>
@@ -1094,13 +1125,20 @@
     </div>
     <div id="cut-progress" class="progress-line" hidden><i></i></div>
     <div id="cut-status" class="inline-status"></div>
+    <!-- 3.4 adım 8: kesimden sonra altyazı (js/kesim-altyazi.js; ücretsiz) -->
+    <div id="cut-altyazi" class="kesim-altyazi" hidden>
+      <span id="cut-altyazi-metin" class="kesim-altyazi-metin"></span>
+      <button id="cut-altyazi-uyarla" class="btn tiny" type="button" title="Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)">Altyazıyı yeni kurguya uyarla</button>
+    </div>
 
     <details class="adv">
       <summary>Hassasiyet</summary>
+      <p class="hint cut-canli-ipucu">Analizden sonra kaydırıcılar kesim haritasını anında günceller; ffmpeg yeniden çalışmaz.</p>
       <div class="row">
         <label>Eşik</label>
         <input id="cut-noise" type="range" min="-60" max="-20" value="-38">
         <span id="cut-noise-val" class="mono">-38 dB</span>
+        <button id="cut-noise-auto" class="btn tiny" type="button" title="Eşiği klibin kendi sesinden öner: arka plan gürültüsünün 8 dB üstü">Otomatik</button>
       </div>
       <div class="row">
         <label>Min. sessizlik</label>
@@ -1112,6 +1150,11 @@
         <input id="cut-pad" type="range" min="0" max="0.5" step="0.05" value="0.15">
         <span id="cut-pad-val" class="mono">0.15 sn</span>
       </div>
+      <div class="row" title="İki kesim arasında bundan kısa konuşma kalırsa kesimler birleşir (0 = kapalı)">
+        <label>Min. konuşma</label>
+        <input id="cut-minkeep" type="range" min="0" max="0.6" step="0.05" value="0">
+        <span id="cut-minkeep-val" class="mono">0 sn</span>
+      </div>
     </details>
 
     <div id="cut-result" hidden>
@@ -1121,10 +1164,13 @@
       </div>
       <audio id="cut-audio" class="tc-audio" controls hidden></audio>
       <div id="cut-bar" class="cut-bar" title="Turuncu: kesilecek — tıklayıp kapatabilirsin"></div>
+      <canvas id="cut-wave" class="cut-wave" hidden aria-label="Ses zarfı ve eşik çizgisi"></canvas>
       <details class="adv">
         <summary>Kesim listesi</summary>
         <div id="cut-ranges" class="segments"></div>
       </details>
+      <!-- korunan katman uyarıları: video + ripple (Boşluk bırakarak uygula), bağlı çiftin ayrılması -->
+      <div id="cut-koru-uyari" class="cut-koru-uyari" hidden></div>
       <div class="seg-ctl full" id="cut-target">
         <button class="on" data-m="clone">Kopya sekansta<em>önerilen</em></button>
         <button data-m="here">Bu sekansta</button>
@@ -1184,6 +1230,12 @@
       </div>
       <div id="tc-progress" class="progress-line" hidden><i></i></div>
       <div id="tc-status" class="inline-status"></div>
+      <!-- 3.4 adım 8: kesimden sonra altyazı (js/kesim-altyazi.js; ücretsiz) -->
+      <div id="tc-altyazi" class="kesim-altyazi" hidden>
+        <span id="tc-altyazi-metin" class="kesim-altyazi-metin"></span>
+        <button id="tc-altyazi-aktar" class="btn tiny" type="button" title="Kesilmeyen kelimelerden yeni kurgunun zamanlarıyla altyazı kurar (yeniden yazıya dökmeden)">Altyazıya aktar</button>
+        <button id="tc-altyazi-uyarla" class="btn tiny" type="button" title="Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)">Altyazıyı yeni kurguya uyarla</button>
+      </div>
       <div id="tc-sessiz" class="sessiz-uyari" role="alert" hidden>
         <span id="tc-sessiz-metin" class="sessiz-uyari-metin"></span>
         <div class="sessiz-uyari-btns">
@@ -1319,6 +1371,10 @@
       <button data-s="jumpcut">Jump Cut<em>sert kesme</em></button>
       <button data-s="snapin">Snap-In<em>hızlı</em></button>
     </div>
+    <!-- 3.4 adım 12: özel eğri (varsayılan Otomatik) -->
+    <div class="egri-secici" id="zoom-egri">
+      <p class="hint egri-secici-not">Yumuşak ve Snap-In stillerinde her zoom hareketinin hızlanıp yavaşlamasını eğri belirler (Yumuşak'ın küçük taşmasının yerini alır); Jump Cut sert kesmedir, eğri kullanmaz. Özel eğri her kareye anahtar kare yazar; uzun kliplerde uygulama biraz daha sürer.</p>
+    </div>
     <div class="zoom-lbl">Zoom merkezi <span style="color:var(--faint);font-weight:450">— sabit nokta</span></div>
     <div class="zoom-nokta" id="zoom-nokta" role="group" aria-label="Zoom merkezi">
       <button data-a="0.2,0.2" aria-label="sol üst"></button>
@@ -1355,6 +1411,7 @@
     <div id="zoom-progress" class="progress-line" hidden><i></i></div>
     <div id="zoom-status" class="inline-status"></div>
     <button id="zoom-remove" class="btn outline" style="width:100%">Zoom'u kaldır</button>
+    <p class="kaldir-not">Yalnız Suflo'nun yazdığı zoom anahtar karelerini kaldırır; kendi anahtar karelerine dokunmaz. Ücretsiz.</p>
   </section>
 
   <!-- ================= RITIM ================= -->
@@ -1492,6 +1549,10 @@
         </select>
       </label>
     </div>
+    <!-- 3.4 adım 12: özel eğri (varsayılan Otomatik); yalnız panelin 12 Suflo önayarı, paket presetleri kendi eğrisini korur -->
+    <div class="egri-secici" id="preset-egri">
+      <p class="hint egri-secici-not">Panelin 12 Suflo önayarında her hareketin hızlanıp yavaşlamasını eğri belirler; Suflo Smooth paketindeki presetler kendi eğrisini korur. Özel eğri her kareye anahtar kare yazar; Önayarı kaldır yine yalnız Suflo'nun anahtarlarını siler.</p>
+    </div>
     <div class="preset-subbar">
       <div class="seg-ctl" id="preset-filter">
         <button class="on" data-f="all">Tümü</button>
@@ -1505,6 +1566,11 @@
       <span id="preset-count" class="dim">290 panel preseti</span>
     </div>
     <div class="preset-note"><span>1</span> Timeline’da klibi seç <i>·</i><span>2</span> Preset kartında Uygula’ya bas <i>→</i><b>Doğrudan timeline</b></div>
+    <!-- 3.4 adım 11: kayıt tabanlı kaldırma (kapısız) -->
+    <div class="kaldir-satir">
+      <button id="preset-kaldir" class="btn outline" type="button">Önayarı kaldır</button>
+      <span class="kaldir-not">Seçili klipte yalnız Suflo'nun yerleşik hareket önayarlarının yazdığı anahtar kareleri kaldırır (Suflo Smooth paket presetleri kayıt tutmaz); kendi anahtar karelerine dokunmaz.</span>
+    </div>
     <div id="preset-grid" class="preset-grid"></div>
     <div id="preset-empty" class="empty-state" hidden>
       <b>Eşleşen preset yok</b>
@@ -1548,6 +1614,15 @@
         </select>
       </label>
     </div>
+    <!-- 3.4 adım 12: özel eğri (varsayılan Otomatik: Suflo'nun bugünkü yumuşatması; js/egri.js SufloEgriSecici) -->
+    <div class="egri-secici" id="gecis-egri">
+      <p class="hint egri-secici-not">Gelen klip (B) eğriyi izler; giden klip (A) eğrinin aynasıyla kesime gelir, iki yarı kesimde buluşur. Özel eğri Premiere'e her kareye (1 sn'den uzun harekette 2 karede bir) anahtar kare olarak yazılır; Geçişi kaldır yine yalnız Suflo'nun anahtarlarını siler.</p>
+    </div>
+    <!-- 3.4 adım 11: kayıt tabanlı kaldırma (kapısız: ücretsizde de çalışır) -->
+    <div class="kaldir-satir">
+      <button id="gecis-kaldir" class="btn outline" type="button">Geçişi kaldır</button>
+      <span class="kaldir-not">Playhead'e en yakın Suflo geçişini kaldırır (en çok 1 sn uzakta; seçili klip değil playhead belirler); kendi anahtar karelerine dokunmaz.</span>
+    </div>
     <div id="gecis-status" class="inline-status"></div>
     <div id="gecis-grid" class="preset-grid gecis-grid"></div>
   </section>
@@ -1583,6 +1658,37 @@
       </label>
     </div>
     <div id="hiz-grid" class="preset-grid hiz-grid"></div>
+    <!-- 3.4 adım 13: Özel eğri düzenleyicisi (SufloEgriEditor mod 'hiz'; yalnız Özel eğri seçiliyken görünür). Düzenlemek ücretsiz,
+         uygulamak Rampayı uygula ile aynı kapıdan (speedramp, 3 deneme). aria-label kutuda: SVG çevrilmez -->
+    <div id="hiz-ozel" class="hiz-ozel" hidden>
+      <div class="hiz-ozel-bas">
+        <b>Özel eğri</b>
+        <label class="hiz-ozel-hit-etiket" title="Darbe anını playhead'e hizala açıkken playhead'e oturan an; çizgiyi üstteki noktasından sürükle"><input id="hiz-ozel-hit" type="checkbox" checked> Ağır çekim anı</label>
+      </div>
+      <div id="hiz-ozel-editor" class="egri-editor hiz-ozel-editor" tabindex="0" role="img" aria-label="Özel hız eğrisi düzenleyicisi"></div>
+      <p class="hint hiz-ozel-ipucu">Tıkla: nokta ekle · sürükle: taşı · çift tık: sil · Shift: ızgaraya yapış · Alt+tık: sert basamak. Yoğunluk ve Yumuşatma özel eğriye de uygulanır.</p>
+      <div class="row hiz-ozel-arac">
+        <button id="hiz-ozel-basamak" class="btn tiny" type="button" title="Seçili noktada hız bir anda değişsin (Alt+tık)" disabled>Sert basamak</button>
+        <button id="hiz-ozel-sil" class="btn tiny" type="button" title="Seçili noktayı sil (Delete ya da çift tık)" disabled>Noktayı sil</button>
+        <button id="hiz-ozel-sifirla" class="btn tiny" type="button" title="Başlangıç eğrisine dön">Sıfırla</button>
+      </div>
+      <div class="row hiz-ozel-kayit-satir">
+        <input id="hiz-ozel-ad" type="text" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Özel rampa adı">
+        <button id="hiz-ozel-kaydet" class="btn tiny" type="button" title="Bu eğriyi adıyla sakla (bu bilgisayarda, en çok 12)">Kaydet</button>
+        <button id="hiz-ozel-adlandir" class="btn tiny" type="button" title="Seçili kayıtlı rampanın adını kutudaki adla değiştir" disabled>Adı değiştir</button>
+      </div>
+      <div id="hiz-ozel-kayitlar" class="hiz-ozel-kayitlar" role="group" aria-label="Kayıtlı özel rampalar" hidden></div>
+      <div class="row hiz-ozel-paylas">
+        <textarea id="hiz-ozel-kod" rows="2" spellcheck="false" autocomplete="off" placeholder="Hız Rampası kodu (SFC1) yapıştır" aria-label="Hız Rampası kodu yapıştır"></textarea>
+        <button id="hiz-ozel-kod-yukle" class="btn tiny" type="button" title="Tek kod düzenleyiciye gelir; birden çok kod kayıtlı rampalara eklenir">Yükle</button>
+      </div>
+      <div class="row hiz-ozel-paylas-eylem">
+        <button id="hiz-ozel-kod-kopyala" class="btn tiny" type="button" title="Bu özel eğrinin SFC1 kodunu ve suflo.app/egri bağlantısını kopyala">Kodu kopyala</button>
+        <button id="hiz-ozel-ice-aktar" class="btn tiny" type="button" title=".suflo-egri dosyasını oku (özel rampalar buraya, eğriler Eğri sekmesine)">İçe aktar…</button>
+        <button id="hiz-ozel-disa-aktar" class="btn tiny" type="button" title="Kayıtlı özel rampaları .suflo-egri dosyasına yaz">Dışa aktar…</button>
+      </div>
+      <p class="hint hiz-ozel-paylas-ipucu">Paylaşmak ücretsiz; kayıtlı rampaları sürükleyerek sıralayabilirsin. Uygulamak yine Rampayı uygula'dan geçer.</p>
+    </div>
     <div class="hiz-onizleme-kutu">
       <!-- aria-label SVG'nin dışında: çeviri SVG'ye girmez, İngilizce ekran okuyucu da çevrilmiş adı duysun -->
       <div class="hiz-onizleme-cerceve" role="img" aria-label="Hız eğrisi önizlemesi">
@@ -1647,6 +1753,133 @@
     </div>
     <div id="hiz-status" class="inline-status" role="status" aria-live="polite"></div>
     <p class="hint">Ctrl+Z rampayı tek adımda geri almaz; geri almak için Rampayı kaldır'ı kullan. Yakınlaştırma ve geçişleri rampadan sonra ekle.</p>
+  </section>
+
+  <!-- ================= EGRI (3.4 adım 10): kullanıcının kendi anahtar karelerine özel yumuşatma ================= -->
+  <section id="tab-egri" class="tabpane">
+    <div class="pro-tanitim" id="egri-tanitim" hidden>
+      <div class="pt-copy">
+        <span class="pt-rozet">SUFLO PRO</span>
+        <b>Anahtar karelerine özel eğri</b>
+        <span>Eğriyi ve yaylanmayı düzenlemek, önizlemek ve geri almak ücretsiz; anahtar karelerine uygulamak Pro.</span>
+      </div>
+      <div class="pt-proof" aria-label="Pro özeti">
+        <i><strong>15</strong> hazır eğri</i><i><strong>8</strong> nokta</i><i><strong>1×</strong> lisans</i>
+      </div>
+      <button class="btn primary pro-ac-btn" data-pro-feature="curves">Eğriyi aç — 749 TL</button>
+    </div>
+    <div class="cut-intro">
+      <div class="ci-head">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 16C9 16 9 4 17 4"/><circle cx="3" cy="16" r="1.3"/><circle cx="17" cy="4" r="1.3"/></svg>
+        <b>Kendi anahtar karelerine özel yumuşatma</b>
+      </div>
+      <p class="ci-p">Effect Controls'te bir özelliğe iki anahtar kare koy, playhead'i aralarına getir, eğriyi seç ve uygula. Premiere'in betikleri Bezier tutamaçlarını yazamadığı için Suflo eğriyi her kareye (ya da 2 / 4 karede bir) anahtar kare olarak yazar; uçlardaki iki anahtar karen değişmez.</p>
+    </div>
+    <div class="egri-ust">
+      <div class="egri-editor-kutu">
+        <div class="egri-gorunum" role="group" aria-label="Görünüm">
+          <button id="egri-gorunum-deger" class="btn tiny on" type="button" aria-pressed="true" title="Değer eğrisi (V)">Değer</button>
+          <button id="egri-gorunum-hiz" class="btn tiny" type="button" aria-pressed="false" title="Hız eğrisi (V)">Hız</button>
+        </div>
+        <!-- aria-label kutuda: SVG çevrilmez, ekran okuyucu çevrilmiş adı duyar -->
+        <div id="egri-editor" class="egri-editor" tabindex="0" role="img" aria-label="Eğri düzenleyici"></div>
+        <p class="hint egri-ipucu">Tutamaçları sürükle · Shift 0,05'e yapışır · çift tık nokta ekler · Alt tutamaçları ayırır · Delete seçili noktayı siler</p>
+      </div>
+      <div class="egri-sahne-kutu">
+        <div id="egri-sahne" class="egri-sahne" role="img" aria-label="Canlı önizleme"><i id="egri-kare" class="egri-kare"></i></div>
+        <label class="preset-control egri-css-kutu">cubic-bezier
+          <input id="egri-css" type="text" maxlength="4096" spellcheck="false" autocomplete="off" placeholder="cubic-bezier(0.25, 0.1, 0.25, 1)">
+        </label>
+        <div class="egri-sayilar">
+          <label>P1 x <input id="egri-p1x" type="number" step="0.01" min="0" max="1"></label>
+          <label>P1 y <input id="egri-p1y" type="number" step="0.01" min="-1" max="2"></label>
+          <label>P2 x <input id="egri-p2x" type="number" step="0.01" min="0" max="1"></label>
+          <label>P2 y <input id="egri-p2y" type="number" step="0.01" min="-1" max="2"></label>
+        </div>
+        <div class="row egri-donustur">
+          <button id="egri-cevir" class="btn tiny" type="button" title="Yumuşak giriş ↔ yumuşak çıkış (F)">Yönü çevir</button>
+          <button id="egri-ters" class="btn tiny" type="button" title="Eksenleri değiştir; yalnız taşmayan eğrilerde (I)">Ters çevir</button>
+          <button id="egri-kaydet" class="btn tiny" type="button" title="Bu eğriyi önayarlarına ekle (bu bilgisayarda saklanır)">Önayar olarak kaydet</button>
+        </div>
+      </div>
+    </div>
+    <div id="egri-onayarlar" class="egri-onayarlar" role="group" aria-label="Hazır eğriler"></div>
+    <div id="egri-onayar-duzen" class="row egri-onayar-duzen" hidden>
+      <input id="egri-onayar-ad" type="text" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Önayar adı">
+      <button id="egri-onayar-adlandir" class="btn tiny" type="button" title="Seçili önayarın adını değiştir">Adı değiştir</button>
+      <button id="egri-onayar-sola" class="btn tiny" type="button" title="Önayarı bir sola taşı (kartları sürükleyerek de sıralayabilirsin)" aria-label="Önayarı sola taşı">◀</button>
+      <button id="egri-onayar-saga" class="btn tiny" type="button" title="Önayarı bir sağa taşı (kartları sürükleyerek de sıralayabilirsin)" aria-label="Önayarı sağa taşı">▶</button>
+    </div>
+    <div id="egri-paylas" class="egri-paylas" role="group" aria-label="Paylaş ve içe aktar">
+      <div class="egri-paylas-bas">
+        <b>Paylaş ve içe aktar</b>
+        <span class="hint">Ücretsiz. Kod tek satırdır (suflo.app/egri bağlantısıyla); dosya kendi önayarlarının hepsini taşır.</span>
+      </div>
+      <div class="row egri-kod-satir">
+        <textarea id="egri-kod" rows="2" spellcheck="false" autocomplete="off" placeholder="SFC1 kodu, bağlantı ya da cubic-bezier(…) yapıştır" aria-label="Eğri kodu yapıştır"></textarea>
+        <button id="egri-kod-yukle" class="btn tiny" type="button" title="Tek eğri düzenleyiciye gelir; birden çok kod önayarlarına eklenir">Yükle</button>
+      </div>
+      <div class="row egri-paylas-eylem">
+        <button id="egri-kod-kopyala" class="btn tiny" type="button" title="Düzenleyicideki eğrinin SFC1 kodunu ve suflo.app/egri bağlantısını kopyala">Kodu kopyala</button>
+        <button id="egri-ice-aktar" class="btn tiny" type="button" title=".suflo-egri dosyasını ya da bir eğri aracının JSON dışa aktarmasını oku (en çok 64 KB, 32 önayar)">İçe aktar…</button>
+        <button id="egri-disa-aktar" class="btn tiny" type="button" title="Kaydettiğin eğri önayarlarını .suflo-egri dosyasına yaz">Dışa aktar…</button>
+      </div>
+    </div>
+    <div class="egri-liste-bas">
+      <b>Özellikler</b>
+      <button id="egri-yenile" class="btn tiny" type="button" title="Klibi ve anahtar kareleri yeniden oku">↻ Yenile</button>
+      <button id="egri-sonraki" class="btn tiny" type="button" title="Playhead'i sonraki anahtar kare çiftine götür">Sonraki çift</button>
+    </div>
+    <div id="egri-hedef" class="egri-hedef">Eğri sekmesi açıkken seçimi ve playhead'i izler.</div>
+    <div id="egri-ozellikler" class="egri-ozellikler" role="list"></div>
+    <div class="preset-toolbar egri-secenekler">
+      <label class="preset-control" title="Suflo'nun yazacağı anahtar karelerin sıklığı: her kare en pürüzsüzü, 2 / 4 karede bir daha az anahtar">Anahtar sıklığı
+        <select id="egri-yogunluk">
+          <option value="1" selected>Her kare</option>
+          <option value="2">2 karede bir</option>
+          <option value="4">4 karede bir</option>
+        </select>
+      </label>
+      <button id="egri-pr-onizle" class="btn" type="button" title="Kaba önizleme: playhead çiftin başından sonuna saniyede en çok 12 adımla gider, sonra geri döner">Premiere'de önizle</button>
+    </div>
+    <div class="row egri-eylem">
+      <button id="egri-geri-tumu" class="btn" type="button" title="Bu sekansta Suflo'nun yazdığı tüm eğri ve yaylanma anahtar karelerini kaldır">Tümünü geri al</button>
+      <button id="egri-uygula" class="btn primary grow" type="button">Uygula</button>
+    </div>
+    <div id="egri-yaylan" class="egri-yaylan" role="group" aria-label="Varışta yaylan">
+      <div class="egri-yaylan-bas">
+        <b>Varışta yaylan</b>
+        <span class="hint">İniş anahtar karesinden sonra hareket hedefi biraz aşar, salınıp oturur (follow-through). İşaretli özelliklerde playhead'i saran çiftin ikinci anahtar karesine ya da tüm varışlara yazılır; sonraki anahtar kareyi geçmez.</span>
+      </div>
+      <div class="egri-yaylan-govde">
+        <svg id="egri-yaylan-grafik" class="egri-yaylan-grafik" viewBox="0 0 240 80" aria-hidden="true" focusable="false">
+          <line id="egri-yaylan-hedef" class="egri-yaylan-hedef" x1="0" y1="20" x2="240" y2="20"></line>
+          <line id="egri-yaylan-varis" class="egri-yaylan-varis" x1="60" y1="0" x2="60" y2="80"></line>
+          <path id="egri-yaylan-yol" class="egri-yaylan-yol" d=""></path>
+        </svg>
+        <div class="egri-yaylan-ayarlar">
+          <label class="egri-yaylan-ayar" title="Aşımın büyüklüğü: varış hızıyla kaç saniyelik yol (0,02–0,5 sn)">Genlik
+            <input id="egri-yaylan-genlik" type="range" min="0.02" max="0.5" step="0.01" value="0.1">
+            <output id="egri-yaylan-genlik-deger" for="egri-yaylan-genlik">0,10 sn</output>
+          </label>
+          <label class="egri-yaylan-ayar" title="Saniyedeki salınım (1–6 Hz)">Frekans
+            <input id="egri-yaylan-frekans" type="range" min="1" max="6" step="0.5" value="3">
+            <output id="egri-yaylan-frekans-deger" for="egri-yaylan-frekans">3 Hz</output>
+          </label>
+          <label class="egri-yaylan-ayar" title="Ne kadar çabuk oturur (2–10); yüksek sönüm kısa yaylanma">Sönüm
+            <input id="egri-yaylan-sonum" type="range" min="2" max="10" step="1" value="6">
+            <output id="egri-yaylan-sonum-deger" for="egri-yaylan-sonum">6</output>
+          </label>
+          <label class="egri-yaylan-tum" title="İşaretli özelliklerde klibin her varışına (hareketin durduğu her anahtar kareye) uygula"><input id="egri-yaylan-tum" type="checkbox"> Tüm varışlar</label>
+        </div>
+      </div>
+      <div class="row egri-yaylan-eylem">
+        <span id="egri-yaylan-sure" class="egri-yaylan-sure">Oturma ≈ 0,80 sn</span>
+        <button id="egri-yaylan-uygula" class="btn grow" type="button" title="İşaretli özelliklerin varışına yaylanma yaz (Pro; düzenlemek ve önizlemek ücretsiz)">Varışta yaylan</button>
+      </div>
+    </div>
+    <div id="egri-status" class="inline-status" role="status" aria-live="polite"></div>
+    <p class="hint">Kısayollar (bir yazı alanında değilken): Enter uygula · U son uygulamayı geri al · F yönü çevir · I ters çevir · V görünüm · 1–9 önayar. Ctrl+Z eğriyi tek adımda geri almaz; Geri al'ı kullan, yalnız Suflo'nun yazdığı anahtar kareler kalkar. Şimdilik yalnız video katmanları.</p>
   </section>
 
   <!-- ================= KANCA BASLIGI ================= -->
@@ -2033,7 +2266,7 @@
       <span class="set-back-title">Ayarlar</span>
     </div>
 
-    <div class="set-group caption-engine-settings">
+    <div class="set-group caption-engine-settings" id="grp-motor">
       <div class="set-title">Suflo Altyazı Motoru</div>
       <div class="suflo-engine-card">
         <span class="suflo-engine-mark" aria-hidden="true">S</span>
@@ -2053,6 +2286,12 @@
         <label>Doğruluk modeli</label>
         <select id="set-model" class="grow" title="Büyük model = daha doğru ama yavaş"></select>
       </div>
+      <!-- 3.4 adım 19: çevrimdışı model içe aktarma (js/model-ice-aktar.js + KEngine.modelIceAktar) -->
+      <div class="row">
+        <label></label>
+        <button id="set-model-ice" class="btn" type="button" title="Modeli başka bir bilgisayarda indirdiysen buradan kur (.bin)">Model dosyası içe aktar</button>
+      </div>
+      <p class="hint" id="set-model-ice-ipucu">İnternet yoksa ya da şirket ağı model indirmeyi engelliyorsa: modeli (ör. ggml-large-v3-turbo-q5_0.bin) başka bir bilgisayarda indir, buradan seç. Katalogdaki modeller SHA-256 ile doğrulanır; tanınmayan dosya yalnız Özel model olarak eklenir.</p>
       <!-- Çözme modu (3.2 adım 5, js/whisper-args.js): yalnız yerel motor; varsayılan Türkçe kıyasa dek En doğru -->
       <div class="row">
         <label for="set-cozme">Çözme</label>
@@ -2307,6 +2546,7 @@
         <div class="library-health-actions doctor-actions">
           <button id="set-doctor-fix-all" class="btn" hidden>Güvenli sorunları düzelt</button>
           <button id="set-library-health-copy" class="btn ghost" hidden>Raporu kopyala</button>
+          <button id="set-doctor-kaynak" class="btn ghost" type="button" title="huggingface.co, hf-mirror.com ve motor sürüm sunucusuna 5 saniyelik deneme isteği">Model kaynaklarını sına</button>
           <a href="#" id="set-doctor-panel-rehberi" class="link-btn" title="Premiere 25.6+ ve 2026: Window > Extensions (Legacy) > Suflo">Panel menüde görünmüyor mu? →</a>
         </div>
       <div id="set-library-health-result" class="library-health" role="status" aria-live="polite" hidden></div>
@@ -2388,10 +2628,12 @@
               <li>Viral anlar ve 0–100 viral puan · Geçişler</li>
               <li>Altyazı Efektleri timeline'da · Kanca başlığı</li>
               <li>Sesi iyileştir · Otomatik zoom · Ritim · Hız rampası</li>
+              <li>Eğri: anahtar karelerine özel yumuşatma ve varışta yaylanma (düzenlemek ücretsiz)</li>
               <li>YouTube indirici: MP3 · 720p · 1080p · 4K, projeye otomatik</li>
               <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
               <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
+              <li>Yapay zekâ köprüsü (MCP, deneysel; deneme hakkı yok)</li>
               <li>MOGRT, SFX, preset ve Motion BG kütüphaneleri</li>
               <li>Ömür boyu güncelleme</li>
             </ul>
@@ -2482,6 +2724,45 @@
       <p class="hint"><a href="#" id="davet-ortaklik">İçerik üreticisi misin? Ortaklık programı →</a></p>
     </div>
 
+    <!-- Yapay zekâ köprüsü (MCP, 3.4, Deneysel, varsayılan kapalı): js/otomasyon*.js, mcp/suflo-mcp.js -->
+    <div class="set-group mcp-kart" id="grp-mcp">
+      <div class="set-title">Yapay zekâ köprüsü (MCP) <span class="mcp-deneysel">Deneysel</span> <span class="pro-inline">PRO</span> <span class="mcp-acik-rozet" id="mcp-acik-rozet" hidden>AÇIK</span></div>
+      <p class="hint">Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.</p>
+      <div class="row-btns">
+        <button id="mcp-ac" class="btn primary" type="button">Köprüyü aç</button>
+        <button id="mcp-jeton" class="btn" type="button" disabled title="Eski jeton anında geçersiz olur">Yeni jeton</button>
+      </div>
+      <p class="hint mcp-not">Açmak Pro gerektirir; köprü için deneme hakkı yok. Pro araçlarını çağıran eylemler ayrıca o aracın kendi kapısından geçer.</p>
+      <label class="chk"><input type="checkbox" id="mcp-duzenleme"> Düzenlemeye izin ver</label>
+      <p class="hint mcp-not">Kapalıyken asistan yalnız okur (bağlam, izler, altyazı). Açıkken marker, altyazı ve kesim gibi değişiklikler yapabilir.</p>
+      <label class="chk"><input type="checkbox" id="mcp-onay" checked> Yıkıcı eylemlerde onay iste</label>
+      <div id="mcp-durum" class="inline-status"></div>
+      <div class="mcp-onay-kart" id="mcp-onay-kart" hidden role="alertdialog" aria-labelledby="mcp-onay-baslik">
+        <b id="mcp-onay-baslik">Yapay zekâ asistanı bunu yapmak istiyor</b>
+        <p id="mcp-onay-ozet"></p>
+        <div class="row-btns">
+          <button id="mcp-onayla" class="btn primary" type="button">Onayla</button>
+          <button id="mcp-reddet" class="btn" type="button">Reddet</button>
+          <span class="dim" id="mcp-onay-sure"></span>
+        </div>
+      </div>
+      <details class="adv">
+        <summary>Claude'a bağla</summary>
+        <p class="hint" style="margin:6px 0">Claude Desktop: Ayarlar → Geliştirici → Yapılandırmayı düzenle, kopyalanan satırları ekle. Claude Code: komutu terminale yapıştır.</p>
+        <div class="row-btns">
+          <button id="mcp-kopyala-desktop" class="btn" type="button">Claude Desktop ayarını kopyala</button>
+          <button id="mcp-kopyala-code" class="btn" type="button">Claude Code komutunu kopyala</button>
+          <button id="mcp-node-denetle" class="btn tiny" type="button">Node'u denetle</button>
+        </div>
+        <p class="hint" id="mcp-node"></p>
+      </details>
+      <details class="adv">
+        <summary>Etkinlik (son 50 çağrı)</summary>
+        <ul id="mcp-etkinlik" class="mcp-etkinlik"></ul>
+      </details>
+      <p class="hint"><a href="#" id="mcp-guvenlik-link">Güvenlik modeli →</a></p>
+    </div>
+
     <div class="set-group">
       <div class="set-title">Destek</div>
       <p class="hint" style="margin-bottom:8px">Bir sorun mu var? "Sorun bildir" günlüğü kopyalar ve bildirim sayfasını açar; tek yapman gereken yapıştırmak.</p>
@@ -2547,15 +2828,40 @@
     </div>
   </div>
 
+  <!-- 3.4 adım 20: Araç ara (Ctrl+K / ⌘K). Puanlama js/arac-ara.js, pencere js/app.js; seçim yalnız gezinir.
+       Liste satırları app.js'te zaten arayüz dilinde çizilir (vurgulu parça bölünmesin diye çevirmen girmez) -->
+  <div id="arac-ara" class="arac-ara-arka" hidden>
+    <div class="arac-ara-kutu" role="dialog" aria-modal="true" aria-label="Araç ara">
+      <div class="arac-ara-ust">
+        <svg class="arac-ara-buyutec" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3.6 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="arac-ara-girdi" type="text" placeholder="Araç ya da eylem ara… (ör. sessizlik, rampa)" aria-label="Araç ara" autocomplete="off" spellcheck="false"
+          role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="arac-ara-liste">
+        <kbd class="arac-ara-esc">Esc</kbd>
+      </div>
+      <div id="arac-ara-liste" class="arac-ara-liste" role="listbox" aria-label="Araçlar ve eylemler" data-i18n-skip></div>
+      <div id="arac-ara-bos" class="arac-ara-bos" hidden>Eşleşen araç yok. Başka bir kelime dene.</div>
+      <div class="arac-ara-alt" id="arac-ara-ipucu">
+        <span><kbd>↑</kbd><kbd>↓</kbd> seç</span>
+        <span><kbd>Enter</kbd> aç</span>
+        <span><kbd id="arac-ara-fav-tus">Ctrl+D</kbd> favori</span>
+        <span><kbd>Esc</kbd> kapat</span>
+      </div>
+    </div>
+  </div>
+
   <script src="js/CSInterface.js"></script>
   <script src="js/pricing.js"></script>
   <script src="i18n/en.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/ag-dayanim.js"></script>
   <script src="js/bridge.js"></script>
   <script src="js/deneme.js"></script>
   <script src="js/pro.js"></script>
   <script src="js/pro-sync.js"></script>
+  <!-- 3.4 adım 20: Araç ara saf modülü (captions.js'in önizleme tuş ilgisi ve app.js paleti kullanır) -->
+  <script src="js/arac-ara.js"></script>
   <script src="js/whisper-args.js"></script>
+  <script src="js/model-ice-aktar.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/caption-layout.js"></script>
   <script src="js/caption-quality.js"></script>
@@ -2572,6 +2878,7 @@
   <script src="js/caption-mogrt-json.js"></script>
   <script src="js/filigran.js"></script>
   <script src="js/overlay-render.js"></script>
+  <script src="js/kesim-esle.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/emoji-picker.js"></script>
   <script src="js/textcut.js"></script>
@@ -2581,9 +2888,18 @@
   <script src="js/audio-clean.js"></script>
   <script src="js/ses.js"></script>
   <script src="js/chapters.js"></script>
+  <!-- 3.4 Yumuşatma motoru ve anahtar kare kayıtları: saf modüller (yüklenirken Premiere/ağ yok);
+       Geçiş, Zoom, Hareket, Hız Rampası ve Eğri bunları kullanır -->
+  <script src="js/ease-curve.js"></script>
+  <!-- 3.4 adım 12: Geçiş / Zoom / Hareket önayarı özel eğrisi (saf; ease-curve.js'ten sonra, transitions.js'ten önce) -->
+  <script src="js/egri-secim.js"></script>
+  <script src="js/key-records.js"></script>
+  <script src="js/kayit-kaldir.js"></script>
   <script src="js/transitions.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/highlights.js"></script>
+  <script src="js/sessizlik.js"></script>
+  <script src="js/kesim-altyazi.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
   <script src="js/referral-core.js"></script>
@@ -2592,6 +2908,9 @@
   <script src="js/gecisler.js"></script>
   <script src="js/speedramp.js"></script>
   <script src="js/hiz-rampasi.js"></script>
+  <!-- 3.4 Eğri sekmesi: saf model (yumuşatma motoru + kayıtlardan sonra) ve panel + SufloEgriEditor -->
+  <script src="js/egri-model.js"></script>
+  <script src="js/egri.js"></script>
   <script src="js/sahneler.js"></script>
   <script src="js/viral.js"></script>
   <script src="js/broll.js"></script>
@@ -2618,6 +2937,9 @@
   <script src="js/onboarding-steps.js"></script>
   <script src="js/onboarding.js"></script>
   <script src="js/davet.js"></script>
+  <script src="js/otomasyon.js"></script>
+  <script src="js/otomasyon-sunucu.js"></script>
+  <script src="js/otomasyon-panel.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

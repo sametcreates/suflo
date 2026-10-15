@@ -23,7 +23,7 @@ New-Item -ItemType Directory -Path $panel -Force | Out-Null
 # Bulutu otomatik kurar. Eski ortam degiskeni public sizinti riskine karsi yasak.
 if ($env:SUFLO_BUNDLE_CONTENT) { throw "SUFLO_BUNDLE_CONTENT desteklenmiyor: Pro icerigi public kurucuya gomulemez." }
 # assets/ icinde 3.3 adim 21 Altyazi Efektleri sablonu (assets/mogrt/altyazi-efekt-v1.mogrt) ve js/caption-mogrt-json.js js/ ile gelir
-$panelItems = @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "index.html", "LICENSE", "THIRD_PARTY_NOTICES.md")
+$panelItems = @("CSXS", "css", "js", "i18n", "jsx", "fonts", "emoji", "assets", "mcp", "index.html", "LICENSE", "THIRD_PARTY_NOTICES.md")
 foreach ($item in $panelItems) {
     $p = Join-Path $root $item
     if (Test-Path $p) { Copy-Item $p -Destination $panel -Recurse -Force }

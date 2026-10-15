@@ -117,6 +117,31 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.3 adim 21: Altyazi Efektleri > Premiere yerel (saf model + pakette gelen sablon; sha256 yukarida)
             '(^|/)js/caption-mogrt-json\.js$',
             '(^|/)assets/mogrt/altyazi-efekt-v1\.mogrt$',
+            # 3.4 adim 19: kurumsal ag dayanikliligi + cevrimdisi model ice aktarma (bridge/engine'den once yuklenir)
+            '(^|/)js/ag-dayanim\.js$',
+            '(^|/)js/model-ice-aktar\.js$',
+            # 3.4 adim 20: Arac ara (Ctrl+K) saf modulu; app.js paleti ve captions.js onizleme tus ilgisi kullanir
+            '(^|/)js/arac-ara\.js$',
+            # 3.4 Yapay zeka koprusu (MCP, Deneysel): eylem kaydi, panel sunucusu, Ayarlar karti ve stdio shim'i
+            '(^|/)js/otomasyon\.js$',
+            '(^|/)js/otomasyon-sunucu\.js$',
+            '(^|/)js/otomasyon-panel\.js$',
+            '(^|/)mcp/suflo-mcp\.js$',
+            # 3.4 Otomatik Kesim canli esik: tepe zarfi / kesim haritasi (magiccut.js bunsuz eski akisa duser)
+            '(^|/)js/sessizlik\.js$',
+            # 3.4 adim 8: kesimden sonra altyazi (saf esleme modulu + kesim kartlarindaki eylem satiri)
+            '(^|/)js/kesim-esle\.js$',
+            '(^|/)js/kesim-altyazi\.js$',
+            # 3.4 Yumusatma motoru (Rebound MIT uyarlamasi) ve anahtar kare kayitlari: Egri, Gecis, Zoom, Hareket bunlara dayanir
+            '(^|/)js/ease-curve\.js$',
+            '(^|/)js/key-records\.js$',
+            # 3.4 Gecis / Zoom / Hareket onayari ozel egrisi (saf modul; ease alani, yogunlastirma)
+            '(^|/)js/egri-secim\.js$',
+            # 3.4 Egri sekmesi: saf model + panel (SufloEgriEditor); host tarafi jsx/host.jsx icinde
+            '(^|/)js/egri-model\.js$',
+            '(^|/)js/egri\.js$',
+            # 3.4 kayit tabanli guvenli kaldirma (Gecis, Zoom, Hareket onayari); host tarafi KS_removeSufloKeys
+            '(^|/)js/kayit-kaldir\.js$',
             # "Kalin yazi" kapaliyken libass'in sectigi statik Montserrat Regular (yoksa ayar hic etki etmez)
             '(^|/)fonts/Montserrat-Regular\.ttf$',
             '(^|/)fonts/Montserrat-Bold\.ttf$',

@@ -1,4 +1,4 @@
-// Suflo testi: Pro'yu dene bağlantıları — 12 araç deneme kapısından geçer, hak yalnız
+// Suflo testi: Pro'yu dene bağlantıları — 13 araç deneme kapısından geçer, hak yalnız
 // başarı dalında düşer; kütüphaneler/MOGRT/toplu/ASS deneme almaz; filigran yalnız
 // stilli katman ve kanca başlığında; temiz yeniden oluşturma KS_removeOverlay'e nodeId vermez.
 var fs = require("fs"), path = require("path"), vm = require("vm");
@@ -20,9 +20,9 @@ function govde(src, imza) {
 // [dosya, işlev imzası, özellik, başarı denetimi (harcamadan ÖNCE gelmeli), harcama bekleniyor mu]
 var SITELER = [
   ["js/magiccut.js", "async function analyze(ev)", "cut", null, false],
-  ["js/magiccut.js", "async function apply()", "cut", "if (r.ok) {", true],
+  ["js/magiccut.js", "async function apply(ek)", "cut", "if (r.ok) {", true],
   ["js/konusma-kes.js", "async function analyze(zorla)", "textcut", null, false],
-  ["js/konusma-kes.js", "async function apply()", "textcut", "if (res.ok) {", true],
+  ["js/konusma-kes.js", "async function apply(ek)", "textcut", "if (res.ok) {", true],
   ["js/viral.js", "async function bul()", "highlights", "if (!bulunan.length) throw", true],
   ["js/ses.js", "async function iyilestir()", "audioclean", "if (!sonuclar.length) throw", true],
   ["js/kanca.js", "async function ekle(ek)", "overlay", "if (!yer.ok) throw", true],
@@ -38,7 +38,11 @@ var SITELER = [
   // 3.2 adım 5: çevrimdışı İngilizce (-tr) Altyazı oluştur'da; hak yalnız transkript başarıyla bitince
   ["js/captions.js", "async function go(opts)", "offlineTranslate", "basarili = true;", true],
   // 3.3 YouTube indirici: Bilgi al ücretsiz (kapı yok); hak yalnız dosya Premiere'e hazır olunca
-  ["js/youtube-indir-ui.js", "async function indir(ev)", "youtube", "if (!sonuc || !sonuc.dosya) throw", true]
+  ["js/youtube-indir-ui.js", "async function indir(ev)", "youtube", "if (!sonuc || !sonuc.dosya) throw", true],
+  // 3.4 Eğri: düzenleyici, önizleme ve geri al ücretsiz; hak yalnız en az bir özellik yazılınca, bir kez
+  ["js/egri.js", "async function uygula()", "curves", "if (!basarili) hataAt(", true],
+  // 3.4 adım 14 Varışta yaylan: aynı 'curves' kapısı ve hakları; hak yalnız en az bir varış yazılınca, bir kez
+  ["js/egri.js", "async function yaylanUygula()", "curves", "if (!varisSayi) hataAt(", true]
 ];
 var kapiliOzellikler = {};
 SITELER.forEach(function (s) {
@@ -58,8 +62,8 @@ SITELER.forEach(function (s) {
   var hata = g.search(/\n    \} catch \(/);
   ok(ad + ": hak yalnız başarı denetiminden sonra düşer", basari > 0 && harca > basari && (hata === -1 || harca < hata), "basari " + basari + " harca " + harca + " catch " + hata);
 });
-var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube"];
-ok("12 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
+var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube", "curves"];
+ok("13 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
 ok("deneme listesi deneme.js ile aynı", JSON.stringify(require(path.join(KOK, "js", "deneme.js")).OZELLIKLER) === JSON.stringify(DOKUZ));
 
 /* ---------------- 2) deneme almayan kapılar ---------------- */
@@ -78,7 +82,13 @@ jsDosyalari.forEach(function (f) {
     }
   });
 });
-ok("tarama deneme kapılarını buluyor (18 kapı: 17 araç + rehberin stil adımı)", denemeli.length === 18, denemeli.join(" | "));
+ok("tarama deneme kapılarını buluyor (20 kapı: 19 araç + rehberin stil adımı)", denemeli.length === 20, denemeli.join(" | "));
+// 3.4 Yapay zekâ köprüsü (MCP): kurucu kademesi "köprüyü açmak Pro gerektirir" (deneme hakkı yok; Shorts Paketi /
+// Podcast Modu gibi). İnceleme bulgusu: açılış Pro.gate("mcp", { deneme: true }) ile 3 deneme oturumu veriyordu.
+var kopruAc = govde(oku("js/otomasyon-panel.js"), "async function ac(ev)");
+ok("köprüyü açmak denemesiz Pro kapısı; hak harcanmaz, deneme oturumu yok",
+  /Pro\.gate\("mcp"\)\) return;/.test(kopruAc) && !/deneme/.test(kopruAc.replace(/\/\/[^\n]*/g, "")) && oku("js/otomasyon-panel.js").indexOf('denemeHarca("mcp"') === -1 &&
+  !/DENEME_OTURUMU|sure: /.test(oku("js/otomasyon-panel.js")), kopruAc.slice(0, 400));
 // Rehberin "Timeline'a koy"u Altyazı sekmesindeki "… ile ekle" ile aynı stilli katman denemesini sunar;
 // MOGRT stili seçiliyse denemesiz kütüphane penceresi (inceleme bulgusu: Suflo Stili için de captionStyles açılıyordu)
 var koy = govde(oku("js/onboarding.js"), "function stilKoyTikla()");
@@ -95,7 +105,8 @@ ok("captions.js: MOGRT, toplu klip ve stilli ASS kapıları denemesiz", /Pro\.ga
 
 /* ---------------- 3) zoom kaldır kapısız, MOGRT sızıntısı kapalı ---------------- */
 var zoom = oku("js/zoom.js");
-ok("zoom.js kaldir(): kapı yok (deneme zoom'u her zaman geri alınır)", !/Pro\./.test(govde(zoom, "async function kaldir()")) && govde(zoom, "async function kaldir()").length > 50);
+ok("zoom.js kaldir(): kapı yok (deneme zoom'u her zaman geri alınır; 3.4: kayıt tabanlı)", !/Pro\./.test(govde(zoom, "async function kaldir(")) && govde(zoom, "async function kaldir(").length > 50 &&
+  /KS_removeSufloKeys|\.akis\(/.test(govde(zoom, "async function kaldir(")));
 var ou = govde(cap, "async function overlayUygula()");
 ok("overlayUygula: ücretsizde seçili MOGRT stilini reddeder", /if \(typeof Pro !== "undefined" && !Pro\.isPro\(\) && secilenMogrt\) \{[\s\S]{0,200}Deneme yalnız Altyazı Efektleri için[\s\S]{0,200}return;/.test(ou) &&
   ou.indexOf("!Pro.isPro() && secilenMogrt") < ou.indexOf("mogrtStiliniUygula"));
@@ -110,7 +121,7 @@ ok("captions.js: filigran yalnız overlayUygula içinde, filigranGerekli'ye bağ
 var kancaEkle = govde(oku("js/kanca.js"), "async function ekle(ek)");
 ok("kanca.js: filigran yalnız ekle'de (önizleme temiz)", /SufloFiligran\.ekle\(/.test(kancaEkle) && /Pro\.filigranGerekli\(\)/.test(kancaEkle) && !/SufloFiligran/.test(govde(oku("js/kanca.js"), "async function onizle()")));
 ok("deneme çıktısı kaydı: temiz ASS saklanır (stilli katman + kanca)", /assTemiz: assTemiz/.test(ou) && /denemeKaydet\(K, Pro,/.test(ou) && /assTemiz: built\.ass/.test(kancaEkle) && /denemeKaydet\(K, Pro,/.test(kancaEkle));
-["exportFile", "async function apply(stilIle)"].forEach(function (imza) {
+["exportFile", "async function apply(stilIle, secenek)"].forEach(function (imza) {
   var g = govde(cap, imza);
   ok("filigran " + imza + " yolunda yok (SRT/VTT/caption izi temiz)", !g || !/SufloFiligran/.test(g));
 });

@@ -53,7 +53,7 @@ function motor(opts) {
     findFfmpeg: function () { ffAranma++; return Promise.resolve(opts.ffmpeg ? "/usr/bin/ffmpeg" : null); },
     httpGet: function () { return Promise.resolve({ status: 404, body: "" }); },     // SHA bilinmiyor: boyutla devam
     download: function (url, hedef, ilerleme, r, d, meta) {
-      indirmeler.push({ anahtar: meta && meta.key, hedef: hedef, iptal: meta && meta.iptal });
+      indirmeler.push({ anahtar: meta && meta.key, hedef: hedef, iptal: meta && meta.iptal, enAzBayt: meta && meta.enAzBayt });
       if (opts.yavas && meta && meta.iptal) {
         // 3.2 İptal: jeton gelince istek kesilir, .part korunur (K.download sözleşmesi)
         return new Promise(function (coz) {
@@ -70,7 +70,8 @@ function motor(opts) {
       return new Promise(function (coz) {
         setTimeout(function () {
           if (/^ffmpeg:/.test(meta && meta.key)) { coz({ ok: false, error: "test: ag yok" }); return; }
-          vfs[hedef] = Math.round(((meta && meta.expectedMB) || 1) * MB);
+          // kucukModel: meta.enAzBayt'ı yok sayan indirici engel sayfasını (84 bayt) "indi" diye bırakır
+          vfs[hedef] = opts.kucukModel && /^model:/.test(meta && meta.key) ? 84 : Math.round(((meta && meta.expectedMB) || 1) * MB);
           if (ilerleme) ilerleme(1);
           coz({ ok: true });
         }, 15);
@@ -301,6 +302,30 @@ Promise.all([a, b]).then(function (r) {
       ok("cuBLAS → CPU: CUDA DLL'leri (nvblas, nvrtc-builtins dahil) silinir, CPU dosyaları kalır, derleme 'cpu'",
         JSON.stringify(kalan) === JSON.stringify(["ggml-cpu-haswell.dll", "whisper.dll"]) && m16.ayarlar.engineBuild === "cpu" && r.build === "cpu", JSON.stringify(kalan));
     });
+  });
+}).then(function () {
+  // 3.4 adım 19 inceleme: katalog modeli indirmesi en az boyutu (installedModels'in %85 kuralı)
+  // K.download'a söyler: ağ filtresinin engel sayfası "indi" sayılmaz. VAD'e sınır konmaz (gerçek
+  // dosyası katalogdaki 2 MB'tan küçük)
+  var m17 = motor({ ffmpeg: true, ayarlar: { provider: "local", engineBuild: "cpu" } });
+  return m17.E.install({ modelId: "small", useGpu: false }).then(function () {
+    var model = m17.indirmeler.filter(function (x) { return x.anahtar === "model:small"; })[0];
+    var vad = m17.indirmeler.filter(function (x) { return x.anahtar === "vad"; })[0];
+    ok("model indirmesi meta.enAzBayt taşır (%85 kuralı), VAD taşımaz",
+      model && model.enAzBayt === Math.floor(190 * MB * 0.85) + 1 && vad && vad.enAzBayt === undefined,
+      JSON.stringify(m17.indirmeler.map(function (x) { return [x.anahtar, x.enAzBayt]; })));
+  });
+}).then(function () {
+  // Sınırı yok sayan bir indirici küçük dosya bıraksa bile installModel çözülmez: rehber "Turbo hazır"
+  // deyip settings.model'i kurulu olmayan modele geçirmesin; doğrulanmamış küçük dosya silinir
+  var m18 = motor({ kucukModel: true });
+  var turboYolu = path.join("/sanal/whisper", "models", "ggml-large-v3-turbo-q5_0.bin");
+  return m18.E.installModel("turbo").then(function () {
+    ok("kurulu sayılmayacak küçük dosyayla installModel çözülmemeli", false);
+  }, function (e) {
+    ok("küçük dosya: installModel 'indirildi ama doğrulanamadı' ile reddedilir, dosya silinir, Turbo kurulu değil",
+      e && /Turbo indirildi ama doğrulanamadı/.test(e.message) && !Object.prototype.hasOwnProperty.call(m18.vfs, turboYolu) &&
+      !m18.E.installedModels().some(function (x) { return x.id === "turbo"; }), e && e.message);
   });
 }).then(function () {
   console.log(gecen + "/" + toplam + " gecti");

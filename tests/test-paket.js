@@ -42,6 +42,13 @@ ok("verify-release.ps1: THIRD_PARTY_NOTICES.md ve LICENSE paketten eksikse yayı
 ok("3.3 Altyazı Efektleri: oluşturucu modeli ve stil motoru pakette (js/ klasörü) ve verify-release'te zorunlu",
   /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /altyazi-efekt\\\.js\$/.test(gerekli) && /style-engine\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "altyazi-efekt.js")), gerekli.slice(0, 400));
+ok("3.4 canlı eşikli sessizlik kesimi: js/sessizlik.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /js\/sessizlik\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "sessizlik.js")), gerekli.slice(0, 600));
+ok("3.4 kesimden sonra altyazı: js/kesim-esle.js ve js/kesim-altyazi.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /js\/kesim-esle\\\.js\$/.test(gerekli) && /js\/kesim-altyazi\\\.js\$/.test(gerekli) &&
+  fs.existsSync(path.join(__dirname, "..", "js", "kesim-esle.js")) && fs.existsSync(path.join(__dirname, "..", "js", "kesim-altyazi.js")), gerekli.slice(0, 700));
 ok("3.3 'Kalın yazı' kapalı: statik Montserrat Regular / Bold pakette (fonts/ klasörü) ve verify-release'te zorunlu",
   /\$stageItems = @\([^)]*"fonts"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"fonts"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /fonts\/Montserrat-Regular\\\.ttf\$/.test(gerekli) && /fonts\/Montserrat-Bold\\\.ttf\$/.test(gerekli) &&
@@ -69,7 +76,41 @@ ok("yeni font dosyaları ve lisansları verify-release'te zorunlu, bildirimlerde
   yeniDosyalar.every(function (f) { return gerekli.indexOf("fonts/" + f.replace(/\./g, "\\.") + "$") !== -1 && notice.indexOf("`" + f + "`") !== -1; }) &&
   yeniFontlar.every(function (n) { var l = "OFL-" + (lisansDosyasi[n] || n) + ".txt"; return gerekli.indexOf("fonts/" + l.replace(/\./g, "\\.") + "$") !== -1 && notice.indexOf(l) !== -1; }),
   yeniDosyalar.join(","));
+ok("3.4 Yumuşatma motoru ve anahtar kare kayıtları pakette (js/ klasörü), verify-release'te zorunlu, Rebound bildirimi var",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /ease-curve\\\.js\$/.test(gerekli) && /key-records\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "ease-curve.js")) &&
+  fs.existsSync(path.join(__dirname, "..", "js", "key-records.js")) && /### Rebound/.test(notice) && /0f9fd6c526514d20b688b13c393061606f166ad5/.test(notice) &&
+  /"js"/.test(okuK("tools/install.ps1")), gerekli.slice(0, 600));
+ok("3.4 Eğri sekmesi: model ve panel pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /egri-model\\\.js\$/.test(gerekli) && /egri\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "egri-model.js")) &&
+  fs.existsSync(path.join(__dirname, "..", "js", "egri.js")), gerekli.slice(0, 600));
+ok("3.4 kayıt tabanlı güvenli kaldırma: js/kayit-kaldir.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /kayit-kaldir\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "kayit-kaldir.js")), gerekli.slice(0, 700));
+ok("3.4 özel eğri (Geçiş / Zoom / Hareket): js/egri-secim.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /egri-secim\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "egri-secim.js")), gerekli.slice(0, 800));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
+
+/* ---- 3.4 Yapay zekâ köprüsü (MCP): mcp/ klasörü her pakette, .debug hiçbirinde ---- */
+var pk = okuK("tools/package.ps1"), ky = okuK("tools/kurucu-yap.ps1");
+ok("MCP: package.ps1 $stageItems ve kurucu $panelItems mcp/ taşır", /\$stageItems = @\([^)]*"mcp"/.test(pk) && /\$panelItems = @\([^)]*"mcp"/.test(ky) &&
+  /"mcp"/.test(okuK("tools/install.ps1")) && /\bmcp\b/.test(okuK("tools/install.sh")));
+ok("MCP: ZXP/kurucu listelerinde .debug yok", !/\$stageItems = @\([^)]*"\.debug"/.test(pk) && !/\$panelItems = @\([^)]*"\.debug"/.test(ky));
+ok("MCP: verify-release shim'i ve üç panel dosyasını zorunlu tutar", /mcp\/suflo-mcp\\\.js\$/.test(gerekli) && /js\/otomasyon\\\.js\$/.test(gerekli) &&
+  /js\/otomasyon-sunucu\\\.js\$/.test(gerekli) && /js\/otomasyon-panel\\\.js\$/.test(gerekli), gerekli.slice(0, 300));
+ok("MCP: shim js/otomasyon.js'i göreli yoldan ister (paket düzeni: <ext>/mcp + <ext>/js)", /require\("\.\.\/js\/otomasyon\.js"\)/.test(okuK("mcp/suflo-mcp.js")) && fs.existsSync(path.join(__dirname, "..", "mcp", "suflo-mcp.js")));
+var ih = okuK("index.html");
+var sira = ["js/deneme.js", "js/pro.js", "js/captions.js", "js/magiccut.js", "js/konusma-kes.js", "js/hiz-rampasi.js", "js/zoom.js", "js/otomasyon.js", "js/otomasyon-sunucu.js", "js/otomasyon-panel.js", "js/app.js"].map(function (f) { return ih.indexOf('<script src="' + f + '"></script>'); });
+ok("MCP: index.html betik sırası (kayıt → sunucu → panel → app)", sira.every(function (x, i) { return x > 0 && (i === 0 || x > sira[i - 1]); }), sira.join(","));
+
+/* ---- 3.4 adım 19-20: ağ dayanıklılığı, model içe aktarma ve Araç ara her pakette ---- */
+ok("3.4 adım 19-20: verify-release ag-dayanim, model-ice-aktar ve arac-ara'yı zorunlu tutar",
+  /js\/ag-dayanim\\\.js\$/.test(gerekli) && /js\/model-ice-aktar\\\.js\$/.test(gerekli) && /js\/arac-ara\\\.js\$/.test(gerekli), gerekli.slice(0, 300));
+var sira34 = ["js/ag-dayanim.js", "js/bridge.js", "js/arac-ara.js", "js/model-ice-aktar.js", "js/engine.js", "js/captions.js", "js/app.js"].map(function (f) { return ih.indexOf('<script src="' + f + '"></script>'); });
+ok("3.4 adım 19-20: index.html betik sırası (ag-dayanim → bridge, model-ice-aktar → engine, arac-ara → captions → app)",
+  sira34.every(function (x, i) { return x > 0 && (i === 0 || x > sira34[i - 1]); }), sira34.join(","));
 
 /* ---- Caption Editor "Çevir": kelime kelime (k1) / birikimli (kc) / N kelime belgesi çevrilmez ---- */
 // Her kelime ayrı altyazı satırı olarak LLM'e gidiyor, sonuç kelime kelime yazılıyor ("Today|to you|with the

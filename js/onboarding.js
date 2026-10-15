@@ -296,7 +296,7 @@ window.KOnboarding = (function () {
     var aktif = ekBilgi.aktif;
     if (hazir) {
       yaz("ia-motor-metin", aktif
-        ? "Hazır: " + aktif.label.split(" —")[0] + " · yerel, çevrimdışı ve sınırsız."
+        ? "Hazır: " + (KEngine.modelKisaAdi ? KEngine.modelKisaAdi(aktif) : aktif.label.split(" —")[0]) + " · yerel, çevrimdışı ve sınırsız."
         : "Hazır: Groq bulut motoru (ücretsiz anahtarla).");
     } else if (secim.bulut) {
       yaz("ia-motor-metin", "Mac'te yerel motor Homebrew ile kurulur ve Homebrew bulunamadı. En hızlı başlangıç: ücretsiz Groq anahtarıyla bulut motoru.");
@@ -862,7 +862,7 @@ window.KOnboarding = (function () {
     }
     if (kararDegeri === "tam") {
       // Taze kurulumda "Suflo 3.1'de yeni" penceresi rehberin üstüne binmesin
-      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.3";
+      if (tazeKurulum) s.yeniliklerGoruldu = KApp.yenilikSurumu ? KApp.yenilikSurumu() : "3.4";
       kayitYaz();
     }
     olaylariBagla();

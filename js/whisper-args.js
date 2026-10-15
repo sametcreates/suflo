@@ -56,8 +56,14 @@
   function modelKimligi(x) {
     var s = String(x == null ? "" : x);
     if (sahip(DTW_ON_AYAR, s)) return s;
+    // 3.4 adım 19: içe aktarılmış Özel model ("ozel:<dosya>" kimliği ya da ozel-*.bin dosyası).
+    // Adı tanıdık görünse de (ozel-ggml-distil-large-v3.bin) mimarisi bilinmez: distil-large-v3'ün
+    // 2 çözücü katmanı large.v3 hizalama başlıklarını (katman 7-31) taşımaz ve whisper.cpp bağlamı
+    // hiç açılmaz. İçe aktarma uyarısının söz verdiği gibi ne DTW ön ayarı ne çeviri seçilir.
+    if (/^ozel:/i.test(s)) return "";
     var ad = s.replace(/^.*[\\\/]/, "").toLowerCase();
     if (!ad) return "";
+    if (/^ozel-/.test(ad)) return "";
     if (/(^|[-_.])en([-_.]|$)/.test(ad.replace(/\.bin$/, ""))) return "";
     if (/large-v3-turbo|large-turbo|turbo/.test(ad)) return "turbo";
     if (/large-v3(?![\w-]*turbo)/.test(ad)) return "large";

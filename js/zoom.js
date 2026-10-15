@@ -99,18 +99,38 @@ function KZoomAkilliNoktalar(opts) {
   return filled.filter(function (point) { return point.time >= 0 && point.time < dur - .12; });
 }
 
+// Ozel egri (3.4 adim 12): js/egri-secim.js cagri aninda aranir (panelde window, Node'da require)
+function KZoomEgriModulu() {
+  if (typeof window !== "undefined" && window.SufloEgriSecim) return window.SufloEgriSecim;
+  if (typeof require === "function") { try { return require("./egri-secim.js"); } catch (e) {} }
+  return null;
+}
+
 function KZoomPlan(opts) {
   /*
    * opts: { dur, segments:[{start,end}] (0-tabanli), intensity (.06-.25),
    *         speed (sn), mode: "smart"|"speech"|"rhythm", points:[{time}], interval (sn),
-   *         style: "smooth"|"jumpcut"|"snapin" }  (AutoCut'taki uc stil)
+   *         style: "smooth"|"jumpcut"|"snapin",  (AutoCut'taki uc stil)
+   *         ease: "auto" | hazir egri | cubic-bezier | SFC1 kodu, fps }  (3.4 adim 12)
    * donus: { keys:[{time,value}], mode, style } — time 0-tabanli sn, value carpan.
+   * ease "auto" (varsayilan) iken cikti eskisiyle bayt bayt ayni. Ozel egride (Jump Cut haric: sert kesme egrisizdir)
+   * Yumusak stilin kucuk tasmasi yazilmaz (ivmeyi egri verir), anahtarlar js/egri-secim.js ile yogunlasir:
+   * { keys:[{time,value,a?}], ..., ease (kanonik), dense: true, seyrek (yogunlasmadan onceki anahtar), capped? }.
+   * Gecersiz ease hata firlatir.
    */
+  var egriS = null, egriC = null;
+  if (opts.ease !== undefined && opts.ease !== null && opts.ease !== "" && opts.ease !== "auto") {
+    egriS = KZoomEgriModulu();
+    egriC = egriS ? egriS.coz(opts.ease) : null;
+    if (!egriC || !egriC.ok) throw new Error("Geçersiz eğri: " + String(opts.ease).slice(0, 60));
+    if (!egriC.curve) egriC = null;
+  }
   var dur = Math.max(0.2, Number(opts.dur) || 0);
   var I = Number(opts.intensity); if (!isFinite(I)) I = 0.12; I = Math.max(0.04, Math.min(0.3, I));
   var d = Number(opts.speed); if (!isFinite(d)) d = 0.45; d = Math.max(0.2, Math.min(0.9, d));
   var interval = Number(opts.interval); if (!isFinite(interval)) interval = 5; interval = Math.max(2, Math.min(15, interval));
   var style = opts.style === "jumpcut" || opts.style === "snapin" ? opts.style : "smooth";
+  if (style === "jumpcut") egriC = null;   // sert kesme: yumusatilacak hareket yok
   var minGap = Math.max(d * 2, 1.2);
 
   var mode = opts.mode === "rhythm" ? "rhythm" : (opts.mode === "smart" ? "smart" : "speech");
@@ -169,6 +189,10 @@ function KZoomPlan(opts) {
       anahtar(t0, cur + (hedef - cur) * 0.55);
       anahtar(t0 + 0.09, cur + (hedef - cur) * 0.85);
       anahtar(t0 + 0.18, hedef);
+    } else if (egriC) {
+      // ozel egri: Suflo'nun kucuk tasmasi yok, gecisin ivmesini secilen egri verir
+      anahtar(t0, cur);
+      anahtar(t0 + gecis, hedef);
     } else {
       var ov = hedef > cur ? hedef * 1.012 : hedef * 0.996; // hafif overshoot -> dogal his
       anahtar(t0, cur);
@@ -178,7 +202,16 @@ function KZoomPlan(opts) {
     cur = hedef;
   }
   if (!keys.length || keys[0].time > 0.011) keys.unshift({ time: 0, value: BAZ });
-  return { keys: keys, mode: mode, style: style, toggles: temiz.length };
+  var sonuc = { keys: keys, mode: mode, style: style, toggles: temiz.length };
+  if (egriC) {
+    var y = egriS.yogunZaman(keys, { curve: egriC.curve, fps: opts.fps });
+    sonuc.keys = y.keys;
+    sonuc.ease = egriC.ease;
+    sonuc.dense = true;
+    sonuc.seyrek = keys.length;
+    if (y.capped) sonuc.capped = true;
+  }
+  return sonuc;
 }
 
 if (typeof module !== "undefined" && module.exports) {
@@ -191,6 +224,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
   "use strict";
 
   var busy = false;
+  var secici = null;   // Eğri seçicisi (3.4 adım 12): Otomatik iken yük eskisiyle aynı
 
   function el(id) { return document.getElementById(id); }
   function status(msg, cls) {
@@ -235,13 +269,19 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     return out;
   }
 
+  /*
+   * Sonuç açıkça döner (Yapay zekâ köprüsü / MCP bunu kullanır; düğme yok sayar):
+   * { ok:true, hareket } ya da { ok:false, hata:'mesgul'|'pro_gerekli'|'klip_yok'|'zoom_yok'|'uygulanamadi', mesaj }.
+   * Meşgulken (ffmpeg konuşma analizi sürerken) dönen çağrı başarı sayılmasın.
+   */
   async function calistir() {
-    if (busy) return;
+    if (busy) return { ok: false, hata: "mesgul", mesaj: "Auto Zoom is already running." };
     // Pro: otomatik zoom (ucretsizde 3 deneme hakki; hak yalniz anahtar kareler yazilinca duser)
-    if (typeof Pro !== "undefined" && !Pro.gate("zoom", { deneme: true, yeniden: calistir })) return;
+    if (typeof Pro !== "undefined" && !Pro.gate("zoom", { deneme: true, yeniden: calistir })) return { ok: false, hata: "pro_gerekli", mesaj: "Auto Zoom needs Suflo Pro." };
     var clip = KApp.ctx().sel;
-    if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
+    if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return { ok: false, hata: "klip_yok", mesaj: "Select a clip on the timeline first." }; }
     setBusy(true);
+    var gecIpucu = false;
     try {
       var sourceDur = Math.max(.2, clip.outPoint - clip.inPoint);
       var dur = Math.max(.2, clip.clipEnd - clip.clipStart);
@@ -279,6 +319,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
       }
 
       var stil = (document.querySelector('#zoom-stil .on') || {}).dataset;
+      var S = window.SufloEgriSecim;
       var plan = KZoomPlan({
         dur: dur,
         segments: segments,
@@ -287,49 +328,111 @@ if (typeof window !== "undefined") window.KZoom = (function () {
         speed: deger("zoom-hiz", 0.45),
         mode: mode,
         interval: interval,
-        style: stil && stil.s ? stil.s : "smooth"
+        style: stil && stil.s ? stil.s : "smooth",
+        ease: secici ? secici.deger() : "auto",          // 3.4 adım 12: özel eğri
+        fps: S && KApp.ctx ? S.kareHizi(KApp.ctx()) : undefined
       });
-      if (plan.toggles < 1) { status("Zoom noktası bulunamadı — Ritmik modu dene.", "warn"); return; }
+      if (plan.toggles < 1) { status("Zoom noktası bulunamadı — Ritmik modu dene.", "warn"); return { ok: false, hata: "zoom_yok", mesaj: "No zoom points found: try the rhythmic mode in the Zoom tab." }; }
 
       status("Anahtar kareler yazılıyor…");
       var keys = plan.keys.map(function (k) {
-        return { time: clip.clipStart + k.time, value: k.value };
+        var q = { time: clip.clipStart + k.time, value: k.value };
+        if (k.a) q.a = 1;   // özel eğri: seyrek planın çapası (host kare altı örnekleri seyreltirken korur)
+        return q;
       });
-      var result = await K.call("KS_autoZoom", {
+      var yuk = {
         keys: keys,
         anchor: sabitNokta(),
         clearStart: clip.clipStart,
         clearEnd: clip.clipStart + dur
-      }, 30000);
+      };
+      // Otomatik'te yük eskisiyle aynı; özel eğride host Bezier'siz yazar, süre anahtar sayısıyla büyür: Ölçek + Konum,
+      // host aynı planı HER seçili klibe yazar (seçili klip sayısı kadar)
+      var sure = 30000;
+      if (plan.dense) {
+        yuk.dense = true;
+        var secili = Math.max(1, Math.floor(Number(KApp.ctx().selCount)) || 1);
+        if (S) sure = S.cagriSuresi(30000, keys.length * 2 * secili);
+      }
+      // Zaman aşımından sonra gelen cevap: Premiere yazmayı bitirdi; kaldırma kaydı yine saklanır (Geri al çıkar)
+      var result = await K.call("KS_autoZoom", yuk, sure, plan.dense ? function (gec) { if (gec && gec.ok) yazildi(gec, plan, true); } : undefined);
+      gecIpucu = !!(plan.dense && S && result && !result.ok && result.zamanAsimi);   // betik durdurulamaz: yazım sürüyor olabilir
       if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Zoom uygulanamadı.");
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);   // deneme: yalniz basarida
       status("");
-      KApp.toast(plan.toggles + " zoom hareketi eklendi (" +
-        (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")", "good");
+      yazildi(result, plan, false);
+      return { ok: true, hareket: plan.toggles, mod: plan.mode };
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
+      if (gecIpucu) KApp.toast(SufloEgriSecim.GEC_IPUCU, "warn", 12000);
+      return { ok: false, hata: "uygulanamadi", mesaj: String(e && e.message ? e.message : e) };
     } finally {
       setBusy(false);
     }
   }
 
-  // Kapisiz: deneme hakkiyla eklenen zoom'u herkes her zaman geri alabilmeli
-  async function kaldir() {
+  // Yazılan zoom'un kaldırma kaydı (3.4 adım 11) ve bildirimi; Geri al yalnız bu uygulamanın anahtarlarını kaldırır.
+  // gec: cevap zaman aşımından sonra geldi (3.4 adım 12): zoom yine de yazıldı, deneme hakkı da o zaman düşer
+  function yazildi(result, plan, gec) {
+    if (gec && typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);
+    // geç cevap: zaman aşımının kırmızı satırı kalmasın (bu sırada başka bir işlem sürüyorsa onun durumuna dokunulmaz)
+    if (gec && !busy) status("");
+    var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
+    var proje = result.proje || "";
+    var metin = plan.toggles + " zoom hareketi eklendi (" +
+      (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")";
+    KApp.toast(gec ? "Premiere geç yanıt verdi: " + metin : metin, "good",
+      saklama.idler.length ? 9000 : undefined,
+      saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
+    if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
+  }
+
+  function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }
+  function uiMetni(s) { return window.SufloI18n && SufloI18n.tr ? SufloI18n.tr(s) : s; }
+  var YEDEK_SORU = {
+    yok: "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek ve Konum anahtar kareleri de silinir.",
+    degisti: "Suflo'nun zoom kaydı bu klibin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek ve Konum anahtar kareleri de silinir."
+  };
+
+  /*
+   * Kapisiz: deneme hakkiyla eklenen zoom'u herkes her zaman geri alabilmeli (3.4 adim 11: kayit tabanli).
+   * Secili klip(ler)in Suflo zoom kayitlari KS_removeSufloKeys'e gider: yalniz Suflo'nun yazdigi ve hala duran
+   * Olcek / Konum anahtarlari silinir, kullanicinin kendi anahtarlari kalir, olcek eski degerine doner.
+   * Kayit yoksa (eski proje) bugunku davranis (tum Olcek anahtarlarini silip Konum'u sifirlamak) YALNIZ onayla.
+   * kapsam { idler, proje }: bildirimdeki Geri al (yalniz o uygulama; eski yonteme dusmez).
+   */
+  async function kaldir(kapsam) {
     if (busy) return;
+    var tekUygulama = !!(kapsam && kapsam.idler);
     var clip = KApp.ctx().sel;
-    if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
+    if (!tekUygulama && !clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
+    var k = kd();
+    if (!k) return;
     setBusy(true);
     try {
-      var dur = Math.max(.2, clip.clipEnd - clip.clipStart);
-      var result = await K.call("KS_autoZoom", {
-        keys: [{ time: clip.clipStart, value: 1 }, { time: clip.clipStart + dur, value: 1 }],
-        anchor: sabitNokta(), // merkez-disi uygulandiysa pozisyon da baza doner
-        clearStart: clip.clipStart,
-        clearEnd: clip.clipStart + dur
-      }, 30000);
-      if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Temizlenemedi.");
+      var s = await k.akis({
+        tur: "zoom",
+        kapsam: kapsam || { secili: true },
+        onay: function (soru) { return window.confirm ? window.confirm(uiMetni(soru)) : false; },
+        yedekMetni: tekUygulama ? null : YEDEK_SORU,
+        kayitYokMetni: tekUygulama ? "Bu zoom'un kaydı bulunamadı; hiçbir şey silinmedi." : "",
+        yedek: async function () {
+          // Eski yontem (bugunku davranis): klibin tum araligi temizlenir, olcek ve konum baza doner
+          var dur = Math.max(.2, clip.clipEnd - clip.clipStart);
+          var result = await K.call("KS_autoZoom", {
+            keys: [{ time: clip.clipStart, value: 1 }, { time: clip.clipStart + dur, value: 1 }],
+            anchor: sabitNokta(), // merkez-disi uygulandiysa pozisyon da baza doner
+            clearStart: clip.clipStart,
+            clearEnd: clip.clipStart + dur
+          }, 30000);
+          if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Temizlenemedi.");
+          // Düz anahtarların kaydı saklanmaz; klibin temizlenen (artık ölü) zoom kayıtları düşer (yeniden 'değişti' sorulmasın)
+          k.sakla(result.proje || "", [], result);
+          return { parcalar: ["Zoom anahtarları temizlendi"], tur: "good" };
+        }
+      });
       status("");
-      KApp.toast("Zoom anahtarları temizlendi", "good");
+      KApp.toast(SufloKaldir.dugum(s.parcalar), s.tur, 7000);
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
@@ -339,8 +442,9 @@ if (typeof window !== "undefined") window.KZoom = (function () {
 
   function init() {
     if (!el("tab-zoom")) return;
+    if (window.SufloEgriSecici && el("zoom-egri")) secici = SufloEgriSecici.olustur(el("zoom-egri"), { arac: "zoom" });
     el("zoom-run").addEventListener("click", calistir);
-    el("zoom-remove").addEventListener("click", kaldir);
+    el("zoom-remove").addEventListener("click", function () { return kaldir(); });
     // mod secici (seg-ctl kalibi)
     Array.prototype.forEach.call(document.querySelectorAll("#zoom-mode button"), function (b) {
       b.addEventListener("click", function () {
@@ -368,5 +472,6 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     });
   }
 
-  return { init: init };
+  // Yapay zekâ köprüsü (MCP, 3.4): "Zoom uygula" düğmesinin aynı işlevi
+  return { init: init, calistir: calistir, kaldir: kaldir, _secici: function () { return secici; } };
 })();

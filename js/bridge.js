@@ -85,21 +85,34 @@ window.K = (function () {
     return mesgul;
   }
 
-  function call(fn, arg, timeout) {
+  /*
+   * gec (isteğe bağlı, 3.4 adım 12): zaman aşımından SONRA gelen cevap (Premiere işi geç de olsa bitirdi) bir kez bu
+   * işleve verilir. Yoğun anahtar yazan araçlar geç gelen kaldırma kayıtlarını böyle saklar; verilmezse geç cevap
+   * eskisi gibi atılır. Zaman aşımı sonucu zamanAsimi: true taşır.
+   */
+  function call(fn, arg, timeout, gec) {
     return new Promise(function (resolve) {
-      var bitti = false;
+      var bitti = false, asildi = false;
       var id = ++cagriNo;
       yoldakiler[id] = { bas: Date.now(), sinir: Math.min(2 * (timeout || 60000), 2 * 3600000) };
       function cevapGeldi() { delete yoldakiler[id]; }
       function son(v) {
-        if (bitti) return;          // evalScript bazen gecikip sonra da cevap verebiliyor
+        if (bitti) {                // evalScript bazen gecikip sonra da cevap verebiliyor
+          if (asildi && typeof gec === "function") {
+            asildi = false;
+            log("jsx GEC CEVAP " + fn);
+            try { gec(v); } catch (eG) { log("jsx " + fn + ": gec cevap islenemedi - " + (eG && eG.message)); }
+          }
+          return;
+        }
         bitti = true;
         clearTimeout(saat);
         resolve(v);
       }
       var saat = setTimeout(function () {
         log("jsx ZAMAN ASIMI " + fn + " (" + (timeout || 60000) + " ms)");
-        son({ ok: false, error: "Premiere yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
+        son({ ok: false, zamanAsimi: true, error: "Premiere yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
+        asildi = true;
       }, timeout || 60000);
 
       var script = arg === undefined
@@ -422,6 +435,91 @@ window.K = (function () {
     });
   }
 
+  /*
+   * İkili güvenli akış (3.4, Otomatik Kesim tek çözümleme): stdout'a setEncoding UYGULANMAZ; her parça
+   * Buffer olarak opts.onData'ya gider ve BİRİKTİRİLMEZ (bellek klip boyuyla büyümez). K.run stdout'u
+   * utf8 metin olarak biriktirir: ham PCM baytları U+FFFD'ye döner, ses bozulur. stderr metindir, birikir.
+   *   opts.onData(Buffer)  stdout parçası (fırlatırsa süreç öldürülür, { code: -1, hata } döner)
+   *   opts.onStderr(s)     stderr parçası (metin)
+   *   opts.iptal           K.iptalJetonu(): süreç ağacı öldürülür, { code: -2, iptal: true }
+   *   opts.timeout         ms (varsayılan 5 dk)
+   * Döner: Promise<{ code, stderr, bayt, iptal?, hata? }>
+   */
+  function runAkis(cmd, args, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      if (!nodeOK) { resolve({ code: -1, stderr: "Node erişimi yok", bayt: 0 }); return; }
+      var jeton = opts.iptal && typeof opts.iptal.dinle === "function" ? opts.iptal : null;
+      if (jeton && jeton.iptalEdildi) { resolve({ code: -2, iptal: true, stderr: "", bayt: 0 }); return; }
+      var child;
+      try {
+        var spawnOpts = { windowsHide: true };
+        if (MAC) {
+          var env = {};
+          for (var ek in process.env) if (process.env.hasOwnProperty(ek)) env[ek] = process.env[ek];
+          env.PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" + (process.env.PATH ? ":" + process.env.PATH : "");
+          spawnOpts.env = env;
+        }
+        child = cp.spawn(cmd, args, spawnOpts);
+      } catch (e) {
+        resolve({ code: -1, stderr: String(e), bayt: 0 });
+        return;
+      }
+      var err = "", bayt = 0, done = false, birak = null;
+      aktifSurec++;
+      function kapat() {
+        done = true;
+        aktifSurec = Math.max(0, aktifSurec - 1);
+        clearTimeout(timer);
+        if (birak) { birak(); birak = null; }
+      }
+      var timer = setTimeout(function () {
+        if (done) return;
+        surecAgaciniOldur(child, false);
+        kapat();
+        resolve({ code: -1, stderr: err + "\n[zaman aşımı]", bayt: bayt });
+      }, opts.timeout || 300000);
+      if (jeton) {
+        birak = jeton.dinle(function () {
+          if (done) return;
+          kapat();
+          surecAgaciniOldur(child, false);
+          log("runAkis IPTAL [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kullanici iptal etti");
+          resolve({ code: -2, iptal: true, stderr: err, bayt: bayt });
+        });
+      }
+      // yalnız stderr metin: stdout ham bayt kalır (setEncoding yok)
+      if (child.stderr && child.stderr.setEncoding) child.stderr.setEncoding("utf8");
+      child.stdout.on("data", function (d) {
+        if (done) return;
+        bayt += d.length;
+        if (!opts.onData) return;
+        try { opts.onData(d); } catch (eD) {
+          kapat();
+          surecAgaciniOldur(child, false);
+          log("runAkis onData: " + (eD && eD.message ? eD.message : eD));
+          resolve({ code: -1, stderr: err, bayt: bayt, hata: String(eD && eD.message ? eD.message : eD) });
+        }
+      });
+      child.stderr.on("data", function (d) {
+        var s = String(d);
+        err += s;
+        if (opts.onStderr && !done) { try { opts.onStderr(s); } catch (eS) {} }
+      });
+      function finish(code) {
+        if (done) return;
+        kapat();
+        if (code !== 0) {
+          log("runAkis HATA [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kod=" + code + " " +
+            String(err).split("\n").slice(-2).join(" ").slice(0, 200));
+        }
+        resolve({ code: code, stderr: err, bayt: bayt });
+      }
+      child.on("error", function (e) { err += String(e); finish(-1); });
+      child.on("close", finish);
+    });
+  }
+
   /* ---------------- HTTP (Node üzerinden, CORS'suz) ---------------- */
 
   /*
@@ -605,6 +703,124 @@ window.K = (function () {
     return n;
   }
 
+  /* ---------------- Kurumsal ağ dayanıklılığı (3.4 adım 19, js/ag-dayanim.js) ---------------- */
+
+  function AG() { return (typeof window !== "undefined" && window.SufloAgDayanim) || null; }
+
+  // İndirme hatasına yalnız sistem kökleriyle ikinci deneme GERÇEKTEN yapıldıysa eklenir
+  var SERTIFIKA_YENIDEN_DENENDI = "Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi, olmadı.";
+
+  /*
+   * İkili dosya yerine gelen yanıt (download(), 3.4 adım 19 inceleme). Cisco Umbrella kökü Windows
+   * deposundaysa sertifika yeniden denemesi engel sunucusunda TLS'i geçer, engel sayfası HTTP 200
+   * döner: bu "indi" sayılsaydı sayfa model adıyla kaydedilir, DNS ipucu hiç çıkmazdı.
+   */
+  var SAYFA_GELDI = "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.";
+  function kucukGeldi(bayt, beklenenMB) {
+    var b = Number(bayt) || 0;
+    var boyut = b >= 1048576 ? Math.round(b / 1048576) + " MB" : Math.max(1, Math.ceil(b / 1024)) + " KB";
+    return "Sunucu beklenenden çok küçük bir yanıt gönderdi (" + boyut + ", beklenen ~" + beklenenMB +
+      " MB): ağ filtresinin engel sayfası olabilir.";
+  }
+
+  /*
+   * macOS: System.keychain dökümünden "Asla Güvenme" (yönetici -d ve kullanıcı güven ayarı Deny) olanları at
+   * (3.4 adım 19 inceleme 2; Windows'ta aynısını WIN_BETIK yapar). security trust-settings-export ayarları yalnız
+   * dosyaya yazar: geçici klasöre yazılıp okunur, hemen silinir (yalnız güven ayarı; PEM diske yazılmaz).
+   * Komut / okuma arızası yerel bir arızadır (ağdaki saldırgan etkileyemez): o alan boş sayılır.
+   */
+  function macReddedilenleriAt(ag, pemler) {
+    if (!MAC || !pemler.length || !ag || typeof ag.guvenAyariKomutu !== "function") return Promise.resolve(pemler);
+    var dizin = "";
+    try { dizin = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-guven-")); } catch (e) { return Promise.resolve(pemler); }
+    var alanlar = ["yonetici", "kullanici"];
+    return Promise.all(alanlar.map(function (alan) {
+      var dosya = path.join(dizin, alan + ".plist");
+      var komut = ag.guvenAyariKomutu(alan, dosya);
+      return run(komut.cmd, komut.args, { timeout: 10000 }).then(function (r) {
+        var metin = "";
+        if (r && r.code === 0) { try { metin = fs.readFileSync(dosya, "utf8"); } catch (e2) { metin = ""; } }
+        try { if (fs.existsSync(dosya)) fs.unlinkSync(dosya); } catch (e3) {}
+        return ag.reddedilenParmakIzleri(metin);
+      }, function () { return {}; });
+    })).then(function (listeler) {
+      try { fs.rmdirSync(dizin); } catch (e4) {}
+      var reddedilen = {};
+      listeler.forEach(function (l) { for (var k in l) if (l.hasOwnProperty(k)) reddedilen[k] = true; });
+      var crypto = require("crypto"), Buf = require("buffer").Buffer;
+      var temiz = ag.reddedilenleriAt(pemler, reddedilen, function (b64) {
+        return crypto.createHash("sha1").update(Buf.from(b64, "base64")).digest("hex");
+      });
+      if (temiz.length !== pemler.length) log("sistem kok sertifikalari: " + (pemler.length - temiz.length) + " adet 'Asla Guvenme' atildi");
+      return temiz;
+    }, function () {
+      try { fs.rmdirSync(dizin); } catch (e5) {}
+      return pemler;
+    });
+  }
+
+  /*
+   * İşletim sisteminin güvendiği ek kök sertifikalar (PEM). Oturum boyunca bellekte saklanır;
+   * diske yazılmaz. Windows: sabit PowerShell betiği (argüman dizisi, girdi eklenmez; Disallowed ve
+   * amacı HTTPS'i dışlayan kökler alınmaz); macOS: security find-certificate, "Asla Güvenme" olanlar
+   * atılır (macReddedilenleriAt). Linux: boş liste.
+   * Yalnız BAŞARILI dışa aktarma önbelleğe girer: soğuk PowerShell'in antivirüs altında zaman
+   * aşımına uğraması ya da komut hatası oturumu "ek kök yok"a kilitlemesin; sonraki
+   * (kullanıcının başlattığı) deneme yeniden sorar.
+   */
+  var _ekPem = null, _ekPemIsi = null;
+  function ekSertifikalar() {
+    if (_ekPem) return Promise.resolve(_ekPem);
+    if (_ekPemIsi) return _ekPemIsi;
+    var ag = AG();
+    var komut = ag && nodeOK ? ag.sertifikaKomutu(process.platform) : null;
+    if (!komut) { _ekPem = []; return Promise.resolve(_ekPem); }
+    _ekPemIsi = run(komut.cmd, komut.args, { timeout: 20000 }).then(function (r) {
+      if (!r || r.code !== 0) {
+        _ekPemIsi = null;
+        log("sistem kok sertifikalari alinamadi (kod " + (r ? r.code : "?") + "), onbellege alinmadi");
+        return [];
+      }
+      return macReddedilenleriAt(ag, ag.pemleriAyikla(r.stdout)).then(function (pemler) {
+        _ekPemIsi = null;
+        _ekPem = pemler;
+        log("sistem kok sertifikalari: " + _ekPem.length + " adet");
+        return _ekPem;
+      });
+    }).then(null, function () { _ekPemIsi = null; return []; });
+    return _ekPemIsi;
+  }
+
+  // Yeniden deneme için ca: tls.rootCertificates (Node 12.3+; yoksa atlanır) + ek kökler. Ek kök yoksa null.
+  function ekCaListesi() {
+    var ag = AG();
+    if (!ag || !nodeOK) return Promise.resolve(null);
+    return ekSertifikalar().then(function (pemler) {
+      var kokler = null;
+      try { kokler = require("tls").rootCertificates; } catch (e) { kokler = null; }
+      return ag.caListesi(kokler, pemler);
+    }, function () { return null; });
+  }
+
+  /*
+   * DNS filtresi: ad 146.112.0.0/16 (Cisco Umbrella) ya da 0.0.0.0'a çözülüyor mu?
+   * Döner: engelleyen adres ya da "" (çözülemedi / engel yok). En çok 3 sn bekler.
+   */
+  function dnsEngeli(host) {
+    return new Promise(function (resolve) {
+      var ag = AG();
+      if (!ag || !nodeOK || !host) { resolve(""); return; }
+      var bitti = false;
+      function son(x) { if (!bitti) { bitti = true; clearTimeout(t); resolve(x); } }
+      var t = setTimeout(function () { son(""); }, 3000);
+      try {
+        require("dns").lookup(String(host), { all: true }, function (err, adresler) {
+          son(err ? "" : ag.dnsEngelAdresi(adresler || []));
+        });
+      } catch (e) { son(""); }
+    });
+  }
+
   /* ---------------- HTTP GET (güncelleme kontrolü) ---------------- */
 
   /*
@@ -612,35 +828,111 @@ window.K = (function () {
    * (https hedefe CONNECT tüneli, http hedefe mutlak adresli istek). Yalnız doğrudan bağlantıya izin
    * veren ağlarda sürüm denetimleri (GitHub API) hep başarısız olmasın.
    */
-  function httpGet(urlStr, headers) {
+  /*
+   * secenek (3.4 adım 19, isteğe bağlı):
+   *   method: "HEAD"   Doctor "Model kaynaklarını sına" HEAD ister (varsayılan GET).
+   *   timeout: ms      İSTEĞİN TAMAMI için duvar saati sınırı: DNS, TCP bağlantısı, vekil CONNECT
+   *                    tüneli, TLS, sertifika yeniden denemesi ve yanıt gövdesi. Node'un
+   *                    req.setTimeout'u soket 'connect' olmadan saymaya başlamaz (güvenlik duvarı
+   *                    SYN'i düşürünce Windows'ta ~21 sn, macOS'ta ~75 sn askıda kalırdı); sınır
+   *                    dolunca istek / tünel yıkılır ve { status: 0, kod: "ETIMEDOUT" } döner.
+   *                    Verilmezse 20 sn'lik soket hareketsizlik sınırı (bağlantı kurulurken de sayar).
+   *   sistemKokleri: true  Sertifika hatasında (kurumsal HTTPS denetimi) istek BİR KEZ
+   *                    ca = tls.rootCertificates + sistem kökleri ile yeniden denenir (bkz. ekCaListesi);
+   *                    dönüşte caDenendi: true. YALNIZ kullanıcının başlattığı isteklerde açılır
+   *                    (Doctor sınaması, model özeti): panel açılışındaki sessiz güncelleme denetimi
+   *                    Premiere'den gizli PowerShell başlatmasın.
+   *                    Sınır, sistem kökleri okunurken (soğuk PowerShell antivirüs altında birkaç sn) ya
+   *                    da ikinci deneme sürerken dolarsa dönüş ETIMEDOUT DEĞİL, ilk denemenin sertifika
+   *                    hatasıdır (kod: ör. UNABLE_TO_GET_ISSUER_CERT_LOCALLY) + caSuresiDoldu: true:
+   *                    "güvenlik duvarı düşürüyor" yerine HTTPS denetimi anlatılır (3.4 adım 19 inceleme 2).
+   *                    Dışa aktarma arka planda sürer ve önbelleğe girer: birkaç sn sonraki deneme onu kullanır.
+   * Hata dönüşünde kod: Node hata kodu (ör. ENOTFOUND).
+   */
+  var HTTP_HAREKETSIZ_MS = 20000;
+  function httpGet(urlStr, headers, secenek) {
+    secenek = secenek || {};
     return new Promise(function (resolve0) {
       var bitti = false;
-      function resolve(x) { if (!bitti) { bitti = true; resolve0(x); } }
+      var aktifReq = null, sayac = null;
+      // sistem kökleriyle yeniden deneme başladıysa ilk denemenin sertifika hatası (süre dolarsa bu döner)
+      var sertifikaHatasi = null;
+      function sertifikaSonucu(e) {
+        return { status: 0, body: String(e), kod: e && e.code ? String(e.code) : "", caSuresiDoldu: true };
+      }
+      function resolve(x) {
+        if (bitti) return;
+        bitti = true;
+        if (sayac) { clearTimeout(sayac); sayac = null; }
+        if (secenek.caDenendi && x) x.caDenendi = true;
+        resolve0(x);
+      }
       if (!nodeOK) { resolve({ status: 0, body: "Node erişimi yok" }); return; }
       var proto, u;
       try {
         u = new URL(urlStr);
         proto = require(u.protocol === "http:" ? "http" : "https");
       } catch (e) { resolve({ status: 0, body: String(e) }); return; }
+      // duvar saati sınırı (yeniden denemede aynı son an devralınır: toplam süre uzamaz)
+      var sonAn = secenek._sonAn > 0 ? secenek._sonAn : (secenek.timeout > 0 ? Date.now() + Number(secenek.timeout) : 0);
+      if (sonAn) {
+        sayac = setTimeout(function () {
+          sayac = null;
+          try { if (aktifReq) aktifReq.destroy(); } catch (eD) {}
+          resolve(sertifikaHatasi ? sertifikaSonucu(sertifikaHatasi) : { status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" });
+        }, Math.max(1, sonAn - Date.now()));
+      }
+      var hareketsiz = secenek.timeout > 0 ? Math.min(Number(secenek.timeout), HTTP_HAREKETSIZ_MS) : HTTP_HAREKETSIZ_MS;
       var hdrs = { "User-Agent": "Suflo-Panel" };
       for (var h in headers) if (headers.hasOwnProperty(h)) hdrs[h] = headers[h];
+      var yontem = secenek.method === "HEAD" ? "HEAD" : "GET";
       var reqOpts = {
         hostname: u.hostname,
         port: u.port || (u.protocol === "http:" ? 80 : 443),
         path: u.pathname + (u.search || ""),
-        headers: hdrs
+        method: yontem,
+        headers: hdrs,
+        // soket oluşturulurken kurulur: DNS ve TCP bağlantısı da sayılır (setTimeout yalnız 'connect' sonrası)
+        timeout: hareketsiz
       };
+      if (secenek.ca && u.protocol === "https:") reqOpts.ca = secenek.ca;
+      function hataDonus(e3) {
+        if (bitti) return;
+        // kurumsal HTTPS denetimi: sistemin güvendiği köklerle bir kez daha (doğrulama hep açık)
+        if (secenek.sistemKokleri && !secenek.caDenendi && u.protocol === "https:" && AG() && AG().sertifikaHatasiMi(e3)) {
+          log("sertifika hatasi (" + (e3 && e3.code ? e3.code : "?") + "), sistem kokleriyle bir kez daha: " + u.hostname);
+          sertifikaHatasi = e3 || new Error("sertifika");
+          ekCaListesi().then(function (ca) {
+            if (bitti) return;
+            if (!ca) { resolve({ status: 0, body: String(e3), kod: e3 && e3.code ? String(e3.code) : "" }); return; }
+            var s2 = {};
+            for (var k2 in secenek) if (secenek.hasOwnProperty(k2)) s2[k2] = secenek[k2];
+            s2.ca = ca; s2.caDenendi = true;
+            if (sonAn) s2._sonAn = sonAn;
+            httpGet(urlStr, headers, s2).then(function (r2) {
+              // ikinci deneme aynı son ana takıldı: zaman aşımı değil, ilk denemenin sertifika hatası
+              resolve(r2 && r2.status === 0 && r2.kod === "ETIMEDOUT" ? sertifikaSonucu(sertifikaHatasi) : r2);
+            });
+          });
+          return;
+        }
+        resolve({ status: 0, body: String(e3), kod: e3 && e3.code ? String(e3.code) : "" });
+      }
       function fire(extra) {
         if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) reqOpts[k] = extra[k];
-        var req = proto.get(reqOpts, function (res) {
+        if (bitti) { try { if (extra && extra.socket) extra.socket.destroy(); } catch (eS0) {} return; }
+        // GET eskisi gibi proto.get (kendiliğinden end eder); HEAD için request + end
+        var req = (yontem === "HEAD" ? proto.request : proto.get).call(proto, reqOpts, function (res) {
           var data = "";
           res.setEncoding("utf8");   // cok baytli harfler (ş, ğ) parca sinirinda bolunmesin
           res.on("data", function (d) { data += d; });
           res.on("end", function () { resolve({ status: res.statusCode, body: data }); });
           res.on("error", function (e2) { resolve({ status: 0, body: String(e2) }); });
         });
-        req.on("error", function (e3) { resolve({ status: 0, body: String(e3) }); });
-        req.setTimeout(20000, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı" }); });
+        aktifReq = req;
+        req.on("error", hataDonus);
+        req.setTimeout(hareketsiz, function () { req.destroy(); resolve({ status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" }); });
+        if (yontem === "HEAD") req.end();
       }
       var pu = null;
       try { pu = proxyFor(u); } catch (eP) { pu = null; }
@@ -648,20 +940,21 @@ window.K = (function () {
         var h2 = Object.assign({ Host: u.hostname }, hdrs);
         var au = proxyAuth(pu);
         if (au) h2["Proxy-Authorization"] = au;
-        reqOpts = { hostname: pu.hostname, port: proxyPort(pu), path: urlStr, headers: h2 };
+        reqOpts = { hostname: pu.hostname, port: proxyPort(pu), path: urlStr, method: yontem, headers: h2, timeout: hareketsiz };
         proto = require("http");
         fire();
       } else if (pu) {
-        connectTunnel(pu, u, function (err, socket) {
+        // tünelin kendi 30 sn'si duvar saati sınırını aşmasın: sınır dolunca CONNECT isteği yıkılır
+        aktifReq = connectTunnel(pu, u, function (err, socket) {
           if (err) {
             log("proxy tuneli kurulamadi (httpGet): " + err.message);
-            resolve({ status: 0, body: String(err.message || err) });
+            resolve({ status: 0, body: String(err.message || err), kod: err && err.code ? String(err.code) : "" });
             return;
           }
           if (bitti) { try { socket.destroy(); } catch (eS) {} return; }
           // hazir socket uzerinden TLS: SNI ve Host icin host/servername sart
           fire({ socket: socket, agent: false, host: u.hostname, servername: u.hostname });
-        });
+        }, sonAn ? Math.max(1, sonAn - Date.now()) : 0);
       } else {
         fire();
       }
@@ -670,7 +963,7 @@ window.K = (function () {
 
   /* ---------------- Tanılama günlüğü ---------------- */
 
-  var VERSION = "3.3.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
+  var VERSION = "3.4.0";  // NOT: build sirasinda tools/package.ps1 + kurucu-yap.ps1 bunu manifest'ten OTOMATIK senkronlar; elle bumplarken de guncel tut
   // depo adresi sabit: guncelleme kontrolu ve sorun bildirimi bunu kullanir
   var REPO = "sametcreates/suflo";
   var logBuf = [];
@@ -729,6 +1022,23 @@ window.K = (function () {
       re: /ENOSPC|no space left|not enough space|yeterli alan/i,
       tip: "Diskte yer kalmamış. 2 GB kadar yer aç, tekrar dene; indirme kaldığı yerden devam eder."
     },
+    { // 3.4 adım 19: DNS filtresi (Cisco Umbrella / 0.0.0.0) — downloadTeshisli ekler
+      re: /Kurumsal ağ filtresi/,
+      tip: "BT ekibinden huggingface.co, hf-mirror.com ve github.com için izin iste ya da modeli başka bir " +
+        "bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur."
+    },
+    { // 3.4 adım 19 inceleme: dosya yerine web sayfası / çok küçük yanıt (DNS teşhisi yoksa: Zscaler vb.)
+      re: /engel sayfası olabilir/,
+      tip: "Ağ filtresi bu indirmeyi engelliyor olabilir. BT ekibinden bu adres için izin iste; " +
+        "şirket ağındaysan Ayarlar'dan vekil sunucu tanımla."
+    },
+    { // 3.4 adım 19: kurumsal HTTPS denetimi. Tarafsız: yeniden deneme yalnız indirme/HEAD'de ve
+      // yalnız ek kök varsa yapılır, o zaman hatanın kendisi söyler (SERTIFIKA_YENIDEN_DENENDI);
+      // içe aktarma önerisi yalnız model indirme hatasına eklenir (hataYardimi, modelIceAktarOner)
+      re: /UNABLE_TO_GET_ISSUER_CERT_LOCALLY|SELF_SIGNED_CERT_IN_CHAIN|CERT_UNTRUSTED|UNABLE_TO_VERIFY_LEAF_SIGNATURE|local issuer certificate|self.signed certificate in certificate chain|unable to verify the first certificate|certificate not trusted/i,
+      tip: "Ağ HTTPS bağlantılarını denetliyor olabilir (kurumsal güvenlik yazılımı). BT ekibinden bu adres " +
+        "için izin iste; şirket ağındaysan Ayarlar'dan vekil sunucu tanımla."
+    },
     { // ağ: DNS, kopma, güvenlik duvarı, sertifika, indirme/istek zaman aşımı
       re: /ENOTFOUND|EAI_AGAIN|getaddrinfo|ETIMEDOUT|ECONNRESET|ECONNREFUSED|socket hang up|SELF_SIGNED|CERT_|indirme zaman aşımı|timed? ?out/i,
       tip: "İnternet bağlantısında sorun görünüyor. Bağlantıyı kontrol edip tekrar dene; " +
@@ -769,9 +1079,21 @@ window.K = (function () {
 
   function hataYardimi(e) {
     var m = String(e && e.message ? e.message : (e || ""));
+    // 3.4 adım 19: model indirilemediyse (ağ) çevrimdışı içe aktarma yolu da söylenir; başka
+    // hatalarda (bulut API, motor arşivi) söylenmez. İleti/ipucu zaten içeriyorsa tekrarlanmaz.
+    // İşaret: engine.js modelKur, hata.modelIceAktarOner
+    var iceAktar = e && typeof e === "object" && e.modelIceAktarOner
+      ? "Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin." : "";
     for (var i = 0; i < HATA_REHBERI.length; i++) {
-      if (HATA_REHBERI[i].re.test(m)) return m + "\nÇözüm: " + HATA_REHBERI[i].tip;
+      if (HATA_REHBERI[i].re.test(m)) {
+        var tip = HATA_REHBERI[i].tip;
+        // içe aktarma önerisi kendi satırında: İngilizce arayüzde her satır kendi sözlük anahtarıyla çevrilir
+        // (aynı satıra eklense "Çözüm:" satırı sözlükte bulunmaz, Türkçe kalırdı; 3.4 adım 19 inceleme 2)
+        if (iceAktar && (m + tip).indexOf("Model dosyası içe aktar") === -1) tip += "\n" + iceAktar;
+        return m + "\nÇözüm: " + tip;
+      }
     }
+    if (iceAktar && m.indexOf("Model dosyası içe aktar") === -1) return m + "\nÇözüm: " + iceAktar;
     return m;
   }
 
@@ -1099,7 +1421,9 @@ window.K = (function () {
     try { hazir(null, proto.request(opts, yanit)); } catch (e4) { hazir(e4); }
   }
 
-  function connectTunnel(pu, u, cb) {
+  // sinirMs (isteğe bağlı): CONNECT için zaman aşımı (varsayılan 30 sn). Döner: CONNECT isteği
+  // (çağıran kendi duvar saati sınırında yıkabilsin; yıkılınca cb hata ile çağrılır)
+  function connectTunnel(pu, u, cb, sinirMs) {
     var hdrs = {};
     var au = proxyAuth(pu);
     if (au) hdrs["Proxy-Authorization"] = au;
@@ -1121,8 +1445,9 @@ window.K = (function () {
       done(null, socket);
     });
     cr.on("error", function (e) { done(e); });
-    cr.setTimeout(30000, function () { cr.destroy(); done(new Error("Proxy CONNECT zaman asimi")); });
+    cr.setTimeout(sinirMs > 0 ? Math.min(sinirMs, 30000) : 30000, function () { cr.destroy(); done(new Error("Proxy CONNECT zaman asimi")); });
     cr.end();
+    return cr;
   }
 
   /*
@@ -1134,7 +1459,52 @@ window.K = (function () {
    *   (ornegin CPU/GPU derlemeleri) birbirine eklenmez.
    *   iptal: K.iptalJetonu() — iptalde istek kesilir, .part KORUNUR (sonraki deneme kaldigi
    *   yerden devam eder) ve { ok: false, iptal: true, kept } doner.
+   *   expectedMB: ikili dosya bekleniyor demektir; text/html yanit (agin engel sayfasi) dosya
+   *   sayilmaz: { ok: false, sayfa: true }, hedefe ve .part'a dokunulmaz (3.4 adim 19 inceleme).
+   *   enAzBayt (istege bagli): bundan kucuk yanit dosya sayilmaz: { ok: false, kucuk: true };
+   *   hedef dosya degistirilmez (katalog modelleri: KEngine.installedModels'in %85 kurali).
    */
+  /*
+   * Dışa açılan indirici (3.4 adım 19): download() + DNS filtresi teşhisi. İndirme başarısızsa
+   * (iptal değilse) istenen ana makinenin ve (yönlendirildiyse) son denenen ana makinenin adı
+   * çözülür; 146.112.0.0/16 (Cisco Umbrella) ya da 0.0.0.0 ise hataya "Kurumsal ağ filtresi …
+   * engelliyor" eklenir ve dnsEngeli alanı dolar. İkisi de engelliyse istenen ad söylenir: engel
+   * sunucusu block.opendns.com'a yönlendirdiğinde kullanıcıya o adı değil huggingface.co'yu anlatmalı.
+   *
+   * Başarı demek dosya demektir: ikili dosya beklenirken gelen web sayfası (engel sayfası; Umbrella
+   * kökü Windows deposunda kuruluysa sertifika yeniden denemesi TLS'i geçer ve sayfa 200 döner) ya da
+   * meta.enAzBayt'tan küçük yanıt download() içinde BAŞARISIZ sayılır, hedef dosyaya hiç taşınmaz;
+   * bu teşhis de o zaman çalışır. Gerçek dosya inince DNS'e bakılmaz: Umbrella'nın seçici vekili
+   * (intelligent proxy) izin verilen içeriği de 146.112.x adresinden geçirir.
+   */
+  function downloadTeshisli(urlStr, destPath, onProgress, redirects, resumeFrom, meta) {
+    var izle = {};
+    var m2 = {};
+    if (meta) for (var k in meta) if (meta.hasOwnProperty(k)) m2[k] = meta[k];
+    m2._izle = izle;
+    return download(urlStr, destPath, onProgress, redirects, resumeFrom, m2).then(function (r) {
+      if (!r || r.ok || r.iptal) return r;
+      // yeniden deneme YALNIZ gerçekten yapıldıysa söylenir (HATA_REHBERI'nin genel ipucu bunu iddia etmez)
+      if (r.caDenendi && r.sertifika) r.error = String(r.error || "") + " — " + SERTIFIKA_YENIDEN_DENENDI;
+      var ilk = "";
+      try { ilk = new URL(urlStr).hostname; } catch (e) { ilk = ""; }
+      var adaylar = [];
+      if (ilk) adaylar.push(ilk);
+      if (izle.host && izle.host !== ilk) adaylar.push(izle.host);
+      return Promise.all(adaylar.map(dnsEngeli)).then(function (adresler) {
+        var ag = AG();
+        for (var i = 0; i < adaylar.length; i++) {
+          if (!adresler[i] || !ag) continue;
+          r.dnsEngeli = adresler[i];
+          r.error = String(r.error || "") + " — " + ag.dnsEngelTeshis(adaylar[i], adresler[i]);
+          log("DNS filtresi: " + adaylar[i] + " -> " + adresler[i]);
+          break;
+        }
+        return r;
+      });
+    });
+  }
+
   function download(urlStr, destPath, onProgress, redirects, resumeFrom, meta) {
     redirects = redirects || 0;
     meta = meta || {};
@@ -1154,6 +1524,8 @@ window.K = (function () {
         u = new URL(urlStr);
         proto = require(u.protocol === "http:" ? "http" : "https");
       } catch (e) { resolve({ ok: false, error: String(e) }); return; }
+      // son denenen ana makine (yönlendirmeden sonra CDN olabilir): DNS filtresi ipucu için
+      if (meta._izle) meta._izle.host = u.hostname;
 
       var partPath0 = destPath + ".part";
       var sidePath = destPath + ".part.json";
@@ -1271,6 +1643,24 @@ window.K = (function () {
         var partial = Number(res.headers["content-length"] || 0);
         var base = resuming ? resumeFrom : 0;
         var total = partial ? base + partial : 0;
+        // 3.4 adım 19 inceleme: ikili dosya beklenirken gelen web sayfası (engel sayfası) ya da en az
+        // boyutun altındaki yanıt dosya değildir. Hiçbir şey yazılmaz: .part ve hedef olduğu gibi kalır
+        // (hedefte içe aktarılmış model olabilir). Başarısız döner ki downloadTeshisli DNS'e baksın,
+        // fetchFile sıradaki aynayı denesin.
+        var tur = String(res.headers["content-type"] || "");
+        var beklenenMB = meta.expectedMB ? Math.max(1, Math.round(meta.expectedMB)) : Math.ceil((meta.enAzBayt || 0) / 1048576);
+        if (meta.expectedMB && /^\s*(text\/html|application\/xhtml\+xml)/i.test(tur)) {
+          res.resume();
+          log("indirme: dosya yerine web sayfasi geldi (HTTP " + res.statusCode + ", " + tur + "): " + u.hostname);
+          resolve({ ok: false, error: SAYFA_GELDI, kept: partSize(), sayfa: true });
+          return;
+        }
+        if (meta.enAzBayt > 0 && total && total < meta.enAzBayt) {
+          res.resume();
+          log("indirme: yanit beklenenden kucuk (" + total + " bayt < " + meta.enAzBayt + "): " + u.hostname);
+          resolve({ ok: false, error: kucukGeldi(total, beklenenMB), kept: partSize(), kucuk: true });
+          return;
+        }
         if (!resuming) writeSide(total);
         // Katalog boyutuyla kaba denetim (checksum yok): sapma varsa uyar, engelleme.
         if (total && meta.expectedMB) {
@@ -1288,11 +1678,13 @@ window.K = (function () {
         try { out = fs.createWriteStream(partPath, resuming ? { flags: "a" } : undefined); }
         catch (eO) { resolve({ ok: false, error: String(eO) }); return; }
         aktifOut = out;
-        function fail(msg, keepPart) {
+        function fail(msg, keepPart, ek) {
           try { out.destroy(); } catch (e1) {}
           // ag hatasinda .part'i KORU — sonraki denemede kaldigi yerden devam eder
           if (!keepPart) dropPart();
-          resolve({ ok: false, error: msg, kept: keepPart ? partSize() : 0 });
+          var sonucF = { ok: false, error: msg, kept: keepPart ? partSize() : 0 };
+          if (ek) for (var ekA in ek) if (ek.hasOwnProperty(ekA)) sonucF[ekA] = ek[ekA];
+          resolve(sonucF);
         }
         res.on("data", function (d) {
           got += d.length;
@@ -1302,6 +1694,12 @@ window.K = (function () {
         out.on("finish", function () {
           out.close(function () {
             if (total > 0 && got !== total) { fail("Eksik indirme: " + got + "/" + total, true); return; }
+            // boyut bildirmeyen (chunked) küçük yanıt: hedefe taşınmaz, .part atılır (dosya değil)
+            if (meta.enAzBayt > 0 && got < meta.enAzBayt) {
+              log("indirme: inen dosya beklenenden kucuk (" + got + " bayt < " + meta.enAzBayt + ")");
+              fail(kucukGeldi(got, beklenenMB), false, { kucuk: true });
+              return;
+            }
             try {
               if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
               fs.renameSync(partPath, destPath);
@@ -1321,11 +1719,34 @@ window.K = (function () {
           return;
         }
         if (extra) for (var k in extra) reqOpts[k] = extra[k];
+        // 3.4 adım 19: sertifika yeniden denemesinde sistemin güvendiği kökler (doğrulama AÇIK kalır)
+        if (meta.ca && u.protocol === "https:") reqOpts.ca = meta.ca;
         var req = proto.get(reqOpts, onRes);
         aktifReq = req;
         // ag hatasinda .part korunur ki sonraki deneme kaldigi yerden devam etsin
         req.on("error", function (eq) {
-          resolve({ ok: false, error: String(eq), kept: partSize() });
+          var ag = AG();
+          if (!bitti && !meta.caDenendi && u.protocol === "https:" && ag && ag.sertifikaHatasiMi(eq)) {
+            // kurumsal HTTPS denetimi: bir kez, ca = tls.rootCertificates + sistem kökleri ile
+            log("sertifika hatasi (" + (eq && eq.code ? eq.code : "?") + "), sistem kokleriyle bir kez daha: " + u.hostname);
+            ekCaListesi().then(function (ca) {
+              if (bitti) return;
+              if (!ca) { resolve({ ok: false, error: String(eq), kept: partSize(), sertifika: true }); return; }
+              var meta2 = {};
+              for (var mk in meta) if (meta.hasOwnProperty(mk)) meta2[mk] = meta[mk];
+              meta2.ca = ca;
+              meta2.caDenendi = true;
+              download(urlStr, destPath, onProgress, redirects, resumeFrom, meta2).then(function (r2) {
+                if (r2 && !r2.ok && !r2.iptal) {
+                  r2.caDenendi = true;
+                  if (ag.sertifikaHatasiMi(r2.error)) r2.sertifika = true;
+                }
+                resolve(r2);
+              });
+            });
+            return;
+          }
+          resolve({ ok: false, error: String(eq), kept: partSize(), sertifika: !!(ag && ag.sertifikaHatasiMi(eq)) });
         });
         req.setTimeout(1800000, function () {
           req.destroy();
@@ -1583,6 +2004,7 @@ window.K = (function () {
     call: call,
     hostMesgul: hostMesgul,
     run: run,
+    runAkis: runAkis,
     iptalJetonu: iptalJetonu,
     iptalHatasi: iptalHatasi,
     iptalTikiGecerli: iptalTikiGecerli,
@@ -1609,7 +2031,11 @@ window.K = (function () {
     whisperDir: whisperDir,
     ffmpegDir: ffmpegDir,
     ffmpegKurulu: ffmpegKurulu,
-    download: download,
+    download: downloadTeshisli,
+    dnsEngeli: dnsEngeli,
+    ekSertifikalar: ekSertifikalar,
+    // yalnız testler: oturum önbelleğini doldur (işletim sistemi komutu çalıştırılmadan)
+    _ekSertifikaOnbellek: function (pemler) { _ekPem = Array.isArray(pemler) ? pemler.slice() : null; _ekPemIsi = null; },
     unzip: unzip,
     findFfmpeg: findFfmpeg,
     ffmpegLibass: ffmpegLibass,
