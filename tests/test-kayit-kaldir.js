@@ -140,6 +140,16 @@ ok("kesimYeri: V katmanı + dakika:saniye.salise; saat varsa başa; geçersizse 
     eg({ id: "e5", tur: "egri", nodeId: "n1", times: [3, 4], c: 5 }), rec({ id: "e6", tur: "egri", nodeId: "n1", times: [1, 2] })];
   var a = SK.egriAdaylari(egriler, arac).map(function (r) { return r.id; });
   ok("egriAdaylari: yalnız araç kaydıyla aynı sekans + klip + özellikteki uçlu Eğri kayıtları, en yeni önce", JSON.stringify(a) === '["e5","e1"]', a);
+  // 3.4 son inceleme: arayüz dili değişti (Eğri kaydı Türkçe "Ölçek", araç kaydı İngilizce "Scale")
+  var egTr = eg({ id: "et", tur: "egri", nodeId: "n1", matchName: "AE.ADBE Motion/\u00d6l\u00e7ek", times: [0.5, 1], c: 7 });
+  ok("egriAdaylari: dil değişse de aynı özellikteki Eğri kaydı aday (Ölçek ↔ Scale)", JSON.stringify(SK.egriAdaylari([egTr], arac).map(function (r) { return r.id; })) === '["et"]');
+  var zTr = rec({ id: "ztr", tur: "zoom", matchName: "AE.ADBE Motion/\u00d6l\u00e7ek", times: [0, 2, 4] });
+  var zEn = rec({ id: "zen", tur: "zoom", matchName: "AE.ADBE Motion/Scale", times: [1, 3] });
+  var tzEn = SK.temizlenenler({ temizlenen: [{ seqId: "s1", nodeId: "n1", clipName: "", clipStart: 0, clipEnd: 10, clipIn: 0, clipOut: 10,
+    matchName: "AE.ADBE Motion/Scale", pencereler: [[0, 4]], times: [0, 2, 4], bosaldi: true }] });
+  var gTr = SK.yerineGecis([zTr], [zEn], tzEn, 0.25 / 25);
+  ok("dil değişince: çakışan eski kayıt (cakisanlar) ve host temizliği (ayniYer) Türkçe kaydı da bulur; yeni zoom eskinin yerine geçer",
+    JSON.stringify(SK.cakisanlar([zTr], zEn).map(function (r) { return r.id; })) === '["ztr"]' && !!gTr.at.ztr, gTr);
   ok("egriAdaylari: araç kaydı yoksa boş", SK.egriAdaylari(egriler, []).length === 0 && SK.egriAdaylari(null, arac).length === 0);
   var yay = rec({ id: "y1", tur: "yaylan", nodeId: "n1", times: [2.08, 2.24] }); yay.uclar = null; yay.kenarDegerleri = [{ t: 2, v: 100 }]; yay.createdAt = 9;
   var yayIni = rec({ id: "y2", tur: "yaylan", nodeId: "n1", times: [2.08] }); yayIni.uclar = null; yayIni.kenarDegerleri = [];

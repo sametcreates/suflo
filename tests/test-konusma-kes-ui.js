@@ -92,6 +92,13 @@ function ortam(o) {
         if (fn === "KS_getSelectedClips") return Promise.resolve({ ok: true, clips: [secim.clip] });
         if (fn === "KS_getContext" && o.baglam) return o.baglam();   // testin denetlediği (bekleyen) cevap
         if (fn === "KS_getContext") return Promise.resolve({ ok: true, sequence: "Vlog", sequenceId: "S1", frame: 0.04 });
+        // 3.4 son inceleme: Uygula yazıya dökülen klibin yerini sorar (o.duzen: testin sahte Premiere düzeni; yoksa yazıya
+        // dökülen her klip yerinde)
+        if (fn === "KS_getTrackLayout") {
+          if (o.duzen) return Promise.resolve(o.duzen(arg));
+          var yerinde = say.tw.map(function (op) { var c = op.clip || clip; return { s: c.clipStart, e: c.clipEnd, yol: c.mediaPath, hiza: (c.inPoint || 0) - c.clipStart }; });
+          return Promise.resolve({ ok: true, video: [{ index: 0, klipler: yerinde }], audio: [] });
+        }
         var sonuc = { ok: true, newSeq: arg && arg.cloneName, removed: 1 };
         // 3.4 adım 8: host'un esleme raporu (kopyanın kimliği, kare, gerçek kayma)
         if (arg && arg.esleme && o.esleme !== false) {
@@ -248,6 +255,32 @@ function ortam(o) {
   ok("dil değişince bellek ıskalar (anahtar dil içerir)", E.say.tw.length === 5, E.say.tw.length);
   await tetikle(E.el["tc-analyze"], "click"); await bekle();
   ok("aynı dil + klip: bellekten", E.say.tw.length === 5 && E.el["tc-cache"].hidden === false, E.say.tw.length);
+
+  /* 3.4 son inceleme: yazıya döküldükten sonra Premiere'de taşınan / kırpılan klip: kesimler eski konuma gönderilmez */
+  var tasindi = { s: 25, e: 65, yol: "/v/a.mp4", hiza: -25 };   // A 10–50'den 25–65'e taşındı
+  var T1 = ortam({ duzen: function (a) { return { ok: true, video: [{ index: 0, klipler: [tasindi] }], audio: [] }; } });
+  await tetikle(T1.el["tc-analyze"], "click"); await bekle();
+  await tetikle(T1.el["tc-apply"], "click"); await bekle();
+  var lc = T1.say.call.filter(function (c) { return c[0] === "KS_getTrackLayout"; });
+  ok("taşınan klip: KS_applyCuts gönderilmez, 'taşındı ya da kırpıldı … yeniden yazıya dök', transkript kalır",
+    T1.say.call.filter(function (c) { return c[0] === "KS_applyCuts"; }).length === 0 && /taşındı ya da kırpıldı/.test(T1.el["tc-status"].textContent) &&
+    T1.el["tc-result"].hidden === false && lc.length === 1 && lc[0][1].klipler === true && lc[0][1].start === 10 && lc[0][1].end === 50,
+    T1.el["tc-status"].textContent + " " + JSON.stringify(lc.map(function (c) { return c[1]; })));
+  var T2 = ortam({ duzen: function () { return { ok: true, video: [{ index: 0, klipler: [{ s: 10, e: 45, yol: "/v/a.mp4", hiza: -10 }] }], audio: [] }; } });
+  await tetikle(T2.el["tc-analyze"], "click"); await bekle();
+  await tetikle(T2.el["tc-apply"], "click"); await bekle();
+  var T3 = ortam({ duzen: function () { return { ok: false, error: "x" }; } });
+  await tetikle(T3.el["tc-analyze"], "click"); await bekle();
+  await tetikle(T3.el["tc-apply"], "click"); await bekle();
+  ok("sondan kırpılan klip de gönderilmez; yer okunamazsa 'okunamadı', kesim yok",
+    T2.say.call.filter(function (c) { return c[0] === "KS_applyCuts"; }).length === 0 && /taşındı ya da kırpıldı/.test(T2.el["tc-status"].textContent) &&
+    T3.say.call.filter(function (c) { return c[0] === "KS_applyCuts"; }).length === 0 && /okunamadı/.test(T3.el["tc-status"].textContent),
+    T2.el["tc-status"].textContent + " | " + T3.el["tc-status"].textContent);
+  var T4 = ortam({ duzen: function () { return { ok: true, video: [{ index: 0, klipler: [{ s: 10, e: 50, yol: "/v/a.mp4", hiza: -10 }] }], audio: [{ index: 0, klipler: [tasindi] }] }; } });
+  await tetikle(T4.el["tc-analyze"], "click"); await bekle();
+  await tetikle(T4.el["tc-apply"], "click"); await bekle();
+  ok("klip yerindeyse (aynı medya, başlangıç, bitiş, kaynak hizası) eskisi gibi uygulanır", T4.say.call.filter(function (c) { return c[0] === "KS_applyCuts"; }).length === 1,
+    T4.el["tc-status"].textContent);
 
   // İngilizce arayüz: kopya sekans adı İngilizce
   var EN = ortam({ dil: "en" });

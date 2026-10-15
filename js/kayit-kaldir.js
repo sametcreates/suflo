@@ -95,7 +95,7 @@
     var pay = 1e-4;
     return (Array.isArray(liste) ? liste : []).filter(function (r) {
       if (!r || r === yeni || r.id === yeni.id || !aracMi(r.tur)) return false;
-      if (r.seqId !== yeni.seqId || r.nodeId !== yeni.nodeId || r.matchName !== yeni.matchName) return false;
+      if (r.seqId !== yeni.seqId || r.nodeId !== yeni.nodeId || !ayniOzellik(r, yeni)) return false;
       var ra = aralik(r);
       return !!ra && ra[0] <= ya[1] + pay && ya[0] <= ra[1] + pay;
     });
@@ -103,6 +103,15 @@
 
   function sonlu(v) { return typeof v === "number" && isFinite(v); }
   function kopya(v) { return Array.isArray(v) ? v.slice() : v; }
+  /*
+   * Aynı özellik: kimlik ("bileşen/özellik") dilden bağımsız (SufloKeyRecords.ayniOzellik). Özellik kısmı Premiere'in
+   * arayüz dilindeki görünen ad: dil değişince eski kayıtlar yeni araç kayıtlarıyla, temizlik bildirimiyle ve Eğri
+   * kayıtlarıyla yine eşleşir (host KS_kayitDilsizUyar ile aynı kural; 3.4 inceleme)
+   */
+  function ayniOzellik(a, b) {
+    if (KR && typeof KR.ayniOzellik === "function") return KR.ayniOzellik(a, b);
+    return String((a && a.matchName) || "") === String((b && b.matchName) || "");
+  }
   function ayniTur(a, b) {
     if (typeof a === "number" || typeof b === "number") return typeof a === "number" && typeof b === "number";
     return Array.isArray(a) && Array.isArray(b) && a.length === b.length;
@@ -131,7 +140,7 @@
 
   // Kayıt ile temizlik girdisi aynı klibin aynı özelliği mi: sekans + özellik kimliği + klip (nodeId; yoksa ad + başlangıç)
   function ayniYer(r, e, tol) {
-    if (!r || !e || String(r.seqId || "") !== String(e.seqId || "") || r.matchName !== e.matchName) return false;
+    if (!r || !e || String(r.seqId || "") !== String(e.seqId || "") || !ayniOzellik(r, e)) return false;
     if (r.nodeId && e.nodeId) return String(r.nodeId) === String(e.nodeId);
     return String(r.clipName || "") === String(e.clipName || "") && sonlu(r.clipStart) && Math.abs(r.clipStart - e.clipStart) <= Math.max(tol, 1e-3);
   }
@@ -274,7 +283,7 @@
         if (!Array.isArray(e.kenarDegerleri) || !e.kenarDegerleri[0] || typeof e.kenarDegerleri[0].t !== "number") return false;
       } else if (e.tur !== "egri" || !Array.isArray(e.uclar) || e.uclar.length !== 2) return false;
       return araclar.some(function (r) {
-        if (r.matchName !== e.matchName || String(r.seqId || "") !== String(e.seqId || "")) return false;
+        if (!ayniOzellik(r, e) || String(r.seqId || "") !== String(e.seqId || "")) return false;
         if (r.nodeId && e.nodeId) return String(r.nodeId) === String(e.nodeId);
         return String(r.clipName || "") === String(e.clipName || "");
       });

@@ -484,6 +484,107 @@ async function kapsamTestleri(K, stereo) {
   ok("kapsam değişimi bu WAV'ı da siler", !fs.existsSync(w.wavlar[0]));
 
   await kapsamInceleme(K, stereo, klipK);
+  await dinlenenBosTestleri(K, stereo);
+  await kurguIzTestleri(K, stereo);
+}
+
+/*
+ * 3.4 son inceleme: sekans kapsamında analizden sonra Premiere'de klipler taşınır / kırpılırsa kesimler eski sekans
+ * zamanlarına düşerdi. Analiz kurgu izini okur (KS_kurguIzi), Uygula expectIz gönderir; host 'kurgu' derse analiz bırakılır.
+ */
+async function kurguIzTestleri(K, stereo) {
+  var simdikiIz = "6:abc.def", hostIz = function () { return simdikiIz; };
+  var o = { duzen: function () { return duzenYap(); }, iz: hostIz,
+    uygula: function (yuk) {
+      if (yuk.expectIz && yuk.expectIz !== simdikiIz) return { ok: false, kod: "kurgu", error: "Sekans analizden sonra degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul." };
+      return { ok: true, newSeq: "Vlog - kopya", removed: 4, selected: 0, rippleFallback: false };
+    } };
+  var p = sahtePanel(K, stereo, o);
+  p.kapsam("inout");
+  await p.bekle(20);
+  await p.tikla("cut-analyze");
+  var izCagri = p.cagrilar("KS_kurguIzi");
+  // analizden sonra kurgu değişti (Premiere'de klip taşındı)
+  simdikiIz = "6:xyz.uvw";
+  await p.tikla("cut-apply");
+  var ac = p.cagrilar("KS_applyCuts");
+  ok("sekans kapsamı: analiz kurgu izini okur, Uygula expectIz gönderir; kurgu değiştiyse ('kurgu') analiz bırakılır, hak düşmez",
+    izCagri.length === 1 && izCagri[0].payload.seqId === "seq-1" && ac.length === 1 && ac[0].payload.expectIz === "6:abc.def" &&
+    p.el("cut-result").hidden === true && /Sekans analizden sonra değişti/.test(p.el("cut-status").textContent) && p.kayit.harca.length === 0 &&
+    p.wavlar.every(function (w) { return !fs.existsSync(w); }),
+    JSON.stringify(ac.length && ac[0].payload.expectIz) + " " + p.el("cut-status").textContent);
+  // kurgu değişmediyse eskisi gibi uygulanır; iz okunamazsa (eski host) expectIz gönderilmez
+  simdikiIz = "6:abc.def";
+  var q = sahtePanel(K, stereo, o);
+  q.kapsam("inout");
+  await q.bekle(20);
+  await q.tikla("cut-analyze");
+  await q.tikla("cut-apply");
+  var r = sahtePanel(K, stereo, { duzen: function () { return duzenYap(); } });
+  r.kapsam("inout");
+  await r.bekle(20);
+  await r.tikla("cut-analyze");
+  await r.tikla("cut-apply");
+  ok("kurgu aynı: uygulanır (hak düşer); iz okunamazsa expectIz yok, eskisi gibi uygulanır",
+    q.cagrilar("KS_applyCuts").length === 1 && q.kayit.harca.length === 1 && r.cagrilar("KS_applyCuts").length === 1 &&
+    r.cagrilar("KS_applyCuts")[0].payload.expectIz === undefined && r.kayit.harca.length === 1,
+    JSON.stringify([q.kayit.harca.length, r.cagrilar("KS_applyCuts").map(function (x) { return x.payload.expectIz; })]));
+}
+
+/*
+ * 3.4 son inceleme: kullanıcının Dinlenecek ses seçimi (secDinle) aynı adlı katmanlarla başka bir In / Out'a taşınır.
+ * Yeni aralıkta dinlenen katmanların hiçbirinde klip yoksa karışım sessiz çıkar, tüm aralık tek kesim olurdu: dışa
+ * aktarılmaz, ses hiç yoksa 'Bu aralıkta ses klibi yok', yalnız dinlenmeyen katmanda varsa 'Dinlenecek bir ses katmanı seç'.
+ */
+async function dinlenenBosTestleri(K, stereo) {
+  function iz(i, ad, kl) { return { index: i, name: ad, locked: false, muted: false, clipCount: kl.length, first: 0, last: 60, klipler: kl }; }
+  var a2Ara = false;
+  function duzen() {
+    var konusma = [{ s: 0, e: 15.5, yol: "cam.mp4", hiza: 0 }, { s: 30, e: 60, yol: "cam.mp4", hiza: 0 }];
+    return { ok: true, seqId: "seq-1", name: "Vlog", duration: 60,
+      video: [iz(0, "Video 1", [{ s: 0, e: 60, yol: "cam.mp4", hiza: 0 }])],
+      audio: [iz(0, "Audio 1", konusma), iz(1, "Audio 2", a2Ara ? konusma.concat([{ s: 19, e: 26, yol: "ortam.wav", hiza: -19 }]) : konusma)] };
+  }
+  var o = { duzen: duzen, hostIn: 10, hostOut: 15.1 };
+  var p = sahtePanel(K, stereo, o);
+  p.kapsam("inout");
+  await p.bekle(20);
+  // A2'nin çipine tıkla: seçim artık kullanıcının (secDinle); katman adları aynı kaldıkça sürer
+  p.el("cut-dinle-izler").children[1].onclick();
+  var secim = cipler(p, "cut-dinle-izler");
+  var dinlenen = secim.filter(function (c) { return /\+$/.test(c); }).length;
+  // In / Out 20–25: B-roll, hiçbir ses katmanında klip yok
+  o.hostIn = 20; o.hostOut = 25;
+  await p.bekle(560);
+  await p.tikla("cut-analyze");
+  ok("kalıcı Dinlenecek ses seçimi + seslisiz In / Out: dışa aktarılmaz, 'Bu aralıkta ses klibi yok …' (sessiz karışım tek kesim olmaz)",
+    dinlenen >= 1 && p.cagrilar("KS_exportAudio").length === 0 && p.el("cut-status").textContent === "Bu aralıkta ses klibi yok: sessizlik aranacak ses bulunamadı." &&
+    p.el("cut-result").hidden === true, JSON.stringify(secim) + " " + p.el("cut-status").textContent + " / " + p.cagrilar("KS_exportAudio").length);
+  // Aralıkta yalnız dinlenmeyen katmanda (A2, 19–26 sn ortam sesi) ses var: seçim istenir, Katmanlar açılır.
+  // sahtePanel o nesnesinin hostIn / hostOut'unu her okumada yeniden okur: In / Out Premiere'de taşınmış gibi
+  a2Ara = true;
+  var o2 = { duzen: duzen, hostIn: 10, hostOut: 15.1 };
+  var r = sahtePanel(K, stereo, o2);
+  r.kapsam("inout");
+  await r.bekle(20);
+  if (/\+$/.test(cipler(r, "cut-dinle-izler")[1])) r.el("cut-dinle-izler").children[1].onclick();
+  if (!/\+$/.test(cipler(r, "cut-dinle-izler")[0])) r.el("cut-dinle-izler").children[0].onclick();
+  var rSecim = cipler(r, "cut-dinle-izler");
+  r.el("cut-katman").open = false;
+  o2.hostIn = 20; o2.hostOut = 25;
+  await r.bekle(560);
+  await r.tikla("cut-analyze");
+  ok("yalnız dinlenmeyen katmanda (A2) ses varken: dışa aktarılmaz, 'Dinlenecek bir ses katmanı seç', Katmanlar açılır",
+    JSON.stringify(rSecim) === JSON.stringify(["A1+", "A2"]) && r.cagrilar("KS_exportAudio").length === 0 &&
+    r.el("cut-status").textContent === "Dinlenecek bir ses katmanı seç (Katmanlar › Dinlenecek ses)." && r.el("cut-katman").open === true,
+    JSON.stringify([rSecim, cipler(r, "cut-dinle-izler")]) + " " + r.el("cut-status").textContent + " / " + r.cagrilar("KS_exportAudio").length);
+  a2Ara = false;
+  // dinlenen katmanda ses varken eskisi gibi dışa aktarılır
+  var t = sahtePanel(K, stereo, { duzen: duzen, hostIn: 10, hostOut: 15.1 });
+  t.kapsam("inout");
+  await t.bekle(20);
+  await t.tikla("cut-analyze");
+  ok("dinlenen katmanda klip varken (In / Out 10–15.1) dışa aktarım eskisi gibi", t.cagrilar("KS_exportAudio").length === 1, t.el("cut-status").textContent);
 }
 
 /*
@@ -509,6 +610,8 @@ function sahtePanel(K, stereo, o) {
         return { ok: true, wav: hedef, offset: da.offset, duration: da.duration, seqId: o.disaSeqId ? o.disaSeqId() : "seq-1" };
       }
       if (fn === "KS_applyCuts") return o.uygula ? o.uygula(yuk) : { ok: true, newSeq: "Vlog - kopya", removed: 4, selected: 0, rippleFallback: false, protectedSkipped: { video: 0, audio: 1 } };
+      // 3.4 son inceleme: kurgu izi (o.iz verilmezse eski host gibi okunamaz: expectIz gönderilmez)
+      if (fn === "KS_kurguIzi" && o.iz) return { ok: true, seqId: "seq-1", iz: o.iz() };
       return { ok: false, error: "beklenmeyen " + fn };
     } });
   p.wavlar = wavlar;

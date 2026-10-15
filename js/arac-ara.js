@@ -8,7 +8,8 @@
  *                             ü→u, â/î/û; harf ve rakam dışı her şey boşluk). katla uzunluğu korur
  *                             (eşleşen parçayı vurgulamak için), sade boşlukları teke indirir.
  *   kayitKur(navlar, o)       kayıt: sol menü girdileri (data-tab, ad, alt yazı, PRO kilidi) + EYLEMLER
- *                             (o.mevcut(eylem) false dönen eylem atlanır, ör. sekmesi bu sürümde olmayan).
+ *                             (o.mevcut(eylem) false dönen eylem atlanır: sekmesi panelde olmayan; 3.4'te her eylemin
+ *                             sekmesi var, test-arac-ara hiçbirinin atlanmadığını denetler). pro: Pro.gate anahtarı.
  *   puanla(oge, sorgu)        0 = eşleşmedi. Sorgunun her kelimesi bir yerde geçmeli; adın başı > kelime başı >
  *                             ad içinde > alt yazı / anahtar kelime > harf sırası (kısaltma, "hr" → Hız Rampası).
  *   ara(kayit, sorgu, durum)  boş sorgu: Favoriler, Son kullanılanlar, Araçlar, Eylemler bölümleri;
@@ -21,6 +22,7 @@
  *                             fiziksel K = M) → o tuşun ilgisi bırakılmalı.
  *   yeniKisayolTusu(e, mac, kodlar)   macOS: ⌘K tutulmayan bir fiziksel tuştan geldi (Türkçe F: fiziksel J) → o tuş
  *                             da tutulmalı (MAC_KVK: e.code → kVK); yoksa ⌘K Premiere'e de gider.
+ *   macTuslariOku / macTuslariYaz     öğrenilen macOS tuşları localStorage'da ("suflo.aracAra.macTuslari"; try/catch).
  *   yaziAlaniMi(hedef)        metin kutusu, açılır liste, contenteditable ya da altyazı düzenleyicisi
  *                             (#cap-segments, #tc-words, [data-kisayol-yok]): kısayol orada hiç bağlanmaz.
  *   tusIlgisiBirakilsinMi(h)  odak düzenleyicide ama metin girişinde değil (satır düğmeleri): Ctrl+K ilgisi
@@ -99,6 +101,13 @@
     { id: "sessizlik-bul", ad: "Sessizlikleri bul", tab: "cut", hedef: ["cut-analyze"], pro: "cut", anahtar: "sessizlik kesim jump cut silence" },
     { id: "kesim-uygula", ad: "Kesimleri uygula", tab: "cut", hedef: ["cut-apply"], pro: "cut",
       gerekli: "Önce sessizlikleri bul.", anahtar: "sessizlik kes apply cuts silence" },
+    // 3.4 adım 7: kapsam ve korunan katmanlar Otomatik Kesim'in seçenekleri (Pro 'cut'); Katmanlar kapalıysa açılır
+    { id: "kesim-kapsam", ad: "Kesim kapsamı", tab: "cut", hedef: ["cut-scope"], pro: "cut", anahtar: "in out sekans tum secili klip kapsam scope sequence range" },
+    { id: "kesim-katman", ad: "Kesilmeyecek katmanlar", tab: "cut", hedef: ["cut-koru-izler", "cut-katman"], pro: "cut",
+      anahtar: "korunan katman muzik dinlenecek ses protect protected tracks music listen" },
+    // 3.4 adım 8 (ücretsiz): kesim kartının eylem satırı yalnız bir kesimden sonra görünür
+    { id: "altyazi-uyarla", ad: "Altyazıyı yeni kurguya uyarla", tab: "cut", hedef: ["cut-altyazi-uyarla", "tc-altyazi-uyarla"],
+      gerekli: "Önce kesimleri uygula.", anahtar: "kesimden sonra altyazi esle kaydir remap captions after cut" },
     { id: "konusmadan-kes", ad: "Konuşmadan kes", tab: "cut", hedef: ["tc-analyze"], pro: "textcut", anahtar: "dolgu eee tekrar filler text cut" },
     { id: "sahne-bul", ad: "Sahneleri bul", tab: "cut", hedef: ["sc-analyze"], pro: "cut", anahtar: "sahne algilama scene detect marker" },
     { id: "ses-iyilestir", ad: "Sesi iyileştir", tab: "cut", hedef: ["ses-go"], pro: "audioclean", anahtar: "gurultu lufs ses audio noise enhance" },
@@ -106,8 +115,22 @@
     { id: "ritim-bul", ad: "Ritmi bul", tab: "beat", hedef: ["beat-analyze"], pro: "beat", anahtar: "beat muzik marker ritim bpm" },
     { id: "rampa-uygula", ad: "Rampayı uygula", tab: "hiz", hedef: ["hiz-uygula"], pro: "speedramp", anahtar: "hiz rampasi agir cekim speed ramp slow motion" },
     { id: "rampa-kaldir", ad: "Rampayı kaldır", tab: "hiz", hedef: ["hiz-kaldir"], anahtar: "hiz rampasi geri al remove speed ramp" },
-    // 3.4 adım 10 (Eğri sekmesi, data-tab="egri"): sekme bu sürümde yoksa kayıt bu eylemi atlar
-    { id: "egri-uygula", ad: "Eğri uygula", tab: "egri", hedef: ["egri-uygula"], anahtar: "egri yumusatma easing bezier keyframe anahtar kare curve" },
+    // 3.4: Özel eğri düzenleyicisi yalnız rampa listesinde Özel eğri seçiliyken görünür; değilse liste vurgulanır
+    { id: "hiz-ozel", ad: "Özel hız eğrisi", tab: "hiz", hedef: ["hiz-ozel-editor", "hiz-grid"], pro: "speedramp",
+      anahtar: "ozel rampa egri duzenleyici sfc1 kod custom speed curve editor" },
+    // 3.4 Eğri sekmesi: uygulamak ve varışta yaylanma Pro ('curves'); kod / dosya paylaşımı ve geri almak ücretsiz
+    { id: "egri-uygula", ad: "Eğri uygula", tab: "egri", hedef: ["egri-uygula"], pro: "curves", anahtar: "egri yumusatma easing bezier keyframe anahtar kare curve" },
+    { id: "egri-yaylan", ad: "Varışta yaylan", tab: "egri", hedef: ["egri-yaylan-uygula"], pro: "curves",
+      anahtar: "yaylanma salinim zipla overshoot bounce spring follow through" },
+    { id: "egri-kod", ad: "Eğri kodu yapıştır", tab: "egri", hedef: ["egri-kod"], anahtar: "sfc1 kod paylas baglanti cubic bezier css share code paste link" },
+    { id: "egri-kod-kopyala", ad: "Eğri kodunu kopyala", tab: "egri", hedef: ["egri-kod-kopyala"], anahtar: "sfc1 kod paylas baglanti share copy code link" },
+    { id: "egri-ice-aktar", ad: "Eğri önayarlarını içe aktar", tab: "egri", hedef: ["egri-ice-aktar"], anahtar: "suflo egri dosya json import file presets" },
+    { id: "egri-disa-aktar", ad: "Eğri önayarlarını dışa aktar", tab: "egri", hedef: ["egri-disa-aktar"], anahtar: "suflo egri dosya export file presets" },
+    { id: "egri-geri-al", ad: "Suflo eğrilerini geri al", tab: "egri", hedef: ["egri-geri-tumu"], anahtar: "egri yaylanma kaldir sil tumu undo remove curves" },
+    // 3.4 güvenli kaldırma: yalnız Suflo'nun kaydettiği anahtar kareler (ücretsiz)
+    { id: "gecis-kaldir", ad: "Geçişi kaldır", tab: "gecis", hedef: ["gecis-kaldir"], anahtar: "gecis sil anahtar kare remove transition" },
+    { id: "zoom-kaldir", ad: "Zoom'u kaldır", tab: "zoom", hedef: ["zoom-remove"], anahtar: "zoom sil punch in remove" },
+    { id: "onayar-kaldir", ad: "Önayarı kaldır", tab: "presets", hedef: ["preset-kaldir"], anahtar: "hareket preset onayar sil remove motion" },
     { id: "kanca-ekle", ad: "Kanca başlığı ekle", tab: "kanca", hedef: ["kanca-ekle"], pro: "overlay", anahtar: "kanca baslik hook title shorts" },
     { id: "youtube-indir", ad: "YouTube'dan indir", tab: "youtube", hedef: ["yt-url"], pro: "youtube", anahtar: ["youtube indir video download", "mp3", "mp4"] },
     { id: "ayar-motor", ad: "Ayarlar › Motor", tab: "settings", hedef: ["grp-motor"], anahtar: "motor model whisper gpu cozme bulut yedegi engine" },
@@ -116,6 +139,11 @@
     { id: "ayar-marka", ad: "Ayarlar › Marka Kiti", tab: "settings", hedef: ["grp-marka-kiti"], anahtar: "marka kiti logo renk font brand kit" },
     { id: "ayar-pro", ad: "Suflo Pro lisansı", tab: "settings", hedef: ["pro-key", "grp-pro"], anahtar: "pro lisans anahtar deneme license key trial" },
     { id: "doctor", ad: "Suflo Doctor", tab: "settings", hedef: ["set-library-health-run"], anahtar: "doctor saglik tarama onarim health scan" },
+    { id: "kaynak-sina", ad: "Model kaynaklarını sına", tab: "settings", hedef: ["set-doctor-kaynak"],
+      anahtar: "doctor huggingface hf mirror ag baglanti vekil proxy network test model sources" },
+    // 3.4 adım 22 (Deneysel): köprüyü açmak Pro ('mcp', deneme hakkı yok); her eylem ayrıca kendi aracının kapısından geçer
+    { id: "ayar-mcp", ad: "Ayarlar › Yapay zekâ köprüsü (MCP)", tab: "settings", hedef: ["mcp-ac", "grp-mcp"], pro: "mcp",
+      anahtar: "mcp claude asistan otomasyon yapay zeka ai assistant automation bridge" },
     { id: "sorun-bildir", ad: "Sorun bildir", tab: "settings", hedef: ["set-report"], anahtar: "destek gunluk hata support log bug" },
     { id: "guncelleme", ad: "Güncellemeleri denetle", tab: "settings", hedef: ["set-guncelleme-denetle"], anahtar: "guncelleme surum update version" },
     { id: "rehber", ad: "Kurulum rehberini aç", tab: "settings", hedef: ["set-onb-ac"], anahtar: "rehber kurulum ilk adim onboarding guide" }
@@ -126,8 +154,8 @@
     "tab:captions": "transkript whisper srt caption subtitle",
     "tab:cut": "sessizlik jump cut silence filler",
     "tab:beat": "beat muzik bpm marker",
-    "tab:zoom": "punch in yakinlastirma",
-    "tab:gecis": "transition whip",
+    "tab:zoom": "punch in yakinlastirma egri easing",
+    "tab:gecis": "transition whip egri easing",
     "tab:hiz": "speed ramp slow motion agir cekim",
     "tab:egri": "easing bezier keyframe curve yumusatma",
     "tab:kanca": "hook baslik shorts",
@@ -137,7 +165,7 @@
     "tab:text/captions": "mogrt caption template sablon",
     "tab:text/custom": "mogrt lower third logo",
     "tab:text/buton": "button abone subscribe",
-    "tab:presets": "preset motion efekt effect",
+    "tab:presets": "preset motion efekt effect hareket egri easing",
     "tab:text/fav": "favorite favori",
     "tab:sfx": "ses efekti sound effect",
     "tab:emoji-assets": "emoji png gif",
@@ -411,6 +439,39 @@
     return kod && MAC_KVK.hasOwnProperty(kod) && kodlar.indexOf(kod) === -1 ? kod : "";
   }
 
+  /*
+   * Öğrenilen macOS tuşları bu bilgisayarda saklanır (localStorage "suflo.aracAra.macTuslari"; inceleme 3): yoksa Türkçe F /
+   * Dvorak kullanıcısının her panel yüklemesinde ilk ⌘K'sı Premiere'e de gider (Add Edit), ilk ⌘M'si yine yutulurdu.
+   * Okuma: yalnız MAC_KVK'deki kodlar (en çok 8, tekrarsız); kayıt yok ya da bozuksa ["KeyK"]. Saklanan boş liste geçerlidir
+   * (K bırakıldı, ⌘K'yı yazan tuş henüz görülmedi). Düzen değişirse tusDuzeniUyumsuz / yeniKisayolTusu yine düzeltir.
+   */
+  var MAC_TUS_ANAHTARI = "suflo.aracAra.macTuslari";
+  function macTuslariNormal(a) {
+    var out = [];
+    (Array.isArray(a) ? a : []).forEach(function (k) {
+      if (typeof k === "string" && MAC_KVK.hasOwnProperty(k) && out.indexOf(k) === -1 && out.length < 8) out.push(k);
+    });
+    return out;
+  }
+  function macTuslariOku(depo) {
+    try {
+      if (!depo || typeof depo.getItem !== "function") return ["KeyK"];
+      var ham = depo.getItem(MAC_TUS_ANAHTARI);
+      if (!ham) return ["KeyK"];
+      var a = JSON.parse(ham);
+      if (!Array.isArray(a)) return ["KeyK"];
+      var n = macTuslariNormal(a);
+      return n.length || !a.length ? n : ["KeyK"];
+    } catch (e) { return ["KeyK"]; }
+  }
+  function macTuslariYaz(depo, kodlar) {
+    try {
+      if (!depo || typeof depo.setItem !== "function") return false;
+      depo.setItem(MAC_TUS_ANAHTARI, JSON.stringify(macTuslariNormal(kodlar)));
+      return true;
+    } catch (e) { return false; }
+  }
+
   function kisayolMetni(mac) { return mac ? "⌘K" : "Ctrl+K"; }
 
   // Metin kutusu sayılmayan input türleri (odaktayken Ctrl+K paleti açar)
@@ -551,6 +612,9 @@
     tusDuzeniUyumsuz: tusDuzeniUyumsuz,
     MAC_KVK: MAC_KVK,
     yeniKisayolTusu: yeniKisayolTusu,
+    MAC_TUS_ANAHTARI: MAC_TUS_ANAHTARI,
+    macTuslariOku: macTuslariOku,
+    macTuslariYaz: macTuslariYaz,
     kisayolMetni: kisayolMetni,
     yaziAlaniMi: yaziAlaniMi,
     metinGirdisiMi: metinGirdisiMi,

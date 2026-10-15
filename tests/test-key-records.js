@@ -445,5 +445,22 @@ ok("depo: araç kaydı diskten aynen döner (sıkıştırılmış zamanlar, çap
     K.canli(yk, [1, 2.08, 2.24, 2.8, 5], 25) && K.canli(yk, [1, 2.08, 2.24, 2.8], 25) && !K.canli(yk, [1, 2, 2.24, 5], 25));
 })();
 
+/* 3.4 son inceleme: kimlik dilden bağımsız (host KS_kayitDilsizUyar ile aynı kural) */
+(function () {
+  var tr = { matchName: "AE.ADBE Motion/\u00d6l\u00e7ek", compIdx: 1, propIdx: 1 };
+  ok("ayniOzellik: aynı kimlik; dil değişince (Ölçek ↔ Scale) aynı sıradaki özellik eşleşir; bilinmeyen dil (Skalierung) yalnız aynı sırada",
+    K.ayniOzellik(tr, { matchName: "AE.ADBE Motion/\u00d6l\u00e7ek", compIdx: 1, propIdx: 1 }) &&
+    K.ayniOzellik(tr, { matchName: "AE.ADBE Motion/Scale", compIdx: 1, propIdx: 1 }) &&
+    K.ayniOzellik(tr, { matchName: "AE.ADBE Motion/Skalierung", compIdx: 1, propIdx: 1 }) &&
+    !K.ayniOzellik(tr, { matchName: "AE.ADBE Motion/Skalierung", compIdx: 1, propIdx: 2 }));
+  ok("ayniOzellik: bilinen adlar çelişirse (Ölçek ↔ Position), bileşen başkaysa ya da kimlik bölünemiyorsa eşleşmez",
+    !K.ayniOzellik(tr, { matchName: "AE.ADBE Motion/Position", compIdx: 1, propIdx: 1 }) &&
+    !K.ayniOzellik(tr, { matchName: "AE.ADBE Opacity/Scale", compIdx: 1, propIdx: 1 }) &&
+    !K.ayniOzellik(tr, { matchName: "Scale", compIdx: 1, propIdx: 1 }) && !K.ayniOzellik(tr, null));
+  ok("ayniOzellik: dizinsiz taraf (host temizlik bildirimi) yalnız iki bilinen aynı adla (Opaklık ↔ Opacity), bilinmeyende hayır",
+    K.ayniOzellik({ matchName: "AE.ADBE Opacity/Opakl\u0131k", compIdx: 0, propIdx: 0 }, { matchName: "AE.ADBE Opacity/Opacity" }) &&
+    !K.ayniOzellik(tr, { matchName: "AE.ADBE Motion/Skalierung" }) && K.ayniOzellik(tr, { matchName: "AE.ADBE Motion/Scale" }));
+})();
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

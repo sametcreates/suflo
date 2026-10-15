@@ -555,6 +555,19 @@ window.KTextCut = (function () {
       status("Bu kesimler başka bir sekans için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
       return;
     }
+    /*
+     * 3.4 son inceleme: kesimler sekans zamanında (yazıya dökülen klibin clipStart'ı + kelime zamanı). Klip yazıya
+     * döküldükten sonra Premiere'de taşındı ya da kırpıldıysa (bağlam yoklaması aynı medyanın taşınmasını bildirmez, panel
+     * odakta değilken hiç yoklanmaz; kesim seçim istemez) kesimler eski konuma düşerdi: klibin aynı yerde durduğu sorulur.
+     */
+    var yerKlip = clip, yer = await klipYerinde(yerKlip);
+    if (clip !== yerKlip) return;
+    if (yer !== "tamam") {
+      K.log("[konusmadan kes] yaziya dokulen klip " + (yer === "okunamadi" ? "okunamadi" : "tasindi/kirpildi") + " (clipStart " + yerKlip.clipStart + "): KS_applyCuts gonderilmedi");
+      status(yer === "okunamadi" ? "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden dene." :
+        "✕ Yazıya döktüğün klip taşındı ya da kırpıldı: kesimler eski konuma düşerdi, uygulanmadı. Klibi yeniden yazıya dök.", "bad");
+      return;
+    }
     el("tc-apply").disabled = true;
     status("Uygulanıyor…");
     try {
@@ -600,6 +613,28 @@ window.KTextCut = (function () {
 
   // Yapay zekâ köprüsü (MCP, 3.4): "Uygula" düğmesinin aynı işlevi, HER ZAMAN kopya sekansta
   // (açık seçenekle; panelin hedef düğmeleri bu kesimi etkilemez, köprü de onları değiştirmez)
+  /*
+   * Yazıya dökülen klip hâlâ yerinde mi: [clipStart, clipEnd] aralığına değen kliplerden biri aynı medya, aynı başlangıç /
+   * bitiş ve aynı kaynak hizası (inPoint - start) mı (KS_getTrackLayout klipler). Döner: "tamam" | "degisti" | "okunamadi".
+   */
+  async function klipYerinde(c) {
+    if (!c || !isFinite(Number(c.clipStart)) || !isFinite(Number(c.clipEnd))) return "tamam";
+    var r = null;
+    try { r = await K.call("KS_getTrackLayout", { klipler: true, start: Number(c.clipStart), end: Number(c.clipEnd) }, 20000); } catch (e) { r = null; }
+    if (!r || !r.ok) return "okunamadi";
+    var hiza = Number(c.inPoint || 0) - Number(c.clipStart);
+    function yakin(a, b) { return Math.abs(Number(a) - Number(b)) < 0.0005; }
+    var izler = [].concat(r.video || [], r.audio || []);
+    for (var i = 0; i < izler.length; i++) {
+      var kl = (izler[i] && izler[i].klipler) || [];
+      for (var j = 0; j < kl.length; j++) {
+        var k = kl[j];
+        if (k && String(k.yol || "") === String(c.mediaPath || "") && yakin(k.s, c.clipStart) && yakin(k.e, c.clipEnd) && yakin(k.hiza, hiza)) return "tamam";
+      }
+    }
+    return "degisti";
+  }
+
   async function mcpKes() {
     if (!words.length) return { ok: false, hata: "analiz_yok", mesaj: "Prepare the Text-based cut in the Suflo panel first (no analysed transcript)." };
     var res = await apply({ cloneFirst: true });

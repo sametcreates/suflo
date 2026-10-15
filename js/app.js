@@ -254,8 +254,9 @@ window.KApp = (function () {
   var arama = { acik: false, kayit: [], sonuclar: [], aktif: 0, durum: null, onceki: null, vurgu: null, vurguSaat: null,
     tutulan: null, tutulanBirak: null };
   // aramaIlgisi: ilk etkileşim oldu (ilgi kurulabilir). aramaMacTuslari: macOS'ta ⌘K için tutulan fiziksel tuşlar (e.code;
-  // düzen öğrenildikçe değişir). aramaIlgisiSon: CEP'e en son verilen liste (aynısı yeniden verilmez).
-  var aramaIlgisi = false, aramaMacTuslari = ["KeyK"], aramaIlgisiSon = null;
+  // düzen öğrenildikçe değişir ve bu bilgisayarda saklanır: panel yeniden yüklenince ya da Premiere yeniden açılınca ilk ⌘K
+  // yine Premiere'e gitmesin; inceleme 3). aramaIlgisiSon: CEP'e en son verilen liste (aynısı yeniden verilmez).
+  var aramaIlgisi = false, aramaMacTuslari = AA && AA.macTuslariOku ? AA.macTuslariOku(aramaDepo()) : ["KeyK"], aramaIlgisiSon = null;
 
   function aramaDepo() { try { return window.localStorage || null; } catch (e) { return null; } }
   function aramaAcik() { return arama.acik; }
@@ -307,9 +308,11 @@ window.KApp = (function () {
       var yeni = AA.yeniKisayolTusu ? AA.yeniKisayolTusu(e, true, aramaMacTuslari) : "";
       if (AA.tusDuzeniUyumsuz(e, true, aramaMacTuslari)) {
         aramaMacTuslari = aramaMacTuslari.filter(function (k) { return k !== e.code; });
+        if (AA.macTuslariYaz) AA.macTuslariYaz(aramaDepo(), aramaMacTuslari);
         K.log("arac ara: Cmd+K tus ilgisi birakildi (" + e.code + " bu duzende '" + e.key + "')");
       } else if (yeni) {
         aramaMacTuslari = aramaMacTuslari.concat([yeni]);
+        if (AA.macTuslariYaz) AA.macTuslariYaz(aramaDepo(), aramaMacTuslari);
         K.log("arac ara: Cmd+K bu duzende " + yeni + " tusunda, tus ilgisine eklendi");
       }
     }
@@ -374,7 +377,7 @@ window.KApp = (function () {
       navlar.push({ tab: b.getAttribute("data-tab"), kat: b.getAttribute("data-kat") || "", ad: navAdi(ad),
         alt: alt ? uiOzgun(alt).replace(/\s+/g, " ").trim() : "", pro: !!b.querySelector("[data-kilit]") });
     });
-    // sekmesi bu sürümde olmayan eylem (ör. Eğri) listelenmez
+    // sekmesi panelde olmayan eylem listelenmez (3.4'te hepsinin sekmesi var; test-arac-ara denetler)
     var kayit = AA.kayitKur(navlar, { mevcut: function (e) { return !!el("tab-" + e.tab); } });
     kayit.forEach(function (o) {
       o.adGoster = uiMetni(o.ad);

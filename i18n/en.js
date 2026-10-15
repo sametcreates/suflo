@@ -3444,9 +3444,16 @@
       "✕ The selected clip changed after the analysis (moved, trimmed, or another clip selected): the cuts would have landed at its old position, so they weren't applied. Run Find silences again.",
     "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden Kesimleri uygula.":
       "✕ Couldn't read the clip's position from Premiere: the cuts weren't applied. Click Apply cuts again.",
+    // Text-based cut: the transcribed clip was moved / trimmed in Premiere after transcription (3.4 final review)
+    "✕ Yazıya döktüğün klip taşındı ya da kırpıldı: kesimler eski konuma düşerdi, uygulanmadı. Klibi yeniden yazıya dök.":
+      "✕ The transcribed clip was moved or trimmed: the cuts would have landed at its old position, so they weren't applied. Transcribe the clip again.",
+    "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden dene.": "✕ Couldn't read the clip's position from Premiere: the cuts weren't applied. Try again.",
     // host.jsx (KS_applyCuts expectSeqId)
     "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.": "The active sequence changed; the cuts weren't applied. Run Find silences again.",
     "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.": "The track layout changed; the cuts weren't applied. Read the tracks again.",
+    "Sekans analizden sonra degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.": "The sequence changed after the analysis; the cuts weren't applied. Run Find silences again.",
+    "✕ Sekans analizden sonra değişti (klipler taşındı, kırpıldı ya da silindi): kesimler eski yerlere düşerdi, uygulanmadı. Sessizlikleri yeniden bul.":
+      "✕ The sequence changed after the analysis (clips were moved, trimmed or deleted): the cuts would have landed in the old places, so they weren't applied. Run Find silences again.",
     // Auto Cut / Text-based cut 3.4 step 8: keep captions in sync after cuts (js/kesim-altyazi.js, js/captions.js)
     "Altyazıyı yeni kurguya uyarla": "Adapt captions to the new edit",
     "Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)":
@@ -3863,7 +3870,15 @@
     "Ayarlar › Motor": "Settings › Engine",
     "Ayarlar › Arayüz dili": "Settings › Interface language",
     "Ayarlar › Marka Kiti": "Settings › Brand kit",
-    "Önce sessizlikleri bul.": "Find silences first."
+    "Önce sessizlikleri bul.": "Find silences first.",
+    // 3.4 actions (Curves tab, cut options, safe removal, Doctor, AI bridge)
+    "Önce kesimleri uygula.": "Apply the cuts first.",
+    "Özel hız eğrisi": "Custom speed curve",
+    "Eğri kodunu kopyala": "Copy curve code",
+    "Eğri önayarlarını içe aktar": "Import curve presets",
+    "Eğri önayarlarını dışa aktar": "Export curve presets",
+    "Suflo eğrilerini geri al": "Undo Suflo curves",
+    "Ayarlar › Yapay zekâ köprüsü (MCP)": "Settings › AI bridge (MCP)"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */

@@ -700,6 +700,48 @@ ok("yaylan geri al: yalnız Suflo'nun yaylanma anahtarları silinir; iniş, bekl
   anahtarlar(YT.olcek).filter(function (k) { return k.s > 2 && k.s < 4; }).length === 0 && anahtarlar(YT.olcek).filter(function (k) { return k.s > 5 && k.s < 8; }).length === ytB.records[1].times.length,
   js(yUndo));
 ok("yaylan geri al ikinci kez: kayıt 'yok' ile biter", cagir("KS_easeUndo", { records: [ytB.records[0]] }).sonuclar[0].kod === "yok");
+/*
+ * 3.4 son inceleme: zaman aşımı + host'un sık yedeği. Panel seyrek ve sık plan için iki geçici kayıt saklar (önce seyrek);
+ * seyrek planın sık ızgaraya düşen zamanları (uçlar dahil) sık anahtarlarda da durur. Geri al önce tamamen eşleşen sık
+ * kaydı işlemeli: Suflo'nun hiçbir anahtarı kalmaz, yazılmayan planın kaydı 'yok' ile biter ('degisti' uyarısı yok).
+ */
+var izlerOnceZ = izler, playheadOnceZ = playhead;
+[[25, 1, 2], [30, 6, 6], [25, 3, 6]].forEach(function (d) {
+  var fpsY = d[0];
+  sequence.timebase = String(254016000000 / fpsY);
+  var Z = yaylanKlibi({ nodeId: "nZY" + d.join("_"), olcek: [[0, 50], [1, 100], [5, 100]], ph: 0.5 });
+  var tz = yaylanTara(Z, [0, 1]);
+  tz.p.fps = fpsY;
+  var plZ = yaylanPlani(tz.p, { genlik: 0.1, frekans: d[1], sonum: d[2] });
+  var gZ = plZ.gruplar[0], itZ = gZ && gZ.items[0];
+  if (!itZ) { ok("ikiz geçici kayıt planı kuruldu " + d.join("/"), false, js(plZ.atlanan)); return; }
+  // host Bezier yazamadı, sık planı yazdı (çağrı zaman aşımına uğradı: panel iki geçici kayıt sakladı)
+  itZ.yogunKeys.forEach(function (k) { Z.olcek.keys.push({ s: k.t, v: k.v }); });
+  var gec = Mh.yaylanGeciciKayitlar(gZ, "seq-1");
+  gec.forEach(function (r, i) { r.id = "gz" + i; });
+  var ortak = itZ.keys.filter(function (k) { return itZ.yogunKeys.some(function (y) { return Math.abs(y.t - k.t) < 1e-6; }); }).length;
+  var uZ = cagir("KS_easeUndo", { records: gec });
+  var kalanSuflo = anahtarlar(Z.olcek).filter(function (k) { return k.s > 1 + 1e-6 && k.s < 5 - 1e-6; }).length;
+  var bitti = uZ.sonuclar.map(function (r) { return r.id + ":" + (r.kod || r.silinen); }).sort();
+  ok("yaylan ikiz geçici kayıt (" + fpsY + " fps, " + d[1] + " Hz / " + d[2] + "): sık plan yazılmışken Geri al Suflo'nun bütün anahtarlarını siler, " +
+    "iki kayıt da biter (yazılmayanınki 'yok'), atlanan yok; iniş ve sonraki anahtar kalır",
+    gec.length === 2 && gec[0].times.length === itZ.keys.length && uZ.ok && kalanSuflo === 0 && uZ.atlanan.length === 0 && uZ.sonuclar.length === 2 &&
+    uZ.sonuclar.filter(function (r) { return r.id === "gz1"; })[0].silinen === itZ.yogunKeys.length &&
+    uZ.sonuclar.filter(function (r) { return r.id === "gz0"; })[0].kod === "yok" && !!Z.olcek.bul(1) && !!Z.olcek.bul(5) && !!Z.olcek.bul(0),
+    js({ ortak: ortak, seyrek: itZ.keys.length, sik: itZ.yogunKeys.length, sonuclar: uZ.sonuclar, atlanan: uZ.atlanan, kalan: kalanSuflo }));
+  // seyrek plan yazıldıysa (host Bezier yaptı): seyrek kayıt silinir, sık kaydın kalıntısı yok → 'yok'
+  var Z2 = yaylanKlibi({ nodeId: "nZS" + d.join("_"), olcek: [[0, 50], [1, 100], [5, 100]], ph: 0.5 });
+  itZ.keys.forEach(function (k) { Z2.olcek.keys.push({ s: k.t, v: k.v }); });
+  var gec2 = Mh.yaylanGeciciKayitlar({ target: { nodeId: Z2.nodeId, clipName: Z2.name, clipStart: 0, seqId: "seq-1" }, items: [itZ], satirlar: gZ.satirlar, klip: gZ.klip }, "seq-1");
+  gec2.forEach(function (r, i) { r.id = "gs" + i; });
+  var uZ2 = cagir("KS_easeUndo", { records: gec2 });
+  ok("…seyrek plan yazılmışsa (" + fpsY + " fps): seyrek kayıt anahtarlarını siler, sık kaydınki 'yok'; Suflo'nun anahtarı kalmaz",
+    uZ2.ok && uZ2.atlanan.length === 0 && anahtarlar(Z2.olcek).filter(function (k) { return k.s > 1 + 1e-6 && k.s < 5 - 1e-6; }).length === 0 &&
+    uZ2.sonuclar.filter(function (r) { return r.id === "gs0"; })[0].silinen === itZ.keys.length && uZ2.sonuclar.filter(function (r) { return r.id === "gs1"; })[0].kod === "yok",
+    js(uZ2));
+});
+sequence.timebase = String(254016000000 / 25);
+izKur(izlerOnceZ); playhead = playheadOnceZ;
 var ytKayit1 = JSON.parse(JSON.stringify(ytB.records[1])); ytKayit1.id = "kryt1";
 YT.start.seconds = 2; YT.end.seconds = 12;   // klip 2 sn sağa taşındı
 var yRem = cagir("KS_removeSufloKeys", { records: [ytKayit1] });

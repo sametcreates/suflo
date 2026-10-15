@@ -50,18 +50,35 @@ ok("kayıt: aynı sekmenin farklı kategorileri ayrı (Yazı Animasyonları / Al
   kim["tab:text/mogrt"].kat === "mogrt" && kim["tab:text/captions"].ad === "Altyazı Şablonları" && kim["tab:text/fav"].ad === "Favoriler");
 ok("kayıt: eylemler sekmenin adını alt yazı olarak alır, Pro anahtarı taşır", kim["eylem:sessizlik-bul"].alt === "Otomatik Kesim" &&
   kim["eylem:rampa-uygula"].pro === "speedramp" && kim["eylem:ayar-motor"].alt === "Ayarlar" && kim["eylem:altyazi-olustur"].pro === "");
-ok("kayıt: sekmesi bu sürümde olmayan eylem (Eğri) listelenmez; sekme gelince listelenir",
-  !sekmeler.egri ? !kim["eylem:egri-uygula"] && !!AA.kayitKur(navlar, { mevcut: function () { return true; } }).filter(function (o) { return o.id === "eylem:egri-uygula"; }).length : !!kim["eylem:egri-uygula"]);
+ok("kayıt: sekmesi panelde olmayan eylem listelenmez (mevcut false)",
+  !AA.kayitKur(navlar, { mevcut: function (e) { return e.tab !== "egri"; } }).some(function (o) { return o.id === "eylem:egri-uygula"; }) && !!kim["eylem:egri-uygula"]);
+// 3.4: dört dalın sekmeleri birleşti; hiçbir eylem sekmesi yok diye atlanmaz
+var atlananEylem = AA.EYLEMLER.filter(function (e) { return !kim["eylem:" + e.id]; }).map(function (e) { return e.id; });
+ok("kayıt: 3.4'te her eylemin sekmesi var, hiçbiri atlanmaz (Eğri dahil)", sekmeler.egri && atlananEylem.length === 0 && !!kim["tab:egri"], atlananEylem.join(", "));
+ok("3.4 araçları ve eylemleri kayıtta: Eğri sekmesi, Eğri uygula, Varışta yaylan, eğri kodu / içe / dışa aktar, kesim kapsamı ve korunan katmanlar, " +
+  "kesimden sonra altyazı, güvenli kaldırma, özel hız eğrisi, model içe aktar, Doctor kaynak sınaması, yapay zekâ köprüsü",
+  ["tab:egri", "eylem:egri-uygula", "eylem:egri-yaylan", "eylem:egri-kod", "eylem:egri-kod-kopyala", "eylem:egri-ice-aktar", "eylem:egri-disa-aktar",
+    "eylem:egri-geri-al", "eylem:kesim-kapsam", "eylem:kesim-katman", "eylem:altyazi-uyarla", "eylem:gecis-kaldir", "eylem:zoom-kaldir",
+    "eylem:onayar-kaldir", "eylem:hiz-ozel", "eylem:model-ice-aktar", "eylem:kaynak-sina", "eylem:ayar-mcp"].every(function (id) { return !!kim[id]; }));
+// Pro rozeti: kenar çubuğuyla aynı (Eğri sekmesi PRO kilitli; uygulamak ve yaylanma 'curves'); ücretsizler rozetsiz
+ok("3.4 Pro kapıları: Eğri uygula ve Varışta yaylan 'curves', kesim seçenekleri 'cut', özel hız eğrisi 'speedramp', köprü 'mcp'; Eğri sekmesi PRO kilitli",
+  kim["tab:egri"].pro === true && kim["eylem:egri-uygula"].pro === "curves" && kim["eylem:egri-yaylan"].pro === "curves" &&
+  kim["eylem:kesim-kapsam"].pro === "cut" && kim["eylem:kesim-katman"].pro === "cut" && kim["eylem:hiz-ozel"].pro === "speedramp" &&
+  kim["eylem:ayar-mcp"].pro === "mcp", J([kim["tab:egri"].pro, kim["eylem:egri-uygula"].pro]));
+ok("3.4 ücretsizler kapısız: model içe aktar, kaynak sınaması, eğri kodu / dosyası, geri alma ve kaldırma, kesimden sonra altyazı",
+  ["model-ice-aktar", "kaynak-sina", "egri-kod", "egri-kod-kopyala", "egri-ice-aktar", "egri-disa-aktar", "egri-geri-al", "gecis-kaldir",
+    "zoom-kaldir", "onayar-kaldir", "altyazi-uyarla"].every(function (id) { return kim["eylem:" + id].pro === ""; }));
 ok("kayıt: aynı kimlik iki kez girmez (Ayarlar hem üst çubukta hem menüde)", AA.kayitKur([{ tab: "settings", ad: "Ayarlar" }, { tab: "settings", ad: "Ayarlar" }]).filter(function (o) { return o.tur === "arac"; }).length === 1);
 ok("temizAd: sondaki YENİ / NEW / PRO atılır", AA.temizAd("Geçişler  YENİ") === "Geçişler" && AA.temizAd("Transitions NEW PRO") === "Transitions" && AA.temizAd("Proje") === "Proje");
 
-// Eylemlerin hedefleri gerçekten var (sekmesi olmayan Eğri hariç)
+// Eylemlerin hedefleri gerçekten var (her hedef kimliği; ilki görünmezse sıradaki seçilir)
 var eksikHedef = [];
 AA.EYLEMLER.forEach(function (e) {
-  if (!sekmeler[e.tab]) { if (e.tab !== "egri") eksikHedef.push(e.id + " → #tab-" + e.tab); return; }
-  if (!e.hedef.length || !e.hedef.some(function (id) { return html.indexOf('id="' + id + '"') !== -1; })) eksikHedef.push(e.id + " → " + e.hedef.join("|"));
+  if (!sekmeler[e.tab]) { eksikHedef.push(e.id + " → #tab-" + e.tab); return; }
+  var yok = e.hedef.filter(function (id) { return html.indexOf('id="' + id + '"') === -1; });
+  if (!e.hedef.length || yok.length) eksikHedef.push(e.id + " → " + (yok.join("|") || "hedef yok"));
 });
-ok("her eylemin sekmesi ve hedef düğmesi index.html'de (Eğri yalnız sekmesi gelince)", eksikHedef.length === 0, eksikHedef.join(" · ") || AA.EYLEMLER.length + " eylem");
+ok("her eylemin sekmesi ve hedef kimlikleri index.html'de", eksikHedef.length === 0, eksikHedef.join(" · ") || AA.EYLEMLER.length + " eylem");
 var disarda = AA.EYLEMLER.filter(function (e) {
   if (!sekmeler[e.tab]) return false;
   var bas = html.indexOf('<section id="tab-' + e.tab + '"'), son = html.indexOf('<section id="tab-', bas + 5);
@@ -83,7 +100,12 @@ ok("aksan ve büyük harf duyarsız: SESSİZLİK, sessızlık, sessızlık → '
   ilk("SESSİZLİK") === "Sessizlikleri bul" && ilk("sessızlık") === "Sessizlikleri bul" && ilk("Sessizlik") === "Sessizlikleri bul");
 ok("'hiz rampasi' ve 'HIZ RAMPASI' → Hız Rampası", ilk("hiz rampasi") === "Hız Rampası" && ilk("HIZ RAMPASI") === "Hız Rampası");
 ok("'altyazi' → önce tam ad Altyazı, sonra 'Altyazı ' ile başlayanlar, sonra kelimenin bir kısmı", J(adlar("altyazi", 4)) === J(["Altyazı", "Altyazı Şablonları", "Altyazı oluştur", "Altyazıyı çevir"]), J(adlar("altyazi", 6)));
-ok("adda tam kelime, kelimenin başından önce: 'kesim' → Otomatik Kesim, sonra Kesimleri uygula", J(adlar("kesim", 2)) === J(["Otomatik Kesim", "Kesimleri uygula"]), J(adlar("kesim")));
+ok("adın ilk kelimesi > adda tam kelime > kelimenin başı: 'kesim' → Kesim kapsamı, Otomatik Kesim, Kesimleri uygula",
+  J(adlar("kesim", 3)) === J(["Kesim kapsamı", "Otomatik Kesim", "Kesimleri uygula"]), J(adlar("kesim")));
+ok("3.4: 'eğri' → önce Eğri sekmesi, sonra Eğri uygula; 'curve' / 'mcp' / 'yaylan' / 'kaynak' / 'korunan' bulur",
+  J(adlar("eğri", 2)) === J(["Eğri", "Eğri uygula"]) && adlar("curve", 3).indexOf("Eğri") !== -1 && ilk("mcp") === "Ayarlar › Yapay zekâ köprüsü (MCP)" &&
+  ilk("yaylan") === "Varışta yaylan" && ilk("model kaynak") === "Model kaynaklarını sına" && ilk("korunan katman") === "Kesilmeyecek katmanlar",
+  J([adlar("eğri"), adlar("curve"), ilk("mcp"), ilk("yaylan"), ilk("model kaynak"), ilk("korunan katman")]));
 ok("'motor' → Ayarlar › Motor; Ayarlar alt yazısından (motor · dil · lisans) da bulunur", ilk("motor") === "Ayarlar › Motor" && adlar("motor", 6).indexOf("Ayarlar") !== -1, J(adlar("motor")));
 ok("çok kelime: her kelime bir yerde geçmeli ('ayarlar motor', 'sess bul')", ilk("ayarlar motor") === "Ayarlar › Motor" && ilk("sess bul") === "Sessizlikleri bul" &&
   AA.ara(kayit, "sessizlik zebra", null).length === 0);
@@ -191,6 +213,15 @@ ok("yeniKisayolTusu: macOS'ta tutulmayan fiziksel tuştan gelen ⌘K o tuşun ko
 ok("tusDuzeniUyumsuz: tutulan tuşlar verilince onlara bakar (Türkçe Q'ya dönüş: fiziksel J 'j' yazar)",
   AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "j", code: "KeyJ" }), true, ["KeyJ"]) && !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "j", code: "KeyJ" }), true) &&
   !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "m", code: "KeyK" }), true, ["KeyJ"]));
+(function () {
+  var d1 = depo();
+  var bozukMac = ["{x", "null", "42", J({ a: 1 }), J(["Numpad5", 7, "<x>"])].map(function (v) { var d = depo(); d.m[AA.MAC_TUS_ANAHTARI] = v; return J(AA.macTuslariOku(d)); });
+  ok("macTuslariOku / macTuslariYaz: gidip gelir (yalnız bilinen kodlar, tekrarsız); kayıt yok / bozuk → K; saklanan boş liste geçerli; erişim hatası atılmaz",
+    J(AA.macTuslariOku(d1)) === J(["KeyK"]) && AA.macTuslariYaz(d1, ["KeyJ", "KeyJ", "Numpad5", "KeyV"]) === true && J(AA.macTuslariOku(d1)) === J(["KeyJ", "KeyV"]) &&
+    AA.macTuslariYaz(d1, []) === true && J(AA.macTuslariOku(d1)) === "[]" && bozukMac.every(function (x) { return x === J(["KeyK"]); }) &&
+    J(AA.macTuslariOku({ getItem: function () { throw new Error("x"); } })) === J(["KeyK"]) && AA.macTuslariYaz({ setItem: function () { throw new Error("y"); } }, ["KeyJ"]) === false &&
+    J(AA.macTuslariOku(null)) === J(["KeyK"]) && AA.MAC_TUS_ANAHTARI !== AA.DEPO_ANAHTARI, J(bozukMac));
+})();
 ok("macOS kVK tablosu: ANSI K 40, J 38, V 9, M 46, T 17 (Events.h); tusIlgisi(mac, kodlar) her tuşu ⌘ ile tutar, bilinmeyeni atlar",
   AA.MAC_KVK.KeyK === 40 && AA.MAC_KVK.KeyJ === 38 && AA.MAC_KVK.KeyV === 9 && AA.MAC_KVK.KeyM === 46 && AA.MAC_KVK.KeyT === 17 && AA.MAC_KVK.KeyA === 0 &&
   J(AA.tusIlgisi(true, ["KeyK", "KeyJ", "Numpad5"])) === J([{ keyCode: 40, metaKey: true }, { keyCode: 38, metaKey: true }]) &&
@@ -397,8 +428,10 @@ function sahne(o) {
   nav("cut", "Otomatik Kesim ", "sessizlik · konuşma · dolgu", true, "", true);
   nav("hiz", "Hız Rampası ", "ağır çekim · hızlanma", true, "", true);
   nav("text", "Yazı Animasyonları", "text efektleri · typewriter", true, "mogrt");
+  if (o.egri) nav("egri", "Eğri ", "anahtar kare yumuşatma", true, "", true);
   nav("settings", "Ayarlar", "motor · dil · lisans", false);
   var cap = sekme("captions"), cut = sekme("cut"), hiz = sekme("hiz"); sekme("text"); var ayar = sekme("settings");
+  if (o.egri) { var egriS = sekme("egri"); egriS.appendChild(D("button", { id: "egri-uygula" })); egriS.appendChild(D("button", { id: "egri-yaylan-uygula" })); }
   cap.classList.add("active");
   cap.appendChild(D("button", { id: "cap-go" }));
   cap.appendChild(D("button", { id: "cap-import-srt" }));
@@ -479,6 +512,22 @@ function sahne(o) {
     function rozet(x) { return bul(x, function (c) { return c.classList && c.classList.contains("arac-ara-kilit"); }).length; }
     return rozet(kesim) === 1 && rozet(altyazi) === 0 && rozet(ramp) === 1;
   })());
+  // 3.4 (ag-palet bulgu 9): Eğri sekmesi ve Pro 'curves' kapılı Eğri uygula / Varışta yaylan kenar çubuğu gibi PRO rozetli;
+  // Pro kullanıcıda rozet yok
+  (function () {
+    function rozetliAdlar(x) {
+      x.belgeTusu(x.olay({ key: "k", ctrlKey: true, target: x.belge.body }));
+      x.yaz("eğri");
+      return x.satirlar().filter(function (r) { return bul(r, function (c) { return c.classList && c.classList.contains("arac-ara-kilit"); }).length; }).map(x.satirAdi);
+    }
+    var eg = sahne({ egri: true }), egPro = sahne({ egri: true, pro: true });
+    var tum = (eg.belgeTusu(eg.olay({ key: "k", ctrlKey: true, target: eg.belge.body })), eg.yaz("eğri"), eg.satirlar().map(eg.satirAdi));
+    eg.girdiTusu({ key: "Escape" });
+    var rozetli = rozetliAdlar(eg), proRozet = rozetliAdlar(egPro);
+    ok("3.4 Eğri: ücretsiz kullanıcı 'eğri' yazınca Eğri aracı, Eğri uygula ve Varışta yaylan satırlarında PRO; Pro kullanıcıda rozet yok",
+      tum[0] === "Eğri" && tum.indexOf("Eğri uygula") !== -1 && rozetli.indexOf("Eğri") !== -1 && rozetli.indexOf("Eğri uygula") !== -1 &&
+      AA.ara(eg.api.durum().kayit, "yaylan", null)[0].oge.pro === "curves" && proRozet.length === 0, J([tum, rozetli, proRozet]));
+  })();
   // inceleme 2: rozet ipucu deneme hakkı vaat etmez (SFX, Motion Presetleri, Podcast, "Sahneleri bul" kapılarında deneme yok)
   var ipuclari = bul(s.liste, function (c) { return c.classList && c.classList.contains("arac-ara-kilit"); }).map(function (k) { return k.title; });
   ok("PRO rozetinin ipucu tarafsız ('Suflo Pro özelliği'): deneme hakkı vaat etmez", ipuclari.length > 0 &&
@@ -707,6 +756,18 @@ function ac(s, o) { return s.belgeTusu(s.olay(o || { key: "k", ctrlKey: true, ta
   var son7 = sahipCagrilari(aa7, "arac-ara");
   ok("macOS düzen değişince: ⌘J (fiziksel J 'j') o tuşu bırakır, ⌘K (fiziksel K 'k') K'yı yeniden tutar",
     J(son7.slice(3)) === J(["", J([{ keyCode: 40, metaKey: true }])]), J(son7));
+  // inceleme 3: öğrenilen tuşlar bu bilgisayarda saklanır; panel yeniden yüklenince (yeni sahne, aynı depo) ilk ilgi
+  // öğrenilmiş listeyle kurulur: Türkçe F'de ilk ⌘K Premiere'e (Add Edit) gitmez, ilk ⌘M yutulmaz
+  var depoTr = depo(), aaTr = ilgiCasusu(), tr1 = sahne({ mac: true, aa: aaTr, depo: depoTr });
+  tr1.belgeTusu(tr1.olay({ type: "keydown", key: "m", code: "KeyK", metaKey: true, target: tr1.belge.body }));
+  tr1.belgeTusu(tr1.olay({ type: "keydown", key: "k", code: "KeyJ", metaKey: true, target: tr1.belge.body }));
+  var aaTr2 = ilgiCasusu(), tr2 = sahne({ mac: true, aa: aaTr2, depo: depoTr });
+  (tr2.belge.yakala.pointerdown || []).forEach(function (f) { f({ type: "pointerdown" }); });
+  var aaTr3 = ilgiCasusu(), tr3 = sahne({ mac: true, aa: aaTr3, depo: depo() });
+  (tr3.belge.yakala.pointerdown || []).forEach(function (f) { f({ type: "pointerdown" }); });
+  ok("macOS Türkçe F: öğrenilen tuş (yalnız fiziksel J) saklanır; yeniden yüklenen panelin ilk ilgisi kVK 38, K değil; boş depoda K",
+    depoTr.m[AA.MAC_TUS_ANAHTARI] === J(["KeyJ"]) && J(sahipCagrilari(aaTr2, "arac-ara")) === J([J([{ keyCode: 38, metaKey: true }])]) &&
+    J(sahipCagrilari(aaTr3, "arac-ara")) === J([J([{ keyCode: 40, metaKey: true }])]), J([depoTr.m, aaTr2.cagri]));
   var aa8 = ilgiCasusu(), m8 = sahne({ mac: true, aa: aa8 });
   m8.belgeTusu(m8.olay({ type: "keydown", key: "k", code: "KeyK", metaKey: true, target: m8.belge.body }));
   ok("macOS ABD / Türkçe Q: ⌘K ilgisi kurulur ve kalır, palet açılır", J(sahipCagrilari(aa8, "arac-ara")) === J([J([{ keyCode: 40, metaKey: true }])]) && m8.kutu.hidden === false);

@@ -682,20 +682,22 @@ window.KHizRampasi = (function () {
     }
   }
   // Silinen ya da üstüne yazılan kaydı geri koy (bildirimdeki Geri al): aynı id varsa eğrisi eskiye döner, yoksa eski
-  // sırasına eklenir (liste doluysa söylenir)
+  // sırasına eklenir (liste doluysa söylenir). Bildirim açıkken aynı adla yeni bir rampa kaydedildiyse (ad kutusunun önerisi
+  // silinenin adıdır) geri gelen "Ad (2)" olur: iki kayıt aynı adı taşımaz (Kaydet adla üzerine yazar; 3.4 inceleme)
   function ozelKayitGeriKoy(eski, sira) {
     if (!eski) return;
-    var liste = ozelKayitlar(), var1 = false;
+    var liste = ozelKayitlar(), var1 = false, ad = eski.ad;
     liste = liste.map(function (x) { if (x.id !== eski.id) return x; var1 = true; return { id: x.id, ad: x.ad, keys: eski.keys, hit: eski.hit }; });
     if (!var1) {
       if (liste.length >= SR.ozel.KAYIT) { durum("En çok 12 özel rampa saklanır; birini sil.", "warn"); return; }
-      liste.splice(sira >= 0 && sira <= liste.length ? sira : liste.length, 0, { id: eski.id, ad: eski.ad, keys: eski.keys, hit: eski.hit });
+      ad = SR.ozelKayitBenzersizAd(liste, eski.ad) || eski.ad;
+      liste.splice(sira >= 0 && sira <= liste.length ? sira : liste.length, 0, { id: eski.id, ad: ad, keys: eski.keys, hit: eski.hit });
     }
     if (!depoYaz(OZEL_KAYIT_ANAHTAR, liste)) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return; }
     var girdi = el("hiz-ozel-ad");
     if (girdi) girdi.setAttribute("placeholder", SR.ozelKayitAdi(ozelKayitlar(), tr));
     ozelKayitlariCiz();
-    durum(["Geri geldi: ", { ad: eski.ad }], "good");
+    durum(["Geri geldi: ", { ad: ad }], "good");
   }
   function ozelKayitSil(id) {
     var once = ozelKayitlar(), sira = -1;

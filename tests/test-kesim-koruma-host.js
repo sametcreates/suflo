@@ -343,6 +343,20 @@ var r10c = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", clon
   expectTracks: { video: ["Video 1"], audio: ["Audio 1", "Müzik"] } });
 ok("expectTracks tutuyor: uygulanır, Müzik korunur", r10c.ok && r10c.removed === 4 && js(ozet(s10).A2) === js([[0, 60]]) && js(r10c.protectedSkipped) === js({ video: 0, audio: 1 }), js(r10c));
 
+/* ---------- 10b) 3.4 son inceleme: expectIz — sekans kapsamında analizden sonra kurgu değiştiyse hiçbir şey yapılmaz ---------- */
+var s10d = vlog("s10d");
+var iz10d = call("KS_kurguIzi", { seqId: "s10d" }).iz;
+var klonOnce10d = klonSayisi;
+razorlar = [];
+// analizden sonra Premiere'de V1'in klibi kırpıldı (sonu 60 → 55): kurgu izi değişti
+s10d.videoTracks[0]._k[0].end.seconds = 55;
+var r10d = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: true, expectSeqId: "s10d", expectIz: iz10d, esitKayma: true });
+ok("expectIz tutmuyor (analizden sonra klip kırpıldı): kod kurgu, kopya yok, razor yok, timeline aynı",
+  !r10d.ok && r10d.kod === "kurgu" && klonSayisi === klonOnce10d && razorlar.length === 0 && aktif === s10d && s10d.videoTracks[0]._k.length === 1, js(r10d));
+s10d.videoTracks[0]._k[0].end.seconds = 60;
+var r10e = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: false, expectSeqId: "s10d", expectIz: iz10d, esitKayma: true });
+ok("expectIz tutuyor (kurgu analizdeki gibi): uygulanır", r10e.ok && r10e.removed > 0, js(r10e));
+
 /* ---------- 11) KS_getTrackLayout scope: aralık panel bağlamından değil sekansın kendi In / Out'undan ---------- */
 // sahte sekans: In 10, Out 40, sonu 60, kare 0.04; V2'de In / Out dışında (45–50) bir klip
 var s11 = vlog("s11", { v2: [klip(45, 50, { name: "Son" })] });

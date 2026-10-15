@@ -47,6 +47,14 @@ var baska = KR.kayit({ id: "kr2", tur: "egri", nodeId: "n1", compIdx: 0, propIdx
 var olu = KR.kayit({ id: "kr3", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", uclar: [3, 4], times: [3.5] });
 ok("satır kayıtları: yalnız aynı klip + bileşen + özellik + kimlik", js(M.satirKayitlari([rec, baska, olu], pr).map(function (r) { return r.id; })) === js(["kr1", "kr3"]));
 ok("canlı kayıtlar: uçları ve zamanlarının %60'ı anahtarlarda olan", js(M.canliKayitlar([rec, baska, olu], pr).map(function (r) { return r.id; })) === js(["kr1"]));
+// 3.4 son inceleme: Premiere'in arayüz dili değişti (kayıt Türkçe "Ölçek", tarama İngilizce "Scale"): kayıt satırına bağlı kalır
+var prEn = { nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", keys: [1, 1.04, 1.08, 1.12, 2], fps: 25 };
+var recTr = KR.kayit({ id: "kt1", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/\u00d6l\u00e7ek", uclar: [1, 2], times: [1.04, 1.08, 1.12] });
+var recTrKonum = KR.kayit({ id: "kt2", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Konum", uclar: [1, 2], times: [1.04, 1.08, 1.12] });
+ok("dil değişince: Türkçe kayıt İngilizce satırda bulunur (satır kayıtları, canlı kayıt, canlı uçlu çift); çelişen ad (Konum) bulunmaz",
+  js(M.satirKayitlari([recTr, recTrKonum], prEn).map(function (r) { return r.id; })) === js(["kt1"]) &&
+  js(M.canliKayitlar([recTr], prEn).map(function (r) { return r.id; })) === js(["kt1"]) && !!M.satirKaydi([recTr], prEn, { t0: 1, t1: 2 }) &&
+  js(M.ipuclari([recTr], [prEn])) === js([{ nodeId: "n1", compIdx: 0, propIdx: 1, t0: 1, t1: 2 }]));
 ok("ipuçları: canlı kayıtların uçları (host'a)", js(M.ipuclari([rec, olu], [pr])) === js([{ nodeId: "n1", compIdx: 0, propIdx: 1, t0: 1, t1: 2 }]));
 ok("satır kaydı: çiftle aynı uçlu canlı kayıt", M.satirKaydi([rec], pr, { t0: 1, t1: 2 }).id === "kr1" && M.satirKaydi([rec], pr, { t0: 1, t1: 1.04 }) === null);
 var yeni = { id: "kr9", tur: "egri", nodeId: "n1", compIdx: 0, propIdx: 1, uclar: [1.5, 2.5] };

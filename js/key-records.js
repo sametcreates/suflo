@@ -239,6 +239,40 @@
 
   function canli(rec, canliZamanlar, fps) { return canliAyrinti(rec, canliZamanlar, fps).canli; }
 
+  /*
+   * Aynı özellik mi (kayıt ↔ kayıt, kayıt ↔ tarama satırı ya da host'un temizlik bildirimi; 3.4 inceleme). matchName
+   * (host KS_easeKimlik: "bileşen matchName/özellik") aynıysa evet. Premiere'in özellik parametrelerinin matchName'i yok:
+   * kimliğin özellik kısmı görünen addır, arayüz dilinde ("AE.ADBE Motion/Ölçek" İngilizce Premiere'de "AE.ADBE Motion/Scale").
+   * Host KS_kayitDilsizUyar gibi: bileşen kısmı aynı, özellik kısmı farklıysa iki tarafın da dizinleri (compIdx, propIdx)
+   * biliniyorsa aynı sırada olmalı ve bilinen adlar (Konum, Ölçek, Döndürme, Opaklık…; Türkçe ve İngilizce) çelişmemeli;
+   * dizin yoksa (temizlik bildirimi) iki ad da bilinmeli ve aynı özelliği göstermeli.
+   */
+  var OZELLIK_ADLARI = {
+    "position": "konum", "konum": "konum", "adbe position": "konum",
+    "scale": "olcek", "\u00f6l\u00e7ek": "olcek", "olcek": "olcek", "adbe scale": "olcek",
+    "scale width": "olcekg", "\u00f6l\u00e7ek geni\u015fli\u011fi": "olcekg", "adbe scale width": "olcekg",
+    "rotation": "dondurme", "d\u00f6nd\u00fcrme": "dondurme", "adbe rotation": "dondurme", "adbe rotation angle": "dondurme",
+    "anchor point": "baglanti", "ba\u011flant\u0131 noktas\u0131": "baglanti", "adbe anchor point": "baglanti",
+    "anti-flicker filter": "titreme", "titreme \u00f6nleme filtresi": "titreme", "adbe anti-flicker filter": "titreme",
+    "opacity": "opaklik", "opakl\u0131k": "opaklik", "opaklik": "opaklik", "adbe opacity": "opaklik"
+  };
+  function ozellikAdi(s) {
+    var k = String(s || "").toLowerCase().replace(/^ae\./, "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+    return Object.prototype.hasOwnProperty.call(OZELLIK_ADLARI, k) ? OZELLIK_ADLARI[k] : "";
+  }
+  function dizinli(o) {
+    return !!o && typeof o.compIdx === "number" && o.compIdx >= 0 && typeof o.propIdx === "number" && o.propIdx >= 0;
+  }
+  function ayniOzellik(a, b) {
+    var ma = String((a && a.matchName) || ""), mb = String((b && b.matchName) || "");
+    if (ma === mb) return true;
+    var ia = ma.indexOf("/"), ib = mb.indexOf("/");
+    if (ia <= 0 || ib <= 0 || ma.slice(0, ia) !== mb.slice(0, ib)) return false;
+    var ka = ozellikAdi(ma.slice(ia + 1)), kb = ozellikAdi(mb.slice(ib + 1));
+    if (dizinli(a) && dizinli(b)) return a.compIdx === b.compIdx && a.propIdx === b.propIdx && !(ka && kb && ka !== kb);
+    return !!ka && ka === kb;
+  }
+
   // Liste süzgeci: { tur, seqId, nodeId } (verilenler eşleşmeli)
   function filtrele(liste, f) {
     f = f || {};
@@ -639,7 +673,7 @@
     TURLER: TURLER.slice(), TOLERANS_KARE: TOLERANS_KARE, CANLI_ORAN: CANLI_ORAN,
     PROJE_SINIR: PROJE_SINIR, TOPLAM_SINIR: TOPLAM_SINIR, PROJE_KARAKTER: PROJE_KARAKTER, TOPLAM_KARAKTER: TOPLAM_KARAKTER,
     ONEK: ONEK, DIZIN: DIZIN, zamanKodla: zamanKodla, zamanCoz: zamanCoz,
-    kayit: kayit, canli: canli, canliAyrinti: canliAyrinti, eslestir: eslestir, tolerans: tolerans,
+    kayit: kayit, canli: canli, canliAyrinti: canliAyrinti, eslestir: eslestir, tolerans: tolerans, ayniOzellik: ayniOzellik,
     filtrele: filtrele, enYeniler: enYeniler, sinifEnYeniler: sinifEnYeniler, sinif: sinif, depoAnahtari: depoAnahtari, depo: depo, yeniId: yeniId
   };
 });

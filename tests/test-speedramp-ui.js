@@ -1121,6 +1121,22 @@ function cevir(n) {
   if (silToast) silToast.e.fn();
   ok("...Geri al: silinen rampa eski sırasına aynen döner", js(kayitlar43(r2)) === js([kayitlar43(r2)[0], ikiOnce, kayitlar43(r2)[2]]) &&
     js(kayitlar43(r2).map(function (k) { return k.ad; })) === js(["Bir", "İki", "Üç"]) && js(kayitlar43(r2)[1]) === js(ikiOnce) && cipBul(r2, "İki") !== undefined, js(kayitlar43(r2)));
+  // 3.4 son inceleme: silindikten sonra (bildirim açıkken) aynı adla yeni rampa kaydedildi; Geri al ikinci "İki" yaratmaz
+  var r2x = kur({ cevap: function () { return { ok: false }; } });
+  dz41(r2x, "atilim"); r2x.dom["hiz-ozel-ad"].value = "Bir"; r2x.dom["hiz-ozel-kaydet"]._o.click();
+  dz41(r2x, "darbe"); r2x.dom["hiz-ozel-ad"].value = "İki"; r2x.dom["hiz-ozel-kaydet"]._o.click();
+  dz41(r2x, "vites"); r2x.dom["hiz-ozel-ad"].value = "Üç"; r2x.dom["hiz-ozel-kaydet"]._o.click();
+  var ikiX = kayitlar43(r2x)[1];
+  r2x.toastlar.length = 0;
+  bul(cipBul(r2x, "İki"), function (c) { return c.className === "hiz-ozel-kayit-sil"; })[0]._o.click({ stopPropagation: function () {} });
+  var silToast2 = r2x.toastlar.filter(function (t) { return t.e && t.e.metin === "Geri al"; })[0];
+  dz41(r2x, "dalis"); r2x.dom["hiz-ozel-ad"].value = "İki"; r2x.dom["hiz-ozel-kaydet"]._o.click();
+  var yeniIki = kayitlar43(r2x).filter(function (k) { return k.ad === "İki"; })[0];
+  if (silToast2) silToast2.e.fn();
+  var adlar43 = kayitlar43(r2x).map(function (k) { return k.ad; });
+  ok("...silinen rampanın adıyla yeni kayıt varken Geri al: geri gelen 'İki (2)' olur, iki kayıt aynı adı taşımaz, yeni kayıt dokunulmaz",
+    !!silToast2 && !!yeniIki && js(adlar43) === js(["Bir", "İki (2)", "Üç", "İki"]) && js(kayitlar43(r2x)[1].keys) === js(ikiX.keys) &&
+    js(kayitlar43(r2x)[3]) === js(yeniIki) && /^Geri geldi: İki \(2\)/.test(r2x.dom["hiz-status"].textContent), js(adlar43) + " " + r2x.dom["hiz-status"].textContent);
   r2.toastlar.length = 0;
   var birOnce = kayitlar43(r2)[0];
   dz41(r2, "dalis"); r2.dom["hiz-ozel-ad"].value = "bir"; r2.dom["hiz-ozel-kaydet"]._o.click();

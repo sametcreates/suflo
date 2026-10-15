@@ -841,7 +841,12 @@ window.KCut = (function () {
     var aralik = okunan.aralik;
     if (aralik.hata) { status(kapsamHataMetni(aralik.hata), "warn"); return null; }
     var o = korumaHesapla();
-    if (!o || !o.dinle.length) {
+    /*
+     * Dinlenecek katmanların hiçbirinde bu aralıkta klip yoksa da (kullanıcının seçimi aynı adlı katmanlarla başka In / Out'a
+     * taşındı: B-roll bölümü) karışım sessiz çıkar ve tüm aralık tek kesim olurdu: boş seçim gibi durulur (3.4 inceleme).
+     */
+    var dinlenenDolu = !!(o && o.dinle.some(function (i) { return izDoluMu(lay.audio[i], aralik); }));
+    if (!o || !o.dinle.length || !dinlenenDolu) {
       /*
        * Aralıkta hiçbir ses katmanında klip yoksa (yalnız video: ekran kaydı, timelapse; ya da hiç ses katmanı yok) seçilecek
        * çip yok ya da hepsi boş: boş çip seçmek sessiz karışım dışa aktarır, tüm aralık tek kesim olurdu.
@@ -890,11 +895,21 @@ window.KCut = (function () {
     }
     var dur = Number(ex.duration) > 0 ? Number(ex.duration) : aralik.end - aralik.start;
     var ofset = Number(ex.offset) || 0;
+    /*
+     * Analiz edilen kurgunun izi (KS_kurguIzi: tüm kliplerin yeri). Uygula KS_applyCuts'a expectIz olarak verir: analizden
+     * sonra Premiere'de klipler taşındı / kırpıldı / silindiyse kesimler eski sekans zamanlarına düşerdi, host uygulamaz
+     * (3.4 son inceleme). İz okunamazsa (eski host) denetim yapılmaz.
+     */
+    var kurguIz = "";
+    try {
+      var izR = await K.call("KS_kurguIzi", { seqId: seqId }, 20000);
+      if (izR && izR.ok && typeof izR.iz === "string") kurguIz = izR.iz;
+    } catch (eIz) { kurguIz = ""; }
     K.log("[kesim] " + kapsam + " karisimi: " + o.dinle.map(function (i) { return "A" + (i + 1); }).join(",") +
       " ofset=" + ofset.toFixed(3) + " sure=" + dur.toFixed(3));
     return { mediaPath: geciciWav, inPoint: 0, outPoint: dur, clipStart: ofset, clipEnd: ofset + dur,
       name: kapsam === "inout" ? "In → Out" : "Sekans", kapsam: kapsam, seqId: seqId,
-      dinle: o.dinle.slice() };
+      dinle: o.dinle.slice(), kurguIz: kurguIz };
   }
 
   function kapsamSec(s) {
@@ -1350,6 +1365,8 @@ window.KCut = (function () {
        * çağrı 3.3'teki tam kaplama kuralıyla birebir aynı kalır.
        */
       if (clip.kapsam) yuk.esitKayma = true;
+      // sekans kapsamı: analiz edilen kurgu değiştiyse host uygulamaz (kod "kurgu")
+      if (clip.kapsam && clip.kurguIz) yuk.expectIz = clip.kurguIz;
       // 3.4 adım 7: analiz edilen sekans (kopyadan önce denetlenir) ve korunan katmanlar (yalnız varsa)
       if (analizSeqId) yuk.expectSeqId = analizSeqId;
       var kor = korumaHesapla(mode);
@@ -1432,7 +1449,12 @@ window.KCut = (function () {
     if (r && !r.ok) {
       // expectSeqId tutmadı (arada başka sekansa geçildi): hiçbir şey yapılmadı, kopya da açılmadı
       if (r.kod === "sekans") status("✕ Etkin sekans değişti: kesimler uygulanmadı. Analiz edilen sekansı aç ya da Sessizlikleri yeniden bul.", "bad");
-      else if (r.kod === "katman") {
+      else if (r.kod === "kurgu") {
+        // expectIz tutmadı: analizden sonra klipler taşındı / kırpıldı / silindi; hiçbir şey yapılmadı, analiz bırakılır
+        sesiKapat();
+        analiziBirak();
+        status("✕ Sekans analizden sonra değişti (klipler taşındı, kırpıldı ya da silindi): kesimler eski yerlere düşerdi, uygulanmadı. Sessizlikleri yeniden bul.", "bad");
+      } else if (r.kod === "katman") {
         /*
          * expectTracks tutmadı: analizden sonra katman eklendi / silindi / yeniden adlandırıldı, korunan dizinler başka
          * katmanı gösterirdi. Hiçbir şey yapılmadı. Düzen yeniden okunur (seçimler öneriye döner), kullanıcı kontrol eder.

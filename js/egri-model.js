@@ -128,12 +128,18 @@
   function satirAnahtari(p) { return String(p.nodeId) + "|" + p.compIdx + "|" + p.propIdx; }
 
   /* ================= kayıtlar ================= */
-  // Bu satırın (klip + bileşen + özellik + kimlik) kayıtları; tur verilmezse Eğri ('egri'), 'yaylan' varışta yaylanma
+  // Bu satırın (klip + bileşen + özellik + kimlik) kayıtları; tur verilmezse Eğri ('egri'), 'yaylan' varışta yaylanma.
+  // Kimlik dilden bağımsız karşılaştırılır (SufloKeyRecords.ayniOzellik): Premiere'in arayüz dili değişince kaydın
+  // "Motion/Ölçek"i taramanın "Motion/Scale"ine eşlenir (host KS_kayitDilsizUyar ile aynı kural; 3.4 inceleme)
+  function ayniKimlik(r, prop) {
+    if (KR && typeof KR.ayniOzellik === "function") return KR.ayniOzellik(r, prop);
+    return String(r.matchName || "") === String(prop.matchName || "");
+  }
   function satirKayitlari(kayitlar, prop, tur) {
     var t = tur || "egri";
     return (Array.isArray(kayitlar) ? kayitlar : []).filter(function (r) {
       return r && r.tur === t && String(r.nodeId) === String(prop.nodeId) && r.compIdx === prop.compIdx && r.propIdx === prop.propIdx &&
-        String(r.matchName || "") === String(prop.matchName || "");
+        ayniKimlik(r, prop);
     });
   }
   // Klibin kaynak çapası (tarama satırından ya da kayıttan): { clipStart, clipEnd, clipIn, clipOut, ters } | null

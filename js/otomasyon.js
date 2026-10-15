@@ -87,7 +87,7 @@
       aciklama: "Save the editor captions as SRT, VTT or TXT into the Premiere project folder only (no path can be chosen). Returns the file name.",
       sema: { bicim: { tur: "metin", gerekli: true, enum: ["srt", "vtt", "txt"] } } },
     { ad: "suflo_sessizlik_analiz", sinif: "yaz", pro: "cut",
-      aciklama: "Analyze the selected clip for silences (Auto Cut). Returns the proposed cut ranges in sequence seconds; nothing is cut yet.",
+      aciklama: "Analyze for silences (Auto Cut) in the scope chosen in the panel: the selected clip, In to Out, or the whole sequence. Returns the proposed cut ranges in sequence seconds; nothing is cut yet.",
       sema: {
         esik_db: { tur: "sayi", min: -60, max: -20, aciklama: "Silence threshold in dB (default: panel value)." },
         min_sessizlik: { tur: "sayi", min: 0.3, max: 2.5, aciklama: "Minimum silence length in seconds." },
