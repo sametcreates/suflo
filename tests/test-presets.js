@@ -364,5 +364,12 @@ var bozukT = Q.P.cagir("KS_applyMotionPreset", { id: "fade-in", duration: .45, s
 var bozukU = Q.P.cagir("KS_applyMotionPreset", { id: "fade-in", duration: .45, strength: 1, egri: { tablo: hm.tablo.map(function (v, i) { return i === 5 ? "NaN" : v; }) } });
 ok("geçersiz eğri tablosu (kısa, NaN) reddedilir, hiçbir şey yazılmaz", !bozukT.ok && /Egri tablosu gecersiz/.test(bozukT.error) && !bozukU.ok, js([bozukT, bozukU]));
 
+// ease seçeneği gidiş dönüş: panelin gönderdiği ease kanonik, aynı ease aynı tabloyu verir; 'auto' / geçersiz → eğri yok (yük eskisi)
+var kodRT = E12.sfcKodla({ ad: "Benim", curve: E12.builtin("cift-yumusak").curve });
+ok("ease gidiş dönüş: hazır eğri, cubic-bezier (kanonik), SFC1 kodu; 'auto' ve geçersizde tablo yok", S12.hareketEgrisi("tasma").ease === "tasma" &&
+  S12.hareketEgrisi("cubic-bezier(0.3,0,0.2,1)").ease === "cubic-bezier(0.3, 0, 0.2, 1)" && S12.hareketEgrisi(S12.hareketEgrisi(kodRT).ease).ease === S12.hareketEgrisi(kodRT).ease &&
+  js(S12.hareketEgrisi(S12.hareketEgrisi(kodRT).ease).tablo) === js(S12.hareketEgrisi(kodRT).tablo) && S12.hareketEgrisi("auto") === null && S12.hareketEgrisi("") === null &&
+  S12.hareketEgrisi(undefined) === null && S12.hareketEgrisi("dalga") === null);
+
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);
