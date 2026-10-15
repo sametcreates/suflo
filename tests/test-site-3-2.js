@@ -76,8 +76,8 @@ articles.forEach(function (p) {
 });
 var checkoutBaseline = {
   "index.html": [
-    "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?checkout%5Bcustom%5D%5Bsource%5D=suflo_website&amp;checkout%5Bcustom%5D%5Bfeature%5D=pricing&amp;checkout%5Bcustom%5D%5Bapp_version%5D=3.3.0",
-    "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?checkout%5Bcustom%5D%5Bsource%5D=suflo_website&amp;checkout%5Bcustom%5D%5Bfeature%5D=footer&amp;checkout%5Bcustom%5D%5Bapp_version%5D=3.3.0"
+    "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?checkout%5Bcustom%5D%5Bsource%5D=suflo_website&amp;checkout%5Bcustom%5D%5Bfeature%5D=pricing&amp;checkout%5Bcustom%5D%5Bapp_version%5D=3.4.0",
+    "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?checkout%5Bcustom%5D%5Bsource%5D=suflo_website&amp;checkout%5Bcustom%5D%5Bfeature%5D=footer&amp;checkout%5Bcustom%5D%5Bapp_version%5D=3.4.0"
   ],
   "en/index.html": [
     "https://suflo.lemonsqueezy.com/checkout/buy/e33dda31-8e47-46c3-be1d-e047ab1b2dd1?checkout%5Bcustom%5D%5Bsource%5D=suflo_website_en&amp;checkout%5Bcustom%5D%5Bfeature%5D=pricing_en"
@@ -92,7 +92,8 @@ Object.keys(checkoutBaseline).forEach(function (p) {
 });
 var pricing = read("index.html").match(/<section id="fiyat"[\s\S]*?<\/section>/)[0];
 // 3.3.0: only app_version and two Pro list rows changed from main 43a6815 (Altyazı Efektleri row, YouTube indirici row)
-ok("TR pricing, VAT, no-refund text and social proof pinned (3.3.0)", crypto.createHash("sha256").update(pricing).digest("hex") === "7cb475f3c5161a14a2ba89e3578833cc8a7d008e3ee168369ee95b95c5d8054c");
+// 3.4.0: only app_version and one Pro list row (Eğri) changed from 3.3.0
+ok("TR pricing, VAT, no-refund text and social proof pinned (3.4.0)", crypto.createHash("sha256").update(pricing).digest("hex") === "ab6bdd1ad9a6c7b13f1a41adb76e1fbc4f86f6ef096df03574c4afe88b548a85");
 ok("TR pricing keeps 749 ₺ / 1.249 ₺, + KDV, no-refund, countdown and social proof",
   pricing.includes('<s>1.249 ₺</s><span class="b">749 ₺</span>') && pricing.includes('<span class="kdv">+ KDV</span>') &&
   pricing.includes("Dijital ürün olduğu için iade yapılmaz") && pricing.includes('id="erken-bitis"') && pricing.includes("<b>75+ içerik üreticisi</b>"));

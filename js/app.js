@@ -2147,19 +2147,21 @@ window.KApp = (function () {
   }
 
   /*
-   * "Suflo 3.3'te yeni": surum basina bir kez. Yeni ozellikler sekmelerin
-   * derinliginde (Hiz Rampasi sol menude, cozme modu Ayarlar'da);
+   * "Suflo 3.4'te yeni": surum basina bir kez. Yeni ozellikler sekmelerin
+   * derinliginde (Egri sol menude, Ozel egri Hiz Rampasi kartlarinda);
    * gosterilmezse kullanici guncellemenin ne getirdigini hic gormeden gecer.
-   * 3.1'den yukselten kullanicida yeniliklerGoruldu "3.1" oldugundan pencere bir kez acilir.
+   * Eski surumden yukselten kullanicida yeniliklerGoruldu eski surum oldugundan pencere bir kez acilir.
+   * eylem: "aracAra" sekme yerine Arac ara paletini acar (KApp.aracAra).
    */
   var YENILIKLER = {
-    surum: "3.3",
-    alt: "Altyazı Efektleri ve YouTube indirici",
+    surum: "3.4",
+    alt: "Eğri, canlı sessizlik kesimi ve Araç ara",
     maddeler: [
-      { ikon: "✦", baslik: "Altyazı Efektleri", metin: "Altı hazır görünüm, giriş ve vurgu animasyonu; önizlemek ücretsiz, eklemek Pro.", sekme: "captions", hedef: "cap-efekt" },
-      { ikon: "◎", baslik: "Gölge, kutu ve konum", metin: "Gölge, arka plan kutusu; yazıyı önizlemede sürükleyerek yerleştir.", sekme: "captions", hedef: "cap-sahne" },
-      { ikon: "Aa", baslik: "Yeni yazı tipleri", metin: "7 yeni font: 13 yazı tipi dört kategoride.", sekme: "captions", hedef: "cap-font" },
-      { ikon: "▼", baslik: "YouTube İndir", metin: "MP3, 720p, 1080p ya da 4K; dosya projene gelir (Pro).", sekme: "youtube", hedef: "yt-url" }
+      { ikon: "~", baslik: "Eğri", metin: "Kendi anahtar karelerine hazır ya da çizdiğin eğri; düzenlemek ücretsiz, uygulamak Pro.", sekme: "egri", hedef: "egri-editor" },
+      { ikon: "∿", baslik: "Varışta yaylan", metin: "Hareket inişte hedefi biraz aşar, salınıp oturur (Pro).", sekme: "egri", hedef: "egri-yaylan" },
+      { ikon: "✂", baslik: "Canlı eşikli kesim", metin: "Kaydırıcılar kesimleri anında günceller; sekans ya da In → Out, müzik bölünmez (Pro).", sekme: "cut", hedef: "cut-scope" },
+      { ikon: "»", baslik: "Özel hız eğrisi", metin: "Hız Rampası'nda kendi hız eğrini çiz (Pro).", sekme: "hiz", hedef: "hiz-grid" },
+      { ikon: "⌘", baslik: "Araç ara", metin: "Ctrl+K (⌘K) ile her araca ve eyleme saniyede ulaş.", eylem: "aracAra" }
     ]
   };
 
@@ -2193,6 +2195,7 @@ window.KApp = (function () {
       satir.appendChild(ik); satir.appendChild(yazi); satir.appendChild(git);
       satir.addEventListener("click", function () {
         kapat();
+        if (m.eylem === "aracAra") { aramaAc(); return; }
         goster(m.sekme);
         if (m.acilir && el(m.acilir)) { el(m.acilir).open = true; }
         var odak = el(m.hedef || m.acilir);

@@ -6,7 +6,7 @@ Türkçe ve Azerice dahil 99 dil — abonelik yok, kredi yok, hesap yok.
 
 > Premiere'in yerleşik altyazısı Türkçe konuşmayı yazıya dökemiyor. Suflo döküyor, üstelik bilgisayarında çalışan yapay zekâyla.
 
-**Sürüm 3.3.0:** Suflo Stilleri galerisinin yerine **Altyazı Efektleri** oluşturucusu (6 hazır görünüm, giriş ve vurgu animasyonu, gölge, arka plan kutusu, önizlemede sürükleyerek konum), 7 yeni yazı tipi (13 font, 4 kategori), **YouTube indirici** (Pro) ve isteğe bağlı Premiere yerel çıktı (Pro, Beta); Hız Rampası, lisans, vekil, macOS ffmpeg ve yerel motor düzeltmeleri. Önceki sürüm 3.2.0: Hız Rampası (Pro), canlı transkripsiyon ve İptal, 2 satır × 42 düzen, ölçülmüş kelime zamanları. Ayrıntılar: [sürüm notları](marketing/release-notes.md).
+**Sürüm 3.4.0:** **Eğri** sekmesi (kendi anahtar karelerine özel eğri ve varışta yaylanma; düzenlemek ücretsiz, uygulamak Pro), Geçiş / Zoom / Hareket önayarlarında ve Hız Rampası'nda özel eğri (Pro), eğri paylaşım kodları, canlı eşikli ve sekans / In-Out kapsamlı Otomatik Kesim (Pro), kesimden sonra altyazıyı yeni kurguya uyarlama, Suflo'nun anahtar karelerini güvenle kaldırma, **Araç ara** (Ctrl+K / ⌘K), çevrimdışı model içe aktarma ve kurumsal ağ dayanıklılığı, deneysel **Yapay zekâ köprüsü (MCP)** (varsayılan kapalı, açmak Pro). Önceki sürüm 3.3.0: Altyazı Efektleri oluşturucusu, 7 yeni yazı tipi, YouTube indirici (Pro) ve isteğe bağlı Premiere yerel çıktı (Pro, Beta). Ayrıntılar: [sürüm notları](marketing/release-notes.md).
 
 ## Özellikler
 

@@ -19,25 +19,30 @@ ok("başlık alt yazısı tanımlı", !!Y && typeof Y.alt === "string" && Y.alt.
 var sekmeler = {};
 html.replace(/data-tab="([^"]+)"/g, function (_, t) { sekmeler[t] = 1; });
 (Y ? Y.maddeler : []).forEach(function (m) {
+  // eylem: "aracAra" maddesi sekme yerine Araç ara paletini açar (js/app.js aramaAc)
+  if (m.eylem) { ok("madde '" + m.baslik + "': eylem tanımlı", m.eylem === "aracAra" && /function aramaAc\(/.test(app) && /if \(m\.eylem === "aracAra"\) \{ aramaAc\(\); return; \}/.test(app), m.eylem); return; }
   ok("madde '" + m.baslik + "': sekme var", !!sekmeler[m.sekme], m.sekme);
   var id = m.hedef || m.acilir;
   if (id) ok("madde '" + m.baslik + "': hedef öğe index.html'de", html.indexOf('id="' + id + '"') !== -1, id);
 });
-var hedefler = (Y ? Y.maddeler : []).map(function (m) { return m.sekme + ":" + (m.hedef || m.acilir || ""); }).join(" ");
-["captions:cap-efekt", "captions:cap-font", "youtube:yt-url"].forEach(function (h) {
-  ok("v3.3 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
+var hedefler = (Y ? Y.maddeler : []).map(function (m) { return (m.eylem ? "eylem:" + m.eylem : m.sekme + ":" + (m.hedef || m.acilir || "")); }).join(" ");
+["egri:egri-editor", "egri:egri-yaylan", "cut:cut-scope", "hiz:hiz-grid", "eylem:aracAra"].forEach(function (h) {
+  ok("v3.4 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
 });
-// Premiere yerel çıktı Beta (gerçek Premiere'de denenmedi): Yenilikler penceresinde öne çıkarılmaz
-ok("Beta Premiere yerel çıktı Yenilikler'de duyurulmuyor", !/yerel|render/i.test(JSON.stringify(Y ? Y.maddeler : [])) && hedefler.indexOf("cap-efekt-cikti") === -1);
+// Yapay zekâ köprüsü (MCP) Deneysel ve varsayılan kapalı: Yenilikler penceresinde öne çıkarılmaz
+ok("Deneysel yapay zekâ köprüsü Yenilikler'de duyurulmuyor", !/MCP|köprü/i.test(JSON.stringify(Y ? Y.maddeler : [])));
 
 // Pro kapılı araçlar pencerede (Pro) işaretli: işaretsiz madde ücretsiz gibi okunur, Uygula'da upsell çıkar
-["YouTube İndir"].forEach(function (b) {
+["Varışta yaylan", "Canlı eşikli kesim", "Özel hız eğrisi"].forEach(function (b) {
   var m = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === b; })[0];
   ok("madde '" + b + "' (Pro) işaretli", !!m && /\(Pro\)\.?$/.test(m.metin), m && m.metin);
 });
-// Altyazı Efektleri: önizleme ücretsiz, timeline'a eklemek Pro (3 deneme) — madde bunu söyler
-var mAE = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Altyazı Efektleri"; })[0];
-ok("madde 'Altyazı Efektleri' eklemenin Pro olduğunu söyler", !!mAE && /eklemek Pro/.test(mAE.metin), mAE && mAE.metin);
+// Eğri: düzenlemek ücretsiz, anahtar karelere uygulamak Pro (3 deneme) — madde bunu söyler
+var mEg = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Eğri"; })[0];
+ok("madde 'Eğri' uygulamanın Pro olduğunu söyler", !!mEg && /düzenlemek ücretsiz, uygulamak Pro/.test(mEg.metin), mEg && mEg.metin);
+// Araç ara ücretsiz: (Pro) işareti yok
+var mAA = (Y ? Y.maddeler : []).filter(function (x) { return x.baslik === "Araç ara"; })[0];
+ok("madde 'Araç ara' ücretsiz (Pro işareti yok)", !!mAA && !/Pro/.test(mAA.metin), mAA && mAA.metin);
 
 // İngilizce karşılıklar
 var EN = require(path.join(KOK, "i18n", "en.js"));

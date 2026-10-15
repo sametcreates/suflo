@@ -808,6 +808,14 @@
     "Yeni yazı tipleri": "New fonts",
     "7 yeni font: 13 yazı tipi dört kategoride.": "7 new fonts: 13 typefaces in four categories.",
     "MP3, 720p, 1080p ya da 4K; dosya projene gelir (Pro).": "MP3, 720p, 1080p or 4K; the file lands in your project (Pro).",
+    // 3.4 "What's new" (titles "Eğri", "Varışta yaylan", "Özel hız eğrisi", "Araç ara" are translated with their tools)
+    "Eğri, canlı sessizlik kesimi ve Araç ara": "Easing, live silence cut and Search tools",
+    "Kendi anahtar karelerine hazır ya da çizdiğin eğri; düzenlemek ücretsiz, uygulamak Pro.": "A preset or hand-drawn curve on your own keyframes; editing is free, applying is Pro.",
+    "Hareket inişte hedefi biraz aşar, salınıp oturur (Pro).": "Motion overshoots its landing a little, then settles (Pro).",
+    "Canlı eşikli kesim": "Live-threshold cut",
+    "Kaydırıcılar kesimleri anında günceller; sekans ya da In → Out, müzik bölünmez (Pro).": "Sliders update the cuts instantly; cut a sequence or In → Out without splitting the music (Pro).",
+    "Hız Rampası'nda kendi hız eğrini çiz (Pro).": "Draw your own speed curve in Speed Ramp (Pro).",
+    "Ctrl+K (⌘K) ile her araca ve eyleme saniyede ulaş.": "Reach any tool or action in seconds with Ctrl+K (⌘K).",
     "Göster →": "Show →",
     "Başlayalım": "Let's go"
   });
