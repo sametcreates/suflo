@@ -2392,6 +2392,7 @@
               <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
               <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
+              <li>Yapay zekâ köprüsü (MCP, deneysel; deneme hakkı yok)</li>
               <li>MOGRT, SFX, preset ve Motion BG kütüphaneleri</li>
               <li>Ömür boyu güncelleme</li>
             </ul>
@@ -2480,6 +2481,45 @@
       </details>
       <div id="davet-durum" class="inline-status"></div>
       <p class="hint"><a href="#" id="davet-ortaklik">İçerik üreticisi misin? Ortaklık programı →</a></p>
+    </div>
+
+    <!-- Yapay zekâ köprüsü (MCP, 3.4, Deneysel, varsayılan kapalı): js/otomasyon*.js, mcp/suflo-mcp.js -->
+    <div class="set-group mcp-kart" id="grp-mcp">
+      <div class="set-title">Yapay zekâ köprüsü (MCP) <span class="mcp-deneysel">Deneysel</span> <span class="pro-inline">PRO</span> <span class="mcp-acik-rozet" id="mcp-acik-rozet" hidden>AÇIK</span></div>
+      <p class="hint">Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.</p>
+      <div class="row-btns">
+        <button id="mcp-ac" class="btn primary" type="button">Köprüyü aç</button>
+        <button id="mcp-jeton" class="btn" type="button" disabled title="Eski jeton anında geçersiz olur">Yeni jeton</button>
+      </div>
+      <p class="hint mcp-not">Açmak Pro gerektirir; köprü için deneme hakkı yok. Pro araçlarını çağıran eylemler ayrıca o aracın kendi kapısından geçer.</p>
+      <label class="chk"><input type="checkbox" id="mcp-duzenleme"> Düzenlemeye izin ver</label>
+      <p class="hint mcp-not">Kapalıyken asistan yalnız okur (bağlam, izler, altyazı). Açıkken marker, altyazı ve kesim gibi değişiklikler yapabilir.</p>
+      <label class="chk"><input type="checkbox" id="mcp-onay" checked> Yıkıcı eylemlerde onay iste</label>
+      <div id="mcp-durum" class="inline-status"></div>
+      <div class="mcp-onay-kart" id="mcp-onay-kart" hidden role="alertdialog" aria-labelledby="mcp-onay-baslik">
+        <b id="mcp-onay-baslik">Yapay zekâ asistanı bunu yapmak istiyor</b>
+        <p id="mcp-onay-ozet"></p>
+        <div class="row-btns">
+          <button id="mcp-onayla" class="btn primary" type="button">Onayla</button>
+          <button id="mcp-reddet" class="btn" type="button">Reddet</button>
+          <span class="dim" id="mcp-onay-sure"></span>
+        </div>
+      </div>
+      <details class="adv">
+        <summary>Claude'a bağla</summary>
+        <p class="hint" style="margin:6px 0">Claude Desktop: Ayarlar → Geliştirici → Yapılandırmayı düzenle, kopyalanan satırları ekle. Claude Code: komutu terminale yapıştır.</p>
+        <div class="row-btns">
+          <button id="mcp-kopyala-desktop" class="btn" type="button">Claude Desktop ayarını kopyala</button>
+          <button id="mcp-kopyala-code" class="btn" type="button">Claude Code komutunu kopyala</button>
+          <button id="mcp-node-denetle" class="btn tiny" type="button">Node'u denetle</button>
+        </div>
+        <p class="hint" id="mcp-node"></p>
+      </details>
+      <details class="adv">
+        <summary>Etkinlik (son 50 çağrı)</summary>
+        <ul id="mcp-etkinlik" class="mcp-etkinlik"></ul>
+      </details>
+      <p class="hint"><a href="#" id="mcp-guvenlik-link">Güvenlik modeli →</a></p>
     </div>
 
     <div class="set-group">
@@ -2618,6 +2658,9 @@
   <script src="js/onboarding-steps.js"></script>
   <script src="js/onboarding.js"></script>
   <script src="js/davet.js"></script>
+  <script src="js/otomasyon.js"></script>
+  <script src="js/otomasyon-sunucu.js"></script>
+  <script src="js/otomasyon-panel.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

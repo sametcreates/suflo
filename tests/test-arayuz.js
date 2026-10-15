@@ -651,7 +651,7 @@ var bekleyenUI = y1.api.yerelCalistir("whisper-cli", ["-f", "a.wav"], outBaseC, 
 });
 var mcSrc = fs.readFileSync(KOKYOL + "js/magiccut.js", "utf8");
 ok("Otomatik Kesim: ffmpeg analizi jetonla, iptal 'İptal edildi.' uyarısı, #cut-cancel 'Sessizlikleri bul'un yerini alır",
-  /iptal: jeton \}\);/.test(mcSrc) && /if \(res\.iptal\) \{ status\("İptal edildi\.", "warn"\); return; \}/.test(mcSrc) &&
+  /iptal: jeton \}\);/.test(mcSrc) && /if \(res\.iptal\) \{ status\("İptal edildi\.", "warn"\); return \{ sonuc: "iptal" \}; \}/.test(mcSrc) &&
   /el\("cut-analyze"\)\.hidden = b;/.test(mcSrc) && /el\("cut-cancel"\)\.addEventListener\("click", iptalEt\)/.test(mcSrc) &&
   html.indexOf('id="cut-cancel"') > html.indexOf('id="cut-analyze"') && /id="cut-cancel"[^>]* hidden/.test(html));
 var kur = fnGovde(appSrc, "async function installLocalWhisper(");

@@ -5,7 +5,8 @@
  * dener. Haklar süresiz; hak yalnız işlem BAŞARIYLA bitince düşer (pro.js kurar,
  * çağıran modül başarı dalında harcar). İçerik kütüphaneleri (MOGRT, SFX, Motion BG,
  * preset, Pro paketi, altyazı MOGRT stilleri), toplu klip, stilli ASS dışa aktarma,
- * Shorts paketi ve çoklu kamera listede YOK: onların hakkı her zaman 0.
+ * Shorts paketi, çoklu kamera ve yapay zekâ köprüsünü (MCP) açmak listede YOK: onların hakkı
+ * her zaman 0 (köprünün eylemleri ise kendi araçlarının haklarını kullanır).
  *
  * Durum: { v: 1, kullanilan: { cut: 1, zoom: 3, … } } — harcanan hak sayısı tutulur,
  * böylece iki depo (dosya + localStorage) birleşirken büyük olan kazanır ve bir deponun

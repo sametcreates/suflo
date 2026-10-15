@@ -20,9 +20,9 @@ function govde(src, imza) {
 // [dosya, işlev imzası, özellik, başarı denetimi (harcamadan ÖNCE gelmeli), harcama bekleniyor mu]
 var SITELER = [
   ["js/magiccut.js", "async function analyze(ev)", "cut", null, false],
-  ["js/magiccut.js", "async function apply()", "cut", "if (r.ok) {", true],
+  ["js/magiccut.js", "async function apply(ek)", "cut", "if (r.ok) {", true],
   ["js/konusma-kes.js", "async function analyze(zorla)", "textcut", null, false],
-  ["js/konusma-kes.js", "async function apply()", "textcut", "if (res.ok) {", true],
+  ["js/konusma-kes.js", "async function apply(ek)", "textcut", "if (res.ok) {", true],
   ["js/viral.js", "async function bul()", "highlights", "if (!bulunan.length) throw", true],
   ["js/ses.js", "async function iyilestir()", "audioclean", "if (!sonuclar.length) throw", true],
   ["js/kanca.js", "async function ekle(ek)", "overlay", "if (!yer.ok) throw", true],
@@ -79,6 +79,12 @@ jsDosyalari.forEach(function (f) {
   });
 });
 ok("tarama deneme kapılarını buluyor (18 kapı: 17 araç + rehberin stil adımı)", denemeli.length === 18, denemeli.join(" | "));
+// 3.4 Yapay zekâ köprüsü (MCP): kurucu kademesi "köprüyü açmak Pro gerektirir" (deneme hakkı yok; Shorts Paketi /
+// Podcast Modu gibi). İnceleme bulgusu: açılış Pro.gate("mcp", { deneme: true }) ile 3 deneme oturumu veriyordu.
+var kopruAc = govde(oku("js/otomasyon-panel.js"), "async function ac(ev)");
+ok("köprüyü açmak denemesiz Pro kapısı; hak harcanmaz, deneme oturumu yok",
+  /Pro\.gate\("mcp"\)\) return;/.test(kopruAc) && !/deneme/.test(kopruAc.replace(/\/\/[^\n]*/g, "")) && oku("js/otomasyon-panel.js").indexOf('denemeHarca("mcp"') === -1 &&
+  !/DENEME_OTURUMU|sure: /.test(oku("js/otomasyon-panel.js")), kopruAc.slice(0, 400));
 // Rehberin "Timeline'a koy"u Altyazı sekmesindeki "… ile ekle" ile aynı stilli katman denemesini sunar;
 // MOGRT stili seçiliyse denemesiz kütüphane penceresi (inceleme bulgusu: Suflo Stili için de captionStyles açılıyordu)
 var koy = govde(oku("js/onboarding.js"), "function stilKoyTikla()");
@@ -110,7 +116,7 @@ ok("captions.js: filigran yalnız overlayUygula içinde, filigranGerekli'ye bağ
 var kancaEkle = govde(oku("js/kanca.js"), "async function ekle(ek)");
 ok("kanca.js: filigran yalnız ekle'de (önizleme temiz)", /SufloFiligran\.ekle\(/.test(kancaEkle) && /Pro\.filigranGerekli\(\)/.test(kancaEkle) && !/SufloFiligran/.test(govde(oku("js/kanca.js"), "async function onizle()")));
 ok("deneme çıktısı kaydı: temiz ASS saklanır (stilli katman + kanca)", /assTemiz: assTemiz/.test(ou) && /denemeKaydet\(K, Pro,/.test(ou) && /assTemiz: built\.ass/.test(kancaEkle) && /denemeKaydet\(K, Pro,/.test(kancaEkle));
-["exportFile", "async function apply(stilIle)"].forEach(function (imza) {
+["exportFile", "async function apply(stilIle, secenek)"].forEach(function (imza) {
   var g = govde(cap, imza);
   ok("filigran " + imza + " yolunda yok (SRT/VTT/caption izi temiz)", !g || !/SufloFiligran/.test(g));
 });

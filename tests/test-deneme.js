@@ -5,8 +5,9 @@ var gecen = 0, toplam = 0;
 function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 300) + "]" : "")); }
 
 // 3.2 adım 5: çevrimdışı İngilizce çeviri (offlineTranslate) 11. araç; 3.3: YouTube indirici (youtube) 12. araç
+// 3.4 yapay zekâ köprüsü (mcp): açmak yalnız Pro (kurucu kademesi), deneme listesinde YOK
 var LISTE = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube"];
-var KILITLI = ["mogrt", "sfx", "motionbg", "presets", "propack", "captionStyles", "batch", "assexport", "shortsPaket", "multicam", "glossary", "pro", "", "__proto__", "toString"];
+var KILITLI = ["mcp", "mogrt", "sfx", "motionbg", "presets", "propack", "captionStyles", "batch", "assexport", "shortsPaket", "multicam", "glossary", "pro", "", "__proto__", "toString"];
 
 /* ---------------- temel ---------------- */
 ok("HAK = 3, 12 özellik (spec sırası)", D.HAK === 3 && JSON.stringify(D.OZELLIKLER) === JSON.stringify(LISTE), JSON.stringify(D.OZELLIKLER));

@@ -28,6 +28,13 @@ fs.readdirSync(dizin).filter(function (f) { return /\.js$/.test(f) && f !== "CSI
   });
   ok("js/" + f + ": Chromium 74 / Node 12 uyumlu", bulgular.length === 0, bulgular.slice(0, 4).join(" | "));
 });
+// 3.4 Yapay zekâ köprüsü: panel sunucusu ve kaydı (js/otomasyon*.js) yukarıdaki taramada; stdio shim'i
+// (mcp/suflo-mcp.js) Premiere'de değil, kullanıcının Node 18+'inde çalışır: CEF taramasından bilerek hariç
+ok("MCP panel kodu taranan js/ içinde, shim js/ dışında", ["otomasyon.js", "otomasyon-sunucu.js", "otomasyon-panel.js"].every(function (f) { return fs.existsSync(path.join(dizin, f)); }) &&
+  !fs.existsSync(path.join(dizin, "suflo-mcp.js")) && fs.existsSync(path.join(__dirname, "..", "mcp", "suflo-mcp.js")));
+var sunucuSrc = ayikla(fs.readFileSync(path.join(dizin, "otomasyon-sunucu.js"), "utf8"));
+ok("MCP sunucusu Node 12.3'te olan API'lerle: timingSafeEqual, randomBytes, Buffer.from; async/await yok", /timingSafeEqual/.test(sunucuSrc) && /randomBytes\(32\)/.test(sunucuSrc) &&
+  !/\basync\b|\bawait\b|\bclass\b|=>/.test(sunucuSrc) && !/\b(let|const)\s/.test(sunucuSrc));
 // Node 14+ fs API'leri yalniz yedekli kullanilir (ornegin fs.rmSync -> rmrf yedegi)
 var yedeksiz = [];
 fs.readdirSync(dizin).filter(function (f) { return /\.js$/.test(f); }).forEach(function (f) {

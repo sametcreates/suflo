@@ -119,6 +119,10 @@ function validate() { return new Promise(function (resolve) { ctx.Pro.validate(r
     P.gate("cut", { deneme: true, silent: true }) === true && P.gate("cut", { silent: true }) === false &&
     P.gate("zoom", { deneme: true, silent: true }) === false && P.gate("textcut", { deneme: true, silent: true }) === false);
   ok("deneme: filigran gerekli (Pro degil)", P.filigranGerekli() === true);
+  // 3.4 Yapay zekâ köprüsü: etkileşimsiz kapı upsell göstermez, hak kurmaz ya da harcamaz
+  var iv = P.izinVar("zoom"), ivYok = P.izinVar("mogrt");
+  ok("izinVar: hak varken {ok:true, deneme:true}, listede olmayan özellikte {ok:false}; kurulum ve harcama yok",
+    iv.ok === true && iv.deneme === true && iv.kalan === 3 && ivYok.ok === false && !P.denemeAcik("zoom") && !fs.existsSync(DF), JSON.stringify([iv, ivYok]));
   var bildirilen = [];
   var kalanCut = P.denemeHarca("cut", function (m, t) { bildirilen.push([m, t]); });
   ok("deneme: denemeHarca 2 doner ve bildirir", kalanCut === 2 && bildirilen.length === 1 && bildirilen[0][0] === "1 deneme hakkı kullanıldı · 2 kaldı" && bildirilen[0][1] === "good", JSON.stringify(bildirilen));

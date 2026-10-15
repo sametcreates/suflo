@@ -26,6 +26,7 @@
  *                                opts.deneme: true -> kurulmus deneme hakkiyla gecer (SENKRON kalir)
  *                                opts.yeniden: fn  -> "Ucretsiz dene"den sonra ayni eylemi yeniden calistirir
  *                                opts.silent: true -> upsell gosterme
+ *   Pro.izinVar(feature)      -> upsell gostermeden {ok, deneme}: MCP koprusu (pro_gerekli) icin
  *   Pro.denemeHarca(f, bildir)-> yalniz BASARI dalinda: kurulmus hakki harcar, kalan sayiyi doner (-1 = yok)
  *   Pro.denemeAcik(f)         -> bu ozellikte deneme kurulu mu (Pro degilken)
  *   Pro.denemeBaslat(f)       -> denemeyi kurar (listede olmayan / hakki biten ozellikte false)
@@ -95,6 +96,7 @@
     speedramp: 'Hız rampası: tek tıkla ağır çekim ve hızlanma',
     offlineTranslate: 'Çevrimdışı İngilizce çeviri: internetsiz, yerel motorla',
     youtube:   'YouTube indirici: MP3 ve 720p / 1080p / 4K, projeye otomatik',
+    mcp:       'Yapay zekâ köprüsü (MCP, deneysel): Claude gibi bir asistan Suflo işlerini senin yerine yapar',
     batch:     'Toplu (coklu klip) transkripsiyon',
     translate: 'Altyazi cevirisi',
     assexport: 'Stilli ASS disa aktarma',
@@ -593,6 +595,17 @@
     return false;
   }
 
+  // Etkileşimsiz kapı (Yapay zekâ köprüsü / MCP): upsell GÖSTERMEZ. Pro ise { ok:true, deneme:false };
+  // ücretsizde deneme hakkı kaldıysa { ok:true, deneme:true, kalan } (çağıran denemeBaslat ile kurar,
+  // hak yalnız başarıda denemeHarca ile düşer); yoksa { ok:false }.
+  function izinVar(feature) {
+    if (isPro()) return { ok: true, deneme: false };
+    var Dm = DM();
+    if (!Dm || !Dm.listede(feature)) return { ok: false, deneme: false };
+    var k = denemeKalan(feature);
+    return k > 0 ? { ok: true, deneme: true, kalan: k } : { ok: false, deneme: false };
+  }
+
   function onUpgrade(fn) { _onUpgrade = fn; }
 
   // Fiyat kutusu tek kaynaktan (js/pricing.js); her zaman Türkçe yazılır, İngilizce arayüzde
@@ -853,6 +866,7 @@
     validate: validate,
     deactivate: deactivate,
     gate: gate,
+    izinVar: izinVar,
     markLocked: markLocked,
     status: status,
     contentCredentials: contentCredentials,

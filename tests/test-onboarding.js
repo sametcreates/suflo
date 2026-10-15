@@ -277,7 +277,7 @@ ok("ornekYukle: örnek bayrağı, Kurtar teklifi gizlenmez", /ornekBelge = true;
 ok("go(ornek): Kurtar teklifi yalnız gerçek transkriptte gizlenir", /ornekBelge = !!ornek;\s*\n\s*if \(!ornek\) hideRestore\(\);/.test(goGovde));
 ok("geri al/yinele örnek bayrağını taşır", /shorts: shortsYuklenen, ornek: ornekBelge/.test(capSrc) && /if \(typeof st\.ornek === "boolean"\) ornekBelge = st\.ornek;/.test(capSrc));
 ok("gerçek belge yükleyen yollar bayrağı indirir (kurtarma, SRT, Shorts)", (capSrc.match(/ornekBelge = false;/g) || []).length >= 3);
-var uygulaGovde = capSrc.slice(capSrc.indexOf("async function apply(stilIle)"), capSrc.indexOf("async function apply(stilIle)") + 4000);
+var uygulaGovde = capSrc.slice(capSrc.indexOf("async function apply(stilIle, secenek)"), capSrc.indexOf("async function apply(stilIle, secenek)") + 4000);
 ok("örnek altyazı yalnız kendi sekansına uygulanır", /if \(ornekBelge && ornekSekansId && KApp\.ctx\(\)\.sequenceId && String\(KApp\.ctx\(\)\.sequenceId\) !== ornekSekansId\)/.test(uygulaGovde));
 ok("uygulanan örnek kullanıcının taslağını silmez", /if \(!shortsYuklenen && !ornekBelge\) K\.clearDraft\(\);/.test(capSrc));
 var stilGeriGovde = capSrc.slice(capSrc.indexOf("function stilYedeginiYukle("), capSrc.indexOf("function stilDene("));

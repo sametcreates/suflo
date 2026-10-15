@@ -16,7 +16,7 @@ echo "  PlayerDebugMode acildi (CSXS 9-14)"
 # 2) Dosyalari kopyala
 rm -rf "$DEST"
 mkdir -p "$DEST"
-for item in CSXS css js i18n jsx fonts emoji assets index.html LICENSE THIRD_PARTY_NOTICES.md .debug; do
+for item in CSXS css js i18n jsx fonts emoji assets mcp index.html LICENSE THIRD_PARTY_NOTICES.md .debug; do
   [ -e "$SRC/$item" ] && cp -R "$SRC/$item" "$DEST/"
 done
 echo "  Kopyalandi: $DEST"

@@ -3060,6 +3060,8 @@ window.KCaptions = (function () {
     // gelen tık yeni iş açmasın (yeni iş ses dışa aktarımında İptal'i kilitler). Rehberin { ornek } çağrısı geçer.
     if (K.baslatTikiGecerli && !K.baslatTikiGecerli(opts, baslatAcilis)) return false;
     var ornek = (opts && opts.ornek && opts.ornek.wav) ? opts.ornek : null;
+    // Yapay zekâ köprüsü (mcpOlustur): { mcp: {} } — köprü upsell AÇMAZ; nedenini buraya yazar
+    var mcpBilgi = (!ornek && opts && opts.mcp && typeof opts.mcp === "object") ? opts.mcp : null;
     var ctx = KApp.ctx();
     var clip = ctx.sel;
     if (!ornek && scope === "clip" && !clip) { status("Önce timeline'da bir klip seç.", "warn"); return false; }
@@ -3072,6 +3074,17 @@ window.KCaptions = (function () {
     if (cevirEn) {
       var ceviriEngeli = cevrimdisiCeviriEngeli();
       if (ceviriEngeli) { status(ceviriEngeli, "warn"); KApp.toast(ceviriEngeli, "warn", 8000); return false; }
+      // Köprü: etkileşimsiz kapı. Hak varsa deneme kurulur (aşağıdaki kapı upsell'siz geçer, hak yalnız
+      // başarıda düşer); yoksa iş başlamaz ve köprü pro_gerekli döner
+      if (mcpBilgi && typeof Pro !== "undefined" && Pro.izinVar) {
+        var cevirIzni = Pro.izinVar("offlineTranslate");
+        if (!cevirIzni.ok) {
+          mcpBilgi.hata = "pro_gerekli";
+          mcpBilgi.mesaj = "Offline English translation is selected in the Captions tab and needs Suflo Pro (no free trial credits left). Turn it off in the panel or upgrade.";
+          return false;
+        }
+        if (cevirIzni.deneme && Pro.denemeBaslat) Pro.denemeBaslat("offlineTranslate");
+      }
       if (typeof Pro !== "undefined" && !Pro.gate("offlineTranslate", { deneme: true, yeniden: function () { go(); } })) return false;
     }
     var dtwIste = !ornek && dtwSecili();
@@ -3082,6 +3095,9 @@ window.KCaptions = (function () {
     aktifIptal = K.iptalJetonu ? K.iptalJetonu() : null;
     canliBaslat();
     setBusy(true);
+    // Köprü: iş artık gerçekten başladı (bu noktadan önceki her dönüş bir ret: pro_gerekli, klip yok…);
+    // köprü iş kimliğini ancak şimdi verir
+    if (mcpBilgi && typeof mcpBilgi.basladi === "function") { try { mcpBilgi.basladi(); } catch (eB) {} }
     /*
      * Ekranda duzenlenmis is varken yeni transkript uretmek TEK korumasiz
      * yikici yoldu: undo yigini temizlenip taslak da eziliyordu. importSrt
@@ -3142,7 +3158,9 @@ window.KCaptions = (function () {
         iptalDenetle();
         if (sc.ok && sc.clips && sc.clips.length > 1) {
           if (typeof Pro !== "undefined" && !Pro.isPro()) {                   // Pro: toplu klip
-            Pro.gate("batch");
+            // köprü upsell açmaz: yalnız ilk klip, sonuçta söylenir
+            if (mcpBilgi) mcpBilgi.topluAtlandi = sc.clips.length - 1;
+            else Pro.gate("batch");
             clip = sc.clips[0];                               // ilk kliple devam et
           } else {
             batchClips = sc.clips;
@@ -6154,22 +6172,44 @@ window.KCaptions = (function () {
     }
   }
 
-  async function apply(stilIle) {
-    if (segments.length === 0) return;
+  /*
+   * Sonuç (Yapay zekâ köprüsü / MCP kullanır; düğmeler yok sayar), normal altyazı izi yolunda her dalda:
+   *   { ok:true, captionTrack:true } | { ok:false, kod, mesaj, captionTrack? }
+   *   kod: altyazi_yok | ornek_sekans | kalite_onayi | onay_gerekli | iz_olusmadi | uygulanamadi
+   * Stilli yollar (Altyazı Efektleri katmanı / MOGRT) kendi arayüzlerinde bildirir: { stil: true }.
+   * secenek.mcp: köprüden gelen çağrı. İki tıklık korumalar ("Yine de yeni iz ekle", "N kritik sorunla
+   * yine de uygula") köprü adına KURULMAZ ve GEÇİLMEZ: ikinci tık yalnız panelde kullanıcıdan gelir.
+   */
+  async function apply(stilIle, secenek) {
+    var mcp = !!(secenek && secenek.mcp);
+    if (segments.length === 0) return { ok: false, kod: "altyazi_yok", mesaj: "There are no captions in the Suflo editor." };
     stilIle = stilIle === true;
     // Rehberin örnek altyazısı yalnız kendi "Suflo Deneme" sekansına: başka sekans açıksa uygulama
     if (ornekBelge && ornekSekansId && KApp.ctx().sequenceId && String(KApp.ctx().sequenceId) !== ornekSekansId) {
       KApp.toast("Bu örnek altyazı Suflo Deneme sekansı için. Önce o sekansı aç, sonra uygula.", "warn", 8000);
-      return;
+      return { ok: false, kod: "ornek_sekans", mesaj: "These are the onboarding sample captions: they only go on the 'Suflo Deneme' sequence. Open that sequence first." };
     }
     if (stilIle && !secilenMogrt && !secilenMotorStili) {
       KApp.toast("Önce Altyazı Efektleri'nden bir görünüm seç ya da bir Premiere şablonu seç.", "warn");
-      return;
+      return { stil: true };
     }
     var rapor = qualityReport();
     var kritik = Number(rapor.bad) || 0;
     var sekans = (KApp.ctx().sequenceId || KApp.ctx().sequence || "") || "?";
     var kaliteAnahtari = stilIle ? "style" : "normal";
+    var kaliteMesaj = kritik + " critical caption issue(s): the red lines in the Suflo editor. Fix them first; applying anyway is only possible from the Suflo panel.";
+    var yeniIzMesaj = "Captions were already applied to this sequence: Premiere would add a SECOND caption track. Only the user can confirm that in the Suflo panel.";
+    if (mcp && !stilIle && (kritik > 0 || uygulananSekans[sekans])) {
+      // Köprü: panelin aynı uyarısı gösterilir, düğmeler "yine de" durumuna KURULMAZ
+      var mUyari = kritik > 0
+        ? kritik + " kritik altyazı sorunu var. Önce kırmızı satırları kontrol et veya Nizami düzelt'i kullan."
+        : "";
+      if (uygulananSekans[sekans]) {
+        mUyari += (mUyari ? " " : "") + "Bu sekansa zaten altyazı uygulandı; devam etmek yeni bir altyazı izi ekler.";
+      }
+      KApp.toast(mUyari, "warn", 9000);
+      return kritik > 0 ? { ok: false, kod: "kalite_onayi", mesaj: kaliteMesaj } : { ok: false, kod: "onay_gerekli", mesaj: yeniIzMesaj };
+    }
     var yeniIzOnayi = !stilIle && uygulananSekans[sekans] && onayBekleyen !== sekans;
     if ((kritik > 0 && kaliteOnayBekleyen !== kaliteAnahtari) || yeniIzOnayi) {
       if (kritik > 0) kaliteOnayBekleyen = kaliteAnahtari;
@@ -6188,15 +6228,15 @@ window.KCaptions = (function () {
         uyari += (uyari ? " " : "") + "Bu sekansa zaten altyazı uygulandı; devam etmek yeni bir altyazı izi ekler.";
       }
       KApp.toast(uyari, "warn", 9000);
-      return;
+      return yeniIzOnayi ? { ok: false, kod: "onay_gerekli", mesaj: yeniIzMesaj } : { ok: false, kod: "kalite_onayi", mesaj: kaliteMesaj };
     }
     if (stilIle && !secilenMogrt && secilenMotorStili) {
       await overlayUygula();             // Pro kapisi overlayUygula icinde
       uygulaEtiketiniSifirla();
-      return;
+      return { stil: true };
     }
     if (stilIle) {
-      if (typeof Pro !== "undefined" && !Pro.gate("mogrt")) return;
+      if (typeof Pro !== "undefined" && !Pro.gate("mogrt")) return { stil: true };
       try {
         await mogrtStiliniUygula();
         uygulaEtiketiniSifirla();
@@ -6204,7 +6244,7 @@ window.KCaptions = (function () {
         status("", "");
         KApp.toast("✕ " + (eMogrt && eMogrt.message ? eMogrt.message : eMogrt), "bad", 8000);
       }
-      return;
+      return { stil: true };
     }
     if (uygulananSekans[sekans] && onayBekleyen !== sekans) {
       onayBekleyen = sekans;
@@ -6213,11 +6253,11 @@ window.KCaptions = (function () {
       btn.classList.add("warn");
       KApp.toast("Bu sekansa zaten altyazı uyguladın. Premiere var olan izi güncelleyemiyor, " +
         "YENİ bir altyazı izi ekler — eskisini silmezsen ikisi üst üste görünür.", "warn");
-      return;
+      return { ok: false, kod: "onay_gerekli", mesaj: yeniIzMesaj };
     }
     try {
       var srt = buildSrt({ ciftDil: ciftDilAcik() });
-      if (!srt) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return; }
+      if (!srt) { KApp.toast("Yazılacak altyazı metni kalmadı.", "bad"); return { ok: false, kod: "altyazi_yok", mesaj: "No caption text left to write." }; }
       // Premiere içe aktardığı SRT'yi KOPYALAMAZ, diskteki yola referans verir. Bu yüzden
       // temp'e yazmak yasak (biz ya da Windows süpürünce projedeki altyazı kırılır):
       // proje klasörü varsa oraya, yoksa kalıcı srt klasörüne yaz.
@@ -6245,15 +6285,18 @@ window.KCaptions = (function () {
           if (!ornekBelge) hideRestore();
           KApp.toast("Altyazı izi oluşturuldu", "good");
           yildizIste();
-        } else {
-          // caption izi oluşmadı: düzenlenebilir tek kopya olan taslağı SİLME
-          KApp.toast("SRT projeye alındı — proje panelinden timeline'a sürükle: " + p, "good");
+          return { ok: true, captionTrack: true };
         }
-      } else {
-        KApp.toast(r.error, "bad");
+        // caption izi oluşmadı: düzenlenebilir tek kopya olan taslağı SİLME
+        KApp.toast("SRT projeye alındı — proje panelinden timeline'a sürükle: " + p, "good");
+        return { ok: false, kod: "iz_olusmadi", captionTrack: false,
+          mesaj: "The SRT was imported into the Premiere project, but Premiere did not create a caption track: drag it from the Project panel onto the timeline. Do not apply again." };
       }
+      KApp.toast(r.error, "bad");
+      return { ok: false, kod: "uygulanamadi", mesaj: String(r.error || "Premiere could not import the captions.") };
     } catch (e) {
       KApp.toast(e.message, "bad");
+      return { ok: false, kod: "uygulanamadi", mesaj: String(e && e.message ? e.message : e) };
     }
   }
 
@@ -6381,6 +6424,102 @@ window.KCaptions = (function () {
     } catch (e) {
       KApp.toast(e.message, "bad");
     }
+  }
+
+  /* ---------------- Yapay zekâ köprüsü (MCP, 3.4) ---------------- */
+  // Altyazı sekmesindeki düğmelerin aynı işlevleri; köprü yalnız bunları çağırır.
+
+  function durumOku() {
+    var e = el("cap-status");
+    return e ? { metin: e.textContent || "", kotu: /\bbad\b/.test(e.className) } : { metin: "", kotu: false };
+  }
+
+  // Seçimi kullanıcı değiştirmiş gibi: değer + "change" (önizleme, bağımlı kutular, tercih kaydı)
+  function secimDegistir(sec, deger) {
+    if (!sec || sec.value === deger) return;
+    sec.value = deger;
+    try { sec.dispatchEvent(new Event("change", { bubbles: true })); } catch (e) {}
+  }
+
+  /*
+   * Kapsam / dil / mod düğmelerle aynı yoldan seçilir, sonra "Altyazı oluştur" (go).
+   * Önce HEPSİ doğrulanır, sonra seçilir: geçersiz çağrı kullanıcının seçimlerine dokunmaz.
+   * dil "auto" = paneldeki "Otomatik" (değeri ""). mod, kullanıcının satır düzenini aynı ailedeyse
+   * korur (2 satır × 42, N kelime… "satir"da kalır; yalnız aile değişirse l42 / k1).
+   */
+  // geri.basladi(): go() işi gerçekten başlatınca (meşgule geçince) bir kez çağrılır; köprü iş
+  // kimliğini o zaman verir, başlamadan dönen ret (pro_gerekli…) kendi koduyla hemen döner
+  async function mcpOlustur(o, geri) {
+    o = o || {};
+    if (busy) return { ok: false, hata: "mesgul", mesaj: "Caption generation is already running." };
+    var OT = window.SufloOtomasyon;
+    var dil = OT && OT.dilDegeri ? OT.dilDegeri(o.dil) : (o.dil === undefined ? null : (o.dil === "auto" ? "" : o.dil));
+    var sec = el("cap-lang");
+    if (dil !== null && sec && !Array.prototype.some.call(sec.options, function (x) { return x.value === dil; })) {
+      return { ok: false, hata: "dil", mesaj: "Language not offered by Suflo: " + o.dil };
+    }
+    var kapsamBtn = null;
+    if (o.kapsam && el("cap-scope")) {
+      kapsamBtn = el("cap-scope").querySelector('button[data-s="' + o.kapsam + '"]');
+      if (!kapsamBtn) return { ok: false, hata: "gecersiz", mesaj: "Unknown scope: " + o.kapsam };
+    }
+    if (kapsamBtn && scope !== o.kapsam) kapsamBtn.click();
+    if (dil !== null) secimDegistir(sec, dil);
+    var ml = el("cap-maxlen");
+    if (o.mod && ml && OT && OT.satirDegeri) secimDegistir(ml, OT.satirDegeri(o.mod, ml.value));
+    var bilgi = {};
+    if (geri && typeof geri.basladi === "function") bilgi.basladi = geri.basladi;
+    var sonuc = await go({ mcp: bilgi });
+    var d = durumOku();
+    if (sonuc !== true || d.kotu) {
+      return { ok: false, hata: bilgi.hata || "olusturulamadi", mesaj: bilgi.mesaj || d.metin || "Caption generation did not start." };
+    }
+    var r = { ok: true, satir: segments.length, durum: d.metin };
+    if (bilgi.topluAtlandi) r.not = "Only the first selected clip was transcribed: multi-clip captions need Suflo Pro (" + bilgi.topluAtlandi + " clip(s) skipped).";
+    return r;
+  }
+
+  /*
+   * "Normal altyazı izi ekle" ile aynı işlev. Sonuç apply()'ın kendi dönüşünden (durum satırından
+   * DEĞİL): onay isteyen durumlar (bu sekansa zaten uygulandı, kritik kalite sorunu) köprü adına
+   * geçilmez ve kurulmaz; ok:false + nedeni döner, ikinci tık yalnız panelde kullanıcıdan gelir.
+   */
+  async function mcpKanala() {
+    if (!segments.length) return { ok: false, hata: "altyazi_yok", mesaj: "There are no captions in the Suflo editor." };
+    var satir = segments.length;
+    var r = await apply(false, { mcp: true });
+    if (!r || typeof r !== "object" || r.stil) return { ok: false, hata: "uygulanamadi", mesaj: "Not applied." };
+    if (!r.ok) return { ok: false, hata: r.kod || "uygulanamadi", mesaj: r.mesaj || "Not applied." };
+    return { ok: true, satir: satir, iz: true };
+  }
+
+  // SRT / VTT / TXT yalnız proje klasörüne (yol seçilemez); var olan dosyanın üstüne yazılmaz
+  async function mcpDisari(bicim) {
+    if (!segments.length) return { ok: false, hata: "altyazi_yok", mesaj: "There are no captions in the Suflo editor." };
+    if (["srt", "vtt", "txt"].indexOf(bicim) === -1) return { ok: false, hata: "gecersiz", mesaj: "srt, vtt or txt" };
+    var pd = await K.call("KS_projectDir");
+    var dir = pd && pd.ok ? String(pd.dir || "") : "";
+    if (!dir) return { ok: false, hata: "proje_kaydedilmemis", mesaj: "Save the Premiere project first: captions are written next to the project file." };
+    var ek = dosyaDilEki(), icerik, ad;
+    if (bicim === "txt") {
+      icerik = segments.map(function (s) { return CL.duzMetin(styleText(CT.stripEmphasis(s.text))); }).filter(Boolean).join("\r\n");
+      ad = "suflo-transkript" + ek + ".txt";
+    } else if (bicim === "vtt") {
+      icerik = buildVtt({ ciftDil: ciftDilAcik() });
+      ad = "suflo-altyazi" + ek + ".vtt";
+    } else {
+      icerik = buildSrt({ ciftDil: ciftDilAcik() });
+      ad = "suflo-altyazi" + ek + ".srt";
+    }
+    if (!icerik) return { ok: false, hata: "altyazi_yok", mesaj: "No caption text to write." };
+    // Proje klasörü yazılamıyorsa (salt okunur paylaşım / dolu disk) yol söylemeden dön
+    try { K.fs.accessSync(dir, K.fs.constants.W_OK); }
+    catch (eW) { return { ok: false, hata: "yazilamiyor", mesaj: "The Premiere project folder is not writable, so the captions could not be saved there." }; }
+    var nokta = ad.lastIndexOf("."), kok = ad.slice(0, nokta), uz = ad.slice(nokta), hedef = ad;
+    for (var i = 2; K.fs.existsSync(K.path.join(dir, hedef)) && i < 1000; i++) hedef = kok + "-" + i + uz;
+    try { K.fs.writeFileSync(K.path.join(dir, hedef), "\uFEFF" + icerik, "utf8"); }
+    catch (eY) { return { ok: false, hata: "yazilamiyor", mesaj: "Could not write " + hedef + " (" + String(eY && eY.code ? eY.code : "error") + ")." }; }
+    return { ok: true, dosya: hedef };
   }
 
   /* ---------------- Başlat ---------------- */
@@ -6955,6 +7094,11 @@ window.KCaptions = (function () {
     language: function () { return (ceviriDili && ceviriVar() ? ceviriDili : "") || (cevrimdisiEn() ? "en" : "") || algilananDil || (el("cap-lang") && el("cap-lang").value) || arayuzDili(); },
     refreshMogrtStyles: refreshMogrtStyles,
     // Podcast Modu: mikrofonları ayrı ayrı dışa aktarırken aynı gömülü WAV presetleri
-    bundledEpr: bundledEpr
+    bundledEpr: bundledEpr,
+    // Yapay zekâ köprüsü (MCP, 3.4)
+    mcpOlustur: mcpOlustur,
+    mcpKanala: mcpKanala,
+    mcpDisari: mcpDisari,
+    mesgulMu: function () { return busy; }
   };
 })();
