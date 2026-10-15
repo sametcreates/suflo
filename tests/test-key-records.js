@@ -358,6 +358,13 @@ ok("depo: araç kaydı diskten aynen döner (sıkıştırılmış zamanlar, çap
     son.filter(function (r) { return r.tur === "egri"; }).length === 300 && !son.some(function (r) { return r.id === egriK.id; }), son.length);
   ok("sinifEnYeniler: sınıf başına en yeniler, sıra korunur", js(K.sinifEnYeniler([{ tur: "egri", createdAt: 1 }, { tur: "zoom", createdAt: 2 }, { tur: "gecis", createdAt: 3 }], 1)
     .map(function (r) { return r.tur; })) === js(["egri", "gecis"]));
+  ok("sınıf: varışta yaylanma Eğri sekmesinin sınıfında (araç kayıtlarını atmaz), araçlar ayrı", K.sinif({ tur: "yaylan" }) === "egri" && K.sinif({ tur: "egri" }) === "egri" &&
+    K.sinif({ tur: "hareket" }) === "arac" && js(K.sinifEnYeniler([{ tur: "yaylan", createdAt: 1 }, { tur: "egri", createdAt: 2 }, { tur: "zoom", createdAt: 3 }], 1)
+    .map(function (r) { return r.tur; })) === js(["egri", "zoom"]));
+  var yk = K.kayit({ tur: "yaylan", seqId: "s1", nodeId: "n1", matchName: "AE.ADBE Motion/Position", compIdx: 0, propIdx: 0, uclar: null, times: [2.08, 2.24, 2.8],
+    kenarDegerleri: [{ t: 2, v: [0.6, 0.5] }] });
+  ok("yaylan kaydı: uçsuz, iniş kenarDegerleri'nde; canlılık kendi anahtarlarıyla (iniş taşınsa da)", yk && yk.uclar === null && js(yk.kenarDegerleri) === js([{ t: 2, v: [0.6, 0.5] }]) &&
+    K.canli(yk, [1, 2.08, 2.24, 2.8, 5], 25) && K.canli(yk, [1, 2.08, 2.24, 2.8], 25) && !K.canli(yk, [1, 2, 2.24, 5], 25));
 })();
 
 console.log(gecen + "/" + toplam + " gecti");

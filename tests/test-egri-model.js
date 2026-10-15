@@ -226,6 +226,116 @@ ok("yoklama: odak geri gelince / sekme yeniden açılınca (tazele) aynı imzada
 ok("klip başına ret kodları satırda nedeniyle (genel 'uygulanamadı' değil)", ["klipYok", "klipTasindi", "sekans", "sekansYok", "zamanAsimi"].every(function (k) {
   return M.nedenMetni(k) !== "uygulanamadı"; }) && /taşınmış/.test(M.nedenMetni("klipTasindi")));
 
+/* ---------------- varışta yaylanma (3.4 adım 14) ---------------- */
+(function () {
+  var A = M.yaylanAyar({ genlik: 9, frekans: "x", sonum: 1, tum: true });
+  ok("yaylan ayarı: sınırlara kırpılır, geçersiz varsayılan, tum bayrağı", A.genlik === 0.5 && A.frekans === 3 && A.sonum === 2 && A.tum === true &&
+    js(M.yaylanAyar(null)) === js({ genlik: 0.1, frekans: 3, sonum: 6, tum: false }) && M.yaylanAyar({ genlik: "" }).genlik === 0.1, js(A));
+  ok("yaylan süresi: autoDuration(sönüm)", yakin(M.yaylanSure({ sonum: 6 }), E.autoDuration(6), 1e-12) && M.yaylanSure({ sonum: 2 }) === 2);
+  function satir(keys, degerler, ek) {
+    var p = { nodeId: "nA", clipName: "A.mp4", clipStart: 10, clipEnd: 20, clipIn: 5, clipOut: 15, ters: false, compIdx: 0, propIdx: 0,
+      matchName: "AE.ADBE Motion/Position", label: "Konum", opak: false, tur: "xy", keys: keys, degerler: degerler, fps: 25, kfInterp: true };
+    for (var k in ek || {}) p[k] = ek[k];
+    return p;
+  }
+  var p = satir([11, 12, 15], [[0, 0], [500, 0], [500, 0]]);
+  var v = M.varislar(p, [], { ph: 11.5 });
+  ok("varış (tek): playhead'i saran çiftin ikinci ucu; hız Δv/Δt; sonraki anahtar sınır", v.kod === "" && v.varislar.length === 1 && v.varislar[0].tL === 12 &&
+    js(v.varislar[0].hiz) === js([500, 0]) && v.varislar[0].tN === 15 && v.varislar[0].sinir === 15 && v.varislar[0].eski === null, js(v));
+  ok("varış: değerler yoksa 'degerYok', playhead dışarıdaysa 'disinda'", M.varislar(satir([11, 12], null), [], { ph: 11.5 }).kod === "degerYok" &&
+    M.varislar(p, [], { ph: 9 }).kod === "disinda" && M.varislar(satir([11], [[0, 0]]), [], { ph: 11 }).kod === "disinda");
+  var son = M.varislar(satir([11, 12], [[0, 0], [100, 0]]), [], { ph: 11.5 });
+  ok("varış: sonraki anahtar yoksa sınır klibin sonu", son.varislar[0].tN === null && son.varislar[0].sinir === 20 && son.varislar[0].vN === null);
+  var bekleme = M.varislar(satir([11, 12, 15], [[5, 5], [5, 5], [9, 9]]), [], { ph: 11.5 });
+  ok("varış (tek): iniş anahtarına hareket gelmiyorsa nedeniyle", bekleme.varislar.length === 0 && bekleme.kod === "varisYok");
+  ok("varış (tek): iniş klibin dışında (tutamakta) → klipDisi", M.varislar(satir([19, 21], [[0, 0], [1, 1]]), [], { ph: 19.5 }).kod === "klipDisi");
+  // Önce pişirilmiş Eğri: önceki anahtar Suflo'nun son sık anahtarı → hız eğrinin bitiş eğimi
+  // Opaklık 11 → 12 'Yumuşak çıkış' ile her kare pişirilmiş (24 iç anahtar), 14'te bekleme
+  var ek = [11], ed = [0];
+  for (var i = 1; i < 25; i++) { ek.push(Math.round((11 + i * 0.04) * 1e6) / 1e6); ed.push(100 * E.toFunction(E.builtin("yumusak-cikis").curve)(i / 25)); }
+  ek.push(12); ed.push(100); ek.push(14); ed.push(100);
+  var egriKayit = KR.kayit({ tur: "egri", seqId: "s1", nodeId: "nA", clipName: "A.mp4", clipStart: 10, compIdx: 1, propIdx: 0, matchName: "AE.ADBE Opacity/Opacity",
+    uclar: [11, 12], times: ek.slice(1, 25), kenarDegerleri: [] });
+  var op = satir(ek, ed, { compIdx: 1, matchName: "AE.ADBE Opacity/Opacity", opak: true, tur: "sayi" });
+  var ve = M.varislar(op, [egriKayit], { ph: 11.5 });
+  var egim = (100 - ed[24]) / (12 - ek[24]);
+  ok("varış: canlı Eğri çifti bölünmez; önceki anahtar eğrinin son sık anahtarı (bitiş eğimi)", ve.varislar.length === 1 && ve.varislar[0].tL === 12 &&
+    yakin(ve.varislar[0].hiz, egim, 1e-6) && ve.varislar[0].tP === ek[24] && ve.varislar[0].tN === 14, js([ve.varislar[0] && ve.varislar[0].hiz, egim]));
+  var vt = M.varislar(op, [egriKayit], { ph: 0, tum: true });
+  ok("tüm varışlar: Eğri'nin iç anahtarları iniş sayılmaz; bekleyen anahtar sessizce geçilir", vt.varislar.length === 1 && vt.varislar[0].tL === 12 &&
+    vt.atlanan.length === 0 && vt.kod === "", js(vt.varislar.map(function (x) { return x.tL; })));
+  var zincir = satir([11, 12, 13, 14], [[0, 0], [100, 0], [100, 50], [100, 50]]);
+  var vz = M.varislar(zincir, [], { tum: true });
+  ok("tüm varışlar: her hareketin inişi (12 ve 13); bekleme (14) geçilir; her biri kendi sonraki anahtarına kadar", vz.varislar.length === 2 &&
+    vz.varislar[0].tL === 12 && vz.varislar[0].tN === 13 && js(vz.varislar[1].hiz) === js([0, 50]) && vz.varislar[1].tN === 14, js(vz.varislar.map(function (x) { return [x.tL, x.tN]; })));
+  // canlı yaylanma kaydı: aynı inişe yeniden uygulama onun yerine geçer; anahtarları önceki / sonraki sayılmaz
+  var yk = [11, 12, 12.08, 12.24, 12.4, 12.56, 12.8, 15], yd = [[0, 0], [500, 0], [530, 0], [488, 0], [504, 0], [498, 0], [500, 0], [500, 0]];
+  var yKayit = KR.kayit({ tur: "yaylan", seqId: "s1", nodeId: "nA", clipName: "A.mp4", clipStart: 10, compIdx: 0, propIdx: 0, matchName: "AE.ADBE Motion/Position",
+    uclar: null, times: [12.08, 12.24, 12.4, 12.56, 12.8], kenarDegerleri: [{ t: 12, v: [500, 0] }] });
+  var py = satir(yk, yd);
+  ok("canlı yaylanmalar: iniş zamanı kenarDegerleri[0]'dan; anahtar indisleri", M.varisZamani(yKayit) === 12 && M.canliYaylanlar([yKayit], py).length === 1 &&
+    js(M.canliYaylanlar([yKayit], py)[0].idx) === js([2, 3, 4, 5, 6]) && isNaN(M.varisZamani({})));
+  var ic1 = M.varislar(py, [yKayit], { ph: 12.3 });
+  ok("varış (tek): playhead yaylanmanın penceresinde → o iniş yeniden uygulanır (eski = kayıt, sonraki = 15)", ic1.varislar.length === 1 && ic1.varislar[0].tL === 12 &&
+    ic1.varislar[0].eski && ic1.varislar[0].eski.id === yKayit.id && ic1.varislar[0].tN === 15 && js(ic1.varislar[0].hiz) === js([500, 0]), js(ic1));
+  var once = M.varislar(py, [yKayit], { ph: 11.5 });
+  ok("varış (tek): çift iniş anahtarında bitiyor → aynı iniş, eski yaylanma değişir", once.varislar[0].tL === 12 && once.varislar[0].eski.id === yKayit.id && once.varislar[0].tN === 15);
+  var sonra = M.varislar(py, [yKayit], { ph: 13.5 });
+  var py2 = satir(yk, yd.slice(0, 7).concat([[700, 0]]));
+  var sonra2 = M.varislar(py2, [yKayit], { ph: 13.5 });
+  ok("varış (tek): yaylanmadan sonraki çift → sonraki iniş (15), önceki anahtar yaylanmanın son anahtarı (bekleme ise varisYok)",
+    sonra.varislar.length === 0 && sonra.kod === "varisYok" && sonra2.varislar.length === 1 && sonra2.varislar[0].tL === 15 && sonra2.varislar[0].tP === 12.8 &&
+    yakin(sonra2.varislar[0].hiz[0], 200 / 2.2, 1e-9) && sonra2.varislar[0].eski === null, js([sonra, sonra2]));
+  var tumY = M.varislar(py, [yKayit], { tum: true });
+  ok("tüm varışlar: canlı yaylanmanın anahtarları iniş / önceki / sonraki sayılmaz, yerine geçilir", tumY.varislar.length === 1 && tumY.varislar[0].tL === 12 &&
+    tumY.varislar[0].eski.id === yKayit.id && tumY.varislar[0].tP === 11 && tumY.varislar[0].tN === 15, js(tumY.varislar.map(function (x) { return [x.tL, x.tP, x.tN]; })));
+  ok("satır kaydı: playhead pencerede ya da iniş çiftin ikinci ucu → kayıt; başka yerde null", M.yaylanSatirKaydi([yKayit], py, 12.3).id === yKayit.id &&
+    M.yaylanSatirKaydi([yKayit], py, 11.5).id === yKayit.id && M.yaylanSatirKaydi([yKayit], py, 13.5) === null);
+  ok("satır uygunluğu: çift ya da pencere; tüm varışlarda ≥ 2 anahtar", M.yaylanUygun(py, 12.3, [yKayit], false) && M.yaylanUygun(p, 11.5, [], false) &&
+    !M.yaylanUygun(p, 9, [], false) && M.yaylanUygun(p, 9, [], true) && !M.yaylanUygun(satir([11], [[0, 0]]), 11, [], true));
+
+  /* gruplar */
+  var g = M.yaylanGruplari([{ prop: p, varis: v }], { genlik: 0.1, frekans: 3, sonum: 6 }, "s1");
+  var it = g.gruplar[0].items[0];
+  ok("yaylan grupları: klip başına çağrı; öğe tur 'yaylan', iniş / sonraki uçları ve sınır", g.gruplar.length === 1 && g.atlanan.length === 0 &&
+    js(g.gruplar[0].target) === js({ nodeId: "nA", clipName: "A.mp4", clipStart: 10, seqId: "s1" }) && it.tur === "yaylan" && it.t0 === 12 &&
+    js(it.v0) === js([500, 0]) && it.t1 === 15 && js(it.v1) === js([500, 0]) && it.sinir === 15 && it.degistir === false && it.eski === undefined, js(it).slice(0, 200));
+  ok("yaylan grupları: seyrek (tepe / çukur) ve 2 karede bir yedek plan; hepsi inişten sonra, sınırdan önce", it.keys.length >= 4 && it.yogunKeys.length > it.keys.length &&
+    it.keys.concat(it.yogunKeys).every(function (k) { return k.t > 12 && k.t < 15 && Array.isArray(k.v); }) && g.gruplar[0].satirlar[0].bezier === true);
+  var gy = M.yaylanGruplari([{ prop: py, varis: ic1 }], {}, "s1");
+  ok("yaylan grupları: aynı inişteki canlı yaylanma degistir + eski (kaydın zamanları)", gy.gruplar[0].items[0].degistir === true &&
+    js(gy.gruplar[0].items[0].eski) === js(yKayit.times));
+  var opv = M.varislar(satir([11, 12], [0, 100], { opak: true, tur: "sayi", compIdx: 1 }), [], { ph: 11.5 });
+  var go = M.yaylanGruplari([{ prop: satir([11, 12], [0, 100], { opak: true, tur: "sayi", compIdx: 1 }), varis: opv }], { genlik: 0.3 }, "s1");
+  ok("yaylan grupları: Opaklık 0..100 kırpılır", go.gruplar[0].items[0].keys.every(function (k) { return k.v >= 0 && k.v <= 100; }) &&
+    go.gruplar[0].items[0].yogunKeys.every(function (k) { return k.v >= 0 && k.v <= 100; }));
+  var dar = satir([11, 12, 12.08], [[0, 0], [100, 0], [100, 0]]);
+  var gd = M.yaylanGruplari([{ prop: dar, varis: M.varislar(dar, [], { ph: 11.5 }) }], {}, "s1");
+  ok("yaylan grupları: 2 kareden az yer → atlanan 'yer' (nedeni metinle)", gd.gruplar.length === 0 && gd.atlanan.length === 1 && gd.atlanan[0].kod === "yer" &&
+    /2 kareden az yer/.test(M.nedenMetni("yer")));
+  var gdt = M.yaylanGruplari([{ prop: dar, varis: M.varislar(dar, [], { tum: true }) }], {}, "s1");
+  ok("yaylan grupları: tüm varışlarda yeri olmayan iniş sessizce geçilir", gdt.gruplar.length === 0 && gdt.atlanan.length === 0, js(gdt.atlanan));
+  ok("yaylan grupları: varış yoksa satır nedeniyle atlanır", M.yaylanGruplari([{ prop: p, varis: M.varislar(p, [], { ph: 9 }) }], {}, "s1").atlanan[0].kod === "disinda");
+  var gec = M.yaylanGeciciKayitlar(g.gruplar[0], "s1");
+  g.gruplar[0].satirlar[0].bezier = false;
+  var gecY = M.yaylanGeciciKayitlar(g.gruplar[0], "s1");
+  ok("yaylan zaman aşımı: geçici kayıt (Bezier varsa seyrek, yoksa sık plan), iniş kenarDegerleri'nde, depo kabul eder",
+    gec.length === 1 && gec[0].tur === "yaylan" && gec[0].uclar === null && gec[0].times.length === it.keys.length && gecY[0].times.length === it.yogunKeys.length &&
+    js(gec[0].kenarDegerleri) === js([{ t: 12, v: [500, 0] }]) && KR.kayit(gec[0]) !== null && gec[0].clipIn === 5);
+  /* yerine geçme */
+  var yeni = KR.kayit({ tur: "yaylan", seqId: "s1", nodeId: "nA", clipName: "A.mp4", clipStart: 10, clipEnd: 20, clipIn: 5, clipOut: 15, compIdx: 0, propIdx: 0,
+    matchName: "AE.ADBE Motion/Position", uclar: null, times: [12.08, 12.4], kenarDegerleri: [{ t: 12, v: [500, 0] }] });
+  var baska = KR.kayit({ tur: "yaylan", seqId: "s1", nodeId: "nA", clipStart: 10, compIdx: 0, propIdx: 0, matchName: "AE.ADBE Motion/Position", times: [15.1], kenarDegerleri: [{ t: 15, v: [0, 0] }] });
+  ok("yaylan çakışanlar: aynı satırda aynı iniş yerine geçer; başka iniş ve Eğri kaydı kalır", js(M.yaylanCakisanlar([yKayit, baska, egriKayit, yeni], yeni).map(function (r) { return r.id; })) === js([yKayit.id]));
+  var tasinan = KR.kayit({ tur: "yaylan", seqId: "s1", nodeId: "nA", clipStart: 30, clipEnd: 40, clipIn: 5, clipOut: 15, compIdx: 0, propIdx: 0, matchName: "AE.ADBE Motion/Position",
+    times: [32.08, 32.4], kenarDegerleri: [{ t: 32, v: [500, 0] }] });
+  ok("yaylan çakışanlar: klip taşındıysa iniş kaynak çapasıyla karşılaştırılır", M.yaylanCakisanlar([tasinan], yeni).length === 1);
+  /* önizleme */
+  var on = M.yaylanOnizleme({ genlik: 0.1 }, 240, 80), on2 = M.yaylanOnizleme({ genlik: 0.4 }, 240, 80);
+  ok("yaylan önizlemesi: SVG yolu, hedef çizgisi, tepe genlikle büyür (Premiere'e gitmez)", /^M[\d.]+ [\d.]+( L[\d.-]+ [\d.-]+){120}$/.test(on.yol) && on.tepe > 0 &&
+    on2.tepe > on.tepe * 3.9 && on.hedefY > 0 && on.hedefY < 80 && yakin(on.sure, E.autoDuration(6), 1e-12), on.yol.slice(0, 60));
+})();
+
 /* ---------------- metinler ---------------- */
 ok("neden ve hata metinleri", M.nedenMetni("degisti") === "uç anahtar karenin değeri değişmiş" && M.nedenMetni("??") === "uygulanamadı" && /Liste yenilendi/.test(M.hataMetni("klipTasindi")) && M.hataMetni("yok") === "");
 var src = require("fs").readFileSync(path.join(KOK, "js", "egri-model.js"), "utf8");

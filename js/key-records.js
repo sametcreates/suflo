@@ -12,7 +12,7 @@
  *   times: Suflo'nun yazdığı anahtar karelerin timeline saniyeleri (artan).
  *   uclar: Eğri'de çiftin kullanıcıya ait iki ucu; null ise times'ın ilk ve son elemanı.
  *   kenarDegerleri: yazmadan önceki kenar değerleri [{ t, v }] (v sayı ya da [x,y]); kaldırmada
- *   geri konur.
+ *   geri konur. Varışta yaylanmada (tur 'yaylan', uclar null) kenarDegerleri[0] iniş anahtarıdır.
  *   İsteğe bağlı kaynak çapası { clipEnd, clipIn, clipOut, ters }: yazıldığı andaki klip bitişi, kaynak
  *   giriş / çıkış noktası ve ters oynatma. Anahtarlar klibin kaynak zamanında durur; slip ya da baştan
  *   ripple kırpma onları timeline'da kaydırır, kaldırırken bu çapayla bulunur (Eğri; 3.4 adım 10).
@@ -243,9 +243,10 @@
     });
   }
 
-  // Kayıt sınıfı: Eğri'nin Geri al kayıtları ('egri') ya da araç kayıtları (diğer türler). Proje kovasında her sınıfın
-  // kendi sınırı var ve yer açmak için bir sınıfın kayıtları yalnız kendi sınıfının eskilerini atar.
-  function sinif(r) { return r && r.tur === "egri" ? "egri" : "arac"; }
+  // Kayıt sınıfı: Eğri sekmesinin Geri al kayıtları ('egri' ve varışta yaylanma 'yaylan', 3.4 adım 14) ya da araç kayıtları
+  // (diğer türler). Proje kovasında her sınıfın kendi sınırı var ve yer açmak için bir sınıfın kayıtları yalnız kendi sınıfının
+  // eskilerini atar.
+  function sinif(r) { return r && (r.tur === "egri" || r.tur === "yaylan") ? "egri" : "arac"; }
 
   // Sınıf başına en yeni `sinir` kaydı tutar (enYeniler her sınıfa ayrı; listedeki sıra korunur)
   function sinifEnYeniler(liste, sinir) {

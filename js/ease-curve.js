@@ -18,8 +18,9 @@
  * Suflo'nun kendi (temiz oda) eklemeleri: çok noktalı eğri ({type:'multi'}; her parça kendi
  * genel kübik Newton + ikiye bölme çözücüsüyle), normalize, split (de Casteljau, şekil değişmez),
  * flip (180° döndürme), invert (eksen değişimi; yalnız tekdüze eğri), toCss/fromCss (yalnız tek
- * 'cubic-bezier(a,b,c,d)'), hazır eğriler (BUILTINS), bakePlan (sık anahtar kare planı) ve SFC1 eğri
- * kodu (sfcKodla / sfcCoz; adım 12 çekirdeği, adım 15 genişletir).
+ * 'cubic-bezier(a,b,c,d)'), hazır eğriler (BUILTINS), bakePlan (sık anahtar kare planı), yaylanPlan (varışta
+ * yaylanma: Rebound'un overshoot matematiğini iniş anahtarından sonra anahtar karelere pişirir; adım 14) ve SFC1
+ * eğri kodu (sfcKodla / sfcCoz; adım 12 çekirdeği, adım 15 genişletir).
  * Premiere'in ExtendScript'i Bezier tutamaçlarını yazamaz: Suflo eğriyi sık anahtar karelere
  * "pişirir" (bakePlan). Çok noktalı eğrilerin metin sözdizimi YOK; yalnız SFC1 kodu içinde JSON.
  *
@@ -992,6 +993,86 @@
     return { keys: keys, step: adim, capped: kapali };
   }
 
+  /* ================= Suflo: varışta yaylanma planı (temiz oda; 3.4 adım 14) ================= */
+  // Ayar sınırları: genlik saniye cinsinden "varış hızıyla kaç saniyelik yol" (0,02–0,5), frekans Hz, sönüm
+  var YAYLAN = {
+    GENLIK: { min: 0.02, max: 0.5, varsayilan: 0.1 },
+    FREKANS: { min: 1, max: 6, varsayilan: 3 },
+    SONUM: { min: 2, max: 10, varsayilan: 6 },
+    YOGUN_ADIM: 2,      // Bezier ara değerlemesi yazılamazsa 2 karede bir sık yazım
+    EN_AZ_KARE: 2       // inişten sonra en az 2 kare yer yoksa reddedilir
+  };
+  function ayarSayi(v, s) { var n = Number(v); return isFinite(n) ? sinirla(n, s.min, s.max) : s.varsayilan; }
+
+  /*
+   * Varışta yaylanma (follow-through): iniş anahtar karesinden (tL, vL) SONRA, varış hızıyla orantılı sönümlü
+   * sinüs. Rebound'un overshoot matematiği (dampedSine / followThroughAnchors / autoDuration) anahtar kareye
+   * pişirilir: değer_k = taban(t_k) + hız · genlik · s(t_k − tL).
+   * o: { tL, vL (sayı ya da [x,y]), hiz (varış hızı, birim/sn; vL ile aynı tür), genlik (sn), frekans (Hz), sonum,
+   *      sinir (timeline sn: sonraki anahtar kare ya da klibin sonu; o kareye ve ötesine yazılmaz), fps,
+   *      tN, vN (sonraki anahtar karenin zamanı ve değeri: taban oraya doğru doğrusal gider, kullanıcının sonraki
+   *      hareketi kaymaz; tN verilmezse sinir; vN yoksa taban vL), clampMin, clampMax (Opaklık 0..100),
+   *      yogun (true: 2 karede bir sık yazım) }
+   * Süre autoDuration(sönüm); sonraki anahtar karenin bir kare öncesine (ya da klibin son karesine) kırpılır.
+   * Anahtarlar timeline kare zamanlarında. Seyrek planda (Bezier ile yazılır) her tepe / çukur en yakın kareye
+   * oturur, son anahtar pencere sonu; değer o karedeki gerçek eğri değeri.
+   * Döner: { keys: [{ t, v }], sure (sn), oda (inişten sonra yazılabilen kare), yogun } ya da hata:
+   *   'aralik' (tL / sinir geçersiz) | 'fps' | 'deger' | 'hiz' (varış hızı yok) | 'yer' (2 kareden az yer)
+   */
+  function yaylanPlan(o) {
+    o = o || {};
+    var tL = Number(o.tL), sinir = Number(o.sinir), fps = Number(o.fps);
+    var bos = function (hata, ek) { var r = { keys: [], sure: 0, oda: 0, yogun: !!o.yogun, hata: hata }; for (var k in ek || {}) r[k] = ek[k]; return r; };
+    if (!(isFinite(tL) && isFinite(sinir) && sinir > tL)) return bos("aralik");
+    if (!(isFinite(fps) && fps > 0 && fps <= 1000)) return bos("fps");
+    var vL = degerOku(o.vL), hiz = degerOku(o.hiz), vN = o.vN === undefined || o.vN === null ? null : degerOku(o.vN);
+    var dizi = Array.isArray(vL);
+    if (vL === null || hiz === null || dizi !== Array.isArray(hiz) || (dizi && vL.length !== hiz.length)) return bos("deger");
+    if (vN !== null && (dizi !== Array.isArray(vN) || (dizi && vN.length !== vL.length))) return bos("deger");
+    var hizlar = dizi ? hiz : [hiz];
+    if (!hizlar.some(function (h) { return Math.abs(h) > 1e-9; })) return bos("hiz");
+    var genlik = ayarSayi(o.genlik, YAYLAN.GENLIK), frekans = ayarSayi(o.frekans, YAYLAN.FREKANS), sonum = ayarSayi(o.sonum, YAYLAN.SONUM);
+    var lo = sonlu(o.clampMin) ? o.clampMin : -Infinity, hi = sonlu(o.clampMax) ? o.clampMax : Infinity;
+    if (lo > hi) { lo = -Infinity; hi = Infinity; }
+
+    // kare ızgarası bakePlan'daki gibi: iniş karesinden sonraki kareler, sinirden en az yarım kare önce
+    var f0 = tL * fps, f1 = sinir * fps;
+    var taban = Math.abs(f0 - Math.round(f0)) < 1e-3 ? Math.round(f0) : Math.floor(f0);
+    var jmin = Math.max(1, Math.floor(f0 + 0.5 - taban) + 1);
+    var jmax = Math.ceil(f1 - 0.5 - taban) - 1;
+    var oda = Math.max(0, jmax - jmin + 1);
+    if (oda < YAYLAN.EN_AZ_KARE) return bos("yer", { oda: oda });
+    var sure = Math.min(autoDuration(sonum), (taban + jmax) / fps - tL);
+    var jSon = Math.min(jmax, Math.max(jmin, Math.round((tL + sure) * fps) - taban));
+    sure = (taban + jSon) / fps - tL;
+
+    var js = [];
+    if (o.yogun) {
+      for (var j = jmin; j < jSon; j += YAYLAN.YOGUN_ADIM) js.push(j);
+      js.push(jSon);
+    } else {
+      followThroughAnchors(frekans, sonum, sure).forEach(function (a) {
+        if (!(a.t > 0)) return;
+        var jj = Math.min(jSon, Math.max(jmin, Math.round((tL + a.t) * fps) - taban));
+        if (!js.length || jj > js[js.length - 1]) js.push(jj);
+      });
+      if (!js.length || js[js.length - 1] !== jSon) js.push(jSon);
+    }
+    var s = dampedSine(frekans, sonum);
+    var tN = Number(o.tN);
+    if (!(isFinite(tN) && tN >= sinir - 1e-9)) tN = sinir;
+    var vLd = dizi ? vL : [vL], vNd = vN === null ? null : (dizi ? vN : [vN]);
+    var keys = js.map(function (jj) {
+      var t = (taban + jj) / fps, u = t - tL, sv = s(u);
+      var v = vLd.map(function (a, d) {
+        var base = vNd ? a + (vNd[d] - a) * (u / (tN - tL)) : a;
+        return r6(sinirla(base + hizlar[d] * genlik * sv, lo, hi));
+      });
+      return { t: t, v: dizi ? v : v[0] };
+    });
+    return { keys: keys, sure: sure, oda: oda, yogun: !!o.yogun, genlik: genlik, frekans: frekans, sonum: sonum };
+  }
+
   var bezier = { cubicBezier: cubicBezier };
   var penner = { fns: fns, get: pennerGet, elasticOutWith: elasticOutWith, names: Object.keys(fns), isMonotonic: pennerMonotonic };
   var springApi = { resolveParams: resolveParams, spring: spring, springNormalized: springNormalized, settleTime: settleTime };
@@ -1010,7 +1091,8 @@
     dampedSine: dampedSine, extremaTimes: extremaTimes, autoDuration: autoDuration, followThroughAnchors: followThroughAnchors,
     // Suflo eklemeleri
     normalize: normalize, split: split, flip: flip, invert: invert, toMulti: toMulti, isMonotonic: isMonotonic,
-    toCss: toCss, fromCss: fromCss, bakePlan: bakePlan, builtins: builtins, builtin: builtin, builtinName: builtinName, kopya: kopya,
+    toCss: toCss, fromCss: fromCss, bakePlan: bakePlan, yaylanPlan: yaylanPlan, YAYLAN: YAYLAN,
+    builtins: builtins, builtin: builtin, builtinName: builtinName, kopya: kopya,
     sfcKodla: sfcKodla, sfcCoz: sfcCoz,
     BUILTINS: builtins(),
     LIMITS: { Y_MIN: Y_MIN, Y_MAX: Y_MAX, MAX_PTS: MAX_PTS, MIN_GAP: MIN_GAP, CSS_MAX: CSS_MAX, MAX_KEYS: MAX_KEYS, SFC_MAX: SFC_MAX, SFC_AD: SFC_AD }

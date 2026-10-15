@@ -461,6 +461,76 @@ var S = E.spring;
   ok("bakePlan: sonuç JSON güvenli (NaN yok)", JSON.stringify(xy).indexOf("null") === -1 && JSON.stringify(p).indexOf("NaN") === -1);
 })();
 
+/* ================= Suflo: yaylanPlan (varışta yaylanma, 3.4 adım 14) ================= */
+(function () {
+  var Y = E.YAYLAN;
+  ok("yaylanPlan: varsayılanlar ve sınırlar (genlik 0,02–0,5 sn, frekans 1–6 Hz, sönüm 2–10)", Y.GENLIK.min === 0.02 && Y.GENLIK.max === 0.5 &&
+    Y.FREKANS.min === 1 && Y.FREKANS.max === 6 && Y.SONUM.min === 2 && Y.SONUM.max === 10 && Y.YOGUN_ADIM === 2 && Y.EN_AZ_KARE === 2);
+  var fps = 25, s = E.dampedSine(3, 6);
+  var p = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: 0.1, frekans: 3, sonum: 6, sinir: 5, fps: fps });
+  ok("yaylanPlan: anahtarlar yalnız inişten SONRA ve kare ızgarasında", p.keys.length >= 4 && p.keys.every(function (k) {
+    return k.t > 2 + 0.5 / fps && yakin(k.t * fps, Math.round(k.t * fps), 1e-6);
+  }), js(p.keys.map(function (k) { return k.t; })));
+  ok("yaylanPlan: süre autoDuration(sönüm) (yer varken; kareye oturur)", yakin(p.sure, Math.round(E.autoDuration(6) * fps) / fps, 1e-9) &&
+    yakin(p.keys[p.keys.length - 1].t, 2 + p.sure, 1e-9), p.sure);
+  var ext = E.extremaTimes(3, 6, p.sure);
+  var ic = p.keys.slice(0, -1);
+  ok("yaylanPlan: her iç anahtar bir tepe / çukurun en yakın karesinde", ic.length === ext.length && ic.every(function (k, i) {
+    return Math.abs((k.t - 2) - ext[i]) <= 0.5 / fps + 1e-9;
+  }), js([ic.length, ext.length]));
+  ok("yaylanPlan: değer = iniş + hız · genlik · s(t − iniş)", p.keys.every(function (k) { return yakin(k.v, 500 + 1000 * 0.1 * s(k.t - 2), 1e-5); }));
+  var sap = ic.map(function (k) { return k.v - 500; }), azalir = true, isaret = true;
+  for (var i = 1; i < sap.length; i++) {
+    if (!(Math.abs(sap[i]) < Math.abs(sap[i - 1]))) azalir = false;
+    if (Math.sign(sap[i]) !== -Math.sign(sap[i - 1])) isaret = false;
+  }
+  ok("yaylanPlan: genlikler söner, hedefin bir üstünde bir altında; ilk aşım varış yönünde", azalir && isaret && sap[0] > 0, js(sap));
+  ok("yaylanPlan: pencere sonunda neredeyse oturmuş (%1'in altında)", Math.abs(p.keys[p.keys.length - 1].v - 500) < 0.01 * 1000 * 0.1 + 0.5);
+  var ters = E.yaylanPlan({ tL: 2, vL: 500, hiz: -1000, genlik: 0.1, frekans: 3, sonum: 6, sinir: 5, fps: fps });
+  ok("yaylanPlan: aşağı gelen harekette ilk aşım aşağı", ters.keys[0].v < 500 && yakin(ters.keys[0].v - 500, -(p.keys[0].v - 500), 1e-6));
+  // sonraki anahtar yakın: süre kırpılır, sonraki anahtarın karesine ve ötesine yazılmaz
+  var yakinP = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: 0.1, frekans: 3, sonum: 6, sinir: 2.32, fps: fps });
+  ok("yaylanPlan: sonraki anahtarı geçmez (son anahtar bir kare önce, süre kırpılır)", yakinP.keys.every(function (k) { return k.t <= 2.32 - 1 / fps + 1e-9; }) &&
+    yakin(yakinP.keys[yakinP.keys.length - 1].t, 2.32 - 1 / fps, 1e-9) && yakinP.sure < p.sure && yakinP.oda === 7, js([yakinP.keys, yakinP.oda]));
+  var hicCapa = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: 0.1, frekans: 1, sonum: 2, sinir: 5, fps: fps });
+  ok("yaylanPlan: hiçbir çapa sınırın ötesinde değil (uzun salınım, kare dışı sınır)", E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, frekans: 1, sonum: 2, sinir: 2.51, fps: fps })
+    .keys.every(function (k) { return k.t < 2.51 - 0.5 / fps; }) && hicCapa.keys.every(function (k) { return k.t < 5; }));
+  var iki = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, sinir: 2 + 2 / fps, fps: fps });
+  var uc = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, sinir: 2 + 3 / fps, fps: fps });
+  ok("yaylanPlan: 2 kareden az yer → 'yer' reddi; 2 kare yer → yazılır", iki.hata === "yer" && iki.keys.length === 0 && iki.oda === 1 &&
+    !uc.hata && uc.oda === 2 && uc.keys.length >= 1 && uc.keys.every(function (k) { return k.t <= 2 + 2 / fps + 1e-9; }), js([iki, uc.keys]));
+  ok("yaylanPlan: varış hızı yoksa 'hiz' reddi", E.yaylanPlan({ tL: 2, vL: 500, hiz: 0, sinir: 5, fps: fps }).hata === "hiz" &&
+    E.yaylanPlan({ tL: 2, vL: [1, 2], hiz: [0, 0], sinir: 5, fps: fps }).hata === "hiz");
+  ok("yaylanPlan: geçersiz girdi (aralık, fps, değer türü)", E.yaylanPlan({ tL: 2, vL: 1, hiz: 1, sinir: 2, fps: 25 }).hata === "aralik" &&
+    E.yaylanPlan({ tL: 2, vL: 1, hiz: 1, sinir: 3, fps: 0 }).hata === "fps" && E.yaylanPlan({ tL: 2, vL: [1, 2], hiz: 1, sinir: 3, fps: 25 }).hata === "deger" &&
+    E.yaylanPlan({ tL: 2, vL: 1, hiz: 1, sinir: 3, fps: 25, vN: [1, 2] }).hata === "deger" && E.yaylanPlan().hata === "aralik");
+  var xy = E.yaylanPlan({ tL: 1, vL: [960, 540], hiz: [800, 0], genlik: 0.05, sinir: 3, fps: 30 });
+  ok("yaylanPlan: [x,y] boyut başına (y'de hız yok → y sabit)", xy.keys.length > 2 && xy.keys.every(function (k) { return Array.isArray(k.v) && k.v[1] === 540; }) &&
+    xy.keys[0].v[0] > 960, js(xy.keys[0]));
+  var op = E.yaylanPlan({ tL: 1, vL: 100, hiz: 400, genlik: 0.2, sinir: 3, fps: 30, clampMin: 0, clampMax: 100 });
+  ok("yaylanPlan: Opaklık 0..100 kırpılır (100'e gelen opaklık aşmaz)", op.keys.every(function (k) { return k.v >= 0 && k.v <= 100; }) &&
+    op.keys.some(function (k) { return k.v === 100; }) && op.keys.some(function (k) { return k.v < 100; }));
+  // sonraki anahtar başka değerdeyse taban oraya doğru doğrusal gider (kullanıcının sonraki hareketi kaymaz)
+  var dog = E.yaylanPlan({ tL: 2, vL: 0, hiz: 100, genlik: 0.1, frekans: 3, sonum: 6, sinir: 4, tN: 4, vN: 200, fps: 25 });
+  ok("yaylanPlan: sonraki anahtar farklıysa taban doğrusal (iniş → sonraki)", dog.keys.every(function (k) {
+    return yakin(k.v, 0 + 200 * (k.t - 2) / 2 + 100 * 0.1 * s(k.t - 2), 1e-5);
+  }));
+  var tnOte = E.yaylanPlan({ tL: 2, vL: 0, hiz: 100, sinir: 3, tN: 6, vN: 400, fps: 25 });
+  ok("yaylanPlan: sonraki anahtar klibin ötesindeyse taban yine o anahtara göre (sınır klip sonu)", tnOte.keys.every(function (k) { return k.t < 3; }) &&
+    yakin(tnOte.keys[tnOte.keys.length - 1].v - 400 * (tnOte.keys[tnOte.keys.length - 1].t - 2) / 4, 100 * 0.1 * E.dampedSine(3, 6)(tnOte.keys[tnOte.keys.length - 1].t - 2), 1e-5));
+  var yog = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: 0.1, frekans: 3, sonum: 6, sinir: 5, fps: fps, yogun: true });
+  var kareler = yog.keys.map(function (k) { return Math.round(k.t * fps) - 50; });
+  ok("yaylanPlan yoğun: 2 karede bir, son anahtar pencere sonu (Bezier yazılamazsa yedek)", yog.yogun === true && kareler[0] === 1 &&
+    kareler.slice(1, -1).every(function (k, i) { return k - kareler[i] === 2; }) && yakin(yog.keys[yog.keys.length - 1].t, 2 + p.sure, 1e-9) &&
+    yog.keys.every(function (k) { return yakin(k.v, 500 + 100 * s(k.t - 2), 1e-5); }), js(kareler));
+  var kirp = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: 9, frekans: 99, sonum: -3, sinir: 5, fps: fps });
+  ok("yaylanPlan: ayarlar sınırlara kırpılır, sayı olmayan varsayılan olur", kirp.genlik === 0.5 && kirp.frekans === 6 && kirp.sonum === 2 &&
+    E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, genlik: "x", sinir: 5, fps: fps }).genlik === 0.1);
+  ok("yaylanPlan: kare dışı iniş (yarım kare) — anahtarlar inişten en az yarım kare sonra", E.yaylanPlan({ tL: 2.013, vL: 1, hiz: 10, sinir: 4, fps: 25 })
+    .keys.every(function (k) { return k.t >= 2.013 + 0.5 / 25 - 1e-9; }));
+  ok("yaylanPlan: sonuç JSON güvenli", JSON.stringify(p).indexOf("null") === -1 && JSON.stringify(xy).indexOf("NaN") === -1);
+})();
+
 /* ================= Atıf ve paket ================= */
 var src = fs.readFileSync(path.join(KOK, "js", "ease-curve.js"), "utf8");
 var REBOUND_BASLIK = "Portions adapted from Rebound (https://github.com/meszmate/rebound), MIT License, Copyright (c) 2026 Rebound contributors. See THIRD_PARTY_NOTICES.md.";

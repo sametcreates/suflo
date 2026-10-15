@@ -11,6 +11,8 @@
  *   - düzenleyici geometrisi: değer ve hız görünümü, tutamaç sürükleme, Shift ile 0,05'e yapışma,
  *     çift tıkla şekli bozmadan nokta ekleme (SufloEase.split), nokta silme, önizleme sahnesi
  *   - kısayollar (metin alanında değilken) ve CEP tuş ilgisi, kullanıcı önayarlarının doğrulanması
+ *   - varışta yaylanma (adım 14): varışları bulma (önceki anahtardan varış hızı, sonraki anahtar / klip sonu sınırı),
+ *     KS_easeBake yaylanma öğeleri (SufloEase.yaylanPlan; seyrek + 2 karede bir yedek), aynı inişte yerine geçme, önizleme
  * Suflo'nun kendi kodu (temiz oda). Yumuşatma matematiği js/ease-curve.js'te (Rebound MIT uyarlaması).
  */
 (function (root, factory) {
@@ -124,10 +126,11 @@
   function satirAnahtari(p) { return String(p.nodeId) + "|" + p.compIdx + "|" + p.propIdx; }
 
   /* ================= kayıtlar ================= */
-  // Bu satırın (klip + bileşen + özellik + kimlik) kayıtları
-  function satirKayitlari(kayitlar, prop) {
+  // Bu satırın (klip + bileşen + özellik + kimlik) kayıtları; tur verilmezse Eğri ('egri'), 'yaylan' varışta yaylanma
+  function satirKayitlari(kayitlar, prop, tur) {
+    var t = tur || "egri";
     return (Array.isArray(kayitlar) ? kayitlar : []).filter(function (r) {
-      return r && r.tur === "egri" && String(r.nodeId) === String(prop.nodeId) && r.compIdx === prop.compIdx && r.propIdx === prop.propIdx &&
+      return r && r.tur === t && String(r.nodeId) === String(prop.nodeId) && r.compIdx === prop.compIdx && r.propIdx === prop.propIdx &&
         String(r.matchName || "") === String(prop.matchName || "");
     });
   }
@@ -207,10 +210,10 @@
     }
     return null;
   }
-  // Canlı kayıtlar (taşınan klipte kaydırılmış kopyalarıyla)
-  function canliKayitlar(kayitlar, prop) {
+  // Canlı kayıtlar (taşınan klipte kaydırılmış kopyalarıyla); tur: satirKayitlari gibi
+  function canliKayitlar(kayitlar, prop, tur) {
     var out = [];
-    satirKayitlari(kayitlar, prop).forEach(function (r) { var c = canliHali(r, prop); if (c) out.push(c); });
+    satirKayitlari(kayitlar, prop, tur).forEach(function (r) { var c = canliHali(r, prop); if (c) out.push(c); });
     return out;
   }
   function uclarDan(kayitlar) {
@@ -329,6 +332,230 @@
     var n = 0;
     ((grup && grup.items) || []).forEach(function (it) { n += it.keys ? it.keys.length : 0; });
     return Math.max(120000, Math.min(600000, n * 50));
+  }
+
+  /* ================= varışta yaylanma (3.4 adım 14) ================= */
+  /*
+   * İniş anahtar karesinden sonra hedefi varış hızıyla orantılı aşıp salınarak oturma (follow-through). Matematik
+   * SufloEase.yaylanPlan'da (Rebound'un overshoot'u); burada satır verisinden varışları bulma ve KS_easeBake öğeleri.
+   * Kayıt: tur 'yaylan', uclar null (kayıt kendi anahtarlarıyla yaşar: kullanıcı sonraki anahtarı taşısa da Geri al
+   * bulur), kenarDegerleri[0] = iniş anahtarı { t, v } (aynı inişe yeniden uygulanınca eskisinin yerine geçer).
+   */
+  function yaylanAyar(ham) {
+    var Y = E.YAYLAN;
+    ham = ham && typeof ham === "object" ? ham : {};
+    function s(v, a) { var n = Number(v); return v !== null && v !== "" && isFinite(n) ? sinirla(n, a.min, a.max) : a.varsayilan; }
+    return { genlik: r4(s(ham.genlik, Y.GENLIK)), frekans: r4(s(ham.frekans, Y.FREKANS)), sonum: r4(s(ham.sonum, Y.SONUM)), tum: ham.tum === true };
+  }
+  // Ayarın oturma süresi (sn; sonraki anahtar kare ya da klip sonu daha yakınsa uygulamada kısalır)
+  function yaylanSure(ayar) { return E.autoDuration(yaylanAyar(ayar).sonum); }
+  // Kaydın iniş anahtarı zamanı (kenarDegerleri[0]; yoksa NaN)
+  function varisZamani(r) {
+    var k = r && Array.isArray(r.kenarDegerleri) && r.kenarDegerleri[0];
+    return k && sonlu(Number(k.t)) ? Number(k.t) : NaN;
+  }
+  // Canlı yaylanma kayıtları: { r (kaydırılmış canlı kopya), tL, son (son anahtar zamanı), idx (anahtar indisleri) }
+  function canliYaylanlar(kayitlar, prop) {
+    var keys = (prop && prop.keys) || [], tol = tolerans(prop && prop.fps);
+    return canliKayitlar(kayitlar, prop, "yaylan").map(function (r) {
+      var idx = [];
+      (r.times || []).forEach(function (t) { var i = indis(keys, t, tol); if (i >= 0) idx.push(i); });
+      return { r: r, tL: varisZamani(r), son: r.times && r.times.length ? r.times[r.times.length - 1] : NaN, idx: idx };
+    }).filter(function (y) { return sonlu(y.tL); });
+  }
+  // Playhead bu kaydın penceresinde mi: [iniş, son anahtar]
+  function yaylanPencerede(y, ph, tol) { return sonlu(ph) && ph >= y.tL - tol && ph <= y.son + tol; }
+  /*
+   * Satırın playhead'deki yaylanma kaydı (satır rozeti ve satırın Geri al'ı): playhead kaydın penceresindeyse ya da
+   * kaydın inişi playhead'i saran çiftin ikinci ucuysa (Varışta yaylan'ın o satırda hedefleyeceği iniş). Yoksa null.
+   */
+  function yaylanSatirKaydi(kayitlar, prop, ph) {
+    var tol = tolerans(prop && prop.fps), liste = canliYaylanlar(kayitlar, prop);
+    for (var i = liste.length - 1; i >= 0; i--) if (yaylanPencerede(liste[i], Number(ph), tol)) return liste[i].r;
+    var c = ciftBul(prop && prop.keys, ph, prop && prop.fps, uclarDan(canliKayitlar(kayitlar, prop)));
+    if (!c) return null;
+    for (var j = liste.length - 1; j >= 0; j--) if (Math.abs(liste[j].tL - c.t1) <= tol) return liste[j].r;
+    return null;
+  }
+  // Satır Varışta yaylan'a uygun mu (değer okumadan, yoklamadaki önbellekle): tüm varışlarda ≥ 2 anahtar; yoksa
+  // playhead bir çiftin içinde ya da bir yaylanmanın penceresinde
+  function yaylanUygun(prop, ph, kayitlar, tum) {
+    var keys = (prop && prop.keys) || [];
+    if (keys.length < 2) return false;
+    if (tum) return true;
+    if (ciftBul(keys, ph, prop.fps, uclarDan(canliKayitlar(kayitlar, prop)))) return true;
+    var tol = tolerans(prop.fps);
+    return canliYaylanlar(kayitlar, prop).some(function (y) { return yaylanPencerede(y, Number(ph), tol); });
+  }
+
+  function degerKopya(v) { return Array.isArray(v) ? v.slice() : v; }
+  function degerGecerli(v) { return sonlu(v) || (Array.isArray(v) && v.length === 2 && sonlu(v[0]) && sonlu(v[1])); }
+
+  /*
+   * Satırın varışları (iniş anahtar kareleri). prop: tarama satırı; prop.degerler (keys ile hizalı değerler,
+   * KS_easeScan degerIste) gerekir. o: { tum, ph }.
+   *   Tek varış (varsayılan): playhead canlı bir yaylanmanın penceresindeyse onun inişi (yeniden uygulanır); değilse
+   *   playhead'i saran çiftin ikinci ucu (canlı Eğri kaydı çifti bölmez). Yalnız o inişin eski yaylanması değişir.
+   *   Tüm varışlar: önceki anahtarı olan her anahtar; canlı Eğri'nin iç anahtarları iniş sayılmaz, tüm canlı
+   *   yaylanmalar değişir (onların anahtarları önceki / sonraki anahtar sayılmaz).
+   * Varış hızı önceki anahtardan (Δv/Δt, boyut başına): önceki anahtar Suflo'nun sık Eğri anahtarıysa bu, hemen önce
+   * pişirilmiş eğrinin bitiş eğimidir. Sonraki anahtar (yoksa klibin sonu) sınırdır: yaylanma onu geçmez.
+   * Döner: { varislar: [{ iL, tL, vL, tP, vP, tN, vN, sinir, hiz, eski (değişecek kayıt | null) }], kod, atlanan: [kod] }
+   *   kod (hiç varış yoksa): 'degerYok' | 'disinda' | 'varisYok' (iniş anahtarına hareket gelmiyor) | 'klipDisi'
+   */
+  function varislar(prop, kayitlar, o) {
+    o = o || {};
+    var keys = (prop && prop.keys) || [], vals = prop && prop.degerler, fps = fpsOku(prop && prop.fps), tol = tolerans(fps);
+    var sonuc = { varislar: [], kod: "", atlanan: [] };
+    if (keys.length < 2) { sonuc.kod = "disinda"; return sonuc; }
+    if (!Array.isArray(vals) || vals.length !== keys.length) { sonuc.kod = "degerYok"; return sonuc; }
+    var ph = Number(o.ph), tum = o.tum === true;
+    var canliY = canliYaylanlar(kayitlar, prop);
+    var egriUclari = uclarDan(canliKayitlar(kayitlar, prop));
+    var egriIc = {};
+    egriUclari.forEach(function (u) { keys.forEach(function (t, i) { if (t > u[0] + tol && t < u[1] - tol) egriIc[i] = 1; }); });
+    var degisen = [], adaylar = [];
+    if (tum) {
+      degisen = canliY;
+      var haric0 = {};
+      canliY.forEach(function (y) { y.idx.forEach(function (i) { haric0[i] = 1; }); });
+      keys.forEach(function (t, i) { if (!haric0[i] && !egriIc[i]) adaylar.push(i); });
+    } else {
+      var pen = null;
+      for (var a = canliY.length - 1; a >= 0 && !pen; a--) if (yaylanPencerede(canliY[a], ph, tol)) pen = canliY[a];
+      var iL = -1;
+      if (pen) iL = indis(keys, pen.tL, tol);
+      else {
+        var c = ciftBul(keys, ph, fps, egriUclari);
+        if (c) iL = c.i1;
+      }
+      if (iL < 0) { sonuc.kod = "disinda"; return sonuc; }
+      canliY.forEach(function (y) { if (Math.abs(y.tL - keys[iL]) <= tol) degisen.push(y); });
+      adaylar = [iL];
+    }
+    var haric = {};
+    degisen.forEach(function (y) { y.idx.forEach(function (i) { haric[i] = 1; }); });
+    var bas = sonlu(prop.clipStart) ? prop.clipStart : -Infinity, son = sonlu(prop.clipEnd) ? prop.clipEnd : Infinity;
+    // Tüm varışlarda varış olmayan anahtar (bekleme), klibin dışındaki anahtar sessizce geçilir; tek varışta nedeni söylenir
+    function atla(kod) { if (!tum || kod === "degerYok") sonuc.atlanan.push(kod); }
+    adaylar.forEach(function (iL2) {
+      if (haric[iL2]) return;
+      var tL = keys[iL2];
+      var iP = iL2 - 1;
+      while (iP >= 0 && haric[iP]) iP--;
+      var iN = iL2 + 1;
+      while (iN < keys.length && haric[iN]) iN++;
+      if (iP < 0) { atla("varisYok"); return; }
+      if (tL < bas - tol || tL >= son - tol) { atla("klipDisi"); return; }
+      var vL = vals[iL2], vP = vals[iP];
+      if (!degerGecerli(vL) || !degerGecerli(vP) || Array.isArray(vL) !== Array.isArray(vP)) { atla("degerYok"); return; }
+      var dt = tL - keys[iP];
+      if (!(dt > 1e-9)) { atla("varisYok"); return; }
+      var hiz = Array.isArray(vL) ? [(vL[0] - vP[0]) / dt, (vL[1] - vP[1]) / dt] : (vL - vP) / dt;
+      var hizlar = Array.isArray(hiz) ? hiz : [hiz];
+      // hareket gelmiyor: değer değişimi değerin milyonda birinden küçük
+      var olcu = Math.max(1, Math.abs(Array.isArray(vL) ? Math.max(Math.abs(vL[0]), Math.abs(vL[1])) : vL));
+      if (!hizlar.some(function (h) { return Math.abs(h * dt) > 1e-6 * olcu; })) { atla("varisYok"); return; }
+      var tN = iN < keys.length ? keys[iN] : null, vN = tN === null ? null : vals[iN];
+      if (tN !== null && !degerGecerli(vN)) { atla("degerYok"); return; }
+      var eski = null;
+      degisen.forEach(function (y) { if (Math.abs(y.tL - tL) <= tol) eski = y.r; });
+      sonuc.varislar.push({ iL: iL2, tL: tL, vL: degerKopya(vL), tP: keys[iP], vP: degerKopya(vP), tN: tN, vN: degerKopya(vN),
+        sinir: tN === null ? son : Math.min(tN, son), hiz: hiz, eski: eski, tum: tum });
+    });
+    if (!sonuc.varislar.length) sonuc.kod = sonuc.atlanan.length ? sonuc.atlanan[0] : "varisYok";
+    return sonuc;
+  }
+
+  /*
+   * Seçili satırlardan KS_easeBake çağrıları (klip başına bir). satirlar: [{ prop, varis: varislar() sonucu }];
+   * ayar: yaylanAyar. Her varış bir öğe: { tur: 'yaylan', t0 (iniş), v0, t1 / v1 (sonraki anahtar; yoksa null),
+   * sinir, keys (seyrek: tepe / çukurlar, host Bezier (5) yazar), yogunKeys (Bezier yazılamazsa 2 karede bir),
+   * degistir + eski (aynı inişteki canlı yaylanmanın zamanları: host önce onları siler) }.
+   * Döner: { gruplar: [{ target, items, satirlar: [{ prop, varis }], klip }], atlanan: [{ prop, kod }] }.
+   */
+  function yaylanGruplari(satirlar, ayar, seqId) {
+    var a = yaylanAyar(ayar), gruplar = [], dizin = {}, atlanan = [];
+    (satirlar || []).forEach(function (s) {
+      var p = s.prop, v = s.varis || {};
+      (v.atlanan || []).forEach(function (k) { atlanan.push({ prop: p, kod: k }); });
+      if (!v.varislar || !v.varislar.length) { if (!(v.atlanan && v.atlanan.length)) atlanan.push({ prop: p, kod: v.kod || "varisYok" }); return; }
+      v.varislar.forEach(function (va) {
+        var temel = { tL: va.tL, vL: va.vL, hiz: va.hiz, genlik: a.genlik, frekans: a.frekans, sonum: a.sonum, sinir: va.sinir, fps: p.fps,
+          tN: va.tN === null ? undefined : va.tN, vN: va.tN === null ? null : va.vN, clampMin: p.opak ? 0 : undefined, clampMax: p.opak ? 100 : undefined };
+        var seyrek = E.yaylanPlan(temel);
+        temel.yogun = true;
+        var yogun = E.yaylanPlan(temel);
+        if (seyrek.hata || yogun.hata) {
+          // tüm varışlarda yeri olmayan iniş (hemen ardından Eğri başlıyor ya da anahtarlar çok yakın) sessizce geçilir
+          var kod = seyrek.hata || yogun.hata;
+          if (!(va.tum && kod === "yer")) atlanan.push({ prop: p, kod: kod });
+          return;
+        }
+        var anahtar = String(p.nodeId);
+        if (!Object.prototype.hasOwnProperty.call(dizin, anahtar)) {
+          dizin[anahtar] = gruplar.length;
+          gruplar.push({ target: { nodeId: p.nodeId, clipName: p.clipName, clipStart: p.clipStart, seqId: seqId || "" }, items: [], satirlar: [], klip: capa(p) });
+        }
+        var g = gruplar[dizin[anahtar]];
+        var oge = { tur: "yaylan", compIdx: p.compIdx, propIdx: p.propIdx, matchName: p.matchName, t0: va.tL, v0: degerKopya(va.vL),
+          t1: va.tN, v1: va.tN === null ? null : degerKopya(va.vN), sinir: va.sinir, keys: seyrek.keys, yogunKeys: yogun.keys, degistir: !!va.eski };
+        if (va.eski) oge.eski = (va.eski.times || []).slice();
+        g.items.push(oge);
+        g.satirlar.push({ prop: p, varis: va, bezier: p.kfInterp !== false });
+      });
+    });
+    return { gruplar: gruplar, atlanan: atlanan };
+  }
+  // KS_easeBake zaman aşımında yaylanma öğelerinin geçici kayıtları (taramanın kfInterp'ine göre seyrek ya da sık plan)
+  function yaylanGeciciKayitlar(grup, seqId) {
+    var h = (grup && grup.target) || {}, c = capa(grup && grup.klip);
+    return ((grup && grup.items) || []).map(function (it, i) {
+      var sat = grup.satirlar && grup.satirlar[i];
+      var liste = sat && sat.bezier === false ? it.yogunKeys : it.keys;
+      var r = { tur: "yaylan", seqId: String(seqId || h.seqId || ""), nodeId: h.nodeId, clipName: h.clipName, clipStart: h.clipStart,
+        matchName: it.matchName, compIdx: it.compIdx, propIdx: it.propIdx, uclar: null,
+        times: (liste || []).map(function (k) { return k.t; }), kenarDegerleri: [{ t: it.t0, v: it.v0 }] };
+      if (c) { r.clipEnd = c.clipEnd; r.clipIn = c.clipIn; r.clipOut = c.clipOut; r.ters = c.ters; }
+      return r;
+    }).filter(function (r) { return r.times.length > 0; });
+  }
+  // Yeni yaylanma kaydıyla aynı inişteki eskiler (aynı satır; inişler kaynak çapasıyla ya da klip başlangıcıyla
+  // karşılaştırılır): yeni yaylanma onların yerine geçer
+  function yaylanCakisanlar(kayitlar, yeni) {
+    var tY = varisZamani(yeni);
+    if (!yeni || !sonlu(tY)) return [];
+    var tol = tolerans(yeni.fps);
+    return (Array.isArray(kayitlar) ? kayitlar : []).filter(function (r) {
+      if (!r || r.id === yeni.id || r.tur !== "yaylan") return false;
+      if (String(r.nodeId) !== String(yeni.nodeId) || r.compIdx !== yeni.compIdx || r.propIdx !== yeni.propIdx) return false;
+      var tR = varisZamani(r);
+      if (!sonlu(tR)) return true;
+      var d = capaKaymasi(r, yeni, tol);
+      if (!sonlu(d)) d = sonlu(r.clipStart) && sonlu(yeni.clipStart) ? yeni.clipStart - r.clipStart : 0;
+      return Math.abs(tR + d - tY) <= tol;
+    });
+  }
+  /*
+   * Ayar önizlemesi (Premiere'e gitmez): birim yolu 0,5 sn'de doğrusal gelen bir değerin inişten sonraki yaylanması.
+   * w × h SVG yolu; kesikli hedef çizgisi için hedefY. Döner: { yol, hedefY, sure, tepe (ilk aşım, yolun oranı) }.
+   */
+  function yaylanOnizleme(ayar, w, h) {
+    var a = yaylanAyar(ayar), W = Number(w) || 240, H = Number(h) || 80, pad = 6;
+    var gelis = 0.5, sure = E.autoDuration(a.sonum), toplam = gelis + sure;
+    var s = E.dampedSine(a.frekans, a.sonum), v = 1 / gelis;
+    var tepe = 0;
+    E.extremaTimes(a.frekans, a.sonum, sure).slice(0, 1).forEach(function (t) { tepe = v * a.genlik * s(t); });
+    var ust = 1 + Math.max(0.05, tepe), alt = -0.05;
+    function y(deg) { return pad + (ust - deg) / (ust - alt) * (H - 2 * pad); }
+    function x(t) { return pad + t / toplam * (W - 2 * pad); }
+    var adet = 120, yol = [];
+    for (var i = 0; i <= adet; i++) {
+      var t = i / adet * toplam;
+      var deg = t <= gelis ? t / gelis : 1 + v * a.genlik * s(t - gelis);
+      yol.push((i ? "L" : "M") + n2(x(t)) + " " + n2(y(deg)));
+    }
+    return { yol: yol.join(" "), hedefY: n2(y(1)), varisX: n2(x(gelis)), sure: sure, tepe: tepe };
   }
 
   /* ================= gezinme ================= */
@@ -596,7 +823,16 @@
     klipTasindi: "klip taşınmış; liste yenilendi, yeniden dene",
     sekans: "eğri başka bir sekans için hazırlanmıştı; liste yenilendi, yeniden dene",
     sekansYok: "aktif sekans yok",
-    zamanAsimi: "Premiere yanıt vermedi; yazılmış olabilecek anahtar kareler kayda alındı, Geri al ile kaldırılabilir"
+    zamanAsimi: "Premiere yanıt vermedi; yazılmış olabilecek anahtar kareler kayda alındı, Geri al ile kaldırılabilir",
+    // Varışta yaylan (3.4 adım 14)
+    varisYok: "iniş anahtar karesine hareket gelmiyor",
+    hiz: "iniş anahtar karesine hareket gelmiyor",
+    klipDisi: "iniş anahtar karesi klibin görünen kısmının dışında",
+    yer: "sonraki anahtar kareye ya da klibin sonuna 2 kareden az yer var",
+    aralik: "geçersiz plan",
+    deger: "geçersiz plan",
+    fps: "geçersiz plan",
+    sonrakiYok: "sonraki anahtar kare yerinde değil"
   };
   var HATA = {
     sekansYok: "Aktif sekans yok. Bir sekans aç.",
@@ -616,6 +852,9 @@
     satirKayitlari: satirKayitlari, canliKayitlar: canliKayitlar, canliHali: canliHali, kaydir: kaydir, uclarDan: uclarDan, ipuclari: ipuclari,
     satirKaydi: satirKaydi, cakisanlar: cakisanlar, capaKaymasi: capaKaymasi,
     bakeGruplari: bakeGruplari, geciciKayitlar: geciciKayitlar, bakeSuresi: bakeSuresi, sonrakiCift: sonrakiCift, onizlemeAdimlari: onizlemeAdimlari,
+    yaylanAyar: yaylanAyar, yaylanSure: yaylanSure, varisZamani: varisZamani, canliYaylanlar: canliYaylanlar, yaylanSatirKaydi: yaylanSatirKaydi,
+    yaylanUygun: yaylanUygun, varislar: varislar, yaylanGruplari: yaylanGruplari, yaylanGeciciKayitlar: yaylanGeciciKayitlar,
+    yaylanCakisanlar: yaylanCakisanlar, yaylanOnizleme: yaylanOnizleme,
     kisayol: kisayol, metinAlani: metinAlani, tusIlgisi: tusIlgisi,
     onayarlar: onayarlar, onayarEkle: onayarEkle, onayarSil: onayarSil, onayarAdi: onayarAdi,
     ekranX: ekranX, ekranY: ekranY, egriX: egriX, egriY: egriY, yapis: yapis,
