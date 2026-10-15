@@ -1,5 +1,5 @@
 /*
- * Suflo — Yapay zekâ köprüsü (MCP) Ayarlar kartı ve eylem yürütücüleri (3.4, Deneysel)
+ * Suflo — Yapay zekâ köprüsü (MCP) Ayarlar kartı ve eylem yürütücüleri (3.4)
  *
  * İnce yapıştırıcı: kurallar js/otomasyon.js (eylem listesi, doğrulama, temizlik) ve
  * js/otomasyon-sunucu.js'te (127.0.0.1 sunucusu). Burada yalnız:
@@ -27,6 +27,8 @@ window.KOtomasyon = (function () {
   var izin = { duzenleme: false, onay: true };   // bellekte: her açılışta güvenli varsayılan
   var bekleyenOnay = null;                         // { coz, saat }
   var mesgul = false;
+  var temaslar = {};                               // istemci nabızları: { desktop|code|diger: { son, veda } }
+  var istemciSaati = null;
 
   function el(id) { return document.getElementById(id); }
   function toast(m, t, sure, eylem) { try { if (window.KApp && KApp.toast) KApp.toast(m, t, sure, eylem); } catch (e) {} }
@@ -271,6 +273,42 @@ window.KOtomasyon = (function () {
     etkinlikCiz();
   }
 
+  /* ---------------- İstemci bağlantısı ---------------- */
+
+  function temasAl(kod, tur) {
+    if (!sunucu || !sunucu.acikMi()) return;
+    temaslar[kod] = { son: Date.now(), veda: tur === "veda" };
+    istemciCiz();
+  }
+  function saatMetni(ms) {
+    var d = new Date(ms);
+    return iki(d.getHours()) + ":" + iki(d.getMinutes()) + ":" + iki(d.getSeconds());
+  }
+  function istemciCiz() {
+    var e = el("mcp-istemci");
+    if (!e || !O) return;
+    var acik = !!(sunucu && sunucu.acikMi());
+    var d = O.istemciDurumu(temaslar, acik, Date.now());
+    e.hidden = d.durum === "kapali";
+    if (d.durum === "bagli") {
+      e.className = "inline-status mcp-istemci good";
+      e.textContent = d.adlar.length
+        ? "● Claude bağlı: " + d.adlar.join(", ") + " · son iletişim " + saatMetni(d.son)
+        : "● Bir MCP istemcisi bağlı · son iletişim " + saatMetni(d.son);
+    } else if (d.durum === "koptu") {
+      e.className = "inline-status mcp-istemci warn";
+      e.textContent = "Claude bağlantısı kesildi · son iletişim " + saatMetni(d.son) +
+        ". Bu bilgisayarda Claude Desktop'u ya da Claude Code'u yeniden aç.";
+    } else if (d.durum === "bekliyor") {
+      e.className = "inline-status mcp-istemci warn";
+      e.textContent = "Köprü açık, Claude henüz bağlanmadı. Bu bilgisayarda Claude Desktop'u ya da Claude Code'u aç " +
+        "(ayarı ekledikten sonra yeniden başlat). claude.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz.";
+    } else {
+      e.className = "inline-status mcp-istemci";
+      e.textContent = "";
+    }
+  }
+
   /* ---------------- Aç / kapat ---------------- */
 
   function arayuz() {
@@ -279,6 +317,11 @@ window.KOtomasyon = (function () {
     if (b) { b.textContent = acik ? "Köprüyü kapat" : "Köprüyü aç"; b.classList.toggle("primary", !acik); b.disabled = mesgul; }
     if (el("mcp-jeton")) el("mcp-jeton").disabled = !acik;
     if (el("mcp-acik-rozet")) el("mcp-acik-rozet").hidden = !acik;
+    // Kapalı köprüde eski bağlantı bilgisi kalmaz; açıkken 15 sn'de bir tazelenir (nabız gelmezse "kesildi")
+    if (!acik) temaslar = {};
+    if (acik && !istemciSaati) istemciSaati = setInterval(istemciCiz, 15000);
+    if (!acik && istemciSaati) { clearInterval(istemciSaati); istemciSaati = null; }
+    istemciCiz();
   }
 
   function sunucuKur() {
@@ -296,6 +339,7 @@ window.KOtomasyon = (function () {
         return Pro.izinVar(f);
       },
       kayit: kaydet,
+      temas: temasAl,
       gunluk: function (m) { try { K.log(m); } catch (e) {} },
       onKapandi: function (neden) {
         if (bekleyenOnay) bekleyenOnay.coz(false);
@@ -460,6 +504,9 @@ window.KOtomasyon = (function () {
     _ac: ac,
     _sunucu: function () { return sunucu; },
     _kalanDosyayiSil: kalanDosyayiSil,
-    _etkinlik: function () { return etkinlik.slice(); }
+    _etkinlik: function () { return etkinlik.slice(); },
+    _temasAl: temasAl,
+    _temaslar: function () { return temaslar; },
+    _istemciCiz: istemciCiz
   };
 })();

@@ -29,8 +29,8 @@ var hedefler = (Y ? Y.maddeler : []).map(function (m) { return (m.eylem ? "eylem
 ["egri:egri-editor", "egri:egri-yaylan", "cut:cut-scope", "hiz:hiz-grid", "eylem:aracAra"].forEach(function (h) {
   ok("v3.4 yeniliği duyuruluyor: " + h, hedefler.indexOf(h) !== -1);
 });
-// Yapay zekâ köprüsü (MCP) Deneysel ve varsayılan kapalı: Yenilikler penceresinde öne çıkarılmaz
-ok("Deneysel yapay zekâ köprüsü Yenilikler'de duyurulmuyor", !/MCP|köprü/i.test(JSON.stringify(Y ? Y.maddeler : [])));
+// Yapay zekâ köprüsü (MCP) varsayılan kapalı ve Pro: 3.4 Yenilikler penceresinde öne çıkarılmaz (sürüm notu ve sitede duyurulur)
+ok("yapay zekâ köprüsü 3.4 Yenilikler penceresinde yok", !/MCP|köprü/i.test(JSON.stringify(Y ? Y.maddeler : [])));
 
 // Pro kapılı araçlar pencerede (Pro) işaretli: işaretsiz madde ücretsiz gibi okunur, Uygula'da upsell çıkar
 ["Varışta yaylan", "Canlı eşikli kesim", "Özel hız eğrisi"].forEach(function (b) {

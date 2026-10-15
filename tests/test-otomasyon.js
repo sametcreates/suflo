@@ -184,5 +184,23 @@ ok("Claude Desktop JSON ve Claude Code komutu", JSON.parse(O.claudeDesktopJson("
   JSON.parse(O.claudeDesktopJson("/a/mcp/suflo-mcp.js")).mcpServers.suflo.args[0] === "/a/mcp/suflo-mcp.js" &&
   O.claudeCodeKomutu("/a b/mcp/suflo-mcp.js") === 'claude mcp add suflo -- node "/a b/mcp/suflo-mcp.js"');
 
+/* ---------------- 3.4.1 istemci bağlantı durumu ---------------- */
+ok("istemci adı yalnız bilinen tam adlardan: claude-ai → desktop, claude-code → code, gerisi diger",
+  O.istemciKodu("claude-ai") === "desktop" && O.istemciKodu("Claude-Code") === "code" && O.istemciKodu("claude") === "diger" &&
+  O.istemciKodu("cursor") === "diger" && O.istemciKodu(undefined) === "diger" && O.istemciKodu({}) === "diger");
+ok("istemciAdi: diger için ad yok", O.istemciAdi("desktop") === "Claude Desktop" && O.istemciAdi("code") === "Claude Code" && O.istemciAdi("diger") === "");
+var T0 = 1000000;
+ok("köprü kapalıyken durum 'kapali' (eski temas gösterilmez)", O.istemciDurumu({ desktop: { son: T0, veda: false } }, false, T0 + 1).durum === "kapali");
+ok("temas yokken 'bekliyor'", O.istemciDurumu({}, true, T0).durum === "bekliyor" && O.istemciDurumu(null, true, T0).durum === "bekliyor");
+var dB = O.istemciDurumu({ desktop: { son: T0, veda: false } }, true, T0 + 30000);
+ok("taze nabız: 'bagli', ad ve son iletişim", dB.durum === "bagli" && js(dB.adlar) === js(["Claude Desktop"]) && dB.son === T0, js(dB));
+ok("eşikten (75 sn) eski nabız: 'koptu', bağlı gösterilmez", O.istemciDurumu({ desktop: { son: T0, veda: false } }, true, T0 + O.NABIZ_ESIGI + 1).durum === "koptu");
+ok("veda gelince hemen 'koptu'", O.istemciDurumu({ code: { son: T0, veda: true } }, true, T0 + 10).durum === "koptu");
+var dI = O.istemciDurumu({ desktop: { son: T0, veda: true }, code: { son: T0 + 5, veda: false }, diger: { son: T0 - 999999, veda: false } }, true, T0 + 20);
+ok("iki istemci: kapanan listeden düşer, canlı olan kalır; tanınmayan eski istemci adı görünmez", dI.durum === "bagli" && js(dI.adlar) === js(["Claude Code"]) && dI.son === T0 + 5, js(dI));
+var dD = O.istemciDurumu({ diger: { son: T0, veda: false } }, true, T0 + 1);
+ok("tanınmayan istemci bağlıyken ad listesi boş (panel 'Bir MCP istemcisi bağlı' der)", dD.durum === "bagli" && dD.adlar.length === 0);
+ok("nabız aralığı eşiğin yarısından kısa (iki nabız kaçmadan 'kesildi' denmez)", O.NABIZ_ARALIGI * 2 < O.NABIZ_ESIGI);
+
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

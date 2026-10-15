@@ -1,5 +1,5 @@
 /*
- * Suflo — Yapay zekâ köprüsü (MCP) eylem kaydı (3.4, Deneysel)
+ * Suflo — Yapay zekâ köprüsü (MCP) eylem kaydı (3.4)
  *
  * Panel sunucusu (js/otomasyon-sunucu.js), stdio köprüsü (mcp/suflo-mcp.js) ve testler
  * bu tek listeyi paylaşır. Köprü genel bir Premiere uzaktan kumandası DEĞİLDİR: yalnız
@@ -458,7 +458,49 @@
     return "claude mcp add suflo -- node \"" + String(shimYolu).replace(/"/g, "\\\"") + "\"";
   }
 
+  /* ---------------- İstemci bağlantısı (nabız) ---------------- */
+
+  // Shim, istemci açıkken NABIZ_ARALIGI'nda bir kez nabız gönderir; NABIZ_ESIGI içinde haber
+  // gelmezse istemci "bağlantısı kesildi" sayılır. Nabız köprünün 30 dakika boşta sayacını sıfırlamaz.
+  var NABIZ_ARALIGI = 30000;
+  var NABIZ_ESIGI = 75000;
+  var ISTEMCI_KODLARI = ["desktop", "code", "diger"];
+
+  // MCP initialize › clientInfo.name. Yalnız bilinen tam adlar tanınır; gerisi "diger" (ad gösterilmez)
+  function istemciKodu(ad) {
+    var n = typeof ad === "string" ? ad.toLowerCase() : "";
+    if (n === "claude-ai") return "desktop";
+    if (n === "claude-code") return "code";
+    return "diger";
+  }
+  function istemciAdi(kod) {
+    if (kod === "desktop") return "Claude Desktop";
+    if (kod === "code") return "Claude Code";
+    return "";
+  }
+  // temaslar: { desktop|code|diger: { son: ms, veda: bool } }
+  // -> { durum: "kapali" | "bekliyor" | "bagli" | "koptu", adlar: [..], son: ms }
+  function istemciDurumu(temaslar, acik, simdi) {
+    if (!acik) return { durum: "kapali", adlar: [], son: 0 };
+    var t = temaslar && typeof temaslar === "object" ? temaslar : {};
+    var adlar = [], son = 0, canli = false, gorulen = false;
+    for (var i = 0; i < ISTEMCI_KODLARI.length; i++) {
+      var k = ISTEMCI_KODLARI[i], x = t[k];
+      if (!x || typeof x.son !== "number" || !(x.son > 0)) continue;
+      gorulen = true;
+      if (x.son > son) son = x.son;
+      if (!x.veda && simdi - x.son <= NABIZ_ESIGI) {
+        canli = true;
+        if (istemciAdi(k)) adlar.push(istemciAdi(k));
+      }
+    }
+    if (canli) return { durum: "bagli", adlar: adlar, son: son };
+    return { durum: gorulen ? "koptu" : "bekliyor", adlar: [], son: son };
+  }
+
   return {
+    NABIZ_ARALIGI: NABIZ_ARALIGI, NABIZ_ESIGI: NABIZ_ESIGI, ISTEMCI_KODLARI: ISTEMCI_KODLARI.slice(),
+    istemciKodu: istemciKodu, istemciAdi: istemciAdi, istemciDurumu: istemciDurumu,
     SURUM: SURUM, CIKTI_SINIRI: CIKTI_SINIRI, DIZI_SINIRI: DIZI_SINIRI, ALTYAZI_SINIRI: ALTYAZI_SINIRI,
     MARKER_SINIRI: MARKER_SINIRI, ETKINLIK_SINIRI: ETKINLIK_SINIRI, SINIFLAR: SINIFLAR.slice(), HARIC: HARIC.slice(),
     EYLEMLER: EYLEMLER, eylem: eylem, adlar: adlar, dogrula: dogrula, temizle: temizle, tabanAd: tabanAd,

@@ -2119,7 +2119,7 @@ window.KApp = (function () {
     // Premiere'e (evalScript) hiçbir şey göndermez
     guvenli("Onboarding", function () { if (window.KOnboarding) KOnboarding.init(); });
     guvenli("Davet", function () { if (window.KDavet) KDavet.init(); });
-    // Yapay zekâ köprüsü (MCP, 3.4, Deneysel): açılışta sunucu açılmaz, ağa/Premiere'e gidilmez
+    // Yapay zekâ köprüsü (MCP, 3.4): açılışta sunucu açılmaz, ağa/Premiere'e gidilmez
     guvenli("Yapay zekâ köprüsü", function () { if (window.KOtomasyon) KOtomasyon.init(); });
     guvenli("Pro-UI", reflectPro);
 

@@ -2633,7 +2633,7 @@
               <li>12 dile çeviri · çevrimdışı İngilizce · Toplu klip · stilli ASS</li>
               <li>Marka Kiti logosu ve stilleri timeline'da</li>
               <li>Tek Tık Shorts Paketi · Podcast Modu (deneme hakkı yok)</li>
-              <li>Yapay zekâ köprüsü (MCP, deneysel; deneme hakkı yok)</li>
+              <li>Yapay zekâ köprüsü (MCP; deneme hakkı yok)</li>
               <li>MOGRT, SFX, preset ve Motion BG kütüphaneleri</li>
               <li>Ömür boyu güncelleme</li>
             </ul>
@@ -2724,9 +2724,9 @@
       <p class="hint"><a href="#" id="davet-ortaklik">İçerik üreticisi misin? Ortaklık programı →</a></p>
     </div>
 
-    <!-- Yapay zekâ köprüsü (MCP, 3.4, Deneysel, varsayılan kapalı): js/otomasyon*.js, mcp/suflo-mcp.js -->
+    <!-- Yapay zekâ köprüsü (MCP, 3.4, varsayılan kapalı): js/otomasyon*.js, mcp/suflo-mcp.js -->
     <div class="set-group mcp-kart" id="grp-mcp">
-      <div class="set-title">Yapay zekâ köprüsü (MCP) <span class="mcp-deneysel">Deneysel</span> <span class="pro-inline">PRO</span> <span class="mcp-acik-rozet" id="mcp-acik-rozet" hidden>AÇIK</span></div>
+      <div class="set-title">Yapay zekâ köprüsü (MCP) <span class="pro-inline">PRO</span> <span class="mcp-acik-rozet" id="mcp-acik-rozet" hidden>AÇIK</span></div>
       <p class="hint">Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.</p>
       <div class="row-btns">
         <button id="mcp-ac" class="btn primary" type="button">Köprüyü aç</button>
@@ -2737,6 +2737,8 @@
       <p class="hint mcp-not">Kapalıyken asistan yalnız okur (bağlam, izler, altyazı). Açıkken marker, altyazı ve kesim gibi değişiklikler yapabilir.</p>
       <label class="chk"><input type="checkbox" id="mcp-onay" checked> Yıkıcı eylemlerde onay iste</label>
       <div id="mcp-durum" class="inline-status"></div>
+      <div id="mcp-istemci" class="inline-status mcp-istemci" hidden aria-live="polite"></div>
+      <p class="hint mcp-not">Bağlanmak için bu bilgisayarda çalışan bir Claude oturumu gerekir: Claude Desktop ya da Claude Code. claude.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz.</p>
       <div class="mcp-onay-kart" id="mcp-onay-kart" hidden role="alertdialog" aria-labelledby="mcp-onay-baslik">
         <b id="mcp-onay-baslik">Yapay zekâ asistanı bunu yapmak istiyor</b>
         <p id="mcp-onay-ozet"></p>

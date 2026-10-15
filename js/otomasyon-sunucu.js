@@ -1,5 +1,5 @@
 /*
- * Suflo — Yapay zekâ köprüsü (MCP) panel sunucusu (3.4, Deneysel, varsayılan KAPALI)
+ * Suflo — Yapay zekâ köprüsü (MCP) panel sunucusu (3.4, varsayılan KAPALI)
  *
  * MCP istemcisi ⇄ stdio ⇄ mcp/suflo-mcp.js ⇄ HTTP POST 127.0.0.1 ⇄ BU SUNUCU ⇄ panel eylemleri.
  *
@@ -9,7 +9,7 @@
  *    kapanışta silinir: yalnız içindeki jeton bu oturumun yazdığıysa (aynı Kesit klasörünü paylaşan
  *    başka bir Premiere sürümünün açık köprüsünün dosyası silinmez); "Yeni jeton" dosyayı
  *    yazamazsa köprü kapanır (eski jetonla açık kalmaz, kimsenin bilmediği jetonla da değil)
- *  - yalnız POST /v1/eylem; Host = 127.0.0.1:<port> (DNS rebinding); Origin/Referer/Sec-Fetch-*
+ *  - yalnız POST /v1/eylem (eylem ya da {nabiz: merhaba|veda} istemci teması); Host = 127.0.0.1:<port> (DNS rebinding); Origin/Referer/Sec-Fetch-*
  *    ya da Upgrade varsa (tarayıcı) 403; CORS başlığı hiç gönderilmez, OPTIONS 403
  *  - Content-Type application/json; Authorization: Bearer <jeton> (timingSafeEqual)
  *  - gövde en çok 256 KB, 30 sn okuma süresi; jetonu doğru isteklerde dakikada en çok 120 çağrı;
@@ -80,6 +80,7 @@
     var kayit = s.kayit || function () {};
     var log = s.gunluk || function () {};
     var onKapandi = s.onKapandi || function () {};
+    var temas = s.temas || function () {};
 
     var sunucu = null, port = 0, token = "", tokenBuf = null;
     var yazilanToken = "";      // bağlantı dosyasına bu oturumun en son yazdığı jeton (silmeden önce karşılaştırılır)
@@ -419,7 +420,6 @@
       var uzunluk = Number(h["content-length"]);
       if (isFinite(uzunluk) && uzunluk > govdeSiniri) { ret(413, "buyuk", "Body too large."); return; }
 
-      bostaKur();
       var parcalar = [], boy = 0, bitti = false;
       var okumaSaati = setTimeout(function () {
         if (bitti) return;
@@ -448,6 +448,18 @@
         try { govde = JSON.parse(Buffer.concat(parcalar).toString("utf8")); }
         catch (e) { ret(400, "json", "Invalid JSON.", false); return; }
         if (!govde || typeof govde !== "object" || Array.isArray(govde)) { ret(400, "json", "Invalid body.", false); return; }
+        // İstemci teması: jetonu doğru her istek (nabız ya da eylem) son iletişim zamanını yeniler
+        var ik = govde.istemci === "desktop" || govde.istemci === "code" ? govde.istemci : "diger";
+        if (govde.nabiz === "merhaba" || govde.nabiz === "veda") {
+          // gövde okunurken köprü kapandıysa eski oturuma temas yazılmaz
+          if (!acik || nesil !== benimNesil) { var kn = kapaliHata(); red(res, kn.kod, kn.hata, kn.mesaj); return; }
+          // Nabız: Premiere'e gitmez, etkinlik listesine yazılmaz, 30 dakika boşta sayacını SIFIRLAMAZ
+          try { temas(ik, govde.nabiz); } catch (eN) {}
+          yanit(res, 200, { ok: true });
+          return;
+        }
+        try { temas(ik, "eylem"); } catch (eT2) {}
+        bostaKur();
         // Jetonu doğru, gövdesi okunmuş istek: soket boşta sınırı kalkar (kopyada kesim gibi uzun
         // eylemin ya da onay kartının yanıtı beklenirken bağlantı kesilmesin); kapanışta da kapatılmaz,
         // yanıtını (503 kopru_kapali ya da eylemin sonucu) alır. Yanıt "Connection: close" ile biter.
