@@ -3096,6 +3096,46 @@
     "Bu Premiere surumunde Suflo klibin sesle bagini okuyamiyor ve koparamiyor.": "In this Premiere version Suflo can't read or break the clip's link to its audio."
   });
 
+  /* ================= Hız Rampası özel eğri / Speed Ramp custom curve (3.4 step 13: js/speedramp.js ozel*, js/egri.js mod 'hiz',
+     js/hiz-rampasi.js, #hiz-ozel) ================= */
+  add({
+    "Kendi hız eğrini çiz: nokta ekle, sürükle, sert basamak yap": "Draw your own speed curve: add points, drag them, make hard steps",
+    "Özel rampa {n}": "Custom ramp {}",
+    // preset cards
+    "Düzenle": "Edit",
+    "Bu eğriyi Özel eğri düzenleyicisine kopyala": "Copy this curve into the custom curve editor",
+    "{} özel eğriye kopyalandı; noktaları sürükleyerek değiştir.": "{} copied to the custom curve; drag the points to change it.",
+    // editor box (index.html #hiz-ozel)
+    "Ağır çekim anı": "Slow-mo moment",
+    "Darbe anını playhead'e hizala açıkken playhead'e oturan an; çizgiyi üstteki noktasından sürükle": "With “Line up the hit with the playhead” on, this moment lands on the playhead; drag the line by its top dot",
+    "Özel hız eğrisi düzenleyicisi": "Custom speed curve editor",
+    "Tıkla: nokta ekle · sürükle: taşı · çift tık: sil · Shift: ızgaraya yapış · Alt+tık: sert basamak. Yoğunluk ve Yumuşatma özel eğriye de uygulanır.":
+      "Click: add a point · drag: move it · double-click: delete · Shift: snap to the grid · Alt+click: hard step. Intensity and Easing apply to the custom curve too.",
+    "Sert basamak": "Hard step",
+    "Basamağı kaldır": "Remove step",
+    "Seçili noktada hız bir anda değişsin (Alt+tık)": "Make the speed change instantly at the selected point (Alt+click)",
+    "Noktayı sil": "Delete point",
+    "Seçili noktayı sil (çift tık)": "Delete the selected point (double-click)",
+    "Başlangıç eğrisine dön": "Go back to the starting curve",
+    "Özel rampa adı": "Custom ramp name",
+    "Bu eğriyi adıyla sakla (bu bilgisayarda, en çok 12)": "Save this curve under a name (on this computer, up to 12)",
+    "Kayıtlı özel rampalar": "Saved custom ramps",
+    "Özel rampayı sil": "Delete custom ramp",
+    // status lines
+    "Yüklendi:": "Loaded:",
+    "Kaydedildi:": "Saved:",
+    "Güncellendi:": "Updated:",
+    "En çok 12 özel rampa saklanır; birini sil.": "Up to 12 custom ramps are kept; delete one first.",
+    "Özel rampaya bir ad yaz.": "Give the custom ramp a name.",
+    "Özel rampa bu bilgisayarda saklanamadı.": "Couldn't save the custom ramp on this computer.",
+    // editor warnings (js/egri.js mod 'hiz')
+    "En çok 8 nokta. Yeni nokta için birini çift tıklayıp sil.": "8 points at most. Double-click one to delete it before adding another.",
+    "Başka bir noktaya çok yakın; biraz yana tıkla.": "Too close to another point; click a little to the side.",
+    "Uç noktada sert basamak olmaz; aradaki bir noktayı seç.": "The end points can't be hard steps; pick a point in between.",
+    "Uç noktalar silinmez; hızını yukarı / aşağı sürükleyerek değiştir.": "The end points can't be deleted; drag them up or down to change their speed.",
+    "Önce eğride bir nokta seç.": "Select a point on the curve first."
+  });
+
   /* ============ 3.2 step 2: sound tag filter + silent audio guard (caption-text.js, sessiz-ses.js, Settings › #grp-altyazi) ============ */
   add({
     "Ses etiketlerini koru": "Keep sound tags",

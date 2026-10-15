@@ -22,6 +22,14 @@
  *                         aralık hep balanced.
  *
  * Zaman ekseni: u ∈ [0,1] ÇIKIŞ (timeline) zamanı; hız = kaynak sn / timeline sn (1 = %100).
+ *
+ * Özel eğri (3.4 adım 13): "ozel" önayarının anahtarları kullanıcıdan gelir (o.ozelKeys: [[t, %]] ya da
+ * [{t, v}], o.ozelHit: ağır çekim anı ya da null). ozelDogrula onları 2–8 noktaya, [0, 1] zamanına ve
+ * %10–%1000 hıza oturtur; sonra her şey (yoğunluk, yumuşatma, vuruş anı hizalama, parçalama, Tam hız /
+ * Dengeli / Otomatik, uyarı kodları, srcFrames ≤ F) önayarlardaki gibidir. hostPlan ve host değişmedi.
+ * Düzenleyici geometrisi (log2 hız ekseni, tıkla ekle, sürükle, çift tıkla sil, Shift ızgara, Alt sert
+ * basamak) ozel.* altında saf ve testli; SVG düzenleyici js/egri.js'te (SufloEgriEditor, mod 'hiz').
+ * Suflo'nun kendi kodu (temiz oda).
  */
 (function (root, factory) {
   var api = factory();
@@ -55,6 +63,10 @@
     // Vuruşlar Ritim sekmesinin analizinden gelir (KBeat.vuruslar); vuruş anları müziğe bağlı
     // olduğu için vuruş anı hizalaması bu eğride yapılmaz
     { id: "ritim", name: "Ritme Rampa", desc: "Ritim analizindeki vuruşlarda yavaşla (ya da hızlan)", group: "vurus", hit: null, beats: true,
+      keys: [] },
+    // 3.4 adım 13: kullanıcının kendi çizdiği eğri. Anahtarlar seçeneklerden gelir (o.ozelKeys, o.ozelHit;
+    // ozelDogrula), plan / biçim / parçalama / kaynak politikası önayarlarla aynı yoldan geçer
+    { id: "ozel", name: "Özel eğri", desc: "Kendi hız eğrini çiz: nokta ekle, sürükle, sert basamak yap", group: "ozel", hit: null,
       keys: [] }
   ];
 
@@ -303,6 +315,303 @@
     return { keys: out, hitU2: hc, err: Math.abs(got - f) * (Number(Lsec) > 0 ? Number(Lsec) : 1), clamped: Math.abs(hc - h) > 1e-9 };
   }
 
+  /* ---------------- özel eğri (3.4 adım 13) ---------------- */
+
+  var OZEL = {
+    EN_AZ: 2, EN_COK: 8,             // nokta sayısı (uçlar dahil)
+    ARA: 0.01,                       // düzenleyicide iki ayrı zaman arasındaki en kısa aralık
+    X_YAPIS: 0.05,                   // Shift: zaman %5'e
+    IZGARA: [0.25, 0.5, 1, 2, 4, 8], // Shift: hız bu çizgilere (log2 uzayında en yakın)
+    HIT: [0.02, 0.98],               // ağır çekim anı sınırı
+    KAYIT: 12,                       // adlı özel rampa sayısı (yerel depo)
+    AD: 40
+  };
+  // Düzenleyici boşken (ilk açılış) başlangıç eğrisi: tek derin ağır çekim
+  var OZEL_VARSAYILAN = { keys: [[0, 100], [0.5, 30], [1, 100]], hit: 0.5 };
+
+  function r4(v) { return Math.round(v * 1e4) / 1e4; }
+  function r3(v) { return Math.round(v * 1e3) / 1e3; }
+  // Sayı ya da sayı metni; null / boş / mantıksal değer geçersiz (Number(null) = 0 sessizce t = 0 olmasın)
+  function sayi(x) {
+    if (typeof x === "number") return x;
+    if (typeof x === "string" && /\S/.test(x)) return Number(x);
+    return NaN;
+  }
+
+  /*
+   * ozelDogrula(keys) → [{t, v}] (her zaman 2–8 nokta). keys: [[t, %]] (önayar biçimi) ya da [{t, v (oran)}].
+   *   - sayı olmayan nokta atılır; t [0, 1]'e, v [MIN_V, MAX_V]'ye (%10–%1000) çekilir; t ve v 4 ondalık
+   *   - t'ye göre sıralanır (aynı t'de giriş sırası korunur)
+   *   - aynı t'de en çok iki nokta: ilki ve sonuncusu (sert basamak); hızları aynıysa tek nokta. t = 0'daki
+   *     basamakta yalnız sağdaki, t = 1'dekinde yalnız soldaki hız görünür: o tek nokta kalır
+   *   - ilk nokta t = 0'da, son nokta t = 1'de değilse aynı hızla eklenir (eğri değişmez)
+   *   - 8'den çok nokta: en az iz bırakan iç nokta (komşularının log2 doğrusundan en az sapan) atılır
+   *   - geçerli nokta yoksa düz %100 (plan bunu "duz" ile reddeder)
+   */
+  function ozelDogrula(keys) {
+    var ham = [];
+    (Array.isArray(keys) ? keys : []).forEach(function (k, i) {
+      var t, v;
+      if (Array.isArray(k)) { t = sayi(k[0]); v = sayi(k[1]) / 100; }
+      else if (k && typeof k === "object") { t = sayi(k.t); v = sayi(k.v); }
+      else return;
+      if (!isFinite(t) || !isFinite(v)) return;
+      ham.push({ t: r4(clamp(t, 0, 1)), v: r4(clamp(v, MIN_V, MAX_V)), i: i });
+    });
+    ham.sort(function (a, b) { return a.t - b.t || a.i - b.i; });
+    var out = [];
+    for (var j = 0; j < ham.length;) {
+      var e = j;
+      while (e + 1 < ham.length && ham[e + 1].t === ham[j].t) e++;
+      var a = ham[j], b = ham[e];
+      if (a.t === 0) out.push({ t: 0, v: b.v });
+      else if (a.t === 1) out.push({ t: 1, v: a.v });
+      else {
+        out.push({ t: a.t, v: a.v });
+        if (e > j && b.v !== a.v) out.push({ t: a.t, v: b.v });
+      }
+      j = e + 1;
+    }
+    if (!out.length) return [{ t: 0, v: 1 }, { t: 1, v: 1 }];
+    if (out[0].t > 0) out.unshift({ t: 0, v: out[0].v });
+    if (out[out.length - 1].t < 1) out.push({ t: 1, v: out[out.length - 1].v });
+    while (out.length > OZEL.EN_COK) {
+      var en = -1, enHata = Infinity;
+      for (var q = 1; q < out.length - 1; q++) {
+        var s = out[q - 1], n = out[q + 1], h;
+        if (s.t === out[q].t) h = Math.abs(lg(out[q].v) - lg(s.v));
+        else if (n.t === out[q].t) h = Math.abs(lg(out[q].v) - lg(n.v));
+        else {
+          var x = n.t > s.t ? (out[q].t - s.t) / (n.t - s.t) : 0;
+          h = Math.abs(lg(out[q].v) - (lg(s.v) + x * (lg(n.v) - lg(s.v))));
+        }
+        if (h < enHata) { enHata = h; en = q; }
+      }
+      out.splice(en, 1);
+    }
+    return out;
+  }
+
+  // Ağır çekim anı: [0.02, 0.98] ya da null (yok)
+  function ozelHit(h) {
+    var x = sayi(h);
+    return isFinite(x) ? r4(clamp(x, OZEL.HIT[0], OZEL.HIT[1])) : null;
+  }
+  // Depo / paylaşım biçimi: [[t, %]] (önayarlardaki gibi; % iki ondalık, oran dört ondalıkla gidiş dönüş aynı)
+  function ozelYuzde(keys) {
+    return ozelDogrula(keys).map(function (k) { return [k.t, Math.round(k.v * 1e4) / 100]; });
+  }
+  // "ozel" önayarı: anahtarlar ve ağır çekim anı seçeneklerden. ozelKeys yoksa (boş) başlangıç eğrisi
+  function ozelOnayar(o) {
+    o = o || {};
+    var bos = !Array.isArray(o.ozelKeys) || !o.ozelKeys.length;
+    var keys = ozelDogrula(bos ? OZEL_VARSAYILAN.keys : o.ozelKeys);
+    var hit = bos && o.ozelHit === undefined ? OZEL_VARSAYILAN.hit : ozelHit(o.ozelHit);
+    return { id: "ozel", name: get("ozel").name, desc: get("ozel").desc, group: "ozel", hit: hit, keys: keys };
+  }
+  function onayar(id, o) { return id === "ozel" ? ozelOnayar(o) : get(id); }
+
+  /* ---- düzenleyici geometrisi (SufloEgriEditor mod 'hiz'; viewBox 0 0 W H) ---- */
+  // y: log2 hız, %10 (alt) – %1000 (üst), %100 ortada; x: çıkış zamanı. SOL: eksen yazıları için sol boşluk
+  var OED = { W: 320, H: 176, PAD: 12, SOL: 34 };
+  var LG_ALT = lg(MIN_V), LG_UST = lg(MAX_V);
+  function oX(t) { return yuvarla(OED.SOL + clamp(Number(t), 0, 1) * (OED.W - OED.SOL - OED.PAD), 2); }
+  function oY(v) {
+    var l = clamp(lg(Math.max(1e-6, Number(v))), LG_ALT, LG_UST);
+    return yuvarla(OED.PAD + (LG_UST - l) / (LG_UST - LG_ALT) * (OED.H - 2 * OED.PAD), 2);
+  }
+  function oT(px) { return clamp((Number(px) - OED.SOL) / (OED.W - OED.SOL - OED.PAD), 0, 1); }
+  function oV(py) {
+    var l = LG_UST - (Number(py) - OED.PAD) / (OED.H - 2 * OED.PAD) * (LG_UST - LG_ALT);
+    return clamp(Math.pow(2, l), MIN_V, MAX_V);
+  }
+  // Shift: zaman %5'e; değilse 0,001'e
+  function yapisT(t, shift) { return shift ? r3(Math.round(t / OZEL.X_YAPIS) * OZEL.X_YAPIS) : r3(t); }
+  // Shift: hız en yakın ızgara çizgisine (log2); değilse %1'e
+  function yapisV(v, shift) {
+    v = clamp(Number(v), MIN_V, MAX_V);
+    if (!shift) return clamp(Math.round(v * 100) / 100, MIN_V, MAX_V);
+    var en = OZEL.IZGARA[0];
+    OZEL.IZGARA.forEach(function (g) { if (Math.abs(lg(g) - lg(v)) < Math.abs(lg(en) - lg(v))) en = g; });
+    return en;
+  }
+  function kopyaKeys(keys) { return (keys || []).map(function (k) { return { t: k.t, v: k.v }; }); }
+  // i'nin sert basamak eşi (aynı t'deki komşu) ya da -1
+  function basamakEsi(ks, i) {
+    if (i > 0 && ks[i - 1].t === ks[i].t) return i - 1;
+    if (i < ks.length - 1 && ks[i + 1].t === ks[i].t) return i + 1;
+    return -1;
+  }
+
+  /*
+   * Tıkla: (t, v)'ye nokta (o.shift: ızgaraya yapışır). Döner: { keys, i } | { hata: 'dolu' (8 nokta) | 'yakin'
+   * (başka bir noktaya %1'den yakın) | 'gecersiz' }
+   */
+  function ozelEkle(keys, t, v, o) {
+    o = o || {};
+    var ks = ozelDogrula(keys);
+    t = sayi(t); v = sayi(v);
+    if (!isFinite(t) || !isFinite(v)) return { hata: "gecersiz" };
+    if (ks.length >= OZEL.EN_COK) return { hata: "dolu" };
+    t = clamp(yapisT(clamp(t, 0, 1), !!o.shift), 0, 1);
+    v = yapisV(v, !!o.shift);
+    for (var q = 0; q < ks.length; q++) if (Math.abs(ks[q].t - t) < OZEL.ARA - 1e-9) return { hata: "yakin" };
+    var j = 0;
+    while (j < ks.length && ks[j].t < t) j++;
+    ks.splice(j, 0, { t: t, v: v });
+    return { keys: ks, i: j };
+  }
+
+  /*
+   * Sürükle: i. nokta (t, v)'ye. Uçların zamanı sabit (yalnız hızı oynar). İç nokta komşularının %1 içine
+   * giremez (sıra değişmez, dizin aynı kalır); sert basamağın iki noktası birlikte kayar, yalnız tutulanın hızı
+   * değişir. Sürükleme boyunca dizin kararlı olsun diye ozelDogrula çağrılmaz (bırakınca düzenleyici çağırır).
+   * keys: ozelDogrula çıktısı. Döner: { keys, i } | null.
+   */
+  function ozelTasi(keys, i, t, v, o) {
+    o = o || {};
+    var ks = kopyaKeys(keys);
+    if (!(i >= 0 && i < ks.length)) return null;
+    v = sayi(v); t = sayi(t);
+    if (isFinite(v)) ks[i].v = yapisV(v, !!o.shift);
+    if (i > 0 && i < ks.length - 1 && isFinite(t)) {
+      var e = basamakEsi(ks, i), g0 = e === -1 ? i : Math.min(i, e), g1 = e === -1 ? i : Math.max(i, e);
+      if (g0 > 0 && g1 < ks.length - 1) {
+        var lo = ks[g0 - 1].t + OZEL.ARA, hi = ks[g1 + 1].t - OZEL.ARA;
+        if (hi >= lo) {
+          var nt = r4(clamp(yapisT(clamp(t, 0, 1), !!o.shift), lo, hi));
+          for (var q = g0; q <= g1; q++) ks[q].t = nt;
+        }
+      }
+    }
+    return { keys: ks, i: i };
+  }
+
+  // Çift tık: iç noktayı sil (uçlar silinmez). Döner: { keys } | null
+  function ozelSil(keys, i) {
+    var ks = ozelDogrula(keys);
+    if (!(i > 0 && i < ks.length - 1)) return null;
+    ks.splice(i, 1);
+    return { keys: ozelDogrula(ks) };
+  }
+
+  /*
+   * Alt+tık: sert basamak aç / kapat. Noktanın basamak eşi varsa eş silinir (yumuşak geçiş geri gelir);
+   * yoksa aynı zamana ikinci nokta eklenir: hız o anda bir sonraki noktanın hızına atlar (o da aynıysa
+   * öncekinin hızına, o da aynıysa iki katına ya da yarısına). Döner: { keys, i (tutulacak nokta) } |
+   * { hata: 'uc' (uçta basamak olmaz) | 'dolu' }
+   */
+  function ozelBasamak(keys, i) {
+    var ks = ozelDogrula(keys);
+    if (!(i > 0 && i < ks.length - 1)) return { hata: "uc" };
+    var e = basamakEsi(ks, i);
+    if (e !== -1) {
+      ks.splice(e, 1);
+      return { keys: ozelDogrula(ks), i: e < i ? i - 1 : i };
+    }
+    if (ks.length >= OZEL.EN_COK) return { hata: "dolu" };
+    var v = ks[i].v, v2;
+    if (Math.abs(lg(ks[i + 1].v) - lg(v)) > 0.05) v2 = ks[i + 1].v;
+    else if (Math.abs(lg(ks[i - 1].v) - lg(v)) > 0.05) v2 = ks[i - 1].v;
+    else v2 = v * 2 <= MAX_V ? v * 2 : v / 2;
+    ks.splice(i + 1, 0, { t: ks[i].t, v: r4(v2) });
+    return { keys: ozelDogrula(ks), i: i + 1 };
+  }
+
+  // En yakın nokta (ekran koordinatı, yarıçap px) ya da -1. Sert basamağın iki noktası aynı x'te, ayrı y'de
+  function ozelEnYakin(keys, px, py, yaricap) {
+    var ks = ozelDogrula(keys), en = -1, d0 = Number(yaricap) > 0 ? Number(yaricap) : 9;
+    ks.forEach(function (k, i) {
+      var dx = oX(k.t) - px, dy = oY(k.v) - py, d = Math.sqrt(dx * dx + dy * dy);
+      if (d <= d0) { d0 = d; en = i; }
+    });
+    return en;
+  }
+
+  // Düzenleyicideki eğri yolu (SVG d): yumuşatma seçicisine göre; sert basamaklar dikey
+  function ozelYol(keys, ease) {
+    ease = easeOf(ease);
+    var ks = hazir(ozelDogrula(keys), ease);
+    if (ease === "step") {
+      var son = at(ks, 0, ease), nok = [[0, son]];
+      ks.forEach(function (k) { if (k.t > 0 && k.t < 1) { nok.push([k.t, k.v]); son = k.v; } });
+      nok.push([1, son]);
+      return nok.map(function (q, j) { return (j ? "L" : "M") + oX(q[0]) + " " + oY(q[1]); }).join(" ");
+    }
+    var n = 160, us = [];
+    for (var i = 0; i <= n; i++) us.push(i / n);
+    // anahtar zamanları (ve basamağın hemen solu) da örneklenir: basamak dikey, tepe noktası tam
+    ks.forEach(function (k) { if (k.t > 0 && k.t < 1) us.push(k.t, Math.max(0, k.t - 1e-6)); });
+    us.sort(function (a, b) { return a - b; });
+    var out = [], onceki = -1;
+    us.forEach(function (u) {
+      if (u === onceki) return;
+      onceki = u;
+      out.push((out.length ? "L" : "M") + oX(u) + " " + oY(at(ks, u, ease)));
+    });
+    return out.join(" ");
+  }
+
+  // Izgara: yatay çizgiler (IZGARA hızları, %100 ana) ve dikey çeyrekler
+  function ozelIzgara() {
+    return {
+      yatay: OZEL.IZGARA.map(function (g) { return { v: g, y: oY(g), etiket: Math.round(g * 100) + "%", ana: g === 1 }; }),
+      dikey: [0, 0.25, 0.5, 0.75, 1].map(function (t) { return { t: t, x: oX(t) }; }),
+      ust: OED.PAD, alt: OED.H - OED.PAD, sol: OED.SOL, sag: OED.W - OED.PAD
+    };
+  }
+
+  /* ---- adlı özel rampalar (yerel depo: en çok 12) ---- */
+  function adTemiz(ad) {
+    if (typeof ad !== "string") return "";
+    return ad.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "").slice(0, OZEL.AD);
+  }
+  // Depodan okunan listeyi doğrular: [{ id, ad, keys: [[t, %]], hit }] (en çok 12; bozuk / yinelenen atılır)
+  function ozelKayitlar(ham) {
+    var out = [], idler = {};
+    (Array.isArray(ham) ? ham : []).forEach(function (o) {
+      if (out.length >= OZEL.KAYIT || !o || typeof o !== "object") return;
+      var id = typeof o.id === "string" && /^r[0-9a-z]{1,16}$/.test(o.id) ? o.id : "";
+      var ad = adTemiz(o.ad);
+      if (!id || !ad || idler[id] || !Array.isArray(o.keys) || !o.keys.length) return;
+      idler[id] = 1;
+      out.push({ id: id, ad: ad, keys: ozelYuzde(o.keys), hit: ozelHit(o.hit) });
+    });
+    return out;
+  }
+  // Kaydet: aynı ad (büyük / küçük harf ayrımsız) varsa üzerine yazılır. Döner: { ok, liste, id, guncellendi, kod: 'ad' | 'dolu' }
+  function ozelKayitEkle(liste, ad, keys, hit, simdi) {
+    var temiz = ozelKayitlar(liste), a = adTemiz(ad);
+    if (!a) return { ok: false, liste: temiz, kod: "ad" };
+    var kayit = { id: "", ad: a, keys: ozelYuzde(keys), hit: ozelHit(hit) };
+    for (var i = 0; i < temiz.length; i++) {
+      if (temiz[i].ad.toLowerCase() === a.toLowerCase()) {
+        kayit.id = temiz[i].id;
+        temiz[i] = kayit;
+        return { ok: true, liste: temiz, id: kayit.id, guncellendi: true };
+      }
+    }
+    if (temiz.length >= OZEL.KAYIT) return { ok: false, liste: temiz, kod: "dolu" };
+    var taban = "r" + Math.floor(isFinite(Number(simdi)) ? Math.abs(Number(simdi)) : 0).toString(36).slice(-10), n = 0;
+    function varMi(id) { return temiz.some(function (x) { return x.id === id; }); }
+    while (varMi(taban + n.toString(36))) n++;
+    kayit.id = taban + n.toString(36);
+    temiz.push(kayit);
+    return { ok: true, liste: temiz, id: kayit.id, guncellendi: false };
+  }
+  function ozelKayitSil(liste, id) { return ozelKayitlar(liste).filter(function (x) { return x.id !== id; }); }
+  // Varsayılan ad: "Özel rampa N" (ilk boş numara). cevir (isteğe bağlı): arayüz dilindeki hâli (panel adı o dilde
+  // saklar: "Custom ramp 2" varken önerilen ad onun üstüne yazmasın); dönen ad yine Türkçe kaynak metindir
+  function ozelKayitAdi(liste, cevir) {
+    var l = ozelKayitlar(liste), n = l.length + 1;
+    function varMi(ad) {
+      var c = typeof cevir === "function" ? String(cevir(ad)) : ad;
+      return l.some(function (x) { var a = x.ad.toLowerCase(); return a === ad.toLowerCase() || a === c.toLowerCase(); });
+    }
+    while (varMi("Özel rampa " + n)) n++;
+    return "Özel rampa " + n;
+  }
+
   /* ---------------- biçim ---------------- */
 
   // Önayar → yoğunluk (v' = v^k), vuruş üretimi, Basamaklı'da açık basamaklar, vuruş anı hizalama.
@@ -331,7 +640,7 @@
 
   // shape(id, o, ctx) → [{t, v}] — ctx: { beatsU, F, hitFrac, mode, Lsec }
   function shape(id, o, ctx) {
-    var p = get(id);
+    var p = onayar(id, o);
     if (!p) throw new Error("Bilinmeyen rampa: " + id);
     o = opts(o);
     return shapeRaw(p, o, ctx || {}, o.k).keys;
@@ -534,9 +843,10 @@
    *          warnings, keys (çizim için, c ile ölçekli) }
    * Uyarı kodları: yogunlukDustu, dengeliyeGecti, sureYok, sinirlandi, takilabilir, vurusYok, hitKaydi.
    * Atar: F < 12 ("çok kısa"); tek hız çıkan plan (e.kod "duz": tek parça ya da hızlar %1 içinde).
+   * id "ozel": anahtarlar o.ozelKeys'ten, ağır çekim anı o.ozelHit'ten (ozelOnayar); gerisi aynı yol.
    */
   function plan(id, o, clip) {
-    var p = get(id);
+    var p = onayar(id, o);
     if (!p) throw new Error("Bilinmeyen rampa: " + id);
     o = opts(o);
     clip = clip || {};
@@ -743,9 +1053,9 @@
 
   var ORNEK_VURUS = [0.125, 0.375, 0.625, 0.875];
 
-  // Kart küçük resmi: { path, base (y %100), hit {x, y} | null, w, h }
+  // Kart küçük resmi: { path, base (y %100), hit {x, y} | null, w, h } — "ozel": o.ozelKeys / o.ozelHit
   function thumb(id, w, h, o) {
-    var p = get(id);
+    var p = onayar(id, o);
     if (!p) throw new Error("Bilinmeyen rampa: " + id);
     o = opts(o);
     w = Number(w) > 0 ? Number(w) : 120; h = Number(h) > 0 ? Number(h) : 56;
@@ -834,6 +1144,17 @@
     integrate: integrate, B: B, segment: segment, plan: plan, hostPlan: hostPlan, quality: quality,
     parseMedia: parseMedia, thumb: thumb, steps: steps, path: path, base: base, yAt: yAt,
     summary: summary, remapKeys: remapKeys, clipFor: clipFor,
+    // özel eğri (3.4 adım 13)
+    ozelDogrula: ozelDogrula, ozelHit: ozelHit, ozelYuzde: ozelYuzde,
+    ozelKayitlar: ozelKayitlar, ozelKayitEkle: ozelKayitEkle, ozelKayitSil: ozelKayitSil, ozelKayitAdi: ozelKayitAdi,
+    OZEL_VARSAYILAN: { keys: OZEL_VARSAYILAN.keys.map(function (k) { return [k[0], k[1]]; }), hit: OZEL_VARSAYILAN.hit },
+    // SufloEgriEditor mod 'hiz' (js/egri.js) geometrisi ve düzenleme işlemleri
+    ozel: {
+      ED: { W: OED.W, H: OED.H, PAD: OED.PAD, SOL: OED.SOL }, EN_AZ: OZEL.EN_AZ, EN_COK: OZEL.EN_COK, ARA: OZEL.ARA, X_YAPIS: OZEL.X_YAPIS,
+      IZGARA: OZEL.IZGARA.slice(), HIT: OZEL.HIT.slice(), KAYIT: OZEL.KAYIT,
+      ekranX: oX, ekranY: oY, egriT: oT, egriV: oV, yapisT: yapisT, yapisV: yapisV,
+      ekle: ozelEkle, tasi: ozelTasi, sil: ozelSil, basamak: ozelBasamak, enYakin: ozelEnYakin, yol: ozelYol, izgara: ozelIzgara
+    },
     MIN_V: MIN_V, MAX_V: MAX_V, MAX_BEATS: MAX_BEATS, DENSITY: DENSITY
   };
 });

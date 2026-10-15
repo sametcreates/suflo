@@ -192,7 +192,7 @@ function cevir(n) {
   var g = kur({ cevap: function () { return { ok: false }; } });
   var kartlar = g.dom["hiz-grid"].children;
   var ritim = kartlar.filter(function (k) { return k.getAttribute("data-id") === "ritim"; })[0];
-  ok("11 kart, seçili olan aria-pressed", kartlar.length === 11 && kartlar.filter(function (k) { return k.getAttribute("aria-pressed") === "true"; }).length === 1);
+  ok("12 kart (11 önayar + Özel eğri), seçili olan aria-pressed", kartlar.length === 12 && kartlar.filter(function (k) { return k.getAttribute("aria-pressed") === "true"; }).length === 1);
   ok("vuruş yokken Ritme Rampa kapalı ve neden yazar", ritim.disabled === true && ritim.children[1].children[1].textContent === "Önce Ritim sekmesinde müziği analiz et", ritim.children[1].children[1].textContent);
   ok("kartlarda küçük resim SVG'si (eğri + %100 çizgisi)", /<path class="hiz-egri" d="M/.test(kartlar[0].children[0].innerHTML) && /hiz-taban/.test(kartlar[0].children[0].innerHTML));
   var g2 = kur({ vuruslar: [{ t: 2.5, guc: 1 }, { t: 3.5, guc: 0.8 }], cevap: function () { return { ok: false }; } });
