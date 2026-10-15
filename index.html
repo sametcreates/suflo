@@ -1291,6 +1291,10 @@
       <button data-s="jumpcut">Jump Cut<em>sert kesme</em></button>
       <button data-s="snapin">Snap-In<em>hızlı</em></button>
     </div>
+    <!-- 3.4 adım 12: özel eğri (varsayılan Otomatik) -->
+    <div class="egri-secici" id="zoom-egri">
+      <p class="hint egri-secici-not">Yumuşak ve Snap-In stillerinde her zoom hareketinin hızlanıp yavaşlamasını eğri belirler (Yumuşak'ın küçük taşmasının yerini alır); Jump Cut sert kesmedir, eğri kullanmaz. Özel eğri her kareye anahtar kare yazar; uzun kliplerde uygulama biraz daha sürer.</p>
+    </div>
     <div class="zoom-lbl">Zoom merkezi <span style="color:var(--faint);font-weight:450">— sabit nokta</span></div>
     <div class="zoom-nokta" id="zoom-nokta" role="group" aria-label="Zoom merkezi">
       <button data-a="0.2,0.2" aria-label="sol üst"></button>
@@ -1465,6 +1469,10 @@
         </select>
       </label>
     </div>
+    <!-- 3.4 adım 12: özel eğri (varsayılan Otomatik); yalnız panelin 12 Suflo önayarı, paket presetleri kendi eğrisini korur -->
+    <div class="egri-secici" id="preset-egri">
+      <p class="hint egri-secici-not">Panelin 12 Suflo önayarında her hareketin hızlanıp yavaşlamasını eğri belirler; Suflo Smooth paketindeki presetler kendi eğrisini korur. Özel eğri her kareye anahtar kare yazar; Önayarı kaldır yine yalnız Suflo'nun anahtarlarını siler.</p>
+    </div>
     <div class="preset-subbar">
       <div class="seg-ctl" id="preset-filter">
         <button class="on" data-f="all">Tümü</button>
@@ -1525,6 +1533,10 @@
           <option value="1.35">Güçlü</option>
         </select>
       </label>
+    </div>
+    <!-- 3.4 adım 12: özel eğri (varsayılan Otomatik: Suflo'nun bugünkü yumuşatması; js/egri.js SufloEgriSecici) -->
+    <div class="egri-secici" id="gecis-egri">
+      <p class="hint egri-secici-not">Gelen klip (B) eğriyi izler; giden klip (A) eğrinin aynasıyla kesime gelir, iki yarı kesimde buluşur. Özel eğri Premiere'e her kareye (1 sn'den uzun harekette 2 karede bir) anahtar kare olarak yazılır; Geçişi kaldır yine yalnız Suflo'nun anahtarlarını siler.</p>
     </div>
     <!-- 3.4 adım 11: kayıt tabanlı kaldırma (kapısız: ücretsizde de çalışır) -->
     <div class="kaldir-satir">
@@ -2626,6 +2638,8 @@
   <!-- 3.4 Yumuşatma motoru ve anahtar kare kayıtları: saf modüller (yüklenirken Premiere/ağ yok);
        Geçiş, Zoom, Hareket, Hız Rampası ve Eğri bunları kullanır -->
   <script src="js/ease-curve.js"></script>
+  <!-- 3.4 adım 12: Geçiş / Zoom / Hareket önayarı özel eğrisi (saf; ease-curve.js'ten sonra, transitions.js'ten önce) -->
+  <script src="js/egri-secim.js"></script>
   <script src="js/key-records.js"></script>
   <script src="js/kayit-kaldir.js"></script>
   <script src="js/transitions.js"></script>

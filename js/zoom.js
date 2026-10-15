@@ -224,6 +224,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
   "use strict";
 
   var busy = false;
+  var secici = null;   // Eğri seçicisi (3.4 adım 12): Otomatik iken yük eskisiyle aynı
 
   function el(id) { return document.getElementById(id); }
   function status(msg, cls) {
@@ -312,6 +313,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
       }
 
       var stil = (document.querySelector('#zoom-stil .on') || {}).dataset;
+      var S = window.SufloEgriSecim;
       var plan = KZoomPlan({
         dur: dur,
         segments: segments,
@@ -320,20 +322,27 @@ if (typeof window !== "undefined") window.KZoom = (function () {
         speed: deger("zoom-hiz", 0.45),
         mode: mode,
         interval: interval,
-        style: stil && stil.s ? stil.s : "smooth"
+        style: stil && stil.s ? stil.s : "smooth",
+        ease: secici ? secici.deger() : "auto",          // 3.4 adım 12: özel eğri
+        fps: S && KApp.ctx ? S.kareHizi(KApp.ctx()) : undefined
       });
       if (plan.toggles < 1) { status("Zoom noktası bulunamadı — Ritmik modu dene.", "warn"); return; }
 
       status("Anahtar kareler yazılıyor…");
       var keys = plan.keys.map(function (k) {
-        return { time: clip.clipStart + k.time, value: k.value };
+        var q = { time: clip.clipStart + k.time, value: k.value };
+        if (k.a) q.a = 1;   // özel eğri: seyrek planın çapası (host kare altı örnekleri seyreltirken korur)
+        return q;
       });
-      var result = await K.call("KS_autoZoom", {
+      var yuk = {
         keys: keys,
         anchor: sabitNokta(),
         clearStart: clip.clipStart,
         clearEnd: clip.clipStart + dur
-      }, 30000);
+      };
+      // Otomatik'te yük eskisiyle aynı; özel eğride host Bezier'siz yazar, süre anahtar sayısıyla büyür (Ölçek + Konum)
+      if (plan.dense) yuk.dense = true;
+      var result = await K.call("KS_autoZoom", yuk, plan.dense && S ? S.cagriSuresi(30000, keys.length * 2) : 30000);
       if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Zoom uygulanamadı.");
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);   // deneme: yalniz basarida
       status("");
@@ -407,6 +416,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
 
   function init() {
     if (!el("tab-zoom")) return;
+    if (window.SufloEgriSecici && el("zoom-egri")) secici = SufloEgriSecici.olustur(el("zoom-egri"), { arac: "zoom" });
     el("zoom-run").addEventListener("click", calistir);
     el("zoom-remove").addEventListener("click", function () { return kaldir(); });
     // mod secici (seg-ctl kalibi)
@@ -436,5 +446,5 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     });
   }
 
-  return { init: init, kaldir: kaldir };
+  return { init: init, kaldir: kaldir, _secici: function () { return secici; } };
 })();

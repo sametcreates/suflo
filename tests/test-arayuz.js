@@ -440,6 +440,30 @@ ok("Yumuşatma motoru: betik sırası ease-curve.js → key-records.js → trans
   ok("Yumuşatma motoru: yüklenirken yalnız global tanımlar (localStorage/DOM/Premiere/ağ erişimi yok)", typeof pencere.SufloEase === "object" &&
     typeof pencere.SufloKeyRecords === "object" && typeof pencere.SufloEase.bakePlan === "function" && erisim.length === 0, erisim.join(","));
 })();
+/* ---------- 3.4 adım 12: Geçiş, Zoom ve Hareket önayarlarında özel eğri ---------- */
+ok("Özel eğri: betik sırası ease-curve.js → egri-secim.js → transitions/zoom/presets → egri.js → app.js", betikSira("egri-secim.js") > betikSira("ease-curve.js") &&
+  betikSira("egri-secim.js") < betikSira("transitions.js") && betikSira("egri-secim.js") < betikSira("zoom.js") && betikSira("egri-secim.js") < betikSira("presets.js") &&
+  betikSira("egri-secim.js") < betikSira("egri.js") && betikSira("egri.js") < betikSira("app.js"));
+[["gecis-egri", "tab-gecis", "gecis-grid"], ["zoom-egri", "tab-zoom", "zoom-run"], ["preset-egri", "tab-presets", "preset-grid"]].forEach(function (x) {
+  var i = html.indexOf('id="' + x[0] + '"');
+  ok("Özel eğri: #" + x[0] + " " + x[1] + " içinde, uygulama düğmelerinden önce, açıklamasıyla", !!idler[x[0]] && i > html.indexOf('id="' + x[1] + '"') &&
+    i < html.indexOf('id="' + x[2] + '"') && new RegExp('<div class="egri-secici" id="' + x[0] + '">\\s*<p class="hint egri-secici-not">[^<]{40,}</p>\\s*</div>').test(html));
+});
+(function () {
+  // saf modül: yüklenince yalnız window.SufloEgriSecim tanımlar (localStorage / DOM / Premiere / ağ yok)
+  var vm = require("vm"), erisim = [];
+  var pencere = {};
+  ["localStorage", "document", "CSInterface", "fetch", "XMLHttpRequest"].forEach(function (ad) {
+    Object.defineProperty(pencere, ad, { get: function () { erisim.push(ad); return undefined; } });
+  });
+  var ctx = vm.createContext({ window: pencere, JSON: JSON, Math: Math, Date: Date, Object: Object, Array: Array, String: String, Number: Number, isFinite: isFinite, isNaN: isNaN, Error: Error, RegExp: RegExp,
+    unescape: unescape, escape: escape, encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent });
+  ["ease-curve.js", "egri-secim.js"].forEach(function (f) { vm.runInContext(fs.readFileSync(KOKYOL + "js/" + f, "utf8"), ctx); });
+  ok("Özel eğri: egri-secim.js yüklenirken yalnız global tanımlar (localStorage/DOM/Premiere/ağ erişimi yok)", typeof pencere.SufloEgriSecim === "object" &&
+    typeof pencere.SufloEgriSecim.yogunlastir === "function" && pencere.SufloEgriSecim.coz("yumusak").ok && erisim.length === 0, erisim.join(","));
+})();
+ok("Özel eğri: kart ızgarası ve seçici egri.js'ten dışa açık (SufloEgriIzgara, SufloEgriSecici)", /^window\.SufloEgriIzgara = \(function \(\) \{/m.test(egriUi) &&
+  /^window\.SufloEgriSecici = \(function \(\) \{/m.test(egriUi));
 /* ---------- 3.4 adım 11: kayıt tabanlı güvenli kaldırma ---------- */
 ok("Kaldırma: betik sırası key-records.js → kayit-kaldir.js → gecisler/zoom/presets → app.js", betikSira("kayit-kaldir.js") > betikSira("key-records.js") &&
   betikSira("kayit-kaldir.js") < betikSira("gecisler.js") && betikSira("kayit-kaldir.js") < betikSira("zoom.js") &&

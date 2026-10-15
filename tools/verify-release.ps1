@@ -104,6 +104,8 @@ function Test-Archive([string]$path, [string]$kind) {
             # 3.4 Yumusatma motoru (Rebound MIT uyarlamasi) ve anahtar kare kayitlari: Egri, Gecis, Zoom, Hareket bunlara dayanir
             '(^|/)js/ease-curve\.js$',
             '(^|/)js/key-records\.js$',
+            # 3.4 Gecis / Zoom / Hareket onayari ozel egrisi (saf modul; ease alani, yogunlastirma)
+            '(^|/)js/egri-secim\.js$',
             # 3.4 Egri sekmesi: saf model + panel (SufloEgriEditor); host tarafi jsx/host.jsx icinde
             '(^|/)js/egri-model\.js$',
             '(^|/)js/egri\.js$',

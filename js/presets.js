@@ -5,6 +5,9 @@
  * parametreleri panelden secili klibe uygulanir. Opak Adobe/ucuncu taraf
  * verisi kullanan az sayidaki preset, dosyayi gosteren guvenli ice aktarma
  * yoluna duser; hicbir zaman sahte "uygulandi" mesaji verilmez.
+ * Ozel egri (3.4 adim 12): #preset-egri secicisi (SufloEgriSecici) yalniz 12 yerlesik onayara uygulanir. Otomatik iken
+ * KS_applyMotionPreset yuku eskisiyle ayni; baska egride yuk egriyi tablo olarak tasir (SufloEgriSecim.hareketEgrisi)
+ * ve host her klibin kendi degerlerinden kurdugu anahtarlari kare zamanlarinda yogunlastirir. Kapi degismez (presets).
  */
 window.KPresets = (function () {
   "use strict";
@@ -36,6 +39,7 @@ window.KPresets = (function () {
   ];
   var filter = "all";
   var query = "";
+  var secici = null;   // Eğri seçicisi (3.4 adım 12)
   var busy = "";
   var packCatalog = [];
   var packCatalogKey = "";
@@ -236,11 +240,15 @@ window.KPresets = (function () {
     busy = preset.id;
     setApplyBusy(card, true);
     try {
-      var result = await K.call("KS_applyMotionPreset", {
+      var yuk = {
         id: preset.id,
         duration: speedValue(),
         strength: strengthValue()
-      }, 30000);
+      };
+      // Özel eğri: tablo olarak (Otomatik'te yük eskisiyle aynı)
+      var hm = secici && window.SufloEgriSecim ? SufloEgriSecim.hareketEgrisi(secici.deger()) : null;
+      if (hm) { yuk.ease = hm.ease; yuk.egri = { tablo: hm.tablo }; }
+      var result = await K.call("KS_applyMotionPreset", yuk, hm ? 60000 : 30000);
       if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Preset uygulanamadi.");
       if (card) card.classList.add("ok");
       // Kaldırma kaydı (3.4 adım 11): bildirimdeki Geri al yalnız bu uygulamanın anahtarlarını kaldırır
@@ -404,6 +412,7 @@ window.KPresets = (function () {
 
   function init() {
     if (!el("tab-presets")) return;
+    if (window.SufloEgriSecici && el("preset-egri")) secici = SufloEgriSecici.olustur(el("preset-egri"), { arac: "hareket" });
     var search = el("preset-search");
     if (search) search.addEventListener("input", function () { query = this.value.trim().toLowerCase(); render(); });
     var filters = el("preset-filter");
@@ -435,6 +444,7 @@ window.KPresets = (function () {
     packs: function () { return PACKS.slice(); },
     catalog: function () { return packCatalog.slice(); },
     loadPackCatalog: loadPackCatalog,
+    _secici: function () { return secici; },
     count: function () { return PRESETS.length + (packCatalog.length || PACKS[0].count); }
   };
 })();

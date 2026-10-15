@@ -3908,6 +3908,27 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .egri-eylem .btn { margin-right: 6px; }
 .egri-eylem .btn.grow { flex: 1; margin-right: 0; }
 
+/* ---------- Eğri seçicisi (3.4 adım 12): Geçiş, Zoom, Hareket önayarı — #gecis-egri, #zoom-egri, #preset-egri ----------
+   Aynı kart ızgarası (.egri-onayarlar / .egri-onayar) Eğri sekmesinden. CEF 74: flex gap ve :focus-visible yok */
+.egri-secici { position: relative; margin: 0 0 10px; }
+.egri-secici-dugme { display: flex; align-items: center; width: 100%; min-height: 36px; padding: 4px 9px 4px 5px; border: 1px solid #253141; border-radius: 8px; background: #101720; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.egri-secici-dugme:hover { border-color: var(--line2); }
+.egri-secici-dugme:focus { outline: 2px solid var(--accent-lite); outline-offset: 1px; }
+.egri-secici-dugme.ozel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); }
+.egri-secici-resim { flex: none; width: 40px; margin-right: 8px; }
+.egri-secici-resim .egri-kucuk { height: 26px; }
+.egri-secici-etiket { flex: none; margin-right: 6px; color: #758196; font-size: 8px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.egri-secici-ad { flex: 1; min-width: 0; overflow: hidden; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.egri-secici-ok { flex: none; margin-left: 6px; color: var(--faint); font-style: normal; font-size: 10px; }
+.egri-secici-dugme[aria-expanded="true"] .egri-secici-ok { color: var(--accent-lite); }
+.egri-secici-panel { margin-top: 6px; padding: 8px; border: 1px solid #263242; border-radius: 10px; background: linear-gradient(180deg, #131b26, #0e151e); }
+.egri-secici-panel[hidden] { display: none; }
+.egri-secici-izgara { margin: 0 0 8px; }
+.egri-secici-not { margin: 0 0 8px; font-size: 10px; line-height: 1.45; }
+.egri-secici-git { margin: 0; }
+.egri-kucuk.oto path { stroke: var(--faint); stroke-dasharray: 3 3; }
+.egri-onayar.oto.on .egri-kucuk path, .egri-secici-dugme .egri-kucuk.oto path { stroke: var(--accent-lite); }
+
 /* ---------- YouTube indirici (3.3, #tab-youtube) ----------
    CEF 74: flex gap ve inset yok — aralıklar margin ile, kaplama top/right/bottom/left ile */
 .yt-kart { margin-bottom: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }

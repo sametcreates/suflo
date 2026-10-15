@@ -252,6 +252,22 @@
     return { ease: c.ease, tablo: E.bakeFactors(c.curve, TABLO_N).map(function (v) { return Math.round(v * 1e6) / 1e6; }) };
   }
 
+  // Panel bağlamından (KApp.ctx(): frame = bir karenin saniyesi) sekansın kare hızı; bilinmiyorsa undefined (plan 30 alır)
+  function kareHizi(ctx) {
+    var f = ctx ? Number(ctx.frame) : NaN;
+    return f > 0 && f <= 1 ? 1 / f : undefined;
+  }
+  // Yoğun Geçiş planının toplam anahtar sayısı (çağrı süresi için)
+  function planAnahtari(plan) {
+    var n = 0;
+    ["out", "in"].forEach(function (y) {
+      var s = plan && plan[y];
+      if (!s) return;
+      ["scale", "opacity", "pos"].forEach(function (ad) { if (Array.isArray(s[ad])) n += s[ad].length; });
+    });
+    return n;
+  }
+
   // Yoğun yazımın Premiere çağrı süresi (ms): taban + anahtar başına pay; en çok 10 dk
   function cagriSuresi(taban, anahtar) {
     var n = Math.max(0, Number(anahtar) || 0);
@@ -264,7 +280,7 @@
     secenekler: secenekler, bul: bul,
     capalar: function (keys) { return capalar(temizle(keys)); },
     yogunlastir: yogunlastir, yogunXY: yogunXY, yogunZaman: yogunZaman, yogunTV: yogunTV,
-    hareketEgrisi: hareketEgrisi, cagriSuresi: cagriSuresi,
+    hareketEgrisi: hareketEgrisi, cagriSuresi: cagriSuresi, kareHizi: kareHizi, planAnahtari: planAnahtari,
     // 180° döndürme (SufloEase.flip): Geçiş'te giden klibin (A) eğrisi
     ayna: function (curve) { return E ? E.flip(curve) : null; }
   };

@@ -19,6 +19,8 @@
  * çift tık nokta, Alt tutamaç ayırma, Delete nokta silme, önceki eğrinin hayaleti). Hız Rampası'nın özel
  * eğrisi (adım 13) aynı düzenleyiciyi kullanır.
  * Klip adları ve Premiere'in kendi özellik adları data-i18n-skip içinde (İngilizce arayüz çevirmez).
+ * SufloEgriIzgara (eğri kartı ızgarası) ve SufloEgriSecici (Geçiş / Zoom / Hareket önayarlarının "Eğri" açılır seçicisi,
+ * 3.4 adım 12) da burada: Eğri sekmesi önayarları ile araçların seçicisi aynı kartları kullanır.
  * Suflo'nun kendi kodu (temiz oda); canlı önizleme sahnesi fikri Rebound'dan (MIT), küçük ve yeniden yazıldı.
  */
 
@@ -169,6 +171,229 @@ window.SufloEgriEditor = (function () {
 })();
 
 /* ======================================================================
+ * SufloEgriIzgara.ciz(kap, kartlar, { secili, sec(id), sil(id), silBaslik, numarali }) — eğri kartı ızgarası
+ * (3.4 adım 12): Eğri sekmesinin önayarları ile Geçiş / Zoom / Hareket eğri seçicisi aynı kartları kullanır.
+ * kartlar: [{ id, ad, curve (null: Otomatik, Suflo'nun kendi yumuşatması), kullanici, adCevrilir }]
+ * adCevrilir: ad Suflo'nun kendi metni (arayüz sözlüğüyle çevrilir); değilse kart çeviriden muaf (hazır eğri adları
+ * zaten arayüz dilinde gelir, kullanıcının adları hiç çevrilmez).
+ * ====================================================================== */
+window.SufloEgriIzgara = (function () {
+  "use strict";
+  var svgEl = window.SufloEgriEditor.svgEl, bosalt = window.SufloEgriEditor.bosalt;
+
+  // Küçük resim; Otomatik (curve yok): kesikli yumuşak S (Suflo'nun kendi Bezier yumuşatması)
+  function kucuk(ust, curve) {
+    var E = window.SufloEase, M = window.SufloEgriModel;
+    var s = svgEl("svg", { viewBox: "0 0 48 30", "class": "egri-kucuk" + (curve ? "" : " oto"), "aria-hidden": "true", focusable: "false" }, ust);
+    svgEl("path", { d: M.kucukYol(curve || E.builtin("yumusak-giris-cikis").curve, 48, 30) }, s);
+    return s;
+  }
+
+  function ciz(kap, kartlar, o) {
+    o = o || {};
+    if (!kap) return;
+    bosalt(kap);
+    (kartlar || []).forEach(function (k, i) {
+      var secili = k.id === o.secili;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "egri-onayar" + (secili ? " on" : "") + (k.kullanici ? " kullanici" : "") + (k.curve ? "" : " oto");
+      if (!k.adCevrilir) b.setAttribute("data-i18n-skip", "");
+      b.setAttribute("data-id", k.id);
+      b.setAttribute("aria-pressed", secili ? "true" : "false");
+      b.setAttribute("title", (o.numarali && i < 9 ? (i + 1) + " · " : "") + k.ad);
+      kucuk(b, k.curve);
+      var ad = document.createElement("span");
+      ad.textContent = k.ad;
+      b.appendChild(ad);
+      if (k.kullanici && typeof o.sil === "function") {
+        var x = document.createElement("i");
+        x.className = "egri-onayar-sil";
+        x.setAttribute("role", "button");
+        x.setAttribute("title", o.silBaslik || "Önayarı sil");
+        x.textContent = "×";
+        x.addEventListener("click", function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); o.sil(k.id); });
+        b.appendChild(x);
+      }
+      b.addEventListener("click", function () { if (typeof o.sec === "function") o.sec(k.id); });
+      kap.appendChild(b);
+    });
+  }
+  return { ciz: ciz, kucuk: kucuk };
+})();
+
+/* ======================================================================
+ * SufloEgriSecici.olustur(kap, { arac: 'gecis' | 'zoom' | 'hareket', degisti(ease) }) — Geçiş, Zoom ve Hareket
+ * önayarlarının "Eğri" açılır seçicisi (3.4 adım 12). Düğme seçili eğrinin küçük resmini ve adını gösterir; tıklayınca
+ * kart ızgarası açılır: Otomatik (Suflo'nun bugünkü yumuşatması, varsayılan), Eğri sekmesindeki eğri, 15 hazır eğri ve
+ * Eğri sekmesinde kaydedilen önayarlar. Seçim araç başına bu görüntüleyicinin yerel deposunda kalır (kolaylık; her
+ * erişim korumalı, okunamazsa Otomatik). Seçmek ve önizlemek ücretsiz; uygulamak aracın kendi kapısından geçer.
+ * Premiere'e gitmez (K.call yok). Kabın içindeki .egri-secici-not açıklaması açılan panele taşınır.
+ * ====================================================================== */
+window.SufloEgriSecici = (function () {
+  "use strict";
+  var DEPO = "suflo.egri.secim";
+  var ONAYAR = "suflo.egri.onayarlar", AYAR = "suflo.egri.ayar";   // Eğri sekmesinin depoları (yalnız okunur)
+  var acikSecici = null, disDinleniyor = false;
+
+  function ls() { try { return window.localStorage || null; } catch (e) { return null; } }
+  function oku(anahtar) {
+    try { var l = ls(), h = l ? l.getItem(anahtar) : null; return h ? JSON.parse(h) : null; } catch (e) { return null; }
+  }
+  function secimler() { var v = oku(DEPO); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
+  function secimYaz(arac, ease) {
+    try {
+      var l = ls();
+      if (!l) return false;
+      var v = secimler();
+      v[arac] = ease;
+      l.setItem(DEPO, JSON.stringify(v));
+      return true;
+    } catch (e) { return false; }
+  }
+  function dil() { return window.SufloI18n && SufloI18n.getLang ? SufloI18n.getLang() : "tr"; }
+  function liste() {
+    var M = window.SufloEgriModel, E = window.SufloEase;
+    var ayar = oku(AYAR);
+    return window.SufloEgriSecim.secenekler({ dil: dil(), kullanici: M.onayarlar(oku(ONAYAR) || []),
+      duzenleyici: ayar && typeof ayar === "object" ? E.normalize(ayar.egri) : null });
+  }
+  // Açık seçicinin dışına tıklanınca kapanır (tek dinleyici)
+  function disTiklama(e) {
+    if (!acikSecici) return;
+    var n = e && e.target;
+    while (n) { if (n === acikSecici.kap) return; n = n.parentNode; }
+    acikSecici.kapat();
+  }
+
+  function olustur(kap, opts) {
+    opts = opts || {};
+    var S = window.SufloEgriSecim;
+    if (!kap || !S) return null;
+    var arac = String(opts.arac || "");
+    var deger = S.kanonik(secimler()[arac]);
+    var bosalt = window.SufloEgriEditor.bosalt;
+    var api = null;
+
+    // açıklama (index.html'de kabın içinde; panele taşınır)
+    var not = null;
+    for (var c = 0; c < (kap.children || []).length; c++) {
+      if (String(kap.children[c].className || "").indexOf("egri-secici-not") !== -1) { not = kap.children[c]; break; }
+    }
+    if (not) kap.removeChild(not);
+    bosalt(kap);
+    var dugme = document.createElement("button");
+    dugme.type = "button";
+    dugme.className = "egri-secici-dugme";
+    dugme.setAttribute("aria-haspopup", "true");
+    dugme.setAttribute("aria-expanded", "false");
+    dugme.setAttribute("title", "Hareketin nasıl hızlanıp yavaşlayacağı");
+    var resim = document.createElement("span");
+    resim.className = "egri-secici-resim";
+    dugme.appendChild(resim);
+    var etiket = document.createElement("span");
+    etiket.className = "egri-secici-etiket";
+    etiket.textContent = "Eğri";
+    dugme.appendChild(etiket);
+    var ad = document.createElement("b");
+    ad.className = "egri-secici-ad";
+    dugme.appendChild(ad);
+    var ok = document.createElement("i");
+    ok.className = "egri-secici-ok";
+    ok.setAttribute("aria-hidden", "true");
+    ok.textContent = "▾";
+    dugme.appendChild(ok);
+    kap.appendChild(dugme);
+
+    var panel = document.createElement("div");
+    panel.className = "egri-secici-panel";
+    panel.hidden = true;
+    panel.setAttribute("role", "group");
+    panel.setAttribute("aria-label", "Eğri seç");
+    var izgara = document.createElement("div");
+    izgara.className = "egri-onayarlar egri-secici-izgara";
+    panel.appendChild(izgara);
+    if (not) panel.appendChild(not);
+    var git = document.createElement("button");
+    git.type = "button";
+    git.className = "btn tiny egri-secici-git";
+    git.textContent = "Kendi eğrini Eğri sekmesinde çiz";
+    git.addEventListener("click", function () { kapat(); if (window.KApp && KApp.goster) KApp.goster("egri"); });
+    panel.appendChild(git);
+    kap.appendChild(panel);
+
+    function kart() { return S.bul(deger, liste()) || S.bul(S.OTOMATIK, []); }
+    function dugmeCiz() {
+      var k = kart();
+      bosalt(resim);
+      window.SufloEgriIzgara.kucuk(resim, k.curve);
+      ad.textContent = k.ad;
+      // Suflo'nun kendi adları (Otomatik, Özel eğri) çevrilir; hazır eğri adı zaten dilde, kullanıcının adı çevrilmez
+      if (k.adCevrilir) { if (ad.removeAttribute) ad.removeAttribute("data-i18n-skip"); }
+      else ad.setAttribute("data-i18n-skip", "");
+      if (dugme.classList) dugme.classList.toggle("ozel", deger !== S.OTOMATIK);
+    }
+    function izgaraCiz() {
+      window.SufloEgriIzgara.ciz(izgara, liste().map(function (o) {
+        return { id: o.ease, ad: o.ad, curve: o.curve, kullanici: false, adCevrilir: o.adCevrilir };
+      }), { secili: deger, sec: sec });
+    }
+    function ac() {
+      if (acikSecici && acikSecici !== api) acikSecici.kapat();
+      izgaraCiz();
+      panel.hidden = false;
+      dugme.setAttribute("aria-expanded", "true");
+      acikSecici = api;
+    }
+    function kapat() {
+      panel.hidden = true;
+      dugme.setAttribute("aria-expanded", "false");
+      if (acikSecici === api) acikSecici = null;
+    }
+    // Geçersiz ease Otomatik olur (ör. bozuk depo, silinmiş önayarın kodu yine geçerlidir: eğriyi taşır)
+    function ata(ease) {
+      var cz = S.coz(ease);
+      deger = cz.ok ? cz.ease : S.OTOMATIK;
+      secimYaz(arac, deger);
+      dugmeCiz();
+      return deger;
+    }
+    function sec(ease) {
+      ata(ease);
+      kapat();
+      try { if (dugme.focus) dugme.focus(); } catch (eF) {}
+      if (typeof opts.degisti === "function") { try { opts.degisti(deger); } catch (eD) {} }
+    }
+    dugme.addEventListener("click", function () { if (panel.hidden) ac(); else kapat(); });
+    kap.addEventListener("keydown", function (e) {
+      if (e && (e.key === "Escape" || e.keyCode === 27) && !panel.hidden) {
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
+        kapat();
+        try { if (dugme.focus) dugme.focus(); } catch (eF) {}
+      }
+    });
+    if (!disDinleniyor && document.addEventListener) { document.addEventListener("click", disTiklama, true); disDinleniyor = true; }
+    if (window.SufloI18n && SufloI18n.onChange) { try { SufloI18n.onChange(function () { dugmeCiz(); if (!panel.hidden) izgaraCiz(); }); } catch (eI) {} }
+
+    api = {
+      kap: kap,
+      // Seçili eğri: kanonik ease metni ('auto' = Suflo'nun kendi yumuşatması)
+      deger: function () { return deger; },
+      ata: ata,
+      yenile: dugmeCiz,
+      ac: ac,
+      kapat: kapat,
+      acik: function () { return !panel.hidden; },
+      _izgara: izgara
+    };
+    dugmeCiz();
+    return api;
+  }
+  return { olustur: olustur, DEPO: DEPO };
+})();
+
+/* ======================================================================
  * KEgri: sekme denetleyicisi
  * ====================================================================== */
 window.KEgri = (function () {
@@ -303,33 +528,11 @@ window.KEgri = (function () {
   function onayarKartlari() {
     var kap = el("egri-onayarlar");
     if (!kap) return;
-    bosalt(kap);
-    tumOnayarlar().forEach(function (o, i) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "egri-onayar" + (o.id === seciliOnayar ? " on" : "") + (o.kullanici ? " kullanici" : "");
-      // Adı ve ipucunu panel kendisi dile göre yazar (yerleşik adlar SufloEase'ten; "Yumuşak" başka araçta "Smooth")
-      b.setAttribute("data-i18n-skip", "");
-      b.setAttribute("data-id", o.id);
-      b.setAttribute("aria-pressed", o.id === seciliOnayar ? "true" : "false");
-      b.setAttribute("title", (i < 9 ? (i + 1) + " · " : "") + o.ad);
-      var s = svgEl("svg", { viewBox: "0 0 48 30", "class": "egri-kucuk", "aria-hidden": "true", focusable: "false" }, b);
-      svgEl("path", { d: M.kucukYol(o.curve, 48, 30) }, s);
-      var ad = document.createElement("span");
-      ad.textContent = o.ad;
-      b.appendChild(ad);
-      if (o.kullanici) {
-        var x = document.createElement("i");
-        x.className = "egri-onayar-sil";
-        x.setAttribute("role", "button");
-        x.setAttribute("title", tr("Önayarı sil"));
-        x.textContent = "×";
-        x.addEventListener("click", function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); onayarSil(o.id); });
-        b.appendChild(x);
-      }
-      b.addEventListener("click", function () { onayarSec(o.id); });
-      kap.appendChild(b);
-    });
+    // Adı ve ipucunu panel kendisi dile göre yazar (yerleşik adlar SufloEase'ten; "Yumuşak" başka araçta "Smooth"):
+    // kartlar çeviriden muaf. Aynı ızgara Geçiş / Zoom / Hareket eğri seçicisinde (SufloEgriIzgara, adım 12)
+    window.SufloEgriIzgara.ciz(kap, tumOnayarlar().map(function (o) {
+      return { id: o.id, ad: o.ad, curve: o.curve, kullanici: o.kullanici, adCevrilir: false };
+    }), { secili: seciliOnayar, numarali: true, sec: onayarSec, sil: onayarSil, silBaslik: tr("Önayarı sil") });
   }
   function onayarSec(id) {
     var o = tumOnayarlar().filter(function (x) { return x.id === id; })[0];

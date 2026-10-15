@@ -58,6 +58,9 @@ ok("3.4 Eğri sekmesi: model ve panel pakette (js/ klasörü) ve verify-release'
 ok("3.4 kayıt tabanlı güvenli kaldırma: js/kayit-kaldir.js pakette (js/ klasörü) ve verify-release'te zorunlu",
   /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
   /kayit-kaldir\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "kayit-kaldir.js")), gerekli.slice(0, 700));
+ok("3.4 özel eğri (Geçiş / Zoom / Hareket): js/egri-secim.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /egri-secim\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "egri-secim.js")), gerekli.slice(0, 800));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
 
 console.log(gecen + "/" + toplam + " gecti");

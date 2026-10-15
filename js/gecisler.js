@@ -7,12 +7,16 @@
  * dokunmaz): kesimi host seçer, Suflo kaydı olan en yakın kesim; seçili klip uygulamadaki gibi öne geçmez. Kaldırmak
  * ücretsiz (Pro kapısı yok). Kayıt yoksa eski yöntem (geçiş penceresini temizlemek) yalnız onayla; onay hangi kesim
  * olduğunu söyler (V1, 00:09.04) ve eski yöntem yeniden aramadan tam o kesimi temizler.
+ * Özel eğri (3.4, plan adım 12): #gecis-egri seçicisi (SufloEgriSecici). Otomatik (varsayılan) iken host'a giden plan
+ * bayt bayt eskisi; başka eğride plan js/egri-secim.js ile yoğunlaşır (hostPlan ease + sekansın kare hızı), host
+ * Bezier'siz yazar. Seçmek ücretsiz; uygulamak Geçişler'in kendi Pro kapısından (transitions, 3 deneme) geçer.
  */
 window.KGecis = (function () {
   "use strict";
 
   var TR = window.SufloTransitions;
   var busy = false;
+  var secici = null;   // Eğri seçicisi (3.4 adım 12)
 
   // Kaydı olmayan (önceki sürümde ya da başka bilgisayarda uygulanmış) geçiş: eski yöntem onay sorusu
   var YEDEK_SORU = {
@@ -45,6 +49,15 @@ window.KGecis = (function () {
     };
   }
 
+  // Host planı: seçili eğri ve sekansın kare hızıyla (Otomatik'te plan eskisiyle aynı)
+  function hostPlani(t) {
+    var o = secenek();
+    o.ease = secici ? secici.deger() : "auto";
+    var S = window.SufloEgriSecim;
+    if (S && window.KApp && KApp.ctx) o.fps = S.kareHizi(KApp.ctx());
+    return TR.hostPlan(t.id, o);
+  }
+
   async function uygula(t, btn) {
     // Pro (ucretsizde 3 deneme hakki; hak yalniz gecis yazilinca duser)
     if (typeof Pro !== "undefined" && !Pro.gate("transitions", { deneme: true, yeniden: function () { uygula(t, btn); } })) return;
@@ -53,7 +66,10 @@ window.KGecis = (function () {
     if (btn) btn.disabled = true;
     status(t.name + " uygulanıyor…");
     try {
-      var r = await K.call("KS_applyCutTransition", { plan: TR.hostPlan(t.id, secenek()), tolerance: 1.0 }, 60000);
+      var plan = hostPlani(t);
+      // Yoğun (özel eğri) yazım daha çok anahtar demek: süre anahtar sayısıyla büyür
+      var sure = plan.dense && window.SufloEgriSecim ? SufloEgriSecim.cagriSuresi(60000, SufloEgriSecim.planAnahtari(plan)) : 60000;
+      var r = await K.call("KS_applyCutTransition", { plan: plan, tolerance: 1.0 }, sure);
       if (!r.ok) throw new Error(r.error);
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("transitions", KApp.toast);   // deneme: yalniz basarida
       status("");
@@ -142,11 +158,12 @@ window.KGecis = (function () {
 
   function init() {
     if (!TR || !el("gecis-grid")) return;
+    if (window.SufloEgriSecici && el("gecis-egri")) secici = SufloEgriSecici.olustur(el("gecis-egri"), { arac: "gecis" });
     render();
     var kb = el("gecis-kaldir");
     if (kb) kb.addEventListener("click", function () { return kaldir(); });
     if (typeof Pro !== "undefined" && Pro.on) { try { Pro.on(render); } catch (e) {} }
   }
 
-  return { init: init, kaldir: kaldir };
+  return { init: init, kaldir: kaldir, _hostPlani: hostPlani, _secici: function () { return secici; } };
 })();

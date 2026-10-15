@@ -2794,8 +2794,8 @@
     "Eğri (anahtar kare yumuşatma)": "Easing (keyframe curves)",
     "Eğri: anahtar karelerine özel yumuşatma (düzenlemek ücretsiz)": "Easing: custom curves on your keyframes (editing is free)",
     "Anahtar kare ara değerlemesi (setInterpolationTypeAtKey)": "Keyframe interpolation (setInterpolationTypeAtKey)",
-    "Eğri, yazdığı sık anahtar kareleri doğrusal yapamaz; Premiere'in varsayılan ara değerlemesi kalır (eğri yine uygulanır, kareler arasında hafif sapma olabilir)":
-      "Easing can't make the dense keyframes it writes linear; Premiere's default interpolation stays (the curve is still applied, with possible slight wobble between frames)",
+    "Eğri ve Geçiş / Zoom / Hareket önayarlarının özel eğrisi, yazdığı sık anahtar kareleri doğrusal yapamaz; Premiere'in varsayılan ara değerlemesi kalır (eğri yine uygulanır, kareler arasında hafif sapma olabilir)":
+      "Easing and the custom curve in Transitions / Zoom / Motion presets can't make the dense keyframes they write linear; Premiere's default interpolation stays (the curve is still applied, with possible slight wobble between frames)",
     // jsx/host.jsx KS_easeBake (ASCII Turkish; the panel shows its own text from the code)
     "Egri baska bir sekans icin hazirlandi.": "The curve was prepared for another sequence.",
     "Gecersiz egri plani.": "Invalid curve plan.",
@@ -2855,6 +2855,26 @@
     // jsx/host.jsx KS_removeSufloKeys (ASCII Turkish; the panel shows its own text from the code)
     "Playhead'in yakininda kesim yok.": "No cut near the playhead.",
     "Kesim artik orada degil (timeline degismis); yeniden dene.": "The cut is no longer there (the timeline changed); try again."
+  });
+
+  /* ================= Özel eğri / Custom curve in Transitions, Auto Zoom and Motion presets (3.4 step 12: js/egri-secim.js,
+     SufloEgriSecici in js/egri.js, #gecis-egri, #zoom-egri, #preset-egri) ================= */
+  // "Eğri" (the picker label) stays "Easing" like the tab; built-in curve names come from SufloEase.builtinName.
+  add({
+    "Hareketin nasıl hızlanıp yavaşlayacağı": "How the motion speeds up and slows down",
+    "Eğri seç": "Choose a curve",
+    "Kendi eğrini Eğri sekmesinde çiz": "Draw your own curve in the Easing tab",
+    "Eğri sekmesindeki eğri": "Curve from the Easing tab",
+    "Özel eğri": "Custom curve",
+    "Gelen klip (B) eğriyi izler; giden klip (A) eğrinin aynasıyla kesime gelir, iki yarı kesimde buluşur. Özel eğri Premiere'e her kareye (1 sn'den uzun harekette 2 karede bir) anahtar kare olarak yazılır; Geçişi kaldır yine yalnız Suflo'nun anahtarlarını siler.":
+      "The incoming clip (B) follows the curve; the outgoing clip (A) reaches the cut with its mirror image, so the two halves meet at the cut. A custom curve is written to Premiere as a keyframe on every frame (every 2 frames for moves longer than 1 s); Remove transition still deletes only Suflo's keyframes.",
+    "Yumuşak ve Snap-In stillerinde her zoom hareketinin hızlanıp yavaşlamasını eğri belirler (Yumuşak'ın küçük taşmasının yerini alır); Jump Cut sert kesmedir, eğri kullanmaz. Özel eğri her kareye anahtar kare yazar; uzun kliplerde uygulama biraz daha sürer.":
+      "In the Smooth and Snap-In styles the curve sets how each zoom move speeds up and slows down (it replaces Smooth's small overshoot); Jump Cut is a hard cut and uses no curve. A custom curve writes a keyframe on every frame, so applying takes a little longer on long clips.",
+    "Panelin 12 Suflo önayarında her hareketin hızlanıp yavaşlamasını eğri belirler; Suflo Smooth paketindeki presetler kendi eğrisini korur. Özel eğri her kareye anahtar kare yazar; Önayarı kaldır yine yalnız Suflo'nun anahtarlarını siler.":
+      "In the panel's 12 Suflo presets the curve sets how each move speeds up and slows down; presets from the Suflo Smooth pack keep their own curve. A custom curve writes a keyframe on every frame; Remove preset still deletes only Suflo's keyframes.",
+    "Geçersiz eğri: {}": "Invalid curve: {}",
+    // jsx/host.jsx KS_applyMotionPreset (ASCII Turkish)
+    "Egri tablosu gecersiz.": "The curve table is invalid."
   });
 
   /* ================= Hız rampası / Speed ramp (js/speedramp.js, js/hiz-rampasi.js, #tab-hiz) ================= */
