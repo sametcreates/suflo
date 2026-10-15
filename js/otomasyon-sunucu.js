@@ -6,20 +6,27 @@
  * Güvenlik modeli (docs/mcp-guvenlik.html):
  *  - yalnız 127.0.0.1'e bağlanır, rastgele port; 0.0.0.0 asla
  *  - her açılışta yeni 32 baytlık jeton; bağlantı dosyası otomasyon.json (0600, tmp+rename),
- *    kapanışta silinir
+ *    kapanışta silinir: yalnız içindeki jeton bu oturumun yazdığıysa (aynı Kesit klasörünü paylaşan
+ *    başka bir Premiere sürümünün açık köprüsünün dosyası silinmez); "Yeni jeton" dosyayı
+ *    yazamazsa köprü kapanır (eski jetonla açık kalmaz, kimsenin bilmediği jetonla da değil)
  *  - yalnız POST /v1/eylem; Host = 127.0.0.1:<port> (DNS rebinding); Origin/Referer/Sec-Fetch-*
  *    ya da Upgrade varsa (tarayıcı) 403; CORS başlığı hiç gönderilmez, OPTIONS 403
  *  - Content-Type application/json; Authorization: Bearer <jeton> (timingSafeEqual)
  *  - gövde en çok 256 KB, 30 sn okuma süresi; jetonu doğru isteklerde dakikada en çok 120 çağrı;
  *    aynı anda tek eylem, kuyrukta en çok 4
+ *  - soket boşta sınırı 30 sn (hiç bayt göndermeyen ya da başlığı yarım bırakan bağlantı kapanır;
+ *    Node 12'de headersTimeout yalnız yeni bayt gelince denetlenir); süre sınırı yalnız jetonu doğru,
+ *    gövdesi okunmuş istekte kalkar (uzun eylem yanıtı beklerken). Kapanışta istek taşımayan açık
+ *    soketler de kapatılır
  *  - yalnız js/otomasyon.js listesindeki eylemler; yaz/yıkıcı eylemler "Düzenlemeye izin ver"
  *    ister, yıkıcılar ayrıca panelde onay kartı (60 sn'de yanıt yoksa reddedilir; aynı anda tek
  *    kart, ikinci yıkıcı istek 409 onay_bekliyor)
  *  - kapatma anahtarı: köprü kapanınca kuyruktaki, meşgul beklemesindeki ve onay bekleyen hiçbir
  *    istek yürütülmez (503 kopru_kapali); izin / Pro yürütmeden hemen önce yeniden denetlenir
+ *    ("Düzenlemeye izin ver" kapatılınca bekleyen yazma 403 izin_yok alır, onay kartı da kapanır)
  *  - hata metinleri de temizlenir (mutlak yol → dosya adı); reddedilen istekler de günlüğe yazılır
- *  - 30 dakika çağrı gelmezse kendiliğinden kapanır; deneme oturumu ayrıca mutlak süre sınırıyla
- *    (baslat({ sure })) kapanır, çağrılar bu sınırı uzatmaz
+ *  - 30 dakika çağrı gelmezse kendiliğinden kapanır; isteğe bağlı mutlak süre sınırı (baslat({ sure }))
+ *    çağrılarla uzamaz (panel şu an kullanmaz: köprü yalnız Pro, deneme oturumu yok; kurucu notu MCP.9)
  *
  * Saf Node (http/crypto/fs/path enjekte edilebilir): DOM'a dokunmaz, testte gerçek loopback
  * sunucusuyla çalışır. CEF 74 / Node 12.3 uyumlu.
@@ -75,11 +82,14 @@
     var onKapandi = s.onKapandi || function () {};
 
     var sunucu = null, port = 0, token = "", tokenBuf = null;
+    var yazilanToken = "";      // bağlantı dosyasına bu oturumun en son yazdığı jeton (silmeden önce karşılaştırılır)
+    var soketler = null;        // bu sunucunun açık soketleri (kapanışta istek taşımayanlar kapatılır)
+    var yetkiliSoketler = null; // jetonu doğru, gövdesi okunmuş isteği taşıyan soketler (yanıtını bekler)
     var cagrilar = [];          // son bir dakikadaki çağrı zamanları (yalnız jetonu doğru istekler)
     var calisan = false;        // aynı anda tek eylem
     var kuyruk = [];            // bekleyen eylemler: { calistir: function(), reddet: function(hata) }
     var bostaSaat = null;
-    var sureSaat = null;        // oturumun mutlak süre sınırı (deneme oturumu): çağrılar uzatmaz
+    var sureSaat = null;        // oturumun isteğe bağlı mutlak süre sınırı: çağrılar uzatmaz
     var acik = false;
     // Oturum kuşağı: her açılış ve kapanışta artar. Kabul edilmiş bir istek kuyrukta, meşgul
     // beklemesinde ya da onay kartında beklerken köprü kapatılırsa (ya da kapatılıp yeniden
@@ -113,20 +123,37 @@
       var icerik = JSON.stringify({ v: 1, port: port, token: token, pid: process.pid, baslangic: new Date(saat()).toISOString() });
       var tmp = dosya + ".tmp-" + process.pid + "-" + crypto.randomBytes(4).toString("hex");
       try { fs.mkdirSync(path.dirname(dosya), { recursive: true }); } catch (e) {}
-      fs.writeFileSync(tmp, icerik, { encoding: "utf8", mode: 384 });   // 0o600
-      try { fs.chmodSync(tmp, 384); } catch (e2) {}
-      try { fs.renameSync(tmp, dosya); }
-      catch (e3) {
-        // Windows'ta hedef varken rename başarısız olabilir: önce sil, yeniden dene
-        try { fs.unlinkSync(dosya); } catch (e4) {}
-        fs.renameSync(tmp, dosya);
+      try {
+        fs.writeFileSync(tmp, icerik, { encoding: "utf8", mode: 384 });   // 0o600
+        try { fs.chmodSync(tmp, 384); } catch (e2) {}
+        try { fs.renameSync(tmp, dosya); }
+        catch (e3) {
+          // Windows'ta hedef varken rename başarısız olabilir: önce sil, yeniden dene
+          try { fs.unlinkSync(dosya); } catch (e4) {}
+          fs.renameSync(tmp, dosya);
+        }
+      } catch (eY) {
+        // yarım kalan geçici dosya (dolu disk, kilitli hedef) Kesit klasöründe birikmesin
+        try { fs.unlinkSync(tmp); } catch (e6) {}
+        throw eY;
       }
       try { fs.chmodSync(dosya, 384); } catch (e5) {}
+      yazilanToken = token;
     }
 
+    /*
+     * Bağlantı dosyası yalnız BU oturumun yazdığıysa silinir. Tüm Suflo panelleri (aynı anda açık
+     * iki Premiere sürümü dahil) aynı Kesit klasörünü paylaşır: diğer panelin sonradan açtığı köprü
+     * dosyayı kendi jetonuyla yeniden yazmışsa, bu köprünün kapanması onu silmez.
+     */
     function dosyaSil() {
-      if (!dosya) return;
-      try { fs.unlinkSync(dosya); } catch (e) {}
+      var benim = yazilanToken;
+      yazilanToken = "";
+      if (!dosya || !benim) return;
+      var b = null;
+      try { b = JSON.parse(fs.readFileSync(dosya, "utf8")); } catch (e) { return; }
+      if (!b || typeof b !== "object" || b.token !== benim) return;
+      try { fs.unlinkSync(dosya); } catch (e2) {}
     }
 
     /* ---------------- Yanıt ---------------- */
@@ -181,8 +208,8 @@
       if (bostaSaat && bostaSaat.unref) bostaSaat.unref();
     }
 
-    // Mutlak süre sınırı: boşta sayacından farklı olarak çağrılar onu UZATMAZ (deneme oturumu en çok
-    // bu kadar açık kalır). ms <= 0 ya da sayı değilse sınır kaldırılır (ör. oturum sırasında Pro alındı).
+    // Mutlak süre sınırı: boşta sayacından farklı olarak çağrılar onu UZATMAZ (oturum en çok bu kadar
+    // açık kalır). ms <= 0 ya da sayı değilse sınır kaldırılır.
     function sureSiniri(ms) {
       if (sureSaat) { clearTimeout(sureSaat); sureSaat = null; }
       if (!acik || typeof ms !== "number" || !(ms > 0)) return;
@@ -307,6 +334,8 @@
       }
       adim.then(function (onay) {
         if (!gecerli()) throw kapaliHata();
+        // Kart açıkken "Düzenlemeye izin ver" kapatıldıysa (panel kartı kapatır): asıl neden izin
+        if (!onay && !duzenlemeAcik()) { logla("hata", "izin_yok"); red(res, 403, "izin_yok", IZIN_YOK_MESAJ); return; }
         if (!onay) { logla("hata", "reddedildi"); red(res, 403, "reddedildi", "The user did not confirm this destructive action in Suflo (denied or timed out)."); return; }
         return sirayaKoy(function () {
           if (!gecerli()) return Promise.reject(kapaliHata());
@@ -404,6 +433,14 @@
         try { govde = JSON.parse(Buffer.concat(parcalar).toString("utf8")); }
         catch (e) { ret(400, "json", "Invalid JSON.", false); return; }
         if (!govde || typeof govde !== "object" || Array.isArray(govde)) { ret(400, "json", "Invalid body.", false); return; }
+        // Jetonu doğru, gövdesi okunmuş istek: soket boşta sınırı kalkar (kopyada kesim gibi uzun
+        // eylemin ya da onay kartının yanıtı beklenirken bağlantı kesilmesin); kapanışta da kapatılmaz,
+        // yanıtını (503 kopru_kapali ya da eylemin sonucu) alır. Yanıt "Connection: close" ile biter.
+        var sk = req.socket;
+        if (sk) {
+          try { sk.setTimeout(0); } catch (eT) {}
+          if (yetkiliSoketler) yetkiliSoketler.add(sk);
+        }
         // gövde okunurken köprü kapatıldıysa eylemCalistir 503 kopru_kapali döner
         eylemCalistir(res, govde, bas, benimNesil);
       });
@@ -411,7 +448,7 @@
 
     /* ---------------- Aç / kapat ---------------- */
 
-    // o.sure (ms): oturumun mutlak süre sınırı (deneme oturumu); verilmezse yalnız boşta kapanma
+    // o.sure (ms): oturumun isteğe bağlı mutlak süre sınırı; verilmezse (panel) yalnız boşta kapanma
     function baslat(o) {
       o = o || {};
       return new Promise(function (resolve, reject) {
@@ -420,9 +457,20 @@
         cagrilar = [];
         nesil++;
         sunucu = http.createServer(istek);
-        // eylemler (kopyada kesim) uzun sürebilir: yanıt beklerken soket kapanmasın; gövde
-        // okuma süresi istek başına 30 sn ile ayrıca sınırlı
-        try { sunucu.timeout = 0; sunucu.keepAliveTimeout = 1000; sunucu.headersTimeout = okumaSuresi; } catch (e) {}
+        /*
+         * Soket boşta sınırı = okuma süresi (30 sn): bağlanıp hiç bayt göndermeyen ya da başlığı yarım
+         * bırakan soket kapanır. headersTimeout tek başına yetmez: Node 12–17'de yalnız yeni bayt
+         * gelince denetlenir, sessiz soket süresiz açık kalır (yerel bir süreç yüzlerce soketle
+         * panelin dosya tanıtıcılarını tüketebilir). Uzun eylemler kesilmesin diye sınır yalnız
+         * jetonu doğru, gövdesi okunmuş istekte kaldırılır (istek() › "end").
+         */
+        try { sunucu.timeout = okumaSuresi; sunucu.keepAliveTimeout = 1000; sunucu.headersTimeout = okumaSuresi; } catch (e) {}
+        var buSoketler = new Set(), buYetkili = new Set();
+        soketler = buSoketler; yetkiliSoketler = buYetkili;
+        sunucu.on("connection", function (sk) {
+          buSoketler.add(sk);
+          sk.on("close", function () { buSoketler.delete(sk); buYetkili.delete(sk); });
+        });
         sunucu.on("error", function (err) { if (!acik) reject(err); else log("[mcp] sunucu hatasi: " + (err && err.message)); });
         sunucu.listen(0, "127.0.0.1", function () {
           var a = sunucu.address();
@@ -447,6 +495,17 @@
       dosyaSil();
       token = ""; tokenBuf = null;
       if (sunucu) { try { sunucu.close(); } catch (e) {} sunucu = null; }
+      // close() yalnız yeni bağlantıyı durdurur: istek taşımayan (sessiz, yarım başlıklı, jetonsuz)
+      // açık soketler de şimdi kapanır. Jetonu doğru isteğin soketi yanıtını almak için kalır
+      // (kuyruktakiler aşağıda 503 alır, süren eylem kendi yanıtını alır), sonra kendiliğinden kapanır.
+      if (soketler) {
+        var yetkili = yetkiliSoketler;
+        soketler.forEach(function (sk) {
+          if (yetkili && yetkili.has(sk)) return;
+          try { sk.destroy(); } catch (eS) {}
+        });
+        soketler = null; yetkiliSoketler = null;
+      }
       // Kabul edilmiş ama henüz yürütülmemiş işler: hiçbiri artık yürütülmez (kuşak değişti) ve
       // kuyrukta bekleyenler hemen 503 kopru_kapali yanıtı alır. Süren tek eylem Premiere'de yarıda
       // kesilemez; o bitince kendi yanıtını alır.
@@ -461,12 +520,24 @@
       }
     }
 
-    // "Yeni jeton": dosya yeniden yazılır, eski jeton anında geçersiz
+    /*
+     * "Yeni jeton": dosya yeniden yazılır, eski jeton anında geçersiz -> { ok:true }.
+     * Dosya yazılamazsa (dolu disk, Windows'ta kilitli dosya) köprü KAPANIR -> { ok:false, hata }:
+     * yeni jetonu hiçbir istemci öğrenemez, eskisine geri dönmek de kullanıcının "eski jeton geçmesin"
+     * isteğini boşa çıkarır; açılıştaki dosya hatasıyla aynı yol (durdur("dosya")).
+     */
     function jetonYenile() {
-      if (!acik) return false;
-      yeniToken();
-      dosyaYaz();
-      return true;
+      if (!acik) return { ok: false, hata: "kapali" };
+      try {
+        yeniToken();
+        dosyaYaz();
+      } catch (e) {
+        var kod = e && e.code ? String(e.code) : (e && e.message ? String(e.message) : String(e));
+        log("[mcp] jeton yenilenemedi: " + kod);
+        durdur("dosya");
+        return { ok: false, hata: kod.slice(0, 80) };
+      }
+      return { ok: true };
     }
 
     return {

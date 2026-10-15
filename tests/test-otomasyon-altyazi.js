@@ -27,7 +27,7 @@ var capKod = [
   kes(cap, "async function apply(stilIle, secenek)"),
   kes(cap, "function durumOku()"),
   kes(cap, "function secimDegistir("),
-  kes(cap, "async function mcpOlustur(o)"),
+  kes(cap, "async function mcpOlustur(o, geri)"),
   kes(cap, "async function mcpKanala()"),
   kes(cap, "async function mcpDisari(bicim)")
 ].join("\n");
@@ -232,6 +232,17 @@ async function main() {
   ok("dil 'auto' → 'Otomatik' (''), change olayıyla; kapsam düğmesi; 2 satır × 42 korunur", r.ok === true && g.dom["cap-lang"].value === "" && js(g.dom["cap-lang"].olaylar) === '["change"]' &&
     g.c.kapsam === "entire" && g.dom["cap-maxlen"].value === "c42x2" && g.dom["cap-maxlen"].olaylar.length === 0, js([r, g.dom["cap-lang"].value, g.dom["cap-maxlen"].value]));
   ok("go köprü bilgisiyle çağrılır (upsell açmaz)", g.c.go.length === 1 && g.c.go[0] && typeof g.c.go[0].mcp === "object");
+  // İnceleme bulgusu: köprü iş kimliğini go() başlamadan veriyordu; başlamadan dönen ret (pro_gerekli) kodunu kaybediyordu
+  var basladiSay = 0;
+  var gb = altyaziKur({ go: function (opts) { if (opts.mcp.basladi) opts.mcp.basladi(); return true; } });
+  r = await gb.api.mcpOlustur({}, { basladi: function () { basladiSay++; } });
+  ok("mcpOlustur 'basladi' geri çağrısını go()'ya iletir (iş gerçekten başlayınca çağrılır)", r.ok === true && basladiSay === 1 && typeof gb.c.go[0].mcp.basladi === "function", js(r));
+  var goGovde = cap.slice(cap.indexOf("async function go(opts)"), cap.indexOf("function setBusy("));
+  var mesgulSira = goGovde.indexOf("busy = true;"), basladiSira = goGovde.indexOf("mcpBilgi.basladi()");
+  var ilkAwait = goGovde.indexOf("await ");
+  ok("go(): basladi yalnız meşgule geçtikten sonra, ilk await'ten önce; pro_gerekli reddi ondan önce döner",
+    mesgulSira > 0 && basladiSira > mesgulSira && (ilkAwait === -1 || basladiSira < ilkAwait) && goGovde.indexOf('mcpBilgi.hata = "pro_gerekli"') < mesgulSira,
+    [mesgulSira, basladiSira, ilkAwait].join(","));
   var g2 = altyaziKur({ maxlen: "c42x2" });
   r = await g2.api.mcpOlustur({ mod: "kelime" });
   ok("mod 'kelime': satır düzeninden kelime kelimeye geçer (change olayıyla)", g2.dom["cap-maxlen"].value === "k1" && js(g2.dom["cap-maxlen"].olaylar) === '["change"]');

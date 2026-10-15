@@ -80,7 +80,8 @@ function metinSonuc(nesne, hataMi) {
 }
 
 var MESAJLAR = {
-  kopru_kapali: "köprü kapalı / bridge is off: open Suflo in Premiere Pro > Settings > 'Yapay zekâ köprüsü (MCP)' and turn it on.",
+  // Panel İngilizce de olabilir: kart ve düğme adları iki dilde (izin_yok gibi)
+  kopru_kapali: "köprü kapalı / bridge is off: open Suflo in Premiere Pro > Settings (Ayarlar) > 'AI bridge (MCP)' / 'Yapay zekâ köprüsü (MCP)' and turn it on (Turn bridge on / Köprüyü aç).",
   premiere_mesgul: "Premiere meşgul / Premiere is busy with another Suflo task. Try again in a moment.",
   kuyruk_dolu: "Premiere meşgul / too many Suflo actions are queued. Try again in a moment.",
   pro_gerekli: "pro_gerekli: this action needs Suflo Pro (no free trial credits left).",

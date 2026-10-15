@@ -38,9 +38,7 @@ var SITELER = [
   // 3.2 adım 5: çevrimdışı İngilizce (-tr) Altyazı oluştur'da; hak yalnız transkript başarıyla bitince
   ["js/captions.js", "async function go(opts)", "offlineTranslate", "basarili = true;", true],
   // 3.3 YouTube indirici: Bilgi al ücretsiz (kapı yok); hak yalnız dosya Premiere'e hazır olunca
-  ["js/youtube-indir-ui.js", "async function indir(ev)", "youtube", "if (!sonuc || !sonuc.dosya) throw", true],
-  // 3.4 Yapay zekâ köprüsü (MCP): köprüyü açmak Pro; hak yalnız köprü gerçekten açılınca düşer
-  ["js/otomasyon-panel.js", "async function ac(ev)", "mcp", "if (sonuc.ok) {", true]
+  ["js/youtube-indir-ui.js", "async function indir(ev)", "youtube", "if (!sonuc || !sonuc.dosya) throw", true]
 ];
 var kapiliOzellikler = {};
 SITELER.forEach(function (s) {
@@ -60,8 +58,8 @@ SITELER.forEach(function (s) {
   var hata = g.search(/\n    \} catch \(/);
   ok(ad + ": hak yalnız başarı denetiminden sonra düşer", basari > 0 && harca > basari && (hata === -1 || harca < hata), "basari " + basari + " harca " + harca + " catch " + hata);
 });
-var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube", "mcp"];
-ok("13 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
+var DOKUZ = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube"];
+ok("12 özelliğin hepsi deneme kapısında", DOKUZ.every(function (f) { return kapiliOzellikler[f]; }), Object.keys(kapiliOzellikler).join(","));
 ok("deneme listesi deneme.js ile aynı", JSON.stringify(require(path.join(KOK, "js", "deneme.js")).OZELLIKLER) === JSON.stringify(DOKUZ));
 
 /* ---------------- 2) deneme almayan kapılar ---------------- */
@@ -80,7 +78,13 @@ jsDosyalari.forEach(function (f) {
     }
   });
 });
-ok("tarama deneme kapılarını buluyor (19 kapı: 18 araç + rehberin stil adımı)", denemeli.length === 19, denemeli.join(" | "));
+ok("tarama deneme kapılarını buluyor (18 kapı: 17 araç + rehberin stil adımı)", denemeli.length === 18, denemeli.join(" | "));
+// 3.4 Yapay zekâ köprüsü (MCP): kurucu kademesi "köprüyü açmak Pro gerektirir" (deneme hakkı yok; Shorts Paketi /
+// Podcast Modu gibi). İnceleme bulgusu: açılış Pro.gate("mcp", { deneme: true }) ile 3 deneme oturumu veriyordu.
+var kopruAc = govde(oku("js/otomasyon-panel.js"), "async function ac(ev)");
+ok("köprüyü açmak denemesiz Pro kapısı; hak harcanmaz, deneme oturumu yok",
+  /Pro\.gate\("mcp"\)\) return;/.test(kopruAc) && !/deneme/.test(kopruAc.replace(/\/\/[^\n]*/g, "")) && oku("js/otomasyon-panel.js").indexOf('denemeHarca("mcp"') === -1 &&
+  !/DENEME_OTURUMU|sure: /.test(oku("js/otomasyon-panel.js")), kopruAc.slice(0, 400));
 // Rehberin "Timeline'a koy"u Altyazı sekmesindeki "… ile ekle" ile aynı stilli katman denemesini sunar;
 // MOGRT stili seçiliyse denemesiz kütüphane penceresi (inceleme bulgusu: Suflo Stili için de captionStyles açılıyordu)
 var koy = govde(oku("js/onboarding.js"), "function stilKoyTikla()");

@@ -2,7 +2,7 @@
 // Gerçek loopback sunucusu (Node): jeton, Host, tarayıcı başlıkları, yöntem, gövde sınırı,
 // hız ve kuyruk sınırı, bağlantı dosyası (0600, kapanışta silinir), düzenleme izni,
 // yıkıcı eylem onayı (zaman aşımında ret), Pro kapısı (pro_gerekli, hak harcanmaz).
-var fs = require("fs"), os = require("os"), path = require("path"), http = require("http");
+var fs = require("fs"), os = require("os"), path = require("path"), http = require("http"), net = require("net"), cp = require("child_process");
 var S = require(path.join(__dirname, "..", "js", "otomasyon-sunucu.js"));
 var gecen = 0, toplam = 0;
 function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 300) + "]" : "")); }
@@ -37,6 +37,22 @@ function istek(port, o) {
 }
 
 function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+// Ham TCP soketi (HTTP isteği değil): bağlanır, isterse bir şey yazar
+function soketAc(port, yaz) {
+  return new Promise(function (resolve) {
+    var sk = net.connect(port, "127.0.0.1", function () { if (yaz) sk.write(yaz); resolve(sk); });
+    sk.on("error", function () {});
+  });
+}
+// Soket kapanınca geçen ms; ms içinde kapanmazsa -1
+function kapaninca(sk, ms) {
+  return new Promise(function (resolve) {
+    var bas = Date.now();
+    var t = setTimeout(function () { resolve(-1); }, ms);
+    sk.on("close", function () { clearTimeout(t); resolve(Date.now() - bas); });
+  });
+}
 
 async function main() {
   var cagrilar = [], kayitlar = [], harcanan = [], onaylar = [];
@@ -189,7 +205,8 @@ async function main() {
 
   /* ---- jeton yenileme ---- */
   var eski = token;
-  sunucu.jetonYenile();
+  var yenileSonuc = sunucu.jetonYenile();
+  ok("Yeni jeton başarıda { ok: true } döner", yenileSonuc && yenileSonuc.ok === true, js(yenileSonuc));
   token = sunucu._token();
   r = await istek(port, { token: eski });
   var r2 = await istek(port, { token: token });
@@ -218,16 +235,16 @@ async function main() {
   await bekle(450);
   ok("çağrı gelmezse kendiliğinden kapanır, dosya silinir", bosta[0] === "bosta" && !bs.acikMi() && !fs.existsSync(dosya));
 
-  /* ---- deneme oturumu: mutlak süre sınırı, çağrılar uzatmaz ---- */
-  // İnceleme bulgusu: her doğrulanmış çağrı boşta sayacını sıfırladığından tek deneme hakkı, istemci
-  // birkaç dakikada bir yokladıkça süresiz açık kalıyordu
+  /* ---- isteğe bağlı mutlak oturum süresi (baslat({ sure })): çağrılar uzatmaz ---- */
+  // (İlk inceleme: deneme oturumu için eklendi; köprü artık yalnız Pro, panel kullanmıyor. Mekanizma kurucu
+  // deneme oturumunu geri isterse diye sunucuda ve testte kalıyor: kurucu notu MCP.9)
   var sureKapanma = [];
   var ss = S.olustur({ dosya: dosya, bostaKapanma: 250, yurut: function () { return { ok: true }; }, onKapandi: function (n) { sureKapanma.push(n); } });
   var sp = (await ss.baslat({ sure: 600 })).port, st = ss._token();
   var sBas = Date.now(), sKodlar = [];
   while (ss.acikMi() && Date.now() - sBas < 2000) { sKodlar.push((await istek(sp, { token: st })).kod); await bekle(100); }
   var sGecen = Date.now() - sBas;
-  ok("deneme oturumu: 100 ms'de bir çağrı boşta sayacını canlı tutsa da süre dolunca kapanır ('sure'), dosya silinir",
+  ok("süre sınırlı oturum: 100 ms'de bir çağrı boşta sayacını canlı tutsa da süre dolunca kapanır ('sure'), dosya silinir",
     sureKapanma[0] === "sure" && !ss.acikMi() && !fs.existsSync(dosya) && sGecen >= 550 && sGecen < 1500 && sKodlar.length >= 4 && sKodlar.every(function (k) { return k === 200; }), sureKapanma.join(",") + " " + sGecen + "ms " + js(sKodlar));
   r = await istek(sp, { token: st });
   ok("süre dolduktan sonra istek bağlanamaz", r.kod === 0, r.kod);
@@ -246,7 +263,7 @@ async function main() {
   sz.durdur("kapat");
   await sz.baslat();
   await bekle(350);
-  ok("deneme oturumu kapatılıp Pro oturumu açılınca eski süre sınırı işlemez", sz.acikMi() && js(sureKapanma) === '["kapat"]', js(sureKapanma));
+  ok("süre sınırlı oturum kapatılıp sınırsız açılınca eski süre sınırı işlemez", sz.acikMi() && js(sureKapanma) === '["kapat"]', js(sureKapanma));
   sz.durdur();
 
   /* ---- Premiere meşgul: yazma eylemi bekler, zaman aşımında 503 ---- */
@@ -369,6 +386,100 @@ async function main() {
   r = await o3;
   ok("ikinci kart reddedilince 403 reddedildi, yürütülmez", r.kod === 403 && r.govde.hata === "reddedildi" && oYurut.length === 1, js(r.govde));
   os2.durdur();
+
+  /* ---- bağlantı dosyası yalnız bu oturumun yazdığıysa silinir (inceleme bulgusu) ---- */
+  // Tüm Suflo panelleri (aynı anda açık iki Premiere sürümü) aynı Kesit klasörünü paylaşır: eski kapanış, diğer
+  // köprünün sonradan yazdığı dosyayı da siliyordu; o köprü "AÇIK" görünürken Claude "köprü kapalı" alıyordu
+  var bA = S.olustur({ dosya: dosya, yurut: function () { return { ok: true }; } });
+  var bB = S.olustur({ dosya: dosya, yurut: function () { return { ok: true }; } });
+  await bA.baslat();
+  var bpB = (await bB.baslat()).port, btB = bB._token();
+  ok("ikinci köprü dosyayı kendi jetonuyla yazar", JSON.parse(fs.readFileSync(dosya, "utf8")).token === btB);
+  bA.durdur("kapat");
+  ok("ilk köprü kapanınca ikincinin dosyası SİLİNMEZ", fs.existsSync(dosya) && JSON.parse(fs.readFileSync(dosya, "utf8")).token === btB);
+  r = await istek(bpB, { token: btB });
+  ok("ikinci köprü çalışmaya devam eder", r.kod === 200 && r.govde.ok === true, r.kod);
+  bB.jetonYenile();
+  bB.durdur("kapat");
+  ok("sahibi kapanınca (jeton yenilendikten sonra da) dosya silinir", !fs.existsSync(dosya));
+
+  /* ---- sessiz / yarım soketler: okuma süresinde kapanır, uzun eylem kesilmez (inceleme bulgusu) ---- */
+  // sunucu.timeout = 0 ve headersTimeout (Node 12'de yalnız yeni bayt gelince denetlenir) ile hiç bayt göndermeyen
+  // soket süresiz açık kalıyordu; yüzlerce soket panelin dosya tanıtıcılarını tüketebilirdi
+  var tYurut = [];
+  var ts = S.olustur({ dosya: dosya, okumaSuresi: 300, yurut: function (ad) {
+    tYurut.push(ad);
+    return new Promise(function (res4) { setTimeout(function () { res4({ ok: true, uzun: true }); }, 900); });
+  } });
+  var tp = (await ts.baslat()).port;
+  var sessiz = await soketAc(tp);
+  var yarim = await soketAc(tp, "POST /v1/eylem HTTP/1.1\r\nHost: 127.0.0.1:" + tp + "\r\n");
+  var tk = await Promise.all([kapaninca(sessiz, 4000), kapaninca(yarim, 4000)]);
+  ok("hiç bayt göndermeyen ve başlığı yarım bırakan soket okuma süresi dolunca kapanır", tk[0] >= 0 && tk[0] < 2500 && tk[1] >= 0 && tk[1] < 2500, js(tk));
+  bas = Date.now();
+  r = await istek(tp, { token: ts._token(), govde: JSON.stringify({ ad: "suflo_doktor", args: {} }) });
+  ok("jetonu doğru eylem okuma süresinden (300 ms) uzun sürse de (900 ms) yanıtını alır", r.kod === 200 && r.govde.ok === true && r.govde.sonuc.uzun === true && Date.now() - bas >= 850,
+    r.kod + " " + js(r.govde));
+  ts.durdur();
+
+  // Köprüyü kapat: close() yalnız yeni bağlantıyı durdurur; istek taşımayan açık soketler de kapanmalı
+  var ds = S.olustur({ dosya: dosya, yurut: function () { return { ok: true }; } });
+  var dp = (await ds.baslat()).port;
+  var d1 = await soketAc(dp), d2 = await soketAc(dp, "POST /v1/eylem HTTP/1.1\r\n");
+  await bekle(50);
+  var dk = [kapaninca(d1, 3000), kapaninca(d2, 3000)];
+  ds.durdur("kapat");
+  dk = await Promise.all(dk);
+  ok("Köprüyü kapat: istek taşımayan açık soketler hemen kapanır (30 sn beklemez)", dk.every(function (x) { return x >= 0 && x < 1000; }), js(dk));
+
+  /* ---- Yeni jeton yazılamazsa köprü kapanır, istisna kaçmaz (inceleme bulgusu) ---- */
+  var yazHatasi = "", adHatasi = false;
+  var sahteFs = {
+    mkdirSync: fs.mkdirSync, chmodSync: fs.chmodSync, unlinkSync: fs.unlinkSync, readFileSync: fs.readFileSync,
+    writeFileSync: function (f, d, o) {
+      if (yazHatasi) { var e = new Error(yazHatasi + ": no space left on device, open '" + f + "'"); e.code = yazHatasi; throw e; }
+      return fs.writeFileSync(f, d, o);
+    },
+    renameSync: function (a, b) {
+      if (adHatasi) { var e = new Error("EPERM: operation not permitted, rename '" + a + "'"); e.code = "EPERM"; throw e; }
+      return fs.renameSync(a, b);
+    }
+  };
+  var jk = [];
+  var jsS = S.olustur({ dosya: dosya, fs: sahteFs, yurut: function () { return { ok: true }; }, onKapandi: function (n) { jk.push(n); } });
+  var jp = (await jsS.baslat()).port, jt = jsS._token();
+  yazHatasi = "ENOSPC";
+  var jr;
+  try { jr = jsS.jetonYenile(); } catch (e) { jr = { firlatti: String(e && e.message) }; }
+  ok("Yeni jeton yazılamazsa (dolu disk): istisna fırlatmaz, { ok:false, hata }", jr && jr.ok === false && jr.hata === "ENOSPC", js(jr));
+  ok("... köprü kapanır (kimsenin bilmediği jetonla açık kalmaz), onKapandi('dosya')", !jsS.acikMi() && js(jk) === '["dosya"]', js(jk));
+  ok("... eski jetonun dosyası da silinir, geçici dosya kalmaz", !fs.existsSync(dosya) && fs.readdirSync(path.dirname(dosya)).length === 0, fs.readdirSync(path.dirname(dosya)).join(","));
+  r = await istek(jp, { token: jt });
+  ok("... port artık dinlemiyor", r.kod === 0, r.kod);
+  // Windows: hedef kilitliyken rename hep başarısız (önce eski dosya silinir, ikinci rename de düşer)
+  yazHatasi = "";
+  jk = [];
+  await jsS.baslat();
+  adHatasi = true;
+  jr = jsS.jetonYenile();
+  ok("rename hatası (kilitli dosya): { ok:false, EPERM }, köprü kapanır, geçici dosya kalmaz", jr.ok === false && jr.hata === "EPERM" && !jsS.acikMi() &&
+    fs.readdirSync(path.dirname(dosya)).length === 0, js(jr) + " " + fs.readdirSync(path.dirname(dosya)).join(","));
+  adHatasi = false;
+  ok("kapalı köprüde jetonYenile { ok:false } döner", jsS.jetonYenile().ok === false);
+
+  /* ---- onay kartı açıkken "Düzenlemeye izin ver" kapatılırsa: 403 izin_yok, yürütülmez ---- */
+  var eIzin = { duzenleme: true, onay: true }, eCoz = null, eYurut = [];
+  var es = S.olustur({ dosya: dosya, izinler: function () { return eIzin; }, proIzin: function () { return { ok: true, deneme: false }; },
+    onayIste: function () { return new Promise(function (res5) { eCoz = res5; }); },
+    yurut: function (ad) { eYurut.push(ad); return { ok: true }; } });
+  var ep = (await es.baslat()).port;
+  var eSoz = istek(ep, { token: es._token(), govde: JSON.stringify({ ad: "suflo_sessizlik_kes", args: {} }) });
+  await bekle(150);
+  eIzin.duzenleme = false;
+  eCoz(false);   // panel: izin kapanınca bekleyen kart kapanır (coz(false))
+  r = await eSoz;
+  ok("onay beklerken düzenleme izni kapatılırsa 403 izin_yok (reddedildi değil), yürütülmez", r.kod === 403 && r.govde.hata === "izin_yok" && eYurut.length === 0, js(r.govde));
+  es.durdur();
 
   try { fs.rmdirSync(path.join(dizin, "Kesit")); fs.rmdirSync(dizin); } catch (e) {}
   console.log("\n" + gecen + "/" + toplam + " gecti");

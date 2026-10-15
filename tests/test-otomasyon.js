@@ -26,7 +26,16 @@ ok("Pro eylemleri mevcut kapı anahtarlarını kullanır", O.eylem("suflo_sessiz
   O.eylem("suflo_metinden_kes").pro === "textcut" && O.eylem("suflo_zoom").pro === "zoom" && O.eylem("suflo_hiz_rampasi").pro === "speedramp" &&
   O.eylem("suflo_baglam").pro === null && O.eylem("suflo_altyazi_olustur").pro === null);
 var D = require(path.join(__dirname, "..", "js", "deneme.js"));
-ok("Pro anahtarları deneme listesinde (3 hak) + köprünün kendi anahtarı 'mcp'", O.EYLEMLER.every(function (e) { return !e.pro || D.listede(e.pro); }) && D.listede("mcp") && D.AD.mcp === "Yapay zekâ köprüsü (MCP)");
+ok("Pro eylemlerinin anahtarları aracın kendi deneme listesinde (aynı kapı)", O.EYLEMLER.every(function (e) { return !e.pro || D.listede(e.pro); }));
+// Kurucu kademesi: köprüyü açmak yalnız Pro, köprünün kendi deneme hakkı yok (inceleme bulgusu)
+ok("köprünün kendi anahtarı 'mcp' deneme listesinde YOK", !D.listede("mcp") && D.kalan(D.bos(), "mcp") === 0 && !Object.prototype.hasOwnProperty.call(D.AD, "mcp"));
+
+/* ---------------- dallar birleşince: eğri pişirme eylemi unutulmasın ---------------- */
+// Plan adım 22 v1 izin listesindeki suflo_egri_uygula, adım 10 (js/egri.js, yerel-34-egri) bu dala gelmediği için yok.
+// İki dal birleşince bu test, eylem eklenene kadar KALIR (kurucu notu MCP.5: EYLEMLER, YURUT, TR_AD, testler, belgeler).
+var egriVar = require("fs").existsSync(path.join(__dirname, "..", "js", "egri.js"));
+ok("eğri modülü varsa suflo_egri_uygula yazma eylemi listede" + (egriVar ? "" : " (js/egri.js bu dalda yok)"),
+  !egriVar || (!!O.eylem("suflo_egri_uygula") && O.eylem("suflo_egri_uygula").sinif === "yaz"));
 
 /* ---------------- Kalıcı olarak dışarıda kalanlar ---------------- */
 var yasakAd = /extendscript|qe|eval|script|project|save|close|delete|remove|export_media|render|setting|license|lisans|api|key|anahtar|http|fetch|url|path|yol|dosya_ac|ag_/i;
@@ -133,7 +142,12 @@ var kafa = araclar.filter(function (a) { return a.name === "suflo_oynatma_kafasi
 ok("gerekli alan ve sınırlar şemada", js(kafa.inputSchema.required) === '["saniye"]' && kafa.inputSchema.properties.saniye.minimum === 0 && kafa.inputSchema.properties.saniye.maximum === 86400);
 var mk = araclar.filter(function (a) { return a.name === "suflo_marker_ekle"; })[0];
 ok("iç içe dizi şeması", mk.inputSchema.properties.markerlar.type === "array" && mk.inputSchema.properties.markerlar.maxItems === 200 && mk.inputSchema.properties.markerlar.items.additionalProperties === false);
-ok("açıklamalar güvenilmez içerik uyarısı taşır (metin taşıyan araçlar)", ["suflo_baglam", "suflo_izler", "suflo_secim", "suflo_altyazi_oku"].every(function (n) {
+// İnceleme bulgusu: uyarı yalnız 4 okuma aracındaydı; sessizlik analizi (klip adı), kesimler (kopya sekans adı),
+// doktor ve iş durumu da kullanıcı içeriği döner. Artık her araçta, bir kez.
+ok("her aracın açıklaması güvenilmez içerik uyarısı taşır (klip, sekans, iz, marker adı, transkript), bir kez", araclar.every(function (a) {
+  return (a.description.match(/untrusted user content/g) || []).length === 1 && /sequence/.test(a.description) && /clip/.test(a.description);
+}), araclar.filter(function (a) { return (a.description.match(/untrusted user content/g) || []).length !== 1; }).map(function (a) { return a.name; }).join(","));
+ok("kullanıcı adı döndüren araçlar dahil (analiz, kesimler, doktor, iş durumu)", ["suflo_sessizlik_analiz", "suflo_sessizlik_kes", "suflo_metinden_kes", "suflo_hiz_rampasi", "suflo_doktor", "suflo_is_durumu", "suflo_baglam"].every(function (n) {
   return /untrusted user content/.test(araclar.filter(function (a) { return a.name === n; })[0].description);
 }));
 ok("ipuçları: okuma readOnly, yıkıcı destructive", araclar.every(function (a) {
@@ -153,6 +167,10 @@ ok("iş durumu: sürüyor → bitti", it.oku(id1).durum === "suruyor" && (it.bit
 var id2 = it.ekle("altyazi");
 it.bitir(id2, false, "hata!");
 ok("iş durumu: hata", it.oku(id2).durum === "hata" && it.oku(id2).hata === "hata!" && it.oku("is_yok") === null);
+// İnceleme bulgusu: başarısız işin hata KODU (pro_gerekli…) kayboluyordu, yalnız mesaj kalıyordu
+var id3 = it.ekle("altyazi");
+it.bitir(id3, false, { hata: "pro_gerekli", mesaj: "needs Pro" });
+ok("iş durumu: hata kodu ve mesajı ayrı tutulur", it.oku(id3).durum === "hata" && it.oku(id3).kod === "pro_gerekli" && it.oku(id3).hata === "needs Pro", js(it.oku(id3)));
 var tok = new Array(65).join("a");
 ok("bağlantı dosyası doğrulaması", O.baglantiGecerli({ v: 1, port: 5000, token: tok }) && !O.baglantiGecerli({ v: 1, port: 0, token: tok }) &&
   !O.baglantiGecerli({ v: 1, port: 5000, token: "kisa" }) && !O.baglantiGecerli({ v: 2, port: 5000, token: tok }) && !O.baglantiGecerli(null));

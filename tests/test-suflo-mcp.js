@@ -54,6 +54,13 @@ async function main() {
   ok("tools/list js/otomasyon.js'ten üretilir", liste && js(liste.result.tools.map(function (t) { return t.name; })) === js(O.adlar()));
   var c3 = bul(r.satirlar, 3);
   ok("bağlantı dosyası yoksa isError: köprü kapalı", c3 && c3.result.isError === true && /köprü kapalı/.test(c3.result.content[0].text), js(c3));
+  // İnceleme bulgusu: yalnız Türkçe kart adını söylüyordu; İngilizce arayüzde kart "AI bridge (MCP)"
+  var kapaliMetin = c3 && c3.result.content[0].text;
+  ok("köprü kapalı mesajı kartı ve düğmeyi iki dilde anar", /'AI bridge \(MCP\)'/.test(kapaliMetin) && /'Yapay zekâ köprüsü \(MCP\)'/.test(kapaliMetin) &&
+    /Turn bridge on/.test(kapaliMetin) && /Köprüyü aç/.test(kapaliMetin), kapaliMetin);
+  var enS = require(path.join(__dirname, "..", "i18n", "en.js"));
+  var enSoz = enS.strings || (enS.default && enS.default.strings) || {};
+  ok("mesajdaki İngilizce adlar panelin İngilizce sözlüğüyle aynı", enSoz["Yapay zekâ köprüsü (MCP)"] === "AI bridge (MCP)" && enSoz["Köprüyü aç"] === "Turn bridge on" && enSoz["Ayarlar"] === "Settings");
   ok("ping boş sonuç", js(bul(r.satirlar, 4).result) === "{}");
   ok("bildirime (notifications/initialized) yanıt yok", r.satirlar.length === 4, r.satirlar.length);
   ok("stdout yalnız JSON-RPC 2.0 satırları", r.satirlar.every(function (s) { try { return JSON.parse(s).jsonrpc === "2.0"; } catch (e) { return false; } }), r.out.slice(0, 200));

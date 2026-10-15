@@ -1,6 +1,7 @@
 // Suflo testi: Yapay zekâ köprüsü (MCP) panel yapıştırıcısı — js/otomasyon-panel.js
 // Her eylemin yürütücüsü var ve panel düğmelerinin işlevlerini çağırır; Pro eylemde deneme
-// hakkı kurulur (harcanmaz); açılışta sunucu/Premiere/ağ yok; Ayarlar kartı öğeleri index.html'de.
+// hakkı kurulur (harcanmaz); köprüyü açmak yalnız Pro (deneme yok); açılışta sunucu/Premiere/ağ yok,
+// başka sürecin bağlantı dosyası silinmez; Ayarlar kartı öğeleri index.html'de.
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var KOK = path.join(__dirname, "..");
 var gecen = 0, toplam = 0;
@@ -11,7 +12,7 @@ function oku(f) { return fs.readFileSync(path.join(KOK, f), "utf8"); }
 function kur(dom, o) {
   dom = dom || {};
   o = o || {};
-  var c = { call: [], baslat: [], harca: [], olustur: 0, dinle: [], goster: [], toast: [], sunucuBaslat: [], sureSiniri: [], proDinleyici: [] };
+  var c = { call: [], baslat: [], harca: [], olustur: 0, dinle: [], goster: [], toast: [], sunucuBaslat: [], sureSiniri: [], proDinleyici: [], gate: [] };
   var win = {};
   var sb = {
     window: win, console: console, setTimeout: setTimeout, clearTimeout: clearTimeout, setInterval: setInterval, clearInterval: clearInterval,
@@ -23,7 +24,7 @@ function kur(dom, o) {
       nodeOK: true, VERSION: "3.4.0",
       call: function (fn, arg) { c.call.push([fn, arg]); return Promise.resolve({ ok: true, added: arg && arg.times ? arg.times.length : 0 }); },
       settingsPath: function () { return o.ayarYolu || "/tmp/Kesit/settings.json"; }, extensionPath: function () { return "/ext"; },
-      path: require("path"), fs: { existsSync: function () { return false; }, unlinkSync: function () {} },
+      path: require("path"), fs: o.fs || { existsSync: function () { return false; }, unlinkSync: function () {} },
       hostMesgul: function () { return false; }, log: function () {}, ffmpegKurulu: function () { return "/x/ffmpeg"; },
       run: function () { return Promise.resolve({ code: 0, stdout: "v20.1.0\n" }); }
     },
@@ -31,7 +32,9 @@ function kur(dom, o) {
       denemeBaslat: function (f) { c.baslat.push(f); return true; },
       denemeHarca: function (f) { c.harca.push(f); return 2; },
       izinVar: function () { return { ok: true, deneme: true }; },
-      gate: function () { return true; },
+      // pro.js gate gibi: Pro ise geçer; ücretsizde yalnız deneme kabul eden çağrı (kurulu hak varsayılır) geçer,
+      // denemesiz çağrı upsell açar ve geçmez
+      gate: function (f, op) { c.gate.push([f, op === undefined ? "yok" : op]); return sb.Pro._pro || !!(op && op.deneme === true); },
       // Pro durumu (pro.js'teki gibi): isPro + on(dinleyici); _degis lisans değişimini (emit) taklit eder
       _pro: o.pro !== undefined ? o.pro : true,
       isPro: function () { return sb.Pro._pro; },
@@ -64,7 +67,12 @@ function kur(dom, o) {
   };
   sb.window.KCaptions = {
     getSegments: function () { return [{ start: 0, end: 1.5, text: "Merhaba" }, { start: 1.5, end: 3, text: "dünya" }]; },
-    mcpOlustur: function (a) { c.olustur_a = a; return new Promise(function (r) { setTimeout(function () { r({ ok: true, satir: 2 }); }, 30); }); },
+    // captions.js gibi: go() işi başlatınca geri.basladi() çağrılır, iş sonra biter
+    mcpOlustur: function (a, geri) {
+      c.olustur_a = a;
+      if (o.mcpOlustur) return o.mcpOlustur(a, geri);
+      return new Promise(function (r) { if (geri && geri.basladi) geri.basladi(); setTimeout(function () { r({ ok: true, satir: 2 }); }, 30); });
+    },
     mesgulMu: function () { return false; }, engineReady: function () { return true; }, localEngineReady: function () { return false; }
   };
   sb.window.KCut = { mcpAnaliz: function (a) { c.analiz = a; return Promise.resolve({ ok: true, araliklar: [] }); }, mcpKes: function () { return Promise.resolve({ ok: true }); } };
@@ -163,15 +171,35 @@ async function main() {
   var p3sonuc = await p3;
   ok("yanıt gelmezse süre dolunca reddedilir", p3sonuc === false && dom["mcp-onay-kart"].hidden === true);
 
-  /* ---- Pro / deneme oturumu (inceleme bulgusu) ---- */
-  // Deneme hakkıyla açılan köprü, çağrılar boşta sayacını sıfırladıkça süresiz açık kalıyordu; Pro yalnız
-  // açılışta denetleniyordu (Pro.deactivate / iade sonrası köprü panel yeniden yüklenene kadar açık kalıyordu)
+  /* ---- suflo_altyazi_olustur: iş kimliği yalnız iş başlayınca (inceleme bulgusu) ---- */
+  // Eskiden iş kimliği go() başlamadan veriliyordu: go()'nun anında reddi (çevrimdışı çeviri seçili, Pro / hak yok ->
+  // pro_gerekli) ok:true "suruyor" olarak dönüyor, iş kaydında da kod kayboluyordu (shim isError:false veriyordu)
+  var ra = kur(null, { mcpOlustur: function () { return Promise.resolve({ ok: false, hata: "pro_gerekli", mesaj: "Offline English translation is selected in the Captions tab and needs Suflo Pro." }); } });
+  r = await ra.P._yurut("suflo_altyazi_olustur", { kapsam: "clip" }, {});
+  ok("başlamadan reddedilen altyazı işi: iş kimliği YOK, ok:false + pro_gerekli hemen döner", r.ok === false && r.hata === "pro_gerekli" && !r.is && /needs Suflo Pro/.test(r.mesaj), js(r));
+  var rb = kur(null, { mcpOlustur: function (a, geri) {
+    geri.basladi();
+    return new Promise(function (res6) { setTimeout(function () { res6({ ok: false, hata: "motor", mesaj: "Whisper model missing." }); }, 30); });
+  } });
+  r = await rb.P._yurut("suflo_altyazi_olustur", {}, {});
+  ok("başlayan iş: hemen iş kimliği", r.ok === true && /^is_/.test(r.is) && r.durum === "suruyor", js(r));
+  await bekle(60);
+  var rd = await rb.P._yurut("suflo_is_durumu", { is: r.is }, {});
+  ok("başladıktan sonra başarısız iş: suflo_is_durumu ok:false + işin hata kodu (asistan 'bitti' sanmaz)", rd.ok === false && rd.hata === "motor" && /Whisper model missing/.test(rd.mesaj), js(rd));
+  var rc = kur(null, { mcpOlustur: function () { return Promise.reject(new Error("beklenmeyen")); } });
+  r = await rc.P._yurut("suflo_altyazi_olustur", {}, {});
+  ok("başlamadan istisna: ok:false olusturulamadi (iş kimliği yok)", r.ok === false && r.hata === "olusturulamadi" && !r.is, js(r));
+
+  /* ---- Pro: köprüyü açmak yalnız Pro, deneme hakkı yok (inceleme bulgusu) ---- */
+  // Kurucu kademesi "enabling the bridge requires Pro": eskiden Pro.gate("mcp", { deneme: true }) ücretsiz
+  // kullanıcıya 3 deneme oturumu veriyordu
   var os = require("os");
   var tmp = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-mcp-panel-"));
   function kartDom() {
     var d = {};
-    ["mcp-ac", "mcp-jeton", "mcp-acik-rozet", "mcp-durum", "mcp-node", "mcp-onay-kart"].forEach(function (id) { d[id] = eleman(id); d[id].className = ""; });
+    ["mcp-ac", "mcp-jeton", "mcp-acik-rozet", "mcp-durum", "mcp-node", "mcp-onay-kart", "mcp-onay-ozet", "mcp-onay-sure", "mcp-onayla", "mcp-reddet", "mcp-duzenleme"].forEach(function (id) { d[id] = eleman(id); d[id].className = ""; });
     d["mcp-ac"].classList = { toggle: function () {} };
+    d["mcp-onay-kart"].hidden = true;
     return d;
   }
   var bagFile = path.join(tmp, "otomasyon.json");
@@ -180,45 +208,84 @@ async function main() {
   dn.P.init();
   ok("init: Pro durumu dinlenir (yalnız dinleyici kaydı, sunucu yok)", dn.c.proDinleyici.length === 1 && dn.c.olustur === 0);
   await dn.P._ac();
-  ok("ücretsiz + deneme hakkı: köprü açılır, 'deneme' oturumu, hak açılınca düşer",
-    dn.P.acikMi() && dn.P._oturum() === "deneme" && js(dn.c.harca) === '["mcp"]' && fs.existsSync(bagFile), dn.P._oturum() + " " + js(dn.c.harca));
-  ok("deneme oturumu 30 dakikalık MUTLAK süre sınırıyla açılır (çağrılar uzatmaz)",
-    dn.P.DENEME_OTURUMU === 30 * 60000 && dn.c.sunucuBaslat.length === 1 && dn.c.sunucuBaslat[0] && dn.c.sunucuBaslat[0].sure === 30 * 60000, js(dn.c.sunucuBaslat));
-  ok("durum satırı deneme oturumunu ve süresini söyler", /deneme/.test(dd["mcp-durum"].textContent) && /30 dakika/.test(dd["mcp-durum"].textContent), dd["mcp-durum"].textContent);
-  dn.sb.Pro._degis(false);   // başka bir Pro olayı (ör. hak sayısı değişti): deneme oturumu sürer
-  ok("deneme oturumunda Pro olayı (hâlâ ücretsiz) köprüyü kapatmaz", dn.P.acikMi() && dn.P._oturum() === "deneme");
-  // süre dolunca kapanır (sınır testte kısaltılır)
-  dn.P._sunucu().sureSiniri(40);
-  await bekle(150);
-  ok("deneme süresi dolunca köprü kapanır, dosya silinir, kullanıcıya söylenir",
-    !dn.P.acikMi() && dn.P._oturum() === "" && !fs.existsSync(bagFile) && /deneme oturumu doldu/.test(dd["mcp-durum"].textContent) &&
-    dn.c.toast.some(function (x) { return /deneme oturumu doldu/.test(x.m); }), dd["mcp-durum"].textContent);
-
-  // deneme oturumunda Pro alınırsa süre sınırı kalkar
-  dn.c.sureSiniri = [];
-  await dn.P._ac();
-  ok("ikinci deneme açılışı da süre sınırlı", dn.P._oturum() === "deneme" && dn.c.sunucuBaslat[dn.c.sunucuBaslat.length - 1].sure === 30 * 60000);
-  dn.sb.Pro._degis(true);
-  ok("deneme oturumunda Pro alınınca: oturum Pro'ya döner, süre sınırı kaldırılır (sureSiniri(0))",
-    dn.P.acikMi() && dn.P._oturum() === "pro" && js(dn.c.sureSiniri) === "[0]" && !/deneme/.test(dd["mcp-durum"].textContent), js(dn.c.sureSiniri));
-  // ... ve sonra lisans giderse köprü kapanır
+  ok("ücretsiz hesap: köprü AÇILMAZ (deneme hakkı yok), sunucu kurulmaz, dosya yazılmaz, hak harcanmaz",
+    !dn.P.acikMi() && dn.c.olustur === 0 && !fs.existsSync(bagFile) && dn.c.harca.length === 0, js(dn.c.harca));
+  ok("açılış kapısı Pro.gate('mcp') deneme seçeneği OLMADAN (upsell'de 'Ücretsiz dene' yok)", js(dn.c.gate) === '[["mcp","yok"]]', js(dn.c.gate));
   dn.sb.Pro._degis(false);
-  ok("Pro'ya dönen oturumda lisans gidince köprü kapanır", !dn.P.acikMi() && dn.P._oturum() === "");
+  ok("kapalı köprüde Pro olayı bir şey yapmaz", !dn.P.acikMi() && dn.c.olustur === 0);
 
-  // Pro ile açılan köprü: lisans gidince (Pro.deactivate / iade) hemen kapanır
+  // Pro ile açılan köprü: süre sınırı yok; lisans gidince (Pro.deactivate / iade) hemen kapanır
   var dp = kartDom();
   var pp = kur(dp, { pro: true, ayarYolu: path.join(tmp, "settings.json") });
   pp.P.init();
   await pp.P._ac();
-  ok("Pro kullanıcı: köprü süre sınırı OLMADAN açılır, deneme hakkı harcanmaz", pp.P.acikMi() && pp.P._oturum() === "pro" && pp.c.sunucuBaslat[0] === "yok", js(pp.c.sunucuBaslat));
+  ok("Pro kullanıcı: köprü süre sınırı OLMADAN açılır, deneme hakkı harcanmaz", pp.P.acikMi() && pp.c.sunucuBaslat[0] === "yok" && pp.c.harca.length === 0 && fs.existsSync(bagFile), js(pp.c.sunucuBaslat));
+  ok("durum satırı açık köprüyü söyler, 'deneme' demez", /Köprü açık/.test(dp["mcp-durum"].textContent) && !/deneme/.test(dp["mcp-durum"].textContent), dp["mcp-durum"].textContent);
   pp.sb.Pro._degis(true);
   ok("Pro olayı (hâlâ Pro): köprü açık kalır", pp.P.acikMi());
+
+  /* ---- Düzenlemeye izin ver kapatılınca bekleyen onay kartı kapanır (inceleme bulgusu) ---- */
+  dp["mcp-duzenleme"].checked = true;
+  dp["mcp-duzenleme"].dinle.change();
+  ok("izin kutusu belleğe yansır", pp.P._izin.duzenleme === true);
+  var kartSonuc = "bekliyor";
+  pp.P._onayIste("suflo_sessizlik_kes", {}, "Sessizlikleri kes (kopyada)", 5000).then(function (v) { kartSonuc = v; });
+  await bekle(20);
+  ok("onay kartı açık", dp["mcp-onay-kart"].hidden === false && kartSonuc === "bekliyor");
+  dp["mcp-duzenleme"].checked = false;
+  dp["mcp-duzenleme"].dinle.change();
+  await bekle(20);
+  ok("izin kapatılınca kart hemen kapanır, istek onaylanmamış sayılır (sunucu izin_yok döner)", kartSonuc === false && dp["mcp-onay-kart"].hidden === true && pp.P._izin.duzenleme === false, String(kartSonuc));
+
+  /* ---- Yeni jeton yazılamazsa: istisna tıklamadan kaçmaz, köprü kapanır, söylenir (inceleme bulgusu) ---- */
+  var jetonTik = dp["mcp-jeton"].dinle.click;
+  var gercekYenile = pp.P._sunucu().jetonYenile;
+  pp.P._sunucu().jetonYenile = function () { var e = new Error("EPERM: operation not permitted, rename"); e.code = "EPERM"; throw e; };
+  var kacti = null;
+  try { jetonTik(); } catch (e) { kacti = e; }
+  ok("jetonYenile istisnası tıklama işleyicisinden kaçmaz; köprü kapanır, dosya silinir", kacti === null && !pp.P.acikMi() && !fs.existsSync(bagFile), String(kacti));
+  ok("durum satırı ve bildirim söyler (yeşil AÇIK kalmaz)", /Jeton yenilenemedi \(EPERM\)/.test(dp["mcp-durum"].textContent) && /bad/.test(dp["mcp-durum"].className) &&
+    pp.c.toast.some(function (x) { return /Jeton yenilenemedi/.test(x.m) && x.t === "bad"; }) && dp["mcp-acik-rozet"].hidden === true, dp["mcp-durum"].textContent);
+  await pp.P._ac();
+  // sunucu dosyayı yazamayıp kendisi kapatırsa ({ ok:false, hata }) da aynı
+  pp.P._sunucu().jetonYenile = function () { pp.P._sunucu().durdur("dosya"); return { ok: false, hata: "ENOSPC" }; };
+  jetonTik();
+  ok("{ ok:false, ENOSPC }: köprü kapalı, durum satırında neden", !pp.P.acikMi() && /ENOSPC/.test(dp["mcp-durum"].textContent), dp["mcp-durum"].textContent);
+  pp.P._sunucu().jetonYenile = gercekYenile;
+  await pp.P._ac();
+  var eskiJeton = pp.P._sunucu()._token();
+  jetonTik();
+  ok("başarılı Yeni jeton: köprü açık, dosyada yeni jeton, bildirim", pp.P.acikMi() && JSON.parse(fs.readFileSync(bagFile, "utf8")).token === pp.P._sunucu()._token() &&
+    pp.P._sunucu()._token() !== eskiJeton && pp.c.toast.some(function (x) { return /Yeni jeton oluşturuldu/.test(x.m); }));
+
   pp.sb.Pro._degis(false);
   ok("Pro.deactivate / iade: köprü hemen kapanır, dosya silinir, kullanıcıya söylenir",
     !pp.P.acikMi() && !fs.existsSync(bagFile) && /Pro lisansı artık etkin değil/.test(dp["mcp-durum"].textContent) &&
     pp.c.toast.some(function (x) { return /Pro lisansı etkin değil/.test(x.m); }), dp["mcp-durum"].textContent);
+  var acilis = pp.c.sunucuBaslat.length;
   pp.sb.Pro._degis(false);
-  ok("kapalı köprüde Pro olayı bir şey yapmaz", !pp.P.acikMi() && pp.c.sunucuBaslat.length === 1);
+  ok("kapalı köprüde Pro olayı bir şey yapmaz (Pro)", !pp.P.acikMi() && pp.c.sunucuBaslat.length === acilis);
+
+  /* ---- açılışta kalan bağlantı dosyası: yalnız sahibi ölmüşse silinir (inceleme bulgusu) ---- */
+  // Aynı anda açık iki Premiere sürümü aynı Kesit klasörünü paylaşır: eski kod, diğer sürümün açık köprüsünün
+  // dosyasını her panel açılışında siliyordu (o köprü "AÇIK" görünürken Claude "köprü kapalı" alıyordu)
+  var kf = kur(kartDom(), { ayarYolu: path.join(tmp, "settings.json"), fs: fs });
+  function dosyaYaz(icerik) { fs.writeFileSync(bagFile, typeof icerik === "string" ? icerik : JSON.stringify(icerik)); }
+  var tok = new Array(65).join("a");
+  var yasayan = process.ppid;   // bu testi başlatan süreç: yaşıyor, bizden farklı
+  dosyaYaz({ v: 1, port: 5000, token: tok, pid: yasayan, baslangic: "x" });
+  kf.P._kalanDosyayiSil();
+  ok("başka bir yaşayan sürecin (açık köprü) dosyası SİLİNMEZ", fs.existsSync(bagFile), yasayan);
+  var olu = require("child_process").spawnSync(process.execPath, ["-e", ""]).pid;
+  dosyaYaz({ v: 1, port: 5000, token: tok, pid: olu, baslangic: "x" });
+  kf.P._kalanDosyayiSil();
+  ok("süreci ölmüş (çökme) dosya silinir", !fs.existsSync(bagFile), olu);
+  dosyaYaz({ v: 1, port: 5000, token: tok, pid: process.pid, baslangic: "x" });
+  kf.P._kalanDosyayiSil();
+  ok("bu sürecin kendi kalmış dosyası (panel yeniden yüklendi) silinir", !fs.existsSync(bagFile));
+  dosyaYaz("{bozuk");
+  kf.P._kalanDosyayiSil();
+  ok("okunamayan dosya silinir", !fs.existsSync(bagFile));
   try { fs.rmdirSync(tmp); } catch (e) {}
 
   /* ---- kaynak denetimleri ---- */
@@ -227,7 +294,7 @@ async function main() {
   ok("init: K.call / K.run / sunucu açılışı yok (yalnız kalmış bağlantı dosyasını siler)", !/K\.call|K\.run|baslat\(|sunucuKur\(/.test(init) && /kalanDosyayiSil\(\)/.test(init));
   ok("panel kapanınca köprü kapanır (beforeunload + unload)", /beforeunload/.test(init) && /"unload"/.test(init));
   ok("evalScript ya da rastgele betik yok", !/evalScript|new Function|eval\(/.test(src));
-  ok("köprüyü açmak Pro kapısından geçer, hak yalnız açılınca düşer", /Pro\.gate\("mcp", \{ deneme: true, yeniden: ac \}\)/.test(src) && src.indexOf('Pro.denemeHarca("mcp"') > src.indexOf("if (sonuc.ok) {"));
+  ok("köprüyü açmak denemesiz Pro kapısından geçer, köprü hakkı harcanmaz", /Pro\.gate\("mcp"\)\) return;/.test(src) && src.indexOf('Pro.denemeHarca("mcp"') === -1 && !/Pro\.gate\("mcp",/.test(src));
   ok("izinler bellekte, varsayılan: düzenleme kapalı, onay açık", /var izin = \{ duzenleme: false, onay: true \}/.test(src) && !/saveSettings/.test(src));
   // inceleme bulgusu: köprünün Pro penceresi başlığı "Bu ozellik" diyordu (FEATURE_LABELS'ta 'mcp' yoktu)
   var proSrc = oku("js/pro.js"), etiket = /\n\s+mcp:\s+'([^']+)'/.exec(proSrc);

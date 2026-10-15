@@ -3,18 +3,18 @@
  *
  * İnce yapıştırıcı: kurallar js/otomasyon.js (eylem listesi, doğrulama, temizlik) ve
  * js/otomasyon-sunucu.js'te (127.0.0.1 sunucusu). Burada yalnız:
- *  - Ayarlar kartı: Aç/Kapat (Pro: kapı + 3 deneme hakkı; deneme hakkıyla açılan köprü en çok
- *    30 dakika açık kalır, çağrılar bu süreyi uzatmaz; Pro ile açılan köprü lisans gidince kapanır),
- *    Düzenlemeye izin ver,
- *    Yıkıcı eylemlerde onay iste, Yeni jeton, etkinlik listesi, Claude kopyala düğmeleri,
- *    Node denetimi
+ *  - Ayarlar kartı: Aç/Kapat (yalnız Pro, deneme hakkı yok: kurucu kademesi "köprüyü açmak Pro
+ *    gerektirir"; Pro ile açılan köprü lisans gidince hemen kapanır), Düzenlemeye izin ver (kapatılınca
+ *    bekleyen onay kartı da kapanır), Yıkıcı eylemlerde onay iste, Yeni jeton, etkinlik listesi,
+ *    Claude kopyala düğmeleri, Node denetimi
  *  - her eylem panel düğmelerinin çağırdığı AYNI işlevi çağırır (aynı doğrulama, kapı,
  *    deneme hakkı, kopya sekans); Pro eylemde ücretsiz kullanıcının hakkı varsa deneme
  *    kurulur (Pro.denemeBaslat), hak yalnız başarıda düşer (modülün kendi denemeHarca'sı)
  *  - yıkıcı eylemlerde panel içi onay kartı (Onayla / Reddet, 60 sn)
  *
  * Panel açılışında sunucu AÇILMAZ, Premiere'e / ağa gidilmez; açık durum kaydedilmez,
- * panel yeniden yüklenince kapanır. Kalmış bağlantı dosyası (çökme) açılışta silinir.
+ * panel yeniden yüklenince kapanır. Kalmış bağlantı dosyası (çökme) açılışta silinir; aynı Kesit
+ * klasörünü paylaşan başka bir Premiere sürümünün açık köprüsünün dosyası (süreci yaşıyor) silinmez.
  */
 window.KOtomasyon = (function () {
   "use strict";
@@ -27,10 +27,6 @@ window.KOtomasyon = (function () {
   var izin = { duzenleme: false, onay: true };   // bellekte: her açılışta güvenli varsayılan
   var bekleyenOnay = null;                         // { coz, saat }
   var mesgul = false;
-  // Deneme hakkıyla açılan oturum: mutlak süre sınırı (boşta sayacı gibi çağrılarla uzamaz). Diğer
-  // araçların denemesi tek işlemdir; köprünün denemesi bu yüzden süreyle sınırlı tek oturumdur.
-  var DENEME_OTURUMU = 30 * 60000;
-  var oturum = "";                                 // açıkken "pro" | "deneme"
 
   function el(id) { return document.getElementById(id); }
   function toast(m, t, sure, eylem) { try { if (window.KApp && KApp.toast) KApp.toast(m, t, sure, eylem); } catch (e) {} }
@@ -85,8 +81,13 @@ window.KOtomasyon = (function () {
         })
       };
     },
+    // Biten ama başarısız iş ok:false + işin kendi hata kodunu döner (pro_gerekli dahil): shim onu
+    // isError yapar, asistan "bitti" sanmaz
     suflo_is_durumu: function (a) {
-      return isler.oku(a.is) || { ok: false, hata: "bilinmeyen_is", mesaj: "Unknown or expired job id." };
+      var k = isler.oku(a.is);
+      if (!k) return { ok: false, hata: "bilinmeyen_is", mesaj: "Unknown or expired job id." };
+      if (k.durum === "hata") return { ok: false, hata: k.kod || "is_hatasi", mesaj: "Job " + k.is + " failed: " + (k.hata || "unknown error") };
+      return k;
     },
     suflo_doktor: async function () {
       var p = await K.call("KS_apiProbe", undefined, 30000);
@@ -111,14 +112,40 @@ window.KOtomasyon = (function () {
       }
       return eklenen > 0 ? { ok: true, eklenen: eklenen } : { ok: false, hata: "marker", mesaj: hatalar[0] || "No marker added." };
     },
+    /*
+     * İş kimliği yalnız iş GERÇEKTEN başlayınca verilir (go() meşgule geçince "basladi" çağrılır).
+     * Başlamadan reddedilen çağrı (çevrimdışı çeviri seçili ve Pro / hak yok -> pro_gerekli, klip
+     * seçili değil, model yok) kendi kodu ve mesajıyla hemen döner; "iş başladı" denip sonra kodsuz
+     * bir hata kaydına dönmez. Başladıktan sonraki hata işe kodu ve mesajıyla yazılır.
+     */
     suflo_altyazi_olustur: function (a) {
       if (!window.KCaptions || !window.KCaptions.mcpOlustur) return { ok: false, hata: "yok", mesaj: "Captions module unavailable." };
       if (window.KCaptions.mesgulMu && window.KCaptions.mesgulMu()) return { ok: false, hata: "premiere_mesgul", mesaj: "Caption generation is already running." };
-      var id = isler.ekle("altyazi");
-      window.KCaptions.mcpOlustur(a).then(function (r) {
-        isler.bitir(id, !!(r && r.ok), r && r.ok ? O.temizle(r) : (r && r.mesaj) || "failed");
-      }, function (e) { isler.bitir(id, false, e && e.message ? e.message : String(e)); });
-      return { ok: true, is: id, durum: "suruyor" };
+      return new Promise(function (resolve) {
+        var id = "";
+        function basladi() {
+          if (id) return;
+          id = isler.ekle("altyazi");
+          resolve({ ok: true, is: id, durum: "suruyor" });
+        }
+        function bitti(r) {
+          if (!id) {
+            // başlamadan bitti: çoğunlukla ret; sonuç nesnesi yoksa başarı sayılmaz
+            resolve(r && typeof r === "object" && typeof r.ok === "boolean" ? r : { ok: false, hata: "olusturulamadi", mesaj: "Caption generation did not start." });
+            return;
+          }
+          if (r && r.ok) isler.bitir(id, true, O.temizle(r));
+          else isler.bitir(id, false, { hata: (r && r.hata) || "olusturulamadi", mesaj: (r && r.mesaj) || "Caption generation failed." });
+        }
+        var p;
+        try { p = Promise.resolve(window.KCaptions.mcpOlustur(a, { basladi: basladi })); }
+        catch (e) { p = Promise.reject(e); }
+        p.then(bitti, function (e) {
+          var m = e && e.message ? e.message : String(e);
+          if (!id) resolve({ ok: false, hata: "olusturulamadi", mesaj: m });
+          else isler.bitir(id, false, { hata: "olusturulamadi", mesaj: m });
+        });
+      });
     },
     suflo_altyazi_kanala: function () { return window.KCaptions.mcpKanala(); },
     suflo_altyazi_disari: function (a) { return window.KCaptions.mcpDisari(a.bicim); },
@@ -266,10 +293,8 @@ window.KOtomasyon = (function () {
       kayit: kaydet,
       gunluk: function (m) { try { K.log(m); } catch (e) {} },
       onKapandi: function (neden) {
-        oturum = "";
         if (bekleyenOnay) bekleyenOnay.coz(false);
         if (neden === "bosta") { durum("30 dakika çağrı gelmedi: köprü kapandı.", "warn"); toast("Yapay zekâ köprüsü kapandı (30 dakika boşta)", "warn"); }
-        if (neden === "sure") { durum("30 dakikalık deneme oturumu doldu: köprü kapandı.", "warn"); toast("Yapay zekâ köprüsü kapandı: deneme oturumu doldu", "warn"); }
         if (neden === "pro") { durum("Pro lisansı artık etkin değil: köprü kapandı.", "warn"); toast("Yapay zekâ köprüsü kapandı: Pro lisansı etkin değil", "warn"); }
         arayuz();
       }
@@ -294,45 +319,31 @@ window.KOtomasyon = (function () {
   async function ac(ev) {
     if (mesgul || (sunucu && sunucu.acikMi())) return;
     if (!O || !S || !K.nodeOK) { durum("Bu ortamda köprü açılamaz (Node yok).", "bad"); return; }
-    // Pro: köprüyü açmak (ücretsizde 3 deneme hakkı; hak yalnız köprü açılınca düşer). Her eylem ayrıca kendi kapısında.
-    if (typeof Pro !== "undefined" && !Pro.gate("mcp", { deneme: true, yeniden: ac })) return;
-    // Pro değilken kapı yalnız kurulu deneme hakkıyla geçer: bu açılış süre sınırlı bir deneme oturumu
-    // (kapıyla aynı anda, await'ten önce okunur)
-    var deneme = typeof Pro !== "undefined" && typeof Pro.isPro === "function" && !Pro.isPro();
+    // Köprüyü açmak yalnız Pro (kurucu kademesi: "enabling the bridge requires Pro"); deneme hakkı yok,
+    // Shorts Paketi / Podcast Modu gibi. Her eylem ayrıca kendi Pro kapısından geçer.
+    if (typeof Pro !== "undefined" && !Pro.gate("mcp")) return;
     mesgul = true;
     arayuz();
     durum("Köprü açılıyor…");
     if (!sunucu) sunucu = sunucuKur();
-    oturum = deneme ? "deneme" : "pro";
-    var sonuc = await sunucu.baslat(deneme ? { sure: DENEME_OTURUMU } : undefined).then(function (r) { return { ok: true, port: r.port }; },
+    var sonuc = await sunucu.baslat().then(function (r) { return { ok: true, port: r.port }; },
       function (e) { return { ok: false, hata: e && e.message ? e.message : String(e) }; });
     mesgul = false;
     if (sonuc.ok) {
-      if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("mcp", KApp.toast);   // deneme: yalniz basarida
-      acikDurum();
+      durum("Köprü açık: yalnız bu bilgisayardan (127.0.0.1), 30 dakika boşta kalırsa kapanır.", "good");
       nodeDenetle();
-      proDegisti();   // açılış beklenirken Pro durumu değiştiyse (lisans gitti / alındı) hemen uygulanır
+      proDegisti();   // açılış beklenirken lisans gittiyse hemen uygulanır
     } else {
-      oturum = "";
       durum("✕ Köprü açılamadı: " + sonuc.hata, "bad");
     }
     arayuz();
   }
 
-  function acikDurum() {
-    if (oturum === "deneme") durum("Köprü açık (deneme): yalnız bu bilgisayardan (127.0.0.1), en çok 30 dakika; boşta kalırsa daha önce kapanır.", "good");
-    else durum("Köprü açık: yalnız bu bilgisayardan (127.0.0.1), 30 dakika boşta kalırsa kapanır.", "good");
-  }
-
-  // Pro durumu köprü açıkken de izlenir (Pro.on): Pro ile açılmış köprü lisans gidince (iade, koltuk
-  // taşıma / Pro.deactivate) hemen kapanır; deneme oturumunda Pro alınırsa süre sınırı kalkar.
+  // Pro durumu köprü açıkken de izlenir (Pro.on): lisans gidince (iade, koltuk taşıma /
+  // Pro.deactivate) köprü hemen kapanır.
   function proDegisti() {
     if (!sunucu || !sunucu.acikMi() || typeof Pro === "undefined" || typeof Pro.isPro !== "function") return;
-    if (Pro.isPro()) {
-      if (oturum === "deneme") { oturum = "pro"; sunucu.sureSiniri(0); acikDurum(); }
-      return;
-    }
-    if (oturum !== "deneme") sunucu.durdur("pro");
+    if (!Pro.isPro()) sunucu.durdur("pro");
   }
 
   function kapat() {
@@ -353,12 +364,45 @@ window.KOtomasyon = (function () {
     toast(ok ? mesaj : "Kopyalanamadı", ok ? "good" : "bad");
   }
 
-  // Çökmüş oturumdan kalan bağlantı dosyası: yalnız dosya sistemi, ağ yok
+  /*
+   * Çökmüş oturumdan kalan bağlantı dosyası: yalnız dosya sistemi, ağ yok. Tüm Suflo panelleri
+   * (aynı anda açık iki Premiere sürümü dahil) aynı Kesit klasörünü paylaşır: dosyayı yazan süreç
+   * hâlâ yaşıyorsa (başka bir Premiere'deki açık köprü) dosya SİLİNMEZ. Yalnız süreci ölmüş
+   * (ESRCH), bu sürecin kendisinin (panel yeniden yüklendi; açık durum kaydedilmez) ya da
+   * okunamayan / pid'siz dosya silinir.
+   */
+  function surecYasiyor(pid) {
+    if (typeof pid !== "number" || !(pid > 0) || Math.floor(pid) !== pid) return false;
+    if (typeof process === "undefined" || !process || typeof process.kill !== "function") return false;
+    if (pid === process.pid) return false;
+    try { process.kill(pid, 0); return true; }
+    catch (e) { return !(e && e.code === "ESRCH"); }   // EPERM: süreç var (başka kullanıcı)
+  }
   function kalanDosyayiSil() {
     try {
       var f = baglantiDosyasi();
-      if (f && K.fs.existsSync(f)) K.fs.unlinkSync(f);
+      if (!f || !K.fs.existsSync(f)) return;
+      var b = null;
+      try { b = JSON.parse(K.fs.readFileSync(f, "utf8")); } catch (e1) { b = null; }
+      if (b && typeof b === "object" && surecYasiyor(b.pid)) return;
+      K.fs.unlinkSync(f);
     } catch (e) {}
+  }
+
+  // "Yeni jeton": dosya yazılamazsa sunucu köprüyü kapatır; sonuç kullanıcıya söylenir, istisna
+  // tıklama işleyicisinden kaçmaz (eskiden yeşil "AÇIK" rozeti kimsenin bilmediği jetonla kalıyordu)
+  function jetonYenile() {
+    if (!sunucu || !sunucu.acikMi()) return;
+    var r;
+    try { r = sunucu.jetonYenile(); }
+    catch (e) { r = { ok: false, hata: e && e.code ? e.code : (e && e.message ? e.message : String(e)) }; }
+    if (r && r.ok === true) { toast("Yeni jeton oluşturuldu: eski jeton artık geçmez", "good"); return; }
+    var neden = String((r && r.hata) || "?").slice(0, 80);
+    // sunucu kapanmadıysa (beklenmeyen istisna) güvenli tarafta kal: köprü kapanır
+    if (sunucu.acikMi()) { try { sunucu.durdur("dosya"); } catch (e2) {} }
+    durum("✕ Jeton yenilenemedi (" + neden + "): köprü kapandı. Yeniden açmayı dene.", "bad");
+    toast("Jeton yenilenemedi: köprü kapandı", "bad");
+    arayuz();
   }
 
   function init() {
@@ -368,11 +412,16 @@ window.KOtomasyon = (function () {
       if (sunucu && sunucu.acikMi()) kapat(); else ac(ev);
     });
     var d = el("mcp-duzenleme"), o = el("mcp-onay");
-    if (d) { d.checked = false; d.addEventListener("change", function () { izin.duzenleme = !!d.checked; }); }
+    if (d) {
+      d.checked = false;
+      d.addEventListener("change", function () {
+        izin.duzenleme = !!d.checked;
+        // izin kapandı: bekleyen yıkıcı eylemin kartı açık kalmasın (sunucu isteğe 403 izin_yok döner)
+        if (!izin.duzenleme && bekleyenOnay) bekleyenOnay.coz(false);
+      });
+    }
     if (o) { o.checked = true; o.addEventListener("change", function () { izin.onay = !!o.checked; }); }
-    if (el("mcp-jeton")) el("mcp-jeton").addEventListener("click", function () {
-      if (sunucu && sunucu.jetonYenile()) toast("Yeni jeton oluşturuldu: eski jeton artık geçmez", "good");
-    });
+    if (el("mcp-jeton")) el("mcp-jeton").addEventListener("click", jetonYenile);
     if (el("mcp-kopyala-desktop")) el("mcp-kopyala-desktop").addEventListener("click", function () {
       panoya(O.claudeDesktopJson(shimYolu()), "Claude Desktop ayarı kopyalandı");
     });
@@ -404,9 +453,8 @@ window.KOtomasyon = (function () {
     _onayIste: onayIste,
     _izin: izin,
     _ac: ac,
-    _oturum: function () { return oturum; },
     _sunucu: function () { return sunucu; },
-    DENEME_OTURUMU: DENEME_OTURUMU,
+    _kalanDosyayiSil: kalanDosyayiSil,
     _etkinlik: function () { return etkinlik.slice(); }
   };
 })();

@@ -3056,6 +3056,9 @@ window.KCaptions = (function () {
     aktifIptal = K.iptalJetonu ? K.iptalJetonu() : null;
     canliBaslat();
     setBusy(true);
+    // Köprü: iş artık gerçekten başladı (bu noktadan önceki her dönüş bir ret: pro_gerekli, klip yok…);
+    // köprü iş kimliğini ancak şimdi verir
+    if (mcpBilgi && typeof mcpBilgi.basladi === "function") { try { mcpBilgi.basladi(); } catch (eB) {} }
     /*
      * Ekranda duzenlenmis is varken yeni transkript uretmek TEK korumasiz
      * yikici yoldu: undo yigini temizlenip taslak da eziliyordu. importSrt
@@ -6128,7 +6131,9 @@ window.KCaptions = (function () {
    * dil "auto" = paneldeki "Otomatik" (değeri ""). mod, kullanıcının satır düzenini aynı ailedeyse
    * korur (2 satır × 42, N kelime… "satir"da kalır; yalnız aile değişirse l42 / k1).
    */
-  async function mcpOlustur(o) {
+  // geri.basladi(): go() işi gerçekten başlatınca (meşgule geçince) bir kez çağrılır; köprü iş
+  // kimliğini o zaman verir, başlamadan dönen ret (pro_gerekli…) kendi koduyla hemen döner
+  async function mcpOlustur(o, geri) {
     o = o || {};
     if (busy) return { ok: false, hata: "mesgul", mesaj: "Caption generation is already running." };
     var OT = window.SufloOtomasyon;
@@ -6147,6 +6152,7 @@ window.KCaptions = (function () {
     var ml = el("cap-maxlen");
     if (o.mod && ml && OT && OT.satirDegeri) secimDegistir(ml, OT.satirDegeri(o.mod, ml.value));
     var bilgi = {};
+    if (geri && typeof geri.basladi === "function") bilgi.basladi = geri.basladi;
     var sonuc = await go({ mcp: bilgi });
     var d = durumOku();
     if (sonuc !== true || d.kotu) {
