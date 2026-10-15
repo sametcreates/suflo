@@ -630,6 +630,19 @@
     temiz[i] = { id: temiz[i].id, ad: a, keys: temiz[i].keys, hit: temiz[i].hit };
     return { ok: true, liste: temiz };
   }
+  /*
+   * Benzersiz ad: ad listede (büyük / küçük harf ayrımsız, haricId dışında) yoksa kendisi, varsa "Ad (2)", "Ad (3)" …
+   * (en çok 40 karakter). Kaydet aynı adlı kaydın üstüne yazdığından koddan yüklenen ve içe alınan adlar bundan geçer.
+   */
+  function ozelKayitBenzersizAd(liste, ad, haricId) {
+    var temiz = ozelKayitlar(liste), a = adTemiz(ad);
+    if (!a || !adVarMi(temiz, a, haricId || "")) return a;
+    for (var n = 2; n < 1000; n++) {
+      var ek = " (" + n + ")", aday = a.slice(0, OZEL.AD - ek.length).replace(/\s+$/, "") + ek;
+      if (!adVarMi(temiz, aday, haricId || "")) return aday;
+    }
+    return a;
+  }
   // Sürükle-bırak: id'li kayıt hedef sıraya (0 … n-1, kırpılır). Döner: yeni liste (id yoksa aynı sıra)
   function ozelKayitTasi(liste, id, hedef) {
     var temiz = ozelKayitlar(liste), i = -1, h = Math.round(Number(hedef));
@@ -656,14 +669,9 @@
       if (kayit.ad ? ayniEgri.some(function (x) { return x.ad.toLowerCase() === kayit.ad.toLowerCase(); }) : ayniEgri.length) { yinelenen++; return; }
       if (temiz.length >= OZEL.KAYIT) { dolu++; return; }
       var ad = kayit.ad || (typeof cevir === "function" ? adTemiz(String(cevir(ozelKayitAdi(temiz, cevir)))) : "") || ozelKayitAdi(temiz);
-      if (adVarMi(temiz, ad, "")) {
-        for (var n = 2; n < 1000; n++) {
-          var ek = " (" + n + ")", aday = ad.slice(0, OZEL.AD - ek.length).replace(/\s+$/, "") + ek;
-          if (!adVarMi(temiz, aday, "")) { ad = aday; break; }
-        }
-        if (kayit.ad) adDegisti++;
-      }
-      kayit.ad = ad;
+      var yeniAd = ozelKayitBenzersizAd(temiz, ad);
+      if (yeniAd !== ad && kayit.ad) adDegisti++;
+      kayit.ad = yeniAd;
       do { kayit.id = taban + (sayac++).toString(36); } while (temiz.some(function (x) { return x.id === kayit.id; }));
       temiz.push(kayit);
       eklenen.push(kayit.id);
@@ -1252,6 +1260,7 @@
     ozelDogrula: ozelDogrula, ozelHit: ozelHit, ozelYuzde: ozelYuzde,
     ozelKayitlar: ozelKayitlar, ozelKayitEkle: ozelKayitEkle, ozelKayitSil: ozelKayitSil, ozelKayitAdi: ozelKayitAdi,
     ozelKayitAdlandir: ozelKayitAdlandir, ozelKayitTasi: ozelKayitTasi, ozelKayitlarIceAl: ozelKayitlarIceAl, ozelKayitlarDisa: ozelKayitlarDisa,
+    ozelKayitBenzersizAd: ozelKayitBenzersizAd,
     ozelDuz: ozelDuz, ozelAyni: ozelAyni, ozelBilinen: ozelBilinen,
     OZEL_VARSAYILAN: { keys: OZEL_VARSAYILAN.keys.map(function (k) { return [k[0], k[1]]; }), hit: OZEL_VARSAYILAN.hit },
     // SufloEgriEditor mod 'hiz' (js/egri.js) geometrisi ve düzenleme işlemleri

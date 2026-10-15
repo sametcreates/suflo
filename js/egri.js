@@ -801,6 +801,20 @@ window.SufloEgriPaylas = (function () {
     for (var i = 2; k.fs.existsSync(aday) && i < 100; i++) aday = k.path.join(dir, kok + "-" + i + uz);
     return k.fs.existsSync(aday) ? k.path.join(dir, kok + "-" + Date.now() + uz) : aday;
   }
+  // Yol var mı (Node fs, yoksa window.cep.fs.stat); anlaşılamazsa false
+  function dosyaVar(yol) {
+    try {
+      var fs = nodeFs(), cf = cepFs();
+      if (fs && typeof fs.existsSync === "function") return !!fs.existsSync(yol);
+      if (cf && typeof cf.stat === "function") { var s = cf.stat(yol); return !!s && s.err === 0; }
+    } catch (e) {}
+    return false;
+  }
+  // Var olan dosyanın üzerine yazılsın mı (arayüz dilinde sorulur; soru sorulamazsa hayır)
+  function uzerineYazOnay(yol) {
+    var k = kopru(), ad = k && k.path && typeof k.path.basename === "function" ? k.path.basename(yol) : yol;
+    try { return typeof window.confirm === "function" ? !!window.confirm(uiMetni("Bu adla bir dosya zaten var: " + ad + ". Üzerine yazılsın mı?")) : false; } catch (e) { return false; }
+  }
   /*
    * Dosyaya kaydet (window.cep.fs.showSaveDialogEx). Pencere yoksa Masaüstü'ne yazar.
    * Döner: { ok: true, yol } | { ok: false, hata: 'iptal' | 'diyalog' | 'yazilamadi' }
@@ -813,7 +827,11 @@ window.SufloEgriPaylas = (function () {
         if (r && r.err) return { ok: false, hata: "diyalog" };
         yol = r && typeof r.data === "string" ? r.data : "";
         if (!yol) return { ok: false, hata: "iptal" };
-        yol = uzantili(yol);
+        // Uzantı sonradan eklendiyse pencerenin "üzerine yazılsın mı" sorusu bu adı görmedi: dosya varsa burada sorulur
+        // (3.4 adım 15 incelemesi; yoksa eski bir dışa aktarma sessizce silinirdi)
+        var tam = uzantili(yol);
+        if (tam !== yol && dosyaVar(tam) && !uzerineYazOnay(tam)) return { ok: false, hata: "iptal" };
+        yol = tam;
       } else if (fs && kopru().path && kopru().os) yol = masaustuYolu(varsayilanAd || ("suflo-egriler." + UZANTI));
       else return { ok: false, hata: "diyalog" };
     } catch (e) { return { ok: false, hata: "diyalog" }; }
@@ -1897,7 +1915,8 @@ window.KEgri = (function () {
     function bagla(id, olay, fn) { var e = el(id); if (e) e.addEventListener(olay, fn); }
     function enterIle(fn) { return function (e) { if (e && (e.key === "Enter" || e.keyCode === 13)) { if (e.preventDefault) e.preventDefault(); fn(); } }; }
     bagla("egri-kod-yukle", "click", function () { kodYukle(); });
-    bagla("egri-kod", "keydown", enterIle(kodYukle));
+    // kod kutusu çok satırlı (textarea): Enter yükler, Shift+Enter alt satıra geçer
+    bagla("egri-kod", "keydown", function (e) { if (!(e && e.shiftKey)) enterIle(kodYukle)(e); });
     bagla("egri-kod-kopyala", "click", kodKopyala);
     bagla("egri-ice-aktar", "click", function () { dosyaIceAktar(); });
     bagla("egri-disa-aktar", "click", function () { dosyaDisaAktar(); });

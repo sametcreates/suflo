@@ -34,6 +34,21 @@ function eleman(tag, id) {
   };
   return x;
 }
+/*
+ * Gerçek yapıştırma (Chromium / CEF 74, TextFieldInputType): öğe index.html'deki etiketine göre. Tek satırlık
+ * <input type="text">: sondaki satır sonları atılır, kalanlar boşluğa döner, maxlength'te kesilir. <textarea>: satır
+ * sonları kalır (maxlength varsa kesilir). Sahte DOM .value'yu olduğu gibi tuttuğundan paylaşım testleri bununla yapıştırır.
+ */
+var PANEL_HTML = oku("index.html");
+function yapistirSim(x, id, metin) {
+  var m = new RegExp('<(input|textarea)\\b[^>]*\\bid="' + id + '"[^>]*>').exec(PANEL_HTML);
+  if (!m) throw new Error(id + " index.html'de yok");
+  var ml = /\bmaxlength="(\d+)"/.exec(m[0]), t = String(metin);
+  if (m[1] === "input") t = t.replace(/[\r\n]+$/, "").replace(/\r\n|\r|\n/g, " ");
+  if (ml) t = t.slice(0, Number(ml[1]));
+  x.dom[id].value = t;
+  return t;
+}
 function hepsi(kok, kosul, out) {
   out = out || [];
   (kok.children || []).forEach(function (c) { if (kosul(c)) out.push(c); hepsi(c, kosul, out); });
@@ -56,7 +71,7 @@ var IDLER = ["tab-egri", "egri-tanitim", "egri-gorunum-deger", "egri-gorunum-hiz
 function kur(o) {
   o = o || {};
   var dom = {}, cagri = [], kapi = [], harcanan = [], toastlar = [], ilgi = [], raf = [];
-  IDLER.forEach(function (id) { dom[id] = eleman(/^egri-(css|p[12][xy]|kod|onayar-ad)$/.test(id) ? "input" : id === "egri-yogunluk" ? "select" : "div", id); });
+  IDLER.forEach(function (id) { dom[id] = eleman(/^egri-(css|p[12][xy]|onayar-ad)$/.test(id) ? "input" : id === "egri-kod" ? "textarea" : id === "egri-yogunluk" ? "select" : "div", id); });
   dom["egri-onayar-duzen"].hidden = true;
   dom["egri-yogunluk"].value = "1";
   if (o.aktif !== false) dom["tab-egri"].classList.add("active");
@@ -879,6 +894,41 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   p12.dom["egri-css"].tetikle("change");
   ok("cubic-bezier alanı: CSS anahtar sözcüğü; Hız Rampası kodu yönlendirilir", p12.dom["egri-css"].value === "cubic-bezier(0, 0, 0.58, 1)" &&
     (p12.dom["egri-css"].value = hizKodu, p12.dom["egri-css"].tetikle("change"), /Hız Rampası kodu/.test(p12.dom["egri-status"].textContent)));
+  // 3.4 adım 15 incelemesi: yapıştırma gerçek kutudaki gibi (yapistirSim). Kod kutusu çok satırlı: alt alta kodlar ve
+  // Kodu kopyala çıktıları (kod + bağlantı) satır sonlarıyla gelir, hiçbiri düşmez; büyük dosya metni kesilmez
+  ok("kod kutusu index.html'de çok satırlı <textarea> (satır sonu korunur), 64 KB'tan kısa maxlength yok",
+    /<textarea id="egri-kod"[^>]*>/.test(PANEL_HTML) && !/<textarea id="egri-kod"[^>]*maxlength/.test(PANEL_HTML) && /<textarea id="hiz-ozel-kod"[^>]*>/.test(PANEL_HTML) &&
+    !/<textarea id="hiz-ozel-kod"[^>]*maxlength/.test(PANEL_HTML));
+  var p12c = kur({ cevap: function () { throw new Error("çağrılmamalı"); } });
+  var kopyaCikti = function (k) { return k + "\n" + Ep.egriAdresi(k); };
+  var uc12 = ["Bir", "İki", "Üç"].map(function (ad, q) { return kopyaCikti(Ep.paylasimKodla({ ad: ad, curve: { type: "bezier", x1: 0.1 + q / 10, y1: 0, x2: 0.6, y2: 1 } })); }).join("\n");
+  yapistirSim(p12c, "egri-kod", uc12);
+  p12c.dom["egri-kod-yukle"].tetikle("click");
+  ok("Kod yapıştır (gerçek kutu): üç 'Kodu kopyala' çıktısı üç önayar olur (yalnız sonuncusu değil)", js(JSON.parse(p12c.depo["suflo.egri.onayarlar"] || "[]").map(function (o) { return o.ad; })) ===
+    js(["Bir", "İki", "Üç"]) && p12c.dom["egri-status"].textContent === "Eğri önayarlarına eklendi: 3", p12c.dom["egri-status"].textContent);
+  var onCok = [];
+  for (var q12 = 0; q12 < 12; q12++) onCok.push({ ad: "Önayar " + q12, curve: { type: "multi", pts: [{ x: 0, y: 0, ox: 0.123456, oy: 0.012345 }, { x: 0.333333, y: 0.712345 - q12 / 100, ix: 0.211111, iy: 0.7, ox: 0.411111, oy: 0.7, smooth: true },
+    { x: 0.666667, y: 0.912345, ix: 0.588888, iy: 0.9, ox: 0.744444, oy: 0.95 }, { x: 1, y: 1, ix: 0.876543, iy: 1 }] } });
+  var dosyaCok = Ep.dosyaYaz(onCok).metin;
+  yapistirSim(p12c, "egri-kod", dosyaCok);
+  p12c.dom["egri-kod-yukle"].tetikle("click");
+  ok("Kod yapıştır (gerçek kutu): 4096 karakterden uzun .suflo-egri metni kesilmeden okunur", dosyaCok.length > 4096 && JSON.parse(p12c.depo["suflo.egri.onayarlar"]).length === 15 &&
+    p12c.dom["egri-status"].textContent === "Eğri önayarlarına eklendi: 12", dosyaCok.length + " " + p12c.dom["egri-status"].textContent);
+  // cubic-bezier alanı tek satırlık: Kodu kopyala çıktısı (adlı, çok noktalı) satır sonu boşluk olarak ve maxlength'e takılmadan gelir
+  var kodUzun = Ep.paylasimKodla({ ad: "Yumuşak çıkış ve biraz taşma", curve: onCok[0].curve });
+  var cssYap = yapistirSim(p12c, "egri-css", kopyaCikti(kodUzun));
+  p12c.dom["egri-css"].tetikle("change");
+  ok("cubic-bezier alanı (gerçek kutu): adlı çok noktalı eğrinin Kodu kopyala çıktısı kesilmeden yüklenir", cssYap.length > 200 && js(p12c.G._durum().egri) === js(Ep.normalize(onCok[0].curve)) &&
+    /^Yüklendi: Yumuşak çıkış ve biraz taşma/.test(p12c.dom["egri-status"].textContent), cssYap.length + " " + p12c.dom["egri-status"].textContent);
+  yapistirSim(p12c, "egri-css", Ep.paylasimKodla({ ad: "X", curve: cokN }) + " " + kodUzun);
+  p12c.dom["egri-css"].tetikle("change");
+  ok("cubic-bezier alanı: iki farklı kod yapıştırılınca biri sessizce seçilmez, nedeni yazılır", js(p12c.G._durum().egri) === js(Ep.normalize(onCok[0].curve)) &&
+    p12c.dom["egri-status"].textContent === "Birden çok farklı kod var; burada tek kod kullanılır. Birkaçını önayarlara eklemek için Eğri sekmesindeki kod kutusuna yapıştır.",
+    p12c.dom["egri-status"].textContent);
+  var sh12 = 0;
+  p12c.dom["egri-kod"].value = "ease-in";
+  p12c.dom["egri-kod"].tetikle("keydown", { key: "Enter", shiftKey: true, target: p12c.dom["egri-kod"], preventDefault: function () { sh12++; } });
+  ok("kod kutusunda Shift+Enter alt satıra geçer (yüklemez)", sh12 === 0 && p12c.dom["egri-kod"].value === "ease-in");
   // yeniden adlandır ve taşı
   var onIdler = JSON.parse(p12.depo["suflo.egri.onayarlar"]).map(function (o) { return o.id; });
   var kartBul = function (x, id) { return x.dom["egri-onayarlar"].children.filter(function (c) { return c.getAttribute("data-id") === id; })[0]; };
@@ -933,6 +983,30 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   ok("Dışa aktar: kaydetme penceresi (.suflo-egri, varsayılan ad); uzantı eklenir; dosya geri okunur", !!dosyaMetni && pencereler[0][0] === "kaydet" && pencereler[0][2] === js(["suflo-egri"]) &&
     pencereler[0][3] === "suflo-egriler.suflo-egri" && Ep.dosyaOku(dosyaMetni).presets.length === 2 && p13.dom["egri-status"].textContent === "Dışa aktarıldı: 2 önayar → /ev/egriler.suflo-egri",
     p13.dom["egri-status"].textContent);
+  // 3.4 adım 15 incelemesi: uzantı pencereden sonra eklenince pencerenin üzerine yazma sorusu o adı görmedi; dosya varsa sorulur
+  var yaz14 = {}, sorular14 = [], evet14 = false, secilen14 = "/ev/egrilerim";
+  var kfs14 = { writeFileSync: function (p, m) { yaz14[p] = m; }, existsSync: function (p) { return p === "/ev/egrilerim.suflo-egri"; },
+    statSync: function () { return { size: 0 }; }, readFileSync: function () { throw new Error("ENOENT"); } };
+  var p14 = kur({ cepFs: { showSaveDialogEx: function () { return { err: 0, data: secilen14 }; } }, kfs: kfs14, cevap: function () { throw new Error("çağrılmamalı"); } });
+  p14.ctx.confirm = function (s) { sorular14.push(s); return evet14; };
+  p14.dom["egri-kod"].value = cokKod;
+  p14.dom["egri-kod-yukle"].tetikle("click");
+  var durum14 = p14.dom["egri-status"].textContent;
+  p14.dom["egri-disa-aktar"].tetikle("click");
+  ok("Dışa aktar: uzantı eklenen ad zaten varsa sorulur; hayır → eski dosya yerinde, durum değişmez", sorular14.length === 1 &&
+    sorular14[0] === "Bu adla bir dosya zaten var: egrilerim.suflo-egri. Üzerine yazılsın mı?" && !Object.keys(yaz14).length && p14.dom["egri-status"].textContent === durum14, js(sorular14));
+  evet14 = true;
+  p14.dom["egri-disa-aktar"].tetikle("click");
+  ok("...evet → üzerine yazılır", sorular14.length === 2 && !!yaz14["/ev/egrilerim.suflo-egri"] && p14.dom["egri-status"].textContent === "Dışa aktarıldı: 2 önayar → /ev/egrilerim.suflo-egri");
+  secilen14 = "/ev/egrilerim.suflo-egri";
+  p14.dom["egri-disa-aktar"].tetikle("click");
+  ok("...ad uzantısıyla geldiyse (pencere zaten sordu) yeniden sorulmaz", sorular14.length === 2);
+  var I18N14 = require(path.join(KOK, "js", "i18n.js"));
+  I18N14.setDictionary(require(path.join(KOK, "i18n", "en.js")));
+  ok("İngilizce: üzerine yazma sorusu ve çoklu kod uyarısı", I18N14.translate("Bu adla bir dosya zaten var: egrilerim.suflo-egri. Üzerine yazılsın mı?") ===
+    "A file with this name already exists: egrilerim.suflo-egri. Overwrite it?" &&
+    I18N14.translate("Birden çok farklı kod var; burada tek kod kullanılır. Birkaçını önayarlara eklemek için Eğri sekmesindeki kod kutusuna yapıştır.") !==
+    "Birden çok farklı kod var; burada tek kod kullanılır. Birkaçını önayarlara eklemek için Eğri sekmesindeki kod kutusuna yapıştır.");
   // içe aktar: dış biçim (anahtar adı birleştirilerek) + BOM, yineleme
   var disO = {}; disO["open" + "curve"] = 1;
   disO.presets = [{ name: "Dış kübik", curve: [0.3, 0.1, 0.1, 1] }, { name: "Dış çok noktalı", curve: { points: [[0, 0], [0.4, 0.9], [1, 1]] } }, { name: "Yay", curve: { type: "spring" } }];

@@ -52,7 +52,7 @@ function kur(o) {
     // 3.4 adım 15: paylaşım satırları
     ["hiz-ozel-adlandir", "hiz-ozel-kod-yukle", "hiz-ozel-kod-kopyala", "hiz-ozel-ice-aktar", "hiz-ozel-disa-aktar"].forEach(function (id) { dom[id] = eleman("button", id); });
     dom["hiz-ozel-adlandir"].disabled = true;
-    dom["hiz-ozel-kod"] = eleman("input", "hiz-ozel-kod"); dom["hiz-ozel-kod"].type = "text";
+    dom["hiz-ozel-kod"] = eleman("textarea", "hiz-ozel-kod");
     dom["hiz-ozel"].hidden = true;
   }
   var depo = o.depo || {};
@@ -1018,6 +1018,69 @@ function cevir(n) {
   await k42.H.uygula();
   ok("içe aktarılan özel eğriyi uygulamak 'speedramp' kapısından geçer (kapalıyken Premiere'e gidilmez)", k42.kapi.length === 1 && k42.kapi[0][0] === "speedramp" &&
     k42.uygulamalar().length === 0);
+  /* ---------- 43) 3.4 adım 15 incelemesi: ad kutusu başka bir kaydın üstüne yazdırmaz; kod kutusu çok satırlı ---------- */
+  function cipBul(x, ad) { return x.dom["hiz-ozel-kayitlar"].children.filter(function (c) { return c.children[0].textContent === ad; })[0]; }
+  function kayitlar43(x) { return JSON.parse(x.depo["suflo.hizRampa.ozelKayitlar"] || "[]"); }
+  var z43 = kur({ cevap: function () { return { ok: false }; } });
+  dz41(z43, "atilim");
+  z43.dom["hiz-ozel-ad"].value = "Benim";
+  z43.dom["hiz-ozel-kaydet"]._o.click();
+  var benim43 = kayitlar43(z43)[0];
+  cipBul(z43, "Benim")._o.click();
+  ok("çip seçilince ad kutusunda adı (Kaydet onu günceller)", z43.dom["hiz-ozel-ad"].value === "Benim" && z43.dom["hiz-ozel-adlandir"].disabled === false);
+  dz41(z43, "darbe");
+  ok("Düzenle başka eğri getirince seçim bırakılır, kutudaki kaydın adı silinir", z43.dom["hiz-ozel-ad"].value === "" && z43.dom["hiz-ozel-adlandir"].disabled === true &&
+    cipBul(z43, "Benim").className.indexOf(" on") === -1);
+  z43.dom["hiz-ozel-kaydet"]._o.click();
+  var kl43 = kayitlar43(z43);
+  ok("...ardından Kaydet 'Benim'in üstüne Darbe'yi yazmaz: yeni kayıt", kl43.length === 2 && kl43[0].ad === "Benim" && js(kl43[0].keys) === js(benim43.keys) &&
+    js(kl43[1].keys) === js(SR.ozelYuzde(SR.get("darbe").keys)) && /^Kaydedildi: /.test(z43.dom["hiz-status"].textContent), js(kl43));
+  cipBul(z43, "Benim")._o.click();
+  z43.dom["hiz-ozel-sifirla"]._o.click();
+  ok("Sıfırla da seçimi ve kutudaki kaydın adını bırakır", z43.dom["hiz-ozel-ad"].value === "" && z43.dom["hiz-ozel-adlandir"].disabled === true);
+  cipBul(z43, "Benim")._o.click();
+  z43.dom["hiz-ozel-ad"].value = "Yepyeni";
+  dz41(z43, "vites");
+  ok("kutuya elle yazılmış başka ad Düzenle'de silinmez", z43.dom["hiz-ozel-ad"].value === "Yepyeni");
+  // arkadaşın kodu kullanıcının kendi kaydıyla aynı adı taşıyor (varsayılan ad): "Ad (2)" önerilir, Kaydet üstüne yazmaz
+  var dost43 = E42.paylasimKodla({ tur: "hiz", ad: "Benim", keys: [[0, 100], [0.5, 40], [1, 300]] });
+  z43.dom["hiz-ozel-kod"].value = dost43;
+  z43.dom["hiz-ozel-kod-yukle"]._o.click();
+  ok("aynı adlı başka eğri kodu: ad kutusuna 'Benim (2)', seçim yok", z43.dom["hiz-ozel-ad"].value === "Benim (2)" && z43.dom["hiz-ozel-adlandir"].disabled === true &&
+    /^Yüklendi: Benim/.test(z43.dom["hiz-status"].textContent), z43.dom["hiz-ozel-ad"].value);
+  z43.dom["hiz-ozel-kaydet"]._o.click();
+  var kl43b = kayitlar43(z43);
+  ok("...Kaydet kullanıcının 'Benim'ini değiştirmez, 'Benim (2)' eklenir", kl43b.length === 3 && js(kl43b[0].keys) === js(benim43.keys) && kl43b[2].ad === "Benim (2)" &&
+    js(kl43b[2].keys) === js([[0, 100], [0.5, 40], [1, 300]]), js(kl43b.map(function (k) { return k.ad; })));
+  z43.dom["hiz-ozel-kod"].value = E42.paylasimKodla({ tur: "hiz", ad: "benim", keys: benim43.keys, hit: benim43.hit });
+  z43.dom["hiz-ozel-kod-yukle"]._o.click();
+  ok("kendi kaydının kodu (aynı ad ve eğri): o kayıt seçilir, kopya açılmaz", z43.dom["hiz-ozel-ad"].value === "Benim" && cipBul(z43, "Benim").className.indexOf(" on") !== -1 &&
+    kayitlar43(z43).length === 3);
+  // Kodu kopyala: kutudaki ad eğrisi başka olan bir kaydınsa kod o adı taşımaz
+  var pano43 = { metin: "" };
+  var c43 = kur({ pano: pano43, depo: { "suflo.hizRampa.ozelKayitlar": JSON.stringify([{ id: "r1", ad: "Benim", keys: benim43.keys, hit: benim43.hit }]) }, cevap: function () { return { ok: false }; } });
+  dz41(c43, "darbe");
+  c43.dom["hiz-ozel-ad"].value = "benim";
+  c43.dom["hiz-ozel-kod-kopyala"]._o.click();
+  await bekle(5);
+  ok("Kodu kopyala: başka bir kaydın adı (eğrisi farklı) koda yazılmaz", E42.paylasimCoz(pano43.metin.split("\n")[0]).ad === "" &&
+    SR.ozelAyni(E42.paylasimCoz(pano43.metin.split("\n")[0]), { keys: SR.get("darbe").keys, hit: SR.get("darbe").hit }), pano43.metin);
+  // kod kutusu çok satırlı: üç "Kodu kopyala" çıktısı alt alta → üç kayıtlı rampa (yalnız sonuncusu değil)
+  var u43 = kur({ cevap: function () { return { ok: false }; } });
+  u43.dom["hiz-ozel-kod"].value = [["Bir", 200], ["İki", 300], ["Üç", 400]].map(function (a) {
+    var k = E42.paylasimKodla({ tur: "hiz", ad: a[0], keys: [[0, 100], [1, a[1]]] });
+    return k + "\n" + E42.egriAdresi(k);
+  }).join("\n");
+  u43.dom["hiz-ozel-kod-yukle"]._o.click();
+  ok("kod kutusu: üç 'Kodu kopyala' çıktısı üç kayıtlı rampa", js(kayitlar43(u43).map(function (k) { return k.ad; })) === js(["Bir", "İki", "Üç"]) &&
+    u43.dom["hiz-status"].textContent === "Hız Rampası özel rampalarına eklendi: 3", u43.dom["hiz-status"].textContent);
+  var sh43 = 0;
+  u43.dom["hiz-ozel-kod"].value = "x";
+  u43.dom["hiz-ozel-kod"]._o.keydown({ key: "Enter", shiftKey: true, preventDefault: function () { sh43++; } });
+  ok("kod kutusunda Shift+Enter alt satıra geçer (yüklemez)", sh43 === 0 && u43.dom["hiz-ozel-kod"].value === "x");
+  ok("benzersiz ad yardımcısı (SufloSpeedRamp.ozelKayitBenzersizAd)", SR.ozelKayitBenzersizAd(kl43b, "benim") === "benim (3)" && SR.ozelKayitBenzersizAd(kl43b, "Yeni") === "Yeni" &&
+    SR.ozelKayitBenzersizAd(kl43b, "Benim", kl43b[0].id) === "Benim");
+
   ok("İngilizce: Hız Rampası paylaşım metinleri", I18N.translate("Dışa aktarıldı: 3 özel rampa →") === "Exported: 3 custom ramps →" &&
     I18N.translate("Hız Rampası kodu (SFC1) yapıştır") === "Paste a Speed Ramp code (SFC1)" && I18N.translate("Adı değişti:") === "Renamed:");
 

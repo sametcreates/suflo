@@ -1880,6 +1880,18 @@ Rampası'nın Kaydet'i adla üzerine yazdığı için içe aktarma hiçbir kayd�
 diye yapıldı (stil sayfasının düzeniyle, panelin çözücüsüyle).
 Farklı istersen söyle.
 
+**15.7 İnceleme düzeltmeleri (bilgi, 2 dk).** (a) **Birden çok kod:** kod kutusu artık birkaç satırlık (textarea; Enter yükler,
+Shift+Enter alt satır) ve 64 KB'a kadar dosya metnini kesmez. Yapıştırılan metin her `SFC1.` başından bölünür: alt alta, boşlukla ya
+da bitişik kodlar ve bağlantılar ayrılır; "Kodu kopyala"nın kod + bağlantı çifti tek kod sayılır. Önceden son satır bağlantıysa
+yalnız sonuncusu alınıyordu. Tek kod bekleyen yerler (cubic-bezier alanı, Geçiş / Zoom / Hareket seçicisi) iki farklı koda "Birden
+çok farklı kod var…" der, birini sessizce seçmez; cubic-bezier alanı adlı çok noktalı kodları kesmesin diye 4096 karakter alır.
+(b) **Hız Rampası ad kutusu:** düzenleyiciye başka eğri gelince (Düzenle, Sıfırla, Geri al, kod) seçili kayıt bırakılır ve kutudaki
+o kaydın adı silinir; koddan gelen ad başka bir kaydınsa "Ad (2)" önerilir. Kaydet böylece kullanıcının bir rampasının üstüne başka
+eğri yazmaz (elle aynı adı yazarsan yine günceller, adım 13'ün kuralı). (c) **Dışa aktar:** uzantı pencereden sonra eklenince aynı
+adlı dosya varsa üzerine yazmadan önce sorulur. (d) **Lisans:** `js/ease-curve.js`'in başında Rebound'un MIT lisansı artık tam metniyle;
+suflo.app'teki bayt bayt kopyası (THIRD_PARTY_NOTICES.md sitede yok) bildirimi kendisi taşır. (e) README'deki dış aracın adı
+kaldırıldı ("yalnız dosya biçimi okunur"); test README'yi de tarar. Deneme listesi **15.15**.
+
 **15.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
 `Kaynak: adım 15 temiz oda — paylaşım kodu, .suflo-egri dosyası, cubic-bezier yapıştırma ve arayüz Suflo'nun; OpenCurve açılmadı,
 yalnız planın tanımladığı dışa aktarma dosya biçimi okunur (kod / tablo / sözdizimi / arayüz alınmadı), bildirim gerekmez; Rebound

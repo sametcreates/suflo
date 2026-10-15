@@ -2885,6 +2885,8 @@
     "Kod çok uzun (en çok 4096 karakter).": "The code is too long (up to 4096 characters).",
     "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır.": "Not recognized: paste an SFC1 code, a suflo.app/egri link or cubic-bezier(…).",
     "Kod eksik ya da bozuk; baştan sona yeniden kopyala.": "The code is incomplete or damaged; copy it again from start to end.",
+    "Birden çok farklı kod var; burada tek kod kullanılır. Birkaçını önayarlara eklemek için Eğri sekmesindeki kod kutusuna yapıştır.":
+      "There are several different codes; only one code works here. To add several to your presets, paste them into the code box in the Easing tab.",
     "Bu kod ya da dosya Suflo'nun daha yeni bir sürümünden; önce Suflo'yu güncelle.": "This code or file is from a newer version of Suflo; update Suflo first.",
     "Bu kod bir eğri ya da hız rampası değil.": "This code isn't a curve or a speed ramp.",
     "Koddaki eğri geçersiz.": "The curve in the code is invalid.",
@@ -2898,6 +2900,7 @@
     "Tanınmayan dosya: .suflo-egri dosyası ya da bir eğri aracının JSON dışa aktarmasını seç.": "Unrecognized file: choose a .suflo-egri file or a curve tool's JSON export.",
     "Dosya penceresi açılamadı; kodu kopyalayıp yapıştırarak paylaş.": "The file dialog couldn't open; share by copying and pasting the code.",
     "Dosya yazılamadı.": "Couldn't write the file.",
+    "Bu adla bir dosya zaten var: {}. Üzerine yazılsın mı?": "A file with this name already exists: {}. Overwrite it?",
     // import summary (js/egri-model.js iceAktarOzeti)
     "Eğri önayarlarına eklendi: {n}": "Added to curve presets: {}",
     "Hız Rampası özel rampalarına eklendi: {n}": "Added to Speed Ramp custom ramps: {}",

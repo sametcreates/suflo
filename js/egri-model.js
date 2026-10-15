@@ -876,6 +876,7 @@
     bicim: "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır.",
     gecersiz: "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır.",
     bozuk: "Kod eksik ya da bozuk; baştan sona yeniden kopyala.",
+    coklu: "Birden çok farklı kod var; burada tek kod kullanılır. Birkaçını önayarlara eklemek için Eğri sekmesindeki kod kutusuna yapıştır.",
     surum: "Bu kod ya da dosya Suflo'nun daha yeni bir sürümünden; önce Suflo'yu güncelle.",
     tur: "Bu kod bir eğri ya da hız rampası değil.",
     egri: "Koddaki eğri geçersiz.",

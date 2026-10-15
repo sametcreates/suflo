@@ -185,6 +185,41 @@ ok("iceAktar: satır satır birkaç kod (bağlantı da), yineleme ve bozuk satı
 ok("iceAktar: tek kodun ikiye bölünmüşü de çözülür; hata kodları geçer", E.iceAktar(kE.slice(0, 20) + "\n" + kE.slice(20)).ok && E.iceAktar("").hata === "bos" &&
   E.iceAktar("merhaba").hata === "bicim" && E.iceAktar("{x").hata === "json" && E.iceAktar("SFC1.@@\nSFC1.##").hata === "bozuk" &&
   E.iceAktar(new Array(70000).join("a")).hata === "buyuk" && E.iceAktar("cubic-bezier(0,-3,1,1)").kirpildi === true);
+// 3.4 adım 15 incelemesi: birden çok kod hiçbiri sessizce düşmeden alınır. Kodu kopyala panoya "kod\nbağlantı" koyar; tek
+// satırlık <input> yapıştırılan satır sonlarını boşluğa çevirir (Chromium), değer atanınca siler
+var kA = E.paylasimKodla({ ad: "A", curve: { type: "bezier", x1: 0.1, y1: 0, x2: 0.5, y2: 1 } });
+var kB = E.paylasimKodla({ ad: "B", curve: { type: "bezier", x1: 0.3, y1: 0, x2: 0.7, y2: 1 } });
+var kC = E.paylasimKodla({ ad: "C", curve: { type: "bezier", x1: 0.4, y1: 0.2, x2: 0.9, y2: 1 } });
+function kopyaCikti(k) { return k + "\n" + E.egriAdresi(k); }
+function adlar(r) { return r.ok ? r.presets.map(function (p) { return p.ad; }).join(",") : "hata:" + r.hata; }
+var uc = [kA, kB, kC].map(kopyaCikti).join("\n");
+var ucBag = [kA, kB, kC].map(function (k) { return E.egriAdresi(k); }).join("\n");
+ok("iceAktar: üç 'Kodu kopyala' çıktısı (kod + bağlantı, son satır bağlantı) üç önayar; çift yineleme sayılmaz", adlar(E.iceAktar(uc)) === "A,B,C" &&
+  E.iceAktar(uc).yinelenen === 0 && !E.iceAktar(uc).uyarilar.length, js(E.iceAktar(uc)));
+ok("iceAktar: alt alta üç bağlantı üç önayar (yalnız sonuncusu değil)", adlar(E.iceAktar(ucBag)) === "A,B,C", adlar(E.iceAktar(ucBag)));
+ok("iceAktar: tek satırlık kutuya yapıştırılan (satır sonları boşluk) kodlar ve kod + bağlantı çiftleri ayrılır",
+  adlar(E.iceAktar([kA, kB, kC].join(" "))) === "A,B,C" && adlar(E.iceAktar(uc.replace(/\n/g, " "))) === "A,B,C" && adlar(E.iceAktar(ucBag.replace(/\n/g, " "))) === "A,B,C",
+  adlar(E.iceAktar([kA, kB, kC].join(" "))));
+ok("iceAktar: satır sonları silinmiş (bitişik) kodlar ve kod + bağlantı çiftleri de ayrılır", adlar(E.iceAktar(kA + kB + kC)) === "A,B,C" &&
+  adlar(E.iceAktar(uc.replace(/\n/g, ""))) === "A,B,C", adlar(E.iceAktar(uc.replace(/\n/g, ""))));
+ok("iceAktar: tek 'Kodu kopyala' çıktısı (her biçimiyle) tek eğri: panel düzenleyiciye yükler", [kopyaCikti(kA), kopyaCikti(kA).replace(/\n/g, " "), kopyaCikti(kA).replace(/\n/g, "")].every(function (t) {
+  var r = E.iceAktar(t);
+  return r.ok && r.bicim === "kod" && r.presets.length === 1 && r.presets[0].ad === "A" && !r.yinelenen && !r.uyarilar.length;
+}));
+ok("iceAktar: kodun ardından ya da önünde yazı olsa da kod alınır; her kodun bozuğu ayrı uyarı", adlar(E.iceAktar("Bunu dene: " + kA + " bence güzel")) === "A" &&
+  adlar(E.iceAktar("1) " + kA + "\n2) " + kB)) === "A,B" && (function () {
+    var r = E.iceAktar(kA + "\n" + kB.slice(0, 30) + "\n" + kC);
+    return adlar(r) === "A,C" && r.uyarilar.length === 1 && r.uyarilar[0].kod === "bozuk";
+  })());
+ok("iceAktar: 32'den çok kod 'fazla' uyarısıyla (ilk 32 alınır)", (function () {
+  var cok = [];
+  for (var q = 0; q < 35; q++) cok.push(E.paylasimKodla({ ad: "K" + q, curve: { type: "bezier", x1: q / 40, y1: 0, x2: 1, y2: 1 } }));
+  var r = E.iceAktar(cok.join(" "));
+  return r.ok && r.presets.length === 32 && r.fazla === 3 && r.uyarilar[r.uyarilar.length - 1].kod === "fazla";
+})());
+ok("yapistir (cubic-bezier alanı, Eğri seçicisi): kod + kendi bağlantısı tek kod; iki farklı kod 'coklu' (biri sessizce seçilmez)",
+  E.yapistir(kopyaCikti(kA).replace(/\n/g, " ")).ok && E.yapistir(kopyaCikti(kA)).ad === "A" && E.yapistir(kA + " " + kB).hata === "coklu" &&
+  E.yapistir(E.egriAdresi(kA) + "\n" + E.egriAdresi(kB)).hata === "coklu" && S.coz(kA + " " + kB).hata === "coklu" && M.paylasimHatasi("coklu") !== M.paylasimHatasi("bozuk"));
 ok("hiçbir işlev fırlatmaz (çöp girdiler)", [undefined, null, 1, {}, [], "SFC1.", "{}", "{\"suflo\":\"egri\",\"v\":1,\"presets\":[null,{\"tur\":\"egri\",\"curve\":{\"type\":\"multi\",\"pts\":[null,null]}}]}"].every(function (x) {
   try { E.paylasimCoz(x); E.sfcCoz(x); E.iceAktar(x); E.dosyaOku(x); E.yapistir(x); E.cssCoz(x); E.disEgri(x); E.dosyaYaz(x); E.paylasimKodla(x); return true; } catch (e) { return false; }
 }));
@@ -217,7 +252,7 @@ ok("önayar dışa: dosyaYaz girdileri ve gidiş dönüş", (function () {
   return d2.adet === 6 && js(geri.liste.map(function (o) { return o.ad + js(o.curve); })) === js(ia.liste.map(function (o) { return o.ad + js(o.curve); }));
 })());
 ok("metinler: her paylaşım hatasının metni var (bilinmeyen kod 'bozuk' metni); özet parçaları", ["bos", "uzun", "onek", "bicim", "gecersiz", "bozuk", "surum", "tur", "egri", "hiz", "nokta",
-  "css", "hizKodu", "egriKodu", "buyuk", "json", "dosyaBicim", "diyalog", "okunamadi", "yazilamadi"].every(function (h) { return M.paylasimHatasi(h).length > 10; }) &&
+  "css", "hizKodu", "egriKodu", "buyuk", "json", "dosyaBicim", "diyalog", "okunamadi", "yazilamadi", "coklu"].every(function (h) { return M.paylasimHatasi(h).length > 10; }) &&
   M.paylasimHatasi("??") === M.paylasimHatasi("bozuk"));
 var oz = M.iceAktarOzeti({ egri: 3, hiz: 1, yinelenen: 2, uyarilar: [{ kod: "bilinmeyen" }, { kod: "egri" }, { kod: "fazla", n: 4 }, { kod: "dosyaSurumu" }] });
 ok("içe aktarma özeti: eklenenler, yineleme, geçersiz / tanınmayan / fazla / sürüm uyarıları; araya ' · '", oz.uyari && oz.eklenen === 4 && js(oz.parcalar) === js(["Eğri önayarlarına eklendi: 3", " · ",
@@ -318,7 +353,20 @@ ok("sayfa: bozuk / yeni sürüm kodu hata kartı (dilinde); kodsuz ziyarette yal
 /* ================= site kopyası ve temiz oda ================= */
 ok("docs/js/ease-curve.js panelinkinin bayt bayt kopyası (suflo.app/egri aynı çözücüyle açar)", fs.existsSync(path.join(KOK, "docs", "js", "ease-curve.js")) &&
   fs.readFileSync(path.join(KOK, "docs", "js", "ease-curve.js"), "utf8") === fs.readFileSync(path.join(KOK, "js", "ease-curve.js"), "utf8"));
-var kaynaklar = ["js/egri-model.js", "js/speedramp.js", "js/egri-secim.js", "js/hiz-rampasi.js", "js/egri.js", "index.html", "docs/egri.html", "docs/en/egri.html", "docs/js/egri-sayfa.js"];
+// MIT: telif ve izin bildirimi her kopyada. Site kopyası (suflo.app/js/ease-curve.js) THIRD_PARTY_NOTICES.md olmadan yayımlanır:
+// Rebound lisansının tam metni (THIRD_PARTY_NOTICES.md'deki blok) dosyanın baş yorumunda satır satır bulunmalı
+ok("site kopyası Rebound'un MIT lisansını tam metniyle (telif + izin bildirimi) taşır", (function () {
+  var notice = fs.readFileSync(path.join(KOK, "THIRD_PARTY_NOTICES.md"), "utf8").replace(/\r\n/g, "\n");
+  var bolum = notice.slice(notice.indexOf("### Rebound"));
+  var blok = /```\n(MIT License\n[\s\S]*?SOFTWARE\.)\n```/.exec(bolum);
+  var site = fs.readFileSync(path.join(KOK, "docs", "js", "ease-curve.js"), "utf8").replace(/\r\n/g, "\n");
+  var bas = site.slice(0, site.indexOf("*/"));
+  var basSatir = bas.split("\n").map(function (l) { return l.replace(/^\s*\*\s?/, "").replace(/^\s+|\s+$/g, ""); }).join("\n");
+  var lisans = blok ? blok[1].split("\n").map(function (l) { return l.replace(/^\s+|\s+$/g, ""); }).join("\n") : "";
+  return !!blok && /Permission is hereby granted/.test(lisans) && /Copyright \(c\) 2026 Rebound contributors/.test(lisans) && basSatir.indexOf(lisans) !== -1;
+})());
+var kaynaklar = ["js/egri-model.js", "js/speedramp.js", "js/egri-secim.js", "js/hiz-rampasi.js", "js/egri.js", "index.html", "docs/egri.html", "docs/en/egri.html", "docs/js/egri-sayfa.js",
+  "README.md"];
 ok("temiz oda: dış aracın adı yalnız SufloEase'in okuyucu bölümünde; panel, sayfa ve modeller onu anmaz",
   kaynaklar.every(function (f) { return !new RegExp(DIS, "i").test(fs.readFileSync(path.join(KOK, f), "utf8")); }) &&
   !new RegExp(DIS, "i").test(fs.readFileSync(__filename, "utf8").replace(/"open" \+ "curve"/g, "")));

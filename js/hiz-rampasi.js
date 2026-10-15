@@ -500,6 +500,7 @@ window.KHizRampasi = (function () {
     if (ozel.hit !== null) ozel.sonHit = ozel.hit;
     if (editor) editor.ata(ozel.keys, ozel.hit);
     ozelKaydet();
+    kayitSecimiBirak();
     if (secili === "ozel") { ozelKutu(); onizlemeCiz(); }
     else sec("ozel");
     ozelResim();
@@ -623,6 +624,18 @@ window.KHizRampasi = (function () {
       kap.appendChild(b);
     });
   }
+  /*
+   * Düzenleyiciye başka bir eğri geldi (Düzenle, Sıfırla, Geri al, kod; ozelAta): seçili kayıt bırakılır, ad kutusunda o
+   * kaydın adı duruyorsa silinir. Yoksa Kaydet o kaydın üstüne başka eğriyi yazardı (3.4 adım 15 incelemesi). Kayıt çipi
+   * (ozelKayitSec) seçimi ozelAta'dan sonra yeniden kurar; elle sürüklenen noktalar seçimi bozmaz (Kaydet onu günceller).
+   */
+  function kayitSecimiBirak() {
+    if (!seciliKayit) return;
+    var k = ozelKayitlar().filter(function (x) { return x.id === seciliKayit; })[0], girdi = el("hiz-ozel-ad");
+    if (girdi && k && String(girdi.value || "").replace(/^\s+|\s+$/g, "").toLowerCase() === k.ad.toLowerCase()) girdi.value = "";
+    seciliKayit = "";
+    ozelKayitlariCiz();
+  }
   function ozelKayitSec(id) {
     if (mesgul) return;
     var k = ozelKayitlar().filter(function (x) { return x.id === id; })[0];
@@ -682,12 +695,14 @@ window.KHizRampasi = (function () {
     if (!depoYaz(OZEL_KAYIT_ANAHTAR, SR.ozelKayitTasi(once, id, h))) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return; }
     ozelKayitlariCiz();
   }
-  // Paylaşılacak ad: seçili kayıt (eğri aynıysa), yoksa ad kutusuna yazılan ad
+  // Paylaşılacak ad: seçili kayıt (eğri aynıysa), yoksa ad kutusuna yazılan ad; o ad eğrisi başka olan bir kayda aitse
+  // (seçili kayıt dışında) adsız paylaşılır: kod başka bir rampanın adını taşımasın
   function paylasilacakAd() {
-    var k = ozelKayitlar().filter(function (x) { return x.id === seciliKayit; })[0];
+    var liste = ozelKayitlar(), k = liste.filter(function (x) { return x.id === seciliKayit; })[0];
     if (k && SR.ozelAyni(k, ozel)) return k.ad;
-    var girdi = el("hiz-ozel-ad");
-    return girdi ? String(girdi.value || "") : "";
+    var girdi = el("hiz-ozel-ad"), ad = girdi ? String(girdi.value || "").replace(/^\s+|\s+$/g, "") : "";
+    var baska = liste.some(function (x) { return x.id !== seciliKayit && x.ad.toLowerCase() === ad.toLowerCase() && !SR.ozelAyni(x, ozel); });
+    return baska ? "" : ad;
   }
   function ozelKodKopyala() {
     var E = EZ(), p = P();
@@ -725,9 +740,12 @@ window.KHizRampasi = (function () {
     if (tek) {
       var p = r.presets[0];
       ozelAta(p.keys, p.hit);
-      seciliKayit = "";
-      var girdi = el("hiz-ozel-ad");
-      if (girdi) girdi.value = p.ad || "";
+      // ad kutusu: aynı ad ve eğriyle kayıtlıysa o kayıt seçilir; ad başka bir kaydınsa "Ad (2)" (Kaydet kullanıcının
+      // kendi rampasının üstüne yazmasın; içe aktarmanın kuralı)
+      var girdi = el("hiz-ozel-ad"), liste = ozelKayitlar();
+      var ayni = p.ad ? liste.filter(function (x) { return x.ad.toLowerCase() === p.ad.toLowerCase() && SR.ozelAyni(x, p); })[0] : null;
+      seciliKayit = ayni ? ayni.id : "";
+      if (girdi) girdi.value = ayni ? ayni.ad : (p.ad ? SR.ozelKayitBenzersizAd(liste, p.ad) : "");
       ozelKayitlariCiz();
       durum(p.ad ? ["Yüklendi: ", { ad: p.ad }, ". Saklamak için Kaydet'e bas."] : "Özel eğri yüklendi. Saklamak için Kaydet'e bas.", "good");
       return true;
@@ -1153,8 +1171,9 @@ window.KHizRampasi = (function () {
     function bagla(id, olay, fn) { var e = el(id); if (e) e.addEventListener(olay, fn); }
     bagla("hiz-ozel-adlandir", "click", function () { ozelKayitAdlandir(); });
     bagla("hiz-ozel-kod-yukle", "click", function () { ozelKodYukle(); });
+    // kod kutusu çok satırlı (textarea): Enter yükler, Shift+Enter alt satıra geçer
     bagla("hiz-ozel-kod", "keydown", function (e) {
-      if (e && (e.key === "Enter" || e.keyCode === 13)) { if (e.preventDefault) e.preventDefault(); ozelKodYukle(); }
+      if (e && !e.shiftKey && (e.key === "Enter" || e.keyCode === 13)) { if (e.preventDefault) e.preventDefault(); ozelKodYukle(); }
     });
     bagla("hiz-ozel-kod-kopyala", "click", ozelKodKopyala);
     bagla("hiz-ozel-ice-aktar", "click", function () { ozelDosyaIceAktar(); });

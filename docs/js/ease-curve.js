@@ -5,6 +5,31 @@
  *
  * Portions adapted from Rebound (https://github.com/meszmate/rebound), MIT License, Copyright (c) 2026 Rebound contributors. See THIRD_PARTY_NOTICES.md.
  *
+ * Rebound'un lisansı tam metniyle burada: bu dosyanın her kopyası (suflo.app'te yayımlanan docs/js/ease-curve.js dahil;
+ * THIRD_PARTY_NOTICES.md sitede yok) telif ve izin bildirimini kendisi taşısın (tests/test-ease-share.js denetler).
+ *
+ *   MIT License
+ *
+ *   Copyright (c) 2026 Rebound contributors
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy
+ *   of this software and associated documentation files (the "Software"), to deal
+ *   in the Software without restriction, including without limitation the rights
+ *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *   copies of the Software, and to permit persons to whom the Software is
+ *   furnished to do so, subject to the following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included in all
+ *   copies or substantial portions of the Software.
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *   SOFTWARE.
+ *
  * Rebound'dan (commit 0f9fd6c, client/js/easing/) uyarlananlar — her biri "// Rebound: <ad>" ile işaretli:
  *   bezier.js     cubicBezier (Newton 8 adım + ikiye bölme yedeği)
  *   penner.js     Penner kümesi (quad … bounce, In/Out/InOut), get, isMonotonic, elasticOutWith
@@ -1237,10 +1262,43 @@
   }
 
   /*
-   * Tek yapıştırılan şey: SFC1 kodu ya da paylaşım bağlantısı (iki tür), ya da cubic-bezier / CSS (cssCoz).
+   * Yapıştırılan metindeki SFC1 kodları. Metin her "SFC1." başından bölünür (base64url'de '.' yok: önek bir kodun içinde
+   * geçemez); böylece alt alta, boşlukla (tek satırlık kutu satır sonlarını boşluğa çevirir) ya da bitişik yapıştırılan
+   * kodlar ve bağlantılar ayrılır. Parçanın sonuna düşen bir sonraki bağlantının öneki ("https://suflo.app/egri#" gibi,
+   * # dahil) atılır. Her parça önce bütün boşlukları atılarak denenir (satıra bölünmüş tek kod birleşir), çözülmezse yalnız
+   * ilk sözcüğüyle (kodun ardından gelen yazı); ikisi de base64url dışındaki ilk karakterde (nokta, parantez) kesilir.
+   * Kodu kopyala'nın çifti (kod ve hemen ardından aynı kodun bağlantısı, ya da tersi) tek kod sayılır; aynı kodun başka
+   * tekrarı listede kalır (iceAktar onu yineleme sayar).
+   * Döner: [{ kod, bag (bağlantıdan), r: paylasimCoz sonucu }] (metindeki sırayla)
+   */
+  function kodlariAyikla(text) {
+    var s = String(text), yer = [], out = [];
+    for (var p = s.indexOf(SFC_ONEK); p !== -1; p = s.indexOf(SFC_ONEK, p + SFC_ONEK.length)) yer.push(p);
+    function kes(x) { return SFC_ONEK + /^[A-Za-z0-9_-]*/.exec(x)[0]; }
+    for (var i = 0; i < yer.length; i++) {
+      // bağlantı öneki: "http(s)://…#" koda bitişse de (değer atanınca satır sonu silinir) yalnız kendisi atılır; şemasız
+      // önek ("suflo.app/egri#") ayrı bir sözcükse atılır
+      var parca = s.slice(yer[i] + SFC_ONEK.length, i + 1 < yer.length ? yer[i + 1] : s.length)
+        .replace(/https?:\/\/[^\s#]*#/gi, " ").replace(/(^|\s)[^\s#]*#/g, "$1 ");
+      var bag = yer[i] > 0 && s.charAt(yer[i] - 1) === "#";
+      var tum = kes(parca.replace(/\s+/g, "")), kod = tum, r = paylasimCoz(tum);
+      if (!r.ok) {
+        var ilk = kes(parca.replace(/^\s+/, "").split(/\s/)[0]);
+        var r2 = ilk !== tum ? paylasimCoz(ilk) : r;
+        if (r2.ok) { kod = ilk; r = r2; }
+      }
+      var once = out.length ? out[out.length - 1] : null;
+      if (once && !once.cift && once.kod === kod && once.bag !== bag) { once.cift = true; continue; }
+      out.push({ kod: kod, bag: bag, r: r });
+    }
+    return out;
+  }
+  /*
+   * Tek yapıştırılan şey: SFC1 kodu ya da paylaşım bağlantısı (iki tür; aynı kodun "kod + bağlantı" çifti de tek kod),
+   * ya da cubic-bezier / CSS (cssCoz).
    * Döner: { ok: true, kaynak: 'kod', tur: 'egri', ad, curve } | { ok: true, kaynak: 'kod', tur: 'hiz', ad, keys, hit } |
-   * { ok: true, kaynak: 'css', tur: 'egri', ad: '', curve, kirpildi } | { ok: false, hata } (paylasimCoz hataları; 'css'
-   * bozuk cubic-bezier, 'bicim' tanınmadı)
+   * { ok: true, kaynak: 'css', tur: 'egri', ad: '', curve, kirpildi } | { ok: false, hata } (paylasimCoz hataları; 'coklu'
+   * birden çok farklı kod (birini sessizce seçmek yerine; birkaç kodu iceAktar alır), 'css' bozuk cubic-bezier, 'bicim' tanınmadı)
    */
   function yapistir(text) {
     if (typeof text !== "string") return { ok: false, hata: "bos" };
@@ -1248,7 +1306,12 @@
     if (!s) return { ok: false, hata: "bos" };
     if (s.length > SFC_MAX) return { ok: false, hata: "uzun" };
     if (s.indexOf(SFC_ONEK) !== -1) {
-      var k = paylasimCoz(s);
+      var kodlar = kodlariAyikla(s), farkli = {};
+      for (var i = 0; i < kodlar.length; i++) {
+        farkli[kodlar[i].kod] = 1;
+        if (Object.keys(farkli).length > 1) return { ok: false, hata: "coklu" };
+      }
+      var k = kodlar[0].r;
       if (!k.ok) return k;
       k.kaynak = "kod";
       return k;
@@ -1258,40 +1321,43 @@
     return { ok: false, hata: /cubic-bezier/i.test(s) ? "css" : "bicim" };
   }
   /*
-   * Panelin "Kod yapıştır" kutusu ve İçe aktar: SFC1 kodu / bağlantı (bir tane ya da satır satır birkaç), cubic-bezier / CSS,
-   * .suflo-egri ya da dış biçim JSON metni. Hepsi dosyaOku biçiminde döner:
+   * Panelin "Kod yapıştır" kutusu ve İçe aktar: SFC1 kodu / bağlantı (bir tane ya da birkaç: alt alta, boşlukla ya da
+   * bitişik; kodlariAyikla), cubic-bezier / CSS, .suflo-egri ya da dış biçim JSON metni. Tek koda ancak metinde tek bir
+   * farklı kod varsa (aynı kodun bağlantısı sayılmaz) inilir; yoksa her kod ayrı önayar olur (en çok 32), hiçbiri sessizce
+   * düşmez. Hepsi dosyaOku biçiminde döner:
    * { ok: true, bicim: 'kod' | 'css' | 'suflo' | 'dis', presets, uyarilar, yinelenen, fazla, kirpildi? } | { ok: false, hata }
    */
   function iceAktar(text) {
     try {
       if (typeof text !== "string") return dosyaHata("bos");
+      if (buyukMu(text)) return dosyaHata("buyuk");
       var s = text.replace(/^\s+|\s+$/g, "");
       if (!s) return dosyaHata("bos");
       if (s.charAt(0) === "{") return dosyaOku(text);
-      if (buyukMu(text)) return dosyaHata("buyuk");
-      var tek = yapistir(s);
-      if (tek.ok) {
-        var p = tek.tur === "egri" ? { ok: true, tur: "egri", ad: tek.ad, curve: tek.curve } : { ok: true, tur: "hiz", ad: tek.ad, keys: tek.keys, hit: tek.hit };
-        var r1 = { ok: true, bicim: tek.kaynak, presets: [p], uyarilar: [], yinelenen: 0, fazla: 0 };
+      if (s.indexOf(SFC_ONEK) === -1) {
+        var tek = yapistir(s);
+        if (!tek.ok) return tek;
+        var r1 = { ok: true, bicim: tek.kaynak, presets: [{ ok: true, tur: "egri", ad: tek.ad, curve: tek.curve }], uyarilar: [], yinelenen: 0, fazla: 0 };
         if (tek.kirpildi) r1.kirpildi = true;
         return r1;
       }
-      // Satır satır birkaç kod (her satır bir kod ya da bağlantı); tek kod ikiye bölünmüşse yukarıda zaten çözüldü
-      if ((s.match(/SFC1\./g) || []).length < 2) return tek;
-      var satirlar = s.split(/\s*[\r\n]+\s*/), presets = [], uyarilar = [], gorulen = {}, yinelenen = 0, sayilan = 0;
-      for (var i = 0; i < satirlar.length; i++) {
-        if (satirlar[i].indexOf(SFC_ONEK) === -1) continue;
-        if (sayilan++ >= DOSYA.ONAYAR) continue;
-        var r = paylasimCoz(satirlar[i]);
+      var kodlar = kodlariAyikla(s);
+      if (kodlar.length === 1) {
+        var k = kodlar[0].r;
+        return k.ok ? { ok: true, bicim: "kod", presets: [k], uyarilar: [], yinelenen: 0, fazla: 0 } : k;
+      }
+      var presets = [], uyarilar = [], gorulen = {}, yinelenen = 0;
+      for (var i = 0; i < kodlar.length && i < DOSYA.ONAYAR; i++) {
+        var r = kodlar[i].r;
         if (!r.ok) { uyarilar.push({ kod: r.hata, i: i, ad: "" }); continue; }
         var imza = onayarImzasi(r);
         if (gorulen[imza]) { yinelenen++; continue; }
         gorulen[imza] = 1;
         presets.push(r);
       }
-      var fazla = Math.max(0, sayilan - DOSYA.ONAYAR);
+      var fazla = Math.max(0, kodlar.length - DOSYA.ONAYAR);
       if (fazla) uyarilar.push({ kod: "fazla", i: DOSYA.ONAYAR, ad: "", n: fazla });
-      if (!presets.length && !yinelenen) return uyarilar.length ? { ok: false, hata: uyarilar[0].kod } : tek;
+      if (!presets.length && !yinelenen) return { ok: false, hata: uyarilar.length ? uyarilar[0].kod : "bozuk" };
       return { ok: true, bicim: "kod", presets: presets, uyarilar: uyarilar, yinelenen: yinelenen, fazla: fazla };
     } catch (e) {
       return dosyaHata("bozuk");
