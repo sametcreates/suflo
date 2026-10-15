@@ -141,6 +141,20 @@ ok("Altyazı Efektleri: gizli onay kutularının :focus-visible kuralı ayrı bi
 
 ok("Tüm .switch anahtarları CEF 74'te klavye odağı gösterir (:focus yedeği + :not(:focus-visible))",
   tumSeciciler.indexOf(".switch input:focus + i") !== -1 && tumSeciciler.indexOf(".switch input:focus:not(:focus-visible) + i") !== -1);
+// Eğri sekmesi (3.4 adım 10): flex gap, overflow-wrap:anywhere ve :focus-visible yok (CEF 74 kuralı tümden atar)
+var egriKurallari = [], gre = /([^{}]*(?:\.egri-)[^{}]*)\{([^{}]*)\}/g, gm;
+while ((gm = gre.exec(css))) egriKurallari.push({ secici: gm[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), govde: gm[2] });
+var egriCssSorun = egriKurallari.filter(function (k) {
+  return (/display:\s*(inline-)?flex/.test(k.govde) && /(^|[;\s])(row-|column-)?gap:/.test(k.govde)) || /overflow-wrap:\s*anywhere/.test(k.govde) || /:focus-visible/.test(k.secici);
+}).map(function (k) { return k.secici; });
+ok("Eğri CSS: flex gap, overflow-wrap:anywhere ve :focus-visible yok (CEF 74)", egriKurallari.length >= 40 && egriCssSorun.length === 0, egriKurallari.length + " kural · " + egriCssSorun.join(" | "));
+// 3.4 adım 11: kaldırma satırı (Geçişi kaldır / Önayarı kaldır) — aynı kural
+var kaldirKurallari = [], kkre = /([^{}]*(?:\.kaldir-)[^{}]*)\{([^{}]*)\}/g, kkm;
+while ((kkm = kkre.exec(css))) kaldirKurallari.push({ secici: kkm[1].replace(/\/\*[\s\S]*?\*\//g, "").trim(), govde: kkm[2] });
+var kaldirCssSorun = kaldirKurallari.filter(function (k) {
+  return /(^|[;\s])(row-|column-)?gap:/.test(k.govde) || /overflow-wrap:\s*anywhere/.test(k.govde) || /:focus-visible/.test(k.secici);
+}).map(function (k) { return k.secici; });
+ok("Kaldırma satırı CSS: flex gap, overflow-wrap:anywhere ve :focus-visible yok (CEF 74)", kaldirKurallari.length >= 4 && kaldirCssSorun.length === 0, kaldirKurallari.length + " kural · " + kaldirCssSorun.join(" | "));
 
 var ornekRegex = ayikla("function f(x){ return /a'b/.test(x); }\nvar y = o?.p;");
 ok("denetleyici: return'den sonraki regex metin sanilmaz, arkasindaki kod gorunur", /o\?\.p/.test(ornekRegex.split("\n")[1]));

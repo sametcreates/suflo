@@ -1682,6 +1682,425 @@ getirmezse "geri alınmış" yerine "değişti" uyarısı çıkar; öyleyse gün
 "Altyazıyı yeni kurguya uyarla" → kopyada senkron altyazı. Sürüm notuna: "Kesimden sonra altyazıyı yeniden yazıya dökmeye
 gerek yok: tek tıkla yeni kurguya uyar".
 
+### Adım 9: Yumuşatma motoru ve anahtar kare kayıtları (altyapı, ücretsiz; görünen araç yok)
+
+Ne değişti: iki saf modül geldi. `js/ease-curve.js` (`SufloEase`) Rebound'un (MIT, commit `0f9fd6c`) yumuşatma
+motorundan uyarlandı: CSS cubic-bezier çözücüsü, Penner kümesi (quad … bounce), yay (spring), örnekleyici, hız grafiği
+ve yaylanma (overshoot) matematiği. Suflo'nun kendi eklemeleri: çok noktalı eğri (en çok 8 nokta), şekli bozmadan nokta
+ekleme (de Casteljau), çevir (ease-in ↔ ease-out), ters çevir (yalnız tekdüze eğri), tek `cubic-bezier()` metni
+okuma / yazma, 15 hazır eğri ve `bakePlan` (eğriyi iki anahtar kare arasına timeline karelerinde sık anahtar kare
+olarak yazma planı). `js/key-records.js` (`SufloKeyRecords`) Suflo'nun yazdığı anahtar kareleri kayıt olarak tutar
+ve "hâlâ yerinde mi" denetler (iki uç + kayıtlı zamanların en az %60'ı, 0,25 kare tolerans); depo proje başına
+localStorage anahtarı, projede en çok 300, toplam 2000 kayıt; boyut da sınırlı (proje 400 000, toplam 1 000 000 karakter,
+zamanlar sıkıştırılmış), kota ya da sınır dolunca en eski kayıtlar tek tek atılır. Panel açılışında Premiere'e ya da ağa
+çağrı yok.
+OpenCurve'den yalnız fikir alındı (lisansı yok); kodu, tabloları ve metin sözdizimi kullanılmadı.
+
+**9.1 Lisans ve atıf (5 dk, bilgi).** `THIRD_PARTY_NOTICES.md`'ye Rebound girdisi eklendi (commit, MIT, telif satırı,
+tam lisans metni, uyarlanan dosyalar); `js/ease-curve.js` başında atıf satırı, uyarlanan her işlevde
+`// Rebound: <ad>` işareti var. ZXP ve kurucu `THIRD_PARTY_NOTICES.md`'yi zaten taşıyor; `tools/verify-release.ps1`
+iki yeni dosyayı (`js/ease-curve.js`, `js/key-records.js`) zorunlu tutuyor. Yapacak bir şey yok; yalnız göz at.
+
+**9.2 İsteğe bağlı teşekkür satırı (2 dk, karar).** Plan README'ye "İlham: OpenCurve, Rebound" satırını isteğe
+bağlı bırakıyor (lisans iddiası değil, teşekkür). Eklenmedi; istersen `README.md` › `## Lisanslar / Licenses` altına
+ekle. OpenCurve'ün adı başka hiçbir yerde geçmemeli (inceleme `opencurve` arar; tek izinli yer adım 15'teki
+OpenCurve JSON içe aktarıcısı).
+
+**9.3 Hazır eğri adlarını onayla (5 dk).** `js/ease-curve.js` › `BUILTINS`: Doğrusal, Yumuşak, Yumuşak giriş,
+Yumuşak çıkış, Yumuşak giriş-çıkış, Sert giriş, Sert çıkış, Güçlü S, Geri çekil, Taşma, Esnek, Zıplama, Yay yumuşak,
+Yay canlı, Çift yumuşak (İngilizceleri `nameEn` alanında ve `i18n/en.js`'te). "Süzülme" Hız Rampası önayarı olduğu
+için kullanılmadı. Ad değiştirirsen `i18n/en.js`'teki karşılığını da değiştir; "Yumuşak" (Smooth) ve "Zıplama"
+(Bounce) sözlükte başka araçlarla ortak, eğri seçicisi İngilizce adı `SufloEase.builtinName()`'den alır.
+
+**9.4 Eğri fiyatlandırması (bilgi, adım 10'a not).** Senin kararınla adım 10'da Eğri editörü ve önizleme ücretsiz;
+eğriyi anahtar karelere uygulamak Pro (`Pro.gate('curves')`, 3 deneme hakkı, `js/deneme.js` listesine `curves` girer,
+Ayarlar'daki Pro / deneme tablosunda görünür). Adım 9'da kapı yok; sunucu tarafında yapılacak bir şey yok (deneme
+hakları panelde tutuluyor).
+
+**9.5 Premiere'de dene (10 dk).** `marketing/v3.4-deneme-listesi.md` › `## 9` (geliştirici kurulumu + Chrome'da
+`http://localhost:8092` konsolu). Özellikle 9.1'i eski Premiere'de (14.x / 2020, CEF 74) yap.
+
+### Adım 10: Eğri sekmesi: kendi anahtar karelerine özel yumuşatma (Pro: düzenlemek ücretsiz, uygulamak 3 deneme hakkı)
+
+Ne değişti: sol menüde **Eğri** sekmesi (Hız Rampası'nın altında). Kullanıcı Effect Controls'te bir özelliğe iki anahtar
+kare koyar, playhead'i aralarına getirir, eğriyi seçer, Uygula der; Suflo eğriyi aralarına her kareye (ya da 2 / 4 karede
+bir) sık anahtar kare olarak yazar (Premiere'in betikleri Bezier tutamacı yazamaz), uçtaki iki anahtar değişmez. Seçili
+klipler (en çok 20) toplu, yoksa playhead'in altındaki klip. SVG düzenleyici (Değer / Hız, tutamaç, çok nokta, Shift / Alt /
+Delete), 15 hazır eğri + kendi önayarların, canlı önizleme sahnesi (Premiere'e gitmez), kaba "Premiere'de önizle",
+cubic-bezier alanı, kısayollar (Enter, U, F, I, V, 1–9). Geri al yalnız Suflo'nun yazdığı ve hâlâ duran anahtarları siler;
+kayıtlar `SufloKeyRecords` deposunda (adım 9), panel kapanıp açılsa da çalışır. Host: `KS_easePeek` / `KS_easeScan` /
+`KS_easeBake` / `KS_easeUndo` ve Doctor'da `kfInterp` satırı. Panel açılışında Premiere'e çağrı yok; yoklama yalnız sekme
+görünür, panel odakta ve Premiere boştayken 1,2 sn'de bir ve ucuz. OpenCurve'den yalnız fikir alındı (lisansı yok; kod,
+tablo, metin sözdizimi yok); motor Rebound (MIT, adım 9).
+
+**10.1 Fiyat kararın uygulandı (bilgi).** Senin kararınla düzenleyici, önayarlar, önizleme ve geri alma ücretsiz; eğriyi
+anahtar karelere uygulamak (tek klip ya da toplu) `Pro.gate('curves')`, 3 deneme hakkı. `js/deneme.js` listesine 13. araç
+olarak `curves` ("Eğri (anahtar kare yumuşatma)") girdi, Ayarlar › Suflo Pro'daki deneme tablosunda görünür; Pro listesine
+"Eğri: anahtar karelerine özel yumuşatma (düzenlemek ücretsiz)" satırı eklendi. Hak yalnız en az bir özellik gerçekten
+yazılınca, bir kez düşer. Sunucu tarafında yapılacak bir şey yok (haklar panelde). Planın ayrı "egri-toplu" kapısı yok:
+toplu uygulama da aynı `curves` kapısından geçer. Farklı istersen (ör. tek klip ücretsiz) söyle.
+
+**10.2 Premiere'de dene (30–40 dk).** `marketing/v3.4-deneme-listesi.md` › `## 10`. Özellikle: **10.3** (Delete, F, I, V
+Premiere'e gitmemeli; Delete seçili klibi silmemeli), **10.5** (deneme penceresi ve hak bir kez), **10.6** (%50 hız ve ters
+klip), **10.7** (yazılan anahtarlar Doğrusal mı: `setInterpolationTypeAtKey` sabiti 0 = doğrusal varsayımı Premiere'de
+doğrulanmadı) ve **10.9** (Geri al senin elle eklediğin anahtarı korumalı). Hem yeni (2025 / 2026) hem eski (14.x / 2020,
+CEF 74) Premiere'de.
+
+**10.3 Adlar (5 dk, karar).** Sol menü adı "Eğri" (açıklama "anahtar kare yumuşatma"), İngilizcesi "Easing". Panelde "Bezier
+tutamaçları" iddiası yok: arayüz ve README "tutamaç yazamaz, sık anahtar kare" der. Site, blog ve sürüm notu bu adımda
+değişmedi; 3.4 yayınında Eğri'yi anlatırken de "Bezier tutamacı" deme, "her kareye anahtar kare" de.
+
+**10.4 Yenilikler penceresi (3.4 yayınında).** `js/app.js` › `YENILIKLER` hâlâ 3.2'nin listesi. 3.4'ü yayınlarken sürümü
+"3.4" yapıp Eğri maddesini (`sekme: "egri"`, `hedef: "egri-editor"`) ekle; bu adımda bilerek dokunulmadı (yayın kararı).
+
+**10.5 Ses düzeyi sonra (bilgi).** v1 yalnız video katmanlarındaki özellikleri tarar (arayüzde yazıyor). Ses Volume
+anahtarları için ayrı bir adım gerekir; şimdilik bir şey yapma.
+
+### Adım 11: Kayıt tabanlı güvenli kaldırma: Geçiş, Zoom, Hareket önayarı (ücretsiz)
+
+Ne değişti: `KS_applyCutTransition`, `KS_autoZoom` ve `KS_applyMotionPreset` artık yazdıkları her özellik için bir kayıt
+döndürür (klip nodeId, sekans, özellik kimliği, yazılan anahtar zamanları, yazmadan önceki kenar değerleri, kaynak çapası);
+panel bunları `js/kayit-kaldir.js` ile proje başına saklar (adım 9'un `SufloKeyRecords` deposu, Eğri ile ortak). Yeni host
+işlevi `KS_removeSufloKeys` yalnız canlı kaydın (iki uç yerinde ve zamanların en az %60'ı) Suflo'nun yazdığı ve hâlâ duran
+anahtarlarını siler, kenar değerlerini geri koyar, updateUI ile tazeler; taşınan klibi nodeId ile bulur, bulunamayan klibin
+kaydını saklar, Premiere'de geri alınmış uygulamanın kaydını bitirir. Geçişler'e **Geçişi kaldır**, Hareket önayarlarına
+**Önayarı kaldır** geldi; **Zoom'u kaldır** artık kullanıcının Ölçek anahtarlarını silmiyor. Uygulama bildirimlerinde kapısız
+**Geri al**. Kaydı olmayan zoom ve geçişte eski yöntem yalnız onayla çalışır. Kaldırmak her tierde ücretsiz (Pro kapısı ve
+deneme hakkı yok). OpenCurve'den yalnız "canlılık parmak izli kayıt" fikri alındı; kod yok.
+
+**11.1 Fiyat (bilgi).** Senin kuralın uygulandı: Suflo'nun yazdığını kaldırmak hiçbir zaman ücretli değil. Geçişler ve Zoom
+uygulamak Pro (3 deneme hakkı) olarak kaldı; kaldırma düğmeleri ücretsizde de kilitsiz. Sunucu tarafında yapılacak bir şey yok.
+
+**11.2 Eski önayarlar için karar (5 dk).** 3.3 ve öncesinde uygulanan Hareket önayarlarının kaydı yok; plan "kayıt yoksa
+bugünkü davranış onayla" diyor, ama önayarlarda bugün hiçbir kaldırma yolu yoktu ve bir önayarın penceresi (giriş / çıkış /
+playhead çevresi) sonradan bilinemiyor. Bu yüzden Önayarı kaldır kaydı olmayan önayarı tahminle silmez; kullanıcıya Ctrl+Z ya
+da Effect Controls'ü önerir. Geçişte eski yöntem, uygulamanın kendisinin de temizlediği kesim penceresidir (onaylı). Önayar
+için de onaylı bir "giriş / çıkış penceresini temizle" istersen söyle.
+
+**11.3 Zoom'un eski yöntemi (bilgi, sonra düzeltilebilir).** Onaylı eski yol 3.3'teki `kaldir()`'ın aynısı: klibin tüm Ölçek
+anahtarlarını silip iki düz anahtar yazar ve Konum'u sıfırlar. Düz değer klibin başındaki değerden okunur; zoom klibin başında
+yakınlaşmış başlıyorsa düz değer de yakın kalır (3.3'ten beri var olan sınır; kayıtlı yol bunu yaşamaz). Aynı sebeple zoom'u
+aynı klibe ikinci kez uygulamak hâlâ birincinin üstüne biner (taban yakınlaşmış ilk anahtardan okunur; 3.3'ten beri). Kayıtlı
+kaldırma bunu telafi eder: yeniden uygulamada yeni kayıt ilk uygulamanın "önceki değer"ini devralır, Zoom'u kaldır ölçeği
+zoom'dan önceki değere döndürür (yalnız yerine geçilen kayıt uygulamadan hemen önce hâlâ canlıysa; Premiere'de geri
+alınmış eski kaydın bayat değeri devralınmaz, klip taşınmış olsa da eşlenir). Zoom'un tabanını düzeltmek (yeniden
+uygulamada üst üste binmesin) ayrı bir iş; istersen söyle.
+
+**11.4 Yerel depo (bilgi).** Kayıtlar bu bilgisayarın panel deposunda (proje yolu karma anahtarla; projede Eğri ve araç
+kayıtları için ayrı ayrı en çok 300, toplam 2000 kayıt, en eskiler tek tek atılır; çok klipli bir araç uygulaması Eğri'nin
+Geri al kayıtlarını atmaz). Proje başka bilgisayarda açılırsa kayıt yok: eski yöntem (onaylı) ya da Ctrl+Z.
+Projenin içine yazmak (marker / proje meta verisi) sonraki bir karar.
+
+**11.5 Premiere'de dene (25–30 dk).** `marketing/v3.4-deneme-listesi.md` › `## 11`. Özellikle **11.2** (kendi anahtarın kalır,
+kenarlar eski değerde), **11.6** (eski geçiş: onay, Karartma'dan sonra klip siyah kalmaz), **11.7** (zoom kaldırma senin Ölçek
+anahtarını silmez), **11.9** (önayar kaldırınca Opaklık 80'e döner) ve **11.10** (hakları bitmiş ücretsiz kullanıcı kaldırabilir).
+Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de. `setTimeVarying(false)` + `setValue` ile sabit değere
+dönüşün Premiere'de anahtar bırakmadığını (Effect Controls'te kronometre kapalı) doğrula. İnceleme düzeltmeleri için
+**11.13 (d)** ve **11.14** (araçlar arası: Zoom + Punch, Zoom + geçiş, Karartma → Zoom İçeri, Ctrl+Z sonra yeniden uygulama,
+çoklu seçim uyarısı) da dene. İkinci inceleme için **11.15** (Eğri ile birlikte kaldırma) ve **11.16** (seçili klip
+playhead'in önüne geçmez, onayda kesim yeri) da.
+
+**11.6 Kaynak satırı (PR / birleştirme, 1 dk).** Adım 11'in ilk dört commit'inde (675cddd, 13b08f1, 63c3fe7, 74dfccb) kaynak
+satırı yok; inceleme düzeltmesi commit'inde var. 3.4 PR açıklamasına ve squash-merge commit'ine şu satırı ekle:
+`Kaynak: temiz oda (OpenCurve'den yalnız "canlılık parmak izli kayıt" fikri); kod alınmadı, bildirim gerekmez.`
+(plan › attribution_notes: her adımın commit / PR metni kaynağı ve kodun alınıp alınmadığını söyler).
+
+**11.7 İkinci inceleme: iki davranış değişikliği (bilgi, 2 dk).** (a) Bir araç anahtarının ucunda duran **Suflo Eğrisi**
+artık o araçla birlikte kalkar: Zoom'un, geçişin ya da önayarın iki anahtarı arasına Eğri uygulanmışsa Zoom'u kaldır /
+Geçişi kaldır / Önayarı kaldır Eğri'nin iç anahtarlarını da siler ve Eğri kaydını bitirir (bildirim "…Suflo eğrisi de
+kaldırıldı" der). Önceden Eğri'nin anahtarları kalıyor, rampa görünür kalıyor ve Eğri'nin Geri al'ı onları bulamıyordu.
+Uçları senin kendi anahtarların olan Eğri'ye dokunulmaz. (b) **Geçişi kaldır** artık seçili klibe göre kesim seçmez:
+playhead'e en fazla 1 sn uzaktaki, Suflo geçişi olan en yakın kesimi kaldırır (yoksa en yakın kesimi). Kaydı olmayan
+geçişin onayı ilk satırda hangi kesim olduğunu söyler ("Kesim: V1, 00:09.04") ve Tamam tam o kesimi temizler; önceden
+seçili bir klip, onaylanan eski yöntemle başka bir kesimdeki senin anahtarlarını sildirebiliyordu. Geçiş **uygulama**
+kuralı değişmedi (seçili klibin kesimi öncelikli). Yapılacak bir şey yok; 11.15 / 11.16'da gözle doğrula.
+
+### Adım 12: Geçiş, Zoom ve Hareket önayarlarında özel eğri (her aracın kendi katmanı; eğri seçmek ücretsiz)
+
+Ne değişti: Geçişler, Otomatik Zoom ve Hareket önayarları sekmelerinde küçük resimli **Eğri** seçicisi (Eğri sekmesinin
+kart ızgarasıyla aynı; `js/egri.js` › `SufloEgriIzgara`, `SufloEgriSecici`). Varsayılan **Otomatik** = bugünkü çıktı (panelin
+Premiere'e gönderdiği yük 3.4 adım 12 öncesiyle bayt bayt aynı; `tests/fixtures/egri-otomatik-3.4.json`). Başka bir eğride
+yeni saf modül `js/egri-secim.js` (`SufloEgriSecim`) her parçayı `SufloEase.bakePlan` ile sık anahtar karelere çevirir (her
+kare, 1 sn'den uzun parçada 2 karede bir; özellik başına en çok 2000 ara anahtar, aşarsa adım katlanır); host
+`KS_presetKeys`'in yeni `dense` bayrağıyla Bezier (5) yazmaz, `setInterpolationTypeAtKey` varsa doğrusal (0) yazar, updateUI
+yine yalnız son anahtarda, ilk / son anahtar doğrulaması aynı; yazılan her anahtar kayda girer (adım 11'in kaldırması aynen
+çalışır). `ease` alanı: `'auto'` | hazır eğri kimliği | `cubic-bezier(…)` | `SFC1.` kodu. Temiz oda; yalnız Suflo'nun kendi
+`js/ease-curve.js`'i (Rebound MIT, adım 9'da atıflı).
+
+**12.1 Fiyat (bilgi).** Senin kuralın: araçların katmanı aynen. Geçişler `transitions`, Zoom `zoom` (ikisi de Pro, 3 deneme
+hakkı), Hareket önayarları `presets` (Pro, denemesiz) kapısından geçer; eğri **seçmek ve küçük resimlere bakmak ücretsiz**.
+`js/deneme.js`'e yeni anahtar eklenmedi, `curves` hakkı bu araçlarda düşmez. Sunucu tarafında yapılacak bir şey yok.
+
+**12.2 Tasarım kararlarını onayla (10 dk, karar).** Plan "her anahtar parçasını yoğunlaştır" diyor; birebir uygulanınca
+Zoom İçeri / Whip gibi üç anahtarlı hareketler ortadaki anahtarda durup kalkıyordu. Bu yüzden:
+(a) **Aynı yöne giden ara anahtarlar tek parça** sayılır (Suflo'nun ivme biçimiydi, onun yerini eğri alır); yön değiştiren
+anahtarlar (taşma, zıplama, sarsıntı tepeleri) ve duruş / kalkış anları korunur.
+(b) **Geçişte giden klip (A) eğrinin aynasını** (`SufloEase.flip`) kullanır: kullanıcı "Sert çıkış" seçince A kesime hızlanır,
+B kesimden yavaşlar (Suflo'nun kendi geçişleri gibi). Birebir aynı eğriyi istersen `js/transitions.js` › `hostPlan`'da
+`S.ayna(c.curve)` yerine `c.curve` yaz.
+(c) **Zoom'da özel eğri Yumuşak stilin %1,2'lik taşmasını yazmaz** (taşmayı istersen Taşma / yay eğrisini seçersin); Jump Cut
+eğrisizdir, Snap-In'in kademeleri tek eğrili harekete dönüşür.
+(d) **Hareket önayarlarında** anahtarları host her seçili klibin o anki değerlerinden kurduğu için panel `bakePlan` yerine eğriyi
+241 noktalık tablo (`SufloEase.bakeFactors`) olarak gönderir, host aynı kare kuralıyla yoğunlaştırır (`KS_egriYogun`). Yalnız
+12 yerleşik önayar; Suflo Smooth paketi (`.prfpset`) kendi anahtarlarını korur.
+Farklı istersen söyle.
+
+**12.3 SFC1 kodu çekirdeği (bilgi, adım 15'e not).** Kullanıcı önayarları ve çok noktalı / yay eğrileri seçicide `SFC1.` kodu
+olarak taşınır (`SufloEase.sfcKodla` / `sfcCoz`: `"SFC1." + base64url(UTF-8 JSON { v: 1, tur: 'egri', ad, curve })`, en çok 4096
+karakter, 8 nokta, ad 40 karakter, denetim karakterleri atılır). Adım 15 bunu genişletecek (`tur: 'hiz'`, `.suflo-egri`
+dosyası, içe / dışa aktarma); biçim değişirse seçicinin yerel depoda tuttuğu kodlar `coz` ile geçersiz sayılır ve Otomatik'e
+düşer (veri kaybı yok, kullanıcı yeniden seçer).
+
+**12.4 Premiere'de dene (30–40 dk).** `marketing/v3.4-deneme-listesi.md` › `## 12`. Özellikle **12.2** (Otomatik 3.3 ile aynı),
+**12.4** (doğrusal anahtar simgesi: `setInterpolationTypeAtKey` sabiti 0 = doğrusal varsayımı adım 10.7 ile birlikte
+doğrulanmalı), **12.5** (kısa klipte anahtar yığılması yok), **12.6** (uzun klipte özel eğrili zoom süresi; Premiere çok
+yavaşsa sınırı 2000'den düşürebiliriz: `js/egri-secim.js` › `EN_COK` ve `jsx/host.jsx` › `KS_EGRI_EN_COK`) ve **12.9**
+(29,97 kare/sn). Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de.
+
+**12.5 Yenilikler penceresi (3.4 yayınında).** `js/app.js` › `YENILIKLER`'e Eğri maddesiyle birlikte "Geçiş, Zoom ve Hareket
+önayarlarında özel eğri" de girebilir (`sekme: "gecis"`, `hedef: "gecis-egri"`); bu adımda bilerek dokunulmadı. Site / sürüm
+notunda "Bezier tutamacı" deme, "her kareye anahtar kare" de (adım 10.3).
+
+**12.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
+`Kaynak: temiz oda (OpenCurve'den yalnız "otomatik Bezier yerine tam eğri" fikri; OpenCurve'den kod alınmadı). Suflo'nun Rebound (MIT,
+adım 9'da atıflı) motoru kullanıldı; host'taki Hareket önayarı yoğunlaştırması (jsx/host.jsx KS_egriTabloDeger, KS_egriYogun) Rebound'un
+host/commands/spring.jsx lookup / bakeSegment'inden uyarlandı, THIRD_PARTY_NOTICES.md Rebound girdisinde ve dosyada atıflı.`
+(İnceleme r2: ilk sürümde bu satır "kod alınmadı … yeni bildirim gerekmez" diyordu; host'taki iki işlevin Rebound'a benzerliği
+nedeniyle atıf eklendi. Adım 12 commit'lerindeki eski satır geçmişte kalır; PR açıklamasında bu satırı kullan.)
+
+### Adım 13: Hız Rampası için Özel eğri editörü (Pro: 'speedramp' kapısı ve 3 deneme hakkı; düzenlemek ücretsiz)
+
+Ne değişti: Hız Rampası'na 12. kart **Özel eğri** (`js/speedramp.js` LIST `{ id: 'ozel', group: 'ozel', hit: null, keys: [] }`).
+Anahtarlar seçeneklerden gelir (`o.ozelKeys` [[t, %]], `o.ozelHit`); `SufloSpeedRamp.ozelDogrula` onları 2–8 noktaya, t = 0 ve
+t = 1 uçlarına, %10–%1000 hıza oturtur (aynı t'de en çok iki nokta = sert basamak). Sonra her şey hazır eğrilerle aynı yoldan
+geçer: yoğunluk, yumuşatma, vuruş anı hizalama, parçalama, Otomatik / Dengeli kaynak bütçesi, uyarı kodları, srcFrames ≤ F.
+`hostPlan` ve `KS_applySpeedRamp` değişmedi (host'a dokunulmadı). Düzenleyici `SufloEgriEditor` (adım 10) yeni **'hiz' modu**
+(`js/egri.js` › `hizOlustur`; geometri saf ve testli: `SufloSpeedRamp.ozel`). Her hazır kartta **Düzenle** anahtarları kopyalar
+(aynı anahtarlar bire bir aynı planı verir; testli). Önizleme her düzenlemede 80 ms ertelenerek, Premiere'e gitmeden yenilenir.
+Son özel eğri `suflo.hizRampa.ozel`, adlı özel rampalar (en çok 12) `suflo.hizRampa.ozelKayitlar` anahtarında, yalnız bu
+bilgisayarın yerel deposunda (her erişim korumalı; bozuk depo başlangıç eğrisine döner). Temiz oda: OpenCurve'den yalnız "hız
+eğrisini noktalarla düzenleme" fikri; kod, tablo, sabit, metin sözdizimi ya da arayüz alınmadı. Rebound'dan kod alınmadı (Suflo'nun
+kendi düzenleyicisi ve hız rampası matematiği); yeni bildirim gerekmez.
+
+**13.1 Fiyat (bilgi).** Senin kuralın: Hız Rampası'nın katmanı aynen. Özel eğriyi çizmek, Düzenle, önizleme ve kayıtlar
+**ücretsiz**; timeline'a uygulamak `Pro.gate('speedramp')` ve aynı 3 deneme hakkı (hak yalnız en az bir klip rampalanınca düşer).
+`js/deneme.js`'e yeni anahtar eklenmedi, Ayarlar › Pro / deneme tablosu değişmedi. Sunucu tarafında yapılacak bir şey yok.
+
+**13.2 Tasarım kararlarını onayla (10 dk, karar).**
+(a) **Başlangıç eğrisi:** Özel eğri ilk açıldığında tek derin ağır çekim (%100 → %30 → %100, ağır çekim anı 0,5). Başka bir
+başlangıç istersen `js/speedramp.js` › `OZEL_VARSAYILAN`.
+(b) **Alt+tık sert basamak:** noktanın hızı solda kalır, aynı anda bir sonraki noktanın hızına atlanır (o da aynıysa öncekine,
+o da aynıysa iki katına). İkinci Alt+tık tıklanan noktayı bırakıp basamağı kapatır. Alt'ın Windows'ta Premiere menüsünü
+uyandırma ihtimaline karşı aynı iş **Sert basamak** düğmesinde de var (deneme listesi 13.4).
+(c) **Yoğunluk ve Yumuşatma özel eğriye de uygulanır** (Düzenle ile kopyalanan eğri hazır karttakiyle aynı rampayı versin diye).
+(d) **Uç noktalar** silinmez ve zamanı oynamaz (yalnız hızı); en çok 8 nokta; iki ayrı nokta arasında en az %1 zaman.
+(e) **Klavye (inceleme sonrası değişti):** kısayol olmaması Delete'i Premiere'den saklamıyordu (CEP, odak metin kutusunda
+değilken tuşu Premiere'e de verir: seçili timeline klibi silinirdi). Artık düzenleyici odaktayken Delete / Backspace panelde tutulur
+ve seçili noktayı siler (Eğri sekmesindeki düzenleyici gibi); bir kartın Düzenle'si odaktayken Enter / Space panelde tutulur
+(Premiere render / oynatma başlatmaz). Odak gidince ya da sekmeden çıkınca tuşlar Premiere'e geri verilir. Ok tuşları
+tutulmaz (playhead Premiere'de kalır). Deneme listesi 13.12.
+(g) **Geri al (inceleme sonrası):** Düzenle rozeti kart resminin köşesinde; Düzenle / kayıtlı rampa / Sıfırla, adıyla
+kaydedilmemiş elle çizilmiş bir eğrinin üstüne yazınca bildirimde **Geri al** çıkar (hazır kart kopyası, başlangıç eğrisi ya da
+kayıtlı rampa yeniden elde edildiği için onlarda çıkmaz). Rozeti kartın dışına taşımak istersen söyle.
+(f) **Ritme Rampa'da Düzenle yok:** plan "her önayar kartı" diyor, ama Ritme Rampa'nın sabit anahtarı yok (eğrisi her klipte
+o klibin vuruşlarından kurulur); kopyalanacak bir eğri olmadığı için kartında Düzenle gösterilmez. İstersen o anki klibin vuruş
+eğrisini kopyalayan bir Düzenle eklenebilir (klibe bağlı, başka klipte anlamı değişir).
+Farklı istersen söyle.
+
+**13.3 Paylaşım kodu (bilgi, adım 15'e not).** Plan özel rampaların `SFC1` koduyla `tur: 'hiz'` olarak paylaşılmasını adım 15'e
+bırakıyor; bu adımda kod yok. Depo biçimi adım 15'in `keys` alanıyla aynı (`[[t, %]]`, `SufloSpeedRamp.ozelYuzde`), ağır çekim
+anı `hit` (0,02–0,98 ya da null); adım 15 `SufloSpeedRamp.ozelDogrula`'yı doğrulayıcı olarak kullanabilir.
+
+**13.4 Premiere'de dene (25–35 dk).** `marketing/v3.4-deneme-listesi.md` › `## 13`. Özellikle **13.3** (sürüklerken panel
+takılmıyor mu; yavaş makinede 80 ms gecikme az gelirse `js/hiz-rampasi.js` › `OZEL_GECIKME`), **13.4** (Windows'ta Alt+tık ve
+Premiere menüsü), **13.6** (uygulanan parçalar önizlemeyle aynı) ve **13.7** (hızlı özel eğride medya sonu). Hem yeni (2025 / 2026)
+hem eski (14.x / 2020, CEF 74) Premiere'de.
+
+**13.5 Yenilikler penceresi ve tanıtım (3.4 yayınında, isteğe bağlı).** `js/app.js` › `YENILIKLER`'e "Hız Rampası'nda kendi
+eğrini çiz" maddesi (`sekme: "hiz"`) eklenebilir; tanıtım kartı (`#hiz-tanitim`) hâlâ "11 eğri" diyor, istersen "11 eğri +
+özel eğri" yap. Bu adımda bilerek dokunulmadı.
+
+**13.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
+`Kaynak: temiz oda (OpenCurve'den yalnız "hız eğrisini noktalarla düzenleme" fikri; Rebound'dan "ortak düzenleyiciyle hız grafiği"
+fikri); kod alınmadı, Suflo'nun kendi SufloEgriEditor'ü ve hız rampası matematiği kullanıldı, yeni bildirim gerekmez.`
+
+### Adım 14: Varışta yaylanma (follow-through) (Pro: Eğri'nin 'curves' kapısı ve ortak 3 deneme hakkı; ayarlar ücretsiz)
+
+Ne değişti: Eğri sekmesinde **Varışta yaylan** kartı (`#egri-yaylan`). Hareket iniş anahtar karesine vardıktan sonra hedefi
+varış hızıyla orantılı aşar, salınıp oturur: After Effects'teki overshoot ifadesinin anahtar kareye pişirilmiş hâli.
+Matematik adım 9'da Rebound'dan (MIT, atıflı) alınan `dampedSine` / `followThroughAnchors` / `autoDuration`; plan Suflo'nun
+`SufloEase.yaylanPlan`'ı: değer_k = taban + hız · genlik · s(t_k − iniş). Varışlar `SufloEgriModel.varislar` (tek varış:
+kullanıcının anahtarlarında playhead'i saran çiftin ikinci ucu, bkz. 14.8 (a); **Tüm varışlar**: bekleme ve Eğri iç anahtarları hariç her
+iniş), varış hızı boyut başına önceki anahtardan (Eğri'nin son sık anahtarıysa bitiş eğimi). Host `KS_easeBake`'e `tur: 'yaylan'`
+öğeleri (`KS_easeYaylanOge`): iniş ve sonraki anahtar değerleriyle doğrulanır, yalnız inişten sonra ve sonraki anahtardan / klip
+sonundan önce yazar; `setInterpolationTypeAtKey` varsa tepe / çukurlara seyrek plan + Bezier (5), yoksa 2 karede bir sık plan.
+Kayıt `tur: 'yaylan'` (uçsuz, iniş `kenarDegerleri[0]`); satır Geri al'ı, U, bildirim, Tümünü geri al (`KS_easeUndo`) ve adım 11'in
+kaldırması (`KS_removeSufloKeys`) siler; inişi silen bir Geçiş / Zoom / Önayar kaldırması ardındaki yaylanmayı da kaldırır. Ayarlar
+`suflo.egri.yaylan` anahtarında (yalnız bu bilgisayarın yerel deposu). Temiz oda: plan adımı yalnız Rebound'a dayanıyor; OpenCurve
+açılmadı, kod / tablo / metin alınmadı. Yeni bildirim gerekmez (overshoot.js adım 9'da Rebound girdisiyle zaten atıflı).
+
+**14.1 Fiyat (bilgi).** Senin kuralın: "part of 'curves'". Ayarlar, önizleme ve geri almak **ücretsiz**; anahtar karelere yazmak
+`Pro.gate('curves')` ve Eğri ile **ortak** 3 deneme hakkı (hak yalnız en az bir varış yazılınca, bir kez). `js/deneme.js`'e yeni
+anahtar eklenmedi; Ayarlar › Pro / deneme tablosundaki ad "Eğri (yumuşatma ve varışta yaylanma)", Pro etiketi ve Ayarlar'daki Pro
+listesi de yaylanmayı anıyor. Sunucu tarafında yapılacak bir şey yok.
+
+**14.2 Premiere'de Bezier türünü doğrula (5 dk, önemli).** Plan yaylanma anahtarlarını `setInterpolationTypeAtKey(t, 5)` ile
+Bezier yapar ("enum'u kfInterp yoklamasıyla doğrula"); yoklama yalnız işlevin VARLIĞINI görebilir, 5'in Premiere'de gerçekten
+Bezier olduğunu göremez (Geçiş / Zoom / Hareket önayarlarının seyrek anahtarları da 5 kullanıyor). Deneme listesi **14.3**:
+Effect Controls'te yaylanma anahtarı Bezier / Otomatik Bezier görünmeli. Başka bir tür görünürse sürümü yaz; 5 yerine doğru sayı
+`jsx/host.jsx` › `KS_easeYaylanOge`'de tek yerde değişir.
+
+**14.3 Tasarım kararlarını onayla (10 dk, karar).**
+(a) **Varsayılanlar:** Genlik 0,10 sn, Frekans 3 Hz, Sönüm 6 (oturma ≈ 0,8 sn): 0,5 sn'de 500 px giden (1000 px/sn) bir harekette ilk aşım
+≈ 60 px. Daha belirgin istersen `js/ease-curve.js` › `YAYLAN`. Sönüm kaydırıcısı tam sayı adımlı (İngilizce arayüzde ondalık virgül
+görünmesin diye).
+(b) **Sonraki anahtar başka değerdeyse** taban o anahtara doğru doğrusal gider (plan "iniş değeri" diyor; ama sabit taban senin
+sonraki hareketini yaylanma bitene dek bekletip sonra sıkıştırırdı). Kullanıcının o aralıkta Bezier yumuşatması varsa hafif sapma
+olabilir.
+(c) **2 kareden az yer:** inişten sonra sonraki anahtara / klibin son karesine kadar 2'den az yazılabilir kare varsa yazılmaz
+(Tüm varışlar'da sessizce geçilir, tek varışta nedeni söylenir).
+(d) **Kayıt uçsuz:** yaylanma kaydı kendi anahtarlarıyla yaşar; kullanıcı sonraki anahtarı taşısa da Geri al bulur. Aynı inişe
+yeniden uygulama öncekinin yerine geçer; kullanıcı pencerenin ortasına anahtar koyduysa yeni yaylanma ondan önce biter, eskinin
+ötesindeki anahtarları da silinir (onun anahtarı kalır).
+(e) **Değerler yalnız Uygula'da okunur:** yoklama taraması değer okumaz (40 özellik × 400 anahtar yavaş olurdu); Uygula işaretli
+satırların değerlerini taze taramayla ister.
+(f) **Kısayol:** Eğri'nin kısayolları (Enter, U, F, I, V, 1–9) aynı; Varışta yaylan için ayrı tuş eklenmedi (CEP tuş ilgisi
+listesi değişmedi). Odak Varışta yaylan kartındayken (kaydırıcı, Tüm varışlar kutusu) Enter yaylanmayı uygular, Eğri'yi değil.
+U ve Tümünü geri al yaylanmayı da kaldırır.
+Farklı istersen söyle.
+
+**14.4 Premiere'de dene (25–35 dk).** `marketing/v3.4-deneme-listesi.md` › `## 14`. Özellikle **14.3** (Bezier türü), **14.4**
+(sonraki anahtarı geçmez, yer reddi), **14.5** (yeniden uygulama ve Geri al) ve **14.9** (Geçişi kaldır yaylanmayı da kaldırır).
+Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de.
+
+**14.5 Pazarlama (bilgi).** "Bezier tutamaçları" iddiası yok: yaylanma anahtar karelere yazılır (her tepe / çukura bir anahtar;
+Premiere izin veriyorsa Bezier ara değerleme). Tanıtım kartı artık "Eğriyi ve yaylanmayı düzenlemek, önizlemek ve geri almak
+ücretsiz" diyor. `js/app.js` › `YENILIKLER`'e "Eğri: Varışta yaylan" maddesi (`sekme: "egri"`) 3.4 yayınında eklenebilir; bu adımda
+bilerek dokunulmadı.
+
+**14.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
+`Kaynak: Rebound (MIT) overshoot.js — adım 9'da js/ease-curve.js'e atıflı uyarlandı (dampedSine, extremaTimes, autoDuration,
+followThroughAnchors); varışlar, plan, host yazımı ve arayüz Suflo'nun (temiz oda), yeni bildirim gerekmez.`
+İnceleme düzeltme commit'i bu satırı zaten taşıyor (adım 14'ün ilk beş commit'inde yoktu; geçmiş yeniden yazılmadı). Squash-merge
+yapmazsan da PR açıklamasına ekle.
+
+**14.7 İnceleme kararlarını onayla (5 dk, karar).** Adım 14 incelemesinden sonra davranış:
+(a) **Kapsam:** yalnız Hareket › Konum, Ölçek (ve Ölçek genişliği), Döndürme ve Opaklık yaylanır (plan adımı 14 (4)). Efekt
+parametreleri (Bulanıklık, Kırpma %…), Bağlantı noktası ve Titreme önleme satırı Varışta yaylan için seçilmez (Eğri için seçilir).
+İngilizce / Türkçe olmayan Premiere'de Hareket parametreleri Premiere'in sabit sırasıyla tanınır (Konum 0, Ölçek 1, Ölçek genişliği 2,
+Döndürme 4); bu sıra bir sürümde değişirse `js/egri-model.js` › `YAYLAN_HAREKET_SIRA`.
+(b) **Sınırlar:** Opaklık (0–100) ve Ölçek (≥ 0) aşımı kırpılmaz, sınıra sığacak kadar küçültülür (ilk tepe sınıra değer). Aşım
+ayarın %10'undan küçülecekse (iniş sınırda: 0'a sönen / 100'e dolan Opaklık, 0'a küçülen Ölçek) yazılmaz: "iniş değeri sınırda".
+Önceden 100'e dolan opaklık kırpılıp "yalnız aşağı salınım" yazılıyordu; 0'a sönen klip yeniden görünüyordu. Eşik
+`js/ease-curve.js` › `YAYLAN.EN_AZ_ORAN`.
+(c) **Tüm varışlar ve süren hareket:** hareketin aynı yönde, varış hızının en az dörtte biriyle sürdüğü ara anahtarda o boyut
+yaylanmaz (köşede yalnız duran boyut); hiçbir boyut kalmazsa anahtar sessizce geçilir. Tek varışta (playhead'in çifti) kullanıcı
+seçtiği için yine yazılır. Oran `js/egri-model.js` › `DEVAM_ORAN` (0,25).
+(d) **Son anahtar tam iniş değerinde:** sönümlü sinüsün pencere sonundaki kalıntısı (%0,5 civarı) yazılmaz; iniş son anahtarsa
+özellik senin değerinde oturur.
+(e) **Eğri yaylanmanın içindeyse** (iki yaylanma anahtarı arasına Eğri) yaylanma yeniden uygulanmaz; önce o Eğri geri alınır.
+Tümünü geri al Eğri kayıtlarını yaylanmalardan önce geri alır.
+(f) **40'tan çok varış** (Tüm varışlar) aynı klibin birkaç KS_easeBake çağrısına bölünür (çağrı başına en çok 40 öğe).
+Farklı istersen söyle.
+
+**14.8 İkinci inceleme kararlarını onayla (5 dk, karar).**
+(a) **Tek varışta iniş kullanıcının anahtarlarından:** Varışta yaylan, Suflo'nun yaylanma anahtarlarını saymadan playhead'i saran
+çiftin ikinci anahtarına yazar. Önceden playhead bir yaylanmanın içindeyken o yaylanma yeniden yazılıyordu; yaylanma sonraki
+anahtarda kısaldıysa (iniş → sonraki anahtar oturma süresinden kısa) o sonraki anahtar tek varışta hiç seçilemiyordu. Artık bir
+yaylanmayı yeniden ayarlamak için playhead o inişe gelen aralıkta olur (Eğri'nin çift kuralıyla aynı); yalnız son anahtarın
+yaylanmasında (sonrasında çift yok) playhead yaylanmanın içindeyken de o iniş yeniden yazılır. Satır rozeti ve satırın Geri al'ı
+playhead yaylanmanın içindeyken o yaylanmayı göstermeyi sürdürür.
+(b) **400'den çok anahtarlı satırda Tüm varışlar yazmaz:** tarama böyle bir özellikte yalnız playhead çevresindeki 400 anahtarı
+verir; pencerenin kenarındaki yaylanmalar tanınmadığı için tepeleri iniş sanılıp Suflo'nun kendi anahtarları arasına yaylanma
+yazılıyordu, pencere dışındaki inişler de sessizce eski ayarda kalıyordu. Artık satır "400'den çok anahtar kare var; Tüm varışlar'ı
+kapatıp varışlara tek tek uygula" nedeniyle atlanır; tek varış çalışır. İleride gerekirse host değer istenen satırın tüm anahtarlarını
+(bir okuma bütçesiyle) döndürebilir; bu adımda yapılmadı (40 × 400 değer okuması zaten Uygula'nın üst sınırı).
+(c) **Geri al kayıtlarının yeri:** Eğri ve yaylanma kayıtları proje başına ortak en çok 300 (adım 11'in sınıf sınırı); fazlası en
+eskilerden atılır. Tüm varışlar sınırsız sayıda varış yazabildiği için tek uygulama önceki tüm eğrilerin Geri al'ını sessizce
+silebiliyordu. Artık Tüm varışlar boş yerden çok kayıt yazacaksa önce sorulur (İptal: hiçbir şey yazılmaz, hak düşmez); her
+uygulamada (Eğri dahil) yer açmak için eski kayıt atıldıysa sarı bildirim söyler. Tek varış Eğri gibi bir uygulamada en çok 40 kayıt
+yazar ve sormaz. Sınırı büyütmek istersen `js/key-records.js` › `PROJE_SINIR` (localStorage boyut sınırları da var).
+Farklı istersen söyle.
+
+### Adım 15: Eğri paylaşım kodları ve içe / dışa aktarma (paylaşmak ücretsiz; uygulamak her aracın kendi kapısından)
+
+Ne değişti: Eğri sekmesinde **Paylaş ve içe aktar** kartı (Kodu kopyala, kod kutusu + Yükle, İçe aktar… / Dışa aktar…), kendi
+önayarlarını yeniden adlandırma ve sürükleyerek (ya da ◀ ▶ ile) sıralama; Hız Rampası › Özel eğri'de aynısı (kod kutusu, Kodu
+kopyala, İçe / Dışa aktar, kayıtlı rampayı Adı değiştir, çipleri sürükle); Geçiş / Zoom / Hareket'in Eğri seçicisinde "kod ya da
+cubic-bezier yapıştır" kutusu. Kod: `SFC1.` + base64url(JSON) — `{ v: 1, tur: 'egri', ad, curve }` ya da `{ v: 1, tur: 'hiz', ad,
+keys: [[t, %]], hit }`; bağlantı `https://suflo.app/egri#KOD` (`/en/egri`). Dosya: `.suflo-egri` = `{ suflo: 'egri', v: 1, presets:
+[{ ad, tur, curve | keys, hit? }] }`, en çok 64 KB / 32 önayar, BOM atılır, ad 40 karakter (denetim ve görünmez yön karakterleri
+atılır), eğri başına 8 nokta, sonlu olmayan sayı reddedilir, aralık dışı kırpılır, aynı ad + eğri ikinci kez alınmaz. Çekirdek
+`js/ease-curve.js` (SufloEase: paylasimKodla / paylasimCoz / iceAktar / dosyaOku / dosyaYaz / cssCoz), liste işlemleri
+`js/egri-model.js` ve `js/speedramp.js`, panel `js/egri.js` (SufloEgriPaylas: pano, `window.cep.fs` pencereleri, dağıtım) ve
+`js/hiz-rampasi.js`. Site: `docs/egri.html`, `docs/en/egri.html`, `docs/js/egri-sayfa.js` ve panelin bayt bayt kopyası
+`docs/js/ease-curve.js` (test denetler). Panel dosya listesi değişmedi (yeni runtime dosyası yok; paketleme aynı).
+
+**15.1 Fiyat (bilgi).** Senin kuralın: "free to create/share codes; applying goes through the Pro 'curves' gate". Kod oluşturmak,
+kopyalamak, yapıştırmak, içe / dışa aktarmak, önayarı adlandırmak ve sıralamak **ücretsiz** ve kapısız (deneme hakkı düşmez).
+Uygulamak değişmedi: Eğri sekmesinde içe aktarılan eğri `Pro.gate('curves')` (3 deneme hakkı) ile yazılır. İki yorum, farklı
+istersen söyle: (a) içe aktarılan bir **Hız Rampası** eğrisi Hız Rampası'nın kendi kapısından (`'speedramp'`, adım 13'ün kuralı)
+uygulanır, ikinci bir 'curves' kapısı eklenmedi; (b) Geçiş / Zoom / Hareket seçicisine yapıştırılan eğri o aracın kapısından geçer
+(adım 12'nin kuralı). `js/deneme.js`'e yeni anahtar eklenmedi.
+
+**15.2 Dış eğri aracının dışa aktarma dosyasını dene (10 dk, önemli).** Plan, OpenCurve'ün dışa aktarma dosyasının yalnız JSON
+biçimini (`{ opencurve: 1, presets: [{ name, curve }] }`) okumamızı söylüyor; temiz oda kuralı yüzünden o araç **hiç açılmadı**.
+İlk sürüm `curve` alanının içini tahminle okuyordu ve gerçek dosyadaki şekilleri tanımıyordu. Adım 15 incelemesinde bir bulgu
+gerçek biçimin **alan adlarını** bildirdi (kod değil): `curve` bir nesnedir, `{ p1x, p1y, p2x, p2y }` (p1 = (0,0)'ın çıkış, p2 =
+(1,1)'in giriş tutamacı, mutlak); çok noktalı eğride ek olarak `pts` yalnız **iç** çapaları `{ x, y, ix, iy, ox, oy, smooth }`
+(mutlak tutamaçlar) tutar, uçlar örtüktür. Okuyucu bu tanımdan, o aracın kodu açılmadan düzeltildi: tek kübik
+`cubic-bezier(p1x, p1y, p2x, p2y)` olur, iç çapalı eğri (0,0) + iç çapalar + (1,1) olarak (en çok 6 iç çapa = 8 nokta; fazlası
+"geçersiz önayar atlandı" sayılır) gelir. İlk sürümün tahmin ettiği şekiller (`"cubic-bezier(a,b,c,d)"`, `[x1,y1,x2,y2]`,
+`{x1,y1,x2,y2}`, uçları da içeren nokta dizileri) zararsız olduğu için okunmaya devam eder; gerisi "tanınmayan eğri" uyarısıyla
+atlanır. (Not: bulgu biçimi o aracın dışa aktarma kodunun çıktısına bakarak doğruladığını söylüyor; plan dosya biçimini okumaya
+izin veriyor, Suflo'ya o koddan hiçbir şey alınmadı.) Elinde o araçla yapılmış gerçek bir dışa aktarma dosyası varsa (kendi bilgisayarında,
+aracı kodunu açmadan yalnız kullanarak) Suflo'da **İçe aktar…** ile dene (deneme listesi **15.8**): şekiller aynı görünüyor mu,
+kaç tanesi atlandı? Tutamaçlar göreli çıkarsa ya da başka bir alan adı kullanılıyorsa bana yalnız **dosyanın biçimini** (bir örnek
+dosya) gönder; okuyucu `js/ease-curve.js`'teki işaretli "DIŞ BİÇİM OKUYUCUSU" bölümünde, tek yerde güncellenir. O aracın adı depoda
+yalnız o bölümde geçer (test denetler); panel ve site metinleri "bir eğri aracının JSON dışa aktarması" der.
+
+**15.3 suflo.app/egri sayfasını yayınla (3.4 yayınında, 2 dk).** Panelin Kodu kopyala'sı `https://suflo.app/egri#KOD` (İngilizce
+arayüzde `/en/egri`) bağlantısı üretir; `docs/egri.html` ve `docs/en/egri.html` 3.4 ile birlikte yayınlanmalı (site haritasına
+eklendi). Sayfa kodu tarayıcıda, panelin kopyası `docs/js/ease-curve.js` ile çözer; sunucuya bir şey gitmez (CSP `connect-src
+'none'`). Yayından sonra deneme listesi **15.13**. Ana sayfaya ya da blog'a bağlantı bu adımda eklenmedi (isteğe bağlı).
+
+**15.4 Premiere'de dene (20–30 dk).** `marketing/v3.4-deneme-listesi.md` › `## 15`. Özellikle **15.2** (kopyala → yükle, pano),
+**15.6 / 15.7** (Windows ve macOS'ta kaydetme / açma pencereleri, uzantısız ad, 64 KB, BOM), **15.11** (sürükle-bırak CEF 74'te) ve
+**15.4** (seçicide Enter / Esc Premiere'e gitmez). Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de.
+
+**15.5 Tasarım kararlarını onayla (5 dk, karar).**
+(a) **Tek kod düzenleyiciye, birden çok kod önayarlara:** tek eğri kodu yüklenince önayar olarak kendiliğinden kaydedilmez (Önayar
+olarak kaydet kodun adını kullanır); dosya ya da alt alta birkaç kod doğrudan önayarlara eklenir. Hız Rampası kodu Eğri sekmesine
+yapıştırılırsa Hız Rampası'nın kayıtlı rampalarına eklenir; eğri kodu Hız Rampası'na yapıştırılırsa yönlendirme metni çıkar.
+(b) **Dışa aktarma her sekmenin kendi listesi:** Eğri'nin dosyası yalnız eğri önayarlarını (en çok 24), Hız Rampası'nınki yalnız
+kayıtlı rampaları (en çok 12) taşır; ikisi birlikte 32 önayar sınırını aşabileceği için tek dosyada birleştirilmedi. İçe aktarma
+her dosyayı türüne göre dağıtır.
+(c) **Ad çakışması:** içe aktarılan önayar aynı ad + aynı eğriyse atlanır; aynı ad başka eğriyse "Ad (2)" olarak eklenir (Hız
+Rampası'nın Kaydet'i adla üzerine yazdığı için içe aktarma hiçbir kaydın üstüne yazmaz).
+(d) **cubic-bezier yapıştırma:** düz `cubic-bezier()`, onu içeren CSS bildirimi, yalın dört sayı ve `ease` / `linear` / `ease-in` /
+`ease-out` / `ease-in-out` kabul edilir; x 0–1 dışı reddedilir, y -1–2'ye kırpılır ve kullanıcıya söylenir. Elle yazılan
+`cubic-bezier()` alanının eski sıkı kuralı (`fromCss`) API'de duruyor.
+(e) **Paylaşım sayfası:** plan suflo.app/egri'yi isteğe bağlı sayıyordu; Kodu kopyala'nın bağlantısı boş bir sayfaya gitmesin
+diye yapıldı (stil sayfasının düzeniyle, panelin çözücüsüyle).
+Farklı istersen söyle.
+
+**15.7 İnceleme düzeltmeleri (bilgi, 2 dk).** (a) **Birden çok kod:** kod kutusu artık birkaç satırlık (textarea; Enter yükler,
+Shift+Enter alt satır) ve 64 KB'a kadar dosya metnini kesmez. Yapıştırılan metin her `SFC1.` başından bölünür: alt alta, boşlukla ya
+da bitişik kodlar ve bağlantılar ayrılır; "Kodu kopyala"nın kod + bağlantı çifti tek kod sayılır. Önceden son satır bağlantıysa
+yalnız sonuncusu alınıyordu. Tek kod bekleyen yerler (cubic-bezier alanı, Geçiş / Zoom / Hareket seçicisi) iki farklı koda "Birden
+çok farklı kod var…" der, birini sessizce seçmez; cubic-bezier alanı adlı çok noktalı kodları kesmesin diye 4096 karakter alır.
+(b) **Hız Rampası ad kutusu:** düzenleyiciye başka eğri gelince (Düzenle, Sıfırla, Geri al, kod) seçili kayıt bırakılır ve kutudaki
+o kaydın adı silinir; koddan gelen ad başka bir kaydınsa "Ad (2)" önerilir. Kaydet böylece kullanıcının bir rampasının üstüne başka
+eğri yazmaz (elle aynı adı yazarsan yine günceller, adım 13'ün kuralı). (c) **Dışa aktar:** uzantı pencereden sonra eklenince aynı
+adlı dosya varsa üzerine yazmadan önce sorulur. (d) **Lisans:** `js/ease-curve.js`'in başında Rebound'un MIT lisansı artık tam metniyle;
+suflo.app'teki bayt bayt kopyası (THIRD_PARTY_NOTICES.md sitede yok) bildirimi kendisi taşır. (e) README'deki dış aracın adı
+kaldırıldı ("yalnız dosya biçimi okunur"); test README'yi de tarar. Deneme listesi **15.15**.
+
+**15.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
+`Kaynak: adım 15 temiz oda — paylaşım kodu, .suflo-egri dosyası, cubic-bezier yapıştırma ve arayüz Suflo'nun; OpenCurve açılmadı,
+yalnız planın tanımladığı dışa aktarma dosya biçimi okunur (kod / tablo / sözdizimi / arayüz alınmadı), bildirim gerekmez; Rebound
+kodu eklenmedi (docs/js/ease-curve.js panelin kopyası, THIRD_PARTY_NOTICES Rebound girdisinde).`
+
 ### Adım 19: Kurumsal ağ dayanıklılığı ve çevrimdışı model içe aktarma (ücretsiz)
 
 Ne değişti: Ayarlar › Motor'da **Model dosyası içe aktar** (`js/model-ice-aktar.js` + `KEngine.modelIceAktar`), indirmede
@@ -1786,13 +2205,11 @@ Claude Desktop + Claude Code ile `initialize` → `tools/list` → `tools/call` 
 **MCP.4 Güvenlik sayfası yayını.** `docs/mcp-guvenlik.html` panelde `https://suflo.app/mcp-guvenlik` olarak açılır. Site
 yayınlandığında adresin çalıştığını doğrula; istersen `docs/sitemap.xml`'e ekle ve İngilizce kopyasını `docs/en/` altına koy.
 
-**MCP.5 Kapsam notu (dallar birleşince zorunlu).** Plan adım 22'deki `suflo_egri_uygula` (adım 10, eğri pişirme) bu dalda yok,
-çünkü adım 10 (`yerel-34-egri`) henüz `yerel-34-mcp` dalına gelmedi. `tests/test-otomasyon.js` bunu unutturmaz: `js/egri.js`
-depoda varken `suflo_egri_uygula` listede değilse test KALIR. Birleşince yapılacaklar: `js/otomasyon.js` › EYLEMLER'e
-`{ ad: "suflo_egri_uygula", sinif: "yaz", pro: <adım 10'un toplu pişirme kapısı ya da null> }` (EN açıklama, gerekirse şema),
-`TR_AD` + `i18n/en.js` adı, `js/otomasyon-panel.js` › YURUT'a Eğri sekmesindeki "Pişir" düğmesinin çağırdığı AYNI işlevi çağıran
-yürütücü (sonuç nesnesi `{ ok, hata, mesaj }`), `tests/test-otomasyon.js` › BEKLENEN.yaz'a ad, README ve `docs/mcp-guvenlik.html`
-eylem tablolarına satır, deneme listesine bir madde.
+**MCP.5 Kapsam notu (yapıldı).** Plan adım 22'deki `suflo_egri_uygula` (adım 10, eğri pişirme) `yerel-34-egri` birleşirken
+eklendi: `js/otomasyon.js` › EYLEMLER (`sinif: "yaz"`, `pro: "curves"`), `TR_AD` ("Eğri uygula", sözlükte vardı),
+`js/otomasyon-panel.js` › YURUT (Eğri sekmesinin Uygula düğmesinin çağırdığı aynı `KEgri.uygula`; artık açık sonuç
+`{ ok, hata, mesaj }` döner), `tests/test-otomasyon.js` › BEKLENEN.yaz, `tests/test-otomasyon-panel.js`, README ve
+`docs/mcp-guvenlik.html` eylem satırları, deneme listesi **22.33**.
 
 **MCP.6 İsteğe bağlı: MCPB paketi.** Claude Desktop'un yerleşik Node'uyla çalışan tek tık kurulum (`.mcpb`) sonraya kaldı;
 biçimi önce doğrula. Şimdilik kullanıcıda Node 18+ gerekir (kart denetler ve ipucu verir).

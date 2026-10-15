@@ -28,7 +28,7 @@ function ok(ad, kosul, kanit) {
 var DOSYALAR = ["js/app.js", "js/captions.js", "js/engine.js", "js/bridge.js",
                 "js/library.js", "js/presets.js", "js/sfx.js", "js/emoji-assets.js", "js/library-health.js", "js/pro-sync.js",
                 "js/onboarding.js", "js/viral.js", "js/davet.js", "js/bolumler.js", "js/konusma-kes.js",
-                "js/marka-kiti-ui.js", "js/kanca.js", "js/hiz-rampasi.js"];
+                "js/marka-kiti-ui.js", "js/kanca.js", "js/hiz-rampasi.js", "js/egri.js"];
 
 /* ---------- 1) el("...") ile aranan her id markup'ta var mı ---------- */
 
@@ -386,6 +386,72 @@ ok("Hız Rampası: Ayarlar Pro listesinde", /<li>Sesi iyileştir · Otomatik zoo
 ok("Hız Rampası: Premiere çağrıları yalnız tıklamada (init'te K.call yok)", !/K\.call\(/.test(fnGovde(hizUi, "function init(")) && !/K\.call\(/.test(fnGovde(hizUi, "function render(")) &&
   !/K\.call\(/.test(fnGovde(hizUi, "function refresh(")) && !/K\.call\(/.test(fnGovde(hizUi, "function onizlemeCiz(")));
 ok("Hız Rampası: Ctrl+Z uyarısı ve kaldırma düğmesi arayüzde", /Ctrl\+Z rampayı tek adımda geri almaz/.test(html) && /id="hiz-kaldir"[^>]*>Rampayı kaldır</.test(html));
+/* ---------- 3.4 adım 13: Hız Rampası için Özel eğri editörü ---------- */
+["hiz-ozel", "hiz-ozel-editor", "hiz-ozel-hit", "hiz-ozel-basamak", "hiz-ozel-sil", "hiz-ozel-sifirla", "hiz-ozel-ad", "hiz-ozel-kaydet", "hiz-ozel-kayitlar"].forEach(function (id) {
+  ok("Özel eğri: #" + id + " var", !!idler[id]);
+});
+var hizBolum = html.slice(html.indexOf('id="tab-hiz"'), html.indexOf("</section>", html.indexOf('id="tab-hiz"')));
+var egriOzelSrc = fs.readFileSync(KOKYOL + "js/egri.js", "utf8").replace(/\r\n/g, "\n"), cssOzel = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
+ok("Özel eğri: kutu Hız Rampası sekmesinde, kart ızgarasından sonra ve önizlemeden önce, gizli başlar", hizBolum.indexOf('id="hiz-ozel"') > hizBolum.indexOf('id="hiz-grid"') &&
+  hizBolum.indexOf('id="hiz-ozel"') < hizBolum.indexOf('id="hiz-onizleme"') && /<div id="hiz-ozel" class="hiz-ozel" hidden>/.test(hizBolum));
+ok("Özel eğri: düzenleyicinin aria-label'ı SVG'nin dışında (kutuda), odaklanabilir; Sert basamak / Noktayı sil seçimsiz kapalı",
+  /<div id="hiz-ozel-editor" class="egri-editor hiz-ozel-editor" tabindex="0" role="img" aria-label="Özel hız eğrisi düzenleyicisi"><\/div>/.test(hizBolum) &&
+  /id="hiz-ozel-basamak"[^>]*disabled>Sert basamak</.test(hizBolum) && /id="hiz-ozel-sil"[^>]*disabled>Noktayı sil</.test(hizBolum) &&
+  /<input id="hiz-ozel-ad" type="text" maxlength="40"/.test(hizBolum));
+ok("Özel eğri: ipucu tıkla / sürükle / çift tık / Shift / Alt'ı anlatır", /Tıkla: nokta ekle · sürükle: taşı · çift tık: sil · Shift: ızgaraya yapış · Alt\+tık: sert basamak\./.test(hizBolum));
+ok("Özel eğri: hiz-rampasi.js düzenleyiciyi SufloEgriEditor 'hiz' moduyla kurar; egri.js 'hiz' modunu SufloSpeedRamp.ozel ile çizer",
+  /ED\.olustur\(kap, \{ mod: "hiz",/.test(hizUi) && /if \(opts\.mod === "hiz"\) return hizOlustur\(kap, opts\);/.test(egriOzelSrc) && /Z = SR\.ozel/.test(egriOzelSrc));
+ok("Özel eğri: kapı ve deneme değişmedi (yalnız 'speedramp')", (hizUi.match(/Pro\.gate\(/g) || []).length === 1 && /Pro\.gate\("speedramp"/.test(hizUi) &&
+  (hizUi.match(/Pro\.denemeHarca\(/g) || []).length === 1 && /Pro\.denemeHarca\("speedramp"/.test(hizUi));
+ok("Özel eğri: düzenleme, Düzenle ve kayıtlar Premiere'e gitmez", ["function ozelKur(", "function ozelDegisti(", "function ozelAta(", "function duzenle(", "function ozelKayitKaydet(", "function kartlar("].every(function (f) {
+  var g = fnGovde(hizUi, f); return g.length > 20 && !/K\.call\(/.test(g);
+}));
+ok("Özel eğri: CSS (kart Düzenle, kutu, çipler) ve CEF 74'te olmayan flex gap / :focus-visible yok", /\.hiz-duzenle \{/.test(cssOzel) && /\.hiz-ozel \{/.test(cssOzel) && /\.hiz-ozel-kayit \{/.test(cssOzel) &&
+  !/\.hiz-(ozel|duzenle)[^{]*\{[^}]*\bgap:/.test(cssOzel) && !/\.hiz-(ozel|duzenle)[^{]*:focus-visible/.test(cssOzel));
+/* ---------- Eğri (3.4 adım 10) ---------- */
+var egriUi = fs.readFileSync(KOKYOL + "js/egri.js", "utf8").replace(/\r\n/g, "\n");
+ok("Eğri: kenar çubuğunda Hız Rampası'ndan sonra, Kanca Başlığı'ndan önce; YENİ ve PRO rozetli, sayaçsız",
+  html.indexOf('data-tab="egri"') > html.indexOf('data-tab="hiz"') && html.indexOf('data-tab="egri"') < html.indexOf('data-tab="kanca"') &&
+  /data-tab="egri">[\s\S]{0,400}<b>Eğri <em class="ky-yeni">YENİ<\/em><\/b><i>anahtar kare yumuşatma<\/i>[\s\S]{0,80}data-kilit>PRO/.test(html) &&
+  !/ky-adet/.test(html.slice(html.indexOf('data-tab="egri"'), html.indexOf('data-tab="kanca"'))));
+["tab-egri", "egri-tanitim", "egri-gorunum-deger", "egri-gorunum-hiz", "egri-editor", "egri-sahne", "egri-kare", "egri-css", "egri-p1x", "egri-p1y", "egri-p2x",
+  "egri-p2y", "egri-cevir", "egri-ters", "egri-kaydet", "egri-onayarlar", "egri-yenile", "egri-sonraki", "egri-hedef", "egri-ozellikler", "egri-yogunluk",
+  "egri-pr-onizle", "egri-geri-tumu", "egri-uygula", "egri-status"].forEach(function (id) {
+  ok("Eğri: #" + id + " var", !!idler[id]);
+});
+ok("Eğri: sekme Hız Rampası'ndan sonra, Kanca'dan önce", html.indexOf('id="tab-egri"') > html.indexOf('id="tab-hiz"') && html.indexOf('id="tab-egri"') < html.indexOf('id="tab-kanca"'));
+ok("Eğri: betik sırası ease-curve.js → key-records.js → egri-model.js → egri.js → app.js", betikSira("ease-curve.js") > 0 &&
+  betikSira("ease-curve.js") < betikSira("key-records.js") && betikSira("key-records.js") < betikSira("egri-model.js") &&
+  betikSira("egri-model.js") < betikSira("egri.js") && betikSira("egri.js") < betikSira("app.js"));
+ok("Eğri: yoğunluk 1 / 2 / 4 kare (varsayılan her kare)", /<select id="egri-yogunluk">\s*<option value="1" selected>Her kare<\/option>\s*<option value="2">2 karede bir<\/option>\s*<option value="4">4 karede bir<\/option>/.test(html));
+ok("Eğri: app.js başlatır, yan menüyü kilitler, tanıtımı Pro'da gizler; Pro etiketi ve tanıtım düğmesi 'curves'", /KEgri\.init\(\)/.test(appSrc) &&
+  /Pro\.markLocked\(document\.querySelector\('\.ky-oge\[data-tab="egri"\]'\), !s\.pro\)/.test(appSrc) && /"egri-tanitim"/.test(appSrc) &&
+  /curves:\s+'Eğri: kendi anahtar karelerine özel yumuşatma ve varışta yaylanma'/.test(proSrc) && /data-pro-feature="curves">Eğriyi aç — 749 TL</.test(html));
+ok("Eğri: Ayarlar Pro listesinde (varışta yaylanma dahil)", /<li>Eğri: anahtar karelerine özel yumuşatma ve varışta yaylanma \(düzenlemek ücretsiz\)<\/li>/.test(html));
+ok("Eğri: init / render / listeCiz Premiere'e gitmez", ["function init(", "function render(", "function listeCiz(", "function onayarKartlari("].every(function (f) {
+  var g = fnGovde(egriUi, f); return g.length > 20 && !/K\.call\(/.test(g);
+}));
+ok("Eğri: Ctrl+Z uyarısı, yalnız video katmanları notu ve 'Bezier tutamacı yazamaz' açıklaması arayüzde", /Ctrl\+Z eğriyi tek adımda geri almaz/.test(html) &&
+  /Şimdilik yalnız video katmanları/.test(html) && /Bezier tutamaçlarını yazamadığı için/.test(html));
+ok("Eğri: SufloEgriEditor dışa açık (Hız Rampası özel eğrisi yeniden kullanır)", /^window\.SufloEgriEditor = \(function \(\) \{/m.test(egriUi) && /return \{ olustur: olustur/.test(egriUi));
+/* ---------- Varışta yaylan (3.4 adım 14): Eğri sekmesinde kart ---------- */
+["egri-yaylan", "egri-yaylan-grafik", "egri-yaylan-hedef", "egri-yaylan-varis", "egri-yaylan-yol", "egri-yaylan-genlik", "egri-yaylan-genlik-deger", "egri-yaylan-frekans",
+  "egri-yaylan-frekans-deger", "egri-yaylan-sonum", "egri-yaylan-sonum-deger", "egri-yaylan-tum", "egri-yaylan-sure", "egri-yaylan-uygula"].forEach(function (id) {
+  ok("Varışta yaylan: #" + id + " var", !!idler[id]);
+});
+var yaylanBolum = html.slice(html.indexOf('id="egri-yaylan"'), html.indexOf('id="egri-status"'));
+ok("Varışta yaylan: kart Eğri sekmesinde, Uygula satırından sonra ve durum satırından önce", html.indexOf('id="egri-yaylan"') > html.indexOf('id="egri-uygula"') &&
+  html.indexOf('id="egri-yaylan"') < html.indexOf('id="egri-status"') && html.indexOf('id="egri-yaylan"') > html.indexOf('id="tab-egri"') && html.indexOf('id="egri-yaylan"') < html.indexOf('id="tab-kanca"'));
+ok("Varışta yaylan: kaydırıcı sınırları plandaki gibi (genlik 0,02–0,5 sn, frekans 1–6 Hz, sönüm 2–10), Tüm varışlar kutusu",
+  /<input id="egri-yaylan-genlik" type="range" min="0\.02" max="0\.5" step="0\.01" value="0\.1">/.test(yaylanBolum) &&
+  /<input id="egri-yaylan-frekans" type="range" min="1" max="6" step="0\.5" value="3">/.test(yaylanBolum) &&
+  /<input id="egri-yaylan-sonum" type="range" min="2" max="10" step="1" value="6">/.test(yaylanBolum) && /<input id="egri-yaylan-tum" type="checkbox"> Tüm varışlar/.test(yaylanBolum));
+ok("Varışta yaylan: önizleme SVG'si ekran okuyucuya gizli; düğmenin ipucu Pro olduğunu söyler", /<svg id="egri-yaylan-grafik"[^>]*aria-hidden="true"/.test(yaylanBolum) &&
+  /id="egri-yaylan-uygula"[^>]*title="[^"]*Pro;/.test(yaylanBolum));
+ok("Varışta yaylan: yaylanUygula 'curves' kapısından; init / yaylanCiz Premiere'e gitmez", /function yaylanUygula\(\) \{\n    if \(typeof Pro !== "undefined" && !Pro\.gate\("curves"/.test(egriUi) &&
+  ["function yaylanCiz(", "function yaylanDegisti(", "function yaylanYukle("].every(function (f) { var g = fnGovde(egriUi, f); return g.length > 20 && !/K\.call\(/.test(g); }));
+ok("Varışta yaylan: CSS kartı (CEF 74: flex gap yok)", /\.egri-yaylan \{/.test(cssOzel) && /\.egri-yaylan-yol \{/.test(cssOzel) &&
+  !/\.egri-yaylan[^{]*\{[^}]*\bgap\s*:/.test(cssOzel));
 /* ---------- Ses etiketi filtresi + sessiz ses uyarısı (3.2 adım 2) ---------- */
 ["grp-altyazi", "set-ses-etiket", "cap-sessiz", "cap-sessiz-metin", "cap-sessiz-devam", "cap-sessiz-vazgec",
   "tc-sessiz", "tc-sessiz-metin", "tc-sessiz-devam", "tc-sessiz-vazgec"].forEach(function (id) {
@@ -409,6 +475,68 @@ ok("Sessiz ses: uyarı kutuları durum satırının hemen altında, gizli başla
   /id="cap-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="cap-sessiz-vazgec"[^>]*>Vazgeç</.test(html) &&
   /id="tc-sessiz-devam"[^>]*>Yine de devam et</.test(html) && /id="tc-sessiz-vazgec"[^>]*>Vazgeç</.test(html));
 ok("Sessiz ses: betik sırası caption-text.js → sessiz-ses.js → captions.js", betikSira("sessiz-ses.js") > betikSira("caption-text.js") && betikSira("sessiz-ses.js") < betikSira("captions.js"));
+// 3.4 adım 9: yumuşatma motoru ve kayıtlar, onları kullanacak araçlardan (Geçiş, Zoom, Hareket, Hız Rampası) önce
+ok("Yumuşatma motoru: betik sırası ease-curve.js → key-records.js → transitions/speedramp/zoom/presets → app.js", betikSira("ease-curve.js") > 0 &&
+  betikSira("ease-curve.js") < betikSira("key-records.js") && betikSira("key-records.js") < betikSira("transitions.js") &&
+  betikSira("key-records.js") < betikSira("speedramp.js") && betikSira("key-records.js") < betikSira("zoom.js") &&
+  betikSira("key-records.js") < betikSira("presets.js") && betikSira("key-records.js") < betikSira("app.js"));
+(function () {
+  // saf modüller: yüklenince yalnız window.SufloEase / SufloKeyRecords tanımlar; Premiere, ağ, DOM, depo erişimi yok
+  var vm = require("vm"), erisim = [];
+  var pencere = {};
+  ["localStorage", "document", "CSInterface", "fetch", "XMLHttpRequest"].forEach(function (ad) {
+    Object.defineProperty(pencere, ad, { get: function () { erisim.push(ad); return undefined; } });
+  });
+  var ctx = vm.createContext({ window: pencere, JSON: JSON, Math: Math, Date: Date, Object: Object, Array: Array, String: String, Number: Number, isFinite: isFinite, isNaN: isNaN, Error: Error, RegExp: RegExp });
+  ["ease-curve.js", "key-records.js"].forEach(function (f) { vm.runInContext(fs.readFileSync(KOKYOL + "js/" + f, "utf8"), ctx); });
+  ok("Yumuşatma motoru: yüklenirken yalnız global tanımlar (localStorage/DOM/Premiere/ağ erişimi yok)", typeof pencere.SufloEase === "object" &&
+    typeof pencere.SufloKeyRecords === "object" && typeof pencere.SufloEase.bakePlan === "function" && erisim.length === 0, erisim.join(","));
+})();
+/* ---------- 3.4 adım 12: Geçiş, Zoom ve Hareket önayarlarında özel eğri ---------- */
+ok("Özel eğri: betik sırası ease-curve.js → egri-secim.js → transitions/zoom/presets → egri.js → app.js", betikSira("egri-secim.js") > betikSira("ease-curve.js") &&
+  betikSira("egri-secim.js") < betikSira("transitions.js") && betikSira("egri-secim.js") < betikSira("zoom.js") && betikSira("egri-secim.js") < betikSira("presets.js") &&
+  betikSira("egri-secim.js") < betikSira("egri.js") && betikSira("egri.js") < betikSira("app.js"));
+[["gecis-egri", "tab-gecis", "gecis-grid"], ["zoom-egri", "tab-zoom", "zoom-run"], ["preset-egri", "tab-presets", "preset-grid"]].forEach(function (x) {
+  var i = html.indexOf('id="' + x[0] + '"');
+  ok("Özel eğri: #" + x[0] + " " + x[1] + " içinde, uygulama düğmelerinden önce, açıklamasıyla", !!idler[x[0]] && i > html.indexOf('id="' + x[1] + '"') &&
+    i < html.indexOf('id="' + x[2] + '"') && new RegExp('<div class="egri-secici" id="' + x[0] + '">\\s*<p class="hint egri-secici-not">[^<]{40,}</p>\\s*</div>').test(html));
+});
+(function () {
+  // saf modül: yüklenince yalnız window.SufloEgriSecim tanımlar (localStorage / DOM / Premiere / ağ yok)
+  var vm = require("vm"), erisim = [];
+  var pencere = {};
+  ["localStorage", "document", "CSInterface", "fetch", "XMLHttpRequest"].forEach(function (ad) {
+    Object.defineProperty(pencere, ad, { get: function () { erisim.push(ad); return undefined; } });
+  });
+  var ctx = vm.createContext({ window: pencere, JSON: JSON, Math: Math, Date: Date, Object: Object, Array: Array, String: String, Number: Number, isFinite: isFinite, isNaN: isNaN, Error: Error, RegExp: RegExp,
+    unescape: unescape, escape: escape, encodeURIComponent: encodeURIComponent, decodeURIComponent: decodeURIComponent });
+  ["ease-curve.js", "egri-secim.js"].forEach(function (f) { vm.runInContext(fs.readFileSync(KOKYOL + "js/" + f, "utf8"), ctx); });
+  ok("Özel eğri: egri-secim.js yüklenirken yalnız global tanımlar (localStorage/DOM/Premiere/ağ erişimi yok)", typeof pencere.SufloEgriSecim === "object" &&
+    typeof pencere.SufloEgriSecim.yogunlastir === "function" && pencere.SufloEgriSecim.coz("yumusak").ok && erisim.length === 0, erisim.join(","));
+})();
+ok("Özel eğri: kart ızgarası ve seçici egri.js'ten dışa açık (SufloEgriIzgara, SufloEgriSecici)", /^window\.SufloEgriIzgara = \(function \(\) \{/m.test(egriUi) &&
+  /^window\.SufloEgriSecici = \(function \(\) \{/m.test(egriUi));
+/* ---------- 3.4 adım 11: kayıt tabanlı güvenli kaldırma ---------- */
+ok("Kaldırma: betik sırası key-records.js → kayit-kaldir.js → gecisler/zoom/presets → app.js", betikSira("kayit-kaldir.js") > betikSira("key-records.js") &&
+  betikSira("kayit-kaldir.js") < betikSira("gecisler.js") && betikSira("kayit-kaldir.js") < betikSira("zoom.js") &&
+  betikSira("kayit-kaldir.js") < betikSira("presets.js") && betikSira("kayit-kaldir.js") < betikSira("app.js"));
+["gecis-kaldir", "preset-kaldir", "zoom-remove"].forEach(function (id) { ok("Kaldırma: #" + id + " var", !!idler[id]); });
+ok("Kaldırma: 'Geçişi kaldır' Geçişler sekmesinde, 'Önayarı kaldır' Hareket önayarlarında; ikisi de kilitsiz düğme",
+  html.indexOf('id="gecis-kaldir"') > html.indexOf('id="tab-gecis"') && html.indexOf('id="gecis-kaldir"') < html.indexOf('id="gecis-grid"') &&
+  html.indexOf('id="preset-kaldir"') > html.indexOf('id="tab-presets"') && html.indexOf('id="preset-kaldir"') < html.indexOf('id="preset-grid"') &&
+  /<button id="gecis-kaldir" class="btn outline" type="button">Geçişi kaldır<\/button>/.test(html) &&
+  /<button id="preset-kaldir" class="btn outline" type="button">Önayarı kaldır<\/button>/.test(html));
+(function () {
+  // Kaldırmak hiçbir zaman ücretli değil: kaldir() gövdelerinde Pro kapısı yok
+  var gs = fs.readFileSync(KOKYOL + "js/gecisler.js", "utf8"), zs = fs.readFileSync(KOKYOL + "js/zoom.js", "utf8"), ps = fs.readFileSync(KOKYOL + "js/presets.js", "utf8");
+  var govdeler = [fnGovde(gs, "async function kaldir("), fnGovde(zs, "async function kaldir("), fnGovde(ps, "async function kaldir(")];
+  ok("Kaldırma kapısız: üç aracın kaldir() gövdesinde Pro.gate / deneme hakkı yok, KS_removeSufloKeys modül üzerinden",
+    govdeler.every(function (g) { return g.length > 200 && !/Pro\.gate|denemeHarca/.test(g) && /\.akis\(/.test(g); }), govdeler.map(function (g) { return g.length; }).join(","));
+  ok("Kaldırma: eski yöntem (zoom ve geçiş) yalnız onayla — confirm arayüz dilinde",
+    /window\.confirm\(uiMetni\(soru\)\)/.test(govdeler[0]) && /window\.confirm\(uiMetni\(soru\)\)/.test(govdeler[1]) && !/KS_autoZoom/.test(govdeler[1].split("yedek:")[0]));
+  ok("Kaldırma: init / render Premiere'e gitmez (yalnız tıklamada)", !/K\.call\(/.test(fnGovde(gs, "function init(")) && !/K\.call\(/.test(fnGovde(gs, "function render(")) &&
+    !/K\.call\(/.test(fnGovde(zs, "function init(")) && !/K\.call\(/.test(fnGovde(ps, "function init(")));
+})();
 ok("Sessiz ses: panel açılışında ölçüm/Premiere çağrısı yok (yalnız Altyazı oluştur / Konuşmadan kes akışında)",
   !/sessizDenetim\(/.test(fnGovde(capSrc, "function init(")) && /\.sessiz-uyari\[hidden\] \{ display: none !important; \}/.test(fs.readFileSync(KOKYOL + "css/style.css", "utf8")));
 

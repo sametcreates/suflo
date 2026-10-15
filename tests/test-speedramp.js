@@ -25,12 +25,18 @@ function kaynakAn(p, x) {
 }
 
 /* ---------------- LIST ---------------- */
-var L = S.list();
-var idler = L.map(function (p) { return p.id; });
-ok("LIST: 11 önayar, benzersiz ASCII kimlikler", L.length === 11 && idler.every(function (id, i) { return /^[a-z]+$/.test(id) && idler.indexOf(id) === i; }), idler.join(","));
-ok("LIST dışa kopya: değiştirmek modülü bozmaz", (function () { var x = S.list(); x[0].keys[0][1] = 999; x.pop(); return S.list().length === 11 && S.list()[0].keys[0][1] === 100; })());
+var LT = S.list();
+var idler = LT.map(function (p) { return p.id; });
+ok("LIST: 12 önayar (11 hazır + Özel eğri), benzersiz ASCII kimlikler", LT.length === 12 && idler.every(function (id, i) { return /^[a-z]+$/.test(id) && idler.indexOf(id) === i; }), idler.join(","));
+ok("LIST dışa kopya: değiştirmek modülü bozmaz", (function () { var x = S.list(); x[0].keys[0][1] = 999; x.pop(); return S.list().length === 12 && S.list()[0].keys[0][1] === 100; })());
+ok("LIST: Özel eğri girdisi { id 'ozel', grup 'ozel', vuruş anı yok, anahtar yok } ve sonda", (function () {
+  var z = LT[LT.length - 1];
+  return z.id === "ozel" && z.name === "Özel eğri" && z.group === "ozel" && z.hit === null && z.keys.length === 0 && z.beats === false && S.has("ozel");
+})(), js(LT[LT.length - 1]));
 var enEksik = [];
-L.forEach(function (p) { [p.name, p.desc].forEach(function (s) { if (!EN.strings[s]) enEksik.push(s); }); });
+LT.forEach(function (p) { [p.name, p.desc].forEach(function (s) { if (!EN.strings[s]) enEksik.push(s); }); });
+// Hazır önayarlar: özel eğrinin anahtarları kullanıcıdan gelir, aşağıda (Özel eğri bölümü) ayrı sınanır
+var L = LT.filter(function (p) { return p.group !== "ozel"; });
 ok("her önayar adı ve açıklaması i18n/en.js'te", enEksik.length === 0, enEksik.join(" | "));
 ok("has/get", S.has("dalis") && !S.has("yok") && S.get("vites").keys.length === 6 && S.get("yok") === null);
 ok("ritim önayarı vuruşlu, vuruş anı yok", S.get("ritim").beats === true && S.get("ritim").hit === null);
@@ -505,6 +511,217 @@ L.forEach(function (p) {
   });
 });
 ok("Dengeli ve tutamaksız exact: srcFrames ≤ F (4 ondalık artığı Out'u aşmaz), Dengeli Σ d·v ≈ F", asim.length === 0, asim.slice(0, 4).join(" | "));
+
+/* ================= Özel eğri (3.4 adım 13) ================= */
+var D = S.ozelDogrula;
+function gecerliOzel(ks) {
+  if (!Array.isArray(ks) || ks.length < 2 || ks.length > 8) return "sayı " + (ks && ks.length);
+  if (ks[0].t !== 0 || ks[ks.length - 1].t !== 1) return "uçlar";
+  for (var i = 0; i < ks.length; i++) {
+    var k = ks[i];
+    if (!(typeof k.t === "number" && typeof k.v === "number" && isFinite(k.t) && isFinite(k.v))) return "sayı değil";
+    if (k.v < 0.1 || k.v > 10 || k.t < 0 || k.t > 1) return "sınır";
+    if (i && ks[i - 1].t > k.t) return "sıra";
+    if (i > 1 && ks[i - 2].t === k.t) return "üçlü t";
+    if (i && ks[i - 1].t === k.t && ks[i - 1].v === k.v) return "aynı nokta";
+  }
+  return "";
+}
+ok("ozelDogrula: [t, %] → {t, v oran}; uçlar t = 0 ve t = 1'de aynı hızla eklenir", js(D([[0.3, 200], [0.7, 50]])) === js([{ t: 0, v: 2 }, { t: 0.3, v: 2 }, { t: 0.7, v: 0.5 }, { t: 1, v: 0.5 }]), js(D([[0.3, 200], [0.7, 50]])));
+ok("ozelDogrula: {t, v} nesneleri ve sayı metinleri de okunur; sıralanır", js(D([{ t: 1, v: 1 }, { t: "0.5", v: "0.4" }, { t: 0, v: 2 }])) === js([{ t: 0, v: 2 }, { t: 0.5, v: 0.4 }, { t: 1, v: 1 }]));
+ok("ozelDogrula: hız %10–%1000'e, zaman [0, 1]'e çekilir", js(D([[-0.3, 5], [0.5, 2000], [1.5, 100]])) === js([{ t: 0, v: 0.1 }, { t: 0.5, v: 10 }, { t: 1, v: 1 }]), js(D([[-0.3, 5], [0.5, 2000], [1.5, 100]])));
+ok("ozelDogrula: aynı t'de en çok iki nokta (ilk ve son = sert basamak)", js(D([[0, 100], [0.4, 50], [0.4, 200], [0.4, 300], [1, 100]])) ===
+  js([{ t: 0, v: 1 }, { t: 0.4, v: 0.5 }, { t: 0.4, v: 3 }, { t: 1, v: 1 }]));
+ok("ozelDogrula: aynı t ve aynı hız tek nokta; uçtaki basamak görünen tek hıza iner", js(D([[0, 100], [0.5, 50], [0.5, 50], [1, 100]])) === js([{ t: 0, v: 1 }, { t: 0.5, v: 0.5 }, { t: 1, v: 1 }]) &&
+  js(D([[0, 50], [0, 200], [1, 100]])) === js([{ t: 0, v: 2 }, { t: 1, v: 1 }]) && js(D([[0, 100], [1, 50], [1, 300]])) === js([{ t: 0, v: 1 }, { t: 1, v: 0.5 }]));
+ok("ozelDogrula: geçersiz girdi (boş, null, sayısız) düz %100; geçersiz noktalar atılır", [[], null, "x", 5, [[null, 100]], [["a", 1]], [[0.5]], [{}]].every(function (x) {
+  return js(D(x)) === js([{ t: 0, v: 1 }, { t: 1, v: 1 }]);
+}) && js(D([[0.5, 50], [NaN, 3], [0.2, Infinity], null, [true, 100]])) === js([{ t: 0, v: 0.5 }, { t: 0.5, v: 0.5 }, { t: 1, v: 0.5 }]));
+var dokuz = [[0, 100], [0.1, 100], [0.2, 100], [0.3, 100], [0.4, 400], [0.5, 100], [0.6, 100], [0.7, 100], [0.8, 100], [0.9, 100], [1, 100]];
+var kesik = D(dokuz);
+ok("ozelDogrula: 8'den çok nokta 8'e iner; en az iz bırakanlar atılır (sivri tepe kalır)", kesik.length === 8 && kesik.some(function (k) { return k.t === 0.4 && k.v === 4; }) && gecerliOzel(kesik) === "", js(kesik));
+var tohum = 7;
+function rast() { tohum = (tohum * 1103515245 + 12345) % 2147483648; return tohum / 2147483648; }
+var fuzzSorun = [];
+for (var fz = 0; fz < 400; fz++) {
+  var n = Math.floor(rast() * 14), ham = [];
+  for (var q = 0; q < n; q++) {
+    var t = rast() < 0.2 ? (ham.length ? ham[ham.length - 1][0] : 0) : rast() * 1.4 - 0.2;
+    ham.push(rast() < 0.5 ? [t, rast() * 1500] : { t: t, v: rast() * 12 });
+  }
+  var g = D(ham), neden = gecerliOzel(g);
+  if (neden) fuzzSorun.push(neden + " " + js(ham));
+  else if (js(D(g)) !== js(g)) fuzzSorun.push("idempotent değil " + js(ham));
+  else if (js(D(S.ozelYuzde(g))) !== js(g)) fuzzSorun.push("[t, %] gidiş dönüş " + js(ham));
+}
+ok("ozelDogrula: 400 rastgele girdi → 2–8 nokta, uçlar 0 / 1, sıralı, t başına en çok iki, sınırda; idempotent; [t, %] gidiş dönüş aynı", fuzzSorun.length === 0, fuzzSorun.slice(0, 2).join(" | "));
+ok("ozelHit: [0.02, 0.98] ya da null", S.ozelHit(0.5) === 0.5 && S.ozelHit(0) === 0.02 && S.ozelHit(1.4) === 0.98 && S.ozelHit(null) === null &&
+  S.ozelHit(undefined) === null && S.ozelHit("") === null && S.ozelHit(true) === null && S.ozelHit(NaN) === null && S.ozelHit("0.3") === 0.3);
+
+/* ---- plan: hazır önayarla aynı anahtarlar aynı planı verir ---- */
+var aynaSorun = [], aynaSayi = 0;
+L.forEach(function (p) {
+  if (p.beats) return;
+  [{}, { mode: "balanced" }, { ease: "step", density: "few" }, { ease: "linear", k: 1.4, density: "many" }, { k: 0.6 }].forEach(function (o) {
+    [{ frames: 12, fps: 25 }, { frames: 100, fps: 25, handleSec: 1000 }, { frames: 250, fps: 59.94, handleSec: 0.5, hitFrac: 0.3, srcFps: 24 },
+      { frames: 90, fps: 29.97, partial: true, hitFrac: 0.8 }, { frames: 300, fps: 30, handleSec: null, hitFrac: 0.5 }].forEach(function (c) {
+      var oz = {};
+      for (var a in o) oz[a] = o[a];
+      oz.ozelKeys = p.keys; oz.ozelHit = p.hit;
+      var a1, a2, h1 = "", h2 = "";
+      try { a1 = S.plan(p.id, o, c); } catch (e) { h1 = e.kod || e.message; }
+      try { a2 = S.plan("ozel", oz, c); } catch (e2) { h2 = e2.kod || e2.message; }
+      aynaSayi++;
+      if (h1 || h2) { if (h1 !== h2) aynaSorun.push(p.id + " hata " + h1 + " / " + h2); return; }
+      if (a2.id !== "ozel") aynaSorun.push(p.id + " id " + a2.id);
+      delete a1.id; delete a2.id;
+      if (js(a1) !== js(a2)) aynaSorun.push(p.id + " " + js(o) + " " + js(c));
+      if (js(S.hostPlan(a1)) !== js(S.hostPlan(a2))) aynaSorun.push(p.id + " hostPlan");
+    });
+  });
+  var t1 = S.thumb(p.id, 120, 56), t2 = S.thumb("ozel", 120, 56, { ozelKeys: p.keys, ozelHit: p.hit });
+  if (js(t1) !== js(t2)) aynaSorun.push(p.id + " küçük resim");
+  if (js(S.shape(p.id, { k: 1.4 })) !== js(S.shape("ozel", { k: 1.4, ozelKeys: p.keys, ozelHit: p.hit }))) aynaSorun.push(p.id + " shape");
+});
+ok("özel eğri = hazır önayarın anahtarları → plan, hostPlan, hatalar, küçük resim ve biçim bire bir aynı (10 önayar × 5 seçenek × 5 klip)", aynaSorun.length === 0 && aynaSayi === 250,
+  aynaSayi + " " + aynaSorun.slice(0, 3).join(" | "));
+
+var butceSorun = [], ozelUyari = {};
+tohum = 99;
+for (var bz = 0; bz < 120; bz++) {
+  var nn = 2 + Math.floor(rast() * 7), kk = [];
+  for (var j2 = 0; j2 < nn; j2++) kk.push([j2 === 0 ? 0 : j2 === nn - 1 ? 1 : rast(), Math.round(10 + rast() * 990)]);
+  if (rast() < 0.3 && nn > 2) kk.push([kk[1][0], Math.round(10 + rast() * 990)]);
+  var oo = { ozelKeys: kk, ozelHit: rast() < 0.5 ? rast() : null, ease: ["smooth", "linear", "step"][bz % 3], k: [0.6, 1, 1.4][bz % 3], density: ["few", "normal", "many"][(bz >> 1) % 3], mode: bz % 4 ? "auto" : "balanced" };
+  [{ frames: 12 + Math.floor(rast() * 400), fps: 25, handleSec: 0 }, { frames: 60 + Math.floor(rast() * 900), fps: 29.97, handleSec: rast() * 2, hitFrac: rast(), srcFps: 24 },
+    { frames: 50 + Math.floor(rast() * 200), fps: 59.94, handleSec: null }, { frames: 40 + Math.floor(rast() * 200), fps: 23.976, partial: true }].forEach(function (c) {
+    var pl = planDene("ozel", oo, c);
+    if (!pl) return;
+    pl.warnings.forEach(function (w) { ozelUyari[w] = 1; });
+    var top = dvToplam(pl), sumD = pl.segments.reduce(function (s, g) { return s + g.d; }, 0);
+    if (sumD !== pl.F) butceSorun.push("Σd " + js(oo) + js(c));
+    if (pl.segments.some(function (g) { return g.v < 0.1 || g.v > 10; })) butceSorun.push("v sınır " + js(oo));
+    if (!nanYok(pl)) butceSorun.push("NaN " + js(oo));
+    if (pl.mode === "balanced" && Math.abs(top - pl.F) > 0.01) butceSorun.push("Dengeli Σ d·v " + (top - pl.F));
+    if ((pl.mode === "balanced" || pl.B <= 1) && pl.srcFrames > pl.F) butceSorun.push("srcFrames " + pl.srcFrames + " > " + pl.F);
+    if (pl.mode === "exact" && c.handleSec !== null && c.handleSec !== undefined && pl.B > 1 && (pl.B - 1) * pl.F + 2 > c.handleSec * c.fps + 1e-6) butceSorun.push("tutamak aşıldı " + js(c));
+    if (c.partial && pl.mode !== "balanced") butceSorun.push("kısmi aralık Dengeli değil");
+  });
+}
+ok("özel eğri: kaynak bütçesi önayarlarla aynı (Σd = F, v ∈ [0.1, 10], Dengeli Σ d·v ≈ F, srcFrames ≤ F, exact tutamağa sığar, kısmi aralık Dengeli; 120 rastgele eğri × 4 klip)",
+  butceSorun.length === 0, butceSorun.slice(0, 3).join(" | "));
+var hizli = { ozelKeys: [[0, 100], [0.5, 800], [1, 800]] };
+var u1 = S.plan("ozel", hizli, { frames: 100, fps: 25, handleSec: 0.5 }).warnings, u2 = S.plan("ozel", hizli, { frames: 100, fps: 25, handleSec: null }).warnings;
+var u3 = S.plan("ozel", { ozelKeys: [[0, 1000], [0.3, 10], [0.7, 10], [1, 1000]], mode: "balanced", k: 1.5 }, { frames: 100, fps: 25 }).warnings;
+var u4 = S.plan("ozel", { ozelKeys: [[0, 100], [0.5, 20], [1, 100]] }, { frames: 100, fps: 25, partial: true, srcFps: 24 }).warnings;
+var u5 = S.plan("ozel", { ozelKeys: [[0, 100], [0.7, 100], [1, 300]] }, { frames: 200, fps: 25, handleSec: 1.5 }).warnings;
+ok("özel eğri: uyarı kodları önayarlardaki gibi (dengeliyeGecti, sureYok, sinirlandi, takilabilir, yogunlukDustu)", u1.indexOf("dengeliyeGecti") !== -1 && u2.indexOf("sureYok") !== -1 &&
+  u3.indexOf("sinirlandi") !== -1 && u4.indexOf("takilabilir") !== -1 && u5.indexOf("yogunlukDustu") !== -1, js([u1, u2, u3, u4, u5]));
+ok("özel eğri: düz eğri 'duz' ile atar (rampa değil)", (function () { try { S.plan("ozel", { ozelKeys: [[0, 150], [1, 150]] }, { frames: 100, fps: 25 }); return false; } catch (e) { return e.kod === "duz"; } })());
+var vars = S.plan("ozel", {}, { frames: 100, fps: 25, hitFrac: 0.6 }), varsHit = S.plan("ozel", { ozelKeys: S.OZEL_VARSAYILAN.keys, ozelHit: S.OZEL_VARSAYILAN.hit }, { frames: 100, fps: 25, hitFrac: 0.6 });
+ok("özel eğri: anahtar yoksa başlangıç eğrisi (tek derin ağır çekim, ağır çekim anı 0,5)", js(vars) === js(varsHit) && vars.hit && vars.hit.f === 0.6 && vars.minV < 1 && vars.maxV > 1 &&
+  js(S.OZEL_VARSAYILAN) === js({ keys: [[0, 100], [0.5, 30], [1, 100]], hit: 0.5 }), js(vars.hit));
+var hitsiz = S.plan("ozel", { ozelKeys: [[0, 100], [0.5, 30], [1, 100]], ozelHit: null }, { frames: 100, fps: 25, hitFrac: 0.6 });
+var hitli = S.plan("ozel", { ozelKeys: [[0, 100], [0.5, 30], [1, 100]], ozelHit: 0.5 }, { frames: 100, fps: 25, hitFrac: 0.6 });
+ok("özel eğri: ağır çekim anı yoksa playhead'e hizalanmaz; varsa hizalanır", hitsiz.hit === null && hitli.hit && hitli.hit.f === 0.6 && js(hitsiz.segments) !== js(hitli.segments));
+var basamakli = S.plan("ozel", { ozelKeys: [[0, 50], [0.5, 50], [0.5, 300], [1, 300]], ease: "smooth" }, { frames: 100, fps: 25, mode: "balanced" });
+ok("özel eğri: sert basamak zorunlu kesim olur (ortada basamak, iki yanda tek hız)", basamakli.segments.length === 2 && basamakli.segments[0].d === 50 && basamakli.segments[1].v > basamakli.segments[0].v * 5.9,
+  js(basamakli.segments));
+
+/* ---- düzenleyici geometrisi (SufloEgriEditor mod 'hiz') ---- */
+var Z = S.ozel;
+ok("ekran: %100 ortada, %10 altta, %1000 üstte; log2 eksen gidiş dönüş", Z.ekranY(1) === Z.ED.H / 2 && Z.ekranY(0.1) === Z.ED.H - Z.ED.PAD && Z.ekranY(10) === Z.ED.PAD &&
+  Z.ekranX(0) === Z.ED.SOL && Z.ekranX(1) === Z.ED.W - Z.ED.PAD && [0.1, 0.25, 0.37, 1, 2.5, 8, 10].every(function (v) { return yakin(Z.egriV(Z.ekranY(v)), v, v * 0.003); }) &&
+  [0, 0.123, 0.5, 1].every(function (t) { return yakin(Z.egriT(Z.ekranX(t)), t, 0.002); }) && Z.egriV(-50) === 10 && Z.egriV(1e4) === 0.1 && Z.egriT(-5) === 0 && Z.egriT(1e4) === 1);
+var iz = Z.izgara();
+ok("ızgara: 25 / 50 / 100 / 200 / 400 / 800 % yatay çizgiler (100 ana), dört çeyrek dikey", iz.yatay.map(function (x) { return x.etiket; }).join(",") === "25%,50%,100%,200%,400%,800%" &&
+  iz.yatay.filter(function (x) { return x.ana; }).length === 1 && iz.yatay[2].ana && iz.dikey.length === 5 && iz.yatay.every(function (x, i) { return !i || x.y < iz.yatay[i - 1].y; }));
+var e0 = [[0, 100], [0.5, 30], [1, 100]];
+var ek1 = Z.ekle(e0, 0.25, 2.03);
+ok("tıkla: noktayı sıraya ekler, hız %1'e yuvarlanır", ek1.i === 1 && js(ek1.keys) === js([{ t: 0, v: 1 }, { t: 0.25, v: 2.03 }, { t: 0.5, v: 0.3 }, { t: 1, v: 1 }]), js(ek1));
+var ek2 = Z.ekle(e0, 0.263, 1.8, { shift: true });
+ok("Shift+tıkla: zaman %5'e, hız ızgara çizgisine yapışır", ek2.keys[ek2.i].t === 0.25 && ek2.keys[ek2.i].v === 2 && Z.ekle(e0, 0.71, 0.3, { shift: true }).keys[2].v === 0.25 &&
+  Z.ekle(e0, 0.7, 0.34, { shift: true }).keys[2].v === 0.25 && Z.ekle(e0, 0.7, 0.36, { shift: true }).keys[2].v === 0.5 && Z.ekle(e0, 0.7, 0.36, {}).keys[2].v === 0.36, js(ek2));
+ok("tıkla: başka noktaya %1'den yakın 'yakin', 8 noktada 'dolu', sayı değilse 'gecersiz'", Z.ekle(e0, 0.505, 1).hata === "yakin" && Z.ekle(e0, 0.002, 1).hata === "yakin" &&
+  Z.ekle([[0, 1], [0.1, 1], [0.2, 2], [0.3, 1], [0.4, 2], [0.5, 1], [0.6, 2], [1, 1]], 0.8, 1).hata === "dolu" && Z.ekle(e0, NaN, 1).hata === "gecersiz");
+var ks0 = D([[0, 100], [0.3, 200], [0.5, 50], [0.5, 300], [0.8, 100], [1, 100]]);
+var ts1 = Z.tasi(ks0, 1, 0.9, 0.333);
+ok("sürükle: iç nokta komşusunun %1 yakınında durur (sıra ve dizin değişmez), hız %1'e", ts1.i === 1 && ts1.keys[1].t === 0.49 && ts1.keys[1].v === 0.33 && js(ks0) !== js(ts1.keys), js(ts1.keys));
+var ts2 = Z.tasi(ks0, 3, 0.6, 4.4);
+ok("sürükle: sert basamağın iki noktası birlikte kayar, yalnız tutulanın hızı değişir", ts2.keys[2].t === 0.6 && ts2.keys[3].t === 0.6 && ts2.keys[2].v === 0.5 && ts2.keys[3].v === 4.4 &&
+  Z.tasi(ks0, 2, 0.1, 0.5).keys[2].t === 0.31 && Z.tasi(ks0, 2, 0.1, 0.5).keys[3].t === 0.31, js(ts2.keys));
+var ts3 = Z.tasi(ks0, 0, 0.4, 7), ts4 = Z.tasi(ks0, 5, 0.2, 0.05);
+ok("sürükle: uçların zamanı sabit, yalnız hızı oynar (%10–%1000)", ts3.keys[0].t === 0 && ts3.keys[0].v === 7 && ts4.keys[5].t === 1 && ts4.keys[5].v === 0.1);
+var ts5 = Z.tasi(ks0, 1, 0.417, 1.7, { shift: true });
+ok("Shift+sürükle: zaman %5'e, hız ızgaraya", ts5.keys[1].t === 0.4 && ts5.keys[1].v === 2, js(ts5.keys[1]));
+ok("sürükle: geçersiz dizin null; girdi değişmez", Z.tasi(ks0, 9, 0.5, 1) === null && Z.tasi(ks0, -1, 0.5, 1) === null && ks0[1].t === 0.3 && ks0[1].v === 2);
+ok("çift tık: iç nokta silinir, uçlar silinmez", js(Z.sil(e0, 1).keys) === js([{ t: 0, v: 1 }, { t: 1, v: 1 }]) && Z.sil(e0, 0) === null && Z.sil(e0, 2) === null);
+var b1 = Z.basamak(e0, 1);
+ok("Alt+tık: sert basamak açılır (aynı anda sonraki noktanın hızına atlar), yeni nokta seçili", b1.i === 2 && js(b1.keys) === js([{ t: 0, v: 1 }, { t: 0.5, v: 0.3 }, { t: 0.5, v: 1 }, { t: 1, v: 1 }]), js(b1));
+var b2 = Z.basamak(b1.keys, 1), b3 = Z.basamak(b1.keys, 2);
+ok("Alt+tık basamakta: basamak kapanır, tıklanan nokta kalır (soldakine: eski eğri)", js(b2.keys) === js(D(e0)) && b2.i === 1 &&
+  js(b3.keys) === js([{ t: 0, v: 1 }, { t: 0.5, v: 1 }, { t: 1, v: 1 }]) && b3.i === 1, js([b2, b3]));
+ok("Alt+tık: uçta 'uc', 8 noktada 'dolu'; komşular aynı hızdaysa iki katına atlar", Z.basamak(e0, 0).hata === "uc" && Z.basamak(e0, 2).hata === "uc" &&
+  Z.basamak([[0, 1], [0.1, 1], [0.2, 2], [0.3, 1], [0.4, 2], [0.5, 1], [0.6, 2], [1, 1]], 3).hata === "dolu" &&
+  Z.basamak([[0, 50], [0.5, 50], [1, 50]], 1).keys[2].v === 1 && Z.basamak([[0, 1000], [0.5, 1000], [1, 1000]], 1).keys[2].v === 5);
+var yk = D([[0, 100], [0.5, 30], [0.5, 300], [1, 100]]);
+ok("en yakın nokta: yarıçap içinde, basamağın iki noktası y ile ayrılır", Z.enYakin(yk, Z.ekranX(0.5), Z.ekranY(0.3) + 3, 9) === 1 && Z.enYakin(yk, Z.ekranX(0.5), Z.ekranY(3) - 2, 9) === 2 &&
+  Z.enYakin(yk, Z.ekranX(0.25), Z.ekranY(1) - 40, 9) === -1 && Z.enYakin(yk, Z.ekranX(0) + 2, Z.ekranY(1), 9) === 0);
+var yol1 = Z.yol(yk, "smooth"), yol2 = Z.yol(yk, "step"), yolN = sayilar(yol1);
+ok("düzenleyici yolu: M ile başlar, sayılar sonlu ve kutuda; basamak dikey (aynı x iki y)", /^M/.test(yol1) && /^M/.test(yol2) && yolN.every(function (x) { return isFinite(x) && x >= 0 && x <= Z.ED.W; }) &&
+  (function () { var x5 = String(Z.ekranX(0.5)); return yol1.indexOf("L" + x5 + " " + Z.ekranY(0.3)) !== -1 && yol1.indexOf("L" + x5 + " " + Z.ekranY(3)) !== -1; })(), yol1.slice(0, 120));
+
+/* ---- adlı özel rampalar ---- */
+var kl = S.ozelKayitlar([{ id: "r1", ad: "  Benim\u0007 rampam ", keys: [[0.2, 50]], hit: 0.4 }, { id: "r1", ad: "kopya", keys: [[0, 1]] }, { id: "X!", ad: "a", keys: [[0, 1]] },
+  { id: "r2", ad: "", keys: [[0, 1]] }, { id: "r3", ad: "boş", keys: [] }, null, "x", { id: "r4", ad: "Uzun".repeat(20), keys: [[0, 100], [1, 300]], hit: "yok" }]);
+ok("kayıtlar: bozuk / yinelenen / adsız / anahtarsız atılır; ad temizlenir (en çok 40); anahtarlar [t, %]", kl.length === 2 && kl[0].ad === "Benim rampam" &&
+  js(kl[0].keys) === js([[0, 50], [0.2, 50], [1, 50]]) && kl[0].hit === 0.4 && kl[1].ad.length === 40 && kl[1].hit === null, js(kl));
+// inceleme r2: hiçbir noktası sayı olmayan kayıt düz %100 rampa olarak alınmaz, atılır
+var klB = S.ozelKayitlar([{ id: "r1", ad: "Bozuk", keys: [["a", "b"]] }, { id: "r2", ad: "Boş nokta", keys: [null, {}] }, { id: "r3", ad: "Sağlam", keys: [["x", 1], [0.5, 200]] }]);
+ok("kayıtlar: geçerli noktası olmayan rampa atılır (düz %100 olarak yüklenmez); bir geçerli nokta yeter", klB.length === 1 && klB[0].ad === "Sağlam" &&
+  S.ozelGecerliMi([[0, 100]]) && S.ozelGecerliMi([{ t: 0, v: 1 }]) && !S.ozelGecerliMi([null]) && !S.ozelGecerliMi([["x", 3]]) && !S.ozelGecerliMi("x") &&
+  !S.ozelGecerliMi([]), js(klB));
+var dolu = [];
+for (var di = 0; di < 12; di++) dolu.push({ id: "r" + di, ad: "R" + di, keys: [[0, 100], [1, 200]] });
+var ek12 = S.ozelKayitEkle(dolu, "Yeni", [[0, 100], [1, 50]], null, 1700000000000), ekAyni = S.ozelKayitEkle(dolu, "r5", [[0, 100], [0.5, 30], [1, 100]], 0.5, 1);
+ok("kayıt: en çok 12 ('dolu'); aynı ad (büyük / küçük harf) üzerine yazılır, kimlik aynı kalır", S.ozelKayitlar(dolu.concat([{ id: "r99", ad: "fazla", keys: [[0, 1]] }])).length === 12 &&
+  !ek12.ok && ek12.kod === "dolu" && ekAyni.ok && ekAyni.guncellendi && ekAyni.id === "r5" && ekAyni.liste.length === 12 && ekAyni.liste[5].hit === 0.5 && ekAyni.liste[5].keys.length === 3);
+var ek1k = S.ozelKayitEkle([], "Rampa", [[0, 100], [0.5, 25], [1, 100]], 0.5, 1700000000000), ek2k = S.ozelKayitEkle(ek1k.liste, "İkinci", [[0, 300], [1, 100]], null, 1700000000000);
+ok("kayıt: yeni kimlik benzersiz ve geçerli; adsız 'ad'; sil", ek1k.ok && /^r[0-9a-z]{1,16}$/.test(ek1k.id) && ek2k.ok && ek2k.id !== ek1k.id && /^r[0-9a-z]{1,16}$/.test(ek2k.id) &&
+  S.ozelKayitlar(ek2k.liste).length === 2 && S.ozelKayitEkle([], "  \u0001 ", [[0, 1]], null, 1).kod === "ad" && S.ozelKayitSil(ek2k.liste, ek1k.id).length === 1, js(ek2k));
+ok("kayıt adı: 'Özel rampa N' (ilk boş numara)", S.ozelKayitAdi([]) === "Özel rampa 1" && S.ozelKayitAdi([{ id: "r1", ad: "Özel rampa 2", keys: [[0, 1]] }]) === "Özel rampa 3" &&
+  S.ozelKayitAdi([{ id: "r1", ad: "özel rampa 2", keys: [[0, 1]] }, { id: "r2", ad: "x", keys: [[0, 1]] }]) === "Özel rampa 3");
+ok("kayıt adı İngilizce arayüzde: çevrilmiş ad ('Custom ramp 2') da dolu sayılır, üstüne yazılmaz", S.ozelKayitAdi([{ id: "r1", ad: "Custom ramp 2", keys: [[0, 1]] }],
+  function (s) { return s.replace("Özel rampa", "Custom ramp"); }) === "Özel rampa 3" && S.ozelKayitAdi([{ id: "r1", ad: "Custom ramp 2", keys: [[0, 1]] }]) === "Özel rampa 2");
+var enOzel = ["Özel rampa {n}"].filter(function (k) { return !EN.strings[k]; });
+ok("varsayılan kayıt adı kalıbı i18n/en.js'te", enOzel.length === 0, enOzel.join(" | "));
+
+/* ---- 3.4 adım 13 inceleme: düz özel eğri, eğri eşitliği / kurtarılabilirlik, CEP tuş ilgisi ---- */
+var duzler = [[[0, 100], [1, 100]], [[0, 100], [0.5, 100], [1, 100]], [[0, 50], [0.3, 50.4], [1, 50]], [[0, 300], [0.5, 300], [0.5, 300], [1, 300]], []];
+ok("ozelDuz: noktaları %1 içinde aynı hızdaki eğri (boş girdi düz %100)", duzler.every(function (k) { return S.ozelDuz(k); }) &&
+  !S.ozelDuz(S.OZEL_VARSAYILAN.keys) && !S.ozelDuz([[0, 100], [1, 102]]) && !S.ozelDuz(S.get("vites").keys));
+var duzHep = [];
+// tam düz eğriler (%1'in içindeki fark Güçlü yoğunlukta %1'i aşabilir: o zaman plan rampa verir, metin gerekmez)
+[duzler[0], duzler[1], duzler[3]].forEach(function (k) {
+  [0.5, 1, 1.5].forEach(function (yo) { ["smooth", "linear", "step"].forEach(function (ea) { ["few", "normal", "many"].forEach(function (pa) { [12, 50, 400].forEach(function (F) {
+    var kod = "";
+    try { S.plan("ozel", { ozelKeys: k, ozelHit: 0.5, k: yo, ease: ea, density: pa }, { frames: F, fps: 25 }); } catch (e) { kod = e.kod || e.message; }
+    if (kod !== "duz") duzHep.push(js(k) + " k" + yo + " " + ea + " " + pa + " F" + F + ": " + kod);
+  }); }); }); });
+});
+ok("ozelDuz eğrisi her yoğunluk / yumuşatma / parça / uzunlukta 'duz' atar (panelin 'bir noktayı sürükle' demesi doğru)", duzHep.length === 0, duzHep.slice(0, 3).join(" | "));
+ok("ozelAyni: doğrulanmış anahtarlar ve ağır çekim anı karşılaştırılır", S.ozelAyni({ keys: [[0, 100], [0.5, 30], [1, 100]], hit: 0.5 }, { keys: [{ t: 0.5, v: 0.3 }, { t: 0, v: 1 }, { t: 1, v: 1 }], hit: "0.5" }) &&
+  !S.ozelAyni({ keys: S.OZEL_VARSAYILAN.keys, hit: 0.5 }, { keys: S.OZEL_VARSAYILAN.keys, hit: null }) && !S.ozelAyni({ keys: [[0, 100], [1, 200]] }, { keys: [[0, 100], [1, 201]] }) &&
+  !S.ozelAyni({ keys: [[0, 100], [1, 200]] }, { keys: [[0, 100], [0.5, 150], [1, 200]] }) && S.ozelAyni(null, { keys: [] }));
+var kayit13 = [{ id: "r1", ad: "Benim", keys: [[0, 100], [0.3, 420], [1, 100]], hit: 0.3 }];
+ok("ozelBilinen: başlangıç eğrisi, her hazır kartın kopyası (Ritme Rampa hariç) ve adlı kayıt yeniden elde edilir; elle çizilen değil",
+  S.ozelBilinen(S.OZEL_VARSAYILAN, []) && S.list().filter(function (p) { return !p.beats && p.id !== "ozel"; }).every(function (p) { return S.ozelBilinen({ keys: p.keys, hit: p.hit }, null); }) &&
+  S.ozelBilinen({ keys: [[0, 100], [0.3, 420], [1, 100]], hit: 0.3 }, kayit13) && !S.ozelBilinen({ keys: [[0, 100], [0.3, 420], [1, 100]], hit: 0.4 }, kayit13) &&
+  !S.ozelBilinen({ keys: S.get("darbe").keys, hit: 0.7 }, []) && !S.ozelBilinen({ keys: [[0, 100], [0.25, 400], [0.5, 30], [1, 100]], hit: 0.5 }, "bozuk"));
+ok("CEP tuş ilgisi: düzenleyici Delete / Backspace, Düzenle Enter / Space (Windows VK, macOS sanal kodlar); başka tür boş",
+  Z.tusIlgisi("editor", false) === js([{ keyCode: 46 }, { keyCode: 8 }]) && Z.tusIlgisi("editor", true) === js([{ keyCode: 117 }, { keyCode: 51 }]) &&
+  Z.tusIlgisi("duzenle", false) === js([{ keyCode: 13 }, { keyCode: 32 }]) && Z.tusIlgisi("duzenle", true) === js([{ keyCode: 36 }, { keyCode: 49 }]) &&
+  Z.tusIlgisi("", false) === "" && Z.tusIlgisi("constructor", false) === "" && Z.tusIlgisi(undefined, true) === "");
 
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

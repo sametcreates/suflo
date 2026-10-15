@@ -10,11 +10,11 @@ function js(x) { return JSON.stringify(x); }
 /* ---------------- v1 izin listesi ve sınıflar ---------------- */
 var BEKLENEN = {
   oku: ["suflo_baglam", "suflo_izler", "suflo_secim", "suflo_altyazi_oku", "suflo_is_durumu", "suflo_doktor"],
-  yaz: ["suflo_oynatma_kafasi", "suflo_marker_ekle", "suflo_altyazi_olustur", "suflo_altyazi_kanala", "suflo_altyazi_disari", "suflo_sessizlik_analiz", "suflo_zoom"],
+  yaz: ["suflo_oynatma_kafasi", "suflo_marker_ekle", "suflo_altyazi_olustur", "suflo_altyazi_kanala", "suflo_altyazi_disari", "suflo_sessizlik_analiz", "suflo_zoom", "suflo_egri_uygula"],
   yikici: ["suflo_sessizlik_kes", "suflo_metinden_kes", "suflo_hiz_rampasi"]
 };
 var hepsi = [].concat(BEKLENEN.oku, BEKLENEN.yaz, BEKLENEN.yikici);
-ok("izin listesi tam olarak v1 eylemleri (eğri pişirme bu dalda yok)", js(O.adlar().slice().sort()) === js(hepsi.slice().sort()), js(O.adlar()));
+ok("izin listesi tam olarak v1 eylemleri (3.4 adım 10 eğri pişirme dahil)", js(O.adlar().slice().sort()) === js(hepsi.slice().sort()), js(O.adlar()));
 Object.keys(BEKLENEN).forEach(function (sinif) {
   ok("sınıf " + sinif + ": doğru atanmış", BEKLENEN[sinif].every(function (a) { return O.eylem(a).sinif === sinif; }));
 });
@@ -23,7 +23,7 @@ ok("her eylem: ad, EN açıklama, sınıf, şema nesnesi", O.EYLEMLER.every(func
     O.SINIFLAR.indexOf(e.sinif) !== -1 && e.sema && typeof e.sema === "object";
 }));
 ok("Pro eylemleri mevcut kapı anahtarlarını kullanır", O.eylem("suflo_sessizlik_analiz").pro === "cut" && O.eylem("suflo_sessizlik_kes").pro === "cut" &&
-  O.eylem("suflo_metinden_kes").pro === "textcut" && O.eylem("suflo_zoom").pro === "zoom" && O.eylem("suflo_hiz_rampasi").pro === "speedramp" &&
+  O.eylem("suflo_metinden_kes").pro === "textcut" && O.eylem("suflo_zoom").pro === "zoom" && O.eylem("suflo_hiz_rampasi").pro === "speedramp" && O.eylem("suflo_egri_uygula").pro === "curves" &&
   O.eylem("suflo_baglam").pro === null && O.eylem("suflo_altyazi_olustur").pro === null);
 var D = require(path.join(__dirname, "..", "js", "deneme.js"));
 ok("Pro eylemlerinin anahtarları aracın kendi deneme listesinde (aynı kapı)", O.EYLEMLER.every(function (e) { return !e.pro || D.listede(e.pro); }));
@@ -31,8 +31,8 @@ ok("Pro eylemlerinin anahtarları aracın kendi deneme listesinde (aynı kapı)"
 ok("köprünün kendi anahtarı 'mcp' deneme listesinde YOK", !D.listede("mcp") && D.kalan(D.bos(), "mcp") === 0 && !Object.prototype.hasOwnProperty.call(D.AD, "mcp"));
 
 /* ---------------- dallar birleşince: eğri pişirme eylemi unutulmasın ---------------- */
-// Plan adım 22 v1 izin listesindeki suflo_egri_uygula, adım 10 (js/egri.js, yerel-34-egri) bu dala gelmediği için yok.
-// İki dal birleşince bu test, eylem eklenene kadar KALIR (kurucu notu MCP.5: EYLEMLER, YURUT, TR_AD, testler, belgeler).
+// Plan adım 22 v1 izin listesindeki suflo_egri_uygula (adım 10, js/egri.js) yerel-34-egri birleşirken eklendi (kurucu
+// notu MCP.5); js/egri.js depodayken eylem listeden düşerse bu test KALIR.
 var egriVar = require("fs").existsSync(path.join(__dirname, "..", "js", "egri.js"));
 ok("eğri modülü varsa suflo_egri_uygula yazma eylemi listede" + (egriVar ? "" : " (js/egri.js bu dalda yok)"),
   !egriVar || (!!O.eylem("suflo_egri_uygula") && O.eylem("suflo_egri_uygula").sinif === "yaz"));

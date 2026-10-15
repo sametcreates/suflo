@@ -5,6 +5,9 @@
  * parametreleri panelden secili klibe uygulanir. Opak Adobe/ucuncu taraf
  * verisi kullanan az sayidaki preset, dosyayi gosteren guvenli ice aktarma
  * yoluna duser; hicbir zaman sahte "uygulandi" mesaji verilmez.
+ * Ozel egri (3.4 adim 12): #preset-egri secicisi (SufloEgriSecici) yalniz 12 yerlesik onayara uygulanir. Otomatik iken
+ * KS_applyMotionPreset yuku eskisiyle ayni; baska egride yuk egriyi tablo olarak tasir (SufloEgriSecim.hareketEgrisi)
+ * ve host her klibin kendi degerlerinden kurdugu anahtarlari kare zamanlarinda yogunlastirir. Kapi degismez (presets).
  */
 window.KPresets = (function () {
   "use strict";
@@ -36,6 +39,7 @@ window.KPresets = (function () {
   ];
   var filter = "all";
   var query = "";
+  var secici = null;   // Eğri seçicisi (3.4 adım 12)
   var busy = "";
   var packCatalog = [];
   var packCatalogKey = "";
@@ -235,21 +239,93 @@ window.KPresets = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("presets")) return;
     busy = preset.id;
     setApplyBusy(card, true);
+    var gecIpucu = false;
     try {
-      var result = await K.call("KS_applyMotionPreset", {
+      var yuk = {
         id: preset.id,
         duration: speedValue(),
         strength: strengthValue()
-      }, 30000);
-      if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Preset uygulanamadi.");
+      };
+      // Özel eğri: tablo olarak (Otomatik'te yük ve süre eskisiyle aynı)
+      var S = window.SufloEgriSecim;
+      var hm = secici && S ? S.hareketEgrisi(secici.deger()) : null;
+      var sure = 30000;
+      if (hm) {
+        yuk.ease = hm.ease;
+        yuk.egri = { tablo: hm.tablo };
+        // Yoğun yazım her seçili klibe kare kare anahtar yazar: süre seçili klip sayısı × önayar süresi × kare hızıyla
+        // büyür (üst sınır tahmini; host toplamı ayrıca sınırlar)
+        var c = window.KApp && KApp.ctx ? KApp.ctx() : null;
+        sure = S.cagriSuresi(30000, S.hareketAnahtari({ klip: c && c.selCount, sure: yuk.duration, fps: S.kareHizi(c) }));
+      }
+      // Zaman aşımından sonra gelen cevap: Premiere yazmayı bitirdi; kaldırma kaydı yine saklanır (Geri al çıkar)
+      var result = await K.call("KS_applyMotionPreset", yuk, sure, hm ? function (gec) { if (gec && gec.ok) uygulandi(gec, preset, true); } : undefined);
+      if (!result || !result.ok) {
+        if (hm && result && result.kod === "cokFazla") {
+          throw new Error("Özel eğriyle bu seçim " + result.gereken + " anahtar kare ister; tek seferde en çok " + result.enCok + ". Daha az klip seç ya da Eğri'yi Otomatik yap.");
+        }
+        gecIpucu = !!(hm && result && result.zamanAsimi);   // Premiere'in betiği durdurulamaz: yazım sürüyor olabilir
+        throw new Error(result && result.error ? result.error : "Preset uygulanamadi.");
+      }
       if (card) card.classList.add("ok");
-      KApp.toast(result.applied + " klibe uygulandi · " + preset.name, "good");
+      uygulandi(result, preset, false);
       setTimeout(function () { if (card) card.classList.remove("ok"); }, 900);
+    } catch (e) {
+      KApp.toast("✕ " + (e && e.message ? e.message : e), "bad");
+      if (gecIpucu) KApp.toast(SufloEgriSecim.GEC_IPUCU, "warn", 12000);
+    } finally {
+      busy = "";
+      setApplyBusy(card, false);
+    }
+  }
+
+  // Uygulanan önayarın kaldırma kaydı (3.4 adım 11) ve bildirimi: Geri al yalnız bu uygulamanın anahtarlarını kaldırır.
+  // gec: cevap zaman aşımından sonra geldi (3.4 adım 12)
+  function uygulandi(result, preset, gec) {
+    var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
+    var proje = result.proje || "";
+    var metin = result.applied + " klibe uygulandi · " + preset.name;
+    KApp.toast(gec ? "Premiere geç yanıt verdi: " + metin : metin, "good",
+      saklama.idler.length ? 9000 : undefined,
+      saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
+    if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
+  }
+
+  function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }
+
+  /*
+   * Önayarı kaldır (3.4 adım 11; kapısız): seçili klip(ler)deki Suflo önayar kayıtları KS_removeSufloKeys'e
+   * gider; yalnız Suflo'nun yazdığı ve hâlâ duran anahtarlar silinir, özellikler önceki değerine döner,
+   * kullanıcının anahtarlarına dokunulmaz. Önceki sürümde uygulanmış (kaydı olmayan) önayarın bugün bir
+   * kaldırma yolu yoktu: Suflo tahminle silmez, nasıl kaldırılacağını söyler. Paket presetleri (.prfpset)
+   * kayıt tutmaz. kapsam { idler, proje }: bildirimdeki Geri al.
+   */
+  async function kaldir(kapsam) {
+    if (busy) return;
+    var k = kd();
+    if (!k) return;
+    var tekUygulama = !!(kapsam && kapsam.idler);
+    busy = "kaldir";
+    var btn = el("preset-kaldir");
+    if (btn) btn.disabled = true;
+    try {
+      var s = await k.akis({
+        tur: "hareket",
+        kapsam: kapsam || { secili: true },
+        // Suflo'nun anahtarları sonradan değişmiş (önayarın eski yöntemi yok): ne yapılacağı söylenir, kayıt saklanır
+        degistiMetni: function (n) {
+          return n + " önayar kaydının anahtar kareleri sonradan değiştirilmiş (ya da klibin hızı değişmiş); dokunulmadı. Kalanları Effect Controls'ten silebilir ya da Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile geri alabilirsin.";
+        },
+        kayitYokMetni: tekUygulama
+          ? "Bu önayarın kaydı bulunamadı; hiçbir şey silinmedi."
+          : "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önayar önceki sürümde uygulanmış ya da bir Suflo Smooth paket preseti olabilir (paket presetleri kayıt tutmaz): Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin."
+      });
+      KApp.toast(SufloKaldir.dugum(s.parcalar), s.tur, s.tur === "good" ? 6000 : 9000);
     } catch (e) {
       KApp.toast("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
       busy = "";
-      setApplyBusy(card, false);
+      if (btn) btn.disabled = false;
     }
   }
 
@@ -364,6 +440,7 @@ window.KPresets = (function () {
 
   function init() {
     if (!el("tab-presets")) return;
+    if (window.SufloEgriSecici && el("preset-egri")) secici = SufloEgriSecici.olustur(el("preset-egri"), { arac: "hareket" });
     var search = el("preset-search");
     if (search) search.addEventListener("input", function () { query = this.value.trim().toLowerCase(); render(); });
     var filters = el("preset-filter");
@@ -376,6 +453,8 @@ window.KPresets = (function () {
     });
     var cta = el("preset-proya-gec");
     if (cta) cta.addEventListener("click", function () { if (typeof Pro !== "undefined") Pro.gate("presets"); });
+    var kb = el("preset-kaldir");
+    if (kb) kb.addEventListener("click", function () { return kaldir(); });
     if (typeof Pro !== "undefined") Pro.on(function () { render(); loadPackCatalog(false); });
     if (typeof ProSync !== "undefined" && ProSync.on) ProSync.on(function (state) {
       if (state && state.phase === "ready") loadPackCatalog(false);
@@ -388,10 +467,12 @@ window.KPresets = (function () {
   return {
     init: init,
     render: render,
+    kaldir: kaldir,
     list: function () { return PRESETS.slice(); },
     packs: function () { return PACKS.slice(); },
     catalog: function () { return packCatalog.slice(); },
     loadPackCatalog: loadPackCatalog,
+    _secici: function () { return secici; },
     count: function () { return PRESETS.length + (packCatalog.length || PACKS[0].count); }
   };
 })();

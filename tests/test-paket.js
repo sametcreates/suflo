@@ -76,6 +76,21 @@ ok("yeni font dosyaları ve lisansları verify-release'te zorunlu, bildirimlerde
   yeniDosyalar.every(function (f) { return gerekli.indexOf("fonts/" + f.replace(/\./g, "\\.") + "$") !== -1 && notice.indexOf("`" + f + "`") !== -1; }) &&
   yeniFontlar.every(function (n) { var l = "OFL-" + (lisansDosyasi[n] || n) + ".txt"; return gerekli.indexOf("fonts/" + l.replace(/\./g, "\\.") + "$") !== -1 && notice.indexOf(l) !== -1; }),
   yeniDosyalar.join(","));
+ok("3.4 Yumuşatma motoru ve anahtar kare kayıtları pakette (js/ klasörü), verify-release'te zorunlu, Rebound bildirimi var",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /ease-curve\\\.js\$/.test(gerekli) && /key-records\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "ease-curve.js")) &&
+  fs.existsSync(path.join(__dirname, "..", "js", "key-records.js")) && /### Rebound/.test(notice) && /0f9fd6c526514d20b688b13c393061606f166ad5/.test(notice) &&
+  /"js"/.test(okuK("tools/install.ps1")), gerekli.slice(0, 600));
+ok("3.4 Eğri sekmesi: model ve panel pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /egri-model\\\.js\$/.test(gerekli) && /egri\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "egri-model.js")) &&
+  fs.existsSync(path.join(__dirname, "..", "js", "egri.js")), gerekli.slice(0, 600));
+ok("3.4 kayıt tabanlı güvenli kaldırma: js/kayit-kaldir.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /kayit-kaldir\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "kayit-kaldir.js")), gerekli.slice(0, 700));
+ok("3.4 özel eğri (Geçiş / Zoom / Hareket): js/egri-secim.js pakette (js/ klasörü) ve verify-release'te zorunlu",
+  /\$stageItems = @\([^)]*"js"/.test(okuK("tools/package.ps1")) && /\$panelItems = @\([^)]*"js"/.test(okuK("tools/kurucu-yap.ps1")) &&
+  /egri-secim\\\.js\$/.test(gerekli) && fs.existsSync(path.join(__dirname, "..", "js", "egri-secim.js")), gerekli.slice(0, 800));
 ok("README 'Lisanslar / Licenses' bölümü bildirimlere bağlanır", /## Lisanslar \/ Licenses[\s\S]*\[THIRD_PARTY_NOTICES\.md\]\(THIRD_PARTY_NOTICES\.md\)/.test(okuK("README.md")));
 
 /* ---- 3.4 Yapay zekâ köprüsü (MCP): mcp/ klasörü her pakette, .debug hiçbirinde ---- */

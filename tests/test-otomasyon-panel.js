@@ -131,6 +131,20 @@ async function main() {
   t.sb.window.KHizRampasi = { uygula: function () { return Promise.resolve(undefined); } };
   r = await t.P._yurut("suflo_hiz_rampasi", {}, {});
   ok("hız rampası kapıdan dönerse (undefined) başarı sayılmaz", r.ok === false, js(r));
+  // 3.4 adım 10: suflo_egri_uygula Eğri sekmesinin Uygula'sı (KEgri.uygula) ile aynı işlev, açık sonuç
+  t.sb.window.KEgri = { uygula: function () { return Promise.resolve({ ok: false, hata: "mesgul", mesaj: "Curves is already running." }); } };
+  r = await t.P._yurut("suflo_egri_uygula", {}, {});
+  ok("eğri meşgulken ok:false mesgul", r.ok === false && r.hata === "mesgul", js(r));
+  t.sb.window.KEgri = { uygula: function () { return Promise.resolve(undefined); } };
+  r = await t.P._yurut("suflo_egri_uygula", {}, {});
+  ok("eğri sonuç döndürmeden biterse başarı sayılmaz", r.ok === false && r.hata === "uygulanamadi", js(r));
+  t.sb.window.KEgri = { uygula: function () { return Promise.resolve({ ok: true, ozellik: 2, anahtar: 40 }); } };
+  r = await t.P._yurut("suflo_egri_uygula", {}, {});
+  ok("eğri başarısı modülün sonucundan", r.ok === true && r.ozellik === 2 && r.anahtar === 40, js(r));
+  var es = oku("js/egri.js");
+  ok("egri.js uygula kapı / meşgul / başarı / hata dallarında açık sonuç döner", /"curves"[^\n]*\)\) return \{ ok: false, hata: "pro_gerekli"/.test(es) &&
+    /if \(mesgul\) return \{ ok: false, hata: "mesgul"/.test(es) && /return \{ ok: true, ozellik: ozellik, anahtar: yazilan/.test(es) &&
+    /return \{ ok: false, hata: "uygulanamadi"/.test(es));
   var zs = oku("js/zoom.js"), hs = oku("js/hiz-rampasi.js");
   ok("zoom.js calistir / hiz-rampasi.js uygula meşgul dalı açık sonuç döner", /if \(busy\) return \{ ok: false, hata: "mesgul"/.test(zs) && /if \(mesgul\) return \{ ok: false, hata: "mesgul"/.test(hs) &&
     /return \{ ok: true, hareket: plan\.toggles/.test(zs) && /return sonuc;\n  \}/.test(hs.replace(/\r\n/g, "\n")));

@@ -85,21 +85,34 @@ window.K = (function () {
     return mesgul;
   }
 
-  function call(fn, arg, timeout) {
+  /*
+   * gec (isteğe bağlı, 3.4 adım 12): zaman aşımından SONRA gelen cevap (Premiere işi geç de olsa bitirdi) bir kez bu
+   * işleve verilir. Yoğun anahtar yazan araçlar geç gelen kaldırma kayıtlarını böyle saklar; verilmezse geç cevap
+   * eskisi gibi atılır. Zaman aşımı sonucu zamanAsimi: true taşır.
+   */
+  function call(fn, arg, timeout, gec) {
     return new Promise(function (resolve) {
-      var bitti = false;
+      var bitti = false, asildi = false;
       var id = ++cagriNo;
       yoldakiler[id] = { bas: Date.now(), sinir: Math.min(2 * (timeout || 60000), 2 * 3600000) };
       function cevapGeldi() { delete yoldakiler[id]; }
       function son(v) {
-        if (bitti) return;          // evalScript bazen gecikip sonra da cevap verebiliyor
+        if (bitti) {                // evalScript bazen gecikip sonra da cevap verebiliyor
+          if (asildi && typeof gec === "function") {
+            asildi = false;
+            log("jsx GEC CEVAP " + fn);
+            try { gec(v); } catch (eG) { log("jsx " + fn + ": gec cevap islenemedi - " + (eG && eG.message)); }
+          }
+          return;
+        }
         bitti = true;
         clearTimeout(saat);
         resolve(v);
       }
       var saat = setTimeout(function () {
         log("jsx ZAMAN ASIMI " + fn + " (" + (timeout || 60000) + " ms)");
-        son({ ok: false, error: "Premiere yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
+        son({ ok: false, zamanAsimi: true, error: "Premiere yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." });
+        asildi = true;
       }, timeout || 60000);
 
       var script = arg === undefined

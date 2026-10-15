@@ -156,6 +156,11 @@ window.KOtomasyon = (function () {
       if (!window.KZoom || !window.KZoom.calistir) return { ok: false, hata: "yok", mesaj: "Auto Zoom unavailable." };
       return sonucla(await window.KZoom.calistir(), "zoom-status");
     },
+    // 3.4 adım 10: Eğri sekmesinin Uygula düğmesiyle aynı işlev (işaretli çiftler, sekmedeki eğri; Geri al panelde)
+    suflo_egri_uygula: async function () {
+      if (!window.KEgri || !window.KEgri.uygula) return { ok: false, hata: "yok", mesaj: "Curves unavailable." };
+      return sonucla(await window.KEgri.uygula(), "egri-status");
+    },
     suflo_sessizlik_kes: function () { return window.KCut.mcpKes(); },
     suflo_metinden_kes: function () { return window.KTextCut.mcpKes(); },
     suflo_hiz_rampasi: async function () {

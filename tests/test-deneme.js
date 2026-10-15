@@ -4,20 +4,21 @@ var D = require(path.join(__dirname, "..", "js", "deneme.js"));
 var gecen = 0, toplam = 0;
 function ok(ad, k, ek) { toplam++; if (k) gecen++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined ? "   [" + String(ek).slice(0, 300) + "]" : "")); }
 
-// 3.2 adım 5: çevrimdışı İngilizce çeviri (offlineTranslate) 11. araç; 3.3: YouTube indirici (youtube) 12. araç
+// 3.2 adım 5: çevrimdışı İngilizce çeviri (offlineTranslate) 11. araç; 3.3: YouTube indirici (youtube) 12. araç;
+// 3.4 adım 10: Eğri (curves; düzenleyici ücretsiz, anahtar karelere uygulamak denemeli) 13. araç
 // 3.4 yapay zekâ köprüsü (mcp): açmak yalnız Pro (kurucu kademesi), deneme listesinde YOK
-var LISTE = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube"];
+var LISTE = ["cut", "textcut", "highlights", "zoom", "transitions", "audioclean", "overlay", "translate", "beat", "speedramp", "offlineTranslate", "youtube", "curves"];
 var KILITLI = ["mcp", "mogrt", "sfx", "motionbg", "presets", "propack", "captionStyles", "batch", "assexport", "shortsPaket", "multicam", "glossary", "pro", "", "__proto__", "toString"];
 
 /* ---------------- temel ---------------- */
-ok("HAK = 3, 12 özellik (spec sırası)", D.HAK === 3 && JSON.stringify(D.OZELLIKLER) === JSON.stringify(LISTE), JSON.stringify(D.OZELLIKLER));
+ok("HAK = 3, 13 özellik (spec sırası)", D.HAK === 3 && JSON.stringify(D.OZELLIKLER) === JSON.stringify(LISTE), JSON.stringify(D.OZELLIKLER));
 var b = D.bos();
 ok("bos() geçerli", D.gecerliMi(b));
 ok("listedeki her özellik 3 hakla başlar", LISTE.every(function (f) { return D.kalan(b, f) === 3; }));
 ok("liste dışı özellikler ve içerik kütüphaneleri 0", KILITLI.every(function (f) { return D.kalan(b, f) === 0; }), KILITLI.filter(function (f) { return D.kalan(b, f) !== 0; }).join(","));
 ok("her özelliğin kısa adı var", LISTE.every(function (f) { return typeof D.AD[f] === "string" && D.AD[f].length > 2; }));
 D.OZELLIKLER.push("mogrt");
-ok("dışa verilen liste kopya: değiştirmek kilidi açmaz", D.kalan(D.bos(), "mogrt") === 0 && D.OZELLIKLER.length === 13);
+ok("dışa verilen liste kopya: değiştirmek kilidi açmaz", D.kalan(D.bos(), "mogrt") === 0 && D.OZELLIKLER.length === 14);
 
 /* ---------------- harca ---------------- */
 var s0 = D.bos();
@@ -58,7 +59,7 @@ ok("tükenmiş: her özellik 0", LISTE.every(function (f) { return D.kalan(D.tuk
 
 /* ---------------- ozet + mesaj ---------------- */
 var oz = D.ozet({ v: 1, kullanilan: { cut: 1, overlay: 3 } });
-ok("ozet: 12 satır, kalan ve toplam", oz.ozellikler.length === 12 && oz.hak === 3 && oz.toplamKalan === 36 - 4 &&
+ok("ozet: 13 satır, kalan ve toplam", oz.ozellikler.length === 13 && oz.hak === 3 && oz.toplamKalan === 39 - 4 &&
   oz.ozellikler[0].id === "cut" && oz.ozellikler[0].kalan === 2 && oz.ozellikler[0].ad === "Otomatik kesim", JSON.stringify(oz.ozellikler[0]));
 ok("harcama mesajı", D.harcamaMesaji(2) === "1 deneme hakkı kullanıldı · 2 kaldı" && /hakkın bitti/.test(D.harcamaMesaji(0)), D.harcamaMesaji(2));
 

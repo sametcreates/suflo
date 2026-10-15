@@ -96,6 +96,9 @@
     { ad: "suflo_zoom", sinif: "yaz", pro: "zoom",
       aciklama: "Run Auto Zoom on the selected clip with the panel's current settings (speech-driven punch-ins).",
       sema: {} },
+    { ad: "suflo_egri_uygula", sinif: "yaz", pro: "curves",
+      aciklama: "Apply the curve set in the Curves tab to the checked keyframe pairs around the playhead (same as the tab's Apply button; undo stays in the panel).",
+      sema: {} },
 
     /* ---------------- yikici (onay kartı) ---------------- */
     { ad: "suflo_sessizlik_kes", sinif: "yikici", pro: "cut",
@@ -347,6 +350,7 @@
     suflo_altyazi_disari: "Altyazıyı dışa aktar", suflo_sessizlik_analiz: "Sessizlikleri bul",
     suflo_zoom: "Otomatik zoom", suflo_sessizlik_kes: "Sessizlikleri kes (kopyada)",
     suflo_metinden_kes: "Konuşmadan kes (kopyada)", suflo_hiz_rampasi: "Hız rampası uygula",
+    suflo_egri_uygula: "Eğri uygula",
     // eyleme ulaşmadan reddedilen istek (Host, tarayıcı, jeton, hız sınırı, boyut, JSON)
     _istek: "Reddedilen istek"
   };
