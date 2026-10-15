@@ -42,6 +42,25 @@ ok("hfBeklenenOzet: LFS olmayan / bozuk girdi bos", E._hfBeklenenOzet([{ path: "
   fs.writeFileSync(yol3, Buffer.from("x"));
   agacYaniti = null;
   ok("API'ye ulasilamazsa kurulum engellenmez (dosya kalir)", await E._modelDogrula(model3, yol3) === true && fs.existsSync(yol3));
+  // 3.4 adım 19: içe aktarma "doğrulandı" ile "doğrulanamadı (bilinmiyor)" durumunu ayırt eder
+  var s1 = {}, s2 = {}, s3 = {};
+  fs.writeFileSync(yol, icerik);
+  agacYaniti = [{ type: "file", path: "ggml-test.bin", lfs: { oid: dogruOzet } }];
+  await E._modelDogrula(model, yol, null, s1);
+  agacYaniti = null;
+  var model4 = { file: "ggml-test4.bin", urls: ["https://huggingface.co/ag/yok4/resolve/main/ggml-test4.bin"] };
+  var yol4 = path.join(tmp, "ggml-test4.bin");
+  fs.writeFileSync(yol4, Buffer.from("x"));
+  await E._modelDogrula(model4, yol4, null, s2);
+  var model5 = { file: "ggml-test5.bin", urls: ["https://huggingface.co/baska/depo5/resolve/main/ggml-test5.bin"] };
+  var yol5 = path.join(tmp, "ggml-test5.bin");
+  fs.writeFileSync(yol5, Buffer.from("bozuk5"));
+  agacYaniti = [{ type: "file", path: "ggml-test5.bin", lfs: { oid: dogruOzet } }];
+  var donus5 = await E._modelDogrula(model5, yol5, null, s3);
+  ok("sonuc.durum: dogrulandi / bilinmiyor / uyusmadi (dönüş değeri eskisi gibi)",
+    s1.durum === "dogrulandi" && s2.durum === "bilinmiyor" && s3.durum === "uyusmadi" && donus5 === false && !fs.existsSync(yol5), JSON.stringify([s1, s2, s3]));
+  istekler = istekler.filter(function (u) { return !/yok4|depo5/.test(u); });
+
   ok("ozet yalniz huggingface.co'dan istenir (ayna kendi dosyasini onaylamaz)",
     istekler.filter(function (u) { return /ag\/yok/.test(u); }).length === 1 && istekler.every(function (u) { return /^https:\/\/huggingface\.co\//.test(u); }), istekler.join(" "));
 

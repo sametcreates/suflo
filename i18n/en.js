@@ -3139,6 +3139,150 @@
     "bunlar için Çıktı: Video katmanı": "for these use Output: Video layer"
   });
 
+  /* ============ 3.4 step 19: corporate-network resilience + offline model import (js/ag-dayanim.js, js/model-ice-aktar.js) ============ */
+  add({
+    // Settings › Engine
+    "Model dosyası içe aktar": "Import model file",
+    "Modeli başka bir bilgisayarda indirdiysen buradan kur (.bin)": "If you downloaded the model on another computer, install it from here (.bin)",
+    "İnternet yoksa ya da şirket ağı model indirmeyi engelliyorsa: modeli (ör. ggml-large-v3-turbo-q5_0.bin) başka bir bilgisayarda indir, buradan seç. Katalogdaki modeller SHA-256 ile doğrulanır; tanınmayan dosya yalnız Özel model olarak eklenir.":
+      "No internet, or your company network blocks the model download? Download the model (e.g. ggml-large-v3-turbo-q5_0.bin) on another computer and pick it here. Catalog models are verified with SHA-256; an unrecognised file can only be added as a Custom model.",
+    "Whisper model dosyasını seç (.bin)": "Choose the Whisper model file (.bin)",
+    "Motor kurulumu sürüyor; bitince içe aktar.": "The engine is still installing; import when it's done.",
+    "Model içe aktarıldı ve doğrulandı: {}": "Model imported and verified: {}",
+    "Model içe aktarıldı (doğrulanmadı): {}": "Model imported (not verified): {}",
+    "Özel model eklendi: {}": "Custom model added: {}",
+    "Özel model — {}": "Custom model — {}",
+    "içe aktarıldı, doğrulanmadı": "imported, not verified",
+    "Model kopyalanıyor…": "Copying the model…",
+    "Model kopyalanıyor… %{n}": "Copying the model… {}%",
+    "Model içe aktarma modülü yüklenmedi.": "The model import module didn't load.",
+    "Başka bir model içe aktarılıyor; bitmesini bekle.": "Another model is being imported; wait for it to finish.",
+    "Dosya okunamadı: {}": "Couldn't read the file: {}",
+    "Bir model dosyası (.bin) seç.": "Choose a model file (.bin).",
+    "Bu dosya zaten Suflo'nun model klasöründe: yeniden içe aktarmaya gerek yok.": "This file is already in Suflo's model folder: no need to import it again.",
+    "{} doğrulanamadı: SHA-256 uyuşmadı (bozuk ya da farklı bir dosya). Kurulmadı.": "{} couldn't be verified: SHA-256 mismatch (damaged or a different file). Not installed.",
+    "Özel model dosyası bulunamadı: Ayarlar › Motor › Model dosyası içe aktar ile yeniden ekle.": "Custom model file not found: add it again with Settings › Engine › Import model file.",
+    "Kopya eksik: {}/{} bayt": "Incomplete copy: {}/{} bytes",
+    // file checks (js/model-ice-aktar.js)
+    "Bu dosya model değil, Git LFS işaretçisi (yalnız birkaç yüz bayt). Modeli Hugging Face'teki indirme (resolve) bağlantısından indir.":
+      "This file isn't a model but a Git LFS pointer (only a few hundred bytes). Download the model from the Hugging Face download (resolve) link.",
+    "Dosya model olamayacak kadar küçük (1 MB ya da daha az). İndirme yarım kalmış olabilir.": "The file is too small to be a model (1 MB or less). The download may be incomplete.",
+    "Dosya 4 GB'tan büyük: whisper.cpp modeli olamaz.": "The file is larger than 4 GB: it can't be a whisper.cpp model.",
+    "Dosyanın başı okunamadı.": "Couldn't read the start of the file.",
+    "Dosya {} için beklenenden küçük ({} MB, beklenen ~{} MB): indirme yarım kalmış olabilir.": "The file is smaller than expected for {} ({} MB, expected ~{} MB): the download may be incomplete.",
+    "Bu bir GGUF dosyası; Suflo'nun motoru (whisper.cpp) ggml biçiminde .bin model ister.": "This is a GGUF file; Suflo's engine (whisper.cpp) needs a ggml .bin model.",
+    "Bu dosya whisper.cpp modeli değil (ggml imzası yok).": "This file isn't a whisper.cpp model (no ggml signature).",
+    // confirmations
+    "Bu dosya Suflo'nun model kataloğunda yok. Doğruluğu denetlenemez ve DTW ön ayarı uygulanmaz. Yalnız güvendiğin bir kaynaktan aldıysan devam et. Özel model olarak eklensin mi?":
+      "This file isn't in Suflo's model catalog. It can't be verified and no DTW preset applies. Only continue if you got it from a source you trust. Add it as a Custom model?",
+    "Bu dosya Suflo'nun model kataloğunda yok ({}: katalogdaki sürümden farklı). Doğruluğu denetlenemez ve DTW ön ayarı uygulanmaz. Yalnız güvendiğin bir kaynaktan aldıysan devam et. Özel model olarak eklensin mi?":
+      "This file isn't in Suflo's model catalog ({}: differs from the catalog version). It can't be verified and no DTW preset applies. Only continue if you got it from a source you trust. Add it as a Custom model?",
+    "İnternete ulaşılamadığı için {} SHA-256 ile doğrulanamadı (doğrulanmadı). Dosyayı güvendiğin bir kaynaktan aldıysan kurulsun mu?":
+      "The internet couldn't be reached, so {} couldn't be checked with SHA-256 (not verified). Install it if you got the file from a source you trust?",
+    "Model klasöründe zaten {} var. Mevcut model silinip içe aktarılan dosya yerine konsun mu?":
+      "{} is already in the model folder. Delete the current model and put the imported file in its place?",
+    // Doctor › Test model sources
+    "Model kaynaklarını sına": "Test model sources",
+    "huggingface.co, hf-mirror.com ve motor sürüm sunucusuna 5 saniyelik deneme isteği": "A 5-second test request to huggingface.co, hf-mirror.com and the engine release server",
+    "Model kaynakları sınanıyor…": "Testing model sources…",
+    "Bazı model kaynaklarına ulaşılamıyor: ayrıntı Doctor raporunda": "Some model sources can't be reached: details in the Doctor report",
+    "Tüm model kaynaklarına ulaşılıyor": "All model sources are reachable",
+    "Model kaynağı: {}": "Model source: {}",
+    "Hugging Face (modeller)": "Hugging Face (models)",
+    "Model aynası": "Model mirror",
+    "Motor sürümleri": "Engine releases",
+    "ulaşılıyor (HTTP {})": "reachable (HTTP {})",
+    "kurumsal sertifikayla": "via the corporate certificate",
+    // network explanations (js/ag-dayanim.js agHatasiAcikla)
+    "Kurumsal ağ filtresi {} adresini engelliyor (Cisco Umbrella, {}).": "A corporate network filter is blocking {} (Cisco Umbrella, {}).",
+    "Kurumsal ağ filtresi {} adresini engelliyor (ad {} adresine yönlendiriliyor).": "A corporate network filter is blocking {} (the name resolves to {}).",
+    "Kurumsal ağ filtresi {} adresini engelliyor (Cisco Umbrella, {}). BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
+      "A corporate network filter is blocking {} (Cisco Umbrella, {}). Ask your IT team for access, or download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Kurumsal ağ filtresi {} adresini engelliyor (ad {} adresine yönlendiriliyor). BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
+      "A corporate network filter is blocking {} (the name resolves to {}). Ask your IT team for access, or download the model on another computer and install it with Settings › Engine › Import model file.",
+    "BT ekibinden izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
+      "Ask your IT team for access, or download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Ağ HTTPS bağlantılarını denetliyor (kurumsal güvenlik yazılımı, sertifika: {}). Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi, olmadı. BT ekibinden {} için izin iste. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "The network inspects HTTPS connections (corporate security software, certificate: {}). Suflo retried once with the certificates this computer trusts, without success. Ask your IT team to allow {}. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Ağ HTTPS bağlantılarını denetliyor (kurumsal güvenlik yazılımı, sertifika: {}). BT ekibinden {} için izin iste. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "The network inspects HTTPS connections (corporate security software, certificate: {}). Ask your IT team to allow {}. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Vekil sunucu kimlik doğrulaması istiyor (HTTP 407). Ayarlar'daki vekil adresine kullanıcı:parola ekle.": "The proxy requires authentication (HTTP 407). Add user:password to the proxy address in Settings.",
+    "Vekil sunucu bağlantıyı kurmadı ({}). Ayarlar'daki vekil adresini kontrol et.": "The proxy didn't open the connection ({}). Check the proxy address in Settings.",
+    "{} adı çözülemedi: internet yok ya da ağ bu adı engelliyor. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "{} couldn't be resolved: no internet, or the network blocks this name. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "{} yanıt vermedi (zaman aşımı): güvenlik duvarı bağlantıyı düşürüyor olabilir. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "{} didn't respond (timeout): a firewall may be dropping the connection. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "{} bağlantıyı reddetti ya da kesti: ağ filtresi engelliyor olabilir. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "{} refused or dropped the connection: a network filter may be blocking it. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "{} erişimi reddetti (HTTP {}): kurumsal filtre engelliyor olabilir. Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "{} denied access (HTTP {}): a corporate filter may be blocking it. Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "{} HTTP {} döndü.": "{} returned HTTP {}.",
+    // single sentences (sentence-by-sentence fallback when a host name splits a composed message)
+    "Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
+      "Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi, olmadı.": "Suflo retried once with the certificates this computer trusts, without success.",
+    "Bilgisayarın güvendiği sertifikalarla yeniden deneme süreye sığmadı: birkaç saniye sonra yeniden sına.":
+      "The retry with the certificates this computer trusts ran out of time: test again in a few seconds.",
+    "Doğruluğu denetlenemez ve DTW ön ayarı uygulanmaz.": "It can't be verified and no DTW preset applies.",
+    "Yalnız güvendiğin bir kaynaktan aldıysan devam et.": "Only continue if you got it from a source you trust.",
+    "Özel model olarak eklensin mi?": "Add it as a Custom model?",
+    "({}: katalogdaki sürümden farklı)": "({}: differs from the catalog version)",
+    "{} · ulaşılıyor (HTTP {})": "{} · reachable (HTTP {})",
+    "bağlantı kurulamadı": "couldn't connect",
+    // error guide (js/bridge.js HATA_REHBERI)
+    "BT ekibinden huggingface.co, hf-mirror.com ve github.com için izin iste ya da modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kur.":
+      "Ask your IT team to allow huggingface.co, hf-mirror.com and github.com, or download the model on another computer and install it with Settings › Engine › Import model file.",
+    "Ağ HTTPS bağlantılarını denetliyor olabilir (kurumsal güvenlik yazılımı). BT ekibinden bu adres için izin iste; şirket ağındaysan Ayarlar'dan vekil sunucu tanımla.":
+      "Your network may be inspecting HTTPS connections (corporate security software). Ask your IT team to allow this address; on a company network, set up a proxy in Settings.",
+    // review fixes: engine status, unverified import, Doctor › Verify
+    "doğrulanmadı": "not verified",
+    "motor kurulu değil": "engine not installed",
+    "{} hazır · motor kurulu değil": "{} ready · engine not installed",
+    "Bu model katalogda yok: doğrulanamaz.": "This model isn't in the catalog: it can't be verified.",
+    "Doğrula": "Verify",
+    "Model doğrulanmadı": "Model not verified",
+    "{} çevrimdışı içe aktarıldı; SHA-256 henüz denetlenmedi. İnternet varken Doğrula'ya bas.":
+      "{} was imported offline; its SHA-256 hasn't been checked yet. Press Verify when you're online.",
+    "{} doğrulanamadı: SHA-256 uyuşmadı, dosya silindi. Modeli yeniden indir ya da içe aktar.":
+      "{} couldn't be verified: SHA-256 mismatch, so the file was deleted. Download or import the model again.",
+    "{} doğrulanamadı: huggingface.co'ya ulaşılamadı. İnternet varken yeniden dene.":
+      "{} couldn't be verified: huggingface.co couldn't be reached. Try again when you're online.",
+    // review fixes: block page instead of the file (js/bridge.js download)
+    "Sunucu dosya yerine bir web sayfası gönderdi: ağ filtresinin engel sayfası olabilir.":
+      "The server sent a web page instead of the file: it may be a network filter's block page.",
+    "Sunucu beklenenden çok küçük bir yanıt gönderdi ({}, beklenen ~{} MB): ağ filtresinin engel sayfası olabilir.":
+      "The server sent a much smaller response than expected ({}, expected ~{} MB): it may be a network filter's block page.",
+    "Ağ filtresi bu indirmeyi engelliyor olabilir. BT ekibinden bu adres için izin iste; şirket ağındaysan Ayarlar'dan vekil sunucu tanımla.":
+      "A network filter may be blocking this download. Ask your IT team to allow this address; on a company network, set up a proxy in Settings."
+  });
+
+  /* ============ 3.4 step 20: tool search / command palette (Ctrl+K / ⌘K; js/arac-ara.js, js/app.js #arac-ara) ============ */
+  add({
+    "Araç ara": "Search tools",
+    "Araç ara ({})": "Search tools ({})",
+    "Araç ya da eylem ara… (ör. sessizlik, rampa)": "Search tools or actions… (e.g. silence, ramp)",
+    "Araçlar ve eylemler": "Tools and actions",
+    "Eşleşen araç yok. Başka bir kelime dene.": "No matching tool. Try another word.",
+    "seç": "select",
+    "aç": "open",
+    "favori": "favorite",
+    "kapat": "close",
+    "Son kullanılanlar": "Recent",
+    "Eylemler": "Actions",
+    "Favorilere ekle": "Add to favorites",
+    "Favorilerden çıkar": "Remove from favorites",
+    "Suflo Pro özelliği": "Suflo Pro feature",
+    // static actions (js/arac-ara.js EYLEMLER); the others reuse existing button labels
+    "Altyazıyı çevir": "Translate captions",
+    "Eğri uygula": "Apply curve",
+    "Kanca başlığı ekle": "Add hook title",
+    "YouTube'dan indir": "Download from YouTube",
+    "Ayarlar › Motor": "Settings › Engine",
+    "Ayarlar › Arayüz dili": "Settings › Interface language",
+    "Ayarlar › Marka Kiti": "Settings › Brand kit",
+    "Önce sessizlikleri bul.": "Find silences first."
+  });
+
   /* ============ patterns for numbers / names that templates can't express ============ */
   /* ================= English (beta) UI + global sales (v3.1) ================= */
   add({
@@ -3405,7 +3549,8 @@
     "Editing is not allowed: turn on 'Düzenlemeye izin ver' (Allow editing) in Suflo > Settings > AI bridge.",
     "These are the onboarding sample captions: they only go on the 'Suflo Deneme' sequence. Open that sequence first.",
     "The SRT was imported into the Premiere project, but Premiere did not create a caption track: drag it from the Project panel onto the timeline. Do not apply again.",
-    "Select a clip on the timeline first."];   // file picker filter (not shown as text)   // language pickers show each language in its own name
+    "Select a clip on the timeline first.",
+    "Ctrl+K", "⌘K", "Ctrl+D", "⌘D", "Esc"];   // tool search (3.4 step 20): keyboard keys   // file picker filter (not shown as text)   // language pickers show each language in its own name
   S["ASS · stilli"] = "ASS · styled";
 
   var d = { strings: S, patterns: P, keep: KEEP };

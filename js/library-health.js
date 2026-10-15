@@ -23,7 +23,8 @@ window.KLibraryHealth = (function () {
     "sync-pro": "Eşitle",
     "clear-folders": "Bağlantıyı temizle",
     "check-update": "Güncelle",
-    "update-ytdlp": "yt-dlp'yi güncelle"
+    "update-ytdlp": "yt-dlp'yi güncelle",
+    "verify-model": "Doğrula"
   };
   var GROUP_LABELS = {
     system: "Sistem",
@@ -379,7 +380,12 @@ window.KLibraryHealth = (function () {
         if (!probe || probe.code !== 0) throw new Error("motor kod=" + (probe ? probe.code : "?"));
         var model = window.KEngine && KEngine.activeModel ? KEngine.activeModel() : null;
         var build = window.KEngine && KEngine.installedBuild ? KEngine.installedBuild() : "cpu";
-        checks.push({ status: "good", title: "Yerel altyazı motoru", detail: (model ? model.label.split(" —")[0] : basename(ready.model)) + " · " + String(build).toUpperCase(), group: "engine" });
+        var modelAdi = model ? (KEngine.modelKisaAdi ? KEngine.modelKisaAdi(model) : model.label.split(" —")[0]) : basename(ready.model);
+        checks.push({ status: "good", title: "Yerel altyazı motoru", detail: modelAdi + " · " + String(build).toUpperCase(), group: "engine" });
+        // 3.4 adım 19: çevrimdışı içe aktarılıp SHA-256'sı denetlenmemiş model ("doğrulanmadı")
+        if (model && KEngine.dogrulanmadiMi && KEngine.dogrulanmadiMi(model)) {
+          checks.push({ status: "warn", title: "Model doğrulanmadı", detail: modelAdi + " çevrimdışı içe aktarıldı; SHA-256 henüz denetlenmedi. İnternet varken Doğrula'ya bas.", action: "verify-model", group: "engine" });
+        }
         // 3.2 adım 5: etkin çözme modu ve DTW desteği (yardım metni yukarıdaki "-h" yoklamasından)
         motorSecenekSatirlari(probe, model, ready, build).forEach(function (c) { checks.push(c); });
       } catch (eP) {
@@ -420,6 +426,92 @@ window.KLibraryHealth = (function () {
       return [{ status: "good", title: "Güncelleme bağlantısı", detail: "Suflo v" + (K.VERSION || latest || "?") + " güncel", group: "system" }];
     } catch (e) {
       return [{ status: "warn", title: "İnternet bağlantısı sınanamadı", detail: "Yerel özellikler çalışmaya devam eder · " + String(e && e.message ? e.message : e), group: "system" }];
+    }
+  }
+
+  /*
+   * 3.4 adım 19 — "Model kaynaklarını sına": huggingface.co, hf-mirror.com ve motor sürüm
+   * sunucusuna 5 sn zaman aşımlı (duvar saati: DNS, bağlantı, vekil tüneli dahil) HEAD isteği
+   * (paralel). Her kaynağın adı HEAD ile aynı anda çözülür: 146.112.0.0/16 (Cisco Umbrella) /
+   * 0.0.0.0 kurumsal filtre olarak anlatılır (HEAD yanıt verse bile: engel sunucusu 200/302 döner).
+   * Satırlar js/ag-dayanim.js kaynakSatirlari ile kurulur (group "engine", kaynak: true).
+   * Yalnız düğmeyle çalışır: panel açılışında ve normal taramada ağ isteği yapılmaz.
+   * Sistem kökleri düğmeye basılınca önceden OKUNMAZ (Windows'ta gizli PowerShell yalnız gerçek bir sertifika
+   * hatasında başlar); okuma 5 sn'ye sığmazsa satır HTTPS denetimini ve "birkaç saniye sonra yeniden sına"yı söyler.
+   */
+  async function kaynakSina() {
+    var ag = window.SufloAgDayanim;
+    if (!ag || !K.httpGet) return [];
+    var motorUrl = window.KEngine && KEngine.motorKaynakAdresi ? KEngine.motorKaynakAdresi() : "";
+    var adresler = ag.kaynakAdresleri(motorUrl);
+    var sonuclar = await Promise.all(adresler.map(async function (a) {
+      var t0 = Date.now(), r = null;
+      // DNS her kaynak için ve HEAD ile AYNI ANDA sorulur (en çok 3 sn, toplam süre 5 sn'yi aşmaz):
+      // Cisco Umbrella kök sertifikası kurulu ağda engel sunucusu TLS'i geçip 200 / 302 döner,
+      // yalnız HEAD'e bakmak engellenen kaynağı "ulaşılıyor" gösterirdi
+      var dnsIsi = K.dnsEngeli ? Promise.resolve().then(function () { return K.dnsEngeli(a.host); }).then(null, function () { return ""; }) : Promise.resolve("");
+      try { r = await K.httpGet(a.url, {}, { method: "HEAD", timeout: ag.SINAMA_ZAMAN_ASIMI, sistemKokleri: true }); }
+      catch (e) { r = { status: 0, body: String(e && e.message ? e.message : e) }; }
+      r = r || { status: 0, body: "" };
+      // Node hata kodu iletiyle birlikte taşınır: ileti OpenSSL sürümüne göre değişir (OpenSSL 3:
+      // "self-signed certificate in certificate chain"), kod değişmez (SELF_SIGNED_CERT_IN_CHAIN)
+      var hata = "";
+      if (!r.status) {
+        var metin = String(r.body || r.kod || "bağlantı kurulamadı");
+        hata = r.kod ? { code: String(r.kod), message: metin } : metin;
+      }
+      var s = {
+        id: a.id, ad: a.ad, host: a.host, status: Number(r.status) || 0, hata: hata,
+        sure: Date.now() - t0, caDenendi: !!r.caDenendi, caSuresiDoldu: !!r.caSuresiDoldu, dnsEngelAdresi: ""
+      };
+      s.dnsEngelAdresi = String((await dnsIsi) || "");
+      return s;
+    }));
+    return ag.kaynakSatirlari(sonuclar);
+  }
+
+  // Önceki sınama satırlarını at, yenilerini ekle, genel durumu yeniden hesapla
+  function kaynakSatirlariniEkle(report, satirlar) {
+    report.checks = (report.checks || []).filter(function (c) { return !c.kaynak; });
+    (satirlar || []).forEach(function (c) {
+      report.checks.push({ status: c.status, title: c.title, detail: c.detail || "", action: "", group: c.group || "engine", kaynak: true });
+    });
+    report.status = "good";
+    report.checks.forEach(function (c) {
+      if (c.status === "bad") report.status = "bad";
+      else if (c.status === "warn" && report.status === "good") report.status = "warn";
+    });
+    return report;
+  }
+
+  async function kaynaklariSina() {
+    if (busy) return lastReport;
+    busy = true;
+    setWorking("Model kaynakları sınanıyor…");
+    try {
+      // Tam tarama hiç yapılmadıysa önce o (sınamayla aynı anda): yalnız dosya erişimi ve
+      // kütüphane satırlarından kurulan rapor, üç kaynak satırı iyi diye "Suflo hazır" yazıp
+      // "Yerel motor kurulu değil"i hiç sınamadan Altyazı motoru çipini yeşile boyardı
+      var temel = lastReport;
+      var isler = [kaynakSina()];
+      if (!temel) { temel = makeReport(); isler.push(runAsyncChecks(temel)); }
+      var sonuclar = await Promise.all(isler);
+      var satirlar = sonuclar[0];
+      if (isler.length > 1 && window.KApp && KApp.refreshContext) KApp.refreshContext();
+      lastReport = kaynakSatirlariniEkle(temel, satirlar);
+      var kotu = satirlar.filter(function (c) { return c.status !== "good"; }).length;
+      if (window.KApp) {
+        KApp.toast(kotu ? "Bazı model kaynaklarına ulaşılamıyor: ayrıntı Doctor raporunda" : "Tüm model kaynaklarına ulaşılıyor", kotu ? "warn" : "good", kotu ? 9000 : 4500);
+      }
+      render(lastReport);
+      return lastReport;
+    } catch (e) {
+      if (window.KApp) KApp.toast(K.hataYardimi ? K.hataYardimi(e) : String(e), "bad", 9000);
+      if (lastReport) render(lastReport);
+      return lastReport;
+    } finally {
+      busy = false;
+      clearWorking();
     }
   }
 
@@ -646,11 +738,11 @@ window.KLibraryHealth = (function () {
       box.hidden = false; box.className = "library-health checking";
       box.innerHTML = '<div class="library-health-title"><span class="spinner"></span><b>' + esc(label || "Suflo taranıyor…") + '</b></div><div class="doctor-progress">Timeline ve medya dosyaları değiştirilmez.</div>';
     }
-    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all"), function (b) { b.disabled = true; });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all, #set-doctor-kaynak"), function (b) { b.disabled = true; });
   }
 
   function clearWorking() {
-    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all"), function (b) { b.disabled = false; });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-doctor-action], #set-library-health-run, #set-doctor-fix-all, #set-doctor-kaynak"), function (b) { b.disabled = false; });
     var runBtn = el("set-library-health-run");
     if (runBtn) {
       if (runBtn._doctorIdleHtml) runBtn.innerHTML = runBtn._doctorIdleHtml;
@@ -732,6 +824,18 @@ window.KLibraryHealth = (function () {
       }
       K.saveSettings();
       await refreshLibraries();
+      return;
+    }
+    if (action === "verify-model") {
+      // 3.4 adım 19: çevrimdışı içe aktarılan katalog modelini internet varken SHA-256 ile denetle
+      if (!window.KEngine || !KEngine.modelYenidenDogrula || !KEngine.dogrulanmamisModeller) throw new Error("Yerel motor kurulum modülü yüklenmedi.");
+      var bekleyen = KEngine.dogrulanmamisModeller();
+      for (var vi = 0; vi < bekleyen.length; vi++) {
+        var dv = await KEngine.modelYenidenDogrula(bekleyen[vi].id, say);
+        var vAd = KEngine.modelKisaAdi ? KEngine.modelKisaAdi(dv.model) : bekleyen[vi].id;
+        if (dv.durum === "uyusmadi") throw new Error(vAd + " doğrulanamadı: SHA-256 uyuşmadı, dosya silindi. Modeli yeniden indir ya da içe aktar.");
+        if (dv.durum !== "dogrulandi") throw new Error(vAd + " doğrulanamadı: huggingface.co'ya ulaşılamadı. İnternet varken yeniden dene.");
+      }
       return;
     }
     if (action === "update-ytdlp") {
@@ -820,6 +924,8 @@ window.KLibraryHealth = (function () {
       if (K.cs && K.cs.openURLInDefaultBrowser) K.cs.openURLInDefaultBrowser(PANEL_REHBERI);
     });
     if (fixAllBtn) fixAllBtn.addEventListener("click", repairAll);
+    var kaynakBtn = el("set-doctor-kaynak");
+    if (kaynakBtn) kaynakBtn.addEventListener("click", function () { kaynaklariSina(); });
     if (box) box.addEventListener("click", function (event) {
       var target = event.target;
       while (target && target !== box && !target.getAttribute("data-doctor-action")) target = target.parentNode;
@@ -840,6 +946,9 @@ window.KLibraryHealth = (function () {
     repairAll: repairAll,
     apiKontrolleri: apiKontrolleri,
     cipDurumlari: cipDurumlari,
+    kaynakSina: kaynakSina,
+    kaynaklariSina: kaynaklariSina,
+    kaynakSatirlariniEkle: kaynakSatirlariniEkle,
     PANEL_REHBERI: PANEL_REHBERI,
     last: function () { return lastReport; }
   };

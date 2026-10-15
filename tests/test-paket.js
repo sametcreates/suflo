@@ -83,6 +83,13 @@ var ih = okuK("index.html");
 var sira = ["js/deneme.js", "js/pro.js", "js/captions.js", "js/magiccut.js", "js/konusma-kes.js", "js/hiz-rampasi.js", "js/zoom.js", "js/otomasyon.js", "js/otomasyon-sunucu.js", "js/otomasyon-panel.js", "js/app.js"].map(function (f) { return ih.indexOf('<script src="' + f + '"></script>'); });
 ok("MCP: index.html betik sırası (kayıt → sunucu → panel → app)", sira.every(function (x, i) { return x > 0 && (i === 0 || x > sira[i - 1]); }), sira.join(","));
 
+/* ---- 3.4 adım 19-20: ağ dayanıklılığı, model içe aktarma ve Araç ara her pakette ---- */
+ok("3.4 adım 19-20: verify-release ag-dayanim, model-ice-aktar ve arac-ara'yı zorunlu tutar",
+  /js\/ag-dayanim\\\.js\$/.test(gerekli) && /js\/model-ice-aktar\\\.js\$/.test(gerekli) && /js\/arac-ara\\\.js\$/.test(gerekli), gerekli.slice(0, 300));
+var sira34 = ["js/ag-dayanim.js", "js/bridge.js", "js/arac-ara.js", "js/model-ice-aktar.js", "js/engine.js", "js/captions.js", "js/app.js"].map(function (f) { return ih.indexOf('<script src="' + f + '"></script>'); });
+ok("3.4 adım 19-20: index.html betik sırası (ag-dayanim → bridge, model-ice-aktar → engine, arac-ara → captions → app)",
+  sira34.every(function (x, i) { return x > 0 && (i === 0 || x > sira34[i - 1]); }), sira34.join(","));
+
 /* ---- Caption Editor "Çevir": kelime kelime (k1) / birikimli (kc) / N kelime belgesi çevrilmez ---- */
 // Her kelime ayrı altyazı satırı olarak LLM'e gidiyor, sonuç kelime kelime yazılıyor ("Today|to you|with the
 // camera…"), deneme hakkı düşüyordu. Çok dilli paketteki kural; kapıdan önce (deneme kurulmaz).

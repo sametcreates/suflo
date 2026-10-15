@@ -241,6 +241,430 @@ window.KApp = (function () {
     });
   }
 
+  /* ---------------- Araç ara (Ctrl+K / ⌘K) — 3.4 adım 20 ---------------- */
+
+  /*
+   * Saf mantık js/arac-ara.js'te (SufloAracAra): Türkçe katlama, puanlama, kayıt, favori / son kullanılan,
+   * kısayol ve CEP tuş ilgisi. Burada yalnız ince DOM katmanı: #arac-ara penceresi ve üst çubuktaki #arac-ara-ac.
+   * Seçim yalnız gezinir: araç satırı sol menüdeki girdiye tıklar; eylem satırı sekmeyi açar, düğmeyi bulur, odaklar
+   * ve vurgular, ÇALIŞTIRMAZ (Pro kapısı, onay ve seçim denetimi aracın kendi düğmesinde). Premiere'e çağrı yok;
+   * favoriler ve son kullanılanlar yalnız bu bilgisayarın localStorage'ında. Ücretsiz.
+   */
+  var AA = window.SufloAracAra || null;
+  var arama = { acik: false, kayit: [], sonuclar: [], aktif: 0, durum: null, onceki: null, vurgu: null, vurguSaat: null,
+    tutulan: null, tutulanBirak: null };
+  // aramaIlgisi: ilk etkileşim oldu (ilgi kurulabilir). aramaMacTuslari: macOS'ta ⌘K için tutulan fiziksel tuşlar (e.code;
+  // düzen öğrenildikçe değişir). aramaIlgisiSon: CEP'e en son verilen liste (aynısı yeniden verilmez).
+  var aramaIlgisi = false, aramaMacTuslari = ["KeyK"], aramaIlgisiSon = null;
+
+  function aramaDepo() { try { return window.localStorage || null; } catch (e) { return null; } }
+  function aramaAcik() { return arama.acik; }
+  // Pro rozeti yalnız bilgi: pro.js yapılandırılmadıysa (isPro true) rozet yok, markLocked ile aynı
+  function proAcik() { var P = window.Pro; try { return !P || typeof P.isPro !== "function" || P.isPro(); } catch (e) { return true; } }
+
+  /*
+   * Pro penceresi, AI anahtar sihirbazı, yenilikler, YouTube onayı, preset paketi rehberi (#preset-pack-guide) ya da
+   * görünen başka bir aria-modal pencere açıkken palet üstlerine açılmaz (çoğunun z-index'i paletinkinden yüksek: palet
+   * arkada görünmeden açılır, odağı ve yazılanları alırdı)
+   */
+  function baskaPencereAcik() {
+    var anahtar = el("onb-anahtar"), yt = el("yt-onay");
+    if (document.querySelector(".pro-upsell-backdrop") || document.querySelector(".yenilik-arka") || document.querySelector("#preset-pack-guide") ||
+      (anahtar && !anahtar.hidden) || (yt && !yt.hidden)) return true;
+    var palet = el("arac-ara"), modallar = document.querySelectorAll('[aria-modal="true"]');
+    for (var i = 0; i < modallar.length; i++) {
+      var m = modallar[i];
+      if ((palet && palet.contains(m)) || (m.closest && m.closest("[hidden]"))) continue;
+      if (gorunur(m)) return true;
+    }
+    return false;
+  }
+
+  /*
+   * CEP: Ctrl+K / ⌘K panelde tutulur (yoksa Premiere'e de gider: Kes / Add Edit). Panel açılışında değil, panel
+   * ilk kez odak / tıklama / tuş alınca; önizleme sahnesinin konum tuşlarıyla birleşik tek kayıt.
+   * Odak altyazı düzenleyicisinde bir düğmedeyken (AA.tusIlgisiBirakilsinMi: palet orada açılmaz) ilgi bırakılır,
+   * Ctrl+K eskisi gibi Premiere'in Kes'ine gider; odak çıkınca geri kurulur (inceleme 2, aramaOdakIlgisi).
+   * macOS klavye düzeni (kurucu 20.K3): ⌘ + tutulan fiziksel tuş K olmayan bir harf yazıyorsa (Türkçe F: fiziksel K = M,
+   * ⌘M = Export Media) o tuş bırakılır; ⌘K tutulmayan bir tuştan geldiyse (Türkçe F: fiziksel J) o tuş eklenir: ilk
+   * basış Premiere'e de gitmiş olabilir, sonrakiler panelde kalır.
+   */
+  function aramaIlgisiUygula() {
+    if (!AA || !aramaIlgisi) return;
+    var liste = [];
+    try { if (!(AA.tusIlgisiBirakilsinMi && AA.tusIlgisiBirakilsinMi(document.activeElement))) liste = AA.tusIlgisi(!!K.MAC, aramaMacTuslari); }
+    catch (x) { liste = []; }
+    var anahtar = JSON.stringify(liste);
+    if (anahtar === aramaIlgisiSon) return;
+    aramaIlgisiSon = anahtar;
+    try { AA.tusIlgisiAyarla("arac-ara", liste.length ? liste : ""); } catch (x2) {}
+  }
+
+  function aramaTusIlgisi(e) {
+    if (!AA) return;
+    aramaIlgisi = true;
+    if (e && e.type === "keydown" && K.MAC) {
+      var yeni = AA.yeniKisayolTusu ? AA.yeniKisayolTusu(e, true, aramaMacTuslari) : "";
+      if (AA.tusDuzeniUyumsuz(e, true, aramaMacTuslari)) {
+        aramaMacTuslari = aramaMacTuslari.filter(function (k) { return k !== e.code; });
+        K.log("arac ara: Cmd+K tus ilgisi birakildi (" + e.code + " bu duzende '" + e.key + "')");
+      } else if (yeni) {
+        aramaMacTuslari = aramaMacTuslari.concat([yeni]);
+        K.log("arac ara: Cmd+K bu duzende " + yeni + " tusunda, tus ilgisine eklendi");
+      }
+    }
+    aramaIlgisiUygula();
+  }
+
+  // Odak değişti: düzenleyicinin düğmesine girdiyse ilgi bırakılır, çıktıysa geri kurulur. focusout'ta odak bir öğeye
+  // geçiyorsa (relatedTarget) focusin halleder; boşluğa (gövdeye) düştüyse burada.
+  function aramaOdakIlgisi(e) {
+    if (e && e.type === "focusout" && e.relatedTarget) return;
+    aramaIlgisiUygula();
+  }
+
+  /*
+   * Seçimden sonra odak aracın düğmesinde (eylem) ya da sol menü girdisinde (araç) ve kullanıcıya "Enter'a bir kez daha
+   * bas" deniyor. Odak metin kutusunda değilken CEP tuşları Premiere'e de gönderir (Enter = Render Effects In to Out,
+   * Boşluk = oynat / durdur): odak o öğede kaldıkça Enter ve Boşluk panelde tutulur (AA.hedefTusIlgisi), odak gidince
+   * bırakılır. Metin kutusu ve açılır liste zaten Premiere'e tuş göndermez: orada tutulmaz.
+   */
+  function hedefTuslariniTut(x) {
+    hedefTuslariniBirak();
+    if (!AA || !x || !x.addEventListener || document.activeElement !== x || AA.yaziAlaniMi(x)) return;
+    var birak = function () { if (arama.tutulan === x) hedefTuslariniBirak(); };
+    arama.tutulan = x;
+    arama.tutulanBirak = birak;
+    x.addEventListener("blur", birak);
+    try { AA.tusIlgisiAyarla("arac-ara-hedef", AA.hedefTusIlgisi(!!K.MAC)); } catch (e) {}
+  }
+
+  function hedefTuslariniBirak() {
+    var x = arama.tutulan;
+    if (!x) return;
+    if (x.removeEventListener && arama.tutulanBirak) x.removeEventListener("blur", arama.tutulanBirak);
+    arama.tutulan = null;
+    arama.tutulanBirak = null;
+    try { AA.tusIlgisiAyarla("arac-ara-hedef", ""); } catch (e) {}
+  }
+
+  // Sol menü girdisinin özgün (Türkçe) adı; "YENİ" rozeti (em.ky-yeni) ada katılmaz
+  function navAdi(b) {
+    if (!b) return "";
+    var s = "";
+    Array.prototype.forEach.call(b.childNodes, function (n) {
+      if (n.nodeType === 1 && n.classList && n.classList.contains("ky-yeni")) return;
+      s += uiOzgun(n);
+    });
+    return s.replace(/\s+/g, " ").trim();
+  }
+
+  function navDugmesi(tab, kat) {
+    var adaylar = document.querySelectorAll(".yan-menu .ky-oge[data-tab]");
+    for (var i = 0; i < adaylar.length; i++) {
+      if (adaylar[i].getAttribute("data-tab") === tab && (adaylar[i].getAttribute("data-kat") || "") === (kat || "")) return adaylar[i];
+    }
+    return null;
+  }
+
+  function aramaKaydi() {
+    var navlar = [];
+    Array.prototype.forEach.call(document.querySelectorAll(".yan-menu .ky-oge[data-tab]"), function (b) {
+      var ad = b.querySelector(".ky-metin b"), alt = b.querySelector(".ky-metin i");
+      navlar.push({ tab: b.getAttribute("data-tab"), kat: b.getAttribute("data-kat") || "", ad: navAdi(ad),
+        alt: alt ? uiOzgun(alt).replace(/\s+/g, " ").trim() : "", pro: !!b.querySelector("[data-kilit]") });
+    });
+    // sekmesi bu sürümde olmayan eylem (ör. Eğri) listelenmez
+    var kayit = AA.kayitKur(navlar, { mevcut: function (e) { return !!el("tab-" + e.tab); } });
+    kayit.forEach(function (o) {
+      o.adGoster = uiMetni(o.ad);
+      o.altGoster = o.alt ? uiMetni(o.alt) : "";
+    });
+    return kayit;
+  }
+
+  function aramaIkonu(o) {
+    var b = navDugmesi(o.tab, o.kat) || navDugmesi(o.tab, "");
+    var svg = b ? b.querySelector(".ky-ikon svg") : null;
+    var s = document.createElement("span");
+    s.className = "arac-ara-ikon" + (o.tur === "eylem" ? " eylem" : "");
+    s.setAttribute("aria-hidden", "true");
+    if (svg) s.appendChild(svg.cloneNode(true));
+    return s;
+  }
+
+  // Ad, eşleşen parçası <mark> içinde (metin düğümleriyle; innerHTML yok)
+  function aramaAdi(o, sorgu) {
+    var b = document.createElement("b"), ad = o.adGoster || o.ad, m = AA.eslesme(ad, sorgu);
+    if (!m) { b.textContent = ad; return b; }
+    if (m.bas > 0) b.appendChild(document.createTextNode(ad.slice(0, m.bas)));
+    var isaret = document.createElement("mark");
+    isaret.textContent = ad.slice(m.bas, m.son);
+    b.appendChild(isaret);
+    if (m.son < ad.length) b.appendChild(document.createTextNode(ad.slice(m.son)));
+    return b;
+  }
+
+  function aramaCiz() {
+    var liste = el("arac-ara-liste"), girdi = el("arac-ara-girdi");
+    var sorgu = girdi ? girdi.value : "";
+    arama.sonuclar = AA.ara(arama.kayit, sorgu, arama.durum);
+    if (arama.aktif >= arama.sonuclar.length) arama.aktif = 0;
+    while (liste.firstChild) liste.removeChild(liste.firstChild);
+    var pro = proAcik(), sonBolum = "";
+    arama.sonuclar.forEach(function (r, i) {
+      if (r.bolum && r.bolum !== sonBolum) {
+        var bas = document.createElement("div");
+        bas.className = "arac-ara-bolum";
+        bas.setAttribute("role", "presentation");
+        bas.textContent = uiMetni(AA.BOLUMLER[r.bolum] || "");
+        liste.appendChild(bas);
+      }
+      sonBolum = r.bolum;
+      var o = r.oge, satir = document.createElement("div");
+      satir.className = "arac-ara-satir";
+      satir.id = "arac-ara-s" + i;
+      satir.setAttribute("role", "option");
+      satir.setAttribute("aria-selected", "false");
+      satir.appendChild(aramaIkonu(o));
+      var metin = document.createElement("span");
+      metin.className = "arac-ara-metin";
+      metin.appendChild(aramaAdi(o, sorgu));
+      if (o.altGoster) { var alt = document.createElement("i"); alt.textContent = o.altGoster; metin.appendChild(alt); }
+      satir.appendChild(metin);
+      if (o.pro && !pro) {
+        var kilit = document.createElement("span");
+        kilit.className = "arac-ara-kilit";
+        kilit.textContent = "PRO";
+        // tarafsız: deneme hakkı her Pro araçta yok (SFX, Motion Presetleri, Podcast, Sahneleri bul…; inceleme 2)
+        kilit.title = uiMetni("Suflo Pro özelliği");
+        satir.appendChild(kilit);
+      }
+      var yildiz = document.createElement("button");
+      yildiz.type = "button";
+      yildiz.className = "arac-ara-yildiz" + (r.fav ? " on" : "");
+      yildiz.tabIndex = -1;
+      yildiz.textContent = r.fav ? "★" : "☆";
+      yildiz.setAttribute("aria-pressed", r.fav ? "true" : "false");
+      yildiz.title = uiMetni(r.fav ? "Favorilerden çıkar" : "Favorilere ekle");
+      yildiz.setAttribute("aria-label", yildiz.title);
+      yildiz.addEventListener("click", function (e) { e.stopPropagation(); aramaFavori(i); });
+      satir.appendChild(yildiz);
+      satir.addEventListener("mousemove", function () { if (arama.aktif !== i) aramaAktif(i, false); });
+      satir.addEventListener("click", function () { aramaSec(i); });
+      liste.appendChild(satir);
+    });
+    var bos = el("arac-ara-bos");
+    if (bos) bos.hidden = arama.sonuclar.length > 0;
+    aramaAktif(arama.aktif, true);
+  }
+
+  function aramaAktif(i, kaydir) {
+    var n = arama.sonuclar.length, girdi = el("arac-ara-girdi");
+    if (!n) { if (girdi) girdi.removeAttribute("aria-activedescendant"); return; }
+    i = ((i % n) + n) % n;
+    var eski = el("arac-ara-s" + arama.aktif);
+    if (eski) { eski.classList.remove("aktif"); eski.setAttribute("aria-selected", "false"); }
+    arama.aktif = i;
+    var s = el("arac-ara-s" + i);
+    if (!s) return;
+    s.classList.add("aktif");
+    s.setAttribute("aria-selected", "true");
+    if (girdi) girdi.setAttribute("aria-activedescendant", s.id);
+    if (kaydir && s.scrollIntoView) { try { s.scrollIntoView({ block: "nearest" }); } catch (e) { s.scrollIntoView(false); } }
+  }
+
+  function aramaFavori(i) {
+    var r = arama.sonuclar[i];
+    if (!r) return;
+    arama.durum = AA.favoriDegistir(arama.durum, r.oge.id);
+    AA.durumYaz(aramaDepo(), arama.durum);
+    var id = r.oge.id;
+    aramaCiz();
+    // boş sorguda satır Favoriler bölümüne taşınır: imleç aynı öğede kalsın
+    for (var k = 0; k < arama.sonuclar.length; k++) if (arama.sonuclar[k].oge.id === id) { aramaAktif(k, true); break; }
+    var girdi = el("arac-ara-girdi");
+    if (girdi) girdi.focus();
+  }
+
+  function aramaAc() {
+    if (!AA || arama.acik) return;
+    var kutu = el("arac-ara"), girdi = el("arac-ara-girdi");
+    if (!kutu || !girdi) return;
+    aramaTusIlgisi();
+    hedefTuslariniBirak();
+    arama.onceki = document.activeElement;
+    arama.durum = AA.durumOku(aramaDepo());
+    arama.kayit = aramaKaydi();
+    arama.aktif = 0;
+    girdi.value = "";
+    kutu.hidden = false;
+    arama.acik = true;
+    var ac = el("arac-ara-ac");
+    if (ac) ac.setAttribute("aria-expanded", "true");
+    // liste data-i18n-skip (satırlar zaten arayüz dilinde çizilir): kendi aria-label'ı çevirmene girmez, burada verilir
+    var liste = el("arac-ara-liste");
+    if (liste) liste.setAttribute("aria-label", uiMetni("Araçlar ve eylemler"));
+    aramaCiz();
+    try { girdi.focus(); } catch (e) {}
+  }
+
+  // geriOdak: Esc / dışarı tıklama → odak paletten önceki öğeye döner; seçimde odak hedefe gider
+  function aramaKapat(geriOdak) {
+    if (!arama.acik) return;
+    arama.acik = false;
+    var kutu = el("arac-ara");
+    if (kutu) kutu.hidden = true;
+    var ac = el("arac-ara-ac");
+    if (ac) ac.setAttribute("aria-expanded", "false");
+    var onceki = arama.onceki;
+    arama.onceki = null;
+    if (geriOdak && onceki && onceki.focus && document.body.contains(onceki)) { try { onceki.focus(); } catch (e) {} }
+  }
+
+  function gorunur(x) { return !!(x && (x.offsetParent !== null || (x.getClientRects && x.getClientRects().length))); }
+
+  function aramaVurgula(x) {
+    if (arama.vurgu) arama.vurgu.classList.remove("arac-ara-vurgu");
+    if (arama.vurguSaat) clearTimeout(arama.vurguSaat);
+    arama.vurgu = x;
+    // aynı öğe ikinci kez seçilirse animasyon yeniden başlasın
+    void x.offsetWidth;
+    x.classList.add("arac-ara-vurgu");
+    arama.vurguSaat = setTimeout(function () { x.classList.remove("arac-ara-vurgu"); arama.vurgu = null; arama.vurguSaat = null; }, 2600);
+  }
+
+  function aramaKaydir(x) {
+    if (!x.scrollIntoView) return;
+    try { x.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) { x.scrollIntoView(); }
+  }
+
+  function aracaGit(o) {
+    var b = navDugmesi(o.tab, o.kat);
+    if (b) { b.click(); try { b.focus(); } catch (e) {} hedefTuslariniTut(b); }
+    else goster(o.tab);
+  }
+
+  function eylemeGit(o) {
+    var b = navDugmesi(o.tab, "");
+    if (b) b.click(); else goster(o.tab);
+    var hedef = null, ilk = null, i;
+    for (i = 0; i < o.hedef.length; i++) {
+      var x = el(o.hedef[i]);
+      if (!x) continue;
+      if (!ilk) ilk = x;
+      // kapalı <details> içindeyse aç (Bölümler, Viral anlar…)
+      for (var p = x.parentNode; p && p.tagName; p = p.parentNode) if (p.tagName === "DETAILS" && !p.open) p.open = true;
+      if (gorunur(x)) { hedef = x; break; }
+    }
+    if (!hedef) {
+      // düğme henüz görünmüyor (ör. transkript yok): ipucu + görünen en yakın kap vurgulanır
+      if (o.gerekli) toast(o.gerekli, "warn");
+      var kap = ilk;
+      while (kap && kap.parentNode && !gorunur(kap)) kap = kap.parentNode;
+      if (kap && kap.classList && kap !== document.body && !kap.classList.contains("tabpane")) { aramaKaydir(kap); aramaVurgula(kap); }
+      return;
+    }
+    aramaKaydir(hedef);
+    aramaVurgula(hedef);
+    if (!hedef.disabled && hedef.focus) {
+      try { hedef.focus({ preventScroll: true }); } catch (e) { try { hedef.focus(); } catch (e2) {} }
+      // "Enter'a bir kez daha bas": o Enter (ve Boşluk) Premiere'e gitmesin
+      hedefTuslariniTut(hedef);
+    }
+  }
+
+  function aramaSec(i) {
+    var r = arama.sonuclar[i];
+    if (!r) return;
+    arama.durum = AA.sonEkle(arama.durum, r.oge.id);
+    AA.durumYaz(aramaDepo(), arama.durum);
+    aramaKapat(false);
+    try { if (r.oge.tur === "eylem") eylemeGit(r.oge); else aracaGit(r.oge); }
+    catch (e) { K.log("arac ara: " + (e && e.message ? e.message : e)); }
+  }
+
+  // Paletin arama kutusu: ↑↓ / Tab seç, Enter aç, Esc kapat, Ctrl+D (⌘D) favori, Ctrl+K (⌘K) kapat
+  function aramaGirdiTusu(e) {
+    var n = arama.sonuclar.length;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); aramaKapat(true); return; }
+    if (AA.kisayolMu(e, !!K.MAC)) { e.preventDefault(); e.stopPropagation(); aramaKapat(true); return; }
+    if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) { e.preventDefault(); if (n) aramaAktif(arama.aktif + 1, true); return; }
+    if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)) { e.preventDefault(); if (n) aramaAktif(arama.aktif - 1, true); return; }
+    if (e.key === "Enter") { e.preventDefault(); if (n) aramaSec(arama.aktif); return; }
+    var mod = K.MAC ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);
+    if (mod && !e.altKey && !e.shiftKey && (e.key === "d" || e.key === "D")) { e.preventDefault(); if (n) aramaFavori(arama.aktif); }
+  }
+
+  /*
+   * Palet açıkken tuş arama kutusundan başka bir yerden geldiyse (odak bir yolla kutudan çıktı): odak kutuya döner ve tuş
+   * paletin olur (Esc kapatır, ↑↓ / Enter / Ctrl+D çalışır). Yakalama evresinde durdurulur: belgenin diğer kısayolları
+   * (Ayarlar açıkken Esc ile çıkış…) paletin arkasındaki sekmede çalışmaz. Yazılan harf de odağı alan kutuya gider.
+   */
+  function aramaDisTusu(e) {
+    if (!arama.acik) return;
+    var girdi = el("arac-ara-girdi");
+    if (!girdi || e.target === girdi) return;
+    e.stopPropagation();
+    try { girdi.focus(); } catch (x) {}
+    aramaGirdiTusu(e);
+  }
+
+  /*
+   * Belge kısayolu: Ctrl+K (⌘K) paleti açar ya da açıksa kapatır. Metin kutusunda, açılır listede, contenteditable'da
+   * ve altyazı düzenleyicisinde (#cap-segments, #tc-words) hiç bağlanmaz (AA.yaziAlaniMi): orada tuş yazının
+   * kendisine kalır. Başka bir pencere (Pro, AI anahtarı, yenilikler) açıkken de açılmaz.
+   */
+  function aracAraTusu(e) {
+    if (!AA || !AA.kisayolMu(e, !!K.MAC)) return false;
+    if (aramaAcik()) { e.preventDefault(); aramaKapat(true); return true; }
+    if (AA.yaziAlaniMi(e.target)) return false;
+    if (baskaPencereAcik()) return false;
+    e.preventDefault();
+    aramaAc();
+    return true;
+  }
+
+  function aracAramaBaslat() {
+    if (!AA) return;
+    var ac = el("arac-ara-ac"), kutu = el("arac-ara"), girdi = el("arac-ara-girdi");
+    var kisayol = AA.kisayolMetni(!!K.MAC);
+    if (ac) {
+      ac.title = "Araç ara (" + kisayol + ")";
+      ac.setAttribute("aria-keyshortcuts", K.MAC ? "Meta+K" : "Control+K");
+      var kt = ac.querySelector(".arac-ara-kisayol");
+      if (kt) kt.textContent = kisayol;
+      ac.addEventListener("click", function () { if (arama.acik) aramaKapat(true); else aramaAc(); });
+    }
+    var favTus = el("arac-ara-fav-tus");
+    if (favTus) favTus.textContent = K.MAC ? "⌘D" : "Ctrl+D";
+    if (girdi) {
+      girdi.addEventListener("keydown", aramaGirdiTusu);
+      girdi.addEventListener("input", function () { arama.aktif = 0; aramaCiz(); });
+    }
+    /*
+     * Pencerede odağı yalnız arama kutusu alır: liste satırı / yıldız, başlıktaki büyüteç, Esc rozeti, alt bilgi ya da
+     * "Eşleşen araç yok" satırı tıklanınca odak kutuda kalır. Yoksa odak gövdeye düşer: tuşlar paletin olmaz ve CEP
+     * onları (metin kutusunda değil diye) Premiere'e de gönderir (oklar oynatma kafasını, Ctrl+D geçişi, Enter render).
+     * Karartılmış alana basış paleti kapatır.
+     */
+    if (kutu) kutu.addEventListener("mousedown", function (e) {
+      if (e.target === kutu) { e.preventDefault(); aramaKapat(true); }
+      else if (e.target !== girdi) e.preventDefault();
+    });
+    document.addEventListener("keydown", aramaDisTusu, true);
+    document.addEventListener("keydown", aracAraTusu);
+    // CEP tuş ilgisi: panel ilk kez odak / tıklama / tuş alınca (açılışta değil)
+    window.addEventListener("focus", aramaTusIlgisi);
+    document.addEventListener("pointerdown", aramaTusIlgisi, true);
+    document.addEventListener("keydown", aramaTusIlgisi, true);
+    // Ctrl+K ilgisi odağı izler: altyazı düzenleyicisinin düğmelerinde bırakılır (tuş Premiere'in Kes'ine gider)
+    document.addEventListener("focusin", aramaOdakIlgisi, true);
+    document.addEventListener("focusout", aramaOdakIlgisi, true);
+    // seçimden sonra tutulan Enter / Boşluk: odak başka bir öğeye geçince bırakılır (öğe DOM'dan kalkıp blur gelmese de)
+    document.addEventListener("focusin", function (e) { if (arama.tutulan && e.target !== arama.tutulan) hedefTuslariniBirak(); }, true);
+  }
+
   /* ---------------- Ayarlar ---------------- */
 
 
@@ -335,17 +759,22 @@ window.KApp = (function () {
     var hw = derleme === "cuda"
       ? "GPU" + (gpu && gpu.name ? " (" + gpu.name.replace(/NVIDIA\s*/i, "") + ")" : "")
       : (derleme === "metal" ? "Metal (Apple GPU)" : "CPU");
-    if (m) {
-      box.className = "inline-status good";
-      box.textContent = "✓ " + m.label.split(" —")[0] + " · " + hw + (KEngine.vadPath() ? " · VAD" : "");
-      btn.textContent = "Değiştir";
-      btn.hidden = false;
-    } else {
-      box.className = "inline-status";
-      box.textContent = installingLocal ? box.textContent : "kurulu değil";
-      btn.textContent = "İndir & kur";
-      btn.hidden = installingLocal;
-    }
+    // 3.4 adım 19: içe aktarılan model motor kurulmadan da diskte olabilir (kurumsal ağ): ✓ yalnız
+    // motor (whisper-cli) da varken; yalnız model varsa motorun eksik olduğu söylenir, düğme kurar
+    var motorVar = false;
+    try { motorVar = !!(K.whisperLocal && K.whisperLocal({ skipModel: true })); } catch (eW) { motorVar = false; }
+    var ad = m ? (KEngine.modelKisaAdi ? KEngine.modelKisaAdi(m) : m.label.split(" —")[0]) : "";
+    var d = window.SufloModelIceAktar && SufloModelIceAktar.yerelDurum ? SufloModelIceAktar.yerelDurum({
+      ad: ad, motorVar: motorVar, donanim: hw, vad: !!KEngine.vadPath(),
+      dogrulanmadi: !!(m && KEngine.dogrulanmadiMi && KEngine.dogrulanmadiMi(m))
+    }) : (m ? { sinif: "good", metin: "✓ " + ad + " · " + hw, dugme: "Değiştir" } : { sinif: "", metin: "kurulu değil", dugme: "İndir & kur" });
+    var hazir = d.dugme === "Değiştir";
+    // kurulum sürerken ilerleme satırı ezilmez (hazır durum dışında)
+    var ilerleme = installingLocal && !hazir;
+    box.className = "inline-status" + (d.sinif && !ilerleme ? " " + d.sinif : "");
+    box.textContent = ilerleme ? box.textContent : d.metin;
+    btn.textContent = d.dugme;
+    btn.hidden = hazir ? false : installingLocal;
     refreshModelPicker();
     refreshEngineRoute();
   }
@@ -357,14 +786,29 @@ window.KApp = (function () {
     var inst = KEngine.installedModels().map(function (m) { return m.id; });
     var active = KEngine.activeModel();
     sel.innerHTML = "";
+    var degerler = [];
     KEngine.MODELS.forEach(function (m) {
       var o = document.createElement("option");
       o.value = m.id;
       var kurulu = inst.indexOf(m.id) !== -1;
-      o.textContent = (kurulu ? "✓ " : "") + m.label + " — " + KEngine.fmtMB(m.sizeMB);
+      // 3.4 adım 19: çevrimdışı içe aktarılıp SHA-256'sı denetlenmemiş model listede ayrışır
+      var dogrulanmadi = kurulu && KEngine.dogrulanmadiMi && KEngine.dogrulanmadiMi(m);
+      o.textContent = (kurulu ? "✓ " : "") + m.label + " — " + KEngine.fmtMB(m.sizeMB) + (dogrulanmadi ? " · doğrulanmadı" : "");
       sel.appendChild(o);
+      degerler.push(m.id);
     });
-    sel.value = active ? active.id : (K.settings().model || "turbo");
+    // 3.4 adım 19: içe aktarılmış özel modeller (yalnız diskte duranlar)
+    KEngine.installedModels().forEach(function (m) {
+      if (!m.ozel) return;
+      var o2 = document.createElement("option");
+      o2.value = m.id;
+      o2.textContent = "✓ " + m.label + " — " + KEngine.fmtMB(m.sizeMB);
+      sel.appendChild(o2);
+      degerler.push(m.id);
+    });
+    // seçim listede yoksa (dosyası silinmiş Özel model) liste boş görünmesin: varsayılana düş
+    var secim = active ? active.id : (K.settings().model || "turbo");
+    sel.value = degerler.indexOf(secim) !== -1 ? secim : "turbo";
   }
 
   /*
@@ -418,7 +862,7 @@ window.KApp = (function () {
 
       var donanim = res.build === "cuda" ? " · GPU hızlandırmalı"
         : (res.build === "metal" ? " · Metal hızlandırmalı" : " · CPU");
-      toast("Hazır: " + res.model.label.split(" —")[0] + donanim +
+      toast("Hazır: " + (KEngine.modelKisaAdi ? KEngine.modelKisaAdi(res.model) : res.model.label.split(" —")[0]) + donanim +
         (res.vad ? " · sessizlik atlama açık" : ""), "good");
     } catch (e) {
       if (e && e.iptal) {
@@ -449,6 +893,50 @@ window.KApp = (function () {
     return sonuc;
   }
 
+
+  /*
+   * 3.4 adım 19 — çevrimdışı model içe aktarma. Dosya seçici .bin süzgeçli; denetim, SHA-256 ve
+   * kopyalama KEngine.modelIceAktar'da. Onaylar (Özel model, üzerine yazma, doğrulanmadı) burada
+   * sorulur: hiçbiri varsayılan olarak kabul edilmez.
+   */
+  var modelIceAktariliyor = false;
+  async function modelDosyasiIceAktar() {
+    if (modelIceAktariliyor) return;
+    if (!K.nodeOK || !KEngine.modelIceAktar) { toast("Bu ortamda kurulamaz — Premiere içinde dene", "bad"); return; }
+    if (installingLocal) { toast("Motor kurulumu sürüyor; bitince içe aktar.", "warn"); return; }
+    var yol = null;
+    if (window.cep && window.cep.fs && window.cep.fs.showOpenDialogEx) {
+      var r = window.cep.fs.showOpenDialogEx(false, false, uiMetni("Whisper model dosyasını seç (.bin)"), "", ["bin"]);
+      if (r && r.data && r.data.length) yol = r.data[0];
+    }
+    if (!yol) return;
+    var box = el("set-local-status"), btn = el("set-model-ice");
+    modelIceAktariliyor = true;
+    if (btn) btn.disabled = true;
+    var hata = null;
+    try {
+      var sonuc = await KEngine.modelIceAktar(yol, {
+        say: function (m) { box.className = "inline-status"; box.textContent = m; },
+        onayla: function (tur, metin) { return Promise.resolve(!!(window.confirm && window.confirm(uiMetni(metin)))); }
+      });
+      if (sonuc && sonuc.ok) {
+        // Özel modelin etiketi "Özel model — <dosya>": kısa ad dosya adıdır (hangisi olduğu belli olsun)
+        var ad = (sonuc.model && KEngine.modelKisaAdi ? KEngine.modelKisaAdi(sonuc.model) : "") || sonuc.file;
+        if (sonuc.durum === "dogrulandi") toast("Model içe aktarıldı ve doğrulandı: " + ad, "good");
+        else if (sonuc.durum === "dogrulanmadi") toast("Model içe aktarıldı (doğrulanmadı): " + ad, "warn", 8000);
+        else toast("Özel model eklendi: " + ad, "warn", 8000);
+      }
+    } catch (e) {
+      hata = K.hataYardimi(e);
+      toast(hata, "bad", 12000);
+    } finally {
+      modelIceAktariliyor = false;
+      if (btn) btn.disabled = false;
+      refreshLocalStatus();
+      if (window.KCaptions && KCaptions.refreshSetup) KCaptions.refreshSetup();
+      if (hata) { box.className = "inline-status bad"; box.textContent = "✕ " + hata; }
+    }
+  }
 
   /* ---------------- Suflo Pro lisans UI ---------------- */
 
@@ -973,6 +1461,8 @@ window.KApp = (function () {
     });
 
     el("set-local-install").addEventListener("click", function (ev) { if (kurulumTikiGecerli(ev)) installLocalWhisper(); });
+    // 3.4 adım 19: Ayarlar › Motor › Model dosyası içe aktar (ücretsiz, çevrimdışı kurulum)
+    if (el("set-model-ice")) el("set-model-ice").addEventListener("click", modelDosyasiIceAktar);
     // İptal: Ayarlar'da ve Altyazı kurulum kartında (indirme kesilir, .part korunur)
     if (el("set-local-cancel")) el("set-local-cancel").addEventListener("click", kurulumuIptalEt);
     if (el("cap-local-cancel")) el("cap-local-cancel").addEventListener("click", kurulumuIptalEt);
@@ -1590,6 +2080,8 @@ window.KApp = (function () {
     });
 
     guvenli("sekmeler", initTabs);
+    // Araç ara (Ctrl+K): yalnız DOM ve kısayol; Premiere'e / ağa gitmez
+    guvenli("Araç ara", aracAramaBaslat);
     guvenli("ayarlar", initSettings);
     guvenli("Altyazı", function () { KCaptions.init(); });
     guvenli("Kesim", function () { KCut.init(); });
@@ -1731,6 +2223,8 @@ window.KApp = (function () {
     proCheckoutUrl: proCheckoutUrl,
     installLocalWhisper: installLocalWhisper,
     kurulumTikiGecerli: kurulumTikiGecerli,
-    checkUpdate: checkUpdate
+    checkUpdate: checkUpdate,
+    // 3.4 adım 20: Araç ara penceresini açar (ör. yenilikler maddesinden)
+    aracAra: aramaAc
   };
 })();

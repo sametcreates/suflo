@@ -1570,6 +1570,96 @@ yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız
 
 ## 3.4
 
+3.4'ün kapsamı: `marketing/alti-repo-plan.json` › `plan.build_order` adımları. Her adım kendi alt bölümünü ekler
+(adım sırasıyla). Elle Premiere denemeleri `marketing/v3.4-deneme-listesi.md`'de.
+
+### Adım 19: Kurumsal ağ dayanıklılığı ve çevrimdışı model içe aktarma (ücretsiz)
+
+Ne değişti: Ayarlar › Motor'da **Model dosyası içe aktar** (`js/model-ice-aktar.js` + `KEngine.modelIceAktar`), indirmede
+kurumsal HTTPS denetimine karşı tek seferlik sistem kökü yeniden denemesi ve Cisco Umbrella / 0.0.0.0 DNS teşhisi
+(`js/ag-dayanim.js` + `js/bridge.js`), Doctor'da **Model kaynaklarını sına**. Raunen'den (MIT) yalnız fikir; kod temiz oda,
+THIRD_PARTY_NOTICES.md değişmedi. Pro kapısı yok.
+
+**19.K1 Windows kök dışa aktarma betiği (bir kez, gerçek makinede).** `js/ag-dayanim.js` › `WIN_BETIK` PowerShell 5.1'de
+(Windows 10 / 11) `Cert:\CurrentUser\Root` ve `Cert:\LocalMachine\Root` köklerini PEM olarak basmalı. Komut istemcisinde
+`node -e "var a=require('./js/ag-dayanim.js'),c=a.sertifikaKomutu('win32');var r=require('child_process').spawnSync(c.cmd,c.args,{encoding:'utf8'});console.log(a.pemleriAyikla(r.stdout).length)"`
+çalıştır: 30-80 arası bir sayı beklenir (0 ise betik çalışmıyor demektir; günlükte `sistem kok sertifikalari: 0 adet`).
+Grup ilkesiyle PowerShell'i kısıtlı (Constrained Language Mode) bir makinede de bir kez dene; çalışmazsa Suflo yine
+eskisi gibi hata verir (yeniden deneme atlanır), kırılmaz. İnceleme 2'den beri betik Windows'un güvensizliğini korur:
+`Cert:\CurrentUser\Disallowed` / `Cert:\LocalMachine\Disallowed`'daki (Güvenilmeyen Sertifikalar) parmak izlerini ve amacı
+"Sunucu Kimlik Doğrulaması"nı dışlayan kökleri atlar. Denemek için Root'taki bir test kökünü (ör. Fiddler'ınki) `certmgr.msc`
+› Güvenilmeyen Sertifikalar'a da kopyala: yukarıdaki sayı bir azalmalı. macOS'ta System.keychain'deki bir kökü Anahtar Zinciri
+Erişimi'nde "Asla Güvenme" yap: o kök artık ek köklere girmez (günlükte `… adet 'Asla Guvenme' atildi`). `security
+trust-settings-export` ayarları yalnız dosyaya yazdığı için Suflo onları geçici klasöre yazıp okur ve hemen siler.
+
+**19.K2 Kurumsal ağ denemesi (mümkünse).** HTTPS denetleyen bir ağda (Zscaler, Netskope, Fortinet, Sophos, kurum
+proxy'si) ya da Fiddler / mitmproxy'nin kökünü Windows deposuna ekleyip "HTTPS'i çöz" açıkken yerel motoru kur:
+eskiden `unable to get local issuer certificate` ile düşen indirme şimdi inmeli (günlükte `sertifika hatasi (...), sistem
+kokleriyle bir kez daha`). Fiddler / mitmproxy'yi deneme bitince kaldır ve kökü depodan sil.
+
+**19.K3 Destek metni.** Kurumsal kullanıcı "model inmiyor" yazarsa: önce Doctor › **Model kaynaklarını sına** sonucunu
+iste; "Kurumsal ağ filtresi" ya da "HTTPS bağlantılarını denetliyor" görünüyorsa iki yol: BT'den `huggingface.co`,
+`hf-mirror.com`, `github.com` ve `objects.githubusercontent.com` / `release-assets.githubusercontent.com` için izin, ya da
+modeli evde indirip **Model dosyası içe aktar**. İndirme bağlantıları: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin`
+(Turbo; diğerleri aynı klasörde: `ggml-tiny-q5_1.bin`, `ggml-base-q5_1.bin`, `ggml-small-q5_1.bin`, `ggml-large-v3-q5_0.bin`).
+Bu metni suflo.app SSS'ine / blog'a eklemek istersen "Şirket ağında Suflo modeli inmiyor" başlığı uygun.
+
+**19.K4 Bilinen sınır (bilgi).** Yerel motor arşivi (whisper.cpp zip) ve ffmpeg için içe aktarma yok; yalnız model.
+Sertifika yeniden denemesi indirme, Doctor sınaması ve model özeti (SHA-256) içindir; panel açılışındaki sessiz
+güncelleme denetimi PowerShell başlatmaz. Groq / OpenAI bulut çağrıları (`httpUpload` / `httpJson`) değişmedi ve
+hata ipucu onlara yeniden deneme ya da model içe aktarma iddia etmez. Serbest "özel ayna" adresi bilerek eklenmedi (plan: özet doğrulamasını atlatır).
+
+### Adım 20: Araç ara (Ctrl+K / ⌘K komut paleti; ücretsiz)
+
+Ne değişti: üst çubukta büyüteç düğmesi ve **Ctrl+K** (macOS ⌘K) ile açılan arama penceresi. Sol menüdeki her araç ve 26
+sık kullanılan eylem ("Altyazı oluştur", "Sessizlikleri bul", "Rampayı uygula", "Ayarlar › Motor"…) Türkçe karakter
+duyarsız aranır; favoriler (☆, Ctrl+D) ve son kullanılan 8 araç `localStorage`'da (`suflo.aracAra`, yalnız o bilgisayarda).
+Eylem seçmek yalnız gezinir: sekme açılır, düğme odaklanıp çerçevelenir, **çalıştırılmaz** (Pro kapısı ve deneme hakları
+aracın kendi düğmesinde kaldı; paletin kendisinde kapı yok). Saf mantık `js/arac-ara.js`, arayüz `js/app.js`. Rebound'un
+Home başlatıcısından yalnız fikir; kod temiz oda, THIRD_PARTY_NOTICES.md değişmedi.
+
+**20.K1 Destek / SSS notu.** Suflo paneli odaktayken Ctrl+K artık Premiere'in **Kes (Add Edit)** kısayoluna gitmez, araç
+aramayı açar (CEP `registerKeyEventsInterest` ile panelde tutulur). İstisna: altyazı düzenleyicisinin bir düğmesi (satırın
+zaman düğmesi gibi) odaktayken Ctrl+K eskisi gibi Premiere'e gider. Timeline'a tıklayınca Premiere'in Ctrl+K'sı eskisi gibi
+çalışır. "Ctrl+K klibi kesmiyor" diye yazan olursa: önce timeline'a tıklasın. Bunu 3.4 yenilikler / sürüm notuna eklemek
+istersen tek cümle yeter: "Ctrl+K ile her araca ve eyleme saniyede ulaş."
+
+**20.K2 3.4 yayın hazırlığı (bilgi).** "Suflo 3.x'te yeni" penceresi (`js/app.js` › `YENILIKLER`) bu adımda değişmedi; 3.4
+yayınında sürüm ve maddeler birlikte güncellenir. Önerilen madde: ikon "⌘", başlık "Araç ara", metin "Ctrl+K ile her araca ve
+eyleme saniyede ulaş; favorilerin başta."; madde tıklanınca paleti açmak için `KApp.aracAra()` hazır.
+
+**20.K3 Bilinen sınır: macOS ve Türkçe F klavye.** CEP tuş ilgisi işletim sisteminin sanal tuş koduyla çalışır: Windows'ta
+VK_K (75, klavye düzenine göre K harfi), macOS'ta kVK_ANSI_K (40, ANSI düzeninde K'nın **fiziksel** yeri). Türkçe Q'da sorun
+yok. macOS'ta Türkçe F düzeninde K başka bir tuşta (fiziksel J) olduğu için ilk ⌘K paleti açar ama Premiere'e de gidebilir
+(timeline'da Add Edit). İnceleme 2'den beri panel o basışta K'yı yazan tuşu öğrenir (`yeniKisayolTusu`, `MAC_KVK`: J = kVK 38)
+ve ilgiye ekler: **ikinci ⌘K'dan itibaren** panelde kalır. İkinci etki: Türkçe F'de fiziksel ANSI K tuşu **M** yazar, yani
+tutulan tuş aslında ⌘M'dir (Premiere: Export Media). Panel ⌘ + tutulan bir tuşta K olmayan bir harf görünce
+(`tusDuzeniUyumsuz`) o tuşun ilgisini bırakır: ilk ⌘M yutulmuş olabilir, sonrakiler Premiere'e gider. Türkçe Q'ya dönülürse
+aynı kural ters yönde çalışır (fiziksel J 'j' yazınca bırakılır, fiziksel K 'k' yazınca yeniden tutulur). Latin olmayan
+düzenlerde (Windows Rusça / Yunanca) e.key 'л' / 'κ' olsa da tutulan VK_K tuşu Ctrl+K sayılır, palet açılır (tuş ölü kalmaz).
+Altyazı düzenleyicisi (inceleme 2): satırın zaman / böl / sil düğmesi odaktayken palet açılmadığı için Ctrl+K ilgisi
+bırakılır, tuş eskisi gibi Premiere'in Kes'ine gider (zaman düğmesiyle oynatma kafasını taşıyıp Ctrl+K ile kesmek çalışır);
+odak düzenleyiciden çıkınca ilgi geri kurulur.
+
+**20.K4 Eğri sekmesi gelince (adım 10).** "Eğri uygula" eylemi `#tab-egri` varsa kendiliğinden listeye girer, yoksa
+görünmez. Eğri sekmesinin Uygula düğmesinin kimliği `egri-uygula` değilse `js/arac-ara.js` › `EYLEMLER` › `egri-uygula`
+satırındaki `hedef`i güncelle (`tests/test-arac-ara.js` sekme varken eksik hedefi yakalar). **Birleştirirken zorunlu
+(inceleme 2):** aynı satıra `pro: "curves"` ekle: Eğri'nin Uygula'sı `Pro.gate("curves", { deneme: true })` ile kapılı, satır
+eklenmezse palette Eğri aracında PRO rozeti olur ama "Eğri uygula" eyleminde olmaz (adım 20 "Pro öğeleri kilit rozeti
+gösterir"). Bu dalda `js/pro.js` `curves`'i tanımlamadığı için eklenmedi ("eylemlerin Pro anahtarları pro.js'te tanımlı"
+sınaması düşerdi); `yerel-34-egri` ile birleşince `js/pro.js`'te `curves:` satırı olduğunu doğrula. Yeni bir sekme / sık eylem
+eklendiğinde de aynı listeye bir satır eklemek yeter (sol menü girdileri kendiliğinden gelir).
+
+**Birleştirirken zorunlu (inceleme):** `yerel-34-egri` dalındaki `js/egri.js` › `tuslariTut` CEP tuş ilgisini doğrudan
+`window.__adobe_cep__.registerKeyEventsInterest(...)` ile veriyor. Bu çağrı panelin **bütün** listesini değiştirir: Eğri
+sekmesi açılınca Ctrl+K (⌘K) ilgisi silinir ve geri gelmez (app.js onu bir kez kurar); sonra panelde her Ctrl+K hem paleti
+açar hem timeline'daki klibi keser (20.2'nin tam tersi). Birleştirmede `tuslariTut`'u `captions.js` › `konumTuslariniTut`
+gibi yaz: `var AA = window.SufloAracAra; if (AA && typeof AA.tusIlgisiAyarla === "function") { if (AA.tusIlgisiAyarla("egri",
+tut ? M.tusIlgisi(mac) : "")) tusTutuluyor = tut; return; }` ve doğrudan çağrı yalnız bu dalın altında yedek olarak kalsın
+(`js/arac-ara.js`, `js/egri.js`'ten önce yüklenir). `tests/test-arac-ara.js` "panelin tuş ilgileri ortak yöneticiden
+geçer" maddesi bunu yapmadan birleştirilen dalda **kalır** (egri.js satırını adıyla gösterir). Deneme: Eğri sekmesini aç,
+panelde boş bir yere tıkla, Ctrl+K: palet açılır, timeline kesilmez; sekmeden çık, yine aynı.
+
 ### 22. Yapay zekâ köprüsü (MCP, Deneysel)
 
 **MCP.1 Güvenlik incelemesi (yayından önce, zorunlu).** Diff üzerinde `/security-review` çalıştır; sonra

@@ -296,7 +296,7 @@ window.KOnboarding = (function () {
     var aktif = ekBilgi.aktif;
     if (hazir) {
       yaz("ia-motor-metin", aktif
-        ? "Hazır: " + aktif.label.split(" —")[0] + " · yerel, çevrimdışı ve sınırsız."
+        ? "Hazır: " + (KEngine.modelKisaAdi ? KEngine.modelKisaAdi(aktif) : aktif.label.split(" —")[0]) + " · yerel, çevrimdışı ve sınırsız."
         : "Hazır: Groq bulut motoru (ücretsiz anahtarla).");
     } else if (secim.bulut) {
       yaz("ia-motor-metin", "Mac'te yerel motor Homebrew ile kurulur ve Homebrew bulunamadı. En hızlı başlangıç: ücretsiz Groq anahtarıyla bulut motoru.");
