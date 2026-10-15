@@ -2988,6 +2988,13 @@
       "Couldn't read the tracks: cuts aren't applied without knowing the protected tracks. Click Tracks › Refresh, then click Apply cuts again.",
     "⚠ Korunan video katmanı kaymasın diye kesimler boşluk bırakılarak silindi.": "⚠ Cuts were removed leaving gaps so the protected video track wouldn't drift.",
     "✕ Etkin sekans değişti: kesimler uygulanmadı. Analiz edilen sekansı aç ya da Sessizlikleri yeniden bul.": "✕ The active sequence changed: the cuts weren't applied. Open the analyzed sequence or run Find silences again.",
+    // Selected clip scope: the analyzed clip was moved / trimmed in Premiere after the analysis (cuts are in sequence time)
+    "Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da aynı dosyanın başka klibi seçildi): öneriler eski konumdaydı. Sessizlikleri yeniden bul.":
+      "The selected clip changed after the analysis (moved, trimmed, or another clip of the same file was selected): the suggestions were at its old position. Run Find silences again.",
+    "✕ Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da başka klip seçildi): kesimler eski konuma düşerdi, uygulanmadı. Sessizlikleri yeniden bul.":
+      "✕ The selected clip changed after the analysis (moved, trimmed, or another clip selected): the cuts would have landed at its old position, so they weren't applied. Run Find silences again.",
+    "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden Kesimleri uygula.":
+      "✕ Couldn't read the clip's position from Premiere: the cuts weren't applied. Click Apply cuts again.",
     // host.jsx (KS_applyCuts expectSeqId)
     "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.": "The active sequence changed; the cuts weren't applied. Run Find silences again.",
     "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.": "The track layout changed; the cuts weren't applied. Read the tracks again.",

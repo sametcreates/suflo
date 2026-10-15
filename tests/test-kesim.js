@@ -266,7 +266,10 @@ async function canliTestler() {
   p2.kaydir("cut-pad", "0.15"); p2.kaydir("cut-minkeep", "0");
   await p2.bekle(160);
   await p2.tikla("cut-apply");
-  ok("yedek akış: aynı ayarla Uygula silencedetect'i yeniden koşmaz", p2.kayit.run.length === 1 && p2.kayit.call.length === 1 && p2.kayit.harca.length === 1, p2.kayit.run.length);
+  // Premiere'e iki çağrı: klibin yerinin taze denetimi (KS_getContext), sonra KS_applyCuts
+  ok("yedek akış: aynı ayarla Uygula silencedetect'i yeniden koşmaz", p2.kayit.run.length === 1 &&
+    p2.kayit.call.map(function (x) { return x.fn; }).join(",") === "KS_getContext,KS_applyCuts" && p2.kayit.harca.length === 1,
+    p2.kayit.run.length + " " + p2.kayit.call.map(function (x) { return x.fn; }).join(","));
 
   await zamanEkseniTestleri(K, stereo);
   await ornekHiziTestleri(K);
@@ -1007,8 +1010,9 @@ async function iptalTestleri(K, stereo, klip) {
   var p = kabi.kesimPaneli({ K: KA, ffmpeg: FF, clip: klip });
   await p.tikla("cut-analyze");
   ok("iptal öncesi: ilk klip analiz edildi (2 kesim)", /^2 kesim/.test(p.el("cut-summary").textContent) && !p.el("cut-result").hidden);
-  // Premiere'de klip kaydırıldı (slip): medya ve klipStart aynı, in/out farklı → onContext sıfırlamaz
-  p.ctx({ mediaPath: stereo, inPoint: 1.0, outPoint: 4.5, clipStart: 10, clipEnd: 13.5 });
+  // Premiere'de klip kaydırıldı (slip): medya ve klipStart aynı, in/out farklı → app.js onContext'e haber vermez; panel
+  // henüz yoklamadan Sessizlikleri bul (sessiz: analyze kendi sıfırlar)
+  p.ctx({ mediaPath: stereo, inPoint: 1.0, outPoint: 4.5, clipStart: 10, clipEnd: 13.5 }, null, true);
   askida = true;
   await p.bekle(560);
   var analiz = p.tikla("cut-analyze");
@@ -1115,6 +1119,7 @@ async function sahteTestler(K) {
   await kilitTestleri(K1);
   await altyaziTestleri(K1);
   await incelemeR2Testleri(K1);
+  await tasinanKlipTestleri(K1);
 }
 
 /*
@@ -1267,6 +1272,127 @@ async function incelemeR2Testleri(K1) {
   await f3.tikla("cut-analyze");
   ok("ses katmanı var ama aralıkta klibi yok: yine 'Bu aralıkta ses klibi yok …'",
     f3.el("cut-status").textContent === "Bu aralıkta ses klibi yok: sessizlik aranacak ses bulunamadı.", f3.el("cut-status").textContent);
+}
+
+/*
+ * ---- 3.4 inceleme r3: analizden sonra taşınan / kırpılan klip, yeniden analiz edilmeden Uygula ----
+ * Kesimler sekans zamanında (analizdeki clipStart). app.js onContext aynı medyanın taşınmasını bildirmez, yoklama yalnız
+ * panel odaktayken koşar: Uygula Premiere'e taze sorar (KS_getContext), onPoll analizi bırakır.
+ */
+async function tasinanKlipTestleri(K1) {
+  var pcm = pcmMono([[1.0, 1], [1.5, 0], [1.0, 1], [1.5, 0], [1.0, 1]]);   // 6 sn; sessizlik 1.0–2.5 ve 3.5–5.0
+  var KT = {};
+  for (var k in K1) KT[k] = K1[k];
+  KT.runAkis = function (cmd, args, opts) {
+    opts.onStderr(CIKIS);
+    opts.onData(pcm);
+    return Promise.resolve({ code: 0, stderr: CIKIS, bayt: pcm.length });
+  };
+  KT.run = function () { return Promise.resolve({ code: 0, stderr: sdCiktisi([[1.0, 2.5], [3.5, 5.0]]) }); };
+  function uygulamalar(p) { return p.kayit.call.filter(function (x) { return x.fn === "KS_applyCuts"; }); }
+  function cagrilar(p) { return p.kayit.call.map(function (x) { return x.fn; }).join(","); }
+  function baslar(p, i) { var u = uygulamalar(p)[i]; return u ? u.payload.ranges.map(function (r) { return +r.start.toFixed(3); }) : null; }
+  var UYGULA = "✕ Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da başka klip seçildi): kesimler eski konuma düşerdi, uygulanmadı. Sessizlikleri yeniden bul.";
+  var HARITA = "Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da aynı dosyanın başka klibi seçildi): öneriler eski konumdaydı. Sessizlikleri yeniden bul.";
+  var OKUNAMADI = "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden Kesimleri uygula.";
+  var klipA = { mediaPath: "/sahte/tasi.mp4", inPoint: 0, outPoint: 6, clipStart: 30, clipEnd: 36 };
+  var klipB = { mediaPath: "/sahte/tasi.mp4", inPoint: 0, outPoint: 6, clipStart: 32.5, clipEnd: 38.5 };   // 2.5 sn sağa taşındı
+
+  /* a) Taşındı, panel yoklamadı: KS_applyCuts eski konuma (31.15: öndeki klip; 33.65: konuşmanın ortası) gitmez, hak düşmez */
+  var a = kabi.kesimPaneli({ K: KT, ffmpeg: "ffmpeg", clip: klipA });
+  await a.tikla("cut-analyze");
+  ok("taşıma: analiz 2 kesim (30 sn'deki klipte 31.15 ve 33.65)", /^2 kesim/.test(a.el("cut-summary").textContent), a.el("cut-summary").textContent);
+  a.ctx(klipB, null, true);
+  await a.tikla("cut-apply");
+  ok("taşınan klip (30 → 32.5 sn, yoklama yok), Kesimleri uygula: Premiere'e taze sorulur, KS_applyCuts gönderilmez, deneme hakkı düşmez",
+    cagrilar(a) === "KS_getContext" && uygulamalar(a).length === 0 && a.kayit.harca.length === 0, cagrilar(a) + " harca=" + a.kayit.harca.length);
+  ok("…'✕ Seçili klip analizden sonra değişti …', eski konumdaki harita bırakılır, Kesimleri uygula kapanır",
+    a.el("cut-status").textContent === UYGULA && /bad/.test(a.el("cut-status").className) && a.el("cut-result").hidden === true &&
+    a.el("cut-apply").disabled === true && a.el("cut-ranges").children.length === 0 && a.el("cut-analyze").disabled === false,
+    JSON.stringify([a.el("cut-status").textContent, a.el("cut-result").hidden, a.el("cut-apply").disabled]));
+  await a.bekle(560);   // "Sessizlikleri bul" yeniden göründükten sonraki çift tık koruması
+  await a.tikla("cut-analyze");
+  await a.tikla("cut-apply");
+  ok("…Sessizlikleri yeniden bul (zarf ve doğrulama önbellekten, ffmpeg yok) → Uygula yeni konumdaki kesimleri gönderir (33.65, 36.15), hak bir kez",
+    a.kayit.runAkis.length === 1 && a.kayit.run.length === 1 && uygulamalar(a).length === 1 && JSON.stringify(baslar(a, 0)) === "[33.65,36.15]" && a.kayit.harca.length === 1,
+    JSON.stringify([a.kayit.runAkis.length, a.kayit.run.length, baslar(a, 0), a.kayit.harca.length]));
+
+  /* b) Kırpıldı (baştan 1 sn: in 0 → 1, clipStart aynı, clipEnd 36 → 35), yoklama yok: uygulanmaz */
+  var b = kabi.kesimPaneli({ K: KT, ffmpeg: "ffmpeg", clip: klipA });
+  await b.tikla("cut-analyze");
+  b.ctx({ mediaPath: "/sahte/tasi.mp4", inPoint: 1, outPoint: 6, clipStart: 30, clipEnd: 35 }, null, true);
+  await b.tikla("cut-apply");
+  ok("kırpılan klip (in 0 → 1, aynı clipStart), yoklama yok: KS_applyCuts gönderilmez, hak düşmez, aynı uyarı",
+    uygulamalar(b).length === 0 && b.kayit.harca.length === 0 && b.el("cut-status").textContent === UYGULA && b.el("cut-result").hidden === true,
+    cagrilar(b) + " " + b.el("cut-status").textContent);
+  // onContext de geldi (ör. seçim sayısı değişti): in / out da sayılır, analiz düşer (eskiden yalnız medya ve clipStart)
+  var b2 = kabi.kesimPaneli({ K: KT, ffmpeg: "ffmpeg", clip: klipA });
+  await b2.tikla("cut-analyze");
+  b2.ctx({ mediaPath: "/sahte/tasi.mp4", inPoint: 0, outPoint: 5, clipStart: 30, clipEnd: 35 });
+  await b2.tikla("cut-apply");   // (düğme gizli #cut-result'ın içinde; tık yine de hiçbir şey göndermez)
+  ok("onContext: aynı medya ve clipStart, out 6 → 5: analiz düşer (sonuç gizli), Uygula Premiere'e hiçbir şey göndermez",
+    b2.el("cut-result").hidden === true && b2.kayit.call.length === 0 && b2.kayit.harca.length === 0, String(b2.el("cut-result").hidden) + " " + cagrilar(b2));
+
+  /* c) Taşındı, panel yokladı (onPoll; seçim anahtarı değişmedi, onContext gelmez): analiz bırakılır, nedeni söylenir */
+  var c = kabi.kesimPaneli({ K: KT, ffmpeg: "ffmpeg", clip: klipA });
+  await c.tikla("cut-analyze");
+  c.ctx(klipB, null, true);
+  c.yokla();
+  ok("yoklama taşınan klibi gördü: harita bırakılır, 'Seçili klip analizden sonra değişti … öneriler eski konumdaydı', Kesimleri uygula kapalı",
+    c.el("cut-result").hidden === true && c.el("cut-status").textContent === HARITA && /warn/.test(c.el("cut-status").className) &&
+    c.el("cut-apply").disabled === true && c.kayit.call.length === 0, JSON.stringify([c.el("cut-result").hidden, c.el("cut-status").textContent]));
+  c.kaydir("cut-pad", "0.1");
+  await c.bekle(160);
+  ok("…kaydırıcı eski konuma harita kurmaz", c.el("cut-result").hidden === true && c.el("cut-ranges").children.length === 0 && c.el("cut-apply").disabled === true,
+    c.el("cut-summary").textContent);
+  c.kaydir("cut-pad", "0.15");
+  await c.bekle(560);
+  await c.tikla("cut-analyze");
+  await c.tikla("cut-apply");
+  ok("…yeniden bul (ffmpeg yok) → Uygula yeni konumda (33.65, 36.15)", c.kayit.runAkis.length === 1 && JSON.stringify(baslar(c, 0)) === "[33.65,36.15]",
+    JSON.stringify([c.kayit.runAkis.length, baslar(c, 0)]));
+
+  /* c2) Uygula sürerken gelen yoklama analizi kilitte bırakmaz: Uygula'nın kendi denetimi durdurur, mesaj onunki */
+  var c2 = null;
+  c2 = kabi.kesimPaneli({ K: KT, ffmpeg: "ffmpeg", clip: klipA, getContext: function (bag) { c2.yokla(); return bag; } });
+  await c2.tikla("cut-analyze");
+  c2.ctx(klipB, null, true);
+  await c2.tikla("cut-apply");
+  ok("Uygula sürerken yoklama (klip taşınmış): kilitte analiz bırakılmaz, Uygula'nın denetimi durdurur ('✕ … uygulanmadı'), KS_applyCuts yok",
+    uygulamalar(c2).length === 0 && c2.kayit.harca.length === 0 && c2.el("cut-status").textContent === UYGULA && c2.el("cut-result").hidden === true,
+    c2.el("cut-status").textContent);
+
+  /* d) Yerinde duran klipte yoklama: analiz kalır, Uygula denetimden geçer */
+  var d = kabi.kesimPaneli({ K: KT, ffmpeg: "ffmpeg", clip: klipA });
+  await d.tikla("cut-analyze");
+  d.ctx({ mediaPath: "/sahte/tasi.mp4", inPoint: 0, outPoint: 6, clipStart: 30, clipEnd: 36 }, null, true);   // aynı klip, yeni bağlam nesnesi
+  d.yokla();
+  ok("aynı yerdeki klipte yoklama: analiz kalır (2 kesim), uyarı yok", d.el("cut-result").hidden === false && /^2 kesim/.test(d.el("cut-summary").textContent) &&
+    d.el("cut-status").textContent === "", d.el("cut-status").textContent);
+  await d.tikla("cut-apply");
+  ok("…Uygula: KS_getContext sonra KS_applyCuts (31.15, 33.65), hak bir kez", cagrilar(d) === "KS_getContext,KS_applyCuts" &&
+    JSON.stringify(baslar(d, 0)) === "[31.15,33.65]" && d.kayit.harca.length === 1, cagrilar(d) + " " + JSON.stringify(baslar(d, 0)));
+
+  /* e) Premiere klibin yerini döndüremedi: gönderilmez, hak düşmez, analiz kalır (yeniden denenebilir) */
+  var e = kabi.kesimPaneli({ K: KT, ffmpeg: "ffmpeg", clip: klipA,
+    getContext: function () { return { ok: false, error: "Premiere yanıt vermedi (KS_getContext) — işlem zaman aşımına uğradı." }; } });
+  await e.tikla("cut-analyze");
+  await e.tikla("cut-apply");
+  ok("KS_getContext başarısız: KS_applyCuts gönderilmez, hak düşmez, '✕ Klibin yeri Premiere'den okunamadı …', harita kalır, Uygula yeniden açık",
+    uygulamalar(e).length === 0 && e.kayit.harca.length === 0 && e.el("cut-status").textContent === OKUNAMADI && /bad/.test(e.el("cut-status").className) &&
+    e.el("cut-result").hidden === false && e.el("cut-apply").disabled === false, JSON.stringify([cagrilar(e), e.el("cut-status").textContent, e.el("cut-apply").disabled]));
+
+  /* f) Başka sekans etkin (yoklama yok): denetim karar vermez, KS_applyCuts expectSeqId ile reddeder ("Etkin sekans değişti") */
+  var f = kabi.kesimPaneli({ K: KT, ffmpeg: "ffmpeg", clip: klipA, ctx: { sequenceId: "seq-1" },
+    applyCuts: function (yuk) {
+      return yuk.expectSeqId === "seq-2" ? { ok: true, newSeq: "Kopya", removed: 2 } : { ok: false, kod: "sekans", error: "Etkin sekans degisti; kesimler uygulanmadi." };
+    } });
+  await f.tikla("cut-analyze");
+  f.ctx(null, { sequenceId: "seq-2" }, true);
+  await f.tikla("cut-apply");
+  ok("başka sekansa geçildi (yoklama yok): klip uyarısı değil, host'un 'Etkin sekans değişti' reddi; hak düşmez",
+    uygulamalar(f).length === 1 && uygulamalar(f)[0].payload.expectSeqId === "seq-1" && f.kayit.harca.length === 0 &&
+    /^✕ Etkin sekans değişti/.test(f.el("cut-status").textContent), f.el("cut-status").textContent);
 }
 
 /*

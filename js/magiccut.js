@@ -52,9 +52,10 @@ window.KCut = (function () {
   var sonAnahtar = "";
   /*
    * Ekrandaki analizin klibi + sekanstaki yeri (anahtar@clipStart). Kararlar (kapatilanlar) ve harita SEKANS zamanında:
-   * aynı medya / in / süre başka konumdaysa (klip taşındı, aynı aralığın kopyası seçildi; bağlam yoklaması bunu bildirmez)
+   * aynı medya / in / süre başka konumdaysa (klip taşındı, aynı aralığın kopyası seçildi; onContext bunu bildirmez)
    * önceki kararlar yeni konumdaki başka bir kesime oturmasın. Zarf ve silencedetect önbellekleri klibe göredir
-   * (sonAnahtar): konum değişince ffmpeg yeniden çalışmaz.
+   * (sonAnahtar): konum değişince ffmpeg yeniden çalışmaz. Yeniden analiz edilmeden de eski konuma kesilmez: onPoll
+   * taşınan / kırpılan klibin analizini bırakır, Uygula Premiere'e taze sorar (klipYeriniDenetle).
    */
   var sonKonum = "";
   var farkUyarisi = false;  // durum satırında "doğrulama kesimleri değiştirdi" uyarısı var (kaydırıcı silsin)
@@ -94,6 +95,16 @@ window.KCut = (function () {
   var KESIM_YOK = {
     burada: "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, timeline değişmedi.",
     kopya: "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, açılan kopya sekans özgünüyle aynı."
+  };
+  /*
+   * Seçili klip kapsamında analiz edilen klip Premiere'de analizden sonra taşındı / kırpıldı (aynı medya): kesimler ve
+   * harita sekans zamanında (analizdeki clipStart), eski konumdadır. harita: yoklama fark etti (analiz bırakıldı);
+   * uygula: Uygula'daki taze denetim fark etti (KS_applyCuts gönderilmedi); okunamadi: denetim Premiere'den okuyamadı.
+   */
+  var KLIP_DEGISTI = {
+    harita: "Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da aynı dosyanın başka klibi seçildi): öneriler eski konumdaydı. Sessizlikleri yeniden bul.",
+    uygula: "✕ Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da başka klip seçildi): kesimler eski konuma düşerdi, uygulanmadı. Sessizlikleri yeniden bul.",
+    okunamadi: "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden Kesimleri uygula."
   };
   var IPTAL_IPUCU = "ffmpeg analizini durdurur; önceki sonuç ekranda kalır";
   var IPTAL_KILITLI = "Premiere sesi dışa aktarıyor; bu adım yarıda kesilemez. Bitince İptal açılır.";
@@ -310,6 +321,8 @@ window.KCut = (function () {
       var ff = await K.findFfmpeg();
       if (!ff) throw new Error("ffmpeg bulunamadı — Ayarlar sekmesinden kur.");
       if (jeton && jeton.iptalEdildi) { status("İptal edildi.", "warn"); return; }
+      // bu arada onContext analizi bıraktıysa (seçim değişti): ffmpeg boş klibin (clip null) yoluyla çağrılmasın
+      if (!sekansMi && clip !== benimKlip) return;
 
       if (sekansMi) {
         var hazir = await sekansSesiHazirla(ctx, jeton);
@@ -1293,6 +1306,26 @@ window.KCut = (function () {
         }
       }
       status("Uygulanıyor…");
+      /*
+       * Seçili klip kapsamı: kesimler sekans zamanında (analizdeki clipStart + klip-göreli zaman). Bağlam yoklaması aynı
+       * medyanın taşınmasını / kırpılmasını onContext'e bildirmez, yoklama da yalnız panel odaktayken koşar: Premiere'de
+       * klibi taşıyıp hemen Uygula'ya basınca kesimler eski konuma (öndeki klibe, konuşmanın ortasına) düşer, deneme hakkı
+       * da giderdi. Premiere'e taze sorulur; klip analizdeki yerinde değilse gönderilmez, analiz bırakılır (zarf ve
+       * doğrulama önbellekleri kaynağa göre kalır: yeniden Sessizlikleri bul ffmpeg'siz).
+       */
+      if (!clip.kapsam) {
+        var yerKlip = clip;
+        var yer = await klipYeriniDenetle(yerKlip);
+        if (!clip || clip !== yerKlip) return;
+        if (yer === "okunamadi") { status(KLIP_DEGISTI.okunamadi, "bad"); return; }
+        if (yer === "degisti") {
+          K.log("[kesim] analiz edilen klip tasindi/kirpildi/secim degisti (clipStart " + yerKlip.clipStart + "): KS_applyCuts gonderilmedi");
+          sesiKapat();
+          analiziBirak();
+          status(KLIP_DEGISTI.uygula, "bad");
+          return;
+        }
+      }
       var mode = etkinMod();
       if (bosluk && mode === "ripple") mode = "gap";
       // esleme: host kesilen sekansı, kareyi ve gerçek ripple kaymasını bildirir (altyazıyı yeni kurguya uyarlamak için)
@@ -1433,6 +1466,35 @@ window.KCut = (function () {
     render();   // çubuk / liste / dalga boşalır, "Kesimleri uygula" kapanır
   }
 
+  // Premiere'in saniye değerleri (aynı klipte her okumada aynı); yarım milisaniye pay, bir kareden çok küçük
+  function ayniZaman(a, b) {
+    if (a === b) return true;
+    var x = Number(a), y = Number(b);
+    return isFinite(x) && isFinite(y) && Math.abs(x - y) < 0.0005;
+  }
+
+  /*
+   * Seçili klip kapsamı: bağlamdaki seçim analiz edilen klibin kendisi mi — aynı medya, in / out ve sekanstaki yer
+   * (clipStart, clipEnd: hız değişimi de). Kesimler ve kararlar sekans zamanında; yer ya da in / out değişince eskidir.
+   */
+  function klipYerindeMi(sel, c) {
+    return !!(sel && c && sel.mediaPath === c.mediaPath && ayniZaman(sel.clipStart, c.clipStart) &&
+      ayniZaman(sel.clipEnd, c.clipEnd) && ayniZaman(sel.inPoint, c.inPoint) && ayniZaman(sel.outPoint, c.outPoint));
+  }
+
+  /*
+   * Uygula'dan hemen önce Premiere'e taze sorulur (KApp.ctx() son yoklamadır, panel odakta değilken hiç yenilenmez).
+   * Döner: null (gönderilebilir; sekans yoksa / başka sekans etkinse KS_applyCuts kendisi reddeder: "Etkin sekans
+   * değişti", analiz kalır) | "degisti" | "okunamadi".
+   */
+  async function klipYeriniDenetle(c) {
+    var r = null;
+    try { r = await K.call("KS_getContext", undefined, 20000); } catch (e) { r = null; }
+    if (!r || !r.ok) return "okunamadi";
+    if (!r.hasSeq || (analizSeqId && r.sequenceId && String(r.sequenceId) !== analizSeqId)) return null;
+    return klipYerindeMi(r.sel, c) ? null : "degisti";
+  }
+
   /* ---------------- Dinle (önizleme) ---------------- */
 
   // Kesimler uygulanmis gibi sesi panelde cal (ortak oynatici: js/dinle.js)
@@ -1545,7 +1607,7 @@ window.KCut = (function () {
       // seçim değiştiyse eski analiz geçersiz (sekans kapsamında: sekans değiştiyse / kapandıysa)
       var gecersiz = clip && (clip.kapsam
         ? (!ctx.hasSeq || (ctx.sequenceId && clip.seqId && String(ctx.sequenceId) !== String(clip.seqId)))
-        : (!ctx.sel || ctx.sel.mediaPath !== clip.mediaPath || ctx.sel.clipStart !== clip.clipStart));
+        : !klipYerindeMi(ctx.sel, clip));
       if (gecersiz) {
         el("cut-result").hidden = true;
         sesiKapat();
@@ -1560,6 +1622,25 @@ window.KCut = (function () {
         hamSessizlik = null;
         onbellekleriBosalt();
       }
+    });
+    /*
+     * Her yoklamada (app.js onPoll; onContext yalnız medya / seçim sayısı / sekans değişince gelir): seçili klip kapsamında
+     * analiz edilen klip aynı medyayla taşındı / kırpıldıysa harita ve kaydırıcıların kurduğu kesimler eski konumda.
+     * Analiz bırakılır, nedeni söylenir; zarf ve doğrulama önbellekleri kaynağa göre kalır (yeniden bulmak ffmpeg'siz).
+     * Yoklama panel odakta değilken koşmaz: Uygula ayrıca Premiere'e taze sorar (klipYeriniDenetle). Analiz ya da Uygula
+     * sürerken bırakılmaz: süren çözümlemenin zarfı önbelleğe girsin (bir sonraki yoklama bırakır, yeniden bulmak anında),
+     * Uygula'yı kendi taze denetimi durdurur.
+     */
+    if (KApp.onPoll) KApp.onPoll(function (ctx) {
+      if (busy || uygulaniyor) return;
+      if (!clip || clip.kapsam || !ctx || !ctx.sel || klipYerindeMi(ctx.sel, clip)) return;
+      // seçim kalktı / başka sekans: onContext'in işi (yukarıda); burada yalnız aynı medyanın yeri / in / out'u değişti
+      if (ctx.sel.mediaPath !== clip.mediaPath) return;
+      if (analizSeqId && ctx.sequenceId && String(ctx.sequenceId) !== analizSeqId) return;
+      K.log("[kesim] analiz edilen klip tasindi/kirpildi (clipStart " + clip.clipStart + " -> " + ctx.sel.clipStart + "): analiz birakildi");
+      sesiKapat();
+      analiziBirak();
+      status(KLIP_DEGISTI.harita, "warn");
     });
     refreshButton();
   }

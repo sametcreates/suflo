@@ -54,8 +54,10 @@ function eleman(id) {
  *   altyazi?: sahte KCaptions (3.4 adım 8: verilirse js/kesim-esle.js ve js/kesim-altyazi.js da yüklenir),
  *   ctx?: { hasSeq, sequenceId, seqIn, seqOut, seqDur, frame } (3.4 adım 7: sekans kapsamı),
  *   call?(fn, payload) → sonuç (verilirse her K.call buna gider; KS_exportAudio / KS_getTrackLayout sahtesi),
+ *   getContext?(ctx) → sonuç (KS_getContext sahtesi; verilmezse Premiere'in o anki bağlamı: ctx(...) ile son verilen seçim,
+ *     sessiz olsa da — Uygula'nın taze denetimi yoklamanın görmediğini görür),
  *   fs? (K.fs yerine) }
- * Döner: { el, KCut, kayit: { gate, harca, toast, call, run, runAkis }, ctx(sel, ek, sessiz?), bekle(ms), kapsam(s), hedef(m) }
+ * Döner: { el, KCut, kayit: { gate, harca, toast, call, run, runAkis }, ctx(sel, ek, sessiz?), yokla(), bekle(ms), kapsam(s), hedef(m) }
  */
 function kesimPaneli(o) {
   var els = {};
@@ -72,7 +74,7 @@ function kesimPaneli(o) {
   var hedefDugmeleri = ["clone", "here"].map(function (m) { var b = eleman(""); b.tagName = "BUTTON"; b.dataset.m = m; return b; });
   el("cut-target").querySelectorAll = function () { return hedefDugmeleri; };
   var kayit = { gate: [], harca: [], toast: [], call: [], run: [], runAkis: [] };
-  var sel = o.clip || null, dinleyiciler = [], ekCtx = o.ctx || {};
+  var sel = o.clip || null, dinleyiciler = [], yoklamaDinleyicileri = [], ekCtx = o.ctx || {};
   function ctxNesnesi() {
     var c = { sel: sel, connected: true };
     for (var k in ekCtx) c[k] = ekCtx[k];
@@ -90,6 +92,13 @@ function kesimPaneli(o) {
   K.runAkis = o.runAkisYok ? undefined : function (cmd, args, opts) { kayit.runAkis.push(args); return gercekK.runAkis(cmd, args, opts); };
   K.call = function (fn, payload) {
     kayit.call.push({ fn: fn, payload: payload });
+    if (fn === "KS_getContext") {
+      // host gibi: bağlam + ok; sekans açık sayılır (testin ctx'i hasSeq vermediyse)
+      var bag = ctxNesnesi();
+      bag.ok = true;
+      if (bag.hasSeq === undefined) bag.hasSeq = true;
+      return Promise.resolve(o.getContext ? o.getContext(bag) : bag);
+    }
     if (o.call) return Promise.resolve(o.call(fn, payload));
     return Promise.resolve(o.applyCuts ? o.applyCuts(payload) : { ok: true, newSeq: "Kopya" });
   };
@@ -104,6 +113,7 @@ function kesimPaneli(o) {
     KApp: {
       ctx: ctxNesnesi,
       onContext: function (fn) { dinleyiciler.push(fn); },
+      onPoll: function (fn) { yoklamaDinleyicileri.push(fn); },
       toast: function (m, t) { kayit.toast.push([m, t]); },
       davetAni: function () {}
     },
@@ -126,13 +136,19 @@ function kesimPaneli(o) {
   sandbox.KCut.init();
   return {
     el: el, KCut: sandbox.KCut, kayit: kayit,
-    // sessiz: bağlam değişir ama onContext dinleyicileri çağrılmaz (app.js pollContext yalnız medya / seçim sayısı /
-    // sekans değişince haber verir: aynı klip taşınınca ya da aynı aralığın kopyası seçilince sessizdir)
+    // Premiere'de bağlam değişti ve panel yokladı: app.js pollContext gibi önce onContext, sonra onPoll dinleyicileri.
+    // sessiz: bağlam değişir ama henüz yoklanmadı (panel odakta değil ya da tık yoklamadan önce geldi): hiçbir dinleyici
+    // çağrılmaz; KS_getContext (Uygula'nın taze denetimi) yine yeni bağlamı döndürür
     ctx: function (yeni, ek, sessiz) {
       sel = yeni;
       if (ek) for (var k in ek) ekCtx[k] = ek[k];
-      if (!sessiz) dinleyiciler.forEach(function (f) { f(ctxNesnesi()); });
+      if (sessiz) return;
+      dinleyiciler.forEach(function (f) { f(ctxNesnesi()); });
+      yoklamaDinleyicileri.forEach(function (f) { f(ctxNesnesi()); });
     },
+    // Seçim anahtarı (medya / seçim sayısı / sekans) değişmeden gelen yoklama: app.js yalnız onPoll'u çağırır
+    // (aynı klip taşındı / kırpıldı; sessiz ctx(...) sonrası panel odaklanınca)
+    yokla: function () { yoklamaDinleyicileri.forEach(function (f) { f(ctxNesnesi()); }); },
     kapsam: function (s) { kapsamDugmeleri.forEach(function (b) { if (b.dataset.s === s) b.fire("click"); }); },
     hedef: function (m) { hedefDugmeleri.forEach(function (b) { if (b.dataset.m === m) b.fire("click"); }); },
     tikla: function (id) { return Promise.resolve(el(id).fire("click", { detail: 0 })); },

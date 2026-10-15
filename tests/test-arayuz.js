@@ -753,9 +753,11 @@ var bekleyenKesim = (function () {
       p.kayit.harca.join(",") + " esik " + p.el("cut-noise").value);
     return p.tikla("cut-apply");
   }).then(function () {
-    ok("3.4 Uygula: silencedetect doğrulaması koştu, KS_applyCuts çağrıldı, hak bir kez düştü",
-      p.kayit.run.length === 1 && p.kayit.call.length === 1 && p.kayit.call[0].fn === "KS_applyCuts" && p.kayit.harca.length === 1 && p.kayit.harca[0] === "cut",
-      p.kayit.run.length + " " + p.kayit.call.length + " " + p.kayit.harca.join(","));
+    // Premiere'e iki çağrı: klibin yerinin taze denetimi (KS_getContext), sonra KS_applyCuts
+    var cagrilar = p.kayit.call.map(function (c) { return c.fn; }).join(",");
+    ok("3.4 Uygula: silencedetect doğrulaması koştu, klibin yeri denetlendi, KS_applyCuts çağrıldı, hak bir kez düştü",
+      p.kayit.run.length === 1 && cagrilar === "KS_getContext,KS_applyCuts" && p.kayit.harca.length === 1 && p.kayit.harca[0] === "cut",
+      p.kayit.run.length + " " + cagrilar + " " + p.kayit.harca.join(","));
   }).catch(function (e) { ok("3.4 kesim kabı çöktü: " + (e && e.stack || e), false); });
 })();
 
