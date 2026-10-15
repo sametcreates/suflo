@@ -556,6 +556,168 @@ DE.opak.displayName = "Maskenausweitung";
 ok("Opaklık bileşeninde başka adlı parametre (maske) opak sayılmaz", cagir("KS_easeScan", {}).props.filter(function (p) { return p.compIdx === 1; })[0].opak === false);
 secim = [];
 
+/* ---------- 7c) varışta yaylanma (3.4 adım 14): KS_easeBake 'yaylan' öğeleri ---------- */
+// Konum 1 sn → 2 sn hareket eder (iniş 2 sn), 5 sn'de bekler; panelin yaptığı gibi: değerli tarama → varışlar → gruplar
+function yaylanKlibi(o) {
+  var c = klip({ nodeId: o.nodeId, ad: o.ad || "Yaylan.mp4", start: 0, end: o.end || 10, inP: 0, outP: o.end || 10, konum: o.konum, opak: o.opak, olcek: o.olcek });
+  izKur([[c]]);
+  playhead = o.ph === undefined ? 1.5 : o.ph;
+  return c;
+}
+function yaylanTara(c, satir) {
+  var dI = [{ nodeId: c.nodeId, compIdx: satir[0], propIdx: satir[1] }];
+  var rr = cagir("KS_easeScan", { degerIste: dI });
+  return { r: rr, p: rr.props.filter(function (x) { return x.compIdx === satir[0] && x.propIdx === satir[1]; })[0] };
+}
+function yaylanPlani(prop, ayar, kayitlar, o) {
+  var v = Mh.varislar(prop, kayitlar || [], { ph: playhead, tum: !!(o && o.tum) });
+  return Mh.yaylanGruplari([{ prop: prop, varis: v }], ayar || {}, "seq-1");
+}
+var YL = yaylanKlibi({ nodeId: "nYL", konum: [[1, [0.1, 0.5]], [2, [0.6, 0.5]], [5, [0.6, 0.5]]], olcek: [[1, 100], [3, 120]] });
+var tyl = yaylanTara(YL, [0, 0]);
+ok("yaylan tarama: değer istenen satırda keys ile hizalı değerler; istenmeyende yok; kfInterp", js(tyl.p.degerler) === js([[0.1, 0.5], [0.6, 0.5], [0.6, 0.5]]) &&
+  tyl.p.kfInterp === true && tyl.r.props.filter(function (x) { return x.propIdx === 1; })[0].degerler === undefined, js(tyl.p.degerler));
+var ylPlan = yaylanPlani(tyl.p, { genlik: 0.1, frekans: 3, sonum: 6 });
+var ylOge = ylPlan.gruplar[0].items[0];
+yazimlar = [];
+var ylB = cagir("KS_easeBake", ylPlan.gruplar[0]);
+var ylK = anahtarlar(YL.konum);
+var yeniler = ylK.filter(function (k) { return k.s > 2 + 1e-6 && k.s < 5 - 1e-6; });
+ok("yaylan: yalnız iniş anahtarından SONRA ve sonraki anahtardan önce yazılır (seyrek plan: tepe / çukurlar)", ylB.ok && ylB.basarili === 1 &&
+  yeniler.length === ylOge.keys.length && ylK.filter(function (k) { return k.s < 2 - 1e-6; }).length === 1 && ylK.length === 3 + ylOge.keys.length, js([ylB.sonuclar, ylK.length]));
+ok("yaylan: ilk anahtar varış yönünde aşar (x > 0,6), y değişmez; değerler planla aynı", yeniler[0].v[0] > 0.6 && yeniler.every(function (k) { return k.v[1] === 0.5; }) &&
+  yeniler.every(function (k, i) { return yakin(k.v[0], ylOge.keys[i].v[0], 1e-9); }), js(yeniler[0]));
+ok("yaylan: kfInterp varken her yeni anahtar Bezier (5); iniş ve sonraki anahtara dokunulmaz", YL.konum.interp.length === yeniler.length &&
+  YL.konum.interp.every(function (x) { return x.tur === 5 && x.ui === false && x.s > 2 && x.s < 5; }) && ylB.bezier === yeniler.length && ylB.yogun === 0 &&
+  ylB.sonuclar[0].interp === "bezier", js([YL.konum.interp.length, ylB.bezier]));
+ok("yaylan: kullanıcının iniş ve sonraki anahtarı değerleriyle kalır; updateUI yalnız son yazımda", js(YL.konum.bul(2).v) === js([0.6, 0.5]) && js(YL.konum.bul(5).v) === js([0.6, 0.5]) &&
+  yazimlar.filter(function (y) { return y.ui; }).length === 1 && yazimlar[yazimlar.length - 1].ui === true);
+var ylKayit = ylB.records[0];
+ok("yaylan kaydı: tur 'yaylan', uçlar yok, iniş kenarDegerleri'nde, zamanlar yazılanlar, depo kabul eder, canlı", ylKayit.tur === "yaylan" && ylKayit.uclar === null &&
+  js(ylKayit.kenarDegerleri) === js([{ t: 2, v: [0.6, 0.5] }]) && ylKayit.times.length === yeniler.length && ylKayit.clipIn === 0 && ylKayit.matchName === "AE.ADBE Motion/Position" &&
+  KRh.kayit(ylKayit) !== null && KRh.canli(ylKayit, ylK.map(function (k) { return k.s; }), 25), js(ylKayit).slice(0, 240));
+// yeniden uygulama: canlı yaylanma aynı inişte; degistir + eski yalnız Suflo'nun eski anahtarlarını siler
+ylKayit.id = "kryl";
+var tyl2 = yaylanTara(YL, [0, 0]);
+var ylPlan2 = yaylanPlani(tyl2.p, { genlik: 0.3, frekans: 2, sonum: 4 }, [KRh.kayit(ylKayit)]);
+var ylB2 = cagir("KS_easeBake", ylPlan2.gruplar[0]);
+var ylK2 = anahtarlar(YL.konum);
+ok("yaylan yeniden uygulama: eski yaylanma silinir, yenisi yazılır (aynı iniş), sonraki anahtar kalır", ylPlan2.gruplar[0].items[0].degistir === true &&
+  ylB2.sonuclar[0].ok && ylB2.sonuclar[0].silinen === ylKayit.times.length && ylK2.length === 3 + ylPlan2.gruplar[0].items[0].keys.length && YL.konum.bul(5) &&
+  js(Mh.yaylanCakisanlar([KRh.kayit(ylKayit)], KRh.kayit(ylB2.records[0])).map(function (r) { return r.id; })) === js(["kryl"]), js([ylB2.sonuclar, ylK2.length]));
+// kullanıcı eski yaylanmanın ortasına kendi anahtarını koyduysa: o sonraki anahtar olur, yeni yaylanma ondan önce biter,
+// eskinin onun ötesindeki anahtarları da silinir (sahipsiz kalmaz), kullanıcının anahtarı kalır
+var ylKayit2 = ylB2.records[0]; ylKayit2.id = "kryl2";
+var ortada = ylKayit2.times[1] + 0.04;
+YL.konum.keys.push({ s: ortada, v: [0.7, 0.5] });
+var tyl3 = yaylanTara(YL, [0, 0]);
+var ylPlan3 = yaylanPlani(tyl3.p, {}, [KRh.kayit(ylKayit2)]);
+var ylB3 = cagir("KS_easeBake", ylPlan3.gruplar[0]);
+var ylK3 = anahtarlar(YL.konum);
+ok("yaylan: kullanıcı pencereye anahtar koyduysa yeni yaylanma ondan önce biter, eskinin tüm anahtarları silinir, kullanıcınınki kalır",
+  ylPlan3.gruplar[0].items[0].t1 === ortada && ylB3.sonuclar[0].ok && ylB3.sonuclar[0].silinen === ylKayit2.times.length && YL.konum.bul(ortada) &&
+  ylK3.length === 4 + ylB3.records[0].times.length && ylB3.records[0].times.every(function (t) { return t > 2 && t < ortada; }) && ylB3.records[0].times.length >= 1,
+  js([ylPlan3.gruplar[0].items[0].t1, ylB3.sonuclar, ylK3.length]));
+// plan hazırlandıktan sonra araya kullanıcının anahtarı girdiyse (eski kayıtta yok) icAnahtar, hiçbir şey silinmez
+var ylKayit3 = ylB3.records[0]; ylKayit3.id = "kryl3";
+var tyl4 = yaylanTara(YL, [0, 0]);
+var temelPlan = yaylanPlani(tyl4.p, {}, [KRh.kayit(ylKayit3)]).gruplar[0];
+YL.konum.keys.push({ s: 2.02, v: [0.65, 0.5] });
+var once3 = YL.konum.keys.length;
+var ylB4 = cagir("KS_easeBake", temelPlan);
+ok("yaylan: araya kullanıcının anahtarı girdiyse (eski kayıtta yok) icAnahtar, dokunulmaz", ylB4.sonuclar[0].kod === "icAnahtar" && ylB4.sonuclar[0].ic === 1 &&
+  ylB4.sonuclar[0].silinen === 0 && YL.konum.keys.length === once3 && YL.konum.bul(2.02), js(ylB4.sonuclar));
+YL.konum.removeKey({ seconds: 2.02 });
+// ret: iniş değişti / iniş yok / sonraki anahtar yok / plan sonraki anahtarı geçiyor
+function kopyaGrup(f) { var g = JSON.parse(JSON.stringify({ target: temelPlan.target, items: temelPlan.items })); f(g.items[0]); return g; }
+var sayi0 = YL.konum.keys.length;
+var rDeg = cagir("KS_easeBake", kopyaGrup(function (it) { it.v0 = [0.61, 0.5]; }));
+var rUc = cagir("KS_easeBake", kopyaGrup(function (it) { it.t0 = 1.5; }));
+var rSon = cagir("KS_easeBake", kopyaGrup(function (it) { it.t1 = 4.5; }));
+var rSonDeg = cagir("KS_easeBake", kopyaGrup(function (it) { it.v1 = [0, 0]; }));
+var rTas = cagir("KS_easeBake", kopyaGrup(function (it) { it.keys.push({ t: 5, v: [0.6, 0.5] }); }));
+var rOnce = cagir("KS_easeBake", kopyaGrup(function (it) { it.keys[0].t = 1.9; }));
+ok("yaylan ret: iniş değeri değişmiş (degisti), iniş yok (ucYok), sonraki anahtar yok (sonrakiYok) / değişmiş (degisti)",
+  rDeg.sonuclar[0].kod === "degisti" && rUc.sonuclar[0].kod === "ucYok" && rSon.sonuclar[0].kod === "sonrakiYok" && rSonDeg.sonuclar[0].kod === "degisti",
+  js([rDeg.sonuclar, rUc.sonuclar, rSon.sonuclar, rSonDeg.sonuclar]));
+ok("yaylan ret: plan sonraki anahtarı geçerse ya da inişten önceyse 'gecersiz'; hiçbir anahtar yazılmaz / silinmez", rTas.sonuclar[0].kod === "gecersiz" &&
+  rOnce.sonuclar[0].kod === "gecersiz" && YL.konum.keys.length === sayi0, js([rTas.sonuclar, rOnce.sonuclar]));
+// yer yok: sonraki anahtar inişten 2 kare sonra → panel göndermez ('yer')
+var YD = yaylanKlibi({ nodeId: "nYD", konum: [[1, [0, 0]], [2, [1, 0]], [2.08, [1, 0]]] });
+var tyd = yaylanTara(YD, [0, 0]);
+var ydPlan = yaylanPlani(tyd.p, {});
+ok("yaylan: 2 kareden az yer → plan reddedilir ('yer'), host'a öğe gitmez", ydPlan.gruplar.length === 0 && ydPlan.atlanan.length === 1 && ydPlan.atlanan[0].kod === "yer" &&
+  YD.konum.keys.length === 3, js(ydPlan.atlanan));
+// yoğun yedek: Premiere ara değerlemeyi yazamıyorsa 2 karede bir sık plan, Bezier çağrısı yok
+var YY = yaylanKlibi({ nodeId: "nYY", konum: [[1, [0, 0]], [2, [1, 0]]] });
+YY.konum.setInterpolationTypeAtKey = undefined;
+var tyy = yaylanTara(YY, [0, 0]);
+var yyPlan = yaylanPlani(tyy.p, {});
+var yyB = cagir("KS_easeBake", yyPlan.gruplar[0]);
+var yyYeni = anahtarlar(YY.konum).filter(function (k) { return k.s > 2 + 1e-6; });
+ok("yaylan yoğun yedek: kfInterp yok → 2 karede bir yazılır, Bezier çağrılmaz, interp 'yogun'", tyy.p.kfInterp === false && yyB.sonuclar[0].ok &&
+  yyB.sonuclar[0].interp === "yogun" && yyB.yogun === 1 && yyB.bezier === 0 && YY.konum.interp.length === 0 &&
+  yyYeni.length === yyPlan.gruplar[0].items[0].yogunKeys.length && yyYeni.length > yyPlan.gruplar[0].items[0].keys.length &&
+  yyYeni.slice(1).every(function (k, i) { return Math.round((k.s - yyYeni[i].s) * 25) <= 2; }), js([yyB.sonuclar, yyYeni.length]));
+ok("yaylan: iniş son anahtarsa sınır klibin sonu (t1 null), yazılanlar klibin içinde", yyPlan.gruplar[0].items[0].t1 === null && yyPlan.gruplar[0].items[0].v1 === null &&
+  yyYeni.every(function (k) { return k.s < 10; }));
+// Opaklık: host da 0..100 kırpar (panel kırpmasa bile)
+var YO = yaylanKlibi({ nodeId: "nYO", opak: [[1, 0], [2, 100]] });
+var tyo = yaylanTara(YO, [1, 0]);
+var yoPlan = yaylanPlani(tyo.p, { genlik: 0.4 });
+yoPlan.gruplar[0].items[0].keys = yoPlan.gruplar[0].items[0].keys.map(function (k) { return { t: k.t, v: 100 + (k.v - 100) * -3 + 5 }; });
+cagir("KS_easeBake", yoPlan.gruplar[0]);
+ok("yaylan Opaklık: değerler 0..100'e kırpılır", YO.opak.keys.length > 2 && YO.opak.keys.every(function (k) { return k.v >= 0 && k.v <= 100; }), js(YO.opak.keys.map(function (k) { return k.v; })));
+// tüm varışlar: zincirdeki her hareketin inişi, tek çağrıda
+var YT = yaylanKlibi({ nodeId: "nYT", olcek: [[1, 100], [2, 150], [4, 150], [5, 120], [8, 120]] });
+var tyt = yaylanTara(YT, [0, 1]);
+var ytPlan = yaylanPlani(tyt.p, {}, [], { tum: true });
+var ytB = cagir("KS_easeBake", ytPlan.gruplar[0]);
+var ytK = anahtarlar(YT.olcek);
+ok("tüm varışlar: iki iniş (2 ve 5), bekleme (4, 8) geçilir; her yaylanma kendi sonraki anahtarından önce biter", ytPlan.gruplar[0].items.length === 2 &&
+  ytPlan.gruplar[0].items[0].t0 === 2 && ytPlan.gruplar[0].items[0].t1 === 4 && ytPlan.gruplar[0].items[1].t0 === 5 && ytB.basarili === 2 && ytB.records.length === 2 &&
+  ytB.records[0].times.every(function (t) { return t > 2 && t < 4; }) && ytB.records[1].times.every(function (t) { return t > 5 && t < 8; }) &&
+  YT.olcek.bul(4).v === 150 && YT.olcek.bul(8).v === 120 && ytB.records[1].times.length > 0 && ytK.filter(function (k) { return k.s > 5 && k.s < 8; })[0].v < 120,
+  js(ytPlan.gruplar[0].items.map(function (x) { return [x.t0, x.t1]; })));
+
+/* geri alma: Eğri sekmesinin Geri al'ı (KS_easeUndo) ve kayıt tabanlı kaldırma (KS_removeSufloKeys, adım 11) */
+var yUndo = cagir("KS_easeUndo", { records: [ytB.records[0]] });
+ok("yaylan geri al: yalnız Suflo'nun yaylanma anahtarları silinir; iniş, bekleme ve diğer yaylanma kalır", yUndo.ok && yUndo.sonuclar.length === 1 &&
+  yUndo.sonuclar[0].silinen === ytB.records[0].times.length && YT.olcek.bul(2).v === 150 && YT.olcek.bul(4).v === 150 &&
+  anahtarlar(YT.olcek).filter(function (k) { return k.s > 2 && k.s < 4; }).length === 0 && anahtarlar(YT.olcek).filter(function (k) { return k.s > 5 && k.s < 8; }).length === ytB.records[1].times.length,
+  js(yUndo));
+ok("yaylan geri al ikinci kez: kayıt 'yok' ile biter", cagir("KS_easeUndo", { records: [ytB.records[0]] }).sonuclar[0].kod === "yok");
+var ytKayit1 = JSON.parse(JSON.stringify(ytB.records[1])); ytKayit1.id = "kryt1";
+YT.start.seconds = 2; YT.end.seconds = 12;   // klip 2 sn sağa taşındı
+var yRem = cagir("KS_removeSufloKeys", { records: [ytKayit1] });
+ok("yaylan kaydı kayıt tabanlı kaldırmayla da kalkar (klip taşınmış): iniş kalır, kenar anahtarı eklenmez", yRem.ok && yRem.sonuclar.length === 1 &&
+  yRem.sonuclar[0].silinen === ytKayit1.times.length && yRem.sonuclar[0].eklenen === 0 && YT.olcek.keys.length === 5 && YT.olcek.bul(5).v === 120, js(yRem));
+// araç kaldırması inişi silerse ardındaki yaylanma sahipsiz kalmaz (KS_kayitEgriUclari)
+var YH = yaylanKlibi({ nodeId: "nYH", olcek: [[1, 100], [2, 160], [6, 160]] });
+var tyh = yaylanTara(YH, [0, 1]);
+var yhB = cagir("KS_easeBake", yaylanPlani(tyh.p, {}).gruplar[0]);
+var yhKayit = yhB.records[0]; yhKayit.id = "kryh";
+var hareketKaydi = { id: "krhar", tur: "hareket", seqId: "seq-1", nodeId: "nYH", clipName: "Yaylan.mp4", clipStart: 0, matchName: "AE.ADBE Motion/Scale", compIdx: 0, propIdx: 1,
+  uclar: null, times: [1, 2], kenarDegerleri: [] };
+var yhRem = cagir("KS_removeSufloKeys", { records: [hareketKaydi], egriler: [yhKayit] });
+ok("araç kaydı inişi silince yaylanma da kalkar (egriBiten), sonraki anahtar kalır", yhRem.ok && js(yhRem.egriBiten) === js(["kryh"]) &&
+  yhRem.sonuclar[0].silinen === 2 + yhKayit.times.length && YH.olcek.keys.length === 1 && YH.olcek.bul(6).v === 160, js([yhRem, YH.olcek.keys.length]));
+// yaylanma geri alınırken iki yaylanma anahtarı arasına uygulanmış Eğri de sahipsiz kalmaz
+var YE = yaylanKlibi({ nodeId: "nYE", olcek: [[1, 100], [2, 160], [6, 160]] });
+var tye = yaylanTara(YE, [0, 1]);
+var yeB = cagir("KS_easeBake", yaylanPlani(tye.p, { frekans: 1, sonum: 2 }).gruplar[0]);
+var yeKayit = yeB.records[0]; yeKayit.id = "krye";
+var yeT = yeKayit.times;
+playhead = (yeT[0] + yeT[1]) / 2;
+var tye2 = cagir("KS_easeScan", {}).props.filter(function (x) { return x.propIdx === 1; })[0];
+var yeEgri = cagir("KS_easeBake", { target: hedef(tye2), items: [plan(tye2, E.builtin("yumusak").curve, 1)] });
+var yeEgriKayit = yeEgri.records[0]; yeEgriKayit.id = "krye-egri";
+var yeU = cagir("KS_easeUndo", { records: [yeKayit], egriler: [yeEgriKayit] });
+ok("yaylan geri al: ucu yaylanma anahtarında olan Eğri'nin iç anahtarları da silinir (egriBiten); kullanıcının anahtarları kalır",
+  yeEgri.basarili === 1 && js(yeEgriKayit.uclar) === js([yeT[0], yeT[1]]) && js(yeU.egriBiten) === js(["krye-egri"]) &&
+  yeU.sonuclar[0].silinen === yeT.length + yeEgriKayit.times.length && YE.olcek.keys.length === 3 && YE.olcek.bul(2).v === 160, js([yeU, YE.olcek.keys.length]));
+secim = [];
+
 /* ---------- 8) yoklama: kfInterp ---------- */
 izKur([[A]]);
 var pr = cagir("KS_apiProbe");

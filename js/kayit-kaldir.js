@@ -13,6 +13,7 @@
  * Kaldırılan anahtarlarda ucu duran Suflo Eğrisi (3.4 adım 10; aynı depo, tur 'egri') de kalkar: Eğri iki anahtarın
  * arasına iç anahtarlar yazar, ucu gidince onlar sahipsiz kalır (rampa durur, Eğri'nin Geri al'ı kaydı bulamaz). kaldir,
  * aynı klip ve özellikteki Eğri kayıtlarını da host'a verir (egriAdaylari); host karar verir, biten Eğri kaydı depodan düşer.
+ * Varışta yaylanma (3.4 adım 14; tur 'yaylan') da öyle: iniş anahtarı kalkarsa ardındaki yaylanma anahtarları sahipsiz kalmaz.
  * Geçişi kaldır'ın kesimini host seçer (playhead'in yakınında Suflo kaydı olan en yakın kesim; seçim öne geçmez); eski
  * yöntemin onayı o kesimi gösterir (kesimYeri) ve yedek tam o kesimi temizler.
  *
@@ -257,7 +258,7 @@
   }
 
   /*
-   * Eğri kayıtlarından (tur 'egri') host'a gidecek adaylar: araç kayıtlarından biriyle aynı sekansta, aynı özellikte
+   * Eğri sekmesi kayıtlarından (tur 'egri' ve 'yaylan') host'a gidecek adaylar: araç kayıtlarından biriyle aynı sekansta, aynı özellikte
    * (matchName) ve aynı klipte (iki nodeId de varsa onlar, yoksa klip adı) olanlar; en yeniler önce, en çok EN_COK. Host
    * yalnız ucu silinen anahtarlarda duran canlı Eğri'ye dokunur (KS_kayitEgriUclari); burada yalnız gereksiz yük ayıklanır.
    */
@@ -265,7 +266,11 @@
     var araclar = (Array.isArray(liste) ? liste : []).filter(function (r) { return r && aracMi(r.tur); });
     if (!araclar.length) return [];
     return (Array.isArray(egriler) ? egriler : []).filter(function (e) {
-      if (!e || e.tur !== "egri" || !Array.isArray(e.uclar) || e.uclar.length !== 2 || !Array.isArray(e.times) || !e.times.length) return false;
+      if (!e || !Array.isArray(e.times) || !e.times.length) return false;
+      // Eğri: iki ucu; varışta yaylanma (3.4 adım 14): iniş anahtarı (kenarDegerleri[0]) silinirse ardındaki yaylanma da kalkar
+      if (e.tur === "yaylan") {
+        if (!Array.isArray(e.kenarDegerleri) || !e.kenarDegerleri[0] || typeof e.kenarDegerleri[0].t !== "number") return false;
+      } else if (e.tur !== "egri" || !Array.isArray(e.uclar) || e.uclar.length !== 2) return false;
       return araclar.some(function (r) {
         if (r.matchName !== e.matchName || String(r.seqId || "") !== String(e.seqId || "")) return false;
         if (r.nodeId && e.nodeId) return String(r.nodeId) === String(e.nodeId);
@@ -359,7 +364,7 @@
     function egriKayitlari(proje, seqId) {
       var d = depo(), liste = [];
       try { liste = d ? d.oku(proje) : []; } catch (e) { liste = []; }
-      return liste.filter(function (r) { return r && r.tur === "egri" && (!seqId || r.seqId === String(seqId)); });
+      return liste.filter(function (r) { return r && (r.tur === "egri" || r.tur === "yaylan") && (!seqId || r.seqId === String(seqId)); });
     }
 
     // Projenin araç kayıtları (depo + bu oturumun belleği); f: { tur, seqId, idler }

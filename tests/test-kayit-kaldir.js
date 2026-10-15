@@ -141,6 +141,10 @@ ok("kesimYeri: V katmanı + dakika:saniye.salise; saat varsa başa; geçersizse 
   var a = SK.egriAdaylari(egriler, arac).map(function (r) { return r.id; });
   ok("egriAdaylari: yalnız araç kaydıyla aynı sekans + klip + özellikteki uçlu Eğri kayıtları, en yeni önce", JSON.stringify(a) === '["e5","e1"]', a);
   ok("egriAdaylari: araç kaydı yoksa boş", SK.egriAdaylari(egriler, []).length === 0 && SK.egriAdaylari(null, arac).length === 0);
+  var yay = rec({ id: "y1", tur: "yaylan", nodeId: "n1", times: [2.08, 2.24] }); yay.uclar = null; yay.kenarDegerleri = [{ t: 2, v: 100 }]; yay.createdAt = 9;
+  var yayIni = rec({ id: "y2", tur: "yaylan", nodeId: "n1", times: [2.08] }); yayIni.uclar = null; yayIni.kenarDegerleri = [];
+  var ay = SK.egriAdaylari(egriler.concat([yay, yayIni]), arac).map(function (r) { return r.id; });
+  ok("egriAdaylari: varışta yaylanma (3.4 adım 14) inişiyle aday olur (uçsuz); inişi olmayan yaylanma aday değil", JSON.stringify(ay) === '["y1","e5","e1"]', ay);
   var oe = SK.ozet({ eslesen: 1, sonuclar: [{ id: "z", silinen: 7, egri: ["e1"] }], atlanan: [], egriBiten: ["e1", "e1", 5, ""] });
   ok("ozet: egriBiten (tekrarsız, yalnız metin id) ve sayısı", JSON.stringify(oe.egriBiten) === '["e1"]' && oe.egri === 1, oe);
   var me = SK.mesajParcalari("zoom", oe);

@@ -5268,6 +5268,16 @@ function KS_easeKapsam(seq, ph, ust) {
   return [a, b];
 }
 
+// Tarama degerIste listesinde bu satir (nodeId + compIdx + propIdx) var mi (en cok 40 oge bakilir)
+function KS_easeDegerIstendi(liste, kim) {
+  if (!liste || typeof liste.length !== "number") return false;
+  for (var i = 0; i < liste.length && i < KS_EASE_MAX_PROPS; i++) {
+    var u = liste[i];
+    if (u && String(u.nodeId) === kim.nodeId && Number(u.compIdx) === kim.compIdx && Number(u.propIdx) === kim.propIdx) return true;
+  }
+  return false;
+}
+
 /*
  * Ucuz yoklama (panel 1,2 sn'de bir, yalniz Egri sekmesi gorunur ve panel odaktayken): bilesen
  * yurumez. selSig: en cok 8 secili video klibinin "nodeId|baslangic|bitis"i.
@@ -5295,14 +5305,16 @@ function KS_easePeek() {
 }
 
 /*
- * p: { maxProps (<= 40), ipuclari: [{ nodeId, compIdx, propIdx, t0, t1 }] (canli Suflo kayitlarinin uclari) }
+ * p: { maxProps (<= 40), ipuclari: [{ nodeId, compIdx, propIdx, t0, t1 }] (canli Suflo kayitlarinin uclari),
+ *      degerIste?: [{ nodeId, compIdx, propIdx }] (3.4 adim 14: bu satirlara degerler eklenir) }
  * Hedef: secili video klipleri (en cok 20), yoksa playhead'in altindaki en ustteki video klibi.
  * Doner: { seqId, ph, fps, proje, kaynak: 'secim'|'playhead'|'yok', kapsam: [a, b) (bu sonucun gecerli
  *   oldugu playhead araligi: secimde sinirsiz; playhead'de klibin ust katmanlarla kirpilmis araligi; klip
  *   yoksa playhead'i saran bosluk; 400'den cok anahtarda pencere), klipler: [...], props: [{ nodeId, clipName, clipStart, clipEnd,
  *   clipIn, clipOut, ters (kaynak capasi: panel kaydin canliligini slip / ripple kirpmadan sonra da bununla olcer), compIdx,
  *   propIdx, matchName, label, labelTablo, opak, tur: 'sayi'|'xy', keys (timeline sn), kesik,
- *   pair: { t0, t1, i0, i1, ic, kayitli } | null, v0, v1, fps }], atlanan (sinir disi ozellik) }
+ *   pair: { t0, t1, i0, i1, ic, kayitli } | null, v0, v1, fps, kfInterp (Bezier yazilabilir mi), degerler? (degerIste'de olan
+ *   satirda keys ile hizali degerler) }], atlanan (sinir disi ozellik) }
  */
 function KS_easeScan(encoded) {
   try {
@@ -5391,8 +5403,17 @@ function KS_easeScan(encoded) {
             nodeId: oz.nodeId, clipName: oz.clipName, clipStart: oz.clipStart, clipEnd: oz.clipEnd, track: oz.track,
             clipIn: kay.clipIn, clipOut: kay.clipOut, ters: kay.ters, compIdx: ci, propIdx: pi, matchName: KS_easeKimlik(comp, prop), label: etiket.label, labelTablo: etiket.tablo,
             opak: KS_easeOpakMi(comp, prop), tur: typeof ilk === "number" ? "sayi" : "xy",
-            keys: keys, kesik: kesik, toplam: an.length, pair: null, v0: null, v1: null, fps: fps
+            keys: keys, kesik: kesik, toplam: an.length, pair: null, v0: null, v1: null, fps: fps,
+            // 3.4 adim 14: varista yaylanma Bezier (5) yazabilir mi (yalniz typeof; KS_apiProbe kfInterp ile ayni denetim)
+            kfInterp: typeof prop.setInterpolationTypeAtKey === "function"
           };
+          // Varista yaylanma (3.4 adim 14): istenen satirlarda tum anahtarlarin degerleri (keys ile hizali; okunamayan null).
+          // Yalniz Uygula'da ve yalniz isaretli satirlar icin istenir (yoklamada degil): 40 x 400 okuma yavas olur
+          if (KS_easeDegerIstendi(p.degerIste, kim)) {
+            var dg = [];
+            for (var kd = bas; kd < son; kd++) dg.push(KS_easeDegerAt(prop, an[kd].k));
+            oge.degerler = dg;
+          }
           if (cift) {
             oge.pair = { t0: keys[cift.i0], t1: keys[cift.i1], i0: cift.i0, i1: cift.i1, ic: cift.i1 - cift.i0 - 1, kayitli: !!cift.kayitli };
             oge.v0 = KS_easeDegerAt(prop, an[bas + cift.i0].k);
@@ -5412,8 +5433,11 @@ function KS_easeScan(encoded) {
  *      keys: [{ t, v }] (yalniz IC anahtarlar, timeline sn), degistir?, eski?: [t] }], degistir: bool, dogrusal: bool }
  * Her oge yazilmadan once dogrulanir: ozellik ayni (kimlik), t0 ve t1'de anahtar var ve degerleri ~ v0/v1,
  * arada anahtar yok (degistir ise once silinir; eski verildiyse yalniz o zamanlardaki anahtarlar, baska ic
- * anahtar varsa icAnahtar). Opaklikta degerler 0..100. Bir ogenin reddi digerini durdurmaz. Doner:
- * { basarili, sonuclar: [{ i, ok, kod, yazilan, silinen }], records: [...], yazilan, dogrusal }.
+ * anahtar varsa icAnahtar). Opaklikta degerler 0..100. Bir ogenin reddi digerini durdurmaz.
+ * tur 'yaylan' ogeleri (3.4 adim 14, varista yaylanma) KS_easeYaylanOge ile yazilir: inis anahtarindan SONRA, Bezier (5)
+ * ya da 2 karede bir sik. Doner:
+ * { basarili, sonuclar: [{ i, ok, kod, yazilan, silinen, interp? ('bezier' | 'yogun') }], records: [...], yazilan, dogrusal,
+ *   bezier (Bezier yapilan yaylanma anahtari), yogun (Bezier yazilamadigi icin sik yazilan yaylanma ogesi) }.
  */
 function KS_easeBake(encoded) {
   try {
@@ -5433,11 +5457,16 @@ function KS_easeBake(encoded) {
     }
     var kay = KS_easeKaynak(clip, oz.clipStart, oz.clipEnd);
     var toplamYaz = 0;
-    for (var s = 0; s < items.length; s++) toplamYaz += items[s] && items[s].keys && items[s].keys.length ? items[s].keys.length : 0;
+    for (var s = 0; s < items.length; s++) {
+      var sy = items[s] || {};
+      var n1 = sy.keys && sy.keys.length ? sy.keys.length : 0, n2 = sy.yogunKeys && sy.yogunKeys.length ? sy.yogunKeys.length : 0;
+      toplamYaz += Math.max(n1, n2);
+    }
     if (toplamYaz > KS_EASE_MAX_WRITE) return KS_errKod("cokFazla", "Cok fazla anahtar kare.");
 
-    var sonuclar = [], records = [], yazilanToplam = 0, dogrusalSayi = 0;
+    var sonuclar = [], records = [], yazilanToplam = 0, dogrusalSayi = 0, bezierSayi = 0, yogunSayi = 0;
     var sonYazim = null;   // en son yazilan anahtar: UI yalniz onda tazelenir
+    var seqKimlik = String(seq.sequenceID);
     for (var i = 0; i < items.length; i++) {
       var it = items[i] || {};
       var r = { i: i, ok: false, kod: "", yazilan: 0, silinen: 0 };
@@ -5446,6 +5475,20 @@ function KS_easeBake(encoded) {
       try { comp = clip.components[Number(it.compIdx)]; } catch (eC) { comp = null; }
       try { prop = comp ? comp.properties[Number(it.propIdx)] : null; } catch (eP) { prop = null; }
       if (!prop || KS_easeKimlik(comp, prop) !== String(it.matchName || "")) { r.kod = "ozellik"; continue; }
+      if (it.tur === "yaylan") {
+        var yo = KS_easeYaylanOge(clip, oz, kay, comp, prop, it, p.degistir === true, tol, seqKimlik);
+        r.silinen = yo.silinen;
+        if (yo.sonYazim) sonYazim = yo.sonYazim;
+        if (!yo.kayit) { r.kod = yo.kod || "yazilamadi"; if (yo.ic) r.ic = yo.ic; continue; }
+        r.ok = true;
+        r.kod = yo.kod;
+        r.yazilan = yo.kayit.times.length;
+        r.interp = yo.bezier ? "bezier" : "yogun";
+        yazilanToplam += r.yazilan;
+        if (yo.bezier) bezierSayi += yo.interp; else yogunSayi++;
+        records.push(yo.kayit);
+        continue;
+      }
       var t0 = Number(it.t0), t1 = Number(it.t1);
       if (!(isFinite(t0) && isFinite(t1) && t1 > t0)) { r.kod = "gecersiz"; continue; }
       var plan = it.keys && typeof it.keys.length === "number" ? it.keys : [];
@@ -5521,8 +5564,108 @@ function KS_easeBake(encoded) {
     var basarili = 0;
     for (var b = 0; b < sonuclar.length; b++) if (sonuclar[b].ok) basarili++;
     return KS_ok({ basarili: basarili, sonuclar: sonuclar, records: records, yazilan: yazilanToplam, dogrusal: dogrusalSayi,
-      seqId: String(seq.sequenceID), nodeId: oz.nodeId, clipName: oz.clipName });
+      bezier: bezierSayi, yogun: yogunSayi, seqId: String(seq.sequenceID), nodeId: oz.nodeId, clipName: oz.clipName });
   } catch (e) { return KS_err(e); }
+}
+
+/*
+ * Varista yaylanma ogesi (3.4 adim 14; KS_easeBake icinden). it: { tur: 'yaylan', t0 (inis anahtari), v0, t1 / v1 (sonraki
+ * anahtar; null: inis son anahtar), keys (seyrek plan: tepe / cukurlar ve pencere sonu), yogunKeys (2 karede bir), degistir?,
+ * eski?: [t] }. Dogrulama: t0'da anahtar var ve degeri ~ v0; t1 verildiyse orada anahtar var ('sonrakiYok') ve degeri ~ v1;
+ * aradaki (t1 yoksa inisten sonraki tum) anahtarlar yalniz eski (ayni inisin canli yaylanmasi) olabilir, baska anahtar varsa
+ * 'icAnahtar'. degistir ile eskinin inisten sonra hala duran tum anahtarlari once silinir (kullanici pencerenin ortasina anahtar
+ * koyduysa onun otesindekiler de: sahipsiz kalmasin). Yazilan her anahtar inisten SONRA, sonraki anahtardan ve klibin sonundan once.
+ * Premiere ara degerlemeyi yazabiliyorsa (setInterpolationTypeAtKey var; KS_apiProbe kfInterp ile ayni denetim) seyrek plan yazilir
+ * ve her yeni anahtar Bezier (5) yapilir: tepe / cukurlar yumusak okunur. Yazamiyorsa 2 karede bir sik plan (Premiere'in varsayilan
+ * dogrusal ara degeri). Inis ve sonraki anahtar kullanicinindir: degerine de ara degerlemesine de dokunulmaz.
+ * Doner: { kod, ic?, silinen, kayit (tur 'yaylan'; uclar null, kenarDegerleri [inis]) | null, bezier, interp (5 yapilan), sonYazim }
+ */
+function KS_easeYaylanOge(clip, oz, kay, comp, prop, it, degistirHepsi, tol, seqId) {
+  var o = { kod: "", silinen: 0, kayit: null, bezier: false, interp: 0, sonYazim: null };
+  var t0 = Number(it.t0), t1 = it.t1 === null || it.t1 === undefined ? null : Number(it.t1);
+  if (!isFinite(t0) || (t1 !== null && !(isFinite(t1) && t1 > t0))) { o.kod = "gecersiz"; return o; }
+  var bezier = typeof prop.setInterpolationTypeAtKey === "function";
+  var seyrek = it.keys && typeof it.keys.length === "number" ? it.keys : [];
+  var yogun = it.yogunKeys && typeof it.yogunKeys.length === "number" ? it.yogunKeys : [];
+  if (bezier && !seyrek.length) bezier = false;
+  var plan = bezier ? seyrek : yogun;
+  if (!plan.length) { o.kod = "bos"; return o; }
+  if (plan.length > KS_EASE_MAX_ITEM_KEYS) { o.kod = "cokFazla"; return o; }
+  var an = KS_easeAnahtarlar(clip, prop, oz.clipStart, oz.clipEnd);
+  var j0 = KS_easeBulIndis(an, t0, tol);
+  if (j0 < 0) { o.kod = "ucYok"; return o; }
+  var d0 = KS_easeDegerAt(prop, an[j0].k);
+  if (d0 === null || !KS_easeAyni(d0, it.v0)) { o.kod = "degisti"; return o; }
+  var ust = Number(oz.clipEnd);
+  if (t1 !== null) {
+    var j1 = KS_easeBulIndis(an, t1, tol);
+    if (j1 < 0) { o.kod = "sonrakiYok"; return o; }
+    var d1 = KS_easeDegerAt(prop, an[j1].k);
+    if (d1 === null || !KS_easeAyni(d1, it.v1)) { o.kod = "degisti"; return o; }
+    if (t1 < ust) ust = t1;
+  }
+  var ic = [], sonrasi = [];
+  for (var a = 0; a < an.length; a++) {
+    if (an[a].t <= t0 + tol) continue;
+    sonrasi.push(an[a]);
+    if (t1 === null || an[a].t < t1 - tol) ic.push(an[a]);
+  }
+  // degistir + eski: ayni inisin eski yaylanmasinin hala duran anahtarlari (inisten sonra, nerede olursa olsun: kullanici
+  // pencerenin ortasina anahtar koyduysa yeni yaylanma ondan once biter, eskisinin otesindeki anahtarlari da sahipsiz kalmaz)
+  var sil = [];
+  if ((degistirHepsi || it.degistir === true) && it.eski && typeof it.eski.length === "number") {
+    var eskiZ = [];
+    for (var ez = 0; ez < it.eski.length && ez < 4096; ez++) eskiZ.push(it.eski[ez]);
+    var es = KS_easeEslestir(sonrasi, eskiZ, tol);
+    for (var e1 = 0; e1 < es.length; e1++) sil.push(sonrasi[es[e1]]);
+  }
+  // aradaki her anahtar eski yaylanmanin olmali; kullanicinin araya ekledigi anahtar varsa yazilmaz (sessizce silinmez)
+  var yabanci = 0;
+  for (var c1 = 0; c1 < ic.length; c1++) {
+    var eskiMi = false;
+    for (var c2 = 0; c2 < sil.length && !eskiMi; c2++) if (sil[c2] === ic[c1]) eskiMi = true;
+    if (!eskiMi) yabanci++;
+  }
+  if (yabanci) { o.kod = "icAnahtar"; o.ic = yabanci; return o; }
+  var opak = KS_easeOpakMi(comp, prop);
+  var temiz = [];
+  for (var q = 0; q < plan.length; q++) {
+    var pt = Number(plan[q] && plan[q].t), pv = KS_easeDeger(plan[q] ? plan[q].v : null);
+    if (!isFinite(pt) || pt <= t0 + tol || pt >= ust - tol || pv === null || (typeof pv === "number") !== (typeof d0 === "number")) { o.kod = "gecersiz"; return o; }
+    if (opak && typeof pv === "number") pv = Math.max(0, Math.min(100, pv));
+    temiz.push({ t: pt, v: pv });
+  }
+  for (var x = sil.length - 1; x >= 0; x--) {
+    try { prop.removeKey(sil[x].k); o.silinen++; } catch (eRm) {}
+  }
+  var yazilan = [];
+  for (var w = 0; w < temiz.length; w++) {
+    var src = KS_presetSourceTime(clip, temiz[w].t, oz.clipStart, oz.clipEnd, true);
+    if (!isFinite(src) || src < 0) continue;
+    var zt = KS_presetTime(src);
+    var eklendi = false;
+    try { prop.addKey(zt); eklendi = true; } catch (eAdd) {}
+    try {
+      prop.setValueAtKey(zt, temiz[w].v, false);
+    } catch (eSet) {
+      if (eklendi) { try { prop.removeKey(zt); } catch (eRm2) {} }
+      continue;
+    }
+    yazilan.push(temiz[w].t);
+    o.sonYazim = { prop: prop, t: zt, v: temiz[w].v };
+    // 5 = Premiere'in Bezier'i (KS_presetKeys'teki seyrek anahtarlar gibi): tepe / cukurlar arasi yumusak
+    if (bezier) { try { prop.setInterpolationTypeAtKey(zt, 5, false); o.interp++; } catch (eI) {} }
+  }
+  var sonra = KS_easeAnahtarlar(clip, prop, oz.clipStart, oz.clipEnd), dogru = [];
+  var bulunan = KS_easeEslestir(sonra, yazilan, tol);
+  for (var y = 0; y < bulunan.length; y++) dogru.push(Math.round(sonra[bulunan[y]].t * 1000000) / 1000000);
+  o.bezier = bezier;
+  if (!dogru.length) { o.kod = "yazilamadi"; return o; }
+  if (dogru.length < temiz.length) o.kod = "eksik";
+  o.kayit = { tur: "yaylan", seqId: seqId, nodeId: oz.nodeId, clipName: oz.clipName, clipStart: oz.clipStart, clipEnd: oz.clipEnd,
+    clipIn: kay.clipIn, clipOut: kay.clipOut, ters: kay.ters, matchName: String(it.matchName), compIdx: Number(it.compIdx), propIdx: Number(it.propIdx),
+    uclar: null, times: dogru, kenarDegerleri: [{ t: t0, v: d0 }] };
+  return o;
 }
 
 var KS_EASE_CANLI_ORAN = 0.6;   // SufloKeyRecords.canli ile ayni esik
@@ -5614,7 +5757,10 @@ function KS_easeKayitEsle(an, rec, oz, kay, tol) {
  * cift yerinde ama Suflo'nun anahtarlari gitmis (Ctrl+Z, elle silme) -> sonuclar'da kod 'yok' (kayit biter);
  * cift de yoksa (klibin hizi / uc anahtarlar degisti) -> atlanan 'degisti' (panel saklar). Baska sekanstaki /
  * bulunamayan klibin / degisen ozelligin kaydi da dokunulmadan atlanan'da doner.
- * Doner: { sonuclar: [{ id, ok, kod, silinen }], atlanan: [{ id, kod }] }.
+ * egriler (istege bagli, 3.4 adim 14): ayni sekansin diger Egri sekmesi kayitlari. Varista yaylanmanin anahtari baska bir
+ * Egri'nin ucuysa (kullanici iki yaylanma anahtari arasina egri uyguladiysa) o Egri'nin ic anahtarlari da silinir, kaydi biter
+ * (KS_kayitEgriUclari; KS_removeSufloKeys'teki gibi).
+ * Doner: { sonuclar: [{ id, ok, kod, silinen }], atlanan: [{ id, kod }], egriBiten: [id] }.
  */
 function KS_easeUndo(encoded) {
   try {
@@ -5623,6 +5769,9 @@ function KS_easeUndo(encoded) {
     if (!seq) return KS_errKod("sekansYok", "Aktif sequence yok.");
     var fps = KS_easeFps(seq), tol = KS_EASE_TOL_KARE / fps;
     var recs = p.records && typeof p.records.length === "number" ? p.records : [];
+    var egriler = p.egriler && typeof p.egriler.length === "number" ? p.egriler : [];
+    var egriBitti = {}, egriBiten = [];
+    for (var eb = 0; eb < recs.length && eb < 300; eb++) if (recs[eb] && recs[eb].id) egriBitti[String(recs[eb].id)] = 1;
     var sonuclar = [], atlanan = [];
     for (var i = 0; i < recs.length && i < 300; i++) {
       var rec = recs[i] || {};
@@ -5638,7 +5787,10 @@ function KS_easeUndo(encoded) {
       var an = KS_easeAnahtarlar(clip, prop, oz.clipStart, oz.clipEnd);
       var esle = KS_easeKayitEsle(an, rec, oz, KS_easeKaynak(clip, oz.clipStart, oz.clipEnd), tol);
       if (!esle.canli) {
-        if (esle.ciftVar) sonuclar.push({ id: id, ok: true, silinen: 0, kod: "yok" });
+        // ucsuz kayit (varista yaylanma; uclari kendi anahtarlari): Suflo'nun anahtarlarindan hicbiri yerinde degilse biter
+        // (KS_removeSufloKeys gibi); uclu Egri kaydi: kullanicinin uclari yerindeyse
+        var ucsuz = !(rec.uclar && rec.uclar.length === 2);
+        if (ucsuz ? !(esle.enCok > 0) : esle.ciftVar) sonuclar.push({ id: id, ok: true, silinen: 0, kod: "yok" });
         else atlanan.push({ id: id, kod: "degisti" });
         continue;
       }
@@ -5650,9 +5802,24 @@ function KS_easeUndo(encoded) {
         if (koru && (Math.abs(a.t - koru[0]) <= tol || Math.abs(a.t - koru[1]) <= tol)) continue;
         sil.push(a);
       }
+      // Ucu bu anahtarlarda duran diger Egri sekmesi kayitlari (silmeden once, ayni anahtar listesiyle)
+      var egriAday = egriler.length ? KS_kayitEgriUclari(egriler, egriBitti, seq, fps, clip, oz, KS_easeKaynak(clip, oz.clipStart, oz.clipEnd),
+        String(rec.matchName || ""), an, sil, tol) : [];
       var silinen = 0;
       for (var s = sil.length - 1; s >= 0; s--) {
         try { prop.removeKey(sil[s].k); silinen++; } catch (eR) {}
+      }
+      for (var ea = 0; silinen && ea < egriAday.length; ea++) {
+        var eg = egriAday[ea], egSil = 0;
+        for (var ek = eg.keys.length - 1; ek >= 0; ek--) {
+          var ayni = false;
+          for (var sk = 0; sk < sil.length && !ayni; sk++) if (Math.abs(sil[sk].t - eg.keys[ek].t) <= tol) ayni = true;
+          if (ayni) continue;
+          try { prop.removeKey(eg.keys[ek].k); egSil++; } catch (eR3) {}
+        }
+        egriBitti[eg.id] = 1;
+        egriBiten.push(eg.id);
+        silinen += egSil;
       }
       if (silinen) {
         // Program monitoru tazelensin: kalan bir uc anahtarin degeri updateUI ile yeniden yazilir
@@ -5668,7 +5835,7 @@ function KS_easeUndo(encoded) {
       }
       sonuclar.push({ id: id, ok: true, silinen: silinen, kod: silinen ? "" : "yok" });
     }
-    return KS_ok({ sonuclar: sonuclar, atlanan: atlanan });
+    return KS_ok({ sonuclar: sonuclar, atlanan: atlanan, egriBiten: egriBiten });
   } catch (e) { return KS_err(e); }
 }
 
@@ -6018,7 +6185,9 @@ function KS_kayitKesimSec(seq, ph, kTol, recs, fps, tol) {
  * Silinecek anahtarlarda (sil) ucu duran canli Egri kayitlari (3.4 adim 10): Egri iki anahtarin arasina ic anahtarlar
  * yazar. Ucu silinince ic anahtarlar sahipsiz kalir: gecis / zoom / onayar kalkmis gorunurken rampa durur, Egri'nin
  * Geri al'i ucu gitmis kaydi bulamaz ('degisti'). Bu Egri'lerin kayitli ve hala duran ic anahtarlari da silinir (uclar
- * Egri'nin degil: onlara burada dokunulmaz) ve kayit biter. egriler: panelin verdigi Egri kayitlari; bitti: { id: 1 }
+ * Egri'nin degil: onlara burada dokunulmaz) ve kayit biter. Varista yaylanma (tur 'yaylan', 3.4 adim 14) da ayni: inis
+ * anahtari (kenarDegerleri[0]) silinirse ardindaki yaylanma sahipsiz kalir, kayitli anahtarlarinin hepsi silinir.
+ * egriler: panelin verdigi Egri sekmesi kayitlari; bitti: { id: 1 }
  * (bu cagrida bitenler); clip / oz / kay: aracin klibi; matchName: aracin ozelligi; an: ozelligin anahtarlari (silmeden
  * once). Doner: [{ id, keys: [an ogesi] }]
  */
@@ -6028,8 +6197,13 @@ function KS_kayitEgriUclari(egriler, bitti, seq, fps, clip, oz, kay, matchName, 
   for (var i = 0; i < egriler.length && i < KS_KALDIR_MAX_KAYIT; i++) {
     var e = egriler[i] || {};
     var id = String(e.id || "");
-    if (!id || bitti[id] || String(e.tur || "egri") !== "egri" || String(e.matchName || "") !== matchName) continue;
-    if (!e.uclar || e.uclar.length !== 2) continue;
+    var tur = String(e.tur || "egri");
+    if (!id || bitti[id] || (tur !== "egri" && tur !== "yaylan") || String(e.matchName || "") !== matchName) continue;
+    var inis = NaN;
+    if (tur === "yaylan") {
+      try { inis = Number(e.kenarDegerleri[0].t); } catch (eK) { inis = NaN; }
+      if (!isFinite(inis)) continue;
+    } else if (!e.uclar || e.uclar.length !== 2) continue;
     if (e.seqId && String(e.seqId) !== String(seq.sequenceID)) continue;
     // ayni klip mi: iki nodeId de varsa onlar; yoksa Egri'nin klibi bulunur
     if (e.nodeId && oz.nodeId) {
@@ -6039,16 +6213,17 @@ function KS_kayitEgriUclari(egriler, bitti, seq, fps, clip, oz, kay, matchName, 
       if (!ce || !KS_easeAyniKlip(ce, clip)) continue;
     }
     var es = KS_easeKayitEsle(an, e, oz, kay, tol);
-    if (!es.canli || !es.koru) continue;
+    if (!es.canli || (tur === "egri" && !es.koru)) continue;
     var ucGider = false;
     for (var s = 0; s < sil.length && !ucGider; s++) {
-      if (Math.abs(sil[s].t - es.koru[0]) <= tol || Math.abs(sil[s].t - es.koru[1]) <= tol) ucGider = true;
+      if (tur === "yaylan") { if (Math.abs(sil[s].t - (inis + es.d)) <= tol) ucGider = true; }
+      else if (Math.abs(sil[s].t - es.koru[0]) <= tol || Math.abs(sil[s].t - es.koru[1]) <= tol) ucGider = true;
     }
     if (!ucGider) continue;
     var keys = [];
     for (var k = 0; k < es.es.length; k++) {
       var a = an[es.es[k]];
-      if (Math.abs(a.t - es.koru[0]) <= tol || Math.abs(a.t - es.koru[1]) <= tol) continue;
+      if (es.koru && (Math.abs(a.t - es.koru[0]) <= tol || Math.abs(a.t - es.koru[1]) <= tol)) continue;
       keys.push(a);
     }
     out.push({ id: id, keys: keys });
