@@ -26,6 +26,8 @@
  * kullanılmaz) ve hepsini birleştiren iceAktar.
  * Premiere'in ExtendScript'i Bezier tutamaçlarını yazamaz: Suflo eğriyi sık anahtar karelere
  * "pişirir" (bakePlan). Çok noktalı eğrilerin metin sözdizimi YOK; yalnız SFC1 kodu ve .suflo-egri içinde JSON.
+ * suflo.app/egri paylaşım sayfası kodu aynı modülle çözer: docs/js/ease-curve.js bu dosyanın bayt bayt kopyasıdır
+ * (değiştirince kopyala; tests/test-ease-share.js denetler).
  *
  * Eğri tanımı (JSON):
  *   { type: 'bezier', x1, y1, x2, y2 }                 CSS cubic-bezier ile aynı
