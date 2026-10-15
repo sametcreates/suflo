@@ -19,10 +19,13 @@
  * genel kübik Newton + ikiye bölme çözücüsüyle), normalize, split (de Casteljau, şekil değişmez),
  * flip (180° döndürme), invert (eksen değişimi; yalnız tekdüze eğri), toCss/fromCss (yalnız tek
  * 'cubic-bezier(a,b,c,d)'), hazır eğriler (BUILTINS), bakePlan (sık anahtar kare planı), yaylanPlan (varışta
- * yaylanma: Rebound'un overshoot matematiğini iniş anahtarından sonra anahtar karelere pişirir; adım 14) ve SFC1
- * eğri kodu (sfcKodla / sfcCoz; adım 12 çekirdeği, adım 15 genişletir).
+ * yaylanma: Rebound'un overshoot matematiğini iniş anahtarından sonra anahtar karelere pişirir; adım 14) ve paylaşım:
+ * SFC1 kodu (sfcKodla / sfcCoz adım 12; paylasimKodla / paylasimCoz 'egri' + 'hiz' türleri adım 15), .suflo-egri
+ * dosyası (dosyaOku / dosyaYaz), serbest cubic-bezier / CSS yapıştırma (cssCoz / cssOku, yapistir), üçüncü taraf bir eğri
+ * aracının dışa aktarma dosyasını yalnız JSON biçiminden okuma (aşağıdaki "dış biçim okuyucusu"; o aracın kodu
+ * kullanılmaz) ve hepsini birleştiren iceAktar.
  * Premiere'in ExtendScript'i Bezier tutamaçlarını yazamaz: Suflo eğriyi sık anahtar karelere
- * "pişirir" (bakePlan). Çok noktalı eğrilerin metin sözdizimi YOK; yalnız SFC1 kodu içinde JSON.
+ * "pişirir" (bakePlan). Çok noktalı eğrilerin metin sözdizimi YOK; yalnız SFC1 kodu ve .suflo-egri içinde JSON.
  *
  * Eğri tanımı (JSON):
  *   { type: 'bezier', x1, y1, x2, y2 }                 CSS cubic-bezier ile aynı
@@ -797,14 +800,28 @@
     return normalize({ type: "bezier", x1: n[0], y1: n[1], x2: n[2], y2: n[3] });
   }
 
-  /* ================= Suflo: SFC1 eğri kodu (temiz oda) ================= */
-  // Tek satırlık paylaşım kodu: "SFC1." + base64url(UTF-8 JSON { v: 1, tur: 'egri', ad?, curve }).
-  // 3.4 adım 12 (Geçiş / Zoom / Hareket eğri seçicisi) çok noktalı ve hazır olmayan eğrileri bununla taşır;
-  // adım 15 (paylaşım kodları, .suflo-egri dosyası, tur 'hiz') bu çekirdeği genişletir.
+  /* ================= Suflo: paylaşım — SFC1 kodu, .suflo-egri dosyası, içe aktarma (temiz oda; 3.4 adım 12 + 15) ================= */
+  /*
+   * Tek satırlık paylaşım kodu: "SFC1." + base64url(UTF-8 JSON). İki tür:
+   *   { v: 1, tur: 'egri', ad?, curve }                 eğri (Eğri sekmesi, Geçiş / Zoom / Hareket eğri seçicisi)
+   *   { v: 1, tur: 'hiz', ad?, keys: [[t, %]], hit? }   Hız Rampası özel eğrisi (adım 13): t 0..1, hız %10–%1000, ağır çekim anı
+   * Adım 12 'egri' kodunu getirdi (Geçiş / Zoom / Hareket seçicisi çok noktalı eğriyi bununla taşır). Adım 15: 'hiz' türü,
+   * .suflo-egri dosyası { suflo: 'egri', v: 1, presets: [{ ad, tur, curve | keys, hit? }] }, serbest cubic-bezier / CSS
+   * yapıştırma ve üçüncü taraf bir eğri aracının dışa aktarma dosyasını Suflo'nun kendi ayrıştırıcısıyla okuma (aşağıdaki
+   * "dış biçim okuyucusu": o araca dair her şey yalnız o bölümde). Yalnız dosya BİÇİMİ okunur: o aracın kodu, tabloları,
+   * sabitleri, metin sözdizimi ve arayüzü kullanılmaz; yalnız tek kübik ve çok noktalı şekiller eşlenir, gerisi uyarıyla atlanır.
+   * Güvenlik: girdi yabancıdır. Kod en çok 4096 karakter, dosya en çok 64 KB (UTF-8), dosyada en çok 32 önayar; ad en çok
+   * 40 karakter, denetim ve görünmez yön karakterleri atılır; eğri başına en çok 8 nokta; her sayı sonlu olmalı (yoksa
+   * reddedilir), aralık dışı değer kırpılır; bilinmeyen alanlar okunmaz; hiçbir işlev fırlatmaz.
+   */
   var SFC_ONEK = "SFC1.";
   var SFC_SURUM = 1;
   var SFC_MAX = 4096;                 // en uzun kod girdisi (karakter)
   var SFC_AD = 40;                    // ad en çok 40 karakter
+  var DOSYA = { BAYT: 65536, ONAYAR: 32, SURUM: 1, UZANTI: "suflo-egri" };
+  // Hız Rampası özel eğrisi, % (SufloSpeedRamp MIN_V / MAX_V × 100, ozel.HIT ve ozel.EN_COK ile aynı; test denetler)
+  var HIZ = { MIN: 10, MAX: 1000, HIT: [0.02, 0.98], EN_AZ: 2 };
+  var PAYLASIM_ADRESI = "https://suflo.app/egri", PAYLASIM_ADRESI_EN = "https://suflo.app/en/egri";
   var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   function b64urlYaz(str) {
     var bin = unescape(encodeURIComponent(String(str)));
@@ -838,52 +855,444 @@
     }
     try { return decodeURIComponent(escape(bin)); } catch (e) { return null; }
   }
-  // Ad: denetim karakterleri atılır, kırpılır, en çok 40 karakter
+
+  /*
+   * Ad: denetim karakterleri (C0, DEL, C1) ve görünmez biçim karakterleri atılır: sıfır genişlikli boşluk, LRM / RLM, satır /
+   * paragraf ayırıcı, yön gömme / geçersiz kılma (U+202A–202E: adı tersine çevirip başka bir ad gibi gösterebilir), sözcük
+   * birleştirici, yön yalıtımı (U+2066–2069) ve BOM. ZWJ / ZWNJ kalır (emoji ve bazı yazılar). Boşluklar teke iner, kırpılır,
+   * en çok 40 karakter (yarım kalan vekil çifti atılır).
+   */
+  var AD_ATILAN = /[\u0000-\u001f\u007f-\u009f\u200b\u200e\u200f\u2028-\u202e\u2060\u2066-\u2069\ufeff]/g;
   function adTemiz(ad) {
     if (typeof ad !== "string") return "";
-    return ad.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, "").replace(/^\s+|\s+$/g, "").slice(0, SFC_AD);
+    var s = ad.replace(AD_ATILAN, "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "").slice(0, SFC_AD);
+    if (/[\ud800-\udbff]$/.test(s)) s = s.slice(0, -1);
+    return s.replace(/\s+$/, "");
   }
-  // { ad?, curve } → "SFC1.…"; geçersiz eğride null
-  function sfcKodla(o) {
-    var c = normalize(o && o.curve);
-    if (!c) return null;
-    var obj = { v: SFC_SURUM, tur: "egri" };
-    var ad = adTemiz(o.ad);
-    if (ad) obj.ad = ad;
-    obj.curve = c;
+  function sayiMi(v) { return typeof v === "number"; }
+  function bosMu(v) { return v === undefined || v === null; }
+  function kendi(o, k) { return !!o && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k); }
+
+  // UTF-8 bayt sayısı (dosya sınırı; büyük metni kopyalamadan sayar)
+  function utf8Bayt(s) {
+    var n = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c < 0x80) n += 1;
+      else if (c < 0x800) n += 2;
+      else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) { n += 4; i++; }
+      else n += 3;
+    }
+    return n;
+  }
+
+  /*
+   * Yabancı eğri tanımının sayıları sonlu mu (normalize sonlu olmayan noktayı sessizce atar, tutamacı varsayılana
+   * çevirirdi; paylaşılan girdide bu reddedilir). Döner: '' (geçerli) | 'egri' | 'nokta' (8'den çok nokta)
+   */
+  function sikiEgri(c) {
+    if (!c || typeof c !== "object" || Array.isArray(c)) return "egri";
+    if (c.type === "bezier") return [c.x1, c.y1, c.x2, c.y2].every(sonlu) ? "" : "egri";
+    if (c.type === "penner") return typeof c.name === "string" ? "" : "egri";
+    if (c.type === "spring") {
+      for (var k in SPRING_ALAN) if (kendi(SPRING_ALAN, k) && !bosMu(c[k]) && !sonlu(c[k])) return "egri";
+      return "";
+    }
+    if (c.type !== "multi" || !Array.isArray(c.pts) || c.pts.length < 2) return "egri";
+    if (c.pts.length > MAX_PTS) return "nokta";
+    for (var i = 0; i < c.pts.length; i++) {
+      var p = c.pts[i];
+      if (!p || typeof p !== "object" || !sonlu(p.x) || !sonlu(p.y)) return "egri";
+      var h = [p.ix, p.iy, p.ox, p.oy];
+      for (var j = 0; j < 4; j++) if (!bosMu(h[j]) && !sonlu(h[j])) return "egri";
+    }
+    return "";
+  }
+
+  /*
+   * Hız Rampası özel eğrisinin paylaşılan anahtarları [[t, %]]: 2–8 nokta, her biri iki sonlu sayı; t [0,1]'e (4 ondalık),
+   * hız %10–%1000'e (2 ondalık) kırpılır, t'ye göre (eşitte giriş sırasıyla) sıralanır. Sert basamak (aynı t'de iki nokta)
+   * korunur; son biçimlendirmeyi Hız Rampası yapar (SufloSpeedRamp.ozelYuzde).
+   * Döner: { keys } | { hata: 'hiz' (geçersiz) | 'nokta' (8'den çok) }
+   */
+  function hizAnahtarlari(keys) {
+    if (!Array.isArray(keys) || keys.length < HIZ.EN_AZ) return { hata: "hiz" };
+    if (keys.length > MAX_PTS) return { hata: "nokta" };
+    var ham = [];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (!Array.isArray(k) || k.length !== 2 || !sonlu(k[0]) || !sonlu(k[1])) return { hata: "hiz" };
+      ham.push({ t: r6(Math.round(sinirla(k[0], 0, 1) * 1e4) / 1e4), v: Math.round(sinirla(k[1], HIZ.MIN, HIZ.MAX) * 100) / 100, i: i });
+    }
+    ham.sort(function (a, b) { return a.t - b.t || a.i - b.i; });
+    return { keys: ham.map(function (k2) { return [k2.t, k2.v]; }) };
+  }
+  // Ağır çekim anı: [0,02, 0,98] (4 ondalık) | null (yok). Sonlu olmayan sayı: undefined (geçersiz)
+  function hitOku(h) {
+    if (bosMu(h)) return null;
+    return sonlu(h) ? Math.round(sinirla(h, HIZ.HIT[0], HIZ.HIT[1]) * 1e4) / 1e4 : undefined;
+  }
+
+  /*
+   * Paylaşılan tek önayarı doğrula (kod nesnesi ya da .suflo-egri girdisi): { tur: 'egri', ad?, curve } |
+   * { tur: 'hiz', ad?, keys, hit? }. Döner: { ok: true, tur: 'egri', ad, curve } | { ok: true, tur: 'hiz', ad, keys, hit } |
+   * { ok: false, hata: 'tur' | 'egri' | 'hiz' | 'nokta' | 'bozuk' }
+   */
+  function onayarDogrula(p) {
+    if (!p || typeof p !== "object" || Array.isArray(p)) return { ok: false, hata: "bozuk" };
+    if (p.tur === "egri") {
+      var s = sikiEgri(p.curve);
+      if (s) return { ok: false, hata: s };
+      var c = normalize(p.curve);
+      return c ? { ok: true, tur: "egri", ad: adTemiz(p.ad), curve: c } : { ok: false, hata: "egri" };
+    }
+    if (p.tur === "hiz") {
+      var h = hizAnahtarlari(p.keys);
+      if (!h.keys) return { ok: false, hata: h.hata };
+      var hit = hitOku(p.hit);
+      if (hit === undefined) return { ok: false, hata: "hiz" };
+      return { ok: true, tur: "hiz", ad: adTemiz(p.ad), keys: h.keys, hit: hit };
+    }
+    return { ok: false, hata: "tur" };
+  }
+  // Yineleme imzası: tür | ad (küçük harf) | eğri. Aynı ad ve aynı eğri ikinci kez içe alınmaz; geçersizde ''
+  function onayarImzasi(p) {
+    var r = p && p.ok === true ? p : onayarDogrula(p);
+    if (!r.ok) return "";
+    var govde = r.tur === "egri" ? JSON.stringify(r.curve) : JSON.stringify([r.keys, r.hit]);
+    return r.tur + "|" + r.ad.toLowerCase() + "|" + govde;
+  }
+
+  // { tur: 'egri' (varsayılan), ad?, curve } | { tur: 'hiz', ad?, keys, hit? } → "SFC1.…"; geçersizde null
+  function paylasimKodla(o) {
+    if (!o || typeof o !== "object") return null;
+    var r = onayarDogrula({ tur: o.tur === undefined ? "egri" : o.tur, ad: o.ad, curve: o.curve, keys: o.keys, hit: o.hit });
+    if (!r.ok) return null;
+    var obj = { v: SFC_SURUM, tur: r.tur };
+    if (r.ad) obj.ad = r.ad;
+    if (r.tur === "egri") obj.curve = r.curve;
+    else {
+      obj.keys = r.keys;
+      if (r.hit !== null) obj.hit = r.hit;
+    }
     return SFC_ONEK + b64urlYaz(JSON.stringify(obj));
   }
+  // Adım 12'nin eğri kodu (Geçiş / Zoom / Hareket seçicisinin ease alanı): { ad?, curve } → "SFC1.…"; geçersizde null
+  function sfcKodla(o) { return o && typeof o === "object" ? paylasimKodla({ tur: "egri", ad: o.ad, curve: o.curve }) : null; }
+
+  // Kod metni → doğrulanmamış JSON nesnesi. Boşluk ve satır sonları (bölünerek yapıştırılan kod) yok sayılır; tam bağlantı
+  // da olabilir (…#SFC1.…; son #'ten sonrası). Döner: { ok: true, obj } | { ok: false, hata }
+  function kodNesnesi(text) {
+    function hata(k) { return { ok: false, hata: k }; }
+    if (typeof text !== "string") return hata("bos");
+    if (text.length > SFC_MAX) return hata("uzun");
+    var s = text.replace(/\s+/g, "");
+    var kare = s.lastIndexOf("#");
+    if (kare !== -1) s = s.slice(kare + 1);
+    if (!s) return hata("bos");
+    if (s.indexOf(SFC_ONEK) !== 0) return hata("onek");
+    var json = b64urlOku(s.slice(SFC_ONEK.length));
+    if (json === null) return hata("bozuk");
+    var obj;
+    try { obj = JSON.parse(json); } catch (eJ) { return hata("bozuk"); }
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return hata("bozuk");
+    if (typeof obj.v === "number" && obj.v > SFC_SURUM) return hata("surum");
+    if (obj.v !== SFC_SURUM) return hata("bozuk");
+    return { ok: true, obj: obj };
+  }
   /*
-   * Kodu çöz. Boşluk ve satır sonları (bölünerek yapıştırılan kod) yok sayılır; tam bağlantı da olabilir (…#SFC1.…).
-   * Döner: { ok: true, tur: 'egri', ad, curve } | { ok: false, hata }
-   *   hata: 'bos' | 'uzun' | 'onek' (SFC1. ile başlamıyor) | 'bozuk' | 'surum' (daha yeni Suflo) | 'tur' (eğri kodu değil,
-   *   ör. Hız Rampası kodu) | 'egri' (eğri geçersiz ya da 8'den çok nokta)
+   * Kodu çöz (iki tür). Döner: { ok: true, tur: 'egri', ad, curve } | { ok: true, tur: 'hiz', ad, keys, hit } | { ok: false, hata }
+   *   hata: 'bos' | 'uzun' | 'onek' (SFC1. ile başlamıyor) | 'bozuk' (base64 / JSON değil, eksik kopyalanmış) | 'surum' (daha
+   *   yeni Suflo) | 'tur' (bilinmeyen tür) | 'egri' (eğri geçersiz) | 'hiz' (hız anahtarları geçersiz) | 'nokta' (8'den çok nokta)
+   */
+  function paylasimCoz(text) {
+    try {
+      var n = kodNesnesi(text);
+      if (!n.ok) return n;
+      var r = onayarDogrula(n.obj);
+      return r.ok ? r : { ok: false, hata: r.hata === "bozuk" ? "tur" : r.hata };
+    } catch (e) {
+      return { ok: false, hata: "bozuk" };
+    }
+  }
+  /*
+   * Yalnız eğri kodu (adım 12; Geçiş / Zoom / Hareket ease alanı): Hız Rampası kodu 'tur' ile reddedilir, 8'den çok nokta
+   * 'egri' sayılır. Döner: { ok: true, tur: 'egri', ad, curve } | { ok: false, hata }
    */
   function sfcCoz(text) {
-    function hata(k) { return { ok: false, hata: k }; }
     try {
-      if (typeof text !== "string") return hata("bos");
-      if (text.length > SFC_MAX) return hata("uzun");
-      var s = text.replace(/\s+/g, "");
-      var kare = s.lastIndexOf("#");
-      if (kare !== -1) s = s.slice(kare + 1);
-      if (!s) return hata("bos");
-      if (s.indexOf(SFC_ONEK) !== 0) return hata("onek");
-      var json = b64urlOku(s.slice(SFC_ONEK.length));
-      if (json === null) return hata("bozuk");
-      var obj;
-      try { obj = JSON.parse(json); } catch (eJ) { return hata("bozuk"); }
-      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return hata("bozuk");
-      if (typeof obj.v === "number" && obj.v > SFC_SURUM) return hata("surum");
-      if (obj.v !== SFC_SURUM) return hata("bozuk");
-      if (obj.tur !== "egri") return hata("tur");
-      var ham = obj.curve;
-      if (ham && ham.type === "multi" && (!Array.isArray(ham.pts) || ham.pts.length > MAX_PTS)) return hata("egri");
-      var c = normalize(ham);
-      if (!c) return hata("egri");
-      return { ok: true, tur: "egri", ad: adTemiz(obj.ad), curve: c };
+      var n = kodNesnesi(text);
+      if (!n.ok) return n;
+      if (n.obj.tur !== "egri") return { ok: false, hata: "tur" };
+      var r = onayarDogrula(n.obj);
+      return r.ok ? r : { ok: false, hata: r.hata === "nokta" ? "egri" : r.hata };
     } catch (e) {
-      return hata("bozuk");
+      return { ok: false, hata: "bozuk" };
+    }
+  }
+  // Paylaşım bağlantısı: kod # ile (sunucuya gitmez, günlüğe düşmez). dil 'en': İngilizce sayfa (/en/egri)
+  function egriAdresi(kod, dil) { return (dil === "en" ? PAYLASIM_ADRESI_EN : PAYLASIM_ADRESI) + "#" + kod; }
+
+  /* ---- yapıştırılan CSS (W3C CSS Easing Level 1) ---- */
+  // Anahtar sözcüklerin cubic-bezier karşılıkları (spesifikasyondaki tanımlar)
+  var CSS_SOZCUK = { linear: [0, 0, 1, 1], ease: [0.25, 0.1, 0.25, 1], "ease-in": [0.42, 0, 1, 1], "ease-out": [0, 0, 0.58, 1], "ease-in-out": [0.42, 0, 0.58, 1] };
+  // "a, b, c, d" → 4 sonlu sayı (fromCss'in sayı kuralı) | null
+  function cssSayilari(icerik) {
+    var parca = String(icerik).split(",");
+    if (parca.length !== 4) return null;
+    var n = [];
+    for (var i = 0; i < 4; i++) {
+      var s = parca[i].replace(/^\s+|\s+$/g, "");
+      if (!CSS_SAYI.test(s)) return null;
+      var v = Number(s);
+      if (!isFinite(v)) return null;
+      n.push(v);
+    }
+    return n;
+  }
+  /*
+   * Yapıştırılan CSS → { curve, kirpildi } | null. En çok 200 karakter. Kabul edilenler:
+   *   - düz 'cubic-bezier(a, b, c, d)' ya da onu içeren bir CSS bildirimi ('transition-timing-function: cubic-bezier(…);',
+   *     'transition: transform .3s cubic-bezier(…)'); metinde tam BİR cubic-bezier( … ) olmalı
+   *   - yalın dört sayı '0.25, 0.1, 0.25, 1' (cubic-bezier üreteçlerinin kopyaladığı biçim)
+   *   - tek anahtar sözcük: linear, ease, ease-in, ease-out, ease-in-out (önünde özellik adı, sonunda ; olabilir)
+   * x değerleri CSS'teki gibi 0–1 olmalı (değilse null); y değerleri -1–2'ye kırpılır (kirpildi: true).
+   */
+  function cssCoz(text) {
+    if (typeof text !== "string" || text.length > CSS_MAX) return null;
+    var s = text.replace(/^\s+|\s+$/g, ""), n = null;
+    var bul = s.match(/cubic-bezier\s*\([^()]*\)/gi);
+    if (bul) {
+      if (bul.length !== 1) return null;
+      n = cssSayilari(bul[0].replace(/^cubic-bezier\s*\(/i, "").replace(/\)$/, ""));
+    } else if (/^[-+.\d]/.test(s)) {
+      n = cssSayilari(s.replace(/\s*;$/, ""));
+    } else {
+      var m = /^(?:[a-z-]+\s*:\s*)?([a-z-]+)\s*;?$/i.exec(s);
+      var k = m ? m[1].toLowerCase() : "";
+      if (kendi(CSS_SOZCUK, k)) n = CSS_SOZCUK[k].slice();
+    }
+    if (!n || n[0] < 0 || n[0] > 1 || n[2] < 0 || n[2] > 1) return null;
+    var kirpildi = n[1] < Y_MIN || n[1] > Y_MAX || n[3] < Y_MIN || n[3] > Y_MAX;
+    return { curve: normalize({ type: "bezier", x1: n[0], y1: n[1], x2: n[2], y2: n[3] }), kirpildi: kirpildi };
+  }
+  function cssOku(text) { var r = cssCoz(text); return r ? r.curve : null; }
+
+  /* ==================== DIŞ BİÇİM OKUYUCUSU (başı) ====================
+   * OpenCurve'ün (lisansı olmayan, tüm hakları saklı bir Premiere eğri aracı) dışa aktarma dosyası:
+   *   { opencurve: 1, presets: [{ name, curve }] }
+   * Birlikte çalışma için yalnız bu JSON BİÇİMİ okunur (dosya biçimi kod değildir). O aracın kodu, tabloları, sabitleri,
+   * metin sözdizimi, arayüzü ve CSS'i kullanılmaz; okuyucu o araç açılmadan, yalnız Suflo'nun planındaki biçim tanımından
+   * Suflo'nun kendi ayrıştırıcısıyla yazıldı (temiz oda). Yalnız tek kübik ve çok noktalı şekiller eşlenir, gerisi
+   * 'bilinmeyen' uyarısıyla atlanır. Bu ad depoda yalnız bu bölümde (ve docs/js'teki bayt bayt kopyasında) geçer.
+   */
+  var DIS_ANAHTAR = "opencurve";
+  // Dış dosya mı: { <DIS_ANAHTAR>: sürüm, presets: [...] } → { surumUyari (sürüm 1 değil; yine de okunur) } | null
+  function disDosya(obj) { return kendi(obj, DIS_ANAHTAR) && Array.isArray(obj.presets) ? { surumUyari: obj[DIS_ANAHTAR] !== 1 } : null; }
+  // Nokta: [x, y] ya da { x, y } (isteğe bağlı mutlak tutamaçlar: in / out { x, y } ya da [x, y], veya ix, iy, ox, oy);
+  // geçersizse null
+  function disNokta(p) {
+    if (Array.isArray(p)) return p.length === 2 && sonlu(p[0]) && sonlu(p[1]) ? { x: p[0], y: p[1] } : null;
+    if (!p || typeof p !== "object" || !sonlu(p.x) || !sonlu(p.y)) return null;
+    function cift(h) {
+      if (Array.isArray(h)) return h.length === 2 && sonlu(h[0]) && sonlu(h[1]) ? h : undefined;
+      if (h && typeof h === "object") return sonlu(h.x) && sonlu(h.y) ? [h.x, h.y] : undefined;
+      return bosMu(h) ? null : undefined;
+    }
+    var q = { x: p.x, y: p.y };
+    var gi = cift(p["in"]), ci = cift(p.out);
+    if (gi === undefined || ci === undefined) return null;
+    if (gi) { q.ix = gi[0]; q.iy = gi[1]; }
+    else if (!bosMu(p.ix) || !bosMu(p.iy)) { if (!sonlu(p.ix) || !sonlu(p.iy)) return null; q.ix = p.ix; q.iy = p.iy; }
+    if (ci) { q.ox = ci[0]; q.oy = ci[1]; }
+    else if (!bosMu(p.ox) || !bosMu(p.oy)) { if (!sonlu(p.ox) || !sonlu(p.oy)) return null; q.ox = p.ox; q.oy = p.oy; }
+    if (p.smooth === true) q.smooth = true;
+    return q;
+  }
+  /*
+   * Dış eğri → Suflo eğrisi. Yalnız iki şekil eşlenir:
+   *   tek kübik   'cubic-bezier(a, b, c, d)' metni (cssCoz), [x1, y1, x2, y2] ya da { x1, y1, x2, y2 }
+   *   çok noktalı noktalar dizisi ya da { points | pts: [...] }; 2–8 nokta (uçlar (0,0) ve (1,1)'e oturur)
+   * Döner: { curve } | { hata: 'bilinmeyen' (başka şekil) | 'egri' (sayılar geçersiz) | 'nokta' (8'den çok) }
+   */
+  function disEgri(c) {
+    if (typeof c === "string") { var k = cssCoz(c); return k ? { curve: k.curve } : { hata: /cubic-bezier/i.test(c) ? "egri" : "bilinmeyen" }; }
+    var dizi = null;
+    if (Array.isArray(c)) {
+      if (c.length === 4 && c.every(sayiMi)) {
+        if (!c.every(sonlu)) return { hata: "egri" };
+        return { curve: normalize({ type: "bezier", x1: c[0], y1: c[1], x2: c[2], y2: c[3] }) };
+      }
+      dizi = c;
+    } else if (c && typeof c === "object") {
+      if (sayiMi(c.x1) && sayiMi(c.y1) && sayiMi(c.x2) && sayiMi(c.y2)) {
+        if (![c.x1, c.y1, c.x2, c.y2].every(sonlu)) return { hata: "egri" };
+        return { curve: normalize({ type: "bezier", x1: c.x1, y1: c.y1, x2: c.x2, y2: c.y2 }) };
+      }
+      dizi = Array.isArray(c.points) ? c.points : Array.isArray(c.pts) ? c.pts : null;
+    }
+    if (!dizi || !dizi.length || !(Array.isArray(dizi[0]) || (dizi[0] && typeof dizi[0] === "object"))) return { hata: "bilinmeyen" };
+    if (dizi.length < 2) return { hata: "egri" };
+    if (dizi.length > MAX_PTS) return { hata: "nokta" };
+    var pts = [];
+    for (var i = 0; i < dizi.length; i++) {
+      var q = disNokta(dizi[i]);
+      if (!q) return { hata: "egri" };
+      pts.push(q);
+    }
+    var m = normalize({ type: "multi", pts: pts });
+    if (!m) return { hata: "egri" };
+    // iki nokta: düz cubic-bezier (metin alanı ve P1 / P2 sayıları kullanılabilsin)
+    if (m.pts.length === 2) return { curve: normalize({ type: "bezier", x1: m.pts[0].ox, y1: m.pts[0].oy, x2: m.pts[1].ix, y2: m.pts[1].iy }) };
+    return { curve: m };
+  }
+  // Dış önayar { name, curve } → { ok: true, tur: 'egri', ad, curve } | { ok: false, hata }
+  function disOnayar(g) {
+    var d = disEgri(g.curve);
+    return d.curve ? { ok: true, tur: "egri", ad: adTemiz(g.name), curve: d.curve } : { ok: false, hata: d.hata };
+  }
+  /* ==================== DIŞ BİÇİM OKUYUCUSU (sonu) ==================== */
+
+  /* ---- .suflo-egri dosyası ---- */
+  function dosyaHata(k) { return { ok: false, hata: k }; }
+  function buyukMu(text) { return text.length > DOSYA.BAYT || utf8Bayt(text) > DOSYA.BAYT; }
+  /*
+   * .suflo-egri dosyasının (ya da dış biçim okuyucusunun tanıdığı dışa aktarma dosyasının) metni → önayarlar.
+   * Sınırlar: en çok 64 KB (UTF-8 bayt), baştaki BOM atılır, dosyanın ilk 32 önayarı okunur (fazlası 'fazla' uyarısıyla
+   * atlanır), ad en çok 40 karakter (denetim karakterleri atılır), eğri başına en çok 8 nokta, her sayı sonlu (aralık dışı
+   * kırpılır), aynı tür + ad + eğri (onayarImzasi) dosyada ikinci kez gelirse atlanır (yinelenen). Suflo dosyasında
+   * türü yazılmamış girdi curve'ü varsa 'egri', keys'i varsa 'hiz' sayılır.
+   * Döner: { ok: true, bicim: 'suflo' | 'dis' (dış biçim), presets: [{ ok, tur: 'egri', ad, curve } | { ok, tur: 'hiz', ad, keys, hit }],
+   *          uyarilar: [{ kod, i, ad, n? }], yinelenen, fazla }
+   *   uyarı kodu: 'tur' | 'egri' | 'hiz' | 'nokta' | 'bilinmeyen' (eşlenmeyen şekil) | 'bozuk' (girdi nesne değil) |
+   *   'fazla' (32'den sonrası; n: atlanan sayısı) | 'dosyaSurumu' (dış dosyanın sürümü 1 değil; yine de okundu)
+   *   | { ok: false, hata: 'bos' | 'buyuk' (64 KB'tan büyük) | 'json' (JSON değil) | 'bicim' (tanınmayan dosya) | 'surum' (daha yeni Suflo) }
+   */
+  function dosyaOku(text) {
+    try {
+      if (typeof text !== "string") return dosyaHata("bos");
+      if (buyukMu(text)) return dosyaHata("buyuk");
+      var s = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+      if (!/\S/.test(s)) return dosyaHata("bos");
+      var obj;
+      try { obj = JSON.parse(s); } catch (eJ) { return dosyaHata("json"); }
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return dosyaHata("bicim");
+      var bicim, uyarilar = [];
+      if (obj.suflo === "egri") {
+        if (typeof obj.v === "number" && obj.v > DOSYA.SURUM) return dosyaHata("surum");
+        if (obj.v !== DOSYA.SURUM || !Array.isArray(obj.presets)) return dosyaHata("bicim");
+        bicim = "suflo";
+      } else if (disDosya(obj)) {
+        bicim = "dis";
+        if (disDosya(obj).surumUyari) uyarilar.push({ kod: "dosyaSurumu", i: -1, ad: "" });
+      } else return dosyaHata("bicim");
+
+      var presets = [], gorulen = {}, yinelenen = 0;
+      var n = Math.min(obj.presets.length, DOSYA.ONAYAR);
+      for (var i = 0; i < n; i++) {
+        var g = obj.presets[i], r, nesne = !!g && typeof g === "object" && !Array.isArray(g);
+        if (!nesne) r = { ok: false, hata: "bozuk" };
+        else if (bicim === "suflo") {
+          var tur = g.tur !== undefined ? g.tur : (g.curve !== undefined ? "egri" : g.keys !== undefined ? "hiz" : undefined);
+          r = onayarDogrula({ tur: tur, ad: g.ad, curve: g.curve, keys: g.keys, hit: g.hit });
+        } else r = disOnayar(g);
+        if (!r.ok) { uyarilar.push({ kod: r.hata, i: i, ad: nesne ? adTemiz(bicim === "suflo" ? g.ad : g.name) : "" }); continue; }
+        var imza = onayarImzasi(r);
+        if (gorulen[imza]) { yinelenen++; continue; }
+        gorulen[imza] = 1;
+        presets.push(r);
+      }
+      var fazla = Math.max(0, obj.presets.length - DOSYA.ONAYAR);
+      if (fazla) uyarilar.push({ kod: "fazla", i: DOSYA.ONAYAR, ad: "", n: fazla });
+      return { ok: true, bicim: bicim, presets: presets, uyarilar: uyarilar, yinelenen: yinelenen, fazla: fazla };
+    } catch (e) {
+      return dosyaHata("json");
+    }
+  }
+  /*
+   * Önayarlar → .suflo-egri metni { suflo: 'egri', v: 1, presets: [{ ad, tur, curve | keys, hit? }] }. Her önayar
+   * dosyaOku'nun kuralıyla doğrulanır (geçersiz atlanır), en çok 32 (fazlası atlanan sayılır); her önayar kendi satırında.
+   * 32 önayar en uzun ad ve 8 noktayla da 64 KB'ın çok altında kalır (test denetler).
+   * Döner: { ok (en az bir önayar), metin, adet, atlanan }
+   */
+  function dosyaYaz(presets) {
+    var out = [], atlanan = 0;
+    (Array.isArray(presets) ? presets : []).forEach(function (p) {
+      var r = p && typeof p === "object" ? onayarDogrula({ tur: p.tur === undefined ? "egri" : p.tur, ad: p.ad, curve: p.curve, keys: p.keys, hit: p.hit }) : { ok: false };
+      if (!r.ok || out.length >= DOSYA.ONAYAR) { atlanan++; return; }
+      var o = { ad: r.ad, tur: r.tur };
+      if (r.tur === "egri") o.curve = r.curve;
+      else {
+        o.keys = r.keys;
+        if (r.hit !== null) o.hit = r.hit;
+      }
+      out.push(o);
+    });
+    var govde = out.map(function (o) { return JSON.stringify(o); });
+    var metin = "{\n  \"suflo\": \"egri\",\n  \"v\": " + DOSYA.SURUM + ",\n  \"presets\": [" +
+      (govde.length ? "\n    " + govde.join(",\n    ") + "\n  " : "") + "]\n}\n";
+    return { ok: out.length > 0, metin: metin, adet: out.length, atlanan: atlanan };
+  }
+
+  /*
+   * Tek yapıştırılan şey: SFC1 kodu ya da paylaşım bağlantısı (iki tür), ya da cubic-bezier / CSS (cssCoz).
+   * Döner: { ok: true, kaynak: 'kod', tur: 'egri', ad, curve } | { ok: true, kaynak: 'kod', tur: 'hiz', ad, keys, hit } |
+   * { ok: true, kaynak: 'css', tur: 'egri', ad: '', curve, kirpildi } | { ok: false, hata } (paylasimCoz hataları; 'css'
+   * bozuk cubic-bezier, 'bicim' tanınmadı)
+   */
+  function yapistir(text) {
+    if (typeof text !== "string") return { ok: false, hata: "bos" };
+    var s = text.replace(/^\s+|\s+$/g, "");
+    if (!s) return { ok: false, hata: "bos" };
+    if (s.length > SFC_MAX) return { ok: false, hata: "uzun" };
+    if (s.indexOf(SFC_ONEK) !== -1) {
+      var k = paylasimCoz(s);
+      if (!k.ok) return k;
+      k.kaynak = "kod";
+      return k;
+    }
+    var c = cssCoz(s);
+    if (c) return { ok: true, kaynak: "css", tur: "egri", ad: "", curve: c.curve, kirpildi: c.kirpildi };
+    return { ok: false, hata: /cubic-bezier/i.test(s) ? "css" : "bicim" };
+  }
+  /*
+   * Panelin "Kod yapıştır" kutusu ve İçe aktar: SFC1 kodu / bağlantı (bir tane ya da satır satır birkaç), cubic-bezier / CSS,
+   * .suflo-egri ya da dış biçim JSON metni. Hepsi dosyaOku biçiminde döner:
+   * { ok: true, bicim: 'kod' | 'css' | 'suflo' | 'dis', presets, uyarilar, yinelenen, fazla, kirpildi? } | { ok: false, hata }
+   */
+  function iceAktar(text) {
+    try {
+      if (typeof text !== "string") return dosyaHata("bos");
+      var s = text.replace(/^\s+|\s+$/g, "");
+      if (!s) return dosyaHata("bos");
+      if (s.charAt(0) === "{") return dosyaOku(text);
+      if (buyukMu(text)) return dosyaHata("buyuk");
+      var tek = yapistir(s);
+      if (tek.ok) {
+        var p = tek.tur === "egri" ? { ok: true, tur: "egri", ad: tek.ad, curve: tek.curve } : { ok: true, tur: "hiz", ad: tek.ad, keys: tek.keys, hit: tek.hit };
+        var r1 = { ok: true, bicim: tek.kaynak, presets: [p], uyarilar: [], yinelenen: 0, fazla: 0 };
+        if (tek.kirpildi) r1.kirpildi = true;
+        return r1;
+      }
+      // Satır satır birkaç kod (her satır bir kod ya da bağlantı); tek kod ikiye bölünmüşse yukarıda zaten çözüldü
+      if ((s.match(/SFC1\./g) || []).length < 2) return tek;
+      var satirlar = s.split(/\s*[\r\n]+\s*/), presets = [], uyarilar = [], gorulen = {}, yinelenen = 0, sayilan = 0;
+      for (var i = 0; i < satirlar.length; i++) {
+        if (satirlar[i].indexOf(SFC_ONEK) === -1) continue;
+        if (sayilan++ >= DOSYA.ONAYAR) continue;
+        var r = paylasimCoz(satirlar[i]);
+        if (!r.ok) { uyarilar.push({ kod: r.hata, i: i, ad: "" }); continue; }
+        var imza = onayarImzasi(r);
+        if (gorulen[imza]) { yinelenen++; continue; }
+        gorulen[imza] = 1;
+        presets.push(r);
+      }
+      var fazla = Math.max(0, sayilan - DOSYA.ONAYAR);
+      if (fazla) uyarilar.push({ kod: "fazla", i: DOSYA.ONAYAR, ad: "", n: fazla });
+      if (!presets.length && !yinelenen) return uyarilar.length ? { ok: false, hata: uyarilar[0].kod } : tek;
+      return { ok: true, bicim: "kod", presets: presets, uyarilar: uyarilar, yinelenen: yinelenen, fazla: fazla };
+    } catch (e) {
+      return dosyaHata("bozuk");
     }
   }
 
@@ -1112,7 +1521,12 @@
     toCss: toCss, fromCss: fromCss, bakePlan: bakePlan, yaylanPlan: yaylanPlan, YAYLAN: YAYLAN,
     builtins: builtins, builtin: builtin, builtinName: builtinName, kopya: kopya,
     sfcKodla: sfcKodla, sfcCoz: sfcCoz,
+    // paylaşım (3.4 adım 15): iki türlü SFC1 kodu, .suflo-egri dosyası, yapıştırma ve içe aktarma
+    paylasimKodla: paylasimKodla, paylasimCoz: paylasimCoz, egriAdresi: egriAdresi, cssOku: cssOku, cssCoz: cssCoz, yapistir: yapistir,
+    iceAktar: iceAktar, dosyaOku: dosyaOku, dosyaYaz: dosyaYaz, disEgri: disEgri, onayarDogrula: onayarDogrula,
+    onayarImzasi: onayarImzasi, hizAnahtarlari: hizAnahtarlari, adTemiz: adTemiz, utf8Bayt: utf8Bayt,
     BUILTINS: builtins(),
-    LIMITS: { Y_MIN: Y_MIN, Y_MAX: Y_MAX, MAX_PTS: MAX_PTS, MIN_GAP: MIN_GAP, CSS_MAX: CSS_MAX, MAX_KEYS: MAX_KEYS, SFC_MAX: SFC_MAX, SFC_AD: SFC_AD }
+    LIMITS: { Y_MIN: Y_MIN, Y_MAX: Y_MAX, MAX_PTS: MAX_PTS, MIN_GAP: MIN_GAP, CSS_MAX: CSS_MAX, MAX_KEYS: MAX_KEYS, SFC_MAX: SFC_MAX, SFC_AD: SFC_AD,
+      DOSYA_BAYT: DOSYA.BAYT, DOSYA_ONAYAR: DOSYA.ONAYAR, DOSYA_UZANTI: DOSYA.UZANTI, HIZ_MIN: HIZ.MIN, HIZ_MAX: HIZ.MAX, HIZ_HIT: HIZ.HIT.slice() }
   };
 });

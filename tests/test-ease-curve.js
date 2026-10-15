@@ -571,7 +571,14 @@ var isaretler = ["cubicBezier", "bounceOut", "fns", "elasticOutWith", "get", "is
 var eksikIsaret = isaretler.filter(function (n) { return !new RegExp("// Rebound: " + n + "\\b").test(src); });
 ok("her uyarlanan işlev '// Rebound: <ad>' ile işaretli", eksikIsaret.length === 0, eksikIsaret.join(","));
 // (inceleme bu adı depoda arar; desen birleştirilerek kurulur ki test dosyası da temiz kalsın)
-ok("temiz oda: lisanssız kaynağın sözdizimi / tanımlayıcısı yok", !new RegExp("open" + "curve", "i").test(src) && !new RegExp("PARAM" + "_NAMES").test(src));
+// 3.4 adım 15: planın izin verdiği tek yer dış biçim okuyucusu (yalnız dışa aktarma JSON'unun biçimi okunur); ad o bölümün
+// dışında geçmez, o aracın metin sözdizimi ('<ad>(' çağrısı) hiçbir yerde yok
+var okBas = src.indexOf("DIŞ BİÇİM OKUYUCUSU (başı)"), okSon = src.indexOf("DIŞ BİÇİM OKUYUCUSU (sonu)");
+var okuyucuDisi = okBas > 0 && okSon > okBas ? src.slice(0, okBas) + src.slice(okSon) : src;
+var okuyucu = okBas > 0 && okSon > okBas ? src.slice(okBas, okSon) : "";
+ok("temiz oda: lisanssız kaynağın adı yalnız dış biçim okuyucusunda; sözdizimi / tablosu hiçbir yerde yok",
+  okuyucu.length > 500 && okuyucu.length < 6000 && !new RegExp("open" + "curve", "i").test(okuyucuDisi) && !new RegExp("open" + "curve\\s*\\(", "i").test(src) &&
+  !new RegExp("PARAM" + "_NAMES").test(src) && (okuyucu.match(new RegExp("\"open" + "curve\"", "g")) || []).length === 1);
 var notice = fs.readFileSync(path.join(KOK, "THIRD_PARTY_NOTICES.md"), "utf8");
 ok("THIRD_PARTY_NOTICES: Rebound girdisi (commit, MIT, telif, dosyalar, tam lisans)", /### Rebound/.test(notice) && /https:\/\/github\.com\/meszmate\/rebound/.test(notice) &&
   /0f9fd6c526514d20b688b13c393061606f166ad5/.test(notice) && /Copyright \(c\) 2026 Rebound contributors/.test(notice) &&

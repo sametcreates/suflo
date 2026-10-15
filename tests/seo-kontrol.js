@@ -183,6 +183,36 @@ if (fs.existsSync(stilEnYol)) {
     "stil-temel", "stil-font", "renk-yazi", "renk-kontur", "renk-vurgu", "stil-konum", "stil-kod", "kodu-kopyala"].every(function (id) { return se.indexOf('id="' + id + '"') !== -1; }));
 }
 
+/* ---------------- suflo.app/egri: paylaşılan eğri / Hız Rampası kodu sayfası (3.4 adım 15) ---------------- */
+[["egri.html", "tr", "https://suflo.app/egri", '<script src="js/ease-curve.js" <script src="js/egri-sayfa.js"', /Eğri/, "Kodu kopyala", "Suflo'yu indir"],
+  ["en/egri.html", "en", "https://suflo.app/en/egri", '<script src="../js/ease-curve.js" <script src="../js/egri-sayfa.js"', /Curve/, "Copy code", "Download Suflo"]].forEach(function (s) {
+  var yol = D + s[0];
+  chk(s[0] + " var", fs.existsSync(yol));
+  if (!fs.existsSync(yol)) return;
+  var eg = fs.readFileSync(yol, "utf8");
+  var egBaslik = (eg.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
+  var egAcik = (eg.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "";
+  chk(s[0] + ": lang, canonical, og:url, og:locale, og:image, twitter:card", new RegExp('<html lang="' + s[1] + '">').test(eg) &&
+    eg.indexOf('rel="canonical" href="' + s[2] + '"') !== -1 && eg.indexOf('property="og:url" content="' + s[2] + '"') !== -1 &&
+    eg.indexOf('og:locale" content="' + (s[1] === "en" ? "en_US" : "tr_TR") + '"') !== -1 && /property="og:image" content="https:\/\/suflo\.app\/og\.png"/.test(eg) && /twitter:card/.test(eg));
+  chk(s[0] + ": title ≤ 60 (Suflo geçiyor), description 120-160", egBaslik.length > 10 && egBaslik.length <= 60 && s[4].test(egBaslik) && /Suflo/.test(egBaslik) &&
+    egAcik.length >= 120 && egAcik.length <= 160, egBaslik + " / " + egAcik.length);
+  chk(s[0] + ": hreflang tr/en/x-default karşılıklı", /hreflang="tr" href="https:\/\/suflo\.app\/egri"/.test(eg) && /hreflang="en" href="https:\/\/suflo\.app\/en\/egri"/.test(eg) &&
+    /hreflang="x-default" href="https:\/\/suflo\.app\/en\/egri"/.test(eg));
+  chk(s[0] + ": site haritasında", sitemapSrc.indexOf("<loc>" + s[2] + "</loc>") !== -1);
+  var cspEg = (eg.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/) || [])[1] || "";
+  chk(s[0] + ": CSP script-src 'self', connect-src 'none', yalnız yerel iki betik (panelin çözücüsü + sayfa)", /script-src 'self'(;|$)/.test(cspEg) && /connect-src 'none'/.test(cspEg) &&
+    !/<script(?![^>]*\ssrc=)[^>]*>/.test(eg) && (eg.match(/<script src="([^"]+)"/g) || []).join(" ") === s[3], cspEg);
+  chk(s[0] + ": Kodu kopyala düğmesi ve releases/latest indirme bağlantısı", eg.indexOf('id="kodu-kopyala" type="button">' + s[5] + "<") !== -1 &&
+    eg.indexOf('releases/latest">' + s[6] + "<") !== -1);
+  chk(s[0] + ": egri-sayfa.js'in öğe kimlikleri", ["egri-ad", "egri-tur", "egri-hata", "egri-hata-metin", "egri-icerik", "egri-grafik", "egri-sahne", "egri-kare", "egri-bicim",
+    "egri-css-sar", "egri-css", "egri-hit-sar", "egri-hit", "egri-nasil", "egri-kod", "kodu-kopyala"].every(function (id) { return eg.indexOf('id="' + id + '"') !== -1; }));
+  if (s[1] === "en") chk(s[0] + ": Türkçe metin yok", !/[ğışĞİŞ]/.test(eg));
+});
+var egriJs = fs.existsSync(D + "js/egri-sayfa.js") ? fs.readFileSync(D + "js/egri-sayfa.js", "utf8") : "";
+chk("egri-sayfa.js: innerHTML / document.write yok; metin textContent, çözücü SufloEase.paylasimCoz", !!egriJs && !/innerHTML|outerHTML|document\.write|insertAdjacentHTML|eval\(/.test(egriJs) &&
+  /textContent/.test(egriJs) && /E\.paylasimCoz\(kod\)/.test(egriJs));
+
 chk("TR ana sayfa altbilgisinde English bağlantısı", /<a href="\/en\/" hreflang="en" lang="en">English<\/a>/.test(h));
 
 console.log(s.join("\n"));

@@ -10,8 +10,10 @@
  * ease alanı (metin):
  *   'auto'                      Suflo'nun bugünkü eğrisi; çıktı bayt bayt aynı (varsayılan; boş da 'auto')
  *   hazır eğri kimliği          'yumusak', 'sert-cikis', 'ziplama'… (SufloEase.BUILTINS)
- *   'cubic-bezier(a, b, c, d)'  CSS metni (SufloEase.fromCss; sıkı ayrıştırıcı)
- *   'SFC1.…'                    Suflo eğri kodu (SufloEase.sfcCoz): çok noktalı eğri, yay, kullanıcı önayarı
+ *   'cubic-bezier(a, b, c, d)'  CSS metni; 3.4 adım 15'ten beri yapıştırılan her biçim (SufloEase.yapistir): onu içeren
+ *                               CSS bildirimi, yalın dört sayı, CSS anahtar sözcüğü (x 0–1 olmalı, y -1–2'ye kırpılır)
+ *   'SFC1.…'                    Suflo eğri kodu ya da suflo.app/egri#SFC1.… bağlantısı: çok noktalı eğri, yay, kullanıcı
+ *                               önayarı (Hız Rampası kodu 'hizKodu' ile reddedilir)
  *
  * Yoğunlaştırma kuralı (yogunlastir):
  *   - Aynı yönde giden ardışık anahtarlar (ör. Zoom İçeri'nin 1 → 1,18 → 1,55'i) tek parça sayılır: aradaki
@@ -65,13 +67,17 @@
     if (s.length > E.LIMITS.SFC_MAX) return basarisiz("uzun");
     var b = E.builtin(s);
     if (b) return { ok: true, tur: "hazir", ease: b.id, curve: b.curve };
-    if (/^cubic-bezier\s*\(/i.test(s)) {
-      var c = E.fromCss(s);
-      return c ? { ok: true, tur: "css", ease: E.toCss(c), curve: c } : basarisiz("css");
+    // 3.4 adım 15: yapıştırılan her biçim (SufloEase.yapistir): SFC1 kodu ya da suflo.app/egri bağlantısı, düz
+    // cubic-bezier(…) ya da onu içeren CSS bildirimi, yalın dört sayı, CSS anahtar sözcüğü (y -1–2'ye kırpılır)
+    var y = E.yapistir(s);
+    if (y.ok && y.kaynak === "css") {
+      var r = { ok: true, tur: "css", ease: E.toCss(y.curve), curve: y.curve };
+      if (y.kirpildi) r.kirpildi = true;
+      return r;
     }
-    var k = E.sfcCoz(s);
-    if (!k.ok) return basarisiz(k.hata === "onek" ? "gecersiz" : k.hata);
-    return { ok: true, tur: "kod", ease: E.sfcKodla({ ad: k.ad, curve: k.curve }), curve: k.curve, ad: k.ad };
+    if (y.ok && y.tur === "egri") return { ok: true, tur: "kod", ease: E.sfcKodla({ ad: y.ad, curve: y.curve }), curve: y.curve, ad: y.ad };
+    if (y.ok) return basarisiz("hizKodu");
+    return basarisiz(y.hata === "onek" || y.hata === "bicim" ? "gecersiz" : y.hata === "nokta" ? "egri" : y.hata);
   }
   function kanonik(ease) { var c = coz(ease); return c.ok ? c.ease : OTOMATIK; }
   function otomatikMi(ease) { return kanonik(ease) === OTOMATIK; }

@@ -29,6 +29,8 @@
  * Dengeli / Otomatik, uyarı kodları, srcFrames ≤ F) önayarlardaki gibidir. hostPlan ve host değişmedi.
  * Düzenleyici geometrisi (log2 hız ekseni, tıkla ekle, sürükle, çift tıkla sil, Shift ızgara, Alt sert
  * basamak) ozel.* altında saf ve testli; SVG düzenleyici js/egri.js'te (SufloEgriEditor, mod 'hiz').
+ * Paylaşım (3.4 adım 15): adlı özel rampaları yeniden adlandırma, sürükleyerek sıralama, içe aktarılanları yinelemesiz
+ * ekleme ve dışa aktarma girdileri burada; SFC1 'hiz' kodu ve .suflo-egri dosyası SufloEase'te (js/ease-curve.js).
  * Suflo'nun kendi kodu (temiz oda).
  */
 (function (root, factory) {
@@ -612,6 +614,67 @@
     return "Özel rampa " + n;
   }
 
+  /* ---- adlı özel rampaları paylaşma (3.4 adım 15; kod / dosya biçimi SufloEase'te) ---- */
+  function adVarMi(liste, ad, haricId) {
+    var a = ad.toLowerCase();
+    return liste.some(function (x) { return x.id !== haricId && x.ad.toLowerCase() === a; });
+  }
+  // Yeniden adlandır. Döner: { ok, liste, kod?: 'ad' (boş) | 'yok' (id yok) | 'ayni' (başka kayıtta aynı ad; Kaydet adla
+  // üzerine yazdığından iki kayıt aynı adı taşımaz) }
+  function ozelKayitAdlandir(liste, id, ad) {
+    var temiz = ozelKayitlar(liste), a = adTemiz(ad), i = -1;
+    temiz.forEach(function (x, k) { if (x.id === id) i = k; });
+    if (i < 0) return { ok: false, liste: temiz, kod: "yok" };
+    if (!a) return { ok: false, liste: temiz, kod: "ad" };
+    if (adVarMi(temiz, a, id)) return { ok: false, liste: temiz, kod: "ayni" };
+    temiz[i] = { id: temiz[i].id, ad: a, keys: temiz[i].keys, hit: temiz[i].hit };
+    return { ok: true, liste: temiz };
+  }
+  // Sürükle-bırak: id'li kayıt hedef sıraya (0 … n-1, kırpılır). Döner: yeni liste (id yoksa aynı sıra)
+  function ozelKayitTasi(liste, id, hedef) {
+    var temiz = ozelKayitlar(liste), i = -1, h = Math.round(Number(hedef));
+    temiz.forEach(function (x, k) { if (x.id === id) i = k; });
+    if (i < 0 || !isFinite(h)) return temiz;
+    var x = temiz.splice(i, 1)[0];
+    temiz.splice(clamp(h, 0, temiz.length), 0, x);
+    return temiz;
+  }
+  /*
+   * İçe aktarılan özel rampaları ekle (Kod yapıştır, İçe aktar). gelenler: SufloEase.iceAktar'ın presets'i; yalnız tür
+   * 'hiz' olanlar ({ ad, keys: [[t, %]], hit }) alınır. Aynı ad (büyük / küçük harf ayrımsız) ve aynı eğri varsa atlanır
+   * (yinelenen); adsız gelen, aynı eğri herhangi bir adla varsa atlanır. Ad başka bir eğride kullanılıyorsa "Ad (2)" olur
+   * (Kaydet adla üzerine yazdığından içe aktarma hiçbir kaydın üstüne yazmaz); adsız gelene ozelKayitAdi (cevir: arayüz
+   * dili). En çok 12: sığmayanlar sayılır (dolu). Döner: { liste, eklenen: [id], yinelenen, dolu, adDegisti }
+   */
+  function ozelKayitlarIceAl(liste, gelenler, simdi, cevir) {
+    var temiz = ozelKayitlar(liste), eklenen = [], yinelenen = 0, dolu = 0, adDegisti = 0;
+    var taban = "r" + Math.floor(isFinite(Number(simdi)) ? Math.abs(Number(simdi)) : 0).toString(36).slice(-10), sayac = 0;
+    (Array.isArray(gelenler) ? gelenler : []).forEach(function (g) {
+      if (!g || typeof g !== "object" || g.tur !== "hiz" || !Array.isArray(g.keys) || !g.keys.length) return;
+      var kayit = { id: "", ad: adTemiz(g.ad), keys: ozelYuzde(g.keys), hit: ozelHit(g.hit) };
+      var ayniEgri = temiz.filter(function (x) { return ozelAyni(x, kayit); });
+      if (kayit.ad ? ayniEgri.some(function (x) { return x.ad.toLowerCase() === kayit.ad.toLowerCase(); }) : ayniEgri.length) { yinelenen++; return; }
+      if (temiz.length >= OZEL.KAYIT) { dolu++; return; }
+      var ad = kayit.ad || (typeof cevir === "function" ? adTemiz(String(cevir(ozelKayitAdi(temiz, cevir)))) : "") || ozelKayitAdi(temiz);
+      if (adVarMi(temiz, ad, "")) {
+        for (var n = 2; n < 1000; n++) {
+          var ek = " (" + n + ")", aday = ad.slice(0, OZEL.AD - ek.length).replace(/\s+$/, "") + ek;
+          if (!adVarMi(temiz, aday, "")) { ad = aday; break; }
+        }
+        if (kayit.ad) adDegisti++;
+      }
+      kayit.ad = ad;
+      do { kayit.id = taban + (sayac++).toString(36); } while (temiz.some(function (x) { return x.id === kayit.id; }));
+      temiz.push(kayit);
+      eklenen.push(kayit.id);
+    });
+    return { liste: temiz, eklenen: eklenen, yinelenen: yinelenen, dolu: dolu, adDegisti: adDegisti };
+  }
+  // Dışa aktarma girdileri (SufloEase.dosyaYaz): [{ tur: 'hiz', ad, keys: [[t, %]], hit }]
+  function ozelKayitlarDisa(liste) {
+    return ozelKayitlar(liste).map(function (x) { return { tur: "hiz", ad: x.ad, keys: x.keys, hit: x.hit }; });
+  }
+
   /*
    * Özel eğrinin bütün noktaları %1 içinde aynı hızda mı. Tam düz eğriyi plan her aralık, Parça, Yumuşatma ve Yoğunlukta
    * "duz" ile reddeder (v^k de sabit kalır); %1'in içindeki fark da ancak Güçlü yoğunlukta rampa olur. Plan "duz" atınca
@@ -1188,6 +1251,7 @@
     // özel eğri (3.4 adım 13)
     ozelDogrula: ozelDogrula, ozelHit: ozelHit, ozelYuzde: ozelYuzde,
     ozelKayitlar: ozelKayitlar, ozelKayitEkle: ozelKayitEkle, ozelKayitSil: ozelKayitSil, ozelKayitAdi: ozelKayitAdi,
+    ozelKayitAdlandir: ozelKayitAdlandir, ozelKayitTasi: ozelKayitTasi, ozelKayitlarIceAl: ozelKayitlarIceAl, ozelKayitlarDisa: ozelKayitlarDisa,
     ozelDuz: ozelDuz, ozelAyni: ozelAyni, ozelBilinen: ozelBilinen,
     OZEL_VARSAYILAN: { keys: OZEL_VARSAYILAN.keys.map(function (k) { return [k[0], k[1]]; }), hit: OZEL_VARSAYILAN.hit },
     // SufloEgriEditor mod 'hiz' (js/egri.js) geometrisi ve düzenleme işlemleri

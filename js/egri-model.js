@@ -13,6 +13,8 @@
  *   - kısayollar (metin alanında değilken) ve CEP tuş ilgisi, kullanıcı önayarlarının doğrulanması
  *   - varışta yaylanma (adım 14): varışları bulma (önceki anahtardan varış hızı, sonraki anahtar / klip sonu sınırı),
  *     KS_easeBake yaylanma öğeleri (SufloEase.yaylanPlan; seyrek + 2 karede bir yedek), aynı inişte yerine geçme, önizleme
+ *   - paylaşım (adım 15): önayarı yeniden adlandırma, sırasını değiştirme, içe aktarılanları yinelemesiz ekleme, dışa
+ *     aktarma girdileri, paylaşım hata metinleri ve içe aktarma özeti (kod / dosya biçimi SufloEase'te)
  * Suflo'nun kendi kodu (temiz oda). Yumuşatma matematiği js/ease-curve.js'te (Rebound MIT uyarlaması).
  */
 (function (root, factory) {
@@ -790,6 +792,139 @@
   function onayarSil(liste, id) { return onayarlar(liste).filter(function (o) { return o.id !== id; }); }
   function onayarAdi(liste) { return "Benim eğrim " + (onayarlar(liste).length + 1); }
 
+  /* ================= paylaşım: önayar listesi (3.4 adım 15) ================= */
+  // Ad değiştir (paylaşılan adlarla aynı temizlik: SufloEase.adTemiz). Döner: { ok, liste, kod?: 'ad' (boş) | 'yok' (id yok) }
+  function onayarAdlandir(liste, id, ad) {
+    var temiz = onayarlar(liste), a = E.adTemiz(typeof ad === "string" ? ad : ""), bulundu = false;
+    if (!a) return { ok: false, liste: temiz, kod: "ad" };
+    var yeni = temiz.map(function (o) {
+      if (o.id !== id) return o;
+      bulundu = true;
+      return { id: o.id, ad: a, curve: o.curve };
+    });
+    return bulundu ? { ok: true, liste: yeni } : { ok: false, liste: temiz, kod: "yok" };
+  }
+  // Sürükle-bırak ya da ◀ ▶: id'li önayar hedef sıraya (0 … n-1, kırpılır) taşınır. Döner: yeni liste (id yoksa aynı sıra)
+  function onayarTasi(liste, id, hedef) {
+    var temiz = onayarlar(liste), i = -1, h = Math.round(Number(hedef));
+    temiz.forEach(function (o, k) { if (o.id === id) i = k; });
+    if (i < 0 || !isFinite(h)) return temiz;
+    var o = temiz.splice(i, 1)[0];
+    temiz.splice(sinirla(h, 0, temiz.length), 0, o);
+    return temiz;
+  }
+  // Benzersiz ad: "Ad", sonra "Ad (2)", "Ad (3)" … (büyük / küçük harf ayrımsız; en çok 40 karakter)
+  function benzersizAd(ad, adlar) {
+    var kullanilan = {};
+    (adlar || []).forEach(function (a) { kullanilan[String(a).toLowerCase()] = 1; });
+    if (!kullanilan[ad.toLowerCase()]) return ad;
+    for (var n = 2; n < 1000; n++) {
+      var ek = " (" + n + ")", aday = ad.slice(0, AD_SINIR - ek.length).replace(/\s+$/, "") + ek;
+      if (!kullanilan[aday.toLowerCase()]) return aday;
+    }
+    return ad;
+  }
+  function egriImzasi(ad, c) { return E.onayarImzasi({ ok: true, tur: "egri", ad: ad, curve: c }); }
+  /*
+   * İçe aktarılan eğri önayarlarını kullanıcının listesine ekle (Kod yapıştır, İçe aktar). gelenler: SufloEase.iceAktar'ın
+   * presets'i; yalnız tür 'egri' olanlar alınır (Hız Rampası'nınkiler orada). Kurallar:
+   *   - aynı ad (büyük / küçük harf ayrımsız) ve aynı eğri listede varsa atlanır (yinelenen); adsız gelen, aynı eğri
+   *     listede herhangi bir adla varsa atlanır
+   *   - ad başka bir eğride kullanılıyorsa "Ad (2)" olur (adDegisti); adsız gelene varsayilanAd(n) (arayüz dilinde
+   *     "Benim eğrim N"; yoksa Türkçe), o da benzersiz yapılır
+   *   - liste en çok 24: sığmayanlar sayılır (dolu), eklenmez
+   * Döner: { liste, eklenen: [id], yinelenen, dolu, adDegisti }
+   */
+  function onayarlariIceAl(liste, gelenler, simdi, varsayilanAd) {
+    var temiz = onayarlar(liste), eklenen = [], yinelenen = 0, dolu = 0, adDegisti = 0, imzalar = {}, egriler = {}, idler = {};
+    temiz.forEach(function (o) { imzalar[egriImzasi(o.ad, o.curve)] = 1; egriler[JSON.stringify(o.curve)] = 1; idler[o.id] = 1; });
+    var taban = "k" + Math.floor(sonlu(simdi) ? Math.abs(simdi) : 0).toString(36).slice(-10), sayac = 0;
+    (Array.isArray(gelenler) ? gelenler : []).forEach(function (g) {
+      if (!g || typeof g !== "object" || (g.tur !== undefined && g.tur !== "egri")) return;
+      var c = E.normalize(g.curve);
+      if (!c) return;
+      var ad = E.adTemiz(g.ad), cj = JSON.stringify(c);
+      if (ad ? imzalar[egriImzasi(ad, c)] : egriler[cj]) { yinelenen++; return; }
+      if (temiz.length >= EN_COK_ONAYAR) { dolu++; return; }
+      var adlar = temiz.map(function (o) { return o.ad; });
+      var son = ad ? benzersizAd(ad, adlar) : benzersizAd(E.adTemiz(typeof varsayilanAd === "function" ? String(varsayilanAd(temiz.length + 1)) : "") ||
+        "Benim eğrim " + (temiz.length + 1), adlar);
+      if (ad && son !== ad) adDegisti++;
+      var id;
+      do { id = taban + (sayac++).toString(36); } while (idler[id]);
+      idler[id] = 1;
+      temiz.push({ id: id, ad: son, curve: c });
+      imzalar[egriImzasi(son, c)] = 1;
+      if (ad) imzalar[egriImzasi(ad, c)] = 1;
+      egriler[cj] = 1;
+      eklenen.push(id);
+    });
+    return { liste: temiz, eklenen: eklenen, yinelenen: yinelenen, dolu: dolu, adDegisti: adDegisti };
+  }
+  // Dışa aktarma girdileri (SufloEase.dosyaYaz): [{ tur: 'egri', ad, curve }]
+  function onayarlariDisa(liste) { return onayarlar(liste).map(function (o) { return { tur: "egri", ad: o.ad, curve: o.curve }; }); }
+
+  /*
+   * Paylaşım metinleri (durum satırı; i18n/en.js çevirir). Kodlar: SufloEase.paylasimCoz / yapistir / dosyaOku / iceAktar
+   * hataları, SufloEgriSecim.coz'un 'gecersiz' / 'hizKodu'su, panelin dosya hataları ('diyalog', 'okunamadi', 'yazilamadi')
+   * ve 'egriKodu' (Hız Rampası'na eğri kodu yapıştırıldı).
+   */
+  var PAYLASIM_HATA = {
+    bos: "Yapıştırılacak bir kod yok.",
+    uzun: "Kod çok uzun (en çok 4096 karakter).",
+    onek: "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır.",
+    bicim: "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır.",
+    gecersiz: "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır.",
+    bozuk: "Kod eksik ya da bozuk; baştan sona yeniden kopyala.",
+    surum: "Bu kod ya da dosya Suflo'nun daha yeni bir sürümünden; önce Suflo'yu güncelle.",
+    tur: "Bu kod bir eğri ya da hız rampası değil.",
+    egri: "Koddaki eğri geçersiz.",
+    hiz: "Koddaki hız eğrisi geçersiz.",
+    nokta: "Eğride 8'den çok nokta var; Suflo en çok 8 nokta okur.",
+    css: "Geçersiz cubic-bezier: dört sayı yaz; x değerleri 0–1 arası olmalı.",
+    hizKodu: "Bu bir Hız Rampası kodu: Hız Rampası › Özel eğri'deki kod kutusuna yapıştır.",
+    egriKodu: "Bu bir eğri kodu: Eğri sekmesinde ya da Geçiş / Zoom / Hareket'in Eğri seçicisinde kullan.",
+    buyuk: "Dosya çok büyük (en çok 64 KB).",
+    json: "Dosya okunamadı: JSON değil.",
+    dosyaBicim: "Tanınmayan dosya: .suflo-egri dosyası ya da bir eğri aracının JSON dışa aktarmasını seç.",
+    diyalog: "Dosya penceresi açılamadı; kodu kopyalayıp yapıştırarak paylaş.",
+    okunamadi: "Dosya okunamadı.",
+    yazilamadi: "Dosya yazılamadı."
+  };
+  function paylasimHatasi(kod) { return PAYLASIM_HATA[kod] || PAYLASIM_HATA.bozuk; }
+  /*
+   * İçe aktarma özeti → { parcalar (durum satırı; her parça kendi çevirisiyle), uyari, eklenen }.
+   * o: { egri, hiz (eklenen sayıları), yinelenen, dolu (Eğri listesi dolu), hizDolu (Hız Rampası listesi dolu), alinamadi
+   *      (yerine yazılamayan: depo yazılamadı ya da o sekme yüklü değil), uyarilar (SufloEase uyarıları: geçersiz / tanınmayan / fazla / dosyaSurumu) }
+   */
+  function iceAktarOzeti(o) {
+    o = o || {};
+    var p = [], egri = Number(o.egri) || 0, hiz = Number(o.hiz) || 0, uyari = false;
+    var gecersiz = 0, bilinmeyen = 0, fazla = 0, surum = false;
+    (Array.isArray(o.uyarilar) ? o.uyarilar : []).forEach(function (u) {
+      if (!u) return;
+      if (u.kod === "fazla") fazla += Number(u.n) || 0;
+      else if (u.kod === "dosyaSurumu") surum = true;
+      else if (u.kod === "bilinmeyen") bilinmeyen++;
+      else gecersiz++;
+    });
+    if (egri) p.push("Eğri önayarlarına eklendi: " + egri);
+    if (hiz) p.push("Hız Rampası özel rampalarına eklendi: " + hiz);
+    if (!egri && !hiz) p.push("Yeni önayar eklenmedi");
+    if (o.yinelenen) p.push(o.yinelenen + " yineleme atlandı");
+    if (o.dolu) p.push(o.dolu + " eğri sığmadı (en çok " + EN_COK_ONAYAR + " önayar)");
+    if (o.hizDolu) p.push(o.hizDolu + " özel rampa sığmadı (en çok 12)");
+    if (o.alinamadi) p.push(o.alinamadi + " önayar saklanamadı");
+    if (gecersiz) p.push(gecersiz + " geçersiz önayar atlandı");
+    if (bilinmeyen) p.push(bilinmeyen + " tanınmayan eğri atlandı (yalnız tek kübik ve çok noktalı eğriler okunur)");
+    if (fazla) p.push("dosyadaki ilk 32 önayar okundu, " + fazla + " atlandı");
+    if (surum) p.push("dosya sürümü tanınmadı; okunabilenler alındı");
+    uyari = (!egri && !hiz) || !!(o.dolu || o.hizDolu || o.alinamadi || gecersiz || bilinmeyen || fazla || surum);
+    var parcalar = [];
+    p.forEach(function (x, i) { if (i) parcalar.push(" · "); parcalar.push(x); });
+    return { parcalar: parcalar, uyari: uyari, eklenen: egri + hiz };
+  }
+
   /* ================= düzenleyici geometrisi ================= */
   var GEN = ED.W - 2 * ED.PAD, YUK = ED.H - 2 * ED.PAD;
   function ekranX(x) { return ED.PAD + x * GEN; }
@@ -993,6 +1128,9 @@
     yaylanCakisanlar: yaylanCakisanlar, yaylanYeri: yaylanYeri, yaylanOnizleme: yaylanOnizleme, yaylanTuru: yaylanTuru, yaylanSiniri: yaylanSiniri, yaylanAlaninda: yaylanAlaninda,
     kisayol: kisayol, metinAlani: metinAlani, tusIlgisi: tusIlgisi,
     onayarlar: onayarlar, onayarEkle: onayarEkle, onayarSil: onayarSil, onayarAdi: onayarAdi,
+    // paylaşım (3.4 adım 15)
+    onayarAdlandir: onayarAdlandir, onayarTasi: onayarTasi, benzersizAd: benzersizAd, onayarlariIceAl: onayarlariIceAl, onayarlariDisa: onayarlariDisa,
+    paylasimHatasi: paylasimHatasi, iceAktarOzeti: iceAktarOzeti, PAYLASIM_HATA: PAYLASIM_HATA,
     ekranX: ekranX, ekranY: ekranY, egriX: egriX, egriY: egriY, yapis: yapis,
     degerYolu: degerYolu, hizYolu: hizYolu, kucukYol: kucukYol, duzenlenebilir: duzenlenebilir, tutamaclar: tutamaclar,
     surukle: surukle, noktaEkle: noktaEkle, noktaSil: noktaSil, enYakin: enYakin, sahneKaresi: sahneKaresi,

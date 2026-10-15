@@ -100,7 +100,11 @@ SOFTWARE.
     segments, each solved with its own general-cubic Newton plus bisection), `normalize`, `split`
     (de Casteljau), `flip`, `invert`, `toCss` / `fromCss` (a single `cubic-bezier()` only), the built-in
     curve list and `bakePlan` (dense keyframes on timeline frame times), plus exact 0/1 endpoints and a
-    numeric speed graph for non-bezier curves.
+    numeric speed graph for non-bezier curves. The share layer (SFC1 codes, the `.suflo-egri` file, cubic-bezier /
+    CSS paste and the JSON export reader of a third-party curve tool, 3.4 step 15) is also Suflo's own clean-room
+    code; that reader parses only a file format and contains no code from that tool.
+  - `docs/js/ease-curve.js` — a byte-for-byte copy of `js/ease-curve.js` served by the suflo.app/egri share page so the
+    site decodes curve codes exactly like the panel (tests check that the two files are identical).
   - `tests/test-ease-curve.js` — Rebound's `bezier`, `penner`, `spring`, `sampler`, `speedgraph` and
     `overshoot` unit-test cases (vitest) adapted to Suflo's test style, next to Suflo's own cases.
   - `js/key-records.js` (keyframe records and liveness check) is Suflo's own code; no Rebound code.
