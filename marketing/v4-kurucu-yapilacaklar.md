@@ -2139,9 +2139,11 @@ hata ipucu onlara yeniden deneme ya da model içe aktarma iddia etmez. Serbest "
 
 ### Adım 20: Araç ara (Ctrl+K / ⌘K komut paleti; ücretsiz)
 
-Ne değişti: üst çubukta büyüteç düğmesi ve **Ctrl+K** (macOS ⌘K) ile açılan arama penceresi. Sol menüdeki her araç ve 26
-sık kullanılan eylem ("Altyazı oluştur", "Sessizlikleri bul", "Rampayı uygula", "Ayarlar › Motor"…) Türkçe karakter
-duyarsız aranır; favoriler (☆, Ctrl+D) ve son kullanılan 8 araç `localStorage`'da (`suflo.aracAra`, yalnız o bilgisayarda).
+Ne değişti: üst çubukta büyüteç düğmesi ve **Ctrl+K** (macOS ⌘K) ile açılan arama penceresi. Sol menüdeki her araç ve 41
+sık kullanılan eylem ("Altyazı oluştur", "Sessizlikleri bul", "Rampayı uygula", "Ayarlar › Motor"…; birleştirmeden sonra 3.4'ün
+yeni araçları da: Eğri sekmesi, Eğri uygula, Varışta yaylan, eğri kodu / içe / dışa aktar, Suflo eğrilerini geri al, Kesim
+kapsamı, Kesilmeyecek katmanlar, Altyazıyı yeni kurguya uyarla, Geçişi / Zoom'u / Önayarı kaldır, Özel hız eğrisi, Model dosyası
+içe aktar, Model kaynaklarını sına, Ayarlar › Yapay zekâ köprüsü) Türkçe karakter duyarsız aranır; favoriler (☆, Ctrl+D) ve son kullanılan 8 araç `localStorage`'da (`suflo.aracAra`, yalnız o bilgisayarda).
 Eylem seçmek yalnız gezinir: sekme açılır, düğme odaklanıp çerçevelenir, **çalıştırılmaz** (Pro kapısı ve deneme hakları
 aracın kendi düğmesinde kaldı; paletin kendisinde kapı yok). Saf mantık `js/arac-ara.js`, arayüz `js/app.js`. Rebound'un
 Home başlatıcısından yalnız fikir; kod temiz oda, THIRD_PARTY_NOTICES.md değişmedi.
@@ -2160,7 +2162,9 @@ eyleme saniyede ulaş; favorilerin başta."; madde tıklanınca paleti açmak i�
 VK_K (75, klavye düzenine göre K harfi), macOS'ta kVK_ANSI_K (40, ANSI düzeninde K'nın **fiziksel** yeri). Türkçe Q'da sorun
 yok. macOS'ta Türkçe F düzeninde K başka bir tuşta (fiziksel J) olduğu için ilk ⌘K paleti açar ama Premiere'e de gidebilir
 (timeline'da Add Edit). İnceleme 2'den beri panel o basışta K'yı yazan tuşu öğrenir (`yeniKisayolTusu`, `MAC_KVK`: J = kVK 38)
-ve ilgiye ekler: **ikinci ⌘K'dan itibaren** panelde kalır. İkinci etki: Türkçe F'de fiziksel ANSI K tuşu **M** yazar, yani
+ve ilgiye ekler: **ikinci ⌘K'dan itibaren** panelde kalır. Son incelemeden beri öğrenilen tuşlar bu bilgisayarda saklanır
+(`localStorage` › `suflo.aracAra.macTuslari`): panel yeniden yüklenince ya da Premiere yeniden açılınca ilk ⌘K yine panelde
+kalır, bedel yalnız ilk kez (ya da klavye düzeni değişince) ödenir. İkinci etki: Türkçe F'de fiziksel ANSI K tuşu **M** yazar, yani
 tutulan tuş aslında ⌘M'dir (Premiere: Export Media). Panel ⌘ + tutulan bir tuşta K olmayan bir harf görünce
 (`tusDuzeniUyumsuz`) o tuşun ilgisini bırakır: ilk ⌘M yutulmuş olabilir, sonrakiler Premiere'e gider. Türkçe Q'ya dönülürse
 aynı kural ters yönde çalışır (fiziksel J 'j' yazınca bırakılır, fiziksel K 'k' yazınca yeniden tutulur). Latin olmayan
@@ -2169,26 +2173,18 @@ Altyazı düzenleyicisi (inceleme 2): satırın zaman / böl / sil düğmesi oda
 bırakılır, tuş eskisi gibi Premiere'in Kes'ine gider (zaman düğmesiyle oynatma kafasını taşıyıp Ctrl+K ile kesmek çalışır);
 odak düzenleyiciden çıkınca ilgi geri kurulur.
 
-**20.K4 Eğri sekmesi gelince (adım 10).** "Eğri uygula" eylemi `#tab-egri` varsa kendiliğinden listeye girer, yoksa
-görünmez. Eğri sekmesinin Uygula düğmesinin kimliği `egri-uygula` değilse `js/arac-ara.js` › `EYLEMLER` › `egri-uygula`
-satırındaki `hedef`i güncelle (`tests/test-arac-ara.js` sekme varken eksik hedefi yakalar). **Birleştirirken zorunlu
-(inceleme 2):** aynı satıra `pro: "curves"` ekle: Eğri'nin Uygula'sı `Pro.gate("curves", { deneme: true })` ile kapılı, satır
-eklenmezse palette Eğri aracında PRO rozeti olur ama "Eğri uygula" eyleminde olmaz (adım 20 "Pro öğeleri kilit rozeti
-gösterir"). Bu dalda `js/pro.js` `curves`'i tanımlamadığı için eklenmedi ("eylemlerin Pro anahtarları pro.js'te tanımlı"
-sınaması düşerdi); `yerel-34-egri` ile birleşince `js/pro.js`'te `curves:` satırı olduğunu doğrula. Yeni bir sekme / sık eylem
-eklendiğinde de aynı listeye bir satır eklemek yeter (sol menü girdileri kendiliğinden gelir).
+**20.K4 Eğri sekmesi ve 3.4 araçları (yapıldı, birleştirmede).** `#tab-egri` geldi: "Eğri uygula" listede ve `pro: "curves"`
+taşır (Eğri sekmesi gibi PRO rozetli; `js/pro.js`'te `curves:` var). 3.4'ün öbür yeni araçları da `js/arac-ara.js` ›
+`EYLEMLER`'de (Pro olanlar kendi kapı anahtarıyla: kesim seçenekleri `cut`, özel hız eğrisi `speedramp`, köprü `mcp`;
+ücretsizler rozetsiz). `tests/test-arac-ara.js` artık hiçbir eylemin sekmesi yok diye atlanmadığını, her hedef kimliğin
+`index.html`'de olduğunu ve ücretsiz kullanıcıda 'eğri' aramasında Eğri ile Eğri uygula satırlarının PRO gösterdiğini denetler.
+Deneme 20.17. Yeni bir sekme / sık eylem eklendiğinde de aynı listeye bir satır eklemek yeter (sol menü girdileri kendiliğinden gelir).
 
-**Birleştirirken zorunlu (inceleme):** `yerel-34-egri` dalındaki `js/egri.js` › `tuslariTut` CEP tuş ilgisini doğrudan
-`window.__adobe_cep__.registerKeyEventsInterest(...)` ile veriyor. Bu çağrı panelin **bütün** listesini değiştirir: Eğri
-sekmesi açılınca Ctrl+K (⌘K) ilgisi silinir ve geri gelmez (app.js onu bir kez kurar); sonra panelde her Ctrl+K hem paleti
-açar hem timeline'daki klibi keser (20.2'nin tam tersi). Birleştirmede `tuslariTut`'u `captions.js` › `konumTuslariniTut`
-gibi yaz: `var AA = window.SufloAracAra; if (AA && typeof AA.tusIlgisiAyarla === "function") { if (AA.tusIlgisiAyarla("egri",
-tut ? M.tusIlgisi(mac) : "")) tusTutuluyor = tut; return; }` ve doğrudan çağrı yalnız bu dalın altında yedek olarak kalsın
-(`js/arac-ara.js`, `js/egri.js`'ten önce yüklenir). `tests/test-arac-ara.js` "panelin tuş ilgileri ortak yöneticiden
-geçer" maddesi bunu yapmadan birleştirilen dalda **kalır** (egri.js satırını adıyla gösterir). Deneme: Eğri sekmesini aç,
-panelde boş bir yere tıkla, Ctrl+K: palet açılır, timeline kesilmez; sekmeden çık, yine aynı.
+**Tuş ilgisi tek yöneticiden (yapıldı, birleştirmede).** `js/egri.js` › `tuslariTut` ve `js/hiz-rampasi.js` (Özel eğri
+düzenleyicisi) CEP tuş ilgisini `SufloAracAra.tusIlgisiAyarla` ile verir; doğrudan `registerKeyEventsInterest` yalnız yedek
+dalda. `tests/test-arac-ara.js` "panelin tuş ilgileri ortak yöneticiden geçer" bunu denetler. Deneme 20.18.
 
-### 22. Yapay zekâ köprüsü (MCP, Deneysel)
+### Adım 22: Yapay zekâ köprüsü (MCP, Deneysel; köprüyü açmak Pro, varsayılan kapalı)
 
 **MCP.1 Güvenlik incelemesi (yayından önce, zorunlu).** Diff üzerinde `/security-review` çalıştır; sonra
 `marketing/v3.4-deneme-listesi.md` › 22.24–22.27'yi elle doğrula (tarayıcıdan fetch / no-cors / form POST / WebSocket,
@@ -2227,3 +2223,24 @@ Devre dışı bırak, iade) hemen kapanır. Önceki sürümdeki "3 deneme oturum
 `js/deneme.js` › OZELLIKLER ve AD'ye geri ekle, `ac()`'de `Pro.gate("mcp", { deneme: true, yeniden: ac })` + başarıda
 `Pro.denemeHarca("mcp")`, deneme açılışında `sunucu.baslat({ sure: 30 * 60000 })` (sunucunun mutlak süre sınırı hâlâ var ve
 testli), kart / README / `docs/mcp-guvenlik.html` / deneme listesi metinleri ve `tests/test-deneme*.js` listeleri.
+**Bunlar olmadan deneme çalışmaz (son inceleme):** `js/otomasyon-panel.js` › `proDegisti()` bugün `if (!Pro.isPro())
+sunucu.durdur("pro")`; `ac()` başarıdan hemen sonra onu çağırır, `Pro.denemeHarca()` da `emit()` ile çağırır. Yalnız yukarıdakiler
+yapılırsa ücretsiz kullanıcının köprüsü açılır açılmaz "Pro lisansı artık etkin değil" ile kapanır ve her deneme hakkı boşa gider.
+Ayrıca: (1) oturum bayrağını geri koy (`2cba403`'teki gibi `oturum = deneme ? "deneme" : "pro"`, `ac()`'de kur, kapanınca sıfırla);
+(2) `proDegisti()` yalnız `oturum === "pro"` iken `!Pro.isPro()` durumunda kapatsın, deneme oturumuna dokunmasın; (3) deneme
+sürerken kullanıcı Pro olursa `oturum = "pro"` yap ve `sunucu.sureSiniri(0)` ile 30 dakikalık sınırı kaldır; (4) şu sınamaları
+geri çevir: `tests/test-otomasyon.js` ("köprünün kendi anahtarı 'mcp' deneme listesinde YOK"), `tests/test-otomasyon-panel.js`
+(açılış kapısı deneme seçeneği olmadan, hak harcanmaz; kaynak metni denetimi) ve `tests/test-pro-license.js`'teki özellik
+sayıları; (5) yeni sınama: deneme oturumu açılır, `Pro.denemeHarca("mcp")` sonrası köprü AÇIK kalır, 30 dakikada kapanır.
+
+**MCP.10 3.4 araçları ve köprü (karar, birleştirmede).** Köprünün izin listesinde 3.4'ten yalnız `suflo_egri_uygula` var
+(plan adım 22 v1 listesi; Eğri sekmesinin Uygula'sıyla aynı işlev, `curves` kapısı). Diğerleri bilerek eklenmedi:
+(a) **Varışta yaylan**: "Tüm varışlar" Geri al kayıtlarına yer kalmayınca panelde engelleyici bir onay penceresi açar
+(asistan adına geçilemez) ve işlev açık sonuç döndürmüyor; eklemek için önce sonuç nesnesi ve köprüye özgü "sorma, reddet"
+dalı gerekir. (b) **Güvenli kaldırma** (Geçişi / Zoom'u / Önayarı kaldır, Eğri'de Tümünü geri al): toplu silme; plan v1'de
+yok, izin listesi silme yeteneği içermez. (c) **Eğri paylaşım kodları / içe-dışa aktarma**: Premiere'e dokunmaz, dosya yolu
+ister ya da asistanın önayar listesine güvenilmez kod yazmasına yol açar. (d) **Model dosyası içe aktar**: rastgele dosya yolu
+(kalıcı olarak dışarıda). (e) **Model kaynaklarını sına**: ağa çıkar (kalıcı olarak dışarıda). (f) **Araç ara**: yalnız
+gezinme. Zaten kapsananlar: Kesim kapsamı ve korunan katmanlar `suflo_sessizlik_analiz` / `suflo_sessizlik_kes`'te panelin
+seçimiyle çalışır (açıklama güncellendi: seçili klip, In → Out ya da sekans); Geçiş / Zoom / Hareket özel eğrisi ve Hız
+Rampası özel eğrisi `suflo_zoom` / `suflo_hiz_rampasi`'nın panelde seçili ayarlarıyla gelir.
