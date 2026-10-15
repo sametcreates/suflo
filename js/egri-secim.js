@@ -38,7 +38,12 @@
   var UZUN_PARCA = 1;        // sn: bundan uzun parça 2 karede bir
   var EN_COK = 2000;         // özellik başına en çok ara anahtar
   var TABLO_N = 241;         // Hareket önayarı: host'a giden eğri tablosu (SufloEase.bakeFactors) nokta sayısı
+  var ANAHTAR_MS = 50;       // yoğun yazımda anahtar başına Premiere çağrı süresi payı (Eğri sekmesiyle aynı)
+  var HAREKET_EN_COK = 6000; // Hareket önayarı: tek çağrıda en çok yoğun anahtar (host KS_EGRI_TOPLAM_EN_COK ile aynı)
   var EPS = 1e-9;
+  // Yoğun yazım zaman aşımına uğrarsa (Geçiş, Zoom, Hareket): Premiere'in betiği durdurulamaz, yazım sürüyor olabilir.
+  // Panel geç gelen cevabı (K.call'un gec işlevi) yine saklar.
+  var GEC_IPUCU = "Premiere anahtar kareleri yazmayı sürdürüyor olabilir; bitince kaldırma kaydı saklanır ve Geri al çıkar. O zamana dek yeniden uygulama.";
 
   function sonlu(v) { return typeof v === "number" && isFinite(v); }
   function fpsOku(fps) { var f = Number(fps); return f > 0 && f <= 1000 ? f : 30; }
@@ -268,14 +273,31 @@
     return n;
   }
 
-  // Yoğun yazımın Premiere çağrı süresi (ms): taban + anahtar başına pay; en çok 10 dk
+  /*
+   * Hareket önayarının yoğun yazımında anahtar sayısının ÜST SINIRI (çağrı süresi için; host her seçili klibe yazar).
+   * Klip başına en çok iki özellik (Konum / Ölçek + Opaklık); her özelliğin hareketi önayar süresini aşmaz: özellik
+   * başına en çok ceil(süre × fps) ara anahtar + 5 seyrek anahtar (Mikro sarsıntı'nın beşi). Süre host'taki gibi
+   * okunur (0,18–1,5 sn dışı 0,45). o: { klip (seçili klip sayısı; yoksa 1), sure (sn), fps (bilinmiyorsa 30) }
+   */
+  function hareketAnahtari(o) {
+    o = o || {};
+    var klip = Math.floor(Number(o.klip));
+    klip = isFinite(klip) && klip >= 1 ? klip : 1;
+    var sure = Number(o.sure);
+    if (!(sure >= 0.18 && sure <= 1.5)) sure = 0.45;
+    return klip * 2 * (Math.ceil(sure * fpsOku(o.fps) - EPS) + 5);
+  }
+
+  // Yoğun yazımın Premiere çağrı süresi (ms): taban + anahtar başına ANAHTAR_MS (Eğri sekmesinin KS_easeBake payıyla
+  // aynı: her anahtar addKey + setValueAtKey + doğrusal); en çok 10 dk
   function cagriSuresi(taban, anahtar) {
     var n = Math.max(0, Number(anahtar) || 0);
-    return Math.min(600000, Math.max(Number(taban) || 0, 0) + Math.ceil(n * 25));
+    return Math.min(600000, Math.max(Number(taban) || 0, 0) + Math.ceil(n * ANAHTAR_MS));
   }
 
   return {
-    OTOMATIK: OTOMATIK, UZUN_PARCA: UZUN_PARCA, EN_COK: EN_COK, TABLO_N: TABLO_N,
+    OTOMATIK: OTOMATIK, UZUN_PARCA: UZUN_PARCA, EN_COK: EN_COK, TABLO_N: TABLO_N, ANAHTAR_MS: ANAHTAR_MS, HAREKET_EN_COK: HAREKET_EN_COK,
+    GEC_IPUCU: GEC_IPUCU, hareketAnahtari: hareketAnahtari,
     coz: coz, kanonik: kanonik, otomatikMi: otomatikMi, egridenEase: egridenEase,
     secenekler: secenekler, bul: bul,
     capalar: function (keys) { return capalar(temizle(keys)); },

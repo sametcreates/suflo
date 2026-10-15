@@ -371,5 +371,61 @@ ok("ease gidiş dönüş: hazır eğri, cubic-bezier (kanonik), SFC1 kodu; 'auto
   js(S12.hareketEgrisi(S12.hareketEgrisi(kodRT).ease).tablo) === js(S12.hareketEgrisi(kodRT).tablo) && S12.hareketEgrisi("auto") === null && S12.hareketEgrisi("") === null &&
   S12.hareketEgrisi(undefined) === null && S12.hareketEgrisi("dalga") === null);
 
+/* ---------- 3.4 adım 12 inceleme: yoğun Hareket yazımının süresi ve toplam sınırı ----------
+ * Panel çağrı süresini SufloEgriSecim.hareketAnahtari (seçili klip × 2 özellik × (ceil(süre × fps) + 5)) ile kurar:
+ * bu sayı host'un gerçekten yazdığı yoğun anahtarın ÜST SINIRI olmalı (yoksa zaman aşımında kayıtlar kaybolurdu). */
+function hareketKur(fps, n, uzunluk) {
+  var P = require("./_kayit-premiere.js").olustur({ fps: fps });
+  var kl = [];
+  for (var i = 0; i < n; i++) kl.push(P.klip({ ad: "K" + i + ".mp4", nodeId: "H" + i, start: i * 6, end: i * 6 + (uzunluk || 5), inP: 0, opak: 100 }));
+  P.izKur([kl]);
+  P.durum.secim = kl;
+  return { P: P, kl: kl, anahtar: function () { var t = 0; kl.forEach(function (k) { ["olcek", "konum", "opak"].forEach(function (a) { t += k[a].keys.length; }); }); return t; } };
+}
+var PRESET12 = ["simple-zoom-in", "simple-zoom-out", "pop-in", "slide-in-left", "slide-in-right", "slide-in-up", "slide-in-down",
+  "fade-in", "fade-out", "punch", "micro-shake", "slide-out-right"];
+var asanlar = [], enYakin = 0, denenen = 0;
+[23.976, 25, 29.97, 50, 59.94].forEach(function (fps) {
+  [5, 0.9].forEach(function (uzunluk) {
+    var H = hareketKur(fps, 2, uzunluk);
+    PRESET12.forEach(function (id) {
+      [0.18, 0.45, 1, 1.5].forEach(function (sure) {
+        ["yumusak", "tasma"].forEach(function (e) {
+          var h = S12.hareketEgrisi(e);
+          var r = H.P.cagir("KS_applyMotionPreset", { id: id, duration: sure, strength: 1.8, ease: h.ease, egri: { tablo: h.tablo } });
+          var ust = S12.hareketAnahtari({ klip: 2, sure: sure, fps: fps });
+          denenen++;
+          if (!r.ok || !(r.yazilan > 0) || r.yazilan > ust) asanlar.push([fps, uzunluk, id, sure, e, r.ok && r.yazilan, ust].join(" "));
+          else enYakin = Math.max(enYakin, r.yazilan / ust);
+        });
+      });
+    });
+  });
+});
+ok("hareketAnahtari host'un yazdığı yoğun anahtarın üst sınırı (12 önayar × 5 kare hızı × 4 süre × 2 eğri × uzun / kısa klip)", asanlar.length === 0 && denenen === 960 && enYakin > 0.5,
+  asanlar.slice(0, 3).join(" | ") + " oran " + enYakin.toFixed(2));
+// İncelemedeki örnek: 30 klip, Slide In Left, 1,5 sn, 59,94 kare/sn, Yumuşak → host 3393 anahtar yazar (Otomatik 150);
+// eskiden süre 60 sn sabitti (anahtar başına 50 ms ile ~170 sn iş). Artık süre işi kapsar ve kayıtlar döner.
+var H30 = hareketKur(59.94, 30);
+var h30 = S12.hareketEgrisi("yumusak");
+var r30 = H30.P.cagir("KS_applyMotionPreset", { id: "slide-in-left", duration: 1.5, strength: 1, ease: h30.ease, egri: { tablo: h30.tablo } });
+var sure30 = S12.cagriSuresi(30000, S12.hareketAnahtari({ klip: 30, sure: 1.5, fps: 59.94 }));
+ok("30 klip yoğun Slide In Left: yazılır, kayıtlar döner; panelin süresi 60 sn'nin ve işin (30 sn + anahtar × 50 ms) üstünde", r30.ok && r30.applied === 30 &&
+  r30.yazilan === H30.anahtar() && r30.yazilan > 3000 && (r30.records || []).length === 60 && sure30 > 60000 && sure30 >= 30000 + r30.yazilan * 50,
+  js({ ok: r30.ok, yazilan: r30.yazilan, sure: sure30 }));
+// Toplam sınır: 60 klip × ~113 ≈ 6790 > 6000 → temiz red, HİÇBİR anahtar yazılmaz (sayım geçişi yalnız okur)
+var H60 = hareketKur(59.94, 60);
+var r60 = H60.P.cagir("KS_applyMotionPreset", { id: "slide-in-left", duration: 1.5, strength: 1, ease: h30.ease, egri: { tablo: h30.tablo } });
+ok("60 klip yoğun: toplam 6000'i aşınca kod 'cokFazla' (gereken, enÇok), hiçbir klibe anahtar yazılmaz, kayıt yok", !r60.ok && r60.kod === "cokFazla" &&
+  r60.gereken > 6000 && r60.gereken <= S12.hareketAnahtari({ klip: 60, sure: 1.5, fps: 59.94 }) && r60.enCok === 6000 && H60.anahtar() === 0 && r60.records === undefined && /cok fazla anahtar/.test(r60.error), js(r60));
+var r60o = H60.P.cagir("KS_applyMotionPreset", { id: "slide-in-left", duration: 1.5, strength: 1 });
+ok("aynı 60 klip Otomatik: sınır yok, eskisi gibi klip başına 5 anahtar (Bezier)", r60o.ok && r60o.applied === 60 && H60.anahtar() === 300 && r60o.yogun === undefined, js({ ok: r60o.ok, n: H60.anahtar() }));
+var H53 = hareketKur(59.94, 53);
+var r53 = H53.P.cagir("KS_applyMotionPreset", { id: "slide-in-left", duration: 1.5, strength: 1, ease: h30.ease, egri: { tablo: h30.tablo } });
+ok("sınırın hemen altında (53 klip × ~113) yazılır, kayıtlar döner", r53.ok && r53.yazilan > 5900 && r53.yazilan <= 6000 && H53.anahtar() === r53.yazilan &&
+  (r53.records || []).length === 106, js({ ok: r53.ok, y: r53.yazilan, kod: r53.kod }));
+var hostSrc12 = fs.readFileSync(path.join(ROOT, "jsx", "host.jsx"), "utf8");
+ok("host ve panel sınırı aynı (KS_EGRI_TOPLAM_EN_COK = SufloEgriSecim.HAREKET_EN_COK)", new RegExp("var KS_EGRI_TOPLAM_EN_COK = " + S12.HAREKET_EN_COK + ";").test(hostSrc12));
+
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

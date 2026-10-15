@@ -2873,8 +2873,15 @@
     "Panelin 12 Suflo önayarında her hareketin hızlanıp yavaşlamasını eğri belirler; Suflo Smooth paketindeki presetler kendi eğrisini korur. Özel eğri her kareye anahtar kare yazar; Önayarı kaldır yine yalnız Suflo'nun anahtarlarını siler.":
       "In the panel's 12 Suflo presets the curve sets how each move speeds up and slows down; presets from the Suflo Smooth pack keep their own curve. A custom curve writes a keyframe on every frame; Remove preset still deletes only Suflo's keyframes.",
     "Geçersiz eğri: {}": "Invalid curve: {}",
+    // dense writes: timeout hint, late reply from Premiere, total keyframe cap (js/egri-secim.js, gecisler.js, zoom.js, presets.js)
+    "Premiere anahtar kareleri yazmayı sürdürüyor olabilir; bitince kaldırma kaydı saklanır ve Geri al çıkar. O zamana dek yeniden uygulama.":
+      "Premiere may still be writing the keyframes; when it finishes, the removal record is saved and Undo appears. Don't apply again until then.",
+    "Premiere geç yanıt verdi: {}": "Premiere answered late: {}",
+    "Özel eğriyle bu seçim {n} anahtar kare ister; tek seferde en çok {n}. Daha az klip seç ya da Eğri'yi Otomatik yap.":
+      "With a custom curve this selection needs {1} keyframes; at most {2} per apply. Select fewer clips or set Easing to Auto.",
     // jsx/host.jsx KS_applyMotionPreset (ASCII Turkish)
-    "Egri tablosu gecersiz.": "The curve table is invalid."
+    "Egri tablosu gecersiz.": "The curve table is invalid.",
+    "Ozel egriyle cok fazla anahtar kare.": "Too many keyframes for a custom curve."
   });
 
   /* ================= Hız rampası / Speed ramp (js/speedramp.js, js/hiz-rampasi.js, #tab-hiz) ================= */

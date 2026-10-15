@@ -65,28 +65,41 @@ window.KGecis = (function () {
     busy = true;
     if (btn) btn.disabled = true;
     status(t.name + " uygulanıyor…");
+    var gecIpucu = false;
     try {
       var plan = hostPlani(t);
       // Yoğun (özel eğri) yazım daha çok anahtar demek: süre anahtar sayısıyla büyür
       var sure = plan.dense && window.SufloEgriSecim ? SufloEgriSecim.cagriSuresi(60000, SufloEgriSecim.planAnahtari(plan)) : 60000;
-      var r = await K.call("KS_applyCutTransition", { plan: plan, tolerance: 1.0 }, sure);
+      var yari = secenek().duration / 2;
+      // Zaman aşımından sonra gelen cevap: Premiere yazmayı bitirdi; kaldırma kaydı yine saklanır (Geri al çıkar)
+      var r = await K.call("KS_applyCutTransition", { plan: plan, tolerance: 1.0 }, sure,
+        plan.dense ? function (gec) { if (gec && gec.ok) eklendi(gec, t, yari, true); } : undefined);
+      gecIpucu = !!(plan.dense && !r.ok && r.zamanAsimi && window.SufloEgriSecim);   // betik durdurulamaz: yazım sürüyor olabilir
       if (!r.ok) throw new Error(r.error);
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("transitions", KApp.toast);   // deneme: yalniz basarida
       status("");
-      // Kaldırma kaydı (kapısız Geri al: yalnız bu uygulamanın anahtarları)
-      var saklama = kd() ? kd().sakla(r.proje || "", r.records, r) : { ok: true, idler: [] };
-      var proje = r.proje || "";
-      KApp.toast("↔ " + t.name + " · V" + r.track + " kesimine eklendi" +
-        (r.half < secenek().duration / 2 - 0.01 ? " (kısa klip: süre kısaltıldı)" : ""), "good",
-        saklama.idler.length ? 9000 : undefined,
-        saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
-      if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
+      eklendi(r, t, yari, false);
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
+      if (gecIpucu) KApp.toast(SufloEgriSecim.GEC_IPUCU, "warn", 12000);
     } finally {
       busy = false;
       if (btn) btn.disabled = false;
     }
+  }
+
+  // Eklenen geçişin kaldırma kaydı (kapısız Geri al: yalnız bu uygulamanın anahtarları) ve bildirimi. yari: istenen
+  // yarım süre (kısa klip uyarısı); gec: cevap zaman aşımından sonra geldi (3.4 adım 12): geçiş yine de yazıldı, deneme
+  // hakkı da o zaman düşer
+  function eklendi(r, t, yari, gec) {
+    if (gec && typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("transitions", KApp.toast);
+    var saklama = kd() ? kd().sakla(r.proje || "", r.records, r) : { ok: true, idler: [] };
+    var proje = r.proje || "";
+    var metin = "↔ " + t.name + " · V" + r.track + " kesimine eklendi" + (r.half < yari - 0.01 ? " (kısa klip: süre kısaltıldı)" : "");
+    KApp.toast(gec ? "Premiere geç yanıt verdi: " + metin : metin, "good",
+      saklama.idler.length ? 9000 : undefined,
+      saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
+    if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
   }
 
   /*

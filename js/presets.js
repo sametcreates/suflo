@@ -239,32 +239,56 @@ window.KPresets = (function () {
     if (typeof Pro !== "undefined" && !Pro.gate("presets")) return;
     busy = preset.id;
     setApplyBusy(card, true);
+    var gecIpucu = false;
     try {
       var yuk = {
         id: preset.id,
         duration: speedValue(),
         strength: strengthValue()
       };
-      // Özel eğri: tablo olarak (Otomatik'te yük eskisiyle aynı)
-      var hm = secici && window.SufloEgriSecim ? SufloEgriSecim.hareketEgrisi(secici.deger()) : null;
-      if (hm) { yuk.ease = hm.ease; yuk.egri = { tablo: hm.tablo }; }
-      var result = await K.call("KS_applyMotionPreset", yuk, hm ? 60000 : 30000);
-      if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Preset uygulanamadi.");
+      // Özel eğri: tablo olarak (Otomatik'te yük ve süre eskisiyle aynı)
+      var S = window.SufloEgriSecim;
+      var hm = secici && S ? S.hareketEgrisi(secici.deger()) : null;
+      var sure = 30000;
+      if (hm) {
+        yuk.ease = hm.ease;
+        yuk.egri = { tablo: hm.tablo };
+        // Yoğun yazım her seçili klibe kare kare anahtar yazar: süre seçili klip sayısı × önayar süresi × kare hızıyla
+        // büyür (üst sınır tahmini; host toplamı ayrıca sınırlar)
+        var c = window.KApp && KApp.ctx ? KApp.ctx() : null;
+        sure = S.cagriSuresi(30000, S.hareketAnahtari({ klip: c && c.selCount, sure: yuk.duration, fps: S.kareHizi(c) }));
+      }
+      // Zaman aşımından sonra gelen cevap: Premiere yazmayı bitirdi; kaldırma kaydı yine saklanır (Geri al çıkar)
+      var result = await K.call("KS_applyMotionPreset", yuk, sure, hm ? function (gec) { if (gec && gec.ok) uygulandi(gec, preset, true); } : undefined);
+      if (!result || !result.ok) {
+        if (hm && result && result.kod === "cokFazla") {
+          throw new Error("Özel eğriyle bu seçim " + result.gereken + " anahtar kare ister; tek seferde en çok " + result.enCok + ". Daha az klip seç ya da Eğri'yi Otomatik yap.");
+        }
+        gecIpucu = !!(hm && result && result.zamanAsimi);   // Premiere'in betiği durdurulamaz: yazım sürüyor olabilir
+        throw new Error(result && result.error ? result.error : "Preset uygulanamadi.");
+      }
       if (card) card.classList.add("ok");
-      // Kaldırma kaydı (3.4 adım 11): bildirimdeki Geri al yalnız bu uygulamanın anahtarlarını kaldırır
-      var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
-      var proje = result.proje || "";
-      KApp.toast(result.applied + " klibe uygulandi · " + preset.name, "good",
-        saklama.idler.length ? 9000 : undefined,
-        saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
-      if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
+      uygulandi(result, preset, false);
       setTimeout(function () { if (card) card.classList.remove("ok"); }, 900);
     } catch (e) {
       KApp.toast("✕ " + (e && e.message ? e.message : e), "bad");
+      if (gecIpucu) KApp.toast(SufloEgriSecim.GEC_IPUCU, "warn", 12000);
     } finally {
       busy = "";
       setApplyBusy(card, false);
     }
+  }
+
+  // Uygulanan önayarın kaldırma kaydı (3.4 adım 11) ve bildirimi: Geri al yalnız bu uygulamanın anahtarlarını kaldırır.
+  // gec: cevap zaman aşımından sonra geldi (3.4 adım 12)
+  function uygulandi(result, preset, gec) {
+    var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
+    var proje = result.proje || "";
+    var metin = result.applied + " klibe uygulandi · " + preset.name;
+    KApp.toast(gec ? "Premiere geç yanıt verdi: " + metin : metin, "good",
+      saklama.idler.length ? 9000 : undefined,
+      saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
+    if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
   }
 
   function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }

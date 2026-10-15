@@ -129,7 +129,18 @@ ok("ayna: Yumuşak çıkış'ın aynası Yumuşak giriş", js(S.ayna(E.builtin("
 var hm = S.hareketEgrisi("sert-cikis");
 ok("hareketEgrisi: 241 değer, uçlar 0 ve 1, eğriyle aynı; otomatik / geçersizde null", hm.ease === "sert-cikis" && hm.tablo.length === 241 && hm.tablo[0] === 0 &&
   hm.tablo[240] === 1 && yakin(hm.tablo[120], E.toFunction(E.builtin("sert-cikis").curve)(0.5), 1e-6) && S.hareketEgrisi("auto") === null && S.hareketEgrisi("dalga") === null);
-ok("cagriSuresi: taban + anahtar başına 25 ms, en çok 10 dk", S.cagriSuresi(30000, 400) === 40000 && S.cagriSuresi(30000, 1e9) === 600000 && S.cagriSuresi(60000, 0) === 60000);
+ok("cagriSuresi: taban + anahtar başına 50 ms (Eğri sekmesinin KS_easeBake payı), en çok 10 dk", S.ANAHTAR_MS === 50 && S.cagriSuresi(30000, 400) === 50000 &&
+  S.cagriSuresi(30000, 1e9) === 600000 && S.cagriSuresi(60000, 0) === 60000 && S.cagriSuresi(30000, -5) === 30000);
+// Hareket önayarı: üst sınır seçili klip sayısıyla, önayar süresiyle ve kare hızıyla büyür (inceleme: 60 sn sabitti)
+ok("hareketAnahtari: klip × 2 özellik × (ceil(süre × fps) + 5)", S.hareketAnahtari({ klip: 30, sure: 1.5, fps: 59.94 }) === 30 * 2 * (90 + 5) &&
+  S.hareketAnahtari({ klip: 1, sure: 0.45, fps: 25 }) === 2 * (12 + 5) && S.hareketAnahtari({ klip: 2, sure: 1, fps: 30 }) === 2 * 2 * (30 + 5),
+  js([S.hareketAnahtari({ klip: 30, sure: 1.5, fps: 59.94 }), S.hareketAnahtari({ klip: 1, sure: 0.45, fps: 25 })]));
+ok("hareketAnahtari: klip yok / 0 / bozuk → 1; fps yok → 30; süre host'taki gibi (0,18–1,5 dışı 0,45)",
+  S.hareketAnahtari({ sure: 1, fps: 30 }) === S.hareketAnahtari({ klip: 0, sure: 1, fps: 30 }) && S.hareketAnahtari({ klip: "x", sure: 1, fps: 30 }) === 70 &&
+  S.hareketAnahtari({ klip: 1, sure: 1 }) === 70 && S.hareketAnahtari({ klip: 1, sure: 3, fps: 30 }) === S.hareketAnahtari({ klip: 1, sure: 0.45, fps: 30 }) &&
+  S.hareketAnahtari({ klip: 1, sure: 0.1, fps: 30 }) === S.hareketAnahtari({ klip: 1, sure: 0.45, fps: 30 }) && S.hareketAnahtari() === 2 * (14 + 5));
+ok("cagriSuresi + hareketAnahtari: 30 klip, 1,5 sn, 59,94 kare/sn → 60 sn'nin çok üstünde (30 sn + 5700 × 50 ms)",
+  S.cagriSuresi(30000, S.hareketAnahtari({ klip: 30, sure: 1.5, fps: 59.94 })) === 30000 + 5700 * 50 && S.HAREKET_EN_COK === 6000);
 
 /* ================= temiz oda ================= */
 var src = fs.readFileSync(path.join(KOK, "js", "egri-secim.js"), "utf8");

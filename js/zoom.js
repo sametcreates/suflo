@@ -276,6 +276,7 @@ if (typeof window !== "undefined") window.KZoom = (function () {
     var clip = KApp.ctx().sel;
     if (!clip) { status("Önce timeline'da bir klip seç.", "warn"); return; }
     setBusy(true);
+    var gecIpucu = false;
     try {
       var sourceDur = Math.max(.2, clip.outPoint - clip.inPoint);
       var dur = Math.max(.2, clip.clipEnd - clip.clipStart);
@@ -340,25 +341,41 @@ if (typeof window !== "undefined") window.KZoom = (function () {
         clearStart: clip.clipStart,
         clearEnd: clip.clipStart + dur
       };
-      // Otomatik'te yük eskisiyle aynı; özel eğride host Bezier'siz yazar, süre anahtar sayısıyla büyür (Ölçek + Konum)
-      if (plan.dense) yuk.dense = true;
-      var result = await K.call("KS_autoZoom", yuk, plan.dense && S ? S.cagriSuresi(30000, keys.length * 2) : 30000);
+      // Otomatik'te yük eskisiyle aynı; özel eğride host Bezier'siz yazar, süre anahtar sayısıyla büyür: Ölçek + Konum,
+      // host aynı planı HER seçili klibe yazar (seçili klip sayısı kadar)
+      var sure = 30000;
+      if (plan.dense) {
+        yuk.dense = true;
+        var secili = Math.max(1, Math.floor(Number(KApp.ctx().selCount)) || 1);
+        if (S) sure = S.cagriSuresi(30000, keys.length * 2 * secili);
+      }
+      // Zaman aşımından sonra gelen cevap: Premiere yazmayı bitirdi; kaldırma kaydı yine saklanır (Geri al çıkar)
+      var result = await K.call("KS_autoZoom", yuk, sure, plan.dense ? function (gec) { if (gec && gec.ok) yazildi(gec, plan, true); } : undefined);
+      gecIpucu = !!(plan.dense && S && result && !result.ok && result.zamanAsimi);   // betik durdurulamaz: yazım sürüyor olabilir
       if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Zoom uygulanamadı.");
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);   // deneme: yalniz basarida
       status("");
-      // Kaldırma kaydı (3.4 adım 11): bildirimdeki Geri al yalnız bu uygulamanın anahtarlarını kaldırır
-      var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
-      var proje = result.proje || "";
-      KApp.toast(plan.toggles + " zoom hareketi eklendi (" +
-        (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")", "good",
-        saklama.idler.length ? 9000 : undefined,
-        saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
-      if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
+      yazildi(result, plan, false);
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
+      if (gecIpucu) KApp.toast(SufloEgriSecim.GEC_IPUCU, "warn", 12000);
     } finally {
       setBusy(false);
     }
+  }
+
+  // Yazılan zoom'un kaldırma kaydı (3.4 adım 11) ve bildirimi; Geri al yalnız bu uygulamanın anahtarlarını kaldırır.
+  // gec: cevap zaman aşımından sonra geldi (3.4 adım 12): zoom yine de yazıldı, deneme hakkı da o zaman düşer
+  function yazildi(result, plan, gec) {
+    if (gec && typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);
+    var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
+    var proje = result.proje || "";
+    var metin = plan.toggles + " zoom hareketi eklendi (" +
+      (plan.mode === "smart" ? "akıllı ritim" : (plan.mode === "speech" ? "konuşmaya göre" : "ritmik")) + ")";
+    KApp.toast(gec ? "Premiere geç yanıt verdi: " + metin : metin, "good",
+      saklama.idler.length ? 9000 : undefined,
+      saklama.idler.length ? { metin: "Geri al", fn: function () { kaldir({ idler: saklama.idler, proje: proje }); } } : undefined);
+    if (!saklama.ok) KApp.toast("Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.", "warn", 9000);
   }
 
   function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }

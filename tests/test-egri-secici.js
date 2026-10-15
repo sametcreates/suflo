@@ -57,7 +57,7 @@ var NOTLAR = { "gecis-egri": "Gelen klip (B) eğriyi izler…", "zoom-egri": "Ju
  */
 function kur(o) {
   o = o || {};
-  var dom = {}, cagri = [], kapi = [], toastlar = [], goster = [];
+  var dom = {}, cagri = [], kapi = [], toastlar = [], goster = [], harcanan = [];
   IDLER.forEach(function (id) { dom[id] = eleman(/sure|guc|speed|strength/.test(id) ? "select" : "div", id); });
   dom["gecis-sure"].value = "0.6"; dom["gecis-guc"].value = "1";
   dom["zoom-aralik"].value = "5"; dom["zoom-yogunluk"].value = "12"; dom["zoom-hiz"].value = "0.45";
@@ -93,16 +93,20 @@ function kur(o) {
     setTimeout: function (fn, ms) { return setTimeout(fn, Math.min(ms || 0, 2)); }, clearTimeout: clearTimeout, setInterval: function () { return 0; },
     confirm: function () { return false; },
     K: {
-      call: function (fn, arg, sure) { cagri.push({ fn: fn, arg: JSON.parse(JSON.stringify(arg === undefined ? null : arg)), sure: sure }); return Promise.resolve(yanit[fn] || { ok: false }); },
+      // gec: zaman aşımından sonra gelen cevabı alan işlev (K.call'un 4. bağımsız değişkeni); o.yanit yanıtları değiştirir
+      call: function (fn, arg, sure, gec) {
+        cagri.push({ fn: fn, arg: JSON.parse(JSON.stringify(arg === undefined ? null : arg)), sure: sure, gec: gec });
+        return Promise.resolve((o.yanit && o.yanit[fn]) || yanit[fn] || { ok: false });
+      },
       settings: function () { return {}; }, saveSettings: function () {}, log: function () {}, nodeOK: false
     },
     KApp: {
       ctx: function () { return o.ctx || { frame: 1 / 25, sel: { name: "Konusma.mp4", clipStart: 10, clipEnd: 40, inPoint: 0, outPoint: 30, mediaPath: "x" } }; },
-      toast: function (m, t, s, e) { toastlar.push({ m: m, t: t }); }, onTab: function () {}, goster: function (ad) { goster.push(ad); }
+      toast: function (m, t, s, e) { toastlar.push({ m: m, t: t, e: e }); }, onTab: function () {}, goster: function (ad) { goster.push(ad); }
     },
     Pro: {
       isPro: function () { return o.pro !== false; }, on: function () {}, denemeAcik: function () { return false; },
-      gate: function (f, op) { kapi.push(f); return o.kapi === undefined ? true : !!o.kapi; }, denemeHarca: function () {}
+      gate: function (f, op) { kapi.push(f); return o.kapi === undefined ? true : !!o.kapi; }, denemeHarca: function (f) { harcanan.push(f); }
     }
   };
   ctx.window = ctx;
@@ -114,7 +118,7 @@ function kur(o) {
   ctx.KGecis.init();
   ctx.KZoom.init();
   ctx.KPresets.init();
-  return { ctx: ctx, dom: dom, cagri: cagri, kapi: kapi, toastlar: toastlar, depo: depo, goster: goster, belge: belge,
+  return { ctx: ctx, dom: dom, cagri: cagri, kapi: kapi, toastlar: toastlar, depo: depo, goster: goster, belge: belge, harcanan: harcanan,
     secici: function (arac) { return arac === "gecis" ? ctx.KGecis._secici() : arac === "zoom" ? ctx.KZoom._secici() : ctx.KPresets._secici(); } };
 }
 function dugmesi(kap) { return sinifli(kap, "egri-secici-dugme")[0]; }
@@ -153,6 +157,7 @@ function sonCagri(h, fn) { return h.cagri.filter(function (c) { return c.fn === 
   await a.dom["preset-grid"].children[1]._q[".preset-apply"].tetikle("click");
   var pc = sonCagri(a, "KS_applyMotionPreset");
   ok("Hareket önayarı (Otomatik): yük eskisiyle aynı ({ id, duration, strength }), süre 30 sn", pc && js(pc.arg) === js({ id: "simple-zoom-in", duration: 0.45, strength: 1 }) && pc.sure === 30000, pc && js(pc.arg));
+  ok("Otomatik: üç araçta geç cevap işlevi yok (K.call eskisi gibi üç bağımsız değişkenli)", gc.gec === undefined && zc.gec === undefined && pc.gec === undefined);
 
   /* ---------- 3) seçici: aç, kartlar, seç, depoya yaz ---------- */
   var b = kur({ depo: {
@@ -210,19 +215,98 @@ function sonCagri(h, fn) { return h.cagri.filter(function (c) { return c.fn === 
   var bek = T.hostPlan("zoom-in", { duration: 0.6, strength: 1, ease: "sert-cikis", fps: 25 });
   ok("Geçiş (Sert çıkış): yük yoğun plan (sekansın 25 kare/sn'siyle), kapı yine 'transitions', süre anahtar sayısıyla", gy && js(gy.arg.plan) === js(bek) &&
     gy.arg.plan.dense === true && gy.arg.plan.ease === "sert-cikis" && b.kapi.indexOf("transitions") !== -1 && b.kapi.indexOf("curves") === -1 &&
-    gy.sure === 60000 + 25 * (bek.out.scale.length + bek["in"].scale.length), gy && js({ e: gy.arg.plan.ease, s: gy.sure }));
+    gy.sure === 60000 + 50 * (bek.out.scale.length + bek["in"].scale.length) && typeof gy.gec === "function", gy && js({ e: gy.arg.plan.ease, s: gy.sure }));
   await b.dom["zoom-run"].tetikle("click");
   var zy = sonCagri(b, "KS_autoZoom");
   var bekZ = Z.plan({ dur: 30, segments: [], points: [], intensity: 0.12, speed: 0.45, mode: "rhythm", interval: 5, style: "smooth", ease: b.secici("zoom").deger(), fps: 25 });
   ok("Zoom (kullanıcı eğrisi): yük dense, anahtarlar çapalı (a: 1) ve yoğun, kapı 'zoom'", zy && zy.arg.dense === true && zy.arg.keys.length === bekZ.keys.length &&
     zy.arg.keys.length > eskiZ.keys.length && zy.arg.keys.filter(function (k) { return k.a === 1; }).length === bekZ.seyrek &&
     zy.arg.keys.every(function (k, i) { return Math.abs(k.time - (10 + bekZ.keys[i].time)) < 1e-9 && k.value === bekZ.keys[i].value; }) &&
-    b.kapi.indexOf("zoom") !== -1 && zy.sure === 30000 + Math.ceil(zy.arg.keys.length * 2 * 25), zy && js({ n: zy.arg.keys.length, s: zy.sure }));
+    b.kapi.indexOf("zoom") !== -1 && zy.sure === 30000 + Math.ceil(zy.arg.keys.length * 2 * 50) && typeof zy.gec === "function", zy && js({ n: zy.arg.keys.length, s: zy.sure }));
   kartSec(b, "preset-egri", "ziplama");
   await b.dom["preset-grid"].children[1]._q[".preset-apply"].tetikle("click");
   var py = sonCagri(b, "KS_applyMotionPreset");
-  ok("Hareket (Zıplama): yük eğriyi tablo olarak taşır (241 değer, uçlar 0 ve 1), kapı 'presets', süre 60 sn", py && py.arg.ease === "ziplama" && py.arg.egri.tablo.length === 241 &&
-    py.arg.egri.tablo[0] === 0 && py.arg.egri.tablo[240] === 1 && py.arg.id === "simple-zoom-in" && b.kapi.indexOf("presets") !== -1 && py.sure === 60000, py && js({ e: py.arg.ease, s: py.sure }));
+  // tek klip (bağlamda selCount yok), 0,45 sn, 25 kare/sn: 1 × 2 × (12 + 5) = 34 anahtar üst sınırı → 30 sn + 34 × 50 ms
+  ok("Hareket (Zıplama): yük eğriyi tablo olarak taşır (241 değer, uçlar 0 ve 1), kapı 'presets', süre üst sınır tahminiyle", py && py.arg.ease === "ziplama" && py.arg.egri.tablo.length === 241 &&
+    py.arg.egri.tablo[0] === 0 && py.arg.egri.tablo[240] === 1 && py.arg.id === "simple-zoom-in" && b.kapi.indexOf("presets") !== -1 && py.sure === 30000 + 34 * 50 &&
+    typeof py.gec === "function" && js(Object.keys(py.arg.egri)) === js(["tablo"]), py && js({ e: py.arg.ease, s: py.sure }));
+
+  /* ---------- 4b) inceleme: yoğun yazımın süresi seçimle büyür; sınır; zaman aşımı ve geç cevap ---------- */
+  var S12 = require(path.join(KOK, "js", "egri-secim.js"));
+  var cok = kur({ ctx: { frame: 1 / 59.94, selCount: 30, sel: { name: "Konusma.mp4", clipStart: 10, clipEnd: 40, inPoint: 0, outPoint: 30, mediaPath: "x" } },
+    depo: { "suflo.egri.secim": js({ hareket: "yumusak", zoom: "yumusak", gecis: "yumusak" }) } });
+  cok.dom["preset-speed"].value = "1.5";
+  await cok.dom["preset-grid"].children[4]._q[".preset-apply"].tetikle("click");
+  var p30 = sonCagri(cok, "KS_applyMotionPreset");
+  ok("Hareket: 30 klip, 1,5 sn, 59,94 kare/sn → süre 30 sn + 30 × 2 × 95 × 50 ms (eskiden 60 sn sabit)", p30 && p30.arg.id === "slide-in-left" &&
+    p30.sure === 30000 + 30 * 2 * 95 * 50 && p30.sure === S12.cagriSuresi(30000, S12.hareketAnahtari({ klip: 30, sure: 1.5, fps: 59.94 })) && p30.sure > 60000, p30 && js({ id: p30.arg.id, s: p30.sure }));
+  var tek = kur({ ctx: { frame: 1 / 59.94, selCount: 1, sel: { name: "K.mp4", clipStart: 10, clipEnd: 40, inPoint: 0, outPoint: 30, mediaPath: "x" } },
+    depo: { "suflo.egri.secim": js({ hareket: "yumusak", zoom: "yumusak" }) } });
+  tek.dom["preset-speed"].value = "1.5";
+  await tek.dom["preset-grid"].children[4]._q[".preset-apply"].tetikle("click");
+  ok("Hareket: süre seçili klip sayısıyla büyür (1 klip < 30 klip)", sonCagri(tek, "KS_applyMotionPreset").sure < p30.sure &&
+    sonCagri(tek, "KS_applyMotionPreset").sure === 30000 + 2 * 95 * 50);
+  await cok.dom["zoom-run"].tetikle("click");
+  await tek.dom["zoom-run"].tetikle("click");
+  var z30 = sonCagri(cok, "KS_autoZoom"), z1 = sonCagri(tek, "KS_autoZoom");
+  ok("Zoom: host aynı planı her seçili klibe yazar → süre seçili klip sayısıyla (30 klip: anahtar × 2 × 30 × 50 ms)", z30 && z1 && z30.arg.dense === true &&
+    z30.sure === Math.min(600000, 30000 + Math.ceil(z30.arg.keys.length * 2 * 30 * 50)) && z1.sure === 30000 + Math.ceil(z1.arg.keys.length * 2 * 50) && z30.sure > z1.sure,
+    js({ n: z30.arg.keys.length, s30: z30.sure, s1: z1.sure }));
+
+  // Host toplam sınırı aşıldı: anlaşılır metin (sayılarla), kayıt saklanmaz
+  var sinir = kur({ yanit: { KS_applyMotionPreset: { ok: false, kod: "cokFazla", error: "Ozel egriyle cok fazla anahtar kare.", gereken: 6790, enCok: 6000 } },
+    depo: { "suflo.egri.secim": js({ hareket: "yumusak" }) } });
+  await sinir.dom["preset-grid"].children[1]._q[".preset-apply"].tetikle("click");
+  await bekle(10);   // presets.js düğme dinleyicisi apply sözünü döndürmez
+  ok("Hareket 'cokFazla': 'Özel eğriyle bu seçim 6790 anahtar kare ister; tek seferde en çok 6000…' (bad), başka bildirim yok",
+    sinir.toastlar.length === 1 && sinir.toastlar[0].t === "bad" &&
+    sinir.toastlar[0].m === "✕ Özel eğriyle bu seçim 6790 anahtar kare ister; tek seferde en çok 6000. Daha az klip seç ya da Eğri'yi Otomatik yap.", js(sinir.toastlar));
+
+  // Zaman aşımı: hata + "yazım sürüyor olabilir" ipucu; geç gelen cevap kaydı yine saklar (Geri al çıkar)
+  var ZA = function (fn) { return { ok: false, zamanAsimi: true, error: "Premiere yanıt vermedi (" + fn + ") — işlem zaman aşımına uğradı." }; };
+  var asim = kur({ yanit: { KS_applyMotionPreset: ZA("KS_applyMotionPreset"), KS_autoZoom: ZA("KS_autoZoom"), KS_applyCutTransition: ZA("KS_applyCutTransition") },
+    depo: { "suflo.egri.secim": js({ hareket: "yumusak", zoom: "yumusak", gecis: "yumusak" }) } });
+  await asim.dom["preset-grid"].children[1]._q[".preset-apply"].tetikle("click");
+  await bekle(10);   // presets.js düğme dinleyicisi apply sözünü döndürmez
+  var pz = sonCagri(asim, "KS_applyMotionPreset");
+  ok("Hareket zaman aşımı: önce hata (bad), sonra ipucu (warn): yazım sürüyor olabilir, bitince kayıt saklanır", asim.toastlar.length === 2 &&
+    asim.toastlar[0].t === "bad" && /^✕ Premiere yanıt vermedi \(KS_applyMotionPreset\)/.test(asim.toastlar[0].m) &&
+    asim.toastlar[1].t === "warn" && asim.toastlar[1].m === S12.GEC_IPUCU && /yazmayı sürdürüyor olabilir/.test(S12.GEC_IPUCU), js(asim.toastlar));
+  var kayitH = { tur: "hareket", seqId: "S1", nodeId: "N1", clipName: "K.mp4", clipStart: 0, matchName: "AE.ADBE Motion", compIdx: 1, propIdx: 0,
+    uclar: [0, 0.45], times: [0, 0.04, 0.08, 0.45], kenarDegerleri: [{ t: 0, v: 112 }, { t: 0.45, v: 100 }] };
+  asim.toastlar.length = 0;
+  pz.gec({ ok: true, applied: 30, records: [kayitH], proje: "" });
+  var gt = asim.toastlar.filter(function (x) { return x.t === "good"; });
+  ok("Hareket geç cevap: 'Premiere geç yanıt verdi: 30 klibe uygulandi · Simple Zoom In', kayıt saklandı (Geri al)", gt.length === 1 &&
+    gt[0].m === "Premiere geç yanıt verdi: 30 klibe uygulandi · Simple Zoom In" && gt[0].e && gt[0].e.metin === "Geri al" &&
+    asim.ctx.SufloKaldir.panel().kayitlar("").some(function (r) { return r.tur === "hareket" && r.times.length === 4; }), js(asim.toastlar.map(function (x) { return [x.t, x.m]; })));
+  asim.toastlar.length = 0;
+  pz.gec({ ok: false, error: "x" });
+  ok("geç cevap başarısızsa hiçbir şey yapılmaz", asim.toastlar.length === 0);
+
+  asim.toastlar.length = 0;
+  await asim.dom["zoom-run"].tetikle("click");
+  var zz = sonCagri(asim, "KS_autoZoom");
+  ok("Zoom zaman aşımı: hata durum satırında, ipucu bildirimde; deneme hakkı düşmez", /^✕ Premiere yanıt vermedi \(KS_autoZoom\)/.test(asim.dom["zoom-status"].textContent) &&
+    asim.toastlar.length === 1 && asim.toastlar[0].m === S12.GEC_IPUCU && asim.harcanan.indexOf("zoom") === -1, js([asim.dom["zoom-status"].textContent, asim.toastlar]));
+  zz.gec({ ok: true, applied: 1, records: [], proje: "" });
+  ok("Zoom geç cevap: bildirim 'Premiere geç yanıt verdi: … zoom hareketi eklendi', deneme hakkı o zaman düşer", asim.harcanan.indexOf("zoom") !== -1 &&
+    asim.toastlar.some(function (x) { return x.t === "good" && /^Premiere geç yanıt verdi: \d+ zoom hareketi eklendi \(ritmik\)$/.test(x.m); }), js(asim.toastlar));
+
+  asim.toastlar.length = 0;
+  await hepsi(asim.dom["gecis-grid"], function (c) { return c.tagName === "BUTTON"; })[0].tetikle("click");
+  var gz = sonCagri(asim, "KS_applyCutTransition");
+  ok("Geçiş zaman aşımı: hata durum satırında, ipucu bildirimde; deneme hakkı düşmez", /^✕ Premiere yanıt vermedi \(KS_applyCutTransition\)/.test(asim.dom["gecis-status"].textContent) &&
+    asim.toastlar.length === 1 && asim.toastlar[0].m === S12.GEC_IPUCU && asim.harcanan.indexOf("transitions") === -1, js([asim.dom["gecis-status"].textContent, asim.toastlar]));
+  gz.gec({ ok: true, track: 2, half: 0.3, records: [], proje: "" });
+  ok("Geçiş geç cevap: 'Premiere geç yanıt verdi: ↔ … · V2 kesimine eklendi', deneme hakkı o zaman düşer", asim.harcanan.indexOf("transitions") !== -1 &&
+    asim.toastlar.some(function (x) { return x.t === "good" && /^Premiere geç yanıt verdi: ↔ .+ · V2 kesimine eklendi$/.test(x.m); }), js(asim.toastlar));
+  // Otomatik'te zaman aşımı: eski davranış (ipucu yok; geç cevap işlevi yok)
+  var asimOto = kur({ yanit: { KS_applyMotionPreset: ZA("KS_applyMotionPreset") } });
+  await asimOto.dom["preset-grid"].children[1]._q[".preset-apply"].tetikle("click");
+  await bekle(10);   // presets.js düğme dinleyicisi apply sözünü döndürmez
+  ok("Otomatik zaman aşımı: yalnız hata (ipucu yok, geç cevap işlevi yok)", asimOto.toastlar.length === 1 && asimOto.toastlar[0].t === "bad" &&
+    sonCagri(asimOto, "KS_applyMotionPreset").gec === undefined, js(asimOto.toastlar));
   // Jump Cut: eğri seçili olsa da sert kesme (yük Otomatik'teki gibi)
   var j = kur({ stil: "jumpcut", depo: { "suflo.egri.secim": js({ zoom: "yumusak" }) } });
   await j.dom["zoom-run"].tetikle("click");
