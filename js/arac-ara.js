@@ -17,9 +17,14 @@
  *                             try/catch içinde, bozuk ya da yabancı kayıt yok sayılır.
  *   kisayolMu(e, mac)         Ctrl+K (Windows) / ⌘K (macOS); Shift / Alt / AltGr'li hâli değil. Latin olmayan
  *                             düzende (Rusça…) tuşun yerine bakılır (CEP'in panelde tuttuğu tuş da odur).
- *   tusDuzeniUyumsuz(e, mac)  macOS: ⌘ + fiziksel K başka bir harf yazıyor (Türkçe F: M) → ⌘K ilgisi bırakılmalı.
+ *   tusDuzeniUyumsuz(e, mac, kodlar)  macOS: ⌘ + tutulan fiziksel tuş K olmayan bir harf yazıyor (Türkçe F'de
+ *                             fiziksel K = M) → o tuşun ilgisi bırakılmalı.
+ *   yeniKisayolTusu(e, mac, kodlar)   macOS: ⌘K tutulmayan bir fiziksel tuştan geldi (Türkçe F: fiziksel J) → o tuş
+ *                             da tutulmalı (MAC_KVK: e.code → kVK); yoksa ⌘K Premiere'e de gider.
  *   yaziAlaniMi(hedef)        metin kutusu, açılır liste, contenteditable ya da altyazı düzenleyicisi
  *                             (#cap-segments, #tc-words, [data-kisayol-yok]): kısayol orada hiç bağlanmaz.
+ *   tusIlgisiBirakilsinMi(h)  odak düzenleyicide ama metin girişinde değil (satır düğmeleri): Ctrl+K ilgisi
+ *                             bırakılır, tuş eskisi gibi Premiere'e gider (yoksa panelde tutulup ölü kalırdı).
  *   tusIlgisiAyarla(sahip, l) CEP registerKeyEventsInterest tek bir listeyi kabul eder (her çağrı öncekini
  *                             siler): araç arama kısayolu ve Altyazı Efektleri önizleme sahnesinin konum tuşları
  *                             burada birleştirilip tek kayıt olarak verilir. Ctrl+K panelde tutulmazsa Premiere'e de
@@ -372,14 +377,38 @@
   }
 
   /*
-   * macOS: CEP ilgisi (tusIlgisi) fiziksel ANSI K tuşunu tutar. Bu tuş etkin düzende başka bir Latin harfiyse (Türkçe F'de
-   * M, Dvorak'ta T) ⌘ + o harf (Türkçe F: ⌘M = Premiere'in Export Media'sı) panelde yutulur ama palet açılmaz. Böyle
-   * bir ⌘ basışı görülünce app.js ilgiyi bırakır: ilk basış yutulmuş olur, sonrakiler Premiere'e gider (kurucu 20.K3).
+   * macOS: CEP ilgisi (tusIlgisi) fiziksel tuş tutar (başta ANSI K). Tutulan tuş etkin düzende başka bir Latin harfiyse
+   * (Türkçe F'de fiziksel K = M, Dvorak'ta T) ⌘ + o harf (Türkçe F: ⌘M = Premiere'in Export Media'sı) panelde yutulur ama
+   * palet açılmaz. Böyle bir ⌘ basışı görülünce app.js o tuşun ilgisini bırakır: ilk basış yutulmuş olur, sonrakiler
+   * Premiere'e gider (kurucu 20.K3). kodlar: tutulan fiziksel tuşlar (e.code; verilmezse ["KeyK"]).
    */
-  function tusDuzeniUyumsuz(e, mac) {
-    if (!mac || !e || !e.metaKey || e.ctrlKey || e.altKey || e.code !== "KeyK") return false;
+  function tusDuzeniUyumsuz(e, mac, kodlar) {
+    kodlar = Array.isArray(kodlar) ? kodlar : ["KeyK"];
+    if (!mac || !e || !e.metaKey || e.ctrlKey || e.altKey || kodlar.indexOf(e.code) === -1) return false;
     var k = e.key == null ? "" : String(e.key);
     return k.length === 1 && /[a-z]/i.test(k) && k !== "k" && k !== "K";
+  }
+
+  /*
+   * macOS sanal tuş kodları (kVK_ANSI_*, Events.h) — tarayıcının e.code adıyla. K harfi ANSI K'dan başka bir tuştaysa
+   * (Türkçe F: fiziksel J, kVK 38; Dvorak: fiziksel V, kVK 9) ⌘K basışı paleti açar ama CEP o tuşu tutmadığı için
+   * Premiere'e de gider (menü kısayolu harfle eşleşir: Add Edit). app.js ilk böyle basışta o tuşu da ilgiye ekler:
+   * sonraki ⌘K'lar panelde kalır (inceleme 2).
+   */
+  var MAC_KVK = {
+    KeyA: 0, KeyS: 1, KeyD: 2, KeyF: 3, KeyH: 4, KeyG: 5, KeyZ: 6, KeyX: 7, KeyC: 8, KeyV: 9, IntlBackslash: 10, KeyB: 11,
+    KeyQ: 12, KeyW: 13, KeyE: 14, KeyR: 15, KeyY: 16, KeyT: 17, Digit1: 18, Digit2: 19, Digit3: 20, Digit4: 21, Digit6: 22,
+    Digit5: 23, Equal: 24, Digit9: 25, Digit7: 26, Minus: 27, Digit8: 28, Digit0: 29, BracketRight: 30, KeyO: 31, KeyU: 32,
+    BracketLeft: 33, KeyI: 34, KeyP: 35, KeyL: 37, KeyJ: 38, Quote: 39, KeyK: 40, Semicolon: 41, Backslash: 42, Comma: 43,
+    Slash: 44, KeyN: 45, KeyM: 46, Period: 47, Backquote: 50
+  };
+
+  // macOS'ta bu ⌘K basışı tutulmayan bir fiziksel tuştan mı geldi? Öyleyse o tuşun e.code'u (ilgiye eklenecek), yoksa "".
+  function yeniKisayolTusu(e, mac, kodlar) {
+    kodlar = Array.isArray(kodlar) ? kodlar : ["KeyK"];
+    if (!mac || !kisayolMu(e, true)) return "";
+    var kod = e.code == null ? "" : String(e.code);
+    return kod && MAC_KVK.hasOwnProperty(kod) && kodlar.indexOf(kod) === -1 ? kod : "";
   }
 
   function kisayolMetni(mac) { return mac ? "⌘K" : "Ctrl+K"; }
@@ -389,7 +418,8 @@
   // Altyazı düzenleyicisi: satır kutuları ve Konuşmadan kes kelime listesi (kendi kısayolları var)
   var DUZENLEYICI_IDLERI = ["cap-segments", "tc-words"];
 
-  function yaziAlaniMi(h) {
+  // Metin girişi: metin kutusu, açılır liste, contenteditable (öğe ya da atası). CEP buradan Premiere'e tuş göndermez.
+  function metinGirdisiMi(h) {
     if (!h || h.nodeType !== 1) return false;
     var tag = String(h.tagName || "").toUpperCase();
     if (tag === "TEXTAREA" || tag === "SELECT") return true;
@@ -401,17 +431,43 @@
       if (n.isContentEditable === true) return true;
       var ce = n.getAttribute ? n.getAttribute("contenteditable") : null;
       if (ce !== null && ce !== undefined && String(ce).toLowerCase() !== "false") return true;
+    }
+    return false;
+  }
+
+  // Altyazı düzenleyicisinin (#cap-segments, #tc-words) ya da [data-kisayol-yok] kabın içinde mi?
+  function duzenleyicideMi(h) {
+    if (!h || h.nodeType !== 1) return false;
+    for (var n = h; n && n.nodeType === 1; n = n.parentNode) {
       if (n.id && DUZENLEYICI_IDLERI.indexOf(n.id) !== -1) return true;
       if (n.hasAttribute && n.hasAttribute("data-kisayol-yok")) return true;
     }
     return false;
   }
 
+  function yaziAlaniMi(h) { return metinGirdisiMi(h) || duzenleyicideMi(h); }
+
+  /*
+   * Odak altyazı düzenleyicisinde ama metin girişinde DEĞİL (satırın zaman düğmesi, böl / birleştir / sil düğmeleri…):
+   * kısayol orada bağlanmadığı için Ctrl+K (⌘K) ilgisi bırakılmalı, yoksa CEP tuşu panelde tutar ve hiçbir şey olmaz
+   * (Premiere'in Kes'i de çalışmaz). Odak oradan çıkınca app.js ilgiyi geri kurar (inceleme 2). Metin girişinde CEP
+   * zaten Premiere'e tuş göndermez: ilgi değişmez.
+   */
+  function tusIlgisiBirakilsinMi(h) { return duzenleyicideMi(h) && !metinGirdisiMi(h); }
+
   /*
    * CEP tuş ilgisi. İşletim sisteminin sanal tuş kodları (CEP Cookbook): Windows VK_K = 75 + ctrlKey,
-   * macOS kVK_ANSI_K = 40 + metaKey (⌘).
+   * macOS kVK_ANSI_K = 40 + metaKey (⌘). macOS'ta kodlar: tutulacak fiziksel tuşlar (e.code; verilmezse ["KeyK"]);
+   * bilinmeyen kod atlanır, boş liste = ilgi yok.
    */
-  function tusIlgisi(mac) { return mac ? [{ keyCode: 40, metaKey: true }] : [{ keyCode: 75, ctrlKey: true }]; }
+  function tusIlgisi(mac, kodlar) {
+    if (!mac) return [{ keyCode: 75, ctrlKey: true }];
+    var out = [];
+    (Array.isArray(kodlar) ? kodlar : ["KeyK"]).forEach(function (k) {
+      if (MAC_KVK.hasOwnProperty(k)) out.push({ keyCode: MAC_KVK[k], metaKey: true });
+    });
+    return out;
+  }
 
   /*
    * Seçimden sonra odak aracın düğmesinde (eylem) ya da sol menü girdisinde (araç). Odak metin kutusunda değilken CEP
@@ -493,8 +549,13 @@
     sonEkle: sonEkle,
     kisayolMu: kisayolMu,
     tusDuzeniUyumsuz: tusDuzeniUyumsuz,
+    MAC_KVK: MAC_KVK,
+    yeniKisayolTusu: yeniKisayolTusu,
     kisayolMetni: kisayolMetni,
     yaziAlaniMi: yaziAlaniMi,
+    metinGirdisiMi: metinGirdisiMi,
+    duzenleyicideMi: duzenleyicideMi,
+    tusIlgisiBirakilsinMi: tusIlgisiBirakilsinMi,
     tusIlgisi: tusIlgisi,
     hedefTusIlgisi: hedefTusIlgisi,
     ilgiBirlestir: ilgiBirlestir,

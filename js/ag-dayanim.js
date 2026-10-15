@@ -11,8 +11,10 @@
  *      Sertifika doğrulaması ASLA kapatılmaz: sertifika yine doğrulanır, yalnız bilgisayarın
  *      zaten güvendiği kökler de hesaba katılır.
  *        Windows: CurrentUser\Root ve LocalMachine\Root depoları, SABİT bir PowerShell betiğiyle
- *                 (execFile/spawn, argüman dizisi; betiğe hiçbir girdi eklenmez).
- *        macOS:   security find-certificate -a -p /Library/Keychains/System.keychain
+ *                 (execFile/spawn, argüman dizisi; betiğe hiçbir girdi eklenmez). Disallowed depolarındaki ve
+ *                 amacı Sunucu Kimlik Doğrulamasını dışlayan kökler alınmaz.
+ *        macOS:   security find-certificate -a -p /Library/Keychains/System.keychain; yönetici ya da
+ *                 kullanıcı güven ayarında "Asla Güvenme" (Deny) olanlar atılır.
  *   2. DNS filtresi: ad 146.112.0.0/16'ya (Cisco Umbrella engel sayfası) ya da 0.0.0.0'a
  *      çözülüyorsa "kurumsal filtre engelliyor" denir.
  *   3. Doctor "Model kaynaklarını sına": huggingface.co, hf-mirror.com ve motor sürüm sunucusuna
@@ -52,17 +54,23 @@
     return e && typeof e === "object" && e.code ? String(e.code) : "";
   }
 
+  // Metinde kod ya da ileti var mı? OpenSSL 3 (Node 17+) "self-signed" yazar, OpenSSL 1.1 "self signed":
+  // tire boşluk sayılır (3.4 adım 19 inceleme 2)
+  function koduBul(m) {
+    var kucuk = String(m || "").toLowerCase().replace(/-/g, " ");
+    for (var k in SERTIFIKA_HATALARI) {
+      if (!SERTIFIKA_HATALARI.hasOwnProperty(k)) continue;
+      if (m.indexOf(k) !== -1 || kucuk.indexOf(SERTIFIKA_HATALARI[k]) !== -1) return k;
+    }
+    return "";
+  }
+
   // Yeniden denemeyi hak eden sertifika hatası mı? (süresi dolmuş / ad uyuşmazlığı DEĞİL: onlar ağ sorunu değildir)
   function sertifikaHatasiMi(e) {
     var kod = hataKodu(e);
     if (kod && SERTIFIKA_HATALARI.hasOwnProperty(kod)) return true;
     var m = hataMetni(e);
-    if (!m) return false;
-    for (var k in SERTIFIKA_HATALARI) {
-      if (!SERTIFIKA_HATALARI.hasOwnProperty(k)) continue;
-      if (m.indexOf(k) !== -1 || m.toLowerCase().indexOf(SERTIFIKA_HATALARI[k]) !== -1) return true;
-    }
-    return false;
+    return !!m && !!koduBul(m);
   }
 
   /* ---------------- PEM ---------------- */
@@ -116,13 +124,22 @@
   /*
    * Windows kök deposu dışa aktarımı. SABİT betik: içine hiçbir kullanıcı / ağ girdisi eklenmez,
    * argüman dizisiyle (kabuk yok) çalıştırılır. Base64 satır kırmasız gelir; pemleriAyikla sarar.
+   * Windows'un kendi güvensizliği korunur (3.4 adım 19 inceleme 2). Root'ta dursa da:
+   *   - Disallowed (Güvenilmeyen Sertifikalar: GPO "Untrusted Certificates", Microsoft'un güvenmediği kökler)
+   *     depolarındaki parmak izleri atlanır,
+   *   - amaçları sınırlanmış (EnhancedKeyUsageList boş değil) ve Sunucu Kimlik Doğrulaması (1.3.6.1.5.5.7.3.1)
+   *     içermeyen kökler atlanır: Edge / Chrome onlarla HTTPS'e güvenmez.
+   * İlk denemeyi düşüren ağdaki saldırgan, Windows'un reddettiği bir kökle ikinci denemeyi geçemez.
    */
   var WIN_BETIK =
-    "$ErrorActionPreference='SilentlyContinue';" +
+    "$ErrorActionPreference='SilentlyContinue';$y=@{};" +
+    "foreach($d in @('Cert:\\CurrentUser\\Disallowed','Cert:\\LocalMachine\\Disallowed')){" +
+    "Get-ChildItem -Path $d | ForEach-Object {$y[[string]$_.Thumbprint]=1}};" +
     "foreach($d in @('Cert:\\CurrentUser\\Root','Cert:\\LocalMachine\\Root')){" +
-    "Get-ChildItem -Path $d | ForEach-Object {" +
-    "'-----BEGIN CERTIFICATE-----';[Convert]::ToBase64String($_.RawData);'-----END CERTIFICATE-----'" +
-    "}}";
+    "Get-ChildItem -Path $d | ForEach-Object {$c=$_;$e=@($c.EnhancedKeyUsageList | Where-Object {$_});" +
+    "if(-not $y.ContainsKey([string]$c.Thumbprint) -and ($e.Count -eq 0 -or ($e | Where-Object {$_.ObjectId -eq '1.3.6.1.5.5.7.3.1'}))){" +
+    "'-----BEGIN CERTIFICATE-----';[Convert]::ToBase64String($c.RawData);'-----END CERTIFICATE-----'" +
+    "}}}";
 
   function winKomutu() {
     return { cmd: "powershell.exe", args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", WIN_BETIK] };
@@ -137,6 +154,53 @@
     if (platform === "win32") return winKomutu();
     if (platform === "darwin") return macKomutu();
     return null;
+  }
+
+  /*
+   * macOS güven ayarları (3.4 adım 19 inceleme 2). find-certificate System.keychain'deki her sertifikayı basar,
+   * yöneticinin ya da kullanıcının "Asla Güvenme" dediklerini de: onlar ek köklerden atılır.
+   *   guvenAyariKomutu(alan, dosya)  alan "yonetici" (-d) ya da "kullanici". security trust-settings-export
+   *                                  ayarları dosyaya yazar (stdout'a değil); ayar yoksa sıfırdan farklı kodla
+   *                                  biter: o alanda reddedilen yok demektir.
+   *   reddedilenParmakIzleri(plist)  XML plist'te sonucu kSecTrustSettingsResultDeny (3) olan girdilerin SHA-1
+   *                                  parmak izleri { "AB12…": true } (trustList anahtarları sertifikanın SHA-1'i).
+   *   reddedilenleriAt(p, r, sha1)   sha1(DER'in base64'ü) → onaltılık parmak izi; reddedilenler atılır.
+   * Okunamayan / çözülemeyen ayar yerel bir arızadır (ağdaki saldırgan etkileyemez): o alan boş sayılır.
+   */
+  function guvenAyariKomutu(alan, dosya) {
+    var args = ["trust-settings-export"];
+    if (alan === "yonetici") args.push("-d");
+    args.push(String(dosya));
+    return { cmd: "/usr/bin/security", args: args };
+  }
+
+  var GUVEN_ANAHTARI = /<key>\s*([0-9A-Fa-f]{40})\s*<\/key>/g;
+  var GUVEN_RED = /<key>\s*kSecTrustSettingsResult\s*<\/key>\s*<integer>\s*3\s*<\/integer>/;
+
+  function reddedilenParmakIzleri(plist) {
+    var out = {};
+    var s = String(plist || "");
+    var bas = s.indexOf("trustList");
+    if (bas === -1) return out;
+    s = s.slice(bas);
+    var yerler = [], m;
+    GUVEN_ANAHTARI.lastIndex = 0;
+    while ((m = GUVEN_ANAHTARI.exec(s))) yerler.push({ iz: m[1].toUpperCase(), bas: m.index + m[0].length });
+    for (var i = 0; i < yerler.length; i++) {
+      var parca = s.slice(yerler[i].bas, i + 1 < yerler.length ? yerler[i + 1].bas : s.length);
+      if (GUVEN_RED.test(parca)) out[yerler[i].iz] = true;
+    }
+    return out;
+  }
+
+  function reddedilenleriAt(pemler, reddedilen, sha1) {
+    var liste = Array.isArray(pemler) ? pemler : [];
+    if (!reddedilen || typeof sha1 !== "function" || !Object.keys(reddedilen).length) return liste.slice();
+    return liste.filter(function (p) {
+      var iz = "";
+      try { iz = String(sha1(pemGovdesi(p)) || "").toUpperCase(); } catch (e) { iz = ""; }
+      return !iz || !reddedilen[iz];
+    });
   }
 
   /* ---------------- DNS filtresi ---------------- */
@@ -224,17 +288,12 @@
     return { tur: "bilinmiyor", mesaj: m.replace(/^Error:\s*/, "") };
   }
 
-  function sertifikaKoduBul(m) {
-    for (var k in SERTIFIKA_HATALARI) {
-      if (!SERTIFIKA_HATALARI.hasOwnProperty(k)) continue;
-      if (m.indexOf(k) !== -1 || m.toLowerCase().indexOf(SERTIFIKA_HATALARI[k]) !== -1) return k;
-    }
-    return "?";
-  }
+  function sertifikaKoduBul(m) { return koduBul(m) || "?"; }
 
   /* ---------------- Doctor: model kaynaklarını sına ---------------- */
 
   var SINAMA_ZAMAN_ASIMI = 5000;
+  var YENIDEN_SINA = "Bilgisayarın güvendiği sertifikalarla yeniden deneme süreye sığmadı: birkaç saniye sonra yeniden sına.";
 
   // motorUrl: motorun sürüm arşivi (KEngine.motorKaynakAdresi()); ana makinesi sınanır
   function kaynakAdresleri(motorUrl) {
@@ -248,7 +307,8 @@
   }
 
   /*
-   * sonuclar: [{ id, ad, host, status, hata, sure, dnsEngelAdresi, caDenendi }]
+   * sonuclar: [{ id, ad, host, status, hata, sure, dnsEngelAdresi, caDenendi, caSuresiDoldu }]
+   *   hata: metin ya da { code, message } (Node hata kodu iletiden sağlam: OpenSSL sürümüyle değişmez)
    * Döner: Doctor satırları { status, title, detail, group: "engine", kaynak: true }
    */
   function kaynakSatirlari(sonuclar) {
@@ -266,7 +326,9 @@
         return { status: "warn", title: baslik, detail: s.ad + " · " + a.mesaj, group: "engine", kaynak: true };
       }
       var b = agHatasiAcikla(s.hata || "bağlantı kurulamadı", { host: s.host, caDenendi: s.caDenendi });
-      return { status: "bad", title: baslik, detail: s.ad + " · " + b.mesaj, group: "engine", kaynak: true };
+      // sistem kökleri 5 sn içinde okunamadı / ikinci deneme bitmedi: okuma arka planda sürüp önbelleğe girer
+      var ek = b.tur === "sertifika" && s.caSuresiDoldu ? " · " + YENIDEN_SINA : "";
+      return { status: "bad", title: baslik, detail: s.ad + " · " + b.mesaj + ek, group: "engine", kaynak: true };
     });
     return satirlar;
   }
@@ -279,6 +341,9 @@
     pemleriAyikla: pemleriAyikla,
     caListesi: caListesi,
     sertifikaKomutu: sertifikaKomutu,
+    guvenAyariKomutu: guvenAyariKomutu,
+    reddedilenParmakIzleri: reddedilenParmakIzleri,
+    reddedilenleriAt: reddedilenleriAt,
     dnsEngelliMi: dnsEngelliMi,
     dnsEngelAdresi: dnsEngelAdresi,
     dnsEngelTeshis: dnsEngelTeshis,

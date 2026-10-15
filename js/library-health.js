@@ -435,6 +435,8 @@ window.KLibraryHealth = (function () {
    * 0.0.0.0 kurumsal filtre olarak anlatılır (HEAD yanıt verse bile: engel sunucusu 200/302 döner).
    * Satırlar js/ag-dayanim.js kaynakSatirlari ile kurulur (group "engine", kaynak: true).
    * Yalnız düğmeyle çalışır: panel açılışında ve normal taramada ağ isteği yapılmaz.
+   * Sistem kökleri düğmeye basılınca önceden OKUNMAZ (Windows'ta gizli PowerShell yalnız gerçek bir sertifika
+   * hatasında başlar); okuma 5 sn'ye sığmazsa satır HTTPS denetimini ve "birkaç saniye sonra yeniden sına"yı söyler.
    */
   async function kaynakSina() {
     var ag = window.SufloAgDayanim;
@@ -450,10 +452,16 @@ window.KLibraryHealth = (function () {
       try { r = await K.httpGet(a.url, {}, { method: "HEAD", timeout: ag.SINAMA_ZAMAN_ASIMI, sistemKokleri: true }); }
       catch (e) { r = { status: 0, body: String(e && e.message ? e.message : e) }; }
       r = r || { status: 0, body: "" };
+      // Node hata kodu iletiyle birlikte taşınır: ileti OpenSSL sürümüne göre değişir (OpenSSL 3:
+      // "self-signed certificate in certificate chain"), kod değişmez (SELF_SIGNED_CERT_IN_CHAIN)
+      var hata = "";
+      if (!r.status) {
+        var metin = String(r.body || r.kod || "bağlantı kurulamadı");
+        hata = r.kod ? { code: String(r.kod), message: metin } : metin;
+      }
       var s = {
-        id: a.id, ad: a.ad, host: a.host, status: Number(r.status) || 0,
-        hata: r.status ? "" : String(r.body || r.kod || "bağlantı kurulamadı"),
-        sure: Date.now() - t0, caDenendi: !!r.caDenendi, dnsEngelAdresi: ""
+        id: a.id, ad: a.ad, host: a.host, status: Number(r.status) || 0, hata: hata,
+        sure: Date.now() - t0, caDenendi: !!r.caDenendi, caSuresiDoldu: !!r.caSuresiDoldu, dnsEngelAdresi: ""
       };
       s.dnsEngelAdresi = String((await dnsIsi) || "");
       return s;

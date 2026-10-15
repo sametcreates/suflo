@@ -253,7 +253,9 @@ window.KApp = (function () {
   var AA = window.SufloAracAra || null;
   var arama = { acik: false, kayit: [], sonuclar: [], aktif: 0, durum: null, onceki: null, vurgu: null, vurguSaat: null,
     tutulan: null, tutulanBirak: null };
-  var aramaIlgisi = false, aramaIlgisiBirakildi = false;
+  // aramaIlgisi: ilk etkileşim oldu (ilgi kurulabilir). aramaMacTuslari: macOS'ta ⌘K için tutulan fiziksel tuşlar (e.code;
+  // düzen öğrenildikçe değişir). aramaIlgisiSon: CEP'e en son verilen liste (aynısı yeniden verilmez).
+  var aramaIlgisi = false, aramaMacTuslari = ["KeyK"], aramaIlgisiSon = null;
 
   function aramaDepo() { try { return window.localStorage || null; } catch (e) { return null; } }
   function aramaAcik() { return arama.acik; }
@@ -280,22 +282,45 @@ window.KApp = (function () {
 
   /*
    * CEP: Ctrl+K / ⌘K panelde tutulur (yoksa Premiere'e de gider: Kes / Add Edit). Panel açılışında değil, panel
-   * ilk kez odak / tıklama / tuş alınca bir kez; önizleme sahnesinin konum tuşlarıyla birleşik tek kayıt.
-   * macOS'ta ⌘ + fiziksel K başka bir harf yazıyorsa (Türkçe F: ⌘M = Export Media) ilgi bu düzende yanlış tuşu
-   * tutuyor demektir: bırakılır, bir daha kurulmaz (AA.tusDuzeniUyumsuz, kurucu 20.K3).
+   * ilk kez odak / tıklama / tuş alınca; önizleme sahnesinin konum tuşlarıyla birleşik tek kayıt.
+   * Odak altyazı düzenleyicisinde bir düğmedeyken (AA.tusIlgisiBirakilsinMi: palet orada açılmaz) ilgi bırakılır,
+   * Ctrl+K eskisi gibi Premiere'in Kes'ine gider; odak çıkınca geri kurulur (inceleme 2, aramaOdakIlgisi).
+   * macOS klavye düzeni (kurucu 20.K3): ⌘ + tutulan fiziksel tuş K olmayan bir harf yazıyorsa (Türkçe F: fiziksel K = M,
+   * ⌘M = Export Media) o tuş bırakılır; ⌘K tutulmayan bir tuştan geldiyse (Türkçe F: fiziksel J) o tuş eklenir: ilk
+   * basış Premiere'e de gitmiş olabilir, sonrakiler panelde kalır.
    */
+  function aramaIlgisiUygula() {
+    if (!AA || !aramaIlgisi) return;
+    var liste = [];
+    try { if (!(AA.tusIlgisiBirakilsinMi && AA.tusIlgisiBirakilsinMi(document.activeElement))) liste = AA.tusIlgisi(!!K.MAC, aramaMacTuslari); }
+    catch (x) { liste = []; }
+    var anahtar = JSON.stringify(liste);
+    if (anahtar === aramaIlgisiSon) return;
+    aramaIlgisiSon = anahtar;
+    try { AA.tusIlgisiAyarla("arac-ara", liste.length ? liste : ""); } catch (x2) {}
+  }
+
   function aramaTusIlgisi(e) {
-    if (!AA || aramaIlgisiBirakildi) return;
-    if (e && e.type === "keydown" && AA.tusDuzeniUyumsuz(e, !!K.MAC)) {
-      aramaIlgisiBirakildi = true;
-      aramaIlgisi = true;
-      try { AA.tusIlgisiAyarla("arac-ara", ""); } catch (x) {}
-      K.log("arac ara: Cmd+K tus ilgisi birakildi (fiziksel K tusu bu duzende '" + e.key + "')");
-      return;
-    }
-    if (aramaIlgisi) return;
+    if (!AA) return;
     aramaIlgisi = true;
-    try { AA.tusIlgisiAyarla("arac-ara", AA.tusIlgisi(!!K.MAC)); } catch (x) {}
+    if (e && e.type === "keydown" && K.MAC) {
+      var yeni = AA.yeniKisayolTusu ? AA.yeniKisayolTusu(e, true, aramaMacTuslari) : "";
+      if (AA.tusDuzeniUyumsuz(e, true, aramaMacTuslari)) {
+        aramaMacTuslari = aramaMacTuslari.filter(function (k) { return k !== e.code; });
+        K.log("arac ara: Cmd+K tus ilgisi birakildi (" + e.code + " bu duzende '" + e.key + "')");
+      } else if (yeni) {
+        aramaMacTuslari = aramaMacTuslari.concat([yeni]);
+        K.log("arac ara: Cmd+K bu duzende " + yeni + " tusunda, tus ilgisine eklendi");
+      }
+    }
+    aramaIlgisiUygula();
+  }
+
+  // Odak değişti: düzenleyicinin düğmesine girdiyse ilgi bırakılır, çıktıysa geri kurulur. focusout'ta odak bir öğeye
+  // geçiyorsa (relatedTarget) focusin halleder; boşluğa (gövdeye) düştüyse burada.
+  function aramaOdakIlgisi(e) {
+    if (e && e.type === "focusout" && e.relatedTarget) return;
+    aramaIlgisiUygula();
   }
 
   /*
@@ -411,7 +436,8 @@ window.KApp = (function () {
         var kilit = document.createElement("span");
         kilit.className = "arac-ara-kilit";
         kilit.textContent = "PRO";
-        kilit.title = uiMetni("Pro: uygulamak için lisans ya da deneme hakkı gerekir");
+        // tarafsız: deneme hakkı her Pro araçta yok (SFX, Motion Presetleri, Podcast, Sahneleri bul…; inceleme 2)
+        kilit.title = uiMetni("Suflo Pro özelliği");
         satir.appendChild(kilit);
       }
       var yildiz = document.createElement("button");
@@ -632,6 +658,9 @@ window.KApp = (function () {
     window.addEventListener("focus", aramaTusIlgisi);
     document.addEventListener("pointerdown", aramaTusIlgisi, true);
     document.addEventListener("keydown", aramaTusIlgisi, true);
+    // Ctrl+K ilgisi odağı izler: altyazı düzenleyicisinin düğmelerinde bırakılır (tuş Premiere'in Kes'ine gider)
+    document.addEventListener("focusin", aramaOdakIlgisi, true);
+    document.addEventListener("focusout", aramaOdakIlgisi, true);
     // seçimden sonra tutulan Enter / Boşluk: odak başka bir öğeye geçince bırakılır (öğe DOM'dan kalkıp blur gelmese de)
     document.addEventListener("focusin", function (e) { if (arama.tutulan && e.target !== arama.tutulan) hedefTuslariniBirak(); }, true);
   }

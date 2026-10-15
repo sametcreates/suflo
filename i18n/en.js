@@ -3132,6 +3132,8 @@
     "Olmazsa modeli başka bir bilgisayarda indirip Ayarlar › Motor › Model dosyası içe aktar ile kurabilirsin.":
       "Otherwise, download the model on another computer and install it with Settings › Engine › Import model file.",
     "Suflo bilgisayarın güvendiği sertifikalarla bir kez daha denedi, olmadı.": "Suflo retried once with the certificates this computer trusts, without success.",
+    "Bilgisayarın güvendiği sertifikalarla yeniden deneme süreye sığmadı: birkaç saniye sonra yeniden sına.":
+      "The retry with the certificates this computer trusts ran out of time: test again in a few seconds.",
     "Doğruluğu denetlenemez ve DTW ön ayarı uygulanmaz.": "It can't be verified and no DTW preset applies.",
     "Yalnız güvendiğin bir kaynaktan aldıysan devam et.": "Only continue if you got it from a source you trust.",
     "Özel model olarak eklensin mi?": "Add it as a Custom model?",
@@ -3180,7 +3182,7 @@
     "Eylemler": "Actions",
     "Favorilere ekle": "Add to favorites",
     "Favorilerden çıkar": "Remove from favorites",
-    "Pro: uygulamak için lisans ya da deneme hakkı gerekir": "Pro: applying it needs a license or a trial credit",
+    "Suflo Pro özelliği": "Suflo Pro feature",
     // static actions (js/arac-ara.js EYLEMLER); the others reuse existing button labels
     "Altyazıyı çevir": "Translate captions",
     "Eğri uygula": "Apply curve",

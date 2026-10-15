@@ -618,9 +618,46 @@ window.K = (function () {
   }
 
   /*
+   * macOS: System.keychain dökümünden "Asla Güvenme" (yönetici -d ve kullanıcı güven ayarı Deny) olanları at
+   * (3.4 adım 19 inceleme 2; Windows'ta aynısını WIN_BETIK yapar). security trust-settings-export ayarları yalnız
+   * dosyaya yazar: geçici klasöre yazılıp okunur, hemen silinir (yalnız güven ayarı; PEM diske yazılmaz).
+   * Komut / okuma arızası yerel bir arızadır (ağdaki saldırgan etkileyemez): o alan boş sayılır.
+   */
+  function macReddedilenleriAt(ag, pemler) {
+    if (!MAC || !pemler.length || !ag || typeof ag.guvenAyariKomutu !== "function") return Promise.resolve(pemler);
+    var dizin = "";
+    try { dizin = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-guven-")); } catch (e) { return Promise.resolve(pemler); }
+    var alanlar = ["yonetici", "kullanici"];
+    return Promise.all(alanlar.map(function (alan) {
+      var dosya = path.join(dizin, alan + ".plist");
+      var komut = ag.guvenAyariKomutu(alan, dosya);
+      return run(komut.cmd, komut.args, { timeout: 10000 }).then(function (r) {
+        var metin = "";
+        if (r && r.code === 0) { try { metin = fs.readFileSync(dosya, "utf8"); } catch (e2) { metin = ""; } }
+        try { if (fs.existsSync(dosya)) fs.unlinkSync(dosya); } catch (e3) {}
+        return ag.reddedilenParmakIzleri(metin);
+      }, function () { return {}; });
+    })).then(function (listeler) {
+      try { fs.rmdirSync(dizin); } catch (e4) {}
+      var reddedilen = {};
+      listeler.forEach(function (l) { for (var k in l) if (l.hasOwnProperty(k)) reddedilen[k] = true; });
+      var crypto = require("crypto"), Buf = require("buffer").Buffer;
+      var temiz = ag.reddedilenleriAt(pemler, reddedilen, function (b64) {
+        return crypto.createHash("sha1").update(Buf.from(b64, "base64")).digest("hex");
+      });
+      if (temiz.length !== pemler.length) log("sistem kok sertifikalari: " + (pemler.length - temiz.length) + " adet 'Asla Guvenme' atildi");
+      return temiz;
+    }, function () {
+      try { fs.rmdirSync(dizin); } catch (e5) {}
+      return pemler;
+    });
+  }
+
+  /*
    * İşletim sisteminin güvendiği ek kök sertifikalar (PEM). Oturum boyunca bellekte saklanır;
-   * diske yazılmaz. Windows: sabit PowerShell betiği (argüman dizisi, girdi eklenmez);
-   * macOS: security find-certificate. Linux: boş liste.
+   * diske yazılmaz. Windows: sabit PowerShell betiği (argüman dizisi, girdi eklenmez; Disallowed ve
+   * amacı HTTPS'i dışlayan kökler alınmaz); macOS: security find-certificate, "Asla Güvenme" olanlar
+   * atılır (macReddedilenleriAt). Linux: boş liste.
    * Yalnız BAŞARILI dışa aktarma önbelleğe girer: soğuk PowerShell'in antivirüs altında zaman
    * aşımına uğraması ya da komut hatası oturumu "ek kök yok"a kilitlemesin; sonraki
    * (kullanıcının başlattığı) deneme yeniden sorar.
@@ -633,15 +670,18 @@ window.K = (function () {
     var komut = ag && nodeOK ? ag.sertifikaKomutu(process.platform) : null;
     if (!komut) { _ekPem = []; return Promise.resolve(_ekPem); }
     _ekPemIsi = run(komut.cmd, komut.args, { timeout: 20000 }).then(function (r) {
-      _ekPemIsi = null;
       if (!r || r.code !== 0) {
+        _ekPemIsi = null;
         log("sistem kok sertifikalari alinamadi (kod " + (r ? r.code : "?") + "), onbellege alinmadi");
         return [];
       }
-      _ekPem = ag.pemleriAyikla(r.stdout);
-      log("sistem kok sertifikalari: " + _ekPem.length + " adet");
-      return _ekPem;
-    }, function () { _ekPemIsi = null; return []; });
+      return macReddedilenleriAt(ag, ag.pemleriAyikla(r.stdout)).then(function (pemler) {
+        _ekPemIsi = null;
+        _ekPem = pemler;
+        log("sistem kok sertifikalari: " + _ekPem.length + " adet");
+        return _ekPem;
+      });
+    }).then(null, function () { _ekPemIsi = null; return []; });
     return _ekPemIsi;
   }
 
@@ -696,6 +736,11 @@ window.K = (function () {
    *                    dönüşte caDenendi: true. YALNIZ kullanıcının başlattığı isteklerde açılır
    *                    (Doctor sınaması, model özeti): panel açılışındaki sessiz güncelleme denetimi
    *                    Premiere'den gizli PowerShell başlatmasın.
+   *                    Sınır, sistem kökleri okunurken (soğuk PowerShell antivirüs altında birkaç sn) ya
+   *                    da ikinci deneme sürerken dolarsa dönüş ETIMEDOUT DEĞİL, ilk denemenin sertifika
+   *                    hatasıdır (kod: ör. UNABLE_TO_GET_ISSUER_CERT_LOCALLY) + caSuresiDoldu: true:
+   *                    "güvenlik duvarı düşürüyor" yerine HTTPS denetimi anlatılır (3.4 adım 19 inceleme 2).
+   *                    Dışa aktarma arka planda sürer ve önbelleğe girer: birkaç sn sonraki deneme onu kullanır.
    * Hata dönüşünde kod: Node hata kodu (ör. ENOTFOUND).
    */
   var HTTP_HAREKETSIZ_MS = 20000;
@@ -704,6 +749,11 @@ window.K = (function () {
     return new Promise(function (resolve0) {
       var bitti = false;
       var aktifReq = null, sayac = null;
+      // sistem kökleriyle yeniden deneme başladıysa ilk denemenin sertifika hatası (süre dolarsa bu döner)
+      var sertifikaHatasi = null;
+      function sertifikaSonucu(e) {
+        return { status: 0, body: String(e), kod: e && e.code ? String(e.code) : "", caSuresiDoldu: true };
+      }
       function resolve(x) {
         if (bitti) return;
         bitti = true;
@@ -723,7 +773,7 @@ window.K = (function () {
         sayac = setTimeout(function () {
           sayac = null;
           try { if (aktifReq) aktifReq.destroy(); } catch (eD) {}
-          resolve({ status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" });
+          resolve(sertifikaHatasi ? sertifikaSonucu(sertifikaHatasi) : { status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" });
         }, Math.max(1, sonAn - Date.now()));
       }
       var hareketsiz = secenek.timeout > 0 ? Math.min(Number(secenek.timeout), HTTP_HAREKETSIZ_MS) : HTTP_HAREKETSIZ_MS;
@@ -745,6 +795,7 @@ window.K = (function () {
         // kurumsal HTTPS denetimi: sistemin güvendiği köklerle bir kez daha (doğrulama hep açık)
         if (secenek.sistemKokleri && !secenek.caDenendi && u.protocol === "https:" && AG() && AG().sertifikaHatasiMi(e3)) {
           log("sertifika hatasi (" + (e3 && e3.code ? e3.code : "?") + "), sistem kokleriyle bir kez daha: " + u.hostname);
+          sertifikaHatasi = e3 || new Error("sertifika");
           ekCaListesi().then(function (ca) {
             if (bitti) return;
             if (!ca) { resolve({ status: 0, body: String(e3), kod: e3 && e3.code ? String(e3.code) : "" }); return; }
@@ -752,7 +803,10 @@ window.K = (function () {
             for (var k2 in secenek) if (secenek.hasOwnProperty(k2)) s2[k2] = secenek[k2];
             s2.ca = ca; s2.caDenendi = true;
             if (sonAn) s2._sonAn = sonAn;
-            httpGet(urlStr, headers, s2).then(resolve);
+            httpGet(urlStr, headers, s2).then(function (r2) {
+              // ikinci deneme aynı son ana takıldı: zaman aşımı değil, ilk denemenin sertifika hatası
+              resolve(r2 && r2.status === 0 && r2.kod === "ETIMEDOUT" ? sertifikaSonucu(sertifikaHatasi) : r2);
+            });
           });
           return;
         }
@@ -927,7 +981,9 @@ window.K = (function () {
     for (var i = 0; i < HATA_REHBERI.length; i++) {
       if (HATA_REHBERI[i].re.test(m)) {
         var tip = HATA_REHBERI[i].tip;
-        if (iceAktar && (m + tip).indexOf("Model dosyası içe aktar") === -1) tip += " " + iceAktar;
+        // içe aktarma önerisi kendi satırında: İngilizce arayüzde her satır kendi sözlük anahtarıyla çevrilir
+        // (aynı satıra eklense "Çözüm:" satırı sözlükte bulunmaz, Türkçe kalırdı; 3.4 adım 19 inceleme 2)
+        if (iceAktar && (m + tip).indexOf("Model dosyası içe aktar") === -1) tip += "\n" + iceAktar;
         return m + "\nÇözüm: " + tip;
       }
     }

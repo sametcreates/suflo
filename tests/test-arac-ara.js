@@ -182,6 +182,19 @@ ok("tusDuzeniUyumsuz: yalnız macOS'ta ⌘ + fiziksel K başka bir Latin harf ya
   !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "k", code: "KeyK" }), true) && !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "л", code: "KeyK" }), true) &&
   !AA.tusDuzeniUyumsuz(tus({ key: "m", code: "KeyK" }), true) && !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "m", code: "KeyM" }), true) &&
   !AA.tusDuzeniUyumsuz(tus({ ctrlKey: true, key: "m", code: "KeyK" }), false) && !AA.tusDuzeniUyumsuz(null, true));
+// inceleme 2: K'yı yazan tuş başka yerdeyse (Türkçe F: fiziksel J) o tuş da tutulur; tutulan tuş başka harf yazarsa bırakılır
+ok("yeniKisayolTusu: macOS'ta tutulmayan fiziksel tuştan gelen ⌘K o tuşun kodunu verir; tutuluyorsa, K'daysa ya da Windows'ta boş",
+  AA.yeniKisayolTusu(tus({ metaKey: true, key: "k", code: "KeyJ" }), true) === "KeyJ" && AA.yeniKisayolTusu(tus({ metaKey: true, key: "k", code: "KeyV" }), true, ["KeyK", "KeyJ"]) === "KeyV" &&
+  AA.yeniKisayolTusu(tus({ metaKey: true, key: "k", code: "KeyJ" }), true, ["KeyJ"]) === "" && AA.yeniKisayolTusu(tus({ metaKey: true, key: "k", code: "KeyK" }), true) === "" &&
+  AA.yeniKisayolTusu(tus({ ctrlKey: true, key: "k", code: "KeyJ" }), false) === "" && AA.yeniKisayolTusu(tus({ metaKey: true, key: "j", code: "KeyJ" }), true) === "" &&
+  AA.yeniKisayolTusu(tus({ metaKey: true, key: "k", code: "Numpad5" }), true) === "");
+ok("tusDuzeniUyumsuz: tutulan tuşlar verilince onlara bakar (Türkçe Q'ya dönüş: fiziksel J 'j' yazar)",
+  AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "j", code: "KeyJ" }), true, ["KeyJ"]) && !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "j", code: "KeyJ" }), true) &&
+  !AA.tusDuzeniUyumsuz(tus({ metaKey: true, key: "m", code: "KeyK" }), true, ["KeyJ"]));
+ok("macOS kVK tablosu: ANSI K 40, J 38, V 9, M 46, T 17 (Events.h); tusIlgisi(mac, kodlar) her tuşu ⌘ ile tutar, bilinmeyeni atlar",
+  AA.MAC_KVK.KeyK === 40 && AA.MAC_KVK.KeyJ === 38 && AA.MAC_KVK.KeyV === 9 && AA.MAC_KVK.KeyM === 46 && AA.MAC_KVK.KeyT === 17 && AA.MAC_KVK.KeyA === 0 &&
+  J(AA.tusIlgisi(true, ["KeyK", "KeyJ", "Numpad5"])) === J([{ keyCode: 40, metaKey: true }, { keyCode: 38, metaKey: true }]) &&
+  J(AA.tusIlgisi(true, [])) === "[]" && J(AA.tusIlgisi(false, ["KeyJ"])) === J([{ keyCode: 75, ctrlKey: true }]));
 ok("hedefTusIlgisi: Windows Enter 13 + Boşluk 32; macOS Return 36, tuş takımı Enter 76, Boşluk 49 (değiştiricisiz)",
   J(AA.hedefTusIlgisi(false)) === J([{ keyCode: 13 }, { keyCode: 32 }]) && J(AA.hedefTusIlgisi(true)) === J([{ keyCode: 36 }, { keyCode: 76 }, { keyCode: 49 }]));
 
@@ -207,6 +220,13 @@ ok("contenteditable (öğe ya da atası) yazı alanı; contenteditable=false de�
 ok("altyazı düzenleyicisi: #cap-segments ve #tc-words içindeki her şey (düğme dahil), [data-kisayol-yok]",
   AA.yaziAlaniMi(ogeY("button", {}, satirKutu)) && AA.yaziAlaniMi(ogeY("input", { type: "checkbox" }, segs)) && AA.yaziAlaniMi(ogeY("span", {}, tcw)) &&
   AA.yaziAlaniMi(ogeY("button", {}, yok)));
+// inceleme 2: düzenleyicinin düğmesinde palet açılmaz; Ctrl+K ilgisi de bırakılmalı (yoksa tuş ölü: ne palet ne Premiere'in Kes'i)
+ok("tusIlgisiBirakilsinMi: düzenleyicideki düğme / onay kutusu / [data-kisayol-yok] düğmesi evet; düzenleyicideki metin girişi ve düzenleyici dışı hayır",
+  AA.tusIlgisiBirakilsinMi(ogeY("button", {}, satirKutu)) && AA.tusIlgisiBirakilsinMi(ogeY("input", { type: "checkbox" }, segs)) &&
+  AA.tusIlgisiBirakilsinMi(ogeY("span", {}, tcw)) && AA.tusIlgisiBirakilsinMi(ogeY("button", {}, yok)) &&
+  !AA.tusIlgisiBirakilsinMi(ogeY("textarea", {}, satirKutu)) && !AA.tusIlgisiBirakilsinMi(ogeY("input", { type: "text" }, segs)) &&
+  !AA.tusIlgisiBirakilsinMi(ogeY("span", {}, ogeY("div", { isContentEditable: true }, segs))) &&
+  !AA.tusIlgisiBirakilsinMi(ogeY("button", {}, govde)) && !AA.tusIlgisiBirakilsinMi(ogeY("textarea", {}, govde)) && !AA.tusIlgisiBirakilsinMi(null));
 
 /* ---------------- CEP tuş ilgisi ---------------- */
 
@@ -459,6 +479,10 @@ function sahne(o) {
     function rozet(x) { return bul(x, function (c) { return c.classList && c.classList.contains("arac-ara-kilit"); }).length; }
     return rozet(kesim) === 1 && rozet(altyazi) === 0 && rozet(ramp) === 1;
   })());
+  // inceleme 2: rozet ipucu deneme hakkı vaat etmez (SFX, Motion Presetleri, Podcast, "Sahneleri bul" kapılarında deneme yok)
+  var ipuclari = bul(s.liste, function (c) { return c.classList && c.classList.contains("arac-ara-kilit"); }).map(function (k) { return k.title; });
+  ok("PRO rozetinin ipucu tarafsız ('Suflo Pro özelliği'): deneme hakkı vaat etmez", ipuclari.length > 0 &&
+    ipuclari.every(function (t) { return t === "Suflo Pro özelliği"; }), J(ipuclari));
   s.yaz("sessızlık");
   ok("yazdıkça süzülür: 'sessızlık' → 'Sessizlikleri bul', eşleşen parça <mark> içinde", s.satirAdi(s.satirlar()[0]) === "Sessizlikleri bul" &&
     bul(s.satirlar()[0], function (c) { return c.tagName === "MARK"; })[0].textContent === "Sessizlik");
@@ -666,13 +690,59 @@ function ac(s, o) { return s.belgeTusu(s.olay(o || { key: "k", ctrlKey: true, ta
   var kuruldu = J(sahipCagrilari(aa7, "arac-ara"));
   m7.belgeTusu(m7.olay({ type: "keydown", key: "m", code: "KeyK", metaKey: true, target: m7.belge.body }));
   tikla();
+  var birakildi = J(sahipCagrilari(aa7, "arac-ara"));
   m7.belgeTusu(m7.olay({ type: "keydown", key: "k", code: "KeyJ", metaKey: true, target: m7.belge.body }));
-  ok("macOS Türkçe F: ⌘ + fiziksel K 'm' yazınca (⌘M = Export Media yutulur) ⌘K ilgisi bırakılır ve yeniden kurulmaz; ⌘K paleti yine açar",
-    kuruldu === J([J([{ keyCode: 40, metaKey: true }])]) && J(sahipCagrilari(aa7, "arac-ara")) === J([J([{ keyCode: 40, metaKey: true }]), ""]) &&
+  ok("macOS Türkçe F: ⌘ + fiziksel K 'm' yazınca (⌘M = Export Media yutulur) ⌘K ilgisi bırakılır ve tıklamayla yeniden kurulmaz; ⌘K paleti yine açar",
+    kuruldu === J([J([{ keyCode: 40, metaKey: true }])]) && birakildi === J([J([{ keyCode: 40, metaKey: true }]), ""]) &&
     m7.kutu.hidden === false, J(aa7.cagri));
+  // inceleme 2: K harfini yazan fiziksel tuş (Türkçe F'de J, kVK 38) tutulmuyordu: ⌘K paleti açıp Premiere'e de (Add Edit) gidiyordu
+  m7.girdiTusu({ key: "Escape" });
+  m7.belgeTusu(m7.olay({ type: "keydown", key: "k", code: "KeyJ", metaKey: true, target: m7.belge.body }));
+  ok("macOS Türkçe F: ⌘K'yı yazan fiziksel J (kVK 38) ilk basışta ilgiye eklenir, sonraki basışta yeniden eklenmez (sonraki ⌘K'lar panelde)",
+    J(sahipCagrilari(aa7, "arac-ara")) === J([J([{ keyCode: 40, metaKey: true }]), "", J([{ keyCode: 38, metaKey: true }])]) && m7.kutu.hidden === false, J(aa7.cagri));
+  // düzen Türkçe Q'ya dönerse: fiziksel J artık 'j' yazar → bırakılır; fiziksel K 'k' yazar → yeniden tutulur
+  m7.girdiTusu({ key: "Escape" });
+  m7.belgeTusu(m7.olay({ type: "keydown", key: "j", code: "KeyJ", metaKey: true, target: m7.belge.body }));
+  m7.belgeTusu(m7.olay({ type: "keydown", key: "k", code: "KeyK", metaKey: true, target: m7.belge.body }));
+  var son7 = sahipCagrilari(aa7, "arac-ara");
+  ok("macOS düzen değişince: ⌘J (fiziksel J 'j') o tuşu bırakır, ⌘K (fiziksel K 'k') K'yı yeniden tutar",
+    J(son7.slice(3)) === J(["", J([{ keyCode: 40, metaKey: true }])]), J(son7));
   var aa8 = ilgiCasusu(), m8 = sahne({ mac: true, aa: aa8 });
   m8.belgeTusu(m8.olay({ type: "keydown", key: "k", code: "KeyK", metaKey: true, target: m8.belge.body }));
   ok("macOS ABD / Türkçe Q: ⌘K ilgisi kurulur ve kalır, palet açılır", J(sahipCagrilari(aa8, "arac-ara")) === J([J([{ keyCode: 40, metaKey: true }])]) && m8.kutu.hidden === false);
+
+  // 8) inceleme 2: altyazı düzenleyicisinin düğmesi odaktayken (satırın zaman düğmesi oynatma kafasını taşır) palet
+  // açılmaz; Ctrl+K ilgisi de bırakılır ki tuş eskisi gibi Premiere'in Kes'ine (Add Edit) gitsin. Odak çıkınca geri kurulur.
+  var aa9 = ilgiCasusu(), s9 = sahne({ aa: aa9 });
+  var segs9 = s9.el("tab-captions").appendChild(s9.D("div", { id: "cap-segments" }));
+  var zaman9 = segs9.appendChild(s9.D("button", { className: "seg-time jump" }));
+  var metin9 = segs9.appendChild(s9.D("textarea", {}));
+  (s9.belge.yakala.pointerdown || []).forEach(function (f) { f({ type: "pointerdown" }); });
+  var kur9 = sahipCagrilari(aa9, "arac-ara").slice();
+  zaman9.focus();
+  var tus9 = s9.belgeTusu(s9.olay({ type: "keydown", key: "k", ctrlKey: true, target: zaman9 }));
+  var bos9 = sahipCagrilari(aa9, "arac-ara").slice();
+  ok("düzenleyicinin düğmesi odakta: Ctrl+K ilgisi bırakılır (tuş Premiere'in Kes'ine gider), palet açılmaz, tuşa dokunulmaz",
+    J(kur9) === J([J([{ keyCode: 75, ctrlKey: true }])]) && J(bos9) === J([J([{ keyCode: 75, ctrlKey: true }]), ""]) &&
+    s9.kutu.hidden === true && tus9.engel === 0, J(bos9));
+  metin9.focus();
+  var metinde9 = sahipCagrilari(aa9, "arac-ara").slice();
+  s9.el("cap-go").focus();
+  var disarida9 = sahipCagrilari(aa9, "arac-ara").slice();
+  zaman9.focus();
+  // odak boşluğa düşer (tıklanan yer odaklanamaz): focusout, relatedTarget yok, etkin öğe gövde
+  s9.belge.activeElement = s9.belge.body;
+  (s9.belge.yakala.focusout || []).forEach(function (f) { f({ type: "focusout", target: zaman9, relatedTarget: null }); });
+  var govdede9 = sahipCagrilari(aa9, "arac-ara").slice();
+  var ac9 = s9.belgeTusu(s9.olay({ type: "keydown", key: "k", ctrlKey: true, target: s9.belge.body }));
+  ok("odak düzenleyicinin metin kutusuna ya da dışarı geçince Ctrl+K ilgisi geri kurulur; boşluğa düşünce de (palet yine açılır)",
+    metinde9.length === 3 && metinde9[2] === J([{ keyCode: 75, ctrlKey: true }]) && disarida9.length === 3 &&
+    govdede9.length === 5 && govdede9[3] === "" && govdede9[4] === J([{ keyCode: 75, ctrlKey: true }]) && s9.kutu.hidden === false && ac9.engel === 1,
+    J(govdede9));
+  // ilk etkileşimden önce odak değişimi ilgi kurmaz (panel açılışında CEP çağrısı yok)
+  var aa10 = ilgiCasusu(), s10 = sahne({ aa: aa10 });
+  s10.el("cap-go").focus();
+  ok("ilk etkileşimden önce odak değişimi Ctrl+K ilgisini kurmaz", sahipCagrilari(aa10, "arac-ara").length === 0, J(aa10.cagri));
 })();
 
 /* ---------------- İngilizce arayüz ---------------- */
@@ -684,7 +754,7 @@ AA.EYLEMLER.forEach(function (e) {
   [e.ad, e.gerekli].forEach(function (s) { if (s && I18N.translate(s) === s && EN.keep.indexOf(s) === -1) cevrilmeyen.push(s); });
 });
 Object.keys(AA.BOLUMLER).forEach(function (k) { if (I18N.translate(AA.BOLUMLER[k]) === AA.BOLUMLER[k]) cevrilmeyen.push(AA.BOLUMLER[k]); });
-["Araç ara", "Araç ara (Ctrl+K)", "Araç ara (⌘K)", "Favorilere ekle", "Favorilerden çıkar", "Pro: uygulamak için lisans ya da deneme hakkı gerekir",
+["Araç ara", "Araç ara (Ctrl+K)", "Araç ara (⌘K)", "Favorilere ekle", "Favorilerden çıkar", "Suflo Pro özelliği",
   "Eşleşen araç yok. Başka bir kelime dene.", "Araç ya da eylem ara… (ör. sessizlik, rampa)", "Araçlar ve eylemler", "seç", "aç", "favori", "kapat"].forEach(function (s) {
   if (I18N.translate(s) === s) cevrilmeyen.push(s);
 });

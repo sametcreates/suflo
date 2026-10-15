@@ -377,6 +377,114 @@ async function kurumsalAg(base) {
   chk("adım 19: başarısız sertifika dışa aktarması oturumu 'ek kök yok'a kilitlemez; başarılı olan önbelleğe girer",
     p1.length === 0 && p2.length === 1 && p3.length === 1 && cagri === 2, "cagri=" + cagri + " " + [p1.length, p2.length, p3.length].join(","));
 
+  /*
+   * 10e5) inceleme 2: Doctor'un 5 sn'lik sınırı soğuk PowerShell dışa aktarmasını da kapsar. Sınır dışa aktarma
+   * sürerken dolarsa dönüş "zaman aşımı" (güvenlik duvarı) DEĞİL, ilk denemenin sertifika hatası + caSuresiDoldu;
+   * dışa aktarma arka planda bitip önbelleğe girer, sonraki sınama ondan yararlanır. (Ölçek: sınır 300 ms, dışa
+   * aktarma 700 ms.)
+   */
+  var yavasCp = {
+    spawn: function () {
+      var EE = require("events");
+      var c = new EE();
+      c.stdout = new EE(); c.stderr = new EE();
+      setTimeout(function () { c.stdout.emit("data", caPem); c.emit("close", 0); }, 700);
+      return c;
+    }
+  };
+  var K8 = loadBridge({ ag: true, cp: yavasCp, process: sahteSurec });
+  var AGm = require(pathm.join(KOKYOL, "js", "ag-dayanim.js"));
+  var t5 = Date.now();
+  var h5 = await K8.httpGet(tbase, {}, { method: "HEAD", timeout: 300, sistemKokleri: true });
+  chk("adım 19 inceleme 2: sınır sistem kökleri okunurken dolarsa sertifika hatası döner (ETIMEDOUT / 'güvenlik duvarı' değil)",
+    h5.status === 0 && h5.kod !== "ETIMEDOUT" && AGm.sertifikaHatasiMi({ code: h5.kod, message: h5.body }) && h5.caSuresiDoldu === true &&
+    !h5.caDenendi && Date.now() - t5 < 650 && AGm.agHatasiAcikla({ code: h5.kod, message: h5.body }).tur === "sertifika", JSON.stringify(h5));
+  await new Promise(function (r) { setTimeout(r, 600); });
+  var h5b = await K8.httpGet(tbase, {}, { method: "HEAD", timeout: 300, sistemKokleri: true });
+  chk("adım 19 inceleme 2: dışa aktarma arka planda bitip önbelleğe girer; sonraki sınama kurumsal kökle ulaşır",
+    h5b.status === 200 && h5b.caDenendi === true && !h5b.caSuresiDoldu, JSON.stringify(h5b));
+
+  // 10e6) kökler hazır ama ikinci bağlantı yanıtsız kalıyor: sınır yine sertifika hatasını söyler
+  var aracBag = 0;
+  var arac = require("net").createServer(function (soket) {
+    aracBag++;
+    if (aracBag > 1) { soket.on("error", function () {}); return; }   // ikinci deneme: hiç yanıt yok
+    var hedef = require("net").connect(tsrv.address().port, "127.0.0.1");
+    hedef.on("error", function () {}); soket.on("error", function () {});
+    soket.pipe(hedef); hedef.pipe(soket);
+  });
+  await new Promise(function (r) { arac.listen(0, "127.0.0.1", r); });
+  K2._ekSertifikaOnbellek([caPem]);
+  var h6 = await K2.httpGet("https://127.0.0.1:" + arac.address().port + "/", {}, { method: "HEAD", timeout: 400, sistemKokleri: true });
+  chk("adım 19 inceleme 2: ikinci deneme sınıra takılırsa da ilk denemenin sertifika hatası döner (2 bağlantı)",
+    h6.status === 0 && h6.kod !== "ETIMEDOUT" && AGm.sertifikaHatasiMi({ code: h6.kod, message: h6.body }) && h6.caSuresiDoldu === true && aracBag === 2,
+    JSON.stringify(h6) + " bag=" + aracBag);
+  arac.close();
+
+  /*
+   * 10e7) inceleme 2: macOS'ta System.keychain dökümü "Asla Güvenme" (Deny) sertifikaları da içerir. Yönetici (-d) ya da
+   * kullanıcı güven ayarında Deny olan kök ek köklere girmez; ayar dosyaları geçici klasörden silinir.
+   */
+  function sha1Iz(pem) {
+    var b64 = pem.replace(/-----(BEGIN|END) CERTIFICATE-----/g, "").replace(/\s+/g, "");
+    return require("crypto").createHash("sha1").update(Buffer.from(b64, "base64")).digest("hex").toUpperCase();
+  }
+  function guvenPlist(girdiler) {
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n\t<key>trustList</key>\n\t<dict>\n' +
+      girdiler.map(function (g) {
+        return "\t\t<key>" + g.iz + "</key>\n\t\t<dict>\n\t\t\t<key>issuerName</key>\n\t\t\t<data>AAAA</data>\n\t\t\t<key>trustSettings</key>\n\t\t\t<array>\n" +
+          (g.sonuc ? "\t\t\t\t<dict>\n\t\t\t\t\t<key>kSecTrustSettingsPolicyName</key>\n\t\t\t\t\t<string>sslServer</string>\n" +
+            "\t\t\t\t\t<key>kSecTrustSettingsResult</key>\n\t\t\t\t\t<integer>" + g.sonuc + "</integer>\n\t\t\t\t</dict>\n" : "") +
+          "\t\t\t</array>\n\t\t</dict>\n";
+      }).join("") + "\t</dict>\n\t<key>trustVersion</key>\n\t<integer>1</integer>\n</dict>\n</plist>\n";
+  }
+  var macCagri = [], macDosyalar = [];
+  var macCp = {
+    spawn: function (cmd, args) {
+      macCagri.push(args.join(" "));
+      var EE = require("events");
+      var c = new EE();
+      c.stdout = new EE(); c.stderr = new EE();
+      setTimeout(function () {
+        if (args[0] === "find-certificate") { c.stdout.emit("data", caPem + baskaPem); c.emit("close", 0); return; }
+        var dosya = args[args.length - 1];
+        macDosyalar.push(dosya);
+        // yönetici alanı: kurumsal köke güven (sonuç yok = kök olarak güven); kullanıcı alanı: ilgisiz kök "Asla Güvenme"
+        if (args.indexOf("-d") !== -1) fs.writeFileSync(dosya, guvenPlist([{ iz: sha1Iz(caPem), sonuc: 0 }]));
+        else fs.writeFileSync(dosya, guvenPlist([{ iz: sha1Iz(baskaPem).toLowerCase(), sonuc: 3 }]));
+        c.emit("close", 0);
+      }, 2);
+      return c;
+    }
+  };
+  var macSurec = Object.create(process);
+  Object.defineProperty(macSurec, "platform", { value: "darwin" });
+  var K10 = loadBridge({ ag: true, cp: macCp, process: macSurec });
+  var macPem = await K10.ekSertifikalar();
+  chk("adım 19 inceleme 2: macOS'ta kullanıcının 'Asla Güvenme' dediği kök ek köklere girmez, güvenilen kalır",
+    macPem.length === 1 && macPem[0].replace(/\s+/g, "") === caPem.replace(/\s+/g, ""), macPem.length + " " + macCagri.join(" | "));
+  chk("adım 19 inceleme 2: macOS güven ayarı iki alandan (yönetici -d ve kullanıcı) okunur, dosyalar silinir",
+    macCagri.filter(function (a) { return /^trust-settings-export -d /.test(a); }).length === 1 &&
+    macCagri.filter(function (a) { return /^trust-settings-export (?!-d)/.test(a); }).length === 1 &&
+    macDosyalar.length === 2 && macDosyalar.every(function (d) { return !fs.existsSync(d) && !fs.existsSync(pathm.dirname(d)); }), macCagri.join(" | "));
+  // ayar yok (komut sıfırdan farklı kodla biter): hiçbir kök atılmaz
+  var bosCp = {
+    spawn: function (cmd, args) {
+      var EE = require("events");
+      var c = new EE();
+      c.stdout = new EE(); c.stderr = new EE();
+      setTimeout(function () {
+        if (args[0] === "find-certificate") { c.stdout.emit("data", caPem + baskaPem); c.emit("close", 0); return; }
+        c.stderr.emit("data", "SecTrustSettingsCreateExternalRepresentation: No Trust Settings were found.");
+        c.emit("close", 1);
+      }, 2);
+      return c;
+    }
+  };
+  var K11 = loadBridge({ ag: true, cp: bosCp, process: macSurec });
+  chk("adım 19 inceleme 2: macOS'ta güven ayarı yoksa System.keychain kökleri olduğu gibi kalır",
+    (await K11.ekSertifikalar()).length === 2);
+
   // 10f) sertifika doğrulaması hiçbir yerde kapatılmaz
   var jsDir = pathm.join(KOKYOL, "js");
   var kapatan = fs.readdirSync(jsDir).filter(function (f) { return /\.js$/.test(f) && /rejectUnauthorized\s*[:=]/.test(fs.readFileSync(pathm.join(jsDir, f), "utf8")); });

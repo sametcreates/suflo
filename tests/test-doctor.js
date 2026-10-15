@@ -221,6 +221,23 @@ async function main() {
   ok("adım 19: DNS HEAD bitmeden (aynı anda) sorulur: toplam süre 5 sn sınırını aşmaz",
     ["huggingface.co", "hf-mirror.com", "github.com"].every(function (h) { return sira.indexOf("dns:" + h) !== -1 && sira.indexOf("dns:" + h) < sira.indexOf("head:" + h); }), sira.join(","));
 
+  // inceleme 2: köprünün Node hata kodu satıra taşınır (OpenSSL 3 iletisi "self-signed" yazar: yalnız metne bakmak
+  // HTTPS denetimini 'bilinmiyor' sayardı); sistem kökleri 5 sn'ye sığmadıysa (caSuresiDoldu) "yeniden sına" denir
+  ctx.K.httpGet = async function (u, h, s) {
+    if (!(s && s.method === "HEAD")) return eskiGet(u, h, s);
+    if (/huggingface\.co/.test(u)) return { status: 0, body: "Error: self-signed certificate in certificate chain", kod: "SELF_SIGNED_CERT_IN_CHAIN", caDenendi: true };
+    if (/hf-mirror\.com/.test(u)) return { status: 0, body: "Error: unable to get local issuer certificate", kod: "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", caSuresiDoldu: true };
+    return { status: 0, body: "zaman aşımı", kod: "ETIMEDOUT" };
+  };
+  ctx.K.dnsEngeli = async function () { return ""; };
+  var o3 = await ctx.KDoctor.kaynakSina();
+  function o3Satir(host) { return o3.filter(function (c) { return c.title === "Model kaynağı: " + host; })[0]; }
+  ok("inceleme 2: OpenSSL 3 iletili sertifika hatası (kod SELF_SIGNED_CERT_IN_CHAIN) HTTPS denetimi olarak anlatılır",
+    /HTTPS bağlantılarını denetliyor/.test(o3Satir("huggingface.co").detail) && /SELF_SIGNED_CERT_IN_CHAIN/.test(o3Satir("huggingface.co").detail), o3Satir("huggingface.co").detail);
+  ok("inceleme 2: süreye sığmayan sertifika denemesi güvenlik duvarı değil HTTPS denetimi + 'birkaç saniye sonra yeniden sına'",
+    /HTTPS bağlantılarını denetliyor/.test(o3Satir("hf-mirror.com").detail) && /birkaç saniye sonra yeniden sına/.test(o3Satir("hf-mirror.com").detail) &&
+    !/güvenlik duvarı/.test(o3Satir("hf-mirror.com").detail) && /güvenlik duvarı/.test(o3Satir("github.com").detail), o3Satir("hf-mirror.com").detail);
+
   // Tam tarama yapılmadan sınama: rapor yalnız üç kaynak satırından "Suflo hazır" olmamalı;
   // motor kurulu değilse Altyazı motoru çipi yeşil yanmamalı
   ctx.K.httpGet = async function (u, h, s) { return s && s.method === "HEAD" ? { status: 200, body: "" } : eskiGet(u, h, s); };
