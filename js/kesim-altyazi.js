@@ -8,6 +8,9 @@
  *   - "Altyazıya aktar" (yalnız Konuşmadan kes): kesilmeyen kelimeler yeni kurgunun zamanlarıyla Altyazı sekmesine
  *     (KCaptions.yukleKelimeler, satırlar Satır uzunluğu seçimiyle kurulur).
  * Satır yalnız kesilen sekans (kopyada kopya) Premiere'de açıkken görünür. Ücretsiz (Pro kesim araçlarından tetiklenir).
+ * Panel Premiere'in geri almasını görmez: kayıt host'un kurgu izini taşıyorsa (esleme.izSonra) iki düğme de önce taze
+ * izi sorar (KS_kurguIzi, salt okur). Kesim geri alındıysa uyarlanmaz; kurgu başka türlü değiştiyse uyarı + "Yine de
+ * uyarla". Kesim kısmen uygulandıysa (host esleme.eksik: silinemeyip seçilen parça) iki eylem de önerilmez.
  * Hesap saf modülde (js/kesim-esle.js), belge KCaptions'ta (js/captions.js); burası yalnız DOM yapıştırıcısı.
  *
  * Kullanım: var eylem = KKesimAltyazi({ kutu, metin, uyarla, aktar? }); KS_applyCuts'tan sonra
@@ -17,7 +20,8 @@ window.KKesimAltyazi = function (ids) {
   "use strict";
 
   ids = ids || {};
-  var bekleyen = null;   // { plan, hedef, hedefAd, sira, aktifSekans, kelimeler, dil, sonSinir }
+  var bekleyen = null;   // { plan, hedef, hedefAd, sira, aktifSekans, kelimeler, dil, sonSinir, geriAlma? }
+  var sorguda = false;   // KS_kurguIzi yanıtı bekleniyor (çift tık ikinci sorgu açmaz)
 
   function el(id) { return id ? document.getElementById(id) : null; }
   function modul() { return window.SufloKesimEsle || null; }
@@ -27,7 +31,9 @@ window.KKesimAltyazi = function (ids) {
     mesgul: "Altyazı oluşturulurken uyarlanamaz; iş bitince yeniden dene.",
     bos: "Altyazı sekmesinde uyarlanacak belge yok.",
     sekans: "Altyazı sekmesindeki belge bu kurgunun sekansına ait değil.",
-    guncel: "Altyazı zaten yeni kurguya göre."
+    guncel: "Altyazı zaten yeni kurguya göre.",
+    eksik: "Arada tam uygulanamamış ya da artık hatırlanmayan bir kesim var; altyazıyı bu kurgu için yeniden oluştur.",
+    geriAlma: "Kesim Premiere'de geri alınmış; altyazı zaten bu kurguya göre."
   };
 
   // Kesim KCaptions'a kaydedilir (kopyanın kimliği bilinince)
@@ -36,7 +42,8 @@ window.KKesimAltyazi = function (ids) {
     var c = altyazi();
     if (!c || !c.kesimKaydet) return;
     var p = bekleyen.plan;
-    bekleyen.sira = c.kesimKaydet({ kaynak: p.kaynak, hedef: bekleyen.hedef, hedefAd: bekleyen.hedefAd, mod: p.mod, cuts: p.cuts, kare: p.kare, imza: p.imza }) || 0;
+    bekleyen.sira = c.kesimKaydet({ kaynak: p.kaynak, hedef: bekleyen.hedef, hedefAd: bekleyen.hedefAd, mod: p.mod, cuts: p.cuts, kare: p.kare, imza: p.imza,
+      izOnce: p.izOnce, izSonra: p.izSonra, eksik: !!p.eksik }) || 0;
   }
 
   function tazele() {
@@ -46,7 +53,7 @@ window.KKesimAltyazi = function (ids) {
     if (bekleyen && bekleyen.hedef && bekleyen.aktifSekans === bekleyen.hedef) {
       var c = altyazi();
       var d = c && c.kurguDurumu ? c.kurguDurumu(bekleyen.hedef) : { ok: false };
-      uyarla = !!d.ok;
+      uyarla = !!d.ok && !bekleyen.geriAlma;
       aktar = !!(ids.aktar && bekleyen.kelimeler && bekleyen.kelimeler.length);
       if (uyarla) metin = "Altyazı sekmesindeki " + d.satir + " satır kesimden önceki kurguya göre.";
       else if (aktar) metin = "Kesilmeyen " + bekleyen.kelimeler.length + " kelime yeni kurgunun zamanlarıyla altyazıya hazır.";
@@ -59,10 +66,55 @@ window.KKesimAltyazi = function (ids) {
     if (ba) ba.hidden = !aktar;
   }
 
+  function dugmeler(kapali) {
+    var bu = el(ids.uyarla), ba = el(ids.aktar);
+    if (bu) bu.disabled = !!kapali;
+    if (ba) ba.disabled = !!kapali;
+  }
+
+  /*
+   * Hedef sekansın bugünkü kurgu izi (KS_kurguIzi). devam(iz): iz = taze iz, "" = okunamadı, null = köprü yok
+   * (denetlenemez). Yanıt beklenirken düğmeler kapalı; döner: Promise ya da null.
+   */
+  function tazeIz(hedef, devam) {
+    var K = window.K;
+    if (!K || typeof K.call !== "function") { devam(null); return null; }
+    if (sorguda) return null;
+    sorguda = true;
+    dugmeler(true);
+    return Promise.resolve()
+      .then(function () { return K.call("KS_kurguIzi", { seqId: hedef }, 30000); })
+      .then(function (r) { return r && r.ok && r.iz ? String(r.iz) : ""; }, function () { return ""; })
+      .then(function (iz) { sorguda = false; dugmeler(false); devam(iz); });
+  }
+  // Kurgu kesimden sonra değişti (ya da okunamadı): uyarı + "Yine de uyarla"
+  function degistiUyar(okundu, zorla) {
+    KApp.toast(okundu
+      ? "Kurgu kesimden sonra Premiere'de değişti (geri alma ya da başka bir düzenleme); altyazı bu kurguya uymayabilir."
+      : "Kurgu Premiere'den okunamadı; altyazı bu kurguya uymayabilir.", "warn", 10000, { metin: "Yine de uyarla", fn: zorla });
+  }
+
   function uyarlaTikla() {
     var c = altyazi();
-    if (!bekleyen || !bekleyen.hedef || !c || !c.kurguyaUyarla) return;
-    var r = c.kurguyaUyarla(bekleyen.hedef) || {};
+    if (!bekleyen || !bekleyen.hedef || !c || !c.kurguyaUyarla) return null;
+    var hedef = bekleyen.hedef, b = bekleyen;
+    var d = c.kurguDurumu ? c.kurguDurumu(hedef) : { ok: true };
+    if (!d.ok || !d.izli) { uyarlaSonuc(c.kurguyaUyarla(hedef)); return null; }
+    return tazeIz(hedef, function (iz) {
+      if (iz === null) { uyarlaSonuc(c.kurguyaUyarla(hedef)); return; }
+      var r = iz ? c.kurguyaUyarla(hedef, { guncelIz: iz }) : { ok: false, neden: "degisti" };
+      if (!r.ok && r.neden === "degisti") {
+        degistiUyar(!!iz, function () { uyarlaSonuc(c.kurguyaUyarla(hedef)); });
+        tazele();
+        return;
+      }
+      if (!r.ok && r.neden === "geriAlma") b.geriAlma = true;
+      uyarlaSonuc(r);
+    });
+  }
+
+  function uyarlaSonuc(r) {
+    r = r || {};
     if (r.ok) {
       // parça parça (" · "): çevirmen her parçayı ayrı çevirir
       var parcalar = ["Altyazı yeni kurguya uyarlandı: " + r.satir + " satır"];
@@ -75,13 +127,25 @@ window.KKesimAltyazi = function (ids) {
     tazele();
   }
 
+  // Kelimeler bu kesimden hemen sonraki kurgunun zamanlarında: kurgu o zamandan beri değiştiyse önce uyarılır
   function aktarTikla() {
     var c = altyazi();
-    if (!bekleyen || !bekleyen.hedef || !bekleyen.kelimeler || !c || !c.yukleKelimeler) return;
-    var r = c.yukleKelimeler(bekleyen.kelimeler, { sekansId: bekleyen.hedef, sira: bekleyen.sira, sekansAd: bekleyen.hedefAd,
-      dil: bekleyen.dil, sonSinir: bekleyen.sonSinir }) || {};
+    if (!bekleyen || !bekleyen.hedef || !bekleyen.kelimeler || !c || !c.yukleKelimeler) return null;
+    var b = bekleyen, beklenen = b.plan && b.plan.izSonra ? String(b.plan.izSonra) : "";
+    if (!beklenen) { aktar(b); return null; }
+    return tazeIz(b.hedef, function (iz) {
+      if (iz === null || iz === beklenen) { aktar(b); return; }
+      degistiUyar(!!iz, function () { aktar(b); });
+    });
+  }
+
+  function aktar(b) {
+    var c = altyazi();
+    if (!b || !b.kelimeler || !c || !c.yukleKelimeler) return;
+    var r = c.yukleKelimeler(b.kelimeler, { sekansId: b.hedef, sira: b.sira, sekansAd: b.hedefAd,
+      dil: b.dil, sonSinir: b.sonSinir }) || {};
     if (r.ok) {
-      bekleyen.kelimeler = null;   // tek sefer: ikinci tık ikinci belge kurmaz
+      b.kelimeler = null;   // tek sefer: ikinci tık ikinci belge kurmaz
       KApp.toast(r.satir + " altyazı satırı yeni kurguya göre Altyazı sekmesinde", "good");
       if (KApp.goster) KApp.goster("captions");
     } else {
@@ -105,7 +169,8 @@ window.KKesimAltyazi = function (ids) {
       // Premiere kesilen sekansı (kopyada kopyayı) etkin yaptı: bağlam yoklaması değişeni bildirene dek o açık sayılır
       bekleyen = { plan: plan, hedef: plan.hedef, hedefAd: plan.hedefAd, sira: 0, aktifSekans: plan.hedef, kelimeler: null,
         dil: String(bilgi.dil || ""), sonSinir: 0 };
-      if (bilgi.kelimeler && bilgi.kelimeler.length) {
+      // kısmen uygulanan kesim (silinemeyip seçilen parça): kaydedilir (yolu keser) ama kelimeler bu kurguya eşlenemez
+      if (bilgi.kelimeler && bilgi.kelimeler.length && !plan.eksik) {
         bekleyen.kelimeler = m.kelimeEsle(bilgi.kelimeler, plan.cuts, { mod: plan.mod, kare: plan.kare });
         var son = Number(bilgi.sonSinir);
         if (son > 0) bekleyen.sonSinir = m.zamanEsle(son, m.kareyeOturt(plan.cuts, plan.kare), plan.mod, "son");

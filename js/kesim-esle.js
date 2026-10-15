@@ -12,13 +12,16 @@
  *   kelimeEsle(words, cuts, o)   -> ORTASI bir kesimde kalan kelime DÜŞER, kalanlar eşlenir (kelime kesimin içine
  *                                   kırpılmaz: sıfır süreli ya da üst üste cue çıkmaz)
  *   satirEsle(cues, cuts, o)     -> kelimeli cue kalan kelimelerinden (metin ve zaman) yeniden kurulur; kelimesiz cue'nun
- *                                   uçları eşlenir, tamamen kesimde kalan ya da kesimle 0,2 sn'nin altına inen düşer
+ *                                   uçları eşlenir, tamamen kesimde kalan ya da kesimle 0,2 sn'nin altına inen düşer;
+ *                                   kelime kelime / birikimli belgede (o.kelimeModu) her cue bir kelime: kelime kuralı
  *                                   -> { cues, dusen, kirpilan, imza }
  *   imza(cuts, mod, kare)        -> aynı kesim kümesine aynı metin: aynı kesim bir belgeye iki kez uygulanmaz
  *   kelimelerdenSegment(words)   -> kelime listesini cümle / duraklama sınırında segmentlere böler (satır kurucuya girdi)
  *   uyarlamaPlani(r, o)          -> KS_applyCuts sonucundan kesim kaydı: { kaynak, hedef, mod, cuts, kare } ya da null
  *   yolBul(kayitlar, belge, hedef) -> oturumdaki kesim kayıtlarından belgenin sekansından hedef sekansa uygulanacak
  *                                   kayıtlar (sırayla); kopya sekans dalları ve aynı sekansta art arda kesimler dahil
+ *   yolUzlastir(yol), izliYol(uz, hedef, iz) -> yolu host'un kurgu izleriyle uzlaştır (Premiere'de geri alınan /
+ *                                   yeniden uygulanan kesim) ve bugünkü kurguya (taze iz) uyan kısmını bul
  *   zincirEsle(cues, yol, o)     -> yoldaki kesimleri sırayla uygular (her kesim bir öncekinin kurgusunda ölçülmüştür)
  *
  * Kesim nesnesi { start, end, kayma? } (sekans zamanı, sn). kayma: host'un ripple'da ölçtüğü gerçek kayma (aralığın
@@ -44,7 +47,7 @@
   "use strict";
 
   var EPS = 1e-6;
-  var MIN_KALAN = 0.2;    // kelimesiz cue: kesim yüzünden bundan kısa kalırsa (ve yarısından fazlası gittiyse) düşer
+  var MIN_KALAN = 0.2;    // kelimesiz cue: kesim yüzünden bundan kısa kalırsa düşer (zaten kısa olan cue: yarısından azı kaldıysa)
   var MIN_SURE = 0.05;    // yeniden kurulan cue'nun en kısa süresi (caption-layout cueKur ile aynı)
   var CUMLE_SONU = /[.!?…]["'”’»)\]]*$/;
   var KAPANIS_NOKTALAMA = /^(.*?)([.,!?;:…»"')\]]*)$/;
@@ -157,9 +160,12 @@
   }
 
   /*
-   * Tek zamanı eşle. taraf: kesimin içine düşen zaman 'gap'te nereye gitsin ("bas": kesimin sonuna — içerik orada
-   * yeniden başlar; "son": kesimin başına — içerik orada biter; verilmezse değişmez). 'ripple'da kesimin içi kesimin
-   * (eşlenmiş) başıdır: o aralık artık yok.
+   * Tek zamanı eşle. taraf: kesimin içine düşen zaman nereye gitsin ("bas": içeriğin kesimden sonra yeniden başladığı
+   * yere; "son": içeriğin kesimden önce bittiği yere). 'gap'te taraf verilmezse zaman değişmez.
+   * 'ripple'da aralığın hiçbir içeriği kalmaz (klip parçaları silindi; kalan kısım her katmanda boş): "son" kesimin
+   * (eşlenmiş) başına, "bas" (ve taraf yok) içeriğin yeniden başladığı yere (k.end − önceki kaymalar − kendi kayması).
+   * Host kaymayı aralıktan kısa ölçtüyse (sekansta klipsiz boşluk aralığa girdi, Premiere onu silmez) ikisi ayrışır:
+   * aradaki boşluk yeni kurguda da boştur, kesimde başlayan satır o boşluğun üstüne gerilmez. Tam kaymada ikisi aynı.
    */
   function esle(hz, t, mod, taraf) {
     if (!hz.length || !gecerli(t)) return t;
@@ -167,7 +173,7 @@
     if (i < 0) return t;
     var k = hz[i];
     if (t < k.end - EPS) {
-      if (mod === "ripple") return k.start - k.once;
+      if (mod === "ripple") return taraf === "son" ? k.start - k.once : k.end - k.once - k.kay;
       if (mod === "gap") return taraf === "bas" ? k.end : (taraf === "son" ? k.start : t);
       return t;
     }
@@ -329,6 +335,61 @@
   }
 
   /*
+   * Kelimesiz cue [a, b] kesimlerle ust kadar örtüşüyor: düşer mi? Tamamen kesimde kaldıysa ya da kesim yüzünden
+   * 0,2 sn'nin altına indiyse düşer (plan: "0,2 sn'den kısa ya da tamamen kesimde"). Tek istisna kesimden ÖNCE de
+   * 0,2 sn'den kısa olan cue (SRT'deki tek kelime, kısa ünlem): yarısından fazlası kaldıysa kalır, kenarı kesime
+   * değdi diye silinmez. Aralığın tamamı sayılır: ripple'da silinmeyen kısım da her katmanda boştur (içerik yok).
+   */
+  function kesimleDusen(a, b, ust) {
+    var sure = b - a, kalanSure = sure - ust;
+    if (kalanSure <= EPS) return true;
+    if (kalanSure >= MIN_KALAN) return false;
+    return sure >= MIN_KALAN || kalanSure < sure / 2;
+  }
+
+  /*
+   * Kelime kelime (k1) ve birikimli (kc) belgeler: cue'lar kelime taşımaz (caption-text karaokeWords /
+   * karaokeCumulative yalnız { start, end, text } üretir), her cue'nun kendi kelimesi vardır. k1'de cue'nun metni,
+   * kc'de önceki cue'nun metnini sürdüren kısmı (satır kelime kelime dolar; sıfırlanınca yeni satır baştan). Tek
+   * kelimelik cue kelime kuralıyla düşer (ORTASI kesimde); düşen kelime aynı birikimli satırın sonraki cue'larından da
+   * çıkar (kesilen konuşma ekranda kalmasın). Birden çok kelimelik parça (ölçülmüş kelimesi olmayan satır) kelimesiz
+   * cue kuralıyla. Metni elle değişip öncekini sürdürmeyen cue kendi satırını başlatır (yalnız kendisi denetlenir).
+   */
+  function karaokeIcerik(text) {
+    var out = [];
+    belirtecler(text).forEach(function (t) { if (icerikli(t)) out.push(vurgusuz(t)); });
+    return out;
+  }
+  function karaokeCueEsle(c, hz, mod, km, o, onceki) {
+    var icerik = karaokeIcerik(c.text);
+    var devam = km === "kc" && !!onceki && onceki.icerik.length < icerik.length &&
+      onceki.icerik.every(function (t, i) { return t === icerik[i]; });
+    var basPoz = devam ? onceki.icerik.length : 0;
+    var dusenPoz = devam ? kopya(onceki.dusen) : {};
+    var a = sayi(c.start), b = sayi(c.end);
+    var durum = { icerik: icerik, dusen: dusenPoz };
+    if (!gecerli(a)) return { cues: [cueKopya(c)], kirpildi: false, durum: durum };
+    if (!gecerli(b) || b < a) b = a;
+    var ust = ortusme(hz, a, b);
+    var dus = false;
+    if (ust > EPS) dus = icerik.length - basPoz === 1 ? icinde(hz, (a + b) / 2) : kesimleDusen(a, b, ust);
+    var y = cueKopya(c);
+    if (!dus && !ozgunEsle(y, c, hz, mod, o)) dus = true;
+    if (dus) {
+      for (var p = basPoz; p < icerik.length; p++) dusenPoz[p] = true;
+      return { cues: [], kirpildi: true, durum: durum };
+    }
+    var secilen = [];
+    for (var q = 0; q < icerik.length; q++) if (!dusenPoz[q]) secilen.push(q);
+    var metinDegisti = secilen.length < icerik.length;
+    if (metinDegisti) y.text = metinKur(c.text, icerik.map(function (t) { return { text: t }; }), secilen, o);
+    y.start = ms(esle(hz, a, mod, "bas"));
+    y.end = ms(Math.max(esle(hz, b, mod, "son"), y.start));
+    if (y.end < y.start + MIN_SURE) y.end = ms(y.start + MIN_SURE);
+    return { cues: [y], kirpildi: metinDegisti || ust > EPS, durum: durum };
+  }
+
+  /*
    * Tek cue'yu eşle. Döner: { cues: [...], kirpildi } — boş liste: cue düştü.
    */
   function cueEsle(c, hz, mod, o) {
@@ -344,10 +405,7 @@
       y0.start = ms(esle(hz, a, mod, "bas"));
       y0.end = ms(Math.max(esle(hz, b, mod, "son"), y0.start));
       if (ust <= EPS) return { cues: [y0], kirpildi: false };
-      var kalanSure = (b - a) - ust;
-      // tamamen kesimde (kalan 0) ya da kesim yüzünden 0,2 sn'nin altında ve yarısından azı kaldı: düşer.
-      // Zaten kısa olan (kelime kelime modundaki tek kelime) cue'nun kenarı kesime değince düşmez.
-      if (kalanSure <= EPS || (kalanSure < MIN_KALAN && kalanSure < (b - a) / 2)) return { cues: [], kirpildi: true };
+      if (kesimleDusen(a, b, ust)) return { cues: [], kirpildi: true };
       if (y0.end < y0.start + MIN_SURE) y0.end = ms(y0.start + MIN_SURE);
       return { cues: [y0], kirpildi: true };
     }
@@ -385,9 +443,10 @@
   }
 
   /*
-   * Belgenin satırlarını kesimlere göre eşle. o: { mod, kare, maxChars, maxLines, uygulanan: [imza] }.
+   * Belgenin satırlarını kesimlere göre eşle. o: { mod, kare, maxChars, maxLines, uygulanan: [imza], kelimeModu }.
    *   - kelimeli cue kalan kelimelerinden yeniden kurulur (metin ve zaman); 'gap'te kesimin iki yanı ayrı cue olur
    *   - kelimesiz cue'nun uçları eşlenir; tamamen kesimde kalan ya da kesimle 0,2 sn'nin altına inen düşer
+   *   - kelimeModu "k1" / "kc" (belgenin segmentsMode'u): kelimesiz cue'lar kelime cue'su (karaokeCueEsle)
    *   - mod 'select' (ya da bilinmeyen) hiçbir şey yapmaz; imza o.uygulanan içindeyse de (aynı kesim ikinci kez) — tekrar
    * Döner: { cues, dusen, kirpilan, imza, tekrar? }. Girdi değişmez.
    */
@@ -404,9 +463,13 @@
       if (tekrar) sonuc.tekrar = true;
       return sonuc;
     }
+    var km = o.kelimeModu === "k1" || o.kelimeModu === "kc" ? o.kelimeModu : "";
+    var onceki = null;   // birikimli satırın önceki cue'su: { icerik, dusen }
     liste.forEach(function (c) {
       if (!c) return;
-      var r = cueEsle(c, hz, mod, o);
+      var r;
+      if (km && !(dizi(c.words) && c.words.length)) { r = karaokeCueEsle(c, hz, mod, km, o, onceki); onceki = r.durum; }
+      else { r = cueEsle(c, hz, mod, o); onceki = null; }
       if (!r.cues.length) { sonuc.dusen++; return; }
       if (r.kirpildi) sonuc.kirpilan++;
       r.cues.forEach(function (y) { sonuc.cues.push(y); });
@@ -456,11 +519,16 @@
   /* ---------------- kesim kayıtları ---------------- */
 
   /*
-   * KS_applyCuts sonucundan kesim kaydı. r: host sonucu ({ ok, newSeq, rippleFallback, esleme? }); esleme host'un
-   * raporudur: { kaynak (kesimden önceki sekans), seqId (kesilen sekans: kopya ya da aynısı), kare, kesimler: [{ start,
-   * end, kayma? }] }. o: { removeMode (istenen), kaynak (analiz edilen sekans), ranges (gönderilen kesimler), kare }.
-   * Mod: rippleFallback → 'gap', yoksa istenen; 'select' (kes + seç) null döner: hiçbir şey silinmedi.
-   * Döner: { kaynak, hedef ("" = kopyanın kimliği bilinmiyor), hedefAd, mod, cuts, kare, imza } ya da null.
+   * KS_applyCuts sonucundan kesim kaydı. r: host sonucu ({ ok, newSeq, rippleFallback, removed, selected, esleme? });
+   * esleme host'un raporudur: { kaynak (kesimden önceki sekans), seqId (kesilen sekans: kopya ya da aynısı), kare,
+   * kesimler: [{ start, end, kayma? }], izOnce / izSonra (kesimden önceki / sonraki kurgu izi), eksik? }. o: { removeMode
+   * (istenen), kaynak (analiz edilen sekans), ranges (gönderilen kesimler), kare }.
+   * Mod: rippleFallback → 'gap', yoksa istenen; 'select' (kes + seç) null döner: hiçbir şey silinmedi. Hiçbir parça
+   * silinmediyse (removed 0, seçilen yok) de null: kurgu değişmedi. Bir parça silinemeyip seçildiyse (host esleme.eksik
+   * ya da selected > 0) kesim kısmen uygulandı: plan eksik: true taşır — kayıt olur ama uyarlama / aktarma önerilmez
+   * (eşleme gerçek kurguyla tutmaz) ve belgeyi bu kesimin ötesine taşıyan yol da kurulmaz.
+   * Döner: { kaynak, hedef ("" = kopyanın kimliği bilinmiyor), hedefAd, mod, cuts, kare, imza, izOnce?, izSonra?, eksik? }
+   * ya da null.
    */
   function uyarlamaPlani(r, o) {
     o = o || {};
@@ -468,6 +536,8 @@
     var mod = modu(r.rippleFallback ? "gap" : o.removeMode);
     if (!mod) return null;
     var es = r.esleme && typeof r.esleme === "object" ? r.esleme : {};
+    var eksik = !!es.eksik || Number(r.selected) > 0;
+    if (typeof r.removed === "number" && r.removed === 0 && !eksik) return null;
     var kaynak = String(es.kaynak || o.kaynak || "");
     if (!kaynak) return null;
     var hedef = String(es.seqId || "");
@@ -481,9 +551,15 @@
     });
     if (!cuts.length) return null;
     var kare = sayi(es.kare) > 0 ? sayi(es.kare) : (sayi(o.kare) > 0 ? sayi(o.kare) : 0);
-    return { kaynak: kaynak, hedef: hedef, hedefAd: String(r.newSeq || o.kaynakAd || ""), mod: mod, cuts: cuts, kare: kare,
+    var plan = { kaynak: kaynak, hedef: hedef, hedefAd: String(r.newSeq || o.kaynakAd || ""), mod: mod, cuts: cuts, kare: kare,
       imza: imza(cuts, mod, kare) };
+    if (izOku(es.izOnce)) plan.izOnce = izOku(es.izOnce);
+    if (izOku(es.izSonra)) plan.izSonra = izOku(es.izSonra);
+    if (eksik) plan.eksik = true;
+    return plan;
   }
+
+  function izOku(x) { return typeof x === "string" && x ? x : ""; }
 
   /*
    * Belgeyi (belge: { sekansId, sira } — sira: belgenin güncel olduğu son kayıt) hedef sekansın bugünkü kurgusuna
@@ -515,12 +591,70 @@
     return ara(bas, Number(belge.sira) || 0, 0);
   }
 
-  // Yoldaki kayıtları sırayla uygula. Döner: { cues, dusen, kirpilan }
+  /*
+   * Yolu Premiere'deki kurgu izleriyle uzlaştır. Panel Premiere'in geri almasını görmez: kesim kaydı oturum boyunca
+   * kalır, kullanıcı kesimi Ctrl+Z ile geri alıp yeniden (ya da başka) kesim uygularsa ikinci kayıt da yola girer.
+   * Host her kesimde kurgunun önceki ve sonraki izini (izOnce / izSonra; tüm kliplerin yeri) bildirir:
+   *   - kaydın izOnce'si bir önceki durumun iziyse zincir sağlam
+   *   - yoldaki daha eski bir durumun iziyse arada geri alma olmuş: o durumdan sonraki kayıtlar yoldan çıkar
+   *   - hiçbirine uymuyorsa kurgu kesimler arasında başka bir yolla değişmiş: kopuk (uyarıyla uygulanır)
+   *   - iz yoksa (eski kayıt, doğrudan API) aynı sekanstaki aynı kesimin (imza) tekrarı bir kez sayılır
+   * Belgenin başlangıç izi bilinmez: ilk kaydın izOnce'si (belge o kesimden önce oluştu). Kesimleri atılmış (atildi) ya
+   * da kısmen uygulanmış (eksik) kayıt yolda kalırsa eksik: true — böyle yol uygulanmaz.
+   * Döner: { yol, kopuk, eksik, basIz, sonIz, durumlar: [{ sekans, iz }] } (durumlar[i]: ilk i kayıttan sonraki durum)
+   */
+  function yolUzlastir(yol) {
+    var liste = (dizi(yol) ? yol : []).filter(Boolean);
+    var out = [], kopuk = false;
+    var durumlar = [{ sekans: liste.length ? String(liste[0].kaynak) : "", iz: liste.length ? izOku(liste[0].izOnce) : "" }];
+    liste.forEach(function (k) {
+      var cur = durumlar[durumlar.length - 1];
+      var on = izOku(k.izOnce);
+      if (on && cur.iz) {
+        if (on !== cur.iz) {
+          var j = -1;
+          for (var i = durumlar.length - 2; i >= 0; i--) {
+            if (durumlar[i].sekans === String(k.kaynak) && durumlar[i].iz === on) { j = i; break; }
+          }
+          if (j >= 0) { out.length = j; durumlar.length = j + 1; }
+          else kopuk = true;
+        }
+      } else if (k.imza && out.some(function (x) { return String(x.kaynak) === String(k.kaynak) && String(x.hedef) === String(k.hedef) && x.imza === k.imza; })) {
+        return;
+      }
+      out.push(k);
+      durumlar.push({ sekans: String(k.hedef), iz: izOku(k.izSonra) });
+    });
+    return { yol: out, kopuk: kopuk, eksik: out.some(function (k) { return !!(k.atildi || k.eksik); }),
+      basIz: durumlar[0].iz, sonIz: durumlar[durumlar.length - 1].iz, durumlar: durumlar };
+  }
+
+  /*
+   * Uzlaşmış yolun hedef sekansın bugünkü kurgusuna (guncelIz: host'tan taze iz) uyan kısmı. Döner: { yol, durum }:
+   *   "tam"     — yolun sonu bugünkü kurgu
+   *   "onek"    — sondaki kesim(ler) Premiere'de geri alınmış: bugünkü kurguya varan önek
+   *   "guncel"  — kesimlerin hepsi geri alınmış: belge zaten bugünkü kurguya göre (yol boş)
+   *   "degisti" — bugünkü kurgu hiçbir duruma uymuyor (kısmi geri alma, elle düzenleme) ya da yol kopuk
+   *   "bilinmiyor" — iz yok (eski kayıt / taze iz okunamadı): denetlenemedi
+   */
+  function izliYol(uz, hedef, guncelIz) {
+    var g = izOku(guncelIz);
+    if (!uz || !g || !uz.sonIz) return { yol: uz ? uz.yol : [], durum: "bilinmiyor" };
+    if (!uz.kopuk && uz.sonIz === g) return { yol: uz.yol, durum: "tam" };
+    if (!uz.kopuk) {
+      for (var i = uz.durumlar.length - 2; i >= 0; i--) {
+        if (uz.durumlar[i].sekans === String(hedef) && uz.durumlar[i].iz === g) return { yol: uz.yol.slice(0, i), durum: i ? "onek" : "guncel" };
+      }
+    }
+    return { yol: uz.yol, durum: "degisti" };
+  }
+
+  // Yoldaki kayıtları sırayla uygula. o: { maxChars, maxLines, kelimeModu }. Döner: { cues, dusen, kirpilan }
   function zincirEsle(cues, yol, o) {
     o = o || {};
     var cur = (dizi(cues) ? cues : []).filter(Boolean).map(cueKopya), dusen = 0, kirpilan = 0;
     (dizi(yol) ? yol : []).forEach(function (k) {
-      var r = satirEsle(cur, k.cuts, { mod: k.mod, kare: k.kare, maxChars: o.maxChars, maxLines: o.maxLines });
+      var r = satirEsle(cur, k.cuts, { mod: k.mod, kare: k.kare, maxChars: o.maxChars, maxLines: o.maxLines, kelimeModu: o.kelimeModu });
       cur = r.cues; dusen += r.dusen; kirpilan += r.kirpilan;
     });
     return { cues: cur, dusen: dusen, kirpilan: kirpilan };
@@ -537,6 +671,8 @@
     kelimelerdenSegment: kelimelerdenSegment,
     uyarlamaPlani: uyarlamaPlani,
     yolBul: yolBul,
+    yolUzlastir: yolUzlastir,
+    izliYol: izliYol,
     zincirEsle: zincirEsle
   };
 });

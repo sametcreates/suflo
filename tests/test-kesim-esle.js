@@ -197,5 +197,123 @@ ok("zincirEsle: kesimler sırayla, her biri bir öncekinin kurgusunda (C1'in kes
   yakin(zin.cues[0].start, 17.2) && zin.cues[0].end === 26 && zin.cues[0].words[1].start === 21 && zin.dusen === 0 && zin.kirpilan === 2,
   js(zin));
 
+/* ---------- inceleme: host kayması aralıktan kısa (sekansta klipsiz boşluk aralığa girdi) ---------- */
+// V1/A1: klip1 11'de biter, klip2 13'te başlar; sessizlik [10, 14]; host yalnız [10, 11] ve [13, 14]'ü siler: kayma 2.
+// Yeni kurguda [10, 12] boş, içerik 12'de (eski 14) yeniden başlar.
+var KK = [{ start: 10, end: 14, kayma: 2 }];
+ok("kayma < aralık: içerik eski 14'ten 12'de başlar; kesimde başlayan zaman (bas) oraya, biten (son) kesimin başına",
+  E.zamanEsle(14, KK, "ripple") === 12 && E.zamanEsle(13.8, KK, "ripple", "bas") === 12 && E.zamanEsle(13.8, KK, "ripple") === 12 &&
+  E.zamanEsle(10.3, KK, "ripple", "son") === 10 && E.zamanEsle(20, KK, "ripple") === 18,
+  [E.zamanEsle(13.8, KK, "ripple", "bas"), E.zamanEsle(10.3, KK, "ripple", "son")].join(" "));
+var kk1 = E.kelimeEsle([w("Merhaba", 13.8, 14.5), w("ve", 9.6, 10.3)], KK, { mod: "ripple" });
+ok("kayma < aralık, kelime: ortası dışarıda kalan 'Merhaba' [13,8–14,5] → [12–12,5] (boşluğun üstüne gerilmez); kesimde biten kelime kesimin başında",
+  kk1.length === 2 && kk1[0].start === 12 && kk1[0].end === 12.5 && kk1[1].start === 9.6 && kk1[1].end === 10, js(kk1));
+var kk2 = E.satirEsle([
+  { start: 13.6, end: 15, text: "Merhaba dünya", words: [w("Merhaba", 13.8, 14.5), w("dünya", 14.6, 15)] },
+  { start: 13.6, end: 15, text: "Merhaba dünya" },
+  { start: 10.5, end: 13.5, text: "boşlukta" }
+], KK, { mod: "ripple" });
+ok("kayma < aralık, satır: kelimeli ve kelimesiz cue 12'de başlar (2 sn erken değil); tamamen aralıkta kalan düşer",
+  kk2.cues.length === 2 && kk2.cues[0].start === 12 && kk2.cues[0].end === 13 && kk2.cues[1].start === 12 && kk2.cues[1].end === 13 && kk2.dusen === 1,
+  js(kk2.cues.map(function (c) { return [c.text, c.start, c.end]; })));
+// kayma 0: aralık tamamen kliplerin arasındaki boşlukta, hiçbir şey silinmedi — içerik yerinde
+var K0 = [{ start: 10, end: 14, kayma: 0 }];
+var k0 = E.satirEsle([{ start: 12, end: 15, text: "x y" }, { start: 14, end: 16, text: "sonra", words: [w("sonra", 14.2, 15.6)] }, { start: 8, end: 9, text: "önce" }], K0, { mod: "ripple" });
+ok("kayma 0: içerik kaymaz; aralıkta başlayan cue içeriğin başladığı yerden (14), aralıktan önce / sonra olan aynen",
+  js(k0.cues.map(function (c) { return [c.start, c.end]; })) === js([[14, 15], [14, 16], [8, 9]]) && E.zamanEsle(14, K0, "ripple") === 14 && E.zamanEsle(11, K0, "ripple", "son") === 10,
+  js(k0.cues.map(function (c) { return [c.start, c.end]; })));
+ok("tam kayma (kayma = aralık): 'bas' ile 'son' aynı yere (eski davranış)", E.zamanEsle(11, [{ start: 10, end: 12, kayma: 2 }], "ripple", "bas") === 10 &&
+  E.zamanEsle(11, [{ start: 10, end: 12, kayma: 2 }], "ripple", "son") === 10);
+
+/* ---------- inceleme: kelime kelime (k1) ve birikimli (kc) belgeler ---------- */
+var kcKel = [w("Merhaba", 0, 0.5), w("ııı", 0.6, 1.2), w("ben", 1.3, 1.6), w("Samet", 1.7, 2.1)];
+var kcDoc = CT.karaokeCumulative(kcKel, 4);
+var kcSonuc = E.satirEsle(kcDoc, [{ start: 0.55, end: 1.25 }], { mod: "ripple", kelimeModu: "kc" });
+ok("kc: kesilen dolgunun cue'su düşer VE sonraki birikimli cue'lardan çıkar, zamanlar kayar",
+  js(kcSonuc.cues.map(function (c) { return [c.text, c.start, c.end]; })) === js([["Merhaba", 0, 0.5], ["Merhaba ben", 0.6, 0.9], ["Merhaba ben Samet", 1, 1.4]]) &&
+  kcSonuc.dusen === 1 && kcSonuc.kirpilan === 2, js(kcSonuc));
+var kcGap = E.satirEsle(kcDoc, [{ start: 0.55, end: 1.25 }], { mod: "gap", kelimeModu: "kc" });
+ok("kc gap: zaman kaymaz, kesilen kelime sonraki satırlardan da çıkar",
+  js(kcGap.cues.map(function (c) { return [c.text, c.start]; })) === js([["Merhaba", 0], ["Merhaba ben", 1.3], ["Merhaba ben Samet", 1.7]]), js(kcGap.cues));
+// birikimli satır sıfırlanınca (4 kelime) yeni satır baştan; elle değişen cue kendi satırını başlatır
+var kcUzun = CT.karaokeCumulative([w("a", 0, 0.3), w("b", 0.4, 0.7), w("c", 0.8, 1.1), w("d", 1.2, 1.5), w("e", 1.6, 1.9), w("f", 2.0, 2.3)], 4);
+var kcU = E.satirEsle(kcUzun, [{ start: 1.15, end: 1.55 }], { mod: "gap", kelimeModu: "kc" });
+ok("kc: 4 kelimede sıfırlanan satırda düşen kelime yalnız kendi satırından çıkar", js(kcU.cues.map(function (c) { return c.text; })) === js(["a", "a b", "a b c", "e", "e f"]), js(kcU.cues));
+var kcElle = E.satirEsle([{ start: 0, end: 0.5, text: "Merhaba" }, { start: 0.6, end: 1.2, text: "Merhaba ııı" }, { start: 1.3, end: 1.6, text: "Merhabalar ııı ben" }],
+  [{ start: 0.55, end: 1.25 }], { mod: "gap", kelimeModu: "kc" });
+ok("kc: metni elle değişen cue öncekini sürdürmüyorsa kendi satırı (birden çok kelime: kelimesiz kural, kesime değmiyor: aynen)",
+  js(kcElle.cues.map(function (c) { return c.text; })) === js(["Merhaba", "Merhabalar ııı ben"]), js(kcElle.cues));
+var vurgulu = E.satirEsle([{ start: 0, end: 0.5, text: "*Merhaba*" }, { start: 0.6, end: 1.2, text: "*Merhaba* ııı" }, { start: 1.3, end: 1.6, text: "*Merhaba* ııı ben" }],
+  [{ start: 0.55, end: 1.25 }], { mod: "ripple", kelimeModu: "kc" });
+ok("kc: *vurgu* korunur, düşen kelime vurgulu satırdan da çıkar", js(vurgulu.cues.map(function (c) { return c.text; })) === js(["*Merhaba*", "*Merhaba* ben"]), js(vurgulu.cues));
+var k1s = E.satirEsle([{ start: 0.5, end: 0.9, text: "Merhaba" }, { start: 1.0, end: 1.6, text: "ııı" }, { start: 1.7, end: 2.0, text: "ben" }, { start: 2.1, end: 2.5, text: "uzun satır burada" }],
+  [{ start: 1.25, end: 2.0 }], { mod: "ripple", kelimeModu: "k1" });
+ok("k1: ORTASI kesimde kalan kelime cue'su düşer (0,25 sn'si kalsa da); kenarı kesime değen kalır, sonrası kayar",
+  js(k1s.cues.map(function (c) { return [c.text, c.start, c.end]; })) === js([["Merhaba", 0.5, 0.9], ["uzun satır burada", 1.35, 1.75]]) && k1s.dusen === 2,
+  js(k1s.cues.map(function (c) { return [c.text, c.start, c.end]; })));
+var k1b = E.satirEsle([{ start: 0.9, end: 1.4, text: "evet" }], [{ start: 1.25, end: 2.0 }], { mod: "ripple", kelimeModu: "k1" });
+ok("k1: ortası kesimden önce olan kelime kalır, ucu kesimin başına çekilir", k1b.cues.length === 1 && k1b.cues[0].start === 0.9 && k1b.cues[0].end === 1.25 && k1b.kirpilan === 1, js(k1b));
+ok("kelimeModu yoksa kelimesiz cue eski kural (geriye uyum)", E.satirEsle([{ start: 1.0, end: 1.6, text: "ııı" }], [{ start: 1.25, end: 2.0 }], { mod: "ripple" }).cues.length === 1);
+ok("zincirEsle kelimeModu'nu her kesime geçirir",
+  js(E.zincirEsle(kcDoc, [{ mod: "ripple", cuts: [{ start: 0.55, end: 1.25 }] }], { kelimeModu: "kc" }).cues.map(function (c) { return c.text; })) === js(["Merhaba", "Merhaba ben", "Merhaba ben Samet"]));
+
+/* ---------- inceleme: kelimesiz cue 0,2 sn kuralı (plan: "0,2 sn'den kısa ya da tamamen kesimde" düşer) ---------- */
+var evet = E.satirEsle([{ start: 10, end: 10.36, text: "Evet" }], [{ start: 10.18, end: 11 }], { mod: "ripple" });
+ok("0,36 sn'lik cue kesimle 0,18 sn'ye inince düşer (yarısı kalsa da)", evet.cues.length === 0 && evet.dusen === 1, js(evet));
+ok("aynısı gap modunda da düşer", E.satirEsle([{ start: 10, end: 10.36, text: "Evet" }], [{ start: 10.18, end: 11 }], { mod: "gap" }).cues.length === 0);
+var kisaKalan = E.satirEsle([{ start: 29.9, end: 30.05, text: "ve" }, { start: 29.95, end: 30.1, text: "şu" }], K, { mod: "ripple" });
+ok("zaten 0,2 sn'den kısa cue: yarısından fazlası kaldıysa kalır, azı kaldıysa düşer", kisaKalan.cues.length === 1 && kisaKalan.cues[0].text === "ve" && kisaKalan.dusen === 1, js(kisaKalan));
+
+/* ---------- inceleme: kısmen uygulanan kesim (uyarlamaPlani) ---------- */
+var pEks = E.uyarlamaPlani({ ok: true, removed: 2, selected: 2, rippleFallback: false, esleme: { kaynak: "S", seqId: "S", eksik: true,
+  kesimler: [{ start: 2, end: 4, kesildi: false }] } }, { removeMode: "ripple" });
+ok("uyarlamaPlani: silinemeyip seçilen parça (esleme.eksik / selected > 0) → plan eksik: true", pEks && pEks.eksik === true, js(pEks));
+ok("uyarlamaPlani: selected > 0 yalnız da eksik; removed 0 ve seçilen yok → null (kurgu değişmedi)",
+  E.uyarlamaPlani({ ok: true, removed: 3, selected: 1, esleme: { kaynak: "S", seqId: "S", kesimler: [{ start: 2, end: 4, kayma: 2 }] } }, { removeMode: "ripple" }).eksik === true &&
+  E.uyarlamaPlani({ ok: true, removed: 0, selected: 0, esleme: { kaynak: "S", seqId: "S", kesimler: [{ start: 2, end: 4, kayma: 2 }] } }, { removeMode: "ripple" }) === null &&
+  E.uyarlamaPlani({ ok: true, removed: 4, selected: 0, esleme: { kaynak: "S", seqId: "S", kesimler: [{ start: 2, end: 4, kayma: 2 }] } }, { removeMode: "ripple" }).eksik === undefined);
+var pIz = E.uyarlamaPlani({ ok: true, removed: 4, selected: 0, esleme: { kaynak: "S", seqId: "S", izOnce: "6:a.b", izSonra: "8:c.d", kesimler: [{ start: 2, end: 4, kayma: 2 }] } }, { removeMode: "ripple" });
+ok("uyarlamaPlani: host'un kurgu izleri plana geçer", pIz.izOnce === "6:a.b" && pIz.izSonra === "8:c.d", js(pIz));
+
+/* ---------- inceleme: Premiere'de geri alma (yolUzlastir + izliYol) ---------- */
+function kay(sira, kaynak, hedef, imz, once, sonra, ek) {
+  var k = { sira: sira, kaynak: kaynak, hedef: hedef, mod: "ripple", cuts: [{ start: 2, end: 4 }], imza: imz };
+  if (once) k.izOnce = once; if (sonra) k.izSonra = sonra;
+  for (var x in ek || {}) k[x] = ek[x];
+  return k;
+}
+function sl(y) { return y.map(function (k) { return k.sira; }); }
+// 1) kesim (X→Y), Premiere'de geri alındı (X), aynı kesim yeniden (X→Y): iki kayıt, kesim bir kez
+var u1 = E.yolUzlastir(E.yolBul([kay(1, "A", "A", "i", "X", "Y"), kay(2, "A", "A", "i", "X", "Y")], { sekansId: "A", sira: 0 }, "A"));
+ok("geri alınıp yeniden uygulanan kesim bir kez (ikinci kayıt aynı durumdan başlıyor: ilki geri alınmış)",
+  js(sl(u1.yol)) === "[2]" && !u1.kopuk && u1.basIz === "X" && u1.sonIz === "Y" && E.izliYol(u1, "A", "Y").durum === "tam", js(u1));
+// 2) geri alındı, başka kesim uygulandı (X→W)
+var u2 = E.yolUzlastir([kay(1, "A", "A", "i", "X", "Y"), kay(2, "A", "A", "j", "X", "W")]);
+ok("geri alınıp başka kesim: yalnız ikincisi", js(sl(u2.yol)) === "[2]" && u2.sonIz === "W" && E.izliYol(u2, "A", "W").durum === "tam");
+// 3) iki kesim, ikincisi geri alındı, üçüncü kesim ikinciden önceki durumdan
+var u3 = E.yolUzlastir([kay(1, "A", "A", "i", "X", "Y"), kay(2, "A", "A", "j", "Y", "Z"), kay(3, "A", "A", "k", "Y", "W")]);
+ok("ortadaki kesim geri alınmış: 1 ve 3", js(sl(u3.yol)) === "[1,3]" && !u3.kopuk);
+// 4) yalnız geri alma: bugünkü kurgu kesimden önceki
+var u4 = E.yolUzlastir([kay(1, "A", "A", "i", "X", "Y"), kay(2, "A", "A", "j", "Y", "Z")]);
+ok("izliYol: hepsi geri alındı → guncel (boş yol); sondaki geri alındı → önek; elle değişti → degisti",
+  E.izliYol(u4, "A", "X").durum === "guncel" && E.izliYol(u4, "A", "X").yol.length === 0 &&
+  E.izliYol(u4, "A", "Y").durum === "onek" && js(sl(E.izliYol(u4, "A", "Y").yol)) === "[1]" &&
+  E.izliYol(u4, "A", "Q").durum === "degisti" && E.izliYol(u4, "A", "Z").durum === "tam" && E.izliYol(u4, "A", "").durum === "bilinmiyor");
+// 5) kesimler arasında başka düzenleme: zincir kopuk (uyarı)
+var u5 = E.yolUzlastir([kay(1, "A", "A", "i", "X", "Y"), kay(2, "A", "A", "j", "Y2", "Z")]);
+ok("kesimler arasında elle düzenleme: kopuk, ikisi de yolda, izliYol degisti", u5.kopuk && js(sl(u5.yol)) === "[1,2]" && E.izliYol(u5, "A", "Z").durum === "degisti");
+// 6) kopya dalı: kaynak durumları ve kopya durumları ayrı
+var u6 = E.yolUzlastir(E.yolBul([kay(1, "A", "B", "i", "X", "B1"), kay(2, "B", "B", "j", "B1", "B2")], { sekansId: "A", sira: 0 }, "B"));
+ok("kopya dalı: zincir sağlam, kopyada sondaki geri alınınca önek", js(sl(u6.yol)) === "[1,2]" && !u6.kopuk && E.izliYol(u6, "B", "B1").durum === "onek" &&
+  js(sl(E.izliYol(u6, "B", "B1").yol)) === "[1]" && E.izliYol(u6, "B", "X").durum === "degisti");
+// 7) iz yoksa (doğrudan API): aynı imzalı tekrar bir kez, imza farklıysa ikisi
+ok("iz yok: aynı sekansta aynı kesim (imza) tekrarı bir kez", js(sl(E.yolUzlastir([kay(1, "A", "A", "i"), kay(2, "A", "A", "i"), kay(3, "A", "A", "j")]).yol)) === "[1,3]");
+// 8) atılmış / kısmen uygulanmış kayıt yolda: eksik; geri alınmışsa yoldan çıktığı için değil
+ok("yer tutucu (atildi) ya da kısmen uygulanmış (eksik) kayıt yoldaysa eksik",
+  E.yolUzlastir([kay(1, "A", "A", "i", "X", "Y", { atildi: true }), kay(2, "A", "A", "j", "Y", "Z")]).eksik === true &&
+  E.yolUzlastir([kay(1, "A", "A", "i", "X", "Y", { eksik: true })]).eksik === true &&
+  E.yolUzlastir([kay(1, "A", "A", "i", "X", "Y", { eksik: true }), kay(2, "A", "A", "j", "X", "W")]).eksik === false);
+ok("yolUzlastir: boş / null yol", E.yolUzlastir(null).yol.length === 0 && E.yolUzlastir([]).sonIz === "");
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

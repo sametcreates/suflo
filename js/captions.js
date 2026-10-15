@@ -102,9 +102,12 @@ window.KCaptions = (function () {
   var belgeSira = 0;            // belge bu kesim kaydına kadar (dahil) güncel
   var belgeKesimAdi = null;     // null: kesime bağlı değil; metin: belge bir kesimden sonra uyarlandı / aktarıldı, o
                                 // sekansın adı ("" = adı bilinmiyor): Uygula başka sekansta açılmaz (altyazı kayık çıkardı)
-  var kesimKayitlari = [];      // oturumdaki uygulanmış kesimler: { sira, kaynak, hedef, hedefAd, mod, cuts, kare, imza }
+  var kesimKayitlari = [];      // oturumdaki uygulanmış kesimler: { sira, kaynak, hedef, hedefAd, mod, cuts, kare, imza,
+                                // izOnce?, izSonra?, eksik? }; en eskiler kesimleri atılmış yer tutucu (atildi: true)
   var kesimSayac = 0;
-  var KESIM_KAYIT_SINIRI = 40;
+  var KESIM_KAYIT_SINIRI = 40;  // kesimleriyle tutulan kayıt
+  var KESIM_YER_TUTUCU_SINIRI = 1000;
+  var unutulanSira = 0;         // bütünüyle unutulan en yeni kayıt: daha eski belgeye uyarlama önerilmez
 
   // Onizleme/ipucu icin: ekranda veri varsa GERCEK bicimine, henuz uretim
   // yapilmadiysa UI secimine bak (bir sonraki uretimin bicimini gosterir).
@@ -3067,8 +3070,13 @@ window.KCaptions = (function () {
     var dtwIste = !ornek && dtwSecili();
     var cevrildi = false;
     var basarili = false;
-    // 3.4 adım 8: yeni belgenin sekansı (sekans kapsamında dışa aktarımın sekansı) ve o anki kesim kaydı: bu işten
-    // önce uygulanmış kesimler sesin içinde zaten var, belgeye bir daha uygulanmaz
+    /*
+     * 3.4 adım 8: yeni belgenin sekansı (sekans kapsamında dışa aktarımın sekansı) ve sesin alındığı andaki kesim kaydı:
+     * o ana dek uygulanmış kesimler sesin içinde zaten var, belgeye bir daha uygulanmaz. Sıra sesi Premiere'den aldıktan
+     * SONRA okunur (KS_exportAudio / KS_getSelectedClips dönünce): ExtendScript çağrıları sırayla çalışır, Otomatik
+     * Kesim'in o sırada süren KS_applyCuts'ı dışa aktarımdan önce biter ve kaydı (kesimKaydet) dönüşünde hemen yazılır —
+     * işin başında okunsaydı kesilmiş kurgunun belgesi kesimden önceki sayılır, aynı kesim ona ikinci kez önerilirdi.
+     */
     var isSekansId = ornek ? (ornekSekansId || String(ctx.sequenceId || "")) : String(ctx.sequenceId || "");
     var isSira = kesimSayac;
     busy = true;
@@ -3133,6 +3141,7 @@ window.KCaptions = (function () {
       } else if (scope === "clip") {
         iptalDenetle();
         var sc = await K.call("KS_getSelectedClips");
+        isSira = kesimSayac;   // klip konumları bu andaki kurgudan
         iptalDenetle();
         if (sc.ok && sc.clips && sc.clips.length > 1) {
           if (typeof Pro !== "undefined" && !Pro.isPro()) {                   // Pro: toplu klip
@@ -3183,6 +3192,7 @@ window.KCaptions = (function () {
         } finally {
           iptalKilidi(false);
         }
+        isSira = kesimSayac;   // dışa aktarılan ses bu andaki kurgudan (önünde sıradaki KS_applyCuts kaydedildi)
         if (ex && ex.ok && ex.wav) tempFiles.push(ex.wav);
         iptalDenetle();
         if (!ex.ok) throw new Error(ex.error);
@@ -3400,21 +3410,38 @@ window.KCaptions = (function () {
 
   /*
    * Otomatik Kesim / Konuşmadan kes: başarılı KS_applyCuts'ın kaydı (SufloKesimEsle.uyarlamaPlani çıktısı). Döner:
-   * kaydın sırası (0: kaydedilmedi). Kayıtlar oturumluk (panel yeniden açılınca boşalır; en çok 40).
+   * kaydın sırası (0: kaydedilmedi). Kayıtlar oturumluk (panel yeniden açılınca boşalır). Kesimleriyle en çok 40 kayıt
+   * tutulur; daha eskisi silinmez, kesimleri atılmış bir yer tutucuya iner (atildi): yolu ondan geçen belgeye eksik bir
+   * zincir sessizce uygulanmaz ("eksik"). Yer tutucular da 1000'i aşınca en eskisi unutulur (unutulanSira).
    */
   function kesimKaydet(k) {
     if (!k || !k.kaynak || !k.hedef || !k.cuts || !k.cuts.length || (k.mod !== "ripple" && k.mod !== "gap")) return 0;
     var kayit = { sira: ++kesimSayac, kaynak: String(k.kaynak), hedef: String(k.hedef), hedefAd: String(k.hedefAd || ""),
       mod: k.mod, cuts: k.cuts, kare: Number(k.kare) || 0, imza: String(k.imza || "") };
+    if (typeof k.izOnce === "string" && k.izOnce) kayit.izOnce = k.izOnce;
+    if (typeof k.izSonra === "string" && k.izSonra) kayit.izSonra = k.izSonra;
+    if (k.eksik) kayit.eksik = true;
     kesimKayitlari.push(kayit);
-    if (kesimKayitlari.length > KESIM_KAYIT_SINIRI) kesimKayitlari.shift();
+    var tam = 0;
+    for (var i = kesimKayitlari.length - 1; i >= 0; i--) {
+      var x = kesimKayitlari[i];
+      if (x.atildi) continue;
+      if (++tam <= KESIM_KAYIT_SINIRI) continue;
+      var yer = { sira: x.sira, kaynak: x.kaynak, hedef: x.hedef, hedefAd: x.hedefAd, mod: x.mod, cuts: [], kare: 0, imza: "", atildi: true };
+      if (x.izOnce) yer.izOnce = x.izOnce;
+      if (x.izSonra) yer.izSonra = x.izSonra;
+      kesimKayitlari[i] = yer;
+    }
+    while (kesimKayitlari.length > KESIM_YER_TUTUCU_SINIRI) unutulanSira = Math.max(unutulanSira, kesimKayitlari.shift().sira);
     return kayit.sira;
   }
 
   /*
-   * Ekrandaki belge hedef sekansın bugünkü kurgusuna uyarlanabilir mi? { ok, adim, satir } ya da { ok: false, neden }:
-   * "yok" (modül / hedef yok), "mesgul" (transkripsiyon sürüyor), "bos", "sekans" (belge başka sekansın ya da sekansı
-   * bilinmiyor), "guncel" (belge zaten bu kurguda).
+   * Ekrandaki belge hedef sekansın bugünkü kurgusuna uyarlanabilir mi? { ok, adim, satir, izli? } ya da { ok: false,
+   * neden }: "yok" (modül / hedef yok), "mesgul" (transkripsiyon sürüyor), "bos", "sekans" (belge başka sekansın ya da
+   * sekansı bilinmiyor), "guncel" (belge zaten bu kurguda), "eksik" (yoldaki bir kesim kısmen uygulandı ya da artık
+   * hatırlanmıyor). Yol host'un kurgu izleriyle uzlaştırılır (Premiere'de geri alınıp yeniden uygulanan kesim bir kez);
+   * izli: yolun sonunun izi var — uygulamadan önce taze izle denetlenebilir (KS_kurguIzi).
    */
   function kurguYolu(hedef) {
     hedef = String(hedef || "");
@@ -3425,26 +3452,46 @@ window.KCaptions = (function () {
     if (!belgeSekansId) return { ok: false, neden: "sekans" };
     var yol = M.yolBul(kesimKayitlari, { sekansId: belgeSekansId, sira: belgeSira }, hedef);
     if (!yol) return { ok: false, neden: "sekans" };
-    if (!yol.length) return { ok: false, neden: "guncel" };
-    return { ok: true, adim: yol.length, satir: segments.length, yol: yol };
+    if (yol.length && belgeSira < unutulanSira) return { ok: false, neden: "eksik" };
+    var uz = M.yolUzlastir(yol);
+    if (!uz.yol.length) return { ok: false, neden: "guncel" };
+    if (uz.eksik) return { ok: false, neden: "eksik" };
+    var d = { ok: true, adim: uz.yol.length, satir: segments.length, yol: uz.yol, uz: uz };
+    if (uz.sonIz) d.izli = true;
+    return d;
   }
   function kurguDurumu(hedef) {
     var d = kurguYolu(hedef);
-    return d.ok ? { ok: true, adim: d.adim, satir: d.satir } : d;
+    if (!d.ok) return d;
+    var o = { ok: true, adim: d.adim, satir: d.satir };
+    if (d.izli) o.izli = true;
+    return o;
   }
 
   /*
    * Belgeyi hedef sekansın kurgusuna uyarla: yoldaki kesimler sırayla (SufloKesimEsle.zincirEsle), TEK geri alma adımı,
    * taslak güncellenir. Belge hedefe bağlanır; Shorts / rehber örneğinin belgesi kopyaya geçince onların kaydından çıkar.
+   * o.guncelIz (KS_kurguIzi'nin taze izi) verilirse yol bugünkü kurguyla denetlenir (SufloKesimEsle.izliYol): sondaki
+   * kesim Premiere'de geri alındıysa yalnız kalan önek; hepsi geri alındıysa { neden: "geriAlma" }; kurgu hiçbir
+   * duruma uymuyorsa { neden: "degisti" } (kullanıcı "Yine de uyarla" derse o.guncelIz'siz yeniden çağrılır).
+   * Kelime kelime / birikimli belgede kesilen kelime cue'su kelime kuralıyla düşer (segmentsMode → kelimeModu).
    */
-  function kurguyaUyarla(hedef) {
+  function kurguyaUyarla(hedef, o) {
+    o = o || {};
     var d = kurguYolu(hedef);
     if (!d.ok) return d;
+    var yol = d.yol;
+    if (typeof o.guncelIz === "string" && o.guncelIz) {
+      var iy = kesimEsleModulu().izliYol(d.uz, String(hedef), o.guncelIz);
+      if (iy.durum === "guncel") return { ok: false, neden: "geriAlma" };
+      if (iy.durum === "degisti") return { ok: false, neden: "degisti" };
+      yol = iy.yol;
+    }
     var ayar = CL.uzunlukAyari(el("cap-maxlen") ? el("cap-maxlen").value : "");
-    var r = kesimEsleModulu().zincirEsle(segments, d.yol, { maxChars: ayar.maxChars || 42 });
+    var r = kesimEsleModulu().zincirEsle(segments, yol, { maxChars: ayar.maxChars || 42, kelimeModu: segmentsMode });
     cancelDraft();
     snapshot("kesimden sonra uyarlama");
-    var son = d.yol[d.yol.length - 1];
+    var son = yol[yol.length - 1];
     segments = r.cues;
     belgeBagla(son.hedef, son.sira, son.hedefAd || "");
     if (shortsYuklenen && shortsYuklenen !== belgeSekansId) shortsYuklenen = "";
@@ -3453,7 +3500,7 @@ window.KCaptions = (function () {
     render();
     el("cap-result-info").textContent = segments.length + " satır · yeni kurguya uyarlandı";
     saveDraftNow();
-    return { ok: true, satir: segments.length, dusen: r.dusen, kirpilan: r.kirpilan, adim: d.yol.length };
+    return { ok: true, satir: segments.length, dusen: r.dusen, kirpilan: r.kirpilan, adim: yol.length };
   }
 
   /*

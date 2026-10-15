@@ -1960,9 +1960,12 @@ function KS_cloneActiveSeq() {
  * dizinleri ozgununkiyle ayni. protect yoksa cikti 3.3 ile birebir ayni (protectedSkipped alani da yok).
  * esleme raporu (yalniz istenince; panel altyaziyi yeni kurguya uyarlar, js/kesim-esle.js):
  *   { kaynak: kesimden onceki sekansin kimligi, seqId: kesilen sekans (kopya ya da ayni), kare: sekans karesi (sn),
- *     kesimler: [{ start, end, kayma? }] (gelen sirayla) }. kayma yalniz ripple gercekten uygulandiysa: aralikta silinen
- *   kliplerin toplam suresi = sonraki icerigin kaydigi miktar (sekans kapsaminda hicbir katmanda klip olmayan bosluk
- *   araliga girerse araligin uzunlugundan kisadir; sonrasinda icerik yoksa alan yok).
+ *     kesimler: [{ start, end, kayma?, kesildi? }] (gelen sirayla), izOnce / izSonra: kesimden onceki (kaynak) ve
+ *     sonraki (kesilen sekans) kurgu izi (KS_kurguIzHesap), eksik?: true }. kayma yalniz ripple gercekten
+ *   uygulandiysa: aralikta silinen kliplerin toplam suresi = sonraki icerigin kaydigi miktar (sekans kapsaminda hicbir
+ *   katmanda klip olmayan bosluk araliga girerse araligin uzunlugundan kisadir; sonrasinda icerik yoksa alan yok).
+ *   Aralikta bir klip silinemeyip yalniz secildiyse (remove hatasi) o aralik kesildi: false (kayma yok) ve eksik: true:
+ *   kesim kismen uygulandi, panel altyaziyi bu kurguya uyarlamaz.
  */
 function KS_applyCuts(encoded) {
   try {
@@ -1984,11 +1987,14 @@ function KS_applyCuts(encoded) {
       return KS_errKod("katman", "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.");
     }
 
-    // 3.4 adim 8: esleme raporu icin kesimden onceki sekans ve gelen sirayla araliklar (asagida ranges yerinde siralanir)
-    var eslemeKaynak = String(seq.sequenceID), eslemeGiris = [], eslemeKayma = [], ei;
+    // 3.4 adim 8: esleme raporu icin kesimden onceki sekans, kurgu izi ve gelen sirayla araliklar (asagida ranges
+    // yerinde siralanir; her aralik gelis sirasini _ei'de tasir)
+    var eslemeKaynak = String(seq.sequenceID), eslemeGiris = [], eslemeKayma = [], eslemeHata = [], eslemeIzOnce = "", ei;
     if (p.esleme) {
       for (ei = 0; ei < ranges.length; ei++) eslemeGiris.push({ start: Number(ranges[ei].start), end: Number(ranges[ei].end) });
+      eslemeIzOnce = KS_kurguIzHesap(seq);
     }
+    for (ei = 0; ei < ranges.length; ei++) ranges[ei]._ei = ei;
 
     // Korunan katmanlar: ES3'te Array.indexOf yok, nesne haritasi
     var korV = {}, korA = {}, korVSay = 0, korASay = 0, korumaVar = false, pk, ki, kn;
@@ -2106,6 +2112,7 @@ function KS_applyCuts(encoded) {
     }
     ranges.sort(function (a, b) { return b.start - a.start; });
 
+    var aralikHatasi = false;   // bu aralikta silinemeyip yalniz secilen klip var (esleme: kesim kismen uygulandi)
     function handleTracks(tracks, kor) {
       for (var ti = 0; ti < tracks.numTracks; ti++) {
         if (kor[ti]) continue;
@@ -2122,6 +2129,7 @@ function KS_applyCuts(encoded) {
               cl.remove(p.removeMode === "ripple", false);
               removed++;
             } catch (eR) {
+              aralikHatasi = true;
               try { cl.setSelected(true, true); selected++; } catch (eS2) {}
             }
           }
@@ -2131,8 +2139,10 @@ function KS_applyCuts(encoded) {
 
     for (i = 0; i < ranges.length; i++) {
       r = ranges[i];
+      aralikHatasi = false;
       handleTracks(seq.audioTracks, korA);
       handleTracks(seq.videoTracks, korV);
+      if (aralikHatasi) eslemeHata[r._ei] = true;
     }
 
     var sonuc = { cuts: boundaries.length, removed: removed, selected: selected, newSeq: newSeqName, rippleFallback: rippleDustu };
@@ -2143,15 +2153,62 @@ function KS_applyCuts(encoded) {
       if (KS_korunanIz(seq, korV, korA) !== korunanOnce) sonuc.protectedChanged = true;
     }
     if (p.esleme) {
-      var eslemeKesim = [];
+      var eslemeKesim = [], eslemeEksik = false;
       for (ei = 0; ei < eslemeGiris.length; ei++) {
         var ek = { start: eslemeGiris[ei].start, end: eslemeGiris[ei].end };
-        if (p.removeMode === "ripple" && !rippleDustu && typeof eslemeKayma[ei] === "number") ek.kayma = eslemeKayma[ei];
+        if (eslemeHata[ei]) { ek.kesildi = false; eslemeEksik = true; }
+        else if (p.removeMode === "ripple" && !rippleDustu && typeof eslemeKayma[ei] === "number") ek.kayma = eslemeKayma[ei];
         eslemeKesim.push(ek);
       }
-      sonuc.esleme = { kaynak: eslemeKaynak, seqId: String(seq.sequenceID), kare: tb > 0 ? tb / KS_TPS : 0, kesimler: eslemeKesim };
+      sonuc.esleme = { kaynak: eslemeKaynak, seqId: String(seq.sequenceID), kare: tb > 0 ? tb / KS_TPS : 0, kesimler: eslemeKesim,
+        izOnce: eslemeIzOnce, izSonra: KS_kurguIzHesap(seq) };
+      if (eslemeEksik) sonuc.esleme.eksik = true;
     }
     return KS_ok(sonuc);
+  } catch (e) { return KS_err(e); }
+}
+
+/*
+ * 3.4 adim 8: kurgu izi — sekanstaki tum kliplerin yeri (katman, baslangic, bitis; ms) iki karmayla ozetlenir.
+ * KS_applyCuts esleme raporu kesimden onceki ve sonraki izi verir; panel "Altyaziyi yeni kurguya uyarla"dan once
+ * KS_kurguIzi ile taze izi sorar: Premiere'de geri alinan (ya da sonradan degisen) kesim panelden gorunmez.
+ */
+function KS_kurguIzHesap(seq) {
+  var h1 = 7, h2 = 13, n = 0;
+  function ekle(s) {
+    for (var j = 0; j < s.length; j++) {
+      var kod = s.charCodeAt(j);
+      h1 = (h1 * 31 + kod) % 2147483647;
+      h2 = (h2 * 131 + kod) % 2147483629;
+    }
+  }
+  function izler(tracks, harf) {
+    var sayi = 0;
+    try { sayi = tracks.numTracks; } catch (e0) { sayi = 0; }
+    for (var ti = 0; ti < sayi; ti++) {
+      var tr = tracks[ti], kn = 0;
+      try { kn = tr.clips.numItems; } catch (e1) { kn = 0; }
+      ekle("|" + harf + ti + ":");
+      for (var ci = 0; ci < kn; ci++) {
+        var c = tr.clips[ci];
+        try { ekle(Math.round(c.start.seconds * 1000) + "-" + Math.round(c.end.seconds * 1000) + ","); n++; } catch (e2) {}
+      }
+    }
+  }
+  try {
+    izler(seq.videoTracks, "V");
+    izler(seq.audioTracks, "A");
+  } catch (e) { return ""; }
+  return n + ":" + h1.toString(36) + "." + h2.toString(36);
+}
+
+// { seqId? } -> { ok, seqId, iz }: sekansin (verilmezse etkin sekansin) bugunku kurgu izi. Salt okur.
+function KS_kurguIzi(encoded) {
+  try {
+    var p = KS_arg(encoded);
+    var seq = p.seqId ? KS_seqById(p.seqId) : KS_seq();
+    if (!seq) return KS_err("Aktif sequence yok.");
+    return KS_ok({ seqId: String(seq.sequenceID), iz: KS_kurguIzHesap(seq) });
   } catch (e) { return KS_err(e); }
 }
 

@@ -340,10 +340,39 @@ ok("getTrackLayout scope inout, In / Out işaretsiz: klipler tüm sekanstan, hos
 /* ---------- 12) 3.4 adım 8: esleme raporu (altyazıyı yeni kurguya uyarlamak için) ---------- */
 var E8 = require(path.join(__dirname, "..", "js", "kesim-esle.js"));
 var s12 = vlog("s12");
+var iz12Once = call("KS_kurguIzi", { seqId: "s12" });
 var r12 = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: true, protect: { video: [], audio: [1] }, esleme: true });
+function eslemeOzu(e) { return { kaynak: e.kaynak, seqId: e.seqId, kare: e.kare, kesimler: e.kesimler }; }
 ok("esleme (Kopya sekansta, ripple): kaynak özgün sekans, seqId kopya, kare 0.04, gelen sırayla kesimler + gerçek kayma",
-  r12.ok && js(r12.esleme) === js({ kaynak: "s12", seqId: "s12-kopya", kare: 0.04, kesimler: [{ start: 10, end: 12, kayma: 2 }, { start: 30, end: 31.5, kayma: 1.5 }] }) &&
-  aktif.sequenceID === "s12-kopya", js(r12.esleme));
+  r12.ok && js(eslemeOzu(r12.esleme)) === js({ kaynak: "s12", seqId: "s12-kopya", kare: 0.04, kesimler: [{ start: 10, end: 12, kayma: 2 }, { start: 30, end: 31.5, kayma: 1.5 }] }) &&
+  r12.esleme.eksik === undefined && aktif.sequenceID === "s12-kopya", js(r12.esleme));
+// kurgu izi: kesimden önceki (kaynak) ve sonraki (kopya) iz; KS_kurguIzi aynı hesabı taze verir
+var iz12Kopya = call("KS_kurguIzi", { seqId: "s12-kopya" }), iz12Kaynak = call("KS_kurguIzi", { seqId: "s12" }), iz12Etkin = call("KS_kurguIzi");
+ok("esleme izOnce = kesimden önce kaynağın izi (kopya da öyle başladı), izSonra = kesilen kopyanın taze izi; ikisi farklı",
+  iz12Once.ok && typeof r12.esleme.izOnce === "string" && r12.esleme.izOnce.length > 0 && r12.esleme.izOnce === iz12Once.iz &&
+  iz12Kaynak.iz === iz12Once.iz && r12.esleme.izSonra === iz12Kopya.iz && r12.esleme.izSonra !== r12.esleme.izOnce &&
+  iz12Etkin.ok && iz12Etkin.seqId === "s12-kopya" && iz12Etkin.iz === iz12Kopya.iz, js([r12.esleme.izOnce, r12.esleme.izSonra, iz12Once, iz12Kopya, iz12Etkin]));
+// Premiere'de geri alma panelden görünmez: silinen parçalar geri gelince iz kesimden önceki ize döner
+var s12g = vlog("s12g");
+var r12g = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: false, esleme: true });
+var yedekV = s12g.videoTracks[0]._k.slice();
+var izSonraTaze = call("KS_kurguIzi", { seqId: "s12g" }).iz;
+s12g.videoTracks[0]._k = [klip(0, 60, { name: "Kamera" })]; s12g.videoTracks[0]._k[0]._iz = s12g.videoTracks[0];
+s12g.audioTracks[0]._k = [klip(0, 60, { tur: "a", name: "Kamera" })]; s12g.audioTracks[0]._k[0]._iz = s12g.audioTracks[0];
+s12g.audioTracks[1]._k = [klip(0, 60, { tur: "a", name: "sarki.mp3" })]; s12g.audioTracks[1]._k[0]._iz = s12g.audioTracks[1];
+var izGeri = call("KS_kurguIzi", { seqId: "s12g" });
+ok("kurgu izi: Bu sekansta kesimden sonra izSonra tazeyle aynı; kesim geri alınınca iz izOnce'ye döner",
+  r12g.esleme.izSonra === izSonraTaze && izGeri.iz === r12g.esleme.izOnce && izGeri.iz !== izSonraTaze && yedekV.length === 3, js([r12g.esleme, izGeri]));
+ok("KS_kurguIzi: bilinmeyen sekans hata", call("KS_kurguIzi", { seqId: "yok" }).ok === false);
+// bir klip silinemedi (remove hatası): yalnız seçildi — o aralık kesildi: false, kayma yok, rapor eksik
+var s12h = vlog("s12h");
+var bozRemove = s12h.audioTracks[1]._k[0];
+var r12hOnce = call("KS_applyCuts", { ranges: [{ start: 30, end: 31.5 }], removeMode: "select", cloneFirst: false });   // razor yalnız (seçer)
+s12h.audioTracks[1]._k.forEach(function (k) { if (k.start.seconds >= 29.99 && k.end.seconds <= 31.51) k.remove = function () { throw new Error("kilitli"); }; });
+var r12h = call("KS_applyCuts", { ranges: [{ start: 10, end: 12 }, { start: 30, end: 31.5 }], removeMode: "ripple", cloneFirst: false, esleme: true });
+ok("esleme: aralıkta silinemeyip seçilen klip → kesildi: false, kayma yok, eksik: true; öbür aralık normal",
+  r12hOnce.ok && bozRemove && r12h.ok && r12h.selected === 1 && r12h.esleme.eksik === true &&
+  js(r12h.esleme.kesimler) === js([{ start: 10, end: 12, kayma: 2 }, { start: 30, end: 31.5, kesildi: false }]), js(r12h));
 ok("esleme yalnız istenince (protect'li çağrıda da alan yok)", r1.esleme === undefined && r2.esleme === undefined && r9.esleme === undefined);
 var s12b = bosluklu("s12b", 0);
 var r12b = call("KS_applyCuts", { ranges: [{ start: 30, end: 31.5 }, { start: 10, end: 12 }, { start: 20.15, end: 21.85 }], removeMode: "ripple", cloneFirst: false,

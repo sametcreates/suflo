@@ -1561,15 +1561,29 @@ varsayımıyla kareye oturtuluyor (`js/kesim-esle.js` › `kareyeOturt`). Altyaz
 satırları da). **8.6**: host'un "gerçek kayma" raporu (`KS_applyCuts` › `esleme.kesimler[].kayma`) Premiere'in boşlukta
 hiçbir şey silmediği varsayımına dayanıyor; boşluktan sonraki altyazılar kayıksa günlükle bildir.
 
-**K8.2 Karar: kelimesiz satır eşiği.** Kelime zamanı olmayan satır (bulut satır modu, SRT içe aktarma, kelime kelime /
-birikimli modlar, çevrilmiş satır) kesimle 0,2 sn'nin altına inerse düşer (`MIN_KALAN`). Plandan küçük sapma: yarısından
-fazlası kalan kısa satır (kelime kelime modundaki tek kelime, 0,15 sn) kesime değdi diye düşmez. Denemelerde kelime kelime
-modunda kesim kenarında kelime kaybolursa ya da kesilen kısa satır kalıyorsa bildir.
+**K8.2 Kelimesiz satır eşiği (inceleme sonrası plana göre).** Kelime zamanı olmayan satır (bulut satır modu, SRT içe
+aktarma, çevrilmiş satır) kesimle 0,2 sn'nin altına inerse ya da tamamen kesimde kalırsa düşer (`MIN_KALAN`; plan madde 1).
+Tek istisna kesimden ÖNCE de 0,2 sn'den kısa olan satır (SRT'deki tek kelime, kısa ünlem): yarısından fazlası kaldıysa
+kesime değdi diye silinmez. İlk sürümdeki daha geniş istisna (0,2–0,4 sn'lik satırı da 0,2 sn'nin altında bırakıyordu)
+kaldırıldı. **Kelime kelime** ve **Birikimli** belgelerde her satır bir kelimedir: kelime kuralı (ortası kesimde kalan düşer)
+uygulanır, birikimli satırda kesilen kelime sonraki satırlardan da çıkar. Denemelerde (deneme listesi 8.18) kesim
+kenarında kelime kaybolursa ya da kesilen kısa satır kalıyorsa bildir.
 
 **K8.3 Bilinen sınır (metinler için).** Premiere'e daha önce eklenmiş altyazı izi (ya da Altyazı Efektleri katmanı)
 güncellenmez: Suflo yalnız paneldeki belgeyi uyarlar. Kopya sekansta eski iz (özgün sekanstan kopyalanan) duruyorsa sil,
 sonra uyarlanan belgeyi Uygula. Kesim kayıtları oturumluk: panel kapanıp açılınca eski kesime uyarlama önerilmez. Sürüm notu
 ve site metninde böyle söyle; "altyazı izi kendiliğinden kayar" deme.
+
+**K8.5 İnceleme sonrası: Premiere'de geri alma ve kısmi kesim.** Panel Premiere'in Ctrl+Z'sini görmez. `KS_applyCuts`
+esleme raporu artık kurgunun kesimden önceki ve sonraki **izini** (tüm kliplerin yeri, iki karma; `KS_kurguIzHesap`) verir;
+**Altyazıyı yeni kurguya uyarla** ve **Altyazıya aktar** önce yeni salt okur `KS_kurguIzi` ile taze izi sorar. Kesim tamamen
+geri alındıysa uyarlanmaz; geri alınıp aynı kesim yeniden uygulandıysa belgeye bir kez uygulanır; kurgu başka türlü
+değiştiyse (yarım geri alma, elle düzenleme, kesimden sonra eklenen SFX / grafik katmanı da dahil) uyarı + **Yine de
+uyarla**. Bir klip silinemeyip yalnız seçildiyse (`remove` hatası; esleme `eksik`) kesim kaydedilir ama uyarlama / aktarma
+önerilmez ve bu kesimden geçen yol kurulmaz. 40'tan eski kesim kayıtları silinmez, kesimleri atılmış yer tutucuya iner:
+eksik zincir sessizce uygulanmaz. Deneme listesi 8.14–8.17 ve 8.19'u gerçek Premiere'de dene; özellikle 8.14 (iz geri
+almadan sonra kesimden önceki ize dönüyor mu: Premiere ripple geri almada klip sınırlarını milisaniyesine kadar geri
+getirmezse "geri alınmış" yerine "değişti" uyarısı çıkar; öyleyse günlükle bildir).
 
 **K8.4 Tanıtım (isteğe bağlı).** 15 sn'lik ekran kaydı: altyazılı bir vlogda Otomatik Kesim → Kesimleri uygula →
 "Altyazıyı yeni kurguya uyarla" → kopyada senkron altyazı. Sürüm notuna: "Kesimden sonra altyazıyı yeniden yazıya dökmeye

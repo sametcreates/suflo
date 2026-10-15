@@ -6,6 +6,8 @@
 //  - belge kesimden SONRA oluştuysa önerilmez; Sadece kes + seç kaydedilmez; rippleFallback → boşluk modu
 //  - art arda iki kesim (kopya + kopyada Bu sekansta) tek tıkla sırayla uygulanır
 //  - Altyazıya aktar: kelimeler satır kurucuyla belge olur, hedef sekansa bağlanır; Uygula başka sekansta açılmaz
+//  - inceleme: Premiere'de geri alma / yeniden uygulama (taze kurgu izi, KS_kurguIzi), kısmen uygulanan kesim, 40'tan
+//    eski kesim kaydı (yer tutucu: eksik zincir uygulanmaz), birikimli belge, işin kesim sırası, İngilizce sekans adı
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var KOK = path.join(__dirname, "..");
 var gecen = 0, toplam = 0;
@@ -22,6 +24,11 @@ var blokBas = cap.indexOf("  /* ---------------- 3.4 adım 8: kesimden sonra alt
 var blokSon = cap.indexOf("  /*\n   * Başarılı transkript dinleyicileri");
 if (blokBas < 0 || blokSon < blokBas) throw new Error("3.4 adım 8 bloğu captions.js'te bulunamadı");
 var BLOK = cap.slice(blokBas, blokSon);
+// belge / kesim kaydı durum değişkenleri captions.js'teki bildirimlerin kendisi (sınırlar, yer tutucu sayacı dahil)
+var degBas = cap.indexOf('  var belgeSekansId = "";');
+var degSon = cap.indexOf("\n", cap.indexOf("  var unutulanSira = 0;"));
+if (degBas < 0 || degSon < degBas) throw new Error("kesim kaydı değişkenleri captions.js'te bulunamadı");
+var DEGISKENLER = cap.slice(degBas, degSon);
 var E = require(path.join(KOK, "js", "kesim-esle.js"));
 var CT = require(path.join(KOK, "js", "caption-text.js"));
 var CL = require(path.join(KOK, "js", "caption-layout.js"));
@@ -48,7 +55,7 @@ function altyaziKur(o) {
   var doc = o.document || belgeYap();
   var src = [
     "var segments = [], segmentsMode = 'plain', ceviriDili = '', algilananDil = '', shortsYuklenen = '', ornekBelge = false, ornekSekansId = '', busy = false;",
-    "var belgeSekansId = '', belgeSira = 0, belgeKesimAdi = null, kesimKayitlari = [], kesimSayac = 0, KESIM_KAYIT_SINIRI = 40;",
+    DEGISKENLER,
     "var undoStack = [], redoStack = [], UNDO_MAX = 50, kaliteOnayBekleyen = null, onayBekleyen = null, uygulananSekans = {};",
     "function render() {} function refreshUndoUI() {} function renderHistory() {} function uygulaEtiketiniSifirla() {} function shortsDugmesi() {}",
     "function clearRevert() {} function hideRestore() {} function applyGlossary() {} function cancelDraft() {}",
@@ -63,6 +70,7 @@ function altyaziKur(o) {
     "  belgeBilgisi: function () { return { sekansId: belgeSekansId, sira: belgeSira, kesimAdi: belgeKesimAdi, satir: segments.length }; },",
     "  yukle: function (segs, sekansId) { segments = JSON.parse(JSON.stringify(segs)); belgeBagla(sekansId, kesimSayac, null); },",
     "  segs: function () { return segments; }, mod: function () { return segmentsMode; }, dil: function () { return algilananDil; },",
+    "  modAyarla: function (m) { segmentsMode = m; }, kayitlar: function () { return kesimKayitlari; },",
     "  mesgul: function (b) { busy = b; }, shorts: function (v) { if (v !== undefined) shortsYuklenen = v; return shortsYuklenen; },",
     "  geriAl: function () { return undoStack.length; } };"
   ].join("\n");
@@ -73,19 +81,25 @@ function altyaziKur(o) {
 }
 
 /* ---------- eylem satırı (js/kesim-altyazi.js) ---------- */
-function satirKur(C, ids) {
+// o.iz: işlev(seqId) → KS_kurguIzi yanıtı (verilirse window.K.call sahte köprüsü kurulur; çağrılar o.cagri'ya)
+function satirKur(C, ids, o) {
+  o = o || {};
   var doc = C.document;
   var dugum = doc.dugum = doc.dugum || {};   // aynı belgedeki iki kartın düğümleri tek haritada
   function d(id) { if (!dugum[id]) dugum[id] = { id: id, hidden: true, textContent: "", dinle: {}, addEventListener: function (t, f) { (this.dinle[t] = this.dinle[t] || []).push(f); },
-    click: function () { (this.dinle.click || []).forEach(function (f) { f({}); }); } }; return dugum[id]; }
+    click: function () { var son; (this.dinle.click || []).forEach(function (f) { var x = f({}); if (x) son = x; }); return son; } }; return dugum[id]; }
   [ids.kutu, ids.metin, ids.uyarla, ids.aktar].forEach(function (id) { if (id) d(id); });
   doc.getElementById = function (id) { return dugum[id] || null; };
   var baglam = [], sekmeler = [], toast = [];
   var sb = { window: {}, document: doc, console: console, JSON: JSON, Math: Math, Number: Number, String: String };
   sb.window.SufloKesimEsle = E;
   sb.window.KCaptions = C;
-  sb.window.KApp = sb.KApp = { onContext: function (f) { baglam.push(f); }, toast: function (m, c) { toast.push([m, c]); }, goster: function (s) { sekmeler.push(s); },
+  sb.window.KApp = sb.KApp = { onContext: function (f) { baglam.push(f); }, toast: function (m, c, sure, eylem) { toast.push([m, c, eylem]); }, goster: function (s) { sekmeler.push(s); },
     ctx: function () { return C.ctx; } };
+  if (o.iz) {
+    o.cagri = o.cagri || [];
+    sb.window.K = { call: function (fn, arg) { o.cagri.push([fn, arg]); return Promise.resolve(fn === "KS_kurguIzi" ? o.iz(arg && arg.seqId) : { ok: false }); } };
+  }
   vm.createContext(sb);
   vm.runInContext(fs.readFileSync(path.join(KOK, "js", "kesim-altyazi.js"), "utf8"), sb);
   var eylem = sb.window.KKesimAltyazi(ids);
@@ -227,6 +241,132 @@ var KESIM = [{ start: 1.72, end: 2.48 }, { start: 8, end: 10 }];   // dolgu "ı�
   ok("esleKesim: uyarlar; aynı kesim (sırasız da) ikinci kez no-op (idempotent)", e1.ok && e1.dusen === 0 && e1.kirpilan === 1 && !e2.ok && e2.neden === "guncel" && js(C8.segs()) === e1s, js([e1, e2]));
   ok("esleKesim: select ve başka sekans reddedilir", C8.esleKesim(KESIM, "select", "S1-kopya").neden === "mod" && C8.esleKesim(KESIM, "ripple", "Z").neden === "sekans");
 
+
+  /* ---- 7) inceleme: Premiere'de geri alma (taze kurgu izi) ---- */
+  function izliSonuc(kaynak, hedef, kesimler, once, sonra, ek) {
+    var r = kopyaSonucu(kaynak, hedef, kesimler, ek);
+    r.esleme.izOnce = once; r.esleme.izSonra = sonra;
+    return r;
+  }
+  var guncelIz = "X";
+  var cagri = [];
+  var CU = altyaziKur();
+  CU.yukle(BELGE, "S1");
+  var U = satirKur(CU, CUT_IDS, { iz: function (id) { return { ok: true, seqId: id, iz: guncelIz }; }, cagri: cagri });
+  var rU = izliSonuc("S1", "S1", KESIM, "X", "Y", { newSeq: "" });
+  U.eylem.kesimSonrasi(rU, { removeMode: "ripple", kaynak: "S1", ranges: KESIM });
+  ok("izli kayıt: kurguDurumu izli, satır görünür", CU.kurguDurumu("S1").izli === true && U.el("cut-altyazi").hidden === false && CU.kayitlar()[0].izSonra === "Y",
+    js(CU.kurguDurumu("S1")));
+  // kullanıcı kesimi Premiere'de Ctrl+Z ile geri aldı: bugünkü iz kesimden önceki
+  await U.el("cut-altyazi-uyarla").click();
+  ok("geri alınan kesim: taze iz sorulur (salt okur, hedef sekans), belge değişmez, 'geri alınmış' uyarısı, satır kapanır",
+    js(cagri[0]) === js(["KS_kurguIzi", { seqId: "S1" }]) && js(CU.segs()) === js(BELGE) && CU.geriAl() === 0 &&
+    U.toast.some(function (t) { return t[0] === "Kesim Premiere'de geri alınmış; altyazı zaten bu kurguya göre." && t[1] === "warn"; }) &&
+    U.el("cut-altyazi").hidden === true, js(U.toast));
+  // aynı kesim yeniden bulunup uygulandı (X → Y): iki kayıt, kesim belgeye bir kez
+  U.eylem.kesimSonrasi(izliSonuc("S1", "S1", KESIM, "X", "Y", { newSeq: "" }), { removeMode: "ripple", kaynak: "S1", ranges: KESIM });
+  guncelIz = "Y";
+  ok("yeniden uygulanan aynı kesim: iki kayıt ama yol tek adım", CU.kayitlar().length === 2 && CU.kurguDurumu("S1").adim === 1, js(CU.kurguDurumu("S1")));
+  await U.el("cut-altyazi-uyarla").click();
+  var tekKez = E.zincirEsle(BELGE, [{ mod: "ripple", kare: 0.04, cuts: rU.esleme.kesimler }]).cues;
+  ok("yeniden uygulanan kesim belgeye bir kez uygulanır (iki kez kaydırmaz)", js(CU.segs()) === js(tekKez) && Math.abs(CU.segs()[2].start - 9.24) < 1e-6 &&
+    CU.belgeBilgisi().sira === 2, js(CU.segs().map(function (x) { return [x.text, x.start]; })));
+  // kurgu kesimden sonra başka türlü değişti: uyarı + "Yine de uyarla"
+  var CD = altyaziKur();
+  CD.yukle(BELGE, "S1");
+  var izD = "Q", cagriD = [];
+  var D = satirKur(CD, CUT_IDS, { iz: function (id) { return izD === null ? { ok: false, error: "yok" } : { ok: true, seqId: id, iz: izD }; }, cagri: cagriD });
+  D.eylem.kesimSonrasi(izliSonuc("S1", "S1", KESIM, "X", "Y", { newSeq: "" }), { removeMode: "ripple", kaynak: "S1", ranges: KESIM });
+  await D.el("cut-altyazi-uyarla").click();
+  var uyari = D.toast.filter(function (t) { return /^Kurgu kesimden sonra Premiere'de değişti/.test(t[0]); })[0];
+  ok("kurgu kesimden sonra değişti: belge değişmez, uyarı 'Yine de uyarla' düğmesiyle, satır açık kalır",
+    uyari && uyari[1] === "warn" && uyari[2] && uyari[2].metin === "Yine de uyarla" && js(CD.segs()) === js(BELGE) && D.el("cut-altyazi").hidden === false, js(D.toast));
+  uyari[2].fn();
+  ok("Yine de uyarla: denetimsiz uygulanır", CD.segs()[0].text === "Merhaba arkadaşlar," && Math.abs(CD.segs()[2].start - 9.24) < 1e-6, js(CD.segs()));
+  CD.undo();
+  izD = null;
+  await D.el("cut-altyazi-uyarla").click();
+  ok("taze iz okunamadı: uyarı + Yine de uyarla, belge değişmez", D.toast.some(function (t) { return t[0] === "Kurgu Premiere'den okunamadı; altyazı bu kurguya uymayabilir." && t[2]; }) &&
+    js(CD.segs()) === js(BELGE), js(D.toast.slice(-1)));
+  izD = "Y";
+  await D.el("cut-altyazi-uyarla").click();
+  ok("bugünkü iz kesimden sonraki: uygulanır", CD.segs()[0].text === "Merhaba arkadaşlar," && cagriD.length === 3, js(cagriD));
+  // Altyazıya aktar da kurgu değiştiyse uyarır
+  var CA = altyaziKur();
+  CA.yukle([{ start: 50, end: 51, text: "Başka" }], "B");
+  var izA = "Z";
+  var A = satirKur(CA, TC_IDS, { iz: function (id) { return { ok: true, seqId: id, iz: izA }; } });
+  A.eylem.kesimSonrasi(izliSonuc("S1", "S1-kopya", [{ start: 11.1, end: 12.1 }], "X", "Y"), { removeMode: "ripple", kaynak: "S1", ranges: [{ start: 11.1, end: 12.1 }],
+    kelimeler: [w("Merhaba", 10, 10.4), w("arkadaşlar.", 10.5, 11), w("Bugün", 12.2, 12.5)], dil: "tr", sonSinir: 20 });
+  await A.el("tc-altyazi-aktar").click();
+  var uyariA = A.toast.filter(function (t) { return /^Kurgu kesimden sonra Premiere'de değişti/.test(t[0]); })[0];
+  ok("Altyazıya aktar: kurgu kesimden sonra değiştiyse uyarı + Yine de uyarla, belge değişmez", uyariA && uyariA[2] && CA.segs()[0].text === "Başka", js(A.toast));
+  izA = "Y";
+  await A.el("tc-altyazi-aktar").click();
+  ok("Altyazıya aktar: bugünkü iz kesimden sonraki → aktarılır", CA.segs()[0].text === "Merhaba arkadaşlar." && CA.belgeBilgisi().sekansId === "S1-kopya", js(CA.segs()));
+
+  /* ---- 8) inceleme: kısmen uygulanan kesim (silinemeyip seçilen parça) ---- */
+  var CE = altyaziKur();
+  CE.yukle(BELGE, "S1");
+  var EK = satirKur(CE, TC_IDS);
+  var rE = kopyaSonucu("S1", "S1", KESIM, { newSeq: "", selected: 2 });
+  rE.esleme.eksik = true; rE.esleme.kesimler[1] = { start: 8, end: 10, kesildi: false };
+  var bE = EK.eylem.kesimSonrasi(rE, { removeMode: "ripple", kaynak: "S1", ranges: KESIM, kelimeler: [w("Merhaba", 1, 1.5)], dil: "tr" });
+  ok("kısmen uygulanan kesim: kaydedilir (eksik) ama satır, uyarla ve aktar yok", bE && bE.plan.eksik === true && CE.kayitlar()[0].eksik === true &&
+    EK.el("tc-altyazi").hidden === true && bE.kelimeler === null && CE.kurguDurumu("S1").neden === "eksik" && CE.kurguyaUyarla("S1").neden === "eksik" &&
+    js(CE.segs()) === js(BELGE), js(CE.kurguDurumu("S1")));
+  EK.eylem.kesimSonrasi(kopyaSonucu("S1", "S1", [{ start: 20, end: 21 }], { newSeq: "" }), { removeMode: "ripple", kaynak: "S1", ranges: [{ start: 20, end: 21 }] });
+  ok("sonraki tam kesimde de önceki eksik kesimden geçen yol uygulanmaz", CE.kurguDurumu("S1").neden === "eksik" && EK.el("tc-altyazi").hidden === true);
+  ok("removed 0 (hiçbir şey silinmedi): kayıt yok", EK.eylem.kesimSonrasi(kopyaSonucu("S1", "S1", KESIM, { newSeq: "", removed: 0 }), { removeMode: "ripple", kaynak: "S1", ranges: KESIM }) === null &&
+    CE.kayitlar().length === 2);
+
+  /* ---- 9) inceleme: 40'tan eski kesim kaydı (yer tutucu) ---- */
+  var CK = altyaziKur();
+  CK.yukle([{ start: 40, end: 41, text: "Sonda" }], "A");
+  CK.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("A", "A", [{ start: 5, end: 15 }], { newSeq: "" }), { removeMode: "ripple" }));
+  for (var kn = 0; kn < 40; kn++) CK.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("B" + kn, "B" + kn, [{ start: 1, end: 2 }], { newSeq: "" }), { removeMode: "ripple" }));
+  CK.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("A", "A", [{ start: 30, end: 31 }], { newSeq: "" }), { removeMode: "ripple" }));
+  var tamKayit = CK.kayitlar().filter(function (k) { return !k.atildi; }).length;
+  ok("40'tan eski kayıt silinmez, kesimleri atılmış yer tutucuya iner (tam kayıt 40)", tamKayit === 40 && CK.kayitlar().length === 42 && CK.kayitlar()[0].atildi === true &&
+    CK.kayitlar()[0].cuts.length === 0 && CK.kayitlar()[0].kaynak === "A", tamKayit + " / " + CK.kayitlar().length);
+  ok("yolu yer tutucudan geçen belge: eksik zincir uygulanmaz (40 → 39 değil), belge değişmez",
+    CK.kurguDurumu("A").neden === "eksik" && CK.kurguyaUyarla("A").neden === "eksik" && CK.segs()[0].start === 40, js(CK.kurguDurumu("A")));
+  CK.belgeBagla("A", 1, null);   // belge ilk kesimden SONRA oluşmuş olsaydı: yalnız son kesim
+  ok("yer tutucudan sonra oluşan belge etkilenmez", CK.kurguDurumu("A").ok === true && CK.kurguyaUyarla("A").ok && CK.segs()[0].start === 39, js(CK.segs()));
+  var CK2 = altyaziKur();
+  CK2.yukle([{ start: 40, end: 41, text: "Sonda" }], "A");
+  CK2.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("A", "A", [{ start: 5, end: 15 }], { newSeq: "" }), { removeMode: "ripple" }));
+  for (var kn2 = 0; kn2 < 1000; kn2++) CK2.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("B", "B", [{ start: 1, end: 2 }], { newSeq: "" }), { removeMode: "ripple" }));
+  CK2.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("A", "A", [{ start: 30, end: 31 }], { newSeq: "" }), { removeMode: "ripple" }));
+  ok("yer tutucular da 1000'i aşınca en eskisi unutulur: daha eski belgeye uyarlama yine önerilmez", CK2.kayitlar().length === 1000 && CK2.kurguDurumu("A").neden === "eksik",
+    CK2.kayitlar().length + " " + js(CK2.kurguDurumu("A")));
+
+  /* ---- 10) inceleme: birikimli (kc) belge ---- */
+  var CC = altyaziKur();
+  var kcBelge = CT.karaokeCumulative([w("Merhaba", 0, 0.5), w("ııı", 0.6, 1.2), w("ben", 1.3, 1.6), w("Samet", 1.7, 2.1)], 4);
+  CC.yukle(kcBelge, "S1");
+  CC.modAyarla("kc");
+  CC.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("S1", "S1", [{ start: 0.55, end: 1.25 }], { newSeq: "" }), { removeMode: "ripple" }));
+  var rC = CC.kurguyaUyarla("S1");
+  ok("birikimli belge: kesilen dolgu sonraki birikimli satırlardan da çıkar ('kesilen konuşmanın satırları çıkar')",
+    rC.ok && js(CC.segs().map(function (x) { return x.text; })) === js(["Merhaba", "Merhaba ben", "Merhaba ben Samet"]) && rC.dusen === 1, js(CC.segs()));
+  var C1 = altyaziKur();
+  C1.yukle([{ start: 0.5, end: 0.9, text: "Merhaba" }, { start: 1.0, end: 1.6, text: "ııı" }, { start: 2.1, end: 2.5, text: "ben" }], "S1");
+  C1.modAyarla("k1");
+  C1.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("S1", "S1", [{ start: 1.25, end: 2.0 }], { newSeq: "" }), { removeMode: "ripple" }));
+  C1.kurguyaUyarla("S1");
+  ok("kelime kelime belge: ORTASI kesimde kalan kelime cue'su düşer", js(C1.segs().map(function (x) { return x.text; })) === js(["Merhaba", "ben"]), js(C1.segs()));
+
+  /* ---- 11) inceleme: yeni belgenin kesim sırası sesin alındığı anda ---- */
+  var goGovde = govde("async function go(");
+  var exIdx = goGovde.indexOf('await K.call("KS_exportAudio"'), scIdx = goGovde.indexOf('await K.call("KS_getSelectedClips")');
+  var bagIdx = goGovde.indexOf("belgeBagla(isSekansId, isSira, null)");
+  var sonraEx = goGovde.indexOf("isSira = kesimSayac", exIdx), sonraSc = goGovde.indexOf("isSira = kesimSayac", scIdx);
+  ok("go(): kesim sırası KS_exportAudio ve KS_getSelectedClips döndükten SONRA okunur (sırada bekleyen KS_applyCuts'ın kaydı dahil), belge ona bağlanır",
+    exIdx > 0 && scIdx > 0 && sonraEx > exIdx && sonraEx < bagIdx && sonraSc > scIdx && sonraSc < exIdx &&
+    goGovde.slice(exIdx + 5, sonraEx).indexOf("await ") === -1 &&
+    goGovde.slice(scIdx + 5, sonraSc).indexOf("await ") === -1, [exIdx, sonraEx, scIdx, sonraSc, bagIdx].join(" "));
+
   /* ---- 6) kaynakta ---- */
   ok("index.html: kesim-esle.js captions.js'ten, kesim-altyazi.js magiccut.js ve konusma-kes.js'ten önce; satırlar varsayılan gizli",
     html.indexOf('src="js/caption-layout.js"') < html.indexOf('src="js/kesim-esle.js"') && html.indexOf('src="js/caption-text.js"') < html.indexOf('src="js/kesim-esle.js"') &&
@@ -244,7 +384,12 @@ var KESIM = [{ start: 1.72, end: 2.48 }, { start: 8, end: 10 }];   // dolgu "ı�
     I.translate("Altyazı sekmesindeki 3 satır kesimden önceki kurguya göre.") === "The 3 lines in the Captions tab still follow the edit from before the cut." &&
     I.translate("Altyazıyı yeni kurguya uyarla") === "Adapt captions to the new edit" && I.translate("Altyazıya aktar") === "Send to captions" &&
     I.translate("12 satır · yeni kurguya uyarlandı") === "12 lines · adapted to the new edit" &&
-    I.translate("Bu altyazı \"Vlog — Suflo Temiz\" sekansının kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.").indexOf("These captions were adapted to the edit of the \"Vlog") === 0,
+    I.translate("Bu altyazı \"Vlog — Suflo Temiz\" sekansının kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.") ===
+      "These captions were adapted to the edit of the \"Vlog — Suflo Temiz\" sequence. Open that sequence first, then apply." &&
+    I.translate("Bu altyazı \"Röportaj — Suflo Temiz\" sekansının kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.") ===
+      "These captions were adapted to the edit of the \"Röportaj — Suflo Temiz\" sequence. Open that sequence first, then apply." &&
+    I.translate("Yine de uyarla") === "Adapt anyway" &&
+    I.translate("Kesim Premiere'de geri alınmış; altyazı zaten bu kurguya göre.") === "The cut was undone in Premiere; the captions already follow this edit.",
     I.translate("Altyazı yeni kurguya uyarlandı: 4 satır · kesilen 1 satır çıkarıldı · 2 satır kısaldı"));
 
   console.log(gecen + "/" + toplam + " gecti");

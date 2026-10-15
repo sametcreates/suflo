@@ -3008,11 +3008,18 @@
     // undo history labels
     "Konuşmadan kes aktarımı": "Text-based cut handoff",
     "kesimden sonra uyarlama": "adapt after cut",
-    // Apply: captions adapted to a cut edit only go to that sequence
-    "Bu altyazı \"{}\" sekansının kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.":
-      "These captions were adapted to the edit of the \"{}\" sequence. Open that sequence first, then apply.",
+    // Apply: captions adapted to a cut edit only go to that sequence (the named form is a raw pattern below: the
+    // Premiere sequence name stays verbatim)
     "Bu altyazı kesilmiş başka bir sekansın kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.":
       "These captions were adapted to the edit of another, cut sequence. Open that sequence first, then apply.",
+    // the edit changed in Premiere after the cut (undo or another edit): checked against a fresh timeline fingerprint
+    "Arada tam uygulanamamış ya da artık hatırlanmayan bir kesim var; altyazıyı bu kurgu için yeniden oluştur.":
+      "A cut in between wasn't fully applied or is no longer remembered; create the captions again for this edit.",
+    "Kesim Premiere'de geri alınmış; altyazı zaten bu kurguya göre.": "The cut was undone in Premiere; the captions already follow this edit.",
+    "Kurgu kesimden sonra Premiere'de değişti (geri alma ya da başka bir düzenleme); altyazı bu kurguya uymayabilir.":
+      "The edit changed in Premiere after the cut (an undo or another edit); the captions may not match it.",
+    "Kurgu Premiere'den okunamadı; altyazı bu kurguya uymayabilir.": "Couldn't read the edit from Premiere; the captions may not match it.",
+    "Yine de uyarla": "Adapt anyway",
     // Auto Cut: Cancel replaces "Sessizlikleri bul" while ffmpeg analyzes
     "ffmpeg analizini durdurur; önceki sonuç ekranda kalır": "Stops the ffmpeg analysis; the previous result stays on screen",
     // engine / model / ffmpeg download cancel (Settings and the caption setup card)
@@ -3315,6 +3322,9 @@
     }],
     // "Bu Shorts'un…" style possessives are handled by exact keys; "Premiere'e geç" etc. too.
     [/^V(\d+) katmanına eklendi$/, "Added to track V$1"],
+    // captions adapted to a cut edit: the Premiere sequence name stays verbatim ($1 = raw, not translated)
+    [/^Bu altyazı "([\s\S]+)" sekansının kurgusuna göre uyarlandı\. Önce o sekansı aç, sonra uygula\.$/,
+      "These captions were adapted to the edit of the \"$1\" sequence. Open that sequence first, then apply."],
     // Try Pro clean re-render: the Premiere project item name and file path stay verbatim ($ = raw, not translated)
     [/^Filigran kısmen kaldırıldı: (\d+) proje öğesi değiştirilemedi\. Proje panelinde ona sağ tıkla, Replace Footage ile temiz dosyayı seç: ([\s\S]*)$/,
       function (m) { return "Watermark partly removed: " + m[1] + " project item" + (m[1] === "1" ? "" : "s") + " couldn't be swapped. Right-click " + (m[1] === "1" ? "it" : "them") + " in the Project panel, choose Replace Footage and pick the clean file: " + m[2]; }],
