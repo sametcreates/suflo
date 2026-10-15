@@ -349,5 +349,73 @@ ok("uçları kullanıcının anahtarlarında olan Eğri ve kullanıcının anaht
 var u12 = PM4.cagir("KS_easeUndo", { records: [eRec2] });
 ok("öbür Eğri'nin kendi Geri al'ı hâlâ çalışır", u12.ok && u12.sonuclar.length === 1 && u12.sonuclar[0].silinen === 1, js(u12));
 
+/* ---- 3.4 adım 12: özel eğri — yoğun yazım (Bezier 5 yok, doğrusal 0, kayıtlar) ---- */
+function izliPremiere() {
+  var P = require("./_kayit-premiere.js").olustur({ fps: 25 });
+  var interp = [];
+  P.FakeProp.prototype.setInterpolationTypeAtKey = function (t, tur, u) { interp.push({ ad: this.displayName, s: t.seconds, tur: tur, ui: u === true }); };
+  return { P: P, interp: interp };
+}
+var Y = izliPremiere();
+var G1 = Y.P.klip({ ad: "A.mp4", nodeId: "G1", start: 0, end: 5 }), G2 = Y.P.klip({ ad: "B.mp4", nodeId: "G2", start: 5, end: 10 });
+Y.P.izKur([[G1, G2]]);
+Y.P.durum.playhead = 5;
+var yPlan = T.hostPlan("zoom-in", { duration: 0.6, ease: "yumusak", fps: 25 });
+var uiOnce = Y.P.ui.length;
+var yr = Y.P.cagir("KS_applyCutTransition", { plan: yPlan, tolerance: 1 });
+var g1tl = G1.olcek.tl(G1), g2tl = G2.olcek.tl(G2);
+ok("yoğun: anahtar sayısı plandakiyle aynı (A ve B Ölçek; 0,3 sn · 25 kare: 2 çapa + 6 iç)", yr.ok && yr.yogun === true && g1tl.length === yPlan.out.scale.length &&
+  g2tl.length === yPlan["in"].scale.length && g1tl.length === 8, js([g1tl, g2tl]));
+ok("yoğun: zamanlar plandaki (kesim + t) ve değerler klibin ölçeği × çarpan", g1tl.every(function (t, i) { return yak(t, 5 + yPlan.out.scale[i].t); }) &&
+  G1.olcek.keys.every(function (k, i) { return yak(k.v, 100 * yPlan.out.scale[i].v); }), js(G1.olcek.keys.slice(0, 3)));
+ok("yoğun: hiçbir anahtara Bezier (5) yazılmadı; her anahtar doğrusal (0)", Y.interp.length === g1tl.length + g2tl.length &&
+  Y.interp.every(function (c) { return c.tur === 0 && !c.ui; }), js(Y.interp.slice(0, 3)));
+var anahtarUi = Y.P.ui.slice(uiOnce).filter(function (u) { return u.tur === "anahtar" && u.ad === "Scale"; });
+ok("yoğun: updateUI yalnız her özelliğin son anahtarında", anahtarUi.filter(function (u) { return u.ui; }).length === 2 &&
+  anahtarUi[g1tl.length - 1].ui === true && anahtarUi[anahtarUi.length - 1].ui === true && anahtarUi.length === g1tl.length + g2tl.length, js(anahtarUi.map(function (u) { return u.ui; })));
+var ys = sakla(yr);
+ok("yoğun: kayıtlar döner; her kayıt yazılan tüm anahtarların zamanını taşır; yazilan toplamı", ys.length === 2 && ys.every(function (r) { return r.tur === "gecis" && r.times.length === 8; }) &&
+  yr.yazilan === 16, js(yr.records.map(function (r) { return r.times.length; })));
+var yk = Y.P.cagir("KS_removeSufloKeys", { records: ys });
+ok("yoğun yazım kayıtla kaldırılır: tüm anahtarlar gider, Ölçek 100", yk.ok && yk.sonuclar.every(function (x) { return x.silinen === 8; }) &&
+  G1.olcek.keys.length === 0 && G1.olcek.value === 100 && G2.olcek.keys.length === 0, js(yk));
+// 'auto' planı: Bezier (5) eskisi gibi, doğrusal yok
+Y.interp.length = 0;
+var ar = Y.P.cagir("KS_applyCutTransition", { plan: T.hostPlan("zoom-in", { duration: 0.6 }), tolerance: 1 });
+ok("'auto': her anahtara Bezier (5) — yazım eskisi gibi; cevapta yogun yok", ar.ok && ar.yogun === undefined && Y.interp.length === 6 && Y.interp.every(function (c) { return c.tur === 5; }), js(Y.interp));
+// Premiere setInterpolationTypeAtKey sunmuyorsa (kfInterp yok): yoğun anahtarlar yine yazılır, ara değerleme çağrılmaz
+var Y2 = izliPremiere();
+delete Y2.P.FakeProp.prototype.setInterpolationTypeAtKey;
+var H1 = Y2.P.klip({ ad: "A.mp4", nodeId: "H1", start: 0, end: 5 }), H2 = Y2.P.klip({ ad: "B.mp4", nodeId: "H2", start: 5, end: 10 });
+Y2.P.izKur([[H1, H2]]);
+Y2.P.durum.playhead = 5;
+var nr = Y2.P.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.6, ease: "sert-cikis", fps: 25 }), tolerance: 1 });
+ok("kfInterp yoksa: yoğun anahtarlar yine yazılır (ara değerleme çağrısı yok)", nr.ok && H1.opak.keys.length === 8 && H2.opak.keys.length === 8, js([H1.opak.keys.length, H2.opak.keys.length]));
+// Kısa klip: host zamanı sıkıştırır (oran < 1); kare altına sıkışan iç örnekler seyreltilir, çapalar kalır
+var Y3 = izliPremiere();
+var J1 = Y3.P.klip({ ad: "A.mp4", nodeId: "J1", start: 0, end: 0.3 }), J2 = Y3.P.klip({ ad: "B.mp4", nodeId: "J2", start: 0.3, end: 5 });
+Y3.P.izKur([[J1, J2]]);
+Y3.P.durum.playhead = 0.3;
+var kPlan = T.hostPlan("dip", { duration: 1.6, ease: "yumusak", fps: 25 });   // yarı 0,8 sn; A yalnız 0,3 sn → oran 0,1875
+var kr = Y3.P.cagir("KS_applyCutTransition", { plan: kPlan, tolerance: 1 });
+var j1tl = J1.opak.tl(J1), j2tl = J2.opak.tl(J2);
+var enYakin = 1;
+[j1tl, j2tl].forEach(function (d) { for (var q = 1; q < d.length; q++) enYakin = Math.min(enYakin, d[q] - d[q - 1]); });
+ok("kısa klip: sıkıştırılan iç örnekler seyreltilir (komşu anahtarlar en az yarım kare), uçlar yerinde", kr.ok && kr.half < 0.8 &&
+  j1tl.length < kPlan.out.opacity.length && j1tl.length >= 2 && enYakin >= 0.5 / 25 - 1e-9 && yak(j1tl[j1tl.length - 1], 0.3) && yak(j2tl[0], 0.3) &&
+  J1.opak.keys[J1.opak.keys.length - 1].v === 0 && J2.opak.keys[J2.opak.keys.length - 1].v === 100, js([j1tl, j2tl, kr.half]));
+var sy = Y3.P.ctx.KS_yogunSeyrelt([{ time: 0 }, { time: 0.001 }, { time: 0.03 }, { time: 0.05 }, { time: 0.051 }], 25).map(function (k) { return k.time; });
+ok("KS_yogunSeyrelt: çapa işareti yoksa ilk ve son çapa; ara örnek yarım kareden yakınsa (öncekine ya da sonraki çapaya) atılır", js(sy) === js([0, 0.03, 0.051]), js(sy));
+var syA = Y3.P.ctx.KS_yogunSeyrelt([{ time: 0, a: 1 }, { time: 0.001, a: 1 }, { time: 0.01 }, { time: 0.04, a: 1 }], 25).map(function (k) { return k.time; });
+ok("KS_yogunSeyrelt: çapalar (a: 1) birbirine çok yakın olsa da kalır", js(syA) === js([0, 0.001, 0.04]), js(syA));
+// Opaklık: taşan eğri (Taşma) Opaklığı 0..100 dışına itmez
+var Y4 = izliPremiere();
+var L1 = Y4.P.klip({ ad: "A.mp4", nodeId: "L1", start: 0, end: 5 }), L2 = Y4.P.klip({ ad: "B.mp4", nodeId: "L2", start: 5, end: 10 });
+Y4.P.izKur([[L1, L2]]);
+Y4.P.durum.playhead = 5;
+var lr = Y4.P.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.8, ease: "tasma", fps: 25 }), tolerance: 1 });
+ok("Taşma eğrisi: Opaklık 0..100 içinde kalır (en az bir örnek sınırda)", lr.ok && L1.opak.keys.concat(L2.opak.keys).every(function (k) { return k.v >= 0 && k.v <= 100; }) &&
+  L2.opak.keys.some(function (k, i) { return i < L2.opak.keys.length - 1 && k.v === 100; }), js(L2.opak.keys.map(function (k) { return k.v; })));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

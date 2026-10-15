@@ -323,7 +323,13 @@ function KS_presetCloneValue(value) {
 
 var KS_presetRemovedCount = 0;
 
-function KS_presetKeys(prop, keys, clearStart, clearEnd) {
+/*
+ * dense (3.4 adim 12, ozel egri): anahtarlar panelin sik (her kare / 2 karede bir) yazdigi egri ornekleri.
+ * Premiere'in Bezier'i (5) yazilmaz (ornekler arasinda dalgalanma olmasin); Premiere izin veriyorsa (kfInterp:
+ * setInterpolationTypeAtKey var) anahtarlar dogrusal (0) yapilir. updateUI yine yalniz son anahtarda; ilk / son
+ * anahtar dogrulamasi ayni.
+ */
+function KS_presetKeys(prop, keys, clearStart, clearEnd, dense) {
   if (!prop || !keys || !keys.length) return false;
   try {
     try {
@@ -355,6 +361,7 @@ function KS_presetKeys(prop, keys, clearStart, clearEnd) {
     try {
       if (!removedIndividually && prop.removeKeyRange) prop.removeKeyRange(first, last);
     } catch (eRange) {}
+    var dogrusal = dense === true && typeof prop.setInterpolationTypeAtKey === "function";
     for (var i = 0; i < keys.length; i++) {
       var t = KS_presetTime(keys[i].time);
       try { prop.addKey(t); } catch (e1) {}
@@ -362,9 +369,14 @@ function KS_presetKeys(prop, keys, clearStart, clearEnd) {
       // AE efektlerinde Effect Controls'i tekrar tekrar cizip 10-120 sn gecikme
       // yaratiyordu; anahtar verisinin kendisi false ile de aninda yazilir.
       prop.setValueAtKey(t, KS_presetCloneValue(keys[i].value), i === keys.length - 1);
-      // 5, Premiere'in Bezier/ease turudur. Eski surum kabul etmezse
-      // anahtarlar lineer kalir; preset yine calisir.
-      try { if (prop.setInterpolationTypeAtKey) prop.setInterpolationTypeAtKey(t, 5, false); } catch (e2) {}
+      if (dense === true) {
+        // ozel egri: 0 = dogrusal (sik ornekler arasinda Bezier dalgalanmasi olmasin)
+        if (dogrusal) { try { prop.setInterpolationTypeAtKey(t, 0, false); } catch (e3) {} }
+      } else {
+        // 5, Premiere'in Bezier/ease turudur. Eski surum kabul etmezse
+        // anahtarlar lineer kalir; preset yine calisir.
+        try { if (prop.setInterpolationTypeAtKey) prop.setInterpolationTypeAtKey(t, 5, false); } catch (e2) {}
+      }
     }
     // Premiere bazen çağrıyı hata vermeden kabul edip anahtar yazmayabiliyor.
     // Kullanıcıya "uygulandı" demeden önce ilk ve son anahtarın gerçekten
@@ -406,7 +418,7 @@ function KS_presetSourceTime(clip, timelineSec, timelineStart, timelineEnd, sini
   return reversed ? sourceOut - (sourceOut - sourceIn) * ratio : sourceIn + (sourceOut - sourceIn) * ratio;
 }
 
-function KS_presetClipKeys(clip, timelineStart, timelineEnd, prop, keys, clearTimelineStart, clearTimelineEnd) {
+function KS_presetClipKeys(clip, timelineStart, timelineEnd, prop, keys, clearTimelineStart, clearTimelineEnd, dense) {
   var mapped = [];
   for (var i = 0; i < keys.length; i++) {
     mapped.push({
@@ -416,7 +428,120 @@ function KS_presetClipKeys(clip, timelineStart, timelineEnd, prop, keys, clearTi
   }
   var clearStart = clearTimelineStart === undefined ? undefined : KS_presetSourceTime(clip, clearTimelineStart, timelineStart, timelineEnd);
   var clearEnd = clearTimelineEnd === undefined ? undefined : KS_presetSourceTime(clip, clearTimelineEnd, timelineStart, timelineEnd);
-  return KS_presetKeys(prop, mapped, clearStart, clearEnd);
+  return KS_presetKeys(prop, mapped, clearStart, clearEnd, dense);
+}
+
+/* ---------- 3.4 adim 12: Gecis, Zoom ve Hareket onayarlarinda ozel egri (sik anahtarlar) ---------- */
+
+/*
+ * Yogun anahtarlari seyreltir (timeline saniyesi, artan): capa anahtarlar (a: 1; panelin seyrek plani) hep kalir;
+ * aradaki egri ornegi yalniz bir onceki kalan anahtardan ve sonraki capadan en az yarim kare uzaksa kalir. Gecis
+ * kisa klipte zamani sikistirinca (oran < 1) ornekler kare altina sikismasin. Hic capa isareti yoksa ilk ve son capa.
+ */
+function KS_yogunSeyrelt(keys, fps) {
+  if (!keys || keys.length < 3) return keys;
+  var yarim = 0.5 / (fps > 0 ? fps : 30), i, capaVar = false;
+  for (i = 0; i < keys.length; i++) if (keys[i] && keys[i].a) { capaVar = true; break; }
+  function capa(j) { return capaVar ? !!(keys[j] && keys[j].a) : (j === 0 || j === keys.length - 1); }
+  // her anahtarin ardindaki ilk capanin zamani
+  var sonraki = [], z = 1e15;
+  for (i = keys.length - 1; i >= 0; i--) { sonraki[i] = z; if (capa(i)) z = Number(keys[i].time); }
+  var out = [], son = -1e15;
+  for (i = 0; i < keys.length; i++) {
+    var t = Number(keys[i].time);
+    if (capa(i) || (t - son >= yarim - 1e-9 && sonraki[i] - t >= yarim - 1e-9)) { out.push(keys[i]); son = t; }
+  }
+  return out;
+}
+
+// Panelin gonderdigi egri tablosu (SufloEase.bakeFactors: 0..1 araliginda esit aralikli ilerleme degerleri, uclar 0
+// ve 1). Gecersizse null.
+var KS_EGRI_TABLO_MIN = 17;
+var KS_EGRI_TABLO_MAX = 1025;
+var KS_EGRI_EN_COK = 2000;        // ozellik basina en cok ara anahtar (js/egri-secim.js ile ayni)
+function KS_egriTablo(t) {
+  if (!t || typeof t === "string" || typeof t.length !== "number" || t.length < KS_EGRI_TABLO_MIN || t.length > KS_EGRI_TABLO_MAX) return null;
+  var out = [];
+  for (var i = 0; i < t.length; i++) {
+    var v = Number(t[i]);
+    if (!isFinite(v) || v < -1 || v > 2) return null;
+    out.push(v);
+  }
+  if (Math.abs(out[0]) > 1e-6 || Math.abs(out[out.length - 1] - 1) > 1e-6) return null;
+  return out;
+}
+function KS_egriTabloDeger(tablo, u) {
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  var x = u * (tablo.length - 1), i = Math.floor(x);
+  if (i >= tablo.length - 1) return tablo[tablo.length - 1];
+  return tablo[i] + (tablo[i + 1] - tablo[i]) * (x - i);
+}
+function KS_egriAyni(a, b) {
+  if (typeof a === "number") return Math.abs(a - b) <= 1e-9;
+  for (var i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 1e-9) return false;
+  return true;
+}
+/*
+ * Seyrek anahtarlari [{ time, value }] (timeline sn; value sayi ya da [x, y]) egri tablosuyla yogunlastirir: her parcanin
+ * icine kare zamanlarinda (1 sn'den uzun parcada 2 karede bir; ozellik basina en cok 2000 ara anahtar, asarsa adim
+ * ikiye katlanir) ara anahtar; uclardan en az yarim kare iceride. Degeri degismeyen parca atlanir. Seyrek anahtarlar
+ * a: 1 (capa). opak: deger 0..100'e kirpilir. Kural js/egri-secim.js yogunlastir ile ayni (SufloEase.bakePlan kare
+ * secimi); Hareket onayarlarinda ayni yonlu ara anahtar olmadigi icin birlestirme gerekmez.
+ */
+function KS_egriYogun(keys, tablo, fps, opak) {
+  if (!keys || keys.length < 2 || !tablo) return keys;
+  fps = fps > 0 ? fps : 30;
+  var carpan = 1, parcalar, toplam, i;
+  function kareler(t0, t1, adim) {
+    var f0 = t0 * fps, f1 = t1 * fps;
+    var taban = Math.abs(f0 - Math.round(f0)) < 1e-3 ? Math.round(f0) : Math.floor(f0);
+    function aralik(s) {
+      var jmin = Math.max(1, Math.floor((f0 + 0.5 - taban) / s) + 1);
+      var jmax = Math.ceil((f1 - 0.5 - taban) / s) - 1;
+      return { jmin: jmin, n: Math.max(0, jmax - jmin + 1) };
+    }
+    var ja = aralik(adim);
+    if (!ja.n && adim > 1) {
+      adim = Math.max(1, Math.min(adim, Math.floor((f1 - f0) / 2)));
+      ja = aralik(adim);
+      while (!ja.n && adim > 1) { adim--; ja = aralik(adim); }
+    }
+    var out = [];
+    for (var j = 0; j < ja.n; j++) out.push((taban + (ja.jmin + j) * adim) / fps);
+    return out;
+  }
+  for (;;) {
+    parcalar = [];
+    toplam = 0;
+    for (i = 0; i < keys.length - 1; i++) {
+      var a = keys[i], b = keys[i + 1], t0 = Number(a.time), t1 = Number(b.time);
+      if (!(t1 > t0) || KS_egriAyni(a.value, b.value)) { parcalar.push([]); continue; }
+      var zt = kareler(t0, t1, (t1 - t0 > 1 + 1e-9 ? 2 : 1) * carpan);
+      parcalar.push(zt);
+      toplam += zt.length;
+    }
+    if (toplam <= KS_EGRI_EN_COK || carpan >= 512) break;
+    carpan *= 2;
+  }
+  var sonuc = [];
+  for (i = 0; i < keys.length; i++) {
+    sonuc.push({ time: keys[i].time, value: keys[i].value, a: 1 });
+    if (i >= parcalar.length) continue;
+    var p0 = keys[i], p1 = keys[i + 1], s0 = Number(p0.time), s1 = Number(p1.time);
+    for (var q = 0; q < parcalar[i].length; q++) {
+      var t = parcalar[i][q], e = KS_egriTabloDeger(tablo, (t - s0) / (s1 - s0)), v;
+      if (typeof p0.value === "number") {
+        v = p0.value + (p1.value - p0.value) * e;
+        if (opak) v = Math.max(0, Math.min(100, v));
+      } else {
+        v = [];
+        for (var k = 0; k < p0.value.length; k++) v.push(p0.value[k] + (p1.value[k] - p0.value[k]) * e);
+      }
+      sonuc.push({ time: t, value: v });
+    }
+  }
+  return sonuc;
 }
 
 function KS_presetPositionValue(prop) {
@@ -455,6 +580,13 @@ function KS_presetNumberValueAt(prop, seconds, fallback) {
   return KS_presetNumberValue(prop, fallback);
 }
 
+// Hareket onayari yazimi (KS_kayitliYaz): ozel egri varsa (3.4 adim 12) seyrek anahtarlar tabloyla yogunlasir
+// (KS_egriYogun; Opaklik 0..100) ve Bezier'siz yazilir. egri null: eskisi gibi.
+function KS_onayarYaz(egri, kt, clip, start, end, props, ad, keys, clearA, clearB) {
+  if (egri) keys = KS_egriYogun(keys, egri.tablo, egri.fps, ad === "opacity");
+  return KS_kayitliYaz(kt, clip, start, end, props, ad, keys, clearA, clearB, !!egri);
+}
+
 function KS_applyMotionPreset(encoded) {
   try {
     KS_presetRemovedCount = 0;
@@ -476,6 +608,16 @@ function KS_applyMotionPreset(encoded) {
     if (!isFinite(strength) || strength < 0.5 || strength > 1.8) strength = 1;
     var playhead = 0;
     try { playhead = seq.getPlayerPosition().seconds; } catch (eP) {}
+    // 3.4 adim 12: ozel egri. Panel egriyi tablo olarak gonderir (p.egri.tablo; SufloEase.bakeFactors), seyrek
+    // anahtarlar burada her klibin kendi degerleriyle kurulup kare zamanlarinda yogunlasir (KS_onayarYaz).
+    // p.egri yoksa ('auto') yazim eskisi gibi (Bezier 5).
+    var egri = null;
+    if (p.egri) {
+      var tablo = KS_egriTablo(p.egri.tablo);
+      if (!tablo) return KS_err("Egri tablosu gecersiz.");
+      egri = { tablo: tablo, fps: 30 };
+      try { egri.fps = KS_easeFps(seq); } catch (eFps) {}
+    }
     var frameW = Number(seq.frameSizeHorizontal) || 1920;
     var frameH = Number(seq.frameSizeVertical) || 1080;
     var applied = 0;
@@ -505,12 +647,12 @@ function KS_applyMotionPreset(encoded) {
       var t2 = start + d;
 
       if (id === "simple-zoom-in" && props.scale) {
-        changed = KS_kayitliYaz(kt, clip, start, end, props, "scale", [{ time: t0, value: scale * (1 + .12 * strength) }, { time: t1, value: scale * .985 }, { time: t2, value: scale }], start, start + clearD) || changed;
+        changed = KS_onayarYaz(egri, kt, clip, start, end, props, "scale", [{ time: t0, value: scale * (1 + .12 * strength) }, { time: t1, value: scale * .985 }, { time: t2, value: scale }], start, start + clearD) || changed;
       } else if (id === "simple-zoom-out" && props.scale) {
-        changed = KS_kayitliYaz(kt, clip, start, end, props, "scale", [{ time: t0, value: scale * Math.max(.55, 1 - .14 * strength) }, { time: t1, value: scale * 1.015 }, { time: t2, value: scale }], start, start + clearD) || changed;
+        changed = KS_onayarYaz(egri, kt, clip, start, end, props, "scale", [{ time: t0, value: scale * Math.max(.55, 1 - .14 * strength) }, { time: t1, value: scale * 1.015 }, { time: t2, value: scale }], start, start + clearD) || changed;
       } else if (id === "pop-in") {
-        if (props.scale) changed = KS_kayitliYaz(kt, clip, start, end, props, "scale", [{ time: t0, value: scale * Math.max(.45, 1 - .28 * strength) }, { time: t1, value: scale * (1 + .08 * strength) }, { time: t2, value: scale }], start, start + clearD) || changed;
-        if (props.opacity) changed = KS_kayitliYaz(kt, clip, start, end, props, "opacity", [{ time: t0, value: 0 }, { time: start + d * .52, value: opacity }], start, start + clearD) || changed;
+        if (props.scale) changed = KS_onayarYaz(egri, kt, clip, start, end, props, "scale", [{ time: t0, value: scale * Math.max(.45, 1 - .28 * strength) }, { time: t1, value: scale * (1 + .08 * strength) }, { time: t2, value: scale }], start, start + clearD) || changed;
+        if (props.opacity) changed = KS_onayarYaz(egri, kt, clip, start, end, props, "opacity", [{ time: t0, value: 0 }, { time: start + d * .52, value: opacity }], start, start + clearD) || changed;
       } else if (id.indexOf("slide-in-") === 0 && pos) {
         var from = [pos[0], pos[1]];
         if (id === "slide-in-left") from[0] -= dx;
@@ -518,27 +660,27 @@ function KS_applyMotionPreset(encoded) {
         if (id === "slide-in-up") from[1] -= dy;
         if (id === "slide-in-down") from[1] += dy;
         var over = [pos[0] + (pos[0] - from[0]) * .035, pos[1] + (pos[1] - from[1]) * .035];
-        changed = KS_kayitliYaz(kt, clip, start, end, props, "position", [{ time: t0, value: from }, { time: t1, value: over }, { time: t2, value: pos }], start, start + clearD) || changed;
-        if (props.opacity) changed = KS_kayitliYaz(kt, clip, start, end, props, "opacity", [{ time: t0, value: 0 }, { time: start + d * .62, value: opacity }], start, start + clearD) || changed;
+        changed = KS_onayarYaz(egri, kt, clip, start, end, props, "position", [{ time: t0, value: from }, { time: t1, value: over }, { time: t2, value: pos }], start, start + clearD) || changed;
+        if (props.opacity) changed = KS_onayarYaz(egri, kt, clip, start, end, props, "opacity", [{ time: t0, value: 0 }, { time: start + d * .62, value: opacity }], start, start + clearD) || changed;
       } else if (id === "fade-in" && props.opacity) {
-        changed = KS_kayitliYaz(kt, clip, start, end, props, "opacity", [{ time: t0, value: 0 }, { time: t2, value: opacity }], start, start + clearD) || changed;
+        changed = KS_onayarYaz(egri, kt, clip, start, end, props, "opacity", [{ time: t0, value: 0 }, { time: t2, value: opacity }], start, start + clearD) || changed;
       } else if (id === "fade-out" && props.opacity) {
         t0 = end - d; t2 = end;
-        changed = KS_kayitliYaz(kt, clip, start, end, props, "opacity", [{ time: t0, value: opacity }, { time: t2, value: 0 }], end - clearD, end) || changed;
+        changed = KS_onayarYaz(egri, kt, clip, start, end, props, "opacity", [{ time: t0, value: opacity }, { time: t2, value: 0 }], end - clearD, end) || changed;
       } else if (id === "slide-out-right" && pos) {
         t0 = end - d; t1 = t0 + d * .22; t2 = end;
-        changed = KS_kayitliYaz(kt, clip, start, end, props, "position", [{ time: t0, value: pos }, { time: t1, value: [pos[0] - dx * .035, pos[1]] }, { time: t2, value: [pos[0] + dx, pos[1]] }], end - clearD, end) || changed;
-        if (props.opacity) changed = KS_kayitliYaz(kt, clip, start, end, props, "opacity", [{ time: t0 + d * .35, value: opacity }, { time: t2, value: 0 }], end - clearD, end) || changed;
+        changed = KS_onayarYaz(egri, kt, clip, start, end, props, "position", [{ time: t0, value: pos }, { time: t1, value: [pos[0] - dx * .035, pos[1]] }, { time: t2, value: [pos[0] + dx, pos[1]] }], end - clearD, end) || changed;
+        if (props.opacity) changed = KS_onayarYaz(egri, kt, clip, start, end, props, "opacity", [{ time: t0 + d * .35, value: opacity }, { time: t2, value: 0 }], end - clearD, end) || changed;
       } else if (id === "punch" && props.scale) {
         var center = playhead > start + d && playhead < end - d ? playhead : start + clipDur * .5;
         var half = Math.min(d * .5, Math.max(.08, Math.min(center - start, end - center)));
         var clearHalf = Math.min(clearD * .5, Math.max(.08, Math.min(center - start, end - center)));
-        changed = KS_kayitliYaz(kt, clip, start, end, props, "scale", [{ time: center - half, value: scale }, { time: center, value: scale * (1 + .12 * strength) }, { time: center + half, value: scale }], center - clearHalf, center + clearHalf) || changed;
+        changed = KS_onayarYaz(egri, kt, clip, start, end, props, "scale", [{ time: center - half, value: scale }, { time: center, value: scale * (1 + .12 * strength) }, { time: center + half, value: scale }], center - clearHalf, center + clearHalf) || changed;
       } else if (id === "micro-shake" && pos) {
         var c = playhead > start + d && playhead < end - d ? playhead : start + clipDur * .5;
         var span = Math.min(d, Math.max(.16, clipDur * .25));
         var clearSpan = Math.min(clearD, Math.max(.16, clipDur * .25));
-        changed = KS_kayitliYaz(kt, clip, start, end, props, "position", [
+        changed = KS_onayarYaz(egri, kt, clip, start, end, props, "position", [
           { time: c - span * .5, value: pos },
           { time: c - span * .25, value: [pos[0] - dx * .055, pos[1] + dy * .025] },
           { time: c, value: [pos[0] + dx * .045, pos[1] - dy * .03] },
@@ -549,8 +691,10 @@ function KS_applyMotionPreset(encoded) {
       if (changed) applied++; else skipped++;
     }
     if (!applied) return KS_err("Secili klipte uygulanabilir Motion/Opacity ozelligi bulunamadi.");
-    return KS_ok({ applied: applied, skipped: skipped, preset: id, removedKeys: KS_presetRemovedCount,
-      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() });
+    var cevap = { applied: applied, skipped: skipped, preset: id, removedKeys: KS_presetRemovedCount,
+      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() };
+    if (egri) { cevap.yogun = true; cevap.yazilan = KS_kayitYazilan(kt); }
+    return KS_ok(cevap);
   } catch (e) { return KS_err(e); }
 }
 
@@ -748,6 +892,9 @@ function KS_applyCutTransition(encoded) {
     var half = Math.min(Number(plan.half), (aEnd2 - aStart) * 0.5, (bEnd - bStart2) * 0.5);
     if (!(half >= 0.08)) return KS_err("Kesimdeki klipler gecis icin cok kisa.");
     var oran = half / Number(plan.half);   // klip kisaysa plan zamanda sikistirilir
+    // 3.4 adim 12: ozel egri. Plan sik anahtarlar tasir (capalar a: 1); Bezier (5) yazilmaz, kare alti sikisan
+    // ornekler seyreltilir (KS_kayitliYaz), Opaklik 0..100'e kirpilir. 'auto' planda bu bayrak yok: yazim eskisi gibi.
+    var yogun = plan.dense === true;
     var frameW = Number(seq.frameSizeHorizontal) || 1920;
     var frameH = Number(seq.frameSizeVertical) || 1080;
 
@@ -770,14 +917,22 @@ function KS_applyCutTransition(encoded) {
       if (side.scale && props.scale) {
         var sc = KS_presetNumberValueAt(props.scale, kaynakAn, 100);
         list = [];
-        for (k = 0; k < side.scale.length; k++) list.push({ time: cut + side.scale[k].t * oran, value: sc * Number(side.scale[k].v) });
-        changed = KS_kayitliYaz(kt, clip, cStart, cEnd, props, "scale", list, clearA, clearB) || changed;
+        for (k = 0; k < side.scale.length; k++) {
+          list.push({ time: cut + side.scale[k].t * oran, value: sc * Number(side.scale[k].v) });
+          if (yogun && side.scale[k].a) list[list.length - 1].a = 1;
+        }
+        changed = KS_kayitliYaz(kt, clip, cStart, cEnd, props, "scale", list, clearA, clearB, yogun) || changed;
       }
       if (side.opacity && props.opacity) {
         var op = KS_presetNumberValueAt(props.opacity, kaynakAn, 100);
         list = [];
-        for (k = 0; k < side.opacity.length; k++) list.push({ time: cut + side.opacity[k].t * oran, value: op * Number(side.opacity[k].v) });
-        changed = KS_kayitliYaz(kt, clip, cStart, cEnd, props, "opacity", list, clearA, clearB) || changed;
+        for (k = 0; k < side.opacity.length; k++) {
+          var opV = op * Number(side.opacity[k].v);
+          if (yogun) opV = Math.max(0, Math.min(100, opV));
+          list.push({ time: cut + side.opacity[k].t * oran, value: opV });
+          if (yogun && side.opacity[k].a) list[list.length - 1].a = 1;
+        }
+        changed = KS_kayitliYaz(kt, clip, cStart, cEnd, props, "opacity", list, clearA, clearB, yogun) || changed;
       }
       if (side.pos && props.position) {
         var pos = KS_presetPositionValueAt(props.position, kaynakAn);
@@ -789,8 +944,9 @@ function KS_applyCutTransition(encoded) {
           for (k = 0; k < side.pos.length; k++) {
             list.push({ time: cut + side.pos[k].t * oran,
               value: [pos[0] + Number(side.pos[k].x) * fx, pos[1] + Number(side.pos[k].y) * fy] });
+            if (yogun && side.pos[k].a) list[list.length - 1].a = 1;
           }
-          changed = KS_kayitliYaz(kt, clip, cStart, cEnd, props, "position", list, clearA, clearB) || changed;
+          changed = KS_kayitliYaz(kt, clip, cStart, cEnd, props, "position", list, clearA, clearB, yogun) || changed;
         }
       }
       return changed;
@@ -799,8 +955,10 @@ function KS_applyCutTransition(encoded) {
     var outOk = uygula(best.a, plan.out, aStart, aEnd2, cut - half, aEnd2, tabanA);
     var inOk = uygula(best.b, plan["in"], bStart2, bEnd, bStart2, cut + half, tabanB);
     if (!outOk && !inOk) return KS_err("Kesimdeki kliplerde Motion/Opaklik ozelligi bulunamadi.");
-    return KS_ok({ cut: cut, track: best.track + 1, half: half, out: outOk, "in": inOk, removedKeys: KS_presetRemovedCount,
-      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() });
+    var cevap = { cut: cut, track: best.track + 1, half: half, out: outOk, "in": inOk, removedKeys: KS_presetRemovedCount,
+      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() };
+    if (yogun) { cevap.yogun = true; cevap.yazilan = KS_kayitYazilan(kt); }
+    return KS_ok(cevap);
   } catch (e) { return KS_err(e); }
 }
 
@@ -1265,6 +1423,9 @@ function KS_autoZoom(encoded) {
     var frameW = Number(seq.frameSizeHorizontal) || 1920;
     var frameH = Number(seq.frameSizeVertical) || 1080;
     var applied = 0, skipped = 0;
+    // 3.4 adim 12: ozel egri. Panel sik anahtarlar gonderir (capalar a: 1): Bezier (5) yazilmaz, Olcek ve Konum ayni
+    // zamanlarda; 'auto' (dense yok) yazim eskisi gibi.
+    var yogun = p.dense === true;
     // Kaldirma kayitlari (3.4 adim 11): Olcek ve Konum icin (KS_kayitliYaz). Panelin eski "Zoom'u kaldir" yolu
     // (kaydi olmayan klipte, onayla) bu fonksiyonu duz anahtarlarla cagirir; o yazimin kaydini panel saklamaz.
     var kt = KS_kayitToplayici(seq, "zoom");
@@ -1291,16 +1452,18 @@ function KS_autoZoom(encoded) {
         if (t < start) t = start;
         if (t > end) t = end;
         mapped.push({ time: t, value: base * v });
+        if (yogun && keys[k].a) mapped[mapped.length - 1].a = 1;
         if (!merkezde && pos0) {
           posKeys.push({ time: t, value: [pos0[0] - sx * (v - 1), pos0[1] - sy * (v - 1)] });
+          if (yogun && keys[k].a) posKeys[posKeys.length - 1].a = 1;
         }
       }
       if (!mapped.length) { skipped++; continue; }
       var cs = p.clearStart === undefined ? start : Math.max(start, Number(p.clearStart));
       var ce = p.clearEnd === undefined ? end : Math.min(end, Number(p.clearEnd));
-      var ok = KS_kayitliYaz(kt, clip, start, end, props, "scale", mapped, cs, ce);
+      var ok = KS_kayitliYaz(kt, clip, start, end, props, "scale", mapped, cs, ce, yogun);
       if (!merkezde && posKeys.length && props.position) {
-        KS_kayitliYaz(kt, clip, start, end, props, "position", posKeys, cs, ce);
+        KS_kayitliYaz(kt, clip, start, end, props, "position", posKeys, cs, ce, yogun);
       } else if (props.position && pos0) {
         // merkez / anchor kapali: onceki zoom'dan kalan pozisyon kaymalarini geri al
         KS_kayitliYaz(kt, clip, start, end, props, "position", [{ time: start, value: pos0 }, { time: end, value: pos0 }], cs, ce);
@@ -1308,8 +1471,10 @@ function KS_autoZoom(encoded) {
       if (ok) applied++; else skipped++;
     }
     if (!applied) return KS_err("Secili klipte Motion > Scale ozelligi bulunamadi.");
-    return KS_ok({ applied: applied, skipped: skipped, keyCount: keys.length, removedKeys: KS_presetRemovedCount, engine: "Motion > Scale",
-      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() });
+    var cevap = { applied: applied, skipped: skipped, keyCount: keys.length, removedKeys: KS_presetRemovedCount, engine: "Motion > Scale",
+      records: kt.kayitlar, temizlenen: kt.temizlenen, tol: KS_kayitTol(kt), proje: KS_projeYolu() };
+    if (yogun) { cevap.yogun = true; cevap.yazilan = KS_kayitYazilan(kt); }
+    return KS_ok(cevap);
   } catch (e) { return KS_err(e); }
 }
 
@@ -5512,6 +5677,13 @@ function KS_projeYolu() {
 // pencereleri temizlenen'e ekler (panel eski kayitlarin yerine gecilip gecilmedigine bununla karar verir)
 function KS_kayitToplayici(seq, tur) { return { seq: seq, tur: tur, kayitlar: [], temizlenen: [] }; }
 
+// Kayitlarin toplam anahtar sayisi (3.4 adim 12: ozel egriyle yazilan sik anahtarlar bildirimde)
+function KS_kayitYazilan(kt) {
+  var n = 0;
+  for (var i = 0; kt && kt.kayitlar && i < kt.kayitlar.length; i++) n += kt.kayitlar[i].times ? kt.kayitlar[i].times.length : 0;
+  return n;
+}
+
 // Eslesme toleransi (0,25 kare, saniye): panel temizlenen zamanlari eski kayitlarla bununla karsilastirir
 function KS_kayitTol(kt) {
   var fps = 30;
@@ -5593,9 +5765,15 @@ function KS_kayitDegerAt(prop, src) {
  *   4) planli zamanlardan gercekten anahtar olanlar (0,25 kare tolerans) kt.kayitlar'a bir kayit olarak girer.
  * Doner: KS_presetClipKeys'in sonucu (yazildi mi).
  */
-function KS_kayitliYaz(kt, clip, start, end, props, ad, keys, clearA, clearB) {
+function KS_kayitliYaz(kt, clip, start, end, props, ad, keys, clearA, clearB, dense) {
   var prop = props ? props[ad] : null;
   if (!prop || !keys || !keys.length) return false;
+  // 3.4 adim 12: ozel egrinin sik anahtarlari (kare alti sikisanlar seyreltilir; kayit her zaman dondurulur)
+  if (dense === true) {
+    var sFps = 30;
+    try { sFps = KS_easeFps(kt && kt.seq ? kt.seq : KS_seq()); } catch (eF) {}
+    keys = KS_yogunSeyrelt(keys, sFps);
+  }
   var kay = KS_easeKaynak(clip, start, end);
   var ca = clearA === undefined ? Number(keys[0].time) : Number(clearA);
   var cb = clearB === undefined ? Number(keys[keys.length - 1].time) : Number(clearB);
@@ -5624,7 +5802,7 @@ function KS_kayitliYaz(kt, clip, start, end, props, ad, keys, clearA, clearB) {
       if (vB !== null) kenar.push({ t: tB, v: vB });
     }
   }
-  var ok = KS_presetClipKeys(clip, start, end, prop, keys, clearA, clearB);
+  var ok = KS_presetClipKeys(clip, start, end, prop, keys, clearA, clearB, dense === true);
   if (!ok || !kt || !tl.length) return ok;
   if (!yer) return ok;
   var fps = KS_easeFps(kt.seq), tol = KS_EASE_TOL_KARE / fps;

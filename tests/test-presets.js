@@ -315,5 +315,54 @@ ok("pencere dışında anahtar kalırsa (özellik boşalmadı) önceki değer ka
   f3.ok && f3.records[0].kenarDegerleri[0].v === 40 && f3.temizlenen[0].bosaldi === false && f3.temizlenen[0].times.length === 0, js([f3.records[0].kenarDegerleri, f3.temizlenen]));
 ok("kaydı olmayan önayar metni macOS'un Cmd+Z'sini de söyler", /Ctrl\+Z \(macOS'ta Cmd\+Z\)/.test(src), "presets.js");
 
+/* ---------- 3.4 adım 12: Hareket önayarında özel eğri (panel tabloyu gönderir, host kare zamanlarında yoğunlaştırır) ---------- */
+var S12 = require(path.join(ROOT, "js", "egri-secim.js"));
+var E12 = require(path.join(ROOT, "js", "ease-curve.js"));
+function izli(fps) {
+  var P = require("./_kayit-premiere.js").olustur({ fps: fps || 25 });
+  var interp = [];
+  P.FakeProp.prototype.setInterpolationTypeAtKey = function (t, tur, u) { interp.push({ ad: this.displayName, s: t.seconds, tur: tur, ui: u === true }); };
+  return { P: P, interp: interp };
+}
+var Q = izli(25);
+var Q1 = Q.P.klip({ ad: "Sahne.mp4", nodeId: "Q1", start: 0, end: 5, inP: 0, opak: 80 });
+Q.P.izKur([[Q1]]);
+Q.P.durum.secim = [Q1];
+var otoQ = Q.P.cagir("KS_applyMotionPreset", { id: "simple-zoom-in", duration: .45, strength: 1 });
+ok("varsayılan (eğri yok): Simple Zoom In eskisi gibi 3 anahtar, her birine Bezier (5)", otoQ.ok && Q1.olcek.keys.length === 3 && Q.interp.length === 3 &&
+  Q.interp.every(function (c) { return c.tur === 5; }) && otoQ.yogun === undefined, js([Q1.olcek.keys, Q.interp]));
+Q.interp.length = 0;
+var hm = S12.hareketEgrisi("yumusak-cikis");
+var uiOnceQ = Q.P.ui.length;
+var yq = Q.P.cagir("KS_applyMotionPreset", { id: "simple-zoom-in", duration: .45, strength: 1, ease: hm.ease, egri: { tablo: hm.tablo } });
+var qtl = Q1.olcek.tl(Q1);
+// t0 = 0, t1 = 0,351, t2 = 0,45 (25 kare/sn) → [0, 0,351]: 8 iç kare (0,04 … 0,32); [0,351, 0,45]: 1 iç kare (0,40)
+function yak(a, b) { return Math.abs(a - b) < 1e-6; }
+var qBek = [0, 0.04, 0.08, 0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.351, 0.4, 0.45];
+ok("eğriyle: üç seyrek anahtar yerinde (değerleri eskisiyle aynı), aralar her karede (12 anahtar)", yq.ok && yq.yogun === true && qtl.length === qBek.length &&
+  qtl.every(function (t, i) { return yak(t, qBek[i]); }) && yak(Q1.olcek.keys[0].v, 112) && yak(Q1.olcek.keys[9].v, 98.5) && Q1.olcek.keys[11].v === 100, js(qtl));
+ok("eğriyle: hiçbir anahtara Bezier (5) yazılmadı, hepsi doğrusal (0)", Q.interp.length === qtl.length && Q.interp.every(function (c) { return c.tur === 0; }), js(Q.interp.slice(0, 3)));
+var qUi = Q.P.ui.slice(uiOnceQ).filter(function (u) { return u.tur === "anahtar" && u.ad === "Scale"; });
+ok("eğriyle: updateUI yalnız son anahtarda", qUi.length === qtl.length && qUi.filter(function (u) { return u.ui; }).length === 1 && qUi[qUi.length - 1].ui === true, js(qUi.map(function (u) { return u.ui; })));
+var fQ = E12.toFunction(E12.builtin("yumusak-cikis").curve);
+var v0Q = Q1.olcek.keys[0].v, v1Q = Q1.olcek.keys.filter(function (k, i) { return yak(qtl[i], 0.351); })[0].v;
+ok("eğriyle: ara değerler tablodaki eğriyi izler (ilk parça)", Q1.olcek.keys.every(function (k, i) {
+  var t = qtl[i]; if (!(t > 0 && t < 0.351 - 1e-6)) return true;
+  return Math.abs(k.v - (v0Q + (v1Q - v0Q) * fQ(t / 0.351))) < 0.05;
+}), js(Q1.olcek.keys.slice(0, 4)));
+var rq = (yq.records || []).map(function (x) { return KR.kayit(x); });
+ok("eğriyle: kayıt döner, tüm yoğun zamanları taşır; kaldırınca Ölçek 100'e döner", rq.length === 1 && rq[0].times.length === qtl.length && yq.yazilan === qtl.length &&
+  (function () { var kq = Q.P.cagir("KS_removeSufloKeys", { records: rq, secili: true }); return kq.ok && Q1.olcek.keys.length === 0 && Q1.olcek.value === 100; })(), js(rq[0] && rq[0].times.length));
+// Opaklık: Taşma eğrisi 0..100 dışına çıkmaz; Konum [x,y] iki bileşenli
+Q.durum = Q.P.durum;
+var tq = S12.hareketEgrisi("tasma");
+var sq = Q.P.cagir("KS_applyMotionPreset", { id: "slide-in-left", duration: .72, strength: 1, ease: tq.ease, egri: { tablo: tq.tablo } });
+ok("Slide In Left + Taşma: Konum [x,y] yoğun, Opaklık 0..100 (klibin 80'i aşılmaz değil, 100'ü aşmaz)", sq.ok && Q1.konum.keys.length > 3 &&
+  Q1.konum.keys.every(function (k) { return Array.isArray(k.v) && k.v.length === 2; }) && Q1.opak.keys.length > 2 &&
+  Q1.opak.keys.every(function (k) { return k.v >= 0 && k.v <= 100; }), js(Q1.opak.keys.map(function (k) { return k.v; })));
+var bozukT = Q.P.cagir("KS_applyMotionPreset", { id: "fade-in", duration: .45, strength: 1, ease: "x", egri: { tablo: [0, 0.5, 1] } });
+var bozukU = Q.P.cagir("KS_applyMotionPreset", { id: "fade-in", duration: .45, strength: 1, egri: { tablo: hm.tablo.map(function (v, i) { return i === 5 ? "NaN" : v; }) } });
+ok("geçersiz eğri tablosu (kısa, NaN) reddedilir, hiçbir şey yazılmaz", !bozukT.ok && /Egri tablosu gecersiz/.test(bozukT.error) && !bozukU.ok, js([bozukT, bozukU]));
+
 console.log("\n" + passed + "/" + (passed + failed) + " gecti");
 process.exit(failed ? 1 : 0);

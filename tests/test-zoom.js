@@ -114,6 +114,56 @@ chk("tum stillerde deger araligi korunur", [yum, jc, sn].every(function (pl) {
   return pl.keys.every(function (k) { return k.value >= 0.99 && k.value <= 1.31; });
 }));
 
+/* ---- 3.4 adım 12: özel eğri (ease) ---- */
+var ALTIN = require("./fixtures/egri-otomatik-3.4.json");
+var segAltin = [{ start: 0, end: 6 }, { start: 8, end: 16 }, { start: 18, end: 30 }, { start: 31, end: 40 }];
+var altinFark = [];
+["smooth", "jumpcut", "snapin"].forEach(function (st) {
+  ["speech", "rhythm"].forEach(function (m) {
+    var o = { dur: 40, segments: segAltin, intensity: 0.12, speed: 0.45, mode: m, interval: 5, style: st };
+    var b = JSON.stringify(ALTIN.zoom[st + "|" + m]);
+    if (JSON.stringify(Z.plan(o)) !== b) altinFark.push(st + "|" + m);
+    o.ease = "auto"; o.fps = 30;
+    if (JSON.stringify(Z.plan(o)) !== b) altinFark.push(st + "|" + m + "|auto");
+  });
+  var sm = { dur: 24, points: [{ time: 0 }, { time: 3.1 }, { time: 8.6 }, { time: 15.2 }], mode: "smart", intensity: 0.18, speed: 0.6, style: st };
+  if (JSON.stringify(Z.plan(sm)) !== JSON.stringify(ALTIN.zoom[st + "|smart"])) altinFark.push(st + "|smart");
+});
+chk("eğri 'auto' (ya da yok): zoom planı 3.4 adım 12 öncesiyle bayt bayt aynı (3 stil × 3 mod)", altinFark.length === 0, altinFark);
+var eSmooth = Z.plan({ dur: 40, segments: segAltin, intensity: 0.12, speed: 0.45, mode: "speech", style: "smooth", ease: "yumusak-giris-cikis", fps: 25 });
+chk("ease gidiş dönüş: plan kanonik eğriyi ve yoğun bayrağını taşır", eSmooth.ease === "yumusak-giris-cikis" && eSmooth.dense === true && eSmooth.mode === "speech" &&
+  Z.plan({ dur: 20, segments: segAltin, mode: "speech", ease: "CUBIC-BEZIER(0.3, 0, 0.2, 1)", fps: 25 }).ease === "cubic-bezier(0.3, 0, 0.2, 1)", { ease: eSmooth.ease, dense: eSmooth.dense });
+var capalar = eSmooth.keys.filter(function (k) { return k.a; });
+chk("özel eğri: Yumuşak stilin küçük taşması yazılmaz (çapalar yalnız 1 ve 1,12); ivmeyi eğri verir", capalar.every(function (k) { return k.value === 1 || Math.abs(k.value - 1.12) < 1e-9; }) &&
+  eSmooth.seyrek === 7 && capalar.length === 7, capalar);
+chk("özel eğri: zamanlar kesin artan, iç anahtarlar kare zamanında, değerler 1..1,12 arasında", eSmooth.keys.every(function (k, i) {
+  return (i === 0 || k.time > eSmooth.keys[i - 1].time) && (k.a || Math.abs(k.time * 25 - Math.round(k.time * 25)) < 1e-6) && k.value >= 1 - 1e-9 && k.value <= 1.12 + 1e-9;
+}) && eSmooth.keys.length === 7 + 3 * 10, eSmooth.keys.length);   // 3 geçiş × (0,45 sn · 25 kare: 10 iç anahtar)
+var eJump = Z.plan({ dur: 40, segments: segAltin, intensity: 0.12, speed: 0.45, mode: "speech", style: "jumpcut", ease: "ziplama", fps: 25 });
+chk("Jump Cut: sert kesme eğrisizdir (plan 'auto' ile aynı, yoğun değil)", JSON.stringify(eJump) === JSON.stringify(ALTIN.zoom["jumpcut|speech"]), eJump.dense);
+var eSnap = Z.plan({ dur: 40, segments: segAltin, intensity: 0.12, speed: 0.45, mode: "speech", style: "snapin", ease: "yumusak", fps: 25 });
+chk("Snap-In: aynı yönlü kademeler tek parça olur (çapa: başlangıç ve hedef)", eSnap.dense && eSnap.keys.filter(function (k) { return k.a; }).length === 7, eSnap.keys.filter(function (k) { return k.a; }));
+var hata12 = false; try { Z.plan({ dur: 10, ease: "dalga" }); } catch (eH) { hata12 = /Geçersiz eğri/.test(eH.message); }
+chk("geçersiz eğri hata verir (panel sessizce otomatiğe düşmez)", hata12);
+
+/* ---- 3.4 adım 12: KS_autoZoom yoğun yazım (sahte Premiere) ---- */
+var PMz = require("./_kayit-premiere.js").olustur({ fps: 25 });
+var interpZ = [];
+PMz.FakeProp.prototype.setInterpolationTypeAtKey = function (t, tur) { interpZ.push(tur); };
+var Zy = PMz.klip({ ad: "Konusma.mp4", nodeId: "ZY", start: 0, end: 40, inP: 0 });
+PMz.izKur([[Zy]]);
+PMz.durum.secim = [Zy];
+var zr = PMz.cagir("KS_autoZoom", { keys: eSmooth.keys, anchor: [0.5, 0.2], clearStart: 0, clearEnd: 40, dense: true });
+chk("KS_autoZoom yoğun: tüm anahtarlar yazıldı (Ölçek ve sabit nokta Konum'u), Bezier (5) yok, hepsi doğrusal (0)", zr.ok && zr.yogun === true &&
+  Zy.olcek.keys.length === eSmooth.keys.length && Zy.konum.keys.length === eSmooth.keys.length && interpZ.length === 2 * eSmooth.keys.length &&
+  interpZ.every(function (t) { return t === 0; }), { n: Zy.olcek.keys.length, interp: interpZ.slice(0, 4) });
+var zrec = zr.records || [];
+chk("KS_autoZoom yoğun: kayıtlar (Ölçek + Konum) tüm zamanları taşır", zrec.length === 2 && zrec.every(function (r) { return r.tur === "zoom" && r.times.length === eSmooth.keys.length; }) &&
+  zr.yazilan === 2 * eSmooth.keys.length, zrec.map(function (r) { return r.times.length; }));
+interpZ.length = 0;
+var zo = PMz.cagir("KS_autoZoom", { keys: Z.plan({ dur: 40, segments: segAltin, mode: "speech" }).keys, anchor: [0.5, 0.5], clearStart: 0, clearEnd: 40 });
+chk("KS_autoZoom 'auto': eskisi gibi Bezier (5); cevapta yogun yok", zo.ok && zo.yogun === undefined && interpZ.length > 0 && interpZ.every(function (t) { return t === 5; }), interpZ.slice(0, 4));
+
 /* ---- 3.4 adım 11: Zoom'u kaldır kayıt tabanlı (uçtan uca: js/zoom.js + js/kayit-kaldir.js + host.jsx sahte Premiere) ---- */
 var fs = require("fs");
 var path = require("path");

@@ -18,7 +18,8 @@
  * Suflo'nun kendi (temiz oda) eklemeleri: çok noktalı eğri ({type:'multi'}; her parça kendi
  * genel kübik Newton + ikiye bölme çözücüsüyle), normalize, split (de Casteljau, şekil değişmez),
  * flip (180° döndürme), invert (eksen değişimi; yalnız tekdüze eğri), toCss/fromCss (yalnız tek
- * 'cubic-bezier(a,b,c,d)'), hazır eğriler (BUILTINS) ve bakePlan (sık anahtar kare planı).
+ * 'cubic-bezier(a,b,c,d)'), hazır eğriler (BUILTINS), bakePlan (sık anahtar kare planı) ve SFC1 eğri
+ * kodu (sfcKodla / sfcCoz; adım 12 çekirdeği, adım 15 genişletir).
  * Premiere'in ExtendScript'i Bezier tutamaçlarını yazamaz: Suflo eğriyi sık anahtar karelere
  * "pişirir" (bakePlan). Çok noktalı eğrilerin metin sözdizimi YOK; yalnız SFC1 kodu içinde JSON.
  *
@@ -795,6 +796,96 @@
     return normalize({ type: "bezier", x1: n[0], y1: n[1], x2: n[2], y2: n[3] });
   }
 
+  /* ================= Suflo: SFC1 eğri kodu (temiz oda) ================= */
+  // Tek satırlık paylaşım kodu: "SFC1." + base64url(UTF-8 JSON { v: 1, tur: 'egri', ad?, curve }).
+  // 3.4 adım 12 (Geçiş / Zoom / Hareket eğri seçicisi) çok noktalı ve hazır olmayan eğrileri bununla taşır;
+  // adım 15 (paylaşım kodları, .suflo-egri dosyası, tur 'hiz') bu çekirdeği genişletir.
+  var SFC_ONEK = "SFC1.";
+  var SFC_SURUM = 1;
+  var SFC_MAX = 4096;                 // en uzun kod girdisi (karakter)
+  var SFC_AD = 40;                    // ad en çok 40 karakter
+  var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  function b64urlYaz(str) {
+    var bin = unescape(encodeURIComponent(String(str)));
+    var out = "", i;
+    for (i = 0; i + 2 < bin.length; i += 3) {
+      var n = (bin.charCodeAt(i) << 16) | (bin.charCodeAt(i + 1) << 8) | bin.charCodeAt(i + 2);
+      out += B64.charAt((n >> 18) & 63) + B64.charAt((n >> 12) & 63) + B64.charAt((n >> 6) & 63) + B64.charAt(n & 63);
+    }
+    var kalan = bin.length - i;
+    if (kalan === 1) {
+      var a = bin.charCodeAt(i) << 16;
+      out += B64.charAt((a >> 18) & 63) + B64.charAt((a >> 12) & 63);
+    } else if (kalan === 2) {
+      var b = (bin.charCodeAt(i) << 16) | (bin.charCodeAt(i + 1) << 8);
+      out += B64.charAt((b >> 18) & 63) + B64.charAt((b >> 12) & 63) + B64.charAt((b >> 6) & 63);
+    }
+    return out;
+  }
+  // Geçersizse null (fırlatmaz)
+  function b64urlOku(s) {
+    if (typeof s !== "string" || !/^[A-Za-z0-9_-]+$/.test(s) || s.length % 4 === 1) return null;
+    var bin = "", bits = 0, deger = 0;
+    for (var i = 0; i < s.length; i++) {
+      deger = (deger << 6) | B64.indexOf(s.charAt(i));
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        bin += String.fromCharCode((deger >> bits) & 255);
+        deger &= (1 << bits) - 1;
+      }
+    }
+    try { return decodeURIComponent(escape(bin)); } catch (e) { return null; }
+  }
+  // Ad: denetim karakterleri atılır, kırpılır, en çok 40 karakter
+  function adTemiz(ad) {
+    if (typeof ad !== "string") return "";
+    return ad.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, "").replace(/^\s+|\s+$/g, "").slice(0, SFC_AD);
+  }
+  // { ad?, curve } → "SFC1.…"; geçersiz eğride null
+  function sfcKodla(o) {
+    var c = normalize(o && o.curve);
+    if (!c) return null;
+    var obj = { v: SFC_SURUM, tur: "egri" };
+    var ad = adTemiz(o.ad);
+    if (ad) obj.ad = ad;
+    obj.curve = c;
+    return SFC_ONEK + b64urlYaz(JSON.stringify(obj));
+  }
+  /*
+   * Kodu çöz. Boşluk ve satır sonları (bölünerek yapıştırılan kod) yok sayılır; tam bağlantı da olabilir (…#SFC1.…).
+   * Döner: { ok: true, tur: 'egri', ad, curve } | { ok: false, hata }
+   *   hata: 'bos' | 'uzun' | 'onek' (SFC1. ile başlamıyor) | 'bozuk' | 'surum' (daha yeni Suflo) | 'tur' (eğri kodu değil,
+   *   ör. Hız Rampası kodu) | 'egri' (eğri geçersiz ya da 8'den çok nokta)
+   */
+  function sfcCoz(text) {
+    function hata(k) { return { ok: false, hata: k }; }
+    try {
+      if (typeof text !== "string") return hata("bos");
+      if (text.length > SFC_MAX) return hata("uzun");
+      var s = text.replace(/\s+/g, "");
+      var kare = s.lastIndexOf("#");
+      if (kare !== -1) s = s.slice(kare + 1);
+      if (!s) return hata("bos");
+      if (s.indexOf(SFC_ONEK) !== 0) return hata("onek");
+      var json = b64urlOku(s.slice(SFC_ONEK.length));
+      if (json === null) return hata("bozuk");
+      var obj;
+      try { obj = JSON.parse(json); } catch (eJ) { return hata("bozuk"); }
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return hata("bozuk");
+      if (typeof obj.v === "number" && obj.v > SFC_SURUM) return hata("surum");
+      if (obj.v !== SFC_SURUM) return hata("bozuk");
+      if (obj.tur !== "egri") return hata("tur");
+      var ham = obj.curve;
+      if (ham && ham.type === "multi" && (!Array.isArray(ham.pts) || ham.pts.length > MAX_PTS)) return hata("egri");
+      var c = normalize(ham);
+      if (!c) return hata("egri");
+      return { ok: true, tur: "egri", ad: adTemiz(obj.ad), curve: c };
+    } catch (e) {
+      return hata("bozuk");
+    }
+  }
+
   /* ================= Suflo: hazır eğriler ================= */
   // ("Süzülme" Hız Rampası önayarı; burada kullanılmaz)
   var BUILTINS = [
@@ -920,7 +1011,8 @@
     // Suflo eklemeleri
     normalize: normalize, split: split, flip: flip, invert: invert, toMulti: toMulti, isMonotonic: isMonotonic,
     toCss: toCss, fromCss: fromCss, bakePlan: bakePlan, builtins: builtins, builtin: builtin, builtinName: builtinName, kopya: kopya,
+    sfcKodla: sfcKodla, sfcCoz: sfcCoz,
     BUILTINS: builtins(),
-    LIMITS: { Y_MIN: Y_MIN, Y_MAX: Y_MAX, MAX_PTS: MAX_PTS, MIN_GAP: MIN_GAP, CSS_MAX: CSS_MAX, MAX_KEYS: MAX_KEYS }
+    LIMITS: { Y_MIN: Y_MIN, Y_MAX: Y_MAX, MAX_PTS: MAX_PTS, MIN_GAP: MIN_GAP, CSS_MAX: CSS_MAX, MAX_KEYS: MAX_KEYS, SFC_MAX: SFC_MAX, SFC_AD: SFC_AD }
   };
 });

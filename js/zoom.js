@@ -99,18 +99,38 @@ function KZoomAkilliNoktalar(opts) {
   return filled.filter(function (point) { return point.time >= 0 && point.time < dur - .12; });
 }
 
+// Ozel egri (3.4 adim 12): js/egri-secim.js cagri aninda aranir (panelde window, Node'da require)
+function KZoomEgriModulu() {
+  if (typeof window !== "undefined" && window.SufloEgriSecim) return window.SufloEgriSecim;
+  if (typeof require === "function") { try { return require("./egri-secim.js"); } catch (e) {} }
+  return null;
+}
+
 function KZoomPlan(opts) {
   /*
    * opts: { dur, segments:[{start,end}] (0-tabanli), intensity (.06-.25),
    *         speed (sn), mode: "smart"|"speech"|"rhythm", points:[{time}], interval (sn),
-   *         style: "smooth"|"jumpcut"|"snapin" }  (AutoCut'taki uc stil)
+   *         style: "smooth"|"jumpcut"|"snapin",  (AutoCut'taki uc stil)
+   *         ease: "auto" | hazir egri | cubic-bezier | SFC1 kodu, fps }  (3.4 adim 12)
    * donus: { keys:[{time,value}], mode, style } — time 0-tabanli sn, value carpan.
+   * ease "auto" (varsayilan) iken cikti eskisiyle bayt bayt ayni. Ozel egride (Jump Cut haric: sert kesme egrisizdir)
+   * Yumusak stilin kucuk tasmasi yazilmaz (ivmeyi egri verir), anahtarlar js/egri-secim.js ile yogunlasir:
+   * { keys:[{time,value,a?}], ..., ease (kanonik), dense: true, seyrek (yogunlasmadan onceki anahtar), capped? }.
+   * Gecersiz ease hata firlatir.
    */
+  var egriS = null, egriC = null;
+  if (opts.ease !== undefined && opts.ease !== null && opts.ease !== "" && opts.ease !== "auto") {
+    egriS = KZoomEgriModulu();
+    egriC = egriS ? egriS.coz(opts.ease) : null;
+    if (!egriC || !egriC.ok) throw new Error("Geçersiz eğri: " + String(opts.ease).slice(0, 60));
+    if (!egriC.curve) egriC = null;
+  }
   var dur = Math.max(0.2, Number(opts.dur) || 0);
   var I = Number(opts.intensity); if (!isFinite(I)) I = 0.12; I = Math.max(0.04, Math.min(0.3, I));
   var d = Number(opts.speed); if (!isFinite(d)) d = 0.45; d = Math.max(0.2, Math.min(0.9, d));
   var interval = Number(opts.interval); if (!isFinite(interval)) interval = 5; interval = Math.max(2, Math.min(15, interval));
   var style = opts.style === "jumpcut" || opts.style === "snapin" ? opts.style : "smooth";
+  if (style === "jumpcut") egriC = null;   // sert kesme: yumusatilacak hareket yok
   var minGap = Math.max(d * 2, 1.2);
 
   var mode = opts.mode === "rhythm" ? "rhythm" : (opts.mode === "smart" ? "smart" : "speech");
@@ -169,6 +189,10 @@ function KZoomPlan(opts) {
       anahtar(t0, cur + (hedef - cur) * 0.55);
       anahtar(t0 + 0.09, cur + (hedef - cur) * 0.85);
       anahtar(t0 + 0.18, hedef);
+    } else if (egriC) {
+      // ozel egri: Suflo'nun kucuk tasmasi yok, gecisin ivmesini secilen egri verir
+      anahtar(t0, cur);
+      anahtar(t0 + gecis, hedef);
     } else {
       var ov = hedef > cur ? hedef * 1.012 : hedef * 0.996; // hafif overshoot -> dogal his
       anahtar(t0, cur);
@@ -178,7 +202,16 @@ function KZoomPlan(opts) {
     cur = hedef;
   }
   if (!keys.length || keys[0].time > 0.011) keys.unshift({ time: 0, value: BAZ });
-  return { keys: keys, mode: mode, style: style, toggles: temiz.length };
+  var sonuc = { keys: keys, mode: mode, style: style, toggles: temiz.length };
+  if (egriC) {
+    var y = egriS.yogunZaman(keys, { curve: egriC.curve, fps: opts.fps });
+    sonuc.keys = y.keys;
+    sonuc.ease = egriC.ease;
+    sonuc.dense = true;
+    sonuc.seyrek = keys.length;
+    if (y.capped) sonuc.capped = true;
+  }
+  return sonuc;
 }
 
 if (typeof module !== "undefined" && module.exports) {

@@ -12,13 +12,25 @@
  *   scale  klibin kendi ölçeğinin çarpanı (1 = değişmez)
  *   x, y   kadraj genişliği/yüksekliği oranında kayma (0.5 = yarım kadraj)
  *   opacity klibin kendi opaklığının çarpanı
+ *
+ * Özel eğri (3.4, plan adım 12): hostPlan(id, { ease, fps }) — ease 'auto' (varsayılan) iken çıktı bayt bayt
+ * eskisiyle aynı; hazır eğri / cubic-bezier / SFC1 kodu verilirse her taraf js/egri-secim.js ile sık anahtar
+ * karelere çevrilir (dense: true; çapalar a: 1) ve host bunları Premiere'in Bezier'i (5) olmadan yazar. Gelen
+ * klip (B) eğriyi izler, giden klip (A) eğrinin aynasını (SufloEase.flip): iki yarı kesimde buluşur.
  */
 (function (root, factory) {
-  var api = factory();
+  var api = factory(root);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloTransitions = api;
-})(typeof window !== "undefined" ? window : this, function () {
+})(typeof window !== "undefined" ? window : this, function (root) {
   "use strict";
+
+  // Eğri seçimi modülü çağrı anında aranır (panelde js/egri-secim.js bu dosyadan önce yüklenir; Node'da require)
+  function egriModulu() {
+    if (root && root.SufloEgriSecim) return root.SufloEgriSecim;
+    if (typeof require === "function") { try { return require("./egri-secim.js"); } catch (e) {} }
+    return null;
+  }
 
   var LIST = [
     { id: "zoom-in", name: "Zoom İçeri", desc: "Kesimden içeri dalar", group: "zoom" },
@@ -172,6 +184,9 @@
   /*
    * Host'a gidecek bicim: { half, out: {scale, pos, opacity}, in: {...} }
    * pos = [{t, x, y}] (kadraj orani), scale/opacity = [{t, v}] (carpan)
+   * opts.ease (3.4 adim 12): 'auto' / yok → eski cikti (ek alan yok). Ozel egri → her dizi yogun
+   * ({ t, v, a? } / { t, x, y, a? }), plana { ease (kanonik), dense: true, fps, capped? } eklenir.
+   * opts.fps: sekansin kare hizi (yogun anahtarlar kare zamanlarinda; yoksa 30). Gecersiz ease hata firlatir.
    */
   function hostPlan(id, opts) {
     var p = plan(id, opts);
@@ -183,7 +198,31 @@
       if (pos) r.pos = pos;
       return r;
     }
-    return { id: p.id, half: p.half, out: side(p.out), "in": side(p["in"]) };
+    var out = { id: p.id, half: p.half, out: side(p.out), "in": side(p["in"]) };
+    var ease = opts ? opts.ease : undefined;
+    if (ease === undefined || ease === null || ease === "" || ease === "auto") return out;
+    var S = egriModulu();
+    var c = S ? S.coz(ease) : null;
+    if (!c || !c.ok) throw new Error("Geçersiz eğri: " + String(ease).slice(0, 60));
+    if (!c.curve) return out;
+    var fps = Number(opts.fps);
+    if (!(fps > 0 && fps <= 1000)) fps = 30;
+    var kesik = false;
+    function yogun(s, curve) {
+      // Opaklık çarpanı 0..1 (taşan eğri klibi saydamlığın ötesine itmesin); Ölçek ve Konum serbest
+      if (s.scale) { var a = S.yogunTV(s.scale, { curve: curve, fps: fps }); s.scale = a.keys; kesik = kesik || a.capped; }
+      if (s.opacity) { var b = S.yogunTV(s.opacity, { curve: curve, fps: fps, clampMin: 0, clampMax: 1 }); s.opacity = b.keys; kesik = kesik || b.capped; }
+      if (s.pos) { var d = S.yogunXY(s.pos, { curve: curve, fps: fps }); s.pos = d.keys; kesik = kesik || d.capped; }
+    }
+    // Gelen klip (B) eğriyi izler; giden klip (A) eğrinin aynasıyla (180° döndürme) kesime gelir: iki yarı kesimde
+    // buluşur (Suflo'nun kendi geçişleri gibi: A kesime hızlanır, B kesimden yavaşlar)
+    yogun(out.out, S.ayna(c.curve));
+    yogun(out["in"], c.curve);
+    out.ease = c.ease;
+    out.dense = true;
+    out.fps = fps;
+    if (kesik) out.capped = true;
+    return out;
   }
 
   return { list: function () { return LIST.slice(); }, has: has, plan: plan, hostPlan: hostPlan, mergeXY: mergeXY, findCut: findCut, fitHalf: fitHalf };
