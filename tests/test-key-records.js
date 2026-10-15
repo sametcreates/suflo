@@ -59,7 +59,17 @@ function canliZamanlar(rec) { return [rec.uclar[0]].concat(rec.times, [rec.uclar
   ok("kayit: metin alanları sınırlı", uzun.seqId.length === 128 && uzun.clipName.length === 256);
   var cokZaman = [];
   for (var i = 0; i < 10000; i++) cokZaman.push(i / 60);
-  ok("kayit: kayıt başına en çok 4096 zaman", K.kayit(egriKaydi({ times: cokZaman })).times.length === 4096);
+  // 4096'dan çok zaman kesilmez, kayıt reddedilir: kesik kayıt kaldırmada Suflo'nun anahtarlarının bir kısmını bırakırdı
+  var tam4096 = cokZaman.slice(0, 4096), fazla4097 = cokZaman.slice(0, 4097);
+  var k4096 = K.kayit(egriKaydi({ times: tam4096 }));
+  ok("kayit: kayıt başına en çok 4096 zaman; fazlası kesilmez, kayıt reddedilir", k4096 && k4096.times.length === 4096 &&
+    K.kayit(egriKaydi({ times: fazla4097 })) === null && K.kayit(egriKaydi({ times: cokZaman })) === null &&
+    K.kayit(egriKaydi({ times: tam4096.concat(tam4096) })).times.length === 4096);
+  var Dz = K.depo(sahteDepo(), { simdi: function () { return 3; } });
+  var rz = Dz.ekle("p", egriKaydi({ id: "uzun", tur: "zoom", times: fazla4097 }));
+  var rz2 = Dz.ekle("p", [egriKaydi({ id: "kisa" }), egriKaydi({ id: "uzun2", times: fazla4097 })]);
+  ok("ekle: 4096'dan çok zamanlı kayıt saklanmaz, ok false (karışık toplu eklemede de)", rz.ok === false && rz.eklenen === 0 &&
+    rz2.ok === false && rz2.eklenen === 1 && Dz.oku("p").map(function (r) { return r.id; }).join() === "kisa", js([rz.ok, rz2.ok, rz2.eklenen]));
 })();
 
 /* ---------------- canlılık ---------------- */
@@ -307,6 +317,74 @@ function canliZamanlar(rec) { return [rec.uclar[0]].concat(rec.times, [rec.uclar
   ok("toplam pay: tüm kovalar ≤ 1 000 000 karakter; en eski kayıtlar (önce en eski proje) tek tek atılır, yeni proje kısalmaz",
     hepOkT && !toplamTasti && !sonDustu && DT.oku("kucuk").length === 0 && a.length < b.length && c.length === sonN && c.length > 0 &&
     a.every(function (r) { return +r.id.slice(1) >= 34 - a.length; }), [DT.oku("kucuk").length, a.length, b.length, c.length].join("/"));
+})();
+
+/* ---------- inceleme r2: kazançsız atma, bozuk / eski dizin, dizin yazılamaması ---------- */
+(function () {
+  function anlik(ls) { var o = {}; Object.keys(ls.veri).sort().forEach(function (k) { o[k] = ls.veri[k]; }); return o; }
+  function kucukKayitlar(on, n, c0) {
+    var l = [];
+    for (var i = 0; i < n; i++) l.push({ tur: "egri", id: on + i, times: [1, 1.5, 2], uclar: [1, 2], createdAt: c0 + i });
+    return l;
+  }
+  function dolu(ls) { var b = 0; Object.keys(ls.veri).forEach(function (k) { b += ls.veri[k].length; }); return b; }
+  // B 20, A 5 kayıt; ~400 karakter boş; tek başına sığmayan bir kayıt (2000 düzensiz zaman) A'ya eklenir
+  var hazir = sahteDepo(), saat = 0, Dh = K.depo(hazir, { simdi: function () { return ++saat; } });
+  Dh.ekle("C:/p/B.prproj", kucukKayitlar("b", 20, 10));
+  Dh.ekle("C:/p/A.prproj", kucukKayitlar("a", 5, 100));
+  var ls = sahteDepo(dolu(hazir) + 400);
+  Object.keys(hazir.veri).forEach(function (k) { ls.setItem(k, hazir.veri[k]); });
+  var D = K.depo(ls, { simdi: function () { return ++saat; } });
+  var once = anlik(ls), dev = [], u = 0;
+  for (var i = 0; i < 2000; i++) { u += 300 + ((i * 7919) % 211); dev.push(u / 10000); }
+  var r = D.ekle("C:/p/A.prproj", { tur: "egri", id: "dev", times: dev, createdAt: 999 });
+  ok("kota: tek başına sığmayan kayıt hiçbir kaydı sildirmez (tüm kovalar ve dizin bayt bayt aynı), ok false, atilan 0",
+    r.ok === false && r.eklenen === 0 && r.atilan === 0 && js(anlik(ls)) === js(once) && D.oku("C:/p/A.prproj").length === 5 && D.oku("C:/p/B.prproj").length === 20,
+    js([r.ok, r.eklenen, r.atilan, D.oku("C:/p/A.prproj").length, D.oku("C:/p/B.prproj").length]));
+  // ardından küçük kayıtlar yine sığar: başarısız çağrı depoyu bozmadı
+  var r2 = D.ekle("C:/p/A.prproj", kucukKayitlar("y", 3, 2000));
+  ok("kota: küçük kayıtlar yine sığar (önceki başarısız çağrı depoyu bozmadı)", r2.ok && r2.eklenen === 3 && D.oku("C:/p/A.prproj").length === 8, js(r2));
+
+  // bozuk / eski dizin: kovası olmayan girdi (n 1990) ve şişik n / b gerçek kayıtları sildirmez
+  [true, false].forEach(function (anahtarliDepo) {
+    var ls2 = sahteDepo(), s2 = 0, D2 = K.depo(ls2, { simdi: function () { return ++s2; } });
+    D2.ekle("B", kucukKayitlar("b", 50, 10));
+    D2.ekle("A", kucukKayitlar("a", 5, 100));
+    var d = JSON.parse(ls2.getItem(K.DIZIN));
+    d[K.ONEK + "00000000ffffffff"] = { n: 1990, t: 5, b: 999999 };
+    d[K.depoAnahtari("A")].n = 5000; d[K.depoAnahtari("A")].b = 5000000;
+    ls2.setItem(K.DIZIN, JSON.stringify(d));
+    if (!anahtarliDepo) { ls2.key = undefined; }   // key()/length vermeyen depo: uzlaştırma yok, kaydet gerçek kovaları okur
+    var r3 = D2.ekle("C", kucukKayitlar("c", 1, 500));
+    var d3 = JSON.parse(ls2.getItem(K.DIZIN));
+    ok("bozuk dizin (" + (anahtarliDepo ? "key() var" : "key() yok") + "): eski / şişik girdiler geçerli kayıtları sildirmez, dizin gerçek değerlerle düzelir",
+      r3.ok && r3.eklenen === 1 && r3.atilan === 0 && D2.oku("B").length === 50 && D2.oku("A").length === 5 &&
+      !d3[K.ONEK + "00000000ffffffff"] && d3[K.depoAnahtari("A")].n === 5 && d3[K.depoAnahtari("A")].b < 5000 && D2.toplam() === 56,
+      js([r3.ok, r3.atilan, D2.oku("B").length, D2.oku("A").length, D2.toplam()]));
+  });
+
+  // dizin yazılamazsa (kota yalnız dizinde): eski dizin bırakılmaz, sonraki okuma kovalardan doğru sayar
+  var ls4 = sahteDepo(), s4 = 0, D4 = K.depo(ls4, { simdi: function () { return ++s4; } });
+  D4.ekle("A", kucukKayitlar("a", 20, 10));
+  D4.ekle("B", kucukKayitlar("b", 20, 100));
+  var asil = ls4.setItem;
+  ls4.setItem = function (k, v) {
+    if (k === K.DIZIN) { var e = new Error("dolu"); e.name = "QuotaExceededError"; throw e; }
+    return asil.call(ls4, k, v);
+  };
+  var r4 = D4.ekle("C", kucukKayitlar("c", 3, 500));
+  ls4.setItem = asil;
+  ok("dizin yazılamazsa: kayıt saklanır, eski dizin silinir; toplam ve sonraki sınırlar gerçek kovalardan (C dahil)",
+    r4.ok && r4.eklenen === 3 && ls4.getItem(K.DIZIN) === null && D4.toplam() === 43 && D4.oku("C").length === 3, js([r4.ok, ls4.getItem(K.DIZIN), D4.toplam()]));
+  var r5 = D4.ekle("A", kucukKayitlar("a2_", 1, 900));
+  var d5 = JSON.parse(ls4.getItem(K.DIZIN));
+  ok("dizin yazılamazsa: bir sonraki yazımda dizin tüm kovalarla (C dahil) yeniden kurulur", r5.ok && d5[K.depoAnahtari("C")] && d5[K.depoAnahtari("C")].n === 3 &&
+    d5[K.depoAnahtari("A")].n === 21 && D4.toplam() === 44, js(d5));
+  // dizinde olmayan kova (eski sürümün yarım yazımı): uzlaştırma onu sayar
+  var d6 = JSON.parse(ls4.getItem(K.DIZIN));
+  delete d6[K.depoAnahtari("B")];
+  ls4.setItem(K.DIZIN, JSON.stringify(d6));
+  ok("dizin uzlaştırma: dizinde olmayan kova sayılır", D4.toplam() === 44);
 })();
 
 /* ---------------- kaynak denetimi ---------------- */

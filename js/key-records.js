@@ -31,8 +31,11 @@
  * Sınır aşılınca kayıtlar TEK TEK, en eskiden atılır: önce diğer projelerinkiler, sonra bu projenin
  * eski kayıtları, en son (yalnız başka yol kalmadıysa) yeni eklenenler. Yazma kota hatası verirse
  * (yalnız kota hatasında; başka hatada hiçbir şey silinmez) birkaç kayıtlık yer açılıp yeniden
- * denenir. ekle() kaç kaydın gerçekten saklandığını (eklenen) ve kaç eski kaydın atıldığını (atilan)
- * bildirir. Her okuma/yazma try/catch içinde; bozuk veri yok sayılır.
+ * denenir. Yeni kayıtların hiçbiri sığmıyorsa ya da yazma sonunda başarısızsa atılanlar geri konur (kazanç
+ * getirmeyen atma diskte kalmaz). ekle() kaç kaydın gerçekten saklandığını (eklenen) ve kaç eski kaydın atıldığını
+ * (atilan) bildirir. Her okuma/yazma try/catch içinde; bozuk veri yok sayılır: dizin (proje başına sayı / boyut)
+ * yalnız tahmindir, depodaki kovalarla uzlaştırılır, sınır aşılıyor görünürse gerçek kovalardan yeniden hesaplanır;
+ * yazılamazsa silinir (sonraki okuma kovalardan kurar). Kayıt başına en çok 4096 zaman: fazlası kesilmez, reddedilir.
  * Depo yalnız bu bilgisayardaki panelin kolaylığıdır: silinirse eski davranış (onaylı) çalışır.
  */
 (function (root, factory) {
@@ -136,8 +139,13 @@
   function kayit(o, simdi) {
     if (!o || typeof o !== "object") return null;
     if (TURLER.indexOf(o.tur) === -1) return null;
-    var times = siraliZamanlar(o.times, ZAMAN_SINIR, r4);
-    if (!times.length) return null;
+    // Kayıt başına en çok ZAMAN_SINIR zaman: fazlası KESİLMEZ, kayıt reddedilir (ekle ok: false). Kesik kayıt Suflo'nun
+    // yazdığı anahtarların bir kısmını unutur: kaldırma geri kalanını bırakır, canlılık oranı yanlış listeyle ölçülür.
+    // Üreticiler bunun çok altında: özellik başına en çok 2000 ara anahtar (bakePlan, yogunlastir, host KS_EGRI_EN_COK)
+    // ve birkaç yüz çapa.
+    if (Array.isArray(o.times) && o.times.length > ZAMAN_SINIR * 2) return null;
+    var times = siraliZamanlar(o.times, ZAMAN_SINIR + 1, r4);
+    if (!times.length || times.length > ZAMAN_SINIR) return null;
     var uclar = null;
     if (Array.isArray(o.uclar) && o.uclar.length === 2 && sonlu(o.uclar[0]) && sonlu(o.uclar[1]) && o.uclar[1] > o.uclar[0]) {
       uclar = [r4(o.uclar[0]), r4(o.uclar[1])];
@@ -370,43 +378,61 @@
     function sil(k) { try { if (!ls) return false; ls.removeItem(k); return true; } catch (e) { return false; } }
     function json(ham) { if (!ham) return null; try { return JSON.parse(ham); } catch (e) { return null; } }
 
-    function kovaOku(anahtar) {
-      var o = json(al(anahtar));
+    function kovaCoz(metinHam) {
+      var o = json(metinHam);
       var ham = o && typeof o === "object" && !Array.isArray(o) && Array.isArray(o.k) ? o.k : [];
       var out = [];
       for (var i = 0; i < ham.length && i < PROJE_SINIR * 2; i++) { var r = kayit(diskten(ham[i])); if (r) out.push(r); }
       return out;
     }
+    function kovaOku(anahtar) { return kovaCoz(al(anahtar)); }
+
+    // Depodaki kova anahtarları { anahtar: 1 } (yalnız adlar okunur, ucuz); depo key()/length vermiyorsa null
+    function kovaAnahtarlari() {
+      try {
+        if (!ls || !sonlu(ls.length) || typeof ls.key !== "function") return null;
+        var out = {};
+        for (var i = 0; i < ls.length; i++) {
+          var k = ls.key(i);
+          if (typeof k === "string" && k.indexOf(ONEK) === 0) out[k] = 1;
+        }
+        return out;
+      } catch (e) { return null; }
+    }
 
     // dizin: { anahtar: { n: kayıt sayısı, t: son yazma, b: kovanın karakter boyutu } }.
     // Bozuksa depodaki kovalar taranır; boyutu bilinmeyen kovanın boyutu gerektiğinde okunur.
+    // Dizin yalnız bir TAHMİNDİR: depodaki kova adlarıyla uzlaştırılır (kovası olmayan girdi atılır, dizinde olmayan
+    // kova eklenir) ve bir sınır aşılıyor görünürse kaydet() gerçek kovaları okuyup yeniden hesaplar; bozuk ya da eski
+    // bir dizin geçerli kayıtları sildirmez.
     function dizinOku() {
-      var d = json(al(DIZIN));
+      var d = json(al(DIZIN)), mevcut = kovaAnahtarlari();
+      var temiz = {};
       if (d && typeof d === "object" && !Array.isArray(d)) {
-        var temiz = {};
         Object.keys(d).forEach(function (k) {
           var e = d[k];
-          if (k.indexOf(ONEK) === 0 && e && sonlu(e.n) && e.n >= 0 && sonlu(e.t)) {
-            temiz[k] = { n: Math.floor(e.n), t: e.t, b: sonlu(e.b) && e.b >= 0 ? Math.floor(e.b) : -1 };
+          if (k.indexOf(ONEK) === 0 && e && sonlu(e.n) && e.n >= 0 && sonlu(e.t) && (!mevcut || mevcut[k])) {
+            temiz[k] = { n: Math.min(Math.floor(e.n), PROJE_SINIR * 2), t: e.t, b: sonlu(e.b) && e.b >= 0 ? Math.floor(e.b) : -1 };
           }
         });
-        return temiz;
       }
-      var yeni = {};
-      try {
-        if (ls && sonlu(ls.length) && typeof ls.key === "function") {
-          for (var i = 0; i < ls.length; i++) {
-            var k = ls.key(i);
-            if (typeof k === "string" && k.indexOf(ONEK) === 0) {
-              var n = kovaOku(k).length;
-              if (n) yeni[k] = { n: n, t: 0, b: -1 };
-            }
-          }
-        }
-      } catch (e) {}
-      return yeni;
+      if (mevcut) {
+        Object.keys(mevcut).forEach(function (k) {
+          if (temiz[k]) return;
+          var n = kovaOku(k).length;
+          if (n) temiz[k] = { n: n, t: 0, b: -1 };
+        });
+      }
+      return temiz;
     }
     function dizinYaz(d) { return koy(DIZIN, JSON.stringify(d)); }
+    // Dizin yazılamazsa (kota) eski dizin bırakılmaz: silinir, bir sonraki okuma kovalardan yeniden kurar
+    // (yanlış sayılar sınırları bozmasın).
+    function dizinKaydet(d) {
+      var s = dizinYaz(d);
+      if (s !== true) sil(DIZIN);
+      return s;
+    }
     function boyutu(d, k) {
       if (d[k].b < 0) { var ham = al(k); d[k].b = typeof ham === "string" ? ham.length : 0; }
       return d[k].b;
@@ -420,22 +446,37 @@
      * Projenin listesini yazar; sayı ve boyut sınırlarını uygular. korunan: { id: 1 } — bu çağrıda
      * eklenen kayıtlar, en son atılır. Atma sırası (hep en eskiden, tek tek): diğer projelerin
      * kayıtları (tüm projelerde createdAt sırasıyla), bu projenin eski kayıtları, korunanlar.
+     * Kazanç getirmeyen atma diskte KALMAZ: korunanların hiçbiri saklanamıyorsa ya da yazma sonunda başarısızsa
+     * diske geçmiş atmalar geri konur ve bu projenin kovasına dokunulmaz (ok: false, atilan 0).
      * Döner: { ok, liste, atilan }.
      */
     function kaydet(proje, liste, korunan) {
       korunan = korunan || {};
+      var korunanVar = Object.keys(korunan).length > 0;
       var anahtar = depoAnahtari(proje);
       var d = dizinOku();
       var eskiKova = al(anahtar);
+      var eskiBoyut = typeof eskiKova === "string" ? eskiKova.length : 0;
       var p = paketle(sinifEnYeniler(liste, PROJE_SINIR));
       var atilanKendi = liste.length - p.liste.length, atilanDiger = 0;
+      // korunanlardan (bu çağrıda eklenenler) en az biri listede mi; korunan yoksa hep evet
+      function yeniVar() {
+        if (!korunanVar) return true;
+        for (var i = 0; i < p.liste.length; i++) if (korunan[p.liste[i].id]) return true;
+        return false;
+      }
 
-      // diğer projelerin kovaları yalnız gerektiğinde okunur; atmalar önce bellekte yapılır
+      // diğer projelerin kovaları yalnız gerektiğinde okunur; atmalar önce bellekte yapılır. Okununca dizin gerçek
+      // değerlerle düzeltilir (bozuk / eski dizin girdisine güvenilmez). ham: okunduğu andaki metin (geri koymak için).
       var digerleri = null;
       function digerleriAl() {
         if (!digerleri) {
-          digerleri = Object.keys(d).filter(function (k) { return k !== anahtar; })
-            .map(function (k) { return { anahtar: k, p: paketle(kovaOku(k)), bekleyen: 0 }; });
+          digerleri = Object.keys(d).filter(function (k) { return k !== anahtar; }).map(function (k) {
+            var ham = al(k), x = { anahtar: k, ham: ham, p: paketle(kovaCoz(ham)), bekleyen: 0, diskte: 0, dOnce: null };
+            if (x.p.liste.length) d[k] = { n: x.p.liste.length, t: d[k].t, b: paketBoyutu(x.p) }; else delete d[k];
+            x.dOnce = d[k] ? { n: d[k].n, t: d[k].t, b: d[k].b } : null;
+            return x;
+          });
         }
         return digerleri;
       }
@@ -474,7 +515,7 @@
         (digerleri || []).forEach(function (x) {
           if (!x.bekleyen) return;
           if (kovaKoy(x.anahtar, x.p) === true) {
-            atilanDiger += x.bekleyen; yazilan += x.bekleyen;
+            atilanDiger += x.bekleyen; yazilan += x.bekleyen; x.diskte += x.bekleyen;
             if (x.p.liste.length) d[x.anahtar] = { n: x.p.liste.length, t: d[x.anahtar] ? d[x.anahtar].t : 0, b: paketBoyutu(x.p) };
             else delete d[x.anahtar];
           } else {
@@ -484,29 +525,53 @@
         });
         return yazilan;
       }
+      // diske geçmiş ama kazanç getirmemiş atmaları geri koyar (kovalar okunduğu hâline döner; toplam boyut çağrı
+      // öncesine iner, o zaman sığıyordu). Geri konamayan kova kısalmış kalır ve dizine öyle yazılır.
+      function geriKoy() {
+        var dizinDegisti = false;
+        (digerleri || []).forEach(function (x) {
+          if (!x.diskte) return;
+          var s = typeof x.ham === "string" ? koy(x.anahtar, x.ham) : sil(x.anahtar);
+          if (s === true) {
+            atilanDiger -= x.diskte; x.diskte = 0;
+            if (x.dOnce) d[x.anahtar] = x.dOnce; else delete d[x.anahtar];
+          } else dizinDegisti = true;
+        });
+        return dizinDegisti;
+      }
+      function basarisiz() {
+        if (geriKoy() || atilanDiger) dizinKaydet(d);
+        return { ok: false, liste: kovaOku(anahtar), atilan: atilanDiger > 0 ? atilanDiger : 0 };
+      }
       function kendinden(hedefKarakter, hedefSayi) {
         var r = paketten(p, hedefKarakter, hedefSayi, korunan);
         atilanKendi += r.sayi;
         return r;
       }
-      // bu çağrıdan önce depoda duran Suflo kayıtlarının boyutu (o hâliyle sığıyordu)
-      var once = (typeof eskiKova === "string" ? eskiKova.length : 0) + digerOzet().b;
 
       // 1) proje boyut payı
       var fazla = paketBoyutu(p) - PROJE_KARAKTER;
       if (fazla > 0) kendinden(fazla, 0);
-      // 2) toplam boyut ve toplam kayıt sınırı: önce diğer projelerin en eskileri, sonra bu projeninkiler
+      // 2) toplam boyut ve toplam kayıt sınırı: önce diğer projelerin en eskileri, sonra bu projeninkiler. Dizin bir
+      // sınırı aşıyor gösteriyorsa önce gerçek kovalar okunur ve fazlalık onlardan yeniden hesaplanır.
+      var tahmin = digerOzet();
+      if (tahmin.b + paketBoyutu(p) > TOPLAM_KARAKTER || tahmin.n + p.liste.length > TOPLAM_SINIR) digerleriAl();
       fazla = digerOzet().b + paketBoyutu(p) - TOPLAM_KARAKTER;
       if (fazla > 0) { fazla -= digerlerinden(fazla, 0).serbest; if (fazla > 0) kendinden(fazla, 0); }
       var fazlaN = digerOzet().n + p.liste.length - TOPLAM_SINIR;
       if (fazlaN > 0) { fazlaN -= digerlerinden(0, fazlaN).sayi; if (fazlaN > 0) kendinden(0, fazlaN); }
+      // yeni kayıtların hiçbiri sığmıyorsa hiçbir şey yazılmaz (bellekteki atmalar diske geçmez)
+      if (!yeniVar()) return basarisiz();
 
       // 3) yaz. YALNIZ kota hatasında küçük adımlarla (birkaç kayıt) yer açılır — önce diğer
       // projelerin en eskileri — ve yeniden denenir. Başka hatada hiçbir kayıt silinmez.
       // Üst sınır: Suflo verisi bu çağrıdan önce depoda duran boyutun (once) KOTA_PAY altına inince
       // durulur; o boyut zaten sığıyordu, hata sürüyorsa sebep yer değildir, silmek işe yaramaz.
+      // Yeni kayıtların sonuncusu da atılmak zorunda kalırsa durulur: atmalar geri konur.
       var sonuc = kovaKoy(anahtar, p);
       if (sonuc === KOTA) {
+        var once = eskiBoyut;
+        digerleriAl().forEach(function (x) { once += typeof x.ham === "string" ? x.ham.length : 0; });
         var ust = once - KOTA_PAY;
         var adim = Math.max(KOTA_ADIM, Math.ceil((paketBoyutu(p) + digerOzet().b - ust) / 16));
         for (var deneme = 0; sonuc === KOTA && deneme < KOTA_DENEME; deneme++) {
@@ -518,16 +583,14 @@
           var kendiden = digerden.serbest < hedef ? kendinden(hedef - digerden.serbest, 0) : { sayi: 0 };
           // ilerleme yoksa (küçülen kova bile yazılamıyor: depo yer yüzünden reddetmiyor) dur
           if (!yazilan && !kendiden.sayi) break;
+          if (!yeniVar()) break;
           sonuc = kovaKoy(anahtar, p);
         }
       }
-      if (sonuc !== true) {
-        if (atilanDiger) dizinYaz(d);
-        return { ok: false, liste: kovaOku(anahtar), atilan: atilanDiger };
-      }
+      if (sonuc !== true) return basarisiz();
       digerleriYaz();
       if (p.liste.length) d[anahtar] = { n: p.liste.length, t: simdi(), b: paketBoyutu(p) }; else delete d[anahtar];
-      dizinYaz(d);
+      dizinKaydet(d);
       return { ok: true, liste: p.liste.slice(), atilan: atilanKendi + atilanDiger };
     }
 
@@ -538,9 +601,10 @@
       // Kayıt(lar) ekler; aynı id varsa yenisi yerine geçer. { ok, eklenen, atilan, liste }
       // eklenen: gerçekten saklanan yeni kayıt sayısı; ok yalnız hepsi saklandıysa true.
       // atilan: yer açmak için atılan eski kayıt sayısı (bu ve diğer projelerden).
+      // Geçersiz girdi (ör. ZAMAN_SINIR'dan çok zaman) saklanmaz ve ok false olur.
       ekle: function (proje, kayitlar) {
-        var gelen = (Array.isArray(kayitlar) ? kayitlar : [kayitlar]).map(function (r) { return kayit(r, simdi()); })
-          .filter(function (r) { return r; });
+        var girdi = Array.isArray(kayitlar) ? kayitlar : [kayitlar];
+        var gelen = girdi.map(function (r) { return kayit(r, simdi()); }).filter(function (r) { return r; });
         if (!gelen.length) return { ok: false, eklenen: 0, atilan: 0, liste: kovaOku(depoAnahtari(proje)) };
         var idler = {};
         gelen.forEach(function (r) { idler[r.id] = 1; });
@@ -549,7 +613,7 @@
         var eklenen = 0;
         if (s.ok) s.liste.forEach(function (r) { if (idler[r.id]) eklenen++; });
         var atilan = s.ok ? s.atilan - (gelen.length - eklenen) : s.atilan;   // atılan yeniler "eski" sayılmaz
-        return { ok: s.ok && eklenen === gelen.length, eklenen: eklenen, atilan: atilan > 0 ? atilan : 0, liste: s.liste };
+        return { ok: s.ok && eklenen === girdi.length, eklenen: eklenen, atilan: atilan > 0 ? atilan : 0, liste: s.liste };
       },
       // id(ler)i siler. { ok, silinen, liste }
       kaldir: function (proje, idler) {
