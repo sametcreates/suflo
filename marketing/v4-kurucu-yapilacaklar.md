@@ -1602,9 +1602,20 @@ anahtarını silmez), **11.9** (önayar kaldırınca Opaklık 80'e döner) ve **
 Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de. `setTimeVarying(false)` + `setValue` ile sabit değere
 dönüşün Premiere'de anahtar bırakmadığını (Effect Controls'te kronometre kapalı) doğrula. İnceleme düzeltmeleri için
 **11.13 (d)** ve **11.14** (araçlar arası: Zoom + Punch, Zoom + geçiş, Karartma → Zoom İçeri, Ctrl+Z sonra yeniden uygulama,
-çoklu seçim uyarısı) da dene.
+çoklu seçim uyarısı) da dene. İkinci inceleme için **11.15** (Eğri ile birlikte kaldırma) ve **11.16** (seçili klip
+playhead'in önüne geçmez, onayda kesim yeri) da.
 
 **11.6 Kaynak satırı (PR / birleştirme, 1 dk).** Adım 11'in ilk dört commit'inde (675cddd, 13b08f1, 63c3fe7, 74dfccb) kaynak
 satırı yok; inceleme düzeltmesi commit'inde var. 3.4 PR açıklamasına ve squash-merge commit'ine şu satırı ekle:
 `Kaynak: temiz oda (OpenCurve'den yalnız "canlılık parmak izli kayıt" fikri); kod alınmadı, bildirim gerekmez.`
 (plan › attribution_notes: her adımın commit / PR metni kaynağı ve kodun alınıp alınmadığını söyler).
+
+**11.7 İkinci inceleme: iki davranış değişikliği (bilgi, 2 dk).** (a) Bir araç anahtarının ucunda duran **Suflo Eğrisi**
+artık o araçla birlikte kalkar: Zoom'un, geçişin ya da önayarın iki anahtarı arasına Eğri uygulanmışsa Zoom'u kaldır /
+Geçişi kaldır / Önayarı kaldır Eğri'nin iç anahtarlarını da siler ve Eğri kaydını bitirir (bildirim "…Suflo eğrisi de
+kaldırıldı" der). Önceden Eğri'nin anahtarları kalıyor, rampa görünür kalıyor ve Eğri'nin Geri al'ı onları bulamıyordu.
+Uçları senin kendi anahtarların olan Eğri'ye dokunulmaz. (b) **Geçişi kaldır** artık seçili klibe göre kesim seçmez:
+playhead'e en fazla 1 sn uzaktaki, Suflo geçişi olan en yakın kesimi kaldırır (yoksa en yakın kesimi). Kaydı olmayan
+geçişin onayı ilk satırda hangi kesim olduğunu söyler ("Kesim: V1, 00:09.04") ve Tamam tam o kesimi temizler; önceden
+seçili bir klip, onaylanan eski yöntemle başka bir kesimdeki senin anahtarlarını sildirebiliyordu. Geçiş **uygulama**
+kuralı değişmedi (seçili klibin kesimi öncelikli). Yapılacak bir şey yok; 11.15 / 11.16'da gözle doğrula.

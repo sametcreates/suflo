@@ -2809,8 +2809,10 @@
   add({
     "Geçişi kaldır": "Remove transition",
     "Önayarı kaldır": "Remove preset",
-    "Playhead'e en yakın kesimdeki Suflo geçişini kaldırır; kendi anahtar karelerine dokunmaz.":
-      "Removes the Suflo transition at the cut nearest the playhead; your own keyframes stay untouched.",
+    "Playhead'e en yakın Suflo geçişini kaldırır (en çok 1 sn uzakta; seçili klip değil playhead belirler); kendi anahtar karelerine dokunmaz.":
+      "Removes the Suflo transition nearest the playhead (up to 1 s away; the playhead decides, not the selected clip); your own keyframes stay untouched.",
+    "Kesim: V{n}, {}": "Cut: V{}, {}",
+    "Uçları bu anahtar karelerde olan {n} Suflo eğrisi de kaldırıldı.": "{} Suflo curves whose ends were on these keyframes were removed too.",
     "Seçili klipte yalnız Suflo'nun yazdığı önayar anahtar karelerini kaldırır; kendi anahtar karelerine dokunmaz.":
       "Removes only the preset keyframes Suflo wrote on the selected clip; your own keyframes stay untouched.",
     "Yalnız Suflo'nun yazdığı zoom anahtar karelerini kaldırır; kendi anahtar karelerine dokunmaz. Ücretsiz.":
@@ -2831,7 +2833,7 @@
     "Suflo'nun anahtar kareleri zaten kaldırılmış (Premiere'de geri alınmış ya da silinmiş); kayıt temizlendi.":
       "Suflo's keyframes were already removed (undone or deleted in Premiere); the record was cleared.",
     "Kaldırılacak Suflo anahtar karesi yok.": "There are no Suflo keyframes to remove.",
-    "Kendi anahtar karelerin korundu; kenarlara {n} anahtar kare eski değerle eklendi.": "Your own keyframes were kept; {} keyframes with the earlier value were added at the edges.",
+    "Klipteki diğer anahtar kareler korundu; kenarlara {n} anahtar kare eski değerle eklendi.": "The clip's other keyframes were kept; {} keyframes with the earlier value were added at the edges.",
     "Kaldırılamadı.": "Couldn't remove.",
     "Hiçbir şey silinmedi.": "Nothing was deleted.",
     "Kaldırma kaydı bu bilgisayarda saklanamadı; kayıt yalnız panel açıkken kullanılabilir.":
@@ -2851,7 +2853,8 @@
     "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önceki sürümde uygulanan önayarı Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin.":
       "There's no Suflo preset record on the selected clip; nothing was deleted. To remove a preset applied in an earlier version, use Ctrl+Z in Premiere (Cmd+Z on macOS) or delete its keyframes in Effect Controls.",
     // jsx/host.jsx KS_removeSufloKeys (ASCII Turkish; the panel shows its own text from the code)
-    "Playhead'in yakininda kesim yok.": "No cut near the playhead."
+    "Playhead'in yakininda kesim yok.": "No cut near the playhead.",
+    "Kesim artik orada degil (timeline degismis); yeniden dene.": "The cut is no longer there (the timeline changed); try again."
   });
 
   /* ================= Hız rampası / Speed ramp (js/speedramp.js, js/hiz-rampasi.js, #tab-hiz) ================= */

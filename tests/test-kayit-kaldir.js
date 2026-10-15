@@ -120,10 +120,33 @@ ok("i18n: her metin (sayılı kalıplar dahil) i18n/en.js ile İngilizceye çevr
   var I = require(path.join(ROOT, "js", "i18n.js"));
   I.setDictionary(require(path.join(ROOT, "i18n", "en.js")));
   var hepsi = [].concat(Object.keys(SK.BASARI).map(function (k) { return SK.BASARI[k]("7"); }), Object.keys(SK.KALAN).map(function (k) { return SK.KALAN[k]("2"); }),
-    Object.keys(SK.HATALAR).map(function (k) { return SK.HATALAR[k]; }), [SK.kenarMetni("2"), SK.kayitsizMetni("2")]);
+    Object.keys(SK.HATALAR).map(function (k) { return SK.HATALAR[k]; }), [SK.kenarMetni("2"), SK.kayitsizMetni("2"), SK.egriMetni("2"),
+      SK.kesimYeri({ cut: 9.04, track: 2 })]);
   var eksik = hepsi.filter(function (s) { var t = I.translate(s); return t === s || /[çğıöşüÇĞİÖŞÜ]/.test(t); });
-  return eksik.length === 0 || console.log(eksik);
+  return (eksik.length === 0 && I.translate(SK.kesimYeri({ cut: 9.04, track: 2 })) === "Cut: V2, 00:09.04") || console.log(eksik);
 })());
+
+/* inceleme 2: kenar notu kalan anahtarlara "senin" demez (başka bir Suflo aracının olabilir); Eğri ve kesim yeri */
+ok("kenarMetni: kalan anahtarlar 'kendi anahtar karelerin' diye anılmaz", !/Kendi anahtar/.test(SK.kenarMetni("2")) && /diğer anahtar kareler korundu/.test(SK.kenarMetni("2")));
+ok("kesimYeri: V katmanı + dakika:saniye.salise; saat varsa başa; geçersizse boş",
+  SK.kesimYeri({ cut: 9.04, track: 1 }) === "Kesim: V1, 00:09.04" && SK.kesimYeri({ cut: 3725.499, track: 3 }) === "Kesim: V3, 1:02:05.50" &&
+  SK.kesimYeri({ cut: 59.999, track: 1 }) === "Kesim: V1, 01:00.00" && SK.kesimYeri(null) === "" && SK.kesimYeri({ cut: "x" }) === "",
+  [SK.kesimYeri({ cut: 9.04, track: 1 }), SK.kesimYeri({ cut: 3725.499, track: 3 }), SK.kesimYeri({ cut: 59.999, track: 1 })]);
+(function () {
+  function eg(o) { var r = rec(o); r.uclar = o.uclar || [r.times[0] - 0.5, r.times[r.times.length - 1] + 0.5]; r.createdAt = o.c || 1; return r; }
+  var arac = [rec({ id: "z", tur: "zoom", nodeId: "n1", times: [0, 2, 5] })];
+  var egriler = [eg({ id: "e1", tur: "egri", nodeId: "n1", times: [0.5, 1], c: 2 }), eg({ id: "e2", tur: "egri", nodeId: "n2", times: [0.5, 1] }),
+    eg({ id: "e3", tur: "egri", nodeId: "n1", matchName: "AE.ADBE Opacity/Opacity", times: [0.5, 1] }), eg({ id: "e4", tur: "egri", nodeId: "n1", seqId: "s2", times: [0.5, 1] }),
+    eg({ id: "e5", tur: "egri", nodeId: "n1", times: [3, 4], c: 5 }), rec({ id: "e6", tur: "egri", nodeId: "n1", times: [1, 2] })];
+  var a = SK.egriAdaylari(egriler, arac).map(function (r) { return r.id; });
+  ok("egriAdaylari: yalnız araç kaydıyla aynı sekans + klip + özellikteki uçlu Eğri kayıtları, en yeni önce", JSON.stringify(a) === '["e5","e1"]', a);
+  ok("egriAdaylari: araç kaydı yoksa boş", SK.egriAdaylari(egriler, []).length === 0 && SK.egriAdaylari(null, arac).length === 0);
+  var oe = SK.ozet({ eslesen: 1, sonuclar: [{ id: "z", silinen: 7, egri: ["e1"] }], atlanan: [], egriBiten: ["e1", "e1", 5, ""] });
+  ok("ozet: egriBiten (tekrarsız, yalnız metin id) ve sayısı", JSON.stringify(oe.egriBiten) === '["e1"]' && oe.egri === 1, oe);
+  var me = SK.mesajParcalari("zoom", oe);
+  ok("mesaj: kaldırılan Eğri ayrıca söylenir, temiz başarı 'good'", me.tur === "good" && me.parcalar[0] === "Zoom kaldırıldı: 7 anahtar kare silindi." &&
+    me.parcalar[1] === "Uçları bu anahtar karelerde olan 1 Suflo eğrisi de kaldırıldı.", me);
+})();
 
 /* ---------------- depo + akış (sahte call) ---------------- */
 function bellekDepo() {
@@ -304,15 +327,36 @@ async function uctanUca() {
   await dinleyici["preset-kaldir:click"]();
   ok("kaydı olmayan önayar: onay sorulmaz, hiçbir şey silinmez, nasıl kaldırılacağı söylenir", sorular.length === soruOnce && A.opak.keys.length === 2 &&
     /önayar kaydı yok; hiçbir şey silinmedi/.test(toastlar[toastlar.length - 1].m), toastlar[toastlar.length - 1]);
+
+  // inceleme 2: Geçişi kaldır'da seçili klip playhead'in önüne geçmez; onay hangi kesim olduğunu söyler, eski yöntem
+  // tam o kesimi temizler (seçili C'nin kesimindeki kullanıcı anahtarları silinmez)
+  var X = PM.klip({ ad: "X.mp4", nodeId: "X", start: 30, end: 39 }), Y = PM.klip({ ad: "Y.mp4", nodeId: "Y", start: 39, end: 40 });
+  var Zc = PM.klip({ ad: "Z.mp4", nodeId: "Zc", start: 40, end: 50 });
+  PM.izKur([[A, B], [X, Y, Zc]]);
+  PM.durum.secim = []; PM.durum.playhead = 39;
+  PM.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.4 }), tolerance: 1 });   // kaydı olmayan (eski) Karartma, V2 39 sn
+  Zc.opak.elle(Zc, 40, 0); Zc.opak.elle(Zc, 40.3, 100);   // kullanıcının Z başındaki kendi solması (40 sn kesimi)
+  PM.durum.playhead = 39.1; PM.durum.secim = [Zc];
+  cevap.onay = true;
+  var soruSay = sorular.length;
+  await dinleyici["gecis-kaldir:click"]();
+  var soruK = sorular[sorular.length - 1] || "", tostK = toastlar[toastlar.length - 1];
+  ok("Geçişi kaldır + seçili Z: onay playhead'in altındaki kesimi gösterir (V2, 39 sn), seçili Z'nin kesimini (40) değil",
+    sorular.length === soruSay + 1 && soruK.indexOf("Kesim: V2, 00:39.00\n\n") === 0 && /geçiş kaydı yok/.test(soruK), soruK);
+  ok("onaylanınca eski yöntem tam o kesimi temizler: X / Y'nin Karartması gider, Z'deki kullanıcı anahtarları kalır; bildirim kesimi söyler",
+    X.opak.keys.length === 0 && Y.opak.keys.length === 0 && JSON.stringify(Zc.opak.tl(Zc)) === "[40,40.3]" &&
+    /^Kesim: V2, 00:39\.00 · Geçiş penceresi eski yöntemle temizlendi/.test(tostK.m), [tostK.m, Zc.opak.keys]);
 }
 
 /* ---------------- araçlar arası ve yeniden uygulama (3.4 adım 11 inceleme bulguları; panel modülü + host sahte Premiere) ---------------- */
 async function araclarArasi() {
   function ortam() {
     var PM = require("./_kayit-premiere.js").olustur();
-    var t = 1000;
-    var o = SK.olustur({ call: PM.kcall, depo: KR.depo(bellekDepo()), simdi: function () { return t++; } });
-    return { PM: PM, o: o, sakla: function (r) { return o.sakla(r.proje, r.records, r); } };
+    var t = 1000, depo = KR.depo(bellekDepo());
+    var o = SK.olustur({ call: PM.kcall, depo: depo, simdi: function () { return t++; } });
+    return { PM: PM, o: o, depo: depo, sakla: function (r) { return o.sakla(r.proje, r.records, r); },
+      // Eğri panelinin yaptığı gibi: KS_easeBake kayıtları aynı depoya (tur 'egri')
+      egriSakla: function (r) { (r.records || []).forEach(function (x) { x.id = KR.yeniId(t++); x.createdAt = t++; }); return depo.ekle(PROJE, r.records).ok; } };
   }
   // s..e sn: 2 sn arayla zoom; ilk anahtar yakınlaşmış (1,12), sonra 1 / 1,12 dönüşümlü (ritmik mod gibi)
   function zoomPlani(s, e) { var k = []; for (var t = s, i = 0; t <= e + 1e-9; t += 2, i++) k.push({ time: t, value: i % 2 ? 1 : 1.12 }); return k; }
@@ -465,4 +509,32 @@ async function araclarArasi() {
   await e.o.akis({ tur: "gecis", kapsam: { kesim: { tolerance: 1 } } });
   ok("Zoom İçeri → Karartma → Geçişi kaldır: B Ölçeği 145'te kalmaz (100), Opaklık 100", B.olcek.keys.length === 0 && B.olcek.value === 100 &&
     A.olcek.value === 100 && B.opak.value === 100 && A.opak.value === 100, [A.olcek, B.olcek]);
+
+  // 7) inceleme 2: Zoom'un iki anahtarı arasına Eğri yazıldı; Zoom'u kaldır Eğri'nin iç anahtarlarını da kaldırır (rampa
+  //    kalmaz), Eğri kaydı depodan düşer. Kullanıcının iki anahtarı arasındaki Eğri ve anahtarları yerinde kalır.
+  e = ortam(); PM = e.PM;
+  var Ze = PM.klip({ ad: "Z.mp4", nodeId: "Ze", start: 0, end: 10 });
+  PM.izKur([[Ze]]); PM.durum.secim = [Ze];
+  e.sakla(PM.cagir("KS_autoZoom", { keys: [{ time: 0, value: 1 }, { time: 2, value: 1.12 }, { time: 5, value: 1.12 }, { time: 7, value: 1 }, { time: 10, value: 1 }],
+    clearStart: 0, clearEnd: 10 }));
+  var icE = [];
+  for (var q = 1; q < 10; q++) { var tq = q * 0.2, uq = tq / 2; icE.push({ t: tq, v: 100 + 12 * uq * uq * (3 - 2 * uq) }); }
+  var hedefE = { nodeId: "Ze", clipName: "Z.mp4", clipStart: 0, seqId: "seq-1" };
+  var be1 = PM.cagir("KS_easeBake", { target: hedefE, items: [{ compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", t0: 0, t1: 2, v0: 100, v1: 112, keys: icE }] });
+  Ze.olcek.elle(Ze, 8, 105); Ze.olcek.elle(Ze, 9, 108);
+  var be2 = PM.cagir("KS_easeBake", { target: hedefE, items: [{ compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", t0: 8, t1: 9, v0: 105, v1: 108,
+    keys: [{ t: 8.5, v: 106.5 }] }] });
+  ok("Zoom + Eğri hazırlığı: iki Eğri yazıldı ve aynı depoda", be1.ok && be1.yazilan === 9 && be2.ok && be2.yazilan === 1 && e.egriSakla(be1) && e.egriSakla(be2), [be1, be2]);
+  var egri2 = e.depo.oku(PROJE).filter(function (r) { return r.tur === "egri" && r.uclar[0] === 8; })[0];
+  s = await yedekli(e.o, "zoom", { secili: true }, sorular = []);
+  var zeTl = Ze.olcek.tl(Ze), zeV = Ze.olcek.keys.map(function (k) { return Math.round(k.v * 100) / 100; });
+  ok("Zoom + Eğri → Zoom'u kaldır: Eğri'nin iç anahtarları da gider (0–2 sn rampası kalmaz), onay sorulmaz, sonuç 'good'",
+    s.tur === "good" && sorular.length === 0 && !zeTl.some(function (t) { return t > 0 && t < 2.1; }) &&
+    s.parcalar.indexOf("Uçları bu anahtar karelerde olan 1 Suflo eğrisi de kaldırıldı.") !== -1, [s, zeTl, zeV]);
+  ok("Zoom + Eğri → Zoom'u kaldır: kullanıcının anahtarları ve aralarındaki Eğri yerinde, kenarlar Suflo'dan önceki 100",
+    JSON.stringify(zeTl) === "[0,8,8.5,9,10]" && JSON.stringify(zeV) === "[100,105,106.5,108,100]" &&
+    /^Klipteki diğer anahtar kareler korundu; kenarlara 2 anahtar kare/.test(s.parcalar[s.parcalar.length - 1]), [zeTl, zeV, s.parcalar]);
+  ok("Zoom + Eğri → Zoom'u kaldır: ucu silinen Eğri'nin kaydı depodan düştü, öbür Eğri kaydı ve Eğri'nin Geri al'ı duruyor",
+    JSON.stringify(e.depo.oku(PROJE).map(function (r) { return r.tur; })) === '["egri"]' && egri2 &&
+    PM.cagir("KS_easeUndo", { records: [egri2] }).sonuclar[0].silinen === 1, e.depo.oku(PROJE));
 }

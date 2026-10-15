@@ -284,5 +284,70 @@ ok("removeKey hata verirse: o kayıt atlanan 'silinemedi' (kayıt saklanır), ö
   c8.sonuclar.length === 1 && c8.sonuclar[0].silinen === 2 && D2.opak.keys.length === 2, js([c8, D2.opak.keys]));
 delete D2.opak.removeKey;
 
+/* ---- inceleme 2: Geçişi kaldır'da seçim playhead'in önüne geçmez; eski yöntem tam gösterilen kesimi temizler ---- */
+var PM3 = require("./_kayit-premiere.js").olustur();
+var E1 = PM3.klip({ ad: "A.mp4", nodeId: "E1", start: 0, end: 9 }), E2 = PM3.klip({ ad: "B.mp4", nodeId: "E2", start: 9, end: 10 });
+var E3 = PM3.klip({ ad: "C.mp4", nodeId: "E3", start: 10, end: 20 });
+PM3.izKur([[E1, E2, E3]]);
+PM3.durum.playhead = 9;
+var s9 = sakla(PM3.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.4 }), tolerance: 1 }));
+E3.opak.elle(E3, 10, 0); E3.opak.elle(E3, 10.3, 100);   // kullanıcının C başındaki kendi solması (kesim 10)
+PM3.durum.playhead = 9.1; PM3.durum.secim = [E3];
+ok("uygulama kuralı değişmedi: seçili C'nin kesimi (10) playhead'e daha yakın kesimin (9) önüne geçer",
+  PM3.ctx.KS_gecisKesimBul(PM3.sequence, 9.1, 1).cut === 10);
+var c9 = PM3.cagir("KS_removeSufloKeys", { records: s9, kesim: { tolerance: 1 } });
+ok("kaldırma: seçili C'ye dokunan kesim (10) değil, playhead'in altındaki Suflo geçişinin kesimi (9) seçilir ve kaldırılır",
+  c9.ok && c9.kesim && c9.kesim.cut === 9 && c9.kesim.track === 1 && c9.eslesen === 2 && E1.opak.keys.length === 0 && E2.opak.keys.length === 0, js(c9));
+ok("kaldırma: kullanıcının C'deki anahtarları (10 · 0, 10,3 · 100) yerinde", js(E3.opak.tl(E3)) === js([10, 10.3]) && E3.opak.keys[0].v === 0, js(E3.opak.keys));
+// Kayıt hiçbir kesimde yoksa: playhead'e en yakın kesim (seçim öne geçmez); eski yöntem tam o kesimi temizler
+PM3.durum.secim = []; PM3.durum.playhead = 9;
+PM3.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.4 }), tolerance: 1 });   // kesim 9'a kayıtsız (eski) Karartma
+PM3.durum.playhead = 9.1; PM3.durum.secim = [E3];
+var c10 = PM3.cagir("KS_removeSufloKeys", { records: [], kesim: { tolerance: 1 } });
+ok("kayıt yoksa kesim cevabı playhead'e en yakın kesim (9; seçili C'nin kesimi 10 değil)", c10.ok && c10.eslesen === 0 && c10.kesim && c10.kesim.cut === 9, js(c10));
+var t10 = PM3.cagir("KS_applyCutTransition", { temizle: true, tolerance: 1, cut: c10.kesim.cut, track: c10.kesim.track });
+ok("eski yöntem cut + track ile tam o kesimi temizler (seçim yeniden aramayı 10'a çekmez); C'deki kullanıcı anahtarları kalır",
+  t10.ok && t10.cut === 9 && E1.opak.keys.length === 0 && E2.opak.keys.length === 0 && js(E3.opak.tl(E3)) === js([10, 10.3]), js([t10, E3.opak.keys]));
+var t10y = PM3.cagir("KS_applyCutTransition", { temizle: true, tolerance: 1, cut: 12, track: 1 });
+ok("eski yöntem: gösterilen kesim artık yoksa (timeline değişti) başka kesime düşmez, hata", !t10y.ok && /Kesim artik orada degil/.test(t10y.error) &&
+  js(E3.opak.tl(E3)) === js([10, 10.3]), js(t10y));
+// Kayıtlı kesim, kayıtsız daha yakın kesimin önüne geçer (tolerans içinde)
+E1.opak.keys = []; E2.opak.keys = []; E3.opak.keys = []; E1.opak.tv = E2.opak.tv = E3.opak.tv = false; E1.opak.value = E2.opak.value = E3.opak.value = 100;
+PM3.durum.secim = []; PM3.durum.playhead = 10;
+var s11 = sakla(PM3.cagir("KS_applyCutTransition", { plan: T.hostPlan("dip", { duration: 0.4 }), tolerance: 1 }));
+PM3.durum.playhead = 9.4;
+var c11 = PM3.cagir("KS_removeSufloKeys", { records: s11, kesim: { tolerance: 1 } });
+ok("kaldırma: playhead'e daha yakın kesimde (9) kayıt yoksa, tolerans içindeki Suflo geçişinin kesimi (10) kaldırılır",
+  c11.ok && c11.kesim.cut === 10 && c11.eslesen === 2 && E2.opak.keys.length === 0 && E3.opak.keys.length === 0, js(c11));
+
+/* ---- inceleme 2: ucu kaldırılan anahtarlarda duran Eğri'nin iç anahtarları da kalkar ---- */
+var PM4 = require("./_kayit-premiere.js").olustur();
+var F1 = PM4.klip({ ad: "A.mp4", nodeId: "F1", start: 0, end: 5 }), F2 = PM4.klip({ ad: "B.mp4", nodeId: "F2", start: 5, end: 10 });
+PM4.izKur([[F1, F2]]);
+PM4.durum.playhead = 5;
+var s12 = sakla(PM4.cagir("KS_applyCutTransition", { plan: T.hostPlan("zoom-in", { duration: 0.6 }), tolerance: 1 }));
+var b12 = s12.filter(function (r) { return r.nodeId === "F2"; })[0];
+var bT = F2.olcek.tl(F2), bV = F2.olcek.keys.map(function (k) { return k.v; });
+// Eğri: B'nin geçiş anahtarlarının ilk ikisinin arasına iç anahtarlar
+var icK = [];
+for (var ii = 1; ii < 5; ii++) { var tt = bT[0] + (bT[1] - bT[0]) * ii / 5; icK.push({ t: tt, v: bV[0] + (bV[1] - bV[0]) * ii / 5 }); }
+var eb = PM4.cagir("KS_easeBake", { target: { nodeId: "F2", clipName: "B.mp4", clipStart: 5, seqId: "seq-1" },
+  items: [{ compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", t0: bT[0], t1: bT[1], v0: bV[0], v1: bV[1], keys: icK }] });
+var eRec = KR.kayit(eb.records[0]);
+// Kullanıcının iki anahtarı arasında başka bir Eğri (uçları geçişin değil): dokunulmaz
+F2.olcek.elle(F2, 8, 110); F2.olcek.elle(F2, 9, 120);
+var eb2 = PM4.cagir("KS_easeBake", { target: { nodeId: "F2", clipName: "B.mp4", clipStart: 5, seqId: "seq-1" },
+  items: [{ compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale", t0: 8, t1: 9, v0: 110, v1: 120, keys: [{ t: 8.5, v: 115 }] }] });
+var eRec2 = KR.kayit(eb2.records[0]);
+ok("Eğri hazırlığı: geçişin iki anahtarı arasına 4, kullanıcının iki anahtarı arasına 1 iç anahtar", eb.ok && eb.yazilan === 4 && eb2.ok && eb2.yazilan === 1, js([eb, eb2]));
+var c12 = PM4.cagir("KS_removeSufloKeys", { records: [b12], egriler: [eRec, eRec2] });
+var f2tl = F2.olcek.tl(F2);
+ok("Geçiş kaldırılınca ucu geçişin anahtarında duran Eğri'nin 4 iç anahtarı da silinir, Eğri kaydı biter (egriBiten)",
+  c12.ok && js(c12.egriBiten) === js([eRec.id]) && c12.sonuclar[0].silinen === b12.times.length + 4 && js(c12.sonuclar[0].egri) === js([eRec.id]) &&
+  !f2tl.some(function (t) { return t > 5 && t < 5.5; }), js([c12, f2tl]));
+ok("uçları kullanıcının anahtarlarında olan Eğri ve kullanıcının anahtarları yerinde (8, 8,5, 9)", js(f2tl.filter(function (t) { return t >= 7; })) === js([8, 8.5, 9]), js(f2tl));
+var u12 = PM4.cagir("KS_easeUndo", { records: [eRec2] });
+ok("öbür Eğri'nin kendi Geri al'ı hâlâ çalışır", u12.ok && u12.sonuclar.length === 1 && u12.sonuclar[0].silinen === 1, js(u12));
+
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

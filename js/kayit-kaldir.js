@@ -10,8 +10,14 @@
  * Kaldırmak hiçbir zaman ücretli değil (Pro kapısı yok). Kayıt bulunamazsa (eski proje, başka bilgisayar,
  * silinmiş yerel depo) araç eski yöntemi YALNIZ onayla çalıştırır (yedekGerekli).
  *
+ * Kaldırılan anahtarlarda ucu duran Suflo Eğrisi (3.4 adım 10; aynı depo, tur 'egri') de kalkar: Eğri iki anahtarın
+ * arasına iç anahtarlar yazar, ucu gidince onlar sahipsiz kalır (rampa durur, Eğri'nin Geri al'ı kaydı bulamaz). kaldir,
+ * aynı klip ve özellikteki Eğri kayıtlarını da host'a verir (egriAdaylari); host karar verir, biten Eğri kaydı depodan düşer.
+ * Geçişi kaldır'ın kesimini host seçer (playhead'in yakınında Suflo kaydı olan en yakın kesim; seçim öne geçmez); eski
+ * yöntemin onayı o kesimi gösterir (kesimYeri) ve yedek tam o kesimi temizler.
+ *
  * Saf kısım (DOM'suz, node ile test edilir): yerineGecis, kenarMiras, cakisanlar, ozet, mesajParcalari, yedekGerekli,
- * hataMetni. olustur({ call, depo, simdi }) → { sakla, kayitlar, kaldir, akis }: call = K.call (Promise),
+ * hataMetni, egriAdaylari, kesimYeri. olustur({ call, depo, simdi }) → { sakla, kayitlar, kaldir, akis }: call = K.call (Promise),
  * depo = SufloKeyRecords.depo().
  * Depo yazılamazsa kayıtlar bu oturumun belleğinde kalır (panel açıkken kaldırma yine çalışır).
  * Premiere'e yalnız kullanıcı eyleminde gidilir (kaldir): panel açılışında çağrı yok.
@@ -47,7 +53,19 @@
   };
   // Seçili kapsamda Suflo kaydı eşleşmeyen video klipleri (önceki sürümde uygulanmış olabilir): dokunulmaz, söylenir
   function kayitsizMetni(n) { return n + " seçili klipte Suflo'nun kaydı yok; onlara dokunulmadı (önceki sürümde uygulandıysa yalnız o klibi seçip yeniden dene)."; }
-  function kenarMetni(n) { return "Kendi anahtar karelerin korundu; kenarlara " + n + " anahtar kare eski değerle eklendi."; }
+  // Kalan anahtarlar kullanıcının ya da başka bir Suflo aracının olabilir (ör. zoom'un ortasındaki Punch): "senin" denmez
+  function kenarMetni(n) { return "Klipteki diğer anahtar kareler korundu; kenarlara " + n + " anahtar kare eski değerle eklendi."; }
+  function egriMetni(n) { return "Uçları bu anahtar karelerde olan " + n + " Suflo eğrisi de kaldırıldı."; }
+  // Geçişi kaldır'ın kesimi: { cut (sn), track (1'den) } → "Kesim: V1, 00:09.04" (onay sorusu ve sonuç bildirimi)
+  function kesimYeri(k) {
+    if (!k || !sonlu(Number(k.cut))) return "";
+    var cs = Math.round(Math.max(0, Number(k.cut)) * 100), s = Math.floor(cs / 100), sa = Math.floor(s / 3600), dk = Math.floor((s % 3600) / 60);
+    var sn = s % 60, ys = cs % 100;
+    function iki(x) { return (x < 10 ? "0" : "") + x; }
+    var z = (sa ? sa + ":" + iki(dk) : iki(dk)) + ":" + iki(sn) + "." + iki(ys);
+    var iz = Math.max(1, Math.floor(Number(k.track) || 1));
+    return "Kesim: V" + iz + ", " + z;
+  }
   var HATALAR = {
     sekansYok: "Aktif sekans yok.",
     kesimYok: "Playhead'in yakınında kesim yok. Playhead'i iki klibin birleştiği yere getir.",
@@ -239,15 +257,41 @@
   }
 
   /*
+   * Eğri kayıtlarından (tur 'egri') host'a gidecek adaylar: araç kayıtlarından biriyle aynı sekansta, aynı özellikte
+   * (matchName) ve aynı klipte (iki nodeId de varsa onlar, yoksa klip adı) olanlar; en yeniler önce, en çok EN_COK. Host
+   * yalnız ucu silinen anahtarlarda duran canlı Eğri'ye dokunur (KS_kayitEgriUclari); burada yalnız gereksiz yük ayıklanır.
+   */
+  function egriAdaylari(egriler, liste) {
+    var araclar = (Array.isArray(liste) ? liste : []).filter(function (r) { return r && aracMi(r.tur); });
+    if (!araclar.length) return [];
+    return (Array.isArray(egriler) ? egriler : []).filter(function (e) {
+      if (!e || e.tur !== "egri" || !Array.isArray(e.uclar) || e.uclar.length !== 2 || !Array.isArray(e.times) || !e.times.length) return false;
+      return araclar.some(function (r) {
+        if (r.matchName !== e.matchName || String(r.seqId || "") !== String(e.seqId || "")) return false;
+        if (r.nodeId && e.nodeId) return String(r.nodeId) === String(e.nodeId);
+        return String(r.clipName || "") === String(e.clipName || "");
+      });
+    }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, EN_COK);
+  }
+
+  /*
    * KS_removeSufloKeys cevabının özeti: { eslesen, silinen, eklenen, biten (host'un bitirdiği kayıt id'leri:
    * silindi ya da Suflo'nun anahtarları zaten yoktu), yok (zaten kaldırılmış sayısı), kalan: { kod: sayı },
-   * kalanSayi, degistiSayi, kayitsiz (seçili kapsamda kaydı eşleşmeyen seçili video klibi sayısı) }
+   * kalanSayi, degistiSayi, kayitsiz (seçili kapsamda kaydı eşleşmeyen seçili video klibi sayısı),
+   * egriBiten (uçları silindiği için host'un kaldırdığı Eğri kayıtlarının id'leri), egri (sayısı) }
    */
   function ozet(r) {
-    var o = { eslesen: 0, silinen: 0, eklenen: 0, biten: [], yok: 0, kalan: {}, kalanSayi: 0, degistiSayi: 0, kayitsiz: 0 };
+    var o = { eslesen: 0, silinen: 0, eklenen: 0, biten: [], yok: 0, kalan: {}, kalanSayi: 0, degistiSayi: 0, kayitsiz: 0, egriBiten: [], egri: 0 };
     if (!r || typeof r !== "object") return o;
     o.eslesen = Math.max(0, Number(r.eslesen) || 0);
     o.kayitsiz = Array.isArray(r.kayitsiz) ? r.kayitsiz.length : 0;
+    var gorulen = {};
+    o.egriBiten = (Array.isArray(r.egriBiten) ? r.egriBiten : []).filter(function (id) {
+      if (typeof id !== "string" || !id || gorulen[id]) return false;
+      gorulen[id] = 1;
+      return true;
+    });
+    o.egri = o.egriBiten.length;
     (Array.isArray(r.sonuclar) ? r.sonuclar : []).forEach(function (s) {
       if (!s || typeof s.id !== "string") return;
       o.biten.push(s.id);
@@ -280,6 +324,7 @@
     if (o.silinen) p.push(doldur(BASARI[tur] || BASARI.gecis, o.silinen));
     else if (o.yok && !o.kalanSayi) p.push("Suflo'nun anahtar kareleri zaten kaldırılmış (Premiere'de geri alınmış ya da silinmiş); kayıt temizlendi.");
     else if (!o.kalanSayi) p.push("Kaldırılacak Suflo anahtar karesi yok.");
+    if (o.egri) p.push(doldur(egriMetni, o.egri));
     if (o.eklenen) p.push(doldur(kenarMetni, o.eklenen));
     Object.keys(KALAN).forEach(function (kod) { if (o.kalan[kod]) p.push(doldur(KALAN[kod], o.kalan[kod])); });
     if (o.kayitsiz) p.push(doldur(kayitsizMetni, o.kayitsiz));
@@ -309,6 +354,13 @@
       return depoNesnesi || null;
     }
     function anahtar(proje) { return KR ? KR.depoAnahtari(proje) : String(proje || ""); }
+
+    // Projenin bu sekanstaki Eğri kayıtları (depo; Eğri'nin oturum belleğindekiler onun panelinde kalır)
+    function egriKayitlari(proje, seqId) {
+      var d = depo(), liste = [];
+      try { liste = d ? d.oku(proje) : []; } catch (e) { liste = []; }
+      return liste.filter(function (r) { return r && r.tur === "egri" && (!seqId || r.seqId === String(seqId)); });
+    }
 
     // Projenin araç kayıtları (depo + bu oturumun belleği); f: { tur, seqId, idler }
     function kayitlar(proje, f) {
@@ -392,12 +444,14 @@
         return bos;
       }
       var arg = { records: liste };
+      var egriler = egriAdaylari(egriKayitlari(proje, pk.seqId), liste);
+      if (egriler.length) arg.egriler = egriler;
       if (opts.secili) arg.secili = true;
       if (opts.kesim) arg.kesim = { tolerance: Number(opts.kesim.tolerance) || 1 };
       var r = await call("KS_removeSufloKeys", arg, 120000);
       if (!r || !r.ok) throw hata(r && r.kod, r && r.error);
       var oz = ozet(r);
-      sil(proje, oz.biten);
+      sil(proje, oz.biten.concat(oz.egriBiten));
       oz.kayitYok = oz.eslesen === 0;
       if (!opts.secili) oz.kayitsiz = 0;
       oz.proje = proje;
@@ -410,9 +464,10 @@
     /*
      * Araçların ortak kaldırma akışı (DOM'a dokunmaz; gösterilecek metni döndürür).
      * o: { tur, kapsam (kaldir seçenekleri), onay: (soru) → bool,
-     *      yedek?: async () → { parcalar, tur } (eski yöntem), yedekMetni?: { yok, degisti } (onay sorusu),
+     *      yedek?: async (oz) → { parcalar, tur } (eski yöntem; oz.kesim: host'un seçtiği kesim, tam o temizlenir),
+     *      yedekMetni?: { yok, degisti } (onay sorusu; metin ya da (oz) → metin),
      *      kayitYokMetni?: kayıt yoksa ve eski yöntem yoksa gösterilecek metin }
-     * Eski yöntem YALNIZ onayla çalışır. Doner: { parcalar, tur: 'good' | 'warn', yedek, iptal }
+     * Eski yöntem YALNIZ onayla çalışır. Doner: { parcalar, tur: 'good' | 'warn', yedek, iptal, kesim (host'un seçtiği | null) }
      */
     async function akis(o) {
       o = o || {};
@@ -420,16 +475,18 @@
       Object.keys(o.kapsam || {}).forEach(function (k) { kapsam[k] = o.kapsam[k]; });
       kapsam.tur = o.tur;
       var oz = await kaldir(kapsam);
-      if (kapsam.secili && oz.secim === 0) return { parcalar: ["Önce timeline'da bir klip seç."], tur: "warn", yedek: false, iptal: false };
+      var kesim = oz.kesim || null;
+      if (kapsam.secili && oz.secim === 0) return { parcalar: ["Önce timeline'da bir klip seç."], tur: "warn", yedek: false, iptal: false, kesim: kesim };
       var y = yedekGerekli(oz);
       if (y && typeof o.yedek === "function" && o.yedekMetni && o.yedekMetni[y]) {
-        if (!(typeof o.onay === "function" && o.onay(o.yedekMetni[y]))) return { parcalar: ["Hiçbir şey silinmedi."], tur: "warn", yedek: false, iptal: true };
-        var s = await o.yedek();
-        return { parcalar: s && s.parcalar ? s.parcalar : [], tur: s && s.tur ? s.tur : "good", yedek: true, iptal: false };
+        var soru = typeof o.yedekMetni[y] === "function" ? o.yedekMetni[y](oz) : o.yedekMetni[y];
+        if (!(typeof o.onay === "function" && o.onay(soru))) return { parcalar: ["Hiçbir şey silinmedi."], tur: "warn", yedek: false, iptal: true, kesim: kesim };
+        var s = await o.yedek(oz);
+        return { parcalar: s && s.parcalar ? s.parcalar : [], tur: s && s.tur ? s.tur : "good", yedek: true, iptal: false, kesim: kesim };
       }
-      if (y === "yok" && o.kayitYokMetni) return { parcalar: [o.kayitYokMetni], tur: "warn", yedek: false, iptal: false };
+      if (y === "yok" && o.kayitYokMetni) return { parcalar: [o.kayitYokMetni], tur: "warn", yedek: false, iptal: false, kesim: kesim };
       var m = mesajParcalari(o.tur, oz);
-      return { parcalar: m.parcalar, tur: m.tur, yedek: false, iptal: false };
+      return { parcalar: m.parcalar, tur: m.tur, yedek: false, iptal: false, kesim: kesim };
     }
 
     return { sakla: sakla, kayitlar: kayitlar, kaldir: kaldir, akis: akis, sil: sil };
@@ -460,6 +517,7 @@
 
   return {
     TURLER: TURLER.slice(), BASARI: BASARI, KALAN: KALAN, HATALAR: HATALAR, kenarMetni: kenarMetni, kayitsizMetni: kayitsizMetni,
+    egriMetni: egriMetni, kesimYeri: kesimYeri, egriAdaylari: egriAdaylari,
     cakisanlar: cakisanlar, kenarMiras: kenarMiras, yerineGecis: yerineGecis, temizlenenler: temizlenenler, ozet: ozet, yedekGerekli: yedekGerekli, mesajParcalari: mesajParcalari,
     hataMetni: hataMetni, olustur: olustur, panel: panel, dugum: dugum
   };

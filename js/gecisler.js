@@ -3,8 +3,10 @@
  * Playhead'e en yakın kesime iki tarafa eşleşik keyframe yazar.
  * Plan: js/transitions.js (saf, testli) · Uygulama: host KS_applyCutTransition.
  * Kaldırma (3.4, plan adım 11): uygulama her yazdığı özellik için bir kayıt döndürür; js/kayit-kaldir.js saklar.
- * "Geçişi kaldır" playhead'e en yakın kesimdeki Suflo geçişini kayıtla kaldırır (kullanıcının anahtar karelerine
- * dokunmaz). Kaldırmak ücretsiz (Pro kapısı yok). Kayıt yoksa eski yöntem (geçiş penceresini temizlemek) yalnız onayla.
+ * "Geçişi kaldır" playhead'in yakınındaki (en çok 1 sn) Suflo geçişini kayıtla kaldırır (kullanıcının anahtar karelerine
+ * dokunmaz): kesimi host seçer, Suflo kaydı olan en yakın kesim; seçili klip uygulamadaki gibi öne geçmez. Kaldırmak
+ * ücretsiz (Pro kapısı yok). Kayıt yoksa eski yöntem (geçiş penceresini temizlemek) yalnız onayla; onay hangi kesim
+ * olduğunu söyler (V1, 00:09.04) ve eski yöntem yeniden aramadan tam o kesimi temizler.
  */
 window.KGecis = (function () {
   "use strict";
@@ -17,6 +19,14 @@ window.KGecis = (function () {
     yok: "Bu kesimde Suflo'nun geçiş kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir.",
     degisti: "Suflo'nun geçiş kaydı bu kesimin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle kesimin iki yanındaki geçiş penceresinde (en çok 0,8 sn) Ölçek, Konum ve Opaklık anahtar kareleri silinsin mi? O aralıktaki kendi anahtar karelerin de silinir."
   };
+
+  // Onay sorusu: önce hangi kesim (host'un seçtiği), sonra soru (satır satır çevrilir)
+  function soruMetni(kod) {
+    return function (oz) {
+      var yer = oz && oz.kesim ? SufloKaldir.kesimYeri(oz.kesim) : "";
+      return (yer ? yer + "\n\n" : "") + YEDEK_SORU[kod];
+    };
+  }
 
   function el(id) { return document.getElementById(id); }
   function uiMetni(s) { return window.SufloI18n && SufloI18n.tr ? SufloI18n.tr(s) : s; }
@@ -81,17 +91,21 @@ window.KGecis = (function () {
         tur: "gecis",
         kapsam: kapsam || { kesim: { tolerance: 1.0 } },
         onay: function (soru) { return window.confirm ? window.confirm(uiMetni(soru)) : false; },
-        yedekMetni: tekUygulama ? null : YEDEK_SORU,
+        yedekMetni: tekUygulama ? null : { yok: soruMetni("yok"), degisti: soruMetni("degisti") },
         kayitYokMetni: tekUygulama ? "Bu geçişin kaydı bulunamadı; hiçbir şey silinmedi." : "",
-        yedek: async function () {
-          var r = await K.call("KS_applyCutTransition", { temizle: true, tolerance: 1.0 }, 60000);
+        yedek: async function (oz) {
+          // Onayda gösterilen kesim: yeniden aranmaz (seçim başka bir kesimi öne geçirip oradaki anahtarları sildirmesin)
+          if (!oz || !oz.kesim) throw new Error(SufloKaldir.hataMetni("kesimYok"));
+          var r = await K.call("KS_applyCutTransition", { temizle: true, tolerance: 1.0, cut: oz.kesim.cut, track: oz.kesim.track }, 60000);
           if (!r || !r.ok) throw new Error(r && r.error ? r.error : "Temizlenemedi.");
           k.sakla(r.proje || "", [], r);   // penceresi temizlenen (artık ölü) kayıtlar düşer; eski yöntem kayıt yazmaz
           return { parcalar: ["Geçiş penceresi eski yöntemle temizlendi: " + (Number(r.removedKeys) || 0) + " anahtar kare silindi."], tur: "good" };
         }
       });
       status("");
-      KApp.toast(SufloKaldir.dugum(s.parcalar), s.tur, 7000);
+      // Hangi kesimde çalışıldı (playhead'e en yakın Suflo geçişi; seçim öne geçmez)
+      var parcalar = s.kesim ? [SufloKaldir.kesimYeri(s.kesim)].concat(s.parcalar) : s.parcalar;
+      KApp.toast(SufloKaldir.dugum(parcalar), s.tur, 7000);
     } catch (e) {
       status("✕ " + (e && e.message ? e.message : e), "bad");
     } finally {
