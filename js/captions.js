@@ -3460,6 +3460,23 @@ window.KCaptions = (function () {
     if (uz.sonIz) d.izli = true;
     return d;
   }
+  /*
+   * Shorts belgesi (ayarlar.shortsAltyazi[eskiId]) kesilmiş kopyaya uyarlanırken kopyanın Shorts kaydı: özgün kaydın
+   * kopyası (adı, aralığı), satırlarını hemen ardından shortsKaydiGuncelle yazar. Özgün kayıt artık yoksa (30 kayıt
+   * sınırı) boş kayıt açılır. viral.js'teki gibi en yeni 30 kayıt tutulur. Döner: yeniId (shortsYuklenen olur).
+   */
+  function shortsKaydiKopyala(eskiId, yeniId) {
+    var s = K.settings();
+    var harita = s.shortsAltyazi || {};
+    var kayit = harita[eskiId] ? JSON.parse(JSON.stringify(harita[eskiId])) : { ad: "", mod: segmentsMode, segs: [] };
+    kayit.ts = Date.now();
+    harita[yeniId] = kayit;
+    var anahtarlar = Object.keys(harita).sort(function (x, y) { return (harita[y].ts || 0) - (harita[x].ts || 0); });
+    anahtarlar.slice(30).forEach(function (k) { if (k !== yeniId) delete harita[k]; });
+    s.shortsAltyazi = harita;
+    return yeniId;
+  }
+
   function kurguDurumu(hedef) {
     var d = kurguYolu(hedef);
     if (!d.ok) return d;
@@ -3470,7 +3487,8 @@ window.KCaptions = (function () {
 
   /*
    * Belgeyi hedef sekansın kurgusuna uyarla: yoldaki kesimler sırayla (SufloKesimEsle.zincirEsle), TEK geri alma adımı,
-   * taslak güncellenir. Belge hedefe bağlanır; Shorts / rehber örneğinin belgesi kopyaya geçince onların kaydından çıkar.
+   * taslak güncellenir. Belge hedefe bağlanır; Shorts belgesi kopyaya geçince kopyanın kendi Shorts kaydına yazılır
+   * (shortsKaydiKopyala: ana videonun taslağı ezilmez), rehber örneğinin belgesi kopyanın örneği olur.
    * o.guncelIz (KS_kurguIzi'nin taze izi) verilirse yol bugünkü kurguyla denetlenir (SufloKesimEsle.izliYol): sondaki
    * kesim Premiere'de geri alındıysa yalnız kalan önek; hepsi geri alındıysa { neden: "geriAlma" }; kurgu hiçbir
    * duruma uymuyorsa { neden: "degisti" } (kullanıcı "Yine de uyarla" derse o.guncelIz'siz yeniden çağrılır).
@@ -3494,7 +3512,12 @@ window.KCaptions = (function () {
     var son = yol[yol.length - 1];
     segments = r.cues;
     belgeBagla(son.hedef, son.sira, son.hedefAd || "");
-    if (shortsYuklenen && shortsYuklenen !== belgeSekansId) shortsYuklenen = "";
+    // Shorts belgesi kopyaya geçti: özgün Shorts'un kaydı (kesilmemiş kurgusu) değişmez, kopya kendi kaydını alır ve
+    // taslak oraya yazılır — Shorts satırları ana videonun taslağını (writeDraft → K.saveDraft) asla ezmez
+    if (shortsYuklenen && shortsYuklenen !== belgeSekansId) {
+      shortsYuklenen = shortsKaydiKopyala(shortsYuklenen, belgeSekansId);
+      try { shortsDugmesi(KApp.ctx()); } catch (eS) {}
+    }
     if (ornekBelge) ornekSekansId = belgeSekansId;
     el("cap-result").hidden = false;
     render();

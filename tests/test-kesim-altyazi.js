@@ -32,6 +32,7 @@ var DEGISKENLER = cap.slice(degBas, degSon);
 var E = require(path.join(KOK, "js", "kesim-esle.js"));
 var CT = require(path.join(KOK, "js", "caption-text.js"));
 var CL = require(path.join(KOK, "js", "caption-layout.js"));
+var WWM = require(path.join(KOK, "js", "whisper-words.js"));
 
 /* ---------- küçük olay yolu (document) ---------- */
 function belgeYap() {
@@ -59,7 +60,10 @@ function altyaziKur(o) {
     "var undoStack = [], redoStack = [], UNDO_MAX = 50, kaliteOnayBekleyen = null, onayBekleyen = null, uygulananSekans = {};",
     "function render() {} function refreshUndoUI() {} function renderHistory() {} function uygulaEtiketiniSifirla() {} function shortsDugmesi() {}",
     "function clearRevert() {} function hideRestore() {} function applyGlossary() {} function cancelDraft() {}",
-    "function saveDraftNow() { kayit.taslak++; } function saveDraftSoon() { kayit.taslak++; }",
+    // o.K verilirse taslak yazımı gerçek: writeDraft / shortsKaydiGuncelle (Shorts belgesi ana taslağı ezmesin)
+    o.K ? "var scope = 'entire', WW = window.SufloWhisperWords;\n" + govde("function writeDraft(") + "\n" + govde("function shortsKaydiGuncelle(") +
+      "\nfunction saveDraftNow() { kayit.taslak++; writeDraft(); } function saveDraftSoon() { kayit.taslak++; writeDraft(); }"
+      : "function saveDraftNow() { kayit.taslak++; } function saveDraftSoon() { kayit.taslak++; }",
     "function qualityReport() { throw new Error('UYGULAMA_DEVAM'); }",
     "function kurSecenekleri(s) { return { minSure: 0.8, maxSure: 6, sonSinir: Number(s) > 0 ? Number(s) : undefined }; }",
     govde("function dilKodu("), govde("function durumAl("), govde("function durumYukle("), govde("function snapshot("), govde("function undo("),
@@ -74,8 +78,8 @@ function altyaziKur(o) {
     "  mesgul: function (b) { busy = b; }, shorts: function (v) { if (v !== undefined) shortsYuklenen = v; return shortsYuklenen; },",
     "  geriAl: function () { return undoStack.length; } };"
   ].join("\n");
-  var api = new Function("window", "document", "CustomEvent", "el", "CT", "CL", "KApp", "kayit", src)(
-    { SufloKesimEsle: E }, doc, OlayYap, function (id) { return dom[id] || null; }, CT, CL, KApp, kayit);
+  var api = new Function("window", "document", "CustomEvent", "el", "CT", "CL", "KApp", "kayit", "K", src)(
+    { SufloKesimEsle: E, SufloWhisperWords: WWM }, doc, OlayYap, function (id) { return dom[id] || null; }, CT, CL, KApp, kayit, o.K);
   api.dom = dom; api.kayit = kayit; api.ctx = ctx; api.document = doc;
   return api;
 }
@@ -366,6 +370,69 @@ var KESIM = [{ start: 1.72, end: 2.48 }, { start: 8, end: 10 }];   // dolgu "ı�
     exIdx > 0 && scIdx > 0 && sonraEx > exIdx && sonraEx < bagIdx && sonraSc > scIdx && sonraSc < exIdx &&
     goGovde.slice(exIdx + 5, sonraEx).indexOf("await ") === -1 &&
     goGovde.slice(scIdx + 5, sonraSc).indexOf("await ") === -1, [exIdx, sonraEx, scIdx, sonraSc, bagIdx].join(" "));
+
+  /* ---- 12) inceleme: Shorts belgesi kopyaya uyarlanınca ana videonun taslağı ezilmez ---- */
+  // gerçek writeDraft / shortsKaydiGuncelle; sahte K: ayarlar (shortsAltyazi) ve ana taslak (saveDraft / clearDraft)
+  function shortsOrtami(kayitlar) {
+    var ayar = { shortsAltyazi: kayitlar };
+    var z = { ayar: ayar, taslak: [], temizle: 0, ayarKaydi: 0 };
+    z.K = { settings: function () { return ayar; }, saveSettings: function () { z.ayarKaydi++; },
+      saveDraft: function (d) { z.taslak.push(d); }, clearDraft: function () { z.temizle++; } };
+    return z;
+  }
+  function bas(x) { return (x || []).map(function (s) { return [s.text, s.start]; }); }
+  var anaKayit = { ad: "An 1", start: 30, end: 60, mod: "plain", ceviriDili: "", dil: "tr", segs: WWM.kelimesizKopya(BELGE), ts: 1 };
+  var ZS = shortsOrtami({ SHORTS1: JSON.parse(JSON.stringify(anaKayit)) });
+  var CS = altyaziKur({ K: ZS.K });
+  CS.yukle(BELGE, "SHORTS1");
+  CS.shorts("SHORTS1");   // "Bu Shorts'un altyazısını ana videodan al"
+  CS.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("SHORTS1", "SHORTS1-kopya", KESIM), { removeMode: "ripple" }));
+  var rS = CS.kurguyaUyarla("SHORTS1-kopya");
+  var kopyaKaydi = ZS.ayar.shortsAltyazi["SHORTS1-kopya"];
+  ok("Shorts belgesi kopyaya uyarlanınca ana videonun taslağı yazılmaz / silinmez (K.saveDraft yok)",
+    rS.ok && CS.kayit.taslak === 1 && ZS.taslak.length === 0 && ZS.temizle === 0, js({ r: rS, taslak: ZS.taslak.length, temizle: ZS.temizle }));
+  ok("kopyanın kendi Shorts kaydı açılır, uyarlanan satırlar oraya yazılır (kelimesiz), belge ona bağlı kalır",
+    CS.shorts() === "SHORTS1-kopya" && kopyaKaydi && kopyaKaydi.ad === "An 1" && js(bas(kopyaKaydi.segs)) === js(bas(CS.segs())) &&
+    kopyaKaydi.segs[0].text === "Merhaba arkadaşlar," && kopyaKaydi.segs[0].words === undefined && ZS.ayarKaydi > 0,
+    js({ shorts: CS.shorts(), kayit: kopyaKaydi }));
+  ok("özgün Shorts'un kaydı (kesilmemiş kurgusu) değişmez",
+    js(ZS.ayar.shortsAltyazi.SHORTS1.segs) === js(WWM.kelimesizKopya(BELGE)), js(bas(ZS.ayar.shortsAltyazi.SHORTS1.segs)));
+  CS.undo();
+  ok("geri al: belge yine özgün Shorts'un, taslak onun kaydına yazılır; ana taslak yine yazılmaz",
+    CS.shorts() === "SHORTS1" && js(CS.segs()) === js(BELGE) && ZS.taslak.length === 0 && ZS.temizle === 0 &&
+    js(ZS.ayar.shortsAltyazi.SHORTS1.segs) === js(WWM.kelimesizKopya(BELGE)), js({ shorts: CS.shorts(), taslak: ZS.taslak.length }));
+  // aynı Shorts sekansında (Bu sekansta) kesim: kayıt kendisi güncellenir
+  var ZY = shortsOrtami({ SHORTS1: JSON.parse(JSON.stringify(anaKayit)) });
+  var CY = altyaziKur({ K: ZY.K });
+  CY.yukle(BELGE, "SHORTS1");
+  CY.shorts("SHORTS1");
+  CY.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("SHORTS1", "SHORTS1", KESIM, { newSeq: "" }), { removeMode: "ripple" }));
+  CY.kurguyaUyarla("SHORTS1");
+  ok("Bu sekansta kesilen Shorts: kendi kaydı uyarlanır, yeni kayıt açılmaz, ana taslak yazılmaz",
+    CY.shorts() === "SHORTS1" && Object.keys(ZY.ayar.shortsAltyazi).length === 1 && ZY.ayar.shortsAltyazi.SHORTS1.segs[0].text === "Merhaba arkadaşlar," &&
+    ZY.taslak.length === 0, js(Object.keys(ZY.ayar.shortsAltyazi)));
+  // özgün Shorts kaydı artık yoksa (30 kayıt sınırı) kopya için yine kayıt açılır; en çok 30 kayıt tutulur
+  var dolu = {};
+  for (var sk = 0; sk < 30; sk++) dolu["ESKI" + sk] = { ad: "", mod: "plain", segs: [], ts: 10 + sk };
+  var ZE = shortsOrtami(dolu);
+  var CE2 = altyaziKur({ K: ZE.K });
+  CE2.yukle(BELGE, "SHORTS9");
+  CE2.shorts("SHORTS9");
+  CE2.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("SHORTS9", "SHORTS9-kopya", KESIM), { removeMode: "ripple" }));
+  CE2.kurguyaUyarla("SHORTS9-kopya");
+  ok("özgün kayıt yoksa da kopyanın kaydı açılır (en çok 30 kayıt, en eskisi düşer), ana taslak yazılmaz",
+    CE2.shorts() === "SHORTS9-kopya" && ZE.ayar.shortsAltyazi["SHORTS9-kopya"] && ZE.ayar.shortsAltyazi["SHORTS9-kopya"].segs.length === 3 &&
+    Object.keys(ZE.ayar.shortsAltyazi).length === 30 && !ZE.ayar.shortsAltyazi.ESKI0 && ZE.taslak.length === 0,
+    Object.keys(ZE.ayar.shortsAltyazi).length + " " + js(ZE.taslak));
+  // ana videonun belgesi kopyaya uyarlanınca taslak eskisi gibi ana taslağa yazılır
+  var ZN = shortsOrtami({});
+  var CN = altyaziKur({ K: ZN.K });
+  CN.yukle(BELGE, "S1");
+  CN.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("S1", "S1-kopya", KESIM), { removeMode: "ripple" }));
+  CN.kurguyaUyarla("S1-kopya");
+  ok("ana videonun belgesi: uyarlanan satırlar ana taslağa (kopyanın sekansıyla), Shorts kaydı açılmaz",
+    ZN.taslak.length === 1 && ZN.taslak[0].sekansId === "S1-kopya" && ZN.taslak[0].segments[0].text === "Merhaba arkadaşlar," &&
+    Object.keys(ZN.ayar.shortsAltyazi).length === 0, js(ZN.taslak.map(function (d) { return d.sekansId; })));
 
   /* ---- 6) kaynakta ---- */
   ok("index.html: kesim-esle.js captions.js'ten, kesim-altyazi.js magiccut.js ve konusma-kes.js'ten önce; satırlar varsayılan gizli",
