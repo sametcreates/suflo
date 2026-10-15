@@ -50,6 +50,7 @@
   
   <div class="govde">
   <aside class="yan-menu" id="yan-menu">
+    <button type="button" class="ky-daralt" id="ky-daralt" aria-controls="yan-menu" aria-expanded="true" title="Menüyü daralt"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
     <div class="ky-baslik">Araçlar</div>
     <button class="ky-oge on" data-tab="captions">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6 8h8M6 12h5"/></svg></span>
@@ -84,6 +85,11 @@
     <button class="ky-oge" data-tab="egri">
       <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16C9 16 9 4 17 4"/><circle cx="3" cy="16" r="1.3"/><circle cx="17" cy="4" r="1.3"/></svg></span>
       <span class="ky-metin"><b>Eğri <em class="ky-yeni">YENİ</em></b><i>anahtar kare yumuşatma</i></span>
+      <span class="ky-kilit" data-kilit>PRO</span>
+    </button>
+    <button class="ky-oge" data-tab="mcp">
+      <span class="ky-ikon"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="5" width="12" height="10" rx="2.5"/><path d="M10 2.5V5M7.5 9h.1M12.4 9h.1M7.5 12h5"/></svg></span>
+      <span class="ky-metin"><b>Yapay Zekâ <em class="ky-yeni">YENİ</em></b><i>Claude ile çalış · MCP</i></span>
       <span class="ky-kilit" data-kilit>PRO</span>
     </button>
     <button class="ky-oge" data-tab="kanca">
@@ -2256,6 +2262,50 @@
   </section>
 
   <!-- ================= AYARLAR ================= -->
+  <!-- Yapay zekâ köprüsü (MCP): 3.4.2'den beri sol menüde kendi sekmesi (önceden Ayarlar içindeydi) -->
+  <section id="tab-mcp" class="tabpane">
+    <!-- Yapay zekâ köprüsü (MCP, 3.4, varsayılan kapalı): js/otomasyon*.js, mcp/suflo-mcp.js -->
+    <div class="set-group mcp-kart" id="grp-mcp">
+      <div class="set-title">Yapay zekâ köprüsü (MCP) <span class="pro-inline">PRO</span> <span class="mcp-acik-rozet" id="mcp-acik-rozet" hidden>AÇIK</span></div>
+      <p class="hint">Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.</p>
+      <div class="row-btns">
+        <button id="mcp-ac" class="btn primary" type="button">Köprüyü aç</button>
+        <button id="mcp-jeton" class="btn" type="button" disabled title="Eski jeton anında geçersiz olur">Yeni jeton</button>
+      </div>
+      <p class="hint mcp-not">Açmak Pro gerektirir; köprü için deneme hakkı yok. Pro araçlarını çağıran eylemler ayrıca o aracın kendi kapısından geçer.</p>
+      <label class="chk"><input type="checkbox" id="mcp-duzenleme"> Düzenlemeye izin ver</label>
+      <p class="hint mcp-not">Kapalıyken asistan yalnız okur (bağlam, izler, altyazı). Açıkken marker, altyazı ve kesim gibi değişiklikler yapabilir.</p>
+      <label class="chk"><input type="checkbox" id="mcp-onay" checked> Yıkıcı eylemlerde onay iste</label>
+      <div id="mcp-durum" class="inline-status"></div>
+      <div id="mcp-istemci" class="inline-status mcp-istemci" hidden aria-live="polite"></div>
+      <p class="hint mcp-not">Bağlanmak için bu bilgisayarda çalışan bir Claude oturumu gerekir: Claude Desktop ya da Claude Code. claude.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz.</p>
+      <div class="mcp-onay-kart" id="mcp-onay-kart" hidden role="alertdialog" aria-labelledby="mcp-onay-baslik">
+        <b id="mcp-onay-baslik">Yapay zekâ asistanı bunu yapmak istiyor</b>
+        <p id="mcp-onay-ozet"></p>
+        <div class="row-btns">
+          <button id="mcp-onayla" class="btn primary" type="button">Onayla</button>
+          <button id="mcp-reddet" class="btn" type="button">Reddet</button>
+          <span class="dim" id="mcp-onay-sure"></span>
+        </div>
+      </div>
+      <details class="adv">
+        <summary>Claude'a bağla</summary>
+        <p class="hint" style="margin:6px 0">Claude Desktop: Ayarlar → Geliştirici → Yapılandırmayı düzenle, kopyalanan satırları ekle. Claude Code: komutu terminale yapıştır.</p>
+        <div class="row-btns">
+          <button id="mcp-kopyala-desktop" class="btn" type="button">Claude Desktop ayarını kopyala</button>
+          <button id="mcp-kopyala-code" class="btn" type="button">Claude Code komutunu kopyala</button>
+          <button id="mcp-node-denetle" class="btn tiny" type="button">Node'u denetle</button>
+        </div>
+        <p class="hint" id="mcp-node"></p>
+      </details>
+      <details class="adv">
+        <summary>Etkinlik (son 50 çağrı)</summary>
+        <ul id="mcp-etkinlik" class="mcp-etkinlik"></ul>
+      </details>
+      <p class="hint"><a href="#" id="mcp-guvenlik-link">Güvenlik modeli →</a></p>
+    </div>
+  </section>
+
   <section id="tab-settings" class="tabpane">
     <!-- Solo modda sekme çubuğu gizli: ayarlardan çıkışın görünür tek yolu bu -->
     <div class="set-back-bar">
@@ -2724,46 +2774,6 @@
       <p class="hint"><a href="#" id="davet-ortaklik">İçerik üreticisi misin? Ortaklık programı →</a></p>
     </div>
 
-    <!-- Yapay zekâ köprüsü (MCP, 3.4, varsayılan kapalı): js/otomasyon*.js, mcp/suflo-mcp.js -->
-    <div class="set-group mcp-kart" id="grp-mcp">
-      <div class="set-title">Yapay zekâ köprüsü (MCP) <span class="pro-inline">PRO</span> <span class="mcp-acik-rozet" id="mcp-acik-rozet" hidden>AÇIK</span></div>
-      <p class="hint">Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.</p>
-      <div class="row-btns">
-        <button id="mcp-ac" class="btn primary" type="button">Köprüyü aç</button>
-        <button id="mcp-jeton" class="btn" type="button" disabled title="Eski jeton anında geçersiz olur">Yeni jeton</button>
-      </div>
-      <p class="hint mcp-not">Açmak Pro gerektirir; köprü için deneme hakkı yok. Pro araçlarını çağıran eylemler ayrıca o aracın kendi kapısından geçer.</p>
-      <label class="chk"><input type="checkbox" id="mcp-duzenleme"> Düzenlemeye izin ver</label>
-      <p class="hint mcp-not">Kapalıyken asistan yalnız okur (bağlam, izler, altyazı). Açıkken marker, altyazı ve kesim gibi değişiklikler yapabilir.</p>
-      <label class="chk"><input type="checkbox" id="mcp-onay" checked> Yıkıcı eylemlerde onay iste</label>
-      <div id="mcp-durum" class="inline-status"></div>
-      <div id="mcp-istemci" class="inline-status mcp-istemci" hidden aria-live="polite"></div>
-      <p class="hint mcp-not">Bağlanmak için bu bilgisayarda çalışan bir Claude oturumu gerekir: Claude Desktop ya da Claude Code. claude.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz.</p>
-      <div class="mcp-onay-kart" id="mcp-onay-kart" hidden role="alertdialog" aria-labelledby="mcp-onay-baslik">
-        <b id="mcp-onay-baslik">Yapay zekâ asistanı bunu yapmak istiyor</b>
-        <p id="mcp-onay-ozet"></p>
-        <div class="row-btns">
-          <button id="mcp-onayla" class="btn primary" type="button">Onayla</button>
-          <button id="mcp-reddet" class="btn" type="button">Reddet</button>
-          <span class="dim" id="mcp-onay-sure"></span>
-        </div>
-      </div>
-      <details class="adv">
-        <summary>Claude'a bağla</summary>
-        <p class="hint" style="margin:6px 0">Claude Desktop: Ayarlar → Geliştirici → Yapılandırmayı düzenle, kopyalanan satırları ekle. Claude Code: komutu terminale yapıştır.</p>
-        <div class="row-btns">
-          <button id="mcp-kopyala-desktop" class="btn" type="button">Claude Desktop ayarını kopyala</button>
-          <button id="mcp-kopyala-code" class="btn" type="button">Claude Code komutunu kopyala</button>
-          <button id="mcp-node-denetle" class="btn tiny" type="button">Node'u denetle</button>
-        </div>
-        <p class="hint" id="mcp-node"></p>
-      </details>
-      <details class="adv">
-        <summary>Etkinlik (son 50 çağrı)</summary>
-        <ul id="mcp-etkinlik" class="mcp-etkinlik"></ul>
-      </details>
-      <p class="hint"><a href="#" id="mcp-guvenlik-link">Güvenlik modeli →</a></p>
-    </div>
 
     <div class="set-group">
       <div class="set-title">Destek</div>

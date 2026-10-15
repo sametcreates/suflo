@@ -103,7 +103,7 @@ ok("'altyazi' → önce tam ad Altyazı, sonra 'Altyazı ' ile başlayanlar, son
 ok("adın ilk kelimesi > adda tam kelime > kelimenin başı: 'kesim' → Kesim kapsamı, Otomatik Kesim, Kesimleri uygula",
   J(adlar("kesim", 3)) === J(["Kesim kapsamı", "Otomatik Kesim", "Kesimleri uygula"]), J(adlar("kesim")));
 ok("3.4: 'eğri' → önce Eğri sekmesi, sonra Eğri uygula; 'curve' / 'mcp' / 'yaylan' / 'kaynak' / 'korunan' bulur",
-  J(adlar("eğri", 2)) === J(["Eğri", "Eğri uygula"]) && adlar("curve", 3).indexOf("Eğri") !== -1 && ilk("mcp") === "Ayarlar › Yapay zekâ köprüsü (MCP)" &&
+  J(adlar("eğri", 2)) === J(["Eğri", "Eğri uygula"]) && adlar("curve", 3).indexOf("Eğri") !== -1 && ["Yapay Zekâ", "Yapay zekâ köprüsü (MCP) › Köprüyü aç"].indexOf(ilk("mcp")) !== -1 &&
   ilk("yaylan") === "Varışta yaylan" && ilk("model kaynak") === "Model kaynaklarını sına" && ilk("korunan katman") === "Kesilmeyecek katmanlar",
   J([adlar("eğri"), adlar("curve"), ilk("mcp"), ilk("yaylan"), ilk("model kaynak"), ilk("korunan katman")]));
 ok("'motor' → Ayarlar › Motor; Ayarlar alt yazısından (motor · dil · lisans) da bulunur", ilk("motor") === "Ayarlar › Motor" && adlar("motor", 6).indexOf("Ayarlar") !== -1, J(adlar("motor")));

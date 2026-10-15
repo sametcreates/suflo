@@ -1,3 +1,10 @@
+## Suflo 3.4.2 — Yapay Zekâ sol menüde, menü daraltılabilir
+
+### İyileştirildi
+- **Yapay Zekâ artık sol menüde:** Claude ile çalışma (yapay zekâ köprüsü, MCP) Ayarlar'ın içinden çıktı; Altyazı ve Otomatik Kesim gibi sol menüde kendi **Yapay Zekâ** bölümü var (Pro). Köprüyü açma, bağlantı göstergesi, Düzenlemeye izin ver ve onay kartı bu bölümde. Büyük bir işlem onay beklediğinde panel bu bölüme geçer.
+- **Sol menüyü daralt / genişlet:** Menünün üstündeki ok düğmesiyle araç listesi ikon rayına iner, böylece çalışma alanı genişler; yeniden basınca açılır. Tercih bu bilgisayarda hatırlanır; dar modda simgenin üstüne gelince aracın adı görünür.
+- Araç ara (Ctrl+K / ⌘K): "mcp" ya da "claude" araması Yapay Zekâ bölümünü bulur.
+
 ## Suflo 3.4.1 — Söyle, Suflo uygulasın: yapay zekâ köprüsü artık deneysel değil
 
 ### Yeni

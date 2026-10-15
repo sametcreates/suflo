@@ -24,7 +24,7 @@ var path = require("path");
 var http = require("http");
 var O = require("../js/otomasyon.js");
 
-var SURUM = "3.4.1";
+var SURUM = "3.4.2";
 // En yeni önce. Yayından önce güncel MCP belirtimine göre doğrulanır (marketing/v4-kurucu-yapilacaklar.md)
 var PROTOKOLLER = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 var CAGRI_SURESI = 20 * 60000;   // kopyada kesim gibi uzun eylemler
@@ -83,7 +83,7 @@ function metinSonuc(nesne, hataMi) {
 
 var MESAJLAR = {
   // Panel İngilizce de olabilir: kart ve düğme adları iki dilde (izin_yok gibi)
-  kopru_kapali: "köprü kapalı / bridge is off: open Suflo in Premiere Pro > Settings (Ayarlar) > 'AI bridge (MCP)' / 'Yapay zekâ köprüsü (MCP)' and turn it on (Turn bridge on / Köprüyü aç).",
+  kopru_kapali: "köprü kapalı / bridge is off: open Suflo in Premiere Pro > left menu 'Yapay Zekâ' / 'AI' > card 'Yapay zekâ köprüsü (MCP)' / 'AI bridge (MCP)' and turn it on (Turn bridge on / Köprüyü aç).",
   premiere_mesgul: "Premiere meşgul / Premiere is busy with another Suflo task. Try again in a moment.",
   kuyruk_dolu: "Premiere meşgul / too many Suflo actions are queued. Try again in a moment.",
   pro_gerekli: "pro_gerekli: this action needs Suflo Pro (no free trial credits left).",

@@ -46,7 +46,7 @@ function kur(dom, o) {
         c.toast.push({ m: m, t: t, sure: sure, eylem: eylem });
         if (dom.toasts) dom.toasts.ekle({ m: m, kaldirildi: false, remove: function () { this.kaldirildi = true; } });
       },
-      goster: function (ad) { c.goster.push(ad); if (dom["tab-settings"]) dom["tab-settings"].aktif = ad === "settings"; }
+      goster: function (ad) { c.goster.push(ad); if (dom["tab-mcp"]) dom["tab-mcp"].aktif = ad === "mcp"; }
     }
   };
   sb.window.addEventListener = function (ad) { c.dinle.push(ad); };
@@ -156,7 +156,7 @@ async function main() {
     return e;
   }
   var dom = {};
-  ["mcp-ac", "mcp-onay-kart", "mcp-onay-ozet", "mcp-onay-sure", "mcp-onayla", "mcp-reddet", "tab-settings"].forEach(function (id) { dom[id] = eleman(id); });
+  ["mcp-ac", "mcp-onay-kart", "mcp-onay-ozet", "mcp-onay-sure", "mcp-onayla", "mcp-reddet", "tab-mcp"].forEach(function (id) { dom[id] = eleman(id); });
   dom["mcp-ac"].classList = { toggle: function () {} };
   dom["mcp-onay-kart"].hidden = true;
   dom.toasts = { liste: [], ekle: function (x) { this.liste.push(x); this.lastElementChild = x; }, lastElementChild: null };
@@ -164,8 +164,8 @@ async function main() {
   u.P.init();
   ok("init: Onayla / Reddet düğmeleri bağlanır, sunucu açılmaz", typeof dom["mcp-onayla"].dinle.click === "function" && typeof dom["mcp-reddet"].dinle.click === "function" && u.c.olustur === 0 && !u.P.acikMi());
   var p1 = u.P._onayIste("suflo_sessizlik_kes", {}, "Sessizlikleri kes (kopyada)", 1500);
-  ok("onay kartı açılınca Ayarlar sekmesine geçilir ve kart görünür kaydırılır (başka sekmedeyken gizli kalmasın)",
-    js(u.c.goster) === '["settings"]' && dom["tab-settings"].aktif === true && dom["mcp-onay-kart"].hidden === false && dom["mcp-onay-kart"].kaydirildi === 1, js(u.c.goster));
+  ok("onay kartı açılınca Yapay Zekâ sekmesine geçilir ve kart görünür kaydırılır (başka sekmedeyken gizli kalmasın)",
+    js(u.c.goster) === '["mcp"]' && dom["tab-mcp"].aktif === true && dom["mcp-onay-kart"].hidden === false && dom["mcp-onay-kart"].kaydirildi === 1, js(u.c.goster));
   var bildirim = u.c.toast[u.c.toast.length - 1];
   ok("bildirim süre boyunca kalır ve karta götüren düğmesi var", bildirim.sure === 1500 && bildirim.eylem && bildirim.eylem.metin === "Onay kartını göster" && typeof bildirim.eylem.fn === "function", js(bildirim));
   ok("Onayla kart belirdiği an kısa süre kapalı (yanlış tık onay sayılmasın)", dom["mcp-onayla"].disabled === true);
@@ -336,6 +336,12 @@ async function main() {
   var eksik = idler.filter(function (id) { return id !== "zoom-status" && id !== "hiz-status" ? html.indexOf('id="' + id + '"') === -1 : html.indexOf('id="' + id + '"') === -1; });
   ok("Ayarlar kartının tüm öğeleri index.html'de", eksik.length === 0, eksik.join(","));
   ok("kart 'Deneysel' etiketi taşımaz, varsayılan kapalı (aç düğmesi)", /Yapay zekâ köprüsü \(MCP\) <span class="pro-inline">PRO<\/span>/.test(html) && !/mcp-deneysel|>Deneysel</.test(html) && />Köprüyü aç</.test(html) && /id="mcp-onay" checked/.test(html) && !/id="mcp-duzenleme" checked/.test(html));
+  ok("köprü kartı sol menüdeki Yapay Zekâ sekmesinde (Ayarlar'da değil); menüde PRO kilitli girdi var",
+    /<section id="tab-mcp" class="tabpane">\s*<!--[^>]*-->\s*<div class="set-group mcp-kart" id="grp-mcp">/.test(html) &&
+    html.indexOf('id="grp-mcp"') < html.indexOf('id="tab-settings"') && /<button class="ky-oge" data-tab="mcp">[\s\S]{0,600}?data-kilit>PRO</.test(html));
+  ok("sol menüde daralt / genişlet düğmesi; dar mod CSS'i ve tercihin saklanması",
+    /<button type="button" class="ky-daralt" id="ky-daralt"[^>]*aria-expanded="true"/.test(html) && /\.yan-menu\.dar \.ky-metin/.test(oku("css/style.css")) &&
+    /suflo\.yanMenuDar/.test(oku("js/app.js")) && /yanMenuDaraltKur\(\);/.test(oku("js/app.js")));
   ok("kartta bağlantı göstergesi ve yerel oturum notu var", /id="mcp-istemci"[^>]*hidden/.test(html) && /claude\.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz/.test(html));
   ok("app.js kartı başlatır", /KOtomasyon\.init\(\)/.test(oku("js/app.js")));
 

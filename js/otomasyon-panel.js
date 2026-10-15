@@ -3,7 +3,7 @@
  *
  * İnce yapıştırıcı: kurallar js/otomasyon.js (eylem listesi, doğrulama, temizlik) ve
  * js/otomasyon-sunucu.js'te (127.0.0.1 sunucusu). Burada yalnız:
- *  - Ayarlar kartı: Aç/Kapat (yalnız Pro, deneme hakkı yok: kurucu kademesi "köprüyü açmak Pro
+ *  - Yapay Zekâ sekmesindeki kart (3.4.2'ye kadar Ayarlar'daydı): Aç/Kapat (yalnız Pro, deneme hakkı yok: kurucu kademesi "köprüyü açmak Pro
  *    gerektirir"; Pro ile açılan köprü lisans gidince hemen kapanır), Düzenlemeye izin ver (kapatılınca
  *    bekleyen onay kartı da kapanır), Yıkıcı eylemlerde onay iste, Yeni jeton, etkinlik listesi,
  *    Claude kopyala düğmeleri, Node denetimi
@@ -184,10 +184,10 @@ window.KOtomasyon = (function () {
 
   /* ---------------- Onay kartı ---------------- */
 
-  // Onay kartı Ayarlar sekmesinde (#tab-settings): kullanıcı başka sekmedeyken .tabpane gizli olduğundan
-  // kart da görünmezdi. Ayarlar'a geçilir ve kart ortalanır.
+  // Onay kartı Yapay Zekâ sekmesinde (#tab-mcp, 3.4.2'ye kadar Ayarlar'daydı): kullanıcı başka sekmedeyken
+  // .tabpane gizli olduğundan kart da görünmezdi. Yapay Zekâ sekmesine geçilir ve kart ortalanır.
   function kartiGoster() {
-    try { if (window.KApp && KApp.goster) KApp.goster("settings"); } catch (e) {}
+    try { if (window.KApp && KApp.goster) KApp.goster("mcp"); } catch (e) {}
     var kart = el("mcp-onay-kart");
     try { if (kart) kart.scrollIntoView({ block: "center" }); } catch (e2) {}
   }
