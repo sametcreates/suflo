@@ -54,14 +54,20 @@ function kur(o) {
   var depo = o.depo || {};
   var ls = o.lsAtar ? { getItem: function () { throw new Error("SecurityError"); }, setItem: function () { throw new Error("QuotaExceeded"); } }
     : { getItem: function (k) { return Object.prototype.hasOwnProperty.call(depo, k) ? depo[k] : null; }, setItem: function (k, v) { depo[k] = String(v); } };
-  var dinleyici = { ctx: null, tab: {} };
+  var dinleyici = { ctx: null, tab: {}, belge: {} };
   var win = { SufloSpeedRamp: SR, localStorage: ls, KBeat: { vuruslar: function () { return (o.vuruslar || []).slice(); }, analiz: function () { return o.analiz || null; } } };
+  // CEP köprüsü (yalnız verilirse): registerKeyEventsInterest çağrıları kaydedilir (3.4 adım 13 inceleme)
+  var ilgi = [];
+  if (o.cep) win.__adobe_cep__ = { registerKeyEventsInterest: function (j) { ilgi.push(j); } };
+  if (o.sekmeAcik) dom["tab-hiz"].classList.add("active");
   var ctx = {
     window: win,
     document: { getElementById: function (id) { return dom[id] || null; }, createElement: function (t) { return eleman(t); }, createTextNode: function (t) { return { nodeType: 3, textContent: String(t) }; },
-      createElementNS: function (ns, t) { var e = eleman(t); e.tagName = String(t); return e; } },
+      createElementNS: function (ns, t) { var e = eleman(t); e.tagName = String(t); return e; },
+      addEventListener: function (t, fn) { dinleyici.belge[t] = fn; } },
     setTimeout: setTimeout, clearTimeout: clearTimeout,
     K: {
+      MAC: !!o.mac,
       call: function (fn, arg, sure) { cagri.push({ fn: fn, arg: JSON.parse(JSON.stringify(arg === undefined ? null : arg)), sure: sure }); return Promise.resolve(o.cevap(fn, arg, cagri.length)); },
       findFfmpeg: function () { return Promise.resolve(o.ffmpeg === false ? null : "ffmpeg"); },
       run: function (ff, args) { cagri.push({ fn: "ffmpeg", arg: args }); return Promise.resolve({ code: 1, stdout: "", stderr: o.ffCikti || "" }); }
@@ -86,7 +92,7 @@ function kur(o) {
   if (!o.editorYok) vm.runInContext(fs.readFileSync(path.join(KOK, "js", "egri.js"), "utf8"), ctx);
   var H = ctx.window.KHizRampasi;
   H.init();
-  return { H: H, dom: dom, cagri: cagri, kapi: kapi, harcanan: harcanan, toastlar: toastlar, depo: depo, dinleyici: dinleyici, ctx: ctx,
+  return { H: H, dom: dom, cagri: cagri, kapi: kapi, harcanan: harcanan, toastlar: toastlar, depo: depo, dinleyici: dinleyici, ctx: ctx, ilgi: ilgi,
     uygulamalar: function () { return cagri.filter(function (c) { return c.fn === "KS_applySpeedRamp"; }); } };
 }
 
@@ -737,6 +743,189 @@ function cevir(n) {
     "Özel rampa bu bilgisayarda saklanamadı.", "En çok 8 nokta. Yeni nokta için birini çift tıklayıp sil.", "Başka bir noktaya çok yakın; biraz yana tıkla.",
     "Uç noktada sert basamak olmaz; aradaki bir noktayı seç.", "Önce eğride bir nokta seç.", "Özel rampa 3", "Kendi hız eğrini çiz: nokta ekle, sürükle, sert basamak yap"].filter(function (s) { return I18N.translate(s) === s; });
   ok("özel eğri metinleri İngilizcede çevrilir", enEksik35.length === 0, enEksik35.join(" | "));
+
+  /* ================= 3.4 adım 13 inceleme ================= */
+  /* ---------- 36) ağır çekim anı tutamacı noktaların üstünü kapatmaz ---------- */
+  function cizgiTutamac(x) { return bul(kok(x), function (c) { return /hiz-ozel-hit-tutamac/.test(c.getAttribute && c.getAttribute("class") || ""); })[0]; }
+  var z36 = kur({ cevap: function () { return { ok: false }; } });
+  bul(kart(z36, "atilim"), function (c) { return c.className === "hiz-duzenle"; })[0]._o.click({ stopPropagation: function () {} });
+  var k36 = kok(z36);
+  // Atılım'ın %700 tepesi (t 0,5) ağır çekim anının (0,5) altında: tepeyi %1000'e (çizim alanının üst çizgisi) sürükle
+  k36._o.pointerdown(ev(Z.ekranX(0.5), Z.ekranY(7)));
+  k36._o.pointermove(ev(Z.ekranX(0.5), Z.ekranY(10)));
+  k36._o.pointerup(ev(Z.ekranX(0.5), Z.ekranY(10)));
+  ok("Atılım'ın tepesi %1000'e sürüklenir (ağır çekim anının tam altına)", js(z36.H._ozel().keys[2]) === js([0.5, 1000]) && z36.H._ozel().hit === 0.5, js(z36.H._ozel()));
+  // eskiden tutamaç (üstten 22 px, ±7 px) tepenin seçim alanını yutardı: nokta bir daha tutulamazdı, basış ağır çekim anını kaydırırdı
+  k36._o.pointerdown(ev(Z.ekranX(0.5) + 3, Z.ekranY(10) + 2));
+  var sr36 = z36.H._editor()._d.surukleme;
+  ok("tutamacın altındaki nokta basınca tutulur ve seçilir (Noktayı sil etkin)", !!sr36 && sr36.tur === "nokta" && sr36.i === 2 && z36.H._editor().secili() === 2 &&
+    z36.dom["hiz-ozel-sil"].disabled === false, js(sr36));
+  k36._o.pointermove(ev(Z.ekranX(0.52), Z.ekranY(2)));
+  k36._o.pointerup(ev(Z.ekranX(0.52), Z.ekranY(2)));
+  ok("...ve aşağı sürüklenir; ağır çekim anı yerinde kalır, depoda da", z36.H._ozel().keys[2][1] === 200 && z36.H._ozel().hit === 0.5 &&
+    JSON.parse(z36.depo["suflo.hizRampa.ozel"]).hit === 0.5, js(z36.H._ozel()));
+  var z36b = kur({ cevap: function () { return { ok: false }; } });
+  z36b.H._sec("ozel");
+  var k36b = kok(z36b);
+  k36b._o.pointerdown(ev(Z.ekranX(0.5), Z.ekranY(0.3)));
+  k36b._o.pointermove(ev(Z.ekranX(0.5), Z.ekranY(8)));
+  k36b._o.pointerup(ev(Z.ekranX(0.5), Z.ekranY(8)));
+  k36b._o.pointerdown(ev(Z.ekranX(0.5), Z.ekranY(8), { altKey: true }));
+  k36b._o.pointerup(ev(Z.ekranX(0.5), Z.ekranY(8)));
+  var k36bKeys = z36b.H._ozel().keys;
+  ok("%800'e çekilen orta noktaya Alt+tık: sert basamak açılır (eskiden tutamaç tutulurdu)", k36bKeys.length === 4 && k36bKeys[1][0] === 0.5 && k36bKeys[2][0] === 0.5 &&
+    Math.abs(k36bKeys[1][1] - 800) <= 1 && k36bKeys[2][1] === 100 && z36b.H._ozel().hit === 0.5, js(z36b.H._ozel()));
+  var t36 = cizgiTutamac(z36b);
+  ok("tutamaç çizim alanının üstündeki şeritte çizilir (noktaların en üst çizgisinin üstünde)", !!t36 && Number(t36.getAttribute("cy")) + Number(t36.getAttribute("r")) <= Z.ED.PAD + 0.01 &&
+    Number(t36.getAttribute("cx")) === Z.ekranX(0.5), t36 && js(t36._a));
+  k36b._o.pointerdown(ev(Z.ekranX(0.5), Number(t36.getAttribute("cy"))));
+  k36b._o.pointermove(ev(Z.ekranX(0.3), Number(t36.getAttribute("cy"))));
+  k36b._o.pointerup(ev(0, 0));
+  ok("tutamaç şeritten tutulur: nokta tutamacın altındayken de ağır çekim anı sürüklenir, noktalar yerinde", z36b.H._ozel().hit === 0.3 && js(z36b.H._ozel().keys) === js(k36bKeys), js(z36b.H._ozel()));
+
+  /* ---------- 37) yalnız sol tık (kalem / dokunma da button 0) nokta ekler ya da tutar ---------- */
+  var z37 = kur({ cevap: function () { return { ok: false }; } });
+  z37.H._sec("ozel");
+  var k37 = kok(z37);
+  [2, 1].forEach(function (b) { k37._o.pointerdown(ev(Z.ekranX(0.25), Z.ekranY(2), { button: b })); k37._o.pointerup(ev(Z.ekranX(0.25), Z.ekranY(2), { button: b })); });
+  ok("sağ / orta tık boş yerde nokta eklemez, depoya yazmaz (bağlam menüsü, Mac'te iki parmakla dokunma)", js(z37.H._ozel().keys) === js(SR.OZEL_VARSAYILAN.keys) &&
+    !z37.depo["suflo.hizRampa.ozel"], js(z37.H._ozel().keys));
+  k37._o.pointerdown(ev(Z.ekranX(0.5), Z.ekranY(0.3), { button: 2 }));
+  k37._o.pointermove(ev(Z.ekranX(0.5), Z.ekranY(3)));
+  k37._o.pointerup(ev(0, 0));
+  k37._o.pointerdown(ev(Z.ekranX(0.5), 4, { button: 2 }));
+  k37._o.pointermove(ev(Z.ekranX(0.8), 4));
+  k37._o.pointerup(ev(0, 0));
+  ok("sağ tıkla nokta ve ağır çekim anı sürüklenmez", js(z37.H._ozel().keys) === js(SR.OZEL_VARSAYILAN.keys) && z37.H._ozel().hit === 0.5 && !z37.depo["suflo.hizRampa.ozel"], js(z37.H._ozel()));
+  k37._o.pointerdown(ev(Z.ekranX(0.25), Z.ekranY(2), { button: 0 }));
+  k37._o.pointerup(ev(0, 0));
+  ok("sol tık (button 0) nokta ekler", z37.H._ozel().keys.length === 4 && js(JSON.parse(z37.depo["suflo.hizRampa.ozel"]).keys) === js(z37.H._ozel().keys));
+
+  /* ---------- 38) CEP tuş ilgisi: düzenleyici odaktayken Delete / Backspace Premiere'e gitmez ---------- */
+  var z38 = kur({ cep: true, sekmeAcik: true, cevap: function () { return { ok: false }; } });
+  var ed38 = z38.dom["hiz-ozel-editor"], DEL_WIN = js([{ keyCode: 46 }, { keyCode: 8 }]);
+  ok("açılışta (odak yokken) tuş ilgisi bildirilmez", z38.ilgi.length === 0);
+  z38.H._sec("ozel");
+  ed38._o.focus();
+  ok("düzenleyici odakta: Delete (46) ve Backspace (8) panelde tutulur (Windows)", js(z38.ilgi) === js([DEL_WIN]), js(z38.ilgi));
+  var k38 = kok(z38), onl38 = 0;
+  function tus38(ek) { var e = { key: "Delete", keyCode: 46, target: ed38, preventDefault: function () { onl38++; } }; for (var k in ek || {}) e[k] = ek[k]; ed38._o.keydown(e); }
+  k38._o.pointerdown(ev(Z.ekranX(0.5), Z.ekranY(0.3)));
+  k38._o.pointerup(ev(Z.ekranX(0.5), Z.ekranY(0.3)));
+  tus38();
+  ok("Delete seçili noktayı siler (Eğri sekmesindeki düzenleyici gibi), olay panelde kalır, depoda", js(z38.H._ozel().keys) === js([[0, 100], [1, 100]]) && onl38 === 1 &&
+    JSON.parse(z38.depo["suflo.hizRampa.ozel"]).keys.length === 2 && z38.dom["hiz-ozel-sil"].disabled === true, js(z38.H._ozel().keys));
+  tus38({ key: "Backspace", keyCode: 8 });
+  ok("seçim yokken Backspace: nokta silinmez, neden durum satırında; olay yine panelde", onl38 === 2 && z38.H._ozel().keys.length === 2 &&
+    z38.dom["hiz-status"].textContent === "Önce eğride bir nokta seç.", z38.dom["hiz-status"].textContent);
+  tus38({ ctrlKey: true });
+  tus38({ key: "a", keyCode: 65 });
+  ok("Ctrl+Delete ve başka tuşlar düzenleyiciyi ilgilendirmez", onl38 === 2);
+  ed38._o.blur();
+  ok("odak gidince ilgi bırakılır ('')", js(z38.ilgi) === js([DEL_WIN, ""]), js(z38.ilgi));
+  ed38._o.focus();
+  z38.dom["tab-hiz"].classList.remove("active");
+  z38.dinleyici.belge.click();
+  await bekle(5);
+  ok("odak düzenleyicide kalsa da başka sekmeye geçince ilgi bırakılır (tıklamadan sonra)", js(z38.ilgi) === js([DEL_WIN, "", DEL_WIN, ""]), js(z38.ilgi));
+  k38._o.pointerdown(ev(Z.ekranX(0.5), Z.ekranY(4)));
+  k38._o.pointerup(ev(0, 0));
+  var n38 = z38.H._ozel().keys.length;
+  tus38();
+  ok("sekme kapalıyken Delete düzenleyiciye dokunmaz (Premiere'e gider)", onl38 === 2 && z38.H._ozel().keys.length === n38 && n38 === 3, js(z38.H._ozel().keys));
+  z38.dom["tab-hiz"].classList.add("active");
+  z38.dinleyici.tab.hiz();
+  ok("sekmeye dönünce (odak hâlâ düzenleyicide) ilgi yeniden", z38.ilgi[z38.ilgi.length - 1] === DEL_WIN && z38.ilgi.length === 5, js(z38.ilgi));
+  z38.dom["tab-hiz"].classList.remove("active");
+  z38.dinleyici.poll({ hasSeq: false });
+  ok("yoklama da sekme kapalıyken ilgiyi bırakır", z38.ilgi[z38.ilgi.length - 1] === "" && z38.ilgi.length === 6, js(z38.ilgi));
+  var m38 = kur({ cep: true, sekmeAcik: true, mac: true, cevap: function () { return { ok: false }; } });
+  m38.H._sec("ozel");
+  m38.dom["hiz-ozel-editor"]._o.focus();
+  ok("macOS: Delete 117, Backspace 51", js(m38.ilgi) === js([js([{ keyCode: 117 }, { keyCode: 51 }])]), js(m38.ilgi));
+  var c38 = kur({ sekmeAcik: true, cevap: function () { return { ok: false }; } });
+  c38.H._sec("ozel");
+  c38.dom["hiz-ozel-editor"]._o.focus();
+  c38.dom["hiz-ozel-editor"]._o.blur();
+  ok("CEP dışında (köprü yok) odak hata vermez", c38.ilgi.length === 0);
+
+  /* ---------- 39) CEP tuş ilgisi: Düzenle odaktayken Enter / Space Premiere'e gitmez ---------- */
+  var z39 = kur({ cep: true, sekmeAcik: true, cevap: function () { return { ok: false }; } });
+  var ENT_WIN = js([{ keyCode: 13 }, { keyCode: 32 }]);
+  function dz39(id) { return bul(kart(z39, id), function (c) { return c.className === "hiz-duzenle"; })[0]; }
+  dz39("darbe")._o.focus();
+  ok("Düzenle odakta: Enter (13) ve Space (32) panelde tutulur (Premiere'de Enter efektleri render eder, Space oynatır)", js(z39.ilgi) === js([ENT_WIN]), js(z39.ilgi));
+  dz39("darbe")._o.keydown({ key: "Enter", keyCode: 13, preventDefault: function () {}, stopPropagation: function () {} });
+  ok("Enter Düzenle'yi çalıştırır; ızgara yeniden kurulmaz, ilgi değişmez", z39.H._secili() === "ozel" && js(z39.ilgi) === js([ENT_WIN]), js(z39.ilgi));
+  dz39("darbe")._o.blur();
+  ok("odak gidince bırakılır", js(z39.ilgi) === js([ENT_WIN, ""]));
+  dz39("vites")._o.focus();
+  z39.dom["hiz-yogunluk"].value = "1.5";
+  z39.dom["hiz-yogunluk"]._o.change();
+  ok("odaktaki Düzenle ızgarayla yeniden kurulunca (Yoğunluk) ilgi bırakılır", js(z39.ilgi) === js([ENT_WIN, "", ENT_WIN, ""]), js(z39.ilgi));
+  dz39("darbe")._o.focus();
+  z39.dom["hiz-ozel-editor"]._o.focus();
+  dz39("darbe")._o.blur();
+  ok("odak Düzenle'den düzenleyiciye geçince ilgi düzenleyicinin tuşlarına döner (blur sırası ne olursa olsun)", z39.ilgi[z39.ilgi.length - 1] === DEL_WIN, js(z39.ilgi));
+  var m39 = kur({ cep: true, sekmeAcik: true, mac: true, cevap: function () { return { ok: false }; } });
+  bul(kart(m39, "darbe"), function (c) { return c.className === "hiz-duzenle"; })[0]._o.focus();
+  ok("macOS: Return 36, Space 49", js(m39.ilgi) === js([js([{ keyCode: 36 }, { keyCode: 49 }])]), js(m39.ilgi));
+
+  /* ---------- 40) düz özel eğri: neden ve çözüm özel eğriye göre ---------- */
+  var depo40 = { "suflo.hizRampa.ozel": JSON.stringify({ keys: [[0, 100], [0.5, 100], [1, 100]], hit: 0.5 }), "suflo.hizRampa.ayar": JSON.stringify({ secili: "ozel" }) };
+  var z40 = kur({ kurulu: true, depo: depo40, cevap: function (fn, arg) { return fn === "KS_speedRampTargets" ? hedefler([hedef("A.mp4", 2, 6)]) : basari(arg); } });
+  var DUZ_OZEL = "Özel eğrinin noktaları aynı hızda: bir noktayı yukarı ya da aşağı sürükle.";
+  ok("düz özel eğri: önizleme 'bir noktayı sürükle' der (aralık / Parça / Yumuşatma önerisi değil)", z40.dom["hiz-ozet"].textContent === DUZ_OZEL, z40.dom["hiz-ozet"].textContent);
+  await z40.H.uygula();
+  ok("...uygulanmaz, hak düşmez, durum satırı aynı metni verir", z40.uygulamalar().length === 0 && z40.harcanan.length === 0 &&
+    z40.dom["hiz-status"].textContent === "✕ " + DUZ_OZEL, z40.dom["hiz-status"].textContent);
+  ok("İngilizcesi var; hazır önayarların 'duz' metni değişmedi; atlama özetinde 'tek hız'", I18N.translate(DUZ_OZEL) === "The custom curve's points are all at the same speed: drag a point up or down." &&
+    /Parça: Çok/.test(z40.H._hataMetni({ kod: "duz" })) && z40.H._atlamaOzeti([{ name: "A.mp4", kod: "ozelDuz" }]) === "1 klip atlandı: A.mp4 (tek hız)");
+  var k40 = kok(z40);
+  k40._o.pointerdown(ev(Z.ekranX(0.5), Z.ekranY(1)));
+  k40._o.pointermove(ev(Z.ekranX(0.5), Z.ekranY(0.4)));
+  k40._o.pointerup(ev(0, 0));
+  await bekle(120);
+  ok("bir nokta sürüklenince önizleme rampayı çizer", z40.dom["hiz-ozet"].textContent !== DUZ_OZEL && /hiz-egri/.test(z40.dom["hiz-onizleme"].innerHTML), z40.dom["hiz-ozet"].textContent);
+
+  /* ---------- 41) kaydedilmemiş elle çizilmiş eğrinin üstüne yazılınca bir kez "Geri al" ---------- */
+  function geriAl41(x) { return x.toastlar.filter(function (t) { return t.e && t.e.metin === "Geri al"; }); }
+  function dz41(x, id) { bul(kart(x, id), function (c) { return c.className === "hiz-duzenle"; })[0]._o.click({ stopPropagation: function () {} }); }
+  var z41 = kur({ cevap: function () { return { ok: false }; } });
+  dz41(z41, "darbe");
+  dz41(z41, "vites");
+  z41.dom["hiz-ozel-sifirla"]._o.click();
+  ok("hazır eğri kopyası ya da başlangıç eğrisi değişince bildirim yok (yeniden elde edilir)", geriAl41(z41).length === 0, js(z41.toastlar));
+  var k41 = kok(z41);
+  k41._o.pointerdown(ev(Z.ekranX(0.25), Z.ekranY(4)));
+  k41._o.pointerup(ev(0, 0));
+  k41._o.pointerdown(ev(Z.ekranX(0.5), 4));
+  k41._o.pointermove(ev(Z.ekranX(0.6), 4));
+  k41._o.pointerup(ev(0, 0));
+  var elle41 = z41.H._ozel();
+  dz41(z41, "darbe");
+  var t41 = geriAl41(z41);
+  ok("elle çizilmiş eğrinin üstüne Düzenle: eğri değişir, 'Geri al'lı bildirim gelir (çevrilir)", t41.length === 1 && t41[0].m === "Kaydedilmemiş özel eğrinin yerine yenisi geldi." &&
+    I18N.translate(t41[0].m) === "Your unsaved custom curve was replaced." && js(z41.H._ozel().keys) === js(SR.ozelYuzde(SR.get("darbe").keys)) && elle41.hit === 0.6, js(z41.toastlar));
+  t41[0].e.fn();
+  ok("Geri al: elle çizilen eğri ve ağır çekim anı geri gelir (düzenleyici, depo, durum satırı)", js(z41.H._ozel().keys) === js(elle41.keys) && z41.H._ozel().hit === 0.6 &&
+    js(JSON.parse(z41.depo["suflo.hizRampa.ozel"]).keys) === js(elle41.keys) && JSON.parse(z41.depo["suflo.hizRampa.ozel"]).hit === 0.6 &&
+    js(z41.H._editor().anahtarlar()) === js(elle41.keys) && z41.H._editor().hit() === 0.6 && z41.dom["hiz-status"].textContent === "Önceki özel eğri geri geldi." &&
+    I18N.translate("Önceki özel eğri geri geldi.") === "Previous custom curve restored.", js(z41.H._ozel()));
+  ok("Geri al'ın yerine koyduğu eğri (Darbe kopyası) yeniden elde edilir: yeni bildirim yok", geriAl41(z41).length === 1);
+  z41.dom["hiz-ozel-sifirla"]._o.click();
+  ok("Sıfırla da elle çizilen eğrinin üstüne yazınca bildirir", geriAl41(z41).length === 2 && js(z41.H._ozel().keys) === js(SR.OZEL_VARSAYILAN.keys));
+  geriAl41(z41)[1].e.fn();
+  z41.dom["hiz-ozel-ad"].value = "Benim";
+  z41.dom["hiz-ozel-kaydet"]._o.click();
+  dz41(z41, "nabiz");
+  ok("adıyla kaydedilmiş eğrinin üstüne yazınca bildirim yok (çipten geri gelir)", geriAl41(z41).length === 2 && js(z41.H._ozel().keys) === js(SR.ozelYuzde(SR.get("nabiz").keys)));
+  k41 = kok(z41);
+  k41._o.pointerdown(ev(Z.ekranX(0.9), Z.ekranY(5)));
+  k41._o.pointerup(ev(0, 0));
+  z41.dom["hiz-ozel-kayitlar"].children[0]._o.click();
+  ok("kayıtlı rampa çipi de elle değiştirilmiş eğrinin üstüne yazınca bildirir", geriAl41(z41).length === 3 && js(z41.H._ozel().keys) === js(elle41.keys));
+  ok("bildirimler Premiere'e gitmez", z41.cagri.length === 0);
 
   console.log("\n" + gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);

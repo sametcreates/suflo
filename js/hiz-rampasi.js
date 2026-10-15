@@ -43,6 +43,8 @@ window.KHizRampasi = (function () {
   // Özel eğri: anahtarlar [[t, %]] ve ağır çekim anı (null: yok); sonHit: kutu yeniden açılınca dönülecek yer
   var ozel = { keys: SR ? SR.OZEL_VARSAYILAN.keys : [], hit: SR ? SR.OZEL_VARSAYILAN.hit : null, sonHit: 0.5 };
   var editor = null, ozelZaman = null;
+  // CEP tuş ilgisi (tuslariTut): odaktaki öğenin türü ('editor' | 'duzenle' | '') ve CEP'e son bildirilen
+  var tusOdak = "", tusTutuluyor = "";
 
   function el(id) { return document.getElementById(id); }
   function tr(s) { var I = window.SufloI18n; return I && I.tr ? I.tr(s) : s; }
@@ -318,13 +320,13 @@ window.KHizRampasi = (function () {
       return;
     }
     var fr = h.frame || bagSure();
-    var p;
+    var p, so = secenek();
     try {
-      p = SR.plan(secili, secenek(), SR.clipFor(h, fr, { media: medyaBilgisiOnbellek(h.mediaPath), playhead: ctx ? ctx.playhead : null,
+      p = SR.plan(secili, so, SR.clipFor(h, fr, { media: medyaBilgisiOnbellek(h.mediaPath), playhead: ctx ? ctx.playhead : null,
         hizala: !!el("hiz-vurus").checked && !h.ornek, beats: vuruslar() }));
     } catch (e) {
       svg.innerHTML = "";
-      if (oz) oz.textContent = /çok kısa/.test(e.message) ? "Rampa için en az 12 kare gerekli." : (e.kod === "duz" ? HATA.duz : e.message);
+      if (oz) oz.textContent = /çok kısa/.test(e.message) ? "Rampa için en az 12 kare gerekli." : (e.kod === "duz" ? HATA[duzKodu(secili, so)] : e.message);
       return;
     }
     var gw = onizlemeGenislik(svg);
@@ -356,6 +358,8 @@ window.KHizRampasi = (function () {
   function kartlar() {
     var grid = el("hiz-grid");
     if (!grid) return;
+    // Odaktaki Düzenle ızgarayla birlikte kaldırılır (CEF 74 blur yaymaz): Enter / Space Premiere'e geri verilir
+    if (tusOdak === "duzenle") tusOdakAta("");
     grid.innerHTML = "";
     var o = secenek(), vb = vurusBilgi();
     sonVurusDurum = vb.durum;
@@ -392,6 +396,9 @@ window.KHizRampasi = (function () {
           if (ev.stopPropagation) ev.stopPropagation();
           duzenle(p.id);
         });
+        // Odaktayken Enter / Space panelde tutulur (CEP ikisini de Premiere'e verirdi: Enter render, Space oynatma)
+        dz.addEventListener("focus", function () { tusOdakAta("duzenle"); });
+        dz.addEventListener("blur", function () { if (tusOdak === "duzenle") tusOdakAta(""); });
         kart.appendChild(dz);
       }
       if (kapali) { kart.disabled = true; kart.className += " kapali"; }
@@ -478,8 +485,11 @@ window.KHizRampasi = (function () {
     if (b) { b.disabled = !ic; b.textContent = bilgi && bilgi.basamak ? "Basamağı kaldır" : "Sert basamak"; }
     if (s) s.disabled = !ic;
   }
-  // Düzenleyiciye dışarıdan eğri (Düzenle, kayıtlı rampa, Sıfırla): Özel eğri seçilir, önizleme hemen çizilir
+  // Düzenleyiciye dışarıdan eğri (Düzenle, kayıtlı rampa, Sıfırla): Özel eğri seçilir, önizleme hemen çizilir.
+  // Yerine geçilen eğri başka yoldan geri gelmiyorsa (elle çizilmiş, adıyla kaydedilmemiş: SR.ozelBilinen) bildirimde
+  // "Geri al" çıkar: Düzenle rozeti kart resminin köşesinde, kartı seçmek isterken de basılabilir (depoya hemen yazılır)
   function ozelAta(keys, hit) {
+    var eski = { keys: ozel.keys, hit: ozel.hit };
     ozel.keys = SR.ozelYuzde(keys);
     ozel.hit = SR.ozelHit(hit);
     if (ozel.hit !== null) ozel.sonHit = ozel.hit;
@@ -488,6 +498,14 @@ window.KHizRampasi = (function () {
     if (secili === "ozel") { ozelKutu(); onizlemeCiz(); }
     else sec("ozel");
     ozelResim();
+    if (!SR.ozelAyni(eski, ozel) && !SR.ozelBilinen(eski, ozelKayitlar()) && window.KApp && KApp.toast) {
+      KApp.toast("Kaydedilmemiş özel eğrinin yerine yenisi geldi.", "warn", 9000, { metin: "Geri al", fn: function () { ozelGeriAl(eski); } });
+    }
+  }
+  function ozelGeriAl(eski) {
+    if (mesgul || !eski) return;
+    ozelAta(eski.keys, eski.hit);
+    durum("Önceki özel eğri geri geldi.", "good");
   }
   function duzenle(id) {
     if (mesgul) return;
@@ -507,6 +525,36 @@ window.KHizRampasi = (function () {
     ozelKaydet();
     ozelResim();
     onizlemeCiz();
+  }
+
+  /*
+   * CEP tuş ilgisi: odak metin kutusunda değilken basılan tuşlar Premiere'e de gider. Özel eğri düzenleyicisi odaktayken
+   * Delete seçili timeline klibini silerdi (Eğri sekmesinin aynı düzenleyicisinde Delete noktayı siler), bir Düzenle
+   * odaktayken Enter efektleri render eder, Space oynatırdı. Odaktaki öğenin tuşları (SR.ozel.tusIlgisi) panelde tutulur;
+   * odak gidince, Düzenle ızgarayla kaldırılınca ve sekmeden çıkınca "" ile bırakılır (CEF 74 gizlenen ya da kaldırılan
+   * öğeden blur yaymayabilir: tıklama ve yoklama yeniden bakar). Eğri sekmesi kendi ilgisini yalnız kendi sekmesi
+   * açıkken tutar (js/egri.js tuslariTut). Paketteki CSInterface.js'te sarmalayıcı yok: doğrudan window.__adobe_cep__;
+   * CEP dışında (test, tarayıcı) hiçbir şey yapmaz.
+   */
+  function tuslariTut() {
+    var tur = tusOdak && sekmeAcik() ? tusOdak : "";
+    if (tur === tusTutuluyor) return;
+    var cep = window.__adobe_cep__;
+    if (!cep || typeof cep.registerKeyEventsInterest !== "function") return;
+    try {
+      cep.registerKeyEventsInterest(tur ? SR.ozel.tusIlgisi(tur, !!(typeof K !== "undefined" && K && K.MAC)) : "");
+      tusTutuluyor = tur;
+    } catch (e) {}
+  }
+  function tusOdakAta(tur) { tusOdak = tur || ""; tuslariTut(); }
+  // Düzenleyicide Delete / Backspace: seçili noktayı siler (Noktayı sil düğmesi gibi; seçim yoksa nedeni söyler).
+  // Ctrl / Alt / Cmd'li hâller ve sekme kapalıyken basılanlar Premiere'in
+  function ozelTus(e) {
+    if (!e || e.ctrlKey || e.metaKey || e.altKey || !editor || mesgul || !sekmeAcik() || secili !== "ozel") return;
+    var k = String(e.key || "");
+    if (!(k === "Delete" || k === "Backspace" || (!k && (e.keyCode === 46 || e.keyCode === 8)))) return;
+    if (e.preventDefault) e.preventDefault();
+    editor.sil();
   }
 
   /* ---- adlı özel rampalar (bu görüntüleyicinin yerel deposu, en çok 12) ---- */
@@ -620,6 +668,7 @@ window.KHizRampasi = (function () {
   // Her yoklamada (app.js onPoll): seçim anahtarı değişmese de playhead, In/Out ya da aynı medyanın başka
   // klibine geçiş önizlemeyi ve aralığı tazeler. Sekme kapalıyken yalnız bağlam saklanır.
   function yoklama(c) {
+    tuslariTut();   // sekmeden çıkılmışsa tutulan tuşlar Premiere'e geri verilir
     if (!c) return;
     var a = baglamAnahtari(c);
     if (a === sonAnahtar) return;
@@ -679,6 +728,8 @@ window.KHizRampasi = (function () {
     kopya: "Kopya sekans oluşturulamadı. Önce sekansı kopyala kutusunu kapatıp dene.",
     plan: "Rampa planı geçersiz.",
     duz: "Bu ayarlarla rampa oluşmuyor: parçaların hepsi aynı hızda. Daha uzun bir aralık, Parça: Çok ya da başka bir Yumuşatma dene.",
+    // Noktaları aynı hızdaki özel eğri: aralık, Parça, Yumuşatma ve Yoğunluk bunu değiştirmez (SR.ozelDuz)
+    ozelDuz: "Özel eğrinin noktaları aynı hızda: bir noktayı yukarı ya da aşağı sürükle.",
     inoutKlipYok: "Giriş–Çıkış tek bir video klibin içinde olmalı (kilitli ya da gizli katmanlar sayılmaz).",
     // getLinkedItems ve unlinkSelection yok: Ctrl+L önerilmez (bağ koparılsa da Suflo bunu göremez)
     linkedBilinmiyor: "Bu Premiere sürümünde Suflo klibin sesle bağını okuyamıyor ve koparamıyor. Premiere'i güncelle; Doctor'da ayrıntı var.",
@@ -698,7 +749,9 @@ window.KHizRampasi = (function () {
   var KISA = { grafik: "grafik", ters: "ters", remap: "zaman eşleme", warp: "Warp", kilitli: "kilitli", multicam: "multicam", kisa: "kısa",
     qeYok: "hız yazılamadı", linkedConflict: "bağlı ses", tutamak: "medya yetmedi", hizYazilamadi: "hız yazılamadı", yerlesim: "yerleşmedi",
     geriAlinamadi: "geri alınamadı", degisti: "değişmiş", sekans: "sekans değişti", plan: "plan", vurusYok: "vuruş yok", fazla: "12 klip sınırı",
-    duz: "tek hız", linkedBilinmiyor: "bağlı ses" };
+    duz: "tek hız", ozelDuz: "tek hız", linkedBilinmiyor: "bağlı ses" };
+  // Plan "duz" ile reddetti: özel eğrinin noktaları aynı hızdaysa özel eğriye göre neden ve çözüm (ozelDuz)
+  function duzKodu(presetId, o) { return presetId === "ozel" && SR.ozelDuz(o && o.ozelKeys) ? "ozelDuz" : "duz"; }
   // "2 klip atlandı: logo.png (grafik), Röportaj (hızı %50)": şablon, her ad ve her neden ayrı düğüm
   function atlamaParcalari(liste) {
     if (!liste || !liste.length) return [];
@@ -781,7 +834,7 @@ window.KHizRampasi = (function () {
         // vuruş anı yalnız playhead'in altındaki klipte hizalanır; her klip kendi vuruşlarını alır
         var cl = SR.clipFor(t, hd.frame, { media: m, playhead: hd.playhead, hizala: hizala, beats: beats });
         var p = null;
-        try { p = SR.plan(presetId, o, cl); } catch (eP) { hatalar.push({ t: t, r: { kod: eP && eP.kod === "duz" ? "duz" : "plan", error: eP.message } }); continue; }
+        try { p = SR.plan(presetId, o, cl); } catch (eP) { hatalar.push({ t: t, r: { kod: eP && eP.kod === "duz" ? duzKodu(presetId, o) : "plan", error: eP.message } }); continue; }
         if (p.warnings.indexOf("vurusYok") !== -1) { hatalar.push({ t: t, r: { kod: "vurusYok", error: vurusYokMetni(vb) } }); continue; }
         var kopyaIste = kopya && !klonlandi;
         var arg = { target: { track: t.track, start: t.start, end: t.end, mediaPath: t.mediaPath }, range: { start: t.rangeStart, end: t.rangeEnd },
@@ -918,6 +971,10 @@ window.KHizRampasi = (function () {
     if (kap && ED && ED.olustur) {
       editor = ED.olustur(kap, { mod: "hiz", anahtarlar: ozel.keys, hit: ozel.hit, ease: el("hiz-gecis").value,
         degisti: ozelDegisti, secim: ozelSecim, uyari: function (m) { durum(m, "warn"); } });
+      // odaktayken Delete / Backspace panelde (Premiere seçili klibi silmesin) ve seçili noktayı siler
+      kap.addEventListener("focus", function () { tusOdakAta("editor"); });
+      kap.addEventListener("blur", function () { if (tusOdak === "editor") tusOdakAta(""); });
+      kap.addEventListener("keydown", ozelTus);
     }
     ozelSecim(-1, null);
     var h = el("hiz-ozel-hit");
@@ -970,7 +1027,11 @@ window.KHizRampasi = (function () {
       sonAnahtar = baglamAnahtari(ctx);
       render();
       refresh();
+      tuslariTut();   // odak düzenleyicide kaldıysa tuşları yeniden tut
     });
+    // Başka sekmeye geçilince (odak gizlenen düzenleyicide kalsa da) tuşlar Premiere'e geri verilir: tıklamanın sekme
+    // geçişinden SONRA bakılır
+    if (typeof document.addEventListener === "function") document.addEventListener("click", function () { setTimeout(tuslariTut, 0); });
     // Panel genişliği değişince önizleme yeni genişlikte yeniden çizilir (gerilmiş metin / elips kalmasın)
     if (typeof window.addEventListener === "function") {
       var boyutZaman = null;

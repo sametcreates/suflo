@@ -1696,8 +1696,14 @@ o da aynıysa iki katına). İkinci Alt+tık tıklanan noktayı bırakıp basama
 uyandırma ihtimaline karşı aynı iş **Sert basamak** düğmesinde de var (deneme listesi 13.4).
 (c) **Yoğunluk ve Yumuşatma özel eğriye de uygulanır** (Düzenle ile kopyalanan eğri hazır karttakiyle aynı rampayı versin diye).
 (d) **Uç noktalar** silinmez ve zamanı oynamaz (yalnız hızı); en çok 8 nokta; iki ayrı nokta arasında en az %1 zaman.
-(e) **Klavye:** düzenleyicide tuş kısayolu yok (Delete / ok tuşları CEP'te Premiere'e de gider: seçili klibi silebilirdi). Fare
-dışı yol: Düzenle (Enter), Sert basamak / Noktayı sil / Sıfırla düğmeleri, kayıtlı rampalar.
+(e) **Klavye (inceleme sonrası değişti):** kısayol olmaması Delete'i Premiere'den saklamıyordu (CEP, odak metin kutusunda
+değilken tuşu Premiere'e de verir: seçili timeline klibi silinirdi). Artık düzenleyici odaktayken Delete / Backspace panelde tutulur
+ve seçili noktayı siler (Eğri sekmesindeki düzenleyici gibi); bir kartın Düzenle'si odaktayken Enter / Space panelde tutulur
+(Premiere render / oynatma başlatmaz). Odak gidince ya da sekmeden çıkınca tuşlar Premiere'e geri verilir. Ok tuşları
+tutulmaz (playhead Premiere'de kalır). Deneme listesi 13.12.
+(g) **Geri al (inceleme sonrası):** Düzenle rozeti kart resminin köşesinde; Düzenle / kayıtlı rampa / Sıfırla, adıyla
+kaydedilmemiş elle çizilmiş bir eğrinin üstüne yazınca bildirimde **Geri al** çıkar (hazır kart kopyası, başlangıç eğrisi ya da
+kayıtlı rampa yeniden elde edildiği için onlarda çıkmaz). Rozeti kartın dışına taşımak istersen söyle.
 (f) **Ritme Rampa'da Düzenle yok:** plan "her önayar kartı" diyor, ama Ritme Rampa'nın sabit anahtarı yok (eğrisi her klipte
 o klibin vuruşlarından kurulur); kopyalanacak bir eğri olmadığı için kartında Düzenle gösterilmez. İstersen o anki klibin vuruş
 eğrisini kopyalayan bir Düzenle eklenebilir (klibe bağlı, başka klipte anlamı değişir).

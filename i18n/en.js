@@ -3115,7 +3115,7 @@
     "Basamağı kaldır": "Remove step",
     "Seçili noktada hız bir anda değişsin (Alt+tık)": "Make the speed change instantly at the selected point (Alt+click)",
     "Noktayı sil": "Delete point",
-    "Seçili noktayı sil (çift tık)": "Delete the selected point (double-click)",
+    "Seçili noktayı sil (Delete ya da çift tık)": "Delete the selected point (Delete key or double-click)",
     "Başlangıç eğrisine dön": "Go back to the starting curve",
     "Özel rampa adı": "Custom ramp name",
     "Bu eğriyi adıyla sakla (bu bilgisayarda, en çok 12)": "Save this curve under a name (on this computer, up to 12)",
@@ -3133,7 +3133,11 @@
     "Başka bir noktaya çok yakın; biraz yana tıkla.": "Too close to another point; click a little to the side.",
     "Uç noktada sert basamak olmaz; aradaki bir noktayı seç.": "The end points can't be hard steps; pick a point in between.",
     "Uç noktalar silinmez; hızını yukarı / aşağı sürükleyerek değiştir.": "The end points can't be deleted; drag them up or down to change their speed.",
-    "Önce eğride bir nokta seç.": "Select a point on the curve first."
+    "Önce eğride bir nokta seç.": "Select a point on the curve first.",
+    // review fixes: flat custom curve, undo after Edit / saved ramp / Reset replaced an unsaved hand-drawn curve
+    "Özel eğrinin noktaları aynı hızda: bir noktayı yukarı ya da aşağı sürükle.": "The custom curve's points are all at the same speed: drag a point up or down.",
+    "Kaydedilmemiş özel eğrinin yerine yenisi geldi.": "Your unsaved custom curve was replaced.",
+    "Önceki özel eğri geri geldi.": "Previous custom curve restored."
   });
 
   /* ============ 3.2 step 2: sound tag filter + silent audio guard (caption-text.js, sessiz-ses.js, Settings › #grp-altyazi) ============ */

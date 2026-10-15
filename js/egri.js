@@ -177,8 +177,10 @@ window.SufloEgriEditor = (function () {
    *   degisti(anahtarlar [[t, %]], { bitti, hit }), secim(i, { ic, basamak }), uyari(metin) })
    * y: log2 hız (%10–%1000; 25 / 50 / 100 / 200 / 400 / 800 % çizgileri), x: çıkış zamanı. Tıkla nokta ekler (aynı basışta
    * sürüklenir), sürükle taşır, çift tık siler, Shift ızgaraya yapışır (hız çizgilere, zaman %5'e), Alt+tık sert basamak
-   * açar / kapar. 'Ağır çekim anı' çizgisi üstteki tutamacından yatayda sürüklenir. Noktalar arası geçiş Yumuşatma
-   * seçicisindeki gibi çizilir. Geometri ve işlemler saf ve testli: SufloSpeedRamp.ozel (js/speedramp.js). Premiere'e gitmez.
+   * açar / kapar. 'Ağır çekim anı' çizgisi çizim alanının üstündeki tutamacından yatayda sürüklenir (çizim alanında önce
+   * noktalar tutulur: tutamacın altına çekilen nokta da seçilir). Yalnız ana düğme (sol tık; kalem ve dokunma da) nokta
+   * ekler / tutar. Delete / Backspace'i panel bağlar (js/hiz-rampasi.js: CEP tuş ilgisi, sil()). Noktalar arası geçiş
+   * Yumuşatma seçicisindeki gibi çizilir. Geometri ve işlemler saf ve testli: SufloSpeedRamp.ozel (js/speedramp.js). Premiere'e gitmez.
    * degisti her zaman geçerli anahtarlar verir (SufloSpeedRamp.ozelDogrula); sürüklerken bitti:false, bırakınca true.
    */
   function hizOlustur(kap, opts) {
@@ -200,6 +202,8 @@ window.SufloEgriEditor = (function () {
     var yol = svgEl("path", { "class": "egri-yol", d: "" }, kok);
     var katman = svgEl("g", { "class": "egri-tutamaclar" }, kok);
     var okuma = svgEl("text", { "class": "hiz-ozel-okuma", x: 0, y: 0 }, kok);
+    // Ağır çekim anı tutamacı çizim alanının üstündeki şeritte (y < iz.ust): en hızlı nokta (%1000) bile iz.ust'te, örtmez
+    var TUT_Y = iz.ust - 5, TUT_R = 5;
 
     function uyar(m) { if (typeof opts.uyari === "function") { try { opts.uyari(m); } catch (e) {} } }
     function bildir(bitti) {
@@ -226,8 +230,8 @@ window.SufloEgriEditor = (function () {
       bosalt(hitKatman);
       if (d.hit !== null) {
         var hx = Z.ekranX(d.hit);
-        svgEl("line", { x1: hx, y1: iz.ust, x2: hx, y2: iz.alt, "class": "hiz-vurus-cizgi" }, hitKatman);
-        svgEl("circle", { cx: hx, cy: iz.ust, r: 5, "class": "hiz-vurus hiz-ozel-hit-tutamac" }, hitKatman);
+        svgEl("line", { x1: hx, y1: TUT_Y, x2: hx, y2: iz.alt, "class": "hiz-vurus-cizgi" }, hitKatman);
+        svgEl("circle", { cx: hx, cy: TUT_Y, r: TUT_R, "class": "hiz-vurus hiz-ozel-hit-tutamac" }, hitKatman);
       }
       // seçili noktanın hızı (yalnız sayı ve %: SVG çevrilmez)
       var s = d.keys[d.secili];
@@ -256,15 +260,20 @@ window.SufloEgriEditor = (function () {
         : kod === "uc" ? "Uç noktada sert basamak olmaz; aradaki bir noktayı seç." : "";
     }
     kok.addEventListener("pointerdown", function (e) {
+      // Yalnız ana düğme (fare sol tık; kalem ve dokunma da 0): sağ / orta tık (bağlam menüsü, Mac'te iki parmakla
+      // dokunma) nokta eklemez, taşımaz, kaydetmez
+      if (typeof e.button === "number" && e.button !== 0) return;
       var n = noktaOku(e);
       if (!n) return;
-      // ağır çekim anı: üstteki tutamaç
-      if (d.hit !== null && Math.abs(n.px - Z.ekranX(d.hit)) <= 7 && n.py <= iz.ust + 10) {
+      var i = Z.enYakin(d.keys, n.px, n.py, 9), eklendi = false;
+      // Ağır çekim anı: tutamacın şeridi (çizim alanının üstü) her zaman onun; çizim alanında önce noktalar, yakında
+      // nokta yoksa çizginin üst ucu da tutar (eskiden üstteki 22 px'te tutamaç öndeydi: oraya çekilen %740 üstü nokta
+      // bir daha tutulamaz, seçilemezdi; her basış ağır çekim anını kaydırırdı)
+      if (d.hit !== null && Math.abs(n.px - Z.ekranX(d.hit)) <= 7 && (n.py < iz.ust || (i < 0 && n.py <= iz.ust + 10))) {
         d.surukleme = { tur: "hit", id: e.pointerId, oynadi: false };
         yakala(e);
         return;
       }
-      var i = Z.enYakin(d.keys, n.px, n.py, 9), eklendi = false;
       if (e.altKey) {
         if (i < 0) return;
         yakala(e);

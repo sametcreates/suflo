@@ -612,6 +612,47 @@
     return "Özel rampa " + n;
   }
 
+  /*
+   * Özel eğrinin bütün noktaları %1 içinde aynı hızda mı. Tam düz eğriyi plan her aralık, Parça, Yumuşatma ve Yoğunlukta
+   * "duz" ile reddeder (v^k de sabit kalır); %1'in içindeki fark da ancak Güçlü yoğunlukta rampa olur. Plan "duz" atınca
+   * panel bu eğride hazır önayarların "daha uzun aralık / Parça: Çok" önerisi yerine "bir noktayı sürükle" der. Eğri
+   * gerçekten değişiyorsa "duz" kısa aralıktan gelir, hazır önayarlardaki metin doğrudur.
+   */
+  function ozelDuz(keys) {
+    var mn = Infinity, mx = 0;
+    ozelDogrula(keys).forEach(function (k) { mn = Math.min(mn, k.v); mx = Math.max(mx, k.v); });
+    return mx / mn < 1.01;
+  }
+  // İki özel eğri aynı mı ({ keys, hit }; doğrulanmış [t, %] ve ağır çekim anıyla)
+  function ozelAyni(a, b) {
+    var ka = ozelYuzde(a && a.keys), kb = ozelYuzde(b && b.keys);
+    if (ka.length !== kb.length || ozelHit(a && a.hit) !== ozelHit(b && b.hit)) return false;
+    for (var i = 0; i < ka.length; i++) if (ka[i][0] !== kb[i][0] || ka[i][1] !== kb[i][1]) return false;
+    return true;
+  }
+  /*
+   * Eğri yeniden elde edilebilir mi: başlangıç eğrisi, bir hazır kartın kopyası (Düzenle; vuruşlu Ritme Rampa ve Özel
+   * eğri hariç) ya da adlı bir kayıt (kayitlar: depodaki liste). Panel, bunların dışındaki (elle çizilmiş, adıyla
+   * kaydedilmemiş) eğrinin üstüne Düzenle / kayıtlı rampa / Sıfırla yazınca bir kez "Geri al" sunar.
+   */
+  function ozelBilinen(egri, kayitlar) {
+    if (ozelAyni(egri, OZEL_VARSAYILAN)) return true;
+    var hazir = LIST.some(function (p) { return !p.beats && p.id !== "ozel" && ozelAyni(egri, p); });
+    return hazir || ozelKayitlar(kayitlar).some(function (k) { return ozelAyni(egri, k); });
+  }
+  /*
+   * CEP tuş ilgisi (window.__adobe_cep__.registerKeyEventsInterest): odak metin kutusunda değilken basılan tuşlar
+   * Premiere'e de gider (Delete seçili klibi siler, Enter efektleri render eder, Space oynatır). tur 'editor': özel
+   * eğri düzenleyicisi odakta, Delete / Backspace (Windows VK 46 / 8, macOS 117 / 51) seçili noktayı siler; tur
+   * 'duzenle': bir kartın Düzenle'si odakta, Enter / Space (Windows 13 / 32, macOS Return 36 / Space 49). Yalnız
+   * değiştiricisiz tuşlar. Başka tür: "" (ilgiyi bırakır).
+   */
+  var OZEL_TUSLAR = { editor: { win: [46, 8], mac: [117, 51] }, duzenle: { win: [13, 32], mac: [36, 49] } };
+  function ozelTusIlgisi(tur, mac) {
+    if (!Object.prototype.hasOwnProperty.call(OZEL_TUSLAR, tur)) return "";
+    return JSON.stringify(OZEL_TUSLAR[tur][mac ? "mac" : "win"].map(function (k) { return { keyCode: k }; }));
+  }
+
   /* ---------------- biçim ---------------- */
 
   // Önayar → yoğunluk (v' = v^k), vuruş üretimi, Basamaklı'da açık basamaklar, vuruş anı hizalama.
@@ -1147,13 +1188,15 @@
     // özel eğri (3.4 adım 13)
     ozelDogrula: ozelDogrula, ozelHit: ozelHit, ozelYuzde: ozelYuzde,
     ozelKayitlar: ozelKayitlar, ozelKayitEkle: ozelKayitEkle, ozelKayitSil: ozelKayitSil, ozelKayitAdi: ozelKayitAdi,
+    ozelDuz: ozelDuz, ozelAyni: ozelAyni, ozelBilinen: ozelBilinen,
     OZEL_VARSAYILAN: { keys: OZEL_VARSAYILAN.keys.map(function (k) { return [k[0], k[1]]; }), hit: OZEL_VARSAYILAN.hit },
     // SufloEgriEditor mod 'hiz' (js/egri.js) geometrisi ve düzenleme işlemleri
     ozel: {
       ED: { W: OED.W, H: OED.H, PAD: OED.PAD, SOL: OED.SOL }, EN_AZ: OZEL.EN_AZ, EN_COK: OZEL.EN_COK, ARA: OZEL.ARA, X_YAPIS: OZEL.X_YAPIS,
       IZGARA: OZEL.IZGARA.slice(), HIT: OZEL.HIT.slice(), KAYIT: OZEL.KAYIT,
       ekranX: oX, ekranY: oY, egriT: oT, egriV: oV, yapisT: yapisT, yapisV: yapisV,
-      ekle: ozelEkle, tasi: ozelTasi, sil: ozelSil, basamak: ozelBasamak, enYakin: ozelEnYakin, yol: ozelYol, izgara: ozelIzgara
+      ekle: ozelEkle, tasi: ozelTasi, sil: ozelSil, basamak: ozelBasamak, enYakin: ozelEnYakin, yol: ozelYol, izgara: ozelIzgara,
+      tusIlgisi: ozelTusIlgisi
     },
     MIN_V: MIN_V, MAX_V: MAX_V, MAX_BEATS: MAX_BEATS, DENSITY: DENSITY
   };

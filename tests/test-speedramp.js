@@ -691,5 +691,32 @@ ok("kayıt adı İngilizce arayüzde: çevrilmiş ad ('Custom ramp 2') da dolu s
 var enOzel = ["Özel rampa {n}"].filter(function (k) { return !EN.strings[k]; });
 ok("varsayılan kayıt adı kalıbı i18n/en.js'te", enOzel.length === 0, enOzel.join(" | "));
 
+/* ---- 3.4 adım 13 inceleme: düz özel eğri, eğri eşitliği / kurtarılabilirlik, CEP tuş ilgisi ---- */
+var duzler = [[[0, 100], [1, 100]], [[0, 100], [0.5, 100], [1, 100]], [[0, 50], [0.3, 50.4], [1, 50]], [[0, 300], [0.5, 300], [0.5, 300], [1, 300]], []];
+ok("ozelDuz: noktaları %1 içinde aynı hızdaki eğri (boş girdi düz %100)", duzler.every(function (k) { return S.ozelDuz(k); }) &&
+  !S.ozelDuz(S.OZEL_VARSAYILAN.keys) && !S.ozelDuz([[0, 100], [1, 102]]) && !S.ozelDuz(S.get("vites").keys));
+var duzHep = [];
+// tam düz eğriler (%1'in içindeki fark Güçlü yoğunlukta %1'i aşabilir: o zaman plan rampa verir, metin gerekmez)
+[duzler[0], duzler[1], duzler[3]].forEach(function (k) {
+  [0.5, 1, 1.5].forEach(function (yo) { ["smooth", "linear", "step"].forEach(function (ea) { ["few", "normal", "many"].forEach(function (pa) { [12, 50, 400].forEach(function (F) {
+    var kod = "";
+    try { S.plan("ozel", { ozelKeys: k, ozelHit: 0.5, k: yo, ease: ea, density: pa }, { frames: F, fps: 25 }); } catch (e) { kod = e.kod || e.message; }
+    if (kod !== "duz") duzHep.push(js(k) + " k" + yo + " " + ea + " " + pa + " F" + F + ": " + kod);
+  }); }); }); });
+});
+ok("ozelDuz eğrisi her yoğunluk / yumuşatma / parça / uzunlukta 'duz' atar (panelin 'bir noktayı sürükle' demesi doğru)", duzHep.length === 0, duzHep.slice(0, 3).join(" | "));
+ok("ozelAyni: doğrulanmış anahtarlar ve ağır çekim anı karşılaştırılır", S.ozelAyni({ keys: [[0, 100], [0.5, 30], [1, 100]], hit: 0.5 }, { keys: [{ t: 0.5, v: 0.3 }, { t: 0, v: 1 }, { t: 1, v: 1 }], hit: "0.5" }) &&
+  !S.ozelAyni({ keys: S.OZEL_VARSAYILAN.keys, hit: 0.5 }, { keys: S.OZEL_VARSAYILAN.keys, hit: null }) && !S.ozelAyni({ keys: [[0, 100], [1, 200]] }, { keys: [[0, 100], [1, 201]] }) &&
+  !S.ozelAyni({ keys: [[0, 100], [1, 200]] }, { keys: [[0, 100], [0.5, 150], [1, 200]] }) && S.ozelAyni(null, { keys: [] }));
+var kayit13 = [{ id: "r1", ad: "Benim", keys: [[0, 100], [0.3, 420], [1, 100]], hit: 0.3 }];
+ok("ozelBilinen: başlangıç eğrisi, her hazır kartın kopyası (Ritme Rampa hariç) ve adlı kayıt yeniden elde edilir; elle çizilen değil",
+  S.ozelBilinen(S.OZEL_VARSAYILAN, []) && S.list().filter(function (p) { return !p.beats && p.id !== "ozel"; }).every(function (p) { return S.ozelBilinen({ keys: p.keys, hit: p.hit }, null); }) &&
+  S.ozelBilinen({ keys: [[0, 100], [0.3, 420], [1, 100]], hit: 0.3 }, kayit13) && !S.ozelBilinen({ keys: [[0, 100], [0.3, 420], [1, 100]], hit: 0.4 }, kayit13) &&
+  !S.ozelBilinen({ keys: S.get("darbe").keys, hit: 0.7 }, []) && !S.ozelBilinen({ keys: [[0, 100], [0.25, 400], [0.5, 30], [1, 100]], hit: 0.5 }, "bozuk"));
+ok("CEP tuş ilgisi: düzenleyici Delete / Backspace, Düzenle Enter / Space (Windows VK, macOS sanal kodlar); başka tür boş",
+  Z.tusIlgisi("editor", false) === js([{ keyCode: 46 }, { keyCode: 8 }]) && Z.tusIlgisi("editor", true) === js([{ keyCode: 117 }, { keyCode: 51 }]) &&
+  Z.tusIlgisi("duzenle", false) === js([{ keyCode: 13 }, { keyCode: 32 }]) && Z.tusIlgisi("duzenle", true) === js([{ keyCode: 36 }, { keyCode: 49 }]) &&
+  Z.tusIlgisi("", false) === "" && Z.tusIlgisi("constructor", false) === "" && Z.tusIlgisi(undefined, true) === "");
+
 console.log("\n" + gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);
