@@ -5924,7 +5924,10 @@ function KS_easeUndo(encoded) {
       var comp = null, prop = null;
       try { comp = clip.components[Number(rec.compIdx)]; } catch (eC) { comp = null; }
       try { prop = comp ? comp.properties[Number(rec.propIdx)] : null; } catch (eP) { prop = null; }
-      if (!prop || KS_easeKimlik(comp, prop) !== String(rec.matchName || "")) { atlanan.push({ id: id, kod: "ozellik" }); continue; }
+      if (!prop || (KS_easeKimlik(comp, prop) !== String(rec.matchName || "") && !KS_kayitDilsizUyar(comp, prop, String(rec.matchName || ""), rec))) {
+        atlanan.push({ id: id, kod: "ozellik" });
+        continue;
+      }
       var oz = KS_easeKlipOzeti(clip);
       var kay = KS_easeKaynak(clip, oz.clipStart, oz.clipEnd);
       var an = KS_easeAnahtarlar(clip, prop, oz.clipStart, oz.clipEnd, kay);
@@ -6158,6 +6161,33 @@ function KS_kayitliYaz(kt, clip, start, end, props, ad, keys, clearA, clearB, de
   return ok;
 }
 
+/*
+ * Premiere'in dili degistiyse kayit yine kendi ozelligini bulsun: ComponentParam'in matchName'i yok, kimligin ozellik kismi
+ * Premiere'in dilindeki gorunen ad ("AE.ADBE Motion/Scale" Ingilizce, ".../Olcek" Turkce Premiere'de). Kayittaki dizinlerdeki
+ * ozellik, bileseninin matchName'i (dilden bagimsiz; kimligin '/' oncesi) tutuyorsa, kendi matchName'i yoksa ve deger turu
+ * (sayi / [x,y]) kaydin kenar degeriyle ayniysa kaydin ozelligidir. Efekt sirasi degistiyse bilesen tutmaz (eski kural).
+ * Iki ad da Suflo'nun ad tablosunda (Ingilizce / Turkce) varsa ayni etikete cikmalari gerekir (Konum kaydi Olcek'e dusmez).
+ */
+function KS_kayitDilsizUyar(comp, prop, hedef, rec) {
+  var bol = hedef.indexOf("/");
+  if (bol <= 0) return false;
+  var cm = "", pm = "";
+  try { cm = String(comp.matchName || ""); } catch (e1) {}
+  if (!cm || cm !== hedef.substr(0, bol)) return false;
+  try { pm = String(prop.matchName || ""); } catch (e2) {}
+  if (pm) return false;
+  var kayitAd = KS_easeAd(hedef.substr(bol + 1)), simdiAd = "";
+  try { simdiAd = KS_easeAd(prop.displayName); } catch (e4) {}
+  var e1Ad = KS_EASE_ADLAR.hasOwnProperty(kayitAd) ? KS_EASE_ADLAR[kayitAd] : null;
+  var e2Ad = KS_EASE_ADLAR.hasOwnProperty(simdiAd) ? KS_EASE_ADLAR[simdiAd] : null;
+  if (e1Ad !== null && e2Ad !== null && e1Ad !== e2Ad) return false;
+  var simdi = null;
+  try { simdi = KS_easeDeger(prop.getValue()); } catch (e3) { simdi = null; }
+  if (simdi === null) return false;
+  var k = rec && rec.kenarDegerleri && rec.kenarDegerleri.length ? KS_easeDeger(rec.kenarDegerleri[0] ? rec.kenarDegerleri[0].v : null) : null;
+  return k === null || (typeof k === "number") === (typeof simdi === "number");
+}
+
 // Kaydin ozelligi: kayittaki dizinlerde kimlik tutuyorsa o; tutmuyorsa (efekt sirasi degisti) ayni kimlikli ilk ozellik.
 // { comp, prop } | null
 function KS_kayitOzellik(clip, rec) {
@@ -6169,7 +6199,7 @@ function KS_kayitOzellik(clip, rec) {
   try {
     var c0 = comps[Number(rec.compIdx)];
     var p0 = c0 && c0.properties ? c0.properties[Number(rec.propIdx)] : null;
-    if (p0 && KS_easeKimlik(c0, p0) === hedef) return { comp: c0, prop: p0 };
+    if (p0 && (KS_easeKimlik(c0, p0) === hedef || KS_kayitDilsizUyar(c0, p0, hedef, rec))) return { comp: c0, prop: p0 };
   } catch (e0) {}
   try {
     for (var i = 0; i < comps.numItems; i++) {

@@ -246,6 +246,15 @@ function bellekDepo() {
   cevaplar.KS_removeSufloKeys = { ok: true, eslesen: 0, sonuclar: [], atlanan: [], secim: 0 };
   var a4 = await o3.akis({ tur: "zoom", kapsam: { secili: true }, onay: function () { throw new Error("sorulmamalı"); }, yedekMetni: { yok: "Y?" }, yedek: function () {} });
   ok("akis: seçili kapsamda hiç klip seçili değilse 'Önce klip seç' (onay sorulmaz)", /Önce timeline'da bir klip seç/.test(a4.parcalar[0]), a4);
+  // inceleme r2: eski yöntemi olmayan araçta (Hareket önayarı) kayıtların hepsi 'degisti': degistiMetni ne yapılacağını söyler,
+  // kayıt saklanır (önceden yalnız "dokunulmadı" deniyordu)
+  o3.sakla("C:\\p\\a.prproj", [{ tur: "hareket", seqId: "s1", nodeId: "n1", matchName: "m", compIdx: 0, propIdx: 1, times: [0, 3] }]);
+  cevaplar.KS_removeSufloKeys = function (arg) { return { ok: true, eslesen: arg.records.length, sonuclar: [], atlanan: arg.records.map(function (r) { return { id: r.id, kod: "degisti" }; }), secim: 1 }; };
+  var a5 = await o3.akis({ tur: "hareket", kapsam: { secili: true }, kayitYokMetni: "Kayıt yok.", degistiMetni: function (n) { return n + " değişmiş; Effect Controls."; } });
+  ok("akis: eski yöntemi yoksa 'degisti' için degistiMetni (sayıyla); kayıt saklanır", !a5.yedek && a5.parcalar.length === 1 && a5.parcalar[0] === "1 değişmiş; Effect Controls." &&
+    a5.tur === "warn" && o3.kayitlar("C:\\p\\a.prproj", { tur: "hareket" }).length === 1, a5);
+  var a6 = await o3.akis({ tur: "hareket", kapsam: { secili: true }, kayitYokMetni: "Kayıt yok." });
+  ok("akis: degistiMetni verilmezse eski ileti (geri uyum)", /1 kaydın anahtar kareleri sonradan değiştirilmiş; dokunulmadı\./.test(a6.parcalar.join(" ")), a6);
 
   await uctanUca();
   await araclarArasi();
@@ -343,6 +352,19 @@ async function uctanUca() {
   await dinleyici["preset-kaldir:click"]();
   ok("kaydı olmayan önayar: onay sorulmaz, hiçbir şey silinmez, nasıl kaldırılacağı söylenir", sorular.length === soruOnce && A.opak.keys.length === 2 &&
     /önayar kaydı yok; hiçbir şey silinmedi/.test(toastlar[toastlar.length - 1].m), toastlar[toastlar.length - 1]);
+  // inceleme r2: kayıt yok metni paket presetlerini de anar (onlar kayıt tutmaz); düğmenin notu yerleşik önayarlarla sınırlı
+  ok("kayıt yok metni ve düğme notu: Suflo Smooth paket presetleri kayıt tutmaz", /Suflo Smooth paket preseti olabilir \(paket presetleri kayıt tutmaz\)/.test(toastlar[toastlar.length - 1].m) &&
+    /yerleşik hareket önayarlarının yazdığı anahtar kareleri kaldırır \(Suflo Smooth paket presetleri kayıt tutmaz\)/.test(fs.readFileSync(path.join(ROOT, "index.html"), "utf8")),
+    toastlar[toastlar.length - 1]);
+  // inceleme r2: önayarın son anahtarı silinmiş ('degisti'): ne yapılacağı söylenir (Effect Controls / Ctrl+Z), kayıt saklanır
+  A.opak.keys = [];
+  var rd = await ctx.K.call("KS_applyMotionPreset", { id: "fade-in", duration: 0.45, strength: 1 });
+  ctx.SufloKaldir.panel().sakla(rd.proje, rd.records);
+  A.opak.keys = A.opak.keys.slice(0, 1).concat([{ s: A.opak.keys[0].s + 0.2, v: 50 }]);
+  await dinleyici["preset-kaldir:click"]();
+  ok("önayar kaydı 'degisti': onay sorulmaz, dokunulmaz; Effect Controls / Ctrl+Z önerilir, kayıt saklanır", sorular.length === soruOnce && A.opak.keys.length === 2 &&
+    /önayar kaydının anahtar kareleri sonradan değiştirilmiş .*Effect Controls'ten silebilir ya da Premiere'de Ctrl\+Z/.test(toastlar[toastlar.length - 1].m) &&
+    ctx.SufloKaldir.panel().kayitlar(rd.proje, { tur: "hareket" }).length >= 1, [toastlar[toastlar.length - 1], A.opak.keys]);
 
   // inceleme 2: Geçişi kaldır'da seçili klip playhead'in önüne geçmez; onay hangi kesim olduğunu söyler, eski yöntem
   // tam o kesimi temizler (seçili C'nin kesimindeki kullanıcı anahtarları silinmez)

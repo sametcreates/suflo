@@ -93,6 +93,8 @@ window.KGecis = (function () {
   // hakkı da o zaman düşer
   function eklendi(r, t, yari, gec) {
     if (gec && typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("transitions", KApp.toast);
+    // geç cevap: zaman aşımının kırmızı satırı kalmasın (bu sırada başka bir işlem sürüyorsa onun durumuna dokunulmaz)
+    if (gec && !busy) status("");
     var saklama = kd() ? kd().sakla(r.proje || "", r.records, r) : { ok: true, idler: [] };
     var proje = r.proje || "";
     var metin = "↔ " + t.name + " · V" + r.track + " kesimine eklendi" + (r.half < yari - 0.01 ? " (kısa klip: süre kısaltıldı)" : "");

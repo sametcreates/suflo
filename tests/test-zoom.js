@@ -256,6 +256,11 @@ function selOf(c) { return { name: c.name, clipStart: c.start.seconds, clipEnd: 
   await P.dinleyici["zoom-remove:click"]();
   chk("kayıt yoksa onay sorulur (eski yöntem uyarısıyla); vazgeçince hiçbir şey silinmez", P.sorular.length === 1 && /zoom kaydı yok/.test(P.sorular[0]) &&
     /TÜM Ölçek anahtar kareleri/.test(P.sorular[0]) && Yk.olcek.keys.length === yOnce && /Hiçbir şey silinmedi/.test(P.toastlar[P.toastlar.length - 1].m), P.sorular);
+  // inceleme r2: eski yöntem Konum'u da tüm klip boyunca temizler; onay bunu söyler (TR ve EN)
+  var enSozluk = require(path.join(__dirname, "..", "i18n", "en.js"));
+  var soruEn = (enSozluk.strings || enSozluk)[P.sorular[0]] || "";
+  chk("eski yöntem onayı kendi Konum anahtar karelerinin de silineceğini söyler (TR + EN)", /Kendi eklediğin Ölçek ve Konum anahtar kareleri de silinir\./.test(P.sorular[0]) &&
+    /Scale and Position keyframes you added yourself are deleted too\./.test(soruEn), [P.sorular[0], soruEn]);
   P.cevap.onay = true;
   await P.dinleyici["zoom-remove:click"]();
   chk("onaylanınca bugünkü davranış: klibin tüm Ölçek anahtarları (kullanıcınınki dahil) temizlenir, iki düz anahtar kalır", P.sorular.length === 2 &&

@@ -892,6 +892,25 @@ secim = [];
   var rh2 = cagir("KS_removeSufloKeys", { records: [hzKayit] });
   ok("kaldırma: hız aynı ve anahtarlar gerçekten gitmiş → yine 'yok' (kayıt biter)", rh2.sonuclar.length === 1 && rh2.sonuclar[0].kod === "yok", js(rh2));
 
+  // (d2) Premiere'in dili değişti: kayıt Türkçe Premiere'de yazıldı ("AE.ADBE Motion/Ölçek"), şimdi İngilizce ("Scale").
+  // Bileşenin matchName'i dilden bağımsız; kayıttaki dizinlerdeki özellik bulunur, 'ozellik' çıkmazına düşülmez
+  var DL = klip({ nodeId: "nDL", ad: "Dil.mp4", start: 0, end: 10, inP: 0, outP: 10, olcek: [[2, 100], [2.5, 118], [3, 100]] });
+  izKur([[DL]]);
+  var dlKayit = { id: "krdil", tur: "zoom", seqId: "seq-1", nodeId: "nDL", clipName: "Dil.mp4", clipStart: 0, clipEnd: 10, clipIn: 0, clipOut: 10, ters: false,
+    matchName: "AE.ADBE Motion/Ölçek", compIdx: 0, propIdx: 1, uclar: null, times: [2, 2.5, 3], kenarDegerleri: [{ t: 2, v: 100 }, { t: 3, v: 100 }] };
+  var rdl = cagir("KS_removeSufloKeys", { records: [dlKayit] });
+  ok("kaldırma, Premiere dili değişmiş: kayıttaki dizinlerde bileşen (dilden bağımsız) tutuyor → Ölçek anahtarları silinir ('ozellik' değil)",
+    rdl.ok && rdl.atlanan.length === 0 && rdl.sonuclar.length === 1 && rdl.sonuclar[0].silinen === 3 && DL.olcek.keys.length === 0, js([rdl, DL.olcek.keys]));
+  DL.olcek.keys = [{ s: 2, v: 100 }, { s: 2.5, v: 118 }, { s: 3, v: 100 }];
+  var yanlis = JSON.parse(JSON.stringify(dlKayit)); yanlis.id = "krdil2"; yanlis.matchName = "AE.ADBE Opacity/Opaklık";
+  var rdl2 = cagir("KS_removeSufloKeys", { records: [yanlis] });
+  ok("kaldırma: bileşen tutmuyorsa (Opaklık kaydı Hareket dizininde) yine 'ozellik', hiçbir şey silinmez", js(rdl2.atlanan) === js([{ id: "krdil2", kod: "ozellik" }]) &&
+    DL.olcek.keys.length === 3, js(rdl2));
+  var udl = cagir("KS_easeUndo", { records: [{ id: "kregdil", tur: "egri", seqId: "seq-1", nodeId: "nDL", clipName: "Dil.mp4", clipStart: 0, clipEnd: 10, clipIn: 0, clipOut: 10,
+    ters: false, matchName: "AE.ADBE Motion/Ölçek", compIdx: 0, propIdx: 1, uclar: [2, 3], times: [2.5], kenarDegerleri: [{ t: 2, v: 100 }, { t: 3, v: 100 }] }] });
+  ok("geri al (Eğri), Premiere dili değişmiş: kayıt bulunur, iç anahtar silinir, uçlar kalır", udl.sonuclar.length === 1 && udl.sonuclar[0].silinen === 1 &&
+    js(DL.olcek.keys.map(function (k) { return k.s; })) === js([2, 3]), js([udl, DL.olcek.keys]));
+
   // (e) kaldırma ve geri al kayıt başına tüm sekansı yürümez: 300 klipli katman, son 30 seçili, 30 kayıt
   var nidOkuma = 0, cok = [];
   for (var q = 0; q < 300; q++) {

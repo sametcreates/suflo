@@ -477,7 +477,9 @@
      * o: { tur, kapsam (kaldir seçenekleri), onay: (soru) → bool,
      *      yedek?: async (oz) → { parcalar, tur } (eski yöntem; oz.kesim: host'un seçtiği kesim, tam o temizlenir),
      *      yedekMetni?: { yok, degisti } (onay sorusu; metin ya da (oz) → metin),
-     *      kayitYokMetni?: kayıt yoksa ve eski yöntem yoksa gösterilecek metin }
+     *      kayitYokMetni?: kayıt yoksa ve eski yöntem yoksa gösterilecek metin,
+     *      degistiMetni?: (n) → metin: kayıtların hepsi 'degisti' ve eski yöntem yoksa (Hareket önayarı) ne yapılacağını söyleyen
+     *        metin; kayıtlar saklanır }
      * Eski yöntem YALNIZ onayla çalışır. Doner: { parcalar, tur: 'good' | 'warn', yedek, iptal, kesim (host'un seçtiği | null) }
      */
     async function akis(o) {
@@ -496,6 +498,11 @@
         return { parcalar: s && s.parcalar ? s.parcalar : [], tur: s && s.tur ? s.tur : "good", yedek: true, iptal: false, kesim: kesim };
       }
       if (y === "yok" && o.kayitYokMetni) return { parcalar: [o.kayitYokMetni], tur: "warn", yedek: false, iptal: false, kesim: kesim };
+      if (y === "degisti" && typeof o.degistiMetni === "function") {
+        var dp = [doldur(o.degistiMetni, oz.degistiSayi)];
+        if (oz.kayitsiz) dp.push(doldur(kayitsizMetni, oz.kayitsiz));
+        return { parcalar: dp, tur: "warn", yedek: false, iptal: false, kesim: kesim };
+      }
       var m = mesajParcalari(o.tur, oz);
       return { parcalar: m.parcalar, tur: m.tur, yedek: false, iptal: false, kesim: kesim };
     }

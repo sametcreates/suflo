@@ -368,6 +368,8 @@ if (typeof window !== "undefined") window.KZoom = (function () {
   // gec: cevap zaman aşımından sonra geldi (3.4 adım 12): zoom yine de yazıldı, deneme hakkı da o zaman düşer
   function yazildi(result, plan, gec) {
     if (gec && typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("zoom", KApp.toast);
+    // geç cevap: zaman aşımının kırmızı satırı kalmasın (bu sırada başka bir işlem sürüyorsa onun durumuna dokunulmaz)
+    if (gec && !busy) status("");
     var saklama = kd() ? kd().sakla(result.proje || "", result.records, result) : { ok: true, idler: [] };
     var proje = result.proje || "";
     var metin = plan.toggles + " zoom hareketi eklendi (" +
@@ -381,8 +383,8 @@ if (typeof window !== "undefined") window.KZoom = (function () {
   function kd() { return window.SufloKaldir ? SufloKaldir.panel() : null; }
   function uiMetni(s) { return window.SufloI18n && SufloI18n.tr ? SufloI18n.tr(s) : s; }
   var YEDEK_SORU = {
-    yok: "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir.",
-    degisti: "Suflo'nun zoom kaydı bu klibin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek anahtar kareleri de silinir."
+    yok: "Bu klipte Suflo'nun zoom kaydı yok (önceki sürümde ya da başka bilgisayarda uygulanmış, ya da kaydı çok eski olduğu için silinmiş olabilir). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek ve Konum anahtar kareleri de silinir.",
+    degisti: "Suflo'nun zoom kaydı bu klibin anahtar kareleriyle artık eşleşmiyor (anahtar kareler sonradan değiştirilmiş). Eski yöntemle klibin TÜM Ölçek anahtar kareleri silinip Konum sıfırlansın mı? Kendi eklediğin Ölçek ve Konum anahtar kareleri de silinir."
   };
 
   /*

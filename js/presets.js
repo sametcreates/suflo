@@ -312,9 +312,13 @@ window.KPresets = (function () {
       var s = await k.akis({
         tur: "hareket",
         kapsam: kapsam || { secili: true },
+        // Suflo'nun anahtarları sonradan değişmiş (önayarın eski yöntemi yok): ne yapılacağı söylenir, kayıt saklanır
+        degistiMetni: function (n) {
+          return n + " önayar kaydının anahtar kareleri sonradan değiştirilmiş (ya da klibin hızı değişmiş); dokunulmadı. Kalanları Effect Controls'ten silebilir ya da Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile geri alabilirsin.";
+        },
         kayitYokMetni: tekUygulama
           ? "Bu önayarın kaydı bulunamadı; hiçbir şey silinmedi."
-          : "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önceki sürümde uygulanan önayarı Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin."
+          : "Seçili klipte Suflo'nun önayar kaydı yok; hiçbir şey silinmedi. Önayar önceki sürümde uygulanmış ya da bir Suflo Smooth paket preseti olabilir (paket presetleri kayıt tutmaz): Premiere'de Ctrl+Z (macOS'ta Cmd+Z) ile ya da Effect Controls'ten anahtar kareleri silerek kaldırabilirsin."
       });
       KApp.toast(SufloKaldir.dugum(s.parcalar), s.tur, s.tur === "good" ? 6000 : 9000);
     } catch (e) {

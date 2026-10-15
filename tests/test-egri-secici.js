@@ -292,6 +292,8 @@ function sonCagri(h, fn) { return h.cagri.filter(function (c) { return c.fn === 
   zz.gec({ ok: true, applied: 1, records: [], proje: "" });
   ok("Zoom geç cevap: bildirim 'Premiere geç yanıt verdi: … zoom hareketi eklendi', deneme hakkı o zaman düşer", asim.harcanan.indexOf("zoom") !== -1 &&
     asim.toastlar.some(function (x) { return x.t === "good" && /^Premiere geç yanıt verdi: \d+ zoom hareketi eklendi \(ritmik\)$/.test(x.m); }), js(asim.toastlar));
+  ok("Zoom geç cevap: zaman aşımının kırmızı durum satırı temizlenir (başarıyla birlikte hata kalmaz)", asim.dom["zoom-status"].textContent === "" &&
+    !/bad/.test(asim.dom["zoom-status"].className), js([asim.dom["zoom-status"].textContent, asim.dom["zoom-status"].className]));
 
   asim.toastlar.length = 0;
   await hepsi(asim.dom["gecis-grid"], function (c) { return c.tagName === "BUTTON"; })[0].tetikle("click");
@@ -301,6 +303,15 @@ function sonCagri(h, fn) { return h.cagri.filter(function (c) { return c.fn === 
   gz.gec({ ok: true, track: 2, half: 0.3, records: [], proje: "" });
   ok("Geçiş geç cevap: 'Premiere geç yanıt verdi: ↔ … · V2 kesimine eklendi', deneme hakkı o zaman düşer", asim.harcanan.indexOf("transitions") !== -1 &&
     asim.toastlar.some(function (x) { return x.t === "good" && /^Premiere geç yanıt verdi: ↔ .+ · V2 kesimine eklendi$/.test(x.m); }), js(asim.toastlar));
+  ok("Geçiş geç cevap: zaman aşımının kırmızı durum satırı temizlenir", asim.dom["gecis-status"].textContent === "" && !/bad/.test(asim.dom["gecis-status"].className),
+    js([asim.dom["gecis-status"].textContent, asim.dom["gecis-status"].className]));
+  // inceleme r2: geçiş bildirimi İngilizce arayüzde tümüyle çevrilir (normal ve geç cevap)
+  var I18N12 = require(path.join(KOK, "js", "i18n.js"));
+  I18N12.setDictionary(require(path.join(KOK, "i18n", "en.js")));
+  var gecMetin = asim.toastlar.filter(function (x) { return x.t === "good"; })[0].m;
+  ok("İngilizce: geçiş bildirimi (normal, kısa klip, geç cevap) Türkçe kalmaz", I18N12.translate("↔ Whip Sola · V1 kesimine eklendi") === "↔ Whip Left · added to the V1 cut" &&
+    I18N12.translate("↔ Zoom İçeri · V2 kesimine eklendi (kısa klip: süre kısaltıldı)") === "↔ Zoom In · added to the V2 cut (short clip: duration reduced)" &&
+    /^Premiere answered late: ↔ .+ · added to the V2 cut$/.test(I18N12.translate(gecMetin)) && !/kesimine|eklendi/.test(I18N12.translate(gecMetin)), I18N12.translate(gecMetin));
   // Otomatik'te zaman aşımı: eski davranış (ipucu yok; geç cevap işlevi yok)
   var asimOto = kur({ yanit: { KS_applyMotionPreset: ZA("KS_applyMotionPreset") } });
   await asimOto.dom["preset-grid"].children[1]._q[".preset-apply"].tetikle("click");
