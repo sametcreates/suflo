@@ -1619,3 +1619,53 @@ playhead'e en fazla 1 sn uzaktaki, Suflo geçişi olan en yakın kesimi kaldır�
 geçişin onayı ilk satırda hangi kesim olduğunu söyler ("Kesim: V1, 00:09.04") ve Tamam tam o kesimi temizler; önceden
 seçili bir klip, onaylanan eski yöntemle başka bir kesimdeki senin anahtarlarını sildirebiliyordu. Geçiş **uygulama**
 kuralı değişmedi (seçili klibin kesimi öncelikli). Yapılacak bir şey yok; 11.15 / 11.16'da gözle doğrula.
+
+### Adım 12: Geçiş, Zoom ve Hareket önayarlarında özel eğri (her aracın kendi katmanı; eğri seçmek ücretsiz)
+
+Ne değişti: Geçişler, Otomatik Zoom ve Hareket önayarları sekmelerinde küçük resimli **Eğri** seçicisi (Eğri sekmesinin
+kart ızgarasıyla aynı; `js/egri.js` › `SufloEgriIzgara`, `SufloEgriSecici`). Varsayılan **Otomatik** = bugünkü çıktı (panelin
+Premiere'e gönderdiği yük 3.4 adım 12 öncesiyle bayt bayt aynı; `tests/fixtures/egri-otomatik-3.4.json`). Başka bir eğride
+yeni saf modül `js/egri-secim.js` (`SufloEgriSecim`) her parçayı `SufloEase.bakePlan` ile sık anahtar karelere çevirir (her
+kare, 1 sn'den uzun parçada 2 karede bir; özellik başına en çok 2000 ara anahtar, aşarsa adım katlanır); host
+`KS_presetKeys`'in yeni `dense` bayrağıyla Bezier (5) yazmaz, `setInterpolationTypeAtKey` varsa doğrusal (0) yazar, updateUI
+yine yalnız son anahtarda, ilk / son anahtar doğrulaması aynı; yazılan her anahtar kayda girer (adım 11'in kaldırması aynen
+çalışır). `ease` alanı: `'auto'` | hazır eğri kimliği | `cubic-bezier(…)` | `SFC1.` kodu. Temiz oda; yalnız Suflo'nun kendi
+`js/ease-curve.js`'i (Rebound MIT, adım 9'da atıflı).
+
+**12.1 Fiyat (bilgi).** Senin kuralın: araçların katmanı aynen. Geçişler `transitions`, Zoom `zoom` (ikisi de Pro, 3 deneme
+hakkı), Hareket önayarları `presets` (Pro, denemesiz) kapısından geçer; eğri **seçmek ve küçük resimlere bakmak ücretsiz**.
+`js/deneme.js`'e yeni anahtar eklenmedi, `curves` hakkı bu araçlarda düşmez. Sunucu tarafında yapılacak bir şey yok.
+
+**12.2 Tasarım kararlarını onayla (10 dk, karar).** Plan "her anahtar parçasını yoğunlaştır" diyor; birebir uygulanınca
+Zoom İçeri / Whip gibi üç anahtarlı hareketler ortadaki anahtarda durup kalkıyordu. Bu yüzden:
+(a) **Aynı yöne giden ara anahtarlar tek parça** sayılır (Suflo'nun ivme biçimiydi, onun yerini eğri alır); yön değiştiren
+anahtarlar (taşma, zıplama, sarsıntı tepeleri) ve duruş / kalkış anları korunur.
+(b) **Geçişte giden klip (A) eğrinin aynasını** (`SufloEase.flip`) kullanır: kullanıcı "Sert çıkış" seçince A kesime hızlanır,
+B kesimden yavaşlar (Suflo'nun kendi geçişleri gibi). Birebir aynı eğriyi istersen `js/transitions.js` › `hostPlan`'da
+`S.ayna(c.curve)` yerine `c.curve` yaz.
+(c) **Zoom'da özel eğri Yumuşak stilin %1,2'lik taşmasını yazmaz** (taşmayı istersen Taşma / yay eğrisini seçersin); Jump Cut
+eğrisizdir, Snap-In'in kademeleri tek eğrili harekete dönüşür.
+(d) **Hareket önayarlarında** anahtarları host her seçili klibin o anki değerlerinden kurduğu için panel `bakePlan` yerine eğriyi
+241 noktalık tablo (`SufloEase.bakeFactors`) olarak gönderir, host aynı kare kuralıyla yoğunlaştırır (`KS_egriYogun`). Yalnız
+12 yerleşik önayar; Suflo Smooth paketi (`.prfpset`) kendi anahtarlarını korur.
+Farklı istersen söyle.
+
+**12.3 SFC1 kodu çekirdeği (bilgi, adım 15'e not).** Kullanıcı önayarları ve çok noktalı / yay eğrileri seçicide `SFC1.` kodu
+olarak taşınır (`SufloEase.sfcKodla` / `sfcCoz`: `"SFC1." + base64url(UTF-8 JSON { v: 1, tur: 'egri', ad, curve })`, en çok 4096
+karakter, 8 nokta, ad 40 karakter, denetim karakterleri atılır). Adım 15 bunu genişletecek (`tur: 'hiz'`, `.suflo-egri`
+dosyası, içe / dışa aktarma); biçim değişirse seçicinin yerel depoda tuttuğu kodlar `coz` ile geçersiz sayılır ve Otomatik'e
+düşer (veri kaybı yok, kullanıcı yeniden seçer).
+
+**12.4 Premiere'de dene (30–40 dk).** `marketing/v3.4-deneme-listesi.md` › `## 12`. Özellikle **12.2** (Otomatik 3.3 ile aynı),
+**12.4** (doğrusal anahtar simgesi: `setInterpolationTypeAtKey` sabiti 0 = doğrusal varsayımı adım 10.7 ile birlikte
+doğrulanmalı), **12.5** (kısa klipte anahtar yığılması yok), **12.6** (uzun klipte özel eğrili zoom süresi; Premiere çok
+yavaşsa sınırı 2000'den düşürebiliriz: `js/egri-secim.js` › `EN_COK` ve `jsx/host.jsx` › `KS_EGRI_EN_COK`) ve **12.9**
+(29,97 kare/sn). Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de.
+
+**12.5 Yenilikler penceresi (3.4 yayınında).** `js/app.js` › `YENILIKLER`'e Eğri maddesiyle birlikte "Geçiş, Zoom ve Hareket
+önayarlarında özel eğri" de girebilir (`sekme: "gecis"`, `hedef: "gecis-egri"`); bu adımda bilerek dokunulmadı. Site / sürüm
+notunda "Bezier tutamacı" deme, "her kareye anahtar kare" de (adım 10.3).
+
+**12.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
+`Kaynak: temiz oda (OpenCurve'den yalnız "otomatik Bezier yerine tam eğri" fikri); kod alınmadı, yalnız Suflo'nun Rebound (MIT,
+adım 9'da atıflı) motoru kullanıldı, yeni bildirim gerekmez.`
