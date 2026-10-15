@@ -81,7 +81,7 @@ async function main() {
   ok("geçersiz argüman shim'de reddedilir", bul(r.satirlar, 9).result.isError === true && /Invalid arguments/.test(bul(r.satirlar, 9).result.content[0].text));
 
   /* ---- sahte panel sunucusuyla gidiş-dönüş ---- */
-  var cagrilar = [];
+  var cagrilar = [], temaslar = [];
   var izin = { duzenleme: false, onay: true };
   var sunucu = S.olustur({
     dosya: dosya,
@@ -91,6 +91,7 @@ async function main() {
       return { ok: true };
     },
     izinler: function () { return izin; },
+    temas: function (kod, tur) { temaslar.push(kod + ":" + tur); },
     proIzin: function () { return { ok: false }; }
   });
   await sunucu.baslat();
@@ -108,6 +109,15 @@ async function main() {
   r = await konus([{ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "suflo_zoom", arguments: {} } }], { SUFLO_OTOMASYON_DOSYASI: dosya });
   ok("Pro gerekli: isError pro_gerekli", bul(r.satirlar, 4).result.isError === true && /pro_gerekli/.test(bul(r.satirlar, 4).result.content[0].text), bul(r.satirlar, 4).result.content[0].text);
   ok("yalnız geçerli çağrı panele ulaştı", js(cagrilar.map(function (c) { return c[0]; })) === js(["suflo_baglam"]));
+  // 3.4.1 nabız: initialize'dan sonra "merhaba", çağrılar "eylem", stdin kapanınca "veda" (merhabadan sonra)
+  ok("nabız: clientInfo yoksa 'diger'; merhaba → eylem → veda sırası", temaslar[0] === "diger:merhaba" && temaslar.indexOf("diger:eylem") > 0 &&
+    temaslar.lastIndexOf("diger:veda") > temaslar.indexOf("diger:merhaba"), temaslar.join());
+  temaslar.length = 0;
+  r = await konus([{ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25", clientInfo: { name: "claude-code", version: "2" } } }], { SUFLO_OTOMASYON_DOSYASI: dosya });
+  ok("Claude Code kendini tanıtınca 'code'; kapanınca veda en son gelir", js(temaslar) === js(["code:merhaba", "code:veda"]), temaslar.join());
+  temaslar.length = 0;
+  r = await konus([{ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25", clientInfo: { name: "claude-ai", version: "0.1" } } }], { SUFLO_OTOMASYON_DOSYASI: dosya });
+  ok("Claude Desktop (claude-ai) 'desktop' olarak tanınır", js(temaslar) === js(["desktop:merhaba", "desktop:veda"]), temaslar.join());
 
   /* ---- jeton yenilenince shim dosyayı yeniden okur ---- */
   sunucu.jetonYenile();

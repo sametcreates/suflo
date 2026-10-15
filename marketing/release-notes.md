@@ -1,3 +1,15 @@
+## Suflo 3.4.1 — Söyle, Suflo uygulasın: yapay zekâ köprüsü artık deneysel değil
+
+### Yeni
+- **Premiere'de yeni bir çalışma biçimi: söyle, Suflo uygulasın (Pro).** Claude'a ne yapmak istediğini söyle; Suflo, desteklenen işlemleri Premiere'de uygulasın: sekans bilgilerini oku, marker ekle, altyazı işlerini başlat ve kurgu akışını hızlandır. Yapay zekâ köprüsü (MCP) artık "Deneysel" etiketi taşımıyor.
+- **Kontrol sende:** **Düzenlemeye izin ver** kapalıyken asistan yalnız okur, hiçbir şeyi değiştiremez. Kesim gibi büyük işlemler varsayılan olarak panelde **Onayla / Reddet** kartıyla senin onayına gelir ve her zaman kopya sekansta yapılır. Köprü varsayılan olarak kapalıdır; kapattığın anda erişim kesilir. Genel bir Premiere kumandası değildir: yalnız Suflo'nun kendi işlerini yapar.
+- **"Claude bağlı" göstergesi:** Ayarlar › Yapay zekâ köprüsü kartı artık üç durumu ayırır: "Köprü açık, Claude henüz bağlanmadı", "Claude bağlı" (son iletişim saatiyle; Claude Desktop ya da Claude Code adı yalnız istemci kendini tanıttığında gösterilir) ve "bağlantı kesildi". Claude kapanınca ya da 75 saniye haber gelmeyince eski bilgi "bağlı" diye gösterilmez.
+- **Yerel oturum gerekir:** Bağlanmak için bu bilgisayarda çalışan Claude Desktop ya da Claude Code gerekir; claude.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz. Kart ve güvenlik sayfası bunu açıkça söyler.
+
+### Bilmen gerekenler
+- Gerçek Premiere'de Windows'ta denendi: Claude ile sekans bilgisi okuma ve marker ekleme. macOS'ta henüz gerçek Premiere denemesi yapılmadı. Bilgisayarda Node 18+ gerekir.
+- Köprüyü açmak Pro (köprü için deneme hakkı yok); her eylem ayrıca kendi Pro kapısından geçer. Güvenlik modeli: [suflo.app/mcp-guvenlik](https://suflo.app/mcp-guvenlik).
+
 ## Suflo 3.4.0 — Eğri, canlı sessizlik kesimi ve Araç ara
 
 ### Yeni

@@ -498,6 +498,34 @@ async function main() {
   ok("onay beklerken düzenleme izni kapatılırsa 403 izin_yok (reddedildi değil), yürütülmez", r.kod === 403 && r.govde.hata === "izin_yok" && eYurut.length === 0, js(r.govde));
   es.durdur();
 
+  /* ---- 3.4.1 istemci nabzı: temas, boşta sayacı, jeton, kapanış ---- */
+  var temaslar = [], nKayit = [], nYurut = [], nKapanma = [];
+  var ns = S.olustur({ dosya: dosya, bostaKapanma: 300,
+    yurut: function (ad) { nYurut.push(ad); return { ok: true }; },
+    kayit: function (k) { nKayit.push(k); },
+    temas: function (kod, tur) { temaslar.push(kod + ":" + tur); },
+    onKapandi: function (n) { nKapanma.push(n); } });
+  var np = (await ns.baslat()).port, nt = ns._token();
+  r = await istek(np, { token: nt, govde: JSON.stringify({ nabiz: "merhaba", istemci: "desktop" }) });
+  ok("nabız: 200 ok, temas 'desktop:merhaba', Premiere'e gitmez, etkinlik listesine yazılmaz",
+    r.kod === 200 && r.govde && r.govde.ok === true && temaslar.join() === "desktop:merhaba" && nYurut.length === 0 && nKayit.length === 0, js(r.govde) + " " + temaslar.join());
+  r = await istek(np, { token: nt, govde: JSON.stringify({ nabiz: "merhaba", istemci: "<script>" }) });
+  ok("bilinmeyen istemci adı 'diger' olarak alınır (ham ad panele geçmez)", temaslar[temaslar.length - 1] === "diger:merhaba", temaslar.join());
+  r = await istek(np, { token: "yanlis", govde: JSON.stringify({ nabiz: "merhaba", istemci: "code" }) });
+  ok("jetonsuz / yanlış jetonlu nabız 401, temas yazılmaz", r.kod === 401 && temaslar.length === 2, r.kod + " " + temaslar.join());
+  r = await istek(np, { token: nt, basliklar: { "Origin": "http://evil.example" }, govde: JSON.stringify({ nabiz: "merhaba" }) });
+  ok("tarayıcıdan gelen nabız 403, temas yazılmaz", r.kod === 403 && temaslar.length === 2, r.kod);
+  r = await istek(np, { token: nt, govde: JSON.stringify({ ad: "suflo_baglam", args: {}, istemci: "code" }) });
+  ok("eylem çağrısı da temas sayılır ('code:eylem') ve kaydedilir", r.kod === 200 && temaslar[temaslar.length - 1] === "code:eylem" &&
+    nKayit.filter(function (k) { return k.ad === "suflo_baglam" && k.sonuc === "ok"; }).length === 1, temaslar.join());
+  // nabızlar 30 dakika boşta sayacını sıfırlamaz: yalnız nabız gelen köprü kendiliğinden kapanır
+  var nBas = Date.now();
+  while (ns.acikMi() && Date.now() - nBas < 1500) { await istek(np, { token: nt, govde: JSON.stringify({ nabiz: "merhaba", istemci: "desktop" }) }); await bekle(60); }
+  ok("yalnız nabız gelirken köprü boşta sayılır ve kapanır ('bosta'), dosya silinir",
+    !ns.acikMi() && nKapanma[0] === "bosta" && !fs.existsSync(dosya) && Date.now() - nBas < 1200, nKapanma.join() + " " + (Date.now() - nBas) + "ms");
+  r = await istek(np, { token: nt, govde: JSON.stringify({ nabiz: "veda", istemci: "desktop" }) });
+  ok("kapanan köprüye nabız ulaşmaz", r.kod === 0 || r.kod === 503, r.kod);
+
   try { fs.rmdirSync(path.join(dizin, "Kesit")); fs.rmdirSync(dizin); } catch (e) {}
   console.log("\n" + gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);

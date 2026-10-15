@@ -211,7 +211,7 @@ async function main() {
   var tmp = fs.mkdtempSync(path.join(os.tmpdir(), "suflo-mcp-panel-"));
   function kartDom() {
     var d = {};
-    ["mcp-ac", "mcp-jeton", "mcp-acik-rozet", "mcp-durum", "mcp-node", "mcp-onay-kart", "mcp-onay-ozet", "mcp-onay-sure", "mcp-onayla", "mcp-reddet", "mcp-duzenleme"].forEach(function (id) { d[id] = eleman(id); d[id].className = ""; });
+    ["mcp-ac", "mcp-jeton", "mcp-acik-rozet", "mcp-durum", "mcp-node", "mcp-onay-kart", "mcp-onay-ozet", "mcp-onay-sure", "mcp-onayla", "mcp-reddet", "mcp-duzenleme", "mcp-istemci"].forEach(function (id) { d[id] = eleman(id); d[id].className = ""; });
     d["mcp-ac"].classList = { toggle: function () {} };
     d["mcp-onay-kart"].hidden = true;
     return d;
@@ -235,6 +235,18 @@ async function main() {
   await pp.P._ac();
   ok("Pro kullanıcı: köprü süre sınırı OLMADAN açılır, deneme hakkı harcanmaz", pp.P.acikMi() && pp.c.sunucuBaslat[0] === "yok" && pp.c.harca.length === 0 && fs.existsSync(bagFile), js(pp.c.sunucuBaslat));
   ok("durum satırı açık köprüyü söyler, 'deneme' demez", /Köprü açık/.test(dp["mcp-durum"].textContent) && !/deneme/.test(dp["mcp-durum"].textContent), dp["mcp-durum"].textContent);
+  // 3.4.1 bağlantı göstergesi: açık ama bağlanmadı / bağlı (ad + son iletişim) / kesildi; kapalıyken eski bilgi kalmaz
+  var gi = dp["mcp-istemci"];
+  ok("açık köprü, nabız yok: 'Claude henüz bağlanmadı' + web/bulut oturumu uyarısı", !gi.hidden && /Claude henüz bağlanmadı/.test(gi.textContent) &&
+    /web sohbetleri ve bulut oturumları/.test(gi.textContent) && /warn/.test(gi.className), gi.textContent);
+  pp.P._temasAl("desktop", "merhaba");
+  ok("nabız gelince 'Claude bağlı: Claude Desktop · son iletişim SS:DD:ss'", /^● Claude bağlı: Claude Desktop · son iletişim \d\d:\d\d:\d\d$/.test(gi.textContent) && /good/.test(gi.className), gi.textContent);
+  pp.P._temasAl("diger", "merhaba");
+  pp.P._temasAl("desktop", "veda");
+  ok("Desktop kapanınca ad düşer; tanınmayan istemci adsız gösterilir", /^● Bir MCP istemcisi bağlı · son iletişim/.test(gi.textContent), gi.textContent);
+  pp.P._temaslar().diger.son = Date.now() - 80000;
+  pp.P._istemciCiz();
+  ok("75 sn nabız gelmeyince 'bağlantısı kesildi', bağlı denmez", /^Claude bağlantısı kesildi · son iletişim/.test(gi.textContent) && !/bağlı:/.test(gi.textContent), gi.textContent);
   pp.sb.Pro._degis(true);
   ok("Pro olayı (hâlâ Pro): köprü açık kalır", pp.P.acikMi());
 
@@ -277,6 +289,9 @@ async function main() {
     !pp.P.acikMi() && !fs.existsSync(bagFile) && /Pro lisansı artık etkin değil/.test(dp["mcp-durum"].textContent) &&
     pp.c.toast.some(function (x) { return /Pro lisansı etkin değil/.test(x.m); }), dp["mcp-durum"].textContent);
   var acilis = pp.c.sunucuBaslat.length;
+  ok("köprü kapanınca bağlantı göstergesi gizlenir, eski temas silinir", dp["mcp-istemci"].hidden === true && Object.keys(pp.P._temaslar()).length === 0);
+  pp.P._temasAl("desktop", "merhaba");
+  ok("kapalı köprüye gelen geç temas yazılmaz", Object.keys(pp.P._temaslar()).length === 0 && dp["mcp-istemci"].hidden === true);
   pp.sb.Pro._degis(false);
   ok("kapalı köprüde Pro olayı bir şey yapmaz (Pro)", !pp.P.acikMi() && pp.c.sunucuBaslat.length === acilis);
 
@@ -320,7 +335,8 @@ async function main() {
   var idler = (src.match(/el\("([a-z0-9-]+)"\)/g) || []).map(function (x) { return x.slice(4, -2); }).filter(function (v, i, a) { return a.indexOf(v) === i; });
   var eksik = idler.filter(function (id) { return id !== "zoom-status" && id !== "hiz-status" ? html.indexOf('id="' + id + '"') === -1 : html.indexOf('id="' + id + '"') === -1; });
   ok("Ayarlar kartının tüm öğeleri index.html'de", eksik.length === 0, eksik.join(","));
-  ok("kart 'Deneysel' etiketli, varsayılan kapalı (aç düğmesi)", /Yapay zekâ köprüsü \(MCP\) <span class="mcp-deneysel">Deneysel<\/span>/.test(html) && />Köprüyü aç</.test(html) && /id="mcp-onay" checked/.test(html) && !/id="mcp-duzenleme" checked/.test(html));
+  ok("kart 'Deneysel' etiketi taşımaz, varsayılan kapalı (aç düğmesi)", /Yapay zekâ köprüsü \(MCP\) <span class="pro-inline">PRO<\/span>/.test(html) && !/mcp-deneysel|>Deneysel</.test(html) && />Köprüyü aç</.test(html) && /id="mcp-onay" checked/.test(html) && !/id="mcp-duzenleme" checked/.test(html));
+  ok("kartta bağlantı göstergesi ve yerel oturum notu var", /id="mcp-istemci"[^>]*hidden/.test(html) && /claude\.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz/.test(html));
   ok("app.js kartı başlatır", /KOtomasyon\.init\(\)/.test(oku("js/app.js")));
 
   console.log("\n" + gecen + "/" + toplam + " gecti");

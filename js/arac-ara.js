@@ -141,7 +141,7 @@
     { id: "doctor", ad: "Suflo Doctor", tab: "settings", hedef: ["set-library-health-run"], anahtar: "doctor saglik tarama onarim health scan" },
     { id: "kaynak-sina", ad: "Model kaynaklarını sına", tab: "settings", hedef: ["set-doctor-kaynak"],
       anahtar: "doctor huggingface hf mirror ag baglanti vekil proxy network test model sources" },
-    // 3.4 adım 22 (Deneysel): köprüyü açmak Pro ('mcp', deneme hakkı yok); her eylem ayrıca kendi aracının kapısından geçer
+    // 3.4 adım 22: köprüyü açmak Pro ('mcp', deneme hakkı yok); her eylem ayrıca kendi aracının kapısından geçer
     { id: "ayar-mcp", ad: "Ayarlar › Yapay zekâ köprüsü (MCP)", tab: "settings", hedef: ["mcp-ac", "grp-mcp"], pro: "mcp",
       anahtar: "mcp claude asistan otomasyon yapay zeka ai assistant automation bridge" },
     { id: "sorun-bildir", ad: "Sorun bildir", tab: "settings", hedef: ["set-report"], anahtar: "destek gunluk hata support log bug" },

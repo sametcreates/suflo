@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Suflo yapay zekâ köprüsü (MCP): güvenlik modeli</title>
-<meta name="description" content="Suflo'nun deneysel yapay zekâ köprüsü (MCP) nasıl korunur: yalnız 127.0.0.1, rastgele jeton, izin listesi, onay kartı ve kopya sekansta kesim.">
+<meta name="description" content="Suflo'nun yapay zekâ köprüsü (MCP) nasıl korunur: yalnız 127.0.0.1, rastgele jeton, izin listesi, onay kartı ve kopya sekansta kesim.">
 <link rel="canonical" href="https://suflo.app/mcp-guvenlik">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#0f1017">
@@ -35,7 +35,7 @@ th{color:var(--text)}
 <main class="wrap">
 <p><a href="/">← suflo.app</a></p>
 <h1>Yapay zekâ köprüsü (MCP): güvenlik modeli</h1>
-<p><span class="etiket">Deneysel</span> · Suflo 3.4 · varsayılan olarak kapalı</p>
+<p>Suflo 3.4.1 · varsayılan olarak kapalı · bağlanmak için bu bilgisayarda çalışan Claude Desktop ya da Claude Code gerekir (claude.ai web ve bulut oturumları bağlanamaz)</p>
 
 <div class="kutu">
 <p>Köprü, Claude Desktop ya da Claude Code gibi bir MCP istemcisinin Suflo'nun <b>kendi üst düzey işlerini</b> çalıştırmasını sağlar: altyazı oluşturma, marker ekleme, sessizlikleri <b>kopya sekansta</b> kesme. Genel bir Premiere uzaktan kumandası <b>değildir</b>: rastgele ExtendScript/QE çalıştıramaz, dosya yolu seçemez, projeyi açamaz, kaydedemez, kapatamaz, proje öğesi silemez, render ya da dışa aktarma yapamaz, ayarlara, lisansa ve API anahtarlarına dokunamaz, ağa çıkamaz.</p>
@@ -72,7 +72,7 @@ th{color:var(--text)}
 <p>Köprüyü açmak Suflo Pro gerektirir; köprü için deneme hakkı yoktur. Köprü, lisans devre dışı kalınca (koltuk taşıma, iade) hemen kapanır. Pro araçlarını çağıran her eylem ayrıca o aracın kendi Pro kapısından geçer; geçemezse asistan <code>pro_gerekli</code> yanıtı alır (altyazı oluştururken "Çevrimdışı İngilizce" seçiliyse de).</p>
 
 <h2 lang="en">In English</h2>
-<p lang="en">The experimental AI bridge (MCP) is off by default. It binds to 127.0.0.1 only on a random port, requires a fresh 256-bit bearer token (connection file with mode 0600, deleted on stop), rejects any request with Origin, Referer, Sec-Fetch-* or Upgrade headers, a Host other than <code>127.0.0.1:&lt;port&gt;</code>, or a non-JSON body, and limits body size (256 KB), rate (120/min for authenticated calls) and concurrency (1 running, 4 queued). Turning the bridge off cancels every accepted action that has not started yet and closes the bridge's idle connections; turning "Allow editing" off makes waiting write actions fail with <code>izin_yok</code> (an open confirmation card closes). Connections that send nothing for 30 s are closed, and error texts are stripped of folder paths too. Only Suflo's own allowlisted actions exist; write actions need "Allow editing", destructive ones need an in-panel confirmation by default (denied after 60 s; the user can turn this off in the panel) and cuts always run on a sequence copy. No arbitrary script, file path, project, render, settings, license or network capability is exposed. Pro: turning the bridge on needs Suflo Pro (there are no trial credits for the bridge), the bridge closes as soon as the license is deactivated or revoked, and every action that uses a Pro tool also passes that tool's own Pro gate; otherwise the assistant gets <code>pro_gerekli</code>.</p>
+<p lang="en">The AI bridge (MCP) is off by default and needs Claude Desktop or Claude Code running on this computer (claude.ai web and cloud sessions cannot connect). It binds to 127.0.0.1 only on a random port, requires a fresh 256-bit bearer token (connection file with mode 0600, deleted on stop), rejects any request with Origin, Referer, Sec-Fetch-* or Upgrade headers, a Host other than <code>127.0.0.1:&lt;port&gt;</code>, or a non-JSON body, and limits body size (256 KB), rate (120/min for authenticated calls) and concurrency (1 running, 4 queued). Turning the bridge off cancels every accepted action that has not started yet and closes the bridge's idle connections; turning "Allow editing" off makes waiting write actions fail with <code>izin_yok</code> (an open confirmation card closes). Connections that send nothing for 30 s are closed, and error texts are stripped of folder paths too. Only Suflo's own allowlisted actions exist; write actions need "Allow editing", destructive ones need an in-panel confirmation by default (denied after 60 s; the user can turn this off in the panel) and cuts always run on a sequence copy. No arbitrary script, file path, project, render, settings, license or network capability is exposed. Pro: turning the bridge on needs Suflo Pro (there are no trial credits for the bridge), the bridge closes as soon as the license is deactivated or revoked, and every action that uses a Pro tool also passes that tool's own Pro gate; otherwise the assistant gets <code>pro_gerekli</code>.</p>
 </main>
 </body>
 </html>

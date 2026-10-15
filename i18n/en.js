@@ -4061,11 +4061,10 @@
 
   // Intentionally identical in English (brands, product/feature names, fonts, formats, keys).
   // Only used by tools/i18n-coverage.js so these don't count as missing.
-  /* ================= Yapay zekâ köprüsü (MCP, 3.4, Deneysel) ================= */
+  /* ================= Yapay zekâ köprüsü (MCP, 3.4) ================= */
   add({
     "Yapay zekâ köprüsü (MCP)": "AI bridge (MCP)",
     "Yapay zekâ köprüsü": "AI bridge",
-    "Deneysel": "Experimental",
     "AÇIK": "ON",
     "Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.":
       "An AI assistant such as Claude can run Suflo's own tasks for you: generating captions, adding markers, cutting silences on a sequence copy. It is not a general Premiere remote control; only this computer can connect, and it turns off after 30 idle minutes.",
@@ -4088,7 +4087,15 @@
     "Node'u denetle": "Check Node",
     "Etkinlik (son 50 çağrı)": "Activity (last 50 calls)",
     "Güvenlik modeli →": "Security model →",
-    "Yapay zekâ köprüsü (MCP, deneysel; deneme hakkı yok)": "AI bridge (MCP, experimental; no trial credits)",
+    "Yapay zekâ köprüsü (MCP; deneme hakkı yok)": "AI bridge (MCP; no trial credits)",
+    "Bağlanmak için bu bilgisayarda çalışan bir Claude oturumu gerekir: Claude Desktop ya da Claude Code. claude.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz.":
+      "Connecting needs a Claude session running on this computer: Claude Desktop or Claude Code. claude.ai web chats and cloud sessions cannot reach Premiere on this computer.",
+    "● Claude bağlı: {} · son iletişim {}": "● Claude connected: {} · last contact {}",
+    "● Bir MCP istemcisi bağlı · son iletişim {}": "● An MCP client is connected · last contact {}",
+    "Claude bağlantısı kesildi · son iletişim {}. Bu bilgisayarda Claude Desktop'u ya da Claude Code'u yeniden aç.":
+      "Claude disconnected · last contact {}. Reopen Claude Desktop or Claude Code on this computer.",
+    "Köprü açık, Claude henüz bağlanmadı. Bu bilgisayarda Claude Desktop'u ya da Claude Code'u aç (ayarı ekledikten sonra yeniden başlat). claude.ai web sohbetleri ve bulut oturumları bu bilgisayardaki Premiere'e bağlanamaz.":
+      "Bridge on, Claude has not connected yet. Open Claude Desktop or Claude Code on this computer (restart it after adding the setting). claude.ai web chats and cloud sessions cannot reach Premiere on this computer.",
     "Yapay zekâ köprüsü onay bekliyor: {}": "AI bridge is waiting for approval: {}",
     "Henüz çağrı yok.": "No calls yet.",
     "30 dakika çağrı gelmedi: köprü kapandı.": "No calls for 30 minutes: the bridge turned off.",
@@ -4136,7 +4143,7 @@
     "Hız rampası uygula": "Apply speed ramp",
     "Reddedilen istek": "Rejected request",
     "Onay kartını göster": "Show the approval card",
-    "Yapay zekâ köprüsü (MCP, deneysel): Claude gibi bir asistan Suflo işlerini senin yerine yapar": "AI bridge (MCP, experimental): an assistant such as Claude runs Suflo tasks for you"
+    "Yapay zekâ köprüsü (MCP): Claude gibi bir asistan Suflo işlerini senin yerine yapar": "AI bridge (MCP): an assistant such as Claude runs Suflo tasks for you"
   });
 
   var KEEP = ["Suflo", "Suflo Pro", "Suflo Doctor", "SUFLO PRO", "SUFLO CAPTION EDITOR", "PREMIERE CREATOR STUDIO", "PRO", "PREMIERE",
