@@ -1732,7 +1732,7 @@ Ne değişti: Eğri sekmesinde **Varışta yaylan** kartı (`#egri-yaylan`). Har
 varış hızıyla orantılı aşar, salınıp oturur: After Effects'teki overshoot ifadesinin anahtar kareye pişirilmiş hâli.
 Matematik adım 9'da Rebound'dan (MIT, atıflı) alınan `dampedSine` / `followThroughAnchors` / `autoDuration`; plan Suflo'nun
 `SufloEase.yaylanPlan`'ı: değer_k = taban + hız · genlik · s(t_k − iniş). Varışlar `SufloEgriModel.varislar` (tek varış:
-playhead'i saran çiftin ikinci ucu ya da canlı yaylanmanın inişi; **Tüm varışlar**: bekleme ve Eğri iç anahtarları hariç her
+kullanıcının anahtarlarında playhead'i saran çiftin ikinci ucu, bkz. 14.8 (a); **Tüm varışlar**: bekleme ve Eğri iç anahtarları hariç her
 iniş), varış hızı boyut başına önceki anahtardan (Eğri'nin son sık anahtarıysa bitiş eğimi). Host `KS_easeBake`'e `tur: 'yaylan'`
 öğeleri (`KS_easeYaylanOge`): iniş ve sonraki anahtar değerleriyle doğrulanır, yalnız inişten sonra ve sonraki anahtardan / klip
 sonundan önce yazar; `setInterpolationTypeAtKey` varsa tepe / çukurlara seyrek plan + Bezier (5), yoksa 2 karede bir sık plan.
@@ -1803,4 +1803,23 @@ seçtiği için yine yazılır. Oran `js/egri-model.js` › `DEVAM_ORAN` (0,25).
 (e) **Eğri yaylanmanın içindeyse** (iki yaylanma anahtarı arasına Eğri) yaylanma yeniden uygulanmaz; önce o Eğri geri alınır.
 Tümünü geri al Eğri kayıtlarını yaylanmalardan önce geri alır.
 (f) **40'tan çok varış** (Tüm varışlar) aynı klibin birkaç KS_easeBake çağrısına bölünür (çağrı başına en çok 40 öğe).
+Farklı istersen söyle.
+
+**14.8 İkinci inceleme kararlarını onayla (5 dk, karar).**
+(a) **Tek varışta iniş kullanıcının anahtarlarından:** Varışta yaylan, Suflo'nun yaylanma anahtarlarını saymadan playhead'i saran
+çiftin ikinci anahtarına yazar. Önceden playhead bir yaylanmanın içindeyken o yaylanma yeniden yazılıyordu; yaylanma sonraki
+anahtarda kısaldıysa (iniş → sonraki anahtar oturma süresinden kısa) o sonraki anahtar tek varışta hiç seçilemiyordu. Artık bir
+yaylanmayı yeniden ayarlamak için playhead o inişe gelen aralıkta olur (Eğri'nin çift kuralıyla aynı); yalnız son anahtarın
+yaylanmasında (sonrasında çift yok) playhead yaylanmanın içindeyken de o iniş yeniden yazılır. Satır rozeti ve satırın Geri al'ı
+playhead yaylanmanın içindeyken o yaylanmayı göstermeyi sürdürür.
+(b) **400'den çok anahtarlı satırda Tüm varışlar yazmaz:** tarama böyle bir özellikte yalnız playhead çevresindeki 400 anahtarı
+verir; pencerenin kenarındaki yaylanmalar tanınmadığı için tepeleri iniş sanılıp Suflo'nun kendi anahtarları arasına yaylanma
+yazılıyordu, pencere dışındaki inişler de sessizce eski ayarda kalıyordu. Artık satır "400'den çok anahtar kare var; Tüm varışlar'ı
+kapatıp varışlara tek tek uygula" nedeniyle atlanır; tek varış çalışır. İleride gerekirse host değer istenen satırın tüm anahtarlarını
+(bir okuma bütçesiyle) döndürebilir; bu adımda yapılmadı (40 × 400 değer okuması zaten Uygula'nın üst sınırı).
+(c) **Geri al kayıtlarının yeri:** Eğri ve yaylanma kayıtları proje başına ortak en çok 300 (adım 11'in sınıf sınırı); fazlası en
+eskilerden atılır. Tüm varışlar sınırsız sayıda varış yazabildiği için tek uygulama önceki tüm eğrilerin Geri al'ını sessizce
+silebiliyordu. Artık Tüm varışlar boş yerden çok kayıt yazacaksa önce sorulur (İptal: hiçbir şey yazılmaz, hak düşmez); her
+uygulamada (Eğri dahil) yer açmak için eski kayıt atıldıysa sarı bildirim söyler. Tek varış Eğri gibi bir uygulamada en çok 40 kayıt
+yazar ve sormaz. Sınırı büyütmek istersen `js/key-records.js` › `PROJE_SINIR` (localStorage boyut sınırları da var).
 Farklı istersen söyle.

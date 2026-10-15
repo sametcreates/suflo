@@ -700,6 +700,68 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
     !!ycBil && /^Varışta yaylanma uygulandı: 45 varış · \d+ anahtar kare$/.test(ycBil.m.textContent) && ycKutular.length === 2 && ycKutular[1].disabled === true &&
     ycTar.length >= 1 && ycTar.every(function (c) { return js(c.arg.degerIste) === js([{ nodeId: "nA", compIdx: 0, propIdx: 1 }]); }),
     js([ycBake.map(function (c) { return c.arg.items.length; }), ycBil && ycBil.m.textContent, ycKutular.map(function (c) { return c.disabled; })]));
+  // İnceleme 3 (bulgu): Geri al kayıtları proje başına 300 (Eğri ile ortak). Projede 290 eski Eğri kaydı varken Tüm varışlar 45 kayıt
+  // yazacaksa önce sorulur; hayır → Premiere'e yazılmaz, hak düşmez, eski kayıtlar yerinde. Evet → yazılır, atılan eski kayıtlar söylenir
+  function doluDepo(n, ek) {
+    var dp = {}, depoD = KR.depo({ getItem: function (k) { return dp[k] === undefined ? null : dp[k]; }, setItem: function (k, v) { dp[k] = v; }, removeItem: function (k) { delete dp[k]; } },
+      { simdi: function () { return 1000; } });
+    var eskiler = [];
+    for (var e1 = 0; e1 < n; e1++) {
+      eskiler.push({ id: "kreski" + e1, tur: "egri", seqId: "s1", nodeId: "nZ", clipName: "Başka.mp4", clipStart: 0, matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0,
+        uclar: [e1, e1 + 0.5], times: [e1 + 0.2], createdAt: 1000 + e1 });
+    }
+    depoD.ekle("C:/p/deneme.prproj", eskiler);
+    for (var k1 in ek || {}) dp[k1] = ek[k1];
+    return dp;
+  }
+  function egriSayisi(G) { return KR.depo(G.ctx.localStorage).oku("C:/p/deneme.prproj").filter(function (r) { return r.tur === "egri"; }).length; }
+  function yerKur(cevapEvet, tum, props, n) {
+    var sorular = [];
+    var k2 = kur({ kurulu: true, depo: doluDepo(n || 290, { "suflo.egri.yaylan": JSON.stringify({ tum: tum, sonum: 10 }) }), cevap: function (fn, arg) {
+      if (fn === "KS_easePeek") return peek(tum ? 10.1 : 12.5);
+      if (fn === "KS_easeScan") return tarama(tum ? 10.1 : 12.5, degerli(props, arg));
+      if (fn === "KS_easeBake") return yaylanBake(arg);
+      return { ok: false };
+    } });
+    k2.ctx.confirm = function (s) { sorular.push(s); return cevapEvet; };
+    k2.sorular = sorular;
+    return k2;
+  }
+  var yh = yerKur(false, true, [olcCok]);
+  yh.ctx._tab.egri(); await bekle(10);
+  await yh.G.yaylanUygula();
+  ok("Tüm varışlar, Geri al kayıtlarına yer yok (290 + 45 > 300): önce sorulur; hayır → KS_easeBake yok, hak düşmez, eski kayıtlar yerinde, durum söyler",
+    yh.sorular.length === 1 && /^Bu uygulama 45 yaylanma kaydı yazacak; projede Geri al için 10 kayıtlık yer kaldı \(Eğri ve yaylanma kayıtları proje başına en çok 300\)\. Sürdürürsen en eski 35 /.test(yh.sorular[0]) &&
+    yh.cagri.filter(function (c) { return c.fn === "KS_easeBake"; }).length === 0 && yh.harcanan.length === 0 && egriSayisi(yh) === 290 &&
+    /^Hiçbir şey yazılmadı: Geri al kayıtlarına yer yok/.test(yh.dom["egri-status"].textContent) && /warn/.test(yh.dom["egri-status"].className),
+    js([yh.sorular, yh.dom["egri-status"].textContent]));
+  var ye = yerKur(true, true, [olcCok]);
+  ye.ctx._tab.egri(); await bekle(10);
+  await ye.G.yaylanUygula();
+  var yeSak = KR.depo(ye.ctx.localStorage).oku("C:/p/deneme.prproj");
+  var yeUyari = ye.toastlar.filter(function (t) { return typeof t.m === "string" && /^Yer açmak için en eski/.test(t.m); })[0];
+  ok("Tüm varışlar, evet: 45 varış yazılır, hak bir kez; en eski 35 kayıt atılır ve bildirimle söylenir (sessiz değil)",
+    ye.sorular.length === 1 && ye.cagri.filter(function (c) { return c.fn === "KS_easeBake"; }).length === 2 && js(ye.harcanan) === js(["curves"]) &&
+    yeSak.length === 300 && yeSak.filter(function (r) { return r.tur === "yaylan"; }).length === 45 && egriSayisi(ye) === 255 && !!yeUyari && yeUyari.t === "warn" &&
+    yeUyari.m === "Yer açmak için en eski 35 Suflo Geri al kaydı silindi; o anahtar kareler Premiere'de kalır ama Suflo onları artık geri alamaz.",
+    js([ye.sorular.length, yeSak.length, ye.toastlar.map(function (t) { return typeof t.m === "string" ? t.m : t.m.textContent; })]));
+  // tek varış (Eğri gibi en çok 40 kayıt): sorulmaz; yer yoksa en eskiler atılır ve bildirim söyler
+  var ys = yerKur(false, false, ikiProp(12.5), 299), ys2 = yerKur(false, false, ikiProp(12.5));
+  ys.ctx._tab.egri(); ys2.ctx._tab.egri(); await bekle(10);
+  await ys.G.yaylanUygula();
+  await ys2.G.yaylanUygula();
+  ok("tek varış (Eğri gibi en çok 40 kayıt): sorulmaz, yazılır; 299 + 2 kayıtta en eski 1 kayıt atılır ve bildirim söyler; 290 + 2 sığar, uyarı yok",
+    ys.sorular.length === 0 && ys.cagri.filter(function (c) { return c.fn === "KS_easeBake"; }).length === 1 && egriSayisi(ys) === 298 &&
+    ys.toastlar.some(function (t) { return t.m === "Yer açmak için en eski 1 Suflo Geri al kaydı silindi; o anahtar kareler Premiere'de kalır ama Suflo onları artık geri alamaz."; }) &&
+    ys2.sorular.length === 0 && egriSayisi(ys2) === 290 && !ys2.toastlar.some(function (t) { return typeof t.m === "string" && /^Yer açmak/.test(t.m); }),
+    js(ys.toastlar.map(function (t) { return typeof t.m === "string" ? t.m : ""; })));
+  var I18Nyer = require(path.join(KOK, "js", "i18n.js"));
+  I18Nyer.setDictionary(require(path.join(KOK, "i18n", "en.js")));
+  ok("İngilizce: yer sorusu, yazılmadı ve atılan kayıt bildirimi", /^This will write 45 follow-through records, but the project only has room for 10 more undo records \(curves and follow-through keep at most 300 per project\)\. If you go on, the 35 oldest/.test(I18Nyer.translate(yh.sorular[0])) &&
+    /^Nothing was written: there's no room for the undo records\./.test(I18Nyer.translate(yh.dom["egri-status"].textContent)) &&
+    I18Nyer.translate(yeUyari ? yeUyari.m : "") === "To make room, the 35 oldest Suflo undo records were deleted; those keyframes stay in Premiere, but Suflo can no longer undo them." &&
+    I18Nyer.translate(": " + "400'den çok anahtar kare var; Tüm varışlar'ı kapatıp varışlara tek tek uygula") === ": there are more than 400 keyframes; turn off Every landing and apply to the landings one at a time",
+    js([I18Nyer.translate(yh.sorular[0] || ""), I18Nyer.translate(yeUyari ? yeUyari.m : "")]));
   // satır rozeti + satırın Geri al'ı (kapısız); geri alırken aynı sekansın Eğri kayıtları da host'a gider (ucu yaylanmada olan kalkar)
   var yKay = { id: "kryay1", tur: "yaylan", seqId: "s1", nodeId: "nA", clipName: "Röportaj.mp4", clipStart: 10, matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0,
     uclar: null, times: [14.08, 14.24, 14.4], kenarDegerleri: [{ t: 14, v: 100 }], createdAt: 5000 };

@@ -684,6 +684,11 @@ window.KEgri = (function () {
     else e.textContent = msg || "";
   }
   function toast(msg, tur, sure, eylem) { if (window.KApp && KApp.toast) KApp.toast(msg, tur, sure, eylem); }
+  // Evet / hayır sorusu (Geçişler / Zoom'daki gibi window.confirm, arayüz dilinde); soramazsa hayır
+  function uiMetni(s) { return tr(s); }
+  function onayla(soru) {
+    try { return typeof window.confirm === "function" ? !!window.confirm(uiMetni(soru)) : false; } catch (e) { return false; }
+  }
 
   /* ---------------- yerel depo (bu görüntüleyicinin kolaylığı; her erişim korumalı) ---------------- */
   function depoOku(anahtar, varsayilan) {
@@ -731,7 +736,8 @@ window.KEgri = (function () {
     return liste.filter(function (r) { return r && (r.tur === "egri" || r.tur === "yaylan"); });
   }
   // yeni: host'un doğruladığı kayıtlar (çakışan eskilerin yerine geçer: Eğri aynı aralıkta, yaylanma aynı inişte);
-  // gecici: zaman aşımında planlanan zamanlar (yazıldığı bilinmez: eskiler atılmaz, Geri al yalnız canlıysa siler)
+  // gecici: zaman aşımında planlanan zamanlar (yazıldığı bilinmez: eskiler atılmaz, Geri al yalnız canlıysa siler).
+  // Döner: { ok (hepsi depoda), atilan (yer açmak için atılan eski kayıt: depo sınırı; kullanıcıya söylenir) }
   function kayitlariSakla(yeni, gecici) {
     gecici = gecici || [];
     var d = depo(), pr = proje(), eski = kayitlar(), at = {};
@@ -742,14 +748,25 @@ window.KEgri = (function () {
     });
     var atilacak = Object.keys(at);
     bellek = bellek.filter(function (r) { return !at[r.id]; });
-    var ok = false;
+    var ok = false, atilan = 0;
     try {
       if (d && atilacak.length) d.kaldir(pr, atilacak);
-      ok = !!(d && d.ekle(pr, hepsi).ok);
+      var s = d ? d.ekle(pr, hepsi) : null;
+      ok = !!(s && s.ok);
+      atilan = s && Number(s.atilan) > 0 ? Number(s.atilan) : 0;
     } catch (e) { ok = false; }
     if (!ok) hepsi.forEach(function (r) { bellek.push(r); });
     sonUygulanan = hepsi.map(function (r) { return r.id; });
-    return ok;
+    return { ok: ok, atilan: atilan };
+  }
+  // Saklama sonucunun uyarıları (Eğri ve yaylanma uygulaması): saklanamadı ya da yer açmak için eski kayıtlar atıldı
+  function saklamaUyarisi(sak) {
+    if (!sak.ok) toast("Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.", "warn", 9000);
+    if (sak.atilan) toast("Yer açmak için en eski " + sak.atilan + " Suflo Geri al kaydı silindi; o anahtar kareler Premiere'de kalır ama Suflo onları artık geri alamaz.", "warn", 12000);
+  }
+  // Projenin depodaki kayıtları (bellek hariç: yalnız depodakiler yer tutar)
+  function depodakiler() {
+    try { var d = depo(); return d ? d.oku(proje()) : []; } catch (e) { return []; }
   }
   function kayitlariSil(idler) {
     if (!idler.length) return;
@@ -1174,7 +1191,7 @@ window.KEgri = (function () {
         yazilan += Number(r.yazilan) || 0;
         basarili += Number(r.basarili) || 0;
       }
-      var saklandi = yeniKayitlar.length || gecici.length ? kayitlariSakla(yeniKayitlar, gecici) : true;
+      var sak = yeniKayitlar.length || gecici.length ? kayitlariSakla(yeniKayitlar, gecici) : { ok: true, atilan: 0 };
       if (!basarili) hataAt(atlanan.length ? ["Uygulanamadı: "].concat(atlamaParcalari(atlanan)) : ["Uygulanamadı."]);
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("curves", toast);   // deneme: yalnız başarıda, bir kez
       var mesaj = ["Eğri uygulandı: " + ozellik + " özellik · " + yazilan + " anahtar kare"];
@@ -1187,7 +1204,7 @@ window.KEgri = (function () {
       toast(dugum(mesaj), uyari ? "warn" : "good", 9000, { metin: "Geri al", fn: function () {
         geriAl(kayitlar().filter(function (k) { return buIdler.indexOf(k.id) !== -1; }), "son");
       } });
-      if (!saklandi) toast("Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.", "warn", 9000);
+      saklamaUyarisi(sak);
     } catch (e) {
       durum(e && e.parcalar ? ["✕ "].concat(e.parcalar) : "✕ " + (e && e.message ? e.message : String(e)), "bad");
     } finally {
@@ -1272,6 +1289,16 @@ window.KEgri = (function () {
         return { prop: s.prop, varis: M.varislar(s.prop, kl, { ph: ph, tum: ayar.tum }) };
       }), ayar, tar.seqId);
       var atlanan = plan.atlanan.slice();
+      // Geri al kayıtları projede Eğri ile ortak en çok 300 (fazlası en eskilerden atılır). Tüm varışlar (sınırsız varış) boş
+      // yerden çok kayıt yazacaksa önce sorulur: önceki eğri ve yaylanmaların Geri al'ı sessizce gitmesin (3.4 adım 14 inceleme).
+      // Tek varış Eğri gibi bir uygulamada en çok 40 kayıt yazar; atılan olursa bildirim söyler (saklamaUyarisi)
+      var yer = M.yaylanYeri(plan, depodakiler(), KR.PROJE_SINIR);
+      if (ayar.tum && yer.atilacak > 0 && !onayla("Bu uygulama " + yer.yeni + " yaylanma kaydı yazacak; projede Geri al için " + yer.yer +
+        " kayıtlık yer kaldı (Eğri ve yaylanma kayıtları proje başına en çok " + KR.PROJE_SINIR + "). Sürdürürsen en eski " + yer.atilacak +
+        " Eğri / yaylanma kaydı silinir: o anahtar kareler Premiere'de kalır ama Suflo onları artık geri alamaz. Sürdürülsün mü?")) {
+        durum("Hiçbir şey yazılmadı: Geri al kayıtlarına yer yok. Daha az satır işaretle ya da varışlara tek tek uygula.", "warn");
+        return;
+      }
       var yeniKayitlar = [], gecici = [], eksik = [], yazilan = 0, varisSayi = 0, yogun = 0;
       for (var g = 0; g < plan.gruplar.length; g++) {
         var grup = plan.gruplar[g];
@@ -1296,7 +1323,7 @@ window.KEgri = (function () {
       }
       atlanan = tekil(atlanan);
       eksik = tekil(eksik);
-      var saklandi = yeniKayitlar.length || gecici.length ? kayitlariSakla(yeniKayitlar, gecici) : true;
+      var sak = yeniKayitlar.length || gecici.length ? kayitlariSakla(yeniKayitlar, gecici) : { ok: true, atilan: 0 };
       if (!varisSayi) hataAt(atlanan.length ? ["Yaylanma uygulanamadı: "].concat(atlamaParcalari(atlanan)) : ["Yaylanma uygulanamadı."]);
       if (typeof Pro !== "undefined" && Pro.denemeHarca) Pro.denemeHarca("curves", toast);   // deneme: yalnız başarıda, bir kez
       var mesaj = ["Varışta yaylanma uygulandı: " + varisSayi + " varış · " + yazilan + " anahtar kare"];
@@ -1309,7 +1336,7 @@ window.KEgri = (function () {
       toast(dugum(mesaj), uyari ? "warn" : "good", 9000, { metin: "Geri al", fn: function () {
         geriAl(kayitlar().filter(function (k) { return buIdler.indexOf(k.id) !== -1; }), "son");
       } });
-      if (!saklandi) toast("Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.", "warn", 9000);
+      saklamaUyarisi(sak);
     } catch (e) {
       durum(e && e.parcalar ? ["✕ "].concat(e.parcalar) : "✕ " + (e && e.message ? e.message : String(e)), "bad");
     } finally {

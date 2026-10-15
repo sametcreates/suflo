@@ -282,9 +282,45 @@ ok("klip başına ret kodları satırda nedeniyle (genel 'uygulanamadı' değil)
   var py = satir(yk, yd);
   ok("canlı yaylanmalar: iniş zamanı kenarDegerleri[0]'dan; anahtar indisleri", M.varisZamani(yKayit) === 12 && M.canliYaylanlar([yKayit], py).length === 1 &&
     js(M.canliYaylanlar([yKayit], py)[0].idx) === js([2, 3, 4, 5, 6]) && isNaN(M.varisZamani({})));
-  var ic1 = M.varislar(py, [yKayit], { ph: 12.3 });
-  ok("varış (tek): playhead yaylanmanın penceresinde → o iniş yeniden uygulanır (eski = kayıt, sonraki = 15)", ic1.varislar.length === 1 && ic1.varislar[0].tL === 12 &&
-    ic1.varislar[0].eski && ic1.varislar[0].eski.id === yKayit.id && ic1.varislar[0].tN === 15 && js(ic1.varislar[0].hiz) === js([500, 0]), js(ic1));
+  // 3.4 adım 14 inceleme 3: tek varışın inişi kullanıcının anahtarlarından (yaylanma anahtarları çıkarılmış çift). Aynı inişin
+  // yaylanması playhead o inişe gelen aralıktayken (11 → 12) yeniden uygulanır; pencerenin içi (12 → 12,8) kullanıcının sonraki
+  // çiftini (12 → 15) hedefler: 15'e hareket gelmiyor → varisYok, 12'nin yaylanmasına dokunulmaz
+  var ic1 = M.varislar(py, [yKayit], { ph: 11.5 });
+  var icPen = M.varislar(py, [yKayit], { ph: 12.3 });
+  ok("varış (tek): inişe gelen aralıkta (11,5) o inişin yaylanması yeniden uygulanır (eski = kayıt, sonraki = 15); pencerenin içi (12,3) çifti 12 → 15 hedefler",
+    ic1.varislar.length === 1 && ic1.varislar[0].tL === 12 && ic1.varislar[0].eski && ic1.varislar[0].eski.id === yKayit.id && ic1.varislar[0].tN === 15 &&
+    js(ic1.varislar[0].hiz) === js([500, 0]) && icPen.varislar.length === 0 && icPen.kod === "varisYok", js([ic1, icPen]));
+  // son kullanıcı anahtarının yaylanma penceresi (sonrasında çift yok): o iniş yeniden uygulanır
+  var pySon = satir(yk.slice(0, 7), yd.slice(0, 7));
+  var icSon = M.varislar(pySon, [yKayit], { ph: 12.3 });
+  ok("varış (tek): son anahtarın yaylanma penceresinde (sonrasında anahtar yok) o iniş yeniden uygulanır; sınır klibin sonu",
+    icSon.varislar.length === 1 && icSon.varislar[0].tL === 12 && icSon.varislar[0].eski && icSon.varislar[0].eski.id === yKayit.id &&
+    icSon.varislar[0].tN === null && icSon.varislar[0].sinir === 20 && M.yaylanSatirKaydi([yKayit], pySon, 12.3).id === yKayit.id, js(icSon));
+  // İnceleme 3 (bulgu): L1'in yaylanması K2'de kısaldı (L1 → K2 oturma süresinden kısa). Playhead L1 → K2 arasındayken (pencerenin
+  // içi dahil) Varışta yaylan K2'yi hedefler (eskiden L1'i yeniden yazıyordu, K2 tek varışta hiç seçilemiyordu)
+  var donS = function (keys, vals) {
+    return satir(keys, vals, { tur: "sayi", propIdx: 4, matchName: "AE.ADBE Motion/Rotation", label: "Döndürme", clipStart: 0, clipEnd: 10, clipIn: 0, clipOut: 10 });
+  };
+  var d0 = donS([0, 1, 1.52, 3], [0, 100, 0, 0]);
+  var dv0 = M.varislar(d0, [], { ph: 0.5 });
+  var dIt = M.yaylanGruplari([{ prop: d0, varis: dv0 }], {}, "s1").gruplar[0].items[0];
+  var dKay = KR.kayit({ id: "krdon1", tur: "yaylan", seqId: "s1", nodeId: "nA", clipName: "A.mp4", clipStart: 0, clipEnd: 10, clipIn: 0, clipOut: 10, compIdx: 0, propIdx: 4,
+    matchName: "AE.ADBE Motion/Rotation", uclar: null, times: dIt.keys.map(function (k2) { return k2.t; }), kenarDegerleri: [{ t: 1, v: 100 }] });
+  var d1 = donS([0, 1].concat(dKay.times).concat([1.52, 3]), [0, 100].concat(dIt.keys.map(function (k2) { return k2.v; })).concat([0, 0]));
+  var dHedef = [1, 1.04, 1.2, 1.4, dKay.times[dKay.times.length - 1], 1.49].map(function (ph2) { return M.varislar(d1, [dKay], { ph: ph2 }); });
+  var dYeniden = M.varislar(d1, [dKay], { ph: 0.5 });
+  ok("varış (tek): kısalmış yaylanma penceresinin içi (1,00–1,49) sonraki anahtarı (K2 = 1,52) hedefler; önceki anahtar L1, eski yok; L1'e yeniden uygulamak A → L1 aralığından",
+    dKay.times[dKay.times.length - 1] < 1.52 && dKay.times[dKay.times.length - 1] > 1.4 &&
+    dHedef.every(function (v2) { return v2.varislar.length === 1 && v2.varislar[0].tL === 1.52 && v2.varislar[0].tP === 1 && v2.varislar[0].eski === null &&
+      yakin(v2.varislar[0].hiz, -100 / 0.52, 1e-9) && v2.varislar[0].tN === 3; }) &&
+    dYeniden.varislar.length === 1 && dYeniden.varislar[0].tL === 1 && dYeniden.varislar[0].eski.id === "krdon1" && M.varislar(d1, [dKay], { ph: 1.52 }).kod === "varisYok" &&
+    M.yaylanSatirKaydi([dKay], d1, 1.2).id === "krdon1" && M.yaylanSatirKaydi([dKay], d1, 0.5).id === "krdon1" && M.yaylanSatirKaydi([dKay], d1, 2) === null,
+    js(dHedef.map(function (v2) { return [v2.kod, v2.varislar.map(function (x) { return [x.tL, x.tP, x.eski && x.eski.id]; })]; })));
+  // K2'ye yazılan yaylanmanın grubu: t0 = K2, sonraki anahtar K3; L1'in kaydına dokunulmaz (degistir yok)
+  var dG = M.yaylanGruplari([{ prop: d1, varis: dHedef[2] }], {}, "s1");
+  ok("yaylan grupları: K2'nin yaylanması K2'den sonra, K3'ten önce; L1'in yaylanması değişmez", dG.gruplar.length === 1 && dG.gruplar[0].items[0].t0 === 1.52 &&
+    dG.gruplar[0].items[0].t1 === 3 && dG.gruplar[0].items[0].degistir === false && dG.gruplar[0].items[0].keys.every(function (k2) { return k2.t > 1.52 && k2.t < 3; }),
+    js(dG.gruplar[0] && dG.gruplar[0].items[0]).slice(0, 200));
   var inissiz = satir(yk.filter(function (t) { return t !== 12; }), yd.filter(function (v, i) { return yk[i] !== 12; }));
   var vInissiz = M.varislar(inissiz, [yKayit], { ph: 12.3 });
   ok("varış (tek): iniş anahtarı silinmiş, playhead yaylanmanın penceresinde → 'inisYok' (kendi anahtarlarının üstüne yazılmaz), satır Geri al'ı yine bulur",
@@ -374,7 +410,8 @@ ok("klip başına ret kodları satırda nedeniyle (genel 'uygulanamadı' değil)
   var ykE = [11, 12, 12.08, 12.12, 12.16, 12.2, 12.24, 12.4, 12.56, 12.8, 15];
   var ydE = [[0, 0], [500, 0], [530, 0], [520, 0], [505, 0], [495, 0], [488, 0], [504, 0], [498, 0], [500, 0], [500, 0]];
   var pE = satir(ykE, ydE);
-  var vE = M.varislar(pE, [yKayit, egriYay], { ph: 12.3 }), vEt = M.varislar(pE, [yKayit, egriYay], { tum: true });
+  // (tek varışta 12'ye yeniden uygulamak için playhead 11 → 12 aralığında; pencerenin içi sonraki çifti hedefler)
+  var vE = M.varislar(pE, [yKayit, egriYay], { ph: 11.5 }), vEt = M.varislar(pE, [yKayit, egriYay], { tum: true });
   ok("varış: değişecek yaylanmanın anahtarlarına Eğri uygulanmışsa 'egriVar' (tek ve tüm varışlar; sessiz değil), metin Geri al'ı söyler",
     vE.varislar.length === 0 && vE.kod === "egriVar" && vEt.varislar.length === 0 && js(vEt.atlanan) === js(["egriVar"]) && /Geri al/.test(M.nedenMetni("egriVar")),
     js([vE, vEt]));
@@ -408,6 +445,41 @@ ok("klip başına ret kodları satırda nedeniyle (genel 'uygulanamadı' değil)
     !M.yaylanUygun(bulanik, 11.5, [], false) && M.yaylanUygun(almanca, 0, [], true) && M.varislar(bulanik, [], { tum: true }).kod === "ozellikDisi" &&
     M.yaylanGruplari([{ prop: bulanik, varis: M.varislar(bulanik, [], { ph: 11.5 }) }], {}, "s1").atlanan[0].kod === "ozellikDisi" && /Opaklık/.test(M.nedenMetni("ozellikDisi")));
   ok("yaylan grupları: varış yoksa satır nedeniyle atlanır", M.yaylanGruplari([{ prop: p, varis: M.varislar(p, [], { ph: 9 }) }], {}, "s1").atlanan[0].kod === "disinda");
+  // İnceleme 3 (bulgu): 400'den çok anahtarlı satırda tarama yalnız playhead çevresindeki pencereyi verir; pencerenin kenarına taşan
+  // yaylanmalar canlı görünmez, tepeleri iniş sanılırdı (Suflo'nun anahtarları arasına iç içe yaylanma). Tüm varışlar o satıra yazmaz
+  // ('kesik', nedeni söylenir); tek varış (pencere playhead'in çiftinde ortalanır) yine çalışır
+  var uzK = [], uzD = [];
+  for (var u1 = 1; u1 <= 40; u1++) { uzK.push(u1); uzD.push([u1 % 2 ? 0.2 : 0.8, 0.5]); }
+  var uz0 = satir(uzK, uzD, { fps: 60, clipStart: 0, clipEnd: 41, clipIn: 0, clipOut: 41 });
+  var uzG = M.yaylanGruplari([{ prop: uz0, varis: M.varislar(uz0, [], { tum: true }) }], { frekans: 6, sonum: 2, tum: true }, "s1");
+  var uzKay = [], uzHep = uzK.map(function (t2, i2) { return { t: t2, v: uzD[i2] }; });
+  uzG.gruplar.forEach(function (g2) { g2.items.forEach(function (it2) {
+    uzKay.push(KR.kayit({ id: "kruz" + uzKay.length, tur: "yaylan", seqId: "s1", nodeId: "nA", clipName: "A.mp4", clipStart: 0, clipEnd: 41, clipIn: 0, clipOut: 41,
+      compIdx: 0, propIdx: 0, matchName: "AE.ADBE Motion/Position", uclar: null, times: it2.keys.map(function (k2) { return k2.t; }), kenarDegerleri: [{ t: it2.t0, v: it2.v0 }] }));
+    it2.keys.forEach(function (k2) { uzHep.push(k2); });
+  }); });
+  uzHep.sort(function (a2, b2) { return a2.t - b2.t; });
+  var uzI = 0;
+  while (uzI < uzHep.length - 2 && uzHep[uzI + 1].t <= 20.5) uzI++;
+  var uzBas = Math.max(0, Math.min(uzHep.length - 400, uzI - 200)), uzPen = uzHep.slice(uzBas, uzBas + 400);
+  var uzW = satir(uzPen.map(function (x2) { return x2.t; }), uzPen.map(function (x2) { return x2.v; }), { fps: 60, clipStart: 0, clipEnd: 41, clipIn: 0, clipOut: 41, kesik: true, toplam: uzHep.length });
+  var uzTum = M.varislar(uzW, uzKay, { tum: true, ph: 20.5 });
+  var uzGr = M.yaylanGruplari([{ prop: uzW, varis: uzTum }], { tum: true }, "s1");
+  var uzTek = M.varislar(uzW, uzKay, { ph: 20.5 });
+  ok("tüm varışlar: 400'den çok anahtarlı (kesik) satır yazılmaz ('kesik', metinli); tek varış pencerede çalışır (iniş kullanıcının 21'i)",
+    uzHep.length > 400 && uzTum.varislar.length === 0 && uzTum.kod === "kesik" && uzGr.gruplar.length === 0 && js(uzGr.atlanan.map(function (x2) { return x2.kod; })) === js(["kesik"]) &&
+    /400/.test(M.nedenMetni("kesik")) && /Tüm varışlar/.test(M.nedenMetni("kesik")) && uzTek.varislar.length === 1 && uzTek.varislar[0].tL === 21 && uzTek.varislar[0].tP === 20 &&
+    M.varislar(satir(uzK, uzD, { fps: 60, clipStart: 0, clipEnd: 41 }), [], { tum: true }).varislar.length > 0,
+    js([uzHep.length, uzTum.kod, uzTek.kod, uzTek.varislar.map(function (x2) { return [x2.tL, x2.tP]; })]));
+  // İnceleme 3 (bulgu): Geri al kayıtlarının yeri (Eğri ile ortak sınıf, proje başına 300): yazılacak kayıt, yerine geçilen eski kayıt yer açar
+  var dep = [];
+  for (var dq = 0; dq < 290; dq++) dep.push({ id: "kreg" + dq, tur: dq % 2 ? "egri" : "yaylan" });
+  dep.push({ id: "krzoom1", tur: "zoom" });
+  var yerPlan = { gruplar: [{ items: new Array(45), satirlar: [{ varis: { eski: { id: "kreg0" } } }, { varis: { eski: null } }] }, { items: new Array(5), satirlar: [] }] };
+  var yr1 = M.yaylanYeri(yerPlan, dep, 300), yr2 = M.yaylanYeri({ gruplar: [{ items: [1, 2], satirlar: [] }] }, dep, 300), yr3 = M.yaylanYeri(yerPlan, [], 300);
+  ok("yaylan yeri: 289 Eğri / yaylanma kaydı (+1 yerine geçen, araç kaydı sayılmaz) ve 50 yeni → 11 yer, 39 atılacak; 2 yeni sığar; boş projede atılan yok",
+    yr1.yeni === 50 && yr1.yer === 11 && yr1.atilacak === 39 && yr2.yer === 10 && yr2.atilacak === 0 && yr3.atilacak === 0 && yr3.yer === 300 &&
+    M.yaylanYeri(null, null).atilacak === 0 && M.yaylanYeri({ gruplar: [{ items: new Array(301), satirlar: [] }] }, []).atilacak === 1, js([yr1, yr2, yr3]));
   var gec = M.yaylanGeciciKayitlar(g.gruplar[0], "s1");
   g.gruplar[0].satirlar[0].bezier = false;
   var gecY = M.yaylanGeciciKayitlar(g.gruplar[0], "s1");

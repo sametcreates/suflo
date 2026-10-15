@@ -366,15 +366,41 @@
   // Playhead bu kaydın penceresinde mi: [iniş, son anahtar]
   function yaylanPencerede(y, ph, tol) { return sonlu(ph) && ph >= y.tL - tol && ph <= y.son + tol; }
   /*
+   * Suflo'nun yaylanma anahtarlarının indisleri ({ i: 1 }): canlı yaylanmaların anahtarları ve bir yaylanma penceresinin içine
+   * (iki yaylanma anahtarı arasına) uygulanmış Eğri'nin iç anahtarları. Bunlar iniş, önceki ve sonraki anahtar sayılmaz.
+   */
+  function yaylanHaric(keys, canliY, egriUclari, tol) {
+    var haric = {};
+    canliY.forEach(function (y) { y.idx.forEach(function (i) { haric[i] = 1; }); });
+    egriUclari.forEach(function (u) {
+      if (!(haric[indis(keys, u[0], tol)] || haric[indis(keys, u[1], tol)])) return;
+      keys.forEach(function (t, i) { if (t > u[0] + tol && t < u[1] - tol) haric[i] = 1; });
+    });
+    return haric;
+  }
+  /*
+   * Tek varışın inişi (keys'teki indis ya da -1): kullanıcının anahtarlarında (yaylanma anahtarları çıkarılmış) playhead'i saran
+   * çiftin ikinci ucu; canlı Eğri çifti bölmez. Bir yaylanmanın penceresi sonraki anahtarda kısaldıysa (iniş → sonraki anahtar
+   * oturma süresinden kısa) pencerenin içi de o sonraki anahtarı hedefler (3.4 adım 14 inceleme: yoksa o anahtar hiç seçilemezdi).
+   */
+  function kullaniciInisi(keys, haric, ph, fps, egriUclari) {
+    var harita = [], kk = [];
+    keys.forEach(function (t, i) { if (!haric[i]) { harita.push(i); kk.push(t); } });
+    var c = ciftBul(kk, ph, fps, egriUclari);
+    return c ? harita[c.i1] : -1;
+  }
+  /*
    * Satırın playhead'deki yaylanma kaydı (satır rozeti ve satırın Geri al'ı): playhead kaydın penceresindeyse ya da
-   * kaydın inişi playhead'i saran çiftin ikinci ucuysa (Varışta yaylan'ın o satırda hedefleyeceği iniş). Yoksa null.
+   * kaydın inişi Varışta yaylan'ın o satırda hedefleyeceği iniş ise (kullanıcının anahtarlarında playhead'i saran çiftin
+   * ikinci ucu). Yoksa null.
    */
   function yaylanSatirKaydi(kayitlar, prop, ph) {
-    var tol = tolerans(prop && prop.fps), liste = canliYaylanlar(kayitlar, prop);
+    var keys = (prop && prop.keys) || [], fps = prop && prop.fps, tol = tolerans(fps), liste = canliYaylanlar(kayitlar, prop);
     for (var i = liste.length - 1; i >= 0; i--) if (yaylanPencerede(liste[i], Number(ph), tol)) return liste[i].r;
-    var c = ciftBul(prop && prop.keys, ph, prop && prop.fps, uclarDan(canliKayitlar(kayitlar, prop)));
-    if (!c) return null;
-    for (var j = liste.length - 1; j >= 0; j--) if (Math.abs(liste[j].tL - c.t1) <= tol) return liste[j].r;
+    var egriUclari = uclarDan(canliKayitlar(kayitlar, prop));
+    var iL = kullaniciInisi(keys, yaylanHaric(keys, liste, egriUclari, tol), Number(ph), fps, egriUclari);
+    if (iL < 0) return null;
+    for (var j = liste.length - 1; j >= 0; j--) if (Math.abs(liste[j].tL - keys[iL]) <= tol) return liste[j].r;
     return null;
   }
   /*
@@ -418,11 +444,16 @@
   /*
    * Satırın varışları (iniş anahtar kareleri). prop: tarama satırı; prop.degerler (keys ile hizalı değerler,
    * KS_easeScan degerIste) gerekir. o: { tum, ph }.
-   *   Tek varış (varsayılan): playhead canlı bir yaylanmanın penceresindeyse onun inişi (yeniden uygulanır); değilse
-   *   playhead'i saran çiftin ikinci ucu (canlı Eğri kaydı çifti bölmez). Yalnız o inişin eski yaylanması değişir.
+   *   Tek varış (varsayılan): kullanıcının anahtarlarında (yaylanma anahtarları sayılmaz) playhead'i saran çiftin ikinci ucu
+   *   (canlı Eğri kaydı çifti bölmez; kullaniciInisi). Bir inişin yaylanmasını yeniden uygulamak için playhead o inişe gelen
+   *   aralıktadır; yaylanma penceresinin içi sonraki anahtarı hedefler. Yalnız playhead son kullanıcı anahtarının yaylanma
+   *   penceresindeyse (sonrasında çift yok) o iniş yeniden uygulanır. Yalnız o inişin eski yaylanması değişir.
    *   Tüm varışlar: hareketin durduğu ya da döndüğü her anahtar; canlı Eğri'nin iç anahtarları iniş sayılmaz, tüm canlı
    *   yaylanmalar değişir. Hareketin aynı yönde sürdüğü ara anahtarda (çıkış hızı varışın en az dörtte biri, aynı yönde)
-   *   o boyut yaylanmaz; hiçbir boyut kalmazsa anahtar sessizce geçilir ('devam'), beklemeler gibi.
+   *   o boyut yaylanmaz; hiçbir boyut kalmazsa anahtar sessizce geçilir ('devam'), beklemeler gibi. 400'den çok anahtarlı
+   *   satırda (prop.kesik: tarama yalnız playhead çevresindeki pencereyi verir) yazılmaz ('kesik'): pencerenin kenarına taşan
+   *   yaylanmalar canlı görünmez, tepeleri iniş sanılıp Suflo'nun anahtarları arasına yaylanma yazılır, pencere dışındaki
+   *   inişler de sessizce eski ayarda kalırdı.
    * Her iki kipte canlı yaylanmaların anahtarları önceki / sonraki anahtar sayılmaz: varış hızı ve sınır kullanıcının
    * anahtarlarından ölçülür (bir yaylanmanın son anahtarının kalıntısı sonraki inişe sahte hız vermez).
    * Varış hızı önceki anahtardan (Δv/Δt, boyut başına): önceki anahtar Suflo'nun sık Eğri anahtarıysa bu, hemen önce
@@ -433,8 +464,8 @@
    * Döner: { varislar: [{ iL, tL, vL, tP, vP, tN, vN, sinir, hiz, eski (değişecek kayıt | null) }], kod, atlanan: [kod] }
    *   kod (hiç varış yoksa): 'ozellikDisi' (Konum / Ölçek / Döndürme / Opaklık değil) | 'degerYok' | 'disinda' |
    *   'varisYok' (iniş anahtarına hareket gelmiyor) | 'klipDisi' | 'devam' (hareket sürüyor) | 'egriVar' |
-   *   'inisYok' (playhead bir yaylanmanın penceresinde ama iniş anahtarı silinmiş). Tüm varışlarda sessiz geçilenlerden
-   *   en anlamlısı kod olur (klipDisi > devam > varisYok).
+   *   'inisYok' (playhead bir yaylanmanın penceresinde ama iniş anahtarı silinmiş) | 'kesik' (Tüm varışlar, 400'den çok
+   *   anahtar). Tüm varışlarda sessiz geçilenlerden en anlamlısı kod olur (klipDisi > devam > varisYok).
    */
   var DEVAM_ORAN = 0.25;
   function varislar(prop, kayitlar, o) {
@@ -443,20 +474,17 @@
     var sonuc = { varislar: [], kod: "", atlanan: [] };
     if (!yaylanTuru(prop)) { sonuc.kod = "ozellikDisi"; return sonuc; }
     if (keys.length < 2) { sonuc.kod = "disinda"; return sonuc; }
-    if (!Array.isArray(vals) || vals.length !== keys.length) { sonuc.kod = "degerYok"; return sonuc; }
     var ph = Number(o.ph), tum = o.tum === true;
+    // Tüm varışlar pencereyle (400'den çok anahtar) planlanmaz: bkz. yukarı
+    if (tum && prop.kesik) { sonuc.kod = "kesik"; return sonuc; }
+    if (!Array.isArray(vals) || vals.length !== keys.length) { sonuc.kod = "degerYok"; return sonuc; }
     var canliY = canliYaylanlar(kayitlar, prop);
     var egriUclari = uclarDan(canliKayitlar(kayitlar, prop));
     var egriIc = {};
     egriUclari.forEach(function (u) { keys.forEach(function (t, i) { if (t > u[0] + tol && t < u[1] - tol) egriIc[i] = 1; }); });
-    // tüm canlı yaylanmaların anahtarları: iniş, önceki ve sonraki anahtar sayılmaz (iki kipte de)
-    var haric = {};
-    canliY.forEach(function (y) { y.idx.forEach(function (i) { haric[i] = 1; }); });
-    // bir yaylanma penceresinin içine (iki yaylanma anahtarı arasına) uygulanmış Eğri'nin iç anahtarları da öyle
-    egriUclari.forEach(function (u) {
-      if (!(haric[indis(keys, u[0], tol)] || haric[indis(keys, u[1], tol)])) return;
-      keys.forEach(function (t, i) { if (t > u[0] + tol && t < u[1] - tol) haric[i] = 1; });
-    });
+    // tüm canlı yaylanmaların anahtarları (ve içlerine uygulanmış Eğri'nin iç anahtarları): iniş, önceki ve sonraki anahtar
+    // sayılmaz (iki kipte de)
+    var haric = yaylanHaric(keys, canliY, egriUclari, tol);
     var degisen = [], adaylar = [];
     if (tum) {
       degisen = canliY;
@@ -464,15 +492,11 @@
     } else {
       var pen = null;
       for (var a = canliY.length - 1; a >= 0 && !pen; a--) if (yaylanPencerede(canliY[a], ph, tol)) pen = canliY[a];
-      var iL = -1;
-      if (pen) {
-        iL = indis(keys, pen.tL, tol);
-        // iniş anahtarı silinmiş, yaylanma anahtarları duruyor: kendi anahtarlarının üstüne yaylanma yazılmaz
-        if (iL < 0) { sonuc.kod = "inisYok"; return sonuc; }
-      } else {
-        var c = ciftBul(keys, ph, fps, egriUclari);
-        if (c) iL = c.i1;
-      }
+      // iniş anahtarı silinmiş, yaylanma anahtarları duruyor (playhead onun penceresinde): kendi anahtarlarının üstüne yazılmaz
+      if (pen && indis(keys, pen.tL, tol) < 0) { sonuc.kod = "inisYok"; return sonuc; }
+      var iL = kullaniciInisi(keys, haric, ph, fps, egriUclari);
+      // son kullanıcı anahtarının yaylanma penceresi (sonrasında çift yok): o iniş yeniden uygulanır
+      if (iL < 0 && pen) iL = indis(keys, pen.tL, tol);
       if (iL < 0) { sonuc.kod = "disinda"; return sonuc; }
       // iniş bir yaylanmanın kendi anahtarı olamaz (ör. playhead son yaylanma anahtarının üstünde)
       if (haric[iL]) { sonuc.kod = "disinda"; return sonuc; }
@@ -597,6 +621,27 @@
       if (c) { r.clipEnd = c.clipEnd; r.clipIn = c.clipIn; r.clipOut = c.clipOut; r.ters = c.ters; }
       return r;
     }).filter(function (r) { return r.times.length > 0; });
+  }
+  /*
+   * Geri al kayıtlarının yeri (3.4 adım 14 inceleme). Eğri ve yaylanma kayıtları projede aynı sınıfta en çok `sinir`
+   * (SufloKeyRecords.PROJE_SINIR, 300) tutulur; fazlası en eskilerden atılır (o anahtar kareler Premiere'de kalır ama Suflo
+   * onları artık geri alamaz, Tüm varışlar da onları kullanıcı anahtarı sanabilir). plan: yaylanGruplari sonucu (her öğe bir
+   * kayıt; aynı inişteki eski kayıt yerine geçer, yer açar); depodaki: projenin depodaki kayıtları.
+   * Döner: { yeni (yazılacak kayıt), yer (sınıfta kalan yer, yerine geçilenler dahil), atilacak (sığmayan: atılacak en eskiler) }.
+   */
+  function yaylanYeri(plan, depodaki, sinir) {
+    var s = sonlu(sinir) && sinir > 0 ? sinir : (KR && KR.PROJE_SINIR) || 300;
+    var yeni = 0, cikan = {};
+    ((plan && plan.gruplar) || []).forEach(function (g) {
+      yeni += (g.items || []).length;
+      (g.satirlar || []).forEach(function (st) { var e = st && st.varis && st.varis.eski; if (e && e.id) cikan[e.id] = 1; });
+    });
+    var dolu = 0;
+    (Array.isArray(depodaki) ? depodaki : []).forEach(function (r) {
+      if (r && (r.tur === "egri" || r.tur === "yaylan") && !cikan[r.id]) dolu++;
+    });
+    var yer = Math.max(0, s - dolu);
+    return { yeni: yeni, yer: yer, atilacak: Math.max(0, yeni - yer) };
   }
   // Yeni yaylanma kaydıyla aynı inişteki eskiler (aynı satır; inişler kaynak çapasıyla ya da klip başlangıcıyla
   // karşılaştırılır): yeni yaylanma onların yerine geçer
@@ -922,7 +967,8 @@
     ozellikDisi: "yalnız Konum, Ölçek, Döndürme ve Opaklık yaylanır",
     devam: "hareket bu anahtar karede durmuyor, sürüyor",
     egriVar: "bu yaylanmanın anahtar karelerine Suflo eğrisi uygulanmış; önce o eğriyi Geri al ile kaldır",
-    sinir: "iniş değeri sınırda (Opaklık 0 ya da 100, Ölçek 0); aşım sığmıyor"
+    sinir: "iniş değeri sınırda (Opaklık 0 ya da 100, Ölçek 0); aşım sığmıyor",
+    kesik: "400'den çok anahtar kare var; Tüm varışlar'ı kapatıp varışlara tek tek uygula"
   };
   var HATA = {
     sekansYok: "Aktif sekans yok. Bir sekans aç.",
@@ -944,7 +990,7 @@
     bakeGruplari: bakeGruplari, geciciKayitlar: geciciKayitlar, bakeSuresi: bakeSuresi, sonrakiCift: sonrakiCift, onizlemeAdimlari: onizlemeAdimlari,
     yaylanAyar: yaylanAyar, yaylanSure: yaylanSure, varisZamani: varisZamani, canliYaylanlar: canliYaylanlar, yaylanSatirKaydi: yaylanSatirKaydi,
     yaylanUygun: yaylanUygun, varislar: varislar, yaylanGruplari: yaylanGruplari, yaylanGeciciKayitlar: yaylanGeciciKayitlar,
-    yaylanCakisanlar: yaylanCakisanlar, yaylanOnizleme: yaylanOnizleme, yaylanTuru: yaylanTuru, yaylanSiniri: yaylanSiniri, yaylanAlaninda: yaylanAlaninda,
+    yaylanCakisanlar: yaylanCakisanlar, yaylanYeri: yaylanYeri, yaylanOnizleme: yaylanOnizleme, yaylanTuru: yaylanTuru, yaylanSiniri: yaylanSiniri, yaylanAlaninda: yaylanAlaninda,
     kisayol: kisayol, metinAlani: metinAlani, tusIlgisi: tusIlgisi,
     onayarlar: onayarlar, onayarEkle: onayarEkle, onayarSil: onayarSil, onayarAdi: onayarAdi,
     ekranX: ekranX, ekranY: ekranY, egriX: egriX, egriY: egriY, yapis: yapis,

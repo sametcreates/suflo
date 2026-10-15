@@ -2757,6 +2757,7 @@
     "bu yaylanmanın anahtar karelerine Suflo eğrisi uygulanmış; önce o eğriyi Geri al ile kaldır":
       "a Suflo curve was applied on this follow-through's keyframes; remove that curve with Undo first",
     "iniş değeri sınırda (Opaklık 0 ya da 100, Ölçek 0); aşım sığmıyor": "the landing value is at its limit (Opacity 0 or 100, Scale 0); there's no room to overshoot",
+    "400'den çok anahtar kare var; Tüm varışlar'ı kapatıp varışlara tek tek uygula": "there are more than 400 keyframes; turn off Every landing and apply to the landings one at a time",
     // host codes (js/egri-model.js HATA)
     "Aktif sekans yok. Bir sekans aç.": "No active sequence. Open a sequence.",
     "Eğri başka bir sekans için hazırlanmıştı. Liste yenilendi; yeniden dene.": "The curve was prepared for another sequence. The list was refreshed; try again.",
@@ -2788,6 +2789,12 @@
     "Eğri uygulandı: {n} özellik · {n} anahtar kare": "Curve applied: {} properties · {} keyframes",
     "atlanan": "skipped",
     "Geri al kaydı bu bilgisayarda saklanamadı; Geri al yalnız panel açıkken çalışır.": "The undo record couldn't be saved on this computer; Undo only works while the panel stays open.",
+    "Yer açmak için en eski {n} Suflo Geri al kaydı silindi; o anahtar kareler Premiere'de kalır ama Suflo onları artık geri alamaz.":
+      "To make room, the {} oldest Suflo undo records were deleted; those keyframes stay in Premiere, but Suflo can no longer undo them.",
+    "Bu uygulama {n} yaylanma kaydı yazacak; projede Geri al için {n} kayıtlık yer kaldı (Eğri ve yaylanma kayıtları proje başına en çok {n}). Sürdürürsen en eski {n} Eğri / yaylanma kaydı silinir: o anahtar kareler Premiere'de kalır ama Suflo onları artık geri alamaz. Sürdürülsün mü?":
+      "This will write {} follow-through records, but the project only has room for {} more undo records (curves and follow-through keep at most {} per project). If you go on, the {} oldest curve / follow-through records are deleted: those keyframes stay in Premiere, but Suflo can no longer undo them. Go on?",
+    "Hiçbir şey yazılmadı: Geri al kayıtlarına yer yok. Daha az satır işaretle ya da varışlara tek tek uygula.":
+      "Nothing was written: there's no room for the undo records. Tick fewer rows or apply to the landings one at a time.",
     "Bu sekansta geri alınacak Suflo eğrisi yok.": "No Suflo curve to undo in this sequence.",
     "Geri alınacak Suflo eğrisi yok.": "No Suflo curve to undo.",
     "Geri alınıyor…": "Undoing…",

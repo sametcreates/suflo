@@ -762,11 +762,28 @@ var yvP = cagir("KS_easeScan", {}).props.filter(function (x) { return x.propIdx 
 var yvE = cagir("KS_easeBake", { target: hedef(yvP), items: [plan(yvP, E.builtin("yumusak").curve, 1)] });
 var yvEK = KRh.kayit(yvE.records[0]); yvEK.id = "kryv-egri";
 var yvOnce = YV.olcek.keys.length;
+// aynı inişe (2) tek varışta yeniden uygulamak: playhead o inişe gelen aralıkta (1 → 2); pencerenin içi sonraki çifti (2 → 6) hedefler
+playhead = 1.5;
 var yvPlan = yaylanPlani(yaylanTara(YV, [0, 1]).p, { frekans: 3, sonum: 6 }, [yvK, yvEK]);
 var yvPlanT = yaylanPlani(yaylanTara(YV, [0, 1]).p, {}, [yvK, yvEK], { tum: true });
 ok("yeniden uygulama: yaylanmanın içinde Eğri varsa 'egriVar' (tek ve tüm varışlar), host'a öğe gitmez, Eğri'nin Geri al'ı çalışır",
   yvE.basarili === 1 && yvPlan.gruplar.length === 0 && yvPlan.atlanan[0].kod === "egriVar" && yvPlanT.gruplar.length === 0 && yvPlanT.atlanan[0].kod === "egriVar" &&
   YV.olcek.keys.length === yvOnce && cagir("KS_easeUndo", { records: [yvEK] }).sonuclar[0].silinen === yvEK.times.length, js([yvPlan.atlanan, yvPlanT.atlanan]));
+// İnceleme 3 (bulgu): L1'in yaylanması K2'de kısaldı (L1 → K2 oturma süresinden kısa). Playhead pencerenin içindeyken (1,2 sn) tek
+// varış K2'yi hedefler: yaylanma K2'den sonra, K3'ten önce yazılır; L1'in yaylanma anahtarlarına dokunulmaz
+var YK = yaylanKlibi({ nodeId: "nYK", olcek: [[0, 100], [1, 160], [1.52, 100], [3, 100]], ph: 0.5 });
+var ykB1 = cagir("KS_easeBake", yaylanPlani(yaylanTara(YK, [0, 1]).p, {}).gruplar[0]);
+var ykK1 = KRh.kayit(ykB1.records[0]); ykK1.id = "kryk1";
+var ykL1 = anahtarlar(YK.olcek).filter(function (k) { return k.s > 1 + 1e-6 && k.s < 1.52 - 1e-6; }).map(function (k) { return [k.s, k.v]; });
+playhead = 1.2;
+var ykPlan = yaylanPlani(yaylanTara(YK, [0, 1]).p, {}, [ykK1]);
+var ykB2 = ykPlan.gruplar.length ? cagir("KS_easeBake", ykPlan.gruplar[0]) : null;
+var ykK2 = anahtarlar(YK.olcek).filter(function (k) { return k.s > 1.52 + 1e-6 && k.s < 3 - 1e-6; });
+ok("tek varış: L1'in kısalmış yaylanma penceresinin içinden (1,2 sn) Varışta yaylan K2'ye (1,52) yazar; L1'in yaylanması aynen kalır",
+  ykB1.basarili === 1 && ykK1.times[ykK1.times.length - 1] < 1.52 && ykPlan.gruplar.length === 1 && ykPlan.gruplar[0].items[0].t0 === 1.52 &&
+  ykPlan.gruplar[0].items[0].degistir === false && ykB2 && ykB2.basarili === 1 && ykK2.length === ykB2.records[0].times.length && ykK2.length >= 2 &&
+  js(anahtarlar(YK.olcek).filter(function (k) { return k.s > 1 + 1e-6 && k.s < 1.52 - 1e-6; }).map(function (k) { return [k.s, k.v]; })) === js(ykL1),
+  js([ykPlan.atlanan, ykPlan.gruplar.map(function (g) { return g.items.map(function (x) { return x.t0; }); }), ykK2.length]));
 // (d) setInterpolationTypeAtKey var ama hata veriyor: seyrek tepeler bırakılmaz, sık plan yazılır (interp 'yogun')
 var YB = yaylanKlibi({ nodeId: "nYB", konum: [[1, [0, 0]], [2, [1, 0]], [5, [1, 0]]] });
 YB.konum.setInterpolationTypeAtKey = function () { throw new Error("desteklenmiyor"); };
