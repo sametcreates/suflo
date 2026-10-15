@@ -1823,3 +1823,64 @@ silebiliyordu. Artık Tüm varışlar boş yerden çok kayıt yazacaksa önce so
 uygulamada (Eğri dahil) yer açmak için eski kayıt atıldıysa sarı bildirim söyler. Tek varış Eğri gibi bir uygulamada en çok 40 kayıt
 yazar ve sormaz. Sınırı büyütmek istersen `js/key-records.js` › `PROJE_SINIR` (localStorage boyut sınırları da var).
 Farklı istersen söyle.
+
+### Adım 15: Eğri paylaşım kodları ve içe / dışa aktarma (paylaşmak ücretsiz; uygulamak her aracın kendi kapısından)
+
+Ne değişti: Eğri sekmesinde **Paylaş ve içe aktar** kartı (Kodu kopyala, kod kutusu + Yükle, İçe aktar… / Dışa aktar…), kendi
+önayarlarını yeniden adlandırma ve sürükleyerek (ya da ◀ ▶ ile) sıralama; Hız Rampası › Özel eğri'de aynısı (kod kutusu, Kodu
+kopyala, İçe / Dışa aktar, kayıtlı rampayı Adı değiştir, çipleri sürükle); Geçiş / Zoom / Hareket'in Eğri seçicisinde "kod ya da
+cubic-bezier yapıştır" kutusu. Kod: `SFC1.` + base64url(JSON) — `{ v: 1, tur: 'egri', ad, curve }` ya da `{ v: 1, tur: 'hiz', ad,
+keys: [[t, %]], hit }`; bağlantı `https://suflo.app/egri#KOD` (`/en/egri`). Dosya: `.suflo-egri` = `{ suflo: 'egri', v: 1, presets:
+[{ ad, tur, curve | keys, hit? }] }`, en çok 64 KB / 32 önayar, BOM atılır, ad 40 karakter (denetim ve görünmez yön karakterleri
+atılır), eğri başına 8 nokta, sonlu olmayan sayı reddedilir, aralık dışı kırpılır, aynı ad + eğri ikinci kez alınmaz. Çekirdek
+`js/ease-curve.js` (SufloEase: paylasimKodla / paylasimCoz / iceAktar / dosyaOku / dosyaYaz / cssCoz), liste işlemleri
+`js/egri-model.js` ve `js/speedramp.js`, panel `js/egri.js` (SufloEgriPaylas: pano, `window.cep.fs` pencereleri, dağıtım) ve
+`js/hiz-rampasi.js`. Site: `docs/egri.html`, `docs/en/egri.html`, `docs/js/egri-sayfa.js` ve panelin bayt bayt kopyası
+`docs/js/ease-curve.js` (test denetler). Panel dosya listesi değişmedi (yeni runtime dosyası yok; paketleme aynı).
+
+**15.1 Fiyat (bilgi).** Senin kuralın: "free to create/share codes; applying goes through the Pro 'curves' gate". Kod oluşturmak,
+kopyalamak, yapıştırmak, içe / dışa aktarmak, önayarı adlandırmak ve sıralamak **ücretsiz** ve kapısız (deneme hakkı düşmez).
+Uygulamak değişmedi: Eğri sekmesinde içe aktarılan eğri `Pro.gate('curves')` (3 deneme hakkı) ile yazılır. İki yorum, farklı
+istersen söyle: (a) içe aktarılan bir **Hız Rampası** eğrisi Hız Rampası'nın kendi kapısından (`'speedramp'`, adım 13'ün kuralı)
+uygulanır, ikinci bir 'curves' kapısı eklenmedi; (b) Geçiş / Zoom / Hareket seçicisine yapıştırılan eğri o aracın kapısından geçer
+(adım 12'nin kuralı). `js/deneme.js`'e yeni anahtar eklenmedi.
+
+**15.2 Dış eğri aracının dışa aktarma dosyasını dene (10 dk, önemli).** Plan, OpenCurve'ün dışa aktarma dosyasının yalnız JSON
+biçimini (`{ opencurve: 1, presets: [{ name, curve }] }`) okumamızı söylüyor; temiz oda kuralı yüzünden o araç **hiç açılmadı**, bu
+yüzden `curve` alanının içi tahminle, geniş okunuyor: tek kübik (`"cubic-bezier(a,b,c,d)"`, `[x1,y1,x2,y2]`, `{x1,y1,x2,y2}`) ve
+çok noktalı (`[[x,y],…]`, `{ points | pts: [{ x, y, in / out: {x,y} ya da [x,y] }] }`, tutamaçlar MUTLAK koordinat varsayılır);
+gerisi "tanınmayan eğri" uyarısıyla atlanır. Elinde o araçla yapılmış gerçek bir dışa aktarma dosyası varsa (kendi bilgisayarında,
+aracı kodunu açmadan yalnız kullanarak) Suflo'da **İçe aktar…** ile dene (deneme listesi **15.8**): şekiller aynı görünüyor mu,
+kaç tanesi atlandı? Tutamaçlar göreli çıkarsa ya da başka bir alan adı kullanılıyorsa bana yalnız **dosyanın biçimini** (bir örnek
+dosya) gönder; okuyucu `js/ease-curve.js`'teki işaretli "DIŞ BİÇİM OKUYUCUSU" bölümünde, tek yerde güncellenir. O aracın adı depoda
+yalnız o bölümde geçer (test denetler); panel ve site metinleri "bir eğri aracının JSON dışa aktarması" der.
+
+**15.3 suflo.app/egri sayfasını yayınla (3.4 yayınında, 2 dk).** Panelin Kodu kopyala'sı `https://suflo.app/egri#KOD` (İngilizce
+arayüzde `/en/egri`) bağlantısı üretir; `docs/egri.html` ve `docs/en/egri.html` 3.4 ile birlikte yayınlanmalı (site haritasına
+eklendi). Sayfa kodu tarayıcıda, panelin kopyası `docs/js/ease-curve.js` ile çözer; sunucuya bir şey gitmez (CSP `connect-src
+'none'`). Yayından sonra deneme listesi **15.13**. Ana sayfaya ya da blog'a bağlantı bu adımda eklenmedi (isteğe bağlı).
+
+**15.4 Premiere'de dene (20–30 dk).** `marketing/v3.4-deneme-listesi.md` › `## 15`. Özellikle **15.2** (kopyala → yükle, pano),
+**15.6 / 15.7** (Windows ve macOS'ta kaydetme / açma pencereleri, uzantısız ad, 64 KB, BOM), **15.11** (sürükle-bırak CEF 74'te) ve
+**15.4** (seçicide Enter / Esc Premiere'e gitmez). Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de.
+
+**15.5 Tasarım kararlarını onayla (5 dk, karar).**
+(a) **Tek kod düzenleyiciye, birden çok kod önayarlara:** tek eğri kodu yüklenince önayar olarak kendiliğinden kaydedilmez (Önayar
+olarak kaydet kodun adını kullanır); dosya ya da alt alta birkaç kod doğrudan önayarlara eklenir. Hız Rampası kodu Eğri sekmesine
+yapıştırılırsa Hız Rampası'nın kayıtlı rampalarına eklenir; eğri kodu Hız Rampası'na yapıştırılırsa yönlendirme metni çıkar.
+(b) **Dışa aktarma her sekmenin kendi listesi:** Eğri'nin dosyası yalnız eğri önayarlarını (en çok 24), Hız Rampası'nınki yalnız
+kayıtlı rampaları (en çok 12) taşır; ikisi birlikte 32 önayar sınırını aşabileceği için tek dosyada birleştirilmedi. İçe aktarma
+her dosyayı türüne göre dağıtır.
+(c) **Ad çakışması:** içe aktarılan önayar aynı ad + aynı eğriyse atlanır; aynı ad başka eğriyse "Ad (2)" olarak eklenir (Hız
+Rampası'nın Kaydet'i adla üzerine yazdığı için içe aktarma hiçbir kaydın üstüne yazmaz).
+(d) **cubic-bezier yapıştırma:** düz `cubic-bezier()`, onu içeren CSS bildirimi, yalın dört sayı ve `ease` / `linear` / `ease-in` /
+`ease-out` / `ease-in-out` kabul edilir; x 0–1 dışı reddedilir, y -1–2'ye kırpılır ve kullanıcıya söylenir. Elle yazılan
+`cubic-bezier()` alanının eski sıkı kuralı (`fromCss`) API'de duruyor.
+(e) **Paylaşım sayfası:** plan suflo.app/egri'yi isteğe bağlı sayıyordu; Kodu kopyala'nın bağlantısı boş bir sayfaya gitmesin
+diye yapıldı (stil sayfasının düzeniyle, panelin çözücüsüyle).
+Farklı istersen söyle.
+
+**15.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
+`Kaynak: adım 15 temiz oda — paylaşım kodu, .suflo-egri dosyası, cubic-bezier yapıştırma ve arayüz Suflo'nun; OpenCurve açılmadı,
+yalnız planın tanımladığı dışa aktarma dosya biçimi okunur (kod / tablo / sözdizimi / arayüz alınmadı), bildirim gerekmez; Rebound
+kodu eklenmedi (docs/js/ease-curve.js panelin kopyası, THIRD_PARTY_NOTICES Rebound girdisinde).`
