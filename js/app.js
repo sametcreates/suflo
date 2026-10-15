@@ -239,6 +239,38 @@ window.KApp = (function () {
         });
       });
     });
+    yanMenuDaraltKur();
+  }
+
+  // Sol menü daralt / genişlet (3.4.2): ikon rayına iner; tercih bu bilgisayarda hatırlanır.
+  // Dar modda her girdinin adı ipucu (title) olur. localStorage yoksa ya da bozuksa geniş açılır.
+  var YAN_MENU_ANAHTAR = "suflo.yanMenuDar";
+  function yanMenuDarAyarla(dar) {
+    var m = el("yan-menu"), d = el("ky-daralt");
+    if (!m) return;
+    m.classList.toggle("dar", !!dar);
+    if (d) {
+      d.setAttribute("aria-expanded", dar ? "false" : "true");
+      d.title = dar ? "Menüyü genişlet" : "Menüyü daralt";
+    }
+    Array.prototype.forEach.call(m.querySelectorAll(".ky-oge"), function (b) {
+      var ad = b.querySelector(".ky-metin b");
+      if (dar && ad) b.title = (ad.firstChild && ad.firstChild.nodeValue ? ad.firstChild.nodeValue : ad.textContent).trim();
+      else b.removeAttribute("title");
+    });
+  }
+  function yanMenuDaraltKur() {
+    var d = el("ky-daralt");
+    if (!d) return;
+    var dar = false;
+    try { dar = window.localStorage.getItem(YAN_MENU_ANAHTAR) === "1"; } catch (e) { dar = false; }
+    yanMenuDarAyarla(dar);
+    d.addEventListener("click", function () {
+      var m = el("yan-menu");
+      var yeni = !(m && m.classList.contains("dar"));
+      yanMenuDarAyarla(yeni);
+      try { window.localStorage.setItem(YAN_MENU_ANAHTAR, yeni ? "1" : "0"); } catch (e) {}
+    });
   }
 
   /* ---------------- Araç ara (Ctrl+K / ⌘K) — 3.4 adım 20 ---------------- */
@@ -969,6 +1001,7 @@ window.KApp = (function () {
     // Eğri (3.4): düzenleyici ve önizleme ücretsiz; anahtar karelere uygulamak Pro ('curves', 3 deneme hakkı;
     // Uygula düğmesi kilidi kendisi gösterir: js/egri.js dugmeCiz)
     Pro.markLocked(document.querySelector('.ky-oge[data-tab="egri"]'), !s.pro);
+    Pro.markLocked(document.querySelector('.ky-oge[data-tab="mcp"]'), !s.pro);
     Pro.markLocked(document.querySelector('.ky-oge[data-tab="youtube"]'), !s.pro);
     // SFX satirinin kendi ky-kilit rozeti var; ikinci bir ::after rozeti ekleme.
     // Emoji Assets UCRETSIZ (Samet karari) — kilit rozeti yok.

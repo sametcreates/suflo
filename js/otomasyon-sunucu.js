@@ -295,7 +295,7 @@
 
     /* ---------------- Eylem ---------------- */
 
-    var IZIN_YOK_MESAJ = "Editing is not allowed: turn on 'Düzenlemeye izin ver' (Allow editing) in Suflo > Settings > AI bridge.";
+    var IZIN_YOK_MESAJ = "Editing is not allowed: turn on 'Düzenlemeye izin ver' (Allow editing) in Suflo > left menu > 'Yapay Zekâ' (AI).";
     function proYokHata(f) { return { kod: 402, hata: "pro_gerekli", mesaj: "This action needs Suflo Pro (no free trial credits left for '" + f + "')." }; }
     function proDurumu(f) {
       var p = { ok: false };

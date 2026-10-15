@@ -4616,3 +4616,13 @@ button.ia-adim-bas:focus-visible { outline: 2px solid var(--accent); outline-off
 .kaldir-satir .btn { flex: none; margin: 0 10px 4px 0; }
 .kaldir-not { flex: 1 1 160px; min-width: 0; margin: 0 0 4px; color: var(--faint); font-size: 10.5px; line-height: 1.4; word-wrap: break-word; }
 #tab-zoom .kaldir-not { display: block; margin: 6px 0 0; }
+
+/* Sol menü daralt / genişlet (3.4.2): #ky-daralt, .yan-menu.dar = ikon rayı (dar panel kuralıyla aynı görünüm) */
+.ky-daralt { align-self: flex-end; display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 22px; margin: -4px 0 2px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #6b7686; cursor: pointer; }
+.ky-daralt:hover { color: #dce2ec; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); }
+.ky-daralt svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.yan-menu.dar { flex: 0 0 56px !important; padding: 9px 5px !important; }
+.yan-menu.dar .ky-metin, .yan-menu.dar .ky-adet, .yan-menu.dar .ky-kilit, .yan-menu.dar .ky-baslik { display: none !important; }
+.yan-menu.dar .ky-oge { justify-content: center !important; min-height: 42px; padding: 6px 0 !important; }
+.yan-menu.dar .ky-daralt { align-self: center; }
+.yan-menu.dar .ky-daralt svg { transform: rotate(180deg); }

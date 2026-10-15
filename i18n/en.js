@@ -3885,8 +3885,7 @@
     "Eğri kodunu kopyala": "Copy curve code",
     "Eğri önayarlarını içe aktar": "Import curve presets",
     "Eğri önayarlarını dışa aktar": "Export curve presets",
-    "Suflo eğrilerini geri al": "Undo Suflo curves",
-    "Ayarlar › Yapay zekâ köprüsü (MCP)": "Settings › AI bridge (MCP)"
+    "Suflo eğrilerini geri al": "Undo Suflo curves"
   });
 
   /* ============ patterns for numbers / names that templates can't express ============ */
@@ -4064,6 +4063,11 @@
   /* ================= Yapay zekâ köprüsü (MCP, 3.4) ================= */
   add({
     "Yapay zekâ köprüsü (MCP)": "AI bridge (MCP)",
+    "Yapay Zekâ": "AI",
+    "Claude ile çalış · MCP": "Work with Claude · MCP",
+    "Yapay zekâ köprüsü (MCP) › Köprüyü aç": "AI bridge (MCP) › Turn bridge on",
+    "Menüyü daralt": "Collapse menu",
+    "Menüyü genişlet": "Expand menu",
     "Yapay zekâ köprüsü": "AI bridge",
     "AÇIK": "ON",
     "Claude gibi bir yapay zekâ asistanı Suflo'nun kendi işlerini senin yerine yapabilir: altyazı oluşturma, marker ekleme, sessizlikleri kopya sekansta kesme. Genel bir Premiere uzaktan kumandası değildir; yalnız bu bilgisayardan bağlanılır ve 30 dakika boşta kalınca kapanır.":

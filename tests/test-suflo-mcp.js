@@ -56,7 +56,7 @@ async function main() {
   ok("bağlantı dosyası yoksa isError: köprü kapalı", c3 && c3.result.isError === true && /köprü kapalı/.test(c3.result.content[0].text), js(c3));
   // İnceleme bulgusu: yalnız Türkçe kart adını söylüyordu; İngilizce arayüzde kart "AI bridge (MCP)"
   var kapaliMetin = c3 && c3.result.content[0].text;
-  ok("köprü kapalı mesajı kartı ve düğmeyi iki dilde anar", /'AI bridge \(MCP\)'/.test(kapaliMetin) && /'Yapay zekâ köprüsü \(MCP\)'/.test(kapaliMetin) &&
+  ok("köprü kapalı mesajı sol menüyü, kartı ve düğmeyi iki dilde anar", /left menu 'Yapay Zekâ' \/ 'AI'/.test(kapaliMetin) && /'AI bridge \(MCP\)'/.test(kapaliMetin) && /'Yapay zekâ köprüsü \(MCP\)'/.test(kapaliMetin) &&
     /Turn bridge on/.test(kapaliMetin) && /Köprüyü aç/.test(kapaliMetin), kapaliMetin);
   var enS = require(path.join(__dirname, "..", "i18n", "en.js"));
   var enSoz = enS.strings || (enS.default && enS.default.strings) || {};
