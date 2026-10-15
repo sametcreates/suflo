@@ -3840,6 +3840,32 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .hiz-secenekler .preset-control { margin: 0 6px 6px 0; }
 .hiz-eylem { margin-top: 10px; }
 .hiz-eylem .btn.grow { flex: 1; }
+/* 3.4 adım 13: Özel eğri (kart, Düzenle, düzenleyici). CEF 74: flex gap ve :focus-visible yok */
+.hiz-card { position: relative; }
+.hiz-card-ozel .hiz-resim { box-shadow: inset 0 0 0 1px var(--line2); }
+.hiz-duzenle { position: absolute; top: 12px; right: 12px; padding: 1px 6px; border: 1px solid var(--line2); border-radius: 6px; background: rgba(11, 14, 21, .82); color: var(--dim); font-style: normal; font-size: 9.5px; line-height: 1.5; opacity: .7; cursor: pointer; }
+.hiz-card:hover .hiz-duzenle, .hiz-card.on .hiz-duzenle, .hiz-duzenle:focus { opacity: 1; color: var(--text); }
+.hiz-duzenle:hover, .hiz-duzenle:focus { border-color: var(--accent); outline: none; }
+.hiz-ozel { margin: 12px 0 0; padding: 8px; border: 1px solid #263242; border-radius: 10px; background: var(--bg2); }
+.hiz-ozel-bas { display: flex; align-items: center; justify-content: space-between; margin: 0 0 6px; font-size: 11.5px; }
+.hiz-ozel-hit-etiket { display: flex; align-items: center; font-size: 10.5px; color: var(--dim); cursor: pointer; }
+.hiz-ozel-hit-etiket input { margin: 0 5px 0 0; }
+.hiz-ozel-svg .hiz-eksen { font-size: 8px; }
+.hiz-ozel-okuma { fill: var(--text); font-size: 9px; font-weight: 700; pointer-events: none; }
+.hiz-ozel-hit-tutamac { cursor: ew-resize; }
+.egri-nokta.uc { fill: var(--accent); }
+.hiz-ozel-ipucu { margin: 6px 0 4px; }
+.hiz-ozel-arac { flex-wrap: wrap; margin: 0 0 6px; }
+.hiz-ozel-arac .btn, .hiz-ozel-kayit-satir .btn { margin: 0 6px 4px 0; }
+.hiz-ozel-kayit-satir { align-items: center; margin: 0 0 4px; }
+.hiz-ozel-kayit-satir input { flex: 1; min-width: 0; margin: 0 6px 4px 0; padding: 4px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; font-size: 11px; }
+.hiz-ozel-kayitlar { display: flex; flex-wrap: wrap; }
+.hiz-ozel-kayit { position: relative; display: flex; align-items: center; max-width: 100%; margin: 0 5px 5px 0; padding: 2px 4px 2px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; font-size: 10.5px; cursor: pointer; }
+.hiz-ozel-kayit:hover { border-color: var(--line2); }
+.hiz-ozel-kayit:focus { outline: 2px solid var(--accent-lite); outline-offset: 1px; }
+.hiz-ozel-kayit span { overflow: hidden; max-width: 160px; text-overflow: ellipsis; white-space: nowrap; }
+.hiz-ozel-kayit-sil { margin-left: 4px; padding: 0 3px; color: var(--faint); font-style: normal; font-size: 12px; line-height: 1.2; }
+.hiz-ozel-kayit-sil:hover { color: var(--bad); }
 
 /* ---------- Eğri (3.4 adım 10, #tab-egri): SVG düzenleyici, canlı önizleme sahnesi, önayarlar, özellik listesi ----------
    CEF 74: flex gap, inset ve :focus-visible yok — aralıklar margin ile, odak :focus ile */

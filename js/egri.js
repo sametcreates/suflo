@@ -26,6 +26,8 @@
 
 /* ======================================================================
  * SufloEgriEditor.olustur(kap, { egri, gorunum: 'deger'|'hiz', degisti(egri, { bitti }), uyari(metin) })
+ * SufloEgriEditor.olustur(kap, { mod: 'hiz', anahtarlar, hit, ease, degisti, secim, uyari }) — Hız Rampası özel eğrisi
+ *   (3.4 adım 13; aşağıda hizOlustur). 'gorunum: hiz' (Eğri sekmesinin hız grafiği görünümü) ile karıştırma.
  * ====================================================================== */
 window.SufloEgriEditor = (function () {
   "use strict";
@@ -41,6 +43,7 @@ window.SufloEgriEditor = (function () {
 
   function olustur(kap, opts) {
     opts = opts || {};
+    if (opts.mod === "hiz") return hizOlustur(kap, opts);
     var E = window.SufloEase, M = window.SufloEgriModel, ED = M.ED;
     var d = {
       egri: E.normalize(opts.egri) || E.builtin("yumusak").curve, hayalet: null,
@@ -159,6 +162,230 @@ window.SufloEgriEditor = (function () {
         if (!(d.secili > 0)) return false;
         var y = M.noktaSil(d.egri, d.secili);
         if (!y || !degistir(y)) return false;
+        bildir(true);
+        return true;
+      },
+      ciz: ciz,
+      yokEt: function () { d.surukleme = null; bosalt(kap); },
+      _d: d
+    };
+  }
+
+  /*
+   * mod 'hiz' (3.4 adım 13): Hız Rampası'nın özel eğrisi.
+   * olustur(kap, { mod: 'hiz', anahtarlar ([[t, %]]), hit (ağır çekim anı | null), ease ('smooth'|'linear'|'step'),
+   *   degisti(anahtarlar [[t, %]], { bitti, hit }), secim(i, { ic, basamak }), uyari(metin) })
+   * y: log2 hız (%10–%1000; 25 / 50 / 100 / 200 / 400 / 800 % çizgileri), x: çıkış zamanı. Tıkla nokta ekler (aynı basışta
+   * sürüklenir), sürükle taşır, çift tık siler, Shift ızgaraya yapışır (hız çizgilere, zaman %5'e), Alt+tık sert basamak
+   * açar / kapar. 'Ağır çekim anı' çizgisi üstteki tutamacından yatayda sürüklenir. Noktalar arası geçiş Yumuşatma
+   * seçicisindeki gibi çizilir. Geometri ve işlemler saf ve testli: SufloSpeedRamp.ozel (js/speedramp.js). Premiere'e gitmez.
+   * degisti her zaman geçerli anahtarlar verir (SufloSpeedRamp.ozelDogrula); sürüklerken bitti:false, bırakınca true.
+   */
+  function hizOlustur(kap, opts) {
+    var SR = window.SufloSpeedRamp, Z = SR.ozel, ED = Z.ED, iz = Z.izgara();
+    var d = { keys: SR.ozelDogrula(opts.anahtarlar), hit: SR.ozelHit(opts.hit), ease: opts.ease || "smooth", secili: -1, surukleme: null, hayalet: null };
+    function kopya(ks) { return ks.map(function (k) { return { t: k.t, v: k.v }; }); }
+    bosalt(kap);
+    var kok = svgEl("svg", { viewBox: "0 0 " + ED.W + " " + ED.H, "class": "egri-svg hiz-ozel-svg", "aria-hidden": "true", focusable: "false" }, kap);
+    var izgara = svgEl("g", { "class": "egri-izgara" }, kok);
+    iz.dikey.forEach(function (c) {
+      svgEl("line", { x1: c.x, y1: iz.ust, x2: c.x, y2: iz.alt, "class": c.t === 0 || c.t === 1 ? "egri-cizgi" : "egri-cizgi yarim" }, izgara);
+    });
+    iz.yatay.forEach(function (c) {
+      svgEl("line", { x1: iz.sol, y1: c.y, x2: iz.sag, y2: c.y, "class": c.ana ? "egri-cizgi ana" : "egri-cizgi" }, izgara);
+      svgEl("text", { x: iz.sol - 4, y: c.y + 3, "class": "hiz-eksen hiz-ozel-eksen", "text-anchor": "end" }, izgara).textContent = c.etiket;
+    });
+    var hitKatman = svgEl("g", { "class": "hiz-ozel-hit" }, kok);
+    var hayaletYol = svgEl("path", { "class": "egri-hayalet", d: "" }, kok);
+    var yol = svgEl("path", { "class": "egri-yol", d: "" }, kok);
+    var katman = svgEl("g", { "class": "egri-tutamaclar" }, kok);
+    var okuma = svgEl("text", { "class": "hiz-ozel-okuma", x: 0, y: 0 }, kok);
+
+    function uyar(m) { if (typeof opts.uyari === "function") { try { opts.uyari(m); } catch (e) {} } }
+    function bildir(bitti) {
+      if (typeof opts.degisti === "function") { try { opts.degisti(SR.ozelYuzde(d.keys), { bitti: !!bitti, hit: d.hit }); } catch (e) {} }
+    }
+    function esVar(i) { var k = d.keys; return (i > 0 && k[i - 1].t === k[i].t) || (i < k.length - 1 && k[i + 1].t === k[i].t); }
+    function secimBildir() {
+      if (typeof opts.secim !== "function") return;
+      var i = d.secili, ic = i > 0 && i < d.keys.length - 1;
+      try { opts.secim(i, { ic: ic, basamak: ic && esVar(i) }); } catch (e) {}
+    }
+    function seciliAta(i) { if (i !== d.secili) { d.secili = i; secimBildir(); } }
+
+    function ciz() {
+      yol.setAttribute("d", Z.yol(d.keys, d.ease));
+      hayaletYol.setAttribute("d", d.hayalet ? Z.yol(d.hayalet, d.ease) : "");
+      bosalt(katman);
+      var n = d.keys.length;
+      d.keys.forEach(function (k, i) {
+        var x = Z.ekranX(k.t), y = Z.ekranY(k.v);
+        svgEl("rect", { x: x - 4.5, y: y - 4.5, width: 9, height: 9, rx: 1.5,
+          "class": "egri-nokta" + (i === d.secili ? " secili" : "") + (esVar(i) ? " kirik" : "") + (i === 0 || i === n - 1 ? " uc" : "") }, katman);
+      });
+      bosalt(hitKatman);
+      if (d.hit !== null) {
+        var hx = Z.ekranX(d.hit);
+        svgEl("line", { x1: hx, y1: iz.ust, x2: hx, y2: iz.alt, "class": "hiz-vurus-cizgi" }, hitKatman);
+        svgEl("circle", { cx: hx, cy: iz.ust, r: 5, "class": "hiz-vurus hiz-ozel-hit-tutamac" }, hitKatman);
+      }
+      // seçili noktanın hızı (yalnız sayı ve %: SVG çevrilmez)
+      var s = d.keys[d.secili];
+      if (s) {
+        var sx = Z.ekranX(s.t), sy = Z.ekranY(s.v), sag = sx > ED.W - 60;
+        okuma.setAttribute("x", sag ? sx - 8 : sx + 8);
+        okuma.setAttribute("y", sy < iz.ust + 14 ? sy + 16 : sy - 8);
+        okuma.setAttribute("text-anchor", sag ? "end" : "start");
+        okuma.textContent = Math.round(s.v * 100) + "%";
+      } else okuma.textContent = "";
+    }
+
+    function noktaOku(e) {
+      var r = kok.getBoundingClientRect ? kok.getBoundingClientRect() : null;
+      if (!r || !(r.width > 0 && r.height > 0)) return null;
+      return { px: (e.clientX - r.left) / r.width * ED.W, py: (e.clientY - r.top) / r.height * ED.H };
+    }
+    function yakala(e) {
+      if (e.preventDefault) e.preventDefault();
+      try { if (kok.setPointerCapture) kok.setPointerCapture(e.pointerId); } catch (eC) {}
+      try { if (kap.focus) kap.focus(); } catch (eF) {}
+    }
+    function hataMetni(kod) {
+      return kod === "dolu" ? "En çok 8 nokta. Yeni nokta için birini çift tıklayıp sil."
+        : kod === "yakin" ? "Başka bir noktaya çok yakın; biraz yana tıkla."
+        : kod === "uc" ? "Uç noktada sert basamak olmaz; aradaki bir noktayı seç." : "";
+    }
+    kok.addEventListener("pointerdown", function (e) {
+      var n = noktaOku(e);
+      if (!n) return;
+      // ağır çekim anı: üstteki tutamaç
+      if (d.hit !== null && Math.abs(n.px - Z.ekranX(d.hit)) <= 7 && n.py <= iz.ust + 10) {
+        d.surukleme = { tur: "hit", id: e.pointerId, oynadi: false };
+        yakala(e);
+        return;
+      }
+      var i = Z.enYakin(d.keys, n.px, n.py, 9), eklendi = false;
+      if (e.altKey) {
+        if (i < 0) return;
+        yakala(e);
+        var b = Z.basamak(d.keys, i);
+        if (b.hata) { uyar(hataMetni(b.hata)); return; }
+        d.hayalet = kopya(d.keys);
+        d.keys = b.keys;
+        d.secili = -1;
+        seciliAta(b.i);
+        ciz();
+        bildir(true);
+        return;
+      }
+      if (i < 0) {
+        var r = Z.ekle(d.keys, Z.egriT(n.px), Z.egriV(n.py), { shift: !!e.shiftKey });
+        if (r.hata) { if (r.hata !== "gecersiz") uyar(hataMetni(r.hata)); return; }
+        d.hayalet = kopya(d.keys);
+        d.keys = r.keys;
+        i = r.i;
+        eklendi = true;
+      } else d.hayalet = kopya(d.keys);
+      yakala(e);
+      d.surukleme = { tur: "nokta", i: i, id: e.pointerId, oynadi: eklendi };
+      seciliAta(i);
+      ciz();
+      if (eklendi) bildir(false);
+    });
+    kok.addEventListener("pointermove", function (e) {
+      var s = d.surukleme;
+      if (!s) return;
+      var n = noktaOku(e);
+      if (!n) return;
+      if (s.tur === "hit") {
+        var h = SR.ozelHit(Z.yapisT(Z.egriT(n.px), !!e.shiftKey));
+        if (h === d.hit) return;
+        d.hit = h;
+        s.oynadi = true;
+        ciz();
+        bildir(false);
+        return;
+      }
+      var r = Z.tasi(d.keys, s.i, Z.egriT(n.px), Z.egriV(n.py), { shift: !!e.shiftKey });
+      if (!r) return;
+      s.oynadi = true;
+      d.keys = r.keys;
+      ciz();
+      bildir(false);
+    });
+    function birak() {
+      var s = d.surukleme;
+      if (!s) return;
+      d.surukleme = null;
+      try { if (kok.releasePointerCapture) kok.releasePointerCapture(s.id); } catch (eR) {}
+      if (s.tur === "nokta") {
+        // bırakınca doğrula: aynı hıza çekilen basamak tek noktaya iner (dizinler değişebilir: seçim kalkar)
+        var once = d.keys.length;
+        d.keys = SR.ozelDogrula(d.keys);
+        if (d.keys.length !== once) seciliAta(-1);
+        ciz();
+      }
+      if (s.oynadi) bildir(true);
+    }
+    kok.addEventListener("pointerup", birak);
+    kok.addEventListener("pointercancel", birak);
+    kok.addEventListener("dblclick", function (e) {
+      var n = noktaOku(e);
+      if (!n) return;
+      var i = Z.enYakin(d.keys, n.px, n.py, 9);
+      if (i < 0) return;
+      var r = Z.sil(d.keys, i);
+      if (!r) { uyar("Uç noktalar silinmez; hızını yukarı / aşağı sürükleyerek değiştir."); return; }
+      d.hayalet = kopya(d.keys);
+      d.keys = r.keys;
+      d.secili = -1;
+      secimBildir();
+      ciz();
+      bildir(true);
+    });
+
+    ciz();
+    return {
+      mod: "hiz",
+      // [[t, %]] (geçerli; SufloSpeedRamp.ozelDogrula)
+      anahtarlar: function () { return SR.ozelYuzde(d.keys); },
+      // Dışarıdan atama (önayardan Düzenle, kayıtlı rampa, Sıfırla): önceki eğri hayalet olur; o.hayalet:false ile hayaletsiz.
+      // hit verilmezse (undefined) ağır çekim anı değişmez
+      ata: function (keys, hit, o) {
+        d.hayalet = o && o.hayalet === false ? null : kopya(d.keys);
+        d.keys = SR.ozelDogrula(keys);
+        if (hit !== undefined) d.hit = SR.ozelHit(hit);
+        d.surukleme = null;
+        d.secili = -1;
+        secimBildir();
+        ciz();
+      },
+      hit: function (h) { if (arguments.length) { d.hit = SR.ozelHit(h); ciz(); } return d.hit; },
+      ease: function (e) { if (e) { d.ease = String(e); ciz(); } return d.ease; },
+      secili: function () { return d.secili; },
+      // Düğmelerden (Alt / çift tık yerine): seçili iç noktada sert basamak aç / kapat, seçili noktayı sil
+      basamak: function () {
+        if (d.secili < 0) { uyar("Önce eğride bir nokta seç."); return false; }
+        if (!(d.secili > 0 && d.secili < d.keys.length - 1)) { uyar(hataMetni("uc")); return false; }
+        var b = Z.basamak(d.keys, d.secili);
+        if (b.hata) { uyar(hataMetni(b.hata)); return false; }
+        d.hayalet = kopya(d.keys);
+        d.keys = b.keys;
+        d.secili = -1;
+        seciliAta(b.i);
+        ciz();
+        bildir(true);
+        return true;
+      },
+      sil: function () {
+        if (d.secili < 0) { uyar("Önce eğride bir nokta seç."); return false; }
+        var r = Z.sil(d.keys, d.secili);
+        if (!r) { uyar("Uç noktalar silinmez; hızını yukarı / aşağı sürükleyerek değiştir."); return false; }
+        d.hayalet = kopya(d.keys);
+        d.keys = r.keys;
+        d.secili = -1;
+        secimBildir();
+        ciz();
         bildir(true);
         return true;
       },

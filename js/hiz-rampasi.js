@@ -8,6 +8,12 @@
  * geri almaz). Panel açılışında Premiere'e gidilmez: önizleme bağlamdan (KApp.ctx) çizilir.
  * Kullanıcı adları (klip, kopya sekans) bildirim ve durum satırında data-i18n-skip içinde:
  * İngilizce arayüz "Röportaj"ı "Interview" yapmasın.
+ *
+ * Özel eğri (3.4 adım 13): "Özel eğri" kartı seçilince düzenleyici açılır (SufloEgriEditor mod 'hiz', js/egri.js;
+ * geometri SufloSpeedRamp.ozel). Her önayar kartının "Düzenle"si o kartın anahtarlarını düzenleyiciye kopyalar. Her
+ * düzenlemede (80 ms ertelenerek) önizleme ve okuma satırı yeniden çizilir: saf, K.call yok. Son özel eğri ve en çok
+ * 12 adlı özel rampa bu görüntüleyicinin yerel deposunda (her erişim korumalı). Uygulama aynı 'speedramp' kapısından
+ * ve 3 deneme hakkından geçer; plan aynı yoldan (SufloSpeedRamp.plan 'ozel').
  */
 window.KHizRampasi = (function () {
   "use strict";
@@ -16,6 +22,9 @@ window.KHizRampasi = (function () {
   var KAYIT_ANAHTAR = "suflo.hizRampa.kayitlar";
   var KAL_ANAHTAR = "suflo.hizRampa.kalibrasyon";
   var AYAR_ANAHTAR = "suflo.hizRampa.ayar";
+  var OZEL_ANAHTAR = "suflo.hizRampa.ozel";              // son özel eğri { keys: [[t, %]], hit, sonHit }
+  var OZEL_KAYIT_ANAHTAR = "suflo.hizRampa.ozelKayitlar"; // adlı özel rampalar (en çok 12)
+  var OZEL_GECIKME = 80;                                  // düzenlerken önizleme gecikmesi (ms)
   var EN_COK_KLIP = 12, EN_COK_KAYIT = 30;
   var W = 320, H = 120;
 
@@ -31,8 +40,12 @@ window.KHizRampasi = (function () {
   var kopyaSekanslar = {};
   // Bağlam yoklamasının (2.5 sn) önizlemeyi ilgilendiren alanları: playhead, In/Out, seçili klibin yeri
   var sonAnahtar = "";
+  // Özel eğri: anahtarlar [[t, %]] ve ağır çekim anı (null: yok); sonHit: kutu yeniden açılınca dönülecek yer
+  var ozel = { keys: SR ? SR.OZEL_VARSAYILAN.keys : [], hit: SR ? SR.OZEL_VARSAYILAN.hit : null, sonHit: 0.5 };
+  var editor = null, ozelZaman = null;
 
   function el(id) { return document.getElementById(id); }
+  function tr(s) { var I = window.SufloI18n; return I && I.tr ? I.tr(s) : s; }
 
   /* ---------------- metin parçaları ---------------- */
   // Dize = arayüz metni (kendi metin düğümünde, çevrilir); { ad } = kullanıcı adı (çevrilmez)
@@ -129,13 +142,17 @@ window.KHizRampasi = (function () {
   }
 
   /* ---------------- seçenekler ---------------- */
+  // Özel eğrinin anahtarları her zaman eklenir (kart küçük resmi); plan yalnız "ozel"de okur. Kopya: uygulama iş
+  // başında aldığı seçenekle sürer, düzenleyici sonradan değişse de kalan klipler aynı eğriyi alır
   function secenek() {
     return {
       k: Number(el("hiz-yogunluk").value) || 1,
       ease: el("hiz-gecis").value,
       density: el("hiz-parca").value,
       mode: el("hiz-kaynak").value,
-      onBeat: el("hiz-ritim-yon") ? el("hiz-ritim-yon").value : "slow"
+      onBeat: el("hiz-ritim-yon") ? el("hiz-ritim-yon").value : "slow",
+      ozelKeys: ozel.keys.map(function (k) { return [k[0], k[1]]; }),
+      ozelHit: ozel.hit
     };
   }
   function ayarKaydet() {
@@ -327,7 +344,15 @@ window.KHizRampasi = (function () {
 
   /* ---------------- kartlar ---------------- */
   // Küçük resimler yalnız yoğunluk / yumuşatma / vuruş yönü ya da vuruş durumu değişince yeniden çizilir
+  // (Özel eğri kartınınki düzenledikçe de: ozelResim)
   var sonVurusDurum = "";
+  function resimHtml(id, o) {
+    var t = SR.thumb(id, 120, 56, { k: o.k, ease: o.ease, onBeat: o.onBeat, ozelKeys: o.ozelKeys, ozelHit: o.ozelHit });
+    return '<svg viewBox="0 0 120 56" aria-hidden="true">' +
+      '<line class="hiz-taban" x1="0" x2="120" y1="' + t.base + '" y2="' + t.base + '"></line>' +
+      '<path class="hiz-egri" d="' + t.path + '"></path>' +
+      (t.hit ? '<circle class="hiz-vurus" cx="' + t.hit.x + '" cy="' + t.hit.y + '" r="3"></circle>' : "") + "</svg>";
+  }
   function kartlar() {
     var grid = el("hiz-grid");
     if (!grid) return;
@@ -337,16 +362,12 @@ window.KHizRampasi = (function () {
     SR.list().forEach(function (p) {
       var kart = document.createElement("button");
       kart.type = "button";
-      kart.className = "preset-card hiz-card" + (p.id === secili ? " on" : "");
+      kart.className = "preset-card hiz-card" + (p.id === secili ? " on" : "") + (p.id === "ozel" ? " hiz-card-ozel" : "");
       kart.setAttribute("aria-pressed", p.id === secili ? "true" : "false");
       kart.setAttribute("data-id", p.id);
-      var t = SR.thumb(p.id, 120, 56, { k: o.k, ease: o.ease, onBeat: o.onBeat });
       var resim = document.createElement("span");
       resim.className = "hiz-resim";
-      resim.innerHTML = '<svg viewBox="0 0 120 56" aria-hidden="true">' +
-        '<line class="hiz-taban" x1="0" x2="120" y1="' + t.base + '" y2="' + t.base + '"></line>' +
-        '<path class="hiz-egri" d="' + t.path + '"></path>' +
-        (t.hit ? '<circle class="hiz-vurus" cx="' + t.hit.x + '" cy="' + t.hit.y + '" r="3"></circle>' : "") + "</svg>";
+      resim.innerHTML = resimHtml(p.id, o);
       var bilgi = document.createElement("span");
       bilgi.className = "hiz-bilgi";
       var b = document.createElement("b"); b.textContent = p.name;
@@ -355,10 +376,39 @@ window.KHizRampasi = (function () {
       i.textContent = kapali ? (vb.durum === "baska" ? VURUS_BASKA : VURUS_YOK) : p.desc;
       bilgi.appendChild(b); bilgi.appendChild(i);
       kart.appendChild(resim); kart.appendChild(bilgi);
+      // Düzenle: bu önayarın anahtarlarını Özel eğri düzenleyicisine kopyalar (vuruşlu Ritme Rampa ve Özel eğrinin
+      // kendisi hariç). Kartın içinde (ızgarada kart başına tek öğe kalır); tıklaması kartı ayrıca seçmez
+      if (!p.beats && p.id !== "ozel") {
+        var dz = document.createElement("i");
+        dz.className = "hiz-duzenle";
+        dz.setAttribute("role", "button");
+        dz.setAttribute("tabindex", "0");
+        dz.setAttribute("title", "Bu eğriyi Özel eğri düzenleyicisine kopyala");
+        dz.textContent = "Düzenle";
+        dz.addEventListener("click", function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); duzenle(p.id); });
+        dz.addEventListener("keydown", function (ev) {
+          if (!ev || (ev.key !== "Enter" && ev.key !== " " && ev.keyCode !== 13 && ev.keyCode !== 32)) return;
+          if (ev.preventDefault) ev.preventDefault();
+          if (ev.stopPropagation) ev.stopPropagation();
+          duzenle(p.id);
+        });
+        kart.appendChild(dz);
+      }
       if (kapali) { kart.disabled = true; kart.className += " kapali"; }
       kart.addEventListener("click", function () { sec(p.id); });
       grid.appendChild(kart);
     });
+  }
+  // Yalnız Özel eğri kartının küçük resmi (düzenlerken ızgara yeniden kurulmaz: odak ve kaydırma yerinde kalır)
+  function ozelResim() {
+    var grid = el("hiz-grid"), kids = grid ? grid.children : null;
+    if (!kids) return;
+    for (var i = 0; i < kids.length; i++) {
+      var k = kids[i];
+      if (!k.getAttribute || k.getAttribute("data-id") !== "ozel") continue;
+      var r = k.children && k.children[0];
+      if (r) r.innerHTML = resimHtml("ozel", secenek());
+    }
   }
 
   // Seçimi yerinde güncelle: ızgara yeniden kurulmaz, klavye odağı tıklanan kartta kalır
@@ -382,8 +432,137 @@ window.KHizRampasi = (function () {
     var yon = el("hiz-ritim-yon-kutu");
     if (yon) yon.hidden = secili !== "ritim";
     kartSecimi();
+    ozelKutu();
     onizlemeCiz();
     ayarKaydet();
+  }
+
+  /* ---------------- Özel eğri (3.4 adım 13) ---------------- */
+  // Son özel eğri: bozuk / eski kayıt başlangıç eğrisinde bırakır
+  function ozelYukle() {
+    var a = depoOku(OZEL_ANAHTAR, null);
+    if (!a || typeof a !== "object" || !Array.isArray(a.keys) || !a.keys.length) return;
+    ozel.keys = SR.ozelYuzde(a.keys);
+    ozel.hit = SR.ozelHit(a.hit);
+    var sh = SR.ozelHit(a.sonHit);
+    ozel.sonHit = ozel.hit !== null ? ozel.hit : (sh !== null ? sh : 0.5);
+  }
+  function ozelKaydet() { depoYaz(OZEL_ANAHTAR, { keys: ozel.keys, hit: ozel.hit, sonHit: ozel.sonHit }); }
+  // Düzenleyici kutusu yalnız Özel eğri seçiliyken görünür
+  function ozelKutu() {
+    var k = el("hiz-ozel");
+    if (k) k.hidden = secili !== "ozel";
+    var h = el("hiz-ozel-hit");
+    if (h) h.checked = ozel.hit !== null;
+    if (secili === "ozel" && editor) editor.ciz();
+  }
+  // Düzenleyiciden her değişiklik: durum hemen, önizleme ve kart resmi 80 ms ertelenerek (sürüklerken her olayda
+  // çizilmez); depoya yalnız bırakınca yazılır
+  function ozelDegisti(keys, o) {
+    ozel.keys = keys;
+    if (o && o.hit !== undefined) ozel.hit = SR.ozelHit(o.hit);
+    if (ozel.hit !== null) ozel.sonHit = ozel.hit;
+    var h = el("hiz-ozel-hit");
+    if (h) h.checked = ozel.hit !== null;
+    ozelZamanla();
+    if (o && o.bitti) ozelKaydet();
+  }
+  function ozelZamanla() {
+    if (ozelZaman) clearTimeout(ozelZaman);
+    ozelZaman = setTimeout(function () { ozelZaman = null; ozelResim(); onizlemeCiz(); }, OZEL_GECIKME);
+  }
+  // Seçili noktaya göre düğmeler: Sert basamak ve Noktayı sil yalnız aradaki bir nokta seçiliyken
+  function ozelSecim(i, bilgi) {
+    var ic = !!(bilgi && bilgi.ic);
+    var b = el("hiz-ozel-basamak"), s = el("hiz-ozel-sil");
+    if (b) { b.disabled = !ic; b.textContent = bilgi && bilgi.basamak ? "Basamağı kaldır" : "Sert basamak"; }
+    if (s) s.disabled = !ic;
+  }
+  // Düzenleyiciye dışarıdan eğri (Düzenle, kayıtlı rampa, Sıfırla): Özel eğri seçilir, önizleme hemen çizilir
+  function ozelAta(keys, hit) {
+    ozel.keys = SR.ozelYuzde(keys);
+    ozel.hit = SR.ozelHit(hit);
+    if (ozel.hit !== null) ozel.sonHit = ozel.hit;
+    if (editor) editor.ata(ozel.keys, ozel.hit);
+    ozelKaydet();
+    if (secili === "ozel") { ozelKutu(); onizlemeCiz(); }
+    else sec("ozel");
+    ozelResim();
+  }
+  function duzenle(id) {
+    if (mesgul) return;
+    var p = SR.get(id);
+    if (!p || p.beats || p.id === "ozel") return;
+    ozelAta(p.keys, p.hit);
+    durum([p.name + " özel eğriye kopyalandı; noktaları sürükleyerek değiştir."], "good");
+  }
+  function ozelSifirla() {
+    if (mesgul) return;
+    ozelAta(SR.OZEL_VARSAYILAN.keys, SR.OZEL_VARSAYILAN.hit);
+    durum("");
+  }
+  function ozelHitDegisti() {
+    ozel.hit = el("hiz-ozel-hit").checked ? (ozel.sonHit !== null ? ozel.sonHit : 0.5) : null;
+    if (editor) editor.hit(ozel.hit);
+    ozelKaydet();
+    ozelResim();
+    onizlemeCiz();
+  }
+
+  /* ---- adlı özel rampalar (bu görüntüleyicinin yerel deposu, en çok 12) ---- */
+  function ozelKayitlar() { return SR.ozelKayitlar(depoOku(OZEL_KAYIT_ANAHTAR, [])); }
+  function ozelKayitlariCiz() {
+    var kap = el("hiz-ozel-kayitlar");
+    if (!kap) return;
+    kap.innerHTML = "";
+    var liste = ozelKayitlar();
+    kap.hidden = !liste.length;
+    liste.forEach(function (k) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "hiz-ozel-kayit";
+      b.setAttribute("data-id", k.id);
+      var ad = document.createElement("span");
+      // kullanıcının verdiği ad çevrilmez
+      ad.setAttribute("data-i18n-skip", "");
+      ad.textContent = k.ad;
+      b.appendChild(ad);
+      var x = document.createElement("i");
+      x.className = "hiz-ozel-kayit-sil";
+      x.setAttribute("role", "button");
+      x.setAttribute("title", "Özel rampayı sil");
+      x.textContent = "×";
+      x.addEventListener("click", function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); ozelKayitSil(k.id); });
+      b.appendChild(x);
+      b.addEventListener("click", function () { ozelKayitSec(k.id); });
+      kap.appendChild(b);
+    });
+  }
+  function ozelKayitSec(id) {
+    if (mesgul) return;
+    var k = ozelKayitlar().filter(function (x) { return x.id === id; })[0];
+    if (!k) return;
+    ozelAta(k.keys, k.hit);
+    durum(["Yüklendi: ", { ad: k.ad }], "good");
+  }
+  function ozelKayitKaydet() {
+    var liste = ozelKayitlar(), girdi = el("hiz-ozel-ad");
+    var yazilan = girdi ? String(girdi.value || "") : "";
+    var ad = /\S/.test(yazilan) ? yazilan : tr(SR.ozelKayitAdi(liste, tr));
+    var r = SR.ozelKayitEkle(liste, ad, ozel.keys, ozel.hit, Date.now());
+    if (!r.ok) { durum(r.kod === "dolu" ? "En çok 12 özel rampa saklanır; birini sil." : "Özel rampaya bir ad yaz.", "warn"); return; }
+    if (!depoYaz(OZEL_KAYIT_ANAHTAR, r.liste)) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return; }
+    var kayit = r.liste.filter(function (x) { return x.id === r.id; })[0];
+    if (girdi) { girdi.value = ""; girdi.setAttribute("placeholder", SR.ozelKayitAdi(r.liste, tr)); }
+    ozelKayitlariCiz();
+    durum([r.guncellendi ? "Güncellendi: " : "Kaydedildi: ", { ad: kayit ? kayit.ad : ad }], "good");
+  }
+  function ozelKayitSil(id) {
+    var liste = SR.ozelKayitSil(ozelKayitlar(), id);
+    depoYaz(OZEL_KAYIT_ANAHTAR, liste);
+    var girdi = el("hiz-ozel-ad");
+    if (girdi) girdi.setAttribute("placeholder", SR.ozelKayitAdi(liste, tr));
+    ozelKayitlariCiz();
   }
 
   // Kilitliyken de düğmenin adı "Rampayı uygula": tanıtım kartındaki deneme bildirimi bu adı söyler.
@@ -401,6 +580,7 @@ window.KHizRampasi = (function () {
     var yon = el("hiz-ritim-yon-kutu");
     if (yon) yon.hidden = secili !== "ritim";
     kartlar();
+    ozelKutu();
     onizlemeCiz();
     dugmeCiz();
   }
@@ -732,13 +912,43 @@ window.KHizRampasi = (function () {
   }
   async function kaldir(liste) { return (await kaldirIc(liste)).length > 0; }
 
+  // Özel eğri düzenleyicisi ve düğmeleri (kutu yoksa sessizce atlanır). Premiere'e gitmez
+  function ozelKur() {
+    var kap = el("hiz-ozel-editor"), ED = window.SufloEgriEditor;
+    if (kap && ED && ED.olustur) {
+      editor = ED.olustur(kap, { mod: "hiz", anahtarlar: ozel.keys, hit: ozel.hit, ease: el("hiz-gecis").value,
+        degisti: ozelDegisti, secim: ozelSecim, uyari: function (m) { durum(m, "warn"); } });
+    }
+    ozelSecim(-1, null);
+    var h = el("hiz-ozel-hit");
+    if (h) h.addEventListener("change", ozelHitDegisti);
+    var b = el("hiz-ozel-basamak");
+    if (b) b.addEventListener("click", function () { if (editor && !mesgul) editor.basamak(); });
+    var s = el("hiz-ozel-sil");
+    if (s) s.addEventListener("click", function () { if (editor && !mesgul) editor.sil(); });
+    var z = el("hiz-ozel-sifirla");
+    if (z) z.addEventListener("click", ozelSifirla);
+    var k = el("hiz-ozel-kaydet");
+    if (k) k.addEventListener("click", ozelKayitKaydet);
+    var a = el("hiz-ozel-ad");
+    if (a) {
+      a.setAttribute("placeholder", SR.ozelKayitAdi(ozelKayitlar(), tr));
+      a.addEventListener("keydown", function (e) {
+        if (e && (e.key === "Enter" || e.keyCode === 13)) { if (e.preventDefault) e.preventDefault(); ozelKayitKaydet(); }
+      });
+    }
+    ozelKayitlariCiz();
+  }
+
   function init() {
     if (!SR || !el("tab-hiz") || !el("hiz-grid")) return;
     ayarYukle();
+    ozelYukle();
+    ozelKur();
     render();
     ["hiz-yogunluk", "hiz-gecis", "hiz-ritim-yon"].forEach(function (id) {
       var e = el(id);
-      if (e) e.addEventListener("change", function () { kartlar(); onizlemeCiz(); ayarKaydet(); });
+      if (e) e.addEventListener("change", function () { if (id === "hiz-gecis" && editor) editor.ease(e.value); kartlar(); onizlemeCiz(); ayarKaydet(); });
     });
     ["hiz-parca", "hiz-kaynak", "hiz-vurus", "hiz-akis"].forEach(function (id) {
       el(id).addEventListener("change", function () { onizlemeCiz(); ayarKaydet(); });
@@ -785,6 +995,10 @@ window.KHizRampasi = (function () {
     _refresh: refresh,
     _yoklama: yoklama,
     _kopyaSekanslar: kopyaSekanslar,
-    _medya: medya
+    _medya: medya,
+    _duzenle: duzenle,
+    _ozel: function () { return { keys: ozel.keys.map(function (k) { return [k[0], k[1]]; }), hit: ozel.hit, sonHit: ozel.sonHit }; },
+    _editor: function () { return editor; },
+    _ozelKayitSec: ozelKayitSec
   };
 })();

@@ -374,6 +374,28 @@ ok("Hız Rampası: Ayarlar Pro listesinde", /<li>Sesi iyileştir · Otomatik zoo
 ok("Hız Rampası: Premiere çağrıları yalnız tıklamada (init'te K.call yok)", !/K\.call\(/.test(fnGovde(hizUi, "function init(")) && !/K\.call\(/.test(fnGovde(hizUi, "function render(")) &&
   !/K\.call\(/.test(fnGovde(hizUi, "function refresh(")) && !/K\.call\(/.test(fnGovde(hizUi, "function onizlemeCiz(")));
 ok("Hız Rampası: Ctrl+Z uyarısı ve kaldırma düğmesi arayüzde", /Ctrl\+Z rampayı tek adımda geri almaz/.test(html) && /id="hiz-kaldir"[^>]*>Rampayı kaldır</.test(html));
+/* ---------- 3.4 adım 13: Hız Rampası için Özel eğri editörü ---------- */
+["hiz-ozel", "hiz-ozel-editor", "hiz-ozel-hit", "hiz-ozel-basamak", "hiz-ozel-sil", "hiz-ozel-sifirla", "hiz-ozel-ad", "hiz-ozel-kaydet", "hiz-ozel-kayitlar"].forEach(function (id) {
+  ok("Özel eğri: #" + id + " var", !!idler[id]);
+});
+var hizBolum = html.slice(html.indexOf('id="tab-hiz"'), html.indexOf("</section>", html.indexOf('id="tab-hiz"')));
+var egriOzelSrc = fs.readFileSync(KOKYOL + "js/egri.js", "utf8").replace(/\r\n/g, "\n"), cssOzel = fs.readFileSync(KOKYOL + "css/style.css", "utf8");
+ok("Özel eğri: kutu Hız Rampası sekmesinde, kart ızgarasından sonra ve önizlemeden önce, gizli başlar", hizBolum.indexOf('id="hiz-ozel"') > hizBolum.indexOf('id="hiz-grid"') &&
+  hizBolum.indexOf('id="hiz-ozel"') < hizBolum.indexOf('id="hiz-onizleme"') && /<div id="hiz-ozel" class="hiz-ozel" hidden>/.test(hizBolum));
+ok("Özel eğri: düzenleyicinin aria-label'ı SVG'nin dışında (kutuda), odaklanabilir; Sert basamak / Noktayı sil seçimsiz kapalı",
+  /<div id="hiz-ozel-editor" class="egri-editor hiz-ozel-editor" tabindex="0" role="img" aria-label="Özel hız eğrisi düzenleyicisi"><\/div>/.test(hizBolum) &&
+  /id="hiz-ozel-basamak"[^>]*disabled>Sert basamak</.test(hizBolum) && /id="hiz-ozel-sil"[^>]*disabled>Noktayı sil</.test(hizBolum) &&
+  /<input id="hiz-ozel-ad" type="text" maxlength="40"/.test(hizBolum));
+ok("Özel eğri: ipucu tıkla / sürükle / çift tık / Shift / Alt'ı anlatır", /Tıkla: nokta ekle · sürükle: taşı · çift tık: sil · Shift: ızgaraya yapış · Alt\+tık: sert basamak\./.test(hizBolum));
+ok("Özel eğri: hiz-rampasi.js düzenleyiciyi SufloEgriEditor 'hiz' moduyla kurar; egri.js 'hiz' modunu SufloSpeedRamp.ozel ile çizer",
+  /ED\.olustur\(kap, \{ mod: "hiz",/.test(hizUi) && /if \(opts\.mod === "hiz"\) return hizOlustur\(kap, opts\);/.test(egriOzelSrc) && /Z = SR\.ozel/.test(egriOzelSrc));
+ok("Özel eğri: kapı ve deneme değişmedi (yalnız 'speedramp')", (hizUi.match(/Pro\.gate\(/g) || []).length === 1 && /Pro\.gate\("speedramp"/.test(hizUi) &&
+  (hizUi.match(/Pro\.denemeHarca\(/g) || []).length === 1 && /Pro\.denemeHarca\("speedramp"/.test(hizUi));
+ok("Özel eğri: düzenleme, Düzenle ve kayıtlar Premiere'e gitmez", ["function ozelKur(", "function ozelDegisti(", "function ozelAta(", "function duzenle(", "function ozelKayitKaydet(", "function kartlar("].every(function (f) {
+  var g = fnGovde(hizUi, f); return g.length > 20 && !/K\.call\(/.test(g);
+}));
+ok("Özel eğri: CSS (kart Düzenle, kutu, çipler) ve CEF 74'te olmayan flex gap / :focus-visible yok", /\.hiz-duzenle \{/.test(cssOzel) && /\.hiz-ozel \{/.test(cssOzel) && /\.hiz-ozel-kayit \{/.test(cssOzel) &&
+  !/\.hiz-(ozel|duzenle)[^{]*\{[^}]*\bgap:/.test(cssOzel) && !/\.hiz-(ozel|duzenle)[^{]*:focus-visible/.test(cssOzel));
 /* ---------- Eğri (3.4 adım 10) ---------- */
 var egriUi = fs.readFileSync(KOKYOL + "js/egri.js", "utf8").replace(/\r\n/g, "\n");
 ok("Eğri: kenar çubuğunda Hız Rampası'ndan sonra, Kanca Başlığı'ndan önce; YENİ ve PRO rozetli, sayaçsız",

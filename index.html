@@ -1578,6 +1578,26 @@
       </label>
     </div>
     <div id="hiz-grid" class="preset-grid hiz-grid"></div>
+    <!-- 3.4 adım 13: Özel eğri düzenleyicisi (SufloEgriEditor mod 'hiz'; yalnız Özel eğri seçiliyken görünür). Düzenlemek ücretsiz,
+         uygulamak Rampayı uygula ile aynı kapıdan (speedramp, 3 deneme). aria-label kutuda: SVG çevrilmez -->
+    <div id="hiz-ozel" class="hiz-ozel" hidden>
+      <div class="hiz-ozel-bas">
+        <b>Özel eğri</b>
+        <label class="hiz-ozel-hit-etiket" title="Darbe anını playhead'e hizala açıkken playhead'e oturan an; çizgiyi üstteki noktasından sürükle"><input id="hiz-ozel-hit" type="checkbox" checked> Ağır çekim anı</label>
+      </div>
+      <div id="hiz-ozel-editor" class="egri-editor hiz-ozel-editor" tabindex="0" role="img" aria-label="Özel hız eğrisi düzenleyicisi"></div>
+      <p class="hint hiz-ozel-ipucu">Tıkla: nokta ekle · sürükle: taşı · çift tık: sil · Shift: ızgaraya yapış · Alt+tık: sert basamak. Yoğunluk ve Yumuşatma özel eğriye de uygulanır.</p>
+      <div class="row hiz-ozel-arac">
+        <button id="hiz-ozel-basamak" class="btn tiny" type="button" title="Seçili noktada hız bir anda değişsin (Alt+tık)" disabled>Sert basamak</button>
+        <button id="hiz-ozel-sil" class="btn tiny" type="button" title="Seçili noktayı sil (çift tık)" disabled>Noktayı sil</button>
+        <button id="hiz-ozel-sifirla" class="btn tiny" type="button" title="Başlangıç eğrisine dön">Sıfırla</button>
+      </div>
+      <div class="row hiz-ozel-kayit-satir">
+        <input id="hiz-ozel-ad" type="text" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Özel rampa adı">
+        <button id="hiz-ozel-kaydet" class="btn tiny" type="button" title="Bu eğriyi adıyla sakla (bu bilgisayarda, en çok 12)">Kaydet</button>
+      </div>
+      <div id="hiz-ozel-kayitlar" class="hiz-ozel-kayitlar" role="group" aria-label="Kayıtlı özel rampalar" hidden></div>
+    </div>
     <div class="hiz-onizleme-kutu">
       <!-- aria-label SVG'nin dışında: çeviri SVG'ye girmez, İngilizce ekran okuyucu da çevrilmiş adı duysun -->
       <div class="hiz-onizleme-cerceve" role="img" aria-label="Hız eğrisi önizlemesi">
