@@ -1669,3 +1669,53 @@ notunda "Bezier tutamacı" deme, "her kareye anahtar kare" de (adım 10.3).
 **12.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
 `Kaynak: temiz oda (OpenCurve'den yalnız "otomatik Bezier yerine tam eğri" fikri); kod alınmadı, yalnız Suflo'nun Rebound (MIT,
 adım 9'da atıflı) motoru kullanıldı, yeni bildirim gerekmez.`
+
+### Adım 13: Hız Rampası için Özel eğri editörü (Pro: 'speedramp' kapısı ve 3 deneme hakkı; düzenlemek ücretsiz)
+
+Ne değişti: Hız Rampası'na 12. kart **Özel eğri** (`js/speedramp.js` LIST `{ id: 'ozel', group: 'ozel', hit: null, keys: [] }`).
+Anahtarlar seçeneklerden gelir (`o.ozelKeys` [[t, %]], `o.ozelHit`); `SufloSpeedRamp.ozelDogrula` onları 2–8 noktaya, t = 0 ve
+t = 1 uçlarına, %10–%1000 hıza oturtur (aynı t'de en çok iki nokta = sert basamak). Sonra her şey hazır eğrilerle aynı yoldan
+geçer: yoğunluk, yumuşatma, vuruş anı hizalama, parçalama, Otomatik / Dengeli kaynak bütçesi, uyarı kodları, srcFrames ≤ F.
+`hostPlan` ve `KS_applySpeedRamp` değişmedi (host'a dokunulmadı). Düzenleyici `SufloEgriEditor` (adım 10) yeni **'hiz' modu**
+(`js/egri.js` › `hizOlustur`; geometri saf ve testli: `SufloSpeedRamp.ozel`). Her hazır kartta **Düzenle** anahtarları kopyalar
+(aynı anahtarlar bire bir aynı planı verir; testli). Önizleme her düzenlemede 80 ms ertelenerek, Premiere'e gitmeden yenilenir.
+Son özel eğri `suflo.hizRampa.ozel`, adlı özel rampalar (en çok 12) `suflo.hizRampa.ozelKayitlar` anahtarında, yalnız bu
+bilgisayarın yerel deposunda (her erişim korumalı; bozuk depo başlangıç eğrisine döner). Temiz oda: OpenCurve'den yalnız "hız
+eğrisini noktalarla düzenleme" fikri; kod, tablo, sabit, metin sözdizimi ya da arayüz alınmadı. Rebound'dan kod alınmadı (Suflo'nun
+kendi düzenleyicisi ve hız rampası matematiği); yeni bildirim gerekmez.
+
+**13.1 Fiyat (bilgi).** Senin kuralın: Hız Rampası'nın katmanı aynen. Özel eğriyi çizmek, Düzenle, önizleme ve kayıtlar
+**ücretsiz**; timeline'a uygulamak `Pro.gate('speedramp')` ve aynı 3 deneme hakkı (hak yalnız en az bir klip rampalanınca düşer).
+`js/deneme.js`'e yeni anahtar eklenmedi, Ayarlar › Pro / deneme tablosu değişmedi. Sunucu tarafında yapılacak bir şey yok.
+
+**13.2 Tasarım kararlarını onayla (10 dk, karar).**
+(a) **Başlangıç eğrisi:** Özel eğri ilk açıldığında tek derin ağır çekim (%100 → %30 → %100, ağır çekim anı 0,5). Başka bir
+başlangıç istersen `js/speedramp.js` › `OZEL_VARSAYILAN`.
+(b) **Alt+tık sert basamak:** noktanın hızı solda kalır, aynı anda bir sonraki noktanın hızına atlanır (o da aynıysa öncekine,
+o da aynıysa iki katına). İkinci Alt+tık tıklanan noktayı bırakıp basamağı kapatır. Alt'ın Windows'ta Premiere menüsünü
+uyandırma ihtimaline karşı aynı iş **Sert basamak** düğmesinde de var (deneme listesi 13.4).
+(c) **Yoğunluk ve Yumuşatma özel eğriye de uygulanır** (Düzenle ile kopyalanan eğri hazır karttakiyle aynı rampayı versin diye).
+(d) **Uç noktalar** silinmez ve zamanı oynamaz (yalnız hızı); en çok 8 nokta; iki ayrı nokta arasında en az %1 zaman.
+(e) **Klavye:** düzenleyicide tuş kısayolu yok (Delete / ok tuşları CEP'te Premiere'e de gider: seçili klibi silebilirdi). Fare
+dışı yol: Düzenle (Enter), Sert basamak / Noktayı sil / Sıfırla düğmeleri, kayıtlı rampalar.
+(f) **Ritme Rampa'da Düzenle yok:** plan "her önayar kartı" diyor, ama Ritme Rampa'nın sabit anahtarı yok (eğrisi her klipte
+o klibin vuruşlarından kurulur); kopyalanacak bir eğri olmadığı için kartında Düzenle gösterilmez. İstersen o anki klibin vuruş
+eğrisini kopyalayan bir Düzenle eklenebilir (klibe bağlı, başka klipte anlamı değişir).
+Farklı istersen söyle.
+
+**13.3 Paylaşım kodu (bilgi, adım 15'e not).** Plan özel rampaların `SFC1` koduyla `tur: 'hiz'` olarak paylaşılmasını adım 15'e
+bırakıyor; bu adımda kod yok. Depo biçimi adım 15'in `keys` alanıyla aynı (`[[t, %]]`, `SufloSpeedRamp.ozelYuzde`), ağır çekim
+anı `hit` (0,02–0,98 ya da null); adım 15 `SufloSpeedRamp.ozelDogrula`'yı doğrulayıcı olarak kullanabilir.
+
+**13.4 Premiere'de dene (25–35 dk).** `marketing/v3.4-deneme-listesi.md` › `## 13`. Özellikle **13.3** (sürüklerken panel
+takılmıyor mu; yavaş makinede 80 ms gecikme az gelirse `js/hiz-rampasi.js` › `OZEL_GECIKME`), **13.4** (Windows'ta Alt+tık ve
+Premiere menüsü), **13.6** (uygulanan parçalar önizlemeyle aynı) ve **13.7** (hızlı özel eğride medya sonu). Hem yeni (2025 / 2026)
+hem eski (14.x / 2020, CEF 74) Premiere'de.
+
+**13.5 Yenilikler penceresi ve tanıtım (3.4 yayınında, isteğe bağlı).** `js/app.js` › `YENILIKLER`'e "Hız Rampası'nda kendi
+eğrini çiz" maddesi (`sekme: "hiz"`) eklenebilir; tanıtım kartı (`#hiz-tanitim`) hâlâ "11 eğri" diyor, istersen "11 eğri +
+özel eğri" yap. Bu adımda bilerek dokunulmadı.
+
+**13.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
+`Kaynak: temiz oda (OpenCurve'den yalnız "hız eğrisini noktalarla düzenleme" fikri; Rebound'dan "ortak düzenleyiciyle hız grafiği"
+fikri); kod alınmadı, Suflo'nun kendi SufloEgriEditor'ü ve hız rampası matematiği kullanıldı, yeni bildirim gerekmez.`
