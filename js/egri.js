@@ -1390,7 +1390,10 @@ window.KEgri = (function () {
       if (!onbellek || !onbellek.props || !onbellek.props.length) durum("Önce anahtar kareli bir klip seç.", "warn");
       else {
         var kl = kayitlar();
-        var ogesi = function (p) { return { keys: p.keys, uclar: M.uclarDan(M.canliKayitlar(kl, p)) }; };
+        // canlı yaylanmaların ara anahtarları da tek tek gezilmez (iniş → son yaylanma anahtarı tek adım)
+        var ogesi = function (p) {
+          return { keys: p.keys, uclar: M.uclarDan(M.canliKayitlar(kl, p)).concat(M.canliYaylanlar(kl, p).map(function (y) { return [y.tL, y.son]; })) };
+        };
         var secili = satirlar().filter(function (s) { return !kapali[s.anahtar]; }).map(function (s) { return ogesi(s.prop); });
         var fps = onbellek.fps || (onbellek.props[0] && onbellek.props[0].fps) || 30;
         t = M.sonrakiCift(secili.length ? secili : onbellek.props.map(ogesi), ph, fps);

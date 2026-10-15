@@ -401,7 +401,8 @@
    * Varış hızı önceki anahtardan (Δv/Δt, boyut başına): önceki anahtar Suflo'nun sık Eğri anahtarıysa bu, hemen önce
    * pişirilmiş eğrinin bitiş eğimidir. Sonraki anahtar (yoksa klibin sonu) sınırdır: yaylanma onu geçmez.
    * Döner: { varislar: [{ iL, tL, vL, tP, vP, tN, vN, sinir, hiz, eski (değişecek kayıt | null) }], kod, atlanan: [kod] }
-   *   kod (hiç varış yoksa): 'degerYok' | 'disinda' | 'varisYok' (iniş anahtarına hareket gelmiyor) | 'klipDisi'
+   *   kod (hiç varış yoksa): 'degerYok' | 'disinda' | 'varisYok' (iniş anahtarına hareket gelmiyor) | 'klipDisi' |
+   *   'inisYok' (playhead bir yaylanmanın penceresinde ama iniş anahtarı silinmiş)
    */
   function varislar(prop, kayitlar, o) {
     o = o || {};
@@ -424,12 +425,17 @@
       var pen = null;
       for (var a = canliY.length - 1; a >= 0 && !pen; a--) if (yaylanPencerede(canliY[a], ph, tol)) pen = canliY[a];
       var iL = -1;
-      if (pen) iL = indis(keys, pen.tL, tol);
-      else {
+      if (pen) {
+        iL = indis(keys, pen.tL, tol);
+        // iniş anahtarı silinmiş, yaylanma anahtarları duruyor: kendi anahtarlarının üstüne yaylanma yazılmaz
+        if (iL < 0) { sonuc.kod = "inisYok"; return sonuc; }
+      } else {
         var c = ciftBul(keys, ph, fps, egriUclari);
         if (c) iL = c.i1;
       }
       if (iL < 0) { sonuc.kod = "disinda"; return sonuc; }
+      // iniş bir yaylanmanın kendi anahtarı olamaz (ör. playhead son yaylanma anahtarının üstünde)
+      if (canliY.some(function (y) { return y.idx.indexOf(iL) !== -1; })) { sonuc.kod = "disinda"; return sonuc; }
       canliY.forEach(function (y) { if (Math.abs(y.tL - keys[iL]) <= tol) degisen.push(y); });
       adaylar = [iL];
     }
@@ -832,7 +838,8 @@
     aralik: "geçersiz plan",
     deger: "geçersiz plan",
     fps: "geçersiz plan",
-    sonrakiYok: "sonraki anahtar kare yerinde değil"
+    sonrakiYok: "sonraki anahtar kare yerinde değil",
+    inisYok: "iniş anahtar karesi silinmiş; önce yaylanmayı Geri al ile kaldır"
   };
   var HATA = {
     sekansYok: "Aktif sekans yok. Bir sekans aç.",

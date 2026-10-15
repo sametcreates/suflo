@@ -278,6 +278,10 @@ ok("klip başına ret kodları satırda nedeniyle (genel 'uygulanamadı' değil)
   var ic1 = M.varislar(py, [yKayit], { ph: 12.3 });
   ok("varış (tek): playhead yaylanmanın penceresinde → o iniş yeniden uygulanır (eski = kayıt, sonraki = 15)", ic1.varislar.length === 1 && ic1.varislar[0].tL === 12 &&
     ic1.varislar[0].eski && ic1.varislar[0].eski.id === yKayit.id && ic1.varislar[0].tN === 15 && js(ic1.varislar[0].hiz) === js([500, 0]), js(ic1));
+  var inissiz = satir(yk.filter(function (t) { return t !== 12; }), yd.filter(function (v, i) { return yk[i] !== 12; }));
+  var vInissiz = M.varislar(inissiz, [yKayit], { ph: 12.3 });
+  ok("varış (tek): iniş anahtarı silinmiş, playhead yaylanmanın penceresinde → 'inisYok' (kendi anahtarlarının üstüne yazılmaz), satır Geri al'ı yine bulur",
+    vInissiz.varislar.length === 0 && vInissiz.kod === "inisYok" && /Geri al/.test(M.nedenMetni("inisYok")) && M.yaylanSatirKaydi([yKayit], inissiz, 12.3).id === yKayit.id, js(vInissiz));
   var once = M.varislar(py, [yKayit], { ph: 11.5 });
   ok("varış (tek): çift iniş anahtarında bitiyor → aynı iniş, eski yaylanma değişir", once.varislar[0].tL === 12 && once.varislar[0].eski.id === yKayit.id && once.varislar[0].tN === 15);
   var sonra = M.varislar(py, [yKayit], { ph: 13.5 });

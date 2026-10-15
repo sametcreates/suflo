@@ -691,6 +691,20 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
     yrGeri.arg.records.length === 1 && yrGeri.arg.records[0].id === "kryay1" && yrGeri.arg.egriler.length === 1 && yrGeri.arg.egriler[0].id === "kregri9" &&
     KR.depo(yr.ctx.localStorage).oku("C:/p/deneme.prproj").length === 0 &&
     yr.dom["egri-status"].textContent === "Geri alındı: 3 anahtar kare silindi. · Uçları bu anahtar karelerde olan 1 Suflo eğrisi de kaldırıldı.", js([yrGeri && yrGeri.arg, yr.dom["egri-status"].textContent]));
+  // Sonraki çift: canlı yaylanmanın ara anahtarları tek tek gezilmez (iniş 14 → son yaylanma anahtarı 14,4)
+  var dpS2 = {};
+  KR.depo({ getItem: function (k) { return dpS2[k] === undefined ? null : dpS2[k]; }, setItem: function (k, v) { dpS2[k] = v; }, removeItem: function (k) { delete dpS2[k]; } }).ekle("C:/p/deneme.prproj", [yKay]);
+  var ysc = kur({ depo: dpS2, cevap: function (fn) {
+    if (fn === "KS_easePeek") return peek(14.02);
+    if (fn === "KS_easeScan") return tarama(14.02, [prop("nA", "Röportaj.mp4", 1, 0, [12, 14, 14.08, 14.24, 14.4, 16], { t0: 14, t1: 14.08, i0: 1, i1: 2, ic: 0, kayitli: false }, 100, 100)]);
+    if (fn === "KS_setPlayerPosition") return { ok: true };
+    return { ok: false };
+  } });
+  ysc.ctx._tab.egri(); await bekle(10);
+  ysc.dom["egri-sonraki"].tetikle("click");
+  await bekle(20);
+  var ygit = ysc.cagri.filter(function (c) { return c.fn === "KS_setPlayerPosition"; }).map(function (c) { return c.arg.sec; });
+  ok("Sonraki çift: yaylanmanın ara anahtarları atlanır (14,02 → 14,4 + 0,25 kare)", js(ygit) === js([14.41]), js(ygit));
   // İngilizce: kart ve bildirim metinleri çevrilir
   var I18Nyy = require(path.join(KOK, "js", "i18n.js"));
   I18Nyy.setDictionary(require(path.join(KOK, "i18n", "en.js")));

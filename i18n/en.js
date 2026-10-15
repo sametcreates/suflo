@@ -2751,6 +2751,7 @@
     "iniş anahtar karesi klibin görünen kısmının dışında": "the landing keyframe is outside the visible part of the clip",
     "sonraki anahtar kareye ya da klibin sonuna 2 kareden az yer var": "there's less than 2 frames of room before the next keyframe or the clip end",
     "sonraki anahtar kare yerinde değil": "the next keyframe is gone",
+    "iniş anahtar karesi silinmiş; önce yaylanmayı Geri al ile kaldır": "the landing keyframe was deleted; remove the follow-through with Undo first",
     // host codes (js/egri-model.js HATA)
     "Aktif sekans yok. Bir sekans aç.": "No active sequence. Open a sequence.",
     "Eğri başka bir sekans için hazırlanmıştı. Liste yenilendi; yeniden dene.": "The curve was prepared for another sequence. The list was refreshed; try again.",
