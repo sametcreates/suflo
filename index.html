@@ -1091,6 +1091,27 @@
         <li><span>3</span> Turuncu bölümleri kontrol et → <b>Kesimleri uygula</b></li>
       </ol>
     </div>
+    <!-- 3.4 adım 7: kesim kapsamı ve korunan katmanlar (js/magiccut.js kapsamSec / renderKatmanlar) -->
+    <div class="seg-ctl full" id="cut-scope" role="group" aria-label="Kesim kapsamı">
+      <button class="on" data-s="clip" type="button">Seçili klip</button>
+      <button data-s="inout" type="button" title="Sekansın In ve Out noktaları arası: seçili ses katmanlarının karışımı dinlenir">In → Out</button>
+      <button data-s="entire" type="button" title="Tüm sekans: seçili ses katmanlarının karışımı dinlenir">Sekans</button>
+    </div>
+    <details class="adv cut-katman" id="cut-katman">
+      <summary>Katmanlar <span id="cut-katman-ozet" class="dim"></span></summary>
+      <p id="cut-katman-ipucu" class="hint"></p>
+      <div id="cut-dinle-satir" class="cut-iz-satir" hidden>
+        <div class="cut-iz-baslik">Dinlenecek ses</div>
+        <div id="cut-dinle-izler" class="tracks"></div>
+        <p class="hint">Sessizlik bu katmanların karışımında aranır. Müziği dinlemeye katma: sessizlikleri doldurur.</p>
+      </div>
+      <div id="cut-koru-satir" class="cut-iz-satir" hidden>
+        <div class="cut-iz-baslik">Kesilmeyecek katmanlar</div>
+        <div id="cut-koru-izler" class="tracks"></div>
+        <p class="hint">Korunan katman kesilmez ve kaymaz (arka plan müziği gibi). Kesikli çerçeve: öneri.</p>
+      </div>
+      <button id="cut-katman-yenile" class="btn tiny" type="button" title="Sekansın katmanlarını Premiere'den yeniden oku">Yenile</button>
+    </details>
     <div class="action-bar">
       <button id="cut-analyze" class="btn primary big" disabled>
         <span class="btn-label">Sessizlikleri bul</span>
@@ -1099,13 +1120,20 @@
     </div>
     <div id="cut-progress" class="progress-line" hidden><i></i></div>
     <div id="cut-status" class="inline-status"></div>
+    <!-- 3.4 adım 8: kesimden sonra altyazı (js/kesim-altyazi.js; ücretsiz) -->
+    <div id="cut-altyazi" class="kesim-altyazi" hidden>
+      <span id="cut-altyazi-metin" class="kesim-altyazi-metin"></span>
+      <button id="cut-altyazi-uyarla" class="btn tiny" type="button" title="Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)">Altyazıyı yeni kurguya uyarla</button>
+    </div>
 
     <details class="adv">
       <summary>Hassasiyet</summary>
+      <p class="hint cut-canli-ipucu">Analizden sonra kaydırıcılar kesim haritasını anında günceller; ffmpeg yeniden çalışmaz.</p>
       <div class="row">
         <label>Eşik</label>
         <input id="cut-noise" type="range" min="-60" max="-20" value="-38">
         <span id="cut-noise-val" class="mono">-38 dB</span>
+        <button id="cut-noise-auto" class="btn tiny" type="button" title="Eşiği klibin kendi sesinden öner: arka plan gürültüsünün 8 dB üstü">Otomatik</button>
       </div>
       <div class="row">
         <label>Min. sessizlik</label>
@@ -1117,6 +1145,11 @@
         <input id="cut-pad" type="range" min="0" max="0.5" step="0.05" value="0.15">
         <span id="cut-pad-val" class="mono">0.15 sn</span>
       </div>
+      <div class="row" title="İki kesim arasında bundan kısa konuşma kalırsa kesimler birleşir (0 = kapalı)">
+        <label>Min. konuşma</label>
+        <input id="cut-minkeep" type="range" min="0" max="0.6" step="0.05" value="0">
+        <span id="cut-minkeep-val" class="mono">0 sn</span>
+      </div>
     </details>
 
     <div id="cut-result" hidden>
@@ -1126,10 +1159,13 @@
       </div>
       <audio id="cut-audio" class="tc-audio" controls hidden></audio>
       <div id="cut-bar" class="cut-bar" title="Turuncu: kesilecek — tıklayıp kapatabilirsin"></div>
+      <canvas id="cut-wave" class="cut-wave" hidden aria-label="Ses zarfı ve eşik çizgisi"></canvas>
       <details class="adv">
         <summary>Kesim listesi</summary>
         <div id="cut-ranges" class="segments"></div>
       </details>
+      <!-- korunan katman uyarıları: video + ripple (Boşluk bırakarak uygula), bağlı çiftin ayrılması -->
+      <div id="cut-koru-uyari" class="cut-koru-uyari" hidden></div>
       <div class="seg-ctl full" id="cut-target">
         <button class="on" data-m="clone">Kopya sekansta<em>önerilen</em></button>
         <button data-m="here">Bu sekansta</button>
@@ -1189,6 +1225,12 @@
       </div>
       <div id="tc-progress" class="progress-line" hidden><i></i></div>
       <div id="tc-status" class="inline-status"></div>
+      <!-- 3.4 adım 8: kesimden sonra altyazı (js/kesim-altyazi.js; ücretsiz) -->
+      <div id="tc-altyazi" class="kesim-altyazi" hidden>
+        <span id="tc-altyazi-metin" class="kesim-altyazi-metin"></span>
+        <button id="tc-altyazi-aktar" class="btn tiny" type="button" title="Kesilmeyen kelimelerden yeni kurgunun zamanlarıyla altyazı kurar (yeniden yazıya dökmeden)">Altyazıya aktar</button>
+        <button id="tc-altyazi-uyarla" class="btn tiny" type="button" title="Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)">Altyazıyı yeni kurguya uyarla</button>
+      </div>
       <div id="tc-sessiz" class="sessiz-uyari" role="alert" hidden>
         <span id="tc-sessiz-metin" class="sessiz-uyari-metin"></span>
         <div class="sessiz-uyari-btns">
@@ -2649,6 +2691,7 @@
   <script src="js/caption-mogrt-json.js"></script>
   <script src="js/filigran.js"></script>
   <script src="js/overlay-render.js"></script>
+  <script src="js/kesim-esle.js"></script>
   <script src="js/captions.js"></script>
   <script src="js/emoji-picker.js"></script>
   <script src="js/textcut.js"></script>
@@ -2661,6 +2704,8 @@
   <script src="js/transitions.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/highlights.js"></script>
+  <script src="js/sessizlik.js"></script>
+  <script src="js/kesim-altyazi.js"></script>
   <script src="js/magiccut.js"></script>
   <script src="js/konusma-kes.js"></script>
   <script src="js/referral-core.js"></script>

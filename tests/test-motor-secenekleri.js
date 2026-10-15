@@ -340,8 +340,9 @@ function belgeOrtami(o) {
     govde("function dosyaDilEki("), govde("function splitAt("), govde("function yerelKimlik("), govde("function yerelDurumMetni(")
   ].join("\n");
   return new Function("K", "KEngine", "WAR", "WW", "el", "KApp",
-    "var segments = [], segmentsMode = 'plain', ceviriDili = '', algilananDil = '', shortsYuklenen = '', ornekBelge = false, anlik = 0;\n" +
-    "function shortsDugmesi() {} function snapshot() { anlik++; } function render() {} function saveDraftSoon() {}\n" +
+    "var segments = [], segmentsMode = 'plain', ceviriDili = '', algilananDil = '', shortsYuklenen = '', ornekBelge = false, ornekSekansId = '', anlik = 0;\n" +
+    "var belgeSekansId = '', belgeSira = 0, belgeKesimAdi = null;\n" +
+    "function shortsDugmesi() {} function snapshot() { anlik++; } function render() {} function saveDraftSoon() {} function belgeDegisti() {}\n" +
     "function arayuzDili() { return 'tr'; }\n" + kod +
     "\nfunction dil() { " + dilSatiri[1] + " }\nfunction paketDili() { return " + paketSatiri[1] + "; }\n" +
     "return { durumAl: durumAl, durumYukle: durumYukle, kayitDili: kayitDili, splitAt: splitAt, styleLocale: styleLocale, dosyaDilEki: dosyaDilEki," +

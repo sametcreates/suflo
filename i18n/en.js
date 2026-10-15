@@ -2908,6 +2908,156 @@
     "İptal ediliyor…": "Canceling…",
     "İptal edildi.": "Canceled.",
     "İptal edildi": "Canceled",
+    // Auto Cut 3.4: live threshold (decode once, instant preview, min. speech, auto threshold)
+    "Analizden sonra kaydırıcılar kesim haritasını anında günceller; ffmpeg yeniden çalışmaz.": "After the analysis, the sliders update the cut map instantly; ffmpeg doesn't run again.",
+    "Eşiği klibin kendi sesinden öner: arka plan gürültüsünün 8 dB üstü": "Suggest a threshold from the clip's own audio: 8 dB above the background noise",
+    "İki kesim arasında bundan kısa konuşma kalırsa kesimler birleşir (0 = kapalı)": "If less speech than this is left between two cuts, the cuts are merged (0 = off)",
+    "Min. konuşma": "Min. speech",
+    "Ses zarfı ve eşik çizgisi": "Audio envelope and threshold line",
+    "Ses çözümleniyor… ({} sn)": "Decoding audio… ({} s)",
+    "Eşik ve min. sessizlik bu klipte canlı güncellenemiyor: Sessizlikleri bul ile yenile.": "Threshold and min. silence can't update live for this clip: refresh with Find silences.",
+    "Önce Sessizlikleri bul: otomatik eşik klibin kendi sesinden ölçülür.": "Run Find silences first: the auto threshold is measured from the clip's own audio.",
+    // fallback flow (the audio couldn't be decoded, silencedetect map): Find silences again can't help
+    "Otomatik eşik bu klipte kullanılamıyor: ses çözümlenemedi. Eşiği elle ayarla, sonra Sessizlikleri bul.":
+      "Auto threshold isn't available for this clip: its audio couldn't be decoded. Set the threshold by hand, then run Find silences.",
+    "⚠ Konuşma ile arka plan gürültüsü arasındaki fark az ({} dB): kesimler kelime kırpabilir ya da sessizlik kaçırabilir. Önce Sesi iyileştir'i dene ya da eşiği elle ayarla.": "⚠ There's little difference between speech and background noise ({} dB): cuts may clip words or miss silences. Try Enhance audio first or set the threshold by hand.",
+    "Otomatik eşik: {} dB (arka plan {} dB, konuşma {} dB)": "Auto threshold: {} dB (background {} dB, speech {} dB)",
+    "kısa konuşma birleştirildi": "short speech merged",
+    "Kısa konuşma ({} sn)": "Short speech ({} s)",
+    "Kısa konuşma ({} sn) — Min. konuşma nedeniyle kesime katıldı{}": "Short speech ({} s) — joined the cut because of Min. speech{}",
+    "Min. konuşma nedeniyle kesime katıldı": "joined the cut because of Min. speech",
+    "birleşik": "merged",
+    "{n} birleşik": "{} merged",
+    "−{} sn (%{})": "−{} s ({}%)",
+    "Min. konuşma: araya giren kısa konuşma da bu kesime katıldı": "Min. speech: the short speech in between joined this cut too",
+    "Kesimler doğrulanıyor… ({} sn)": "Verifying cuts… ({} s)",
+    "Doğrulamadan sonra uygulanacak kesim kalmadı — eşiği ya da min. sessizliği değiştir.": "No cuts left to apply after verification — change the threshold or min. silence.",
+    "Doğrulama kesimleri değiştirdi (önizleme {n} kesim, doğrulama {n} kesim): haritayı kontrol et, sonra yeniden Kesimleri uygula.": "Verification changed the cuts ({} in the preview, {} verified): check the map, then click Apply cuts again.",
+    // Auto Cut 3.4 step 7: cut scope (Selected clip | In → Out | Sequence), audio to analyze, protected tracks
+    "Kesim kapsamı": "Cut scope",
+    "Sekansın In ve Out noktaları arası: seçili ses katmanlarının karışımı dinlenir": "Between the sequence's In and Out points: the mix of the chosen audio tracks is analyzed",
+    "Tüm sekans: seçili ses katmanlarının karışımı dinlenir": "Whole sequence: the mix of the chosen audio tracks is analyzed",
+    "Katmanlar": "Tracks",
+    "Dinlenecek ses": "Audio to analyze",
+    "Sessizlik bu katmanların karışımında aranır. Müziği dinlemeye katma: sessizlikleri doldurur.": "Silences are detected in the mix of these tracks. Leave music out: it fills the silences.",
+    "Kesilmeyecek katmanlar": "Protected tracks",
+    "Korunan katman kesilmez ve kaymaz (arka plan müziği gibi). Kesikli çerçeve: öneri.": "A protected track isn't cut and doesn't shift (like background music). Dashed outline: suggestion.",
+    "Sekansın katmanlarını Premiere'den yeniden oku": "Read the sequence's tracks from Premiere again",
+    "Yenile": "Refresh",
+    "Bir sekans aç.": "Open a sequence.",
+    "Önce bir sekans aç.": "Open a sequence first.",
+    "Sekans boş: önce klip ekle.": "The sequence is empty: add clips first.",
+    "Bu aralıkta ses klibi yok: sessizlik aranacak ses bulunamadı.": "There are no audio clips in this range: there's no audio to search for silences.",
+    "Sekansta In / Out yok: Premiere'de I ve O ile işaretle ya da Sekans kapsamını seç.": "The sequence has no In / Out: mark them in Premiere with I and O, or choose the Sequence scope.",
+    "Katmanları görmek için bir sekans aç.": "Open a sequence to see its tracks.",
+    "Katmanlar okunamadı.": "Couldn't read the tracks.",
+    "Katmanlar okunamadı: {}": "Couldn't read the tracks: {}",
+    "Katmanlar sekanstan okunur: bu bölümü açınca ya da Sessizlikleri bul'da.": "Tracks are read from the sequence when you open this section or run Find silences.",
+    "Katmanlar okunuyor…": "Reading tracks…",
+    "katmanlar okunamadı — Premiere meşgul olabilir, yeniden dene.": "couldn't read the tracks — Premiere may be busy, try again.",
+    "Dinlenecek ses değişti: Sessizlikleri yeniden bul.": "The audio to analyze changed: run Find silences again.",
+    "Dinlenecek bir ses katmanı seç (Katmanlar › Dinlenecek ses).": "Choose an audio track to analyze (Tracks › Audio to analyze).",
+    "Sekans sesi dışa aktarılıyor…": "Exporting sequence audio…",
+    "Premiere sesi dışa aktaramadı.": "Premiere couldn't export the audio.",
+    "Premiere'de susturulmuş: dinlenirse dışa aktarımda geçici olarak açılır": "Muted in Premiere: if analyzed, it's unmuted temporarily for the export",
+    "Sessizlik bu katmanların karışımında aranır": "Silences are detected in the mix of these tracks",
+    "Bu aralıkta klip yok": "No clips in this range",
+    "Premiere'de kilitli": "Locked in Premiere",
+    "Premiere'de kilitli: zaten kesilmez": "Locked in Premiere: it isn't cut anyway",
+    "Öneri: tek bir klip aralığın çoğunu kaplıyor (müzik ya da ambiyans olabilir)": "Suggestion: a single clip covers most of the range (could be music or ambience)",
+    "Adı müzik / ambiyans: varsayılan olarak korunur": "Named music / ambience: protected by default",
+    "Korunan video katmanı Ripple'da kaymaz: yalnız boşluk modunda güvenli": "A protected video track doesn't shift in Ripple: only safe in gap mode",
+    "Korunan katman kesilmez ve kaymaz": "A protected track isn't cut and doesn't shift",
+    "{n} dinlenen": "{} analyzed",
+    "{n} korunan": "{} protected",
+    "⚠ Korunan video katmanı ({}) Ripple'da kaymaz: kurgunun geri kalanıyla senkronu bozulur. Boşluk bırakarak uygula ya da korumayı kaldır.":
+      "⚠ The protected video track ({}) doesn't shift in Ripple: it goes out of sync with the rest of the edit. Apply leaving gaps, or remove the protection.",
+    "Boşluk bırakarak uygula": "Apply leaving gaps",
+    "Kesimler silinir, yerlerinde boşluk kalır: hiçbir katman kaymaz": "Cuts are removed and leave gaps: no track shifts",
+    "⚠ Bağlı klipler ayrılacak: bir tarafı korunuyor, öbür tarafı kesiliyor ({n} çift).": "⚠ Linked clips will be split: one side is protected, the other is cut ({} pairs).",
+    "A{n} korunuyor, V{n} kesiliyor": "A{} protected, V{} cut",
+    "V{n} korunuyor, A{n} kesiliyor": "V{} protected, A{} cut",
+    "ve {n} çift daha": "and {} more pairs",
+    "Korunan video katmanı Ripple'da kaymaz: Boşluk bırakarak uygula ya da korumayı kaldır.": "A protected video track doesn't shift in Ripple: apply leaving gaps, or remove the protection.",
+    // KS_applyCuts removed / selected nothing (every cut fell into empty parts of the timeline): no trial is used
+    "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, timeline değişmedi.":
+      "⚠ No clips were cut: the cuts only fell on empty parts of the timeline (or locked tracks), so the timeline didn't change.",
+    "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, açılan kopya sekans özgünüyle aynı.":
+      "⚠ No clips were cut: the cuts only fell on empty parts of the timeline (or locked tracks), so the duplicate sequence is the same as the original.",
+    "korunan: {}": "protected: {}",
+    "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et, gerekirse kopyayı silip korumayı değiştirerek yeniden uygula.":
+      "⚠ A protected track changed: Premiere may have cut its linked clip too. The original sequence is unchanged; check the copy, and if needed delete it and apply again with different protection.",
+    "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Kontrol et: tek Ctrl+Z (Mac: Cmd+Z) geri getirmez, her kesim ve silme ayrı adımdır; Geçmiş (History) panelinde kesimlerden önceki adıma dön.":
+      "⚠ A protected track changed: Premiere may have cut its linked clip too. Check it: a single Ctrl+Z (Mac: Cmd+Z) won't restore it, since every cut and removal is its own step; in the History panel, go back to the step before the cuts.",
+    "⚠ Korunan katmanlardan bazıları sekansta bulunamadı, kesilmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et.":
+      "⚠ Some protected tracks weren't found in the sequence and may have been cut. The original sequence is unchanged; check the copy.",
+    "⚠ Korunan katmanlardan bazıları sekansta bulunamadı, kesilmiş olabilir. Kontrol et: tek Ctrl+Z (Mac: Cmd+Z) geri getirmez, her kesim ve silme ayrı adımdır; Geçmiş (History) panelinde kesimlerden önceki adıma dön.":
+      "⚠ Some protected tracks weren't found in the sequence and may have been cut. Check it: a single Ctrl+Z (Mac: Cmd+Z) won't restore it, since every cut and removal is its own step; in the History panel, go back to the step before the cuts.",
+    "✕ Katman düzeni değişti (katman eklendi, silindi ya da yeniden adlandırıldı): kesimler uygulanmadı. Katmanlar yeniden okunuyor: korunanları kontrol et, sonra yeniden Kesimleri uygula.":
+      "✕ The track layout changed (a track was added, deleted or renamed): the cuts weren't applied. Reading the tracks again: check the protected tracks, then click Apply cuts again.",
+    "etkin sekans analiz sırasında değişti — Sessizlikleri yeniden bul.": "the active sequence changed during the analysis — run Find silences again.",
+    // the export's In / Out (or sequence end) no longer matches the range the tracks were read for
+    "In / Out analiz sırasında değişti — Sessizlikleri yeniden bul.": "In / Out changed during the analysis — run Find silences again.",
+    "sekansın süresi analiz sırasında değişti — Sessizlikleri yeniden bul.": "the sequence length changed during the analysis — run Find silences again.",
+    // Apply re-reads the track layout after a sequence switch; if it can't, it won't send cuts without the protected tracks
+    "Katmanlar okunamadı: korunan katmanlar bilinmeden kesim uygulanmaz. Katmanlar › Yenile'ye bas, sonra yeniden Kesimleri uygula.":
+      "Couldn't read the tracks: cuts aren't applied without knowing the protected tracks. Click Tracks › Refresh, then click Apply cuts again.",
+    "⚠ Korunan video katmanı kaymasın diye kesimler boşluk bırakılarak silindi.": "⚠ Cuts were removed leaving gaps so the protected video track wouldn't drift.",
+    "✕ Etkin sekans değişti: kesimler uygulanmadı. Analiz edilen sekansı aç ya da Sessizlikleri yeniden bul.": "✕ The active sequence changed: the cuts weren't applied. Open the analyzed sequence or run Find silences again.",
+    // Selected clip scope: the analyzed clip was moved / trimmed in Premiere after the analysis (cuts are in sequence time)
+    "Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da aynı dosyanın başka klibi seçildi): öneriler eski konumdaydı. Sessizlikleri yeniden bul.":
+      "The selected clip changed after the analysis (moved, trimmed, or another clip of the same file was selected): the suggestions were at its old position. Run Find silences again.",
+    "✕ Seçili klip analizden sonra değişti (taşındı, kırpıldı ya da başka klip seçildi): kesimler eski konuma düşerdi, uygulanmadı. Sessizlikleri yeniden bul.":
+      "✕ The selected clip changed after the analysis (moved, trimmed, or another clip selected): the cuts would have landed at its old position, so they weren't applied. Run Find silences again.",
+    "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden Kesimleri uygula.":
+      "✕ Couldn't read the clip's position from Premiere: the cuts weren't applied. Click Apply cuts again.",
+    // host.jsx (KS_applyCuts expectSeqId)
+    "Etkin sekans degisti; kesimler uygulanmadi. Sessizlikleri yeniden bul.": "The active sequence changed; the cuts weren't applied. Run Find silences again.",
+    "Katman duzeni degisti; kesimler uygulanmadi. Katmanlari yeniden oku.": "The track layout changed; the cuts weren't applied. Read the tracks again.",
+    // Auto Cut / Text-based cut 3.4 step 8: keep captions in sync after cuts (js/kesim-altyazi.js, js/captions.js)
+    "Altyazıyı yeni kurguya uyarla": "Adapt captions to the new edit",
+    "Altyazı sekmesindeki satırları kesilen kurgunun zamanlarına taşır; kesilen konuşmanın satırları çıkar (Ctrl+Z geri alır)":
+      "Moves the lines in the Captions tab to the timing of the cut edit; lines for speech that was cut are removed (Ctrl+Z undoes it)",
+    "Altyazıya aktar": "Send to captions",
+    "Kesilmeyen kelimelerden yeni kurgunun zamanlarıyla altyazı kurar (yeniden yazıya dökmeden)":
+      "Builds captions from the words that weren't cut, timed to the new edit (no new transcription)",
+    "Altyazı sekmesindeki {n} satır kesimden önceki kurguya göre.": "The {} lines in the Captions tab still follow the edit from before the cut.",
+    "Kesilmeyen {n} kelime yeni kurgunun zamanlarıyla altyazıya hazır.": "{} words that weren't cut are ready for captions, timed to the new edit.",
+    "Altyazı yeni kurguya uyarlandı: {n} satır": "Captions adapted to the new edit: {} lines",
+    "kesilen {n} satır çıkarıldı": "{} cut lines removed",
+    "{n} satır kısaldı": "{} lines shortened",
+    "Altyazı oluşturulurken uyarlanamaz; iş bitince yeniden dene.": "Captions can't be adapted while they're being created; try again when the job finishes.",
+    "Altyazı sekmesinde uyarlanacak belge yok.": "There are no captions to adapt in the Captions tab.",
+    "Altyazı sekmesindeki belge bu kurgunun sekansına ait değil.": "The captions in the Captions tab don't belong to this edit's sequence.",
+    "Altyazı zaten yeni kurguya göre.": "The captions already follow the new edit.",
+    "Altyazı uyarlanamadı.": "Couldn't adapt the captions.",
+    "{n} altyazı satırı yeni kurguya göre Altyazı sekmesinde": "{} caption lines in the Captions tab, timed to the new edit",
+    "Altyazı oluşturulurken aktarılamaz; iş bitince yeniden dene.": "Can't send to captions while captions are being created; try again when the job finishes.",
+    "Altyazıya aktarılacak kelime kalmadı.": "No words left to send to captions.",
+    "Altyazı satırları kurulamadı.": "Couldn't build the caption lines.",
+    // js/kesim-esle.js: the word grouper (js/whisper-words.js) didn't load; reaches the Send to captions warning
+    "SufloWhisperWords yüklenmedi (js/whisper-words.js)": "SufloWhisperWords isn't loaded (js/whisper-words.js)",
+    "yeni kurguya uyarlandı": "adapted to the new edit",
+    "{n} satır · yeni kurguya uyarlandı": "{} lines · adapted to the new edit",
+    "Konuşmadan kes'ten": "from Text-based cut",
+    "{n} satır · Konuşmadan kes'ten": "{} lines · from Text-based cut",
+    // undo history labels
+    "Konuşmadan kes aktarımı": "Text-based cut handoff",
+    "kesimden sonra uyarlama": "adapt after cut",
+    // Apply: captions adapted to a cut edit only go to that sequence (the named form is a raw pattern below: the
+    // Premiere sequence name stays verbatim)
+    "Bu altyazı kesilmiş başka bir sekansın kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.":
+      "These captions were adapted to the edit of another, cut sequence. Open that sequence first, then apply.",
+    // the edit changed in Premiere after the cut (undo or another edit): checked against a fresh timeline fingerprint
+    "Arada tam uygulanamamış ya da artık hatırlanmayan bir kesim var; altyazıyı bu kurgu için yeniden oluştur.":
+      "A cut in between wasn't fully applied or is no longer remembered; create the captions again for this edit.",
+    "Kesim Premiere'de geri alınmış; altyazı zaten bu kurguya göre.": "The cut was undone in Premiere; the captions already follow this edit.",
+    "Kurgu kesimden sonra Premiere'de değişti (geri alma ya da başka bir düzenleme); altyazı bu kurguya uymayabilir.":
+      "The edit changed in Premiere after the cut (an undo or another edit); the captions may not match it.",
+    "Kurgu Premiere'den okunamadı; altyazı bu kurguya uymayabilir.": "Couldn't read the edit from Premiere; the captions may not match it.",
+    "Yine de uyarla": "Adapt anyway",
+    // Send to captions replaces the Captions tab document with a new one built from the words (it doesn't adapt it)
+    "Yine de aktar": "Send anyway",
     // Auto Cut: Cancel replaces "Sessizlikleri bul" while ffmpeg analyzes
     "ffmpeg analizini durdurur; önceki sonuç ekranda kalır": "Stops the ffmpeg analysis; the previous result stays on screen",
     // engine / model / ffmpeg download cancel (Settings and the caption setup card)
@@ -3433,6 +3583,9 @@
     }],
     // "Bu Shorts'un…" style possessives are handled by exact keys; "Premiere'e geç" etc. too.
     [/^V(\d+) katmanına eklendi$/, "Added to track V$1"],
+    // captions adapted to a cut edit: the Premiere sequence name stays verbatim ($1 = raw, not translated)
+    [/^Bu altyazı "([\s\S]+)" sekansının kurgusuna göre uyarlandı\. Önce o sekansı aç, sonra uygula\.$/,
+      "These captions were adapted to the edit of the \"$1\" sequence. Open that sequence first, then apply."],
     // Try Pro clean re-render: the Premiere project item name and file path stay verbatim ($ = raw, not translated)
     [/^Filigran kısmen kaldırıldı: (\d+) proje öğesi değiştirilemedi\. Proje panelinde ona sağ tıkla, Replace Footage ile temiz dosyayı seç: ([\s\S]*)$/,
       function (m) { return "Watermark partly removed: " + m[1] + " project item" + (m[1] === "1" ? "" : "s") + " couldn't be swapped. Right-click " + (m[1] === "1" ? "it" : "them") + " in the Project panel, choose Replace Footage and pick the clean file: " + m[2]; }],

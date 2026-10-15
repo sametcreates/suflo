@@ -1,6 +1,7 @@
 // Suflo testi: Konuşmadan kes paneli (js/konusma-kes.js) — sahte DOM + sahte K/KCaptions ile
 // tekrar çekim çipleri, politika, inceleme listesi, önbellek satırı, AI geçişi (bayat cevap
-// ve hata), 300 kesim sınırı ve kopya sekans adı uçtan uca
+// ve hata), 300 kesim sınırı ve kopya sekans adı uçtan uca; 3.4 adım 8: Uygula'dan sonra
+// "Altyazıya aktar" r.newSeq'in kopyasına gider, satır sekans tutmayınca gizlenir (js/kesim-altyazi.js)
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var KOK = path.join(__dirname, "..");
 var gecen = 0, toplam = 0;
@@ -67,7 +68,8 @@ function ortam(o) {
   // Hedef düğmeleri (Kopya sekansta / Bu sekansta): index.html'deki gibi, tıklanınca hedefi değiştirir
   var hedefDugmeleri = ["clone", "here"].map(function (m) { var b = Oge("button"); b.dataset.m = m; return b; });
   ogeler["tc-target"].querySelectorAll = function () { return hedefDugmeleri; };
-  var say = { call: [], toast: [], chat: 0, tw: [] };
+  var say = { call: [], toast: [], chat: 0, tw: [], kayit: [], yukle: [], uyarla: [], sekme: [] };
+  var baglamDinleyici = [];
   var clip = { mediaPath: "/v/a.mp4", inPoint: 0, dur: 40, clipStart: 10, clipEnd: 50, name: "a" };
   var ctx = { sel: clip, sequence: "Vlog", sequenceId: "S1" };
   var secim = { clip: clip };   // Premiere'in TAZE seçimi (ctx.sel 2.5 sn'lik yoklama, bayat olabilir)
@@ -89,13 +91,29 @@ function ortam(o) {
         say.call.push([fn, arg]);
         if (fn === "KS_getSelectedClips") return Promise.resolve({ ok: true, clips: [secim.clip] });
         if (fn === "KS_getContext" && o.baglam) return o.baglam();   // testin denetlediği (bekleyen) cevap
-        return Promise.resolve(fn === "KS_getContext" ? { ok: true, sequence: "Vlog", sequenceId: "S1" } : { ok: true, newSeq: arg && arg.cloneName, removed: 1 });
+        if (fn === "KS_getContext") return Promise.resolve({ ok: true, sequence: "Vlog", sequenceId: "S1", frame: 0.04 });
+        var sonuc = { ok: true, newSeq: arg && arg.cloneName, removed: 1 };
+        // 3.4 adım 8: host'un esleme raporu (kopyanın kimliği, kare, gerçek kayma)
+        if (arg && arg.esleme && o.esleme !== false) {
+          sonuc.esleme = { kaynak: "S1", seqId: arg.cloneFirst ? "S1-kopya" : "S1", kare: 0.04,
+            kesimler: arg.ranges.map(function (k) { return { start: k.start, end: k.end, kayma: k.end - k.start }; }) };
+        }
+        return Promise.resolve(sonuc);
       }
     },
-    KApp: { ctx: function () { return ctx; }, toast: function (m, c) { say.toast.push([m, c]); }, onContext: function () {} },
+    KApp: { ctx: function () { return ctx; }, toast: function (m, c) { say.toast.push([m, c]); }, onContext: function (f) { baglamDinleyici.push(f); },
+      goster: function (sk) { say.sekme.push(sk); } },
     KCaptions: {
       transcribeWords: function (op) { say.tw.push(op); var c = op.clip || clip; return Promise.resolve({ clip: c, lang: "tr", words: kelimeler(c.clipStart), fromCache: !!o.fromCache, motor: "yerel:small" }); },
       motorKimligi: function () { return "yerel:small"; },
+      // 3.4 adım 8: kesim kaydı ve belge (o.belge: Altyazı sekmesindeki belgenin sekansı)
+      kesimKaydet: function (k) { say.kayit.push(k); return say.kayit.length; },
+      kurguDurumu: function (hedef) {
+        var yol = o.belge && say.kayit.some(function (k) { return k.kaynak === o.belge && k.hedef === hedef; });
+        return yol && !say.uyarla.length ? { ok: true, adim: 1, satir: 7 } : { ok: false, neden: "sekans" };
+      },
+      kurguyaUyarla: function (hedef) { say.uyarla.push(hedef); return { ok: true, satir: 7, dusen: 1, kirpilan: 1, adim: 1 }; },
+      yukleKelimeler: function (w, op) { say.yukle.push({ words: w, o: op }); return { ok: true, satir: 3 }; },
       chatConfig: function () { return o.anahtar ? { model: "m" } : null; },
       chatCall: function () {
         say.chat++;
@@ -109,11 +127,15 @@ function ortam(o) {
   sandbox.window.KCaptions = sandbox.KCaptions;
   sandbox.window.SufloTextCut = require(path.join(KOK, "js", "textcut.js"));
   sandbox.window.SufloRetakes = require(path.join(KOK, "js", "retakes.js"));
+  sandbox.window.SufloKesimEsle = require(path.join(KOK, "js", "kesim-esle.js"));
   vm.createContext(sandbox);
+  sandbox.window.KApp = sandbox.KApp;
+  if (o.eylemSatiri !== false) vm.runInContext(fs.readFileSync(path.join(KOK, "js", "kesim-altyazi.js"), "utf8"), sandbox);
   vm.runInContext(fs.readFileSync(path.join(KOK, "js", "konusma-kes.js"), "utf8"), sandbox);
   if (o.dil) sandbox.window.SufloI18n = sandbox.SufloI18n = { getLang: function () { return o.dil; } };
   sandbox.window.KTextCut.init();
-  return { el: ogeler, say: say, ctx: ctx, sb: sandbox, secim: secim, clip: clip, hedef: { clone: hedefDugmeleri[0], here: hedefDugmeleri[1] } };
+  return { el: ogeler, say: say, ctx: ctx, sb: sandbox, secim: secim, clip: clip, hedef: { clone: hedefDugmeleri[0], here: hedefDugmeleri[1] },
+    baglam: function (yeni) { for (var k in yeni) ctx[k] = yeni[k]; baglamDinleyici.forEach(function (f) { f(ctx); }); } };
 }
 
 (async function () {
@@ -233,6 +255,59 @@ function ortam(o) {
   await tetikle(EN.el["tc-apply"], "click"); await bekle();
   var acEn = EN.say.call.filter(function (c) { return c[0] === "KS_applyCuts"; })[0];
   ok("EN arayüz: '<sekans> — Suflo Clean'", acEn && acEn[1].cloneName === "Vlog — Suflo Clean", JSON.stringify(acEn && acEn[1].cloneName));
+
+  /* ---- 3.4 adım 8: Altyazıya aktar / Altyazıyı yeni kurguya uyarla ---- */
+  var KE = require(path.join(KOK, "js", "kesim-esle.js"));
+  var A8 = ortam({ belge: "S1" });
+  ok("adım 8: Uygula'dan önce eylem satırı gizli", A8.el["tc-altyazi"].hidden === true);
+  await tetikle(A8.el["tc-analyze"], "click"); await bekle();
+  var tumKelimeler = kelimeler(10);
+  await tetikle(A8.el["tc-apply"], "click"); await bekle();
+  var ac8 = A8.say.call.filter(function (c) { return c[0] === "KS_applyCuts"; })[0];
+  ok("adım 8: Uygula esleme raporunu ister (kopya + ripple)", ac8 && ac8[1].esleme === true && ac8[1].cloneFirst === true && ac8[1].removeMode === "ripple", JSON.stringify(ac8 && ac8[1]).slice(0, 200));
+  var kay8 = A8.say.kayit[0];
+  ok("adım 8: kesim kaydı — kaynak analiz edilen sekans, hedef r.newSeq'in kopyası (host kimliği), ripple, gerçek kayma, kare",
+    A8.say.kayit.length === 1 && kay8.kaynak === "S1" && kay8.hedef === "S1-kopya" && kay8.mod === "ripple" && kay8.kare === 0.04 &&
+    kay8.cuts.length === ac8[1].ranges.length && kay8.cuts.every(function (k) { return typeof k.kayma === "number"; }), JSON.stringify(kay8).slice(0, 300));
+  ok("adım 8: satır görünür — Altyazıya aktar ve (belge kaynağın) Altyazıyı yeni kurguya uyarla",
+    A8.el["tc-altyazi"].hidden === false && A8.el["tc-altyazi-aktar"].hidden === false && A8.el["tc-altyazi-uyarla"].hidden === false &&
+    /7 satır/.test(A8.el["tc-altyazi-metin"].textContent), A8.el["tc-altyazi-metin"].textContent);
+  // sekans tutmuyor: özgün sekans açıldı → satır gizli; kopyaya dönünce yine görünür
+  A8.baglam({ sequence: "Vlog", sequenceId: "S1" });
+  ok("adım 8: kesilen kopya değil özgün sekans açıkken satır gizli (sekans tutmuyor)", A8.el["tc-altyazi"].hidden === true);
+  A8.baglam({ sequence: "Vlog — Suflo Temiz", sequenceId: "S1-kopya" });
+  ok("adım 8: kopya açılınca satır yine görünür", A8.el["tc-altyazi"].hidden === false);
+  A8.el["tc-altyazi-aktar"]._olay.click.forEach(function (f) { f({}); });
+  var yk = A8.say.yukle[0];
+  // kesilmeyen kelimeler kesimlerin dışında: tüm kelimelerin eşlemesi (ortası kesimde kalan düşer) aynı listeyi verir
+  var beklenen8 = KE.kelimeEsle(tumKelimeler, kay8.cuts, { mod: "ripple", kare: 0.04 }).map(function (x) { return [x.text, x.start, x.end]; });
+  ok("adım 8: Altyazıya aktar r.newSeq'in kopyasına (S1-kopya, adıyla) — kesilen dolgu ve atılan çekim yok, zamanlar yeni kurguda",
+    yk && yk.o.sekansId === "S1-kopya" && yk.o.sekansAd === "Vlog — Suflo Temiz" && yk.o.sira === 1 && yk.o.dil === "tr" &&
+    !yk.words.some(function (x) { return x.text === "ııı"; }) && yk.words.length < tumKelimeler.length &&
+    JSON.stringify(yk.words.map(function (x) { return [x.text, x.start, x.end]; })) === JSON.stringify(beklenen8),
+    JSON.stringify(yk && yk.words.slice(0, 4)));
+  ok("adım 8: aktarımdan sonra Altyazı sekmesine geçilir, Altyazıya aktar bir daha görünmez",
+    A8.say.sekme[0] === "captions" && A8.el["tc-altyazi-aktar"].hidden === true && A8.say.toast.some(function (t) { return /3 altyazı satırı yeni kurguya göre/.test(t[0]); }));
+  A8.el["tc-altyazi-uyarla"]._olay.click.forEach(function (f) { f({}); });
+  ok("adım 8: Altyazıyı yeni kurguya uyarla kopyanın kimliğiyle", A8.say.uyarla[0] === "S1-kopya" && A8.el["tc-altyazi"].hidden === true, JSON.stringify(A8.say.uyarla));
+  // Altyazı sekmesindeki belge başka sekansın: uyarla yok, Altyazıya aktar var; Bu sekansta: hedef aynı sekans
+  var B8 = ortam({ belge: "BASKA" });
+  await tetikle(B8.el["tc-analyze"], "click"); await bekle();
+  await tetikle(B8.el["tc-apply"], "click"); await bekle();
+  ok("adım 8: belge başka sekansın → uyarla gizli, Altyazıya aktar görünür", B8.el["tc-altyazi"].hidden === false && B8.el["tc-altyazi-uyarla"].hidden === true &&
+    B8.el["tc-altyazi-aktar"].hidden === false);
+  var C8 = ortam({ belge: "S1", esleme: false });
+  await tetikle(C8.el["tc-analyze"], "click"); await bekle();
+  await tetikle(C8.el["tc-apply"], "click"); await bekle();
+  ok("adım 8: host raporu yoksa kopyanın kimliği bilinmez: kayıt yok, satır gizli; Premiere kopyayı açınca (aynı ad) kaydedilir",
+    C8.say.kayit.length === 0 && C8.el["tc-altyazi"].hidden === true);
+  C8.baglam({ sequence: "Vlog — Suflo Temiz", sequenceId: "K-77" });
+  ok("adım 8: kopya bağlamdan tanındı (ad), kayıt ve satır", C8.say.kayit.length === 1 && C8.say.kayit[0].hedef === "K-77" && C8.el["tc-altyazi"].hidden === false,
+    JSON.stringify(C8.say.kayit[0] || null).slice(0, 120));
+  var D8 = ortam({ belge: "S1", eylemSatiri: false });
+  await tetikle(D8.el["tc-analyze"], "click"); await bekle();
+  await tetikle(D8.el["tc-apply"], "click"); await bekle();
+  ok("adım 8: eylem modülü yüklenmezse Uygula eskisi gibi (kayıt yok, hata yok)", D8.say.kayit.length === 0 && D8.el["tc-result"].hidden === true);
 
   /* ---- AI geçişi ---- */
   var A = ortam({ anahtar: true, chat: ['```json\n{"groups":[{"ids":[0,5],"keep":5},{"ids":[1,2],"keep":1}]}\n```'] });

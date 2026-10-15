@@ -1573,6 +1573,115 @@ yine birlikte doğrulanır. Doctor her taramada GitHub'a bir istek atar (yalnız
 3.4'ün kapsamı: `marketing/alti-repo-plan.json` › `plan.build_order` adımları. Her adım kendi alt bölümünü ekler
 (adım sırasıyla). Elle Premiere denemeleri `marketing/v3.4-deneme-listesi.md`'de.
 
+### Adım 6: Canlı eşikli sessizlik kesimi (tek çözümleme, anında önizleme, Min. konuşma, Otomatik eşik)
+
+Ne değişti: Otomatik Kesim sesi bir kez çözer (`K.runAkis` → ffmpeg s16le pipe:1, dosyanın kendi örnekleme hızı ve
+kanal sayısı: Uygula'daki silencedetect ile aynı örnekler; 16 kHz'e indirmek tıslamalı kayıtta zarfı ~6 dB alçak
+gösteriyordu. Plan `-ar 16000` diyordu ("ıslıklı ses sonları kalsın" gerekçesiyle); 16 kHz 8 kHz üstünü, yani tam o
+sesleri süzdüğü ve 3.3 silencedetect eşleşmesini bozduğu için özgün hıza geçildi) ve bellekte 10 ms'lik tepe zarfı tutar (`js/sessizlik.js`, saniyede 100 sayı; geçici dosya ve süre sınırı yok).
+Kaydırıcılar haritayı ffmpeg'siz günceller; yeni "Min. konuşma" (0–0,6 sn, varsayılan 0 = 3.3 davranışı) ve
+"Otomatik" eşik düğmesi; `#cut-wave` tuvali. Uygula son ayarlarla silencedetect'i bir kez koşturup doğrular; PCM
+çözümleme olmazsa 3.3 akışı aynen çalışır. Pro kapısı değişmedi (`cut`, 3 deneme hakkı, hak yalnız başarılı Uygula'da).
+Lisans: clean-room (Premiere TR yalnız fikir); NOTICE girdisi gerekmez.
+
+**K6.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 6.1–6.22'yi yeni ve eski
+(CEF 74) Premiere'de dene. Özellikle 6.6 (tek kanallı yaka mikrofonu), 6.7 (önizleme = uygulanan kesimler), 6.11
+(30 dk+ klipte bellek ve hız; çözümleme artık 48 kHz'te, 16 kHz'ten ~3 kat fazla bayt akar), 6.21 (tıslamalı kayıtta
+Otomatik), 6.22 (uygulanırken kilit: ikinci tık ikinci kez kesmez) ve 6.18 (OBS / MTS gibi sesi geç başlayan kayıtlar: zarf ve silencedetect ffmpeg
+`aresample=async=1:min_hard_comp=0.01:first_pts=0` süzgeciyle aynı PTS ekseninde; Premiere'in bu dosyalarda sesi
+nereye yerleştirdiğini gözle doğrula). 6.17'deki "Doğrulama kesimleri değiştirdi" uyarısı sık çıkıyorsa günlükteki
+`[kesim] dogrulama onizlemeden farkli` satırlarıyla bildir.
+
+**K6.2 Varsayılanlar (karar).** Min. konuşma varsayılanı 0 (eski davranış). Denemelerde 0.2–0.3 daha iyi sonuç
+verirse varsayılanı `index.html` › `#cut-minkeep value` ile değiştir; `tests/test-arayuz.js` 3.4 satırı da
+güncellenmeli. Otomatik eşik formülü (arka plan p10 + 8 dB, −60…−20) `js/sessizlik.js` › `esikOner`'de.
+
+**K6.3 Tanıtım (isteğe bağlı).** Site / sosyal medya için 10 sn'lik ekran kaydı: Eşik kaydırıcısı sürüklenirken
+haritanın anında değişmesi ve Otomatik düğmesi. Sürüm notuna: "Sessizlik kesiminde kaydırıcılar artık anında".
+
+### Adım 7: Sekans ve In/Out kapsamlı kesim, korunan katmanlar
+
+Ne değişti: Otomatik Kesim'e kapsam (`#cut-scope`: Seçili klip | In → Out | Sekans) ve **Katmanlar** bölümü geldi:
+"Dinlenecek ses" (sekans kapsamlarında `KS_exportAudio` bu katmanları tek WAV'a karıştırır, adım 6'nın zarfı ve
+`bul()` bu WAV'da koşar, aralıklar ofsetle sekans zamanına çevrilir) ve "Kesilmeyecek katmanlar" (her kapsamda;
+`KS_applyCuts` `protect` ile bu katmanları razor, ripple kaplama denetimi ve silmede atlar). Öneri ve uyarılar saf
+`SufloSessizlik.korumaOner`'de (müzik adı kuralı, %80 kaplama önerisi, korunan video + ripple engeli, bağlı çift
+listesi). `KS_applyCuts` artık `expectSeqId`'yi kopyadan önce denetler; korunan katman kilitlenmez, kilidi açılmaz.
+`protect` gönderilmeyen çağrıların (Konuşmadan kes, seçili klipte Otomatik Kesim) çıktısı 3.3 ile birebir aynı (testle
+karşılaştırıldı): ripple'da her katman aralığı tam kaplamalı, boş bölge içeren aralık boşluk moduna düşer ve uyarılır.
+Kliplerin arasındaki boşluğu ripple'ı düşürmeden geçen "eşit kayma" kuralı yalnız `protect` ya da `esitKayma: true`
+(Otomatik Kesim'in In → Out / Sekans kapsamları) ile. Hiçbir parça silinmeyen / seçilmeyen Uygula (kesimler yalnız boş
+bölgelerde) deneme hakkı düşürmez, uyarır (inceleme r2).
+Pro kapısı değişmedi (`cut`, 3 deneme hakkı; analiz, önizleme, kapsam ve çipler hak yemez). Lisans: clean-room
+(Premiere TR yalnız fikir; onun `Track.locked` ile kilit açıp kapama yöntemi çalışmadığı için kullanılmadı); NOTICE
+girdisi gerekmez. Yeni çalışma zamanı dosyası yok (paketleme değişmedi).
+
+**K7.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 7.1–7.19'u yeni ve eski
+(CEF 74) Premiere'de dene. En önemlisi **7.8**: Premiere'in `TrackItem.remove` çağrısının bağlı (link) öğeyi de silip
+silmediği otomatik testte bilinemiyor. Siliyorsa korunan katman değişir; Suflo bunu fark edip "⚠ Korunan bir katman
+değişti…" der (Kopya sekansta özgün sekans sağlam; Bu sekansta geri alma çok adımlı, Geçmiş paneli), ama o durumda bağlı çiftlerde koruma işe yaramaz. Sonucu bildir: silmiyorsa bir
+şey yapma; siliyorsa bir sonraki adımda bağlı çiftlerde korumayı engelleyen bir uyarıya çevireceğiz.
+
+**K7.2 Müzik adı listesi (karar).** Önceden korunan ad kuralı `js/sessizlik.js` › `MUZIK_RE`
+(`müzik|muzik|music|bgm|şarkı|sarki|song|ambiyans|ambience`; plandaki gibi adın her yerinde, bitişik yazımda da:
+"Backgroundmusic", "Fonmüzik". Yalnız kişi adlarıyla çakışan "şarkı" / "song" sözcük başında ve sözcük olarak aranır:
+"Songül", "Sarkis" müzik sayılmaz). %80 kaplama önerisi dinlenen (konuşma) katmanı önermez; tek istisna videoya bağlı
+sesin olmadığı belirsiz durumda klibi / dosyası müziğe benzeyen (mp3, "music"…) dinlenen katman (inceleme r2). Kullanıcıların katmanlarına başka adlar verdiğini görürsen
+(ör. "Fon", "Background") listeye ekle; `tests/test-sessizlik.js` › `muzikAdi` satırı da güncellenmeli.
+
+**K7.3 Tanıtım (isteğe bağlı).** 15 sn'lik ekran kaydı: Sekans kapsamında müzikli bir vlogda Sessizlikleri bul →
+Kesimleri uygula, kopya sekansta müziğin tek parça kaldığını göster. Sürüm notuna: "Otomatik Kesim artık tüm sekansı ya
+da In/Out aralığını kesebilir; müzik katmanın bölünmez".
+
+### Adım 8: Kesimden sonra altyazıyı yeni kurguya uyarla
+
+Ne değişti: Otomatik Kesim ve Konuşmadan kes başarılı **Kesimleri uygula**'dan sonra kesimi oturumluk bir kayda yazar
+(`KCaptions.kesimKaydet`). Altyazı sekmesindeki belge artık ait olduğu sekansı ve kayıttaki yerini bilir; kesimden önceki
+kurguya aitse kartta **Altyazıyı yeni kurguya uyarla** çıkar (art arda birden çok kesim, kopya dalları dahil, sırayla tek
+geri alma adımında). Konuşmadan kes'te ayrıca **Altyazıya aktar** (kesilmeyen kelimeler satır kurucuyla belge olur).
+Hesap saf modülde: `js/kesim-esle.js` (kelimeEsle: ortası kesimde kalan kelime düşer; satirEsle: kalan kelimelerden
+yeniden kurma; kareyeOturt; yolBul). Kart satırı `js/kesim-altyazi.js`. `KS_applyCuts` `esleme: true` isteyene ek bir
+rapor döner (kesimden önceki sekans, kesilen sekans/kopya, kare, her aralıkta ripple'ın gerçek kayması); istemeyenin çıktısı
+aynı. Uyarlanan / aktarılan belge yalnız o sekansa uygulanır. Kapı yok: ücretsiz (owner kararı: adım 8 free; kesim araçları
+Pro kalır, deneme hakkı yalnız Kesimleri uygula'da düşer). Lisans: clean-room (Premiere TR'nin `remapTime`'ı yalnız fikir;
+onun kesime kırpma davranışı alınmadı), NOTICE girdisi gerekmez. Yeni çalışma zamanı dosyaları `js/kesim-esle.js` ve
+`js/kesim-altyazi.js`: `js/` klasörüyle pakette, `tools/verify-release.ps1` ikisini de zorunlu tutar.
+
+**K8.1 Premiere denemesi (zorunlu, yayından önce).** `marketing/v3.4-deneme-listesi.md` › 8.1–8.13'ü yeni ve eski (CEF 74)
+Premiere'de dene. En önemlisi **8.4**: kesim kenarları Premiere'in `Time.getFormatted` zaman kodunun **aşağı yuvarladığı**
+varsayımıyla kareye oturtuluyor (`js/kesim-esle.js` › `kareyeOturt`). Altyazılar kesimlerden sonra hep aynı yönde tam
+1 kare kayıyorsa bildir; o zaman `Math.floor` yerine en yakın kareye yuvarlamaya geçilir (`tests/test-kesim-esle.js` kare
+satırları da). **8.6**: host'un "gerçek kayma" raporu (`KS_applyCuts` › `esleme.kesimler[].kayma`) Premiere'in boşlukta
+hiçbir şey silmediği varsayımına dayanıyor; boşluktan sonraki altyazılar kayıksa günlükle bildir.
+
+**K8.2 Kelimesiz satır eşiği (inceleme sonrası plana göre).** Kelime zamanı olmayan satır (bulut satır modu, SRT içe
+aktarma, çevrilmiş satır) kesimle 0,2 sn'nin altına inerse ya da tamamen kesimde kalırsa düşer (`MIN_KALAN`; plan madde 1).
+İstisna yok (inceleme r2, plana göre): kesimden ÖNCE de 0,2 sn'den kısa olan satır (SRT'deki tek kelime, kısa ünlem) da
+kesime değip 0,2 sn'den az kalırsa düşer; kesime değmeyen kısa satır olduğu gibi kalır. Önceki "yarısından fazlası kaldıysa
+kalır" istisnası planda yoktu (OWNER DIRECTION da yok) ve kaldırıldı; geri istenirse plana OWNER DIRECTION olarak yazılmalı. **Kelime kelime** ve **Birikimli** belgelerde her satır bir kelimedir: kelime kuralı (ortası kesimde kalan düşer)
+uygulanır, birikimli satırda kesilen kelime sonraki satırlardan da çıkar. Denemelerde (deneme listesi 8.18) kesim
+kenarında kelime kaybolursa ya da kesilen kısa satır kalıyorsa bildir.
+
+**K8.3 Bilinen sınır (metinler için).** Premiere'e daha önce eklenmiş altyazı izi (ya da Altyazı Efektleri katmanı)
+güncellenmez: Suflo yalnız paneldeki belgeyi uyarlar. Kopya sekansta eski iz (özgün sekanstan kopyalanan) duruyorsa sil,
+sonra uyarlanan belgeyi Uygula. Kesim kayıtları oturumluk: panel kapanıp açılınca eski kesime uyarlama önerilmez. Sürüm notu
+ve site metninde böyle söyle; "altyazı izi kendiliğinden kayar" deme.
+
+**K8.5 İnceleme sonrası: Premiere'de geri alma ve kısmi kesim.** Panel Premiere'in Ctrl+Z'sini görmez. `KS_applyCuts`
+esleme raporu artık kurgunun kesimden önceki ve sonraki **izini** (tüm kliplerin yeri, iki karma; `KS_kurguIzHesap`) verir;
+**Altyazıyı yeni kurguya uyarla** ve **Altyazıya aktar** önce yeni salt okur `KS_kurguIzi` ile taze izi sorar. Kesim tamamen
+geri alındıysa uyarlanmaz; geri alınıp aynı kesim yeniden uygulandıysa belgeye bir kez uygulanır; kurgu başka türlü
+değiştiyse (yarım geri alma, elle düzenleme, kesimden sonra eklenen SFX / grafik katmanı da dahil) uyarı + **Yine de
+uyarla**. Bir klip silinemeyip yalnız seçildiyse (`remove` hatası; esleme `eksik`) kesim kaydedilir ama uyarlama / aktarma
+önerilmez ve bu kesimden geçen yol kurulmaz. 40'tan eski kesim kayıtları silinmez, kesimleri atılmış yer tutucuya iner:
+eksik zincir sessizce uygulanmaz. Deneme listesi 8.14–8.17 ve 8.19'u gerçek Premiere'de dene; özellikle 8.14 (iz geri
+almadan sonra kesimden önceki ize dönüyor mu: Premiere ripple geri almada klip sınırlarını milisaniyesine kadar geri
+getirmezse "geri alınmış" yerine "değişti" uyarısı çıkar; öyleyse günlükle bildir).
+
+**K8.4 Tanıtım (isteğe bağlı).** 15 sn'lik ekran kaydı: altyazılı bir vlogda Otomatik Kesim → Kesimleri uygula →
+"Altyazıyı yeni kurguya uyarla" → kopyada senkron altyazı. Sürüm notuna: "Kesimden sonra altyazıyı yeniden yazıya dökmeye
+gerek yok: tek tıkla yeni kurguya uyar".
+
 ### Adım 19: Kurumsal ağ dayanıklılığı ve çevrimdışı model içe aktarma (ücretsiz)
 
 Ne değişti: Ayarlar › Motor'da **Model dosyası içe aktar** (`js/model-ice-aktar.js` + `KEngine.modelIceAktar`), indirmede

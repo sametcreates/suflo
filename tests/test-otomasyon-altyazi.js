@@ -21,6 +21,15 @@ function kes(src, imza) {
   return src.slice(i, son + 4);
 }
 
+// tek satırlık işlev (ör. "function etkinMod(hedef) { ... }")
+function satir(src, imza) {
+  var i = src.indexOf(imza);
+  if (i === -1) throw new Error("bulunamadi: " + imza);
+  return src.slice(i, src.indexOf("\n", i) + 1);
+}
+// 3.4 Otomatik Kesim saf modülü (zarf / kesim haritası; analyze ve apply kullanır)
+var S = require(path.join(KOK, "js", "sessizlik.js"));
+
 /* ---------------- captions.js ---------------- */
 var cap = kaynak("captions.js");
 var capKod = [
@@ -74,6 +83,8 @@ function altyaziKur(o) {
   };
   var f = new Function("E", [
     "var segments = E.segments, ornekBelge = false, ornekSekansId = '', secilenMogrt = null, secilenMotorStili = '';",
+    // 3.4 adım 8: kesimden sonra uyarlanan belge yok (Uygula her sekansa gider)
+    "var belgeKesimAdi = null, belgeSekansId = '';",
     "var uygulananSekans = E.uygulananSekans, onayBekleyen = null, kaliteOnayBekleyen = '', shortsYuklenen = '';",
     "var busy = false, scope = 'clip', Pro, KApp = E.KApp, K = E.K, window = E.window, Event = E.Event;",
     "function el(id) { return E.dom[id] || null; }",
@@ -97,6 +108,12 @@ function altyaziKur(o) {
 var mc = kaynak("magiccut.js");
 var mcKod = [
   kes(mc, "function parseSilence("),
+  // 3.4 adım 6: canlı eşik yardımcıları (kaydırıcı değerleri, silencedetect çağrısı, sekans zamanına çeviri)
+  kes(mc, "function ayarlar()"),
+  kes(mc, "function kesimAyari(a)"),
+  kes(mc, "function sekansaCevir(sonuc)"),
+  kes(mc, "function sessizlikBul(ff, a, jeton)"),
+  satir(mc, "function sdAnahtar(a)"),
   kes(mc, "async function analyze(ev)"),
   kes(mc, "function durumMetni()"),
   kes(mc, "function kaydir("),
@@ -116,6 +133,7 @@ function kesimKur(o) {
   var E = {
     dom: dom, sel: o.sel === undefined ? { name: "klip.mp4", mediaPath: "/m/klip.mp4", inPoint: 0, outPoint: 20, clipStart: 10, clipEnd: 30 } : o.sel,
     ranges: o.ranges || [],
+    S: S,
     Event: function (tur) { this.type = tur; },
     KApp: { ctx: function () { return { sel: E.sel }; }, toast: function (m, t) { c.toast.push([m, t]); } },
     K: {
@@ -125,9 +143,16 @@ function kesimKur(o) {
       log: function () {}
     }
   };
+  E.sonKonum = o.ranges && E.sel ? S.anahtar(E.sel.mediaPath, E.sel.inPoint, E.sel.outPoint - E.sel.inPoint) + "@" + Number(E.sel.clipStart) : "";
   var f = new Function("E", [
     "var clip = null, ranges = E.ranges, busy = false, iptalJetonu = null, baslatAcilis = 0, Pro;",
-    "var KApp = E.KApp, K = E.K, Event = E.Event;",
+    "var KApp = E.KApp, K = E.K, Event = E.Event, S = E.S;",
+    // 3.4: Seçili klip kapsamı, PCM zarfı yok (K.runAkis yok → silencedetect akışı), katman düzeni okunmadı.
+    // Önceki aralıklar verildiyse aynı klibin aynı yerdeki analizidir (sonKonum tutar): iptal / hata onları korur.
+    "var kapsam = 'clip', uygulaniyor = false, adalar = [], kapatilanlar = [], zarf = null, hamSessizlik = null, farkUyarisi = false;",
+    "var analizSeqId = '', sdOnbellek = {}, otoMesaj = null, katman = null, secImza = null, sonAnahtar = E.sonKonum ? E.sonKonum.split('@')[0] : '', sonKonum = E.sonKonum;",
+    "var zarfOnbellek = { al: function () { return null; }, koy: function () {} };",
+    "function katmanBolumuAcik() { return false; } function wavSil() {} function yenidenHesapla() {}",
     "function el(id) { return E.dom[id] || null; }",
     "function status(m, cls) { var e = el('cut-status'); e.className = 'inline-status' + (cls ? ' ' + cls : ''); e.textContent = m || ''; }",
     "function sesiKapat() {} function setBusy() {} function render() {}",
@@ -140,6 +165,7 @@ function kesimKur(o) {
 // suflo_sessizlik_kes: apply + mcpKes GERÇEK kaynağı; hedef düğmesi (Kopya / Bu sekansta) target'a yazar
 var mcUygulaKod = [
   kes(mc, "function activeRanges()"),
+  satir(mc, "function etkinMod(hedef)"),
   kes(mc, "async function apply(ek)"),
   kes(mc, "function durumMetni()"),
   kes(mc, "async function mcpKes()")
@@ -152,6 +178,7 @@ function kesimUygulaKur(o) {
   var E = {
     dom: dom,
     ranges: [{ start: 12, end: 13, keep: true }, { start: 15, end: 16, keep: true }],
+    S: S,
     KApp: { toast: function (m, t) { c.toast.push([m, t]); } },
     K: {
       // KS_applyCuts uzun sürer: test bitirene kadar bekler (kesim sürerken hedef düğmesine basılabilir)
@@ -163,7 +190,13 @@ function kesimUygulaKur(o) {
   };
   var f = new Function("E", [
     "var target = " + JSON.stringify(o.hedef || "clone") + ", ranges = E.ranges, Pro;",
-    "var KApp = E.KApp, K = E.K;",
+    "var KApp = E.KApp, K = E.K, S = E.S;",
+    // 3.4: analiz edilmiş seçili klip; silencedetect doğrulaması önizlemeyle aynı, klip yerinde, korunan katman yok
+    "var clip = { mediaPath: '/m/klip.mp4', inPoint: 0, outPoint: 20, clipStart: 10, clipEnd: 30 };",
+    "var busy = false, uygulaniyor = false, zorlaBosluk = false, farkUyarisi = false, katman = null, secImza = null, analizSeqId = '', altyaziEylemi = null;",
+    "function boslukluUygula() {} function videoRippleEngeli() { return false; } function korumaHesapla() { return null; }",
+    "async function kesimleriDogrula() { return ranges; } async function klipYeriniDenetle() { return null; }",
+    "function onbellekleriBosalt() {} function analiziBirak() {} function kilidiAc() { uygulaniyor = false; }",
     "function el(id) { return E.dom[id] || null; }",
     "function status(m, cls) { var e = el('cut-status'); e.className = 'inline-status' + (cls ? ' ' + cls : ''); e.textContent = m || ''; }",
     "function sesiKapat() {}",

@@ -422,6 +422,91 @@ window.K = (function () {
     });
   }
 
+  /*
+   * İkili güvenli akış (3.4, Otomatik Kesim tek çözümleme): stdout'a setEncoding UYGULANMAZ; her parça
+   * Buffer olarak opts.onData'ya gider ve BİRİKTİRİLMEZ (bellek klip boyuyla büyümez). K.run stdout'u
+   * utf8 metin olarak biriktirir: ham PCM baytları U+FFFD'ye döner, ses bozulur. stderr metindir, birikir.
+   *   opts.onData(Buffer)  stdout parçası (fırlatırsa süreç öldürülür, { code: -1, hata } döner)
+   *   opts.onStderr(s)     stderr parçası (metin)
+   *   opts.iptal           K.iptalJetonu(): süreç ağacı öldürülür, { code: -2, iptal: true }
+   *   opts.timeout         ms (varsayılan 5 dk)
+   * Döner: Promise<{ code, stderr, bayt, iptal?, hata? }>
+   */
+  function runAkis(cmd, args, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      if (!nodeOK) { resolve({ code: -1, stderr: "Node erişimi yok", bayt: 0 }); return; }
+      var jeton = opts.iptal && typeof opts.iptal.dinle === "function" ? opts.iptal : null;
+      if (jeton && jeton.iptalEdildi) { resolve({ code: -2, iptal: true, stderr: "", bayt: 0 }); return; }
+      var child;
+      try {
+        var spawnOpts = { windowsHide: true };
+        if (MAC) {
+          var env = {};
+          for (var ek in process.env) if (process.env.hasOwnProperty(ek)) env[ek] = process.env[ek];
+          env.PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" + (process.env.PATH ? ":" + process.env.PATH : "");
+          spawnOpts.env = env;
+        }
+        child = cp.spawn(cmd, args, spawnOpts);
+      } catch (e) {
+        resolve({ code: -1, stderr: String(e), bayt: 0 });
+        return;
+      }
+      var err = "", bayt = 0, done = false, birak = null;
+      aktifSurec++;
+      function kapat() {
+        done = true;
+        aktifSurec = Math.max(0, aktifSurec - 1);
+        clearTimeout(timer);
+        if (birak) { birak(); birak = null; }
+      }
+      var timer = setTimeout(function () {
+        if (done) return;
+        surecAgaciniOldur(child, false);
+        kapat();
+        resolve({ code: -1, stderr: err + "\n[zaman aşımı]", bayt: bayt });
+      }, opts.timeout || 300000);
+      if (jeton) {
+        birak = jeton.dinle(function () {
+          if (done) return;
+          kapat();
+          surecAgaciniOldur(child, false);
+          log("runAkis IPTAL [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kullanici iptal etti");
+          resolve({ code: -2, iptal: true, stderr: err, bayt: bayt });
+        });
+      }
+      // yalnız stderr metin: stdout ham bayt kalır (setEncoding yok)
+      if (child.stderr && child.stderr.setEncoding) child.stderr.setEncoding("utf8");
+      child.stdout.on("data", function (d) {
+        if (done) return;
+        bayt += d.length;
+        if (!opts.onData) return;
+        try { opts.onData(d); } catch (eD) {
+          kapat();
+          surecAgaciniOldur(child, false);
+          log("runAkis onData: " + (eD && eD.message ? eD.message : eD));
+          resolve({ code: -1, stderr: err, bayt: bayt, hata: String(eD && eD.message ? eD.message : eD) });
+        }
+      });
+      child.stderr.on("data", function (d) {
+        var s = String(d);
+        err += s;
+        if (opts.onStderr && !done) { try { opts.onStderr(s); } catch (eS) {} }
+      });
+      function finish(code) {
+        if (done) return;
+        kapat();
+        if (code !== 0) {
+          log("runAkis HATA [" + String(cmd).replace(/^.*[\\\/]/, "") + "] kod=" + code + " " +
+            String(err).split("\n").slice(-2).join(" ").slice(0, 200));
+        }
+        resolve({ code: code, stderr: err, bayt: bayt });
+      }
+      child.on("error", function (e) { err += String(e); finish(-1); });
+      child.on("close", finish);
+    });
+  }
+
   /* ---------------- HTTP (Node üzerinden, CORS'suz) ---------------- */
 
   /*
@@ -1906,6 +1991,7 @@ window.K = (function () {
     call: call,
     hostMesgul: hostMesgul,
     run: run,
+    runAkis: runAkis,
     iptalJetonu: iptalJetonu,
     iptalHatasi: iptalHatasi,
     iptalTikiGecerli: iptalTikiGecerli,
