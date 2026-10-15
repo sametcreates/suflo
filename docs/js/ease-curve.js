@@ -451,6 +451,20 @@
     return { type: "multi", pts: pts };
   }
 
+  // Suflo: 'inv' (ters fonksiyon) yalnız tekdüze eğride anlamlı — invert() ile aynı kural. Elle yazılmış ya da paylaşılmış
+  // JSON'daki bayrak tekdüze olmayan eğride düşürülür (yoksa ikiye bölme sona dek sıfır yakınında kalıp sıçrayan bir eğri
+  // verir). Sonuç tabanın JSON'una göre küçük bir önbellekte (normalize sık çağrılır).
+  var invOnbellek = {}, invOnbellekN = 0;
+  function invGecerli(taban) {
+    var k = JSON.stringify(taban);
+    if (Object.prototype.hasOwnProperty.call(invOnbellek, k)) return invOnbellek[k];
+    var v = isMonotonic(taban);
+    if (invOnbellekN >= 64) { invOnbellek = {}; invOnbellekN = 0; }
+    invOnbellek[k] = v;
+    invOnbellekN++;
+    return v;
+  }
+
   // Herhangi bir eğri tanımını güvenli, sınırlı bir kopyaya çevirir; geçersizse null.
   function normalize(c) {
     if (!c || typeof c !== "object") return null;
@@ -462,7 +476,7 @@
     if (c.type === "penner") {
       if (typeof c.name !== "string" || !Object.prototype.hasOwnProperty.call(fns, c.name)) return null;
       var pe = { type: "penner", name: c.name };
-      if (c.inv === true) pe.inv = true;
+      if (c.inv === true && invGecerli({ type: "penner", name: c.name })) pe.inv = true;
       return pe;
     }
     if (c.type === "spring") {
@@ -470,8 +484,9 @@
       Object.keys(SPRING_ALAN).forEach(function (k) {
         if (sonlu(c[k])) sp[k] = r6(sinirla(c[k], SPRING_ALAN[k][0], SPRING_ALAN[k][1]));
       });
+      var invVar = c.inv === true && invGecerli(sp);   // taban: henüz flip'siz, inv'siz yay
       if (c.flip === true) sp.flip = true;
-      if (c.inv === true) sp.inv = true;
+      if (invVar) sp.inv = true;
       return sp;
     }
     if (c.type === "multi") return normMulti(c);
@@ -1545,6 +1560,7 @@
     sure = (taban + jSon) / fps - tL;
 
     var js = [];
+    var s = dampedSine(frekans, sonum);
     if (o.yogun) {
       for (var j = jmin; j < jSon; j += YAYLAN.YOGUN_ADIM) js.push(j);
       js.push(jSon);
@@ -1555,8 +1571,19 @@
         if (!js.length || jj > js[js.length - 1]) js.push(jj);
       });
       if (!js.length || js[js.length - 1] !== jSon) js.push(jSon);
+      // Pencere ilk tepeden kısaysa (ya da tek tepe pencere sonuna yuvarlandıysa) seyrek plan yalnız tabandaki son
+      // anahtar olurdu: aşım hiç görünmez. O zaman pencerenin |s| en büyük karesi tepe olur (sık plandaki en yüksek kare);
+      // öyle bir kare yoksa yer yok sayılır.
+      if (js.length === 1) {
+        var enIyi = -1, enB = 0;
+        for (var jt = jmin; jt < jSon; jt++) {
+          var bt = Math.abs(s((taban + jt) / fps - tL));
+          if (bt > enB + 1e-12) { enB = bt; enIyi = jt; }
+        }
+        if (enIyi < 0 || enB < 1e-9) return bos("yer", { oda: oda });
+        js.unshift(enIyi);
+      }
     }
-    var s = dampedSine(frekans, sonum);
     var tN = Number(o.tN);
     if (!(isFinite(tN) && tN >= sinir - 1e-9)) tN = sinir;
     var vLd = dizi ? vL : [vL], vNd = vN === null ? null : (dizi ? vN : [vN]);

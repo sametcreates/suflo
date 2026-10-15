@@ -369,6 +369,19 @@ var S = E.spring;
   var ki = E.invert(E.flip(E.builtin("sert-giris").curve)), ik = E.flip(E.invert(E.builtin("sert-giris").curve));
   ok("invert ve flip yer değiştirebilir", enBuyukFark(ki, ik, 400) < 1e-9);
   ok("isMonotonic: Yumuşak evet, Taşma hayır", E.isMonotonic(E.builtin("yumusak").curve) && !E.isMonotonic(E.builtin("tasma").curve));
+  // inceleme r2: normalize, invert() ile aynı kuralı uygular — tekdüze olmayan eğrideki 'inv' (elle yazılmış / paylaşılmış JSON)
+  // düşer; yoksa ikiye bölme sona dek sıfıra yakın kalıp son karede 1'e sıçrayan bir eğri verirdi
+  var invBack = E.normalize({ type: "penner", name: "backOut", inv: true });
+  var invElastik = E.normalize({ type: "penner", name: "elasticOut", inv: true });
+  var invYay = E.normalize({ type: "spring", response: 0.5, bounce: 0.4, inv: true, flip: true });
+  var invExpo = E.normalize({ type: "penner", name: "expoOut", inv: true });
+  var invYumYay = E.invert({ type: "spring", response: 0.5, bounce: 0 });
+  ok("normalize: tekdüze olmayan eğride 'inv' düşer (backOut, elasticOut, taşan yay); tekdüzede kalır", invBack && !invBack.inv &&
+    invElastik && !invElastik.inv && invYay && !invYay.inv && invYay.flip === true && invExpo.inv === true &&
+    invYumYay && invYumYay.inv === true && E.normalize(invYumYay).inv === true, js([invBack, invYay, invExpo, invYumYay]));
+  var fInvYay = E.toFunction({ type: "spring", response: 0.5, bounce: 0.4, inv: true });
+  ok("normalize: düşen 'inv' ile eğri sıçramaz (x = 0,95'te değer yayın kendi değeri)", yakin(fInvYay(0.95), E.toFunction({ type: "spring", response: 0.5, bounce: 0.4 })(0.95), 1e-12) &&
+    js(E.normalize(invBack)) === js(invBack));
 })();
 
 /* ================= Suflo: toCss / fromCss ================= */
@@ -505,6 +518,28 @@ var S = E.spring;
   var uc = E.yaylanPlan({ tL: 2, vL: 500, hiz: 1000, sinir: 2 + 3 / fps, fps: fps });
   ok("yaylanPlan: 2 kareden az yer → 'yer' reddi; 2 kare yer → yazılır", iki.hata === "yer" && iki.keys.length === 0 && iki.oda === 1 &&
     !uc.hata && uc.oda === 2 && uc.keys.length >= 1 && uc.keys.every(function (k) { return k.t <= 2 + 2 / fps + 1e-9; }), js([iki, uc.keys]));
+  // inceleme r2: pencere ilk tepeden kısa (ya da tek tepe pencere sonuna yuvarlanıyor) — seyrek plan yalnız tabandaki tek
+  // anahtar olmamalı (aşım görünmez, yine de kayıt ve deneme hakkı harcanırdı): pencerenin en yüksek karesi tepe olur
+  var kisaPencereler = [[30, 3, 3, 6], [60, 5, 3, 6], [30, 7, 1, 2], [25, 3, 3, 6], [24, 4, 2, 4], [50, 3, 6, 10]];
+  var kisaSonuc = kisaPencereler.map(function (q) {
+    var o = { tL: 2, vL: 150, hiz: 50, frekans: q[2], sonum: q[3], sinir: 2 + q[1] / q[0], fps: q[0] };
+    var sy = E.yaylanPlan(o), yg = E.yaylanPlan(Object.assign({}, o, { yogun: true }));
+    var enYuksek = Math.max.apply(null, yg.keys.map(function (k) { return Math.abs(k.v - 150); }));
+    return { ok: !sy.hata && sy.keys.length >= 2 && sy.keys[sy.keys.length - 1].v === 150 &&
+      sy.keys.slice(0, -1).some(function (k) { return Math.abs(k.v - 150) > 1e-6; }) &&
+      Math.max.apply(null, sy.keys.map(function (k) { return Math.abs(k.v - 150); })) >= enYuksek - 1e-9, sy: sy.keys, yg: yg.keys };
+  });
+  ok("yaylanPlan seyrek: kısa pencerede de en az bir taban dışı (aşım) anahtar; tepe sık plandaki en yüksek kare",
+    kisaSonuc.every(function (r) { return r.ok; }), js(kisaSonuc.filter(function (r) { return !r.ok; })[0] || ""));
+  var cokPencere = [], cokOk = true;
+  for (var cf = 2; cf <= 40; cf++) [24, 25, 30, 50, 60].forEach(function (f2) {
+    [[1, 2], [3, 6], [6, 10], [1, 10]].forEach(function (fs2) {
+      var pl = E.yaylanPlan({ tL: 2, vL: 0, hiz: 100, frekans: fs2[0], sonum: fs2[1], sinir: 2 + cf / f2, fps: f2 });
+      if (pl.hata === "yer" && cf < 3) return;   // inişten sonra 2 kareden az yer: ret (yukarıda sınanır)
+      if (pl.hata || !pl.keys.slice(0, -1).some(function (k) { return Math.abs(k.v) > 1e-6; })) { cokOk = false; cokPencere.push([cf, f2, fs2, pl.hata]); }
+    });
+  });
+  ok("yaylanPlan seyrek: 2–40 karelik her pencerede (24–60 fps, frekans / sönüm uçları) yazılırsa aşım var", cokOk, js(cokPencere.slice(0, 3)));
   ok("yaylanPlan: varış hızı yoksa 'hiz' reddi", E.yaylanPlan({ tL: 2, vL: 500, hiz: 0, sinir: 5, fps: fps }).hata === "hiz" &&
     E.yaylanPlan({ tL: 2, vL: [1, 2], hiz: [0, 0], sinir: 5, fps: fps }).hata === "hiz");
   ok("yaylanPlan: geçersiz girdi (aralık, fps, değer türü)", E.yaylanPlan({ tL: 2, vL: 1, hiz: 1, sinir: 2, fps: 25 }).hata === "aralik" &&
