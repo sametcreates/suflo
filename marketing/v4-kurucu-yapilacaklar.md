@@ -1725,3 +1725,60 @@ eğrini çiz" maddesi (`sekme: "hiz"`) eklenebilir; tanıtım kartı (`#hiz-tani
 **13.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
 `Kaynak: temiz oda (OpenCurve'den yalnız "hız eğrisini noktalarla düzenleme" fikri; Rebound'dan "ortak düzenleyiciyle hız grafiği"
 fikri); kod alınmadı, Suflo'nun kendi SufloEgriEditor'ü ve hız rampası matematiği kullanıldı, yeni bildirim gerekmez.`
+
+### Adım 14: Varışta yaylanma (follow-through) (Pro: Eğri'nin 'curves' kapısı ve ortak 3 deneme hakkı; ayarlar ücretsiz)
+
+Ne değişti: Eğri sekmesinde **Varışta yaylan** kartı (`#egri-yaylan`). Hareket iniş anahtar karesine vardıktan sonra hedefi
+varış hızıyla orantılı aşar, salınıp oturur: After Effects'teki overshoot ifadesinin anahtar kareye pişirilmiş hâli.
+Matematik adım 9'da Rebound'dan (MIT, atıflı) alınan `dampedSine` / `followThroughAnchors` / `autoDuration`; plan Suflo'nun
+`SufloEase.yaylanPlan`'ı: değer_k = taban + hız · genlik · s(t_k − iniş). Varışlar `SufloEgriModel.varislar` (tek varış:
+playhead'i saran çiftin ikinci ucu ya da canlı yaylanmanın inişi; **Tüm varışlar**: bekleme ve Eğri iç anahtarları hariç her
+iniş), varış hızı boyut başına önceki anahtardan (Eğri'nin son sık anahtarıysa bitiş eğimi). Host `KS_easeBake`'e `tur: 'yaylan'`
+öğeleri (`KS_easeYaylanOge`): iniş ve sonraki anahtar değerleriyle doğrulanır, yalnız inişten sonra ve sonraki anahtardan / klip
+sonundan önce yazar; `setInterpolationTypeAtKey` varsa tepe / çukurlara seyrek plan + Bezier (5), yoksa 2 karede bir sık plan.
+Kayıt `tur: 'yaylan'` (uçsuz, iniş `kenarDegerleri[0]`); satır Geri al'ı, U, bildirim, Tümünü geri al (`KS_easeUndo`) ve adım 11'in
+kaldırması (`KS_removeSufloKeys`) siler; inişi silen bir Geçiş / Zoom / Önayar kaldırması ardındaki yaylanmayı da kaldırır. Ayarlar
+`suflo.egri.yaylan` anahtarında (yalnız bu bilgisayarın yerel deposu). Temiz oda: plan adımı yalnız Rebound'a dayanıyor; OpenCurve
+açılmadı, kod / tablo / metin alınmadı. Yeni bildirim gerekmez (overshoot.js adım 9'da Rebound girdisiyle zaten atıflı).
+
+**14.1 Fiyat (bilgi).** Senin kuralın: "part of 'curves'". Ayarlar, önizleme ve geri almak **ücretsiz**; anahtar karelere yazmak
+`Pro.gate('curves')` ve Eğri ile **ortak** 3 deneme hakkı (hak yalnız en az bir varış yazılınca, bir kez). `js/deneme.js`'e yeni
+anahtar eklenmedi; Ayarlar › Pro / deneme tablosundaki ad "Eğri (yumuşatma ve varışta yaylanma)", Pro etiketi ve Ayarlar'daki Pro
+listesi de yaylanmayı anıyor. Sunucu tarafında yapılacak bir şey yok.
+
+**14.2 Premiere'de Bezier türünü doğrula (5 dk, önemli).** Plan yaylanma anahtarlarını `setInterpolationTypeAtKey(t, 5)` ile
+Bezier yapar ("enum'u kfInterp yoklamasıyla doğrula"); yoklama yalnız işlevin VARLIĞINI görebilir, 5'in Premiere'de gerçekten
+Bezier olduğunu göremez (Geçiş / Zoom / Hareket önayarlarının seyrek anahtarları da 5 kullanıyor). Deneme listesi **14.3**:
+Effect Controls'te yaylanma anahtarı Bezier / Otomatik Bezier görünmeli. Başka bir tür görünürse sürümü yaz; 5 yerine doğru sayı
+`jsx/host.jsx` › `KS_easeYaylanOge`'de tek yerde değişir.
+
+**14.3 Tasarım kararlarını onayla (10 dk, karar).**
+(a) **Varsayılanlar:** Genlik 0,10 sn, Frekans 3 Hz, Sönüm 6 (oturma ≈ 0,8 sn): 0,5 sn'de 500 px giden (1000 px/sn) bir harekette ilk aşım
+≈ 60 px. Daha belirgin istersen `js/ease-curve.js` › `YAYLAN`. Sönüm kaydırıcısı tam sayı adımlı (İngilizce arayüzde ondalık virgül
+görünmesin diye).
+(b) **Sonraki anahtar başka değerdeyse** taban o anahtara doğru doğrusal gider (plan "iniş değeri" diyor; ama sabit taban senin
+sonraki hareketini yaylanma bitene dek bekletip sonra sıkıştırırdı). Kullanıcının o aralıkta Bezier yumuşatması varsa hafif sapma
+olabilir.
+(c) **2 kareden az yer:** inişten sonra sonraki anahtara / klibin son karesine kadar 2'den az yazılabilir kare varsa yazılmaz
+(Tüm varışlar'da sessizce geçilir, tek varışta nedeni söylenir).
+(d) **Kayıt uçsuz:** yaylanma kaydı kendi anahtarlarıyla yaşar; kullanıcı sonraki anahtarı taşısa da Geri al bulur. Aynı inişe
+yeniden uygulama öncekinin yerine geçer; kullanıcı pencerenin ortasına anahtar koyduysa yeni yaylanma ondan önce biter, eskinin
+ötesindeki anahtarları da silinir (onun anahtarı kalır).
+(e) **Değerler yalnız Uygula'da okunur:** yoklama taraması değer okumaz (40 özellik × 400 anahtar yavaş olurdu); Uygula işaretli
+satırların değerlerini taze taramayla ister.
+(f) **Kısayol yok:** Eğri'nin kısayolları (Enter, U, F, I, V, 1–9) aynı; Varışta yaylan için ayrı tuş eklenmedi (CEP tuş ilgisi
+listesi değişmedi). U ve Tümünü geri al yaylanmayı da kaldırır.
+Farklı istersen söyle.
+
+**14.4 Premiere'de dene (25–35 dk).** `marketing/v3.4-deneme-listesi.md` › `## 14`. Özellikle **14.3** (Bezier türü), **14.4**
+(sonraki anahtarı geçmez, yer reddi), **14.5** (yeniden uygulama ve Geri al) ve **14.9** (Geçişi kaldır yaylanmayı da kaldırır).
+Hem yeni (2025 / 2026) hem eski (14.x / 2020, CEF 74) Premiere'de.
+
+**14.5 Pazarlama (bilgi).** "Bezier tutamaçları" iddiası yok: yaylanma anahtar karelere yazılır (her tepe / çukura bir anahtar;
+Premiere izin veriyorsa Bezier ara değerleme). Tanıtım kartı artık "Eğriyi ve yaylanmayı düzenlemek, önizlemek ve geri almak
+ücretsiz" diyor. `js/app.js` › `YENILIKLER`'e "Eğri: Varışta yaylan" maddesi (`sekme: "egri"`) 3.4 yayınında eklenebilir; bu adımda
+bilerek dokunulmadı.
+
+**14.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
+`Kaynak: Rebound (MIT) overshoot.js — adım 9'da js/ease-curve.js'e atıflı uyarlandı (dampedSine, extremaTimes, autoDuration,
+followThroughAnchors); varışlar, plan, host yazımı ve arayüz Suflo'nun (temiz oda), yeni bildirim gerekmez.`
