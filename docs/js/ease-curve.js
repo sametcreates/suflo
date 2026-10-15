@@ -1112,6 +1112,11 @@
    * metin sözdizimi, arayüzü ve CSS'i kullanılmaz; okuyucu o araç açılmadan, yalnız Suflo'nun planındaki biçim tanımından
    * Suflo'nun kendi ayrıştırıcısıyla yazıldı (temiz oda). Yalnız tek kübik ve çok noktalı şekiller eşlenir, gerisi
    * 'bilinmeyen' uyarısıyla atlanır. Bu ad depoda yalnız bu bölümde (ve docs/js'teki bayt bayt kopyasında) geçer.
+   * Gerçek dosyada her önayarın curve'ü bir nesnedir: { p1x, p1y, p2x, p2y } (p1 (0,0)'ın çıkış, p2 (1,1)'in giriş
+   * tutamacı; mutlak) ve çok noktalı eğride ek olarak pts: yalnız İÇ çapalar { x, y, ix, iy, ox, oy, smooth } (mutlak
+   * tutamaçlar; uçlar örtük). Bu biçim tanımı bir inceleme bulgusundaki alan adlarından alındı (yalnız alan adları, kod
+   * değil); okuyucu yine o araç açılmadan yazıldı. İlk sürümün tahmin ettiği şekiller (aşağıda) zararsız olduğu için
+   * okunmaya devam eder.
    */
   var DIS_ANAHTAR = "opencurve";
   // Dış dosya mı: { <DIS_ANAHTAR>: sürüm, presets: [...] } → { surumUyari (sürüm 1 değil; yine de okunur) } | null
@@ -1138,10 +1143,14 @@
   }
   /*
    * Dış eğri → Suflo eğrisi. Yalnız iki şekil eşlenir:
-   *   tek kübik   'cubic-bezier(a, b, c, d)' metni (cssCoz), [x1, y1, x2, y2] ya da { x1, y1, x2, y2 }
-   *   çok noktalı noktalar dizisi ya da { points | pts: [...] }; 2–8 nokta (uçlar (0,0) ve (1,1)'e oturur)
+   *   dosyanın biçimi { p1x, p1y, p2x, p2y } tek kübik (x1 = p1x, y1 = p1y, x2 = p2x, y2 = p2y); pts de doluysa çok
+   *               noktalı: (0,0) [çıkış p1] + en çok 6 iç çapa (pts) + (1,1) [giriş p2]; 6'dan çok iç çapa 'nokta'
+   *   tahminler   'cubic-bezier(a, b, c, d)' metni (cssCoz), [x1, y1, x2, y2] ya da { x1, y1, x2, y2 }; noktalar dizisi
+   *               ya da { points | pts: [...] } (p1x… yoksa): uçlar DAHİL 2–8 nokta (uçlar (0,0) ve (1,1)'e oturur)
    * Döner: { curve } | { hata: 'bilinmeyen' (başka şekil) | 'egri' (sayılar geçersiz) | 'nokta' (8'den çok) }
    */
+  // Dosyanın kendi eğri nesnesi mi: dört uç tutamacı sayısı (p1x, p1y, p2x, p2y) var
+  function disUcTutamakli(c) { return sayiMi(c.p1x) && sayiMi(c.p1y) && sayiMi(c.p2x) && sayiMi(c.p2y); }
   function disEgri(c) {
     if (typeof c === "string") { var k = cssCoz(c); return k ? { curve: k.curve } : { hata: /cubic-bezier/i.test(c) ? "egri" : "bilinmeyen" }; }
     var dizi = null;
@@ -1152,11 +1161,18 @@
       }
       dizi = c;
     } else if (c && typeof c === "object") {
-      if (sayiMi(c.x1) && sayiMi(c.y1) && sayiMi(c.x2) && sayiMi(c.y2)) {
+      if (disUcTutamakli(c)) {
+        if (![c.p1x, c.p1y, c.p2x, c.p2y].every(sonlu)) return { hata: "egri" };
+        var ic = bosMu(c.pts) ? [] : c.pts;
+        if (!Array.isArray(ic)) return { hata: "egri" };
+        if (!ic.length) return { curve: normalize({ type: "bezier", x1: c.p1x, y1: c.p1y, x2: c.p2x, y2: c.p2y }) };
+        if (ic.length > MAX_PTS - 2) return { hata: "nokta" };
+        // iç çapalar uçların arasına; uç tutamaçları p1 / p2 (aşağıdaki döngü her noktayı disNokta ile denetler)
+        dizi = [{ x: 0, y: 0, ox: c.p1x, oy: c.p1y }].concat(ic, [{ x: 1, y: 1, ix: c.p2x, iy: c.p2y }]);
+      } else if (sayiMi(c.x1) && sayiMi(c.y1) && sayiMi(c.x2) && sayiMi(c.y2)) {
         if (![c.x1, c.y1, c.x2, c.y2].every(sonlu)) return { hata: "egri" };
         return { curve: normalize({ type: "bezier", x1: c.x1, y1: c.y1, x2: c.x2, y2: c.y2 }) };
-      }
-      dizi = Array.isArray(c.points) ? c.points : Array.isArray(c.pts) ? c.pts : null;
+      } else dizi = Array.isArray(c.points) ? c.points : Array.isArray(c.pts) ? c.pts : null;
     }
     if (!dizi || !dizi.length || !(Array.isArray(dizi[0]) || (dizi[0] && typeof dizi[0] === "object"))) return { hata: "bilinmeyen" };
     if (dizi.length < 2) return { hata: "egri" };

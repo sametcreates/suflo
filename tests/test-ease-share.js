@@ -173,6 +173,48 @@ ok("dış biçim: sürüm 1 değilse 'dosyaSurumu' uyarısıyla yine okunur; pre
 ok("dış biçim: disEgri doğrudan (dizi / nesne / metin / bilinmeyen)", E.disEgri([0, 0, 1, 1]).curve.type === "bezier" && E.disEgri({ x1: 0, y1: 0, x2: 1, y2: 1 }).curve.type === "bezier" &&
   E.disEgri("ease").curve.type === "bezier" && E.disEgri("wiggle").hata === "bilinmeyen" && E.disEgri("cubic-bezier(5,0,0,1)").hata === "egri" && E.disEgri(null).hata === "bilinmeyen" &&
   E.disEgri([{ x: 0, y: 0 }]).hata === "egri");
+// 3.4 adım 15 incelemesi: dış aracın GERÇEK dışa aktarma biçimi. curve = { p1x, p1y, p2x, p2y } (p1 (0,0)'ın çıkış, p2 (1,1)'in
+// giriş tutamacı, mutlak); çok noktalıda pts yalnız İÇ çapaları { x, y, ix, iy, ox, oy, smooth } tutar (uçlar örtük). Önceki
+// okuyucu tek kübiği 'bilinmeyen' sayıyor, tek iç çapalıyı 'egri' diye atıyor, iki iç çapalıda uç tutamaçlarını kaybediyordu.
+function icCapalar(n) {
+  var out = [];
+  for (var c = 1; c <= n; c++) { var x = c / (n + 1); out.push({ x: x, y: x * x, ix: x - 0.04, iy: x * x - 0.02, ox: x + 0.04, oy: x * x + 0.02, smooth: c % 2 === 1 }); }
+  return out;
+}
+var gercek = E.dosyaOku(disDosya([
+  { name: "Single", curve: { p1x: 0.25, p1y: 0.1, p2x: 0.25, p2y: 1 } },
+  { name: "Bir iç", curve: { p1x: 0.2, p1y: 0, p2x: 0.8, p2y: 1, pts: [{ x: 0.5, y: 0.8, ix: 0.4, iy: 0.7, ox: 0.6, oy: 0.9, smooth: true }] } },
+  { name: "Altı iç", curve: { p1x: 0.05, p1y: 0, p2x: 0.95, p2y: 1, pts: icCapalar(6) } },
+  { name: "Yedi iç", curve: { p1x: 0.05, p1y: 0, p2x: 0.95, p2y: 1, pts: icCapalar(7) } },
+  { name: "İki iç", curve: { p1x: 0.15, p1y: 0.3, p2x: 0.85, p2y: 0.7, pts: icCapalar(2) } },
+  { name: "Boş pts", curve: { p1x: 0.42, p1y: 0, p2x: 0.58, p2y: 1, pts: [] } },
+  { name: "Sonsuz uç", curve: { p1x: 0.25, p1y: "SONSUZ", p2x: 0.25, p2y: 1 } },
+  { name: "Bozuk iç", curve: { p1x: 0.25, p1y: 0.1, p2x: 0.25, p2y: 1, pts: [{ x: 0.5, y: "a" }] } },
+  { name: "pts nesne", curve: { p1x: 0.25, p1y: 0.1, p2x: 0.25, p2y: 1, pts: { x: 0.5, y: 0.5 } } }
+]).replace('"SONSUZ"', "1e999"));
+var gAd = {};
+gercek.ok && gercek.presets.forEach(function (p) { gAd[p.ad] = p.curve; });
+ok("dış biçim (gerçek): tek kübik { p1x, p1y, p2x, p2y } cubic-bezier(p1x, p1y, p2x, p2y) olur; boş pts de tek kübik", gercek.ok && gercek.bicim === "dis" &&
+  gAd.Single && E.toCss(gAd.Single) === "cubic-bezier(0.25, 0.1, 0.25, 1)" && gAd["Boş pts"] && E.toCss(gAd["Boş pts"]) === "cubic-bezier(0.42, 0, 0.58, 1)",
+  js(gercek.presets.map(function (p) { return p.ad; })));
+var bi = gAd["Bir iç"];
+ok("dış biçim (gerçek): bir iç çapa → 3 noktalı eğri; uç tutamaçları p1 / p2, iç çapanın mutlak tutamaçları ve smooth korunur", !!bi && bi.type === "multi" &&
+  bi.pts.length === 3 && bi.pts[0].x === 0 && bi.pts[0].y === 0 && bi.pts[0].ox === 0.2 && bi.pts[0].oy === 0 && bi.pts[1].x === 0.5 && bi.pts[1].y === 0.8 &&
+  bi.pts[1].ix === 0.4 && bi.pts[1].iy === 0.7 && bi.pts[1].ox === 0.6 && bi.pts[1].oy === 0.9 && bi.pts[1].smooth === true &&
+  bi.pts[2].x === 1 && bi.pts[2].y === 1 && bi.pts[2].ix === 0.8 && bi.pts[2].iy === 1 && Math.abs(E.toFunction(bi)(0.5) - 0.8) < 1e-6, js(bi));
+var ai = gAd["Altı iç"], ii = gAd["İki iç"];
+ok("dış biçim (gerçek): altı iç çapa → 8 nokta (sınırda), iki iç çapada uç tutamaçları kaybolmaz", !!ai && ai.type === "multi" && ai.pts.length === 8 &&
+  ai.pts[0].ox === 0.05 && ai.pts[7].ix === 0.95 && js(ai.pts.slice(1, 7).map(function (p) { return p.x; })) === js(icCapalar(6).map(function (p) { return E.normalize({ type: "bezier", x1: p.x, y1: 0, x2: 1, y2: 1 }).x1; })) &&
+  !!ii && ii.pts.length === 4 && ii.pts[0].ox === 0.15 && ii.pts[0].oy === 0.3 && ii.pts[3].ix === 0.85 && ii.pts[3].iy === 0.7, js(ii));
+ok("dış biçim (gerçek): yedi iç çapa 'nokta', sonsuz uç tutamacı / bozuk iç çapa / dizi olmayan pts 'egri' uyarısıyla atlanır",
+  js(gercek.uyarilar.map(function (u) { return u.kod + ":" + u.ad; })) === js(["nokta:Yedi iç", "egri:Sonsuz uç", "egri:Bozuk iç", "egri:pts nesne"]) &&
+  gercek.presets.length === 5, js(gercek.uyarilar));
+ok("dış biçim (gerçek): disEgri doğrudan ve iceAktar aynı sonucu verir (uyarısız)", (E.disEgri({ p1x: 0.25, p1y: 0.1, p2x: 0.25, p2y: 1 }).curve || {}).type === "bezier" &&
+  E.disEgri({ p1x: 0, p1y: 0, p2x: 1, p2y: 1, pts: icCapalar(7) }).hata === "nokta" && (function () {
+    var r = E.iceAktar(disDosya([{ name: "Single", curve: { p1x: 0.25, p1y: 0.1, p2x: 0.25, p2y: 1 } },
+      { name: "Bir iç", curve: { p1x: 0.2, p1y: 0, p2x: 0.8, p2y: 1, pts: [{ x: 0.5, y: 0.8, ix: 0.4, iy: 0.7, ox: 0.6, oy: 0.9, smooth: true }] } }]));
+    return r.ok && r.bicim === "dis" && r.presets.length === 2 && !r.uyarilar.length && r.presets[1].curve.type === "multi";
+  })());
 
 /* ================= iceAktar (Kod yapıştır kutusu ve İçe aktar) ================= */
 var i1 = E.iceAktar(kE), i2 = E.iceAktar("ease-out"), i3 = E.iceAktar("﻿" + dosya.metin), i4 = E.iceAktar(disDosya([{ name: "x", curve: [0, 0, 1, 1] }]));

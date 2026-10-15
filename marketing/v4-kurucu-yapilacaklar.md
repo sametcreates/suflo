@@ -1846,10 +1846,16 @@ uygulanır, ikinci bir 'curves' kapısı eklenmedi; (b) Geçiş / Zoom / Hareket
 (adım 12'nin kuralı). `js/deneme.js`'e yeni anahtar eklenmedi.
 
 **15.2 Dış eğri aracının dışa aktarma dosyasını dene (10 dk, önemli).** Plan, OpenCurve'ün dışa aktarma dosyasının yalnız JSON
-biçimini (`{ opencurve: 1, presets: [{ name, curve }] }`) okumamızı söylüyor; temiz oda kuralı yüzünden o araç **hiç açılmadı**, bu
-yüzden `curve` alanının içi tahminle, geniş okunuyor: tek kübik (`"cubic-bezier(a,b,c,d)"`, `[x1,y1,x2,y2]`, `{x1,y1,x2,y2}`) ve
-çok noktalı (`[[x,y],…]`, `{ points | pts: [{ x, y, in / out: {x,y} ya da [x,y] }] }`, tutamaçlar MUTLAK koordinat varsayılır);
-gerisi "tanınmayan eğri" uyarısıyla atlanır. Elinde o araçla yapılmış gerçek bir dışa aktarma dosyası varsa (kendi bilgisayarında,
+biçimini (`{ opencurve: 1, presets: [{ name, curve }] }`) okumamızı söylüyor; temiz oda kuralı yüzünden o araç **hiç açılmadı**.
+İlk sürüm `curve` alanının içini tahminle okuyordu ve gerçek dosyadaki şekilleri tanımıyordu. Adım 15 incelemesinde bir bulgu
+gerçek biçimin **alan adlarını** bildirdi (kod değil): `curve` bir nesnedir, `{ p1x, p1y, p2x, p2y }` (p1 = (0,0)'ın çıkış, p2 =
+(1,1)'in giriş tutamacı, mutlak); çok noktalı eğride ek olarak `pts` yalnız **iç** çapaları `{ x, y, ix, iy, ox, oy, smooth }`
+(mutlak tutamaçlar) tutar, uçlar örtüktür. Okuyucu bu tanımdan, o aracın kodu açılmadan düzeltildi: tek kübik
+`cubic-bezier(p1x, p1y, p2x, p2y)` olur, iç çapalı eğri (0,0) + iç çapalar + (1,1) olarak (en çok 6 iç çapa = 8 nokta; fazlası
+"geçersiz önayar atlandı" sayılır) gelir. İlk sürümün tahmin ettiği şekiller (`"cubic-bezier(a,b,c,d)"`, `[x1,y1,x2,y2]`,
+`{x1,y1,x2,y2}`, uçları da içeren nokta dizileri) zararsız olduğu için okunmaya devam eder; gerisi "tanınmayan eğri" uyarısıyla
+atlanır. (Not: bulgu biçimi o aracın dışa aktarma kodunun çıktısına bakarak doğruladığını söylüyor; plan dosya biçimini okumaya
+izin veriyor, Suflo'ya o koddan hiçbir şey alınmadı.) Elinde o araçla yapılmış gerçek bir dışa aktarma dosyası varsa (kendi bilgisayarında,
 aracı kodunu açmadan yalnız kullanarak) Suflo'da **İçe aktar…** ile dene (deneme listesi **15.8**): şekiller aynı görünüyor mu,
 kaç tanesi atlandı? Tutamaçlar göreli çıkarsa ya da başka bir alan adı kullanılıyorsa bana yalnız **dosyanın biçimini** (bir örnek
 dosya) gönder; okuyucu `js/ease-curve.js`'teki işaretli "DIŞ BİÇİM OKUYUCUSU" bölümünde, tek yerde güncellenir. O aracın adı depoda
