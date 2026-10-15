@@ -387,7 +387,8 @@
   /*
    * Kesim kapsamının sekans aralığı (sn). ctx: KS_getContext özeti ({ hasSeq, sel, seqIn, seqOut, seqDur, frame }).
    * kapsam: "clip" (seçili klip) | "inout" (sekansın In → Out'u) | "entire" (tüm sekans).
-   * Döner { start, end } ya da { hata: "klip" | "sekans" | "inout" } (panel metni koda göre kurar).
+   * Döner { start, end } ya da { hata: "klip" | "sekans" | "bos" | "inout" } (panel metni koda göre kurar). "bos": sekans
+   * açık ama boş (bilinen süresi bir kareden kısa); "sekans": sekans yok ya da süresi bilinmiyor.
    */
   function kapsamAraligi(kapsam, ctx) {
     ctx = ctx || {};
@@ -398,6 +399,8 @@
     }
     if (!ctx.hasSeq) return { hata: "sekans" };
     var kare = num(ctx.frame, 0) > 0 ? num(ctx.frame, 0) : 1 / 30;
+    var sureBilinir = ctx.seqDur !== undefined && ctx.seqDur !== null && ctx.seqDur !== "" && isFinite(Number(ctx.seqDur));
+    if (sureBilinir && !(Number(ctx.seqDur) > kare)) return { hata: "bos" };
     if (kapsam === "inout") {
       var a = num(ctx.seqIn, 0), b = num(ctx.seqOut, 0), sd = num(ctx.seqDur, 0);
       if (sd > 0 && b > sd) b = sd;
@@ -418,7 +421,7 @@
    * In → Out / Sekans aralığı, katmanların okunduğu ANDA Premiere'in kendi değerlerinden (KS_getTrackLayout({ scope })
    * → kapsam: { scope, seqIn, seqOut, seqDur, frame }). Panelin bağlamı (KS_getContext) yalnız panel odaktayken
    * yoklanır: Premiere'de I / O'ya basıp hemen Sessizlikleri bul'a tıklayınca bayattır ("In / Out yok" der ya da eski
-   * aralığın katmanlarından yanlış "Dinlenecek ses" önerir). kap yoksa { hata: "sekans" }.
+   * aralığın katmanlarından yanlış "Dinlenecek ses" önerir). kap yoksa { hata: "sekans" }; boş sekansta { hata: "bos" }.
    */
   function hostKapsamAraligi(kap) {
     if (!kap || (kap.scope !== "inout" && kap.scope !== "entire")) return { hata: "sekans" };
@@ -444,11 +447,13 @@
   /*
    * Arka plan sesi adı: bu adı taşıyan SES katmanı varsayılan olarak korunur (kesilmez, kaymaz).
    * Ad Türkçe büyük / küçük harf farkı ve şapkasız yazım gözetilerek karşılaştırılır ("MÜZİK", "Sarki").
-   * Yalnız SÖZCÜK BAŞINDA aranır (camelCase sözcük sayılır: "BackgroundMusic"): "Songül", "Kemal Sarkis" gibi kişi
-   * adları müzik sayılmaz. müzik / music / bgm / ambiyans / ambience ekli de olur ("Müziği", "Musical"); "şarkı" yalnız
-   * Türkçe ekleriyle ("şarkılar", "şarkısı"), "song" yalnız "song" / "songs" olarak.
+   * Plandaki kural (/müzik|music|bgm|şarkı|song|ambiyans|ambience/i) gibi müzik / music / bgm / ambiyans / ambience adın
+   * HER yerinde aranır: bitişik yazılmış "Backgroundmusic", "Fonmüzik", "ambientmusic" de müziktir; ekli de olur
+   * ("Müziği", "Musical"). Yalnız kişi adlarıyla çakışan iki sözcük SÖZCÜK BAŞINDA ve sözcük olarak aranır (camelCase
+   * sözcük sayılır: "ThemeSong"): "Songül", "Kemal Sarkis" müzik sayılmaz; "şarkı" yalnız Türkçe ekleriyle ("şarkılar",
+   * "şarkısı"), "song" yalnız "song" / "songs" olarak.
    */
-  var MUZIK_RE = /(^|[^a-zçğıöşüâîû])(m[uü]zi[kğg]|music|bgm|ambiyans|ambience|[sş]ark[iı](lar|ler|s[iı]|n[iı]n|m|n)?(?![a-zçğıöşüâîû])|songs?(?![a-zçğıöşüâîû]))/;
+  var MUZIK_RE = /m[uü]zi[kğg]|music|bgm|ambiyans|ambience|(^|[^a-zçğıöşüâîû])([sş]ark[iı](lar|ler|s[iı]|n[iı]n|m|n)?|songs?)(?![a-zçğıöşüâîû])/;
   function adNormal(ad) {
     return String(ad || "").replace(/([a-zçğıöşü])([A-ZÇĞİÖŞÜ])/g, "$1 $2")
       .replace(/İ/g, "i").replace(/I/g, "i").replace(/ı/g, "i").toLowerCase();
@@ -501,7 +506,6 @@
     }
     return null;
   }
-  function tekKlipKaplar(iz, bas, son, oran) { return !!uzunKlip(iz, bas, son, oran); }
 
   // Klibin kendisi müziğe benziyor mu: klip / dosya adında müzik sözcüğü ya da sıkıştırılmış müzik dosyası uzantısı
   function muzikKlibi(kl) {
@@ -563,7 +567,7 @@
    *  - Adı müzik / music / bgm / şarkı / song / ambiyans / ambience olan SES katmanı korunur (önceden işaretli).
    *  - Bir klibi aralığın %80'ini ya da fazlasını kaplayan, dinlenmeyen ve korunmayan ses katmanı yalnız ÖNERİLİR
    *    (oner.audio: vurgulanır, işaretlenmez): tek uzun klip konuşma da olabilir. Videoya bağlı ses yokken birden
-   *    çok varsayılan dinlenen katman varsa (hangisi konuşma bilinemez) dinlenen böyle bir katman da önerilir.
+   *    çok varsayılan dinlenen katman varsa dinlenen böyle bir katman yalnız klibi müziğe benziyorsa önerilir.
    *  - Video katmanı hiçbir zaman önceden işaretlenmez.
    *  - Dinlenecek ses (varsayılan): aralıkta klibi olan, adı müzik olmayan ses katmanları; susturulmamış olanlar
    *    varsa yalnız onlar; videoya bağlı (kamera sesi) olanlar varsa yalnız onlar.
@@ -608,19 +612,19 @@
     }
 
     /*
-     * Kaplama önerisi. Belirsiz varsayılanda (bağlı ses yok, birden çok aday) tek uzun klipli DİNLENEN katman da
-     * önerilir, adsız müzik yatağı sessizce karışıma katılmış olabilir: başka bir aday parça parça (kurgulanmış konuşma)
-     * ise ya da klibin adı / dosyası müziğe benziyorsa (mp3, "music"…). Tek parça konuşma kayıtları (iki konuşmacılı
-     * podcast) birbirinden ayrılamaz: önerilmez. Önerilen yalnız vurgulanır, dinlemeden çıkarılmaz (yanlış çıkarılan
-     * konuşma katmanı sessiz sanılıp kesilirdi).
+     * Kaplama önerisi (plan: "seçilen bir konuşma katmanı değilse"): DİNLENEN katman önerilmez. Tek istisna belirsiz
+     * varsayılan (bağlı ses yok, birden çok aday): uzun klibin adı / dosyası müziğe benziyorsa (mp3, "music"…) adsız
+     * müzik yatağı sessizce karışıma katılmış olabilir, önerilir. Başka bir adayın parça parça olması (kurgulanmış
+     * konuşma) yeterli DEĞİL: podcast'te ev sahibinin kesintisiz WAV'ı konuşmadır; "müzik olabilir" diye önerilip
+     * korunursa Ripple'da kaymaz, sesi kurgunun geri kalanından kopardı. Önerilen yalnız vurgulanır, dinlemeden
+     * çıkarılmaz (yanlış çıkarılan konuşma katmanı sessiz sanılıp kesilirdi).
      */
-    var karsit = belirsiz && dinle.some(function (i) { return !tekKlipKaplar(A[i], bas, son, 0.8); });
     var oner = [];
     A.forEach(function (iz, i) {
       if (iceriyor(koru.audio, i) || (iz && iz.locked)) return;
       var uzun = uzunKlip(iz, bas, son, 0.8);
       if (!uzun) return;
-      if (iceriyor(dinle, i) && !(belirsiz && (karsit || muzikKlibi(uzun)))) return;
+      if (iceriyor(dinle, i) && !(belirsiz && muzikKlibi(uzun))) return;
       oner.push(i);
     });
 

@@ -55,7 +55,7 @@ function eleman(id) {
  *   ctx?: { hasSeq, sequenceId, seqIn, seqOut, seqDur, frame } (3.4 adım 7: sekans kapsamı),
  *   call?(fn, payload) → sonuç (verilirse her K.call buna gider; KS_exportAudio / KS_getTrackLayout sahtesi),
  *   fs? (K.fs yerine) }
- * Döner: { el, KCut, kayit: { gate, harca, toast, call, run, runAkis }, ctx(sel, ek), bekle(ms), kapsam(s), hedef(m) }
+ * Döner: { el, KCut, kayit: { gate, harca, toast, call, run, runAkis }, ctx(sel, ek, sessiz?), bekle(ms), kapsam(s), hedef(m) }
  */
 function kesimPaneli(o) {
   var els = {};
@@ -126,10 +126,12 @@ function kesimPaneli(o) {
   sandbox.KCut.init();
   return {
     el: el, KCut: sandbox.KCut, kayit: kayit,
-    ctx: function (yeni, ek) {
+    // sessiz: bağlam değişir ama onContext dinleyicileri çağrılmaz (app.js pollContext yalnız medya / seçim sayısı /
+    // sekans değişince haber verir: aynı klip taşınınca ya da aynı aralığın kopyası seçilince sessizdir)
+    ctx: function (yeni, ek, sessiz) {
       sel = yeni;
       if (ek) for (var k in ek) ekCtx[k] = ek[k];
-      dinleyiciler.forEach(function (f) { f(ctxNesnesi()); });
+      if (!sessiz) dinleyiciler.forEach(function (f) { f(ctxNesnesi()); });
     },
     kapsam: function (s) { kapsamDugmeleri.forEach(function (b) { if (b.dataset.s === s) b.fire("click"); }); },
     hedef: function (m) { hedefDugmeleri.forEach(function (b) { if (b.dataset.m === m) b.fire("click"); }); },

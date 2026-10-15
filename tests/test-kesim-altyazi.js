@@ -76,6 +76,7 @@ function altyaziKur(o) {
     "  segs: function () { return segments; }, mod: function () { return segmentsMode; }, dil: function () { return algilananDil; },",
     "  modAyarla: function (m) { segmentsMode = m; }, kayitlar: function () { return kesimKayitlari; },",
     "  mesgul: function (b) { busy = b; }, shorts: function (v) { if (v !== undefined) shortsYuklenen = v; return shortsYuklenen; },",
+    "  ornek: function (id) { ornekBelge = true; ornekSekansId = id; }, ornekSekans: function () { return ornekSekansId; },",
     "  geriAl: function () { return undoStack.length; } };"
   ].join("\n");
   var api = new Function("window", "document", "CustomEvent", "el", "CT", "CL", "KApp", "kayit", "K", src)(
@@ -175,6 +176,31 @@ var KESIM = [{ start: 1.72, end: 2.48 }, { start: 8, end: 10 }];   // dolgu "ı�
   var devam0 = "";
   try { await C0.apply(false); } catch (eB) { devam0 = eB.message; }
   ok("Uygula: kesime bağlı olmayan belge eskisi gibi her sekansta (denetim yok)", devam0 === "UYGULAMA_DEVAM", devam0);
+
+  // inceleme r2: rehber örneğinin belgesi kopyaya uyarlanıp Ctrl+Z ile geri alınınca örneğin sekansı da geri döner
+  // (ornekSekansId geri alma durumunda yoksa özgün Suflo Deneme reddedilir, kesilmiş kopyaya kesimden önceki zamanlar giderdi)
+  var CO = altyaziKur();
+  CO.yukle(BELGE, "DENEME");
+  CO.ornek("DENEME");
+  CO.kesimKaydet(E.uyarlamaPlani(kopyaSonucu("DENEME", "DENEME-kopya", KESIM), { removeMode: "ripple" }));
+  CO.kurguyaUyarla("DENEME-kopya");
+  var ornekUyarlaninca = CO.ornekSekans();
+  CO.ctx.sequenceId = "DENEME-kopya";
+  var devamUK = "";
+  try { await CO.apply(false); } catch (eUK) { devamUK = eUK.message; }
+  CO.undo();
+  CO.ctx.sequenceId = "DENEME";
+  var devamOz = "";
+  try { await CO.apply(false); } catch (eOz) { devamOz = eOz.message; }
+  CO.ctx.sequenceId = "DENEME-kopya";
+  CO.kayit.toast.length = 0;
+  var devamKo = "";
+  try { await CO.apply(false); } catch (eKo) { devamKo = eKo.message; }
+  ok("örnek belge: kopyaya uyarlanınca kopyada uygulanır; geri alınınca örnek sekansı DENEME'ye döner, Uygula özgünde geçer, kesilmiş kopyada reddedilir",
+    ornekUyarlaninca === "DENEME-kopya" && devamUK === "UYGULAMA_DEVAM" && CO.ornekSekans() === "DENEME" && CO.belgeBilgisi().sekansId === "DENEME" &&
+    devamOz === "UYGULAMA_DEVAM" && devamKo === "" &&
+    CO.kayit.toast.some(function (t) { return /^Bu örnek altyazı Suflo Deneme sekansı için/.test(t[0]) && t[1] === "warn"; }),
+    js({ uyarla: ornekUyarlaninca, simdi: CO.ornekSekans(), oz: devamOz, ko: devamKo, toast: CO.kayit.toast }));
 
   /* ---- 2) önerilmeyen durumlar ---- */
   var C2 = altyaziKur();
@@ -304,10 +330,34 @@ var KESIM = [{ start: 1.72, end: 2.48 }, { start: 8, end: 10 }];   // dolgu "ı�
     kelimeler: [w("Merhaba", 10, 10.4), w("arkadaşlar.", 10.5, 11), w("Bugün", 12.2, 12.5)], dil: "tr", sonSinir: 20 });
   await A.el("tc-altyazi-aktar").click();
   var uyariA = A.toast.filter(function (t) { return /^Kurgu kesimden sonra Premiere'de değişti/.test(t[0]); })[0];
-  ok("Altyazıya aktar: kurgu kesimden sonra değiştiyse uyarı + Yine de uyarla, belge değişmez", uyariA && uyariA[2] && CA.segs()[0].text === "Başka", js(A.toast));
+  // inceleme r2: düğme belgeyi uyarlamaz, yerine yeni belge kurar: "Yine de aktar" (uyarla yolunda "Yine de uyarla" kalır)
+  ok("Altyazıya aktar: kurgu kesimden sonra değiştiyse uyarı + 'Yine de aktar' düğmesi, belge değişmez",
+    uyariA && uyariA[1] === "warn" && uyariA[2] && uyariA[2].metin === "Yine de aktar" && CA.segs()[0].text === "Başka", js(A.toast));
+  uyariA[2].fn();
+  ok("Yine de aktar: kelimeler denetimsiz aktarılır (belgenin yerine)", CA.segs()[0].text === "Merhaba arkadaşlar." && CA.belgeBilgisi().sekansId === "S1-kopya", js(CA.segs()));
+  CA.undo();
   izA = "Y";
+  A.eylem.kesimSonrasi(izliSonuc("S1", "S1-kopya", [{ start: 11.1, end: 12.1 }], "X", "Y"), { removeMode: "ripple", kaynak: "S1", ranges: [{ start: 11.1, end: 12.1 }],
+    kelimeler: [w("Merhaba", 10, 10.4), w("arkadaşlar.", 10.5, 11), w("Bugün", 12.2, 12.5)], dil: "tr", sonSinir: 20 });
   await A.el("tc-altyazi-aktar").click();
   ok("Altyazıya aktar: bugünkü iz kesimden sonraki → aktarılır", CA.segs()[0].text === "Merhaba arkadaşlar." && CA.belgeBilgisi().sekansId === "S1-kopya", js(CA.segs()));
+
+  // inceleme r2: satır kurucu kelimeleri reddederse (Kelime kelime'de 8+ kelime aynı ana yığılmış) "kelime kalmadı" denmez:
+  // kurucunun kendi metni ve çaresi (satır modu) gösterilir, kelimeler durur (satır moduna geçip yeniden aktarılabilir)
+  var CY = altyaziKur({ uzunluk: "k1" });
+  CY.yukle([{ start: 50, end: 51, text: "Başka" }], "B");
+  var TY = satirKur(CY, TC_IDS);
+  var yigin = [];
+  for (var yi = 0; yi < 10; yi++) yigin.push(w("k" + yi, 10 + yi * 0.05, 10 + yi * 0.05 + 0.04));
+  TY.eylem.kesimSonrasi(kopyaSonucu("S1", "S1-kopya", [{ start: 20, end: 21 }]), { removeMode: "ripple", kaynak: "S1", ranges: [{ start: 20, end: 21 }],
+    kelimeler: yigin, dil: "tr" });
+  ok("yığılmış kelimeler: satır 'Kesilmeyen 10 kelime … hazır' der", /Kesilmeyen 10 kelime/.test(TY.el("tc-altyazi-metin").textContent), TY.el("tc-altyazi-metin").textContent);
+  TY.el("tc-altyazi-aktar").click();
+  var tY = TY.toast[TY.toast.length - 1];
+  ok("satır kurucu reddetti (neden kur): kendi uyarısı ('Motor kelime zamanlarını veremedi … satır modunu kullan'), 'kelime kalmadı' değil; belge değişmez, Altyazıya aktar açık kalır",
+    tY && /^Motor kelime zamanlarını veremedi/.test(tY[0]) && /satır modunu kullan/.test(tY[0]) && tY[1] === "warn" &&
+    !TY.toast.some(function (t) { return t[0] === "Altyazıya aktarılacak kelime kalmadı."; }) && CY.segs()[0].text === "Başka" && TY.el("tc-altyazi-aktar").hidden === false,
+    js(TY.toast));
 
   /* ---- 8) inceleme: kısmen uygulanan kesim (silinemeyip seçilen parça) ---- */
   var CE = altyaziKur();
@@ -458,6 +508,10 @@ var KESIM = [{ start: 1.72, end: 2.48 }, { start: 8, end: 10 }];   // dolgu "ı�
     I.translate("Yine de uyarla") === "Adapt anyway" &&
     I.translate("Kesim Premiere'de geri alınmış; altyazı zaten bu kurguya göre.") === "The cut was undone in Premiere; the captions already follow this edit.",
     I.translate("Altyazı yeni kurguya uyarlandı: 4 satır · kesilen 1 satır çıkarıldı · 2 satır kısaldı"));
+  ok("English (beta): 'Yine de aktar' (Altyazıya aktar uyarısı) ve satır kurucunun reddi çevrilir",
+    I.translate("Yine de aktar") === "Send anyway" && I.translate("Altyazı satırları kurulamadı.") === "Couldn't build the caption lines." &&
+    /^The engine couldn't provide word timings/.test(I.translate("Motor kelime zamanlarını veremedi (tüm kelimeler aynı anda). Ayarlar > Destek'ten günlüğü kopyalayıp bildir; şimdilik satır modunu kullan.")),
+    I.translate("Yine de aktar"));
 
   console.log(gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);

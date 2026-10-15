@@ -87,11 +87,15 @@ window.KKesimAltyazi = function (ids) {
       .then(function (r) { return r && r.ok && r.iz ? String(r.iz) : ""; }, function () { return ""; })
       .then(function (iz) { sorguda = false; dugmeler(false); devam(iz); });
   }
-  // Kurgu kesimden sonra değişti (ya da okunamadı): uyarı + "Yine de uyarla"
-  function degistiUyar(okundu, zorla) {
+  /*
+   * Kurgu kesimden sonra değişti (ya da okunamadı): uyarı + eylem düğmesi. etiket: düğmenin yaptığı iş — "Yine de uyarla"
+   * (belgeyi yeni kurguya taşır) ya da "Yine de aktar" (Altyazıya aktar: belgenin YERİNE kelimelerden yeni belge kurar;
+   * "uyarla" demek kullanıcıya eski satırlarının yeniden zamanlanacağını vaat ederdi).
+   */
+  function degistiUyar(okundu, zorla, etiket) {
     KApp.toast(okundu
       ? "Kurgu kesimden sonra Premiere'de değişti (geri alma ya da başka bir düzenleme); altyazı bu kurguya uymayabilir."
-      : "Kurgu Premiere'den okunamadı; altyazı bu kurguya uymayabilir.", "warn", 10000, { metin: "Yine de uyarla", fn: zorla });
+      : "Kurgu Premiere'den okunamadı; altyazı bu kurguya uymayabilir.", "warn", 10000, { metin: etiket || "Yine de uyarla", fn: zorla });
   }
 
   function uyarlaTikla() {
@@ -135,7 +139,7 @@ window.KKesimAltyazi = function (ids) {
     if (!beklenen) { aktar(b); return null; }
     return tazeIz(b.hedef, function (iz) {
       if (iz === null || iz === beklenen) { aktar(b); return; }
-      degistiUyar(!!iz, function () { aktar(b); });
+      degistiUyar(!!iz, function () { aktar(b); }, "Yine de aktar");
     });
   }
 
@@ -148,8 +152,17 @@ window.KKesimAltyazi = function (ids) {
       b.kelimeler = null;   // tek sefer: ikinci tık ikinci belge kurmaz
       KApp.toast(r.satir + " altyazı satırı yeni kurguya göre Altyazı sekmesinde", "good");
       if (KApp.goster) KApp.goster("captions");
+    } else if (r.neden === "mesgul") {
+      KApp.toast("Altyazı oluşturulurken aktarılamaz; iş bitince yeniden dene.", "warn");
+    } else if (r.neden === "kur") {
+      /*
+       * Satır kurucu kelimeleri reddetti (ör. Kelime kelime / Birikimli'de 8+ kelime aynı anda: "Motor kelime zamanlarını
+       * veremedi … şimdilik satır modunu kullan."): kendi metni ve çaresi gösterilir; "kelime kalmadı" satırdaki
+       * "Kesilmeyen N kelime … hazır" ile çelişirdi. Kelimeler durur: satır moduna geçip yeniden aktarılabilir.
+       */
+      KApp.toast(r.hata || "Altyazı satırları kurulamadı.", "warn", 10000);
     } else {
-      KApp.toast(r.neden === "mesgul" ? "Altyazı oluşturulurken aktarılamaz; iş bitince yeniden dene." : "Altyazıya aktarılacak kelime kalmadı.", "warn");
+      KApp.toast("Altyazıya aktarılacak kelime kalmadı.", "warn");
     }
     tazele();
   }

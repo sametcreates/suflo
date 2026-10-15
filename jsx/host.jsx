@@ -1953,7 +1953,9 @@ function KS_cloneActiveSeq() {
 /*
  * Kesimleri uygula. p: { ranges:[{start,end}] (sekans zamani), removeMode:"ripple"|"gap"|"select", cloneFirst:bool,
  *   cloneName?, expectSeqId? (3.4: analiz edilen sekans; kopyadan ONCE denetlenir), protect?: { video:[i], audio:[i] }
- *   (3.4: korunan katmanlar; razor, ripple kaplama denetimi ve silme / secme bu katmanlari atlar),
+ *   (3.4: korunan katmanlar; razor, ripple kaplama denetimi ve silme / secme bu katmanlari atlar), esitKayma?: true
+ *   (3.4: protect'siz de ripple'da esit kayma kurali — Otomatik Kesim'in sekans kapsamlarinda kliplerin arasindaki bos
+ *   bolgeye denk gelen aralik bosluk moduna dusurmez; protect varsa zaten bu kural),
  *   expectTracks?: { video:[ad], audio:[ad] } (3.4: protect dizinlerinin okundugu duzen; sayi ya da ad tutmazsa
  *   kod "katman" ile hata, kopyadan ONCE), esleme?: true (3.4 adim 8: sonuca esleme raporu eklenir) }.
  * Korunan katman KILITLENMEZ, kilidi de acilmaz: hata olsa da geri yuklenecek bir sey yok. Kopya sekansin katman
@@ -2057,15 +2059,18 @@ function KS_applyCuts(encoded) {
     /*
      * Ripple guvenligi: clip.remove(ripple=true) YALNIZ kendi track'ini
      * kaydirir; track, araligin icindeki kliplerin toplam suresi kadar kayar.
-     * Sonrasinda icerigi olan track'lerin bu toplamlari esit degilse biri
-     * digerlerinden az kayar ve timeline KALICI senkron kaybeder.
-     * Boyle bir aralik varsa ripple'i bosluk (gap) moduna dusur ve bildir.
-     * Esitse (tam kaplama; ya da sekans kapsaminda kliplerin arasindaki bos
-     * bolge gibi hicbir track'te klip olmayan aralik: hepsi 0) senkron korunur.
+     * Bir track araligi kliplerle tam kaplamiyorsa o track digerlerinden az
+     * kayar ve timeline KALICI senkron kaybeder. Boyle bir aralik varsa
+     * ripple'i bosluk (gap) moduna dusur ve bildir (3.3 kurali, protect'siz
+     * cagrilarda AYNEN: Konusmadan kes, secili klipte Otomatik Kesim).
+     * Esit kayma kurali (yalniz protect ya da esitKayma: true ile; Otomatik Kesim'in sekans kapsamlari): sonrasinda
+     * icerigi olan track'lerin toplamlari esitse (tam kaplama; ya da kliplerin arasindaki bos bolge gibi hicbir
+     * track'te klip olmayan aralik: hepsi ayni) senkron korunur, ripple kalir; bos bolge yerinde kalir.
      * Korunan katman bilerek kaymaz (arka plan muzigi): kaplama denetimine girmez. Korunan VIDEO katmaninda
      * ilk kesimden sonra icerik varsa ripple onu geride birakir: bosluk moduna dusulur (panel bunu zaten engeller).
      */
     var rippleDustu = false, korunanVideoBosluk = false;
+    var esitKaymaKurali = korumaVar || p.esitKayma === true;
     if (p.removeMode === "ripple") {
       // kayma: { video: ilk kayan track'in toplami | null } — ses ve video ayni miktarda kaymali (tek nesne paylasilir)
       var kapliMi = function (tracks, rr, kor, kayma) {
@@ -2082,6 +2087,12 @@ function KS_applyCuts(encoded) {
             if (c2.end.seconds > rr.start + eps) sonrasiVar = true;
           }
           if (!sonrasiVar) continue; // bu track'te kayacak icerik yok
+          if (!esitKaymaKurali) {
+            // 3.3 kurali AYNEN: her track araligi tam kaplamali (bos bolge iceren aralik bosluk moduna dusurur)
+            if (toplam < (rr.end - rr.start) - 2 * eps) return false;
+            if (kayma.miktar === null) kayma.miktar = toplam;   // yalniz esleme raporu icin
+            continue;
+          }
           if (kayma.miktar === null) kayma.miktar = toplam;
           else if (Math.abs(toplam - kayma.miktar) > 2 * eps) return false;
         }

@@ -270,9 +270,17 @@ ok("kapsamAraligi: In → Out; Out ≤ In ya da bir kareden kısa → 'inout'; s
   S.kapsamAraligi("inout", { hasSeq: true, seqIn: 10, seqOut: 10, seqDur: 60 }).hata === "inout" &&
   S.kapsamAraligi("inout", { hasSeq: true, seqIn: 10, seqOut: 10.01, seqDur: 60, frame: 0.04 }).hata === "inout" &&
   S.kapsamAraligi("inout", { hasSeq: false }).hata === "sekans");
-ok("kapsamAraligi: Out sekans sonunu aşmaz; Sekans 0 → seqDur, süresiz sekans 'sekans'",
+ok("kapsamAraligi: Out sekans sonunu aşmaz; Sekans 0 → seqDur; süresi bilinmeyen sekans 'sekans'",
   S.kapsamAraligi("inout", { hasSeq: true, seqIn: 5, seqOut: 900, seqDur: 60 }).end === 60 &&
-  js(S.kapsamAraligi("entire", { hasSeq: true, seqDur: 75.5 })) === js({ start: 0, end: 75.5 }) && S.kapsamAraligi("entire", { hasSeq: true, seqDur: 0 }).hata === "sekans");
+  js(S.kapsamAraligi("entire", { hasSeq: true, seqDur: 75.5 })) === js({ start: 0, end: 75.5 }) &&
+  S.kapsamAraligi("entire", { hasSeq: true }).hata === "sekans");
+// inceleme: açık ama BOŞ sekans "sekans aç" değil "bos" (panel: "Sekans boş: önce klip ekle.")
+ok("kapsamAraligi: açık ama boş sekans (süre 0 ya da bir kareden kısa) → 'bos' (Sekans ve In → Out); sekans yoksa yine 'sekans'",
+  S.kapsamAraligi("entire", { hasSeq: true, seqDur: 0 }).hata === "bos" &&
+  S.kapsamAraligi("entire", { hasSeq: true, seqDur: 0.02, frame: 0.04 }).hata === "bos" &&
+  S.kapsamAraligi("inout", { hasSeq: true, seqIn: 0, seqOut: 0, seqDur: 0 }).hata === "bos" &&
+  S.hostKapsamAraligi({ scope: "entire", seqIn: 0, seqOut: 0, seqDur: 0, frame: 0.04 }).hata === "bos" &&
+  S.kapsamAraligi("entire", { hasSeq: false, seqDur: 0 }).hata === "sekans");
 
 /* 3.4 adım 7 incelemesi: aralık Premiere'in okuma anındaki In / Out'undan (bağlam bayat olabilir) */
 var kapIO = { scope: "inout", seqIn: 10, seqOut: 15.1, seqDur: 60, frame: 0.04 };
@@ -383,6 +391,13 @@ ok("muzikAdi: kişi adları (Songül, Sarkis) müzik sayılmaz",
 ok("muzikAdi: ekli ve bitişik biçimler yine müzik (Müziği, Arka plan müziği, şarkılar, Şarkısı, BackgroundMusic, Song 2, songs, music_01)",
   ["Müziği", "Arka plan müziği", "şarkılar", "Şarkısı", "BackgroundMusic", "Song 2", "songs", "music_01", "Fon Müzik", "BGM1"].every(S.muzikAdi),
   ["Müziği", "Arka plan müziği", "şarkılar", "Şarkısı", "BackgroundMusic", "Song 2", "songs", "music_01", "Fon Müzik", "BGM1"].filter(function (a) { return !S.muzikAdi(a); }).join(","));
+// inceleme: plandaki kural gibi müzik / music / bgm / ambiyans / ambience adın her yerinde (küçük harfle bitişik yazım da)
+var bitisik = ["Backgroundmusic", "backgroundmusic", "Fonmüzik", "arkaplanmüzik", "ambientmusic", "MYBGM", "odaambiyans", "roomambience", "fonmuzigi"];
+ok("muzikAdi: küçük harfle bitişik yazılmış adlar da müzik (Backgroundmusic, Fonmüzik, arkaplanmüzik, ambientmusic…)",
+  bitisik.every(S.muzikAdi), bitisik.filter(function (a) { return !S.muzikAdi(a); }).join(","));
+ok("muzikAdi: şarkı / song yine yalnız sözcük olarak (kişi adları Songül, Sarkis, Jisong değil; camelCase ThemeSong sözcük)",
+  !["Songül", "Kemal Sarkis", "Jisong", "Hasong"].some(S.muzikAdi) && ["ThemeSong", "Tema şarkısı"].every(S.muzikAdi),
+  ["Songül", "Kemal Sarkis", "Jisong", "Hasong", "ThemeSong", "Tema şarkısı"].map(function (a) { return a + "=" + S.muzikAdi(a); }).join(","));
 var podcastSongul = { video: [], audio: [izYap("Ahmet", [k(0, 600, { yol: "ahmet.wav", bag: [] })]), izYap("Songül", [k(0, 600, { yol: "songul.wav", bag: [] })])] };
 var oSongul = S.korumaOner(podcastSongul, { start: 0, end: 600, mod: "ripple" });
 ok("korumaOner: 'Songül' adlı konuşma katmanı korunmaz, dinlenir; iki tek parça konuşma kaydı müzik diye önerilmez",
@@ -413,6 +428,13 @@ ok("korumaOner: kullanıcının açık dinle seçimi varsa dinlenen katman öner
   js(S.korumaOner(podcast, { start: 0, end: 600, dinle: [0, 1] }).oner.audio) === "[]");
 ok("korumaOner: tek aday tek uzun klipse (tek konuşmacı) önerilmez",
   js(S.korumaOner({ video: [], audio: [izYap("Audio 1", [k(0, 600, { bag: [] })])] }, { start: 0, end: 600 }).oner.audio) === "[]");
+// inceleme: dinlenen konuşma katmanı "müzik olabilir" diye önerilmez (plan: "seçilen bir konuşma katmanı değilse"); başka
+// adayın parça parça olması yetmez: podcast'te ev sahibinin kesintisiz WAV'ı korunursa Ripple'da kaymaz, senkron kopar
+var podcastIki = { video: [], audio: [izYap("Audio 1", [k(0, 60, { yol: "ev-sahibi.wav", bag: [] })]),
+  izYap("Audio 2", [k(2, 10, { yol: "konuk.wav", bag: [] }), k(20, 30, { yol: "konuk.wav", bag: [] }), k(40, 58, { yol: "konuk.wav", bag: [] })])] };
+var oPI = S.korumaOner(podcastIki, { start: 0, end: 60, mod: "ripple", dinleGerekli: true });
+ok("korumaOner (bağsız, ev sahibinin tek parça WAV'ı + konuğun parça parça WAV'ı): ikisi de dinlenir, ev sahibi ÖNERİLMEZ",
+  js(oPI.dinle) === js([0, 1]) && js(oPI.oner.audio) === "[]" && js(oPI.koru.audio) === "[]", js(oPI));
 
 // Bağlı çift uyarısında zaman kapsam içinde kalır (klip kapsamında eksi zaman gösterilmesin)
 var oKir = S.korumaOner(duzen, { start: 20, end: 25.1, mod: "ripple", koru: { video: [0], audio: [] } });

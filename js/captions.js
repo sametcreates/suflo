@@ -134,9 +134,11 @@ window.KCaptions = (function () {
 
   // Geri al yigini girdisi: satirlar + mod + ceviri hedef dili (buyuk harf kurali buna bagli)
   // + belgenin dili (algilananDil): cevrimdisi Ingilizce belgeden geri donulen Turkce belge "en" kalmasin
+  // + rehber örneğinin sekansı (ornekSekansId): kurguyaUyarla örnek belgeyi kopyaya taşıyınca değişir; geri alınınca
+  // özgün "Suflo Deneme"ye dönmezse örnek koruması doğru sekansı reddedip kesilmiş kopyaya eski zamanları uygulatırdı
   function durumAl(etiket) {
     return { segs: JSON.stringify(segments), etiket: etiket || "", mode: segmentsMode, cevir: ceviriDili,
-      dil: algilananDil, shorts: shortsYuklenen, ornek: ornekBelge, ts: Date.now(),
+      dil: algilananDil, shorts: shortsYuklenen, ornek: ornekBelge, ornekSekansId: ornekSekansId, ts: Date.now(),
       sekansId: belgeSekansId, sira: belgeSira, kesimAdi: belgeKesimAdi };
   }
   // shorts: ekrandaki belgenin Shorts kaydi mi (geri alinca taslak dogru yere yazilsin)
@@ -152,6 +154,7 @@ window.KCaptions = (function () {
     // geri alınan belge örnek değilse taslak yazımı yeniden açılır (aynı belgedeki
     // metin düzenleme anlık görüntüsü bayrak taşımaz: o zaman bayrak değişmez)
     if (typeof st.ornek === "boolean") ornekBelge = st.ornek;
+    if (typeof st.ornekSekansId === "string") ornekSekansId = st.ornekSekansId;
     // 3.4 adım 8: geri alınan belgenin sekansı ve kesim kayıtlarındaki yeri (uyarlamayı geri alınca yeniden önerilir)
     if (typeof st.sekansId === "string") {
       belgeSekansId = st.sekansId;

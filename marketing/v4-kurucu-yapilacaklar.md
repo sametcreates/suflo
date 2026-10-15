@@ -1520,7 +1520,11 @@ Ne değişti: Otomatik Kesim'e kapsam (`#cut-scope`: Seçili klip | In → Out |
 `KS_applyCuts` `protect` ile bu katmanları razor, ripple kaplama denetimi ve silmede atlar). Öneri ve uyarılar saf
 `SufloSessizlik.korumaOner`'de (müzik adı kuralı, %80 kaplama önerisi, korunan video + ripple engeli, bağlı çift
 listesi). `KS_applyCuts` artık `expectSeqId`'yi kopyadan önce denetler; korunan katman kilitlenmez, kilidi açılmaz.
-`protect` gönderilmeyen çağrıların (Konuşmadan kes, eski akış) çıktısı 3.3 ile birebir aynı (testle karşılaştırıldı).
+`protect` gönderilmeyen çağrıların (Konuşmadan kes, seçili klipte Otomatik Kesim) çıktısı 3.3 ile birebir aynı (testle
+karşılaştırıldı): ripple'da her katman aralığı tam kaplamalı, boş bölge içeren aralık boşluk moduna düşer ve uyarılır.
+Kliplerin arasındaki boşluğu ripple'ı düşürmeden geçen "eşit kayma" kuralı yalnız `protect` ya da `esitKayma: true`
+(Otomatik Kesim'in In → Out / Sekans kapsamları) ile. Hiçbir parça silinmeyen / seçilmeyen Uygula (kesimler yalnız boş
+bölgelerde) deneme hakkı düşürmez, uyarır (inceleme r2).
 Pro kapısı değişmedi (`cut`, 3 deneme hakkı; analiz, önizleme, kapsam ve çipler hak yemez). Lisans: clean-room
 (Premiere TR yalnız fikir; onun `Track.locked` ile kilit açıp kapama yöntemi çalışmadığı için kullanılmadı); NOTICE
 girdisi gerekmez. Yeni çalışma zamanı dosyası yok (paketleme değişmedi).
@@ -1532,8 +1536,10 @@ değişti…" der (Kopya sekansta özgün sekans sağlam; Bu sekansta geri alma 
 şey yapma; siliyorsa bir sonraki adımda bağlı çiftlerde korumayı engelleyen bir uyarıya çevireceğiz.
 
 **K7.2 Müzik adı listesi (karar).** Önceden korunan ad kuralı `js/sessizlik.js` › `MUZIK_RE`
-(`müzik|muzik|music|bgm|şarkı|sarki|song|ambiyans|ambience`, yalnız sözcük başında: "Songül", "Sarkis" gibi kişi adları
-müzik sayılmaz). Kullanıcıların katmanlarına başka adlar verdiğini görürsen
+(`müzik|muzik|music|bgm|şarkı|sarki|song|ambiyans|ambience`; plandaki gibi adın her yerinde, bitişik yazımda da:
+"Backgroundmusic", "Fonmüzik". Yalnız kişi adlarıyla çakışan "şarkı" / "song" sözcük başında ve sözcük olarak aranır:
+"Songül", "Sarkis" müzik sayılmaz). %80 kaplama önerisi dinlenen (konuşma) katmanı önermez; tek istisna videoya bağlı
+sesin olmadığı belirsiz durumda klibi / dosyası müziğe benzeyen (mp3, "music"…) dinlenen katman (inceleme r2). Kullanıcıların katmanlarına başka adlar verdiğini görürsen
 (ör. "Fon", "Background") listeye ekle; `tests/test-sessizlik.js` › `muzikAdi` satırı da güncellenmeli.
 
 **K7.3 Tanıtım (isteğe bağlı).** 15 sn'lik ekran kaydı: Sekans kapsamında müzikli bir vlogda Sessizlikleri bul →
@@ -1563,9 +1569,9 @@ hiçbir şey silmediği varsayımına dayanıyor; boşluktan sonraki altyazılar
 
 **K8.2 Kelimesiz satır eşiği (inceleme sonrası plana göre).** Kelime zamanı olmayan satır (bulut satır modu, SRT içe
 aktarma, çevrilmiş satır) kesimle 0,2 sn'nin altına inerse ya da tamamen kesimde kalırsa düşer (`MIN_KALAN`; plan madde 1).
-Tek istisna kesimden ÖNCE de 0,2 sn'den kısa olan satır (SRT'deki tek kelime, kısa ünlem): yarısından fazlası kaldıysa
-kesime değdi diye silinmez. İlk sürümdeki daha geniş istisna (0,2–0,4 sn'lik satırı da 0,2 sn'nin altında bırakıyordu)
-kaldırıldı. **Kelime kelime** ve **Birikimli** belgelerde her satır bir kelimedir: kelime kuralı (ortası kesimde kalan düşer)
+İstisna yok (inceleme r2, plana göre): kesimden ÖNCE de 0,2 sn'den kısa olan satır (SRT'deki tek kelime, kısa ünlem) da
+kesime değip 0,2 sn'den az kalırsa düşer; kesime değmeyen kısa satır olduğu gibi kalır. Önceki "yarısından fazlası kaldıysa
+kalır" istisnası planda yoktu (OWNER DIRECTION da yok) ve kaldırıldı; geri istenirse plana OWNER DIRECTION olarak yazılmalı. **Kelime kelime** ve **Birikimli** belgelerde her satır bir kelimedir: kelime kuralı (ortası kesimde kalan düşer)
 uygulanır, birikimli satırda kesilen kelime sonraki satırlardan da çıkar. Denemelerde (deneme listesi 8.18) kesim
 kenarında kelime kaybolursa ya da kesilen kısa satır kalıyorsa bildir.
 

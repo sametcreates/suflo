@@ -2901,6 +2901,9 @@
     "Ses çözümleniyor… ({} sn)": "Decoding audio… ({} s)",
     "Eşik ve min. sessizlik bu klipte canlı güncellenemiyor: Sessizlikleri bul ile yenile.": "Threshold and min. silence can't update live for this clip: refresh with Find silences.",
     "Önce Sessizlikleri bul: otomatik eşik klibin kendi sesinden ölçülür.": "Run Find silences first: the auto threshold is measured from the clip's own audio.",
+    // fallback flow (the audio couldn't be decoded, silencedetect map): Find silences again can't help
+    "Otomatik eşik bu klipte kullanılamıyor: ses çözümlenemedi. Eşiği elle ayarla, sonra Sessizlikleri bul.":
+      "Auto threshold isn't available for this clip: its audio couldn't be decoded. Set the threshold by hand, then run Find silences.",
     "⚠ Konuşma ile arka plan gürültüsü arasındaki fark az ({} dB): kesimler kelime kırpabilir ya da sessizlik kaçırabilir. Önce Sesi iyileştir'i dene ya da eşiği elle ayarla.": "⚠ There's little difference between speech and background noise ({} dB): cuts may clip words or miss silences. Try Enhance audio first or set the threshold by hand.",
     "Otomatik eşik: {} dB (arka plan {} dB, konuşma {} dB)": "Auto threshold: {} dB (background {} dB, speech {} dB)",
     "kısa konuşma birleştirildi": "short speech merged",
@@ -2927,6 +2930,8 @@
     "Yenile": "Refresh",
     "Bir sekans aç.": "Open a sequence.",
     "Önce bir sekans aç.": "Open a sequence first.",
+    "Sekans boş: önce klip ekle.": "The sequence is empty: add clips first.",
+    "Bu aralıkta ses klibi yok: sessizlik aranacak ses bulunamadı.": "There are no audio clips in this range: there's no audio to search for silences.",
     "Sekansta In / Out yok: Premiere'de I ve O ile işaretle ya da Sekans kapsamını seç.": "The sequence has no In / Out: mark them in Premiere with I and O, or choose the Sequence scope.",
     "Katmanları görmek için bir sekans aç.": "Open a sequence to see its tracks.",
     "Katmanlar okunamadı.": "Couldn't read the tracks.",
@@ -2958,6 +2963,11 @@
     "V{n} korunuyor, A{n} kesiliyor": "V{} protected, A{} cut",
     "ve {n} çift daha": "and {} more pairs",
     "Korunan video katmanı Ripple'da kaymaz: Boşluk bırakarak uygula ya da korumayı kaldır.": "A protected video track doesn't shift in Ripple: apply leaving gaps, or remove the protection.",
+    // KS_applyCuts removed / selected nothing (every cut fell into empty parts of the timeline): no trial is used
+    "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, timeline değişmedi.":
+      "⚠ No clips were cut: the cuts only fell on empty parts of the timeline (or locked tracks), so the timeline didn't change.",
+    "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, açılan kopya sekans özgünüyle aynı.":
+      "⚠ No clips were cut: the cuts only fell on empty parts of the timeline (or locked tracks), so the duplicate sequence is the same as the original.",
     "korunan: {}": "protected: {}",
     "⚠ Korunan bir katman değişti: Premiere bağlı klibi birlikte kesmiş olabilir. Özgün sekans değişmedi; kopyayı kontrol et, gerekirse kopyayı silip korumayı değiştirerek yeniden uygula.":
       "⚠ A protected track changed: Premiere may have cut its linked clip too. The original sequence is unchanged; check the copy, and if needed delete it and apply again with different protection.",
@@ -3001,6 +3011,9 @@
     "{n} altyazı satırı yeni kurguya göre Altyazı sekmesinde": "{} caption lines in the Captions tab, timed to the new edit",
     "Altyazı oluşturulurken aktarılamaz; iş bitince yeniden dene.": "Can't send to captions while captions are being created; try again when the job finishes.",
     "Altyazıya aktarılacak kelime kalmadı.": "No words left to send to captions.",
+    "Altyazı satırları kurulamadı.": "Couldn't build the caption lines.",
+    // js/kesim-esle.js: the word grouper (js/whisper-words.js) didn't load; reaches the Send to captions warning
+    "SufloWhisperWords yüklenmedi (js/whisper-words.js)": "SufloWhisperWords isn't loaded (js/whisper-words.js)",
     "yeni kurguya uyarlandı": "adapted to the new edit",
     "{n} satır · yeni kurguya uyarlandı": "{} lines · adapted to the new edit",
     "Konuşmadan kes'ten": "from Text-based cut",
@@ -3020,6 +3033,8 @@
       "The edit changed in Premiere after the cut (an undo or another edit); the captions may not match it.",
     "Kurgu Premiere'den okunamadı; altyazı bu kurguya uymayabilir.": "Couldn't read the edit from Premiere; the captions may not match it.",
     "Yine de uyarla": "Adapt anyway",
+    // Send to captions replaces the Captions tab document with a new one built from the words (it doesn't adapt it)
+    "Yine de aktar": "Send anyway",
     // Auto Cut: Cancel replaces "Sessizlikleri bul" while ffmpeg analyzes
     "ffmpeg analizini durdurur; önceki sonuç ekranda kalır": "Stops the ffmpeg analysis; the previous result stays on screen",
     // engine / model / ffmpeg download cancel (Settings and the caption setup card)

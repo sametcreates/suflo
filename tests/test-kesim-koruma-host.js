@@ -297,6 +297,35 @@ var s9c = vlog("s9c", { a3: [klip(10.5, 11, { tur: "a", yol: "C:\\sfx\\tik.wav" 
 var r9c = call("KS_applyCuts", { ranges: kesimler(), removeMode: "ripple", cloneFirst: false, protect: { audio: [1] } });
 ok("eşit olmayan kaplama (A3'te aralığın içinde kısa SFX, sonrasında içerik): yine boşluk moduna düşer",
   r9c.ok && r9c.rippleFallback === true && js(ozet(s9c).A3) === js([[40, 45]]), js(r9c) + " " + js(ozet(s9c)));
+/*
+ * inceleme r2: protect'siz çağrı (Konuşmadan kes, seçili klipte Otomatik Kesim) 3.3 ile BİREBİR (plan: "Without protect,
+ * output is identical to today"): boş bölge içeren aralık 3.3'teki gibi boşluk moduna düşer ve uyarılır (eşit kayma
+ * kuralı sessizce ripple yapıp eski boşluğu "ripple" kurgunun içinde bırakıyordu). Eşit kayma yalnız protect ya da
+ * esitKayma: true (Otomatik Kesim'in sekans kapsamları) ile.
+ */
+function boslukluMuziksiz(id) {
+  var g1 = "g" + (++grupNo), g2 = "g" + (++grupNo);
+  var v = [iz("Video 1", [klip(0, 20, { grup: g1 }), klip(22, 60, { grup: g2, inPoint: 30 })])];
+  var a = [iz("Audio 1", [klip(0, 20, { tur: "a", grup: g1 }), klip(22, 60, { tur: "a", grup: g2, inPoint: 30 })])];
+  var s = sekansYap(id, v, a);
+  sekanslar.push(s); proje.sequences = koleksiyon();
+  aktif = s;
+  return s;
+}
+var BOSLUK_ARALIK = [{ start: 19.5, end: 22.5 }, { start: 40, end: 41 }];
+var s9d = boslukluMuziksiz("s9d");
+var r9d = call("KS_applyCuts", { ranges: BOSLUK_ARALIK.map(function (k) { return { start: k.start, end: k.end }; }), removeMode: "ripple", cloneFirst: false });
+ok("protect yok (3.3 kuralı): boş bölge içeren aralık ripple'ı boşluk moduna düşürür (rippleFallback → panel uyarır), hiçbir şey kaymaz",
+  r9d.ok && r9d.rippleFallback === true && js(ozet(s9d).V1) === js([[0, 19.5], [22.5, 40], [41, 60]]) && js(ozet(s9d).A1) === js(ozet(s9d).V1) &&
+  js(Object.keys(r9d).sort()) === js(["cuts", "newSeq", "ok", "removed", "rippleFallback", "selected"]), js(r9d) + " " + js(ozet(s9d)));
+var s9e = boslukluMuziksiz("s9e");
+var r9e = call("KS_applyCuts", { ranges: BOSLUK_ARALIK.map(function (k) { return { start: k.start, end: k.end }; }), removeMode: "ripple", cloneFirst: false, esitKayma: true });
+ok("esitKayma: true (sekans kapsamı, protect'siz): ripple kalır, V1 ve A1 eşit kayar, boşluk yerinde",
+  r9e.ok && r9e.rippleFallback === false && js(ozet(s9e).V1) === js([[0, 19.5], [21.5, 39], [39, 58]]) && js(ozet(s9e).A1) === js(ozet(s9e).V1), js(r9e) + " " + js(ozet(s9e)));
+var s9f = boslukluMuziksiz("s9f");
+var r9f = call("KS_applyCuts", { ranges: [{ start: 10, end: 12 }, { start: 30, end: 31.5 }], removeMode: "ripple", cloneFirst: false });
+ok("protect yok, tam kaplanan aralıklar: 3.3'teki gibi ripple (boşluklu sekansta da)", r9f.ok && r9f.rippleFallback === false &&
+  js(ozet(s9f).V1) === js([[0, 10], [10, 18], [20, 28], [28, 56.5]]), js(ozet(s9f).V1));
 
 /* ---------- 10) expectTracks: protect dizinleri panelin okuduğu katman düzenine göre ---------- */
 var s10 = vlog("s10");

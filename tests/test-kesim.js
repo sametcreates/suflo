@@ -380,6 +380,8 @@ async function kapsamTestleri(K, stereo) {
     JSON.stringify(ac[0].payload.protect) === JSON.stringify({ video: [], audio: [1] }) && ac[0].payload.expectSeqId === "seq-1" &&
     ac[0].payload.cloneFirst === true && ac[0].payload.removeMode === "ripple" && p.kayit.run.length === 1 && p.kayit.run[0].indexOf(p.wavlar[0]) !== -1,
     JSON.stringify(ac.length && ac[0].payload));
+  // inceleme r2: sekans kapsamı host'tan eşit kayma kuralını ister (kliplerin arasındaki boşluk ripple'ı boşluk moduna düşürmesin)
+  ok("Uygula (In → Out): esitKayma: true gönderilir", ac.length === 1 && ac[0].payload.esitKayma === true, JSON.stringify(ac.length && ac[0].payload));
   ok("Uygula: hak bir kez düştü, toast korunan katmanı söyler, karışım WAV'ı silindi",
     p.kayit.harca.length === 1 && p.kayit.toast.some(function (t) { return /korunan: A2/.test(t[0]); }) && !fs.existsSync(p.wavlar[0]),
     JSON.stringify(p.kayit.toast));
@@ -1112,6 +1114,159 @@ async function sahteTestler(K) {
 
   await kilitTestleri(K1);
   await altyaziTestleri(K1);
+  await incelemeR2Testleri(K1);
+}
+
+/*
+ * ---- 3.4 inceleme r2: konum değişince kararlar, önbellekten analizde eski hata, yedek akışta Otomatik, Otomatik'in
+ * bayat satırı, hiçbir şey kesilmeyen Uygula (hak), protect'siz çağrıda 3.3 ripple kuralı, boş sekans / sessiz aralık ----
+ */
+async function incelemeR2Testleri(K1) {
+  var pcm = pcmMono([[1.0, 1], [1.5, 0], [1.0, 1], [1.5, 0], [1.0, 1]]);   // 6 sn; sessizlik 1.0–2.5 ve 3.5–5.0
+  var K6 = {};
+  for (var k in K1) K6[k] = K1[k];
+  K6.runAkis = function (cmd, args, opts) {
+    opts.onStderr(CIKIS);
+    opts.onData(pcm);
+    return Promise.resolve({ code: 0, stderr: CIKIS, bayt: pcm.length });
+  };
+  K6.run = function () { return Promise.resolve({ code: 0, stderr: sdCiktisi([[1.0, 2.5], [3.5, 5.0]]) }); };
+  function uygulamalar(p) { return p.kayit.call.filter(function (x) { return x.fn === "KS_applyCuts"; }); }
+
+  /* a) Aynı klip sekansta başka konumda (bağlam yoklaması haber vermez): kararlar eski konumdaki kesime oturmaz */
+  var klipA = { mediaPath: "/sahte/konum.mp4", inPoint: 0, outPoint: 6, clipStart: 30, clipEnd: 36 };
+  var a = kabi.kesimPaneli({ K: K6, ffmpeg: "ffmpeg", clip: klipA });
+  await a.tikla("cut-analyze");
+  var cb = a.el("cut-ranges").children[1].children[0];
+  cb.checked = false; cb.onchange();   // 2. kesimi (33.65–34.85) kapat
+  ok("konum: analiz 2 kesim, 2. kesim kapatıldı", /^1 kesim/.test(a.el("cut-summary").textContent), a.el("cut-summary").textContent);
+  var klipB = { mediaPath: "/sahte/konum.mp4", inPoint: 0, outPoint: 6, clipStart: 32.5, clipEnd: 38.5 };
+  a.ctx(klipB, null, true);
+  await a.bekle(560);   // "Sessizlikleri bul" yeniden göründükten sonraki çift tık koruması
+  await a.tikla("cut-analyze");
+  var acik = a.el("cut-ranges").children.map(function (row) { return row.children[0].checked; });
+  ok("konum değişti (klip 30 → 32.5 sn, aynı medya / in / süre): önceki kararlar taşınmaz, iki kesim de açık, ffmpeg yeniden çalışmaz",
+    JSON.stringify(acik) === "[true,true]" && /^2 kesim/.test(a.el("cut-summary").textContent) && a.kayit.runAkis.length === 1,
+    JSON.stringify(acik) + " " + a.el("cut-summary").textContent + " runAkis=" + a.kayit.runAkis.length);
+  await a.tikla("cut-apply");
+  var aa = uygulamalar(a);
+  ok("…Uygula yeni konumdaki iki kesimi gönderir (kapatılan duraksama kaymış haliyle kesilmez, ilki atlanmaz); seçili klipte esitKayma yok",
+    aa.length === 1 && aa[0].payload.ranges.length === 2 && Math.abs(aa[0].payload.ranges[0].start - 33.65) < 1e-6 && Math.abs(aa[0].payload.ranges[1].start - 36.15) < 1e-6 &&
+    aa[0].payload.esitKayma === undefined,
+    JSON.stringify(aa.length && aa[0].payload));
+  // aynı konumda yeniden analiz: kararlar korunur (eski davranış)
+  var a2 = kabi.kesimPaneli({ K: K6, ffmpeg: "ffmpeg", clip: klipA });
+  await a2.tikla("cut-analyze");
+  var cb2 = a2.el("cut-ranges").children[1].children[0];
+  cb2.checked = false; cb2.onchange();
+  await a2.bekle(560);
+  await a2.tikla("cut-analyze");
+  ok("aynı konumda yeniden analiz: kapatılan kesim kapalı kalır", JSON.stringify(a2.el("cut-ranges").children.map(function (row) { return row.children[0].checked; })) === "[true,false]",
+    a2.el("cut-summary").textContent);
+
+  /* b) Başarısız Uygula'nın hatası önbellekten gelen başarılı analizde kalmaz */
+  var b = kabi.kesimPaneli({ K: K6, ffmpeg: "ffmpeg", clip: klipA, applyCuts: function () { return { ok: false, error: "Katman kilitli: V1." }; } });
+  await b.tikla("cut-analyze");
+  await b.tikla("cut-apply");
+  ok("Uygula hatası durum satırında ('✕ Katman kilitli: V1.')", b.el("cut-status").textContent === "✕ Katman kilitli: V1." && /bad/.test(b.el("cut-status").className),
+    b.el("cut-status").textContent);
+  await b.bekle(560);
+  await b.tikla("cut-analyze");
+  ok("aynı klipte yeniden Sessizlikleri bul (önbellek, ffmpeg yok): harita döner, eski hata silinir",
+    b.el("cut-status").textContent === "" && !/bad|warn/.test(b.el("cut-status").className) && /^2 kesim/.test(b.el("cut-summary").textContent) && b.kayit.runAkis.length === 1,
+    JSON.stringify([b.el("cut-status").textContent, b.el("cut-status").className, b.kayit.runAkis.length]));
+
+  /* c) Yedek akış (ses çözümlenemedi, silencedetect haritası): Otomatik "önce bul" diye çıkmaz sokağa göndermez */
+  var Kc = {};
+  for (var kc in K6) Kc[kc] = K6[kc];
+  Kc.runAkis = function () { return Promise.resolve({ code: 1, stderr: "Invalid data", bayt: 0 }); };
+  var c = kabi.kesimPaneli({ K: Kc, ffmpeg: "ffmpeg", clip: klipA });
+  c.tikla("cut-noise-auto");
+  ok("analizden önce Otomatik: 'Önce Sessizlikleri bul' (değişmedi)", /^Önce Sessizlikleri bul/.test(c.el("cut-status").textContent), c.el("cut-status").textContent);
+  await c.tikla("cut-analyze");
+  ok("yedek akış: silencedetect haritası (2 kesim)", /^2 kesim/.test(c.el("cut-summary").textContent) && c.kayit.run.length === 1, c.el("cut-summary").textContent);
+  c.tikla("cut-noise-auto");
+  ok("yedek akışta Otomatik: 'Otomatik eşik bu klipte kullanılamıyor … elle ayarla' (yeniden bulmak yine çözemez)",
+    c.el("cut-status").textContent === "Otomatik eşik bu klipte kullanılamıyor: ses çözümlenemedi. Eşiği elle ayarla, sonra Sessizlikleri bul." &&
+    /warn/.test(c.el("cut-status").className), c.el("cut-status").textContent);
+
+  /* d) Otomatik'in satırı Eşik elle değişince silinir (kaydırıcıyla çelişmesin); başka kaydırıcı silmez */
+  var d = kabi.kesimPaneli({ K: K6, ffmpeg: "ffmpeg", clip: klipA });
+  await d.tikla("cut-analyze");
+  d.tikla("cut-noise-auto");
+  var otoSatir = d.el("cut-status").textContent;
+  ok("Otomatik: 'Otomatik eşik: -60 dB …' ve kaydırıcı -60", /^Otomatik eşik: -60 dB/.test(otoSatir) && d.el("cut-noise").value === "-60", otoSatir);
+  d.kaydir("cut-pad", "0.1");
+  await d.bekle(160);
+  ok("Tampon değişti: Otomatik satırı kalır (eşik hâlâ önerilen)", d.el("cut-status").textContent === otoSatir, d.el("cut-status").textContent);
+  d.kaydir("cut-noise", "-30");
+  await d.bekle(160);
+  ok("Eşik elle -30'a çekildi: 'Otomatik eşik: -60 dB' satırı silinir", d.el("cut-status").textContent === "" && /^2 kesim/.test(d.el("cut-summary").textContent),
+    d.el("cut-status").textContent);
+
+  /* e) KS_applyCuts hiçbir parça silmedi / seçmedi (kesimler yalnız boş bölgelerde): "uygulandı" yok, hak düşmez */
+  var e = kabi.kesimPaneli({ K: K6, ffmpeg: "ffmpeg", clip: klipA,
+    applyCuts: function () { return { ok: true, newSeq: "Vlog - kopya", removed: 0, selected: 0, rippleFallback: false, cuts: 4 }; } });
+  await e.tikla("cut-analyze");
+  var eToast = e.kayit.toast.length;
+  await e.tikla("cut-apply");
+  var eSonra = e.kayit.toast.slice(eToast);
+  ok("removed 0 / selected 0: deneme hakkı düşmez, uyarı (kopya özgünüyle aynı), 'good' bildirim yok, harita kapanır",
+    uygulamalar(e).length === 1 && e.kayit.harca.length === 0 &&
+    e.el("cut-status").textContent === "⚠ Hiçbir klip kesilmedi: kesimler yalnız boş bölgelere (ya da kilitli katmanlara) denk geldi, açılan kopya sekans özgünüyle aynı." &&
+    /warn/.test(e.el("cut-status").className) && eSonra.length === 1 && eSonra[0][1] === "warn" && e.el("cut-result").hidden === true,
+    JSON.stringify([e.kayit.harca, e.el("cut-status").textContent, eSonra]));
+  var e2 = kabi.kesimPaneli({ K: K6, ffmpeg: "ffmpeg", clip: klipA,
+    applyCuts: function () { return { ok: true, newSeq: "Vlog - kopya", removed: 4, selected: 0, rippleFallback: false, cuts: 4 }; } });
+  await e2.tikla("cut-analyze");
+  await e2.tikla("cut-apply");
+  ok("removed > 0: hak bir kez düşer, 'good' bildirim (eskisi gibi)", e2.kayit.harca.length === 1 && e2.kayit.toast.some(function (t) { return t[1] === "good"; }),
+    JSON.stringify(e2.kayit.toast));
+
+  /* f) Sekans kapsamında boş sekans ve sesi olmayan aralık: doğru yönlendirme */
+  function sekansPaneli(duzen, seqDur) {
+    return kabi.kesimPaneli({ K: K6, ffmpeg: "ffmpeg", clip: null,
+      ctx: { hasSeq: true, sequenceId: "seq-1", seqIn: 0, seqOut: 0, seqDur: seqDur, frame: 0.04 },
+      call: function (fn, yuk) {
+        if (fn === "KS_getTrackLayout") {
+          var dz = duzen();
+          dz.kapsam = yuk && yuk.scope ? { scope: yuk.scope, seqIn: 0, seqOut: seqDur, seqDur: seqDur, frame: 0.04 } : undefined;
+          return dz;
+        }
+        return { ok: false, error: "beklenmeyen " + fn };
+      } });
+  }
+  var bosDuzen = function () { return { ok: true, seqId: "seq-1", name: "Boş", duration: 0, video: [], audio: [] }; };
+  var f1 = sekansPaneli(bosDuzen, 0);
+  f1.kapsam("entire");
+  await f1.bekle(20);
+  await f1.tikla("cut-analyze");
+  ok("boş sekans (süre 0), Sekans kapsamı: 'Sekans boş: önce klip ekle.' ('Önce bir sekans aç.' değil), dışa aktarım yok",
+    f1.el("cut-status").textContent === "Sekans boş: önce klip ekle." && f1.kayit.call.every(function (x) { return x.fn !== "KS_exportAudio"; }),
+    f1.el("cut-status").textContent);
+  var yalnizVideo = function () {
+    return { ok: true, seqId: "seq-1", name: "Ekran", duration: 60,
+      video: [{ index: 0, name: "Video 1", locked: false, muted: false, clipCount: 1, first: 0, last: 60, klipler: [{ s: 0, e: 60, ad: "ekran", yol: "ekran.mp4", hiza: 0 }] }],
+      audio: [] };
+  };
+  var f2 = sekansPaneli(yalnizVideo, 60);
+  f2.kapsam("entire");
+  await f2.bekle(20);
+  await f2.tikla("cut-analyze");
+  ok("ses katmanı olmayan sekans (ekran kaydı): 'Bu aralıkta ses klibi yok …' (seçilecek çip yokken 'katman seç' denmez)",
+    f2.el("cut-status").textContent === "Bu aralıkta ses klibi yok: sessizlik aranacak ses bulunamadı." && f2.kayit.call.every(function (x) { return x.fn !== "KS_exportAudio"; }),
+    f2.el("cut-status").textContent);
+  var bosSes = function () {
+    var dz = yalnizVideo();
+    dz.audio = [{ index: 0, name: "Audio 1", locked: false, muted: false, clipCount: 0, first: 0, last: 0, klipler: [] }];
+    return dz;
+  };
+  var f3 = sekansPaneli(bosSes, 60);
+  f3.kapsam("entire");
+  await f3.bekle(20);
+  await f3.tikla("cut-analyze");
+  ok("ses katmanı var ama aralıkta klibi yok: yine 'Bu aralıkta ses klibi yok …'",
+    f3.el("cut-status").textContent === "Bu aralıkta ses klibi yok: sessizlik aranacak ses bulunamadı.", f3.el("cut-status").textContent);
 }
 
 /*

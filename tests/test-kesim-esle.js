@@ -5,7 +5,7 @@
 //  - kelimesiz cue: uçları eşlenir; tamamen kesimde / 0,2 sn'nin altına inen düşer
 //  - kare oturtma (razor gibi aşağı), sırasız ve üst üste kesimler, idempotentlik (imza, gap, kareyeOturt)
 //  - host'un ölçtüğü kayma (sekansta klipsiz boşluk kesimi), kesim kayıtları arasında yol (kopya dalı, art arda kesim)
-var path = require("path");
+var path = require("path"), fs = require("fs");
 var E = require(path.join(__dirname, "..", "js", "kesim-esle.js"));
 var CT = require(path.join(__dirname, "..", "js", "caption-text.js"));
 var gecen = 0, toplam = 0;
@@ -133,11 +133,11 @@ ok("satirEsle: 2 satırlık cue kelime düşünce dengeli yeniden sarılır (her
 var kz = E.satirEsle([
   { start: 9, end: 13, text: "Uzun satır" },        // 1 sn kaldı (9–10 ve 12–13)
   { start: 11.5, end: 12.1, text: "kıs" },          // 0,1 sn kaldı, yarısından azı: düşer
-  { start: 29.9, end: 30.05, text: "ve" },          // kelime kelime: 0,15 sn, kenarı 0,05 sn kesime değiyor: kalır
+  { start: 29.9, end: 30.05, text: "ve" },          // 0,15 sn, kenarı 0,05 sn kesime değiyor: 0,1 sn kalır, düşer (plan: istisna yok)
   { start: 29.5, end: 30.5, text: "yarım" }         // 0,5 sn kaldı: kalır
 ], K, { mod: "ripple" });
-ok("satirEsle kelimesiz: uçlar eşlenir; kesimle 0,2 sn'nin altına inen düşer, kısa kelime cue'su kenara değince kalır",
-  js(kz.cues.map(function (c) { return [c.text, c.start, c.end]; })) === js([["Uzun satır", 9, 11], ["ve", 27.9, 28], ["yarım", 27.5, 28]]) && kz.dusen === 1 && kz.kirpilan === 3,
+ok("satirEsle kelimesiz: uçlar eşlenir; kesimle 0,2 sn'nin altına inen düşer (kesimden önce de kısa olan cue dahil)",
+  js(kz.cues.map(function (c) { return [c.text, c.start, c.end]; })) === js([["Uzun satır", 9, 11], ["yarım", 27.5, 28]]) && kz.dusen === 2 && kz.kirpilan === 2,
   js(kz.cues.map(function (c) { return [c.text, c.start, c.end]; })) + " " + kz.dusen + "/" + kz.kirpilan);
 var kzg = E.satirEsle([{ start: 11, end: 14, text: "baş kesimde" }, { start: 9, end: 11, text: "son kesimde" }], K, { mod: "gap" });
 ok("satirEsle kelimesiz gap: kesimde başlayan cue kesimin sonundan, kesimde biten kesimin başında",
@@ -158,6 +158,17 @@ ok("satirEsle: klipsiz boşluk kesimi (kayma 0) sonrası yalnız gerçek kayma k
 var seg = E.kelimelerdenSegment([w("Merhaba", 0, 0.4), w("arkadaşlar.", 0.5, 1), w("Bugün", 1.2, 1.5), w("burada", 3, 3.4), w("", 4, 4.1), w("değiliz", 3.5, 3.9)]);
 ok("kelimelerdenSegment: cümle sonu ve 1 sn'den uzun duraklamada yeni segment, boş kelime atılır, sıralanır",
   js(seg.map(function (x) { return x.text; })) === js(["Merhaba arkadaşlar.", "Bugün", "burada değiliz"]) && seg[2].words.length === 2 && seg[0].start === 0 && seg[0].end === 1, js(seg));
+// inceleme r2 (lisans): gruplama Raunen'den uyarlanan, kaynağı belirtilmiş kelimeGrupla'nın kendisi; kesim-esle.js kopya taşımaz
+var WWk = require(path.join(__dirname, "..", "js", "whisper-words.js"));
+var uzunListe = [];
+for (var ui = 0; ui < 65; ui++) uzunListe.push(w("k" + ui + (ui === 40 ? "." : ""), ui * 0.3, ui * 0.3 + 0.2));
+uzunListe.push(w("son", 30, 30.4));
+var esSrc = fs.readFileSync(path.join(__dirname, "..", "js", "kesim-esle.js"), "utf8");
+var ksGovde = esSrc.slice(esSrc.indexOf("function kelimelerdenSegment("), esSrc.indexOf("\n  }\n", esSrc.indexOf("function kelimelerdenSegment(")));
+ok("kelimelerdenSegment: gruplama SufloWhisperWords.kelimeGrupla (Raunen: splitByWords) ile birebir; kesim-esle.js'te kopya yok",
+  js(E.kelimelerdenSegment(uzunListe)) === js(WWk.kelimeGrupla(uzunListe, 30, 1.0)) && E.kelimelerdenSegment(uzunListe).length === 4 &&
+  /WW\.kelimeGrupla\(/.test(ksGovde) && !/function bosalt|CUMLE_SONU/.test(esSrc) && !/Raunen:/.test(esSrc),
+  js(E.kelimelerdenSegment(uzunListe).map(function (s) { return s.words.length; })));
 var kur = CT.segmentleriKur(seg, "l42", { minSure: 0.8, maxSure: 6 });
 ok("kelimelerdenSegment → segmentleriKur (l42): satırlar ölçülmüş kelimelerden kurulur", kur.segments.length >= 2 && kur.segments.every(function (c) { return c.words && c.words.length; }), js(kur.segments.map(function (c) { return c.text; })));
 
@@ -262,7 +273,14 @@ var evet = E.satirEsle([{ start: 10, end: 10.36, text: "Evet" }], [{ start: 10.1
 ok("0,36 sn'lik cue kesimle 0,18 sn'ye inince düşer (yarısı kalsa da)", evet.cues.length === 0 && evet.dusen === 1, js(evet));
 ok("aynısı gap modunda da düşer", E.satirEsle([{ start: 10, end: 10.36, text: "Evet" }], [{ start: 10.18, end: 11 }], { mod: "gap" }).cues.length === 0);
 var kisaKalan = E.satirEsle([{ start: 29.9, end: 30.05, text: "ve" }, { start: 29.95, end: 30.1, text: "şu" }], K, { mod: "ripple" });
-ok("zaten 0,2 sn'den kısa cue: yarısından fazlası kaldıysa kalır, azı kaldıysa düşer", kisaKalan.cues.length === 1 && kisaKalan.cues[0].text === "ve" && kisaKalan.dusen === 1, js(kisaKalan));
+// inceleme r2: plan istisnasız ("0,2 sn'den kısa ya da tamamen kesimde" düşer) — kesimden önce de kısa olan cue da
+ok("zaten 0,2 sn'den kısa cue: kesime değip 0,2 sn'den az kalınca düşer (yarısından fazlası kalsa da)", kisaKalan.cues.length === 0 && kisaKalan.dusen === 2, js(kisaKalan));
+var kisaEvet = E.satirEsle([{ start: 10, end: 10.18, text: "Evet" }], [{ start: 10.1, end: 10.15 }], { mod: "ripple" });
+ok("0,18 sn'lik cue'nun ortasından 0,05 sn kesilince (0,13 sn kalır) düşer, kırpılan sayılmaz", kisaEvet.cues.length === 0 && kisaEvet.dusen === 1 && kisaEvet.kirpilan === 0, js(kisaEvet));
+var kisaDegmez = E.satirEsle([{ start: 5, end: 5.15, text: "Ah" }], [{ start: 10.1, end: 10.15 }], { mod: "ripple" });
+ok("kesime değmeyen kısa cue (0,15 sn) olduğu gibi kalır", kisaDegmez.cues.length === 1 && kisaDegmez.cues[0].start === 5 && kisaDegmez.cues[0].end === 5.15 && kisaDegmez.dusen === 0, js(kisaDegmez));
+var tamEsik = E.satirEsle([{ start: 20, end: 20.5, text: "Tamam" }], [{ start: 20.2, end: 21 }], { mod: "ripple" });
+ok("kesimden sonra tam 0,2 sn kalan cue kalır (sınır dahil)", tamEsik.cues.length === 1 && tamEsik.kirpilan === 1, js(tamEsik));
 
 /* ---------- inceleme: kısmen uygulanan kesim (uyarlamaPlani) ---------- */
 var pEks = E.uyarlamaPlani({ ok: true, removed: 2, selected: 2, rippleFallback: false, esleme: { kaynak: "S", seqId: "S", eksik: true,

@@ -16,7 +16,8 @@
  *                                   kelime kelime / birikimli belgede (o.kelimeModu) her cue bir kelime: kelime kuralı
  *                                   -> { cues, dusen, kirpilan, imza }
  *   imza(cuts, mod, kare)        -> aynı kesim kümesine aynı metin: aynı kesim bir belgeye iki kez uygulanmaz
- *   kelimelerdenSegment(words)   -> kelime listesini cümle / duraklama sınırında segmentlere böler (satır kurucuya girdi)
+ *   kelimelerdenSegment(words)   -> kelime listesini cümle / duraklama sınırında segmentlere böler (satır kurucuya girdi;
+ *                                   gruplama js/whisper-words.js kelimeGrupla'nın kendisi)
  *   uyarlamaPlani(r, o)          -> KS_applyCuts sonucundan kesim kaydı: { kaynak, hedef, mod, cuts, kare } ya da null
  *   yolBul(kayitlar, belge, hedef) -> oturumdaki kesim kayıtlarından belgenin sekansından hedef sekansa uygulanacak
  *                                   kayıtlar (sırayla); kopya sekans dalları ve aynı sekansta art arda kesimler dahil
@@ -28,28 +29,31 @@
  * içindeki kliplerin toplam süresi). Sekans kapsamında hiçbir katmanda klip olmayan boşluk da kesim aralığına girebilir;
  * Premiere orayı silemez, sonraki içerik aralığın tamamı kadar değil kayma kadar kayar. Yoksa aralığın uzunluğu.
  *
- * Mostly clean-room: Premiere TR'nin (premiere-tr-plugin, MIT) ~10 satırlık remapTime'ı yalnız fikir kaynağı; kod
- * alınmadı. Onun kesimin içine düşen zamanı kesime kırpma davranışı sıfır süreli / üst üste cue üretiyordu: burada
- * ortası kesimde kalan kelime düşer, kelimesiz cue kısalınca düşer.
+ * Mostly clean-room: Premiere TR'nin (premiere-tr-plugin, MIT) ~10 satırlık remapTime'ı yalnız fikir kaynağı; ondan
+ * kod alınmadı. Onun kesimin içine düşen zamanı kesime kırpma davranışı sıfır süreli / üst üste cue üretiyordu: burada
+ * ortası kesimde kalan kelime düşer, kelimesiz cue kısalınca düşer. Bu dosyada üçüncü taraf kodu yok: kelimeleri
+ * segmentlere toplayan gruplama (kelimelerdenSegment) kendi kopyasını taşımaz, Raunen'den uyarlanmış ve kaynağı
+ * belirtilmiş js/whisper-words.js kelimeGrupla'yı çağırır (bkz. THIRD_PARTY_NOTICES.md › Raunen).
  *
  * Saf UMD modülü: DOM yok, dosya sistemi yok, ES5 (CEF 74 / Node 12.3). Satır sarma js/caption-layout.js,
- * vurgu (*kelime*) js/caption-text.js; ikisi de bu dosyadan ÖNCE yüklenir.
+ * vurgu (*kelime*) js/caption-text.js, kelime gruplama js/whisper-words.js; üçü de bu dosyadan ÖNCE yüklenir.
  */
 (function (root, factory) {
   var CL = (root && root.SufloCaptionLayout) || null;
   if (!CL && typeof require === "function") { try { CL = require("./caption-layout.js"); } catch (e) { CL = null; } }
   var CT = (root && root.SufloCaptionText) || null;
   if (!CT && typeof require === "function") { try { CT = require("./caption-text.js"); } catch (e2) { CT = null; } }
-  var api = factory(CL, CT);
+  var WW = (root && root.SufloWhisperWords) || null;
+  if (!WW && typeof require === "function") { try { WW = require("./whisper-words.js"); } catch (e3) { WW = null; } }
+  var api = factory(CL, CT, WW);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) root.SufloKesimEsle = api;
-})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (CL, CT) {
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this), function (CL, CT, WW) {
   "use strict";
 
   var EPS = 1e-6;
-  var MIN_KALAN = 0.2;    // kelimesiz cue: kesim yüzünden bundan kısa kalırsa düşer (zaten kısa olan cue: yarısından azı kaldıysa)
+  var MIN_KALAN = 0.2;    // kelimesiz cue: kesime değip bundan kısa kalırsa düşer (plan: "0,2 sn'den kısa ya da tamamen kesimde")
   var MIN_SURE = 0.05;    // yeniden kurulan cue'nun en kısa süresi (caption-layout cueKur ile aynı)
-  var CUMLE_SONU = /[.!?…]["'”’»)\]]*$/;
   var KAPANIS_NOKTALAMA = /^(.*?)([.,!?;:…»"')\]]*)$/;
 
   function dizi(x) { return Object.prototype.toString.call(x) === "[object Array]"; }
@@ -335,16 +339,15 @@
   }
 
   /*
-   * Kelimesiz cue [a, b] kesimlerle ust kadar örtüşüyor: düşer mi? Tamamen kesimde kaldıysa ya da kesim yüzünden
-   * 0,2 sn'nin altına indiyse düşer (plan: "0,2 sn'den kısa ya da tamamen kesimde"). Tek istisna kesimden ÖNCE de
-   * 0,2 sn'den kısa olan cue (SRT'deki tek kelime, kısa ünlem): yarısından fazlası kaldıysa kalır, kenarı kesime
-   * değdi diye silinmez. Aralığın tamamı sayılır: ripple'da silinmeyen kısım da her katmanda boştur (içerik yok).
+   * Kelimesiz cue [a, b] kesimlerle ust (> 0) kadar örtüşüyor: düşer mi? Plan (adım 8, madde 1): "0,2 sn'den kısa ya da
+   * tamamen kesimde" kalan düşer — kesime değen cue'dan 0,2 sn'den az kaldıysa (kesimden önce de kısa olan tek kelimelik
+   * SRT satırı dahil: istisna yok, kesim kenarında yanıp sönen altyazı kalmaz). Kesime değmeyen cue'ya bu işlev hiç
+   * sorulmaz: kendi süresi ne olursa olsun kalır. Aralığın tamamı sayılır: ripple'da silinmeyen kısım da her katmanda
+   * boştur (içerik yok).
    */
   function kesimleDusen(a, b, ust) {
-    var sure = b - a, kalanSure = sure - ust;
-    if (kalanSure <= EPS) return true;
-    if (kalanSure >= MIN_KALAN) return false;
-    return sure >= MIN_KALAN || kalanSure < sure / 2;
+    var kalanSure = (b - a) - ust;
+    return kalanSure < MIN_KALAN - EPS;
   }
 
   /*
@@ -479,10 +482,13 @@
 
   /*
    * Kelime listesinden satır kurucuya (caption-text segmentleriKur) girdi: cümle sonunda, araKir'dan (1 sn) uzun
-   * duraklamada ya da enCok (30) kelimede yeni segment. Kelimeler zamanına göre sıralanır; boş metinli kelime atılır.
+   * duraklamada ya da enCok (30) kelimede yeni segment. Kelimeler zamanına göre sıralanır; boş metinli ya da başı
+   * olmayan kelime atılır. Gruplama burada YAZILMAZ: Raunen'den uyarlanan (MIT, THIRD_PARTY_NOTICES.md) ve kaynağı
+   * orada belirtilmiş SufloWhisperWords.kelimeGrupla (js/whisper-words.js) kullanılır; bu dosya Raunen kodu taşımaz.
    */
   function kelimelerdenSegment(words, o) {
     o = o || {};
+    if (!WW || typeof WW.kelimeGrupla !== "function") throw new Error("SufloWhisperWords yüklenmedi (js/whisper-words.js)");
     var araKir = sayi(o.araKir) > 0 ? sayi(o.araKir) : 1.0;
     var enCok = sayi(o.enCok) > 0 ? Math.floor(sayi(o.enCok)) : 30;
     var liste = [];
@@ -496,24 +502,7 @@
       liste.push({ w: y, i: i });
     });
     liste.sort(function (x, y) { return x.w.start - y.w.start || x.i - y.i; });
-    var out = [], cur = [];
-    function bosalt() {
-      if (!cur.length) return;
-      var g = { start: cur[0].start, end: Math.max(cur[cur.length - 1].end, cur[0].start + MIN_SURE),
-        text: cur.map(function (w) { return w.text; }).join(" "), words: cur };
-      var p = guven(cur);
-      if (gecerli(p)) g.confidence = p;
-      out.push(g);
-      cur = [];
-    }
-    liste.forEach(function (x) {
-      var onceki = cur[cur.length - 1];
-      if (onceki && (x.w.start - onceki.end > araKir || cur.length >= enCok)) bosalt();
-      cur.push(x.w);
-      if (CUMLE_SONU.test(x.w.text)) bosalt();
-    });
-    bosalt();
-    return out;
+    return WW.kelimeGrupla(liste.map(function (x) { return x.w; }), enCok, araKir);
   }
 
   /* ---------------- kesim kayıtları ---------------- */

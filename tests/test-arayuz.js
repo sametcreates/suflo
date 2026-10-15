@@ -566,7 +566,7 @@ function sahteDugum() {
 }
 var dom = { "cap-canli": sahteDugum(), "cap-canli-liste": sahteDugum() };
 var kap = new Function("el", "tc", "document", "CANLI_GOSTER",
-  "var canliIs = null, segments = [{ start: 1, end: 2, text: 'Önceki belge' }], segmentsMode = 'plain', ceviriDili = '', algilananDil = 'tr', shortsYuklenen = '', ornekBelge = false;\n" +
+  "var canliIs = null, segments = [{ start: 1, end: 2, text: 'Önceki belge' }], segmentsMode = 'plain', ceviriDili = '', algilananDil = 'tr', shortsYuklenen = '', ornekBelge = false, ornekSekansId = '';\n" +
   "var belgeSekansId = 'S1', belgeSira = 0, belgeKesimAdi = null;\n" +
   "var undoStack = [], redoStack = [];\n" + canliKod +
   "\nreturn { canliBaslat: canliBaslat, canliEkle: canliEkle, canliKirp: canliKirp, canliBitir: canliBitir, durumAl: durumAl, " +
