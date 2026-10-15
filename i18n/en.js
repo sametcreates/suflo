@@ -2759,6 +2759,7 @@
     "hareket bu anahtar karede durmuyor, sürüyor": "the move doesn't stop at this keyframe; it carries on",
     "bu yaylanmanın anahtar karelerine Suflo eğrisi uygulanmış; önce o eğriyi Geri al ile kaldır":
       "a Suflo curve was applied on this follow-through's keyframes; remove that curve with Undo first",
+    "bu inişten sonra Suflo eğrisi başlıyor; yaylanma eğrinin içine yazılmaz": "a Suflo curve starts right after this landing; the follow-through isn't written inside the curve",
     "iniş değeri sınırda (Opaklık 0 ya da 100, Ölçek 0); aşım sığmıyor": "the landing value is at its limit (Opacity 0 or 100, Scale 0); there's no room to overshoot",
     "400'den çok anahtar kare var; Tüm varışlar'ı kapatıp varışlara tek tek uygula": "there are more than 400 keyframes; turn off Every landing and apply to the landings one at a time",
     // host codes (js/egri-model.js HATA)
@@ -3276,6 +3277,9 @@
     "En çok 12 özel rampa saklanır; birini sil.": "Up to 12 custom ramps are kept; delete one first.",
     "Özel rampaya bir ad yaz.": "Give the custom ramp a name.",
     "Özel rampa bu bilgisayarda saklanamadı.": "Couldn't save the custom ramp on this computer.",
+    "Özel rampa silindi.": "Custom ramp deleted.",
+    "Kayıtlı özel rampanın eğrisi yenisiyle değişti.": "The saved custom ramp's curve was replaced with the new one.",
+    "Geri geldi:": "Restored:",
     // editor warnings (js/egri.js mod 'hiz')
     "En çok 8 nokta. Yeni nokta için birini çift tıklayıp sil.": "8 points at most. Double-click one to delete it before adding another.",
     "Başka bir noktaya çok yakın; biraz yana tıkla.": "Too close to another point; click a little to the side.",

@@ -394,6 +394,14 @@
     return out;
   }
 
+  // Depodan / dışarıdan gelen anahtarlarda en az bir geçerli (sayı) nokta var mı. Yoksa ozelDogrula düz %100 verirdi:
+  // bozuk kayıt düz bir rampa gibi yüklenmesin (son eğri başlangıç eğrisinde kalır, bozuk adlı rampa atılır)
+  function ozelGecerliMi(keys) {
+    return (Array.isArray(keys) ? keys : []).some(function (k) {
+      if (Array.isArray(k)) return isFinite(sayi(k[0])) && isFinite(sayi(k[1]));
+      return !!(k && typeof k === "object") && isFinite(sayi(k.t)) && isFinite(sayi(k.v));
+    });
+  }
   // Ağır çekim anı: [0.02, 0.98] ya da null (yok)
   function ozelHit(h) {
     var x = sayi(h);
@@ -575,7 +583,7 @@
       if (out.length >= OZEL.KAYIT || !o || typeof o !== "object") return;
       var id = typeof o.id === "string" && /^r[0-9a-z]{1,16}$/.test(o.id) ? o.id : "";
       var ad = adTemiz(o.ad);
-      if (!id || !ad || idler[id] || !Array.isArray(o.keys) || !o.keys.length) return;
+      if (!id || !ad || idler[id] || !ozelGecerliMi(o.keys)) return;
       idler[id] = 1;
       out.push({ id: id, ad: ad, keys: ozelYuzde(o.keys), hit: ozelHit(o.hit) });
     });
@@ -1257,7 +1265,7 @@
     parseMedia: parseMedia, thumb: thumb, steps: steps, path: path, base: base, yAt: yAt,
     summary: summary, remapKeys: remapKeys, clipFor: clipFor,
     // özel eğri (3.4 adım 13)
-    ozelDogrula: ozelDogrula, ozelHit: ozelHit, ozelYuzde: ozelYuzde,
+    ozelDogrula: ozelDogrula, ozelHit: ozelHit, ozelYuzde: ozelYuzde, ozelGecerliMi: ozelGecerliMi,
     ozelKayitlar: ozelKayitlar, ozelKayitEkle: ozelKayitEkle, ozelKayitSil: ozelKayitSil, ozelKayitAdi: ozelKayitAdi,
     ozelKayitAdlandir: ozelKayitAdlandir, ozelKayitTasi: ozelKayitTasi, ozelKayitlarIceAl: ozelKayitlarIceAl, ozelKayitlarDisa: ozelKayitlarDisa,
     ozelKayitBenzersizAd: ozelKayitBenzersizAd,

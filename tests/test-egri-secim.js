@@ -71,6 +71,13 @@ ok("secenekler: Eğri sekmesindeki eğri hazır eğriyle aynıysa ayrı kart yok
 ok("bul: listedeki kart; listede olmayan kod / CSS / geçersiz", S.bul("ziplama", sec).tur === "hazir" && S.bul("auto", []).ad === "Otomatik" &&
   S.bul(kod, []).ad === "Benim eğrim ğüşİöç" && S.bul("cubic-bezier(0.2,0,0.2,1)", []).ad === "cubic-bezier(0.2, 0, 0.2, 1)" &&
   S.bul(E.sfcKodla({ curve: cokNokta }), []).ad === "Özel eğri" && S.bul("dalga", sec) === null);
+// inceleme r2: kullanıcı önayarı yeniden adlandırılınca saklı kod (eski adlı) aynı eğrili karta düşer: güncel ad, seçili kart
+var dalgaKodu = sec.filter(function (o) { return o.ad === "Dalga"; })[0].ease;
+var yeniAdli = S.secenekler({ dil: "tr", kullanici: [{ id: "u3", ad: "Yeni ad", curve: kullanici[2].curve }] });
+var bulunan = S.bul(dalgaKodu, yeniAdli);
+ok("bul: yeniden adlandırılmış önayar eğrisiyle bulunur (güncel ad, listedeki kartın ease'i); başka eğri eşleşmez",
+  bulunan && bulunan.tur === "kullanici" && bulunan.ad === "Yeni ad" && bulunan.ease !== dalgaKodu && yeniAdli.indexOf(bulunan) !== -1 &&
+  S.bul(E.sfcKodla({ ad: "Dalga", curve: cokNokta }), yeniAdli).ad === "Dalga", js(bulunan));
 
 /* ================= yoğunlaştırma ================= */
 var ease = E.builtin("yumusak-giris-cikis").curve;

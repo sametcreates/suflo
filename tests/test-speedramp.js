@@ -676,6 +676,11 @@ var kl = S.ozelKayitlar([{ id: "r1", ad: "  Benim\u0007 rampam ", keys: [[0.2, 5
   { id: "r2", ad: "", keys: [[0, 1]] }, { id: "r3", ad: "boş", keys: [] }, null, "x", { id: "r4", ad: "Uzun".repeat(20), keys: [[0, 100], [1, 300]], hit: "yok" }]);
 ok("kayıtlar: bozuk / yinelenen / adsız / anahtarsız atılır; ad temizlenir (en çok 40); anahtarlar [t, %]", kl.length === 2 && kl[0].ad === "Benim rampam" &&
   js(kl[0].keys) === js([[0, 50], [0.2, 50], [1, 50]]) && kl[0].hit === 0.4 && kl[1].ad.length === 40 && kl[1].hit === null, js(kl));
+// inceleme r2: hiçbir noktası sayı olmayan kayıt düz %100 rampa olarak alınmaz, atılır
+var klB = S.ozelKayitlar([{ id: "r1", ad: "Bozuk", keys: [["a", "b"]] }, { id: "r2", ad: "Boş nokta", keys: [null, {}] }, { id: "r3", ad: "Sağlam", keys: [["x", 1], [0.5, 200]] }]);
+ok("kayıtlar: geçerli noktası olmayan rampa atılır (düz %100 olarak yüklenmez); bir geçerli nokta yeter", klB.length === 1 && klB[0].ad === "Sağlam" &&
+  S.ozelGecerliMi([[0, 100]]) && S.ozelGecerliMi([{ t: 0, v: 1 }]) && !S.ozelGecerliMi([null]) && !S.ozelGecerliMi([["x", 3]]) && !S.ozelGecerliMi("x") &&
+  !S.ozelGecerliMi([]), js(klB));
 var dolu = [];
 for (var di = 0; di < 12; di++) dolu.push({ id: "r" + di, ad: "R" + di, keys: [[0, 100], [1, 200]] });
 var ek12 = S.ozelKayitEkle(dolu, "Yeni", [[0, 100], [1, 50]], null, 1700000000000), ekAyni = S.ozelKayitEkle(dolu, "r5", [[0, 100], [0.5, 30], [1, 100]], 0.5, 1);

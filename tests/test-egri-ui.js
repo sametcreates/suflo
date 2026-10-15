@@ -884,16 +884,21 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   var cokKod = [Ep.paylasimKodla({ ad: "Bir", curve: { type: "bezier", x1: 0.1, y1: 0, x2: 0.2, y2: 1 } }), Ep.paylasimKodla({ ad: "İki", curve: { type: "spring", response: 0.4, bounce: 0.3 } })].join("\n");
   p12.dom["egri-kod"].value = cokKod;
   p12.dom["egri-kod-yukle"].tetikle("click");
+  var kutuSonra12a = p12.dom["egri-kod"].value;
   var on12b = JSON.parse(p12.depo["suflo.egri.onayarlar"]).map(function (o) { return o.ad; });
   ok("Kod yapıştır: birden çok kod önayarlara eklenir (özet)", js(on12b) === js(["Arkadaşımın eğrisi", "Bir", "İki"]) && p12.dom["egri-status"].textContent === "Eğri önayarlarına eklendi: 2" &&
     p12.dom["egri-onayarlar"].children.length === 18, p12.dom["egri-status"].textContent);
   p12.dom["egri-kod"].value = cokKod;
   p12.dom["egri-kod-yukle"].tetikle("click");
+  var kutuSonra12b = p12.dom["egri-kod"].value;
   ok("Kod yapıştır: aynı kodlar ikinci kez eklenmez (yineleme, uyarı)", JSON.parse(p12.depo["suflo.egri.onayarlar"]).length === 3 &&
     p12.dom["egri-status"].textContent === "Yeni önayar eklenmedi · 2 yineleme atlandı" && p12.dom["egri-status"].className.indexOf("warn") !== -1, p12.dom["egri-status"].textContent);
   p12.dom["egri-kod"].value = hizKodu;
   p12.dom["egri-kod-yukle"].tetikle("click");
   ok("Kod yapıştır: Hız Rampası kodu Hız Rampası'na gider (o sekme yoksa saklanamadı uyarısı)", p12.dom["egri-status"].textContent === "Yeni önayar eklenmedi · 1 önayar saklanamadı", p12.dom["egri-status"].textContent);
+  // inceleme r2: saklanamayan kod varsa kutu boşaltılmaz (kullanıcı kodu yeniden aramak zorunda kalmasın); eklenince / yinelenince boşalır
+  ok("Kod yapıştır: saklanamayan kod kutuda kalır; eklenen ya da yinelenen kodlarda kutu boşalır", p12.dom["egri-kod"].value === hizKodu && kutuSonra12a === "" && kutuSonra12b === "",
+    js([p12.dom["egri-kod"].value, kutuSonra12a, kutuSonra12b]));
   p12.dom["egri-kod"].value = "merhaba dünya";
   p12.dom["egri-kod-yukle"].tetikle("click");
   ok("Kod yapıştır: tanınmayan metin nedeniyle uyarı; JSON gibi başlayan bozuk dosya metni ayrı uyarı", p12.dom["egri-status"].textContent === "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır." &&

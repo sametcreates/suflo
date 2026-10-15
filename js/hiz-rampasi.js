@@ -453,7 +453,7 @@ window.KHizRampasi = (function () {
   // Son özel eğri: bozuk / eski kayıt başlangıç eğrisinde bırakır
   function ozelYukle() {
     var a = depoOku(OZEL_ANAHTAR, null);
-    if (!a || typeof a !== "object" || !Array.isArray(a.keys) || !a.keys.length) return;
+    if (!a || typeof a !== "object" || !SR.ozelGecerliMi(a.keys)) return;
     ozel.keys = SR.ozelYuzde(a.keys);
     ozel.hit = SR.ozelHit(a.hit);
     var sh = SR.ozelHit(a.sonHit);
@@ -629,7 +629,15 @@ window.KHizRampasi = (function () {
    * kaydın adı duruyorsa silinir. Yoksa Kaydet o kaydın üstüne başka eğriyi yazardı (3.4 adım 15 incelemesi). Kayıt çipi
    * (ozelKayitSec) seçimi ozelAta'dan sonra yeniden kurar; elle sürüklenen noktalar seçimi bozmaz (Kaydet onu günceller).
    */
+  var kodAdi = "";          // kod kutusundan yüklenen eğrinin ad kutusuna yazılan adı (inceleme r2)
   function kayitSecimiBirak() {
+    // Koddan yüklenen eğrinin yerine başka eğri geldi (Geri al, Düzenle, Sıfırla, çip): kutuda hâlâ kodun adı duruyorsa
+    // silinir; yoksa Kaydet / Kodu kopyala kullanıcının eğrisini arkadaşının adıyla saklar / paylaşırdı
+    if (kodAdi) {
+      var kg = el("hiz-ozel-ad");
+      if (kg && String(kg.value || "").replace(/^\s+|\s+$/g, "").toLowerCase() === kodAdi.toLowerCase()) kg.value = "";
+      kodAdi = "";
+    }
     if (!seciliKayit) return;
     var k = ozelKayitlar().filter(function (x) { return x.id === seciliKayit; })[0], girdi = el("hiz-ozel-ad");
     if (girdi && k && String(girdi.value || "").replace(/^\s+|\s+$/g, "").toLowerCase() === k.ad.toLowerCase()) girdi.value = "";
@@ -654,20 +662,48 @@ window.KHizRampasi = (function () {
     var ad = /\S/.test(yazilan) ? yazilan : tr(SR.ozelKayitAdi(liste, tr));
     var r = SR.ozelKayitEkle(liste, ad, ozel.keys, ozel.hit, Date.now());
     if (!r.ok) { durum(r.kod === "dolu" ? "En çok 12 özel rampa saklanır; birini sil." : "Özel rampaya bir ad yaz.", "warn"); return; }
+    // aynı adlı (büyük / küçük harf ayrımsız) kaydın eğrisi değişecekse eskisi bildirimdeki Geri al için tutulur
+    var eskiK = r.guncellendi ? liste.filter(function (x) { return x.id === r.id; })[0] : null;
     if (!depoYaz(OZEL_KAYIT_ANAHTAR, r.liste)) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return; }
     var kayit = r.liste.filter(function (x) { return x.id === r.id; })[0];
     if (girdi) { girdi.value = ""; girdi.setAttribute("placeholder", SR.ozelKayitAdi(r.liste, tr)); }
+    kodAdi = "";
     seciliKayit = r.id;
     ozelKayitlariCiz();
     durum([r.guncellendi ? "Güncellendi: " : "Kaydedildi: ", { ad: kayit ? kayit.ad : ad }], "good");
+    if (eskiK && !SR.ozelAyni(eskiK, ozel) && window.KApp && KApp.toast) {
+      KApp.toast("Kayıtlı özel rampanın eğrisi yenisiyle değişti.", "warn", 9000, { metin: "Geri al", fn: function () { ozelKayitGeriKoy(eskiK, -1); } });
+    }
+  }
+  // Silinen ya da üstüne yazılan kaydı geri koy (bildirimdeki Geri al): aynı id varsa eğrisi eskiye döner, yoksa eski
+  // sırasına eklenir (liste doluysa söylenir)
+  function ozelKayitGeriKoy(eski, sira) {
+    if (!eski) return;
+    var liste = ozelKayitlar(), var1 = false;
+    liste = liste.map(function (x) { if (x.id !== eski.id) return x; var1 = true; return { id: x.id, ad: x.ad, keys: eski.keys, hit: eski.hit }; });
+    if (!var1) {
+      if (liste.length >= SR.ozel.KAYIT) { durum("En çok 12 özel rampa saklanır; birini sil.", "warn"); return; }
+      liste.splice(sira >= 0 && sira <= liste.length ? sira : liste.length, 0, { id: eski.id, ad: eski.ad, keys: eski.keys, hit: eski.hit });
+    }
+    if (!depoYaz(OZEL_KAYIT_ANAHTAR, liste)) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return; }
+    var girdi = el("hiz-ozel-ad");
+    if (girdi) girdi.setAttribute("placeholder", SR.ozelKayitAdi(ozelKayitlar(), tr));
+    ozelKayitlariCiz();
+    durum(["Geri geldi: ", { ad: eski.ad }], "good");
   }
   function ozelKayitSil(id) {
-    var liste = SR.ozelKayitSil(ozelKayitlar(), id);
-    depoYaz(OZEL_KAYIT_ANAHTAR, liste);
+    var once = ozelKayitlar(), sira = -1;
+    once.forEach(function (x, i) { if (x.id === id) sira = i; });
+    if (sira < 0) return;
+    var eski = once[sira];
+    var liste = SR.ozelKayitSil(once, id);
+    if (!depoYaz(OZEL_KAYIT_ANAHTAR, liste)) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return; }
     if (seciliKayit === id) seciliKayit = "";
     var girdi = el("hiz-ozel-ad");
     if (girdi) girdi.setAttribute("placeholder", SR.ozelKayitAdi(liste, tr));
     ozelKayitlariCiz();
+    // çipin küçük × işareti yanlışlıkla basılabilir: silinen rampa bildirimdeki Geri al ile yerine döner
+    if (window.KApp && KApp.toast) KApp.toast("Özel rampa silindi.", "warn", 9000, { metin: "Geri al", fn: function () { ozelKayitGeriKoy(eski, sira); } });
   }
 
   /* ---- paylaşım (3.4 adım 15; ücretsiz, Premiere'e gitmez; uygulamak yine 'speedramp' kapısından) ---- */
@@ -716,11 +752,14 @@ window.KHizRampasi = (function () {
       durum("Kopyalanamadı; kod aşağıdaki kutuda, Ctrl+C ile kopyala.", "warn");
     });
   }
-  function iceAlGoster(r) {
+  // kutu (kod kutusu): yalnız saklanamayan kalmadıysa boşalır (liste dolu / depo yazılamadı: kodlar kutuda kalır, yer açınca
+  // yeniden yüklenir; hepsi yinelenense boşalır)
+  function iceAlGoster(r, kutu) {
     var p = P();
     if (!p) { durum(paylasimHatasi("diyalog"), "warn"); return false; }
     var s = p.iceAl(r);
     durum(s.ozet.parcalar, s.ozet.uyari ? "warn" : "good");
+    if (kutu && !(s.kalan > 0)) kutu.value = "";
     return s.ozet.eklenen > 0;
   }
   /*
@@ -736,8 +775,8 @@ window.KHizRampasi = (function () {
     if (!r.ok) { durum(paylasimHatasi(/^\s*\{/.test(metin) && r.hata === "bicim" ? "dosyaBicim" : r.hata), "warn"); return false; }
     var tek = (r.bicim === "kod" || r.bicim === "css") && r.presets.length === 1 && !r.uyarilar.length && !r.yinelenen;
     if (tek && r.presets[0].tur === "egri") { durum(paylasimHatasi("egriKodu"), "warn"); return false; }
-    if (g) g.value = "";
     if (tek) {
+      if (g) g.value = "";
       var p = r.presets[0];
       ozelAta(p.keys, p.hit);
       // ad kutusu: aynı ad ve eğriyle kayıtlıysa o kayıt seçilir; ad başka bir kaydınsa "Ad (2)" (Kaydet kullanıcının
@@ -746,11 +785,12 @@ window.KHizRampasi = (function () {
       var ayni = p.ad ? liste.filter(function (x) { return x.ad.toLowerCase() === p.ad.toLowerCase() && SR.ozelAyni(x, p); })[0] : null;
       seciliKayit = ayni ? ayni.id : "";
       if (girdi) girdi.value = ayni ? ayni.ad : (p.ad ? SR.ozelKayitBenzersizAd(liste, p.ad) : "");
+      kodAdi = !ayni && girdi ? String(girdi.value || "") : "";
       ozelKayitlariCiz();
       durum(p.ad ? ["Yüklendi: ", { ad: p.ad }, ". Saklamak için Kaydet'e bas."] : "Özel eğri yüklendi. Saklamak için Kaydet'e bas.", "good");
       return true;
     }
-    return iceAlGoster(r);
+    return iceAlGoster(r, g);
   }
   function ozelDosyaIceAktar() {
     var E = EZ(), p = P();
@@ -956,7 +996,8 @@ window.KHizRampasi = (function () {
     kilitle(true);
     // Eğri ve seçenekler iş başında sabitlenir: uygulama sürerken kart, kutu ya da bağlam (kopya sekansa
     // geçiş) kalan klipleri değiştirmesin
-    var presetId = secili, hizala = !!el("hiz-vurus").checked;
+    // (özel eğri ve Ağır çekim anı da burada okunur: hedefler okunurken düzenleyicide yapılan değişiklik bu işe girmez)
+    var presetId = secili, hizala = !!el("hiz-vurus").checked, o0 = secenek();
     var basarili = [], hatalar = [], atlanan = [], kopyaAdi = "", bildirildi = false;
     try {
       durum("Hedefler okunuyor…");
@@ -989,7 +1030,7 @@ window.KHizRampasi = (function () {
         throw new Error(hataMetni({ kod: "secimYok" }));
       }
       if (hd.caps && hd.caps.setSpeed === false) throw new Error(hataMetni({ kod: "qeYok" }));
-      var o = secenek(), kal = kalibrasyon(hd.appVersion);
+      var o = o0, kal = kalibrasyon(hd.appVersion);
       // Kopya, gerçekten bir çağrı kopyayı oluşturana dek her çağrıda istenir: ilk hedef panelde
       // atlansa (vuruş yok, plan hatası) ya da host kopyadan önce reddetse (degisti, linkedConflict…)
       // sonraki hedef özgün sekansta uygulanmasın

@@ -631,9 +631,10 @@ window.SufloEgriSecici = (function () {
       if (dugme.classList) dugme.classList.toggle("ozel", deger !== S.OTOMATIK);
     }
     function izgaraCiz() {
+      // seçili kart: saklı ease'in kartı (yeniden adlandırılmış kullanıcı önayarı eğrisiyle bulunur; S.bul)
       window.SufloEgriIzgara.ciz(izgara, liste().map(function (o) {
         return { id: o.ease, ad: o.ad, curve: o.curve, kullanici: false, adCevrilir: o.adCevrilir };
-      }), { secili: deger, sec: sec });
+      }), { secili: kart().ease, sec: sec });
     }
     function ac() {
       if (acikSecici && acikSecici !== api) acikSecici.kapat();
@@ -869,6 +870,8 @@ window.SufloEgriPaylas = (function () {
     dagit(hizlar, window.KHizRampasi && window.KHizRampasi.ozelKayitlariIceAl, "hiz");
     var M = window.SufloEgriModel;
     sonuc.ozet = M && M.iceAktarOzeti ? M.iceAktarOzeti(o) : { parcalar: [], uyari: true, eklenen: o.egri + o.hiz };
+    // saklanamayan (liste dolu ya da depo yazılamadı) önayar sayısı: kod kutusu o zaman boşaltılmaz
+    sonuc.kalan = o.dolu + o.hizDolu + o.alinamadi;
     return sonuc;
   }
   // Hata kodu → metin (SufloEgriModel.paylasimHatasi; o yoksa kısa yedek)
@@ -1172,17 +1175,20 @@ window.KEgri = (function () {
       durum(window.SufloEgriPaylas.hataMetni(json && r.hata === "bicim" ? "dosyaBicim" : r.hata), "warn");
       return false;
     }
-    if (g) g.value = "";
     if ((r.bicim === "kod" || r.bicim === "css") && r.presets.length === 1 && !r.uyarilar.length && !r.yinelenen && r.presets[0].tur === "egri") {
+      if (g) g.value = "";
       return egriYukle(r.presets[0], r.kirpildi, r.bicim);
     }
-    return iceAlGoster(r);
+    return iceAlGoster(r, g);
   }
-  function iceAlGoster(r) {
+  // kutu (kod kutusu): yalnız saklanamayan kalmadıysa boşalır (liste dolu / depo yazılamadı: kodlar kutuda kalır, yer açınca
+  // yeniden yüklenir; hepsi yinelenense boşalır)
+  function iceAlGoster(r, kutu) {
     var s = window.SufloEgriPaylas.iceAl(r);
     // tek eğri eklendiyse seçilir ve düzenleyiciye gelir (birden çoksa düzenleyicideki eğri yerinde kalır)
     if (s.egri.length === 1) onayarSec(s.egri[0]);
     durum(s.ozet.parcalar, s.ozet.uyari ? "warn" : "good");
+    if (kutu && !(s.kalan > 0)) kutu.value = "";
     return s.ozet.eklenen > 0;
   }
   function dosyaIceAktar() {

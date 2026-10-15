@@ -126,6 +126,15 @@
     var c = coz(ease);
     if (!c.ok) return null;
     for (var i = 0; i < (liste || []).length; i++) if (liste[i].ease === c.ease) return liste[i];
+    // Kullanıcı önayarının kodu adını da taşır: önayar Eğri sekmesinde yeniden adlandırılınca saklı kod hiçbir kartla
+    // birebir eşleşmez. Aynı eğrili kullanıcı kartı (ad yok sayılarak) o önayardır: güncel adıyla gösterilir, seçili görünür
+    if (c.tur === "kod" && c.curve) {
+      var j = JSON.stringify(E.normalize(c.curve));
+      for (var k = 0; k < (liste || []).length; k++) {
+        var x = liste[k];
+        if (x && x.tur === "kullanici" && x.curve && JSON.stringify(x.curve) === j) return x;
+      }
+    }
     if (c.tur === "otomatik") return { ease: OTOMATIK, ad: "Otomatik", curve: null, tur: "otomatik", adCevrilir: true };
     return { ease: c.ease, ad: c.ad || (c.tur === "css" ? c.ease : "Özel eğri"), curve: c.curve, tur: c.tur, adCevrilir: !c.ad && c.tur !== "css" };
   }

@@ -415,7 +415,19 @@ ok("klip başına ret kodları satırda nedeniyle (genel 'uygulanamadı' değil)
   ok("varış: değişecek yaylanmanın anahtarlarına Eğri uygulanmışsa 'egriVar' (tek ve tüm varışlar; sessiz değil), metin Geri al'ı söyler",
     vE.varislar.length === 0 && vE.kod === "egriVar" && vEt.varislar.length === 0 && js(vEt.atlanan) === js(["egriVar"]) && /Geri al/.test(M.nedenMetni("egriVar")),
     js([vE, vEt]));
-  // tüm varışlar: hareketin aynı yönde sürdüğü ara anahtar iniş değil ('devam', sessiz); dönüşte yalnız duran boyut yaylanır
+  // inceleme r2: iniş B, canlı bir Suflo eğrisinin (B → C, 4 karede bir) ilk ucu: sonraki anahtar eğrinin ilk iç anahtarı
+  // sayılıp yaylanma eğrinin içine yazılmaz; tek varışta 'egriSonra' söylenir, tüm varışlarda sessiz geçilir
+  var bcIc = [], bcKeys = [1, 2], bcVals = [100, 150];
+  for (var bc = 2.16; bc < 3.9; bc += 0.16) { var bt = Math.round(bc * 100) / 100; bcIc.push(bt); bcKeys.push(bt); bcVals.push(150 - 50 * (bt - 2) / 2); }
+  bcKeys.push(4); bcVals.push(100);
+  var egriBC = KR.kayit({ tur: "egri", seqId: "s1", nodeId: "nA", clipName: "A.mp4", clipStart: 0, compIdx: 0, propIdx: 1, matchName: "AE.ADBE Motion/Scale",
+    uclar: [2, 4], times: bcIc, kenarDegerleri: [] });
+  var pBC = satir(bcKeys, bcVals, { tur: "sayi", propIdx: 1, matchName: "AE.ADBE Motion/Scale", label: "Ölçek", clipStart: 0, clipEnd: 10 });
+  var vBC = M.varislar(pBC, [egriBC], { ph: 1.5 }), vBCt = M.varislar(pBC, [egriBC], { tum: true });
+  ok("varış: iniş canlı bir Suflo eğrisinin başıysa yaylanma eğrinin içine yazılmaz ('egriSonra'; tüm varışlarda sessiz)", vBC.varislar.length === 0 &&
+    vBC.kod === "egriSonra" && js(vBC.atlanan) === js(["egriSonra"]) && !vBCt.varislar.some(function (x) { return Math.abs(x.tL - 2) < 1e-6; }) &&
+    vBCt.atlanan.indexOf("egriSonra") === -1 && /eğrinin içine yazılmaz/.test(M.nedenMetni("egriSonra")) &&
+    !vBCt.varislar.some(function (x) { return x.tN !== null && x.tN > 2 && x.tN < 4 - 1e-6 && x.tL < 2 + 1e-6; }), js([vBC, vBCt.varislar.map(function (x) { return [x.tL, x.tN]; })]));
   var akis = satir([11, 12, 13, 15], [100, 150, 200, 200], { tur: "sayi", propIdx: 1, matchName: "AE.ADBE Motion/Scale", label: "Ölçek" });
   var vAk = M.varislar(akis, [], { tum: true });
   ok("tüm varışlar: düzgün hareketin ara anahtarı (12) iniş sayılmaz, hareketin durduğu 13 sayılır; tek varışta kullanıcı seçtiyse yine yazılır",
@@ -483,9 +495,15 @@ ok("klip başına ret kodları satırda nedeniyle (genel 'uygulanamadı' değil)
   var gec = M.yaylanGeciciKayitlar(g.gruplar[0], "s1");
   g.gruplar[0].satirlar[0].bezier = false;
   var gecY = M.yaylanGeciciKayitlar(g.gruplar[0], "s1");
-  ok("yaylan zaman aşımı: geçici kayıt (Bezier varsa seyrek, yoksa sık plan), iniş kenarDegerleri'nde, depo kabul eder",
-    gec.length === 1 && gec[0].tur === "yaylan" && gec[0].uclar === null && gec[0].times.length === it.keys.length && gecY[0].times.length === it.yogunKeys.length &&
-    js(gec[0].kenarDegerleri) === js([{ t: 12, v: [500, 0] }]) && KR.kayit(gec[0]) !== null && gec[0].clipIn === 5);
+  // inceleme r2: Bezier varsa seyrek VE sık plan (host Bezier yapamazsa sık planı yazar: hangisi yazıldıysa Geri al onu bulur)
+  ok("yaylan zaman aşımı: geçici kayıt (Bezier varsa seyrek ve sık plan, yoksa yalnız sık plan), iniş kenarDegerleri'nde, depo kabul eder",
+    gec.length === 2 && gec[0].tur === "yaylan" && gec[0].uclar === null && gec[0].times.length === it.keys.length && gec[1].times.length === it.yogunKeys.length &&
+    gecY.length === 1 && gecY[0].times.length === it.yogunKeys.length &&
+    js(gec[0].kenarDegerleri) === js([{ t: 12, v: [500, 0] }]) && js(gec[1].kenarDegerleri) === js([{ t: 12, v: [500, 0] }]) && KR.kayit(gec[0]) !== null &&
+    KR.kayit(gec[1]) !== null && gec[0].clipIn === 5);
+  ok("yaylan zaman aşımı payı: öğe başına seyrek + sık plan (Bezier hata verirse ikisi de yazılır)", M.bakeSuresi(g.gruplar[0]) ===
+    Math.max(120000, Math.min(600000, (it.keys.length + it.yogunKeys.length) * 50)) &&
+    M.bakeSuresi({ items: [{ tur: "yaylan", keys: new Array(200), yogunKeys: new Array(2440) }] }) === 132000);
   /* yerine geçme */
   var yeni = KR.kayit({ tur: "yaylan", seqId: "s1", nodeId: "nA", clipName: "A.mp4", clipStart: 10, clipEnd: 20, clipIn: 5, clipOut: 15, compIdx: 0, propIdx: 0,
     matchName: "AE.ADBE Motion/Position", uclar: null, times: [12.08, 12.4], kenarDegerleri: [{ t: 12, v: [500, 0] }] });

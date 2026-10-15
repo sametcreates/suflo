@@ -697,6 +697,27 @@ function cevir(n) {
   ok("iş sürerken eğri değişse de ikinci klip iş başındaki eğriyle; düzenleme sonra geçerli", js(u32[1].arg.plan) === bek32(hedef("B.mp4", 8, 12)) &&
     z32.H._ozel().keys.length === basKeys.length + 1, js(z32.H._ozel().keys));
   ok("bildirim: adsız klipte değil, klip adıyla; 'Uygulanan eğri: Özel eğri' çevrilir", I18N.translate("Uygulanan eğri: Özel eğri") === "Applied curve: Custom curve");
+  // inceleme r2: hedefler okunurken (KS_speedRampTargets) eğri ya da Ağır çekim anı değişse de iş, Uygula'ya basıldığı andaki eğriyle
+  var z32bIs = false;   // yalnız Uygula'nın hedef okuması sırasında (panel açılışta da hedef okuyabilir)
+  var depo32b = { "suflo.hizRampa.ozel": JSON.stringify({ keys: [[0, 100], [0.3, 400], [0.6, 25], [1, 100]], hit: 0.6, sonHit: 0.6 }),
+    "suflo.hizRampa.ayar": JSON.stringify({ secili: "ozel" }) };
+  var z32b = kur({ kurulu: true, depo: depo32b, cevap: function (fn, arg) {
+    if (fn === "KS_speedRampTargets" && !z32bIs) return hedefler([hedef("A.mp4", 2, 6)]);
+    if (fn === "KS_speedRampTargets") {
+      var kb = kok(z32b); kb._o.pointerdown(ev(Z.ekranX(0.8), Z.ekranY(8))); kb._o.pointerup(ev(0, 0));
+      z32b.dom["hiz-ozel-hit"].checked = false; if (z32b.dom["hiz-ozel-hit"]._o.change) z32b.dom["hiz-ozel-hit"]._o.change();
+      return hedefler([hedef("A.mp4", 2, 6)]);
+    }
+    if (fn === "KS_applySpeedRamp") return basari(arg);
+    return { ok: false };
+  } });
+  var basKeysB = z32b.H._ozel().keys;
+  z32bIs = true;
+  await z32b.H.uygula();
+  var u32b = z32b.uygulamalar();
+  ok("hedefler okunurken yapılan düzenleme (nokta, Ağır çekim anı) işe girmez: plan Uygula'daki eğriyle", u32b.length === 1 &&
+    js(u32b[0].arg.plan) === js(SR.hostPlan(SR.plan("ozel", { ozelKeys: basKeysB, ozelHit: 0.6 }, SR.clipFor(hedef("A.mp4", 2, 6), 0.04, { playhead: 0, hizala: false, beats: [] })))) &&
+    z32b.H._ozel().keys.length === basKeysB.length + 1, js([u32b.length, z32b.H._ozel().keys.length, z32b.H._ozel().hit]));
 
   /* ---------- 33) depo: yükleme, bozuk veri, depo atınca ---------- */
   var z33 = kur({ depo: { "suflo.hizRampa.ozel": JSON.stringify({ keys: [[0.4, 250], [0, 100], [1, 100], ["x", 3]], hit: null, sonHit: 0.3 }), "suflo.hizRampa.ayar": JSON.stringify({ secili: "ozel" }) },
@@ -708,6 +729,11 @@ function cevir(n) {
     kur({ depo: { "suflo.hizRampa.ozel": JSON.stringify({ keys: "x" }), "suflo.hizRampa.ozelKayitlar": JSON.stringify({ a: 1 }) }, cevap: function () { return { ok: false }; } }),
     kur({ lsAtar: true, cevap: function () { return { ok: false }; } })];
   ok("bozuk depo / depo atıyor: başlangıç eğrisi, hata yok", bozuk.every(function (b) { return js(b.H._ozel().keys) === js(SR.OZEL_VARSAYILAN.keys) && b.dom["hiz-ozel-kayitlar"].hidden === true; }));
+  // inceleme r2: anahtarların hiçbiri sayı değilse (düz %100 olurdu) başlangıç eğrisi kalır; böyle adlı rampa çip olmaz
+  var bozuk2 = kur({ depo: { "suflo.hizRampa.ozel": JSON.stringify({ keys: [["x", 3]] }), "suflo.hizRampa.ozelKayitlar": JSON.stringify([{ id: "r1", ad: "Bozuk", keys: [["a", "b"]] }]) },
+    cevap: function () { return { ok: false }; } });
+  ok("geçerli noktası olmayan son eğri ve kayıt: başlangıç eğrisi, bozuk kayıt çipi yok", js(bozuk2.H._ozel().keys) === js(SR.OZEL_VARSAYILAN.keys) &&
+    bozuk2.dom["hiz-ozel-kayitlar"].hidden === true, js(bozuk2.H._ozel().keys));
   var ls33 = bozuk[2];
   ls33.H._sec("ozel");
   kok(ls33)._o.pointerdown(ev(Z.ekranX(0.2), Z.ekranY(3)));
@@ -1080,6 +1106,59 @@ function cevir(n) {
   ok("kod kutusunda Shift+Enter alt satıra geçer (yüklemez)", sh43 === 0 && u43.dom["hiz-ozel-kod"].value === "x");
   ok("benzersiz ad yardımcısı (SufloSpeedRamp.ozelKayitBenzersizAd)", SR.ozelKayitBenzersizAd(kl43b, "benim") === "benim (3)" && SR.ozelKayitBenzersizAd(kl43b, "Yeni") === "Yeni" &&
     SR.ozelKayitBenzersizAd(kl43b, "Benim", kl43b[0].id) === "Benim");
+
+  /* ---------- inceleme r2: kayıtlı rampayı silmek / üstüne yazmak geri alınır; kodun adı Geri al'da kalmaz; dolu listede kod kutusu boşalmaz ---------- */
+  var r2 = kur({ cevap: function () { return { ok: false }; } });
+  dz41(r2, "atilim"); r2.dom["hiz-ozel-ad"].value = "Bir"; r2.dom["hiz-ozel-kaydet"]._o.click();
+  dz41(r2, "darbe"); r2.dom["hiz-ozel-ad"].value = "İki"; r2.dom["hiz-ozel-kaydet"]._o.click();
+  dz41(r2, "vites"); r2.dom["hiz-ozel-ad"].value = "Üç"; r2.dom["hiz-ozel-kaydet"]._o.click();
+  var ikiOnce = kayitlar43(r2)[1];
+  r2.toastlar.length = 0;
+  bul(cipBul(r2, "İki"), function (c) { return c.className === "hiz-ozel-kayit-sil"; })[0]._o.click({ stopPropagation: function () {} });
+  var silToast = r2.toastlar.filter(function (t) { return t.e && t.e.metin === "Geri al"; })[0];
+  ok("çipin × işareti: rampa silinir, bildirimde Geri al", js(kayitlar43(r2).map(function (k) { return k.ad; })) === js(["Bir", "Üç"]) && !!silToast && metin(silToast.m) === "Özel rampa silindi.",
+    js(r2.toastlar.map(function (t) { return metin(t.m); })));
+  if (silToast) silToast.e.fn();
+  ok("...Geri al: silinen rampa eski sırasına aynen döner", js(kayitlar43(r2)) === js([kayitlar43(r2)[0], ikiOnce, kayitlar43(r2)[2]]) &&
+    js(kayitlar43(r2).map(function (k) { return k.ad; })) === js(["Bir", "İki", "Üç"]) && js(kayitlar43(r2)[1]) === js(ikiOnce) && cipBul(r2, "İki") !== undefined, js(kayitlar43(r2)));
+  r2.toastlar.length = 0;
+  var birOnce = kayitlar43(r2)[0];
+  dz41(r2, "dalis"); r2.dom["hiz-ozel-ad"].value = "bir"; r2.dom["hiz-ozel-kaydet"]._o.click();
+  var yazToast = r2.toastlar.filter(function (t) { return t.e && t.e.metin === "Geri al"; })[0];
+  ok("aynı adla (büyük / küçük harf ayrımsız) Kaydet başka eğrinin üstüne yazar ama bildirimde Geri al var", /^Güncellendi: /.test(r2.dom["hiz-status"].textContent) && !!yazToast &&
+    js(kayitlar43(r2)[0].keys) === js(SR.ozelYuzde(SR.get("dalis").keys)), js(r2.toastlar.map(function (t) { return metin(t.m); })));
+  if (yazToast) yazToast.e.fn();
+  ok("...Geri al: kaydın eski eğrisi geri gelir (sıra aynı)", js(kayitlar43(r2)[0].keys) === js(birOnce.keys) && kayitlar43(r2)[0].id === birOnce.id &&
+    kayitlar43(r2).length === 3, js(kayitlar43(r2)[0]));
+  // kod: arkadaşın adlı rampası kaydedilmemiş eğrinin yerine gelir; Geri al kullanıcının eğrisini getirince kutuda arkadaşın adı kalmaz
+  var r2b = kur({ cevap: function () { return { ok: false }; } });
+  // kaydedilmemiş, elle çizilmiş eğri: Atılım'ı kopyala, bir nokta ekle
+  dz41(r2b, "atilim");
+  var kb2 = kok(r2b); kb2._o.pointerdown(ev(Z.ekranX(0.8), Z.ekranY(8))); kb2._o.pointerup(ev(0, 0));
+  var kendiKeys = r2b.H._ozel().keys;
+  r2b.toastlar.length = 0;
+  r2b.dom["hiz-ozel-kod"].value = E42.paylasimKodla({ tur: "hiz", ad: "Dostun rampası", keys: [[0, 100], [0.5, 30], [1, 300]] });
+  r2b.dom["hiz-ozel-kod-yukle"]._o.click();
+  var kodToast = r2b.toastlar.filter(function (t) { return t.e && t.e.metin === "Geri al"; })[0];
+  var adKod = r2b.dom["hiz-ozel-ad"].value;
+  if (kodToast) kodToast.e.fn();
+  ok("koddan gelen eğri Geri al ile geri alınınca ad kutusunda kodun adı kalmaz (Kaydet / Kodu kopyala arkadaşın adını kullanmaz)", adKod === "Dostun rampası" && !!kodToast &&
+    r2b.dom["hiz-ozel-ad"].value === "" && js(r2b.H._ozel().keys) === js(kendiKeys), js([adKod, r2b.dom["hiz-ozel-ad"].value, !!kodToast]));
+  r2b.dom["hiz-ozel-kaydet"]._o.click();
+  ok("...ardından Kaydet varsayılan adla saklar", kayitlar43(r2b).length === 1 && kayitlar43(r2b)[0].ad !== "Dostun rampası" && js(kayitlar43(r2b)[0].keys) === js(kendiKeys),
+    js(kayitlar43(r2b)));
+  // 12 kayıt doluyken iki kod: hiçbiri sığmaz, kodlar kutuda kalır (yer açınca yeniden yüklenir); hepsi yinelenense kutu boşalır
+  var dolu12 = [];
+  for (var d12 = 0; d12 < 12; d12++) dolu12.push({ id: "r" + d12, ad: "R" + d12, keys: [[0, 100], [1, 110 + d12 * 10]], hit: null });
+  var r2c = kur({ depo: { "suflo.hizRampa.ozelKayitlar": JSON.stringify(dolu12) }, cevap: function () { return { ok: false }; } });
+  var ikiKod = [E42.paylasimKodla({ tur: "hiz", ad: "Yeni1", keys: [[0, 100], [1, 500]] }), E42.paylasimKodla({ tur: "hiz", ad: "Yeni2", keys: [[0, 400], [1, 100]] })].join("\n");
+  r2c.dom["hiz-ozel-kod"].value = ikiKod;
+  r2c.dom["hiz-ozel-kod-yukle"]._o.click();
+  ok("dolu listede kodlar sığmazsa kod kutusu boşalmaz", r2c.dom["hiz-ozel-kod"].value === ikiKod && /sığmadı/.test(r2c.dom["hiz-status"].textContent) && kayitlar43(r2c).length === 12,
+    r2c.dom["hiz-status"].textContent);
+  r2c.dom["hiz-ozel-kod"].value = [E42.paylasimKodla({ tur: "hiz", ad: "R0", keys: dolu12[0].keys }), E42.paylasimKodla({ tur: "hiz", ad: "R1", keys: dolu12[1].keys })].join("\n");
+  r2c.dom["hiz-ozel-kod-yukle"]._o.click();
+  ok("hepsi yinelenen kodlarda kutu boşalır", r2c.dom["hiz-ozel-kod"].value === "" && /yineleme atlandı/.test(r2c.dom["hiz-status"].textContent), r2c.dom["hiz-status"].textContent);
 
   ok("İngilizce: Hız Rampası paylaşım metinleri", I18N.translate("Dışa aktarıldı: 3 özel rampa →") === "Exported: 3 custom ramps →" &&
     I18N.translate("Hız Rampası kodu (SFC1) yapıştır") === "Paste a Speed Ramp code (SFC1)" && I18N.translate("Adı değişti:") === "Renamed:");

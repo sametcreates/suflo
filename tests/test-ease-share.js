@@ -276,6 +276,12 @@ ok("önayar: sürükleyerek taşı (hedef kırpılır; olmayan id sırayı bozma
   js(M.onayarTasi(liste, "k2", "x").map(function (o) { return o.id; })) === js(["k1", "k2", "k3"]));
 ok("önayar: benzersiz ad 'Ad (2)', 40 karakteri aşmaz", M.benzersizAd("Bir", ["bir"]) === "Bir (2)" && M.benzersizAd("Bir", ["bir", "Bir (2)"]) === "Bir (3)" &&
   M.benzersizAd(new Array(41).join("x"), [new Array(41).join("x")]).length === 40 && M.benzersizAd("Yeni", ["bir"]) === "Yeni");
+// inceleme r2: Object.prototype adları ("constructor", "__proto__", "toString") boş listede alınmış sayılmaz
+var protoAdlar = ["constructor", "__proto__", "toString", "hasOwnProperty", "Constructor"];
+var protoIce = M.onayarlariIceAl([], [{ tur: "egri", ad: "constructor", curve: { type: "bezier", x1: 0.2, y1: 0, x2: 0.4, y2: 1 } }], 1);
+ok("önayar: 'constructor' / '__proto__' gibi adlar boş listede olduğu gibi kalır, ad çakışması sayılmaz", protoAdlar.every(function (a) { return M.benzersizAd(a, []) === a && M.benzersizAd(a, ["bir"]) === a; }) &&
+  M.benzersizAd("constructor", ["Constructor"]) === "constructor (2)" && protoIce.liste.length === 1 && protoIce.liste[0].ad === "constructor" && protoIce.adDegisti === 0,
+  JSON.stringify([protoAdlar.map(function (a) { return M.benzersizAd(a, []); }), protoIce.adDegisti]));
 var gelen = E.iceAktar(E.dosyaYaz([{ ad: "bir", curve: E.builtin("yumusak").curve }, { ad: "Bir", curve: cokNokta }, { ad: "", curve: E.builtin("tasma").curve },
   { ad: "", curve: E.builtin("esnek").curve }, { tur: "hiz", ad: "Hız", keys: [[0, 100], [1, 50]] }, { ad: "Dört", curve: { type: "bezier", x1: 0.1, y1: 0, x2: 0.2, y2: 1 } }]).metin).presets;
 var ia = M.onayarlariIceAl(liste, gelen, 1700000000000, function (n) { return "My curve " + n; });

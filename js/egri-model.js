@@ -329,10 +329,13 @@
       return r;
     }).filter(function (r) { return r.times.length > 0; });
   }
-  // KS_easeBake zaman aşımı: toplam anahtar başına 50 ms, en az 120 sn, en çok 10 dk
+  // KS_easeBake zaman aşımı: toplam anahtar başına 50 ms, en az 120 sn, en çok 10 dk. Yaylanma öğesinde en kötü durum
+  // sayılır: host seyrek planı yazıp Bezier yapamazsa onu silip sık planı (yogunKeys) yazar
   function bakeSuresi(grup) {
     var n = 0;
-    ((grup && grup.items) || []).forEach(function (it) { n += it.keys ? it.keys.length : 0; });
+    ((grup && grup.items) || []).forEach(function (it) {
+      n += (it.keys ? it.keys.length : 0) + (it.yogunKeys ? it.yogunKeys.length : 0);
+    });
     return Math.max(120000, Math.min(600000, n * 50));
   }
 
@@ -467,7 +470,8 @@
    *   kod (hiç varış yoksa): 'ozellikDisi' (Konum / Ölçek / Döndürme / Opaklık değil) | 'degerYok' | 'disinda' |
    *   'varisYok' (iniş anahtarına hareket gelmiyor) | 'klipDisi' | 'devam' (hareket sürüyor) | 'egriVar' |
    *   'inisYok' (playhead bir yaylanmanın penceresinde ama iniş anahtarı silinmiş) | 'kesik' (Tüm varışlar, 400'den çok
-   *   anahtar). Tüm varışlarda sessiz geçilenlerden en anlamlısı kod olur (klipDisi > devam > varisYok).
+   *   anahtar) | 'egriSonra' (inişten sonra canlı Suflo eğrisi başlıyor; Tüm varışlarda sessiz). Tüm varışlarda sessiz
+   *   geçilenlerden en anlamlısı kod olur (klipDisi > devam > egriSonra > varisYok).
    */
   var DEVAM_ORAN = 0.25;
   function varislar(prop, kayitlar, o) {
@@ -518,6 +522,9 @@
       if (eski && egriUclari.some(function (u) {
         return (eski.r.times || []).some(function (t) { return Math.abs(u[0] - t) <= tol || Math.abs(u[1] - t) <= tol; });
       })) { atla("egriVar"); return; }
+      // İnişten hemen sonra canlı bir Suflo eğrisi başlıyor (iniş, eğrinin ilk ucu): yaylanma eğrinin aralığına, iç
+      // anahtarlarının arasına yazılırdı (eğrinin başında sıçrama; eğriyi yeniden uygulamak 'icAnahtar' ile reddedilirdi)
+      if (egriUclari.some(function (u) { return Math.abs(u[0] - tL) <= tol; })) { atla("egriSonra"); return; }
       var iP = iL2 - 1;
       while (iP >= 0 && haric[iP]) iP--;
       var iN = iL2 + 1;
@@ -551,7 +558,7 @@
         sinir: tN === null ? son : Math.min(tN, son), hiz: Array.isArray(vL) ? hizlar : hizlar[0], eski: eski ? eski.r : null, tum: tum });
     });
     if (!sonuc.varislar.length) {
-      sonuc.kod = sonuc.atlanan.length ? sonuc.atlanan[0] : sessiz.klipDisi ? "klipDisi" : sessiz.devam ? "devam" : "varisYok";
+      sonuc.kod = sonuc.atlanan.length ? sonuc.atlanan[0] : sessiz.klipDisi ? "klipDisi" : sessiz.devam ? "devam" : sessiz.egriSonra ? "egriSonra" : "varisYok";
     }
     return sonuc;
   }
@@ -611,18 +618,23 @@
     });
     return { gruplar: gruplar, atlanan: atlanan };
   }
-  // KS_easeBake zaman aşımında yaylanma öğelerinin geçici kayıtları (taramanın kfInterp'ine göre seyrek ya da sık plan)
+  // KS_easeBake zaman aşımında yaylanma öğelerinin geçici kayıtları. Taramanın kfInterp'i yoksa yalnız sık plan; varsa
+  // seyrek VE sık plan (host Bezier yapamazsa seyrek anahtarları silip sık planı yazar; hangisi yazıldıysa o kayıt canlıdır,
+  // Geri al onu siler; yazılmayanın kaydı canlı değildir, anahtarları gidince 'yok' ile biter)
   function yaylanGeciciKayitlar(grup, seqId) {
-    var h = (grup && grup.target) || {}, c = capa(grup && grup.klip);
-    return ((grup && grup.items) || []).map(function (it, i) {
+    var h = (grup && grup.target) || {}, c = capa(grup && grup.klip), out = [];
+    ((grup && grup.items) || []).forEach(function (it, i) {
       var sat = grup.satirlar && grup.satirlar[i];
-      var liste = sat && sat.bezier === false ? it.yogunKeys : it.keys;
-      var r = { tur: "yaylan", seqId: String(seqId || h.seqId || ""), nodeId: h.nodeId, clipName: h.clipName, clipStart: h.clipStart,
-        matchName: it.matchName, compIdx: it.compIdx, propIdx: it.propIdx, uclar: null,
-        times: (liste || []).map(function (k) { return k.t; }), kenarDegerleri: [{ t: it.t0, v: it.v0 }] };
-      if (c) { r.clipEnd = c.clipEnd; r.clipIn = c.clipIn; r.clipOut = c.clipOut; r.ters = c.ters; }
-      return r;
-    }).filter(function (r) { return r.times.length > 0; });
+      var listeler = sat && sat.bezier === false ? [it.yogunKeys] : [it.keys, it.yogunKeys];
+      listeler.forEach(function (liste) {
+        var r = { tur: "yaylan", seqId: String(seqId || h.seqId || ""), nodeId: h.nodeId, clipName: h.clipName, clipStart: h.clipStart,
+          matchName: it.matchName, compIdx: it.compIdx, propIdx: it.propIdx, uclar: null,
+          times: (liste || []).map(function (k) { return k.t; }), kenarDegerleri: [{ t: it.t0, v: it.v0 }] };
+        if (c) { r.clipEnd = c.clipEnd; r.clipIn = c.clipIn; r.clipOut = c.clipOut; r.ters = c.ters; }
+        if (r.times.length) out.push(r);
+      });
+    });
+    return out;
   }
   /*
    * Geri al kayıtlarının yeri (3.4 adım 14 inceleme). Eğri ve yaylanma kayıtları projede aynı sınıfta en çok `sinir`
@@ -815,12 +827,13 @@
   }
   // Benzersiz ad: "Ad", sonra "Ad (2)", "Ad (3)" … (büyük / küçük harf ayrımsız; en çok 40 karakter)
   function benzersizAd(ad, adlar) {
-    var kullanilan = {};
-    (adlar || []).forEach(function (a) { kullanilan[String(a).toLowerCase()] = 1; });
-    if (!kullanilan[ad.toLowerCase()]) return ad;
+    // yabancı adlar (paylaşılan kod / dosya): "constructor", "__proto__" gibi adlar Object.prototype'tan miras sanılmasın
+    var kullanilan = Object.create(null);
+    (adlar || []).forEach(function (a) { kullanilan["a:" + String(a).toLowerCase()] = 1; });
+    if (kullanilan["a:" + ad.toLowerCase()] !== 1) return ad;
     for (var n = 2; n < 1000; n++) {
       var ek = " (" + n + ")", aday = ad.slice(0, AD_SINIR - ek.length).replace(/\s+$/, "") + ek;
-      if (!kullanilan[aday.toLowerCase()]) return aday;
+      if (kullanilan["a:" + aday.toLowerCase()] !== 1) return aday;
     }
     return ad;
   }
@@ -1104,6 +1117,7 @@
     ozellikDisi: "yalnız Konum, Ölçek, Döndürme ve Opaklık yaylanır",
     devam: "hareket bu anahtar karede durmuyor, sürüyor",
     egriVar: "bu yaylanmanın anahtar karelerine Suflo eğrisi uygulanmış; önce o eğriyi Geri al ile kaldır",
+    egriSonra: "bu inişten sonra Suflo eğrisi başlıyor; yaylanma eğrinin içine yazılmaz",
     sinir: "iniş değeri sınırda (Opaklık 0 ya da 100, Ölçek 0); aşım sığmıyor",
     kesik: "400'den çok anahtar kare var; Tüm varışlar'ı kapatıp varışlara tek tek uygula"
   };
