@@ -619,6 +619,14 @@ ok("THIRD_PARTY_NOTICES: Rebound girdisi (commit, MIT, telif, dosyalar, tam lisa
   /0f9fd6c526514d20b688b13c393061606f166ad5/.test(notice) && /Copyright \(c\) 2026 Rebound contributors/.test(notice) &&
   /`js\/ease-curve\.js`/.test(notice) && /`tests\/test-ease-curve\.js`/.test(notice) &&
   (notice.match(/Permission is hereby granted, free of charge/g) || []).length >= 2);
+// inceleme r2: host'taki Hareket önayarı yoğunlaştırması Rebound'un host/commands/spring.jsx lookup / bakeSegment'ine benzer:
+// dosyada başlık + işaret, NOTICE'te jsx/host.jsx girdisi
+var hostSrc = fs.readFileSync(path.join(KOK, "jsx", "host.jsx"), "utf8");
+var reboundBlok = notice.slice(notice.indexOf("### Rebound"), notice.indexOf("## Bundled assets"));
+ok("Rebound uyarlaması host.jsx'te atıflı (başlık, // Rebound: lookup işareti, NOTICE'te jsx/host.jsx)",
+  /Portions adapted from Rebound \(https:\/\/github\.com\/meszmate\/rebound\), MIT/.test(hostSrc) &&
+  /\/\/ Rebound: lookup \(host\/commands\/spring\.jsx\)\s*\nfunction KS_egriTabloDeger/.test(hostSrc) &&
+  /Rebound: bakeSegment/.test(hostSrc) && /`jsx\/host\.jsx`/.test(reboundBlok) && /KS_egriTabloDeger/.test(reboundBlok));
 
 console.log(gecen + "/" + toplam + " gecti");
 process.exit(gecen === toplam ? 0 : 1);

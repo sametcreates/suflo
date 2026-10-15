@@ -107,6 +107,12 @@ SOFTWARE.
     site decodes curve codes exactly like the panel (tests check that the two files are identical).
   - `tests/test-ease-curve.js` — Rebound's `bezier`, `penner`, `spring`, `sampler`, `speedgraph` and
     `overshoot` unit-test cases (vitest) adapted to Suflo's test style, next to Suflo's own cases.
+  - `jsx/host.jsx` (3.4 step 12, custom curves on Motion presets) — `KS_egriTabloDeger` follows `lookup` from Rebound's
+    `host/commands/spring.jsx` (linear interpolation in the evenly spaced factor table the panel computes with
+    `bakeFactors`), and `KS_egriYogun` builds each value per dimension as `va + (vb - va) * factor` after that file's
+    `bakeSegment` (same split: the panel computes the factor table, the host only samples it and writes keys). Both are
+    marked `// Rebound: <name>` under a block header naming Rebound and its license. Frame selection, anchors, the key
+    cap and the Opacity clamp around them are Suflo's own.
   - `js/key-records.js` (keyframe records and liveness check) is Suflo's own code; no Rebound code.
 - Rebound also states: "After Effects, Adobe, and ExtendScript are trademarks of Adobe Inc." Rebound is
   an independent project; Suflo is not affiliated with it.

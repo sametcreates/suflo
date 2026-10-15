@@ -1087,6 +1087,7 @@
     // KS_easeBake'in klip başına (grup) reddi: satırda nedeniyle
     klipYok: "klip bulunamadı (silinmiş ya da değişmiş olabilir)",
     klipTasindi: "klip taşınmış; liste yenilendi, yeniden dene",
+    kilitli: "katman kilitli; kilidi açıp yeniden dene",
     sekans: "eğri başka bir sekans için hazırlanmıştı; liste yenilendi, yeniden dene",
     sekansYok: "aktif sekans yok",
     zamanAsimi: "Premiere yanıt vermedi; yazılmış olabilecek anahtar kareler kayda alındı, Geri al ile kaldırılabilir",

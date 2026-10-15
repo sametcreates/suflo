@@ -2741,6 +2741,7 @@
     "bazı anahtar kareler yazılamadı": "some keyframes couldn't be written",
     "klip bulunamadı (silinmiş ya da değişmiş olabilir)": "clip not found (it may have been deleted or changed)",
     "klip taşınmış; liste yenilendi, yeniden dene": "the clip was moved; the list was refreshed, try again",
+    "katman kilitli; kilidi açıp yeniden dene": "the track is locked; unlock it and try again",
     "eğri başka bir sekans için hazırlanmıştı; liste yenilendi, yeniden dene": "the curve was prepared for another sequence; the list was refreshed, try again",
     "aktif sekans yok": "no active sequence",
     "Premiere yanıt vermedi; yazılmış olabilecek anahtar kareler kayda alındı, Geri al ile kaldırılabilir": "Premiere didn't respond; any keyframes it may have written were recorded and can be removed with Undo",
@@ -2799,9 +2800,14 @@
     "Geri alınacak Suflo eğrisi yok.": "No Suflo curve to undo.",
     "Geri alınıyor…": "Undoing…",
     "Geri alınamadı.": "Couldn't undo.",
-    "Geri alındı: {n} anahtar kare silindi · {n} kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene.": "Undone: {} keyframes removed · {} records are in another sequence; they were kept, open that sequence and try again.",
-    "Geri alındı: {n} anahtar kare silindi · {n} kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.": "Undone: {} keyframes removed · the clip or property of {} records wasn't found; the records were kept.",
-    "Geri alındı: {n} anahtar kare silindi · {n} kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı.": "Undone: {} keyframes removed · the keyframes of {} records changed (clip speed or end keyframes); nothing was touched and the records were kept.",
+    // Geri al özeti: atlanan kayıtlar nedenlerine göre ayrı cümlelerde (" · " ile)
+    "Geri alındı: {n} anahtar kare silindi": "Undone: {} keyframes removed",
+    "{n} kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene.": "{} records are in another sequence; they were kept, open that sequence and try again.",
+    "{n} kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.": "the clip or property of {} records wasn't found; the records were kept.",
+    "{n} kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı.": "the keyframes of {} records changed (clip speed or end keyframes); nothing was touched and the records were kept.",
+    "{n} kaydın Suflo anahtar karelerinin bir kısmı silinmiş; kalanlara dokunulmadı, kayıtlar saklandı (kalanları Effect Controls'ten silebilirsin).":
+      "some of the Suflo keyframes of {} records were deleted; the rest were left untouched and the records were kept (you can delete the rest in Effect Controls).",
+    "{n} kaydın katmanı kilitli; dokunulmadı, kayıtlar saklandı. Kilidi açıp yeniden dene.": "the track of {} records is locked; nothing was touched and the records were kept. Unlock it and try again.",
     "Geri alındı: {n} anahtar kare silindi.": "Undone: {} keyframes removed.",
     "Suflo'nun anahtar kareleri zaten kaldırılmış; kayıt temizlendi.": "Suflo's keyframes were already removed; the record was cleared.",
     "Önce anahtar kareli bir klip seç.": "Select a clip with keyframes first.",
@@ -2839,7 +2845,8 @@
     "Gecersiz egri plani.": "Invalid curve plan.",
     "Cok fazla anahtar kare.": "Too many keyframes.",
     "Klip bulunamadi.": "Clip not found.",
-    "Klip tasinmis.": "The clip was moved."
+    "Klip tasinmis.": "The clip was moved.",
+    "Katman kilitli.": "The track is locked."
   });
 
   /* ================= Eğri paylaşımı / Curve sharing (3.4 step 15: SFC1 codes, .suflo-egri files, cubic-bezier paste,

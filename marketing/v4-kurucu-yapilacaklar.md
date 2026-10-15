@@ -1667,8 +1667,11 @@ yavaşsa sınırı 2000'den düşürebiliriz: `js/egri-secim.js` › `EN_COK` ve
 notunda "Bezier tutamacı" deme, "her kareye anahtar kare" de (adım 10.3).
 
 **12.6 Kaynak satırı (PR / birleştirme, 1 dk).** 3.4 PR açıklamasına ve squash-merge commit'ine:
-`Kaynak: temiz oda (OpenCurve'den yalnız "otomatik Bezier yerine tam eğri" fikri); kod alınmadı, yalnız Suflo'nun Rebound (MIT,
-adım 9'da atıflı) motoru kullanıldı, yeni bildirim gerekmez.`
+`Kaynak: temiz oda (OpenCurve'den yalnız "otomatik Bezier yerine tam eğri" fikri; OpenCurve'den kod alınmadı). Suflo'nun Rebound (MIT,
+adım 9'da atıflı) motoru kullanıldı; host'taki Hareket önayarı yoğunlaştırması (jsx/host.jsx KS_egriTabloDeger, KS_egriYogun) Rebound'un
+host/commands/spring.jsx lookup / bakeSegment'inden uyarlandı, THIRD_PARTY_NOTICES.md Rebound girdisinde ve dosyada atıflı.`
+(İnceleme r2: ilk sürümde bu satır "kod alınmadı … yeni bildirim gerekmez" diyordu; host'taki iki işlevin Rebound'a benzerliği
+nedeniyle atıf eklendi. Adım 12 commit'lerindeki eski satır geçmişte kalır; PR açıklamasında bu satırı kullan.)
 
 ### Adım 13: Hız Rampası için Özel eğri editörü (Pro: 'speedramp' kapısı ve 3 deneme hakkı; düzenlemek ücretsiz)
 

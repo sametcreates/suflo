@@ -802,6 +802,121 @@ ok("yaylan: iniş son anahtarsa son yaylanma anahtarı tam iniş değerinde (öz
   js(yrSon.slice(-2)));
 secim = [];
 
+/* ---------- 7b) inceleme r2: kısmi kayıt, kilitli / gizli katman, köprü okuması, hız değişimi, kayıt başına klip araması ---------- */
+(function () {
+  secim = [];
+  // (a) Suflo'nun anahtarlarının bir kısmı silinmiş (%20–%60): hiçbiri silinmez, kayıt 'kismi' ile saklanır; çok azı kaldıysa 'yok'
+  var KS1 = klip({ nodeId: "nKS", ad: "Kismi.mp4", start: 0, end: 10, inP: 0, outP: 10, olcek: [[1, 100], [3, 200]] });
+  izKur([[KS1]]);
+  playhead = 2;
+  var rk = cagir("KS_easeScan", {});
+  var bk = cagir("KS_easeBake", { target: hedef(rk.props[0]), items: [plan(rk.props[0])] });
+  var kk = bk.records[0]; kk.id = "krkismi";
+  var icler = KS1.olcek.keys.filter(function (k) { return k.s > 1 + 1e-6 && k.s < 3 - 1e-6; }).map(function (k) { return k.s; });
+  var sil = icler.filter(function (s, i) { return i % 2 === 0; });   // 49 iç anahtarın 25'i silinir, 24'ü kalır
+  KS1.olcek.keys = KS1.olcek.keys.filter(function (k) { return sil.indexOf(k.s) === -1; });
+  var onceSayi = KS1.olcek.keys.length;
+  var uk = cagir("KS_easeUndo", { records: [kk] });
+  ok("geri al, kısmi kayıt (49 iç anahtarın 24'ü duruyor): hiçbiri silinmez, kayıt 'kismi' ile atlanır (panel saklar)", icler.length === 49 &&
+    uk.ok && uk.sonuclar.length === 0 && js(uk.atlanan) === js([{ id: "krkismi", kod: "kismi", kalan: 24 }]) && KS1.olcek.keys.length === onceSayi,
+    js([icler.length, uk, KS1.olcek.keys.length]));
+  var kalan3 = icler.filter(function (s, i) { return i % 2 === 1; }).slice(3);   // 24'ün 21'i daha silinir: 3 kaldı (%6)
+  KS1.olcek.keys = KS1.olcek.keys.filter(function (k) { return kalan3.indexOf(k.s) === -1; });
+  var uk2 = cagir("KS_easeUndo", { records: [kk] });
+  ok("geri al, çok azı kaldı (%20'nin altında, rastlantı sayılır): kayıt 'yok' ile biter, kalan anahtarlara dokunulmaz", uk2.sonuclar.length === 1 &&
+    uk2.sonuclar[0].kod === "yok" && uk2.sonuclar[0].silinen === 0 && KS1.olcek.keys.length === 5, js([uk2, KS1.olcek.keys.length]));
+
+  // (b) seçim yokken hedef kilitli / gizli katmanı ve devre dışı klibi atlar; bake ve geri al kilitli katmana yazmaz
+  var V1 = klip({ nodeId: "nV1", ad: "Roportaj.mp4", start: 0, end: 10, inP: 0, outP: 10, opak: [[1, 0], [3, 100]] });
+  var V2 = klip({ nodeId: "nV2", ad: "KilitliLogo.png", start: 0, end: 10, inP: 0, outP: 10, opak: [[1, 0], [3, 100]] });
+  izKur([[V1], [V2]]);
+  playhead = 2;
+  sequence.videoTracks[1].isLocked = function () { return true; };
+  sequence.videoTracks[1].isMuted = function () { return true; };
+  var t1 = cagir("KS_easeScan", {});
+  sequence.videoTracks[1].isMuted = function () { return false; };
+  var t2 = cagir("KS_easeScan", {});
+  sequence.videoTracks[1].isLocked = function () { return false; };
+  sequence.videoTracks[1].isMuted = function () { return true; };
+  var t3 = cagir("KS_easeScan", {});
+  sequence.videoTracks[1].isMuted = function () { return false; };
+  V2.disabled = true;
+  var t4 = cagir("KS_easeScan", {});
+  V2.disabled = false;
+  var t5 = cagir("KS_easeScan", {});
+  ok("hedef: kilitli ve gizli, yalnız kilitli, yalnız gizli katman ve devre dışı klip atlanır; açık üst katman yine hedef",
+    [t1, t2, t3, t4].every(function (t) { return t.kaynak === "playhead" && t.klipler.length === 1 && t.klipler[0].nodeId === "nV1"; }) &&
+    t5.klipler[0].nodeId === "nV2", js([t1.klipler, t2.klipler, t3.klipler, t4.klipler, t5.klipler]));
+  var p2 = t5.props.filter(function (p) { return p.opak; })[0];
+  var onceV2 = V2.opak.keys.length;
+  sequence.videoTracks[1].isLocked = function () { return true; };
+  var bKilit = cagir("KS_easeBake", { target: hedef(p2), items: [plan(p2)] });
+  ok("bake: kilitli katmandaki klibe yazmaz ('kilitli'), anahtarlar aynı", !bKilit.ok && bKilit.kod === "kilitli" && V2.opak.keys.length === onceV2, js(bKilit));
+  sequence.videoTracks[1].isLocked = function () { return false; };
+  var bAcik = cagir("KS_easeBake", { target: hedef(p2), items: [plan(p2)] });
+  var kV2 = (bAcik.records || [])[0] || { tur: "egri", times: [] }; kV2.id = "krkilit";
+  sequence.videoTracks[1].isLocked = function () { return true; };
+  var uKilit = cagir("KS_easeUndo", { records: [kV2] });
+  sequence.videoTracks[1].isLocked = function () { return false; };
+  ok("geri al: kilitli katmandaki kaydın anahtarları silinmez, kayıt 'kilitli' ile atlanır (kilit açılınca geri alınır)", bAcik.basarili === 1 &&
+    js(uKilit.atlanan) === js([{ id: "krkilit", kod: "kilitli" }]) && V2.opak.keys.length === onceV2 + kV2.times.length &&
+    cagir("KS_easeUndo", { records: [kV2] }).sonuclar[0].silinen === kV2.times.length && V2.opak.keys.length === onceV2, js(uKilit));
+
+  // (c) tarama anahtar başına klibin giriş / çıkış noktasını Premiere'den okumaz (601 anahtar: ~1800 okuma yerine birkaç)
+  var okuma = 0;
+  var CK = klip({ nodeId: "nCK", ad: "Cok.mp4", start: 0, end: 30, inP: 0, outP: 30, olcek: [] });
+  for (var ck = 0; ck <= 600; ck++) CK.olcek.keys.push({ s: ck / 25, v: 100 + (ck % 7) });
+  var inP = CK.inPoint, outP = CK.outPoint;
+  Object.defineProperty(CK, "inPoint", { get: function () { okuma++; return inP; } });
+  Object.defineProperty(CK, "outPoint", { get: function () { okuma++; return outP; } });
+  izKur([[CK]]);
+  playhead = 12.02;
+  var rc = cagir("KS_easeScan", {});
+  ok("tarama: 601 anahtarlı özellikte klip eşlemesi özellik başına bir kez okunur (köprü okuması anahtar sayısıyla büyümez)",
+    rc.ok && rc.props.length === 1 && rc.props[0].toplam === 601 && okuma <= 8, okuma);
+
+  // (d) kayıttan sonra klibin hızı değişti (aynı kaynak, yarı süre): anahtarlar duruyor ama sabit kaymayla bulunamaz → 'yok' değil
+  var HZ = klip({ nodeId: "nHZ", ad: "Hiz.mp4", start: 0, end: 10, inP: 0, outP: 10, opak: [[9.55, 100], [10, 0]] });
+  izKur([[HZ]]);
+  var hzKayit = { id: "krhiz", tur: "hareket", seqId: "seq-1", nodeId: "nHZ", clipName: "Hiz.mp4", clipStart: 0, clipEnd: 10, clipIn: 0, clipOut: 10, ters: false,
+    matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0, uclar: null, times: [9.55, 10], kenarDegerleri: [{ t: 9.55, v: 100 }, { t: 10, v: 100 }] };
+  HZ.end = { seconds: 5 };   // %200 hız: kaynak 0–10 aynı, timeline 0–5; anahtarlar 4,775 ve 5'te
+  var rh = cagir("KS_removeSufloKeys", { records: [hzKayit] });
+  ok("kaldırma: klibin hızı değiştiyse (anahtarlar yerinde) kayıt 'yok' ile bitmez, 'degisti' ile saklanır; anahtarlara dokunulmaz",
+    rh.ok && rh.sonuclar.length === 0 && js(rh.atlanan) === js([{ id: "krhiz", kod: "degisti" }]) && HZ.opak.keys.length === 2, js(rh));
+  var ehz = cagir("KS_easeUndo", { records: [{ id: "kryay", tur: "yaylan", seqId: "seq-1", nodeId: "nHZ", clipName: "Hiz.mp4", clipStart: 0, clipEnd: 10, clipIn: 0,
+    clipOut: 10, ters: false, matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0, uclar: null, times: [9.55, 10], kenarDegerleri: [{ t: 9.5, v: 100 }] }] });
+  ok("geri al (yaylanma kaydı): klibin hızı değiştiyse 'yok' değil 'degisti'", js(ehz.atlanan) === js([{ id: "kryay", kod: "degisti" }]) && ehz.sonuclar.length === 0, js(ehz));
+  HZ.end = { seconds: 10 };
+  HZ.opak.keys = [];
+  var rh2 = cagir("KS_removeSufloKeys", { records: [hzKayit] });
+  ok("kaldırma: hız aynı ve anahtarlar gerçekten gitmiş → yine 'yok' (kayıt biter)", rh2.sonuclar.length === 1 && rh2.sonuclar[0].kod === "yok", js(rh2));
+
+  // (e) kaldırma ve geri al kayıt başına tüm sekansı yürümez: 300 klipli katman, son 30 seçili, 30 kayıt
+  var nidOkuma = 0, cok = [];
+  for (var q = 0; q < 300; q++) {
+    var cq = klip({ nodeId: "nq" + q, ad: "Parca" + q + ".mp4", start: q, end: q + 1, inP: 0, outP: 1, opak: [] });
+    (function (c, v) { delete c.nodeId; Object.defineProperty(c, "nodeId", { get: function () { nidOkuma++; return v; } }); })(cq, "nq" + q);
+    cok.push(cq);
+  }
+  izKur([cok]);
+  secim = cok.slice(270);
+  var kayitlar30 = cok.slice(270).map(function (c, i) {
+    return { id: "kq" + i, tur: "hareket", seqId: "seq-1", nodeId: "nq" + (270 + i), clipName: "Parca" + (270 + i) + ".mp4", clipStart: 270 + i,
+      matchName: "AE.ADBE Opacity/Opacity", compIdx: 1, propIdx: 0, uclar: null, times: [270 + i + 0.2, 270 + i + 0.6], kenarDegerleri: [] };
+  });
+  nidOkuma = 0;
+  var rs = cagir("KS_removeSufloKeys", { records: kayitlar30, secili: true });
+  var seciliOkuma = nidOkuma;
+  nidOkuma = 0;
+  var ru = cagir("KS_easeUndo", { records: kayitlar30.map(function (r) { var o = JSON.parse(JSON.stringify(r)); o.tur = "egri"; o.uclar = [r.times[0], r.times[1]]; return o; }) });
+  var geriOkuma = nidOkuma;
+  secim = [];
+  ok("kaldırma (seçili) ve geri al: klipler çağrı başına bir kez dizinlenir (300 klip × 30 kayıt ≈ 9000 nodeId okuması yerine ~ klip sayısı)",
+    rs.ok && rs.eslesen === 30 && rs.sonuclar.length === 30 && ru.ok && ru.sonuclar.length + ru.atlanan.length === 30 &&
+    seciliOkuma < 700 && geriOkuma < 700, js([seciliOkuma, geriOkuma, rs.eslesen, ru.sonuclar.length]));
+})();
+
 /* ---------- 8) yoklama: kfInterp ---------- */
 izKur([[A]]);
 var pr = cagir("KS_apiProbe");

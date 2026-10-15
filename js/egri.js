@@ -1781,12 +1781,9 @@ window.KEgri = (function () {
       var egriNotu = egriBiten.length ? [" · ", "Uçları bu anahtar karelerde olan " + egriBiten.length + " Suflo eğrisi de kaldırıldı."] : [];
       var kalan = (r.atlanan || []).length;
       if (kalan) {
-        var ilk = r.atlanan[0].kod;
-        durum([ilk === "sekans"
-          ? "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene."
-          : ilk === "degisti"
-            ? "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı."
-            : "Geri alındı: " + silinen + " anahtar kare silindi · " + kalan + " kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı."].concat(egriNotu), "warn");
+        // atlanan kayıtlar nedenlerine göre gruplanır: her neden kendi sayısıyla kendi cümlesinde (karışık nedenler ilk kaydın
+        // nedeniyle anlatılmaz)
+        durum(["Geri alındı: " + silinen + " anahtar kare silindi"].concat(geriAlNedenleri(r.atlanan), egriNotu), "warn");
       } else if (!silinen && yok) durum("Suflo'nun anahtar kareleri zaten kaldırılmış; kayıt temizlendi.", "warn");
       else durum(["Geri alındı: " + silinen + " anahtar kare silindi."].concat(egriNotu), "good");
     } catch (e) {
@@ -1795,6 +1792,25 @@ window.KEgri = (function () {
       kilitle(false);
       try { await tara(sonPeek); } catch (eT) { listeCiz(); }
     }
+  }
+  // KS_easeUndo'nun atladığı kayıtların nedenleri: [" · ", cümle, …] (neden başına bir cümle, kendi sayısıyla; ayrı metin
+  // parçaları: İngilizce arayüz her cümleyi kendi kalıbıyla çevirir)
+  var GERI_AL_NEDEN = {
+    sekans: function (n) { return n + " kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene."; },
+    degisti: function (n) { return n + " kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı."; },
+    kismi: function (n) { return n + " kaydın Suflo anahtar karelerinin bir kısmı silinmiş; kalanlara dokunulmadı, kayıtlar saklandı (kalanları Effect Controls'ten silebilirsin)."; },
+    kilitli: function (n) { return n + " kaydın katmanı kilitli; dokunulmadı, kayıtlar saklandı. Kilidi açıp yeniden dene."; },
+    bulunamadi: function (n) { return n + " kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı."; }
+  };
+  var GERI_AL_NEDEN_SIRA = ["sekans", "degisti", "kismi", "kilitli", "bulunamadi"];
+  function geriAlNedenleri(atlanan) {
+    var say = {}, out = [];
+    (atlanan || []).forEach(function (a) {
+      var g = a && GERI_AL_NEDEN.hasOwnProperty(a.kod) && a.kod !== "bulunamadi" ? a.kod : "bulunamadi";
+      say[g] = (say[g] || 0) + 1;
+    });
+    GERI_AL_NEDEN_SIRA.forEach(function (g) { if (say[g]) out.push(" · ", GERI_AL_NEDEN[g](say[g])); });
+    return out;
   }
   function buSekansinKayitlari() {
     var s = seqId();

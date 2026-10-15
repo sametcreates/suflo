@@ -548,7 +548,25 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
   ok("Türkçe: kullanıcı önayarı 'Benim eğrim 1'", JSON.parse(onTr.depo["suflo.egri.onayarlar"])[0].ad === "Benim eğrim 1");
   ok("İngilizce: yeni ret nedenleri ve geri al iletileri çevrilir", I18N.translate(": klip taşınmış; liste yenilendi, yeniden dene") === ": the clip was moved; the list was refreshed, try again" &&
     I18N.translate(" · kısmen yazıldı: ") === " · partly written: " && I18N.translate("Suflo'nun anahtar kareleri zaten kaldırılmış; kayıt temizlendi.") === "Suflo's keyframes were already removed; the record was cleared." &&
-    /^Undone: 0 keyframes removed · the keyframes of 1 records changed/.test(I18N.translate("Geri alındı: 0 anahtar kare silindi · 1 kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı.")));
+    I18N.translate("Geri alındı: 0 anahtar kare silindi") === "Undone: 0 keyframes removed" &&
+    /^the keyframes of 1 records changed/.test(I18N.translate("1 kaydın anahtar kareleri değişmiş (klibin hızı ya da uç anahtar kareleri); dokunulmadı, kayıtlar saklandı.")));
+  // inceleme r2: karışık nedenler ilk kaydın nedeniyle anlatılmaz; her neden kendi sayısıyla. 'kismi' (Suflo anahtarlarının bir kısmı
+  // silinmiş) ve 'kilitli' kayıtları saklanır
+  KR.depo(gg.ctx.localStorage).ekle("C:/p/deneme.prproj", [eskiKayit, Object.assign({}, eskiKayit, { id: "kreski2" }), Object.assign({}, eskiKayit, { id: "kreski3" }),
+    Object.assign({}, eskiKayit, { id: "kreski4" })]);
+  gd.cevap = { ok: true, sonuclar: [], atlanan: [{ id: "kreski1", kod: "klipYok" }, { id: "kreski2", kod: "degisti" }, { id: "kreski3", kod: "kismi", kalan: 24 },
+    { id: "kreski4", kod: "kilitli" }] };
+  await gg.G.geriAlTumu();
+  var karisik = gg.dom["egri-status"].textContent;
+  ok("geri al, karışık nedenler: her neden kendi sayısıyla (1 değişmiş, 1 kısmen silinmiş, 1 kilitli, 1 bulunamadı); kayıtlar saklanır",
+    /Geri alındı: 0 anahtar kare silindi · 1 kaydın anahtar kareleri değişmiş .* · 1 kaydın Suflo anahtar karelerinin bir kısmı silinmiş; kalanlara dokunulmadı.* · 1 kaydın katmanı kilitli; .* · 1 kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı\.$/.test(karisik) &&
+    !/4 kayd/.test(karisik) && KR.depo(gg.ctx.localStorage).oku("C:/p/deneme.prproj").length === 4, karisik);
+  ok("İngilizce: geri al neden cümleleri çevrilir", I18N.translate("1 kaydın Suflo anahtar karelerinin bir kısmı silinmiş; kalanlara dokunulmadı, kayıtlar saklandı (kalanları Effect Controls'ten silebilirsin).") ===
+    "some of the Suflo keyframes of 1 records were deleted; the rest were left untouched and the records were kept (you can delete the rest in Effect Controls)." &&
+    I18N.translate("2 kaydın katmanı kilitli; dokunulmadı, kayıtlar saklandı. Kilidi açıp yeniden dene.") === "the track of 2 records is locked; nothing was touched and the records were kept. Unlock it and try again." &&
+    I18N.translate("3 kayıt başka bir sekansta; kayıtlar saklandı, o sekansı açıp yeniden dene.") === "3 records are in another sequence; they were kept, open that sequence and try again." &&
+    I18N.translate("1 kaydın klibi ya da özelliği bulunamadı; kayıtlar saklandı.") === "the clip or property of 1 records wasn't found; the records were kept." &&
+    I18N.translate(": " + require(path.join(KOK, "js", "egri-model.js")).nedenMetni("kilitli")) === ": the track is locked; unlock it and try again");
 
   /* ---------- 10) önizleme sahnesi ve düzenleyici ---------- */
   var p10 = kur({ cevap: function (fn) { return fn === "KS_easePeek" ? peek(12.5) : tarama(12.5, ikiProp(12.5)); } });
