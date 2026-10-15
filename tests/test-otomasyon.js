@@ -83,7 +83,13 @@ var yollar = [
   ["/Users/a/b.mov ve /Users/c/d.mov", "b.mov ve d.mov"],
   ["~/Masaüstü/x.srt", "x.srt"],
   ["C:\\Proje\\", "Proje"],
-  ["(C:/Users/x/y.mp4)", "(y.mp4)"]
+  ["(C:/Users/x/y.mp4)", "(y.mp4)"],
+  // 3.4 inceleme: kesme işaretli klasör adları (Türkçe ek, O'Brien) sızıyordu; kapanan tırnak yine durur
+  ["C:\\Users\\Sean O'Brien\\Videos\\Ayşe'nin Düğünü\\Gelin Hazırlık\\klip.mp4", "klip.mp4"],
+  ["/Users/ayse/Movies/İstanbul'da Çekim/Müşteri X Lansman/b.mov", "b.mov"],
+  ["open '/Users/bob/Movies/Gizli Müşteri/x.srt'", "open 'x.srt'"],
+  ["'/Users/a/b.mov','/Users/c/d.mov'", "'b.mov','d.mov'"],
+  ["Ayşe'nin videosu: C:\\Users\\Ayşe\\Ali'nin Klasörü\\a.mp4 bulunamadı", "Ayşe'nin videosu: a.mp4 bulunamadı"]
 ];
 yollar.forEach(function (y) { ok("yol temizliği: " + y[0].slice(0, 40), O.temizle(y[0]) === y[1], O.temizle(y[0])); });
 var dokunma = ["Daha fazlası için https://suflo.app/indir adresine gidin", "/home sayfasına dön", "https://example.com/home/x/y", "ve/veya", "16/9 kare",

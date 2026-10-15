@@ -212,9 +212,12 @@
    * Kökten sonra klasör adları boşluk içerebilir ("C:\Users\Ad Soyad\…", "/Volumes/Extreme SSD/…"):
    * aynı satırda son ayraca kadar her şey silinir, dosya adı ve arkasındaki metin kalır. Klasör adında
    * satır sonu, tırnak, < > | * ? ve ":" olamaz ("x.mp4: No such file" ayraçta durur).
+   * Kesme işareti klasör adında kalır, ardından ad karakteri geliyorsa ("Ayşe'nin Düğünü", "Sean O'Brien"): yoksa
+   * kapanan tırnaktır ("open '/Users/a/x.srt'" tırnakta durur). 3.4 inceleme: eskiden ilk kesme işaretinde durup
+   * kullanıcı / proje klasör adlarını sızdırıyordu.
    */
   var YOL_KOKU = /(?:[A-Za-z]:[\\\/]|\\\\|~[\\\/]|\/(?:Users|home|Volumes|private|var|tmp|mnt|opt|Applications|Library)[\\\/])/.source;
-  var YOL_ICINDE = new RegExp("(^|[^A-Za-z0-9_.\\-])(" + YOL_KOKU + "(?:[^\\\\/\\n\\r\"'<>|*?:]*[\\\\/])*)", "g");
+  var YOL_ICINDE = new RegExp("(^|[^A-Za-z0-9_.\\-])(" + YOL_KOKU + "(?:(?:[^\\\\/\\n\\r\"'<>|*?:]|'(?=[^\\s'\\\\/\"]))*[\\\\/])*)", "g");
   // Aynı eşleşmenin içinde boşluktan sonra başlayan ikinci yol ("/Users/a/b.mov ve /Users/c/d.mov")
   var IC_KOK = new RegExp("(?=\\s" + YOL_KOKU + ")");
 

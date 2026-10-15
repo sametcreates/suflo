@@ -594,7 +594,8 @@ var S = E.spring;
 })();
 
 /* ================= Atıf ve paket ================= */
-var src = fs.readFileSync(path.join(KOK, "js", "ease-curve.js"), "utf8");
+// satır sonları LF'ye indirilir: yayın Windows sunucusunda core.autocrlf=true ile çıkar, uzunluk ölçüleri CRLF'de şişmesin
+var src = fs.readFileSync(path.join(KOK, "js", "ease-curve.js"), "utf8").replace(/\r\n/g, "\n");
 var REBOUND_BASLIK = "Portions adapted from Rebound (https://github.com/meszmate/rebound), MIT License, Copyright (c) 2026 Rebound contributors. See THIRD_PARTY_NOTICES.md.";
 ok("başlık: Rebound MIT atfı (plandaki metin)", src.indexOf(REBOUND_BASLIK) !== -1);
 // Rebound'un vitest durumlarından uyarlanan bu test dosyası da aynı başlığı taşır (ilk yorum bloğunda)

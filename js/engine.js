@@ -238,6 +238,7 @@ window.KEngine = (function () {
     try {
       var mdir = K.path.join(K.whisperDir(), "models");
       if (!K.fs.existsSync(mdir)) return out;
+      if (!_parcalarTemizlendi && !_iceAktariliyor) { _parcalarTemizlendi = true; eskiIceAktarParcalariniSil(mdir); }
       var files = K.fs.readdirSync(mdir);
       MODELS.forEach(function (m) {
         if (files.indexOf(m.file) !== -1) {
@@ -803,6 +804,30 @@ window.KEngine = (function () {
    */
   var _iceAktariliyor = false;
 
+  /*
+   * 3.4 inceleme: içe aktarma yarıda kalırsa (panel yeniden yüklendi, Premiere kapandı) <model>.ice-aktar.part
+   * diskte kalıyordu (3 GB'a kadar), aynı model yeniden içe aktarılmadıkça silinmiyordu. İçe aktarma
+   * başlarken ve oturumda ilk model listelemesinde (installedModels) 1 saatten eski parçalar silinir: başka
+   * bir Premiere örneğinin süren kopyası tazedir (yazıldıkça değişme zamanı ilerler).
+   */
+  var ESKI_PARCA_MS = 3600000, _parcalarTemizlendi = false;
+  function eskiIceAktarParcalariniSil(mdir) {
+    var ek = ((MIA() && MIA().PART_EKI) || ".ice-aktar.part").toLowerCase(), silinen = 0;
+    try {
+      K.fs.readdirSync(mdir).forEach(function (f) {
+        if (String(f).toLowerCase().slice(-ek.length) !== ek) return;
+        var p = K.path.join(mdir, f);
+        try {
+          if (Date.now() - K.fs.statSync(p).mtime.getTime() < ESKI_PARCA_MS) return;
+          K.fs.unlinkSync(p);
+          silinen++;
+        } catch (e) {}
+      });
+    } catch (e2) {}
+    if (silinen) { try { K.log("[model] yarim kalan " + silinen + " ice aktarma parcasi silindi"); } catch (e3) {} }
+    return silinen;
+  }
+
   function dosyaKopyala(kaynak, hedef, ilerleme) {
     return new Promise(function (resolve, reject) {
       var toplam = 0, giden = 0, bitti = false;
@@ -882,6 +907,7 @@ window.KEngine = (function () {
       var hedefAd = item ? item.file : ozel.file;
       var mdir = K.path.join(K.whisperDir(), "models");
       K.fs.mkdirSync(mdir, { recursive: true });
+      eskiIceAktarParcalariniSil(mdir);   // bu oturumda başka içe aktarma yok (_iceAktariliyor bizim)
       var hedef = K.path.join(mdir, hedefAd);
       if (ayniYol(kaynak, hedef)) throw new Error("Bu dosya zaten Suflo'nun model klasöründe: yeniden içe aktarmaya gerek yok.");
       var hedefVar = false;

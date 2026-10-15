@@ -350,8 +350,9 @@ async function main() {
   hs2.durdur();
 
   /* ---- hız sınırı jetondan sonra: jetonsuz istekler gerçek istemciyi kilitleyemez ---- */
-  var rk = [];
-  var rs = S.olustur({ dosya: dosya, dakikaSiniri: 5, yurut: function () { return { ok: true }; }, kayit: function (k) { rk.push(k); } });
+  var rk = [], rlog = [];
+  var rs = S.olustur({ dosya: dosya, dakikaSiniri: 5, yurut: function () { return { ok: true }; }, kayit: function (k) { rk.push(k); },
+    gunluk: function (m) { rlog.push(m); } });
   var rp = (await rs.baslat()).port, rt = rs._token();
   var jetonsuz = [];
   for (var u = 0; u < 15; u++) jetonsuz.push((await istek(rp, { token: "0" })).kod);
@@ -364,6 +365,22 @@ async function main() {
   await istek(rp, { token: rt, basliklar: { Host: "kotu.example" } });
   ok("tam sınırdan sonra yeni ret satırı eklenmez (gerçek çağrılar listeden itilmez)", rk.filter(function (k) { return k.ad === "_istek"; }).length === 10 && rk.some(function (k) { return k.ad === "suflo_baglam" && k.sonuc === "ok"; }));
   rs.durdur();
+  // 3.4 inceleme: dakika dolmadan biten selin listeye yazılmayan kısmı köprü kapanırken günlüğe sayıyla düşer
+  var sayiSatiri = function (l) { return l.filter(function (m) { return /reddedilen istek daha/.test(m); }); };
+  ok("kapanışta yazılmamış ret sayısı günlükte (5 jetonsuz + 1 Host = 6), bir kez", js(sayiSatiri(rlog)) === js(["[mcp] 6 reddedilen istek daha (listeye yazilmadi)"]), js(sayiSatiri(rlog)));
+  // ... ve köprü açık kalsa da dakika dolunca zamanlayıcıyla (yeni bir ret beklenmez)
+  var rlog2 = [], sahteSaat = 5000000;
+  var rs2 = S.olustur({ dosya: dosya, saat: function () { return sahteSaat; }, yurut: function () { return { ok: true }; }, gunluk: function (m) { rlog2.push(m); } });
+  var rp2 = (await rs2.baslat()).port;
+  for (var u2 = 0; u2 < 10; u2++) await istek(rp2, { token: "0" });
+  sahteSaat += 59950;   // pencerenin son 50 ms'i
+  for (u2 = 0; u2 < 3; u2++) await istek(rp2, { token: "0" });
+  var oncesi = sayiSatiri(rlog2).length;
+  await bekle(250);
+  ok("dakika dolunca ret sayısı zamanlayıcıyla günlükte (köprü açıkken, yeni ret gelmeden)",
+    oncesi === 0 && js(sayiSatiri(rlog2)) === js(["[mcp] 3 reddedilen istek daha (listeye yazilmadi)"]), oncesi + " " + js(sayiSatiri(rlog2)));
+  rs2.durdur();
+  ok("zamanlayıcının yazdığı sayı kapanışta yinelenmez", sayiSatiri(rlog2).length === 1, js(sayiSatiri(rlog2)));
 
   /* ---- aynı anda tek onay kartı: ikinci yıkıcı istek 409, ilk kart değişmez ---- */
   var oKartlar = [], oCoz = null, oYurut = [];

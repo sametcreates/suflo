@@ -2801,8 +2801,8 @@
     "Önizlemeyi durdur": "Stop preview",
     "Bu sekansta Suflo'nun yazdığı tüm eğri ve yaylanma anahtar karelerini kaldır": "Remove all curve and follow-through keyframes Suflo wrote in this sequence",
     "Tümünü geri al": "Undo all",
-    "Kısayollar (bir yazı alanında değilken): Enter uygula · U son uygulamayı geri al · F yönü çevir · I ters çevir · V görünüm · 1–9 önayar. Ctrl+Z eğriyi tek adımda geri almaz; Geri al'ı kullan, yalnız Suflo'nun yazdığı anahtar kareler kalkar. Şimdilik yalnız video katmanları; ses düzeyi sonraki sürümde.":
-      "Shortcuts (when you're not typing in a field): Enter apply · U undo the last apply · F flip · I invert · V view · 1–9 presets. Ctrl+Z doesn't undo a curve in one step; use Undo, which removes only the keyframes Suflo wrote. Video tracks only for now; audio level comes in a later version.",
+    "Kısayollar (bir yazı alanında değilken): Enter uygula · U son uygulamayı geri al · F yönü çevir · I ters çevir · V görünüm · 1–9 önayar. Ctrl+Z eğriyi tek adımda geri almaz; Geri al'ı kullan, yalnız Suflo'nun yazdığı anahtar kareler kalkar. Şimdilik yalnız video katmanları.":
+      "Shortcuts (when you're not typing in a field): Enter apply · U undo the last apply · F flip · I invert · V view · 1–9 presets. Ctrl+Z doesn't undo a curve in one step; use Undo, which removes only the keyframes Suflo wrote. Video tracks only for now.",
     // status lines and toasts
     "Anahtar kareler okunamadı. Yenile ile tekrar dene.": "Couldn't read the keyframes. Try again with Refresh.",
     "Anahtar kareler okunuyor…": "Reading keyframes…",

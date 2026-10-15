@@ -6423,7 +6423,7 @@ window.KCaptions = (function () {
   /*
    * Sonuç (Yapay zekâ köprüsü / MCP kullanır; düğmeler yok sayar), normal altyazı izi yolunda her dalda:
    *   { ok:true, captionTrack:true } | { ok:false, kod, mesaj, captionTrack? }
-   *   kod: altyazi_yok | ornek_sekans | kalite_onayi | onay_gerekli | iz_olusmadi | uygulanamadi
+   *   kod: altyazi_yok | ornek_sekans | kesim_sekansi | kalite_onayi | onay_gerekli | iz_olusmadi | uygulanamadi
    * Stilli yollar (Altyazı Efektleri katmanı / MOGRT) kendi arayüzlerinde bildirir: { stil: true }.
    * secenek.mcp: köprüden gelen çağrı. İki tıklık korumalar ("Yine de yeni iz ekle", "N kritik sorunla
    * yine de uygula") köprü adına KURULMAZ ve GEÇİLMEZ: ikinci tık yalnız panelde kullanıcıdan gelir.
@@ -6442,7 +6442,10 @@ window.KCaptions = (function () {
       KApp.toast(belgeKesimAdi
         ? "Bu altyazı \"" + belgeKesimAdi + "\" sekansının kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula."
         : "Bu altyazı kesilmiş başka bir sekansın kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula.", "warn", 8000);
-      return;
+      // köprü de nedeni öğrensin (çıplak return MCP'de genel "Not applied." olurdu)
+      return { ok: false, kod: "kesim_sekansi", mesaj: belgeKesimAdi
+        ? "These captions were re-timed to the cut sequence \"" + belgeKesimAdi + "\". Open that sequence in Premiere first, then apply."
+        : "These captions were re-timed to another cut sequence. Open that sequence in Premiere first, then apply." };
     }
     if (stilIle && !secilenMogrt && !secilenMotorStili) {
       KApp.toast("Önce Altyazı Efektleri'nden bir görünüm seç ya da bir Premiere şablonu seç.", "warn");

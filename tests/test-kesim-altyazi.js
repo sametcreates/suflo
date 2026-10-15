@@ -163,9 +163,12 @@ var KESIM = [{ start: 1.72, end: 2.48 }, { start: 8, end: 10 }];   // dolgu "ı�
   // Uygula: kopyaya uyarlanan belge özgün sekansta açılmaz
   C.kurguyaUyarla("S1-kopya");
   C.ctx.sequenceId = "S1";
-  await C.apply(false);
+  var kesimRed = await C.apply(false);
   ok("Uygula: kopyaya uyarlanan belge başka sekansta uygulanmaz (uyarı adıyla)",
     C.kayit.toast.some(function (t) { return t[0] === "Bu altyazı \"Vlog — Suflo Temiz\" sekansının kurgusuna göre uyarlandı. Önce o sekansı aç, sonra uygula." && t[1] === "warn"; }), js(C.kayit.toast));
+  // 3.4 inceleme: köprü (suflo_altyazi_kanala) nedeni öğrenir: genel "Not applied." değil, kod + kesim sekansının adı
+  ok("Uygula: kesim sekansı reddi sonuç nesnesi döner (kod kesim_sekansi, mesajda sekans adı)",
+    kesimRed && kesimRed.ok === false && kesimRed.kod === "kesim_sekansi" && kesimRed.mesaj.indexOf("\"Vlog — Suflo Temiz\"") !== -1, js(kesimRed));
   C.ctx.sequenceId = "S1-kopya";
   var devam = "";
   try { await C.apply(false); } catch (eA) { devam = eA.message; }

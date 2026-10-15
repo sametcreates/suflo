@@ -260,6 +260,22 @@ async function hata(fn) { try { await fn(); return null; } catch (e) { return e;
     e8f && /Kurumsal ağ filtresi huggingface\.co adresini engelliyor \(Cisco Umbrella/.test(e8f.message) && /ETIMEDOUT/.test(e8f.message) &&
     e8f.modelIceAktarOner === true && indirilen.length === 2, e8f && e8f.message);
 
+  // 8g) 3.4 inceleme: yarıda kalan içe aktarma (panel yeniden yüklendi / Premiere kapandı) .part bırakmaz
+  var eskiParca = path.join(MDIR, "ggml-large-v3.bin.ice-aktar.part"), tazeParca = path.join(MDIR, "ggml-medium.bin.ice-aktar.part");
+  fs.writeFileSync(eskiParca, "x"); fs.writeFileSync(tazeParca, "y");
+  var ikiSaatOnce = new Date(Date.now() - 2 * 3600000);
+  fs.utimesSync(eskiParca, ikiSaatOnce, ikiSaatOnce);
+  var E5 = yeniMotor();
+  E5.installedModels();
+  ok("yeni oturumun ilk model listelemesi 1 saatten eski içe aktarma parçasını siler, tazesine (süren kopya) dokunmaz",
+    !fs.existsSync(eskiParca) && fs.existsSync(tazeParca));
+  fs.utimesSync(tazeParca, ikiSaatOnce, ikiSaatOnce);
+  E5.installedModels();
+  var tazeKaldi = fs.existsSync(tazeParca);
+  var e8g = await hata(function () { return E5.modelIceAktar(hedef1, { onayla: onayla }); });
+  ok("listeleme oturumda bir kez temizler; içe aktarma başlarken eski parçalar yine silinir",
+    tazeKaldi && e8g && !fs.existsSync(tazeParca) && parcalar().length === 0, e8g && e8g.message);
+
   // 8g) Doctor sınaması motor kaynağı: macOS'ta motor Homebrew'dan (ghcr.io), Windows'ta GitHub arşivinden
   K.MAC = true;
   var macAdres = E.motorKaynakAdresi();

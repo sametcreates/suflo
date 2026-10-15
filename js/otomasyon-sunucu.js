@@ -184,15 +184,30 @@
      * Eyleme ulaşmadan reddedilen istekler (Host, tarayıcı, yöntem, yol, jeton, hız, içerik türü,
      * boyut, JSON) de etkinlik listesine ve K.log'a yazılır. Dakikada en çok RED_KAYIT_SINIRI satır:
      * bir istek seli son 50 gerçek çağrıyı listeden itmesin; fazlası dakika sonunda tek satırla sayılır.
+     * 3.4 inceleme: sayı dakika dolunca bir zamanlayıcıyla ve köprü kapanırken (durdur) de K.log'a yazılır;
+     * eskiden yalnız bir dakika sonra gelen yeni bir retle yazılıyordu, kısa bir jeton denemesi seli hiç görünmüyordu.
      */
     var RED_KAYIT_SINIRI = 10;
+    var redSaat = null;
+    function redGizliYaz() {
+      if (redSaat) { clearTimeout(redSaat); redSaat = null; }
+      if (redSayac.gizli) { try { log("[mcp] " + redSayac.gizli + " reddedilen istek daha (listeye yazilmadi)"); } catch (e0) {} }
+      redSayac.gizli = 0;
+    }
     function redKaydet(kod, bas) {
       var simdi = saat();
       if (simdi - redSayac.bas >= 60000) {
-        if (redSayac.gizli) { try { log("[mcp] " + redSayac.gizli + " reddedilen istek daha (listeye yazilmadi)"); } catch (e0) {} }
+        redGizliYaz();
         redSayac = { bas: simdi, adet: 0, gizli: 0 };
       }
-      if (redSayac.adet >= RED_KAYIT_SINIRI) { redSayac.gizli++; return; }
+      if (redSayac.adet >= RED_KAYIT_SINIRI) {
+        redSayac.gizli++;
+        if (!redSaat) {
+          redSaat = setTimeout(function () { redSaat = null; redGizliYaz(); }, Math.max(0, redSayac.bas + 60000 - simdi));
+          if (redSaat && redSaat.unref) redSaat.unref();
+        }
+        return;
+      }
       redSayac.adet++;
       var g = { zaman: simdi, ad: "_istek", sonuc: "hata", kod: kod, sure: simdi - bas };
       try { kayit(g); } catch (e) {}
@@ -492,6 +507,7 @@
       acik = false;
       if (bostaSaat) { clearTimeout(bostaSaat); bostaSaat = null; }
       if (sureSaat) { clearTimeout(sureSaat); sureSaat = null; }
+      redGizliYaz();   // yazılmamış ret sayısı kapanışta kaybolmasın
       dosyaSil();
       token = ""; tokenBuf = null;
       if (sunucu) { try { sunucu.close(); } catch (e) {} sunucu = null; }

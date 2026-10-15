@@ -7,9 +7,12 @@
  *      yeniden imzalar; Node'un yerleşik kök listesi bu kökü tanımaz ve istek
  *      UNABLE_TO_GET_ISSUER_CERT_LOCALLY / SELF_SIGNED_CERT_IN_CHAIN / CERT_UNTRUSTED /
  *      UNABLE_TO_VERIFY_LEAF_SIGNATURE ile düşer. Köprü (js/bridge.js) bu hatada isteği BİR KEZ,
- *      ca = tls.rootCertificates + işletim sisteminin güvendiği ek kökler ile yeniden dener.
- *      Sertifika doğrulaması ASLA kapatılmaz: sertifika yine doğrulanır, yalnız bilgisayarın
- *      zaten güvendiği kökler de hesaba katılır.
+ *      ca = tls.rootCertificates + işletim sisteminin sertifika deposundaki ek kökler ile yeniden dener.
+ *      Sertifika doğrulaması ASLA kapatılmaz: sertifika yine doğrulanır, yalnız aşağıdaki depoların
+ *      kökleri de hesaba katılır. Not (3.4 inceleme): macOS'ta bu, işletim sisteminin SSL için güvendiği
+ *      kümeden geniştir: System.keychain'deki her sertifika alınır, yalnız açık "Asla Güvenme" atılır;
+ *      güven ayarı olmayan ("Sistem Varsayılanlarını Kullan") ya da yalnız başka bir amaca (S/MIME, kod
+ *      imzası) güvenilen sertifikalar da girer. O depoya sertifika koymak yönetici yetkisi ister.
  *        Windows: CurrentUser\Root ve LocalMachine\Root depoları, SABİT bir PowerShell betiğiyle
  *                 (execFile/spawn, argüman dizisi; betiğe hiçbir girdi eklenmez). Disallowed depolarındaki ve
  *                 amacı Sunucu Kimlik Doğrulamasını dışlayan kökler alınmaz.

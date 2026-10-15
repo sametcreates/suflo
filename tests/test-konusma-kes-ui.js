@@ -422,6 +422,33 @@ function ortam(o) {
     kp.length === 1 && kp[0][1].cloneFirst === true && kp[0][1].cloneName === "Vlog — Suflo Temiz", JSON.stringify(kp[0] && kp[0][1]).slice(0, 200));
   ok("bekleyen bağlam isteği kalmadı", bekleyen.length === 0, bekleyen.length);
 
+  // 3.4 inceleme: Uygula'nın tekrar girme kilidi. Bağlam ve klip yeri soruları sürerken gelen ikinci tık (çift tık) ve köprü
+  // çağrısı ikinci bir KS_applyCuts göndermez (kaymış kurguda eski zamanlarla konuşma silinirdi)
+  var D = ortam({ baglam: function () { return new Promise(function (r) { bekleyen.push(r); }); } });
+  await tetikle(D.hedef.here, "click");
+  await tetikle(D.el["tc-analyze"], "click"); await bekle();
+  var cift1 = tetikle(D.el["tc-apply"], "click"), cift2 = tetikle(D.el["tc-apply"], "click");
+  var koprudenP = D.sb.window.KTextCut.mcpKes();
+  await bekle();
+  var bekleyenD = bekleyen.length, kapaliD = D.el["tc-apply"].disabled;
+  while (baglamCoz()) { /* kilitsiz kodda bekleyen her soru da cevaplanır: test asılı kalmaz */ }
+  var koprudenD = await koprudenP;
+  ok("çift tık: ilk Uygula bağlam beklerken düğme kapalı, ikinci tık bağlam sormaz; köprü 'mesgul' döner",
+    bekleyenD === 1 && kapaliD === true && koprudenD.ok === false && koprudenD.hata === "mesgul",
+    bekleyenD + " " + JSON.stringify(koprudenD));
+  await Promise.all([cift1, cift2]); await bekle();
+  var kd = kesimCagrilari(D);
+  ok("çift tık: tek KS_applyCuts (Bu sekansta), kilit sonra açılır", kd.length === 1 && kd[0][1].cloneFirst === false && D.el["tc-apply"].disabled === false,
+    kd.length);
+  // erken dönüş (başka sekans) kilidi bırakır: sonraki tık yeniden dener
+  var D2 = ortam({ baglam: function () { return Promise.resolve({ ok: true, sequence: "Diger", sequenceId: "S9" }); } });
+  await tetikle(D2.el["tc-analyze"], "click"); await bekle();
+  await tetikle(D2.el["tc-apply"], "click"); await bekle();
+  await tetikle(D2.el["tc-apply"], "click"); await bekle();
+  ok("başka sekans uyarısıyla dönen Uygula kilidi bırakır (ikinci tık yine bağlam sorar)",
+    kesimCagrilari(D2).length === 0 && D2.say.call.filter(function (c) { return c[0] === "KS_getContext"; }).length >= 2 && D2.el["tc-apply"].disabled === false,
+    D2.say.call.map(function (c) { return c[0]; }).join(","));
+
   console.log(gecen + "/" + toplam + " gecti");
   process.exit(gecen === toplam ? 0 : 1);
 })().catch(function (e) { console.log("FAIL istisna " + e.stack); process.exit(1); });

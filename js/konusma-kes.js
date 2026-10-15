@@ -27,6 +27,7 @@ window.KTextCut = (function () {
   var kaldirilan = [];         // incelemede işareti kaldırılan kelime parçaları: [{ words, reason, start, end }]
   var aiGruplari = null;       // doğrulanmış AI grupları (bu klip için)
   var aiSurum = 0, aiMesgul = 0;   // aiMesgul: süren AI geçişinin sürümü (0 = yok)
+  var uygulaniyor = false;   // Uygula sürüyor (Premiere soruları + KS_applyCuts)
   var onbellektenMi = false;
   var bellek = [];     // bellek içi önbellek: son birkaç klibin transkripti [{ anahtar, sonuc }]
   var target = "clone";
@@ -528,6 +529,7 @@ window.KTextCut = (function () {
   // paylaşılan "target"a hiç yazmaz (kesim sürerken kullanıcının seçtiği hedef ezilmez).
   // Düğmenin tık olayı (Event) cloneFirst taşımaz: o an seçili hedef geçerli.
   async function apply(ek) {
+    if (uygulaniyor) return;   // süren Uygula bitmeden ikinci tık / köprü çağrısı yok sayılır
     var kopyaZorunlu = !!(ek && ek.cloneFirst === true);
     var hedef = kopyaZorunlu ? "clone" : target;
     var yeniden = kopyaZorunlu ? function () { return apply({ cloneFirst: true }); } : apply;
@@ -548,29 +550,35 @@ window.KTextCut = (function () {
      */
     var aktarKelimeler = sinirli.dropped ? words.slice() : tutulan.slice();
     var aktarDil = lang, aktarSon = clip ? Number(clip.clipEnd) : 0;
-    // Bayat olabilecek yoklama yerine Premiere'e taze sor
-    var tazeCtx = await K.call("KS_getContext");
-    var aktif = tazeCtx.ok ? (tazeCtx.sequenceId || tazeCtx.sequence || "") : "";
-    if (sekans && aktif && aktif !== sekans) {
-      status("Bu kesimler başka bir sekans için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
-      return;
-    }
     /*
-     * 3.4 son inceleme: kesimler sekans zamanında (yazıya dökülen klibin clipStart'ı + kelime zamanı). Klip yazıya
-     * döküldükten sonra Premiere'de taşındı ya da kırpıldıysa (bağlam yoklaması aynı medyanın taşınmasını bildirmez, panel
-     * odakta değilken hiç yoklanmaz; kesim seçim istemez) kesimler eski konuma düşerdi: klibin aynı yerde durduğu sorulur.
+     * 3.4 inceleme: tekrar girme kilidi İLK await'ten önce. Yer ve sekans soruları iki Premiere gidiş dönüşü sürer; o arada
+     * gelen ikinci tık (çift tık) aynı sekans zamanlarıyla ikinci bir KS_applyCuts gönderir, kaymış kurguda konuşma silinir
+     * ve deneme hakkı iki kez düşerdi (Otomatik Kesim'deki uygulaniyor gibi).
      */
-    var yerKlip = clip, yer = await klipYerinde(yerKlip);
-    if (clip !== yerKlip) return;
-    if (yer !== "tamam") {
-      K.log("[konusmadan kes] yaziya dokulen klip " + (yer === "okunamadi" ? "okunamadi" : "tasindi/kirpildi") + " (clipStart " + yerKlip.clipStart + "): KS_applyCuts gonderilmedi");
-      status(yer === "okunamadi" ? "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden dene." :
-        "✕ Yazıya döktüğün klip taşındı ya da kırpıldı: kesimler eski konuma düşerdi, uygulanmadı. Klibi yeniden yazıya dök.", "bad");
-      return;
-    }
+    uygulaniyor = true;
     el("tc-apply").disabled = true;
-    status("Uygulanıyor…");
     try {
+      // Bayat olabilecek yoklama yerine Premiere'e taze sor
+      var tazeCtx = await K.call("KS_getContext");
+      var aktif = tazeCtx.ok ? (tazeCtx.sequenceId || tazeCtx.sequence || "") : "";
+      if (sekans && aktif && aktif !== sekans) {
+        status("Bu kesimler başka bir sekans için. O sekansı aç ya da klibi yeniden yazıya dök.", "warn");
+        return;
+      }
+      /*
+       * 3.4 son inceleme: kesimler sekans zamanında (yazıya dökülen klibin clipStart'ı + kelime zamanı). Klip yazıya
+       * döküldükten sonra Premiere'de taşındı ya da kırpıldıysa (bağlam yoklaması aynı medyanın taşınmasını bildirmez, panel
+       * odakta değilken hiç yoklanmaz; kesim seçim istemez) kesimler eski konuma düşerdi: klibin aynı yerde durduğu sorulur.
+       */
+      var yerKlip = clip, yer = await klipYerinde(yerKlip);
+      if (clip !== yerKlip) return;
+      if (yer !== "tamam") {
+        K.log("[konusmadan kes] yaziya dokulen klip " + (yer === "okunamadi" ? "okunamadi" : "tasindi/kirpildi") + " (clipStart " + yerKlip.clipStart + "): KS_applyCuts gonderilmedi");
+        status(yer === "okunamadi" ? "✕ Klibin yeri Premiere'den okunamadı: kesimler uygulanmadı. Yeniden dene." :
+          "✕ Yazıya döktüğün klip taşındı ya da kırpıldı: kesimler eski konuma düşerdi, uygulanmadı. Klibi yeniden yazıya dök.", "bad");
+        return;
+      }
+      status("Uygulanıyor…");
       // esleme: host kesilen sekansı, kareyi ve gerçek ripple kaymasını bildirir (altyazıyı yeni kurguya taşımak için)
       var arg = { ranges: r, removeMode: "ripple", cloneFirst: hedef === "clone", esleme: true };
       // kopya sekansın adı: "<sekans> — Suflo Temiz"; dokunulmamış özgün sekans yedektir
@@ -607,6 +615,7 @@ window.KTextCut = (function () {
       }
       return res;
     } finally {
+      uygulaniyor = false;
       el("tc-apply").disabled = false;
     }
   }
@@ -637,6 +646,7 @@ window.KTextCut = (function () {
 
   async function mcpKes() {
     if (!words.length) return { ok: false, hata: "analiz_yok", mesaj: "Prepare the Text-based cut in the Suflo panel first (no analysed transcript)." };
+    if (uygulaniyor) return { ok: false, hata: "mesgul", mesaj: "Suflo is already applying cuts in the Text-based cut panel; try again when it finishes." };
     var res = await apply({ cloneFirst: true });
     var st = el("tc-status");
     if (!res) return { ok: false, hata: "uygulanamadi", mesaj: (st && st.textContent) || "Nothing to cut." };
