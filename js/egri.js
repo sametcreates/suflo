@@ -21,6 +21,11 @@
  * Klip adları ve Premiere'in kendi özellik adları data-i18n-skip içinde (İngilizce arayüz çevirmez).
  * SufloEgriIzgara (eğri kartı ızgarası) ve SufloEgriSecici (Geçiş / Zoom / Hareket önayarlarının "Eğri" açılır seçicisi,
  * 3.4 adım 12) da burada: Eğri sekmesi önayarları ile araçların seçicisi aynı kartları kullanır.
+ * Paylaşım (3.4 adım 15, ücretsiz): Kodu kopyala (SFC1 + suflo.app/egri bağlantısı), Kod yapıştır (kod, bağlantı,
+ * cubic-bezier / CSS; birden çok kod ya da dosya metni önayarlara eklenir), İçe aktar / Dışa aktar (.suflo-egri dosyası,
+ * window.cep.fs pencereleri; bir eğri aracının JSON dışa aktarması da okunur), kendi önayarlarını yeniden adlandırma ve
+ * sürükleyerek (ya da ◀ ▶ ile) sıralama. SufloEgriPaylas Hız Rampası ile ortak yapıştırıcıdır. Uygulamak yine 'curves'
+ * kapısından geçer; içe aktarmak, kopyalamak ve dosya yazmak hiçbir zaman.
  * Suflo'nun kendi kodu (temiz oda); canlı önizleme sahnesi fikri Rebound'dan (MIT), küçük ve yeniden yazıldı.
  */
 
@@ -407,15 +412,45 @@ window.SufloEgriEditor = (function () {
 })();
 
 /* ======================================================================
- * SufloEgriIzgara.ciz(kap, kartlar, { secili, sec(id), sil(id), silBaslik, numarali }) — eğri kartı ızgarası
- * (3.4 adım 12): Eğri sekmesinin önayarları ile Geçiş / Zoom / Hareket eğri seçicisi aynı kartları kullanır.
+ * SufloEgriIzgara.ciz(kap, kartlar, { secili, sec(id), sil(id), silBaslik, numarali, tasi(id, hedefId) }) — eğri kartı
+ * ızgarası (3.4 adım 12): Eğri sekmesinin önayarları ile Geçiş / Zoom / Hareket eğri seçicisi aynı kartları kullanır.
  * kartlar: [{ id, ad, curve (null: Otomatik, Suflo'nun kendi yumuşatması), kullanici, adCevrilir }]
  * adCevrilir: ad Suflo'nun kendi metni (arayüz sözlüğüyle çevrilir); değilse kart çeviriden muaf (hazır eğri adları
  * zaten arayüz dilinde gelir, kullanıcının adları hiç çevrilmez).
+ * tasi (3.4 adım 15): verilirse kullanıcı kartları sürüklenip başka bir kullanıcı kartının üstüne bırakılarak sıralanır
+ * (HTML5 sürükle-bırak; klavyeyle Eğri sekmesindeki ◀ ▶ düğmeleri).
  * ====================================================================== */
 window.SufloEgriIzgara = (function () {
   "use strict";
   var svgEl = window.SufloEgriEditor.svgEl, bosalt = window.SufloEgriEditor.bosalt;
+  var suruklenen = null;   // sürüklenen kullanıcı kartının id'si
+
+  function sinif(e, ad, on) { try { if (e.classList) e.classList.toggle(ad, !!on); } catch (eS) {} }
+  // Kullanıcı kartını sürüklenebilir yap: bırakılınca o.tasi(suruklenen, bu kartın id'si)
+  function surukleBagla(b, k, o) {
+    b.setAttribute("draggable", "true");
+    b.draggable = true;
+    b.addEventListener("dragstart", function (e) {
+      suruklenen = k.id;
+      try { if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", k.id); } } catch (eD) {}
+      sinif(b, "surukleniyor", true);
+    });
+    b.addEventListener("dragover", function (e) {
+      if (!suruklenen || suruklenen === k.id) return;
+      if (e && e.preventDefault) e.preventDefault();
+      try { if (e && e.dataTransfer) e.dataTransfer.dropEffect = "move"; } catch (eD) {}
+      sinif(b, "birak", true);
+    });
+    b.addEventListener("dragleave", function () { sinif(b, "birak", false); });
+    b.addEventListener("drop", function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      sinif(b, "birak", false);
+      var id = suruklenen;
+      suruklenen = null;
+      if (id && id !== k.id) o.tasi(id, k.id);
+    });
+    b.addEventListener("dragend", function () { suruklenen = null; sinif(b, "surukleniyor", false); });
+  }
 
   // Küçük resim; Otomatik (curve yok): kesikli yumuşak S (Suflo'nun kendi Bezier yumuşatması)
   function kucuk(ust, curve) {
@@ -451,6 +486,7 @@ window.SufloEgriIzgara = (function () {
         x.addEventListener("click", function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); o.sil(k.id); });
         b.appendChild(x);
       }
+      if (k.kullanici && typeof o.tasi === "function") surukleBagla(b, k, o);
       b.addEventListener("click", function () { if (typeof o.sec === "function") o.sec(k.id); });
       kap.appendChild(b);
     });
@@ -465,6 +501,8 @@ window.SufloEgriIzgara = (function () {
  * Eğri sekmesinde kaydedilen önayarlar. Seçim araç başına bu görüntüleyicinin yerel deposunda kalır (kolaylık; her
  * erişim korumalı, okunamazsa Otomatik). Seçmek ve önizlemek ücretsiz; uygulamak aracın kendi kapısından geçer.
  * Premiere'e gitmez (K.call yok). Kabın içindeki .egri-secici-not açıklaması açılan panele taşınır.
+ * 3.4 adım 15: panelde "SFC1 kodu ya da cubic-bezier(…) yapıştır" kutusu (Enter / Kullan; SufloEgriSecim.coz: kod,
+ * suflo.app/egri bağlantısı, cubic-bezier, CSS bildirimi, anahtar sözcük); geçersizse nedeni panelde yazar.
  * ====================================================================== */
 window.SufloEgriSecici = (function () {
   "use strict";
@@ -549,6 +587,29 @@ window.SufloEgriSecici = (function () {
     var izgara = document.createElement("div");
     izgara.className = "egri-onayarlar egri-secici-izgara";
     panel.appendChild(izgara);
+    // 3.4 adım 15: kod / bağlantı / cubic-bezier yapıştır (SufloEgriSecim.coz; ücretsiz, Premiere'e gitmez)
+    var yapistir = document.createElement("div");
+    yapistir.className = "egri-secici-yapistir";
+    var kodGir = document.createElement("input");
+    kodGir.type = "text";
+    kodGir.className = "egri-secici-kod";
+    kodGir.setAttribute("maxlength", "4096");
+    kodGir.setAttribute("spellcheck", "false");
+    kodGir.setAttribute("autocomplete", "off");
+    kodGir.setAttribute("placeholder", "SFC1 kodu ya da cubic-bezier(…) yapıştır");
+    kodGir.setAttribute("aria-label", "Eğri kodu yapıştır");
+    yapistir.appendChild(kodGir);
+    var kodKullan = document.createElement("button");
+    kodKullan.type = "button";
+    kodKullan.className = "btn tiny egri-secici-kullan";
+    kodKullan.textContent = "Kullan";
+    yapistir.appendChild(kodKullan);
+    panel.appendChild(yapistir);
+    var kodHata = document.createElement("p");
+    kodHata.className = "egri-secici-hata";
+    kodHata.setAttribute("role", "status");
+    kodHata.hidden = true;
+    panel.appendChild(kodHata);
     if (not) panel.appendChild(not);
     var git = document.createElement("button");
     git.type = "button";
@@ -600,6 +661,31 @@ window.SufloEgriSecici = (function () {
       try { if (dugme.focus) dugme.focus(); } catch (eF) {}
       if (typeof opts.degisti === "function") { try { opts.degisti(deger); } catch (eD) {} }
     }
+    // Yapıştırılan kod / bağlantı / cubic-bezier: geçerliyse seçilir (panel kapanır), değilse panelde nedeni yazar
+    function kodHataGoster(kod) {
+      var M = window.SufloEgriModel;
+      kodHata.textContent = M && M.paylasimHatasi ? M.paylasimHatasi(kod) : "Geçersiz kod.";
+      kodHata.hidden = false;
+    }
+    function yapistirKullan() {
+      var metin = String(kodGir.value || "");
+      if (!/\S/.test(metin)) { kodHataGoster("bos"); return false; }
+      var cz = S.coz(metin);
+      if (!cz.ok) { kodHataGoster(cz.hata); return false; }
+      kodGir.value = "";
+      kodHata.hidden = true;
+      sec(cz.ease);
+      if (cz.kirpildi && window.KApp && KApp.toast) KApp.toast("cubic-bezier'in y değerleri -1–2 aralığına kırpıldı.", "warn", 7000);
+      return true;
+    }
+    kodKullan.addEventListener("click", function () { yapistirKullan(); });
+    kodGir.addEventListener("keydown", function (e) {
+      if (e && (e.key === "Enter" || e.keyCode === 13)) {
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
+        yapistirKullan();
+      }
+    });
     dugme.addEventListener("click", function () { if (panel.hidden) ac(); else kapat(); });
     kap.addEventListener("keydown", function (e) {
       if (e && (e.key === "Escape" || e.keyCode === 27) && !panel.hidden) {
@@ -621,12 +707,159 @@ window.SufloEgriSecici = (function () {
       ac: ac,
       kapat: kapat,
       acik: function () { return !panel.hidden; },
-      _izgara: izgara
+      // 3.4 adım 15: yapıştırma kutusu (test ve Ctrl+K komut paleti için)
+      yapistir: function (metin) { kodGir.value = String(metin === undefined || metin === null ? "" : metin); return yapistirKullan(); },
+      _izgara: izgara, _kod: kodGir, _kodHata: kodHata
     };
     dugmeCiz();
     return api;
   }
   return { olustur: olustur, DEPO: DEPO };
+})();
+
+/* ======================================================================
+ * SufloEgriPaylas (3.4 adım 15): Eğri sekmesi ve Hız Rampası'nın ortak paylaşım yapıştırıcısı — panoya kopyalama,
+ * .suflo-egri dosya pencereleri (window.cep.fs) ve içe aktarılanları yerlerine dağıtma. Ücretsiz (kapı yok), Premiere'e
+ * gitmez. Kod / dosya biçimi ve doğrulama SufloEase'te (js/ease-curve.js), önayar listeleri SufloEgriModel ve
+ * SufloSpeedRamp'te (saf, testli).
+ * ====================================================================== */
+window.SufloEgriPaylas = (function () {
+  "use strict";
+  var UZANTI = "suflo-egri";
+
+  function uiMetni(s) { var I = window.SufloI18n; return I && I.tr ? I.tr(s) : s; }
+  function cepFs() { try { return window.cep && window.cep.fs ? window.cep.fs : null; } catch (e) { return null; } }
+  function kopru() { return typeof K !== "undefined" && K ? K : (window.K || null); }
+  function nodeFs() { var k = kopru(); return k && k.fs ? k.fs : null; }
+  function bayt() { var E = window.SufloEase; return E && E.LIMITS ? E.LIMITS.DOSYA_BAYT : 65536; }
+
+  /*
+   * Panoya kopyala: navigator.clipboard, olmazsa gizli metin alanı + execCommand('copy'). bitti(ok): ok false ise çağıran
+   * kodu görünür bir kutuya koyar (kullanıcı Ctrl+C ile kopyalar).
+   */
+  function kopyala(metin, bitti) {
+    var cagrildi = false;
+    function son(ok) { if (cagrildi) return; cagrildi = true; if (typeof bitti === "function") { try { bitti(!!ok); } catch (e) {} } }
+    function yedek() {
+      var ok = false;
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = metin;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        if (ta.select) ta.select();
+        ok = !!document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch (e) { ok = false; }
+      son(ok);
+    }
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(metin).then(function () { son(true); }, yedek);
+        return;
+      }
+    } catch (e2) {}
+    yedek();
+  }
+
+  /*
+   * Dosya aç (window.cep.fs.showOpenDialogEx; .suflo-egri ve .json). Okumadan önce boyut denetlenir (en çok 64 KB).
+   * Döner: { ok: true, metin, yol } | { ok: false, hata: 'iptal' | 'diyalog' | 'buyuk' | 'okunamadi' }
+   */
+  function dosyaAc(baslik) {
+    var cf = cepFs();
+    if (!cf || typeof cf.showOpenDialogEx !== "function") return { ok: false, hata: "diyalog" };
+    var r;
+    try { r = cf.showOpenDialogEx(false, false, uiMetni(baslik || "Eğri dosyası seç"), "", [UZANTI, "json"]); } catch (e) { return { ok: false, hata: "diyalog" }; }
+    if (r && r.err) return { ok: false, hata: "diyalog" };
+    var yol = r && r.data && r.data.length ? String(r.data[0]) : "";
+    if (!yol) return { ok: false, hata: "iptal" };
+    try {
+      var fs = nodeFs();
+      if (fs) {
+        if (fs.statSync(yol).size > bayt()) return { ok: false, hata: "buyuk" };
+        return { ok: true, metin: String(fs.readFileSync(yol, "utf8")), yol: yol };
+      }
+      if (typeof cf.readFile !== "function") return { ok: false, hata: "okunamadi" };
+      var o = cf.readFile(yol);
+      if (!o || o.err || typeof o.data !== "string") return { ok: false, hata: "okunamadi" };
+      return { ok: true, metin: o.data, yol: yol };
+    } catch (e2) { return { ok: false, hata: "okunamadi" }; }
+  }
+
+  // Kayıt yolunda uzantı yoksa ".suflo-egri" eklenir (Windows'un kaydetme penceresi uzantıyı eklemeyebilir)
+  function uzantili(yol) { return new RegExp("\\." + UZANTI.replace("-", "\\-") + "$", "i").test(yol) ? yol : yol + "." + UZANTI; }
+  // Pencere yoksa Masaüstü'ne (yoksa ev klasörüne) yeni adla; var olan dosyanın üzerine yazılmaz
+  function masaustuYolu(ad) {
+    var k = kopru();
+    var dir = k.path.join(k.os.homedir(), "Desktop");
+    if (!k.fs.existsSync(dir)) dir = k.os.homedir();
+    var nokta = ad.indexOf("."), kok = nokta > 0 ? ad.slice(0, nokta) : ad, uz = nokta > 0 ? ad.slice(nokta) : "";
+    var aday = k.path.join(dir, ad);
+    for (var i = 2; k.fs.existsSync(aday) && i < 100; i++) aday = k.path.join(dir, kok + "-" + i + uz);
+    return k.fs.existsSync(aday) ? k.path.join(dir, kok + "-" + Date.now() + uz) : aday;
+  }
+  /*
+   * Dosyaya kaydet (window.cep.fs.showSaveDialogEx). Pencere yoksa Masaüstü'ne yazar.
+   * Döner: { ok: true, yol } | { ok: false, hata: 'iptal' | 'diyalog' | 'yazilamadi' }
+   */
+  function dosyaKaydet(metin, varsayilanAd, baslik) {
+    var cf = cepFs(), fs = nodeFs(), yol = "";
+    try {
+      if (cf && typeof cf.showSaveDialogEx === "function") {
+        var r = cf.showSaveDialogEx(uiMetni(baslik || "Eğri önayarlarını kaydet"), "", [UZANTI], varsayilanAd || ("suflo-egriler." + UZANTI));
+        if (r && r.err) return { ok: false, hata: "diyalog" };
+        yol = r && typeof r.data === "string" ? r.data : "";
+        if (!yol) return { ok: false, hata: "iptal" };
+        yol = uzantili(yol);
+      } else if (fs && kopru().path && kopru().os) yol = masaustuYolu(varsayilanAd || ("suflo-egriler." + UZANTI));
+      else return { ok: false, hata: "diyalog" };
+    } catch (e) { return { ok: false, hata: "diyalog" }; }
+    try {
+      if (fs) fs.writeFileSync(yol, metin, "utf8");
+      else {
+        var w = cf.writeFile(yol, metin);
+        if (w && w.err) return { ok: false, hata: "yazilamadi" };
+      }
+      return { ok: true, yol: yol };
+    } catch (e2) { return { ok: false, hata: "yazilamadi" }; }
+  }
+
+  /*
+   * İçe aktarılanları yerlerine dağıt: 'egri' → Eğri sekmesinin önayarları (KEgri.onayarlariIceAl), 'hiz' → Hız Rampası'nın
+   * adlı özel rampaları (KHizRampasi.ozelKayitlariIceAl). r: SufloEase.iceAktar sonucu (ok).
+   * Döner: { ozet: SufloEgriModel.iceAktarOzeti, egri: [eklenen id], hiz: [eklenen id] }
+   */
+  function iceAl(r) {
+    var egriler = [], hizlar = [];
+    ((r && r.presets) || []).forEach(function (p) { if (p && p.tur === "hiz") hizlar.push(p); else if (p) egriler.push(p); });
+    var o = { egri: 0, hiz: 0, yinelenen: Number(r && r.yinelenen) || 0, dolu: 0, hizDolu: 0, alinamadi: 0, uyarilar: (r && r.uyarilar) || [] };
+    var sonuc = { egri: [], hiz: [] };
+    function dagit(liste, fn, tur) {
+      if (!liste.length) return;
+      var s = null;
+      try { s = typeof fn === "function" ? fn(liste) : null; } catch (e) { s = null; }
+      if (!s || !s.ok) { o.alinamadi += liste.length; return; }
+      o[tur] = s.eklenen.length;
+      o.yinelenen += s.yinelenen || 0;
+      if (tur === "egri") o.dolu = s.dolu || 0; else o.hizDolu = s.dolu || 0;
+      sonuc[tur] = s.eklenen.slice();
+    }
+    dagit(egriler, window.KEgri && window.KEgri.onayarlariIceAl, "egri");
+    dagit(hizlar, window.KHizRampasi && window.KHizRampasi.ozelKayitlariIceAl, "hiz");
+    var M = window.SufloEgriModel;
+    sonuc.ozet = M && M.iceAktarOzeti ? M.iceAktarOzeti(o) : { parcalar: [], uyari: true, eklenen: o.egri + o.hiz };
+    return sonuc;
+  }
+  // Hata kodu → metin (SufloEgriModel.paylasimHatasi; o yoksa kısa yedek)
+  function hataMetni(kod) {
+    var M = window.SufloEgriModel;
+    return M && M.paylasimHatasi ? M.paylasimHatasi(kod) : "Geçersiz kod.";
+  }
+
+  return { kopyala: kopyala, dosyaAc: dosyaAc, dosyaKaydet: dosyaKaydet, iceAl: iceAl, hataMetni: hataMetni, uzantili: uzantili, UZANTI: UZANTI };
 })();
 
 /* ======================================================================
@@ -644,6 +877,8 @@ window.KEgri = (function () {
   var editor = null;
   var yaylan = { genlik: 0.1, frekans: 3, sonum: 6, tum: false };   // Varışta yaylan ayarı (init yaylanYukle ile M.yaylanAyar)
   var egri = null, seciliOnayar = "yumusak";
+  // Yapıştırılan koddan yüklenen eğrinin adı (3.4 adım 15): eğri değişmediyse Önayar olarak kaydet ve Kodu kopyala bu adı kullanır
+  var bekleyen = null;          // { ad, j: eğrinin JSON'u }
   var gorunum = "deger";
   var onbellek = null;          // son KS_easeScan (+ selSig)
   var sonPeek = null;
@@ -790,7 +1025,8 @@ window.KEgri = (function () {
     // kartlar çeviriden muaf. Aynı ızgara Geçiş / Zoom / Hareket eğri seçicisinde (SufloEgriIzgara, adım 12)
     window.SufloEgriIzgara.ciz(kap, tumOnayarlar().map(function (o) {
       return { id: o.id, ad: o.ad, curve: o.curve, kullanici: o.kullanici, adCevrilir: false };
-    }), { secili: seciliOnayar, numarali: true, sec: onayarSec, sil: onayarSil, silBaslik: tr("Önayarı sil") });
+    }), { secili: seciliOnayar, numarali: true, sec: onayarSec, sil: onayarSil, silBaslik: tr("Önayarı sil"), tasi: onayarSurukle });
+    duzenCiz();
   }
   function onayarSec(id) {
     var o = tumOnayarlar().filter(function (x) { return x.id === id; })[0];
@@ -802,8 +1038,11 @@ window.KEgri = (function () {
     onayarKartlari();
   }
   function onayarKaydet() {
-    // Varsayılan ad arayüzün dilinde kaydedilir ("My curve 2"); kart data-i18n-skip, sonradan çevrilmez
-    var r = M.onayarEkle(kullaniciOnayarlari(), tr(M.onayarAdi(kullaniciOnayarlari())), egri, Date.now());
+    // Varsayılan ad arayüzün dilinde kaydedilir ("My curve 2"); kart data-i18n-skip, sonradan çevrilmez. Koddan yüklenen
+    // eğri değişmediyse kodun adı (3.4 adım 15; aynı ad varsa "Ad (2)")
+    var liste = kullaniciOnayarlari(), kodAdi = bekleyenAd();
+    var ad = kodAdi ? M.benzersizAd(kodAdi, liste.map(function (o) { return o.ad; })) : tr(M.onayarAdi(liste));
+    var r = M.onayarEkle(liste, ad, egri, Date.now());
     if (!r.ok) { durum(r.kod === "dolu" ? "En çok " + M.EN_COK_ONAYAR + " önayar saklanır; birini sil." : "Bu eğri saklanamadı.", "warn"); return; }
     if (!depoYaz(ONAYAR_ANAHTAR, r.liste)) { durum("Önayar bu bilgisayarda saklanamadı.", "warn"); return; }
     seciliOnayar = r.id;
@@ -814,6 +1053,147 @@ window.KEgri = (function () {
     depoYaz(ONAYAR_ANAHTAR, M.onayarSil(kullaniciOnayarlari(), id));
     if (seciliOnayar === id) seciliOnayar = "";
     onayarKartlari();
+  }
+
+  /* ---------------- önayar düzeni ve paylaşım (3.4 adım 15; ücretsiz: kapı yok, Premiere'e gitmez) ---------------- */
+  function seciliSira() {
+    var l = kullaniciOnayarlari();
+    for (var i = 0; i < l.length; i++) if (l[i].id === seciliOnayar) return { liste: l, i: i };
+    return { liste: l, i: -1 };
+  }
+  // Seçili kullanıcı önayarının satırı: ad kutusu, Adı değiştir, ◀ ▶ (sürükle-bırakın klavye karşılığı)
+  function duzenCiz() {
+    var kutu = el("egri-onayar-duzen");
+    if (!kutu) return;
+    var s = seciliSira();
+    kutu.hidden = s.i < 0;
+    if (s.i < 0) return;
+    var g = el("egri-onayar-ad");
+    if (g && document.activeElement !== g) g.value = s.liste[s.i].ad;
+    if (el("egri-onayar-sola")) el("egri-onayar-sola").disabled = s.i === 0;
+    if (el("egri-onayar-saga")) el("egri-onayar-saga").disabled = s.i === s.liste.length - 1;
+  }
+  function onayarAdlandir() {
+    var g = el("egri-onayar-ad"), id = seciliOnayar;
+    var r = M.onayarAdlandir(kullaniciOnayarlari(), id, g ? String(g.value || "") : "");
+    if (!r.ok) { durum(r.kod === "ad" ? "Önayara bir ad yaz." : "Önce kendi önayarlarından birini seç.", "warn"); return; }
+    if (!depoYaz(ONAYAR_ANAHTAR, r.liste)) { durum("Önayar bu bilgisayarda saklanamadı.", "warn"); return; }
+    var yeni = r.liste.filter(function (o) { return o.id === id; })[0];
+    if (g) g.value = yeni ? yeni.ad : "";
+    onayarKartlari();
+    durum(["Adı değişti: ", { ad: yeni ? yeni.ad : "" }], "good");
+  }
+  // id'li önayarı kullanıcı önayarları içinde hedef sıraya taşı (◀ ▶ ve sürükle-bırak)
+  function onayarTasi(id, hedef) {
+    var once = kullaniciOnayarlari();
+    var l = M.onayarTasi(once, id, hedef);
+    if (JSON.stringify(l) === JSON.stringify(once)) return false;
+    if (!depoYaz(ONAYAR_ANAHTAR, l)) { durum("Önayar bu bilgisayarda saklanamadı.", "warn"); return false; }
+    onayarKartlari();
+    return true;
+  }
+  function onayarSurukle(id, hedefId) {
+    var l = kullaniciOnayarlari(), h = -1;
+    l.forEach(function (o, i) { if (o.id === hedefId) h = i; });
+    if (h >= 0) onayarTasi(id, h);
+  }
+  function onayarKaydir(yon) {
+    var s = seciliSira();
+    if (s.i < 0) return;
+    if (onayarTasi(seciliOnayar, s.i + yon)) {
+      var b = el(yon < 0 ? "egri-onayar-sola" : "egri-onayar-saga");
+      // en uca gelince düğme kapanır; odak öbür yöne geçsin (klavyeyle sürdürülebilsin)
+      if (b && b.disabled) b = el(yon < 0 ? "egri-onayar-saga" : "egri-onayar-sola");
+      try { if (b && b.focus) b.focus(); } catch (e) {}
+    }
+  }
+
+  // Koddan yüklenen eğrinin adı, eğri o andan beri değişmediyse
+  function bekleyenAd() {
+    return bekleyen && egri && JSON.stringify(E.normalize(egri)) === bekleyen.j ? bekleyen.ad : "";
+  }
+  // Paylaşılacak ad: seçili kendi önayarı (eğri aynıysa) ya da koddan yüklenen eğrinin adı; hazır eğride ad yok
+  function paylasilacakAd() {
+    var s = seciliSira(), j = JSON.stringify(E.normalize(egri));
+    if (s.i >= 0 && JSON.stringify(E.normalize(s.liste[s.i].curve)) === j) return s.liste[s.i].ad;
+    return bekleyenAd();
+  }
+  function kodKopyala() {
+    var kod = E.paylasimKodla({ tur: "egri", ad: paylasilacakAd(), curve: egri });
+    if (!kod) { durum("Bu eğri paylaşılamadı.", "warn"); return; }
+    var metin = kod + "\n" + E.egriAdresi(kod, dil());
+    window.SufloEgriPaylas.kopyala(metin, function (ok) {
+      if (ok) { toast("Eğri kodu ve suflo.app/egri bağlantısı kopyalandı", "good", 7000); return; }
+      // pano yoksa kod kutuya konur: kullanıcı Ctrl+C ile kopyalar
+      var g = el("egri-kod");
+      if (g) { g.value = kod; try { if (g.focus) g.focus(); if (g.select) g.select(); } catch (e) {} }
+      durum("Kopyalanamadı; kod aşağıdaki kutuda, Ctrl+C ile kopyala.", "warn");
+    });
+  }
+  // Tek eğriyi düzenleyiciye yükle (yapıştırılan tek kod / cubic-bezier). Döner: true
+  function egriYukle(p, kirpildi, kaynak) {
+    egri = E.normalize(p.curve);
+    if (editor) editor.egriAta(egri);
+    egriDegisti(true);
+    bekleyen = p.ad ? { ad: p.ad, j: JSON.stringify(egri) } : null;
+    if (p.ad) durum(["Yüklendi: ", { ad: p.ad }, ". Saklamak için Önayar olarak kaydet."], "good");
+    else if (kirpildi) durum("cubic-bezier yüklendi; y değerleri -1–2 aralığına kırpıldı.", "warn");
+    else durum(kaynak === "css" ? "cubic-bezier yüklendi." : "Eğri yüklendi. Saklamak için Önayar olarak kaydet.", "good");
+    return true;
+  }
+  /*
+   * Kod yapıştır kutusu: tek eğri kodu / bağlantı / cubic-bezier düzenleyiciye yüklenir (önayar olarak kaydetmek
+   * kullanıcının elinde); birden çok kod, Hız Rampası kodu ya da yapıştırılan dosya metni önayarlara eklenir
+   * (eğriler buraya, hız eğrileri Hız Rampası'nın kayıtlı rampalarına).
+   */
+  function kodYukle() {
+    var g = el("egri-kod"), metin = g ? String(g.value || "") : "";
+    var r = E.iceAktar(metin);
+    if (!r.ok) {
+      var json = /^\s*\{/.test(metin);
+      durum(window.SufloEgriPaylas.hataMetni(json && r.hata === "bicim" ? "dosyaBicim" : r.hata), "warn");
+      return false;
+    }
+    if (g) g.value = "";
+    if ((r.bicim === "kod" || r.bicim === "css") && r.presets.length === 1 && !r.uyarilar.length && !r.yinelenen && r.presets[0].tur === "egri") {
+      return egriYukle(r.presets[0], r.kirpildi, r.bicim);
+    }
+    return iceAlGoster(r);
+  }
+  function iceAlGoster(r) {
+    var s = window.SufloEgriPaylas.iceAl(r);
+    // tek eğri eklendiyse seçilir ve düzenleyiciye gelir (birden çoksa düzenleyicideki eğri yerinde kalır)
+    if (s.egri.length === 1) onayarSec(s.egri[0]);
+    durum(s.ozet.parcalar, s.ozet.uyari ? "warn" : "good");
+    return s.ozet.eklenen > 0;
+  }
+  function dosyaIceAktar() {
+    var d = window.SufloEgriPaylas.dosyaAc("Eğri dosyası seç (.suflo-egri ya da JSON)");
+    if (!d.ok) { if (d.hata !== "iptal") durum(window.SufloEgriPaylas.hataMetni(d.hata), "warn"); return false; }
+    var r = E.iceAktar(d.metin);
+    if (!r.ok) { durum(window.SufloEgriPaylas.hataMetni(r.hata === "bicim" ? "dosyaBicim" : r.hata), "warn"); return false; }
+    return iceAlGoster(r);
+  }
+  function dosyaDisaAktar() {
+    var liste = M.onayarlariDisa(kullaniciOnayarlari());
+    if (!liste.length) { durum("Dışa aktarılacak önayar yok: önce bir eğriyi Önayar olarak kaydet.", "warn"); return false; }
+    var y = E.dosyaYaz(liste);
+    var s = window.SufloEgriPaylas.dosyaKaydet(y.metin, "suflo-egriler." + window.SufloEgriPaylas.UZANTI, "Eğri önayarlarını kaydet");
+    if (!s.ok) { if (s.hata !== "iptal") durum(window.SufloEgriPaylas.hataMetni(s.hata), "warn"); return false; }
+    durum(["Dışa aktarıldı: " + y.adet + " önayar → ", { ad: s.yol }], "good");
+    return true;
+  }
+  /*
+   * Başka sekmeden gelen eğri önayarlarını ekle (SufloEgriPaylas.iceAl: Hız Rampası'nın İçe aktar'ı / kod kutusu).
+   * Döner: { ok (depoya yazıldı), eklenen: [id], yinelenen, dolu }
+   */
+  function onayarlariIceAl(gelenler) {
+    if (!E || !M) return { ok: false, eklenen: [], yinelenen: 0, dolu: 0 };
+    var a = M.onayarlariIceAl(kullaniciOnayarlari(), gelenler, Date.now(), function (n) { return tr("Benim eğrim " + n); });
+    if (a.eklenen.length && !depoYaz(ONAYAR_ANAHTAR, a.liste)) return { ok: false, eklenen: [], yinelenen: 0, dolu: 0 };
+    // düzenleyicideki eğriye dokunulmaz (Hız Rampası'ndan gelen içe aktarma kaydedilmemiş eğriyi silmesin)
+    onayarKartlari();
+    return { ok: true, eklenen: a.eklenen, yinelenen: a.yinelenen, dolu: a.dolu };
   }
 
   /* ---------------- eğri alanları ---------------- */
@@ -836,15 +1216,23 @@ window.KEgri = (function () {
     alanlariCiz();
     ayarKaydet();
   }
+  // cubic-bezier alanı: elle yazılan / yapıştırılan cubic-bezier; 3.4 adım 15'ten beri CSS bildirimi, anahtar sözcük, yalın dört
+  // sayı ve SFC1 eğri kodu / bağlantısı da (SufloEase.yapistir; y -1–2'ye kırpılır)
   function cssUygula() {
     var e = el("egri-css");
     if (!e || !String(e.value || "").replace(/\s/g, "")) { alanlariCiz(); return; }
-    var c = E.fromCss(e.value);
-    if (!c) { durum("Geçersiz: cubic-bezier(x1, y1, x2, y2) yaz; x değerleri 0–1, y değerleri -1–2 arası.", "warn"); return; }
-    egri = c;
-    if (editor) editor.egriAta(c);
-    durum("");
+    var y = E.yapistir(String(e.value));
+    if (!y.ok) {
+      durum(y.hata === "css" || y.hata === "bicim" ? "Geçersiz: cubic-bezier(x1, y1, x2, y2) yaz; x değerleri 0–1, y değerleri -1–2 arası." : window.SufloEgriPaylas.hataMetni(y.hata), "warn");
+      return;
+    }
+    if (y.tur !== "egri") { durum(window.SufloEgriPaylas.hataMetni("hizKodu"), "warn"); return; }
+    if (y.kaynak === "kod") { e.value = ""; egriYukle(y, false, "kod"); return; }
+    egri = y.curve;
+    if (editor) editor.egriAta(y.curve);
+    durum(y.kirpildi ? "cubic-bezier yüklendi; y değerleri -1–2 aralığına kırpıldı." : "", y.kirpildi ? "warn" : "");
     egriDegisti(true);
+    bekleyen = null;
   }
   function sayilarUygula() {
     var v = ["egri-p1x", "egri-p1y", "egri-p2x", "egri-p2y"].map(function (id) { return Number(el(id) ? el(id).value : NaN); });
@@ -1505,6 +1893,18 @@ window.KEgri = (function () {
     el("egri-cevir").addEventListener("click", cevir);
     el("egri-ters").addEventListener("click", tersCevir);
     el("egri-kaydet").addEventListener("click", onayarKaydet);
+    // Paylaşım ve önayar düzeni (3.4 adım 15): ücretsiz, Premiere'e gitmez
+    function bagla(id, olay, fn) { var e = el(id); if (e) e.addEventListener(olay, fn); }
+    function enterIle(fn) { return function (e) { if (e && (e.key === "Enter" || e.keyCode === 13)) { if (e.preventDefault) e.preventDefault(); fn(); } }; }
+    bagla("egri-kod-yukle", "click", function () { kodYukle(); });
+    bagla("egri-kod", "keydown", enterIle(kodYukle));
+    bagla("egri-kod-kopyala", "click", kodKopyala);
+    bagla("egri-ice-aktar", "click", function () { dosyaIceAktar(); });
+    bagla("egri-disa-aktar", "click", function () { dosyaDisaAktar(); });
+    bagla("egri-onayar-adlandir", "click", onayarAdlandir);
+    bagla("egri-onayar-ad", "keydown", enterIle(onayarAdlandir));
+    bagla("egri-onayar-sola", "click", function () { onayarKaydir(-1); });
+    bagla("egri-onayar-saga", "click", function () { onayarKaydir(1); });
     el("egri-yogunluk").addEventListener("change", ayarKaydet);
     el("egri-uygula").addEventListener("click", function () { uygula(); });
     // Tanıtım kartından kurulan deneme Pro olayı yaymaz; app.js düğmeye odaklanır: kilit hemen kalkar
@@ -1542,6 +1942,12 @@ window.KEgri = (function () {
     yaylanUygula: yaylanUygula,
     geriAl: geriAl,
     geriAlTumu: geriAlTumu,
+    // paylaşım (3.4 adım 15): Hız Rampası'nın İçe aktar'ı eğri önayarlarını buraya ekler
+    onayarlariIceAl: onayarlariIceAl,
+    kodYukle: kodYukle,
+    kodKopyala: kodKopyala,
+    dosyaIceAktar: dosyaIceAktar,
+    dosyaDisaAktar: dosyaDisaAktar,
     // testler / tanılama
     _yokla: yokla,
     _sekmeAcildi: sekmeAcildi,

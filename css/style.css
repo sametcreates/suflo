@@ -3866,6 +3866,16 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .hiz-ozel-kayit span { overflow: hidden; max-width: 160px; text-overflow: ellipsis; white-space: nowrap; }
 .hiz-ozel-kayit-sil { margin-left: 4px; padding: 0 3px; color: var(--faint); font-style: normal; font-size: 12px; line-height: 1.2; }
 .hiz-ozel-kayit-sil:hover { color: var(--bad); }
+/* 3.4 adım 15: seçili kayıt, sürükle-bırak, kod ve dosya satırları (CEF 74: flex gap yok) */
+.hiz-ozel-kayit.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.hiz-ozel-kayit[draggable="true"] { cursor: grab; }
+.hiz-ozel-kayit.surukleniyor { opacity: .45; }
+.hiz-ozel-kayit.birak { border-color: var(--accent-lite); }
+.hiz-ozel-paylas { align-items: center; margin: 4px 0 6px; }
+.hiz-ozel-paylas .btn { flex: none; margin-left: 6px; }
+.hiz-ozel-paylas-eylem { flex-wrap: wrap; margin: 0 0 2px; }
+.hiz-ozel-paylas-eylem .btn { margin: 0 6px 4px 0; }
+.hiz-ozel-paylas-ipucu { margin: 0; font-size: 10px; }
 
 /* ---------- Eğri (3.4 adım 10, #tab-egri): SVG düzenleyici, canlı önizleme sahnesi, önayarlar, özellik listesi ----------
    CEF 74: flex gap, inset ve :focus-visible yok — aralıklar margin ile, odak :focus ile */
@@ -3910,6 +3920,24 @@ input:focus, select:focus, textarea:focus { border-color: rgba(132,128,255,.7); 
 .egri-kucuk path { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .egri-onayar-sil { position: absolute; top: 1px; right: 3px; padding: 0 3px; color: var(--faint); font-style: normal; font-size: 12px; line-height: 1.2; }
 .egri-onayar-sil:hover { color: var(--bad); }
+/* 3.4 adım 15: önayar düzeni (ad, ◀ ▶, sürükle-bırak) ve paylaşım kutusu. CEF 74: flex gap yok, aralıklar margin ile */
+.egri-onayar.kullanici[draggable="true"] { cursor: grab; }
+.egri-onayar.surukleniyor { opacity: .45; }
+.egri-onayar.birak { border-color: var(--accent-lite); box-shadow: 0 0 0 1px var(--accent-lite); }
+.egri-onayar-duzen { align-items: center; margin: -6px 0 10px; }
+.egri-onayar-duzen[hidden], .egri-secici-hata[hidden] { display: none; }
+.egri-onayar-duzen input, .egri-kod-satir input, .egri-secici-kod, .hiz-ozel-paylas input { flex: 1; min-width: 0; padding: 4px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; font-size: 11px; }
+.egri-onayar-duzen .btn, .egri-kod-satir .btn { flex: none; margin-left: 5px; }
+.egri-paylas { margin: 0 0 12px; padding: 8px 9px 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.egri-paylas-bas { margin: 0 0 6px; }
+.egri-paylas-bas b { display: block; font-size: 11px; }
+.egri-paylas-bas .hint { display: block; margin: 2px 0 0; font-size: 10px; line-height: 1.4; }
+.egri-kod-satir { align-items: center; margin: 0 0 6px; }
+.egri-paylas-eylem { flex-wrap: wrap; }
+.egri-paylas-eylem .btn { margin: 0 5px 5px 0; }
+.egri-secici-yapistir { display: flex; align-items: center; margin: 0 0 6px; }
+.egri-secici-kullan { flex: none; margin-left: 5px; }
+.egri-secici-hata { margin: 0 0 8px; color: var(--warn); font-size: 10px; line-height: 1.4; }
 .egri-liste-bas { display: flex; align-items: center; margin: 0 0 6px; }
 .egri-liste-bas b { flex: 1; font-size: 11px; }
 .egri-liste-bas .btn { margin-left: 5px; }

@@ -45,7 +45,10 @@ var IDLER = ["tab-egri", "egri-tanitim", "egri-gorunum-deger", "egri-gorunum-hiz
   "egri-yogunluk", "egri-pr-onizle", "egri-geri-tumu", "egri-uygula", "egri-status",
   // Varışta yaylan (3.4 adım 14)
   "egri-yaylan", "egri-yaylan-grafik", "egri-yaylan-hedef", "egri-yaylan-varis", "egri-yaylan-yol", "egri-yaylan-genlik", "egri-yaylan-genlik-deger",
-  "egri-yaylan-frekans", "egri-yaylan-frekans-deger", "egri-yaylan-sonum", "egri-yaylan-sonum-deger", "egri-yaylan-tum", "egri-yaylan-sure", "egri-yaylan-uygula"];
+  "egri-yaylan-frekans", "egri-yaylan-frekans-deger", "egri-yaylan-sonum", "egri-yaylan-sonum-deger", "egri-yaylan-tum", "egri-yaylan-sure", "egri-yaylan-uygula",
+  // Paylaşım ve önayar düzeni (3.4 adım 15)
+  "egri-onayar-duzen", "egri-onayar-ad", "egri-onayar-adlandir", "egri-onayar-sola", "egri-onayar-saga", "egri-paylas", "egri-kod", "egri-kod-yukle",
+  "egri-kod-kopyala", "egri-ice-aktar", "egri-disa-aktar"];
 
 /*
  * o: { cevap(fn, arg, n) → yanıt, pro, kurulu (deneme kurulu), hostMesgul, odak, gizli, aktif (sekme), depo (localStorage içeriği), dil }
@@ -53,7 +56,8 @@ var IDLER = ["tab-egri", "egri-tanitim", "egri-gorunum-deger", "egri-gorunum-hiz
 function kur(o) {
   o = o || {};
   var dom = {}, cagri = [], kapi = [], harcanan = [], toastlar = [], ilgi = [], raf = [];
-  IDLER.forEach(function (id) { dom[id] = eleman(/^egri-(css|p[12][xy])$/.test(id) ? "input" : id === "egri-yogunluk" ? "select" : "div", id); });
+  IDLER.forEach(function (id) { dom[id] = eleman(/^egri-(css|p[12][xy]|kod|onayar-ad)$/.test(id) ? "input" : id === "egri-yogunluk" ? "select" : "div", id); });
+  dom["egri-onayar-duzen"].hidden = true;
   dom["egri-yogunluk"].value = "1";
   if (o.aktif !== false) dom["tab-egri"].classList.add("active");
   var depo = o.depo || {};
@@ -83,10 +87,14 @@ function kur(o) {
         cagri.push({ fn: fn, arg: JSON.parse(JSON.stringify(arg === undefined ? null : arg)), sure: sure });
         try { return Promise.resolve(o.cevap ? o.cevap(fn, arg, cagri.length) : { ok: false }); } catch (e) { return Promise.reject(e); }
       },
-      hostMesgul: function () { return durumlar.hostMesgul; }
+      hostMesgul: function () { return durumlar.hostMesgul; },
+      fs: o.kfs, path: require("path"), os: { homedir: function () { return "/ev"; } }
     },
     KApp: { toast: function (m, t, s, e) { toastlar.push({ m: m, t: t, e: e }); }, onTab: function (ad, fn) { ctx._tab[ad] = fn; }, onContext: function () {}, onPoll: function () {} },
     _tab: {},
+    // 3.4 adım 15: CEP dosya pencereleri (o.cepFs), Node fs (o.kfs), pano (o.pano: { metin } ya da false)
+    cep: o.cepFs ? { fs: o.cepFs } : undefined,
+    navigator: o.pano ? { clipboard: { writeText: function (s) { o.pano.metin = s; return o.pano.hata ? Promise.reject(new Error("izin")) : Promise.resolve(); } } } : undefined,
     Pro: {
       isPro: function () { return !!o.pro; }, on: function () {}, denemeAcik: function () { return !!o.kurulu; },
       gate: function (f, op) { kapi.push([f, op]); return !!o.kurulu || !!o.pro; },
@@ -810,6 +818,163 @@ function fnGovde(src, imza) { var i = src.indexOf(imza); return i < 0 ? "" : src
     I18Nyy.translate("Varışta yaylanma uygulandı: 2 varış · 17 anahtar kare") === "Follow-through applied: 2 landings · 17 keyframes" &&
     I18Nyy.translate("🔒 Varışta yaylan") === "🔒 Follow-through" && I18Nyy.translate(": sonraki anahtar kareye ya da klibin sonuna 2 kareden az yer var") ===
     ": there's less than 2 frames of room before the next keyframe or the clip end");
+
+  /* ---------- 12) paylaşım ve önayar düzeni (3.4 adım 15): ücretsiz, Premiere'e gitmez, kapı yok ---------- */
+  var Ep = require(path.join(KOK, "js", "ease-curve.js"));
+  var cokN = Ep.builtin("cift-yumusak").curve;
+  var hizKodu = Ep.paylasimKodla({ tur: "hiz", ad: "Dalış", keys: [[0, 100], [0.5, 30], [1, 100]], hit: 0.5 });
+  var pano = { metin: "" };
+  var p12 = kur({ pano: pano, cevap: function () { throw new Error("çağrılmamalı"); } });
+  ok("paylaşım: init'te önayar satırı gizli (hazır eğri seçili), kod kutusu boş", p12.dom["egri-onayar-duzen"].hidden === true && p12.dom["egri-kod"].value === "");
+  // tek kod (adıyla) → düzenleyici; Önayar olarak kaydet kodun adını kullanır
+  var kodAdli = Ep.paylasimKodla({ ad: "Arkadaşımın eğrisi", curve: cokN });
+  p12.dom["egri-kod"].value = "https://suflo.app/egri#" + kodAdli;
+  p12.dom["egri-kod-yukle"].tetikle("click");
+  ok("Kod yapıştır: bağlantıdaki tek eğri düzenleyiciye gelir, kutu boşalır, durum adıyla", js(p12.G._durum().egri) === js(Ep.normalize(cokN)) && p12.dom["egri-kod"].value === "" &&
+    p12.dom["egri-status"].textContent === "Yüklendi: Arkadaşımın eğrisi. Saklamak için Önayar olarak kaydet." && p12.G._durum().seciliOnayar === "", p12.dom["egri-status"].textContent);
+  p12.dom["egri-kaydet"].tetikle("click");
+  var on12 = JSON.parse(p12.depo["suflo.egri.onayarlar"]);
+  ok("Önayar olarak kaydet: koddan yüklenen eğri kodun adıyla saklanır; önayar satırı adla görünür", on12.length === 1 && on12[0].ad === "Arkadaşımın eğrisi" &&
+    p12.dom["egri-onayar-duzen"].hidden === false && p12.dom["egri-onayar-ad"].value === "Arkadaşımın eğrisi", js(on12));
+  // Kodu kopyala: seçili kendi önayarının adıyla kod + bağlantı
+  p12.dom["egri-kod-kopyala"].tetikle("click");
+  await bekle(5);
+  var kopyalanan = pano.metin.split("\n");
+  ok("Kodu kopyala: SFC1 kodu + suflo.app/egri bağlantısı panoya, önayarın adı kodda; bildirim", kopyalanan.length === 2 && Ep.paylasimCoz(kopyalanan[0]).ad === "Arkadaşımın eğrisi" &&
+    kopyalanan[1] === "https://suflo.app/egri#" + kopyalanan[0] && p12.toastlar.some(function (t) { return t.m === "Eğri kodu ve suflo.app/egri bağlantısı kopyalandı"; }), pano.metin);
+  // cubic-bezier (CSS bildirimi, y kırpılır)
+  p12.dom["egri-kod"].value = "transition: transform .4s cubic-bezier(0.6, -1.8, 0.3, 1.2);";
+  p12.dom["egri-kod-yukle"].tetikle("click");
+  ok("Kod yapıştır: CSS bildirimindeki cubic-bezier yüklenir, y -1'e kırpılır (uyarı)", p12.dom["egri-css"].value === "cubic-bezier(0.6, -1, 0.3, 1.2)" &&
+    p12.dom["egri-status"].className.indexOf("warn") !== -1, p12.dom["egri-css"].value);
+  // satır satır birkaç kod → önayarlara; ikinci kez yineleme
+  var cokKod = [Ep.paylasimKodla({ ad: "Bir", curve: { type: "bezier", x1: 0.1, y1: 0, x2: 0.2, y2: 1 } }), Ep.paylasimKodla({ ad: "İki", curve: { type: "spring", response: 0.4, bounce: 0.3 } })].join("\n");
+  p12.dom["egri-kod"].value = cokKod;
+  p12.dom["egri-kod-yukle"].tetikle("click");
+  var on12b = JSON.parse(p12.depo["suflo.egri.onayarlar"]).map(function (o) { return o.ad; });
+  ok("Kod yapıştır: birden çok kod önayarlara eklenir (özet)", js(on12b) === js(["Arkadaşımın eğrisi", "Bir", "İki"]) && p12.dom["egri-status"].textContent === "Eğri önayarlarına eklendi: 2" &&
+    p12.dom["egri-onayarlar"].children.length === 18, p12.dom["egri-status"].textContent);
+  p12.dom["egri-kod"].value = cokKod;
+  p12.dom["egri-kod-yukle"].tetikle("click");
+  ok("Kod yapıştır: aynı kodlar ikinci kez eklenmez (yineleme, uyarı)", JSON.parse(p12.depo["suflo.egri.onayarlar"]).length === 3 &&
+    p12.dom["egri-status"].textContent === "Yeni önayar eklenmedi · 2 yineleme atlandı" && p12.dom["egri-status"].className.indexOf("warn") !== -1, p12.dom["egri-status"].textContent);
+  p12.dom["egri-kod"].value = hizKodu;
+  p12.dom["egri-kod-yukle"].tetikle("click");
+  ok("Kod yapıştır: Hız Rampası kodu Hız Rampası'na gider (o sekme yoksa saklanamadı uyarısı)", p12.dom["egri-status"].textContent === "Yeni önayar eklenmedi · 1 önayar saklanamadı", p12.dom["egri-status"].textContent);
+  p12.dom["egri-kod"].value = "merhaba dünya";
+  p12.dom["egri-kod-yukle"].tetikle("click");
+  ok("Kod yapıştır: tanınmayan metin nedeniyle uyarı; JSON gibi başlayan bozuk dosya metni ayrı uyarı", p12.dom["egri-status"].textContent === "Tanınmadı: SFC1 kodu, suflo.app/egri bağlantısı ya da cubic-bezier(…) yapıştır." &&
+    (p12.dom["egri-kod"].value = '{"a":1}', p12.dom["egri-kod-yukle"].tetikle("click"), p12.dom["egri-status"].textContent === "Tanınmayan dosya: .suflo-egri dosyası ya da bir eğri aracının JSON dışa aktarmasını seç."),
+    p12.dom["egri-status"].textContent);
+  // Enter ile yükle
+  var engel12 = 0;
+  p12.dom["egri-kod"].value = "ease-in";
+  p12.dom["egri-kod"].tetikle("keydown", { key: "Enter", target: p12.dom["egri-kod"], preventDefault: function () { engel12++; } });
+  ok("Kod kutusunda Enter yükler (önayar kısayolu değil)", p12.dom["egri-css"].value === "cubic-bezier(0.42, 0, 1, 1)" && engel12 === 1);
+  // cubic-bezier alanı da kod / bağlantı / CSS kabul eder
+  p12.dom["egri-css"].value = kodAdli;
+  p12.dom["egri-css"].tetikle("change");
+  ok("cubic-bezier alanı: SFC1 kodu yapıştırılınca eğri yüklenir", js(p12.G._durum().egri) === js(Ep.normalize(cokN)) && /^Yüklendi: Arkadaşımın eğrisi/.test(p12.dom["egri-status"].textContent));
+  p12.dom["egri-css"].value = "ease-out";
+  p12.dom["egri-css"].tetikle("change");
+  ok("cubic-bezier alanı: CSS anahtar sözcüğü; Hız Rampası kodu yönlendirilir", p12.dom["egri-css"].value === "cubic-bezier(0, 0, 0.58, 1)" &&
+    (p12.dom["egri-css"].value = hizKodu, p12.dom["egri-css"].tetikle("change"), /Hız Rampası kodu/.test(p12.dom["egri-status"].textContent)));
+  // yeniden adlandır ve taşı
+  var onIdler = JSON.parse(p12.depo["suflo.egri.onayarlar"]).map(function (o) { return o.id; });
+  var kartBul = function (x, id) { return x.dom["egri-onayarlar"].children.filter(function (c) { return c.getAttribute("data-id") === id; })[0]; };
+  kartBul(p12, onIdler[1]).tetikle("click");
+  ok("kendi önayarı seçilince satır: ad kutusu, ◀ ▶ (uçta kapalı değil)", p12.dom["egri-onayar-duzen"].hidden === false && p12.dom["egri-onayar-ad"].value === "Bir" &&
+    p12.dom["egri-onayar-sola"].disabled === false && p12.dom["egri-onayar-saga"].disabled === false);
+  p12.dom["egri-onayar-ad"].value = "  Birinci\u0007 ";
+  p12.dom["egri-onayar-adlandir"].tetikle("click");
+  ok("Adı değiştir: ad temizlenir, depo ve kart güncellenir; boş ad uyarı", JSON.parse(p12.depo["suflo.egri.onayarlar"])[1].ad === "Birinci" && kartBul(p12, onIdler[1]).getAttribute("title") === "Birinci" &&
+    (p12.dom["egri-onayar-ad"].value = "  ", p12.dom["egri-onayar-adlandir"].tetikle("click"), p12.dom["egri-status"].textContent === "Önayara bir ad yaz."), js(JSON.parse(p12.depo["suflo.egri.onayarlar"])));
+  p12.dom["egri-onayar-sola"].tetikle("click");
+  ok("◀: önayar bir sola, seçim korunur; en solda ◀ kapanır", js(JSON.parse(p12.depo["suflo.egri.onayarlar"]).map(function (o) { return o.id; })) === js([onIdler[1], onIdler[0], onIdler[2]]) &&
+    p12.G._durum().seciliOnayar === onIdler[1] && p12.dom["egri-onayar-sola"].disabled === true);
+  p12.dom["egri-onayar-saga"].tetikle("click");
+  p12.dom["egri-onayar-saga"].tetikle("click");
+  ok("▶ ▶: en sağa; ▶ kapanır", js(JSON.parse(p12.depo["suflo.egri.onayarlar"]).map(function (o) { return o.id; })) === js([onIdler[0], onIdler[2], onIdler[1]]) && p12.dom["egri-onayar-saga"].disabled === true);
+  // sürükle-bırak: yalnız kullanıcı kartları sürüklenebilir
+  var kSur = kartBul(p12, onIdler[1]), kHedef = kartBul(p12, onIdler[0]), dt = { setData: function () {} };
+  kSur.tetikle("dragstart", { dataTransfer: dt });
+  var izin = 0;
+  kHedef.tetikle("dragover", { dataTransfer: dt, preventDefault: function () { izin++; } });
+  kHedef.tetikle("drop", { dataTransfer: dt, preventDefault: function () {} });
+  ok("sürükle-bırak: kullanıcı kartı başka kullanıcı kartının yerine taşınır; hazır kartlar sürüklenmez", izin === 1 &&
+    js(JSON.parse(p12.depo["suflo.egri.onayarlar"]).map(function (o) { return o.id; })) === js([onIdler[1], onIdler[0], onIdler[2]]) &&
+    kSur.getAttribute("draggable") === "true" && p12.dom["egri-onayarlar"].children[0].getAttribute("draggable") === null);
+  ok("paylaşım: hiçbir eylem Premiere'e gitmez ve Pro kapısından geçmez", p12.cagri.length === 0 && p12.kapi.length === 0, js(p12.kapi));
+  // pano yoksa kod kutuya konur
+  var p12b = kur({ cevap: function () { return { ok: false }; } });
+  p12b.dom["egri-kod-kopyala"].tetikle("click");
+  await bekle(5);
+  ok("Kodu kopyala: pano yoksa kod kutuya konur, uyarı (Ctrl+C)", Ep.paylasimCoz(p12b.dom["egri-kod"].value).ok && p12b.dom["egri-status"].textContent === "Kopyalanamadı; kod aşağıdaki kutuda, Ctrl+C ile kopyala.");
+  // Dışa / içe aktar (window.cep.fs pencereleri + Node fs)
+  var yazilan = {}, okunacak = {}, pencereler = [];
+  var kfs = {
+    writeFileSync: function (p, m) { yazilan[p] = m; },
+    statSync: function (p) { return { size: Buffer.byteLength(okunacak[p] || "", "utf8") }; },
+    readFileSync: function (p) { if (!(p in okunacak)) throw new Error("ENOENT"); return okunacak[p]; },
+    existsSync: function () { return false; }
+  };
+  var secilecek = "/ev/egriler";
+  var cepFs = {
+    showSaveDialogEx: function (baslik, bas, turler, ad) { pencereler.push(["kaydet", baslik, js(turler), ad]); return { err: 0, data: secilecek }; },
+    showOpenDialogEx: function (cok, klasor, baslik, bas, turler) { pencereler.push(["ac", baslik, js(turler)]); return { err: 0, data: secilecek ? [secilecek] : [] }; }
+  };
+  var p13 = kur({ cepFs: cepFs, kfs: kfs, cevap: function () { throw new Error("çağrılmamalı"); } });
+  p13.dom["egri-disa-aktar"].tetikle("click");
+  ok("Dışa aktar: önayar yoksa uyarı, pencere açılmaz", pencereler.length === 0 && p13.dom["egri-status"].textContent === "Dışa aktarılacak önayar yok: önce bir eğriyi Önayar olarak kaydet.");
+  p13.dom["egri-kod"].value = cokKod;
+  p13.dom["egri-kod-yukle"].tetikle("click");
+  p13.dom["egri-disa-aktar"].tetikle("click");
+  var dosyaMetni = yazilan["/ev/egriler.suflo-egri"];
+  ok("Dışa aktar: kaydetme penceresi (.suflo-egri, varsayılan ad); uzantı eklenir; dosya geri okunur", !!dosyaMetni && pencereler[0][0] === "kaydet" && pencereler[0][2] === js(["suflo-egri"]) &&
+    pencereler[0][3] === "suflo-egriler.suflo-egri" && Ep.dosyaOku(dosyaMetni).presets.length === 2 && p13.dom["egri-status"].textContent === "Dışa aktarıldı: 2 önayar → /ev/egriler.suflo-egri",
+    p13.dom["egri-status"].textContent);
+  // içe aktar: dış biçim (anahtar adı birleştirilerek) + BOM, yineleme
+  var disO = {}; disO["open" + "curve"] = 1;
+  disO.presets = [{ name: "Dış kübik", curve: [0.3, 0.1, 0.1, 1] }, { name: "Dış çok noktalı", curve: { points: [[0, 0], [0.4, 0.9], [1, 1]] } }, { name: "Yay", curve: { type: "spring" } }];
+  okunacak["/ev/dis.json"] = "﻿" + JSON.stringify(disO);
+  secilecek = "/ev/dis.json";
+  p13.dom["egri-ice-aktar"].tetikle("click");
+  var on13 = JSON.parse(p13.depo["suflo.egri.onayarlar"]).map(function (o) { return o.ad; });
+  ok("İçe aktar: açma penceresi (.suflo-egri, json); dış biçimin tek kübik ve çok noktalı eğrileri eklenir, tanınmayan uyarıyla atlanır", pencereler[1][0] === "ac" &&
+    pencereler[1][2] === js(["suflo-egri", "json"]) && js(on13) === js(["Bir", "İki", "Dış kübik", "Dış çok noktalı"]) &&
+    p13.dom["egri-status"].textContent === "Eğri önayarlarına eklendi: 2 · 1 tanınmayan eğri atlandı (yalnız tek kübik ve çok noktalı eğriler okunur)", p13.dom["egri-status"].textContent);
+  okunacak["/ev/buyuk.suflo-egri"] = new Array(70000).join("a");
+  secilecek = "/ev/buyuk.suflo-egri";
+  p13.dom["egri-ice-aktar"].tetikle("click");
+  ok("İçe aktar: 64 KB'tan büyük dosya okunmadan reddedilir", p13.dom["egri-status"].textContent === "Dosya çok büyük (en çok 64 KB).");
+  var once13 = p13.dom["egri-status"].textContent;
+  secilecek = "";
+  p13.dom["egri-ice-aktar"].tetikle("click");
+  ok("İçe aktar: pencere iptal edilince hiçbir şey değişmez", p13.dom["egri-status"].textContent === once13 && JSON.parse(p13.depo["suflo.egri.onayarlar"]).length === 4);
+  okunacak["/ev/tek.suflo-egri"] = Ep.dosyaYaz([{ ad: "Tek", curve: { type: "bezier", x1: 0.9, y1: 0, x2: 0.1, y2: 1 } }]).metin;
+  secilecek = "/ev/tek.suflo-egri";
+  p13.dom["egri-ice-aktar"].tetikle("click");
+  var tekId = JSON.parse(p13.depo["suflo.egri.onayarlar"]).filter(function (o) { return o.ad === "Tek"; })[0];
+  ok("İçe aktar: tek eğri eklenince seçilir ve düzenleyiciye gelir", !!tekId && p13.G._durum().seciliOnayar === tekId.id && p13.dom["egri-css"].value === "cubic-bezier(0.9, 0, 0.1, 1)" &&
+    p13.dom["egri-onayar-duzen"].hidden === false && p13.dom["egri-onayar-ad"].value === "Tek");
+  var p13b = kur({ cevap: function () { return { ok: false }; } });
+  p13b.dom["egri-ice-aktar"].tetikle("click");
+  ok("İçe aktar: dosya penceresi yoksa (CEP dışı) kopyala-yapıştır önerilir", p13b.dom["egri-status"].textContent === "Dosya penceresi açılamadı; kodu kopyalayıp yapıştırarak paylaş.");
+  ok("dosya işlemleri de Premiere'e gitmez, kapısız", p13.cagri.length === 0 && p13.kapi.length === 0);
+  // Uygula hâlâ 'curves' kapısından (içe aktarılan eğriyle)
+  var p14 = kur({ kurulu: false, cevap: function (fn) { if (fn === "KS_easePeek") return peek(12.5); if (fn === "KS_easeScan") return tarama(12.5, ikiProp(12.5)); return { ok: false }; } });
+  p14.dom["egri-kod"].value = kodAdli;
+  p14.dom["egri-kod-yukle"].tetikle("click");
+  p14.ctx._tab.egri(); await bekle(10);
+  await p14.G.uygula();
+  ok("içe aktarılan eğriyi uygulamak 'curves' kapısından (3 deneme) geçer; kapı kapalıyken yazılmaz", p14.kapi.length === 1 && p14.kapi[0][0] === "curves" && p14.kapi[0][1].deneme === true &&
+    p14.cagriAdlari().indexOf("KS_easeBake") === -1);
+  // İngilizce
+  var I18N15 = require(path.join(KOK, "js", "i18n.js"));
+  I18N15.setDictionary(require(path.join(KOK, "i18n", "en.js")));
+  ok("İngilizce: paylaşım metinleri ve özet kalıpları", I18N15.translate("Kodu kopyala") === "Copy code" && I18N15.translate("Paylaş ve içe aktar") === "Share and import" &&
+    I18N15.translate("Eğri önayarlarına eklendi: 3") === "Added to curve presets: 3" && I18N15.translate("2 yineleme atlandı") === "2 duplicates skipped" &&
+    I18N15.translate("Dışa aktarıldı: 4 önayar →") === "Exported: 4 presets →" && I18N15.translate("5 eğri sığmadı (en çok 24 önayar)") === "5 curves didn't fit (up to 24 presets)");
 
   /* ---------- 11) bağlantılar ---------- */
   var HTML = oku("index.html"), APP = oku("js/app.js");

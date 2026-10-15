@@ -1595,8 +1595,19 @@
       <div class="row hiz-ozel-kayit-satir">
         <input id="hiz-ozel-ad" type="text" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Özel rampa adı">
         <button id="hiz-ozel-kaydet" class="btn tiny" type="button" title="Bu eğriyi adıyla sakla (bu bilgisayarda, en çok 12)">Kaydet</button>
+        <button id="hiz-ozel-adlandir" class="btn tiny" type="button" title="Seçili kayıtlı rampanın adını kutudaki adla değiştir" disabled>Adı değiştir</button>
       </div>
       <div id="hiz-ozel-kayitlar" class="hiz-ozel-kayitlar" role="group" aria-label="Kayıtlı özel rampalar" hidden></div>
+      <div class="row hiz-ozel-paylas">
+        <input id="hiz-ozel-kod" type="text" maxlength="4096" spellcheck="false" autocomplete="off" placeholder="Hız Rampası kodu (SFC1) yapıştır" aria-label="Hız Rampası kodu yapıştır">
+        <button id="hiz-ozel-kod-yukle" class="btn tiny" type="button" title="Tek kod düzenleyiciye gelir; birden çok kod kayıtlı rampalara eklenir">Yükle</button>
+      </div>
+      <div class="row hiz-ozel-paylas-eylem">
+        <button id="hiz-ozel-kod-kopyala" class="btn tiny" type="button" title="Bu özel eğrinin SFC1 kodunu ve suflo.app/egri bağlantısını kopyala">Kodu kopyala</button>
+        <button id="hiz-ozel-ice-aktar" class="btn tiny" type="button" title=".suflo-egri dosyasını oku (özel rampalar buraya, eğriler Eğri sekmesine)">İçe aktar…</button>
+        <button id="hiz-ozel-disa-aktar" class="btn tiny" type="button" title="Kayıtlı özel rampaları .suflo-egri dosyasına yaz">Dışa aktar…</button>
+      </div>
+      <p class="hint hiz-ozel-paylas-ipucu">Paylaşmak ücretsiz; kayıtlı rampaları sürükleyerek sıralayabilirsin. Uygulamak yine Rampayı uygula'dan geçer.</p>
     </div>
     <div class="hiz-onizleme-kutu">
       <!-- aria-label SVG'nin dışında: çeviri SVG'ye girmez, İngilizce ekran okuyucu da çevrilmiş adı duysun -->
@@ -1713,6 +1724,27 @@
       </div>
     </div>
     <div id="egri-onayarlar" class="egri-onayarlar" role="group" aria-label="Hazır eğriler"></div>
+    <div id="egri-onayar-duzen" class="row egri-onayar-duzen" hidden>
+      <input id="egri-onayar-ad" type="text" maxlength="40" spellcheck="false" autocomplete="off" aria-label="Önayar adı">
+      <button id="egri-onayar-adlandir" class="btn tiny" type="button" title="Seçili önayarın adını değiştir">Adı değiştir</button>
+      <button id="egri-onayar-sola" class="btn tiny" type="button" title="Önayarı bir sola taşı (kartları sürükleyerek de sıralayabilirsin)" aria-label="Önayarı sola taşı">◀</button>
+      <button id="egri-onayar-saga" class="btn tiny" type="button" title="Önayarı bir sağa taşı (kartları sürükleyerek de sıralayabilirsin)" aria-label="Önayarı sağa taşı">▶</button>
+    </div>
+    <div id="egri-paylas" class="egri-paylas" role="group" aria-label="Paylaş ve içe aktar">
+      <div class="egri-paylas-bas">
+        <b>Paylaş ve içe aktar</b>
+        <span class="hint">Ücretsiz. Kod tek satırdır (suflo.app/egri bağlantısıyla); dosya kendi önayarlarının hepsini taşır.</span>
+      </div>
+      <div class="row egri-kod-satir">
+        <input id="egri-kod" type="text" maxlength="4096" spellcheck="false" autocomplete="off" placeholder="SFC1 kodu, bağlantı ya da cubic-bezier(…) yapıştır" aria-label="Eğri kodu yapıştır">
+        <button id="egri-kod-yukle" class="btn tiny" type="button" title="Tek eğri düzenleyiciye gelir; birden çok kod önayarlarına eklenir">Yükle</button>
+      </div>
+      <div class="row egri-paylas-eylem">
+        <button id="egri-kod-kopyala" class="btn tiny" type="button" title="Düzenleyicideki eğrinin SFC1 kodunu ve suflo.app/egri bağlantısını kopyala">Kodu kopyala</button>
+        <button id="egri-ice-aktar" class="btn tiny" type="button" title=".suflo-egri dosyasını ya da bir eğri aracının JSON dışa aktarmasını oku (en çok 64 KB, 32 önayar)">İçe aktar…</button>
+        <button id="egri-disa-aktar" class="btn tiny" type="button" title="Kaydettiğin eğri önayarlarını .suflo-egri dosyasına yaz">Dışa aktar…</button>
+      </div>
+    </div>
     <div class="egri-liste-bas">
       <b>Özellikler</b>
       <button id="egri-yenile" class="btn tiny" type="button" title="Klibi ve anahtar kareleri yeniden oku">↻ Yenile</button>

@@ -336,6 +336,34 @@ function sonCagri(h, fn) { return h.cagri.filter(function (c) { return c.fn === 
   ok("Eğri sekmesinde silinmiş önayarın kodu yine geçerli: eğri ve adı koddan", /^SFC1\./.test(silinmis.secici("hareket").deger()) &&
     sinifli(silinmis.dom["preset-egri"], "egri-secici-ad")[0].textContent === "Silinen önayar");
 
+  /* ---------- 5b) yapıştır (3.4 adım 15): kod, bağlantı, cubic-bezier, CSS her seçicide ---------- */
+  var y = kur();
+  var degisen = [];
+  var kodKutu = function (h, id) { return sinifli(paneli(h.dom[id]), "egri-secici-kod")[0]; };
+  var hataKutu = function (h, id) { return sinifli(paneli(h.dom[id]), "egri-secici-hata")[0]; };
+  dugmesi(y.dom["gecis-egri"]).tetikle("click");
+  ok("yapıştır kutusu panelde (yer tutucu, etiket); hata satırı gizli", !!kodKutu(y, "gecis-egri") && kodKutu(y, "gecis-egri").getAttribute("placeholder") === "SFC1 kodu ya da cubic-bezier(…) yapıştır" &&
+    hataKutu(y, "gecis-egri").hidden === true && sinifli(paneli(y.dom["gecis-egri"]), "egri-secici-kullan")[0].textContent === "Kullan");
+  kodKutu(y, "gecis-egri").value = "transition-timing-function: cubic-bezier(.2, 0, 0, 1);";
+  var engelY = 0, durduY = 0;
+  kodKutu(y, "gecis-egri").tetikle("keydown", { key: "Enter", preventDefault: function () { engelY++; }, stopPropagation: function () { durduY++; } });
+  ok("Enter: CSS bildirimindeki cubic-bezier seçilir (kanonik), panel kapanır, kutu boşalır", y.secici("gecis").deger() === "cubic-bezier(0.2, 0, 0, 1)" &&
+    paneli(y.dom["gecis-egri"]).hidden === true && kodKutu(y, "gecis-egri").value === "" && engelY === 1 && durduY === 1 && JSON.parse(y.depo["suflo.egri.secim"]).gecis === "cubic-bezier(0.2, 0, 0, 1)");
+  var adliKod = E.paylasimKodla({ ad: "Arkadaşın eğrisi", curve: E.builtin("cift-yumusak").curve });
+  ok("api.yapistir: suflo.app/egri bağlantısı → kod, düğmede kodun adı", y.secici("zoom").yapistir("https://suflo.app/en/egri#" + adliKod) === true &&
+    y.secici("zoom").deger() === adliKod && sinifli(y.dom["zoom-egri"], "egri-secici-ad")[0].textContent === "Arkadaşın eğrisi");
+  dugmesi(y.dom["preset-egri"]).tetikle("click");
+  ok("Hız Rampası kodu: seçilmez, panelde nedeni yazar; panel açık kalır", y.secici("hareket").yapistir(E.paylasimKodla({ tur: "hiz", keys: [[0, 100], [1, 300]] })) === false &&
+    y.secici("hareket").deger() === "auto" && hataKutu(y, "preset-egri").hidden === false && /Hız Rampası kodu/.test(hataKutu(y, "preset-egri").textContent) &&
+    paneli(y.dom["preset-egri"]).hidden === false);
+  ok("boş / bozuk / x aralık dışı: nedenleriyle", y.secici("hareket").yapistir("  ") === false && hataKutu(y, "preset-egri").textContent === "Yapıştırılacak bir kod yok." &&
+    y.secici("hareket").yapistir("SFC1.@@@") === false && hataKutu(y, "preset-egri").textContent === "Kod eksik ya da bozuk; baştan sona yeniden kopyala." &&
+    y.secici("hareket").yapistir("cubic-bezier(1.5, 0, 0, 1)") === false && /^Geçersiz cubic-bezier/.test(hataKutu(y, "preset-egri").textContent));
+  ok("y kırpılırsa uyarı bildirimi; geçerli seçim hata satırını gizler", y.secici("hareket").yapistir("cubic-bezier(0.5, -3, 0.5, 1)") === true &&
+    y.secici("hareket").deger() === "cubic-bezier(0.5, -1, 0.5, 1)" && hataKutu(y, "preset-egri").hidden === true &&
+    y.toastlar.some(function (t) { return t.m === "cubic-bezier'in y değerleri -1–2 aralığına kırpıldı." && t.t === "warn"; }));
+  ok("yapıştırmak da Premiere'e gitmez ve kapıdan geçmez", y.cagri.length === 0 && y.kapi.length === 0);
+
   /* ---------- 6) İngilizce ---------- */
   var en = kur({ dil: "en", depo: { "suflo.egri.secim": js({ gecis: "ziplama" }) } });
   var enKart = kartAc(en, "zoom-egri");

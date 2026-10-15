@@ -14,6 +14,11 @@
  * düzenlemede (80 ms ertelenerek) önizleme ve okuma satırı yeniden çizilir: saf, K.call yok. Son özel eğri ve en çok
  * 12 adlı özel rampa bu görüntüleyicinin yerel deposunda (her erişim korumalı). Uygulama aynı 'speedramp' kapısından
  * ve 3 deneme hakkından geçer; plan aynı yoldan (SufloSpeedRamp.plan 'ozel').
+ *
+ * Paylaşım (3.4 adım 15, ücretsiz; uygulamak yine 'speedramp' kapısından): Kodu kopyala (SFC1 'hiz' kodu + suflo.app/egri
+ * bağlantısı), kod kutusu (tek kod düzenleyiciye; birden çok kod / dosya metni kayıtlı rampalara, içindeki eğriler Eğri
+ * sekmesine), İçe aktar / Dışa aktar (.suflo-egri; window.cep.fs pencereleri, js/egri.js SufloEgriPaylas), kayıtlı
+ * rampaları yeniden adlandırma ve sürükleyerek sıralama. Kod / dosya biçimi SufloEase'te, liste işlemleri SufloSpeedRamp'te.
  */
 window.KHizRampasi = (function () {
   "use strict";
@@ -559,17 +564,48 @@ window.KHizRampasi = (function () {
 
   /* ---- adlı özel rampalar (bu görüntüleyicinin yerel deposu, en çok 12) ---- */
   function ozelKayitlar() { return SR.ozelKayitlar(depoOku(OZEL_KAYIT_ANAHTAR, [])); }
+  var seciliKayit = "";      // seçili (yüklenen) kayıtlı rampa: Adı değiştir onu yeniden adlandırır (3.4 adım 15)
+  var suruklenenKayit = "";  // sürüklenen kayıt
+  function kayitSinif(e, ad, on) { try { if (e.classList) e.classList.toggle(ad, !!on); } catch (eS) {} }
+  // Kayıt çipini sürüklenebilir yap: başka bir çipin üstüne bırakınca o sıraya taşınır (3.4 adım 15)
+  function kayitSurukleBagla(b, k) {
+    b.setAttribute("draggable", "true");
+    b.draggable = true;
+    b.addEventListener("dragstart", function (e) {
+      suruklenenKayit = k.id;
+      try { if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", k.id); } } catch (eD) {}
+      kayitSinif(b, "surukleniyor", true);
+    });
+    b.addEventListener("dragover", function (e) {
+      if (!suruklenenKayit || suruklenenKayit === k.id) return;
+      if (e && e.preventDefault) e.preventDefault();
+      kayitSinif(b, "birak", true);
+    });
+    b.addEventListener("dragleave", function () { kayitSinif(b, "birak", false); });
+    b.addEventListener("drop", function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      kayitSinif(b, "birak", false);
+      var id = suruklenenKayit;
+      suruklenenKayit = "";
+      if (id && id !== k.id) ozelKayitSurukle(id, k.id);
+    });
+    b.addEventListener("dragend", function () { suruklenenKayit = ""; kayitSinif(b, "surukleniyor", false); });
+  }
   function ozelKayitlariCiz() {
     var kap = el("hiz-ozel-kayitlar");
+    var liste = ozelKayitlar();
+    if (seciliKayit && !liste.some(function (x) { return x.id === seciliKayit; })) seciliKayit = "";
+    var ad = el("hiz-ozel-adlandir");
+    if (ad) ad.disabled = !seciliKayit;
     if (!kap) return;
     kap.innerHTML = "";
-    var liste = ozelKayitlar();
     kap.hidden = !liste.length;
     liste.forEach(function (k) {
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "hiz-ozel-kayit";
+      b.className = "hiz-ozel-kayit" + (k.id === seciliKayit ? " on" : "");
       b.setAttribute("data-id", k.id);
+      b.setAttribute("aria-pressed", k.id === seciliKayit ? "true" : "false");
       var ad = document.createElement("span");
       // kullanıcının verdiği ad çevrilmez
       ad.setAttribute("data-i18n-skip", "");
@@ -582,6 +618,7 @@ window.KHizRampasi = (function () {
       x.textContent = "×";
       x.addEventListener("click", function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); ozelKayitSil(k.id); });
       b.appendChild(x);
+      kayitSurukleBagla(b, k);
       b.addEventListener("click", function () { ozelKayitSec(k.id); });
       kap.appendChild(b);
     });
@@ -591,6 +628,11 @@ window.KHizRampasi = (function () {
     var k = ozelKayitlar().filter(function (x) { return x.id === id; })[0];
     if (!k) return;
     ozelAta(k.keys, k.hit);
+    seciliKayit = k.id;
+    // ad kutusuna kaydın adı gelir: Kaydet aynı adla günceller, Adı değiştir yeniden adlandırır
+    var girdi = el("hiz-ozel-ad");
+    if (girdi) girdi.value = k.ad;
+    ozelKayitlariCiz();
     durum(["Yüklendi: ", { ad: k.ad }], "good");
   }
   function ozelKayitKaydet() {
@@ -602,15 +644,128 @@ window.KHizRampasi = (function () {
     if (!depoYaz(OZEL_KAYIT_ANAHTAR, r.liste)) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return; }
     var kayit = r.liste.filter(function (x) { return x.id === r.id; })[0];
     if (girdi) { girdi.value = ""; girdi.setAttribute("placeholder", SR.ozelKayitAdi(r.liste, tr)); }
+    seciliKayit = r.id;
     ozelKayitlariCiz();
     durum([r.guncellendi ? "Güncellendi: " : "Kaydedildi: ", { ad: kayit ? kayit.ad : ad }], "good");
   }
   function ozelKayitSil(id) {
     var liste = SR.ozelKayitSil(ozelKayitlar(), id);
     depoYaz(OZEL_KAYIT_ANAHTAR, liste);
+    if (seciliKayit === id) seciliKayit = "";
     var girdi = el("hiz-ozel-ad");
     if (girdi) girdi.setAttribute("placeholder", SR.ozelKayitAdi(liste, tr));
     ozelKayitlariCiz();
+  }
+
+  /* ---- paylaşım (3.4 adım 15; ücretsiz, Premiere'e gitmez; uygulamak yine 'speedramp' kapısından) ---- */
+  function P() { return window.SufloEgriPaylas || null; }
+  function EZ() { return window.SufloEase || null; }
+  function paylasimHatasi(kod) { var p = P(); return p ? p.hataMetni(kod) : "Geçersiz kod."; }
+  // Seçili kaydı ad kutusundaki adla yeniden adlandır
+  function ozelKayitAdlandir() {
+    var girdi = el("hiz-ozel-ad");
+    var r = SR.ozelKayitAdlandir(ozelKayitlar(), seciliKayit, girdi ? String(girdi.value || "") : "");
+    if (!r.ok) {
+      durum(r.kod === "ayni" ? "Bu adla başka bir özel rampa var; başka bir ad yaz." : r.kod === "ad" ? "Özel rampaya bir ad yaz." : "Önce kayıtlı bir rampa seç.", "warn");
+      return false;
+    }
+    if (!depoYaz(OZEL_KAYIT_ANAHTAR, r.liste)) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return false; }
+    var k = r.liste.filter(function (x) { return x.id === seciliKayit; })[0];
+    ozelKayitlariCiz();
+    durum(["Adı değişti: ", { ad: k ? k.ad : "" }], "good");
+    return true;
+  }
+  function ozelKayitSurukle(id, hedefId) {
+    var once = ozelKayitlar(), h = -1;
+    once.forEach(function (x, i) { if (x.id === hedefId) h = i; });
+    if (h < 0) return;
+    if (!depoYaz(OZEL_KAYIT_ANAHTAR, SR.ozelKayitTasi(once, id, h))) { durum("Özel rampa bu bilgisayarda saklanamadı.", "warn"); return; }
+    ozelKayitlariCiz();
+  }
+  // Paylaşılacak ad: seçili kayıt (eğri aynıysa), yoksa ad kutusuna yazılan ad
+  function paylasilacakAd() {
+    var k = ozelKayitlar().filter(function (x) { return x.id === seciliKayit; })[0];
+    if (k && SR.ozelAyni(k, ozel)) return k.ad;
+    var girdi = el("hiz-ozel-ad");
+    return girdi ? String(girdi.value || "") : "";
+  }
+  function ozelKodKopyala() {
+    var E = EZ(), p = P();
+    var kod = E ? E.paylasimKodla({ tur: "hiz", ad: paylasilacakAd(), keys: ozel.keys, hit: ozel.hit }) : null;
+    if (!kod || !p) { durum("Bu özel eğri paylaşılamadı.", "warn"); return; }
+    var I = window.SufloI18n, dil = I && I.getLang ? I.getLang() : "tr";
+    p.kopyala(kod + "\n" + E.egriAdresi(kod, dil), function (ok) {
+      if (ok) { if (window.KApp && KApp.toast) KApp.toast("Hız Rampası kodu ve suflo.app/egri bağlantısı kopyalandı", "good", 7000); return; }
+      var g = el("hiz-ozel-kod");
+      if (g) { g.value = kod; try { if (g.focus) g.focus(); if (g.select) g.select(); } catch (e) {} }
+      durum("Kopyalanamadı; kod aşağıdaki kutuda, Ctrl+C ile kopyala.", "warn");
+    });
+  }
+  function iceAlGoster(r) {
+    var p = P();
+    if (!p) { durum(paylasimHatasi("diyalog"), "warn"); return false; }
+    var s = p.iceAl(r);
+    durum(s.ozet.parcalar, s.ozet.uyari ? "warn" : "good");
+    return s.ozet.eklenen > 0;
+  }
+  /*
+   * Kod kutusu: tek Hız Rampası kodu düzenleyiciye gelir (adı ad kutusuna; Kaydet ile saklanır); tek eğri kodu /
+   * cubic-bezier burada kullanılamaz (Eğri sekmesine yönlendirilir); birden çok kod ya da dosya metni önayarlara eklenir
+   * (hız eğrileri kayıtlı rampalara, eğriler Eğri sekmesine).
+   */
+  function ozelKodYukle() {
+    if (mesgul) return false;
+    var E = EZ(), g = el("hiz-ozel-kod"), metin = g ? String(g.value || "") : "";
+    if (!E) { durum(paylasimHatasi("bozuk"), "warn"); return false; }
+    var r = E.iceAktar(metin);
+    if (!r.ok) { durum(paylasimHatasi(/^\s*\{/.test(metin) && r.hata === "bicim" ? "dosyaBicim" : r.hata), "warn"); return false; }
+    var tek = (r.bicim === "kod" || r.bicim === "css") && r.presets.length === 1 && !r.uyarilar.length && !r.yinelenen;
+    if (tek && r.presets[0].tur === "egri") { durum(paylasimHatasi("egriKodu"), "warn"); return false; }
+    if (g) g.value = "";
+    if (tek) {
+      var p = r.presets[0];
+      ozelAta(p.keys, p.hit);
+      seciliKayit = "";
+      var girdi = el("hiz-ozel-ad");
+      if (girdi) girdi.value = p.ad || "";
+      ozelKayitlariCiz();
+      durum(p.ad ? ["Yüklendi: ", { ad: p.ad }, ". Saklamak için Kaydet'e bas."] : "Özel eğri yüklendi. Saklamak için Kaydet'e bas.", "good");
+      return true;
+    }
+    return iceAlGoster(r);
+  }
+  function ozelDosyaIceAktar() {
+    var E = EZ(), p = P();
+    if (!E || !p) { durum(paylasimHatasi("diyalog"), "warn"); return false; }
+    var d = p.dosyaAc("Eğri dosyası seç (.suflo-egri ya da JSON)");
+    if (!d.ok) { if (d.hata !== "iptal") durum(paylasimHatasi(d.hata), "warn"); return false; }
+    var r = E.iceAktar(d.metin);
+    if (!r.ok) { durum(paylasimHatasi(r.hata === "bicim" ? "dosyaBicim" : r.hata), "warn"); return false; }
+    return iceAlGoster(r);
+  }
+  function ozelDosyaDisaAktar() {
+    var E = EZ(), p = P();
+    if (!E || !p) { durum(paylasimHatasi("diyalog"), "warn"); return false; }
+    var liste = SR.ozelKayitlarDisa(ozelKayitlar());
+    if (!liste.length) { durum("Dışa aktarılacak özel rampa yok: önce bir eğriyi adıyla Kaydet.", "warn"); return false; }
+    var y = E.dosyaYaz(liste);
+    var s = p.dosyaKaydet(y.metin, "suflo-hiz-rampalari." + p.UZANTI, "Özel rampaları kaydet");
+    if (!s.ok) { if (s.hata !== "iptal") durum(paylasimHatasi(s.hata), "warn"); return false; }
+    durum(["Dışa aktarıldı: " + y.adet + " özel rampa → ", { ad: s.yol }], "good");
+    return true;
+  }
+  /*
+   * Başka sekmeden gelen özel rampaları ekle (SufloEgriPaylas.iceAl: Eğri sekmesinin İçe aktar'ı / kod kutusu).
+   * Döner: { ok (depoya yazıldı), eklenen: [id], yinelenen, dolu }
+   */
+  function ozelKayitlariIceAl(gelenler) {
+    if (!SR) return { ok: false, eklenen: [], yinelenen: 0, dolu: 0 };
+    var r = SR.ozelKayitlarIceAl(ozelKayitlar(), gelenler, Date.now(), tr);
+    if (r.eklenen.length && !depoYaz(OZEL_KAYIT_ANAHTAR, r.liste)) return { ok: false, eklenen: [], yinelenen: 0, dolu: 0 };
+    var girdi = el("hiz-ozel-ad");
+    if (girdi) girdi.setAttribute("placeholder", SR.ozelKayitAdi(r.liste, tr));
+    ozelKayitlariCiz();
+    return { ok: true, eklenen: r.eklenen, yinelenen: r.yinelenen, dolu: r.dolu };
   }
 
   // Kilitliyken de düğmenin adı "Rampayı uygula": tanıtım kartındaki deneme bildirimi bu adı söyler.
@@ -994,6 +1149,16 @@ window.KHizRampasi = (function () {
         if (e && (e.key === "Enter" || e.keyCode === 13)) { if (e.preventDefault) e.preventDefault(); ozelKayitKaydet(); }
       });
     }
+    // Paylaşım (3.4 adım 15): ücretsiz, Premiere'e gitmez
+    function bagla(id, olay, fn) { var e = el(id); if (e) e.addEventListener(olay, fn); }
+    bagla("hiz-ozel-adlandir", "click", function () { ozelKayitAdlandir(); });
+    bagla("hiz-ozel-kod-yukle", "click", function () { ozelKodYukle(); });
+    bagla("hiz-ozel-kod", "keydown", function (e) {
+      if (e && (e.key === "Enter" || e.keyCode === 13)) { if (e.preventDefault) e.preventDefault(); ozelKodYukle(); }
+    });
+    bagla("hiz-ozel-kod-kopyala", "click", ozelKodKopyala);
+    bagla("hiz-ozel-ice-aktar", "click", function () { ozelDosyaIceAktar(); });
+    bagla("hiz-ozel-disa-aktar", "click", function () { ozelDosyaDisaAktar(); });
     ozelKayitlariCiz();
   }
 
@@ -1047,6 +1212,13 @@ window.KHizRampasi = (function () {
     init: init,
     uygula: uygula,
     kaldir: kaldir,
+    // paylaşım (3.4 adım 15): Eğri sekmesinin İçe aktar'ı özel rampaları buraya ekler
+    ozelKayitlariIceAl: ozelKayitlariIceAl,
+    ozelKodYukle: ozelKodYukle,
+    ozelKodKopyala: ozelKodKopyala,
+    ozelDosyaIceAktar: ozelDosyaIceAktar,
+    ozelDosyaDisaAktar: ozelDosyaDisaAktar,
+    ozelKayitAdlandir: ozelKayitAdlandir,
     // testler / tanılama
     _sec: sec,
     _secili: function () { return secili; },
