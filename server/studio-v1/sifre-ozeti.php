@@ -1,0 +1,36 @@
+<?php
+/*
+ * Suflo Studio: giris sifresinin ozetini uretir (yalniz komut satirinda calisir).
+ *   php sifre-ozeti.php
+ * Ciktiyi private/studio-v1/config.php icindeki 'password_hash' alanina yapistir.
+ * Sifre ekrana yazilmaz, hicbir yere kaydedilmez.
+ */
+declare(strict_types=1);
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
+function sor(string $istem): string {
+    fwrite(STDOUT, $istem);
+    // Yazilan sifre ekranda gorunmesin (Linux / macOS terminali). stty basarili olduysa yanki geri acilir.
+    $gizle = false;
+    if (DIRECTORY_SEPARATOR === '/' && function_exists('exec')) {
+        $cikti = [];
+        $kod = 1;
+        @exec('stty -echo 2>/dev/null', $cikti, $kod);
+        $gizle = $kod === 0;
+    }
+    $s = fgets(STDIN);
+    if ($gizle) { @exec('stty echo 2>/dev/null'); fwrite(STDOUT, "\n"); }
+    return rtrim((string)$s, "\r\n");
+}
+
+$a = sor('Yeni sifre (en az 12 karakter): ');
+// mbstring olmayan PHP'de (Windows'ta varsayilan kapali) da calissin: karakterler UTF-8 olarak sayilir
+if (preg_match_all('/./us', $a) < 12) { fwrite(STDERR, "Sifre en az 12 karakter olmali.\n"); exit(1); }
+$b = sor('Yeni sifre (tekrar): ');
+if (!hash_equals($a, $b)) { fwrite(STDERR, "Sifreler ayni degil.\n"); exit(1); }
+$algo = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
+fwrite(STDOUT, password_hash($a, $algo) . "\n");

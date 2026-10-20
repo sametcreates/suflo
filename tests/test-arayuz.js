@@ -733,12 +733,15 @@ function yerelKap(senaryo) {
   };
   var kod = ["function iptalHatasiYap(", "function iptalDenetle(", "function canliZaman(", "function canliBaslat(", "function canliSatirDom(",
     "function canliEkle(", "function canliKirp(", "function canliBitir(", "async function yerelCalistir("].map(function (imza) { return fnGovde(capSrc, imza); }).join("\n");
-  var api = new Function("K", "WA", "WW", "el", "tc", "document", "status", "CANLI_GOSTER", "jeton",
+  // Saat sabit: yerelCalistir ilerlemeyi kaydederken ve durumu yazarken Date.now()'u ayrı ayrı okur; yavaş makinede
+  // arada 1 ms geçerse %25 bildirimi tek ms'lik hızla %50'ye sıçrar (gerçek kullanımda model yüklemesi saniyeler sürer)
+  var sabitSaat = { now: function () { return 1700000000000; } };
+  var api = new Function("K", "WA", "WW", "el", "tc", "document", "status", "CANLI_GOSTER", "jeton", "Date",
     "var aktifIptal = jeton, canliIs = null, algilananDil = '';\nfunction dilKodu(x) { return x; }\n" + kod +
     "\nreturn { yerelCalistir: yerelCalistir, canliBaslat: canliBaslat, is: function () { return canliIs; }, ayarla: function (o) { for (var k in o) canliIs[k] = o[k]; } };")(
     K2, require(KOKYOL + "js/whisper-akis.js"), require(KOKYOL + "js/whisper-words.js"), function (id) { return dom2[id] || null; },
     function (sn) { var t = Math.round(sn * 1000), m = Math.floor(t % 3600000 / 60000), s2 = Math.floor(t % 60000 / 1000); return "00:" + (m < 10 ? "0" : "") + m + ":" + (s2 < 10 ? "0" : "") + s2 + ".000"; },
-    { createElement: function () { return sahteDugum(); } }, function (m) { durumlar.push(m); }, 200, senaryo.jeton || null);
+    { createElement: function () { return sahteDugum(); } }, function (m) { durumlar.push(m); }, 200, senaryo.jeton || null, sabitSaat);
   return { api: api, dom: dom2, durumlar: durumlar };
 }
 var outBaseC = pathm.join(calismaDiz, "cap_1_w");
