@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /studio/
 
 Sitemap: https://suflo.app/sitemap.xml

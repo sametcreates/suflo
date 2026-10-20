@@ -40,3 +40,7 @@ jobs:
         run: php -l server/pro-v1/index.php && php -l server/pro-v1/config.example.php
       - name: Davet sunucusu (php -S + sahte Lemon Squeezy)
         run: node tests/test-referral-server.js
+      - name: Suflo Studio sunucusu (sozdizimi + php -S + SQLite)
+        run: |
+          php -l server/studio-v1/index.php && php -l server/studio-v1/config.example.php && php -l server/studio-v1/sifre-ozeti.php
+          node tests/test-studio-api.js
