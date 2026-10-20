@@ -576,6 +576,32 @@ async function calis() {
   await ayarDegistir({ dsn: "sqlite:" + eskiDb2 });
   r = await ist({ islem: "oturum" });
   ok("baska sema surumu (2): acik 503, uzerine kurulmaz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
+  // Eski gelistirme surumu: kayitlar bos ama tablolar eski kolonlarla (girisler kim'siz). Benimsenmez.
+  var eskiDb3 = path.join(PRIV, "eski3.sqlite").split("\\").join("/");
+  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE kayitlar (id TEXT)'); $p->exec('CREATE TABLE girisler (ip TEXT, zaman INTEGER, basarili INTEGER)');", eskiDb3]);
+  await ayarDegistir({ dsn: "sqlite:" + eskiDb3 });
+  r = await ist({ islem: "oturum" });
+  ok("eski gelistirme semasi (bos kayitlar, eski kolonlar): benimsenmez, 503 uyumsuz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
+  // Ayni veritabaninda baska bir uygulamanin "ayar" tablosu (dolu, sema yok): uzerine kurulmaz
+  var yabanciDb = path.join(PRIV, "yabanci.sqlite").split("\\").join("/");
+  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar TEXT PRIMARY KEY, deger TEXT)'); $p->exec(\"INSERT INTO ayar VALUES ('tema', 'koyu')\");", yabanciDb]);
+  await ayarDegistir({ dsn: "sqlite:" + yabanciDb });
+  r = await ist({ islem: "oturum" });
+  ok("dolu ama semasiz ayar tablosu: uzerine kurulmaz, 503 uyumsuz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
+  // Bu surumun yarim kalmis kurulumu ("kuruluyor-3" isareti, bazi tablolar eksik): kaldigi yerden tamamlanir
+  var yarimDb = path.join(PRIV, "yarim.sqlite").split("\\").join("/");
+  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)'); " +
+    "$p->exec(\"INSERT INTO ayar VALUES ('sema', 'kuruluyor-3')\"); $p->exec('CREATE TABLE oturumlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)');", yarimDb]);
+  await ayarDegistir({ dsn: "sqlite:" + yarimDb, login_max_fail: 50 });
+  r = await ist({ islem: "giris", sifre: SIFRE }, { cerez: "", cereziSakla: true });
+  var yarimSema = cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); echo $p->query(\"SELECT deger FROM ayar WHERE anahtar = 'sema'\")->fetchColumn();", yarimDb], { encoding: "utf8" }).stdout;
+  ok("isaretli yarim kurulum tamamlanir: giris calisir, sema 3 olur", r.status === 200 && yarimSema === "3", r.status + " " + j(r.json) + " sema=" + yarimSema);
+  // Yalniz bos ayar tablosu (MySQL'de isaret yazilmadan kesilen kurulum gibi): yeni kurulum yapilir
+  var bosAyarDb = path.join(PRIV, "bosayar.sqlite").split("\\").join("/");
+  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)');", bosAyarDb]);
+  await ayarDegistir({ dsn: "sqlite:" + bosAyarDb });
+  r = await ist({ islem: "oturum" });
+  ok("yalniz bos ayar tablosu: kurulum tamamlanir", r.status === 200 && r.json.ok === true, j(r.json));
 
   /* ---- Kurulum eksik ---- */
   // asil veritabanina don; kilit sinirini gevset ki sifirlama oncesi acik bir oturum alinabilsin
@@ -611,6 +637,28 @@ async function calis() {
   r = await ist({ islem: "giris", sifre: "sifirlanan-ornek-sifre-3" }, { cerez: "", cereziSakla: true });
   ok("kilitteyken reddedilen denemeler kilidi uzatmaz: pencere bitince dogru sifre girer", j(k1) === "[401,401]" && kiliTak.length > 3 && kiliTak.every(function (x) { return x === 429; }) && r.status === 200,
     j(k1) + " " + j(kiliTak) + " " + r.status);
+
+  /* ---- config.php sifirlamasi biriken hatali denemeleri de siler (sahibi kendi denemeleriyle kilitlenmez) ---- */
+  await ayarDegistir({ password_hash: yeniOzet, login_max_fail: 2, login_window: 900 });
+  var sahipDenemeleri = [];
+  for (i = 0; i < 3; i++) sahipDenemeleri.push((await ist({ islem: "giris", sifre: "hatirlanamayan-" + i }, { cerez: "", cereziSakla: true })).status);
+  var ikinciOzet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", "ikinci-sifirlama-sifre-4"], { encoding: "utf8" }).stdout;
+  await ayarDegistir({ password_hash: ikinciOzet, login_max_fail: 2, login_window: 900 });
+  r = await ist({ islem: "giris", sifre: "ikinci-sifirlama-sifre-4" }, { cerez: "", cereziSakla: true });
+  // (onceki kilit testlerinin denemeleri de bu 900 sn'lik pencerede: ilk denemeler de 429 olabilir; onemli olan sifirlama aninda kilitli olmak)
+  ok("sifirlama oncesi kilitlenen sahip, sifirlamadan hemen sonra girebilir", sahipDenemeleri[2] === 429 && r.status === 200, j(sahipDenemeleri) + " " + r.status);
+
+  /* ---- Yaris: eski config'i okumus bir giris, bu arada yapilan sifirlama temizliginden sonra oturum acamaz ---- */
+  var yavasOzet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_BCRYPT, ['cost' => 15]);", "yavas-ornek-sifre-5"], { encoding: "utf8" }).stdout;
+  await ayarDegistir({ password_hash: yavasOzet, login_max_fail: 50, login_window: 900 });
+  var yarisGiris = ist({ islem: "giris", sifre: "yavas-ornek-sifre-5" }, { cerez: "", cereziSakla: true });
+  await bekle(600);
+  // yeni ozetle gelen bir istegin yapacagi temizlik: oturumlar silinir, parmak izi yeni ozete gecer
+  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('DELETE FROM oturumlar'); $p->exec(\"UPDATE ayar SET deger = '\" . hash('sha256', 'iz|baska-ozet') . \"' WHERE anahtar = 'sifre_izi'\");",
+    path.join(PRIV, "studio.sqlite").split("\\").join("/")]);
+  r = await yarisGiris;
+  ok("temizlik sirasinda dogrulanan eski sifreyle oturum acilmaz", r.status === 401 && !r.setCookie, r.status + " " + j(r.json));
+
   await ayarDegistir({ password_hash: "" });
   r = await ist({ islem: "oturum" });
   ok("sifre ozeti bos: kurulu degil, giris 503", r.status === 200 && r.json.kurulu === false && (await ist({ islem: "giris", sifre: "x" })).status === 503, j(r.json));

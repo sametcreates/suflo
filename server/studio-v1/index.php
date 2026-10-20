@@ -25,6 +25,7 @@ header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 
 const STUDIO_SURUM = 1;
 const SEMA_SURUM = '3';
+const STUDIO_TABLOLARI = ['kayitlar', 'oturumlar', 'cihazlar', 'girisler', 'ayar', 'anliklar', 'sayac'];
 const GOVDE_SINIRI = 8 * 1024 * 1024;      // oturum acikken (ice aktarma)
 const ACIK_GOVDE_SINIRI = 16 * 1024;        // oturumsuz istekler (oturum, giris) icin
 const LISTE_SINIRI = 20000;                 // ice aktarmada tur basina en cok kayit
@@ -164,14 +165,28 @@ function sema_degeri(PDO $p): ?string {
         return null;
     }
 }
+/** Tablo var mi (kolonlarina bakilmaz). Mesgul hatasi yukari iletilir. */
+function tablo_var(PDO $p, string $t): bool {
+    try {
+        $s = $p->query("SELECT 1 FROM $t LIMIT 0");
+        $s->closeCursor();
+        return true;
+    } catch (Throwable $e) {
+        if (mesgul_mu($e)) throw $e;
+        return false;
+    }
+}
 /**
  * Tablolari bir kez kurar (ayar.sema surumu tutulur; her istekte DDL calismaz). Ayni anda gelen ilk istekler
- * kurulum kilidinde bekler (SQLite: BEGIN IMMEDIATE, MySQL: GET_LOCK). Yarim kalmis bir kurulum (sema yok, kayitlar
- * bos) kaldigi yerden tamamlanir. Baska surumun semasi (sema farkli ya da sema yok ama kayit var) uzerine sessizce
- * kurulmaz; acik bir kurulum hatasi doner.
+ * kurulum kilidinde bekler (SQLite: BEGIN IMMEDIATE, MySQL: GET_LOCK).
+ * Kurulum once ayar tablosuna "kuruluyor-<surum>" isareti yazar, tablolar bitince isareti surumle degistirir.
+ * Yalniz bu isaretli yarim kurulum kaldigi yerden tamamlanir (MySQL'de DDL kendiliginden onaylanir). Isaret yokken
+ * Studio tablolarindan biri zaten varsa (eski gelistirme surumu ya da ayni veritabanini kullanan baska bir uygulama)
+ * ya da sema baska bir surumse uzerine sessizce kurulmaz; acik bir kurulum hatasi doner.
  */
 function sema_kur(PDO $p): void {
     if (sema_degeri($p) === SEMA_SURUM) return;
+    $isaret = 'kuruluyor-' . SEMA_SURUM;
     $my = mysql();
     $metin = $my ? 'LONGTEXT' : 'TEXT';
     $son = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin' : '';
@@ -188,22 +203,31 @@ function sema_kur(PDO $p): void {
         $kilitli = true;
         $sema = sema_degeri($p);
         if ($sema !== SEMA_SURUM) {
-            if ($sema !== null) throw new RuntimeException('eski_sema');
-            $kayitVar = false;
-            try { $s = $p->query('SELECT COUNT(*) AS c FROM kayitlar'); $c = $s->fetch(); $s->closeCursor(); $kayitVar = (int)$c['c'] > 0; } catch (Throwable $e) {}
-            if ($kayitVar) throw new RuntimeException('eski_sema');
+            if ($sema === null) {
+                // Kurulum izi yok: yalniz hic Studio tablosu yoksa (ya da yalniz bos bir ayar tablosu varsa; MySQL'de
+                // ayar tablosu kurulup isaret yazilmadan kesilmis olabilir) yeni kurulum yapilir
+                foreach (STUDIO_TABLOLARI as $t) if ($t !== 'ayar' && tablo_var($p, $t)) throw new RuntimeException('eski_sema');
+                if (tablo_var($p, 'ayar')) {
+                    $s = $p->query('SELECT COUNT(*) AS c FROM ayar');
+                    $c = $s->fetch();
+                    $s->closeCursor();
+                    if ((int)$c['c'] > 0) throw new RuntimeException('eski_sema');
+                }
+            } elseif ($sema !== $isaret) {
+                throw new RuntimeException('eski_sema');
+            }
+            $p->exec("CREATE TABLE IF NOT EXISTS ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger $metin NOT NULL)$son");
+            if ($sema === null) $p->exec("INSERT INTO ayar (anahtar, deger) VALUES ('sema', '$isaret')");
             $p->exec("CREATE TABLE IF NOT EXISTS kayitlar (id VARCHAR(40) NOT NULL PRIMARY KEY, tur VARCHAR(10) NOT NULL, anahtar CHAR(64) NULL, veri $metin NOT NULL, surum BIGINT NOT NULL, olusturma BIGINT NOT NULL, guncelleme BIGINT NOT NULL, UNIQUE (tur, anahtar))$son");
             $p->exec("CREATE TABLE IF NOT EXISTS oturumlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)$son");
             $p->exec("CREATE TABLE IF NOT EXISTS cihazlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)$son");
             $p->exec("CREATE TABLE IF NOT EXISTS girisler (kim CHAR(24) NOT NULL PRIMARY KEY, ip CHAR(64) NOT NULL, cihaz CHAR(64) NULL, zaman BIGINT NOT NULL" . ($my ? ', INDEX giris_zaman (zaman)' : '') . ")$son");
             if (!$my) $p->exec('CREATE INDEX IF NOT EXISTS giris_zaman ON girisler (zaman)');
-            $p->exec("CREATE TABLE IF NOT EXISTS ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger $metin NOT NULL)$son");
             $p->exec("CREATE TABLE IF NOT EXISTS anliklar (id VARCHAR(40) NOT NULL PRIMARY KEY, sira BIGINT NOT NULL, zaman BIGINT NOT NULL, neden VARCHAR(40) NOT NULL, ozet VARCHAR(255) NOT NULL, veri $metin NOT NULL)$son");
             $p->exec("CREATE TABLE IF NOT EXISTS sayac (ad VARCHAR(32) NOT NULL PRIMARY KEY, deger BIGINT NOT NULL)$son");
             $p->exec("DELETE FROM sayac WHERE ad = 'surum'");
             $p->exec("INSERT INTO sayac (ad, deger) VALUES ('surum', 0)");
-            $p->exec("DELETE FROM ayar WHERE anahtar = 'sema'");
-            $p->exec("INSERT INTO ayar (anahtar, deger) VALUES ('sema', '" . SEMA_SURUM . "')");
+            $p->exec("UPDATE ayar SET deger = '" . SEMA_SURUM . "' WHERE anahtar = 'sema'");
         }
         if ($my) { $s = $p->query("SELECT RELEASE_LOCK('suflo_studio_sema')"); $s->closeCursor(); }
         else $p->exec('COMMIT');
@@ -397,17 +421,20 @@ function sifre_dene(string $sifre, ?string $cihaz): ?string {
     usleep(400000);
     return null;
 }
+/** Etkin sifre ozetinin parmak izi (veritabaninda saklanir; ozetin kendisi degil). */
+function sifre_izi(string $ozet): string { return hash('sha256', 'iz|' . $ozet); }
 /**
  * config.php'deki sifre ozeti elle degistirilirse (sifre unutuldu / sifre ele gecirildi) butun oturumlar ve
- * taninan cihazlar sonlanir: etkin ozetin parmak izi saklanir, degisirse temizlenir.
+ * taninan cihazlar sonlanir: etkin ozetin parmak izi saklanir, degisirse temizlenir. Hatali giris kayitlari da
+ * silinir: sahibinin sifreyi hatirlamaya calisirken biriktirdigi denemeler sifirlamadan sonra onu kilitlemesin.
  */
 function sifre_izi_denetle(): void {
-    $iz = hash('sha256', 'iz|' . sifre_ozeti());
+    $iz = sifre_izi(sifre_ozeti());
     if (ayar_oku('sifre_izi') === $iz) return;
     islem(function () use ($iz) {
         $eski = ayar_oku('sifre_izi');
         if ($eski === $iz) return;
-        if ($eski !== null) { calistir('DELETE FROM oturumlar'); cihazlari_unut(); }
+        if ($eski !== null) { calistir('DELETE FROM oturumlar'); cihazlari_unut(); calistir('DELETE FROM girisler'); }
         ayar_yaz('sifre_izi', $iz);
     });
 }
@@ -926,9 +953,11 @@ try {
         $cihaz = cihaz_ozeti();
         $dogrulanan = is_string($sifre) ? sifre_dene($sifre, $cihaz) : null;
         if ($dogrulanan === null) hata(401, 'sifre', 'Sifre yanlis.');
-        // oturum, yazma kilidi altinda ve sifre bu arada degismediyse acilir (sifre degisikligiyle yaris olmaz)
+        // oturum, yazma kilidi altinda ve sifre bu arada degismediyse acilir (sifre degisikligiyle yaris olmaz).
+        // Saklanan parmak izi de denetlenir: bu istek config.php'nin eski halini okumus olabilir; bu arada yeni
+        // ozetle gelen bir istek oturumlari temizlediyse eski sifreyle acilan oturum temizligin ardindan kalmasin.
         $tamam = islem(function () use ($dogrulanan, $cihaz) {
-            if (sifre_ozeti() !== $dogrulanan) return false;
+            if (sifre_ozeti() !== $dogrulanan || ayar_oku('sifre_izi') !== sifre_izi($dogrulanan)) return false;
             oturum_ac();
             cihaz_tani($cihaz);
             return true;
@@ -1067,7 +1096,7 @@ try {
                 ayar_yaz('password_hash_kaynak', hash('sha256', (string)$C['password_hash']));
                 calistir('DELETE FROM oturumlar');
                 cihazlari_unut(); // calinmis bir cihaz cerezi kilitten muaf kalmasin
-                ayar_yaz('sifre_izi', hash('sha256', 'iz|' . sifre_ozeti()));
+                ayar_yaz('sifre_izi', sifre_izi(sifre_ozeti()));
                 oturum_ac();
                 cihaz_tani(null);
             });

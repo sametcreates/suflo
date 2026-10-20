@@ -378,6 +378,27 @@ async function calis() {
   await page.unroute("**/studio/v1/index.php", geciktir);
   ok("istek surerken kapanan pencerede hata bildirimle gosterilir", (await icerikAl("Kurgudaki video")).revizyonNotu !== "kapanan pencereden");
 
+  // Pencere acikken kayit baska cihazda arsivlenir; cakismada form tazelenir. "Arşivle" dugmesi yine arsivler (tersini yapmaz)
+  await page.click(".satir-ad:has-text('Kurgudaki video')");
+  d = page.locator("dialog[open]");
+  var k4 = await icerikAl("Kurgudaki video");
+  var v4 = Object.assign({}, k4, { arsiv: true });
+  ["id", "surum", "olusturma", "guncelleme"].forEach(function (k) { delete v4[k]; });
+  await apiCagir({ islem: "kaydet", tur: "icerik", id: k4.id, surum: k4.surum, veri: v4 });
+  await alanGirdi(d, "Not", "textarea").fill("arşivlenmeden önce not");
+  await d.locator("button[type=submit]").click();
+  await d.locator(".hata:has-text('başka bir yerde değişti')").waitFor();
+  var arsivEtiketi = await d.locator("button.sol").textContent();
+  await d.locator("button.sol").click();
+  await page.waitForSelector(".toast:has-text('Kayıt zaten arşivde')");
+  var arsivSonrasi = await icerikAl("Kurgudaki video");
+  ok("cakismadan sonra 'Arşivle' etiketin tersini yapmaz (kayit arsivde kalir)", arsivEtiketi === "Arşivle" && arsivSonrasi.arsiv === true, arsivEtiketi + " " + JSON.stringify(arsivSonrasi.arsiv));
+  var v5 = Object.assign({}, arsivSonrasi, { arsiv: false });
+  ["id", "surum", "olusturma", "guncelleme"].forEach(function (k) { delete v5[k]; });
+  await apiCagir({ islem: "kaydet", tur: "icerik", id: arsivSonrasi.id, surum: arsivSonrasi.surum, veri: v5 });
+  await page.reload();
+  await page.waitForSelector(".sayfa h1:has-text('İçerikler')");
+
   // Geri al, aradaki duzenlemeyi ezmez
   await page.locator(".satir:has-text('Çekimden reels 1') input[type=checkbox]").check();
   await page.locator(".toplu-cubuk select").selectOption("kurguda");

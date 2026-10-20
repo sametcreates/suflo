@@ -247,6 +247,13 @@
     if (ilk && !("ontouchstart" in window)) ilk.focus();
     return d;
   }
+  /**
+   * Penceredeki arsiv dugmesi. Hedef (arsivle / arsivden cikar) dugme kurulurken sabitlenir: etiket ve islem ayni
+   * kalir; pencere acikken kayit baska yerde degisse (cakismada form tazelense) bile etiketin tersi yapilmaz.
+   */
+  function arsivDugmesi(hedef, f) {
+    return h("button", { class: "btn sol " + (hedef ? "tehlike" : ""), type: "button", onclick: function () { f(hedef); } }, hedef ? "Arşivle" : "Arşivden çıkar");
+  }
   function vazgec(d) { return h("button", { class: "btn", type: "button", onclick: function () { (d.d || d).close(); } }, "Vazgeç"); }
   /** Onay penceresi. yazilacak verilirse kullanicinin o metni yazmasi gerekir. Promise<boolean> */
   function onayla(baslik, metin, dugme, yazilacak, tehlike) {
@@ -1037,7 +1044,7 @@
         h("div", { class: "gecmis" }, gecmis.map(function (x) { return h("div", null, x.z + " · " + x.m); }))) : null,
       hataP
     ], [
-      ic_ ? h("button", { class: "btn sol " + (v.arsiv ? "" : "tehlike"), type: "button", onclick: function () { var g2 = icerikBul(ic_.id) || ic_; ref.d.close(); if (!!g2.arsiv !== !v.arsiv) arsivDegistir("icerik", g2, !v.arsiv); else toast(v.arsiv ? "Kayıt zaten arşivden çıkarılmış." : "Kayıt zaten arşivde."); } }, v.arsiv ? "Arşivden çıkar" : "Arşivle") : null,
+      ic_ ? arsivDugmesi(!v.arsiv, function (hedef) { var g2 = icerikBul(ic_.id) || ic_; ref.d.close(); if (!!g2.arsiv !== hedef) arsivDegistir("icerik", g2, hedef); else toast(hedef ? "Kayıt zaten arşivde." : "Kayıt zaten arşivden çıkarılmış."); }) : null,
       vazgec(ref), h("button", { class: "btn birincil", type: "submit" }, "Kaydet")
     ], function () {
       if (!g.musteri.value) { hataP.textContent = "Müşteri seç."; g.musteri.focus(); return; }
@@ -1184,7 +1191,7 @@
         h("button", { class: "btn ince", type: "button", onclick: function () { ref.d.close(); topluIcerikPenceresi({ musteriId: e.musteriId, cekimId: e.id }); } }, "Bu çekimden içerik ekle")) : null,
       hataP
     ], [
-      e ? h("button", { class: "btn sol " + (v.arsiv ? "" : "tehlike"), type: "button", onclick: function () { var g2 = etkinlik(e.id) || e; ref.d.close(); if (!!g2.arsiv !== !v.arsiv) arsivDegistir("etkinlik", g2, !v.arsiv); else toast(v.arsiv ? "Kayıt zaten arşivden çıkarılmış." : "Kayıt zaten arşivde."); } }, v.arsiv ? "Arşivden çıkar" : "Arşivle") : null,
+      e ? arsivDugmesi(!v.arsiv, function (hedef) { var g2 = etkinlik(e.id) || e; ref.d.close(); if (!!g2.arsiv !== hedef) arsivDegistir("etkinlik", g2, hedef); else toast(hedef ? "Kayıt zaten arşivde." : "Kayıt zaten arşivden çıkarılmış."); }) : null,
       vazgec(ref), h("button", { class: "btn birincil", type: "submit" }, "Kaydet")
     ], function () {
       var a = aday();

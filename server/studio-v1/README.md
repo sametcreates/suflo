@@ -21,13 +21,14 @@ Suflo Pro lisans servisinden (`pro-v1`) tamamen ayrıdır: ayar dosyası, verita
   - Kilide takılan istekler sayılmaz; yalnız şifresi gerçekten denenen istekler sayılır. Böylece kilit sürerken yağdırılan istekler kilidi uzatamaz.
   - Şifre değiştirmedeki "mevcut şifre" denemeleri de aynı sınıra tabidir.
   - Oturumsuz istekler en çok 16 KB gövde gönderebilir. Büyük gövde (içe aktarma) yalnız oturum doğrulandıktan sonra okunur; oturumsuz büyük gövde okunmadan `401` alır.
-  - Şifre, giriş oturumu açılmadan hemen önce, aynı işlem içinde yeniden denetlenir. Doğrulama sürerken şifre değiştiyse eski şifreyle oturum açılmaz.
+  - Şifre, giriş oturumu açılmadan hemen önce, aynı işlem içinde yeniden denetlenir. Saklanan şifre parmak izi de karşılaştırılır. Doğrulama sürerken şifre değiştiyse (panelden ya da `config.php`'den) eski şifreyle oturum açılmaz.
 - **Tanınan cihaz:**
   - Doğru şifreyle girilen cihaza ayrı bir `__Host-` çerezi verilir. Çerez her girişte uzatılır; 180 gün kullanılmayan cihaz unutulur.
   - Bu çerez erişim vermez; yalnız o cihazı IP ve toplam kilidinden muaf tutar. Böylece bir saldırgan sahibini bilinen cihazlarında kilitli tutamaz.
   - Tanınan cihazın da kendi sınırı vardır: 15 dakikada 8 hatalı deneme.
   - **Şifre değiştirince ve "Tüm cihazlarda çıkış yap"ta bütün tanınan cihazlar unutulur.** Çalınan bir cihazın çerezi de böylece geçersiz olur. İşlemi yapan cihaz yeni bir çerezle yeniden tanınır.
-  - `config.php`'deki şifre özeti değiştirilirse (şifre sıfırlama) bütün oturumlar ve tanınan cihazlar da kapanır.
+  - `config.php`'deki şifre özeti değiştirilirse (şifre sıfırlama) bütün oturumlar ve tanınan cihazlar da kapanır. Hatalı giriş kayıtları da silinir; şifreyi hatırlamaya çalışırken kilitlenen sahip, sıfırlamadan hemen sonra girebilir.
+  - Sıfırlamadan sonra hiçbir cihaz tanınmaz. O sırada biri sürekli yanlış şifre deniyorsa ilk giriş toplam kilide takılabilir. Saldırı durunca kilit 15 dakika içinde açılır. Beklemeden girmek gerekirse `config.php`'de `login_max_fail` geçici olarak artırılabilir; girişten sonra eski değere döndürülmeli.
 - Saldırı sürerken yeni bir cihazdan ilk giriş kilide takılabilir. Saldırı durunca kilit 15 dakika içinde kendiliğinden açılır. Bilinen cihazlar etkilenmez.
 - Silme işlemi yoktur; kayıtlar arşivlenir.
 - **Bağ denetimi:** Bir içerik, başka bir müşterinin çekimine bağlanamaz. Başka müşterinin içeriği bağlıyken bir çekimin müşterisi değiştirilemez. İçe aktarmada bu tür bir bağ kaldırılır ve önizlemede uyarı olarak gösterilir.
@@ -100,7 +101,7 @@ Adımlar:
 
 ## İlk kurulum notu
 
-Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum yarıda kesildiyse bir sonraki istekte tamamlanır. Başka bir şema sürümü ya da daha önceki bir geliştirme sürümünün tabloları bulunursa üzerine sessizce kurulmaz; açık bir "uyumsuz" hatası döner ve arayüz bu mesajı gösterir. Yalnız geliştirme denemelerinde olabilir. Bu durumda yedeği indir, veritabanını boşalt ve yedeği yeniden içe aktar.
+Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum önce bir "kuruluyor" işareti yazar. Yarıda kesilen kurulum bu işaret sayesinde bir sonraki istekte tamamlanır. İşaret yokken Studio tablolarından biri zaten varsa (eski bir geliştirme sürümü ya da aynı veritabanını kullanan başka bir uygulama) ya da şema başka bir sürümse üzerine sessizce kurulmaz. Açık bir "uyumsuz" hatası döner ve arayüz bu mesajı gösterir. Yalnız geliştirme denemelerinde olabilir. Bu durumda yedeği indir, veritabanını boşalt ve yedeği yeniden içe aktar.
 
 ## Bakım
 
