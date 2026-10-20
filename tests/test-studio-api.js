@@ -161,7 +161,7 @@ async function calis() {
   /* ---- Oturumsuz buyuk govde okunmaz ---- */
   var buyuk = JSON.stringify({ islem: "oturum", dolgu: "x".repeat(20000) });
   r = await ist(buyuk, { cerez: "", cereziSakla: true });
-  ok("oturumsuz 20 KB govde: 413 (cozulmeden reddedilir)", r.status === 413, r.status);
+  ok("oturumsuz 20 KB govde: cozulmeden reddedilir (401 giris gerekli)", r.status === 401 && r.json.hata === "oturum", r.status);
   r = await ist({ islem: "oturum", dolgu: "x".repeat(2000) }, { cerez: "", cereziSakla: true });
   ok("oturumsuz kucuk govde: 200", r.status === 200);
 
@@ -457,6 +457,40 @@ async function calis() {
   r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: yedekA.veriler, onay: "GERI YUKLE", beklenen: degOz.sayilar });
   ok("tumunu degistir: yedekteki ayar da geri gelir", r.status === 200 && degOz.ayar === true && (await ist({ islem: "veri" })).json.veri.ayar.varsayilanStokUyari === ayarOnce, j(r.json));
 
+
+  /* ---- Ucuncu tur: cekim musterisi degisirken bagli icerik, eski yedek birlestirme, ic ice bilinmeyen alan ---- */
+  var mB1 = (await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Bağ müşteri 1" } })).json.kayit;
+  var mB2 = (await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Bağ müşteri 2" } })).json.kayit;
+  var eB = (await ist({ islem: "kaydet", tur: "etkinlik", veri: { musteriId: mB1.id, baslik: "Bağ çekimi", tumGun: true, basTarih: "2030-05-01" } })).json.kayit;
+  var iB = (await ist({ islem: "kaydet", tur: "icerik", veri: { musteriId: mB1.id, baslik: "Bağlı içerik", cekimId: eB.id } })).json.kayit;
+  var yedekB = (await ist({ islem: "disa_aktar" })).json.yedek;
+  r = await ist({ islem: "kaydet", tur: "etkinlik", id: eB.id, surum: eB.surum, veri: Object.assign({}, eB, { musteriId: mB2.id }) });
+  ok("cekimin musterisi, baska musterinin icerigi bagliyken degistirilemez (422, acik mesaj)", r.status === 422 && /bagli/.test(r.json.mesaj), j(r.json));
+  // icerik once ayrilirsa cekim tasinabilir
+  var iB2 = (await ist({ islem: "kaydet", tur: "icerik", id: iB.id, surum: iB.surum, veri: Object.assign({}, iB, { cekimId: null }) })).json.kayit;
+  r = await ist({ islem: "kaydet", tur: "etkinlik", id: eB.id, surum: eB.surum, veri: Object.assign({}, eB, { musteriId: mB2.id }) });
+  ok("bag kaldirilinca cekim baska musteriye tasinabilir", r.status === 200, j(r.json));
+  // eski yedek (cekim B1'de, icerik bagli) birlestirilince var olan kayitlar dogrulanmadan atlanir
+  r = await ist({ islem: "ice_aktar", veriler: yedekB.veriler, onizleme: true });
+  ok("eski yedek birlestirme: var olan kayitlar bugunku kurallara takilmadan atlanir (hata yok)", r.json.onizleme.hataSayisi === 0, j(r.json.onizleme.hatalar));
+  // tumunu degistir: capraz musteri bagi dosyayi reddettirmez, uyariyla kaldirilir
+  var yedekC = JSON.parse(JSON.stringify(yedekB.veriler));
+  yedekC.etkinlikler.filter(function (e) { return e.id === eB.id; })[0].musteriId = mB2.id;
+  r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: yedekC, onizleme: true });
+  ok("geri yuklemede capraz musteri bagi: hata degil, uyari + bag kaldirilir", r.json.onizleme.hataSayisi === 0 && r.json.onizleme.uyarilar.some(function (u) { return /bag kaldirilacak/.test(u); }), j(r.json.onizleme));
+  r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "İç alan", siklik: { tur: "gunluk", siklikTuru: "x" } }], icerikler: [] }, onizleme: true });
+  ok("ic ice bilinmeyen alan (siklik.siklikTuru) uyarisi", r.json.onizleme.uyarilar.some(function (u) { return /siklik\.siklikTuru/.test(u); }), j(r.json.onizleme.uyarilar));
+  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Liste siklik", siklik: ["gunluk"] } });
+  ok("liste bicimli siklik hata (sessizce bos sayilmaz)", r.status === 422 && /siklik nesne/.test(r.json.mesaj), j(r.json));
+  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Geçmiş istisna", slotIstisna: { "2001-01-01": "post", "2099-01-01": "story" } } });
+  ok("gecmis gun istisnalari budanir, gelecekteki kalir", r.status === 200 && j(r.json.kayit.slotIstisna) === '{"2099-01-01":"story"}', j(r.json));
+  // tumunu degistir: onizlemeden sonra baska degisiklik olursa uygulanmaz
+  var dOz = (await ist({ islem: "ice_aktar", kip: "degistir", veriler: yedekB.veriler, onizleme: true })).json.onizleme;
+  await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Önizleme sonrası" } });
+  r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: yedekB.veriler, onay: "GERI YUKLE", beklenen: Object.assign({}, dOz.sayilar, { durum: dOz.durum }) });
+  ok("tumunu degistir: onizlemeden sonra eklenen kayit varsa 409 onizleme_eski (silinmez)", r.status === 409 && r.json.hata === "onizleme_eski" &&
+    (await ist({ islem: "veri" })).json.veri.musteriler.some(function (m) { return m.ad === "Önizleme sonrası"; }), j(r.json));
+
   /* ---- Eszamanli yazma ---- */
   var hedefM = (await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Eşzamanlı örnek" } })).json.kayit;
   var paralel = await Promise.all([0, 1, 2, 3, 4, 5].map(function (k) {
@@ -494,7 +528,8 @@ async function calis() {
   /* ---- Tum oturumlari kapat ---- */
   var eskiCihaz = cihazCerezi;
   r = await ist({ islem: "oturumlari_kapat" });
-  ok("tum oturumlari kapat: bu cerez de gecersiz, cihaz cerezi silinir", r.status === 200 && (await ist({ islem: "veri" })).status === 401 && /^suflo_studio_cihaz=deleted|Max-Age=0/i.test(r.cihazCookie || ""), r.cihazCookie);
+  ok("tum oturumlari kapat: bu cerez de gecersiz; bu cihaz yeni anahtarla taninmaya devam eder, eskisi unutulur", r.status === 200 && (await ist({ islem: "veri" })).status === 401 &&
+    /^suflo_studio_cihaz=(?!deleted)/.test(r.cihazCookie || "") && cihazCerezi !== eskiCihaz, r.cihazCookie);
   cihazCerezi = eskiCihaz; // calinmis eski cihaz cerezi gibi
   // yeni cihaz cerezi icin bir kez dogru giris (basarili giris sayilmaz)
   r = await ist({ islem: "giris", sifre: "yeni-ornek-sifre-22" }, { cerez: "", cereziSakla: true });
@@ -532,12 +567,22 @@ async function calis() {
 
   /* ---- Eski gelistirme semasi uzerine sessizce kurulmaz ---- */
   var eskiDb = path.join(PRIV, "eski.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE kayitlar (id TEXT)');", eskiDb]);
+  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE kayitlar (id TEXT)'); $p->exec(\"INSERT INTO kayitlar VALUES ('x')\");", eskiDb]);
   await ayarDegistir({ dsn: "sqlite:" + eskiDb });
   r = await ist({ islem: "oturum" });
-  ok("eski sema: acik 503 kurulum mesaji", r.status === 503 && r.json.hata === "kurulum" && /eski/.test(r.json.mesaj), j(r.json));
+  ok("eski sema (sema yok, kayit var): acik 503 kurulum mesaji", r.status === 503 && r.json.hata === "kurulum" && /uyumsuz/.test(r.json.mesaj), j(r.json));
+  var eskiDb2 = path.join(PRIV, "eski2.sqlite").split("\\").join("/");
+  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar TEXT PRIMARY KEY, deger TEXT)'); $p->exec(\"INSERT INTO ayar VALUES ('sema', '2')\");", eskiDb2]);
+  await ayarDegistir({ dsn: "sqlite:" + eskiDb2 });
+  r = await ist({ islem: "oturum" });
+  ok("baska sema surumu (2): acik 503, uzerine kurulmaz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
 
   /* ---- Kurulum eksik ---- */
+  // asil veritabanina don; kilit sinirini gevset ki sifirlama oncesi acik bir oturum alinabilsin
+  await ayarDegistir({ login_max_fail: 50 });
+  r = await ist({ islem: "giris", sifre: "yeni-ornek-sifre-22" }, { cerez: "", cereziSakla: true });
+  ok("sifirlama oncesi acik oturum alindi", r.status === 200 && !!r.setCookie, r.status + " " + j(r.json));
+  var sifirlamaOncesi = (r.setCookie || "").split(";")[0].slice("suflo_studio=".length);
   fs.renameSync(path.join(PRIV, "config.php"), path.join(PRIV, "config.php.yok"));
   r = await ist({ islem: "oturum" });
   ok("ayar dosyasi yoksa 503 kurulum (hicbir veri donmez)", r.status === 503 && r.json.hata === "kurulum" && !r.json.veri);
@@ -545,6 +590,8 @@ async function calis() {
   var yeniOzet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", "sifirlanan-ornek-sifre-3"], { encoding: "utf8" }).stdout;
   fs.unlinkSync(path.join(PRIV, "config.php.yok"));
   await ayarDegistir({ password_hash: yeniOzet, login_max_fail: 50 });
+  r = await ist({ islem: "veri" }, { cerez: sifirlamaOncesi, cereziSakla: true });
+  ok("config'te sifre degisince acik oturumlar kapanir (calinan oturum gecersiz)", r.status === 401, r.status);
   ok("sifre sifirlama: config'teki yeni ozet gecerli, panel sifresi gecmez",
     (await ist({ islem: "giris", sifre: "sifirlanan-ornek-sifre-3" }, { cerez: "", cereziSakla: true })).status === 200 &&
     (await ist({ islem: "giris", sifre: "yeni-ornek-sifre-22" }, { cerez: "", cereziSakla: true })).status === 401);

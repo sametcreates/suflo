@@ -209,14 +209,17 @@
 
   /**
    * Hazir stok = yalniz durum "hazir" (musteri onayi alinmis, yayina hazir, yayinlanmamis) ve video turundeki icerikler.
-   * Tarihe atanmis + atanmamis = toplam (cift sayim yok). Postlar ve storyler ayri tutulur, videoya sayilmaz.
+   * Ileri tarihe atanmis + tarihi gecmis + atanmamis = toplam (cift sayim yok; her icerik yalniz birinde).
+   * Tarihi gecmis ama yayinlanmamis hazir icerik o gune sayilmaz, ileriki gunler icin bosta stok gibi oneri havuzuna girer.
+   * Postlar ve storyler ayri tutulur, videoya sayilmaz.
    * bilinen = stok girisi yapildi mi; yapilmadiysa arayuz sayi yerine "stok girisi yapilmadi" gosterir.
    */
   function stok(veri, musteri, bugun) {
     var ic = musteriIcerikleri(veri, musteri.id);
     var hazir = ic.filter(function (i) { return i.durum === "hazir"; });
     var video = hazir.filter(function (i) { return turGrubu(i.tur) === "video"; });
-    var atanmis = video.filter(function (i) { return !!i.planTarihi; });
+    var atanmis = video.filter(function (i) { return !!i.planTarihi && i.planTarihi >= bugun; });
+    var gecmis = video.filter(function (i) { return !!i.planTarihi && i.planTarihi < bugun; });
     var atanmamis = video.filter(function (i) { return !i.planTarihi; });
     var diger = { post: 0, story: 0, diger: 0 };
     hazir.forEach(function (i) { var g = turGrubu(i.tur); if (g !== "video") diger[g] = (diger[g] || 0) + 1; });
@@ -225,10 +228,10 @@
       toplam: video.length,
       atanmis: atanmis.length,
       atanmamis: atanmamis.length,
-      gecmisTarihli: atanmis.filter(function (i) { return i.planTarihi < bugun; }).length,
+      gecmisTarihli: gecmis.length,
       hazirlikta: ic.filter(function (i) { return HAZIRLIKTA.indexOf(i.durum) !== -1 && turGrubu(i.tur) === "video"; }).length,
       digerHazir: diger,
-      idler: { atanmis: atanmis.map(function (i) { return i.id; }), atanmamis: atanmamis.map(function (i) { return i.id; }) }
+      idler: { atanmis: atanmis.map(function (i) { return i.id; }), gecmisTarihli: gecmis.map(function (i) { return i.id; }), atanmamis: atanmamis.map(function (i) { return i.id; }) }
     };
   }
 

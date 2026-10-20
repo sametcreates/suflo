@@ -142,7 +142,7 @@ async function calis() {
   var stokMetni = await page.locator(".bolum:has-text('Stok ve yayın ihtiyacı')").textContent();
   ok("stok girisi: hazir video 2 = atanmis 0 + atanmamis 2, hazirlikta 1", /Hazır video 2/.test(stokMetni) && /tarihe atanmış 0/.test(stokMetni) && /atanmamış 2/.test(stokMetni) && /hazırlıkta 1/.test(stokMetni), stokMetni);
   // 20 Ekim Sali: 7 gunde Sal 20, Cum 23, Sal 27 hmm -> 20..26: Sal 20, Cum 23 = 2 gun
-  ok("haftalik tahmin: 7 gunde 2 paylasim gunu, ikisi oneriyle karsilanabilir", /2 paylaşım günü/.test(stokMetni) && /2 atanmamış hazırla karşılanabilir/.test(stokMetni), stokMetni);
+  ok("haftalik tahmin: 7 gunde 2 paylasim gunu, ikisi oneriyle karsilanabilir", /2 paylaşım günü/.test(stokMetni) && /2 atanmamış ya da tarihi geçmiş hazırla karşılanabilir/.test(stokMetni), stokMetni);
   // Oneriyi plana cevir
   await page.locator(".slot.oneri").first().click();
   await page.locator("dialog[open] button:has-text('Bu tarihe ata')").click();
@@ -295,6 +295,25 @@ async function calis() {
   var oniz = await page.locator(".bolum:has-text('İçe aktar / geri yükle')").textContent();
   ok("ayni yedek ice aktarma onizlemesi: 0 eklenecek, 11 atlanacak; ekle dugmesi kapali", /0 müşteri, 0 içerik, 0 çekim/.test(oniz) && /11 kayıt/.test(oniz) &&
     await page.locator("button:has-text('Yalnız yenileri ekle')").isDisabled(), oniz);
+  // Onizlemeden sonra veri degisirse ekleme yapilmaz; onizleme yenilenir, ikinci denemede eklenir
+  var yeniYedek = JSON.parse(JSON.stringify(yedek));
+  yeniYedek.veriler.musteriler.push({ ad: "Örnek Müşteri D", kurum: "", ucret: null, siklik: { tur: "belirsiz" }, slotTuru: "video", stokGirisi: false, not: "", arsiv: false });
+  var yeniYedekYolu = path.join(TMP, "yedek-yeni.json");
+  fs.writeFileSync(yeniYedekYolu, JSON.stringify(yeniYedek));
+  await page.setInputFiles("input[type=file]", yeniYedekYolu);
+  await page.waitForSelector(".bolum:has-text('İçe aktar / geri yükle') dd:text-is('1 müşteri, 0 içerik, 0 çekim / etkinlik')");
+  var araKayit = (await apiCagir({ islem: "veri" })).veri.musteriler.filter(function (x) { return x.ad === "Örnek Müşteri B"; })[0];
+  var araVeri = Object.assign({}, araKayit, { not: "önizleme sonrası değişiklik" });
+  ["id", "surum", "olusturma", "guncelleme"].forEach(function (k) { delete araVeri[k]; });
+  await apiCagir({ islem: "kaydet", tur: "musteri", id: araKayit.id, surum: araKayit.surum, veri: araVeri });
+  await page.click("button:has-text('Yalnız yenileri ekle')");
+  await page.waitForSelector(".toast:has-text('önizleme yenilendi')");
+  await page.waitForSelector(".bolum:has-text('İçe aktar / geri yükle') dd:text-is('1 müşteri, 0 içerik, 0 çekim / etkinlik')");
+  var eskiOnizlemeSayisi = (await apiCagir({ islem: "veri" })).veri.musteriler.length;
+  await page.click("button:has-text('Yalnız yenileri ekle')");
+  await page.waitForSelector(".toast:has-text('İçe aktarma tamamlandı: 1 müşteri')");
+  var sonMusteriSayisi = (await apiCagir({ islem: "veri" })).veri.musteriler.length;
+  ok("eski onizlemeyle ice aktarma yapilmaz; yenilenen onizlemeyle tek sefer eklenir", eskiOnizlemeSayisi === 2 && sonMusteriSayisi === 3, eskiOnizlemeSayisi + " -> " + sonMusteriSayisi);
 
   // Cakisma: pencere acikken kayit baska cihazda degisir -> pencere acik kalir; ikinci kaydetmede yalniz
   // kullanicinin degistirdigi alan yazilir, diger cihazin degisikligi korunur
@@ -323,6 +342,41 @@ async function calis() {
   await page.waitForSelector("dialog[open]", { state: "detached" });
   var birlesik = await icerikAl("Kurgudaki video");
   ok("cakismadan sonra kaydetme: benim alanim yazildi, diger cihazin notu korundu", birlesik.revizyonNotu === "pencereden revizyon notu" && birlesik.not === "başka cihaz notu", JSON.stringify(birlesik));
+
+  // Cakisma, bu sekmenin bilmedigi (baska cihazda eklenen) musteriye baglanmis kayitla: musteri secimde gorunur, kayit o musteride kalir
+  await page.click(".satir-ad:has-text('Kurgudaki video')");
+  d = page.locator("dialog[open]");
+  var yeniMus = await apiCagir({ islem: "kaydet", tur: "musteri", veri: { ad: "Örnek Müşteri C", kurum: "", ucret: null, siklik: { tur: "belirsiz" }, slotTuru: "video", stokGirisi: false, not: "", arsiv: false } });
+  var k2 = await icerikAl("Kurgudaki video");
+  var v2 = Object.assign({}, k2, { musteriId: yeniMus.kayit.id, cekimId: null });
+  ["id", "surum", "olusturma", "guncelleme"].forEach(function (k) { delete v2[k]; });
+  await apiCagir({ islem: "kaydet", tur: "icerik", id: k2.id, surum: k2.surum, veri: v2 });
+  await alanGirdi(d, "Not", "textarea").fill("yeni müşteriye taşındıktan sonra not");
+  await d.locator("button[type=submit]").click();
+  await d.locator(".hata:has-text('başka bir yerde değişti')").waitFor();
+  var secilenMusteri = await alanGirdi(d, "Müşteri", "select").inputValue();
+  ok("cakisma: baska cihazda eklenen musteri secimde gorunur ve secili", secilenMusteri === yeniMus.kayit.id, secilenMusteri + " / " + yeniMus.kayit.id);
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  var tasinan = await icerikAl("Kurgudaki video");
+  ok("cakismadan sonra kayit yeni musteride kalir, not yazilir", tasinan.musteriId === yeniMus.kayit.id && tasinan.not === "yeni müşteriye taşındıktan sonra not", JSON.stringify(tasinan));
+
+  // Kaydetme surerken pencere kapatilirsa hata kaybolmaz: bildirim gorunur
+  await page.click(".satir-ad:has-text('Kurgudaki video')");
+  d = page.locator("dialog[open]");
+  var k3 = await icerikAl("Kurgudaki video");
+  var v3 = Object.assign({}, k3, { not: "üçüncü cihaz" });
+  ["id", "surum", "olusturma", "guncelleme"].forEach(function (k) { delete v3[k]; });
+  await apiCagir({ islem: "kaydet", tur: "icerik", id: k3.id, surum: k3.surum, veri: v3 });
+  var geciktir = async function (route) { if (/"islem":"toplu"/.test(route.request().postData() || "")) await bekle(900); await route.continue(); };
+  await page.route("**/studio/v1/index.php", geciktir);
+  await alanGirdi(d, "Revizyon notu", "textarea").fill("kapanan pencereden");
+  await d.locator("button[type=submit]").click();
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  await page.waitForSelector(".toast:has-text('Kaydedilmedi')");
+  await page.unroute("**/studio/v1/index.php", geciktir);
+  ok("istek surerken kapanan pencerede hata bildirimle gosterilir", (await icerikAl("Kurgudaki video")).revizyonNotu !== "kapanan pencereden");
 
   // Geri al, aradaki duzenlemeyi ezmez
   await page.locator(".satir:has-text('Çekimden reels 1') input[type=checkbox]").check();
@@ -363,9 +417,24 @@ async function calis() {
   await d.locator(".gun-secim:has-text('Pzt') input").check();
   await d.locator(".gun-secim:has-text('Cum') input").check();
   await d.locator(".gun-secim:has-text('Cum') select").selectOption("post");
+  await alanGirdi(d, "Haftada kaç paylaşım", "input").fill("3");
   await d.locator("button[type=submit]").click();
-  await page.waitForSelector("text=Haftalık: Pzt, Cum (post)");
+  await d.locator(".hata:has-text('en az 3 gün seç')").waitFor();
+  ok("haftada 3 paylasim icin 2 gun secili: kaydetmeden once uyari", await d.isVisible());
+  await alanGirdi(d, "Haftada kaç paylaşım", "input").fill("2");
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("text=Haftada 2: Pzt, Cum (post)");
   ok("gune ozel tur kaydedildi ve gosterildi", true);
+
+  // Ay gorunumunde ekleme: varsayilan tarih izgaranin onceki aydan gelen ilk hucresi degil, ayin 1'i
+  await page.goto(URL_ + "#/cekim?g=ay&t=2031-05-15");
+  await page.waitForSelector(".donem:has-text('2031')");
+  await page.click("button:has-text('Çekim / etkinlik ekle')");
+  d = page.locator("dialog[open]");
+  var ayVarsayilan = await alanGirdi(d, "Başlangıç tarihi", "input").inputValue();
+  ok("ay gorunumu: yeni cekim tarihi o ayin 1'i", ayVarsayilan === "2031-05-01", ayVarsayilan);
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("dialog[open]", { state: "detached" });
 
   // Cikis
   await page.click(".yan >> text=Çıkış");

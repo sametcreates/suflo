@@ -20,14 +20,18 @@ Suflo Pro lisans servisinden (`pro-v1`) tamamen ayrıdır: ayar dosyası, verita
   - 15 dakikada aynı IP'den (IPv6'da /64 bloğundan) 8, tüm IP'lerden toplam 24 hatalı denemeden sonra giriş kilitlenir.
   - Kilide takılan istekler sayılmaz; yalnız şifresi gerçekten denenen istekler sayılır. Böylece kilit sürerken yağdırılan istekler kilidi uzatamaz.
   - Şifre değiştirmedeki "mevcut şifre" denemeleri de aynı sınıra tabidir.
-  - Oturumsuz istekler en çok 16 KB gövde gönderebilir. Büyük gövde (içe aktarma) yalnız oturum doğrulandıktan sonra okunur.
+  - Oturumsuz istekler en çok 16 KB gövde gönderebilir. Büyük gövde (içe aktarma) yalnız oturum doğrulandıktan sonra okunur; oturumsuz büyük gövde okunmadan `401` alır.
+  - Şifre, giriş oturumu açılmadan hemen önce, aynı işlem içinde yeniden denetlenir. Doğrulama sürerken şifre değiştiyse eski şifreyle oturum açılmaz.
 - **Tanınan cihaz:**
   - Doğru şifreyle girilen cihaza ayrı bir `__Host-` çerezi verilir. Çerez her girişte uzatılır; 180 gün kullanılmayan cihaz unutulur.
   - Bu çerez erişim vermez; yalnız o cihazı IP ve toplam kilidinden muaf tutar. Böylece bir saldırgan sahibini bilinen cihazlarında kilitli tutamaz.
   - Tanınan cihazın da kendi sınırı vardır: 15 dakikada 8 hatalı deneme.
-  - **Şifre değiştirince ve "Tüm cihazlarda çıkış yap"ta bütün tanınan cihazlar unutulur.** Çalınan bir cihazın çerezi de böylece geçersiz olur.
+  - **Şifre değiştirince ve "Tüm cihazlarda çıkış yap"ta bütün tanınan cihazlar unutulur.** Çalınan bir cihazın çerezi de böylece geçersiz olur. İşlemi yapan cihaz yeni bir çerezle yeniden tanınır.
+  - `config.php`'deki şifre özeti değiştirilirse (şifre sıfırlama) bütün oturumlar ve tanınan cihazlar da kapanır.
 - Saldırı sürerken yeni bir cihazdan ilk giriş kilide takılabilir. Saldırı durunca kilit 15 dakika içinde kendiliğinden açılır. Bilinen cihazlar etkilenmez.
 - Silme işlemi yoktur; kayıtlar arşivlenir.
+- **Bağ denetimi:** Bir içerik, başka bir müşterinin çekimine bağlanamaz. Başka müşterinin içeriği bağlıyken bir çekimin müşterisi değiştirilemez. İçe aktarmada bu tür bir bağ kaldırılır ve önizlemede uyarı olarak gösterilir.
+- **Veritabanı meşgulse** istek `503` ile "biraz sonra yeniden dene" der; yarım yazma olmaz.
 - **Sürüm denetimi:** İki cihaz aynı kaydı değiştirirse, eski sürümle yazan `409` alır ve hiçbir şey sessizce ezilmez. Sürüm numaraları hep artan tek bir sayaçtan gelir; geri yüklemede bile tekrar kullanılmaz. Güncelleme `WHERE surum = ?` ile yapılır.
 - **Eşzamanlı yazmalar:** Yazmalar işlem (transaction) içinde yapılır.
   - Yazma kilidi her okumadan önce alınır: SQLite'ta `BEGIN IMMEDIATE`, MySQL'de sayaç satırında `FOR UPDATE`.
@@ -40,7 +44,9 @@ Suflo Pro lisans servisinden (`pro-v1`) tamamen ayrıdır: ayar dosyası, verita
   - Bir içerik ya da etkinlik müşteriye `musteriAdi` ile bağlanabilir. `musteriKurum` verilirse, boş da olsa, ad ve kurum tam eşleşmelidir. Verilmezse ad yalnız tek bir müşteriye uyduğunda bağlanır; birden çok aday varsa hata olur.
   - Önizlemede şunlar görünür: her kaydın hangi müşteriye bağlanacağı, eklenecek müşterilerin bilinen aylık ücret toplamı ve tanınmayan alanlar (bunlar uyarı olarak gösterilir, kaydedilmez).
   - Yanlış biçimli bir alan (ör. `siklik` metin olarak yazılmışsa) sessizce boş sayılmaz; hata olarak gösterilir.
-  - Plan, uygulamada yazma kilidi altında yeniden hesaplanır. Önizlemeden sonra veri değiştiyse içe aktarma yapılmaz; önizleme yenilenir.
+  - Plan, uygulamada yazma kilidi altında yeniden hesaplanır. Önizleme verinin o anki sürümünü de taşır. Önizlemeden sonra herhangi bir kayıt değiştiyse içe aktarma yapılmaz; önizleme yenilenir.
+  - Yedekte kimliği zaten var olan kayıtlar doğrulamadan önce atlanır. Eski bir yedekte artık geçersiz sayılan bir alan, mevcut kayıtlar yüzünden içe aktarmayı engellemez.
+  - Liste yerine nesne beklenen alanlara liste gelirse (ya da tersi) hata gösterilir. Alt alanlardaki tanınmayan anahtarlar da uyarı olarak listelenir.
   - "Tümünü değiştir" yedekteki ayar kaydını (varsayılan stok eşiği) da geri getirir.
   - Uygulamadan önce, aynı işlem içinde otomatik kopya alınır. Son 30 kopya sıkıştırılarak saklanır.
   - Tek dosyada en çok 7,5 MB ve tür başına 20.000 kayıt içe aktarılabilir. Daha büyük bir yedek indirildiğinde uyarı gösterilir.
@@ -94,7 +100,7 @@ Adımlar:
 
 ## İlk kurulum notu
 
-Veritabanı ilk istekte boşsa tablolar kurulur. Daha önceki bir geliştirme sürümünün tabloları bulunursa üzerine sessizce kurulmaz; açık bir "eski geliştirme sürümü" hatası döner. Yalnız geliştirme denemelerinde olabilir. Bu durumda yedeği indir, veritabanını boşalt ve yedeği yeniden içe aktar.
+Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum yarıda kesildiyse bir sonraki istekte tamamlanır. Başka bir şema sürümü ya da daha önceki bir geliştirme sürümünün tabloları bulunursa üzerine sessizce kurulmaz; açık bir "uyumsuz" hatası döner ve arayüz bu mesajı gösterir. Yalnız geliştirme denemelerinde olabilir. Bu durumda yedeği indir, veritabanını boşalt ve yedeği yeniden içe aktar.
 
 ## Bakım
 

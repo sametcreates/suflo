@@ -58,7 +58,7 @@ var veri = { musteriler: [m], etkinlikler: [], icerikler: [
 ] };
 var st = C.stok(veri, m, BUGUN);
 ok("hazir video stoku: 4 (post, story, onayda, yayinlanan, arsiv, baska musteri haric)", st.toplam === 4, j(st));
-ok("atanmis 2 + atanmamis 2 = toplam (cift sayim yok)", st.atanmis === 2 && st.atanmamis === 2 && st.atanmis + st.atanmamis === st.toplam, j(st));
+ok("atanmis 2 + atanmamis 2 = toplam (cift sayim yok)", st.atanmis === 2 && st.atanmamis === 2 && st.gecmisTarihli === 0 && st.atanmis + st.gecmisTarihli + st.atanmamis === st.toplam, j(st));
 ok("post ve story ayri: post 1, story 1", st.digerHazir.post === 1 && st.digerHazir.story === 1, j(st.digerHazir));
 ok("hazirlikta video: onayda + kurguda = 2", st.hazirlikta === 2, st.hazirlikta);
 ok("atanmis ve atanmamis id kumeleri ayrik", st.idler.atanmis.every(function (id) { return st.idler.atanmamis.indexOf(id) === -1; }));
@@ -228,14 +228,14 @@ ok("yuksek oncelik siralamada one gecer (0 || 1 hatasi yok)", (function () {
   var k = C.kapsama(v2, m2, BUGUN, 1);
   return l[0].oncelik === "yuksek" && v2.icerikler.filter(function (i) { return i.id === k.slotlar[0].icerikId; })[0].oncelik === "yuksek";
 })());
-ok("ucretCoz: Turkce binlik, bos, kusurat", C.ucretCoz("10.000") === 10000 && C.ucretCoz("10000") === 10000 && C.ucretCoz(" 17.500 TL") === 17500 &&
+ok("ucretCoz: Turkce binlik, bos, kusurat", C.ucretCoz("10.000") === 10000 && C.ucretCoz("10000") === 10000 && C.ucretCoz(" 12.345 TL") === 12345 &&
   C.ucretCoz("10.000,00") === 10000 && C.ucretCoz("") === null && isNaN(C.ucretCoz("15000.00")) && isNaN(C.ucretCoz("7,5")) && isNaN(C.ucretCoz("abc")) && isNaN(C.ucretCoz("1.00")));
 ok("norm: NFD ve sifir genislikli karakter ayni anahtari verir", C.norm("Gu\u0308l\u200Bs\u0327ah") === C.norm("Gülşah") && C.katla("Gu\u0308l") === "gul");
 ok("tarihi gecmis hazir icerik ileri gunler icin oneri havuzunda (kaybolmaz)", (function () {
   var m3 = musteri({ id: "mZ0000000" });
   var v3 = { musteriler: [m3], icerikler: [icerik({ musteriId: "mZ0000000", durum: "hazir", planTarihi: "2030-03-01" })] };
   var k = C.kapsama(v3, m3, BUGUN, 2), st = C.stok(v3, m3, BUGUN);
-  return k.oneri === 1 && k.acik === 1 && st.atanmis === 1 && st.gecmisTarihli === 1;
+  return k.oneri === 1 && k.acik === 1 && st.atanmis === 0 && st.gecmisTarihli === 1 && st.atanmamis === 0 && st.toplam === 1;
 })());
 ok("haftada 2 ama 1 gun secili: duzen eksik (tahmin eksik sayilmaz)", (function () {
   var d = C.duzenDurumu(musteri({ siklik: { tur: "haftalik", gunler: [2], haftalikAdet: 2 } }));
