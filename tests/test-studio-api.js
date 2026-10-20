@@ -157,6 +157,14 @@ async function calis() {
   ok("guvenlik basliklari: no-store, nosniff, CSP, DENY", /no-store/.test(r.headers["cache-control"]) && r.headers["x-content-type-options"] === "nosniff" &&
     /default-src 'none'/.test(r.headers["content-security-policy"] || "") && r.headers["x-frame-options"] === "DENY");
 
+
+  /* ---- Oturumsuz buyuk govde okunmaz ---- */
+  var buyuk = JSON.stringify({ islem: "oturum", dolgu: "x".repeat(20000) });
+  r = await ist(buyuk, { cerez: "", cereziSakla: true });
+  ok("oturumsuz 20 KB govde: 413 (cozulmeden reddedilir)", r.status === 413, r.status);
+  r = await ist({ islem: "oturum", dolgu: "x".repeat(2000) }, { cerez: "", cereziSakla: true });
+  ok("oturumsuz kucuk govde: 200", r.status === 200);
+
   /* ---- Oturumsuz erisim ---- */
   var korunan = ["veri", "kaydet", "toplu", "ice_aktar", "disa_aktar", "anliklar", "anlik_geri", "sifre_degistir", "oturumlari_kapat", "cikis", "bilinmeyen"];
   var sonuc = [];
@@ -398,9 +406,56 @@ async function calis() {
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "Aynı Ad", musteriKurum: "Kurum 3", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
   ok("kurum eslesmezse baska musteriye baglanmaz (hata)", r.json.onizleme.hataSayisi === 1, j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "aynı ad", musteriKurum: "KURUM 2", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
-  ok("ad + kurum eslesirse baglanir; onizleme baglanan musteriyi gosterir", r.json.onizleme.hataSayisi === 0 && r.json.onizleme.ekle[0].bag === "Aynı Ad", j(r.json.onizleme));
+  ok("ad + kurum eslesirse baglanir; onizleme baglanan musteriyi gosterir", r.json.onizleme.hataSayisi === 0 && r.json.onizleme.ekle[0].bag === "Aynı Ad · Kurum 2", j(r.json.onizleme));
   r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Çift" }, { ad: "ÇİFT" }] }, onizleme: true });
   ok("ayni musteri dosyada iki kez: hata (sessizce birlesmez)", r.json.onizleme.hataSayisi === 1, j(r.json.onizleme));
+
+
+  /* ---- Ice aktarma ayrintilari ---- */
+  await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Kurumsuz İkiz" } });
+  await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Kurumsuz İkiz", kurum: "Kurum Y" } });
+  r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "Kurumsuz İkiz", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
+  ok("kurumsuz + kurumlu ayni ad, kurum yazilmadan: hata (sessizce kurumsuza baglanmaz)", r.json.onizleme.hataSayisi === 1 && /birden cok/.test(r.json.onizleme.hatalar[0]), j(r.json.onizleme));
+  r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [{ musteriAdi: "Kurumsuz İkiz", musteriKurum: "", baslik: "x", tumGun: true, basTarih: "2030-03-04" }] }, onizleme: true });
+  ok("musteriKurum bos yazilinca kurumsuz musteriye baglanir", r.json.onizleme.hataSayisi === 0 && r.json.onizleme.ekle[0].bag === "Kurumsuz İkiz", j(r.json.onizleme));
+  r = await ist({ islem: "ice_aktar", veriler: { etkinlikler: [
+    { musteriAdi: "Kurumsuz İkiz", musteriKurum: "Kurum Y", baslik: "Tekrarlanan", tumGun: true, basTarih: "2030-03-05" },
+    { musteriAdi: "Kurumsuz İkiz", musteriKurum: "Kurum Y", baslik: "Tekrarlanan", tumGun: true, basTarih: "2030-03-05" }] }, onizleme: true });
+  ok("kimliksiz ayni satir dosyada iki kez: bir kez eklenir, ikincisi atlanir", r.json.onizleme.sayilar.etkinlik === 1 && r.json.onizleme.sayilar.atlanan === 1 &&
+    /dosyada ayni satir/.test(r.json.onizleme.atla[0].neden), j(r.json.onizleme));
+  r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Alan hatasi", aylikUcret: 12000 }, { ad: "Alan hatasi 2", ucret: 3000, siklik: { tur: "gunluk" } }] }, onizleme: true });
+  ok("bilinmeyen alan uyarisi ve ucret ozeti (bilinen 1, belirsiz 1, toplam 3000)", r.json.onizleme.uyarilar.length === 1 && /aylikUcret/.test(r.json.onizleme.uyarilar[0]) &&
+    r.json.onizleme.ucret.bilinen === 1 && r.json.onizleme.ucret.belirsiz === 1 && r.json.onizleme.ucret.toplam === 3000 &&
+    r.json.onizleme.ekle[1].ucret === 3000 && r.json.onizleme.ekle[1].siklik === "gunluk", j(r.json.onizleme));
+  r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Yanlis siklik", siklik: "gunluk" }] }, onizleme: true });
+  ok("siklik metin olarak yazilmissa hata (sessizce 'belirsiz' olmaz)", r.json.onizleme.hataSayisi === 1 && /siklik nesne/.test(r.json.onizleme.hatalar[0]), j(r.json.onizleme));
+  var beklenenOz = (await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Beklenen örnek" }] }, onizleme: true })).json.onizleme;
+  await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Beklenen örnek" } }); // baska cihaz arada ekledi
+  r = await ist({ islem: "ice_aktar", veriler: { musteriler: [{ ad: "Beklenen örnek" }] }, beklenen: beklenenOz.sayilar });
+  ok("onizlemeden sonra veri degistiyse uygulama 409 (onizleme_eski), yazilmaz", r.status === 409 && r.json.hata === "onizleme_eski", j(r.json));
+
+  /* ---- Bagli cekim ayni musteriye ait olmali; silinmis ayar surumle yeniden yaratilmaz ---- */
+  var mK1 = (await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Çekim sahibi 1" } })).json.kayit;
+  var mK2 = (await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Çekim sahibi 2" } })).json.kayit;
+  var eK1 = (await ist({ islem: "kaydet", tur: "etkinlik", veri: { musteriId: mK1.id, baslik: "K1 çekim", tumGun: true, basTarih: "2030-04-01" } })).json.kayit;
+  r = await ist({ islem: "kaydet", tur: "icerik", veri: { musteriId: mK2.id, baslik: "Yanlış bağ", cekimId: eK1.id } });
+  ok("icerik baska musterinin cekimine baglanamaz (422)", r.status === 422 && /baska musteriye/.test(r.json.mesaj), j(r.json));
+  var ayarK = (await ist({ islem: "veri" })).json.veri.ayar;
+  r = await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: ayarK.surum + 999999, veri: { varsayilanStokUyari: 9 } });
+  ok("ayar eski surumle yazilamaz (409)", r.status === 409, j(r.json));
+  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Gün istisnası", siklik: { tur: "gunluk" }, slotIstisna: { "2030-04-02": "post", "2030-04-03": "" } } });
+  ok("gun bazinda paylasim turu istisnasi saklanir (bos atlanir)", r.status === 200 && j(r.json.kayit.slotIstisna) === '{"2030-04-02":"post"}', j(r.json));
+  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Gün istisnası 2", slotIstisna: { "2030-02-30": "post" } } });
+  ok("gecersiz istisna tarihi 422", r.status === 422);
+
+  /* ---- Yedekten tumunu degistir ayar kaydini da geri getirir ---- */
+  var yedekA = (await ist({ islem: "disa_aktar" })).json.yedek;
+  var ayarOnce = yedekA.veriler.ayar.varsayilanStokUyari;
+  var ayarSimdi = (await ist({ islem: "veri" })).json.veri.ayar;
+  await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: ayarSimdi.surum, veri: { varsayilanStokUyari: 77 } });
+  var degOz = (await ist({ islem: "ice_aktar", kip: "degistir", veriler: yedekA.veriler, onizleme: true })).json.onizleme;
+  r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: yedekA.veriler, onay: "GERI YUKLE", beklenen: degOz.sayilar });
+  ok("tumunu degistir: yedekteki ayar da geri gelir", r.status === 200 && degOz.ayar === true && (await ist({ islem: "veri" })).json.veri.ayar.varsayilanStokUyari === ayarOnce, j(r.json));
 
   /* ---- Eszamanli yazma ---- */
   var hedefM = (await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Eşzamanlı örnek" } })).json.kayit;
@@ -437,8 +492,13 @@ async function calis() {
     (await ist({ islem: "giris", sifre: "yeni-ornek-sifre-22" }, { cerez: "", cereziSakla: true })).status === 200);
 
   /* ---- Tum oturumlari kapat ---- */
+  var eskiCihaz = cihazCerezi;
   r = await ist({ islem: "oturumlari_kapat" });
-  ok("tum oturumlari kapat: bu cerez de gecersiz", r.status === 200 && (await ist({ islem: "veri" })).status === 401);
+  ok("tum oturumlari kapat: bu cerez de gecersiz, cihaz cerezi silinir", r.status === 200 && (await ist({ islem: "veri" })).status === 401 && /^suflo_studio_cihaz=deleted|Max-Age=0/i.test(r.cihazCookie || ""), r.cihazCookie);
+  cihazCerezi = eskiCihaz; // calinmis eski cihaz cerezi gibi
+  // yeni cihaz cerezi icin bir kez dogru giris (basarili giris sayilmaz)
+  r = await ist({ islem: "giris", sifre: "yeni-ornek-sifre-22" }, { cerez: "", cereziSakla: true });
+  ok("yeni giriste yeni cihaz cerezi verilir (eskisi gecersiz)", r.status === 200 && !!cihazCerezi && cihazCerezi !== eskiCihaz);
 
   /* ---- Hatali giris kilidi ---- */
   var durumlar = [];
@@ -451,11 +511,31 @@ async function calis() {
 
   r = await ist({ islem: "giris", sifre: "yeni-ornek-sifre-22" }, { cihaz: true, cerez: "", cereziSakla: true });
   ok("taninan cihaz IP kilidinden etkilenmez (sahibi kilitlenemez)", r.status === 200, j(r.json));
+  var simdikiCihaz = cihazCerezi;
+  cihazCerezi = eskiCihaz;
+  r = await ist({ islem: "giris", sifre: "yeni-ornek-sifre-22" }, { cihaz: true, cerez: "", cereziSakla: true });
+  ok("unutulan (eski) cihaz cerezi kilidi asamaz", r.status === 429, j(r.json));
+  cihazCerezi = simdikiCihaz;
   var cd = [];
   for (i = 0; i < 6; i++) cd.push((await ist({ islem: "giris", sifre: "cihaz-deneme-" + i }, { cihaz: true, cerez: "", cereziSakla: true })).status);
   ok("taninan cihazin da kendi siniri var (5 yanlis, sonra 429)", j(cd) === "[401,401,401,401,401,429]", j(cd));
   var pl = await Promise.all([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (k) { return ist({ islem: "giris", sifre: "paralel-yanlis-" + k }, { cerez: "", cereziSakla: true }); }));
   ok("10 paralel hatali giris: hepsi 401 / 429, 500 yok", pl.every(function (x) { return x.status === 401 || x.status === 429; }), j(pl.map(function (x) { return x.status; })));
+
+
+  /* ---- Ayar dosyasi yokken bilinen Studio adresine CORS'lu kurulum hatasi ---- */
+  fs.renameSync(path.join(PRIV, "config.php"), path.join(PRIV, "config.php.yok2"));
+  r = await ist({ islem: "oturum" }, { baslik: { Origin: "https://suflo.app" } });
+  var opt = await ham({ yontem: "OPTIONS", baslik: { Origin: "https://suflo.app", "Access-Control-Request-Method": "POST" } });
+  ok("ayar yokken: arayuz 'kurulmadi'yi gorebilir (CORS'lu 503, OPTIONS 204)", r.status === 503 && r.headers["access-control-allow-origin"] === "https://suflo.app" && opt.status === 204, r.status + " " + opt.status);
+  fs.renameSync(path.join(PRIV, "config.php.yok2"), path.join(PRIV, "config.php"));
+
+  /* ---- Eski gelistirme semasi uzerine sessizce kurulmaz ---- */
+  var eskiDb = path.join(PRIV, "eski.sqlite").split("\\").join("/");
+  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE kayitlar (id TEXT)');", eskiDb]);
+  await ayarDegistir({ dsn: "sqlite:" + eskiDb });
+  r = await ist({ islem: "oturum" });
+  ok("eski sema: acik 503 kurulum mesaji", r.status === 503 && r.json.hata === "kurulum" && /eski/.test(r.json.mesaj), j(r.json));
 
   /* ---- Kurulum eksik ---- */
   fs.renameSync(path.join(PRIV, "config.php"), path.join(PRIV, "config.php.yok"));
@@ -472,6 +552,18 @@ async function calis() {
   r = await ist({ islem: "giris", sifre: "sifirlanan-ornek-sifre-3" }, { cerez: "", cereziSakla: true });
   var hc = [].concat(r.headers["set-cookie"] || []);
   ok("guvenli kipte cerezler __Host- onekli, Secure, Path=/", r.status === 200 && hc.length === 2 && hc.every(function (c) { return /^__Host-suflo_studio(_cihaz)?=/.test(c) && /;\s*secure/i.test(c) && /path=\/(;|$)/i.test(c) && !/domain=/i.test(c); }), j(hc));
+
+  /* ---- Kilit sirasinda yapilan denemeler kilidi uzatmaz ---- */
+  await ayarDegistir({ password_hash: yeniOzet, login_max_fail: 2, login_window: 4 });
+  var k1 = [];
+  for (i = 0; i < 2; i++) k1.push((await ist({ islem: "giris", sifre: "kisa-pencere-" + i }, { cerez: "", cereziSakla: true })).status);
+  // kilit suresince (pencere icinde) 3 sn boyunca deneme yagdir; hepsi 429 olmali ve kaydedilmemeli
+  var kilitBas = Date.now(), kiliTak = [];
+  while (Date.now() - kilitBas < 3000) { kiliTak.push((await ist({ islem: "giris", sifre: "kilitte-" + kiliTak.length }, { cerez: "", cereziSakla: true })).status); await bekle(250); }
+  await bekle(Math.max(0, 5600 - (Date.now() - kilitBas)));
+  r = await ist({ islem: "giris", sifre: "sifirlanan-ornek-sifre-3" }, { cerez: "", cereziSakla: true });
+  ok("kilitteyken reddedilen denemeler kilidi uzatmaz: pencere bitince dogru sifre girer", j(k1) === "[401,401]" && kiliTak.length > 3 && kiliTak.every(function (x) { return x === 429; }) && r.status === 200,
+    j(k1) + " " + j(kiliTak) + " " + r.status);
   await ayarDegistir({ password_hash: "" });
   r = await ist({ islem: "oturum" });
   ok("sifre ozeti bos: kurulu degil, giris 503", r.status === 200 && r.json.kurulu === false && (await ist({ islem: "giris", sifre: "x" })).status === 503, j(r.json));

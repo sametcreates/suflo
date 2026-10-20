@@ -126,14 +126,27 @@
   /* ---------------- Metin ---------------- */
 
   /** Turkce kucuk harf + harf katlama (arama icin: "Çağrı Işık" ~ "cagri isik"). */
+  function temizMetin(s) {
+    s = String(s == null ? "" : s);
+    if (s.normalize) s = s.normalize("NFC");
+    return s.replace(/[\u200B-\u200D\u2060\uFEFF]/g, "");
+  }
   function katla(s) {
-    return String(s == null ? "" : s).replace(/I/g, "ı").replace(/İ/g, "i").toLowerCase()
+    return temizMetin(s).replace(/I/g, "ı").replace(/İ/g, "i").toLowerCase()
       .replace(/ç/g, "c").replace(/ğ/g, "g").replace(/ı/g, "i").replace(/ö/g, "o").replace(/ş/g, "s").replace(/ü/g, "u")
       .replace(/â/g, "a").replace(/î/g, "i").replace(/û/g, "u").replace(/\s+/g, " ").trim();
   }
   /** Sunucudaki norm() ile ayni: Turkce kucuk harf, bosluklar tek (musteri ad + kurum tekilligi icin). */
   function norm(s) {
-    return String(s == null ? "" : s).replace(/I/g, "ı").replace(/İ/g, "i").toLowerCase().replace(/\s+/g, " ").trim();
+    return temizMetin(s).trim().replace(/I/g, "ı").replace(/İ/g, "i").toLowerCase().replace(/\s+/g, " ");
+  }
+  /** Ucret metnini TL tam sayiya cevirir: "10.000", "10000", "10 000 TL", "10.000,00". Bos -> null, belirsiz/kusuratli -> NaN. */
+  function ucretCoz(s) {
+    s = String(s == null ? "" : s).replace(/\s|TL|₺/gi, "");
+    if (s === "") return null;
+    var m = /^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(s);
+    if (!m || (m[2] && +m[2] !== 0)) return NaN;
+    return +m[1].replace(/\./g, "");
   }
   function para(n) {
     if (n === null || n === undefined || n === "") return "Belirlenmedi";
@@ -224,7 +237,12 @@
     var s = (m && m.siklik) || {};
     if (s.tur === "gunluk") return { tamam: true };
     if (s.tur === "uc_gun") return gecerliTarih(s.baslangic) ? { tamam: true } : { tamam: false, eksik: "3 günde 1 için başlangıç ya da sıradaki yayın tarihi girilmeli" };
-    if (s.tur === "haftalik") return s.gunler && s.gunler.length ? { tamam: true } : { tamam: false, eksik: "Haftalık yayın günleri seçilmeli" };
+    if (s.tur === "haftalik") {
+      var n = s.gunler ? s.gunler.length : 0;
+      if (!n) return { tamam: false, eksik: "Haftalık yayın günleri seçilmeli" };
+      if (s.haftalikAdet && n < s.haftalikAdet) return { tamam: false, eksik: "Haftada " + s.haftalikAdet + " paylaşım için " + s.haftalikAdet + " gün seçilmeli (" + n + " seçili)" };
+      return { tamam: true };
+    }
     return { tamam: false, eksik: "Yayın sıklığı belirlenmedi" };
   }
 
@@ -242,9 +260,12 @@
   }
 
   var ONCELIK_SIRA = { yuksek: 0, normal: 1, dusuk: 2 };
+  function oncelikSira(i) { var v = ONCELIK_SIRA[i && i.oncelik]; return v === undefined ? 1 : v; }
 
-  /** Paylasim gununun beklenen icerik grubu: haftalik duzende gune ozel tur secildiyse o, yoksa musterinin turu. */
+  /** Paylasim gununun beklenen icerik grubu: o gun icin ozel tur (slotIstisna) > haftalik gune ozel tur > musterinin turu. */
   function slotGrubu(m, d) {
+    var ist = m && m.slotIstisna && !Array.isArray(m.slotIstisna) ? m.slotIstisna[d] : null;
+    if (ist) return ist;
     var s = (m && m.siklik) || {}, gt = s.tur === "haftalik" && s.gunTurleri ? s.gunTurleri[haftaGunu(d)] : null;
     return gt || (m && m.slotTuru) || "video";
   }
@@ -269,14 +290,15 @@
     var koy = function (h, k, i) { (h[k] = h[k] || []).push(i); };
     musteriIcerikleri(veri, m.id).forEach(function (i) {
       var g = turGrubu(i.tur);
-      if (i.durum === "hazir" && i.planTarihi) koy(planli, i.planTarihi + "|" + g, i);
+      // tarihi gecmis ama yayinlanmamis hazir icerik ileriki gunler icin atanmamis sayilir (stokta "tarihi gecmis" gorunur)
+      if (i.durum === "hazir" && i.planTarihi && i.planTarihi >= bugun) koy(planli, i.planTarihi + "|" + g, i);
       else if (i.durum === "hazir") koy(havuz, g, i);
       else if (i.durum === "yayinlandi" && i.yayinTarihi) koy(yayin, i.yayinTarihi + "|" + g, i);
       else if (i.durum !== "yayinlandi" && i.planTarihi) koy(hazirlikta, i.planTarihi + "|" + g, i);
     });
     Object.keys(havuz).forEach(function (g) {
       havuz[g].sort(function (a, b) {
-        return (ONCELIK_SIRA[a.oncelik] || 1) - (ONCELIK_SIRA[b.oncelik] || 1) || (a.olusturma || 0) - (b.olusturma || 0);
+        return oncelikSira(a) - oncelikSira(b) || (a.olusturma || 0) - (b.olusturma || 0);
       });
     });
     var kullanilan = {}, slotAnahtari = {}, gruplar = {};
@@ -363,6 +385,14 @@
     if (e.tumGun) return bit !== e.basTarih ? "Tüm gün, " + tarihKisa(e.basTarih) + " – " + tarihKisa(bit) : "Tüm gün";
     return e.basSaat + "–" + e.bitSaat + (bit !== e.basTarih ? " (" + tarihKisa(bit) + ")" : "");
   }
+  /** Takvimde o gune dusen kismin saat metni: baslangic gunu "10:00", ara gun "devam", bitis gunu "–01:00". */
+  function gundekiSaat(e, gun) {
+    if (e.tumGun) return "Tüm gün";
+    var bit = e.bitTarih || e.basTarih;
+    if (gun === e.basTarih) return e.basSaat;
+    if (gun === bit) return "–" + e.bitSaat;
+    return "devam";
+  }
   function etkinlikSirala(a, b) {
     var x = aralik(a)[0], y = aralik(b)[0];
     return x < y ? -1 : x > y ? 1 : 0;
@@ -402,7 +432,7 @@
     acikTarihler.sort(function (a, b) { return a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : 0; });
 
     var sayilar = musteriler.map(function (m) {
-      var s = { musteri: m, cekildi: 0, kurguda: 0, onayda: 0, revizyonda: 0, hazir: 0 };
+      var s = { musteri: m, stokBilinen: !!m.stokGirisi, cekildi: 0, kurguda: 0, onayda: 0, revizyonda: 0, hazir: 0 };
       icerikler.forEach(function (i) { if (i.musteriId === m.id && typeof s[i.durum] === "number") s[i.durum]++; });
       return s;
     });
@@ -417,6 +447,8 @@
       onayda: icerikler.filter(function (i) { return i.durum === "onayda"; }),
       revizyonda: icerikler.filter(function (i) { return i.durum === "revizyonda"; }),
       gecmisPlanYayinlanmamis: icerikler.filter(function (i) { return i.planTarihi && i.planTarihi < bugun && i.durum !== "yayinlandi"; }).sort(tarihSira("planTarihi")),
+      // yayin duzeni ya da stok bilgisinden bagimsiz: 7 gun icinde yayina planli ama hazir olmayan icerikler
+      planliHazirDegil: icerikler.filter(function (i) { return i.planTarihi && i.planTarihi >= bugun && i.planTarihi < hafta && i.durum !== "hazir" && i.durum !== "yayinlandi"; }).sort(tarihSira("planTarihi")),
       stokUyarilari: stokUyarilari,
       stokBilinmeyen: stokBilinmeyen,
       duzenEksik: duzenEksik,
@@ -473,7 +505,7 @@
     if (ay) return (b.yayinTarihi || "") < (a.yayinTarihi || "") ? -1 : (b.yayinTarihi || "") > (a.yayinTarihi || "") ? 1 : 0;
     var x = a.planTarihi || a.teslimTarihi || "9999", y = b.planTarihi || b.teslimTarihi || "9999";
     if (x !== y) return x < y ? -1 : 1;
-    return (ONCELIK_SIRA[a.oncelik] || 1) - (ONCELIK_SIRA[b.oncelik] || 1) || (b.guncelleme || 0) - (a.guncelleme || 0);
+    return oncelikSira(a) - oncelikSira(b) || (b.guncelleme || 0) - (a.guncelleme || 0);
   }
 
   function ara(veri, sorgu) {
@@ -531,7 +563,9 @@
     if (!v || typeof v !== "object") return { hata: "Yedek içinde veri yok." };
     var ok = ["musteriler", "icerikler", "etkinlikler"].some(function (k) { return Array.isArray(v[k]); });
     if (!ok) return { hata: "Dosyada musteriler / icerikler / etkinlikler listesi bulunamadı." };
-    return { veriler: { musteriler: v.musteriler || [], icerikler: v.icerikler || [], etkinlikler: v.etkinlikler || [] } };
+    var out = { musteriler: v.musteriler || [], icerikler: v.icerikler || [], etkinlikler: v.etkinlikler || [] };
+    if (v.ayar && typeof v.ayar === "object") out.ayar = v.ayar;
+    return { veriler: out };
   }
 
   return {
@@ -543,11 +577,11 @@
     gunEkle: gunEkle, gunFarki: gunFarki, haftaGunu: haftaGunu, haftaBasi: haftaBasi, ayBasi: ayBasi, ayEkle: ayEkle,
     gecerliTarih: gecerliTarih, gecerliSaat: gecerliSaat, istanbulSimdi: istanbulSimdi, damga: damga,
     tarihUzun: tarihUzun, tarihKisa: tarihKisa, tarihGunlu: tarihGunlu, ayAdi: ayAdi, goreli: goreli, ayIzgarasi: ayIzgarasi,
-    katla: katla, norm: norm, para: para, musteriAdi: musteriAdi, siklikMetni: siklikMetni, yerelYol: yerelYol, guvenliLink: guvenliLink,
+    katla: katla, norm: norm, para: para, ucretCoz: ucretCoz, musteriAdi: musteriAdi, siklikMetni: siklikMetni, yerelYol: yerelYol, guvenliLink: guvenliLink,
     aktif: aktif, kopya: kopya, idHaritasi: idHaritasi, durumDegistir: durumDegistir, geriAl: geriAl,
     stok: stok, duzenDurumu: duzenDurumu, slotlar: slotlar, slotGrubu: slotGrubu, kapsama: kapsama, stokUyarisi: stokUyarisi,
     aralik: aralik, ustUste: ustUste, cakisanlar: cakisanlar, cakismaHaritasi: cakismaHaritasi, gundeMi: gundeMi,
-    saatMetni: saatMetni, etkinlikSirala: etkinlikSirala,
+    saatMetni: saatMetni, gundekiSaat: gundekiSaat, etkinlikSirala: etkinlikSirala,
     genelBakis: genelBakis, ucretOzeti: ucretOzeti, icerikFiltrele: icerikFiltrele, icerikSirala: icerikSirala, ara: ara,
     csv: csv, musterilerCsv: musterilerCsv, iceriklerCsv: iceriklerCsv, yedekCoz: yedekCoz
   };

@@ -145,9 +145,20 @@ async function calis() {
   ok("haftalik tahmin: 7 gunde 2 paylasim gunu, ikisi oneriyle karsilanabilir", /2 paylaşım günü/.test(stokMetni) && /2 atanmamış hazırla karşılanabilir/.test(stokMetni), stokMetni);
   // Oneriyi plana cevir
   await page.locator(".slot.oneri").first().click();
+  await page.locator("dialog[open] button:has-text('Bu tarihe ata')").click();
   await page.waitForSelector("text=tarihine atandı");
   stokMetni = await page.locator(".bolum:has-text('Stok ve yayın ihtiyacı')").textContent();
   ok("oneri yalniz tiklaninca plana doner: atanmis 1 + atanmamis 1 (toplam yine 2)", /Hazır video 2/.test(stokMetni) && /tarihe atanmış 1/.test(stokMetni) && /atanmamış 1/.test(stokMetni), stokMetni);
+
+  // Tek gunun beklenen turu (istisna): bir paylasim gununu "Post" yap
+  var slotSayisiOnce = await page.locator(".slot").count();
+  await page.locator(".slot").last().click();
+  await alanGirdi(page.locator("dialog[open]"), "Bu gün beklenen paylaşım türü", "select").selectOption("post");
+  await page.locator("dialog[open] button:has-text('Türü kaydet')").click();
+  await page.waitForSelector("text=için beklenen tür: Post");
+  ok("tek gunun beklenen turu degistirilebilir (slot etiketi post)", (await page.locator(".slot").count()) === slotSayisiOnce && /post/.test(await page.locator(".slot").last().textContent()), await page.locator(".slot").last().textContent());
+  await page.click(".toast:has-text('için beklenen tür') button:has-text('Geri al')");
+  await page.waitForSelector("text=Geri alındı.");
 
   // Cekim ekle + cakisma
   await page.click("button:has-text('Çekim ekle')");
@@ -306,6 +317,8 @@ async function calis() {
   await d.locator("button[type=submit]").click();
   await d.locator(".hata:has-text('başka bir yerde değişti')").waitFor();
   ok("cakisma: pencere acik kalir, uyari gorunur (sessiz ezme yok)", dis.ok === true && await d.isVisible());
+  ok("cakisma: dokunulmamis alan guncel degerle doldu, benim alanim duruyor", (await alanGirdi(d, "Not", "textarea").inputValue()) === "başka cihaz notu" &&
+    (await alanGirdi(d, "Revizyon notu", "textarea").inputValue()) === "pencereden revizyon notu");
   await d.locator("button[type=submit]").click();
   await page.waitForSelector("dialog[open]", { state: "detached" });
   var birlesik = await icerikAl("Kurgudaki video");
@@ -326,6 +339,19 @@ async function calis() {
   await page.waitForSelector(".toast:has-text('Geri alınamadı')");
   var korunan = await icerikAl("Çekimden reels 1");
   ok("geri al, aradaki duzenleme varsa yapilmaz (oncelik ve durum korunur)", korunan.oncelik === "yuksek" && korunan.durum === "kurguda", JSON.stringify(korunan));
+
+  // Cift tiklama tek kayit olusturur
+  var oncekiSayi = (await apiCagir({ islem: "veri" })).veri.icerikler.length;
+  await page.click("text=+ Ekle");
+  await page.click("dialog >> text=İçerik");
+  d = page.locator("dialog[open]");
+  await alanGirdi(d, "Müşteri", "select").selectOption({ label: "Örnek Müşteri A" });
+  await alanGirdi(d, "Başlık", "input").fill("Çift tık örneği");
+  await d.locator("button[type=submit]").dblclick();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  await bekle(500);
+  var sonrakiSayi = (await apiCagir({ islem: "veri" })).veri.icerikler.length;
+  ok("cift tiklama: tek icerik olusur", sonrakiSayi === oncekiSayi + 1, oncekiSayi + " -> " + sonrakiSayi);
 
   // Gune ozel paylasim turu (Cuma post)
   await page.goto(URL_ + "#/musteriler");

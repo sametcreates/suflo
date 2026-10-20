@@ -25,7 +25,10 @@ header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 
 const STUDIO_SURUM = 1;
 const SEMA_SURUM = '2';
-const GOVDE_SINIRI = 8 * 1024 * 1024;
+const GOVDE_SINIRI = 8 * 1024 * 1024;      // oturum acikken (ice aktarma)
+const ACIK_GOVDE_SINIRI = 16 * 1024;        // oturumsuz istekler (oturum, giris) icin
+const LISTE_SINIRI = 20000;                 // ice aktarmada tur basina en cok kayit
+const CIHAZ_BOSTA = 180 * 24 * 3600;        // bu kadar kullanilmayan taninan cihaz unutulur
 const TURLER = ['musteri', 'icerik', 'etkinlik', 'ayar'];
 const CIHAZ_OMRU = 400 * 24 * 3600;
 
@@ -44,12 +47,29 @@ function basari(array $veri = []): void {
 
 /* ---------------- Ayarlar ---------------- */
 
-$configPath = dirname((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__)) . '/private/studio-v1/config.php';
-if (!is_file($configPath)) {
-    hata(503, 'kurulum', 'Suflo Studio sunucusu henuz yapilandirilmadi.');
+/** Ayar okunamadan donen kurulum hatasi. Arayuz "sunucuya ulasilamadi" yerine "kurulmadi" gorebilsin diye
+ *  bilinen Studio adreslerine CORS basliklari eklenir (yanit gizli bilgi icermez). */
+function kurulum_hatasi(string $mesaj): void {
+    $o = (string)($_SERVER['HTTP_ORIGIN'] ?? '');
+    if (in_array($o, ['https://suflo.app', 'https://assets.suflo.app'], true)) {
+        header('Access-Control-Allow-Origin: ' . $o);
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Headers: Content-Type, X-Studio');
+        header('Access-Control-Allow-Methods: POST, OPTIONS');
+        header('Vary: Origin');
+    }
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(204); exit; }
+    hata(503, 'kurulum', $mesaj);
 }
-$C = require $configPath;
-if (!is_array($C)) hata(503, 'kurulum', 'Suflo Studio ayar dosyasi okunamadi.');
+
+$configPath = dirname((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__)) . '/private/studio-v1/config.php';
+if (!is_file($configPath)) kurulum_hatasi('Suflo Studio sunucusu henuz yapilandirilmadi.');
+try {
+    $C = require $configPath;
+} catch (Throwable $e) {
+    kurulum_hatasi('Suflo Studio ayar dosyasi okunamadi.');
+}
+if (!is_array($C)) kurulum_hatasi('Suflo Studio ayar dosyasi okunamadi.');
 $C += [
     'password_hash' => '', 'dsn' => '', 'db_user' => '', 'db_pass' => '',
     'allowed_origins' => [], 'session_idle' => 14 * 24 * 3600, 'session_max' => 60 * 24 * 3600,
@@ -79,11 +99,15 @@ if (!$izinli) hata(403, 'kaynak', 'Bu adresten erisim yok.');
 if (($_SERVER['HTTP_X_STUDIO'] ?? '') !== '1') hata(403, 'baslik', 'Eksik istek basligi.');
 $ctype = strtolower(trim(explode(';', (string)($_SERVER['CONTENT_TYPE'] ?? ''))[0]));
 if ($ctype !== 'application/json') hata(415, 'icerik_turu', 'Content-Type application/json olmali.');
+// Oturum govdeden once denetlenir: oturumsuz istek (oturum, giris) yalniz kucuk govde gonderebilir;
+// buyuk govde (ice aktarma) yalniz gecerli oturumla okunur ve cozulur.
+$oturumlu = oturum_gecerli();
+$sinir = $oturumlu ? GOVDE_SINIRI : ACIK_GOVDE_SINIRI;
 $uzunluk = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
-if ($uzunluk > GOVDE_SINIRI) hata(413, 'buyuk', 'Istek cok buyuk.');
-$ham = (string)file_get_contents('php://input', false, null, 0, GOVDE_SINIRI + 1);
-if (strlen($ham) > GOVDE_SINIRI) hata(413, 'buyuk', 'Istek cok buyuk.');
-$G = json_decode($ham, true);
+if ($uzunluk > $sinir) hata(413, 'buyuk', 'Istek cok buyuk.');
+$ham = (string)file_get_contents('php://input', false, null, 0, $sinir + 1);
+if (strlen($ham) > $sinir) hata(413, 'buyuk', 'Istek cok buyuk.');
+$G = json_decode($ham, true, 64);
 if (!is_array($G)) hata(400, 'json', 'Gecersiz JSON.');
 $islem = (string)($G['islem'] ?? '');
 
@@ -121,33 +145,56 @@ function db_surucu(): string {
     return strtolower((string)strtok((string)$C['dsn'], ':'));
 }
 
-/** Tablolari bir kez kurar (ayar.sema surumu tutulur; her istekte DDL calismaz). */
-function sema_kur(PDO $p): void {
+function sema_hazir(PDO $p): bool {
     try {
         $s = $p->query("SELECT deger FROM ayar WHERE anahtar = 'sema'");
         $r = $s->fetch();
         $s->closeCursor();
-        if ($r && (string)$r['deger'] === SEMA_SURUM) return;
-    } catch (Throwable $e) { /* tablo yok: kurulacak */ }
+        return $r && (string)$r['deger'] === SEMA_SURUM;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+/**
+ * Tablolari bir kez kurar (ayar.sema surumu tutulur; her istekte DDL calismaz). Ayni anda gelen ilk istekler
+ * kurulum kilidinde bekler (SQLite: BEGIN IMMEDIATE, MySQL: GET_LOCK). Eski bir gelistirme surumunun tablolari
+ * varsa uzerine sessizce kurulmaz, acik bir kurulum hatasi doner.
+ */
+function sema_kur(PDO $p): void {
+    if (sema_hazir($p)) return;
     $my = mysql();
     $metin = $my ? 'LONGTEXT' : 'TEXT';
     $son = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin' : '';
     try {
-        $p->exec("CREATE TABLE IF NOT EXISTS kayitlar (id VARCHAR(40) NOT NULL PRIMARY KEY, tur VARCHAR(10) NOT NULL, anahtar CHAR(64) NULL, veri $metin NOT NULL, surum BIGINT NOT NULL, olusturma BIGINT NOT NULL, guncelleme BIGINT NOT NULL, UNIQUE (tur, anahtar))$son");
-        $p->exec("CREATE TABLE IF NOT EXISTS oturumlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)$son");
-        $p->exec("CREATE TABLE IF NOT EXISTS cihazlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL)$son");
-        $p->exec("CREATE TABLE IF NOT EXISTS girisler (kim CHAR(24) NOT NULL PRIMARY KEY, ip CHAR(64) NOT NULL, cihaz CHAR(64) NULL, zaman BIGINT NOT NULL)$son");
-        $p->exec("CREATE TABLE IF NOT EXISTS ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger $metin NOT NULL)$son");
-        $p->exec("CREATE TABLE IF NOT EXISTS anliklar (id VARCHAR(40) NOT NULL PRIMARY KEY, sira BIGINT NOT NULL, zaman BIGINT NOT NULL, neden VARCHAR(40) NOT NULL, ozet VARCHAR(255) NOT NULL, veri $metin NOT NULL)$son");
-        $p->exec("CREATE TABLE IF NOT EXISTS sayac (ad VARCHAR(32) NOT NULL PRIMARY KEY, deger BIGINT NOT NULL)$son");
-        if (!$my) $p->exec('CREATE INDEX IF NOT EXISTS giris_zaman ON girisler (zaman)');
-        elseif (!tek("SELECT 1 AS v FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'girisler' AND index_name = 'giris_zaman'")) {
-            $p->exec('CREATE INDEX giris_zaman ON girisler (zaman)');
+        if ($my) { $s = $p->query("SELECT GET_LOCK('suflo_studio_sema', 20)"); $s->closeCursor(); }
+        else $p->exec('BEGIN IMMEDIATE');
+        if (!sema_hazir($p)) {
+            $eski = false;
+            try { $s = $p->query('SELECT COUNT(*) FROM kayitlar'); $s->closeCursor(); $eski = true; } catch (Throwable $e) {}
+            if ($eski) throw new RuntimeException('eski_sema');
+            $p->exec("CREATE TABLE kayitlar (id VARCHAR(40) NOT NULL PRIMARY KEY, tur VARCHAR(10) NOT NULL, anahtar CHAR(64) NULL, veri $metin NOT NULL, surum BIGINT NOT NULL, olusturma BIGINT NOT NULL, guncelleme BIGINT NOT NULL, UNIQUE (tur, anahtar))$son");
+            $p->exec("CREATE TABLE IF NOT EXISTS oturumlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)$son");
+            $p->exec("CREATE TABLE IF NOT EXISTS cihazlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)$son");
+            $p->exec("CREATE TABLE IF NOT EXISTS girisler (kim CHAR(24) NOT NULL PRIMARY KEY, ip CHAR(64) NOT NULL, cihaz CHAR(64) NULL, zaman BIGINT NOT NULL" . ($my ? ', INDEX giris_zaman (zaman)' : '') . ")$son");
+            if (!$my) $p->exec('CREATE INDEX IF NOT EXISTS giris_zaman ON girisler (zaman)');
+            $p->exec("CREATE TABLE IF NOT EXISTS ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger $metin NOT NULL)$son");
+            $p->exec("CREATE TABLE IF NOT EXISTS anliklar (id VARCHAR(40) NOT NULL PRIMARY KEY, sira BIGINT NOT NULL, zaman BIGINT NOT NULL, neden VARCHAR(40) NOT NULL, ozet VARCHAR(255) NOT NULL, veri $metin NOT NULL)$son");
+            $p->exec("CREATE TABLE IF NOT EXISTS sayac (ad VARCHAR(32) NOT NULL PRIMARY KEY, deger BIGINT NOT NULL)$son");
+            $p->exec("DELETE FROM sayac WHERE ad = 'surum'");
+            $p->exec("INSERT INTO sayac (ad, deger) VALUES ('surum', 0)");
+            $p->exec("DELETE FROM ayar WHERE anahtar = 'sema'");
+            $p->exec("INSERT INTO ayar (anahtar, deger) VALUES ('sema', '" . SEMA_SURUM . "')");
         }
-        if (!tek("SELECT deger FROM sayac WHERE ad = 'surum'")) calistir("INSERT INTO sayac (ad, deger) VALUES ('surum', 0)");
-        calistir("DELETE FROM ayar WHERE anahtar = 'sema'");
-        calistir("INSERT INTO ayar (anahtar, deger) VALUES ('sema', ?)", [SEMA_SURUM]);
+        if ($my) { $s = $p->query("SELECT RELEASE_LOCK('suflo_studio_sema')"); $s->closeCursor(); }
+        else $p->exec('COMMIT');
     } catch (Throwable $e) {
+        try {
+            if ($my) { $s = $p->query("SELECT RELEASE_LOCK('suflo_studio_sema')"); $s->closeCursor(); }
+            else $p->exec('ROLLBACK');
+        } catch (Throwable $e2) {}
+        if ($e->getMessage() === 'eski_sema') {
+            hata(503, 'kurulum', 'Veritabaninda eski bir gelistirme surumunun tablolari var. Yedegi indirip veritabanini bosaltin, sonra yedegi yeniden ice aktarin.');
+        }
         hata(503, 'kurulum', 'Veritabani tablolari olusturulamadi.');
     }
 }
@@ -175,10 +222,16 @@ function calistir(string $sql, array $par = []): int {
     $s->closeCursor();
     return $n;
 }
-/** Islem: SQLite'ta yazma kilidi bastan alinir (BEGIN IMMEDIATE), hata olursa geri alinir. */
+/** Islem: yazma kilidi bastan alinir (SQLite BEGIN IMMEDIATE, MySQL sayac satirinda FOR UPDATE), hata olursa geri alinir. */
 function islem(callable $f) {
     $p = db();
-    if (mysql()) $p->beginTransaction(); else $p->exec('BEGIN IMMEDIATE');
+    if (mysql()) {
+        $p->beginTransaction();
+        // BEGIN IMMEDIATE karsiligi: yazma kilidi her okumadan once alinir (REPEATABLE READ goruntusu kilitten sonra olusur)
+        tek("SELECT deger FROM sayac WHERE ad = 'surum' FOR UPDATE");
+    } else {
+        $p->exec('BEGIN IMMEDIATE');
+    }
     try {
         $r = $f();
         if (mysql()) $p->commit(); else $p->exec('COMMIT');
@@ -261,20 +314,28 @@ function oturum_ac(): void {
     calistir('DELETE FROM oturumlar WHERE son < ? OR olusturma < ?', [$n - (int)$C['session_idle'], $n - (int)$C['session_max']]);
     cerez_yaz('oturum', $t, (int)$C['session_max']);
 }
-/** Taninan cihaz: daha once dogru sifreyle girilmis cihaz. Yalniz hatali giris kilidini asmaya yarar, erisim vermez. */
+/** Taninan cihaz: daha once dogru sifreyle girilmis cihaz. Yalniz hatali giris kilidini asmaya yarar, erisim vermez.
+ *  Sifre degisince ve "tum oturumlari kapat"ta hepsi unutulur; 180 gun kullanilmayan cihaz da unutulur. */
 function cihaz_ozeti(): ?string {
     $t = cerez_oku('cihaz');
     if ($t === '') return null;
     $oz = hash('sha256', $t);
-    return tek('SELECT 1 AS v FROM cihazlar WHERE ozet = ?', [$oz]) ? $oz : null;
+    return tek('SELECT 1 AS v FROM cihazlar WHERE ozet = ? AND son >= ?', [$oz, simdi() - CIHAZ_BOSTA]) ? $oz : null;
 }
+/** Basarili giristen sonra: bilinen cihazin suresi uzatilir, bilinmeyen cihaz kaydedilir. */
 function cihaz_tani(?string $mevcut): void {
-    if ($mevcut !== null) return;
+    $n = simdi();
+    if ($mevcut !== null) {
+        calistir('UPDATE cihazlar SET son = ? WHERE ozet = ?', [$n, $mevcut]);
+        cerez_yaz('cihaz', cerez_oku('cihaz'), CIHAZ_OMRU);
+        return;
+    }
     $t = rastgele_anahtar();
-    calistir('INSERT INTO cihazlar (ozet, olusturma) VALUES (?, ?)', [hash('sha256', $t), simdi()]);
-    calistir('DELETE FROM cihazlar WHERE olusturma < ?', [simdi() - CIHAZ_OMRU]);
+    calistir('INSERT INTO cihazlar (ozet, olusturma, son) VALUES (?, ?, ?)', [hash('sha256', $t), $n, $n]);
+    calistir('DELETE FROM cihazlar WHERE son < ?', [$n - CIHAZ_BOSTA]);
     cerez_yaz('cihaz', $t, CIHAZ_OMRU);
 }
+function cihazlari_unut(): void { calistir('DELETE FROM cihazlar'); }
 /** Gecerli sifre ozeti. Panelden degistirilen sifre veritabaninda durur; ama config.php'deki ozet
  *  o degisiklikten sonra elle degistirildiyse (sifre unutuldu) config.php'deki gecerli olur. */
 function sifre_ozeti(): string {
@@ -287,7 +348,7 @@ function sifre_ozeti(): string {
 /**
  * Sifre denemesi (giris ve sifre degistirme). Deneme sifre denetiminden ONCE kaydedilir; sonra sayilir
  * (paralel denemeler siniri asamaz). Taninan cihaz yalniz kendi sayacina tabidir; digerleri IP basina ve
- * toplam sinira. Dogruysa deneme kaydi silinir. Doner: true (dogru) | false (yanlis); kilitliyse 429 ile cikar.
+ * toplam sinira. Dogruysa ya da kilide takildiysa deneme kaydi silinir (yalniz yanlis sifre denemeleri sayilir). Doner: true (dogru) | false (yanlis); kilitliyse 429 ile cikar.
  */
 function sifre_dene(string $sifre, ?string $cihaz): bool {
     global $C;
@@ -303,7 +364,11 @@ function sifre_dene(string $sifre, ?string $cihaz): bool {
         $kilit = (int)tek('SELECT COUNT(*) AS c FROM girisler WHERE cihaz IS NULL AND ip = ? AND zaman >= ?', [ip_ozet(), $pencere])['c'] > $max
             || (int)tek('SELECT COUNT(*) AS c FROM girisler WHERE cihaz IS NULL AND zaman >= ?', [$pencere])['c'] > 3 * $max;
     }
-    if ($kilit) hata(429, 'kilit', 'Cok fazla hatali deneme. Biraz sonra yeniden dene.');
+    if ($kilit) {
+        // kilide takilan deneme sayilmaz (yalniz sifresi denenenler sayilir): tek bir saldirgan kilidi sonsuza uzatamaz
+        calistir('DELETE FROM girisler WHERE kim = ?', [$kim]);
+        hata(429, 'kilit', 'Cok fazla hatali deneme. Biraz sonra yeniden dene.');
+    }
     $ozet = sifre_ozeti();
     $dogru = $ozet !== '' && strlen($sifre) <= 1024 && password_verify($sifre, $ozet);
     if ($dogru) { calistir('DELETE FROM girisler WHERE kim = ?', [$kim]); return true; }
@@ -314,6 +379,8 @@ function sifre_dene(string $sifre, ?string $cihaz): bool {
 /* ---------------- Dogrulama ---------------- */
 
 function norm(string $s): string {
+    if (class_exists('Normalizer')) $s = (string)(Normalizer::normalize($s, Normalizer::FORM_C) ?: $s);
+    $s = (string)preg_replace('/[\x{200B}-\x{200D}\x{2060}\x{FEFF}]/u', '', $s);
     $s = str_replace(['I', 'İ'], ['ı', 'i'], trim($s));
     $s = mb_strtolower($s, 'UTF-8');
     return preg_replace('/\s+/u', ' ', $s) ?? $s;
@@ -356,9 +423,15 @@ function mantik($v): bool { return $v === true || $v === 1 || $v === '1' || $v =
 function id_bicim($v): bool { return is_string($v) && preg_match('/^[a-z0-9]{8,40}$/', $v) === 1; }
 
 /** Kaydi beyaz listeye gore temizler. $var: id => tur (musteri / etkinlik referanslari icin). */
+/** Alan nesne olmali (ya da hic verilmemeli): yanlis bicim sessizce bos sayilmaz. */
+function nesne($v, string $alan): array {
+    if ($v === null) return [];
+    if (!is_array($v)) throw new InvalidArgumentException("$alan nesne olmali");
+    return $v;
+}
 function temizle(string $tur, array $v, array $var): array {
     if ($tur === 'musteri') {
-        $s = is_array($v['siklik'] ?? null) ? $v['siklik'] : [];
+        $s = nesne($v['siklik'] ?? null, 'siklik');
         $gunler = [];
         foreach ((array)($s['gunler'] ?? []) as $g) {
             $g = tamsayi($g, 1, 7, 'siklik.gunler');
@@ -367,13 +440,22 @@ function temizle(string $tur, array $v, array $var): array {
         sort($gunler);
         // Haftalik duzende gune ozel beklenen tur (istege bagli): yalniz secili gunler icin
         $gunTurleri = [];
-        foreach ((is_array($s['gunTurleri'] ?? null) ? $s['gunTurleri'] : []) as $g => $t) {
+        foreach (nesne($s['gunTurleri'] ?? null, 'siklik.gunTurleri') as $g => $t) {
             $g = tamsayi(is_int($g) ? $g : (string)$g, 1, 7, 'siklik.gunTurleri');
             if ($g !== null && in_array($g, $gunler, true) && $t !== null && $t !== '') {
                 $gunTurleri[(string)$g] = secim($t, ['video', 'post', 'story', 'diger'], 'video', 'siklik.gunTurleri');
             }
         }
         ksort($gunTurleri);
+        // Tek tek paylasim gunlerinin beklenen turu (tarih => tur), her duzende
+        $istisna = [];
+        $gelenIstisna = nesne($v['slotIstisna'] ?? null, 'slotIstisna');
+        if (count($gelenIstisna) > 400) throw new InvalidArgumentException('slotIstisna en cok 400 gun');
+        foreach ($gelenIstisna as $t => $tt) {
+            $t = tarih((string)$t, 'slotIstisna tarihi', true);
+            if ($tt !== null && $tt !== '') $istisna[$t] = secim($tt, ['video', 'post', 'story', 'diger'], 'video', 'slotIstisna');
+        }
+        ksort($istisna);
         return [
             'ad' => metin($v['ad'] ?? null, 120, true, 'ad'),
             'kurum' => metin($v['kurum'] ?? null, 120, false, 'kurum'),
@@ -386,6 +468,7 @@ function temizle(string $tur, array $v, array $var): array {
                 'baslangic' => tarih($s['baslangic'] ?? null, 'siklik.baslangic'),
             ],
             'slotTuru' => secim($v['slotTuru'] ?? null, ['video', 'post', 'story', 'diger'], 'video', 'slotTuru'),
+            'slotIstisna' => (object)$istisna,
             'stokUyari' => tamsayi($v['stokUyari'] ?? null, 0, 999, 'stokUyari'),
             'stokGirisi' => mantik($v['stokGirisi'] ?? false),
             'not' => metin($v['not'] ?? null, 5000, false, 'not'),
@@ -398,7 +481,10 @@ function temizle(string $tur, array $v, array $var): array {
         $cid = $v['cekimId'] ?? null;
         if ($cid === '' ) $cid = null;
         if ($cid !== null && (!id_bicim($cid) || ($var[$cid] ?? '') !== 'etkinlik')) throw new InvalidArgumentException('bagli cekim bulunamadi');
-        $d = is_array($v['dosyalar'] ?? null) ? $v['dosyalar'] : [];
+        // bagli cekim musterisiz olmali ya da ayni musteriye ait olmali
+        global $ETK_MUSTERI;
+        if ($cid !== null && ($ETK_MUSTERI[$cid] ?? null) !== null && $ETK_MUSTERI[$cid] !== $mid) throw new InvalidArgumentException('bagli cekim baska musteriye ait');
+        $d = nesne($v['dosyalar'] ?? null, 'dosyalar');
         $gecmis = [];
         foreach (array_slice(array_values((array)($v['gecmis'] ?? [])), -60) as $g) {
             if (!is_array($g)) continue;
@@ -476,15 +562,25 @@ function dogal(string $tur, array $v): string {
 function tum_kayitlar(): array {
     return hepsi('SELECT id, tur, veri, surum, olusturma, guncelleme FROM kayitlar');
 }
+$ETK_MUSTERI = [];  // etkinlik id => musteri id | null (bagli cekim denetimi icin)
 function tur_haritasi(array $satirlar): array {
+    global $ETK_MUSTERI;
     $m = [];
-    foreach ($satirlar as $r) $m[(string)$r['id']] = (string)$r['tur'];
+    $ETK_MUSTERI = [];
+    foreach ($satirlar as $r) {
+        $m[(string)$r['id']] = (string)$r['tur'];
+        if ((string)$r['tur'] === 'etkinlik') {
+            $v = json_decode((string)$r['veri'], true) ?: [];
+            $ETK_MUSTERI[(string)$r['id']] = isset($v['musteriId']) && is_string($v['musteriId']) ? $v['musteriId'] : null;
+        }
+    }
     return $m;
 }
 function disa(array $r): array {
     $v = json_decode((string)$r['veri'], true) ?: [];
     // bos nesne JSON'da {} kalsin (dizi [] olmasin)
     if (isset($v['siklik']) && is_array($v['siklik']) && array_key_exists('gunTurleri', $v['siklik'])) $v['siklik']['gunTurleri'] = (object)$v['siklik']['gunTurleri'];
+    if (array_key_exists('slotIstisna', $v) && is_array($v['slotIstisna'])) $v['slotIstisna'] = (object)$v['slotIstisna'];
     return array_merge($v, ['id' => (string)$r['id'], 'surum' => (int)$r['surum'], 'olusturma' => (int)$r['olusturma'], 'guncelleme' => (int)$r['guncelleme']]);
 }
 function veri_paketi(): array {
@@ -522,9 +618,11 @@ function kayit_yaz(string $tur, ?string $id, array $veri, ?int $surum, array &$v
                 $guncel = tek('SELECT tur, surum, veri, olusturma, guncelleme FROM kayitlar WHERE id = ?', [$id]);
                 throw new RuntimeException('cakisma|' . json_encode(disa(array_merge($guncel ?: $mevcut, ['id' => $id])), JSON_UNESCAPED_UNICODE));
             }
+            if ($tur === 'etkinlik') { global $ETK_MUSTERI; $ETK_MUSTERI[$id] = $temiz['musteriId']; }
             return array_merge($temiz, ['id' => $id, 'surum' => $yeniSurum, 'olusturma' => (int)$mevcut['olusturma'], 'guncelleme' => $n]);
         }
-        if ($tur !== 'ayar' && $surum !== null) throw new RuntimeException('yok|');
+        // surumle gelen ama artik olmayan kayit (ayar dahil) yeniden yaratilmaz
+        if ($surum !== null) throw new RuntimeException('yok|');
     } else {
         $id = yeni_id();
     }
@@ -532,6 +630,7 @@ function kayit_yaz(string $tur, ?string $id, array $veri, ?int $surum, array &$v
     calistir('INSERT INTO kayitlar (id, tur, anahtar, veri, surum, olusturma, guncelleme) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [$id, $tur, $anahtar, json_metin($temiz), $yeniSurum, $n, $n]);
     $var[$id] = $tur;
+    if ($tur === 'etkinlik') { global $ETK_MUSTERI; $ETK_MUSTERI[$id] = $temiz['musteriId']; }
     return array_merge($temiz, ['id' => $id, 'surum' => $yeniSurum, 'olusturma' => $n, 'guncelleme' => $n]);
 }
 
@@ -552,33 +651,53 @@ function mesgul_mu(Throwable $e): bool {
     return (bool)preg_match('/database is locked|database table is locked|Lock wait timeout|Deadlock/i', $e->getMessage());
 }
 
+/** Anlik kopya verisi sikistirilarak saklanir (MySQL max_allowed_packet ve disk icin); eski bicim de okunur. */
+function anlik_paketle(array $paket): string {
+    $j = json_metin($paket);
+    if (function_exists('gzcompress')) { $z = gzcompress($j, 6); if ($z !== false) return 'z:' . base64_encode($z); }
+    return $j;
+}
+function anlik_coz(string $veri): array {
+    if (str_starts_with($veri, 'z:')) { $j = gzuncompress((string)base64_decode(substr($veri, 2), true)); $veri = $j === false ? '' : $j; }
+    return json_decode($veri, true) ?: [];
+}
 /** Anlik kopya (islem icinde cagrilir). En yeni 30 kopya kalir; sira hep artan sayactan (ayni saniyede de dogru sira). */
 function anlik_al(string $neden): string {
     $paket = veri_paketi();
     $id = yeni_id();
     $s = sayilar($paket);
     calistir('INSERT INTO anliklar (id, sira, zaman, neden, ozet, veri) VALUES (?, ?, ?, ?, ?, ?)',
-        [$id, yeni_surum(), simdi(), $neden, sprintf('%d musteri, %d icerik, %d etkinlik', $s['musteri'], $s['icerik'], $s['etkinlik']), json_metin($paket)]);
+        [$id, yeni_surum(), simdi(), $neden, sprintf('%d musteri, %d icerik, %d etkinlik', $s['musteri'], $s['icerik'], $s['etkinlik']), anlik_paketle($paket)]);
     foreach (array_slice(hepsi('SELECT id FROM anliklar ORDER BY sira DESC'), 30) as $r) calistir('DELETE FROM anliklar WHERE id = ?', [$r['id']]);
     return $id;
 }
+
+/** Ice aktarmada taninan alanlar; digerleri yok sayilir ve onizlemede uyari olarak gosterilir. */
+const BILINEN_ALANLAR = [
+    'musteri' => ['id', 'surum', 'olusturma', 'guncelleme', 'ad', 'kurum', 'ucret', 'siklik', 'slotTuru', 'slotIstisna', 'stokUyari', 'stokGirisi', 'not', 'arsiv'],
+    'etkinlik' => ['id', 'surum', 'olusturma', 'guncelleme', 'musteriId', 'musteriAdi', 'musteriKurum', 'baslik', 'tur', 'tumGun', 'basTarih', 'basSaat', 'bitTarih', 'bitSaat', 'konum', 'not', 'durum', 'arsiv'],
+    'icerik' => ['id', 'surum', 'olusturma', 'guncelleme', 'musteriId', 'musteriAdi', 'musteriKurum', 'baslik', 'tur', 'durum', 'oncelik', 'cekimId', 'teslimTarihi', 'planTarihi', 'yayinTarihi', 'revizyonNotu', 'dosyalar', 'not', 'gecmis', 'arsiv'],
+];
 
 /**
  * Ice aktarma plani. $kip: birlestir (yalniz yenileri ekle, var olanlara dokunma) | degistir (tumunu bu dosyayla degistir).
  * - Kimligi (id) olan kayit (yedek) yalniz kimligine gore eslenir: veritabaninda varsa atlanir, yoksa ayni kimlikle eklenir.
  *   Ayni dosyada ayni kimlik iki kez gecerse hata. Boylece yedekten geri yuklemede hicbir kayit "benzer" diye elenmez.
- * - Kimliksiz kayit (elle hazirlanmis liste) dogal anahtarla yalniz veritabanindaki kayitlara karsi denetlenir.
+ * - Kimliksiz kayit (elle hazirlanmis liste) dogal anahtarla veritabanindaki kayitlara ve dosyadaki onceki kimliksiz
+ *   satirlara karsi denetlenir (ayni satir iki kez eklenmez).
  * - Musteri ad + kurum veritabaninda tekil oldugundan: ayni musteri veritabaninda varsa ona baglanir ve atlanir;
  *   ayni dosyada iki kez geciyorsa hata.
  * - Icerik / etkinlik musteriye musteriId (dosyadaki kimlik) ya da musteriAdi (+ musteriKurum) ile baglanir.
- *   musteriKurum verilmisse tam eslesme gerekir; verilmemisse ad yalniz tek bir musteriye uyuyorsa baglanir.
+ *   musteriKurum verilmisse (bos da olsa) ad + kurum tam eslesmeli; verilmemisse ad yalniz tek bir musteriye uyuyorsa baglanir.
+ * - degistir kipinde yedekteki ayar kaydi da geri yuklenir.
  */
 function ice_aktarma_plani(array $gelen, string $kip): array {
+    global $ETK_MUSTERI;
     $mevcut = $kip === 'degistir' ? [] : tum_kayitlar();
     $var = tur_haritasi($mevcut);
     $dbDogal = [];
-    $musteriAd = [];   // norm(ad)|norm(kurum) => id
-    $musteriAdlari = []; // id => ad (onizlemede baglantiyi gostermek icin)
+    $musteriAd = [];     // norm(ad)|norm(kurum) => id
+    $musteriAdlari = []; // id => "ad · kurum" (onizlemede baglantiyi gostermek icin)
     foreach ($mevcut as $r) {
         $v = json_decode((string)$r['veri'], true) ?: [];
         $t = (string)$r['tur'];
@@ -586,21 +705,28 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
         $dbDogal[dogal($t, $v)] = (string)$r['id'];
         if ($t === 'musteri') {
             $musteriAd[norm((string)$v['ad']) . '|' . norm((string)($v['kurum'] ?? ''))] = (string)$r['id'];
-            $musteriAdlari[(string)$r['id']] = (string)$v['ad'];
+            $musteriAdlari[(string)$r['id']] = (string)$v['ad'] . (($v['kurum'] ?? '') !== '' ? ' · ' . $v['kurum'] : '');
         }
     }
-    $plan = ['ekle' => [], 'atla' => [], 'hatalar' => [], 'sayilar' => ['musteri' => 0, 'icerik' => 0, 'etkinlik' => 0, 'atlanan' => 0]];
+    $plan = ['ekle' => [], 'atla' => [], 'hatalar' => [], 'uyarilar' => [],
+        'sayilar' => ['musteri' => 0, 'icerik' => 0, 'etkinlik' => 0, 'atlanan' => 0],
+        'ucret' => ['bilinen' => 0, 'belirsiz' => 0, 'toplam' => 0]];
     $idEslem = [];      // dosyadaki kimlik => son kimlik
     $dosyaIdleri = [];  // bu dosyada gorulen kimlikler
     $dosyaMusteri = []; // bu dosyada eklenecek musterilerin dogal anahtari
+    $dosyaDogal = [];   // bu dosyada eklenecek kimliksiz etkinlik / iceriklerin dogal anahtari
+    $bilinmeyen = [];   // "alan" => sayi
     $sira = ['musteri' => 'musteriler', 'etkinlik' => 'etkinlikler', 'icerik' => 'icerikler'];
     foreach ($sira as $tur => $alan) {
         $liste = $gelen[$alan] ?? [];
         if (!is_array($liste)) { $plan['hatalar'][] = "$alan liste olmali"; continue; }
-        if (count($liste) > 5000) { $plan['hatalar'][] = "$alan cok uzun"; continue; }
+        if (count($liste) > LISTE_SINIRI) { $plan['hatalar'][] = "$alan cok uzun (en cok " . LISTE_SINIRI . ')'; continue; }
         foreach (array_values($liste) as $i => $k) {
             $etiket = $alan . '[' . ($i + 1) . ']';
             if (!is_array($k)) { $plan['hatalar'][] = "$etiket kayit degil"; continue; }
+            foreach (array_keys($k) as $ak) {
+                if (!in_array((string)$ak, BILINEN_ALANLAR[$tur], true)) { $bk = "$alan." . mb_substr((string)$ak, 0, 40); $bilinmeyen[$bk] = ($bilinmeyen[$bk] ?? 0) + 1; }
+            }
             $eskiId = isset($k['id']) && id_bicim($k['id']) ? (string)$k['id'] : null;
             if ($eskiId !== null) {
                 if (isset($dosyaIdleri[$eskiId])) { $plan['hatalar'][] = "$etiket: ayni kimlik dosyada iki kez"; continue; }
@@ -612,10 +738,11 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                     $k['musteriId'] = $idEslem[$mid];
                 } elseif ((!is_string($mid) || $mid === '') && isset($k['musteriAdi']) && is_string($k['musteriAdi']) && trim($k['musteriAdi']) !== '') {
                     $ad = norm($k['musteriAdi']);
-                    $kurum = is_string($k['musteriKurum'] ?? null) ? norm($k['musteriKurum']) : '';
                     $bulunan = null;
-                    if (isset($musteriAd[$ad . '|' . $kurum])) $bulunan = $musteriAd[$ad . '|' . $kurum];
-                    elseif ($kurum === '') {
+                    if (array_key_exists('musteriKurum', $k) && $k['musteriKurum'] !== null) {
+                        $kurum = is_string($k['musteriKurum']) ? norm($k['musteriKurum']) : '';
+                        $bulunan = $musteriAd[$ad . '|' . $kurum] ?? null;
+                    } else {
                         $adaylar = array_values(array_filter(array_keys($musteriAd), fn($a) => explode('|', $a)[0] === $ad));
                         if (count($adaylar) > 1) { $plan['hatalar'][] = "$etiket: ayni adda birden cok musteri var, musteriKurum ekle (" . mb_substr($k['musteriAdi'], 0, 60) . ')'; continue; }
                         if (count($adaylar) === 1) $bulunan = $musteriAd[$adaylar[0]];
@@ -649,25 +776,45 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                     continue;
                 }
                 $dosyaMusteri[$d] = 1;
-            } elseif ($eskiId === null && isset($dbDogal[$d])) {
-                $plan['atla'][] = ['tur' => $tur, 'ad' => $ad, 'neden' => 'mukerrer (ayni ad / tarih)'];
+            } elseif ($eskiId === null && (isset($dbDogal[$d]) || isset($dosyaDogal[$d]))) {
+                $plan['atla'][] = ['tur' => $tur, 'ad' => $ad, 'neden' => isset($dbDogal[$d]) ? 'mukerrer (ayni ad / tarih zaten var)' : 'dosyada ayni satir iki kez'];
                 $plan['sayilar']['atlanan']++;
                 continue;
             }
+            if ($eskiId === null && $tur !== 'musteri') $dosyaDogal[$d] = 1;
             $yeni = $eskiId ?? yeni_id();
             if ($eskiId !== null) $idEslem[$eskiId] = $yeni;
             $var[$yeni] = $tur;
+            if ($tur === 'etkinlik') $ETK_MUSTERI[$yeni] = $temiz['musteriId'];
             if ($tur === 'musteri') {
                 $musteriAd[norm($temiz['ad']) . '|' . norm($temiz['kurum'])] = $yeni;
-                $musteriAdlari[$yeni] = $temiz['ad'];
+                $musteriAdlari[$yeni] = $temiz['ad'] . ($temiz['kurum'] !== '' ? ' · ' . $temiz['kurum'] : '');
+                if ($temiz['ucret'] === null) $plan['ucret']['belirsiz']++;
+                else { $plan['ucret']['bilinen']++; $plan['ucret']['toplam'] += $temiz['ucret']; }
             }
             $bag = $tur === 'musteri' ? null : ($temiz['musteriId'] !== null ? ($musteriAdlari[$temiz['musteriId']] ?? null) : null);
-            $plan['ekle'][] = ['tur' => $tur, 'id' => $yeni, 'veri' => $temiz, 'ad' => $ad, 'bag' => $bag,
+            $ek = $tur === 'musteri' ? ['ucret' => $temiz['ucret'], 'siklik' => $temiz['siklik']['tur']] : [];
+            $plan['ekle'][] = ['tur' => $tur, 'id' => $yeni, 'veri' => $temiz, 'ad' => $ad, 'bag' => $bag, 'ek' => $ek,
                 'olusturma' => isset($k['olusturma']) && is_int($k['olusturma']) && $k['olusturma'] > 0 ? $k['olusturma'] : null];
             $plan['sayilar'][$tur]++;
         }
     }
+    foreach ($bilinmeyen as $bk => $n) $plan['uyarilar'][] = "bilinmeyen alan '$bk' ($n kayit): yok sayilacak";
+    // degistir: yedekteki ayar kaydi da geri gelir
+    $plan['ayar'] = null;
+    if ($kip === 'degistir' && isset($gelen['ayar']) && is_array($gelen['ayar'])) {
+        try { $plan['ayar'] = temizle('ayar', $gelen['ayar'], $var); }
+        catch (InvalidArgumentException $e) { $plan['hatalar'][] = 'ayar: ' . $e->getMessage(); }
+    }
     return $plan;
+}
+function plan_ozeti(array $plan, string $kip): array {
+    $o = ['kip' => $kip, 'sayilar' => $plan['sayilar'], 'ucret' => $plan['ucret'], 'hatalar' => array_slice($plan['hatalar'], 0, 100),
+        'hataSayisi' => count($plan['hatalar']), 'uyarilar' => array_slice($plan['uyarilar'], 0, 50), 'atla' => array_slice($plan['atla'], 0, 200),
+        'ekle' => array_map(fn($e) => ['tur' => $e['tur'], 'ad' => $e['ad'], 'bag' => $e['bag']] + $e['ek'], array_slice($plan['ekle'], 0, 500)),
+        'ayar' => $plan['ayar'] !== null];
+    if ($kip === 'degistir') $o['kaldirilacak'] = sayilar(veri_paketi());
+    return $o;
 }
 
 /** Kayitlari (yeniden) yazar; surum numaralari sayactan gelir, hic tekrarlanmaz. Islem icinde cagrilir. */
@@ -684,7 +831,7 @@ function kayitlari_ekle(array $ekle): void {
 try {
     // Oturum gerektirmeyenler
     if ($islem === 'oturum') {
-        basari(['girisli' => oturum_gecerli(), 'kurulu' => sifre_ozeti() !== '']);
+        basari(['girisli' => $oturumlu, 'kurulu' => sifre_ozeti() !== '']);
     }
     if ($islem === 'giris') {
         if (sifre_ozeti() === '') hata(503, 'kurulum', 'Giris sifresi henuz ayarlanmadi.');
@@ -697,7 +844,7 @@ try {
     }
 
     // Bundan sonrasi oturum ister
-    if (!oturum_gecerli()) hata(401, 'oturum', 'Giris gerekli.');
+    if (!$oturumlu) hata(401, 'oturum', 'Giris gerekli.');
 
     switch ($islem) {
         case 'cikis':
@@ -746,25 +893,36 @@ try {
             $kip = ($G['kip'] ?? 'birlestir') === 'degistir' ? 'degistir' : 'birlestir';
             $gelen = $G['veriler'] ?? null;
             if (!is_array($gelen)) hata(422, 'gecersiz', 'veriler eksik.');
-            $plan = ice_aktarma_plani($gelen, $kip);
-            $ozet = ['kip' => $kip, 'sayilar' => $plan['sayilar'], 'hatalar' => array_slice($plan['hatalar'], 0, 100),
-                'hataSayisi' => count($plan['hatalar']), 'atla' => array_slice($plan['atla'], 0, 200),
-                'ekle' => array_map(fn($e) => ['tur' => $e['tur'], 'ad' => $e['ad'], 'bag' => $e['bag']], array_slice($plan['ekle'], 0, 500))];
-            if ($kip === 'degistir') $ozet['kaldirilacak'] = sayilar(veri_paketi());
-            if (!empty($G['onizleme'])) basari(['onizleme' => $ozet]);
-            if (count($plan['hatalar']) > 0) hata(422, 'gecersiz', 'Dosyada hatali kayitlar var; once onizlemede duzelt.', ['onizleme' => $ozet]);
+            if (!empty($G['onizleme'])) basari(['onizleme' => plan_ozeti(ice_aktarma_plani($gelen, $kip), $kip)]);
             if ($kip === 'degistir' && ($G['onay'] ?? '') !== 'GERI YUKLE') hata(422, 'onay', 'Tum verinin degistirilmesi icin onay gerekli.');
+            $beklenen = is_array($G['beklenen'] ?? null) ? $G['beklenen'] : null;
             try {
-                $anlik = islem(function () use ($kip, $plan) {
+                // Plan, yazma kilidi altinda yeniden hesaplanir (arada baska cihaz yazmis olabilir)
+                $sonuc = islem(function () use ($gelen, $kip, $beklenen) {
+                    $plan = ice_aktarma_plani($gelen, $kip);
+                    $ozet = plan_ozeti($plan, $kip);
+                    if (count($plan['hatalar']) > 0) throw new RuntimeException('plan|' . json_encode($ozet, JSON_UNESCAPED_UNICODE));
+                    if ($beklenen !== null) {
+                        foreach (['musteri', 'icerik', 'etkinlik', 'atlanan'] as $k) {
+                            if ((int)($beklenen[$k] ?? -1) !== $plan['sayilar'][$k]) throw new RuntimeException('onizleme_eski|' . json_encode($ozet, JSON_UNESCAPED_UNICODE));
+                        }
+                    }
                     $a = anlik_al($kip === 'degistir' ? 'geri_yukleme_oncesi' : 'ice_aktarma_oncesi');
-                    if ($kip === 'degistir') calistir("DELETE FROM kayitlar WHERE tur <> 'ayar'");
+                    if ($kip === 'degistir') calistir($plan['ayar'] !== null ? 'DELETE FROM kayitlar' : "DELETE FROM kayitlar WHERE tur <> 'ayar'");
                     kayitlari_ekle($plan['ekle']);
-                    return $a;
+                    if ($plan['ayar'] !== null) kayitlari_ekle([['tur' => 'ayar', 'id' => 'ayar', 'veri' => $plan['ayar']]]);
+                    return ['ozet' => $ozet, 'anlik' => $a];
                 });
             } catch (Throwable $e) {
+                if ($e instanceof RuntimeException && str_starts_with($e->getMessage(), 'plan|')) {
+                    hata(422, 'gecersiz', 'Dosyada hatali kayitlar var; once onizlemede duzelt.', ['onizleme' => json_decode(substr($e->getMessage(), 5))]);
+                }
+                if ($e instanceof RuntimeException && str_starts_with($e->getMessage(), 'onizleme_eski|')) {
+                    hata(409, 'onizleme_eski', 'Veri onizlemeden sonra degisti; onizlemeyi yenile.', ['onizleme' => json_decode(substr($e->getMessage(), 14))]);
+                }
                 yaz_hatasi($e);
             }
-            basari(['sonuc' => $ozet, 'anlik' => $anlik]);
+            basari(['sonuc' => $sonuc['ozet'], 'anlik' => $sonuc['anlik']]);
 
         case 'disa_aktar':
             basari(['yedek' => ['format' => 'suflo-studio-yedek', 'surum' => STUDIO_SURUM, 'olusturma' => gmdate('c'), 'veriler' => veri_paketi()]]);
@@ -777,7 +935,7 @@ try {
             if (($G['onay'] ?? '') !== 'GERI YUKLE') hata(422, 'onay', 'Onay gerekli.');
             $r = tek('SELECT veri FROM anliklar WHERE id = ?', [(string)($G['id'] ?? '')]);
             if (!$r) hata(404, 'yok', 'Anlik kopya bulunamadi.');
-            $paket = json_decode((string)$r['veri'], true) ?: [];
+            $paket = anlik_coz((string)$r['veri']);
             $ekle = [];
             $gruplar = ['musteri' => $paket['musteriler'] ?? [], 'etkinlik' => $paket['etkinlikler'] ?? [], 'icerik' => $paket['icerikler'] ?? [],
                 'ayar' => isset($paket['ayar']) && is_array($paket['ayar']) ? [$paket['ayar']] : []];
@@ -810,13 +968,17 @@ try {
                 ayar_yaz('password_hash', password_hash($yeni, defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT));
                 ayar_yaz('password_hash_kaynak', hash('sha256', (string)$C['password_hash']));
                 calistir('DELETE FROM oturumlar');
+                cihazlari_unut(); // calinmis bir cihaz cerezi kilitten muaf kalmasin
             });
             oturum_ac();
+            cihaz_tani(null);
             basari();
 
         case 'oturumlari_kapat':
             calistir('DELETE FROM oturumlar');
+            cihazlari_unut();
             cerez_yaz('oturum', '', 0);
+            cerez_yaz('cihaz', '', 0);
             basari();
 
         default:

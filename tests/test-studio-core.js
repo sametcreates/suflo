@@ -221,6 +221,41 @@ ok("liste sirasi: yayinlananlar en sonda, digerleri tarihe gore", (function () {
     icerik({ durum: "hazir", planTarihi: "2030-03-05" }), icerik({ durum: "yayinlandi", yayinTarihi: "2030-03-03" })].sort(C.icerikSirala);
   return l[0].planTarihi === "2030-03-05" && l[1].planTarihi === "2030-03-09" && l[2].yayinTarihi === "2030-03-03" && l[3].yayinTarihi === "2030-03-01";
 })());
+ok("yuksek oncelik siralamada one gecer (0 || 1 hatasi yok)", (function () {
+  var l = [icerik({ planTarihi: "2030-03-05", oncelik: "normal" }), icerik({ planTarihi: "2030-03-05", oncelik: "yuksek" })].sort(C.icerikSirala);
+  var m2 = musteri({ id: "mY0000000" });
+  var v2 = { musteriler: [m2], icerikler: [icerik({ musteriId: "mY0000000", durum: "hazir", oncelik: "normal", olusturma: 1 }), icerik({ musteriId: "mY0000000", durum: "hazir", oncelik: "yuksek", olusturma: 2 })] };
+  var k = C.kapsama(v2, m2, BUGUN, 1);
+  return l[0].oncelik === "yuksek" && v2.icerikler.filter(function (i) { return i.id === k.slotlar[0].icerikId; })[0].oncelik === "yuksek";
+})());
+ok("ucretCoz: Turkce binlik, bos, kusurat", C.ucretCoz("10.000") === 10000 && C.ucretCoz("10000") === 10000 && C.ucretCoz(" 17.500 TL") === 17500 &&
+  C.ucretCoz("10.000,00") === 10000 && C.ucretCoz("") === null && isNaN(C.ucretCoz("15000.00")) && isNaN(C.ucretCoz("7,5")) && isNaN(C.ucretCoz("abc")) && isNaN(C.ucretCoz("1.00")));
+ok("norm: NFD ve sifir genislikli karakter ayni anahtari verir", C.norm("Gu\u0308l\u200Bs\u0327ah") === C.norm("Gülşah") && C.katla("Gu\u0308l") === "gul");
+ok("tarihi gecmis hazir icerik ileri gunler icin oneri havuzunda (kaybolmaz)", (function () {
+  var m3 = musteri({ id: "mZ0000000" });
+  var v3 = { musteriler: [m3], icerikler: [icerik({ musteriId: "mZ0000000", durum: "hazir", planTarihi: "2030-03-01" })] };
+  var k = C.kapsama(v3, m3, BUGUN, 2), st = C.stok(v3, m3, BUGUN);
+  return k.oneri === 1 && k.acik === 1 && st.atanmis === 1 && st.gecmisTarihli === 1;
+})());
+ok("haftada 2 ama 1 gun secili: duzen eksik (tahmin eksik sayilmaz)", (function () {
+  var d = C.duzenDurumu(musteri({ siklik: { tur: "haftalik", gunler: [2], haftalikAdet: 2 } }));
+  return !d.tamam && /2 gün seçilmeli \(1 seçili\)/.test(d.eksik);
+})());
+ok("gun istisnasi: o gunun beklenen turu degisir (gunluk musteri, 05 post)", (function () {
+  var m4 = musteri({ id: "mW0000000", slotIstisna: { "2030-03-05": "post" } });
+  var v4 = { musteriler: [m4], icerikler: [icerik({ musteriId: "mW0000000", durum: "hazir", tur: "post" }), icerik({ musteriId: "mW0000000", durum: "hazir" })] };
+  var k = C.kapsama(v4, m4, BUGUN, 2);
+  return k.karisik && k.slotlar[0].grup === "video" && k.slotlar[1].grup === "post" && k.oneri === 2;
+})());
+ok("genel bakis: duzeni olmayan musterinin 7 gun icindeki hazir olmayan planli icerigi gorunur", (function () {
+  var m5 = musteri({ id: "mV0000000", siklik: { tur: "belirsiz", gunler: [] }, stokGirisi: false });
+  var v5 = { musteriler: [m5], etkinlikler: [], icerikler: [icerik({ musteriId: "mV0000000", durum: "kurguda", planTarihi: "2030-03-05" }), icerik({ musteriId: "mV0000000", durum: "hazir", planTarihi: "2030-03-05" })] };
+  var gb = C.genelBakis(v5, BUGUN, null);
+  return gb.planliHazirDegil.length === 1 && gb.planliHazirDegil[0].durum === "kurguda" && gb.sayilar[0].stokBilinen === false;
+})());
+ok("takvim: gece yarisini asan cekim ikinci gunde bitis saatiyle gorunur", C.gundekiSaat(gece, "2030-03-04") === "22:00" && C.gundekiSaat(gece, "2030-03-05") === "–01:00" &&
+  C.gundekiSaat(etk({ basTarih: "2030-03-04", bitTarih: "2030-03-06", basSaat: "10:00", bitSaat: "12:00" }), "2030-03-05") === "devam");
+ok("yedekCoz ayar kaydini da tasir", C.yedekCoz({ format: "suflo-studio-yedek", veriler: { musteriler: [], ayar: { varsayilanStokUyari: 3 } } }).veriler.ayar.varsayilanStokUyari === 3);
 ok("filtre: durum listesi", C.icerikFiltrele(fv, { durum: "onayda,kurguda" }).length === 1);
 ok("filtre: arsiv ayri", C.icerikFiltrele(fv, { arsiv: true }).length === 1 && C.icerikFiltrele(fv, {}).length === 1);
 ok("filtre: tarih araligi", C.icerikFiltrele(fv, { tarihAlan: "plan", bas: "2030-03-09", bit: "2030-03-11" }).length === 1 && C.icerikFiltrele(fv, { bas: "2030-03-11" }).length === 0);

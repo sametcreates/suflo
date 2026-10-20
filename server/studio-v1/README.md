@@ -18,16 +18,32 @@ Suflo Pro lisans servisinden (`pro-v1`) tamamen ayrıdır: ayar dosyası, verita
 - **Hatalı giriş kilidi:**
   - Her deneme şifre denetiminden *önce* kaydedilir; paralel denemeler sınırı aşamaz.
   - 15 dakikada aynı IP'den (IPv6'da /64 bloğundan) 8, tüm IP'lerden toplam 24 hatalı denemeden sonra giriş kilitlenir.
+  - Kilide takılan istekler sayılmaz; yalnız şifresi gerçekten denenen istekler sayılır. Böylece kilit sürerken yağdırılan istekler kilidi uzatamaz.
   - Şifre değiştirmedeki "mevcut şifre" denemeleri de aynı sınıra tabidir.
-- **Tanınan cihaz:** Doğru şifreyle girilen cihaza ayrı bir `__Host-` çerezi (400 gün) verilir. Bu çerez erişim vermez; yalnız o cihazı IP ve toplam kilidinden muaf tutar. Böylece bir saldırgan sürekli yanlış deneyerek sahibini kilitli tutamaz. Tanınan cihazın da kendi sınırı vardır: 15 dakikada 8 hatalı deneme.
-- Yeni bir cihazdan ilk giriş, saldırı sürerken kilide takılabilir. Kilit 15 dakikalık pencereyle kendiliğinden açılır.
+  - Oturumsuz istekler en çok 16 KB gövde gönderebilir. Büyük gövde (içe aktarma) yalnız oturum doğrulandıktan sonra okunur.
+- **Tanınan cihaz:**
+  - Doğru şifreyle girilen cihaza ayrı bir `__Host-` çerezi verilir. Çerez her girişte uzatılır; 180 gün kullanılmayan cihaz unutulur.
+  - Bu çerez erişim vermez; yalnız o cihazı IP ve toplam kilidinden muaf tutar. Böylece bir saldırgan sahibini bilinen cihazlarında kilitli tutamaz.
+  - Tanınan cihazın da kendi sınırı vardır: 15 dakikada 8 hatalı deneme.
+  - **Şifre değiştirince ve "Tüm cihazlarda çıkış yap"ta bütün tanınan cihazlar unutulur.** Çalınan bir cihazın çerezi de böylece geçersiz olur.
+- Saldırı sürerken yeni bir cihazdan ilk giriş kilide takılabilir. Saldırı durunca kilit 15 dakika içinde kendiliğinden açılır. Bilinen cihazlar etkilenmez.
 - Silme işlemi yoktur; kayıtlar arşivlenir.
 - **Sürüm denetimi:** İki cihaz aynı kaydı değiştirirse, eski sürümle yazan `409` alır ve hiçbir şey sessizce ezilmez. Sürüm numaraları hep artan tek bir sayaçtan gelir; geri yüklemede bile tekrar kullanılmaz. Güncelleme `WHERE surum = ?` ile yapılır.
-- **Eşzamanlı yazmalar:** Yazmalar işlem (transaction) içinde yapılır. SQLite'ta yazma kilidi baştan alınır (`BEGIN IMMEDIATE`). MySQL'de tablolar `InnoDB` ve `utf8mb4` olarak kurulur.
+- **Eşzamanlı yazmalar:** Yazmalar işlem (transaction) içinde yapılır.
+  - Yazma kilidi her okumadan önce alınır: SQLite'ta `BEGIN IMMEDIATE`, MySQL'de sayaç satırında `FOR UPDATE`.
+  - Geri yükleme, aynı anda kaydedilen bir değişikliği sessizce silemez.
+  - MySQL'de tablolar `InnoDB` ve `utf8mb4` olarak kurulur.
+  - Tablolar ilk istekte bir kez, kurulum kilidi altında kurulur.
 - **İçe aktarma ve geri yükleme:**
   - Yedekteki kimliği (id) olan kayıtlar yalnız kimliğe göre eşlenir; "benzer" diye hiçbir kayıt elenmez.
-  - Elle hazırlanmış (kimliksiz) listeler ad ve tarihe göre mükerrer denetiminden geçer.
-  - Uygulamadan önce, aynı işlem içinde otomatik kopya alınır (son 30 kopya saklanır).
+  - Elle hazırlanmış (kimliksiz) listeler ad ve tarihe göre mükerrer denetiminden geçer. Hem var olan kayıtlarla hem dosyadaki tekrar eden satırlarla karşılaştırılır.
+  - Bir içerik ya da etkinlik müşteriye `musteriAdi` ile bağlanabilir. `musteriKurum` verilirse, boş da olsa, ad ve kurum tam eşleşmelidir. Verilmezse ad yalnız tek bir müşteriye uyduğunda bağlanır; birden çok aday varsa hata olur.
+  - Önizlemede şunlar görünür: her kaydın hangi müşteriye bağlanacağı, eklenecek müşterilerin bilinen aylık ücret toplamı ve tanınmayan alanlar (bunlar uyarı olarak gösterilir, kaydedilmez).
+  - Yanlış biçimli bir alan (ör. `siklik` metin olarak yazılmışsa) sessizce boş sayılmaz; hata olarak gösterilir.
+  - Plan, uygulamada yazma kilidi altında yeniden hesaplanır. Önizlemeden sonra veri değiştiyse içe aktarma yapılmaz; önizleme yenilenir.
+  - "Tümünü değiştir" yedekteki ayar kaydını (varsayılan stok eşiği) da geri getirir.
+  - Uygulamadan önce, aynı işlem içinde otomatik kopya alınır. Son 30 kopya sıkıştırılarak saklanır.
+  - Tek dosyada en çok 7,5 MB ve tür başına 20.000 kayıt içe aktarılabilir. Daha büyük bir yedek indirildiğinde uyarı gösterilir.
 - `noindex` ve `robots.txt` yalnız arama motorları içindir; güvenlik bunlara dayanmaz.
 
 ## Dağıtım seçeneği (karar gerekli)
@@ -37,11 +53,11 @@ Tarayıcıda aynı adresten (origin) yüklenen her betik, o adresin izin verdiğ
 - **A — `https://suflo.app/studio/`** (GitHub Pages; ilk istenen yol)
   - `allowed_origins = ['https://suflo.app']`.
   - Kurulumu en kolay seçenek. Yukarıdaki risk kalır.
-- **B — `https://assets.suflo.app/studio/` (önerilen)**
+- **B — `https://assets.suflo.app/studio/` (önerilen; örnek ayar dosyasının varsayılanı)**
   - Arayüz ve API aynı adreste olur. Bu adreste üçüncü taraf betik yoktur.
   - `docs/studio/` içindeki dosyaları (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle. `arayuz.htaccess` dosyasını da aynı yere `.htaccess` adıyla koy.
   - `allowed_origins = ['https://assets.suflo.app']`.
-  - `suflo.app/studio/` yalnız bu adrese yönlendiren bir sayfa olur; o sayfa hiçbir veriye erişmez.
+  - `suflo.app/studio/` yalnız yönlendirme sayfası olur ve hiçbir veriye erişmez. Bunun için `main`'e birleştirmeden önce `docs/studio/` içeriği `yonlendirme.html` ile değiştirilir; bu adım onayla yapılır.
   - Önce `assets.suflo.app` üzerinde HTML/JS sunan başka bir sayfa olmadığını kontrol et.
 
 Arayüz kodu iki seçenekte de aynıdır: `assets.suflo.app` üzerinden açılınca API'yi kendi adresinden çağırır.
@@ -75,6 +91,10 @@ Adımlar:
 7. İlk veriyi yalnız giriş yaptıktan sonra **Ayarlar → İçe aktar** ile yükle. Önce önizlemeyi kontrol et, sonra "Yalnız yenileri ekle"ye bas.
 
 `config.php`, `studio.sqlite` ve yedek dosyaları GitHub'a, e-postaya, sohbete ya da herkese açık bir klasöre girmemeli.
+
+## İlk kurulum notu
+
+Veritabanı ilk istekte boşsa tablolar kurulur. Daha önceki bir geliştirme sürümünün tabloları bulunursa üzerine sessizce kurulmaz; açık bir "eski geliştirme sürümü" hatası döner. Yalnız geliştirme denemelerinde olabilir. Bu durumda yedeği indir, veritabanını boşalt ve yedeği yeniden içe aktar.
 
 ## Bakım
 

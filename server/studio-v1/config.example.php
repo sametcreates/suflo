@@ -19,9 +19,9 @@ return [
     'db_pass' => '',
 
     // Arayuzun calistigi adres. Yalniz buradan gelen istekler kabul edilir (CSRF korumasi).
-    // Secenek A: ['https://suflo.app']  |  Secenek B (onerilen, ayri adres): ['https://assets.suflo.app']
-    // Yalniz birini yaz (bkz. README "Dagitim secenegi").
-    'allowed_origins' => ['https://suflo.app'],
+    // Secenek B (onerilen): arayuz ve API ayni adreste, https://assets.suflo.app/studio/
+    // Secenek A: ['https://suflo.app'] (satis sitesindeki ucuncu taraf betiklerle ayni kaynak; bkz. README "Dagitim secenegi")
+    'allowed_origins' => ['https://assets.suflo.app'],
 
     // Oturum: bosta kalma ve mutlak sure (saniye)
     'session_idle' => 14 * 24 * 3600,
