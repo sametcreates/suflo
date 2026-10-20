@@ -17,6 +17,10 @@ declare(strict_types=1);
  * - Gizli bilgi (sifre ozeti, veritabani sifresi) yalniz private config'te; yanitlara/gunluge girmez.
  */
 
+// PHP uyarilari yanita basilmaz (sunucu yolu sizmasin, JSON bozulmasin); yalniz sunucu gunlugune yazilir
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: no-referrer');
@@ -118,7 +122,7 @@ $ham = (string)file_get_contents('php://input', false, null, 0, $sinir + 1);
 if (strlen($ham) > $sinir) $asim();
 $G = json_decode($ham, true, 64);
 if (!is_array($G)) hata(400, 'json', 'Gecersiz JSON.');
-$islem = (string)($G['islem'] ?? '');
+$islem = is_string($G['islem'] ?? null) ? $G['islem'] : '';
 
 /* ---------------- Veritabani ---------------- */
 
@@ -238,7 +242,7 @@ function sema_kur(PDO $p): void {
         } catch (Throwable $e2) {}
         if ($e->getMessage() === 'kilit' || mesgul_mu($e)) hata(503, 'mesgul', 'Sunucu mesgul; yeniden dene.');
         if ($e->getMessage() === 'eski_sema') {
-            hata(503, 'kurulum', 'Veritabani bu surumle uyumsuz bir gelistirme surumune ait. Yeni, bos bir veritabani kullanin (eski SQLite dosyasini ya da MySQL tablolarini kaldirin), sonra yedegi ice aktarin.');
+            hata(503, 'kurulum', 'Veritabani uyumsuz: Studio tablolariyla ayni adli tablolar var (eski bir Studio denemesi ya da ayni veritabanini kullanan baska bir uygulama). Studio icin ayri, bos bir veritabani kullanin; baska uygulamanin tablolarini silmeyin.');
         }
         hata(503, 'kurulum', 'Veritabani tablolari olusturulamadi.');
     }
@@ -331,7 +335,8 @@ function cerez_yaz(string $tur, string $deger, int $omur): void {
     ]);
 }
 function cerez_oku(string $tur): string {
-    $t = (string)($_COOKIE[cerez_adi($tur)] ?? '');
+    $t = $_COOKIE[cerez_adi($tur)] ?? '';
+    if (!is_string($t)) return '';
     return preg_match('/^[A-Za-z0-9_-]{40,64}$/', $t) ? $t : '';
 }
 function rastgele_anahtar(): string { return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '='); }
@@ -429,9 +434,11 @@ function sifre_izi(string $ozet): string { return hash('sha256', 'iz|' . $ozet);
  * silinir: sahibinin sifreyi hatirlamaya calisirken biriktirdigi denemeler sifirlamadan sonra onu kilitlemesin.
  */
 function sifre_izi_denetle(): void {
-    $iz = sifre_izi(sifre_ozeti());
-    if (ayar_oku('sifre_izi') === $iz) return;
-    islem(function () use ($iz) {
+    if (ayar_oku('sifre_izi') === sifre_izi(sifre_ozeti())) return;   // hizli yol (kilitsiz)
+    islem(function () {
+        // Yazma kilidi altinda yeniden hesaplanir: kilitsiz okunan ozet, o arada tamamlanan bir sifre degisikliginden
+        // once kalmis olabilir; eski parmak iziyle temizlik yapilirsa sahibinin yeni oturumu ve cihazi silinirdi
+        $iz = sifre_izi(sifre_ozeti());
         $eski = ayar_oku('sifre_izi');
         if ($eski === $iz) return;
         if ($eski !== null) { calistir('DELETE FROM oturumlar'); cihazlari_unut(); calistir('DELETE FROM girisler'); }
@@ -447,6 +454,13 @@ function norm(string $s): string {
     $s = str_replace(['I', 'İ'], ['ı', 'i'], trim($s));
     $s = mb_strtolower($s, 'UTF-8');
     return preg_replace('/\s+/u', ' ', $s) ?? $s;
+}
+/** Istekteki kimlik / tur gibi skaler deger; dizi ya da nesne gelirse 422 (PHP uyarisi uretmeden). */
+function skaler_metin($v, string $alan): string {
+    if (is_string($v)) return $v;
+    if (is_int($v)) return (string)$v;
+    if ($v === null) return '';
+    throw new InvalidArgumentException($alan . ' gecersiz');
 }
 function metin($v, int $max, bool $zorunlu, string $alan): string {
     if ($v === null) $v = '';
@@ -826,6 +840,14 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                     foreach (array_keys($k[$ak]) as $alt) {
                         if (!in_array((string)$alt, BILINEN_ALT_ALANLAR[$ak], true)) { $bk = "$alan.$ak." . mb_substr((string)$alt, 0, 40); $bilinmeyen[$bk] = ($bilinmeyen[$bk] ?? 0) + 1; }
                     }
+                } elseif ($ak === 'gecmis' && is_array($k[$ak])) {
+                    // gecmis ogeleri { z, m }: baska anahtarlar kaydedilmez, uyarilir
+                    foreach ($k[$ak] as $g) {
+                        if (!is_array($g)) continue;
+                        foreach (array_keys($g) as $alt) {
+                            if ($alt !== 'z' && $alt !== 'm') { $bk = "$alan.gecmis[]." . mb_substr((string)$alt, 0, 40); $bilinmeyen[$bk] = ($bilinmeyen[$bk] ?? 0) + 1; }
+                        }
+                    }
                 }
             }
             $eskiId = isset($k['id']) && id_bicim($k['id']) ? (string)$k['id'] : null;
@@ -835,7 +857,8 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                 // zaten var olan kayit: dokunulmaz, bugunku kurallara gore yeniden dogrulanmaz (eski yedek birlestirilebilir)
                 if (isset($var[$eskiId])) {
                     if ($var[$eskiId] !== $tur) { $plan['hatalar'][] = "$etiket: bu kimlik baska turde bir kayda ait"; continue; }
-                    $ad0 = (string)($k[$tur === 'musteri' ? 'ad' : 'baslik'] ?? $eskiId);
+                    $ad0 = $k[$tur === 'musteri' ? 'ad' : 'baslik'] ?? null;
+                    $ad0 = is_string($ad0) ? $ad0 : $eskiId;
                     $plan['atla'][] = ['tur' => $tur, 'ad' => mb_substr($ad0, 0, 120), 'neden' => 'ayni kayit zaten var'];
                     $idEslem[$eskiId] = $eskiId;
                     $plan['sayilar']['atlanan']++;
@@ -850,7 +873,8 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                     $ad = norm($k['musteriAdi']);
                     $bulunan = null;
                     if (array_key_exists('musteriKurum', $k) && $k['musteriKurum'] !== null) {
-                        $kurum = is_string($k['musteriKurum']) ? norm($k['musteriKurum']) : '';
+                        if (!is_string($k['musteriKurum'])) { $plan['hatalar'][] = "$etiket: musteriKurum metin olmali"; continue; }
+                        $kurum = norm($k['musteriKurum']);
                         $bulunan = $musteriAd[$ad . '|' . $kurum] ?? null;
                     } else {
                         $adaylar = $adIndeks[$ad] ?? [];
@@ -906,13 +930,15 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
             $bag = $tur === 'musteri' ? null : ($temiz['musteriId'] !== null ? ($musteriAdlari[$temiz['musteriId']] ?? null) : null);
             $ek = $tur === 'musteri' ? ['ucret' => $temiz['ucret'], 'siklik' => $temiz['siklik']['tur']] : [];
             $plan['ekle'][] = ['tur' => $tur, 'id' => $yeni, 'veri' => $temiz, 'ad' => $ad, 'bag' => $bag, 'ek' => $ek,
-                'olusturma' => isset($k['olusturma']) && is_int($k['olusturma']) && $k['olusturma'] > 0 ? $k['olusturma'] : null];
+                'olusturma' => isset($k['olusturma']) && is_int($k['olusturma']) && $k['olusturma'] > 0 ? $k['olusturma'] : null,
+                'guncelleme' => isset($k['guncelleme']) && is_int($k['guncelleme']) && $k['guncelleme'] > 0 ? $k['guncelleme'] : null];
             $plan['sayilar'][$tur]++;
         }
     }
     foreach ($bilinmeyen as $bk => $n) $plan['uyarilar'][] = "bilinmeyen alan '$bk' ($n kayit): yok sayilacak";
     // degistir: yedekteki ayar kaydi da geri gelir
     $plan['ayar'] = null;
+    $plan['ayarSil'] = $kip === 'degistir' && array_key_exists('ayar', $gelen) && $gelen['ayar'] === null;
     if ($kip === 'degistir' && isset($gelen['ayar']) && is_array($gelen['ayar'])) {
         foreach (array_keys($gelen['ayar']) as $ak) if (!in_array((string)$ak, BILINEN_AYAR, true)) $plan['uyarilar'][] = "bilinmeyen alan 'ayar." . mb_substr((string)$ak, 0, 40) . "': yok sayilacak";
         try { $plan['ayar'] = temizle('ayar', $gelen['ayar'], $var); }
@@ -926,7 +952,7 @@ function plan_ozeti(array $plan, string $kip): array {
     $o = ['kip' => $kip, 'sayilar' => $plan['sayilar'], 'ucret' => $plan['ucret'], 'hatalar' => array_slice($plan['hatalar'], 0, 100),
         'hataSayisi' => count($plan['hatalar']), 'uyarilar' => array_slice($plan['uyarilar'], 0, 50), 'atla' => array_slice($plan['atla'], 0, 200),
         'ekle' => array_map(fn($e) => ['tur' => $e['tur'], 'ad' => $e['ad'], 'bag' => $e['bag']] + $e['ek'], array_slice($plan['ekle'], 0, 500)),
-        'ayar' => $plan['ayar'] !== null, 'durum' => veri_durumu()];
+        'ayar' => $plan['ayar'] !== null, 'ayarSil' => !empty($plan['ayarSil']), 'durum' => veri_durumu()];
     if ($kip === 'degistir') $o['kaldirilacak'] = sayilar(veri_paketi());
     return $o;
 }
@@ -936,7 +962,7 @@ function kayitlari_ekle(array $ekle): void {
     $n = simdi();
     foreach ($ekle as $e) {
         calistir('INSERT INTO kayitlar (id, tur, anahtar, veri, surum, olusturma, guncelleme) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [$e['id'], $e['tur'], anahtar($e['tur'], $e['veri']), json_metin($e['veri']), yeni_surum(), $e['olusturma'] ?? $n, $n]);
+            [$e['id'], $e['tur'], anahtar($e['tur'], $e['veri']), json_metin($e['veri']), yeni_surum(), $e['olusturma'] ?? $n, $e['guncelleme'] ?? $n]);
     }
 }
 
@@ -983,7 +1009,7 @@ try {
             try {
                 $k = islem(function () use ($G) {
                     $var = tur_haritasi(tum_kayitlar());
-                    return kayit_yaz((string)($G['tur'] ?? ''), isset($G['id']) ? (string)$G['id'] : null, is_array($G['veri'] ?? null) ? $G['veri'] : [],
+                    return kayit_yaz(skaler_metin($G['tur'] ?? '', 'tur'), isset($G['id']) ? skaler_metin($G['id'], 'id') : null, is_array($G['veri'] ?? null) ? $G['veri'] : [],
                         isset($G['surum']) ? (int)$G['surum'] : null, $var);
                 });
             } catch (Throwable $e) {
@@ -1002,7 +1028,7 @@ try {
                     foreach (array_values($liste) as $i => $k) {
                         $sira = $i;
                         if (!is_array($k)) throw new InvalidArgumentException('kayit degil');
-                        $out[] = kayit_yaz((string)($k['tur'] ?? ''), isset($k['id']) ? (string)$k['id'] : null, is_array($k['veri'] ?? null) ? $k['veri'] : [],
+                        $out[] = kayit_yaz(skaler_metin($k['tur'] ?? '', 'tur'), isset($k['id']) ? skaler_metin($k['id'], 'id') : null, is_array($k['veri'] ?? null) ? $k['veri'] : [],
                             isset($k['surum']) ? (int)$k['surum'] : null, $var);
                     }
                     return $out;
@@ -1034,9 +1060,11 @@ try {
                         if ($eskimis) throw new RuntimeException('onizleme_eski|' . json_encode($ozet, JSON_UNESCAPED_UNICODE));
                     }
                     $a = anlik_al($kip === 'degistir' ? 'geri_yukleme_oncesi' : 'ice_aktarma_oncesi');
-                    if ($kip === 'degistir') calistir($plan['ayar'] !== null ? 'DELETE FROM kayitlar' : "DELETE FROM kayitlar WHERE tur <> 'ayar'");
+                    if ($kip === 'degistir') calistir($plan['ayar'] !== null || !empty($plan['ayarSil']) ? 'DELETE FROM kayitlar' : "DELETE FROM kayitlar WHERE tur <> 'ayar'");
                     kayitlari_ekle($plan['ekle']);
-                    if ($plan['ayar'] !== null) kayitlari_ekle([['tur' => 'ayar', 'id' => 'ayar', 'veri' => $plan['ayar']]]);
+                    if ($plan['ayar'] !== null) kayitlari_ekle([['tur' => 'ayar', 'id' => 'ayar', 'veri' => $plan['ayar'],
+                        'olusturma' => is_int($gelen['ayar']['olusturma'] ?? null) && $gelen['ayar']['olusturma'] > 0 ? $gelen['ayar']['olusturma'] : null,
+                        'guncelleme' => is_int($gelen['ayar']['guncelleme'] ?? null) && $gelen['ayar']['guncelleme'] > 0 ? $gelen['ayar']['guncelleme'] : null]]);
                     return ['ozet' => $ozet, 'anlik' => $a];
                 });
             } catch (Throwable $e) {
@@ -1059,7 +1087,7 @@ try {
 
         case 'anlik_geri':
             if (($G['onay'] ?? '') !== 'GERI YUKLE') hata(422, 'onay', 'Onay gerekli.');
-            $r = tek('SELECT veri FROM anliklar WHERE id = ?', [(string)($G['id'] ?? '')]);
+            $r = tek('SELECT veri FROM anliklar WHERE id = ?', [is_string($G['id'] ?? null) ? $G['id'] : '']);
             if (!$r) hata(404, 'yok', 'Anlik kopya bulunamadi.');
             $paket = anlik_coz((string)$r['veri']);
             $ekle = [];
@@ -1069,7 +1097,8 @@ try {
                 foreach ($l as $x) {
                     $v = $x;
                     unset($v['id'], $v['surum'], $v['olusturma'], $v['guncelleme']);
-                    $ekle[] = ['tur' => $tur, 'id' => (string)$x['id'], 'veri' => $v, 'olusturma' => (int)($x['olusturma'] ?? 0) ?: null];
+                    $ekle[] = ['tur' => $tur, 'id' => (string)$x['id'], 'veri' => $v, 'olusturma' => (int)($x['olusturma'] ?? 0) ?: null,
+                        'guncelleme' => (int)($x['guncelleme'] ?? 0) ?: null];
                 }
             }
             try {

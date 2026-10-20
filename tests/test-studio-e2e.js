@@ -420,6 +420,8 @@ async function calis() {
   await page.click("text=+ Ekle");
   await page.click("dialog >> text=İçerik");
   d = page.locator("dialog[open]");
+  var pk = await d.boundingBox();
+  ok("pencere ekranin ortasinda (sol ust koseye yapisik degil)", pk && Math.abs(pk.x - (1280 - pk.width) / 2) < 4, JSON.stringify(pk));
   await alanGirdi(d, "Müşteri", "select").selectOption({ label: "Örnek Müşteri A" });
   await alanGirdi(d, "Başlık", "input").fill("Çift tık örneği");
   await d.locator("button[type=submit]").dblclick();
@@ -456,6 +458,16 @@ async function calis() {
   ok("ay gorunumu: yeni cekim tarihi o ayin 1'i", ayVarsayilan === "2031-05-01", ayVarsayilan);
   await page.keyboard.press("Escape");
   await page.waitForSelector("dialog[open]", { state: "detached" });
+
+  // Genel Bakis kartlarinin acacagi gorunumler: bugunden baslayan 7 gun; Stok sayfasi suzgeci
+  await page.goto(URL_ + "#/cekim?g=hafta&t=2031-05-15&kayan=1");
+  await page.waitForSelector(".donem:has-text('2031')");
+  var kayanIlk = await page.locator(".gun-kolon .gun-bas").first().textContent();
+  ok("kayan hafta: verilen gunden baslar (pazartesiden degil)", /15/.test(kayanIlk) && (await page.locator(".gun-kolon").count()) === 7, kayanIlk);
+  await page.goto(URL_ + "#/stok?f=giris");
+  await page.waitForSelector(".sayfa h1:has-text('Stok')");
+  ok("stok suzgeci: yalniz istenen musteriler ve 'Tüm müşteriler' baglantisi", await page.locator("text=Gösterilen: Stok girişi yapılmayanlar").isVisible() &&
+    await page.locator(".sayfa a:has-text('Tüm müşteriler')").isVisible());
 
   // Cikis
   await page.click(".yan >> text=Çıkış");
@@ -496,6 +508,11 @@ async function calis() {
     if (EKRAN) await mp.screenshot({ path: path.join(EKRAN, "telefon-" + sayfa + ".png"), fullPage: true });
   }
   ok("telefon: 7 sayfada yatay tasma yok", tasmalar.length === 0, tasmalar.join(","));
+  // acik menude, gosterilen sayfanin kendi baglantisina dokununca menu kapanir
+  await mp.click(".menu-dugme");
+  await mp.locator(".yan-menu a[data-rota=ayarlar]").click();
+  await mp.waitForTimeout(200);
+  ok("telefon: ayni sayfanin menu baglantisi menuyu kapatir", !(await mp.locator(".kabuk.menu-acik").count()) && !(await mp.locator(".yan-menu").isVisible()));
   await mp.click(".menu-dugme");
   await mp.locator(".yan-menu a[data-rota=musteriler]").click();
   await mp.waitForSelector(".sayfa h1:has-text('Müşteriler')");

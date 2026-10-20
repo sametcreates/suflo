@@ -186,7 +186,7 @@ td:first-child{min-width:150px}
 .slot.acik{border-color:var(--sari);color:#fde68a;border-style:dashed}
 
 /* ---------- Pencere ---------- */
-dialog.pencere{background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:14px;padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog.pencere{margin:auto;background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:14px;padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
 dialog.pencere.genis{width:min(860px,calc(100vw - 24px))}
 dialog::backdrop{background:rgba(0,0,0,.6)}
 .p-form{display:flex;flex-direction:column;max-height:calc(100vh - 26px)}

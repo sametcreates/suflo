@@ -355,7 +355,9 @@
     S.girisli = true;
     kok.textContent = "";
     var el = S.el = {};
-    el.nav = h("nav", { class: "yan-menu", "aria-label": "Ana menü" }, MENU.map(function (m) { return h("a", { href: "#/" + m[0], "data-rota": m[0] }, m[1]); }));
+    el.nav = h("nav", { class: "yan-menu", "aria-label": "Ana menü" }, MENU.map(function (m) {
+      return h("a", { href: "#/" + m[0], "data-rota": m[0], onclick: function () { var k = document.querySelector(".kabuk"); if (k) k.classList.remove("menu-acik"); } }, m[1]);
+    }));
     el.yan = h("aside", { class: "yan" }, h("div", { class: "marka" }, logo(), h("span", null, "Suflo Studio")), el.nav,
       h("button", { class: "btn ince cikis", type: "button", onclick: cikis }, "Çıkış"));
     el.ara = h("input", { type: "search", class: "ara", placeholder: "Ara: müşteri, içerik, çekim", "aria-label": "Hızlı arama", enterkeyhint: "search",
@@ -533,29 +535,29 @@
     };
     ekle(kok_, [
       dolu("Bugün: çekim ve etkinlikler", gb.bugunEtkinlik, rotaLink("cekim", { g: "gun", t: b }), function (e) { return etkinlikSatiri(e, cak); }),
-      dolu("Önümüzdeki 7 gün: çekimler", gb.yaklasanEtkinlik, rotaLink("cekim", { g: "hafta" }), function (e) { return etkinlikSatiri(e, cak); }),
+      dolu("Önümüzdeki 7 gün: çekimler", gb.yaklasanEtkinlik, rotaLink("cekim", { g: "hafta", t: C.gunEkle(b, 1), kayan: "1" }), function (e) { return etkinlikSatiri(e, cak); }),
       dolu("Durumu güncellenmemiş geçmiş çekimler", gb.gecmisPlanliEtkinlik, null, function (e) { return etkinlikSatiri(e, cak, gecmisDugme(e)); },
         "Geçmiş çekimler kendiliğinden tamamlanmaz. Çekimin tamamlanması kurgunun bittiği anlamına gelmez."),
       dolu("Geciken kurgu teslimleri", gb.gecikenTeslim, rotaLink("icerikler", { ozel: "geciken" }), function (i) { return icerikSatiri(i); }),
       dolu("3 gün içinde kurgu teslimi", gb.yaklasanTeslim, rotaLink("icerikler", { ozel: "yaklasan" }), function (i) { return icerikSatiri(i); }),
       dolu("Müşteri onayında", gb.onayda, rotaLink("icerikler", { durum: "onayda" }), function (i) { return icerikSatiri(i); }),
       dolu("Revizyonda", gb.revizyonda, rotaLink("icerikler", { durum: "revizyonda" }), function (i) { return icerikSatiri(i); }),
-      dolu("Hazır içerikle karşılanmayan paylaşımlar (7 gün)", gb.acikTarihler.filter(function (x) { return x.durum === "acik"; }), rotaLink("yayin", { g: "hafta" }), function (x) {
+      dolu("Hazır içerikle karşılanmayan paylaşımlar (7 gün)", gb.acikTarihler.filter(function (x) { return x.durum === "acik"; }), rotaLink("yayin", { g: "hafta", t: b, kayan: "1" }), function (x) {
         var hz = x.hazirlikta ? icerikBul(x.hazirlikta) : null;
         return h("div", { class: "satir" }, h("b", null, C.tarihGunlu(x.tarih)), musteriLink(x.musteri),
           h("span", { class: "satir-bilgi" }, "hazır içerik yok"),
           hz ? h("span", { class: "satir-bilgi" }, "Bu tarihe planlı ama hazır değil: ", h("button", { class: "satir-ad", type: "button", onclick: function () { icerikPenceresi(hz.id); } }, hz.baslik), " (" + C.DURUM_AD[hz.durum] + ")") : null);
       }, gb.oneriSayisi ? gb.oneriSayisi + " paylaşım günü, tarihe atanmamış ya da tarihi geçmiş hazır içerikle karşılanabilir (öneri; plana çevirmek için müşteri sayfasından ata)." : null),
-      dolu("Hazır stoku azalan müşteriler", gb.stokUyarilari, rotaLink("stok"), function (x) {
+      dolu("Hazır stoku azalan müşteriler", gb.stokUyarilari, rotaLink("stok", { f: "uyari" }), function (x) {
         return h("div", { class: "satir" }, musteriLink(x.musteri), h("span", { class: "satir-bilgi uyari" }, x.nedenler.join(" · ")));
       }),
-      dolu("7 gün içinde yayına planlı ama hazır değil", gb.planliHazirDegil, null, function (i) { return icerikSatiri(i); },
+      dolu("7 gün içinde yayına planlı ama hazır değil", gb.planliHazirDegil, rotaLink("icerikler", { ozel: "planlihazirdegil" }), function (i) { return icerikSatiri(i); },
         "Yayın düzeni ya da stok girişinden bağımsız: planlanan yayın tarihi yaklaşan ama henüz yayına hazır olmayan içerikler."),
       dolu("Planlanan tarihi geçti, yayınlandı işaretlenmedi", gb.gecmisPlanYayinlanmamis, rotaLink("icerikler", { ozel: "gecmisplan" }), function (i) { return icerikSatiri(i); },
         "Planlanan paylaşımlar kendiliğinden yayınlandı sayılmaz."),
-      gb.stokBilinmeyen.length ? bolum("Stok girişi yapılmadı", gb.stokBilinmeyen.length, rotaLink("stok"),
+      gb.stokBilinmeyen.length ? bolum("Stok girişi yapılmadı", gb.stokBilinmeyen.length, rotaLink("stok", { f: "giris" }),
         h("p", { class: "satir-bilgi" }, dizi(gb.stokBilinmeyen.map(musteriLink), ", "))) : null,
-      gb.duzenEksik.length ? bolum("Yayın düzeni kurulmalı", gb.duzenEksik.length, null,
+      gb.duzenEksik.length ? bolum("Yayın düzeni kurulmalı", gb.duzenEksik.length, rotaLink("stok", { f: "duzen" }),
         h("p", { class: "satir-bilgi" }, dizi(gb.duzenEksik.map(function (x) { return musteriLink(x.musteri); }), ", "))) : null,
       bos.length ? h("p", { class: "temiz" }, "Boş: " + bos.join(" · ")) : null,
       gb.sayilar.length ? bolum("Müşteri bazında durum", null, rotaLink("icerikler"), musteriSayiTablosu(gb.sayilar)) : null
@@ -831,10 +833,11 @@
       if (o === "yaklasan") return teslimde && i.teslimTarihi >= b && i.teslimTarihi <= uc;
       if (o === "gecmisplan") return !!i.planTarihi && i.planTarihi < b && i.durum !== "yayinlandi";
       if (o === "plansiz") return !i.planTarihi && i.durum === "hazir";
+      if (o === "planlihazirdegil") return !!i.planTarihi && i.planTarihi >= b && i.planTarihi < C.gunEkle(b, 7) && i.durum !== "hazir" && i.durum !== "yayinlandi";
       return true;
     };
   }
-  var OZEL_AD = { geciken: "Geciken kurgu teslimleri", yaklasan: "3 gün içinde teslim", gecmisplan: "Tarihi geçmiş, yayınlanmamış planlar", plansiz: "Tarihe atanmamış hazırlar" };
+  var OZEL_AD = { geciken: "Geciken kurgu teslimleri", yaklasan: "3 gün içinde teslim", gecmisplan: "Tarihi geçmiş, yayınlanmamış planlar", plansiz: "Tarihe atanmamış hazırlar", planlihazirdegil: "7 gün içinde planlı, hazır değil" };
 
   SAYFALAR.icerikler = function (r) {
     var p = r.p, gorunum = p.gorunum || tercih("gorunum") || "liste";
@@ -1224,7 +1227,7 @@
     var t = C.gecerliTarih(p.t) ? p.t : b, ikisi = p.ikisi === "1", mf = p.musteri || "";
     var gunler;
     if (g === "gun") gunler = [t];
-    else if (g === "hafta") { var hb = C.haftaBasi(t); gunler = [0, 1, 2, 3, 4, 5, 6].map(function (k) { return C.gunEkle(hb, k); }); }
+    else if (g === "hafta") { var hb = p.kayan === "1" ? t : C.haftaBasi(t); gunler = [0, 1, 2, 3, 4, 5, 6].map(function (k) { return C.gunEkle(hb, k); }); }
     else gunler = [].concat.apply([], C.ayIzgarasi(t));
     var ilk = gunler[0], son = gunler[gunler.length - 1];
     var ogeler = takvimOgeleri(katman, ikisi, ilk, son, mf);
@@ -1341,13 +1344,21 @@
 
   /* ================= Stok ================= */
 
-  SAYFALAR.stok = function () {
-    var l = aktifMusteriler(), b = bugun();
+  var STOK_SUZGEC = { uyari: "Stok uyarısı olanlar", giris: "Stok girişi yapılmayanlar", duzen: "Yayın düzeni kurulmamış olanlar" };
+  SAYFALAR.stok = function (r) {
+    var l = aktifMusteriler(), b = bugun(), f = r && r.p ? r.p.f : "";
+    var esik = S.veri.ayar ? S.veri.ayar.varsayilanStokUyari : null;
     var bilinmeyen = l.filter(function (m) { return !m.stokGirisi; });
+    if (STOK_SUZGEC[f]) l = l.filter(function (m) {
+      if (f === "giris") return !m.stokGirisi;
+      if (f === "duzen") return !C.duzenDurumu(m).tamam;
+      return C.stokUyarisi(S.veri, m, b, esik).seviye === "dusuk";
+    });
     return h("div", null,
       sayfaBasligi("Stok", "Hazır stok: müşteri onayı alınmış, yayına hazır ve henüz yayınlanmamış videolar (Reels / video). Postlar videoya sayılmaz."),
       h("p", { class: "soluk kucuk" }, "İleri tarihe atanmış, tarihi geçip yayınlanmamış ve atanmamış hazırlar ayrı sayılır; üçünün toplamı hazır stoktur. Önümüzdeki 7 / 14 gün yayın düzenindeki gerçek günlerden hesaplanır. ",
         "“Öneri” atanmamış ya da tarihi geçmiş bir hazırın o güne konabileceğini gösterir; plana sen çevirmedikçe kaydedilmez."),
+      STOK_SUZGEC[f] ? h("p", { class: "kucuk" }, "Gösterilen: " + STOK_SUZGEC[f] + " (" + l.length + ") · ", ic(rotaLink("stok"), "Tüm müşteriler")) : null,
       bilinmeyen.length ? h("div", { class: "uyari-kutu" }, bilinmeyen.length + " müşteride stok girişi yapılmadı; bunlarda stok 0 sayılmaz, “bilinmiyor” görünür.") : null,
       l.length ? l.map(function (m) {
         var u = C.stokUyarisi(S.veri, m, b, S.veri.ayar ? S.veri.ayar.varsayilanStokUyari : null);
@@ -1489,7 +1500,8 @@
       if (!j.ok) { toast(hataMetni(j), "hata"); return; }
       var metin = JSON.stringify(j.yedek, null, 2);
       indir("suflo-studio-yedek-" + bugun() + ".json", metin, "application/json");
-      if (metin.length > YEDEK_SINIRI) toast("Yedek indirildi ama " + Math.round(metin.length / 1048576) + " MB; tek dosyada geri yüklenebilecek boyutu (7,5 MB) aşıyor. Sunucudaki otomatik kopyalar yine geçerli.", "hata");
+      var govdeBayt = baytBoyutu({ islem: "ice_aktar", veriler: j.yedek.veriler });
+      if (govdeBayt > GOVDE_SINIRI) toast("Yedek indirildi ama verisi " + (govdeBayt / 1048576).toFixed(1).replace(".", ",") + " MB; tek seferde geri yüklenebilecek boyutu (8 MB) aşıyor. Sunucudaki otomatik kopyalar yine geçerli.", "hata");
       else toast("Yedek indirildi. Özel bilgi içerir; güvenli yerde sakla.");
     });
   }
@@ -1514,27 +1526,35 @@
       });
     });
   }
-  var YEDEK_SINIRI = 7.5 * 1024 * 1024;
+  // Sunucu oturumlu istekte en cok 8 MB govde okur; sinir, dosyanin degil gonderilecek sikistirilmis JSON'un bayt boyutudur
+  var GOVDE_SINIRI = 8 * 1024 * 1024 - 64 * 1024, DOSYA_SINIRI = 64 * 1024 * 1024;
+  function baytBoyutu(o) { return new Blob([JSON.stringify(o)]).size; }
   function iceAktarmaBasla(dosyaGirdi, kutu) {
     kutu.textContent = "";
     var f = dosyaGirdi.files && dosyaGirdi.files[0];
     if (!f) return;
-    if (f.size > YEDEK_SINIRI) { kutu.appendChild(h("p", { class: "hata" }, "Dosya çok büyük (en çok 7,5 MB).")); return; }
+    if (f.size > DOSYA_SINIRI) { kutu.appendChild(h("p", { class: "hata" }, "Dosya çok büyük.")); return; }
     f.text().then(function (metin) {
       var obj;
       try { obj = JSON.parse(metin); } catch (e) { kutu.appendChild(h("p", { class: "hata" }, "Dosya geçerli JSON değil.")); return; }
       var c = C.yedekCoz(obj);
       if (c.hata) { kutu.appendChild(h("p", { class: "hata" }, c.hata)); return; }
+      if (baytBoyutu({ islem: "ice_aktar", veriler: c.veriler, kip: "degistir", onay: "GERI YUKLE" }) > GOVDE_SINIRI) {
+        kutu.appendChild(h("p", { class: "hata" }, "Veri tek seferde içe aktarılamayacak kadar büyük (sunucu sınırı 8 MB).")); return;
+      }
+      var dosyaUyarisi = (c.bilinmeyen || []).map(function (k) { return "bilinmeyen alan '" + String(k).slice(0, 40) + "' (dosyanın üst düzeyi): yok sayılacak"; });
       kutu.appendChild(h("p", { class: "soluk kucuk" }, "Önizleme hazırlanıyor…"));
       api("ice_aktar", { veriler: c.veriler, onizleme: true }).then(function (j) {
         kutu.textContent = "";
         if (!j.ok) { kutu.appendChild(h("p", { class: "hata" }, hataMetni(j))); return; }
-        onizlemeGoster(kutu, j.onizleme, c.veriler, dosyaGirdi);
+        onizlemeGoster(kutu, j.onizleme, c.veriler, dosyaGirdi, dosyaUyarisi);
       });
     });
   }
   var SIKLIK_AD = { gunluk: "her gün", uc_gun: "3 günde 1", haftalik: "haftalık", belirsiz: "sıklık belirlenmedi" };
-  function onizlemeGoster(kutu, o, veriler, dosyaGirdi) {
+  function onizlemeGoster(kutu, o, veriler, dosyaGirdi, dosyaUyarisi) {
+    dosyaUyarisi = dosyaUyarisi || [];
+    if (dosyaUyarisi.length) o.uyarilar = dosyaUyarisi.concat(o.uyarilar || []);
     var s = o.sayilar;
     var hataVar = o.hataSayisi > 0;
     var tekrar = function () {
@@ -1543,7 +1563,7 @@
       api("ice_aktar", { veriler: veriler, onizleme: true }).then(function (j) {
         kutu.textContent = "";
         if (!j.ok) { kutu.appendChild(h("p", { class: "hata" }, hataMetni(j))); return; }
-        onizlemeGoster(kutu, j.onizleme, veriler, dosyaGirdi);
+        onizlemeGoster(kutu, j.onizleme, veriler, dosyaGirdi, dosyaUyarisi);
       });
     };
     var bitir = function (j) {
@@ -1598,6 +1618,7 @@
             onayla("Tüm veriyi bu dosyayla değiştir",
               "Şu anki kayıtlar silinecek: " + (k.musteri || 0) + " müşteri, " + (k.icerik || 0) + " içerik, " + (k.etkinlik || 0) + " çekim / etkinlik. " +
               "Yerine dosyadan gelecek: " + e2.musteri + " müşteri, " + e2.icerik + " içerik, " + e2.etkinlik + " çekim / etkinlik" + (d.ayar ? " ve ayarlar" : "") + ". " +
+              (d.ayarSil ? "Yedekte ayar olmadığı için şu anki ayarlar (varsayılan stok eşiği) da kaldırılır. " : "") +
               "Şu anki hal önce otomatik kopyalanır (Ayarlar → Otomatik kopyalar).", "Değiştir", "GERI YUKLE", true).then(function (e) {
               if (e) api("ice_aktar", { veriler: veriler, kip: "degistir", onay: "GERI YUKLE", beklenen: Object.assign({}, e2, { durum: d.durum }) }).then(bitir);
             });

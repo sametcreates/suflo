@@ -567,8 +567,17 @@
     var ok = ["musteriler", "icerikler", "etkinlikler"].some(function (k) { return Array.isArray(v[k]); });
     if (!ok) return { hata: "Dosyada musteriler / icerikler / etkinlikler listesi bulunamadı." };
     var out = { musteriler: v.musteriler || [], icerikler: v.icerikler || [], etkinlikler: v.etkinlikler || [] };
-    if (v.ayar && typeof v.ayar === "object") out.ayar = v.ayar;
-    return { veriler: out };
+    // yedekte ayar acikca bos (null) ise de iletilir: "tumunu degistir" mevcut ayari da kaldirir
+    if (v.ayar === null && Object.prototype.hasOwnProperty.call(v, "ayar")) out.ayar = null;
+    else if (v.ayar && typeof v.ayar === "object") out.ayar = v.ayar;
+    // taninmayan ust duzey alanlar (ornegin elle hazirlanmis "cekimler" listesi) sessizce yok sayilmaz, onizlemede uyarilir
+    var bilinen = { musteriler: 1, icerikler: 1, etkinlikler: 1, ayar: 1 };
+    var bilinmeyen = Object.keys(v).filter(function (k) { return !bilinen[k]; });
+    if (obj.format === "suflo-studio-yedek") {
+      var ust = { format: 1, surum: 1, olusturma: 1, veriler: 1 };
+      bilinmeyen = bilinmeyen.concat(Object.keys(obj).filter(function (k) { return !ust[k]; }));
+    }
+    return { veriler: out, bilinmeyen: bilinmeyen };
   }
 
   return {

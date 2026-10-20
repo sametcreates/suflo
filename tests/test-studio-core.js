@@ -255,6 +255,14 @@ ok("genel bakis: duzeni olmayan musterinin 7 gun icindeki hazir olmayan planli i
 })());
 ok("takvim: gece yarisini asan cekim ikinci gunde bitis saatiyle gorunur", C.gundekiSaat(gece, "2030-03-04") === "22:00" && C.gundekiSaat(gece, "2030-03-05") === "–01:00" &&
   C.gundekiSaat(etk({ basTarih: "2030-03-04", bitTarih: "2030-03-06", basSaat: "10:00", bitSaat: "12:00" }), "2030-03-05") === "devam");
+ok("yedekCoz: yedekte ayar null ise iletilir (tumunu degistir ayari da kaldirsin); tanimsizsa iletilmez", (function () {
+  var a = C.yedekCoz({ format: "suflo-studio-yedek", veriler: { musteriler: [], ayar: null } }).veriler, b = C.yedekCoz({ musteriler: [] }).veriler;
+  return a.ayar === null && Object.prototype.hasOwnProperty.call(a, "ayar") && !Object.prototype.hasOwnProperty.call(b, "ayar");
+})());
+ok("yedekCoz: taninmayan ust duzey alanlar listelenir", (function () {
+  var c = C.yedekCoz({ format: "suflo-studio-yedek", surum: 1, veriler: { musteriler: [], cekimler: [{}] }, ekstra: 1 });
+  return c.bilinmeyen.indexOf("cekimler") !== -1 && c.bilinmeyen.indexOf("ekstra") !== -1 && C.yedekCoz({ musteriler: [] }).bilinmeyen.length === 0;
+})());
 ok("yedekCoz ayar kaydini da tasir", C.yedekCoz({ format: "suflo-studio-yedek", veriler: { musteriler: [], ayar: { varsayilanStokUyari: 3 } } }).veriler.ayar.varsayilanStokUyari === 3);
 ok("filtre: durum listesi", C.icerikFiltrele(fv, { durum: "onayda,kurguda" }).length === 1);
 ok("filtre: arsiv ayri", C.icerikFiltrele(fv, { arsiv: true }).length === 1 && C.icerikFiltrele(fv, {}).length === 1);

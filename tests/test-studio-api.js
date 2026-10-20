@@ -110,7 +110,8 @@ function ist(govde, ek) {
 function baslat() {
   return new Promise(function (res, rej) {
     // birden cok isci: eszamanli istekler gercekten ayni anda islenir (SQLite kilitleri denensin)
-    phpSurec = cp.spawn("php", ["-S", "127.0.0.1:" + PORT, "-t", PUB], { stdio: ["ignore", "ignore", "pipe"], env: Object.assign({}, process.env, { PHP_CLI_SERVER_WORKERS: "4" }) });
+    // display_errors acik: en kotu barindirma ayari; bir PHP uyarisi yanita karisirsa JSON bozulur ve test kalir
+    phpSurec = cp.spawn("php", ["-d", "display_errors=1", "-d", "error_reporting=-1", "-S", "127.0.0.1:" + PORT, "-t", PUB], { stdio: ["ignore", "ignore", "pipe"], env: Object.assign({}, process.env, { PHP_CLI_SERVER_WORKERS: "4" }) });
     phpSurec.stderr.on("data", function () {});
     var n = 0;
     (function dene() {
@@ -178,6 +179,12 @@ async function calis() {
   r = await ist({ islem: "veri", lisans: "SUFLO-PRO-ORNEK-ANAHTAR" });
   ok("Pro lisans anahtari Studio'ya erisim vermez", r.status === 401);
 
+  /* ---- Bicimsiz girdi: PHP uyarisi (sunucu yolu) yanita sizmaz ---- */
+  r = await ist({ islem: ["x"] }, { cerez: "", cereziSakla: true });
+  ok("dizi 'islem' (oturumsuz): yanit saf JSON, yol / uyari yok", !!r.json && r.status === 401 && !/Warning|index\.php|<br/.test(r.metin), r.metin.slice(0, 200));
+  r = await ist({ islem: "oturum" }, { cerez: "", cereziSakla: true, baslik: { Cookie: "suflo_studio[a]=b; suflo_studio_cihaz[]=c" } });
+  ok("dizi cerez: yanit saf JSON, oturum yok sayilir", !!r.json && r.json.ok === true && r.json.girisli === false && !/Warning|<br/.test(r.metin), r.metin.slice(0, 200));
+
   /* ---- Giris ---- */
   r = await ist({ islem: "giris", sifre: "yanlis-sifre-0000" });
   ok("yanlis sifre: 401, cerez yok", r.status === 401 && r.json.hata === "sifre" && !r.setCookie);
@@ -193,6 +200,12 @@ async function calis() {
   ok("oturum: girisli", r.json.girisli === true);
   r = await ist({ islem: "veri" });
   ok("veri: bos baslar (ornek veri eklenmez)", r.status === 200 && r.json.veri.musteriler.length === 0 && r.json.veri.icerikler.length === 0 && r.json.veri.etkinlikler.length === 0, j(r.json));
+
+  r = await ist({ islem: "kaydet", tur: [], veri: { ad: "X" } });
+  var r2 = await ist({ islem: "toplu", kayitlar: [{ tur: "musteri", id: ["x"], veri: { ad: "X" } }] });
+  var r3 = await ist({ islem: "anlik_geri", onay: "GERI YUKLE", id: [] });
+  ok("oturumlu bicimsiz tur / id: 422 / 404 saf JSON, uyari yok", r.status === 422 && r2.status === 422 && r3.status === 404 && [r, r2, r3].every(function (x) { return !!x.json && !/Warning|<br/.test(x.metin); }),
+    [r, r2, r3].map(function (x) { return x.status + " " + x.metin.slice(0, 120); }).join(" | "));
 
   /* ---- Kaydet ---- */
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "  Örnek  Müşteri A ", kurum: "Örnek Kurum", ucret: 12000, siklik: { tur: "haftalik", haftalikAdet: 2, gunler: [4, 1, 4] },
@@ -353,6 +366,26 @@ async function calis() {
   var mSon = v.musteriler.filter(function (x) { return x.id === mA.id; })[0];
   r = await ist({ islem: "kaydet", tur: "musteri", id: mSon.id, surum: mSon.surum, veri: Object.assign({}, mSon, { not: "anlik sonrasi" }) });
   ok("anliga donusten sonra kayitlar duzenlenebilir (surum tutarli)", r.status === 200, j(r.json));
+
+  /* ---- Tumunu degistir: zaman damgalari yedekteki gibi; yedekte ayar bossa mevcut ayar da kalkar ---- */
+  var zYedek = (await ist({ islem: "disa_aktar" })).json.yedek.veriler;
+  var zm = zYedek.musteriler[0];
+  zm.guncelleme = 1700000000; zm.olusturma = 1600000000;
+  zYedek.ayar = null;
+  var zOz = (await ist({ islem: "ice_aktar", kip: "degistir", veriler: zYedek, onizleme: true })).json.onizleme;
+  r = await ist({ islem: "ice_aktar", kip: "degistir", veriler: zYedek, onay: "GERI YUKLE", beklenen: Object.assign({}, zOz.sayilar, { durum: zOz.durum }) });
+  v = (await ist({ islem: "veri" })).json.veri;
+  var zSonra = v.musteriler.filter(function (x) { return x.id === zm.id; })[0];
+  ok("tumunu degistir: olusturma ve guncelleme yedekteki gibi kalir (liste sirasi degismez)", r.status === 200 && zSonra && zSonra.guncelleme === 1700000000 && zSonra.olusturma === 1600000000, j(zSonra));
+  ok("yedekte ayar bos (null): onizleme bildirir, mevcut ayar da kaldirilir", zOz.ayarSil === true && !v.ayar, j(v.ayar));
+  r = await ist({ islem: "kaydet", tur: "ayar", veri: { varsayilanStokUyari: 4 } });
+  ok("ayar yeniden kaydedilebilir", r.status === 200, j(r.json));
+  // Ice aktarma: musteriKurum metin degilse sessizce kurumsuz musteriye baglanmaz; gecmis satirindaki bilinmeyen anahtar uyarilir
+  r = await ist({ islem: "ice_aktar", onizleme: true, veriler: { icerikler: [
+    { musteriAdi: "Örnek Müşteri C", musteriKurum: 2024, baslik: "Kurum sayi" },
+    { musteriAdi: "Örnek Müşteri C", baslik: "Geçmişli", gecmis: [{ z: "2030-01-01 10:00", m: "Eklendi", kim: "biri" }] }] } });
+  ok("musteriKurum sayi: hata; gecmis[].kim: uyari", r.status === 200 && r.json.onizleme.hatalar.some(function (x) { return /musteriKurum metin olmali/.test(x); }) &&
+    r.json.onizleme.uyarilar.some(function (x) { return /gecmis\[\]\.kim/.test(x); }), j(r.json.onizleme));
 
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Örnek gün türlü", siklik: { tur: "haftalik", gunler: [2, 5], gunTurleri: { "5": "post", "3": "story", "2": "" } } } });
   ok("gune ozel tur: yalniz secili gunler saklanir, bos tur atlanir; nesne olarak doner", r.status === 200 && j(r.json.kayit.siklik.gunTurleri) === '{"5":"post"}', j(r.json));

@@ -50,7 +50,9 @@ Suflo Pro lisans servisinden (`pro-v1`) tamamen ayrıdır: ayar dosyası, verita
   - Liste yerine nesne beklenen alanlara liste gelirse (ya da tersi) hata gösterilir. Alt alanlardaki tanınmayan anahtarlar da uyarı olarak listelenir.
   - "Tümünü değiştir" yedekteki ayar kaydını (varsayılan stok eşiği) da geri getirir.
   - Uygulamadan önce, aynı işlem içinde otomatik kopya alınır. Son 30 kopya sıkıştırılarak saklanır.
-  - Tek dosyada en çok 7,5 MB ve tür başına 20.000 kayıt içe aktarılabilir. Daha büyük bir yedek indirildiğinde uyarı gösterilir.
+  - Tek seferde en çok 8 MB veri (yedeğin sıkıştırılmış JSON hali, Türkçe harfler 2 bayt sayılır) ve tür başına 20.000 kayıt içe aktarılabilir. Daha büyük bir yedek indirildiğinde uyarı gösterilir.
+  - "Tümünü değiştir" ve otomatik kopyaya dönüş, kayıtların oluşturma ve son değişiklik zamanlarını korur (liste sırası değişmez); yalnız sürüm numaraları yenilenir. Yedekte ayar yoksa (boş) şu anki ayar da kaldırılır; onay penceresi bunu söyler.
+  - Dosyanın üst düzeyindeki tanınmayan listeler (örneğin elle yazılmış bir `cekimler` listesi) ve geçmiş satırlarındaki tanınmayan anahtarlar da önizlemede uyarı olarak gösterilir.
 - `noindex` ve `robots.txt` yalnız arama motorları içindir; güvenlik bunlara dayanmaz.
 
 ## Dağıtım seçeneği (karar gerekli)
@@ -64,7 +66,7 @@ Tarayıcıda aynı adresten (origin) yüklenen her betik, o adresin izin verdiğ
   - Arayüz ve API aynı adreste olur. Bu adreste üçüncü taraf betik yoktur.
   - `docs/studio/` içindeki dosyaları (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle. `arayuz.htaccess` dosyasını da aynı yere `.htaccess` adıyla koy.
   - `allowed_origins = ['https://assets.suflo.app']`.
-  - `suflo.app/studio/` yalnız yönlendirme sayfası olur ve hiçbir veriye erişmez. Bunun için `main`'e birleştirmeden önce `docs/studio/` içeriği `yonlendirme.html` ile değiştirilir; bu adım onayla yapılır.
+  - `suflo.app/studio/` yalnız yönlendirme sayfası olur ve hiçbir veriye erişmez. B onaylanırsa `main`'e birleştirmeden önce şu yapılır: arayüz kaynak dosyaları yayımlanmayan `server/studio-v1/arayuz/` klasörüne taşınır, testler ve bu belge oraya bakar; `docs/studio/` içinde yalnız `index.html` kalır ve içeriği `yonlendirme.html` olur.
   - Önce `assets.suflo.app` üzerinde HTML/JS sunan başka bir sayfa olmadığını kontrol et.
 
 Arayüz kodu iki seçenekte de aynıdır: `assets.suflo.app` üzerinden açılınca API'yi kendi adresinden çağırır.
@@ -79,6 +81,8 @@ Arayüz kodu iki seçenekte de aynıdır: `assets.suflo.app` üzerinden açılı
 Klasör yapısı, Pro servisiyle aynı kök altında şöyle olmalı:
 
 ```text
+public_html/studio/index.html        <- (yalnız seçenek B) arayüz: index.html, studio.css, studio-core.js, studio.js, favicon.svg
+public_html/studio/.htaccess         <- (yalnız seçenek B) server/studio-v1/arayuz.htaccess
 public_html/studio/v1/index.php      <- server/studio-v1/index.php
 public_html/studio/v1/.htaccess      <- server/studio-v1/.htaccess
 private/studio-v1/config.php         <- config.example.php'nin doldurulmuş kopyası
@@ -88,8 +92,9 @@ private/studio-v1/studio.sqlite      <- sunucu ilk istekte kendisi oluşturur
 Adımlar:
 
 1. `public_html/studio/v1/` klasörünü aç; `index.php` ve `.htaccess` dosyalarını yükle.
+   - Seçenek B'de ayrıca: arayüz dosyalarını (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle ve `arayuz.htaccess` dosyasını aynı klasöre `.htaccess` adıyla koy. Bu dosya güvenlik başlıklarını (çerçeveye gömmeyi engelleme dahil) ekler; atlanmamalı.
 2. `private/studio-v1/` klasörünü aç. `config.example.php` dosyasını buraya `config.php` adıyla koy.
-3. Şifre özetini üret. Kendi bilgisayarında (PHP kuruluysa) ya da Hostinger SSH terminalinde `php sifre-ozeti.php` komutunu çalıştır. Şifreyi iki kez yaz (en az 12 karakter). Çıkan `$argon2id$...` ya da `$2y$...` satırını `config.php` içindeki `'password_hash'` alanına yapıştır. `sifre-ozeti.php` dosyasını `public_html` içine **koyma**.
+3. Şifre özetini üret. Tercihen Hostinger SSH terminalinde, ya da kendi bilgisayarında (PHP kuruluysa) `php sifre-ozeti.php` komutunu çalıştır. Windows terminalinde yazdığın şifre ekranda görünür; yanında kimse yokken çalıştır. Şifreyi iki kez yaz (en az 12 karakter). Çıkan `$argon2id$...` ya da `$2y$...` satırını `config.php` içindeki `'password_hash'` alanına yapıştır. `sifre-ozeti.php` dosyasını `public_html` içine **koyma**.
 4. `allowed_origins`: seçenek A için `['https://suflo.app']`, seçenek B için `['https://assets.suflo.app']` (yalnız biri).
 5. Veritabanı:
    - Varsayılan SQLite için bir şey yapma; `private/studio-v1/` klasörünün PHP tarafından yazılabilir olması yeterli.
@@ -101,7 +106,7 @@ Adımlar:
 
 ## İlk kurulum notu
 
-Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum önce bir "kuruluyor" işareti yazar. Yarıda kesilen kurulum bu işaret sayesinde bir sonraki istekte tamamlanır. İşaret yokken Studio tablolarından biri zaten varsa (eski bir geliştirme sürümü ya da aynı veritabanını kullanan başka bir uygulama) ya da şema başka bir sürümse üzerine sessizce kurulmaz. Açık bir "uyumsuz" hatası döner ve arayüz bu mesajı gösterir. Yalnız geliştirme denemelerinde olabilir. Bu durumda yedeği indir, veritabanını boşalt ve yedeği yeniden içe aktar.
+Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum önce bir "kuruluyor" işareti yazar. Yarıda kesilen kurulum bu işaret sayesinde bir sonraki istekte tamamlanır. İşaret yokken Studio tablolarından biri zaten varsa (eski bir geliştirme sürümü ya da aynı veritabanını kullanan başka bir uygulama) ya da şema başka bir sürümse üzerine sessizce kurulmaz. Açık bir "uyumsuz" hatası döner ve arayüz bu mesajı gösterir. Bu durumda Studio için **ayrı, boş bir veritabanı** kullan (`config.php`'de `dsn`). Tablolar başka bir uygulamaya aitse onları **silme**. Yalnız tablolar eski bir Studio denemesine aitse: önce o denemenin yedeğini indir, sonra yeni boş veritabanına geçip yedeği içe aktar.
 
 ## Bakım
 

@@ -28,7 +28,8 @@ function sor(string $istem): string {
 }
 
 $a = sor('Yeni sifre (en az 12 karakter): ');
-if (mb_strlen($a) < 12) { fwrite(STDERR, "Sifre en az 12 karakter olmali.\n"); exit(1); }
+// mbstring olmayan PHP'de (Windows'ta varsayilan kapali) da calissin: karakterler UTF-8 olarak sayilir
+if (preg_match_all('/./us', $a) < 12) { fwrite(STDERR, "Sifre en az 12 karakter olmali.\n"); exit(1); }
 $b = sor('Yeni sifre (tekrar): ');
 if (!hash_equals($a, $b)) { fwrite(STDERR, "Sifreler ayni degil.\n"); exit(1); }
 $algo = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;

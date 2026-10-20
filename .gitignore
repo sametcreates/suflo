@@ -9,3 +9,12 @@ Thumbs.db
 brand/post1/*.png
 
 content/
+
+# Suflo Studio ozel verisi: veritabani, yedek ve CSV disa aktarimlari, sunucu ayari asla repoya girmez
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+suflo-studio-*.json
+suflo-studio-*.csv
+private/
+config.php
