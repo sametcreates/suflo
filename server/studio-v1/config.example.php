@@ -18,7 +18,9 @@ return [
     'db_user' => '',
     'db_pass' => '',
 
-    // Arayuzun calistigi adres(ler). Yalniz buradan gelen istekler kabul edilir (CSRF korumasi).
+    // Arayuzun calistigi adres. Yalniz buradan gelen istekler kabul edilir (CSRF korumasi).
+    // Secenek A: ['https://suflo.app']  |  Secenek B (onerilen, ayri adres): ['https://assets.suflo.app']
+    // Yalniz birini yaz (bkz. README "Dagitim secenegi").
     'allowed_origins' => ['https://suflo.app'],
 
     // Oturum: bosta kalma ve mutlak sure (saniye)

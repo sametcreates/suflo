@@ -14,9 +14,16 @@ if (PHP_SAPI !== 'cli') {
 
 function sor(string $istem): string {
     fwrite(STDOUT, $istem);
-    $gizle = DIRECTORY_SEPARATOR === '/' && function_exists('shell_exec') && @shell_exec('stty -echo 2>/dev/null') !== null;
+    // Yazilan sifre ekranda gorunmesin (Linux / macOS terminali). stty basarili olduysa yanki geri acilir.
+    $gizle = false;
+    if (DIRECTORY_SEPARATOR === '/' && function_exists('exec')) {
+        $cikti = [];
+        $kod = 1;
+        @exec('stty -echo 2>/dev/null', $cikti, $kod);
+        $gizle = $kod === 0;
+    }
     $s = fgets(STDIN);
-    if ($gizle) { @shell_exec('stty echo 2>/dev/null'); fwrite(STDOUT, "\n"); }
+    if ($gizle) { @exec('stty echo 2>/dev/null'); fwrite(STDOUT, "\n"); }
     return rtrim((string)$s, "\r\n");
 }
 

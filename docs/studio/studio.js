@@ -7,8 +7,9 @@
   "use strict";
   if (window.top !== window.self) { document.documentElement.textContent = ""; return; }
   var C = window.StudioCore;
-  var YEREL = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
-  var API = YEREL ? "/studio/v1/index.php" : "https://assets.suflo.app/studio/v1/index.php";
+  // Arayuz API ile ayni adresten (yerel deneme ya da assets.suflo.app/studio/) sunuluyorsa goreli yol kullanilir.
+  var AYNI_KAYNAK = /^(127\.0\.0\.1|localhost|assets\.suflo\.app)$/.test(location.hostname);
+  var API = AYNI_KAYNAK ? "/studio/v1/index.php" : "https://assets.suflo.app/studio/v1/index.php";
   var kok = document.getElementById("uygulama");
   var S = { veri: bosVeri(), girisli: false, el: null, rota: null, secili: {}, sonYukleme: 0 };
   function bosVeri() { return { musteriler: [], icerikler: [], etkinlikler: [], ayar: null }; }
@@ -52,7 +53,7 @@
   function disLink(url, metin) {
     return C.guvenliLink(url) ? h("a", { href: String(url).trim(), target: "_blank", rel: "noopener noreferrer" }, metin || "Aç") : null;
   }
-  function logo() { return h("img", { src: "/favicon.svg", alt: "", width: "24", height: "24" }); }
+  function logo() { return h("img", { src: "favicon.svg", alt: "", width: "24", height: "24" }); }
   function bul(liste, id) { for (var i = 0; i < liste.length; i++) if (liste[i].id === id) return liste[i]; return null; }
   function musteri(id) { return id ? bul(S.veri.musteriler, id) : null; }
   function etkinlik(id) { return id ? bul(S.veri.etkinlikler, id) : null; }
@@ -82,7 +83,8 @@
     cakisma: "Bu kayıt başka bir cihazda değişmiş. Güncel hali yüklendi; değişikliğini yeniden yap.",
     ayni_ad: "Aynı ad (ve kurum) ile bir müşteri zaten var.", veritabani: "Sunucu veritabanına bağlanamadı.",
     onay: "Onay metni gerekli.", yok: "Kayıt bulunamadı.", buyuk: "Dosya çok büyük.",
-    kaynak: "Bu adresten erişim yok.", ag: "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et."
+    kaynak: "Bu adresten erişim yok.", ag: "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.",
+    mesgul: "Sunucu şu an meşgul; birkaç saniye sonra yeniden dene."
   };
   function hataMetni(j) {
     if (j.hata === "gecersiz") return "Kaydedilemedi: " + (j.mesaj || "geçersiz bilgi");
@@ -132,17 +134,57 @@
       return null;
     });
   }
-  /** Bir islemde birden cok kayit (hepsi ya da hicbiri). kayitlar: [{tur, kayit}] */
-  function topluKaydet(kayitlar) {
+  /** Bir islemde birden cok kayit (hepsi ya da hicbiri); ham sunucu yanitini doner. kayitlar: [{tur, kayit}] */
+  function kaydetHam(kayitlar) {
     return api("toplu", { kayitlar: kayitlar.map(function (x) {
       var o = { tur: x.tur, veri: sade(x.kayit) };
       if (x.kayit.id) { o.id = x.kayit.id; o.surum = x.kayit.surum; }
       return o;
     }) }).then(function (j) {
-      if (j.ok) { j.kayitlar.forEach(function (k, i) { yerlestir(kayitlar[i].tur, k); }); return j.kayitlar; }
+      if (j.ok) j.kayitlar.forEach(function (k, i) { yerlestir(kayitlar[i].tur, k); });
+      else if (j.hata === "cakisma" && j.guncel && j.sira !== undefined && kayitlar[j.sira]) yerlestir(kayitlar[j.sira].tur, j.guncel);
+      return j;
+    });
+  }
+  /** kaydetHam + hata bildirimi. Basarida kaydedilen kayitlar, hatada null. */
+  function topluKaydet(kayitlar) {
+    return kaydetHam(kayitlar).then(function (j) {
+      if (j.ok) return j.kayitlar;
       if (j.hata === "oturum") return null;
       toast(hataMetni(j) + (j.sira !== undefined && kayitlar.length > 1 ? " (" + (j.sira + 1) + ". kayıt)" : ""), "hata");
       if (j.hata === "cakisma") veriYukle().then(yenile);
+      return null;
+    });
+  }
+
+  /**
+   * Penceredeki kaydi kaydeder. Cakismada (kayit bu arada baska yerde degisti) pencere acik kalir: taban guncel
+   * kayitla yenilenir, formdaki degisiklikler durur ve kullanici bilerek yeniden kaydedebilir.
+   */
+  /**
+   * Alan bazinda birlestirme: formda kullanicinin degistirdigi alanlar (acilistaki degerden farkli olanlar) tabana
+   * yazilir; dokunulmayan alanlar tabandan (cakismada guncel kayittan) gelir. Ic ice nesneler alan alan birlesir.
+   */
+  function degisenleriUygula(taban, ilk, simdi) {
+    var n = C.kopya(taban || {});
+    Object.keys(simdi).forEach(function (k) {
+      var a = simdi[k], b = ilk ? ilk[k] : undefined;
+      if (a && typeof a === "object" && !Array.isArray(a) && b && typeof b === "object" && !Array.isArray(b)) {
+        n[k] = degisenleriUygula(n[k] && typeof n[k] === "object" && !Array.isArray(n[k]) ? n[k] : {}, b, a);
+      } else if (JSON.stringify(a) !== JSON.stringify(b)) n[k] = a;
+    });
+    return n;
+  }
+  function pencereKaydet(tur, n, hataP, tabanYenile) {
+    return kaydetHam([{ tur: tur, kayit: n }]).then(function (j) {
+      if (j.ok) return j.kayitlar[0];
+      if (j.hata === "cakisma" && j.guncel) {
+        tabanYenile(C.kopya(j.guncel));
+        yenile();
+        hataP.textContent = "Bu kayıt sen düzenlerken başka bir yerde değişti; güncel hali alındı. Formdaki değişikliklerin duruyor: yeniden “Kaydet”e basarsan onlar kaydedilir.";
+        return null;
+      }
+      if (j.hata !== "oturum") hataP.textContent = hataMetni(j);
       return null;
     });
   }
@@ -215,7 +257,8 @@
     kok.textContent = "";
     kok.appendChild(h("p", { class: "yukleniyor" }, "Bağlanıyor…"));
     api("oturum").then(function (j) {
-      if (!j.ok) return durumEkrani(j.hata === "kurulum" ? "Suflo Studio sunucusu henüz kurulmadı." : hataMetni(j), true);
+      if (!j.ok) return durumEkrani(j.hata === "kurulum" ? "Suflo Studio sunucusu henüz kurulmadı." :
+        j.hata === "ag" ? "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et; sorun sürerse sunucu kurulumu tamamlanmamış olabilir." : hataMetni(j), true);
       if (!j.kurulu) return durumEkrani("Suflo Studio sunucusu kuruldu ama giriş şifresi henüz ayarlanmadı.", false);
       if (!j.girisli) return girisEkrani();
       return veriYukle().then(kabukKur);
@@ -326,16 +369,15 @@
   /** Veri degistikten sonra ayni sayfayi yeniden ciz (kaydirma korunur). */
   function yenile() { ciz(true); }
   window.addEventListener("hashchange", function () { ciz(false); });
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible" && S.girisli && Date.now() - S.sonYukleme > 30000 && !document.querySelector("dialog[open]")) {
-      veriYukle().then(function (ok) { if (ok) yenile(); });
-    }
-  });
-  setInterval(function () {
-    if (document.visibilityState === "visible" && S.girisli && Date.now() - S.sonYukleme > 120000 && !document.querySelector("dialog[open]")) {
-      veriYukle().then(function (ok) { if (ok) yenile(); });
-    }
-  }, 30000);
+  // Arka planda yenileme (baska cihazdaki degisiklikler). Pencere aciksa ya da Ayarlar'daysa (ice aktarma onizlemesi,
+  // secilen dosya) sayfa yeniden cizilmez.
+  function arkaPlanYenile(esik) {
+    if (document.visibilityState !== "visible" || !S.girisli || Date.now() - S.sonYukleme <= esik) return;
+    if (document.querySelector("dialog[open]") || (S.rota && S.rota.ad === "ayarlar")) return;
+    veriYukle().then(function (ok) { if (ok && !document.querySelector("dialog[open]") && !(S.rota && S.rota.ad === "ayarlar")) yenile(); });
+  }
+  document.addEventListener("visibilitychange", function () { arkaPlanYenile(30000); });
+  setInterval(function () { arkaPlanYenile(120000); }, 30000);
 
   /* ================= Ortak parcalar ================= */
 
@@ -378,28 +420,36 @@
     if (!degisim.length) return Promise.resolve(false);
     return topluKaydet(degisim.map(function (d) { return { tur: d.tur, kayit: d.yeni }; })).then(function (sonuc) {
       if (!sonuc) return false;
+      degisim.forEach(function (d, i) { d.sonraki = sonuc[i]; });
       yenile();
       toast(mesaj, "", { ad: "Geri al", f: function () { geriAl(degisim); } });
       return true;
     });
   }
+  /**
+   * Geri alma: degisiklikten hemen sonraki surumle gonderilir. Arada kayit (bu ya da baska cihazda) yeniden
+   * degistiyse sunucu 409 doner ve sonraki degisiklik sessizce ezilmez. degisim: [{tur, onceki, sonraki}]
+   */
   function geriAl(degisim) {
     var zaman = C.damga();
-    var kayitlar = degisim.map(function (d) {
-      var simdiki = bul(liste(d.tur), d.onceki.id);
-      if (!simdiki) return null;
+    var kayitlar = degisim.filter(function (d) { return d.sonraki; }).map(function (d) {
       var n;
       if (d.tur === "icerik") {
-        n = C.geriAl(simdiki, d.onceki, zaman);
-        if (simdiki.durum === d.onceki.durum) n.gecmis[n.gecmis.length - 1].m = "Son değişiklik geri alındı";
+        n = C.geriAl(d.sonraki, d.onceki, zaman);
+        if (d.sonraki.durum === d.onceki.durum) n.gecmis[n.gecmis.length - 1].m = "Son değişiklik geri alındı";
       } else {
         n = C.kopya(d.onceki);
-        n.surum = simdiki.surum;
+        n.surum = d.sonraki.surum;
       }
       return { tur: d.tur, kayit: n };
-    }).filter(Boolean);
+    });
     if (!kayitlar.length) return;
-    topluKaydet(kayitlar).then(function (ok) { if (ok) { yenile(); toast("Geri alındı."); } });
+    kaydetHam(kayitlar).then(function (j) {
+      if (j.ok) { yenile(); toast("Geri alındı."); return; }
+      if (j.hata === "oturum") return;
+      yenile();
+      toast(j.hata === "cakisma" ? "Geri alınamadı: kayıt bu arada yeniden değişti. Güncel hali gösteriliyor." : hataMetni(j), "hata");
+    });
   }
   function durumlariDegistir(idler, yeni) {
     var zaman = C.damga(), b = bugun(), degisim = [];
@@ -634,6 +684,21 @@
     function goster() { ucAlan.hidden = g.siklik.value !== "uc_gun"; hfAlan.hidden = adetAlan.hidden = g.siklik.value !== "haftalik"; }
     g.siklik.addEventListener("change", goster);
     goster();
+    function formDegeri() {
+      var tur = g.siklik.value, ucret = sayiyaCevir(g.ucret.value);
+      return {
+        ad: g.ad.value.trim(), kurum: g.kurum.value.trim(), ucret: isNaN(ucret) ? null : ucret,
+        siklik: {
+          tur: tur,
+          haftalikAdet: tur === "haftalik" && g.adet.value ? Math.max(1, Math.min(7, parseInt(g.adet.value, 10) || 1)) : null,
+          gunler: tur === "haftalik" ? gunKutulari.filter(function (k) { return k.checked; }).map(function (k) { return +k.value; }) : [],
+          gunTurleri: tur === "haftalik" ? gunKutulari.reduce(function (o, k, i) { if (k.checked && gunTurleri[i].value) o[k.value] = gunTurleri[i].value; return o; }, {}) : {},
+          baslangic: tur === "uc_gun" ? (g.baslangic.value || null) : null
+        },
+        slotTuru: g.slot.value, stokUyari: g.esik.value === "" ? null : Math.max(0, parseInt(g.esik.value, 10) || 0), not: g.not.value
+      };
+    }
+    var ilk = formDegeri();
     var hataP = h("p", { class: "hata", role: "alert" });
     var ref = {};
     ref.d = pencere(m ? "Müşteriyi düzenle" : "Müşteri ekle", [
@@ -649,24 +714,13 @@
       var ucret = sayiyaCevir(g.ucret.value);
       if (!g.ad.value.trim()) { hataP.textContent = "Ad gerekli."; g.ad.focus(); return; }
       if (isNaN(ucret)) { hataP.textContent = "Ücret sayı olmalı (ör. 10000) ya da boş."; g.ucret.focus(); return; }
-      var tur = g.siklik.value;
-      var n = Object.assign(C.kopya(v), {
-        ad: g.ad.value.trim(), kurum: g.kurum.value.trim(), ucret: ucret,
-        siklik: {
-          tur: tur,
-          haftalikAdet: tur === "haftalik" && g.adet.value ? Math.max(1, Math.min(7, parseInt(g.adet.value, 10) || 1)) : null,
-          gunler: tur === "haftalik" ? gunKutulari.filter(function (k) { return k.checked; }).map(function (k) { return +k.value; }) : [],
-          gunTurleri: tur === "haftalik" ? gunKutulari.reduce(function (o, k, i) { if (k.checked && gunTurleri[i].value) o[k.value] = gunTurleri[i].value; return o; }, {}) : {},
-          baslangic: tur === "uc_gun" ? (g.baslangic.value || null) : null
-        },
-        slotTuru: g.slot.value, stokUyari: g.esik.value === "" ? null : Math.max(0, parseInt(g.esik.value, 10) || 0), not: g.not.value
-      });
-      var anahtar = C.katla(n.ad) + "|" + C.katla(n.kurum);
-      if (S.veri.musteriler.some(function (x) { return x.id !== v.id && C.katla(x.ad) + "|" + C.katla(x.kurum) === anahtar; })) {
+      var n = degisenleriUygula(v, ilk, formDegeri());
+      var anahtar = C.norm(n.ad) + "|" + C.norm(n.kurum);
+      if (S.veri.musteriler.some(function (x) { return x.id !== v.id && C.norm(x.ad) + "|" + C.norm(x.kurum) === anahtar; })) {
         hataP.textContent = "Aynı ad ve kurumla bir müşteri zaten var.";
         return;
       }
-      kaydet("musteri", n).then(function (k) {
+      pencereKaydet("musteri", n, hataP, function (g2) { v = g2; }).then(function (k) {
         if (!k) return;
         ref.d.close();
         if (!m) git("musteri", null, k.id); else yenile();
@@ -843,6 +897,16 @@
     function goster() { yayinAlan.hidden = g.durum.value !== "yayinlandi"; }
     g.durum.addEventListener("change", goster);
     goster();
+    function formDegeri() {
+      return {
+        musteriId: g.musteri.value, baslik: g.baslik.value.trim(), tur: g.tur.value, durum: g.durum.value, oncelik: g.oncelik.value,
+        cekimId: g.cekim.value || null, teslimTarihi: g.teslim.value || null, planTarihi: g.plan.value || null,
+        yayinTarihi: g.durum.value === "yayinlandi" ? (g.yayin.value || null) : null,
+        revizyonNotu: g.revizyon.value, not: g.not.value,
+        dosyalar: { ham: g.ham.girdi.value.trim(), proje: g.proje.girdi.value.trim(), final: g.final.girdi.value.trim() }
+      };
+    }
+    var ilk = formDegeri();
     var hataP = h("p", { class: "hata", role: "alert" });
     var ref = {};
     var gecmis = (v.gecmis || []).slice().reverse();
@@ -860,37 +924,32 @@
         h("div", { class: "gecmis" }, gecmis.map(function (x) { return h("div", null, x.z + " · " + x.m); }))) : null,
       hataP
     ], [
-      ic_ ? h("button", { class: "btn sol " + (v.arsiv ? "" : "tehlike"), type: "button", onclick: function () { ref.d.close(); arsivDegistir("icerik", ic_, !ic_.arsiv); } }, v.arsiv ? "Arşivden çıkar" : "Arşivle") : null,
+      ic_ ? h("button", { class: "btn sol " + (v.arsiv ? "" : "tehlike"), type: "button", onclick: function () { var g2 = icerikBul(ic_.id) || ic_; ref.d.close(); arsivDegistir("icerik", g2, !g2.arsiv); } }, v.arsiv ? "Arşivden çıkar" : "Arşivle") : null,
       vazgec(ref), h("button", { class: "btn birincil", type: "submit" }, "Kaydet")
     ], function () {
       if (!g.musteri.value) { hataP.textContent = "Müşteri seç."; g.musteri.focus(); return; }
       if (!g.baslik.value.trim()) { hataP.textContent = "Başlık yaz."; g.baslik.focus(); return; }
       var zaman = C.damga(), b = bugun();
-      var n = Object.assign(C.kopya(v), {
-        musteriId: g.musteri.value, baslik: g.baslik.value.trim(), tur: g.tur.value, durum: g.durum.value, oncelik: g.oncelik.value,
-        cekimId: g.cekim.value || null, teslimTarihi: g.teslim.value || null, planTarihi: g.plan.value || null,
-        yayinTarihi: g.durum.value === "yayinlandi" ? (g.yayin.value || b) : null,
-        revizyonNotu: g.revizyon.value, not: g.not.value,
-        dosyalar: { ham: g.ham.girdi.value.trim(), proje: g.proje.girdi.value.trim(), final: g.final.girdi.value.trim() }
-      });
+      var n = degisenleriUygula(v, ilk, formDegeri());
+      if (n.durum === "yayinlandi" && !n.yayinTarihi) n.yayinTarihi = b;
+      if (n.durum !== "yayinlandi") n.yayinTarihi = null;
+      // Gecmis, pencerenin tabanina (acildigi ya da cakismada alinan guncel hal) gore yazilir
       var gec = (v.gecmis || []).slice();
       if (!ic_) gec.push({ z: zaman, m: "Eklendi (" + C.DURUM_AD[n.durum] + ")" });
       else {
-        if (n.durum !== ic_.durum) gec.push({ z: zaman, m: C.DURUM_AD[ic_.durum] + " → " + C.DURUM_AD[n.durum] });
-        if ((n.revizyonNotu || "") !== (ic_.revizyonNotu || "") && n.revizyonNotu) gec.push({ z: zaman, m: "Revizyon notu güncellendi" });
-        if ((n.planTarihi || "") !== (ic_.planTarihi || "")) gec.push({ z: zaman, m: n.planTarihi ? "Yayın tarihi: " + C.tarihKisa(n.planTarihi, true) : "Yayın tarihi kaldırıldı" });
+        if (n.durum !== v.durum) gec.push({ z: zaman, m: C.DURUM_AD[v.durum] + " → " + C.DURUM_AD[n.durum] });
+        if ((n.revizyonNotu || "") !== (v.revizyonNotu || "") && n.revizyonNotu) gec.push({ z: zaman, m: "Revizyon notu güncellendi" });
+        if ((n.planTarihi || "") !== (v.planTarihi || "")) gec.push({ z: zaman, m: n.planTarihi ? "Yayın tarihi: " + C.tarihKisa(n.planTarihi, true) : "Yayın tarihi kaldırıldı" });
       }
       n.gecmis = gec.slice(-60);
-      if (!ic_) {
-        kaydet("icerik", n).then(function (k) { if (k) { ref.d.close(); yenile(); toast("İçerik eklendi."); } });
-      } else {
-        topluKaydet([{ tur: "icerik", kayit: n }]).then(function (k) {
-          if (!k) return;
-          ref.d.close();
-          yenile();
-          toast("Kaydedildi.", "", { ad: "Geri al", f: function () { geriAl([{ tur: "icerik", onceki: C.kopya(ic_) }]); } });
-        });
-      }
+      var taban = C.kopya(v);
+      pencereKaydet("icerik", n, hataP, function (g2) { v = g2; }).then(function (k) {
+        if (!k) return;
+        ref.d.close();
+        yenile();
+        if (!ic_) toast("İçerik eklendi.");
+        else toast("Kaydedildi.", "", { ad: "Geri al", f: function () { geriAl([{ tur: "icerik", onceki: taban, sonraki: k }]); } });
+      });
     }, true);
   }
 
@@ -968,6 +1027,12 @@
           dizi(c.map(function (x) { return x.baslik + " (" + C.tarihKisa(x.basTarih) + ", " + C.saatMetni(x) + ")"; }), "; "), ". Yine de kaydedebilirsin."]);
       }
     }
+    function formDegeri() {
+      var a = aday();
+      return { musteriId: a.musteriId, tumGun: a.tumGun, basTarih: a.basTarih, bitTarih: a.bitTarih, basSaat: a.basSaat, bitSaat: a.bitSaat, durum: a.durum,
+        baslik: g.baslik.value.trim(), tur: g.tur.value, konum: g.konum.value.trim(), not: g.not.value };
+    }
+    var ilk = formDegeri();
     [g.tumGun, g.basTarih, g.basSaat, g.bitTarih, g.bitSaat, g.durum].forEach(function (x) { x.addEventListener("change", denetle); x.addEventListener("input", denetle); });
     g.basTarih.addEventListener("change", function () { if (!g.bitTarih.value || g.bitTarih.value < g.basTarih.value) g.bitTarih.value = g.basTarih.value; denetle(); });
     denetle();
@@ -985,7 +1050,7 @@
         h("button", { class: "btn ince", type: "button", onclick: function () { ref.d.close(); topluIcerikPenceresi({ musteriId: e.musteriId, cekimId: e.id }); } }, "Bu çekimden içerik ekle")) : null,
       hataP
     ], [
-      e ? h("button", { class: "btn sol " + (v.arsiv ? "" : "tehlike"), type: "button", onclick: function () { ref.d.close(); arsivDegistir("etkinlik", e, !e.arsiv); } }, v.arsiv ? "Arşivden çıkar" : "Arşivle") : null,
+      e ? h("button", { class: "btn sol " + (v.arsiv ? "" : "tehlike"), type: "button", onclick: function () { var g2 = etkinlik(e.id) || e; ref.d.close(); arsivDegistir("etkinlik", g2, !g2.arsiv); } }, v.arsiv ? "Arşivden çıkar" : "Arşivle") : null,
       vazgec(ref), h("button", { class: "btn birincil", type: "submit" }, "Kaydet")
     ], function () {
       var a = aday();
@@ -993,18 +1058,16 @@
       if (!C.gecerliTarih(a.basTarih)) { hataP.textContent = "Başlangıç tarihini gir."; return; }
       if (!a.tumGun && (!C.gecerliSaat(a.basSaat) || !C.gecerliSaat(a.bitSaat))) { hataP.textContent = "Başlangıç ve bitiş saatini gir ya da Tüm gün seç."; return; }
       if (a.bitTarih < a.basTarih || C.aralik(a)[1] <= C.aralik(a)[0]) { hataP.textContent = "Bitiş başlangıçtan sonra olmalı."; return; }
-      var n = Object.assign(C.kopya(v), a, { baslik: g.baslik.value.trim(), tur: g.tur.value, konum: g.konum.value.trim(), not: g.not.value, arsiv: v.arsiv });
+      var n = degisenleriUygula(v, ilk, formDegeri());
       if (!e) delete n.id;
-      var cak = C.cakisanlar(S.veri.etkinlikler, n).length;
-      var bitti = function (k) {
+      var cak = C.cakisanlar(S.veri.etkinlikler, n).length, taban = C.kopya(v);
+      pencereKaydet("etkinlik", n, hataP, function (g2) { v = g2; }).then(function (k) {
         if (!k) return;
         ref.d.close();
         yenile();
         toast((e ? "Kaydedildi." : "Eklendi.") + (cak ? " Dikkat: " + cak + " etkinlikle çakışıyor." : ""), cak ? "hata" : "",
-          e ? { ad: "Geri al", f: function () { geriAl([{ tur: "etkinlik", onceki: C.kopya(e) }]); } } : null);
-      };
-      if (e) topluKaydet([{ tur: "etkinlik", kayit: n }]).then(function (k) { bitti(k && k[0]); });
-      else kaydet("etkinlik", n).then(bitti);
+          e ? { ad: "Geri al", f: function () { geriAl([{ tur: "etkinlik", onceki: taban, sonraki: k }]); } } : null);
+      });
     }, true);
   }
 
@@ -1335,7 +1398,10 @@
         h("dt", null, "Atlanacak"), h("dd", null, s.atlanan + " kayıt (zaten var; mükerrer eklenmez)"),
         h("dt", null, "Hatalı"), h("dd", { class: hataVar ? "uyari" : null }, String(o.hataSayisi))),
       hataVar ? h("div", { class: "uyari-kutu kirmizi" }, h("b", null, "Hatalı kayıtlar düzeltilmeden içe aktarma yapılmaz:"), o.hatalar.map(function (x) { return h("div", null, x); })) : null,
-      o.ekle.length ? h("details", null, h("summary", { class: "soluk kucuk" }, "Eklenecekler"), o.ekle.map(function (x) { return h("div", { class: "kucuk" }, ({ musteri: "Müşteri", icerik: "İçerik", etkinlik: "Etkinlik" })[x.tur] + ": " + x.ad); })) : null,
+      o.ekle.length ? h("details", null, h("summary", { class: "soluk kucuk" }, "Eklenecekler (müşteri bağlantısıyla)"), o.ekle.map(function (x) {
+        return h("div", { class: "kucuk" }, ({ musteri: "Müşteri", icerik: "İçerik", etkinlik: "Etkinlik" })[x.tur] + ": " + x.ad +
+          (x.tur === "musteri" ? "" : " → " + (x.bag || "müşteri yok")));
+      })) : null,
       o.atla.length ? h("details", null, h("summary", { class: "soluk kucuk" }, "Atlananlar"), o.atla.map(function (x) { return h("div", { class: "kucuk" }, x.ad + " (" + x.neden + ")"); })) : null,
       h("div", { class: "eylemler" },
         h("button", { class: "btn birincil", type: "button", disabled: hataVar || !(s.musteri + s.icerik + s.etkinlik), onclick: function (ev) {
@@ -1343,9 +1409,17 @@
           api("ice_aktar", { veriler: veriler }).then(bitir);
         } }, "Yalnız yenileri ekle"),
         h("button", { class: "btn tehlike", type: "button", disabled: hataVar, onclick: function () {
-          onayla("Tüm veriyi bu dosyayla değiştir", "Şu anki tüm müşteri, içerik ve takvim kayıtları bu dosyadakilerle değiştirilir. Şu anki hal önce otomatik kopyalanır (Ayarlar → Otomatik kopyalar).",
-            "Değiştir", "GERI YUKLE", true).then(function (e) {
-            if (e) api("ice_aktar", { veriler: veriler, kip: "degistir", onay: "GERI YUKLE" }).then(bitir);
+          // "Tumunu degistir" icin ayri, gercek onizleme: neyin silinip neyin geleceği onaydan once gosterilir
+          api("ice_aktar", { veriler: veriler, kip: "degistir", onizleme: true }).then(function (p) {
+            if (!p.ok) { toast(hataMetni(p), "hata"); return; }
+            var d = p.onizleme, k = d.kaldirilacak || {}, e2 = d.sayilar;
+            if (d.hataSayisi) { toast("Dosyada hatalı kayıt var; tümünü değiştirme yapılamaz.", "hata"); return; }
+            onayla("Tüm veriyi bu dosyayla değiştir",
+              "Şu anki kayıtlar silinecek: " + (k.musteri || 0) + " müşteri, " + (k.icerik || 0) + " içerik, " + (k.etkinlik || 0) + " çekim / etkinlik. " +
+              "Yerine dosyadan gelecek: " + e2.musteri + " müşteri, " + e2.icerik + " içerik, " + e2.etkinlik + " çekim / etkinlik. " +
+              "Şu anki hal önce otomatik kopyalanır (Ayarlar → Otomatik kopyalar).", "Değiştir", "GERI YUKLE", true).then(function (e) {
+              if (e) api("ice_aktar", { veriler: veriler, kip: "degistir", onay: "GERI YUKLE" }).then(bitir);
+            });
           });
         } }, "Tüm veriyi bu dosyayla değiştir…"))
     ]);

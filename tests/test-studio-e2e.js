@@ -31,7 +31,7 @@ var PUB = path.join(TMP, "public_html"), PRIV = path.join(TMP, "private", "studi
 var EKRAN = process.env.STUDIO_EKRAN || null; // ekran goruntusu klasoru (istege bagli, repo disinda)
 fs.mkdirSync(path.join(PUB, "studio", "v1"), { recursive: true });
 fs.mkdirSync(PRIV, { recursive: true });
-["index.html", "studio.css", "studio-core.js", "studio.js"].forEach(function (f) { fs.copyFileSync(path.join(ROOT, "docs", "studio", f), path.join(PUB, "studio", f)); });
+["index.html", "studio.css", "studio-core.js", "studio.js", "favicon.svg"].forEach(function (f) { fs.copyFileSync(path.join(ROOT, "docs", "studio", f), path.join(PUB, "studio", f)); });
 fs.copyFileSync(path.join(ROOT, "docs", "favicon.svg"), path.join(PUB, "favicon.svg"));
 fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "index.php"), path.join(PUB, "studio", "v1", "index.php"));
 var ozet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", SIFRE], { encoding: "utf8" }).stdout;
@@ -284,6 +284,48 @@ async function calis() {
   var oniz = await page.locator(".bolum:has-text('İçe aktar / geri yükle')").textContent();
   ok("ayni yedek ice aktarma onizlemesi: 0 eklenecek, 11 atlanacak; ekle dugmesi kapali", /0 müşteri, 0 içerik, 0 çekim/.test(oniz) && /11 kayıt/.test(oniz) &&
     await page.locator("button:has-text('Yalnız yenileri ekle')").isDisabled(), oniz);
+
+  // Cakisma: pencere acikken kayit baska cihazda degisir -> pencere acik kalir; ikinci kaydetmede yalniz
+  // kullanicinin degistirdigi alan yazilir, diger cihazin degisikligi korunur
+  await page.goto(URL_ + "#/icerikler?gorunum=liste");
+  await page.waitForSelector(".sayfa h1:has-text('İçerikler')");
+  await page.click(".satir-ad:has-text('Kurgudaki video')");
+  d = page.locator("dialog[open]");
+  async function apiCagir(g) {
+    return page.evaluate(function (g) {
+      return fetch("/studio/v1/index.php", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-Studio": "1" }, body: JSON.stringify(g) })
+        .then(function (r) { return r.json(); });
+    }, g);
+  }
+  async function icerikAl(baslik) { return (await apiCagir({ islem: "veri" })).veri.icerikler.filter(function (x) { return x.baslik === baslik; })[0]; }
+  var disKayit = await icerikAl("Kurgudaki video");
+  var disVeri = Object.assign({}, disKayit, { not: "başka cihaz notu" });
+  ["id", "surum", "olusturma", "guncelleme"].forEach(function (k) { delete disVeri[k]; });
+  var dis = await apiCagir({ islem: "kaydet", tur: "icerik", id: disKayit.id, surum: disKayit.surum, veri: disVeri });
+  await alanGirdi(d, "Revizyon notu", "textarea").fill("pencereden revizyon notu");
+  await d.locator("button[type=submit]").click();
+  await d.locator(".hata:has-text('başka bir yerde değişti')").waitFor();
+  ok("cakisma: pencere acik kalir, uyari gorunur (sessiz ezme yok)", dis.ok === true && await d.isVisible());
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  var birlesik = await icerikAl("Kurgudaki video");
+  ok("cakismadan sonra kaydetme: benim alanim yazildi, diger cihazin notu korundu", birlesik.revizyonNotu === "pencereden revizyon notu" && birlesik.not === "başka cihaz notu", JSON.stringify(birlesik));
+
+  // Geri al, aradaki duzenlemeyi ezmez
+  await page.locator(".satir:has-text('Çekimden reels 1') input[type=checkbox]").check();
+  await page.locator(".toplu-cubuk select").selectOption("kurguda");
+  await page.click("button:has-text('Durumu değiştir')");
+  var ilkToast = page.locator(".toast:has-text('“Çekimden reels 1” → Kurguda')");
+  await ilkToast.waitFor();
+  await page.click(".satir-ad:has-text('Çekimden reels 1')");
+  d = page.locator("dialog[open]");
+  await alanGirdi(d, "Öncelik", "select").selectOption("yuksek");
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  await ilkToast.locator("button:has-text('Geri al')").click();
+  await page.waitForSelector(".toast:has-text('Geri alınamadı')");
+  var korunan = await icerikAl("Çekimden reels 1");
+  ok("geri al, aradaki duzenleme varsa yapilmaz (oncelik ve durum korunur)", korunan.oncelik === "yuksek" && korunan.durum === "kurguda", JSON.stringify(korunan));
 
   // Gune ozel paylasim turu (Cuma post)
   await page.goto(URL_ + "#/musteriler");

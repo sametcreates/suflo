@@ -131,6 +131,10 @@
       .replace(/ç/g, "c").replace(/ğ/g, "g").replace(/ı/g, "i").replace(/ö/g, "o").replace(/ş/g, "s").replace(/ü/g, "u")
       .replace(/â/g, "a").replace(/î/g, "i").replace(/û/g, "u").replace(/\s+/g, " ").trim();
   }
+  /** Sunucudaki norm() ile ayni: Turkce kucuk harf, bosluklar tek (musteri ad + kurum tekilligi icin). */
+  function norm(s) {
+    return String(s == null ? "" : s).replace(/I/g, "ı").replace(/İ/g, "i").toLowerCase().replace(/\s+/g, " ").trim();
+  }
   function para(n) {
     if (n === null || n === undefined || n === "") return "Belirlenmedi";
     return String(Math.round(+n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " TL";
@@ -539,7 +543,7 @@
     gunEkle: gunEkle, gunFarki: gunFarki, haftaGunu: haftaGunu, haftaBasi: haftaBasi, ayBasi: ayBasi, ayEkle: ayEkle,
     gecerliTarih: gecerliTarih, gecerliSaat: gecerliSaat, istanbulSimdi: istanbulSimdi, damga: damga,
     tarihUzun: tarihUzun, tarihKisa: tarihKisa, tarihGunlu: tarihGunlu, ayAdi: ayAdi, goreli: goreli, ayIzgarasi: ayIzgarasi,
-    katla: katla, para: para, musteriAdi: musteriAdi, siklikMetni: siklikMetni, yerelYol: yerelYol, guvenliLink: guvenliLink,
+    katla: katla, norm: norm, para: para, musteriAdi: musteriAdi, siklikMetni: siklikMetni, yerelYol: yerelYol, guvenliLink: guvenliLink,
     aktif: aktif, kopya: kopya, idHaritasi: idHaritasi, durumDegistir: durumDegistir, geriAl: geriAl,
     stok: stok, duzenDurumu: duzenDurumu, slotlar: slotlar, slotGrubu: slotGrubu, kapsama: kapsama, stokUyarisi: stokUyarisi,
     aralik: aralik, ustUste: ustUste, cakisanlar: cakisanlar, cakismaHaritasi: cakismaHaritasi, gundeMi: gundeMi,
