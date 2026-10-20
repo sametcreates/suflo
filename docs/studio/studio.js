@@ -732,6 +732,10 @@
       h("div", { class: "gorunum" }, gorunumDugme("liste", "Liste"), gorunumDugme("pano", "Pano")),
       h("button", { class: "btn", type: "button", onclick: function () { topluIcerikPenceresi({ musteriId: p.musteri, cekimId: p.cekim }); } }, "Toplu ekle"),
       h("button", { class: "btn birincil", type: "button", onclick: function () { icerikPenceresi(null, { musteriId: p.musteri || "", cekimId: p.cekim || null }); } }, "İçerik ekle")]);
+    // Telefonda filtreler katlanir (etkin filtre varsa acik baslar)
+    var etkinFiltre = ["musteri", "durum", "oncelik", "tur", "bas", "bit", "arsiv", "cekim", "ozel"].filter(function (k) { return p[k]; }).length;
+    filtreler = h("details", { class: "filtre-kap", open: window.innerWidth > 860 || etkinFiltre > 0 },
+      h("summary", null, "Filtreler" + (etkinFiltre ? " (" + etkinFiltre + ")" : "")), filtreler);
     if (gorunum === "pano") {
       var durumlar = p.durum ? p.durum.split(",") : C.DURUMLAR.map(function (d) { return d.k; });
       return h("div", null, bas, filtreler, h("p", { class: "soluk kucuk" }, "Kartı başka sütuna sürükleyerek durumunu değiştir. Telefonda karta dokunup durumu seç."), pano(l, durumlar));
