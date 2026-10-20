@@ -31,7 +31,7 @@ var PUB = path.join(TMP, "public_html"), PRIV = path.join(TMP, "private", "studi
 var EKRAN = process.env.STUDIO_EKRAN || null; // ekran goruntusu klasoru (istege bagli, repo disinda)
 fs.mkdirSync(path.join(PUB, "studio", "v1"), { recursive: true });
 fs.mkdirSync(PRIV, { recursive: true });
-["index.html", "studio.css", "studio-core.js", "studio.js", "favicon.svg"].forEach(function (f) { fs.copyFileSync(path.join(ROOT, "docs", "studio", f), path.join(PUB, "studio", f)); });
+["index.html", "studio.css", "studio-core.js", "studio.js", "favicon.svg"].forEach(function (f) { fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "arayuz", f), path.join(PUB, "studio", f)); });
 fs.copyFileSync(path.join(ROOT, "docs", "favicon.svg"), path.join(PUB, "favicon.svg"));
 fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "index.php"), path.join(PUB, "studio", "v1", "index.php"));
 var ozet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", SIFRE], { encoding: "utf8" }).stdout;

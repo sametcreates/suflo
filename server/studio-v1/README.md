@@ -2,7 +2,7 @@
 
 Suflo Studio, KYG Digital için tek kullanıcılı, özel içerik üretimi ve ajans takip uygulamasıdır. Müşteri adları, aylık ücretler ve çekim takvimi gibi gerçek, özel bilgiler tutar.
 
-- **Arayüz:** `docs/studio/` (statik dosyalar). Nereden sunulacağı aşağıdaki **Dağıtım seçeneği**ne bağlıdır.
+- **Arayüz:** `server/studio-v1/arayuz/` (statik dosyalar), `https://assets.suflo.app/studio/` adresinden sunulur (seçenek B). `docs/studio/index.html` yalnız oraya yönlendirir.
 - **Sunucu:** bu klasör, yani `https://assets.suflo.app/studio/v1/index.php` (Hostinger PHP).
 - **Veri:** sunucuda, `public_html` dışındaki tek bir SQLite dosyasında (ya da isteğe bağlı MySQL'de). Tarayıcıda veri ya da oturum saklanmaz. Telefon ve bilgisayar aynı kayıtları görür.
 
@@ -64,9 +64,10 @@ Tarayıcıda aynı adresten (origin) yüklenen her betik, o adresin izin verdiğ
   - Kurulumu en kolay seçenek. Yukarıdaki risk kalır.
 - **B — `https://assets.suflo.app/studio/` (önerilen; örnek ayar dosyasının varsayılanı)**
   - Arayüz ve API aynı adreste olur. Bu adreste üçüncü taraf betik yoktur.
-  - `docs/studio/` içindeki dosyaları (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle. `arayuz.htaccess` dosyasını da aynı yere `.htaccess` adıyla koy.
+  - `server/studio-v1/arayuz/` içindeki dosyaları (`index.html`, `studio.css`, `studio-core.js`, `studio.js`, `favicon.svg`) `public_html/studio/` klasörüne yükle. `arayuz.htaccess` dosyasını da aynı yere `.htaccess` adıyla koy.
   - `allowed_origins = ['https://assets.suflo.app']`.
-  - `suflo.app/studio/` yalnız yönlendirme sayfası olur ve hiçbir veriye erişmez. B onaylanırsa `main`'e birleştirmeden önce şu yapılır: arayüz kaynak dosyaları yayımlanmayan `server/studio-v1/arayuz/` klasörüne taşınır, testler ve bu belge oraya bakar; `docs/studio/` içinde yalnız `index.html` kalır ve içeriği `yonlendirme.html` olur.
+  - `suflo.app/studio/` (`docs/studio/index.html`) yalnız yönlendirme sayfasıdır ve hiçbir veriye erişmez. Arayüz kaynağı yayımlanmayan `server/studio-v1/arayuz/` klasöründedir; testler de oradan okur.
+  - **Seçilen: B** (sahibinin onayıyla).
   - Önce `assets.suflo.app` üzerinde HTML/JS sunan başka bir sayfa olmadığını kontrol et.
 
 Arayüz kodu iki seçenekte de aynıdır: `assets.suflo.app` üzerinden açılınca API'yi kendi adresinden çağırır.

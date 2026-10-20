@@ -1,12 +1,12 @@
 /*
- * Suflo Studio hesap cekirdegi (docs/studio/studio-core.js). Yalniz anonim ornek veri.
+ * Suflo Studio hesap cekirdegi (server/studio-v1/arayuz/studio-core.js). Yalniz anonim ornek veri.
  *  - hazir stok: yalniz "hazir" + video; atanmis + atanmamis = toplam, cift sayim yok; post videoya sayilmaz
  *  - yayinlanan stoktan duser ama silinmez; durum geri alininca sayilar duzelir
  *  - gunluk, 3 gunde 1 ve haftalik ihtiyac; eksik duzen "kurulmali", bilinmeyen stok 0 sayilmaz
  *  - takvim cakismasi (saatli, tum gun, cok gunlu, iptal), Istanbul saati, CSV, ucret ozeti
  */
 "use strict";
-var C = require("../docs/studio/studio-core.js");
+var C = require("../server/studio-v1/arayuz/studio-core.js");
 var gecen = 0, kalan = 0;
 function ok(ad, k, ek) { if (k) gecen++; else kalan++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined && !k ? "   [" + String(ek).slice(0, 400) + "]" : "")); }
 function j(x) { return JSON.stringify(x); }
