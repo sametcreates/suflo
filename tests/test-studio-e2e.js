@@ -3,7 +3,7 @@
  * Masaustu ve telefon boyutunda: giris, musteri / stok girisi / cekim / icerik akislari, toplu durum + geri al,
  * pano surukle-birak, cakisma uyarisi, yenilemede kalicilik, cikis, yedek indirme + mukerrersiz ice aktarma onizlemesi,
  * cihaz saat dilimi farkli olsa da Istanbul tarihi, telefonda yatay tasma yok.
- * php ya da Playwright yoksa ATLA.
+ * php ya da Playwright yoksa ATLA; STUDIO_E2E_ZORUNLU=1 iken (CI'daki e2e isi) atlamak kalmak sayilir.
  */
 "use strict";
 var fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process"), net = require("net"), http = require("http");
@@ -22,7 +22,7 @@ var phpVar = cp.spawnSync("php", ["-r", "echo in_array('sqlite', PDO::getAvailab
 var pw = playwrightBul();
 if (phpVar.error || phpVar.stdout !== "var" || !pw) {
   console.log("ATLA Studio uctan uca: " + (!pw ? "Playwright yok" : "php / pdo_sqlite yok"));
-  process.exit(0);
+  process.exit(process.env.STUDIO_E2E_ZORUNLU ? 1 : 0); // CI'daki e2e isinde atlamak kalmak sayilir
 }
 
 var SIFRE = "ornek-e2e-sifresi-123";
@@ -75,8 +75,10 @@ async function calis() {
   var hatalar = [];
   page.on("pageerror", function (e) { hatalar.push(String(e)); });
   page.on("console", function (m) { if (m.type() === "error" && !/favicon|401|Failed to load resource/.test(m.text())) hatalar.push(m.text()); });
-  // 2026-10-19 22:30 UTC = New York'ta 19 Ekim, Istanbul'da 20 Ekim 01:30
-  await page.clock.setFixedTime(new Date("2026-10-19T22:30:00Z"));
+  // 2099-10-19 22:30 UTC = New York'ta 19 Ekim, Istanbul'da 20 Ekim 01:30.
+  // Yil uzak gelecekte kalmali ve takvimi 2026 ile ayni olmali (1 Ocak Persembe, artik yil degil): sunucu gecmis gun
+  // istisnalarini kendi gercek saatine gore budar; tarayici saati gecmise dusen bir tarihe sabitlenirse test kendiliginden kalir.
+  await page.clock.setFixedTime(new Date("2099-10-19T22:30:00Z"));
   await page.goto(URL_);
   await page.waitForSelector("#studio-sifre");
   ok("giris ekrani: sifre alani, uygulama verisi yok", await page.locator("#studio-sifre").isVisible() && !(await page.locator(".yan-menu").count()));
@@ -90,7 +92,7 @@ async function calis() {
   var menu = await page.locator(".yan-menu a").allTextContents();
   ok("sol menu 7 bolum", menu.join("|") === "Genel Bakış|Müşteriler|İçerikler|Çekim Takvimi|Yayın Takvimi|Stok|Ayarlar", menu.join("|"));
   var tarihMetni = await page.locator(".sayfa-bas .soluk").first().textContent();
-  ok("genel bakis tarihi Istanbul'a gore (cihaz New York'ta 19 Ekim)", tarihMetni === "20 Ekim 2026, Salı", tarihMetni);
+  ok("genel bakis tarihi Istanbul'a gore (cihaz New York'ta 19 Ekim)", tarihMetni === "20 Ekim 2099, Salı", tarihMetni);
   ok("bos baslangic: ornek veri yok, yonlendirme var", await page.locator("text=Henüz kayıt yok").isVisible());
   var depolama = await page.evaluate(function () { return Object.keys(localStorage).join(",") + "|" + document.cookie; });
   ok("tarayicida veri / oturum saklanmiyor (localStorage bos, cerez JS'den okunamaz)", depolama === "|", depolama);
@@ -186,15 +188,15 @@ async function calis() {
   d = page.locator("dialog[open]");
   await alanGirdi(d, "Başlık", "input").fill("Örnek organizasyon");
   await d.locator("label:has-text('Tüm gün') input").check();
-  await alanGirdi(d, "Başlangıç tarihi", "input").fill("2026-10-24");
-  await alanGirdi(d, "Bitiş tarihi", "input").fill("2026-10-25");
+  await alanGirdi(d, "Başlangıç tarihi", "input").fill("2099-10-24");
+  await alanGirdi(d, "Bitiş tarihi", "input").fill("2099-10-25");
   await d.locator("button[type=submit]").click();
   await page.waitForSelector(".t-oge:has-text('Örnek organizasyon')");
   ok("iki gunluk tum gun etkinlik haftada iki gunde gorunur", (await page.locator(".t-oge:has-text('Örnek organizasyon')").count()) === 2);
   await page.click(".gorunum >> text=Ay");
-  ok("ay gorunumu: Ekim 2026", await page.locator(".donem:has-text('Ekim 2026')").isVisible() && (await page.locator(".ay .hucre").count()) % 7 === 0);
+  ok("ay gorunumu: Ekim 2099", await page.locator(".donem:has-text('Ekim 2099')").isVisible() && (await page.locator(".ay .hucre").count()) % 7 === 0);
   await page.click(".gorunum >> text=Gün");
-  ok("gun gorunumu: 20 Ekim", await page.locator(".donem:has-text('20 Ekim 2026')").isVisible());
+  ok("gun gorunumu: 20 Ekim", await page.locator(".donem:has-text('20 Ekim 2099')").isVisible());
 
   // Cekimden toplu icerik
   await page.click(".t-oge:has-text('Örnek çekim 1')");
@@ -232,7 +234,8 @@ async function calis() {
   await page.mouse.down();
   for (var adim = 1; adim <= 8; adim++) await page.mouse.move(kb.x + kb.width / 2 + (hb.x + hb.width / 2 - kb.x - kb.width / 2) * adim / 8, kb.y + kb.height / 2 + (hb.y + 60 - kb.y - kb.height / 2) * adim / 8);
   await page.mouse.up();
-  await page.waitForTimeout(800);
+  // kart, sunucu kaydi bitip pano yeniden cizilince tasinir: sabit bekleme yerine yeni kolonda gorunmesini bekle
+  await page.waitForSelector(".kolon[data-durum=onayda] .kart", { timeout: 5000 }).catch(function () {});
   var panoDurum = await page.evaluate(function () {
     return [].map.call(document.querySelectorAll(".kolon"), function (k) { return k.getAttribute("data-durum") + ":" + k.querySelectorAll(".kart").length; }).join(" ") +
       " | " + [].map.call(document.querySelectorAll(".toast span"), function (t) { return t.textContent; }).join(" / ") + " | dialog:" + !!document.querySelector("dialog[open]");
@@ -488,7 +491,7 @@ async function calis() {
   var mp = await mctx.newPage();
   var mhatalar = [];
   mp.on("pageerror", function (e) { mhatalar.push(String(e)); });
-  await mp.clock.setFixedTime(new Date("2026-10-20T09:00:00Z"));
+  await mp.clock.setFixedTime(new Date("2099-10-20T09:00:00Z"));
   await mp.goto(URL_);
   await mp.fill("#studio-sifre", SIFRE);
   await mp.click("button[type=submit]");
@@ -511,7 +514,8 @@ async function calis() {
   // acik menude, gosterilen sayfanin kendi baglantisina dokununca menu kapanir
   await mp.click(".menu-dugme");
   await mp.locator(".yan-menu a[data-rota=ayarlar]").click();
-  await mp.waitForTimeout(200);
+  // menu kapanirken .yan 0,18 sn kayar, gorunurluk ancak gecis bitince kalkar (studio.css): sabit 200 ms yerine gizlenmesini bekle
+  await mp.locator(".yan-menu").waitFor({ state: "hidden", timeout: 5000 }).catch(function () {});
   ok("telefon: ayni sayfanin menu baglantisi menuyu kapatir", !(await mp.locator(".kabuk.menu-acik").count()) && !(await mp.locator(".yan-menu").isVisible()));
   await mp.click(".menu-dugme");
   await mp.locator(".yan-menu a[data-rota=musteriler]").click();
@@ -533,7 +537,7 @@ async function calis() {
   if (EKRAN) {
     var sctx = await tarayici.newContext({ viewport: { width: 1280, height: 860 }, timezoneId: "Europe/Istanbul" });
     var sp = await sctx.newPage();
-    await sp.clock.setFixedTime(new Date("2026-10-20T09:00:00Z"));
+    await sp.clock.setFixedTime(new Date("2099-10-20T09:00:00Z"));
     await sp.goto(URL_);
     await sp.fill("#studio-sifre", SIFRE);
     await sp.click("button[type=submit]");

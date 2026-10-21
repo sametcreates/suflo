@@ -44,3 +44,49 @@ jobs:
         run: |
           php -l server/studio-v1/index.php && php -l server/studio-v1/config.example.php && php -l server/studio-v1/sifre-ozeti.php
           node tests/test-studio-api.js
+
+  # Suflo Studio uctan uca: gercek Chromium + php -S + SQLite, masaustu ve telefon. studio.js baska hicbir CI isinde
+  # tarayicida yuklenmez; bu iste Playwright ya da pdo_sqlite yoksa test atlanmaz, kalir (STUDIO_E2E_ZORUNLU).
+  studio-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Playwright + Chromium
+        run: |
+          npm install -g playwright@1.56.1
+          playwright install --with-deps chromium
+      - name: Suflo Studio uctan uca (Chromium + php -S + SQLite)
+        env:
+          STUDIO_E2E_ZORUNLU: "1"
+        run: node tests/test-studio-e2e.js
+
+  # Suflo Studio: ayni API testi MariaDB ile (canli kurulum SQLite; MySQL, README'deki pdo_sqlite yoksa yolu).
+  # Sifre yalniz bu isin gecici veritabani kabi icin; gizli bilgi degil.
+  studio-mysql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ornek-ci-root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=24
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Suflo Studio sunucusu (php -S + MariaDB 10.11)
+        env:
+          STUDIO_TEST_MYSQL: "host=127.0.0.1;port=3306"
+          STUDIO_TEST_DB_USER: root
+          STUDIO_TEST_DB_PASS: ornek-ci-root
+        run: node tests/test-studio-api.js

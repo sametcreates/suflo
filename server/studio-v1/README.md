@@ -120,9 +120,15 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
 ## Testler
 
 ```text
-node tests/test-studio-core.js   # stok, yayın ihtiyacı, takvim çakışması, saat dilimi, CSV (saf mantık)
+node tests/test-studio-core.js   # stok, yayın ihtiyacı, takvim çakışması, saat dilimi, CSV (saf mantık); arayüz dosyaları ve .htaccess denetimi
 node tests/test-studio-api.js    # gerçek php -S + geçici SQLite: yetki, CSRF, kilit, kayıt, içe aktarma, geri yükleme
 node tests/test-studio-e2e.js    # gerçek tarayıcı (Playwright): masaüstü + telefon akışları
 ```
 
-Testler yalnız anonim örnek veri kullanır. `php` ya da Playwright yoksa ilgili test **ATLA** yazıp geçer. CI'daki `php` işi, API testini her push'ta çalıştırır.
+Testler yalnız anonim örnek veri kullanır. `php` ya da Playwright yoksa ilgili test **ATLA** yazıp geçer. CI her push'ta şunları çalıştırır: `php` işi API testini (SQLite), `studio-mysql` işi aynı API testini MariaDB ile, `studio-e2e` işi tarayıcı testini Chromium ile. `studio-e2e` işinde Playwright ya da `pdo_sqlite` yoksa test atlanmaz, kalır (`STUDIO_E2E_ZORUNLU=1`).
+
+API testini kendi MySQL / MariaDB sunucunla çalıştırmak için bağlantıyı ortam değişkeniyle ver. Kullanıcı `studio_test_` ile başlayan veritabanlarını açıp silebilmeli; test bitince açtıklarını siler. Sunucu kodu ortam değişkeni okumaz, yalnız test okur.
+
+```text
+STUDIO_TEST_MYSQL="host=127.0.0.1;port=3306" STUDIO_TEST_DB_USER=... STUDIO_TEST_DB_PASS=... node tests/test-studio-api.js
+```

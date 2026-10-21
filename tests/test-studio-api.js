@@ -6,7 +6,7 @@
  *  - sunucu yeniden baslayinca veri ve oturum kalir; cikis ve "tum oturumlari kapat" cerezi gecersiz kilar; bosta kalma suresi
  *  - ice aktarma: onizleme degistirmez, uygulama oncesi anlik kopya, ikinci kez aktarmada mukerrer yok, hatali dosya hic yazmaz
  *  - disa aktarma -> tum veriyi degistir (onayli) -> ayni veri; anlik kopyaya donus; sifre degistirme; hatali giris kilidi
- * php yoksa ATLA (CI'da php isi ayrica php -l calistirir).
+ * php yoksa ATLA (CI'da php isi ayrica php -l calistirir). STUDIO_TEST_MYSQL verilirse ayni test MySQL / MariaDB'de kosar.
  */
 "use strict";
 var fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process"), http = require("http"), net = require("net");
@@ -14,13 +14,20 @@ var ROOT = path.join(__dirname, "..");
 var gecen = 0, kalan = 0;
 function ok(ad, k, ek) { if (k) gecen++; else kalan++; console.log((k ? "PASS " : "FAIL ") + ad + (ek !== undefined && !k ? "   [" + String(ek).slice(0, 500) + "]" : "")); }
 function j(x) { return JSON.stringify(x); }
+// Istanbul takvim gunu (UTC+3, yaz saati yok), bugunden ek gun sonra. Sunucu gecmis gun istisnalarini kendi gercek
+// saatine gore budar: sabit bir tarih yazilirsa test o tarih gecince kendiliginden kalir.
+function istanbulGunu(ek) { return new Date(Date.now() + 3 * 3600 * 1000 + ek * 86400 * 1000).toISOString().slice(0, 10); }
 
 var phpVar = cp.spawnSync("php", ["-v"], { encoding: "utf8" });
 if (phpVar.error || phpVar.status !== 0) {
   console.log("ATLA php bulunamadi: Studio sunucu testi calismadi (CI php isi php -l ile sozdizimini denetler)");
   process.exit(0);
 }
-var sqliteVar = cp.spawnSync("php", ["-r", "echo in_array('sqlite', PDO::getAvailableDrivers()) ? 'var' : 'yok';"], { encoding: "utf8" });
+// Varsayilan: gecici SQLite. STUDIO_TEST_MYSQL="host=127.0.0.1;port=3306" verilirse ayni test MySQL / MariaDB'de kosar
+// (STUDIO_TEST_DB_USER / STUDIO_TEST_DB_PASS; kullanici studio_test_* adli veritabanlarini acip silebilmeli, test sonunda siler).
+var MY = process.env.STUDIO_TEST_MYSQL || "";
+var DB_USER = MY ? (process.env.STUDIO_TEST_DB_USER || "root") : "", DB_PASS = MY ? (process.env.STUDIO_TEST_DB_PASS || "") : "";
+var sqliteVar = cp.spawnSync("php", ["-r", "echo in_array($argv[1], PDO::getAvailableDrivers()) ? 'var' : 'yok';", MY ? "mysql" : "sqlite"], { encoding: "utf8" });
 ["server/studio-v1/index.php", "server/studio-v1/config.example.php", "server/studio-v1/sifre-ozeti.php"].forEach(function (f) {
   var r = cp.spawnSync("php", ["-l", path.join(ROOT, f)], { encoding: "utf8" });
   ok("php -l " + f, r.status === 0, r.stdout + r.stderr);
@@ -32,6 +39,7 @@ ok("Pro lisans servisinden ayri: pro-v1 ayari / lisans okunmaz", !/pro-v1|licens
 ok("ayar yolu yalniz public_html disindaki private/studio-v1 (ortam degiskeni yok)", /private\/studio-v1\/config\.php/.test(kaynak) && !/getenv\(/.test(kaynak));
 ok("sifre-ozeti yalniz komut satirinda", /PHP_SAPI !== 'cli'/.test(fs.readFileSync(path.join(ROOT, "server", "studio-v1", "sifre-ozeti.php"), "utf8")));
 if (sqliteVar.stdout !== "var") {
+  if (MY) { ok("STUDIO_TEST_MYSQL verildi ama php pdo_mysql yok", false); process.exit(1); }
   console.log("ATLA php pdo_sqlite yok: Studio sunucu testinin kalani calismadi");
   console.log("\n" + gecen + "/" + (gecen + kalan) + " gecti");
   process.exit(kalan ? 1 : 0);
@@ -45,6 +53,26 @@ fs.mkdirSync(API_DIR, { recursive: true });
 fs.mkdirSync(PRIV, { recursive: true });
 fs.copyFileSync(path.join(ROOT, "server", "studio-v1", "index.php"), path.join(API_DIR, "index.php"));
 var ozet = cp.spawnSync("php", ["-r", "echo password_hash($argv[1], PASSWORD_DEFAULT);", SIFRE], { encoding: "utf8" }).stdout;
+// Test veritabani yardimcilari (SQLite: PRIV altinda dosya; MySQL: studio_test_<pid>_<ad> veritabani)
+var DB_ONEK = "studio_test_" + process.pid + "_", acilanDblar = [];
+function dbPdo(dsn, sqller, sorgu) {
+  var r = cp.spawnSync("php", ["-r", "$p = new PDO($argv[1], $argv[2], $argv[3], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); " +
+    "foreach (json_decode($argv[4]) as $s) $p->exec($s); if ($argv[5] !== '') echo json_encode($p->query($argv[5])->fetchAll(PDO::FETCH_NUM));",
+    dsn, DB_USER, DB_PASS, JSON.stringify(sqller || []), sorgu || ""], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error("test veritabani: " + r.stdout + r.stderr);
+  return r.stdout;
+}
+function dbAc(ad, sqller) {
+  var dsn = "sqlite:" + path.join(PRIV, ad + ".sqlite").split("\\").join("/");
+  if (MY) {
+    dbPdo("mysql:" + MY + ";charset=utf8mb4", ["CREATE DATABASE `" + DB_ONEK + ad + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"]);
+    acilanDblar.push(DB_ONEK + ad);
+    dsn = "mysql:" + MY + ";dbname=" + DB_ONEK + ad + ";charset=utf8mb4";
+  }
+  if (sqller && sqller.length) dbPdo(dsn, sqller);
+  return dsn;
+}
+var ANA_DSN = dbAc("studio");
 // JSON -> PHP dizi sozdizimi (yalniz duz anahtar/deger ve dizi listeleri)
 function phpDizi(o) {
   if (Array.isArray(o)) return "[" + o.map(phpDizi).join(", ") + "]";
@@ -55,13 +83,14 @@ function phpDizi(o) {
 }
 function ayarYaz(ek) {
   fs.writeFileSync(path.join(PRIV, "config.php"), "<?php\nreturn " + phpDizi(Object.assign({
-    password_hash: ozet, dsn: "sqlite:" + path.join(PRIV, "studio.sqlite").split("\\").join("/"), db_user: "", db_pass: "",
+    password_hash: ozet, dsn: ANA_DSN, db_user: DB_USER, db_pass: DB_PASS,
     allowed_origins: [ORIGIN], login_max_fail: 5, login_window: 900, cookie_secure: false
   }, ek || {})) + ";\n");
 }
 ayarYaz();
-// Calisan sunucuda ayar degisikligi: PHP opcache config.php'yi en cok 2 sn onbellekte tutar (revalidate_freq)
-async function ayarDegistir(ek) { ayarYaz(ek); await bekle(3200); }
+// Calisan sunucuda ayar degisikligi: php -S opcache kapali baslatilir (baslat), config.php her istekte yeniden okunur;
+// beklemek gerekmez (opcache acik olsaydi config.php en cok 2 sn onbellekte kalirdi: revalidate_freq)
+async function ayarDegistir(ek) { ayarYaz(ek); }
 
 var PORT = 0, phpSurec = null;
 function bosPort() {
@@ -111,7 +140,8 @@ function baslat() {
   return new Promise(function (res, rej) {
     // birden cok isci: eszamanli istekler gercekten ayni anda islenir (SQLite kilitleri denensin)
     // display_errors acik: en kotu barindirma ayari; bir PHP uyarisi yanita karisirsa JSON bozulur ve test kalir
-    phpSurec = cp.spawn("php", ["-d", "display_errors=1", "-d", "error_reporting=-1", "-S", "127.0.0.1:" + PORT, "-t", PUB], { stdio: ["ignore", "ignore", "pipe"], env: Object.assign({}, process.env, { PHP_CLI_SERVER_WORKERS: "4" }) });
+    // opcache kapali: ayarDegistir'in yazdigi config.php bir sonraki istekte okunur (opcache.enable_cli php -S'e etki etmez)
+    phpSurec = cp.spawn("php", ["-d", "display_errors=1", "-d", "error_reporting=-1", "-d", "opcache.enable=0", "-S", "127.0.0.1:" + PORT, "-t", PUB], { stdio: ["ignore", "ignore", "pipe"], env: Object.assign({}, process.env, { PHP_CLI_SERVER_WORKERS: "4" }) });
     phpSurec.stderr.on("data", function () {});
     var n = 0;
     (function dene() {
@@ -194,7 +224,8 @@ async function calis() {
     /path=\/(;|$)/i.test(r.setCookie) && /Max-Age=\d+/i.test(r.setCookie) && !/domain=/i.test(r.setCookie), r.setCookie);
   ok("taninan cihaz cerezi verildi (yalniz kilidi asmak icin, 400 gun)", !!cihazCerezi && /Max-Age=345600\d\d/.test(r.cihazCookie || ""), r.cihazCookie);
   var oturumCerezi = cerez;
-  var dbHam = fs.readFileSync(path.join(PRIV, "studio.sqlite")).toString("latin1") + (fs.existsSync(path.join(PRIV, "studio.sqlite-wal")) ? fs.readFileSync(path.join(PRIV, "studio.sqlite-wal")).toString("latin1") : "");
+  var dbHam = MY ? ["ayar", "oturumlar", "cihazlar", "girisler"].map(function (t) { return dbPdo(ANA_DSN, [], "SELECT * FROM " + t); }).join("") :
+    fs.readFileSync(path.join(PRIV, "studio.sqlite")).toString("latin1") + (fs.existsSync(path.join(PRIV, "studio.sqlite-wal")) ? fs.readFileSync(path.join(PRIV, "studio.sqlite-wal")).toString("latin1") : "");
   ok("veritabaninda oturum anahtarinin kendisi yok (yalniz ozeti)", dbHam.indexOf(oturumCerezi) === -1);
   r = await ist({ islem: "oturum" });
   ok("oturum: girisli", r.json.girisli === true);
@@ -476,8 +507,10 @@ async function calis() {
   var ayarK = (await ist({ islem: "veri" })).json.veri.ayar;
   r = await ist({ islem: "kaydet", tur: "ayar", id: "ayar", surum: ayarK.surum + 999999, veri: { varsayilanStokUyari: 9 } });
   ok("ayar eski surumle yazilamaz (409)", r.status === 409, j(r.json));
-  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Gün istisnası", siklik: { tur: "gunluk" }, slotIstisna: { "2030-04-02": "post", "2030-04-03": "" } } });
-  ok("gun bazinda paylasim turu istisnasi saklanir (bos atlanir)", r.status === 200 && j(r.json.kayit.slotIstisna) === '{"2030-04-02":"post"}', j(r.json));
+  var istisnaGunu = istanbulGunu(7), istisna = {};
+  istisna[istisnaGunu] = "post"; istisna[istanbulGunu(8)] = "";
+  r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Gün istisnası", siklik: { tur: "gunluk" }, slotIstisna: istisna } });
+  ok("gun bazinda paylasim turu istisnasi saklanir (bos atlanir)", r.status === 200 && j(r.json.kayit.slotIstisna) === '{"' + istisnaGunu + '":"post"}', j(r.json));
   r = await ist({ islem: "kaydet", tur: "musteri", veri: { ad: "Gün istisnası 2", slotIstisna: { "2030-02-30": "post" } } });
   ok("gecersiz istisna tarihi 422", r.status === 422);
 
@@ -539,6 +572,7 @@ async function calis() {
 
   /* ---- Oturum suresi ---- */
   await ayarDegistir({ session_idle: 1 });
+  await bekle(2200); // bosta kalma suresi saniye cozunurluguyle asilsin
   r = await ist({ islem: "veri" });
   ok("bosta kalma suresi asilinca oturum 401", r.status === 401);
   await ayarDegistir();
@@ -599,40 +633,29 @@ async function calis() {
   fs.renameSync(path.join(PRIV, "config.php.yok2"), path.join(PRIV, "config.php"));
 
   /* ---- Eski gelistirme semasi uzerine sessizce kurulmaz ---- */
-  var eskiDb = path.join(PRIV, "eski.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE kayitlar (id TEXT)'); $p->exec(\"INSERT INTO kayitlar VALUES ('x')\");", eskiDb]);
-  await ayarDegistir({ dsn: "sqlite:" + eskiDb });
+  await ayarDegistir({ dsn: dbAc("eski", ["CREATE TABLE kayitlar (id TEXT)", "INSERT INTO kayitlar VALUES ('x')"]) });
   r = await ist({ islem: "oturum" });
   ok("eski sema (sema yok, kayit var): acik 503 kurulum mesaji", r.status === 503 && r.json.hata === "kurulum" && /uyumsuz/.test(r.json.mesaj), j(r.json));
-  var eskiDb2 = path.join(PRIV, "eski2.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar TEXT PRIMARY KEY, deger TEXT)'); $p->exec(\"INSERT INTO ayar VALUES ('sema', '2')\");", eskiDb2]);
-  await ayarDegistir({ dsn: "sqlite:" + eskiDb2 });
+  await ayarDegistir({ dsn: dbAc("eski2", ["CREATE TABLE ayar (anahtar VARCHAR(64) PRIMARY KEY, deger TEXT)", "INSERT INTO ayar VALUES ('sema', '2')"]) });
   r = await ist({ islem: "oturum" });
   ok("baska sema surumu (2): acik 503, uzerine kurulmaz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
   // Eski gelistirme surumu: kayitlar bos ama tablolar eski kolonlarla (girisler kim'siz). Benimsenmez.
-  var eskiDb3 = path.join(PRIV, "eski3.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE kayitlar (id TEXT)'); $p->exec('CREATE TABLE girisler (ip TEXT, zaman INTEGER, basarili INTEGER)');", eskiDb3]);
-  await ayarDegistir({ dsn: "sqlite:" + eskiDb3 });
+  await ayarDegistir({ dsn: dbAc("eski3", ["CREATE TABLE kayitlar (id TEXT)", "CREATE TABLE girisler (ip TEXT, zaman INTEGER, basarili INTEGER)"]) });
   r = await ist({ islem: "oturum" });
   ok("eski gelistirme semasi (bos kayitlar, eski kolonlar): benimsenmez, 503 uyumsuz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
   // Ayni veritabaninda baska bir uygulamanin "ayar" tablosu (dolu, sema yok): uzerine kurulmaz
-  var yabanciDb = path.join(PRIV, "yabanci.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar TEXT PRIMARY KEY, deger TEXT)'); $p->exec(\"INSERT INTO ayar VALUES ('tema', 'koyu')\");", yabanciDb]);
-  await ayarDegistir({ dsn: "sqlite:" + yabanciDb });
+  await ayarDegistir({ dsn: dbAc("yabanci", ["CREATE TABLE ayar (anahtar VARCHAR(64) PRIMARY KEY, deger TEXT)", "INSERT INTO ayar VALUES ('tema', 'koyu')"]) });
   r = await ist({ islem: "oturum" });
   ok("dolu ama semasiz ayar tablosu: uzerine kurulmaz, 503 uyumsuz", r.status === 503 && /uyumsuz/.test(r.json.mesaj), j(r.json));
   // Bu surumun yarim kalmis kurulumu ("kuruluyor-3" isareti, bazi tablolar eksik): kaldigi yerden tamamlanir
-  var yarimDb = path.join(PRIV, "yarim.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)'); " +
-    "$p->exec(\"INSERT INTO ayar VALUES ('sema', 'kuruluyor-3')\"); $p->exec('CREATE TABLE oturumlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)');", yarimDb]);
-  await ayarDegistir({ dsn: "sqlite:" + yarimDb, login_max_fail: 50 });
+  var yarimDsn = dbAc("yarim", ["CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)", "INSERT INTO ayar VALUES ('sema', 'kuruluyor-3')",
+    "CREATE TABLE oturumlar (ozet CHAR(64) NOT NULL PRIMARY KEY, olusturma BIGINT NOT NULL, son BIGINT NOT NULL)"]);
+  await ayarDegistir({ dsn: yarimDsn, login_max_fail: 50 });
   r = await ist({ islem: "giris", sifre: SIFRE }, { cerez: "", cereziSakla: true });
-  var yarimSema = cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); echo $p->query(\"SELECT deger FROM ayar WHERE anahtar = 'sema'\")->fetchColumn();", yarimDb], { encoding: "utf8" }).stdout;
-  ok("isaretli yarim kurulum tamamlanir: giris calisir, sema 3 olur", r.status === 200 && yarimSema === "3", r.status + " " + j(r.json) + " sema=" + yarimSema);
+  var yarimSema = dbPdo(yarimDsn, [], "SELECT deger FROM ayar WHERE anahtar = 'sema'");
+  ok("isaretli yarim kurulum tamamlanir: giris calisir, sema 3 olur", r.status === 200 && yarimSema === '[["3"]]', r.status + " " + j(r.json) + " sema=" + yarimSema);
   // Yalniz bos ayar tablosu (MySQL'de isaret yazilmadan kesilen kurulum gibi): yeni kurulum yapilir
-  var bosAyarDb = path.join(PRIV, "bosayar.sqlite").split("\\").join("/");
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)');", bosAyarDb]);
-  await ayarDegistir({ dsn: "sqlite:" + bosAyarDb });
+  await ayarDegistir({ dsn: dbAc("bosayar", ["CREATE TABLE ayar (anahtar VARCHAR(64) NOT NULL PRIMARY KEY, deger TEXT NOT NULL)"]) });
   r = await ist({ islem: "oturum" });
   ok("yalniz bos ayar tablosu: kurulum tamamlanir", r.status === 200 && r.json.ok === true, j(r.json));
 
@@ -661,14 +684,18 @@ async function calis() {
 
   /* ---- Kilit sirasinda yapilan denemeler kilidi uzatmaz ---- */
   await ayarDegistir({ password_hash: yeniOzet, login_max_fail: 2, login_window: 4 });
-  var k1 = [];
+  await bekle(5100); // onceki testlerin hatali girisleri 4 sn'lik pencereden ciksin (saniye cozunurlugu: 5 sn)
+  // Sure ilk hatali denemeden olculur: kilit ondan en az 4 sn surer (sunucu saniye cozunurlugu: 4-5 sn).
+  // Yavas makinede iki hatali giris (her biri 0,4 sn bekleme + bcrypt) uzar; olcum ondan sonra baslarsa yagmurun sonu pencere disina tasar.
+  var k1 = [], k1Bas = Date.now();
   for (i = 0; i < 2; i++) k1.push((await ist({ islem: "giris", sifre: "kisa-pencere-" + i }, { cerez: "", cereziSakla: true })).status);
-  // kilit suresince (pencere icinde) 3 sn boyunca deneme yagdir; hepsi 429 olmali ve kaydedilmemeli
-  var kilitBas = Date.now(), kiliTak = [];
-  while (Date.now() - kilitBas < 3000) { kiliTak.push((await ist({ islem: "giris", sifre: "kilitte-" + kiliTak.length }, { cerez: "", cereziSakla: true })).status); await bekle(250); }
-  await bekle(Math.max(0, 5600 - (Date.now() - kilitBas)));
+  // kilit suresince deneme yagdir (ilk denemeden 3 sn sonrasina kadar); hepsi 429 olmali ve kaydedilmemeli
+  var kiliTak = [];
+  while (Date.now() - k1Bas < 3000) { kiliTak.push((await ist({ islem: "giris", sifre: "kilitte-" + kiliTak.length }, { cerez: "", cereziSakla: true })).status); await bekle(250); }
+  // kilit en gec ilk denemeden 5 sn sonra biter; reddedilen denemeler sayilsaydi son denemeden en az 4 sn (> 6 sn) surerdi
+  await bekle(Math.max(0, 6000 - (Date.now() - k1Bas)));
   r = await ist({ islem: "giris", sifre: "sifirlanan-ornek-sifre-3" }, { cerez: "", cereziSakla: true });
-  ok("kilitteyken reddedilen denemeler kilidi uzatmaz: pencere bitince dogru sifre girer", j(k1) === "[401,401]" && kiliTak.length > 3 && kiliTak.every(function (x) { return x === 429; }) && r.status === 200,
+  ok("kilitteyken reddedilen denemeler kilidi uzatmaz: pencere bitince dogru sifre girer", j(k1) === "[401,401]" && kiliTak.length >= 3 && kiliTak.every(function (x) { return x === 429; }) && r.status === 200,
     j(k1) + " " + j(kiliTak) + " " + r.status);
 
   /* ---- config.php sifirlamasi biriken hatali denemeleri de siler (sahibi kendi denemeleriyle kilitlenmez) ---- */
@@ -687,8 +714,7 @@ async function calis() {
   var yarisGiris = ist({ islem: "giris", sifre: "yavas-ornek-sifre-5" }, { cerez: "", cereziSakla: true });
   await bekle(600);
   // yeni ozetle gelen bir istegin yapacagi temizlik: oturumlar silinir, parmak izi yeni ozete gecer
-  cp.spawnSync("php", ["-r", "$p = new PDO('sqlite:' . $argv[1]); $p->exec('DELETE FROM oturumlar'); $p->exec(\"UPDATE ayar SET deger = '\" . hash('sha256', 'iz|baska-ozet') . \"' WHERE anahtar = 'sifre_izi'\");",
-    path.join(PRIV, "studio.sqlite").split("\\").join("/")]);
+  dbPdo(ANA_DSN, ["DELETE FROM oturumlar", "UPDATE ayar SET deger = '" + require("crypto").createHash("sha256").update("iz|baska-ozet").digest("hex") + "' WHERE anahtar = 'sifre_izi'"]);
   r = await yarisGiris;
   ok("temizlik sirasinda dogrulanan eski sifreyle oturum acilmaz", r.status === 401 && !r.setCookie, r.status + " " + j(r.json));
 
@@ -700,6 +726,7 @@ async function calis() {
 calis().catch(function (e) { ok("kosum hatasiz", false, e && e.stack ? e.stack : e); }).then(async function () {
   await durdur();
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e3) {}
+  acilanDblar.forEach(function (ad) { try { dbPdo("mysql:" + MY + ";charset=utf8mb4", ["DROP DATABASE IF EXISTS `" + ad + "`"]); } catch (e4) {} });
   console.log("\n" + gecen + "/" + (gecen + kalan) + " gecti");
   process.exit(kalan ? 1 : 0);
 });

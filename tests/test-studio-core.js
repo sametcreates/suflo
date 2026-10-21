@@ -4,6 +4,7 @@
  *  - yayinlanan stoktan duser ama silinmez; durum geri alininca sayilar duzelir
  *  - gunluk, 3 gunde 1 ve haftalik ihtiyac; eksik duzen "kurulmali", bilinmeyen stok 0 sayilmaz
  *  - takvim cakismasi (saatli, tum gun, cok gunlu, iptal), Istanbul saati, CSV, ucret ozeti
+ *  - tarayicisiz statik denetim: studio.js sozdizimi, index.html baglantilari, elle yuklenen .htaccess yasaklari
  */
 "use strict";
 var C = require("../server/studio-v1/arayuz/studio-core.js");
@@ -274,6 +275,27 @@ ok("yedekCoz: suflo-studio-yedek ve duz liste", C.yedekCoz({ format: "suflo-stud
   C.yedekCoz({ etkinlikler: [] }).veriler && !!C.yedekCoz({ x: 1 }).hata && !!C.yedekCoz(null).hata);
 ok("yerel yol uyarisi", C.yerelYol("C:\\Kurgu\\a.prproj") && C.yerelYol("/Users/x/a.mp4") && C.yerelYol("file:///a") && C.yerelYol("\\\\nas\\x") && !C.yerelYol("https://drive.example.com/x"));
 ok("guvenli link yalniz http(s)", C.guvenliLink("https://a.example/x") && !C.guvenliLink("javascript:alert(1)") && !C.guvenliLink("data:text/html,x"));
+
+/* ---------------- Arayuz dosyalari (CI'da tarayici olmadan da): sozdizimi ve index.html baglantilari ---------------- */
+var fs = require("fs"), path = require("path"), vm = require("vm");
+var STUDIO = path.join(__dirname, "..", "server", "studio-v1"), ARAYUZ = path.join(STUDIO, "arayuz");
+["studio.js", "studio-core.js"].forEach(function (f) {
+  var hata = null;
+  try { new vm.Script(fs.readFileSync(path.join(ARAYUZ, f), "utf8"), { filename: f }); } catch (e) { hata = e; }
+  ok("arayuz " + f + ": sozdizimi gecerli", !hata, hata && hata.stack);
+});
+var html = fs.readFileSync(path.join(ARAYUZ, "index.html"), "utf8");
+var bagli = (html.match(/(?:src|href)="[^"]+"/g) || []).map(function (x) { return x.replace(/^(?:src|href)="|"$/g, ""); });
+var eksik = bagli.filter(function (f) { return !/^[a-z]+:/i.test(f) && !fs.existsSync(path.join(ARAYUZ, f)); });
+ok("index.html: studio.js ve studio-core.js bagli, bagli yerel dosyalarin hepsi var", bagli.indexOf("studio.js") !== -1 && bagli.indexOf("studio-core.js") !== -1 && eksik.length === 0, j(bagli) + " eksik: " + j(eksik));
+// Elle yuklenen guvenlik dosyalari (php -S .htaccess okumaz; icerikleri burada denetlenir)
+var ht = fs.readFileSync(path.join(STUDIO, ".htaccess"), "utf8");
+var desen = (ht.match(/<FilesMatch "([^"]+)">/) || [])[1], kapali = desen ? new RegExp(desen) : null;
+ok("v1/.htaccess: config / sifre-ozeti / sqlite / yedek dosyalari kapali, index.php acik, dizin listesi yok", !!kapali && /Options -Indexes/.test(ht) && /Require all denied/.test(ht) &&
+  ["config.php", "config.example.php", "sifre-ozeti.php", "studio.sqlite", "studio.sqlite-wal", "studio.sqlite-shm", "yedek.json", "README.md"].every(function (f) { return kapali.test(f); }) &&
+  !kapali.test("index.php"), desen);
+var aht = fs.readFileSync(path.join(STUDIO, "arayuz.htaccess"), "utf8");
+ok("arayuz.htaccess: cerceveye gomme yok, nosniff, CSP script-src 'self'", /X-Frame-Options "DENY"/.test(aht) && /frame-ancestors 'none'/.test(aht) && /nosniff/.test(aht) && /script-src 'self'[;"]/.test(aht));
 
 console.log("\n" + gecen + "/" + (gecen + kalan) + " gecti");
 process.exit(kalan ? 1 : 0);
