@@ -234,6 +234,20 @@
   function sonrakiDurumlar(durum) {
     return (Object.prototype.hasOwnProperty.call(SONRAKI, durum) ? SONRAKI[durum] : []).map(function (x) { return { k: x[0], ad: x[1] }; });
   }
+  /**
+   * Icerigin musteri onayina gittigi gun (YYYY-AA-GG): gecmisteki son "… → Müşteri onayında" ya da "Eklendi (Müşteri onayında)"
+   * satirinin tarihi. "Geri alındı: …" satirlari sayilmaz (geri alma onceki gonderimi geri getirir). Boyle satir yoksa
+   * (eski ya da ice aktarilmis kayit) null: tarih uydurulmaz.
+   */
+  function onayaGidis(i) {
+    var g = (i && i.gecmis) || [];
+    for (var k = g.length - 1; k >= 0; k--) {
+      var m = String((g[k] && g[k].m) || ""), z = String((g[k] && g[k].z) || "").slice(0, 10);
+      if (/^Geri alındı/.test(m) || !/(→ Müşteri onayında|\(Müşteri onayında\))$/.test(m)) continue;
+      return gecerliTarih(z) ? z : null;
+    }
+    return null;
+  }
 
   /* ---------------- Stok ---------------- */
 
@@ -497,7 +511,11 @@
       gecmisPlanliEtkinlik: gecmisPlanli,
       gecikenTeslim: geciken.sort(tarihSira("teslimTarihi")),
       yaklasanTeslim: yaklasanTeslim.sort(tarihSira("teslimTarihi")),
-      onayda: icerikler.filter(function (i) { return i.durum === "onayda"; }),
+      // en uzun bekleyen once; gonderim gunu bilinmeyenler sonda
+      onayda: icerikler.filter(function (i) { return i.durum === "onayda"; }).map(function (i, k) { return { i: i, d: onayaGidis(i), k: k }; }).sort(function (a, b) {
+        if (a.d !== b.d) return !a.d ? 1 : !b.d ? -1 : a.d < b.d ? -1 : 1;
+        return a.k - b.k;
+      }).map(function (x) { return x.i; }),
       revizyonda: icerikler.filter(function (i) { return i.durum === "revizyonda"; }),
       gecmisPlanYayinlanmamis: icerikler.filter(function (i) { return i.planTarihi && i.planTarihi < bugun && i.durum !== "yayinlandi"; }).sort(tarihSira("planTarihi")),
       // bugune planli, yayina hazir (henuz yayinlanmamis) icerikler; sira Icerikler listesindekiyle ayni
@@ -642,7 +660,7 @@
     gecerliTarih: gecerliTarih, gecerliSaat: gecerliSaat, istanbulSimdi: istanbulSimdi, damga: damga,
     tarihUzun: tarihUzun, tarihKisa: tarihKisa, tarihGunlu: tarihGunlu, ayAdi: ayAdi, goreli: goreli, ayIzgarasi: ayIzgarasi,
     katla: katla, norm: norm, para: para, ucretCoz: ucretCoz, musteriAdi: musteriAdi, siklikMetni: siklikMetni, yerelYol: yerelYol, guvenliLink: guvenliLink,
-    aktif: aktif, kopya: kopya, idHaritasi: idHaritasi, durumDegistir: durumDegistir, geriAl: geriAl, sonrakiDurumlar: sonrakiDurumlar,
+    aktif: aktif, kopya: kopya, idHaritasi: idHaritasi, durumDegistir: durumDegistir, geriAl: geriAl, sonrakiDurumlar: sonrakiDurumlar, onayaGidis: onayaGidis,
     stok: stok, duzenDurumu: duzenDurumu, slotlar: slotlar, slotGrubu: slotGrubu, kapsama: kapsama, stokUyarisi: stokUyarisi,
     aralik: aralik, ustUste: ustUste, cakisanlar: cakisanlar, cakismaHaritasi: cakismaHaritasi, gundeMi: gundeMi,
     saatMetni: saatMetni, gundekiSaat: gundekiSaat, etkinlikSirala: etkinlikSirala,

@@ -3,7 +3,9 @@
  * Masaustu ve telefon boyutunda: giris, musteri / stok girisi / cekim / icerik akislari, toplu durum + geri al,
  * pano surukle-birak, cakisma uyarisi, yenilemede kalicilik, cikis, yedek indirme + mukerrersiz ice aktarma onizlemesi,
  * yaniti kaybolan kaydetmenin yeniden denenmesinde mukerrer kayit olusmamasi, gunluk otomatik kopya etiketi,
- * cihaz saat dilimi farkli olsa da Istanbul tarihi, telefonda yatay tasma yok.
+ * cihaz saat dilimi farkli olsa da Istanbul tarihi, telefonda yatay tasma yok; tek tik sonraki durum (liste, pano), Genel Bakis ozeti,
+ * bugun paylasilacaklar, onay bekleme suresi, son yedek tarihi ve hatirlatmasi, toplu arsiv onayi / arsivden cikar,
+ * kaydedilmemis pencerenin kapatilmadan once sormasi.
  * php ya da Playwright yoksa ATLA; STUDIO_E2E_ZORUNLU=1 iken (CI'daki e2e isi) atlamak kalmak sayilir.
  */
 "use strict";
@@ -132,7 +134,41 @@ async function calis() {
   await alanGirdi(d, "Ad", "input").fill("ÖRNEK müşteri a");
   await d.locator("button[type=submit]").click();
   ok("ayni ad ikinci kez eklenmez", await d.locator(".hata:has-text('zaten var')").isVisible());
+  // Yazilmis pencere sormadan kapanmaz: Vazgec once sorar; sorudaki Vazgec yaziyi korur, "Kaydetmeden kapat" kapatir
   await d.locator("button:has-text('Vazgeç')").click();
+  var soru = page.locator("dialog[open]:has-text('Kaydedilmemiş değişiklik')");
+  await soru.waitFor();
+  await soru.locator("button:has-text('Vazgeç')").click();
+  await soru.waitFor({ state: "detached" });
+  ok("kaydedilmemis pencere: Vazgec sorar; soruda Vazgec yaziyi korur", (await page.locator("dialog[open]").count()) === 1 && (await alanGirdi(d, "Ad", "input").inputValue()) === "ÖRNEK müşteri a");
+  await page.keyboard.press("Escape");
+  await soru.waitFor();
+  ok("kaydedilmemis pencere: Esc de sorar", (await page.locator("dialog[open]").count()) === 2);
+  await soru.locator("button:has-text('Kaydetmeden kapat')").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  // Hicbir sey yazilmamis pencere Esc ve x ile hemen kapanir
+  await page.click("text=Müşteri ekle");
+  await page.locator("dialog[open]").waitFor();
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  await page.click("text=Müşteri ekle");
+  await page.locator("dialog[open] button.kapat").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  ok("bos pencere Esc ve x ile sormadan kapanir", true);
+  // Yazilmis pencere acikken sayfa yenilenirse tarayici sorar (beforeunload); yazilmamisken sormaz
+  await page.click("text=Müşteri ekle");
+  d = page.locator("dialog[open]");
+  await alanGirdi(d, "Not", "textarea").fill("yarım kalan not");
+  var bosaltSorusu = null;
+  var bosaltDinle = function (dl) { bosaltSorusu = dl.type(); dl.dismiss().catch(function () {}); };
+  page.on("dialog", bosaltDinle);
+  await page.reload().catch(function () {});
+  await bekle(300);
+  ok("yazilmis pencere acikken yenileme: tarayici sorar (beforeunload) ve vazgecilince yazi durur", bosaltSorusu === "beforeunload" && (await alanGirdi(d, "Not", "textarea").inputValue()) === "yarım kalan not", bosaltSorusu);
+  page.off("dialog", bosaltDinle);
+  await d.locator("button.kapat").click();
+  await page.locator("dialog[open] button:has-text('Kaydetmeden kapat')").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
 
   // Stok girisi
   await page.click("a:has-text('Örnek Müşteri A')");
@@ -220,7 +256,8 @@ async function calis() {
   await page.waitForSelector("text=2 içerik → Kurguda");
   var kurguda = await page.locator(".satir:has(.d-kurguda)").count();
   ok("toplu durum degisimi: 2 + onceki 1 = 3 kurguda", kurguda === 3, kurguda);
-  await page.click(".toast button:has-text('Geri al')");
+  // eylemli bildirimler (onceki "Geri al"lar) eylemsizlerden once kalkmaz: dogru bildirimin dugmesine bas
+  await page.click(".toast:has-text('2 içerik → Kurguda') button:has-text('Geri al')");
   await page.waitForSelector("text=Geri alındı.");
   kurguda = await page.locator(".satir:has(.d-kurguda)").count();
   ok("geri al: yine 1 kurguda", kurguda === 1, kurguda);
@@ -268,6 +305,26 @@ async function calis() {
   await menuyeGit(page, "Genel Bakış", "Bugün ne yapmalıyım?");
   var gb = await page.locator(".sayfa").textContent();
   ok("genel bakis: bugunku cekimler, onayda ve yayin duzeni eksik musteri", /Bugün: çekim ve etkinlikler/.test(gb) && /Müşteri onayında/.test(gb) && /Yayın düzeni kurulmalı/.test(gb), gb.slice(0, 400));
+  ok("yedek hatirlatmasi: hic JSON yedegi indirilmediyse Genel Bakis'ta", await page.locator(".yedek-hatirlatma:has-text('Henüz JSON yedeği indirmedin')").isVisible());
+  // Ust ozet: bos olmayan her bolum icin bir dugme; sayisi bolum basligindakiyle ayni
+  var cipler = await page.evaluate(function () {
+    return [].map.call(document.querySelectorAll(".ozet-cipler .cip"), function (c) {
+      var b = document.getElementById(c.getAttribute("data-hedef"));
+      return { ad: c.firstChild.textContent, n: c.querySelector(".sayi").textContent, bolum: b ? b.querySelector(".bolum-bas .sayi").textContent : null };
+    }).concat([{ bolumSayisi: document.querySelectorAll(".bolum[id^=gb-]").length }]);
+  });
+  var bolumSayisi = cipler.pop().bolumSayisi;
+  ok("genel bakis ozeti: her bos olmayan bolum icin dugme, sayilar bolumle ayni", cipler.length > 3 && cipler.length === bolumSayisi &&
+    cipler.every(function (c) { return c.n === c.bolum; }) && cipler.some(function (c) { return c.ad === "Onayda" && c.n === "1"; }), JSON.stringify(cipler));
+  await page.click(".cip:has-text('Düzen eksik')");
+  // bolum ust cubugun hemen altina gelir; sayfa sonundaki kisa bolumde sayfa en alta kayar
+  var kaydirma = function () {
+    var r = document.getElementById("gb-duzen").getBoundingClientRect(), enAlt = window.scrollY >= document.documentElement.scrollHeight - window.innerHeight - 1;
+    return { ust: r.top, y: window.scrollY, tamam: window.scrollY > 0 && r.top > 40 && (r.top < 110 || (enAlt && r.bottom <= window.innerHeight)) };
+  };
+  await page.waitForFunction(function (f) { return (new Function("return (" + f + ")()"))().tamam; }, kaydirma.toString(), { timeout: 3000 }).catch(function () {});
+  var duzenKaydirma = await page.evaluate(kaydirma);
+  ok("ozet dugmesi bolume kaydirir (ust cubugun altinda)", duzenKaydirma.tamam, JSON.stringify(duzenKaydirma));
   await page.click(".bolum:has-text('Müşteri onayında') >> text=Listeyi aç →");
   await page.waitForSelector(".sayfa h1:has-text('İçerikler')");
   var filtreSatir = await page.locator(".sayfa .satir, .sayfa .kart").allTextContents(); // son secilen gorunum (pano) hatirlanir
@@ -285,9 +342,16 @@ async function calis() {
   await gunlukSatir.waitFor();
   var gunlukMetin = await gunlukSatir.textContent();
   ok("otomatik kopyalar: gunun ilk degisikliginden onceki kopya 'Günlük kopya' etiketli, ozeti Turkce", /\d+ müşteri, \d+ içerik, \d+ çekim \/ etkinlik/.test(gunlukMetin), gunlukMetin);
+  ok("ayarlar: henuz JSON yedegi indirilmedi yazar", /henüz JSON yedeği indirilmedi/.test(await page.locator(".son-yedek").textContent()));
   var indirme = page.waitForEvent("download");
   await page.click("button:has-text('JSON yedeği indir')");
   var dl = await indirme;
+  var sonYedekMetin = await page.locator(".son-yedek").textContent();
+  ok("yedek indirince son yedek gunu sunucuya yazilir ve gosterilir (bugun)", sonYedekMetin === "Son JSON yedeği: 20 Ekim 2099 (bugün)." &&
+    (await page.evaluate(function () {
+      return fetch("/studio/v1/index.php", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-Studio": "1" }, body: JSON.stringify({ islem: "veri" }) })
+        .then(function (r) { return r.json(); }).then(function (j) { return j.veri.ayar && j.veri.ayar.sonYedek; });
+    })) === "2099-10-20", sonYedekMetin);
   var yedekYolu = path.join(TMP, "yedek.json");
   await dl.saveAs(yedekYolu);
   var yedek = JSON.parse(fs.readFileSync(yedekYolu, "utf8"));
@@ -638,6 +702,110 @@ async function calis() {
   ok("yayin takvimi: acik video gunu turuyle yazilir ('video günü, hazır video yok')", ihtiyacMetni.indexOf("Örnek Müşteri A: video günü, hazır video yok") !== -1, ihtiyacMetni.join(" | "));
   await page.goto(URL_ + "#/genel");
   await page.waitForSelector(".sayfa h1:has-text('Bugün ne yapmalıyım?')");
+  ok("yedek indirildikten sonra Genel Bakis'ta hatirlatma yok", (await page.locator(".yedek-hatirlatma").count()) === 0);
+
+  // Gunluk akis: tek tik sonraki durum, bugun paylasilacaklar, onay bekleme suresi, 5 satir + "tane daha", musteri basina acik gunler
+  function yeniIcerik(o) {
+    return apiCagir({ islem: "kaydet", tur: "icerik", veri: Object.assign({ musteriId: mAKayit.id, baslik: "", tur: "reels", durum: "fikir", oncelik: "normal", cekimId: null, teslimTarihi: null,
+      planTarihi: null, yayinTarihi: null, revizyonNotu: "", dosyalar: { ham: "", proje: "", final: "" }, not: "", gecmis: [], arsiv: false }, o) });
+  }
+  await yeniIcerik({ baslik: "Onay bekleyen reels", durum: "onayda", gecmis: [{ z: "2099-10-16 10:00", m: "Kurguda → Müşteri onayında" }] });
+  await yeniIcerik({ baslik: "Bugün paylaşılacak reels", durum: "hazir", planTarihi: "2099-10-20" });
+  for (var gi = 1; gi <= 7; gi++) await yeniIcerik({ baslik: "Geciken teslim " + gi, durum: "kurguda", teslimTarihi: "2099-10-1" + gi });
+  await apiCagir({ islem: "kaydet", tur: "musteri", veri: { ad: "Örnek Günlük Müşteri", kurum: "", ucret: null, siklik: { tur: "gunluk", haftalikAdet: null, gunler: [], baslangic: null },
+    slotTuru: "video", stokUyari: null, stokGirisi: true, not: "", arsiv: false } });
+  await page.reload();
+  await page.waitForSelector(".sayfa h1:has-text('Bugün ne yapmalıyım?')");
+  var onayBolum = page.locator("#gb-onayda");
+  var onayIlk = await onayBolum.locator(".satir").first().textContent();
+  ok("onay bekleme suresi: en uzun bekleyen ustte, '4 gündür onayda' (3 gunden itibaren uyari)", /Onay bekleyen reels/.test(onayIlk) && /4 gündür onayda/.test(onayIlk) &&
+    (await onayBolum.locator(".satir").first().locator(".uyari:has-text('4 gündür onayda')").count()) === 1, onayIlk);
+  ok("onaydaki satirda iki tek tik dugmesi (Onaylandı, Revizyon)", (await onayBolum.locator(".satir").first().locator("button.hizli").allTextContents()).join("|") === "→ Onaylandı|→ Revizyon");
+  var gecikenBolum = page.locator("#gb-geciken");
+  var gecikenSayi = await gecikenBolum.locator(".bolum-bas .sayi").textContent();
+  ok("uzun bolum en cok 5 satir ve tiklanabilir '+N tane daha'", (await gecikenBolum.locator(".satir").count()) === 5 && (await gecikenBolum.locator("a:has-text('+" + (+gecikenSayi - 5) + " tane daha → listeyi aç')").count()) === 1, gecikenSayi);
+  var acikBolum = page.locator("#gb-acik");
+  var gunlukSatirlar = await acikBolum.locator(".satir:has-text('Örnek Günlük Müşteri')").allTextContents();
+  ok("karsilanmayan paylasim gunleri musteri basina tek satir (gunluk musterinin 7 gunu)", gunlukSatirlar.length === 1 && gunlukSatirlar[0].split(",").length === 7 &&
+    +(await acikBolum.locator(".bolum-bas .sayi").textContent()) >= 7, gunlukSatirlar.join(" / "));
+  // Bugun paylasilacaklar: sayi acilan listeyle ayni; tek tik Yayınlandı + Geri al
+  var paylasimBolum = page.locator("#gb-paylasim");
+  var paylasimSayi = +(await paylasimBolum.locator(".bolum-bas .sayi").textContent());
+  ok("bugun paylasilacaklar bolumu, ustte (bugunku cekimden hemen sonra)", paylasimSayi === 1 && await page.evaluate(function () {
+    var b = [].map.call(document.querySelectorAll(".bolum[id^=gb-]"), function (x) { return x.id; });
+    return b.indexOf("gb-paylasim") === b.indexOf("gb-bugun") + 1;
+  }));
+  await paylasimBolum.locator(".satir:has-text('Bugün paylaşılacak reels') button:has-text('→ Yayınlandı')").click();
+  var paylasimToast = page.locator(".toast:has-text('“Bugün paylaşılacak reels” → Yayınlandı')");
+  await paylasimToast.waitFor();
+  var paylasilan = await icerikAl("Bugün paylaşılacak reels");
+  ok("tek tik Yayınlandı: pencere acilmaz, yayin tarihi bugun, satir bolumden kalkar", paylasilan.durum === "yayinlandi" && paylasilan.yayinTarihi === "2099-10-20" &&
+    (await page.locator("dialog[open]").count()) === 0 && (await page.locator("#gb-paylasim").count()) === 0, JSON.stringify(paylasilan));
+  await paylasimToast.locator("button:has-text('Geri al')").click();
+  await page.waitForSelector("#gb-paylasim .satir:has-text('Bugün paylaşılacak reels')");
+  ok("geri al: yine yayina hazir", (await icerikAl("Bugün paylaşılacak reels")).durum === "hazir");
+  await paylasimBolum.locator("text=Listeyi aç →").click();
+  await page.waitForSelector(".sayfa h1:has-text('İçerikler')");
+  ok("bugun paylasilacaklar listesi ayni sayida icerik acar", (await page.locator(".sayfa .satir, .sayfa .kart").count()) === paylasimSayi && /durum=hazir/.test(page.url()));
+  await page.goto(URL_ + "#/genel");
+  await page.locator("#gb-geciken a:has-text('tane daha')").click();
+  await page.waitForSelector(".sayfa h1:has-text('İçerikler')");
+  ok("'+N tane daha' ayni filtreli listeyi acar", /ozel=geciken/.test(page.url()) && (await page.locator(".sayfa .satir, .sayfa .kart").count()) === +gecikenSayi, page.url());
+  // Liste: tek tik "Onaya gönder" + Geri al
+  await page.goto(URL_ + "#/icerikler?gorunum=liste&q=Geciken teslim 1");
+  await page.waitForSelector(".satir:has-text('Geciken teslim 1') button:has-text('→ Onaya gönder')");
+  await page.click(".satir:has-text('Geciken teslim 1') button:has-text('→ Onaya gönder')");
+  var hizliToast = page.locator(".toast:has-text('“Geciken teslim 1” → Müşteri onayında')");
+  await hizliToast.waitFor();
+  var hizliKayit = await icerikAl("Geciken teslim 1");
+  ok("liste: tek tik sonraki durum (gecmise yazilir, pencere acilmaz)", hizliKayit.durum === "onayda" && hizliKayit.gecmis[hizliKayit.gecmis.length - 1].m === "Kurguda → Müşteri onayında" &&
+    (await page.locator("dialog[open]").count()) === 0, JSON.stringify(hizliKayit.gecmis));
+  await page.waitForSelector(".satir:has-text('Geciken teslim 1'):has-text('bugün onaya gitti')");
+  await hizliToast.locator("button:has-text('Geri al')").click();
+  await page.waitForSelector(".toast:has-text('Geri alındı.')");
+  ok("liste: tek tik geri alinir", (await icerikAl("Geciken teslim 1")).durum === "kurguda");
+  // Pano: kart dugmesi pencere acmaz, kart sutun degistirir
+  await page.goto(URL_ + "#/icerikler?gorunum=pano");
+  var onayKart = page.locator(".kart:has-text('Onay bekleyen reels')");
+  ok("pano karti onay bekleme suresini gosterir", /4 gündür onayda/.test(await onayKart.textContent()));
+  await onayKart.locator("button:has-text('→ Onaylandı')").click();
+  await page.waitForSelector(".kolon[data-durum=hazir] .kart:has-text('Onay bekleyen reels')");
+  ok("pano: kart dugmesi pencere acmadan durumu degistirir", (await page.locator("dialog[open]").count()) === 0 && (await icerikAl("Onay bekleyen reels")).durum === "hazir");
+
+  // Toplu arsiv: 10+ icerikte once sorulur; arsiv gorunumunde toplu "Arşivden çıkar"; toplu geri alma bildirimi kapanana kadar durur
+  for (var ai = 1; ai <= 12; ai++) await yeniIcerik({ baslik: "Arşiv örneği " + ai });
+  await page.goto(URL_ + "#/icerikler?gorunum=liste&q=Arşiv örneği");
+  await page.reload();
+  await page.waitForSelector(".sayfa-bas:has-text('12 içerik')");
+  await page.locator("label:has-text('Tümünü seç') input").check();
+  await page.click(".toplu-cubuk button:has-text('Arşivle')");
+  var arsivSoru = page.locator("dialog[open]:has-text('12 içerik arşivlenecek')");
+  await arsivSoru.waitFor();
+  await arsivSoru.locator("button:has-text('Vazgeç')").click();
+  ok("toplu arsiv: 12 icerikte once sorulur, vazgecince arsivlenmez", !(await icerikAl("Arşiv örneği 1")).arsiv);
+  await page.click(".toplu-cubuk button:has-text('Arşivle')");
+  await arsivSoru.locator("button[type=submit]").click();
+  var arsivToast = page.locator(".toast:has-text('12 içerik arşivlendi')");
+  await arsivToast.waitFor();
+  ok("toplu arsiv onaydan sonra yapilir", (await apiCagir({ islem: "veri" })).veri.icerikler.filter(function (x) { return /^Arşiv örneği/.test(x.baslik) && x.arsiv; }).length === 12);
+  await page.goto(URL_ + "#/icerikler?gorunum=liste&arsiv=1&q=Arşiv örneği");
+  await page.waitForSelector(".sayfa-bas:has-text('12 içerik')");
+  await page.locator("label:has-text('Tümünü seç') input").check();
+  for (var ti = 0; ti < 3; ti++) await page.click(".toplu-cubuk button:has-text('Durumu değiştir')"); // 3 yeni bildirim
+  ok("toplu geri alma bildirimi yeni bildirimlerle kalkmaz", await arsivToast.isVisible() && (await page.locator(".toast").count()) === 3);
+  ok("arsiv gorunumunde toplu dugme 'Arşivden çıkar'", (await page.locator(".toplu-cubuk button:has-text('Arşivden çıkar')").count()) === 1 && (await page.locator(".toplu-cubuk button:text-is('Arşivle')").count()) === 0);
+  await page.click(".toplu-cubuk button:has-text('Arşivden çıkar')");
+  await page.waitForSelector(".toast:has-text('12 içerik arşivden çıkarıldı')");
+  var cikanlar = (await apiCagir({ islem: "veri" })).veri.icerikler.filter(function (x) { return /^Arşiv örneği/.test(x.baslik); });
+  ok("toplu arsivden cikar: hepsi geri geldi, gecmise yazildi", cikanlar.length === 12 && cikanlar.every(function (x) { return !x.arsiv && x.gecmis[x.gecmis.length - 1].m === "Arşivden çıkarıldı"; }));
+  await page.goto(URL_ + "#/icerikler?gorunum=liste&q=Arşiv örneği 1");
+  await page.waitForSelector(".sayfa-bas:has-text('4 içerik')"); // 1, 10, 11, 12
+  await page.locator("label:has-text('Tümünü seç') input").check();
+  await page.click(".toplu-cubuk button:has-text('Arşivle')");
+  await page.waitForSelector(".toast:has-text('4 içerik arşivlendi')");
+  ok("10'dan az icerik sormadan arsivlenir", (await page.locator("dialog[open]").count()) === 0);
+  await page.goto(URL_ + "#/genel");
+  await page.waitForSelector(".sayfa h1:has-text('Bugün ne yapmalıyım?')");
 
   // Cikis
   await page.click(".yan >> text=Çıkış");
@@ -684,6 +852,11 @@ async function calis() {
     return [].filter.call(document.querySelectorAll(".satir .sag button"), function (b) { return b.getBoundingClientRect().right > 390; }).length; // telefon gorunumu 390 px (innerWidth tasan icerikle buyuyebilir)
   });
   ok("telefon: satir dugmeleri (Planlanan günde / Bugün yayınlandı) ekrana sigar, alt satira iner", sagTasma === 0, sagTasma);
+  var hizliBoy = await mp.evaluate(function () {
+    return [].map.call(document.querySelectorAll(".satir button.hizli"), function (b) { return Math.round(b.getBoundingClientRect().height); });
+  });
+  ok("telefon: tek tik durum dugmeleri parmak boyunda (en az 40 px)", hizliBoy.length > 3 && Math.min.apply(null, hizliBoy) >= 40, hizliBoy.join(","));
+  ok("telefon: ozet dugmeleri var; yedek masaustunde indirildigi icin hatirlatma yok", (await mp.locator(".ozet-cipler .cip").count()) > 3 && (await mp.locator(".yedek-hatirlatma").count()) === 0);
   // acik menude, gosterilen sayfanin kendi baglantisina dokununca menu kapanir
   await mp.click(".menu-dugme");
   await mp.locator(".yan-menu a[data-rota=ayarlar]").click();

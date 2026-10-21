@@ -96,6 +96,19 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
 .bilgi dt{color:var(--dim)}
 .uyari-kutu{border-left:3px solid var(--sari);padding:8px 12px;background:rgba(251,191,36,.06);color:#fde68a;font-size:13.5px;margin:10px 0}
 .uyari-kutu.kirmizi{border-color:var(--kirmizi);background:rgba(248,113,113,.07);color:#fecaca}
+.btn.hizli{border-color:rgba(139,124,246,.45)}
+.daha-satir{margin-top:6px}
+.yedek-hatirlatma{margin:-6px 0 12px}
+.son-yedek{margin-top:4px}
+
+/* ---------- Genel Bakis ust ozeti ---------- */
+.ozet-cipler{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 14px}
+.cip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--bg3);border-radius:20px;padding:5px 10px;font-size:13px;font-weight:600;min-height:34px;cursor:pointer}
+.cip:hover{border-color:var(--accent)}
+.cip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bolum{scroll-margin-top:70px}
+.tablo-katla>summary{cursor:pointer;display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
+.tablo-katla>summary h2{display:inline}
 
 /* ---------- Rozetler ---------- */
 .rozet{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--bg4);color:var(--dim);white-space:nowrap}
@@ -133,6 +146,7 @@ tr.tik:hover td{background:var(--bg2)}
 .kart b{font-size:13.5px}
 .kart:hover{border-color:var(--accent)}
 .kart.tasiniyor{opacity:.5}
+.kart .hizli-dugmeler{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 
 /* ---------- Takvim ---------- */
 .takvim-ust{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
@@ -223,6 +237,10 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   .ay .t-oge{font-size:10.5px;padding:1px 3px}
   .filtreler .alan{flex:1 1 140px}
   .toplu-cubuk{top:53px}
+  /* tek tik durum dugmeleri parmakla rahat basilsin */
+  .btn.hizli{min-height:40px;padding:6px 12px;font-size:13px}
+  .ozet-cipler{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+  .cip{white-space:nowrap;min-height:40px;flex:0 0 auto}
 }
 @media (max-width:520px){
   .ust .btn.birincil{padding:8px 10px}

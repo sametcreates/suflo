@@ -336,6 +336,26 @@ ok("genel bakis: bugun paylasilacaklar, yalniz bugune planli aktif hazirlar (onc
   return l.length === 2 && l[0].id === bugunYuksek.id && l[1].id === bugunNormal.id && C.genelBakis(gv, BUGUN, null).bugunPaylasilacaklar.length === 0;
 })());
 
+ok("onayaGidis: son onaya gonderim gunu; geri alma ve diger satirlar sayilmaz, bilinmeyende null", (function () {
+  var n = C.durumDegistir(icerik({ durum: "kurguda" }), "onayda", "2030-02-28 10:00", BUGUN);
+  var ikinci = Object.assign({}, n, { gecmis: n.gecmis.concat([{ z: "2030-03-01 09:00", m: "Müşteri onayında → Revizyonda" }, { z: "2030-03-02 18:00", m: "Revizyonda → Müşteri onayında" },
+    { z: "2030-03-03 08:00", m: "Geri alındı: Yayına hazır → Müşteri onayında" }, { z: "2030-03-03 09:00", m: "Revizyon notu güncellendi" }]) });
+  return C.onayaGidis(n) === "2030-02-28" && C.onayaGidis(ikinci) === "2030-03-02" &&
+    C.onayaGidis(icerik({ durum: "onayda", gecmis: [{ z: "2030-03-01 12:00", m: "Toplu eklendi (Müşteri onayında)" }] })) === "2030-03-01" &&
+    C.onayaGidis(icerik({ durum: "onayda", gecmis: [{ z: "2030-02-27 12:00", m: "Eklendi (Müşteri onayında)" }] })) === "2030-02-27" &&
+    C.onayaGidis(icerik({ durum: "onayda", gecmis: [{ z: "2030-03-01 12:00", m: "Eklendi (Kurguda)" }] })) === null &&
+    C.onayaGidis(icerik({ durum: "onayda", gecmis: [{ z: "bozuk", m: "Kurguda → Müşteri onayında" }] })) === null &&
+    C.onayaGidis(icerik({ durum: "onayda" })) === null && C.onayaGidis(icerik({ durum: "onayda", gecmis: undefined })) === null &&
+    C.gunFarki(C.onayaGidis(n), BUGUN) === 4;
+})());
+ok("genel bakis: onaydakiler en uzun bekleyen once, gonderim gunu bilinmeyenler sonda", (function () {
+  var yeni = icerik({ durum: "onayda", gecmis: [{ z: "2030-03-03 10:00", m: "Kurguda → Müşteri onayında" }] });
+  var bilinmeyen = icerik({ durum: "onayda" });
+  var eski = icerik({ durum: "onayda", gecmis: [{ z: "2030-02-20 10:00", m: "Toplu eklendi (Müşteri onayında)" }] });
+  var l = C.genelBakis({ musteriler: [mA], etkinlikler: [], icerikler: [yeni, bilinmeyen, eski] }, BUGUN, null).onayda;
+  return l.map(function (i) { return i.id; }).join() === [eski.id, yeni.id, bilinmeyen.id].join();
+})());
+
 /* ---------------- Filtre, arama, CSV, yedek ---------------- */
 var fv = { musteriler: [musteri({ ad: "Işıl Çağrı Öz" })], etkinlikler: [], icerikler: [icerik({ baslik: "Şubat kampanyası", durum: "onayda", planTarihi: "2030-03-10" }), icerik({ baslik: "Diğer", durum: "kurguda", arsiv: true })] };
 ok("liste sirasi: yayinlananlar en sonda, digerleri tarihe gore", (function () {

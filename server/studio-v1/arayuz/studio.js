@@ -254,16 +254,29 @@
 
   /* ================= Bildirim ve pencereler ================= */
 
-  function toast(metin, tur, eylem) {
+  /**
+   * Bildirim. kalici: kendiliginden kapanmaz (toplu degisikligin "Geri al"i), yalniz x ile ya da eylemle kapanir.
+   * En cok 3 bildirim durur; fazlasinda once eylemsizler, sonra kalici olmayanlar, en son en eskisi kalkar.
+   */
+  function toast(metin, tur, eylem, kalici) {
     var kap = document.querySelector(".toastlar");
     if (!kap) { kap = h("div", { class: "toastlar", role: "status", "aria-live": "polite" }); document.body.appendChild(kap); }
-    var t = h("div", { class: "toast " + (tur || "") }, h("span", null, metin));
+    var t = h("div", { class: "toast " + (tur || "") + (eylem ? " eylemli" : "") + (kalici ? " kalici" : "") }, h("span", null, metin));
     var kaldir = function () { if (t.parentNode) t.parentNode.removeChild(t); };
     if (eylem) t.appendChild(h("button", { class: "btn ince", type: "button", onclick: function () { kaldir(); eylem.f(); } }, eylem.ad));
     t.appendChild(h("button", { class: "kapat", type: "button", "aria-label": "Kapat", onclick: kaldir }, "×"));
     kap.appendChild(t);
-    while (kap.children.length > 3) kap.removeChild(kap.firstChild);
-    setTimeout(kaldir, eylem ? 12000 : (tur === "hata" ? 9000 : 5000));
+    while (kap.children.length > 3) {
+      var at = kap.querySelector(".toast:not(.eylemli):not(.kalici)") || kap.querySelector(".toast:not(.kalici)") || kap.firstChild;
+      kap.removeChild(at);
+    }
+    if (!kalici) setTimeout(kaldir, eylem ? 12000 : (tur === "hata" ? 9000 : 5000));
+  }
+  /** Formdaki tum girdilerin anlik hali (degisiklik var mi karsilastirmasi icin). */
+  function formDurumu(form) {
+    return JSON.stringify(Array.prototype.map.call(form.querySelectorAll("input, select, textarea"), function (x) {
+      return x.type === "checkbox" || x.type === "radio" ? x.checked : x.value;
+    }));
   }
   /** Pencere: govde dugumleri + alt dugmeler; gonderilince gonder(form) cagrilir. */
   function pencere(baslik, govde, alt, gonder, genis) {
@@ -282,7 +295,7 @@
         p.then(bitti, bitti);
       }
     } },
-      h("div", { class: "p-bas" }, h("h2", null, baslik), h("button", { class: "kapat", type: "button", "aria-label": "Kapat", onclick: function () { d.close(); } }, "×")),
+      h("div", { class: "p-bas" }, h("h2", null, baslik), h("button", { class: "kapat", type: "button", "aria-label": "Kapat", onclick: function () { kapatIste(); } }, "×")),
       h("div", { class: "p-govde" }, govde),
       alt && alt.length ? h("div", { class: "p-alt" }, alt) : null);
     d.appendChild(form);
@@ -291,6 +304,28 @@
     if (d.showModal) d.showModal(); else d.setAttribute("open", "");
     var ilk = d.querySelector("input:not([type=hidden]):not([type=checkbox]), select, textarea");
     if (ilk && !("ontouchstart" in window)) ilk.focus();
+    // Kaydedilmemis yazi sessizce kaybolmasin: Esc, x, Vazgec ve telefonda geri tusu once sorar. Hicbir sey degismediyse
+    // ya da kaydetme surerken (sonuc bildirimle gelir) hemen kapanir. Onay pencereleri (korumasiz) sormaz.
+    var ilkDurum = formDurumu(form), soru = null;
+    d.kirli = function () { return !d.korumasiz && d.open && formDurumu(form) !== ilkDurum; };
+    function kapatIste() {
+      if (gonderiliyor || !d.kirli()) { d.close(); return; }
+      if (soru && soru.open) return; // soru zaten acik
+      var p = onayla("Kaydedilmemiş değişiklik", "Bu pencerede kaydetmediğin değişiklikler var. Kapatırsan kaybolur.", "Kaydetmeden kapat", null, true);
+      var acik = document.querySelectorAll("dialog[open]");
+      soru = acik[acik.length - 1];
+      p.then(function (e) {
+        if (e) d.close();
+        else if (ilk && !("ontouchstart" in window) && !d.contains(document.activeElement)) ilk.focus(); // odak pencereye doner (Esc yine bu pencereye gelir)
+      });
+    }
+    d.kapatIste = kapatIste;
+    d.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && !gonderiliyor && d.kirli()) { ev.preventDefault(); kapatIste(); }
+    });
+    d.addEventListener("cancel", function (ev) {
+      if (!gonderiliyor && d.kirli()) { ev.preventDefault(); kapatIste(); }
+    });
     return d;
   }
   /**
@@ -300,7 +335,7 @@
   function arsivDugmesi(hedef, f) {
     return h("button", { class: "btn sol " + (hedef ? "tehlike" : ""), type: "button", onclick: function () { f(hedef); } }, hedef ? "Arşivle" : "Arşivden çıkar");
   }
-  function vazgec(d) { return h("button", { class: "btn", type: "button", onclick: function () { (d.d || d).close(); } }, "Vazgeç"); }
+  function vazgec(d) { return h("button", { class: "btn", type: "button", onclick: function () { var x = d.d || d; if (x.kapatIste) x.kapatIste(); else x.close(); } }, "Vazgeç"); }
   /** Onay penceresi. yazilacak verilirse kullanicinin o metni yazmasi gerekir. Promise<boolean> */
   function onayla(baslik, metin, dugme, yazilacak, tehlike) {
     return new Promise(function (coz) {
@@ -313,6 +348,7 @@
         sonuc = true;
         ref.d.close();
       });
+      ref.d.korumasiz = true;
       ref.d.addEventListener("close", function () { coz(sonuc); });
     });
   }
@@ -460,6 +496,12 @@
   /** Veri degistikten sonra ayni sayfayi yeniden ciz (kaydirma korunur). */
   function yenile() { ciz(true); }
   window.addEventListener("hashchange", function () { ciz(false); });
+  // Degisiklik yapilmis bir pencere acikken sekme kapatilir ya da sayfa yenilenirse tarayici sorar
+  window.addEventListener("beforeunload", function (ev) {
+    if (!Array.prototype.some.call(document.querySelectorAll("dialog[open]"), function (d) { return d.kirli && d.kirli(); })) return;
+    ev.preventDefault();
+    ev.returnValue = "";
+  });
   // Arka planda yenileme (baska cihazdaki degisiklikler). Pencere aciksa ya da Ayarlar'daysa (ice aktarma onizlemesi,
   // secilen dosya) sayfa yeniden cizilmez.
   function arkaPlanYenile(esik) {
@@ -486,16 +528,35 @@
   function durumRozet(d) { return h("span", { class: "rozet d-" + d }, C.DURUM_AD[d] || d); }
   function musteriLink(m) { return m ? ic(rotaLink("musteri", null, m.id), m.ad) : h("span", { class: "soluk" }, "Müşteri yok"); }
 
+  /**
+   * Tek tikla sonraki durum dugmeleri (pencere acilmaz; "Geri al" bildirimi gelir). Arsivdeki icerikte yok.
+   * haric: gosterilmeyecek hedef durumlar (or. satirin kendi "yayinlandi" dugmeleri varsa).
+   */
+  function hizliDurum(i, haric) {
+    if (i.arsiv) return [];
+    return C.sonrakiDurumlar(i.durum).filter(function (x) { return !haric || haric.indexOf(x.k) === -1; }).map(function (x) {
+      return h("button", { class: "btn ince hizli", type: "button", title: "Durumu “" + C.DURUM_AD[x.k] + "” yap",
+        onclick: function (ev) { ev.stopPropagation(); durumlariDegistir([i.id], x.k); } }, "→ " + x.ad);
+    });
+  }
+  /** Musteri onayinda bekleme suresi ("3 gündür onayda"); gonderim gunu gecmiste yoksa null (uydurulmaz). 3 gunden itibaren uyari renginde. */
+  function onayBeklemesi(i, sinif) {
+    var d = i.durum === "onayda" ? C.onayaGidis(i) : null;
+    if (!d) return null;
+    var n = Math.max(0, C.gunFarki(d, bugun()));
+    return h("span", { class: (sinif || "") + (n >= 3 ? " uyari" : ""), title: "Onaya gönderildiği gün: " + C.tarihKisa(d, true) }, n ? n + " gündür onayda" : "bugün onaya gitti");
+  }
   function icerikSatiri(i, onEk, ekDugmeler) {
     var m = musteri(i.musteriId), b = bugun(), tarih = [];
     if (i.teslimTarihi && C.TESLIM_BEKLEYEN.indexOf(i.durum) !== -1) tarih.push(h("span", { class: i.teslimTarihi < b ? "gecikti" : null }, "Teslim " + C.tarihGunlu(i.teslimTarihi)));
     if (i.planTarihi && i.durum !== "yayinlandi") tarih.push(h("span", { class: i.planTarihi < b ? "gecikti" : null }, "Yayın " + C.tarihGunlu(i.planTarihi)));
     if (i.durum === "yayinlandi" && i.yayinTarihi) tarih.push("Yayınlandı " + C.tarihGunlu(i.yayinTarihi));
+    var dugmeler = hizliDurum(i, ekDugmeler ? ["yayinlandi"] : null).concat(ekDugmeler || []);
     return h("div", { class: "satir" + (i.arsiv ? " arsivli" : "") }, onEk || null, durumRozet(i.durum),
       h("button", { class: "satir-ad", type: "button", onclick: function () { icerikPenceresi(i.id); } }, i.baslik),
       i.oncelik === "yuksek" ? h("span", { class: "oncelik" }, "Öncelikli") : null,
-      h("span", { class: "satir-bilgi" }, dizi([musteriLink(m), C.TUR_AD[i.tur] || i.tur].concat(tarih).concat([i.arsiv ? "Arşivde" : null]))),
-      ekDugmeler ? h("span", { class: "sag" }, ekDugmeler) : null);
+      h("span", { class: "satir-bilgi" }, dizi([musteriLink(m), C.TUR_AD[i.tur] || i.tur].concat(tarih).concat([onayBeklemesi(i), i.arsiv ? "Arşivde" : null]))),
+      dugmeler.length ? h("span", { class: "sag" }, dugmeler) : null);
   }
   function etkinlikSatiri(e, cak, ekDugmeler) {
     var m = musteri(e.musteriId), c = cak && cak[e.id];
@@ -514,7 +575,8 @@
       if (!sonuc) return false;
       degisim.forEach(function (d, i) { d.sonraki = sonuc[i]; });
       yenile();
-      toast(mesaj, "", { ad: "Geri al", f: function () { geriAl(degisim); } });
+      // toplu degisikligin geri alma bildirimi kapatilana kadar durur
+      toast(mesaj, "", { ad: "Geri al", f: function () { geriAl(degisim); } }, degisim.length >= 5);
       return true;
     });
   }
@@ -575,56 +637,120 @@
 
   /* ================= Genel Bakis ================= */
 
+  /** Son JSON yedeginin indirildigi gun (ayar.sonYedek) ve kac gun once; hic yoksa null. */
+  function sonYedek() {
+    var d = S.veri.ayar && S.veri.ayar.sonYedek;
+    if (!C.gecerliTarih(d)) return null;
+    return { tarih: d, gun: Math.max(0, C.gunFarki(d, bugun())) };
+  }
+  function sonYedekMetni() {
+    var y = sonYedek();
+    if (!y) return "Bu sunucudan henüz JSON yedeği indirilmedi.";
+    return "Son JSON yedeği: " + C.tarihKisa(y.tarih, true) + " (" + (y.gun ? y.gun + " gün önce" : "bugün") + ").";
+  }
+  var YEDEK_HATIRLATMA_GUN = 14;
+
   SAYFALAR.genel = function () {
     var b = bugun(), gb = C.genelBakis(S.veri, b, S.veri.ayar), cak = C.cakismaHaritasi(S.veri.etkinlikler);
-    var bos = [];
-    var dolu = function (ad, liste, link, satir, aciklama) {
-      if (!liste.length) { bos.push(ad); return null; }
-      return bolum(ad, liste.length, link, liste.slice(0, 12).map(satir).concat(liste.length > 12 ? [h("p", { class: "soluk kucuk" }, "+" + (liste.length - 12) + " tane daha")] : []), aciklama);
+    var bos = [], cipler = [], SINIR = 5;
+    // Ust ozet: bos olmayan her bolum icin bir dugme (bolum basligindaki sayiyla ayni); dokununca o bolume kayar
+    var kayit = function (sec, id, kisa, sayi) { sec.id = "gb-" + id; cipler.push({ id: sec.id, ad: kisa, n: sayi }); return sec; };
+    // o: { id, ad, kisa, liste, link, satir, aciklama, sayi (varsayilan liste uzunlugu), birim ("+N … daha") }
+    var dolu = function (o) {
+      if (!o.liste.length) { bos.push(o.ad); return null; }
+      var sayi = o.sayi !== undefined ? o.sayi : o.liste.length, kalan = o.liste.length - SINIR;
+      var sec = bolum(o.ad, sayi, o.link, o.liste.slice(0, SINIR).map(o.satir), o.aciklama);
+      var daha = "+" + kalan + " " + (o.birim || "tane") + " daha";
+      if (kalan > 0 && o.link) sec.appendChild(h("p", { class: "daha-satir" }, ic(o.link, daha + " → listeyi aç", { class: "kucuk-link" })));
+      else if (kalan > 0) {
+        // Listesi olmayan bolumde kalanlar yerinde acilir
+        var dugme = h("button", { class: "btn ince daha-satir", type: "button", onclick: function () {
+          dugme.replaceWith.apply(dugme, o.liste.slice(SINIR).map(o.satir));
+        } }, daha + " göster");
+        sec.appendChild(dugme);
+      }
+      return kayit(sec, o.id, o.kisa, sayi);
     };
     var kok_ = h("div", null, sayfaBasligi("Bugün ne yapmalıyım?", C.tarihUzun(b)));
+    var cipKutu = h("nav", { class: "ozet-cipler", "aria-label": "Bölümlere git" });
+    kok_.appendChild(cipKutu);
     if (!S.veri.musteriler.length) {
       kok_.appendChild(h("div", { class: "uyari-kutu" }, "Henüz kayıt yok. ", ic(rotaLink("musteriler"), "Müşteri ekle"),
         " ya da müşteri listeni ", ic(rotaLink("ayarlar"), "Ayarlar → İçe aktar"), " ile yükle."));
+    } else {
+      // Sunucu dışındaki tek kopya indirilen JSON yedeği: 14 günü geçtiyse ya da hiç indirilmediyse nazikçe hatırlat
+      var y = sonYedek();
+      if (!y || y.gun > YEDEK_HATIRLATMA_GUN) {
+        kok_.appendChild(h("p", { class: "yedek-hatirlatma uyari kucuk" }, (y ? "Son JSON yedeğini " + y.gun + " gün önce indirdin." : "Henüz JSON yedeği indirmedin.") +
+          " Yeni yedek için: ", ic(rotaLink("ayarlar"), "Ayarlar → Yedekleme")));
+      }
     }
     var gecmisDugme = function (e) {
       return [h("button", { class: "btn ince", type: "button", onclick: function () { etkinlikDurumu(e, "tamamlandi"); } }, "Tamamlandı"),
         h("button", { class: "btn ince", type: "button", onclick: function () { etkinlikDurumu(e, "iptal"); } }, "İptal")];
     };
+    var icerikS = function (i) { return icerikSatiri(i); };
+    // Karsilanmayan paylasim gunleri musteri basina tek satir; baslik sayisi gun sayisidir
+    var acik = gb.acikTarihler.filter(function (x) { return x.durum === "acik"; }), acikGrup = [], grupHar = {};
+    acik.forEach(function (x) {
+      var g = grupHar[x.musteri.id];
+      if (!g) { g = grupHar[x.musteri.id] = { musteri: x.musteri, gunler: [] }; acikGrup.push(g); }
+      g.gunler.push(x);
+    });
     ekle(kok_, [
-      dolu("Bugün: çekim ve etkinlikler", gb.bugunEtkinlik, rotaLink("cekim", { g: "gun", t: b }), function (e) { return etkinlikSatiri(e, cak); }),
-      dolu("Önümüzdeki 7 gün: çekimler", gb.yaklasanEtkinlik, rotaLink("cekim", { g: "hafta", t: C.gunEkle(b, 1), kayan: "1" }), function (e) { return etkinlikSatiri(e, cak); }),
-      dolu("Durumu güncellenmemiş geçmiş çekimler", gb.gecmisPlanliEtkinlik, null, function (e) { return etkinlikSatiri(e, cak, gecmisDugme(e)); },
-        "Geçmiş çekimler kendiliğinden tamamlanmaz. Çekimin tamamlanması kurgunun bittiği anlamına gelmez."),
-      dolu("Geciken kurgu teslimleri", gb.gecikenTeslim, rotaLink("icerikler", { ozel: "geciken" }), function (i) { return icerikSatiri(i); }),
-      dolu("3 gün içinde kurgu teslimi", gb.yaklasanTeslim, rotaLink("icerikler", { ozel: "yaklasan" }), function (i) { return icerikSatiri(i); }),
-      dolu("Müşteri onayında", gb.onayda, rotaLink("icerikler", { durum: "onayda" }), function (i) { return icerikSatiri(i); }),
-      dolu("Revizyonda", gb.revizyonda, rotaLink("icerikler", { durum: "revizyonda" }), function (i) { return icerikSatiri(i); }),
-      dolu("Hazır içerikle karşılanmayan paylaşımlar (7 gün)", gb.acikTarihler.filter(function (x) { return x.durum === "acik"; }), rotaLink("yayin", { g: "hafta", t: b, kayan: "1" }), function (x) {
-        var hz = x.hazirlikta ? icerikBul(x.hazirlikta) : null;
-        return h("div", { class: "satir" }, h("b", null, C.tarihGunlu(x.tarih)), musteriLink(x.musteri),
-          h("span", { class: "satir-bilgi" }, "hazır içerik yok"),
-          hz ? h("span", { class: "satir-bilgi" }, "Bu tarihe planlı ama hazır değil: ", h("button", { class: "satir-ad", type: "button", onclick: function () { icerikPenceresi(hz.id); } }, hz.baslik), " (" + C.DURUM_AD[hz.durum] + ")") : null);
-      }, gb.oneriSayisi ? gb.oneriSayisi + " paylaşım günü, tarihe atanmamış ya da tarihi geçmiş hazır içerikle karşılanabilir (öneri; plana çevirmek için müşteri sayfasından ata)." : null),
-      dolu("Hazır stoku azalan müşteriler", gb.stokUyarilari, rotaLink("stok", { f: "uyari" }), function (x) {
+      dolu({ id: "bugun", ad: "Bugün: çekim ve etkinlikler", kisa: "Bugün çekim", liste: gb.bugunEtkinlik, link: rotaLink("cekim", { g: "gun", t: b }), satir: function (e) { return etkinlikSatiri(e, cak); } }),
+      dolu({ id: "paylasim", ad: "Bugün paylaşılacaklar", kisa: "Bugün paylaşılacak", liste: gb.bugunPaylasilacaklar || [], link: rotaLink("icerikler", { durum: "hazir", bas: b, bit: b }), satir: icerikS,
+        aciklama: "Bugüne planlı, yayına hazır içerikler. Paylaşınca “Yayınlandı”ya bas; yanlış basarsan “Geri al”." }),
+      dolu({ id: "yaklasan", ad: "Önümüzdeki 7 gün: çekim ve etkinlikler", kisa: "7 gün çekim", liste: gb.yaklasanEtkinlik, link: rotaLink("cekim", { g: "hafta", t: C.gunEkle(b, 1), kayan: "1" }), satir: function (e) { return etkinlikSatiri(e, cak); } }),
+      dolu({ id: "gecmiscekim", ad: "Durumu güncellenmemiş geçmiş çekimler", kisa: "Geçmiş çekim", liste: gb.gecmisPlanliEtkinlik, satir: function (e) { return etkinlikSatiri(e, cak, gecmisDugme(e)); },
+        aciklama: "Geçmiş çekimler kendiliğinden tamamlanmaz. Çekimin tamamlanması kurgunun bittiği anlamına gelmez." }),
+      dolu({ id: "geciken", ad: "Geciken kurgu teslimleri", kisa: "Geciken teslim", liste: gb.gecikenTeslim, link: rotaLink("icerikler", { ozel: "geciken" }), satir: icerikS }),
+      dolu({ id: "teslim", ad: "3 gün içinde kurgu teslimi", kisa: "3 gün teslim", liste: gb.yaklasanTeslim, link: rotaLink("icerikler", { ozel: "yaklasan" }), satir: icerikS }),
+      dolu({ id: "onayda", ad: "Müşteri onayında", kisa: "Onayda", liste: gb.onayda, link: rotaLink("icerikler", { durum: "onayda" }), satir: icerikS }),
+      dolu({ id: "revizyon", ad: "Revizyonda", kisa: "Revizyonda", liste: gb.revizyonda, link: rotaLink("icerikler", { durum: "revizyonda" }), satir: icerikS }),
+      dolu({ id: "acik", ad: "Hazır içerikle karşılanmayan paylaşım günleri (7 gün)", kisa: "Karşılanmayan gün", liste: acikGrup, sayi: acik.length, birim: "müşteri",
+        link: rotaLink("yayin", { g: "hafta", t: b, kayan: "1" }), satir: function (g) {
+          return h("div", { class: "satir" }, musteriLink(g.musteri), h("span", { class: "satir-bilgi" }, dizi(g.gunler.map(function (x) {
+            var hz = x.hazirlikta ? icerikBul(x.hazirlikta) : null;
+            return hz ? h("span", null, C.tarihGunlu(x.tarih) + " (planlı ama hazır değil: ",
+              h("button", { class: "satir-ad", type: "button", onclick: function () { icerikPenceresi(hz.id); } }, hz.baslik), ", " + C.DURUM_AD[hz.durum] + ")") : C.tarihGunlu(x.tarih);
+          }), ", ")));
+        }, aciklama: gb.oneriSayisi ? gb.oneriSayisi + " paylaşım günü, tarihe atanmamış ya da tarihi geçmiş hazır içerikle karşılanabilir (öneri; plana çevirmek için müşteri sayfasından ata)." : null }),
+      dolu({ id: "stok", ad: "Hazır stoku azalan müşteriler", kisa: "Stok azalan", liste: gb.stokUyarilari, link: rotaLink("stok", { f: "uyari" }), satir: function (x) {
         return h("div", { class: "satir" }, musteriLink(x.musteri), h("span", { class: "satir-bilgi uyari" }, x.nedenler.join(" · ")));
-      }),
-      dolu("7 gün içinde yayına planlı ama hazır değil", gb.planliHazirDegil, rotaLink("icerikler", { ozel: "planlihazirdegil" }), function (i) { return icerikSatiri(i); },
-        "Yayın düzeni ya da stok girişinden bağımsız: planlanan yayın tarihi yaklaşan ama henüz yayına hazır olmayan içerikler."),
-      dolu("Planlanan tarihi geçti, yayınlandı işaretlenmedi", gb.gecmisPlanYayinlanmamis, rotaLink("icerikler", { ozel: "gecmisplan" }), function (i) {
+      } }),
+      dolu({ id: "planli", ad: "7 gün içinde yayına planlı ama hazır değil", kisa: "Planlı, hazır değil", liste: gb.planliHazirDegil, link: rotaLink("icerikler", { ozel: "planlihazirdegil" }), satir: icerikS,
+        aciklama: "Yayın düzeni ya da stok girişinden bağımsız: planlanan yayın tarihi yaklaşan ama henüz yayına hazır olmayan içerikler." }),
+      dolu({ id: "gecmisplan", ad: "Planlanan tarihi geçti, yayınlandı işaretlenmedi", kisa: "Yayın işaretlenmedi", liste: gb.gecmisPlanYayinlanmamis, link: rotaLink("icerikler", { ozel: "gecmisplan" }), satir: function (i) {
         return icerikSatiri(i, null, [
           h("button", { class: "btn ince", type: "button", onclick: function () { planlananGundeYayinla(i.id); } }, "Planlanan günde yayınlandı (" + C.tarihKisa(i.planTarihi) + ")"),
           h("button", { class: "btn ince", type: "button", onclick: function () { durumlariDegistir([i.id], "yayinlandi"); } }, "Bugün yayınlandı")]);
-      }, "Planlanan paylaşımlar kendiliğinden yayınlandı sayılmaz. Paylaştığın günü seç; yanlış basarsan “Geri al”."),
-      gb.stokBilinmeyen.length ? bolum("Stok girişi yapılmadı", gb.stokBilinmeyen.length, rotaLink("stok", { f: "giris" }),
-        h("p", { class: "satir-bilgi" }, dizi(gb.stokBilinmeyen.map(musteriLink), ", "))) : null,
-      gb.duzenEksik.length ? bolum("Yayın düzeni kurulmalı", gb.duzenEksik.length, rotaLink("stok", { f: "duzen" }),
-        h("p", { class: "satir-bilgi" }, dizi(gb.duzenEksik.map(function (x) { return musteriLink(x.musteri); }), ", "))) : null,
+      }, aciklama: "Planlanan paylaşımlar kendiliğinden yayınlandı sayılmaz. Paylaştığın günü seç; yanlış basarsan “Geri al”." }),
+      gb.stokBilinmeyen.length ? kayit(bolum("Stok girişi yapılmadı", gb.stokBilinmeyen.length, rotaLink("stok", { f: "giris" }),
+        h("p", { class: "satir-bilgi" }, dizi(gb.stokBilinmeyen.map(musteriLink), ", "))), "stokgiris", "Stok girişi yok", gb.stokBilinmeyen.length) : null,
+      gb.duzenEksik.length ? kayit(bolum("Yayın düzeni kurulmalı", gb.duzenEksik.length, rotaLink("stok", { f: "duzen" }),
+        h("p", { class: "satir-bilgi" }, dizi(gb.duzenEksik.map(function (x) { return musteriLink(x.musteri); }), ", "))), "duzen", "Düzen eksik", gb.duzenEksik.length) : null,
       bos.length ? h("p", { class: "temiz" }, "Boş: " + bos.join(" · ")) : null,
-      gb.sayilar.length ? bolum("Müşteri bazında durum", null, rotaLink("icerikler"), musteriSayiTablosu(gb.sayilar)) : null
+      gb.sayilar.length ? musteriSayiBolumu(gb.sayilar) : null
     ]);
+    if (cipler.length) ekle(cipKutu, cipler.map(function (c) {
+      return h("button", { class: "cip", type: "button", "data-hedef": c.id, onclick: function () {
+        var el = document.getElementById(c.id);
+        if (el) el.scrollIntoView({ block: "start" });
+      } }, c.ad, h("span", { class: "sayi" }, c.n));
+    }));
+    else cipKutu.remove();
     return kok_;
   };
+  /** Musteri bazinda durum tablosu: katlanabilir; acik / kapali tercihi bu tarayicida hatirlanir (telefonda kapali baslar). */
+  function musteriSayiBolumu(sayilar) {
+    var t = tercih("genelTablo"), acik = t ? t === "acik" : window.innerWidth > 860;
+    var kat = h("details", { class: "tablo-katla", open: acik }, h("summary", null, h("h2", null, "Müşteri bazında durum"), h("span", { class: "soluk kucuk" }, " " + sayilar.length + " müşteri")),
+      musteriSayiTablosu(sayilar), h("p", { class: "kucuk" }, ic(rotaLink("icerikler"), "Tüm içerikler →")));
+    var son = acik; // toggle olayi ilk cizimde de gelebilir: yalniz gercek degisiklik saklanir
+    kat.addEventListener("toggle", function () { if (kat.open !== son) { son = kat.open; tercih("genelTablo", son ? "acik" : "kapali"); } });
+    return h("section", { class: "bolum" }, kat);
+  }
   function musteriSayiTablosu(sayilar) {
     var kolonlar = [["cekildi", "Çekildi"], ["kurguda", "Kurguda"], ["onayda", "Onayda"], ["revizyonda", "Revizyonda"], ["hazir", "Yayına hazır"]];
     return h("div", { class: "tablo-kap" }, h("table", null,
@@ -964,14 +1090,22 @@
         if (Object.keys(S.secili).length > 500) { toast("Bir seferde en çok 500 içerik değiştirilebilir.", "hata"); return; }
         durumlariDegistir(Object.keys(S.secili), topluDurum.value).then(function (ok) { if (ok) { S.secili = {}; yenile(); } });
       } }, "Durumu değiştir"),
+      // Arsiv gorunumunde ayni dugme toplu "Arşivden çıkar" olur; 10 ve daha fazla icerigi arsivlemeden once sorulur
       h("button", { class: "btn ince", type: "button", onclick: function () {
-        if (Object.keys(S.secili).length > 500) { toast("Bir seferde en çok 500 içerik arşivlenebilir.", "hata"); return; }
-        var degisim = Object.keys(S.secili).map(icerikBul).filter(Boolean).filter(function (i) { return !i.arsiv; }).map(function (i) {
-          var n = C.kopya(i); n.arsiv = true; n.gecmis = (n.gecmis || []).concat([{ z: C.damga(), m: "Arşivlendi" }]).slice(-60);
+        var hedef = !f.arsiv;
+        if (Object.keys(S.secili).length > 500) { toast("Bir seferde en çok 500 içerik " + (hedef ? "arşivlenebilir." : "arşivden çıkarılabilir."), "hata"); return; }
+        var degisim = Object.keys(S.secili).map(icerikBul).filter(Boolean).filter(function (i) { return !!i.arsiv !== hedef; }).map(function (i) {
+          var n = C.kopya(i); n.arsiv = hedef; n.gecmis = (n.gecmis || []).concat([{ z: C.damga(), m: hedef ? "Arşivlendi" : "Arşivden çıkarıldı" }]).slice(-60);
           return { tur: "icerik", yeni: n, onceki: C.kopya(i) };
         });
-        uygula(degisim, degisim.length + " içerik arşivlendi").then(function (ok) { if (ok) { S.secili = {}; yenile(); } });
-      } }, "Arşivle"),
+        if (!degisim.length) return;
+        var soru = hedef && degisim.length >= 10 ? onayla(degisim.length + " içerik arşivlenecek",
+          "Seçili " + degisim.length + " içerik listelerden kalkar. Silinmez: İçerikler → Arşiv filtresinden geri çıkarabilirsin.", "Arşivle") : Promise.resolve(true);
+        soru.then(function (e) {
+          if (!e) return;
+          uygula(degisim, degisim.length + " içerik " + (hedef ? "arşivlendi" : "arşivden çıkarıldı")).then(function (ok) { if (ok) { S.secili = {}; yenile(); } });
+        });
+      } }, f.arsiv ? "Arşivden çıkar" : "Arşivle"),
       h("button", { class: "btn ince", type: "button", onclick: function () { S.secili = {}; yenile(); } }, "Seçimi temizle")) : null;
     return h("div", null, bas, filtreler, topluCubuk,
       l.length ? h("div", null, h("label", { class: "secenek soluk kucuk" }, hepsi, "Tümünü seç"),
@@ -1003,10 +1137,12 @@
           ondragstart: function (ev) { ev.dataTransfer.setData("text/plain", i.id); ev.dataTransfer.effectAllowed = "move"; ev.currentTarget.classList.add("tasiniyor"); },
           ondragend: function (ev) { ev.currentTarget.classList.remove("tasiniyor"); },
           onclick: function () { icerikPenceresi(i.id); },
-          onkeydown: function (ev) { if (ev.key === "Enter") icerikPenceresi(i.id); } },
+          onkeydown: function (ev) { if (ev.key === "Enter" && ev.target === ev.currentTarget) icerikPenceresi(i.id); } },
           h("b", null, i.baslik), h("span", { class: "soluk kucuk" }, dizi([m ? m.ad : null, C.TUR_AD[i.tur], i.oncelik === "yuksek" ? "Öncelikli" : null])),
           i.teslimTarihi && C.TESLIM_BEKLEYEN.indexOf(i.durum) !== -1 ? h("span", { class: "kucuk" + (i.teslimTarihi < b ? " gecikti" : "") }, "Teslim " + C.tarihGunlu(i.teslimTarihi)) : null,
-          i.planTarihi && i.durum !== "yayinlandi" ? h("span", { class: "kucuk" + (i.planTarihi < b ? " gecikti" : "") }, "Yayın " + C.tarihGunlu(i.planTarihi)) : null);
+          i.planTarihi && i.durum !== "yayinlandi" ? h("span", { class: "kucuk" + (i.planTarihi < b ? " gecikti" : "") }, "Yayın " + C.tarihGunlu(i.planTarihi)) : null,
+          onayBeklemesi(i, "kucuk"),
+          (function () { var hz = hizliDurum(i); return hz.length ? h("span", { class: "hizli-dugmeler" }, hz) : null; })());
       }));
       return kol;
     }));
@@ -1544,6 +1680,7 @@
         h("button", { class: "btn", type: "submit" }, "Kaydet"))),
       bolum("Yedekleme", null, null, [
         h("div", { class: "uyari-kutu" }, "Yedek dosyaları müşteri, ücret ve takvim bilgisi içerir. Güvenli bir yerde sakla; kimseyle paylaşma, herkese açık bir klasöre koyma."),
+        h("p", { class: "son-yedek kucuk" + (sonYedek() && sonYedek().gun <= YEDEK_HATIRLATMA_GUN ? " soluk" : " uyari") }, sonYedekMetni()),
         h("div", { class: "eylemler" },
           h("button", { class: "btn", type: "button", onclick: jsonYedekIndir }, "JSON yedeği indir"),
           h("button", { class: "btn", type: "button", onclick: function () { indir("suflo-studio-musteriler-" + bugun() + ".csv", C.musterilerCsv(S.veri), "text/csv;charset=utf-8"); } }, "Müşteriler (CSV)"),
@@ -1573,15 +1710,33 @@
     a.click();
     setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
   }
+  /**
+   * Son yedek gununu ayar kaydina yazar (telefon ve bilgisayar ayni tarihi gorur). Sessizdir: yazilamazsa yedek yine iner.
+   * Ayar bu arada baska yerde degistiyse guncel surumle bir kez daha denenir (esik korunur).
+   */
+  function sonYedekYaz(tekrar) {
+    var a = S.veri.ayar, n = { sonYedek: bugun() };
+    if (a) { n.id = "ayar"; n.surum = a.surum; n.varsayilanStokUyari = a.varsayilanStokUyari === undefined ? null : a.varsayilanStokUyari; }
+    return kaydetHam([{ tur: "ayar", kayit: n }]).then(function (j) {
+      if (j.ok) return true;
+      if (j.hata === "cakisma" && j.guncel && !tekrar) { S.veri.ayar = j.guncel; return sonYedekYaz(true); }
+      return false;
+    });
+  }
   function jsonYedekIndir() {
     api("disa_aktar").then(function (j) {
       if (!j.ok) { toast(hataMetni(j), "hata"); return; }
-      var metin = JSON.stringify(j.yedek, null, 2);
-      indir("suflo-studio-yedek-" + bugun() + ".json", metin, "application/json");
-      var govdeBayt = baytBoyutu({ islem: "ice_aktar", veriler: j.yedek.veriler });
-      if (govdeBayt > GOVDE_SINIRI) toast("Yedek indirildi ama verisi " + (govdeBayt / 1048576).toFixed(1).replace(".", ",") + " MB; tek seferde geri yüklenebilecek boyutu (8 MB) aşıyor. Sunucudaki otomatik kopyalar yine geçerli.", "hata");
-      else toast("Yedek indirildi. Özel bilgi içerir; güvenli yerde sakla.");
+      return sonYedekYaz().then(function () { yedegiIndir(j); });
     });
+  }
+  function yedegiIndir(j) {
+    var p = document.querySelector(".son-yedek");
+    if (p) { p.textContent = sonYedekMetni(); p.className = "son-yedek kucuk" + (sonYedek() ? " soluk" : " uyari"); }
+    var metin = JSON.stringify(j.yedek, null, 2);
+    indir("suflo-studio-yedek-" + bugun() + ".json", metin, "application/json");
+    var govdeBayt = baytBoyutu({ islem: "ice_aktar", veriler: j.yedek.veriler });
+    if (govdeBayt > GOVDE_SINIRI) toast("Yedek indirildi ama verisi " + (govdeBayt / 1048576).toFixed(1).replace(".", ",") + " MB; tek seferde geri yüklenebilecek boyutu (8 MB) aşıyor. Sunucudaki otomatik kopyalar yine geçerli.", "hata");
+    else toast("Yedek indirildi. Özel bilgi içerir; güvenli yerde sakla.");
   }
   function anliklariYukle(kutu) {
     api("anliklar").then(function (j) {

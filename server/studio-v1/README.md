@@ -116,13 +116,19 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
 
 ## Bakım
 
-- **Yedek:** Ayarlar → **JSON yedeği indir**. Dosya özel bilgi içerir.
+- **Yedek:** Ayarlar → **JSON yedeği indir**. Dosya özel bilgi içerir. İndirilen gün ayar kaydına (`sonYedek`) yazılır ve Ayarlar → Yedekleme'de "Son JSON yedeği: … (N gün önce)" olarak görünür; telefon ve bilgisayar aynı tarihi görür. Hiç indirilmediyse ya da 14 günden eskiyse Genel Bakış'ta küçük bir hatırlatma çıkar.
 - **Geri yükleme:** Ayarlar → İçe aktar → önizleme → "Tüm veriyi bu dosyayla değiştir" (onay için `GERI YUKLE` yazılır), ya da **Otomatik kopyalar** listesinden bir kopyaya dön.
 - **Otomatik kopyalar:** Sunucu tüm verinin sıkıştırılmış kopyasını alır:
   - her gün (İstanbul saatiyle) ilk kaydetmeden önce, aynı işlem içinde ("Günlük kopya"; kayıt yazılamazsa kopya da alınmaz, hiç kayıt yoksa alınmaz). Günün işareti `ayar` tablosunda `gunluk_anlik` satırında durur;
   - her içe aktarma, "Tümünü değiştir" ve kopyaya dönüşten önce.
   - Son 14 günlük kopya ve son 30 diğer kopya ayrı ayrı saklanır; günlük kopyalar içe aktarma kopyalarını listeden itmez. Liste Ayarlar → **Otomatik kopyalar**'dadır; her kopyaya dönülebilir (dönmeden önce şu anki hal de kopyalanır).
 - **Son yedek tarihi:** Ayar kaydı isteğe bağlı `sonYedek` alanını (`YYYY-AA-GG`, son JSON yedeğinin indirildiği gün) tutar. Alan hiç gönderilmezse (eski arayüz eşiği kaydederken) saklı değer korunur; `null` gönderilirse silinir. Eski ayar kaydı ve eski yedekler bu alan olmadan çalışır.
+- **Günlük kullanım (arayüz):**
+  - İçerik satırlarında (İçerikler, Genel Bakış, müşteri sayfası, arama) ve pano kartlarında doğal sonraki adım için tek tık düğmesi vardır (ör. "→ Onaya gönder"; onaydakinde "→ Onaylandı" ve "→ Revizyon"). Pencere açılmaz, geçmişe yazılır, "Geri al" bildirimi gelir. Arşivdeki ve yayınlanmış içerikte düğme yoktur.
+  - Genel Bakış: başlığın altında boş olmayan her bölüm için sayılı bir düğme (dokununca o bölüme kayar); her bölümde en çok 5 satır ve aynı filtreli listeyi açan "+N tane daha"; en üstte "Bugün paylaşılacaklar" (bugüne planlı, yayına hazır içerikler, tek tık "Yayınlandı"); karşılanmayan paylaşım günleri müşteri başına tek satır. "Müşteri bazında durum" tablosu katlanır; açık / kapalı tercihi yalnız o tarayıcıda hatırlanır.
+  - Onaydaki içerikte "N gündür onayda" yazar (geçmişteki son onaya gönderim günü; 3 günden itibaren uyarı renginde). Geçmişinde bu bilgi olmayan eski kayıtta yazmaz.
+  - Toplu arşivleme 10 ve daha fazla içerikte önce sorar. İçerikler → Arşiv görünümünde toplu düğme "Arşivden çıkar"dır. 5 ve daha fazla kaydı değiştiren işlemin "Geri al" bildirimi kapatılana kadar durur.
+  - Yazı yazılmış bir pencere Esc, ×, Vazgeç ya da telefonda geri tuşuyla kapatılmak istenirse önce "Kaydedilmemiş değişiklik" diye sorar; böyle bir pencere açıkken sekme kapatılır ya da sayfa yenilenirse tarayıcı uyarır. Hiçbir şey değişmediyse ya da kaydetme sürerken soru çıkmaz.
 - **Sunucu mesajları:** Türkçe harfli ve ekrandaki alan adlarıyla yazılır (ör. "Aylık ücret 0 ile 100.000.000 arasında tam sayı olmalı"; içe aktarma önizlemesinde "2. müşteri (Ad): …"). Hata kodları (`hata`) değişmez; arayüz koda göre davranır. Mesajlarda sunucu yolu ya da SQL yer almaz.
 - **Şifre değiştirme:** Ayarlar → Güvenlik. Yeni özet veritabanına yazılır ve diğer tüm oturumlar kapanır.
 - **Şifre unutulursa:** `php sifre-ozeti.php` ile yeni özet üret ve `config.php`'deki `'password_hash'` alanına yaz. `config.php`'deki özet değişince o geçerli olur; daha önce panelden konan şifre artık geçmez. (PHP önbelleği yüzünden değişiklik birkaç saniye sonra etkin olur.)
