@@ -34,6 +34,10 @@ Suflo Pro lisans servisinden (`pro-v1`) tamamen ayrıdır: ayar dosyası, verita
 - **Bağ denetimi:** Bir içerik, başka bir müşterinin çekimine bağlanamaz. Başka müşterinin içeriği bağlıyken bir çekimin müşterisi değiştirilemez. İçe aktarmada bu tür bir bağ kaldırılır ve önizlemede uyarı olarak gösterilir.
 - **Veritabanı meşgulse** istek `503` ile "biraz sonra yeniden dene" der; yarım yazma olmaz.
 - **Sürüm denetimi:** İki cihaz aynı kaydı değiştirirse, eski sürümle yazan `409` alır ve hiçbir şey sessizce ezilmez. Sürüm numaraları hep artan tek bir sayaçtan gelir; geri yüklemede bile tekrar kullanılmaz. Güncelleme `WHERE surum = ?` ile yapılır.
+- **Tekrarlanan istek (mükerrer kayıt yok):** Zayıf bağlantıda sunucu kaydı yazar ama yanıt telefona ulaşmayabilir; sahibi "Kaydet"e yeniden basar.
+  - Arayüz yeni kaydı kendi ürettiği kimlikle (`id`, sürümsüz) gönderir; pencere açıkken aynı kimlik kullanılır. Toplu eklemede (toplu içerik, stok girişi) her satırın kimliği satırın içeriğine bağlıdır; düzeltilen satır yeni kimlik alır.
+  - Sunucu, var olan bir kimliğe sürümsüz ya da eski sürümle gelen yazmada kayıt zaten tam gönderildiği gibiyse yeni sürüm yazmaz, var olan kaydı başarıyla döner. İçerik farklıysa eskisi gibi `409` döner; arayüz bu pencerenin yazdığı, o zamandan beri değişmemiş kaydı bir kez güncelleme olarak gönderir, toplu eklemede veriyi tazeleyip yalnız eksik satırları ekler.
+  - Kimlik göndermeyen eski arayüz eskisi gibi çalışır (her istek yeni kayıt).
 - **Eşzamanlı yazmalar:** Yazmalar işlem (transaction) içinde yapılır.
   - Yazma kilidi her okumadan önce alınır: SQLite'ta `BEGIN IMMEDIATE`, MySQL'de sayaç satırında `FOR UPDATE`.
   - Geri yükleme, aynı anda kaydedilen bir değişikliği sessizce silemez.
@@ -49,7 +53,8 @@ Suflo Pro lisans servisinden (`pro-v1`) tamamen ayrıdır: ayar dosyası, verita
   - Yedekte kimliği zaten var olan kayıtlar doğrulamadan önce atlanır. Eski bir yedekte artık geçersiz sayılan bir alan, mevcut kayıtlar yüzünden içe aktarmayı engellemez.
   - Liste yerine nesne beklenen alanlara liste gelirse (ya da tersi) hata gösterilir. Alt alanlardaki tanınmayan anahtarlar da uyarı olarak listelenir.
   - "Tümünü değiştir" yedekteki ayar kaydını (varsayılan stok eşiği) da geri getirir.
-  - Uygulamadan önce, aynı işlem içinde otomatik kopya alınır. Son 30 kopya sıkıştırılarak saklanır.
+  - Uygulamadan önce, aynı işlem içinde otomatik kopya alınır (bkz. Bakım → Otomatik kopyalar).
+  - "Tümünü değiştir" ve kopyaya dönüş onayı (`onay`) büyük / küçük harf ve Türkçe harf farkı gözetmez: `GERİ YÜKLE`, `geri yükle` ve eski arayüzün gönderdiği `GERI YUKLE` kabul edilir.
   - Tek seferde en çok 8 MB veri (yedeğin sıkıştırılmış JSON hali, Türkçe harfler 2 bayt sayılır) ve tür başına 20.000 kayıt içe aktarılabilir. Daha büyük bir yedek indirildiğinde uyarı gösterilir.
   - "Tümünü değiştir" ve otomatik kopyaya dönüş, kayıtların oluşturma ve son değişiklik zamanlarını korur (liste sırası değişmez); yalnız sürüm numaraları yenilenir. Yedekte ayar yoksa (boş) şu anki ayar da kaldırılır; onay penceresi bunu söyler.
   - Dosyanın üst düzeyindeki tanınmayan listeler (örneğin elle yazılmış bir `cekimler` listesi) ve geçmiş satırlarındaki tanınmayan anahtarlar da önizlemede uyarı olarak gösterilir.
@@ -113,6 +118,12 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
 
 - **Yedek:** Ayarlar → **JSON yedeği indir**. Dosya özel bilgi içerir.
 - **Geri yükleme:** Ayarlar → İçe aktar → önizleme → "Tüm veriyi bu dosyayla değiştir" (onay için `GERI YUKLE` yazılır), ya da **Otomatik kopyalar** listesinden bir kopyaya dön.
+- **Otomatik kopyalar:** Sunucu tüm verinin sıkıştırılmış kopyasını alır:
+  - her gün (İstanbul saatiyle) ilk kaydetmeden önce, aynı işlem içinde ("Günlük kopya"; kayıt yazılamazsa kopya da alınmaz, hiç kayıt yoksa alınmaz). Günün işareti `ayar` tablosunda `gunluk_anlik` satırında durur;
+  - her içe aktarma, "Tümünü değiştir" ve kopyaya dönüşten önce.
+  - Son 14 günlük kopya ve son 30 diğer kopya ayrı ayrı saklanır; günlük kopyalar içe aktarma kopyalarını listeden itmez. Liste Ayarlar → **Otomatik kopyalar**'dadır; her kopyaya dönülebilir (dönmeden önce şu anki hal de kopyalanır).
+- **Son yedek tarihi:** Ayar kaydı isteğe bağlı `sonYedek` alanını (`YYYY-AA-GG`, son JSON yedeğinin indirildiği gün) tutar. Alan hiç gönderilmezse (eski arayüz eşiği kaydederken) saklı değer korunur; `null` gönderilirse silinir. Eski ayar kaydı ve eski yedekler bu alan olmadan çalışır.
+- **Sunucu mesajları:** Türkçe harfli ve ekrandaki alan adlarıyla yazılır (ör. "Aylık ücret 0 ile 100.000.000 arasında tam sayı olmalı"; içe aktarma önizlemesinde "2. müşteri (Ad): …"). Hata kodları (`hata`) değişmez; arayüz koda göre davranır. Mesajlarda sunucu yolu ya da SQL yer almaz.
 - **Şifre değiştirme:** Ayarlar → Güvenlik. Yeni özet veritabanına yazılır ve diğer tüm oturumlar kapanır.
 - **Şifre unutulursa:** `php sifre-ozeti.php` ile yeni özet üret ve `config.php`'deki `'password_hash'` alanına yaz. `config.php`'deki özet değişince o geçerli olur; daha önce panelden konan şifre artık geçmez. (PHP önbelleği yüzünden değişiklik birkaç saniye sonra etkin olur.)
 - **Kapatma / geri alma:** `public_html/studio/v1/` klasörünü kaldırmak servisi kapatır. Veri `private/studio-v1/` içinde kalır.

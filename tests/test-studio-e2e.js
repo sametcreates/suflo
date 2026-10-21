@@ -2,6 +2,7 @@
  * Suflo Studio uctan uca (gercek tarayici + gercek php -S sunucusu + gecici SQLite). Yalniz anonim ornek veri.
  * Masaustu ve telefon boyutunda: giris, musteri / stok girisi / cekim / icerik akislari, toplu durum + geri al,
  * pano surukle-birak, cakisma uyarisi, yenilemede kalicilik, cikis, yedek indirme + mukerrersiz ice aktarma onizlemesi,
+ * yaniti kaybolan kaydetmenin yeniden denenmesinde mukerrer kayit olusmamasi, gunluk otomatik kopya etiketi,
  * cihaz saat dilimi farkli olsa da Istanbul tarihi, telefonda yatay tasma yok.
  * php ya da Playwright yoksa ATLA; STUDIO_E2E_ZORUNLU=1 iken (CI'daki e2e isi) atlamak kalmak sayilir.
  */
@@ -280,6 +281,10 @@ async function calis() {
   // Yedek indir + onizleme (mukerrer yok)
   await menuyeGit(page, "Ayarlar", "Ayarlar");
   ok("yedekte ozel veri uyarisi", await page.locator("text=Yedek dosyaları müşteri, ücret ve takvim bilgisi içerir").isVisible());
+  var gunlukSatir = page.locator(".bolum:has-text('Otomatik kopyalar') .satir:has-text('Günlük kopya')").first();
+  await gunlukSatir.waitFor();
+  var gunlukMetin = await gunlukSatir.textContent();
+  ok("otomatik kopyalar: gunun ilk degisikliginden onceki kopya 'Günlük kopya' etiketli, ozeti Turkce", /\d+ müşteri, \d+ içerik, \d+ çekim \/ etkinlik/.test(gunlukMetin), gunlukMetin);
   var indirme = page.waitForEvent("download");
   await page.click("button:has-text('JSON yedeği indir')");
   var dl = await indirme;
@@ -432,6 +437,104 @@ async function calis() {
   await bekle(500);
   var sonrakiSayi = (await apiCagir({ islem: "veri" })).veri.icerikler.length;
   ok("cift tiklama: tek icerik olusur", sonrakiSayi === oncekiSayi + 1, oncekiSayi + " -> " + sonrakiSayi);
+
+  // Yaniti kaybolan kaydetme: sunucu yazar ama yanit tarayiciya ulasmaz (zayif mobil baglanti). Yeniden "Kaydet"e
+  // basmak ikinci kayit olusturmaz, yanlis "zaten var" / "baska yerde degisti" uyarisi da cikmaz.
+  async function birYanitiKaybet() {
+    var kullanildi = false;
+    var isleyici = async function (route) {
+      if (kullanildi || !/"islem":"(toplu|kaydet)"/.test(route.request().postData() || "")) return route.continue();
+      kullanildi = true;
+      await route.fetch(); // sunucu istegi isler ve yazar
+      await route.abort("connectionreset");
+      await page.unroute("**/studio/v1/index.php", isleyici);
+    };
+    await page.route("**/studio/v1/index.php", isleyici);
+  }
+  async function kayitSay(liste, alan, deger) { return (await apiCagir({ islem: "veri" })).veri[liste].filter(function (x) { return x[alan] === deger; }).length; }
+  async function hizliPencere(secenek) {
+    await page.click("text=+ Ekle");
+    await page.click("dialog >> text=" + secenek);
+    return page.locator("dialog[open]");
+  }
+  d = await hizliPencere("İçerik");
+  await alanGirdi(d, "Müşteri", "select").selectOption({ label: "Örnek Müşteri A" });
+  await alanGirdi(d, "Başlık", "input").fill("Kayıp yanıt içerik");
+  await birYanitiKaybet();
+  await d.locator("button[type=submit]").click();
+  await d.locator(".hata:has-text('Sunucuya ulaşılamadı')").waitFor();
+  var kayipIlk = await kayitSay("icerikler", "baslik", "Kayıp yanıt içerik");
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  ok("yaniti kaybolan icerik: sunucu yazmisti, yeniden Kaydet ikinci kayit olusturmaz", kayipIlk === 1 && await kayitSay("icerikler", "baslik", "Kayıp yanıt içerik") === 1);
+
+  d = await hizliPencere("İçerik");
+  await alanGirdi(d, "Müşteri", "select").selectOption({ label: "Örnek Müşteri A" });
+  await alanGirdi(d, "Başlık", "input").fill("Kayıp yanıt sonra not");
+  await birYanitiKaybet();
+  await d.locator("button[type=submit]").click();
+  await d.locator(".hata:has-text('Sunucuya ulaşılamadı')").waitFor();
+  await alanGirdi(d, "Not", "textarea").fill("ikinci denemede yazılan not");
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  var sonNot = (await apiCagir({ islem: "veri" })).veri.icerikler.filter(function (x) { return x.baslik === "Kayıp yanıt sonra not"; });
+  ok("yaniti kaybolan icerik, arada degisen alan: tek kayit, son hali yazilir", sonNot.length === 1 && sonNot[0].not === "ikinci denemede yazılan not", JSON.stringify(sonNot));
+
+  d = await hizliPencere("Toplu içerik");
+  await alanGirdi(d, "Müşteri", "select").selectOption({ label: "Örnek Müşteri A" });
+  await alanGirdi(d, "Başlıklar", "textarea").fill("Kayıp toplu A\nKayıp toplu B\nKayıp toplu B");
+  await birYanitiKaybet();
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector(".toast:has-text('Sunucuya ulaşılamadı')");
+  // ikinci deneme bir dakika sonra: gecmis satirinin zamani degisir, sunucu ayni tekrari tanimaz (409); arayuz veriyi tazeler
+  await page.clock.setFixedTime(new Date("2099-10-19T22:31:00Z"));
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  await page.clock.setFixedTime(new Date("2099-10-19T22:30:00Z"));
+  ok("yaniti kaybolan toplu icerik: her satir bir kez (ayni baslikli iki satir iki kayit)", await kayitSay("icerikler", "baslik", "Kayıp toplu A") === 1 &&
+    await kayitSay("icerikler", "baslik", "Kayıp toplu B") === 2 && await page.locator(".toast:has-text('3 içerik eklendi')").count() === 1);
+
+  d = await hizliPencere("Müşteri");
+  await alanGirdi(d, "Ad", "input").fill("Kayıp yanıt müşteri");
+  await birYanitiKaybet();
+  await d.locator("button[type=submit]").click();
+  await d.locator(".hata:has-text('Sunucuya ulaşılamadı')").waitFor();
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("h1:has-text('Kayıp yanıt müşteri')");
+  ok("yaniti kaybolan musteri: 'zaten var' hatasi yok, tek kayit", await kayitSay("musteriler", "ad", "Kayıp yanıt müşteri") === 1);
+
+  await page.click("button:has-text('Stok girişi yap')");
+  d = page.locator("dialog[open]");
+  await alanGirdi(d, "Yayına hazır (onaylı, yayınlanmamış)", "textarea").fill("Kayıp stok 1\nKayıp stok 2");
+  await birYanitiKaybet();
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector(".toast:has-text('Sunucuya ulaşılamadı')");
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector(".toast:has-text('stok girişi tamamlandı')");
+  ok("yaniti kaybolan stok girisi (musteri guncellemesiyle): tek seferde tamamlanir, ikinci kayit yok", await kayitSay("icerikler", "baslik", "Kayıp stok 1") === 1 &&
+    await kayitSay("icerikler", "baslik", "Kayıp stok 2") === 1 && await page.locator("dialog[open]").count() === 0);
+
+  d = await hizliPencere("Çekim / etkinlik");
+  await alanGirdi(d, "Başlık", "input").fill("Kayıp yanıt çekim");
+  await birYanitiKaybet();
+  await d.locator("button[type=submit]").click();
+  await d.locator(".hata:has-text('Sunucuya ulaşılamadı')").waitFor();
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  ok("yaniti kaybolan cekim: tek kayit", await kayitSay("etkinlikler", "baslik", "Kayıp yanıt çekim") === 1);
+
+  await page.goto(URL_ + "#/icerikler?gorunum=liste");
+  await page.waitForSelector(".sayfa h1:has-text('İçerikler')");
+  await page.click(".satir-ad:has-text('Kayıp yanıt içerik')");
+  d = page.locator("dialog[open]");
+  await alanGirdi(d, "Not", "textarea").fill("düzenleme tekrarı");
+  await birYanitiKaybet();
+  await d.locator("button[type=submit]").click();
+  await d.locator(".hata:has-text('Sunucuya ulaşılamadı')").waitFor();
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  ok("yaniti kaybolan duzenleme: yeniden Kaydet 'baska yerde degisti' demeden kapanir", (await page.locator(".toast:has-text('Kaydedildi')").count()) > 0 &&
+    (await apiCagir({ islem: "veri" })).veri.icerikler.filter(function (x) { return x.baslik === "Kayıp yanıt içerik"; })[0].not === "düzenleme tekrarı");
 
   // Gune ozel paylasim turu (Cuma post)
   await page.goto(URL_ + "#/musteriler");

@@ -118,6 +118,33 @@
     delete v.id; delete v.surum; delete v.olusturma; delete v.guncelleme;
     return v;
   }
+  /**
+   * Yeni kayit icin istemci kimligi (sunucu bicimi [a-z0-9]{8,40}). Pencere acikken ayni kalir: yaniti kaybolan kaydetme
+   * yeniden gonderilince sunucu ayni kimligi tanir, ikinci kayit olusmaz.
+   */
+  function yeniId() {
+    var b = new Uint8Array(12);
+    crypto.getRandomValues(b);
+    return Array.prototype.map.call(b, function (x) { return (x < 16 ? "0" : "") + x.toString(16); }).join("");
+  }
+  /**
+   * Toplu pencerede satir kimlikleri: ayni satir (ayni alanlarla; ayni satir birden cok kez yazildiysa kacinci oldugu da)
+   * yeniden gonderilince ayni kimligi alir. Duzeltilen satir yeni kimlik alir, eski haliyle yazilmis kayit sessizce yerine gecmez.
+   */
+  function satirKimlikleri(harita, kayitlar) {
+    var sayac = {};
+    kayitlar.forEach(function (x) {
+      if (x.kayit.id) return;
+      var v = sade(x.kayit);
+      delete v.gecmis; // gecmis satirindaki dakika her denemede degisebilir
+      var k = x.tur + "|" + JSON.stringify(v);
+      sayac[k] = (sayac[k] || 0) + 1;
+      k += "#" + sayac[k];
+      x.kayit.id = harita[k] || (harita[k] = yeniId());
+    });
+    return kayitlar;
+  }
+  function kayitBul(tur, id) { return tur === "ayar" ? S.veri.ayar : bul(liste(tur), id); }
   /** Tek kayit. Basarida kaydi, hatada null doner (hata bildirilir). */
   function kaydet(tur, kayit) {
     var govde = { tur: tur, veri: sade(kayit) };
@@ -146,6 +173,18 @@
     return kaydetHam(kayitlar).then(function (j) {
       if (j.ok) return j.kayitlar;
       if (j.hata === "oturum") return null;
+      var x = j.sira !== undefined ? kayitlar[j.sira] : null;
+      if (j.hata === "cakisma" && j.guncel && x && x.kayit.id && x.kayit.surum === undefined && j.guncel.id === x.kayit.id) {
+        // Bu pencerenin onceki denemesi yazilmis, yaniti kaybolmus (toplu yazma ya hep ya hic; kimlik bu pencerede uretildi).
+        // Veri tazelenir; yalniz hala eksik olan yeni kayitlar gonderilir, yazilmis olanlar ikinci kez eklenmez.
+        return veriYukle().then(function (tamam) {
+          if (!tamam) return null;
+          var eksik = kayitlar.filter(function (y) { return y.kayit.id && y.kayit.surum === undefined && !kayitBul(y.tur, y.kayit.id); });
+          return (eksik.length ? topluKaydet(eksik) : Promise.resolve([])).then(function (k) {
+            return k ? kayitlar.map(function (y) { return kayitBul(y.tur, y.kayit.id) || y.kayit; }) : null;
+          });
+        });
+      }
       toast(hataMetni(j) + (j.sira !== undefined && kayitlar.length > 1 ? " (" + (j.sira + 1) + ". kayıt)" : ""), "hata");
       if (j.hata === "cakisma") veriYukle().then(yenile);
       return null;
@@ -187,6 +226,13 @@
   function pencereKaydet(tur, n, hataP, tabanYenile) {
     return kaydetHam([{ tur: tur, kayit: n }]).then(function (j) {
       if (j.ok) return j.kayitlar[0];
+      if (j.hata === "cakisma" && j.guncel && n.id && n.surum === undefined && j.guncel.id === n.id && j.guncel.guncelleme === j.guncel.olusturma) {
+        // Bu pencerenin onceki denemesi yazilmis, yaniti kaybolmus; kayit o zamandan beri degismedi (ayni tekrari sunucu
+        // zaten basarili sayar). Ikinci kayit eklenmez: kayit penceredeki son haliyle bir kez guncellenir.
+        var n2 = C.kopya(n);
+        n2.surum = j.guncel.surum;
+        return pencereKaydet(tur, n2, hataP, tabanYenile);
+      }
       // Istek surerken pencere kapandiysa hata kaybolmasin: bildirimle soyle
       var acik = hataP.isConnected;
       if (j.hata === "cakisma" && j.guncel) {
@@ -717,6 +763,7 @@
 
   function musteriPenceresi(id) {
     var m = id ? musteri(id) : null;
+    var yeniKimlik = m ? null : yeniId();
     var v = m ? C.kopya(m) : { ad: "", kurum: "", ucret: null, siklik: { tur: "belirsiz", haftalikAdet: null, gunler: [], baslangic: null }, slotTuru: "video", stokUyari: null, stokGirisi: false, not: "", arsiv: false };
     var s = v.siklik || {};
     var g = {
@@ -809,8 +856,9 @@
         return;
       }
       var n = degisenleriUygula(v, ilk, formDegeri());
+      if (!m) n.id = yeniKimlik;
       var anahtar = C.norm(n.ad) + "|" + C.norm(n.kurum);
-      if (S.veri.musteriler.some(function (x) { return x.id !== v.id && C.norm(x.ad) + "|" + C.norm(x.kurum) === anahtar; })) {
+      if (S.veri.musteriler.some(function (x) { return x.id !== n.id && C.norm(x.ad) + "|" + C.norm(x.kurum) === anahtar; })) {
         hataP.textContent = "Aynı ad ve kurumla bir müşteri zaten var.";
         return;
       }
@@ -975,6 +1023,7 @@
 
   function icerikPenceresi(id, vars) {
     var ic_ = id ? icerikBul(id) : null;
+    var yeniKimlik = ic_ ? null : yeniId();
     var v = ic_ ? C.kopya(ic_) : Object.assign({ musteriId: "", baslik: "", tur: "reels", durum: "fikir", oncelik: "normal", cekimId: null, teslimTarihi: null,
       planTarihi: null, yayinTarihi: null, revizyonNotu: "", dosyalar: { ham: "", proje: "", final: "" }, not: "", gecmis: [], arsiv: false }, vars || {});
     if (!ic_ && v.cekimId && !vars.durum) { var ce = etkinlik(v.cekimId); v.durum = ce && ce.durum === "tamamlandi" ? "cekildi" : "cekim_planlandi"; }
@@ -1065,6 +1114,7 @@
         if ((n.planTarihi || "") !== (v.planTarihi || "")) gec.push({ z: zaman, m: n.planTarihi ? "Yayın tarihi: " + C.tarihKisa(n.planTarihi, true) : "Yayın tarihi kaldırıldı" });
       }
       n.gecmis = gec.slice(-60);
+      if (!ic_) n.id = yeniKimlik;
       var taban = C.kopya(v);
       return pencereKaydet("icerik", n, hataP, tabanYenile).then(function (k) {
         if (!k) return;
@@ -1091,7 +1141,7 @@
     cekimDurumu();
     g.cekim.addEventListener("change", cekimDurumu);
     g.musteri.addEventListener("change", function () { cekimSecenekleri(g.cekim, g.musteri.value, g.cekim.value); });
-    var hataP = h("p", { class: "hata", role: "alert" }), ref = {};
+    var hataP = h("p", { class: "hata", role: "alert" }), ref = {}, kimlikler = {};
     ref.d = pencere("Toplu içerik ekle", [
       h("div", { class: "izgara" }, alan("Müşteri", g.musteri), alan("Bağlı çekim", g.cekim, h("small", null, "Bir çekimden birden çok içerik çıkabilir.")),
         alan("Tür", g.tur), alan("Durum", g.durum), alan("Öncelik", g.oncelik), alan("Kurgu teslim tarihi", g.teslim),
@@ -1109,7 +1159,7 @@
           cekimId: g.cekim.value || null, teslimTarihi: g.teslim.value || null, planTarihi: null, yayinTarihi: g.durum.value === "yayinlandi" ? bugun() : null,
           revizyonNotu: "", dosyalar: { ham: "", proje: "", final: "" }, not: "", gecmis: [{ z: zaman, m: "Toplu eklendi (" + C.DURUM_AD[g.durum.value] + ")" }], arsiv: false } };
       });
-      return topluKaydet(kayitlar).then(function (k) { if (k) { ref.d.close(); yenile(); toast(k.length + " içerik eklendi."); } });
+      return topluKaydet(satirKimlikleri(kimlikler, kayitlar)).then(function (k) { if (k) { ref.d.close(); yenile(); toast(k.length + " içerik eklendi."); } });
     });
   }
 
@@ -1117,6 +1167,7 @@
 
   function etkinlikPenceresi(id, vars) {
     var e = id ? etkinlik(id) : null;
+    var yeniKimlik = e ? null : yeniId();
     var b = (vars && vars.basTarih) || bugun();
     var v = e ? C.kopya(e) : Object.assign({ musteriId: null, baslik: "", tur: "cekim", tumGun: false, basTarih: b, basSaat: "10:00", bitTarih: b, bitSaat: "12:00",
       konum: "", not: "", durum: "planlandi", arsiv: false }, vars || {});
@@ -1203,7 +1254,7 @@
       if (!a.tumGun && (!C.gecerliSaat(a.basSaat) || !C.gecerliSaat(a.bitSaat))) { hataP.textContent = "Başlangıç ve bitiş saatini gir ya da Tüm gün seç."; return; }
       if (a.bitTarih < a.basTarih || C.aralik(a)[1] <= C.aralik(a)[0]) { hataP.textContent = "Bitiş başlangıçtan sonra olmalı."; return; }
       var n = degisenleriUygula(v, ilk, formDegeri());
-      if (!e) delete n.id;
+      if (!e) n.id = yeniKimlik;
       var cak = C.cakisanlar(S.veri.etkinlikler, n).length, taban = C.kopya(v);
       return pencereKaydet("etkinlik", n, hataP, tabanYenile).then(function (k) {
         if (!k) return;
@@ -1384,7 +1435,7 @@
       hazirlikDurum: secim(C.DURUMLAR.filter(function (d) { return C.HAZIRLIKTA.indexOf(d.k) !== -1; }), "kurguda"),
       hazirlikTur: secim(C.TURLER, "reels")
     };
-    var hataP = h("p", { class: "hata", role: "alert" }), ref = {};
+    var hataP = h("p", { class: "hata", role: "alert" }), ref = {}, kimlikler = {};
     ref.d = pencere("Stok girişi: " + m.ad, [
       h("p", { class: "soluk" }, "Şu an elindeki içerikleri gir. Hiç hazır içerik yoksa boş bırakıp kaydet: stok “0” olarak bilinir hale gelir."),
       mevcut.length ? h("p", { class: "soluk kucuk" }, "Sistemde bu müşteri için zaten " + hazirSayi + " hazır ve " + hazirlikSayi + " hazırlıkta içerik var; bunlar korunur, yenileri eklenir.") : null,
@@ -1403,7 +1454,7 @@
         return { tur: "icerik", kayit: { musteriId: m.id, baslik: baslik, tur: tur, durum: durum, oncelik: "normal", cekimId: null, teslimTarihi: null, planTarihi: null,
           yayinTarihi: null, revizyonNotu: "", dosyalar: { ham: "", proje: "", final: "" }, not: "", gecmis: [{ z: zaman, m: "Stok girişiyle eklendi (" + C.DURUM_AD[durum] + ")" }], arsiv: false } };
       };
-      var kayitlar = hz.map(function (s) { return yeni(s, "hazir", g.hazirTur.value); }).concat(hzl.map(function (s) { return yeni(s, g.hazirlikDurum.value, g.hazirlikTur.value); }));
+      var kayitlar = satirKimlikleri(kimlikler, hz.map(function (s) { return yeni(s, "hazir", g.hazirTur.value); }).concat(hzl.map(function (s) { return yeni(s, g.hazirlikDurum.value, g.hazirlikTur.value); })));
       var mg = musteri(id) || m; // gonderim anindaki (cakismadan sonra yenilenmis) kayit
       if (!mg.stokGirisi) { var mn = C.kopya(mg); mn.stokGirisi = true; kayitlar.push({ tur: "musteri", kayit: mn }); }
       if (!kayitlar.length) { ref.d.close(); return; }
@@ -1473,7 +1524,7 @@
       bolum("İçe aktar / geri yükle", null, null, [
         h("p", { class: "soluk kucuk" }, "Suflo Studio JSON yedeği ya da { musteriler, etkinlikler, icerikler } listesi seç. Önce önizleme gösterilir; aynı kayıtlar ikinci kez eklenmez, hiçbir şey sessizce silinmez. Uygulamadan önce otomatik kopya alınır."),
         alan("Dosya", dosya), onizleme]),
-      bolum("Otomatik kopyalar", null, null, [h("p", { class: "soluk kucuk" }, "İçe aktarma ve geri yüklemeden önce sunucu tüm verinin kopyasını alır (son 30)."), anlikKutu]),
+      bolum("Otomatik kopyalar", null, null, [h("p", { class: "soluk kucuk" }, "Sunucu her gün ilk değişiklikten önce (günlük kopya) ve her içe aktarma / geri yüklemeden önce tüm verinin kopyasını alır. Son 14 günlük kopya ve son 30 diğer kopya saklanır."), anlikKutu]),
       bolum("Güvenlik", null, null, [
         h("div", { class: "eylemler" },
           h("button", { class: "btn", type: "button", onclick: sifrePenceresi }, "Şifreyi değiştir"),
@@ -1486,7 +1537,7 @@
       bolum("Bilgi", null, null, h("dl", { class: "bilgi" },
         h("dt", null, "Saat dilimi"), h("dd", null, "Europe/Istanbul (UTC+3)"),
         h("dt", null, "Veri"), h("dd", null, "Suflo Studio sunucusunda; bu tarayıcıda saklanmaz. Telefon ve bilgisayar aynı kayıtları görür."),
-        h("dt", null, "Silme"), h("dd", null, "Tek tek silme yok; kayıtlar arşivlenir. “Tümünü değiştir” ve “Bu kopyaya dön” mevcut kayıtları kaldırır; öncesinde otomatik kopya alınır (son 30 kopya saklanır)."))));
+        h("dt", null, "Silme"), h("dd", null, "Tek tek silme yok; kayıtlar arşivlenir. “Tümünü değiştir” ve “Bu kopyaya dön” mevcut kayıtları kaldırır; öncesinde otomatik kopya alınır (Otomatik kopyalar)."))));
   };
   function indir(ad, icerik, tur) {
     var url = URL.createObjectURL(new Blob([icerik], { type: tur }));
@@ -1510,7 +1561,7 @@
       kutu.textContent = "";
       if (!j.ok) { kutu.appendChild(h("p", { class: "hata" }, hataMetni(j))); return; }
       if (!j.anliklar.length) { kutu.appendChild(h("p", { class: "soluk kucuk" }, "Henüz otomatik kopya yok.")); return; }
-      var neden = { ice_aktarma_oncesi: "İçe aktarma öncesi", geri_yukleme_oncesi: "Geri yükleme öncesi", anlik_geri_oncesi: "Kopyaya dönüş öncesi" };
+      var neden = { gunluk: "Günlük kopya", ice_aktarma_oncesi: "İçe aktarma öncesi", geri_yukleme_oncesi: "Geri yükleme öncesi", anlik_geri_oncesi: "Kopyaya dönüş öncesi" };
       j.anliklar.forEach(function (a) {
         var z = C.istanbulSimdi(new Date(a.zaman * 1000));
         kutu.appendChild(h("div", { class: "satir" }, h("b", null, C.tarihKisa(z.tarih, true) + " " + z.saat), h("span", { class: "satir-bilgi" }, dizi([neden[a.neden] || a.neden, a.ozet])),
