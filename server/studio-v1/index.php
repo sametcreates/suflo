@@ -8,7 +8,9 @@ declare(strict_types=1);
  *   ayri veritabani, ayri oturum cerezi. Pro lisansi burada hicbir yetki vermez.
  * - Her istek: POST + JSON, Origin izin listesinde, "X-Studio: 1" basligi (CSRF), giris disindaki
  *   her islemde sunucu tarafli oturum denetimi (__Host- onekli, HttpOnly, Secure, SameSite=Strict cerez).
- * - Veri: kayitlar tablosunda tur (musteri | icerik | etkinlik | ayar) basina beyaz listeli JSON.
+ * - Veri: kayitlar tablosunda tur (musteri | icerik | etkinlik | blok | ozelgun | ayar) basina beyaz listeli JSON.
+ *   blok: musterinin iceriklerine ayrilan calisma (edit) zamani; ozelgun: takvimde ozel gun / dogum gunu.
+ *   Eski surum (bu turleri bilmeyen index.php) bu satirlari veri paketinde gormez, cokmez.
  *   Silme yok, arsiv var. Iyimser surum denetimi: surum numaralari tek ve hep artan bir sayactan gelir,
  *   geri yuklemede bile tekrar kullanilmaz; guncelleme "WHERE surum = ?" ile yapilir.
  * - Yazmalar islem (transaction) icinde; SQLite'ta BEGIN IMMEDIATE ile yazma kilidi bastan alinir.
@@ -35,7 +37,8 @@ const GOVDE_SINIRI = 8 * 1024 * 1024;      // oturum acikken (ice aktarma)
 const ACIK_GOVDE_SINIRI = 16 * 1024;        // oturumsuz istekler (oturum, giris) icin
 const LISTE_SINIRI = 20000;                 // ice aktarmada tur basina en cok kayit
 const CIHAZ_BOSTA = 180 * 24 * 3600;        // bu kadar kullanilmayan taninan cihaz unutulur
-const TURLER = ['musteri', 'icerik', 'etkinlik', 'ayar'];
+const TURLER = ['musteri', 'icerik', 'etkinlik', 'blok', 'ozelgun', 'ayar'];
+const BLOK_ICERIK_SINIRI = 50;              // bir calisma blogunda en cok bu kadar icerik
 const CIHAZ_OMRU = 400 * 24 * 3600;
 const ANLIK_SINIRI = 30;                    // ice aktarma / geri yukleme oncesi kopyalardan en cok bu kadar
 const GUNLUK_ANLIK_SINIRI = 14;             // gunluk kopyalardan en cok bu kadar (digerlerinden ayri sayilir)
@@ -473,6 +476,8 @@ const ALAN_AD = [
     'dosyalar' => 'Dosya bağlantıları', 'dosyalar.ham' => 'Ham görüntü bağlantısı', 'dosyalar.proje' => 'Proje dosyası bağlantısı',
     'dosyalar.final' => 'Final bağlantısı', 'gecmis.z' => 'Geçmiş satırının zamanı', 'gecmis.m' => 'Geçmiş satırı',
     'basTarih' => 'Başlangıç tarihi', 'bitTarih' => 'Bitiş tarihi', 'basSaat' => 'Başlangıç saati', 'bitSaat' => 'Bitiş saati', 'konum' => 'Konum',
+    'tamamZaman' => 'Tamamlanma zamanı', 'icerikIdler' => 'Bloktaki içerikler', 'tarih' => 'Tarih', 'herYil' => 'Her yıl tekrar',
+    'calismaBas' => 'Çalışma saati başlangıcı', 'calismaBit' => 'Çalışma saati bitişi', 'haftalikHedef' => 'Haftalık hedef',
 ];
 function alan_ad(string $alan): string { return ALAN_AD[$alan] ?? $alan; }
 function sayi_metni(int $n): string { return number_format($n, 0, ',', '.'); }
@@ -511,6 +516,14 @@ function saat($v, string $alan): ?string {
     if (!is_string($v) || !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $v)) throw new InvalidArgumentException(alan_ad($alan) . ' geçerli bir saat olmalı (SS:DD)');
     return $v;
 }
+/** Zaman damgasi 'YYYY-AA-GG SS:DD' (Istanbul saati; ornegin tamamlanma ani) ya da bossa null. */
+function zaman_damgasi($v, string $alan): ?string {
+    if ($v === null || $v === '') return null;
+    if (!is_string($v) || !preg_match('/^(\d{4})-(\d{2})-(\d{2}) ([01]\d|2[0-3]):[0-5]\d$/', $v, $m) || !checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
+        throw new InvalidArgumentException(alan_ad($alan) . ' geçerli bir zaman olmalı (YYYY-AA-GG SS:DD)');
+    }
+    return $v;
+}
 function tamsayi($v, int $min, int $max, string $alan): ?int {
     if ($v === null || $v === '') return null;
     if (is_string($v) && preg_match('/^-?\d+$/', $v)) $v = (int)$v;
@@ -531,6 +544,8 @@ function nesne($v, string $alan): array {
     if (!is_array($v) || ($v !== [] && array_keys($v) === range(0, count($v) - 1))) throw new InvalidArgumentException(alan_ad($alan) . ' biçimi hatalı');
     return $v;
 }
+/** Duz liste mi ([] ya da 0'dan sirali anahtarli dizi; JSON nesnesi degil). */
+function liste_mi($v): bool { return is_array($v) && ($v === [] || array_keys($v) === range(0, count($v) - 1)); }
 function temizle(string $tur, array $v, array $var): array {
     if ($tur === 'musteri') {
         $s = nesne($v['siklik'] ?? null, 'siklik');
@@ -638,14 +653,69 @@ function temizle(string $tur, array $v, array $var): array {
             'konum' => metin($v['konum'] ?? null, 300, false, 'konum'),
             'not' => metin($v['not'] ?? null, 5000, false, 'not'),
             'durum' => secim($v['durum'] ?? null, ['planlandi', 'tamamlandi', 'iptal'], 'planlandi', 'durum'),
+            // tamamlandi'ya gecilen an (istege bagli; arayuz yazar, eski kayitlarda yok -> null)
+            'tamamZaman' => zaman_damgasi($v['tamamZaman'] ?? null, 'tamamZaman'),
+            'arsiv' => mantik($v['arsiv'] ?? false),
+        ];
+    }
+    if ($tur === 'blok') {
+        // Calisma blogu: bir musterinin iceriklerine ayrilan edit zamani. Tamamlamak iceriklerin durumunu degistirmez.
+        $mid = $v['musteriId'] ?? null;
+        if (!id_bicim($mid) || ($var[$mid] ?? '') !== 'musteri') throw new InvalidArgumentException('Müşteri bulunamadı');
+        $gelen = $v['icerikIdler'] ?? null;
+        if ($gelen === null) $gelen = [];
+        if (!liste_mi($gelen)) throw new InvalidArgumentException(alan_ad('icerikIdler') . ' biçimi hatalı');
+        if (count($gelen) > BLOK_ICERIK_SINIRI) throw new InvalidArgumentException('Bir blokta en çok ' . BLOK_ICERIK_SINIRI . ' içerik olabilir');
+        global $ICERIK_MUSTERI;
+        $icerikler = [];
+        foreach ($gelen as $iid) {
+            // arsivlenmis icerik de gecerli referanstir (blok sessizce bozulmaz); yalniz var olmali ve ayni musteriye ait olmali
+            if (!id_bicim($iid) || ($var[$iid] ?? '') !== 'icerik') throw new InvalidArgumentException('Bloktaki içeriklerden biri bulunamadı');
+            if (($ICERIK_MUSTERI[$iid] ?? null) !== $mid) throw new InvalidArgumentException('Bloktaki içeriklerden biri başka bir müşteriye ait; blokta yalnız bu müşterinin içerikleri olabilir');
+            if (in_array($iid, $icerikler, true)) throw new InvalidArgumentException('Aynı içerik blokta iki kez geçiyor');
+            $icerikler[] = $iid;
+        }
+        $bt = tarih($v['basTarih'] ?? null, 'basTarih', true);
+        $st = tarih($v['bitTarih'] ?? null, 'bitTarih') ?? $bt;
+        $bs = saat($v['basSaat'] ?? null, 'basSaat');
+        $ss = saat($v['bitSaat'] ?? null, 'bitSaat');
+        if ($bs === null || $ss === null) throw new InvalidArgumentException('Başlangıç ve bitiş saatini gir');
+        // gece yarisini (ve birden cok gunu) asabilir; bitis kesin olarak baslangictan sonra olmali
+        if ($st . ' ' . $ss <= $bt . ' ' . $bs) throw new InvalidArgumentException('Bitiş başlangıçtan sonra olmalı');
+        return [
+            'musteriId' => $mid,
+            'icerikIdler' => $icerikler,
+            // bos olabilir: arayuz basligi iceriklerden uretir
+            'baslik' => metin($v['baslik'] ?? null, 200, false, 'baslik'),
+            'basTarih' => $bt, 'basSaat' => $bs, 'bitTarih' => $st, 'bitSaat' => $ss,
+            'durum' => secim($v['durum'] ?? null, ['planlandi', 'tamamlandi'], 'planlandi', 'durum'),
+            'tamamZaman' => zaman_damgasi($v['tamamZaman'] ?? null, 'tamamZaman'),
+            'not' => metin($v['not'] ?? null, 5000, false, 'not'),
+            'arsiv' => mantik($v['arsiv'] ?? false),
+        ];
+    }
+    if ($tur === 'ozelgun') {
+        return [
+            'baslik' => metin($v['baslik'] ?? null, 120, true, 'baslik'),
+            'tarih' => tarih($v['tarih'] ?? null, 'tarih', true),
+            'tur' => secim($v['tur'] ?? null, ['ozel', 'dogum'], 'ozel', 'tur'),
+            'herYil' => mantik($v['herYil'] ?? false),
             'arsiv' => mantik($v['arsiv'] ?? false),
         ];
     }
     if ($tur === 'ayar') {
+        // calisma saatleri gun icindeki dakika (bos: arayuz varsayilani 09:00-19:00); bitis baslangictan sonra olmali
+        $cb = tamsayi($v['calismaBas'] ?? null, 0, 1440, 'calismaBas');
+        $ce = tamsayi($v['calismaBit'] ?? null, 0, 1440, 'calismaBit');
+        if (($ce ?? 1140) <= ($cb ?? 540)) throw new InvalidArgumentException('Çalışma saati bitişi başlangıcından sonra olmalı');
         return [
             'varsayilanStokUyari' => tamsayi($v['varsayilanStokUyari'] ?? null, 0, 999, 'varsayilanStokUyari'),
             // son JSON yedeginin indirildigi gun (istege bagli; arayuz yazar, eski ayar kaydinda yok)
             'sonYedek' => tarih($v['sonYedek'] ?? null, 'sonYedek'),
+            'calismaBas' => $cb,
+            'calismaBit' => $ce,
+            // haftada tamamlanacak is hedefi; 0 ya da bos: hedef yok
+            'haftalikHedef' => tamsayi($v['haftalikHedef'] ?? null, 0, 99, 'haftalikHedef'),
         ];
     }
     throw new InvalidArgumentException('Bilinmeyen kayıt türü');
@@ -661,6 +731,8 @@ function dogal(string $tur, array $v): string {
     if ($tur === 'musteri') return 'm|' . norm($v['ad']) . '|' . norm($v['kurum']);
     if ($tur === 'etkinlik') return 'e|' . ($v['musteriId'] ?? '') . '|' . norm($v['baslik']) . '|' . $v['basTarih'] . '|' . ($v['basSaat'] ?? '');
     if ($tur === 'icerik') return 'i|' . $v['musteriId'] . '|' . norm($v['baslik']) . '|' . $v['tur'] . '|' . ($v['planTarihi'] ?? '');
+    if ($tur === 'blok') return 'b|' . $v['musteriId'] . '|' . $v['basTarih'] . '|' . $v['basSaat'] . '|' . implode(',', $v['icerikIdler']);
+    if ($tur === 'ozelgun') return 'o|' . norm($v['baslik']) . '|' . $v['tarih'] . '|' . $v['tur'];
     return 'a|' . $tur;
 }
 
@@ -671,11 +743,15 @@ function tum_kayitlar(): array {
 }
 $ETK_MUSTERI = [];  // etkinlik id => musteri id | null (bagli cekim denetimi icin)
 $ICERIK_BAG = [];   // icerik id => [musteriId, cekimId] (cekimin musterisi degisirken denetim icin)
+$ICERIK_MUSTERI = []; // icerik id => musteri id (calisma blogundaki icerikler ayni musteriye mi ait)
+$BLOK_BAG = [];     // blok id => [musteriId, [icerik id, ...]] (icerigin musterisi degisirken denetim icin)
 function tur_haritasi(array $satirlar): array {
-    global $ETK_MUSTERI, $ICERIK_BAG;
+    global $ETK_MUSTERI, $ICERIK_BAG, $ICERIK_MUSTERI, $BLOK_BAG;
     $m = [];
     $ETK_MUSTERI = [];
     $ICERIK_BAG = [];
+    $ICERIK_MUSTERI = [];
+    $BLOK_BAG = [];
     foreach ($satirlar as $r) {
         $m[(string)$r['id']] = (string)$r['tur'];
         if ((string)$r['tur'] === 'etkinlik') {
@@ -684,6 +760,10 @@ function tur_haritasi(array $satirlar): array {
         } elseif ((string)$r['tur'] === 'icerik') {
             $v = json_decode((string)$r['veri'], true) ?: [];
             if (!empty($v['cekimId'])) $ICERIK_BAG[(string)$r['id']] = [(string)($v['musteriId'] ?? ''), (string)$v['cekimId']];
+            $ICERIK_MUSTERI[(string)$r['id']] = (string)($v['musteriId'] ?? '');
+        } elseif ((string)$r['tur'] === 'blok') {
+            $v = json_decode((string)$r['veri'], true) ?: [];
+            $BLOK_BAG[(string)$r['id']] = [(string)($v['musteriId'] ?? ''), array_values(array_filter((array)($v['icerikIdler'] ?? []), 'is_string'))];
         }
     }
     return $m;
@@ -696,10 +776,21 @@ function cekim_baglarini_denetle(string $id, ?string $musteriId): void {
         if ($bag[1] === $id && $bag[0] !== $musteriId) throw new InvalidArgumentException('Bu çekime başka müşterinin içerikleri bağlı. Müşteriyi değiştirmeden önce o içeriklerin “Bağlı çekim” alanını boşalt');
     }
 }
+/** Icerigin musterisi degisirken onu iceren (arsivdekiler dahil) calisma blogu baska musteride kalmasin. */
+function blok_baglarini_denetle(string $id, string $musteriId): void {
+    global $BLOK_BAG;
+    foreach ($BLOK_BAG as $bag) {
+        if ($bag[0] !== $musteriId && in_array($id, $bag[1], true)) throw new InvalidArgumentException('Bu içerik başka müşterinin bir çalışma bloğunda. Müşteriyi değiştirmeden önce içeriği o bloktan çıkar');
+    }
+}
 function bag_haritasi_yaz(string $tur, string $id, array $temiz): void {
-    global $ETK_MUSTERI, $ICERIK_BAG;
+    global $ETK_MUSTERI, $ICERIK_BAG, $ICERIK_MUSTERI, $BLOK_BAG;
     if ($tur === 'etkinlik') $ETK_MUSTERI[$id] = $temiz['musteriId'];
-    if ($tur === 'icerik') { if (!empty($temiz['cekimId'])) $ICERIK_BAG[$id] = [$temiz['musteriId'], $temiz['cekimId']]; else unset($ICERIK_BAG[$id]); }
+    if ($tur === 'icerik') {
+        if (!empty($temiz['cekimId'])) $ICERIK_BAG[$id] = [$temiz['musteriId'], $temiz['cekimId']]; else unset($ICERIK_BAG[$id]);
+        $ICERIK_MUSTERI[$id] = $temiz['musteriId'];
+    }
+    if ($tur === 'blok') $BLOK_BAG[$id] = [$temiz['musteriId'], $temiz['icerikIdler']];
 }
 function disa(array $r): array {
     $v = json_decode((string)$r['veri'], true) ?: [];
@@ -709,18 +800,22 @@ function disa(array $r): array {
     return array_merge($v, ['id' => (string)$r['id'], 'surum' => (int)$r['surum'], 'olusturma' => (int)$r['olusturma'], 'guncelleme' => (int)$r['guncelleme']]);
 }
 function veri_paketi(): array {
-    $p = ['musteriler' => [], 'icerikler' => [], 'etkinlikler' => [], 'ayar' => null];
+    $p = ['musteriler' => [], 'icerikler' => [], 'etkinlikler' => [], 'bloklar' => [], 'ozelgunler' => [], 'ayar' => null];
     foreach (tum_kayitlar() as $r) {
         $t = (string)$r['tur'];
         if ($t === 'musteri') $p['musteriler'][] = disa($r);
         elseif ($t === 'icerik') $p['icerikler'][] = disa($r);
         elseif ($t === 'etkinlik') $p['etkinlikler'][] = disa($r);
+        elseif ($t === 'blok') $p['bloklar'][] = disa($r);
+        elseif ($t === 'ozelgun') $p['ozelgunler'][] = disa($r);
         elseif ($t === 'ayar') $p['ayar'] = disa($r);
     }
     return $p;
 }
+/** Tur basina kayit sayisi (eski paketlerde bloklar / ozelgunler yok: 0). */
 function sayilar(array $paket): array {
-    return ['musteri' => count($paket['musteriler']), 'icerik' => count($paket['icerikler']), 'etkinlik' => count($paket['etkinlikler'])];
+    return ['musteri' => count($paket['musteriler']), 'icerik' => count($paket['icerikler']), 'etkinlik' => count($paket['etkinlikler']),
+        'blok' => count($paket['bloklar'] ?? []), 'ozelgun' => count($paket['ozelgunler'] ?? [])];
 }
 function json_metin(array $v): string { return json_encode($v, JSON_UNESCAPED_UNICODE); }
 
@@ -730,11 +825,22 @@ function json_metin(array $v): string { return json_encode($v, JSON_UNESCAPED_UN
  */
 function kayit_yaz(string $tur, ?string $id, array $veri, ?int $surum, array &$var): array {
     if (!in_array($tur, TURLER, true)) throw new InvalidArgumentException('Bilinmeyen kayıt türü');
-    if ($tur === 'ayar' && !array_key_exists('sonYedek', $veri)) {
-        // Eski arayuz ayari yalniz esikle kaydeder: gonderilmeyen son yedek tarihi silinmez, saklisi korunur
-        $eskiAyar = tek("SELECT veri FROM kayitlar WHERE id = 'ayar' AND tur = 'ayar'");
-        $eskiYedek = $eskiAyar ? ((json_decode((string)$eskiAyar['veri'], true) ?: [])['sonYedek'] ?? null) : null;
-        if (is_string($eskiYedek)) { try { $veri['sonYedek'] = tarih($eskiYedek, 'sonYedek'); } catch (InvalidArgumentException $e) { /* bozuksa tasinmaz */ } }
+    if ($tur === 'ayar') {
+        // Ayar alanlari ayri ekranlardan kaydedilir (esik, son yedek, takvim calisma saatleri ve hedef); eski arayuz yalniz
+        // esikle kaydeder. Gonderilmeyen alan silinmez, saklisi korunur; acikca null gonderilen alan bosaltilir.
+        $eskiAyar = null;
+        foreach (['sonYedek', 'calismaBas', 'calismaBit', 'haftalikHedef'] as $ak) {
+            if (array_key_exists($ak, $veri)) continue;
+            if ($eskiAyar === null) {
+                $r = tek("SELECT veri FROM kayitlar WHERE id = 'ayar' AND tur = 'ayar'");
+                $eskiAyar = $r ? (json_decode((string)$r['veri'], true) ?: []) : [];
+            }
+            $eski = $eskiAyar[$ak] ?? null;
+            try {
+                if ($ak === 'sonYedek' && is_string($eski)) $veri[$ak] = tarih($eski, $ak);
+                elseif ($ak !== 'sonYedek' && is_int($eski)) $veri[$ak] = tamsayi($eski, 0, $ak === 'haftalikHedef' ? 99 : 1440, $ak);
+            } catch (InvalidArgumentException $e) { /* bozuksa tasinmaz */ }
+        }
     }
     $temiz = temizle($tur, $veri, $var);
     $anahtar = anahtar($tur, $temiz);
@@ -752,6 +858,7 @@ function kayit_yaz(string $tur, ?string $id, array $veri, ?int $surum, array &$v
                 return disa(array_merge($mevcut, ['id' => $id]));
             }
             if ($tur === 'etkinlik') cekim_baglarini_denetle($id, $temiz['musteriId']);
+            if ($tur === 'icerik') blok_baglarini_denetle($id, $temiz['musteriId']);
             $yeniSurum = yeni_surum();
             $degisen = $surum === null ? 0 : calistir('UPDATE kayitlar SET veri = ?, anahtar = ?, surum = ?, guncelleme = ? WHERE id = ? AND surum = ?',
                 [json_metin($temiz), $anahtar, $yeniSurum, $n, $id, $surum]);
@@ -814,7 +921,8 @@ function anlik_al(string $neden): string {
     $id = yeni_id();
     $s = sayilar($paket);
     calistir('INSERT INTO anliklar (id, sira, zaman, neden, ozet, veri) VALUES (?, ?, ?, ?, ?, ?)',
-        [$id, yeni_surum(), simdi(), $neden, sprintf('%d müşteri, %d içerik, %d çekim / etkinlik', $s['musteri'], $s['icerik'], $s['etkinlik']), anlik_paketle($paket)]);
+        [$id, yeni_surum(), simdi(), $neden, sprintf('%d müşteri, %d içerik, %d çekim / etkinlik', $s['musteri'], $s['icerik'], $s['etkinlik'])
+            . ($s['blok'] || $s['ozelgun'] ? sprintf(', %d çalışma bloğu, %d özel gün', $s['blok'], $s['ozelgun']) : ''), anlik_paketle($paket)]);
     $say = ['gunluk' => 0, 'diger' => 0];
     foreach (hepsi('SELECT id, neden FROM anliklar ORDER BY sira DESC') as $r) {
         $g = (string)$r['neden'] === 'gunluk' ? 'gunluk' : 'diger';
@@ -842,11 +950,13 @@ const BILINEN_ALT_ALANLAR = [
     'siklik' => ['tur', 'haftalikAdet', 'gunler', 'gunTurleri', 'baslangic'],
     'dosyalar' => ['ham', 'proje', 'final'],
 ];
-const BILINEN_AYAR = ['id', 'surum', 'olusturma', 'guncelleme', 'varsayilanStokUyari', 'sonYedek'];
+const BILINEN_AYAR = ['id', 'surum', 'olusturma', 'guncelleme', 'varsayilanStokUyari', 'sonYedek', 'calismaBas', 'calismaBit', 'haftalikHedef'];
 const BILINEN_ALANLAR = [
     'musteri' => ['id', 'surum', 'olusturma', 'guncelleme', 'ad', 'kurum', 'ucret', 'siklik', 'slotTuru', 'slotIstisna', 'stokUyari', 'stokGirisi', 'not', 'arsiv'],
-    'etkinlik' => ['id', 'surum', 'olusturma', 'guncelleme', 'musteriId', 'musteriAdi', 'musteriKurum', 'baslik', 'tur', 'tumGun', 'basTarih', 'basSaat', 'bitTarih', 'bitSaat', 'konum', 'not', 'durum', 'arsiv'],
+    'etkinlik' => ['id', 'surum', 'olusturma', 'guncelleme', 'musteriId', 'musteriAdi', 'musteriKurum', 'baslik', 'tur', 'tumGun', 'basTarih', 'basSaat', 'bitTarih', 'bitSaat', 'konum', 'not', 'durum', 'tamamZaman', 'arsiv'],
     'icerik' => ['id', 'surum', 'olusturma', 'guncelleme', 'musteriId', 'musteriAdi', 'musteriKurum', 'baslik', 'tur', 'durum', 'oncelik', 'cekimId', 'teslimTarihi', 'planTarihi', 'yayinTarihi', 'revizyonNotu', 'dosyalar', 'not', 'gecmis', 'arsiv'],
+    'blok' => ['id', 'surum', 'olusturma', 'guncelleme', 'musteriId', 'musteriAdi', 'musteriKurum', 'icerikIdler', 'baslik', 'basTarih', 'basSaat', 'bitTarih', 'bitSaat', 'durum', 'tamamZaman', 'not', 'arsiv'],
+    'ozelgun' => ['id', 'surum', 'olusturma', 'guncelleme', 'baslik', 'tarih', 'tur', 'herYil', 'arsiv'],
 ];
 
 /**
@@ -857,12 +967,13 @@ const BILINEN_ALANLAR = [
  *   satirlara karsi denetlenir (ayni satir iki kez eklenmez).
  * - Musteri ad + kurum veritabaninda tekil oldugundan: ayni musteri veritabaninda varsa ona baglanir ve atlanir;
  *   ayni dosyada iki kez geciyorsa hata.
- * - Icerik / etkinlik musteriye musteriId (dosyadaki kimlik) ya da musteriAdi (+ musteriKurum) ile baglanir.
+ * - Icerik / etkinlik / calisma blogu musteriye musteriId (dosyadaki kimlik) ya da musteriAdi (+ musteriKurum) ile baglanir.
+ * - Calisma blogundaki icerikler dosyadaki kimlikle eslenir; olmayan icerik hata, baska musteriye ait icerik uyariyla bloktan cikarilir.
  *   musteriKurum verilmisse (bos da olsa) ad + kurum tam eslesmeli; verilmemisse ad yalniz tek bir musteriye uyuyorsa baglanir.
  * - degistir kipinde yedekteki ayar kaydi da geri yuklenir.
  */
 function ice_aktarma_plani(array $gelen, string $kip): array {
-    global $ETK_MUSTERI;
+    global $ETK_MUSTERI, $ICERIK_MUSTERI;
     $mevcut = $kip === 'degistir' ? [] : tum_kayitlar();
     $var = tur_haritasi($mevcut);
     $dbDogal = [];
@@ -882,17 +993,18 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
         }
     }
     $plan = ['ekle' => [], 'atla' => [], 'hatalar' => [], 'uyarilar' => [],
-        'sayilar' => ['musteri' => 0, 'icerik' => 0, 'etkinlik' => 0, 'atlanan' => 0],
+        'sayilar' => ['musteri' => 0, 'icerik' => 0, 'etkinlik' => 0, 'blok' => 0, 'ozelgun' => 0, 'atlanan' => 0],
         'ucret' => ['bilinen' => 0, 'belirsiz' => 0, 'toplam' => 0]];
     $idEslem = [];      // dosyadaki kimlik => son kimlik
     $dosyaIdleri = [];  // bu dosyada gorulen kimlikler
     $dosyaMusteri = []; // bu dosyada eklenecek musterilerin dogal anahtari
     $dosyaDogal = [];   // bu dosyada eklenecek kimliksiz etkinlik / iceriklerin dogal anahtari
     $bilinmeyen = [];   // "alan" => sayi
-    $sira = ['musteri' => 'musteriler', 'etkinlik' => 'etkinlikler', 'icerik' => 'icerikler'];
+    // sira onemli: blok, iceriklerinden sonra gelir (icerik kimlikleri eslenmis olsun)
+    $sira = ['musteri' => 'musteriler', 'etkinlik' => 'etkinlikler', 'icerik' => 'icerikler', 'blok' => 'bloklar', 'ozelgun' => 'ozelgunler'];
     // Onizlemede satir etiketi: "2. müşteri (Ad)"; bolum adi arayuzdeki gibi
-    $satirAd = ['musteri' => 'müşteri', 'etkinlik' => 'çekim / etkinlik', 'icerik' => 'içerik'];
-    $bolumAd = ['musteri' => 'Müşteriler', 'etkinlik' => 'Çekim / etkinlikler', 'icerik' => 'İçerikler'];
+    $satirAd = ['musteri' => 'müşteri', 'etkinlik' => 'çekim / etkinlik', 'icerik' => 'içerik', 'blok' => 'çalışma bloğu', 'ozelgun' => 'özel gün'];
+    $bolumAd = ['musteri' => 'Müşteriler', 'etkinlik' => 'Çekim / etkinlikler', 'icerik' => 'İçerikler', 'blok' => 'Çalışma blokları', 'ozelgun' => 'Özel günler'];
     foreach ($sira as $tur => $alan) {
         $liste = $gelen[$alan] ?? [];
         if (!is_array($liste)) { $plan['hatalar'][] = "{$bolumAd[$tur]} ($alan) liste biçiminde olmalı"; continue; }
@@ -933,7 +1045,7 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                     continue;
                 }
             }
-            if ($tur !== 'musteri') {
+            if ($tur !== 'musteri' && $tur !== 'ozelgun') {
                 $mid = $k['musteriId'] ?? null;
                 if (is_string($mid) && $mid !== '' && isset($idEslem[$mid])) {
                     $k['musteriId'] = $idEslem[$mid];
@@ -959,6 +1071,19 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                     $plan['uyarilar'][] = "$etiket: bağlı çekim başka müşteriye ait; bu bağ kaldırılacak";
                     $k['cekimId'] = null;
                 }
+                // calisma blogu: icerik kimlikleri eslenir; baska musteriye ait icerik (ornegin sonradan musterisi degismis)
+                // dosyayi reddettirmez, uyariyla bloktan cikarilir. Olmayan icerik temizle()'de hata olur.
+                if ($tur === 'blok' && liste_mi($k['icerikIdler'] ?? null)) {
+                    $liste2 = [];
+                    $cikan = 0;
+                    foreach ($k['icerikIdler'] as $iid) {
+                        if (is_string($iid) && isset($idEslem[$iid])) $iid = $idEslem[$iid];
+                        if (is_string($iid) && is_string($k['musteriId'] ?? null) && isset($ICERIK_MUSTERI[$iid]) && $ICERIK_MUSTERI[$iid] !== $k['musteriId']) { $cikan++; continue; }
+                        $liste2[] = $iid;
+                    }
+                    if ($cikan) $plan['uyarilar'][] = "$etiket: $cikan içerik başka müşteriye ait; bloktan çıkarılacak";
+                    $k['icerikIdler'] = $liste2;
+                }
             }
             try {
                 $temiz = temizle($tur, $k, $var);
@@ -967,6 +1092,7 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                 continue;
             }
             $ad = $tur === 'musteri' ? $temiz['ad'] : $temiz['baslik'];
+            if ($tur === 'blok' && $ad === '') $ad = 'Çalışma bloğu ' . $temiz['basTarih'] . ' ' . $temiz['basSaat'];
             $d = dogal($tur, $temiz);
             if ($tur === 'musteri') {
                 if (isset($dosyaMusteri[$d])) { $plan['hatalar'][] = "$etiket: aynı müşteri (ad + kurum) dosyada iki kez geçiyor"; continue; }
@@ -987,6 +1113,7 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
             if ($eskiId !== null) $idEslem[$eskiId] = $yeni;
             $var[$yeni] = $tur;
             if ($tur === 'etkinlik') $ETK_MUSTERI[$yeni] = $temiz['musteriId'];
+            if ($tur === 'icerik') $ICERIK_MUSTERI[$yeni] = $temiz['musteriId'];
             if ($tur === 'musteri') {
                 $ak = norm($temiz['ad']) . '|' . norm($temiz['kurum']);
                 $musteriAd[$ak] = $yeni;
@@ -995,7 +1122,7 @@ function ice_aktarma_plani(array $gelen, string $kip): array {
                 if ($temiz['ucret'] === null) $plan['ucret']['belirsiz']++;
                 else { $plan['ucret']['bilinen']++; $plan['ucret']['toplam'] += $temiz['ucret']; }
             }
-            $bag = $tur === 'musteri' ? null : ($temiz['musteriId'] !== null ? ($musteriAdlari[$temiz['musteriId']] ?? null) : null);
+            $bag = isset($temiz['musteriId']) && $tur !== 'musteri' ? ($musteriAdlari[$temiz['musteriId']] ?? null) : null;
             $ek = $tur === 'musteri' ? ['ucret' => $temiz['ucret'], 'siklik' => $temiz['siklik']['tur']] : [];
             $plan['ekle'][] = ['tur' => $tur, 'id' => $yeni, 'veri' => $temiz, 'ad' => $ad, 'bag' => $bag, 'ek' => $ek,
                 'olusturma' => isset($k['olusturma']) && is_int($k['olusturma']) && $k['olusturma'] > 0 ? $k['olusturma'] : null,
@@ -1124,7 +1251,7 @@ try {
                     if (count($plan['hatalar']) > 0) throw new RuntimeException('plan|' . json_encode($ozet, JSON_UNESCAPED_UNICODE));
                     if ($beklenen !== null) {
                         $eskimis = isset($beklenen['durum']) && (int)$beklenen['durum'] !== $durumOnce;
-                        foreach (['musteri', 'icerik', 'etkinlik', 'atlanan'] as $k) {
+                        foreach (['musteri', 'icerik', 'etkinlik', 'blok', 'ozelgun', 'atlanan'] as $k) {
                             if (isset($beklenen[$k]) && (int)$beklenen[$k] !== $plan['sayilar'][$k]) $eskimis = true;
                         }
                         if ($eskimis) throw new RuntimeException('onizleme_eski|' . json_encode($ozet, JSON_UNESCAPED_UNICODE));
@@ -1161,7 +1288,9 @@ try {
             if (!$r) hata(404, 'yok', 'Otomatik kopya bulunamadı.');
             $paket = anlik_coz((string)$r['veri']);
             $ekle = [];
+            // bu surumden onceki kopyalarda bloklar / ozelgunler yok: geri donuste bos gelir
             $gruplar = ['musteri' => $paket['musteriler'] ?? [], 'etkinlik' => $paket['etkinlikler'] ?? [], 'icerik' => $paket['icerikler'] ?? [],
+                'blok' => $paket['bloklar'] ?? [], 'ozelgun' => $paket['ozelgunler'] ?? [],
                 'ayar' => isset($paket['ayar']) && is_array($paket['ayar']) ? [$paket['ayar']] : []];
             foreach ($gruplar as $tur => $l) {
                 foreach ($l as $x) {

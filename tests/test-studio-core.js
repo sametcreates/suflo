@@ -405,6 +405,13 @@ ok("yedekCoz: taninmayan ust duzey alanlar listelenir", (function () {
   var c = C.yedekCoz({ format: "suflo-studio-yedek", surum: 1, veriler: { musteriler: [], cekimler: [{}] }, ekstra: 1 });
   return c.bilinmeyen.indexOf("cekimler") !== -1 && c.bilinmeyen.indexOf("ekstra") !== -1 && C.yedekCoz({ musteriler: [] }).bilinmeyen.length === 0;
 })());
+ok("yedekCoz: calisma bloklari ve ozel gunler tasinir, bilinmeyen bolum sayilmaz; eski yedekte bos liste", (function () {
+  var c = C.yedekCoz({ format: "suflo-studio-yedek", surum: 1, veriler: { musteriler: [], bloklar: [{ id: "b1" }], ozelgunler: [{ baslik: "Örnek gün" }] } });
+  var eski = C.yedekCoz({ format: "suflo-studio-yedek", veriler: { musteriler: [{}] } }).veriler;
+  var yalnizOzel = C.yedekCoz({ ozelgunler: [{ baslik: "x", tarih: "2030-01-01" }] });
+  return c.veriler.bloklar.length === 1 && c.veriler.ozelgunler[0].baslik === "Örnek gün" && c.bilinmeyen.length === 0 &&
+    Array.isArray(eski.bloklar) && eski.bloklar.length === 0 && eski.ozelgunler.length === 0 && !yalnizOzel.hata && yalnizOzel.veriler.ozelgunler.length === 1;
+})());
 ok("yedekCoz ayar kaydini da tasir", C.yedekCoz({ format: "suflo-studio-yedek", veriler: { musteriler: [], ayar: { varsayilanStokUyari: 3 } } }).veriler.ayar.varsayilanStokUyari === 3);
 ok("filtre: durum listesi", C.icerikFiltrele(fv, { durum: "onayda,kurguda" }).length === 1);
 ok("filtre: arsiv ayri", C.icerikFiltrele(fv, { arsiv: true }).length === 1 && C.icerikFiltrele(fv, {}).length === 1);

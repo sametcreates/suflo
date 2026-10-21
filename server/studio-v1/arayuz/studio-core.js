@@ -644,19 +644,22 @@
     return csv(rows);
   }
 
-  /** Ice aktarma dosyasini ortak bicime cevirir: { musteriler, icerikler, etkinlikler } ya da hata metni. */
+  /**
+   * Ice aktarma dosyasini ortak bicime cevirir: { musteriler, icerikler, etkinlikler, bloklar, ozelgunler } ya da hata metni.
+   * bloklar (calisma bloklari) ve ozelgunler eski yedeklerde yoktur: bos liste gider.
+   */
   function yedekCoz(obj) {
     if (!obj || typeof obj !== "object") return { hata: "Bu dosya bir Suflo Studio yedeği değil." };
     var v = obj.format === "suflo-studio-yedek" ? obj.veriler : obj;
     if (!v || typeof v !== "object") return { hata: "Yedek içinde veri yok." };
-    var ok = ["musteriler", "icerikler", "etkinlikler"].some(function (k) { return Array.isArray(v[k]); });
+    var ok = ["musteriler", "icerikler", "etkinlikler", "bloklar", "ozelgunler"].some(function (k) { return Array.isArray(v[k]); });
     if (!ok) return { hata: "Bu dosyada müşteri, içerik ya da çekim listesi bulunamadı. Suflo Studio’dan indirdiğin JSON yedeğini seç." };
-    var out = { musteriler: v.musteriler || [], icerikler: v.icerikler || [], etkinlikler: v.etkinlikler || [] };
+    var out = { musteriler: v.musteriler || [], icerikler: v.icerikler || [], etkinlikler: v.etkinlikler || [], bloklar: v.bloklar || [], ozelgunler: v.ozelgunler || [] };
     // yedekte ayar acikca bos (null) ise de iletilir: "tumunu degistir" mevcut ayari da kaldirir
     if (v.ayar === null && Object.prototype.hasOwnProperty.call(v, "ayar")) out.ayar = null;
     else if (v.ayar && typeof v.ayar === "object") out.ayar = v.ayar;
     // taninmayan ust duzey alanlar (ornegin elle hazirlanmis "cekimler" listesi) sessizce yok sayilmaz, onizlemede uyarilir
-    var bilinen = { musteriler: 1, icerikler: 1, etkinlikler: 1, ayar: 1 };
+    var bilinen = { musteriler: 1, icerikler: 1, etkinlikler: 1, bloklar: 1, ozelgunler: 1, ayar: 1 };
     var bilinmeyen = Object.keys(v).filter(function (k) { return !bilinen[k]; });
     if (obj.format === "suflo-studio-yedek") {
       var ust = { format: 1, surum: 1, olusturma: 1, veriler: 1 };
