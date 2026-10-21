@@ -4,6 +4,8 @@
  *  - yayinlanan stoktan duser ama silinmez; durum geri alininca sayilar duzelir
  *  - gunluk, 3 gunde 1 ve haftalik ihtiyac; eksik duzen "kurulmali", bilinmeyen stok 0 sayilmaz
  *  - takvim cakismasi (saatli, tum gun, cok gunlu, iptal), Istanbul saati, CSV, ucret ozeti
+ *  - saatli takvim: resmi tatiller (2026/2027 dini bayramlar, sonrasi uydurulmaz), gece yarisini asan parcalar, etkinlik + blok
+ *    cakismasi, bos aralik, planlanacaklar, cekime bagli bekleyen video, bugun/hafta tamamlanan, "Simdi ne yapayim?" onerisi
  *  - tarayicisiz statik denetim: studio.js sozdizimi, index.html baglantilari, elle yuklenen .htaccess yasaklari
  */
 "use strict";
@@ -446,6 +448,220 @@ ok("musteri CSV: 'Beklenen paylaşım türü' basligi ve Turkce deger (diger -> 
 ok("icerik CSV: dosya sutunlari formdaki adlarla", /Ham görüntü bağlantısı;Proje dosyası bağlantısı;Final bağlantısı/.test(C.iceriklerCsv({ icerikler: [] })));
 ok("yedekCoz: hata metinleri sade Turkce (alan adi yok)", /^Bu dosyada müşteri, içerik ya da çekim listesi bulunamadı/.test(C.yedekCoz({ x: 1 }).hata) &&
   C.yedekCoz(null).hata === "Bu dosya bir Suflo Studio yedeği değil.", C.yedekCoz({ x: 1 }).hata);
+
+/* ---------------- Resmi tatiller (sabit + yalniz yayimlanmis dini bayramlar) ---------------- */
+var t26 = C.resmiTatiller(2026), t27 = C.resmiTatiller(2027), t28 = C.resmiTatiller(2028);
+var tg26 = function (d) { return t26.gunler.filter(function (x) { return x.tarih === d; }); };
+ok("resmiTatiller: sabit gunler her yil (2429 sayili Kanun, 8 gun)", ["2028-01-01", "2028-04-23", "2028-05-01", "2028-05-19", "2028-07-15", "2028-08-30", "2028-10-28", "2028-10-29"]
+  .every(function (d) { return t28.gunler.some(function (x) { return x.tarih === d && x.tur === "tatil"; }); }), j(t28));
+ok("resmiTatiller: 28 Ekim yarim gun (13.00'ten sonra), 29 Ekim tam gun", tg26("2026-10-28")[0].yarim && tg26("2026-10-28")[0].yarimSaat === "13:00" && !tg26("2026-10-29")[0].yarim);
+ok("resmiTatiller 2026: Ramazan arefe 19 Mart yarim, bayram 20-22 Mart; Kurban arefe 26 Mayis yarim, bayram 27-30 Mayis",
+  t26.diniBilinen && t26.not === null && tg26("2026-03-19")[0].yarim && /Ramazan/.test(tg26("2026-03-19")[0].ad) &&
+  ["2026-03-20", "2026-03-21", "2026-03-22"].every(function (d) { return tg26(d).length === 1 && !tg26(d)[0].yarim && /Ramazan Bayramı/.test(tg26(d)[0].ad); }) &&
+  tg26("2026-05-26")[0].yarim && /Kurban/.test(tg26("2026-05-26")[0].ad) &&
+  ["2026-05-27", "2026-05-28", "2026-05-29", "2026-05-30"].every(function (d) { return tg26(d).length === 1 && /Kurban Bayramı/.test(tg26(d)[0].ad); }) &&
+  !tg26("2026-03-23").length && !tg26("2026-05-31").length && t26.gunler.length === 17, j(t26));
+ok("resmiTatiller 2027: Ramazan 8 Mart arefe + 9-11 Mart; Kurban 15 Mayis arefe + 16-19 Mayis; 19 Mayis'ta iki tatil", (function () {
+  var g = function (d) { return C.gununTatilleri(d); };
+  return t27.diniBilinen && g("2027-03-08")[0].yarim && g("2027-03-09").length === 1 && g("2027-03-11").length === 1 && !g("2027-03-12").length &&
+    g("2027-05-15")[0].yarim && /Kurban/.test(g("2027-05-15")[0].ad) && g("2027-05-16").length === 1 && g("2027-05-19").length === 2 && !g("2027-05-20").length &&
+    t27.gunler.length === 17 && t27.gunler.every(function (x, k) { return k === 0 || t27.gunler[k - 1].tarih <= x.tarih; });
+})(), j(t27));
+ok("resmiTatiller 2028 ve 2025: dini bayram uydurulmaz, yalniz sabit gunler + acik not", !t28.diniBilinen && t28.gunler.length === 8 &&
+  /Diyanet takvimi yayımlanınca eklenecek/.test(t28.not) && !t28.gunler.some(function (x) { return /Ramazan|Kurban/.test(x.ad); }) &&
+  !C.resmiTatiller(2025).diniBilinen && C.resmiTatiller(2025).gunler.length === 8, j(t28));
+ok("resmiTatiller: gecersiz yil bos; donen nesneyi degistirmek sonraki cagriyi bozmaz", C.resmiTatiller("abc").gunler.length === 0 && C.resmiTatiller(1999).gunler.length === 0 &&
+  (function () { var x = C.resmiTatiller(2026); x.gunler.length = 0; x.gunler.push = null; return C.resmiTatiller(2026).gunler.length === 17; })());
+ok("gununTatilleri: tatil olmayan gun ve gecersiz tarih bos", C.gununTatilleri("2026-10-21").length === 0 && C.gununTatilleri("2026-13-01").length === 0);
+var oz = [{ id: "o1", baslik: "Doğum günü", tarih: "2028-02-29", tur: "dogum", herYil: true, arsiv: false },
+  { id: "o2", baslik: "Bakım", tarih: "2030-03-06", tur: "ozel", herYil: false, arsiv: false },
+  { id: "o3", baslik: "Eski", tarih: "2030-03-06", tur: "ozel", herYil: true, arsiv: true }];
+ok("gununOzelGunleri: her yil tekrar, 29 Subat artik olmayan yilda 28 Subat, ilk yildan once yok, tek seferlik yalniz o gun, arsiv yok",
+  C.gununOzelGunleri(oz, "2028-02-29").length === 1 && C.gununOzelGunleri(oz, "2031-02-28").length === 1 && C.gununOzelGunleri(oz, "2032-02-29").length === 1 &&
+  C.gununOzelGunleri(oz, "2032-02-28").length === 0 && C.gununOzelGunleri(oz, "2027-02-28").length === 0 &&
+  C.gununOzelGunleri(oz, "2030-03-06").map(function (o) { return o.id; }).join() === "o2" && C.gununOzelGunleri(oz, "2031-03-06").length === 0 && C.gununOzelGunleri(null, "2030-03-06").length === 0);
+
+/* ---------------- Saatli takvim: parcalar, cakisma, bos aralik ---------------- */
+function blok(o) { return Object.assign({ id: "b" + (++sayac) + "aaaaaaa", musteriId: "mA0000000", icerikIdler: [], baslik: "", basTarih: BUGUN, basSaat: "10:00", bitTarih: BUGUN, bitSaat: "12:00", durum: "planlandi", tamamZaman: null, not: "", arsiv: false }, o); }
+ok("saatDk / dkSaat / anNoktasi: gun sinirinda sarar", C.saatDk("09:30") === 570 && isNaN(C.saatDk("24:00")) && C.dkSaat(1440) === "00:00" && C.dkSaat(-15) === "23:45" &&
+  j(C.anNoktasi("2030-12-31", 1500)) === j({ tarih: "2031-01-01", saat: "01:00" }));
+ok("calismaSaatleri: varsayilan 09-19, ayar gecerliyse ayar, tutarsizsa varsayilan", j(C.calismaSaatleri(null)) === j({ bas: 540, bit: 1140 }) &&
+  j(C.calismaSaatleri({ calismaBas: 600, calismaBit: 1440 })) === j({ bas: 600, bit: 1440 }) && j(C.calismaSaatleri({ calismaBas: 700, calismaBit: 600 })) === j({ bas: 540, bit: 1140 }) &&
+  j(C.calismaSaatleri({ calismaBas: null, calismaBit: 1000 })) === j({ bas: 540, bit: 1000 }));
+var pGece = C.takvimParcalari(blok({ basSaat: "22:00", bitTarih: "2030-03-05", bitSaat: "01:00" }));
+ok("takvimParcalari: gece yarisini asan blok iki gunde (22-24, 00-01)", j(pGece) === j([{ gun: BUGUN, ilk: true, son: false, tumGun: false, bas: 1320, bit: 1440 },
+  { gun: "2030-03-05", ilk: false, son: true, tumGun: false, bas: 0, bit: 60 }]), j(pGece));
+var pYarim = C.takvimParcalari(etk({ basSaat: "22:00", bitTarih: "2030-03-05", bitSaat: "00:00" }));
+ok("takvimParcalari: tam 00:00'da biten is ertesi gune parca birakmaz", pYarim.length === 1 && pYarim[0].bit === 1440 && pYarim[0].son, j(pYarim));
+var pCok = C.takvimParcalari(blok({ basSaat: "10:00", bitTarih: "2030-03-06", bitSaat: "12:00" }));
+ok("takvimParcalari: uc gunluk blokta ara gun 00-24", pCok.length === 3 && pCok[0].bas === 600 && pCok[0].bit === 1440 && pCok[1].bas === 0 && pCok[1].bit === 1440 && !pCok[1].ilk && !pCok[1].son && pCok[2].bit === 720, j(pCok));
+var pTum = C.takvimParcalari(etk({ tumGun: true, basSaat: null, bitSaat: null, basTarih: "2030-03-09", bitTarih: "2030-03-10" }));
+ok("takvimParcalari: iki gunluk tum gun etkinlik iki tum gun parcasi", pTum.length === 2 && pTum.every(function (p) { return p.tumGun && p.bas === 0 && p.bit === 1440; }) && pTum[1].gun === "2030-03-10" && pTum[1].son, j(pTum));
+ok("takvimParcalari: ilkGun / sonGun ile kirpilir; ters ya da bozuk kayit bos", j(C.takvimParcalari(blok({ basSaat: "10:00", bitTarih: "2030-03-06", bitSaat: "12:00" }), "2030-03-05", "2030-03-05").map(function (p) { return p.gun; })) === j(["2030-03-05"]) &&
+  C.takvimParcalari(blok({ basSaat: "12:00", bitSaat: "10:00" })).length === 0 && C.takvimParcalari(blok({ basSaat: "aa" })).length === 0 && C.takvimParcalari(null).length === 0 &&
+  C.takvimParcalari(blok({ basTarih: "2030-02-30" })).length === 0);
+ok("takvimParcalari: bozuk uzun kayit sinirli (en cok 400 gun)", C.takvimParcalari(blok({ bitTarih: "2099-01-01" })).length === 400);
+
+var kE = etk({ basSaat: "10:00", bitSaat: "12:00" }), kB = blok({ basSaat: "11:00", bitSaat: "13:00" }), kB2 = blok({ basSaat: "13:00", bitSaat: "14:00" });
+var kBitti = blok({ basSaat: "10:30", bitSaat: "11:30", durum: "tamamlandi", tamamZaman: BUGUN + " 11:30" }), kEtTamam = etk({ basSaat: "10:30", bitSaat: "11:00", durum: "tamamlandi" });
+var kIptal = etk({ basSaat: "10:30", bitSaat: "11:00", durum: "iptal" }), kArsivB = blok({ basSaat: "10:30", bitSaat: "11:00", arsiv: true });
+var kGeceB = blok({ basSaat: "23:00", bitTarih: "2030-03-05", bitSaat: "01:00" }), kSabahE = etk({ basTarih: "2030-03-05", bitTarih: "2030-03-05", basSaat: "00:30", bitSaat: "02:00" });
+var vK = { etkinlikler: [kE, kEtTamam, kIptal, kSabahE], bloklar: [kB, kB2, kBitti, kArsivB, kGeceB] };
+var tc = C.takvimCakismalari(vK);
+ok("takvimCakismalari: etkinlik ile blok birlikte; uc uca degil; tamamlanan / iptal / arsiv sayilmaz", j(tc[kE.id]) === j([kB.id]) && j(tc[kB.id]) === j([kE.id]) &&
+  !tc[kB2.id] && !tc[kBitti.id] && !tc[kEtTamam.id] && !tc[kIptal.id] && !tc[kArsivB.id], j(tc));
+ok("takvimCakismalari: gece yarisini asan blok ertesi sabahki cekimle cakisir", j(tc[kGeceB.id]) === j([kSabahE.id]) && j(tc[kSabahE.id]) === j([kGeceB.id]), j(tc));
+ok("takvimCakismalari: bos veri bos harita", j(C.takvimCakismalari({})) === "{}");
+ok("eski cakismaHaritasi davranisi aynen: tamamlanan etkinlik hala sayilir", (C.cakismaHaritasi([kE, kEtTamam])[kE.id] || []).indexOf(kEtTamam.id) !== -1);
+var zc = C.zamanCakisanlari(vK, { id: kB.id, basTarih: BUGUN, basSaat: "11:45", bitTarih: BUGUN, bitSaat: "13:30" });
+ok("zamanCakisanlari: surukleme adayi kendisiyle cakismaz, tur bilgisiyle doner", j(zc.map(function (x) { return x.tur + ":" + x.k.id; }).sort()) === j(["blok:" + kB2.id, "etkinlik:" + kE.id].sort()), j(zc));
+
+var bos0 = { etkinlikler: [], bloklar: [] }, S8 = { tarih: BUGUN, saat: "08:00" };
+var ba = function (v, o) { var r = C.bosAralik(v, o); return r ? r.basTarih + " " + r.basSaat + "-" + r.bitTarih + " " + r.bitSaat : null; };
+ok("bosAralik: bos veride calisma basinda; simdi 10:07 ise 15 dakikaya yuvarlanir", ba(bos0, { simdi: S8 }) === BUGUN + " 09:00-" + BUGUN + " 10:00" &&
+  ba(bos0, { simdi: { tarih: BUGUN, saat: "10:07" }, sure: 30 }) === BUGUN + " 10:15-" + BUGUN + " 10:45" && ba({}, { simdi: S8 }) === BUGUN + " 09:00-" + BUGUN + " 10:00");
+var vDolu = { etkinlikler: [etk({ basSaat: "09:00", bitSaat: "11:00" })], bloklar: [blok({ basSaat: "11:00", bitSaat: "12:20" }), blok({ basSaat: "12:30", bitSaat: "13:00", durum: "tamamlandi" })] };
+ok("bosAralik: etkinlik + blok doluluguna bakar, engelin bitisini adima yuvarlar, tamamlanan engel degil", ba(vDolu, { simdi: S8, sure: 60 }) === BUGUN + " 12:30-" + BUGUN + " 13:30", ba(vDolu, { simdi: S8 }));
+ok("bosAralik: mesai bittiyse ertesi gun; sure pencereden uzunsa null; tarih yoksa null", ba(bos0, { simdi: { tarih: BUGUN, saat: "18:30" } }) === "2030-03-05 09:00-2030-03-05 10:00" &&
+  C.bosAralik(bos0, { simdi: S8, sure: 700 }) === null && C.bosAralik(bos0, {}) === null);
+ok("bosAralik: 7 gun tum gun etkinlikle doluysa null, 8. gun gunSayisi ile bulunur", (function () {
+  var v = { etkinlikler: [etk({ tumGun: true, basSaat: null, bitSaat: null, basTarih: BUGUN, bitTarih: "2030-03-10" })] };
+  return C.bosAralik(v, { simdi: S8 }) === null && ba(v, { simdi: S8, gunSayisi: 8 }) === "2030-03-11 09:00-2030-03-11 10:00";
+})());
+ok("bosAralik: dunden gece yarisini asan blok sabahi kapatir", ba({ bloklar: [blok({ basTarih: "2030-03-03", bitTarih: BUGUN, basSaat: "23:00", bitSaat: "10:00" })] }, { simdi: S8 }) === BUGUN + " 10:00-" + BUGUN + " 11:00");
+ok("bosAralik: calisma 24:00'te bitiyorsa bitis ertesi gun 00:00 (gecersiz 24:00 yazilmaz)", ba(bos0, { simdi: { tarih: BUGUN, saat: "23:00" }, ayar: { calismaBas: 600, calismaBit: 1440 } }) === BUGUN + " 23:00-2030-03-05 00:00");
+ok("bosAralik: haricId (tasinan kaydin kendisi) engel sayilmaz; ayardaki calisma basi", (function () {
+  var b = blok({ basSaat: "10:00", bitSaat: "11:00" });
+  return ba({ bloklar: [b] }, { simdi: S8, ayar: { calismaBas: 600, calismaBit: 1140 } }) === BUGUN + " 11:00-" + BUGUN + " 12:00" &&
+    ba({ bloklar: [b] }, { simdi: S8, ayar: { calismaBas: 600, calismaBit: 1140 }, haricId: b.id }) === BUGUN + " 10:00-" + BUGUN + " 11:00";
+})());
+ok("bosAralik: Istanbul saati yil boyu UTC+3 (yaz saati yok): 1 Temmuz 06:00 UTC -> 09:00'da bos", ba(bos0, { simdi: C.istanbulSimdi(new Date(Date.UTC(2030, 6, 1, 6, 0))) }) === "2030-07-01 09:00-2030-07-01 10:00");
+
+/* ---------------- Planlanacaklar ve cekime bagli videolar ---------------- */
+var pM = musteri({}), pMB = musteri({ id: "mB0000000", ad: "Arşivli Müşteri", arsiv: true });
+var pC1 = etk({ id: "ecekim1aa", musteriId: pM.id, basTarih: "2030-03-06", bitTarih: "2030-03-06" }), pC2 = etk({ id: "ecekim2aa", musteriId: pM.id, durum: "iptal" });
+var p = {
+  a1: icerik({ durum: "cekildi", cekimId: pC1.id }), a2: icerik({ durum: "kurguda", cekimId: pC1.id, teslimTarihi: "2030-03-08" }),
+  a3: icerik({ durum: "revizyonda", tur: "video", teslimTarihi: "2030-03-05" }), a4: icerik({ durum: "fikir" }),
+  a5: icerik({ durum: "fikir", cekimId: pC1.id }), a6: icerik({ durum: "cekim_planlandi", cekimId: pC2.id }),
+  a7: icerik({ durum: "onayda" }), a8: icerik({ durum: "hazir", cekimId: pC1.id }), a9: icerik({ durum: "kurguda", arsiv: true, cekimId: pC1.id }),
+  b1: icerik({ durum: "kurguda", musteriId: pMB.id }), a10: icerik({ durum: "kurguda", cekimId: pC1.id }), a11: icerik({ durum: "kurguda", tur: "post" }),
+  a12: icerik({ durum: "kurguda", tur: "post" }), a13: icerik({ durum: "kurguda" }), a14: icerik({ durum: "yayinlandi", cekimId: pC1.id }),
+  a15: icerik({ durum: "kurguda", cekimId: "eyokkayit" })
+};
+var pVeri = {
+  musteriler: [pM, pMB], etkinlikler: [pC1, pC2],
+  icerikler: Object.keys(p).map(function (k) { return p[k]; }),
+  bloklar: [
+    blok({ icerikIdler: [p.a10.id], basTarih: "2030-03-05", bitTarih: "2030-03-05" }),            // gelecekte planli
+    blok({ icerikIdler: [p.a11.id], durum: "tamamlandi", tamamZaman: BUGUN + " 09:00" }),         // tamamlandi: yine planlanacak
+    blok({ icerikIdler: [p.a12.id], basTarih: "2030-03-03", bitTarih: "2030-03-03" }),            // gecmiste kalmis planli blok
+    blok({ icerikIdler: [p.a13.id], basSaat: "09:00", bitSaat: "11:00" }),                        // su an devam ediyor (simdi 10:00)
+    blok({ icerikIdler: [p.a1.id], basTarih: "2030-03-05", bitTarih: "2030-03-05", arsiv: true }) // arsivli blok sayilmaz
+  ]
+};
+var pOnce = j(pVeri), pS = { tarih: BUGUN, saat: "10:00" };
+var pl = C.planlanacaklar(pVeri, pS);
+var plId = function (g) { return g.icerikler.map(function (i) { return i.id; }); };
+ok("planlanacaklar: musteri + cekime gore iki grup, en yakin teslim once", pl.length === 2 && pl[0].anahtar === pM.id + "|" && pl[1].anahtar === pM.id + "|" + pC1.id, j(pl.map(function (g) { return g.anahtar; })));
+ok("planlanacaklar: cekimli grupta cekildi/kurguda + cekime bagli fikir; planli bloklu, hazir, arsivli disarida",
+  j(plId(pl[1]).sort()) === j([p.a1.id, p.a2.id, p.a5.id].sort()) && pl[1].cekim === pC1 && pl[1].teslim === "2030-03-08" && pl[1].ozet === "3 reels" &&
+  pl[1].baslik === "Örnek Müşteri A — 3 reels" && plId(pl[1])[0] === p.a2.id, j(pl[1]));
+ok("planlanacaklar: cekimsiz grupta revizyonda + tamamlanmis/gecmis bloklu + kaydi olmayan cekime bagli icerik; cekimsiz fikir, iptal cekimli, onayda, devam eden bloklu yok",
+  j(plId(pl[0]).sort()) === j([p.a3.id, p.a11.id, p.a12.id, p.a15.id].sort()) && pl[0].ozet === "1 reels, 1 video, 2 post" && pl[0].teslim === "2030-03-05" && pl[0].cekimId === null, j(plId(pl[0])));
+ok("planlanacaklar: arsivli musterinin icerigi yok", !pl.some(function (g) { return plId(g).indexOf(p.b1.id) !== -1; }), j(pl.map(plId)));
+ok("planlanacaklar: veriyi degistirmez; bos / eksik veri bos liste", j(pVeri) === pOnce && C.planlanacaklar({}, pS).length === 0 && C.planlanacaklar(pVeri, null).length === 0);
+ok("planlanacaklar: es teslim ve oncelikte musteri adi Turkce siraya gore (Çiçek < Deniz)", (function () {
+  var m1 = musteri({ id: "mD0000000", ad: "Deniz Kafe" }), m2 = musteri({ id: "mC0000000", ad: "Çiçek Butik" });
+  var r = C.planlanacaklar({ musteriler: [m1, m2], icerikler: [icerik({ musteriId: m1.id, durum: "kurguda" }), icerik({ musteriId: m2.id, durum: "kurguda" })] }, pS);
+  return r.length === 2 && r[0].musteriId === m2.id && r[1].musteriId === m1.id;
+})());
+ok("planlanacaklar: yuksek oncelikli grup ayni teslimde once; grup onceligi en yuksek icerikten", (function () {
+  var m1 = musteri({ id: "mD0000000", ad: "A" }), m2 = musteri({ id: "mC0000000", ad: "B" });
+  var r = C.planlanacaklar({ musteriler: [m1, m2], icerikler: [icerik({ musteriId: m1.id, durum: "kurguda" }), icerik({ musteriId: m2.id, durum: "kurguda", oncelik: "dusuk" }), icerik({ musteriId: m2.id, durum: "cekildi", oncelik: "yuksek" })] }, pS);
+  return r[0].musteriId === m2.id && r[0].oncelik === "yuksek";
+})());
+// a15'in cekimi kayitli degil: cekimsiz gruba duser (cekimId uydurma grup acmaz)
+ok("planlanacaklar: kaydi olmayan cekime bagli icerik cekimsiz gruba duser", (function () {
+  var r = C.planlanacaklar({ musteriler: [pM], icerikler: [p.a15] }, pS);
+  return r.length === 1 && r[0].cekimId === null && r[0].icerikler[0] === p.a15;
+})());
+var cv = C.cekimVideolari(pVeri);
+ok("cekimVideolari: bagli arsivsiz icerikler; bekleyen = hazir/yayinlandi olmayanlar", j(cv[pC1.id]) === j({ bagli: 6, bekleyen: 4 }) &&
+  j(C.bekleyenVideo(pVeri, pC1.id)) === j({ bagli: 6, bekleyen: 4 }) && j(C.bekleyenVideo(pVeri, "eyok")) === j({ bagli: 0, bekleyen: 0 }) && j(C.bekleyenVideo({}, pC1.id)) === j({ bagli: 0, bekleyen: 0 }), j(cv));
+
+/* ---------------- Tamamlanan sayimi (yalniz gercek kayitlar) ---------------- */
+var hz = C.durumDegistir(icerik({ durum: "onayda" }), "hazir", BUGUN + " 15:00", BUGUN);
+ok("hazirZamani: durumDegistir'in yazdigi '… → Yayına hazır' satiri", C.hazirZamani(hz) === BUGUN + " 15:00", j(hz.gecmis));
+var hzGeri = C.geriAl(hz, icerik({ durum: "onayda" }), BUGUN + " 15:01");
+ok("hazirZamani: geri alinan gecis sayilmaz (durum artik onayda)", C.hazirZamani(hzGeri) === null, j(hzGeri.gecmis));
+var hzYay = C.durumDegistir(hz, "yayinlandi", BUGUN + " 18:00", BUGUN);
+ok("hazirZamani: sonra yayinlanan icerik hazir anini korur", C.hazirZamani(hzYay) === BUGUN + " 15:00");
+var hzYayGeri = C.geriAl(hzYay, hz, BUGUN + " 18:05");
+ok("hazirZamani: 'Geri alındı: Yayınlandı → Yayına hazır' ileri gecis sayilmaz, onceki satir kullanilir", C.hazirZamani(hzYayGeri) === BUGUN + " 15:00", j(hzYayGeri.gecmis));
+ok("hazirZamani: elle 'Yayınlandı → Yayına hazır' geri donusu tamamlama sayilmaz, onceki gecis kullanilir", (function () {
+  var x = C.kopya(hzYay); x.durum = "hazir"; x.gecmis.push({ z: "2030-03-06 09:00", m: "Yayınlandı → Yayına hazır" });
+  return C.hazirZamani(x) === BUGUN + " 15:00";
+})());
+ok("gununTatilleri: donen kaydi degistirmek onbellegi bozmaz", (function () { C.gununTatilleri("2026-10-29")[0].ad = "x"; return C.gununTatilleri("2026-10-29")[0].ad === "Cumhuriyet Bayramı"; })());
+ok("hazirZamani: 'Eklendi (Yayına hazır)' / stok girisi tamamlama degil; bozuk zaman null", C.hazirZamani(icerik({ durum: "hazir", gecmis: [{ z: BUGUN + " 10:00", m: "Eklendi (Yayına hazır)" }] })) === null &&
+  C.hazirZamani(icerik({ durum: "hazir", gecmis: [{ z: BUGUN + " 10:00", m: "Stok girişiyle eklendi (Yayına hazır)" }] })) === null &&
+  C.hazirZamani(icerik({ durum: "hazir", gecmis: [{ z: "dün", m: "Kurguda → Yayına hazır" }] })) === null && C.hazirZamani(icerik({ durum: "hazir" })) === null);
+var tVeri = {
+  musteriler: [pM, pMB],
+  bloklar: [blok({ durum: "tamamlandi", tamamZaman: BUGUN + " 11:00" }), blok({ durum: "tamamlandi", tamamZaman: BUGUN + " 23:59" }),
+    blok({ durum: "tamamlandi", tamamZaman: "2030-03-05 00:00" }), blok({ durum: "planlandi", tamamZaman: BUGUN + " 11:00" }),
+    blok({ durum: "tamamlandi", tamamZaman: BUGUN + " 12:00", arsiv: true }), blok({ durum: "tamamlandi", tamamZaman: null }),
+    blok({ durum: "tamamlandi", tamamZaman: "2030-03-03 20:00" })],
+  etkinlikler: [etk({ durum: "tamamlandi", tamamZaman: BUGUN + " 13:00" }), etk({ tur: "toplanti", durum: "tamamlandi", tamamZaman: BUGUN + " 13:00" }),
+    etk({ durum: "tamamlandi" }), etk({ durum: "iptal", tamamZaman: BUGUN + " 13:00" }), etk({ durum: "tamamlandi", tamamZaman: "2030-03-10 13:00" })],
+  icerikler: [hz, hzYay, hzGeri, icerik({ musteriId: pMB.id, durum: "hazir", gecmis: [{ z: BUGUN + " 09:00", m: "Kurguda → Yayına hazır" }] }),
+    icerik({ durum: "hazir", arsiv: true, gecmis: [{ z: BUGUN + " 09:00", m: "Kurguda → Yayına hazır" }] })]
+};
+var bt = C.bugunTamamlanan(tVeri, BUGUN), ht = C.haftaTamamlanan(tVeri, BUGUN);
+ok("bugunTamamlanan: 2 blok (23:59 dahil, ertesi 00:00 haric) + 1 cekim (toplanti, iptal, zamansiz sayilmaz) + 3 icerik (arsivli musteri dahil, arsivli icerik haric)",
+  bt.blok === 2 && bt.cekim === 1 && bt.icerik === 3 && bt.toplam === 6 && bt.kayitlar[0].zaman <= bt.kayitlar[5].zaman, j(bt));
+ok("haftaTamamlanan: Pazartesi-Pazar; onceki Pazar (03-03) haric, Sali 00:00 ve Pazar (03-10) dahil", ht.blok === 3 && ht.cekim === 2 && ht.icerik === 3 && ht.toplam === 8, j(ht));
+ok("haftaTamamlanan: hafta ortasindan sorulsa da ayni hafta; bos veri sifir", C.haftaTamamlanan(tVeri, "2030-03-10").toplam === 8 && C.haftaTamamlanan({}, BUGUN).toplam === 0 &&
+  C.bugunTamamlanan(tVeri, "2030-03-03").toplam === 1);
+
+/* ---------------- "Simdi ne yapayim?" ---------------- */
+var sOnce = j(pVeri);
+var s0 = C.simdiNe(pVeri, pS, null);
+ok("simdiNe: en yakin teslimli grup (yarin) once, nedenler aciklanir", s0 && s0.grup.anahtar === pM.id + "|" && s0.adaySayisi === 2 &&
+  s0.nedenler[0] === "Teslim yarın (Sal 5 Mart)" && s0.nedenler.indexOf("5 içerik edit bekliyor (1 revizyonda)") !== -1 &&
+  s0.nedenler.indexOf("4 içeriğe henüz zaman ayrılmadı") !== -1 && s0.nedenler[s0.nedenler.length - 1] === "Bugün 11:00–15:00 boş" && s0.sure === 240, j(s0 && s0.nedenler));
+ok("simdiNe: hicbir veriyi degistirmez", j(pVeri) === sOnce);
+var s1 = C.simdiNe(pVeri, pS, null, 1);
+ok("simdiNe: 'Başka öner' sirasi; planli icerikler de aday, kismen planli grupta neden", s1.grup.anahtar === pM.id + "|" + pC1.id && s1.sira === 1 &&
+  s1.grup.adet === 4 && s1.nedenler.indexOf("3 içeriğe henüz zaman ayrılmadı") !== -1 &&
+  C.simdiNe(pVeri, pS, null, 2).grup.anahtar === s0.grup.anahtar && C.simdiNe(pVeri, pS, null, -1).grup.anahtar === s1.grup.anahtar, j(s1.nedenler));
+ok("simdiNe: aday yoksa null; tarih yoksa null", C.simdiNe({ musteriler: [pM], icerikler: [icerik({ durum: "hazir" })] }, pS) === null && C.simdiNe(pVeri, {}) === null);
+ok("simdiNe: teslimi gecmis is ve yuksek oncelik nedenleri; teslim, oncelikten agir basar", (function () {
+  var m1 = musteri({ id: "mD0000000", ad: "A" }), m2 = musteri({ id: "mC0000000", ad: "B" });
+  var v = { musteriler: [m1, m2], icerikler: [icerik({ musteriId: m1.id, durum: "kurguda", oncelik: "yuksek" }), icerik({ musteriId: m2.id, durum: "kurguda", teslimTarihi: "2030-03-02" })] };
+  var r = C.simdiNe(v, pS), r2 = C.simdiNe(v, pS, null, 1);
+  return r.grup.musteriId === m2.id && r.nedenler[0] === "Teslim 2 gün önceydi" && r2.nedenler.indexOf("Öncelik yüksek") !== -1 && r.nedenler.indexOf("Henüz zamanı ayrılmadı") !== -1;
+})());
+ok("simdiNe: tamami planli grup, ayni teslimli plansiz gruptan sonra; esitlikte musteri adi", (function () {
+  var m1 = musteri({ id: "mD0000000", ad: "Ayşe" }), m2 = musteri({ id: "mC0000000", ad: "Bora" }), m3 = musteri({ id: "mE0000000", ad: "Can" });
+  var i1 = icerik({ musteriId: m1.id, durum: "kurguda" }), i2 = icerik({ musteriId: m2.id, durum: "kurguda" }), i3 = icerik({ musteriId: m3.id, durum: "kurguda" });
+  var v = { musteriler: [m3, m2, m1], icerikler: [i3, i2, i1], bloklar: [blok({ musteriId: m1.id, icerikIdler: [i1.id], basTarih: "2030-03-06", bitTarih: "2030-03-06" })] };
+  var a = C.simdiNe(v, pS), b = C.simdiNe(v, pS, null, 1), c = C.simdiNe(v, pS, null, 2);
+  return a.grup.musteriId === m2.id && b.grup.musteriId === m3.id && c.grup.musteriId === m1.id && c.nedenler.indexOf("Zamanı ayrıldı: Çar 10:00") !== -1;
+})());
+ok("simdiNe: bos yer yoksa acik neden, aralik null", (function () {
+  var v = { musteriler: [pM], icerikler: [icerik({ durum: "kurguda" })], etkinlikler: [etk({ tumGun: true, basSaat: null, bitSaat: null, basTarih: BUGUN, bitTarih: "2030-03-12" })] };
+  var r = C.simdiNe(v, pS);
+  return r.aralik === null && r.nedenler[r.nedenler.length - 1] === "7 gün içinde çalışma saatlerinde 1 saatlik boş yer yok";
+})());
+ok("tahminiSure: icerik basina 60 dk, 60-240 arasi", C.tahminiSure({ adet: 1 }) === 60 && C.tahminiSure({ adet: 3 }) === 180 && C.tahminiSure({ adet: 9 }) === 240 && C.tahminiSure(null) === 60);
+
+/* ---------------- Gun listeleri ---------------- */
+ok("haftaninGunleri: Pazartesi baslar, ay/yil gecisinde 7 gun", j(C.haftaninGunleri("2030-01-01")) === j(["2029-12-31", "2030-01-01", "2030-01-02", "2030-01-03", "2030-01-04", "2030-01-05", "2030-01-06"]) &&
+  C.haftaninGunleri("2030-03-10")[0] === "2030-03-04");
+ok("ayinGunleri: Subat 2028 = 29, Subat 2030 = 28, Aralik 31; gunListesi 0 bos", C.ayinGunleri("2028-02-15").length === 29 && C.ayinGunleri("2030-02-01").length === 28 &&
+  C.ayinGunleri("2030-12-31")[30] === "2030-12-31" && C.ayinGunleri("2030-12-31")[0] === "2030-12-01" && C.gunListesi(BUGUN, 0).length === 0);
 
 /* ---------------- Arayuz dosyalari (CI'da tarayici olmadan da): sozdizimi ve index.html baglantilari ---------------- */
 var fs = require("fs"), path = require("path"), vm = require("vm");

@@ -470,6 +470,356 @@
     return x < y ? -1 : x > y ? 1 : 0;
   }
 
+  /* ---------------- Resmi tatiller ---------------- */
+
+  // Sabit tarihli resmi tatiller: 2429 sayili Ulusal Bayram ve Genel Tatiller Hakkinda Kanun. Her yil icin uretilir.
+  // 28 Ekim, Cumhuriyet Bayrami arifesi olarak 13.00'ten sonra yarim gundur.
+  var SABIT_TATILLER = [
+    ["01-01", "Yılbaşı"], ["04-23", "Ulusal Egemenlik ve Çocuk Bayramı"], ["05-01", "Emek ve Dayanışma Günü"],
+    ["05-19", "Atatürk'ü Anma, Gençlik ve Spor Bayramı"], ["07-15", "Demokrasi ve Millî Birlik Günü"], ["08-30", "Zafer Bayramı"],
+    ["10-28", "Cumhuriyet Bayramı arifesi", true], ["10-29", "Cumhuriyet Bayramı"]
+  ];
+  // Dini bayramlar: Diyanet Isleri Baskanligi takvimi (haber kaynaklari araciligiyla dogrulandi). Yalniz yayimlanmis yillar
+  // yazilir; listede olmayan yil icin tarih TAHMIN EDILMEZ (diniBilinen: false). Arefe gunleri 13.00'ten sonra yarim gun.
+  var DINI_BAYRAMLAR = {
+    2026: [["03-19", "Ramazan Bayramı arifesi", true], ["03-20", "Ramazan Bayramı 1. gün"], ["03-21", "Ramazan Bayramı 2. gün"], ["03-22", "Ramazan Bayramı 3. gün"],
+      ["05-26", "Kurban Bayramı arifesi", true], ["05-27", "Kurban Bayramı 1. gün"], ["05-28", "Kurban Bayramı 2. gün"], ["05-29", "Kurban Bayramı 3. gün"], ["05-30", "Kurban Bayramı 4. gün"]],
+    2027: [["03-08", "Ramazan Bayramı arifesi", true], ["03-09", "Ramazan Bayramı 1. gün"], ["03-10", "Ramazan Bayramı 2. gün"], ["03-11", "Ramazan Bayramı 3. gün"],
+      ["05-15", "Kurban Bayramı arifesi", true], ["05-16", "Kurban Bayramı 1. gün"], ["05-17", "Kurban Bayramı 2. gün"], ["05-18", "Kurban Bayramı 3. gün"], ["05-19", "Kurban Bayramı 4. gün"]]
+  };
+  var DINI_EKSIK_NOT = "Dini bayram tarihleri Diyanet takvimi yayımlanınca eklenecek";
+  var tatilOnbellek = {};
+  /**
+   * Yilin resmi tatilleri: { yil, gunler: [{ tarih, ad, tur: "tatil", yarim, yarimSaat }], diniBilinen, not }.
+   * yarim: true ise tatil 13.00'ten sonra baslar (yarimSaat "13:00"). Ayni gune iki tatil dusebilir (2027-05-19).
+   * diniBilinen false ise o yilin dini bayramlari bilinmiyor: gunler yalniz sabit tatiller, not arayuzde gosterilir.
+   */
+  function resmiTatiller(yil) {
+    yil = +yil;
+    if (!(yil >= 2000 && yil <= 2099) || Math.floor(yil) !== yil) return { yil: yil, gunler: [], diniBilinen: false, not: DINI_EKSIK_NOT };
+    if (!tatilOnbellek[yil]) {
+      var dini = DINI_BAYRAMLAR[yil] || null;
+      var gunler = SABIT_TATILLER.concat(dini || []).map(function (x) {
+        return { tarih: yil + "-" + x[0], ad: x[1], tur: "tatil", yarim: !!x[2], yarimSaat: x[2] ? "13:00" : null };
+      });
+      gunler.sort(function (a, b) { return a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : 0; });
+      tatilOnbellek[yil] = { yil: yil, gunler: gunler, diniBilinen: !!dini, not: dini ? null : DINI_EKSIK_NOT };
+    }
+    return kopya(tatilOnbellek[yil]);
+  }
+  /** Verilen gunun resmi tatilleri (bos dizi olabilir). */
+  function gununTatilleri(gun) {
+    if (!gecerliTarih(gun)) return [];
+    resmiTatiller(+gun.slice(0, 4)); // onbellegi doldurur; her gun icin tum yili kopyalamamak icin onbellekten suzulur
+    return kopya((tatilOnbellek[+gun.slice(0, 4)] || { gunler: [] }).gunler.filter(function (t) { return t.tarih === gun; }));
+  }
+  /**
+   * Verilen gune dusen (arsivlenmemis) ozel gunler. herYil: ay-gun her yil tekrar eder; tekrarlanan 29 Subat artik
+   * olmayan yillarda 28 Subat'ta gosterilir. Ilk kayit yilindan once tekrar etmez.
+   */
+  function gununOzelGunleri(ozelgunler, gun) {
+    if (!gecerliTarih(gun)) return [];
+    return (ozelgunler || []).filter(function (o) {
+      if (!aktif(o) || !gecerliTarih(o.tarih)) return false;
+      if (o.tarih === gun) return true;
+      if (!o.herYil || gun < o.tarih) return false;
+      var ag = o.tarih.slice(5);
+      if (ag === "02-29" && !gecerliTarih(gun.slice(0, 4) + "-02-29")) ag = "02-28";
+      return gun.slice(5) === ag;
+    });
+  }
+
+  /* ---------------- Saatli takvim: bloklar, parcalar, cakisma ---------------- */
+
+  /** 'SS:DD' -> gun icindeki dakika (gecersizse NaN). */
+  function saatDk(s) { return gecerliSaat(s) ? +s.slice(0, 2) * 60 + +s.slice(3, 5) : NaN; }
+  /** Dakika -> 'SS:DD' (gun sinirinda sarar: 1440 -> "00:00", -15 -> "23:45"). */
+  function dkSaat(m) { m = ((Math.round(m) % 1440) + 1440) % 1440; return iki(Math.floor(m / 60)) + ":" + iki(m % 60); }
+  /** Tarih + dakika (gun disina tasabilir: 1500 ertesi gun 01:00) -> { tarih, saat }. */
+  function anNoktasi(gun, dk) { var g = Math.floor(dk / 1440); return { tarih: gunEkle(gun, g), saat: dkSaat(dk - g * 1440) }; }
+  /** 'YYYY-AA-GG SS:DD' metnini 1970'ten beri dakikaya cevirir (gun numarasi * 1440 + dakika). */
+  function mutlakDk(z) { return gunNo(z.slice(0, 10)) * 1440 + saatDk(z.slice(11, 16)); }
+
+  /** Calisma saatleri: ayardaki calismaBas / calismaBit (dakika); yoksa ya da tutarsizsa 09.00-19.00. */
+  function calismaSaatleri(ayar) {
+    var b = ayar && typeof ayar.calismaBas === "number" ? ayar.calismaBas : 540, s = ayar && typeof ayar.calismaBit === "number" ? ayar.calismaBit : 1140;
+    if (!(b >= 0 && s <= 1440 && s > b)) { b = 540; s = 1140; }
+    return { bas: b, bit: s };
+  }
+
+  /**
+   * Takvimde sayilan saatli kayit: etkinlik ya da calisma blogu; arsiv, iptal ve tamamlanan sayilmaz (tamamlanmis is
+   * kimseyle cakismaz, bos zamani da kapatmaz). Not: eski cakisanlar / cakismaHaritasi tamamlanan etkinligi sayar (aynen kalir).
+   */
+  function takvimdeSayilir(x) { return aktif(x) && x.durum !== "iptal" && x.durum !== "tamamlandi" && !!x.basTarih; }
+  /** Etkinlik ve bloklar tek listede: [{ tur: "etkinlik" | "blok", k: kayit, r: [bas, bit] }] (yalniz sayilanlar). */
+  function takvimOgeleri(veri) {
+    var l = [];
+    (veri.etkinlikler || []).forEach(function (e) { if (takvimdeSayilir(e)) l.push({ tur: "etkinlik", k: e, r: aralik(e) }); });
+    (veri.bloklar || []).forEach(function (b) { if (takvimdeSayilir(b)) l.push({ tur: "blok", k: b, r: aralik(b) }); });
+    return l;
+  }
+
+  /**
+   * Kaydin gunlere bolunmus parcalari (gece yarisini asan is iki gunde gorunur): [{ gun, bas, bit, ilk, son, tumGun }].
+   * bas / bit gun icindeki dakikadir (0-1440); ilk = is bu gun basliyor, son = bu gun bitiyor. Tam 00:00'da biten is
+   * ertesi gune parca birakmaz. Tum gun etkinlik her gunde 0-1440 ve tumGun: true. ilkGun / sonGun verilirse yalniz
+   * o araliktaki parcalar doner. Gecersiz ya da ters kayit bos liste. En cok 400 gun uretilir (bozuk kayit sayfayi kilitlemez).
+   */
+  function takvimParcalari(o, ilkGun, sonGun) {
+    if (!o || !gecerliTarih(o.basTarih)) return [];
+    var r = aralik(o), bt = r[1].slice(0, 10);
+    if (!gecerliTarih(bt) || r[1] <= r[0] || (!o.tumGun && (isNaN(saatDk(r[0].slice(11))) || isNaN(saatDk(r[1].slice(11)))))) return [];
+    var son = r[1].slice(11) === "00:00" ? gunEkle(bt, -1) : bt, out = [];
+    var d = ilkGun && ilkGun > o.basTarih ? ilkGun : o.basTarih;
+    for (var n = 0; d <= son && (!sonGun || d <= sonGun) && n < 400; d = gunEkle(d, 1), n++) {
+      var ilk = d === o.basTarih, sonMu = d === son;
+      out.push({
+        gun: d, ilk: ilk, son: sonMu, tumGun: !!o.tumGun,
+        bas: o.tumGun || !ilk ? 0 : saatDk(o.basSaat),
+        bit: o.tumGun || !sonMu || r[1].slice(11) === "00:00" ? 1440 : saatDk(r[1].slice(11))
+      });
+    }
+    return out;
+  }
+
+  /** Birlesik cakisma haritasi (etkinlik + blok): id -> [cakistigi kayit idleri]. Uc uca degmek cakisma degil. */
+  function takvimCakismalari(veri) {
+    var a = takvimOgeleri(veri);
+    a.sort(function (x, y) { return x.r[0] < y.r[0] ? -1 : x.r[0] > y.r[0] ? 1 : 0; });
+    var m = {};
+    for (var i = 0; i < a.length; i++) {
+      for (var j = i + 1; j < a.length && a[j].r[0] < a[i].r[1]; j++) {
+        if (a[i].r[0] < a[j].r[1] && a[i].k.id !== a[j].k.id) {
+          (m[a[i].k.id] = m[a[i].k.id] || []).push(a[j].k.id);
+          (m[a[j].k.id] = m[a[j].k.id] || []).push(a[i].k.id);
+        }
+      }
+    }
+    return m;
+  }
+  /**
+   * aday ({ id?, basTarih, basSaat, bitTarih, bitSaat, tumGun? }) ile cakisan sayilan kayitlar: [{ tur, k }].
+   * Surukleme hayaleti ve bos aralik icin; aday kendi id'siyle karsilasmaz. Aday iptal / tamamlanmis olsa da denetlenir.
+   */
+  function zamanCakisanlari(veri, aday) {
+    if (!aday || !gecerliTarih(aday.basTarih)) return [];
+    var r = aralik(aday);
+    return takvimOgeleri(veri).filter(function (x) { return x.k.id !== aday.id && x.r[0] < r[1] && r[0] < x.r[1]; })
+      .map(function (x) { return { tur: x.tur, k: x.k }; });
+  }
+
+  /**
+   * Calisma saatleri icinde ilk bos aralik. o: { sure (dk, vars. 60), simdi: { tarih, saat }, ayar, gunSayisi (vars. 7),
+   * adim (vars. 15), haricId }. Bugun simdiden (adima yuvarlanmis) once baslamaz. Dolu sayilan: takvimdeSayilir kayitlar
+   * (tum gun etkinlik butun gunu kapatir). Bulunamazsa null; bulunursa { basTarih, basSaat, bitTarih, bitSaat, gun, bas, bit }.
+   */
+  function bosAralik(veri, o) {
+    o = o || {};
+    var sure = o.sure > 0 ? Math.round(o.sure) : 60, adim = o.adim > 0 ? o.adim : 15, cs = calismaSaatleri(o.ayar);
+    var simdi = o.simdi || {}, bugun = simdi.tarih;
+    if (!gecerliTarih(bugun) || sure > cs.bit - cs.bas) return null;
+    var simdiDk = gecerliSaat(simdi.saat) ? saatDk(simdi.saat) : 0, gs = o.gunSayisi > 0 ? o.gunSayisi : 7;
+    var dolu = takvimOgeleri(veri).filter(function (x) { return x.k.id !== o.haricId; })
+      .map(function (x) { return [mutlakDk(x.r[0]), mutlakDk(x.r[1])]; });
+    for (var d = 0; d < gs; d++) {
+      var gun = gunEkle(bugun, d), taban = gunNo(gun) * 1440;
+      var bas = Math.max(cs.bas, d === 0 ? Math.ceil(simdiDk / adim) * adim : 0);
+      while (bas + sure <= cs.bit) {
+        var a = taban + bas, b = a + sure, engel = null;
+        for (var k = 0; k < dolu.length; k++) if (dolu[k][0] < b && a < dolu[k][1] && (engel === null || dolu[k][1] > engel)) engel = dolu[k][1];
+        if (engel === null) {
+          var bitN = anNoktasi(gun, bas + sure);
+          return { basTarih: gun, basSaat: dkSaat(bas), bitTarih: bitN.tarih, bitSaat: bitN.saat, gun: gun, bas: bas, bit: bas + sure };
+        }
+        bas = Math.ceil((engel - taban) / adim) * adim;
+      }
+    }
+    return null;
+  }
+
+  /* ---------------- Planlanacaklar, bekleyen video, tamamlanan sayimi, oneri ---------------- */
+
+  // Edit zamani ayrilmasi gereken durumlar: cekilmis ve kurgu isi suren icerikler. fikir / cekim_planlandi yalniz
+  // gecerli (arsivsiz, iptal olmayan) bir cekime bagliysa sayilir: cekim sonrasi edit zamani simdiden planlanabilir;
+  // cekimsiz fikir henuz edit isi degildir. onayda (musteride bekliyor), hazir ve yayinlandi edit isi degildir.
+  var EDIT_BEKLEYEN = ["cekildi", "kurguda", "revizyonda"];
+  var CEKIMLE_EDIT = ["fikir", "cekim_planlandi"];
+  /** Icerik edit isi mi (planlanacaklar ve oneri icin). eHar: etkinlik id -> kayit. */
+  function editIsiMi(i, eHar) {
+    if (!aktif(i)) return false;
+    if (EDIT_BEKLEYEN.indexOf(i.durum) !== -1) return true;
+    if (CEKIMLE_EDIT.indexOf(i.durum) === -1 || !i.cekimId) return false;
+    var e = eHar[i.cekimId];
+    return !!e && aktif(e) && e.durum !== "iptal";
+  }
+  /** icerik id -> o icerigi iceren, bitisi simdiden sonra olan planli (arsivsiz) bloklar. */
+  function planliBlokHaritasi(veri, simdi) {
+    var su = simdi.tarih + " " + (gecerliSaat(simdi.saat) ? simdi.saat : "00:00"), m = {};
+    (veri.bloklar || []).forEach(function (b) {
+      if (!aktif(b) || b.durum !== "planlandi" || !gecerliTarih(b.basTarih) || aralik(b)[1] <= su) return;
+      (b.icerikIdler || []).forEach(function (id) { (m[id] = m[id] || []).push(b); });
+    });
+    Object.keys(m).forEach(function (id) { m[id].sort(etkinlikSirala); });
+    return m;
+  }
+  /** Gruptaki iceriklerin tur ozeti: "2 reels", "1 video, 2 post" (tur sirasi sabit). */
+  function turOzeti(icerikler) {
+    var say = {};
+    icerikler.forEach(function (i) { say[i.tur] = (say[i.tur] || 0) + 1; });
+    return TURLER.filter(function (t) { return say[t.k]; }).map(function (t) { return say[t.k] + " " + t.ad.toLowerCase(); })
+      .concat(Object.keys(say).filter(function (k) { return !TUR_AD[k]; }).sort().map(function (k) { return say[k] + " " + k; })).join(", ");
+  }
+  /** Edit isi iceriklerini musteri + bagli cekime gore gruplar (aktif musteriler). planliHaric: planli blogu olanlar atlanir. */
+  function editGruplari(veri, simdi, planliHaric) {
+    var mHar = idHaritasi(veri.musteriler), eHar = idHaritasi(veri.etkinlikler), pb = planliBlokHaritasi(veri, simdi), g = {}, sira = [];
+    (veri.icerikler || []).forEach(function (i) {
+      if (!editIsiMi(i, eHar) || !aktif(mHar[i.musteriId])) return;
+      if (planliHaric && pb[i.id]) return;
+      var cid = i.cekimId && eHar[i.cekimId] ? i.cekimId : null, k = i.musteriId + "|" + (cid || "");
+      if (!g[k]) { g[k] = { anahtar: k, musteriId: i.musteriId, musteri: mHar[i.musteriId], cekimId: cid, cekim: cid ? eHar[cid] : null, icerikler: [], planliBloklar: [] }; sira.push(k); }
+      g[k].icerikler.push(i);
+      (pb[i.id] || []).forEach(function (b) { if (g[k].planliBloklar.indexOf(b) === -1) g[k].planliBloklar.push(b); });
+    });
+    return sira.map(function (k) {
+      var x = g[k];
+      x.icerikler.sort(function (a, b) {
+        var ta = a.teslimTarihi || "9999", tb = b.teslimTarihi || "9999";
+        return ta < tb ? -1 : ta > tb ? 1 : oncelikSira(a) - oncelikSira(b) || (a.olusturma || 0) - (b.olusturma || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      });
+      x.planliBloklar.sort(etkinlikSirala);
+      x.adet = x.icerikler.length;
+      x.ozet = turOzeti(x.icerikler);
+      x.baslik = (x.musteri ? x.musteri.ad : "Müşteri yok") + " — " + x.ozet;
+      x.teslim = x.icerikler.reduce(function (t, i) { return gecerliTarih(i.teslimTarihi) && (!t || i.teslimTarihi < t) ? i.teslimTarihi : t; }, null);
+      x.oncelik = ONCELIKLER[x.icerikler.reduce(function (t, i) { return Math.min(t, oncelikSira(i)); }, 2)].k;
+      x.plansizAdet = x.icerikler.filter(function (i) { return !pb[i.id]; }).length;
+      return x;
+    });
+  }
+  function grupSirala(a, b) {
+    var ta = a.teslim || "9999", tb = b.teslim || "9999";
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    var o = oncelikSira(a) - oncelikSira(b);
+    if (o) return o;
+    var ma = katla(a.musteri && a.musteri.ad), mb = katla(b.musteri && b.musteri.ad);
+    if (ma !== mb) return ma < mb ? -1 : 1;
+    return a.anahtar < b.anahtar ? -1 : a.anahtar > b.anahtar ? 1 : 0;
+  }
+  /**
+   * Planlanacaklar cekmecesi: edit zamani ayrilmamis icerikler, musteri + bagli cekime gore gruplu.
+   * Kural: icerik ve musterisi arsivsiz; durum cekildi / kurguda / revizyonda ya da (fikir / cekim_planlandi ve gecerli
+   * bir cekime bagli); icerigi kapsayan, bitisi simdiden sonra olan planli (devam eden ya da gelecekteki) blok yok.
+   * Sira: en yakin teslim, sonra oncelik, musteri adi, anahtar. Her grup: { anahtar, musteriId, musteri, cekimId, cekim,
+   * icerikler, adet, ozet ("2 reels"), baslik ("Müşteri — 2 reels"), teslim, oncelik, plansizAdet, planliBloklar }.
+   */
+  function planlanacaklar(veri, simdi) {
+    if (!simdi || !gecerliTarih(simdi.tarih)) return [];
+    return editGruplari(veri, simdi, true).sort(grupSirala);
+  }
+
+  /**
+   * Cekime bagli videolar: cekim id -> { bagli, bekleyen }. bagli = cekime bagli arsivsiz icerikler (her tur);
+   * bekleyen = bunlardan hazir ya da yayinlandi olmayanlar ("N video edit bekliyor"). Bagli icerigi olmayan cekim haritada yok.
+   */
+  function cekimVideolari(veri) {
+    var m = {};
+    (veri.icerikler || []).forEach(function (i) {
+      if (!aktif(i) || !i.cekimId) return;
+      var x = m[i.cekimId] = m[i.cekimId] || { bagli: 0, bekleyen: 0 };
+      x.bagli++;
+      if (i.durum !== "hazir" && i.durum !== "yayinlandi") x.bekleyen++;
+    });
+    return m;
+  }
+  function bekleyenVideo(veri, cekimId) { return cekimVideolari(veri)[cekimId] || { bagli: 0, bekleyen: 0 }; }
+
+  /**
+   * Icerigin "yayina hazir"a gectigi an ('YYYY-AA-GG SS:DD') ya da null. Gecmisteki son "… → Yayına hazır" satiri
+   * (durumDegistir ve icerik penceresi boyle yazar) okunur; "Geri alındı: …" satirlari ve yayinlanmisliktan geri donus
+   * ("Yayınlandı → Yayına hazır") is tamamlama sayilmaz, "Eklendi (…)" gibi olusturma satirlari da. Icerik simdi hazir ya da yayinlandi degilse null (gecis geri alinmis).
+   */
+  function hazirZamani(i) {
+    if (!i || (i.durum !== "hazir" && i.durum !== "yayinlandi")) return null;
+    var g = i.gecmis || [], hedef = "→ " + DURUM_AD.hazir, geriDonus = DURUM_AD.yayinlandi + " " + hedef;
+    for (var k = g.length - 1; k >= 0; k--) {
+      var m = String((g[k] && g[k].m) || ""), z = String((g[k] && g[k].z) || "");
+      if (/^Geri alındı/.test(m) || m === geriDonus || m.slice(-hedef.length) !== hedef) continue;
+      return /^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/.test(z) && gecerliTarih(z.slice(0, 10)) ? z : null;
+    }
+    return null;
+  }
+  function gecerliDamga(z) { return typeof z === "string" && /^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/.test(z) && gecerliTarih(z.slice(0, 10)); }
+  /**
+   * [bas, bit] gunlerinde (ikisi dahil) tamamlanan isler, yalniz gercek kayitlardan: tamamlanan bloklar (tamamZaman),
+   * tamamlanan cekimler (tur cekim, tamamZaman) ve yayina hazira gecen icerikler (hazirZamani). Arsivlenmis kayit sayilmaz;
+   * musterinin arsivlenmesi gecmisi silmez (sayilir). tamamZaman'i olmayan eski kayitlar sayilmaz (tarih uydurulmaz).
+   * Doner: { blok, cekim, icerik, toplam, kayitlar: [{ tur, id, zaman }] } (zamana gore sirali).
+   */
+  function tamamlananlar(veri, bas, bit) {
+    var r = { blok: 0, cekim: 0, icerik: 0, toplam: 0, kayitlar: [] };
+    var ici = function (z) { return gecerliDamga(z) && z.slice(0, 10) >= bas && z.slice(0, 10) <= bit; };
+    (veri.bloklar || []).forEach(function (b) {
+      if (aktif(b) && b.durum === "tamamlandi" && ici(b.tamamZaman)) { r.blok++; r.kayitlar.push({ tur: "blok", id: b.id, zaman: b.tamamZaman }); }
+    });
+    (veri.etkinlikler || []).forEach(function (e) {
+      if (aktif(e) && e.tur === "cekim" && e.durum === "tamamlandi" && ici(e.tamamZaman)) { r.cekim++; r.kayitlar.push({ tur: "cekim", id: e.id, zaman: e.tamamZaman }); }
+    });
+    (veri.icerikler || []).forEach(function (i) {
+      var z = aktif(i) ? hazirZamani(i) : null;
+      if (z && ici(z)) { r.icerik++; r.kayitlar.push({ tur: "icerik", id: i.id, zaman: z }); }
+    });
+    r.toplam = r.blok + r.cekim + r.icerik;
+    r.kayitlar.sort(function (a, b) { return a.zaman < b.zaman ? -1 : a.zaman > b.zaman ? 1 : a.id < b.id ? -1 : 1; });
+    return r;
+  }
+  function bugunTamamlanan(veri, bugun) { return tamamlananlar(veri, bugun, bugun); }
+  /** Pazartesi-Pazar haftasi (bugunun haftasi). */
+  function haftaTamamlanan(veri, bugun) { var hb = haftaBasi(bugun); return tamamlananlar(veri, hb, gunEkle(hb, 6)); }
+
+  /** Gruba ayrilacak tahmini edit suresi (dk): icerik basina 60 dk, en az 60, en cok 240. Yalniz oneri icin. */
+  function tahminiSure(grup) { return Math.max(60, Math.min(240, 60 * ((grup && grup.adet) || 1))); }
+  /**
+   * "Simdi ne yapayim?": kurala dayali, aciklanabilir oneri. Hicbir seyi degistirmez ve kaydetmez.
+   * Adaylar edit isi gruplari (planlanacaklar kurali, planli blogu olanlar dahil). Puan (kucuk once):
+   * min(teslime kalan gun, 30) * 3 (teslimsiz 99 -> 30) + oncelik (yuksek 0, normal 1, dusuk 2) * 2 + (butun icerikleri
+   * zaten planliysa 4). Esitlikte musteri adi, sonra anahtar. sira: "Başka öner" icin aday sirasi (mod alinir).
+   * Doner null (aday yok) ya da { grup, puan, sure, aralik (bosAralik ya da null), nedenler: [metin], adaySayisi, sira }.
+   */
+  function simdiNe(veri, simdi, ayar, sira) {
+    if (!simdi || !gecerliTarih(simdi.tarih)) return null;
+    var bugun = simdi.tarih;
+    var adaylar = editGruplari(veri, simdi, false).map(function (g) {
+      var kalan = g.teslim ? gunFarki(bugun, g.teslim) : null, tumuPlanli = g.plansizAdet === 0;
+      return { grup: g, kalan: kalan, puan: Math.min(kalan === null ? 99 : kalan, 30) * 3 + oncelikSira(g) * 2 + (tumuPlanli ? 4 : 0) };
+    });
+    if (!adaylar.length) return null;
+    adaylar.sort(function (a, b) { return a.puan - b.puan || grupSirala(a.grup, b.grup); });
+    var n = adaylar.length, s = ((Math.floor(+sira || 0) % n) + n) % n, x = adaylar[s], g = x.grup;
+    var sure = tahminiSure(g), z = bosAralik(veri, { sure: sure, simdi: simdi, ayar: ayar });
+    var nd = [];
+    if (g.teslim) nd.push(x.kalan === 0 ? "Teslim bugün" : x.kalan < 0 ? "Teslim " + (-x.kalan) + " gün önceydi" :
+      "Teslim " + (x.kalan === 1 ? "yarın" : x.kalan + " gün sonra") + " (" + GUN_KISA[haftaGunu(g.teslim) - 1] + " " + tarihKisa(g.teslim) + ")");
+    if (g.oncelik === "yuksek") nd.push("Öncelik yüksek");
+    var rev = g.icerikler.filter(function (i) { return i.durum === "revizyonda"; }).length;
+    nd.push(g.adet + " içerik edit bekliyor" + (rev ? " (" + rev + " revizyonda)" : ""));
+    if (g.plansizAdet === g.adet) nd.push("Henüz zamanı ayrılmadı");
+    else if (g.plansizAdet) nd.push(g.plansizAdet + " içeriğe henüz zaman ayrılmadı");
+    else if (g.planliBloklar.length) nd.push("Zamanı ayrıldı: " + GUN_KISA[haftaGunu(g.planliBloklar[0].basTarih) - 1] + " " + g.planliBloklar[0].basSaat);
+    if (z) nd.push((z.gun === bugun ? "Bugün " : z.gun === gunEkle(bugun, 1) ? "Yarın " : GUN_KISA[haftaGunu(z.gun) - 1] + " " + tarihKisa(z.gun) + " ") + z.basSaat + "–" + z.bitSaat + " boş");
+    else nd.push("7 gün içinde çalışma saatlerinde " + (sure / 60) + " saatlik boş yer yok");
+    return { grup: g, puan: x.puan, sure: sure, aralik: z, nedenler: nd, adaySayisi: n, sira: s };
+  }
+
+  /* ---------------- Gun listeleri ---------------- */
+
+  /** bas'tan baslayan adet gun. */
+  function gunListesi(bas, adet) { var l = []; for (var k = 0; k < adet; k++) l.push(gunEkle(bas, k)); return l; }
+  /** Gunun haftasi (Pazartesi-Pazar, 7 gun). */
+  function haftaninGunleri(s) { return gunListesi(haftaBasi(s), 7); }
+  /** Gunun ayinin butun gunleri (1'den ay sonuna). */
+  function ayinGunleri(s) { var b = ayBasi(s); return gunListesi(b, gunFarki(b, ayEkle(s, 1))); }
+
   /* ---------------- Genel bakis ---------------- */
 
   function genelBakis(veri, bugun, ayar) {
@@ -682,6 +1032,13 @@
     stok: stok, duzenDurumu: duzenDurumu, slotlar: slotlar, slotGrubu: slotGrubu, kapsama: kapsama, stokUyarisi: stokUyarisi,
     aralik: aralik, ustUste: ustUste, cakisanlar: cakisanlar, cakismaHaritasi: cakismaHaritasi, gundeMi: gundeMi,
     saatMetni: saatMetni, gundekiSaat: gundekiSaat, etkinlikSirala: etkinlikSirala,
+    resmiTatiller: resmiTatiller, gununTatilleri: gununTatilleri, gununOzelGunleri: gununOzelGunleri,
+    saatDk: saatDk, dkSaat: dkSaat, anNoktasi: anNoktasi, calismaSaatleri: calismaSaatleri, takvimdeSayilir: takvimdeSayilir,
+    takvimParcalari: takvimParcalari, takvimCakismalari: takvimCakismalari, zamanCakisanlari: zamanCakisanlari, bosAralik: bosAralik,
+    EDIT_BEKLEYEN: EDIT_BEKLEYEN, editIsiMi: editIsiMi, turOzeti: turOzeti, planlanacaklar: planlanacaklar,
+    cekimVideolari: cekimVideolari, bekleyenVideo: bekleyenVideo, hazirZamani: hazirZamani, tamamlananlar: tamamlananlar,
+    bugunTamamlanan: bugunTamamlanan, haftaTamamlanan: haftaTamamlanan, tahminiSure: tahminiSure, simdiNe: simdiNe,
+    gunListesi: gunListesi, haftaninGunleri: haftaninGunleri, ayinGunleri: ayinGunleri,
     genelBakis: genelBakis, ucretOzeti: ucretOzeti, icerikFiltrele: icerikFiltrele, icerikSirala: icerikSirala, ara: ara,
     csv: csv, musterilerCsv: musterilerCsv, iceriklerCsv: iceriklerCsv, yedekCoz: yedekCoz
   };
