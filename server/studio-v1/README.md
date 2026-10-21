@@ -52,11 +52,11 @@ Suflo Pro lisans servisinden (`pro-v1`) tamamen ayrıdır: ayar dosyası, verita
   - Plan, uygulamada yazma kilidi altında yeniden hesaplanır. Önizleme verinin o anki sürümünü de taşır. Önizlemeden sonra herhangi bir kayıt değiştiyse içe aktarma yapılmaz; önizleme yenilenir.
   - Yedekte kimliği zaten var olan kayıtlar doğrulamadan önce atlanır. Eski bir yedekte artık geçersiz sayılan bir alan, mevcut kayıtlar yüzünden içe aktarmayı engellemez.
   - Liste yerine nesne beklenen alanlara liste gelirse (ya da tersi) hata gösterilir. Alt alanlardaki tanınmayan anahtarlar da uyarı olarak listelenir.
-  - "Tümünü değiştir" yedekteki ayar kaydını (varsayılan stok eşiği) da geri getirir.
+  - "Tüm veriyi bu dosyayla değiştir" yedekteki ayar kaydını (varsayılan stok eşiği) da geri getirir.
   - Uygulamadan önce, aynı işlem içinde otomatik kopya alınır (bkz. Bakım → Otomatik kopyalar).
-  - "Tümünü değiştir" ve kopyaya dönüş onayı (`onay`) büyük / küçük harf ve Türkçe harf farkı gözetmez: `GERİ YÜKLE`, `geri yükle` ve eski arayüzün gönderdiği `GERI YUKLE` kabul edilir.
+  - "Tüm veriyi bu dosyayla değiştir" ve kopyaya dönüş onayı (`onay`) büyük / küçük harf ve Türkçe harf farkı gözetmez: `GERİ YÜKLE`, `geri yükle` ve eski arayüzün gönderdiği `GERI YUKLE` kabul edilir.
   - Tek seferde en çok 8 MB veri (yedeğin sıkıştırılmış JSON hali, Türkçe harfler 2 bayt sayılır) ve tür başına 20.000 kayıt içe aktarılabilir. Daha büyük bir yedek indirildiğinde uyarı gösterilir.
-  - "Tümünü değiştir" ve otomatik kopyaya dönüş, kayıtların oluşturma ve son değişiklik zamanlarını korur (liste sırası değişmez); yalnız sürüm numaraları yenilenir. Yedekte ayar yoksa (boş) şu anki ayar da kaldırılır; onay penceresi bunu söyler.
+  - "Tüm veriyi bu dosyayla değiştir" ve otomatik kopyaya dönüş, kayıtların oluşturma ve son değişiklik zamanlarını korur (liste sırası değişmez); yalnız sürüm numaraları yenilenir. Yedekte ayar yoksa (boş) şu anki ayar da kaldırılır; onay penceresi bunu söyler.
   - Dosyanın üst düzeyindeki tanınmayan listeler (örneğin elle yazılmış bir `cekimler` listesi) ve geçmiş satırlarındaki tanınmayan anahtarlar da önizlemede uyarı olarak gösterilir.
 - `noindex` ve `robots.txt` yalnız arama motorları içindir; güvenlik bunlara dayanmaz.
 
@@ -117,14 +117,22 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
 ## Bakım
 
 - **Yedek:** Ayarlar → **JSON yedeği indir**. Dosya özel bilgi içerir. İndirilen gün ayar kaydına (`sonYedek`) yazılır ve Ayarlar → Yedekleme'de "Son JSON yedeği: … (N gün önce)" olarak görünür; telefon ve bilgisayar aynı tarihi görür. Hiç indirilmediyse ya da 14 günden eskiyse Genel Bakış'ta küçük bir hatırlatma çıkar.
-- **Geri yükleme:** Ayarlar → İçe aktar → önizleme → "Tüm veriyi bu dosyayla değiştir" (onay için `GERI YUKLE` yazılır), ya da **Otomatik kopyalar** listesinden bir kopyaya dön.
+- **Geri yükleme:** Ayarlar → İçe aktar → önizleme → "Tüm veriyi bu dosyayla değiştir" (onay için `GERİ YÜKLE` yazılır; büyük / küçük harf ve Türkçe harf farkı önemsiz), ya da **Otomatik kopyalar** listesinden bir kopyaya dön.
 - **Otomatik kopyalar:** Sunucu tüm verinin sıkıştırılmış kopyasını alır:
   - her gün (İstanbul saatiyle) ilk kaydetmeden önce, aynı işlem içinde ("Günlük kopya"; kayıt yazılamazsa kopya da alınmaz, hiç kayıt yoksa alınmaz). Günün işareti `ayar` tablosunda `gunluk_anlik` satırında durur;
-  - her içe aktarma, "Tümünü değiştir" ve kopyaya dönüşten önce.
+  - her içe aktarma, "Tüm veriyi bu dosyayla değiştir" ve kopyaya dönüşten önce.
   - Son 14 günlük kopya ve son 30 diğer kopya ayrı ayrı saklanır; günlük kopyalar içe aktarma kopyalarını listeden itmez. Liste Ayarlar → **Otomatik kopyalar**'dadır; her kopyaya dönülebilir (dönmeden önce şu anki hal de kopyalanır).
 - **Son yedek tarihi:** Ayar kaydı isteğe bağlı `sonYedek` alanını (`YYYY-AA-GG`, son JSON yedeğinin indirildiği gün) tutar. Alan hiç gönderilmezse (eski arayüz eşiği kaydederken) saklı değer korunur; `null` gönderilirse silinir. Eski ayar kaydı ve eski yedekler bu alan olmadan çalışır.
 - **Günlük kullanım (arayüz):**
   - İçerik satırlarında (İçerikler, Genel Bakış, müşteri sayfası, arama) ve pano kartlarında doğal sonraki adım için tek tık düğmesi vardır (ör. "→ Onaya gönder"; onaydakinde "→ Onaylandı" ve "→ Revizyon"). Pencere açılmaz, geçmişe yazılır, "Geri al" bildirimi gelir. Arşivdeki ve yayınlanmış içerikte düğme yoktur.
+  - Revizyona alırken (tek tık "→ Revizyon", panoda sürükleme ya da toplu durum) küçük bir pencere "Ne düzeltilecek?" notunu ve isteğe bağlı yeni teslim tarihini sorar. Eski teslim tarihi kendiliğinden değişmez (pencerede "Önceki teslim tarihi: … (geçti)" yazar). Not geçmişe metniyle yazılır ("Revizyon notu: …", en çok 250 karakter); ikinci revizyonda ilk not kaybolmaz. Revizyondaki içeriğin notu listede ve panoda kısaltılmış görünür. Durum, not ve tarih tek değişiklikle kaydedilir; "Geri al" hepsini geri getirir.
+  - Çekim "Tamamlandı" yapılınca (Genel Bakış düğmesi ya da çekim penceresi) bildirim, bağlı ve hâlâ "Fikir" / "Çekim planlandı"da duran içerikleri tek tıkla "Çekildi" yapmayı ve "İçerik ekle"yi (çekim seçili toplu ekleme) önerir; tıklanmadıkça hiçbir şey değişmez. Unutulanlar Genel Bakış'ta "Çekimi tamamlandı, içerik “Çekildi” yapılmadı" bölümünde görünür. Bugünkü çekimin bitiş saati geçtiyse "Tamamlandı / İptal" düğmeleri ertesi günü beklemeden çıkar.
+  - Çekim penceresinde başlangıç günü değişince süre korunur: iki günlük çekim iki gün, gece yarısını geçen çekim yine ertesi güne kadar sürer. Aynı gün içinde bitiş saati başlangıçtan önceyse bitiş tarihini ertesi gün yapma ipucu çıkar.
+  - Tarih kutuları 2000–2099 arasını kabul eder: masaüstünde yıl iki haneli yazılırsa (tarayıcı "0026" yapar) kaydetmeden önce uyarı çıkar. Kayıtta zaten öyle duran eski bir tarih dokunulmadıkça kaydı engellemez.
+  - İçeriğin müşterisi değişince başka müşterinin çekimine bağ kendiliğinden kalkar ve yanında nedeni yazar. Çekimin müşterisi, başka müşterinin içeriği (arşivdekiler dahil) bağlıyken değiştirilemez; pencere o içerikleri adıyla sayar.
+  - "Bu kopyaya dön" onayı şu anki ve kopyadaki müşteri / içerik / çekim sayılarını yan yana yazar ve kopyadan sonra eklenen ve değiştirilen her şeyin geri alınacağını söyler.
+  - Giriş ekranında "Şifreni mi unuttun?" açıklaması vardır (şifre e-postayla sıfırlanmaz; bkz. aşağıda "Şifre unutulursa"; veriler silinmez). Kilit mesajı yaklaşık 15 dakika beklemeyi söyler.
+  - CSV dışa aktarımında sütun adları ve değerler ekrandaki gibidir ("Beklenen paylaşım türü: Diğer", "Ham görüntü bağlantısı").
   - Genel Bakış: başlığın altında boş olmayan her bölüm için sayılı bir düğme (dokununca o bölüme kayar); her bölümde en çok 5 satır ve aynı filtreli listeyi açan "+N tane daha"; en üstte "Bugün paylaşılacaklar" (bugüne planlı, yayına hazır içerikler, tek tık "Yayınlandı"); karşılanmayan paylaşım günleri müşteri başına tek satır. "Müşteri bazında durum" tablosu katlanır; açık / kapalı tercihi yalnız o tarayıcıda hatırlanır.
   - Onaydaki içerikte "N gündür onayda" yazar (geçmişteki son onaya gönderim günü; 3 günden itibaren uyarı renginde). Geçmişinde bu bilgi olmayan eski kayıtta yazmaz.
   - İçerikler listesi 200'er satır gösterir ("Daha fazla göster"); "Tümünü seç" yine filtreye uyan tüm içerikleri seçer (sayısı yazar). Kutu işaretlemek sayfayı yeniden çizmez; Shift ile tıklanan kutu son tıklananla arasındaki satırları da seçer. Satırın boş yerine dokunmak içeriği açar.

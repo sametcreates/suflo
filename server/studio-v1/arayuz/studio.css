@@ -54,6 +54,10 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
 .giris-kart{width:100%;max-width:360px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:26px;display:flex;flex-direction:column;gap:12px}
 .giris-kart img{width:34px;height:34px}
 .giris-kart label{font-weight:600;font-size:13px;color:var(--dim)}
+.sifre-yardim summary{cursor:pointer}
+.sifre-yardim p{margin:6px 0 0}
+.alan small:empty{display:none}
+.rev-not{color:var(--sari);overflow-wrap:anywhere}
 
 /* ---------- Kabuk ---------- */
 .kabuk{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
@@ -229,8 +233,8 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 
 /* ---------- Bildirim ---------- */
 .toastlar{position:fixed;left:50%;bottom:18px;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:8px;width:min(520px,calc(100vw - 24px))}
-.toast{display:flex;align-items:center;gap:10px;background:#1f1f27;border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.toast span{flex:1}
+.toast{display:flex;align-items:center;gap:10px;background:#1f1f27;border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.4);flex-wrap:wrap}
+.toast span{flex:1 1 180px}
 .toast.hata{border-color:rgba(248,113,113,.6)}
 
 /* ---------- Telefon ---------- */

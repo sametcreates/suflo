@@ -72,6 +72,11 @@
     if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
     return noGun(gunNo(s)) === s;
   }
+  /**
+   * Kayda yazilabilir tarih: gecerli ve 2000-2099 arasi. Masaustunde yil iki haneli yazilinca tarih girdisi "0026-10-21"
+   * verir; boyle tarih sunucuda gecerli sayilir ama takvimde ve listelerde bos gorunurdu.
+   */
+  function makulTarih(s) { return gecerliTarih(s) && s >= "2000-01-01" && s <= "2099-12-31"; }
   function gecerliSaat(s) { return typeof s === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s); }
 
   // Istanbul bicimleyicisi bir kez kurulur: her satirda yeniden kurmak listeyi ve panoyu belirgin yavaslatir.
@@ -478,6 +483,7 @@
     var bugunEtk = etk.filter(function (e) { return gundeMi(e, bugun); }).sort(etkinlikSirala);
     var yaklasanEtk = etk.filter(function (e) { return e.basTarih > bugun && e.basTarih <= hafta; }).sort(etkinlikSirala);
     var gecmisPlanli = etk.filter(function (e) { return e.durum === "planlandi" && aralik(e)[1] <= bugun + " 00:00"; }).sort(etkinlikSirala);
+    var eHar = idHaritasi(veri.etkinlikler);
 
     var teslim = icerikler.filter(function (i) { return i.teslimTarihi && TESLIM_BEKLEYEN.indexOf(i.durum) !== -1; });
     var geciken = teslim.filter(function (i) { return i.teslimTarihi < bugun; });
@@ -517,6 +523,8 @@
         return a.k - b.k;
       }).map(function (x) { return x.i; }),
       revizyonda: icerikler.filter(function (i) { return i.durum === "revizyonda"; }),
+      // cekimi tamamlanmis ama hala "Fikir" / "Çekim planlandı"da kalan (cekildi yapilmasi unutulmus) icerikler
+      cekimiBitenPlanli: icerikler.filter(function (i) { return cekimiBitti(i, eHar); }),
       gecmisPlanYayinlanmamis: icerikler.filter(function (i) { return i.planTarihi && i.planTarihi < bugun && i.durum !== "yayinlandi"; }).sort(tarihSira("planTarihi")),
       // bugune planli, yayina hazir (henuz yayinlanmamis) icerikler; sira Icerikler listesindekiyle ayni
       bugunPaylasilacaklar: icerikler.filter(function (i) { return i.durum === "hazir" && i.planTarihi === bugun; }).sort(icerikSirala),
@@ -529,6 +537,12 @@
       oneriSayisi: oneriSayisi,
       sayilar: sayilar
     };
+  }
+
+  /** Icerigin bagli cekimi tamamlandi ama icerik hala cekilmemis gorunuyor mu (eHar: etkinlik id -> kayit). */
+  function cekimiBitti(i, eHar) {
+    var e = i && i.cekimId ? eHar[i.cekimId] : null;
+    return !!e && e.durum === "tamamlandi" && (i.durum === "fikir" || i.durum === "cekim_planlandi");
   }
 
   /** Aylik ucret ozeti (anlasma tutari; tahsilat ya da alacak degil). Ucreti bilinmeyen 0 sayilmaz. */
@@ -610,9 +624,10 @@
     return "﻿" + satirlar.map(function (r) { return r.map(csvHucre).join(";"); }).join("\r\n") + "\r\n";
   }
   function musterilerCsv(veri) {
-    var rows = [["Ad", "Kurum", "Aylık ücret (TL)", "Yayın sıklığı", "Slot türü", "Stok uyarı eşiği", "Stok girişi", "Not", "Arşiv"]];
+    var rows = [["Ad", "Kurum", "Aylık ücret (TL)", "Yayın sıklığı", "Beklenen paylaşım türü", "Stok uyarı eşiği", "Stok girişi", "Not", "Arşiv"]];
     (veri.musteriler || []).forEach(function (m) {
-      rows.push([m.ad, m.kurum, m.ucret === null || m.ucret === undefined ? "" : m.ucret, siklikMetni(m), m.slotTuru,
+      var slot = SLOT_TURLERI.filter(function (x) { return x.k === (m.slotTuru || "video"); })[0];
+      rows.push([m.ad, m.kurum, m.ucret === null || m.ucret === undefined ? "" : m.ucret, siklikMetni(m), slot ? slot.ad : m.slotTuru,
         m.stokUyari === null || m.stokUyari === undefined ? "" : m.stokUyari, m.stokGirisi ? "evet" : "hayır", m.not, m.arsiv ? "evet" : "hayır"]);
     });
     return csv(rows);
@@ -620,7 +635,7 @@
   function iceriklerCsv(veri) {
     var mHar = idHaritasi(veri.musteriler), eHar = idHaritasi(veri.etkinlikler);
     var rows = [["Müşteri", "Başlık", "Tür", "Durum", "Öncelik", "Bağlı çekim", "Kurgu teslim", "Planlanan yayın", "Yayınlandığı tarih",
-      "Ham dosya", "Proje dosyası", "Final", "Revizyon notu", "Not", "Arşiv"]];
+      "Ham görüntü bağlantısı", "Proje dosyası bağlantısı", "Final bağlantısı", "Revizyon notu", "Not", "Arşiv"]];
     (veri.icerikler || []).forEach(function (i) {
       var d = i.dosyalar || {}, e = eHar[i.cekimId];
       rows.push([musteriAdi(mHar[i.musteriId]), i.baslik, TUR_AD[i.tur] || i.tur, DURUM_AD[i.durum] || i.durum, ONCELIK_AD[i.oncelik] || i.oncelik,
@@ -631,11 +646,11 @@
 
   /** Ice aktarma dosyasini ortak bicime cevirir: { musteriler, icerikler, etkinlikler } ya da hata metni. */
   function yedekCoz(obj) {
-    if (!obj || typeof obj !== "object") return { hata: "Dosya JSON nesnesi değil." };
+    if (!obj || typeof obj !== "object") return { hata: "Bu dosya bir Suflo Studio yedeği değil." };
     var v = obj.format === "suflo-studio-yedek" ? obj.veriler : obj;
     if (!v || typeof v !== "object") return { hata: "Yedek içinde veri yok." };
     var ok = ["musteriler", "icerikler", "etkinlikler"].some(function (k) { return Array.isArray(v[k]); });
-    if (!ok) return { hata: "Dosyada musteriler / icerikler / etkinlikler listesi bulunamadı." };
+    if (!ok) return { hata: "Bu dosyada müşteri, içerik ya da çekim listesi bulunamadı. Suflo Studio’dan indirdiğin JSON yedeğini seç." };
     var out = { musteriler: v.musteriler || [], icerikler: v.icerikler || [], etkinlikler: v.etkinlikler || [] };
     // yedekte ayar acikca bos (null) ise de iletilir: "tumunu degistir" mevcut ayari da kaldirir
     if (v.ayar === null && Object.prototype.hasOwnProperty.call(v, "ayar")) out.ayar = null;
@@ -657,10 +672,10 @@
     DURUM_AD: DURUM_AD, TUR_AD: TUR_AD, ONCELIK_AD: ONCELIK_AD, ETKINLIK_TUR_AD: ETKINLIK_TUR_AD, ETKINLIK_DURUM_AD: ETKINLIK_DURUM_AD,
     turGrubu: turGrubu,
     gunEkle: gunEkle, gunFarki: gunFarki, haftaGunu: haftaGunu, haftaBasi: haftaBasi, ayBasi: ayBasi, ayEkle: ayEkle,
-    gecerliTarih: gecerliTarih, gecerliSaat: gecerliSaat, istanbulSimdi: istanbulSimdi, damga: damga,
+    gecerliTarih: gecerliTarih, makulTarih: makulTarih, gecerliSaat: gecerliSaat, istanbulSimdi: istanbulSimdi, damga: damga,
     tarihUzun: tarihUzun, tarihKisa: tarihKisa, tarihGunlu: tarihGunlu, ayAdi: ayAdi, goreli: goreli, ayIzgarasi: ayIzgarasi,
     katla: katla, norm: norm, para: para, ucretCoz: ucretCoz, musteriAdi: musteriAdi, siklikMetni: siklikMetni, yerelYol: yerelYol, guvenliLink: guvenliLink,
-    aktif: aktif, kopya: kopya, idHaritasi: idHaritasi, durumDegistir: durumDegistir, geriAl: geriAl, sonrakiDurumlar: sonrakiDurumlar, onayaGidis: onayaGidis,
+    aktif: aktif, kopya: kopya, idHaritasi: idHaritasi, cekimiBitti: cekimiBitti, durumDegistir: durumDegistir, geriAl: geriAl, sonrakiDurumlar: sonrakiDurumlar, onayaGidis: onayaGidis,
     stok: stok, duzenDurumu: duzenDurumu, slotlar: slotlar, slotGrubu: slotGrubu, kapsama: kapsama, stokUyarisi: stokUyarisi,
     aralik: aralik, ustUste: ustUste, cakisanlar: cakisanlar, cakismaHaritasi: cakismaHaritasi, gundeMi: gundeMi,
     saatMetni: saatMetni, gundekiSaat: gundekiSaat, etkinlikSirala: etkinlikSirala,

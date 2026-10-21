@@ -417,6 +417,29 @@ ok("yedekCoz: suflo-studio-yedek ve duz liste", C.yedekCoz({ format: "suflo-stud
 ok("yerel yol uyarisi", C.yerelYol("C:\\Kurgu\\a.prproj") && C.yerelYol("/Users/x/a.mp4") && C.yerelYol("file:///a") && C.yerelYol("\\\\nas\\x") && !C.yerelYol("https://drive.example.com/x"));
 ok("guvenli link yalniz http(s)", C.guvenliLink("https://a.example/x") && !C.guvenliLink("javascript:alert(1)") && !C.guvenliLink("data:text/html,x"));
 
+/* ---------------- Metin, dogrulama ve cekim sonrasi ---------------- */
+ok("makulTarih: yili iki haneli yazilan tarih (0026) ve 2000-2099 disi kaydedilmez", C.makulTarih("2026-10-21") && C.makulTarih("2028-02-29") && !C.makulTarih("2027-02-29") &&
+  !C.makulTarih("0026-10-21") && !C.makulTarih("1999-12-31") && !C.makulTarih("2100-01-01") && C.makulTarih("2099-12-31") && !C.makulTarih(""));
+ok("onay metni: 'GERİ YÜKLE' her yazilisi ayni katlanir, eksik metin katlanmaz", ["GERİ YÜKLE", "GERI YUKLE", "geri yükle", "Geri Yükle", " geri  yukle "].every(function (x) {
+  return C.katla(x) === C.katla("GERİ YÜKLE");
+}) && C.katla("GERI") !== C.katla("GERİ YÜKLE"));
+(function () {
+  var tamam = etk({ id: "eTamam0001", durum: "tamamlandi" }), plan = etk({ id: "ePlan00001", durum: "planlandi" }), iptal = etk({ id: "eIptal0001", durum: "iptal" });
+  var unutulan = icerik({ durum: "cekim_planlandi", cekimId: tamam.id }), fikir = icerik({ durum: "fikir", cekimId: tamam.id });
+  var v = { musteriler: [mA], etkinlikler: [tamam, plan, iptal], icerikler: [unutulan, fikir,
+    icerik({ durum: "cekim_planlandi", cekimId: plan.id }), icerik({ durum: "cekim_planlandi", cekimId: iptal.id }),
+    icerik({ durum: "kurguda", cekimId: tamam.id }), icerik({ durum: "cekim_planlandi", cekimId: tamam.id, arsiv: true }), icerik({ durum: "cekim_planlandi" })] };
+  var l = C.genelBakis(v, BUGUN, null).cekimiBitenPlanli;
+  ok("genel bakis: cekimi tamamlanip 'Çekildi' yapilmayan icerikler (planlanan / iptal cekim, kurgudaki ve arsivdeki haric)",
+    l.length === 2 && l.indexOf(unutulan) !== -1 && l.indexOf(fikir) !== -1, j(l.map(function (i) { return i.durum + ":" + i.cekimId; })));
+})();
+var mCsv = C.musterilerCsv({ musteriler: [musteri({ ad: "Kafe Ornek", slotTuru: "diger" }), musteri({ ad: "Kafe Ornek 2", slotTuru: undefined })] });
+ok("musteri CSV: 'Beklenen paylaşım türü' basligi ve Turkce deger (diger -> Diğer, bos -> Video)", /;Beklenen paylaşım türü;/.test(mCsv) && !/Slot/.test(mCsv) &&
+  /;Diğer;/.test(mCsv) && !/;diger;/.test(mCsv) && /;Video \(Reels \/ video\);/.test(mCsv), mCsv);
+ok("icerik CSV: dosya sutunlari formdaki adlarla", /Ham görüntü bağlantısı;Proje dosyası bağlantısı;Final bağlantısı/.test(C.iceriklerCsv({ icerikler: [] })));
+ok("yedekCoz: hata metinleri sade Turkce (alan adi yok)", /^Bu dosyada müşteri, içerik ya da çekim listesi bulunamadı/.test(C.yedekCoz({ x: 1 }).hata) &&
+  C.yedekCoz(null).hata === "Bu dosya bir Suflo Studio yedeği değil.", C.yedekCoz({ x: 1 }).hata);
+
 /* ---------------- Arayuz dosyalari (CI'da tarayici olmadan da): sozdizimi ve index.html baglantilari ---------------- */
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var STUDIO = path.join(__dirname, "..", "server", "studio-v1"), ARAYUZ = path.join(STUDIO, "arayuz");

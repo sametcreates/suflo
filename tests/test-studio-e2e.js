@@ -183,7 +183,7 @@ async function calis() {
   var stokMetni = await page.locator(".bolum:has-text('Stok ve yayın ihtiyacı')").textContent();
   ok("stok girisi: hazir video 2 = atanmis 0 + atanmamis 2, hazirlikta 1", /Hazır video 2/.test(stokMetni) && /tarihe atanmış 0/.test(stokMetni) && /atanmamış 2/.test(stokMetni) && /hazırlıkta 1/.test(stokMetni), stokMetni);
   // 20 Ekim Sali: 7 gunde Sal 20, Cum 23, Sal 27 hmm -> 20..26: Sal 20, Cum 23 = 2 gun
-  ok("haftalik tahmin: 7 gunde 2 paylasim gunu, ikisi oneriyle karsilanabilir", /2 paylaşım günü/.test(stokMetni) && /2 atanmamış ya da tarihi geçmiş hazırla karşılanabilir/.test(stokMetni), stokMetni);
+  ok("haftalik tahmin: 7 gunde 2 paylasim gunu, ikisi oneriyle karsilanabilir", /2 paylaşım günü/.test(stokMetni) && /2 atanmamış ya da tarihi geçmiş hazır içerikle karşılanabilir/.test(stokMetni), stokMetni);
   // Oneriyi plana cevir
   await page.locator(".slot.oneri").first().click();
   await page.locator("dialog[open] button:has-text('Bu tarihe ata')").click();
@@ -1133,6 +1133,270 @@ async function calis() {
     stokSira.every(function (x, i) { return !i || stokSira[i - 1] <= x; }), stokSira.join(","));
   ok("telefon: sayfa hatasi yok", mhatalar.length === 0, mhatalar.join(" | "));
   await mctx.close();
+
+  /* ================= Metin, dogrulama, cekim sonrasi ve revizyon (masaustu, Istanbul 12:00) ================= */
+  var tctx = await tarayici.newContext({ viewport: { width: 1280, height: 860 }, timezoneId: "Europe/Istanbul", locale: "tr-TR" });
+  var tp = await tctx.newPage();
+  var thatalar = [];
+  tp.on("pageerror", function (e) { thatalar.push(String(e)); });
+  await tp.clock.setFixedTime(new Date("2099-10-20T09:00:00Z"));
+  await tp.goto(URL_);
+  await tp.waitForSelector("#studio-sifre");
+  // Sifremi unuttum yardimi ve kilit mesaji (kilit sunucu yaniti taklit edilir: gercek kilit sonraki girisleri bozardi)
+  await tp.click(".giris-kart summary:has-text('Şifreni mi unuttun?')");
+  ok("giris: 'Şifreni mi unuttun?' acilir, verinin silinmedigini ve kurulum notunu soyler", await tp.locator(".sifre-yardim:has-text('Verilerin silinmez')").isVisible() &&
+    /e-postayla sıfırlanmaz/.test(await tp.locator(".sifre-yardim").textContent()));
+  await tp.route("**/studio/v1/index.php", function (rt) {
+    var g = JSON.parse(rt.request().postData() || "{}");
+    if (g.islem === "giris") return rt.fulfill({ status: 429, contentType: "application/json", body: JSON.stringify({ ok: false, hata: "kilit", mesaj: "Çok fazla hatalı deneme. Biraz sonra yeniden dene." }) });
+    return rt.continue();
+  });
+  await tp.fill("#studio-sifre", "yanlis-sifre-111");
+  await tp.click("button[type=submit]");
+  await tp.waitForSelector(".giris-kart .hata:has-text('Çok fazla')");
+  ok("kilit mesaji ne kadar beklenecegini soyler (15 dakika)", /15 dakika/.test(await tp.locator(".giris-kart .hata").textContent()), await tp.locator(".giris-kart .hata").textContent());
+  await tp.unroute("**/studio/v1/index.php");
+  await tp.fill("#studio-sifre", SIFRE);
+  await tp.click("button[type=submit]");
+  await tp.waitForSelector(".yan-menu");
+  async function tApi(g) {
+    return tp.evaluate(function (g) {
+      return fetch("/studio/v1/index.php", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-Studio": "1" }, body: JSON.stringify(g) })
+        .then(function (r) { return r.json(); });
+    }, g);
+  }
+  async function tKayit(liste, baslik) { return (await tApi({ islem: "veri" })).veri[liste].filter(function (x) { return (x.baslik || x.ad) === baslik; })[0]; }
+  var tid = function (k) { return (k + "metintest000000").slice(0, 16); };
+  var tMus = function (id, ad) { return { tur: "musteri", id: id, veri: { ad: ad, kurum: "", ucret: null, siklik: { tur: "belirsiz" }, slotTuru: "video", stokGirisi: false, not: "", arsiv: false } }; };
+  var tEtk = function (id, o) {
+    return { tur: "etkinlik", id: id, veri: Object.assign({ musteriId: tid("mx"), tur: "cekim", tumGun: false, basSaat: "10:00", bitSaat: "12:00", konum: "", not: "", durum: "planlandi", arsiv: false }, o) };
+  };
+  var tIc = function (o) {
+    return { tur: "icerik", veri: Object.assign({ musteriId: tid("mx"), tur: "reels", durum: "fikir", oncelik: "normal", cekimId: null, teslimTarihi: null, planTarihi: null, yayinTarihi: null,
+      revizyonNotu: "", dosyalar: { ham: "", proje: "", final: "" }, not: "", gecmis: [], arsiv: false }, o) };
+  };
+  var tk = await tApi({ islem: "toplu", kayitlar: [tMus(tid("mx"), "Metin Müşteri X"), tMus(tid("my"), "Metin Müşteri Y")] });
+  var tk2 = await tApi({ islem: "toplu", kayitlar: [
+    tEtk(tid("ebagli"), { baslik: "Metin bağlı çekim", basTarih: "2099-10-28", bitTarih: "2099-10-28" }),
+    tEtk(tid("earsiv"), { baslik: "Arşiv bağlı çekim", basTarih: "2099-10-29", bitTarih: "2099-10-29" }),
+    tEtk(tid("eiki"), { baslik: "İki günlük metin çekimi", tumGun: true, basSaat: null, bitSaat: null, basTarih: "2099-11-02", bitTarih: "2099-11-03" }),
+    tEtk(tid("etek"), { baslik: "Tek günlük metin çekimi", basTarih: "2099-11-10", bitTarih: "2099-11-10" }),
+    tEtk(tid("egece"), { baslik: "Gece metin çekimi", basTarih: "2099-11-05", basSaat: "22:00", bitTarih: "2099-11-06", bitSaat: "02:00" }),
+    tEtk(tid("edun"), { baslik: "Dünkü metin çekimi", basTarih: "2099-10-19", bitTarih: "2099-10-19" }),
+    tEtk(tid("esabah"), { baslik: "Sabah metin çekimi", basTarih: "2099-10-20", basSaat: "08:00", bitTarih: "2099-10-20", bitSaat: "10:00" })] });
+  var tk3 = await tApi({ islem: "toplu", kayitlar: [
+    tIc({ baslik: "Metin bağlı içerik", durum: "cekim_planlandi", cekimId: tid("ebagli") }),
+    tIc({ baslik: "Arşivdeki bağlı içerik", durum: "cekim_planlandi", cekimId: tid("earsiv"), arsiv: true }),
+    tIc({ baslik: "Unutulan metin içeriği", durum: "cekim_planlandi", cekimId: tid("edun") }),
+    tIc({ baslik: "Revizyon metin içeriği", durum: "onayda", teslimTarihi: "2099-10-14" })] });
+  ok("metin testi verisi kuruldu", tk.ok && tk2.ok && tk3.ok, JSON.stringify([tk, tk2, tk3]).slice(0, 300));
+  await tp.reload();
+  await tp.waitForSelector(".yan-menu");
+
+  // Icerigin musterisi degisince baska musterinin cekimine bag kalmaz (eskiden sunucu reddederdi)
+  await tp.goto(URL_ + "#/icerikler?gorunum=liste&q=Metin bağlı");
+  await tp.click(".satir-ad:has-text('Metin bağlı içerik')");
+  var td = tp.locator("dialog[open]");
+  await alanGirdi(td, "Müşteri", "select").selectOption(tid("my"));
+  ok("icerik: musteri degisince baska musterinin cekimi secimden duser, nedeni yazar", (await alanGirdi(td, "Bağlı çekim", "select").inputValue()) === "" &&
+    await td.locator("small.uyari:has-text('bağ kaldırıldı')").isVisible());
+  await td.locator("button[type=submit]").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached", timeout: 5000 }).catch(function () {});
+  var tBagli = await tKayit("icerikler", "Metin bağlı içerik");
+  ok("icerik: yeni musteriyle kaydedilir, bag kaldirilir (sunucu hatasi yok)", tBagli.musteriId === tid("my") && tBagli.cekimId === null, JSON.stringify(tBagli));
+
+  // Cekimin musterisi: arsivdeki bagli icerik de engeller; ne yapilacagi Turkce ve icerik adiyla yazar
+  await tp.goto(URL_ + "#/cekim?g=gun&t=2099-10-29");
+  await tp.click(".t-oge:has-text('Arşiv bağlı çekim')");
+  td = tp.locator("dialog[open]");
+  await alanGirdi(td, "Müşteri", "select").selectOption(tid("my"));
+  await td.locator("button[type=submit]").click();
+  await td.locator(".hata:has-text('Bağlı çekim')").waitFor({ timeout: 5000 }).catch(function () {});
+  var tHata = await td.locator(".hata").textContent();
+  ok("cekim: baska musterinin (arsivdeki) icerigi bagliyken musteri degismez; ad ve '(arşivde)' yazar", /Arşivdeki bağlı içerik/.test(tHata) && /arşivde/.test(tHata) &&
+    (await tKayit("etkinlikler", "Arşiv bağlı çekim")).musteriId === tid("mx"), tHata);
+  await td.locator("button:has-text('Vazgeç')").click();
+  await tp.locator("dialog[open] button:has-text('Kaydetmeden kapat')").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached" });
+
+  // Musteri stok esigi 999'dan buyuk: sunucuya gitmeden anlasilir uyari
+  await tp.goto(URL_ + "#/musteri/" + tid("mx"));
+  await tp.click(".sayfa-bas button:has-text('Düzenle')");
+  td = tp.locator("dialog[open]");
+  await alanGirdi(td, "Stok uyarı eşiği (beklenen türde hazır içerik)", "input").fill("1500");
+  await td.locator("button[type=submit]").click();
+  ok("musteri: esik 1500 -> '0 ile 999 arasında olmalı (boş = varsayılan)'", /0 ile 999 arasında olmalı \(boş = varsayılan\)/.test(await td.locator(".hata").textContent()));
+  await td.locator("button.kapat").click();
+  await tp.locator("dialog[open] button:has-text('Kaydetmeden kapat')").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached" });
+
+  // Cekimin baslangic gunu degisince sure korunur
+  async function cekimTasi(gun, baslik, yeniBas) {
+    await tp.goto(URL_ + "#/cekim?g=gun&t=" + gun);
+    await tp.click(".t-oge:has-text('" + baslik + "')");
+    var d_ = tp.locator("dialog[open]");
+    await alanGirdi(d_, "Başlangıç tarihi", "input").fill(yeniBas);
+    var bit = await alanGirdi(d_, "Bitiş tarihi", "input").inputValue();
+    await d_.locator("button[type=submit]").click();
+    await tp.waitForSelector("dialog[open]", { state: "detached", timeout: 5000 }).catch(function () {});
+    var k = await tKayit("etkinlikler", baslik);
+    return { formBit: bit, bas: k.basTarih, bit: k.bitTarih, hata: (await tp.locator("dialog[open] .hata").count()) ? await tp.locator("dialog[open] .hata").textContent() : "" };
+  }
+  var tasi = await cekimTasi("2099-11-02", "İki günlük metin çekimi", "2099-11-03");
+  ok("iki gunluk tum gun cekim bir gun ileri: yine iki gun (3-4 Kasım)", tasi.formBit === "2099-11-04" && tasi.bas === "2099-11-03" && tasi.bit === "2099-11-04", JSON.stringify(tasi));
+  tasi = await cekimTasi("2099-11-10", "Tek günlük metin çekimi", "2099-11-09");
+  ok("tek gunluk saatli cekim bir gun geri: 26 saate uzamaz", tasi.bas === "2099-11-09" && tasi.bit === "2099-11-09", JSON.stringify(tasi));
+  await tp.goto(URL_ + "#/cekim?g=hafta&t=2099-11-09&kayan=1");
+  ok("haftada tek gunde gorunur", (await tp.locator(".t-oge:has-text('Tek günlük metin çekimi')").count()) === 1);
+  tasi = await cekimTasi("2099-11-05", "Gece metin çekimi", "2099-11-06");
+  ok("gece yarisini asan cekim baska gune tasinir (bitis ertesi gun)", tasi.bas === "2099-11-06" && tasi.bit === "2099-11-07" && !tasi.hata, JSON.stringify(tasi));
+  await tp.click("text=+ Ekle");
+  await tp.click("dialog >> text=Çekim / etkinlik");
+  td = tp.locator("dialog[open]");
+  await alanGirdi(td, "Başlık", "input").fill("Yeni gece çekimi");
+  await alanGirdi(td, "Başlangıç saati", "input").fill("22:00");
+  await alanGirdi(td, "Bitiş saati", "input").fill("02:00");
+  await td.locator("button[type=submit]").click();
+  ok("yeni 22:00-02:00 cekim: bitis tarihini ertesi gun yapma ipucu", /ertesi gün \(21 Ekim\)/.test(await td.locator(".hata").textContent()), await td.locator(".hata").textContent());
+  // Masaustunde yili iki haneli yazilan tarih (0026) kaydedilmez
+  await alanGirdi(td, "Bitiş saati", "input").fill("23:00");
+  await alanGirdi(td, "Başlangıç tarihi", "input").evaluate(function (e) { e.value = "0026-10-20"; });
+  await td.locator("button[type=submit]").click();
+  ok("cekim: yili iki haneli baslangic tarihi icin acik uyari", /yıl 4 haneli/.test(await td.locator(".hata").textContent()), await td.locator(".hata").textContent());
+  await td.locator("button.kapat").click();
+  await tp.locator("dialog[open] button:has-text('Kaydetmeden kapat')").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached" });
+  await tp.click("text=+ Ekle");
+  await tp.click("dialog >> text=Tek içerik kartı");
+  td = tp.locator("dialog[open]");
+  await alanGirdi(td, "Müşteri", "select").selectOption(tid("mx"));
+  await alanGirdi(td, "Başlık", "input").fill("İki haneli yıl içeriği");
+  await alanGirdi(td, "Planlanan yayın tarihi", "input").evaluate(function (e) { e.value = "0026-10-21"; });
+  await td.locator("button[type=submit]").click();
+  await bekle(300);
+  ok("icerik: 0026 yilli tarih kaydedilmez, uyari gorunur", /yıl 4 haneli/.test(await td.locator(".hata").textContent()) && !(await tKayit("icerikler", "İki haneli yıl içeriği")),
+    await td.locator(".hata").textContent());
+  await td.locator("button.kapat").click();
+  await tp.locator("dialog[open] button:has-text('Kaydetmeden kapat')").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached" });
+
+  // Cekim "Tamamlandı": bagli icerigi tek tikla "Çekildi" yapma teklifi; unutulursa Genel Bakis'ta gorunur
+  await tp.goto(URL_ + "#/genel");
+  var dunSatir = tp.locator(".bolum:has-text('Durumu güncellenmemiş geçmiş çekim ve etkinlikler') .satir:has-text('Dünkü metin çekimi')");
+  await dunSatir.locator("button:has-text('Tamamlandı')").click();
+  var cekToast = tp.locator(".toast:has-text('Dünkü metin çekimi” tamamlandı')");
+  await cekToast.waitFor();
+  ok("tamamlandi bildirimi: 'Bağlı 1 içeriği “Çekildi” yap' ve 'İçerik ekle'", (await cekToast.locator("button.btn").allTextContents()).join("|") === "Bağlı 1 içeriği “Çekildi” yap|İçerik ekle",
+    (await cekToast.locator("button.btn").allTextContents()).join("|"));
+  ok("genel bakis: cekimi tamamlanip 'Çekildi' yapilmayan icerik listelenir", await tp.locator("#gb-cekimbitti .satir:has-text('Unutulan metin içeriği')").isVisible());
+  await tp.click("#gb-cekimbitti >> text=Listeyi aç →");
+  await tp.waitForSelector(".sayfa h1:has-text('İçerikler')");
+  ok("liste: ayni filtre ('Çekimi tamamlandı …') yalniz unutulan icerigi acar", /ozel=cekimbitti/.test(tp.url()) && (await tp.locator(".sayfa .satir, .sayfa .kart").count()) === 1);
+  await cekToast.locator("button:has-text('Çekildi')").click();
+  await tp.waitForSelector(".toast:has-text('Unutulan metin içeriği” → Çekildi')");
+  var unut = await tKayit("icerikler", "Unutulan metin içeriği");
+  ok("tek tik: bagli icerik 'Çekildi' (gecmise yazilir)", unut.durum === "cekildi" && /Çekim planlandı → Çekildi/.test(unut.gecmis[unut.gecmis.length - 1].m), JSON.stringify(unut));
+  await tp.goto(URL_ + "#/genel");
+  await tp.waitForSelector(".sayfa h1");
+  ok("genel bakis: 'Çekildi' yapilinca bolum kalkar", (await tp.locator("#gb-cekimbitti").count()) === 0);
+  var sabah = tp.locator(".bolum:has-text('Bugün: çekim ve etkinlikler') .satir:has-text('Sabah metin çekimi')");
+  ok("bugun bitmis cekimde 'Tamamlandı' dugmesi (yarini beklemez)", (await sabah.locator("button:has-text('Tamamlandı')").count()) === 1);
+  await sabah.locator("button:has-text('Tamamlandı')").click();
+  await tp.locator(".toast:has-text('Sabah metin çekimi” tamamlandı') button:has-text('İçerik ekle')").click();
+  td = tp.locator("dialog[open]");
+  await td.waitFor();
+  ok("'İçerik ekle' cekimden toplu ekleme penceresini acar (cekim secili, durum Çekildi)", (await alanGirdi(td, "Bağlı çekim", "select").inputValue()) === tid("esabah") &&
+    (await alanGirdi(td, "Durum", "select").inputValue()) === "cekildi");
+  await td.locator("button:has-text('Vazgeç')").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached" });
+
+  // Revizyon: not ve yeni teslim tarihi bir kerede; not listede gorunur, eski notlar gecmiste kalir
+  await tp.goto(URL_ + "#/icerikler?gorunum=liste&q=Revizyon metin");
+  var revSatir = tp.locator(".satir:has-text('Revizyon metin içeriği')");
+  await revSatir.locator("button:has-text('→ Revizyon')").click();
+  td = tp.locator("dialog[open]");
+  await td.waitFor();
+  ok("revizyon penceresi: onceki (gecmis) teslim tarihi gosterilir, yeni tarih bos", /Önceki teslim tarihi: 14 Ekim 2099 \(geçti\)/.test(await td.textContent()) &&
+    (await alanGirdi(td, "Revizyon teslim tarihi", "input").inputValue()) === "");
+  await td.locator("button:has-text('Vazgeç')").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached" });
+  ok("revizyon: Vazgeç durumu degistirmez", (await tKayit("icerikler", "Revizyon metin içeriği")).durum === "onayda");
+  await revSatir.locator("button:has-text('→ Revizyon')").click();
+  td = tp.locator("dialog[open]");
+  await alanGirdi(td, "Ne düzeltilecek?", "textarea").fill("Müzik değişsin");
+  await alanGirdi(td, "Revizyon teslim tarihi", "input").fill("2099-10-22");
+  await td.locator("button[type=submit]").click();
+  await tp.waitForSelector(".toast:has-text('Revizyon metin içeriği” → Revizyonda')");
+  var rev = await tKayit("icerikler", "Revizyon metin içeriği");
+  ok("revizyon: durum, not ve yeni teslim tarihi tek seferde; not gecmise metniyle", rev.durum === "revizyonda" && rev.revizyonNotu === "Müzik değişsin" && rev.teslimTarihi === "2099-10-22" &&
+    rev.gecmis.some(function (x) { return x.m === "Revizyon notu: Müzik değişsin"; }), JSON.stringify(rev));
+  ok("revizyon notu listede gorunur", await tp.locator(".satir:has-text('Revizyon metin içeriği') .rev-not:has-text('Revizyon: Müzik değişsin')").isVisible());
+  await tp.goto(URL_ + "#/genel");
+  await tp.waitForSelector(".sayfa h1");
+  ok("yeni teslim tarihiyle revizyon 'Geciken kurgu teslimleri'ne dusmez", (await tp.locator(".bolum:has-text('Geciken kurgu teslimleri') .satir:has-text('Revizyon metin içeriği')").count()) === 0 &&
+    (await tp.locator("#gb-revizyon .satir:has-text('Revizyon metin içeriği')").count()) === 1);
+  await tp.goto(URL_ + "#/icerikler?gorunum=liste&q=Revizyon metin");
+  await tp.locator(".satir:has-text('Revizyon metin içeriği') button:has-text('→ Onaya gönder')").click();
+  await tp.waitForSelector(".toast:has-text('→ Müşteri onayında')");
+  await tp.locator(".satir:has-text('Revizyon metin içeriği') button:has-text('→ Revizyon')").click();
+  td = tp.locator("dialog[open]");
+  await alanGirdi(td, "Ne düzeltilecek?", "textarea").fill("Logo büyüsün");
+  await td.locator("button[type=submit]").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached" });
+  rev = await tKayit("icerikler", "Revizyon metin içeriği");
+  ok("ikinci revizyon: yeni not kayitta, ilk not gecmiste; tarih bos birakilinca degismez", rev.revizyonNotu === "Logo büyüsün" && rev.teslimTarihi === "2099-10-22" &&
+    rev.gecmis.some(function (x) { return x.m === "Revizyon notu: Müzik değişsin"; }) && rev.gecmis.some(function (x) { return x.m === "Revizyon notu: Logo büyüsün"; }), JSON.stringify(rev.gecmis));
+
+  // Sifre degistirme: hangi sifrenin yanlis oldugu yazar; tanimadigi islem kodu Turkce aciklanir
+  await tp.goto(URL_ + "#/ayarlar");
+  await tp.click("button:has-text('Şifreyi değiştir')");
+  td = tp.locator("dialog[open]");
+  await alanGirdi(td, "Mevcut şifre", "input").fill("yanlis-mevcut-sifre");
+  await alanGirdi(td, "Yeni şifre", "input").fill("yeni-ornek-sifre-123");
+  await alanGirdi(td, "Yeni şifre (tekrar)", "input").fill("yeni-ornek-sifre-123");
+  await td.locator("button[type=submit]").click();
+  await td.locator(".hata:has-text('şifre')").waitFor();
+  ok("sifre degistirme: 'Mevcut şifre yanlış.'", (await td.locator(".hata").textContent()) === "Mevcut şifre yanlış.", await td.locator(".hata").textContent());
+  await td.locator("button.kapat").click();
+  await tp.locator("dialog[open] button:has-text('Kaydetmeden kapat')").click();
+  await tp.waitForSelector("dialog[open]", { state: "detached" });
+  await tp.route("**/studio/v1/index.php", function (rt) {
+    var g = JSON.parse(rt.request().postData() || "{}");
+    if (g.islem === "anliklar") return rt.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ ok: false, hata: "islem", mesaj: "Bilinmeyen islem." }) });
+    return rt.continue();
+  });
+  await tp.reload();
+  await tp.waitForSelector(".bolum:has-text('Otomatik kopyalar') .hata");
+  ok("bilinmeyen islem kodu: ham sunucu metni yerine Turkce aciklama", /Sunucu bu işlemi tanımıyor/.test(await tp.locator(".bolum:has-text('Otomatik kopyalar') .hata").textContent()));
+  await tp.unroute("**/studio/v1/index.php");
+  ok("ice aktarma yardimi teknik yazi icermez", await tp.locator("text=Suflo Studio’dan indirdiğin JSON yedeğini").isVisible() && !(await tp.locator("text={ musteriler").count()));
+  var bolumYolu = path.join(TMP, "bolumlu.json");
+  fs.writeFileSync(bolumYolu, JSON.stringify({ musteriler: [{ ad: "İçe aktarma Örnek Z", kurum: "", ucret: null, siklik: { tur: "belirsiz" } }], cekimler: [] }));
+  await tp.setInputFiles("input[type=file]", bolumYolu);
+  await tp.waitForSelector("text=Uyarılar (içe aktarma yine yapılabilir):");
+  var oniz2 = await tp.locator(".bolum:has-text('İçe aktar / geri yükle')").textContent();
+  ok("ice aktarma onizlemesi: tanınmayan bolum ve ucret belirlenmedi sade yazilir", /Tanınmayan bölüm 'cekimler': içe aktarılmayacak/.test(oniz2) && /ücret belirlenmedi/.test(oniz2), oniz2);
+
+  // Kopyaya donus: su anki ve kopyadaki sayilar; 'geri yükle' (kucuk harf, Turkce) kabul, eksik metin ret
+  await tp.reload();
+  var kopyaSatir = tp.locator(".bolum:has-text('Otomatik kopyalar') .satir").first();
+  await kopyaSatir.waitFor();
+  ok("kopya listesi sayilari Turkce harfli", /\d+ müşteri, \d+ içerik, \d+ çekim \/ etkinlik/.test(await kopyaSatir.textContent()), await kopyaSatir.textContent());
+  await kopyaSatir.locator("button:has-text('Bu kopyaya dön')").click();
+  td = tp.locator("dialog[open]");
+  var donusMetni = await td.textContent();
+  var suAn = await tApi({ islem: "veri" });
+  ok("kopyaya donus onayi: su an ve kopyadaki sayilar, sonradan eklenenlerin geri alinacagi; GERİ YÜKLE", donusMetni.indexOf("Şu an: " + suAn.veri.musteriler.length + " müşteri, " + suAn.veri.icerikler.length + " içerik") !== -1 &&
+    /Kopyada: \d+ müşteri/.test(donusMetni) && /eklenen ve değiştirilen her şey geri alınır/.test(donusMetni) && /Onaylamak için GERİ YÜKLE yaz/.test(donusMetni), donusMetni);
+  await td.locator("input[aria-label='Onay metni']").fill("GERI");
+  await td.locator("button[type=submit]").click();
+  ok("eksik onay metni kabul edilmez", /eşleşmedi/.test(await td.locator(".hata").textContent()));
+  await td.locator("input[aria-label='Onay metni']").fill("geri yükle");
+  await td.locator("button[type=submit]").click();
+  await tp.waitForSelector(".toast:has-text('Kopyaya dönüldü.')");
+  ok("'geri yükle' (kucuk harf) ile kopyaya donulur", true);
+  ok("metin testi: sayfa hatasi yok", thatalar.length === 0, thatalar.join(" | "));
+  await tctx.close();
 
   if (EKRAN) {
     var sctx = await tarayici.newContext({ viewport: { width: 1280, height: 860 }, timezoneId: "Europe/Istanbul" });

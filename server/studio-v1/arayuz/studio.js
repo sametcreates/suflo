@@ -73,13 +73,17 @@
   /* ================= Sunucu ================= */
 
   var HATA = {
-    sifre: "Şifre yanlış.", kilit: "Çok fazla hatalı deneme. Biraz sonra yeniden dene.",
+    sifre: "Şifre yanlış.", kilit: "Çok fazla hatalı deneme. Kilit kendiliğinden açılır; yaklaşık 15 dakika sonra yeniden dene.",
     kurulum: "Suflo Studio sunucusu henüz kurulmadı.", oturum: "Oturum sona erdi. Yeniden giriş yap.",
     cakisma: "Bu kayıt başka bir cihazda değişmiş. Güncel hali yüklendi; değişikliğini yeniden yap.",
     ayni_ad: "Aynı ad (ve kurum) ile bir müşteri zaten var.", veritabani: "Sunucu veritabanına bağlanamadı.",
     onay: "Onay metni gerekli.", yok: "Kayıt bulunamadı.", buyuk: "Dosya çok büyük.",
     kaynak: "Bu adresten erişim yok.", ag: "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.",
-    mesgul: "Sunucu şu an meşgul; birkaç saniye sonra yeniden dene."
+    mesgul: "Sunucu şu an meşgul; birkaç saniye sonra yeniden dene.",
+    sunucu: "Sunucuda beklenmeyen bir hata oldu. Biraz sonra yeniden dene; sürerse son değişikliğin kaydedilip kaydedilmediğini kontrol et.",
+    islem: "Sunucu bu işlemi tanımıyor. Sayfayı yenile; sürerse sunucudaki Studio dosyası güncel değildir.",
+    onizleme_eski: "Veri önizlemeden sonra değişti; önizlemeyi yenile.",
+    veritabani_sinir: "Veri, sunucu veritabanının tek seferde kabul ettiği sınırı aştı; hosting panelinden artırılması gerekir."
   };
   function hataMetni(j) {
     if (j.hata === "gecersiz") return "Kaydedilemedi: " + (j.mesaj || "geçersiz bilgi");
@@ -255,7 +259,8 @@
   /* ================= Bildirim ve pencereler ================= */
 
   /**
-   * Bildirim. kalici: kendiliginden kapanmaz (toplu degisikligin "Geri al"i), yalniz x ile ya da eylemle kapanir.
+   * Bildirim. eylem: { ad, f } ya da birden cok eylem icin dizi. kalici: kendiliginden kapanmaz (toplu degisikligin
+   * "Geri al"i), yalniz x ile ya da eylemle kapanir.
    * En cok 3 bildirim durur; fazlasinda once eylemsizler, sonra kalici olmayanlar, en son en eskisi kalkar.
    */
   function toast(metin, tur, eylem, kalici) {
@@ -263,7 +268,9 @@
     if (!kap) { kap = h("div", { class: "toastlar", role: "status", "aria-live": "polite" }); document.body.appendChild(kap); }
     var t = h("div", { class: "toast " + (tur || "") + (eylem ? " eylemli" : "") + (kalici ? " kalici" : "") }, h("span", null, metin));
     var kaldir = function () { if (t.parentNode) t.parentNode.removeChild(t); };
-    if (eylem) t.appendChild(h("button", { class: "btn ince", type: "button", onclick: function () { kaldir(); eylem.f(); } }, eylem.ad));
+    (eylem ? [].concat(eylem) : []).forEach(function (x) {
+      t.appendChild(h("button", { class: "btn ince", type: "button", onclick: function () { kaldir(); x.f(); } }, x.ad));
+    });
     t.appendChild(h("button", { class: "kapat", type: "button", "aria-label": "Kapat", onclick: kaldir }, "×"));
     kap.appendChild(t);
     while (kap.children.length > 3) {
@@ -339,12 +346,13 @@
   /** Onay penceresi. yazilacak verilirse kullanicinin o metni yazmasi gerekir. Promise<boolean> */
   function onayla(baslik, metin, dugme, yazilacak, tehlike) {
     return new Promise(function (coz) {
-      var sonuc = false, girdi = yazilacak ? h("input", { type: "text", autocomplete: "off", "aria-label": "Onay metni" }) : null;
+      var sonuc = false, girdi = yazilacak ? h("input", { type: "text", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", "aria-label": "Onay metni" }) : null;
       var hataP = h("p", { class: "hata", role: "alert" });
       var ref = {};
       var govde = [h("p", null, metin), yazilacak ? h("label", { class: "alan" }, h("span", null, "Onaylamak için " + yazilacak + " yaz"), girdi) : null, hataP];
       ref.d = pencere(baslik, govde, [vazgec(ref), h("button", { class: "btn " + (tehlike ? "tehlike" : "birincil"), type: "submit" }, dugme)], function () {
-        if (yazilacak && girdi.value.trim() !== yazilacak) { hataP.textContent = "Onay metni eşleşmedi."; return; }
+        // Buyuk / kucuk harf ve Turkce harf farki onemsiz ("geri yükle", "GERI YUKLE" de olur)
+        if (yazilacak && C.katla(girdi.value) !== C.katla(yazilacak)) { hataP.textContent = "Onay metni eşleşmedi. Kutuya " + yazilacak + " yaz."; return; }
         sonuc = true;
         ref.d.close();
       });
@@ -373,7 +381,22 @@
     return h("select", { value: deger || "" }, h("option", { value: "" }, bos),
       l.map(function (m) { return h("option", { value: m.id }, C.musteriAdi(m) + (m.arsiv ? " (arşiv)" : "")); }));
   }
-  function tarihGirdisi(v) { return h("input", { type: "date", value: v || "" }); }
+  function tarihGirdisi(v) { return h("input", { type: "date", min: "2000-01-01", max: "2099-12-31", value: v || "" }); }
+  /**
+   * Kaydetmeden once tarih kutularini denetler: [[girdi, kayittaki deger]]. Yili iki haneli yazilan (masaustunde "0026")
+   * ya da 2000-2099 disindaki tarih kaydedilmez; kayitta zaten oyle duran (eski / ice aktarilmis) deger dokunulmadikca engellemez.
+   */
+  function tarihHatasi(hataP, ciftler) {
+    for (var k = 0; k < ciftler.length; k++) {
+      var gd = ciftler[k][0], d = gd.value;
+      if (d && !C.makulTarih(d) && d !== (ciftler[k][1] || "")) {
+        hataP.textContent = "Tarih geçersiz: yıl 4 haneli ve 2000 ile 2099 arasında olmalı (ör. " + bugun().slice(0, 4) + ").";
+        gd.focus();
+        return true;
+      }
+    }
+    return false;
+  }
   function metinKutusu(v, satir, maks) { return h("textarea", { rows: String(satir || 3), maxlength: String(maks || 5000), value: v || "" }); }
 
   /* ================= Giris ================= */
@@ -413,7 +436,11 @@
         veriYukle().then(kabukKur);
       });
     } }, logo(), h("h1", null, "Suflo Studio"), h("p", { class: "soluk" }, "Özel çalışma alanı. Yalnız yetkili kullanıcı girebilir."),
-      h("label", { for: "studio-sifre" }, "Şifre"), sifre, durum, btn);
+      h("label", { for: "studio-sifre" }, "Şifre"), sifre, durum, btn,
+      // Sifre e-postayla sifirlanmaz; yol kurulum notundadir (sunucu yolu bu herkese acik sayfaya yazilmaz)
+      h("details", { class: "sifre-yardim soluk kucuk" }, h("summary", null, "Şifreni mi unuttun?"),
+        h("p", null, "Şifre e-postayla sıfırlanmaz. Sunucudaki ayar dosyasına yeni şifrenin özeti yazılarak sıfırlanır; adımlar kurulum notunda (README → Bakım → “Şifre unutulursa”)."),
+        h("p", null, "Verilerin silinmez. Sıfırlamadan sonra tüm cihazlarda yeniden giriş yapman gerekir.")));
     kok.appendChild(h("main", { class: "giris" }, form));
     sifre.focus();
   }
@@ -569,7 +596,7 @@
     return h("div", { class: "satir dokun" + (i.arsiv ? " arsivli" : ""), onclick: satirDokun(function () { icerikPenceresi(i.id); }) }, onEk || null, durumRozet(i.durum),
       h("button", { class: "satir-ad", type: "button", onclick: function () { icerikPenceresi(i.id); } }, i.baslik),
       i.oncelik === "yuksek" ? h("span", { class: "oncelik" }, "Öncelikli") : null,
-      h("span", { class: "satir-bilgi" }, dizi([musteriLink(m), C.TUR_AD[i.tur] || i.tur].concat(tarih).concat([onayBeklemesi(i), i.arsiv ? "Arşivde" : null]))),
+      h("span", { class: "satir-bilgi" }, dizi([musteriLink(m), C.TUR_AD[i.tur] || i.tur].concat(tarih).concat([onayBeklemesi(i), revizyonNotuKisa(i), i.arsiv ? "Arşivde" : null]))),
       dugmeler.length ? h("span", { class: "sag" }, dugmeler) : null);
   }
   function etkinlikSatiri(e, cak, ekDugmeler) {
@@ -620,6 +647,8 @@
     });
   }
   function durumlariDegistir(idler, yeni) {
+    // Revizyona alirken ne duzeltilecegi ve yeni teslim gunu sorulur (pano, toplu cubuk, tek tik dugmesi)
+    if (yeni === "revizyonda") return revizyonPenceresi(idler);
     var zaman = C.damga(), b = bugun(), degisim = [];
     idler.forEach(function (id) {
       var i = icerikBul(id);
@@ -632,6 +661,52 @@
     var gecIsaret = yeni === "yayinlandi" && degisim.some(function (d) { return d.yeni.yayinTarihi === b && d.onceki.planTarihi && d.onceki.planTarihi < b; });
     return uygula(degisim, (degisim.length === 1 ? "“" + degisim[0].yeni.baslik + "”" : degisim.length + " içerik") + " → " + C.DURUM_AD[yeni] +
       (gecIsaret ? " (yayın tarihi: bugün)" : ""));
+  }
+  /** Revizyon notunun gecmise yazilan satiri (sunucu satiri 300 karakterle sinirlar). */
+  function revizyonGecmisi(not) { return "Revizyon notu: " + not.slice(0, 250) + (not.length > 250 ? "…" : ""); }
+  /**
+   * Revizyona alma penceresi: "Ne düzeltilecek?" ve istege bagli yeni teslim tarihi. Eski teslim tarihi kendiliginden
+   * degismez (yalniz gosterilir). Not gecmise metniyle yazilir: ikinci revizyonda ilk not kaybolmaz. Durum, not ve
+   * tarih tek degisiklikle kaydedilir ("Geri al" hepsini geri getirir). Promise<boolean>
+   */
+  function revizyonPenceresi(idler) {
+    var liste = idler.map(icerikBul).filter(function (i) { return i && i.durum !== "revizyonda"; });
+    if (!liste.length) return Promise.resolve(false);
+    return new Promise(function (coz) {
+      var sonuc = false, tek = liste.length === 1 ? liste[0] : null, b = bugun();
+      // Tek icerikte mevcut not gorunur (degistirilip yazilir); birden coklu secimde bos kalirsa notlar degismez
+      var not = metinKutusu(tek ? tek.revizyonNotu : "", 3), teslim = tarihGirdisi(null);
+      var eski = tek && C.gecerliTarih(tek.teslimTarihi) ? "Önceki teslim tarihi: " + C.tarihKisa(tek.teslimTarihi, true) + (tek.teslimTarihi < b ? " (geçti)" : "") + ". " : "";
+      var hataP = h("p", { class: "hata", role: "alert" }), ref = {};
+      ref.d = pencere(tek ? "Revizyon: " + tek.baslik : liste.length + " içerik revizyona", [
+        alan("Ne düzeltilecek?", not, h("small", null, "Müşterinin istediği değişiklik. Önceki notlar içeriğin geçmişinde kalır.")),
+        alan("Revizyon teslim tarihi", teslim, h("small", null, eski + "Boş bırakırsan teslim tarihi değişmez.")),
+        hataP
+      ], [vazgec(ref), h("button", { class: "btn birincil", type: "submit" }, "Revizyona al")], function () {
+        if (tarihHatasi(hataP, [[teslim, null]])) return;
+        var zaman = C.damga(), metin = not.value.trim(), degisim = [];
+        liste.forEach(function (i0) {
+          var i = icerikBul(i0.id) || i0, n = C.durumDegistir(i, "revizyonda", zaman, b);
+          if (!n) return;
+          if (metin && metin !== String(i.revizyonNotu || "").trim()) { n.revizyonNotu = metin; n.gecmis.push({ z: zaman, m: revizyonGecmisi(metin) }); }
+          if (teslim.value) { n.teslimTarihi = teslim.value; n.gecmis.push({ z: zaman, m: "Teslim tarihi: " + C.tarihKisa(teslim.value, true) }); }
+          n.gecmis = n.gecmis.slice(-60);
+          degisim.push({ tur: "icerik", yeni: n, onceki: C.kopya(i) });
+        });
+        if (!degisim.length) { ref.d.close(); return; }
+        return uygula(degisim, (degisim.length === 1 ? "“" + degisim[0].yeni.baslik + "”" : degisim.length + " içerik") + " → " + C.DURUM_AD.revizyonda +
+          (teslim.value ? " (teslim " + C.tarihGunlu(teslim.value) + ")" : "")).then(function (ok) {
+          if (ok) { sonuc = true; ref.d.close(); }
+        });
+      });
+      ref.d.addEventListener("close", function () { coz(sonuc); });
+    });
+  }
+  /** Revizyondaki icerigin notu, listede kisaltilmis (tamami ustune gelince). */
+  function revizyonNotuKisa(i, sinif) {
+    var t = i.durum === "revizyonda" && i.revizyonNotu ? String(i.revizyonNotu).trim() : "";
+    if (!t) return null;
+    return h("span", { class: (sinif || "") + " rev-not", title: t }, "Revizyon: " + (t.length > 100 ? t.slice(0, 100) + "…" : t));
   }
   /** Planlanan gunu gecmis icerigi o gun yayinlanmis olarak isaretler (yayin tarihi = planlanan gun; geri alinabilir). */
   function planlananGundeYayinla(id) {
@@ -704,6 +779,9 @@
         h("button", { class: "btn ince", type: "button", onclick: function () { etkinlikDurumu(e, "iptal"); } }, "İptal")];
     };
     var icerikS = function (i) { return icerikSatiri(i); };
+    // Bugunku cekim bittiyse (bitis saati gectiyse) yarini beklemeden durumu guncellenebilir
+    var simdi = C.damga();
+    var bugunS = function (e) { return etkinlikSatiri(e, cak, e.durum === "planlandi" && C.aralik(e)[1] <= simdi ? gecmisDugme(e) : null); };
     // Karsilanmayan paylasim gunleri musteri basina tek satir; baslik sayisi gun sayisidir
     var acik = gb.acikTarihler.filter(function (x) { return x.durum === "acik"; }), acikGrup = [], grupHar = {};
     acik.forEach(function (x) {
@@ -712,12 +790,14 @@
       g.gunler.push(x);
     });
     ekle(kok_, [
-      dolu({ id: "bugun", ad: "Bugün: çekim ve etkinlikler", kisa: "Bugün çekim", liste: gb.bugunEtkinlik, link: rotaLink("cekim", { g: "gun", t: b }), satir: function (e) { return etkinlikSatiri(e, cak); } }),
+      dolu({ id: "bugun", ad: "Bugün: çekim ve etkinlikler", kisa: "Bugün çekim", liste: gb.bugunEtkinlik, link: rotaLink("cekim", { g: "gun", t: b }), satir: bugunS }),
       dolu({ id: "paylasim", ad: "Bugün paylaşılacaklar", kisa: "Bugün paylaşılacak", liste: gb.bugunPaylasilacaklar || [], link: rotaLink("icerikler", { durum: "hazir", bas: b, bit: b }), satir: icerikS,
         aciklama: "Bugüne planlı, yayına hazır içerikler. Paylaşınca “Yayınlandı”ya bas; yanlış basarsan “Geri al”." }),
       dolu({ id: "yaklasan", ad: "Önümüzdeki 7 gün: çekim ve etkinlikler", kisa: "7 gün çekim", liste: gb.yaklasanEtkinlik, link: rotaLink("cekim", { g: "hafta", t: C.gunEkle(b, 1), kayan: "1" }), satir: function (e) { return etkinlikSatiri(e, cak); } }),
-      dolu({ id: "gecmiscekim", ad: "Durumu güncellenmemiş geçmiş çekimler", kisa: "Geçmiş çekim", liste: gb.gecmisPlanliEtkinlik, satir: function (e) { return etkinlikSatiri(e, cak, gecmisDugme(e)); },
+      dolu({ id: "gecmiscekim", ad: "Durumu güncellenmemiş geçmiş çekim ve etkinlikler", kisa: "Geçmiş çekim", liste: gb.gecmisPlanliEtkinlik, satir: function (e) { return etkinlikSatiri(e, cak, gecmisDugme(e)); },
         aciklama: "Geçmiş çekimler kendiliğinden tamamlanmaz. Çekimin tamamlanması kurgunun bittiği anlamına gelmez." }),
+      dolu({ id: "cekimbitti", ad: "Çekimi tamamlandı, içerik “Çekildi” yapılmadı", kisa: "Çekildi yapılmadı", liste: gb.cekimiBitenPlanli || [], link: rotaLink("icerikler", { ozel: "cekimbitti" }), satir: icerikS,
+        aciklama: "Bağlı çekimi “Tamamlandı” olan ama hâlâ “Fikir” ya da “Çekim planlandı”da duran içerikler." }),
       dolu({ id: "geciken", ad: "Geciken kurgu teslimleri", kisa: "Geciken teslim", liste: gb.gecikenTeslim, link: rotaLink("icerikler", { ozel: "geciken" }), satir: icerikS }),
       dolu({ id: "teslim", ad: "3 gün içinde kurgu teslimi", kisa: "3 gün teslim", liste: gb.yaklasanTeslim, link: rotaLink("icerikler", { ozel: "yaklasan" }), satir: icerikS }),
       dolu({ id: "onayda", ad: "Müşteri onayında", kisa: "Onayda", liste: gb.onayda, link: rotaLink("icerikler", { durum: "onayda" }), satir: icerikS }),
@@ -744,7 +824,7 @@
         h("p", { class: "satir-bilgi" }, dizi(gb.stokBilinmeyen.map(musteriLink), ", "))), "stokgiris", "Stok girişi yok", gb.stokBilinmeyen.length) : null,
       gb.duzenEksik.length ? kayit(bolum("Yayın düzeni kurulmalı", gb.duzenEksik.length, rotaLink("stok", { f: "duzen" }),
         h("p", { class: "satir-bilgi" }, dizi(gb.duzenEksik.map(function (x) { return musteriLink(x.musteri); }), ", "))), "duzen", "Düzen eksik", gb.duzenEksik.length) : null,
-      bos.length ? h("p", { class: "temiz" }, "Boş: " + bos.join(" · ")) : null,
+      bos.length ? h("p", { class: "temiz" }, "Şu an boş olan başlıklar: " + bos.join(" · ")) : null,
       gb.sayilar.length ? musteriSayiBolumu(gb.sayilar) : null
     ]);
     if (cipler.length) ekle(cipKutu, cipler.map(function (c) {
@@ -780,7 +860,25 @@
   function etkinlikDurumu(e, durum) {
     var n = C.kopya(e);
     n.durum = durum;
-    uygula([{ tur: "etkinlik", yeni: n, onceki: C.kopya(e) }], "“" + e.baslik + "” → " + C.ETKINLIK_DURUM_AD[durum]);
+    return uygula([{ tur: "etkinlik", yeni: n, onceki: C.kopya(e) }], "“" + e.baslik + "” → " + C.ETKINLIK_DURUM_AD[durum]).then(function (ok) {
+      if (ok && durum === "tamamlandi" && e.durum !== "tamamlandi") cekimBittiTeklifi(etkinlik(e.id) || n);
+      return ok;
+    });
+  }
+  /**
+   * Cekim "Tamamlandı" yapilinca: bagli ve hala cekilmemis gorunen icerikleri tek tikla "Çekildi"ye alma ve bu cekimden
+   * icerik ekleme teklifi. Tiklanmadikca hicbir sey degismez (unutulanlar Genel Bakis'ta gorunur).
+   */
+  function cekimBittiTeklifi(e) {
+    var eHar = {};
+    eHar[e.id] = e;
+    var bekleyen = S.veri.icerikler.filter(function (i) { return !i.arsiv && C.cekimiBitti(i, eHar); });
+    var eylemler = [];
+    if (bekleyen.length) eylemler.push({ ad: "Bağlı " + bekleyen.length + " içeriği “Çekildi” yap", f: function () {
+      durumlariDegistir(bekleyen.map(function (i) { return i.id; }).filter(icerikBul), "cekildi");
+    } });
+    eylemler.push({ ad: "İçerik ekle", f: function () { topluIcerikPenceresi({ musteriId: e.musteriId, cekimId: e.id }); } });
+    toast("“" + e.baslik + "” tamamlandı." + (bekleyen.length ? " Bağlı " + bekleyen.length + " içerik henüz “Çekildi” yapılmadı." : ""), "", eylemler);
   }
 
   /* ================= Musteriler ================= */
@@ -869,9 +967,9 @@
         h("button", { class: "btn ince", type: "button", onclick: function () { musteriPenceresi(m.id); } }, "Düzeni gir")));
     } else {
       [k7, k14].forEach(function (k) {
-        var bilgi = [k.ihtiyac + " paylaşım günü", k.planli ? k.planli + " tarihe atanmış hazırla karşılanıyor" : (k.yayinlandi || !k.stokBilinen ? null : "tarihe atanmış hazır yok"),
+        var bilgi = [k.ihtiyac + " paylaşım günü", k.planli ? k.planli + " tarihe atanmış hazır içerikle karşılanıyor" : (k.yayinlandi || !k.stokBilinen ? null : "tarihe atanmış hazır içerik yok"),
           k.yayinlandi ? k.yayinlandi + " bugün yayınlandı" : null,
-          k.oneri ? k.oneri + " atanmamış ya da tarihi geçmiş hazırla karşılanabilir (öneri)" : null,
+          k.oneri ? k.oneri + " atanmamış ya da tarihi geçmiş hazır içerikle karşılanabilir (öneri)" : null,
           k.stokBilinen ? (k.acik ? k.acik + " açık" : "açık yok") : "stok bilinmediği için kalan " + (k.ihtiyac - k.planli - k.yayinlandi - k.oneri) + " gün belirsiz",
           k.ilkAcik ? "ilk karşılanmayan: " + C.tarihGunlu(k.ilkAcik) : null,
           k.slotDisiPlanli ? k.slotDisiPlanli + " hazır içerik paylaşım günü dışındaki bir tarihe planlı" : null,
@@ -900,7 +998,7 @@
     var sec = h("select", { value: istisna }, h("option", { value: "" }, "Müşterinin olağan türü"), C.SLOT_TURLERI.map(function (x) { return h("option", { value: x.k }, x.ad); }));
     var ref = {};
     ref.d = pencere(C.tarihUzun(s.tarih) + " · " + mg.ad, [
-      s.durum === "oneri" && oneri ? h("div", { class: "satir" }, h("span", null, "Öneri: “" + oneri.baslik + "” (" + (oneri.planTarihi ? "tarihi geçmiş hazır, " + C.tarihKisa(oneri.planTarihi) : "atanmamış hazır") + ")"),
+      s.durum === "oneri" && oneri ? h("div", { class: "satir" }, h("span", null, "Öneri: “" + oneri.baslik + "” (" + (oneri.planTarihi ? "tarihi geçmiş hazır içerik, " + C.tarihKisa(oneri.planTarihi) : "atanmamış hazır içerik") + ")"),
         h("button", { class: "btn ince birincil", type: "button", onclick: function () { ref.d.close(); oneriyiAta(oneri, s.tarih); } }, "Bu tarihe ata")) : null,
       alan("Bu gün beklenen paylaşım türü", sec, h("small", null, "Yalnız bu tarih için. Olağan tür müşteri ayarındadır."))
     ], [vazgec(ref), h("button", { class: "btn birincil", type: "submit" }, "Türü kaydet")], function () {
@@ -938,7 +1036,7 @@
     var gunTurleri = C.GUN_UZUN.map(function (ad, i) {
       var t = (s.gunTurleri || {})[i + 1] || "";
       return h("select", { "aria-label": C.GUN_UZUN[i] + " paylaşım türü", value: t },
-        h("option", { value: "" }, "Varsayılan tür"), C.SLOT_TURLERI.map(function (x) { return h("option", { value: x.k }, x.ad.replace(/ \(.*\)$/, "")); }));
+        h("option", { value: "" }, "Olağan tür"), C.SLOT_TURLERI.map(function (x) { return h("option", { value: x.k }, x.ad.replace(/ \(.*\)$/, "")); }));
     });
     function gunTuruGoster() { gunKutulari.forEach(function (k, i) { gunTurleri[i].hidden = !k.checked; }); }
     gunKutulari.forEach(function (k) { k.addEventListener("change", gunTuruGoster); });
@@ -946,7 +1044,7 @@
     var ucAlan = alan("Başlangıç / sıradaki yayın tarihi", g.baslangic, h("small", null, "3 günde 1 döngüsü bu tarihten sayılır. Boş bırakırsan tahmin yapılmaz."), "tam");
     var hfAlan = h("div", { class: "tam alan" }, h("span", null, "Yayın günleri"),
       h("div", { class: "gunler" }, gunKutulari.map(function (k, i) { return h("span", { class: "gun-secim" }, h("label", null, k, C.GUN_KISA[i]), gunTurleri[i]); })),
-      h("small", null, "Gün seçmezsen tahmin yapılmaz (\"yayın düzeni kurulmalı\"). Bir gün farklı türde paylaşılıyorsa (ör. Cuma post) yanından seç."));
+      h("small", null, "Gün seçmezsen tahmin yapılmaz (“yayın düzeni kurulmalı”). Bir gün farklı türde paylaşılıyorsa (ör. Cuma post) yanından seç."));
     var adetAlan = alan("Haftada kaç paylaşım", g.adet, h("small", null, "İsteğe bağlı. Tahmin seçili günlerin hepsinden yapılır; haftada daha az paylaşılıyorsa yalnız o günleri seç."));
     function goster() { ucAlan.hidden = g.siklik.value !== "uc_gun"; hfAlan.hidden = adetAlan.hidden = g.siklik.value !== "haftalik"; }
     g.siklik.addEventListener("change", goster);
@@ -1006,7 +1104,9 @@
       var ucret = C.ucretCoz(g.ucret.value);
       if (!g.ad.value.trim()) { hataP.textContent = "Ad gerekli."; g.ad.focus(); return; }
       if (typeof ucret === "number" && isNaN(ucret)) { hataP.textContent = "Ücret TL olarak tam sayı olmalı (ör. 10000 ya da 10.000) ya da boş."; g.ucret.focus(); return; }
+      if (g.esik.value !== "" && !(parseInt(g.esik.value, 10) <= 999)) { hataP.textContent = "Stok uyarı eşiği 0 ile 999 arasında olmalı (boş = varsayılan)."; g.esik.focus(); return; }
       var fs_ = formDegeri().siklik;
+      if (fs_.tur === "uc_gun" && tarihHatasi(hataP, [[g.baslangic, (v.siklik || {}).baslangic]])) return;
       if (fs_.tur === "haftalik" && fs_.haftalikAdet && fs_.gunler.length && fs_.gunler.length < fs_.haftalikAdet) {
         hataP.textContent = "Haftada " + fs_.haftalikAdet + " paylaşım için en az " + fs_.haftalikAdet + " gün seç (" + fs_.gunler.length + " seçili) ya da sayıyı düzelt.";
         g.adet.focus();
@@ -1031,8 +1131,9 @@
   /* ================= Icerikler ================= */
 
   function ozelFiltre(o) {
-    var b = bugun(), uc = C.gunEkle(b, 3);
+    var b = bugun(), uc = C.gunEkle(b, 3), eHar = o === "cekimbitti" ? C.idHaritasi(S.veri.etkinlikler) : null;
     return function (i) {
+      if (o === "cekimbitti") return C.cekimiBitti(i, eHar);
       var teslimde = i.teslimTarihi && C.TESLIM_BEKLEYEN.indexOf(i.durum) !== -1;
       if (o === "geciken") return teslimde && i.teslimTarihi < b;
       if (o === "yaklasan") return teslimde && i.teslimTarihi >= b && i.teslimTarihi <= uc;
@@ -1042,7 +1143,8 @@
       return true;
     };
   }
-  var OZEL_AD = { geciken: "Geciken kurgu teslimleri", yaklasan: "3 gün içinde teslim", gecmisplan: "Tarihi geçmiş, yayınlanmamış planlar", plansiz: "Tarihe atanmamış hazırlar", planlihazirdegil: "7 gün içinde planlı, hazır değil" };
+  var OZEL_AD = { geciken: "Geciken kurgu teslimleri", yaklasan: "3 gün içinde teslim", gecmisplan: "Tarihi geçmiş, yayınlanmamış planlar", plansiz: "Tarihe atanmamış hazır içerikler", planlihazirdegil: "7 gün içinde planlı, hazır değil",
+    cekimbitti: "Çekimi tamamlandı, “Çekildi” yapılmadı" };
 
   SAYFALAR.icerikler = function (r) {
     var p = r.p, gorunum = p.gorunum || tercih("gorunum") || "liste";
@@ -1198,7 +1300,7 @@
           h("b", null, i.baslik), h("span", { class: "soluk kucuk" }, dizi([m ? m.ad : null, C.TUR_AD[i.tur], i.oncelik === "yuksek" ? "Öncelikli" : null])),
           i.teslimTarihi && C.TESLIM_BEKLEYEN.indexOf(i.durum) !== -1 ? h("span", { class: "kucuk" + (i.teslimTarihi < b ? " gecikti" : "") }, "Teslim " + C.tarihGunlu(i.teslimTarihi)) : null,
           i.planTarihi && i.durum !== "yayinlandi" ? h("span", { class: "kucuk" + (i.planTarihi < b ? " gecikti" : "") }, "Yayın " + C.tarihGunlu(i.planTarihi)) : null,
-          onayBeklemesi(i, "kucuk"),
+          onayBeklemesi(i, "kucuk"), revizyonNotuKisa(i, "kucuk"),
           (function () { var hz = hizliDurum(i); return hz.length ? h("span", { class: "hizli-dugmeler" }, hz) : null; })());
       }),
       hepsiD.length > ogeler.length ? ic(rotaLink("icerikler", Object.assign({}, p, { gorunum: "liste", durum: d })), "+" + (hepsiD.length - ogeler.length) + " tane daha · listede aç", { class: "kucuk-link kolon-daha" }) : null);
@@ -1206,7 +1308,14 @@
     }));
   }
 
+  /**
+   * Bagli cekim secenekleri: musterisiz ve bu musterinin cekimleri. Secili cekim baska musteriye aitse secim kaldirilir
+   * (sunucu bu bagi reddeder) ve true doner; cagiran yaninda nedenini yazar.
+   */
+  var BAG_KALDIRILDI = "Seçili çekim başka müşteriye ait olduğu için bağ kaldırıldı.";
   function cekimSecenekleri(sel, musteriId, secili) {
+    var es = secili ? etkinlik(secili) : null, dustu = !!(es && musteriId && es.musteriId && es.musteriId !== musteriId);
+    if (dustu) secili = "";
     sel.textContent = "";
     var l = S.veri.etkinlikler.filter(function (e) {
       return (e.id === secili) || (!e.arsiv && e.tur !== "toplanti" && (!musteriId || !e.musteriId || e.musteriId === musteriId));
@@ -1214,6 +1323,7 @@
     sel.appendChild(h("option", { value: "" }, "Bağlı çekim yok"));
     l.forEach(function (e) { sel.appendChild(h("option", { value: e.id }, C.tarihKisa(e.basTarih, true) + " · " + e.baslik)); });
     sel.value = secili || "";
+    return dustu;
   }
   function linkGirdisi(deger) {
     var girdi = h("input", { type: "text", value: deger || "", maxlength: "1000", placeholder: "https://… (bağlantı)" });
@@ -1247,8 +1357,10 @@
       revizyon: metinKutusu(v.revizyonNotu, 2), not: metinKutusu(v.not, 2),
       ham: linkGirdisi(d.ham), proje: linkGirdisi(d.proje), final: linkGirdisi(d.final)
     };
+    var cekimNotu = h("small", { class: "uyari" });
     cekimSecenekleri(g.cekim, v.musteriId, v.cekimId);
-    g.musteri.addEventListener("change", function () { cekimSecenekleri(g.cekim, g.musteri.value, g.cekim.value); });
+    g.musteri.addEventListener("change", function () { cekimNotu.textContent = cekimSecenekleri(g.cekim, g.musteri.value, g.cekim.value) ? BAG_KALDIRILDI : ""; });
+    g.cekim.addEventListener("change", function () { cekimNotu.textContent = ""; });
     // Planlanan gun gecmisse tek tikla yayin tarihi olarak secilebilir (bos birakilirsa bugun yazilir)
     var planGunu = h("button", { class: "btn ince", type: "button", onclick: function () { g.yayin.value = g.plan.value; goster(); } });
     var yayinAlan = alan("Yayınlandığı tarih", g.yayin, h("small", null, "Boş bırakırsan bugün yazılır; planlanan günde paylaştıysan o günü seç. ", planGunu));
@@ -1301,11 +1413,11 @@
     var hataP = h("p", { class: "hata", role: "alert" });
     var ref = {};
     var gecmis = (v.gecmis || []).slice().reverse();
-    ref.d = pencere(ic_ ? "İçerik" : "İçerik ekle", [
+    ref.d = pencere(ic_ ? "İçeriği düzenle" : "İçerik ekle", [
       h("div", { class: "izgara" },
         alan("Müşteri", g.musteri), alan("Başlık", g.baslik),
         alan("Tür", g.tur), alan("Durum", g.durum),
-        alan("Öncelik", g.oncelik), alan("Bağlı çekim", g.cekim),
+        alan("Öncelik", g.oncelik), alan("Bağlı çekim", g.cekim, cekimNotu),
         alan("Kurgu teslim tarihi", g.teslim), alan("Planlanan yayın tarihi", g.plan, h("small", null, "Hazır içerik bu tarihe atanmış sayılır.")),
         yayinAlan, revAlan,
         alan("Ham görüntü bağlantısı", g.ham.girdi, g.ham.ipucu), alan("Proje dosyası bağlantısı", g.proje.girdi, g.proje.ipucu),
@@ -1320,6 +1432,7 @@
     ], function () {
       if (!g.musteri.value) { hataP.textContent = "Müşteri seç."; g.musteri.focus(); return; }
       if (!g.baslik.value.trim()) { hataP.textContent = "Başlık yaz."; g.baslik.focus(); return; }
+      if (tarihHatasi(hataP, [[g.teslim, v.teslimTarihi], [g.plan, v.planTarihi]].concat(g.durum.value === "yayinlandi" ? [[g.yayin, v.yayinTarihi]] : []))) return;
       var zaman = C.damga(), b = bugun();
       var n = degisenleriUygula(v, ilk, formDegeri());
       if (n.durum === "yayinlandi" && !n.yayinTarihi) n.yayinTarihi = b;
@@ -1329,7 +1442,7 @@
       if (!ic_) gec.push({ z: zaman, m: "Eklendi (" + C.DURUM_AD[n.durum] + ")" });
       else {
         if (n.durum !== v.durum) gec.push({ z: zaman, m: C.DURUM_AD[v.durum] + " → " + C.DURUM_AD[n.durum] });
-        if ((n.revizyonNotu || "") !== (v.revizyonNotu || "") && n.revizyonNotu) gec.push({ z: zaman, m: "Revizyon notu güncellendi" });
+        if ((n.revizyonNotu || "") !== (v.revizyonNotu || "") && n.revizyonNotu) gec.push({ z: zaman, m: revizyonGecmisi(n.revizyonNotu) });
         if ((n.planTarihi || "") !== (v.planTarihi || "")) gec.push({ z: zaman, m: n.planTarihi ? "Yayın tarihi: " + C.tarihKisa(n.planTarihi, true) : "Yayın tarihi kaldırıldı" });
       }
       n.gecmis = gec.slice(-60);
@@ -1359,10 +1472,12 @@
     };
     cekimDurumu();
     g.cekim.addEventListener("change", cekimDurumu);
-    g.musteri.addEventListener("change", function () { cekimSecenekleri(g.cekim, g.musteri.value, g.cekim.value); });
+    var topluCekimNotu = h("small", { class: "uyari" });
+    g.musteri.addEventListener("change", function () { topluCekimNotu.textContent = cekimSecenekleri(g.cekim, g.musteri.value, g.cekim.value) ? BAG_KALDIRILDI : ""; });
+    g.cekim.addEventListener("change", function () { topluCekimNotu.textContent = ""; });
     var hataP = h("p", { class: "hata", role: "alert" }), ref = {}, kimlikler = {};
     ref.d = pencere("Toplu içerik ekle", [
-      h("div", { class: "izgara" }, alan("Müşteri", g.musteri), alan("Bağlı çekim", g.cekim, h("small", null, "Bir çekimden birden çok içerik çıkabilir.")),
+      h("div", { class: "izgara" }, alan("Müşteri", g.musteri), alan("Bağlı çekim", g.cekim, [h("small", null, "Bir çekimden birden çok içerik çıkabilir."), topluCekimNotu]),
         alan("Tür", g.tur), alan("Durum", g.durum), alan("Öncelik", g.oncelik), alan("Kurgu teslim tarihi", g.teslim),
         alan("Başlıklar", g.basliklar, h("small", null, "Her satır ayrı bir içerik olur (en çok 300)."), "tam")),
       hataP
@@ -1372,6 +1487,7 @@
       if (!satirlar.length) { hataP.textContent = "En az bir başlık yaz."; return; }
       if (satirlar.length > 300) { hataP.textContent = "Bir seferde en çok 300 içerik."; return; }
       if (satirlar.some(function (s) { return s.length > 200; })) { hataP.textContent = "Başlıklar en çok 200 karakter olmalı."; return; }
+      if (tarihHatasi(hataP, [[g.teslim, null]])) return;
       var zaman = C.damga();
       var kayitlar = satirlar.map(function (s) {
         return { tur: "icerik", kayit: { musteriId: g.musteri.value, baslik: s, tur: g.tur.value, durum: g.durum.value, oncelik: g.oncelik.value,
@@ -1438,6 +1554,7 @@
       if (!degisti(yollar, "bitSaat") && k.bitSaat) g.bitSaat.value = k.bitSaat;
       if (!degisti(yollar, "konum")) g.konum.value = k.konum || "";
       if (!degisti(yollar, "not")) g.not.value = k.not || "";
+      sureAl();
       denetle();
     }
     function tabanYenile(guncel) {
@@ -1448,10 +1565,20 @@
       yollar.forEach(function (y) { yolYaz(ilk, y, yolAl(v, y)); });
     }
     [g.tumGun, g.basTarih, g.basSaat, g.bitTarih, g.bitSaat, g.durum].forEach(function (x) { x.addEventListener("change", denetle); x.addEventListener("input", denetle); });
-    g.basTarih.addEventListener("change", function () { if (!g.bitTarih.value || g.bitTarih.value < g.basTarih.value) g.bitTarih.value = g.basTarih.value; denetle(); });
+    // Baslangic gunu degisince sure (gun olarak) korunur: iki gunluk ya da gece yarisini asan cekim baska gune
+    // tasininca kisalmaz / uzamaz. Yarim yazilmis (gecersiz ya da yili iki haneli) tarih sureyi bozmaz.
+    var sureGun = 0;
+    function sureAl() { var bs = g.basTarih.value, bt = g.bitTarih.value; if (C.makulTarih(bs) && C.makulTarih(bt) && bt >= bs) sureGun = C.gunFarki(bs, bt); }
+    sureAl();
+    g.bitTarih.addEventListener("change", sureAl);
+    g.basTarih.addEventListener("change", function () {
+      if (C.makulTarih(g.basTarih.value)) g.bitTarih.value = C.gunEkle(g.basTarih.value, sureGun);
+      else if (!g.bitTarih.value || g.bitTarih.value < g.basTarih.value) g.bitTarih.value = g.basTarih.value;
+      denetle();
+    });
     denetle();
     var hataP = h("p", { class: "hata", role: "alert" }), ref = {};
-    ref.d = pencere(e ? "Çekim / etkinlik" : "Çekim / etkinlik ekle", [
+    ref.d = pencere(e ? "Çekimi / etkinliği düzenle" : "Çekim / etkinlik ekle", [
       h("div", { class: "izgara" },
         alan("Müşteri", g.musteri, h("small", null, "Müşterisiz etkinlikler (ör. organizasyon) ücretli müşteri sayılmaz.")), alan("Başlık", g.baslik),
         alan("Tür", g.tur), alan("Durum", g.durum, h("small", null, "Geçmiş çekimler kendiliğinden tamamlanmaz.")),
@@ -1469,9 +1596,23 @@
     ], function () {
       var a = aday();
       if (!g.baslik.value.trim()) { hataP.textContent = "Başlık yaz."; g.baslik.focus(); return; }
+      if (!g.basTarih.value) { hataP.textContent = "Başlangıç tarihini gir."; g.basTarih.focus(); return; }
+      if (tarihHatasi(hataP, [[g.basTarih, v.basTarih], [g.bitTarih, v.bitTarih]])) return;
       if (!C.gecerliTarih(a.basTarih)) { hataP.textContent = "Başlangıç tarihini gir."; return; }
       if (!a.tumGun && (!C.gecerliSaat(a.basSaat) || !C.gecerliSaat(a.bitSaat))) { hataP.textContent = "Başlangıç ve bitiş saatini gir ya da Tüm gün seç."; return; }
+      if (!a.tumGun && a.bitTarih === a.basTarih && a.bitSaat < a.basSaat) {
+        hataP.textContent = "Bitiş saati başlangıçtan önce. Çekim gece yarısını geçiyorsa bitiş tarihini ertesi gün (" + C.tarihKisa(C.gunEkle(a.basTarih, 1)) + ") yap.";
+        return;
+      }
       if (a.bitTarih < a.basTarih || C.aralik(a)[1] <= C.aralik(a)[0]) { hataP.textContent = "Bitiş başlangıçtan sonra olmalı."; return; }
+      // Sunucu, baska musterinin icerigi bagli cekimin musterisini degistirmez; arsivdeki icerikler de sayilir
+      var baskaBagli = e && a.musteriId ? S.veri.icerikler.filter(function (i) { return i.cekimId === e.id && i.musteriId !== a.musteriId; }) : [];
+      if (baskaBagli.length) {
+        hataP.textContent = "Bu çekime başka müşterinin " + baskaBagli.length + " içeriği bağlı: " +
+          baskaBagli.slice(0, 5).map(function (i) { return "“" + i.baslik + "”" + (i.arsiv ? " (arşivde)" : ""); }).join(", ") + (baskaBagli.length > 5 ? " …" : "") +
+          ". Müşteriyi değiştirmeden önce o içeriklerin “Bağlı çekim” alanını boşalt.";
+        return;
+      }
       var n = degisenleriUygula(v, ilk, formDegeri());
       if (!e) n.id = yeniKimlik;
       var cak = C.cakisanlar(S.veri.etkinlikler, n).length, taban = C.kopya(v);
@@ -1479,8 +1620,9 @@
         if (!k) return;
         ref.d.close();
         yenile();
-        toast((e ? "Kaydedildi." : "Eklendi.") + (cak ? " Dikkat: " + cak + " etkinlikle çakışıyor." : ""), cak ? "hata" : "",
+        toast((e ? "Kaydedildi." : "Çekim / etkinlik eklendi.") + (cak ? " Dikkat: " + cak + " etkinlikle çakışıyor." : ""), cak ? "hata" : "",
           e ? { ad: "Geri al", f: function () { geriAl([{ tur: "etkinlik", onceki: taban, sonraki: k }]); } } : null);
+        if (k.durum === "tamamlandi" && taban.durum !== "tamamlandi") cekimBittiTeklifi(k);
       });
     }, true);
   }
@@ -1564,7 +1706,7 @@
       (katman === "cekim" || ikisi) ? [h("span", null, h("i", { class: "t-cekim" }), "Çekim"), h("span", null, h("i", { class: "t-toplanti" }), "Toplantı / diğer"), h("span", null, h("i", { class: "lej-cakisma" }), "Çakışma")] : null,
       (katman === "yayin" || ikisi) ? [h("span", null, h("i", { class: "t-plan-hazir" }), "Planlı, hazır"), h("span", null, h("i", { class: "t-plan-hazirlikta" }), "Planlı, hazır değil"),
         h("span", null, h("i", { class: "t-yayinlandi" }), "Yayınlandı"), h("span", null, h("i", { class: "t-ihtiyac" }), "Paylaşım günü, beklenen türde hazır yok"),
-        h("span", null, h("i", { class: "t-ihtiyac oneri" }), "Atanmamış / tarihi geçmiş hazırdan karşılanabilir")] : null);
+        h("span", null, h("i", { class: "t-ihtiyac oneri" }), "Atanmamış ya da tarihi geçmiş hazır içerikle karşılanabilir")] : null);
     return h("div", null, sayfaBasligi(katman === "cekim" ? "Çekim Takvimi" : "Yayın Takvimi", "Saatler Türkiye saatidir (Europe/Istanbul).", [eylem]), ust, govde, lejant);
   }
   function takvimOgeleri(katman, ikisi, ilk, son, mf) {
@@ -1615,7 +1757,7 @@
     // Acik gunde tur video gunlerinde de yazilir: ayni gune planli baska turdeki hazirla ("Planlı, hazır") celismesin
     var tAd = ({ video: "video", post: "post", story: "story", diger: "diğer" })[o.s.grup || "video"] || o.s.grup;
     var metin = o.s.durum === "acik" ? tAd + " günü, hazır " + (o.s.grup === "diger" ? "içerik" : tAd) + " yok" :
-      (o.s.grup && o.s.grup !== "video" ? tAd + " günü, " : "") + (o.s.durum === "oneri" ? "atanmamış ya da tarihi geçmiş hazırdan karşılanabilir" : "paylaşım günü (stok bilinmiyor)");
+      (o.s.grup && o.s.grup !== "video" ? tAd + " günü, " : "") + (o.s.durum === "oneri" ? "atanmamış ya da tarihi geçmiş hazır içerikle karşılanabilir" : "paylaşım günü (stok bilinmiyor)");
     return h("a", { class: "t-oge t-ihtiyac" + (o.s.durum === "oneri" ? " oneri" : o.s.durum === "bilinmiyor" ? " bilinmiyor" : ""), href: rotaLink("musteri", null, o.m.id),
       title: o.m.ad + ": " + metin }, o.m.ad + ": " + metin);
   }
@@ -1642,8 +1784,8 @@
     l = l.slice().sort(function (x, y) { return sira[x.id] < sira[y.id] ? -1 : sira[x.id] > sira[y.id] ? 1 : adSirala(x, y); });
     return h("div", null,
       sayfaBasligi("Stok", "Hazır stok: müşteri onayı alınmış, yayına hazır ve henüz yayınlanmamış videolar (Reels / video). Postlar videoya sayılmaz."),
-      h("p", { class: "soluk kucuk" }, "İleri tarihe atanmış, tarihi geçip yayınlanmamış ve atanmamış hazırlar ayrı sayılır; üçünün toplamı hazır stoktur. Önümüzdeki 7 / 14 gün yayın düzenindeki gerçek günlerden hesaplanır. ",
-        "“Öneri” atanmamış ya da tarihi geçmiş bir hazırın o güne konabileceğini gösterir; plana sen çevirmedikçe kaydedilmez. Acil olanlar üstte."),
+      h("p", { class: "soluk kucuk" }, "İleri tarihe atanmış, tarihi geçip yayınlanmamış ve atanmamış hazır içerikler ayrı sayılır; üçünün toplamı hazır stoktur. Önümüzdeki 7 / 14 gün yayın düzenindeki gerçek günlerden hesaplanır. ",
+        "“Öneri” atanmamış ya da tarihi geçmiş bir hazır içeriğin o güne konabileceğini gösterir; plana sen çevirmedikçe kaydedilmez. Acil olanlar üstte."),
       STOK_SUZGEC[f] ? h("p", { class: "kucuk" }, "Gösterilen: " + STOK_SUZGEC[f] + " (" + l.length + ") · ", ic(rotaLink("stok"), "Tüm müşteriler")) : null,
       bilinmeyen.length ? h("div", { class: "uyari-kutu" }, bilinmeyen.length + " müşteride stok girişi yapılmadı; bunlarda stok 0 sayılmaz, “bilinmiyor” görünür.") : null,
       l.length ? l.map(function (m) {
@@ -1676,7 +1818,7 @@
       mevcut.length ? h("p", { class: "soluk kucuk" }, "Sistemde bu müşteri için zaten " + hazirSayi + " hazır ve " + hazirlikSayi + " hazırlıkta içerik var; bunlar korunur, yenileri eklenir.") : null,
       h("div", { class: "izgara" },
         alan("Yayına hazır (onaylı, yayınlanmamış)", g.hazir, null, "tam"), alan("Adet (başlık yazmadıysan)", g.hazirAdet), alan("Tür", g.hazirTur),
-        alan("Hazırlıkta olanlar", g.hazirlik, null, "tam"), alan("Durumları", g.hazirlikDurum), alan("Tür", g.hazirlikTur)),
+        alan("Hazırlıkta olanlar", g.hazirlik, null, "tam"), alan("Hazırlıktakilerin durumu", g.hazirlikDurum), alan("Tür", g.hazirlikTur)),
       hataP
     ], [vazgec(ref), h("button", { class: "btn birincil", type: "submit" }, m.stokGirisi ? "Ekle" : "Kaydet ve stok girişini tamamla")], function () {
       var satir = function (t) { return t.value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean); };
@@ -1771,14 +1913,14 @@
           h("button", { class: "btn", type: "button", onclick: function () { indir("suflo-studio-musteriler-" + bugun() + ".csv", C.musterilerCsv(S.veri), "text/csv;charset=utf-8"); } }, "Müşteriler (CSV)"),
           h("button", { class: "btn", type: "button", onclick: function () { indir("suflo-studio-icerikler-" + bugun() + ".csv", C.iceriklerCsv(S.veri), "text/csv;charset=utf-8"); } }, "İçerikler (CSV)"))]),
       bolum("İçe aktar / geri yükle", null, null, [
-        h("p", { class: "soluk kucuk" }, "Suflo Studio JSON yedeği ya da { musteriler, etkinlikler, icerikler } listesi seç. Önce önizleme gösterilir; aynı kayıtlar ikinci kez eklenmez, hiçbir şey sessizce silinmez. Uygulamadan önce otomatik kopya alınır."),
+        h("p", { class: "soluk kucuk" }, "Suflo Studio’dan indirdiğin JSON yedeğini ya da müşteri / çekim / içerik listesi içeren bir JSON dosyasını seç. Önce önizleme gösterilir; aynı kayıtlar ikinci kez eklenmez, hiçbir şey sessizce silinmez. Uygulamadan önce otomatik kopya alınır."),
         alan("Dosya", dosya), onizleme]),
       bolum("Otomatik kopyalar", null, null, [h("p", { class: "soluk kucuk" }, "Sunucu her gün ilk değişiklikten önce (günlük kopya) ve her içe aktarma / geri yüklemeden önce tüm verinin kopyasını alır. Son 14 günlük kopya ve son 30 diğer kopya saklanır."), anlikKutu]),
       bolum("Güvenlik", null, null, [
         h("div", { class: "eylemler" },
           h("button", { class: "btn", type: "button", onclick: sifrePenceresi }, "Şifreyi değiştir"),
           h("button", { class: "btn", type: "button", onclick: function () {
-            onayla("Tüm oturumları kapat", "Telefon ve bilgisayar dahil tüm cihazlarda oturum kapanır; yeniden şifreyle girmen gerekir.", "Tümünü kapat").then(function (e) {
+            onayla("Tüm cihazlarda çıkış yap", "Telefon ve bilgisayar dahil tüm cihazlarda oturum kapanır; yeniden şifreyle girmen gerekir.", "Tümünü kapat").then(function (e) {
               if (e) api("oturumlari_kapat").then(function (j) { if (j.ok) girisEkrani("Tüm oturumlar kapatıldı."); else toast(hataMetni(j), "hata"); });
             });
           } }, "Tüm cihazlarda çıkış yap"),
@@ -1786,7 +1928,7 @@
       bolum("Bilgi", null, null, h("dl", { class: "bilgi" },
         h("dt", null, "Saat dilimi"), h("dd", null, "Europe/Istanbul (UTC+3)"),
         h("dt", null, "Veri"), h("dd", null, "Suflo Studio sunucusunda; bu tarayıcıda saklanmaz. Telefon ve bilgisayar aynı kayıtları görür."),
-        h("dt", null, "Silme"), h("dd", null, "Tek tek silme yok; kayıtlar arşivlenir. “Tümünü değiştir” ve “Bu kopyaya dön” mevcut kayıtları kaldırır; öncesinde otomatik kopya alınır (Otomatik kopyalar)."))));
+        h("dt", null, "Silme"), h("dd", null, "Tek tek silme yok; kayıtlar arşivlenir. “Tüm veriyi bu dosyayla değiştir” ve “Bu kopyaya dön” mevcut kayıtları kaldırır; öncesinde otomatik kopya alınır (Otomatik kopyalar)."))));
   };
   function indir(ad, icerik, tur) {
     var url = URL.createObjectURL(new Blob([icerik], { type: tur }));
@@ -1823,6 +1965,15 @@
     if (govdeBayt > GOVDE_SINIRI) toast("Yedek indirildi ama verisi " + (govdeBayt / 1048576).toFixed(1).replace(".", ",") + " MB; tek seferde geri yüklenebilecek boyutu (8 MB) aşıyor. Sunucudaki otomatik kopyalar yine geçerli.", "hata");
     else toast("Yedek indirildi. Özel bilgi içerir; güvenli yerde sakla.");
   }
+  /**
+   * Kopya ozetindeki sayilar: "1 müşteri, 2 içerik, 3 çekim / etkinlik" (eski kopyalarda "1 musteri, 2 icerik, 3 etkinlik").
+   * Okunamazsa null.
+   */
+  function sayilarOzet(oz) {
+    var m = /(\d+) m[uü][sş]teri, (\d+) i[cç]erik, (\d+) (?:çekim \/ )?etkinlik/.exec(String(oz || ""));
+    return m ? { musteri: +m[1], icerik: +m[2], etkinlik: +m[3] } : null;
+  }
+  function sayiMetni(x) { return x.musteri + " müşteri, " + x.icerik + " içerik, " + x.etkinlik + " çekim / etkinlik"; }
   function anliklariYukle(kutu) {
     api("anliklar").then(function (j) {
       kutu.textContent = "";
@@ -1831,9 +1982,15 @@
       var neden = { gunluk: "Günlük kopya", ice_aktarma_oncesi: "İçe aktarma öncesi", geri_yukleme_oncesi: "Geri yükleme öncesi", anlik_geri_oncesi: "Kopyaya dönüş öncesi" };
       j.anliklar.forEach(function (a) {
         var z = C.istanbulSimdi(new Date(a.zaman * 1000));
-        kutu.appendChild(h("div", { class: "satir" }, h("b", null, C.tarihKisa(z.tarih, true) + " " + z.saat), h("span", { class: "satir-bilgi" }, dizi([neden[a.neden] || a.neden, a.ozet])),
+        var kopyaSayi = sayilarOzet(a.ozet);
+        kutu.appendChild(h("div", { class: "satir" }, h("b", null, C.tarihKisa(z.tarih, true) + " " + z.saat), h("span", { class: "satir-bilgi" }, dizi([neden[a.neden] || a.neden, kopyaSayi ? sayiMetni(kopyaSayi) : a.ozet])),
           h("span", { class: "sag" }, h("button", { class: "btn ince", type: "button", onclick: function () {
-            onayla("Bu kopyaya dön", "Tüm veri " + C.tarihKisa(z.tarih, true) + " " + z.saat + " kopyasındaki haline döner (" + a.ozet + "). Şu anki hal önce otomatik kopyalanır.", "Kopyaya dön", "GERI YUKLE", true).then(function (e) {
+            // Neyin degisecegi acikca yazilir: su anki sayilar (arsiv dahil) ve kopyadakiler
+            var su = { musteri: S.veri.musteriler.length, icerik: S.veri.icerikler.length, etkinlik: S.veri.etkinlikler.length };
+            var metin = kopyaSayi ? "Şu an: " + sayiMetni(su) + ". Kopyada: " + sayiMetni(kopyaSayi) + ". Tüm veri " + C.tarihKisa(z.tarih, true) + " " + z.saat +
+              " kopyasındaki haline döner; kopyadan sonra eklenen ve değiştirilen her şey geri alınır. Şu anki hal önce otomatik kopyalanır." :
+              "Tüm veri " + C.tarihKisa(z.tarih, true) + " " + z.saat + " kopyasındaki haline döner (" + a.ozet + "); kopyadan sonra eklenen ve değiştirilen her şey geri alınır. Şu anki hal önce otomatik kopyalanır.";
+            onayla("Bu kopyaya dön", metin, "Kopyaya dön", "GERİ YÜKLE", true).then(function (e) {
               if (!e) return;
               api("anlik_geri", { id: a.id, onay: "GERI YUKLE" }).then(function (k) {
                 if (!k.ok) { toast(hataMetni(k), "hata"); return; }
@@ -1851,16 +2008,16 @@
     kutu.textContent = "";
     var f = dosyaGirdi.files && dosyaGirdi.files[0];
     if (!f) return;
-    if (f.size > DOSYA_SINIRI) { kutu.appendChild(h("p", { class: "hata" }, "Dosya çok büyük.")); return; }
+    if (f.size > DOSYA_SINIRI) { kutu.appendChild(h("p", { class: "hata" }, "Dosya çok büyük (en çok 64 MB).")); return; }
     f.text().then(function (metin) {
       var obj;
-      try { obj = JSON.parse(metin); } catch (e) { kutu.appendChild(h("p", { class: "hata" }, "Dosya geçerli JSON değil.")); return; }
+      try { obj = JSON.parse(metin); } catch (e) { kutu.appendChild(h("p", { class: "hata" }, "Dosya okunamadı: geçerli bir JSON yedeği değil.")); return; }
       var c = C.yedekCoz(obj);
       if (c.hata) { kutu.appendChild(h("p", { class: "hata" }, c.hata)); return; }
       if (baytBoyutu({ islem: "ice_aktar", veriler: c.veriler, kip: "degistir", onay: "GERI YUKLE" }) > GOVDE_SINIRI) {
         kutu.appendChild(h("p", { class: "hata" }, "Veri tek seferde içe aktarılamayacak kadar büyük (sunucu sınırı 8 MB).")); return;
       }
-      var dosyaUyarisi = (c.bilinmeyen || []).map(function (k) { return "bilinmeyen alan '" + String(k).slice(0, 40) + "' (dosyanın üst düzeyi): yok sayılacak"; });
+      var dosyaUyarisi = (c.bilinmeyen || []).map(function (k) { return "Tanınmayan bölüm '" + String(k).slice(0, 40) + "': içe aktarılmayacak"; });
       kutu.appendChild(h("p", { class: "soluk kucuk" }, "Önizleme hazırlanıyor…"));
       api("ice_aktar", { veriler: c.veriler, onizleme: true }).then(function (j) {
         kutu.textContent = "";
@@ -1893,7 +2050,7 @@
       kutu.textContent = "";
       veriYukle().then(function () {
         yenile();
-        toast("İçe aktarma tamamlandı: " + j.sonuc.sayilar.musteri + " müşteri, " + j.sonuc.sayilar.icerik + " içerik, " + j.sonuc.sayilar.etkinlik + " etkinlik eklendi.");
+        toast("İçe aktarma tamamlandı: " + j.sonuc.sayilar.musteri + " müşteri, " + j.sonuc.sayilar.icerik + " içerik, " + j.sonuc.sayilar.etkinlik + " çekim / etkinlik eklendi.");
       });
     };
     var hataKutusu = function (liste, baslik) {
@@ -1908,12 +2065,12 @@
           (u.belirsiz ? " · " + u.belirsiz + " müşterinin ücreti belirlenmedi" : ""))] : null,
         h("dt", null, "Hatalı"), h("dd", { class: hataVar ? "uyari" : null }, String(o.hataSayisi))),
       hataVar ? hataKutusu(o.hatalar, "Hatalı kayıtlar düzeltilmeden içe aktarma yapılmaz:") : null,
-      o.uyarilar && o.uyarilar.length ? h("div", { class: "uyari-kutu" }, h("b", null, "Uyarı (bu alanlar kaydedilmeyecek):"), o.uyarilar.map(function (x) { return h("div", null, x); })) : null,
+      o.uyarilar && o.uyarilar.length ? h("div", { class: "uyari-kutu" }, h("b", null, "Uyarılar (içe aktarma yine yapılabilir):"), o.uyarilar.map(function (x) { return h("div", null, x); })) : null,
       o.ekle.length ? h("details", null, h("summary", { class: "soluk kucuk" }, "Eklenecekler (müşteri bağlantısı ve ücretiyle)"), o.ekle.map(function (x) {
-        if (x.tur === "musteri") return h("div", { class: "kucuk" }, "Müşteri: " + x.ad + " · " + C.para(x.ucret) + " · " + (SIKLIK_AD[x.siklik] || x.siklik));
+        if (x.tur === "musteri") return h("div", { class: "kucuk" }, "Müşteri: " + x.ad + " · " + (x.ucret === null || x.ucret === undefined ? "ücret belirlenmedi" : C.para(x.ucret)) + " · " + (SIKLIK_AD[x.siklik] || x.siklik));
         return h("div", { class: "kucuk" }, ({ icerik: "İçerik", etkinlik: "Etkinlik" })[x.tur] + ": " + x.ad + " → " + (x.bag || "müşteri yok"));
       })) : null,
-      o.atla.length ? h("details", null, h("summary", { class: "soluk kucuk" }, "Atlananlar"), o.atla.map(function (x) { return h("div", { class: "kucuk" }, x.ad + " (" + x.neden + ")"); })) : null,
+      o.atla.length ? h("details", null, h("summary", { class: "soluk kucuk" }, "Atlananlar"), o.atla.map(function (x) { return h("div", { class: "kucuk" }, x.ad + " — " + x.neden); })) : null,
       h("div", { class: "eylemler" },
         h("button", { class: "btn birincil", type: "button", disabled: hataVar || !(s.musteri + s.icerik + s.etkinlik), onclick: function (ev) {
           var dugme = ev.target;
@@ -1937,7 +2094,7 @@
               "Şu anki kayıtlar silinecek: " + (k.musteri || 0) + " müşteri, " + (k.icerik || 0) + " içerik, " + (k.etkinlik || 0) + " çekim / etkinlik. " +
               "Yerine dosyadan gelecek: " + e2.musteri + " müşteri, " + e2.icerik + " içerik, " + e2.etkinlik + " çekim / etkinlik" + (d.ayar ? " ve ayarlar" : "") + ". " +
               (d.ayarSil ? "Yedekte ayar olmadığı için şu anki ayarlar (varsayılan stok eşiği) da kaldırılır. " : "") +
-              "Şu anki hal önce otomatik kopyalanır (Ayarlar → Otomatik kopyalar).", "Değiştir", "GERI YUKLE", true).then(function (e) {
+              "Şu anki hal önce otomatik kopyalanır (Ayarlar → Otomatik kopyalar).", "Değiştir", "GERİ YÜKLE", true).then(function (e) {
               if (e) api("ice_aktar", { veriler: veriler, kip: "degistir", onay: "GERI YUKLE", beklenen: Object.assign({}, e2, { durum: d.durum }) }).then(bitir);
             });
           });
@@ -1956,7 +2113,7 @@
       if (yeni.value.length < 12) { hataP.textContent = "Yeni şifre en az 12 karakter olmalı."; return; }
       if (yeni.value !== yeni2.value) { hataP.textContent = "Yeni şifreler aynı değil."; return; }
       return api("sifre_degistir", { eski: eski.value, yeni: yeni.value }).then(function (j) {
-        if (!j.ok) { hataP.textContent = hataMetni(j); return; }
+        if (!j.ok) { hataP.textContent = j.hata === "sifre" ? "Mevcut şifre yanlış." : hataMetni(j); return; }
         ref.d.close();
         toast("Şifre değişti. Diğer cihazlarda yeniden giriş gerekecek.");
       });
