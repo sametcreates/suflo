@@ -89,7 +89,7 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
 .satir-bilgi{color:var(--dim);font-size:13px}
 .satir.iptal .satir-ad{text-decoration:line-through;color:var(--faint)}
 .satir.arsivli{opacity:.65}
-.satir .sag{margin-left:auto;display:flex;gap:6px}
+.satir .sag{margin-left:auto;display:flex;flex-wrap:wrap;gap:6px}
 .oncelik{margin-left:6px;font-size:11px;font-weight:700;color:var(--sari)}
 .not-metni{white-space:pre-wrap;color:var(--dim)}
 .bilgi{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:14px}

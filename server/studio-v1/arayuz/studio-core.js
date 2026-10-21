@@ -74,19 +74,32 @@
   }
   function gecerliSaat(s) { return typeof s === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s); }
 
+  // Istanbul bicimleyicisi bir kez kurulur: her satirda yeniden kurmak listeyi ve panoyu belirgin yavaslatir.
+  // Kurulamazsa (Intl yok ya da saat dilimi taninmiyor) null kalir ve sabit UTC+3 kullanilir.
+  var istBicim;
+  function istanbulBicimi() {
+    if (istBicim === undefined) {
+      try {
+        istBicim = new Intl.DateTimeFormat("en-GB", {
+          timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+        });
+      } catch (e) { istBicim = null; }
+    }
+    return istBicim;
+  }
   /** Europe/Istanbul'da su anki tarih ve saat. Intl yoksa sabit UTC+3. */
   function istanbulSimdi(an) {
     an = an || new Date();
-    try {
-      var f = new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", hourCycle: "h23"
-      });
-      var p = {};
-      f.formatToParts(an).forEach(function (x) { p[x.type] = x.value; });
-      var saat = p.hour === "24" ? "00" : p.hour;
-      if (p.year && p.month && p.day) return { tarih: p.year + "-" + p.month + "-" + p.day, saat: saat + ":" + p.minute };
-    } catch (e) { /* asagidaki yedek */ }
+    var f = istanbulBicimi();
+    if (f) {
+      try {
+        var p = {};
+        f.formatToParts(an).forEach(function (x) { p[x.type] = x.value; });
+        var saat = p.hour === "24" ? "00" : p.hour;
+        if (p.year && p.month && p.day) return { tarih: p.year + "-" + p.month + "-" + p.day, saat: saat + ":" + p.minute };
+      } catch (e) { /* asagidaki yedek */ }
+    }
     var d = new Date(an.getTime() + 3 * 3600e3);
     return { tarih: d.toISOString().slice(0, 10), saat: d.toISOString().slice(11, 16) };
   }
@@ -153,9 +166,17 @@
     return String(Math.round(+n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " TL";
   }
   function musteriAdi(m) { return m ? m.ad + (m.kurum ? " · " + m.kurum : "") : "Müşteri yok"; }
-  function siklikMetni(m) {
+  /**
+   * Yayin sikligi metni. bugun verilirse 3 gunde 1'de kayitli baslangic yerine gercek siradaki paylasim gunu yazilir
+   * (bugun de paylasim gunuyse bugun). bugun verilmezse (CSV) kayitli baslangic tarihi yazilir.
+   */
+  function siklikMetni(m, bugun) {
     var s = (m && m.siklik) || {};
     if (s.tur === "gunluk") return "Her gün 1";
+    if (s.tur === "uc_gun" && gecerliTarih(s.baslangic) && gecerliTarih(bugun)) {
+      var siradaki = s.baslangic >= bugun ? s.baslangic : gunEkle(bugun, (3 - gunFarki(s.baslangic, bugun) % 3) % 3);
+      return "3 günde 1 (sıradaki: " + tarihKisa(siradaki, siradaki.slice(0, 4) !== bugun.slice(0, 4)) + " " + GUN_KISA[haftaGunu(siradaki) - 1] + ")";
+    }
     if (s.tur === "uc_gun") return "3 günde 1" + (s.baslangic ? " (sıradaki/başlangıç: " + tarihKisa(s.baslangic, true) + ")" : " (başlangıç tarihi yok)");
     if (s.tur === "haftalik") {
       var adet = s.haftalikAdet ? "Haftada " + s.haftalikAdet : "Haftalık";
@@ -181,13 +202,16 @@
   function kopya(x) { return JSON.parse(JSON.stringify(x)); }
   function idHaritasi(liste) { var m = {}; (liste || []).forEach(function (x) { m[x.id] = x; }); return m; }
 
-  /** Durum degisimi: yeni kayit doner (ayni durumsa null). Yayinlandi -> yayin tarihi bugun (bossa); yayinlanmisliktan cikinca temizlenir. */
-  function durumDegistir(ic, yeni, zaman, bugun) {
+  /**
+   * Durum degisimi: yeni kayit doner (ayni durumsa null). Yayinlandi -> yayin tarihi (bossa) bugun; yayinlanmisliktan cikinca temizlenir.
+   * yayinTarihi verilirse (or. "planlanan gunde yayinlandi" dugmesi) ve gecerli, bugunden ileri olmayan bir tarihse bugun yerine o yazilir.
+   */
+  function durumDegistir(ic, yeni, zaman, bugun, yayinTarihi) {
     if (!DURUM_AD[yeni]) throw new Error("gecersiz durum: " + yeni);
     if (ic.durum === yeni) return null;
     var n = kopya(ic);
     n.durum = yeni;
-    if (yeni === "yayinlandi" && !n.yayinTarihi) n.yayinTarihi = bugun;
+    if (yeni === "yayinlandi" && !n.yayinTarihi) n.yayinTarihi = gecerliTarih(yayinTarihi) && yayinTarihi <= bugun ? yayinTarihi : bugun;
     if (ic.durum === "yayinlandi" && yeni !== "yayinlandi") n.yayinTarihi = null;
     n.gecmis = (n.gecmis || []).concat([{ z: zaman, m: (DURUM_AD[ic.durum] || ic.durum) + " → " + DURUM_AD[yeni] }]).slice(-60);
     return n;
@@ -199,6 +223,16 @@
     n.surum = simdiki.surum;
     n.gecmis = (simdiki.gecmis || []).concat([{ z: zaman, m: "Geri alındı: " + (DURUM_AD[simdiki.durum] || simdiki.durum) + " → " + (DURUM_AD[onceki.durum] || onceki.durum) }]).slice(-60);
     return n;
+  }
+  // Is akisinda dogal sonraki adimlar ve dugme etiketleri. Onayda iki yol var: onaylandi (yayina hazir) ya da revizyon.
+  var SONRAKI = {
+    fikir: [["cekim_planlandi", "Çekim planlandı"]], cekim_planlandi: [["cekildi", "Çekildi"]], cekildi: [["kurguda", "Kurguya al"]],
+    kurguda: [["onayda", "Onaya gönder"]], onayda: [["hazir", "Onaylandı"], ["revizyonda", "Revizyon"]], revizyonda: [["onayda", "Onaya gönder"]],
+    hazir: [["yayinlandi", "Yayınlandı"]], yayinlandi: []
+  };
+  /** Tek tikla gecilebilecek sonraki durumlar: [{ k: durum, ad: dugme etiketi }]. Yayinlandi ve bilinmeyen durumda bos. */
+  function sonrakiDurumlar(durum) {
+    return (Object.prototype.hasOwnProperty.call(SONRAKI, durum) ? SONRAKI[durum] : []).map(function (x) { return { k: x[0], ad: x[1] }; });
   }
 
   /* ---------------- Stok ---------------- */
@@ -279,13 +313,16 @@
    * "oneri" (atanmamis hazir stoktan karsilanabilir; KAYDEDILMEZ, yalniz oneri), "acik" (hazir icerik yok),
    * "bilinmiyor" (stok girisi yapilmadigi icin karsilanip karsilanmadigi bilinmiyor).
    * Ayni icerik iki slotu karsilamaz; slot turu (video / post / story / diger) eslesmeyen icerik o slotu karsilamaz.
+   * Aralikta tarihe atanmis ama hicbir slotu karsilamayan hazir icerik aciklama icin sayilir (tahmini degistirmez):
+   * ayniGunFazla (ayni paylasim gunune ayni turde ikinci icerik), turUyumsuz (baska turde beklenen bir paylasim gunune
+   * planli; turUyumsuzGunler: { tarih, grup, beklenen, icerikId }), slotDisiPlanli (paylasim gunu olmayan bir gune planli).
    */
   function kapsama(veri, m, bugun, gunSayisi) {
     var duzen = duzenDurumu(m);
     var r = {
       gunSayisi: gunSayisi, grup: m.slotTuru || "video", karisik: false, duzenTamam: duzen.tamam, eksik: duzen.eksik || null,
       stokBilinen: !!m.stokGirisi, slotlar: [], ihtiyac: null, planli: 0, yayinlandi: 0, oneri: 0, acik: null,
-      ilkAcik: null, ilkPlansiz: null, slotDisiPlanli: 0
+      ilkAcik: null, ilkPlansiz: null, slotDisiPlanli: 0, ayniGunFazla: 0, turUyumsuz: 0, turUyumsuzGunler: []
     };
     if (!duzen.tamam) return r;
     var son = gunEkle(bugun, gunSayisi - 1);
@@ -304,11 +341,12 @@
         return oncelikSira(a) - oncelikSira(b) || (a.olusturma || 0) - (b.olusturma || 0);
       });
     });
-    var kullanilan = {}, slotAnahtari = {}, gruplar = {};
+    var kullanilan = {}, slotAnahtari = {}, gruplar = {}, slotGunu = {};
     slotlar(m, bugun, gunSayisi).forEach(function (d) {
       var g = slotGrubu(m, d), k = d + "|" + g;
       slotAnahtari[k] = 1;
       gruplar[g] = 1;
+      slotGunu[d] = g;
       var p = (planli[k] || []).filter(function (x) { return !kullanilan[x.id]; })[0];
       if (p) { kullanilan[p.id] = 1; r.slotlar.push({ tarih: d, grup: g, durum: "planli", icerikId: p.id }); r.planli++; return; }
       var y = (yayin[k] || []).filter(function (x) { return !kullanilan[x.id]; })[0];
@@ -332,17 +370,29 @@
     r.acik = r.stokBilinen ? r.slotlar.filter(function (s) { return s.durum === "acik"; }).length : null;
     Object.keys(planli).forEach(function (k) {
       var d = k.slice(0, 10), g = k.slice(11);
-      if (d >= bugun && d <= son && gruplar[g]) planli[k].forEach(function (i) { if (!kullanilan[i.id] && !slotAnahtari[k]) r.slotDisiPlanli++; });
+      if (d < bugun || d > son) return;
+      planli[k].forEach(function (i) {
+        if (kullanilan[i.id]) return;
+        if (slotAnahtari[k]) r.ayniGunFazla++;
+        else if (slotGunu[d]) { r.turUyumsuz++; r.turUyumsuzGunler.push({ tarih: d, grup: g, beklenen: slotGunu[d], icerikId: i.id }); }
+        else if (gruplar[g]) r.slotDisiPlanli++;
+      });
     });
+    r.turUyumsuzGunler.sort(function (a, b) { return a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : 0; });
     return r;
   }
 
-  /** Musteri stok uyarisi. Esik: musteri esigi, yoksa varsayilan; ikisi de yoksa yalniz 7 gunluk acik slotlara bakilir. */
+  /**
+   * Musteri stok uyarisi. Esik: musteri esigi, yoksa varsayilan; ikisi de yoksa yalniz 7 gunluk acik slotlara bakilir.
+   * Esik musterinin beklenen paylasim turundeki (slotTuru) hazir icerikle karsilastirilir: post paylasan musteride hazir post.
+   */
   function stokUyarisi(veri, m, bugun, varsayilanEsik) {
     if (!m.stokGirisi) return { seviye: "bilinmiyor", nedenler: ["Stok girişi yapılmadı"] };
     var st = stok(veri, m, bugun), k7 = kapsama(veri, m, bugun, 7), n = [];
     var esik = m.stokUyari !== null && m.stokUyari !== undefined ? m.stokUyari : (varsayilanEsik !== null && varsayilanEsik !== undefined ? varsayilanEsik : null);
-    if (esik !== null && st.toplam < esik) n.push("Hazır video stoku " + st.toplam + " (eşik " + esik + ")");
+    var grup = m.slotTuru || "video", adet = grup === "video" ? st.toplam : (st.digerHazir[grup] || 0);
+    var grupAd = grup === "video" ? "video" : (TUR_AD[grup] || grup).toLowerCase();
+    if (esik !== null && adet < esik) n.push("Hazır " + grupAd + " stoku " + adet + " (eşik " + esik + ")");
     if (k7.duzenTamam && k7.acik > 0) n.push("7 gün içinde " + k7.acik + " paylaşım hazır içerikle karşılanmıyor (ilk: " + tarihGunlu(k7.ilkAcik) + ")");
     return n.length ? { seviye: "dusuk", nedenler: n, esik: esik } : { seviye: "tamam", nedenler: [], esik: esik };
   }
@@ -450,6 +500,8 @@
       onayda: icerikler.filter(function (i) { return i.durum === "onayda"; }),
       revizyonda: icerikler.filter(function (i) { return i.durum === "revizyonda"; }),
       gecmisPlanYayinlanmamis: icerikler.filter(function (i) { return i.planTarihi && i.planTarihi < bugun && i.durum !== "yayinlandi"; }).sort(tarihSira("planTarihi")),
+      // bugune planli, yayina hazir (henuz yayinlanmamis) icerikler; sira Icerikler listesindekiyle ayni
+      bugunPaylasilacaklar: icerikler.filter(function (i) { return i.durum === "hazir" && i.planTarihi === bugun; }).sort(icerikSirala),
       // yayin duzeni ya da stok bilgisinden bagimsiz: 7 gun icinde yayina planli ama hazir olmayan icerikler
       planliHazirDegil: icerikler.filter(function (i) { return i.planTarihi && i.planTarihi >= bugun && i.planTarihi < hafta && i.durum !== "hazir" && i.durum !== "yayinlandi"; }).sort(tarihSira("planTarihi")),
       stokUyarilari: stokUyarilari,
@@ -590,7 +642,7 @@
     gecerliTarih: gecerliTarih, gecerliSaat: gecerliSaat, istanbulSimdi: istanbulSimdi, damga: damga,
     tarihUzun: tarihUzun, tarihKisa: tarihKisa, tarihGunlu: tarihGunlu, ayAdi: ayAdi, goreli: goreli, ayIzgarasi: ayIzgarasi,
     katla: katla, norm: norm, para: para, ucretCoz: ucretCoz, musteriAdi: musteriAdi, siklikMetni: siklikMetni, yerelYol: yerelYol, guvenliLink: guvenliLink,
-    aktif: aktif, kopya: kopya, idHaritasi: idHaritasi, durumDegistir: durumDegistir, geriAl: geriAl,
+    aktif: aktif, kopya: kopya, idHaritasi: idHaritasi, durumDegistir: durumDegistir, geriAl: geriAl, sonrakiDurumlar: sonrakiDurumlar,
     stok: stok, duzenDurumu: duzenDurumu, slotlar: slotlar, slotGrubu: slotGrubu, kapsama: kapsama, stokUyarisi: stokUyarisi,
     aralik: aralik, ustUste: ustUste, cakisanlar: cakisanlar, cakismaHaritasi: cakismaHaritasi, gundeMi: gundeMi,
     saatMetni: saatMetni, gundekiSaat: gundekiSaat, etkinlikSirala: etkinlikSirala,

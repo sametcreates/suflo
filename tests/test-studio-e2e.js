@@ -575,6 +575,70 @@ async function calis() {
   ok("stok suzgeci: yalniz istenen musteriler ve 'Tüm müşteriler' baglantisi", await page.locator("text=Gösterilen: Stok girişi yapılmayanlar").isVisible() &&
     await page.locator(".sayfa a:has-text('Tüm müşteriler')").isVisible());
 
+  // Gec isaretlenen yayin: dun planlanmis hazir icerik bugun "yayınlandı" yapilirken planlanan gun secilebilir, bugun sessizce yazilmaz
+  var mAKayit = (await apiCagir({ islem: "veri" })).veri.musteriler.filter(function (x) { return x.ad === "Örnek Müşteri A"; })[0];
+  function hazirIcerik(baslik, tur, plan) {
+    return apiCagir({ islem: "kaydet", tur: "icerik", veri: { musteriId: mAKayit.id, baslik: baslik, tur: tur, durum: "hazir", oncelik: "normal", cekimId: null, teslimTarihi: null,
+      planTarihi: plan, yayinTarihi: null, revizyonNotu: "", dosyalar: { ham: "", proje: "", final: "" }, not: "", gecmis: [], arsiv: false } });
+  }
+  await hazirIcerik("Dün paylaşılan reels", "reels", "2099-10-19");
+  await hazirIcerik("Dün unutulan reels", "reels", "2099-10-19");
+  await hazirIcerik("Cuma postu", "post", "2099-10-23"); // Cuma video gunu: post o gunu karsilamaz
+  await page.goto(URL_ + "#/genel");
+  await page.reload();
+  var gecBolum = page.locator(".bolum:has-text('Planlanan tarihi geçti')");
+  var gecSatir = gecBolum.locator(".satir:has-text('Dün paylaşılan reels')");
+  await gecSatir.waitFor();
+  ok("gecikmis plan satirinda 'Planlanan günde yayınlandı (19 Ekim)' ve 'Bugün yayınlandı' dugmeleri", await gecSatir.locator("button:has-text('Planlanan günde yayınlandı (19 Ekim)')").isVisible() &&
+    await gecSatir.locator("button:has-text('Bugün yayınlandı')").isVisible());
+  await gecSatir.locator("button:has-text('Planlanan günde yayınlandı')").click();
+  var planToast = page.locator(".toast:has-text('“Dün paylaşılan reels” → Yayınlandı (19 Ekim Pzt)')");
+  await planToast.waitFor();
+  var planKayit = await icerikAl("Dün paylaşılan reels");
+  ok("planlanan gunde yayinlandi: yayin tarihi planlanan gun (dun), bugun degil", planKayit.durum === "yayinlandi" && planKayit.yayinTarihi === "2099-10-19", JSON.stringify(planKayit));
+  await planToast.locator("button:has-text('Geri al')").click();
+  await page.waitForSelector(".toast:has-text('Geri alındı.')");
+  planKayit = await icerikAl("Dün paylaşılan reels");
+  ok("geri al: yine yayina hazir, yayin tarihi bos", planKayit.durum === "hazir" && !planKayit.yayinTarihi, JSON.stringify(planKayit));
+  // Pencerede: Yayınlandı secilince gecmis planlanan gun tek tikla yayin tarihi olur
+  await gecBolum.locator(".satir-ad:has-text('Dün paylaşılan reels')").click();
+  d = page.locator("dialog[open]");
+  var planGunDugme = d.locator("button:has-text('Planlanan gün: 19 Ekim 2099')");
+  var gizliOnce = !(await planGunDugme.isVisible());
+  await alanGirdi(d, "Durum", "select").selectOption("yayinlandi");
+  var gorunur = await planGunDugme.isVisible();
+  await planGunDugme.click();
+  var secilenYayin = await alanGirdi(d, "Yayınlandığı tarih", "input").inputValue();
+  ok("pencere: 'Planlanan gün' dugmesi yalniz Yayınlandı'da gorunur, tiklayinca yayin tarihini doldurur ve gizlenir", gizliOnce && gorunur && secilenYayin === "2099-10-19" && !(await planGunDugme.isVisible()), secilenYayin);
+  await d.locator("button[type=submit]").click();
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  ok("pencereden kaydedilen yayin tarihi planlanan gun", (await icerikAl("Dün paylaşılan reels")).yayinTarihi === "2099-10-19");
+  await page.goto(URL_ + "#/yayin?g=gun&t=2099-10-19");
+  await page.waitForSelector(".donem:has-text('19 Ekim 2099')");
+  var dunYayinda = await page.locator(".t-oge.t-yayinlandi:has-text('Dün paylaşılan reels')").count();
+  await page.goto(URL_ + "#/yayin?g=gun&t=2099-10-20");
+  await page.waitForSelector(".donem:has-text('20 Ekim 2099')");
+  ok("yayin takvimi: gec isaretlenen icerik paylasildigi gunde (19) gorunur, bugunde (20) gorunmez", dunYayinda === 1 && (await page.locator(".t-oge:has-text('Dün paylaşılan reels')").count()) === 0);
+  // Toplu / surukleme yolu: bugun yazilir ama bildirim bunu soyler
+  await page.goto(URL_ + "#/genel");
+  await gecBolum.locator(".satir:has-text('Dün unutulan reels') button:has-text('Bugün yayınlandı')").click();
+  var bugunToast = page.locator(".toast:has-text('“Dün unutulan reels” → Yayınlandı (yayın tarihi: bugün)')");
+  await bugunToast.waitFor();
+  ok("planlanan gunu gecmis icerik bugunle isaretlenince bildirim 'yayın tarihi: bugün' der", (await icerikAl("Dün unutulan reels")).yayinTarihi === "2099-10-20");
+  await bugunToast.locator("button:has-text('Geri al')").click();
+  await page.waitForSelector(".toast:has-text('Geri alındı.')");
+  // Stok aciklamasi ve takvim metni: video gunune planli post sessizce kaybolmaz
+  await page.goto(URL_ + "#/musteri/" + mAKayit.id);
+  await page.waitForSelector("h1:has-text('Örnek Müşteri A')");
+  var stokAciklama = await page.locator(".bolum:has-text('Stok ve yayın ihtiyacı')").textContent();
+  ok("stok: video gunune planli hazir post aciklanir ('başka türde beklenen bir paylaşım gününe planlı')", /1 hazır içerik başka türde beklenen bir paylaşım gününe planlı \(o günü karşılamaz\)/.test(stokAciklama), stokAciklama);
+  await page.goto(URL_ + "#/yayin?g=gun&t=2099-10-30");
+  await page.waitForSelector(".donem:has-text('30 Ekim 2099')");
+  var ihtiyacMetni = await page.locator(".t-oge.t-ihtiyac").allTextContents();
+  ok("yayin takvimi: acik video gunu turuyle yazilir ('video günü, hazır video yok')", ihtiyacMetni.indexOf("Örnek Müşteri A: video günü, hazır video yok") !== -1, ihtiyacMetni.join(" | "));
+  await page.goto(URL_ + "#/genel");
+  await page.waitForSelector(".sayfa h1:has-text('Bugün ne yapmalıyım?')");
+
   // Cikis
   await page.click(".yan >> text=Çıkış");
   await page.waitForSelector("#studio-sifre");
@@ -614,6 +678,12 @@ async function calis() {
     if (EKRAN) await mp.screenshot({ path: path.join(EKRAN, "telefon-" + sayfa + ".png"), fullPage: true });
   }
   ok("telefon: 7 sayfada yatay tasma yok", tasmalar.length === 0, tasmalar.join(","));
+  await mp.goto(URL_ + "#/genel");
+  await mp.waitForSelector(".bolum:has-text('Planlanan tarihi geçti') .satir .sag button");
+  var sagTasma = await mp.evaluate(function () {
+    return [].filter.call(document.querySelectorAll(".satir .sag button"), function (b) { return b.getBoundingClientRect().right > 390; }).length; // telefon gorunumu 390 px (innerWidth tasan icerikle buyuyebilir)
+  });
+  ok("telefon: satir dugmeleri (Planlanan günde / Bugün yayınlandı) ekrana sigar, alt satira iner", sagTasma === 0, sagTasma);
   // acik menude, gosterilen sayfanin kendi baglantisina dokununca menu kapanir
   await mp.click(".menu-dugme");
   await mp.locator(".yan-menu a[data-rota=ayarlar]").click();

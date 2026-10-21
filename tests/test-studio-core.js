@@ -38,6 +38,37 @@ var ist = C.istanbulSimdi(new Date(Date.UTC(2026, 9, 19, 21, 30)));
 ok("Istanbul saati: 2026-10-19 21:30 UTC -> 2026-10-20 00:30", ist.tarih === "2026-10-20" && ist.saat === "00:30", j(ist));
 var istYaz = C.istanbulSimdi(new Date(Date.UTC(2026, 6, 1, 9, 5)));
 ok("Istanbul saati yazin da UTC+3 (yaz saati uygulamasi yok)", istYaz.tarih === "2026-07-01" && istYaz.saat === "12:05", j(istYaz));
+// Bicimleyici bir kez kurulur; sonuc her cagrida ayni anin Istanbul tarihi ve saatidir
+ok("Istanbul saati: gece yarisi ve yil donumu cevresinde her cagrida kurulan bicimleyiciyle ayni", (function () {
+  var ref = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  var anlar = [];
+  [[2026, 0, 1], [2026, 11, 31], [2027, 1, 28], [2028, 1, 29], [2030, 2, 4]].forEach(function (g) {
+    [[0, 0], [20, 59], [21, 0], [21, 1], [23, 59]].forEach(function (s) { anlar.push(new Date(Date.UTC(g[0], g[1], g[2], s[0], s[1]))); });
+  });
+  var hatali = anlar.filter(function (an) {
+    var p = {};
+    ref.formatToParts(an).forEach(function (x) { p[x.type] = x.value; });
+    var s = C.istanbulSimdi(an);
+    return s.tarih !== p.year + "-" + p.month + "-" + p.day || s.saat !== (p.hour === "24" ? "00" : p.hour) + ":" + p.minute;
+  });
+  return anlar.length === 25 && hatali.length === 0 && C.istanbulSimdi(new Date(Date.UTC(2026, 11, 31, 21, 0))).tarih === "2027-01-01";
+})());
+function cekirdekYeniden(dtf, f) {
+  // studio-core.js'i verilen Intl.DateTimeFormat ile bastan yukler (bicimleyici ilk cagrida kurulur)
+  var yol = require.resolve("../server/studio-v1/arayuz/studio-core.js"), orj = Intl.DateTimeFormat;
+  delete require.cache[yol];
+  Intl.DateTimeFormat = dtf;
+  try { return f(require(yol)); } finally { Intl.DateTimeFormat = orj; delete require.cache[yol]; }
+}
+var kurulum = 0, ORJ_DTF = Intl.DateTimeFormat;
+ok("Istanbul bicimleyicisi 300 cagrida bir kez kurulur (her satirda yeniden kurulmaz)", cekirdekYeniden(function (a, b) { kurulum++; return new ORJ_DTF(a, b); }, function (C2) {
+  for (var i = 0; i < 300; i++) C2.istanbulSimdi(new Date(Date.UTC(2026, 9, 19, 21, i % 60)));
+  return C2.istanbulSimdi(new Date(Date.UTC(2026, 9, 19, 21, 30))).tarih === "2026-10-20";
+}) && kurulum === 1, kurulum);
+ok("Istanbul saati: Intl bicimleyicisi kurulamazsa sabit UTC+3 yedegi (hata firlatmaz)", cekirdekYeniden(function () { throw new RangeError("saat dilimi yok"); }, function (C2) {
+  var s = C2.istanbulSimdi(new Date(Date.UTC(2026, 9, 19, 21, 30))), s2 = C2.istanbulSimdi(new Date(Date.UTC(2026, 6, 1, 9, 5)));
+  return s.tarih === "2026-10-20" && s.saat === "00:30" && s2.tarih === "2026-07-01" && s2.saat === "12:05" && C2.damga(new Date(Date.UTC(2026, 9, 19, 21, 30))) === "2026-10-20 00:30";
+}));
 ok("tarihUzun Turkce", C.tarihUzun("2026-10-20") === "20 Ekim 2026, Salı", C.tarihUzun("2026-10-20"));
 ok("katla: Türkçe harf katlama", C.katla("ÖZGÜR ÇAĞRI İnci Işık") === "ozgur cagri inci isik", C.katla("ÖZGÜR ÇAĞRI İnci Işık"));
 ok("para: binlik nokta, bos -> Belirlenmedi (0 degil)", C.para(123456) === "123.456 TL" && C.para(null) === "Belirlenmedi" && C.para(0) === "0 TL");
@@ -83,6 +114,34 @@ ok("revizyon onaya da kurguya da donebilir; cekimsiz dogrudan kurgu", !!C.durumD
   !!C.durumDegistir(icerik({ durum: "revizyonda" }), "kurguda", "z", BUGUN) && !!C.durumDegistir(icerik({ durum: "fikir" }), "kurguda", "z", BUGUN));
 var cokGecmis = icerik({ gecmis: Array.from({ length: 70 }, function (_, i) { return { z: "z", m: "m" + i }; }) });
 ok("gecmis en cok 60 kayit", C.durumDegistir(cokGecmis, "kurguda", "z", BUGUN).gecmis.length === 60);
+// Gec isaretlenen yayin: planlanan gun (dun) acikca verilirse o gun yazilir; verilmezse eskisi gibi bugun
+var dunPlanli = icerik({ durum: "hazir", planTarihi: "2030-03-03" });
+var dunYay = C.durumDegistir(dunPlanli, "yayinlandi", "2030-03-04 10:00", BUGUN, dunPlanli.planTarihi);
+ok("yayinlandi: verilen planlanan gun (gecmis) yayin tarihi olur", dunYay.yayinTarihi === "2030-03-03" && dunYay.durum === "yayinlandi" && /Yayına hazır → Yayınlandı/.test(dunYay.gecmis[0].m), JSON.stringify(dunYay));
+ok("yayinlandi: verilen tarih bugunden ileri ya da gecersizse bugun yazilir; 4 bagimsiz degiskenle bugun", C.durumDegistir(dunPlanli, "yayinlandi", "z", BUGUN, "2030-03-05").yayinTarihi === BUGUN &&
+  C.durumDegistir(dunPlanli, "yayinlandi", "z", BUGUN, "2030-02-30").yayinTarihi === BUGUN && C.durumDegistir(dunPlanli, "yayinlandi", "z", BUGUN, null).yayinTarihi === BUGUN &&
+  C.durumDegistir(dunPlanli, "yayinlandi", "z", BUGUN).yayinTarihi === BUGUN && C.durumDegistir(dunPlanli, "yayinlandi", "z", BUGUN, BUGUN).yayinTarihi === BUGUN);
+ok("yayinlandi: kayitta yayin tarihi zaten varsa degismez", C.durumDegistir(icerik({ durum: "hazir", yayinTarihi: "2030-03-01" }), "yayinlandi", "z", BUGUN, "2030-03-02").yayinTarihi === "2030-03-01");
+ok("dun yayinlanan (planlanan gunle isaretlenen) bugunku slotu karsilamaz; bugunle isaretlenen karsilar", (function () {
+  var v = function (i) { return { musteriler: [m], etkinlikler: [], icerikler: [i] }; };
+  var kGercek = C.kapsama(v(dunYay), m, BUGUN, 7), kBugun = C.kapsama(v(C.durumDegistir(dunPlanli, "yayinlandi", "z", BUGUN)), m, BUGUN, 7);
+  return kGercek.slotlar[0].durum === "acik" && kGercek.yayinlandi === 0 && kGercek.acik === 7 && kBugun.slotlar[0].durum === "yayinlandi";
+})());
+// Is akisinda tek tikla sonraki adimlar
+ok("sonrakiDurumlar: 8 durumun dogal sonraki adimlari (onayda 2, yayinlandi 0)", (function () {
+  var beklenen = { fikir: "cekim_planlandi:Çekim planlandı", cekim_planlandi: "cekildi:Çekildi", cekildi: "kurguda:Kurguya al", kurguda: "onayda:Onaya gönder",
+    onayda: "hazir:Onaylandı|revizyonda:Revizyon", revizyonda: "onayda:Onaya gönder", hazir: "yayinlandi:Yayınlandı", yayinlandi: "" };
+  return C.DURUMLAR.every(function (d) {
+    return C.sonrakiDurumlar(d.k).map(function (x) { return x.k + ":" + x.ad; }).join("|") === beklenen[d.k];
+  }) && C.sonrakiDurumlar("onayda").length === 2 && C.sonrakiDurumlar("yayinlandi").length === 0;
+})(), C.DURUMLAR.map(function (d) { return d.k + "=" + JSON.stringify(C.sonrakiDurumlar(d.k)); }).join(" "));
+ok("sonrakiDurumlar: bilinmeyen durumda bos; her adim gecerli bir durum ve durumDegistir'den gecer", C.sonrakiDurumlar("yok").length === 0 && C.sonrakiDurumlar("constructor").length === 0 &&
+  C.sonrakiDurumlar(undefined).length === 0 && C.DURUMLAR.every(function (d) {
+    return C.sonrakiDurumlar(d.k).every(function (x) { return !!C.DURUM_AD[x.k] && C.durumDegistir(icerik({ durum: d.k }), x.k, "z", BUGUN).durum === x.k; });
+  }));
+var sd1 = C.sonrakiDurumlar("onayda");
+sd1[0].k = "bozuk";
+ok("sonrakiDurumlar her cagrida yeni liste doner (degistirilen sonuc sonrakini bozmaz)", C.sonrakiDurumlar("onayda")[0].k === "hazir");
 
 /* ---------------- Yayin ihtiyaci: gunluk ---------------- */
 var k7 = C.kapsama(veri, m, BUGUN, 7);
@@ -113,6 +172,26 @@ var vDis = { musteriler: [], etkinlikler: [], icerikler: [icerik({ durum: "hazir
 var mHafta = musteri({ siklik: { tur: "haftalik", gunler: [1, 4], haftalikAdet: 2, baslangic: null } });
 var kDis = C.kapsama(vDis, mHafta, BUGUN, 7);
 ok("slot disi gune planli hazir icerik ayri sayilir, slotu karsilamaz", kDis.slotDisiPlanli === 1 && kDis.planli === 0 && kDis.acik === 2, j(kDis));
+// Slotu karsilamayan tarihli hazir icerik sessizce kaybolmaz: neden karsilamadigi sayilir (tahmin degismez)
+var vAyni = { musteriler: [m], etkinlikler: [], icerikler: [icerik({ durum: "hazir", planTarihi: "2030-03-05" }), icerik({ durum: "hazir", tur: "video", planTarihi: "2030-03-05" })] };
+var kAyni = C.kapsama(vAyni, m, BUGUN, 7);
+ok("ayni paylasim gunune ikinci hazir video: ayniGunFazla 1; o gun bir kez karsilanir (planli 1, acik 6)", kAyni.ayniGunFazla === 1 && kAyni.planli === 1 && kAyni.acik === 6 &&
+  kAyni.turUyumsuz === 0 && kAyni.slotDisiPlanli === 0 && kAyni.ihtiyac === 7, j(kAyni));
+var vPostVideoGunu = { musteriler: [m], etkinlikler: [], icerikler: [icerik({ durum: "hazir", tur: "post", planTarihi: "2030-03-05" })] };
+var kPost = C.kapsama(vPostVideoGunu, m, BUGUN, 7);
+ok("video gunune planli hazir post: turUyumsuz 1 (tarih, tur, beklenen), slot disi sayilmaz, gun acik kalir", kPost.turUyumsuz === 1 && kPost.slotDisiPlanli === 0 && kPost.acik === 7 &&
+  kPost.planli === 0 && kPost.turUyumsuzGunler.length === 1 && kPost.turUyumsuzGunler[0].tarih === "2030-03-05" && kPost.turUyumsuzGunler[0].grup === "post" &&
+  kPost.turUyumsuzGunler[0].beklenen === "video" && kPost.turUyumsuzGunler[0].icerikId === vPostVideoGunu.icerikler[0].id, j(kPost));
+ok("gun istisnasiyla post gunune planli hazir reels: turUyumsuz (eskiden yanlislikla 'paylasim gunu disi')", (function () {
+  var mI = musteri({ slotIstisna: { "2030-03-05": "post" } });
+  var k = C.kapsama({ musteriler: [mI], etkinlikler: [], icerikler: [icerik({ durum: "hazir", planTarihi: "2030-03-05" })] }, mI, BUGUN, 7);
+  return k.turUyumsuz === 1 && k.slotDisiPlanli === 0 && k.turUyumsuzGunler[0].beklenen === "post" && k.slotlar[1].durum === "acik";
+})());
+ok("aralik disindaki (8. gun) ve tarihi gecmis planli hazir aciklama sayilarina girmez", (function () {
+  var v = { musteriler: [m], etkinlikler: [], icerikler: [icerik({ durum: "hazir", tur: "post", planTarihi: "2030-03-11" }), icerik({ durum: "hazir", tur: "post", planTarihi: "2030-03-03" })] };
+  var k = C.kapsama(v, m, BUGUN, 7);
+  return k.turUyumsuz === 0 && k.ayniGunFazla === 0 && k.slotDisiPlanli === 0 && C.kapsama(v, m, BUGUN, 8).turUyumsuz === 1;
+})());
 
 /* ---------------- 3 gunde 1 ---------------- */
 var mUc = musteri({ siklik: { tur: "uc_gun", baslangic: "2030-03-05", gunler: [], haftalikAdet: null } });
@@ -126,6 +205,18 @@ ok("3 gunde 1: gecmis baslangic dongusu surer (02-01 +3k -> 03-06, 03-09)", j(sU
 var mUcYok = musteri({ siklik: { tur: "uc_gun", baslangic: null, gunler: [], haftalikAdet: null } });
 var kUcYok = C.kapsama(bos, mUcYok, BUGUN, 7);
 ok("3 gunde 1 baslangicsiz: duzen kurulmali, tahmin yok, tarih uydurulmaz", !kUcYok.duzenTamam && kUcYok.ihtiyac === null && kUcYok.slotlar.length === 0 && /başlangıç/.test(kUcYok.eksik), j(kUcYok));
+// Metin: bugun verilirse gecmisteki baslangic yerine gercek siradaki paylasim gunu
+ok("siklikMetni 3 gunde 1: gecmis baslangicta gercek siradaki gun (02-01 -> 6 Mart Car)", C.siklikMetni(mUcGecmis, BUGUN) === "3 günde 1 (sıradaki: 6 Mart Çar)", C.siklikMetni(mUcGecmis, BUGUN));
+ok("siklikMetni 3 gunde 1: ileri baslangic kendisi, bugun baslayan ya da donguye denk gelen bugun", C.siklikMetni(mUc, BUGUN) === "3 günde 1 (sıradaki: 5 Mart Sal)" &&
+  C.siklikMetni(musteri({ siklik: { tur: "uc_gun", baslangic: BUGUN } }), BUGUN) === "3 günde 1 (sıradaki: 4 Mart Pzt)" &&
+  C.siklikMetni(musteri({ siklik: { tur: "uc_gun", baslangic: "2030-02-26" } }), BUGUN) === "3 günde 1 (sıradaki: 4 Mart Pzt)", C.siklikMetni(mUc, BUGUN));
+ok("siklikMetni 3 gunde 1: siradaki gun her gecmis baslangicta tahminin ilk gunuyle ayni", ["2029-12-30", "2030-01-01", "2030-02-27", "2030-02-28", "2030-03-01", "2030-03-02", "2030-03-03"].every(function (bas) {
+  var mu = musteri({ siklik: { tur: "uc_gun", baslangic: bas } });
+  return C.siklikMetni(mu, BUGUN) === "3 günde 1 (sıradaki: " + C.tarihGunlu(C.slotlar(mu, BUGUN, 3)[0]) + ")";
+}));
+ok("siklikMetni 3 gunde 1: baska yildaki siradaki gun yilla yazilir; bugunsuz (CSV) kayitli baslangic", C.siklikMetni(musteri({ siklik: { tur: "uc_gun", baslangic: "2031-01-02" } }), BUGUN) === "3 günde 1 (sıradaki: 2 Ocak 2031 Per)" &&
+  C.siklikMetni(mUcGecmis) === "3 günde 1 (sıradaki/başlangıç: 1 Şubat 2030)" && C.siklikMetni(mUcYok, BUGUN) === "3 günde 1 (başlangıç tarihi yok)" &&
+  /1 Şubat 2030/.test(C.musterilerCsv({ musteriler: [mUcGecmis] })), C.siklikMetni(musteri({ siklik: { tur: "uc_gun", baslangic: "2031-01-02" } }), BUGUN));
 
 /* ---------------- Haftalik ---------------- */
 var kHf = C.kapsama(bos, mHafta, BUGUN, 14);
@@ -166,6 +257,23 @@ ok("stok girildi ve 0: dusuk uyari (esik 3 + acik slotlar)", uy2.seviye === "dus
 var mEsiksiz = musteri({ siklik: { tur: "belirsiz", gunler: [] }, stokUyari: null });
 ok("esik yok, duzen yok: uyari uydurulmaz", C.stokUyarisi({ musteriler: [], icerikler: [] }, mEsiksiz, BUGUN, null).seviye === "tamam");
 ok("varsayilan esik kullanilir", C.stokUyarisi({ musteriler: [], icerikler: [] }, mEsiksiz, BUGUN, 2).seviye === "dusuk");
+// Esik musterinin beklenen paylasim turundeki hazirla karsilastirilir (post musterisinde videolar sayilmaz)
+function turStoku(slotTuru, adet, tur) {
+  var mu = musteri({ id: "mP0000000", ad: "Örnek Kafe", slotTuru: slotTuru, siklik: { tur: "haftalik", gunler: [1, 3, 5], haftalikAdet: 3, baslangic: null } });
+  var l = [];
+  for (var k = 0; k < adet; k++) l.push(icerik({ musteriId: "mP0000000", durum: "hazir", tur: tur }));
+  return { m: mu, v: { musteriler: [mu], etkinlikler: [], icerikler: l } };
+}
+var tsPost = turStoku("post", 10, "post"), uyPost = C.stokUyarisi(tsPost.v, tsPost.m, BUGUN, 3);
+ok("post musterisi, 10 hazir post, varsayilan esik 3: uyari yok; genel bakista stok uyarisi yok", uyPost.seviye === "tamam" &&
+  C.genelBakis(tsPost.v, BUGUN, { varsayilanStokUyari: 3 }).stokUyarilari.length === 0, j(uyPost));
+var tsPost2 = turStoku("post", 2, "post"), uyPost2 = C.stokUyarisi(tsPost2.v, tsPost2.m, BUGUN, 3);
+ok("post musterisi, 2 hazir post: 'Hazır post stoku 2 (eşik 3)'", uyPost2.seviye === "dusuk" && uyPost2.nedenler[0] === "Hazır post stoku 2 (eşik 3)", j(uyPost2));
+var tsVideo = turStoku("video", 10, "post"), uyVideo = C.stokUyarisi(tsVideo.v, tsVideo.m, BUGUN, 3);
+ok("video musterisi, 10 hazir post 0 video: yine 'Hazır video stoku 0 (eşik 3)'", uyVideo.seviye === "dusuk" && uyVideo.nedenler[0] === "Hazır video stoku 0 (eşik 3)", j(uyVideo));
+var tsStory = turStoku("story", 4, "reels"), tsDiger = turStoku("diger", 1, "diger");
+ok("story ve diger musterisinde esik kendi turunden: 'Hazır story stoku 0', 'Hazır diğer stoku 1'", C.stokUyarisi(tsStory.v, tsStory.m, BUGUN, 2).nedenler[0] === "Hazır story stoku 0 (eşik 2)" &&
+  C.stokUyarisi(tsDiger.v, tsDiger.m, BUGUN, 2).nedenler[0] === "Hazır diğer stoku 1 (eşik 2)", j(C.stokUyarisi(tsDiger.v, tsDiger.m, BUGUN, 2)));
 
 /* ---------------- Ucret ozeti ---------------- */
 var uo = C.ucretOzeti([musteri({ ucret: 10000 }), musteri({ ucret: 15000 }), musteri({ ucret: null }), musteri({ ucret: 5000, arsiv: true })]);
@@ -214,6 +322,19 @@ ok("genel bakis: stok girisi olmayan musteri ayri, duzeni eksik musteri ayri", g
 var sA = gb.sayilar.filter(function (s) { return s.musteri.id === "mA0000000"; })[0];
 ok("genel bakis: musteri sayilari (cekildi 1, kurguda 2, onayda 1, revizyonda 1, hazir 1)", sA.cekildi === 1 && sA.kurguda === 2 && sA.onayda === 1 && sA.revizyonda === 1 && sA.hazir === 1, j(sA));
 ok("genel bakis: acik tarihler tarih sirasinda", gb.acikTarihler.every(function (x, i, a) { return i === 0 || a[i - 1].tarih <= x.tarih; }));
+ok("genel bakis: bugun paylasilacaklar, yalniz bugune planli aktif hazirlar (oncelikli once)", (function () {
+  var mArs = musteri({ id: "mR0000000", ad: "Örnek Arşiv", arsiv: true });
+  var bugunNormal = icerik({ durum: "hazir", planTarihi: BUGUN, oncelik: "normal" }), bugunYuksek = icerik({ durum: "hazir", planTarihi: BUGUN, oncelik: "yuksek" });
+  var v = { musteriler: [mA, mArs], etkinlikler: [], icerikler: [
+    icerik({ durum: "hazir", planTarihi: "2030-03-03" }), bugunNormal, icerik({ durum: "hazir", planTarihi: "2030-03-05" }), bugunYuksek,
+    icerik({ durum: "hazir", planTarihi: BUGUN, arsiv: true }),                      // arsivdeki icerik
+    icerik({ durum: "hazir", planTarihi: BUGUN, musteriId: "mR0000000" }),           // arsivdeki musteri
+    icerik({ durum: "kurguda", planTarihi: BUGUN }),                                 // hazir degil (ayri bolumde)
+    icerik({ durum: "yayinlandi", planTarihi: BUGUN, yayinTarihi: BUGUN })            // yayinlanmis
+  ] };
+  var l = C.genelBakis(v, BUGUN, null).bugunPaylasilacaklar;
+  return l.length === 2 && l[0].id === bugunYuksek.id && l[1].id === bugunNormal.id && C.genelBakis(gv, BUGUN, null).bugunPaylasilacaklar.length === 0;
+})());
 
 /* ---------------- Filtre, arama, CSV, yedek ---------------- */
 var fv = { musteriler: [musteri({ ad: "Işıl Çağrı Öz" })], etkinlikler: [], icerikler: [icerik({ baslik: "Şubat kampanyası", durum: "onayda", planTarihi: "2030-03-10" }), icerik({ baslik: "Diğer", durum: "kurguda", arsiv: true })] };
