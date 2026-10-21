@@ -5,7 +5,9 @@
  * yaniti kaybolan kaydetmenin yeniden denenmesinde mukerrer kayit olusmamasi, gunluk otomatik kopya etiketi,
  * cihaz saat dilimi farkli olsa da Istanbul tarihi, telefonda yatay tasma yok; tek tik sonraki durum (liste, pano), Genel Bakis ozeti,
  * bugun paylasilacaklar, onay bekleme suresi, son yedek tarihi ve hatirlatmasi, toplu arsiv onayi / arsivden cikar,
- * kaydedilmemis pencerenin kapatilmadan once sormasi.
+ * kaydedilmemis pencerenin kapatilmadan once sormasi; uzun liste (200'er satir, yerinde secim, Shift ile aralik, eski yayinlananlar gizli),
+ * pano sutun siniri, arama sirasi ve "+N tane daha", geri tusunda kaydirma konumu, telefonda 16 px girdi / parmak boyu hedefler /
+ * altta toplu cubuk / kart tablolar / katli takvim filtreleri, Stok sayfasinda acil olanlar ustte.
  * php ya da Playwright yoksa ATLA; STUDIO_E2E_ZORUNLU=1 iken (CI'daki e2e isi) atlamak kalmak sayilir.
  */
 "use strict";
@@ -790,8 +792,16 @@ async function calis() {
   ok("toplu arsiv onaydan sonra yapilir", (await apiCagir({ islem: "veri" })).veri.icerikler.filter(function (x) { return /^Arşiv örneği/.test(x.baslik) && x.arsiv; }).length === 12);
   await page.goto(URL_ + "#/icerikler?gorunum=liste&arsiv=1&q=Arşiv örneği");
   await page.waitForSelector(".sayfa-bas:has-text('12 içerik')");
+  ok("toplu durum: durum secilmeden 'Durumu değiştir' kapali", await page.locator(".toplu-cubuk button:has-text('Durumu değiştir')").isDisabled());
+  // 3 yeni (eylemli, kalici olmayan) bildirim: tek icerikte uc durum degisikligi
+  var ucDurum = [["kurguda", "Kurguda"], ["onayda", "Müşteri onayında"], ["hazir", "Yayına hazır"]];
+  for (var ti = 0; ti < ucDurum.length; ti++) {
+    await page.locator(".satir:has-text('Arşiv örneği 2') input[type=checkbox]").check();
+    await page.locator(".toplu-cubuk select").selectOption(ucDurum[ti][0]);
+    await page.click(".toplu-cubuk button:has-text('Durumu değiştir')");
+    await page.waitForSelector(".toast:has-text('“Arşiv örneği 2” → " + ucDurum[ti][1] + "')");
+  }
   await page.locator("label:has-text('Tümünü seç') input").check();
-  for (var ti = 0; ti < 3; ti++) await page.click(".toplu-cubuk button:has-text('Durumu değiştir')"); // 3 yeni bildirim
   ok("toplu geri alma bildirimi yeni bildirimlerle kalkmaz", await arsivToast.isVisible() && (await page.locator(".toast").count()) === 3);
   ok("arsiv gorunumunde toplu dugme 'Arşivden çıkar'", (await page.locator(".toplu-cubuk button:has-text('Arşivden çıkar')").count()) === 1 && (await page.locator(".toplu-cubuk button:text-is('Arşivle')").count()) === 0);
   await page.click(".toplu-cubuk button:has-text('Arşivden çıkar')");
@@ -806,6 +816,130 @@ async function calis() {
   ok("10'dan az icerik sormadan arsivlenir", (await page.locator("dialog[open]").count()) === 0);
   await page.goto(URL_ + "#/genel");
   await page.waitForSelector(".sayfa h1:has-text('Bugün ne yapmalıyım?')");
+
+  // Olcek: uzun liste 200'er satir, secim yerinde guncellenir, Shift ile aralik secimi, eski yayinlananlar varsayilan gizli,
+  // pano sutunu en cok 60 kart. Arama: liste sirasi, sessiz kesme yok, tum cekimlere erisilir.
+  function icerikVeri(mid, o) {
+    return Object.assign({ musteriId: mid, baslik: "", tur: "reels", durum: "fikir", oncelik: "normal", cekimId: null, teslimTarihi: null, planTarihi: null,
+      yayinTarihi: null, revizyonNotu: "", dosyalar: { ham: "", proje: "", final: "" }, not: "", gecmis: [], arsiv: false }, o);
+  }
+  async function topluEkle(kayitlar) {
+    for (var bi = 0; bi < kayitlar.length; bi += 400) {
+      var j = await apiCagir({ islem: "toplu", kayitlar: kayitlar.slice(bi, bi + 400) });
+      if (!j.ok) throw new Error("toplu ekleme: " + JSON.stringify(j).slice(0, 300));
+    }
+  }
+  var olcekM = (await apiCagir({ islem: "kaydet", tur: "musteri", veri: { ad: "Örnek Ölçek Müşteri", kurum: "", ucret: null, siklik: { tur: "belirsiz" }, slotTuru: "video", stokGirisi: false, not: "", arsiv: false } })).kayit;
+  var olcekK = [];
+  for (var oi = 1; oi <= 230; oi++) olcekK.push({ tur: "icerik", veri: icerikVeri(olcekM.id, { baslik: "Ölçek fikir " + oi, planTarihi: "2099-11-" + String(1 + oi % 28).padStart(2, "0") }) });
+  for (oi = 1; oi <= 30; oi++) olcekK.push({ tur: "icerik", veri: icerikVeri(olcekM.id, { baslik: "Ölçek eski yayın " + oi, durum: "yayinlandi", yayinTarihi: "2099-09-20" }) });
+  for (oi = 1; oi <= 2; oi++) olcekK.push({ tur: "icerik", veri: icerikVeri(olcekM.id, { baslik: "Ölçek yeni yayın " + oi, durum: "yayinlandi", yayinTarihi: "2099-10-17" }) });
+  await topluEkle(olcekK);
+  await page.goto(URL_ + "#/icerikler?gorunum=liste&musteri=" + olcekM.id);
+  await page.reload();
+  await page.waitForSelector(".sayfa-bas:has-text('232 içerik')");
+  var olcekDurum = await page.evaluate(function () {
+    return { satir: document.querySelectorAll(".icerik-liste .satir").length, hepsi: document.querySelector(".icerik-liste > label.secenek").textContent,
+      daha: (document.querySelector(".icerik-liste .daha-satir button") || {}).textContent, not: (document.querySelector(".eski-notu") || {}).textContent };
+  });
+  ok("uzun liste: ilk 200 satir, 'Daha fazla göster (32 içerik daha)', 'Tümünü seç (232)'", olcekDurum.satir === 200 && olcekDurum.daha === "Daha fazla göster (32 içerik daha)" &&
+    olcekDurum.hepsi === "Tümünü seç (232)", JSON.stringify(olcekDurum));
+  ok("14 gunden eski yayinlananlar varsayilan gizli ve sayisi yazar", /^30 eski yayınlanmış içerik gizli/.test(olcekDurum.not || "") &&
+    (await page.locator(".satir:has-text('Ölçek eski yayın')").count()) === 0, olcekDurum.not);
+  // Kutu tiklaninca liste yeniden cizilmez: satir dugumu ayni kalir, odak kutuda kalir, cubuk sayiyi gosterir
+  await page.evaluate(function () { window.__ilkSatir = document.querySelector(".icerik-liste .satir"); });
+  var kutular = page.locator(".icerik-liste .satir input[type=checkbox]");
+  await kutular.nth(2).click();
+  var yerinde = await page.evaluate(function () {
+    var k = document.querySelectorAll(".icerik-liste .satir input[type=checkbox]")[2];
+    return { ayni: window.__ilkSatir.isConnected, odak: document.activeElement === k, cubuk: document.querySelector(".toplu-cubuk:not([hidden]) b").textContent };
+  });
+  ok("secim yerinde guncellenir (liste yeniden cizilmez, odak kutuda)", yerinde.ayni && yerinde.odak && yerinde.cubuk === "1 seçili", JSON.stringify(yerinde));
+  await kutular.nth(7).click({ modifiers: ["Shift"] });
+  var araSecim = await page.evaluate(function () {
+    return { cubuk: document.querySelector(".toplu-cubuk b").textContent, isaretli: [].map.call(document.querySelectorAll(".icerik-liste .satir input[type=checkbox]"), function (k, i) { return k.checked ? i : -1; }).filter(function (i) { return i >= 0; }).join(",") };
+  });
+  ok("Shift ile tiklama: aradaki satirlar da secilir (3. ile 8. arasi 6 secili)", araSecim.cubuk === "6 seçili" && araSecim.isaretli === "2,3,4,5,6,7", JSON.stringify(araSecim));
+  ok("'Tümünü seç' kismi secimde ara durumda", await page.locator(".icerik-liste > label.secenek input").evaluate(function (k) { return k.indeterminate && !k.checked; }));
+  await page.click(".toplu-cubuk button[aria-label='Seçimi temizle']");
+  ok("Seçimi temizle: cubuk gizlenir, kutular bos", await page.locator(".toplu-cubuk").isHidden() && (await page.locator(".icerik-liste .satir input:checked").count()) === 0);
+  await page.click(".icerik-liste .daha-satir button");
+  await page.waitForFunction(function () { return document.querySelectorAll(".icerik-liste .satir").length === 232; });
+  ok("'Daha fazla göster' kalanlari ekler, dugme kalkar", (await page.locator(".icerik-liste .daha-satir button").count()) === 0);
+  await page.click(".eski-notu a:has-text('Göster')");
+  await page.waitForSelector(".sayfa-bas:has-text('262 içerik')");
+  ok("'Göster' ile eski yayinlananlar da listelenir (yeni filtre: yine ilk 200)", /eski=1/.test(page.url()) && (await page.locator(".eski-notu:has-text('Eski yayınlanmış içerikler de gösteriliyor')").count()) === 1 &&
+    (await page.locator(".icerik-liste .daha-satir button").textContent()) === "Daha fazla göster (62 içerik daha)");
+  await page.goto(URL_ + "#/icerikler?gorunum=liste&durum=yayinlandi&musteri=" + olcekM.id);
+  await page.waitForSelector(".sayfa-bas:has-text('32 içerik')");
+  ok("durum filtresi (Yayınlandı) eski yayinlananlari da gosterir", (await page.locator(".eski-notu").count()) === 0);
+  await page.goto(URL_ + "#/icerikler?gorunum=pano&musteri=" + olcekM.id);
+  await page.waitForSelector(".kolon[data-durum=fikir] .kart");
+  var panoOlcek = await page.evaluate(function () {
+    var k = document.querySelector(".kolon[data-durum=fikir]"), y = document.querySelector(".kolon[data-durum=yayinlandi]");
+    return { kart: k.querySelectorAll(".kart").length, sayi: k.querySelector(".kolon-bas .sayi").textContent, link: (k.querySelector("a.kolon-daha") || {}).textContent, yayin: y.querySelectorAll(".kart").length };
+  });
+  ok("pano: sutunda en cok 60 kart, sayi gercek toplam, '+170 tane daha · listede aç'; eski yayinlananlar panoda da gizli", panoOlcek.kart === 60 && panoOlcek.sayi === "230" &&
+    panoOlcek.link === "+170 tane daha · listede aç" && panoOlcek.yayin === 2, JSON.stringify(panoOlcek));
+  await page.click(".kolon[data-durum=fikir] a.kolon-daha");
+  await page.waitForSelector(".sayfa-bas:has-text('230 içerik')");
+  ok("pano '+N tane daha' ayni filtreli listeyi acar", /gorunum=liste/.test(page.url()) && /durum=fikir/.test(page.url()), page.url());
+  // Masaustunde girdiler eski boyutunda (telefondaki 16 px yalniz dar ekranda)
+  await page.click(".icerik-liste .satir-ad >> nth=0");
+  var masaustuGirdi = await page.evaluate(function () { return getComputedStyle(document.querySelector("dialog[open] .alan input[type=text]")).fontSize; });
+  ok("masaustu: pencere girdileri 13 px kalir", masaustuGirdi === "13px", masaustuGirdi);
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+
+  var aramaM = (await apiCagir({ islem: "kaydet", tur: "musteri", veri: { ad: "Örnek Arama Kafe", kurum: "", ucret: null, siklik: { tur: "belirsiz" }, slotTuru: "video", stokGirisi: false, not: "", arsiv: false } })).kayit;
+  var aramaK = [];
+  for (oi = 1; oi <= 105; oi++) aramaK.push({ tur: "icerik", veri: icerikVeri(aramaM.id, { baslik: "Kafe yayınlanan " + oi, durum: "yayinlandi", yayinTarihi: "2099-0" + (1 + oi % 9) + "-10" }) });
+  for (oi = 1; oi <= 15; oi++) aramaK.push({ tur: "icerik", veri: icerikVeri(aramaM.id, { baslik: "Kafe güncel iş " + oi, durum: "kurguda", teslimTarihi: "2099-10-" + (21 + oi % 8) }) });
+  function cekimVeri(baslik, tarih, durum) {
+    return { tur: "etkinlik", veri: { musteriId: aramaM.id, baslik: baslik, tur: "cekim", tumGun: false, basTarih: tarih, basSaat: "10:00", bitTarih: null, bitSaat: "11:00", konum: "", not: "", durum: durum, arsiv: false } };
+  }
+  for (oi = 1; oi <= 55; oi++) aramaK.push(cekimVeri("Kafe geçmiş çekim " + oi, "2099-0" + (1 + oi % 9) + "-" + String(1 + oi % 28).padStart(2, "0"), "tamamlandi"));
+  for (oi = 1; oi <= 3; oi++) aramaK.push(cekimVeri("Kafe yaklaşan çekim " + oi, "2099-11-0" + oi, "planlandi"));
+  await topluEkle(aramaK);
+  await page.reload();
+  await page.waitForSelector(".sayfa h1");
+  await page.fill("input.ara", "Örnek Arama Kafe");
+  await page.waitForSelector("h1:has-text('Arama: Örnek Arama Kafe')");
+  var aramaDurum = await page.evaluate(function () {
+    var b = [].filter.call(document.querySelectorAll(".bolum"), function (x) { return /İçerikler/.test(x.querySelector("h2").textContent); })[0];
+    var c = [].filter.call(document.querySelectorAll(".bolum"), function (x) { return /Çekim ve etkinlikler/.test(x.querySelector("h2").textContent); })[0];
+    var satirlar = [].map.call(b.querySelectorAll(".satir"), function (x) { return x.textContent; });
+    return { n: satirlar.length, ilk15: satirlar.slice(0, 15).every(function (t) { return /Kafe güncel iş/.test(t); }), daha: (b.querySelector(".daha-satir a") || {}).textContent,
+      cekim: c.querySelectorAll(".satir").length, ilkCekim: c.querySelector(".satir").textContent, cekimDaha: (c.querySelector("button.daha-satir") || {}).textContent };
+  });
+  ok("arama: icerikler liste sirasinda (15 guncel is ustte), 100 satir ve '+20 tane daha'", aramaDurum.n === 100 && aramaDurum.ilk15 && aramaDurum.daha === "+20 tane daha → İçerikler listesinde aç", JSON.stringify(aramaDurum));
+  ok("arama: cekimler yaklasanlar once, 50 satir ve kalanlari gosteren dugme", aramaDurum.cekim === 50 && /Kafe yaklaşan çekim 1/.test(aramaDurum.ilkCekim) && aramaDurum.cekimDaha === "+8 tane daha göster", JSON.stringify(aramaDurum));
+  await page.click("button.daha-satir:has-text('+8 tane daha göster')");
+  ok("arama: 'tane daha göster' tum cekimleri acar", (await page.locator(".bolum:has-text('Çekim ve etkinlikler') .satir").count()) === 58);
+  await page.click(".daha-satir a:has-text('İçerikler listesinde aç')");
+  await page.waitForSelector(".sayfa h1:has-text('İçerikler')");
+  await page.waitForSelector(".sayfa-bas:has-text('120 içerik')");
+  ok("arama: listede ac ayni aramayla 120 icerigi acar, guncel isler ustte", /Kafe güncel iş/.test(await page.locator(".icerik-liste .satir").first().textContent()), page.url());
+  // Satirin bos yerine tiklamak icerigi acar; secim kutusu acmaz
+  var ilkSatir = page.locator(".icerik-liste .satir").first();
+  var sk = await ilkSatir.boundingBox();
+  await page.mouse.click(sk.x + sk.width / 2, sk.y + sk.height - 3); // satirin alt boslugu (dugme ya da baglanti degil)
+  await page.waitForSelector("dialog[open]");
+  ok("satirin bos yerine tiklamak icerigi acar", /Kafe güncel iş/.test(await alanGirdi(page.locator("dialog[open]"), "Başlık", "input").inputValue()));
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("dialog[open]", { state: "detached" });
+  await ilkSatir.locator(".sec-kutu").click();
+  ok("secim kutusu cevresi yalniz secer, pencere acmaz", (await page.locator("dialog[open]").count()) === 0 && await ilkSatir.locator("input[type=checkbox]").isChecked());
+  await page.click(".toplu-cubuk button[aria-label='Seçimi temizle']");
+  // Takvim: masaustunde musteri secimi katlanmadan gorunur; ay hucresinin bos yerine tiklamak o gunu acar
+  await page.goto(URL_ + "#/cekim?g=ay&t=2099-10-20");
+  await page.waitForSelector(".donem:has-text('Ekim 2099')");
+  ok("masaustu takvim: musteri secimi katlanmadan gorunur", await page.locator(".takvim-ust select[aria-label='Müşteri']").isVisible());
+  var hucre = page.locator(".ay .hucre:not(.disari)").nth(14);
+  var hk = await hucre.boundingBox();
+  await page.mouse.click(hk.x + hk.width - 6, hk.y + hk.height - 6);
+  await page.waitForFunction(function () { return /g=gun/.test(location.hash); });
+  ok("ay hucresinin bos yerine tiklamak o gunu acar", /t=2099-10-15/.test(page.url()), page.url());
 
   // Cikis
   await page.click(".yan >> text=Çıkış");
@@ -877,6 +1011,126 @@ async function calis() {
   await md.locator("button[type=submit]").tap();
   await mp.waitForSelector("text=İçerik eklendi.");
   ok("telefon: icerik eklendi", true);
+
+  // iPhone cilasi: 16 px girdiler (dokununca buyutme yok), pencere gorunur yukseklige sigar, parmak boyunda hedefler
+  await mp.goto(URL_ + "#/icerikler?gorunum=liste&musteri=" + olcekM.id);
+  await mp.waitForSelector(".sayfa-bas:has-text('232 içerik')");
+  ok("telefon: arama kutusu 16 px", (await mp.locator(".ust .ara").evaluate(function (e) { return getComputedStyle(e).fontSize; })) === "16px");
+  await mp.locator(".icerik-liste .satir-ad").first().tap();
+  var mdlg = mp.locator("dialog[open]");
+  await mdlg.waitFor();
+  var mGirdi = await mp.evaluate(function () {
+    var d = document.querySelector("dialog[open]");
+    var boy = function (s) { return getComputedStyle(d.querySelector(s)).fontSize; };
+    return { input: boy(".alan input[type=text]"), select: boy(".alan select"), textarea: boy(".alan textarea"), maks: parseFloat(getComputedStyle(d).maxHeight), ic: window.innerHeight,
+      kapat: d.querySelector(".kapat").getBoundingClientRect().height };
+  });
+  ok("telefon: pencere girdileri 16 px, pencere gorunur yukseklige sigar, kapat dugmesi en az 40 px", mGirdi.input === "16px" && mGirdi.select === "16px" && mGirdi.textarea === "16px" &&
+    mGirdi.maks <= mGirdi.ic - 24 && mGirdi.kapat >= 40, JSON.stringify(mGirdi));
+  await mdlg.locator(".kapat").tap();
+  await mp.waitForSelector("dialog[open]", { state: "detached" });
+  var hedefBoy = await mp.evaluate(function () {
+    var en = function (s) { return Math.min.apply(null, [].map.call(document.querySelectorAll(s), function (e) { return e.getBoundingClientRect().height; })); };
+    return { menu: en(".menu-dugme"), kutu: en(".icerik-liste .sec-kutu"), hizli: en(".icerik-liste .btn.hizli") };
+  });
+  ok("telefon: menu dugmesi, secim kutusu alani ve satir dugmeleri en az 40 px", hedefBoy.menu >= 40 && hedefBoy.kutu >= 40 && hedefBoy.hizli >= 40, JSON.stringify(hedefBoy));
+  // satirin bos yerine dokunmak icerigi acar
+  var msk = await mp.locator(".icerik-liste .satir").nth(1).boundingBox();
+  await mp.touchscreen.tap(msk.x + msk.width / 2, msk.y + msk.height - 3);
+  await mp.waitForSelector("dialog[open]");
+  ok("telefon: satirin bos yerine dokunmak icerigi acar", true);
+  await mp.locator("dialog[open] .kapat").tap();
+  await mp.waitForSelector("dialog[open]", { state: "detached" });
+  // Toplu secim cubugu altta sabit: dokunulan satir yerinden oynamaz; durum secilmeden "Durumu değiştir" kapali
+  var kutu15 = mp.locator(".icerik-liste .sec-kutu").nth(14);
+  await kutu15.scrollIntoViewIfNeeded();
+  var yOnce = (await kutu15.boundingBox()).y;
+  await kutu15.tap();
+  await mp.locator(".toplu-cubuk").waitFor();
+  var cubukDurum = await mp.evaluate(function () {
+    var c = document.querySelector(".toplu-cubuk"), r = c.getBoundingClientRect();
+    return { konum: getComputedStyle(c).position, alt: r.bottom, ic: window.innerHeight, kapali: c.querySelector("button.birincil").disabled,
+      x: getComputedStyle(c.querySelector(".secim-temizle .kisa-ad")).display !== "none" && getComputedStyle(c.querySelector(".secim-temizle .uzun-ad")).display === "none" };
+  });
+  var ySonra = (await kutu15.boundingBox()).y;
+  ok("telefon: toplu cubuk altta sabit, secilen satir kaymaz, dar ekranda yalniz ×", Math.abs(ySonra - yOnce) <= 2 && cubukDurum.konum === "fixed" && cubukDurum.alt <= cubukDurum.ic &&
+    cubukDurum.x && await kutu15.locator("input").isChecked(), yOnce + " -> " + ySonra + " " + JSON.stringify(cubukDurum));
+  await mp.locator(".toplu-cubuk select").selectOption("kurguda");
+  ok("telefon: 'Durumu değiştir' durum secilmeden kapali, secilince acik", cubukDurum.kapali && !(await mp.locator(".toplu-cubuk button.birincil").isDisabled()));
+  await mp.locator(".toplu-cubuk button[aria-label='Seçimi temizle']").tap();
+  ok("telefon: × secimi temizler, cubuk kalkar", await mp.locator(".toplu-cubuk").isHidden());
+  // Geri tusu kalinan yere doner; yeni acilan sayfa en ustten baslar
+  await mp.evaluate(function () { window.scrollTo(0, 3000); });
+  var yGit = await mp.evaluate(function () { return window.scrollY; });
+  await mp.evaluate(function () {
+    var a = [].filter.call(document.querySelectorAll(".icerik-liste a[href^='#/musteri/']"), function (x) { var r = x.getBoundingClientRect(); return r.top > 120 && r.bottom < window.innerHeight - 160; })[0];
+    a.setAttribute("data-test-hedef", "1");
+  });
+  await mp.locator("[data-test-hedef]").tap();
+  await mp.waitForSelector(".sayfa h1:has-text('Örnek Ölçek Müşteri')");
+  var yMusteri = await mp.evaluate(function () { return window.scrollY; });
+  await mp.goBack();
+  await mp.waitForSelector(".sayfa-bas:has-text('232 içerik')");
+  var yDonus = await mp.evaluate(function () { return window.scrollY; });
+  await mp.goForward();
+  await mp.waitForSelector(".sayfa h1:has-text('Örnek Ölçek Müşteri')");
+  var yIleri = await mp.evaluate(function () { return window.scrollY; });
+  ok("telefon: geri tusu kalinan yere doner (yeni sayfa ve ileri en ustte)", yGit > 2000 && yMusteri === 0 && Math.abs(yDonus - yGit) <= 5 && yIleri === 0, [yGit, yMusteri, yDonus, yIleri].join(","));
+  // Musteriler: tablo kart olur (Hazır video / Açık işler yana kaydirmadan gorunur); satira dokunup geri donunce konum kalir
+  await mp.goto(URL_ + "#/musteriler");
+  await mp.waitForSelector(".sayfa h1:has-text('Müşteriler')");
+  var kartTablo = await mp.evaluate(function () {
+    var k = document.querySelector(".tablo-kap"), hz = document.querySelectorAll("td[data-etiket='Hazır video']");
+    return { tasma: k.scrollWidth - k.clientWidth, n: hz.length, icinde: [].every.call(hz, function (td) { return td.getBoundingClientRect().right <= window.innerWidth; }),
+      baslik: getComputedStyle(document.querySelector("table.kartli thead")).display, metin: k.textContent };
+  });
+  ok("telefon: musteri tablosu kart: yana tasma yok, 'Hazır video' ekranda, 'Stok girişi yapılmadı' / 'Belirlenmedi' korunur", kartTablo.tasma <= 0 && kartTablo.n > 3 && kartTablo.icinde &&
+    kartTablo.baslik === "none" && /Stok girişi yapılmadı/.test(kartTablo.metin) && /Belirlenmedi/.test(kartTablo.metin), JSON.stringify(kartTablo).slice(0, 300));
+  await mp.evaluate(function () { window.scrollTo(0, document.documentElement.scrollHeight); });
+  var yListe = await mp.evaluate(function () { return window.scrollY; });
+  var sonHucre = mp.locator("tr.tik td[data-etiket='Açık işler']").last();
+  await sonHucre.tap();
+  await mp.waitForFunction(function () { return /#\/musteri\//.test(location.hash); });
+  await mp.goBack();
+  await mp.waitForSelector(".sayfa h1:has-text('Müşteriler')");
+  var yListeDonus = await mp.evaluate(function () { return window.scrollY; });
+  ok("telefon: musteri satirina dokunup geri donunce konum kalir", yListe > 100 && Math.abs(yListeDonus - yListe) <= 5, yListe + " -> " + yListeDonus);
+  // Genel Bakis: musteri bazinda durum tablosu da kart
+  await mp.goto(URL_ + "#/genel");
+  await mp.waitForSelector(".tablo-katla");
+  await mp.locator(".tablo-katla > summary").tap();
+  var genelKart = await mp.evaluate(function () {
+    var td = document.querySelectorAll(".tablo-katla td[data-etiket='Yayına hazır']");
+    return { n: td.length, icinde: [].every.call(td, function (x) { var r = x.getBoundingClientRect(); return r.right <= window.innerWidth && r.width > 0; }), tire: /—/.test(document.querySelector(".tablo-katla table").textContent) };
+  });
+  ok("telefon: 'Müşteri bazında durum' kart, 'Yayına hazır' ekranda, stok bilinmeyende '—' korunur", genelKart.n > 0 && genelKart.icinde && genelKart.tire, JSON.stringify(genelKart));
+  // Takvim: filtreler katlanir, icerik ustte baslar; ay hucresine dokunmak o gunu acar
+  await mp.goto(URL_ + "#/yayin?g=gun");
+  await mp.waitForSelector(".gun-liste");
+  var takvimUst = await mp.evaluate(function () {
+    return { liste: Math.round(document.querySelector(".gun-liste").getBoundingClientRect().top + window.scrollY), filtreAcik: document.querySelector(".takvim-filtre").open };
+  });
+  ok("telefon takvim: filtreler katli, liste ustte (320 px'ten once)", !takvimUst.filtreAcik && takvimUst.liste < 320, JSON.stringify(takvimUst));
+  await mp.locator(".takvim-filtre > summary").tap();
+  await mp.locator(".takvim-filtre select").selectOption({ label: "Örnek Müşteri A" });
+  await mp.waitForFunction(function () { return /musteri=/.test(location.hash); });
+  ok("telefon takvim: musteri secilince filtreler acik kalir", await mp.evaluate(function () { return document.querySelector(".takvim-filtre").open && /\(1\)/.test(document.querySelector(".takvim-filtre summary").textContent); }));
+  await mp.goto(URL_ + "#/cekim?g=ay&t=2099-10-20");
+  await mp.waitForSelector(".donem:has-text('Ekim 2099')");
+  var mh = await mp.locator(".ay .hucre:not(.disari)").nth(14).boundingBox();
+  await mp.touchscreen.tap(mh.x + mh.width / 2, mh.y + mh.height - 6);
+  await mp.waitForFunction(function () { return /g=gun/.test(location.hash); }, null, { timeout: 5000 }).catch(function () {});
+  ok("telefon takvim: ay hucresinin herhangi bir yerine dokunmak o gunu acar", /g=gun/.test(mp.url()) && /t=2099-10-15/.test(mp.url()), mp.url());
+  // Stok: acil olanlar ustte (uyari > stok girisi yok > digerleri)
+  await mp.goto(URL_ + "#/stok");
+  await mp.waitForSelector(".stok-musteri");
+  var stokSira = await mp.evaluate(function () {
+    return [].map.call(document.querySelectorAll(".stok-musteri"), function (b) {
+      return b.querySelector(".uyari-rozet") ? 0 : /Stok girişi yapılmadı/.test(b.textContent) ? 1 : 2;
+    });
+  });
+  ok("stok sayfasi: acil olanlar ustte (uyari, sonra stok girisi yok, sonra digerleri)", stokSira[0] === 0 && stokSira.indexOf(2) !== -1 && stokSira.indexOf(1) !== -1 &&
+    stokSira.every(function (x, i) { return !i || stokSira[i - 1] <= x; }), stokSira.join(","));
   ok("telefon: sayfa hatasi yok", mhatalar.length === 0, mhatalar.join(" | "));
   await mctx.close();
 

@@ -11,7 +11,7 @@
   var AYNI_KAYNAK = /^(127\.0\.0\.1|localhost|assets\.suflo\.app)$/.test(location.hostname);
   var API = AYNI_KAYNAK ? "/studio/v1/index.php" : "https://assets.suflo.app/studio/v1/index.php";
   var kok = document.getElementById("uygulama");
-  var S = { veri: bosVeri(), girisli: false, el: null, rota: null, secili: {}, sonYukleme: 0 };
+  var S = { veri: bosVeri(), girisli: false, el: null, rota: null, secili: {}, listeAdet: null, sonYukleme: 0 };
   function bosVeri() { return { musteriler: [], icerikler: [], etkinlikler: [], ayar: null }; }
 
   /* ================= DOM yardimcilari ================= */
@@ -473,12 +473,22 @@
     var s = u.toString();
     return s ? "?" + s : "";
   }
+  // Geri / ileri ile donulen sayfa kalinan yerden acilir: sayfadan ayrilmadan hemen once kaydirma konumu o gecmis
+  // kaydina yazilir (yalniz dokunma ve gecislerde; kaydirma sirasinda yazilmaz). Yeni acilan sayfa en ustten baslar.
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  function konumSakla() {
+    try { history.replaceState(Object.assign({}, history.state || {}, { y: Math.round(window.scrollY) }), "", location.href); } catch (e) { /* konum saklanamazsa en ustten acilir */ }
+  }
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest && ev.target.closest("a[href^='#/']");
+    if (a) konumSakla();
+  }, true);
   function git(ad, p, id, yerinde) {
     var url = rotaLink(ad, p, id);
     if (yerinde) { history.replaceState(null, "", url); ciz(true); }
-    else location.hash = url;
+    else { konumSakla(); location.hash = url; }
   }
-  function ciz(kaydirmaKalsin) {
+  function ciz(kaydirmaKalsin, donusY) {
     if (!S.girisli || !S.el) return;
     var r = S.rota = rota();
     var menuAd = r.ad === "musteri" ? "musteriler" : r.ad;
@@ -491,11 +501,11 @@
     ekle(S.el.sayfa, [f(r)]);
     var ad = (MENU.filter(function (m) { return m[0] === menuAd; })[0] || [null, r.ad === "ara" ? "Arama" : "Genel Bakış"])[1];
     document.title = ad + " · Suflo Studio";
-    window.scrollTo(0, kaydirmaKalsin ? y : 0);
+    window.scrollTo(0, kaydirmaKalsin ? y : (typeof donusY === "number" ? donusY : 0));
   }
   /** Veri degistikten sonra ayni sayfayi yeniden ciz (kaydirma korunur). */
   function yenile() { ciz(true); }
-  window.addEventListener("hashchange", function () { ciz(false); });
+  window.addEventListener("hashchange", function () { var st = history.state; ciz(false, st && typeof st.y === "number" ? st.y : null); });
   // Degisiklik yapilmis bir pencere acikken sekme kapatilir ya da sayfa yenilenirse tarayici sorar
   window.addEventListener("beforeunload", function (ev) {
     if (!Array.prototype.some.call(document.querySelectorAll("dialog[open]"), function (d) { return d.kirli && d.kirli(); })) return;
@@ -546,13 +556,17 @@
     var n = Math.max(0, C.gunFarki(d, bugun()));
     return h("span", { class: (sinif || "") + (n >= 3 ? " uyari" : ""), title: "Onaya gönderildiği gün: " + C.tarihKisa(d, true) }, n ? n + " gündür onayda" : "bugün onaya gitti");
   }
+  /** Satirin bos yerine dokununca kaydi acar; satirdaki baglanti, dugme ve secim kutusu kendi isini yapar. */
+  function satirDokun(f) {
+    return function (ev) { if (!ev.target.closest("a, button, input, select, label")) f(); };
+  }
   function icerikSatiri(i, onEk, ekDugmeler) {
     var m = musteri(i.musteriId), b = bugun(), tarih = [];
     if (i.teslimTarihi && C.TESLIM_BEKLEYEN.indexOf(i.durum) !== -1) tarih.push(h("span", { class: i.teslimTarihi < b ? "gecikti" : null }, "Teslim " + C.tarihGunlu(i.teslimTarihi)));
     if (i.planTarihi && i.durum !== "yayinlandi") tarih.push(h("span", { class: i.planTarihi < b ? "gecikti" : null }, "Yayın " + C.tarihGunlu(i.planTarihi)));
     if (i.durum === "yayinlandi" && i.yayinTarihi) tarih.push("Yayınlandı " + C.tarihGunlu(i.yayinTarihi));
     var dugmeler = hizliDurum(i, ekDugmeler ? ["yayinlandi"] : null).concat(ekDugmeler || []);
-    return h("div", { class: "satir" + (i.arsiv ? " arsivli" : "") }, onEk || null, durumRozet(i.durum),
+    return h("div", { class: "satir dokun" + (i.arsiv ? " arsivli" : ""), onclick: satirDokun(function () { icerikPenceresi(i.id); }) }, onEk || null, durumRozet(i.durum),
       h("button", { class: "satir-ad", type: "button", onclick: function () { icerikPenceresi(i.id); } }, i.baslik),
       i.oncelik === "yuksek" ? h("span", { class: "oncelik" }, "Öncelikli") : null,
       h("span", { class: "satir-bilgi" }, dizi([musteriLink(m), C.TUR_AD[i.tur] || i.tur].concat(tarih).concat([onayBeklemesi(i), i.arsiv ? "Arşivde" : null]))),
@@ -560,7 +574,7 @@
   }
   function etkinlikSatiri(e, cak, ekDugmeler) {
     var m = musteri(e.musteriId), c = cak && cak[e.id];
-    return h("div", { class: "satir" + (e.durum === "iptal" ? " iptal" : "") + (e.arsiv ? " arsivli" : "") },
+    return h("div", { class: "satir dokun" + (e.durum === "iptal" ? " iptal" : "") + (e.arsiv ? " arsivli" : ""), onclick: satirDokun(function () { etkinlikPenceresi(e.id); }) },
       h("span", { class: "rozet e-" + e.tur }, C.ETKINLIK_TUR_AD[e.tur] || e.tur),
       h("button", { class: "satir-ad", type: "button", onclick: function () { etkinlikPenceresi(e.id); } }, e.baslik),
       h("span", { class: "satir-bilgi" }, dizi([C.tarihGunlu(e.basTarih) + ", " + C.saatMetni(e), musteriLink(m), e.konum || null, C.ETKINLIK_DURUM_AD[e.durum]])),
@@ -753,12 +767,12 @@
   }
   function musteriSayiTablosu(sayilar) {
     var kolonlar = [["cekildi", "Çekildi"], ["kurguda", "Kurguda"], ["onayda", "Onayda"], ["revizyonda", "Revizyonda"], ["hazir", "Yayına hazır"]];
-    return h("div", { class: "tablo-kap" }, h("table", null,
+    return h("div", { class: "tablo-kap" }, h("table", { class: "kartli" },
       h("thead", null, h("tr", null, h("th", null, "Müşteri"), kolonlar.map(function (k) { return h("th", { class: "sayi-h" }, k[1]); }))),
       h("tbody", null, sayilar.map(function (s) {
         // stok girisi yapilmamis musteride sifirlar "0" degil "—" (bilinmiyor) gorunur
         return h("tr", null, h("td", null, musteriLink(s.musteri), s.stokBilinen ? null : h("div", { class: "soluk kucuk" }, "Stok girişi yapılmadı")), kolonlar.map(function (k) {
-          return h("td", { class: "sayi-h" }, s[k[0]] ? ic(rotaLink("icerikler", { musteri: s.musteri.id, durum: k[0] }), String(s[k[0]])) :
+          return h("td", { class: "sayi-h", "data-etiket": k[1] }, s[k[0]] ? ic(rotaLink("icerikler", { musteri: s.musteri.id, durum: k[0] }), String(s[k[0]])) :
             h("span", { class: "soluk", title: s.stokBilinen ? null : "Stok girişi yapılmadı" }, s.stokBilinen ? "0" : "—"));
         }));
       }))));
@@ -785,7 +799,7 @@
           h("button", { class: "btn" + (arsiv ? " secili" : ""), type: "button", onclick: function () { git("musteriler", { arsiv: "1" }, null, true); } }, "Arşiv (" + arsivSayi + ")")),
         h("button", { class: "btn birincil", type: "button", onclick: function () { musteriPenceresi(null); } }, "Müşteri ekle")]),
       h("p", { class: "soluk kucuk" }, "Aylık ücret anlaşma tutarıdır; tahsil edilen para ya da alacak değildir."),
-      l.length ? h("div", { class: "tablo-kap" }, h("table", null,
+      l.length ? h("div", { class: "tablo-kap" }, h("table", { class: "kartli" },
         h("thead", null, h("tr", null, h("th", null, "Müşteri"), h("th", { class: "sayi-h" }, "Aylık ücret"), h("th", null, "Yayın düzeni"),
           h("th", { class: "sayi-h" }, "Hazır video"), h("th", { class: "sayi-h" }, "Açık işler"))),
         h("tbody", null, l.map(function (m) {
@@ -793,10 +807,10 @@
           var acikIs = S.veri.icerikler.filter(function (i) { return i.musteriId === m.id && !i.arsiv && i.durum !== "yayinlandi" && i.durum !== "hazir"; }).length;
           return h("tr", { class: "tik", onclick: function (ev) { if (ev.target.tagName !== "A") git("musteri", null, m.id); } },
             h("td", null, ic(rotaLink("musteri", null, m.id), m.ad), m.kurum ? h("div", { class: "soluk kucuk" }, m.kurum) : null),
-            h("td", { class: "sayi-h" }, m.ucret === null || m.ucret === undefined ? h("span", { class: "uyari" }, "Belirlenmedi") : C.para(m.ucret)),
-            h("td", null, C.siklikMetni(m, b), duzen.tamam ? null : h("div", { class: "uyari kucuk" }, "Yayın düzeni kurulmalı")),
-            h("td", { class: "sayi-h" }, st.bilinen ? String(st.toplam) : h("span", { class: "soluk kucuk" }, "Stok girişi yapılmadı")),
-            h("td", { class: "sayi-h" }, String(acikIs)));
+            h("td", { class: "sayi-h", "data-etiket": "Aylık ücret" }, m.ucret === null || m.ucret === undefined ? h("span", { class: "uyari" }, "Belirlenmedi") : C.para(m.ucret)),
+            h("td", { "data-etiket": "Yayın düzeni" }, C.siklikMetni(m, b), duzen.tamam ? null : h("div", { class: "uyari kucuk" }, "Yayın düzeni kurulmalı")),
+            h("td", { class: "sayi-h", "data-etiket": "Hazır video" }, st.bilinen ? String(st.toplam) : h("span", { class: "soluk kucuk" }, "Stok girişi yapılmadı")),
+            h("td", { class: "sayi-h", "data-etiket": "Açık işler" }, String(acikIs)));
         })))) : h("p", { class: "temiz" }, arsiv ? "Arşivde müşteri yok." : "Henüz müşteri yok."));
   };
 
@@ -1038,6 +1052,17 @@
     var l = C.icerikFiltrele(S.veri, f).filter(ozelFiltre(p.ozel)).filter(function (i) {
       return f.musteri || f.arsiv || C.aktif(mHar[i.musteriId]);
     }).sort(C.icerikSirala);
+    // Varsayilan gorunumde 14 gunden eski yayinlanmislar gizlenir (liste ve pano aylar sonra da kisa kalir). Durum ya da
+    // tarih filtresi, arama, cekim, arsiv ya da "Göster" (eski=1) ile hepsi gorunur. Yayin tarihi olmayan kayit gizlenmez.
+    var eskiSinir = C.gunEkle(bugun(), -ESKI_YAYIN_GUN), eskiSayi = 0;
+    if (!p.durum && !p.bas && !p.bit && !p.q && !p.cekim && !f.arsiv && p.eski !== "1") l = l.filter(function (i) {
+      var eski = i.durum === "yayinlandi" && C.gecerliTarih(i.yayinTarihi) && i.yayinTarihi < eskiSinir;
+      if (eski) eskiSayi++;
+      return !eski;
+    });
+    var eskiBag = function (metin, v) { return h("a", { href: rotaLink("icerikler", Object.assign({}, p, { eski: v })), onclick: function (ev) { ev.preventDefault(); degistir("eski", v); } }, metin); };
+    var eskiNotu = eskiSayi ? h("p", { class: "soluk kucuk eski-notu" }, eskiSayi + " eski yayınlanmış içerik gizli (" + ESKI_YAYIN_GUN + " günden önce yayınlanan) · ", eskiBag("Göster", "1")) :
+      p.eski === "1" ? h("p", { class: "soluk kucuk eski-notu" }, "Eski yayınlanmış içerikler de gösteriliyor · ", eskiBag("Gizle", "")) : null;
     var gorunurId = {};
     l.forEach(function (i) { gorunurId[i.id] = 1; });
     Object.keys(S.secili).forEach(function (id) { if (!gorunurId[id]) delete S.secili[id]; });
@@ -1073,23 +1098,25 @@
       h("button", { class: "btn", type: "button", onclick: function () { topluIcerikPenceresi({ musteriId: p.musteri, cekimId: p.cekim }); } }, "Toplu ekle"),
       h("button", { class: "btn birincil", type: "button", onclick: function () { icerikPenceresi(null, { musteriId: p.musteri || "", cekimId: p.cekim || null }); } }, "İçerik ekle")]);
     // Telefonda filtreler katlanir (etkin filtre varsa acik baslar)
-    var etkinFiltre = ["musteri", "durum", "oncelik", "tur", "bas", "bit", "arsiv", "cekim", "ozel"].filter(function (k) { return p[k]; }).length;
+    var etkinFiltre = ["musteri", "durum", "oncelik", "tur", "bas", "bit", "arsiv", "cekim", "ozel", "eski"].filter(function (k) { return p[k]; }).length;
     filtreler = h("details", { class: "filtre-kap", open: window.innerWidth > 860 || etkinFiltre > 0 },
       h("summary", null, "Filtreler" + (etkinFiltre ? " (" + etkinFiltre + ")" : "")), filtreler);
     if (gorunum === "pano") {
       var durumlar = p.durum ? p.durum.split(",") : C.DURUMLAR.map(function (d) { return d.k; });
-      return h("div", null, bas, filtreler, h("p", { class: "soluk kucuk" }, "Kartı başka sütuna sürükleyerek durumunu değiştir. Telefonda karta dokunup durumu seç."), pano(l, durumlar));
+      return h("div", null, bas, filtreler, h("p", { class: "soluk kucuk" }, "Kartı başka sütuna sürükleyerek durumunu değiştir. Telefonda karta dokunup durumu seç."), eskiNotu, pano(l, durumlar, p));
     }
-    var seciliSayi = Object.keys(S.secili).length;
+    // Secim degisince liste yeniden cizilmez: yalniz toplu cubuk, "Tümünü seç" ve gorunen kutular yerinde guncellenir
+    // (uzun listede de aninda tepki verir, odak tiklanan kutuda kalir).
+    var kutular = {}, seciliYazi = h("b");
     var topluDurum = secim(C.DURUMLAR, "", "Durum seç");
-    var hepsi = h("input", { type: "checkbox", "aria-label": "Tümünü seç", checked: l.length > 0 && seciliSayi === l.length,
-      onchange: function (e) { S.secili = {}; if (e.target.checked) l.forEach(function (i) { S.secili[i.id] = 1; }); yenile(); } });
-    var topluCubuk = seciliSayi ? h("div", { class: "toplu-cubuk" }, h("b", null, seciliSayi + " seçili"), topluDurum,
-      h("button", { class: "btn ince birincil", type: "button", onclick: function () {
-        if (!topluDurum.value) { toast("Önce yeni durumu seç.", "hata"); return; }
-        if (Object.keys(S.secili).length > 500) { toast("Bir seferde en çok 500 içerik değiştirilebilir.", "hata"); return; }
-        durumlariDegistir(Object.keys(S.secili), topluDurum.value).then(function (ok) { if (ok) { S.secili = {}; yenile(); } });
-      } }, "Durumu değiştir"),
+    // Durum secilmeden "Durumu değiştir" kapali: hata bildirimi cubugun ustune binmez
+    var durumDugme = h("button", { class: "btn ince birincil", type: "button", disabled: true, onclick: function () {
+      if (!topluDurum.value) { toast("Önce yeni durumu seç.", "hata"); return; }
+      if (Object.keys(S.secili).length > 500) { toast("Bir seferde en çok 500 içerik değiştirilebilir.", "hata"); return; }
+      durumlariDegistir(Object.keys(S.secili), topluDurum.value).then(function (ok) { if (ok) { S.secili = {}; yenile(); } });
+    } }, "Durumu değiştir");
+    topluDurum.addEventListener("change", function () { durumDugme.disabled = !topluDurum.value; });
+    var topluCubuk = h("div", { class: "toplu-cubuk", hidden: true }, seciliYazi, topluDurum, durumDugme,
       // Arsiv gorunumunde ayni dugme toplu "Arşivden çıkar" olur; 10 ve daha fazla icerigi arsivlemeden once sorulur
       h("button", { class: "btn ince", type: "button", onclick: function () {
         var hedef = !f.arsiv;
@@ -1106,21 +1133,51 @@
           uygula(degisim, degisim.length + " içerik " + (hedef ? "arşivlendi" : "arşivden çıkarıldı")).then(function (ok) { if (ok) { S.secili = {}; yenile(); } });
         });
       } }, f.arsiv ? "Arşivden çıkar" : "Arşivle"),
-      h("button", { class: "btn ince", type: "button", onclick: function () { S.secili = {}; yenile(); } }, "Seçimi temizle")) : null;
-    return h("div", null, bas, filtreler, topluCubuk,
-      l.length ? h("div", null, h("label", { class: "secenek soluk kucuk" }, hepsi, "Tümünü seç"),
-        l.map(function (i) {
-          var kutu = h("input", { type: "checkbox", "aria-label": "Seç: " + i.baslik, checked: !!S.secili[i.id], onchange: function (e) {
-            if (e.target.checked) S.secili[i.id] = 1; else delete S.secili[i.id];
-            yenile();
-          } });
-          return icerikSatiri(i, kutu);
-        })) : h("p", { class: "temiz" }, "Bu filtreye uyan içerik yok."));
+      // dar ekranda yalniz "×" gorunur (cubuk iki satira sigar); erisilebilir adi hep "Seçimi temizle"
+      h("button", { class: "btn ince secim-temizle", type: "button", "aria-label": "Seçimi temizle", onclick: function () { S.secili = {}; seciminiGoster(); } },
+        h("span", { class: "uzun-ad" }, "Seçimi temizle"), h("span", { class: "kisa-ad", "aria-hidden": "true" }, "×")));
+    var hepsi = h("input", { type: "checkbox", "aria-label": "Tümünü seç",
+      onchange: function (e) { S.secili = {}; if (e.target.checked) l.forEach(function (i) { S.secili[i.id] = 1; }); seciminiGoster(); } });
+    function seciminiGoster() {
+      var n = Object.keys(S.secili).length;
+      seciliYazi.textContent = n + " seçili";
+      topluCubuk.hidden = !n;
+      hepsi.checked = l.length > 0 && n === l.length;
+      hepsi.indeterminate = n > 0 && n < l.length;
+      Object.keys(kutular).forEach(function (id) { kutular[id].checked = !!S.secili[id]; });
+    }
+    // Uzun listede ilk LISTE_ADIM satir cizilir; "Daha fazla göster" ile artar (filtre degisince basa doner, geri donuste kalir)
+    var anahtar = location.hash.replace(/[?&]gorunum=[^&]*/, "");
+    if (!S.listeAdet || S.listeAdet.k !== anahtar) S.listeAdet = { k: anahtar, n: LISTE_ADIM };
+    var gorunen = l.slice(0, S.listeAdet.n), kalan = l.length - gorunen.length;
+    // Shift ile tiklanan kutu: son tiklanan satirla arasindaki gorunen satirlar ayni duruma gelir
+    var sonIdx = null, shiftBasili = false;
+    var satirlar = gorunen.map(function (i, idx) {
+      var kutu = kutular[i.id] = h("input", { type: "checkbox", "aria-label": "Seç: " + i.baslik, checked: !!S.secili[i.id], onchange: function (e) {
+        var secildi = e.target.checked;
+        var bas_ = shiftBasili && sonIdx !== null ? Math.min(sonIdx, idx) : idx, son_ = shiftBasili && sonIdx !== null ? Math.max(sonIdx, idx) : idx;
+        gorunen.slice(bas_, son_ + 1).forEach(function (x) { if (secildi) S.secili[x.id] = 1; else delete S.secili[x.id]; });
+        sonIdx = idx;
+        shiftBasili = false;
+        seciminiGoster();
+      } });
+      // daha genis dokunma alani; satira dokunmak icerigi acar, kutunun cevresi yalniz secer
+      return icerikSatiri(i, h("label", { class: "sec-kutu", onpointerdown: function (ev) { shiftBasili = ev.shiftKey; } }, kutu));
+    });
+    seciminiGoster();
+    return h("div", null, bas, filtreler, topluCubuk, eskiNotu,
+      l.length ? h("div", { class: "icerik-liste" }, h("label", { class: "secenek soluk kucuk" }, hepsi, "Tümünü seç" + (kalan ? " (" + l.length + ")" : "")),
+        satirlar,
+        kalan ? h("p", { class: "eylemler daha-satir" }, h("button", { class: "btn", type: "button", onclick: function () { S.listeAdet.n += LISTE_ADIM; yenile(); } },
+          "Daha fazla göster (" + kalan + " içerik daha)")) : null) : h("p", { class: "temiz" }, "Bu filtreye uyan içerik yok."));
   };
+  var LISTE_ADIM = 200, PANO_SINIRI = 60, ESKI_YAYIN_GUN = 14;
 
-  function pano(l, durumlar) {
+  function pano(l, durumlar, p) {
+    var b = bugun();
     return h("div", { class: "pano" }, durumlar.map(function (d) {
-      var ogeler = l.filter(function (i) { return i.durum === d; });
+      // Sutunda en cok PANO_SINIRI kart; sayi gercek toplam, kalanlar ayni filtreli listede
+      var hepsiD = l.filter(function (i) { return i.durum === d; }), ogeler = hepsiD.slice(0, PANO_SINIRI);
       var kol = h("div", { class: "kolon", "data-durum": d,
         ondragover: function (ev) { ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; kol.classList.add("uzerinde"); },
         ondragleave: function () { kol.classList.remove("uzerinde"); },
@@ -1130,9 +1187,9 @@
           var id = ev.dataTransfer.getData("text/plain");
           if (id && icerikBul(id)) durumlariDegistir([id], d);
         } },
-      h("div", { class: "kolon-bas" }, durumRozet(d), h("span", { class: "sayi" }, ogeler.length)),
+      h("div", { class: "kolon-bas" }, durumRozet(d), h("span", { class: "sayi" }, hepsiD.length)),
       ogeler.map(function (i) {
-        var m = musteri(i.musteriId), b = bugun();
+        var m = musteri(i.musteriId);
         return h("div", { class: "kart", draggable: "true", tabindex: "0", "data-id": i.id,
           ondragstart: function (ev) { ev.dataTransfer.setData("text/plain", i.id); ev.dataTransfer.effectAllowed = "move"; ev.currentTarget.classList.add("tasiniyor"); },
           ondragend: function (ev) { ev.currentTarget.classList.remove("tasiniyor"); },
@@ -1143,7 +1200,8 @@
           i.planTarihi && i.durum !== "yayinlandi" ? h("span", { class: "kucuk" + (i.planTarihi < b ? " gecikti" : "") }, "Yayın " + C.tarihGunlu(i.planTarihi)) : null,
           onayBeklemesi(i, "kucuk"),
           (function () { var hz = hizliDurum(i); return hz.length ? h("span", { class: "hizli-dugmeler" }, hz) : null; })());
-      }));
+      }),
+      hepsiD.length > ogeler.length ? ic(rotaLink("icerikler", Object.assign({}, p, { gorunum: "liste", durum: d })), "+" + (hepsiD.length - ogeler.length) + " tane daha · listede aç", { class: "kucuk-link kolon-daha" }) : null);
       return kol;
     }));
   }
@@ -1458,10 +1516,14 @@
       h("button", { class: "btn", type: "button", "aria-label": "Sonraki", onclick: function () { kaydir(1); } }, "›"),
       h("span", { class: "donem" }, donem),
       h("div", { class: "gorunum" }, gorDugme("gun", "Gün"), gorDugme("hafta", "Hafta"), gorDugme("ay", "Ay")),
-      h("select", { "aria-label": "Müşteri", value: mf, onchange: function (ev) { git(katman, param({ musteri: ev.target.value }), null, true); } },
-        h("option", { value: "" }, "Tüm müşteriler"), aktifMusteriler().map(function (m) { return h("option", { value: m.id }, m.ad); })),
-      h("label", { class: "secenek" }, h("input", { type: "checkbox", checked: ikisi, onchange: function (ev) { git(katman, param({ ikisi: ev.target.checked ? "1" : "" }), null, true); } }),
-        katman === "cekim" ? "Paylaşımları da göster" : "Çekimleri de göster"));
+      // Telefonda musteri secimi ve ikinci katman "Filtreler" altinda katlanir (etkin filtre varsa acik); masaustunde hep acik
+      h("details", { class: "filtre-kap takvim-filtre", open: window.innerWidth > 860 || !!mf || ikisi },
+        h("summary", null, "Filtreler" + (mf || ikisi ? " (" + ((mf ? 1 : 0) + (ikisi ? 1 : 0)) + ")" : "")),
+        h("div", { class: "takvim-filtre-ic" },
+          h("select", { "aria-label": "Müşteri", value: mf, onchange: function (ev) { git(katman, param({ musteri: ev.target.value }), null, true); } },
+            h("option", { value: "" }, "Tüm müşteriler"), aktifMusteriler().map(function (m) { return h("option", { value: m.id }, m.ad); })),
+          h("label", { class: "secenek" }, h("input", { type: "checkbox", checked: ikisi, onchange: function (ev) { git(katman, param({ ikisi: ev.target.checked ? "1" : "" }), null, true); } }),
+            katman === "cekim" ? "Paylaşımları da göster" : "Çekimleri de göster"))));
     // Ekleme icin varsayilan gun: gun gorunumunde o gun; hafta/ay gorunumunde bugun goruntulenen donemdeyse bugun, yoksa donemin ilk gunu
     // (ay gorunumunde izgaranin onceki aydan gelen ilk hucresi degil, ayin 1'i)
     var varsayilanGun = function () {
@@ -1481,7 +1543,9 @@
       var ay = t.slice(0, 7);
       govde = h("div", { class: "ay" }, C.GUN_KISA.map(function (x) { return h("div", { class: "gb" }, x); }), gunler.map(function (d) {
         var l = ogeler[d] || [];
-        return h("div", { class: "hucre" + (d.slice(0, 7) !== ay ? " disari" : "") + (d === b ? " bugun" : "") },
+        // Hucrenin bos yerine dokununca o gun acilir (telefonda hucrede yalniz nokta ve sayi var)
+        return h("div", { class: "hucre" + (d.slice(0, 7) !== ay ? " disari" : "") + (d === b ? " bugun" : ""),
+          onclick: function (ev) { if (!ev.target.closest("button, a")) git(katman, param({ g: "gun", t: d }), null, true); } },
           h("button", { class: "gun-no", type: "button", onclick: function () { git(katman, param({ g: "gun", t: d }), null, true); } }, String(+d.slice(8))),
           l.length ? h("span", { class: "nokta" }, "● " + l.length) : null,
           l.slice(0, 3).map(takvimOgesi),
@@ -1568,10 +1632,18 @@
       if (f === "duzen") return !C.duzenDurumu(m).tamam;
       return C.stokUyarisi(S.veri, m, b, esik).seviye === "dusuk";
     });
+    // Acil olanlar ustte: stok uyarisi olanlar (ilk karsilanmayan paylasim gunu en yakin olan once), sonra stok girisi
+    // yapilmayanlar, sonra digerleri; esitlikte ada gore
+    var sira = {};
+    l.forEach(function (m) {
+      var u = C.stokUyarisi(S.veri, m, b, esik), k = C.kapsama(S.veri, m, b, 7);
+      sira[m.id] = (u.seviye === "dusuk" ? "0" : u.seviye === "bilinmiyor" ? "1" : "2") + "|" + (k.duzenTamam && k.ilkAcik ? k.ilkAcik : "9999");
+    });
+    l = l.slice().sort(function (x, y) { return sira[x.id] < sira[y.id] ? -1 : sira[x.id] > sira[y.id] ? 1 : adSirala(x, y); });
     return h("div", null,
       sayfaBasligi("Stok", "Hazır stok: müşteri onayı alınmış, yayına hazır ve henüz yayınlanmamış videolar (Reels / video). Postlar videoya sayılmaz."),
       h("p", { class: "soluk kucuk" }, "İleri tarihe atanmış, tarihi geçip yayınlanmamış ve atanmamış hazırlar ayrı sayılır; üçünün toplamı hazır stoktur. Önümüzdeki 7 / 14 gün yayın düzenindeki gerçek günlerden hesaplanır. ",
-        "“Öneri” atanmamış ya da tarihi geçmiş bir hazırın o güne konabileceğini gösterir; plana sen çevirmedikçe kaydedilmez."),
+        "“Öneri” atanmamış ya da tarihi geçmiş bir hazırın o güne konabileceğini gösterir; plana sen çevirmedikçe kaydedilmez. Acil olanlar üstte."),
       STOK_SUZGEC[f] ? h("p", { class: "kucuk" }, "Gösterilen: " + STOK_SUZGEC[f] + " (" + l.length + ") · ", ic(rotaLink("stok"), "Tüm müşteriler")) : null,
       bilinmeyen.length ? h("div", { class: "uyari-kutu" }, bilinmeyen.length + " müşteride stok girişi yapılmadı; bunlarda stok 0 sayılmaz, “bilinmiyor” görünür.") : null,
       l.length ? l.map(function (m) {
@@ -1632,17 +1704,30 @@
 
   /* ================= Arama ================= */
 
+  var ARAMA_ICERIK = 100, ARAMA_CEKIM = 50;
   SAYFALAR.ara = function (r) {
     var q = r.p.q || "";
     if (S.el && document.activeElement !== S.el.ara) S.el.ara.value = q;
     var s = C.ara(S.veri, q), cak = C.cakismaHaritasi(S.veri.etkinlikler), b = bugun();
     var toplam = s.musteriler.length + s.icerikler.length + s.etkinlikler.length;
+    // Icerikler listedeki siraya gore (yayinlanmamislar once, yayinlananlar yeniden eskiye, arsivdekiler en sonda); ilk
+    // ARAMA_ICERIK gosterilir, kalani "+N tane daha" ve ayni aramayla acilan listeden. Cekimler: yaklasanlar once, sonra
+    // gecmis yeniden eskiye; ilk ARAMA_CEKIM gosterilir, kalani yerinde acilir (hicbiri erisilemez kalmaz).
+    var icl = s.icerikler.slice().sort(function (x, y) { return (x.arsiv ? 1 : 0) - (y.arsiv ? 1 : 0) || C.icerikSirala(x, y); });
+    var etl = s.etkinlikler.slice().sort(C.etkinlikSirala);
+    etl = etl.filter(function (e) { return C.aralik(e)[1] > b + " 00:00"; }).concat(etl.filter(function (e) { return C.aralik(e)[1] <= b + " 00:00"; }).reverse());
+    var etkS = function (e) { return etkinlikSatiri(e, cak); };
+    var cekimDaha = etl.length > ARAMA_CEKIM ? h("button", { class: "btn ince daha-satir", type: "button", onclick: function () {
+      cekimDaha.replaceWith.apply(cekimDaha, etl.slice(ARAMA_CEKIM).map(etkS));
+    } }, "+" + (etl.length - ARAMA_CEKIM) + " tane daha göster") : null;
+    var listeLink = rotaLink("icerikler", { gorunum: "liste", q: q });
     return h("div", null, sayfaBasligi("Arama: " + q, toplam + " sonuç"),
       s.musteriler.length ? bolum("Müşteriler", s.musteriler.length, null, s.musteriler.map(function (m) {
         return h("div", { class: "satir" + (m.arsiv ? " arsivli" : "") }, musteriLink(m), h("span", { class: "satir-bilgi" }, dizi([m.kurum, C.siklikMetni(m, b), m.arsiv ? "Arşivde" : null])));
       })) : null,
-      s.icerikler.length ? bolum("İçerikler", s.icerikler.length, null, s.icerikler.slice(0, 100).map(function (i) { return icerikSatiri(i); })) : null,
-      s.etkinlikler.length ? bolum("Çekim ve etkinlikler", s.etkinlikler.length, null, s.etkinlikler.slice().sort(C.etkinlikSirala).map(function (e) { return etkinlikSatiri(e, cak); })) : null,
+      icl.length ? bolum("İçerikler", icl.length, icl.length > ARAMA_ICERIK ? listeLink : null, [icl.slice(0, ARAMA_ICERIK).map(function (i) { return icerikSatiri(i); }),
+        icl.length > ARAMA_ICERIK ? h("p", { class: "daha-satir" }, ic(listeLink, "+" + (icl.length - ARAMA_ICERIK) + " tane daha → İçerikler listesinde aç", { class: "kucuk-link" })) : null]) : null,
+      etl.length ? bolum("Çekim ve etkinlikler", etl.length, null, [etl.slice(0, ARAMA_CEKIM).map(etkS), cekimDaha]) : null,
       toplam ? null : h("p", { class: "temiz" }, "Sonuç yok."));
   };
 

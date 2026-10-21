@@ -10,7 +10,8 @@
 html{-webkit-text-size-adjust:100%}
 body{background:var(--bg);color:var(--text);font:14.5px/1.5 "Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
 a{color:var(--accent-lite);text-decoration:none}
-a:hover{color:#fff;text-decoration:underline}
+/* hover kurallari yalniz fareli cihazda: dokunmatik ekranda dokunulan oge renkli / altı cizili kalmaz */
+@media (hover:hover){a:hover{color:#fff;text-decoration:underline}}
 h1{font-size:22px;font-weight:800;letter-spacing:-.01em}
 h2{font-size:15px;font-weight:700}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -25,7 +26,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- Dugmeler ve girdiler ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line2);background:var(--bg3);
   border-radius:9px;padding:8px 13px;font-weight:600;font-size:13.5px;cursor:pointer;white-space:nowrap;min-height:36px}
-.btn:hover{border-color:var(--accent)}
+@media (hover:hover){.btn:hover{border-color:var(--accent)}}
 .btn:disabled{opacity:.5;cursor:default}
 .btn.birincil{background:var(--grad);border-color:transparent;color:#fff}
 .btn.tehlike{border-color:rgba(248,113,113,.5);color:#fecaca}
@@ -61,7 +62,7 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
 .marka img{width:24px;height:24px}
 .yan-menu{display:flex;flex-direction:column;gap:2px}
 .yan-menu a{color:var(--dim);padding:8px 10px;border-radius:8px;font-weight:600}
-.yan-menu a:hover{background:var(--bg4);color:var(--text);text-decoration:none}
+@media (hover:hover){.yan-menu a:hover{background:var(--bg4);color:var(--text);text-decoration:none}}
 .yan-menu a.aktif{background:rgba(139,124,246,.16);color:var(--text)}
 .yan .cikis{margin-top:auto}
 .govde{min-width:0;display:flex;flex-direction:column}
@@ -85,7 +86,10 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
 .satir{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:7px 0;border-bottom:1px solid rgba(38,38,46,.6)}
 .satir:last-child{border-bottom:0}
 .satir-ad{background:none;border:0;padding:0;text-align:left;font-weight:600;cursor:pointer;color:var(--text)}
-.satir-ad:hover{color:var(--accent-lite);text-decoration:underline}
+@media (hover:hover){.satir-ad:hover{color:var(--accent-lite);text-decoration:underline}}
+.satir.dokun{cursor:pointer;-webkit-tap-highlight-color:transparent}
+/* secim kutusu cevresinde genis dokunma alani (satira dokunmak icerigi acar, kutunun cevresi yalniz secer) */
+.sec-kutu{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;margin:-6px 0 -6px -6px;cursor:pointer}
 .satir-bilgi{color:var(--dim);font-size:13px}
 .satir.iptal .satir-ad{text-decoration:line-through;color:var(--faint)}
 .satir.arsivli{opacity:.65}
@@ -104,7 +108,7 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
 /* ---------- Genel Bakis ust ozeti ---------- */
 .ozet-cipler{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 14px}
 .cip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--bg3);border-radius:20px;padding:5px 10px;font-size:13px;font-weight:600;min-height:34px;cursor:pointer}
-.cip:hover{border-color:var(--accent)}
+@media (hover:hover){.cip:hover{border-color:var(--accent)}}
 .cip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .bolum{scroll-margin-top:70px}
 .tablo-katla>summary{cursor:pointer;display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
@@ -125,7 +129,7 @@ th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);verti
 th{color:var(--dim);font-weight:600;font-size:12.5px;white-space:nowrap}
 td.sayi-h,th.sayi-h{text-align:right;font-variant-numeric:tabular-nums}
 tr.tik{cursor:pointer}
-tr.tik:hover td{background:var(--bg2)}
+@media (hover:hover){tr.tik:hover td{background:var(--bg2)}}
 
 /* ---------- Filtre cubugu ---------- */
 .filtreler{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px}
@@ -134,6 +138,8 @@ tr.tik:hover td{background:var(--bg2)}
 .filtreler .alan{min-width:140px;flex:0 1 180px}
 .toplu-cubuk{position:sticky;top:57px;z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--bg4);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;margin-bottom:10px}
 .toplu-cubuk select{width:auto;min-width:170px}
+.secim-temizle .kisa-ad{display:none}
+.eski-notu{margin:-4px 0 10px}
 .gorunum{display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
 .gorunum .btn{border:0;border-radius:0}
 
@@ -144,7 +150,8 @@ tr.tik:hover td{background:var(--bg2)}
 .kolon-bas{display:flex;justify-content:space-between;align-items:center;padding:2px 2px 4px}
 .kart{background:var(--bg2);border:1px solid var(--line2);border-radius:9px;padding:8px 10px;cursor:grab;display:flex;flex-direction:column;gap:2px;font-size:13px}
 .kart b{font-size:13.5px}
-.kart:hover{border-color:var(--accent)}
+@media (hover:hover){.kart:hover{border-color:var(--accent)}}
+.kolon-daha{padding:4px 2px}
 .kart.tasiniyor{opacity:.5}
 .kart .hizli-dugmeler{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 
@@ -169,8 +176,13 @@ tr.tik:hover td{background:var(--bg2)}
 .gun-liste .t-oge{white-space:normal;font-size:13.5px;padding:7px 10px}
 .hafta .t-oge{white-space:normal;overflow-wrap:anywhere}
 .takvim-ust select{width:auto;max-width:240px}
+.takvim-filtre-ic{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.takvim-ust .takvim-filtre>summary{margin-bottom:0}
+@media (min-width:861px){.takvim-ust .takvim-filtre{display:contents}}
+.ay .hucre{cursor:pointer}
 td:first-child{min-width:150px}
-.t-oge:hover{text-decoration:none;filter:brightness(1.15)}
+.t-oge:hover{text-decoration:none}
+@media (hover:hover){.t-oge:hover{filter:brightness(1.15)}}
 .t-saat{color:var(--dim);font-variant-numeric:tabular-nums}
 .t-cekim{background:rgba(139,124,246,.22);border-color:rgba(139,124,246,.45)}
 .t-toplanti,.t-diger{background:rgba(148,163,184,.14);border-color:rgba(148,163,184,.35)}
@@ -200,10 +212,10 @@ td:first-child{min-width:150px}
 .slot.acik{border-color:var(--sari);color:#fde68a;border-style:dashed}
 
 /* ---------- Pencere ---------- */
-dialog.pencere{margin:auto;background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:14px;padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog.pencere{margin:auto;background:var(--bg2);color:var(--text);border:1px solid var(--line2);border-radius:14px;padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px)}
 dialog.pencere.genis{width:min(860px,calc(100vw - 24px))}
 dialog::backdrop{background:rgba(0,0,0,.6)}
-.p-form{display:flex;flex-direction:column;max-height:calc(100vh - 26px)}
+.p-form{display:flex;flex-direction:column;max-height:calc(100vh - 26px);max-height:calc(100dvh - 26px)}
 .p-bas{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
 .p-bas h2{font-size:16px}
 .kapat{background:none;border:0;font-size:22px;line-height:1;color:var(--dim);cursor:pointer;width:34px;height:34px}
@@ -216,7 +228,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 .secim-izgara .btn small{font-weight:400;color:var(--dim)}
 
 /* ---------- Bildirim ---------- */
-.toastlar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:8px;width:min(520px,calc(100vw - 24px))}
+.toastlar{position:fixed;left:50%;bottom:18px;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:8px;width:min(520px,calc(100vw - 24px))}
 .toast{display:flex;align-items:center;gap:10px;background:#1f1f27;border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .toast span{flex:1}
 .toast.hata{border-color:rgba(248,113,113,.6)}
@@ -228,7 +240,20 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   .kabuk.menu-acik .yan{transform:none;visibility:visible;transition:transform .18s ease}
   .kabuk.menu-acik .ortu{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20}
   .menu-dugme{display:block}
-  .ust{padding:8px 12px}
+  .ust{padding:8px 12px;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  /* iOS Safari 16 px altindaki alana dokununca sayfayi buyutur: telefonda girdiler 16 px */
+  input[type=text],input[type=search],input[type=password],input[type=date],input[type=time],input[type=number],input:not([type]),select,textarea{font-size:16px}
+  /* parmakla rahat basilan hedefler (en az 40 px) */
+  .btn{min-height:42px}
+  .btn.ince{min-height:40px;padding:8px 12px}
+  .menu-dugme{flex:0 0 44px;width:44px;height:44px}
+  .kapat{width:44px;height:44px}
+  .yan-menu a{padding:11px 12px}
+  input[type=checkbox]{width:22px;height:22px}
+  .sec-kutu{min-width:44px;min-height:44px}
+  label.secenek{min-height:40px}
+  .slot{padding:9px 10px}
+  .gun-no{min-width:32px;min-height:28px}
   .sayfa{padding:14px 12px 70px}
   .izgara{grid-template-columns:minmax(0,1fr)}
   .hafta{grid-template-columns:minmax(0,1fr)}
@@ -236,7 +261,11 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   .ay .hucre{min-height:64px}
   .ay .t-oge{font-size:10.5px;padding:1px 3px}
   .filtreler .alan{flex:1 1 140px}
-  .toplu-cubuk{top:53px}
+  /* toplu secim cubugu ekranin altinda sabit: sayfa akisindan cikar, secerken liste kaymaz; basparmak yaninda */
+  .toplu-cubuk{position:fixed;top:auto;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:25;margin:0;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .toplu-cubuk select{min-width:0;flex:1 1 140px}
+  .toplu-cubuk:not([hidden]) ~ .icerik-liste{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
+  body:has(.toplu-cubuk:not([hidden])) .toastlar{bottom:calc(130px + env(safe-area-inset-bottom))}
   /* tek tik durum dugmeleri parmakla rahat basilsin */
   .btn.hizli{min-height:40px;padding:6px 12px;font-size:13px}
   .ozet-cipler{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
@@ -247,6 +276,20 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   .ay .hucre .t-oge{display:none}
   .ay .hucre .nokta{display:inline-block}
   .secim-izgara{grid-template-columns:minmax(0,1fr)}
+  .secim-temizle .uzun-ad{display:none}
+  .secim-temizle .kisa-ad{display:inline;font-size:20px;line-height:1}
+  /* genis tablolar kart olur: her deger kendi etiketiyle, yana kaydirmadan gorunur */
+  table.kartli thead{display:none}
+  table.kartli,table.kartli tbody{display:block}
+  table.kartli tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  table.kartli td{border:0;padding:1px 0;text-align:left;min-width:0}
+  table.kartli td:first-child{grid-column:1/-1;min-width:0}
+  table.kartli td[data-etiket]::before{content:attr(data-etiket) ": ";color:var(--faint);font-size:12px}
+  .tablo-kap:has(table.kartli){overflow-x:visible}
+  /* takvim ust cubugu: donem kendi satirinda, filtreler katlanir */
+  .takvim-ust .donem{order:-1;flex-basis:100%;min-width:0}
+  .takvim-ust .takvim-filtre{flex-basis:100%}
+  .takvim-ust .takvim-filtre-ic select{flex:1 1 200px;max-width:none}
   h1{font-size:19px}
 }
 .ay .nokta{display:none;font-size:11px;color:var(--accent-lite)}
