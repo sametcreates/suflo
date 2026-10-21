@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 /*
- * Suflo Studio MCP kesif belgeleri (PRM, AS / OIDC metadata). Yer: public_html/<uygulama>/kesif.php.
+ * Suflo Studio MCP kesif belgeleri (PRM, AS / OIDC metadata). Yer: public_html/<uygulama>/kesif-giris.php.
  * public_html/.well-known/.htaccess ve public_html/<uygulama>/.htaccess yalniz tam kesif adlarini buraya yonlendirir.
  */
 define('SUFLO_MCP', 1);

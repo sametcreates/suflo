@@ -6,6 +6,9 @@
  *  - MCP: eski donem (initialize 2025-03-26/06-18/11-25) ve yeni donem (2026-07-28: _meta, server/discover, Mcp-* basliklari)
  *  - araclar: sema dogrulama, capraz kurallar, cakisma, mukerrer, toplu onizle / uygula (tek kullanimlik kod, tekrar = ilk sonuc)
  *  - yenileme jetonu donusumu, eski jetonla tekrar -> grant iptal; RFC 7009 iptal; kod tekrari -> jetonlar iptal
+ *  - eszamanli yenileme toleransi (60 sn, halef kullanilmamis, ayni istemci, sifre izi ayni) ve pencere disinda / halef kullanilmis -> tam iptal
+ *  - DCR genel kotasi yalniz basarili kayitlari sayar (429 + Retry-After), sayac sifirlama islevi, 6 saatlik budama; depo 1 -> 2 yukseltmesi
+ *  - isError sonucunda structuredContent outputSchema'ya uyar ya da hic gonderilmez
  *  - olumsuzlar: jetonsuz 401 (error yok), gecersiz / suresi dolmus / yanlis audience 401 invalid_token, okuma jetonuyla yazma
  *    403 insufficient_scope, PKCE yok / plain, izinsiz redirect_uri, CSRF yok, yanlis sifre panel kilidinde sayilir, kapatma
  *    anahtari, sifre izi degisince grant'ler gecersiz, buyuk / toplu / bozuk JSON, bilinmeyen yontem / arac, GET 405, kotu Origin 403
@@ -25,7 +28,7 @@ if (phpVar.error || phpVar.status !== 0) {
 
 /* ---------------- Statik denetimler ---------------- */
 var K = O.MCP_KAYNAK;
-var phpler = ["mcp.php", "oauth.php", "kesif.php"].map(function (f) { return path.join(K, f); })
+var phpler = ["mcp-giris.php", "oauth-giris.php", "kesif-giris.php"].map(function (f) { return path.join(K, f); })
   .concat(fs.readdirSync(path.join(K, "mcp-kitaplik")).filter(function (f) { return /\.php$/.test(f); }).map(function (f) { return path.join(K, "mcp-kitaplik", f); }))
   .concat([O.SAHTE_ARKA, path.join(__dirname, "fixtures", "studio-mcp", "yonlendirici.php")]);
 phpler.forEach(function (f) {
@@ -45,13 +48,34 @@ var studioHt = fs.readFileSync(path.join(K, "studio.htaccess"), "utf8");
 var kurallar = arayuzHt.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(function (s) { return /^Header /.test(s); });
 ok("studio.htaccess arayuz.htaccess'in butun guvenlik basliklarini aynen icerir (" + kurallar.length + " satir)", kurallar.length === 5 &&
   kurallar.every(function (s) { return studioHt.split(/\r?\n/).map(function (x) { return x.trim(); }).indexOf(s) !== -1; }) && /Options -Indexes/.test(studioHt));
-ok("studio.htaccess: mcp / oauth / kesif yeniden yazma + Authorization gecisi + kitaplik kapali", /RewriteRule \^mcp\$ mcp\.php \[L,QSA,E=HTTP_AUTHORIZATION:%\{HTTP:Authorization\}\]/.test(studioHt) &&
-  /RewriteRule \^oauth\/\(authorize\|token\|register\|revoke\)\$ oauth\.php/.test(studioHt) && /RewriteRule \^mcp-kitaplik\(\/\|\$\) - \[F,L\]/.test(studioHt) &&
-  /openid-configuration/.test(studioHt) && /X-LiteSpeed-Cache-Control/.test(studioHt));
+ok("studio.htaccess: mcp / oauth / kesif yeniden yazma + Authorization gecisi + kitaplik kapali", /RewriteRule \^mcp\$ mcp-giris\.php \[L,QSA,E=HTTP_AUTHORIZATION:%\{HTTP:Authorization\}\]/.test(studioHt) &&
+  /RewriteRule \^oauth\/\(authorize\|token\|register\|revoke\)\$ oauth-giris\.php/.test(studioHt) && /RewriteRule \^mcp-kitaplik\(\/\|\$\) - \[F,L\]/.test(studioHt) &&
+  /openid-configuration/.test(studioHt) && /X-LiteSpeed-Cache-Control/.test(studioHt) && /<FilesMatch "\^\(mcp\|oauth\|kesif\)-giris\\\.php\$">/.test(studioHt));
+// MultiViews: "Options -MultiViews" Options degisikligine izin vermeyen sunucuda 500 verir. Onun yerine hicbir giris dosyasi
+// bir istek yolu parcasi + uzanti olmamali (MultiViews "mcp" / "oauth/token" istegini mcp.* / oauth.* dosyasina eslerdi).
+var arayuzSatir = arayuzHt.split(/\r?\n/), studioSatir = studioHt.split(/\r?\n/);
+ok("studio.htaccess 4. satiri arayuz.htaccess'in Options satiriyla ayni; MultiViews yok (" + studioSatir[3] + ")",
+  studioSatir[3] === arayuzSatir[1] && /^Options /.test(studioSatir[3]) && !/MultiViews/i.test(studioHt.replace(/^\s*#.*$/gm, "")), [studioSatir[3], arayuzSatir[1]]);
+var yolParcalari = ["mcp", "oauth", ".well-known"];
+var cakisan = fs.readdirSync(K).filter(function (f) { return yolParcalari.indexOf(f.replace(/\.[^.]+$/, "")) !== -1 && f.indexOf(".") > 0; });
+ok("giris dosyalarinin adi istek yolu parcasiyla ayni degil (MultiViews guvenli): mcp-giris.php, oauth-giris.php, kesif-giris.php", cakisan.length === 0 &&
+  ["mcp-giris.php", "oauth-giris.php", "kesif-giris.php"].every(function (f) { return fs.existsSync(path.join(K, f)); }), cakisan);
+var rwSatir = studioSatir.map(function (x) { return x.trim(); });
+var rwBas = rwSatir.indexOf("RewriteEngine On");
+ok("studio.htaccess: RewriteEngine On'dan hemen sonra acik https yonlendirmesi (kok .htaccess'teki /studio/ altinda artik islemez)",
+  rwBas !== -1 && rwSatir.slice(rwBas + 1).filter(function (x) { return x && x[0] !== "#"; }).slice(0, 3).join("\n") ===
+  "RewriteCond %{HTTPS} !=on\nRewriteCond %{HTTP:X-Forwarded-Proto} !=https\nRewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]", rwSatir.slice(rwBas, rwBas + 6));
+var mcpBeni = fs.readFileSync(path.join(K, "README.md"), "utf8");
+ok("mcp/README dagitim tablosu giris dosyalarinin yeni adlarini ve .htaccess eslemesini tasir (DAGITIM ile ayni)", O.DAGITIM.filter(function (d) { return /\.(php|htaccess)$/.test(d[0]); })
+  .every(function (d) { return mcpBeni.indexOf("| `" + d[0] + "` | `" + d[1].replace("<u>", "studio") + "` |") !== -1; }) && !/`(mcp|oauth|kesif)\.php`/.test(mcpBeni));
+var studioBeni = fs.readFileSync(path.join(O.ROOT, "server", "studio-v1", "README.md"), "utf8").split(/\r?\n/);
+var arayuzKoy = studioBeni.filter(function (x) { return /arayuz\.htaccess/.test(x) && /(\.htaccess` adıyla|<-)/.test(x); });
+ok("studio-v1/README: arayuz.htaccess'i .htaccess olarak koyduran her satir MCP kuruluysa mcp/studio.htaccess'i soyler (yoksa MCP yollari duser)",
+  arayuzKoy.length >= 3 && arayuzKoy.every(function (x) { return /mcp\/studio\.htaccess/.test(x); }), arayuzKoy);
 var wkHt = fs.readFileSync(path.join(K, "well-known.htaccess"), "utf8");
 var wkKurallar = wkHt.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(function (s) { return /^RewriteRule/.test(s); });
 ok(".well-known/.htaccess yalniz tam kesif adlarini esler; acme-challenge'a dokunan / yasaklayan / her seyi yakalayan kural yok",
-  wkKurallar.length === 3 && wkKurallar.every(function (s) { return /^RewriteRule \^(oauth-protected-resource|oauth-authorization-server|openid-configuration)\/\(studio\|studio-test\)(\/mcp)?\$ \/\$1\/kesif\.php \[L\]$/.test(s); }) &&
+  wkKurallar.length === 3 && wkKurallar.every(function (s) { return /^RewriteRule \^(oauth-protected-resource|oauth-authorization-server|openid-configuration)\/\(studio\|studio-test\)(\/mcp)?\$ \/\$1\/kesif-giris\.php \[L\]$/.test(s); }) &&
   !/acme|Require|Deny|Redirect|RewriteCond|\(\.\*\)|\^\.\*/i.test(wkHt.replace(/^#.*$/gm, "")), wkKurallar);
 ok("mcp-kitaplik/.htaccess: Require all denied", /Require all denied/.test(fs.readFileSync(path.join(K, "mcp-kitaplik", ".htaccess"), "utf8")));
 var onayJs = fs.readFileSync(path.join(K, "mcp-onay.js"), "utf8");
@@ -75,6 +99,28 @@ var CLAUDE = "https://claude.ai/api/mcp/auth_callback";
 var GPT = "https://chatgpt.com/connector/oauth/abc_DEF-123";
 function ayar(ek) { O.ayarYaz(TMP, "studio", KOK, ek); }
 function sayaclariSifirla(dosya) { O.db(dosya || DB, "DELETE FROM mcp_sayac"); }
+/** Panelin yapacagi gibi kitapligi dogrudan yukler (php -r) ve kodu calistirir. Doner: stdout (hata varsa ekli). */
+function phpKitaplik(u, kod) {
+  var r = cp.spawnSync("php", ["-r", "define('SUFLO_MCP', 1); require $argv[1] . '/mcp-kitaplik/yukle.php'; mcp_baslat($argv[1]); " + kod, path.join(PUB, u)], { encoding: "utf8" });
+  return (r.stdout || "") + (r.status !== 0 || r.stderr ? " [cikis " + r.status + "] " + r.stderr : "");
+}
+function simdi() { return Math.floor(Date.now() / 1000); }
+// Sema surumu 1 (ilk yayimlanan) depo: yerinde 1 -> 2 yukseltmesinin kaniti icin studio-test'e onceden yazilir
+var SEMA1 = [
+  "CREATE TABLE mcp_ayar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NULL)",
+  "CREATE TABLE mcp_istemci (id TEXT PRIMARY KEY, ad TEXT NOT NULL, yonlendirmeler TEXT NOT NULL, yontem TEXT NOT NULL, sir_ozet TEXT NULL, uygulama_turu TEXT NOT NULL, kapsam TEXT NOT NULL, olusturma INTEGER NOT NULL, ip_ozet TEXT NOT NULL, son_kullanim INTEGER NULL)",
+  "CREATE TABLE mcp_onay (id TEXT PRIMARY KEY, csrf_ozet TEXT NOT NULL, cerez_ozet TEXT NOT NULL, istemci TEXT NOT NULL, yonlendirme TEXT NOT NULL, yonlendirme_acik INTEGER NOT NULL, durum_param TEXT NULL, meydan TEXT NOT NULL, kaynak TEXT NOT NULL, kapsam TEXT NOT NULL, olusturma INTEGER NOT NULL, son INTEGER NOT NULL, kullanildi INTEGER NOT NULL DEFAULT 0, deneme INTEGER NOT NULL DEFAULT 0)",
+  "CREATE TABLE mcp_izin (id TEXT PRIMARY KEY, istemci TEXT NOT NULL, kapsam TEXT NOT NULL, kaynak TEXT NOT NULL, sifre_izi TEXT NOT NULL, olusturma INTEGER NOT NULL, bitis INTEGER NOT NULL, son_kullanim INTEGER NULL, durum TEXT NOT NULL, iptal_nedeni TEXT NULL, iptal_zamani INTEGER NULL)",
+  "CREATE INDEX mcp_izin_istemci ON mcp_izin (istemci)",
+  "CREATE TABLE mcp_kod (ozet TEXT PRIMARY KEY, izin TEXT NOT NULL, istemci TEXT NOT NULL, yonlendirme TEXT NOT NULL, yonlendirme_acik INTEGER NOT NULL, meydan TEXT NOT NULL, kaynak TEXT NOT NULL, kapsam TEXT NOT NULL, olusturma INTEGER NOT NULL, son INTEGER NOT NULL, kullanildi INTEGER NOT NULL DEFAULT 0)",
+  "CREATE TABLE mcp_jeton (ozet TEXT PRIMARY KEY, tur TEXT NOT NULL, izin TEXT NOT NULL, istemci TEXT NOT NULL, kapsam TEXT NOT NULL, kaynak TEXT NOT NULL, olusturma INTEGER NOT NULL, son INTEGER NOT NULL, durum TEXT NOT NULL)",
+  "CREATE INDEX mcp_jeton_izin ON mcp_jeton (izin)",
+  "CREATE TABLE mcp_toplu (kod_ozet TEXT PRIMARY KEY, izin TEXT NOT NULL, islemler TEXT NOT NULL, islem_ozeti TEXT NOT NULL, olusturma INTEGER NOT NULL, son INTEGER NOT NULL, durum TEXT NOT NULL, sonuc TEXT NULL, alinma INTEGER NULL)",
+  "CREATE TABLE mcp_gunluk (sira INTEGER PRIMARY KEY AUTOINCREMENT, zaman INTEGER NOT NULL, istemci TEXT NOT NULL, olay TEXT NOT NULL, sonuc TEXT NOT NULL, etkilenen TEXT NOT NULL, ozet TEXT NOT NULL)",
+  "CREATE TABLE mcp_sayac (anahtar TEXT PRIMARY KEY, pencere INTEGER NOT NULL, sayi INTEGER NOT NULL)",
+  "INSERT INTO mcp_ayar (anahtar, deger) VALUES ('sema', '1')",
+  "INSERT INTO mcp_jeton (ozet, tur, izin, istemci, kapsam, kaynak, olusturma, son, durum) VALUES ('eski-surum-jetonu', 'yenileme', 'eski-izin', 'eski-istemci', 'studio.oku', 'x', 1, 4102444800, 'kullanildi')"
+];
 
 function baslat() {
   return new Promise(function (res, rej) {
@@ -108,6 +154,7 @@ async function calis() {
   KOK = "http://127.0.0.1:" + PORT;
   ayar();
   O.ayarYaz(TMP, "studio-test", KOK);
+  SEMA1.forEach(function (q) { O.db(DB_TEST, q); });
   await baslat();
   I = new O.Istemci(PORT, KOK);
   var r, w, j;
@@ -144,10 +191,10 @@ async function calis() {
   ok("studio-test: ayri uygulama klasoru -> ayri ayar (private/studio-test-v1), resource ve issuer kendi adresi",
     r.json && r.json.resource === KOK + "/studio-test/mcp" && r2.json && r2.json.issuer === KOK + "/studio-test", [r.metin, r2.metin]);
   r = await I.istek({ yol: "/.well-known/oauth-protected-resource" });
-  r2 = await I.istek({ yol: "/studio/kesif.php" });
-  ok("eslenmeyen kok PRM adresi 404; kesif.php dogrudan cagrilinca 404", r.status === 404 && r2.status === 404, [r.status, r2.status]);
-  r = await I.istek({ yol: "/studio/oauth.php" });
-  ok("oauth.php dogrudan cagrilinca 404", r.status === 404, r.status);
+  r2 = await I.istek({ yol: "/studio/kesif-giris.php" });
+  ok("eslenmeyen kok PRM adresi 404; kesif-giris.php dogrudan cagrilinca 404", r.status === 404 && r2.status === 404, [r.status, r2.status]);
+  r = await I.istek({ yol: "/studio/oauth-giris.php" });
+  ok("oauth-giris.php dogrudan cagrilinca 404", r.status === 404, r.status);
   r = await I.istek({ yol: "/studio/mcp-kitaplik/ortak.php" });
   ok("kitaplik klasoru disaridan kapali (403)", r.status === 403, r.status);
   r = await I.istek({ yontem: "POST", yol: "/.well-known/oauth-authorization-server/studio" });
@@ -186,10 +233,44 @@ async function calis() {
   }
   r = await I.istek({ yontem: "POST", yol: "/studio-test/oauth/register", baslik: { "Content-Type": "text/plain" }, govde: "{}" });
   ok("DCR: JSON olmayan govde 400", r.status === 400, r.status);
+  var sayac = function (anahtar) { var x = O.db(DB_TEST, "SELECT sayi FROM mcp_sayac WHERE anahtar = ?", [anahtar])[0]; return x ? x.sayi : 0; };
+  var ipSayac = O.db(DB_TEST, "SELECT sayi FROM mcp_sayac WHERE anahtar LIKE 'kayit|ip|%'")[0];
+  ok("DCR: reddedilen (bozuk) kayitlar genel gunluk kotayi tuketmez; IP basina sinir onlari da sayar", sayac("kayit|toplam") === 0 && ipSayac && ipSayac.sayi === kotuKayit.length,
+    [sayac("kayit|toplam"), ipSayac]);
+  var jetonSutun = O.db(DB_TEST, "PRAGMA table_info(mcp_jeton)").map(function (c) { return c.name; });
+  ok("depo semasi 1 -> 2 yerinde yukseltildi (mcp_jeton: donusum, halef, ebeveyn); eski satirlar korundu", O.db(DB_TEST, "SELECT deger FROM mcp_ayar WHERE anahtar = 'sema'")[0].deger === "2" &&
+    ["donusum", "halef", "ebeveyn"].every(function (c) { return jetonSutun.indexOf(c) !== -1; }) &&
+    O.db(DB_TEST, "SELECT durum, donusum FROM mcp_jeton WHERE ozet = 'eski-surum-jetonu'")[0].durum === "kullanildi", jetonSutun);
   sayaclariSifirla(DB_TEST);
   var kayitlar = [];
   for (var hi = 0; hi < 11; hi++) kayitlar.push((await I.kayit("studio-test", { client_name: "Seri " + hi, redirect_uris: [CLAUDE] })).status);
   ok("DCR hiz siniri: ayni IP'den saatte 10 kayit, 11. -> 429", kayitlar.slice(0, 10).every(function (s) { return s === 201; }) && kayitlar[10] === 429, kayitlar);
+  ok("DCR: genel sayac yalniz basarili kayitlari saydi (10)", sayac("kayit|toplam") === 10, sayac("kayit|toplam"));
+  sayaclariSifirla(DB_TEST);
+  O.db(DB_TEST, "INSERT INTO mcp_sayac (anahtar, pencere, sayi) VALUES ('kayit|toplam', ?, 50)", [Math.floor(simdi() / 86400) * 86400]);
+  var istemciSay = function () { return O.db(DB_TEST, "SELECT COUNT(*) AS c FROM mcp_istemci")[0].c; };
+  var is0 = istemciSay();
+  r = await I.kayit("studio-test", { client_name: "Kota", redirect_uris: [CLAUDE] });
+  var ra = Number(r.headers["retry-after"]);
+  ok("DCR genel sinir (gunde 50) dolu: gecerli kayit -> 429, RFC 7591 hata govdesi (error + error_description), Retry-After, istemci acilmadi",
+    r.status === 429 && r.json && r.json.error === "temporarily_unavailable" && typeof r.json.error_description === "string" && ra > 0 && ra <= 86400 &&
+    /no-store/.test(r.headers["cache-control"] || "") && istemciSay() === is0, [r.status, r.metin, r.headers["retry-after"]]);
+  r = await I.kayit("studio-test", { redirect_uris: ["https://kotu.ornek/cb"] });
+  ok("DCR: genel sinir doluyken bozuk kayit yine 400 invalid_redirect_uri (dogrulama sayactan once)", r.status === 400 && r.json && r.json.error === "invalid_redirect_uri" &&
+    sayac("kayit|toplam") === 50, r.metin);
+  var sifirla = phpKitaplik("studio-test", "echo json_encode(mcp_kayit_sayaci_sifirla());");
+  r = await I.kayit("studio-test", { client_name: "Sifirdan sonra", redirect_uris: [CLAUDE] });
+  ok("depo: mcp_kayit_sayaci_sifirla() (Ayarlar icin) genel sayaci sifirlar; sonra kayit 201", sifirla === "true" && r.status === 201 && sayac("kayit|toplam") === 1 &&
+    O.db(DB_TEST, "SELECT COUNT(*) AS c FROM mcp_gunluk WHERE olay = 'kayit_sayaci_sifirla'")[0].c === 1, [sifirla, r.status, sayac("kayit|toplam")]);
+  // Budama: hic baglanmamis istemci 6 saat sonra silinir; baglanmis istemci ve 6 saatten yeni olan kalir
+  var seri = O.db(DB_TEST, "SELECT id FROM mcp_istemci WHERE ad LIKE 'Seri %' ORDER BY ad LIMIT 3").map(function (x) { return x.id; });
+  O.db(DB_TEST, "UPDATE mcp_istemci SET olusturma = ? WHERE id IN (?, ?)", [simdi() - 7 * 3600, seri[0], seri[1]]);
+  O.db(DB_TEST, "UPDATE mcp_istemci SET son_kullanim = ? WHERE id = ?", [simdi() - 7 * 3600, seri[1]]);
+  O.db(DB_TEST, "UPDATE mcp_istemci SET olusturma = ? WHERE id = ?", [simdi() - 5 * 3600, seri[2]]);
+  var buda = phpKitaplik("studio-test", "mcp_buda(true);");
+  var kalanlar = O.db(DB_TEST, "SELECT id FROM mcp_istemci WHERE id IN (?, ?, ?)", seri).map(function (x) { return x.id; });
+  ok("budama: hic baglanmamis istemci 6 saatten sonra silinir; baglanmis ve 6 saatten yeni istemci kalir", buda === "" && seri.length === 3 &&
+    kalanlar.indexOf(seri[0]) === -1 && kalanlar.indexOf(seri[1]) !== -1 && kalanlar.indexOf(seri[2]) !== -1, [buda, kalanlar]);
 
   /* ================= authorize GET ================= */
   var pk = O.pkce();
@@ -460,6 +541,30 @@ async function calis() {
   O.db(DB, "UPDATE mcp_toplu SET son = 1 WHERE kod_ozet = ?", [O.sha256(kod2)]);
   r = await I.arac("studio", J, "studio_toplu_uygula", { onay_kodu: kod2 });
   ok("toplu_uygula: 15 dakikasi dolmus kod -> isError (yeniden onizle)", r.json.result.isError === true && /süresi doldu/.test(r.json.result.content[0].text), r.metin);
+  // Onizlemeden sonra musteri silinir: uygulama basarisiz (isError) ama structuredContent outputSchema'ya uymali ('sonuc' nesne, [] degil)
+  O.db(SAHTE_DB, "INSERT INTO musteri VALUES ('aaaaaaaa0077', 'Gecici Müşteri', '', 0, 1)");
+  r = await I.arac("studio", J, "studio_toplu_onizle", { islemler: [{ islem: "icerik_olustur", musteri_id: "aaaaaaaa0077", baslik: "Geçici", tur: "post" }] });
+  var kod3 = r.json.result.structuredContent && r.json.result.structuredContent.onay_kodu;
+  O.db(SAHTE_DB, "DELETE FROM musteri WHERE id = 'aaaaaaaa0077'");
+  var araclarSema = {};
+  araclar.forEach(function (t) { araclarSema[t.name] = t.outputSchema; });
+  // outputSchema'nin ust duzey alanlari icin kucuk denetim: zorunlular var, tur (object / array / string / null) uyuyor
+  function semayaUyar(v, sema) {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+    return (sema.required || []).every(function (k) { return k in v; }) && Object.keys(v).every(function (k) {
+      var p = sema.properties[k]; if (!p) return sema.additionalProperties !== false;
+      var turler = [].concat(p.type || (p.anyOf || []).map(function (x) { return x.type; }));
+      var t = v[k] === null ? "null" : Array.isArray(v[k]) ? "array" : typeof v[k] === "number" ? (Number.isInteger(v[k]) ? "integer" : "number") : typeof v[k];
+      return turler.length === 0 || turler.indexOf(t) !== -1 || (t === "integer" && turler.indexOf("number") !== -1);
+    });
+  }
+  var hataSonuclari = [];
+  for (var hk = 0; hk < 2; hk++) hataSonuclari.push(await I.arac("studio", J, "studio_toplu_uygula", { onay_kodu: kod3 }));
+  ok("toplu_uygula basarisiz (isError) ve tekrari: structuredContent outputSchema'ya uyar ('sonuc' {} nesne, [] degil)", kod3 && hataSonuclari.every(function (x) {
+    var s = x.json && x.json.result;
+    return s && s.isError === true && s.structuredContent && s.structuredContent.durum === "basarisiz" && semayaUyar(s.structuredContent, araclarSema.studio_toplu_uygula) &&
+      x.metin.indexOf('"sonuc":[]') === -1 && /Müşteri bulunamadı/.test(s.content[0].text);
+  }), hataSonuclari.map(function (x) { return x.metin; }));
   r = await I.arac("studio", J, "studio_icerik_durum_guncelle", { icerik_id: "cccccccc0001", yeni_durum: "onayda", beklenen_surum: 4 });
   ok("icerik_durum_guncelle: eski surum -> surum_uyusmadi + guncel kayit, yazilmadi", r.json.result.structuredContent.durum === "surum_uyusmadi" &&
     r.json.result.structuredContent.icerik.surum === 5, r.metin);
@@ -477,6 +582,10 @@ async function calis() {
   ayar({ sahte_bozuk_cikti: true });
   r = await I.arac("studio", J, "studio_musteri_ara", { sorgu: "örnek" });
   ok("arka uc semaya uymayan cikti -> isError (outputSchema korunur)", r.json.result.isError === true && /beklenen biçimde değil/.test(r.json.result.content[0].text), r.metin);
+  ayar({ sahte_hata_verisi: true });
+  r = await I.arac("studio", J, "studio_musteri_ara", { sorgu: "örnek" });
+  ok("is hatasi + semaya uymayan veri -> isError, structuredContent GONDERILMEZ, bilgi metin icerikte", r.json.result.isError === true && !("structuredContent" in r.json.result) &&
+    /Arama yapılamadı/.test(r.json.result.content[0].text) && r.json.result.content.length >= 1, r.metin);
   ayar();
   var gunluk = O.db(DB, "SELECT * FROM mcp_gunluk WHERE olay = 'studio_cekim_olustur' AND sonuc = 'tamam' AND etkilenen <> '[]'");
   ok("islem gunlugu: zaman, istemci adi, arac, sonuc, etkilenen kimlikler, ozet", gunluk.length >= 1 && gunluk[0].istemci === "Claude" &&
@@ -601,6 +710,64 @@ async function calis() {
   ok("yenileme tekrari: butun grant iptal (en yeni access 401, en yeni refresh invalid_grant)", r.status === 401 && r2.status === 400 && r2.json.error === "invalid_grant", [r.status, r2.metin]);
   ok("yenileme tekrari gunluge ve grant'e islendi", O.db(DB, "SELECT COUNT(*) AS c FROM mcp_izin WHERE iptal_nedeni = 'yenileme_tekrar'")[0].c === 1 &&
     O.db(DB, "SELECT COUNT(*) AS c FROM mcp_gunluk WHERE olay = 'yenileme_tekrar'")[0].c === 1);
+
+  /* ================= Eszamanli yenileme: tolerans penceresi ================= */
+  var izinDurum = function (rt) { return O.db(DB, "SELECT i.durum, i.iptal_nedeni FROM mcp_izin i JOIN mcp_jeton j ON j.izin = i.id WHERE j.ozet = ?", [O.sha256(rt)])[0] || {}; };
+  var jetonDurum = function (rt) { return rt && (O.db(DB, "SELECT durum FROM mcp_jeton WHERE ozet = ?", [O.sha256(rt)])[0] || {}).durum; };
+  var yeniGrant = async function () { var g = await I.yetkiAl("studio", { client_id: A.client_id, redirect_uri: CLAUDE }); return (await I.kodTakas("studio", A.client_id, g, CLAUDE)).json || {}; };
+  var G = await yeniGrant();
+  var par = await Promise.all([I.yenile("studio", A.client_id, G.refresh_token), I.yenile("studio", A.client_id, G.refresh_token)]);
+  var X1 = par[0].json || {}, X2 = par[1].json || {};
+  ok("eszamanli iki yenileme (ayni refresh token, paralel): ikisi de 200, farkli yeni refresh token'lar, grant iptal EDILMEDI",
+    par[0].status === 200 && par[1].status === 200 && X1.refresh_token && X2.refresh_token && X1.refresh_token !== X2.refresh_token && izinDurum(G.refresh_token).durum === "aktif",
+    [par[0].metin, par[1].metin, izinDurum(G.refresh_token)]);
+  r = await I.rpc("studio", X1.access_token, "tools/list");
+  r2 = await I.rpc("studio", X2.access_token, "tools/list");
+  ok("tolerans: iki yanittaki access token'lar da calisir; iki refresh token da etkin (istemci hangisini saklarsa)", r.status === 200 && r2.status === 200 &&
+    jetonDurum(X1.refresh_token) === "aktif" && jetonDurum(X2.refresh_token) === "aktif", [r.status, r2.status, jetonDurum(X1.refresh_token), jetonDurum(X2.refresh_token)]);
+  ok("tolerans gunluge yazildi (yenileme_tolerans), tekrar algilamasi tetiklenmedi", O.db(DB, "SELECT COUNT(*) AS c FROM mcp_gunluk WHERE olay = 'yenileme_tolerans'")[0].c >= 1 &&
+    O.db(DB, "SELECT COUNT(*) AS c FROM mcp_izin WHERE iptal_nedeni = 'yenileme_tekrar'")[0].c === 1);
+  r = await I.yenile("studio", A.client_id, X2.refresh_token);
+  var Y = r.json || {};
+  ok("kardeslerden biri (sonra gelen yanittaki) normal donusturulur; digeri artik 'kullanildi'", r.status === 200 && Y.refresh_token && jetonDurum(X1.refresh_token) === "kullanildi", r.metin);
+  O.db(DB, "UPDATE mcp_jeton SET donusum = donusum - 120 WHERE ozet = ?", [O.sha256(X1.refresh_token)]);
+  r = await I.yenile("studio", A.client_id, X1.refresh_token);
+  r2 = await I.rpc("studio", Y.access_token, "tools/list");
+  ok("pencere disinda (60 sn) donusturulmus kardes yeniden gelir -> tam iptal (en yeni access 401)", r.status === 400 && r.json.error === "invalid_grant" && r2.status === 401 &&
+    izinDurum(Y.refresh_token).iptal_nedeni === "yenileme_tekrar", [r.metin, r2.status]);
+  G = await yeniGrant();
+  r = await I.yenile("studio", A.client_id, G.refresh_token);
+  var Z = r.json || {};
+  r = await I.yenile("studio", A.client_id, Z.refresh_token);
+  var Z2 = r.json || {};
+  r = await I.yenile("studio", A.client_id, G.refresh_token);
+  r2 = await I.rpc("studio", Z2.access_token, "tools/list");
+  ok("pencere icinde ama halef zaten kullanilmis -> tam iptal (tekrar algilama korunur)", Z2.access_token && r.status === 400 && r.json.error === "invalid_grant" && r2.status === 401 &&
+    izinDurum(G.refresh_token).iptal_nedeni === "yenileme_tekrar", [r.metin, r2.status]);
+  G = await yeniGrant();
+  r = await I.yenile("studio", A.client_id, G.refresh_token);
+  Z = r.json || {};
+  O.db(DB, "UPDATE mcp_jeton SET donusum = donusum - 61 WHERE ozet = ?", [O.sha256(G.refresh_token)]);
+  r = await I.yenile("studio", A.client_id, G.refresh_token);
+  r2 = await I.rpc("studio", Z.access_token, "tools/list");
+  ok("halef kullanilmamis ama 60 sn gecmis -> tam iptal", r.status === 400 && r2.status === 401 && izinDurum(G.refresh_token).iptal_nedeni === "yenileme_tekrar", [r.metin, r2.status]);
+  G = await yeniGrant();
+  r = await I.yenile("studio", A.client_id, G.refresh_token);
+  Z = r.json || {};
+  r = await I.yenile("studio", B.client_id, G.refresh_token);
+  r2 = await I.rpc("studio", Z.access_token, "tools/list");
+  ok("pencere icinde ama baska istemci -> tam iptal", r.status === 400 && r2.status === 401 && izinDurum(G.refresh_token).durum === "iptal", [r.metin, r2.status]);
+  G = await yeniGrant();
+  var tekrarlar = [];
+  for (var ti = 0; ti < 4; ti++) tekrarlar.push(await I.yenile("studio", A.client_id, G.refresh_token));
+  r2 = await I.rpc("studio", tekrarlar[0].json.access_token, "tools/list");
+  ok("ayni jetonla pencere icinde 4 yenileme: ilk 3'u 200 (en cok 3 etkin kardes), 4. invalid_grant ama grant IPTAL EDILMEZ",
+    tekrarlar.slice(0, 3).every(function (x) { return x.status === 200; }) && tekrarlar[3].status === 400 && tekrarlar[3].json.error === "invalid_grant" &&
+    r2.status === 200 && izinDurum(G.refresh_token).durum === "aktif", tekrarlar.map(function (x) { return x.status; }).concat([r2.status]));
+  ayar({ password_hash: cp.spawnSync("php", ["-r", "echo password_hash('tolerans-sifre-3', PASSWORD_DEFAULT);"], { encoding: "utf8" }).stdout });
+  r = await I.yenile("studio", A.client_id, G.refresh_token);
+  ayar();
+  ok("pencere icinde ama panel sifresi degismis -> tolerans yok (invalid_grant), grant iptal", r.status === 400 && r.json.error === "invalid_grant" && izinDurum(G.refresh_token).durum === "iptal", r.metin);
 
   /* ================= Iptal (RFC 7009) ================= */
   a = await I.yetkiAl("studio", { client_id: A.client_id, redirect_uri: CLAUDE });

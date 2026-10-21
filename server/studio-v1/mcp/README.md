@@ -18,22 +18,26 @@ Tasarımın kaynağı `mcp-tasarim.md` (v1) belgesidir. Panel (`../index.php`), 
 
 | Repo (`server/studio-v1/mcp/`) | Sunucu (`public_html/` altında) | Not |
 |---|---|---|
-| `mcp.php` | `studio/mcp.php` | MCP uç noktası. Adres `https://assets.suflo.app/studio/mcp` |
-| `oauth.php` | `studio/oauth.php` | `/studio/oauth/{authorize,token,register,revoke}` |
-| `kesif.php` | `studio/kesif.php` | PRM ve AS / OIDC metadata |
+| `mcp-giris.php` | `studio/mcp-giris.php` | MCP uç noktası. Adres `https://assets.suflo.app/studio/mcp` |
+| `oauth-giris.php` | `studio/oauth-giris.php` | `/studio/oauth/{authorize,token,register,revoke}` |
+| `kesif-giris.php` | `studio/kesif-giris.php` | PRM ve AS / OIDC metadata |
 | `mcp-onay.js`, `mcp-onay.css` | `studio/mcp-onay.js`, `studio/mcp-onay.css` | Onay sayfasının betiği ve stili |
 | `mcp-kitaplik/` (`.htaccess` dahil) | `studio/mcp-kitaplik/` | Kitaplık. Dışarıya kapalı (403) |
-| `studio.htaccess` | `studio/.htaccess` | `../arayuz.htaccess`'in **bütün kuralları** ve MCP kuralları. arayuz.htaccess'in yerine yüklenir |
+| `studio.htaccess` | `studio/.htaccess` | `../arayuz.htaccess`'in **bütün kuralları**, https yönlendirmesi ve MCP kuralları. arayuz.htaccess'in yerine yüklenir |
 | `well-known.htaccess` | `.well-known/.htaccess` | **Yeni dosya.** Yalnız tam keşif adlarını eşler; `acme-challenge`'a dokunmaz |
+
+Giriş dosyalarının adı bilerek istek yollarından farklıdır (`mcp` → `mcp-giris.php`). MultiViews açık bir sunucuda `/studio/mcp` ya da `/studio/oauth/token` isteği aksi hâlde yeniden yazmadan önce `mcp.*` / `oauth.*` adlı bir dosyaya eşlenirdi. Bu yüzden `.htaccess`'te `Options -MultiViews` yoktur; Options değişikliğine izin vermeyen sunucularda o satır 500 verirdi. Dosyaları yeniden adlandırma.
+
+`studio/.htaccess` kendi `RewriteEngine On` satırını taşıdığı için `public_html/.htaccess`'teki https yönlendirmesi `/studio/` altında (panel `/studio/v1/` dahil) artık uygulanmaz. Aynı yönlendirme `studio.htaccess`'te açıkça yapılır: `HTTPS` kapalı ve `X-Forwarded-Proto` `https` değilse 301 ile `https://` adresine.
 
 Test kurulumunda aynı dosyalar `public_html/studio-test/` altına konur. Ayar ve veri yolu uygulama klasörünün adından çıkar; panelle aynı kural geçerlidir: `dirname(DOCUMENT_ROOT)/private/<klasör>-v1/`.
 
 - `studio` → `private/studio-v1/config.php` (canlıdaki bugünkü yol, değişmedi)
 - `studio-test` → `private/studio-test-v1/config.php`
 
-Depo ilk istekte kendiliğinden kurulur: `private/<klasör>-v1/mcp.sqlite` (ayrı dosya, kendi şema sürümü, kurulum kilidi altında). `config.php`'ye yeni ayar eklemek **gerekmez**; varsayılanlar koddadır.
+Depo ilk istekte kendiliğinden kurulur: `private/<klasör>-v1/mcp.sqlite` (ayrı dosya, kendi şema sürümü, kurulum kilidi altında). Eski şema sürümündeki depo aynı kilit altında (`BEGIN IMMEDIATE`) yerinde yükseltilir; veri korunur (1 → 2: refresh token tolerans sütunları). `config.php`'ye yeni ayar eklemek **gerekmez**; varsayılanlar koddadır.
 
-Keşif adresleri (hepsi `kesif.php`'den gelir; `issuer` her belgede bayt bayt aynı):
+Keşif adresleri (hepsi `kesif-giris.php`'den gelir; `issuer` her belgede bayt bayt aynı):
 
 | Adres | Belge |
 |---|---|
@@ -66,7 +70,7 @@ Kök `.well-known/.htaccess` hakkında üç not:
 Üç yol var:
 
 - `config.php`'de `'mcp_acik' => false` yaz.
-- Ya da `studio/.htaccess`'teki "Suflo Studio MCP" bölümünü sil (ya da `arayuz.htaccess`'i geri koy) ve `mcp.php`, `oauth.php`, `kesif.php` dosyalarını ve `.well-known/.htaccess`'teki üç satırı kaldır.
+- Ya da `studio/.htaccess`'teki "Suflo Studio MCP" bölümünü sil (ya da `arayuz.htaccess`'i geri koy) ve `mcp-giris.php`, `oauth-giris.php`, `kesif-giris.php` dosyalarını ve `.well-known/.htaccess`'teki üç satırı kaldır.
 - `mcp.sqlite` silinebilir; bütün bağlantılar biter.
 
 Panel ve Studio verisi bunlardan etkilenmez.
@@ -75,8 +79,9 @@ Panel ve Studio verisi bunlardan etkilenmez.
 
 - **İstemci kaydı (DCR, RFC 7591):**
   - Dönüş adresi yalnız izin listesinden olabilir: https; http yalnız 127.0.0.1 / localhost; `#`, `/../` ve kullanıcı bilgisi yasak.
-  - Hız sınırı: aynı IP'den saatte 10 kayıt, toplam günde 50 kayıt.
-  - Her kayıt yeni bir istemci açar; var olan istemci asla değişmez. Hiç bağlanmamış istemciler 30 gün sonra silinir; bağlanmış istemci silinmez.
+  - Hız sınırı: aynı IP'den saatte 10 istek (doğrulamadan önce sayılır, reddedilen istekler dahil) ve toplam günde 50 kayıt. Genel sayaç yalnız bütün doğrulamalardan geçen ve gerçekten eklenen kayıtları sayar; sayaç ile ekleme aynı işlemdedir. Dolunca 429 döner: gövde RFC 7591 biçiminde (`error: temporarily_unavailable`, `error_description`), `Retry-After` bir sonraki güne (UTC) kalan saniye.
+  - Her kayıt yeni bir istemci açar; var olan istemci asla değişmez. Hiç bağlanmamış (grant almamış) istemciler 6 saat sonra silinir; bağlanmış istemci silinmez. Kayıttan sonra 6 saat içinde onaylanmayan bir bağlantı sohbet uygulamasından yeniden başlatılmalıdır (onay sayfası "Bilinmeyen uygulama" der).
+  - **Kalan risk:** kayıt kimlik doğrulamasız ve açıktır (MCP istemcileri böyle çalışır). Çok sayıda IP'si olan biri izinli bir dönüş adresiyle (`claude.ai` ...) geçerli kayıtlar gönderip günlük 50'lik kotayı yine doldurabilir. O gün claude.ai / ChatGPT yeni bağlantı kuramaz; **var olan bağlantılar etkilenmez** (kayıt yalnız ilk bağlanmada gerekir). Sahte istemciler hiçbir şeye erişemez (onay sayfası Studio şifresi ister) ve 6 saat sonra silinir. Sahip, Ayarlar ekranından `mcp_kayit_sayaci_sifirla()` ile sayacı sıfırlayıp hemen bağlanabilir.
   - CIMD yok (`client_id_metadata_document_supported` yazılmaz).
 - **Onay sayfası (`/oauth/authorize`):**
   - Sayfada şunlar görünür: uygulamanın kendi verdiği ad (kaçışlı), dönüş adresinin host'u, izinler (`studio.oku` zorunlu, `studio.yaz` seçilebilir) ve Studio şifresi.
@@ -92,6 +97,7 @@ Panel ve Studio verisi bunlardan etkilenmez.
   - Kod 5 dk geçerlidir, tek kullanımlıktır. Yalnız PKCE S256 kabul edilir; `plain` ve PKCE'siz istek reddedilir. Kod; istemciye, dönüş adresine, PKCE'ye, `resource`'a ve kapsama bağlıdır. İkinci kez kullanılırsa o koddan çıkan grant iptal edilir.
   - Access token 60 dk geçerlidir.
   - Refresh token 30 gün kayar ve her kullanımda yenisi verilir. Eski refresh token yeniden gelirse grant'in tamamı iptal edilir.
+  - **Eşzamanlı yenileme toleransı (60 sn):** access token süresi dolunca istemcinin paralel iki isteği aynı refresh token'ı iki kez gönderebilir. Az önce dönüştürülmüş jeton 60 saniye içinde yeniden gelirse ve şu koşulların hepsi tutarsa grant iptal edilmez: aynı istemci, grant etkin, panel şifre izi değişmemiş, dönüşümde verilen yeni (halef) refresh token hâlâ etkin ve hiç kullanılmamış. Bu durumda halef **iptal edilmeden** onun kardeşi olan yeni bir access + refresh çifti verilir. İstemci iki yanıttan hangisini saklarsa saklasın çalışır (hangisinin en son yazıldığı belli değildir). Kardeşlerden biri dönüştürülünce diğerleri de "kullanıldı" olur; sonradan gelirlerse tekrar algılaması aynen işler. Aynı dönüşümden en çok 3 etkin kardeş olur; fazlası iptalsiz `invalid_grant` alır. Pencere dışında ya da halef kullanılmışsa eski davranış geçerlidir: grant'in tamamı iptal. Kalan risk: eski refresh token'ı çalan biri, meşru dönüşümden sonraki 60 saniye içinde ve meşru istemci halefi kullanmadan önce gelirse iptal tetiklenmeden bir kardeş çift alır. Kardeşlerden biri dönüştürüldüğünde diğeri "kullanıldı" olur; pencere dışında gelince tekrar algılaması grant'i yine iptal eder.
   - Grant'in mutlak ömrü 180 gündür.
   - Jetonlar opaktır (32 bayt). Depoda yalnız SHA-256 özetleri durur.
   - `resource` (RFC 8707) kanonik MCP adresine eşit olmalıdır. Jetonun audience'ı her istekte denetlenir.
@@ -228,6 +234,7 @@ Depo işlevleri `mcp-kitaplik/depo.php`'dedir:
 |---|---|
 | `mcp_baglantilar()` | Bağlantıları listeler: istemci, kapsam, oluşturma, son kullanım, durum. Jeton dönmez |
 | `mcp_baglanti_kes($izinId)` | Tek bir bağlantıyı keser |
+| `mcp_kayit_sayaci_sifirla()` | İstemci kaydının günlük genel sayacını (günde 50) sıfırlar; IP başına sınıra dokunmaz |
 | `mcp_tumunu_kes()` | Bütün bağlantıları keser |
 | `mcp_gunluk_son(100)` | İşlem günlüğünün son kayıtlarını döndürür |
 
@@ -237,7 +244,7 @@ Panelden kullanmak için: `define('SUFLO_MCP', 1); require '<public_html>/studio
 
 ```text
 node tests/test-studio-mcp.js          # php -S + .htaccess taklidi + sahte arka uç: tam OAuth akışı, iki MCP dönemi, araçlar, olumsuz durumlar
-node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php: .htaccess kuralları, Authorization geçişi, 301 yok, acme-challenge, kapalı kitaplık
+node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php (MultiViews açık, Options yalnız Indexes): .htaccess kuralları, https yönlendirmesi, Authorization geçişi, acme-challenge, kapalı kitaplık
 ```
 
 - `php` (ya da `pdo_sqlite`) yoksa iki test de ATLA der. Apache ya da `mod_php` yoksa Apache testi ATLA der.
@@ -249,4 +256,4 @@ node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php: .htaccess kur
 - **Gerçek arka uç:** panelin `sifre_dene` / `sifre_izi` / kayıt işlevleri çağrılabilir bir kitaplığa ayrılmalı (yukarıda).
 - **Panelin test kurulumu:** panel (`../index.php`) ayar yolunu `private/studio-v1` olarak sabit yazar. `public_html/studio-test/v1/` kurulursa canlı veriyi kullanır. MCP klasör adından türetir; panelde de aynı türetme gerekir.
 - **ChatGPT `connector/oauth/{callback_id}`:** önek varsayılan olarak izinlidir. Daha dar tutmak için yönetim sayfasında görünen tam adres `mcp_redirect_izinli`'ye yazılabilir.
-- **Eşzamanlı yenileme:** aynı refresh token iki istekle aynı anda gelirse tasarım gereği grant iptal olur (tekrar algılama). Gerçek istemcilerde görülürse kısa bir tolerans penceresi düşünülebilir.
+- **Kayıt kotası:** günlük 50'lik genel kota çok IP'li biri tarafından geçerli kayıtlarla doldurulabilir (yukarıda "Kalan risk"). Ayarlar ekranına "kayıt sayacını sıfırla" düğmesi eklenmeli (`mcp_kayit_sayaci_sifirla()`).

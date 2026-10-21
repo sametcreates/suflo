@@ -10,6 +10,8 @@ if (!defined('SUFLO_MCP')) { http_response_code(404); exit; }
 const MCP_SURUM = '1.0.0';
 const MCP_ERISIM_OMRU = 3600;              // access token: 60 dk
 const MCP_YENILEME_OMRU = 30 * 86400;      // refresh token: 30 gun, her kullanimda yenisi (kayan)
+const MCP_YENILEME_TOLERANSI = 60;         // donusturulmus refresh token bu kadar saniye icinde yeniden gelirse (eszamanli yenileme) iptal yok
+const MCP_YENILEME_KARDES_SINIRI = 3;      // tolerans penceresinde ayni donusumden en cok bu kadar etkin yenileme jetonu
 const MCP_IZIN_OMRU = 180 * 86400;         // grant mutlak omru
 const MCP_KOD_OMRU = 300;                  // authorization code: 5 dk, tek kullanimlik
 const MCP_ONAY_OMRU = 600;                 // onay sayfasi istegi + CSRF: 10 dk, tek kullanimlik

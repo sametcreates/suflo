@@ -14,9 +14,9 @@ var SIFRE = "ornek-deneme-sifresi-1";
  * <u> = uygulama klasoru (canli: studio, test: studio-test). Sonu "/" olan satir klasorun tamami (.htaccess dahil).
  */
 var DAGITIM = [
-  ["mcp.php", "<u>/mcp.php"],
-  ["oauth.php", "<u>/oauth.php"],
-  ["kesif.php", "<u>/kesif.php"],
+  ["mcp-giris.php", "<u>/mcp-giris.php"],
+  ["oauth-giris.php", "<u>/oauth-giris.php"],
+  ["kesif-giris.php", "<u>/kesif-giris.php"],
   ["mcp-onay.js", "<u>/mcp-onay.js"],
   ["mcp-onay.css", "<u>/mcp-onay.css"],
   ["mcp-kitaplik/", "<u>/mcp-kitaplik/"],
@@ -110,11 +110,14 @@ function istek(o) {
 }
 
 /** Sunucuya karsi OAuth / MCP yardimcilari. */
-function Istemci(port, kokUrl) {
+function Istemci(port, kokUrl, ekBaslik) {
   this.port = port;
   this.kok = kokUrl;
+  this.ekBaslik = ekBaslik || {};   // her istege eklenen basliklar (Apache testi: X-Forwarded-Proto: https)
 }
-Istemci.prototype.istek = function (o) { return istek(Object.assign({ port: this.port }, o)); };
+Istemci.prototype.istek = function (o) {
+  return istek(Object.assign({ port: this.port }, o, { baslik: Object.assign({}, this.ekBaslik, o.baslik || {}) }));
+};
 Istemci.prototype.kayit = function (u, govde) {
   return this.istek({ yontem: "POST", yol: "/" + u + "/oauth/register", baslik: { "Content-Type": "application/json" }, govde: govde });
 };

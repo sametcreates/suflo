@@ -2,7 +2,8 @@
 declare(strict_types=1);
 /*
  * Suflo Studio OAuth 2.1 yetkilendirme sunucusu: /<uygulama>/oauth/{authorize,token,register,revoke}
- * Yer: public_html/<uygulama>/oauth.php; .htaccess "oauth/..." -> oauth.php. Dogrudan /oauth.php cagrisi 404.
+ * Yer: public_html/<uygulama>/oauth-giris.php; .htaccess "oauth/..." -> oauth-giris.php. Dogrudan /oauth-giris.php cagrisi 404.
+ * Dosya adi bilerek istek yolundan farkli (MultiViews "oauth/token" istegini oauth.* dosyasina eslemesin).
  */
 define('SUFLO_MCP', 1);
 require __DIR__ . '/mcp-kitaplik/yukle.php';

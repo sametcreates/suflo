@@ -1,5 +1,5 @@
 # Suflo Studio MCP kitapligi (public_html/<uygulama>/mcp-kitaplik/): disariya tamamen kapali.
-# Bu PHP dosyalari yalniz mcp.php / oauth.php / kesif.php icinden yuklenir; dogrudan cagrilirsa da bir sey yapmazlar.
+# Bu PHP dosyalari yalniz mcp-giris.php / oauth-giris.php / kesif-giris.php icinden yuklenir; dogrudan cagrilirsa da bir sey yapmazlar.
 Options -Indexes
 <IfModule mod_authz_core.c>
   Require all denied

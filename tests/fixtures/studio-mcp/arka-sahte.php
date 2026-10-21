@@ -8,7 +8,8 @@ declare(strict_types=1);
  *   icindeki hatali deneme sayisi login_max_fail'i asarsa 'kilitli' (sifre denenmez, deneme sayilmaz); dogruysa deneme silinir.
  * - Sifre izi panelle ayni: sha256('iz|' + password_hash).
  * - Kayitlar ayri bir SQLite dosyasinda, anonim ornek veriyle.
- * Test anahtarlari (config): sahte_mesgul => true (gecici hata), sahte_bozuk_cikti => true (semaya uymayan cikti).
+ * Test anahtarlari (config): sahte_mesgul => true (gecici hata), sahte_bozuk_cikti => true (semaya uymayan cikti),
+ * sahte_hata_verisi => true (is hatasi + semaya uymayan veri: structuredContent gonderilmemeli).
  */
 if (!defined('SUFLO_MCP')) { http_response_code(404); exit; }
 
@@ -117,6 +118,7 @@ return new class($C, $ozel) implements McpSahipDogrulayici, McpStudioArka {
         switch ($ad) {
             case 'studio_musteri_ara':
                 if (!empty($this->C['sahte_bozuk_cikti'])) return McpSonuc::tamam(['musteriler' => 'bozuk', 'toplam' => 0]);
+                if (!empty($this->C['sahte_hata_verisi'])) return McpSonuc::hata('Arama yapılamadı (deneme).', ['musteriler' => [], 'neden' => 'deneme']);
                 $q = $this->norm($g['sorgu']);
                 $l = array_values(array_filter($this->hepsi('SELECT * FROM musteri ORDER BY id'),
                     fn ($r) => str_contains($this->norm($r['ad']), $q) || str_contains($this->norm($r['kurum']), $q)));

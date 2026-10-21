@@ -1,7 +1,11 @@
 /*
  * Suflo Studio MCP: GERCEK Apache + mod_php ile .htaccess kurallarinin kaniti (php -S .htaccess okumaz).
  * Kurulum dagitim tablosuyla ayni (public_html/studio, public_html/studio-test, public_html/.well-known/.htaccess).
- *  - /studio/mcp ic yeniden yazma ile mcp.php'ye gider: 301 / sonda / yok; GET 405
+ *  - /studio/mcp ic yeniden yazma ile mcp-giris.php'ye gider: 301 / sonda / yok; GET 405
+ *  - Sunucu kisitli: MultiViews ACIK ve .htaccess'te yalniz "Options=Indexes" degistirilebilir (paylasimli barindirma gibi).
+ *    Giris dosyalarinin adlari istek yollarindan farkli oldugu icin yollar yine dogru dosyaya gider; "Options -MultiViews" yok (500 olurdu)
+ *  - https: studio/.htaccess'teki acik yonlendirme (X-Forwarded-Proto: http -> 301 https, /studio/ ve panel /studio/v1/);
+ *    diger butun istekler vekil arkasindaki https gibi X-Forwarded-Proto: https ile gider
  *  - Authorization basligi PHP'ye ulasir (kurallin E= degiskeni REDIRECT_HTTP_AUTHORIZATION olarak da gorunur); Bearer ile tam akis
  *  - kesif adlari kok .well-known'dan ve /studio/.well-known'dan; acme-challenge dosyalari aynen sunulur; eslenmeyen adlar 404
  *  - mcp-kitaplik klasoru 403; arayuz guvenlik basliklari (X-Frame-Options, CSP) statik dosyalarda duruyor
@@ -26,7 +30,7 @@ var APACHE = "/usr/sbin/apache2";
 var MODUL = "/usr/lib/apache2/modules";
 if (process.platform === "win32" || !fs.existsSync(APACHE)) atla("Apache (/usr/sbin/apache2) yok: .htaccess testi calismadi");
 var libphp = fs.existsSync(MODUL) ? fs.readdirSync(MODUL).filter(function (f) { return /^libphp[0-9.]*\.so$/.test(f); })[0] : null;
-var gerekli = ["mod_mpm_prefork.so", "mod_authz_core.so", "mod_authz_host.so", "mod_dir.so", "mod_mime.so", "mod_rewrite.so", "mod_headers.so"];
+var gerekli = ["mod_mpm_prefork.so", "mod_authz_core.so", "mod_authz_host.so", "mod_dir.so", "mod_mime.so", "mod_rewrite.so", "mod_headers.so", "mod_negotiation.so"];
 if (!libphp || gerekli.some(function (m) { return !fs.existsSync(path.join(MODUL, m)); })) atla("Apache mod_php / mod_rewrite / mod_headers yok: .htaccess testi calismadi");
 var phpVar = cp.spawnSync("php", ["-r", "echo in_array('sqlite', PDO::getAvailableDrivers()) ? 'var' : 'yok';"], { encoding: "utf8" });
 if (phpVar.error || phpVar.stdout !== "var") atla("php / pdo_sqlite yok");
@@ -42,6 +46,7 @@ if (kok) {
   if (!kullanici) atla("root olarak calisiyor ama www-data kullanicisi yok");
 }
 var PORT = 0, KOK = "", pid = 0;
+var HTTPS = { "X-Forwarded-Proto": "https" };   // vekil (LiteSpeed / Cloudflare) arkasinda https istegi
 
 function hazirla() {
   fs.mkdirSync(path.join(B, "logs"), { recursive: true });
@@ -50,9 +55,14 @@ function hazirla() {
   fs.copyFileSync(path.join(O.ROOT, "server", "studio-v1", "arayuz", "index.html"), path.join(PUB, "studio", "index.html"));
   fs.mkdirSync(path.join(PUB, ".well-known", "acme-challenge"), { recursive: true });
   fs.writeFileSync(path.join(PUB, ".well-known", "acme-challenge", "ornek-dogrulama-dosyasi"), "acme-ornek-icerik");
-  // Yoklama uygulamasi: ayni .htaccess, mcp.php yerine basligin PHP'ye nasil ulastigini soyleyen yoklama
+  // Panel (/studio/v1/): repodaki v1 .htaccess'i ve yerine gecen kucuk bir index.php (https yonlendirmesi buraya da islemeli)
+  fs.mkdirSync(path.join(PUB, "studio", "v1"), { recursive: true });
+  fs.copyFileSync(path.join(O.ROOT, "server", "studio-v1", ".htaccess"), path.join(PUB, "studio", "v1", ".htaccess"));
+  fs.writeFileSync(path.join(PUB, "studio", "v1", "index.php"), "<?php echo 'panel-yoklama';\n");
+  // Yoklama uygulamasi: ayni .htaccess, mcp-giris.php yerine basligin PHP'ye nasil ulastigini soyleyen yoklama
   fs.writeFileSync(path.join(PUB, "yoklama", "surucu.php"), "<?php echo in_array('sqlite', PDO::getAvailableDrivers()) ? 'var' : 'yok';\n");
-  fs.writeFileSync(path.join(PUB, "yoklama", "mcp.php"), "<?php header('Content-Type: application/json'); echo json_encode([" +
+  fs.writeFileSync(path.join(PUB, "yoklama", "mv-deneme.txt"), "multiviews-acik");
+  fs.writeFileSync(path.join(PUB, "yoklama", "mcp-giris.php"), "<?php header('Content-Type: application/json'); echo json_encode([" +
     "'HTTP_AUTHORIZATION' => $_SERVER['HTTP_AUTHORIZATION'] ?? null, 'REDIRECT_HTTP_AUTHORIZATION' => $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null," +
     "'getallheaders' => function_exists('getallheaders') ? (getallheaders()['Authorization'] ?? null) : null, 'script' => $_SERVER['SCRIPT_NAME'], 'uri' => $_SERVER['REQUEST_URI']]);\n");
   ["studio", "studio-test"].forEach(function (u) {
@@ -76,13 +86,15 @@ function hazirla() {
     "ErrorLog " + path.join(B, "logs", "error.log"), "LogLevel warn", "DefaultRuntimeDir " + path.join(B, "run"), "Mutex file:" + path.join(B, "run") + " default",
     m("mpm_prefork_module", "mod_mpm_prefork.so"), m("authz_core_module", "mod_authz_core.so"), m("authz_host_module", "mod_authz_host.so"),
     m("dir_module", "mod_dir.so"), m("mime_module", "mod_mime.so"), m("rewrite_module", "mod_rewrite.so"), m("headers_module", "mod_headers.so"),
+    m("negotiation_module", "mod_negotiation.so"),
     m("php_module", libphp),
     kullanici ? "User " + kullanici.ad : "", kullanici ? "Group " + kullanici.ad : "",
     "StartServers 2", "MinSpareServers 2", "MaxSpareServers 4",
     "TypesConfig /etc/mime.types", "DirectoryIndex index.html",
     'DocumentRoot "' + PUB + '"',
     '<Directory "/">', "  AllowOverride None", "  Require all denied", "</Directory>",
-    '<Directory "' + PUB + '">', "  AllowOverride All", "  Require all granted", "</Directory>",
+    // Paylasimli barindirma gibi: MultiViews acik, .htaccess'te Options yalniz Indexes icin degistirilebilir ("-MultiViews" 500 verir)
+    '<Directory "' + PUB + '">', "  Options FollowSymLinks MultiViews", "  AllowOverride AuthConfig FileInfo Indexes Limit Options=Indexes", "  Require all granted", "</Directory>",
     '<FilesMatch "\\.php$">', "  SetHandler application/x-httpd-php", "</FilesMatch>",
     "php_admin_value opcache.enable 0", "php_admin_value display_errors 0"
   ].join("\n") + "\n";
@@ -121,14 +133,37 @@ async function calis() {
   KOK = "http://127.0.0.1:" + PORT;
   hazirla();
   await baslat();
-  var I = new O.Istemci(PORT, KOK), r, w;
+  var I = new O.Istemci(PORT, KOK, HTTPS), r, w;
   r = await I.istek({ yol: "/yoklama/surucu.php" });
+  // 200 disi yanit (ornegin .htaccess'te izin verilmeyen bir komut -> 500) ortam eksigi DEGIL, hatadir: atlanmaz
+  if (r.status !== 200) { ok("Apache: .htaccess'li klasorde PHP calisir (yoklama 200)", false, [r.status, r.metin.slice(0, 200)]); return; }
   if (r.metin !== "var") { console.log("ATLA Apache'nin PHP'sinde (mod_php) pdo_sqlite yok: .htaccess testinin kalani calismadi"); return; }
+
+  /* ---- MultiViews acik (kisitli sunucu) ---- */
+  r = await I.istek({ yol: "/yoklama/mv-deneme" });
+  ok("Apache: MultiViews gercekten acik (uzantisiz /yoklama/mv-deneme -> mv-deneme.txt)", r.status === 200 && r.metin === "multiviews-acik", [r.status, r.metin]);
+
+  /* ---- https yonlendirmesi (studio/.htaccess'te acik; kok .htaccess'teki kural /studio/ altinda islemez) ---- */
+  var httpYol = ["/studio/", "/studio/v1/index.php", "/studio/v1/index.php?a=1"];
+  var httpSonuc = [];
+  for (var hy = 0; hy < httpYol.length; hy++) {
+    r = await O.istek({ port: PORT, yol: httpYol[hy], baslik: { "X-Forwarded-Proto": "http" } });
+    httpSonuc.push([r.status, r.headers.location]);
+  }
+  ok("Apache: X-Forwarded-Proto: http -> 301 https (arayuz /studio/ ve panel /studio/v1/index.php; sorgu korunur)", httpSonuc.every(function (x, k) {
+    return x[0] === 301 && x[1] === "https://127.0.0.1:" + PORT + httpYol[k];
+  }), httpSonuc);
+  r = await O.istek({ port: PORT, yol: "/studio/v1/index.php" });
+  ok("Apache: vekil basligi olmayan duz http istegi de 301 https", r.status === 301 && r.headers.location === "https://127.0.0.1:" + PORT + "/studio/v1/index.php", [r.status, r.headers.location]);
+  r = await I.istek({ yol: "/studio/" });
+  r2 = await I.istek({ yol: "/studio/v1/index.php" });
+  ok("Apache: https istekleri (X-Forwarded-Proto: https) yonlendirilmez: /studio/ 200 arayuz, /studio/v1/index.php 200 panel", r.status === 200 && !r.headers.location &&
+    /<html/i.test(r.metin) && r2.status === 200 && r2.metin === "panel-yoklama", [r.status, r2.status, r2.metin]);
 
   /* ---- yeniden yazma, 301 yok ---- */
   r = await I.rpc("studio", null, "tools/list");
   w = O.wwwCoz(r.headers["www-authenticate"]);
-  ok("Apache: POST /studio/mcp -> mcp.php (401 + resource_metadata), yonlendirme yok", r.status === 401 && !r.headers.location &&
+  ok("Apache (MultiViews acik): POST /studio/mcp -> mcp-giris.php (401 + resource_metadata), yonlendirme yok", r.status === 401 && !r.headers.location &&
     w.resource_metadata === KOK + "/.well-known/oauth-protected-resource/studio/mcp" && w.error === undefined, [r.status, r.headers.location, r.headers["www-authenticate"]]);
   r = await I.istek({ yol: "/studio/mcp" });
   ok("Apache: GET /studio/mcp -> 405 Allow: POST (301 degil)", r.status === 405 && r.headers.allow === "POST" && !r.headers.location, [r.status, r.headers.location]);
@@ -137,7 +172,7 @@ async function calis() {
   /* ---- Authorization basligi PHP'ye ulasiyor ---- */
   r = await I.istek({ yontem: "POST", yol: "/yoklama/mcp", baslik: { Authorization: "Bearer yoklama-degeri-123" } });
   ok("Apache: .htaccess E= kurali Authorization'i PHP'ye gecirir (REDIRECT_HTTP_AUTHORIZATION)", r.status === 200 && r.json &&
-    r.json.REDIRECT_HTTP_AUTHORIZATION === "Bearer yoklama-degeri-123" && r.json.script === "/yoklama/mcp.php" && r.json.uri === "/yoklama/mcp", r.metin);
+    r.json.REDIRECT_HTTP_AUTHORIZATION === "Bearer yoklama-degeri-123" && r.json.script === "/yoklama/mcp-giris.php" && r.json.uri === "/yoklama/mcp", r.metin);
   r = await I.rpc("studio", "a".repeat(43), "tools/list");
   ok("Apache: gecersiz Bearer -> 401 error=invalid_token (baslik PHP'ye ulasti)", r.status === 401 && O.wwwCoz(r.headers["www-authenticate"]).error === "invalid_token", r.headers["www-authenticate"]);
 
@@ -164,9 +199,11 @@ async function calis() {
   var kd = [];
   for (i = 0; i < kapali.length; i++) kd.push((await I.istek({ yol: kapali[i] })).status);
   ok("Apache: mcp-kitaplik klasoru 403 (php dosyalari ve dizin)", kd.every(function (s) { return s === 403; }), kd);
-  r = await I.istek({ yol: "/studio/oauth.php" });
-  r2 = await I.istek({ yol: "/studio/kesif.php" });
-  ok("Apache: oauth.php / kesif.php dogrudan -> 404", r.status === 404 && r2.status === 404, [r.status, r2.status]);
+  r = await I.istek({ yol: "/studio/oauth-giris.php" });
+  r2 = await I.istek({ yol: "/studio/kesif-giris.php" });
+  var r9 = await I.istek({ yol: "/studio/mcp-giris" });
+  ok("Apache: oauth-giris.php / kesif-giris.php dogrudan -> 404; MultiViews ile /studio/mcp-giris de 404", r.status === 404 && r2.status === 404 && r9.status === 404,
+    [r.status, r2.status, r9.status]);
   r = await I.istek({ yol: "/studio/index.html" });
   ok("Apache: arayuz guvenlik basliklari statik dosyada aynen (X-Frame-Options DENY, CSP form-action 'none', nosniff, no-referrer)", r.status === 200 &&
     r.headers["x-frame-options"] === "DENY" && /form-action 'none'/.test(r.headers["content-security-policy"] || "") && r.headers["x-content-type-options"] === "nosniff" &&
@@ -208,7 +245,7 @@ async function calis() {
   } else {
     var tarayici = await pw.chromium.launch();
     try {
-      var sayfa = await tarayici.newPage();
+      var sayfa = await tarayici.newPage({ extraHTTPHeaders: HTTPS });
       var cspIhlali = [];
       sayfa.on("console", function (m) { if (/Content Security Policy|Refused to/i.test(m.text())) cspIhlali.push(m.text()); });
       // Donus adresi (claude.ai) aga cikmadan yakalanir

@@ -278,8 +278,16 @@ function mcp_arac_cagrisi(array $params, $id, array $yetki): array {
     if ($sonuc->veri !== []) $icerik[] = ['type' => 'text', 'text' => mcp_json_metin($sonuc->veri)];
     if (!$icerik) $icerik[] = ['type' => 'text', 'text' => $sonuc->hata ? 'İşlem yapılamadı.' : 'Tamam.'];
     $r = ['content' => $icerik, 'isError' => $sonuc->hata];
-    if (!$sonuc->hata || $sonuc->veri !== []) {
-        $r['structuredContent'] = isset($arac['outputSchema']) && !$sonuc->hata
+    $yapisal = !$sonuc->hata || $sonuc->veri !== [];
+    if ($yapisal && $sonuc->hata && isset($arac['outputSchema'])) {
+        // Hata sonucu da structuredContent tasiyorsa aracin outputSchema'sina uymali: resmi SDK istemcileri (v1) isError'da da
+        // dogrular ve uymazsa cagriyi istisnayla dusurur. Uymuyorsa structuredContent hic gonderilmez; bilgi metin icerikte kalir.
+        $h = [];
+        $sonuc->veri = mcp_sema_uygula($sonuc->veri, $arac['outputSchema'], '', $h);
+        if ($h) $yapisal = false;
+    }
+    if ($yapisal) {
+        $r['structuredContent'] = isset($arac['outputSchema'])
             ? mcp_cikti_bicimle($sonuc->veri, $arac['outputSchema'])
             : ($sonuc->veri === [] ? new stdClass() : $sonuc->veri);
         if ($r['structuredContent'] === []) $r['structuredContent'] = new stdClass();

@@ -10,14 +10,18 @@ declare(strict_types=1);
  *   mcp_onay     onay sayfasi istekleri: CSRF + tarayici cerezi ozeti, OAuth parametreleri (10 dk, tek kullanimlik)
  *   mcp_izin     grant'ler: kapsam, kaynak (audience), panel sifre izi, mutlak bitis, durum
  *   mcp_kod      authorization code'lar (5 dk, tek kullanimlik, PKCE meydan okumasina bagli)
- *   mcp_jeton    access / refresh jetonlari (ozet, tur, grant, bitis, durum: aktif | kullanildi | iptal)
+ *   mcp_jeton    access / refresh jetonlari (ozet, tur, grant, bitis, durum: aktif | kullanildi | iptal). Yenileme jetonunda
+ *                donusum (dondurulme zamani), halef (yerine verilen yenileme jetonunun ozeti) ve ebeveyn (hangi jetonun
+ *                donusumunden ciktigi): ayni anda gelen iki yenilemenin ikincisi icin kisa tolerans penceresi (oauth.php)
  *   mcp_toplu    toplu onay kodlari (islem listesinin ozetine ve grant'e bagli, 15 dk, tek kullanimlik, sonuc saklanir)
  *   mcp_gunluk   islem gunlugu (sir / jeton yok)
  *   mcp_sayac    hiz siniri sayaclari (sabit pencere; pencere = baslangic zamani)
  */
 if (!defined('SUFLO_MCP')) { http_response_code(404); exit; }
 
-const MCP_SEMA = '1';
+const MCP_SEMA = '2';
+const MCP_KAYIT_SAYACI = 'kayit|toplam';         // DCR genel gunluk sayaci (mcp_sayac anahtari)
+const MCP_KAYITSIZ_ISTEMCI_OMRU = 6 * 3600;     // hic baglanmamis (grant almamis) istemci bu sureden sonra silinir
 
 function mcp_mesgul_mu(Throwable $e): bool {
     return $e instanceof McpMesgulHatasi
@@ -54,7 +58,8 @@ function mcp_sema_degeri(PDO $p): ?string {
 
 /**
  * Tablolari bir kez, kurulum kilidi altinda kurar. SQLite'ta DDL islem icindedir: yarim kurulum kalmaz.
- * Baska bir sema surumu bulunursa uzerine yazilmaz (acik kurulum hatasi).
+ * Eski surumdeki depo yerinde, ayni kilit altinda yukseltilir (veri korunur): 1 -> 2 mcp_jeton'a donusum / halef /
+ * ebeveyn sutunlari. Bilinmeyen (daha yeni) bir sema surumu bulunursa uzerine yazilmaz (acik kurulum hatasi).
  */
 function mcp_sema_kur(PDO $p): void {
     if (mcp_sema_degeri($p) === MCP_SEMA) return;
@@ -79,7 +84,7 @@ function mcp_sema_kur(PDO $p): void {
                 kapsam TEXT NOT NULL, olusturma INTEGER NOT NULL, son INTEGER NOT NULL, kullanildi INTEGER NOT NULL DEFAULT 0)');
             $p->exec('CREATE TABLE IF NOT EXISTS mcp_jeton (ozet TEXT PRIMARY KEY, tur TEXT NOT NULL, izin TEXT NOT NULL,
                 istemci TEXT NOT NULL, kapsam TEXT NOT NULL, kaynak TEXT NOT NULL, olusturma INTEGER NOT NULL,
-                son INTEGER NOT NULL, durum TEXT NOT NULL)');
+                son INTEGER NOT NULL, durum TEXT NOT NULL, donusum INTEGER NULL, halef TEXT NULL, ebeveyn TEXT NULL)');
             $p->exec('CREATE INDEX IF NOT EXISTS mcp_jeton_izin ON mcp_jeton (izin)');
             $p->exec('CREATE TABLE IF NOT EXISTS mcp_toplu (kod_ozet TEXT PRIMARY KEY, izin TEXT NOT NULL, islemler TEXT NOT NULL,
                 islem_ozeti TEXT NOT NULL, olusturma INTEGER NOT NULL, son INTEGER NOT NULL, durum TEXT NOT NULL,
@@ -88,6 +93,13 @@ function mcp_sema_kur(PDO $p): void {
                 istemci TEXT NOT NULL, olay TEXT NOT NULL, sonuc TEXT NOT NULL, etkilenen TEXT NOT NULL, ozet TEXT NOT NULL)');
             $p->exec('CREATE TABLE IF NOT EXISTS mcp_sayac (anahtar TEXT PRIMARY KEY, pencere INTEGER NOT NULL, sayi INTEGER NOT NULL)');
             $p->exec("INSERT INTO mcp_ayar (anahtar, deger) VALUES ('sema', '" . MCP_SEMA . "')");
+        } elseif ($s === '1') {
+            // 1 -> 2: yenileme jetonu tolerans penceresi icin sutunlar. Eski 'kullanildi' satirlarinda donusum NULL kalir:
+            // onlar icin tolerans yok (eskisi gibi tekrar = grant iptali).
+            $p->exec('ALTER TABLE mcp_jeton ADD COLUMN donusum INTEGER NULL');
+            $p->exec('ALTER TABLE mcp_jeton ADD COLUMN halef TEXT NULL');
+            $p->exec('ALTER TABLE mcp_jeton ADD COLUMN ebeveyn TEXT NULL');
+            $p->exec("UPDATE mcp_ayar SET deger = '" . MCP_SEMA . "' WHERE anahtar = 'sema'");
         } elseif ($s !== MCP_SEMA) {
             throw new McpKurulumHatasi('MCP veritabani baska bir sema surumunde.');
         }
@@ -190,16 +202,19 @@ function mcp_sifre_izi_uygula(?string $guncel): void {
         }
     });
 }
-/** Yeni access + refresh jetonu (islem icinde cagrilir). Jetonun kendisi yalniz yanitta doner. */
-function mcp_jeton_ver(array $izin, string $kapsam): array {
+/**
+ * Yeni access + refresh jetonu (islem icinde cagrilir). Jetonun kendisi yalniz yanitta doner.
+ * $ebeveyn: yenileme jetonu bir donusumden cikiyorsa o donusumun kaynagi olan yenileme jetonunun ozeti (ilk verilende null).
+ */
+function mcp_jeton_ver(array $izin, string $kapsam, ?string $ebeveyn = null): array {
     $n = mcp_zaman();
     $erisim = mcp_rastgele(32);
     $yenileme = mcp_rastgele(32);
     $erisimSon = min($n + MCP_ERISIM_OMRU, (int)$izin['bitis']);
     $yenilemeSon = min($n + MCP_YENILEME_OMRU, (int)$izin['bitis']);
-    $ekle = 'INSERT INTO mcp_jeton (ozet, tur, izin, istemci, kapsam, kaynak, olusturma, son, durum) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
-    mcp_calistir($ekle, [mcp_ozet($erisim), 'erisim', $izin['id'], $izin['istemci'], $kapsam, $izin['kaynak'], $n, $erisimSon, 'aktif']);
-    mcp_calistir($ekle, [mcp_ozet($yenileme), 'yenileme', $izin['id'], $izin['istemci'], $izin['kapsam'], $izin['kaynak'], $n, $yenilemeSon, 'aktif']);
+    $ekle = 'INSERT INTO mcp_jeton (ozet, tur, izin, istemci, kapsam, kaynak, olusturma, son, durum, ebeveyn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    mcp_calistir($ekle, [mcp_ozet($erisim), 'erisim', $izin['id'], $izin['istemci'], $kapsam, $izin['kaynak'], $n, $erisimSon, 'aktif', null]);
+    mcp_calistir($ekle, [mcp_ozet($yenileme), 'yenileme', $izin['id'], $izin['istemci'], $izin['kapsam'], $izin['kaynak'], $n, $yenilemeSon, 'aktif', $ebeveyn]);
     mcp_calistir('UPDATE mcp_izin SET son_kullanim = ? WHERE id = ?', [$n, $izin['id']]);
     return [
         'access_token' => $erisim,
@@ -279,6 +294,15 @@ function mcp_tumunu_kes(): int {
     mcp_gunluk('Studio', 'tumunu_kes', 'tamam', [], "Sahip tum sohbet baglantilarini kesti ($n)");
     return $n;
 }
+/**
+ * DCR genel gunluk sayacini (gunde 50 kayit) sifirlar. Ayarlar ekrani icin: biri kotayi doldurduysa sahip yeni bir
+ * sohbet baglantisi kurabilsin diye. IP basina sinira dokunmaz. Doner: sayac vardiysa true.
+ */
+function mcp_kayit_sayaci_sifirla(): bool {
+    $var = mcp_calistir('DELETE FROM mcp_sayac WHERE anahtar = ?', [MCP_KAYIT_SAYACI]) > 0;
+    mcp_gunluk('Studio', 'kayit_sayaci_sifirla', 'tamam', [], 'Sahip istemci kaydi gunluk sayacini sifirladi');
+    return $var;
+}
 function mcp_gunluk_son(int $adet = 100): array {
     $adet = max(1, min(500, $adet));
     return array_map(function ($r) {
@@ -302,9 +326,10 @@ function mcp_buda(bool $zorla = false): void {
             mcp_calistir('DELETE FROM mcp_sayac WHERE pencere < ?', [$n - 86400]);   // pencereler en cok 1 gun
             mcp_calistir("DELETE FROM mcp_izin WHERE (durum <> 'aktif' AND iptal_zamani < ?) OR bitis < ?", [$n - 30 * 86400, $n - 30 * 86400]);
             mcp_calistir("UPDATE mcp_izin SET durum = 'iptal', iptal_nedeni = 'suresi_doldu', iptal_zamani = ? WHERE durum = 'aktif' AND bitis < ?", [$n, $n]);
-            // Hic kullanilmamis (grant almamis) istemciler 30 gun sonra silinir; kullanilmis istemci hic silinmez
-            // (ChatGPT ayni istemciyi yeniden kullanir; silinirse invalid_client olur).
-            mcp_calistir('DELETE FROM mcp_istemci WHERE son_kullanim IS NULL AND olusturma < ?', [$n - 30 * 86400]);
+            // Hic kullanilmamis (grant almamis) istemciler 6 saat sonra silinir (sahte kayitlar birikmesin; gercek istemci
+            // kayittan hemen sonra onay sayfasina gider). Kullanilmis istemci hic silinmez (ChatGPT ayni istemciyi yeniden
+            // kullanir; silinirse invalid_client olur).
+            mcp_calistir('DELETE FROM mcp_istemci WHERE son_kullanim IS NULL AND olusturma < ?', [$n - MCP_KAYITSIZ_ISTEMCI_OMRU]);
             $esik = mcp_tek('SELECT sira FROM mcp_gunluk ORDER BY sira DESC LIMIT 1 OFFSET 5000');
             if ($esik) mcp_calistir('DELETE FROM mcp_gunluk WHERE sira <= ?', [(int)$esik['sira']]);
         });

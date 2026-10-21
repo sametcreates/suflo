@@ -502,6 +502,12 @@ function mcp_toplu_onizle(array $islemler, McpBaglam $b): array {
     return ['gecerli' => true, 'satirlar' => $satirlar, 'uyarilar' => $uyarilar, 'onay_kodu' => $k['kod'], 'son_gecerlilik' => mcp_iso($k['son'])];
 }
 
+/** studio_toplu_uygula ciktisindaki 'sonuc' (semada nesne): bos ise stdClass ({}), JSON'da hicbir zaman [] olmaz. */
+function mcp_toplu_sonuc_nesnesi($v) {
+    $v = (array)$v;
+    return $v === [] ? new stdClass() : $v;
+}
+
 /** studio_toplu_uygula: kod grant'e ve islem listesinin ozetine bagli; tek kullanimlik; ikinci kez gelirse ilk sonuc doner. */
 function mcp_toplu_uygula(string $kod, McpBaglam $b): McpSonuc {
     $oz = mcp_ozet($kod);
@@ -520,6 +526,8 @@ function mcp_toplu_uygula(string $kod, McpBaglam $b): McpSonuc {
     if ($durum === 'suruyor') return McpSonuc::hata('Bu toplu işlem şu an uygulanıyor. Biraz sonra aynı onay koduyla yeniden çağır; işlem tekrarlanmaz.');
     if ($durum === 'tekrar') {
         $veri = json_decode((string)$r['sonuc'], true) ?: [];
+        // json_decode(..., true) bos nesneyi {} dizi [] yapar: 'sonuc' semada nesne, JSON'da yine {} olmali
+        if (array_key_exists('sonuc', $veri)) $veri['sonuc'] = mcp_toplu_sonuc_nesnesi($veri['sonuc']);
         $ilk = $veri['durum'] ?? 'basarisiz';
         if ($ilk === 'uygulandi') $veri['durum'] = 'daha_once_uygulandi';
         return new McpSonuc($veri, 'Bu onay kodu daha önce kullanıldı; işlem tekrarlanmadı. İlk sonuç: ' . (string)($veri['mesaj'] ?? ''), $ilk !== 'uygulandi', [], 'Tekrar: ilk sonuc donduruldu');
@@ -529,7 +537,7 @@ function mcp_toplu_uygula(string $kod, McpBaglam $b): McpSonuc {
         mcp_calistir('UPDATE mcp_toplu SET durum = ?, sonuc = ? WHERE kod_ozet = ?', [$tamam ? 'tamam' : 'basarisiz', mcp_json_metin($veri), $oz]);
     };
     if (!hash_equals((string)$r['islem_ozeti'], mcp_ozet((string)$r['islemler']))) {
-        $veri = ['durum' => 'basarisiz', 'mesaj' => 'Onay kaydı bozulmuş; hiçbir şey uygulanmadı.', 'sonuc' => [], 'etkilenen' => [], 'anlik_id' => null];
+        $veri = ['durum' => 'basarisiz', 'mesaj' => 'Onay kaydı bozulmuş; hiçbir şey uygulanmadı.', 'sonuc' => new stdClass(), 'etkilenen' => [], 'anlik_id' => null];
         $kaydet($veri, false);
         return new McpSonuc($veri, $veri['mesaj'], true);
     }
@@ -548,7 +556,7 @@ function mcp_toplu_uygula(string $kod, McpBaglam $b): McpSonuc {
     $veri = [
         'durum' => $tamam ? 'uygulandi' : 'basarisiz',
         'mesaj' => mcp_kisalt((string)($s['mesaj'] ?? ''), 1000),
-        'sonuc' => (array)($s['veri'] ?? []),
+        'sonuc' => mcp_toplu_sonuc_nesnesi($s['veri'] ?? []),
         'etkilenen' => $etkilenen,
         'anlik_id' => isset($s['anlik_id']) ? (string)$s['anlik_id'] : null,
     ];

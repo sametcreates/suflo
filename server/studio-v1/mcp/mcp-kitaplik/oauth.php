@@ -110,6 +110,11 @@ function mcp_oauth_form(): array {
 
 /* ---------------- /register (RFC 7591) ---------------- */
 
+/** 429: RFC 7591 3.2.2 bicimli hata govdesi (error + error_description) ve Retry-After (saniye). */
+function mcp_kayit_cok_fazla(int $saniye): void {
+    mcp_oauth_hata(429, 'temporarily_unavailable', 'Cok fazla istemci kaydi; daha sonra yeniden dene.', ['Retry-After: ' . $saniye]);
+}
+
 function mcp_kayit(): void {
     if (mcp_yontem() !== 'POST') mcp_oauth_hata(405, 'invalid_request', 'Yalniz POST.', ['Allow: POST']);
     if (mcp_icerik_turu() !== 'application/json') mcp_oauth_hata(400, 'invalid_client_metadata', 'Content-Type application/json olmali.');
@@ -117,10 +122,8 @@ function mcp_kayit(): void {
     if ($g === null) mcp_oauth_hata(413, 'invalid_client_metadata', 'Istek cok buyuk.');
     $m = json_decode($g, true, 16);
     if (!is_array($m) || ($m !== [] && array_is_list($m))) mcp_oauth_hata(400, 'invalid_client_metadata', 'Govde JSON nesnesi olmali.');
-    // Hiz siniri: ayni IP'den saatte 10, toplam gunde 50 kayit (tek kullanicili sunucu; ChatGPT baglanti basina bir kez kaydeder)
-    if (!mcp_hiz('kayit|ip|' . mcp_ip_ozet(), 3600, 10) || !mcp_hiz('kayit|toplam', 86400, 50)) {
-        mcp_oauth_hata(429, 'temporarily_unavailable', 'Cok fazla istemci kaydi; daha sonra yeniden dene.', ['Retry-After: 3600']);
-    }
+    // Hiz siniri (IP): ayni IP'den saatte 10 istek; dogrulamadan ONCE sayilir (bozuk istek de sayilir)
+    if (!mcp_hiz('kayit|ip|' . mcp_ip_ozet(), 3600, 10)) mcp_kayit_cok_fazla(3600);
     $ru = $m['redirect_uris'] ?? null;
     if (!is_array($ru) || $ru === [] || count($ru) > 5 || !array_is_list($ru)) mcp_oauth_hata(400, 'invalid_redirect_uri', 'redirect_uris 1-5 adreslik bir liste olmali.');
     foreach ($ru as $u) {
@@ -152,9 +155,16 @@ function mcp_kayit(): void {
     $id = mcp_rastgele(18);
     $sir = $yontem === 'none' ? null : mcp_rastgele(32);
     $n = mcp_zaman();
+    // Genel sinir: gunde 50 kayit. Yalniz butun dogrulamalardan GECEN kayitlar sayilir (reddedilen bozuk istekler gunluk
+    // kotayi tuketip claude.ai / ChatGPT kayitlarini engellemesin). Sayac ve ekleme ayni islemde: eklenmeyen kayit sayilmaz.
     // Her kayit yeni bir istemci acar; var olan bir istemci asla degistirilmez ya da ezilmez.
-    mcp_calistir('INSERT INTO mcp_istemci (id, ad, yonlendirmeler, yontem, sir_ozet, uygulama_turu, kapsam, olusturma, ip_ozet) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [$id, $ad, mcp_json_metin($ru), $yontem, $sir === null ? null : mcp_ozet($sir), $tur, implode(' ', $kapsam), $n, mcp_ip_ozet()]);
+    $eklendi = mcp_islem(function () use ($id, $ad, $ru, $yontem, $sir, $tur, $kapsam, $n) {
+        if (!mcp_hiz(MCP_KAYIT_SAYACI, 86400, 50)) return false;
+        mcp_calistir('INSERT INTO mcp_istemci (id, ad, yonlendirmeler, yontem, sir_ozet, uygulama_turu, kapsam, olusturma, ip_ozet) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$id, $ad, mcp_json_metin($ru), $yontem, $sir === null ? null : mcp_ozet($sir), $tur, implode(' ', $kapsam), $n, mcp_ip_ozet()]);
+        return true;
+    });
+    if (!$eklendi) mcp_kayit_cok_fazla(max(60, 86400 - $n % 86400));
     mcp_gunluk($ad, 'istemci_kaydi', 'tamam', [], 'Donus: ' . implode(', ', array_map(fn ($u) => (string)parse_url($u, PHP_URL_HOST), $ru)));
     $yanit = [
         'client_id' => $id,
@@ -384,6 +394,37 @@ function mcp_token_kod(array $p, array $ist): void {
     mcp_json(200, $sonuc[1]);
 }
 
+/**
+ * Donusturulmus (durum 'kullanildi') bir yenileme jetonu yeniden geldiginde tolerans karari. Tipik neden: access token
+ * suresi dolunca istemcinin paralel iki istegi ayni refresh token ile iki kez yeniler; ikincisi saniyeler icinde gelir.
+ * Doner: ['tolerans', halef satiri] (iptal yok, ikinci bir kardes jeton verilir), ['red'] (iptal yok, yalniz invalid_grant)
+ * ya da ['iptal'] (tekrar algilama: grant'in tamami iptal).
+ * Tolerans icin hepsi gerekir: ayni istemci, donusumden en cok MCP_YENILEME_TOLERANSI saniye gecmis, grant etkin ve
+ * suresi dolmamis, panel sifre izi degismemis, halef (donusumde verilen yeni yenileme jetonu) hala etkin ve hic kullanilmamis.
+ * Halef bir kez kullanildiysa ya da pencere gectiyse eski jetonun gelmesi calinma belirtisidir: tam iptal (eskisi gibi).
+ */
+function mcp_yenileme_toleransi(array $r, array $ist, ?array $izin, ?string $guncelIz, int $n): array {
+    if ($r['donusum'] === null || $r['halef'] === null) return ['iptal'];
+    $gecen = $n - (int)$r['donusum'];
+    if ($gecen < 0 || $gecen > MCP_YENILEME_TOLERANSI) return ['iptal'];
+    if (!hash_equals((string)$r['istemci'], (string)$ist['id'])) return ['iptal'];
+    if (!$izin || $izin['durum'] !== 'aktif' || (int)$izin['bitis'] <= $n) return ['iptal'];
+    if ($guncelIz === null || !hash_equals((string)$izin['sifre_izi'], $guncelIz)) return ['iptal'];
+    $h = mcp_tek("SELECT * FROM mcp_jeton WHERE ozet = ? AND tur = 'yenileme'", [(string)$r['halef']]);
+    if (!$h || $h['durum'] !== 'aktif' || (int)$h['son'] <= $n || $h['izin'] !== $r['izin'] || $h['ebeveyn'] === null) return ['iptal'];
+    $kardes = (int)mcp_tek("SELECT COUNT(*) AS c FROM mcp_jeton WHERE tur = 'yenileme' AND ebeveyn = ? AND durum = 'aktif'", [(string)$h['ebeveyn']])['c'];
+    if ($kardes >= MCP_YENILEME_KARDES_SINIRI) return ['red'];
+    return ['tolerans', $h];
+}
+
+/**
+ * refresh_token: her kullanimda yeni access + YENI refresh token (donusum). Eski jeton 'kullanildi' olur; donusum zamani ve
+ * halefin ozeti saklanir. Tolerans penceresinde (bkz. mcp_yenileme_toleransi) eski jetonla gelen ikinci istege, halefi
+ * iptal ETMEDEN onun kardesi olan yeni bir cift verilir: istemci hangi yaniti saklarsa saklasin calisir (yanitlarin hangisinin
+ * en son yazildigi belli degildir; halef iptal edilseydi ilk yaniti saklayan istemcinin baglantisi bir saat sonra kopardi).
+ * Kardeslerden biri dondurulunce digerleri de 'kullanildi' olur: sonradan gelirlerse tekrar algilamasi (pencere disinda
+ * grant iptali) aynen isler. Etkin kardes sayisi MCP_YENILEME_KARDES_SINIRI ile sinirli.
+ */
 function mcp_token_yenile(array $p, array $ist): void {
     $j = $p['refresh_token'] ?? '';
     if (!is_string($j) || $j === '' || strlen($j) > 200) mcp_oauth_hata(400, 'invalid_request', 'refresh_token eksik.');
@@ -392,18 +433,28 @@ function mcp_token_yenile(array $p, array $ist): void {
     if (isset($p['resource']) && !mcp_kaynak_bizim_mi((string)$p['resource'])) mcp_oauth_hata(400, 'invalid_target', 'resource bu MCP sunucusu degil.');
     $guncelIz = mcp_arka()->sahip_sifre_izi();
     $sonuc = mcp_islem(function () use ($j, $ist, $istenen, $guncelIz) {
+        $n = mcp_zaman();
         $r = mcp_tek("SELECT * FROM mcp_jeton WHERE ozet = ? AND tur = 'yenileme'", [mcp_ozet($j)]);
         if (!$r) return ['invalid_grant', 'Yenileme jetonu gecersiz.'];
-        if ($r['durum'] === 'kullanildi') {
-            // Donusturulmus (eski) yenileme jetonu yeniden geldi: calinmis olabilir; grant'in tamami iptal
-            mcp_calistir("UPDATE mcp_izin SET durum = 'iptal', iptal_nedeni = 'yenileme_tekrar', iptal_zamani = ? WHERE id = ? AND durum = 'aktif'", [mcp_zaman(), $r['izin']]);
-            mcp_calistir("UPDATE mcp_jeton SET durum = 'iptal' WHERE izin = ? AND durum = 'aktif'", [$r['izin']]);
-            return ['invalid_grant', 'Yenileme jetonu daha once kullanildi.', 'yenileme_tekrar'];
-        }
-        if ($r['durum'] !== 'aktif' || (int)$r['son'] <= mcp_zaman()) return ['invalid_grant', 'Yenileme jetonu gecersiz.'];
-        if (!hash_equals((string)$r['istemci'], (string)$ist['id'])) return ['invalid_grant', 'Jeton bu istemciye verilmedi.'];
         $izin = mcp_tek('SELECT * FROM mcp_izin WHERE id = ?', [$r['izin']]);
-        if (!$izin || $izin['durum'] !== 'aktif' || (int)$izin['bitis'] <= mcp_zaman()) return ['invalid_grant', 'Izin gecersiz.'];
+        $ebeveyn = (string)$r['ozet'];   // normal donusum: yeni yenileme jetonu bu jetondan cikar
+        $tolerans = false;
+        if ($r['durum'] === 'kullanildi') {
+            $k = mcp_yenileme_toleransi($r, $ist, $izin, $guncelIz, $n);
+            if ($k[0] === 'red') return ['invalid_grant', 'Cok fazla eszamanli yenileme; en son verilen yenileme jetonunu kullan.'];
+            if ($k[0] !== 'tolerans') {
+                // Donusturulmus (eski) yenileme jetonu pencere disinda ya da halefi kullanildiktan sonra geldi: calinmis olabilir; grant'in tamami iptal
+                mcp_calistir("UPDATE mcp_izin SET durum = 'iptal', iptal_nedeni = 'yenileme_tekrar', iptal_zamani = ? WHERE id = ? AND durum = 'aktif'", [$n, $r['izin']]);
+                mcp_calistir("UPDATE mcp_jeton SET durum = 'iptal' WHERE izin = ? AND durum = 'aktif'", [$r['izin']]);
+                return ['invalid_grant', 'Yenileme jetonu daha once kullanildi.', 'yenileme_tekrar'];
+            }
+            $tolerans = true;
+            $ebeveyn = (string)$k[1]['ebeveyn'];   // yeni jeton halefin kardesi olur
+        } elseif ($r['durum'] !== 'aktif' || (int)$r['son'] <= $n) {
+            return ['invalid_grant', 'Yenileme jetonu gecersiz.'];
+        }
+        if (!hash_equals((string)$r['istemci'], (string)$ist['id'])) return ['invalid_grant', 'Jeton bu istemciye verilmedi.'];
+        if (!$izin || $izin['durum'] !== 'aktif' || (int)$izin['bitis'] <= $n) return ['invalid_grant', 'Izin gecersiz.'];
         if ($guncelIz === null || !hash_equals((string)$izin['sifre_izi'], $guncelIz)) return ['invalid_grant', 'Studio sifresi degisti; yeniden baglan.'];
         $verilen = explode(' ', (string)$izin['kapsam']);
         $kapsam = $verilen;
@@ -413,13 +464,23 @@ function mcp_token_yenile(array $p, array $ist): void {
             $kapsam = $taninan ?: $verilen;
             if (in_array(MCP_KAPSAM_YAZ, $kapsam, true) && !in_array(MCP_KAPSAM_OKU, $kapsam, true)) $kapsam[] = MCP_KAPSAM_OKU;
         }
-        mcp_calistir("UPDATE mcp_jeton SET durum = 'kullanildi' WHERE ozet = ?", [$r['ozet']]);
-        return ['tamam', mcp_jeton_ver($izin, implode(' ', array_values(array_intersect(MCP_KAPSAMLAR, $kapsam))))];
+        $t = mcp_jeton_ver($izin, implode(' ', array_values(array_intersect(MCP_KAPSAMLAR, $kapsam))), $ebeveyn);
+        if (!$tolerans) {
+            $yeni = mcp_ozet($t['refresh_token']);
+            mcp_calistir("UPDATE mcp_jeton SET durum = 'kullanildi', donusum = ?, halef = ? WHERE ozet = ?", [$n, $yeni, $r['ozet']]);
+            // Tolerans penceresinde verilmis kardesler (ayni ebeveyn) de artik dondurulmus sayilir: halefleri bu yeni jeton
+            if ($r['ebeveyn'] !== null) {
+                mcp_calistir("UPDATE mcp_jeton SET durum = 'kullanildi', donusum = ?, halef = ? WHERE tur = 'yenileme' AND ebeveyn = ? AND durum = 'aktif' AND ozet <> ?",
+                    [$n, $yeni, $r['ebeveyn'], $r['ozet']]);
+            }
+        }
+        return ['tamam', $t, $tolerans ? 'tolerans' : ''];
     });
     if ($sonuc[0] !== 'tamam') {
         if (($sonuc[2] ?? '') === 'yenileme_tekrar') mcp_gunluk((string)$ist['ad'], 'yenileme_tekrar', 'iptal', [], 'Eski yenileme jetonu yeniden kullanildi; baglanti iptal edildi');
         mcp_oauth_hata(400, $sonuc[0], $sonuc[1]);
     }
+    if ($sonuc[2] === 'tolerans') mcp_gunluk((string)$ist['ad'], 'yenileme_tolerans', 'tamam', [], 'Eszamanli yenileme: az once donusturulen jeton tolerans penceresinde kabul edildi');
     mcp_json(200, $sonuc[1]);
 }
 
