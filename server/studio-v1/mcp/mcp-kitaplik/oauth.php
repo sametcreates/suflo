@@ -159,7 +159,7 @@ function mcp_kayit(): void {
     // kotayi tuketip claude.ai / ChatGPT kayitlarini engellemesin). Sayac ve ekleme ayni islemde: eklenmeyen kayit sayilmaz.
     // Her kayit yeni bir istemci acar; var olan bir istemci asla degistirilmez ya da ezilmez.
     $eklendi = mcp_islem(function () use ($id, $ad, $ru, $yontem, $sir, $tur, $kapsam, $n) {
-        if (!mcp_hiz(MCP_KAYIT_SAYACI, 86400, 50)) return false;
+        if (!mcp_hiz(MCP_KAYIT_SAYACI, 86400, MCP_KAYIT_GUNLUK_SINIRI)) return false;
         mcp_calistir('INSERT INTO mcp_istemci (id, ad, yonlendirmeler, yontem, sir_ozet, uygulama_turu, kapsam, olusturma, ip_ozet) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [$id, $ad, mcp_json_metin($ru), $yontem, $sir === null ? null : mcp_ozet($sir), $tur, implode(' ', $kapsam), $n, mcp_ip_ozet()]);
         return true;

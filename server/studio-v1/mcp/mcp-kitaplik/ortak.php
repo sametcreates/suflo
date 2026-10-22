@@ -128,6 +128,8 @@ function mcp_bos(int $kod, array $basliklar = []): void {
     exit;
 }
 function mcp_kurulum_yaniti(string $mesaj): void {
+    // Panel (v1/index.php, Ayarlar -> Sohbet baglantilari) kitapligi yuklerken: MCP yaniti basilmaz, panel kendi JSON hatasini verir
+    if (defined('SUFLO_MCP_PANEL')) throw new McpKurulumHatasi($mesaj);
     mcp_json(503, ['error' => 'temporarily_unavailable', 'error_description' => $mesaj], ['Retry-After: 30']);
 }
 function mcp_yontem(): string { return strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? '')); }

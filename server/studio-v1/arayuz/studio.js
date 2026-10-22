@@ -3434,6 +3434,8 @@
     var esik = h("input", { type: "number", min: "0", max: "999", value: ayar.varsayilanStokUyari === null || ayar.varsayilanStokUyari === undefined ? "" : String(ayar.varsayilanStokUyari), placeholder: "Boş = eşik yok" });
     var anlikKutu = h("div", null, h("p", { class: "soluk kucuk" }, "Yükleniyor…"));
     anliklariYukle(anlikKutu);
+    var mcpKutu = h("div", { class: "mcp-kutu" }, h("p", { class: "soluk kucuk" }, "Yükleniyor…"));
+    sohbetBaglantilariYukle(mcpKutu);
     var dosya = h("input", { type: "file", accept: "application/json,.json" });
     var onizleme = h("div");
     dosya.addEventListener("change", function () { iceAktarmaBasla(dosya, onizleme); });
@@ -3455,6 +3457,8 @@
         h("p", { class: "soluk kucuk" }, "Suflo Studio’dan indirdiğin JSON yedeğini ya da müşteri / çekim / içerik listesi içeren bir JSON dosyasını seç. Önce önizleme gösterilir; aynı kayıtlar ikinci kez eklenmez, hiçbir şey sessizce silinmez. Uygulamadan önce otomatik kopya alınır."),
         alan("Dosya", dosya), onizleme]),
       bolum("Otomatik kopyalar", null, null, [h("p", { class: "soluk kucuk" }, "Sunucu her gün ilk değişiklikten önce (günlük kopya) ve her içe aktarma / geri yüklemeden önce tüm verinin kopyasını alır. Son 14 günlük kopya ve son 30 diğer kopya saklanır."), anlikKutu]),
+      bolum("Sohbet bağlantıları", null, null, [h("p", { class: "soluk kucuk" }, "Claude ya da ChatGPT sohbetinden Studio’ya kayıt ekleyebilmek için kurulan bağlantılar. " +
+        "İsteği sohbetin kendisi yorumlar; Studio yalnız denetlenen işlemleri yapar (silme, mesaj gönderme ve ücret yok)."), mcpKutu]),
       bolum("Güvenlik", null, null, [
         h("div", { class: "eylemler" },
           h("button", { class: "btn", type: "button", onclick: sifrePenceresi }, "Şifreyi değiştir"),
@@ -3539,6 +3543,127 @@
           } }, "Bu kopyaya dön"))));
       });
     });
+  }
+  /* ---------------- Sohbet baglantilari (MCP) ---------------- */
+
+  var MCP_OLAY = {
+    studio_bugun: "Bugünün tarihi", studio_musteri_ara: "Müşteri arama", studio_takvim: "Takvim okuma", studio_icerik_listele: "İçerik listesi",
+    studio_musteri_olustur: "Müşteri ekleme", studio_cekim_olustur: "Çekim ekleme", studio_icerik_olustur: "İçerik ekleme",
+    studio_edit_zamani_ayir: "Edit zamanı ayırma", studio_icerik_durum_guncelle: "İçerik durumu", studio_cekim_durum_guncelle: "Çekim durumu",
+    studio_toplu_onizle: "Toplu önizleme", studio_toplu_uygula: "Toplu uygulama", istemci_kaydi: "Yeni uygulama kaydı",
+    yetki: "Bağlanma denemesi", yetki_verildi: "Bağlantı onaylandı", yetki_ret: "Bağlantı reddedildi", jeton_verildi: "Bağlantı açıldı",
+    jeton_iptal: "Bağlantı kapatıldı", kod_tekrar: "Şüpheli tekrar (kesildi)", yenileme_tekrar: "Şüpheli tekrar (kesildi)", yenileme_tolerans: "Eşzamanlı yenileme",
+    baglanti_kes: "Bağlantı kesildi", tumunu_kes: "Tüm bağlantılar kesildi", kayit_sayaci_sifirla: "Kayıt sayacı sıfırlandı"
+  };
+  var MCP_SONUC = { tamam: "Tamam", hata: "Hata", iptal: "İptal edildi", kilitli: "Kilitli", yanlis_sifre: "Yanlış şifre" };
+  function mcpZaman(t) { var z = C.istanbulSimdi(new Date(t * 1000)); return C.tarihKisa(z.tarih, true) + " " + z.saat; }
+  /** Gunlukteki kayit kimligi: Studio'daki kayda baglanti (yoksa kisa kimlik metni). */
+  function mcpKayitBaglantisi(id) {
+    var m = musteri(id);
+    if (m) return ic(rotaLink("musteri", null, id), m.ad);
+    var ara = [["icerik", S.veri.icerikler, icerikPenceresi], ["etkinlik", S.veri.etkinlikler, etkinlikPenceresi], ["blok", S.veri.bloklar || [], blokPenceresi]];
+    for (var i = 0; i < ara.length; i++) {
+      var k = bul(ara[i][1], id), ac = ara[i][2];
+      if (k) return h("button", { class: "satir-ad baglanti", type: "button", onclick: (function (x) { return function () { ac(x); }; })(id) },
+        k.baslik || (ara[i][0] === "blok" ? "Edit zamanı" : id));
+    }
+    return h("span", { class: "soluk", title: "Bu kayıt bulunamadı" }, "#" + String(id).slice(0, 8));
+  }
+  function mcpKopyala(girdi) {
+    var bitti = function () { toast("Adres kopyalandı."); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(girdi.value).then(bitti, function () { girdi.select(); toast("Kopyalanamadı; adres seçildi, elle kopyala.", "hata"); });
+    } else { girdi.select(); try { document.execCommand("copy"); bitti(); } catch (e) { toast("Kopyalanamadı; adres seçildi, elle kopyala.", "hata"); } }
+  }
+  function sohbetBaglantilariYukle(kutu) {
+    api("mcp_durum").then(function (j) {
+      if (!j.ok) { kutu.textContent = ""; kutu.appendChild(h("p", { class: "hata" }, hataMetni(j))); return; }
+      // gunlukte gecen ve bu sayfada henuz olmayan kayitlar (sohbetten az once eklenmis olabilir): once veri tazelenir
+      var eksik = (j.mcp.gunluk || []).some(function (g) { return g.kayitlar.some(function (id) {
+        return !musteri(id) && !icerikBul(id) && !bul(S.veri.etkinlikler, id) && !bul(S.veri.bloklar || [], id);
+      }); });
+      (eksik ? veriYukle() : Promise.resolve()).then(function () { sohbetBaglantilariCiz(kutu, j.mcp); });
+    });
+  }
+  function mcpIslem(kutu, islem, govde, basari) {
+    return api(islem, govde).then(function (j) {
+      if (!j.ok) { toast(hataMetni(j), "hata"); return; }
+      toast(basari(j));
+      sohbetBaglantilariCiz(kutu, j.mcp);
+    });
+  }
+  function sohbetBaglantilariCiz(kutu, d) {
+    kutu.textContent = "";
+    if (!d.kurulu) { kutu.appendChild(h("p", { class: "soluk kucuk mcp-durum" }, "Sohbet bağlantısı bu sunucuda kurulu değil.")); return; }
+    if (!d.acik) {
+      kutu.appendChild(h("p", { class: "uyari-kutu mcp-durum" }, "Sohbet bağlantısı sunucu ayarından kapalı. Claude ve ChatGPT şu an Studio’ya erişemez. " +
+        "Yeniden açılırsa daha önce kurulan bağlantılar tekrar çalışır; o zaman buradan kesebilirsin."));
+      return;
+    }
+    var adres = h("input", { type: "text", readonly: true, value: d.adres, class: "mcp-adres", "aria-label": "Bağlayıcı adresi", spellcheck: "false" });
+    adres.addEventListener("focus", function () { adres.select(); });
+    var adim = function (baslik, liste, not) {
+      return h("div", { class: "mcp-rehber" }, h("b", null, baslik), h("ol", null, liste.map(function (x) { return h("li", null, x); })), not ? h("p", { class: "soluk kucuk" }, not) : null);
+    };
+    kutu.appendChild(h("div", { class: "alan mcp-adres-alan" }, h("span", null, "Bağlayıcı adresi"),
+      h("div", { class: "mcp-adres-satir" }, adres, h("button", { class: "btn", type: "button", onclick: function () { mcpKopyala(adres); } }, "Kopyala"))));
+    kutu.appendChild(h("details", { class: "mcp-rehberler" }, h("summary", null, "Nasıl bağlanır? (Claude ve ChatGPT)"),
+      adim("Claude", ["Claude’da Ayarlar → Bağlayıcılar → “Özel bağlayıcı ekle”yi aç.",
+        "Ad olarak “Suflo Studio” yaz, yukarıdaki adresi yapıştır ve ekle.",
+        "“Bağlan”a bas; açılan Suflo Studio sayfasında Studio şifreni gir ve izin ver."]),
+      adim("ChatGPT", ["ChatGPT’de Ayarlar → Bağlayıcılar (Uygulamalar) → “Özel bağlayıcı ekle”yi aç (gerekirse Gelişmiş bölümünden geliştirici modunu aç).",
+        "Ad olarak “Suflo Studio” yaz, yukarıdaki adresi yapıştır, kimlik doğrulamada OAuth’u seç ve oluştur.",
+        "Açılan Suflo Studio sayfasında Studio şifreni gir ve izin ver."],
+        "Not: ChatGPT’de kayıt ekleme (yazma) Business, Enterprise ya da Edu planı gerektirebilir; diğer planlarda yalnız okuma çalışabilir."),
+      h("p", { class: "soluk kucuk" }, "Şifreni yalnız açılan Suflo Studio sayfasına yaz; sohbete yazma. Studio şifresini değiştirirsen bütün bağlantılar kesilir.")));
+
+    // Bagli sohbetler
+    var b = d.baglantilar || [];
+    var liste = h("div", { class: "mcp-baglantilar" });
+    if (!b.length) liste.appendChild(h("p", { class: "soluk kucuk" }, "Şu an bağlı sohbet yok."));
+    b.forEach(function (x) {
+      var yaz = x.kapsam.indexOf("studio.yaz") !== -1;
+      liste.appendChild(h("div", { class: "satir mcp-baglanti" },
+        h("div", { class: "mcp-ad" }, h("b", null, x.istemci), x.hostlar.length ? h("span", { class: "soluk kucuk" }, " · " + x.hostlar.join(", ")) : null),
+        h("span", { class: "satir-bilgi" }, dizi([yaz ? "Okuma + yazma" : "Yalnız okuma", "Bağlandı: " + mcpZaman(x.olusturma),
+          x.sonKullanim ? "Son kullanım: " + mcpZaman(x.sonKullanim) : "Henüz kullanılmadı"])),
+        h("span", { class: "sag" }, h("button", { class: "btn ince tehlike", type: "button", onclick: function () {
+          onayla("Bağlantıyı kes", "“" + x.istemci + "” (" + (x.hostlar.join(", ") || "bilinmeyen adres") + ") Studio’ya bir daha erişemez. Yeniden bağlanmak için sohbetten tekrar bağlanman ve şifreni girmen gerekir.", "Bağlantıyı kes", null, true).then(function (e) {
+            if (e) mcpIslem(kutu, "mcp_baglanti_kes", { id: x.id }, function (k) { return k.kesildi ? "Bağlantı kesildi." : "Bu bağlantı zaten kesilmiş."; });
+          });
+        } }, "Bağlantıyı kes"))));
+    });
+    kutu.appendChild(h("div", { class: "mcp-bolum" }, h("h3", null, "Bağlı sohbetler", b.length ? h("span", { class: "sayi" }, b.length) : null), liste,
+      b.length ? h("div", { class: "eylemler" }, h("button", { class: "btn tehlike", type: "button", onclick: function () {
+        onayla("Tüm sohbet bağlantılarını kes", "Claude ve ChatGPT dahil " + b.length + " bağlantının hepsi kesilir; hiçbiri Studio’ya erişemez. Studio verisi değişmez.", "Tümünü kes", null, true).then(function (e) {
+          if (e) mcpIslem(kutu, "mcp_tumunu_kes", null, function (k) { return k.kesilen + " bağlantı kesildi."; });
+        });
+      } }, "Tümünü kes")) : null));
+
+    // Son islemler (salt okunur)
+    var g = d.gunluk || [];
+    var gl = h("div", { class: "mcp-gunluk" });
+    if (!g.length) gl.appendChild(h("p", { class: "soluk kucuk" }, "Henüz işlem yok."));
+    g.forEach(function (x) {
+      var iyi = x.sonuc === "tamam";
+      gl.appendChild(h("div", { class: "satir mcp-islem" },
+        h("b", { class: "mcp-zaman" }, mcpZaman(x.zaman)),
+        h("span", { class: "mcp-olay", title: x.olay }, MCP_OLAY[x.olay] || x.olay),
+        h("span", { class: "rozet " + (iyi ? "mcp-tamam" : "mcp-hata") }, MCP_SONUC[x.sonuc] || x.sonuc),
+        h("span", { class: "satir-bilgi" }, dizi([x.istemci, x.kayitlar.length ? h("span", { class: "mcp-kayitlar" }, dizi(x.kayitlar.slice(0, 5).map(mcpKayitBaglantisi), ", "),
+          x.kayitlar.length > 5 ? " +" + (x.kayitlar.length - 5) : null) : null])),
+        x.ozet ? h("div", { class: "mcp-ozet soluk kucuk" }, x.ozet) : null));
+    });
+    kutu.appendChild(h("div", { class: "mcp-bolum" }, h("h3", null, "Son işlemler"), h("p", { class: "soluk kucuk" }, "Sohbet bağlantısıyla ilgili son " + g.length + " işlem (en yenisi üstte). Yalnız görüntüleme."), gl));
+
+    // Kayit sayaci
+    var k = d.kayit || { sayi: 0, sinir: 50 };
+    kutu.appendChild(h("div", { class: "mcp-bolum" }, h("h3", null, "Yeni bağlantı kaydı"),
+      h("p", { class: "soluk kucuk" }, "Bugün " + k.sayi + " / " + k.sinir + " yeni uygulama kaydı. Sınır dolarsa Claude ve ChatGPT o gün yeni bağlantı kuramaz (var olan bağlantılar etkilenmez). " +
+        "Yabancı biri doldurduysa sıfırlayıp hemen bağlanabilirsin."),
+      h("div", { class: "eylemler" }, h("button", { class: "btn ince", type: "button", onclick: function () {
+        mcpIslem(kutu, "mcp_kayit_sayaci_sifirla", null, function () { return "Kayıt sayacı sıfırlandı."; });
+      } }, "Kayıt sayacını sıfırla"))));
   }
   // Sunucu oturumlu istekte en cok 8 MB govde okur; sinir, dosyanin degil gonderilecek sikistirilmis JSON'un bayt boyutudur
   var GOVDE_SINIRI = 8 * 1024 * 1024 - 64 * 1024, DOSYA_SINIRI = 64 * 1024 * 1024;

@@ -263,7 +263,14 @@ Depo işlevleri `mcp-kitaplik/depo.php`'dedir:
 | `mcp_tumunu_kes()` | Bütün bağlantıları keser |
 | `mcp_gunluk_son(100)` | İşlem günlüğünün son kayıtlarını döndürür |
 
-Panelden kullanmak için: `define('SUFLO_MCP', 1); require '<public_html>/studio/mcp-kitaplik/yukle.php'; mcp_baslat('<public_html>/studio');`. Bu çağrılar panelin oturum denetiminden **sonra** yapılmalıdır.
+| `mcp_kayit_sayaci()` | Kayıt sayacının bugünkü değeri ve sınırı (`['sayi', 'sinir']`) |
+
+Panel (`../index.php`) bunları Ayarlar → **Sohbet bağlantıları** bölümü için dört işlemle kullanır: `mcp_durum`, `mcp_baglanti_kes` (`id`), `mcp_tumunu_kes`, `mcp_kayit_sayaci_sifirla`. Hepsi panelin diğer işlemleri gibi Origin + `X-Studio` + JSON + oturum denetiminden **sonra** çalışır; MCP için panelde ayrı bir giriş yolu yoktur. Kitaplık yalnız bu işlemlerde yüklenir: `define('SUFLO_MCP', 1); define('SUFLO_MCP_PANEL', 1); require dirname(__DIR__) . '/mcp-kitaplik/yukle.php'; mcp_baslat(dirname(__DIR__));` (`SUFLO_MCP_PANEL` tanımlıyken kitaplığın kurulum hatası MCP yanıtı basıp çıkmaz, istisna atar; panel kendi JSON hatasını verir).
+
+- `mcp-kitaplik/` yoksa: `kurulu: false`, boş listeler. `mcp_acik => false` ise: `acik: false`, boş listeler, MCP deposu hiç açılmaz (kesme işlemleri 0 döner).
+- Yanıtlar: bağlantılar (kimlik, istemci adı, dönüş adresinin host'u, kapsam, oluşturma, son kullanım), son 20 işlem (araç / olay, zaman, sonuç, etkilenen kayıt kimlikleri, kısa özet), kayıt sayacı ve bağlayıcı adresi (`kok_url` + `/<uygulama>/mcp`). Jeton, özet ya da sır dönmez.
+- Panel ve MCP aynı `config.php`'yi okuyorsa (canlı kurulum) liste alınmadan önce panelin şifre izi MCP'ye uygulanır: şifre değiştiyse eski bağlantılar listede görünmez.
+- Arayüz: bağlayıcı adresi ve Kopyala düğmesi, Claude ve ChatGPT için 3 adımlık rehber, "Bağlantıyı kes" / "Tümünü kes", işlem listesinde kayıtlara bağlantı, "Kayıt sayacını sıfırla". Test: `node tests/test-studio-mcp-panel.js`.
 
 ## Testler
 
@@ -273,6 +280,7 @@ node tests/test-studio-mcp.js          # 1) php -S + .htaccess taklidi + sahte a
                                        #    yetkisiz erişim, yanlış veri, belirsiz müşteri, mükerrer (paralel dahil), çakışma, sürüm, toplu + panelden geri yükleme, ücret yok
 node tests/test-studio-mcp-apache.js   # gerçek Apache + mod_php (MultiViews açık, Options yalnız Indexes): .htaccess kuralları, https yönlendirmesi, Authorization geçişi, acme-challenge, kapalı kitaplık, kapalı v1/studio-ortak.php; studio-test gerçek arka uçla
 node tests/test-studio-ortak.js        # ortak veri kitaplığı panelsiz: kayıt, sürüm, mükerrer, otomatik kopya, şifre kilidi, doğrudan erişim
+node tests/test-studio-mcp-panel.js    # Ayarlar → Sohbet bağlantıları: panel API (oturum / Origin / CSRF, kurulu değil, kapalı, liste, kes, tümünü kes, sayaç, şifre değişimi) + arayüz (masaüstü, telefon)
 ```
 
 - `php` (ya da `pdo_sqlite`) yoksa iki test de ATLA der. Apache ya da `mod_php` yoksa Apache testi ATLA der.
@@ -284,4 +292,5 @@ node tests/test-studio-ortak.js        # ortak veri kitaplığı panelsiz: kayı
 - **Panelin test kurulumu:** panel (`../index.php`) ayar yolunu `private/studio-v1` olarak sabit yazar. `public_html/studio-test/v1/` kurulursa panel canlı veriyi kullanır. MCP (gerçek arka uç dahil) klasör adından türetir: `studio-test` için `private/studio-test-v1/config.php` ve oradaki `dsn` kullanılır. Test kurulumunda bu `dsn` mutlaka ayrı bir veritabanı olmalı (canlı ayar dosyası kopyalanırsa sohbet canlı veriye yazar).
 - **Belirsiz saat ifadeleri:** sunucu yalnız `YYYY-AA-GG` ve `SS:DD` kabul eder; "öğleden sonra" gibi ifadeleri sohbet modeli sormalıdır (araç açıklamaları ve talimat bunu söyler). Model yine de bir saat uydurursa sunucu bunu ayırt edemez.
 - **ChatGPT `connector/oauth/{callback_id}`:** önek varsayılan olarak izinlidir. Daha dar tutmak için yönetim sayfasında görünen tam adres `mcp_redirect_izinli`'ye yazılabilir.
-- **Kayıt kotası:** günlük 50'lik genel kota çok IP'li biri tarafından geçerli kayıtlarla doldurulabilir (yukarıda "Kalan risk"). Ayarlar ekranına "kayıt sayacını sıfırla" düğmesi eklenmeli (`mcp_kayit_sayaci_sifirla()`).
+- **Kayıt kotası:** günlük 50'lik genel kota çok IP'li biri tarafından geçerli kayıtlarla doldurulabilir (yukarıda "Kalan risk"). Sahip Ayarlar → Sohbet bağlantıları → "Kayıt sayacını sıfırla" ile sıfırlar.
+- **Kapalıyken liste:** `mcp_acik => false` iken Ayarlar bağlantıları göstermez (depo açılmaz). Yeniden açılınca eski bağlantılar çalışır; o zaman Ayarlar'dan kesilebilir.

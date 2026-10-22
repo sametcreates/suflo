@@ -411,6 +411,66 @@ function kayitlari_ekle(array $ekle): void {
     }
 }
 
+/* ---------------- Sohbet baglantilari (MCP) ---------------- */
+
+/**
+ * Ayarlar -> "Sohbet baglantilari". Yalniz oturum denetiminden SONRA (switch icinden) cagrilir; buraya gelen istek
+ * yukaridaki Origin + X-Studio + JSON + oturum denetimlerinin hepsinden gecmistir (MCP icin ayri bir giris yolu yok).
+ * MCP kitapligi panelle ayni uygulama klasorundedir (public_html/studio/mcp-kitaplik/); yoksa "kurulu degil" doner.
+ * config 'mcp_acik' => false ise MCP deposu hic acilmaz, bos durum doner. Jeton, ozet ya da sir hicbir yanita girmez.
+ * Doner: null = kurulu degil, false = kapali, true = acik (kitaplik yuklu, mcp_baslat yapildi).
+ */
+function mcp_panel_hazirla(): ?bool {
+    static $durum = 0;
+    if ($durum !== 0) return $durum;
+    $kok = dirname(__DIR__);
+    $yukle = $kok . '/mcp-kitaplik/yukle.php';
+    if (!is_file($yukle)) return $durum = null;
+    if (!defined('SUFLO_MCP')) define('SUFLO_MCP', 1);
+    if (!defined('SUFLO_MCP_PANEL')) define('SUFLO_MCP_PANEL', 1);   // kitaplik kurulum hatasinda yanit basip cikmasin, istisna atsin
+    require_once $yukle;
+    mcp_baslat($kok);
+    return $durum = mcp_acik_mi();
+}
+/** Panelle MCP ayni ayar dosyasini okuyorsa (canli kurulum) panel sifre izi MCP'ye uygulanir: sifre degistiyse eski baglantilar listede "aktif" gorunmez. */
+function mcp_panel_sifre_izi(): void {
+    global $configPath;
+    $a = realpath(mcp_ortam('ozel') . '/config.php');
+    if ($a !== false && $a === realpath($configPath)) mcp_sifre_izi_uygula(sahip_sifre_izi());
+}
+function mcp_panel_durum(): array {
+    $acik = mcp_panel_hazirla();
+    $bos = ['kurulu' => $acik !== null, 'acik' => (bool)$acik, 'adres' => $acik === null ? null : mcp_ortam('kaynak'),
+        'baglantilar' => [], 'gunluk' => [], 'kayit' => null];
+    if (!$acik) return $bos;
+    mcp_panel_sifre_izi();
+    $n = time();
+    $b = array_values(array_filter(mcp_baglantilar(), fn ($r) => $r['durum'] === 'aktif' && (int)$r['bitis'] > $n));
+    $bos['baglantilar'] = array_map(fn ($r) => [
+        'id' => (string)$r['id'], 'istemci' => (string)$r['istemci'], 'hostlar' => $r['yonlendirme_hostlari'],
+        'kapsam' => array_values(array_filter(explode(' ', (string)$r['kapsam']))),
+        'olusturma' => (int)$r['olusturma'], 'sonKullanim' => $r['son_kullanim'] === null ? null : (int)$r['son_kullanim'],
+    ], $b);
+    $bos['gunluk'] = array_map(fn ($r) => [
+        'zaman' => (int)$r['zaman'], 'istemci' => (string)$r['istemci'], 'olay' => (string)$r['olay'], 'sonuc' => (string)$r['sonuc'],
+        'kayitlar' => array_values(array_filter((array)$r['etkilenen'], 'is_string')), 'ozet' => (string)$r['ozet'],
+    ], mcp_gunluk_son(20));
+    $bos['kayit'] = mcp_kayit_sayaci();
+    return $bos;
+}
+/** Panel MCP islemi: istisnalari panelin JSON hatalarina cevirir. */
+function mcp_panel(callable $f): void {
+    try {
+        $sonuc = $f() + ['mcp' => mcp_panel_durum()];
+    } catch (Throwable $e) {
+        if ((function_exists('mcp_mesgul_mu') && mcp_mesgul_mu($e)) || mesgul_mu($e)) hata(503, 'mesgul', MESGUL_MESAJI);
+        error_log('suflo-studio mcp paneli: ' . $e->getMessage());
+        if ($e instanceof McpKurulumHatasi) hata(503, 'mcp_kurulum', 'Sohbet bağlantısı ayarları okunamadı (sunucu ayarlarını kontrol et).');
+        hata(500, 'sunucu', SUNUCU_HATASI);
+    }
+    basari($sonuc);
+}
+
 /* ---------------- Islemler ---------------- */
 
 try {
@@ -575,6 +635,20 @@ try {
                 cihaz_tani(null);
             });
             basari();
+
+        case 'mcp_durum':
+            mcp_panel(fn () => []);
+
+        case 'mcp_baglanti_kes':
+            $mid = $G['id'] ?? null;
+            if (!is_string($mid) || !preg_match('/^[A-Za-z0-9_-]{1,100}$/', $mid)) hata(422, 'gecersiz', 'Bağlantı kimliği geçersiz.');
+            mcp_panel(fn () => ['kesildi' => mcp_panel_hazirla() === true && mcp_baglanti_kes($mid)]);
+
+        case 'mcp_tumunu_kes':
+            mcp_panel(fn () => ['kesilen' => mcp_panel_hazirla() === true ? mcp_tumunu_kes() : 0]);
+
+        case 'mcp_kayit_sayaci_sifirla':
+            mcp_panel(fn () => ['sifirlandi' => mcp_panel_hazirla() === true && mcp_kayit_sayaci_sifirla()]);
 
         case 'oturumlari_kapat':
             islem(function () {

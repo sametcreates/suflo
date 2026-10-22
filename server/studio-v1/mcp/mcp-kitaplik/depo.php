@@ -23,6 +23,7 @@ if (!defined('SUFLO_MCP')) { http_response_code(404); exit; }
 
 const MCP_SEMA = '3';
 const MCP_KAYIT_SAYACI = 'kayit|toplam';         // DCR genel gunluk sayaci (mcp_sayac anahtari)
+const MCP_KAYIT_GUNLUK_SINIRI = 50;              // DCR: gunde en cok bu kadar yeni istemci (genel)
 const MCP_KAYITSIZ_ISTEMCI_OMRU = 6 * 3600;     // hic baglanmamis (grant almamis) istemci bu sureden sonra silinir
 
 function mcp_mesgul_mu(Throwable $e): bool {
@@ -341,11 +342,23 @@ function mcp_toplu_kod_ver(string $izin, array $islemler): array {
 
 /* ---------------- Studio Ayarlar icin (panel entegrasyonu) ---------------- */
 
-/** "Sohbet baglantilari" listesi: istemci, kapsam, olusturma, son kullanim, durum. Jeton / ozet donmez. */
+/**
+ * "Sohbet baglantilari" listesi: istemci, donus adresinin host'u (izinli listeden; istemci adi kayitta serbest yazildigi
+ * icin hangi sohbetin bagli oldugunu bu gosterir), kapsam, olusturma, son kullanim, durum. Jeton / ozet / sir donmez.
+ */
 function mcp_baglantilar(): array {
-    return mcp_hepsi("SELECT i.id, COALESCE(s.ad, 'Bilinmeyen istemci') AS istemci, i.kapsam, i.olusturma, i.son_kullanim, i.bitis,
+    return array_map(function ($r) {
+        $hostlar = [];
+        foreach ((array)(json_decode((string)($r['yonlendirmeler'] ?? '[]'), true) ?: []) as $u) {
+            $h = is_string($u) ? strtolower((string)parse_url($u, PHP_URL_HOST)) : '';
+            if ($h !== '' && !in_array($h, $hostlar, true)) $hostlar[] = $h;
+        }
+        unset($r['yonlendirmeler']);
+        $r['yonlendirme_hostlari'] = $hostlar;
+        return $r;
+    }, mcp_hepsi("SELECT i.id, COALESCE(s.ad, 'Bilinmeyen istemci') AS istemci, s.yonlendirmeler, i.kapsam, i.olusturma, i.son_kullanim, i.bitis,
             i.durum, i.iptal_nedeni FROM mcp_izin i LEFT JOIN mcp_istemci s ON s.id = i.istemci
-        WHERE i.durum = 'aktif' OR i.iptal_zamani > ? ORDER BY COALESCE(i.son_kullanim, i.olusturma) DESC LIMIT 200", [mcp_zaman() - 30 * 86400]);
+        WHERE i.durum = 'aktif' OR i.iptal_zamani > ? ORDER BY COALESCE(i.son_kullanim, i.olusturma) DESC LIMIT 200", [mcp_zaman() - 30 * 86400]));
 }
 function mcp_baglanti_kes(string $izin): bool {
     $var = mcp_tek("SELECT 1 AS v FROM mcp_izin WHERE id = ? AND durum = 'aktif'", [$izin]) !== null;
@@ -366,6 +379,12 @@ function mcp_kayit_sayaci_sifirla(): bool {
     $var = mcp_calistir('DELETE FROM mcp_sayac WHERE anahtar = ?', [MCP_KAYIT_SAYACI]) > 0;
     mcp_gunluk('Studio', 'kayit_sayaci_sifirla', 'tamam', [], 'Sahip istemci kaydi gunluk sayacini sifirladi');
     return $var;
+}
+/** DCR genel gunluk sayacinin bugunku degeri (Ayarlar'da gosterilir): ['sayi' => int, 'sinir' => int]. */
+function mcp_kayit_sayaci(): array {
+    $r = mcp_tek('SELECT pencere, sayi FROM mcp_sayac WHERE anahtar = ?', [MCP_KAYIT_SAYACI]);
+    $no = intdiv(mcp_zaman(), 86400) * 86400;
+    return ['sayi' => $r && (int)$r['pencere'] === $no ? (int)$r['sayi'] : 0, 'sinir' => MCP_KAYIT_GUNLUK_SINIRI];
 }
 function mcp_gunluk_son(int $adet = 100): array {
     $adet = max(1, min(500, $adet));
