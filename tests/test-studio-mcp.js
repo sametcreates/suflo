@@ -404,7 +404,7 @@ async function calis() {
   r = await I.kodTakas("studio", A.client_id, a, CLAUDE, { code_verifier: O.pkce().verifier });
   ok("token: yanlis code_verifier -> invalid_grant", r.status === 400 && r.json.error === "invalid_grant", r.metin);
   a = await I.yetkiAl("studio", { client_id: A.client_id, redirect_uri: CLAUDE });
-  O.db(DB, "UPDATE mcp_kod SET son = 1 WHERE ozet = ?", [O.sha256(a.kod)]);
+  O.db(DB, "UPDATE mcp_kod SET son = ? WHERE ozet = ?", [Math.floor(Date.now() / 1000) - 60, O.sha256(a.kod)]);
   r = await I.kodTakas("studio", A.client_id, a, CLAUDE);
   ok("token: suresi dolmus kod -> invalid_grant", r.status === 400 && r.json.error === "invalid_grant", r.metin);
   r = await I.token("studio", { grant_type: "password", client_id: A.client_id });
@@ -568,7 +568,7 @@ async function calis() {
   j = (r.json && r.json.result) || {};
   var kod2 = j.structuredContent && j.structuredContent.onay_kodu;
   ok("toplu_onizle: gecerli karisik islemler (musterisiz tum gun + durum) -> onay_kodu", j.structuredContent && j.structuredContent.gecerli === true && kod2, r.metin);
-  O.db(DB, "UPDATE mcp_toplu SET son = 1 WHERE kod_ozet = ?", [O.sha256(kod2)]);
+  O.db(DB, "UPDATE mcp_toplu SET son = ? WHERE kod_ozet = ?", [Math.floor(Date.now() / 1000) - 60, O.sha256(kod2)]);
   r = await I.arac("studio", J, "studio_toplu_uygula", { onay_kodu: kod2 });
   ok("toplu_uygula: 15 dakikasi dolmus kod -> isError (yeniden onizle)", r.json.result.isError === true && /süresi doldu/.test(r.json.result.content[0].text), r.metin);
   // Onizlemeden sonra musteri silinir: uygulama basarisiz (isError) ama structuredContent outputSchema'ya uymali ('sonuc' nesne, [] degil)
@@ -823,7 +823,7 @@ async function calis() {
   /* ================= Sure / audience / sifre / kapatma ================= */
   a = await I.yetkiAl("studio", { client_id: A.client_id, redirect_uri: CLAUDE });
   var T7 = (await I.kodTakas("studio", A.client_id, a, CLAUDE)).json || {};
-  O.db(DB, "UPDATE mcp_jeton SET son = 1 WHERE ozet = ?", [O.sha256(T7.access_token)]);
+  O.db(DB, "UPDATE mcp_jeton SET son = ? WHERE ozet = ?", [Math.floor(Date.now() / 1000) - 60, O.sha256(T7.access_token)]);
   r = await I.rpc("studio", T7.access_token, "tools/list");
   w = O.wwwCoz(r.headers["www-authenticate"]);
   ok("suresi dolmus access token -> 401 invalid_token", r.status === 401 && w.error === "invalid_token" && /suresi/.test(w.error_description || ""), r.headers["www-authenticate"]);
@@ -1308,7 +1308,7 @@ async function gercekArka() {
     O.db(STUDIO_DB, "SELECT COUNT(*) AS c FROM kayitlar WHERE tur = 'etkinlik' AND veri LIKE ?", ['%"baslik":"Özge çekim"%'])[0].c === 1 && sayilar() === once, r.metin);
   aOnce = anlikSay();
   r = await arac(J, "studio_toplu_onizle", { islemler: [{ islem: "icerik_olustur", musteri_id: D, baslik: "Süresi dolacak", tur: "post" }] });
-  O.db(DB2, "UPDATE mcp_toplu SET son = 1 WHERE kod_ozet = ?", [O.sha256(yapi(r).onay_kodu)]);
+  O.db(DB2, "UPDATE mcp_toplu SET son = ? WHERE kod_ozet = ?", [Math.floor(Date.now() / 1000) - 60, O.sha256(yapi(r).onay_kodu)]);
   r = await arac(J, "studio_toplu_uygula", { onay_kodu: yapi(r).onay_kodu });
   ok("[gercek] toplu_uygula: suresi dolmus kod -> isError, uygulanmadi", sonuc(r).isError === true && /süresi doldu/.test(metin(r)) && sayilar() === once, r.metin);
   r = await arac(J, "studio_toplu_uygula", { onay_kodu: K1 });
