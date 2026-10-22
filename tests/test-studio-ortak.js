@@ -91,8 +91,9 @@ ok("panelin kilidi: sinir asilinca kilitli (surec cikmaz), kilitteyken dogru sif
   S.sifre_kilitte_dogru.durum === "kilitli" && S.sifre_kilitte_dogru.iz === null, j([S.sifre_yanlis, S.sifre_kilitte_dogru]));
 ok("panelin sifre_dene kilitte StudioHatasi 429 kilit (panelde 429 yaniti)", !S.sifre_dene_panel_kilit.tamam && S.sifre_dene_panel_kilit.http === 429 && S.sifre_dene_panel_kilit.kod === "kilit", j(S.sifre_dene_panel_kilit));
 ok("yalniz yanlis sifre denemeleri sayilir (kilide takilanlar sayilmaz)", S.giris_kaydi === 2, S.giris_kaydi);
-ok("sifre ayarlanmamis: kurulmadi, iz null, deneme sayilmaz", S.kurulmadi.dene.durum === "kurulmadi" && S.kurulmadi.dene.iz === null && S.kurulmadi.iz === null &&
-  S.kurulmadi.giris_kaydi === 2, j(S.kurulmadi));
+ok("sifre ayarlanmamis: kurulmadi, iz null, deneme sayilmaz", S.kurulmadi.ilk.durum === "kurulmadi" && S.kurulmadi.dene.durum === "kurulmadi" && S.kurulmadi.dene.iz === null &&
+  S.kurulmadi.iz === null && S.kurulmadi.giris_kaydi === 1, j(S.kurulmadi));
+ok("sahip_sifre_dene panel gibi once sifre_izi_denetle: etkin ozet degisince eski hatali denemeler silinir", S.giris_kaydi === 2 && S.kurulmadi.temizlendi === 0, j(S.kurulmadi));
 
 /* ---- dogrudan HTTP (php -S; .htaccess yok: yalniz kitapligin kendi korumasi) ---- */
 function bosPort() { return new Promise(function (res) { var s = net.createServer(); s.listen(0, "127.0.0.1", function () { var p = s.address().port; s.close(function () { res(p); }); }); }); }

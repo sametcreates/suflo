@@ -456,7 +456,7 @@ function mcp_panel_durum(): array {
     $bos['gunluk'] = array_map(fn ($r) => [
         'zaman' => (int)$r['zaman'], 'istemci' => (string)$r['istemci'], 'olay' => (string)$r['olay'], 'sonuc' => (string)$r['sonuc'],
         'kayitlar' => array_values(array_filter((array)$r['etkilenen'], 'is_string')), 'ozet' => (string)$r['ozet'],
-    ], mcp_gunluk_son(20));
+    ], mcp_gunluk_son(100));
     $bos['kayit'] = mcp_kayit_sayaci();
     return $bos;
 }

@@ -81,7 +81,7 @@ Arayüz kodu iki seçenekte de aynıdır: `assets.suflo.app` üzerinden açılı
 
 Önce kontrol et:
 
-1. hPanel → **Gelişmiş → PHP Yapılandırması**: PHP **8.0 veya üstü** olmalı; `pdo_sqlite` (ya da MySQL kullanacaksan `pdo_mysql`) eklentisi açık olmalı.
+1. hPanel → **Gelişmiş → PHP Yapılandırması**: PHP **8.1 veya üstü** (8.3 önerilir) olmalı; `pdo_sqlite` (ya da MySQL kullanacaksan `pdo_mysql`) eklentisi açık olmalı.
 2. `assets.suflo.app` için Pro servisinin durduğu yeri bul: `public_html/pro/v1/index.php` ve onun bir üstünde `private/pro-v1/`.
 
 Klasör yapısı, Pro servisiyle aynı kök altında şöyle olmalı:

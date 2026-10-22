@@ -104,8 +104,13 @@ $S['sifre_yanlis'] = [sahip_sifre_dene('yanlis-1')['durum'], sahip_sifre_dene('y
 $S['sifre_kilitte_dogru'] = sahip_sifre_dene('ornek-ortak-sifre-1');
 $S['sifre_dene_panel_kilit'] = yakala(fn() => sifre_dene('ornek-ortak-sifre-1', null));
 $S['giris_kaydi'] = (int)tek('SELECT COUNT(*) AS c FROM girisler')['c'];
-// sifre ayarlanmamis: deneme sayilmaz
+// sifre ayarlanmamis: deneme sayilmaz. Etkin ozet degistigi icin ilk deneme panel gibi once sifre_izi_denetle() yapar:
+// eski hatali denemeler (girisler) silinir. Sonra eklenen bir kayit ikinci denemede artmaz (deneme sayilmaz).
 $GLOBALS['C']['password_hash'] = '';
-$S['kurulmadi'] = ['dene' => sahip_sifre_dene('herhangi'), 'iz' => sahip_sifre_izi(), 'giris_kaydi' => (int)tek('SELECT COUNT(*) AS c FROM girisler')['c']];
+$ilk = sahip_sifre_dene('herhangi');
+$temizlendi = (int)tek('SELECT COUNT(*) AS c FROM girisler')['c'];
+calistir('INSERT INTO girisler (kim, ip, cihaz, zaman) VALUES (?, ?, ?, ?)', [yeni_id(), 'ornek-ip', null, simdi()]);
+$S['kurulmadi'] = ['ilk' => $ilk, 'dene' => sahip_sifre_dene('herhangi'), 'iz' => sahip_sifre_izi(), 'temizlendi' => $temizlendi,
+    'giris_kaydi' => (int)tek('SELECT COUNT(*) AS c FROM girisler')['c']];
 
 echo json_encode($S, JSON_UNESCAPED_UNICODE);

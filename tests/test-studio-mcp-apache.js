@@ -159,6 +159,19 @@ async function calis() {
   }), httpSonuc);
   r = await O.istek({ port: PORT, yol: "/studio/v1/index.php" });
   ok("Apache: vekil basligi olmayan duz http istegi de 301 https", r.status === 301 && r.headers.location === "https://127.0.0.1:" + PORT + "/studio/v1/index.php", [r.status, r.headers.location]);
+  // Kok .well-known'dan ic yeniden yazilan kesif adresleri: http istegi KENDI https adresine gider (ic dosya yoluna -> 404 degil)
+  var kesifHttp = ["/.well-known/oauth-protected-resource/studio/mcp", "/.well-known/oauth-authorization-server/studio", "/.well-known/openid-configuration/studio",
+    "/.well-known/oauth-protected-resource/studio-test/mcp", "/studio/.well-known/openid-configuration", "/studio/mcp?a=1&b=%2F"];
+  var kesifSonuc = [];
+  for (hy = 0; hy < kesifHttp.length; hy++) {
+    r = await O.istek({ port: PORT, yol: kesifHttp[hy], baslik: { "X-Forwarded-Proto": "http" } });
+    kesifSonuc.push([r.status, r.headers.location]);
+  }
+  ok("Apache: http kesif adresleri (kok .well-known, studio ve studio-test) ve sorgulu /studio/mcp kendi https adresine 301", kesifSonuc.every(function (x, k) {
+    return x[0] === 301 && x[1] === "https://127.0.0.1:" + PORT + kesifHttp[k];
+  }), kesifSonuc);
+  r = await I.istek({ yol: kesifHttp[0] });
+  ok("Apache: yonlendirilen https kesif adresi 200 (PRM)", r.status === 200 && r.json && r.json.resource === KOK + "/studio/mcp", [r.status, r.metin]);
   r = await I.istek({ yol: "/studio/" });
   r2 = await I.istek({ yol: "/studio/v1/index.php" });
   ok("Apache: https istekleri (X-Forwarded-Proto: https) yonlendirilmez: /studio/ 200 arayuz, /studio/v1/index.php 200 panel", r.status === 200 && !r.headers.location &&

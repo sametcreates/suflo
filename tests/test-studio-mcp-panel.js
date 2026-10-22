@@ -4,7 +4,7 @@
  *   API: mcp_durum / mcp_baglanti_kes / mcp_tumunu_kes / mcp_kayit_sayaci_sifirla panelin oturum + Origin + X-Studio + JSON
  *   denetimlerinden aynen gecer (oturumsuz 401, yabanci Origin 403, basliksiz 403, yanlis tur 415; hicbirinde bir sey
  *   kesilmez); MCP kurulu degilken ve mcp_acik=false iken bos durum (MCP deposu acilmaz); baglanti listesi (istemci, donus
- *   host'u, kapsam, olusturma, son kullanim), son 20 islem (arac, zaman, sonuc, kayit kimlikleri), kesilen baglantinin
+ *   host'u, kapsam, olusturma, son kullanim), son 100 islem (arac, zaman, sonuc, kayit kimlikleri), kesilen baglantinin
  *   jetonu sonra 401 / yenileme invalid_grant, digerleri calisir; tumunu kes; kayit sayaci; panelde sifre degisince liste bos.
  *   Arayuz (Playwright, masaustu + telefon): adres + kopyala, Claude / ChatGPT rehberi, liste, islem gunlugundeki kayit
  *   baglantisi, "Bağlantıyı kes" ve "Tümünü kes" (sonra jeton 401), kayit sayacini sifirla, telefonda yatay tasma yok.
@@ -159,8 +159,18 @@ async function api() {
     bA.hostlar.join() === "claude.ai" && bB.hostlar.join() === "chatgpt.com" && bA.kapsam.indexOf("studio.yaz") !== -1 && bB.kapsam.join() === "studio.oku" &&
     bA.olusturma > 0 && bB.sonKullanim > 0 && bA.id === izinOf(A.erisim), r.metin);
   ok("[api] liste alanlari yalniz izinli olanlar (jeton / ozet / sir yok)", bA && Object.keys(bA).sort().join() === "hostlar,id,istemci,kapsam,olusturma,sonKullanim", bA && Object.keys(bA).join());
-  ok("[api] gunluk: en cok 20 satir, en yenisi ustte, arac / zaman / sonuc", d.gunluk.length === 20 && d.gunluk[0].olay === "studio_bugun" && d.gunluk[0].sonuc === "tamam" &&
-    d.gunluk[0].zaman >= d.gunluk[19].zaman && Object.keys(d.gunluk[0]).sort().join() === "istemci,kayitlar,olay,ozet,sonuc,zaman", JSON.stringify(d.gunluk[0]));
+  var glSay = O.db(MCP_DB, "SELECT COUNT(*) AS c FROM mcp_gunluk")[0].c;
+  ok("[api] gunluk: 100'e kadar butun satirlar (20 ile kesilmez), en yenisi ustte, arac / zaman / sonuc", glSay > 20 && glSay < 100 && d.gunluk.length === glSay &&
+    d.gunluk[0].olay === "studio_bugun" && d.gunluk[0].sonuc === "tamam" && d.gunluk[0].zaman >= d.gunluk[glSay - 1].zaman &&
+    Object.keys(d.gunluk[0]).sort().join() === "istemci,kayitlar,olay,ozet,sonuc,zaman", [glSay, d.gunluk.length, JSON.stringify(d.gunluk[0])]);
+  // Tasarim: Ayarlar'da son 100 islem gorunur. 120 ek satirla: tam 100 satir, en yenisi ustte
+  var glZaman = Math.floor(Date.now() / 1000) + 5;
+  for (var gi = 0; gi < 120; gi++) O.db(MCP_DB, "INSERT INTO mcp_gunluk (zaman, istemci, olay, sonuc, etkilenen, ozet, izin) VALUES (?, 'Claude', 'studio_takvim', 'tamam', '[]', ?, NULL)", [glZaman, "deneme " + gi]);
+  var r100 = await panel({ islem: "mcp_durum" }, c);
+  var d100 = r100.json && r100.json.mcp;
+  ok("[api] gunluk: son 100 islem (tasarim), en yenisi ustte", d100 && d100.gunluk.length === 100 && d100.gunluk[0].ozet === "deneme 119" && d100.gunluk[99].ozet === "deneme 20",
+    d100 && [d100.gunluk.length, (d100.gunluk[0] || {}).ozet, (d100.gunluk[d100.gunluk.length - 1] || {}).ozet]);
+  O.db(MCP_DB, "DELETE FROM mcp_gunluk WHERE ozet LIKE 'deneme %'");
   ok("[api] yanitta jeton, ozet ya da sir yok", sirYok(r.metin, [A, B]));
   for (i = 0; i < 3; i++) await I.arac("studio", A.erisim, "studio_musteri_ara", { sorgu: "Panel" });
   ok("[api] kayit sayaci: bugun 2 kayit", d.kayit.sayi === 2, JSON.stringify(d.kayit));
@@ -270,7 +280,8 @@ async function arayuz(pw) {
   ok("[ui] liste: istemci, host, izin, baglanma ve son kullanim", satirlar.length === 2 && satirlar.some(function (s) { return /Claude/.test(s) && /claude\.ai/.test(s) && /Okuma \+ yazma/.test(s) && /Bağlandı:/.test(s); }) &&
     satirlar.some(function (s) { return /ChatGPT/.test(s) && /chatgpt\.com/.test(s) && /Yalnız okuma/.test(s); }), satirlar.join(" | "));
   var islemler = await p.locator(".mcp-islem").count();
-  ok("[ui] son islemler en cok 20 satir", islemler > 0 && islemler <= 20, islemler);
+  var islemEtiket = await p.locator(".mcp-bolum:has(.mcp-gunluk) p.soluk").first().innerText();
+  ok("[ui] son islemler (en cok 100); etiket gercek sayiyi yazar", islemler > 20 && islemler <= 100 && islemEtiket.indexOf("son " + islemler + " işlem") !== -1, [islemler, islemEtiket]);
   var sayfaMetni = await p.locator(".mcp-kutu").innerText();
   ok("[ui] ekranda jeton / sir yok", sirYok(sayfaMetni, [A, B]) && sayfaMetni.indexOf(A.client_id) === -1);
   var kayitLink = p.locator(".mcp-islem:has-text('Müşteri ekleme') .mcp-kayitlar a").first();

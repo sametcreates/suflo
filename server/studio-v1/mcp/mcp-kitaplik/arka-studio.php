@@ -362,7 +362,7 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
         return $this->koru(function () use ($islemler, $b) {
             $v = $this->oku();
             $var = tur_haritasi(tum_kayitlar());
-            $sanal = ['ogeler' => [], 'guncellenen' => []];
+            $sanal = ['ogeler' => [], 'guncellenen' => [], 'sayilmaz' => []];
             $satirlar = [];
             foreach (array_values($islemler) as $i => $op) $satirlar[] = $this->opDogrula($op, $i, $v, $var, $sanal, $b)['satir'];
             $hata = (bool)array_filter($satirlar, fn ($s) => $s['durum'] === 'hata');
@@ -374,10 +374,10 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
 
     public function toplu_uygula(array $islemler, string $toplu_anahtar, McpBaglam $b): array {
         try {
-            return $this->koru(fn () => islem(function () use ($islemler, $b) {
+            return $this->koru(fn () => islem(function () use ($islemler, $toplu_anahtar, $b) {
                 $v = $this->oku();
                 $var = tur_haritasi(tum_kayitlar());
-                $sanal = ['ogeler' => [], 'guncellenen' => []];
+                $sanal = ['ogeler' => [], 'guncellenen' => [], 'sayilmaz' => []];
                 $hazir = [];
                 foreach (array_values($islemler) as $i => $op) {
                     $d = $this->opDogrula($op, $i, $v, $var, $sanal, $b);
@@ -389,7 +389,6 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
                 }
                 gunluk_anlik();
                 $anlik = anlik_al('mcp_toplu_oncesi');
-                $sayac = [];
                 $kayitlar = [];
                 $etkilenen = [];
                 $say = ['olusturulan' => 0, 'guncellenen' => 0, 'zaten_vardi' => 0];
@@ -401,11 +400,10 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
                         continue;
                     }
                     if ($d['yeni']) {
-                        // Kimlik: grant + islemin kanonik icerigi + ayni islemin kacinci tekrari. Ayni liste baska bir onay koduyla
-                        // yeniden onaylansa ya da yarida kesilen uygulama yeniden denense de ikinci kayit acilmaz.
-                        $oz = mcp_kanonik_json($d['op']);
-                        $sayac[$oz] = ($sayac[$oz] ?? 0) + 1;
-                        $id = substr(hash('sha256', 'mcp|' . $b->izin_id . '|toplu|' . $oz . '|' . $sayac[$oz]), 0, 24);
+                        // Kimlik: grant + bu onay koduna ozgu anahtar + listedeki sira. Ayni kodla yeniden deneme ayni kimlige gider
+                        // (mukerrer yok). Baska bir kodla onaylanan ayni islem yeni kimlik alir: etkin bir kopyasi varsa anlamsal
+                        // mukerrer kurali (ayniIcerik / ayniEtkinlik -> 'zaten') yakalar; eski kopya iptal ya da arsivdeyse yeni kayit acilir.
+                        $id = substr(hash('sha256', 'mcp|' . $b->izin_id . '|toplu|' . $toplu_anahtar . '|' . $i), 0, 24);
                         $varolan = tek('SELECT tur FROM kayitlar WHERE id = ?', [$id]);
                         if ($varolan) {
                             if ((string)$varolan['tur'] !== $d['tur']) throw new RuntimeException('toplu kimlik cakismasi');
@@ -470,7 +468,7 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
                         . ' · ' . $this->zamanMetni($this->zamanAlanlari($temiz));
                     $s = ['yeni' => true, 'tur' => 'etkinlik', 'veri' => $veri] + $sonuc;
                     if ($e = $this->ayniEtkinlik($v, $temiz)) return ['satir' => $satir('uyari', $ozet, 'Aynı kayıt zaten var (' . $e['id'] . '); uygulanınca yeni kayıt açılmaz.'), 'zaten' => $e['id']] + $s;
-                    $c = array_map(fn ($o) => $this->cakisanDisa($o, $v), $this->zamanCakisanlari($v, $temiz, $sanal['ogeler']));
+                    $c = array_map(fn ($o) => $this->cakisanDisa($o, $v), $this->zamanCakisanlari($v, $temiz, $sanal['ogeler'], $sanal['sayilmaz']));
                     $sanal['ogeler'][] = ['tur' => 'etkinlik', 'k' => $temiz + ['id' => 'toplu-' . $sira], 'r' => $this->aralik($temiz)];
                     if ($c && ($op['cakismayi_onayla'] ?? false) !== true) return ['satir' => $satir('hata', $ozet, 'Çakışma: ' . $this->cakisanMetni($c) . '. Kullanıcı kabul ederse bu işleme cakismayi_onayla: true ekleyip yeniden önizle.')] + $s;
                     return ['satir' => $satir($c ? 'uyari' : 'gecerli', $ozet, $c ? 'Kullanıcının onayıyla çakışıyor: ' . $this->cakisanMetni($c) . '.' : null)] + $s;
@@ -489,6 +487,21 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
                     $sanal['guncellenen'][$id] = true;
                     $s = ['tur' => $tur, 'id' => $id, 'surum' => (int)$r['surum'], 'veri' => $this->durumVerisi($tur, $r, $op['yeni_durum'], $op['not'] ?? null, $b)] + $sonuc;
                     if ($r['durum'] === $op['yeni_durum']) return ['satir' => $satir('uyari', $ozet, 'Zaten bu durumda; yalnız geçmişe not düşülür.')] + $s;
+                    if ($tur === 'etkinlik') {
+                        // Takvimde sayilma degisiyorsa listedeki SONRAKI islemler bunu gorur: iptal / tamamlandi -> planlandi olan
+                        // cekim sonraki cekim_olustur icin cakisma sayilir; planlandi -> iptal / tamamlandi olan artik sayilmaz.
+                        $simdi = $this->sayilir($r);
+                        $sonra = $this->sayilir(['durum' => $op['yeni_durum']] + $r);
+                        if (!$simdi && $sonra) {
+                            $yeni = ['durum' => $op['yeni_durum']] + $r;
+                            // Yeniden planlanan cekimin kendi cakismasi tekil durum araciyla tutarli olarak engellemez, uyari olur
+                            $c = array_map(fn ($o) => $this->cakisanDisa($o, $v), $this->zamanCakisanlari($v, $yeni, $sanal['ogeler'], $sanal['sayilmaz']));
+                            $sanal['ogeler'][] = ['tur' => 'etkinlik', 'k' => $yeni, 'r' => $this->aralik($yeni)];
+                            if ($c) return ['satir' => $satir('uyari', $ozet, 'Yeniden planlanınca takvimde çakışıyor: ' . $this->cakisanMetni($c) . '. Kullanıcıya göster.')] + $s;
+                        } elseif ($simdi && !$sonra) {
+                            $sanal['sayilmaz'][$id] = true;
+                        }
+                    }
                     return ['satir' => $satir('gecerli', $ozet, null)] + $s;
                 }
             }
@@ -626,7 +639,10 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
         return implode(', ', array_map(fn ($m) => '“' . $this->musteriAdi($m) . '” (id: ' . $m['id'] . ')', $l));
     }
 
-    /** Yeni icerik verisi (panel alanlariyla); gecmise "Sohbetten eklendi (<istemci>)" satiri yazilir. */
+    /**
+     * Yeni icerik verisi (panel alanlariyla). Gecmis: "Sohbetten eklendi (<istemci>)" ve en sonda arayuzle ayni bicimde
+     * "Eklendi (<durum>)" (studio-core onayaGidis / hazirZamani bunu okur: dogrudan 'onayda' acilan icerigin onay bekleme tarihi).
+     */
     private function icerikVerisi(array $g, string $mid, array $v, McpBaglam $b): array {
         $cid = $g['cekim_id'] ?? null;
         if ($cid !== null) {
@@ -635,11 +651,12 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
             if (!empty($e['arsiv'])) throw new McpAracHatasi('Hiçbir şey kaydedilmedi: bağlı çekim arşivde.');
         }
         $durum = $g['durum'] ?? 'fikir';
+        $z = $this->damga();
         return [
             'musteriId' => $mid, 'baslik' => $g['baslik'], 'tur' => $g['tur'], 'durum' => $durum, 'cekimId' => $cid,
             'teslimTarihi' => $g['teslim_tarihi'] ?? null, 'planTarihi' => $g['plan_tarihi'] ?? null,
             'yayinTarihi' => $durum === 'yayinlandi' ? istanbul_gunu() : null, 'not' => $g['not'] ?? '',
-            'gecmis' => [['z' => $this->damga(), 'm' => 'Sohbetten eklendi (' . mcp_kisalt($b->istemci_adi, 120) . ')']],
+            'gecmis' => [['z' => $z, 'm' => 'Sohbetten eklendi (' . mcp_kisalt($b->istemci_adi, 120) . ')'], ['z' => $z, 'm' => 'Eklendi (' . self::DURUM_AD[$durum] . ')']],
         ];
     }
     /** Durum degisikligi verisi: arayuzdeki durumDegistir / etkinlikDurumu ile ayni (yayin tarihi, tamamlanma ani, gecmis satiri). */
@@ -698,11 +715,15 @@ return new class implements McpSahipDogrulayici, McpStudioArka {
         foreach ($v['blok'] as $k) if ($this->sayilir($k)) $l[] = ['tur' => 'blok', 'k' => $k, 'r' => $this->aralik($k)];
         return $l;
     }
-    /** aday ile cakisan sayilan kayitlar (core zamanCakisanlari): aday kendi kimligiyle karsilasmaz; uc uca degmek cakisma degil. */
-    private function zamanCakisanlari(array $v, array $aday, array $ek = []): array {
+    /**
+     * aday ile cakisan sayilan kayitlar (core zamanCakisanlari): aday kendi kimligiyle karsilasmaz; uc uca degmek cakisma degil.
+     * $ek: toplu listede daha once takvime giren sanal ogeler; $haric: toplu listede daha once takvimden cikan kimlikler (id => true).
+     */
+    private function zamanCakisanlari(array $v, array $aday, array $ek = [], array $haric = []): array {
         $r = $this->aralik($aday);
         $id = $aday['id'] ?? null;
-        return array_values(array_filter(array_merge($this->ogeler($v), $ek), fn ($o) => $o['k']['id'] !== $id && $o['r'][0] < $r[1] && $r[0] < $o['r'][1]));
+        return array_values(array_filter(array_merge($this->ogeler($v), $ek),
+            fn ($o) => $o['k']['id'] !== $id && !isset($haric[$o['k']['id']]) && $o['r'][0] < $r[1] && $r[0] < $o['r'][1]));
     }
     /** id -> cakistigi kayit idleri (core takvimCakismalari). */
     private function cakismaHaritasi(array $v): array {

@@ -275,7 +275,7 @@ function mcp_erisim_dogrula(string $jeton, ?string $guncelIz): array {
 
 /* ---------------- istek_anahtari (yazma araclari) ---------------- */
 
-const MCP_ISTEK_ASKIDA = 120;   // 'isleniyor' kaydi bu kadar saniyeden eskiyse (surec yarida kesildi) yok sayilir
+const MCP_ISTEK_ASKIDA = 120;   // 'isleniyor' kaydi bu kadar saniyeden eskiyse (surec yarida kesildi) AYNI girdiyle yeniden ayrilabilir
 
 /** Girdinin parmak izi: arac adi + kanonik JSON (istek_anahtari ve cakismayi_onayla haric; onay sonradan verilebilir). */
 function mcp_girdi_ozeti(string $arac, array $girdi): string {
@@ -286,6 +286,9 @@ function mcp_girdi_ozeti(string $arac, array $girdi): string {
  * Yazma aracindan ONCE: grant + istek_anahtari kaydini ayirir (tek islemde). Ayni anahtar baska bir arac ya da farkli
  * girdiyle kullanilmissa null DEGIL hata metni doner ve arka uca gidilmez. Doner: ['yeni' => bool, 'ozet' => anahtar ozeti]
  * ya da ['hata' => metin].
+ * Kayit varsa girdi denetimi HER ZAMAN yapilir: askida kalmis ('isleniyor', MCP_ISTEK_ASKIDA'dan eski) bir kayitta da
+ * arka uc yazmis olabilir (yalniz mcp_istek_bitir basarisiz olmustur); anahtar ilk girdisine bagli kalir. Askidaki kayit
+ * yalniz AYNI girdiyle yeniden ayrilir.
  */
 function mcp_istek_ayir(string $izin, string $arac, array $girdi): array {
     $anahtar = mcp_ozet('mcp|' . $izin . '|' . (string)$girdi['istek_anahtari']);
@@ -293,20 +296,19 @@ function mcp_istek_ayir(string $izin, string $arac, array $girdi): array {
     $n = mcp_zaman();
     return mcp_islem(function () use ($anahtar, $izin, $arac, $gz, $n) {
         $r = mcp_tek('SELECT arac, girdi_ozet, durum, zaman FROM mcp_istek WHERE anahtar_ozet = ?', [$anahtar]);
-        if ($r && ($r['durum'] === 'tamam' || (int)$r['zaman'] > $n - MCP_ISTEK_ASKIDA)) {
-            if ($r['arac'] !== $arac || !hash_equals((string)$r['girdi_ozet'], $gz)) {
-                return ['hata' => 'Bu istek_anahtari daha önce farklı bir istekte kullanıldı; hiçbir şey yapılmadı. Aynı isteği tekrarlıyorsan alanları değiştirme; yeni bir istek için yeni bir istek_anahtari ver.'];
-            }
-            return ['yeni' => false, 'ozet' => $anahtar];
+        if ($r && ($r['arac'] !== $arac || !hash_equals((string)$r['girdi_ozet'], $gz))) {
+            return ['hata' => 'Bu istek_anahtari daha önce farklı bir istekte kullanıldı; hiçbir şey yapılmadı. Aynı isteği tekrarlıyorsan alanları değiştirme; yeni bir istek için yeni bir istek_anahtari ver.'];
         }
+        if ($r && ($r['durum'] === 'tamam' || (int)$r['zaman'] > $n - MCP_ISTEK_ASKIDA)) return ['yeni' => false, 'ozet' => $anahtar];
         mcp_calistir('INSERT OR REPLACE INTO mcp_istek (anahtar_ozet, izin, arac, girdi_ozet, durum, zaman) VALUES (?, ?, ?, ?, ?, ?)',
             [$anahtar, $izin, $arac, $gz, 'isleniyor', $n]);
         return ['yeni' => true, 'ozet' => $anahtar];
     });
 }
 /**
- * Yazma aracindan SONRA: bir kayit yazildiysa anahtar kalici olarak bu girdiye baglanir ('tamam'); hicbir sey yazilmadiysa
- * (hata, cakisma, onizleme) ve kaydi bu cagri actiysa kayit silinir: model duzeltilmis girdiyle ayni anahtari kullanabilir.
+ * Yazma aracindan SONRA: bir kayit yazildiysa ya da arka uc 'zaten_vardi' dediyse anahtar kalici olarak bu girdiye baglanir
+ * ('tamam'); hicbir sey yazilmadiysa (hata, cakisma, onizleme) ve kaydi bu cagri actiysa kayit silinir: model duzeltilmis
+ * girdiyle ayni anahtari kullanabilir.
  */
 function mcp_istek_bitir(array $ayrim, bool $yazildi): void {
     if (!isset($ayrim['ozet'])) return;
@@ -408,7 +410,8 @@ function mcp_buda(bool $zorla = false): void {
             mcp_calistir('DELETE FROM mcp_toplu WHERE son < ?', [$n - 86400]);
             mcp_calistir('DELETE FROM mcp_sayac WHERE pencere < ?', [$n - 86400]);   // pencereler en cok 1 gun
             // istek_anahtari kayitlari grant omru boyunca tutulur (o grant'le ayni anahtar hep ayni kayda gider)
-            mcp_calistir('DELETE FROM mcp_istek WHERE zaman < ? OR (durum <> ? AND zaman < ?)', [$n - MCP_IZIN_OMRU, 'tamam', $n - 86400]);
+            // Askida ('isleniyor') kayitlar da: arka uc yazmis olabilir, anahtar ilk girdisine bagli kalmali
+            mcp_calistir('DELETE FROM mcp_istek WHERE zaman < ?', [$n - MCP_IZIN_OMRU]);
             mcp_calistir("DELETE FROM mcp_izin WHERE (durum <> 'aktif' AND iptal_zamani < ?) OR bitis < ?", [$n - 30 * 86400, $n - 30 * 86400]);
             mcp_calistir("UPDATE mcp_izin SET durum = 'iptal', iptal_nedeni = 'suresi_doldu', iptal_zamani = ? WHERE durum = 'aktif' AND bitis < ?", [$n, $n]);
             // Hic kullanilmamis (grant almamis) istemciler 6 saat sonra silinir (sahte kayitlar birikmesin; gercek istemci

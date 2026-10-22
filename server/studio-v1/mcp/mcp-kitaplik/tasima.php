@@ -319,7 +319,8 @@ function mcp_arac_calistir(array $arac, array $arg, McpBaglam $b): McpSonuc {
         if (isset($ayrim['hata'])) return McpSonuc::hata($ayrim['hata']);
     }
     $sonuc = mcp_arac_isle($arac, $girdi, $b);
-    if ($ayrim) mcp_istek_bitir($ayrim, !$sonuc->hata && $sonuc->etkilenen !== []);
+    // 'zaten_vardi' de baglar: askidan geri alinan anahtarin kaydi (onceki cagri yazmis) 'tamam' olur, silinmez
+    if ($ayrim) mcp_istek_bitir($ayrim, !$sonuc->hata && ($sonuc->etkilenen !== [] || ($sonuc->veri['durum'] ?? null) === 'zaten_vardi'));
     return $sonuc;
 }
 

@@ -371,9 +371,12 @@ function sifre_izi_denetle(): void {
 /**
  * Sohbet baglantisi (MCP) onayi icin sahibin sifresi: panelin kilidinden (sifre_dene_durum, ayni girisler tablosu, ayni
  * sinirlar, taninan cihaz cerezi) gecer. Sifre hic ayarlanmamissa deneme sayilmaz: 'kurulmadi'.
+ * Panel gibi once sifre_izi_denetle(): config.php'de sifre sifirlandiysa (panel henuz acilmamis olsa da) eski oturumlar,
+ * taninan cihazlar ve hatali deneme kayitlari burada da temizlenir; onay sayfasi panelle ayni kilit durumunu gorur.
  * Doner: ['durum' => 'dogru' | 'yanlis' | 'kilitli' | 'kurulmadi', 'iz' => yalniz 'dogru'da sifre_izi(dogrulanan ozet)].
  */
 function sahip_sifre_dene(string $sifre): array {
+    sifre_izi_denetle();
     if (sifre_ozeti() === '') return ['durum' => 'kurulmadi', 'iz' => null];
     $d = sifre_dene_durum($sifre, cihaz_ozeti());
     return ['durum' => $d['durum'], 'iz' => $d['ozet'] !== null ? sifre_izi($d['ozet']) : null];

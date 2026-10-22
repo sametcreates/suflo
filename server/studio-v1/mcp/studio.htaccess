@@ -19,9 +19,13 @@ Options -Indexes
   RewriteEngine On
   # Bu klasorde RewriteEngine acik oldugu icin public_html/.htaccess'teki https yonlendirmesi /studio/ altinda (panel
   # /studio/v1/ dahil) artik uygulanmaz; ayni yonlendirme burada acikca yapilir (vekil arkasinda X-Forwarded-Proto'ya bakilir).
+  # Hedef yol ozgun istek satirindan (THE_REQUEST) alinir: kok .well-known'dan buraya ic yeniden yazilan kesif adresinde
+  # REQUEST_URI ic dosyayi (kesif-giris.php) gosterir ve oraya yonlendirmek 404 olurdu. Yalniz yol yakalanir (sorgu Apache'ce
+  # kendiliginden eklenir; yakalanan %3f Apache 2.4.60+'da 403 verirdi), NE: yuzde kodlari ikinci kez kodlanmaz.
   RewriteCond %{HTTPS} !=on
   RewriteCond %{HTTP:X-Forwarded-Proto} !=https
-  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+  RewriteCond %{THE_REQUEST} ^\S+\s+(/[^?\s]*)
+  RewriteRule ^ https://%{HTTP_HOST}%1 [R=301,L,NE]
   # Kitaplik klasoru disariya kapali (kendi .htaccess'i de var)
   RewriteRule ^mcp-kitaplik(/|$) - [F,L]
   # MCP uc noktasi: /studio/mcp. Klasor degil, dosyaya ic yonlendirme: 301 / sonda / yok.

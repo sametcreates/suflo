@@ -31,7 +31,7 @@ Tasarımın kaynağı `mcp-tasarim.md` (v1) belgesidir. Studio şeması ve `pro`
 
 Giriş dosyalarının adı bilerek istek yollarından farklıdır (`mcp` → `mcp-giris.php`). MultiViews açık bir sunucuda `/studio/mcp` ya da `/studio/oauth/token` isteği aksi hâlde yeniden yazmadan önce `mcp.*` / `oauth.*` adlı bir dosyaya eşlenirdi. Bu yüzden `.htaccess`'te `Options -MultiViews` yoktur; Options değişikliğine izin vermeyen sunucularda o satır 500 verirdi. Dosyaları yeniden adlandırma.
 
-`studio/.htaccess` kendi `RewriteEngine On` satırını taşıdığı için `public_html/.htaccess`'teki https yönlendirmesi `/studio/` altında (panel `/studio/v1/` dahil) artık uygulanmaz. Aynı yönlendirme `studio.htaccess`'te açıkça yapılır: `HTTPS` kapalı ve `X-Forwarded-Proto` `https` değilse 301 ile `https://` adresine.
+`studio/.htaccess` kendi `RewriteEngine On` satırını taşıdığı için `public_html/.htaccess`'teki https yönlendirmesi `/studio/` altında (panel `/studio/v1/` dahil) artık uygulanmaz. Aynı yönlendirme `studio.htaccess`'te açıkça yapılır: `HTTPS` kapalı ve `X-Forwarded-Proto` `https` değilse 301 ile `https://` adresine. Hedef yol özgün istek satırından (`THE_REQUEST`) alınır; sorgu korunur.
 
 Test kurulumunda aynı dosyalar `public_html/studio-test/` altına konur. Ayar ve veri yolu uygulama klasörünün adından çıkar; panelle aynı kural geçerlidir: `dirname(DOCUMENT_ROOT)/private/<klasör>-v1/`.
 
@@ -58,7 +58,7 @@ Keşif adresleri (hepsi `kesif-giris.php`'den gelir; `issuer` her belgede bayt b
 
 Kök `.well-known/.htaccess` hakkında üç not:
 
-- Bu dosyada `RewriteEngine On` var. Bu yüzden `public_html/.htaccess`'teki yeniden yazma kuralları (ör. https'e yönlendirme) `/.well-known/*` için uygulanmaz. ACME doğrulaması için bu zararsızdır, hatta iyidir.
+- Bu dosyada `RewriteEngine On` var. Bu yüzden `public_html/.htaccess`'teki yeniden yazma kuralları (ör. https'e yönlendirme) `/.well-known/*` için uygulanmaz. ACME doğrulaması için bu zararsızdır, hatta iyidir. Keşif adresleri ise `<uygulama>/kesif-giris.php`'ye iç yeniden yazıldığı için `<uygulama>/.htaccess`'in https kuralından geçer: `http://` ile istenen keşif adresi kendi `https://` adresine 301 alır.
 - Klasörde başka bir `.htaccess` varsa üç `RewriteRule` satırı ona eklenir.
 - Kurulumdan sonra `/.well-known/acme-challenge/<deneme-dosyası>`'nın 200 döndüğünü ve hPanel'de SSL'in geçerli kaldığını kontrol et.
 
@@ -206,7 +206,7 @@ Bu işlev yalnız kullanıcı kodu onayladıktan sonra çağrılır:
 
 1. Önce anlık kopyayı al: `anlik_al('mcp_toplu_oncesi')` (`studio-ortak.php`; `islem()` içinde, yazmalarla aynı işlemde).
 2. Sonra **tek işlemde** hepsini ya da hiçbirini uygula.
-3. Kayıt kimliklerini kararlı türet ki yarıda kesilen bir uygulama yeniden denenebilsin ve mükerrer açılmasın. En basiti `$toplu_anahtar`'dan: `substr(sha256($toplu_anahtar.'|'.$sira), 0, 24)`. Gerçek arka uç daha sıkısını yapar: `sha256('mcp|'.grant.'|toplu|'.kanonikJSON(işlem).'|'.tekrarSırası)`; aynı liste başka bir onay koduyla yeniden onaylansa da ikinci kayıt açılmaz. Ayrıca anlamsal mükerrer satırlar önizlemede "uyari" olur ve uygulamada atlanır (`zaten_vardi`).
+3. Kayıt kimliklerini kararlı türet ki yarıda kesilen bir uygulama yeniden denenebilsin ve mükerrer açılmasın. En basiti `$toplu_anahtar`'dan: `substr(sha256($toplu_anahtar.'|'.$sira), 0, 24)`. Gerçek arka uç da böyle yapar: `sha256('mcp|'.grant.'|toplu|'.$toplu_anahtar.'|'.sıra)`; aynı kodla yeniden deneme aynı kimliğe gider. Aynı liste başka bir onay koduyla yeniden onaylanırsa ikinci kayıdı anlamsal mükerrer kuralı engeller: etkin (iptal / arşiv olmayan) aynı kayıt varsa satır önizlemede "uyari" olur ve uygulamada atlanır (`zaten_vardi`). Eski kopya iptal edilmiş ya da arşivdeyse yeni kayıt açılır.
 4. Önizlemeden sonra veri değiştiyse (eski sürüm, çakışma) uygulama **hiçbir şey yazmaz** (kopya da geri alınır) ve `tamam: false` döner.
 
 Döner: `['tamam' => bool, 'mesaj' => string, 'veri' => array, 'etkilenen' => [kimlik…], 'anlik_id' => ?string]`.
@@ -274,7 +274,7 @@ Depo işlevleri `mcp-kitaplik/depo.php`'dedir:
 Panel (`../index.php`) bunları Ayarlar → **Sohbet bağlantıları** bölümü için dört işlemle kullanır: `mcp_durum`, `mcp_baglanti_kes` (`id`), `mcp_tumunu_kes`, `mcp_kayit_sayaci_sifirla`. Hepsi panelin diğer işlemleri gibi Origin + `X-Studio` + JSON + oturum denetiminden **sonra** çalışır; MCP için panelde ayrı bir giriş yolu yoktur. Kitaplık yalnız bu işlemlerde yüklenir: `define('SUFLO_MCP', 1); define('SUFLO_MCP_PANEL', 1); require dirname(__DIR__) . '/mcp-kitaplik/yukle.php'; mcp_baslat(dirname(__DIR__));` (`SUFLO_MCP_PANEL` tanımlıyken kitaplığın kurulum hatası MCP yanıtı basıp çıkmaz, istisna atar; panel kendi JSON hatasını verir).
 
 - `mcp-kitaplik/` yoksa: `kurulu: false`, boş listeler. `mcp_acik => false` ise: `acik: false`, boş listeler, MCP deposu hiç açılmaz (kesme işlemleri 0 döner).
-- Yanıtlar: bağlantılar (kimlik, istemci adı, dönüş adresinin host'u, kapsam, oluşturma, son kullanım), son 20 işlem (araç / olay, zaman, sonuç, etkilenen kayıt kimlikleri, kısa özet), kayıt sayacı ve bağlayıcı adresi (`kok_url` + `/<uygulama>/mcp`). Jeton, özet ya da sır dönmez.
+- Yanıtlar: bağlantılar (kimlik, istemci adı, dönüş adresinin host'u, kapsam, oluşturma, son kullanım), son 100 işlem (araç / olay, zaman, sonuç, etkilenen kayıt kimlikleri, kısa özet), kayıt sayacı ve bağlayıcı adresi (`kok_url` + `/<uygulama>/mcp`). Jeton, özet ya da sır dönmez.
 - Panel ve MCP aynı `config.php`'yi okuyorsa (canlı kurulum) liste alınmadan önce panelin şifre izi MCP'ye uygulanır: şifre değiştiyse eski bağlantılar listede görünmez.
 - Arayüz: bağlayıcı adresi ve Kopyala düğmesi, Claude ve ChatGPT için 3 adımlık rehber, "Bağlantıyı kes" / "Tümünü kes", işlem listesinde kayıtlara bağlantı, "Kayıt sayacını sıfırla". Test: `node tests/test-studio-mcp-panel.js`.
 
@@ -295,7 +295,7 @@ node tests/test-studio-mcp-panel.js    # Ayarlar → Sohbet bağlantıları: pan
 
 ## Açık konular
 
-- **Panelin test kurulumu:** panel (`../index.php`) ayar yolunu `private/studio-v1` olarak sabit yazar. `public_html/studio-test/v1/` kurulursa panel canlı veriyi kullanır. MCP (gerçek arka uç dahil) klasör adından türetir: `studio-test` için `private/studio-test-v1/config.php` ve oradaki `dsn` kullanılır. Test kurulumunda bu `dsn` mutlaka ayrı bir veritabanı olmalı (canlı ayar dosyası kopyalanırsa sohbet canlı veriye yazar).
+- **Test kurulumunun veritabanı:** panel ve MCP ayar yolunu klasör adından türetir (`studio-test` → `private/studio-test-v1/config.php`). Bu ayardaki `dsn` mutlaka ayrı bir veritabanı olmalı; canlı ayar dosyası kopyalanırsa panel ve sohbet canlı veriye yazar.
 - **Belirsiz saat ifadeleri:** sunucu yalnız `YYYY-AA-GG` ve `SS:DD` kabul eder; "öğleden sonra" gibi ifadeleri sohbet modeli sormalıdır (araç açıklamaları ve talimat bunu söyler). Model yine de bir saat uydurursa sunucu bunu ayırt edemez.
 - **ChatGPT `connector/oauth/{callback_id}`:** önek varsayılan olarak izinlidir. Daha dar tutmak için yönetim sayfasında görünen tam adres `mcp_redirect_izinli`'ye yazılabilir.
 - **Kayıt kotası:** günlük 50'lik genel kota çok IP'li biri tarafından geçerli kayıtlarla doldurulabilir (yukarıda "Kalan risk"). Sahip Ayarlar → Sohbet bağlantıları → "Kayıt sayacını sıfırla" ile sıfırlar.

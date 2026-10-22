@@ -97,7 +97,7 @@ function mcp_araclar(): array {
         'baslangic_saati' => $saat('Başlangıç saati; tüm gün etkinlikte verilmez'),
         'bitis_saati' => $saat('Bitiş saati; sure_dakika ile birlikte verilmez'),
         'sure_dakika' => ['type' => 'integer', 'minimum' => 5, 'maximum' => 1440, 'description' => 'Süre (dakika); bitis_saati yerine.'],
-        'tum_gun' => ['type' => 'boolean', 'default' => false, 'description' => 'Tüm gün etkinlik.'],
+        'tum_gun' => ['type' => 'boolean', 'default' => false, 'description' => 'Tüm gün etkinlik. Yalnız kullanıcı açıkça tüm gün dediyse true; saat belli değilse kullanıcıya sor.'],
         'bitis_tarihi' => $tarih('Birden çok güne yayılan etkinliğin bitiş tarihi'),
         'konum' => $metin(300, 'Konum.'),
         'not' => $metin(2000, 'Kısa not.'),
@@ -502,7 +502,7 @@ function mcp_capraz_zaman(array $g): ?string {
         if ($bas !== null || $bit !== null || $sure !== null) return 'Tüm gün etkinlikte baslangic_saati, bitis_saati ve sure_dakika verilmez.';
         return null;
     }
-    if ($bas === null) return 'Saatli etkinlikte baslangic_saati gerekli (saat belli değilse kullanıcıya sor ya da tum_gun: true ver).';
+    if ($bas === null) return 'Saatli etkinlikte baslangic_saati gerekli. Saat belli değilse tahmin etme, kullanıcıya sor; tum_gun: true yalnız kullanıcı açıkça tüm gün dediyse.';
     if (($bit === null) === ($sure === null)) return 'bitis_saati ya da sure_dakika alanlarından tam olarak biri verilmeli.';
     if ($sure !== null && $bitTarih !== null && $bitTarih !== $g['tarih']) return 'sure_dakika ile birlikte farklı bir bitis_tarihi verilmez.';
     if ($bit !== null && ($bitTarih ?? $g['tarih']) . ' ' . $bit <= $g['tarih'] . ' ' . $bas) return 'Bitiş, başlangıçtan sonra olmalı.';
