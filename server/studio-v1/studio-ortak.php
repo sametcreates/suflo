@@ -266,10 +266,22 @@ function ip_ozet(): string {
     return hash('sha256', 'studio|' . $ip);
 }
 
-/** Cerez adi: guvenli kipte __Host- onekli (yalniz bu alan adi, Path=/, Secure; kardes alan adi yazamaz). */
+/**
+ * Uygulama klasoru: kitaplik public_html/<uygulama>/v1/ altinda durur (canli: studio, test kurulumu: studio-test).
+ * Ayar yolu (private/<uygulama>-v1/config.php) ve cerez adlari buna baglidir: test kurulumu canlinin ayarini,
+ * veritabanini ve oturum cerezini hicbir zaman kullanmaz. MCP de ayni kurali uygular (mcp_baslat).
+ */
+function studio_uygulama(): string {
+    $u = basename(dirname(__DIR__));
+    if (!preg_match('/^[a-z0-9][a-z0-9-]{0,39}$/', $u)) throw new StudioHatasi(503, 'kurulum', 'Uygulama klasörü adı geçersiz.');
+    return $u;
+}
+/** Cerez adi: guvenli kipte __Host- onekli (yalniz bu alan adi, Path=/, Secure; kardes alan adi yazamaz).
+ *  Canli (studio) adlar degismedi; baska klasor (studio-test) kendi adini tasir, ayni alan adindaki canli oturumu ezmez. */
 function cerez_adi(string $tur): string {
     global $C;
-    $ad = $tur === 'cihaz' ? 'suflo_studio_cihaz' : 'suflo_studio';
+    $u = studio_uygulama();
+    $ad = 'suflo_studio' . ($u === 'studio' ? '' : '_' . strtr($u, '-', '_')) . ($tur === 'cihaz' ? '_cihaz' : '');
     return $C['cookie_secure'] ? '__Host-' . $ad : $ad;
 }
 

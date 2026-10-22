@@ -40,7 +40,10 @@ var kaynak = fs.readFileSync(path.join(ROOT, "server", "studio-v1", "index.php")
 var ornek = fs.readFileSync(path.join(ROOT, "server", "studio-v1", "config.example.php"), "utf8");
 ok("ornek config: sifre ozeti bos, gizli bilgi yok", /'password_hash' => ''/.test(ornek) && /'db_pass' => ''/.test(ornek) && !/\$2y\$|\$argon2/.test(ornek));
 ok("Pro lisans servisinden ayri: pro-v1 ayari / lisans okunmaz", !/pro-v1|license|lisans/i.test(kaynak.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")));
-ok("ayar yolu yalniz public_html disindaki private/studio-v1 (ortam degiskeni yok)", /private\/studio-v1\/config\.php/.test(kaynak) && !/getenv\(/.test(kaynak));
+// Ayar yolu uygulama klasorunden: public_html/studio/v1 -> private/studio-v1 (canli, degismedi), studio-test -> private/studio-test-v1
+// (calisma kaniti: test-studio-paket.js, gercek Apache'de iki klasor yan yana)
+ok("ayar yolu yalniz public_html disindaki private/<uygulama>-v1 (klasor adindan; ortam degiskeni yok)",
+  /'\/private\/' \. studio_uygulama\(\) \. '-v1\/config\.php'/.test(kaynak) && !/private\/studio-v1\/config\.php';/.test(kaynak) && !/getenv\(/.test(kaynak));
 ok("sifre-ozeti yalniz komut satirinda", /PHP_SAPI !== 'cli'/.test(fs.readFileSync(path.join(ROOT, "server", "studio-v1", "sifre-ozeti.php"), "utf8")));
 if (sqliteVar.stdout !== "var") {
   if (MY) { ok("STUDIO_TEST_MYSQL verildi ama php pdo_mysql yok", false); process.exit(1); }

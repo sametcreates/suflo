@@ -38,6 +38,12 @@ Test kurulumunda aynı dosyalar `public_html/studio-test/` altına konur. Ayar v
 - `studio` → `private/studio-v1/config.php` (canlıdaki bugünkü yol, değişmedi)
 - `studio-test` → `private/studio-test-v1/config.php`
 
+Panel de aynı kuralı uygular: `v1/index.php` ayarı kendi klasörünün üstündeki uygulama klasöründen bulur (`public_html/studio-test/v1/` → `private/studio-test-v1/`). Arayüz (`studio.js`) API'yi sayfanın kendi klasöründen çağırır (`/studio-test/` → `/studio-test/v1/index.php`). Oturum çerezlerinin adı da klasöre bağlıdır: canlıda değişmedi (`suflo_studio`), testte `suflo_studio_studio_test`. Böylece test kurulumu canlının ayarını, verisini ve oturumunu hiçbir zaman kullanmaz.
+
+### Paketler (`tools/studio-paket.js`)
+
+`node tools/studio-paket.js paket --cikis <repo dışında bir klasör>` iki ZIP üretir: `suflo-studio-test-paket.zip` (`studio-test/...`) ve `suflo-studio-canli-paket.zip` (`studio/...`). İkisi de `public_html` içinde açılır ve yukarıdaki tablonun tamamını, arayüz dosyalarını ve `.well-known/.htaccess`'i içerir. Betik içerik listesini beklenen listeyle birebir karşılaştırır; `config.php`, veritabanı, yedek, şifre özeti ya da test arka ucu bulursa paketi yazmaz. ZIP repo içine yazılamaz. `node tools/studio-paket.js ayar --cikis <klasör>` test ortamı için yeni rastgele şifre ve yalnız özetini taşıyan bir `config.php` üretir; şifreyi ekrana yazmaz. Uçtan uca kanıt: `tests/test-studio-paket.js` (gerçek Apache, iki klasör yan yana).
+
 Depo ilk istekte kendiliğinden kurulur: `private/<klasör>-v1/mcp.sqlite` (ayrı dosya, kendi şema sürümü, kurulum kilidi altında). Eski şema sürümündeki depo aynı kilit altında (`BEGIN IMMEDIATE`) yerinde yükseltilir; veri korunur (1 → 2: refresh token tolerans sütunları; 2 → 3: işlem günlüğünde grant sütunu ve `istek_anahtari` kayıtları). `config.php`'ye yeni ayar eklemek **gerekmez**; varsayılanlar koddadır.
 
 Keşif adresleri (hepsi `kesif-giris.php`'den gelir; `issuer` her belgede bayt bayt aynı):

@@ -96,6 +96,8 @@ private/studio-v1/config.php         <- config.example.php'nin doldurulmuş kopy
 private/studio-v1/studio.sqlite      <- sunucu ilk istekte kendisi oluşturur
 ```
 
+Ayar yolu uygulama klasörünün adından çıkar: `public_html/<klasör>/v1/index.php` → `private/<klasör>-v1/config.php`. Canlıda (`studio`) yol değişmedi. Test kurulumu (`public_html/studio-test/`) kendi `private/studio-test-v1/config.php`'sini, kendi veritabanını ve kendi oturum çerezini kullanır. Hazır paketler: `node tools/studio-paket.js paket --cikis <repo dışında klasör>` (bkz. `mcp/README.md` → Paketler).
+
 Adımlar:
 
 1. `public_html/studio/v1/` klasörünü aç; `index.php`, `studio-ortak.php` ve `.htaccess` dosyalarını yükle.

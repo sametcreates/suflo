@@ -4,7 +4,7 @@ declare(strict_types=1);
 /*
  * Suflo Studio API (tek kullanicili ozel icerik uretim ve ajans takip uygulamasi)
  *
- * - Suflo Pro lisans servisinden (pro-v1) TAMAMEN ayri: ayri config (private/studio-v1/config.php),
+ * - Suflo Pro lisans servisinden (pro-v1) TAMAMEN ayri: ayri config (private/studio-v1/config.php; test kurulumu public_html/studio-test -> private/studio-test-v1),
  *   ayri veritabani, ayri oturum cerezi. Pro lisansi burada hicbir yetki vermez.
  * - Her istek: POST + JSON, Origin izin listesinde, "X-Studio: 1" basligi (CSRF), giris disindaki
  *   her islemde sunucu tarafli oturum denetimi (__Host- onekli, HttpOnly, Secure, SameSite=Strict cerez).
@@ -76,8 +76,10 @@ require_once __DIR__ . '/studio-ortak.php';
 // Kitapligin kurulum / veritabani / kilit hatalari panelde dogrudan JSON yanitiyla cikar (eskisi gibi)
 studio_dur_ayarla('hata');
 
-$configPath = dirname((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__)) . '/private/studio-v1/config.php';
+// Ayar: public_html'in ust klasorunde private/<uygulama>-v1/config.php. Uygulama klasoru bu dosyanin klasorunden cikar
+// (public_html/studio/v1 -> private/studio-v1, bugunku canli yol; public_html/studio-test/v1 -> private/studio-test-v1).
 try {
+    $configPath = dirname((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__)) . '/private/' . studio_uygulama() . '-v1/config.php';
     $C = studio_ayar_yukle($configPath);
 } catch (StudioHatasi $e) {
     kurulum_hatasi($e->getMessage());

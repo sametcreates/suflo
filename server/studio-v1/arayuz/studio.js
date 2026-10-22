@@ -8,8 +8,11 @@
   if (window.top !== window.self) { document.documentElement.textContent = ""; return; }
   var C = window.StudioCore;
   // Arayuz API ile ayni adresten (yerel deneme ya da assets.suflo.app/studio/) sunuluyorsa goreli yol kullanilir.
+  // API, sayfanin kendi uygulama klasorundedir: /studio/ -> /studio/v1/, test kurulumu /studio-test/ -> /studio-test/v1/
+  // (test arayuzu canli veriye asla baglanmaz).
   var AYNI_KAYNAK = /^(127\.0\.0\.1|localhost|assets\.suflo\.app)$/.test(location.hostname);
-  var API = AYNI_KAYNAK ? "/studio/v1/index.php" : "https://assets.suflo.app/studio/v1/index.php";
+  var UYGULAMA = (/^\/([a-z0-9][a-z0-9-]{0,39})\//.exec(location.pathname) || [])[1] || "studio";
+  var API = AYNI_KAYNAK ? "/" + UYGULAMA + "/v1/index.php" : "https://assets.suflo.app/studio/v1/index.php";
   var kok = document.getElementById("uygulama");
   var S = { veri: bosVeri(), girisli: false, el: null, rota: null, secili: {}, listeAdet: null, sonYukleme: 0 };
   function bosVeri() { return { musteriler: [], icerikler: [], etkinlikler: [], bloklar: [], ozelgunler: [], ayar: null }; }
