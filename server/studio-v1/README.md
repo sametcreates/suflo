@@ -142,11 +142,37 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
   - Takvimde sürükle-taşı (15 dk, günler arası), alt kenardan süre, sürüklerken çakışma hayaleti; hiçbir iş kendiliğinden kaydırılmaz. Her değişiklik hemen ekrana yansır ve mevcut kaydetme akışıyla (beklenen sürüm) gider: "Kaydediliyor… / ✓ Kaydedildi / Kaydedilemedi". Kaydedilemezse ekran sunucudaki hale döner, "Tekrar dene" çıkar; kayıt başka sekme / cihazda değiştiyse güncel hali yüklenir ve söylenir, üzerine yazılmaz. Her değişiklikten sonra tek "Geri al" bildirimi (önceki değerlerle yeni kaydetme). Klavye: oklar 15 dk / 1 gün, Shift + yukarı / aşağı süre, Enter ayrıntı (ekran okuyucuya duyurulur). Telefonda ayrıntı alttan açılır; adım düğmeleriyle taşınır, yana kaydırınca gün değişir.
   - Planlanacaklar çekmecesi: edit zamanı ayrılmamış içerikler müşteri + bağlı çekime göre gruplanır ("Müşteri — 2 reels"); takvime sürüklenince ya da "Zaman ayır"la önerilen boş aralığa bu içeriklere bağlı bir çalışma bloğu (`blok`) oluşur. Boş aralığı seçince hızlı oluşturma (Edit = blok, Çekim = çekim etkinliği; müşteri seçilmeden kaydedilmez, tahminle atanmaz; "Ayrıntılı form" tam pencereleri açar).
   - Tamamlama: bloğu bitirmek içeriğin durumunu değiştirmez; "Edit işini tamamla" bağlı içerikleri mevcut durum akışıyla "Yayına hazır" yapar (geri alınabilir). Çekimi tamamlamak içerikleri değiştirmez ("N video edit bekliyor"); çekim ertelenirken bağlı bloklar ve teslimler listelenir, değiştirilmez. "Bugün N iş tamamladın" ve isteğe bağlı haftalık hedef (Ayar: `haftalikHedef`; dolunca tek, sakin bildirim). Tamamlama sesi varsayılan kapalı (bu cihazda açılır); hareket azaltma tercihi animasyonları kapatır. "Şimdi ne yapayım?" kurala dayalı tek öneri ve nedenlerini gösterir; yalnız basınca takvime ekler. Takvim ayarlarında özel gün ekle / düzenle / arşivle (her yıl tekrar seçeneği). Google Takvim eşitlemesi yoktur; veri başka servise gitmez.
+  - Takvimde telefon ve erişilebilirlik:
+    - Telefonda (700 px altı) gün görünümü açılır. Üstte hafta şeridi vardır; gün, şeride dokunarak ya da takvimi sağa / sola kaydırarak değişir. Takvim parmakla yukarı / aşağı kayar; kaydırma yanlışlıkla "Yeni iş" açmaz.
+    - Bir işe dokununca ayrıntı alttan açılır. "−15 / +15" (saat), "‹ / ›" (gün) ve süre düğmeleri en az 44 px'tir. Planlanacaklar da alttan açılır. Bildirimler alttaki düğme çubuğunun üstünde çıkar.
+    - Aynı saatte çakışan işler yan yana durur ve müşteri adı okunur kalır. Sütun dar olduğu için sığmayanlar kaybolmaz: kenardaki "+N" düğmesi onları listeler.
+    - Yalnız klavyeyle de kullanılır: Tab ile "Yeni", müşteri seç, Kaydet; oklarla taşı, Enter ile ayrıntı, Esc ile kapat (odak karta döner). Telefonda alttan açılan pencerede Tab pencerenin dışına çıkmaz.
+    - Ekran okuyucu her kartı türü, müşterisi, işi, günü ve saatiyle okur; her düğmenin adı vardır. Kaydetme durumu da okunur.
+    - Renk tek işaret değildir: türler simgeyle (kamera / makas) ve yazıyla da ayrılır. Çakışma "⚠" ile, geciken teslim "Gecikti · …" yazısıyla, biten iş üstü çizili ve tik işaretiyle görünür.
+    - Cihazda "hareketi azalt" açıksa animasyonlar kapanır.
+    - Çok iş olan haftalar (300 iş) hızlı çizilir. Uzun müşteri adları taşmaz. Çok eski ya da çok ileri tarihli işler görünür ve sürükleyerek ya da klavyeyle taşınır.
+    - Arşivdeki müşterinin çekimleri eski takvimdeki gibi görünür. İçerikleri, teslim bayrakları ve Planlanacaklar'daki grupları gizlidir.
+    - Bağı kopmuş kayıt (silinmiş müşteri, içerik ya da çekim) sayfayı bozmaz: kart "Müşterisiz" yazar. Bozuk saatli kayıt çizilmez.
+    - Saatler her yerde Türkiye saatidir; cihaz başka saat dilimindeyse de "bugün" ve şimdi çizgisi İstanbul'a göredir.
   - Stok sayfası acil olanları üstte gösterir: önce stok uyarısı olanlar (ilk karşılanmayan paylaşım günü en yakın olan önce), sonra stok girişi yapılmayanlar, sonra diğerleri.
   - Tarayıcının geri tuşu sayfayı kalınan kaydırma konumunda açar; yeni açılan sayfa en üstten başlar.
   - Telefonda: girdiler 16 px (iPhone dokununca sayfayı büyütmez), düğmeler parmak boyunda, toplu seçim çubuğu ekranın altında sabit ("Durumu değiştir" durum seçilmeden kapalı), Müşteriler ve "Müşteri bazında durum" tabloları kart olarak, Yayın Takviminde müşteri seçimi "Filtreler" altında katlı; takvimlerin ay görünümünde hücreye dokunmak o günü açar.
   - Toplu arşivleme 10 ve daha fazla içerikte önce sorar. İçerikler → Arşiv görünümünde toplu düğme "Arşivden çıkar"dır. 5 ve daha fazla kaydı değiştiren işlemin "Geri al" bildirimi kapatılana kadar durur.
   - Yazı yazılmış bir pencere Esc, ×, Vazgeç ya da telefonda geri tuşuyla kapatılmak istenirse önce "Kaydedilmemiş değişiklik" diye sorar; böyle bir pencere açıkken sekme kapatılır ya da sayfa yenilenirse tarayıcı uyarır. Hiçbir şey değişmediyse ya da kaydetme sürerken soru çıkmaz.
+- **Takvim veri modeli (yalnız ekleme; şema sürümü ve tablo yapısı değişmedi):** Yeni kayıtlar aynı `kayitlar` tablosunda yeni tür adlarıyla durur. Eski kayıtlar ve alanlar olduğu gibi çalışır.
+  - `blok` (çalışma bloğu, edit zamanı): `musteriId` (zorunlu), `icerikIdler` (en çok 50; hepsi aynı müşterinin içeriği olmalı), `baslik` (boş olabilir; arayüz içeriklerden üretir), `basTarih` / `basSaat` / `bitTarih` / `bitSaat` (gece yarısını aşabilir; bitiş başlangıçtan sonra olmalı), `durum` (`planlandi` / `tamamlandi`), `tamamZaman`, `not`, `arsiv`. Bloğu tamamlamak içeriklerin durumunu değiştirmez.
+  - `ozelgun`: `baslik`, `tarih`, `tur` (`ozel` / `dogum`), `herYil`, `arsiv`.
+  - `etkinlik`: isteğe bağlı `tamamZaman` (tamamlandığı an, Türkiye saatiyle). Eski kayıtlarda yoktur; tarih uydurulmaz.
+  - `ayar`: isteğe bağlı `calismaBas` / `calismaBit` (gün içindeki dakika; varsayılan 540–1140, yani 09.00–19.00) ve `haftalikHedef` (0–99; boş ya da 0 hedef yok). Gönderilmeyen alan saklı değeri korur.
+  - Yedek, içe aktarma, otomatik kopya ve kopyaya dönüş bu türleri de taşır.
+- **Takvim güncellemesi ve geri dönüş:**
+  - Güncellemeden **önce** Ayarlar → **JSON yedeği indir** ile yedek al. Dosyaları yükledikten sonra ilk kaydetmede sunucu ayrıca günlük otomatik kopya alır.
+  - Eski dosyalara (`index.php` ve arayüz) dönülebilir. Eski sürüm `blok` ve `ozelgun` kayıtlarını görmez, göstermez ama silmez; veritabanında kalırlar ve yeni sürüme dönülünce yine görünürler.
+  - Eski sürümdeyken dikkat:
+    - Bir çekimi kaydetmek o çekimin `tamamZaman` alanını siler.
+    - Ayar kaydetmek (stok eşiği) çalışma saatlerini ve haftalık hedefi siler.
+    - "Tüm veriyi bu dosyayla değiştir" ve kopyaya dönüş, bloklar ile özel günleri de siler.
+    - Gerekirse yeni sürüme dönüp güncellemeden önce aldığın JSON yedeğini "Yalnız yenileri ekle" ile içe aktar.
 - **Sunucu mesajları:** Türkçe harfli ve ekrandaki alan adlarıyla yazılır (ör. "Aylık ücret 0 ile 100.000.000 arasında tam sayı olmalı"; içe aktarma önizlemesinde "2. müşteri (Ad): …"). Hata kodları (`hata`) değişmez; arayüz koda göre davranır. Mesajlarda sunucu yolu ya da SQL yer almaz.
 - **Şifre değiştirme:** Ayarlar → Güvenlik. Yeni özet veritabanına yazılır ve diğer tüm oturumlar kapanır.
 - **Şifre unutulursa:** `php sifre-ozeti.php` ile yeni özet üret ve `config.php`'deki `'password_hash'` alanına yaz. `config.php`'deki özet değişince o geçerli olur; daha önce panelden konan şifre artık geçmez. (PHP önbelleği yüzünden değişiklik birkaç saniye sonra etkin olur.)
@@ -157,7 +183,7 @@ Veritabanı ilk istekte boşsa tablolar kurulur (şema sürümü 3). Kurulum ön
 ```text
 node tests/test-studio-core.js   # stok, yayın ihtiyacı, takvim çakışması, saat dilimi, CSV (saf mantık); arayüz dosyaları ve .htaccess denetimi
 node tests/test-studio-api.js    # gerçek php -S + geçici SQLite: yetki, CSRF, kilit, kayıt, içe aktarma, geri yükleme
-node tests/test-studio-e2e.js    # gerçek tarayıcı (Playwright): masaüstü + telefon akışları
+node tests/test-studio-e2e.js    # gerçek tarayıcı (Playwright): masaüstü (1280 / 1440 / 1920) + telefon (360 / 390 / 430) akışları, takvimde klavye, ekran okuyucu etiketleri, hareket azaltma, 300 iş, New York saat dilimi
 ```
 
 Testler yalnız anonim örnek veri kullanır. `php` ya da Playwright yoksa ilgili test **ATLA** yazıp geçer. CI her push'ta şunları çalıştırır: `php` işi API testini (SQLite), `studio-mysql` işi aynı API testini MariaDB ile, `studio-e2e` işi tarayıcı testini Chromium ile. `studio-e2e` işinde Playwright ya da `pdo_sqlite` yoksa test atlanmaz, kalır (`STUDIO_E2E_ZORUNLU=1`).

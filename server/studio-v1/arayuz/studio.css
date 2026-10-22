@@ -318,8 +318,8 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 .tk-secim{display:inline-flex;border:1px solid var(--line2);border-radius:10px;padding:2px;gap:2px;background:var(--bg3)}
 .tk-secim button{border:0;background:none;border-radius:8px;padding:5px 11px;font-weight:600;font-size:13px;cursor:pointer;color:var(--dim);min-height:30px;display:inline-flex;align-items:center;gap:6px}
 .tk-secim button[aria-pressed=true]{background:var(--bg4);color:var(--text);box-shadow:inset 0 0 0 1px var(--line2)}
-.tk-secim .nokta{width:8px;height:8px;border-radius:50%;display:inline-block}
-.tk-secim .nokta.cekim{background:var(--cekim)}.tk-secim .nokta.edit{background:var(--edit)}
+.tk-secim .tk-ikon{width:14px;height:14px}
+.tk-secim .tk-ikon.cekim{color:var(--cekim)}.tk-secim .tk-ikon.edit{color:var(--edit)}
 .tk-arac select{width:auto;max-width:200px;min-height:32px;padding:4px 8px}
 .tk-ilerleme{font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
 .tk-ilerleme b{color:var(--text)}
@@ -390,6 +390,13 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 @media (hover:hover){.tk-kart:hover .tut::after{opacity:.5}}
 .tk-kart:focus-visible .tut::after{opacity:.5}
 @container (max-width:84px){.tk-kart .tk-tik,.tk-kart .ust-s .tk-ikon{display:none}.tk-kart .zaman,.tk-kart .bilgi{font-size:10.5px}}
+/* dar serit (cakisan isler yan yana): ic bosluk azalir, musteri adina yer kalir; tur kenar rengi, is adi ve kart etiketinden (title / aria-label) anlasilir */
+.tk-kart.dar{padding:3px 4px 3px 6px}
+.tk-kart.dar .tk-tik,.tk-kart.dar .ust-s .tk-ikon,.tk-kart.dar .cak-isaret{display:none}
+.tk-kart .cak-isaret{color:var(--sari);font-size:11px;flex:none;line-height:1}
+.tk-fazla{position:absolute;right:1px;width:20px;z-index:3;border-radius:6px;border:1px solid var(--line2);background:var(--bg4);color:var(--text);font-size:11px;font-weight:700;padding:2px 0;cursor:pointer;display:flex;align-items:flex-start;justify-content:center;overflow:hidden}
+@media (hover:hover){.tk-fazla:hover{border-color:var(--accent)}}
+.tk-fazla:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .tk-kart.tamam{opacity:.5;filter:saturate(.55)}
 .tk-kart.tamam .mus,.tk-kart.tamam .is,.tk-kart.iptal .mus,.tk-kart.iptal .is{text-decoration:line-through;text-decoration-color:rgba(244,244,247,.35)}
 .tk-kart.iptal{opacity:.4;cursor:pointer}
@@ -428,7 +435,10 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 .tk-acilir.tk-alt{left:0;right:0;bottom:0;width:auto;max-width:none;max-height:80vh;max-height:80dvh;border-radius:18px 18px 0 0;padding:8px 16px calc(18px + env(safe-area-inset-bottom))}
 .tk-acilir.tk-alt::before{content:"";width:40px;height:4px;border-radius:4px;background:var(--line2);align-self:center;margin-bottom:4px;flex:none}
 .tk-perde{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:39}
-.tk-acilir h3{font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px;padding-right:34px}
+.tk-acilir h3{font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px;padding-right:34px;overflow-wrap:anywhere;min-width:0}
+.tk-acilir b,.tk-acilir li{overflow-wrap:anywhere;min-width:0}
+.tk-acilir:focus{outline:none}
+.tk-acilir li .satir-ad{display:inline-flex;align-items:center;gap:6px;text-align:left}
 .tk-acilir .tk-kapat{position:absolute;right:8px;top:8px}
 .tk-acilir.tk-alt .tk-kapat{top:12px}
 .tk-acilir .satir-s{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -473,8 +483,16 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 /* Telefon */
 .tk-tel-ust{padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)}
 .tk-tel-ust .s1{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.tk-tel-ust h1{font-size:17px;font-weight:800;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.tk-tel .tk-kayit{min-width:0}
+.tk-tel-ust h1{font-size:16px;font-weight:800;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tk-tel .tk-kayit{min-width:0;padding:2px 8px}
+.tk-tel .tk-kayit:not(.hata) .ad{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tk-tel .tk-kayit.surer::before{content:"…"}
+.tk-tel-ust h1 .kisa{display:none}
+@media (max-width:459px){
+  .tk-tel-ust .s1:first-child{gap:4px}
+  .tk-tel-ust h1 .uzun{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .tk-tel-ust h1 .kisa{display:inline}
+}
 .tk-hafta-serit{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;flex:1;min-width:0}
 .tk-hafta-serit button{border:0;background:none;border-radius:12px;padding:4px 0;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;color:var(--dim);font-size:11px;font-weight:600;min-height:48px;min-width:0}
 .tk-hafta-serit button b{font-size:15px;color:var(--text)}
@@ -483,8 +501,8 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 .tk-hafta-serit button.bugun:not(.secili) b{color:var(--accent-lite)}
 .tk-hafta-serit .isaret{display:flex;gap:2px;height:5px}
 .tk-hafta-serit .isaret i{width:5px;height:5px;border-radius:50%}
-.tk-hafta-serit .isaret i.cekim{background:var(--cekim)}.tk-hafta-serit .isaret i.edit{background:var(--edit)}
-.tk-tel .tk-kaydirma{padding-bottom:76px}
+.tk-hafta-serit .isaret i.cekim{background:var(--cekim)}.tk-hafta-serit .isaret i.edit{background:var(--edit);border-radius:1px}
+.tk-tel .tk-kaydirma{padding-bottom:76px;touch-action:pan-y}
 .tk-tel .tk-ay{padding-bottom:76px}
 .tk-tel-alt{position:fixed;z-index:10;left:0;right:0;bottom:0;padding:10px 12px calc(12px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;background:linear-gradient(to top,var(--bg) 70%,transparent)}
 .tk-fab{width:52px;height:52px;border-radius:50%;background:var(--grad);border:0;color:#fff;font-size:26px;cursor:pointer;margin-left:auto;display:grid;place-items:center;flex:none}
@@ -498,6 +516,9 @@ body:has(.tk-tel-alt) .toastlar{bottom:calc(84px + env(safe-area-inset-bottom))}
   .tk{height:calc(100vh - 61px);height:calc(100dvh - 61px);min-height:480px;border:0;border-radius:0}
   .tk .btn,.tk-tel-alt .btn,.tk-acilir .btn{min-height:44px}
   .tk-secim button{min-height:44px;padding:5px 10px}
+  .tk .btn.yalin,.tk-acilir .tk-kapat{min-width:44px;justify-content:center}
+  .tk-secim button{min-width:44px;justify-content:center}
+  .tk-gece-dugme{min-height:44px}
   .tk-tel-ust .tk-secim{flex:1 1 auto}
   .tk-acilir input,.tk-acilir select{font-size:16px}
   .tk-gun-bas b{font-size:15px}

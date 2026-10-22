@@ -9,7 +9,10 @@
  * pano sutun siniri, arama sirasi ve "+N tane daha", geri tusunda kaydirma konumu, telefonda 16 px girdi / parmak boyu hedefler /
  * altta toplu cubuk / kart tablolar / katli takvim filtreleri, Stok sayfasinda acil olanlar ustte; saatli takvim (hafta / gun / ay,
  * filtre, gece yarisini asan is, surukle-tasi + geri al, cakisma hayaleti, alt kenardan sure, klavye, cekmeceden blok, hizli olusturma,
- * kaydetme hatasinda geri donus, iki sayfada 409, tamamlama anlamlari, ayarlar / ozel gun, telefonda adim dugmeleri ve kaydirma).
+ * kaydetme hatasinda geri donus, iki sayfada 409, tamamlama anlamlari, ayarlar / ozel gun, telefonda adim dugmeleri ve kaydirma);
+ * takvimde 1280 / 1440 / 1920 ve 360 / 390 / 430 genislikte tasma / kirpilma yok, dar seritte musteri adi ve "+N", 44 px hedefler,
+ * alt sayfa (modal, Tab icinde kalir), dokunmatik dikey kaydirma ve yana kaydirma, yalniz klavyeyle akis, ekran okuyucu etiketleri,
+ * renk tek isaret degil, hareket azaltma, 300 is, uzak gecmis / gelecek, arsivli musteri, kopuk baglantilar, New York saat diliminde Istanbul.
  * php ya da Playwright yoksa ATLA; STUDIO_E2E_ZORUNLU=1 iken (CI'daki e2e isi) atlamak kalmak sayilir.
  */
 "use strict";
@@ -1885,7 +1888,7 @@ async function calis() {
   await tp2.waitForSelector(".menu-dugme");
   await tp2.goto(URL_ + "#/cekim?t=2099-12-08");
   await tp2.waitForSelector(".tk-tel " + kart("etas"));
-  ok("telefon: varsayilan gun gorunumu (Salı, 8 Aralık), alt cubuk ve + dugmesi", (await tp2.locator(".tk-tel-ust h1").textContent()) === "Salı, 8 Aralık" &&
+  ok("telefon: varsayilan gun gorunumu (Salı, 8 Aralık), alt cubuk ve + dugmesi", (await tp2.locator(".tk-tel-ust h1 .uzun").textContent()) === "Salı, 8 Aralık" &&
     (await tp2.locator(".tk-kolon").count()) === 1 && await tp2.locator(".tk-tel-alt .tk-fab").isVisible());
   var telOlcu = await tp2.evaluate(function () {
     var dugme = [].slice.call(document.querySelectorAll(".tk-tel-ust button, .tk-tel-alt button")).filter(function (b) { return b.offsetParent; });
@@ -1930,6 +1933,431 @@ async function calis() {
   if (EKRAN) await tp2.screenshot({ path: path.join(EKRAN, "telefon-takvim-gun.png") });
   ok("takvim telefon: sayfa hatasi yok", t2hatalar.length === 0, t2hatalar.join(" | "));
   await tctx2.close();
+
+  /* ===== Takvim: telefon genislikleri, masaustu genislikleri, klavye, ekran okuyucu, hareket azaltma, saglamlik, saat dilimi ===== */
+  async function oturumAc(secenek, an) {
+    var c = await tarayici.newContext(Object.assign({ timezoneId: "Europe/Istanbul", locale: "tr-TR" }, secenek));
+    var p = await c.newPage(), hata = [];
+    p.on("pageerror", function (e) { hata.push(String(e)); });
+    p.on("console", function (m) { if (m.type() === "error" && !/favicon|Failed to load resource/.test(m.text())) hata.push(m.text()); });
+    await p.clock.setFixedTime(new Date(an || "2099-10-20T09:00:00Z"));
+    await p.goto(URL_);
+    await p.fill("#studio-sifre", SIFRE);
+    await p.click("button[type=submit]");
+    await p.waitForSelector(".yan-menu", { state: "attached" });
+    return { c: c, p: p, hata: hata };
+  }
+  var eid = function (k) { return (k + "erisimtest000000").slice(0, 16); };
+  var UZUN_AD = "Erişim Kafe Uzun Adlı Örnek Müşteri Limited Şirketi Ve Ortakları Yapım Hizmetleri";
+  var eMus = function (k, ad, ek) { return { tur: "musteri", id: eid(k), veri: Object.assign({ ad: ad, kurum: "", ucret: null, siklik: { tur: "belirsiz" }, slotTuru: "video", stokGirisi: false, not: "", arsiv: false }, ek) }; };
+  var eEtk = function (k, o) { return { tur: "etkinlik", id: eid(k), veri: Object.assign({ musteriId: eid("ma"), tur: "cekim", tumGun: false, konum: "", not: "", durum: "planlandi", arsiv: false }, o) }; };
+  var eBlok = function (k, o) { return { tur: "blok", id: eid(k), veri: Object.assign({ musteriId: eid("ma"), icerikIdler: [], baslik: "", durum: "planlandi", not: "" }, o) }; };
+  var eIc = function (k, o) {
+    return { tur: "icerik", id: eid(k), veri: Object.assign({ musteriId: eid("mb"), tur: "reels", durum: "kurguda", oncelik: "normal", cekimId: null, teslimTarihi: null, planTarihi: null, yayinTarihi: null,
+      revizyonNotu: "", dosyalar: { ham: "", proje: "", final: "" }, not: "", gecmis: [], arsiv: false }, o) };
+  };
+  var gun15 = function (o) { return Object.assign({ basTarih: "2099-12-15", bitTarih: "2099-12-15" }, o); };
+  var es = await oturumAc({ viewport: { width: 1440, height: 900 } });
+  var es1 = await kApi({ islem: "toplu", kayitlar: [eMus("ma", UZUN_AD), eMus("mb", "Erişim Butik"), eMus("mc", "Erişim Klinik"), eMus("md", "Erişim Arşiv Müşterisi", { arsiv: true })] }, es.p);
+  var es2 = await kApi({ islem: "toplu", kayitlar: [
+    eEtk("x1", gun15({ baslik: "Erişim çekimi 1", basSaat: "10:00", bitSaat: "12:00" })),
+    eEtk("x2", gun15({ musteriId: eid("mb"), baslik: "Erişim çekimi 2", basSaat: "10:30", bitSaat: "11:30" })),
+    eEtk("x3", gun15({ musteriId: eid("mc"), baslik: "Erişim çekimi 3", basSaat: "11:00", bitSaat: "12:30" })),
+    eEtk("xtas", gun15({ musteriId: eid("mb"), baslik: "Erişim taşınan çekim", basSaat: "17:00", bitSaat: "18:00" })),
+    eEtk("xars", { musteriId: eid("md"), baslik: "Arşiv müşterisinin çekimi", basTarih: "2099-12-16", basSaat: "10:00", bitTarih: "2099-12-16", bitSaat: "11:00" }),
+    eEtk("xarsk", { musteriId: eid("mb"), baslik: "Arşivlenmiş çekim", basTarih: "2099-12-16", basSaat: "13:00", bitTarih: "2099-12-16", bitSaat: "14:00", arsiv: true }),
+    eEtk("xgec", { musteriId: eid("mc"), baslik: "Uzak geçmiş çekimi", basTarih: "1990-03-06", basSaat: "10:00", bitTarih: "1990-03-06", bitSaat: "11:00" }),
+    eEtk("xgel", { musteriId: eid("mc"), baslik: "Uzak gelecek çekimi", basTarih: "2150-06-10", basSaat: "22:00", bitTarih: "2150-06-11", bitSaat: "02:00" }),
+    eEtk("xcok", { musteriId: eid("mc"), baslik: "Üç günlük çekim", basTarih: "2099-12-22", basSaat: "10:00", bitTarih: "2099-12-24", bitSaat: "12:00" }),
+    eBlok("bk1", gun15({ musteriId: eid("mb"), basSaat: "15:00", bitSaat: "15:30", baslik: "Kısa blok B" })),
+    eBlok("bk2", gun15({ musteriId: eid("mc"), basSaat: "15:00", bitSaat: "15:30", baslik: "Kısa blok C" }))] }, es.p);
+  var es3 = await kApi({ islem: "toplu", kayitlar: [
+    eIc("igec", { baslik: "Gecikmiş reels", teslimTarihi: "2099-10-19" }),
+    eIc("iars", { musteriId: eid("md"), baslik: "Arşiv müşteri reels", teslimTarihi: "2099-12-17" })] }, es.p);
+  ok("erisim testi verisi kuruldu", es1.ok && es2.ok && es3.ok, JSON.stringify([es1, es2, es3]).slice(0, 400));
+  var ekart = function (k) { return ".tk-kart[data-id='" + eid(k) + "']"; };
+
+  // Kolondaki kartlar: kolon icinde, birbiriyle ust uste binmez; musteri adi gorunur (en az 28 px, bos degil)
+  async function kolonDenetle(p, gun) {
+    return p.evaluate(function (gun) {
+      var kol = document.querySelector(".tk-kolon[data-gun='" + gun + "']"), kr = kol.getBoundingClientRect(), sorun = [];
+      // gizli kart: dar kolonda sigmayan serit ("+N" listesinde); gorunenler denetlenir
+      var kartlar = [].slice.call(kol.querySelectorAll(".tk-kart, .tk-fazla")).filter(function (e) { return !e.hidden; }).map(function (e) { return { e: e, r: e.getBoundingClientRect() }; });
+      kartlar.forEach(function (a, i) {
+        if (a.r.left < kr.left - 1 || a.r.right > kr.right + 1) sorun.push("kolon disi " + a.e.getAttribute("data-id"));
+        kartlar.slice(i + 1).forEach(function (b) {
+          var x = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), y = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+          if (x > 1 && y > 1) sorun.push("cakisan kutu " + a.e.getAttribute("data-id") + "/" + b.e.getAttribute("data-id"));
+        });
+        var m = a.e.querySelector(".mus");
+        if (m && (getComputedStyle(m).display === "none" || m.getBoundingClientRect().width < 28 || m.getBoundingClientRect().height < 8 || !m.textContent.trim())) sorun.push("ad gorunmuyor " + a.e.getAttribute("data-id") + " " + Math.round(m.getBoundingClientRect().width));
+      });
+      return { sorun: sorun, kartlar: kartlar.filter(function (a) { return a.e.classList.contains("tk-kart"); }).map(function (a) { return a.e.getAttribute("data-id"); }),
+        fazla: [].map.call(kol.querySelectorAll(".tk-fazla"), function (e) { return e.getAttribute("aria-label"); }).join(" | ") };
+    }, gun);
+  }
+
+  /* ---- Masaustu 1280 / 1440 / 1920: tasma yok, cakisma seritlerinde musteri adi okunur, sigmayanlar "+N" ---- */
+  for (var mg of [1280, 1440, 1920]) {
+    await es.p.setViewportSize({ width: mg, height: mg === 1920 ? 1080 : 860 });
+    await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-15");
+    await es.p.reload();
+    await es.p.waitForSelector(ekart("xtas"));
+    var md = await kolonDenetle(es.p, "2099-12-15");
+    var ucu = ["x1", "x2", "x3"].map(function (k) { return md.kartlar.indexOf(eid(k)) !== -1 || md.fazla.indexOf(["Erişim Kafe", "Erişim Butik", "Erişim Klinik"][+k.slice(1) - 1]) !== -1; });
+    ok("masaustu " + mg + ": yatay tasma yok; kartlar kolonda, ust uste binmez, musteri adi okunur", (await es.p.evaluate(function () { return document.documentElement.scrollWidth - window.innerWidth; })) <= 1 &&
+      !md.sorun.length, JSON.stringify(md));
+    ok("masaustu " + mg + ": uc cakisan isin her biri ya kart ya da '+N iş daha' icinde", ucu.every(Boolean), JSON.stringify([ucu, md]));
+    if (EKRAN) await es.p.screenshot({ path: path.join(EKRAN, "takvim-masaustu-" + mg + ".png") });
+  }
+  ok("1920'de uc serit sigar ('+N' yok); 1280'de '+N iş daha' dugmesi", md.fazla === "" && md.kartlar.length >= 3, JSON.stringify(md));
+  await es.p.setViewportSize({ width: 1280, height: 860 });
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-15");
+  await es.p.reload();
+  await es.p.waitForSelector(".tk-kolon[data-gun='2099-12-15'] .tk-fazla");
+  var fz = es.p.locator(".tk-kolon[data-gun='2099-12-15'] .tk-fazla").first();
+  ok("'+N iş daha': gorunur metin ve isimleri sayan ekran okuyucu etiketi", /^\+\d iş daha$/.test(await fz.textContent()) &&
+    /iş daha bu saatlerde: .*Erişim/.test(await fz.getAttribute("aria-label")), await fz.getAttribute("aria-label"));
+  await fz.click();
+  await es.p.waitForSelector(".tk-acilir:has-text('Aynı saatlerde')");
+  var fzListe = await es.p.locator(".tk-acilir li").allTextContents();
+  await es.p.locator(".tk-acilir li button").first().click();
+  await es.p.waitForSelector(".tk-acilir .eylem button:has-text('Çekimi tamamla')");
+  ok("'+N' listesi sigmayan isleri sayar; birine basinca ayrintisi acilir", fzListe.length >= 1 && fzListe.every(function (t) { return /Erişim/.test(t); }) &&
+    /Erişim/.test(await es.p.locator(".tk-acilir h3").textContent()), JSON.stringify(fzListe));
+  await es.p.keyboard.press("Escape");
+
+  /* ---- Renk tek isaret degil: cakisma isareti, gecikmis teslim metni, filtre noktalarinin bicimi, tamamlanan cizili ---- */
+  await es.p.setViewportSize({ width: 1440, height: 900 });
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-15");
+  await es.p.waitForSelector(ekart("bk1"));
+  var renk = await es.p.evaluate(function (a) {
+    var k1 = document.querySelector(a[0]), sec = document.querySelectorAll(".tk-secim[aria-label='Gösterilen işler'] button");
+    return { kisaCak: k1.classList.contains("kucuk-kart") && /⚠/.test(k1.textContent) && /çakışma var/.test(k1.getAttribute("aria-label")),
+      buyukCak: /⚠ Çakışma/.test(document.querySelector(a[1]).textContent),
+      nokta: !!sec[0].querySelector("svg.tk-ikon circle") && !!sec[1].querySelector("svg.tk-ikon path") && sec[0].textContent === "Çekim" && sec[1].textContent === "Edit" };
+  }, [ekart("bk1"), ekart("x1")]);
+  ok("cakisma renkten bagimsiz: kisa kartta ⚠ isareti, buyuk kartta '⚠ Çakışma' yazisi; filtrede tur simgesi (kamera / makas) ve yazisi", renk.kisaCak && renk.buyukCak && renk.nokta, JSON.stringify(renk));
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-10-19");
+  await es.p.waitForSelector(".tk-serit.teslim.gecikti");
+  ok("gecikmis teslim renkten bagimsiz: 'Gecikti · Erişim Butik' yazar", /^Gecikti · Erişim Butik/.test(await es.p.locator(".tk-serit.teslim.gecikti").first().textContent()) &&
+    (await es.p.locator(".tk-cek-kart:has-text('Erişim Butik') .gecikti").textContent()).indexOf("(gecikti)") !== -1);
+
+  /* ---- Arsivli musteri ve arsivli kayit: eski takvimdeki gibi (cekim gorunur; icerik / teslim / planlanacaklar gizli) ---- */
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-16");
+  await es.p.waitForSelector(ekart("xars"));
+  ok("arsivli kayit gizli; arsivli musterinin teslim bayragi, cekmece grubu ve musteri secimi yok (cekim eskisi gibi gorunur)",
+    (await es.p.locator(ekart("xarsk")).count()) === 0 && (await es.p.locator(".tk-serit.teslim:has-text('Erişim Arşiv')").count()) === 0 &&
+    (await es.p.locator(".tk-cek-kart:has-text('Erişim Arşiv')").count()) === 0 && (await es.p.locator(".tk-arac select[aria-label='Müşteri'] option:has-text('Erişim Arşiv')").count()) === 0);
+
+  /* ---- Ekran okuyucu etiketleri ---- */
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-15");
+  await es.p.waitForSelector(ekart("x1"));
+  var etiket = await es.p.evaluate(function () {
+    var adsiz = [].filter.call(document.querySelectorAll(".tk button, .tk [role=button], .tk select, .tk input"), function (b) {
+      return b.offsetParent && !((b.getAttribute("aria-label") || "").trim() || (b.textContent || "").trim() || (b.closest("label") && b.closest("label").textContent.trim()));
+    }).map(function (b) { return b.outerHTML.slice(0, 80); });
+    var kartlar = [].map.call(document.querySelectorAll(".tk-kart"), function (k) { return k.getAttribute("aria-label"); });
+    var kol = document.querySelector(".tk-kolon[data-gun='2099-12-15']");
+    return { adsiz: adsiz, kartlar: kartlar, kolon: kol.getAttribute("role") + "|" + kol.getAttribute("aria-label"), kayit: document.querySelector(".tk-kayit").getAttribute("role"),
+      gruplar: [].map.call(document.querySelectorAll(".tk-secim"), function (g) { return g.getAttribute("role") + ":" + g.getAttribute("aria-label"); }).join(",") };
+  });
+  ok("ekran okuyucu: her dugme / girdi adli; kart etiketi tur, musteri, is, gun ve saat icerir; kolon 'Salı 15 Aralık' grubu; kayit durumu role=status",
+    !etiket.adsiz.length && etiket.kartlar.every(function (l) { return /^(Çekim|Edit bloğu|Toplantı|Etkinlik): .+, .+, \S+ \d\d:\d\d–\d\d:\d\d/.test(l); }) &&
+    etiket.kolon === "group|Salı 15 Aralık" && etiket.kayit === "status" && etiket.gruplar === "group:Gösterilen işler,group:Görünüm", JSON.stringify(etiket).slice(0, 600));
+
+  /* ---- Yalniz klavye: Yeni -> musteri sec -> kaydet -> ok ile tasi -> Enter ayrinti -> bloku tamamla -> Esc odak kartta ---- */
+  async function tabla(p, kosul, en) {
+    for (var i = 0; i < (en || 90); i++) { if (await p.evaluate(kosul)) return true; await p.keyboard.press("Tab"); }
+    return p.evaluate(kosul);
+  }
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-15");
+  await es.p.reload();
+  await es.p.waitForSelector(ekart("x1"));
+  var kl = [];
+  kl.push(await tabla(es.p, function () { var a = document.activeElement; return !!a && a.matches(".tk-arac button") && a.textContent.trim() === "Yeni"; }));
+  await es.p.keyboard.press("Enter");
+  await es.p.waitForSelector(".tk-acilir:has-text('Yeni iş')");
+  kl.push(await es.p.evaluate(function () { return !!document.activeElement.closest(".tk-acilir"); }));
+  kl.push(await tabla(es.p, function () { return document.activeElement && document.activeElement.matches(".tk-acilir select[aria-label='Müşteri']"); }, 6));
+  // musteri listede ok tuslariyla secilir (kapali secim kutusunda asagi ok degeri degistirir)
+  for (var kn = 0; kn < 80 && (await es.p.evaluate(function () { return document.activeElement.value; })) !== eid("mb"); kn++) await es.p.keyboard.press("ArrowDown");
+  kl.push(await es.p.evaluate(function (id) { return document.activeElement.value === id; }, eid("mb")));
+  kl.push(await tabla(es.p, function () { return document.activeElement && document.activeElement.matches(".tk-acilir input[aria-label='İş adı']"); }, 4));
+  await es.p.keyboard.type("Klavye edit");
+  kl.push(await tabla(es.p, function () { return document.activeElement && document.activeElement.textContent.trim() === "Kaydet"; }, 8));
+  await es.p.keyboard.press("Enter");
+  await es.p.waitForSelector(".toast:has-text('Edit zamanı ayrıldı: Erişim Butik')");
+  var kb1;
+  for (bn = 0; bn < 50 && !kb1; bn++) { kb1 = (await kApi({ islem: "veri" }, es.p)).veri.bloklar.filter(function (b) { return b.baslik === "Klavye edit"; })[0]; if (!kb1) await bekle(100); }
+  ok("klavye: Tab ile 'Yeni', Enter, musteri oklarla secilir, Kaydet (pazartesi 09:00-10:00 blok)", kl.every(Boolean) && !!kb1 && kb1.musteriId === eid("mb") && kb1.basTarih === "2099-12-14" && kb1.basSaat === "09:00", JSON.stringify([kl, kb1]));
+  var odakKb = function () { return es.p.waitForFunction(function (id) { return document.activeElement && document.activeElement.getAttribute("data-id") === id; }, kb1.id, { timeout: 5000 }).then(function () { return true; }, function () { return false; }); };
+  var kOdak = await odakKb();
+  ok("klavye: yeni kart kaydedilince odak kartta ve odak gorunur (focus-visible)", kOdak && await es.p.evaluate(function () { return document.activeElement.matches(":focus-visible"); }));
+  await es.p.waitForSelector(".tk-kayit.tamam");
+  await es.p.keyboard.press("ArrowDown");
+  var kb2 = await kBekle("bloklar", kb1.id, function (k) { return k.basSaat === "09:15"; }, es.p);
+  await es.p.waitForSelector(".tk-kayit.tamam");
+  await odakKb();
+  await es.p.keyboard.press("Enter");
+  await es.p.waitForSelector(".tk-acilir .eylem button:has-text('Bloğu tamamla')");
+  var tamamOdak = await tabla(es.p, function () { return document.activeElement && document.activeElement.textContent.trim() === "Bloğu tamamla"; }, 15);
+  await es.p.keyboard.press("Enter");
+  var kb3 = await kBekle("bloklar", kb1.id, function (k) { return k.durum === "tamamlandi"; }, es.p);
+  ok("klavye: ok ile 15 dk tasindi, Enter ayrinti, Tab + Enter ile blok tamamlandi", kb2.basSaat === "09:15" && tamamOdak && kb3.durum === "tamamlandi", JSON.stringify([kb2.basSaat, tamamOdak, kb3.durum]));
+  await es.p.waitForSelector(".tk-kayit.tamam");
+  await odakKb();
+  await es.p.keyboard.press("Enter");
+  await es.p.waitForSelector(".tk-acilir[role=dialog]");
+  await es.p.keyboard.press("Escape");
+  ok("klavye: Esc pencereyi kapatir, odak karta doner", (await es.p.locator(".tk-acilir").count()) === 0 && await odakKb());
+
+  /* ---- Saglamlik: bir haftada 300 is (hiz), uzun adlar, cok uzak gecmis / gelecek, cok gunlu is ---- */
+  var yuk = [];
+  for (var yn = 0; yn < 300; yn++) {
+    var yg = "2099-11-0" + (2 + yn % 7), ys = 6 + yn % 15, yd = (yn * 7) % 4 * 15, yo = { musteriId: eid(["ma", "mb", "mc"][yn % 3]), basTarih: yg, bitTarih: yg,
+      basSaat: (ys < 10 ? "0" : "") + ys + ":" + (yd < 10 ? "0" : "") + yd, bitSaat: (ys + 1 < 10 ? "0" : "") + (ys + 1) + ":" + (yd < 10 ? "0" : "") + yd };
+    yuk.push(yn % 2 ? eEtk("y" + yn, Object.assign({ baslik: "Yük çekimi " + yn }, yo)) : eBlok("y" + yn, Object.assign({ baslik: "Yük bloğu " + yn }, yo)));
+  }
+  var yukS = await kApi({ islem: "toplu", kayitlar: yuk }, es.p);
+  ok("300 is tek toplu istekle yazildi", yukS.ok, JSON.stringify(yukS).slice(0, 300));
+  await es.p.goto(URL_ + "#/genel");
+  await es.p.reload();
+  await es.p.waitForSelector(".sayfa h1");
+  var y0 = Date.now();
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-11-04");
+  await es.p.waitForSelector(".tk-kolon[data-gun='2099-11-08'] .tk-kart");
+  var ySure = Date.now() - y0;
+  var yOlcu = await es.p.evaluate(function () { return { kart: document.querySelectorAll(".tk-kart").length, fazla: document.querySelectorAll(".tk-fazla").length, tasma: document.documentElement.scrollWidth - window.innerWidth }; });
+  var yDen = await kolonDenetle(es.p, "2099-11-04");
+  ok("300 is bir haftada: " + ySure + " ms'de cizilir (< 3000), tasma yok, kartlar ust uste binmez ve adlar okunur, sigmayanlar '+N'", yukS.ok && ySure < 3000 && yOlcu.tasma <= 1 && yOlcu.fazla > 0 &&
+    !yDen.sorun.length, JSON.stringify([yukS.ok, ySure, yOlcu, yDen.sorun.slice(0, 5)]));
+  var yKart = es.p.locator(".tk-kolon[data-gun='2099-11-04'] .tk-kart").first(), yId = await yKart.getAttribute("data-id");
+  var yListe = parseInt(yId.slice(1), 10) % 2 ? "etkinlikler" : "bloklar", yOnce = await kKayit(yListe, yId, es.p);
+  await yKart.focus();
+  y0 = Date.now();
+  await es.p.keyboard.press("ArrowRight");
+  var ySonra = await kBekle(yListe, yId, function (k) { return k.basTarih === "2099-11-05"; }, es.p);
+  ySure = Date.now() - y0;
+  ok("300 is varken klavyeyle tasima " + ySure + " ms'de kaydedilir (< 3000)", ySonra.basTarih === "2099-11-05" && ySonra.basSaat === yOnce.basSaat && ySure < 3000, JSON.stringify([yOnce.basTarih, ySonra.basTarih, ySure]));
+  await es.p.goto(URL_ + "#/takvim?g=ay&t=2099-11-04");
+  await es.p.waitForSelector(".tk-hucre[data-gun='2099-11-04'] .daha");
+  ok("300 is: ay gorunumunde gun basina 3 cip ve '+N daha'", (await es.p.locator(".tk-hucre[data-gun='2099-11-04'] .tk-cip").count()) === 3);
+  // uzun ad: kart ve ayrinti tasmaz
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-15");
+  await es.p.waitForSelector(ekart("x1"));
+  await es.p.click(ekart("x1"));
+  await es.p.waitForSelector(".tk-acilir h3");
+  var uzun = await es.p.evaluate(function () { var a = document.querySelector(".tk-acilir"); return { tasma: a.scrollWidth - a.clientWidth, sayfa: document.documentElement.scrollWidth - window.innerWidth, h3: a.querySelector("h3").textContent }; });
+  ok("uzun musteri adi: ayrinti penceresinde tam yazilir, yatay tasma yok", uzun.h3.indexOf(UZUN_AD) !== -1 && uzun.tasma <= 1 && uzun.sayfa <= 1, JSON.stringify(uzun));
+  await es.p.keyboard.press("Escape");
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=1990-03-06");
+  await es.p.waitForSelector(ekart("xgec"));
+  await es.p.focus(ekart("xgec"));
+  await es.p.keyboard.press("ArrowDown");
+  var xg = await kBekle("etkinlikler", eid("xgec"), function (k) { return k.basSaat === "10:15"; }, es.p);
+  ok("cok eski is (1990): gorunur ve klavyeyle tasinir", xg.basTarih === "1990-03-06" && xg.basSaat === "10:15", JSON.stringify(xg));
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2150-06-10");
+  await es.p.waitForSelector(".tk-kolon[data-gun='2150-06-10'] .tk-gece-ipucu");
+  ok("cok ileri is (2150, gece yarisini asar): ipucu '↓ 1 iş · 22:00' ve ertesi gun '↑ 1 iş gece'", (await es.p.locator(".tk-kolon[data-gun='2150-06-10'] .tk-gece-ipucu").textContent()) === "↓ 1 iş · 22:00" &&
+    (await es.p.locator(".tk-kolon[data-gun='2150-06-11'] .tk-gece-ipucu").textContent()) === "↑ 1 iş gece");
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-23");
+  await es.p.waitForSelector(ekart("xcok"));
+  var cok3 = await es.p.evaluate(function (s) { return [].map.call(document.querySelectorAll(s), function (e) { return e.closest(".tk-kolon").getAttribute("data-gun") + " " + e.querySelector(".zaman").textContent; }).join("|"); }, ekart("xcok"));
+  ok("uc gunluk is uc kolonda: ilk gun saatli, ortada 'devam ediyor', son gun '…–12:00'", cok3 === "2099-12-22 10:00–12:00 (24 Aralık)|2099-12-23 devam ediyor|2099-12-24 …–12:00", cok3);
+
+  /* ---- Bozuk / eksik baglantilar: sunucu yanitina eklenen kayitlar sayfayi dusurmez ---- */
+  await es.p.route("**/studio/v1/index.php", async function (rt) {
+    var g = JSON.parse(rt.request().postData() || "{}");
+    if (g.islem !== "veri") return rt.continue();
+    var yan = await rt.fetch(), j = await yan.json();
+    var bos = { surum: 1, arsiv: false, not: "", tamamZaman: null };
+    j.veri.bloklar.push(Object.assign({ id: "kayipblok0000000", musteriId: "yokmusteri000000", icerikIdler: ["yokicerik0000000"], baslik: "", basTarih: "2099-12-17", basSaat: "10:00", bitTarih: "2099-12-17", bitSaat: "11:00", durum: "planlandi" }, bos));
+    j.veri.bloklar.push(Object.assign({ id: "bozuksaat0000000", musteriId: eid("mb"), icerikIdler: [], baslik: "Bozuk saat", basTarih: "2099-12-17", basSaat: "99:99", bitTarih: "2099-12-17", bitSaat: "11:00", durum: "planlandi" }, bos));
+    j.veri.etkinlikler.push(Object.assign({ id: "sahipsiz00000000", musteriId: null, baslik: "Sahipsiz çekim", tur: "cekim", tumGun: false, basTarih: "2099-12-17", basSaat: "13:00", bitTarih: "2099-12-17", bitSaat: "14:00", konum: "", durum: "planlandi" }, bos));
+    j.veri.etkinlikler.push(Object.assign({ id: "terscekim0000000", musteriId: eid("mb"), baslik: "Ters çekim", tur: "cekim", tumGun: false, basTarih: "2099-12-18", basSaat: "13:00", bitTarih: "2099-12-17", bitSaat: "14:00", konum: "", durum: "planlandi" }, bos));
+    j.veri.etkinlikler.push(Object.assign({ id: "bozuktarih000000", musteriId: eid("mb"), baslik: "Bozuk tarih", tur: "cekim", tumGun: false, basTarih: "2099-02-31", basSaat: "13:00", bitTarih: "2099-02-31", bitSaat: "14:00", konum: "", durum: "planlandi" }, bos));
+    j.veri.icerikler.push(Object.assign({ id: "kayipicerik00000", musteriId: "yokmusteri000000", cekimId: "yokcekim00000000", baslik: "Kayıp içerik", tur: "reels", durum: "kurguda", teslimTarihi: "2099-12-17", gecmis: [] }, bos));
+    j.veri.icerikler.push(Object.assign({ id: "kayipcekimli0000", musteriId: eid("mb"), cekimId: "yokcekim00000000", baslik: "Çekimi kayıp içerik", tur: "reels", durum: "cekim_planlandi", teslimTarihi: "2099-12-17", gecmis: [] }, bos));
+    j.veri.ozelgunler.push(Object.assign({ id: "bozukozel0000000", baslik: "Bozuk gün", tarih: "bozuk", tur: "ozel", herYil: true }, bos));
+    return rt.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(j) });
+  });
+  es.hata.length = 0;
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-17");
+  await es.p.reload();
+  await es.p.waitForSelector(".tk-kart[data-id='kayipblok0000000']");
+  var kayip = await es.p.evaluate(function () {
+    var b = document.querySelector(".tk-kart[data-id='kayipblok0000000']");
+    return { mus: b.querySelector(".mus").textContent, is: b.querySelector(".is").textContent, sahipsiz: !!document.querySelector(".tk-kart[data-id='sahipsiz00000000']"),
+      bozuk: !!document.querySelector(".tk-kart[data-id='bozuksaat0000000'], .tk-kart[data-id='terscekim0000000'], .tk-kart[data-id='bozuktarih000000']") };
+  });
+  await es.p.click(".tk-kart[data-id='kayipblok0000000']");
+  await es.p.waitForSelector(".tk-acilir:has-text('Bu bloğa bağlı içerik yok.')");
+  await es.p.keyboard.press("Escape");
+  await es.p.goto(URL_ + "#/takvim?g=ay&t=2099-12-17");
+  await es.p.waitForSelector(".tk-hucre[data-gun='2099-12-17'] .tk-cip");
+  await es.p.goto(URL_ + "#/genel");
+  await es.p.waitForSelector(".sayfa h1");
+  ok("eksik musteri / icerik / cekim baglantisi ve bozuk kayitlar: sayfa hatasi yok; kart 'Müşterisiz · Edit', bozuk zamanli kayit cizilmez",
+    es.hata.length === 0 && kayip.mus === "Müşterisiz" && kayip.is === "Edit" && kayip.sahipsiz && !kayip.bozuk, JSON.stringify([kayip, es.hata]));
+  await es.p.unroute("**/studio/v1/index.php");
+
+  /* ---- Hareket azaltma (masaustu): kart gecisleri ve hedef cubugu kapali ---- */
+  await es.p.goto(URL_ + "#/takvim?g=hafta&t=2099-12-15");
+  await es.p.waitForSelector(ekart("x1"));
+  var hareketVar = await es.p.locator(ekart("x1")).evaluate(function (e) { return getComputedStyle(e).transitionDuration; });
+  await es.p.emulateMedia({ reducedMotion: "reduce" });
+  var hareketYok = await es.p.locator(ekart("x1")).evaluate(function (e) { return getComputedStyle(e).transitionDuration; });
+  ok("hareket azaltma: kart gecisi normalde var, azaltilinca 0s", /0\.35s/.test(hareketVar) && hareketYok === "0s", hareketVar + " / " + hareketYok);
+  await es.p.emulateMedia({ reducedMotion: "no-preference" });
+  ok("erisim / saglamlik masaustu: sayfa hatasi yok", es.hata.length === 0, es.hata.join(" | "));
+  await es.c.close();
+
+  /* ---- Telefon 360 / 430 / 390: tasma ve kirpilma yok, hedefler 44 px, alt sayfa, cekmece, bildirim alt cubugun ustunde ---- */
+  for (var tg of [360, 430, 390]) {
+    var tt = await oturumAc({ viewport: { width: tg, height: 800 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    var tq = tt.p;
+    await tq.goto(URL_ + "#/takvim?t=2099-12-15");
+    await tq.waitForSelector(".tk-tel " + ekart("x1"));
+    var to = await tq.evaluate(function () {
+      var gor = function (b) { return b.offsetParent && getComputedStyle(b).visibility !== "hidden"; };
+      var kucuk = [].filter.call(document.querySelectorAll(".tk-tel-ust button, .tk-tel-alt button, .tk-gece-dugme"), gor).filter(function (b) {
+        var r = b.getBoundingClientRect();
+        return r.height < 44 || (r.width < (b.closest(".tk-hafta-serit") ? 30 : 44));
+      }).map(function (b) { var r = b.getBoundingClientRect(); return (b.getAttribute("aria-label") || b.textContent).slice(0, 20) + " " + Math.round(r.width) + "x" + Math.round(r.height); });
+      return { tasma: document.documentElement.scrollWidth - window.innerWidth, kucuk: kucuk };
+    });
+    var td_ = await kolonDenetle(tq, "2099-12-15");
+    ok("telefon " + tg + ": tasma yok, butun hedefler en az 44 px (hafta seridi en az 30x44)", to.tasma <= 1 && !to.kucuk.length, JSON.stringify(to));
+    ok("telefon " + tg + ": cakisan uc kart yan yana, ust uste binmez, musteri adlari okunur; kisa cakisan kartta ⚠", !td_.sorun.length && ["x1", "x2", "x3"].every(function (k) { return td_.kartlar.indexOf(eid(k)) !== -1; }) &&
+      /⚠/.test(await tq.locator(ekart("bk1")).textContent()), JSON.stringify(td_));
+    if (EKRAN) await tq.screenshot({ path: path.join(EKRAN, "takvim-telefon-" + tg + ".png") });
+    // en uzun gun basligi (telefonda "Pzt 31 Ağustos"; uzun hali ekran okuyucuda) "Bugün" dugmesiyle ayni satirda kirpilmaz
+    await tq.goto(URL_ + "#/takvim?t=2099-08-31");
+    await tq.waitForSelector(".tk-tel-ust h1:has-text('Pazartesi, 31 Ağustos')");
+    var bas_ = await tq.evaluate(function () {
+      var e = document.querySelector(".tk-tel-ust h1"), g = [].filter.call(e.children, function (x) { return getComputedStyle(x).position !== "absolute"; })[0];
+      return { kirpik: e.scrollWidth - e.clientWidth, gorunen: g && g.textContent, bugun: !!document.querySelector(".tk-tel-ust button:not([aria-label])"), kayit: document.querySelector(".tk-tel .tk-kayit").textContent };
+    });
+    ok("telefon " + tg + ": gun basligi kirpilmaz (" + bas_.gorunen + "), kayit durumu ekran okuyucuya yazili", bas_.kirpik <= 0 && bas_.bugun && bas_.gorunen === "Pzt 31 Ağustos" &&
+      /Kaydedildi/.test(bas_.kayit), JSON.stringify(bas_));
+    await tq.goto(URL_ + "#/takvim?t=2099-12-15");
+    await tq.waitForSelector(".tk-tel " + ekart("x1"));
+    await tq.locator(ekart("xtas")).evaluate(function (e) { e.scrollIntoView({ block: "center" }); });
+    await tq.locator(ekart("xtas")).tap();
+    await tq.waitForSelector(".tk-acilir.tk-alt button[aria-label='Süreyi 15 dakika uzat']");
+    var alt = await tq.evaluate(function () {
+      var a = document.querySelector(".tk-acilir.tk-alt"), r = a.getBoundingClientRect();
+      var adim = ["15 dakika önce", "15 dakika sonra", "Önceki gün", "Sonraki gün", "Süreyi 15 dakika kısalt", "Süreyi 15 dakika uzat"].map(function (l) {
+        var b = a.querySelector("button[aria-label='" + l + "']").getBoundingClientRect(); return Math.min(b.width, b.height);
+      });
+      return { sol: r.left, sag: Math.round(r.right), alt: Math.round(r.bottom), ust: r.top, tasma: a.scrollWidth - a.clientWidth, adim: Math.min.apply(null, adim), odak: document.activeElement === a,
+        modal: a.getAttribute("aria-modal"), rol: a.getAttribute("role") };
+    });
+    ok("telefon " + tg + ": ayrinti alt sayfa (tam genislik, altta, kirpilmaz); ±15 / ‹gün› / süre dugmeleri en az 44x44; odak pencerede", alt.sol === 0 && alt.sag === tg && alt.alt === 800 &&
+      alt.ust > 0 && alt.tasma <= 1 && alt.adim >= 44 && alt.odak && alt.modal === "true" && alt.rol === "dialog", JSON.stringify(alt));
+    if (EKRAN) await tq.screenshot({ path: path.join(EKRAN, "takvim-telefon-" + tg + "-alt-sayfa.png") });
+    // alt sayfa modal: Tab ile odak pencereden arkadaki takvime kacmaz
+    var tabDisari = 0;
+    for (var tn = 0; tn < 25; tn++) {
+      await tq.keyboard.press(tn % 5 === 4 ? "Shift+Tab" : "Tab");
+      if (!(await tq.evaluate(function () { return !!document.activeElement.closest(".tk-acilir.tk-alt"); }))) tabDisari++;
+    }
+    ok("telefon " + tg + ": alt sayfada Tab / Shift+Tab odagi pencere icinde tutar", tabDisari === 0, tabDisari);
+    if (tg === 360) {
+      // Hareket azaltma (telefon): tik animasyonu ve kart gecisi yok
+      await tq.locator(".tk-acilir .tk-kapat").tap();
+      await tq.emulateMedia({ reducedMotion: "reduce" });
+      await tq.goto(URL_ + "#/takvim?t=2099-12-15");
+      await tq.waitForSelector(ekart("x2"));
+      await tq.locator(ekart("x2")).evaluate(function (e) { e.scrollIntoView({ block: "center" }); });
+      await tq.locator(ekart("x2")).tap();
+      await tq.locator(".tk-acilir button:has-text('Çekimi tamamla')").tap();
+      await tq.waitForSelector(ekart("x2") + " .tk-tik.cizil", { state: "attached" });
+      var az = await tq.evaluate(function (s) { var t = document.querySelector(s + " .tk-tik.cizil"), k = document.querySelector(s); return getComputedStyle(t).animationName + "," + getComputedStyle(k).transitionDuration; }, ekart("x2"));
+      ok("telefon hareket azaltma: tik animasyonu ve kart gecisi kapali", az === "none,0s", az);
+      await tq.locator(".toast button:has-text('Geri al')").tap();
+      await kBekle("etkinlikler", eid("x2"), function (k) { return k.durum === "planlandi"; }, tq);
+      await tq.emulateMedia({ reducedMotion: "no-preference" });
+    }
+    if (tg === 390) {
+      await tq.locator(".tk-acilir button[aria-label='Süreyi 15 dakika uzat']").tap();
+      var xt = await kBekle("etkinlikler", eid("xtas"), function (k) { return k.bitSaat === "18:15"; }, tq);
+      await tq.waitForSelector(".toast:has-text('Süre değişti')");
+      var tb = await tq.evaluate(function () { var t = document.querySelector(".toast").getBoundingClientRect(), f = document.querySelector(".tk-fab").getBoundingClientRect(), b = document.querySelector(".tk-tel-alt .btn").getBoundingClientRect(); return { toast: t.bottom, fab: f.top, dugme: b.top, sol: t.left, sag: t.right }; });
+      ok("telefon: 'süre +15' kaydedilir (17:00-18:15); bildirim alt cubugun ustunde ve ekranda", xt.basSaat === "17:00" && xt.bitSaat === "18:15" && tb.toast <= Math.min(tb.fab, tb.dugme) && tb.sol >= 0 && tb.sag <= 390, JSON.stringify([xt, tb]));
+      await tq.waitForSelector(".tk-kayit.tamam");
+      await tq.locator(ekart("xtas")).evaluate(function (e) { e.scrollIntoView({ block: "center" }); });
+      await tq.locator(ekart("xtas")).tap();
+      await tq.locator(".tk-acilir button[aria-label='Sonraki gün']").tap();
+      xt = await kBekle("etkinlikler", eid("xtas"), function (k) { return k.basTarih === "2099-12-16"; }, tq);
+      ok("telefon: '›' (sonraki gun) dugmesiyle bir gun ileri", xt.basTarih === "2099-12-16" && xt.basSaat === "17:00" && xt.bitSaat === "18:15", JSON.stringify(xt));
+      await tq.waitForSelector(".tk-kayit.tamam");
+      await tq.locator(".tk-tel-alt button:has-text('Planlanacaklar')").tap();
+      await tq.waitForSelector(".tk-acilir.tk-alt:has-text('Planlanacaklar')");
+      var cek = await tq.evaluate(function () { var r = document.querySelector(".tk-acilir.tk-alt").getBoundingClientRect(); return [r.left, Math.round(r.right), Math.round(r.bottom)].join(); });
+      ok("telefon: Planlanacaklar cekmecesi alt sayfa olarak acilir", cek === "0,390,800", cek);
+      await tq.locator(".tk-acilir .tk-kapat").tap();
+      // Dokunmatik: izgarada dikey kaydirma calisir (touch-action), gun degismez, yeni is penceresi acilmaz; yatay kaydirma gun degistirir
+      await tq.goto(URL_ + "#/takvim?t=2099-12-17");
+      await tq.waitForSelector(".tk-tel-ust h1:has-text('Perşembe, 17 Aralık')");
+      var cdp = await tt.c.newCDPSession(tq);
+      var dokun = async function (x0, y0, x1, y1, ara) {
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: x0, y: y0 }] });
+        for (var s = 1; s <= 8; s++) { await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x0 + (x1 - x0) * s / 8, y: y0 + (y1 - y0) * s / 8 }] }); await bekle(16); }
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        if (ara) await ara();
+      };
+      await tq.evaluate(function () { var t = document.querySelector(".toastlar"); if (t) t.textContent = ""; }); // bildirim dokunma noktasini ortmesin
+      var ky2 = await tq.locator(".tk-kaydirma").boundingBox();
+      var st0 = await tq.locator(".tk-kaydirma").evaluate(function (e) { e.scrollTop = 0; return e.scrollTop; });
+      var sx = ky2.x + ky2.width - 40, sy = ky2.y + Math.min(260, ky2.height - 90);
+      // bos saatten baslayan dokunmatik kaydirma: hemen ardindan ayni noktada gelen birakma "Yeni iş" acmamali (eski dinleyici kalmaz)
+      await dokun(sx, sy, sx, sy - 200, function () {
+        return tq.evaluate(function (a) {
+          var kol = document.querySelector(".tk-kolon");
+          kol.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: a[0], clientY: a[1], pointerType: "touch", isPrimary: true }));
+        }, [sx, sy]);
+      });
+      await bekle(300);
+      var st1 = await tq.locator(".tk-kaydirma").evaluate(function (e) { return e.scrollTop; });
+      ok("telefon: dokunarak dikey kaydirma izgarayi kaydirir; gun degismez, 'Yeni iş' acilmaz", st1 > st0 + 50 && /t=2099-12-17/.test(tq.url()) && (await tq.locator(".tk-acilir").count()) === 0,
+        JSON.stringify([st0, st1, tq.url(), await tq.locator(".tk-acilir").count()]));
+      ky2 = await tq.locator(".tk-kaydirma").boundingBox();
+      await dokun(ky2.x + ky2.width - 30, ky2.y + 150, ky2.x + 40, ky2.y + 160);
+      await tq.waitForSelector(".tk-tel-ust h1:has-text('Cuma, 18 Aralık')", { timeout: 5000 }).catch(function () {});
+      ok("telefon: dokunarak yana kaydirinca sonraki gun", /t=2099-12-18/.test(tq.url()), tq.url());
+    }
+    ok("telefon " + tg + ": sayfa hatasi yok", tt.hata.length === 0, tt.hata.join(" | "));
+    await tt.c.close();
+  }
+
+  /* ---- Saat dilimi: cihaz New York'ta; bugun kolonu, simdi cizgisi ve tamamlanma ani Istanbul'a gore ---- */
+  // 2099-12-15 21:30 UTC = New York'ta 15 Aralık 16:30, Istanbul'da 16 Aralık 00:30
+  var ny = await oturumAc({ viewport: { width: 1440, height: 900 }, timezoneId: "America/New_York" }, "2099-12-15T21:30:00Z");
+  await ny.p.evaluate(function () { localStorage.setItem("suflo-studio.takvimGece", "1"); });
+  await ny.p.goto(URL_ + "#/takvim?g=hafta");
+  await ny.p.reload();
+  await ny.p.waitForSelector(".tk-kolon[data-gun='2099-12-16'] .tk-simdi");
+  var nyS = await ny.p.evaluate(function () {
+    var s = document.querySelector(".tk-simdi");
+    return { kolon: s.closest(".tk-kolon").getAttribute("data-gun"), top: parseFloat(s.style.top), baslik: s.title, bugun: document.querySelector(".tk-gun-bas.bugun b").textContent,
+      etiket: document.querySelector(".tk-gun-bas.bugun").getAttribute("aria-label") };
+  });
+  ok("New York cihazinda: bugun kolonu 16 Aralık (Istanbul), simdi cizgisi 00:30'da", nyS.kolon === "2099-12-16" && Math.abs(nyS.top - 30 * 52 / 60) < 1 && nyS.baslik === "Şimdi 00:30 (Türkiye)" &&
+    nyS.bugun === "16" && /bugün/.test(nyS.etiket), JSON.stringify(nyS));
+  await ny.p.click(ekart("x1"));
+  await ny.p.click(".tk-acilir button:has-text('Çekimi tamamla')");
+  var nyT = await kBekle("etkinlikler", eid("x1"), function (k) { return k.durum === "tamamlandi"; }, ny.p);
+  ok("New York cihazinda tamamlanma ani Istanbul saatiyle yazilir (2099-12-16 00:30)", nyT.tamamZaman === "2099-12-16 00:30", JSON.stringify(nyT));
+  await ny.p.click(".toast button:has-text('Geri al')");
+  await kBekle("etkinlikler", eid("x1"), function (k) { return k.durum === "planlandi"; }, ny.p);
+  await ny.p.goto(URL_ + "#/takvim?g=gun");
+  await ny.p.waitForSelector(".tk-donem:has-text('Çarşamba, 16 Aralık 2099')");
+  ok("New York cihazinda gun gorunumu Istanbul'un bugunu (Çarşamba, 16 Aralık)", (await ny.p.locator(".tk-kolon").count()) === 1 &&
+    (await ny.p.locator(".tk-kolon").getAttribute("data-gun")) === "2099-12-16" && (await ny.p.locator(".tk-kolon .tk-simdi").count()) === 1);
+  ok("saat dilimi testi: sayfa hatasi yok", ny.hata.length === 0, ny.hata.join(" | "));
+  await ny.c.close();
 
   if (EKRAN) {
     var sctx = await tarayici.newContext({ viewport: { width: 1280, height: 860 }, timezoneId: "Europe/Istanbul" });

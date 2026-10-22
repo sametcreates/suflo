@@ -535,6 +535,7 @@
     S.el.sayfa.textContent = "";
     var f = SAYFALAR[r.ad] || SAYFALAR.genel;
     ekle(S.el.sayfa, [f(r)]);
+    if (menuAd === "cekim") tkSeritSigdir(); // kolon genisligi ancak sayfa yerlesince olculur
     var ad = (MENU.filter(function (m) { return m[0] === menuAd; })[0] || [null, r.ad === "ara" ? "Arama" : "Genel Bakış"])[1];
     document.title = ad + " · Suflo Studio";
     window.scrollTo(0, kaydirmaKalsin ? y : (typeof donusY === "number" ? donusY : 0));
@@ -1749,17 +1750,22 @@
     degisim.slice().reverse().forEach(function (d) { if (d.onceki) yerlestir(d.tur, C.kopya(d.onceki)); else tkKaldir(d.tur, d.yeni.id); });
   }
   function tkKayitGoster() {
-    document.querySelectorAll("[data-tk-kayit]").forEach(function (e) {
-      var s = TK.kayit;
-      e.className = "tk-kayit " + s;
-      e.textContent = s === "surer" ? "Kaydediliyor…" : s === "hata" ? "Kaydedilemedi" : "✓ Kaydedildi";
-      e.title = s === "hata" ? "Son değişiklik sunucuya yazılamadı; ekran sunucudaki hale döndü." : "";
-    });
+    document.querySelectorAll("[data-tk-kayit]").forEach(kayitDoldur);
+  }
+  function kayitDoldur(e) {
+    var s = TK.kayit;
+    e.className = "tk-kayit " + s;
+    e.textContent = "";
+    // telefonda yalniz isaret gorunur (yazi ekran okuyucuda kalir); hata yazisi her zaman gorunur
+    ekle(e, [s === "tamam" ? h("span", { "aria-hidden": "true" }, "✓ ") : null, h("span", { class: "ad" }, s === "surer" ? "Kaydediliyor…" : s === "hata" ? "Kaydedilemedi" : "Kaydedildi")]);
+    e.title = s === "hata" ? "Son değişiklik sunucuya yazılamadı; ekran sunucudaki hale döndü." : "";
+    return e;
   }
   /** Klavyeyle tasinan kart yeniden cizimden hemen sonra odagi geri alir (sonraki tus kaybolmasin). */
   function tkOdakla() {
     if (!TK.odakId) return;
     var el = document.querySelector(".tk-kart[data-id='" + TK.odakId + "']"), a = document.activeElement;
+    if (el && el.hidden && el._fazla) el = el._fazla; // kart dar kolonda sigmadiysa odak "+N" dugmesinde
     if (el && (!a || a === document.body || a.closest(".tk"))) { el.focus(); TK.odakId = null; }
   }
   function toastTemizle() { var k = document.querySelector(".toastlar"); if (k) k.textContent = ""; }
@@ -1946,13 +1952,16 @@
   function tkKapat() { document.querySelectorAll(".tk-acilir, .tk-perde").forEach(function (x) { x.remove(); }); }
   function tkAcilir(icerik, olay, baslik) {
     var donus = document.activeElement;
+    if (donus && donus.closest && donus.closest(".tk-acilir")) donus = TK.donus; // pencere icinden acilan pencere: ilk donus noktasi kalir
     tkKapat();
     TK.donus = donus && donus !== document.body ? donus : null;
     var tel = tkMod() === "tel";
-    var p = h("div", { class: "tk-acilir" + (tel ? " tk-alt" : ""), role: "dialog", "aria-label": baslik || "Ayrıntı" },
+    var p = h("div", { class: "tk-acilir" + (tel ? " tk-alt" : ""), role: "dialog", "aria-label": baslik || "Ayrıntı", "aria-modal": tel ? "true" : null, tabindex: tel ? "-1" : null },
       h("button", { class: "btn ince yalin tk-kapat", type: "button", "aria-label": "Kapat", onclick: tkKapat }, ikon("kapat")), icerik);
     if (tel) document.body.appendChild(h("div", { class: "tk-perde", onclick: tkKapat }));
     document.body.appendChild(p);
+    // telefonda klavye acilmasin diye girdiye degil pencerenin kendisine odaklanilir (ekran okuyucu basligi okur)
+    if (tel) p.focus();
     if (!tel) {
       var hedef = olay && olay.currentTarget && olay.currentTarget.getBoundingClientRect ? olay.currentTarget : olay && olay.target && olay.target.getBoundingClientRect ? olay.target : null;
       var r = hedef ? hedef.getBoundingClientRect() : { left: window.innerWidth / 2 - 165, right: window.innerWidth / 2 - 165, top: 120, bottom: 120 };
@@ -1974,6 +1983,15 @@
     return p;
   }
   document.addEventListener("keydown", function (ev) {
+    var alt = document.querySelector(".tk-acilir.tk-alt");
+    if (ev.key === "Tab" && alt && !document.querySelector("dialog[open]")) {
+      // alt sayfa modal: Tab arkadaki takvime gecmez, pencere icinde doner
+      var od = Array.prototype.filter.call(alt.querySelectorAll("button, input, select, textarea, a[href], [tabindex='0']"), function (x) { return !x.disabled && x.offsetParent !== null; });
+      if (!od.length) return;
+      var a = document.activeElement, i = od.indexOf(a);
+      if (!alt.contains(a) || (ev.shiftKey && i <= 0) || (!ev.shiftKey && i === od.length - 1)) { ev.preventDefault(); od[ev.shiftKey ? od.length - 1 : 0].focus(); }
+      return;
+    }
     if (ev.key === "Escape" && document.querySelector(".tk-acilir") && !document.querySelector("dialog[open]")) {
       ev.preventDefault();
       tkKapat();
@@ -1997,6 +2015,7 @@
     var gunler = g === "gun" ? [t] : g === "hafta" ? C.gunListesi(kayan ? t : C.haftaBasi(t), 7) : [].concat.apply([], C.ayIzgarasi(t));
     var filtre = tkFiltre();
     TK.ref = gunler[0];
+    TK.kumeler = [];
     TK.gorunum = { g: g, t: t, kayan: kayan, mf: mf, gunler: gunler, mod: mod, filtre: filtre };
     var ogeler = tkOgeler(mf, filtre);
     var kap = h("div", { class: "tk tk-" + mod });
@@ -2026,6 +2045,7 @@
       }
       if (TK.odakId) {
         var el = kap.querySelector(".tk-kart[data-id='" + TK.odakId + "']");
+        if (el && el.hidden && el._fazla) el = el._fazla;
         if (el && (document.activeElement === document.body || !document.activeElement || document.activeElement.closest(".tk"))) el.focus();
         TK.odakId = null;
       }
@@ -2048,7 +2068,7 @@
     return h("div", { class: "tk-secim", role: "group", "aria-label": "Gösterilen işler" },
       [["cekim", "Çekim"], ["edit", "Edit"], ["birlikte", "Birlikte"]].map(function (x) {
         return h("button", { type: "button", "aria-pressed": String(f === x[0]), onclick: function () { tercih("takvimFiltre", x[0]); yenile(); } },
-          x[0] !== "birlikte" ? h("i", { class: "nokta " + x[0] }) : null, x[1]);
+          x[0] !== "birlikte" ? ikon(x[0] === "cekim" ? "kamera" : "makas", x[0]) : null, x[1]); // tur renk + simge + yazi ile
       }));
   }
   function gorunumSecim() {
@@ -2064,7 +2084,7 @@
       hd ? h("span", { class: "tk-hedef", title: "Haftalık hedef (Ayarlar → takvim ayarları)" }, "· Hafta " + Math.min(ht, hd) + "/" + hd,
         h("span", { class: "tk-cubuk" }, stil(h("i"), { width: Math.min(100, ht / hd * 100) + "%" }))) : null);
   }
-  function kayitRozeti() { return h("span", { class: "tk-kayit", "data-tk-kayit": "", role: "status" }); }
+  function kayitRozeti() { return kayitDoldur(h("span", { class: "tk-kayit", "data-tk-kayit": "", role: "status" })); }
   function musteriFiltresi() {
     var mf = TK.gorunum.mf;
     return h("select", { "aria-label": "Müşteri", value: mf, onchange: function (ev) { tkGit({ musteri: ev.target.value }); } },
@@ -2104,7 +2124,8 @@
   }
   function telUst() {
     var v = TK.gorunum, b = bugun(), hb = C.haftaBasi(v.g === "hafta" ? v.gunler[0] : v.t);
-    var baslik = v.g === "gun" ? tkGunAdi(v.t) + ", " + C.tarihKisa(v.t) : donemMetni();
+    // dar telefonda gun basligi kisa yazilir ("Pzt 31 Ağustos"); uzun hali ekran okuyucuda kalir
+    var baslik = v.g === "gun" ? [h("span", { class: "uzun" }, tkGunAdi(v.t) + ", " + C.tarihKisa(v.t)), h("span", { class: "kisa", "aria-hidden": "true" }, tkGunKisa(v.t) + " " + C.tarihKisa(v.t))] : donemMetni();
     var serit = h("div", { class: "tk-hafta-serit" }, C.gunListesi(hb, 7).map(function (gn) {
       var l = tkOgeler(v.mf, v.filtre).filter(function (o) { return !o.iptal && C.takvimParcalari(o.k, gn, gn).length; });
       return h("button", { type: "button", class: (gn === v.t && v.g === "gun" ? "secili " : "") + (gn === b ? "bugun" : ""), "aria-pressed": String(gn === v.t && v.g === "gun"),
@@ -2137,6 +2158,7 @@
     if (!kay) return;
     var x0 = null, y0 = null;
     kay.addEventListener("pointerdown", function (e) { x0 = e.clientX; y0 = e.clientY; });
+    kay.addEventListener("pointercancel", function () { x0 = null; }); // dikey kaydirmaya donen dokunma
     kay.addEventListener("pointerup", function (e) {
       if (x0 === null) return;
       var dx = e.clientX - x0, dy = e.clientY - y0;
@@ -2183,8 +2205,10 @@
     var bekleyen = t.icerikler.filter(function (i) { return C.TESLIM_BEKLEYEN.indexOf(i.durum) !== -1; });
     var sinif = !bekleyen.length ? " bitti" : f < 0 ? " gecikti" : f <= 2 ? " yakin" : "";
     var ad = t.icerikler.length === 1 ? t.icerikler[0].baslik : C.turOzeti(t.icerikler);
-    return h("button", { class: "tk-serit teslim" + sinif, type: "button", title: "Teslim: " + t.musteri.ad + " — " + ad + (!bekleyen.length ? " (teslim edildi / hazır)" : ""),
-      onclick: function (ev) { ev.stopPropagation(); teslimPenceresi(g, t, ev); } }, ikon("teslim"), h("span", null, "Teslim · " + t.musteri.ad + " " + ad));
+    // durum renkten bagimsiz da okunur: "Gecikti · …", bitti "✓ Teslim · …" (ustu cizili)
+    var onEk = !bekleyen.length ? "✓ Teslim · " : f < 0 ? "Gecikti · " : "Teslim · ";
+    return h("button", { class: "tk-serit teslim" + sinif, type: "button", title: "Teslim: " + t.musteri.ad + " — " + ad + (!bekleyen.length ? " (teslim edildi / hazır)" : f < 0 ? " (gecikti)" : ""),
+      onclick: function (ev) { ev.stopPropagation(); teslimPenceresi(g, t, ev); } }, ikon("teslim"), h("span", null, onEk + t.musteri.ad + " " + ad));
   }
   function teslimPenceresi(g, t, olay) {
     var bek = t.icerikler.filter(function (i) { return C.TESLIM_BEKLEYEN.indexOf(i.durum) !== -1 && i.durum !== "fikir"; });
@@ -2225,7 +2249,7 @@
     var cak = C.takvimCakismalari(S.veri), ilk = gunler[0], son = gunler[gunler.length - 1];
     var kap = h("div", { class: "tk-izgara-kap" });
     if (gunler.length > 1 || mod === "masa") kap.appendChild(stil(h("div", { class: "tk-bas-satir" }, h("div"), gunler.map(function (g) {
-      return h("button", { class: "tk-gun-bas" + (g === b ? " bugun" : ""), type: "button", "aria-label": tkGunAdi(g) + " " + C.tarihKisa(g) + ": gün görünümü",
+      return h("button", { class: "tk-gun-bas" + (g === b ? " bugun" : ""), type: "button", "aria-label": tkGunAdi(g) + " " + C.tarihKisa(g) + (g === b ? ", bugün" : "") + ": gün görünümü",
         onclick: function () { tkGit({ g: "gun", t: g, kayan: "" }); } }, tkGunKisa(g), h("b", null, String(+g.slice(8))));
     })), { gridTemplateColumns: sablon }));
     kap.appendChild(stil(h("div", { class: "tk-tumgun" }, h("div"), gunler.map(function (g) { return h("div", { class: "hucre", "data-gun": g }, tumGunSerit(g, ogeler)); })), { gridTemplateColumns: sablon }));
@@ -2236,6 +2260,7 @@
     for (var m = vBas + 60; m <= vBit; m += 60) saatler.appendChild(stil(h("span", null, m === 1440 ? "24:00" : C.dkSaat(m)), { top: (m - vBas) * pp + "px" }));
     iz.appendChild(saatler);
     TK.kolonlar = [];
+    TK.kumeler = [];
     // parcalar gun basina
     var gunParca = {};
     ogeler.forEach(function (o) {
@@ -2243,7 +2268,7 @@
       C.takvimParcalari(o.k, ilk, son).forEach(function (p) { (gunParca[p.gun] = gunParca[p.gun] || []).push({ o: o, p: p }); });
     });
     gunler.forEach(function (g, gi) {
-      var kol = h("div", { class: "tk-kolon" + (g === b ? " bugun" : ""), "data-gun": g });
+      var kol = h("div", { class: "tk-kolon" + (g === b ? " bugun" : ""), "data-gun": g, role: "group", "aria-label": tkGunAdi(g) + " " + C.tarihKisa(g) + (g === b ? ", bugün" : "") });
       for (var dm = vBas; dm < vBit; dm += 30) kol.appendChild(stil(h("div", { class: "tk-dilim" + (dm % 60 ? " yarim" : "") }), { top: (dm - vBas) * pp + "px" }));
       if (cs.bas > vBas) kol.appendChild(stil(h("div", { class: "tk-disari" }), { top: "0", height: (cs.bas - vBas) * pp + "px" }));
       if (cs.bit < vBit) kol.appendChild(stil(h("div", { class: "tk-disari" }), { top: (cs.bit - vBas) * pp + "px", height: (vBit - cs.bit) * pp + "px" }));
@@ -2251,8 +2276,13 @@
       var gizliUst = pl.filter(function (x) { return x.p.bit <= vBas; }), gizliAlt = pl.filter(function (x) { return x.p.bas >= vBit; });
       var gor = pl.filter(function (x) { return x.p.bit > vBas && x.p.bas < vBit; }).sort(function (a, c) { return a.p.bas - c.p.bas || c.p.bit - a.p.bit; });
       // ust uste binen kartlar yan yana (hicbiri kaydirilmaz)
-      var kume = [], kumeBit = -1;
-      var kapat = function () { var s = kume.reduce(function (mx, x) { return Math.max(mx, x.serit + 1); }, 0); kume.forEach(function (x) { x.toplam = s; }); kume = []; };
+      var kume = [], kumeBit = -1, kumeler = [];
+      var kapat = function () {
+        var s = kume.reduce(function (mx, x) { return Math.max(mx, x.serit + 1); }, 0);
+        kume.forEach(function (x) { x.toplam = s; });
+        if (kume.length) kumeler.push(kume);
+        kume = [];
+      };
       gor.forEach(function (x) {
         if (x.p.bas >= kumeBit) { kapat(); kumeBit = -1; }
         var dolu = kume.filter(function (y) { return y.p.bit > x.p.bas; }).map(function (y) { return y.serit; }), s = 0;
@@ -2262,7 +2292,14 @@
         kumeBit = Math.max(kumeBit, x.p.bit);
       });
       kapat();
-      gor.forEach(function (x) { kol.appendChild(tkKart(x, vBas, vBit, pp, cak)); });
+      gor.forEach(function (x) { x.el = tkKart(x, vBas, vBit, pp, cak); kol.appendChild(x.el); });
+      // seritler sayfa yerlesince kolon genisligine gore sigdirilir (tkSeritSigdir)
+      kumeler.forEach(function (km) {
+        TK.kumeler.push({ kol: kol, toplam: km[0].toplam, uyeler: km.map(function (x) {
+          var ust = Math.max(x.p.bas, vBas);
+          return { el: x.el, o: x.o, serit: x.serit || 0, ust: (ust - vBas) * pp, alt: (ust - vBas) * pp + Math.max(20, (Math.min(x.p.bit, vBit) - ust) * pp - 2) };
+        }) });
+      });
       if (gizliUst.length) kol.appendChild(stil(h("button", { class: "tk-gece-ipucu", type: "button", onclick: function () { geceAc(gizliUst[0].p.bas); } }, "↑ " + gizliUst.length + " iş gece"), { top: "2px" }));
       if (gizliAlt.length) kol.appendChild(stil(h("button", { class: "tk-gece-ipucu", type: "button", onclick: function () { geceAc(gizliAlt[0].p.bas - 60); } }, "↓ " + gizliAlt.length + " iş · " + C.dkSaat(gizliAlt[0].p.bas)), { bottom: "2px" }));
       if (g === simdi.tarih && simdiDk >= vBas && simdiDk <= vBit) kol.appendChild(stil(h("div", { class: "tk-simdi", title: "Şimdi " + simdi.saat + " (Türkiye)", "data-vbas": String(vBas), "data-pp": String(pp) }), { top: (simdiDk - vBas) * pp + "px" }));
@@ -2289,6 +2326,56 @@
     s.style.top = (C.saatDk(su.saat) - +s.getAttribute("data-vbas")) * +s.getAttribute("data-pp") + "px";
     s.title = "Şimdi " + su.saat + " (Türkiye)";
   }, 60000);
+
+  /*
+   * Cakisan isler yan yana seritlere bolunur. Kolon dar oldugunda serit en az TK_SERIT_EN px kalir (musteri adi okunur);
+   * sigmayan seritlerdeki isler gizlenir ve kumenin sagindaki "+N" dugmesi onlari listeler (hicbir is kaydirilmaz).
+   * Kolon genisligi sayfa yerlesince olculur: ciz() sonrasi ve pencere boyutu degisince cagrilir.
+   */
+  var TK_SERIT_EN = 60, TK_FAZLA_GEN = 22;
+  function tkSeritSigdir() {
+    if (TK.suruk) return; // surukleme sirasinda kart gizlenmez (bir sonraki cizimde sigdirilir)
+    var genler = {};
+    (TK.kumeler || []).forEach(function (km) {
+      if (!km.kol.isConnected) return;
+      var W = genler[km.kol.getAttribute("data-gun")] = genler[km.kol.getAttribute("data-gun")] || km.kol.clientWidth, n = km.toplam, V = n, pay = 0;
+      if (!W) return; // olculemedi (gizli sayfa): kartlar esit seritlerde kalir
+      if (km.fazla) { km.fazla.remove(); km.fazla = null; }
+      if (n > 1 && n * TK_SERIT_EN > W) { V = Math.max(1, Math.floor((W - TK_FAZLA_GEN) / TK_SERIT_EN)); pay = TK_FAZLA_GEN; }
+      var gizli = [];
+      km.uyeler.forEach(function (u) {
+        u.el.hidden = u.serit >= V;
+        u.el._fazla = null;
+        if (u.el.hidden) { gizli.push(u); return; }
+        stil(u.el, { left: "calc((100% - " + pay + "px) * " + u.serit / V + " + 3px)", width: "calc((100% - " + pay + "px) / " + V + " - 6px)" });
+        u.el.classList.toggle("dar", (W - pay) / V - 6 < 84);
+      });
+      if (!gizli.length) return;
+      var ust = Math.min.apply(null, gizli.map(function (u) { return u.ust; })), alt = Math.max.apply(null, gizli.map(function (u) { return u.alt; }));
+      var adlar = gizli.map(function (u) { return tkMusteriAd(u.o.k) + " (" + u.o.k.basSaat + ")"; }).join(", ");
+      var b = h("button", { class: "tk-fazla", type: "button", "aria-label": gizli.length + " iş daha bu saatlerde: " + adlar, title: gizli.length + " iş daha: " + adlar,
+        onclick: function (ev) { ev.stopPropagation(); fazlaPenceresi(gizli.map(function (u) { return u.o; }), ev); } }, "+" + gizli.length, h("span", { class: "tk-sr" }, " iş daha"));
+      stil(b, { top: ust + "px", height: Math.max(20, alt - ust) + "px" });
+      km.kol.appendChild(b);
+      km.fazla = b;
+      gizli.forEach(function (u) { u.el._fazla = b; });
+    });
+  }
+  var tkSigdirBekliyor = false;
+  window.addEventListener("resize", function () {
+    if (tkSigdirBekliyor) return;
+    tkSigdirBekliyor = true;
+    requestAnimationFrame(function () { tkSigdirBekliyor = false; tkSeritSigdir(); });
+  });
+  /** "+N" dugmesi: sigmayan isleri listeler; birine basinca ayrintisi acilir. */
+  function fazlaPenceresi(ogeler, olay) {
+    tkAcilir([h("h3", null, "Aynı saatlerde"), h("div", { class: "kucuk soluk" }, "Sütun dar olduğu için bu işler kart olarak sığmadı; hiçbiri kaydırılmadı."),
+      h("ul", null, ogeler.map(function (o) {
+        var k = kayitBul(o.tur, o.k.id) || o.k;
+        return h("li", null, h("button", { class: "satir-ad", type: "button", onclick: function (ev) { ayrintiPenceresi(o, ev); } },
+          ikon(TIP_IKON[o.tip]), TIP_AD[o.tip] + ": " + tkMusteriAd(k) + " · " + tkOgeAd(o) + " · " + tkZamanMetni(k)));
+      }))], olay, "Aynı saatlerde");
+  }
 
   function kartBilgisi(o, cakVar) {
     if (cakVar) return h("div", { class: "bilgi cak" }, "⚠ Çakışma");
@@ -2320,10 +2407,13 @@
       "aria-label": o.tamam ? "Tamamlandı; geri almak için bas" : (o.tur === "blok" ? "Bloğu tamamla" : o.tip === "cekim" ? "Çekimi tamamla" : "Tamamla"),
       title: o.tamam ? "Tamamlandı" : o.tur === "blok" ? "Bu bloğu tamamla (içerik durumu değişmez)" : o.tip === "cekim" ? "Çekimi tamamla (videoların editi ayrı izlenir)" : "Tamamla",
       onpointerdown: function (e) { e.stopPropagation(); }, onclick: function (e) { e.stopPropagation(); tkTamamla(o); } }, tikSvg());
+    // cakisma renkten bagimsiz: buyuk kartta "⚠ Çakışma" satiri, bilgi satiri olmayan kartta ⚠ isareti
+    var cakIsaret = cakVar && (kisa || yuk <= 66) ? h("span", { class: "cak-isaret", "aria-hidden": "true" }, "⚠") : null;
     var el = h("div", { class: "tk-kart " + o.tip + (o.tamam ? " tamam" : "") + (o.iptal ? " iptal" : "") + (kisa ? " kucuk-kart" : ""), tabindex: "0", role: "button", "data-id": k.id,
+      title: TIP_AD[o.tip] + ": " + tkMusteriAd(k) + " · " + tkOgeAd(o) + " · " + tkZamanMetni(k) + (o.tamam ? " · tamamlandı" : o.iptal ? " · iptal" : "") + (cakVar ? " · çakışma var" : ""),
       "aria-label": TIP_AD[o.tip] + ": " + tkMusteriAd(k) + ", " + tkOgeAd(o) + ", " + tkGunAdi(k.basTarih) + " " + tkZamanMetni(k) + (o.tamam ? ", tamamlandı" : o.iptal ? ", iptal" : "") +
         (cakVar ? ", çakışma var" : "") + (tasinir ? ". Ok tuşlarıyla taşı, Shift ile süreyi değiştir, Enter ile ayrıntı." : ". Enter ile ayrıntı.") },
-      h("div", { class: "ust-s" }, ikon(TIP_IKON[o.tip]), h("span", { class: "mus" }, tkMusteriAd(k)), tik),
+      h("div", { class: "ust-s" }, ikon(TIP_IKON[o.tip]), h("span", { class: "mus" }, tkMusteriAd(k)), cakIsaret, tik),
       h("div", { class: "is" }, tkOgeAd(o)),
       !kisa ? h("div", { class: "zaman" }, parcaSaati(o, p)) : null,
       !kisa && yuk > 66 ? kartBilgisi(o, cakVar) : null,
@@ -2440,12 +2530,18 @@
     if (!k) return;
     if (tkMod() === "tel") {
       // telefonda dokunup birakinca (kaydirma degilse) bir saatlik aralik
+      // Dokunma kaydirmaya donerse tarayici pointercancel gonderir, pointerup gelmez: dinleyiciler o zaman da kaldirilir
+      // (yoksa kalan eski dinleyici sonraki bir birakmada yanlislikla "Yeni iş" acar).
       var y0 = e.clientY, x0 = e.clientX, t0 = Date.now();
-      kol.addEventListener("pointerup", function (ev) {
-        if (Math.abs(ev.clientY - y0) + Math.abs(ev.clientX - x0) > 10 || Date.now() - t0 > 800) return;
+      var temizle = function () { kol.removeEventListener("pointerup", birak); kol.removeEventListener("pointercancel", temizle); };
+      var birak = function (ev) {
+        temizle();
+        if (ev.pointerId !== e.pointerId || Math.abs(ev.clientY - y0) + Math.abs(ev.clientX - x0) > 10 || Date.now() - t0 > 800) return;
         var b0 = Math.floor(kolonDk(k, ev.clientY) / 30) * 30;
         hizliOlustur(gun, b0, Math.min(1440, b0 + 60), ev);
-      }, { once: true });
+      };
+      kol.addEventListener("pointerup", birak);
+      kol.addEventListener("pointercancel", temizle);
       return;
     }
     e.preventDefault();
@@ -2480,7 +2576,7 @@
     var z = grupAraligi(g), b = bugun(), ce = g.cekim;
     var el = h("div", { class: "tk-cek-kart", tabindex: "0", role: "group", "aria-label": g.baslik, "data-anahtar": g.anahtar },
       h("b", null, g.baslik),
-      h("div", { class: "meta" }, g.teslim ? h("span", { class: g.teslim < b ? "gecikti" : null }, "Teslim " + tkGunKisa(g.teslim) + " " + C.tarihKisa(g.teslim)) : h("span", null, "Teslim tarihi yok"),
+      h("div", { class: "meta" }, g.teslim ? h("span", { class: g.teslim < b ? "gecikti" : null }, "Teslim " + tkGunKisa(g.teslim) + " " + C.tarihKisa(g.teslim) + (g.teslim < b ? " (gecikti)" : "")) : h("span", null, "Teslim tarihi yok"),
         h("span", null, "~" + C.tahminiSure(g) / 60 + " sa"), g.oncelik === "yuksek" ? h("span", { class: "uyari" }, "Öncelikli") : null),
       ce ? h("div", { class: "meta" }, h("span", null, "Çekim: " + tkGunKisa(ce.basTarih) + " " + C.tarihKisa(ce.basTarih) + (ce.durum === "tamamlandi" ? " (çekildi)" : " (henüz çekilmedi)"))) : null,
       h("div", { class: "alt" }, h("button", { class: "btn ince", type: "button", disabled: !z, title: z ? "Önerilen boş aralık: " + tkGunAdi(z.gun) + " " + z.basSaat : "7 gün içinde çalışma saatlerinde boş yer yok",
@@ -2749,6 +2845,7 @@
         tumGunSerit(g, ogeler),
         l.slice(0, 3).map(function (o) {
           return h("button", { class: "tk-cip " + o.tip + (o.tamam ? " tamam" : "") + (o.iptal ? " iptal" : ""), type: "button", "data-id": o.k.id, title: tkMusteriAd(o.k) + " · " + tkOgeAd(o) + " · " + tkZamanMetni(o.k),
+            "aria-label": TIP_AD[o.tip] + ": " + tkMusteriAd(o.k) + ", " + tkOgeAd(o) + ", " + tkZamanMetni(o.k) + (o.tamam ? ", tamamlandı" : o.iptal ? ", iptal" : ""),
             onclick: function (ev) { ayrintiPenceresi(o, ev); } }, ikon(TIP_IKON[o.tip]), h("span", null, (g === o.k.basTarih ? o.k.basSaat : "…") + " " + tkMusteriAd(o.k)));
         }),
         l.length > 3 ? h("button", { class: "daha", type: "button", onclick: git_ }, "+" + (l.length - 3) + " daha") : null);
